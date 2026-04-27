@@ -1418,14 +1418,20 @@ body.aqua .form-fieldset {
 }
 body.aqua .form-fieldset-title,
 body.aqua legend.form-fieldset-title {
+  /* legend default flota sobre el borde superior del fieldset; al
+     tener panel glass con border-radius eso descuadraba el título
+     fuera del panel. Lo bajamos a bloque normal dentro del fieldset. */
+  display: block;
+  float: none;
+  width: 100%;
   color: var(--ink-1);
   font-family: var(--font-mono);
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: .14em;
   text-transform: uppercase;
-  padding: 0 8px;
-  margin-bottom: 4px;
+  padding: 0;
+  margin: 0 0 14px 0;
 }
 body.aqua .form-label {
   color: var(--ink-2);
