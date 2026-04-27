@@ -49,7 +49,7 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   z-index: -1;
   pointer-events: none;
   opacity: 1;
-  background-image: url("../img/aqua/substation-photo.jpg");
+  background-image: url("../img/aqua/substation-photo.webp");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
