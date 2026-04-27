@@ -34,30 +34,27 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   mask-image: radial-gradient(ellipse 90% 70% at 50% 40%, #000 30%, transparent 85%);
 }
 
-/* Foto de subestación DOMINANTE en el fondo (tal cual, sin overlay).
-   Toda la pantalla disponible para que se aprecie completa. */
+/* Foto de subestación DOMINANTE en el fondo, full-viewport en cualquier
+   tamaño de pantalla. Usa unidades dinámicas (svh/dvh) cuando están
+   disponibles para que las barras del navegador móvil no recorten. */
 .aqua-power-scene {
   position: fixed;
-  inset: 0;                       /* cubre toda la viewport, no solo abajo */
+  inset: 0;
+  top: 0; right: 0; bottom: 0; left: 0;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+  min-width: 100%;
+  min-height: 100%;
   z-index: -1;
   pointer-events: none;
-  opacity: 1;                      /* foto a plena visibilidad */
+  opacity: 1;
   background-image: url("../img/aqua/substation-photo.png");
   background-repeat: no-repeat;
   background-position: center center;
   background-size: cover;
+  background-color: var(--bg-1, #f4f6fb);
   filter: saturate(106%) contrast(102%);
-}
-/* Velo muy ligero solo para asegurar contraste de texto en zonas claras
-   de la foto (cielo) — sin ocultar el fondo, solo unifica el tono. */
-.aqua-power-scene::after {
-  content: "";
-  position: absolute; inset: 0;
-  background: linear-gradient(180deg,
-    rgba(244,249,255,.18) 0%,
-    rgba(244,249,255,.12) 35%,
-    rgba(244,249,255,.22) 100%);
-  pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .aqua-power-scene { opacity: 1; }
