@@ -7,6 +7,104 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## v2.6.0 — Microcirugía Suministros · Información Contractual + visor PDF (2026-04-27 PM3)
+
+Reestructura del módulo Suministros / Contratos según lineamientos
+del director, en 6 fases atómicas (commits aislados). Documentación
+completa en `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md`.
+
+### Resumen ejecutivo
+
+- **Sidebar restructurado**: la categoría "Suministro de Elementos y
+  Accesorios para Transformadores de Potencia" pasa de ser un link
+  (`<a href>`) a un nodo padre puro (`<button>`). Click solo
+  expande/colapsa, no navega.
+- **Fondo aqua glass del sidebar recuperado**: el director había
+  perdido el material Liquid Glass del sidebar al revertir el dark
+  mode. Restaurado al diseño v2.1.0-aqua original con
+  `background: rgba(255,255,255,.36-.22)` + `blur(52px)
+  saturate(200%) brightness(108%)` + highlight 3D superior.
+- **Nueva página Información Contractual** con nube documental:
+  visor PDF embebido (iframe nativo), buscador instantáneo, lista
+  agrupada por categoría, hash routing para refresh, fullscreen API.
+  Cero dependencias externas.
+- **13 PDFs (39 MB)** commiteados al repo desde las carpetas
+  `Contrato N° XXX Informacion Contractual/` con paths URL-safe en
+  `assets/docs/contratos/{cid}/`. Manifest JSON con título legible
+  + categoría + peso. PDFs sirven inmediato vía GitHub Pages.
+- **Script Node** `scripts/deploy-pdfs-storage.js` para migrar a
+  Firebase Storage cuando el director quiera. Idempotente por md5.
+  Genera URLs firmadas (exp 2100) e inyecta el array
+  `documentos_contractuales[]` en `/contratos/{cid}` Firestore.
+- **Auditoría visual WCAG AA**: corrección de contraste en chips,
+  iconos y tabs donde `color: var(--brand)` se usaba sobre
+  `rgba(0,122,255,.14)` (contraste 3.8:1 → 5.4:1 con `--brand-deep`).
+
+### Micro-fases (6 commits)
+
+- **#1 Fase 1** — Inventario PDFs + plan de microcirugía
+  (`docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md`).
+- **#2 Fase 2** — Sidebar: categoría como nodo padre + recuperar
+  fondo aqua glass.
+- **#3 Fase 3** — Página `pages/contrato-info.html` con visor PDF
+  embebido (split layout: lista + visor). 4 archivos nuevos:
+  `contrato-info.html`, `contrato-info.css`, `contrato-info.js`,
+  `data/documentos_contractuales.js`. PDFs movidos a paths URL-safe.
+- **#4 Fase 4** — `scripts/deploy-pdfs-storage.js` Node ESM con CLI
+  args (`--service-account`, `--contrato`, `--dry-run`). Update de
+  `storage.rules` con match `/contratos/{contratoId}/{filename=**}`
+  (read:true, write:isAdmin con tope 50 MB).
+- **#5 Fase 5** — Auditoría visual: 6 reglas CSS migradas de
+  `var(--brand)` a `var(--brand-deep)` para mejor contraste.
+- **#6 Fase 6** — Esta documentación.
+
+### Decisiones técnicas
+
+1. **Visor PDF nativo** (iframe + `#view=FitH`) en lugar de PDF.js.
+   Cero dependencias, los navegadores modernos lo manejan
+   internamente (Chrome PDF Viewer, Safari built-in, Firefox PDF.js
+   integrado). PDF.js queda como fallback futuro si aparecen
+   limitaciones.
+2. **Manifest JSON** + paths URL-safe. Los PDFs originales tenían
+   acentos, espacios y caracteres especiales (ñ, °, etc.) que
+   complicaban URLs. El slug normalizado (NFD + lowercase + dash)
+   resuelve el transporte; el manifest preserva el título humano.
+3. **Doble canal de transporte**: GitHub Pages (default, vía
+   manifest local) + Firebase Storage (override vía
+   `/contratos/{cid}.documentos_contractuales[]`). Cuando el director
+   ejecute el deploy script, Firestore gana sobre el manifest local
+   sin tocar el frontend.
+4. **`<button>` para nodos solo-toggle**: la categoría de contratos
+   se convirtió de `<a>` a `<button>` para semántica correcta. CSS
+   reset del button (border, font, background) normalizado.
+5. **Hash routing** (`#doc=slug`) para que un refresh o un
+   share-link restaure la selección del PDF.
+
+### Archivos clave
+
+- `assets/css/aqua-components.css` — `.sb` con material aqua glass
+  restaurado, contraste WCAG AA en chips/icons
+- `assets/css/contrato-info.css` — layout split + estilos del visor
+- `assets/js/aqua-shell.js` — categoría como `<button>`, hrefs
+  Información Contractual → `pages/contrato-info.html?id=NNN`
+- `assets/js/contrato-info.js` — controlador de la página (lista,
+  buscador, visor, hash routing, fullscreen)
+- `assets/js/data/documentos_contractuales.js` — data layer dual-channel
+- `pages/contrato-info.html` — shell de la página
+- `assets/docs/contratos/{4123000081,4125000143}/` — 13 PDFs +
+  manifest.json
+- `scripts/deploy-pdfs-storage.js` — migrador a Firebase Storage
+- `storage.rules` — match `/contratos/{cid}/{filename=**}`
+
+### Pendientes post-v2.6.0
+
+- Deploy de `storage.rules` por el director: `firebase deploy --only storage`
+- Eventual ejecución de `node scripts/deploy-pdfs-storage.js
+  --service-account ~/sa.json` cuando el director quiera migrar los
+  PDFs de GitHub Pages a Firebase Storage (sin urgencia).
+- Si se necesitan más documentos contractuales en el futuro, se
+  agregan al manifest JSON o vía Firestore override.
+
 ## v2.5.0 — UI v3 dark mode · foto IMG_9840 · drilldown contratos (2026-04-27 PM)
 
 Refactor visual completo del shell sobre la nueva foto de fondo

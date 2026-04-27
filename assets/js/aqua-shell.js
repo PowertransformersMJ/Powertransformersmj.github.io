@@ -174,13 +174,13 @@
           </a>
           <div class="sb-children" data-tree-children="contratos">
             <div class="sb-tree sb-tree-nested" data-tree-key="cat-sum-tx">
-              <a href="${u('pages/contratos.html')}?cat=sum-tx" class="sb-item sb-item-child sb-item-category" data-key="cat-sum-tx" title="Suministro de Elementos y Accesorios para Transformadores de Potencia">
+              <button type="button" class="sb-item sb-item-child sb-item-category sb-item-toggle" data-key="cat-sum-tx" data-tree-toggle-btn="cat-sum-tx" aria-expanded="true" title="Suministro de Elementos y Accesorios para Transformadores de Potencia">
                 <span class="sb-child-bullet" aria-hidden="true"></span>
                 <span class="sb-cat-text">Suministro de Elementos y Accesorios para Transformadores de Potencia</span>
-                <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir categoría" aria-expanded="true" data-tree-toggle-btn="cat-sum-tx">
+                <span class="sb-caret sb-caret-sm" aria-hidden="true">
                   <i data-lucide="chevron-down"></i>
-                </button>
-              </a>
+                </span>
+              </button>
               <div class="sb-children" data-tree-children="cat-sum-tx">
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4123000081">
                   <a href="${u('pages/contrato.html')}?id=4123000081" class="sb-item sb-item-grandchild" data-key="contrato-4123000081">
@@ -195,7 +195,7 @@
                       <span class="sb-child-bullet" aria-hidden="true"></span>
                       <span class="sb-section-text">Control y Gestión Operativa</span>
                     </a>
-                    <a href="${u('pages/contrato.html')}?id=4123000081#tab=info-contractual" class="sb-item sb-item-greatgrandchild" data-key="info-4123000081" data-tab="info-contractual">
+                    <a href="${u('pages/contrato-info.html')}?id=4123000081" class="sb-item sb-item-greatgrandchild" data-key="info-4123000081">
                       <span class="sb-child-bullet" aria-hidden="true"></span>
                       <span class="sb-section-text">Información Contractual</span>
                     </a>
@@ -214,7 +214,7 @@
                       <span class="sb-child-bullet" aria-hidden="true"></span>
                       <span class="sb-section-text">Control y Gestión Operativa</span>
                     </a>
-                    <a href="${u('pages/contrato.html')}?id=4125000143#tab=info-contractual" class="sb-item sb-item-greatgrandchild" data-key="info-4125000143" data-tab="info-contractual">
+                    <a href="${u('pages/contrato-info.html')}?id=4125000143" class="sb-item sb-item-greatgrandchild" data-key="info-4125000143">
                       <span class="sb-child-bullet" aria-hidden="true"></span>
                       <span class="sb-section-text">Información Contractual</span>
                     </a>

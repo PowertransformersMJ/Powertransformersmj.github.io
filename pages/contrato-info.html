@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>SGM · TRANSPOWER — Información Contractual</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/contrato-info.css"/>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">
+      <a href="contratos.html">Contratos</a>
+      / <span id="bcContrato">—</span>
+      / Información Contractual
+    </div>
+    <h1 class="page-title">
+      Información <em>Contractual</em>
+    </h1>
+    <p class="page-subtitle" id="docSubtitle">
+      Cargando documentos del contrato…
+    </p>
+  </div>
+
+  <section class="cloud-shell" aria-label="Nube documental del contrato">
+    <aside class="cloud-sidebar" aria-label="Lista de documentos">
+      <div class="cloud-sidebar-head">
+        <div class="cloud-search">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <input type="search" id="docSearch" placeholder="Buscar documento…" aria-label="Buscar documento"/>
+        </div>
+        <div class="cloud-counter" id="docCounter">—</div>
+      </div>
+      <div class="cloud-list" id="docList">
+        <div class="cloud-empty">⋯ cargando…</div>
+      </div>
+    </aside>
+
+    <article class="cloud-viewer" aria-label="Visor de documento">
+      <header class="viewer-toolbar" id="viewerToolbar" hidden>
+        <div class="viewer-meta">
+          <span class="viewer-cat" id="viewerCat" data-lucide-icon="file-text">
+            <i data-lucide="file-text" aria-hidden="true"></i>
+            <span class="viewer-cat-label" id="viewerCatLabel">—</span>
+          </span>
+          <h2 class="viewer-title" id="viewerTitle">—</h2>
+          <span class="viewer-size" id="viewerSize">—</span>
+        </div>
+        <div class="viewer-actions">
+          <a class="btn btn--ghost btn--icon" id="btnDownload" href="#" download title="Descargar PDF" aria-label="Descargar PDF">
+            <i data-lucide="download" aria-hidden="true"></i>
+          </a>
+          <a class="btn btn--ghost btn--icon" id="btnOpenNewTab" href="#" target="_blank" rel="noopener" title="Abrir en nueva pestaña" aria-label="Abrir en nueva pestaña">
+            <i data-lucide="external-link" aria-hidden="true"></i>
+          </a>
+          <button type="button" class="btn btn--ghost btn--icon" id="btnFullscreen" title="Pantalla completa" aria-label="Pantalla completa">
+            <i data-lucide="maximize" aria-hidden="true"></i>
+          </button>
+        </div>
+      </header>
+      <div class="viewer-frame-wrap" id="viewerFrameWrap">
+        <div class="viewer-empty" id="viewerEmpty">
+          <i data-lucide="file-text" aria-hidden="true"></i>
+          <h3>Selecciona un documento</h3>
+          <p>Elige un PDF de la lista lateral para visualizarlo aquí mismo, sin abrir nuevas pestañas.</p>
+        </div>
+        <iframe
+          id="viewerFrame"
+          class="viewer-frame"
+          title="Visor PDF"
+          aria-label="Visor de documento PDF"
+          referrerpolicy="no-referrer"
+          loading="lazy"
+          hidden></iframe>
+      </div>
+    </article>
+  </section>
+
+</main>
+
+<script type="module" src="../assets/js/contrato-info.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
