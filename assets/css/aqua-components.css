@@ -230,29 +230,26 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   background: rgba(0,40,90,.06); border-radius: var(--r-pill);
 }
 
-/* ─── SIDEBAR (Finder Tahoe vertical · Liquid Glass · más transparente) ── */
+/* ─── SIDEBAR (Finder Tahoe vertical · vidrio prácticamente transparente
+       para que la foto se aprecie a través) ── */
 .sb {
   position: fixed; top: 0; left: 0; bottom: 0; width: 264px;
   padding: 78px 12px 28px;
   overflow-y: auto;
-  background: linear-gradient(180deg, rgba(255,255,255,.18) 0%, rgba(255,255,255,.08) 100%);
-  backdrop-filter: blur(20px) saturate(180%) brightness(106%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%) brightness(106%);
-  border-right: 1px solid rgba(255,255,255,.32);
+  background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.02) 100%);
+  backdrop-filter: blur(8px) saturate(160%);
+  -webkit-backdrop-filter: blur(8px) saturate(160%);
+  border-right: 1px solid rgba(255,255,255,.20);
   box-shadow:
-    inset -1px 0 0 rgba(0,40,90,.06),
-    1px 0 0 rgba(255,255,255,.30),
-    24px 0 60px -12px rgba(0,40,90,.06);
+    1px 0 0 rgba(255,255,255,.18),
+    24px 0 60px -16px rgba(0,40,90,.05);
   z-index: 100;
   isolation: isolate;
 }
-/* Capa de specular interno del sidebar (highlight superior muy sutil, sin
-   re-tintar la foto que pasa por detrás) */
+/* Specular muy sutil — un destello arriba para marcar el borde, nada más */
 .sb::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-  background:
-    radial-gradient(ellipse 100% 25% at 30% -5%, rgba(255,255,255,.22), transparent 65%),
-    linear-gradient(180deg, rgba(255,255,255,.06) 0%, transparent 28%);
+  background: radial-gradient(ellipse 100% 18% at 30% -5%, rgba(255,255,255,.14), transparent 70%);
 }
 .sb > * { position: relative; z-index: 1; }
 
