@@ -1067,14 +1067,16 @@ panel de KPIs.
 | Evolución v2.0 (F16–F37)    | **22/22 microfases ✅ cerradas** |
 | Tags plan (F16 → F37)       | `v2.0.0-f16` · `v2.0.0-f17` · `v2.0.0-f18` · `v2.0.0-f19` · `v2.0.0-f22` · `v2.0.0-f23` · `v2.0.0-f26` · `v2.0.0-f30` · `v2.0.0-f37` · **`v2.0.0`** |
 | Post-plan polish            | **9 ciclos cerrados**: `v2.0.1` · `v2.0.2` · `v2.0.3` · `v2.0.4` · `v2.0.5` · `v2.0.6` · `v2.0.7` · `v2.0.8` (+ refactor `6accdb6`) |
-| Tests                       | **282 / 282 verdes** (81 suites, node --test) |
+| Tests                       | **468 / 468 verdes** (135 suites, node --test) |
 | Lint HTML                   | limpio |
-| Último tag                  | **`v2.1.0-aqua`** (Liquid Glass redesign · light perla iOS 26) |
-| Tag previo                  | `v2.0.8` (refactor DRY persistirAuditoria) |
+| Último tag                  | (sin tag desde `v2.4.1` · trabajo visual continuo en `claude/set-background-image-nhgwM`) |
+| Tag previo                  | `v2.4.1` (deploy contrato 4125000143) |
 | Referencia normativa activa | MO.00418.DE-GAC-AX.01 Ed. 02 (14/10/2025) |
-| Sistema de diseño activo    | **Aqua light perla** · `assets/css/aqua-tokens.css` + `aqua-components.css` + `assets/js/aqua.js` + `aqua-shell.js`. body class="aqua" en todas las páginas. |
-| **Estado al 2026-04-25**    | **PR #54 mergeado a main** (Aqua base) · **PR #55 OPEN** con 4 commits adicionales (foto subestación + transparencia subida + Steel Corporate Navy + .gitignore .claude/). Pendiente: merge de PR #55 desde GitHub.com web. Pendiente: foto hi-res (la actual 755×752 pixela en viewports grandes). Pendiente: revocar PAT. |
-| Próxima movida              | Mergear PR #55 → ajustes finos visuales si los pide el director → conseguir foto hi-res → cerrar branch. Ver [memoria project_aqua_state.md](#) para decisiones cerradas, no re-debatir. |
+| Sistema de diseño activo    | **UI v3 DARK MODE** · `assets/css/aqua-tokens.css` (inks claros + glass navy oscuro) + `aqua-components.css` (sidebar transparente, topbar dark glass, drilldown contratos 4 niveles) + `assets/js/aqua-shell.js` (markActive con hash matching) · body class="aqua" en todas las páginas |
+| Foto de fondo activa        | `assets/img/aqua/substation-photo.jpg` 2560×1920 JPEG q88 1.16 MB · convertida de `IMG_9840.HEIC` |
+| Service Worker              | **kill-switch** (`sw.js` se auto-desregistra) · PWA offline-first temporalmente desactivada |
+| **Estado al 2026-04-27 PM** | 14 PRs mergeados esta sesión (#90–#103) · UI v3 dark mode completo · drilldown contratos en sidebar · CHANGELOG entrada v2.5.0 · `docs/UI-V3-DARKMODE.md` documentación completa. **Pendiente:** datos Información Contractual (cuando el director suba), reactivar PWA, revocar `ghp_kzk3…` PAT. |
+| Próxima movida              | Esperar datos de Información Contractual del director → montar tab `#tab=info-contractual` en `pages/contrato.html` que renderice los datos según `?id=` → cuando estable, reactivar PWA con SW network-first probado. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
@@ -1167,127 +1169,214 @@ integración SCADA, etc.):
 
 ---
 
-## 9. Rediseño Aqua iOS 26 / macOS Tahoe (v2.1.0-aqua · 2026-04-25)
+## 9. Diseño visual UI v3 · DARK MODE (2026-04-27)
 
 > **Esta sección es el handoff entre sesiones de Claude Code.** Si
 > arrancas una sesión nueva, lee primero §0 (permisos push), luego
-> esta §9 antes de tocar cualquier cosa visual.
+> esta §9 antes de tocar cualquier cosa visual. La regla §0.1.2 es
+> obligatoria: verifica primero el estado del repo (`git log
+> origin/main`, `ls assets/css/`) — esta §9 puede estar desactualizada.
 
-### 9.1 Estado al cierre de sesión
+### 9.1 Estado actual
 
 | Concepto | Valor |
 |---|---|
-| Tag | `v2.1.0-aqua` (pusheado) |
-| PR #54 | ✅ MERGEADO a `main` el 2026-04-25 14:21 UTC (12 commits) |
-| PR #55 | 🟡 OPEN · 4 commits adicionales tras el tag |
-| Último commit del branch | `4e24111` (chore gitignore .claude/) |
-| Branch worktree | `claude/distracted-hoover-43da2d` |
-| Sitio en producción | `ajimenezp99-jpg.github.io` (con base Aqua de PR #54) |
+| Modo visual | **DARK MODE** sobre foto nocturna de subestación |
+| Foto de fondo activa | `assets/img/aqua/substation-photo.jpg` · 2560×1920 · JPEG q88 · 1.16 MB |
+| Origen de la foto | `IMG_9840.HEIC` 5712×4284 (subida por el director 2026-04-27) convertida con `pillow-heif` + redimensionada con LANCZOS |
+| Tag | (sin tag nuevo · trabajo continúa sobre `claude/set-background-image-nhgwM`) |
+| PRs mergeados a main esta sesión | #90 #91 #92 #93 #94 #95 #96 #97 #98 #99 #100 #101 #102 #103 |
+| Sitio en producción | `ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/` (project page · NO el dominio raíz) |
+| Service Worker | **kill-switch** · `sw.js` se auto-desregistra y limpia caches al activarse · sin SW corriendo en producción |
 
 ### 9.2 Decisiones del director (NO re-debatir)
 
-1. **Paleta:** Light Perla Apple (Opción C). Descartado dark navy
-   industrial, descartado mesh con magentas/rosas.
-2. **Imagen de fondo:** foto real `assets/img/aqua/substation-photo.png`
-   (subestación con torre + transformador + panels solares + atardecer
-   dorado). **Tal cual sin overlay.** El director ya rechazó dos
-   intentos: (a) SVG ilustrativo de torre+cables+trafo, (b) foto +
-   overlay SVG de equipos por fase. La foto va a plena visibilidad
-   como fondo fixed full-viewport.
+1. **Modo visual:** light mode (Light Perla) **DESCARTADO**. El sistema
+   ahora es dark mode sobre la foto IMG_9840 que el director subió. Inks
+   claros, glass tokens con tint navy oscuro `rgba(8,18,35,X)` en vez
+   de `rgba(255,255,255,X)`.
+2. **Foto de fondo:** la versión activa es **IMG_9840** (subestación
+   Caribe Colombiano de noche con luces puntuales sobre los aisladores
+   y atardecer detrás). NO la foto vieja `substation-photo.png` que
+   tenía padding blanco interno (esa quedó borrada en commit
+   `7ac452f`). NO SVG ilustrativos.
 3. **Layout:** topbar fixed 64px + sidebar vertical permanente 264px
-   a la izquierda (estilo Finder Tahoe). En mobile (≤1024px) sidebar
-   se oculta, topbar se ajusta.
-4. **Glass material:** Tahoe real con blur 32-72px + saturate 200% +
-   brightness 108%, specular en 4 capas, refracción prismática
-   conic-gradient en blend-mode soft-light, ring 3D con borde
-   superior brillante (`rgba(255,255,255,.98)`).
-5. **Texto:** Steel Corporate Navy. Tokens en `aqua-tokens.css`:
-   - `--ink-1: #0d1f38` (títulos / KPIs)
-   - `--ink-2: #1f3656` (cuerpo / items de menú)
-   - `--ink-3: #4d6485` (meta / muted)
-   - `--ink-4: #8093ad` (placeholder / disabled)
-   - Text-shadow blanca sutil en `.page-title`/`.section-title`
-     para legibilidad sobre la foto.
-6. **Transparencia "alta":** glass-thin .22/.10, glass-regular
-   .30/.16, glass-thick .42/.24, topbar .30/.18 (idle) → .50/.36
-   (scrolled), sidebar .36/.22. Foto al 100% visibilidad (no .68 ni
-   .35 como intentos previos).
+   a la izquierda. En mobile (≤1024px) sidebar se oculta, topbar
+   ocupa full-width. **Foto cubre 100vw × 100vh / 100dvh** garantizado
+   por la regla `.aqua-power-scene` en `aqua-components.css:40-58`.
+4. **Sidebar:** completamente transparente (`background: transparent
+   !important; backdrop-filter: none !important`). La foto se ve a
+   través directamente. Texto del sidebar tiene `text-shadow` oscuro
+   `rgba(0,8,20,.65)` para legibilidad sobre cualquier zona de la foto.
+5. **Texto inks** (DARK MODE):
+   - `--ink-1: #f3f7ff` (títulos, KPI · cool white)
+   - `--ink-2: #d6e0ec` (cuerpo, items menú · light steel)
+   - `--ink-3: #a0b3ca` (subtítulos, meta · muted blue-gray)
+   - `--ink-4: #6f7f96` (placeholder · low contrast)
+6. **Glass tokens** (DARK MODE):
+   - `--glass-thin: rgba(8,18,35,.32-.20)`
+   - `--glass-regular: rgba(8,18,35,.42-.28)`
+   - `--glass-thick: rgba(8,18,35,.55-.40)`
+   - `--glass-ultra: rgba(8,18,35,.72-.56)`
+   - blur reducido a 28-54px y brightness reducido a 92-96% (no
+     aclarar de más en composición sobre foto oscura)
+7. **Topbar dark glass:** `rgba(8,18,35,.45-.30)` con border-bottom
+   `rgba(255,255,255,.10)` (highlight superior sutil). Search box
+   también dark translucent.
+8. **Sidebar drilldown de contratos** (5 niveles):
+   ```
+   Contratos ▾
+     Suministro de Elementos y Accesorios para Transformadores de Potencia ▾
+       4123000081 ▾
+         Control y Gestión Operativa  → contrato.html?id=4123000081
+         Información Contractual      → contrato.html?id=4123000081#tab=info-contractual
+       4125000143 ▾
+         (misma estructura espejo)
+   ```
+   Los DOS items "Control y Gestión Operativa" e "Información
+   Contractual" son **links terminales** (no acordeones) — sin
+   chevron, sin subitems en sidebar. Cargan el contenido en el
+   panel derecho. Los 5 tabs (Dashboard, Catálogo, Movimiento,
+   Histórico, Importar) viven SOLO en `pages/contrato.html`, no
+   replicados en sidebar. **Proper case** (no uppercase) — el
+   director lo pidió explícitamente.
 
 ### 9.3 Pendientes que conoce el director
 
-1. **Foto en baja resolución** — la actual es 755×752 px y se
-   pixela en viewports >1200px. El director intentó exportar el
-   original desde Photos pero terminó con el thumbnail otra vez
-   (mismo md5 73d65545…). Camino para conseguir hi-res:
-   - Photos → File → Export → **Export Unmodified Original**, y
-     verificar dimensiones reales en Finder Get Info antes de mover
-     al repo.
-   - O conseguir URL web de origen y descargar directamente.
-2. **Mergear PR #55** desde GitHub.com web (el director prefiere
-   esa vía sobre GitHub Desktop).
-3. **Revocar el PAT** que el director dio inline en el chat de la
-   sesión 2026-04-25 (token clásico con scope `repo`, usado para
-   push de PR #54 y PR #55). Borrar en
-   https://github.com/settings/tokens. El valor literal NO se
-   versiona en el repo (Push Protection bloquea); vive solo en el
-   historial del chat de Claude.
+1. **Información Contractual** — el director va a subir datos al
+   repo. Cuando suba, debo:
+   - Recibir nombre de archivo + formato (JSON / PDF / Excel / etc.)
+   - Recibir lookup-strategy: ¿mismos datos para ambos contratos
+     o diferenciados por `?id=`?
+   - Montar tab `#tab=info-contractual` en `pages/contrato.html`
+     que rendere los datos
+   - Hasta entonces el link existe pero la página no muestra nada
+     distinto al dashboard default
+2. **Tokens revocar** — el director dio dos PATs inline en esta
+   sesión:
+   - `ghp_3Xnq…` (sesión inicial · usado para PRs #90, #91, #92,
+     #93, #94, #95) · ya revocado por el director (push falló
+     después)
+   - `ghp_kzk3…` (segundo · usado para PRs #96 onwards) · pendiente
+     revocar cuando termine el trabajo
+3. **Datos de Suministros del contrato 4125000143** — algunas KPIs
+   muestran 0 porque la importación XLSM dio 0 movimientos
+   registrados. No es bug visual; falta cargar movimientos via
+   `admin/importar-suministros.html`. Tema fuera de scope visual.
 
 ### 9.4 Inventario de archivos del rediseño
 
 | Archivo | Estado | Propósito |
 |---|---|---|
-| `assets/css/aqua-tokens.css` | Activo | Variables: paleta Light Perla + ink Steel Navy + glass tokens + motion + radii iOS + aliases legacy (--space-*, --surface-*, --brand-500, etc.) |
-| `assets/css/aqua-components.css` | Activo | Componentes: glass, topbar, sidebar 264px, hero, stat, panel, alert, qc, modal, tabs, breadcrumb, page-head, hring + overrides legacy |
-| `assets/js/aqua.js` | Activo | Particles, glint cursor, topbar scroll state, IntersectionObserver reveal, Lucide auto-init |
-| `assets/js/aqua-shell.js` | Activo | Auto-inyecta topbar + sidebar + escena en cualquier `<body class="aqua">`. Marca item activo según URL, lee `window.__sgmSession` para role-chip + iniciales + ocultar links admin a no-admins |
-| `assets/img/aqua/substation-photo.png` | Activo (BAJA RES) | Foto real de fondo |
-| `assets/img/aqua/substation-scene.svg` | **Inactivo** | SVG con foto embedded + overlay de equipos (DPS, 89, 52, CT). Rechazado por el director. Queda en repo por compat |
-| `assets/img/aqua/power-scene.svg` | **Inactivo** | SVG ilustrativo torre+cables+trafo. Rechazado por el director |
-| `assets/img/aqua/{transformer,tower,logo-aqua}.svg` | Logo activo | Bundle inicial de Claude Design |
+| `assets/css/aqua-tokens.css` | **Activo · DARK MODE** | Tokens: inks claros, glass navy oscuro, motion, radii iOS, aliases legacy. Versión light-perla histórica preservada en commits `e28faa2^` |
+| `assets/css/aqua-components.css` | **Activo · DARK MODE** | Topbar dark glass, sidebar transparente, page titles con shadow oscuro, sidebar 5-level (greatgrandchild proper-case) |
+| `assets/js/aqua.js` | Activo | Particles, glint cursor, topbar scroll state |
+| `assets/js/aqua-shell.js` | Activo | Auto-inyecta topbar + sidebar + escena. `markActive()` ahora compara hash `#tab=` para desambiguar items con mismo `?id=`. `bindTreeToggle()` respeta `aria-expanded` inicial del caret en vez de forzar todo expandido |
+| `assets/img/aqua/substation-photo.jpg` | **Activo** · foto de fondo | 2560×1920 · 1.16 MB · JPEG q88 progresivo · sin padding blanco · convertida de IMG_9840.HEIC |
+| `assets/img/aqua/substation-photo.png` | **BORRADO** (commit `7ac452f`) | Era la foto vieja recortada (1598×1599) · reemplazada por la JPEG hi-res |
+| `assets/img/aqua/IMG_9840.HEIC` (raíz y assets) | **BORRADO** (commit `7ac452f`) | Origen HEIC procesado · ya solo queda el JPEG resultado |
+| `assets/img/aqua/{substation-scene,power-scene}.svg` | Inactivos | SVGs ilustrativos rechazados sesiones previas. Dejados por compat |
+| `assets/img/aqua/{transformer,tower,logo-aqua}.svg` | Logo + decorativos | Bundle inicial · `logo-aqua.svg` sigue siendo el favicon |
+| `sw.js` | **kill-switch** | Auto-desregistra al activarse + limpia todos los caches. PWA offline-first temporalmente desactivada |
+| `pages/dashboard.html` | Modificada | Removido el `navigator.serviceWorker.register()` para no re-registrar el SW |
 
-### 9.5 Páginas migradas (35)
+### 9.5 Decisiones técnicas resolvidas en esta sesión
 
-- **Login:** `index.html` con `<body class="aqua">`, escena Aqua,
-  auth-card glass-ultra, Firebase Auth 100% intacto.
-- **Home:** `home.html` con shell auto-inject + KPIs realtime.
-- **13 públicas en `/pages/`:** about, alertas, cobertura,
-  contacto, dashboard, documentos, inventario, kpis, mapa,
-  matriz-riesgo, normativa, ordenes, _firebase-test.
-- **22 admin en `/admin/`:** alertas, auditoria, catalogos,
-  contramuestras, contratos, demo-seed, desempeno-aliados,
-  documentos, fallados, importar, index, inventario, kpis, mapa,
-  motor-salud, muestras, ordenes, plan-inversion, propuestas-fur,
-  subestaciones, umbrales-salud, usuarios.
-
-Todas usan `aqua-shell.js` para inyectar topbar + sidebar.
-Lógica de Firestore intacta en todas.
+1. **Cobertura full-viewport del fondo (PR #91)** · La regla
+   `.aqua-power-scene` ahora es invariante: `position: fixed; inset: 0;
+   width: 100vw; height: 100vh; height: 100dvh; min-width: 100%;
+   min-height: 100%; background-size: cover; background-position:
+   center center;`. La unidad `100dvh` corrige el recorte de barras
+   del navegador en iOS/Android.
+2. **Padding blanco en el PNG (PR #98)** · La foto vieja medía
+   3840×2400 px pero solo el 41% era contenido real (subestación);
+   el resto era padding blanco que `background-size: cover` extendía
+   a todo el viewport. Solución: detectar bounding box de pixeles
+   no-blancos con PIL+numpy y recortar al contenido real
+   (1598×1599 px). Después la foto IMG_9840 ya venía sin padding
+   y reemplazó esa versión.
+3. **Service Worker bloqueando deploys (PR #95, #96)** · El SW v3-5-2
+   original (cache-first puro) seguía sirviendo CSS viejo aunque
+   GitHub Pages tuviera el nuevo. Bumpear `CACHE_VERSION` no era
+   suficiente porque Safari decidía cuándo chequear `sw.js`
+   (hasta 24h). Solución de raíz: SW kill-switch que se
+   auto-desregistra. Una vez que cualquier navegador descarga
+   el nuevo `sw.js`, install + activate borran TODOS los caches
+   y llaman `registration.unregister()`. El sitio queda funcionando
+   como un sitio web tradicional (sin cache de SW) y los deploys
+   son visibles en la siguiente recarga.
+4. **HEIC no es soportado por Chrome/Firefox como CSS background**
+   · Solo Safari renderiza HEIC en `background-image: url()`. Para
+   compatibilidad cross-browser, las fotos en HEIC del director
+   deben convertirse a JPEG/WebP antes de usarse como fondo.
+   Pipeline establecido en sesión: `pillow-heif` para abrir HEIC,
+   `Pillow.Image.LANCZOS` para resize, save como JPEG q88
+   progressive optimize=True.
+5. **Active state desambiguación (PR #102)** · Antes la función
+   `markActive()` solo comparaba pathname + `?id=`. Resultado:
+   múltiples items con mismo ID se marcaban activos a la vez. La
+   nueva versión también compara hash `#tab=`: si la URL tiene
+   `#tab=X`, solo el item con ese tab gana; si no hay hash, gana
+   el item raíz (sin tab). También expande la cadena completa
+   de árboles ancestros (no solo el padre inmediato vía
+   `closest()`).
+6. **Sidebar drilldown contratos (PR #102, #103)** · Estructura
+   planeada inicialmente como 5 niveles con leaves replicando
+   los tabs del contrato. El director clarificó: los tabs viven
+   SOLO en el panel derecho — el sidebar termina en
+   "Control y Gestión Operativa" e "Información Contractual"
+   como links terminales. Estructura final: 4 niveles (categoría
+   → número de contrato → sección).
 
 ### 9.6 Cómo hacer un cambio visual en sesión nueva
 
-1. **Identificar tipo:** token (color, espaciado, radius) → editar
-   `aqua-tokens.css`. Componente específico (sidebar, modal) →
-   editar `aqua-components.css`. Lógica de inyección → editar
-   `aqua-shell.js`.
-2. **Verificar:** `npm run lint:html` debe quedar limpio.
-3. **Tests intactos:** `npm test` debe seguir 282/282 verde. NUNCA
-   tocar `assets/js/data/`, `assets/js/domain/`, `firestore.rules`,
-   `firestore.indexes.json`, `storage.rules`, `functions/` para un
-   cambio visual.
+1. **Identificar tipo:**
+   - Token (color, espaciado, glass, ink) → editar `aqua-tokens.css`.
+   - Componente específico (sidebar, modal, topbar) → editar
+     `aqua-components.css`.
+   - Estructura del shell (qué se inyecta, navegación, role-hide)
+     → editar `aqua-shell.js`.
+2. **Modo dark obligatorio:** los inks son claros (`#f3f7ff…`),
+   los glass son `rgba(8,18,35,X)`. NO uses `rgba(255,255,255,X)`
+   para tints — eso era light mode y se reverted.
+3. **Verificar:** `npm run lint:html` debe quedar limpio. `npm test`
+   debe seguir verde. NUNCA tocar `assets/js/data/`, `assets/js/domain/`,
+   `firestore.rules`, `firestore.indexes.json`, `storage.rules`,
+   `functions/` para un cambio visual.
 4. **Push inline con PAT** (CLAUDE.md §0.1) si el director lo
-   provee.
-5. **PR contra `main`**, mergear desde GitHub.com web.
+   provee, sed-redactando el token de cualquier output visible.
+5. **PR contra `main`**, el director mergea desde GitHub.com web
+   (a veces vía GitHub Desktop si hay conflicto local).
 
-### 9.7 Reglas duras de feedback (cumplidas en esta sesión)
+### 9.7 Reglas duras de feedback (refinadas en esta sesión)
 
-- Si el director pide imagen de fondo X, X va a plena visibilidad
-  como fondo fixed (no en una esquina, no a opacity .35).
-- Si dice "tal cual", no agregar overlays ni capas encima.
-- Si pide "más transparencia", subir alpha de glass + topbar +
-  sidebar (no del fondo de la foto).
-- Si pide "color corporativo serio", proponer paleta concreta hex
-  y aplicarla — no pedir más opciones para elegir.
-- Cero emojis en UI ni copy del producto.
-- Si reporta que algo "no se ve" en `ajimenezp99-jpg.github.io`,
-  verificar primero si los commits están en `origin/main` antes
-  de asumir que la implementación está mal.
+- Si el director pide foto X de fondo, **verificar primero si la foto
+  tiene padding blanco interno**: `python3 -c "from PIL import Image;
+  import numpy as np; img = np.array(Image.open(PATH).convert('RGB'));
+  non_white = np.any(img < 245, axis=2); ..."`. Si hay padding,
+  recortar al bounding box antes de usarla — `background-size: cover`
+  estira el padding a todo el viewport.
+- Si la foto es HEIC, **convertir a JPEG/WebP** antes de comprometerla.
+  Chrome/Firefox no la renderizan como background-image.
+- Si el director reporta "todo sigue igual" después de un deploy,
+  verificar via `curl https://ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/assets/css/...`
+  qué CSS está realmente en el servidor. Si el CSS está bien, el
+  problema es cache local del navegador. El kill-switch SW de esta
+  sesión resolvió eso definitivamente.
+- "Tal cual" significa SIN overlays, velos, scrims, oscurecimientos.
+  La foto a plena visibilidad. Cualquier veil que se agregue
+  necesita justificación específica.
+- "Manéjalo proper case" = NO uppercase. El director lo pidió para
+  los items "Control y Gestión Operativa" / "Información Contractual"
+  cuando primer iteré con `text-transform: uppercase`.
+- "Toda la información asociada debe apreciarse a la derecha" =
+  el sidebar es solo navegación. El contenido va en el panel
+  principal (`<main class="app-main">`). NO replicar tabs del
+  contrato en sidebar.
+- Si el sitio no carga: verificar URL real (project page subpath
+  `LordPowerTransformersMJ.github.io/`, NO dominio raíz
+  `ajimenezp99-jpg.github.io/`). El user página `ajimenezp99-jpg.github.io/`
+  retorna 404 — el repo se sirve en project page.
+
+
 
