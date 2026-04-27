@@ -191,10 +191,47 @@
                     </button>
                   </a>
                   <div class="sb-children" data-tree-children="contrato-4123000081">
-                    <a href="${u('pages/contrato.html')}?id=4123000081&tab=info-contractual" class="sb-item sb-item-greatgrandchild" data-key="contrato-4123000081-info">
-                      <span class="sb-child-bullet" aria-hidden="true"></span>
-                      Información Contractual
-                    </a>
+                    <div class="sb-tree sb-tree-nested" data-tree-key="cgo-4123000081">
+                      <a href="${u('pages/contrato.html')}?id=4123000081" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="cgo-4123000081">
+                        <span class="sb-child-bullet" aria-hidden="true"></span>
+                        <span class="sb-section-text">Control y Gestión Operativa</span>
+                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Control y Gestión 4123000081" aria-expanded="true" data-tree-toggle-btn="cgo-4123000081">
+                          <i data-lucide="chevron-down"></i>
+                        </button>
+                      </a>
+                      <div class="sb-children" data-tree-children="cgo-4123000081">
+                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=dashboard" class="sb-item sb-item-leaf" data-key="cgo-4123000081-dashboard" data-tab="dashboard">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Dashboard
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=catalogo" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-catalogo" data-tab="catalogo">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Catálogo
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=movimiento" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-movimiento" data-tab="movimiento">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Movimiento
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=historico" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-historico" data-tab="historico">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Histórico
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=importar" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-importar" data-tab="importar">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Importar
+                        </a>
+                      </div>
+                    </div>
+                    <div class="sb-tree sb-tree-nested" data-tree-key="info-4123000081">
+                      <a href="${u('pages/contrato.html')}?id=4123000081#tab=info-contractual" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="info-4123000081" data-tab="info-contractual">
+                        <span class="sb-child-bullet" aria-hidden="true"></span>
+                        <span class="sb-section-text">Información Contractual</span>
+                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Información Contractual 4123000081" aria-expanded="false" data-tree-toggle-btn="info-4123000081">
+                          <i data-lucide="chevron-down"></i>
+                        </button>
+                      </a>
+                      <div class="sb-children" data-tree-children="info-4123000081">
+                        <span class="sb-item sb-item-leaf sb-leaf-empty" aria-disabled="true">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
+                          <span class="sb-empty-text">Pendiente subir datos</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4125000143">
@@ -206,10 +243,47 @@
                     </button>
                   </a>
                   <div class="sb-children" data-tree-children="contrato-4125000143">
-                    <a href="${u('pages/contrato.html')}?id=4125000143&tab=info-contractual" class="sb-item sb-item-greatgrandchild" data-key="contrato-4125000143-info">
-                      <span class="sb-child-bullet" aria-hidden="true"></span>
-                      Información Contractual
-                    </a>
+                    <div class="sb-tree sb-tree-nested" data-tree-key="cgo-4125000143">
+                      <a href="${u('pages/contrato.html')}?id=4125000143" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="cgo-4125000143">
+                        <span class="sb-child-bullet" aria-hidden="true"></span>
+                        <span class="sb-section-text">Control y Gestión Operativa</span>
+                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Control y Gestión 4125000143" aria-expanded="true" data-tree-toggle-btn="cgo-4125000143">
+                          <i data-lucide="chevron-down"></i>
+                        </button>
+                      </a>
+                      <div class="sb-children" data-tree-children="cgo-4125000143">
+                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=dashboard" class="sb-item sb-item-leaf" data-key="cgo-4125000143-dashboard" data-tab="dashboard">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Dashboard
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=catalogo" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-catalogo" data-tab="catalogo">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Catálogo
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=movimiento" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-movimiento" data-tab="movimiento">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Movimiento
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=historico" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-historico" data-tab="historico">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Histórico
+                        </a>
+                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=importar" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-importar" data-tab="importar">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Importar
+                        </a>
+                      </div>
+                    </div>
+                    <div class="sb-tree sb-tree-nested" data-tree-key="info-4125000143">
+                      <a href="${u('pages/contrato.html')}?id=4125000143#tab=info-contractual" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="info-4125000143" data-tab="info-contractual">
+                        <span class="sb-child-bullet" aria-hidden="true"></span>
+                        <span class="sb-section-text">Información Contractual</span>
+                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Información Contractual 4125000143" aria-expanded="false" data-tree-toggle-btn="info-4125000143">
+                          <i data-lucide="chevron-down"></i>
+                        </button>
+                      </a>
+                      <div class="sb-children" data-tree-children="info-4125000143">
+                        <span class="sb-item sb-item-leaf sb-leaf-empty" aria-disabled="true">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
+                          <span class="sb-empty-text">Pendiente subir datos</span>
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -245,36 +319,69 @@
     const fileNow = (path.split('/').pop() || 'home.html').replace(/\?.*$/, '');
     const folderNow = path.includes('/admin/') ? 'admin' : (path.includes('/pages/') ? 'pages' : '');
     const queryNow = location.search || '';
+    const idNow = new URLSearchParams(queryNow).get('id');
+    const hashNow = location.hash || '';
+    const tabNow = hashNow ? new URLSearchParams(hashNow.replace(/^#/, '')).get('tab') : null;
+
+    // Items candidatos que matchean filename + ?id=
+    const candidates = [];
     document.querySelectorAll('.sb-item').forEach((a) => {
+      const href = a.getAttribute && a.getAttribute('href');
+      if (!href) return;
       try {
-        const href = a.getAttribute('href') || '';
-        const [pathPart, queryPart = ''] = href.split('?');
+        const [pathPart, queryAndHash = ''] = href.split('?');
+        const [queryPart = '', hashPart = ''] = queryAndHash.split('#');
         const last = pathPart.split('/').pop() || '';
         const folder = pathPart.includes('admin/') ? 'admin' : (pathPart.includes('pages/') ? 'pages' : '');
         if (last !== fileNow || folder !== folderNow) return;
-        // Match exacto si el sidebar item tiene ?id=N: comparar query.
-        if (queryPart) {
-          const idLink = new URLSearchParams('?' + queryPart).get('id');
-          const idNow  = new URLSearchParams(queryNow).get('id');
-          if (idLink && idNow && idLink !== idNow) return;
-          if (idLink && !idNow) return;
-        }
-        a.classList.add('is-active');
-        // Si está dentro de un sb-tree, expandirlo automáticamente.
-        const tree = a.closest('.sb-tree');
-        if (tree) tree.classList.add('is-expanded');
+        const idLink = queryPart ? new URLSearchParams('?' + queryPart).get('id') : null;
+        if (idLink && idNow && idLink !== idNow) return;
+        if (idLink && !idNow) return;
+        const tabLink = hashPart ? new URLSearchParams(hashPart).get('tab') : null;
+        candidates.push({ a, idLink, tabLink });
       } catch (_) {}
     });
+
+    // Política de match: si la URL actual tiene #tab=X, solo el item con
+    // tabLink === X gana. Si no hay #tab, gana el item SIN tabLink (el
+    // link "raíz" del contrato / página). Esto evita que múltiples
+    // items con mismo ?id= se marquen activos a la vez.
+    let winner = null;
+    if (tabNow) {
+      winner = candidates.find((c) => c.tabLink === tabNow);
+    } else {
+      winner = candidates.find((c) => !c.tabLink);
+    }
+    // Fallback: si no hubo match exacto, marcar el primero que matchee
+    // por id (compatibilidad con páginas sin tabs).
+    if (!winner && candidates.length === 1) winner = candidates[0];
+
+    if (!winner) return;
+    winner.a.classList.add('is-active');
+    // Expandir TODA la cadena de árboles ancestros para que el item
+    // activo sea visible (5 niveles posibles: contratos → categoría →
+    // número de contrato → sección → leaf).
+    let node = winner.a.parentElement;
+    while (node) {
+      if (node.classList && node.classList.contains('sb-tree')) {
+        node.classList.add('is-expanded');
+        const btn = node.querySelector(':scope > .sb-item .sb-caret, :scope > .sb-children .sb-caret');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
+      node = node.parentElement;
+    }
   }
 
   /* ─── Tree toggle (sidebar expandible) ──────────────────── */
   function bindTreeToggle() {
+    // Estado inicial respeta el aria-expanded del botón caret.
+    // Si no hay caret, default a expandido (compat con árboles legacy
+    // sin botón de toggle).
     document.querySelectorAll('.sb-tree').forEach((tree) => {
-      // Estado inicial: si no tiene .is-expanded por markActive, queda
-      // expandido por default (mostrar contratos disponibles).
-      if (!tree.classList.contains('is-expanded')) {
-        tree.classList.add('is-expanded');
-      }
+      if (tree.classList.contains('is-expanded')) return; // ya expandido por markActive
+      const btn = tree.querySelector(':scope > .sb-item .sb-caret, :scope > [data-tree-toggle-btn]');
+      const defaultExpanded = btn ? btn.getAttribute('aria-expanded') !== 'false' : true;
+      if (defaultExpanded) tree.classList.add('is-expanded');
     });
     document.querySelectorAll('[data-tree-toggle-btn]').forEach((btn) => {
       btn.addEventListener('click', (e) => {
