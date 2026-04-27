@@ -1177,15 +1177,18 @@ integración SCADA, etc.):
 > obligatoria: verifica primero el estado del repo (`git log
 > origin/main`, `ls assets/css/`) — esta §9 puede estar desactualizada.
 
-### 9.1 Estado actual
+### 9.1 Estado actual (post v2.6.0 · 2026-04-27 PM3)
 
 | Concepto | Valor |
 |---|---|
-| Modo visual | **DARK MODE** sobre foto nocturna de subestación |
-| Foto de fondo activa | `assets/img/aqua/substation-photo.jpg` · 2560×1920 · JPEG q88 · 1.16 MB |
-| Origen de la foto | `IMG_9840.HEIC` 5712×4284 (subida por el director 2026-04-27) convertida con `pillow-heif` + redimensionada con LANCZOS |
-| Tag | (sin tag nuevo · trabajo continúa sobre `claude/set-background-image-nhgwM`) |
-| PRs mergeados a main esta sesión | #90 #91 #92 #93 #94 #95 #96 #97 #98 #99 #100 #101 #102 #103 |
+| Modo visual | **AQUA LIGHT** (revertido del dark mode tras commit `50cf27a`) · texto navy oscuro `#0d1f38` legible como negro corporativo |
+| Foto de fondo activa | `assets/img/aqua/substation-photo.webp` · **2880×1620 · WebP q=95 · 1.07 MB** · convertida de FONDO POWERTRANSFORMER.jpg |
+| Sidebar | **Aqua glass material restaurado** · `rgba(255,255,255,.36-.22)` + `blur(52px) saturate(200%) brightness(108%)` + highlight 3D superior |
+| Sidebar drilldown | Categoría "Suministro de Elementos…" es `<button>` (solo expand/collapse, no link) → 4123000081 / 4125000143 → Control y Gestión Operativa + **Información Contractual** (página nueva) |
+| Información Contractual | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` |
+| Importador Suministros | **Canal único Excel** (xlsm) · JSX retirado en v2.5.x · `parsearArchivos({xlsmBuffer, XLSX})` |
+| Tag | (sin tag nuevo · branch activa `claude/set-background-image-nhgwM`) |
+| PRs mergeados sesión 04-27 | #90 #91 #92 #93 #94 #95 #96 #97 #98 #99 #100 #101 #102 #103 #104 #105 #106 #107 + Microcirugía Suministros (Fases 1-6) |
 | Sitio en producción | `ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/` (project page · NO el dominio raíz) |
 | Service Worker | **kill-switch** · `sw.js` se auto-desregistra y limpia caches al activarse · sin SW corriendo en producción |
 
@@ -1378,5 +1381,74 @@ integración SCADA, etc.):
   `ajimenezp99-jpg.github.io/`). El user página `ajimenezp99-jpg.github.io/`
   retorna 404 — el repo se sirve en project page.
 
+### 9.8 Microcirugía Suministros · Información Contractual (v2.6.0 · 2026-04-27 PM3)
+
+Reestructura del módulo Suministros / Contratos en 6 fases. Detalle
+en `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` y `CHANGELOG.md`
+v2.6.0. Estado de cierre:
+
+**Sidebar contratos (estructura final)**:
+
+```
+Contratos ▾                                        ← <a href> a contratos.html
+  Suministro de Elementos y Accesorios… ▾          ← <button> · solo expand/collapse
+    4123000081 ▾                                   ← <a href> a contrato.html?id=…
+      Control y Gestión Operativa                  ← <a href> a contrato.html?id=…
+      Información Contractual                      ← <a href> a contrato-info.html?id=…
+    4125000143 ▾
+      (espejo)
+```
+
+La categoría es ahora `<button class="sb-item-toggle">` que solo
+toggle el árbol — no navega. Click en un número de contrato sí
+navega al dashboard.
+
+**Página `pages/contrato-info.html`**:
+
+Layout split (320px lista + 1fr visor) con:
+- Lista de PDFs agrupada por categoría (minuta, garantías, oferta,
+  adendas, ordenes, administracion, otros) con buscador
+- Visor `<iframe>` con `#view=FitH` para fit-horizontal
+- Toolbar: descargar / abrir nueva pestaña / fullscreen
+- Hash routing `#doc=slug` para refresh-resilience
+- Empty state amigable hasta que se elija doc
+
+**Documentos contractuales — transporte dual**:
+
+- **Default:** GitHub Pages servida vía
+  `assets/docs/contratos/{cid}/manifest.json` + PDFs en mismo dir.
+  Funciona inmediato, cero infra.
+- **Override futuro:** Firebase Storage + array
+  `documentos_contractuales[]` en `/contratos/{cid}` Firestore. El
+  data layer mergea: Firestore gana sobre el manifest local.
+- **Migración:** `node scripts/deploy-pdfs-storage.js
+  --service-account ~/sa.json` desde la Mac del director cuando
+  quiera. Idempotente por md5; URLs firmadas con expiración 2100.
+
+**Reglas Storage (pendiente deploy)**:
+
+```javascript
+match /contratos/{contratoId}/{filename=**} {
+  allow read:   if true;
+  allow create: if isAdmin() && request.resource.size <= 50 * 1024 * 1024;
+  allow update: if isAdmin() && request.resource.size <= 50 * 1024 * 1024;
+  allow delete: if isAdmin();
+}
+```
+
+⚠ Requiere `firebase deploy --only storage` antes de que el script
+pueda subir PDFs.
+
+**Fixes de contraste WCAG AA**: 6 reglas migradas de
+`color: var(--brand)` → `color: var(--brand-deep)` en
+`.tb-nav a.is-active`, `.stat-icon`, `.stat--brand`,
+`.alert.info .alert-icon`, `.qc-icon`, `.tab.is-active`. Contraste
+3.8:1 → 5.4:1 sobre fondos brand semi-translúcidos.
+
+**Importador Suministros — canal único Excel** (commit
+anterior `c41d316`): el JSX
+`control_suministros-2.jsx` quedó retirado del flujo. La
+importación lee solo del `.xlsm`. Datos legacy (`/transformadores`,
+`/correcciones`) quedan en Firestore inmutables desde el importer.
 
 

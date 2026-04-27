@@ -139,13 +139,101 @@ Dos canales con un único API en frontend:
    `scripts/deploy-pdfs-storage.js` para que el director ejecute
    desde su Mac cuando quiera.
 
-## 7. Plan de 6 fases (este documento es Fase 1)
+## 7. Plan de 6 fases — TODAS COMPLETADAS
 
 | Fase | Descripción | Commit |
 |---|---|---|
-| 1 | Inventario + diagnóstico (este reporte) | feat(contratos): inventario PDFs + plan de microcirugía |
-| 2 | Sidebar restructure + recuperar aqua glass | fix(sidebar): nodo padre expandible + fondo aqua glass |
-| 3 | Página contrato-info con visor PDF | feat(contratos): página Información Contractual con visor PDF |
-| 4 | PDFs commiteados + script Firebase | feat(contratos): cargar PDFs + script de deploy a Firebase Storage |
-| 5 | Auditoría visual + fixes contraste | fix(ui): auditoría visual completa · contrastes y visibilidad |
-| 6 | Documentación | docs: documentar microcirugía sesión 2026-04-27 PM3 |
+| 1 | Inventario + diagnóstico (este reporte) | `1d941f1` feat(contratos): Fase 1 · inventario PDFs + plan |
+| 2 | Sidebar restructure + recuperar aqua glass | `3c5d82e` fix(sidebar): Fase 2 · categoría como nodo padre + fondo aqua glass |
+| 3 | Página contrato-info con visor PDF | `ac17522` feat(contratos): Fase 3 · página Información Contractual con visor PDF |
+| 4 | PDFs commiteados + script Firebase | `13875ce` feat(contratos): Fase 4 · script Node para deploy de PDFs |
+| 5 | Auditoría visual + fixes contraste | `60c0d55` fix(ui): Fase 5 · auditoría visual · contraste WCAG AA |
+| 6 | Documentación final | (este commit) docs(microcirugia): Fase 6 · documentación final |
+
+## 8. Resultado final — entregables verificados
+
+### 8.1 Sidebar (verificado en `assets/js/aqua-shell.js` y `aqua-components.css`)
+
+- `<button class="sb-item sb-item-child sb-item-category sb-item-toggle">`
+  para "Suministro de Elementos y Accesorios para Transformadores
+  de Potencia". Ya no es link. Solo toggle.
+- Material aqua glass del sidebar restaurado:
+  `background: linear-gradient(180deg, rgba(255,255,255,.36),
+  rgba(255,255,255,.22))` + `backdrop-filter: blur(52px)
+  saturate(200%) brightness(108%)` + highlight `::before` 3D.
+- Border-right `rgba(255,255,255,.45)` y box-shadow exterior suave.
+
+### 8.2 Página Información Contractual (`pages/contrato-info.html`)
+
+- 4 archivos: HTML (54 líneas), CSS dedicado (350 líneas), JS
+  controlador (170 líneas), data layer (130 líneas).
+- Soporta `?id=4123000081` y `?id=4125000143`.
+- Visor `<iframe src="...pdf#view=FitH">` — render nativo del PDF
+  por el navegador, sin librerías externas.
+- Lista lateral agrupada por 7 categorías: minuta, garantias,
+  oferta, adenda, orden, administracion, otros.
+- Buscador en vivo (filtra título sin tildes, case-insensitive).
+- Botones de acción: descargar, abrir nueva pestaña, fullscreen
+  (Fullscreen API con fallback a clase CSS).
+- Hash routing `#doc=slug` para deeplink y refresh-resilience.
+
+### 8.3 Documentos commiteados (`assets/docs/contratos/`)
+
+- 6 PDFs (15.4 MB) en `4123000081/` + manifest.json
+- 7 PDFs (23.3 MB) en `4125000143/` + manifest.json
+- Total: 13 PDFs · ~39 MB
+- Slugs URL-safe (lowercase, NFD, dash-separated, sin acentos)
+- Manifest con título legible, slug, categoría, peso
+
+### 8.4 Migración Firebase (`scripts/deploy-pdfs-storage.js`)
+
+- Script Node ESM con CLI args
+- Lee manifest local, sube a `gs://sgm-transpower.appspot.com/
+  contratos/{cid}/{slug}.pdf`
+- Idempotente por md5
+- Inyecta URLs firmadas en `/contratos/{cid}.documentos_contractuales[]`
+  Firestore para que el frontend las consuma como override.
+- `storage.rules` actualizado con match `/contratos/{contratoId}/
+  {filename=**}` (read:true, write:isAdmin, max 50 MB).
+
+### 8.5 Auditoría visual
+
+- 6 reglas CSS migradas de `color: var(--brand)` (#007aff) a
+  `color: var(--brand-deep)` (#0051d5) en lugares donde el bg era
+  `rgba(0,122,255,.14)`. Contraste WCAG AA pasó de 3.8:1 a 5.4:1.
+- Reglas afectadas: `.tb-nav a.is-active`, `.stat-icon`,
+  `.stat--brand .stat-icon`, `.alert.info .alert-icon`, `.qc-icon`,
+  `.tab.is-active`.
+
+### 8.6 Tests + lint
+
+- `npm run lint:html` → limpio en todo el plan
+- `npm run test:unit` → 453/453 verde mantenido durante las 6 fases
+  (perdimos 15 tests JSX en commit anterior `c41d316`)
+
+## 9. Próximos pasos para el director
+
+1. **Mergear el branch a `main`** (o pushear vía web). Con eso GitHub
+   Pages despliega y todo queda visible en producción.
+2. **Verificar visualmente** la página Información Contractual:
+   navegar a un contrato → click en submenu → debería ver lista de
+   PDFs y visor embebido. Probar buscador, fullscreen, descargar.
+3. **(Opcional pero recomendado) Deploy de storage rules**:
+   ```
+   firebase deploy --only storage
+   ```
+   Esto habilita las reglas de `/contratos/{cid}/` en Firebase
+   Storage para cuando se quiera migrar.
+4. **(Opcional, futuro) Migración a Firebase Storage**:
+   ```
+   npm install firebase-admin --save-dev
+   node scripts/deploy-pdfs-storage.js --service-account ~/sa.json
+   ```
+   Tras esto, el frontend lee las URLs de Firebase Storage en lugar
+   de GitHub Pages. Los PDFs en `assets/docs/contratos/` quedan
+   como backup; pueden borrarse del repo en un commit separado para
+   liberar 39 MB del histórico.
+5. **Si en algún momento aparece bug visual**: el issue documentado
+   en este plan + el changelog v2.6.0 + el código tiene comentarios
+   suficientes para que cualquier sesión futura entienda el modelo
+   sin re-leer toda la conversación.
