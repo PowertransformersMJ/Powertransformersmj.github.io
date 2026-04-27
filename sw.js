@@ -1,16 +1,3 @@
-<<<<<<< HEAD
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (event) => {
-  event.waitUntil((async () => {
-    try {
-      const keys = await caches.keys();
-      await Promise.all(keys.map((k) => caches.delete(k)));
-    } catch (_) {}
-    try { await self.registration.unregister(); } catch (_) {}
-    try {
-      const clients = await self.clients.matchAll({ type: 'window' });
-      for (const c of clients) { try { c.navigate(c.url); } catch (_) {} }
-=======
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Service Worker (kill-switch · 2026-04-27)
 // ──────────────────────────────────────────────────────────────
@@ -62,7 +49,6 @@ self.addEventListener('activate', (event) => {
       for (const c of clients) {
         try { c.navigate(c.url); } catch (_) {}
       }
->>>>>>> f1b893d94379d0b2897ccb2f23da0337854504fc
     } catch (_) {}
   })());
 });
