@@ -191,47 +191,14 @@
                     </button>
                   </a>
                   <div class="sb-children" data-tree-children="contrato-4123000081">
-                    <div class="sb-tree sb-tree-nested" data-tree-key="cgo-4123000081">
-                      <a href="${u('pages/contrato.html')}?id=4123000081" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="cgo-4123000081">
-                        <span class="sb-child-bullet" aria-hidden="true"></span>
-                        <span class="sb-section-text">Control y Gestión Operativa</span>
-                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Control y Gestión 4123000081" aria-expanded="true" data-tree-toggle-btn="cgo-4123000081">
-                          <i data-lucide="chevron-down"></i>
-                        </button>
-                      </a>
-                      <div class="sb-children" data-tree-children="cgo-4123000081">
-                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=dashboard" class="sb-item sb-item-leaf" data-key="cgo-4123000081-dashboard" data-tab="dashboard">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Dashboard
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=catalogo" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-catalogo" data-tab="catalogo">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Catálogo
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=movimiento" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-movimiento" data-tab="movimiento">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Movimiento
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=historico" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-historico" data-tab="historico">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Histórico
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4123000081#tab=importar" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4123000081-importar" data-tab="importar">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Importar
-                        </a>
-                      </div>
-                    </div>
-                    <div class="sb-tree sb-tree-nested" data-tree-key="info-4123000081">
-                      <a href="${u('pages/contrato.html')}?id=4123000081#tab=info-contractual" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="info-4123000081" data-tab="info-contractual">
-                        <span class="sb-child-bullet" aria-hidden="true"></span>
-                        <span class="sb-section-text">Información Contractual</span>
-                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Información Contractual 4123000081" aria-expanded="false" data-tree-toggle-btn="info-4123000081">
-                          <i data-lucide="chevron-down"></i>
-                        </button>
-                      </a>
-                      <div class="sb-children" data-tree-children="info-4123000081">
-                        <span class="sb-item sb-item-leaf sb-leaf-empty" aria-disabled="true">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
-                          <span class="sb-empty-text">Pendiente subir datos</span>
-                        </span>
-                      </div>
-                    </div>
+                    <a href="${u('pages/contrato.html')}?id=4123000081" class="sb-item sb-item-greatgrandchild" data-key="cgo-4123000081">
+                      <span class="sb-child-bullet" aria-hidden="true"></span>
+                      <span class="sb-section-text">Control y Gestión Operativa</span>
+                    </a>
+                    <a href="${u('pages/contrato.html')}?id=4123000081#tab=info-contractual" class="sb-item sb-item-greatgrandchild" data-key="info-4123000081" data-tab="info-contractual">
+                      <span class="sb-child-bullet" aria-hidden="true"></span>
+                      <span class="sb-section-text">Información Contractual</span>
+                    </a>
                   </div>
                 </div>
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4125000143">
@@ -243,47 +210,14 @@
                     </button>
                   </a>
                   <div class="sb-children" data-tree-children="contrato-4125000143">
-                    <div class="sb-tree sb-tree-nested" data-tree-key="cgo-4125000143">
-                      <a href="${u('pages/contrato.html')}?id=4125000143" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="cgo-4125000143">
-                        <span class="sb-child-bullet" aria-hidden="true"></span>
-                        <span class="sb-section-text">Control y Gestión Operativa</span>
-                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Control y Gestión 4125000143" aria-expanded="true" data-tree-toggle-btn="cgo-4125000143">
-                          <i data-lucide="chevron-down"></i>
-                        </button>
-                      </a>
-                      <div class="sb-children" data-tree-children="cgo-4125000143">
-                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=dashboard" class="sb-item sb-item-leaf" data-key="cgo-4125000143-dashboard" data-tab="dashboard">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Dashboard
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=catalogo" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-catalogo" data-tab="catalogo">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Catálogo
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=movimiento" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-movimiento" data-tab="movimiento">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Movimiento
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=historico" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-historico" data-tab="historico">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Histórico
-                        </a>
-                        <a href="${u('pages/contrato.html')}?id=4125000143#tab=importar" class="sb-item sb-item-leaf sb-admin" data-key="cgo-4125000143-importar" data-tab="importar">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>Importar
-                        </a>
-                      </div>
-                    </div>
-                    <div class="sb-tree sb-tree-nested" data-tree-key="info-4125000143">
-                      <a href="${u('pages/contrato.html')}?id=4125000143#tab=info-contractual" class="sb-item sb-item-greatgrandchild sb-section-head" data-key="info-4125000143" data-tab="info-contractual">
-                        <span class="sb-child-bullet" aria-hidden="true"></span>
-                        <span class="sb-section-text">Información Contractual</span>
-                        <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir Información Contractual 4125000143" aria-expanded="false" data-tree-toggle-btn="info-4125000143">
-                          <i data-lucide="chevron-down"></i>
-                        </button>
-                      </a>
-                      <div class="sb-children" data-tree-children="info-4125000143">
-                        <span class="sb-item sb-item-leaf sb-leaf-empty" aria-disabled="true">
-                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
-                          <span class="sb-empty-text">Pendiente subir datos</span>
-                        </span>
-                      </div>
-                    </div>
+                    <a href="${u('pages/contrato.html')}?id=4125000143" class="sb-item sb-item-greatgrandchild" data-key="cgo-4125000143">
+                      <span class="sb-child-bullet" aria-hidden="true"></span>
+                      <span class="sb-section-text">Control y Gestión Operativa</span>
+                    </a>
+                    <a href="${u('pages/contrato.html')}?id=4125000143#tab=info-contractual" class="sb-item sb-item-greatgrandchild" data-key="info-4125000143" data-tab="info-contractual">
+                      <span class="sb-child-bullet" aria-hidden="true"></span>
+                      <span class="sb-section-text">Información Contractual</span>
+                    </a>
                   </div>
                 </div>
               </div>
