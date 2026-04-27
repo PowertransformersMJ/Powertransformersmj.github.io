@@ -117,7 +117,7 @@
       <div class="aqua-orb aqua-orb--blue" aria-hidden="true"></div>
       <div class="aqua-orb aqua-orb--cyan" aria-hidden="true"></div>
       <div class="aqua-orb aqua-orb--teal" aria-hidden="true"></div>
-      <div class="aqua-power-scene" aria-hidden="true" style="background-image:url(${u('assets/img/aqua/substation-photo.jpg')})"></div>
+      <div class="aqua-power-scene" aria-hidden="true" style="background-image:url(${u('assets/img/aqua/substation-photo.webp')})"></div>
       <div class="aqua-particles" id="aquaParticles" aria-hidden="true"></div>`;
     while (wrap.firstChild) frag.appendChild(wrap.firstChild);
     document.body.insertBefore(frag, document.body.firstChild);
