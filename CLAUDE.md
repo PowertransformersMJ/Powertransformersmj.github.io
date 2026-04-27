@@ -104,6 +104,44 @@ historial.
 El director (Miguel) solicitó explícitamente esta regla (sesión abril 2026)
 después de que un deploy de functions quedó pendiente dos iteraciones.
 
+### 0.1.2 Regla permanente · El entorno del repo manda, no esta CLAUDE.md
+
+**El director explicitó esta regla en la sesión 2026-04-27:** este
+documento describe HISTORIA, no necesariamente el estado actual.
+Después de `v2.1.0-aqua` el codebase siguió evolucionando (PRs #86–#90:
+fix-menu-colors, deploy-contract-dataset, multi-contrato N1–N5,
+module-shells nuevos en `assets/js/ui/`, página `pages/contrato.html`
+con tabs+iframes, `contrato-context.js`) y §9 quedó sin actualizar.
+**No asumas Aqua puro.**
+
+Antes de tocar UI o cualquier cosa visual, **siempre** ejecuta:
+
+```bash
+git fetch origin main
+git log --oneline origin/main -25
+ls assets/css/ assets/js/ui/ assets/js/*-shell.js
+```
+
+y revisa si hay archivos/arquitecturas más recientes. Aqua tokens
+(`aqua-tokens.css` + `aqua-components.css` + `aqua-shell.js`) siguen
+siendo la base, pero **encima** hay capas posteriores
+(`assets/js/ui/module-shell.js`, `tabs.js`, `nav.js`,
+`contrato-context.js`, páginas `pages/contrato.html`,
+`pages/activos.html`, `pages/contratos.html`) que **NO deben revertirse**.
+Si la prod muestra algo distinto a lo descrito en §9, **la prod tiene
+razón** — actualiza §9, no la prod.
+
+Reglas concretas al recibir un ticket de UI:
+1. Mira el screenshot del director y **describe lo que ve**, no lo que
+   §9 dice que debería ver.
+2. Cambio mínimo: edita la regla específica, no rehagas el sistema.
+3. Si necesitas tokens/colores nuevos, pídelos en lugar de inventarlos.
+4. La foto de fondo (`.aqua-power-scene` en `aqua-components.css`) debe
+   cubrir SIEMPRE el viewport completo: `position: fixed; inset: 0;
+   width: 100vw; height: 100vh; height: 100dvh; background-size: cover`.
+   Esto es invariante; cualquier sesión que quiera cambiarlo necesita
+   justificarlo aquí.
+
 ### 0.2 Branch de trabajo
 
 Durante la evolución v2.0 (F16–F37) la rama activa fue
