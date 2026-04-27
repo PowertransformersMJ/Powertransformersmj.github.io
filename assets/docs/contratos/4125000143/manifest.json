@@ -1,0 +1,51 @@
+{
+  "contrato_id": "4125000143",
+  "nombre": "Suministro de Elementos y Accesorios para Transformadores de Potencia",
+  "documentos": [
+    {
+      "titulo": "024 - Adenda No. 01 41102025T1",
+      "archivo": "024-adenda-no-01-41102025t1.pdf",
+      "categoria": "adenda",
+      "peso_bytes": 639398
+    },
+    {
+      "titulo": "024 - Adenda No. 02 41102025T1_",
+      "archivo": "024-adenda-no-02-41102025t1.pdf",
+      "categoria": "adenda",
+      "peso_bytes": 493630
+    },
+    {
+      "titulo": "043- Informe de recomendación y aceptación_ signed 4122025",
+      "archivo": "043-informe-de-recomendacion-y-aceptacion-signed-4122025.pdf",
+      "categoria": "oferta",
+      "peso_bytes": 300963
+    },
+    {
+      "titulo": "044- Comunicación aceptación de oferta 4125000143 (1)",
+      "archivo": "044-comunicacion-aceptacion-de-oferta-4125000143-1.pdf",
+      "categoria": "oferta",
+      "peso_bytes": 651387
+    },
+    {
+      "titulo": "064 - Orden de inicio N° 4125000143",
+      "archivo": "064-orden-de-inicio-n-4125000143.pdf",
+      "categoria": "orden",
+      "peso_bytes": 314163
+    },
+    {
+      "titulo": "48-Garantías y seguros del contrato 4125000143",
+      "archivo": "48-garantias-y-seguros-del-contrato-4125000143.pdf",
+      "categoria": "garantias",
+      "peso_bytes": 11269487
+    },
+    {
+      "titulo": "PEDIDO 5626000011 - BORIS (1)",
+      "archivo": "pedido-5626000011-boris-1.pdf",
+      "categoria": "orden",
+      "peso_bytes": 10723325
+    }
+  ],
+  "total_documentos": 7,
+  "peso_total_bytes": 24392353,
+  "generado_at": "2026-04-27"
+}
