@@ -458,36 +458,91 @@ body.aqua .sb-item.is-active {
   color: var(--brand-hi);
 }
 
-/* Nivel 4: hijos del número de contrato (Información Contractual, etc.) */
+/* Nivel 4: secciones del contrato (Control y Gestión Operativa, Información Contractual) */
 .sb-tree .sb-item-greatgrandchild {
   position: relative;
-  padding: 6px 14px 6px 68px;
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--ink-3);
+  padding: 8px 30px 8px 64px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-2);
   border-radius: var(--r-sm);
-  margin: 1px 0;
+  margin: 4px 0 1px;
   text-decoration: none;
   display: flex;
   align-items: center;
-  gap: 6px;
-  letter-spacing: -.005em;
+  gap: 8px;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
   transition: background .12s ease, color .12s ease;
 }
 .sb-tree .sb-item-greatgrandchild .sb-child-bullet {
   display: inline-block;
   width: 6px; height: 1px;
-  background: rgba(255, 255, 255, .28);
+  background: rgba(255, 255, 255, .30);
   flex-shrink: 0;
 }
+.sb-tree .sb-item-greatgrandchild .sb-section-text {
+  flex: 1;
+  white-space: normal;
+  line-height: 1.25;
+}
 .sb-tree .sb-item-greatgrandchild:hover {
-  background: rgba(120, 170, 255, .10);
+  background: rgba(120, 170, 255, .08);
   color: var(--ink-1);
 }
 .sb-tree .sb-item-greatgrandchild.is-active {
-  background: linear-gradient(180deg, rgba(0,122,255,.22) 0%, rgba(0,122,255,.12) 100%);
+  color: var(--brand-hi);
+}
+
+/* Nivel 5: items terminales (Dashboard, Catálogo, etc. dentro de cada
+   sección, o "Pendiente subir datos" en Información Contractual) */
+.sb-tree .sb-item-leaf {
+  position: relative;
+  padding: 5px 14px 5px 82px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--ink-3);
+  border-radius: var(--r-sm);
+  margin: 0;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: -.005em;
+  transition: background .12s ease, color .12s ease;
+  cursor: pointer;
+}
+.sb-tree .sb-item-leaf .sb-leaf-bullet {
+  display: inline-block;
+  width: 4px; height: 1px;
+  background: rgba(255, 255, 255, .22);
+  flex-shrink: 0;
+}
+.sb-tree .sb-item-leaf:hover {
+  background: rgba(120, 170, 255, .12);
+  color: var(--ink-1);
+}
+.sb-tree .sb-item-leaf.is-active {
+  background: linear-gradient(180deg, rgba(0,122,255,.24) 0%, rgba(0,122,255,.14) 100%);
   color: var(--brand-hi);
   font-weight: 600;
+}
+.sb-tree .sb-item-leaf.is-active .sb-leaf-bullet {
+  background: var(--brand-hi);
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+}
+.sb-tree .sb-item-leaf.sb-leaf-empty {
+  cursor: default;
+  pointer-events: none;
+  color: var(--ink-4);
+  font-style: italic;
+  font-size: 11px;
+}
+.sb-tree .sb-item-leaf.sb-leaf-empty:hover {
+  background: transparent;
+  color: var(--ink-4);
 }
 
 .sb-item .i {
