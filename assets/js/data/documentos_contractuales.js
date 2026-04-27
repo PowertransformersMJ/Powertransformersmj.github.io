@@ -32,14 +32,20 @@ export const CATEGORIAS_DOC = {
   otros:         { label: 'Otros',                icon: 'file-text' }
 };
 
+// Raíz del proyecto resuelta desde import.meta.url. Soporta project
+// pages (ajimenezp99-jpg.github.io/repo/) sin asumir el path. Este
+// archivo vive en assets/js/data/, así que ../../../ apunta al root.
+const BASE_HREF = new URL('../../../', import.meta.url).href;
+
 /**
- * Devuelve la URL pública de un documento. La ruta es relativa al
- * raíz del sitio (project page subpath), así que el caller resuelve
- * con location.origin si necesita absoluta.
+ * Devuelve la URL pública absoluta de un documento (resuelta contra
+ * el root del sitio, NO relativa al path de la página que llama).
+ * Esto es crítico porque pages/contrato-info.html vive un nivel
+ * adentro y una URL relativa simple se rompe.
  */
 export function urlDocumento(cid, slug) {
   if (!cid || !slug) return '';
-  return `assets/docs/contratos/${cid}/${slug}`;
+  return BASE_HREF + `assets/docs/contratos/${cid}/${slug}`;
 }
 
 /**
@@ -48,9 +54,7 @@ export function urlDocumento(cid, slug) {
  */
 async function cargarManifest(cid) {
   try {
-    // baseHref soporta project pages (ajimenezp99-jpg.github.io/repo/)
-    const baseHref = new URL('../../../', import.meta.url).href;
-    const url = baseHref + `assets/docs/contratos/${cid}/manifest.json`;
+    const url = BASE_HREF + `assets/docs/contratos/${cid}/manifest.json`;
     const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) return null;
     const json = await res.json();
