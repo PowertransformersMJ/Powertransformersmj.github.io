@@ -64,28 +64,20 @@
     <div class="breadcrumb">Administración / Importar Suministros</div>
     <h1 class="page-title">Importar <em>Suministros</em></h1>
     <p class="page-subtitle">
-      Sembrado inicial de <code>/suministros</code>, <code>/marcas</code>,
-      <code>/transformadores</code> y <code>/correcciones</code> desde los archivos fuente
-      <code>Gestion_Suministros_Transformadores-2.xlsm</code> y
-      <code>control_suministros-2.jsx</code>.
+      Sembrado de <code>/suministros</code> y <code>/marcas</code> desde el archivo fuente
+      <code>Gestion_Suministros_Transformadores.xlsm</code> (canal único).
       Idempotente: re-ejecutar no duplica datos. Audit en
-      <code>/auditoria</code> con SHA-256 de cada fuente.
+      <code>/auditoria</code> con SHA-256 del archivo.
     </p>
   </div>
 
   <section class="src-card">
-    <h3>1 · Fuentes de datos</h3>
+    <h3>1 · Fuente de datos</h3>
     <div class="src-line">
       <span>📊 .xlsm:</span>
       <span id="xlsm-status" class="loading">⋯ sin cargar</span>
       <input type="file" id="xlsmInput" accept=".xlsm,.xlsx" style="display:none">
       <button class="btn btn-secondary" id="btnXlsmFile">Subir .xlsm</button>
-    </div>
-    <div class="src-line" style="margin-top: 6px;">
-      <span>📜 .jsx:</span>
-      <span id="jsx-status" class="loading">⋯ sin cargar</span>
-      <input type="file" id="jsxInput" accept=".jsx,.txt" style="display:none">
-      <button class="btn btn-secondary" id="btnJsxFile">Subir .jsx</button>
     </div>
     <div class="src-line" style="margin-top: 12px;">
       <span>🔢 contrato_id:</span>
@@ -149,10 +141,10 @@ async function loadSheetJS() {
 const $ = (id) => document.getElementById(id);
 const setMsg = (t, cls = 'msg-ok') => { $('msg').textContent = t; $('msg').className = cls; };
 
-let estado = { xlsmBuffer: null, jsxText: null, plan: null, parsed: null, hashes: null };
+let estado = { xlsmBuffer: null, plan: null, parsed: null, hashes: null };
 
 function actualizarBotonPlanear() {
-  $('btnPlanear').disabled = !(estado.xlsmBuffer && estado.jsxText);
+  $('btnPlanear').disabled = !estado.xlsmBuffer;
 }
 
 function setStatus(id, txt, cls) {
@@ -163,7 +155,6 @@ function setStatus(id, txt, cls) {
 
 // ── Subir manual ──
 $('btnXlsmFile').addEventListener('click', () => $('xlsmInput').click());
-$('btnJsxFile').addEventListener('click', () => $('jsxInput').click());
 
 $('xlsmInput').addEventListener('change', async (e) => {
   const f = e.target.files[0];
@@ -174,35 +165,26 @@ $('xlsmInput').addEventListener('change', async (e) => {
   actualizarBotonPlanear();
 });
 
-$('jsxInput').addEventListener('change', async (e) => {
-  const f = e.target.files[0];
-  if (!f) return;
-  setStatus('jsx-status', `⋯ leyendo ${f.name}`, 'loading');
-  estado.jsxText = await f.text();
-  setStatus('jsx-status', `✓ ${f.name} (${(estado.jsxText.length/1024).toFixed(1)} KB)`, 'ok');
-  actualizarBotonPlanear();
-});
-
 // ── Cargar desde repo ──
+// Intenta primero el archivo del contrato actual (si lo conoce desde
+// el query string), luego cae al .xlsm legacy del seed inicial.
 $('btnLoadRepo').addEventListener('click', async () => {
-  try {
-    setStatus('xlsm-status', '⋯ fetch ../Gestion_Suministros_Transformadores-2.xlsm', 'loading');
-    setStatus('jsx-status', '⋯ fetch ../control_suministros-2.jsx', 'loading');
-    const [xlsmRes, jsxRes] = await Promise.all([
-      fetch('../Gestion_Suministros_Transformadores-2.xlsm'),
-      fetch('../control_suministros-2.jsx')
-    ]);
-    if (!xlsmRes.ok) throw new Error(`.xlsm fetch ${xlsmRes.status}`);
-    if (!jsxRes.ok)  throw new Error(`.jsx fetch ${jsxRes.status}`);
-    estado.xlsmBuffer = await xlsmRes.arrayBuffer();
-    estado.jsxText    = await jsxRes.text();
-    setStatus('xlsm-status', `✓ repo (${(estado.xlsmBuffer.byteLength/1024).toFixed(1)} KB)`, 'ok');
-    setStatus('jsx-status',  `✓ repo (${(estado.jsxText.length/1024).toFixed(1)} KB)`, 'ok');
-    actualizarBotonPlanear();
-  } catch (err) {
-    setStatus('xlsm-status', '✕ ' + err.message, 'err');
-    setStatus('jsx-status',  '✕ ' + err.message, 'err');
+  const cid = (new URLSearchParams(location.search).get('contratoId') || '').trim();
+  const candidatos = cid
+    ? [`../Gestion_Suministros_Transformadores_${cid}.xlsm`, '../Gestion_Suministros_Transformadores-2.xlsm']
+    : ['../Gestion_Suministros_Transformadores-2.xlsm'];
+  setStatus('xlsm-status', `⋯ fetch ${candidatos[0]}`, 'loading');
+  for (const url of candidatos) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) continue;
+      estado.xlsmBuffer = await res.arrayBuffer();
+      setStatus('xlsm-status', `✓ repo · ${url.split('/').pop()} (${(estado.xlsmBuffer.byteLength/1024).toFixed(1)} KB)`, 'ok');
+      actualizarBotonPlanear();
+      return;
+    } catch (_) { /* prueba siguiente candidato */ }
   }
+  setStatus('xlsm-status', '✕ no encontré ningún .xlsm en el repo', 'err');
 });
 
 // ── Planear ──
@@ -213,7 +195,6 @@ $('btnPlanear').addEventListener('click', async () => {
     const XLSX = await loadSheetJS();
     const { plan, parsed, hashes } = await planearImportacion({
       xlsmBuffer: estado.xlsmBuffer,
-      jsxText:    estado.jsxText,
       XLSX
     });
     estado.plan = plan; estado.parsed = parsed; estado.hashes = hashes;
@@ -232,11 +213,8 @@ function renderPlan(plan) {
   $('planBody').innerHTML = `
     <tr><td>suministros</td><td class="num">${r.suministros.total}</td><td class="num">${r.suministros.crear}</td><td class="num">${r.suministros.actualizar}</td><td class="num">${r.suministros.huerfanos}</td></tr>
     <tr><td>marcas</td><td class="num">${r.marcas.total}</td><td class="num">${r.marcas.crear}</td><td class="num">—</td><td class="num">—</td></tr>
-    <tr><td>transformadores</td><td class="num">${r.transformadores.total}</td><td class="num">${r.transformadores.crear}</td><td class="num">${r.transformadores.actualizar}</td><td class="num">${r.transformadores.huerfanos}</td></tr>
-    <tr><td>correcciones</td><td class="num">${r.correcciones.total}</td><td class="num">${r.correcciones.total}</td><td class="num">—</td><td class="num">—</td></tr>
   `;
-  const huer = [...plan.suministros.huerfanos.map((s) => `suministro: ${s}`),
-                ...plan.transformadores.huerfanos.map((m) => `trafo: ${m}`)];
+  const huer = plan.suministros.huerfanos.map((s) => `suministro: ${s}`);
   if (huer.length === 0) {
     $('huerfanosCard').hidden = true;
   } else {
@@ -274,9 +252,7 @@ async function ejecutar(dryRun) {
     setMsg(
       `✓ ${dryRun ? 'Simulación' : 'Importación'} OK en ${(out.duracion_ms/1000).toFixed(1)}s · ` +
       `Suministros: ${out.summary.suministros.creados}c/${out.summary.suministros.actualizados}u · ` +
-      `Marcas: ${out.summary.marcas.creadas}c · ` +
-      `Trafos: ${out.summary.transformadores.creados}c/${out.summary.transformadores.actualizados}u · ` +
-      `Correcciones: ${out.summary.correcciones.creadas}c` +
+      `Marcas: ${out.summary.marcas.creadas}c` +
       (out.auditId ? ` · Audit: ${out.auditId}` : ''),
       'msg-ok'
     );
