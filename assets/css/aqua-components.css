@@ -230,23 +230,31 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   background: rgba(0,40,90,.06); border-radius: var(--r-pill);
 }
 
-/* ─── SIDEBAR (transparente · la foto se ve detrás sin filtros) ── */
+/* ─── SIDEBAR (Finder Tahoe vertical · Liquid Glass aqua) ──────
+   Material glass con highlight superior brillante, blur fuerte y
+   border-right sutil. Es el shell de navegación principal. */
 .sb {
   position: fixed; top: 0; left: 0; bottom: 0; width: 264px;
   padding: 78px 12px 28px;
   overflow-y: auto;
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  border-right: 1px solid rgba(255,255,255,.18);
+  background: linear-gradient(180deg, rgba(255,255,255,.36) 0%, rgba(255,255,255,.22) 100%);
+  backdrop-filter: blur(52px) saturate(200%) brightness(108%);
+  -webkit-backdrop-filter: blur(52px) saturate(200%) brightness(108%);
+  border-right: 1px solid rgba(255,255,255,.45);
   box-shadow:
-    1px 0 0 rgba(255,255,255,.12),
-    24px 0 60px -16px rgba(0,40,90,.04);
+    inset -1px 0 0 rgba(0,40,90,.08),
+    1px 0 0 rgba(255,255,255,.4),
+    24px 0 60px -12px rgba(0,40,90,.08);
   z-index: 100;
   isolation: isolate;
 }
-/* Sin specular highlight — la foto manda */
-.sb::before { content: none; }
+/* Capa de specular interno del sidebar (highlight superior 3D) */
+.sb::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
+  background:
+    radial-gradient(ellipse 100% 30% at 30% -5%, rgba(255,255,255,.40), transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,.10) 0%, transparent 28%);
+}
 
 /* Texto del sidebar con halo blanco muy sutil para legibilidad
    sobre cualquier color de la foto (cielo claro o tower oscuro) */
@@ -380,7 +388,18 @@ body.aqua .sb-item.is-active {
   color: var(--brand-deep);
 }
 
-/* Nivel intermedio: categoría con texto largo (multi-línea) */
+/* Nivel intermedio: categoría con texto largo (multi-línea).
+   sb-item-toggle es un <button> que solo expande/colapsa la rama;
+   no navega. Heredamos los estilos de .sb-item-child y normalizamos
+   el reset propio del button (border, font, background-system). */
+.sb-tree .sb-item-toggle {
+  width: 100%;
+  background: transparent;
+  border: 0;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
 .sb-tree .sb-item-category {
   align-items: flex-start;
   padding: 8px 30px 8px 24px;
