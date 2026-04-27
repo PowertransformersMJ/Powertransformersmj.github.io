@@ -32,6 +32,19 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // ── Información Contractual (Fase 3 · 2026-04-27) ──
+    // PDFs por contrato: contratos/{contrato_id}/{filename}.pdf
+    // Lectura abierta (los PDFs son del director, no contienen
+    // datos sensibles externos). Escritura solo admin con tope 50 MB.
+    match /contratos/{contratoId}/{filename=**} {
+      allow read:   if true;
+      allow create: if isAdmin()
+                    && request.resource.size <= 50 * 1024 * 1024;
+      allow update: if isAdmin()
+                    && request.resource.size <= 50 * 1024 * 1024;
+      allow delete: if isAdmin();
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{allPaths=**} {
       allow read, write: if false;
