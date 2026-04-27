@@ -323,13 +323,11 @@ async function render() {
 document.addEventListener('sgm:session-ready', render);
 if (window.__sgmSession) render();
 
-// Register SW (F34) · path relativo para project pages.
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    const swUrl = new URL('../sw.js', location.href).href;
-    navigator.serviceWorker.register(swUrl, { scope: new URL('../', location.href).pathname }).catch(() => {});
-  });
-}
+// Service Worker desactivado (2026-04-27). El SW cache-first de F34
+// causaba que los deploys quedaran invisibles hasta que el navegador
+// decidiera chequear sw.js. El sw.js actual es un kill-switch que se
+// auto-desregistra; este registro se mantiene apagado hasta que se
+// reintroduzca una estrategia network-first probada.
 </script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>

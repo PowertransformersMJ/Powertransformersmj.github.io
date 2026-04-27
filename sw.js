@@ -1,133 +1,73 @@
+<<<<<<< HEAD
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', (event) => {
+  event.waitUntil((async () => {
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch (_) {}
+    try { await self.registration.unregister(); } catch (_) {}
+    try {
+      const clients = await self.clients.matchAll({ type: 'window' });
+      for (const c of clients) { try { c.navigate(c.url); } catch (_) {} }
+=======
 // ══════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Service Worker (F34, refactor 2026-04-27)
+// SGM · TRANSPOWER — Service Worker (kill-switch · 2026-04-27)
 // ──────────────────────────────────────────────────────────────
-// Estrategia network-first para HTML/CSS/JS para que un push a
-// GitHub Pages se vea reflejado en la próxima recarga sin tener
-// que bumpear CACHE_VERSION ni que el director toque DevTools.
+// ESTE SW SE AUTO-DESREGISTRA EN SU PRIMERA ACTIVACIÓN.
 //
-//   · HTML/CSS/JS/JSON  → network-first, cache como fallback offline
-//   · Imágenes / fuentes → stale-while-revalidate (cambian rara vez)
-//   · Firebase / GoogleAPIs → network-first con fallback cache
+// Motivo: el SW antiguo (cache-first, F34) provocaba que cualquier
+// deploy a GitHub Pages quedara invisible para los navegadores que
+// ya tenían el sitio cargado, y los workarounds (bumpear CACHE_VERSION,
+// pasar a network-first) seguían dependiendo de que el navegador
+// chequeara sw.js voluntariamente. El director (Miguel) reportó
+// repetidamente "todo sigue igual" después de cada deploy.
 //
-// El SW antiguo (cache-first puro) provocaba que cualquier merge
-// en main quedara invisible hasta que Safari decidiera actualizar
-// el sw.js (podía tardar 24h). Esto se soluciona definitivamente
-// pasando a network-first para el shell.
+// Solución de raíz: matar el SW. Cuando este sw.js sea descargado
+// por un navegador, install + activate borran TODOS los caches y
+// llaman registration.unregister(). Tras la próxima recarga el
+// sitio funciona como un sitio web tradicional (sin cache de SW),
+// y los pushes a main son visibles de inmediato.
 //
-// Firebase Firestore offline persistence se habilita aparte en
-// firebase-init.js con enableIndexedDbPersistence.
+// La PWA / offline-first se reintroducirá más adelante con una
+// estrategia network-first bien probada — por ahora prioridad al
+// "deploy y se ve" sin fricción.
 // ══════════════════════════════════════════════════════════════
-
-const CACHE_VERSION = 'sgm-v4-0-0';
-
-// Pre-cache mínimo — solo el shell estático fundamental para
-// arranque offline. Se actualizará automáticamente con SWR / NF.
-const SHELL = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/assets/img/favicon.svg'
-];
-
-// Extensiones que tratamos como "shell dinámico" (network-first):
-// cualquier cambio que el director suba debe verse en la próxima
-// recarga.
-const SHELL_DYNAMIC_EXT = /\.(?:html|css|js|json)$/i;
-
-// Extensiones de imágenes / fuentes (stale-while-revalidate):
-// rara vez cambian, vale la pena servir del cache mientras se
-// refresca en background.
-const ASSET_EXT = /\.(?:png|jpe?g|webp|svg|gif|ico|woff2?|ttf|otf)$/i;
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then((c) => c.addAll(SHELL)).catch(() => {})
-  );
+  // Activarse inmediatamente sin esperar a que se cierren las pestañas.
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) => Promise.all(
-      keys.filter((k) => k !== CACHE_VERSION).map((k) => caches.delete(k))
-    )).then(() => self.clients.claim())
-  );
-});
-
-// Permite que la app fuerce un skipWaiting desde un mensaje
-// (por si en el futuro queremos un botón "Actualizar").
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// ── Estrategias ───────────────────────────────────────────────
-
-function networkFirst(request) {
-  return fetch(request).then((resp) => {
-    if (resp && resp.status === 200 && resp.type !== 'opaque') {
-      const copy = resp.clone();
-      caches.open(CACHE_VERSION).then((c) => c.put(request, copy)).catch(() => {});
+  event.waitUntil((async () => {
+    // 1. Borrar TODOS los caches (no solo los del SW antiguo,
+    //    para asegurar que ningún asset viejo siga sirviéndose).
+    try {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    } catch (_) {
+      // ignorar — el unregister se hace de todos modos
     }
-    return resp;
-  }).catch(() => caches.match(request).then((cached) => {
-    if (cached) return cached;
-    // Para navegación HTML, fallback a index.html offline
-    if (request.mode === 'navigate') return caches.match('/index.html');
-    return Response.error();
-  }));
-}
 
-function staleWhileRevalidate(request) {
-  return caches.match(request).then((cached) => {
-    const fetchPromise = fetch(request).then((resp) => {
-      if (resp && resp.status === 200 && resp.type !== 'opaque') {
-        const copy = resp.clone();
-        caches.open(CACHE_VERSION).then((c) => c.put(request, copy)).catch(() => {});
+    // 2. Desregistrar este SW.
+    try {
+      await self.registration.unregister();
+    } catch (_) {}
+
+    // 3. Recargar todas las pestañas controladas para que carguen
+    //    los assets ya sin SW intermediando — fresh from server.
+    try {
+      const clients = await self.clients.matchAll({ type: 'window' });
+      for (const c of clients) {
+        try { c.navigate(c.url); } catch (_) {}
       }
-      return resp;
-    }).catch(() => cached);
-    return cached || fetchPromise;
-  });
-}
-
-// ── Router ────────────────────────────────────────────────────
-
-self.addEventListener('fetch', (event) => {
-  const { request } = event;
-  if (request.method !== 'GET') return;
-
-  const url = new URL(request.url);
-
-  // Firebase / Google APIs → network-first puro
-  if (
-    url.hostname.includes('firestore.googleapis.com') ||
-    url.hostname.includes('identitytoolkit.googleapis.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('firebaseio.com')
-  ) {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-
-  // Mismo origen o fuentes Google → estrategia según tipo de archivo
-  const isSameOrigin = url.origin === self.location.origin;
-  const isGoogleFonts = url.hostname === 'fonts.gstatic.com' || url.hostname === 'fonts.googleapis.com';
-  if (!isSameOrigin && !isGoogleFonts) return;
-
-  // HTML, CSS, JS, JSON → network-first (siempre fresco si hay red)
-  if (request.mode === 'navigate' || SHELL_DYNAMIC_EXT.test(url.pathname)) {
-    event.respondWith(networkFirst(request));
-    return;
-  }
-
-  // Imágenes / fuentes → stale-while-revalidate
-  if (ASSET_EXT.test(url.pathname) || isGoogleFonts) {
-    event.respondWith(staleWhileRevalidate(request));
-    return;
-  }
-
-  // Resto: network-first conservador
-  event.respondWith(networkFirst(request));
+>>>>>>> f1b893d94379d0b2897ccb2f23da0337854504fc
+    } catch (_) {}
+  })());
 });
+
+// Sin fetch handler: el navegador maneja las requests directamente.
+// (Aunque sw.js técnicamente sigue activo hasta que termine activate,
+//  es de un solo turno: en cuanto activate completa, el SW deja de
+//  controlar al cliente.)
