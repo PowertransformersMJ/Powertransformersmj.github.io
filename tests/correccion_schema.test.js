@@ -46,8 +46,8 @@ describe('validarCorreccion', () => {
   test('documento mínimo válido pasa', () => {
     const errs = validarCorreccion(sanitizarCorreccion({
       numero: 1, tipo: 'regulacion',
-      ubicacion: 'control_suministros-2.jsx#L120',
-      justificacion: 'serial duplicado en JSX, autorizado por Miguel'
+      ubicacion: 'manual#nota-director',
+      justificacion: 'serial duplicado autorizado por Miguel'
     }));
     assert.deepEqual(errs, []);
   });

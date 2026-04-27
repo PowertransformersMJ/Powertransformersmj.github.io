@@ -1,39 +1,34 @@
 // ══════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Data layer: importador suministros (Fase 42)
+// SGM · TRANSPOWER — Data layer: importador suministros (Fase 42 + polish 2026-04-27)
 // ──────────────────────────────────────────────────────────────
 // Runner del importador. Conecta SheetJS + Firestore al parser puro
-// (domain/importador_suministros.js).
+// (domain/importador_suministros.js). Canal único: Excel (.xlsm).
 //
 // Idempotente por:
-//   · /suministros: docId == codigo (set merge).
+//   · /suministros: docId == {contrato_id}_{codigo} (set merge).
 //   · /marcas: clave (suministro_id, marca) — skip si ya existe.
-//   · /transformadores: matchea por matrícula (identificacion.codigo).
-//   · /correcciones: numero+fuente (skip si ya hay 3 de control_suministros-2.jsx).
 //
-// Audit: una sola entrada bulk_import_suministros con metadata
-// granular del plan §3 decisión 7·A.
+// El canal JSX (control_suministros-2.jsx) fue retirado en 2026-04-27 PM:
+// ya no se sincronizan /transformadores ni /correcciones desde aquí.
+// Esos datos viven en Firestore desde imports anteriores; las ediciones
+// se hacen ahora desde admin/inventario.html y admin/auditoria.html.
+//
+// Audit: una sola entrada bulk_import_suministros con metadata granular.
 // ══════════════════════════════════════════════════════════════
 
 import {
   collection, doc,
-  setDoc, addDoc, getDocs, writeBatch, serverTimestamp,
-  arrayUnion, query, where
+  setDoc, addDoc, getDocs, writeBatch, serverTimestamp, arrayUnion
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
 import {
-  parsearCatalogoRows, parsearMarcasRows,
-  parsearJsxTransformadores, jsxRowADocV2,
-  parsearJsxCatalogo, enriquecerCatalogoConJsx,
-  extraerCorreccionesEmbedded,
-  reconciliarEquipos, prepararPlanImportacion
+  parsearCatalogoRows, parsearMarcasRows, prepararPlanImportacion
 } from '../domain/importador_suministros.js';
 import { composeDocId } from '../domain/contratos.js';
 
 const COL_SUMINISTROS = 'suministros';
 const COL_MARCAS      = 'marcas';
-const COL_TRAFOS      = 'transformadores';
-const COL_CORRECC     = 'correcciones';
 const COL_AUDIT       = 'auditoria';
 const BATCH_LIMIT     = 450;
 
@@ -65,31 +60,16 @@ async function leerExistentes() {
     })
   );
 
-  const txSnap = await getDocs(collection(d, COL_TRAFOS));
-  const transformadoresPorMatricula = new Map();
-  for (const x of txSnap.docs) {
-    const data = x.data();
-    // Match por matrícula. Fallback a codigo plano (shape viejo
-    // pre-corrección donde se persistió matrícula como codigo).
-    const m =
-      (data.identificacion && data.identificacion.matricula) ||
-      data.matricula ||
-      (data.identificacion && data.identificacion.codigo) ||
-      data.codigo || '';
-    if (m) transformadoresPorMatricula.set(String(m).toUpperCase(), x.id);
-  }
-
-  return { suministrosIds, marcasKeys, transformadoresPorMatricula };
+  return { suministrosIds, marcasKeys };
 }
 
 /**
- * Parsea los archivos fuente a estructuras de dominio. Usa SheetJS
+ * Parsea el .xlsm fuente a estructuras de dominio. Usa SheetJS
  * inyectado por el caller (UI hace `loadSheetJS()`).
  */
-export async function parsearArchivos({ xlsmBuffer, jsxText, XLSX }) {
+export async function parsearArchivos({ xlsmBuffer, XLSX }) {
   if (!XLSX) throw new Error('SheetJS (XLSX) no cargado.');
   if (!xlsmBuffer) throw new Error('xlsmBuffer es obligatorio.');
-  if (!jsxText)    throw new Error('jsxText es obligatorio.');
 
   const wb = XLSX.read(xlsmBuffer, { type: 'array', cellDates: true });
   // El .xlsm fuente tiene un título mergeado en row 1 y los headers
@@ -101,45 +81,26 @@ export async function parsearArchivos({ xlsmBuffer, jsxText, XLSX }) {
   const catRes = parsearCatalogoRows(rowsCat);
   const marRes = parsearMarcasRows(rowsMar);
 
-  const jsxArr = parsearJsxTransformadores(jsxText);
-  const transformadores = jsxArr.map((r) => jsxRowADocV2(r));
-
-  // Enriquece el catálogo del .xlsm con valor_unitario del JSX CATALOGO
-  // (merge por posición; el .xlsm fuente no incluye precios).
-  let catalogoEnriquecido = catRes.suministros;
-  try {
-    const jsxCatalogo = parsearJsxCatalogo(jsxText);
-    catalogoEnriquecido = enriquecerCatalogoConJsx(catRes.suministros, jsxCatalogo);
-  } catch (err) {
-    console.warn('[importador.parsearArchivos] no se pudo enriquecer con JSX CATALOGO:', err.message);
-  }
-
-  const correcciones = extraerCorreccionesEmbedded();
-
-  // Hashes para auditoría.
   const xlsmSha = await sha256Hex(xlsmBuffer);
-  const jsxSha  = await sha256Hex(jsxText);
 
   return {
     parsed: {
-      suministros:     catalogoEnriquecido,
-      marcas:          marRes.marcas,
-      transformadores,
-      correcciones
+      suministros: catRes.suministros,
+      marcas:      marRes.marcas
     },
     erroresParseo: {
       catalogo: catRes.errores,
       marcas:   marRes.errores
     },
-    hashes: { xlsm: xlsmSha, jsx: jsxSha }
+    hashes: { xlsm: xlsmSha }
   };
 }
 
 /**
  * Construye el plan completo (parseo + diff contra Firestore).
  */
-export async function planearImportacion({ xlsmBuffer, jsxText, XLSX }) {
-  const { parsed, erroresParseo, hashes } = await parsearArchivos({ xlsmBuffer, jsxText, XLSX });
+export async function planearImportacion({ xlsmBuffer, XLSX }) {
+  const { parsed, erroresParseo, hashes } = await parsearArchivos({ xlsmBuffer, XLSX });
   const existentes = await leerExistentes();
   const plan = prepararPlanImportacion(parsed, existentes);
   return { plan, parsed, erroresParseo, hashes };
@@ -162,8 +123,8 @@ export async function ejecutarImportacion({
   const t0 = Date.now();
   const cid = String(contrato_id || '').trim();
 
-  const idsCreados = { suministros: [], marcas: [], correcciones: [], transformadores: [] };
-  const idsActualizados = { suministros: [], transformadores: [] };
+  const idsCreados = { suministros: [], marcas: [] };
+  const idsActualizados = { suministros: [] };
 
   let batch = writeBatch(d);
   let count = 0;
@@ -265,79 +226,11 @@ export async function ejecutarImportacion({
   }
   await flush();
 
-  // ── 3. /transformadores (dual-write F41) ─────────────────────
-  i = 0;
-  const txTotal = plan.transformadores.crear.length + plan.transformadores.actualizar.length;
-  for (const t of plan.transformadores.crear) {
-    if (!dryRun) {
-      const ref = doc(collection(d, COL_TRAFOS));
-      const { _existingId, ...payload } = t;
-      batch.set(ref, {
-        ...payload,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-        createdBy: uid
-      });
-      idsCreados.transformadores.push(ref.id);
-    } else {
-      idsCreados.transformadores.push('(dry-run)');
-    }
-    await enqueue();
-    reportProgress('transformadores', ++i, txTotal);
-  }
-  for (const t of plan.transformadores.actualizar) {
-    const { _existingId, ...payload } = t;
-    if (!dryRun) {
-      batch.set(doc(d, COL_TRAFOS, _existingId), {
-        ...payload,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-    }
-    idsActualizados.transformadores.push(_existingId);
-    await enqueue();
-    reportProgress('transformadores', ++i, txTotal);
-  }
-  await flush();
-
-  // ── 4. /correcciones ─────────────────────────────────────────
-  // Idempotencia por (numero, fuente): si ya existen 3 de
-  // control_suministros-2.jsx, skip. Implementación simple: query.
-  if (!dryRun) {
-    for (const c of plan.correcciones.crear) {
-      // Idempotencia ahora considera también el contrato_id, para que
-      // dos contratos puedan tener la misma corrección sin colisionar.
-      const q = cid
-        ? query(collection(d, COL_CORRECC),
-            where('numero',      '==', c.numero),
-            where('fuente',      '==', c.fuente),
-            where('contrato_id', '==', cid))
-        : query(collection(d, COL_CORRECC),
-            where('numero',  '==', c.numero),
-            where('fuente',  '==', c.fuente));
-      const snap = await getDocs(q);
-      if (snap.empty) {
-        const ref = await addDoc(collection(d, COL_CORRECC), {
-          ...c,
-          contrato_id: cid,
-          createdAt: serverTimestamp(),
-          createdBy: uid
-        });
-        idsCreados.correcciones.push(ref.id);
-      }
-    }
-  } else {
-    for (const _ of plan.correcciones.crear) idsCreados.correcciones.push('(dry-run)');
-  }
-
-  // ── 4b. Registrar el contrato en /contratos/{id} ─────────────
+  // ── 3. Registrar el contrato en /contratos/{id} ─────────────
   // Crea o actualiza el doc para que pages/contratos.html lo liste
-  // automáticamente sin depender del semilla hardcoded.
+  // automáticamente y la UI de cards muestre con_datos=true.
   if (!dryRun && cid) {
     try {
-      // Payload alineado con contrato_schema (F21) + rules (estado in
-      // ['vigente','suspendido','finalizado','en_liquidacion']). El
-      // 'activo' anterior era rechazado server-side y silenciado por
-      // el try/catch — bug detectado durante el deploy del 4125000143.
       await setDoc(
         doc(d, 'contratos', cid),
         {
@@ -359,12 +252,9 @@ export async function ejecutarImportacion({
           ultima_importacion: serverTimestamp(),
           ultima_importacion_uid: uid || null,
           ultima_importacion_summary: {
-            suministros_creados:     idsCreados.suministros.length,
+            suministros_creados:      idsCreados.suministros.length,
             suministros_actualizados: idsActualizados.suministros.length,
-            marcas_creadas:          idsCreados.marcas.length,
-            transformadores_creados: idsCreados.transformadores.length,
-            transformadores_actualizados: idsActualizados.transformadores.length,
-            correcciones_creadas:    idsCreados.correcciones.length
+            marcas_creadas:           idsCreados.marcas.length
           },
           updatedAt: serverTimestamp()
         },
@@ -375,7 +265,7 @@ export async function ejecutarImportacion({
     }
   }
 
-  // ── 5. Audit entry granular ──────────────────────────────────
+  // ── 4. Audit entry granular ──────────────────────────────────
   const duracion_ms = Date.now() - t0;
   const summary = {
     suministros: {
@@ -383,24 +273,16 @@ export async function ejecutarImportacion({
       actualizados: idsActualizados.suministros.length,
       huerfanos: plan.suministros.huerfanos.length
     },
-    marcas: { creadas: idsCreados.marcas.length },
-    transformadores: {
-      creados: idsCreados.transformadores.length,
-      actualizados: idsActualizados.transformadores.length,
-      huerfanos: plan.transformadores.huerfanos.length
-    },
-    correcciones: { creadas: idsCreados.correcciones.length }
+    marcas: { creadas: idsCreados.marcas.length }
   };
   const auditPayload = {
     accion: 'bulk_import_suministros',
     fuente_xlsm_sha256: hashes && hashes.xlsm || '',
-    fuente_jsx_sha256:  hashes && hashes.jsx  || '',
     summary,
     ids_creados: idsCreados,
     ids_actualizados: idsActualizados,
     huerfanos: {
-      suministros: plan.suministros.huerfanos,
-      transformadores: plan.transformadores.huerfanos
+      suministros: plan.suministros.huerfanos
     },
     duracion_ms,
     dryRun,
