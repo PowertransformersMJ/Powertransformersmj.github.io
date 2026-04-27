@@ -230,26 +230,30 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   background: rgba(0,40,90,.06); border-radius: var(--r-pill);
 }
 
-/* ─── SIDEBAR (Finder Tahoe vertical · vidrio prácticamente transparente
-       para que la foto se aprecie a través) ── */
+/* ─── SIDEBAR (transparente · la foto se ve detrás sin filtros) ── */
 .sb {
   position: fixed; top: 0; left: 0; bottom: 0; width: 264px;
   padding: 78px 12px 28px;
   overflow-y: auto;
-  background: linear-gradient(180deg, rgba(255,255,255,.06) 0%, rgba(255,255,255,.02) 100%);
-  backdrop-filter: blur(8px) saturate(160%);
-  -webkit-backdrop-filter: blur(8px) saturate(160%);
-  border-right: 1px solid rgba(255,255,255,.20);
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-right: 1px solid rgba(255,255,255,.18);
   box-shadow:
-    1px 0 0 rgba(255,255,255,.18),
-    24px 0 60px -16px rgba(0,40,90,.05);
+    1px 0 0 rgba(255,255,255,.12),
+    24px 0 60px -16px rgba(0,40,90,.04);
   z-index: 100;
   isolation: isolate;
 }
-/* Specular muy sutil — un destello arriba para marcar el borde, nada más */
-.sb::before {
-  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 0;
-  background: radial-gradient(ellipse 100% 18% at 30% -5%, rgba(255,255,255,.14), transparent 70%);
+/* Sin specular highlight — la foto manda */
+.sb::before { content: none; }
+
+/* Texto del sidebar con halo blanco muy sutil para legibilidad
+   sobre cualquier color de la foto (cielo claro o tower oscuro) */
+body.aqua .sb-item,
+body.aqua .sb-brand-head,
+.sb-group-title {
+  text-shadow: 0 1px 1px rgba(255,255,255,.55), 0 0 2px rgba(255,255,255,.35);
 }
 .sb > * { position: relative; z-index: 1; }
 
