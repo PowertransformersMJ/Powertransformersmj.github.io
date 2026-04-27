@@ -7,6 +7,126 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## v2.5.0 — UI v3 dark mode · foto IMG_9840 · drilldown contratos (2026-04-27 PM)
+
+Refactor visual completo del shell sobre la nueva foto de fondo
+`IMG_9840.HEIC` que el director subió al repo. 14 PRs micro
+(#90–#103) en una sola sesión. Documentación completa en
+`docs/UI-V3-DARKMODE.md` y `CLAUDE.md` §9 reescrito.
+
+### Resumen ejecutivo
+
+- **Foto nueva** `assets/img/aqua/substation-photo.jpg` 2560×1920,
+  1.16 MB JPEG q88. Origen: `IMG_9840.HEIC` 5712×4284 convertida
+  con `pillow-heif` + redimensionada con LANCZOS. Subestación
+  Caribe Colombiano de noche con luces puntuales sobre aisladores.
+- **Dark mode completo**: inks claros (`#f3f7ff` títulos,
+  `#d6e0ec` cuerpo, `#a0b3ca` meta, `#6f7f96` placeholder), glass
+  tokens con tint navy oscuro `rgba(8,18,35,X)` en vez de
+  `rgba(255,255,255,X)`. Topbar, sidebar y page titles con
+  text-shadow oscuro para legibilidad.
+- **Sidebar transparente** (`background: transparent !important;
+  backdrop-filter: none !important`). La foto se ve a través
+  directamente.
+- **Drilldown contratos en sidebar**: bajo cada número de contrato
+  (4123000081, 4125000143) ahora se despliegan dos links terminales
+  — "Control y Gestión Operativa" e "Información Contractual" —
+  que cargan el contrato en el panel derecho con o sin tab
+  pre-seleccionado.
+- **Service Worker kill-switch**: el SW v3-5-2 (cache-first) que
+  bloqueaba deploys queda reemplazado por uno que se
+  auto-desregistra al activarse. PWA offline-first temporalmente
+  desactivada — prioridad: deploy y se ve.
+- **Foto vieja borrada** (`substation-photo.png` 1598×1599 con
+  41% de área útil) y archivos HEIC de tránsito removidos del
+  repo.
+
+### Micro-fases (14 PRs)
+
+- **#90** — Swap foto thumbnail (755×752) → hi-res (3840×2400 con
+  padding blanco interno).
+- **#91** — Cobertura full-viewport `.aqua-power-scene` con
+  `width: 100vw; height: 100vh; height: 100dvh`.
+- **#92** — Sidebar más transparente (rgba .18-.08, blur 20px).
+- **#93** — SW bump v3-5-2 → v3-5-3.
+- **#94** — Sidebar prácticamente transparente (rgba .06-.02,
+  blur 8px).
+- **#95** — SW refactor a network-first.
+- **#96** — SW kill-switch auto-desregistra.
+- **#97** — Sidebar 100% transparente (`!important`) + text-shadow
+  blanco halo.
+- **#98** — Recorte de la foto al bounding box no-blanco
+  (3840×2400 → 1598×1599) eliminando 60% de padding blanco interno.
+- **#99** — Nueva foto IMG_9840 procesada · HEIC 3.9 MB →
+  JPEG 2560×1920 1.16 MB.
+- **#100** — Dark mode tokens (inks claros, glass navy oscuro,
+  topbar dark, text-shadows oscuros).
+- **#101** — Submenu inicial "Información Contractual" bajo cada
+  contrato (luego refactorizado).
+- **#102** — Drilldown 5 niveles · `markActive()` reescrito para
+  desambiguar por hash `#tab=`, expandir cadena completa de
+  árboles ancestros · `bindTreeToggle()` respeta `aria-expanded`
+  inicial del caret.
+- **#103** — Refactor: "Control y Gestión Operativa" e "Información
+  Contractual" como links terminales (no acordeones), proper case
+  (sin uppercase). Removidos los 5 leaves (Dashboard, Catálogo,
+  Movimiento, Histórico, Importar) del sidebar — ya viven como
+  tabs en el panel derecho del contrato.
+
+### Lecciones técnicas
+
+1. **HEIC no es válido como CSS background-image** en Chrome/Firefox.
+   Pipeline establecido: `pillow-heif` → resize LANCZOS → JPEG q88
+   progressive optimize=True.
+2. **Padding blanco dentro de un PNG** es invisible para el
+   desarrollador pero `background-size: cover` lo estira hasta los
+   bordes del viewport. Detectar bounding box no-blanco con
+   PIL+numpy antes de usar fotos como fondo:
+   ```python
+   non_white = np.any(arr < 245, axis=2)
+   rows = np.any(non_white, axis=1)
+   cols = np.any(non_white, axis=0)
+   ```
+3. **Service Workers cache-first bloquean deploys de GitHub Pages**
+   incluso bumpeando `CACHE_VERSION` — Safari no chequea `sw.js`
+   con suficiente frecuencia. Solución de raíz: kill-switch SW
+   que se auto-desregistra al activarse.
+4. **`markActive()` con multi-active** ocurría cuando varios
+   sidebar items compartían el mismo `?id=`. Fix: agregar
+   comparación de hash `#tab=` y elegir un solo ganador antes de
+   marcar `is-active`.
+5. **`bindTreeToggle()` forzando expand-all** impedía colapsar
+   árboles por default. Fix: respetar el `aria-expanded` inicial
+   del botón caret.
+6. **Project page URL** (`ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/`)
+   distinta de user page (`ajimenezp99-jpg.github.io/`). La user
+   page retorna 404. Documentado en CLAUDE.md §9.7.
+
+### Archivos clave
+
+- `assets/css/aqua-tokens.css` · inks dark + glass navy
+- `assets/css/aqua-components.css` · topbar dark, sidebar
+  transparent, sidebar 4-level structure (greatgrandchild proper
+  case), text-shadows dark
+- `assets/js/aqua-shell.js` · `markActive()` con hash matching,
+  `bindTreeToggle()` respetando aria-expanded
+- `assets/img/aqua/substation-photo.jpg` · foto activa
+- `sw.js` · kill-switch
+- `pages/dashboard.html` · removida llamada a `register('/sw.js')`
+- `docs/UI-V3-DARKMODE.md` · documento de decisiones de diseño
+
+### Pendientes post-v2.5.0
+
+- **Datos de Información Contractual** · cuando el director suba
+  el archivo (formato/contenido por definir), montar tab
+  `#tab=info-contractual` en `pages/contrato.html` que renderice
+  los datos.
+- **Reactivar PWA offline-first** después de validar que los
+  deploys quedan estables · sustituir kill-switch por SW
+  network-first probado.
+- **Revocar segundo PAT** (`ghp_kzk3…`) cuando termine la
+  iteración visual.
+
 ## v2.4.1 — Deploy contrato 4125000143 · export espejo + rules multi-contrato (2026-04-27)
 
 Integración del nuevo dataset del contrato **4125000143**
