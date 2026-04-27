@@ -1398,6 +1398,83 @@ body.aqua.is-embedded .app-main {
   padding-top: 16px !important;
 }
 
+/* ── Forms en modo Aqua (Movimiento, Importar, etc) ───────────
+   Las páginas-iframe usan .form-fieldset / .form-input / etc. del
+   stack legacy (app.css + inventario.css), donde el background era
+   --surface-sunken (oscuro). Sobre el sistema Aqua light-perla con
+   foto de subestación, esos estilos quedaban casi transparentes y
+   la legibilidad se rompía. Este bloque les pone material glass
+   coherente con el resto del lenguaje visual. */
+body.aqua .form-fieldset {
+  background: rgba(255, 255, 255, .58);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, .65);
+  border-radius: 16px;
+  padding: 18px 22px;
+  margin-bottom: 16px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .85),
+              0 1px 2px rgba(0, 40, 90, .06);
+}
+body.aqua .form-fieldset-title,
+body.aqua legend.form-fieldset-title {
+  color: var(--ink-1);
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  padding: 0 8px;
+  margin-bottom: 4px;
+}
+body.aqua .form-label {
+  color: var(--ink-2);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  margin-bottom: 6px;
+  display: block;
+  letter-spacing: .005em;
+}
+body.aqua .form-input,
+body.aqua .form-select,
+body.aqua .form-textarea {
+  width: 100%;
+  background: rgba(255, 255, 255, .9);
+  border: 1px solid rgba(0, 40, 90, .14);
+  color: var(--ink-1);
+  padding: 9px 12px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color .15s ease, box-shadow .15s ease, background .15s ease;
+}
+body.aqua .form-input::placeholder,
+body.aqua .form-textarea::placeholder {
+  color: var(--ink-4);
+}
+body.aqua .form-input:hover,
+body.aqua .form-select:hover,
+body.aqua .form-textarea:hover {
+  background: rgba(255, 255, 255, .98);
+  border-color: rgba(0, 40, 90, .26);
+}
+body.aqua .form-input:focus,
+body.aqua .form-select:focus,
+body.aqua .form-textarea:focus {
+  background: #fff;
+  border-color: var(--brand, #007aff);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, .16);
+}
+body.aqua .form-textarea { min-height: 96px; resize: vertical; }
+
+/* Breadcrumb legible sobre la foto en iframes */
+body.aqua.is-embedded .breadcrumb {
+  color: var(--ink-2);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
+}
+
 /* Page header legacy */
 body.aqua .page-header,
 body.aqua .home-section-head {
