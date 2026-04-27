@@ -1373,6 +1373,31 @@ body.aqua .module-card h3 {
   letter-spacing: -.015em;
 }
 
+/* ── Modo embebido (iframe dentro de pages/contrato.html, etc) ────
+   aqua-shell.js añade la clase .is-embedded al body cuando detecta
+   que la página corre dentro de un iframe (window.self !== top).
+   En ese modo:
+   - El padre ya muestra topbar/sidebar/escena Aqua → ocultamos los
+     duplicados que pudiera inyectar la página interior.
+   - El body NO debe pintar var(--bg-mesh) — el padre ya lo hace y
+     queremos que la foto de subestación se vea a través.
+   Estas reglas viven en aqua-components.css (cargado por TODAS las
+   páginas con body.aqua) en lugar de tabs.css (que solo carga el
+   shell padre); así garantizamos el override en cualquier iframe. */
+body.aqua.is-embedded {
+  background: transparent !important;
+}
+body.aqua.is-embedded .topbar,
+body.aqua.is-embedded .sb,
+body.aqua.is-embedded .aqua-power-scene,
+body.aqua.is-embedded .aqua-particles {
+  display: none !important;
+}
+body.aqua.is-embedded .app-main {
+  margin-left: 0 !important;
+  padding-top: 16px !important;
+}
+
 /* Page header legacy */
 body.aqua .page-header,
 body.aqua .home-section-head {
