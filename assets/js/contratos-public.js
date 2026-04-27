@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Contratos · selector (M2 + M7 v2.4)
+// SGM · TRANSPOWER — Contratos · selector (M2 + M7 v2.4 + polish 2026-04-27)
 // ──────────────────────────────────────────────────────────────
 // Página índice del módulo Contratos. Muestra una jerarquía de
 // 2 niveles:
@@ -10,14 +10,22 @@
 // y Accesorios para Transformadores de Potencia" que agrupa los
 // contratos 4123000081 y 4125000143. Cuando se registren más
 // categorías o números en /contratos, la lista se hará dinámica.
+//
+// El estado real de cada contrato (origen='firestore'|'semilla' y
+// con_datos=true|false) se calcula leyendo /contratos/{id}: si el
+// doc existe → origen='firestore'; si tiene `ultima_importacion` →
+// con_datos=true. Esto evita que el tag SIN DATOS quede pegado en
+// contratos que ya fueron importados (bug reportado 2026-04-27 PM).
 // ══════════════════════════════════════════════════════════════
 
 import {
-  collection, query, where, onSnapshot
+  collection, query, where, onSnapshot, doc
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { getDbSafe, isFirebaseConfigured } from './firebase-init.js';
 
-// Estructura semilla: 1 categoría con 2 contratos.
+// Estructura semilla: 1 categoría con 2 contratos. Los flags
+// origen/con_datos se sobrescriben con los del doc Firestore si
+// existe (ver suscribirContratos abajo).
 const CATEGORIAS_SEMILLA = [
   {
     id: 'sum-tx',
@@ -38,7 +46,7 @@ const CATEGORIAS_SEMILLA = [
         nombre: 'Suministro de Elementos y Accesorios para Transformadores de Potencia',
         estado: 'activo',
         origen: 'semilla',
-        con_datos: false
+        con_datos: true
       }
     ]
   }
@@ -60,9 +68,9 @@ function renderCard(c) {
   const nombre = c.nombre || 'Contrato sin descripción';
   const estado = (c.estado || 'activo').toUpperCase();
   const isActivo = estado === 'ACTIVO' || estado === 'VIGENTE';
-  const semillaTag = c.origen === 'semilla'
-    ? '<span class="contrato-semilla-tag" title="Contrato semilla — pendiente de registrar formalmente">SEMILLA</span>'
-    : '';
+  // Solo mostrar SIN DATOS si está EXPLÍCITAMENTE en false. Los
+  // contratos que ya tienen ultima_importacion en Firestore quedan
+  // con con_datos=true automáticamente.
   const sinDatosTag = c.con_datos === false
     ? '<span class="contrato-pendiente-tag" title="Pendiente de importar Excel">SIN DATOS</span>'
     : '';
@@ -74,7 +82,6 @@ function renderCard(c) {
         </div>
         <div class="contrato-numero">
           <code>${escHtml(numero)}</code>
-          ${semillaTag}
           ${sinDatosTag}
         </div>
         <span class="contrato-estado-pill estado-${escHtml(estado.toLowerCase())}">${escHtml(estado)}</span>
@@ -113,6 +120,42 @@ function render(categorias) {
   window.sgmRefreshIcons?.();
 }
 
+/**
+ * Aplica el estado real de Firestore a la categoría semilla.
+ * Para cada contrato semilla: si /contratos/{id} existe, se usa su
+ * `estado` y se calcula `con_datos` desde `ultima_importacion`.
+ * Si no existe, se mantienen los flags semilla por defecto.
+ */
+function aplicarEstadoFirestore(categoriaSemilla, docsFirestore) {
+  const cat = { ...categoriaSemilla, contratos: [...categoriaSemilla.contratos] };
+  const docsById = new Map(docsFirestore.map((d) => [d.id, d]));
+  cat.contratos = cat.contratos.map((c) => {
+    const fd = docsById.get(c.id);
+    if (!fd) return c;
+    return {
+      ...c,
+      origen: 'firestore',
+      estado: fd.estado || c.estado,
+      con_datos: !!fd.ultima_importacion || c.con_datos === true
+    };
+  });
+  // Inyectar contratos de Firestore que no estén en la semilla.
+  const idsSemilla = new Set(categoriaSemilla.contratos.map((c) => c.id));
+  for (const fd of docsFirestore) {
+    if (!idsSemilla.has(fd.id)) {
+      cat.contratos.push({
+        id: fd.id,
+        numero: fd.codigo || fd.numero || fd.id,
+        nombre: fd.alcance || fd.nombre || cat.nombre,
+        estado: fd.estado || 'activo',
+        origen: 'firestore',
+        con_datos: !!fd.ultima_importacion
+      });
+    }
+  }
+  return cat;
+}
+
 function arrancar() {
   if (!isFirebaseConfigured) {
     render(CATEGORIAS_SEMILLA);
@@ -123,30 +166,17 @@ function arrancar() {
     render(CATEGORIAS_SEMILLA);
     return;
   }
-  // Por ahora seguimos con la semilla. Cuando el director registre
-  // más contratos en /contratos, esta función se ampliará para hacer
-  // merge con la lista dinámica.
+  // Suscripción a /contratos: refresca el estado real de cada
+  // contrato (existencia, ultima_importacion, estado) y mergea con
+  // la categoría semilla. Cada vez que el importador escribe
+  // /contratos/{id} (al final de una importación), el doc cambia
+  // y este onSnapshot lo refleja.
   try {
     unsub = onSnapshot(
-      query(collection(db, 'contratos'), where('tipo', '==', 'suministros')),
+      collection(db, 'contratos'),
       (snap) => {
         const docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-        // Por simplicidad, mostramos siempre la categoría semilla.
-        // Si Firestore tiene contratos del tipo, los inyectamos a la lista.
-        const cat = { ...CATEGORIAS_SEMILLA[0] };
-        const idsSemilla = new Set(cat.contratos.map((c) => c.id));
-        for (const d of docs) {
-          if (!idsSemilla.has(d.id)) {
-            cat.contratos.push({
-              id: d.id,
-              numero: d.numero || d.id,
-              nombre: d.nombre || cat.nombre,
-              estado: d.estado || 'activo',
-              origen: 'firestore',
-              con_datos: d.con_datos !== false
-            });
-          }
-        }
+        const cat = aplicarEstadoFirestore(CATEGORIAS_SEMILLA[0], docs);
         render([cat]);
       },
       (err) => {
