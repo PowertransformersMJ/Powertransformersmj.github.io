@@ -310,6 +310,11 @@
   background: #fff;
   display: block;
 }
+/* [hidden] DEBE ganar sobre display:block del rule de arriba.
+   Sin esto el iframe queda visible aunque la app no haya elegido
+   un doc todavía (display:block tiene más especificidad que el
+   selector de atributo nativo [hidden] del browser). */
+.viewer-frame[hidden] { display: none !important; }
 
 .viewer-empty {
   position: absolute;
@@ -323,6 +328,11 @@
   text-align: center;
   color: var(--ink-3);
 }
+/* Mismo problema: la regla de arriba con display:flex tapa el
+   [hidden] implícito del browser. La empty-state se queda flotando
+   sobre el PDF aunque hidden=true esté seteado (bug reportado por
+   el director: 'marca de agua que prevalece sobre el PDF'). */
+.viewer-empty[hidden] { display: none !important; }
 .viewer-empty i, .viewer-empty svg {
   width: 56px;
   height: 56px;

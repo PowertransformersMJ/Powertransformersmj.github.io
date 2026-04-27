@@ -140,8 +140,13 @@ function seleccionar(archivo) {
   $('btnDownload').setAttribute('href', doc.url);
   $('btnDownload').setAttribute('download', doc.titulo + '.pdf');
   $('btnOpenNewTab').setAttribute('href', doc.url);
-  // Iframe — nota el #toolbar=1 hint para Chrome PDF Viewer.
-  $('viewerFrame').setAttribute('src', `${doc.url}#view=FitH`);
+  // Iframe sin hash params — el visor nativo del navegador (Chrome PDF
+  // Viewer / Safari built-in / Firefox PDF.js) muestra el documento
+  // completo con scroll vertical funcional. El #view=FitH anterior
+  // hacía fit-horizontal y bloqueaba el scroll del wheel en algunos
+  // navegadores (bug reportado por el director: 'no me permite bajar
+  // con el scroll del mouse para apreciar todas las páginas').
+  $('viewerFrame').setAttribute('src', doc.url);
   // Re-render lista para actualizar selección visual.
   renderLista(state.filtrados);
 }
