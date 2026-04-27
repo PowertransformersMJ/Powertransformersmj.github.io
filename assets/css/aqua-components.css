@@ -159,20 +159,20 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   display: grid; grid-template-columns: auto 1fr auto;
   gap: 24px; align-items: center;
   padding: 12px 32px;
-  background: linear-gradient(180deg, rgba(8,18,35,.45) 0%, rgba(8,18,35,.30) 100%);
-  backdrop-filter: blur(36px) saturate(180%) brightness(96%);
-  -webkit-backdrop-filter: blur(36px) saturate(180%) brightness(96%);
-  border-bottom: 1px solid rgba(255,255,255,.10);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.18), 0 1px 0 rgba(0,0,0,.20);
+  background: linear-gradient(180deg, rgba(255,255,255,.30) 0%, rgba(255,255,255,.18) 100%);
+  backdrop-filter: blur(44px) saturate(200%) brightness(108%);
+  -webkit-backdrop-filter: blur(44px) saturate(200%) brightness(108%);
+  border-bottom: 1px solid rgba(255,255,255,.45);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.75), 0 1px 0 rgba(0,40,90,.06);
   transition: background var(--dur-med) var(--ease-out), backdrop-filter var(--dur-med) var(--ease-out);
   height: 64px;
 }
 .tb.is-scrolled {
   /* Cuando se hace scroll, opacar UN POCO para que el texto del contenido
-     no compita con el de la topbar — sigue mostrando la foto detrás. */
-  background: linear-gradient(180deg, rgba(8,18,35,.62) 0%, rgba(8,18,35,.50) 100%);
-  backdrop-filter: blur(52px) saturate(200%) brightness(94%);
-  -webkit-backdrop-filter: blur(52px) saturate(200%) brightness(94%);
+     no compita con el de la topbar — pero seguimos mostrando la foto. */
+  background: linear-gradient(180deg, rgba(255,255,255,.50) 0%, rgba(255,255,255,.36) 100%);
+  backdrop-filter: blur(60px) saturate(220%) brightness(110%);
+  -webkit-backdrop-filter: blur(60px) saturate(220%) brightness(110%);
 }
 @media (max-width: 1024px) {
   .tb { left: 0; padding: 12px 18px; }
@@ -194,25 +194,25 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   display: inline-flex; align-items: center; gap: 6px;
   transition: all var(--dur-fast) var(--ease-out);
 }
-.tb-nav a:hover { background: rgba(120,170,255,.12); color: var(--ink-1); opacity: 1; }
-.tb-nav a.is-active { background: rgba(0,122,255,.20); color: var(--brand-hi); }
+.tb-nav a:hover { background: rgba(0,40,90,.05); color: var(--ink-1); opacity: 1; }
+.tb-nav a.is-active { background: rgba(0,122,255,.12); color: var(--brand); }
 .tb-nav a svg, .tb-nav a i { width: 15px; height: 15px; }
 .tb-right { display: flex; align-items: center; gap: 10px; }
 
 .tb-search {
   display: flex; align-items: center; gap: 8px;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.16);
+  background: rgba(255,255,255,.7);
+  border: 1px solid rgba(0,40,90,.10);
   border-radius: var(--r-pill);
   padding: 7px 14px; color: var(--ink-3); font-size: 13px;
   min-width: 240px;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.10);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
 }
 .tb-search input { background: transparent; border: 0; outline: 0; color: var(--ink-1); font: inherit; flex: 1; }
 .tb-search input::placeholder { color: var(--ink-4); }
 .tb-search kbd {
   font-family: var(--font-mono); font-size: 10px;
-  background: rgba(255,255,255,.10); padding: 2px 6px; border-radius: 4px; color: var(--ink-3);
+  background: rgba(0,40,90,.08); padding: 2px 6px; border-radius: 4px; color: var(--ink-3);
 }
 
 .tb-avatar {
@@ -227,7 +227,7 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   font-family: var(--font-mono); font-size: 10.5px; font-weight: 700;
   text-transform: uppercase; letter-spacing: var(--tracking-caps);
   color: var(--ink-3); padding: 4px 9px;
-  background: rgba(255,255,255,.10); border-radius: var(--r-pill);
+  background: rgba(0,40,90,.06); border-radius: var(--r-pill);
 }
 
 /* ─── SIDEBAR (transparente · la foto se ve detrás sin filtros) ── */
@@ -253,7 +253,7 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
 body.aqua .sb-item,
 body.aqua .sb-brand-head,
 .sb-group-title {
-  text-shadow: 0 1px 2px rgba(0,8,20,.65), 0 0 4px rgba(0,8,20,.45);
+  text-shadow: 0 1px 1px rgba(255,255,255,.55), 0 0 2px rgba(255,255,255,.35);
 }
 .sb > * { position: relative; z-index: 1; }
 
@@ -286,16 +286,16 @@ body.aqua .sb-item {
 body.aqua .sb-item:hover {
   background: rgba(120,170,255,.14);
   color: var(--ink-1); opacity: 1;
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
 body.aqua .sb-item.is-active {
-  background: linear-gradient(180deg, rgba(0,122,255,.22) 0%, rgba(0,122,255,.12) 100%);
-  color: var(--brand-hi);
+  background: linear-gradient(180deg, rgba(0,122,255,.18) 0%, rgba(0,122,255,.10) 100%);
+  color: var(--brand-deep);
   font-weight: 600;
   box-shadow:
-    inset 0 1px 0 rgba(255,255,255,.20),
-    inset 0 -1px 0 rgba(0,0,0,.20),
-    0 1px 2px rgba(0,0,0,.20);
+    inset 0 1px 0 rgba(255,255,255,.65),
+    inset 0 -1px 0 rgba(0,80,180,.08),
+    0 1px 2px rgba(0,122,255,.10);
 }
 .sb-item.is-active::before {
   content: ""; position: absolute; left: -2px; top: 50%; transform: translateY(-50%);
@@ -323,7 +323,7 @@ body.aqua .sb-item.is-active {
   border-radius: 6px;
   transition: background .12s ease;
 }
-.sb-tree .sb-caret:hover { background: rgba(255, 255, 255, .10); color: var(--ink-1); }
+.sb-tree .sb-caret:hover { background: rgba(0, 40, 90, .08); color: var(--ink-1); }
 .sb-tree .sb-caret svg,
 .sb-tree .sb-caret i { width: 14px; height: 14px; transition: transform .18s ease; }
 .sb-tree:not(.is-expanded) .sb-caret svg,
@@ -358,16 +358,16 @@ body.aqua .sb-item.is-active {
 .sb-tree .sb-item-child .sb-child-bullet {
   display: inline-block;
   width: 8px; height: 1px;
-  background: rgba(255, 255, 255, .25);
+  background: rgba(0, 40, 90, .25);
   flex-shrink: 0;
 }
 .sb-tree .sb-item-child:hover {
-  background: rgba(120, 170, 255, .10);
+  background: rgba(0, 122, 255, .07);
   color: var(--ink-1);
 }
 .sb-tree .sb-item-child.is-active {
-  background: linear-gradient(180deg, rgba(0,122,255,.22) 0%, rgba(0,122,255,.12) 100%);
-  color: var(--brand-hi);
+  background: linear-gradient(180deg, rgba(0,122,255,.18) 0%, rgba(0,122,255,.10) 100%);
+  color: var(--brand-deep);
   font-weight: 600;
 }
 .sb-tree .sb-item-child .sb-contrato-num {
@@ -377,7 +377,7 @@ body.aqua .sb-item.is-active {
   padding: 0;
 }
 .sb-tree .sb-item-child.is-active .sb-contrato-num {
-  color: var(--brand-hi);
+  color: var(--brand-deep);
 }
 
 /* Nivel intermedio: categoría con texto largo (multi-línea) */
@@ -399,7 +399,7 @@ body.aqua .sb-item.is-active {
 }
 .sb-tree .sb-item-category.is-active .sb-cat-text {
   font-weight: 600;
-  color: var(--brand-hi);
+  color: var(--brand-deep);
 }
 .sb-caret-sm {
   width: 20px !important;
@@ -437,15 +437,15 @@ body.aqua .sb-item.is-active {
 }
 .sb-tree .sb-item-grandchild .sb-child-bullet {
   width: 6px;
-  background: rgba(255, 255, 255, .22);
+  background: rgba(0, 40, 90, .22);
 }
 .sb-tree .sb-item-grandchild:hover {
-  background: rgba(120, 170, 255, .10);
+  background: rgba(0, 122, 255, .07);
   color: var(--ink-1);
 }
 .sb-tree .sb-item-grandchild.is-active {
-  background: linear-gradient(180deg, rgba(0,122,255,.22) 0%, rgba(0,122,255,.12) 100%);
-  color: var(--brand-hi);
+  background: linear-gradient(180deg, rgba(0,122,255,.18) 0%, rgba(0,122,255,.10) 100%);
+  color: var(--brand-deep);
   font-weight: 600;
 }
 .sb-tree .sb-item-grandchild .sb-contrato-num {
@@ -455,7 +455,7 @@ body.aqua .sb-item.is-active {
   padding: 0;
 }
 .sb-tree .sb-item-grandchild.is-active .sb-contrato-num {
-  color: var(--brand-hi);
+  color: var(--brand-deep);
 }
 
 /* Nivel 4: secciones del contrato (Control y Gestión Operativa, Información Contractual)
@@ -479,7 +479,7 @@ body.aqua .sb-item.is-active {
 .sb-tree .sb-item-greatgrandchild .sb-child-bullet {
   display: inline-block;
   width: 6px; height: 1px;
-  background: rgba(255, 255, 255, .30);
+  background: rgba(0, 40, 90, .25);
   flex-shrink: 0;
 }
 .sb-tree .sb-item-greatgrandchild .sb-section-text {
@@ -488,16 +488,16 @@ body.aqua .sb-item.is-active {
   line-height: 1.25;
 }
 .sb-tree .sb-item-greatgrandchild:hover {
-  background: rgba(120, 170, 255, .12);
+  background: rgba(0, 122, 255, .07);
   color: var(--ink-1);
 }
 .sb-tree .sb-item-greatgrandchild.is-active {
-  background: linear-gradient(180deg, rgba(0,122,255,.22) 0%, rgba(0,122,255,.12) 100%);
-  color: var(--brand-hi);
+  background: linear-gradient(180deg, rgba(0,122,255,.18) 0%, rgba(0,122,255,.10) 100%);
+  color: var(--brand-deep);
   font-weight: 600;
 }
 .sb-tree .sb-item-greatgrandchild.is-active .sb-child-bullet {
-  background: var(--brand-hi);
+  background: var(--brand-deep);
   width: 8px;
   height: 2px;
   border-radius: 1px;
@@ -532,12 +532,12 @@ body.aqua .sb-item.is-active {
   color: var(--ink-1);
 }
 .sb-tree .sb-item-leaf.is-active {
-  background: linear-gradient(180deg, rgba(0,122,255,.24) 0%, rgba(0,122,255,.14) 100%);
-  color: var(--brand-hi);
+  background: linear-gradient(180deg, rgba(0,122,255,.18) 0%, rgba(0,122,255,.10) 100%);
+  color: var(--brand-deep);
   font-weight: 600;
 }
 .sb-tree .sb-item-leaf.is-active .sb-leaf-bullet {
-  background: var(--brand-hi);
+  background: var(--brand-deep);
   width: 8px;
   height: 2px;
   border-radius: 1px;
@@ -558,12 +558,12 @@ body.aqua .sb-item.is-active {
   width: 22px; height: 22px;
   display: grid; place-items: center;
   border-radius: 6px;
-  background: rgba(255,255,255,.06);
+  background: rgba(0,40,90,.05);
   transition: all var(--dur-fast);
 }
 .sb-item:hover .i, .sb-item.is-active .i {
-  background: rgba(0,122,255,.24);
-  color: var(--brand-hi);
+  background: rgba(0,122,255,.18);
+  color: var(--brand);
 }
 .sb-item .i svg, .sb-item .i i { width: 14px; height: 14px; }
 .sb-item .badge {
@@ -963,24 +963,23 @@ body.aqua .sb-item.is-active {
   display: flex; align-items: center; justify-content: space-between;
   margin-bottom: 28px; gap: 16px; flex-wrap: wrap;
 }
-/* Títulos directamente sobre la foto (dark mode): sombra OSCURA para
-   legibilidad sobre zonas brillantes (luces de subestación, reflejos)
-   y mantener contraste sobre zonas oscuras (cielo nocturno). */
+/* Títulos directamente sobre la foto: sombra blanca sutil para
+   legibilidad sobre zonas claras (cielo) y oscuras (transformador). */
 .page-title {
   font-size: 28px; font-weight: 700; color: var(--ink-1);
   letter-spacing: -.02em; margin: 0;
-  text-shadow: 0 1px 2px rgba(0,8,20,.70), 0 2px 12px rgba(0,8,20,.50);
+  text-shadow: 0 1px 0 rgba(255,255,255,.55), 0 2px 8px rgba(244,249,255,.42);
 }
-.page-title em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--brand-hi); }
+.page-title em { font-family: var(--font-serif); font-style: italic; font-weight: 400; color: var(--brand); }
 .page-sub {
   font-size: 13px; color: var(--ink-3); margin-top: 4px;
-  text-shadow: 0 1px 2px rgba(0,8,20,.60);
+  text-shadow: 0 1px 0 rgba(255,255,255,.45);
 }
 .section-title {
-  text-shadow: 0 1px 2px rgba(0,8,20,.65), 0 2px 8px rgba(0,8,20,.45);
+  text-shadow: 0 1px 0 rgba(255,255,255,.42), 0 2px 6px rgba(244,249,255,.32);
 }
 .section-sub {
-  text-shadow: 0 1px 2px rgba(0,8,20,.55);
+  text-shadow: 0 1px 0 rgba(255,255,255,.40);
 }
 
 /* ─── FORM GRID ───────────────────────────────────────────── */
@@ -1578,10 +1577,10 @@ body.aqua .form-textarea:focus {
 }
 body.aqua .form-textarea { min-height: 96px; resize: vertical; }
 
-/* Breadcrumb legible sobre la foto en iframes (dark mode) */
+/* Breadcrumb legible sobre la foto en iframes */
 body.aqua.is-embedded .breadcrumb {
   color: var(--ink-2);
-  text-shadow: 0 1px 2px rgba(0,8,20,.60);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
 }
 
 /* Page header legacy */

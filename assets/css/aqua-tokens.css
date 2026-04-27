@@ -23,39 +23,36 @@
     radial-gradient(ellipse 55% 38% at 92% 88%,  rgba(255,184,76,.10) 0%, transparent 65%),
     linear-gradient(180deg, #f7f9fd 0%, #eef3fa 50%, #e6edf7 100%);
 
-  /* ── VIDRIO LIQUID GLASS (4 materiales — DARK MODE para foto nocturna) ───
-     Anteriormente eran tints blancos (rgba(255,255,255,X)) sobre foto
-     clara. Con la nueva foto IMG_9840 (subestación de noche · cielo
-     oscuro · luces puntuales) el fondo cambia a oscuro, así que las
-     superficies glass ahora usan tints AZUL-NAVY-OSCUROS. El blur
-     fuerte mantiene la sensación Liquid Glass — solo cambia el color
-     de la capa translúcida. */
-  --glass-thin:    linear-gradient(140deg, rgba(8,18,35,.32) 0%, rgba(12,24,42,.20) 100%);
-  --glass-regular: linear-gradient(140deg, rgba(8,18,35,.42) 0%, rgba(12,24,42,.28) 100%);
-  --glass-thick:   linear-gradient(140deg, rgba(8,18,35,.55) 0%, rgba(12,24,42,.40) 100%);
-  --glass-ultra:   linear-gradient(140deg, rgba(8,18,35,.72) 0%, rgba(12,24,42,.56) 100%);
+  /* ── VIDRIO LIQUID GLASS (4 materiales — macOS Tahoe 26.3) ───
+     Tints blancos sobre la foto: las cards se ven como vidrio claro
+     translúcido, ideal para texto oscuro/negro inside. El blur fuerte
+     mantiene legibilidad. */
+  --glass-thin:    linear-gradient(140deg, rgba(255,255,255,.22) 0%, rgba(238,247,255,.10) 100%);
+  --glass-regular: linear-gradient(140deg, rgba(255,255,255,.30) 0%, rgba(232,243,255,.16) 100%);
+  --glass-thick:   linear-gradient(140deg, rgba(255,255,255,.42) 0%, rgba(228,240,255,.24) 100%);
+  --glass-ultra:   linear-gradient(140deg, rgba(255,255,255,.62) 0%, rgba(228,240,255,.42) 100%);
 
-  --glass-blur-thin:    blur(28px) saturate(170%) brightness(96%);
-  --glass-blur-regular: blur(40px) saturate(180%) brightness(94%);
-  --glass-blur-thick:   blur(54px) saturate(190%) brightness(92%);
+  --glass-blur-thin:    blur(32px) saturate(190%) brightness(108%);
+  --glass-blur-regular: blur(48px) saturate(200%) brightness(108%);
+  --glass-blur-thick:   blur(64px) saturate(220%) brightness(110%);
 
-  /* Ring 3D — luz arriba (highlight blanco MUY sutil), sombra abajo
-     (oscura), lados con refracción cromática */
-  --glass-border-top:    rgba(255,255,255,.42);
-  --glass-border-bottom: rgba(0,0,0,.30);
+  /* Ring 3D — luz arriba MUY brillante, sombra abajo, lados con
+     refracción cromática (efecto borde prismático Tahoe) */
+  --glass-border-top:    rgba(255,255,255,.98);
+  --glass-border-bottom: rgba(0,40,90,.10);
   --glass-ring:
-    inset 0 1.5px 0 rgba(255,255,255,.42),
-    inset 0 -1px 0 rgba(0,0,0,.30),
-    inset 1.5px 0 0 rgba(255,255,255,.18),
-    inset -1.5px 0 0 rgba(0,0,0,.18),
-    inset 0 0 0 .5px rgba(255,255,255,.10);
+    inset 0 1.5px 0 rgba(255,255,255,.98),
+    inset 0 -1px 0 rgba(0,40,90,.10),
+    inset 1.5px 0 0 rgba(255,255,255,.72),
+    inset -1.5px 0 0 rgba(0,40,90,.05),
+    inset 0 0 0 .5px rgba(255,255,255,.30);
 
-  /* Specular — destello blanco superior (capa ::before) más sutil
-     en dark mode para no parecer plástico */
+  /* Specular — destello blanco intenso superior (capa ::before)
+     dos capas: highlight diagonal arriba-izquierda + linear suave */
   --glass-specular:
-    radial-gradient(ellipse 80% 50% at 22% -12%, rgba(255,255,255,.32) 0%, rgba(255,255,255,.12) 28%, transparent 62%),
-    radial-gradient(ellipse 40% 30% at 88% 8%, rgba(255,255,255,.18) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,.04) 22%, transparent 50%, transparent 80%, rgba(0,0,0,.16) 100%);
+    radial-gradient(ellipse 80% 50% at 22% -12%, rgba(255,255,255,.92) 0%, rgba(255,255,255,.42) 28%, transparent 62%),
+    radial-gradient(ellipse 40% 30% at 88% 8%, rgba(255,255,255,.55) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,.10) 22%, transparent 50%, transparent 80%, rgba(0,40,90,.08) 100%);
 
   /* Refracción prismática (efecto Tahoe en los bordes) */
   --glass-refraction:
@@ -99,14 +96,14 @@
   --grad-warn:    linear-gradient(180deg, #ffb866 0%, #ff9500 50%, #b85f00 100%);
   --grad-success: linear-gradient(180deg, #5fdb95 0%, #1cc870 50%, #008f4a 100%);
 
-  /* ── TEXTO (DARK MODE · light inks sobre foto oscura) ───
-     Antes eran navy oscuros (#0d1f38…) optimizados para fondo perla.
-     Con la foto nocturna IMG_9840 todo el sistema pasa a inks claros
-     que mantienen la familia cromática steel-navy invertida. */
-  --ink-1: #f3f7ff;   /* títulos, números KPI · cool white */
-  --ink-2: #d6e0ec;   /* cuerpo, items de menú · light steel */
-  --ink-3: #a0b3ca;   /* subtítulos, meta · muted blue-gray */
-  --ink-4: #6f7f96;   /* placeholder / disabled · low contrast */
+  /* ── TEXTO (Steel Corporate Navy · negro corporativo serio) ───
+     Familia cromática del brand iOS blue #007aff pero más saturada y
+     oscura. Da seriedad corporativa, lee como negro a tamaño normal,
+     se distingue de los acentos. Match con el entorno aqua light perla. */
+  --ink-1: #0d1f38;   /* títulos, números KPI · steel navy deep (lee como negro) */
+  --ink-2: #1f3656;   /* cuerpo, items de menú · corporate steel */
+  --ink-3: #4d6485;   /* subtítulos, meta · muted blue-gray */
+  --ink-4: #8093ad;   /* placeholder / disabled · light blue-gray */
 
   /* ── TIPOGRAFÍA ───────────────────────────────────────── */
   --font-sans:  -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', sans-serif;
