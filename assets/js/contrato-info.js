@@ -23,6 +23,8 @@ import {
   listarDocumentos,
   agruparPorCategoria,
   formatearPeso,
+  subirDocumento,
+  eliminarDocumento,
   CATEGORIAS_DOC
 } from './data/documentos_contractuales.js';
 
@@ -76,17 +78,22 @@ function renderLista(docs) {
         ${escHtml(g.label)}
       </div>
       ${g.docs.map((d) => `
-        <button type="button" class="cloud-doc${state.seleccionado === d.archivo ? ' is-selected' : ''}"
-                aria-pressed="${state.seleccionado === d.archivo ? 'true' : 'false'}"
-                data-archivo="${escHtml(d.archivo)}">
-          <span class="cloud-doc-icon" aria-hidden="true">
-            <i data-lucide="${escHtml(CATEGORIAS_DOC[d.categoria]?.icon || 'file-text')}"></i>
-          </span>
-          <span class="cloud-doc-body">
-            <span class="cloud-doc-title">${escHtml(d.titulo)}</span>
-            <span class="cloud-doc-meta">${formatearPeso(d.peso_bytes)}</span>
-          </span>
-        </button>
+        <div class="cloud-doc-wrap" data-archivo="${escHtml(d.archivo)}">
+          <button type="button" class="cloud-doc${state.seleccionado === d.archivo ? ' is-selected' : ''}"
+                  aria-pressed="${state.seleccionado === d.archivo ? 'true' : 'false'}"
+                  data-archivo="${escHtml(d.archivo)}">
+            <span class="cloud-doc-icon" aria-hidden="true">
+              <i data-lucide="${escHtml(CATEGORIAS_DOC[d.categoria]?.icon || 'file-text')}"></i>
+            </span>
+            <span class="cloud-doc-body">
+              <span class="cloud-doc-title">${escHtml(d.titulo)}</span>
+              <span class="cloud-doc-meta">${formatearPeso(d.peso_bytes)}</span>
+            </span>
+          </button>
+          <button type="button" class="cloud-doc-delete" data-archivo="${escHtml(d.archivo)}" data-titulo="${escHtml(d.titulo)}" title="Eliminar documento" aria-label="Eliminar ${escHtml(d.titulo)}">
+            <i data-lucide="trash-2" aria-hidden="true"></i>
+          </button>
+        </div>
       `).join('')}
     </div>
   `).join('');
@@ -95,9 +102,21 @@ function renderLista(docs) {
   if (window.lucide && window.lucide.createIcons) {
     window.lucide.createIcons({ root: list });
   }
-  // Wire click en cada doc.
+  // Wire click en cada doc (selección).
   for (const btn of list.querySelectorAll('.cloud-doc')) {
-    btn.addEventListener('click', () => seleccionar(btn.dataset.archivo));
+    btn.addEventListener('click', (ev) => {
+      // Si el target es el delete (o un descendiente), no seleccionar.
+      if (ev.target.closest('.cloud-doc-delete')) return;
+      seleccionar(btn.dataset.archivo);
+    });
+  }
+  // Wire click en cada delete (admin).
+  for (const del of list.querySelectorAll('.cloud-doc-delete')) {
+    del.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      pedirEliminar(del.dataset.archivo, del.dataset.titulo);
+    });
   }
 }
 
@@ -218,3 +237,156 @@ async function cargar() {
 }
 
 cargar();
+
+// ══════════════════════════════════════════════════════════════
+// ADMIN — Upload + Delete (Fase C)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Activa los controles de admin si la sesión los permite.
+ * Lee window.__sgmSession (lo expone session-guard.js + aqua-shell).
+ */
+function aplicarRolAdmin() {
+  const sess = window.__sgmSession || {};
+  const role = sess.role || (sess.profile && sess.profile.rol) || 'tecnico';
+  if (role === 'admin') {
+    document.body.classList.add('is-admin');
+    $('btnAddDoc').hidden = false;
+  }
+}
+if (window.__sgmSession) {
+  aplicarRolAdmin();
+} else {
+  window.addEventListener('sgm:session-ready', aplicarRolAdmin, { once: true });
+}
+
+// ── Modal de Upload ──────────────────────────────────────────
+function abrirUpload() {
+  $('uploadForm').reset();
+  $('upMsg').textContent = '';
+  $('upMsg').className = 'upload-msg';
+  $('upProgress').hidden = true;
+  $('upProgressFill').style.width = '0%';
+  $('btnSubmitUpload').disabled = false;
+  $('uploadModalBg').hidden = false;
+  setTimeout(() => $('upTitulo').focus(), 50);
+}
+function cerrarUpload() {
+  $('uploadModalBg').hidden = true;
+}
+$('btnAddDoc').addEventListener('click', abrirUpload);
+$('btnCloseUpload').addEventListener('click', cerrarUpload);
+$('btnCancelUpload').addEventListener('click', cerrarUpload);
+$('uploadModalBg').addEventListener('click', (ev) => {
+  if (ev.target === $('uploadModalBg')) cerrarUpload();
+});
+
+$('uploadForm').addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const titulo = $('upTitulo').value.trim();
+  const categoria = $('upCategoria').value;
+  const fileInput = $('upArchivo');
+  const file = fileInput.files && fileInput.files[0];
+  if (!titulo || !file) return;
+
+  const sess = window.__sgmSession || {};
+  const uid = sess.user && sess.user.uid;
+
+  $('btnSubmitUpload').disabled = true;
+  $('upMsg').textContent = '';
+  $('upMsg').className = 'upload-msg';
+  $('upProgress').hidden = false;
+  $('upProgressFill').style.width = '0%';
+  $('upProgressText').textContent = '⋯ subiendo';
+
+  try {
+    await subirDocumento({
+      cid: contratoId,
+      titulo,
+      categoria,
+      file,
+      uid,
+      onProgress: (pct) => {
+        $('upProgressFill').style.width = pct + '%';
+        $('upProgressText').textContent = `⋯ subiendo ${pct}%`;
+      }
+    });
+    $('upProgressText').textContent = '✓ subido';
+    $('upMsg').textContent = `✓ '${titulo}' agregado correctamente.`;
+    $('upMsg').className = 'upload-msg is-ok';
+    // Refresca la lista (mergea Firestore override sobre manifest).
+    await cargar();
+    setTimeout(cerrarUpload, 1200);
+  } catch (err) {
+    console.error('[contrato-info] upload fallo:', err);
+    let msg = err.message || 'Error desconocido al subir';
+    // Pista útil cuando las storage rules no están deployadas
+    if (/permission-denied|unauthorized/i.test(msg)) {
+      msg += ' · Verifica que se haya hecho `firebase deploy --only storage` en la Mac (CLAUDE.md §0.1.1).';
+    }
+    $('upMsg').textContent = '✕ ' + msg;
+    $('upMsg').className = 'upload-msg is-err';
+    $('upProgress').hidden = true;
+    $('btnSubmitUpload').disabled = false;
+  }
+});
+
+// ── Modal de Delete ──────────────────────────────────────────
+let deleteTarget = null;
+
+function pedirEliminar(archivo, titulo) {
+  deleteTarget = { archivo, titulo };
+  $('deleteDocName').textContent = titulo;
+  $('deleteMsg').textContent = '';
+  $('deleteMsg').className = 'upload-msg';
+  $('btnConfirmDelete').disabled = false;
+  $('deleteModalBg').hidden = false;
+}
+function cerrarDelete() {
+  deleteTarget = null;
+  $('deleteModalBg').hidden = true;
+}
+$('btnCancelDelete').addEventListener('click', cerrarDelete);
+$('deleteModalBg').addEventListener('click', (ev) => {
+  if (ev.target === $('deleteModalBg')) cerrarDelete();
+});
+
+$('btnConfirmDelete').addEventListener('click', async () => {
+  if (!deleteTarget) return;
+  const { archivo, titulo } = deleteTarget;
+  $('btnConfirmDelete').disabled = true;
+  $('deleteMsg').textContent = '⋯ eliminando…';
+  $('deleteMsg').className = 'upload-msg';
+  try {
+    await eliminarDocumento({ cid: contratoId, archivo });
+    $('deleteMsg').textContent = `✓ '${titulo}' eliminado.`;
+    $('deleteMsg').className = 'upload-msg is-ok';
+    // Si el doc eliminado era el seleccionado, vuelve al placeholder.
+    if (state.seleccionado === archivo) {
+      state.seleccionado = null;
+      $('viewerToolbar').hidden = true;
+      $('viewerEmpty').hidden = false;
+      $('viewerFrame').hidden = true;
+      $('viewerFrame').setAttribute('src', '');
+      history.replaceState(null, '', location.pathname + location.search);
+    }
+    await cargar();
+    setTimeout(cerrarDelete, 1200);
+  } catch (err) {
+    console.error('[contrato-info] delete fallo:', err);
+    let msg = err.message || 'Error al eliminar';
+    if (/permission-denied|unauthorized/i.test(msg)) {
+      msg += ' · Verifica que se haya hecho `firebase deploy --only storage` en la Mac.';
+    }
+    $('deleteMsg').textContent = '✕ ' + msg;
+    $('deleteMsg').className = 'upload-msg is-err';
+    $('btnConfirmDelete').disabled = false;
+  }
+});
+
+// ESC cierra cualquier modal abierto.
+document.addEventListener('keydown', (ev) => {
+  if (ev.key !== 'Escape') return;
+  if (!$('uploadModalBg').hidden) cerrarUpload();
+  if (!$('deleteModalBg').hidden) cerrarDelete();
+});
