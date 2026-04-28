@@ -237,3 +237,121 @@ Dos canales con un único API en frontend:
    en este plan + el changelog v2.6.0 + el código tiene comentarios
    suficientes para que cualquier sesión futura entienda el modelo
    sin re-leer toda la conversación.
+
+## 10. Follow-up v2.7.0 (2026-04-27 PM4)
+
+Después de v2.6.0 el director pidió dos cambios adicionales:
+
+1. **Número de contrato no debe ser link** — debe solo expandir/
+   colapsar el árbol; la navegación al dashboard sale por el
+   sub-item Control y Gestión Operativa.
+2. **UI admin para gestionar PDFs**: botón + Agregar documento en
+   la nube documental + botón eliminar en cada doc, ambos visibles
+   solo para rol admin.
+
+Implementado en 4 fases atómicas:
+
+| Fase | Commit | Resumen |
+|---|---|---|
+| A | `76f7b88` | Sidebar: contracto como `<button>` toggle, no link |
+| B | `3f7963e` | UI admin: botón Agregar + hover delete + modales |
+| C | `450f2f9` | Wire a Firebase Storage + Firestore (subir/eliminar) |
+| D | (este commit) | Documentación |
+
+### 10.1 Resultado final
+
+**Sidebar**:
+- 4123000081 / 4125000143 son `<button class="sb-item-grandchild
+  sb-item-toggle">`. Click solo togglea.
+- Mismos estilos heredados de `.sb-item-grandchild` (introducidos
+  en v2.5.x).
+- `markActive()` no rompe — los buttons no tienen href, no
+  matchean nunca, lo cual es semánticamente correcto: la sub-item
+  activa se ve en Control y Gestión Operativa o Información
+  Contractual.
+
+**Admin upload UI** (en `pages/contrato-info.html`):
+- Botón `#btnAddDoc` en cabecera de lista lateral, oculto por
+  default. JS `aplicarRolAdmin()` lo muestra si
+  `window.__sgmSession.role === 'admin'`.
+- Modal upload con campos título / categoría (7 enums) / archivo
+  PDF + barra de progreso resumable + área de mensajes.
+- Modal delete con confirmación + warning glass.
+- ESC + click backdrop cierran cualquier modal.
+- Body recibe class `is-admin` para activar `body.is-admin
+  .cloud-doc-wrap:hover .cloud-doc-delete { display: inline-flex }`.
+
+**Data layer** (`assets/js/data/documentos_contractuales.js`):
+- `slugFromTitle(titulo)`: NFD normalize + lowercase + a-z0-9 +
+  dash separator + sufijo .pdf. Mismas reglas que el script Python
+  `scripts/deploy-pdfs-storage.js` para que un upload UI y una
+  migración server-side coincidan en slugs.
+- `subirDocumento({cid, titulo, categoria, file, uid, onProgress})`:
+  - Valida tipo y tamaño (≤50 MB, alineado con storage rule)
+  - `uploadBytesResumable` a `contratos/{cid}/{slug}` con
+    `state_changed` mapeado a `onProgress(pct)`
+  - `getDownloadURL` para obtener URL firmada de larga duración
+  - `setDoc` con merge:true en `/contratos/{cid}` updateando
+    `documentos_contractuales[]` (filter de duplicados por slug)
+- `eliminarDocumento({cid, archivo})`:
+  - Lee array existente
+  - Si el archivo NO está → error informativo (probablemente del
+    manifest base del repo, no eliminable desde frontend)
+  - `deleteObject` del Storage (tolera 404 storage/object-not-found)
+  - `setDoc` con array filtrado
+
+### 10.2 Para que funcione en producción
+
+1. **Deploy de storage rules** (si no se hizo en v2.6.0):
+   ```bash
+   firebase deploy --only storage
+   ```
+   Las rules ya están en `storage.rules` (commit `13875ce` Fase 4
+   de v2.6.0):
+   ```
+   match /contratos/{contratoId}/{filename=**} {
+     allow read:   if true;
+     allow create: if isAdmin() && request.resource.size <= 50 * 1024 * 1024;
+     allow update: if isAdmin() && request.resource.size <= 50 * 1024 * 1024;
+     allow delete: if isAdmin();
+   }
+   ```
+
+2. **Verificar rol admin**: el director debe tener
+   `/admins/{uid}` doc en Firestore, o un `/usuarios/{uid}` con
+   `rol: 'admin'` y `activo: true`. Las storage rules usan
+   `isAdmin()` que chequea ambos.
+
+3. **Probar flujo completo**:
+   - Login como admin → la página `pages/contrato-info.html` debe
+     mostrar el botón "+ Agregar documento" arriba de la lista
+   - Click → modal con campos vacíos
+   - Llenar título, categoría, elegir PDF, click "Subir" → barra
+     de progreso 0-100% → "✓ subido" → lista refrescada con el
+     nuevo doc al final
+   - Hover sobre cualquier doc → aparece botón trash a la derecha
+   - Click en trash → modal de confirmación → "Eliminar" → doc
+     desaparece de la lista (y de Storage)
+
+4. **Comportamiento esperado para no-admin** (rol tecnico):
+   - Botón "+ Agregar documento" oculto
+   - Sin botón trash al hover
+   - Solo lectura: lista + visor + descarga + nueva pestaña
+     funcionan normalmente
+
+### 10.3 Notas técnicas para futuras sesiones
+
+- Los docs subidos via UI admin viven en
+  `/contratos/{cid}.documentos_contractuales[]` (array). El frontend
+  los **mergea sobre el manifest local** del repo (Firestore gana).
+- Los docs originales del repo (`assets/docs/contratos/{cid}/...`)
+  NO se pueden eliminar desde la UI — solo via PR contra el repo.
+  El error es claro al intentar.
+- Si quieres convertir un doc del repo a doc Firestore (para poder
+  editarlo/eliminarlo desde la UI), hay que: subir mismo PDF via
+  modal admin (esto crea entrada en Firestore con misma slug) y
+  borrarlo del repo en commit aparte.
+- El script `scripts/deploy-pdfs-storage.js` (Fase 4 v2.6.0) sigue
+  útil para el bootstrap inicial: sube todos los PDFs del manifest
+  local a Firebase Storage de una vez. Después la UI admin gestiona
+  los nuevos.

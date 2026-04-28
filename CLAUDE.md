@@ -1387,21 +1387,24 @@ Reestructura del módulo Suministros / Contratos en 6 fases. Detalle
 en `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` y `CHANGELOG.md`
 v2.6.0. Estado de cierre:
 
-**Sidebar contratos (estructura final)**:
+**Sidebar contratos (estructura final v2.7.0)**:
 
 ```
 Contratos ▾                                        ← <a href> a contratos.html
   Suministro de Elementos y Accesorios… ▾          ← <button> · solo expand/collapse
-    4123000081 ▾                                   ← <a href> a contrato.html?id=…
+    4123000081 ▾                                   ← <button> · SOLO expand/collapse (v2.7.0)
       Control y Gestión Operativa                  ← <a href> a contrato.html?id=…
       Información Contractual                      ← <a href> a contrato-info.html?id=…
     4125000143 ▾
       (espejo)
 ```
 
-La categoría es ahora `<button class="sb-item-toggle">` que solo
-toggle el árbol — no navega. Click en un número de contrato sí
-navega al dashboard.
+Tanto la categoría como cada número de contrato son `<button
+class="sb-item-toggle">` que solo togglean el árbol. La navegación
+real al dashboard del contrato sale exclusivamente por
+"Control y Gestión Operativa". Esta consistencia se introdujo en
+v2.7.0 (commit `76f7b88`) — el director había pedido el cambio
+explícitamente.
 
 **Página `pages/contrato-info.html`**:
 
@@ -1437,7 +1440,33 @@ match /contratos/{contratoId}/{filename=**} {
 ```
 
 ⚠ Requiere `firebase deploy --only storage` antes de que el script
-pueda subir PDFs.
+ó la UI admin de upload puedan subir PDFs.
+
+**Admin upload + delete (v2.7.0)**:
+
+Si el usuario logueado tiene `rol=admin`:
+- Aparece botón "+ Agregar documento" en la cabecera de la lista
+  lateral. Abre modal con campos título / categoría (7 opciones
+  canónicas) / archivo PDF. Upload via `uploadBytesResumable` con
+  barra de progreso 0-100. Idempotente por slug. Al éxito refresca
+  la lista (mergea Firestore sobre manifest).
+- Aparece botón trash absoluto al hover sobre cada doc. Abre modal
+  de confirmación. Al confirmar, `deleteObject` del Storage +
+  filter del array Firestore.
+
+Las funciones de upload/delete viven en
+`assets/js/data/documentos_contractuales.js`:
+- `slugFromTitle(titulo)` — genera slug URL-safe (NFD + lowercase
+  + a-z0-9 con dash separator, sufijo .pdf). Mismas reglas que el
+  script Python.
+- `subirDocumento({cid, titulo, categoria, file, uid, onProgress})`
+- `eliminarDocumento({cid, archivo})` — solo elimina docs que
+  estén en el array Firestore. Docs del manifest base del repo
+  lanzan error informativo.
+
+Manejo de errores: `permission-denied` en upload/delete agrega
+sugerencia explícita del comando `firebase deploy --only storage`
+en el mensaje (referencia a §0.1.1 de este archivo).
 
 **Fixes de contraste WCAG AA**: 6 reglas migradas de
 `color: var(--brand)` → `color: var(--brand-deep)` en

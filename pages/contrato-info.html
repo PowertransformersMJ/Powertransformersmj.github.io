@@ -39,7 +39,13 @@
           <i data-lucide="search" aria-hidden="true"></i>
           <input type="search" id="docSearch" placeholder="Buscar documento…" aria-label="Buscar documento"/>
         </div>
-        <div class="cloud-counter" id="docCounter">—</div>
+        <div class="cloud-toolbar">
+          <span class="cloud-counter" id="docCounter">—</span>
+          <button type="button" class="cloud-add-btn sb-admin" id="btnAddDoc" hidden title="Agregar nuevo documento PDF">
+            <i data-lucide="plus" aria-hidden="true"></i>
+            <span>Agregar documento</span>
+          </button>
+        </div>
       </div>
       <div class="cloud-list" id="docList">
         <div class="cloud-empty">⋯ cargando…</div>
@@ -85,6 +91,73 @@
       </div>
     </article>
   </section>
+
+  <!-- Modal de upload (solo admins) -->
+  <div class="upload-modal-bg" id="uploadModalBg" hidden>
+    <div class="upload-modal" role="dialog" aria-labelledby="uploadModalTitle" aria-modal="true">
+      <header class="upload-modal-head">
+        <h3 id="uploadModalTitle">Agregar documento contractual</h3>
+        <button type="button" class="upload-modal-close" id="btnCloseUpload" aria-label="Cerrar">
+          <i data-lucide="x" aria-hidden="true"></i>
+        </button>
+      </header>
+      <form class="upload-modal-form" id="uploadForm">
+        <label class="upload-field">
+          <span>Título del documento</span>
+          <input type="text" id="upTitulo" required maxlength="160" placeholder="Ej. Adenda No. 03 al contrato"/>
+        </label>
+        <label class="upload-field">
+          <span>Categoría</span>
+          <select id="upCategoria" required>
+            <option value="minuta">Minuta del contrato</option>
+            <option value="garantias">Garantías y seguros</option>
+            <option value="oferta">Oferta y aceptación</option>
+            <option value="adenda">Adendas</option>
+            <option value="orden">Órdenes y pedidos</option>
+            <option value="administracion">Administración</option>
+            <option value="otros" selected>Otros</option>
+          </select>
+        </label>
+        <label class="upload-field">
+          <span>Archivo PDF (máx. 50 MB)</span>
+          <input type="file" id="upArchivo" accept="application/pdf,.pdf" required/>
+        </label>
+        <div class="upload-progress" id="upProgress" hidden>
+          <div class="upload-progress-bar"><div class="upload-progress-fill" id="upProgressFill"></div></div>
+          <span class="upload-progress-text" id="upProgressText">⋯ subiendo</span>
+        </div>
+        <div class="upload-msg" id="upMsg"></div>
+        <div class="upload-actions">
+          <button type="button" class="btn btn--ghost" id="btnCancelUpload">Cancelar</button>
+          <button type="submit" class="btn btn--primary" id="btnSubmitUpload">
+            <i data-lucide="upload-cloud" aria-hidden="true"></i>
+            Subir
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal de confirmación de eliminar (solo admins) -->
+  <div class="upload-modal-bg" id="deleteModalBg" hidden>
+    <div class="upload-modal upload-modal--small" role="alertdialog" aria-labelledby="deleteModalTitle" aria-modal="true">
+      <header class="upload-modal-head">
+        <h3 id="deleteModalTitle">Eliminar documento</h3>
+      </header>
+      <div class="upload-modal-body">
+        <p>¿Confirmas eliminar <strong id="deleteDocName">—</strong>?</p>
+        <p class="upload-warn">El archivo se borra de Firebase Storage y se quita del manifiesto. Esta acción no se puede deshacer.</p>
+        <div class="upload-msg" id="deleteMsg"></div>
+      </div>
+      <div class="upload-actions">
+        <button type="button" class="btn btn--ghost" id="btnCancelDelete">Cancelar</button>
+        <button type="button" class="btn btn--danger" id="btnConfirmDelete">
+          <i data-lucide="trash-2" aria-hidden="true"></i>
+          Eliminar
+        </button>
+      </div>
+    </div>
+  </div>
 
 </main>
 
