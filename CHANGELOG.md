@@ -7,6 +7,80 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## v2.7.0 — Sidebar contratos como toggle puro + admin upload de PDFs (2026-04-27 PM4)
+
+Microcirugía adicional al módulo Contratos según lineamientos del
+director. Documentación en `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md`
+sección 'v2.7.0 follow-up'. 4 fases atómicas (A, B, C, D).
+
+### Resumen ejecutivo
+
+- **Número de contrato deja de ser link**: 4123000081 / 4125000143
+  pasan de `<a href>` a `<button class="sb-item-toggle">`. Click solo
+  expande/colapsa el árbol; la navegación al dashboard del contrato
+  sale exclusivamente por el sub-item "Control y Gestión Operativa".
+  Misma filosofía aplicada antes a la categoría "Suministro de
+  Elementos…" — consistencia total.
+- **UI admin para gestionar PDFs contractuales**: botón
+  "+ Agregar documento" en la cabecera de la lista (visible solo a
+  admin) + hover-action de eliminar en cada doc. Modales con form
+  glass material y barra de progreso resumable.
+- **Wire a Firebase Storage + Firestore**: upload via
+  `uploadBytesResumable` con onProgress 0-100, idempotente por slug
+  (re-subir el mismo título sobreescribe). Delete con `deleteObject`
+  + filter del array Firestore. Manejo de errores con pista de
+  deploy de storage rules cuando aplica.
+
+### Micro-fases (4 commits)
+
+- **Fase A** — `76f7b88` fix(sidebar): número de contrato es
+  `<button>` toggle, no link. CSS reutilizado de
+  `.sb-item-toggle` (sin nuevas reglas).
+- **Fase B** — `3f7963e` feat(contrato-info): UI admin de
+  upload/eliminar (HTML + CSS). Modales glass material con
+  campos título / categoría / archivo. Botón delete absoluto en
+  hover sobre cada doc.
+- **Fase C** — `450f2f9` feat(contrato-info): wire a Firebase
+  Storage + Firestore. Nuevas funciones `subirDocumento`,
+  `eliminarDocumento`, `slugFromTitle` en el data layer.
+  Detección de admin via `window.__sgmSession.role` con fallback a
+  evento `sgm:session-ready`.
+- **Fase D** — Esta documentación.
+
+### Decisiones técnicas
+
+1. **`<button>` para nodos solo-toggle** (consistencia con la
+   categoría). Cuando un nodo de árbol no debe navegar, es siempre
+   `<button>` para semántica correcta y reset uniforme via CSS
+   `.sb-item-toggle`.
+2. **`uploadBytesResumable` en lugar de `uploadBytes` simple** — da
+   onProgress y permite que el director vea %  durante el upload de
+   PDFs grandes (algunos pesan 11 MB).
+3. **Idempotencia por slug**: si el director sube un doc con título
+   que ya existe (mismo slug), el archivo en Storage se sobreescribe
+   y el array Firestore filtra el duplicado antes de hacer push.
+   Re-ejecutar es seguro.
+4. **Delete tolerante a 404 en Storage**: si el objeto ya no existe
+   en Storage (alguien lo borró por consola o nunca se subió), el
+   filter del array Firestore se ejecuta igual para limpieza.
+5. **Wrapper div** (`.cloud-doc-wrap`) para evitar `<button>` dentro
+   de `<button>` (HTML5 inválido). El delete absoluto se posiciona
+   sobre el wrap, hover-detection en el wrap.
+6. **Manejo de errores con pista de deploy**: si el upload/delete
+   recibe `permission-denied`, el mensaje incluye sugerencia de
+   ejecutar `firebase deploy --only storage` (referencia a la
+   regla §0.1.1 de CLAUDE.md sobre protocolo de deploys).
+
+### Pendientes post-v2.7.0
+
+- **Deploy de storage rules** (si no se hizo en v2.6.0):
+  ```
+  firebase deploy --only storage
+  ```
+- **Verificar rol admin del director** está activo en Firestore
+  `/admins/{uid}` o `/usuarios/{uid}` con `rol=admin`.
+- **Probar upload + delete en producción** después del merge.
+
 ## v2.6.0 — Microcirugía Suministros · Información Contractual + visor PDF (2026-04-27 PM3)
 
 Reestructura del módulo Suministros / Contratos según lineamientos
