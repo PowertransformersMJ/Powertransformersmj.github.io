@@ -109,9 +109,11 @@
 .cloud-add-btn:active { transform: translateY(0); }
 .cloud-add-btn i, .cloud-add-btn svg { width: 13px; height: 13px; }
 
-/* Hover-action de eliminar en cada doc — visible solo en hover y solo
-   si la app marcó al usuario como admin (clase .is-admin en body). */
-.cloud-doc { position: relative; }
+/* Wrapper de cada documento: contiene el button principal de
+   selección + el button absoluto de eliminar (sin nesting de
+   buttons que es HTML inválido). */
+.cloud-doc-wrap { position: relative; }
+
 .cloud-doc-delete {
   position: absolute;
   top: 50%;
@@ -136,7 +138,7 @@
   background: rgba(255,59,48,.20);
   transform: translateY(-50%) scale(1.06);
 }
-body.is-admin .cloud-doc:hover .cloud-doc-delete { display: inline-flex; }
+body.is-admin .cloud-doc-wrap:hover .cloud-doc-delete { display: inline-flex; }
 
 /* ─── MODAL UPLOAD ───────────────────────────────────────────── */
 .upload-modal-bg {
