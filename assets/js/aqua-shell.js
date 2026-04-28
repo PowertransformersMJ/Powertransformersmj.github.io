@@ -183,13 +183,13 @@
               </button>
               <div class="sb-children" data-tree-children="cat-sum-tx">
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4123000081">
-                  <a href="${u('pages/contrato.html')}?id=4123000081" class="sb-item sb-item-grandchild" data-key="contrato-4123000081">
+                  <button type="button" class="sb-item sb-item-grandchild sb-item-toggle" data-key="contrato-4123000081" data-tree-toggle-btn="contrato-4123000081" aria-expanded="false">
                     <span class="sb-child-bullet" aria-hidden="true"></span>
                     <code class="sb-contrato-num">4123000081</code>
-                    <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir 4123000081" aria-expanded="false" data-tree-toggle-btn="contrato-4123000081">
+                    <span class="sb-caret sb-caret-sm" aria-hidden="true">
                       <i data-lucide="chevron-down"></i>
-                    </button>
-                  </a>
+                    </span>
+                  </button>
                   <div class="sb-children" data-tree-children="contrato-4123000081">
                     <a href="${u('pages/contrato.html')}?id=4123000081" class="sb-item sb-item-greatgrandchild" data-key="cgo-4123000081">
                       <span class="sb-child-bullet" aria-hidden="true"></span>
@@ -202,13 +202,13 @@
                   </div>
                 </div>
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4125000143">
-                  <a href="${u('pages/contrato.html')}?id=4125000143" class="sb-item sb-item-grandchild" data-key="contrato-4125000143">
+                  <button type="button" class="sb-item sb-item-grandchild sb-item-toggle" data-key="contrato-4125000143" data-tree-toggle-btn="contrato-4125000143" aria-expanded="false">
                     <span class="sb-child-bullet" aria-hidden="true"></span>
                     <code class="sb-contrato-num">4125000143</code>
-                    <button type="button" class="sb-caret sb-caret-sm" aria-label="Expandir 4125000143" aria-expanded="false" data-tree-toggle-btn="contrato-4125000143">
+                    <span class="sb-caret sb-caret-sm" aria-hidden="true">
                       <i data-lucide="chevron-down"></i>
-                    </button>
-                  </a>
+                    </span>
+                  </button>
                   <div class="sb-children" data-tree-children="contrato-4125000143">
                     <a href="${u('pages/contrato.html')}?id=4125000143" class="sb-item sb-item-greatgrandchild" data-key="cgo-4125000143">
                       <span class="sb-child-bullet" aria-hidden="true"></span>
