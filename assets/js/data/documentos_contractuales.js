@@ -17,9 +17,12 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  doc, getDoc
+  doc, getDoc, setDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
-import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import {
+  ref as storageRef, uploadBytesResumable, getDownloadURL, deleteObject
+} from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
+import { getDbSafe, getStorageSafe, isFirebaseConfigured } from '../firebase-init.js';
 
 // Categorías canónicas con label legible + ícono Lucide.
 export const CATEGORIAS_DOC = {
@@ -159,4 +162,150 @@ export function formatearPeso(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/**
+ * Genera un slug URL-safe a partir de un título humano.
+ * Mismas reglas que el script Python `deploy-pdfs-storage.js`:
+ * NFD para descomponer tildes, mantener solo a-z0-9, separar con dash.
+ */
+export function slugFromTitle(titulo) {
+  const base = String(titulo || '').replace(/\.pdf$/i, '');
+  const norm = base.normalize('NFD').replace(/\p{Diacritic}/gu, '');
+  const lower = norm.toLowerCase();
+  const ascii = lower.replace(/[^a-z0-9]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+  return (ascii || 'documento') + '.pdf';
+}
+
+/**
+ * Sube un PDF nuevo a Firebase Storage + actualiza el array
+ * `documentos_contractuales[]` en /contratos/{cid}.
+ *
+ * @param {object} args
+ * @param {string} args.cid       — contrato_id (4123000081, …)
+ * @param {string} args.titulo    — título legible del documento
+ * @param {string} args.categoria — clave de CATEGORIAS_DOC
+ * @param {File}   args.file      — File del input <type=file>
+ * @param {string} [args.uid]     — uid del admin que sube (audit)
+ * @param {(progress: number) => void} [args.onProgress] — 0-100
+ * @returns {Promise<{archivo: string, url: string}>}
+ */
+export async function subirDocumento({ cid, titulo, categoria, file, uid = null, onProgress = null }) {
+  if (!isFirebaseConfigured) throw new Error('Firebase no está configurado.');
+  const db = getDbSafe();
+  const storage = getStorageSafe();
+  if (!db || !storage) throw new Error('Firebase no está inicializado.');
+
+  if (!cid)       throw new Error('cid es obligatorio.');
+  if (!titulo)    throw new Error('titulo es obligatorio.');
+  if (!categoria) throw new Error('categoria es obligatoria.');
+  if (!file)      throw new Error('file es obligatorio.');
+  if (file.type !== 'application/pdf' && !/\.pdf$/i.test(file.name)) {
+    throw new Error('Solo se permiten archivos PDF.');
+  }
+  if (file.size > 50 * 1024 * 1024) {
+    throw new Error('El archivo excede 50 MB (límite de las storage rules).');
+  }
+
+  const cat = CATEGORIAS_DOC[categoria] ? categoria : 'otros';
+  const slug = slugFromTitle(titulo);
+  const remotePath = `contratos/${cid}/${slug}`;
+  const fileRef = storageRef(storage, remotePath);
+
+  // Upload con progreso resumable.
+  await new Promise((resolve, reject) => {
+    const task = uploadBytesResumable(fileRef, file, {
+      contentType: 'application/pdf',
+      customMetadata: { uploaded_by: uid || 'unknown', titulo }
+    });
+    task.on('state_changed',
+      (snap) => {
+        if (onProgress) {
+          const pct = snap.totalBytes > 0
+            ? Math.round((snap.bytesTransferred / snap.totalBytes) * 100)
+            : 0;
+          onProgress(pct);
+        }
+      },
+      (err) => reject(err),
+      () => resolve()
+    );
+  });
+
+  const url = await getDownloadURL(fileRef);
+
+  // Actualizar /contratos/{cid}.documentos_contractuales[].
+  // Leemos primero, filtramos duplicados por slug (idempotencia
+  // si re-suben el mismo archivo), y escribimos el array completo.
+  const docRef = doc(db, 'contratos', cid);
+  const snap = await getDoc(docRef);
+  const data = snap.exists() ? snap.data() : {};
+  const arr = Array.isArray(data.documentos_contractuales) ? data.documentos_contractuales : [];
+  const sinDuplicado = arr.filter((d) => d.archivo !== slug);
+  sinDuplicado.push({
+    titulo: String(titulo).trim(),
+    archivo: slug,
+    categoria: cat,
+    peso_bytes: file.size,
+    url,
+    uploaded_by: uid || null,
+    uploaded_at: new Date().toISOString()
+  });
+
+  await setDoc(docRef, {
+    documentos_contractuales: sinDuplicado,
+    documentos_contractuales_updated_at: serverTimestamp()
+  }, { merge: true });
+
+  return { archivo: slug, url };
+}
+
+/**
+ * Elimina un PDF de Firebase Storage y lo quita del array de
+ * /contratos/{cid}.documentos_contractuales[]. Si el doc proviene
+ * del manifest local (canal GitHub Pages), no se puede eliminar
+ * server-side — se devuelve error informativo.
+ *
+ * @param {object} args
+ * @param {string} args.cid     — contrato_id
+ * @param {string} args.archivo — slug del archivo (ej. 'minuta.pdf')
+ * @returns {Promise<void>}
+ */
+export async function eliminarDocumento({ cid, archivo }) {
+  if (!isFirebaseConfigured) throw new Error('Firebase no está configurado.');
+  const db = getDbSafe();
+  const storage = getStorageSafe();
+  if (!db || !storage) throw new Error('Firebase no está inicializado.');
+  if (!cid || !archivo) throw new Error('cid y archivo son obligatorios.');
+
+  const docRef = doc(db, 'contratos', cid);
+  const snap = await getDoc(docRef);
+  const data = snap.exists() ? snap.data() : {};
+  const arr = Array.isArray(data.documentos_contractuales) ? data.documentos_contractuales : [];
+  const target = arr.find((d) => d.archivo === archivo);
+
+  if (!target) {
+    // No está en Firestore — probablemente vive solo en el manifest
+    // local del repo. Esos no son eliminables desde el frontend.
+    throw new Error('Este documento es del manifest base del repo y no se puede eliminar desde el navegador. Contacta al desarrollador para borrarlo del repo.');
+  }
+
+  // Borrar del Storage primero (si falla por permission-denied,
+  // no tocamos Firestore — mejor dejar consistente).
+  try {
+    await deleteObject(storageRef(storage, `contratos/${cid}/${archivo}`));
+  } catch (err) {
+    // Si el objeto no existe en Storage (404), seguimos — quitamos
+    // del array igualmente para limpieza.
+    if (err && err.code !== 'storage/object-not-found') {
+      throw err;
+    }
+  }
+
+  // Quitar del array y persistir.
+  const nueva = arr.filter((d) => d.archivo !== archivo);
+  await setDoc(docRef, {
+    documentos_contractuales: nueva,
+    documentos_contractuales_updated_at: serverTimestamp()
+  }, { merge: true });
 }
