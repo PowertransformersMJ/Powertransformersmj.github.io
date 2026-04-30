@@ -142,6 +142,66 @@ Reglas concretas al recibir un ticket de UI:
    Esto es invariante; cualquier sesión que quiera cambiarlo necesita
    justificarlo aquí.
 
+### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
+
+**Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
+Movimiento del contrato 4125000143 dejó de funcionar tras la migración
+multi-contrato N5. Síntoma: al guardar un movimiento aparecía
+"Suministro X no existe".
+
+**Causa raíz:** desde N5 los suministros se guardan en Firestore con
+**docId compuesto** `'{contrato_id}_{codigo}'` (ej. `4125000143_S01`).
+Pero `assets/js/data/movimientos.js#suministroRef(sid)` y
+`assets/js/data/marcas.js#suministroRef(sid)` accedían directo a
+`/suministros/{sid}` con solo el código plano, lo que **falla
+silenciosamente** para todos los contratos que usan docId compuesto.
+
+**Regla obligatoria para cualquier consumer de `/suministros`:**
+
+```javascript
+// ❌ MAL — solo funciona con docs legacy 4123000081 pre-migración
+const ref = doc(db, 'suministros', codigo);
+
+// ✅ BIEN — soporta docId compuesto N5 + fallback a codigo plano
+import { composeDocId } from '../domain/contratos.js';
+function suministroRef(sid, contratoId = '') {
+  const docId = contratoId ? composeDocId(contratoId, sid) : sid;
+  return doc(db(), COL_SUMINISTROS, docId);
+}
+```
+
+**Cualquier código nuevo que lea/escriba `/suministros/{X}` directo
+debe pasar el `contrato_id`** del payload, del filtro activo, o del
+contrato_context (`getContratoActivo()` de `assets/js/ui/contrato-
+context.js`). Sin contrato_id queda fallback a codigo plano (compat
+con el contrato 4123000081 importado antes de la migración N5).
+
+**Aplica también a:**
+- `crearMovimiento` (lee suministro para `stock_inicial` en la tx)
+- `computarStock(suministroId)` (one-shot stock calculation)
+- `marcas.js` `crear/actualizar/eliminar` (sync de
+  `marcas_disponibles[]` en el suministro)
+- Cualquier query de movimientos por suministro debe filtrar también
+  por `contrato_id` para que dos contratos con el mismo S01 no
+  mezclen su stock en el cálculo agregado.
+
+**Verificación:** si en una sesión nueva tocas o creas algo que
+accede a `/suministros/{X}`, **ejecutar siempre**:
+
+```bash
+grep -rn "doc(.*, 'suministros'\|COL_SUMINISTROS" assets/js/ --include="*.js"
+```
+
+y verificar que cada call site usa `composeDocId(cid, codigo)` o
+recibe el ID ya compuesto desde un `getDocs` previo.
+
+**Indicios visuales del bug:**
+- "Suministro X no existe" en el formulario de Movimiento.
+- Stock muestra "—" persistentemente en el formulario.
+- Sync de `marcas_disponibles` no actualiza el array del suministro
+  (la marca queda en `/marcas` pero no aparece en el dropdown del
+  formulario de Movimiento ni en el catálogo).
+
 ### 0.2 Branch de trabajo
 
 Durante la evolución v2.0 (F16–F37) la rama activa fue

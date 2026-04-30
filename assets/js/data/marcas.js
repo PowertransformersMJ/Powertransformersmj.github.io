@@ -19,6 +19,7 @@ import {
   sanitizarMarca, validarMarca
 } from '../domain/marca_schema.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
+import { composeDocId } from '../domain/contratos.js';
 
 const COL_NAME = 'marcas';
 const COL_SUMINISTROS = 'suministros';
@@ -32,7 +33,19 @@ function db() {
 }
 function collRef() { return collection(db(), COL_NAME); }
 function docRef(id) { return doc(db(), COL_NAME, id); }
-function suministroRef(sid) { return doc(db(), COL_SUMINISTROS, sid); }
+/**
+ * Resuelve el ref de un suministro respetando el docId compuesto
+ * por contrato (multi-contrato N5: '{contrato_id}_{codigo}').
+ * Sin contrato_id, intenta el codigo plano (compat legacy 4123000081).
+ *
+ * Mismo patrón que assets/js/data/movimientos.js — fix 2026-04-27 PM5
+ * para evitar que las operaciones CRUD de marcas fallen en silencio
+ * sobre los suministros del 4125000143 (que usan docId compuesto).
+ */
+function suministroRef(sid, contratoId = '') {
+  const docId = contratoId ? composeDocId(contratoId, sid) : sid;
+  return doc(db(), COL_SUMINISTROS, docId);
+}
 
 function prepararDoc(input, uid) {
   const sane = sanitizarMarca(input);
@@ -85,9 +98,11 @@ export async function crear(data, uid) {
   payload.createdAt = serverTimestamp();
   payload.updatedAt = serverTimestamp();
   const ref = await addDoc(collRef(), payload);
-  // Sync atómico: añade la marca al array del suministro.
+  // Sync atómico: añade la marca al array del suministro. El docId
+  // del suministro puede ser compuesto (multi-contrato), por eso
+  // pasamos contrato_id si está presente en el payload.
   if (payload.suministro_id && payload.marca) {
-    await updateDoc(suministroRef(payload.suministro_id), {
+    await updateDoc(suministroRef(payload.suministro_id, payload.contrato_id), {
       marcas_disponibles: arrayUnion(payload.marca),
       updatedAt: serverTimestamp()
     }).catch(() => { /* suministro puede no existir todavía si la marca llega por importador */ });
@@ -108,10 +123,11 @@ export async function actualizar(id, data, opts = {}) {
   // Si la marca cambió, actualizar el array del suministro:
   // remover la antigua, añadir la nueva.
   if (prev && prev.marca && payload.marca && prev.marca !== payload.marca && payload.suministro_id) {
-    await updateDoc(suministroRef(payload.suministro_id), {
+    const cidActualizar = payload.contrato_id || (prev && prev.contrato_id) || '';
+    await updateDoc(suministroRef(payload.suministro_id, cidActualizar), {
       marcas_disponibles: arrayRemove(prev.marca)
     }).catch(() => { /* noop */ });
-    await updateDoc(suministroRef(payload.suministro_id), {
+    await updateDoc(suministroRef(payload.suministro_id, cidActualizar), {
       marcas_disponibles: arrayUnion(payload.marca),
       updatedAt: serverTimestamp()
     }).catch(() => { /* noop */ });
@@ -127,7 +143,7 @@ export async function eliminar(id, opts = {}) {
   // Si era la última marca de ese suministro_id, el array queda vacío.
   // (No relistamos para verificar — overhead innecesario; el panel F44 refresca via realtime.)
   if (prev && prev.suministro_id && prev.marca) {
-    await updateDoc(suministroRef(prev.suministro_id), {
+    await updateDoc(suministroRef(prev.suministro_id, prev.contrato_id || ''), {
       marcas_disponibles: arrayRemove(prev.marca),
       updatedAt: serverTimestamp()
     }).catch(() => { /* noop */ });
