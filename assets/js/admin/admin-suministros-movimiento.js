@@ -131,9 +131,13 @@ async function aplicarSuministro() {
   fUnidad.value = found.unidad || 'Und';
   fValorUnit.value = fmtCOP(found.valor_unitario);
   // Stock actual via cómputo on-demand (puede fallar si las rules no permiten read agregado — best effort).
+  // Pasamos contrato_id para resolver el docId compuesto del suministro
+  // en multi-contrato N5 (`{cid}_{codigo}`). Sin esto, el lookup
+  // intentaría /suministros/S01 plano y fallaría para 4125000143.
   fStockActual.value = '⋯';
   try {
-    const stock = await computarStock(found.codigo);
+    const cid = getContratoActivo() || (found.contrato_id || '');
+    const stock = await computarStock(found.codigo, cid);
     if (stock) fStockActual.value = `${stock.actual} (ini ${stock.inicial}, +${stock.ingresado}, -${stock.egresado})`;
     else fStockActual.value = '—';
   } catch (err) {
