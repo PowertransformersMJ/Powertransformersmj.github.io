@@ -7,6 +7,61 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## v2.7.1 — Hotfix Movimiento · docId compuesto en suministroRef (2026-04-27 PM5)
+
+Bug crítico reportado por el director: el módulo Movimiento dentro
+del Control y Gestión Operativa del contrato 4125000143 fallaba al
+intentar guardar (síntoma sutil: el lookup del suministro retornaba
+"Suministro X no existe", el formulario aceptaba la entrada pero el
+submit fallaba).
+
+### Causa raíz
+
+Tras la migración multi-contrato N5, los suministros se guardan con
+**docId compuesto** `{contrato_id}_{codigo}` (ej. `4125000143_S01`)
+para aislar contratos. Pero el data layer de movimientos
+(`assets/js/data/movimientos.js#suministroRef`) y el de marcas
+(`assets/js/data/marcas.js#suministroRef`) seguían accediendo a
+`/suministros/{sid}` directo con solo el código plano "S01".
+
+Resultado: el `tx.get(suministroRef('S01'))` dentro de la tx atómica
+de `crearMovimiento` retornaba `exists() === false` para todos los
+suministros del contrato 4125000143 (que tienen docId compuesto),
+lanzando "Suministro S01 no existe". El contrato legacy 4123000081
+seguía funcionando porque sus docs se importaron antes de N5 y
+usan codigo plano como docId.
+
+### Fix aplicado
+
+1. `data/movimientos.js#suministroRef(sid, contratoId='')` ahora
+   compone el docId con `composeDocId(cid, codigo)` cuando se pasa
+   `contratoId`. Sin él, fallback al codigo plano (compat 4123).
+2. `data/movimientos.js#crear` lee `sane.contrato_id` del payload
+   sanitizado y lo pasa a `suministroRef`. También filtra el
+   query de movimientos por `contrato_id` cuando aplica para que
+   dos contratos con el mismo S01 no mezclen su stock en el
+   cálculo agregado.
+3. `data/movimientos.js#computarStock(suministroId, contratoId)`
+   acepta `contratoId` opcional. El controller del formulario lo
+   pasa desde `getContratoActivo()` o desde el `contrato_id` del
+   suministro encontrado en cache.
+4. `admin/admin-suministros-movimiento.js#aplicarSuministro` pasa
+   el `contratoId` activo a `computarStock`.
+5. **Mismo fix preventivo en `data/marcas.js`**: las funciones
+   `crear/actualizar/eliminar` que sync-ean `marcas_disponibles[]`
+   en el suministro también componían mal el docId. Ahora todas
+   las llamadas pasan `contrato_id` del payload o del prev.
+
+### Regla operativa permanente
+
+Documentada en `CLAUDE.md` §0.1.3 (nueva) — para que ninguna sesión
+futura introduzca código que acceda a `/suministros/{X}` directo
+sin pasar por `composeDocId` y se rompa el módulo Movimiento (o
+cualquier otro consumer de `/suministros`) en silencio para los
+contratos N5.
+
+Tests 453/453 verde · Lint HTML limpio.
+
 ## v2.7.0 — Sidebar contratos como toggle puro + admin upload de PDFs (2026-04-27 PM4)
 
 Microcirugía adicional al módulo Contratos según lineamientos del
