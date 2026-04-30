@@ -81,6 +81,56 @@ sección 'v2.7.0 follow-up'. 4 fases atómicas (A, B, C, D).
   `/admins/{uid}` o `/usuarios/{uid}` con `rol=admin`.
 - **Probar upload + delete en producción** después del merge.
 
+## v2.6.1 — Hotfixes Información Contractual · URL absoluta + scroll iframe (2026-04-27 PM3.5)
+
+Dos bug fixes inmediatos al cierre de v2.6.0 reportados por el director
+durante la verificación visual de la página `pages/contrato-info.html`.
+
+### Bugs corregidos
+
+**Bug 1 — `0bd2122` URL absoluta del PDF (404 en visor)**
+
+Síntoma: la lista lateral de PDFs cargaba bien pero al hacer click en
+un doc el visor mostraba "404 File not found".
+
+Causa raíz: `urlDocumento(cid, slug)` devolvía la cadena RELATIVA
+`assets/docs/contratos/{cid}/{slug}`. El navegador la resolvía contra
+`location.href` de la página, dando:
+
+```
+https://.../LordPowerTransformersMJ.github.io/pages/assets/docs/...
+                                              ^^^^^ pages/ sobrando
+```
+
+GitHub Pages 404 porque el path real es sin `pages/` en medio.
+
+Fix: la función ahora prepende `BASE_HREF` resuelto desde
+`import.meta.url` (mismo patrón que `aqua-shell.js` y la función
+`cargarManifest()` que ya funcionaba). URLs absolutas que no
+dependen del path de la página llamante.
+
+**Bug 2 — `91dec5f` empty-state + scroll del PDF**
+
+Síntoma: el placeholder "Selecciona un documento / Elige un PDF…"
+se veía como marca de agua sobre el PDF aún después de seleccionar
+uno; y la rueda del mouse no scroleaba dentro del PDF.
+
+Causa 1 (empty-state): `.viewer-empty { display: flex }` ganaba en
+especificidad sobre el `[hidden] { display: none }` implícito del
+browser. Setear `hidden=true` no surtía efecto visual.
+
+Fix 1: regla explícita `.viewer-empty[hidden] { display: none
+!important }`. Lo mismo para `.viewer-frame[hidden]` por consistencia.
+
+Causa 2 (scroll): el iframe se cargaba con `src='...pdf#view=FitH'`.
+El parámetro `FitH` instruye al visor PDF nativo a fit-horizontal
+(página entera en ancho), lo que en Chrome/Safari resulta en una
+vista single-page que NO captura wheel events.
+
+Fix 2: removido el `#view=FitH` del src. La URL bare deja al visor
+nativo del browser en su modo default (vista continua con scroll
+vertical funcional).
+
 ## v2.6.0 — Microcirugía Suministros · Información Contractual + visor PDF (2026-04-27 PM3)
 
 Reestructura del módulo Suministros / Contratos según lineamientos
@@ -178,6 +228,76 @@ completa en `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md`.
   PDFs de GitHub Pages a Firebase Storage (sin urgencia).
 - Si se necesitan más documentos contractuales en el futuro, se
   agregan al manifest JSON o vía Firestore override.
+
+## v2.5.1 — Iteraciones visuales · revert aqua light + JSX removal + SIN DATOS fix (2026-04-27 PM2)
+
+Período de afinamiento entre v2.5.0 (UI v3 dark mode) y v2.6.0
+(microcirugía Suministros). 5 commits incrementales no agrupados en
+un plan formal pero todos en la misma sesión.
+
+### Cambios consolidados
+
+1. **`215f615` Foto Fondo PT.jpg** — el director subió un primer
+   reemplazo (1920×1080 JPEG, 1.16 MB). Procesada con `optimize=True
+   progressive=True` + EXIF stripped → 365 KB sin pérdida visual.
+   PR #105.
+2. **`8c32420` Foto Fonto PT.jpg** — segunda iteración con fuente
+   más grande (2880×1620, 2.9 MB). Redimensionada a 2560×1440 LANCZOS
+   q88 progressive → 657 KB retina-suitable. PR #106.
+3. **`50cf27a` Revert dark mode → aqua light** — el director pidió
+   "letras de color negro que haga match con el entorno aqua".
+   Tokens revertidos: ink-1 #f3f7ff → #0d1f38 (steel navy deep),
+   glass tokens rgba(8,18,35,X) → rgba(255,255,255,X) (blanco perla
+   translúcido), specular y borders restaurados al diseño v2.1.0-aqua
+   original. PR #107.
+4. **`7310a33` Foto FONDO POWERTRANSFORMER.jpg en WebP** — tercera
+   iteración (2880×1620, 3.4 MB JPG). Convertida a WebP q=95 method=6
+   sin redimensionar para garantizar nitidez en monitores 4K/5K.
+   1.07 MB final · 67% reducción vs JPG original con calidad
+   visualmente idéntica. PR #108.
+5. **`c41d316` Importador canal único Excel + tag SIN DATOS dinámico** —
+   el director pidió retirar JSX como canal de importación
+   (`control_suministros-2.jsx`) y arreglar el tag "SIN DATOS" pegado
+   en el contrato 4125000143 después de su importación. PR #109.
+
+### Detalle del refactor JSX (commit `c41d316`)
+
+**Eliminado del importador** (UI + data + domain):
+- Campo `<input type="file" id="jsxInput">` y botón "Subir .jsx"
+- Funciones `parsearJsxTransformadores`, `parsearJsxCatalogo`,
+  `enriquecerCatalogoConJsx`, `jsxRowADocV2`,
+  `extraerCorreccionesEmbedded`, `reconciliarEquipos` (6 funciones,
+  ~270 líneas en domain)
+- Etapas /transformadores y /correcciones de `ejecutarImportacion`
+- 5 describes de tests asociados a JSX
+- Archivo `control_suministros-2.jsx` borrado del repo
+
+**Razón**: el JSX era un canal de bootstrap one-time. Sus datos
+(206 transformers, 22 catalog items con valU, 3 correcciones
+hardcoded) ya viven en Firestore desde imports anteriores. Re-leer
+de JSX en cada import sobreescribía el `valor_unitario` que el
+director ajustaba manualmente desde `admin/suministros-catalogo.html`.
+Excel queda como motor único de importación.
+
+### Detalle del fix SIN DATOS (mismo commit `c41d316`)
+
+**Causa raíz**: en `assets/js/contratos-public.js` el flag
+`con_datos: false` para 4125000143 estaba HARDCODEADO en el array
+seed `CATEGORIAS_SEMILLA`. La suscripción a `/contratos` solo
+agregaba contratos no-semilla, jamás actualizaba los flags de
+contratos semilla.
+
+**Fix**: nueva función `aplicarEstadoFirestore()` que mergea cada
+contrato semilla con el doc Firestore `/contratos/{id}`. Si el doc
+existe y tiene `ultima_importacion` (lo escribe el importador al
+final de cada bulk), el flag `con_datos` queda `true` y el tag SIN
+DATOS desaparece. Auto-corregible: la primera importación al
+contrato 4125 quita el tag automáticamente.
+
+### Tests
+
+- 468/468 → 453/453 verde (perdimos 15 tests del JSX, esperado)
+- Lint HTML limpio en cada commit
 
 ## v2.5.0 — UI v3 dark mode · foto IMG_9840 · drilldown contratos (2026-04-27 PM)
 
