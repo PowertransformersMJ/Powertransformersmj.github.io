@@ -199,6 +199,25 @@
                       <span class="sb-child-bullet" aria-hidden="true"></span>
                       <span class="sb-section-text">Información Contractual</span>
                     </a>
+                    <div class="sb-tree sb-tree-nested" data-tree-key="seguimiento-4123000081">
+                      <button type="button" class="sb-item sb-item-greatgrandchild sb-item-toggle" data-key="seguimiento-4123000081" data-tree-toggle-btn="seguimiento-4123000081" aria-expanded="false">
+                        <span class="sb-child-bullet" aria-hidden="true"></span>
+                        <span class="sb-section-text">Seguimiento Contractual</span>
+                        <span class="sb-caret sb-caret-sm" aria-hidden="true">
+                          <i data-lucide="chevron-down"></i>
+                        </span>
+                      </button>
+                      <div class="sb-children" data-tree-children="seguimiento-4123000081">
+                        <a href="${u('pages/contrato-info.html')}?id=4123000081&tipo=remisiones" class="sb-item sb-item-leaf" data-key="rem-4123000081">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
+                          <span class="sb-section-text">Remisiones</span>
+                        </a>
+                        <a href="${u('pages/contrato-info.html')}?id=4123000081&tipo=reuniones-seguimiento" class="sb-item sb-item-leaf" data-key="reu-4123000081">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
+                          <span class="sb-section-text">Reuniones de Seguimiento</span>
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4125000143">
@@ -218,6 +237,25 @@
                       <span class="sb-child-bullet" aria-hidden="true"></span>
                       <span class="sb-section-text">Información Contractual</span>
                     </a>
+                    <div class="sb-tree sb-tree-nested" data-tree-key="seguimiento-4125000143">
+                      <button type="button" class="sb-item sb-item-greatgrandchild sb-item-toggle" data-key="seguimiento-4125000143" data-tree-toggle-btn="seguimiento-4125000143" aria-expanded="false">
+                        <span class="sb-child-bullet" aria-hidden="true"></span>
+                        <span class="sb-section-text">Seguimiento Contractual</span>
+                        <span class="sb-caret sb-caret-sm" aria-hidden="true">
+                          <i data-lucide="chevron-down"></i>
+                        </span>
+                      </button>
+                      <div class="sb-children" data-tree-children="seguimiento-4125000143">
+                        <a href="${u('pages/contrato-info.html')}?id=4125000143&tipo=remisiones" class="sb-item sb-item-leaf" data-key="rem-4125000143">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
+                          <span class="sb-section-text">Remisiones</span>
+                        </a>
+                        <a href="${u('pages/contrato-info.html')}?id=4125000143&tipo=reuniones-seguimiento" class="sb-item sb-item-leaf" data-key="reu-4125000143">
+                          <span class="sb-leaf-bullet" aria-hidden="true"></span>
+                          <span class="sb-section-text">Reuniones de Seguimiento</span>
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -253,11 +291,13 @@
     const fileNow = (path.split('/').pop() || 'home.html').replace(/\?.*$/, '');
     const folderNow = path.includes('/admin/') ? 'admin' : (path.includes('/pages/') ? 'pages' : '');
     const queryNow = location.search || '';
-    const idNow = new URLSearchParams(queryNow).get('id');
+    const qsNow = new URLSearchParams(queryNow);
+    const idNow = qsNow.get('id');
+    const tipoNow = (qsNow.get('tipo') || '').trim();
     const hashNow = location.hash || '';
     const tabNow = hashNow ? new URLSearchParams(hashNow.replace(/^#/, '')).get('tab') : null;
 
-    // Items candidatos que matchean filename + ?id=
+    // Items candidatos que matchean filename + ?id= (+ ?tipo= si aplica)
     const candidates = [];
     document.querySelectorAll('.sb-item').forEach((a) => {
       const href = a.getAttribute && a.getAttribute('href');
@@ -268,11 +308,16 @@
         const last = pathPart.split('/').pop() || '';
         const folder = pathPart.includes('admin/') ? 'admin' : (pathPart.includes('pages/') ? 'pages' : '');
         if (last !== fileNow || folder !== folderNow) return;
-        const idLink = queryPart ? new URLSearchParams('?' + queryPart).get('id') : null;
+        const qs = queryPart ? new URLSearchParams('?' + queryPart) : new URLSearchParams();
+        const idLink = qs.get('id');
         if (idLink && idNow && idLink !== idNow) return;
         if (idLink && !idNow) return;
+        const tipoLink = (qs.get('tipo') || '').trim();
+        // Si la URL actual tiene tipo=X, solo aceptamos links con mismo tipo.
+        // Si la URL actual NO tiene tipo, solo aceptamos links sin tipo.
+        if (tipoNow !== tipoLink) return;
         const tabLink = hashPart ? new URLSearchParams(hashPart).get('tab') : null;
-        candidates.push({ a, idLink, tabLink });
+        candidates.push({ a, idLink, tabLink, tipoLink });
       } catch (_) {}
     });
 
