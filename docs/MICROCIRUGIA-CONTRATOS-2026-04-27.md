@@ -355,3 +355,92 @@ Implementado en 4 fases atómicas:
   útil para el bootstrap inicial: sube todos los PDFs del manifest
   local a Firebase Storage de una vez. Después la UI admin gestiona
   los nuevos.
+
+---
+
+## 11. Hotfix v2.8.1 · defaults codigo+estado al escribir /contratos/{cid} (2026-05-01)
+
+Bug de regresión revelado al lanzar Seguimiento Contractual (v2.8.0):
+el botón "+ Agregar documento" caía con `Missing or insufficient
+permissions` después de que el upload a Storage llegara al 100 %.
+
+### 11.1 Síntomas
+
+- Modal "Agregar documento contractual" muestra barra de progreso
+  hasta 100 %.
+- El PDF llega correctamente a Firebase Storage en
+  `gs://…/contratos/{cid}/{tipo}/{slug}.pdf`.
+- Inmediatamente después aparece banner rojo "Missing or insufficient
+  permissions" y el botón "Subir" se reactiva.
+- En consola del navegador: `FirebaseError: Missing or insufficient
+  permissions.` desde la línea del `setDoc` en `subirDocumento`.
+
+### 11.2 Diagnóstico (no obvio)
+
+El error parece de Storage pero **no lo es**: Storage ya respondió
+200 (el archivo está subido). La falla es del Firestore write
+posterior que actualiza el array `documentos_<tipo>[]` en
+`/contratos/{cid}`.
+
+Las rules de `/contratos/{id}` exigen `codigo` (no vacío) y `estado`
+(en enum `['vigente','suspendido','finalizado','en_liquidacion']`)
+tanto en CREATE como en UPDATE. El data layer hacía:
+
+```javascript
+await setDoc(docRef, {
+  [campo]: arr,
+  [campoUpdatedAt]: serverTimestamp()
+}, { merge: true });
+```
+
+Con `merge: true`:
+- Doc no existe → CREATE → falta `codigo` y `estado` → ❌
+- Doc existe pero sin `estado` válido → UPDATE → `estado` post-merge
+  queda `undefined` → ❌
+
+`4123000081` en v2.7.0 funcionaba porque su doc tiene
+`estado: 'vigente'` legítimo. Cualquier otro contrato (incluyendo
+`4125000143`) fallaba.
+
+### 11.3 Fix
+
+Helper `_conDefaultsContrato(payload, cid, dataExistente)` que
+respeta valores existentes y solo agrega `codigo: cid` + `estado:
+'vigente'` cuando faltan o son inválidos. Aplicado en
+`subirDocumento` y `eliminarDocumento` de
+`assets/js/data/documentos_contractuales.js`.
+
+### 11.4 Cómo evitar este patrón en futuras sesiones
+
+Cuando un `setDoc(merge:true)` toca una colección con rules que
+exigen campos enum/obligatorios, asegurar siempre que el payload
+contenga todos esos campos — sea preservando los del doc existente
+(`getDoc` previo) o agregando defaults seguros desde el data layer.
+
+Lista de colecciones afectadas por este patrón (verificadas a
+2026-05-01):
+- `/contratos/{cid}` → `codigo`, `estado` ✅ (cubierto v2.8.1)
+- `/transformadores/{id}` → no usa setDoc-merge, OK
+- `/ordenes/{id}` → no usa setDoc-merge, OK
+- `/usuarios/{uid}` → CRUD via `crear`/`actualizar` con payload
+  completo, OK
+- `/suministros/{id}` → similar, OK
+- `/movimientos/{id}` → append-only en tx, OK
+
+### 11.5 Verificación funcional
+
+- 7 remisiones (`REMISION 1.pdf` … `REMISION 7.pdf`) cargadas
+  exitosamente al contrato `4123000081` vía admin upload.
+- Visor PDF embebido renderiza correctamente.
+- Categorización automática como "Remisiones" en la lista lateral.
+- Pendiente: probar Reuniones de Seguimiento + Información
+  Contractual en `4125000143` (caso CREATE pleno).
+
+### 11.6 Referencias
+
+- Branch: `claude/mira-feature-XqsGK`
+- Commit: `e43aa42`
+- PR: [#119](https://github.com/ajimenezp99-jpg/LordPowerTransformersMJ.github.io/pull/119)
+- Merge a main: `8e1aa10`
+- CHANGELOG: v2.8.1
+- CLAUDE.md: §9.9
