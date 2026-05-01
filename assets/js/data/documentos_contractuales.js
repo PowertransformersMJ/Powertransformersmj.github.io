@@ -276,12 +276,29 @@ export async function subirDocumento({ cid, tipo = '', titulo, categoria, file, 
     uploaded_at: new Date().toISOString()
   });
 
-  await setDoc(docRef, {
+  await setDoc(docRef, _conDefaultsContrato({
     [campo]: sinDuplicado,
     [campoUpdatedAt]: serverTimestamp()
-  }, { merge: true });
+  }, cid, data), { merge: true });
 
   return { archivo: slug, url };
+}
+
+/**
+ * Asegura que el payload del setDoc(merge:true) sobre /contratos/{cid}
+ * cumple las rules: codigo y estado son obligatorios para create y se
+ * exigen como enum válido en update. Si el doc existente ya los tiene
+ * los respeta; si faltan, agrega defaults razonables (codigo == cid,
+ * estado == 'vigente'). Sin esto, subir un PDF a un contrato que aún
+ * no fue dado de alta como /contratos/{cid} falla con
+ * permission-denied aun siendo admin.
+ */
+function _conDefaultsContrato(payload, cid, dataExistente) {
+  const out = { ...payload };
+  if (!dataExistente.codigo) out.codigo = String(cid);
+  const ESTADOS_VALIDOS = ['vigente', 'suspendido', 'finalizado', 'en_liquidacion'];
+  if (!ESTADOS_VALIDOS.includes(dataExistente.estado)) out.estado = 'vigente';
+  return out;
 }
 
 /**
@@ -322,8 +339,8 @@ export async function eliminarDocumento({ cid, tipo = '', archivo }) {
 
   // Quitar del array y persistir.
   const nueva = arr.filter((d) => d.archivo !== archivo);
-  await setDoc(docRef, {
+  await setDoc(docRef, _conDefaultsContrato({
     [campo]: nueva,
     [campoUpdatedAt]: serverTimestamp()
-  }, { merge: true });
+  }, cid, data), { merge: true });
 }
