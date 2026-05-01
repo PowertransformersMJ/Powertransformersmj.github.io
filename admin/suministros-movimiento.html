@@ -23,15 +23,17 @@
     <div class="breadcrumb">Suministros / Movimiento (Entrega)</div>
     <h1 class="page-title">Registrar <em>Movimiento</em></h1>
     <p class="page-subtitle">
-      Ingreso o egreso de suministros. La descripción y la matrícula
-      auto-completan el resto. Stock se valida en transacción atómica.
+      Ingreso o egreso de suministros. Puedes registrar varios suministros
+      en un mismo movimiento — cada línea se persiste como un movimiento
+      individual con código MOV-YYYY-NNNN propio. Stock validado en
+      transacción atómica por línea.
     </p>
   </div>
 
   <div id="infoBox" class="info-msg" style="display:none"></div>
 
   <form id="form" class="mov-form" novalidate>
-    <!-- Cabecera -->
+    <!-- Cabecera (compartida por todas las líneas) -->
     <fieldset class="form-fieldset mov-cabecera">
       <legend class="form-fieldset-title">Cabecera</legend>
       <div class="form-row-3">
@@ -59,36 +61,7 @@
       </div>
     </fieldset>
 
-    <!-- Suministro -->
-    <fieldset class="form-fieldset mov-suministro">
-      <legend class="form-fieldset-title">Suministro</legend>
-      <div class="form-group">
-        <label class="form-label" for="fSumId">Descripción / código *</label>
-        <input class="form-input cell-keyfield" type="text" id="fSumId" list="dlSums" required autocomplete="off" placeholder="Escriba el código (S01) o el nombre del suministro">
-        <datalist id="dlSums"></datalist>
-        <small class="form-hint">Al elegir un suministro se completan unidad, valor unitario y stock disponible.</small>
-      </div>
-      <div class="form-row-4">
-        <div class="form-group">
-          <label class="form-label">Marca</label>
-          <input class="form-input cell-auto" type="text" id="fMarca" readonly tabindex="-1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Unidad</label>
-          <input class="form-input cell-auto" type="text" id="fUnidad" readonly tabindex="-1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Valor unit. (COP)</label>
-          <input class="form-input cell-auto" type="text" id="fValorUnit" readonly tabindex="-1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Stock actual</label>
-          <input class="form-input cell-auto" type="text" id="fStockActual" readonly tabindex="-1">
-        </div>
-      </div>
-    </fieldset>
-
-    <!-- Equipo -->
+    <!-- Equipo destinatario (compartido) -->
     <fieldset class="form-fieldset mov-equipo">
       <legend class="form-fieldset-title">Equipo destinatario</legend>
       <div class="form-group">
@@ -117,21 +90,31 @@
       </div>
     </fieldset>
 
-    <!-- Detalle del movimiento -->
+    <!-- Líneas de suministro (multi-línea) -->
+    <fieldset class="form-fieldset mov-suministros">
+      <legend class="form-fieldset-title">Suministros</legend>
+      <div id="lineasContainer" class="lineas-container">
+        <!-- Las líneas se generan dinámicamente desde lineaTemplate -->
+      </div>
+      <div class="lineas-actions">
+        <button type="button" class="btn-add-linea" id="btnAddLinea">
+          <i data-lucide="plus"></i> Agregar más suministros
+        </button>
+      </div>
+      <datalist id="dlSums"></datalist>
+    </fieldset>
+
+    <!-- Datos adicionales (compartidos) -->
     <fieldset class="form-fieldset mov-detalle">
-      <legend class="form-fieldset-title">Detalle del movimiento</legend>
-      <div class="form-row-3">
-        <div class="form-group">
-          <label class="form-label" for="fCantidad">Cantidad *</label>
-          <input class="form-input cell-manual" type="number" id="fCantidad" required min="1" step="1" placeholder="1">
-        </div>
-        <div class="form-group">
-          <label class="form-label">Valor total (COP)</label>
-          <input class="form-input cell-calc" type="text" id="fValorTotal" readonly tabindex="-1">
-        </div>
+      <legend class="form-fieldset-title">Datos adicionales</legend>
+      <div class="form-row-2">
         <div class="form-group">
           <label class="form-label" for="fOdt">ODT (orden de trabajo)</label>
           <input class="form-input cell-manual" type="text" id="fOdt" maxlength="60" placeholder="ODT-2026-115">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Total movimiento (COP)</label>
+          <input class="form-input cell-calc" type="text" id="fTotalMovimiento" readonly tabindex="-1">
         </div>
       </div>
       <div class="form-group" style="margin-top:14px">
@@ -158,6 +141,48 @@
       <span class="legend-pill cell-calc">Calculado</span>
     </p>
   </form>
+
+  <!-- Template de una línea de suministro · clonado por +Agregar más suministros -->
+  <template id="lineaTemplate">
+    <div class="linea-suministro" data-linea-idx="">
+      <header class="linea-header">
+        <span class="linea-badge">Suministro <span class="linea-num">#1</span></span>
+        <button type="button" class="btn-remove-linea" data-action="remove" title="Quitar línea" aria-label="Quitar línea">
+          <i data-lucide="x"></i>
+        </button>
+      </header>
+      <div class="form-group">
+        <label class="form-label">Descripción / código *</label>
+        <input class="form-input cell-keyfield" type="text" data-field="sumId" list="dlSums" required autocomplete="off" placeholder="S01, S02, … o nombre del suministro">
+      </div>
+      <div class="form-row-5">
+        <div class="form-group">
+          <label class="form-label">Marca</label>
+          <input class="form-input cell-auto" type="text" data-field="marca" readonly tabindex="-1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unidad</label>
+          <input class="form-input cell-auto" type="text" data-field="unidad" readonly tabindex="-1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Valor unit. (COP)</label>
+          <input class="form-input cell-auto" type="text" data-field="valorUnit" readonly tabindex="-1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Stock actual</label>
+          <input class="form-input cell-auto" type="text" data-field="stockActual" readonly tabindex="-1">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Cantidad *</label>
+          <input class="form-input cell-manual" type="number" data-field="cantidad" required min="1" step="1" placeholder="1">
+        </div>
+      </div>
+      <div class="linea-total">
+        <span class="linea-total-label">Subtotal:</span>
+        <span class="linea-total-val" data-field="valorTotal">—</span>
+      </div>
+    </div>
+  </template>
 
 </main>
 
