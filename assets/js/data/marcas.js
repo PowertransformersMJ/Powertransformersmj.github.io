@@ -38,13 +38,34 @@ function docRef(id) { return doc(db(), COL_NAME, id); }
  * por contrato (multi-contrato N5: '{contrato_id}_{codigo}').
  * Sin contrato_id, intenta el codigo plano (compat legacy 4123000081).
  *
- * Mismo patrón que assets/js/data/movimientos.js — fix 2026-04-27 PM5
+ * Mismo patrón que assets/js/data/movimientos.js — fix 2026-04-27 PM5/6
  * para evitar que las operaciones CRUD de marcas fallen en silencio
- * sobre los suministros del 4125000143 (que usan docId compuesto).
+ * sobre los suministros del 4125000143 (que usan docId compuesto)
+ * o del 4123000081 (que aún usan docId plano legacy).
  */
 function suministroRef(sid, contratoId = '') {
   const docId = contratoId ? composeDocId(contratoId, sid) : sid;
   return doc(db(), COL_SUMINISTROS, docId);
+}
+
+/**
+ * Update con heurística dual: intenta compuesto, fallback a plano.
+ * Para operaciones de sync (arrayUnion / arrayRemove de
+ * marcas_disponibles[]) que no deben fallar en silencio.
+ */
+async function updateSuministroDual(sid, contratoId, fields) {
+  if (contratoId) {
+    try {
+      await updateDoc(suministroRef(sid, contratoId), fields);
+      return true;
+    } catch (_) { /* prueba con plano abajo */ }
+  }
+  try {
+    await updateDoc(doc(db(), COL_SUMINISTROS, sid), fields);
+    return true;
+  } catch (_) {
+    return false;
+  }
 }
 
 function prepararDoc(input, uid) {
@@ -102,10 +123,10 @@ export async function crear(data, uid) {
   // del suministro puede ser compuesto (multi-contrato), por eso
   // pasamos contrato_id si está presente en el payload.
   if (payload.suministro_id && payload.marca) {
-    await updateDoc(suministroRef(payload.suministro_id, payload.contrato_id), {
+    await updateSuministroDual(payload.suministro_id, payload.contrato_id, {
       marcas_disponibles: arrayUnion(payload.marca),
       updatedAt: serverTimestamp()
-    }).catch(() => { /* suministro puede no existir todavía si la marca llega por importador */ });
+    });
   }
   await auditarSeguro(auditar({
     accion: 'crear', coleccion: COL_NAME, docId: ref.id,
@@ -124,13 +145,13 @@ export async function actualizar(id, data, opts = {}) {
   // remover la antigua, añadir la nueva.
   if (prev && prev.marca && payload.marca && prev.marca !== payload.marca && payload.suministro_id) {
     const cidActualizar = payload.contrato_id || (prev && prev.contrato_id) || '';
-    await updateDoc(suministroRef(payload.suministro_id, cidActualizar), {
+    await updateSuministroDual(payload.suministro_id, cidActualizar, {
       marcas_disponibles: arrayRemove(prev.marca)
-    }).catch(() => { /* noop */ });
-    await updateDoc(suministroRef(payload.suministro_id, cidActualizar), {
+    });
+    await updateSuministroDual(payload.suministro_id, cidActualizar, {
       marcas_disponibles: arrayUnion(payload.marca),
       updatedAt: serverTimestamp()
-    }).catch(() => { /* noop */ });
+    });
   }
   await auditarSeguro(auditar({
     accion: 'actualizar', coleccion: COL_NAME, docId: id, uid: opts.uid
@@ -143,10 +164,10 @@ export async function eliminar(id, opts = {}) {
   // Si era la última marca de ese suministro_id, el array queda vacío.
   // (No relistamos para verificar — overhead innecesario; el panel F44 refresca via realtime.)
   if (prev && prev.suministro_id && prev.marca) {
-    await updateDoc(suministroRef(prev.suministro_id, prev.contrato_id || ''), {
+    await updateSuministroDual(prev.suministro_id, prev.contrato_id || '', {
       marcas_disponibles: arrayRemove(prev.marca),
       updatedAt: serverTimestamp()
-    }).catch(() => { /* noop */ });
+    });
   }
   await auditarSeguro(auditar({
     accion: 'eliminar', coleccion: COL_NAME, docId: id, uid: opts.uid,
