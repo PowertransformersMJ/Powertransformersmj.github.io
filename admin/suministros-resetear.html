@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>SGM · TRANSPOWER — Resetear Movimientos</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/admin-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/inventario.css"/>
+  <link rel="stylesheet" href="../assets/css/suministros.css"/>
+  <style>
+    .reset-shell { max-width: 760px; margin: 24px auto 0; padding: 0 12px; }
+    .reset-card {
+      background: rgba(255,255,255,.62);
+      backdrop-filter: blur(28px) saturate(190%);
+      -webkit-backdrop-filter: blur(28px) saturate(190%);
+      border: 1px solid rgba(255,59,48,.22);
+      border-radius: 16px;
+      padding: 24px 26px;
+      box-shadow: var(--glass-ring), 0 8px 28px rgba(255,59,48,.10);
+    }
+    .reset-icon {
+      width: 56px; height: 56px;
+      display: grid; place-items: center;
+      border-radius: 14px;
+      background: rgba(255,59,48,.12);
+      color: var(--danger);
+      margin-bottom: 14px;
+    }
+    .reset-icon i, .reset-icon svg { width: 28px; height: 28px; }
+    .reset-title {
+      margin: 0 0 8px;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ink-1);
+      letter-spacing: -.015em;
+    }
+    .reset-desc {
+      margin: 0 0 18px;
+      color: var(--ink-2);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+    .reset-stats {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      padding: 14px;
+      background: rgba(0,40,90,.04);
+      border-radius: 10px;
+      margin-bottom: 18px;
+    }
+    .reset-stat-label {
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: var(--tracking-caps);
+      text-transform: uppercase;
+      color: var(--ink-3);
+    }
+    .reset-stat-val {
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ink-1);
+      margin-top: 2px;
+    }
+    .reset-stat-val.is-danger { color: var(--danger); }
+    .reset-warn {
+      background: rgba(255,149,0,.08);
+      border: 1px solid rgba(255,149,0,.30);
+      border-radius: 10px;
+      padding: 12px 14px;
+      color: #92400e;
+      font-size: 13px;
+      line-height: 1.45;
+      margin-bottom: 18px;
+    }
+    .reset-warn strong { color: #7c2d12; }
+    .reset-confirm {
+      display: flex; flex-direction: column; gap: 6px;
+      margin-bottom: 18px;
+    }
+    .reset-confirm label {
+      font-size: 12.5px;
+      color: var(--ink-2);
+      font-weight: 500;
+    }
+    .reset-confirm input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,59,48,.30);
+      border-radius: 8px;
+      background: rgba(255,255,255,.85);
+      font-family: var(--font-mono);
+      font-size: 14px;
+      letter-spacing: .04em;
+      box-sizing: border-box;
+      outline: none;
+      transition: border-color .12s ease, box-shadow .12s ease;
+    }
+    .reset-confirm input:focus {
+      border-color: var(--danger);
+      box-shadow: 0 0 0 3px rgba(255,59,48,.16);
+    }
+    .reset-actions {
+      display: flex; gap: 10px;
+      justify-content: flex-end;
+    }
+    .btn-danger {
+      display: inline-flex; align-items: center; gap: 7px;
+      padding: 10px 18px;
+      background: var(--grad-danger);
+      color: #fff;
+      border: 0;
+      border-radius: var(--r-pill);
+      font-weight: 600; font-size: 13.5px;
+      cursor: pointer;
+      box-shadow: var(--sh-sm), inset 0 1px 0 rgba(255,255,255,.35);
+      transition: transform .12s ease, box-shadow .12s ease;
+      font-family: inherit;
+    }
+    .btn-danger:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 18px rgba(255,59,48,.30), inset 0 1px 0 rgba(255,255,255,.45);
+    }
+    .btn-danger:disabled { opacity: .45; cursor: not-allowed; transform: none; filter: saturate(.4); }
+    .btn-danger i, .btn-danger svg { width: 14px; height: 14px; }
+
+    .reset-msg {
+      margin-top: 14px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      display: none;
+    }
+    .reset-msg:not(:empty) { display: block; }
+    .reset-msg.is-ok {
+      background: rgba(28,200,112,.12);
+      color: #008f4a;
+      border: 1px solid rgba(28,200,112,.25);
+    }
+    .reset-msg.is-err {
+      background: rgba(255,59,48,.10);
+      color: #c91a14;
+      border: 1px solid rgba(255,59,48,.22);
+    }
+    .reset-msg.is-progress {
+      background: rgba(0,122,255,.08);
+      color: var(--brand-deep);
+      border: 1px solid rgba(0,122,255,.22);
+      font-family: var(--font-mono);
+    }
+  </style>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="reset-shell">
+
+    <div class="page-header">
+      <div class="breadcrumb">Suministros / Resetear</div>
+      <h1 class="page-title">Resetear <em>Movimientos</em></h1>
+      <p class="page-subtitle">
+        Borra TODOS los movimientos registrados de este contrato. El
+        catálogo de suministros y sus stocks iniciales NO se afectan;
+        solo se eliminan las entradas de la bitácora INGRESO/EGRESO.
+        Operación irreversible — se requiere confirmación textual.
+      </p>
+    </div>
+
+    <section class="reset-card">
+      <div class="reset-icon">
+        <i data-lucide="alert-triangle"></i>
+      </div>
+      <h2 class="reset-title">Resetear bitácora de movimientos</h2>
+      <p class="reset-desc">
+        Esta acción elimina permanentemente todos los documentos de la
+        colección <code>/movimientos</code> que pertenecen al contrato
+        actual. Tras el reset, el stock de cada suministro vuelve a su
+        valor <code>stock_inicial</code> (los datos del catálogo
+        permanecen intactos).
+      </p>
+
+      <div class="reset-stats">
+        <div>
+          <div class="reset-stat-label">Contrato</div>
+          <div class="reset-stat-val" id="statContrato">—</div>
+        </div>
+        <div>
+          <div class="reset-stat-label">Movimientos a borrar</div>
+          <div class="reset-stat-val is-danger" id="statCount">⋯</div>
+        </div>
+      </div>
+
+      <div class="reset-warn">
+        <strong>⚠ Atención:</strong> esta operación NO se puede deshacer.
+        Cada movimiento eliminado deja un registro en
+        <code>/auditoria</code> con tu UID y la fecha, pero los
+        documentos en sí no se recuperan.
+      </div>
+
+      <div class="reset-confirm">
+        <label for="confirmText">
+          Para habilitar el botón, escribe exactamente
+          <strong>RESETEAR</strong> abajo:
+        </label>
+        <input type="text" id="confirmText" autocomplete="off"
+               placeholder="Escribe RESETEAR" maxlength="16">
+      </div>
+
+      <div class="reset-actions">
+        <button type="button" class="btn-danger" id="btnResetear" disabled>
+          <i data-lucide="trash-2"></i>
+          Resetear movimientos
+        </button>
+      </div>
+
+      <div class="reset-msg" id="resetMsg" role="status" aria-live="polite"></div>
+    </section>
+
+  </div>
+
+</main>
+
+<script type="module" src="../assets/js/admin/admin-suministros-resetear.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
