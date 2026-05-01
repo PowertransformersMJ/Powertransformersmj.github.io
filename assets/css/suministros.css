@@ -719,3 +719,17 @@
 @media (max-width: 600px) {
   .form-row-2 { grid-template-columns: 1fr; }
 }
+
+/* ─── Validación reactiva del botón Guardar (PM6) ────────────── */
+.mov-actions .btn-primary[disabled],
+.mov-actions .btn-primary.is-disabled {
+  opacity: .5;
+  cursor: not-allowed;
+  filter: saturate(.4);
+  transform: none;
+  pointer-events: none;
+}
+.msg.hint {
+  color: var(--ink-3);
+  font-style: italic;
+}
