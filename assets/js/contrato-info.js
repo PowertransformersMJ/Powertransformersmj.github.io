@@ -30,20 +30,57 @@ import {
 
 const $ = (id) => document.getElementById(id);
 
-// Lee el contrato_id del query.
+// Lee el contrato_id y el tipo de documento del query.
+//   tipo=''                     → Información Contractual (default)
+//   tipo='remisiones'           → Remisiones
+//   tipo='reuniones-seguimiento'→ Reuniones de Seguimiento
 const params = new URLSearchParams(window.location.search);
 const contratoId = (params.get('id') || '').trim();
+const tipoDoc    = (params.get('tipo') || '').trim();
 
 if (!contratoId) {
   // Sin id, vuelve al índice de contratos.
   window.location.replace('contratos.html');
 }
 
+// Mapping tipo → metadata visual de la página
+const META_TIPO = {
+  '': {
+    titleLead: 'Información',
+    titleEm: 'Contractual',
+    breadcrumb: 'Información Contractual',
+    subtitleSingular: 'documento contractual',
+    subtitlePlural: 'documentos contractuales',
+    emptyMsg: 'Aún no hay documentos contractuales subidos para este contrato.'
+  },
+  'remisiones': {
+    titleLead: 'Seguimiento',
+    titleEm: 'Remisiones',
+    breadcrumb: 'Seguimiento / Remisiones',
+    subtitleSingular: 'remisión cargada',
+    subtitlePlural: 'remisiones cargadas',
+    emptyMsg: 'Aún no hay remisiones cargadas para este contrato.'
+  },
+  'reuniones-seguimiento': {
+    titleLead: 'Seguimiento',
+    titleEm: 'Reuniones',
+    breadcrumb: 'Seguimiento / Reuniones de Seguimiento',
+    subtitleSingular: 'acta / reunión cargada',
+    subtitlePlural: 'actas / reuniones cargadas',
+    emptyMsg: 'Aún no hay reuniones de seguimiento cargadas para este contrato.'
+  }
+};
+const meta = META_TIPO[tipoDoc] || META_TIPO[''];
+
 const META_CONTRATO = {
   '4123000081': 'Contrato 4123000081',
   '4125000143': 'Contrato 4125000143'
 };
-$('bcContrato').textContent = META_CONTRATO[contratoId] || contratoId;
+$('bcContrato').textContent  = META_CONTRATO[contratoId] || contratoId;
+$('bcSeccion').textContent   = meta.breadcrumb;
+$('pageTitleLead').textContent = meta.titleLead;
+$('pageTitleEm').textContent   = meta.titleEm;
+document.title = `SGM · TRANSPOWER — ${meta.titleLead} ${meta.titleEm}`;
 
 const state = {
   documentos: [],
@@ -130,10 +167,12 @@ function actualizarCounter(total, visibles) {
 
 function actualizarSubtitle(total) {
   if (total === 0) {
-    $('docSubtitle').textContent = 'Aún no hay documentos contractuales subidos para este contrato.';
+    $('docSubtitle').textContent = meta.emptyMsg;
   } else {
-    const meta = META_CONTRATO[contratoId] || contratoId;
-    $('docSubtitle').textContent = `${total} documento${total === 1 ? '' : 's'} disponible${total === 1 ? '' : 's'} para el ${meta}.`;
+    const ctxt = META_CONTRATO[contratoId] || contratoId;
+    const noun = total === 1 ? meta.subtitleSingular : meta.subtitlePlural;
+    const verb = total === 1 ? 'disponible' : 'disponibles';
+    $('docSubtitle').textContent = `${total} ${noun} ${verb} para el ${ctxt}.`;
   }
 }
 
@@ -213,7 +252,7 @@ $('docSearch').addEventListener('input', (e) => {
 // Carga inicial.
 async function cargar() {
   try {
-    state.documentos = await listarDocumentos(contratoId);
+    state.documentos = await listarDocumentos(contratoId, tipoDoc);
     state.filtrados = state.documentos;
     actualizarSubtitle(state.documentos.length);
     actualizarCounter(state.documentos.length, state.documentos.length);
@@ -302,6 +341,7 @@ $('uploadForm').addEventListener('submit', async (ev) => {
   try {
     await subirDocumento({
       cid: contratoId,
+      tipo: tipoDoc,
       titulo,
       categoria,
       file,
@@ -358,7 +398,7 @@ $('btnConfirmDelete').addEventListener('click', async () => {
   $('deleteMsg').textContent = '⋯ eliminando…';
   $('deleteMsg').className = 'upload-msg';
   try {
-    await eliminarDocumento({ cid: contratoId, archivo });
+    await eliminarDocumento({ cid: contratoId, tipo: tipoDoc, archivo });
     $('deleteMsg').textContent = `✓ '${titulo}' eliminado.`;
     $('deleteMsg').className = 'upload-msg is-ok';
     // Si el doc eliminado era el seleccionado, vuelve al placeholder.

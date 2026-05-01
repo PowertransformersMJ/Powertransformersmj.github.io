@@ -1137,6 +1137,7 @@ panel de KPIs.
 | Service Worker              | **kill-switch** (`sw.js` se auto-desregistra) · PWA offline-first temporalmente desactivada |
 | Importador Suministros      | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 · `parsearArchivos({xlsmBuffer, XLSX})` |
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
+| Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) |
 | **Estado al 2026-04-27 PM** | 24+ PRs mergeados a `main` esta jornada (#90 → #108+). Versiones publicadas en CHANGELOG: **v2.5.0**, **v2.5.1**, **v2.6.0**, **v2.6.1**, **v2.7.0**. Documentación completa en `docs/UI-V3-DARKMODE.md` + `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` + esta §9. **Pendiente:** `firebase deploy --only storage` (rules de v2.6.0 + v2.7.0), revocar `ghp_kzk3…` PAT cuando termine la jornada. |
 | Próxima movida              | Director hace `firebase deploy --only storage` desde su Mac → prueba el flujo admin de upload/delete de PDFs en `pages/contrato-info.html` → si todo OK, eventualmente ejecuta `node scripts/deploy-pdfs-storage.js --service-account ~/sa.json` para migrar los 13 PDFs de GitHub Pages a Firebase Storage. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
@@ -1290,19 +1291,23 @@ integración SCADA, etc.):
 7. **Topbar dark glass:** `rgba(8,18,35,.45-.30)` con border-bottom
    `rgba(255,255,255,.10)` (highlight superior sutil). Search box
    también dark translucent.
-8. **Sidebar drilldown de contratos** (5 niveles):
+8. **Sidebar drilldown de contratos** (5 niveles · actualizado v2.8.0):
    ```
    Contratos ▾
      Suministro de Elementos y Accesorios para Transformadores de Potencia ▾
        4123000081 ▾
          Control y Gestión Operativa  → contrato.html?id=4123000081
-         Información Contractual      → contrato.html?id=4123000081#tab=info-contractual
+         Información Contractual      → contrato-info.html?id=4123000081
+         Seguimiento Contractual ▾    (toggle puro · v2.8.0)
+           Remisiones                 → contrato-info.html?id=4123000081&tipo=remisiones
+           Reuniones de Seguimiento   → contrato-info.html?id=4123000081&tipo=reuniones-seguimiento
        4125000143 ▾
          (misma estructura espejo)
    ```
-   Los DOS items "Control y Gestión Operativa" e "Información
-   Contractual" son **links terminales** (no acordeones) — sin
-   chevron, sin subitems en sidebar. Cargan el contenido en el
+   "Control y Gestión Operativa", "Información Contractual",
+   "Remisiones" y "Reuniones de Seguimiento" son **links terminales**
+   (no acordeones). "Seguimiento Contractual" es un **toggle puro**
+   (botón · solo expand/collapse, no navega). Cargan el contenido en el
    panel derecho. Los 5 tabs (Dashboard, Catálogo, Movimiento,
    Histórico, Importar) viven SOLO en `pages/contrato.html`, no
    replicados en sidebar. **Proper case** (no uppercase) — el
