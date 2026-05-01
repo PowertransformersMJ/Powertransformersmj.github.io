@@ -1,19 +1,30 @@
 // ══════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Data layer: documentos contractuales (Fase 3 · 2026-04-27)
+// SGM · TRANSPOWER — Data layer: documentos por contrato (Fase 3 + multi-tipo PM7)
 // ──────────────────────────────────────────────────────────────
-// Resuelve la lista de PDFs de Información Contractual por contrato.
+// Resuelve la lista de PDFs de cada contrato. Soporta varias
+// "tipos" de colección de documentos por contrato (información
+// contractual, remisiones, reuniones de seguimiento, …).
 //
-// Tres canales con un único API:
-//   1. Manifest local (default · GitHub Pages)
-//      assets/docs/contratos/{cid}/manifest.json + PDFs en mismo dir
-//   2. Firebase Storage (futuro · cuando el director ejecute el
-//      script scripts/deploy-pdfs-storage.js)
-//      gs://sgm-transpower.appspot.com/contratos/{cid}/{slug}.pdf
-//   3. Firestore /contratos/{cid}/documentos (override opcional · si
-//      el doc tiene un array `documentos`, gana sobre el manifest)
+// Tipos soportados:
+//   · ''                       (default) → Información Contractual
+//                              (compat con la implementación
+//                              original anterior a multi-tipo)
+//   · 'remisiones'             → Remisiones
+//   · 'reuniones-seguimiento'  → Reuniones de Seguimiento
 //
-// El frontend siempre llama listarDocumentos(cid) y recibe la misma
-// shape independientemente de la fuente.
+// Path en GitHub Pages:
+//   tipo=''                    → assets/docs/contratos/{cid}/{slug}.pdf
+//   tipo='X'                   → assets/docs/contratos/{cid}/{X}/{slug}.pdf
+//
+// Path en Firebase Storage (mismo patrón):
+//   gs://…/contratos/{cid}/{tipo opcional}/{slug}.pdf
+//
+// Campo Firestore en /contratos/{cid}:
+//   tipo=''                    → documentos_contractuales[]   (legacy)
+//   tipo='X'                   → documentos_X_underscored[]   (donde - se reemplaza por _)
+//
+// El frontend siempre llama listarDocumentos(cid, tipo) y recibe
+// la misma shape independientemente de la fuente.
 // ══════════════════════════════════════════════════════════════
 
 import {
@@ -32,6 +43,8 @@ export const CATEGORIAS_DOC = {
   adenda:        { label: 'Adendas',              icon: 'file-plus' },
   orden:         { label: 'Órdenes y pedidos',    icon: 'package-check' },
   administracion:{ label: 'Administración',       icon: 'briefcase' },
+  remision:      { label: 'Remisiones',           icon: 'truck' },
+  acta:          { label: 'Actas / Reuniones',    icon: 'users' },
   otros:         { label: 'Otros',                icon: 'file-text' }
 };
 
@@ -40,24 +53,36 @@ export const CATEGORIAS_DOC = {
 // archivo vive en assets/js/data/, así que ../../../ apunta al root.
 const BASE_HREF = new URL('../../../', import.meta.url).href;
 
+// ── Helpers internos para el shape de paths/campos según tipo ──
+function _segmento(tipo) {
+  return tipo ? `${tipo}/` : '';
+}
+function _campoFirestore(tipo) {
+  if (!tipo) return 'documentos_contractuales';
+  return `documentos_${String(tipo).replace(/-/g, '_')}`;
+}
+function _campoUpdatedAt(tipo) {
+  return `${_campoFirestore(tipo)}_updated_at`;
+}
+
 /**
  * Devuelve la URL pública absoluta de un documento (resuelta contra
  * el root del sitio, NO relativa al path de la página que llama).
- * Esto es crítico porque pages/contrato-info.html vive un nivel
- * adentro y una URL relativa simple se rompe.
  */
-export function urlDocumento(cid, slug) {
+export function urlDocumento(cid, slug, tipo = '') {
   if (!cid || !slug) return '';
-  return BASE_HREF + `assets/docs/contratos/${cid}/${slug}`;
+  return BASE_HREF + `assets/docs/contratos/${cid}/${_segmento(tipo)}${slug}`;
 }
 
 /**
  * Carga el manifest local (GitHub Pages) y devuelve la lista
- * sanitizada. Si no existe, devuelve [].
+ * sanitizada. Si no existe, devuelve null (NO un manifest vacío;
+ * eso indica que no hay manifest local de respaldo y el caller debe
+ * apoyarse 100% en el override Firestore).
  */
-async function cargarManifest(cid) {
+async function cargarManifest(cid, tipo = '') {
   try {
-    const url = BASE_HREF + `assets/docs/contratos/${cid}/manifest.json`;
+    const url = BASE_HREF + `assets/docs/contratos/${cid}/${_segmento(tipo)}manifest.json`;
     const res = await fetch(url, { cache: 'no-cache' });
     if (!res.ok) return null;
     const json = await res.json();
@@ -70,7 +95,7 @@ async function cargarManifest(cid) {
         archivo:     String(d.archivo || '').trim(),
         categoria:   CATEGORIAS_DOC[d.categoria] ? d.categoria : 'otros',
         peso_bytes:  Number(d.peso_bytes) || 0,
-        url:         urlDocumento(cid, d.archivo)
+        url:         urlDocumento(cid, d.archivo, tipo)
       })).filter((d) => d.archivo)
     };
   } catch (err) {
@@ -80,12 +105,11 @@ async function cargarManifest(cid) {
 }
 
 /**
- * Si el doc /contratos/{cid} tiene un array `documentos_contractuales`,
+ * Si el doc /contratos/{cid} tiene un array `documentos_<tipo>[]`,
  * lo retorna mergeado con el manifest local (Firestore gana en
- * conflictos por archivo). Esto permite que el director re-ordene,
- * oculte o agregue documentos sin re-deployar el sitio.
+ * conflictos por archivo).
  */
-async function cargarOverrideFirestore(cid) {
+async function cargarOverrideFirestore(cid, tipo = '') {
   if (!isFirebaseConfigured) return null;
   const db = getDbSafe();
   if (!db) return null;
@@ -93,13 +117,14 @@ async function cargarOverrideFirestore(cid) {
     const snap = await getDoc(doc(db, 'contratos', String(cid)));
     if (!snap.exists()) return null;
     const data = snap.data() || {};
-    if (!Array.isArray(data.documentos_contractuales)) return null;
-    return data.documentos_contractuales.map((d) => ({
+    const campo = _campoFirestore(tipo);
+    if (!Array.isArray(data[campo])) return null;
+    return data[campo].map((d) => ({
       titulo:     String(d.titulo || d.archivo || '').trim(),
       archivo:    String(d.archivo || '').trim(),
       categoria:  CATEGORIAS_DOC[d.categoria] ? d.categoria : 'otros',
       peso_bytes: Number(d.peso_bytes) || 0,
-      url:        d.url || urlDocumento(cid, d.archivo)
+      url:        d.url || urlDocumento(cid, d.archivo, tipo)
     })).filter((d) => d.archivo);
   } catch (err) {
     console.warn('[documentos_contractuales] firestore override fallo:', err);
@@ -108,17 +133,17 @@ async function cargarOverrideFirestore(cid) {
 }
 
 /**
- * API pública: devuelve la lista combinada de documentos del contrato.
- * El consumidor (UI) recibe la misma shape independientemente de la
- * fuente.
+ * API pública: devuelve la lista combinada de documentos del contrato
+ * según tipo. El consumidor (UI) recibe la misma shape independiente
+ * de la fuente.
  */
-export async function listarDocumentos(cid) {
+export async function listarDocumentos(cid, tipo = '') {
   const id = String(cid || '').trim();
   if (!id) return [];
 
   const [manifest, override] = await Promise.all([
-    cargarManifest(id),
-    cargarOverrideFirestore(id)
+    cargarManifest(id, tipo),
+    cargarOverrideFirestore(id, tipo)
   ]);
 
   const base = manifest ? manifest.documentos : [];
@@ -166,8 +191,6 @@ export function formatearPeso(bytes) {
 
 /**
  * Genera un slug URL-safe a partir de un título humano.
- * Mismas reglas que el script Python `deploy-pdfs-storage.js`:
- * NFD para descomponer tildes, mantener solo a-z0-9, separar con dash.
  */
 export function slugFromTitle(titulo) {
   const base = String(titulo || '').replace(/\.pdf$/i, '');
@@ -179,10 +202,11 @@ export function slugFromTitle(titulo) {
 
 /**
  * Sube un PDF nuevo a Firebase Storage + actualiza el array
- * `documentos_contractuales[]` en /contratos/{cid}.
+ * `documentos_<tipo>[]` en /contratos/{cid}.
  *
  * @param {object} args
- * @param {string} args.cid       — contrato_id (4123000081, …)
+ * @param {string} args.cid       — contrato_id
+ * @param {string} [args.tipo]    — '' | 'remisiones' | 'reuniones-seguimiento'
  * @param {string} args.titulo    — título legible del documento
  * @param {string} args.categoria — clave de CATEGORIAS_DOC
  * @param {File}   args.file      — File del input <type=file>
@@ -190,7 +214,7 @@ export function slugFromTitle(titulo) {
  * @param {(progress: number) => void} [args.onProgress] — 0-100
  * @returns {Promise<{archivo: string, url: string}>}
  */
-export async function subirDocumento({ cid, titulo, categoria, file, uid = null, onProgress = null }) {
+export async function subirDocumento({ cid, tipo = '', titulo, categoria, file, uid = null, onProgress = null }) {
   if (!isFirebaseConfigured) throw new Error('Firebase no está configurado.');
   const db = getDbSafe();
   const storage = getStorageSafe();
@@ -209,14 +233,14 @@ export async function subirDocumento({ cid, titulo, categoria, file, uid = null,
 
   const cat = CATEGORIAS_DOC[categoria] ? categoria : 'otros';
   const slug = slugFromTitle(titulo);
-  const remotePath = `contratos/${cid}/${slug}`;
+  const remotePath = `contratos/${cid}/${_segmento(tipo)}${slug}`;
   const fileRef = storageRef(storage, remotePath);
 
   // Upload con progreso resumable.
   await new Promise((resolve, reject) => {
     const task = uploadBytesResumable(fileRef, file, {
       contentType: 'application/pdf',
-      customMetadata: { uploaded_by: uid || 'unknown', titulo }
+      customMetadata: { uploaded_by: uid || 'unknown', titulo, tipo: tipo || 'info-contractual' }
     });
     task.on('state_changed',
       (snap) => {
@@ -234,13 +258,13 @@ export async function subirDocumento({ cid, titulo, categoria, file, uid = null,
 
   const url = await getDownloadURL(fileRef);
 
-  // Actualizar /contratos/{cid}.documentos_contractuales[].
-  // Leemos primero, filtramos duplicados por slug (idempotencia
-  // si re-suben el mismo archivo), y escribimos el array completo.
+  // Actualizar /contratos/{cid}.documentos_<tipo>[].
+  const campo = _campoFirestore(tipo);
+  const campoUpdatedAt = _campoUpdatedAt(tipo);
   const docRef = doc(db, 'contratos', cid);
   const snap = await getDoc(docRef);
   const data = snap.exists() ? snap.data() : {};
-  const arr = Array.isArray(data.documentos_contractuales) ? data.documentos_contractuales : [];
+  const arr = Array.isArray(data[campo]) ? data[campo] : [];
   const sinDuplicado = arr.filter((d) => d.archivo !== slug);
   sinDuplicado.push({
     titulo: String(titulo).trim(),
@@ -253,59 +277,53 @@ export async function subirDocumento({ cid, titulo, categoria, file, uid = null,
   });
 
   await setDoc(docRef, {
-    documentos_contractuales: sinDuplicado,
-    documentos_contractuales_updated_at: serverTimestamp()
+    [campo]: sinDuplicado,
+    [campoUpdatedAt]: serverTimestamp()
   }, { merge: true });
 
   return { archivo: slug, url };
 }
 
 /**
- * Elimina un PDF de Firebase Storage y lo quita del array de
- * /contratos/{cid}.documentos_contractuales[]. Si el doc proviene
- * del manifest local (canal GitHub Pages), no se puede eliminar
- * server-side — se devuelve error informativo.
+ * Elimina un PDF de Firebase Storage y lo quita del array
+ * `documentos_<tipo>[]` de /contratos/{cid}.
  *
  * @param {object} args
  * @param {string} args.cid     — contrato_id
- * @param {string} args.archivo — slug del archivo (ej. 'minuta.pdf')
+ * @param {string} [args.tipo]  — vacío | 'remisiones' | 'reuniones-seguimiento'
+ * @param {string} args.archivo — slug del archivo
  * @returns {Promise<void>}
  */
-export async function eliminarDocumento({ cid, archivo }) {
+export async function eliminarDocumento({ cid, tipo = '', archivo }) {
   if (!isFirebaseConfigured) throw new Error('Firebase no está configurado.');
   const db = getDbSafe();
   const storage = getStorageSafe();
   if (!db || !storage) throw new Error('Firebase no está inicializado.');
   if (!cid || !archivo) throw new Error('cid y archivo son obligatorios.');
 
+  const campo = _campoFirestore(tipo);
+  const campoUpdatedAt = _campoUpdatedAt(tipo);
   const docRef = doc(db, 'contratos', cid);
   const snap = await getDoc(docRef);
   const data = snap.exists() ? snap.data() : {};
-  const arr = Array.isArray(data.documentos_contractuales) ? data.documentos_contractuales : [];
+  const arr = Array.isArray(data[campo]) ? data[campo] : [];
   const target = arr.find((d) => d.archivo === archivo);
 
   if (!target) {
-    // No está en Firestore — probablemente vive solo en el manifest
-    // local del repo. Esos no son eliminables desde el frontend.
     throw new Error('Este documento es del manifest base del repo y no se puede eliminar desde el navegador. Contacta al desarrollador para borrarlo del repo.');
   }
 
-  // Borrar del Storage primero (si falla por permission-denied,
-  // no tocamos Firestore — mejor dejar consistente).
+  // Borrar del Storage primero.
   try {
-    await deleteObject(storageRef(storage, `contratos/${cid}/${archivo}`));
+    await deleteObject(storageRef(storage, `contratos/${cid}/${_segmento(tipo)}${archivo}`));
   } catch (err) {
-    // Si el objeto no existe en Storage (404), seguimos — quitamos
-    // del array igualmente para limpieza.
-    if (err && err.code !== 'storage/object-not-found') {
-      throw err;
-    }
+    if (err && err.code !== 'storage/object-not-found') throw err;
   }
 
   // Quitar del array y persistir.
   const nueva = arr.filter((d) => d.archivo !== archivo);
   await setDoc(docRef, {
-    documentos_contractuales: nueva,
-    documentos_contractuales_updated_at: serverTimestamp()
+    [campo]: nueva,
+    [campoUpdatedAt]: serverTimestamp()
   }, { merge: true });
 }
