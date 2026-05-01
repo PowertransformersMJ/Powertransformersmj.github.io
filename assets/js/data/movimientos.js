@@ -30,6 +30,7 @@ import {
   DEFAULT_SUMINISTROS_CONFIG
 } from '../domain/stock_calculo.js';
 import { generarCodigoMov } from '../domain/schema.js';
+import { composeDocId } from '../domain/contratos.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
 import { obtenerConfig } from './suministros_config.js';
 
@@ -56,7 +57,22 @@ function db() {
 }
 function collRef() { return collection(db(), COL_NAME); }
 function docRef(id) { return doc(db(), COL_NAME, id); }
-function suministroRef(sid) { return doc(db(), COL_SUMINISTROS, sid); }
+
+/**
+ * Resuelve el ref de un suministro respetando el docId compuesto
+ * por contrato (multi-contrato N5). Si se pasa contrato_id, busca
+ * `/suministros/{cid}_{codigo}`. Si no, intenta el codigo plano
+ * (compat con docs legacy del 4123000081 antes de la migración N5).
+ *
+ * Bug 2026-04-27 PM5: el módulo de movimientos pasaba solo el
+ * código a un ref directo. Para suministros del 4125000143 (que
+ * usan docId compuesto) eso fallaba con 'Suministro X no existe'.
+ * Fix: aceptar contrato_id opcional y construir con composeDocId.
+ */
+function suministroRef(sid, contratoId = '') {
+  const docId = contratoId ? composeDocId(contratoId, sid) : sid;
+  return doc(db(), COL_SUMINISTROS, docId);
+}
 
 function auditarSeguro(entry) {
   return persistirAuditoria(
@@ -105,12 +121,18 @@ export async function obtener(id) {
  * Calcula el stock actual de un suministro agregando todos sus
  * movimientos. Útil para vistas one-shot. Para realtime use
  * `suscribirStockGlobal`.
+ *
+ * `contratoId` opcional: si se pasa, resuelve el suministro con
+ * docId compuesto (`{cid}_{codigo}`). Sin él, intenta codigo plano
+ * (compat legacy 4123000081 pre-N5).
  */
-export async function computarStock(suministroId) {
-  const sumDoc = await getDoc(suministroRef(suministroId));
+export async function computarStock(suministroId, contratoId = '') {
+  const sumDoc = await getDoc(suministroRef(suministroId, contratoId));
   if (!sumDoc.exists()) return null;
   const stockInicial = +sumDoc.data().stock_inicial || 0;
-  const movs = await listar({ suministro_id: suministroId });
+  const movFiltros = { suministro_id: suministroId };
+  if (contratoId) movFiltros.contrato_id = contratoId;
+  const movs = await listar(movFiltros);
   return computarStockDesdeMovimientos(stockInicial, movs);
 }
 
@@ -134,17 +156,25 @@ export async function crear(payload, uid) {
   // 2. Tx: lee correlativo y movimientos previos, valida stock, escribe.
   const ref = doc(collRef());  // pre-genera id de documento
   const movId = await runTransaction(db(), async (tx) => {
-    // Lee suministro para stock_inicial.
-    const sumSnap = await tx.get(suministroRef(sane.suministro_id));
+    // Lee suministro para stock_inicial. El docId puede ser compuesto
+    // (multi-contrato N5: '{contrato_id}_{codigo}') o plano (legacy
+    // 4123000081 pre-migración). suministroRef resuelve ambos casos.
+    const sumSnap = await tx.get(suministroRef(sane.suministro_id, sane.contrato_id));
     if (!sumSnap.exists()) {
-      throw new Error(`Suministro ${sane.suministro_id} no existe.`);
+      throw new Error(`Suministro ${sane.suministro_id} no existe (contrato_id="${sane.contrato_id || '—'}").`);
     }
     const stockInicial = +sumSnap.data().stock_inicial || 0;
 
     // Lee TODOS los movimientos del suministro (no solo del año):
     //   stock_actual = stock_inicial + Σ ingresos − Σ egresos (todo el histórico).
+    // Filtramos también por contrato_id cuando aplica para que dos
+    // contratos con el mismo S01 no se mezclen en el cálculo de stock.
+    const movsConstraints = [where('suministro_id', '==', sane.suministro_id)];
+    if (sane.contrato_id) {
+      movsConstraints.push(where('contrato_id', '==', sane.contrato_id));
+    }
     const movsTodosSnap = await getDocs(
-      query(collRef(), where('suministro_id', '==', sane.suministro_id))
+      query(collRef(), ...movsConstraints)
     );
     const movs = movsTodosSnap.docs.map((d) => d.data());
     const stock = computarStockDesdeMovimientos(stockInicial, movs);

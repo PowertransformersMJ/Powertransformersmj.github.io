@@ -142,6 +142,66 @@ Reglas concretas al recibir un ticket de UI:
    Esto es invariante; cualquier sesión que quiera cambiarlo necesita
    justificarlo aquí.
 
+### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
+
+**Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
+Movimiento del contrato 4125000143 dejó de funcionar tras la migración
+multi-contrato N5. Síntoma: al guardar un movimiento aparecía
+"Suministro X no existe".
+
+**Causa raíz:** desde N5 los suministros se guardan en Firestore con
+**docId compuesto** `'{contrato_id}_{codigo}'` (ej. `4125000143_S01`).
+Pero `assets/js/data/movimientos.js#suministroRef(sid)` y
+`assets/js/data/marcas.js#suministroRef(sid)` accedían directo a
+`/suministros/{sid}` con solo el código plano, lo que **falla
+silenciosamente** para todos los contratos que usan docId compuesto.
+
+**Regla obligatoria para cualquier consumer de `/suministros`:**
+
+```javascript
+// ❌ MAL — solo funciona con docs legacy 4123000081 pre-migración
+const ref = doc(db, 'suministros', codigo);
+
+// ✅ BIEN — soporta docId compuesto N5 + fallback a codigo plano
+import { composeDocId } from '../domain/contratos.js';
+function suministroRef(sid, contratoId = '') {
+  const docId = contratoId ? composeDocId(contratoId, sid) : sid;
+  return doc(db(), COL_SUMINISTROS, docId);
+}
+```
+
+**Cualquier código nuevo que lea/escriba `/suministros/{X}` directo
+debe pasar el `contrato_id`** del payload, del filtro activo, o del
+contrato_context (`getContratoActivo()` de `assets/js/ui/contrato-
+context.js`). Sin contrato_id queda fallback a codigo plano (compat
+con el contrato 4123000081 importado antes de la migración N5).
+
+**Aplica también a:**
+- `crearMovimiento` (lee suministro para `stock_inicial` en la tx)
+- `computarStock(suministroId)` (one-shot stock calculation)
+- `marcas.js` `crear/actualizar/eliminar` (sync de
+  `marcas_disponibles[]` en el suministro)
+- Cualquier query de movimientos por suministro debe filtrar también
+  por `contrato_id` para que dos contratos con el mismo S01 no
+  mezclen su stock en el cálculo agregado.
+
+**Verificación:** si en una sesión nueva tocas o creas algo que
+accede a `/suministros/{X}`, **ejecutar siempre**:
+
+```bash
+grep -rn "doc(.*, 'suministros'\|COL_SUMINISTROS" assets/js/ --include="*.js"
+```
+
+y verificar que cada call site usa `composeDocId(cid, codigo)` o
+recibe el ID ya compuesto desde un `getDocs` previo.
+
+**Indicios visuales del bug:**
+- "Suministro X no existe" en el formulario de Movimiento.
+- Stock muestra "—" persistentemente en el formulario.
+- Sync de `marcas_disponibles` no actualiza el array del suministro
+  (la marca queda en `/marcas` pero no aparece en el dropdown del
+  formulario de Movimiento ni en el catálogo).
+
 ### 0.2 Branch de trabajo
 
 Durante la evolución v2.0 (F16–F37) la rama activa fue
@@ -1072,11 +1132,13 @@ panel de KPIs.
 | Último tag                  | (sin tag desde `v2.4.1` · trabajo visual continuo en `claude/set-background-image-nhgwM`) |
 | Tag previo                  | `v2.4.1` (deploy contrato 4125000143) |
 | Referencia normativa activa | MO.00418.DE-GAC-AX.01 Ed. 02 (14/10/2025) |
-| Sistema de diseño activo    | **UI v3 DARK MODE** · `assets/css/aqua-tokens.css` (inks claros + glass navy oscuro) + `aqua-components.css` (sidebar transparente, topbar dark glass, drilldown contratos 4 niveles) + `assets/js/aqua-shell.js` (markActive con hash matching) · body class="aqua" en todas las páginas |
-| Foto de fondo activa        | `assets/img/aqua/substation-photo.jpg` 2560×1920 JPEG q88 1.16 MB · convertida de `IMG_9840.HEIC` |
+| Sistema de diseño activo    | **AQUA LIGHT** · `assets/css/aqua-tokens.css` (inks Steel Navy oscuros que leen como negro corporativo + glass blanco perla translúcido) + `aqua-components.css` (sidebar aqua glass, topbar light glass, drilldown contratos 4 niveles con números como botones toggle) + `assets/js/aqua-shell.js` (markActive con hash matching) · body class="aqua" en todas las páginas |
+| Foto de fondo activa        | `assets/img/aqua/substation-photo.webp` **2880×1620 WebP q=95 method=6 · 1.07 MB** · convertida de `FONDO POWERTRANSFORMER.jpg` (3.4 MB) |
 | Service Worker              | **kill-switch** (`sw.js` se auto-desregistra) · PWA offline-first temporalmente desactivada |
-| **Estado al 2026-04-27 PM** | 14 PRs mergeados esta sesión (#90–#103) · UI v3 dark mode completo · drilldown contratos en sidebar · CHANGELOG entrada v2.5.0 · `docs/UI-V3-DARKMODE.md` documentación completa. **Pendiente:** datos Información Contractual (cuando el director suba), reactivar PWA, revocar `ghp_kzk3…` PAT. |
-| Próxima movida              | Esperar datos de Información Contractual del director → montar tab `#tab=info-contractual` en `pages/contrato.html` que renderice los datos según `?id=` → cuando estable, reactivar PWA con SW network-first probado. |
+| Importador Suministros      | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 · `parsearArchivos({xlsmBuffer, XLSX})` |
+| Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
+| **Estado al 2026-04-27 PM** | 24+ PRs mergeados a `main` esta jornada (#90 → #108+). Versiones publicadas en CHANGELOG: **v2.5.0**, **v2.5.1**, **v2.6.0**, **v2.6.1**, **v2.7.0**. Documentación completa en `docs/UI-V3-DARKMODE.md` + `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` + esta §9. **Pendiente:** `firebase deploy --only storage` (rules de v2.6.0 + v2.7.0), revocar `ghp_kzk3…` PAT cuando termine la jornada. |
+| Próxima movida              | Director hace `firebase deploy --only storage` desde su Mac → prueba el flujo admin de upload/delete de PDFs en `pages/contrato-info.html` → si todo OK, eventualmente ejecuta `node scripts/deploy-pdfs-storage.js --service-account ~/sa.json` para migrar los 13 PDFs de GitHub Pages a Firebase Storage. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
@@ -1177,18 +1239,20 @@ integración SCADA, etc.):
 > obligatoria: verifica primero el estado del repo (`git log
 > origin/main`, `ls assets/css/`) — esta §9 puede estar desactualizada.
 
-### 9.1 Estado actual (post v2.6.0 · 2026-04-27 PM3)
+### 9.1 Estado actual (post v2.7.0 · 2026-04-27 PM4)
 
 | Concepto | Valor |
 |---|---|
-| Modo visual | **AQUA LIGHT** (revertido del dark mode tras commit `50cf27a`) · texto navy oscuro `#0d1f38` legible como negro corporativo |
+| Modo visual | **AQUA LIGHT** (revertido del dark mode en commit `50cf27a` v2.5.1) · texto Steel Navy oscuro `#0d1f38` legible como negro corporativo |
 | Foto de fondo activa | `assets/img/aqua/substation-photo.webp` · **2880×1620 · WebP q=95 · 1.07 MB** · convertida de FONDO POWERTRANSFORMER.jpg |
-| Sidebar | **Aqua glass material restaurado** · `rgba(255,255,255,.36-.22)` + `blur(52px) saturate(200%) brightness(108%)` + highlight 3D superior |
-| Sidebar drilldown | Categoría "Suministro de Elementos…" es `<button>` (solo expand/collapse, no link) → 4123000081 / 4125000143 → Control y Gestión Operativa + **Información Contractual** (página nueva) |
-| Información Contractual | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` |
-| Importador Suministros | **Canal único Excel** (xlsm) · JSX retirado en v2.5.x · `parsearArchivos({xlsmBuffer, XLSX})` |
-| Tag | (sin tag nuevo · branch activa `claude/set-background-image-nhgwM`) |
-| PRs mergeados sesión 04-27 | #90 #91 #92 #93 #94 #95 #96 #97 #98 #99 #100 #101 #102 #103 #104 #105 #106 #107 + Microcirugía Suministros (Fases 1-6) |
+| Sidebar | **Aqua glass material** · `rgba(255,255,255,.36-.22)` + `blur(52px) saturate(200%) brightness(108%)` + highlight 3D superior |
+| Sidebar drilldown | Categoría "Suministro de Elementos…" + cada número de contrato (4123, 4125) son `<button>` puros — **solo expand/collapse, NO navegan** (v2.7.0). La navegación al dashboard sale exclusivamente por "Control y Gestión Operativa" |
+| Información Contractual | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` (manifest local) + override Firestore `/contratos/{cid}.documentos_contractuales[]` (admin upload v2.7.0) |
+| Admin Information Contractual (v2.7.0) | Botón **"+ Agregar documento"** en cabecera de lista lateral · hover-action **trash** en cada doc · modales upload/delete con barra de progreso resumable · solo visibles para `rol === 'admin'` · wire a Firebase Storage (`uploadBytesResumable` + `deleteObject`) y Firestore (`setDoc` con merge en array) |
+| Importador Suministros | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 commit `c41d316` · `parsearArchivos({xlsmBuffer, XLSX})` |
+| Tag de release | (sin tag nuevo · branch activa `claude/set-background-image-nhgwM`) |
+| Versiones CHANGELOG | v2.5.0 · v2.5.1 · v2.6.0 · v2.6.1 · v2.7.0 (todas en sesión 2026-04-27) |
+| PRs mergeados a main esta jornada | #90 → #108+ (24+ PRs) |
 | Sitio en producción | `ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/` (project page · NO el dominio raíz) |
 | Service Worker | **kill-switch** · `sw.js` se auto-desregistra y limpia caches al activarse · sin SW corriendo en producción |
 
