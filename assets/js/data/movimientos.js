@@ -74,6 +74,25 @@ function suministroRef(sid, contratoId = '') {
   return doc(db(), COL_SUMINISTROS, docId);
 }
 
+/**
+ * Lee un suministro probando primero docId compuesto y haciendo
+ * fallback al codigo plano. Útil para reads one-shot (computarStock).
+ *
+ * Bug 2026-04-27 PM6: el fix anterior (PM5) asumía que SI hay
+ * contrato_id, entonces el doc usa docId compuesto. Pero el
+ * contrato 4123000081 tiene contrato_id activo y SUS docs son
+ * LEGACY con docId plano (importados antes de la migración N5).
+ * Resultado: el lookup compuesto fallaba y el stock quedaba en "—".
+ * Esta heurística dual resuelve sin asumir el shape.
+ */
+async function leerSuministroDual(sid, contratoId) {
+  if (contratoId) {
+    const c = await getDoc(suministroRef(sid, contratoId));
+    if (c.exists()) return c;
+  }
+  return getDoc(doc(db(), COL_SUMINISTROS, sid));
+}
+
 function auditarSeguro(entry) {
   return persistirAuditoria(
     { db: getDbSafe(), addDoc, collection, serverTimestamp },
@@ -127,7 +146,8 @@ export async function obtener(id) {
  * (compat legacy 4123000081 pre-N5).
  */
 export async function computarStock(suministroId, contratoId = '') {
-  const sumDoc = await getDoc(suministroRef(suministroId, contratoId));
+  // Heurística dual: prueba docId compuesto primero, fallback a plano.
+  const sumDoc = await leerSuministroDual(suministroId, contratoId);
   if (!sumDoc.exists()) return null;
   const stockInicial = +sumDoc.data().stock_inicial || 0;
   const movFiltros = { suministro_id: suministroId };
@@ -158,8 +178,17 @@ export async function crear(payload, uid) {
   const movId = await runTransaction(db(), async (tx) => {
     // Lee suministro para stock_inicial. El docId puede ser compuesto
     // (multi-contrato N5: '{contrato_id}_{codigo}') o plano (legacy
-    // 4123000081 pre-migración). suministroRef resuelve ambos casos.
-    const sumSnap = await tx.get(suministroRef(sane.suministro_id, sane.contrato_id));
+    // 4123000081 pre-migración). Heurística dual: intenta compuesto
+    // si hay contrato_id, fallback a plano. Necesita 2 tx.get sucesivos
+    // porque la transacción no permite operaciones async externas.
+    let sumSnap = null;
+    if (sane.contrato_id) {
+      sumSnap = await tx.get(suministroRef(sane.suministro_id, sane.contrato_id));
+      if (!sumSnap.exists()) sumSnap = null;
+    }
+    if (!sumSnap) {
+      sumSnap = await tx.get(doc(db(), COL_SUMINISTROS, sane.suministro_id));
+    }
     if (!sumSnap.exists()) {
       throw new Error(`Suministro ${sane.suministro_id} no existe (contrato_id="${sane.contrato_id || '—'}").`);
     }
