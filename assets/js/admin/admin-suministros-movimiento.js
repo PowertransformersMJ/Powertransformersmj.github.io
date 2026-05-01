@@ -189,6 +189,7 @@ async function aplicarSuministroLinea(lineaEl) {
     f.stockActual.value = '';
     f.valorTotal.textContent = '—';
     actualizarTotalMovimiento();
+    actualizarBtnGuardar();
     return;
   }
   // Marca: si hay 1 marca disponible, la pre-llena; si hay varias,
@@ -220,6 +221,70 @@ function actualizarValorTotalLinea(lineaEl) {
   const total = cant * valU;
   f.valorTotal.textContent = total > 0 ? fmtCOP(total) : '—';
   actualizarTotalMovimiento();
+  actualizarBtnGuardar();
+}
+
+// ══════════════════════════════════════════════════════════════
+// Validación reactiva · btnGuardar disabled hasta que todo OK
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Devuelve { ok: bool, motivo: string } indicando si el formulario
+ * está listo para guardar. El motivo se usa como tooltip del botón
+ * disabled (UX: el director ve qué falta sin tener que adivinar).
+ */
+function validarFormulario() {
+  if (!fUsuario.value.trim()) {
+    return { ok: false, motivo: 'Falta indicar Usuario / Responsable' };
+  }
+  if (!tipoSeleccionado()) {
+    return { ok: false, motivo: 'Selecciona INGRESO o EGRESO' };
+  }
+  if (!trafoSel) {
+    return { ok: false, motivo: 'Selecciona una Matrícula válida del parque' };
+  }
+  const lineas = [...lineasContainer.querySelectorAll('.linea-suministro')];
+  if (lineas.length === 0) {
+    return { ok: false, motivo: 'Agrega al menos una línea de suministro' };
+  }
+  for (let i = 0; i < lineas.length; i++) {
+    const f = lineaFields(lineas[i]);
+    const data = lineaState.get(lineas[i]) || {};
+    if (!data.suministro) {
+      return { ok: false, motivo: `Línea #${i + 1}: selecciona un suministro válido del catálogo` };
+    }
+    const cant = parseInt(f.cantidad.value, 10);
+    if (!Number.isInteger(cant) || cant < 1) {
+      return { ok: false, motivo: `Línea #${i + 1}: la cantidad debe ser un entero ≥ 1` };
+    }
+  }
+  return { ok: true, motivo: '' };
+}
+
+/**
+ * Actualiza el estado visual del botón Guardar según validarFormulario.
+ * Se llama desde TODOS los listeners que cambian el estado.
+ */
+function actualizarBtnGuardar() {
+  const v = validarFormulario();
+  btnGuardar.disabled = !v.ok;
+  btnGuardar.title = v.ok
+    ? 'Guardar el movimiento (Enter)'
+    : v.motivo;
+  // Pequeño hint visual: añade clase para que el botón muestre cursor
+  // not-allowed y opacidad reducida (la regla CSS se aplica por
+  // [disabled], pero la clase asegura compatibilidad cross-browser).
+  btnGuardar.classList.toggle('is-disabled', !v.ok);
+  // Mensaje al footer del formulario cuando hay un motivo (sin pisar
+  // mensajes de error/éxito que vengan del submit).
+  if (formMsg.classList.contains('err') || formMsg.classList.contains('ok')) return;
+  if (v.ok) {
+    formMsg.className = 'msg';
+    formMsg.textContent = '';
+  } else {
+    formMsg.className = 'msg hint';
+    formMsg.textContent = '· ' + v.motivo;
+  }
 }
 
 /**
@@ -243,6 +308,7 @@ function agregarLinea() {
       lineaState.delete(lineaEl);
       renumerarLineas();
       actualizarTotalMovimiento();
+      actualizarBtnGuardar();
     });
   }
   // Re-init iconos Lucide del template recién clonado.
@@ -299,10 +365,14 @@ function arrancar() {
 }
 
 // ══════════════════════════════════════════════════════════════
-// Eventos top-level
+// Eventos top-level · cada uno re-evalúa btnGuardar
 // ══════════════════════════════════════════════════════════════
-fMatricula.addEventListener('input',  aplicarTrafo);
-fMatricula.addEventListener('change', aplicarTrafo);
+fMatricula.addEventListener('input',  () => { aplicarTrafo(); actualizarBtnGuardar(); });
+fMatricula.addEventListener('change', () => { aplicarTrafo(); actualizarBtnGuardar(); });
+fUsuario.addEventListener('input', actualizarBtnGuardar);
+for (const r of document.querySelectorAll('input[name="tipo"]')) {
+  r.addEventListener('change', actualizarBtnGuardar);
+}
 btnAddLinea.addEventListener('click', () => {
   const lineaEl = agregarLinea();
   // Foco al campo descripción de la línea recién agregada.
@@ -334,6 +404,9 @@ btnLimpiar.addEventListener('click', () => {
     const r = document.querySelector(`input[name="tipo"][value="${tipo}"]`);
     if (r) r.checked = true;
   }
+  // Re-evalúa el botón: con todo limpio (matrícula vacía, líneas
+  // sin suministro), debería quedar disabled de nuevo.
+  actualizarBtnGuardar();
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -461,3 +534,4 @@ window.addEventListener('beforeunload', () => {
 fillAnios();
 agregarLinea();    // primera línea siempre presente
 arrancar();
+actualizarBtnGuardar();   // estado inicial: disabled hasta llenar
