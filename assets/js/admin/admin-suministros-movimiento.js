@@ -232,16 +232,35 @@ function actualizarValorTotalLinea(lineaEl) {
  * Devuelve { ok: bool, motivo: string } indicando si el formulario
  * está listo para guardar. El motivo se usa como tooltip del botón
  * disabled (UX: el director ve qué falta sin tener que adivinar).
+ *
+ * Lista de campos obligatorios (decisión del director PM7):
+ *   · Año seleccionado (siempre tiene default, pero validamos por
+ *     consistencia)
+ *   · Tipo INGRESO/EGRESO
+ *   · Usuario / Responsable
+ *   · Matrícula del parque (trafoSel resuelto del datalist)
+ *   · ODT (orden de trabajo)
+ *   · Observaciones
+ *   · Al menos una línea, cada una con suministro + cantidad ≥ 1
  */
 function validarFormulario() {
-  if (!fUsuario.value.trim()) {
-    return { ok: false, motivo: 'Falta indicar Usuario / Responsable' };
+  if (!fAnio.value) {
+    return { ok: false, motivo: 'Selecciona un Año' };
   }
   if (!tipoSeleccionado()) {
     return { ok: false, motivo: 'Selecciona INGRESO o EGRESO' };
   }
+  if (!fUsuario.value.trim()) {
+    return { ok: false, motivo: 'Falta indicar Usuario / Responsable' };
+  }
   if (!trafoSel) {
     return { ok: false, motivo: 'Selecciona una Matrícula válida del parque' };
+  }
+  if (!fOdt.value.trim()) {
+    return { ok: false, motivo: 'Falta indicar la ODT (orden de trabajo)' };
+  }
+  if (!fObs.value.trim()) {
+    return { ok: false, motivo: 'Falta indicar las Observaciones del movimiento' };
   }
   const lineas = [...lineasContainer.querySelectorAll('.linea-suministro')];
   if (lineas.length === 0) {
@@ -370,6 +389,9 @@ function arrancar() {
 fMatricula.addEventListener('input',  () => { aplicarTrafo(); actualizarBtnGuardar(); });
 fMatricula.addEventListener('change', () => { aplicarTrafo(); actualizarBtnGuardar(); });
 fUsuario.addEventListener('input', actualizarBtnGuardar);
+fAnio.addEventListener('change', actualizarBtnGuardar);
+fOdt.addEventListener('input', actualizarBtnGuardar);
+fObs.addEventListener('input', actualizarBtnGuardar);
 for (const r of document.querySelectorAll('input[name="tipo"]')) {
   r.addEventListener('change', actualizarBtnGuardar);
 }
