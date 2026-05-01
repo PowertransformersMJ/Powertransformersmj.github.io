@@ -1,8 +1,21 @@
 // ══════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Admin · Movimiento de Suministros (Fase 45)
+// SGM · TRANSPOWER — Admin · Movimiento de Suministros (F45 · multi-línea PM6)
+// ──────────────────────────────────────────────────────────────
 // Formulario INGRESO/EGRESO con autocomplete cascada y validación
-// atómica de stock (runTransaction vive en data/movimientos.js#crear,
-// implementada en F39).
+// atómica de stock por línea (runTransaction vive en
+// data/movimientos.js#crear, implementada en F39).
+//
+// Multi-línea (2026-04-27 PM6): el director pidió poder registrar
+// varios suministros en un mismo formulario. Cada línea se persiste
+// como un movimiento individual (mismo modelo Firestore que antes —
+// no hay migración). Cabecera (año/tipo/usuario), equipo destinatario
+// y datos adicionales (ODT, observaciones) son compartidos entre
+// todas las líneas; suministro + cantidad varían por línea.
+//
+// Botón '+ Agregar más suministros' clona el template de línea y le
+// asigna un índice nuevo. Cada línea tiene un botón × para quitar
+// (excepto si solo queda una). El submit itera y crea N movimientos
+// secuencialmente; reporta cuántos se grabaron y cuál falló si lo hace.
 // ══════════════════════════════════════════════════════════════
 
 import {
@@ -14,39 +27,34 @@ import { getContratoActivo, withContratoFiltro } from '../ui/contrato-context.js
 
 const $ = (id) => document.getElementById(id);
 
-// ── Elementos ──
+// ── Elementos top-level (compartidos) ──
 const form          = $('form');
 const info          = $('infoBox');
 const formMsg       = $('formMsg');
 const fAnio         = $('fAnio');
 const fUsuario      = $('fUsuario');
-const fSumId        = $('fSumId');
-const dlSums        = $('dlSums');
-const fMarca        = $('fMarca');
-const fUnidad       = $('fUnidad');
-const fValorUnit    = $('fValorUnit');
-const fStockActual  = $('fStockActual');
 const fMatricula    = $('fMatricula');
 const dlTrafos      = $('dlTrafos');
+const dlSums        = $('dlSums');
 const fSub          = $('fSub');
 const fZona         = $('fZona');
 const fDepto        = $('fDepto');
 const fPotencia     = $('fPotencia');
-const fCantidad     = $('fCantidad');
-const fValorTotal   = $('fValorTotal');
 const fOdt          = $('fOdt');
 const fObs          = $('fObs');
+const fTotalMovimiento = $('fTotalMovimiento');
+const lineasContainer  = $('lineasContainer');
+const lineaTemplate    = $('lineaTemplate');
+const btnAddLinea   = $('btnAddLinea');
 const btnLimpiar    = $('btnLimpiar');
 const btnGuardar    = $('btnGuardar');
 
-// ── Cache realtime ──
-let cacheSums = [];
-let cacheTrafos = [];
-let unsubSums = null;
-let unsubTrafos = null;
-// suministroSeleccionado / trafoSeleccionado: doc completo cacheado.
-let sumSel = null;
-let trafoSel = null;
+// ── Estado ──
+let cacheSums   = [];      // suministros del cache realtime
+let cacheTrafos = [];      // transformadores del cache realtime
+let trafoSel    = null;    // el equipo actualmente seleccionado
+let unsubSums, unsubTrafos;
+let lineaCounter = 0;      // contador para data-linea-idx único
 
 // ── Helpers ──
 function showInfo(msg, kind) {
@@ -98,7 +106,6 @@ function rebuildDatalistTrafos() {
 function buscarSuministro(input) {
   const v = String(input || '').trim().toUpperCase();
   if (!v) return null;
-  // Match exacto por codigo, o si el usuario tipeó un nombre, por nombre.
   return cacheSums.find((s) => s.codigo === v) ||
          cacheSums.find((s) => s.nombre.toUpperCase() === v.toUpperCase()) ||
          cacheSums.find((s) => s.nombre.toUpperCase().includes(v)) ||
@@ -113,40 +120,143 @@ function buscarTrafo(input) {
   }) || null;
 }
 
-// ── Auto-fill suministro ──
-async function aplicarSuministro() {
-  const found = buscarSuministro(fSumId.value);
-  sumSel = found;
+// ══════════════════════════════════════════════════════════════
+// Líneas de suministro (multi)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * Helper: obtiene los inputs/elementos de una línea por su data-field.
+ */
+function lineaFields(lineaEl) {
+  return {
+    el:           lineaEl,
+    sumId:        lineaEl.querySelector('[data-field="sumId"]'),
+    marca:        lineaEl.querySelector('[data-field="marca"]'),
+    unidad:       lineaEl.querySelector('[data-field="unidad"]'),
+    valorUnit:    lineaEl.querySelector('[data-field="valorUnit"]'),
+    stockActual:  lineaEl.querySelector('[data-field="stockActual"]'),
+    cantidad:     lineaEl.querySelector('[data-field="cantidad"]'),
+    valorTotal:   lineaEl.querySelector('[data-field="valorTotal"]'),
+    num:          lineaEl.querySelector('.linea-num'),
+    btnRemove:    lineaEl.querySelector('[data-action="remove"]')
+  };
+}
+
+/**
+ * Renumera las líneas visualmente (#1, #2, …) y oculta el botón × si
+ * solo queda una línea (no permitimos quedar con 0 líneas).
+ */
+function renumerarLineas() {
+  const lineas = lineasContainer.querySelectorAll('.linea-suministro');
+  lineas.forEach((el, i) => {
+    const f = lineaFields(el);
+    if (f.num) f.num.textContent = `#${i + 1}`;
+    if (f.btnRemove) f.btnRemove.hidden = (lineas.length === 1);
+  });
+}
+
+/**
+ * Actualiza el total general del movimiento sumando todas las líneas.
+ */
+function actualizarTotalMovimiento() {
+  let total = 0;
+  for (const el of lineasContainer.querySelectorAll('.linea-suministro')) {
+    const data = lineaState.get(el);
+    if (data && data.suministro) {
+      const cant = +lineaFields(el).cantidad.value || 0;
+      total += cant * (+data.suministro.valor_unitario || 0);
+    }
+  }
+  fTotalMovimiento.value = total > 0 ? fmtCOP(total) : '—';
+}
+
+// Map de elemento de línea → datos asociados (suministro, etc.)
+const lineaState = new WeakMap();
+
+/**
+ * Auto-fill de los campos automáticos de una línea cuando el
+ * suministro cambia (consulta cache + computarStock con heurística
+ * dual de docId — ver data/movimientos.js).
+ */
+async function aplicarSuministroLinea(lineaEl) {
+  const f = lineaFields(lineaEl);
+  const found = buscarSuministro(f.sumId.value);
+  lineaState.set(lineaEl, { suministro: found });
   if (!found) {
-    fMarca.value = '';
-    fUnidad.value = '';
-    fValorUnit.value = '';
-    fStockActual.value = '';
-    actualizarValorTotal();
+    f.marca.value = '';
+    f.unidad.value = '';
+    f.valorUnit.value = '';
+    f.stockActual.value = '';
+    f.valorTotal.textContent = '—';
+    actualizarTotalMovimiento();
     return;
   }
-  // Marca: si hay 1 marca disponible, la pre-llena; si hay varias, muestra "(varias)".
+  // Marca: si hay 1 marca disponible, la pre-llena; si hay varias,
+  // muestra el conteo. El usuario debe elegir manualmente cuál
+  // quedó pendiente (UI de selección llega en futuro).
   const marcas = Array.isArray(found.marcas_disponibles) ? found.marcas_disponibles : [];
-  fMarca.value = marcas.length === 1 ? marcas[0] : (marcas.length > 1 ? `(${marcas.length} marcas)` : '—');
-  fUnidad.value = found.unidad || 'Und';
-  fValorUnit.value = fmtCOP(found.valor_unitario);
-  // Stock actual via cómputo on-demand (puede fallar si las rules no permiten read agregado — best effort).
-  // Pasamos contrato_id para resolver el docId compuesto del suministro
-  // en multi-contrato N5 (`{cid}_{codigo}`). Sin esto, el lookup
-  // intentaría /suministros/S01 plano y fallaría para 4125000143.
-  fStockActual.value = '⋯';
+  f.marca.value = marcas.length === 1 ? marcas[0] : (marcas.length > 1 ? `(${marcas.length} marcas)` : '—');
+  f.unidad.value = found.unidad || 'Und';
+  f.valorUnit.value = fmtCOP(found.valor_unitario);
+  // Stock actual via cómputo on-demand (heurística dual del data layer).
+  f.stockActual.value = '⋯';
   try {
     const cid = getContratoActivo() || (found.contrato_id || '');
     const stock = await computarStock(found.codigo, cid);
-    if (stock) fStockActual.value = `${stock.actual} (ini ${stock.inicial}, +${stock.ingresado}, -${stock.egresado})`;
-    else fStockActual.value = '—';
+    if (stock) f.stockActual.value = `${stock.actual} (ini ${stock.inicial}, +${stock.ingresado}, -${stock.egresado})`;
+    else f.stockActual.value = '—';
   } catch (err) {
     console.warn('No se pudo computar stock:', err);
-    fStockActual.value = '—';
+    f.stockActual.value = '—';
   }
-  actualizarValorTotal();
+  actualizarValorTotalLinea(lineaEl);
 }
 
+function actualizarValorTotalLinea(lineaEl) {
+  const f = lineaFields(lineaEl);
+  const data = lineaState.get(lineaEl);
+  const cant = +f.cantidad.value || 0;
+  const valU = (data && data.suministro) ? (+data.suministro.valor_unitario || 0) : 0;
+  const total = cant * valU;
+  f.valorTotal.textContent = total > 0 ? fmtCOP(total) : '—';
+  actualizarTotalMovimiento();
+}
+
+/**
+ * Crea una línea nueva clonando el template y la añade al container.
+ * Engancha los listeners de cada input.
+ */
+function agregarLinea() {
+  lineaCounter += 1;
+  const frag = lineaTemplate.content.cloneNode(true);
+  const lineaEl = frag.querySelector('.linea-suministro');
+  lineaEl.dataset.lineaIdx = String(lineaCounter);
+  lineasContainer.appendChild(frag);
+  const f = lineaFields(lineaEl);
+  // Listeners.
+  f.sumId.addEventListener('input',  () => aplicarSuministroLinea(lineaEl));
+  f.sumId.addEventListener('change', () => aplicarSuministroLinea(lineaEl));
+  f.cantidad.addEventListener('input', () => actualizarValorTotalLinea(lineaEl));
+  if (f.btnRemove) {
+    f.btnRemove.addEventListener('click', () => {
+      lineaEl.remove();
+      lineaState.delete(lineaEl);
+      renumerarLineas();
+      actualizarTotalMovimiento();
+    });
+  }
+  // Re-init iconos Lucide del template recién clonado.
+  if (window.lucide && window.lucide.createIcons) {
+    window.lucide.createIcons({ root: lineaEl });
+  }
+  renumerarLineas();
+  actualizarTotalMovimiento();
+  return lineaEl;
+}
+
+// ══════════════════════════════════════════════════════════════
+// Equipo destinatario (compartido entre todas las líneas)
+// ══════════════════════════════════════════════════════════════
 function aplicarTrafo() {
   const found = buscarTrafo(fMatricula.value);
   trafoSel = found;
@@ -154,7 +264,6 @@ function aplicarTrafo() {
     fSub.value = ''; fZona.value = ''; fDepto.value = ''; fPotencia.value = '';
     return;
   }
-  const id = found.identificacion || {};
   const ub = found.ubicacion || {};
   const pl = found.placa || {};
   fSub.value      = ub.subestacion_nombre || found.subestacion || '';
@@ -163,14 +272,9 @@ function aplicarTrafo() {
   fPotencia.value = pl.potencia_kva ?? found.potencia_kva ?? '';
 }
 
-function actualizarValorTotal() {
-  const cant = +fCantidad.value || 0;
-  const valU = sumSel ? +sumSel.valor_unitario || 0 : 0;
-  const total = cant * valU;
-  fValorTotal.value = total > 0 ? fmtCOP(total) : '—';
-}
-
-// ── Suscripciones ──
+// ══════════════════════════════════════════════════════════════
+// Suscripciones realtime
+// ══════════════════════════════════════════════════════════════
 function arrancar() {
   if (!isReady()) {
     showInfo('⚠ Firebase no configurado.', 'err');
@@ -180,6 +284,12 @@ function arrancar() {
   if (unsubTrafos) try { unsubTrafos(); } catch (_) {}
   unsubSums = suscribirSuministros(withContratoFiltro(), (rows) => {
     cacheSums = rows; rebuildDatalistSums();
+    // Re-evaluar todas las líneas que ya tengan suministro escrito
+    // (por si la subscripción tarda en llegar y el usuario tipeó antes).
+    for (const el of lineasContainer.querySelectorAll('.linea-suministro')) {
+      const f = lineaFields(el);
+      if (f.sumId.value) aplicarSuministroLinea(el);
+    }
   }, (err) => console.warn('[sums]', err));
   // Transformadores se mantienen sin filtro de contrato — el parque es
   // único y cada movimiento debe poder asociarse a cualquier trafo.
@@ -188,37 +298,52 @@ function arrancar() {
   }, (err) => console.warn('[trafos]', err));
 }
 
-// ── Eventos input ──
-fSumId.addEventListener('input', aplicarSuministro);
-fSumId.addEventListener('change', aplicarSuministro);
-fMatricula.addEventListener('input', aplicarTrafo);
+// ══════════════════════════════════════════════════════════════
+// Eventos top-level
+// ══════════════════════════════════════════════════════════════
+fMatricula.addEventListener('input',  aplicarTrafo);
 fMatricula.addEventListener('change', aplicarTrafo);
-fCantidad.addEventListener('input', actualizarValorTotal);
+btnAddLinea.addEventListener('click', () => {
+  const lineaEl = agregarLinea();
+  // Foco al campo descripción de la línea recién agregada.
+  const f = lineaFields(lineaEl);
+  setTimeout(() => f.sumId.focus(), 50);
+});
 
 btnLimpiar.addEventListener('click', () => {
-  // Conserva Año + Tipo + Usuario per decisión del plan.
+  // 'Nuevo Movimiento': conserva Año + Tipo + Usuario, vacía el resto
+  // y deja UNA sola línea de suministro fresca.
   const anio = fAnio.value;
   const usuario = fUsuario.value;
   const tipo = tipoSeleccionado();
-  form.reset();
+  // Limpia campos compartidos (excepto los conservados).
+  fMatricula.value = '';
+  fSub.value = ''; fZona.value = ''; fDepto.value = ''; fPotencia.value = '';
+  fOdt.value = '';
+  fObs.value = '';
+  fTotalMovimiento.value = '';
+  trafoSel = null;
+  formMsg.className = 'msg'; formMsg.textContent = '';
+  // Reset líneas: borra todas, regenera una.
+  lineasContainer.innerHTML = '';
+  agregarLinea();
+  // Re-aplica los conservados.
   fAnio.value = anio;
   fUsuario.value = usuario;
-  if (tipo) document.querySelector(`input[name="tipo"][value="${tipo}"]`).checked = true;
-  sumSel = null; trafoSel = null;
-  formMsg.className = 'msg'; formMsg.textContent = '';
+  if (tipo) {
+    const r = document.querySelector(`input[name="tipo"][value="${tipo}"]`);
+    if (r) r.checked = true;
+  }
 });
 
-// ── Submit ──
+// ══════════════════════════════════════════════════════════════
+// Submit · crea N movimientos (uno por línea)
+// ══════════════════════════════════════════════════════════════
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   formMsg.className = 'msg'; formMsg.textContent = '';
 
-  // Validación cliente (replica las reglas de F40 para feedback inmediato).
-  if (!sumSel) {
-    formMsg.className = 'msg err';
-    formMsg.textContent = '✗ Seleccione un suministro válido del catálogo.';
-    fSumId.focus(); return;
-  }
+  // Validaciones top-level.
   if (!trafoSel) {
     formMsg.className = 'msg err';
     formMsg.textContent = '✗ Seleccione una matrícula válida del parque.';
@@ -230,59 +355,99 @@ form.addEventListener('submit', async (e) => {
     formMsg.textContent = '✗ Seleccione INGRESO o EGRESO.';
     return;
   }
-  const cantidad = parseInt(fCantidad.value, 10);
-  if (!Number.isInteger(cantidad) || cantidad < 1) {
+
+  // Validaciones por línea.
+  const lineas = [...lineasContainer.querySelectorAll('.linea-suministro')];
+  if (lineas.length === 0) {
     formMsg.className = 'msg err';
-    formMsg.textContent = '✗ Cantidad debe ser entero mayor o igual a 1.';
-    fCantidad.focus(); return;
+    formMsg.textContent = '✗ Agregue al menos una línea de suministro.';
+    return;
+  }
+  const payloads = [];
+  for (let i = 0; i < lineas.length; i++) {
+    const lineaEl = lineas[i];
+    const f = lineaFields(lineaEl);
+    const data = lineaState.get(lineaEl) || {};
+    const sumSel = data.suministro;
+    if (!sumSel) {
+      formMsg.className = 'msg err';
+      formMsg.textContent = `✗ Línea #${i + 1}: seleccione un suministro válido del catálogo.`;
+      f.sumId.focus(); return;
+    }
+    const cantidad = parseInt(f.cantidad.value, 10);
+    if (!Number.isInteger(cantidad) || cantidad < 1) {
+      formMsg.className = 'msg err';
+      formMsg.textContent = `✗ Línea #${i + 1}: cantidad debe ser entero ≥ 1.`;
+      f.cantidad.focus(); return;
+    }
+    payloads.push({ sumSel, cantidad, lineaIdx: i + 1 });
   }
 
   btnGuardar.disabled = true;
   const orig = btnGuardar.textContent;
   btnGuardar.textContent = 'GUARDANDO…';
-  try {
-    const uid = window.__sgmSession && window.__sgmSession.user && window.__sgmSession.user.uid;
-    const id = trafoSel.identificacion || {};
-    const ub = trafoSel.ubicacion || {};
-    // El codigo del movimiento se genera dentro de la tx (data layer F39).
-    // El sanitizer F38 lo ignora si traemos placeholder; el data layer F39
-    // reescribe con el correlativo real del año.
-    const movId = await crearMovimiento({
-      contrato_id: getContratoActivo() || (sumSel && sumSel.contrato_id) || '',
-      anio: parseInt(fAnio.value, 10),
-      tipo: tipo,
-      suministro_id: sumSel.codigo,
-      suministro_nombre: sumSel.nombre,
-      marca: (sumSel.marcas_disponibles && sumSel.marcas_disponibles.length === 1) ? sumSel.marcas_disponibles[0] : '',
-      cantidad: cantidad,
-      valor_unitario: +sumSel.valor_unitario || 0,
-      valor_total: cantidad * (+sumSel.valor_unitario || 0),
-      transformador_id: trafoSel.id,
-      matricula: id.matricula || trafoSel.matricula || trafoSel.codigo || '',
-      subestacion: ub.subestacion_nombre || trafoSel.subestacion || '',
-      zona: ub.zona || trafoSel.zona || '',
-      departamento: ub.departamento || trafoSel.departamento || '',
-      odt: fOdt.value.trim(),
-      usuario: fUsuario.value.trim(),
-      observaciones: fObs.value.trim()
-    }, uid);
+
+  const uid = window.__sgmSession && window.__sgmSession.user && window.__sgmSession.user.uid;
+  const id = trafoSel.identificacion || {};
+  const ub = trafoSel.ubicacion || {};
+
+  const movimientosCreados = [];
+  let errorOcurrido = null;
+  let lineaErrFalla = null;
+
+  // Crea cada línea como un movimiento individual (cada uno con su
+  // propia tx atómica de stock). Si una falla, paramos pero
+  // mantenemos las anteriores (situación de fallo parcial — el
+  // mensaje al usuario explica cuántas se crearon).
+  for (const p of payloads) {
+    try {
+      const movId = await crearMovimiento({
+        contrato_id: getContratoActivo() || (p.sumSel && p.sumSel.contrato_id) || '',
+        anio: parseInt(fAnio.value, 10),
+        tipo: tipo,
+        suministro_id: p.sumSel.codigo,
+        suministro_nombre: p.sumSel.nombre,
+        marca: (p.sumSel.marcas_disponibles && p.sumSel.marcas_disponibles.length === 1) ? p.sumSel.marcas_disponibles[0] : '',
+        cantidad: p.cantidad,
+        valor_unitario: +p.sumSel.valor_unitario || 0,
+        valor_total: p.cantidad * (+p.sumSel.valor_unitario || 0),
+        transformador_id: trafoSel.id,
+        matricula: id.matricula || trafoSel.matricula || trafoSel.codigo || '',
+        subestacion: ub.subestacion_nombre || trafoSel.subestacion || '',
+        zona: ub.zona || trafoSel.zona || '',
+        departamento: ub.departamento || trafoSel.departamento || '',
+        odt: fOdt.value.trim(),
+        usuario: fUsuario.value.trim(),
+        observaciones: fObs.value.trim()
+      }, uid);
+      movimientosCreados.push({ movId, sumId: p.sumSel.codigo, cantidad: p.cantidad });
+    } catch (err) {
+      errorOcurrido = err;
+      lineaErrFalla = p.lineaIdx;
+      break;
+    }
+  }
+
+  if (errorOcurrido) {
+    formMsg.className = 'msg err';
+    let detalle = errorOcurrido && errorOcurrido.name === 'StockInsuficienteError'
+      ? errorOcurrido.message
+      : (errorOcurrido && errorOcurrido.message) || String(errorOcurrido);
+    if (movimientosCreados.length > 0) {
+      formMsg.textContent = `⚠ Se grabaron ${movimientosCreados.length} de ${payloads.length} líneas. La línea #${lineaErrFalla} falló: ${detalle}. Revisa y reintenta solo lo pendiente.`;
+    } else {
+      formMsg.textContent = `✗ Línea #${lineaErrFalla}: ${detalle}`;
+    }
+  } else {
     formMsg.className = 'msg ok';
-    formMsg.textContent = `✓ Movimiento ${tipo} guardado (id: ${movId}). Stock actualizado.`;
-    showInfo(`✓ ${tipo} ${cantidad} × ${sumSel.codigo} → ${id.matricula || trafoSel.codigo}`, 'ok');
-    // Limpieza parcial: conserva Año + Tipo + Usuario; recarga stock actual.
+    formMsg.textContent = `✓ ${movimientosCreados.length} movimiento${movimientosCreados.length === 1 ? '' : 's'} ${tipo} guardado${movimientosCreados.length === 1 ? '' : 's'}. Stock actualizado.`;
+    showInfo(`✓ ${tipo} ×${movimientosCreados.length} en ${id.matricula || trafoSel.codigo}`, 'ok');
     btnLimpiar.click();
     setTimeout(() => showInfo(''), 5000);
-  } catch (err) {
-    formMsg.className = 'msg err';
-    if (err && err.name === 'StockInsuficienteError') {
-      formMsg.textContent = `✗ ${err.message}`;
-    } else {
-      formMsg.textContent = '✗ ' + (err.message || err);
-    }
-  } finally {
-    btnGuardar.disabled = false;
-    btnGuardar.textContent = orig;
   }
+
+  btnGuardar.disabled = false;
+  btnGuardar.textContent = orig;
 });
 
 window.addEventListener('beforeunload', () => {
@@ -290,6 +455,9 @@ window.addEventListener('beforeunload', () => {
   if (unsubTrafos) try { unsubTrafos(); } catch (_) {}
 });
 
-// ── Init ──
+// ══════════════════════════════════════════════════════════════
+// Init
+// ══════════════════════════════════════════════════════════════
 fillAnios();
+agregarLinea();    // primera línea siempre presente
 arrancar();
