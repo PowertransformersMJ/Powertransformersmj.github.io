@@ -7,6 +7,94 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## v2.8.0 — Seguimiento Contractual · Remisiones + Reuniones de Seguimiento (2026-05-01)
+
+Bajo cada contrato (4123000081 y 4125000143) se agrega un nuevo
+sub-árbol **Seguimiento Contractual** en el sidebar — sibling de
+"Control y Gestión Operativa" e "Información Contractual" — que
+expande a dos secciones documentales:
+
+- **Remisiones**
+- **Reuniones de Seguimiento**
+
+Ambas reutilizan exactamente el mismo visor PDF embebido y el flujo
+admin de upload/delete que ya existía para Información Contractual
+(v2.7.0). Estructura final del sidebar:
+
+```
+Contratos ▾
+  Suministro de Elementos y Accesorios… ▾
+    4123000081 ▾
+      Control y Gestión Operativa
+      Información Contractual
+      Seguimiento Contractual ▾
+        Remisiones                    → ?id=…&tipo=remisiones
+        Reuniones de Seguimiento      → ?id=…&tipo=reuniones-seguimiento
+    4125000143 ▾  (espejo)
+```
+
+### Cambios técnicos
+
+**Data layer · `assets/js/data/documentos_contractuales.js`** —
+generalizado para multi-tipo. Helpers internos `_segmento(tipo)`,
+`_campoFirestore(tipo)`, `_campoUpdatedAt(tipo)` resuelven path/campo
+según tipo:
+
+| `tipo`                    | Storage path                                       | Campo Firestore                       |
+|---------------------------|----------------------------------------------------|---------------------------------------|
+| `''` (default)            | `contratos/{cid}/{slug}.pdf`                       | `documentos_contractuales[]`          |
+| `'remisiones'`            | `contratos/{cid}/remisiones/{slug}.pdf`            | `documentos_remisiones[]`             |
+| `'reuniones-seguimiento'` | `contratos/{cid}/reuniones-seguimiento/{slug}.pdf` | `documentos_reuniones_seguimiento[]`  |
+
+Funciones públicas (`listarDocumentos`, `urlDocumento`, `subirDocumento`,
+`eliminarDocumento`) reciben parámetro opcional `tipo`. Backwards-compat
+total: cualquier llamada existente sin `tipo` sigue resolviendo al
+flujo Información Contractual original.
+
+Categorías agregadas a `CATEGORIAS_DOC`:
+- `remision` (icono Lucide `truck`)
+- `acta` (icono Lucide `users`)
+
+**Página · `assets/js/contrato-info.js`** — lee `?tipo=` del query y
+aplica un map `META_TIPO` para breadcrumb / título / subtítulo /
+empty-state. Pasa `tipoDoc` a las 3 calls del data layer
+(`listarDocumentos`, `subirDocumento`, `eliminarDocumento`). Una sola
+página HTML sirve a las 3 secciones documentales.
+
+**HTML · `pages/contrato-info.html`** — breadcrumb (`#bcSeccion`) y
+título (`#pageTitleLead` / `#pageTitleEm`) ahora son spans dinámicos.
+Select de categoría del modal upload incluye opciones `remision` y
+`acta`.
+
+**Sidebar · `assets/js/aqua-shell.js`** — inyecta 2 sub-árboles nuevos
+(`seguimiento-{cid}`) bajo cada contrato, cada uno con sus 2 leaves
+nivel 5 (`sb-item-leaf`). `markActive()` ahora también compara `?tipo=`
+para desambiguar items con el mismo pathname + id (Información
+Contractual vs Remisiones vs Reuniones comparten
+`contrato-info.html?id=N` y se diferencian solo por `?tipo=`).
+
+### Storage rules — sin deploy
+
+La regla wildcard de v2.6.0 ya cubre los nuevos sub-paths:
+
+```javascript
+match /contratos/{contratoId}/{filename=**} { ... }
+```
+
+El `{filename=**}` (recursive wildcard) matchea
+`contratos/4123000081/remisiones/foo.pdf` sin cambios. **No requiere
+`firebase deploy --only storage`** para esta versión.
+
+### Verificación
+
+- 453/453 tests verdes (sin tests nuevos — la generalización es
+  estructural, no agrega lógica de dominio)
+- Lint HTML limpio
+- Manual: `/pages/contrato-info.html?id=4123000081&tipo=remisiones`
+  pinta breadcrumb "Seguimiento / Remisiones", título "Seguimiento
+  Remisiones", lista vacía hasta primer upload (Firestore-only,
+  sin manifest local de respaldo)
+
 ## v2.7.1 — Hotfix Movimiento · docId compuesto en suministroRef (2026-04-27 PM5)
 
 Bug crítico reportado por el director: el módulo Movimiento dentro
