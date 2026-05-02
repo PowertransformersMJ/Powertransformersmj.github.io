@@ -582,6 +582,7 @@ const chartPlugin = {
     const ctx = chart.ctx, xs = chart.scales.x, ys = chart.scales.y;
     const ip   = chart._interpPct || 133;
     const onan = chart._onan;
+    const cfm  = chart._cfm;
     const labelKva = (onan && onan >= xs.min && onan <= xs.max)
       ? Math.min(onan * 1.12, xs.max * 0.87)
       : (xs.min + xs.max) * 0.55;
@@ -611,8 +612,43 @@ const chartPlugin = {
       ctx.fillText(label, 0, -0.5);
       ctx.restore();
     }
+
     ctx.save();
-    CURVAS_GRAFICO.forEach(d => drawLabel(interpolarPendiente(d.pct), d.color, d.pct + '% OA RATING', d.pct === ip));
+    // Etiquetas SOBRE las curvas fijas
+    CURVAS_GRAFICO.forEach(d =>
+      drawLabel(interpolarPendiente(d.pct), d.color, d.pct + '% OA RATING', d.pct === ip)
+    );
+    // Etiqueta de la curva interpolada (solo si difiere de las fijas)
+    if (!CURVAS_GRAFICO.find(d => d.pct === ip)) {
+      drawLabel(interpolarPendiente(ip), '#0d1f38', ip.toFixed(1) + '% OA RATING ◀', true);
+    }
+
+    // ── Cruceta roja: líneas dashed desde los ejes hasta el punto de
+    //    operación + puntos rojos en las intersecciones + labels MVA/CFM.
+    //    Replica fielmente la presentación original (Westinghouse/AFINIA).
+    if (onan && cfm && onan >= xs.min && onan <= xs.max && cfm >= ys.min && cfm <= ys.max) {
+      const xPx = xs.getPixelForValue(onan);
+      const yPx = ys.getPixelForValue(cfm);
+      const bot = chart.chartArea.bottom;
+      const lft = chart.chartArea.left;
+
+      ctx.strokeStyle = '#C00000';
+      ctx.lineWidth   = 1.2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath(); ctx.moveTo(xPx, bot); ctx.lineTo(xPx, yPx); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(lft, yPx); ctx.lineTo(xPx, yPx); ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.fillStyle = '#C00000';
+      ctx.beginPath(); ctx.arc(xPx, bot, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(lft, yPx, 4, 0, Math.PI * 2); ctx.fill();
+
+      ctx.font = 'bold 10px -apple-system, "SF Pro", Inter, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText(`${(onan / 1000).toFixed(1)} MVA`, xPx + 6, bot - 4);
+      ctx.fillText(`${formatearNumero(cfm)} CFM`, lft + 6, yPx - 4);
+    }
     ctx.restore();
   }
 };
@@ -686,15 +722,16 @@ function initChart() {
       },
       plugins: {
         legend: {
-          display: true, position: 'top', align: 'end',
-          labels: { font: { size: 11, weight: '600' }, color: '#1f3656', boxWidth: 22, padding: 10 }
+          display: true,
+          position: 'bottom',
+          labels: { font: { size: 10, weight: '600' }, color: '#1f3656', boxWidth: 22, padding: 10 }
         },
         tooltip: {
           callbacks: {
-            label(ctx) {
-              const x = ctx.parsed.x, y = ctx.parsed.y;
-              return `${ctx.dataset.label}: ${(x / 1000).toFixed(1)} MVA → ${formatearNumero(y)} CFM`;
-            }
+            title: (it) => `ONAN: ${(it[0].parsed.x / 1000).toFixed(1)} MVA (${formatearNumero(it[0].parsed.x)} kVA)`,
+            label: (it) => it.dataset.pct === 'op'
+              ? `Punto de operación: ${formatearNumero(it.parsed.y)} CFM`
+              : `${it.dataset.label}: ${formatearNumero(it.parsed.y)} CFM`
           }
         }
       }
