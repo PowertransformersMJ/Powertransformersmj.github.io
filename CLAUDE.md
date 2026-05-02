@@ -142,6 +142,54 @@ Reglas concretas al recibir un ticket de UI:
    Esto es invariante; cualquier sesión que quiera cambiarlo necesita
    justificarlo aquí.
 
+### 0.1.2.1 Regla permanente · Migrar archivos legacy SIN perder detalles visuales
+
+**Contexto del bug histórico (sesión 2026-05-02):** al portar el archivo
+legacy `Calculo de Sistemas de refriegracion.html` (1917 líneas
+monolíticas) al módulo Mantenimiento Brigada · Selección ONAF, perdí
+**dos detalles del gráfico Chart.js** que el director identificó
+inmediatamente al ver el resultado:
+
+1. **Posición de la leyenda.** El original tenía `legend.position:
+   'bottom'`. La reescribí como `'top'` por costumbre. El director
+   notó al instante que estaba en el lado equivocado.
+2. **"Cruceta roja" (segmentos de referencia).** El plugin Chart.js
+   original dibujaba dos líneas rojas dashed desde los ejes hasta el
+   punto de operación + puntos en las intersecciones + etiquetas
+   `X.X MVA` y `XX.XXX CFM` justo en los ejes. La eliminé del plugin
+   pensando que no era esencial. Era esencial — es la lectura visual
+   directa que el ingeniero usa para validar el cálculo.
+
+**Regla permanente:** cuando se migre cualquier archivo legacy
+existente (HTML + JS inline) a la arquitectura moderna del proyecto:
+
+1. **Antes de declarar la migración cerrada, comparar lado a lado
+   contra el original** — abrir ambos en el navegador, verificar que
+   cada elemento visual y funcional está presente. No basta con
+   "preservar los IDs" o "pasar los tests"; los detalles de
+   presentación (posición de leyenda, líneas auxiliares, etiquetas
+   en márgenes, hover states, formato de tooltip) deben mantenerse.
+2. **Para gráficos Chart.js específicamente:** copiar `plugins.legend`
+   y `plugins.tooltip` palabra por palabra del original, y replicar
+   el plugin de `afterDraw` completo, no solo las partes que parecen
+   "nuevas". Cualquier `setLineDash`, `arc`, `fillText` que dibuje
+   sobre el canvas TIENE un propósito de UX que el ingeniero original
+   pensó.
+3. **Cuando sea posible, ejecutar el original primero** (servidor
+   local) para fotografiar visualmente qué hay y comparar contra el
+   resultado.
+4. **Si el director provee captura del original junto con el ticket,
+   es la fuente de verdad** — no la imagen del rediseño propuesto en
+   un design bundle. El rediseño puede sugerir pulido visual, pero
+   los elementos funcionales del original (referencia de ejes,
+   anotaciones del punto de operación, etc.) son **invariantes**.
+
+**Aplica a futuras migraciones:** el mismo patrón debe seguirse al
+portar cualquier `*.html` con script inline a un módulo moderno
+(dominio puro + data layer + UI). El "100% de precisión numérica"
+no es suficiente; también debe haber 100% de paridad visual y
+funcional con el origen.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
