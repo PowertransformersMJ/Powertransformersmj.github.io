@@ -13,25 +13,507 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
   <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/calculo-refrigeracion.css"/>
 </head>
 <body class="aqua">
-<main class="app-main page-container" id="calcRefrigeracionRoot" aria-busy="false">
+<main class="app-main page-container" id="calcRefrigeracionRoot">
 
   <div class="page-header">
     <div class="breadcrumb">Operación / Mantenimiento Brigada / Sistema de Refrigeración</div>
     <h1 class="page-title">Selección <em>ONAF</em></h1>
     <p class="page-subtitle">
-      Cálculo de capacidad térmica adicional y selección de
-      ventiladores forzados conforme IEEE C57.12 · IEC 60076 · IEEE C57.91.
+      Curvas de enfriamiento adicional ONAF — flujo de aire requerido
+      por potencia ONAN. Conforme <strong>IEEE C57.12.00</strong> ·
+      <strong>ANSI C57.12.91</strong> · <strong>Westinghouse T&amp;D Reference</strong> ·
+      AFINIA · Grupo EPM.
     </p>
   </div>
 
-  <section class="sect" aria-label="Marcador de fase">
-    <p style="color:var(--ink-2);font-family:var(--font-mono,monospace);font-size:12px;letter-spacing:.08em">
-      [ Fase 1 · skeleton listo · maquetación Aqua Liquid Glass en Fase 2 ]
-    </p>
-  </section>
+  <div class="calc-wrap">
 
+    <!-- ── BANDA DE CALIBRACIÓN ──────────────────────────── -->
+    <div class="calc-note" role="note">
+      <strong>Calibración Westinghouse T&amp;D:</strong>
+      115% → 1,20 · 125% → 2,00 · 133% → 2,65 · 166% → 4,25 CFM/kVA<sub>ONAN</sub>
+      &nbsp;·&nbsp;
+      <strong>Verificación:</strong> 24 MVA × 125% = <strong>48.000 CFM</strong>
+      &nbsp;·&nbsp;
+      Flujo siempre en <strong>CFM (ft³/min)</strong> — conversiones automáticas
+      desde m³/s, m³/h, ft³/s.
+    </div>
+
+    <!-- ── IDENTIFICACIÓN TRANSFORMADOR ──────────────────── -->
+    <section class="calc-section id-sect" aria-labelledby="id-stit">
+      <div class="calc-stit" id="id-stit">
+        Identificación del transformador · 206 unidades AFINIA · búsqueda por matrícula
+      </div>
+      <div class="calc-row">
+        <div class="fld">
+          <label for="mat_input">Búsqueda por matrícula</label>
+          <input type="text" id="mat_input" list="mat_list" class="w200" placeholder="Ej: T1A-A/M-BYC" autocomplete="off">
+          <datalist id="mat_list"></datalist>
+          <span class="hint">Seleccione para autocompletar todos los campos</span>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_serie">Serie</label>
+          <input type="text" id="t_serie" class="w140" readonly>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_sub">Subestación</label>
+          <input type="text" id="t_sub" class="w160" readonly>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_zona">Zona</label>
+          <input type="text" id="t_zona" class="w100" readonly>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_dept">Departamento</label>
+          <input type="text" id="t_dept" class="w120" readonly>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_grupo">Grupo</label>
+          <input type="text" id="t_grupo" class="w70" readonly>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_kva">Potencia</label>
+          <input type="text" id="t_kva" class="w100" readonly>
+        </div>
+        <div class="fld fld-ro">
+          <label for="t_refrig">Refrigeración</label>
+          <input type="text" id="t_refrig" class="w100" readonly>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PARÁMETROS DEL CÁLCULO ────────────────────────── -->
+    <section class="calc-section" aria-labelledby="param-stit">
+      <div class="calc-stit" id="param-stit">Parámetros del cálculo de refrigeración</div>
+      <div class="calc-row">
+        <div class="fld">
+          <label for="kva_onan">Potencia ONAN (kVA)</label>
+          <input type="number" id="kva_onan" class="w140" value="60000" min="500" max="140000" step="500">
+          <span class="hint">Base sin ventilación forzada</span>
+        </div>
+        <div class="fld">
+          <label for="kva_onaf">Potencia ONAF (kVA) <span class="lnk">↔</span></label>
+          <input type="number" id="kva_onaf" class="w140" value="79800" min="500" max="280000" step="500">
+        </div>
+        <div class="fld">
+          <label for="pct">Factor ONAF/ONAN (%) <span class="lnk">↔</span></label>
+          <input type="number" id="pct" class="w120" value="133" min="101" max="200" step="0.5">
+          <span class="hint">115% · 125% · 133% · 166%</span>
+        </div>
+        <div class="fld">
+          <label for="alt">Altitud (m.s.n.m.)</label>
+          <input type="number" id="alt" class="w120" value="0" min="0" max="4000" step="50">
+          <span class="hint">Corrección densidad ISA</span>
+        </div>
+        <div class="fld">
+          <label for="proyecto">Nombre del proyecto</label>
+          <input type="text" id="proyecto" class="w200" placeholder="Ej: Intervención ONAF S/E Norte">
+        </div>
+      </div>
+    </section>
+
+    <!-- ── KPIs ──────────────────────────────────────────── -->
+    <div class="kpis" role="group" aria-label="Indicadores de cálculo">
+      <div class="kpi bl"><div class="l">Potencia ONAN base</div><div class="v" id="v1">—</div></div>
+      <div class="kpi bl"><div class="l">Potencia ONAF objetivo</div><div class="v" id="v2">—</div></div>
+      <div class="kpi bl"><div class="l">Δ Potencia adicional</div><div class="v" id="v3">—</div></div>
+      <div class="kpi gr"><div class="l">CFM requerido (nivel mar)</div><div class="v" id="v4">—</div></div>
+      <div class="kpi tl"><div class="l">CFM corregido altitud</div><div class="v" id="v5">—</div></div>
+    </div>
+
+    <!-- ── ZOOM DEL GRÁFICO ──────────────────────────────── -->
+    <section class="calc-section zoom-sect" aria-labelledby="zoom-stit">
+      <div class="calc-stit" id="zoom-stit">Rango del gráfico</div>
+      <div class="calc-row" style="gap: 18px">
+        <div>
+          <span class="zoom-axis-label">Eje X — MVA</span>
+          <div class="calc-row" style="gap: 8px; margin-top: 4px">
+            <label class="zoom-inline">Desde
+              <input type="number" id="x_min" class="zi" value="0" min="0" max="138" step="0.5">
+              <span class="zu">MVA</span>
+            </label>
+            <label class="zoom-inline">Hasta
+              <input type="number" id="x_max" class="zi" value="100" min="0.5" max="140" step="0.5">
+              <span class="zu">MVA</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <span class="zoom-axis-label">Eje Y — CFM</span>
+          <div class="calc-row" style="gap: 8px; margin-top: 4px">
+            <label class="zoom-inline">Desde
+              <input type="number" id="y_min" class="zi" style="width: 92px" value="0" min="0" step="20000">
+              <span class="zu">CFM</span>
+            </label>
+            <label class="zoom-inline">Hasta
+              <input type="number" id="y_max" class="zi" style="width: 92px" value="600000" min="20000" step="20000">
+              <span class="zu">CFM</span>
+            </label>
+          </div>
+        </div>
+        <div style="align-self: flex-end">
+          <button type="button" class="btn-auto" id="btnAutoRange">↻ Auto ajustar</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── CANVAS DEL GRÁFICO ────────────────────────────── -->
+    <div class="cw"><canvas id="cv"></canvas></div>
+
+    <!-- ── DATOS DEL RADIADOR ────────────────────────────── -->
+    <section class="mec-sect" aria-labelledby="rad-stit">
+      <div class="mec-hdr rad">
+        <div class="mec-hdr-t" id="rad-stit">Datos mecánicos del cuerpo de radiador</div>
+        <div class="mec-hdr-meta">Medidas A–D según diagrama de referencia AFINIA · obleas de enfriamiento</div>
+      </div>
+      <div class="mec-body">
+        <div class="ref-grid">
+          <div class="ref-item ref-A"><div class="ref-dot dot-A">A</div><span><strong>A —</strong> Altura del cuerpo de radiador</span></div>
+          <div class="ref-item ref-B"><div class="ref-dot dot-B">B</div><span><strong>B —</strong> Distancia entre oblea inicial y oblea final</span></div>
+          <div class="ref-item ref-C"><div class="ref-dot dot-C">C</div><span><strong>C —</strong> Ancho de frente del cuerpo de radiador</span></div>
+          <div class="ref-item ref-D"><div class="ref-dot dot-D">D</div><span><strong>D —</strong> Distancia entre centros de tornillos del flanche</span></div>
+        </div>
+
+        <div class="grid4" style="margin-bottom: 10px">
+          <div class="fld">
+            <label for="rad_A"><span class="label-dot a">A</span> Altura cuerpo (mm)</label>
+            <input type="number" id="rad_A" class="w100" placeholder="ej: 1650">
+          </div>
+          <div class="fld">
+            <label for="rad_B"><span class="label-dot b">B</span> Oblea ini–fin (mm)</label>
+            <input type="number" id="rad_B" class="w100" placeholder="ej: 640">
+          </div>
+          <div class="fld">
+            <label for="rad_C"><span class="label-dot c">C</span> Ancho frente (mm)</label>
+            <input type="number" id="rad_C" class="w100" placeholder="ej: 380">
+          </div>
+          <div class="fld">
+            <label for="rad_D"><span class="label-dot d">D</span> Ctro. tornillos (mm)</label>
+            <input type="number" id="rad_D" class="w100" placeholder="ej: 75">
+          </div>
+          <div class="fld">
+            <label for="rad_cant">Cantidad de radiadores</label>
+            <input type="number" id="rad_cant" class="w100" placeholder="ej: 4">
+          </div>
+          <div class="fld">
+            <label for="rad_obleas">Obleas por radiador</label>
+            <input type="number" id="rad_obleas" class="w100" placeholder="ej: 26">
+          </div>
+          <div class="fld" style="grid-column: span 2">
+            <label for="rad_otras">Otras medidas / observaciones</label>
+            <input type="text" id="rad_otras" class="tw" placeholder="Separación entre radiadores, longitud de tuberías de conexión, etc.">
+          </div>
+        </div>
+
+        <!-- Pregunta disposición -->
+        <div class="q-banner">
+          <div class="q-banner-head">¿Cómo será la disposición mecánica del ventilador sobre el radiador?</div>
+          <div class="q-banner-body">
+            <div class="fld" style="flex: 1; min-width: 280px">
+              <label for="disposicion">Disposición mecánica</label>
+              <select id="disposicion">
+                <option value="">— Seleccionar disposición mecánica —</option>
+                <option value="lateral">Lateral — ventilador al costado del radiador · flujo horizontal · dimensión crítica: B (span obleas)</option>
+                <option value="vertical_1">Vertical ascendente — 1 cuerpo de radiador · flujo ↑ · dimensión crítica: A (altura)</option>
+                <option value="vertical_2">Vertical ascendente — 2 cuerpos de radiador · flujo ↑ · dimensión crítica: 2×A</option>
+              </select>
+            </div>
+            <div class="info-inline" id="disp-info"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── DATOS DEL MOTOVENTILADOR ──────────────────────── -->
+    <section class="mec-sect" aria-labelledby="fan-stit">
+      <div class="mec-hdr fan-s">
+        <div class="mec-hdr-t" id="fan-stit">Datos técnicos del motoventilador</div>
+        <div class="mec-hdr-meta">Montaje sobre radiador · caudal en CFM (ft³/min) · conversiones automáticas</div>
+      </div>
+      <div class="mec-body">
+
+        <!-- Selector base de datos -->
+        <div class="fan-sel-bar">
+          <label for="fan_db_sel">Modelo desde base de datos:</label>
+          <select id="fan_db_sel">
+            <option value="">— Ingresar datos manualmente —</option>
+            <optgroup label="── ZIEHL-ABEGG ZN045-4DL.2F.V7P2 — Ø450 mm · ZAplus ──">
+              <option value="zn045_50">ZN045-4DL.2F.V7P2 · 50 Hz · 230/400 V · 1.260 rpm · 3.850 CFM</option>
+              <option value="zn045_60">ZN045-4DL.2F.V7P2 · 60 Hz · 230/400 V · 1.330 rpm · 4.060 CFM</option>
+              <option value="zn045_60h">ZN045-4DL.2F.V7P2 · 60 Hz · 265/460 V · 1.430 rpm · 4.365 CFM</option>
+            </optgroup>
+            <optgroup label="── ZIEHL-ABEGG FN050-4DH.4I.A7P1 — Ø500 mm ──">
+              <option value="fn050_50">FN050-4DH.4I.A7P1 · 50 Hz · 230/400 V · 1.290 rpm · 4.873 CFM</option>
+              <option value="fn050_60">FN050-4DH.4I.A7P1 · 60 Hz · 230/400 V · 1.400 rpm · 5.403 CFM</option>
+              <option value="fn050_60h">FN050-4DH.4I.A7P1 · 60 Hz · 265/460 V · 1.480 rpm · 5.721 CFM</option>
+            </optgroup>
+            <optgroup label="── ZIEHL-ABEGG FN063-6DL.4I.A7P1 — Ø630 mm ──">
+              <option value="fn063_50">FN063-6DL.4I.A7P1 · 50 Hz · 230/400 V · 830 rpm · 5.933 CFM</option>
+              <option value="fn063_60">FN063-6DL.4I.A7P1 · 60 Hz · 230/400 V · 820 rpm · 6.357 CFM</option>
+              <option value="fn063_60h">FN063-6DL.4I.A7P1 · 60 Hz · 265/460 V · 900 rpm · 6.569 CFM</option>
+            </optgroup>
+            <optgroup label="── ZIEHL-ABEGG ZN063-6DL.4I.V7P1 — Ø630 mm · ZAplus ──">
+              <option value="zn063_50">ZN063-6DL.4I.V7P1 · 50 Hz · 230/400 V · 890 rpm · 6.520 CFM</option>
+              <option value="zn063_60">ZN063-6DL.4I.V7P1 · 60 Hz · 230/400 V · 940 rpm · 6.886 CFM</option>
+              <option value="zn063_60h">ZN063-6DL.4I.V7P1 · 60 Hz · 265/460 V · 1.010 rpm · 7.403 CFM</option>
+            </optgroup>
+            <optgroup label="── KRENZ &amp; CO. — Ø559 mm ──">
+              <option value="krenz_f20">F20-A10069 · 60 Hz · 208–230 V · 1.140 rpm · 6.200 CFM</option>
+            </optgroup>
+          </select>
+          <span id="fan_db_status"></span>
+        </div>
+
+        <div class="calc-subsect">Identificación y datos del ventilador</div>
+        <div class="grid3" style="margin-bottom: 8px">
+          <div class="fld"><label for="fan_marca">Marca</label><input type="text" id="fan_marca" class="w160" placeholder="ej: ZIEHL-ABEGG"></div>
+          <div class="fld"><label for="fan_modelo">Modelo / Referencia</label><input type="text" id="fan_modelo" class="w160"></div>
+          <div class="fld"><label for="fan_nserie">N.° artículo / parte</label><input type="text" id="fan_nserie" class="w140"></div>
+          <div class="fld"><label for="fan_diam">Diámetro nominal (mm)</label><input type="number" id="fan_diam" class="w120" placeholder="ej: 630" min="100" step="1"></div>
+          <div class="fld"><label for="fan_aspas">Número de aspas</label><input type="number" id="fan_aspas" class="w90" placeholder="ej: 6" min="2" step="1"></div>
+          <div class="fld"><label for="fan_tipo_pala">Tipo de pala</label><input type="text" id="fan_tipo_pala" class="w160" placeholder="ej: Sickle blade (hoz)"></div>
+          <div class="fld"><label for="fan_rpm">RPM nominal</label><input type="number" id="fan_rpm" class="w90" placeholder="ej: 830" min="0" step="10"></div>
+          <div class="fld"><label for="fan_montaje">Posición de montaje</label><input type="text" id="fan_montaje" class="w120" placeholder="ej: H/Vu/Vo"></div>
+          <div class="fld"><label for="fan_peso">Peso conjunto (kg)</label><input type="number" id="fan_peso" class="w100" placeholder="ej: 26.9" min="0" step="0.1"></div>
+        </div>
+
+        <!-- Caudal con selector de unidades -->
+        <div class="flow-box">
+          <div class="flow-head">Caudal de aire libre (P<sub>stat</sub> = 0 Pa) — conversión automática a CFM (ft³/min)</div>
+          <div class="flow-row">
+            <div class="fld">
+              <label for="fan_flow_val">Valor del caudal</label>
+              <input type="number" id="fan_flow_val" class="w120" placeholder="ej: 2.80" step="0.001" min="0">
+            </div>
+            <div class="fld">
+              <label for="fan_flow_unit">Unidad de entrada</label>
+              <select id="fan_flow_unit">
+                <option value="m3s">m³/s — metros cúbicos por segundo (× 2.119 = CFM)</option>
+                <option value="m3min">m³/min — metros cúbicos por minuto (× 35,31 = CFM)</option>
+                <option value="m3h">m³/h — metros cúbicos por hora (÷ 1,699 = CFM)</option>
+                <option value="cfm" selected>ft³/min — CFM (sin conversión)</option>
+                <option value="cfs">ft³/s — CFS pies cúbicos/segundo (× 60 = CFM)</option>
+              </select>
+            </div>
+            <div class="cfm-result">
+              <div class="l">CFM resultante (ft³/min)</div>
+              <div class="v" id="cfm_result_disp">—</div>
+            </div>
+            <div class="fld" style="flex: 1; min-width: 120px">
+              <label for="fan_cfm_nom">CFM registrado (ft³/min) ←</label>
+              <input type="number" id="fan_cfm_nom" placeholder="Automático" readonly>
+              <span class="hint">Se usa para calcular unidades requeridas</span>
+            </div>
+            <div class="fld">
+              <label for="fan_m3s">m³/s equivalente</label>
+              <input type="number" id="fan_m3s" class="w90" placeholder="—" readonly>
+            </div>
+          </div>
+        </div>
+
+        <div class="calc-subsect">Datos del motor eléctrico</div>
+        <div class="grid3" style="margin-bottom: 8px">
+          <div class="fld"><label for="fan_volt">Tensión nominal · conexión</label><input type="text" id="fan_volt" class="w200" placeholder="ej: 3~230/400 V ±10% D/Y"></div>
+          <div class="fld"><label for="fan_hz">Frecuencia (Hz)</label>
+            <select id="fan_hz" class="w100"><option value="60">60 Hz</option><option value="50">50 Hz</option></select>
+          </div>
+          <div class="fld"><label for="fan_kw">Potencia absorbida P₁ (W)</label><input type="number" id="fan_kw" class="w110" placeholder="ej: 540" min="0" step="1"></div>
+          <div class="fld"><label for="fan_amp">Corriente nominal I (A)</label><input type="text" id="fan_amp" class="w160" placeholder="ej: 1.60 / 0.92 A (D/Y)"></div>
+          <div class="fld"><label for="fan_cosphi">Factor de potencia cos φ</label><input type="number" id="fan_cosphi" class="w100" placeholder="ej: 0.85" min="0" max="1" step="0.01"></div>
+          <div class="fld"><label for="fan_ip">Grado de protección (IP)</label>
+            <select id="fan_ip" class="w120">
+              <option value="">— Sel. —</option>
+              <option>IP23</option><option>IP44</option><option>IP54</option><option>IP55</option><option>IP65</option>
+            </select>
+          </div>
+          <div class="fld"><label for="fan_aislam">Clase de aislamiento</label><input type="text" id="fan_aislam" class="w140" placeholder="ej: THCL155 / Clase F"></div>
+          <div class="fld"><label for="fan_protmotor">Protección del motor</label><input type="text" id="fan_protmotor" class="w160" placeholder="ej: Contacto térmico"></div>
+          <div class="fld"><label for="fan_tmin">Temperatura mínima (°C)</label><input type="number" id="fan_tmin" class="w100" placeholder="ej: -40" step="1"></div>
+          <div class="fld"><label for="fan_sentido">Sentido de rotación</label>
+            <select id="fan_sentido" class="w200">
+              <option value="">— Seleccionar —</option>
+              <option>Horario (CW) visto desde motor</option>
+              <option>Antihorario (CCW) visto desde motor</option>
+              <option>Reversible</option>
+            </select>
+          </div>
+          <div class="fld"><label for="fan_cert">Certificación</label><input type="text" id="fan_cert" class="w200" placeholder="ej: UL/CSA E111399 ZA-155"></div>
+          <div class="fld"><label for="fan_material">Material palas / rotor</label><input type="text" id="fan_material" class="w160" placeholder="ej: Aluminio RAL 7035"></div>
+        </div>
+
+        <div class="calc-subsect">Montaje sobre radiador (no en base de concreto)</div>
+        <div class="grid3" style="margin-bottom: 6px">
+          <div class="fld"><label for="mon_tipo_fij">Tipo de fijación</label>
+            <select id="mon_tipo_fij" class="w200">
+              <option value="">— Seleccionar —</option>
+              <option>Directo sobre radiador (sin marco)</option>
+              <option>Marco / soporte metálico adaptador</option>
+              <option>Brida adaptadora con pernos</option>
+              <option>Estructura colgante sobre radiador</option>
+            </select>
+          </div>
+          <div class="fld"><label for="mon_flujo_dir">Dirección del flujo</label>
+            <select id="mon_flujo_dir" class="w240">
+              <option value="">— Seleccionar —</option>
+              <option>Soplador — Push (ventilador empuja aire hacia radiador)</option>
+              <option>Extractor — Pull (ventilador extrae aire del radiador)</option>
+            </select>
+          </div>
+          <div class="fld"><label for="mon_marco">Dimensiones marco (mm)</label><input type="text" id="mon_marco" class="w160" placeholder="ej: 700 × 700 mm"></div>
+          <div class="fld"><label for="mon_npuntos">Puntos de fijación</label><input type="number" id="mon_npuntos" class="w90" placeholder="ej: 4" min="1" step="1"></div>
+          <div class="fld"><label for="mon_tornillos">Tornillos tipo / Ø (mm)</label><input type="text" id="mon_tornillos" class="w160" placeholder="ej: M10 × 25 mm Inox 316"></div>
+          <div class="fld"><label for="mon_dist">Separación ventilador–radiador (mm)</label><input type="number" id="mon_dist" class="w140" placeholder="ej: 50" min="0" step="5"></div>
+          <div class="fld"><label for="mon_junta">Junta / sello perimetral</label>
+            <select id="mon_junta" class="w160">
+              <option value="">— Sin junta —</option>
+              <option>Goma EPDM</option>
+              <option>Espuma de celda cerrada</option>
+              <option>Silicona</option>
+              <option>Neopreno</option>
+            </select>
+          </div>
+          <div class="fld" style="grid-column: span 2"><label for="mon_obs">Observaciones de montaje</label><input type="text" id="mon_obs" class="tw" placeholder="Dirección de flujo, inclinación, aisladores de vibración, restricciones, etc."></div>
+        </div>
+        <div class="nota-box">
+          <strong>Montaje sobre radiador:</strong> verificar que el marco de fijación
+          sea compatible con las obleas y el flanche del radiador (medida D).
+          Distancia mínima recomendada ventilador–superficie radiador ≥ 5 % del
+          diámetro Ø. Usar junta perimetral para evitar recirculación de aire.
+          Asegurar acceso para mantenimiento sin desmontaje del transformador.
+        </div>
+      </div>
+    </section>
+
+    <!-- ── PROTECCIÓN ELÉCTRICA Y MANDO ──────────────────── -->
+    <section class="mec-sect" aria-labelledby="prot-stit">
+      <div class="mec-hdr prot">
+        <div class="mec-hdr-t" id="prot-stit">Circuito de protección eléctrica y mando</div>
+        <div class="mec-hdr-meta">Guardamotor MS116 por ventilador · breaker principal S203 · contactos auxiliares SCADA</div>
+      </div>
+      <div class="mec-body">
+
+        <div class="conn-box">
+          <div class="conn-head">Conexión del motor trifásico del ventilador</div>
+          <div class="conn-options">
+            <label class="conn-radio delta">
+              <input type="radio" name="motor_conn" value="D" id="conn_D" checked>
+              <span class="glyph">Δ</span> DELTA (D)
+            </label>
+            <label class="conn-radio estrella">
+              <input type="radio" name="motor_conn" value="Y" id="conn_Y">
+              <span class="glyph">Y</span> ESTRELLA (Y)
+            </label>
+            <div class="conn-note" id="conn_note"></div>
+          </div>
+        </div>
+
+        <div class="calc-subsect">Protección individual por ventilador — guardamotor ABB MS116 + contacto auxiliar HK1-11 (SCADA)</div>
+        <div id="prot-per-fan">
+          <p style="color: var(--ink-4); font-style: italic; padding: 10px">
+            Seleccione un ventilador desde la base de datos para calcular.
+          </p>
+        </div>
+
+        <div class="calc-subsect">Corriente total del sistema — breaker principal ABB S203 + contacto auxiliar S2C-H11L (SCADA)</div>
+        <div id="prot-total">
+          <p style="color: var(--ink-4); font-style: italic; padding: 10px">
+            Seleccione un ventilador desde la base de datos para calcular.
+          </p>
+        </div>
+
+        <div id="prot-summary"></div>
+      </div>
+    </section>
+
+    <!-- ── COMPATIBILIDAD MECÁNICA ───────────────────────── -->
+    <section class="mec-sect" aria-labelledby="comp-stit">
+      <div class="mec-hdr comp">
+        <div class="mec-hdr-t" id="comp-stit">Análisis de compatibilidad mecánica — ventilador vs radiador</div>
+        <div class="mec-hdr-meta">Complete medidas del radiador y diámetro del ventilador para evaluar</div>
+      </div>
+      <div class="mec-body">
+        <div class="comp-grid" id="comp-grid">
+          <div class="comp-card comp-nd" id="r-c1">
+            <div class="comp-title">Cobertura del panel (B vs Ø)</div>
+            <div class="comp-val" id="c1-val">—</div>
+            <div class="comp-desc" id="c1-desc">Ingrese B y Ø ventilador</div>
+          </div>
+          <div class="comp-card comp-nd">
+            <div class="comp-title" id="c2-title">Sección de flujo / altura vs Ø</div>
+            <div class="comp-val" id="c2-val">—</div>
+            <div class="comp-desc" id="c2-desc">Ingrese C y Ø ventilador</div>
+          </div>
+          <div class="comp-card comp-nd">
+            <div class="comp-title">Holgura ventilador–radiador</div>
+            <div class="comp-val" id="c3-val">—</div>
+            <div class="comp-desc" id="c3-desc">Ingrese separación libre</div>
+          </div>
+          <div class="comp-card comp-nd">
+            <div class="comp-title">Relación altura/diámetro (A/Ø)</div>
+            <div class="comp-val" id="c4-val">—</div>
+            <div class="comp-desc" id="c4-desc">Ingrese A y Ø ventilador</div>
+          </div>
+        </div>
+        <div id="comp-summary"></div>
+      </div>
+    </section>
+
+    <!-- ── CALCULADOR DE MOTOVENTILADORES ────────────────── -->
+    <div class="fan-hdr">
+      <div class="fan-hdr-t">Calculador de motoventiladores</div>
+      <div class="fan-formula">N° unidades = ⌈ CFM<sub>total</sub> ÷ CFM<sub>ventilador</sub> ⌉</div>
+      <div class="fan-meta">Todos los caudales en CFM (ft³/min)</div>
+    </div>
+    <div class="fan-body">
+      <div class="cfm-bar">
+        <span class="fs" style="font-weight: 700; color: var(--brand-deep)">CFM requerido (nivel mar):</span>
+        <span class="cpill cp-b" id="cfm-disp">— CFM</span>
+        <span class="fs" style="font-weight: 700; color: var(--cyan-deep)">CFM corregido altitud:</span>
+        <span class="cpill cp-g" id="cfm-alt-disp">— CFM</span>
+        <span class="fs" style="margin-left: auto; color: var(--ink-4); font-style: italic">⌈ ⌉ = entero superior siempre hacia arriba</span>
+      </div>
+
+      <div class="ft-wrap">
+        <table class="ft">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 26px">#</th>
+              <th scope="col">Descripción / modelo del ventilador</th>
+              <th scope="col" style="width: 128px">CFM / ventilador<br><span style="font-weight: 400; font-size: 9px">(ft³/min)</span></th>
+              <th scope="col" style="width: 98px; text-align: center">Unidades<br>requeridas</th>
+              <th scope="col" style="width: 118px; text-align: right">CFM total<br>logrado</th>
+              <th scope="col" style="width: 88px; text-align: right">Cobertura</th>
+              <th scope="col" style="width: 98px; text-align: right">Exceso CFM</th>
+              <th scope="col" style="width: 50px; text-align: center">OK</th>
+              <th scope="col" style="width: 26px" aria-label="Acciones"></th>
+            </tr>
+          </thead>
+          <tbody id="fan-tbody"></tbody>
+        </table>
+      </div>
+      <button type="button" class="badd" id="btnAddFan">+ Agregar opción de ventilador</button>
+      <div class="fansum" id="fan-sum"></div>
+    </div>
+
+    <!-- ── EXPORTAR ──────────────────────────────────────── -->
+    <div class="export-bar">
+      <button type="button" class="btn-exp" id="btnExportReport">
+        <i data-lucide="file-text"></i> Exportar informe técnico AFINIA
+      </button>
+      <button type="button" class="btn-exp-sec" id="btnPrint">
+        <i data-lucide="printer"></i> Imprimir pantalla
+      </button>
+    </div>
+
+    <div class="foot">
+      IEEE C57.12.00-2015 · ANSI C57.12.91 · Westinghouse T&amp;D Reference ·
+      AFINIA Grupo EPM · N = ⌈CFM<sub>total</sub> / CFM<sub>fan</sub>⌉ · CFM = ft³/min
+    </div>
+
+  </div>
 </main>
 
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
