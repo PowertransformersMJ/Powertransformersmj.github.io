@@ -47,6 +47,35 @@ function getOnaf() { return parseFloat($('kva_onaf').value) || 79800; }
 function getPct()  { return parseFloat($('pct').value)      || 133; }
 function getAlt()  { return parseFloat($('alt').value)      || 0; }
 
+/**
+ * Validación reactiva por input. Lee el atributo min/max declarado
+ * en el DOM y marca el campo con .input-error / .input-warn según
+ * corresponda. Devuelve `true` si está dentro del rango.
+ */
+function validarRangoInput(input) {
+  if (!input) return true;
+  const v   = parseFloat(input.value);
+  const min = parseFloat(input.getAttribute('min'));
+  const max = parseFloat(input.getAttribute('max'));
+  let estado = 'ok';
+  if (input.value === '' || Number.isNaN(v)) estado = 'ok';
+  else if ((Number.isFinite(min) && v < min) || (Number.isFinite(max) && v > max)) estado = 'error';
+  input.classList.toggle('input-error', estado === 'error');
+  // Mensaje inline (vive en el siguiente sibling .hint si existe)
+  const hint = input.nextElementSibling;
+  if (hint && hint.classList.contains('hint')) {
+    if (estado === 'error') {
+      hint.dataset.original = hint.dataset.original || hint.textContent;
+      hint.textContent = `Fuera de rango (${Number.isFinite(min) ? min : '−∞'} – ${Number.isFinite(max) ? max : '+∞'})`;
+      hint.classList.add('hint-error');
+    } else if (hint.dataset.original) {
+      hint.textContent = hint.dataset.original;
+      hint.classList.remove('hint-error');
+    }
+  }
+  return estado === 'ok';
+}
+
 function getMotorConn() {
   const el = document.querySelector('input[name="motor_conn"]:checked');
   return el ? el.value : 'D';
@@ -448,6 +477,44 @@ function autoRange() {
   applyRange();
 }
 
+/* ─── Animación de KPIs (count-up con respeto a reduced-motion) ──── */
+
+const _prefersReducedMotion = (() => {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+  catch { return false; }
+})();
+
+const _kpiAnimState = new Map(); // id → {raf, from}
+
+function setKpi(id, target, suffix) {
+  const el = $(id);
+  if (!el) return;
+  const newText = formatearNumero(target) + suffix;
+  if (_prefersReducedMotion) { el.textContent = newText; el.dataset.kpiVal = String(target); return; }
+  const prev = parseFloat(el.dataset.kpiVal);
+  const from = Number.isFinite(prev) ? prev : target;
+  if (Math.abs(from - target) < 1) { el.textContent = newText; el.dataset.kpiVal = String(target); return; }
+  // Cancelar anterior si seguía corriendo
+  const cur = _kpiAnimState.get(id);
+  if (cur) cancelAnimationFrame(cur.raf);
+  const start = performance.now();
+  const dur   = 480;
+  const ease  = (t) => 1 - Math.pow(1 - t, 3); // easeOutCubic (iOS feel)
+  const tick  = (now) => {
+    const t = Math.min(1, (now - start) / dur);
+    const v = from + (target - from) * ease(t);
+    el.textContent = formatearNumero(v) + suffix;
+    if (t < 1) {
+      const nextRaf = requestAnimationFrame(tick);
+      _kpiAnimState.set(id, { raf: nextRaf, from });
+    } else {
+      el.dataset.kpiVal = String(target);
+      _kpiAnimState.delete(id);
+    }
+  };
+  _kpiAnimState.set(id, { raf: requestAnimationFrame(tick), from });
+}
+
 /* ─── Update general (al cambiar parámetros del cálculo) ────── */
 
 function upd() {
@@ -455,11 +522,12 @@ function upd() {
   state.cfmReq    = r.cfm_nivel_mar;
   state.cfmReqAlt = r.cfm_corregido;
 
-  $('v1').textContent = formatearNumero(r.onan)        + ' kVA';
-  $('v2').textContent = formatearNumero(r.onaf)        + ' kVA';
-  $('v3').textContent = formatearNumero(r.delta)       + ' kVA';
-  $('v4').textContent = formatearNumero(r.cfm_nivel_mar) + ' CFM';
-  $('v5').textContent = formatearNumero(r.cfm_corregido) + ' CFM';
+  // Tween animado del KPI (skip si reduced-motion)
+  setKpi('v1', r.onan,          ' kVA');
+  setKpi('v2', r.onaf,          ' kVA');
+  setKpi('v3', r.delta,         ' kVA');
+  setKpi('v4', r.cfm_nivel_mar, ' CFM');
+  setKpi('v5', r.cfm_corregido, ' CFM');
   $('cfm-disp').textContent     = formatearNumero(r.cfm_nivel_mar) + ' CFM';
   $('cfm-alt-disp').textContent = formatearNumero(r.cfm_corregido) + ' CFM';
 
@@ -551,7 +619,20 @@ const chartPlugin = {
 
 function initChart() {
   const cv = $('cv');
-  if (!cv || typeof window.Chart === 'undefined') return;
+  if (!cv) return;
+  if (typeof window.Chart === 'undefined') {
+    // Reintenta una vez tras un pequeño delay (CDN puede tardar en parsear).
+    setTimeout(() => {
+      if (typeof window.Chart !== 'undefined') {
+        initChart();
+        upd();
+      } else {
+        const wrap = cv.parentElement;
+        if (wrap) wrap.innerHTML = '<div style="display:grid;place-items:center;height:100%;color:var(--ink-3);font-family:var(--font-mono);font-size:12px;text-align:center;padding:24px"><div><div style="font-size:32px;margin-bottom:8px">⚠</div>No se pudo cargar Chart.js desde el CDN.<br>Verifica tu conexión y recarga la página.</div></div>';
+      }
+    }, 600);
+    return;
+  }
   state.chart = new window.Chart(cv, {
     type: 'line',
     data: { datasets: buildDatasets() },
@@ -634,10 +715,18 @@ function generateReport() {
 
 function bindEvents() {
   $('mat_input')?.addEventListener('change', onMatChange);
-  $('kva_onan')?.addEventListener('input', onOnanCh);
-  $('kva_onaf')?.addEventListener('input', onOnafCh);
-  $('pct')?.addEventListener('input', onPctCh);
-  $('alt')?.addEventListener('input', upd);
+
+  // Inputs numéricos críticos: validar rango + propagar al cálculo.
+  const wrapNumeric = (id, handler) => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener('input', () => { validarRangoInput(el); handler(); });
+    el.addEventListener('blur',  () => validarRangoInput(el));
+  };
+  wrapNumeric('kva_onan', onOnanCh);
+  wrapNumeric('kva_onaf', onOnafCh);
+  wrapNumeric('pct',      onPctCh);
+  wrapNumeric('alt',      upd);
 
   $('x_min')?.addEventListener('input', applyRange);
   $('x_max')?.addEventListener('input', applyRange);
@@ -681,6 +770,25 @@ function bindEvents() {
   });
 }
 
+/* ─── Reveal por scroll ─────────────────────────────────────── */
+
+function bindReveal() {
+  if (_prefersReducedMotion || typeof IntersectionObserver === 'undefined') {
+    document.querySelectorAll('.calc-section, .mec-sect, .kpis, .cw, .fan-hdr')
+      .forEach(el => el.classList.add('is-revealed'));
+    return;
+  }
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (e.isIntersecting) {
+        e.target.classList.add('is-revealed');
+        io.unobserve(e.target);
+      }
+    }
+  }, { rootMargin: '0px 0px -40px 0px', threshold: 0.05 });
+  document.querySelectorAll('.calc-section, .mec-sect, .kpis, .cw, .fan-hdr').forEach(el => io.observe(el));
+}
+
 /* ─── Bootstrap ─────────────────────────────────────────────── */
 
 async function init() {
@@ -691,8 +799,19 @@ async function init() {
     renderFans();
     upd();
     await calcProtection();
+    bindReveal();
   } catch (err) {
     console.error('[calculo-refrigeracion] init error:', err);
+    // Mostrar mensaje al usuario sin colgarse
+    const root = $('calcRefrigeracionRoot');
+    if (root) {
+      const banner = document.createElement('div');
+      banner.className = 'calc-note';
+      banner.style.borderColor = 'rgba(255,59,48,.30)';
+      banner.style.background  = 'rgba(255,59,48,.05)';
+      banner.innerHTML = `<strong>⚠ Error de inicialización:</strong> ${escaparHtml(err && err.message || String(err))}. Algunas funciones pueden estar limitadas.`;
+      root.insertBefore(banner, root.firstElementChild?.nextSibling || null);
+    }
   }
 }
 
