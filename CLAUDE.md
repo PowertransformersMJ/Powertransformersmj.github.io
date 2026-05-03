@@ -504,6 +504,117 @@ cover-block recortado), pero NO es suficiente para garantizar
 compatibilidad cross-browser. La paginación manual descrita arriba
 es la ÚNICA técnica probada que funciona universalmente.
 
+### 0.1.2.4 Regla permanente · Refactor 1→N NO debe vaciar la UI legacy
+
+**Contexto del bug histórico (sesión 2026-05-03 PM4):** al refactorizar
+la calculadora de refrigeración para soportar **mix multi-modelo**
+(escoger varios tipos de ventiladores con cantidades en el mismo
+transformador), eliminé la ruta de "1 modelo único" en
+`calcProtection()` y reemplacé el contenido de la sección
+"Circuito de protección eléctrica y mando" por un stub *"Agregue al
+menos un modelo de ventilador al mix para calcular la protección
+eléctrica"* cuando `state.mix.length === 0`.
+
+**Consecuencia:** el director, que estaba acostumbrado a ver el
+detalle completo (guardamotores con cantidades + PIDs + settings +
+breaker principal + auxiliares SCADA) en cuanto seleccionaba **un**
+modelo del dropdown técnico, abrió la página tras el refactor y vio
+la sección VACÍA. Lo interpretó (con razón) como *"eliminaste todo
+lo de este apartado"*. La ficha del modelo seguía cargándose en
+la sección "Datos técnicos del motoventilador" pero la sección de
+protección no la consumía si el mix estaba vacío.
+
+**Regla permanente** para CUALQUIER refactor que pase de "trabajar
+con 1 entidad" a "trabajar con N entidades":
+
+1. **NO eliminar el cómputo legacy de "1 entidad".** Manténgalo
+   como **fallback**. La protección eléctrica (o cualquier sección
+   computada) debe tener tres rutas:
+   - **Ruta 1 (principal):** colección N >= 1 → cómputo agregado.
+   - **Ruta 2 (fallback):** colección vacía PERO hay un *preview*
+     legacy seleccionado (ej.: dropdown con 1 modelo cargado) →
+     cálculo con ese 1 modelo + N derivado.
+   - **Ruta 3 (vacío real):** colección vacía Y sin preview →
+     placeholder INFORMATIVO mostrando los componentes que
+     aparecerán cuando se carguen datos (no un stub silencioso).
+
+2. **El stub "vacío" nunca debe parecer "eliminado".** Mostrar:
+   - El catálogo de componentes esperables (PIDs, modelos de
+     referencia, ranges de catálogo).
+   - Una pista explícita: *"cargue una ficha desde el dropdown
+     técnico O agregue modelos al mix para ver cantidades reales"*.
+   - Mantener el bloque visual con su altura mínima para que el
+     usuario no perciba que la sección "desapareció".
+
+3. **Antes de cerrar un commit con refactor de UI:** abrir la
+   página en el browser **sin hacer ninguna acción** y verificar
+   visualmente cada sección consumidora. Si alguna queda vacía
+   (stub, sin contenido, "agregue X"), probablemente rompiste un
+   flujo legacy. Restaurar como fallback.
+
+4. **Casos típicos de aplicación de esta regla:**
+   - 1 ventilador → mix de N ventiladores (commit 2026-05-03).
+   - 1 transformador en cálculo → batch de N transformadores.
+   - 1 muestra DGA → batch de muestras.
+   - 1 contrato seleccionado → multi-contrato.
+   - 1 documento → biblioteca de documentos.
+
+5. **Anti-patrón a evitar:** *"el usuario tiene que aprender el
+   nuevo flujo"*. NO. La UX debe ser progresiva: la versión legacy
+   sigue funcionando, y la versión nueva la complementa. El
+   usuario gana funcionalidad sin perder familiaridad.
+
+**Indicios visuales del bug:**
+- Sección con título visible pero contenido reemplazado por
+  *"agregue X para ver Y"*.
+- Director reporta *"eliminaste todo lo de [sección]"* tras un
+  refactor.
+- Funcionalidad que antes era automática (calcular al seleccionar
+  un modelo) ahora exige acción explícita (agregar al mix).
+
+**Solución del bug original (commit `f1a4403` siguiente):** la
+función `calcProtection()` se reescribió con las 3 rutas descritas.
+La Ruta 2 reusa `calcularProteccionElectrica` (cálculo legacy con
+1 modelo + N derivado) como preview cuando `state.mix.length === 0`
+y hay un modelo en el dropdown legacy. La Ruta 3 muestra un panel
+con tarjetas dashed de los 4 componentes (MS116, HK1-11, S203,
+S2C-H11L) con sus PIDs y rangos.
+
+### 0.1.2.5 Regla permanente · Lint local con `npm run lint:html`, no `npx html-validate`
+
+**Contexto del bug histórico (sesión 2026-05-03 PM4):** verifiqué el
+lint con `npx html-validate "pages/consolidado-refrigeracion.html"`
+y obtuve exit 0. Pusheé el commit. CI falló con 15 errores
+WCAG H63 (`<th>` sin `scope`).
+
+**Causa raíz:** `npx html-validate` descarga la versión más reciente
+disponible del paquete (transitiva), distinta de la fijada en
+`package.json` (`^8.24.0`). La versión transitiva traía un set de
+reglas más laxo y no marcó los errores que sí marca CI con la
+versión declarada.
+
+**Regla permanente:** antes de cerrar cualquier commit con HTML
+nuevo o modificado, **siempre** verificar con:
+
+```bash
+npm install --no-audit --no-fund
+npm run lint:html
+```
+
+NO usar:
+- `npx html-validate ...` — descarga versión transitoria.
+- `html-validate ...` directo — depende del PATH global.
+- Solo verificar visualmente el render — no detecta accesibilidad.
+
+CI ejecuta exactamente `npm ci || npm install` + `npm run lint:html`,
+así que reproducirlo localmente es la única garantía de que el
+push pasará. La diferencia entre exit 0 local y CI rojo es
+**siempre** desalineación de versiones del lint.
+
+**Aplica también a:** `npm test`, `npm run test:unit` — siempre con
+las devDependencies del repo instaladas, nunca con runners
+transitorios.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
