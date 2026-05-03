@@ -321,6 +321,44 @@ firebase deploy --only firestore:rules
 firebase deploy --only firestore:indexes
 ```
 
+### 4.7 Tab "Consolidado Sistemas de Refrigeración" (commit 5, 2026-05-03)
+
+Segunda pestaña del módulo Mantenimiento Brigada (al lado de
+"Sistema de Refrigeración"). Visualiza todas las acciones
+registradas en realtime.
+
+**Estructura:**
+- `pages/mantenimiento-brigada.html` · tab `data-tab="consolidado"`
+  → iframe lazy-load.
+- `pages/consolidado-refrigeracion.html` · página dedicada.
+- `assets/js/consolidado-refrigeracion.js` · UI binding +
+  suscripción `onSnapshot`.
+
+**Funcionalidades:**
+
+| Componente | Detalle |
+|---|---|
+| 5 KPIs | Total acciones · Aprobadas / Ejecutadas · Planificadas / Pendientes · Σ kVA ONAF · Σ Ventiladores |
+| Filtros | Búsqueda libre (matrícula / proyecto / descripción / responsable) · estado · subestación (poblada dinámicamente) · zona · rango fechas |
+| Tabla | 15 columnas con sticky header · estado-pills 5 colores · OK ✓/✗ aprobado · descripción truncada con tooltip |
+| Acciones admin | Cambiar estado (prompt) · Eliminar (confirm) |
+| Export CSV | 28 columnas con BOM UTF-8 · BOM (mix resumen, agregados de evaluación + protección) |
+
+**Filtros cliente-side:** la suscripción `suscribir({}, ...)` no
+aplica filtros server-side; los filtros se aplican en cliente para
+no requerir índices adicionales por combinación arbitraria. Los 4
+índices del commit 4 cubren los casos comunes (por activo, por
+estado, por subestación, por responsable). Para queries más
+específicos cliente-side, los rows se mantienen en memoria (la
+colección espera pocas decenas a cientos de acciones por proyecto).
+
+**Manejo de errores:** si la suscripción cae con
+`permission-denied` o `failed-precondition`, el banner de error
+indica al usuario el comando exacto a ejecutar
+(`firebase deploy --only firestore:rules` /
+`firebase deploy --only firestore:indexes`) — útil para
+recuperación cuando se olvida el deploy del commit 4.
+
 ---
 
 ## 5. Casos golden (regresión numérica)
