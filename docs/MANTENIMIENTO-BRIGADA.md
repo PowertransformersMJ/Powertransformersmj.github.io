@@ -148,6 +148,217 @@ Funciones puras sin DOM ni I/O · 100% testeable con `node --test`.
 | `formatearNumero(v)` | `number → string` | Formato es-CO entero |
 | `escaparHtml(s)` | `string → string` | Escape básico para innerHTML |
 
+### 4.3 Mix multi-modelo de ventiladores (2026-05-03)
+
+A partir del refactor del 2026-05-03 el dominio acepta combinar
+modelos heterogéneos en el mismo transformador (caso real de
+campo: 4 × FN-050 + 8 × FN-063 + 12 × KRENZ F20 alimentando un
+transformador 24 MVA). Tres funciones puras nuevas y la constante
+`MIX_ESTADO`:
+
+| Función | Firma | Devuelve |
+|---|---|---|
+| `evaluarMixVentiladores({items, cfm_requerido})` | `({Array<{key, modelo, marca, cfm_unitario, cantidad}>, number}) → object` | `{items[], cfm_aporte_total, deficit, exceso, cobertura_pct, n_unidades_total, aprobado, estado, mensaje}` |
+| `sugerirMejoras({items, cfm_requerido, fan_db, max_sugerencias?})` | `({…, Record<string, FichaFan>, number?}) → Array<Sugerencia>` | Sugerencias ordenadas por menor exceso. Estrategias: `agregar_unidades`, `sustituir`, `agregar_modelo`. |
+| `calcularProteccionMix({items, factor_seguridad?})` | `({Array<{key, modelo, marca, cantidad, amps_unitario, kw_unitario?, peso_unitario?}>, number?}) → object` | `{grupos[], n_total, amps_totales, amps_min_breaker, kw_totales, peso_total, breaker, aux_breaker}` |
+
+`MIX_ESTADO`: `'aprobado' | 'no_aprobado' | 'sin_datos'`.
+
+**Reglas de validación del mix:**
+
+- Estado APROBADO: `cfm_aporte_total ≥ cfm_requerido`.
+- Estado NO_APROBADO: hay items con cantidad y CFM > 0 pero la
+  suma no cubre el requerido. Reporta `deficit` exacto.
+- Estado SIN_DATOS: mix vacío, todas las cantidades en 0, o
+  `cfm_requerido` no positivo.
+
+**Protección eléctrica con mix heterogéneo:** cada modelo lleva
+su propio guardamotor MS116 dimensionado a la corriente unitaria
+del modelo (no del total), y el sistema completo lleva **un único
+breaker principal S203** dimensionado a la corriente total con
+factor de seguridad NEC 430 ×1.25.
+
+**Motor de sugerencias** (3 estrategias, orden por menor exceso):
+
+1. `agregar_unidades` · agrega N extra del modelo más eficiente
+   ya en el mix.
+2. `sustituir` · cambia el modelo más débil por otro mayor del
+   catálogo manteniendo la cantidad.
+3. `agregar_modelo` · agrega N unidades de un modelo nuevo del
+   catálogo (no presente en el mix actual).
+
+Cada sugerencia retorna `cambios[]` con `{accion, key, modelo,
+marca, cantidad, cfm_unitario}` listo para aplicar al estado UI.
+
+### 4.4 UI del mix (commit 2, 2026-05-03)
+
+`pages/calculo-refrigeracion.html` expone los siguientes elementos
+para gestionar el mix:
+
+| Elemento | Descripción |
+|---|---|
+| `#mix_fan_sel` | Dropdown con los 13 modelos del catálogo agrupados por familia (ZIEHL ZN045 / FN050 / FN063 / ZN063 + KRENZ F20). |
+| `#mix_fan_qty` | Input numérico (default 1, min 1, max 999). |
+| `#btnAddToMix` | Botón "+ Agregar al mix". Si el modelo ya está, suma cantidades. Si no, lo agrega como nuevo item. |
+| `#mix-table` | Tabla con filas dinámicas. Cada fila lleva su propio input de cantidad editable inline (`input.mix-qty`) y botón eliminar (`button.btn-rm-mix`). Pie de tabla con totales agregados (cantidad, CFM, %). |
+| `#mix-status` | Banner con 3 estados: `is-aprobado` (verde), `is-no-aprobado` (rojo), `is-sin-datos` (gris). Muestra badge + mensaje + KPIs (cobertura %, exceso/déficit CFM, n total). |
+| `#mix-suggestions` | Panel con 3 cards (una por estrategia). Visible solo cuando el mix está NO_APROBADO. Cada card lleva botón "Aplicar sugerencia" que muta el `state.mix`. |
+
+**Modelo de estado** (en `assets/js/calculo-refrigeracion.js`):
+
+```javascript
+state.mix = [
+  {
+    id: 1,
+    key: 'fn063_50',
+    marca: 'ZIEHL-ABEGG',
+    modelo: 'FN063-6DL.4I.A7P1',
+    cfm_unitario: 5933,
+    cantidad: 8,
+    ficha: { /* snapshot inmutable Object.freeze del catálogo */ }
+  },
+  // ...
+];
+```
+
+La `ficha` se congela con `Object.freeze` al agregar el item para
+proteger contra mutaciones accidentales del catálogo. Cuando se
+agrega un modelo, también se sincroniza la ficha técnica visible
+del formulario para mantener compatibilidad mecánica + protección
+eléctrica reflejando el modelo más reciente seleccionado.
+
+**Convivencia con el selector legacy `#fan_db_sel`** (dentro de
+"Datos técnicos del motoventilador"): se conserva como preview de
+ficha sin agregar al mix. Útil para inspeccionar especificaciones
+de un modelo antes de decidir si lo agrega.
+
+### 4.5 Reflejo del mix en el informe AFINIA (commit 3, 2026-05-03)
+
+El generador `generateReport()` (en `assets/js/calculo-refrigeracion.js`)
+produce un HTML imprimible Letter conforme `Formato Afinia.docx`.
+Desde el commit 3 cada sección refleja el mix multi-modelo:
+
+| Sección | Contenido |
+|---|---|
+| **5. Datos de los motoventiladores** | Una sub-sección 5.N por cada modelo del mix con marca + modelo + cantidad. Ficha completa (12 campos identificación + 12 campos motor eléctrico) por modelo. Aporte de CFM por modelo (cantidad × cfm_unitario). Peso y kW agregados del grupo. |
+| **8. Selección de motoventiladores** | Tabla del mix (#, marca, modelo, CFM/u, cantidad, aporte, aporte %) con pie de totales. Banner APROBADO/NO con cobertura + déficit/exceso. Si NO aprobado: tabla de hasta 3 sugerencias del motor `sugerirMejoras`. Fórmula `CFM_mix = Σ (cantidad × cfm_unitario)` sustituida con los valores reales. |
+| **9. Circuito de protección eléctrica** | Tabla de grupos (una fila por modelo) con A/unidad, A del grupo, guardamotor MS116 sugerido, PID + setting. Pie con Σ corriente del sistema y breaker principal S203 único. Tabla complementaria con corriente total, mínima breaker, kW total, kVA aparente (Σ P_i / cosφ_i), peso total. Fórmulas: `I_total = Σ (cantidad_i × I_unitario_i)`, `I_min,breaker = 1.25 × I_total`, `P_total`, `S_total`, `W_total`. |
+| **10. Lista de materiales** | BOM agrupado: por cada grupo (motoventiladores + guardamotores + auxiliares) + 1 breaker principal único + 1 auxiliar SCADA del breaker. Cada línea con cantidad + PID + especificación. |
+
+**Reglas de paginación** se mantienen (regla CLAUDE.md §0.1.2.3 ·
+paginación manual con `.sheet` divs, NO thead/tfoot ni position
+fixed). El header `header_compact.png` y el footer `footer.png` se
+inyectan explícitamente en cada hoja para garantizar repetición en
+Safari.
+
+### 4.6 Persistencia · acciones_refrigeracion (commit 4, 2026-05-03)
+
+Cada cálculo ejecutado en la calculadora puede registrarse como
+una "acción de mantenimiento" persistida en Firestore para
+trazabilidad y consolidación posterior.
+
+**Botón** `#btnRegistrarAccion` en la barra de exportar abre el
+modal `#modalAccion` con:
+- Resumen del cálculo (matrícula, subestación, mix, cobertura,
+  estado APROBADO/NO).
+- Descripción de la acción (textarea, mínimo 10 caracteres,
+  obligatorio).
+- Estado del workflow (`planificada`, `pendiente_aprobacion`,
+  `aprobada`, `ejecutada`, `cancelada`).
+- Fecha de la acción (obligatoria, default hoy).
+- Fecha de ejecución (opcional).
+- Observaciones (textarea libre).
+
+**Colección `acciones_refrigeracion/{id}`** (ID autogenerado):
+
+```javascript
+{
+  // Identificación
+  transformador_id, matricula, proyecto, subestacion, zona,
+  departamento, grupo, serie, refrigeracion,
+  // Parámetros del cálculo
+  kva_onan, kva_onaf, pct, altitud,
+  cfm_requerido, cfm_corregido,
+  // Snapshot completo
+  mix: [{ key, marca, modelo, cfm_unitario, cantidad, ficha }],
+  evaluacion: { cfm_aporte_total, cobertura_pct, deficit, exceso,
+                n_unidades_total, aprobado, estado, mensaje },
+  proteccion: { grupos[], n_total, amps_totales, amps_min_breaker,
+                kw_totales, peso_total, breaker, aux_breaker },
+  compatibilidad: { c1, c2, c3, c4, resumen },
+  // Workflow
+  accion_descripcion, estado_accion, fecha_accion,
+  fecha_ejecucion, observaciones,
+  // Responsable
+  responsable_uid, responsable_nombre, responsable_email,
+  // Auditoría
+  createdAt, updatedAt, createdBy
+}
+```
+
+**Reglas Firestore** (en `firestore.rules`):
+- `read: isTeamMember()` — todo el equipo puede listar acciones.
+- `create: isAdmin()` con validación server-side de campos
+  obligatorios + enum `estado_accion` + `mix.size() >= 1`.
+- `update: isAdmin()` solo permite cambiar campos no críticos
+  (estado_accion, observaciones, fechas) — `transformador_id`
+  queda inmutable.
+- `delete: isAdmin()`.
+
+**Índices compuestos** (`firestore.indexes.json`):
+- `transformador_id ASC + fecha_accion DESC` (histórico por activo).
+- `estado_accion ASC + fecha_accion DESC` (filtrar por estado).
+- `subestacion ASC + fecha_accion DESC` (filtro geográfico).
+- `responsable_uid ASC + fecha_accion DESC` (mis acciones).
+
+**Data layer** `assets/js/data/acciones_refrigeracion.js` con
+sanitización + validación cliente + CRUD + suscripción realtime.
+
+**Deploy manual obligatorio** (regla §0.1.1):
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
+
+### 4.7 Tab "Consolidado Sistemas de Refrigeración" (commit 5, 2026-05-03)
+
+Segunda pestaña del módulo Mantenimiento Brigada (al lado de
+"Sistema de Refrigeración"). Visualiza todas las acciones
+registradas en realtime.
+
+**Estructura:**
+- `pages/mantenimiento-brigada.html` · tab `data-tab="consolidado"`
+  → iframe lazy-load.
+- `pages/consolidado-refrigeracion.html` · página dedicada.
+- `assets/js/consolidado-refrigeracion.js` · UI binding +
+  suscripción `onSnapshot`.
+
+**Funcionalidades:**
+
+| Componente | Detalle |
+|---|---|
+| 5 KPIs | Total acciones · Aprobadas / Ejecutadas · Planificadas / Pendientes · Σ kVA ONAF · Σ Ventiladores |
+| Filtros | Búsqueda libre (matrícula / proyecto / descripción / responsable) · estado · subestación (poblada dinámicamente) · zona · rango fechas |
+| Tabla | 15 columnas con sticky header · estado-pills 5 colores · OK ✓/✗ aprobado · descripción truncada con tooltip |
+| Acciones admin | Cambiar estado (prompt) · Eliminar (confirm) |
+| Export CSV | 28 columnas con BOM UTF-8 · BOM (mix resumen, agregados de evaluación + protección) |
+
+**Filtros cliente-side:** la suscripción `suscribir({}, ...)` no
+aplica filtros server-side; los filtros se aplican en cliente para
+no requerir índices adicionales por combinación arbitraria. Los 4
+índices del commit 4 cubren los casos comunes (por activo, por
+estado, por subestación, por responsable). Para queries más
+específicos cliente-side, los rows se mantienen en memoria (la
+colección espera pocas decenas a cientos de acciones por proyecto).
+
+**Manejo de errores:** si la suscripción cae con
+`permission-denied` o `failed-precondition`, el banner de error
+indica al usuario el comando exacto a ejecutar
+(`firebase deploy --only firestore:rules` /
+`firebase deploy --only firestore:indexes`) — útil para
+recuperación cuando se olvida el deploy del commit 4.
+
 ---
 
 ## 5. Casos golden (regresión numérica)

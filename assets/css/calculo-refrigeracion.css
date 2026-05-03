@@ -510,6 +510,205 @@
 .fs  { font: 500 12px var(--font-mono); color: var(--ink-2); }
 .fsv { font-weight: 700; color: var(--brand-deep); }
 
+/* ─── Mix · banner de estado APROBADO / NO APROBADO / SIN DATOS ─── */
+.mix-status {
+  margin: 14px 0 8px;
+  padding: 12px 16px;
+  border-radius: var(--r-md);
+  border: 1px solid;
+  font: 600 13px var(--font-sans);
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  transition: background var(--dur-fast), border-color var(--dur-fast);
+}
+.mix-status .mix-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 12px; border-radius: 999px;
+  font: 700 11px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.mix-status .mix-msg { flex: 1 1 280px; line-height: 1.4; }
+.mix-status .mix-kpis {
+  display: flex; gap: 14px; flex-wrap: wrap;
+  font: 500 12px var(--font-mono); color: var(--ink-2);
+}
+.mix-status .mix-kpi b { color: var(--brand-deep); font-weight: 700; }
+/* Estados */
+.mix-status.is-aprobado {
+  background: rgba(46, 125, 50, .08); border-color: rgba(46, 125, 50, .35);
+}
+.mix-status.is-aprobado .mix-badge { background: rgba(46, 125, 50, 1); color: #fff; }
+.mix-status.is-no-aprobado {
+  background: rgba(198, 40, 40, .08); border-color: rgba(198, 40, 40, .35);
+}
+.mix-status.is-no-aprobado .mix-badge { background: rgba(198, 40, 40, 1); color: #fff; }
+.mix-status.is-sin-datos {
+  background: rgba(120, 120, 120, .06); border-color: rgba(120, 120, 120, .25);
+  color: var(--ink-3);
+}
+.mix-status.is-sin-datos .mix-badge { background: rgba(120, 120, 120, .9); color: #fff; }
+
+/* ─── Mix · panel de sugerencias (3 cards) ──────────────────── */
+.mix-suggestions {
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  background: rgba(255, 248, 225, .55);
+  border: 1px solid rgba(245, 124, 0, .28);
+  border-radius: var(--r-md);
+}
+.mix-suggestions .mix-sug-title {
+  font: 700 12px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .08em;
+  color: rgba(184, 95, 0, 1);
+  margin-bottom: 8px;
+}
+.mix-suggestions .mix-sug-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+}
+.mix-suggestions .mix-sug-card {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid rgba(245, 124, 0, .25);
+  border-radius: var(--r-sm);
+  font: 500 12px var(--font-sans);
+  color: var(--ink-2);
+  display: flex; flex-direction: column; gap: 6px;
+}
+.mix-suggestions .mix-sug-card .strat {
+  font: 700 10px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+  color: rgba(184, 95, 0, 1);
+}
+.mix-suggestions .mix-sug-card .desc { line-height: 1.4; color: var(--ink-1); }
+.mix-suggestions .mix-sug-card .kpi {
+  font: 500 11px var(--font-mono); color: var(--ink-3);
+}
+.mix-suggestions .mix-sug-card .kpi b { color: rgba(46, 125, 50, 1); font-weight: 700; }
+.mix-suggestions .mix-sug-card button {
+  align-self: flex-start;
+  margin-top: 4px; padding: 6px 12px;
+  background: rgba(245, 124, 0, 1); color: #fff;
+  border: 0; border-radius: var(--r-xs);
+  font: 700 11px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .04em;
+  cursor: pointer;
+  transition: opacity var(--dur-fast);
+}
+.mix-suggestions .mix-sug-card button:hover { opacity: .85; }
+
+/* ─── Modal "Registrar acción de mantenimiento" ─────────────── */
+.sgm-modal {
+  position: fixed; inset: 0;
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: sgm-modal-fade .18s ease-out;
+}
+@keyframes sgm-modal-fade {
+  from { opacity: 0; } to { opacity: 1; }
+}
+.sgm-modal[hidden] { display: none; }
+.sgm-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(8, 18, 35, .55);
+  backdrop-filter: blur(6px);
+}
+.sgm-modal-card {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .35);
+  max-width: 720px; width: 100%;
+  max-height: 90vh; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.sgm-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(0, 40, 90, .10);
+  background: linear-gradient(135deg, #f0f7ff 0%, #fff 100%);
+}
+.sgm-modal-head h2 {
+  margin: 0; font: 700 17px var(--font-sans); color: var(--brand-deep);
+}
+.sgm-modal-x {
+  background: transparent; border: 0; cursor: pointer;
+  font: 700 16px var(--font-sans); color: var(--ink-3);
+  width: 32px; height: 32px; border-radius: 6px;
+}
+.sgm-modal-x:hover { background: rgba(198, 40, 40, .08); color: rgba(198, 40, 40, 1); }
+.sgm-modal-body {
+  padding: 14px 18px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+.sgm-modal-meta {
+  font: 500 12px var(--font-sans);
+  color: var(--ink-3);
+  background: rgba(0, 122, 255, .05);
+  border-left: 3px solid rgba(0, 122, 255, .35);
+  padding: 8px 10px; border-radius: 4px;
+  margin: 0 0 10px;
+}
+.sgm-modal-meta code {
+  background: rgba(0, 0, 0, .05); padding: 1px 4px; border-radius: 3px;
+  font-size: 11px;
+}
+.sgm-modal-summary {
+  padding: 10px 12px;
+  background: rgba(46, 125, 50, .06);
+  border: 1px solid rgba(46, 125, 50, .25);
+  border-radius: 6px;
+  font: 500 12px var(--font-mono);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.sgm-modal-summary b { color: var(--brand-deep); }
+.sgm-modal-status {
+  margin-top: 10px;
+  padding: 8px 10px; border-radius: 4px;
+  font: 500 12px var(--font-sans);
+  min-height: 0; transition: min-height .2s, padding .2s;
+}
+.sgm-modal-status.is-error {
+  background: rgba(198, 40, 40, .08);
+  color: rgba(178, 34, 34, 1);
+  border: 1px solid rgba(198, 40, 40, .25);
+}
+.sgm-modal-status.is-success {
+  background: rgba(46, 125, 50, .08);
+  color: rgba(31, 100, 33, 1);
+  border: 1px solid rgba(46, 125, 50, .30);
+}
+.sgm-modal-status.is-info {
+  background: rgba(0, 122, 255, .08);
+  color: var(--brand-deep);
+  border: 1px solid rgba(0, 122, 255, .25);
+}
+.sgm-modal-foot {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(0, 40, 90, .10);
+  background: rgba(248, 250, 253, 1);
+}
+
+/* Botón eliminar fila del mix */
+#mix-tbody .btn-rm-mix {
+  background: transparent; border: 0;
+  padding: 4px 6px; cursor: pointer;
+  color: rgba(198, 40, 40, .85); font-size: 14px;
+}
+#mix-tbody .btn-rm-mix:hover { color: rgba(198, 40, 40, 1); }
+#mix-tbody input.mix-qty {
+  width: 64px; text-align: center;
+  padding: 4px 6px; border-radius: var(--r-xs);
+  border: 1px solid rgba(0, 40, 90, .15);
+  font: 700 13px var(--font-mono); color: var(--brand-deep);
+}
+#mix-tbody input.mix-qty:focus {
+  outline: 2px solid rgba(0, 122, 255, .35); outline-offset: 1px;
+}
+
 /* ─── Tarjetas compatibilidad ──────────────────────────────── */
 .comp-grid {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -7,6 +7,282 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## En curso · Mix multi-modelo en Selección ONAF (2026-05-03)
+
+Trabajo en curso para soportar **combinación de varios modelos de
+ventilador en el mismo transformador** (mix real de campo, ej.:
+4 × ZIEHL FN-050 + 8 × ZIEHL FN-063 + 12 × KRENZ F20 alimentando
+un mismo transformador 24 MVA). Estado actual: dominio puro listo
++ tests verdes. Pendientes: UI · informe · persistencia · tab
+consolidado.
+
+### Commit 5 · Tab "Consolidado Sistemas de Refrigeración" (2026-05-03)
+
+Nueva pestaña del módulo Mantenimiento Brigada para visualizar
+todas las acciones registradas en `acciones_refrigeracion` en
+realtime.
+
+- **`pages/mantenimiento-brigada.html`** · segunda tab agregada al
+  tablist: `data-tab="consolidado"` con icono Lucide `list-checks`
+  → `consolidado-refrigeracion.html` vía iframe lazy-load.
+- **`pages/consolidado-refrigeracion.html`** · página dedicada con:
+  - Cabecera con título + estado de sincronización + botón
+    **"Exportar CSV"**.
+  - 5 KPI cards con paleta semáforo: total acciones · aprobadas
+    o ejecutadas (verde) · planificadas o pendientes (naranja) ·
+    Σ kVA ONAF objetivo · Σ ventiladores totales del parque.
+  - Barra de filtros: búsqueda libre (matrícula / proyecto /
+    descripción / responsable) · estado · subestación (poblada
+    dinámicamente desde la suscripción) · zona · rango de fechas
+    (desde / hasta). Botón "Limpiar".
+  - Tabla con 15 columnas: fecha, matrícula, proyecto,
+    subestación, zona, ONAN, ONAF, mix (resumen "8× ZIEHL FN-063
+    + 4× ZIEHL FN-050"), CFM total, cobertura %, OK ✓/✗,
+    estado-pill (5 colores), responsable, acción (descripción
+    truncada con tooltip al título completo), acciones de fila.
+  - Acciones admin-only en cada fila: cambiar estado (prompt) /
+    eliminar (confirm).
+  - Banner de error visible si las rules o índices no están
+    desplegados (mensaje incluye comando exacto a ejecutar).
+- **`assets/js/consolidado-refrigeracion.js`** · UI binding:
+  - `suscribir()` del data layer al primer paint sin filtros
+    server-side (filtros se aplican cliente para no requerir
+    índices adicionales por combinación).
+  - Filtros cliente reactivos (input + change events).
+  - KPIs recalculados en cada cambio de filtro.
+  - Export CSV con BOM UTF-8 + 28 columnas planas (campos del
+    payload + agregados de `evaluacion`/`proteccion`).
+  - Detección de admin via `window.__sgmSession.profile.rol`.
+  - Cleanup de la suscripción en `beforeunload`.
+- Estilos inline en la página (paleta consistente con el resto
+  del módulo): KPIs glass + tabla con sticky header + estado-pills
+  por estado_accion + aprobado-pills verde/rojo.
+
+JS lint OK · HTML lint OK · 501/503 tests verdes.
+
+⚠ La pestaña requiere los deploys del commit 4 (rules + indexes
+para `acciones_refrigeracion`). Sin ellos los queries fallarán con
+`permission-denied` y/o `FAILED_PRECONDITION` con mensaje claro
+en el banner de error.
+
+### Commit 4 · Persistencia · acciones_refrigeracion + botón "Registrar acción" (2026-05-03)
+
+Persistencia en Firestore de las acciones de mantenimiento del
+sistema de refrigeración. Cada acción es un snapshot completo del
+cálculo (mix, evaluación, protección, BOM, compatibilidad) + datos
+del responsable + estado del workflow.
+
+- **Nueva colección Firestore `acciones_refrigeracion/{id}`** con
+  ID autogenerado. Schema:
+  - Identificación: `transformador_id`, `matricula`, `proyecto`,
+    `subestacion`, `zona`, `departamento`, `grupo`, `serie`,
+    `refrigeracion`.
+  - Parámetros del cálculo: `kva_onan`, `kva_onaf`, `pct`,
+    `altitud`, `cfm_requerido`, `cfm_corregido`.
+  - Snapshot: `mix[]` (lista de items con marca/modelo/cantidad/
+    cfm_unitario + ficha técnica completa), `evaluacion`,
+    `proteccion`, `compatibilidad`.
+  - Workflow: `accion_descripcion`, `estado_accion` ∈
+    {planificada, pendiente_aprobacion, aprobada, ejecutada,
+    cancelada}, `fecha_accion`, `fecha_ejecucion`, `observaciones`.
+  - Responsable: `responsable_uid`, `responsable_nombre`,
+    `responsable_email` (extraídos de `window.__sgmSession`).
+  - Auditoría: `createdAt`, `updatedAt`, `createdBy`.
+- **`firestore.rules`** · `match /acciones_refrigeracion/{id}`:
+  - `read: isTeamMember()`.
+  - `create: isAdmin()` con validación server-side: tipo `string`
+    no vacío de `transformador_id` y `matricula`, `accion_descripcion`
+    de mínimo 10 caracteres, `estado_accion` en enum,
+    `mix is list && mix.size() >= 1`, `fecha_accion` no vacío.
+  - `update: isAdmin()` con validación de enum + congelación de
+    `transformador_id` (no se puede cambiar el activo asociado).
+  - `delete: isAdmin()`.
+- **`firestore.indexes.json`** · 4 índices compuestos nuevos:
+  - `transformador_id ASC + fecha_accion DESC` (histórico por activo).
+  - `estado_accion ASC + fecha_accion DESC` (filtrar por estado).
+  - `subestacion ASC + fecha_accion DESC` (filtro geográfico).
+  - `responsable_uid ASC + fecha_accion DESC` (mis acciones).
+- **`assets/js/data/acciones_refrigeracion.js`** · data layer
+  completo: `crear`, `listar`, `suscribir`, `obtener`,
+  `actualizar`, `actualizarEstado`, `eliminar`, `validar`,
+  constante `ESTADOS_ACCION`, helper `labelEstado`. Sanitización
+  + validación cliente antes de pegarle a las rules.
+- **UI** · `pages/calculo-refrigeracion.html`:
+  - Botón nuevo **"Registrar acción de mantenimiento"**
+    (`#btnRegistrarAccion`) en la barra de exportar (color verde
+    AFINIA, junto al "Exportar informe AFINIA").
+  - Modal `#modalAccion` con cabecera + cuerpo + pie. Cuerpo:
+    aviso explicativo, resumen del cálculo (matrícula, subestación,
+    mix, cobertura, estado APROBADO/NO), formulario con
+    descripción (textarea required minlength 10), estado (select),
+    fecha de la acción (date required), fecha de ejecución (date
+    opcional), observaciones (textarea), área de status para
+    feedback. Pie: cancelar + guardar.
+- **`assets/js/calculo-refrigeracion.js`** · funciones nuevas:
+  `openModalAccion`, `closeModalAccion`, `guardarAccion`. Lazy
+  import de `data/acciones_refrigeracion.js` solo al guardar.
+  Captura del usuario logueado vía `window.__sgmSession`. Cierra
+  el modal con backdrop + botón ✕ + tecla Escape. Status visual
+  con tres estados (info/error/success) y auto-cierre al éxito.
+- **`assets/css/calculo-refrigeracion.css`** · sistema de modales
+  reutilizable `.sgm-modal` + variantes (`.sgm-modal-card`,
+  `.sgm-modal-head`, `.sgm-modal-body`, `.sgm-modal-foot`,
+  `.sgm-modal-summary`, `.sgm-modal-status` con 3 estados,
+  `.sgm-modal-meta`, `.sgm-modal-x`).
+
+⚠ **Requiere deploy manual** (regla CLAUDE.md §0.1.1):
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
+
+Sin esos deploys los queries van a fallar con `permission-denied`
+(rules) y `FAILED_PRECONDITION` (indexes) hasta que el director los
+ejecute desde su Mac.
+
+JS/HTML lint OK · 501/503 tests verdes (los 2 fallos pre-existentes
+son de importador Excel sin relación con este trabajo).
+
+### Commit 3 · Informe AFINIA · refleja mix multi-modelo (2026-05-03)
+
+Refactor del generador de informe técnico AFINIA
+(`generateReport()` en `assets/js/calculo-refrigeracion.js`) para
+que la salida HTML imprimible refleje el mix multi-modelo en lugar
+del modelo único legacy.
+
+- **Sección 5 · Datos de los motoventiladores** — se vuelve plural.
+  Una sub-sección 5.N por cada modelo del mix (ej.: 5.1 ZIEHL FN-050,
+  5.2 ZIEHL FN-063, 5.3 KRENZ F20). Cada una con:
+  - Cabecera con marca + modelo + cantidad ("8 unidades").
+  - Aporte de CFM al mix (`cantidad × cfm_unitario`).
+  - Ficha completa de identificación + aerodinámica (12 campos).
+  - Sub-sección 5.N.1 con motor eléctrico (12 campos) + cantidad
+    × kW del grupo + peso del grupo agregado.
+- **Sección 8 · Selección de motoventiladores** — pasa de "tabla
+  comparativa de opciones" a **tabla del mix con totales y estado**:
+  - Columnas: # · Marca · Modelo · CFM/u · Cantidad · Aporte CFM ·
+    Aporte %.
+  - Pie con totales (Σ unidades, Σ CFM, 100%).
+  - Banner de estado APROBADO ✓ verde / NO APROBADO ✗ rojo con
+    cobertura % + déficit/exceso CFM + n total.
+  - Si NO aprobado: sub-sección "Sugerencias para alcanzar el CFM
+    requerido" con tabla de hasta 3 estrategias del motor
+    `sugerirMejoras` (agregar_unidades / sustituir / agregar_modelo)
+    + descripción + CFM resultante + cobertura + exceso.
+  - Fórmula del mix sustituida con valores reales:
+    `CFM_mix = Σ (Cantidad_i × CFM_unitario_i)` con expansión.
+- **Sección 9 · Protección eléctrica** — refleja agrupación:
+  - Tabla con una fila por grupo (modelo del mix) + columnas
+    "A/unidad", "A grupo", guardamotor sugerido, PID + setting.
+  - Pie con totales del sistema (Σ corriente, breaker principal
+    único S203 dimensionado a la corriente total).
+  - Tabla de KPIs adicionales: corriente total, corriente mínima
+    breaker, kW total absorbido (Σ por grupo), kVA aparente
+    (Σ P_grupo / cosφ_grupo), peso total, auxiliar breaker.
+  - Fórmulas eléctricas adaptadas:
+    - `I_total = Σ (Cantidad_i × I_unitario_i)` con expansión.
+    - `I_min,breaker = 1.25 × I_total` (NEC 430).
+    - `P_total`, `S_total = Σ (P_i / cosφ_i)`, `W_total`.
+- **Sección 10 · Lista de materiales** — BOM agrupado:
+  - Por cada grupo del mix: línea de motoventiladores (cantidad +
+    PID + diámetro + CFM + Hz + corriente del grupo) + línea de
+    guardamotores (cantidad para ese modelo + setting + rango) +
+    línea de auxiliares SCADA del guardamotor.
+  - Línea única de breaker principal del sistema completo
+    (1 unidad cubre toda la corriente del mix).
+  - Línea de auxiliar SCADA del breaker.
+- El alias `state.fans` derivado del mix queda como código
+  defensivo sin lectores activos en producción (tanto la UI como
+  el informe son nativos al mix).
+
+`assets/js/calculo-refrigeracion.js` · 175 LOC modificadas en el
+generador de informe. JS lint OK · 501/503 tests verdes.
+
+### Commit 2 · UI · selector agregar-al-mix + tabla + estado APROBADO/NO + sugerencias (2026-05-03)
+
+- `pages/calculo-refrigeracion.html` · sección "Calculador de
+  motoventiladores" reemplazada por **"Mix de motoventiladores"**:
+  - Nueva barra superior con selector `#mix_fan_sel` (catálogo
+    completo: 13 modelos ZIEHL-ABEGG + KRENZ), input de cantidad
+    `#mix_fan_qty` y botón **"+ Agregar al mix"** (`#btnAddToMix`).
+  - Nueva tabla `#mix-table` con columnas: # · Marca · Modelo ·
+    CFM/u · Cantidad (input editable inline) · Aporte CFM · Aporte %
+    · Eliminar. Pie de tabla con totales.
+  - Nuevo banner `#mix-status` con badge **APROBADO ✓ / NO APROBADO ✗ /
+    SIN DATOS** + cobertura % + déficit/exceso + n total.
+  - Nuevo panel `#mix-suggestions` (visible solo si NO aprobado)
+    con 3 cards (una por estrategia: agregar_unidades, sustituir,
+    agregar_modelo) + botón "Aplicar sugerencia" en cada una.
+  - El selector legacy `#fan_db_sel` (dentro de "Datos técnicos del
+    motoventilador") se conserva como preview de ficha técnica sin
+    agregar al mix.
+- `assets/css/calculo-refrigeracion.css` · estilos nuevos `.mix-status`
+  (3 estados con paleta semáforo verde/rojo/gris), `.mix-suggestions`
+  con grid responsive de cards, `.btn-rm-mix`, `input.mix-qty`.
+- `assets/js/calculo-refrigeracion.js` · refactor profundo del estado
+  y handlers:
+  - `state.mix` reemplaza `state.fans` (legacy). Cada item:
+    `{id, key, marca, modelo, cfm_unitario, cantidad, ficha}`. La
+    `ficha` es snapshot inmutable (Object.freeze) del catálogo al
+    momento de agregar — protege contra mutaciones del catálogo.
+  - Funciones nuevas: `addToMix`, `removeFromMix`, `updateMixQty`,
+    `applyMixSuggestion`, `renderMix`, `renderMixStatus`,
+    `renderMixSuggestions`, `syncFichaVisibleConKey`.
+  - `calcProtection()` reescrito para usar `calcularProteccionMix`
+    del dominio puro. Renderiza grupos por modelo (cada uno con
+    su guardamotor MS116) + breaker principal único S203 +
+    auxiliares SCADA + KPIs agregados (kW totales, peso total).
+  - `onFanSelect()` simplificado: ya no muta `state.fans[0]` —
+    solo sincroniza la ficha visible con el modelo seleccionado.
+  - Funciones legacy eliminadas: `renderFans`, `addFan`, `removeFan`,
+    `updateCells`, `updateSum`, `calcFan`, `renderPerFanCard`,
+    `renderTotalCard`, `renderListaMateriales` (~120 LOC).
+  - Alias `state.fans` derivado del mix mantenido para que
+    `generateReport()` siga funcionando hasta el commit 3 (informe
+    AFINIA con mix nativo).
+- `bindEvents()` actualizado: `btnAddFan` removido (era opción legacy
+  manual); listeners para `mix-tbody` (input qty + click eliminar)
+  y `mix-suggestions` (click "Aplicar sugerencia").
+- HTML lint limpio · 501/503 tests verdes (los 2 fallos son
+  pre-existentes de importador Excel · sin relación con este trabajo).
+
+### Commit 1 · Dominio puro (2026-05-03)
+
+- `assets/js/domain/refrigeracion.js` · 3 funciones puras nuevas:
+  - `evaluarMixVentiladores({items, cfm_requerido})` — suma los
+    aportes de cada modelo (cantidad × CFM unitario), calcula
+    cobertura, déficit, exceso, número total de unidades y emite
+    estado **APROBADO / NO_APROBADO / SIN_DATOS** con mensaje
+    humanizado.
+  - `sugerirMejoras({items, cfm_requerido, fan_db, max_sugerencias})`
+    — motor de sugerencias activo cuando el mix no aprueba. Tres
+    estrategias: (1) **agregar_unidades** del modelo más eficiente
+    ya en el mix; (2) **sustituir** el modelo más débil del mix
+    por otro mayor del catálogo; (3) **agregar_modelo** del catálogo
+    que no esté en el mix. Cada sugerencia incluye los cambios
+    estructurados, CFM total resultante, cobertura y exceso.
+    Ordenadas por menor exceso (ajuste más fino primero).
+  - `calcularProteccionMix({items, factor_seguridad})` — protección
+    eléctrica para mix heterogéneo: cada modelo con su propio
+    guardamotor MS116 dimensionado a la corriente unitaria del
+    grupo, y **un único breaker principal** S203 dimensionado a
+    la corriente total del sistema con factor de seguridad NEC 430
+    ×1.25. Devuelve también totales de potencia (kW) y peso (kg)
+    agregados por grupo.
+- Constante exportada `MIX_ESTADO` con los 3 estados.
+- `tests/refrigeracion.test.js` · 18 tests nuevos (44 → 62 totales)
+  cubriendo: estado SIN_DATOS por mix vacío o requerido cero, suma
+  correcta de aportes con n unidades total, no_aprobado con déficit
+  exacto, aporte_pct por modelo, clamp de cantidades negativas,
+  vacío de sugerencias cuando ya cubre, las 3 estrategias del motor
+  de sugerencias con casos de control, ordenamiento por exceso,
+  respeto de `max_sugerencias`, agrupación por modelo en protección
+  eléctrica, totales kW/peso, factor de seguridad personalizado,
+  filtrado de items con cantidad o amperaje no positivos.
+- 501 / 503 tests verdes (los 2 fallos pre-existentes son de
+  importador Excel · sin relación con este trabajo).
+
 ## v2.9.0 — Mantenimiento Brigada · Selección ONAF (2026-05-02)
 
 Nuevo módulo top-level **"Mantenimiento Brigada"** en el sidebar
