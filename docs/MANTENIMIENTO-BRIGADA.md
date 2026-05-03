@@ -190,6 +190,48 @@ factor de seguridad NEC 430 ×1.25.
 Cada sugerencia retorna `cambios[]` con `{accion, key, modelo,
 marca, cantidad, cfm_unitario}` listo para aplicar al estado UI.
 
+### 4.4 UI del mix (commit 2, 2026-05-03)
+
+`pages/calculo-refrigeracion.html` expone los siguientes elementos
+para gestionar el mix:
+
+| Elemento | Descripción |
+|---|---|
+| `#mix_fan_sel` | Dropdown con los 13 modelos del catálogo agrupados por familia (ZIEHL ZN045 / FN050 / FN063 / ZN063 + KRENZ F20). |
+| `#mix_fan_qty` | Input numérico (default 1, min 1, max 999). |
+| `#btnAddToMix` | Botón "+ Agregar al mix". Si el modelo ya está, suma cantidades. Si no, lo agrega como nuevo item. |
+| `#mix-table` | Tabla con filas dinámicas. Cada fila lleva su propio input de cantidad editable inline (`input.mix-qty`) y botón eliminar (`button.btn-rm-mix`). Pie de tabla con totales agregados (cantidad, CFM, %). |
+| `#mix-status` | Banner con 3 estados: `is-aprobado` (verde), `is-no-aprobado` (rojo), `is-sin-datos` (gris). Muestra badge + mensaje + KPIs (cobertura %, exceso/déficit CFM, n total). |
+| `#mix-suggestions` | Panel con 3 cards (una por estrategia). Visible solo cuando el mix está NO_APROBADO. Cada card lleva botón "Aplicar sugerencia" que muta el `state.mix`. |
+
+**Modelo de estado** (en `assets/js/calculo-refrigeracion.js`):
+
+```javascript
+state.mix = [
+  {
+    id: 1,
+    key: 'fn063_50',
+    marca: 'ZIEHL-ABEGG',
+    modelo: 'FN063-6DL.4I.A7P1',
+    cfm_unitario: 5933,
+    cantidad: 8,
+    ficha: { /* snapshot inmutable Object.freeze del catálogo */ }
+  },
+  // ...
+];
+```
+
+La `ficha` se congela con `Object.freeze` al agregar el item para
+proteger contra mutaciones accidentales del catálogo. Cuando se
+agrega un modelo, también se sincroniza la ficha técnica visible
+del formulario para mantener compatibilidad mecánica + protección
+eléctrica reflejando el modelo más reciente seleccionado.
+
+**Convivencia con el selector legacy `#fan_db_sel`** (dentro de
+"Datos técnicos del motoventilador"): se conserva como preview de
+ficha sin agregar al mix. Útil para inspeccionar especificaciones
+de un modelo antes de decidir si lo agrega.
+
 ---
 
 ## 5. Casos golden (regresión numérica)
