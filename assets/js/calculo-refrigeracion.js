@@ -1603,12 +1603,6 @@ function generateReport() {
     </div>
   </section>
 
-  <div class="info-box" style="margin-top:12pt">
-    Documento generado automáticamente por SGM · TRANSPOWER. La validación
-    final del diseño debe ser revisada por el ingeniero responsable conforme
-    a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
-  </div>
-
 </article>
 </div>
 
@@ -1626,58 +1620,89 @@ function generateReport() {
   // del informe se mueve un bloque a la vez al sheet-content del
   // sheet actual; cuando el contenido excede el alto disponible,
   // el bloque pasa a una nueva hoja.
-  (function paginate() {
+  //
+  // CRITICO: la paginacion se ejecuta DESPUES de que todas las
+  // imagenes hayan cargado, porque scrollHeight subestima el alto
+  // del contenido cuando los <img> aun no tienen su altura natural,
+  // lo que provocaria que tablas y bloques se "metan" en una hoja
+  // donde no caben y queden recortados por overflow:hidden.
+  (function () {
     const HEADER_HTML = ${JSON.stringify(`<img class="afinia-header-img" src="${headerImg}" alt="">`)};
     const FOOTER_HTML = ${JSON.stringify(`<img class="afinia-footer-img" src="${footerImg}" alt=""><div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>`)};
 
-    const buffer = document.querySelector('.report-buffer');
-    const out = document.querySelector('.report-paginated');
-    if (!buffer || !out) return;
-
-    function newSheet() {
-      const s = document.createElement('div');
-      s.className = 'sheet';
-      s.innerHTML =
-        '<div class="sheet-header">' + HEADER_HTML + '</div>' +
-        '<div class="sheet-content"></div>' +
-        '<div class="sheet-footer">' + FOOTER_HTML + '</div>';
-      out.appendChild(s);
-      return s.querySelector('.sheet-content');
-    }
-    function fits(content) {
-      return content.scrollHeight <= content.clientHeight;
+    function waitImages(root) {
+      const imgs = Array.from(root.querySelectorAll('img'));
+      return Promise.all(imgs.map(img => {
+        if (img.complete && img.naturalHeight > 0) return Promise.resolve();
+        return new Promise(res => {
+          img.addEventListener('load', res, { once: true });
+          img.addEventListener('error', res, { once: true });
+          // Failsafe timeout 5s
+          setTimeout(res, 5000);
+        });
+      }));
     }
 
-    // Aplanar children del article en bloques de primer nivel
-    const article = buffer.querySelector('.report');
-    const blocks = Array.from(article.children);
-    let content = newSheet();
+    function paginate() {
+      const buffer = document.querySelector('.report-buffer');
+      const out = document.querySelector('.report-paginated');
+      if (!buffer || !out) return;
 
-    for (const block of blocks) {
-      content.appendChild(block);
-      if (!fits(content)) {
-        // Mover este block a una nueva hoja
-        content.removeChild(block);
-        content = newSheet();
-        content.appendChild(block);
-        // Si SIGUE sin caber (bloque solo es mas alto que la hoja),
-        // se queda igual y el navegador lo recorta. Para el informe
-        // AFINIA ningun bloque excede una hoja completa por diseno.
+      function newSheet() {
+        const s = document.createElement('div');
+        s.className = 'sheet';
+        s.innerHTML =
+          '<div class="sheet-header">' + HEADER_HTML + '</div>' +
+          '<div class="sheet-content"></div>' +
+          '<div class="sheet-footer">' + FOOTER_HTML + '</div>';
+        out.appendChild(s);
+        return s.querySelector('.sheet-content');
       }
-    }
-    // Limpiar buffer
-    buffer.remove();
+      function fits(content) {
+        return content.scrollHeight <= content.clientHeight;
+      }
+      // Detecta si un bloque es un h2/h3 huerfano: una <section> que
+      // solo contiene el titulo + parrafo meta corto (sin tabla,
+      // formula, KPI ni info-box). Si la hoja actual termina en uno
+      // de estos al hacer overflow, lo movemos a la siguiente hoja.
+      function isOrphanTitleBlock(el) {
+        if (!el || !el.classList) return false;
+        if (!el.classList.contains('section-anchor')) return false;
+        const heavy = el.querySelector('table, .formula-box, .rpt-table, .ft, .kpi-grid, .chart-block, .rad-diagram, .info-box, .estado, .materiales');
+        return heavy === null;
+      }
 
-    // Cargar imagenes y luego imprimir
-    let pending = document.images.length;
-    function go() { setTimeout(() => window.print(), 250); }
-    if (pending === 0) { go(); return; }
-    for (const img of document.images) {
-      if (img.complete) { pending--; if (pending === 0) go(); }
-      else img.addEventListener('load', () => { pending--; if (pending === 0) go(); }, { once: true });
-      img.addEventListener('error', () => { pending--; if (pending === 0) go(); }, { once: true });
+      const article = buffer.querySelector('.report');
+      const blocks = Array.from(article.children);
+      let content = newSheet();
+
+      for (const block of blocks) {
+        content.appendChild(block);
+        if (!fits(content)) {
+          // Mover este bloque a una nueva hoja
+          content.removeChild(block);
+          // Si la hoja actual termina con un titulo huerfano (h2 sin
+          // contenido pesado siguiente), tambien lo movemos para
+          // evitar dejarlo solo al pie de pagina.
+          const last = content.lastElementChild;
+          const carryOver = isOrphanTitleBlock(last) ? last : null;
+          if (carryOver) content.removeChild(carryOver);
+          content = newSheet();
+          if (carryOver) content.appendChild(carryOver);
+          content.appendChild(block);
+        }
+      }
+      buffer.remove();
     }
-    if (pending === 0) go();
+
+    // Esperar imagenes (header, footer, diagrama radiador, firma,
+    // grafica chart-img) ANTES de paginar. Si paginamos antes, las
+    // alturas son subestimadas y los bloques se traslapan dentro de
+    // una sola hoja, recortando contenido por overflow:hidden.
+    waitImages(document.body).then(() => {
+      paginate();
+      setTimeout(() => window.print(), 250);
+    });
   })();
 </script>
 
