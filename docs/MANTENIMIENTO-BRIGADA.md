@@ -251,6 +251,76 @@ fixed). El header `header_compact.png` y el footer `footer.png` se
 inyectan explícitamente en cada hoja para garantizar repetición en
 Safari.
 
+### 4.6 Persistencia · acciones_refrigeracion (commit 4, 2026-05-03)
+
+Cada cálculo ejecutado en la calculadora puede registrarse como
+una "acción de mantenimiento" persistida en Firestore para
+trazabilidad y consolidación posterior.
+
+**Botón** `#btnRegistrarAccion` en la barra de exportar abre el
+modal `#modalAccion` con:
+- Resumen del cálculo (matrícula, subestación, mix, cobertura,
+  estado APROBADO/NO).
+- Descripción de la acción (textarea, mínimo 10 caracteres,
+  obligatorio).
+- Estado del workflow (`planificada`, `pendiente_aprobacion`,
+  `aprobada`, `ejecutada`, `cancelada`).
+- Fecha de la acción (obligatoria, default hoy).
+- Fecha de ejecución (opcional).
+- Observaciones (textarea libre).
+
+**Colección `acciones_refrigeracion/{id}`** (ID autogenerado):
+
+```javascript
+{
+  // Identificación
+  transformador_id, matricula, proyecto, subestacion, zona,
+  departamento, grupo, serie, refrigeracion,
+  // Parámetros del cálculo
+  kva_onan, kva_onaf, pct, altitud,
+  cfm_requerido, cfm_corregido,
+  // Snapshot completo
+  mix: [{ key, marca, modelo, cfm_unitario, cantidad, ficha }],
+  evaluacion: { cfm_aporte_total, cobertura_pct, deficit, exceso,
+                n_unidades_total, aprobado, estado, mensaje },
+  proteccion: { grupos[], n_total, amps_totales, amps_min_breaker,
+                kw_totales, peso_total, breaker, aux_breaker },
+  compatibilidad: { c1, c2, c3, c4, resumen },
+  // Workflow
+  accion_descripcion, estado_accion, fecha_accion,
+  fecha_ejecucion, observaciones,
+  // Responsable
+  responsable_uid, responsable_nombre, responsable_email,
+  // Auditoría
+  createdAt, updatedAt, createdBy
+}
+```
+
+**Reglas Firestore** (en `firestore.rules`):
+- `read: isTeamMember()` — todo el equipo puede listar acciones.
+- `create: isAdmin()` con validación server-side de campos
+  obligatorios + enum `estado_accion` + `mix.size() >= 1`.
+- `update: isAdmin()` solo permite cambiar campos no críticos
+  (estado_accion, observaciones, fechas) — `transformador_id`
+  queda inmutable.
+- `delete: isAdmin()`.
+
+**Índices compuestos** (`firestore.indexes.json`):
+- `transformador_id ASC + fecha_accion DESC` (histórico por activo).
+- `estado_accion ASC + fecha_accion DESC` (filtrar por estado).
+- `subestacion ASC + fecha_accion DESC` (filtro geográfico).
+- `responsable_uid ASC + fecha_accion DESC` (mis acciones).
+
+**Data layer** `assets/js/data/acciones_refrigeracion.js` con
+sanitización + validación cliente + CRUD + suscripción realtime.
+
+**Deploy manual obligatorio** (regla §0.1.1):
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
+
 ---
 
 ## 5. Casos golden (regresión numérica)

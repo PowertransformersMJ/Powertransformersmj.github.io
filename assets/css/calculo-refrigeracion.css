@@ -596,6 +596,102 @@
 }
 .mix-suggestions .mix-sug-card button:hover { opacity: .85; }
 
+/* ─── Modal "Registrar acción de mantenimiento" ─────────────── */
+.sgm-modal {
+  position: fixed; inset: 0;
+  z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  animation: sgm-modal-fade .18s ease-out;
+}
+@keyframes sgm-modal-fade {
+  from { opacity: 0; } to { opacity: 1; }
+}
+.sgm-modal[hidden] { display: none; }
+.sgm-modal-backdrop {
+  position: absolute; inset: 0;
+  background: rgba(8, 18, 35, .55);
+  backdrop-filter: blur(6px);
+}
+.sgm-modal-card {
+  position: relative;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .35);
+  max-width: 720px; width: 100%;
+  max-height: 90vh; overflow: hidden;
+  display: flex; flex-direction: column;
+}
+.sgm-modal-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(0, 40, 90, .10);
+  background: linear-gradient(135deg, #f0f7ff 0%, #fff 100%);
+}
+.sgm-modal-head h2 {
+  margin: 0; font: 700 17px var(--font-sans); color: var(--brand-deep);
+}
+.sgm-modal-x {
+  background: transparent; border: 0; cursor: pointer;
+  font: 700 16px var(--font-sans); color: var(--ink-3);
+  width: 32px; height: 32px; border-radius: 6px;
+}
+.sgm-modal-x:hover { background: rgba(198, 40, 40, .08); color: rgba(198, 40, 40, 1); }
+.sgm-modal-body {
+  padding: 14px 18px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+.sgm-modal-meta {
+  font: 500 12px var(--font-sans);
+  color: var(--ink-3);
+  background: rgba(0, 122, 255, .05);
+  border-left: 3px solid rgba(0, 122, 255, .35);
+  padding: 8px 10px; border-radius: 4px;
+  margin: 0 0 10px;
+}
+.sgm-modal-meta code {
+  background: rgba(0, 0, 0, .05); padding: 1px 4px; border-radius: 3px;
+  font-size: 11px;
+}
+.sgm-modal-summary {
+  padding: 10px 12px;
+  background: rgba(46, 125, 50, .06);
+  border: 1px solid rgba(46, 125, 50, .25);
+  border-radius: 6px;
+  font: 500 12px var(--font-mono);
+  color: var(--ink-2);
+  line-height: 1.6;
+}
+.sgm-modal-summary b { color: var(--brand-deep); }
+.sgm-modal-status {
+  margin-top: 10px;
+  padding: 8px 10px; border-radius: 4px;
+  font: 500 12px var(--font-sans);
+  min-height: 0; transition: min-height .2s, padding .2s;
+}
+.sgm-modal-status.is-error {
+  background: rgba(198, 40, 40, .08);
+  color: rgba(178, 34, 34, 1);
+  border: 1px solid rgba(198, 40, 40, .25);
+}
+.sgm-modal-status.is-success {
+  background: rgba(46, 125, 50, .08);
+  color: rgba(31, 100, 33, 1);
+  border: 1px solid rgba(46, 125, 50, .30);
+}
+.sgm-modal-status.is-info {
+  background: rgba(0, 122, 255, .08);
+  color: var(--brand-deep);
+  border: 1px solid rgba(0, 122, 255, .25);
+}
+.sgm-modal-foot {
+  display: flex; gap: 10px; justify-content: flex-end;
+  padding: 12px 18px;
+  border-top: 1px solid rgba(0, 40, 90, .10);
+  background: rgba(248, 250, 253, 1);
+}
+
 /* Botón eliminar fila del mix */
 #mix-tbody .btn-rm-mix {
   background: transparent; border: 0;

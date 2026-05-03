@@ -16,6 +16,85 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Commit 4 · Persistencia · acciones_refrigeracion + botón "Registrar acción" (2026-05-03)
+
+Persistencia en Firestore de las acciones de mantenimiento del
+sistema de refrigeración. Cada acción es un snapshot completo del
+cálculo (mix, evaluación, protección, BOM, compatibilidad) + datos
+del responsable + estado del workflow.
+
+- **Nueva colección Firestore `acciones_refrigeracion/{id}`** con
+  ID autogenerado. Schema:
+  - Identificación: `transformador_id`, `matricula`, `proyecto`,
+    `subestacion`, `zona`, `departamento`, `grupo`, `serie`,
+    `refrigeracion`.
+  - Parámetros del cálculo: `kva_onan`, `kva_onaf`, `pct`,
+    `altitud`, `cfm_requerido`, `cfm_corregido`.
+  - Snapshot: `mix[]` (lista de items con marca/modelo/cantidad/
+    cfm_unitario + ficha técnica completa), `evaluacion`,
+    `proteccion`, `compatibilidad`.
+  - Workflow: `accion_descripcion`, `estado_accion` ∈
+    {planificada, pendiente_aprobacion, aprobada, ejecutada,
+    cancelada}, `fecha_accion`, `fecha_ejecucion`, `observaciones`.
+  - Responsable: `responsable_uid`, `responsable_nombre`,
+    `responsable_email` (extraídos de `window.__sgmSession`).
+  - Auditoría: `createdAt`, `updatedAt`, `createdBy`.
+- **`firestore.rules`** · `match /acciones_refrigeracion/{id}`:
+  - `read: isTeamMember()`.
+  - `create: isAdmin()` con validación server-side: tipo `string`
+    no vacío de `transformador_id` y `matricula`, `accion_descripcion`
+    de mínimo 10 caracteres, `estado_accion` en enum,
+    `mix is list && mix.size() >= 1`, `fecha_accion` no vacío.
+  - `update: isAdmin()` con validación de enum + congelación de
+    `transformador_id` (no se puede cambiar el activo asociado).
+  - `delete: isAdmin()`.
+- **`firestore.indexes.json`** · 4 índices compuestos nuevos:
+  - `transformador_id ASC + fecha_accion DESC` (histórico por activo).
+  - `estado_accion ASC + fecha_accion DESC` (filtrar por estado).
+  - `subestacion ASC + fecha_accion DESC` (filtro geográfico).
+  - `responsable_uid ASC + fecha_accion DESC` (mis acciones).
+- **`assets/js/data/acciones_refrigeracion.js`** · data layer
+  completo: `crear`, `listar`, `suscribir`, `obtener`,
+  `actualizar`, `actualizarEstado`, `eliminar`, `validar`,
+  constante `ESTADOS_ACCION`, helper `labelEstado`. Sanitización
+  + validación cliente antes de pegarle a las rules.
+- **UI** · `pages/calculo-refrigeracion.html`:
+  - Botón nuevo **"Registrar acción de mantenimiento"**
+    (`#btnRegistrarAccion`) en la barra de exportar (color verde
+    AFINIA, junto al "Exportar informe AFINIA").
+  - Modal `#modalAccion` con cabecera + cuerpo + pie. Cuerpo:
+    aviso explicativo, resumen del cálculo (matrícula, subestación,
+    mix, cobertura, estado APROBADO/NO), formulario con
+    descripción (textarea required minlength 10), estado (select),
+    fecha de la acción (date required), fecha de ejecución (date
+    opcional), observaciones (textarea), área de status para
+    feedback. Pie: cancelar + guardar.
+- **`assets/js/calculo-refrigeracion.js`** · funciones nuevas:
+  `openModalAccion`, `closeModalAccion`, `guardarAccion`. Lazy
+  import de `data/acciones_refrigeracion.js` solo al guardar.
+  Captura del usuario logueado vía `window.__sgmSession`. Cierra
+  el modal con backdrop + botón ✕ + tecla Escape. Status visual
+  con tres estados (info/error/success) y auto-cierre al éxito.
+- **`assets/css/calculo-refrigeracion.css`** · sistema de modales
+  reutilizable `.sgm-modal` + variantes (`.sgm-modal-card`,
+  `.sgm-modal-head`, `.sgm-modal-body`, `.sgm-modal-foot`,
+  `.sgm-modal-summary`, `.sgm-modal-status` con 3 estados,
+  `.sgm-modal-meta`, `.sgm-modal-x`).
+
+⚠ **Requiere deploy manual** (regla CLAUDE.md §0.1.1):
+
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
+
+Sin esos deploys los queries van a fallar con `permission-denied`
+(rules) y `FAILED_PRECONDITION` (indexes) hasta que el director los
+ejecute desde su Mac.
+
+JS/HTML lint OK · 501/503 tests verdes (los 2 fallos pre-existentes
+son de importador Excel sin relación con este trabajo).
+
 ### Commit 3 · Informe AFINIA · refleja mix multi-modelo (2026-05-03)
 
 Refactor del generador de informe técnico AFINIA
