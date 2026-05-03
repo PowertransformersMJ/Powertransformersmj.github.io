@@ -1366,8 +1366,9 @@ panel de KPIs.
 | Importador Suministros      | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 · `parsearArchivos({xlsmBuffer, XLSX})` |
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
 | Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) |
-| **Estado al 2026-04-27 PM** | 24+ PRs mergeados a `main` esta jornada (#90 → #108+). Versiones publicadas en CHANGELOG: **v2.5.0**, **v2.5.1**, **v2.6.0**, **v2.6.1**, **v2.7.0**. Documentación completa en `docs/UI-V3-DARKMODE.md` + `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` + esta §9. **Pendiente:** `firebase deploy --only storage` (rules de v2.6.0 + v2.7.0), revocar `ghp_kzk3…` PAT cuando termine la jornada. |
-| Próxima movida              | Director hace `firebase deploy --only storage` desde su Mac → prueba el flujo admin de upload/delete de PDFs en `pages/contrato-info.html` → si todo OK, eventualmente ejecuta `node scripts/deploy-pdfs-storage.js --service-account ~/sa.json` para migrar los 13 PDFs de GitHub Pages a Firebase Storage. |
+| Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` (552 LOC, 44 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con header/footer en cada hoja vía `<thead>`/`<tfoot>` · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` · branch `claude/add-calculation-tool-LSoff` (10 commits) |
+| **Estado al 2026-05-02 PM** | Sesión Mantenimiento Brigada completa · 10 commits desde `4323ac4` hasta `2ee9a9c` en `claude/add-calculation-tool-LSoff`. Versión publicada en CHANGELOG: **v2.9.0**. CLAUDE.md ampliado con §0.1.2.1 (migración legacy SIN perder detalles) y §0.1.2.2 (informes imprimibles · 13 reglas + checklist). 497/497 tests verdes. Pendiente: revisión visual del director + merge a `main` + revocar PAT `ghp_nStu…GlTAA` cuando termine la jornada. |
+| Próxima movida              | Director valida visualmente el informe AFINIA en producción (header/footer repetidos por hoja vía thead/tfoot, fórmulas aplicadas, diagrama SVG del radiador, BOM completo) → mergea PR a `main` → opcional Vercel deploy → eventualmente ampliar el módulo "Mantenimiento Brigada" con nuevas calculadoras (cálculo de aceite, aterramiento, etc.) sin tocar el sidebar. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
@@ -1431,6 +1432,9 @@ integración SCADA, etc.):
 - **Runbook operativo** → `docs/OPERACIONES.md`.
 - **Despliegue de Cloud Functions** → `docs/DEPLOY-FUNCTIONS.md`.
 - **Servicios externos (legacy)** → `docs/PLAN-SERVICIOS-EXTERNOS.md`.
+- **Mantenimiento Brigada · Selección ONAF** → `docs/MANTENIMIENTO-BRIGADA.md`
+  (arquitectura · dominio puro · catálogos AFINIA + ZIEHL-ABEGG ·
+   plantilla informe AFINIA · cómo extender).
 
 ---
 
