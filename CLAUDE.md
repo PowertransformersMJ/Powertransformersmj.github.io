@@ -368,7 +368,141 @@ de cerrar la sesión, ejecutar mentalmente esta checklist:
 - ¿Cada componente con dimensiones lleva su diagrama?
 - ¿La lista de materiales tiene cantidades + PIDs?
 - ¿Los totales del sistema están todos calculados (kW, kVA, peso, A)?
-- ¿El header/footer se repite por hoja (vía thead/tfoot, no fixed)?
+- ¿El header/footer se repite por hoja **vía paginación manual con
+  `.sheet` divs + JS** (regla §0.1.2.3, NO thead/tfoot, NO position:fixed)?
+
+### 0.1.2.3 Regla permanente · Safari NO repite header/footer · usar paginación manual con `.sheet` divs
+
+**Contexto del bug histórico (sesión 2026-05-03 PM2):** después de
+varios intentos previos (position:fixed con `@page margin`, después
+thead/tfoot de tabla paginada) el director volvió a reportar que su
+informe AFINIA exportado a PDF desde producción mostraba el header y
+footer **solo en la página 1 y 6, ausentes en las páginas 2-5**.
+
+**Causa raíz definitiva:** el director imprime/exporta desde **Safari
+en macOS** (`Creator: Safari, Producer: macOS Versión 26.3 / Quartz
+PDFContext`). WebKit/Safari **NO repite** `<thead>` ni `<tfoot>` de
+tabla paginada en cada página al imprimir cuando hay un solo `<tr>`
+con `<td>` grande en `<tbody>` — solo los renderea arriba del primer
+TR (página 1) y abajo del último TR (última página). Es un bug
+WebKit histórico, ampliamente documentado, sin fix.
+
+Mi error fue verificar con `puppeteer.pdf()` (que respeta thead/tfoot
+correctamente como Chrome) y declarar el fix como bueno sin probar
+en el navegador real del director. El comportamiento de
+`puppeteer.pdf()` **NO es representativo** de `window.print()` en
+Safari. Tampoco lo es siquiera de `chrome --headless --print-to-pdf`.
+
+**Regla obligatoria** para CUALQUIER informe imprimible que requiera
+header/footer en cada hoja:
+
+1. **NO usar `<thead>/<tfoot>` de tabla paginada.** Falla en Safari.
+2. **NO usar `position: fixed` con `@page margin`.** Inestable entre
+   browsers (Safari + Chrome + Firefox interpretan distinto los
+   offsets), y el contenido normal puede traslaparse con el
+   header/footer en hojas 2+.
+3. **SÍ usar paginación manual con divs `.sheet`** + script de
+   paginación que distribuye el contenido un bloque a la vez:
+
+   ```html
+   <div class="report-buffer" aria-hidden="true">
+     <article class="report">
+       <!-- TODOS los bloques del informe sin paginar -->
+       <section>...</section>
+       <section>...</section>
+     </article>
+   </div>
+   <div class="report-paginated">
+     <!-- vacío; se rellena con .sheet divs vía JS -->
+   </div>
+   ```
+
+   ```css
+   @page { size: letter portrait; margin: 0; }
+   body { margin: 0; padding: 0; }
+   .sheet {
+     width: 8.5in; height: 11in;
+     position: relative; overflow: hidden;
+     page-break-after: always;
+     box-sizing: border-box;
+   }
+   .sheet:last-child { page-break-after: auto; }
+   .sheet-header {
+     position: absolute; top: 0; left: 0; right: 0;
+     width: 100%; height: 1.0in;
+   }
+   .sheet-footer {
+     position: absolute; bottom: 0; left: 0; right: 0;
+     width: 100%; height: 1.07in;
+   }
+   .sheet-content {
+     position: absolute;
+     top: 1.0in; bottom: 1.07in;
+     left: 1.18in; right: 1.18in;
+     overflow: hidden;
+   }
+   .report-buffer {
+     position: absolute; left: -10000px;
+     width: calc(8.5in - 2 * 1.18in);
+     visibility: hidden;
+   }
+   ```
+
+   ```javascript
+   (function paginate() {
+     const buffer = document.querySelector('.report-buffer');
+     const out = document.querySelector('.report-paginated');
+     function newSheet() {
+       const s = document.createElement('div');
+       s.className = 'sheet';
+       s.innerHTML =
+         '<div class="sheet-header">' + HEADER_HTML + '</div>' +
+         '<div class="sheet-content"></div>' +
+         '<div class="sheet-footer">' + FOOTER_HTML + '</div>';
+       out.appendChild(s);
+       return s.querySelector('.sheet-content');
+     }
+     const blocks = Array.from(buffer.querySelector('.report').children);
+     let content = newSheet();
+     for (const block of blocks) {
+       content.appendChild(block);
+       if (content.scrollHeight > content.clientHeight) {
+         content.removeChild(block);
+         content = newSheet();
+         content.appendChild(block);
+       }
+     }
+     buffer.remove();
+     // Cargar imágenes y luego window.print()
+   })();
+   ```
+
+   Cada hoja `.sheet` lleva SU PROPIO header y footer DOM-explícitos
+   (no vía thead ni vía fixed). El navegador NO necesita "repetir"
+   nada — cada hoja es un elemento independiente con `page-break-
+   after: always`. Funciona idéntico en Chrome, Edge, Firefox y
+   Safari/WebKit en `window.print()` y en exportaciones PDF nativas.
+
+4. **VERIFICAR el fix en navegadores reales antes de cerrar.**
+   Específicamente:
+   - Safari (macOS): exportar a PDF desde el diálogo de impresión.
+   - Chrome (cualquier OS): "Imprimir → Guardar como PDF".
+   - `puppeteer.pdf()` o `chrome --headless --print-to-pdf` **NO**
+     reemplazan la prueba real — son test rápidos, NO confirmación.
+   - Pedirle al director que abra el informe y exporte desde su
+     navegador habitual ANTES de declarar el bug cerrado.
+
+5. **Trampa cognitiva a evitar:** "el headless verificó que header
+   y footer están en cada página, ergo el fix funciona" — eso es
+   FALSO. Headless usa el mismo motor de Chrome (Blink) con la API
+   `pdf()` interna, que NO comparte código con `window.print()`.
+   La verificación final SOLO la da el navegador del director.
+
+**Lección de meta-proceso:** "verifico headless antes del commit" es
+útil como filtro rápido para detectar errores groseros (como el
+cover-block recortado), pero NO es suficiente para garantizar
+compatibilidad cross-browser. La paginación manual descrita arriba
+es la ÚNICA técnica probada que funciona universalmente.
 
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
