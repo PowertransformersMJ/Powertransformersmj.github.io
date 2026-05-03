@@ -338,6 +338,269 @@ export function calcularProteccionElectrica({ amps_por_fan, n_fans, factor_segur
   };
 }
 
+/* ─── Mix de ventiladores (multi-modelo · cantidades) ────────── */
+
+/** Estados de la evaluación del mix. */
+export const MIX_ESTADO = Object.freeze({
+  APROBADO:    'aprobado',
+  NO_APROBADO: 'no_aprobado',
+  SIN_DATOS:   'sin_datos'
+});
+
+/**
+ * Evalúa una combinación de modelos de ventilador (cada uno con su
+ * CFM unitario y la cantidad seleccionada) contra el CFM requerido.
+ * Permite mezclar modelos distintos en el mismo transformador (ej.:
+ * 4 × FN-050 + 8 × FN-063 + 12 × Krenz F20).
+ *
+ * @param {{
+ *   items: Array<{key?:string, modelo?:string, marca?:string,
+ *                 cfm_unitario:number, cantidad:number}>,
+ *   cfm_requerido: number
+ * }} input
+ * @returns {{
+ *   items: Array<{key, modelo, marca, cfm_unitario, cantidad,
+ *                 cfm_aporte, aporte_pct}>,
+ *   cfm_aporte_total: number,
+ *   cfm_requerido: number,
+ *   deficit: number,
+ *   exceso: number,
+ *   cobertura_pct: number|null,
+ *   n_unidades_total: number,
+ *   aprobado: boolean,
+ *   estado: 'aprobado'|'no_aprobado'|'sin_datos',
+ *   mensaje: string
+ * }}
+ */
+export function evaluarMixVentiladores({ items, cfm_requerido }) {
+  const req = Number(cfm_requerido) || 0;
+  const list = Array.isArray(items) ? items : [];
+  const detalle = list.map(it => {
+    const cfmU = Math.max(0, Number(it.cfm_unitario) || 0);
+    const cant = Math.max(0, Math.floor(Number(it.cantidad) || 0));
+    return {
+      key:          it.key || '',
+      modelo:       it.modelo || '',
+      marca:        it.marca || '',
+      cfm_unitario: cfmU,
+      cantidad:     cant,
+      cfm_aporte:   +(cfmU * cant).toFixed(2),
+      aporte_pct:   null
+    };
+  });
+  const total = +detalle.reduce((s, x) => s + x.cfm_aporte, 0).toFixed(2);
+  const nTotal = detalle.reduce((s, x) => s + x.cantidad, 0);
+  detalle.forEach(d => {
+    d.aporte_pct = total > 0 ? +(d.cfm_aporte / total * 100).toFixed(1) : null;
+  });
+  if (req <= 0 || total <= 0) {
+    return {
+      items: detalle, cfm_aporte_total: total, cfm_requerido: req,
+      deficit: 0, exceso: 0, cobertura_pct: null, n_unidades_total: nTotal,
+      aprobado: false, estado: MIX_ESTADO.SIN_DATOS,
+      mensaje: 'Cargue al menos un modelo con cantidad y defina el CFM requerido.'
+    };
+  }
+  const cob = +(total / req * 100).toFixed(1);
+  const aprobado = total >= req;
+  const def = aprobado ? 0 : +(req - total).toFixed(2);
+  const exc = aprobado ? +(total - req).toFixed(2) : 0;
+  return {
+    items: detalle, cfm_aporte_total: total, cfm_requerido: req,
+    deficit: def, exceso: exc, cobertura_pct: cob, n_unidades_total: nTotal,
+    aprobado,
+    estado: aprobado ? MIX_ESTADO.APROBADO : MIX_ESTADO.NO_APROBADO,
+    mensaje: aprobado
+      ? `Mix aprobado · cobertura ${cob}% · exceso ${exc.toFixed(0)} CFM sobre el requerido.`
+      : `Mix NO aprobado · faltan ${def.toFixed(0)} CFM (cobertura ${cob}%). Ajuste cantidades o agregue modelos.`
+  };
+}
+
+/**
+ * Genera sugerencias para alcanzar el CFM requerido cuando el mix
+ * actual no aprueba. Aplica tres estrategias y devuelve hasta
+ * `max_sugerencias` ordenadas por menor exceso (ajuste más fino).
+ *
+ * Estrategias:
+ *   1. agregar_unidades — agrega N unidades del modelo con mayor
+ *      CFM unitario ya en el mix.
+ *   2. sustituir — sustituye el modelo de menor CFM unitario del
+ *      mix por otro modelo del catálogo con mayor CFM.
+ *   3. agregar_modelo — agrega N unidades de un modelo del catálogo
+ *      que NO esté en el mix actual.
+ *
+ * @param {{
+ *   items: Array<{key, modelo, marca, cfm_unitario, cantidad}>,
+ *   cfm_requerido: number,
+ *   fan_db: Record<string, {fan_marca, fan_modelo, fan_cfm_nom}>,
+ *   max_sugerencias?: number
+ * }} input
+ * @returns {Array<{
+ *   estrategia: string,
+ *   descripcion: string,
+ *   cambios: Array<{accion, key, modelo, marca, cantidad, cfm_unitario}>,
+ *   cfm_aporte_total: number,
+ *   cobertura_pct: number,
+ *   exceso: number,
+ *   aprobado: boolean
+ * }>}
+ */
+export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias = 3 }) {
+  const req = Number(cfm_requerido) || 0;
+  const mix = Array.isArray(items) ? items.filter(it => (it.cantidad | 0) > 0 && (it.cfm_unitario || 0) > 0) : [];
+  const db  = (fan_db && typeof fan_db === 'object') ? fan_db : {};
+  if (req <= 0) return [];
+  const total = mix.reduce((s, it) => s + (it.cfm_unitario || 0) * (it.cantidad | 0), 0);
+  if (total >= req) return [];
+  const deficit = req - total;
+  const sugerencias = [];
+
+  // ── 1) Agregar unidades del modelo más eficiente ya en el mix ──
+  if (mix.length > 0) {
+    const mejor = mix.reduce((a, b) => (b.cfm_unitario > a.cfm_unitario ? b : a));
+    if (mejor.cfm_unitario > 0) {
+      const nExtra = Math.ceil(deficit / mejor.cfm_unitario);
+      const nuevoTotal = total + nExtra * mejor.cfm_unitario;
+      sugerencias.push({
+        estrategia:  'agregar_unidades',
+        descripcion: `Agrega ${nExtra} unidad${nExtra === 1 ? '' : 'es'} más de ${mejor.marca || ''} ${mejor.modelo || mejor.key} (cantidad pasa de ${mejor.cantidad} a ${mejor.cantidad + nExtra}).`,
+        cambios: [{
+          accion: 'agregar', key: mejor.key, modelo: mejor.modelo, marca: mejor.marca,
+          cantidad: nExtra, cfm_unitario: mejor.cfm_unitario
+        }],
+        cfm_aporte_total: +nuevoTotal.toFixed(2),
+        cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
+        exceso:           +(nuevoTotal - req).toFixed(2),
+        aprobado:         nuevoTotal >= req
+      });
+    }
+  }
+
+  // ── 2) Sustituir el modelo más débil del mix por uno mayor ──
+  if (mix.length > 0 && Object.keys(db).length > 0) {
+    const debil = mix.reduce((a, b) => (b.cfm_unitario < a.cfm_unitario ? b : a));
+    const candidatos = Object.entries(db)
+      .map(([k, d]) => ({ key: k, cfm: +d.fan_cfm_nom || 0, modelo: d.fan_modelo || '', marca: d.fan_marca || '' }))
+      .filter(c => c.cfm > debil.cfm_unitario && c.key !== debil.key);
+    if (candidatos.length > 0) {
+      candidatos.sort((a, b) => a.cfm - b.cfm);
+      for (const c of candidatos) {
+        const nuevoTotal = total - debil.cantidad * debil.cfm_unitario + debil.cantidad * c.cfm;
+        if (nuevoTotal >= req) {
+          sugerencias.push({
+            estrategia:  'sustituir',
+            descripcion: `Sustituye los ${debil.cantidad} × ${debil.marca || ''} ${debil.modelo || debil.key} por ${debil.cantidad} × ${c.marca} ${c.modelo} (mayor CFM unitario: ${Math.round(c.cfm)} vs ${Math.round(debil.cfm_unitario)}).`,
+            cambios: [
+              { accion: 'quitar',   key: debil.key, modelo: debil.modelo, marca: debil.marca, cantidad: debil.cantidad, cfm_unitario: debil.cfm_unitario },
+              { accion: 'agregar',  key: c.key,     modelo: c.modelo,     marca: c.marca,     cantidad: debil.cantidad, cfm_unitario: c.cfm }
+            ],
+            cfm_aporte_total: +nuevoTotal.toFixed(2),
+            cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
+            exceso:           +(nuevoTotal - req).toFixed(2),
+            aprobado:         true
+          });
+          break; // primer candidato que cubra es el mínimo
+        }
+      }
+    }
+  }
+
+  // ── 3) Agregar un modelo nuevo del catálogo (no en el mix) ──
+  const enMix = new Set(mix.map(m => m.key).filter(Boolean));
+  const candidatosNuevos = Object.entries(db)
+    .map(([k, d]) => ({ key: k, cfm: +d.fan_cfm_nom || 0, modelo: d.fan_modelo || '', marca: d.fan_marca || '' }))
+    .filter(c => c.cfm > 0 && !enMix.has(c.key));
+  // Ordenar por CFM descendente para minimizar unidades agregadas
+  candidatosNuevos.sort((a, b) => b.cfm - a.cfm);
+  for (const c of candidatosNuevos) {
+    const nExtra = Math.ceil(deficit / c.cfm);
+    const nuevoTotal = total + nExtra * c.cfm;
+    sugerencias.push({
+      estrategia:  'agregar_modelo',
+      descripcion: `Agrega ${nExtra} × ${c.marca} ${c.modelo} (modelo no incluido en el mix actual · ${Math.round(c.cfm)} CFM/u).`,
+      cambios: [{
+        accion: 'agregar', key: c.key, modelo: c.modelo, marca: c.marca,
+        cantidad: nExtra, cfm_unitario: c.cfm
+      }],
+      cfm_aporte_total: +nuevoTotal.toFixed(2),
+      cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
+      exceso:           +(nuevoTotal - req).toFixed(2),
+      aprobado:         nuevoTotal >= req
+    });
+    if (sugerencias.filter(s => s.estrategia === 'agregar_modelo').length >= 2) break;
+  }
+
+  // Ordena por menor exceso (ajuste más fino) y limita
+  return sugerencias
+    .filter(s => s.aprobado)
+    .sort((a, b) => a.exceso - b.exceso)
+    .slice(0, max_sugerencias);
+}
+
+/**
+ * Cálculo de protección eléctrica para un mix de modelos. Cada
+ * modelo tiene su propio guardamotor (dimensionado a la corriente
+ * por unidad), y hay un único breaker principal dimensionado a la
+ * corriente total del sistema con factor de seguridad NEC 430.
+ *
+ * @param {{
+ *   items: Array<{key, modelo, marca, cantidad, amps_unitario,
+ *                 kw_unitario?:number, peso_unitario?:number}>,
+ *   factor_seguridad?: number
+ * }} input
+ * @returns {{
+ *   grupos: Array<{key, modelo, marca, cantidad, amps_unitario,
+ *                  amps_grupo, kw_grupo, peso_grupo,
+ *                  guardamotor, aux_guardamotor}>,
+ *   n_total: number,
+ *   amps_totales: number,
+ *   amps_min_breaker: number,
+ *   kw_totales: number,
+ *   peso_total: number,
+ *   breaker: object|null,
+ *   aux_breaker: object
+ * }}
+ */
+export function calcularProteccionMix({ items, factor_seguridad = 1.25 }) {
+  const fs = Number(factor_seguridad) || 1.25;
+  const list = Array.isArray(items) ? items : [];
+  const grupos = list
+    .filter(it => (it.cantidad | 0) > 0 && Number(it.amps_unitario) > 0)
+    .map(it => {
+      const cant = Math.floor(Number(it.cantidad) || 0);
+      const iU   = Number(it.amps_unitario) || 0;
+      const kwU  = Number(it.kw_unitario)   || 0;
+      const pU   = Number(it.peso_unitario) || 0;
+      return {
+        key:    it.key || '',
+        modelo: it.modelo || '',
+        marca:  it.marca || '',
+        cantidad: cant,
+        amps_unitario: iU,
+        amps_grupo: +(cant * iU).toFixed(2),
+        kw_grupo:   +(cant * kwU).toFixed(2),
+        peso_grupo: +(cant * pU).toFixed(2),
+        guardamotor: seleccionarGuardamotor(iU),
+        aux_guardamotor: AUX_GUARDAMOTOR
+      };
+    });
+  const nTotal = grupos.reduce((s, g) => s + g.cantidad, 0);
+  const iTot   = +grupos.reduce((s, g) => s + g.amps_grupo, 0).toFixed(2);
+  const iMin   = +(iTot * fs).toFixed(2);
+  const kwTot  = +grupos.reduce((s, g) => s + g.kw_grupo, 0).toFixed(2);
+  const pTot   = +grupos.reduce((s, g) => s + g.peso_grupo, 0).toFixed(2);
+  return {
+    grupos,
+    n_total:          nTotal,
+    amps_totales:     iTot,
+    amps_min_breaker: iMin,
+    kw_totales:       kwTot,
+    peso_total:       pTot,
+    breaker:          seleccionarBreaker(iMin),
+    aux_breaker:      AUX_BREAKER
+  };
+}
+
 /* ─── Compatibilidad mecánica ───────────────────────────────── */
 
 /** Estados posibles de cada criterio de compatibilidad. */
