@@ -1096,13 +1096,12 @@ function generateReport() {
 <base href="${cssBase}">
 <style>
   /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
-  /* @page con márgenes verticales que reservan espacio al header
+  /* @page con margenes verticales que reservan espacio al header
      (1.7in arriba) y al footer (1.3in abajo). En print mode los
-     elementos `position: fixed` con offsets POSITIVOS desde el
-     borde de la hoja se renderizan UNA VEZ POR PÁGINA — Chrome,
-     Edge, Firefox y Safari modernos respetan este comportamiento.
-     Esta es la técnica que usan html2pdf.js, jsPDF y Puppeteer
-     para encabezados/pies repetidos. */
+     elementos position:fixed con offsets POSITIVOS desde el borde
+     de la hoja se renderizan UNA VEZ POR PAGINA -- Chrome, Edge,
+     Firefox y Safari modernos respetan este comportamiento. Es
+     la tecnica que usan html2pdf.js, jsPDF y Puppeteer. */
   @page {
     size: letter portrait;
     margin: 1.7in 0 1.3in 0;
@@ -1117,11 +1116,11 @@ function generateReport() {
   }
 
   /* ── HEADER + FOOTER fijos · se repiten en CADA hoja impresa ──
-     position: fixed con `top: 0`/`bottom: 0` se ancla al borde
-     físico de cada hoja en print mode. El navegador rasteriza el
-     elemento UNA VEZ POR PÁGINA, no una sola en todo el documento.
-     Los offsets son POSITIVOS (no negativos) para que la imagen
-     entre completa dentro del área del @page. */
+     position:fixed con top:0 / bottom:0 se ancla al borde fisico
+     de cada hoja en print mode. El navegador rasteriza el elemento
+     una vez por pagina, no una sola en todo el documento. Los
+     offsets son positivos (no negativos) para que la imagen entre
+     completa dentro del area del @page. */
   .afinia-header {
     position: fixed;
     top: 0; left: 0; right: 0;
