@@ -1085,7 +1085,7 @@ function generateReport() {
     }
 
     const cssBase   = location.origin + location.pathname.replace(/\/[^\/]*$/, '/');
-    const headerImg = '../assets/img/afinia/header.png';
+    const headerImg = '../assets/img/afinia/header_compact.png';
     const footerImg = '../assets/img/afinia/footer.png';
 
     const html = `<!DOCTYPE html>
@@ -1095,16 +1095,15 @@ function generateReport() {
 <title>Informe técnico AFINIA — Selección ONAF — ${escaparHtml(proyecto)}</title>
 <base href="${cssBase}">
 <style>
-  /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
-  /* @page con margenes verticales que reservan espacio al header
-     (1.7in arriba) y al footer (1.3in abajo). En print mode los
-     elementos position:fixed con offsets POSITIVOS desde el borde
-     de la hoja se renderizan UNA VEZ POR PAGINA -- Chrome, Edge,
-     Firefox y Safari modernos respetan este comportamiento. Es
-     la tecnica que usan html2pdf.js, jsPDF y Puppeteer. */
+  /* Hoja Letter conforme Formato Afinia.docx (referencia: Informe
+     Casacara). El header y footer se repiten en CADA hoja al
+     imprimir mediante el patron clasico thead/tfoot de tabla
+     paginada. En print mode los navegadores Chrome, Edge, Firefox
+     y Safari rasterizan thead UNA VEZ POR PAGINA al inicio y tfoot
+     al final, replicando el comportamiento del Formato Afinia. */
   @page {
     size: letter portrait;
-    margin: 1.7in 0 1.3in 0;
+    margin: 0;
   }
   html, body {
     margin: 0; padding: 0;
@@ -1115,30 +1114,27 @@ function generateReport() {
     print-color-adjust: exact;
   }
 
-  /* ── HEADER + FOOTER fijos · se repiten en CADA hoja impresa ──
-     position:fixed con top:0 / bottom:0 se ancla al borde fisico
-     de cada hoja en print mode. El navegador rasteriza el elemento
-     una vez por pagina, no una sola en todo el documento. Los
-     offsets son positivos (no negativos) para que la imagen entre
-     completa dentro del area del @page. */
-  .afinia-header {
-    position: fixed;
-    top: 0; left: 0; right: 0;
-    width: 100%;
-    z-index: 100;
-  }
-  .afinia-footer {
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    width: 100%;
-    z-index: 100;
-  }
+  /* Marco de pagina: tabla con thead = header repetido y
+     tfoot = footer repetido. tbody contiene el flujo del informe. */
+  .page-frame { width: 100%; border-collapse: collapse; }
+  .page-frame > thead { display: table-header-group; }
+  .page-frame > tfoot { display: table-footer-group; }
+  .page-frame > thead > tr > th,
+  .page-frame > tfoot > tr > td,
+  .page-frame > tbody > tr > td { padding: 0; border: 0; vertical-align: top; }
+
+  /* Cuerpo del informe: padding lateral 1.18in (3 cm aprox., pgMar
+     del docx) y padding vertical pequeno para separar del header/
+     footer en cada hoja impresa. */
+  .page-frame > tbody > tr > td.page-body { padding: 8pt 1.18in 8pt 1.18in; }
+
   .afinia-header-img,
   .afinia-footer-img {
     display: block;
     width: 100%;
     height: auto;
   }
+  .afinia-footer { position: relative; }
   .afinia-footer .footer-text {
     position: absolute;
     left: 6%; right: 6%; bottom: 14%;
@@ -1147,14 +1143,7 @@ function generateReport() {
     font-weight: 600; letter-spacing: .01em;
     line-height: 1.2;
   }
-  /* El cuerpo del informe respeta los márgenes laterales del
-     Formato Afinia (1.18in = 3 cm aprox., conforme pgMar del
-     docx oficial) vía padding interno; los márgenes verticales
-     los maneja el @page para que el contenido nunca pise el
-     header/footer fixed. */
-  .report {
-    padding: 0 1.18in;
-  }
+  .report { padding: 0; }
 
   /* ── Tipografía · tamaños reducidos para mejor densidad ────── */
   h1 { font-size: 13pt; margin: 0 0 3pt; color: #0d3a73; letter-spacing: -.01em; line-height: 1.25; }
@@ -1296,38 +1285,20 @@ function generateReport() {
   .lbl.b         { background: #2e7d32; }
   .lbl.d         { background: #0288d1; }
 
-  /* ── SCREEN preview vs PRINT ───────────────────────────────── */
+  /* SCREEN preview: simula una hoja Letter centrada con sombra. */
   @media screen {
     body { background: #888; padding: 24px 0; }
-    .report {
+    .page-frame {
       width: 8.5in;
-      min-height: calc(11in - 1.7in - 1.3in);
-      margin: 1.7in auto 1.3in;
+      margin: 0 auto;
       background: #fff;
       box-shadow: 0 4px 18px rgba(0,0,0,.18);
-      padding-top: 0.20in;
-      padding-bottom: 0.20in;
     }
-    /* En screen el position:fixed muestra header/footer una vez
-       (preview); centrarlos respecto al .report. */
-    .afinia-header,
-    .afinia-footer {
-      width: 8.5in;
-      left: 50%; right: auto;
-      transform: translateX(-50%);
-    }
-    .afinia-header { top: 24px; }
-    .afinia-footer { bottom: 24px; }
   }
 
   @media print {
     body { background: #fff; }
-    .report {
-      width: auto;
-      margin: 0;
-      box-shadow: none;
-      min-height: auto;
-    }
+    .page-frame { box-shadow: none; }
     .no-print { display: none !important; }
   }
 
@@ -1353,22 +1324,28 @@ function generateReport() {
   <button class="sec" onclick="window.close()">Cerrar</button>
 </div>
 
-<!-- HEADER AFINIA · position:fixed con offsets POSITIVOS desde el
-     borde físico de la hoja. En print mode el navegador rasteriza
-     este elemento una vez por cada página, entrando dentro del
-     área que el @page reserva con margin-top: 1.7in. -->
-<header class="afinia-header" aria-label="Encabezado oficial CaribeMar de la Costa S.A.S E.S.P. - AFINIA Grupo EPM">
-  <img class="afinia-header-img" src="${headerImg}" alt="">
-</header>
-
-<!-- FOOTER AFINIA · mismo patrón que el header, anclado al borde
-     inferior con bottom:0 y respaldado por @page margin-bottom de
-     1.3in para no pisar el contenido del informe. -->
-<footer class="afinia-footer" aria-hidden="true">
-  <img class="afinia-footer-img" src="${footerImg}" alt="">
-  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
-</footer>
-
+<!-- Marco de pagina: thead se repite como ENCABEZADO y tfoot como
+     PIE en cada hoja al imprimir. El contenido del informe vive
+     dentro de un unico td del tbody, que el navegador pagina
+     respetando page-break-* y break-inside:avoid. -->
+<table class="page-frame">
+  <thead>
+    <tr><th>
+      <header class="afinia-header" aria-label="Encabezado oficial CaribeMar de la Costa S.A.S E.S.P. - AFINIA Grupo EPM">
+        <img class="afinia-header-img" src="${headerImg}" alt="">
+      </header>
+    </th></tr>
+  </thead>
+  <tfoot>
+    <tr><td>
+      <footer class="afinia-footer" aria-hidden="true">
+        <img class="afinia-footer-img" src="${footerImg}" alt="">
+        <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+      </footer>
+    </td></tr>
+  </tfoot>
+  <tbody>
+    <tr><td class="page-body">
 <article class="report">
 
   <!-- ── CARÁTULA ───────────────────────────────────────── -->
@@ -1587,6 +1564,9 @@ function generateReport() {
   </div>
 
 </article>
+    </td></tr>
+  </tbody>
+</table>
 
 <script>
   // Auto-print una vez que las imágenes hayan cargado.
