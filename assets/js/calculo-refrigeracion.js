@@ -740,12 +740,399 @@ function initChart() {
   });
 }
 
-/* ─── Generación de reporte (placeholder Fase 4) ────────────── */
+/* ─── Generación del informe técnico AFINIA ─────────────────── */
+//
+// Replica el formato oficial "Formato Afinia.docx" en HTML/CSS:
+//   · Hoja Letter (8.5″ × 11″) con márgenes 0.984″/1.18″/0.984″/1.18″.
+//   · Header Afinia + footer banda azul "www.afinia.com.co" en cada
+//     página, fijos vía background del .report-page.
+//   · Gráfico exportado como base64 PNG (chart.toBase64Image) para que
+//     se imprima como imagen única e indivisible — sin riesgo de corte.
+//   · Cada bloque grande (gráfico, calculador, protección) en su propia
+//     página vía `page-break-before: always` + `break-inside: avoid`.
+//
+// El usuario obtiene la previsualización nativa del navegador y puede
+// elegir "Guardar como PDF" o imprimir físicamente.
 
 function generateReport() {
-  // Versión simple: usa el flujo nativo del navegador. Una versión PDF
-  // más rica se considerará en una fase posterior si es prioritaria.
-  window.print();
+  try {
+    const win = window.open('', '_blank', 'width=1100,height=900');
+    if (!win) {
+      alert('Activa las ventanas emergentes para generar el informe.');
+      return;
+    }
+
+    const r = calcularRefrigeracion({ kva_onan: getOnan(), pct: getPct(), alt: getAlt() });
+    const proyecto = ($('proyecto')?.value || '').trim() || 'Sin nombre asignado';
+    const matricula = ($('mat_input')?.value || '').trim() || '—';
+    const t = {
+      serie:     $('t_serie')?.value     || '—',
+      sub:       $('t_sub')?.value       || '—',
+      zona:      $('t_zona')?.value      || '—',
+      dept:      $('t_dept')?.value      || '—',
+      grupo:     $('t_grupo')?.value     || '—',
+      kva:       $('t_kva')?.value       || '—',
+      refrig:    $('t_refrig')?.value    || '—'
+    };
+    const fan = {
+      marca:   $('fan_marca')?.value   || '—',
+      modelo:  $('fan_modelo')?.value  || '—',
+      diam:    $('fan_diam')?.value    || '—',
+      rpm:     $('fan_rpm')?.value     || '—',
+      cfm_nom: $('fan_cfm_nom')?.value || '—',
+      hz:      $('fan_hz')?.value      || '—',
+      kw:      $('fan_kw')?.value      || '—',
+      amp:     $('fan_amp')?.value     || '—',
+      ip:      $('fan_ip')?.value      || '—'
+    };
+    const rad = {
+      A: $('rad_A')?.value    || '—',
+      B: $('rad_B')?.value    || '—',
+      C: $('rad_C')?.value    || '—',
+      D: $('rad_D')?.value    || '—',
+      cant:   $('rad_cant')?.value   || '—',
+      obleas: $('rad_obleas')?.value || '—'
+    };
+    const disp = $('disposicion')?.options[$('disposicion').selectedIndex]?.text || '—';
+    const conn = getMotorConn() === 'D' ? 'Δ Delta' : 'Y Estrella';
+    const fechaIso = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
+    const horaIso  = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+    // Snapshot del gráfico — convertir a base64 PNG con fondo blanco
+    let chartImg = '';
+    try {
+      if (state.chart) chartImg = state.chart.toBase64Image('image/png', 1);
+    } catch (err) {
+      console.warn('[informe] chart snapshot failed:', err);
+    }
+
+    // Resumen del calculador de ventiladores (todas las opciones)
+    const fansRows = state.fans.filter(f => f.cfm > 0).map((f, i) => {
+      const c = calcularUnidadesRequeridas({ cfm_total: state.cfmReq, cfm_fan: f.cfm });
+      return `<tr>
+        <td class="tc">${i + 1}</td>
+        <td>${escaparHtml(f.desc) || `Opción ${i + 1}`}</td>
+        <td class="tr mono">${formatearNumero(f.cfm)}</td>
+        <td class="tc mono"><strong>${c.n ?? '—'}</strong></td>
+        <td class="tr mono">${c.n !== null ? formatearNumero(c.cfm_logrado) : '—'}</td>
+        <td class="tr mono">${c.cobertura_pct !== null ? c.cobertura_pct + '%' : '—'}</td>
+        <td class="tc">${c.ok ? '✓' : (c.n !== null ? '✗' : '—')}</td>
+      </tr>`;
+    }).join('') || '<tr><td colspan="7" class="tc" style="font-style:italic;color:#888;padding:14px">Sin opciones registradas</td></tr>';
+
+    // Protección (solo si hay datos de fan + corriente)
+    let protBlock = '<p style="font-style:italic;color:#888">Sin ficha de ventilador seleccionada para evaluar la protección.</p>';
+    const iF = extraerCorrienteFan(fan.amp, getMotorConn());
+    const f0 = state.fans[0];
+    const nF = (f0 && f0.cfm > 0 && state.cfmReq > 0) ? Math.ceil(state.cfmReq / f0.cfm) : 0;
+    if (iF !== null && Number.isFinite(iF)) {
+      const p = calcularProteccionElectrica({ amps_por_fan: iF, n_fans: nF });
+      protBlock = `
+        <table class="rpt-table">
+          <tbody>
+            <tr><th>Conexión motor</th><td>${conn}</td></tr>
+            <tr><th>Corriente nominal por ventilador</th><td class="mono">${iF.toFixed(2)} A</td></tr>
+            <tr><th>Cantidad de ventiladores</th><td class="mono">${nF || '—'} unidades</td></tr>
+            <tr><th>Corriente total del sistema</th><td class="mono">${nF ? p.amps_totales.toFixed(2) + ' A' : '—'}</td></tr>
+            <tr><th>Corriente mínima del breaker (×1.25 NEC 430)</th><td class="mono">${nF ? p.amps_min_breaker.toFixed(2) + ' A' : '—'}</td></tr>
+            <tr><th>Guardamotor sugerido</th><td>${p.guardamotor ? 'ABB ' + p.guardamotor.model + ' · PID ' + p.guardamotor.pid + ' · setting ' + iF.toFixed(2) + ' A' : 'Fuera de catálogo MS116'}</td></tr>
+            <tr><th>Breaker principal sugerido</th><td>${p.breaker ? 'ABB ' + p.breaker.model + ' · ' + p.breaker.in + ' A · PID ' + p.breaker.pid : (nF ? 'Excede catálogo S203 (50 A)' : '—')}</td></tr>
+            <tr><th>Auxiliar guardamotor (SCADA)</th><td>ABB ${p.aux_guardamotor.model} · PID ${p.aux_guardamotor.pid}</td></tr>
+            <tr><th>Auxiliar breaker (SCADA)</th><td>ABB ${p.aux_breaker.model} · PID ${p.aux_breaker.pid}</td></tr>
+          </tbody>
+        </table>`;
+    }
+
+    const cssBase = location.origin + location.pathname.replace(/\/[^\/]*$/, '/');
+    const headerImg = '../assets/img/afinia/header.png';
+    const footerImg = '../assets/img/afinia/footer.png';
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Informe técnico AFINIA — Selección ONAF — ${escaparHtml(proyecto)}</title>
+<base href="${cssBase}">
+<style>
+  /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
+  @page { size: letter portrait; margin: 0; }
+  html, body { margin: 0; padding: 0; background: #888; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  .report-page {
+    box-sizing: border-box;
+    width: 8.5in; min-height: 11in;
+    margin: 0 auto 24px; background: #fff;
+    position: relative; overflow: hidden;
+    /* Márgenes exactos del template (twips → in): */
+    padding: 1.6in 1.18in 1.4in 1.18in;
+    page-break-after: always; break-after: page;
+    box-shadow: 0 4px 18px rgba(0,0,0,.18);
+  }
+  .report-page:last-child { page-break-after: auto; break-after: auto; }
+  .report-page::before {
+    /* Header: logo Afinia + Grupo·epm */
+    content: ""; position: absolute; left: 0; right: 0; top: 0;
+    height: 1.5in;
+    background: url("${headerImg}") no-repeat center top;
+    background-size: 100% auto;
+  }
+  .report-page::after {
+    /* Footer: banda azul + URL */
+    content: ""; position: absolute; left: 0; right: 0; bottom: 0.30in;
+    height: 0.85in;
+    background: url("${footerImg}") no-repeat center bottom;
+    background-size: 100% auto;
+  }
+  .footer-text {
+    position: absolute; left: 1.18in; right: 1.18in; bottom: 0.10in;
+    font-size: 8pt; color: #555; text-align: center;
+  }
+
+  /* ── Tipografía ────────────────────────────────────────────── */
+  h1 { font-size: 18pt; margin: 0 0 4pt; color: #0d3a73; letter-spacing: -.01em; }
+  h2 { font-size: 13pt; margin: 14pt 0 6pt; color: #0d3a73; padding-bottom: 4pt; border-bottom: 1px solid #5ba4d4; }
+  h3 { font-size: 11pt; margin: 10pt 0 4pt; color: #0d3a73; }
+  p, td, th { font-size: 10pt; line-height: 1.45; }
+  .meta { font-size: 9pt; color: #666; margin-bottom: 4pt; }
+  .mono { font-family: "Consolas", "Courier New", monospace; font-variant-numeric: tabular-nums; }
+  .tc { text-align: center; }
+  .tr { text-align: right; }
+
+  .cover-block {
+    margin-top: 12pt;
+    padding: 16pt 18pt; border-radius: 6pt;
+    background: linear-gradient(135deg, #e3f2fd 0%, #f5fafd 100%);
+    border: 1px solid #90caf9;
+  }
+  .cover-block h1 { color: #0d3a73; }
+  .cover-block .proj { font-size: 13pt; font-weight: 600; color: #1258a0; margin-top: 6pt; }
+  .cover-block .ref  { font-size: 9pt; color: #555; margin-top: 4pt; line-height: 1.5; }
+
+  /* ── KPIs ──────────────────────────────────────────────────── */
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8pt; margin: 10pt 0; }
+  .kpi-card {
+    border: 1px solid #b0cce8; border-radius: 5pt;
+    padding: 8pt 10pt; background: #f0f7ff;
+    border-left: 3pt solid #0d47a1;
+  }
+  .kpi-card.cfm { background: #f0fafd; border-left-color: #0277bd; }
+  .kpi-card.alt { background: #f0fdf6; border-left-color: #1b5e20; }
+  .kpi-card .l { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #555; margin-bottom: 4pt; }
+  .kpi-card .v { font-size: 13pt; font-weight: 700; color: #0d3a73; }
+
+  /* ── Tablas de datos ───────────────────────────────────────── */
+  .rpt-table { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; }
+  .rpt-table th, .rpt-table td { padding: 4pt 8pt; border-bottom: 1px solid #d8e3f0; vertical-align: top; }
+  .rpt-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 9pt; width: 40%; }
+  .rpt-table td { font-size: 10pt; }
+  .ft { width: 100%; border-collapse: collapse; margin-top: 6pt; }
+  .ft th { background: #0d3a73; color: #fff; padding: 5pt 7pt; text-align: left; font-size: 9pt; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .ft td { padding: 5pt 7pt; border-bottom: 1px solid #e0e8f3; font-size: 10pt; }
+  .ft tr:nth-child(even) td { background: #f8fbff; }
+
+  .info-box {
+    margin: 8pt 0; padding: 10pt 14pt; border-radius: 5pt;
+    background: #fff8e1; border: 1px solid #ffe082;
+    font-size: 9.5pt; color: #5d4037;
+  }
+  .info-box strong { color: #b85f00; }
+
+  /* ── Página del gráfico (imagen completa, sin corte) ───────── */
+  .chart-page-wrap {
+    display: flex; align-items: center; justify-content: center;
+    min-height: calc(11in - 1.6in - 1.4in);  /* área interior */
+  }
+  .chart-img {
+    width: 100%; max-width: 6.5in; height: auto;
+    border: 1px solid #b0cce8; border-radius: 5pt;
+    background: #fff;
+  }
+
+  /* ── Print ─────────────────────────────────────────────────── */
+  @media print {
+    html, body { background: #fff; }
+    .report-page { margin: 0; box-shadow: none; }
+    .no-print { display: none !important; }
+  }
+
+  .toolbar {
+    position: fixed; top: 12px; right: 12px;
+    display: flex; gap: 8px; z-index: 999;
+    background: rgba(255,255,255,.95);
+    padding: 8px 10px; border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.18);
+  }
+  .toolbar button {
+    padding: 8px 14px; border: 0; border-radius: 6px;
+    background: #0d47a1; color: #fff; font: 600 12px Arial, sans-serif; cursor: pointer;
+  }
+  .toolbar button.sec { background: #fff; color: #0d47a1; border: 1px solid #0d47a1; }
+  .toolbar button:hover { opacity: .92; }
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <button onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
+  <button class="sec" onclick="window.close()">Cerrar</button>
+</div>
+
+<!-- ══════════ PÁGINA 1 · CARÁTULA + IDENTIFICACIÓN ══════════ -->
+<section class="report-page">
+  <div class="cover-block">
+    <div class="meta">CARIBEMAR DE LA COSTA S.A.S E.S.P · AFINIA Grupo EPM</div>
+    <h1>Informe técnico de selección ONAF</h1>
+    <div class="proj">${escaparHtml(proyecto)}</div>
+    <div class="ref">
+      <strong>Generado:</strong> ${fechaIso} · ${horaIso}<br>
+      <strong>Normativas:</strong> IEEE C57.12.00-2015 · ANSI C57.12.91 · IEEE C57.91-2011 · Westinghouse T&amp;D Reference
+    </div>
+  </div>
+
+  <h2>Identificación del transformador</h2>
+  <table class="rpt-table">
+    <tbody>
+      <tr><th>Matrícula</th><td><strong>${escaparHtml(matricula)}</strong></td></tr>
+      <tr><th>Serie</th><td>${escaparHtml(t.serie)}</td></tr>
+      <tr><th>Subestación</th><td>${escaparHtml(t.sub)}</td></tr>
+      <tr><th>Zona</th><td>${escaparHtml(t.zona)}</td></tr>
+      <tr><th>Departamento</th><td>${escaparHtml(t.dept)}</td></tr>
+      <tr><th>Grupo</th><td>${escaparHtml(t.grupo)}</td></tr>
+      <tr><th>Potencia placa</th><td>${escaparHtml(t.kva)}</td></tr>
+      <tr><th>Refrigeración actual</th><td>${escaparHtml(t.refrig)}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Parámetros del cálculo</h2>
+  <table class="rpt-table">
+    <tbody>
+      <tr><th>Potencia ONAN base</th><td class="mono">${formatearNumero(r.onan)} kVA</td></tr>
+      <tr><th>Potencia ONAF objetivo</th><td class="mono">${formatearNumero(r.onaf)} kVA</td></tr>
+      <tr><th>Δ Potencia adicional</th><td class="mono">${formatearNumero(r.delta)} kVA</td></tr>
+      <tr><th>Factor ONAF/ONAN</th><td class="mono">${getPct().toFixed(1)} %</td></tr>
+      <tr><th>Pendiente Westinghouse</th><td class="mono">${r.pendiente.toFixed(3)} CFM/kVA</td></tr>
+      <tr><th>Altitud</th><td class="mono">${getAlt()} m s.n.m.</td></tr>
+      <tr><th>Factor corrección densidad ISA</th><td class="mono">${r.factor_altitud.toFixed(4)}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="l">ONAN</div><div class="v">${formatearNumero(r.onan)} kVA</div></div>
+    <div class="kpi-card"><div class="l">ONAF</div><div class="v">${formatearNumero(r.onaf)} kVA</div></div>
+    <div class="kpi-card"><div class="l">Δ Potencia</div><div class="v">${formatearNumero(r.delta)} kVA</div></div>
+    <div class="kpi-card cfm"><div class="l">CFM nivel mar</div><div class="v">${formatearNumero(r.cfm_nivel_mar)}</div></div>
+    <div class="kpi-card alt"><div class="l">CFM altitud</div><div class="v">${formatearNumero(r.cfm_corregido)}</div></div>
+  </div>
+
+  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+</section>
+
+<!-- ══════════ PÁGINA 2 · GRÁFICO COMPLETO ══════════ -->
+<section class="report-page">
+  <h2>Curvas de enfriamiento adicional ONAF — flujo de aire requerido</h2>
+  <p class="meta">Punto de operación: <strong class="mono">${(r.onan / 1000).toFixed(1)} MVA · ${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · pendiente Westinghouse <strong class="mono">${r.pendiente.toFixed(3)} CFM/kVA</strong> al ${getPct().toFixed(1)} %.</p>
+  <div class="chart-page-wrap">
+    ${chartImg
+      ? `<img class="chart-img" src="${chartImg}" alt="Curvas de enfriamiento ONAF">`
+      : `<div style="padding:40pt;text-align:center;color:#888;font-style:italic">Gráfico no disponible (Chart.js no se cargó). Reintente desde la calculadora con conexión activa.</div>`}
+  </div>
+  <div class="info-box">
+    <strong>Lectura del gráfico:</strong> los segmentos rojos punteados indican la
+    proyección del punto de operación sobre los ejes — potencia ONAN y CFM
+    requerido al nivel de mar. Las cuatro curvas fijas (115 / 125 / 133 / 166 %)
+    son los pares calibrados Westinghouse T&amp;D Reference. La curva oscura es la
+    interpolación lineal al porcentaje seleccionado.
+  </div>
+  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+</section>
+
+<!-- ══════════ PÁGINA 3 · DATOS MECÁNICOS Y VENTILADOR ══════════ -->
+<section class="report-page">
+  <h2>Datos mecánicos del cuerpo de radiador</h2>
+  <table class="rpt-table">
+    <tbody>
+      <tr><th>A — Altura del cuerpo (mm)</th><td class="mono">${escaparHtml(rad.A)}</td></tr>
+      <tr><th>B — Distancia oblea inicial–final (mm)</th><td class="mono">${escaparHtml(rad.B)}</td></tr>
+      <tr><th>C — Ancho de frente (mm)</th><td class="mono">${escaparHtml(rad.C)}</td></tr>
+      <tr><th>D — Distancia entre tornillos del flanche (mm)</th><td class="mono">${escaparHtml(rad.D)}</td></tr>
+      <tr><th>Cantidad de radiadores</th><td class="mono">${escaparHtml(rad.cant)}</td></tr>
+      <tr><th>Obleas por radiador</th><td class="mono">${escaparHtml(rad.obleas)}</td></tr>
+      <tr><th>Disposición mecánica del ventilador</th><td>${escaparHtml(disp)}</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Datos del motoventilador</h2>
+  <table class="rpt-table">
+    <tbody>
+      <tr><th>Marca</th><td>${escaparHtml(fan.marca)}</td></tr>
+      <tr><th>Modelo / Referencia</th><td>${escaparHtml(fan.modelo)}</td></tr>
+      <tr><th>Diámetro nominal (mm)</th><td class="mono">${escaparHtml(fan.diam)}</td></tr>
+      <tr><th>RPM nominal</th><td class="mono">${escaparHtml(fan.rpm)}</td></tr>
+      <tr><th>CFM nominal (ft³/min)</th><td class="mono">${escaparHtml(fan.cfm_nom)}</td></tr>
+      <tr><th>Frecuencia</th><td class="mono">${escaparHtml(fan.hz)} Hz</td></tr>
+      <tr><th>Potencia absorbida P₁</th><td class="mono">${escaparHtml(fan.kw)} W</td></tr>
+      <tr><th>Corriente nominal</th><td class="mono">${escaparHtml(fan.amp)}</td></tr>
+      <tr><th>Grado de protección</th><td>${escaparHtml(fan.ip)}</td></tr>
+    </tbody>
+  </table>
+
+  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+</section>
+
+<!-- ══════════ PÁGINA 4 · CALCULADOR DE VENTILADORES ══════════ -->
+<section class="report-page">
+  <h2>Selección de motoventiladores · N = ⌈ CFM<sub>total</sub> / CFM<sub>fan</sub> ⌉</h2>
+  <p class="meta">CFM requerido a nivel del mar: <strong class="mono">${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · CFM corregido por altitud (${getAlt()} m): <strong class="mono">${formatearNumero(r.cfm_corregido)} CFM</strong></p>
+  <table class="ft">
+    <thead>
+      <tr>
+        <th class="tc" style="width:30px">#</th>
+        <th>Descripción / modelo</th>
+        <th class="tr" style="width:90px">CFM/fan</th>
+        <th class="tc" style="width:65px">Unidades</th>
+        <th class="tr" style="width:90px">CFM logrado</th>
+        <th class="tr" style="width:70px">Cobertura</th>
+        <th class="tc" style="width:40px">OK</th>
+      </tr>
+    </thead>
+    <tbody>${fansRows}</tbody>
+  </table>
+
+  <h2>Protección eléctrica</h2>
+  ${protBlock}
+
+  <div class="info-box" style="margin-top:14pt">
+    Documento generado automáticamente por SGM · TRANSPOWER. La validación
+    final del diseño debe ser revisada por el ingeniero responsable conforme
+    a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
+  </div>
+
+  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+</section>
+
+<script>
+  // Auto-print una vez que las imágenes hayan cargado.
+  window.addEventListener('load', () => {
+    let pending = document.images.length;
+    if (pending === 0) { setTimeout(() => window.print(), 250); return; }
+    for (const img of document.images) {
+      if (img.complete) pending--; else img.addEventListener('load', () => { pending--; if (pending === 0) setTimeout(() => window.print(), 250); }, { once: true });
+      img.addEventListener('error', () => { pending--; if (pending === 0) setTimeout(() => window.print(), 250); }, { once: true });
+    }
+    if (pending === 0) setTimeout(() => window.print(), 250);
+  });
+</script>
+
+</body>
+</html>`;
+
+    win.document.open();
+    win.document.write(html);
+    win.document.close();
+  } catch (err) {
+    console.error('[informe] generación falló:', err);
+    alert('No se pudo generar el informe. Detalle: ' + (err && err.message || err));
+  }
 }
 
 /* ─── Cableado de eventos ───────────────────────────────────── */
