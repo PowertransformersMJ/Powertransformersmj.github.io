@@ -1096,15 +1096,14 @@ function generateReport() {
 <base href="${cssBase}">
 <style>
   /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
-  /* @page margin = 0: header/footer ocupan toda la hoja vía
-     thead/tfoot. Método bulletproof multi-navegador (Chrome/
-     Firefox/Safari/Edge): el navegador repite automáticamente
-     <thead> y <tfoot> en cada hoja impresa sin importar cuántas
-     páginas atraviese el documento. Imposible que el cuerpo
-     quede encima del header o se corte ambiguamente. */
-  @page { size: letter portrait; margin: 0; }
-
-  * { box-sizing: border-box; }
+  /* @page sin márgenes — el patrón thead/tfoot del envoltorio
+     .afinia-page provee header/footer en CADA hoja impresa. Los
+     márgenes laterales del contenido se controlan con padding del
+     <td class="report-body">. */
+  @page {
+    size: letter portrait;
+    margin: 0;
+  }
   html, body {
     margin: 0; padding: 0;
     background: #fff;
@@ -1114,52 +1113,43 @@ function generateReport() {
     print-color-adjust: exact;
   }
 
-  /* ── Tabla maestra · una sola por documento ──────────────── */
-  table.report-doc {
-    width: 8.5in; margin: 0 auto;
+  /* ── HEADER + FOOTER se repiten en CADA hoja vía thead/tfoot ──
+     El navegador (Chrome/Edge/Firefox/Safari) imprime automática-
+     mente el contenido de <thead> al inicio de cada página y el
+     de <tfoot> al final, gracias al modo de tabla. Esto es el
+     mecanismo más robusto cross-browser para encabezados/pies
+     repetidos en CSS Paged Media. */
+  table.afinia-page {
+    width: 100%;
     border-collapse: collapse;
-    table-layout: fixed;
-    background: #fff;
+    margin: 0; padding: 0;
   }
-
-  /* ── Header repetido en cada hoja ───────────────────────── */
-  table.report-doc thead { display: table-header-group; }
-  table.report-doc thead td.page-header-cell {
-    height: 1.55in;
-    padding: 0; vertical-align: top;
+  table.afinia-page > thead { display: table-header-group; }
+  table.afinia-page > tfoot { display: table-footer-group; }
+  table.afinia-page > thead > tr > td,
+  table.afinia-page > tfoot > tr > td,
+  table.afinia-page > tbody > tr > td {
+    padding: 0; margin: 0; border: 0;
   }
-  .page-header {
-    width: 100%; height: 1.50in;
-    background: url("${headerImg}") no-repeat top center;
-    background-size: 100% 100%;
+  .afinia-header-img,
+  .afinia-footer-img {
+    display: block;
+    width: 100%;
+    height: auto;
   }
-
-  /* ── Footer repetido en cada hoja ───────────────────────── */
-  table.report-doc tfoot { display: table-footer-group; }
-  table.report-doc tfoot td.page-footer-cell {
-    height: 1.20in;
-    padding: 0; vertical-align: bottom;
-  }
-  .page-footer {
-    position: relative;
-    width: 100%; height: 1.20in;
-  }
-  .page-footer .ribbon {
-    position: absolute; left: 0; right: 0; bottom: 0;
-    height: 0.85in;
-    background: url("${footerImg}") no-repeat bottom center;
-    background-size: 100% 100%;
-  }
-  .page-footer .footer-text {
-    position: absolute; left: 5%; right: 5%; bottom: 0.18in;
-    text-align: center; font-size: 7.5pt; color: #fff;
+  .afinia-footer { position: relative; width: 100%; }
+  .afinia-footer .footer-text {
+    position: absolute;
+    left: 6%; right: 6%; bottom: 12%;
+    text-align: center;
+    font-size: 7.5pt; color: #fff;
     font-weight: 600; letter-spacing: .01em;
     line-height: 1.2;
   }
-
-  /* ── Cuerpo del informe (única celda del tbody) ─────────── */
-  table.report-doc tbody td.body-cell {
-    padding: 0.10in 1.18in;
+  /* El cuerpo conserva los márgenes laterales del Formato Afinia
+     (1.18in = 3 cm aprox., conforme pgMar del docx oficial). */
+  td.report-body {
+    padding: 0.30in 1.18in 0.20in;
     vertical-align: top;
   }
 
@@ -1306,13 +1296,20 @@ function generateReport() {
   /* ── SCREEN preview vs PRINT ───────────────────────────────── */
   @media screen {
     body { background: #888; padding: 24px 0; }
-    table.report-doc {
+    table.afinia-page {
+      width: 8.5in;
+      margin: 0 auto;
+      background: #fff;
       box-shadow: 0 4px 18px rgba(0,0,0,.18);
     }
   }
+
   @media print {
     body { background: #fff; }
-    table.report-doc { box-shadow: none; }
+    table.afinia-page {
+      width: 100%;
+      box-shadow: none;
+    }
     .no-print { display: none !important; }
   }
 
@@ -1338,25 +1335,20 @@ function generateReport() {
   <button class="sec" onclick="window.close()">Cerrar</button>
 </div>
 
-<!-- Tabla maestra · thead+tfoot se repiten en cada hoja impresa
-     (técnica reliable cross-navegador para informes paginados). -->
-<table class="report-doc">
+<!-- ENVOLTORIO AFINIA · header en <thead> + footer en <tfoot>.
+     Por especificación CSS Tables, el navegador repite thead al
+     inicio y tfoot al final de CADA página impresa. Es el patrón
+     más robusto cross-browser para "running headers" en print. -->
+<table class="afinia-page" role="presentation">
   <thead>
-    <tr><td class="page-header-cell">
-      <div class="page-header" aria-hidden="true"></div>
+    <tr><td>
+      <img class="afinia-header-img" src="${headerImg}" alt="Encabezado oficial CaribeMar de la Costa S.A.S E.S.P. - AFINIA Grupo EPM">
     </td></tr>
   </thead>
-  <tfoot>
-    <tr><td class="page-footer-cell">
-      <div class="page-footer" aria-hidden="true">
-        <div class="ribbon"></div>
-        <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
-      </div>
-    </td></tr>
-  </tfoot>
   <tbody>
-    <tr><td class="body-cell">
-      <article class="report">
+    <tr><td class="report-body">
+
+<article class="report">
 
   <!-- ── CARÁTULA ───────────────────────────────────────── -->
   <div class="cover-block">
@@ -1573,9 +1565,18 @@ function generateReport() {
     a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
   </div>
 
-      </article>
+</article>
+
     </td></tr>
   </tbody>
+  <tfoot>
+    <tr><td>
+      <div class="afinia-footer" aria-hidden="true">
+        <img class="afinia-footer-img" src="${footerImg}" alt="">
+        <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+      </div>
+    </td></tr>
+  </tfoot>
 </table>
 
 <script>
