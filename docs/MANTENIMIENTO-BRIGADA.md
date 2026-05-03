@@ -148,6 +148,48 @@ Funciones puras sin DOM ni I/O · 100% testeable con `node --test`.
 | `formatearNumero(v)` | `number → string` | Formato es-CO entero |
 | `escaparHtml(s)` | `string → string` | Escape básico para innerHTML |
 
+### 4.3 Mix multi-modelo de ventiladores (2026-05-03)
+
+A partir del refactor del 2026-05-03 el dominio acepta combinar
+modelos heterogéneos en el mismo transformador (caso real de
+campo: 4 × FN-050 + 8 × FN-063 + 12 × KRENZ F20 alimentando un
+transformador 24 MVA). Tres funciones puras nuevas y la constante
+`MIX_ESTADO`:
+
+| Función | Firma | Devuelve |
+|---|---|---|
+| `evaluarMixVentiladores({items, cfm_requerido})` | `({Array<{key, modelo, marca, cfm_unitario, cantidad}>, number}) → object` | `{items[], cfm_aporte_total, deficit, exceso, cobertura_pct, n_unidades_total, aprobado, estado, mensaje}` |
+| `sugerirMejoras({items, cfm_requerido, fan_db, max_sugerencias?})` | `({…, Record<string, FichaFan>, number?}) → Array<Sugerencia>` | Sugerencias ordenadas por menor exceso. Estrategias: `agregar_unidades`, `sustituir`, `agregar_modelo`. |
+| `calcularProteccionMix({items, factor_seguridad?})` | `({Array<{key, modelo, marca, cantidad, amps_unitario, kw_unitario?, peso_unitario?}>, number?}) → object` | `{grupos[], n_total, amps_totales, amps_min_breaker, kw_totales, peso_total, breaker, aux_breaker}` |
+
+`MIX_ESTADO`: `'aprobado' | 'no_aprobado' | 'sin_datos'`.
+
+**Reglas de validación del mix:**
+
+- Estado APROBADO: `cfm_aporte_total ≥ cfm_requerido`.
+- Estado NO_APROBADO: hay items con cantidad y CFM > 0 pero la
+  suma no cubre el requerido. Reporta `deficit` exacto.
+- Estado SIN_DATOS: mix vacío, todas las cantidades en 0, o
+  `cfm_requerido` no positivo.
+
+**Protección eléctrica con mix heterogéneo:** cada modelo lleva
+su propio guardamotor MS116 dimensionado a la corriente unitaria
+del modelo (no del total), y el sistema completo lleva **un único
+breaker principal S203** dimensionado a la corriente total con
+factor de seguridad NEC 430 ×1.25.
+
+**Motor de sugerencias** (3 estrategias, orden por menor exceso):
+
+1. `agregar_unidades` · agrega N extra del modelo más eficiente
+   ya en el mix.
+2. `sustituir` · cambia el modelo más débil por otro mayor del
+   catálogo manteniendo la cantidad.
+3. `agregar_modelo` · agrega N unidades de un modelo nuevo del
+   catálogo (no presente en el mix actual).
+
+Cada sugerencia retorna `cambios[]` con `{accion, key, modelo,
+marca, cantidad, cfm_unitario}` listo para aplicar al estado UI.
+
 ---
 
 ## 5. Casos golden (regresión numérica)
