@@ -974,10 +974,14 @@ function generateReport() {
             ${_row('Potencia eléctrica total absorbida', kwTot + ' kW', true)}
             ${kvaTot ? _row('Potencia aparente total (S = P/cos φ)', kvaTot + ' kVA', true) : ''}
             ${_row('Peso total motoventiladores', pesoTot + ' kg', true)}
-            ${_row('Guardamotor sugerido', p.guardamotor ? `ABB ${p.guardamotor.model} · PID ${p.guardamotor.pid} · setting ${iF.toFixed(2)} A` : 'Fuera de catálogo MS116')}
-            ${_row('Breaker principal sugerido', p.breaker ? `ABB ${p.breaker.model} · ${p.breaker.in} A · PID ${p.breaker.pid} · pérdidas ${p.breaker.power_w} W` : 'Excede catálogo S203 (50 A) — consultar familia superior')}
-            ${_row('Auxiliar guardamotor (SCADA)', `ABB ${p.aux_guardamotor.model} · PID ${p.aux_guardamotor.pid}`)}
-            ${_row('Auxiliar breaker (SCADA)', `ABB ${p.aux_breaker.model} · PID ${p.aux_breaker.pid}`)}
+            ${_row('Cantidad guardamotores',         nF + ' unidades', true)}
+            ${_row('Guardamotor sugerido',            p.guardamotor ? `${nF} × ABB ${p.guardamotor.model} · PID ${p.guardamotor.pid} · setting ${iF.toFixed(2)} A` : 'Fuera de catálogo MS116')}
+            ${_row('Cantidad breakers principales',   '1 unidad', true)}
+            ${_row('Breaker principal sugerido',      p.breaker ? `1 × ABB ${p.breaker.model} · ${p.breaker.in} A · PID ${p.breaker.pid} · pérdidas ${p.breaker.power_w} W` : 'Excede catálogo S203 (50 A) — consultar familia superior')}
+            ${_row('Cantidad auxiliares guardamotor', nF + ' unidades', true)}
+            ${_row('Auxiliar guardamotor (SCADA)',    `${nF} × ABB ${p.aux_guardamotor.model} · PID ${p.aux_guardamotor.pid}`)}
+            ${_row('Cantidad auxiliares breaker',     '1 unidad', true)}
+            ${_row('Auxiliar breaker (SCADA)',        `1 × ABB ${p.aux_breaker.model} · PID ${p.aux_breaker.pid}`)}
           </tbody>
         </table>`;
       // Lista de materiales con cantidades y PIDs
@@ -1247,11 +1251,15 @@ function generateReport() {
   .ft td { padding: 4pt 6pt; border-bottom: 1px solid #e0e8f3; font-size: 7.8pt; vertical-align: top; }
   .ft tr:nth-child(even) td { background: #f8fbff; }
 
-  /* Bloque firma · Elaborado/Aprobado */
+  /* Bloque firma · Elaborado/Aprobado · formato etiqueta/valor lineal */
   .firma-block { margin-top: 14pt; }
-  .firma-table { width: 100%; border-collapse: collapse; margin: 4pt 0 12pt; }
-  .firma-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 7.5pt; padding: 4pt 6pt; width: 24%; }
-  .firma-table td { padding: 4pt 6pt; font-size: 8pt; border-bottom: 1px solid #d8e3f0; }
+  .firma-data { margin: 6pt 0 12pt; }
+  .firma-pair { margin-bottom: 6pt; }
+  .firma-key {
+    font-size: 7.5pt; font-weight: 700; color: #0d3a73;
+    text-transform: uppercase; letter-spacing: .04em; line-height: 1.2;
+  }
+  .firma-val { font-size: 9pt; color: #1a1a1a; line-height: 1.3; margin-top: 1pt; }
   .firma-block-img { margin-top: 12pt; max-width: 3in; }
   .firma-img { display: block; max-width: 2.5in; max-height: 0.75in; margin-bottom: 2pt; }
   .firma-line-under { width: 2.5in; border-top: 1px solid #1a1a1a; }
@@ -1589,13 +1597,11 @@ function generateReport() {
   <!-- ── FIRMAS · ELABORADO/APROBADO ─────────────────────── -->
   <section class="section-anchor firma-block">
     <h2>11. Elaborado / Aprobado</h2>
-    <table class="firma-table">
-      <tbody>
-        <tr><th>Nombre</th><td>Ing. Miguel Jimenez</td></tr>
-        <tr><th>Cargo</th><td>Líder de Transformadores de Potencia AFINIA</td></tr>
-        <tr><th>Unidad</th><td>Mantenimiento Red Alta Tensión</td></tr>
-      </tbody>
-    </table>
+    <div class="firma-data">
+      <div class="firma-pair"><div class="firma-key">Elaborado / Aprobado</div><div class="firma-val">Ing. Miguel Jimenez</div></div>
+      <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Líder de Transformadores de Potencia AFINIA</div></div>
+      <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Mantenimiento Red Alta Tensión</div></div>
+    </div>
     <div class="firma-block-img">
       <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
       <div class="firma-line-under"></div>
