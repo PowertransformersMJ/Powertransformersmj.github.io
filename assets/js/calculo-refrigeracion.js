@@ -974,10 +974,14 @@ function generateReport() {
             ${_row('Potencia eléctrica total absorbida', kwTot + ' kW', true)}
             ${kvaTot ? _row('Potencia aparente total (S = P/cos φ)', kvaTot + ' kVA', true) : ''}
             ${_row('Peso total motoventiladores', pesoTot + ' kg', true)}
-            ${_row('Guardamotor sugerido', p.guardamotor ? `ABB ${p.guardamotor.model} · PID ${p.guardamotor.pid} · setting ${iF.toFixed(2)} A` : 'Fuera de catálogo MS116')}
-            ${_row('Breaker principal sugerido', p.breaker ? `ABB ${p.breaker.model} · ${p.breaker.in} A · PID ${p.breaker.pid} · pérdidas ${p.breaker.power_w} W` : 'Excede catálogo S203 (50 A) — consultar familia superior')}
-            ${_row('Auxiliar guardamotor (SCADA)', `ABB ${p.aux_guardamotor.model} · PID ${p.aux_guardamotor.pid}`)}
-            ${_row('Auxiliar breaker (SCADA)', `ABB ${p.aux_breaker.model} · PID ${p.aux_breaker.pid}`)}
+            ${_row('Cantidad guardamotores',         nF + ' unidades', true)}
+            ${_row('Guardamotor sugerido',            p.guardamotor ? `${nF} × ABB ${p.guardamotor.model} · PID ${p.guardamotor.pid} · setting ${iF.toFixed(2)} A` : 'Fuera de catálogo MS116')}
+            ${_row('Cantidad breakers principales',   '1 unidad', true)}
+            ${_row('Breaker principal sugerido',      p.breaker ? `1 × ABB ${p.breaker.model} · ${p.breaker.in} A · PID ${p.breaker.pid} · pérdidas ${p.breaker.power_w} W` : 'Excede catálogo S203 (50 A) — consultar familia superior')}
+            ${_row('Cantidad auxiliares guardamotor', nF + ' unidades', true)}
+            ${_row('Auxiliar guardamotor (SCADA)',    `${nF} × ABB ${p.aux_guardamotor.model} · PID ${p.aux_guardamotor.pid}`)}
+            ${_row('Cantidad auxiliares breaker',     '1 unidad', true)}
+            ${_row('Auxiliar breaker (SCADA)',        `1 × ABB ${p.aux_breaker.model} · PID ${p.aux_breaker.pid}`)}
           </tbody>
         </table>`;
       // Lista de materiales con cantidades y PIDs
@@ -1247,11 +1251,15 @@ function generateReport() {
   .ft td { padding: 4pt 6pt; border-bottom: 1px solid #e0e8f3; font-size: 7.8pt; vertical-align: top; }
   .ft tr:nth-child(even) td { background: #f8fbff; }
 
-  /* Bloque firma · Elaborado/Aprobado */
+  /* Bloque firma · Elaborado/Aprobado · formato etiqueta/valor lineal */
   .firma-block { margin-top: 14pt; }
-  .firma-table { width: 100%; border-collapse: collapse; margin: 4pt 0 12pt; }
-  .firma-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 7.5pt; padding: 4pt 6pt; width: 24%; }
-  .firma-table td { padding: 4pt 6pt; font-size: 8pt; border-bottom: 1px solid #d8e3f0; }
+  .firma-data { margin: 6pt 0 12pt; }
+  .firma-pair { margin-bottom: 6pt; }
+  .firma-key {
+    font-size: 7.5pt; font-weight: 700; color: #0d3a73;
+    text-transform: uppercase; letter-spacing: .04em; line-height: 1.2;
+  }
+  .firma-val { font-size: 9pt; color: #1a1a1a; line-height: 1.3; margin-top: 1pt; }
   .firma-block-img { margin-top: 12pt; max-width: 3in; }
   .firma-img { display: block; max-width: 2.5in; max-height: 0.75in; margin-bottom: 2pt; }
   .firma-line-under { width: 2.5in; border-top: 1px solid #1a1a1a; }
@@ -1430,7 +1438,7 @@ function generateReport() {
   </div>
 
   <!-- ── 3 · CURVAS WESTINGHOUSE ────────────────────────── -->
-  <section class="section-anchor">
+  <section class="section-anchor start-new-page">
     <h2>3. Curvas de enfriamiento adicional ONAF</h2>
     <p class="meta">Punto de operación: <strong class="mono">${(r.onan / 1000).toFixed(1)} MVA · ${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · pendiente Westinghouse <strong class="mono">${r.pendiente.toFixed(3)} CFM/kVA</strong> al ${getPct().toFixed(1)} %.</p>
   </section>
@@ -1589,25 +1597,17 @@ function generateReport() {
   <!-- ── FIRMAS · ELABORADO/APROBADO ─────────────────────── -->
   <section class="section-anchor firma-block">
     <h2>11. Elaborado / Aprobado</h2>
-    <table class="firma-table">
-      <tbody>
-        <tr><th>Nombre</th><td>Ing. Miguel Jimenez</td></tr>
-        <tr><th>Cargo</th><td>Líder de Transformadores de Potencia AFINIA</td></tr>
-        <tr><th>Unidad</th><td>Mantenimiento Red Alta Tensión</td></tr>
-      </tbody>
-    </table>
+    <div class="firma-data">
+      <div class="firma-pair"><div class="firma-key">Elaborado / Aprobado</div><div class="firma-val">Ing. Miguel Jimenez</div></div>
+      <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Líder de Transformadores de Potencia AFINIA</div></div>
+      <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Mantenimiento Red Alta Tensión</div></div>
+    </div>
     <div class="firma-block-img">
       <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
       <div class="firma-line-under"></div>
       <div class="firma-cap">Firma</div>
     </div>
   </section>
-
-  <div class="info-box" style="margin-top:12pt">
-    Documento generado automáticamente por SGM · TRANSPOWER. La validación
-    final del diseño debe ser revisada por el ingeniero responsable conforme
-    a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
-  </div>
 
 </article>
 </div>
@@ -1626,58 +1626,95 @@ function generateReport() {
   // del informe se mueve un bloque a la vez al sheet-content del
   // sheet actual; cuando el contenido excede el alto disponible,
   // el bloque pasa a una nueva hoja.
-  (function paginate() {
+  //
+  // CRITICO: la paginacion se ejecuta DESPUES de que todas las
+  // imagenes hayan cargado, porque scrollHeight subestima el alto
+  // del contenido cuando los <img> aun no tienen su altura natural,
+  // lo que provocaria que tablas y bloques se "metan" en una hoja
+  // donde no caben y queden recortados por overflow:hidden.
+  (function () {
     const HEADER_HTML = ${JSON.stringify(`<img class="afinia-header-img" src="${headerImg}" alt="">`)};
     const FOOTER_HTML = ${JSON.stringify(`<img class="afinia-footer-img" src="${footerImg}" alt=""><div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>`)};
 
-    const buffer = document.querySelector('.report-buffer');
-    const out = document.querySelector('.report-paginated');
-    if (!buffer || !out) return;
-
-    function newSheet() {
-      const s = document.createElement('div');
-      s.className = 'sheet';
-      s.innerHTML =
-        '<div class="sheet-header">' + HEADER_HTML + '</div>' +
-        '<div class="sheet-content"></div>' +
-        '<div class="sheet-footer">' + FOOTER_HTML + '</div>';
-      out.appendChild(s);
-      return s.querySelector('.sheet-content');
-    }
-    function fits(content) {
-      return content.scrollHeight <= content.clientHeight;
+    function waitImages(root) {
+      const imgs = Array.from(root.querySelectorAll('img'));
+      return Promise.all(imgs.map(img => {
+        if (img.complete && img.naturalHeight > 0) return Promise.resolve();
+        return new Promise(res => {
+          img.addEventListener('load', res, { once: true });
+          img.addEventListener('error', res, { once: true });
+          // Failsafe timeout 5s
+          setTimeout(res, 5000);
+        });
+      }));
     }
 
-    // Aplanar children del article en bloques de primer nivel
-    const article = buffer.querySelector('.report');
-    const blocks = Array.from(article.children);
-    let content = newSheet();
+    function paginate() {
+      const buffer = document.querySelector('.report-buffer');
+      const out = document.querySelector('.report-paginated');
+      if (!buffer || !out) return;
 
-    for (const block of blocks) {
-      content.appendChild(block);
-      if (!fits(content)) {
-        // Mover este block a una nueva hoja
-        content.removeChild(block);
-        content = newSheet();
-        content.appendChild(block);
-        // Si SIGUE sin caber (bloque solo es mas alto que la hoja),
-        // se queda igual y el navegador lo recorta. Para el informe
-        // AFINIA ningun bloque excede una hoja completa por diseno.
+      function newSheet() {
+        const s = document.createElement('div');
+        s.className = 'sheet';
+        s.innerHTML =
+          '<div class="sheet-header">' + HEADER_HTML + '</div>' +
+          '<div class="sheet-content"></div>' +
+          '<div class="sheet-footer">' + FOOTER_HTML + '</div>';
+        out.appendChild(s);
+        return s.querySelector('.sheet-content');
       }
-    }
-    // Limpiar buffer
-    buffer.remove();
+      function fits(content) {
+        return content.scrollHeight <= content.clientHeight;
+      }
+      // Detecta si un bloque es un h2/h3 huerfano: una <section> que
+      // solo contiene el titulo + parrafo meta corto (sin tabla,
+      // formula, KPI ni info-box). Si la hoja actual termina en uno
+      // de estos al hacer overflow, lo movemos a la siguiente hoja.
+      function isOrphanTitleBlock(el) {
+        if (!el || !el.classList) return false;
+        if (!el.classList.contains('section-anchor')) return false;
+        const heavy = el.querySelector('table, .formula-box, .rpt-table, .ft, .kpi-grid, .chart-block, .rad-diagram, .info-box, .estado, .materiales');
+        return heavy === null;
+      }
 
-    // Cargar imagenes y luego imprimir
-    let pending = document.images.length;
-    function go() { setTimeout(() => window.print(), 250); }
-    if (pending === 0) { go(); return; }
-    for (const img of document.images) {
-      if (img.complete) { pending--; if (pending === 0) go(); }
-      else img.addEventListener('load', () => { pending--; if (pending === 0) go(); }, { once: true });
-      img.addEventListener('error', () => { pending--; if (pending === 0) go(); }, { once: true });
+      const article = buffer.querySelector('.report');
+      const blocks = Array.from(article.children);
+      let content = newSheet();
+
+      for (const block of blocks) {
+        // Si el bloque pide forzar nueva hoja antes y la hoja actual
+        // ya tiene contenido, cerramos esta hoja y empezamos otra.
+        const forceBreak = block.classList && block.classList.contains('start-new-page');
+        if (forceBreak && content.children.length > 0) {
+          content = newSheet();
+        }
+        content.appendChild(block);
+        if (!fits(content)) {
+          // Mover este bloque a una nueva hoja
+          content.removeChild(block);
+          // Si la hoja actual termina con un titulo huerfano (h2 sin
+          // contenido pesado siguiente), tambien lo movemos para
+          // evitar dejarlo solo al pie de pagina.
+          const last = content.lastElementChild;
+          const carryOver = isOrphanTitleBlock(last) ? last : null;
+          if (carryOver) content.removeChild(carryOver);
+          content = newSheet();
+          if (carryOver) content.appendChild(carryOver);
+          content.appendChild(block);
+        }
+      }
+      buffer.remove();
     }
-    if (pending === 0) go();
+
+    // Esperar imagenes (header, footer, diagrama radiador, firma,
+    // grafica chart-img) ANTES de paginar. Si paginamos antes, las
+    // alturas son subestimadas y los bloques se traslapan dentro de
+    // una sola hoja, recortando contenido por overflow:hidden.
+    waitImages(document.body).then(() => {
+      paginate();
+      setTimeout(() => window.print(), 250);
+    });
   })();
 </script>
 
