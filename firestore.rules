@@ -616,6 +616,38 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // ── /acciones_refrigeracion/{id} ──
+    // Acciones de mantenimiento del sistema de refrigeración
+    // generadas desde el módulo Mantenimiento Brigada (Selección
+    // ONAF · mix multi-modelo). Cada documento es un snapshot
+    // completo del cálculo + datos del responsable + estado del
+    // workflow. Lectura por todo el equipo; creación / update /
+    // delete por admin (los brigadistas envían la acción al admin
+    // para registro en una sesión posterior). El transformador
+    // referenciado no se puede cambiar después de creado el doc.
+    match /acciones_refrigeracion/{id} {
+      allow read: if isTeamMember();
+      allow create: if isAdmin()
+                    && request.resource.data.transformador_id is string
+                    && request.resource.data.transformador_id.size() > 0
+                    && request.resource.data.matricula is string
+                    && request.resource.data.matricula.size() > 0
+                    && request.resource.data.accion_descripcion is string
+                    && request.resource.data.accion_descripcion.size() >= 10
+                    && request.resource.data.estado_accion in
+                       ['planificada', 'pendiente_aprobacion', 'aprobada', 'ejecutada', 'cancelada']
+                    && request.resource.data.mix is list
+                    && request.resource.data.mix.size() >= 1
+                    && request.resource.data.fecha_accion is string
+                    && request.resource.data.fecha_accion.size() > 0;
+      allow update: if isAdmin()
+                    && (!('estado_accion' in request.resource.data)
+                        || request.resource.data.estado_accion in
+                           ['planificada', 'pendiente_aprobacion', 'aprobada', 'ejecutada', 'cancelada'])
+                    && request.resource.data.transformador_id == resource.data.transformador_id;
+      allow delete: if isAdmin();
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

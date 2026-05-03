@@ -557,14 +557,75 @@
       <div class="fansum" id="fan-sum"></div>
     </div>
 
-    <!-- ── EXPORTAR ──────────────────────────────────────── -->
+    <!-- ── EXPORTAR / REGISTRAR ACCIÓN ─────────────────────── -->
     <div class="export-bar">
       <button type="button" class="btn-exp" id="btnExportReport">
         <i data-lucide="file-text"></i> Exportar informe técnico AFINIA
       </button>
+      <button type="button" class="btn-exp" id="btnRegistrarAccion" style="background: #2e7d32">
+        <i data-lucide="save"></i> Registrar acción de mantenimiento
+      </button>
       <button type="button" class="btn-exp-sec" id="btnPrint">
         <i data-lucide="printer"></i> Imprimir pantalla
       </button>
+    </div>
+
+    <!-- ── MODAL · Registrar acción de mantenimiento ───────── -->
+    <div id="modalAccion" class="sgm-modal" hidden role="dialog" aria-labelledby="modalAccionTitle" aria-modal="true">
+      <div class="sgm-modal-backdrop" data-modal-close></div>
+      <div class="sgm-modal-card">
+        <header class="sgm-modal-head">
+          <h2 id="modalAccionTitle">Registrar acción de mantenimiento</h2>
+          <button type="button" class="sgm-modal-x" data-modal-close aria-label="Cerrar">✕</button>
+        </header>
+        <div class="sgm-modal-body">
+          <p class="sgm-modal-meta">
+            La acción quedará persistida en la colección <code>acciones_refrigeracion</code> con un snapshot completo del cálculo (mix, evaluación, protección, BOM). Será visible en la pestaña <strong>Consolidado Sistemas de Refrigeración</strong>.
+          </p>
+
+          <div class="sgm-modal-summary" id="modalAccionResumen"></div>
+
+          <div class="fld" style="margin-top: 14px">
+            <label for="acc_descripcion">Descripción de la acción <span style="color:#c62828">*</span></label>
+            <textarea id="acc_descripcion" rows="3" placeholder="Ej.: Reemplazo de motoventiladores ZIEHL FN-063 (8 unidades) en transformador 4123XXX por degradación térmica detectada en termografía de mayo 2026. Aplicación del mix calculado con cobertura del 105%." required minlength="10"></textarea>
+            <span class="hint">Mínimo 10 caracteres · explicar qué intervención se va a hacer / se hizo</span>
+          </div>
+
+          <div class="grid3" style="margin-top: 8px">
+            <div class="fld">
+              <label for="acc_estado">Estado <span style="color:#c62828">*</span></label>
+              <select id="acc_estado" required>
+                <option value="planificada">Planificada</option>
+                <option value="pendiente_aprobacion">Pendiente de aprobación</option>
+                <option value="aprobada">Aprobada</option>
+                <option value="ejecutada">Ejecutada</option>
+              </select>
+            </div>
+            <div class="fld">
+              <label for="acc_fecha">Fecha de la acción <span style="color:#c62828">*</span></label>
+              <input type="date" id="acc_fecha" required>
+            </div>
+            <div class="fld">
+              <label for="acc_fecha_ej">Fecha de ejecución</label>
+              <input type="date" id="acc_fecha_ej">
+              <span class="hint">Solo si ya se ejecutó</span>
+            </div>
+          </div>
+
+          <div class="fld" style="margin-top: 8px">
+            <label for="acc_observaciones">Observaciones adicionales</label>
+            <textarea id="acc_observaciones" rows="2" placeholder="Notas técnicas, riesgos, autorización, etc."></textarea>
+          </div>
+
+          <div id="acc_status" class="sgm-modal-status" aria-live="polite"></div>
+        </div>
+        <footer class="sgm-modal-foot">
+          <button type="button" class="btn-exp-sec" data-modal-close>Cancelar</button>
+          <button type="button" class="btn-exp" id="btnGuardarAccion" style="background: #2e7d32">
+            <i data-lucide="check"></i> Guardar acción
+          </button>
+        </footer>
+      </div>
     </div>
 
     <div class="foot">

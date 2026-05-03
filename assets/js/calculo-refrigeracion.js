@@ -1053,6 +1053,168 @@ function radiadorDiagramSVG() {
   </svg>`;
 }
 
+/* ─── Modal "Registrar acción de mantenimiento" ─────────────── */
+//
+// Abre un modal que captura una descripción + estado + fechas, y
+// persiste un snapshot completo del cálculo en la colección
+// `acciones_refrigeracion` de Firestore. La pestaña "Consolidado
+// Sistemas de Refrigeración" suscribe a esa colección y refleja
+// la acción inmediatamente vía onSnapshot.
+
+function openModalAccion() {
+  const modal = $('modalAccion');
+  if (!modal) return;
+  if (state.mix.length === 0) {
+    alert('Agregue al menos un modelo al mix antes de registrar la acción.');
+    return;
+  }
+  // Pre-llenado: fecha de hoy + resumen del mix
+  const hoy = new Date().toISOString().slice(0, 10);
+  $('acc_fecha').value = hoy;
+  $('acc_estado').value = 'planificada';
+  $('acc_descripcion').value = '';
+  $('acc_observaciones').value = '';
+  $('acc_fecha_ej').value = '';
+  $('acc_status').textContent = '';
+  $('acc_status').className = 'sgm-modal-status';
+
+  // Resumen del cálculo
+  const resumen = $('modalAccionResumen');
+  if (resumen && state.lastEval) {
+    const ev = state.lastEval;
+    const matricula = (_val('mat_input').trim()) || '—';
+    const sub = _val('t_sub') || '—';
+    const aprobado = ev.aprobado;
+    resumen.innerHTML = `
+      <div><b>Transformador:</b> ${escaparHtml(matricula)} · <b>Subestación:</b> ${escaparHtml(sub)}</div>
+      <div><b>Mix:</b> ${state.mix.length} modelo(s) · ${ev.n_unidades_total} unidades · ${formatearNumero(ev.cfm_aporte_total)} CFM total</div>
+      <div><b>CFM requerido:</b> ${formatearNumero(state.cfmReq)} · <b>Cobertura:</b> ${ev.cobertura_pct !== null ? ev.cobertura_pct.toFixed(1) + '%' : '—'} · <b>Estado:</b> <span style="color:${aprobado ? '#1b5e20' : '#b71c1c'}">${aprobado ? '✓ APROBADO' : '✗ NO APROBADO'}</span></div>
+    `;
+  }
+  modal.hidden = false;
+  setTimeout(() => $('acc_descripcion')?.focus(), 50);
+}
+
+function closeModalAccion() {
+  const modal = $('modalAccion');
+  if (modal) modal.hidden = true;
+}
+
+async function guardarAccion() {
+  const status = $('acc_status');
+  const btnGuardar = $('btnGuardarAccion');
+  const setStatus = (msg, kind = 'info') => {
+    status.textContent = msg;
+    status.className = 'sgm-modal-status is-' + kind;
+  };
+  try {
+    btnGuardar.disabled = true;
+    setStatus('Guardando…', 'info');
+
+    // 1) Lectura del modal
+    const descripcion   = $('acc_descripcion').value.trim();
+    const estado        = $('acc_estado').value;
+    const fechaAccion   = $('acc_fecha').value;
+    const fechaEj       = $('acc_fecha_ej').value;
+    const observaciones = $('acc_observaciones').value.trim();
+
+    if (!descripcion || descripcion.length < 10) {
+      throw new Error('La descripción debe tener al menos 10 caracteres.');
+    }
+    if (!fechaAccion) throw new Error('La fecha de la acción es obligatoria.');
+
+    // 2) Lectura del formulario completo
+    const matricula = (_val('mat_input').trim()) || '';
+    if (!matricula) throw new Error('Selecciona un transformador (matrícula AFINIA) antes de registrar la acción.');
+
+    // 3) Snapshot del cálculo
+    const cfmCalc = calcularRefrigeracion({ kva_onan: getOnan(), pct: getPct(), alt: getAlt() });
+    const mixForEval = state.mix.map(it => ({
+      key: it.key, modelo: it.modelo, marca: it.marca,
+      cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+    }));
+    const evaluacion = evaluarMixVentiladores({ items: mixForEval, cfm_requerido: cfmCalc.cfm_nivel_mar });
+    const connKey = getMotorConn();
+    const itemsProt = state.mix.map(it => {
+      const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
+      return {
+        key: it.key, modelo: it.modelo, marca: it.marca, cantidad: it.cantidad,
+        amps_unitario: Number.isFinite(iU) ? iU : 0,
+        kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,
+        peso_unitario: +it.ficha?.fan_peso || 0
+      };
+    });
+    const proteccion = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    const compat = evaluarCompatibilidad({
+      A: parseFloat(_val('rad_A')), B: parseFloat(_val('rad_B')), C: parseFloat(_val('rad_C')),
+      diametro_mm: parseFloat(_val('fan_diam')), distancia_mm: parseFloat(_val('mon_dist')),
+      disposicion: _val('disposicion')
+    });
+
+    // 4) Identidad del usuario logueado
+    const session = window.__sgmSession || {};
+    const responsable_uid    = session.user?.uid || '';
+    const responsable_email  = session.user?.email || session.profile?.email || '';
+    const responsable_nombre = session.profile?.nombre || responsable_email || 'Responsable';
+
+    // 5) Payload final
+    const payload = {
+      transformador_id: matricula,        // El catálogo AFINIA usa la matrícula como ID
+      matricula,
+      proyecto:      _val('proyecto').trim(),
+      subestacion:   _val('t_sub'),
+      zona:          _val('t_zona'),
+      departamento:  _val('t_dept'),
+      grupo:         _val('t_grupo'),
+      serie:         _val('t_serie'),
+      refrigeracion: _val('t_refrig'),
+
+      kva_onan:      getOnan(),
+      kva_onaf:      getOnaf(),
+      pct:           getPct(),
+      altitud:       getAlt(),
+      cfm_requerido: cfmCalc.cfm_nivel_mar,
+      cfm_corregido: cfmCalc.cfm_corregido,
+
+      mix: state.mix.map(it => ({
+        key:          it.key,
+        marca:        it.marca,
+        modelo:       it.modelo,
+        cfm_unitario: it.cfm_unitario,
+        cantidad:     it.cantidad,
+        ficha:        { ...(it.ficha || {}) }      // unfreeze para serializar
+      })),
+      evaluacion,
+      proteccion,
+      compatibilidad: compat,
+
+      accion_descripcion: descripcion,
+      estado_accion:      estado,
+      fecha_accion:       fechaAccion,
+      fecha_ejecucion:    fechaEj || '',
+      observaciones,
+
+      responsable_uid,
+      responsable_nombre,
+      responsable_email
+    };
+
+    // 6) Persistir vía data layer (lazy import)
+    const mod = await import('./data/acciones_refrigeracion.js');
+    if (!mod.isReady()) {
+      throw new Error('Firebase no está configurado · contacte al administrador.');
+    }
+    const id = await mod.crear(payload, responsable_uid);
+    setStatus(`✓ Acción registrada con ID ${id}`, 'success');
+    setTimeout(closeModalAccion, 1500);
+  } catch (err) {
+    console.error('[acciones_refrigeracion] guardarAccion failed:', err);
+    setStatus('✗ ' + (err?.message || String(err)), 'error');
+  } finally {
+    btnGuardar.disabled = false;
+  }
+}
+
 function generateReport() {
   try {
     const win = window.open('', '_blank', 'width=1100,height=900');
@@ -2131,7 +2293,17 @@ function bindEvents() {
 
   $('btnAddToMix')?.addEventListener('click', addToMix);
   $('btnExportReport')?.addEventListener('click', generateReport);
+  $('btnRegistrarAccion')?.addEventListener('click', openModalAccion);
+  $('btnGuardarAccion')?.addEventListener('click', guardarAccion);
   $('btnPrint')?.addEventListener('click', () => window.print());
+
+  // Cierre del modal: backdrop + botón ✕ + tecla Escape
+  document.querySelectorAll('[data-modal-close]').forEach(el => {
+    el.addEventListener('click', closeModalAccion);
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('modalAccion')?.hidden) closeModalAccion();
+  });
 
   // Delegación para los inputs de cantidad y botones de eliminar en
   // la tabla del mix (filas dinámicas).
