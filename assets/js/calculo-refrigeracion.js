@@ -1252,9 +1252,10 @@ function generateReport() {
   .firma-table { width: 100%; border-collapse: collapse; margin: 4pt 0 12pt; }
   .firma-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 7.5pt; padding: 4pt 6pt; width: 24%; }
   .firma-table td { padding: 4pt 6pt; font-size: 8pt; border-bottom: 1px solid #d8e3f0; }
-  .firma-line { margin-top: 22pt; }
-  .firma-line span { display: block; width: 3in; border-top: 1px solid #1a1a1a; }
-  .firma-line .firma-cap { font-size: 7pt; color: #555; margin-top: 2pt; }
+  .firma-block-img { margin-top: 12pt; max-width: 3in; }
+  .firma-img { display: block; max-width: 2.5in; max-height: 0.75in; margin-bottom: 2pt; }
+  .firma-line-under { width: 2.5in; border-top: 1px solid #1a1a1a; }
+  .firma-cap { font-size: 7pt; color: #555; margin-top: 2pt; }
 
   .info-box {
     margin: 6pt 0; padding: 8pt 12pt; border-radius: 4pt;
@@ -1595,7 +1596,11 @@ function generateReport() {
         <tr><th>Unidad</th><td>Mantenimiento Red Alta Tensión</td></tr>
       </tbody>
     </table>
-    <div class="firma-line"><span></span><div class="firma-cap">Firma</div></div>
+    <div class="firma-block-img">
+      <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
+      <div class="firma-line-under"></div>
+      <div class="firma-cap">Firma</div>
+    </div>
   </section>
 
   <div class="info-box" style="margin-top:12pt">
