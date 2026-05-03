@@ -16,6 +16,61 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Commit 3 · Informe AFINIA · refleja mix multi-modelo (2026-05-03)
+
+Refactor del generador de informe técnico AFINIA
+(`generateReport()` en `assets/js/calculo-refrigeracion.js`) para
+que la salida HTML imprimible refleje el mix multi-modelo en lugar
+del modelo único legacy.
+
+- **Sección 5 · Datos de los motoventiladores** — se vuelve plural.
+  Una sub-sección 5.N por cada modelo del mix (ej.: 5.1 ZIEHL FN-050,
+  5.2 ZIEHL FN-063, 5.3 KRENZ F20). Cada una con:
+  - Cabecera con marca + modelo + cantidad ("8 unidades").
+  - Aporte de CFM al mix (`cantidad × cfm_unitario`).
+  - Ficha completa de identificación + aerodinámica (12 campos).
+  - Sub-sección 5.N.1 con motor eléctrico (12 campos) + cantidad
+    × kW del grupo + peso del grupo agregado.
+- **Sección 8 · Selección de motoventiladores** — pasa de "tabla
+  comparativa de opciones" a **tabla del mix con totales y estado**:
+  - Columnas: # · Marca · Modelo · CFM/u · Cantidad · Aporte CFM ·
+    Aporte %.
+  - Pie con totales (Σ unidades, Σ CFM, 100%).
+  - Banner de estado APROBADO ✓ verde / NO APROBADO ✗ rojo con
+    cobertura % + déficit/exceso CFM + n total.
+  - Si NO aprobado: sub-sección "Sugerencias para alcanzar el CFM
+    requerido" con tabla de hasta 3 estrategias del motor
+    `sugerirMejoras` (agregar_unidades / sustituir / agregar_modelo)
+    + descripción + CFM resultante + cobertura + exceso.
+  - Fórmula del mix sustituida con valores reales:
+    `CFM_mix = Σ (Cantidad_i × CFM_unitario_i)` con expansión.
+- **Sección 9 · Protección eléctrica** — refleja agrupación:
+  - Tabla con una fila por grupo (modelo del mix) + columnas
+    "A/unidad", "A grupo", guardamotor sugerido, PID + setting.
+  - Pie con totales del sistema (Σ corriente, breaker principal
+    único S203 dimensionado a la corriente total).
+  - Tabla de KPIs adicionales: corriente total, corriente mínima
+    breaker, kW total absorbido (Σ por grupo), kVA aparente
+    (Σ P_grupo / cosφ_grupo), peso total, auxiliar breaker.
+  - Fórmulas eléctricas adaptadas:
+    - `I_total = Σ (Cantidad_i × I_unitario_i)` con expansión.
+    - `I_min,breaker = 1.25 × I_total` (NEC 430).
+    - `P_total`, `S_total = Σ (P_i / cosφ_i)`, `W_total`.
+- **Sección 10 · Lista de materiales** — BOM agrupado:
+  - Por cada grupo del mix: línea de motoventiladores (cantidad +
+    PID + diámetro + CFM + Hz + corriente del grupo) + línea de
+    guardamotores (cantidad para ese modelo + setting + rango) +
+    línea de auxiliares SCADA del guardamotor.
+  - Línea única de breaker principal del sistema completo
+    (1 unidad cubre toda la corriente del mix).
+  - Línea de auxiliar SCADA del breaker.
+- El alias `state.fans` derivado del mix queda como código
+  defensivo sin lectores activos en producción (tanto la UI como
+  el informe son nativos al mix).
+
+`assets/js/calculo-refrigeracion.js` · 175 LOC modificadas en el
+generador de informe. JS lint OK · 501/503 tests verdes.
+
 ### Commit 2 · UI · selector agregar-al-mix + tabla + estado APROBADO/NO + sugerencias (2026-05-03)
 
 - `pages/calculo-refrigeracion.html` · sección "Calculador de
