@@ -774,9 +774,10 @@ function _row(label, value, mono = false) {
 
 /* SVG con la vista CAD del cuerpo de radiador (frontal + perspectiva)
    con dimensiones A/B/C/D codificadas por color, replicando el modelo
-   de referencia AFINIA original. */
+   de referencia AFINIA original. ViewBox extendido en Y negativo para
+   que las cotas D (arriba) y B (arriba) no queden recortadas. */
 function radiadorDiagramSVG() {
-  return `<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de referencia del cuerpo de radiador">
+  return `<svg viewBox="0 -30 720 350" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de referencia del cuerpo de radiador">
     <!-- ── VISTA FRONTAL (cuerpo de obleas) ── -->
     <g transform="translate(20, 20)">
       <!-- Obleas (rectángulos verticales paralelos) -->
@@ -792,19 +793,19 @@ function radiadorDiagramSVG() {
       <rect x="-14" y="234" width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
       <rect x="232" y="6"   width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
       <rect x="232" y="234" width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
-      <!-- Tubería conectora vertical izquierda -->
+      <!-- Tubería conectora vertical izquierda y derecha -->
       <line x1="-3" y1="30" x2="-3" y2="234" stroke="#222" stroke-width="0.6"/>
       <line x1="243" y1="30" x2="243" y2="234" stroke="#222" stroke-width="0.6"/>
 
-      <!-- Dim B (verde) — distancia oblea inicial a oblea final, arriba -->
+      <!-- Dim B (verde) — distancia oblea inicial a oblea final, ARRIBA -->
       <g stroke="#2e7d32" stroke-width="1.2" fill="#2e7d32">
-        <line x1="8"   y1="-2" x2="8"   y2="22"/>
-        <line x1="239" y1="-2" x2="239" y2="22"/>
-        <line x1="8"   y1="6"  x2="239" y2="6"/>
-        <polygon points="8,6 14,3 14,9"/>
-        <polygon points="239,6 233,3 233,9"/>
+        <line x1="8"   y1="-18" x2="8"   y2="22"/>
+        <line x1="239" y1="-18" x2="239" y2="22"/>
+        <line x1="8"   y1="-12" x2="239" y2="-12"/>
+        <polygon points="8,-12 14,-15 14,-9"/>
+        <polygon points="239,-12 233,-15 233,-9"/>
       </g>
-      <text x="124" y="-4" text-anchor="middle" fill="#2e7d32" font-size="22" font-weight="bold" font-family="Arial">B</text>
+      <text x="124" y="-22" text-anchor="middle" fill="#2e7d32" font-size="22" font-weight="bold" font-family="Arial">B</text>
 
       <!-- Dim A (rojo) — altura cuerpo radiador, lado derecho -->
       <g stroke="#c62828" stroke-width="1.2" fill="#c62828">
@@ -830,11 +831,10 @@ function radiadorDiagramSVG() {
           return `<line x1="${x}" y1="44" x2="${x}" y2="248"/>`;
         }).join('')}
       </g>
-      <!-- Tornillos del flanche superior -->
-      <circle cx="138" cy="14" r="2.5" fill="#222"/>
-      <circle cx="156" cy="6"  r="2.5" fill="#222"/>
-      <line x1="138" y1="14" x2="138" y2="28" stroke="#888" stroke-width="0.4"/>
-      <line x1="156" y1="6"  x2="156" y2="20" stroke="#888" stroke-width="0.4"/>
+      <!-- Tornillos del flanche superior + brackets -->
+      <rect x="125" y="10" width="36" height="20" fill="none" stroke="#222" stroke-width="0.6"/>
+      <circle cx="135" cy="20" r="2.5" fill="#0288d1"/>
+      <circle cx="155" cy="20" r="2.5" fill="#0288d1"/>
 
       <!-- Dim C (rojo) — ancho de frente, lado izquierdo -->
       <g stroke="#c62828" stroke-width="1.2" fill="#c62828">
@@ -846,15 +846,15 @@ function radiadorDiagramSVG() {
       </g>
       <text x="-8" y="148" fill="#c62828" font-size="22" font-weight="bold" font-family="Arial">C</text>
 
-      <!-- Dim D (cian) — distancia entre centros de tornillos -->
-      <g stroke="#0288d1" stroke-width="1.2" fill="#0288d1">
-        <line x1="138" y1="-4" x2="138" y2="14"/>
-        <line x1="156" y1="-4" x2="156" y2="6"/>
-        <line x1="138" y1="-2" x2="156" y2="-2"/>
-        <polygon points="138,-2 144,-5 144,1"/>
-        <polygon points="156,-2 150,-5 150,1"/>
+      <!-- Dim D (cian) — distancia entre centros de tornillos · ARRIBA -->
+      <g stroke="#0288d1" stroke-width="1.4" fill="#0288d1">
+        <line x1="135" y1="-12" x2="135" y2="20"/>
+        <line x1="155" y1="-12" x2="155" y2="20"/>
+        <line x1="135" y1="-6"  x2="155" y2="-6"/>
+        <polygon points="135,-6 141,-9 141,-3"/>
+        <polygon points="155,-6 149,-9 149,-3"/>
       </g>
-      <text x="147" y="-12" text-anchor="middle" fill="#0288d1" font-size="22" font-weight="bold" font-family="Arial">D</text>
+      <text x="145" y="-18" text-anchor="middle" fill="#0288d1" font-size="22" font-weight="bold" font-family="Arial">D</text>
     </g>
   </svg>`;
 }
@@ -1096,33 +1096,60 @@ function generateReport() {
 <base href="${cssBase}">
 <style>
   /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
-  @page { size: letter portrait; margin: 0; }
-  html, body { margin: 0; padding: 0; background: #888; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; color: #1a1a1a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-
-  /* Patrón de hoja con header + footer FIJOS en cada página
-     impresa (background-image se replica una vez por hoja). */
-  .report {
-    box-sizing: border-box;
-    width: 8.5in; margin: 0 auto;
-    padding: 1.6in 1.18in 1.4in 1.18in;
-    background:
-      url("${headerImg}") no-repeat center top / 100% 1.5in,
-      url("${footerImg}") no-repeat center bottom / 100% 0.85in,
-      #fff;
-    background-attachment: local;
+  @page {
+    size: letter portrait;
+    margin: 1.55in 1.18in 1.30in 1.18in;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: #fff;
+    font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+    color: #1a1a1a;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  /* Texto del footer flotando sobre la banda azul */
-  .footer-text {
-    text-align: center; font-size: 8pt; color: #555;
-    margin-top: 24pt; padding-top: 6pt;
+  /* ── HEADER + FOOTER fijos · se repiten en CADA hoja impresa ──
+     Position: fixed con offsets negativos los proyecta sobre el
+     área de margen del @page que Chrome/Edge replican por página.
+     Firefox 110+ también honra esto. */
+  .page-header {
+    position: fixed;
+    top: -1.55in; left: -1.18in; right: -1.18in;
+    height: 1.50in;
+    background: url("${headerImg}") no-repeat top center;
+    background-size: 100% 100%;
+    z-index: 100;
+  }
+  .page-footer {
+    position: fixed;
+    bottom: -1.30in; left: -1.18in; right: -1.18in;
+    height: 1.20in;
+    z-index: 100;
+  }
+  .page-footer .ribbon {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    height: 0.85in;
+    background: url("${footerImg}") no-repeat bottom center;
+    background-size: 100% 100%;
+  }
+  .page-footer .footer-text {
+    position: absolute; left: 5%; right: 5%; bottom: 0.16in;
+    text-align: center; font-size: 7.5pt; color: #fff;
+    font-weight: 600; letter-spacing: .01em;
+    line-height: 1.2;
   }
 
   /* ── Tipografía ────────────────────────────────────────────── */
   h1 { font-size: 18pt; margin: 0 0 4pt; color: #0d3a73; letter-spacing: -.01em; }
-  h2 { font-size: 13pt; margin: 14pt 0 6pt; color: #0d3a73; padding-bottom: 4pt; border-bottom: 1px solid #5ba4d4; }
-  h3 { font-size: 11pt; margin: 10pt 0 4pt; color: #0d3a73; }
-  p, td, th { font-size: 10pt; line-height: 1.45; }
+  h2 { font-size: 13pt; margin: 10pt 0 5pt; color: #0d3a73; padding-bottom: 3pt; border-bottom: 1px solid #5ba4d4; }
+  h3 { font-size: 11pt; margin: 7pt 0 3pt; color: #0d3a73; }
+  p, td, th { font-size: 10pt; line-height: 1.42; }
+  .meta { margin: 0 0 4pt; }
+  /* Sección anchor: el primer h2/h3 dentro NO lleva margen-top
+     extra, evita huecos cuando la sección entera salta de página. */
+  .section-anchor > h2:first-child,
+  .section-anchor > h3:first-child { margin-top: 0; }
   .meta { font-size: 9pt; color: #666; margin-bottom: 4pt; }
   .mono { font-family: "Consolas", "Courier New", monospace; font-variant-numeric: tabular-nums; }
   .tc { text-align: center; }
@@ -1253,14 +1280,36 @@ function generateReport() {
   .lbl.b         { background: #2e7d32; }
   .lbl.d         { background: #0288d1; }
 
-  /* ── Print: solo se imprime el .report sin sombras ─────────── */
-  @media print {
-    html, body { background: #fff; }
-    .no-print { display: none !important; }
-  }
+  /* ── SCREEN preview vs PRINT ───────────────────────────────── */
   @media screen {
-    body { padding: 24px 0; }
-    .report { box-shadow: 0 4px 18px rgba(0,0,0,.18); }
+    body { background: #888; padding: 24px 0; }
+    .report {
+      width: 8.5in;
+      min-height: calc(11in - 1.55in - 1.30in);
+      margin: 1.55in auto 1.30in;
+      padding: 0.20in 1.18in;
+      background: #fff;
+      box-shadow: 0 4px 18px rgba(0,0,0,.18);
+      position: relative;
+    }
+    /* En screen el position:fixed muestra header/footer una vez (preview).
+       Centrar respecto al .report. */
+    .page-header, .page-footer {
+      width: 8.5in;
+      left: 50%; right: auto;
+      transform: translateX(-50%);
+    }
+    .page-header { top: 24px; }
+    .page-footer { bottom: 24px; }
+  }
+
+  @media print {
+    body { background: #fff; }
+    .report {
+      width: auto; margin: 0; padding: 0;
+      box-shadow: none; min-height: auto;
+    }
+    .no-print { display: none !important; }
   }
 
   .toolbar {
@@ -1283,6 +1332,14 @@ function generateReport() {
 <div class="toolbar no-print">
   <button onclick="window.print()">🖨 Imprimir / Guardar PDF</button>
   <button class="sec" onclick="window.close()">Cerrar</button>
+</div>
+
+<!-- Header AFINIA · se repite en TODA hoja vía position:fixed -->
+<div class="page-header" aria-hidden="true"></div>
+<!-- Footer AFINIA · se repite en TODA hoja vía position:fixed -->
+<div class="page-footer" aria-hidden="true">
+  <div class="ribbon"></div>
+  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
 </div>
 
 <article class="report">
@@ -1501,8 +1558,6 @@ function generateReport() {
     final del diseño debe ser revisada por el ingeniero responsable conforme
     a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
   </div>
-
-  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
 
 </article>
 
