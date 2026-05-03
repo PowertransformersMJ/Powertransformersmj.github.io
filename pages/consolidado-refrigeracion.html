@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>Consolidado · Sistemas de Refrigeración</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/calculo-refrigeracion.css"/>
+  <style>
+    .consol-root {
+      max-width: 1400px; margin: 0 auto;
+      padding: 18px 22px 60px;
+      font-family: var(--font-sans);
+      color: var(--ink-1);
+    }
+    .consol-head {
+      display: flex; align-items: flex-end; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap; margin-bottom: 14px;
+    }
+    .consol-head h1 {
+      margin: 0; font: 700 22px var(--font-sans);
+      color: var(--brand-deep); letter-spacing: -.01em;
+    }
+    .consol-head .meta {
+      font: 500 12px var(--font-mono); color: var(--ink-3);
+      margin-top: 2px;
+    }
+    .consol-kpis {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 10px; margin-bottom: 16px;
+    }
+    .consol-kpi {
+      background: rgba(255, 255, 255, .55);
+      backdrop-filter: blur(20px) saturate(140%);
+      border: 1px solid rgba(13, 71, 161, .15);
+      border-left: 4px solid var(--brand);
+      border-radius: 10px;
+      padding: 10px 14px;
+    }
+    .consol-kpi .l {
+      font: 600 10px var(--font-mono);
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--ink-3); margin-bottom: 4px;
+    }
+    .consol-kpi .v {
+      font: 700 22px var(--font-sans);
+      color: var(--brand-deep); line-height: 1.1;
+    }
+    .consol-kpi.kpi-ok    { border-left-color: rgba(46, 125, 50, .85); }
+    .consol-kpi.kpi-ok .v { color: rgba(31, 100, 33, 1); }
+    .consol-kpi.kpi-warn  { border-left-color: rgba(245, 124, 0, .85); }
+    .consol-kpi.kpi-warn .v { color: rgba(184, 95, 0, 1); }
+    .consol-filters {
+      background: rgba(255, 255, 255, .55);
+      border: 1px solid rgba(13, 71, 161, .15);
+      border-radius: 10px;
+      padding: 12px 14px;
+      display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+      margin-bottom: 14px;
+    }
+    .consol-filters .fld { display: flex; flex-direction: column; gap: 4px; }
+    .consol-filters .fld label {
+      font: 600 10px var(--font-mono);
+      text-transform: uppercase; letter-spacing: .06em;
+      color: var(--ink-3);
+    }
+    .consol-filters .fld input,
+    .consol-filters .fld select {
+      padding: 6px 10px;
+      border: 1px solid rgba(0, 40, 90, .15);
+      border-radius: 6px;
+      font: 500 13px var(--font-sans);
+      background: #fff; color: var(--ink-1);
+    }
+    .consol-filters .fld input:focus,
+    .consol-filters .fld select:focus {
+      outline: 2px solid rgba(0, 122, 255, .35); outline-offset: 1px;
+    }
+    .consol-filters #q   { min-width: 220px; }
+    .consol-filters .actions {
+      margin-left: auto; display: flex; gap: 8px;
+    }
+    .consol-filters button {
+      padding: 7px 14px; border-radius: 6px; cursor: pointer;
+      font: 600 11px var(--font-mono); letter-spacing: .04em;
+      border: 1px solid rgba(13, 71, 161, .25);
+      background: #fff; color: var(--brand-deep);
+      transition: all var(--dur-fast);
+    }
+    .consol-filters button:hover { background: rgba(0, 122, 255, .08); border-color: var(--brand); }
+    .consol-filters button.primary {
+      background: var(--brand); color: #fff; border-color: var(--brand);
+    }
+    .consol-filters button.primary:hover { opacity: .88; }
+
+    .consol-table-wrap {
+      background: rgba(255, 255, 255, .55);
+      border: 1px solid rgba(13, 71, 161, .15);
+      border-radius: 10px;
+      overflow: auto;
+    }
+    table.consol-table {
+      width: 100%; border-collapse: collapse;
+      font-family: var(--font-sans);
+    }
+    table.consol-table thead th {
+      position: sticky; top: 0;
+      background: rgba(13, 71, 161, .08);
+      color: var(--brand-deep);
+      padding: 9px 10px;
+      font: 700 10px var(--font-mono);
+      text-transform: uppercase; letter-spacing: .06em;
+      text-align: left;
+      border-bottom: 2px solid rgba(13, 71, 161, .20);
+      white-space: nowrap;
+    }
+    table.consol-table tbody td {
+      padding: 8px 10px;
+      border-bottom: 1px solid rgba(0, 40, 90, .07);
+      font: 500 13px var(--font-sans);
+      color: var(--ink-2);
+      vertical-align: middle;
+    }
+    table.consol-table tbody tr:hover {
+      background: rgba(0, 122, 255, .04);
+    }
+    table.consol-table .mono { font-family: var(--font-mono); }
+    table.consol-table .tr   { text-align: right; }
+    table.consol-table .tc   { text-align: center; }
+    .estado-pill {
+      display: inline-block;
+      padding: 2px 9px; border-radius: 999px;
+      font: 700 10px var(--font-mono);
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .estado-pill.planificada           { background: #e3f2fd; color: #0d47a1; }
+    .estado-pill.pendiente_aprobacion  { background: #fff3e0; color: #b85f00; }
+    .estado-pill.aprobada              { background: #e8f5e9; color: #1b5e20; }
+    .estado-pill.ejecutada             { background: #e0f2f1; color: #00695c; }
+    .estado-pill.cancelada             { background: #fce4ec; color: #ad1457; }
+    .aprobado-pill {
+      display: inline-block; padding: 1px 7px; border-radius: 4px;
+      font: 700 9px var(--font-mono); letter-spacing: .04em;
+    }
+    .aprobado-pill.si { background: #e8f5e9; color: #1b5e20; }
+    .aprobado-pill.no { background: #ffebee; color: #b71c1c; }
+    .row-actions {
+      display: flex; gap: 4px;
+    }
+    .row-actions button {
+      padding: 4px 8px; border-radius: 4px; cursor: pointer;
+      font: 600 10px var(--font-mono);
+      border: 1px solid rgba(0, 40, 90, .15); background: #fff;
+      color: var(--ink-2);
+    }
+    .row-actions button.danger {
+      color: rgba(178, 34, 34, 1); border-color: rgba(198, 40, 40, .25);
+    }
+    .row-actions button:hover { background: rgba(0, 0, 0, .04); }
+    .row-actions button.danger:hover { background: rgba(198, 40, 40, .06); }
+    .empty-row {
+      padding: 30px 14px;
+      text-align: center; color: var(--ink-3);
+      font: 500 13px var(--font-sans); font-style: italic;
+    }
+    .err-bar {
+      background: rgba(198, 40, 40, .08);
+      border: 1px solid rgba(198, 40, 40, .25);
+      color: rgba(178, 34, 34, 1);
+      padding: 10px 14px; border-radius: 6px;
+      font: 500 12px var(--font-mono);
+      margin-bottom: 12px;
+    }
+  </style>
+</head>
+<body class="aqua">
+<main class="consol-root">
+
+  <header class="consol-head">
+    <div>
+      <h1>Consolidado · Acciones del Sistema de Refrigeración</h1>
+      <div class="meta" id="consol-status">Conectando con Firestore…</div>
+    </div>
+    <div class="actions">
+      <button type="button" class="btn-exp" id="btnExportCsv" style="padding: 8px 14px">
+        <i data-lucide="download"></i> Exportar CSV
+      </button>
+    </div>
+  </header>
+
+  <div id="errBar" class="err-bar" hidden></div>
+
+  <div class="consol-kpis" id="consol-kpis">
+    <div class="consol-kpi"><div class="l">Total acciones</div><div class="v" id="kpi-total">—</div></div>
+    <div class="consol-kpi kpi-ok"><div class="l">Aprobadas / Ejecutadas</div><div class="v" id="kpi-aprobadas">—</div></div>
+    <div class="consol-kpi kpi-warn"><div class="l">Planificadas / Pendientes</div><div class="v" id="kpi-pendientes">—</div></div>
+    <div class="consol-kpi"><div class="l">Σ kVA ONAF objetivo</div><div class="v" id="kpi-kva">—</div></div>
+    <div class="consol-kpi"><div class="l">Σ Ventiladores</div><div class="v" id="kpi-ventiladores">—</div></div>
+  </div>
+
+  <div class="consol-filters">
+    <div class="fld">
+      <label for="q">Búsqueda</label>
+      <input type="text" id="q" placeholder="Matrícula, proyecto, descripción…">
+    </div>
+    <div class="fld">
+      <label for="f-estado">Estado</label>
+      <select id="f-estado">
+        <option value="">— Todos —</option>
+        <option value="planificada">Planificada</option>
+        <option value="pendiente_aprobacion">Pendiente de aprobación</option>
+        <option value="aprobada">Aprobada</option>
+        <option value="ejecutada">Ejecutada</option>
+        <option value="cancelada">Cancelada</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label for="f-subestacion">Subestación</label>
+      <select id="f-subestacion"><option value="">— Todas —</option></select>
+    </div>
+    <div class="fld">
+      <label for="f-zona">Zona</label>
+      <select id="f-zona">
+        <option value="">— Todas —</option>
+        <option value="BOLIVAR">Bolívar</option>
+        <option value="ORIENTE">Oriente</option>
+        <option value="OCCIDENTE">Occidente</option>
+      </select>
+    </div>
+    <div class="fld">
+      <label for="f-from">Desde</label>
+      <input type="date" id="f-from">
+    </div>
+    <div class="fld">
+      <label for="f-to">Hasta</label>
+      <input type="date" id="f-to">
+    </div>
+    <div class="actions">
+      <button type="button" id="btnReset">Limpiar</button>
+    </div>
+  </div>
+
+  <div class="consol-table-wrap">
+    <table class="consol-table">
+      <thead>
+        <tr>
+          <th style="width:90px">Fecha</th>
+          <th>Matrícula</th>
+          <th>Proyecto</th>
+          <th>Subestación</th>
+          <th>Zona</th>
+          <th class="tr">ONAN</th>
+          <th class="tr">ONAF</th>
+          <th>Mix</th>
+          <th class="tr">CFM total</th>
+          <th class="tc">Cobertura</th>
+          <th class="tc">OK</th>
+          <th>Estado</th>
+          <th>Responsable</th>
+          <th>Acción</th>
+          <th aria-label="Acciones"></th>
+        </tr>
+      </thead>
+      <tbody id="consol-tbody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script type="module" src="../assets/js/consolidado-refrigeracion.js"></script>
+</body>
+</html>
