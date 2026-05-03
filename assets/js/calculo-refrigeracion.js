@@ -1438,7 +1438,7 @@ function generateReport() {
   </div>
 
   <!-- ── 3 · CURVAS WESTINGHOUSE ────────────────────────── -->
-  <section class="section-anchor">
+  <section class="section-anchor start-new-page">
     <h2>3. Curvas de enfriamiento adicional ONAF</h2>
     <p class="meta">Punto de operación: <strong class="mono">${(r.onan / 1000).toFixed(1)} MVA · ${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · pendiente Westinghouse <strong class="mono">${r.pendiente.toFixed(3)} CFM/kVA</strong> al ${getPct().toFixed(1)} %.</p>
   </section>
@@ -1683,6 +1683,12 @@ function generateReport() {
       let content = newSheet();
 
       for (const block of blocks) {
+        // Si el bloque pide forzar nueva hoja antes y la hoja actual
+        // ya tiene contenido, cerramos esta hoja y empezamos otra.
+        const forceBreak = block.classList && block.classList.contains('start-new-page');
+        if (forceBreak && content.children.length > 0) {
+          content = newSheet();
+        }
         content.appendChild(block);
         if (!fits(content)) {
           // Mover este bloque a una nueva hoja
