@@ -190,6 +190,83 @@ portar cualquier `*.html` con script inline a un módulo moderno
 no es suficiente; también debe haber 100% de paridad visual y
 funcional con el origen.
 
+### 0.1.2.2 Regla permanente · Generación de informes imprimibles (PDF / print)
+
+**Contexto del bug histórico (sesión 2026-05-02 PM2):** al construir
+el informe técnico AFINIA del módulo Selección ONAF cometí dos
+errores que el director identificó al instante:
+
+1. **Saltos de página forzados → hojas en blanco.** Usé
+   `page-break-after: always` después de cada sección (carátula,
+   gráfico, mecánicos, calculador). Resultado: hojas a medio llenar
+   + páginas en blanco entre secciones cortas. Mal patrón.
+
+2. **Página dedicada solo para el gráfico.** El director pidió "que
+   no se corte" y yo interpreté "que tenga su propia página". La
+   intención real era simplemente **bloque indivisible**: si cabe en
+   la hoja actual, va ahí; si no, pasa íntegro a la siguiente. Sin
+   dedicarle una hoja exclusiva. El orden natural del contenido
+   manda, no el deseo de que el gráfico "destaque".
+
+3. **Datos incompletos.** Capturé solo un subconjunto del formulario
+   (≈ 20 de 60+ campos). Faltaban montaje sobre radiador, ficha
+   eléctrica completa del motor, análisis de compatibilidad
+   mecánica (4 cards C1-C4), totales del sistema (kW totales, kVA
+   aparente, peso conjunto) y lista de materiales con cantidades.
+   El informe **debe ser exhaustivo** — todo lo que el ingeniero
+   capturó en la calculadora aparece en el documento entregable,
+   en su orden lógico.
+
+**Regla permanente para CUALQUIER informe imprimible (PDF/print):**
+
+1. **Flujo natural** — NO usar `page-break-after: always` salvo entre
+   documentos completamente distintos. El navegador decide los saltos
+   según el espacio disponible.
+
+2. **Bloques indivisibles** — usar `break-inside: avoid` +
+   `page-break-inside: avoid` en cada bloque atómico (gráfico,
+   tabla, KPI grid, sección de detalle). Si no cabe, el navegador
+   lo lleva entero a la siguiente hoja sin partirlo.
+
+3. **`break-after: avoid`** en cada `h2`/`h3` para que no quede
+   como última línea de una página huérfana.
+
+4. **Captura completa del formulario** — al generar un informe,
+   hacer `grep -oE 'id="[^"]+"' source.html` para listar TODOS los
+   IDs y mapear uno a uno al output. No basta "lo importante" —
+   los formularios técnicos del director son intencionalmente
+   exhaustivos (placa, electromecánica, hidráulica, control,
+   normativa). El informe debe reflejar esa exhaustividad.
+
+5. **Totales calculados** — además de los valores individuales,
+   incluir totales del sistema cuando aplique (potencia eléctrica
+   total = kW × N, kVA aparente = P/cos φ, peso total = peso × N,
+   corriente total = I × N + factor seguridad NEC, etc.). El
+   ingeniero los necesita para dimensionar tableros, contratar
+   transporte y calcular pérdidas.
+
+6. **Lista de materiales (BOM)** — toda selección de protección
+   o componentes debe terminar en una tabla "Lista de materiales"
+   con columnas: # · Cantidad · Componente · PID/Ref · Especificación.
+   Sin BOM el informe no sirve para emitir orden de compra.
+
+7. **Plantilla del cliente como fuente de verdad** — si el director
+   provee un docx (Formato AFINIA, plantilla GETP, etc.), extraer
+   las dimensiones (page size, margins en twips/in), el header y
+   footer (imágenes en `word/media/`) y los textos exactos
+   (`grep -oE '<w:t[^>]*>[^<]+</w:t>'`). El informe imprimible
+   debe reproducir esos elementos en cada página.
+
+8. **Auto-print al cargar imágenes** — antes de invocar
+   `window.print()`, esperar a que TODAS las imágenes (header,
+   footer, gráfico exportado) terminen de cargar. Si se imprime
+   antes, salen sin logos.
+
+**Aplica a futuros informes:** propuestas de inversión, fichas de
+salud de transformador, certificados de calibración, actas de
+brigada, etc. El mismo patrón flujo-natural + break-inside-avoid +
+captura-exhaustiva + BOM se reutiliza tal cual.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
