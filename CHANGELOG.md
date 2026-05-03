@@ -16,6 +16,54 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Commit 2 · UI · selector agregar-al-mix + tabla + estado APROBADO/NO + sugerencias (2026-05-03)
+
+- `pages/calculo-refrigeracion.html` · sección "Calculador de
+  motoventiladores" reemplazada por **"Mix de motoventiladores"**:
+  - Nueva barra superior con selector `#mix_fan_sel` (catálogo
+    completo: 13 modelos ZIEHL-ABEGG + KRENZ), input de cantidad
+    `#mix_fan_qty` y botón **"+ Agregar al mix"** (`#btnAddToMix`).
+  - Nueva tabla `#mix-table` con columnas: # · Marca · Modelo ·
+    CFM/u · Cantidad (input editable inline) · Aporte CFM · Aporte %
+    · Eliminar. Pie de tabla con totales.
+  - Nuevo banner `#mix-status` con badge **APROBADO ✓ / NO APROBADO ✗ /
+    SIN DATOS** + cobertura % + déficit/exceso + n total.
+  - Nuevo panel `#mix-suggestions` (visible solo si NO aprobado)
+    con 3 cards (una por estrategia: agregar_unidades, sustituir,
+    agregar_modelo) + botón "Aplicar sugerencia" en cada una.
+  - El selector legacy `#fan_db_sel` (dentro de "Datos técnicos del
+    motoventilador") se conserva como preview de ficha técnica sin
+    agregar al mix.
+- `assets/css/calculo-refrigeracion.css` · estilos nuevos `.mix-status`
+  (3 estados con paleta semáforo verde/rojo/gris), `.mix-suggestions`
+  con grid responsive de cards, `.btn-rm-mix`, `input.mix-qty`.
+- `assets/js/calculo-refrigeracion.js` · refactor profundo del estado
+  y handlers:
+  - `state.mix` reemplaza `state.fans` (legacy). Cada item:
+    `{id, key, marca, modelo, cfm_unitario, cantidad, ficha}`. La
+    `ficha` es snapshot inmutable (Object.freeze) del catálogo al
+    momento de agregar — protege contra mutaciones del catálogo.
+  - Funciones nuevas: `addToMix`, `removeFromMix`, `updateMixQty`,
+    `applyMixSuggestion`, `renderMix`, `renderMixStatus`,
+    `renderMixSuggestions`, `syncFichaVisibleConKey`.
+  - `calcProtection()` reescrito para usar `calcularProteccionMix`
+    del dominio puro. Renderiza grupos por modelo (cada uno con
+    su guardamotor MS116) + breaker principal único S203 +
+    auxiliares SCADA + KPIs agregados (kW totales, peso total).
+  - `onFanSelect()` simplificado: ya no muta `state.fans[0]` —
+    solo sincroniza la ficha visible con el modelo seleccionado.
+  - Funciones legacy eliminadas: `renderFans`, `addFan`, `removeFan`,
+    `updateCells`, `updateSum`, `calcFan`, `renderPerFanCard`,
+    `renderTotalCard`, `renderListaMateriales` (~120 LOC).
+  - Alias `state.fans` derivado del mix mantenido para que
+    `generateReport()` siga funcionando hasta el commit 3 (informe
+    AFINIA con mix nativo).
+- `bindEvents()` actualizado: `btnAddFan` removido (era opción legacy
+  manual); listeners para `mix-tbody` (input qty + click eliminar)
+  y `mix-suggestions` (click "Aplicar sugerencia").
+- HTML lint limpio · 501/503 tests verdes (los 2 fallos son
+  pre-existentes de importador Excel · sin relación con este trabajo).
+
 ### Commit 1 · Dominio puro (2026-05-03)
 
 - `assets/js/domain/refrigeracion.js` · 3 funciones puras nuevas:
