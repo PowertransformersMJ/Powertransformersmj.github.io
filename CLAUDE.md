@@ -304,6 +304,62 @@ tres errores adicionales que también deben evitarse:
     + vista en perspectiva o isométrica), con cotas codificadas por
     color (mismo color que las leyendas del UI).
 
+**Refinamiento adicional (sesión 2026-05-02 PM4):** después de
+varios intentos, el director sigue viendo el cuerpo del informe
+ENCIMA del header/footer en páginas internas. La causa raíz fue
+intentar usar `position: fixed` con `@page margin` y offsets
+negativos — Chrome lo soporta pero Firefox/Safari no de manera
+consistente, y el contenido se traslapaba en hojas 2+.
+
+12. **Encabezado/pie repetido por página · usar SIEMPRE
+    `<thead>` + `<tfoot>` con `display: table-header-group` /
+    `table-footer-group`.** Este patrón es el único 100% reliable
+    cross-navegador (Chrome, Firefox, Safari, Edge) para informes
+    paginados imprimibles:
+
+    ```html
+    <table class="report-doc">
+      <thead><tr><td class="page-header-cell">
+        <div class="page-header"></div>  <!-- logo Afinia -->
+      </td></tr></thead>
+      <tfoot><tr><td class="page-footer-cell">
+        <div class="page-footer">         <!-- banda azul + texto -->
+          <div class="ribbon"></div>
+          <div class="footer-text">CaribeMar...</div>
+        </div>
+      </td></tr></tfoot>
+      <tbody><tr><td class="body-cell">
+        ...todo el contenido del informe...
+      </td></tr></tbody>
+    </table>
+    ```
+
+    ```css
+    @page { size: letter portrait; margin: 0; }
+    table.report-doc { width: 8.5in; margin: 0 auto; }
+    table.report-doc thead { display: table-header-group; }
+    table.report-doc tfoot { display: table-footer-group; }
+    table.report-doc thead td.page-header-cell { height: 1.55in; }
+    table.report-doc tfoot td.page-footer-cell { height: 1.20in; }
+    table.report-doc tbody td.body-cell { padding: 0.10in 1.18in; }
+    ```
+
+    El navegador automáticamente:
+    - Repite el `thead` al inicio de cada hoja impresa
+    - Repite el `tfoot` al final de cada hoja impresa
+    - Reserva espacio para ambos en el flujo de paginación, así que
+      el contenido del `tbody` NUNCA puede traslaparse con header/
+      footer ni cortarse ambiguamente
+
+    Esto es lo que usan wkhtmltopdf, jsPDF, y prácticamente todo
+    motor de reportes corporativos. Es el "gold standard".
+
+13. **NO usar `position: fixed` para headers/footers de informes.**
+    Aunque funciona en Chrome con `@page margin` configurado, es
+    inconsistente en Firefox y Safari, y con frecuencia produce
+    el bug visible de "contenido encima del header en página 2+".
+    El método thead/tfoot es estricto y predecible.
+
 **Lección de meta-proceso:** después de generar un informe nuevo, ANTES
 de cerrar la sesión, ejecutar mentalmente esta checklist:
 - ¿Fluye el contenido sin hojas en blanco?
@@ -312,6 +368,7 @@ de cerrar la sesión, ejecutar mentalmente esta checklist:
 - ¿Cada componente con dimensiones lleva su diagrama?
 - ¿La lista de materiales tiene cantidades + PIDs?
 - ¿Los totales del sistema están todos calculados (kW, kVA, peso, A)?
+- ¿El header/footer se repite por hoja (vía thead/tfoot, no fixed)?
 
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 

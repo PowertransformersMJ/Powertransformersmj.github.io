@@ -1096,10 +1096,15 @@ function generateReport() {
 <base href="${cssBase}">
 <style>
   /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
-  @page {
-    size: letter portrait;
-    margin: 1.55in 1.18in 1.30in 1.18in;
-  }
+  /* @page margin = 0: header/footer ocupan toda la hoja vía
+     thead/tfoot. Método bulletproof multi-navegador (Chrome/
+     Firefox/Safari/Edge): el navegador repite automáticamente
+     <thead> y <tfoot> en cada hoja impresa sin importar cuántas
+     páginas atraviese el documento. Imposible que el cuerpo
+     quede encima del header o se corte ambiguamente. */
+  @page { size: letter portrait; margin: 0; }
+
+  * { box-sizing: border-box; }
   html, body {
     margin: 0; padding: 0;
     background: #fff;
@@ -1109,23 +1114,35 @@ function generateReport() {
     print-color-adjust: exact;
   }
 
-  /* ── HEADER + FOOTER fijos · se repiten en CADA hoja impresa ──
-     Position: fixed con offsets negativos los proyecta sobre el
-     área de margen del @page que Chrome/Edge replican por página.
-     Firefox 110+ también honra esto. */
+  /* ── Tabla maestra · una sola por documento ──────────────── */
+  table.report-doc {
+    width: 8.5in; margin: 0 auto;
+    border-collapse: collapse;
+    table-layout: fixed;
+    background: #fff;
+  }
+
+  /* ── Header repetido en cada hoja ───────────────────────── */
+  table.report-doc thead { display: table-header-group; }
+  table.report-doc thead td.page-header-cell {
+    height: 1.55in;
+    padding: 0; vertical-align: top;
+  }
   .page-header {
-    position: fixed;
-    top: -1.55in; left: -1.18in; right: -1.18in;
-    height: 1.50in;
+    width: 100%; height: 1.50in;
     background: url("${headerImg}") no-repeat top center;
     background-size: 100% 100%;
-    z-index: 100;
+  }
+
+  /* ── Footer repetido en cada hoja ───────────────────────── */
+  table.report-doc tfoot { display: table-footer-group; }
+  table.report-doc tfoot td.page-footer-cell {
+    height: 1.20in;
+    padding: 0; vertical-align: bottom;
   }
   .page-footer {
-    position: fixed;
-    bottom: -1.30in; left: -1.18in; right: -1.18in;
-    height: 1.20in;
-    z-index: 100;
+    position: relative;
+    width: 100%; height: 1.20in;
   }
   .page-footer .ribbon {
     position: absolute; left: 0; right: 0; bottom: 0;
@@ -1134,10 +1151,16 @@ function generateReport() {
     background-size: 100% 100%;
   }
   .page-footer .footer-text {
-    position: absolute; left: 5%; right: 5%; bottom: 0.16in;
+    position: absolute; left: 5%; right: 5%; bottom: 0.18in;
     text-align: center; font-size: 7.5pt; color: #fff;
     font-weight: 600; letter-spacing: .01em;
     line-height: 1.2;
+  }
+
+  /* ── Cuerpo del informe (única celda del tbody) ─────────── */
+  table.report-doc tbody td.body-cell {
+    padding: 0.10in 1.18in;
+    vertical-align: top;
   }
 
   /* ── Tipografía ────────────────────────────────────────────── */
@@ -1283,32 +1306,13 @@ function generateReport() {
   /* ── SCREEN preview vs PRINT ───────────────────────────────── */
   @media screen {
     body { background: #888; padding: 24px 0; }
-    .report {
-      width: 8.5in;
-      min-height: calc(11in - 1.55in - 1.30in);
-      margin: 1.55in auto 1.30in;
-      padding: 0.20in 1.18in;
-      background: #fff;
+    table.report-doc {
       box-shadow: 0 4px 18px rgba(0,0,0,.18);
-      position: relative;
     }
-    /* En screen el position:fixed muestra header/footer una vez (preview).
-       Centrar respecto al .report. */
-    .page-header, .page-footer {
-      width: 8.5in;
-      left: 50%; right: auto;
-      transform: translateX(-50%);
-    }
-    .page-header { top: 24px; }
-    .page-footer { bottom: 24px; }
   }
-
   @media print {
     body { background: #fff; }
-    .report {
-      width: auto; margin: 0; padding: 0;
-      box-shadow: none; min-height: auto;
-    }
+    table.report-doc { box-shadow: none; }
     .no-print { display: none !important; }
   }
 
@@ -1334,15 +1338,25 @@ function generateReport() {
   <button class="sec" onclick="window.close()">Cerrar</button>
 </div>
 
-<!-- Header AFINIA · se repite en TODA hoja vía position:fixed -->
-<div class="page-header" aria-hidden="true"></div>
-<!-- Footer AFINIA · se repite en TODA hoja vía position:fixed -->
-<div class="page-footer" aria-hidden="true">
-  <div class="ribbon"></div>
-  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
-</div>
-
-<article class="report">
+<!-- Tabla maestra · thead+tfoot se repiten en cada hoja impresa
+     (técnica reliable cross-navegador para informes paginados). -->
+<table class="report-doc">
+  <thead>
+    <tr><td class="page-header-cell">
+      <div class="page-header" aria-hidden="true"></div>
+    </td></tr>
+  </thead>
+  <tfoot>
+    <tr><td class="page-footer-cell">
+      <div class="page-footer" aria-hidden="true">
+        <div class="ribbon"></div>
+        <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+      </div>
+    </td></tr>
+  </tfoot>
+  <tbody>
+    <tr><td class="body-cell">
+      <article class="report">
 
   <!-- ── CARÁTULA ───────────────────────────────────────── -->
   <div class="cover-block">
@@ -1559,7 +1573,10 @@ function generateReport() {
     a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
   </div>
 
-</article>
+      </article>
+    </td></tr>
+  </tbody>
+</table>
 
 <script>
   // Auto-print una vez que las imágenes hayan cargado.
