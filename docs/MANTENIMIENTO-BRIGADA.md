@@ -232,6 +232,25 @@ eléctrica reflejando el modelo más reciente seleccionado.
 ficha sin agregar al mix. Útil para inspeccionar especificaciones
 de un modelo antes de decidir si lo agrega.
 
+### 4.5 Reflejo del mix en el informe AFINIA (commit 3, 2026-05-03)
+
+El generador `generateReport()` (en `assets/js/calculo-refrigeracion.js`)
+produce un HTML imprimible Letter conforme `Formato Afinia.docx`.
+Desde el commit 3 cada sección refleja el mix multi-modelo:
+
+| Sección | Contenido |
+|---|---|
+| **5. Datos de los motoventiladores** | Una sub-sección 5.N por cada modelo del mix con marca + modelo + cantidad. Ficha completa (12 campos identificación + 12 campos motor eléctrico) por modelo. Aporte de CFM por modelo (cantidad × cfm_unitario). Peso y kW agregados del grupo. |
+| **8. Selección de motoventiladores** | Tabla del mix (#, marca, modelo, CFM/u, cantidad, aporte, aporte %) con pie de totales. Banner APROBADO/NO con cobertura + déficit/exceso. Si NO aprobado: tabla de hasta 3 sugerencias del motor `sugerirMejoras`. Fórmula `CFM_mix = Σ (cantidad × cfm_unitario)` sustituida con los valores reales. |
+| **9. Circuito de protección eléctrica** | Tabla de grupos (una fila por modelo) con A/unidad, A del grupo, guardamotor MS116 sugerido, PID + setting. Pie con Σ corriente del sistema y breaker principal S203 único. Tabla complementaria con corriente total, mínima breaker, kW total, kVA aparente (Σ P_i / cosφ_i), peso total. Fórmulas: `I_total = Σ (cantidad_i × I_unitario_i)`, `I_min,breaker = 1.25 × I_total`, `P_total`, `S_total`, `W_total`. |
+| **10. Lista de materiales** | BOM agrupado: por cada grupo (motoventiladores + guardamotores + auxiliares) + 1 breaker principal único + 1 auxiliar SCADA del breaker. Cada línea con cantidad + PID + especificación. |
+
+**Reglas de paginación** se mantienen (regla CLAUDE.md §0.1.2.3 ·
+paginación manual con `.sheet` divs, NO thead/tfoot ni position
+fixed). El header `header_compact.png` y el footer `footer.png` se
+inyectan explícitamente en cada hoja para garantizar repetición en
+Safari.
+
 ---
 
 ## 5. Casos golden (regresión numérica)
