@@ -110,7 +110,12 @@
         </div>
         <div class="fld">
           <label for="proyecto">Nombre del proyecto</label>
-          <input type="text" id="proyecto" class="w200" placeholder="Ej: Intervención ONAF S/E Norte">
+          <input type="text" id="proyecto" class="w240" list="proyecto_list" placeholder="Ej: Intervención ONAF S/E Norte" autocomplete="off">
+          <datalist id="proyecto_list">
+            <option value="Actualización y Repotenciación del Sistema de Refrigeración"></option>
+            <option value="Sistema de Refrigeración URE"></option>
+          </datalist>
+          <span class="hint">Seleccione un proyecto frecuente o escriba uno nuevo</span>
         </div>
       </div>
     </section>
