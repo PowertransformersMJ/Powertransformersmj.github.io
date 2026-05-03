@@ -7,6 +7,51 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## En curso · Mix multi-modelo en Selección ONAF (2026-05-03)
+
+Trabajo en curso para soportar **combinación de varios modelos de
+ventilador en el mismo transformador** (mix real de campo, ej.:
+4 × ZIEHL FN-050 + 8 × ZIEHL FN-063 + 12 × KRENZ F20 alimentando
+un mismo transformador 24 MVA). Estado actual: dominio puro listo
++ tests verdes. Pendientes: UI · informe · persistencia · tab
+consolidado.
+
+### Commit 1 · Dominio puro (2026-05-03)
+
+- `assets/js/domain/refrigeracion.js` · 3 funciones puras nuevas:
+  - `evaluarMixVentiladores({items, cfm_requerido})` — suma los
+    aportes de cada modelo (cantidad × CFM unitario), calcula
+    cobertura, déficit, exceso, número total de unidades y emite
+    estado **APROBADO / NO_APROBADO / SIN_DATOS** con mensaje
+    humanizado.
+  - `sugerirMejoras({items, cfm_requerido, fan_db, max_sugerencias})`
+    — motor de sugerencias activo cuando el mix no aprueba. Tres
+    estrategias: (1) **agregar_unidades** del modelo más eficiente
+    ya en el mix; (2) **sustituir** el modelo más débil del mix
+    por otro mayor del catálogo; (3) **agregar_modelo** del catálogo
+    que no esté en el mix. Cada sugerencia incluye los cambios
+    estructurados, CFM total resultante, cobertura y exceso.
+    Ordenadas por menor exceso (ajuste más fino primero).
+  - `calcularProteccionMix({items, factor_seguridad})` — protección
+    eléctrica para mix heterogéneo: cada modelo con su propio
+    guardamotor MS116 dimensionado a la corriente unitaria del
+    grupo, y **un único breaker principal** S203 dimensionado a
+    la corriente total del sistema con factor de seguridad NEC 430
+    ×1.25. Devuelve también totales de potencia (kW) y peso (kg)
+    agregados por grupo.
+- Constante exportada `MIX_ESTADO` con los 3 estados.
+- `tests/refrigeracion.test.js` · 18 tests nuevos (44 → 62 totales)
+  cubriendo: estado SIN_DATOS por mix vacío o requerido cero, suma
+  correcta de aportes con n unidades total, no_aprobado con déficit
+  exacto, aporte_pct por modelo, clamp de cantidades negativas,
+  vacío de sugerencias cuando ya cubre, las 3 estrategias del motor
+  de sugerencias con casos de control, ordenamiento por exceso,
+  respeto de `max_sugerencias`, agrupación por modelo en protección
+  eléctrica, totales kW/peso, factor de seguridad personalizado,
+  filtrado de items con cantidad o amperaje no positivos.
+- 501 / 503 tests verdes (los 2 fallos pre-existentes son de
+  importador Excel · sin relación con este trabajo).
+
 ## v2.9.0 — Mantenimiento Brigada · Selección ONAF (2026-05-02)
 
 Nuevo módulo top-level **"Mantenimiento Brigada"** en el sidebar
