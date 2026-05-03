@@ -269,6 +269,38 @@
         { "fieldPath": "tipo",   "order": "ASCENDING" },
         { "fieldPath": "numero", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "acciones_refrigeracion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transformador_id", "order": "ASCENDING"  },
+        { "fieldPath": "fecha_accion",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "acciones_refrigeracion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado_accion", "order": "ASCENDING"  },
+        { "fieldPath": "fecha_accion",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "acciones_refrigeracion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "subestacion",  "order": "ASCENDING"  },
+        { "fieldPath": "fecha_accion", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "acciones_refrigeracion",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "responsable_uid", "order": "ASCENDING"  },
+        { "fieldPath": "fecha_accion",    "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -15,7 +15,9 @@ import {
   CURVAS_GRAFICO, EJE_X_KVA,
   interpolarPendiente, convertirCaudalACFM, cfmAM3s,
   calcularRefrigeracion, calcularUnidadesRequeridas,
-  calcularProteccionElectrica, extraerCorrienteFan,
+  calcularProteccionElectrica, calcularProteccionMix,
+  evaluarMixVentiladores, sugerirMejoras, MIX_ESTADO,
+  extraerCorrienteFan,
   evaluarCompatibilidad, mensajeDisposicion, COMPAT_ESTADO,
   deduceOnafDesdeOnanYPct, deducePctDesdeOnanYOnaf,
   calcularYStep, calcularAutoRango,
@@ -25,19 +27,23 @@ import {
 const $ = (id) => document.getElementById(id);
 
 /* ─── Estado UI mutable (mínimo) ────────────────────────────── */
+//
+// `state.mix` es la fuente de verdad del cálculo desde 2026-05-03.
+// Cada item es un snapshot del modelo del catálogo + cantidad. La
+// suma de aportes (cantidad × CFM unitario) se compara contra el
+// CFM requerido vía `evaluarMixVentiladores` del dominio puro.
 const state = {
-  fans: [
-    { id: 1, desc: 'Opción 1 — ZIEHL-ABEGG FN063-6DL.4I.A7P1 · 50Hz', cfm: 5933 },
-    { id: 2, desc: 'Opción 2 — ', cfm: 0 }
-  ],
-  fanIdCnt: 3,
+  mix:       [],               // Array<{id, key, marca, modelo, cfm_unitario, cantidad, ficha}>
+  mixIdCnt:  1,
+  lastEval:  null,             // Snapshot de evaluarMixVentiladores (cache para informe)
   cfmReq:    0,
   cfmReqAlt: 0,
   yStep:     20000,
   lock:      false,            // anti-recursión ONAN↔ONAF↔%
   fanDb:     null,             // cargado lazy
   transformers: null,          // cargado lazy
-  chart:     null
+  chart:     null,
+  lastSuggestions: []          // cache para applyMixSuggestion
 };
 
 /* ─── Helpers ───────────────────────────────────────────────── */
@@ -137,34 +143,8 @@ async function onFanSelect() {
   if (!key) { if (status) status.textContent = ''; return; }
   const d = db[key];
   if (!d) return;
-  const fields = [
-    'fan_marca', 'fan_modelo', 'fan_nserie', 'fan_tipo_pala', 'fan_diam',
-    'fan_aspas', 'fan_rpm', 'fan_montaje', 'fan_peso', 'fan_flow_val',
-    'fan_cfm_nom', 'fan_m3s', 'fan_volt', 'fan_kw', 'fan_amp', 'fan_cosphi',
-    'fan_aislam', 'fan_protmotor', 'fan_material', 'fan_sentido', 'fan_tmin', 'fan_cert'
-  ];
-  for (const k of fields) {
-    const el = $(k);
-    if (el && k in d) el.value = d[k];
-  }
-  // Selectors
-  for (const o of $('fan_hz').options)        if (o.value === d.fan_hz)         { o.selected = true; break; }
-  for (const o of $('fan_ip').options)        if (o.value === d.fan_ip || (o.text || '').includes(d.fan_ip || '')) { o.selected = true; break; }
-  for (const o of $('fan_flow_unit').options) if (o.value === d.fan_flow_unit)  { o.selected = true; break; }
-  syncCfm();
-  $('cfm_result_disp').textContent = formatearNumero(d.fan_cfm_nom) + ' CFM';
-  if (status) status.textContent = '✓ Datos cargados desde ficha técnica';
-  // Sync calculador de fans (fila 1)
-  if (state.fans.length > 0) {
-    state.fans[0].cfm  = d.fan_cfm_nom || 0;
-    state.fans[0].desc = (d.fan_marca || '') + ' ' + (d.fan_modelo || '');
-    const desc = $('fd' + state.fans[0].id);
-    const cfm  = $('fc' + state.fans[0].id);
-    if (desc) desc.value = state.fans[0].desc;
-    if (cfm)  cfm.value  = state.fans[0].cfm;
-    updateCells();
-  }
-  checkCompat();
+  syncFichaVisibleConKey(key, db);
+  if (status) status.textContent = '✓ Datos cargados desde ficha técnica · use "Agregar al mix" para incluirlo en el cálculo';
   await calcProtection();
 }
 
@@ -212,88 +192,279 @@ function onPctCh() {
 
 /* ─── Calculador de ventiladores (tabla) ────────────────────── */
 
-function calcFan(f) {
-  return calcularUnidadesRequeridas({ cfm_total: state.cfmReq, cfm_fan: f.cfm });
+/* ─── Mix multi-modelo (estado APROBADO / NO APROBADO + sugerencias) ─── */
+
+/**
+ * Agrega un modelo del catálogo al mix con la cantidad indicada.
+ * Si el modelo ya está en el mix, incrementa la cantidad existente
+ * (caso "agregaste 4, ahora pones 2 más → quedan 6").
+ */
+async function addToMix() {
+  const sel = $('mix_fan_sel');
+  const qtyInput = $('mix_fan_qty');
+  if (!sel || !qtyInput) return;
+  const key = sel.value;
+  const qty = Math.max(1, Math.floor(parseFloat(qtyInput.value) || 1));
+  if (!key) {
+    sel.focus();
+    return;
+  }
+  const db = await ensureFanDb();
+  const f = db[key];
+  if (!f) return;
+  const existente = state.mix.find(it => it.key === key);
+  if (existente) {
+    existente.cantidad += qty;
+  } else {
+    state.mix.push({
+      id:    state.mixIdCnt++,
+      key,
+      marca:        f.fan_marca || '',
+      modelo:       f.fan_modelo || '',
+      cfm_unitario: +f.fan_cfm_nom || 0,
+      cantidad:     qty,
+      ficha:        Object.freeze({ ...f })   // snapshot inmutable de la ficha completa
+    });
+    // Sincronizar la ficha visible con el ÚLTIMO modelo agregado
+    // (mantiene el flujo de compatibilidad mecánica + protección).
+    syncFichaVisibleConKey(key, db);
+  }
+  qtyInput.value = 1;
+  renderMix();
+  await calcProtection();
 }
 
-function renderFans() {
-  const focId = document.activeElement ? document.activeElement.id : null;
-  const tbody = $('fan-tbody');
-  tbody.innerHTML = state.fans.map((f, i) => {
-    const r = calcFan(f);
-    const nT = r.n !== null ? r.n : '—';
-    const nC = r.n !== null ? (r.ok ? 'cok' : 'cwrn') : '';
-    const covOk = r.cobertura_pct !== null && r.cobertura_pct >= 100;
-    return `<tr id="fr${f.id}">
-      <td style="color:var(--ink-4);font-size:11px;text-align:center">${i + 1}</td>
-      <td><input id="fd${f.id}" type="text" class="ti ti-d" value="${escaparHtml(f.desc)}"
-           placeholder="Descripción o modelo" data-fan-desc="${f.id}"></td>
-      <td style="white-space:nowrap">
-        <input id="fc${f.id}" type="number" class="ti ti-c" value="${f.cfm || ''}"
-               placeholder="CFM" min="0" step="1" data-fan-cfm="${f.id}">
-        <span style="font-size:9px;color:var(--ink-4)">ft³/min</span>
-      </td>
-      <td class="nbig ${nC}" id="fn${f.id}">${nT}</td>
-      <td class="tr" id="fa${f.id}">${r.n !== null ? formatearNumero(r.cfm_logrado) + ' CFM' : '—'}</td>
-      <td class="tr" id="fv${f.id}" style="font-weight:600;color:${covOk ? '#008f4a' : '#c91a14'}">${r.cobertura_pct !== null ? r.cobertura_pct + '%' : '—'}</td>
-      <td class="tr" id="fe${f.id}" style="color:${r.n !== null ? (r.ok ? '#008f4a' : '#c91a14') : 'inherit'}">${r.n !== null ? formatearNumero(r.exceso) + ' CFM' : '—'}</td>
-      <td class="tc" id="fs${f.id}">${r.n !== null ? `<span class="ico ${r.ok ? 'cok' : 'cerr'}" aria-label="${r.ok ? 'OK' : 'Insuficiente'}">${r.ok ? '✓' : '✗'}</span>` : ''}</td>
-      <td class="tc"><button type="button" class="bdel" data-fan-remove="${f.id}" aria-label="Eliminar opción ${i + 1}">✕</button></td>
-    </tr>`;
-  }).join('');
-  updateSum();
-  if (focId) { const el = $(focId); if (el) el.focus(); }
+/**
+ * Sincroniza los inputs de la ficha técnica visible con un modelo
+ * del catálogo (mantiene compatibilidad con compatibilidad mecánica
+ * y la sección "Datos del motoventilador" del informe legacy).
+ */
+function syncFichaVisibleConKey(key, db) {
+  if (!db || !db[key]) return;
+  const d = db[key];
+  const fields = [
+    'fan_marca', 'fan_modelo', 'fan_nserie', 'fan_tipo_pala', 'fan_diam',
+    'fan_aspas', 'fan_rpm', 'fan_montaje', 'fan_peso', 'fan_flow_val',
+    'fan_cfm_nom', 'fan_m3s', 'fan_volt', 'fan_kw', 'fan_amp', 'fan_cosphi',
+    'fan_aislam', 'fan_protmotor', 'fan_material', 'fan_sentido', 'fan_tmin', 'fan_cert'
+  ];
+  for (const k of fields) {
+    const el = $(k);
+    if (el && k in d) el.value = d[k];
+  }
+  for (const o of $('fan_hz').options)        if (o.value === d.fan_hz)         { o.selected = true; break; }
+  for (const o of $('fan_ip').options)        if (o.value === d.fan_ip || (o.text || '').includes(d.fan_ip || '')) { o.selected = true; break; }
+  for (const o of $('fan_flow_unit').options) if (o.value === d.fan_flow_unit)  { o.selected = true; break; }
+  // Reflejar también en el dropdown legacy `fan_db_sel` para que
+  // calcProtection pueda extraer la corriente del modelo dominante.
+  const legacy = $('fan_db_sel');
+  if (legacy) {
+    for (const o of legacy.options) if (o.value === key) { o.selected = true; break; }
+  }
+  syncCfm();
+  $('cfm_result_disp').textContent = formatearNumero(d.fan_cfm_nom) + ' CFM';
+  checkCompat();
 }
 
-function updateCells() {
-  state.fans.forEach(f => {
-    const r = calcFan(f);
-    const fn = $('fn' + f.id), fa = $('fa' + f.id), fv = $('fv' + f.id);
-    const fe = $('fe' + f.id), fs = $('fs' + f.id);
-    if (!fn) return;
-    fn.textContent = r.n !== null ? r.n : '—';
-    fn.className   = 'nbig ' + (r.n !== null ? (r.ok ? 'cok' : 'cwrn') : '');
-    fa.textContent = r.n !== null ? formatearNumero(r.cfm_logrado) + ' CFM' : '—';
-    fv.textContent = r.cobertura_pct !== null ? r.cobertura_pct + '%' : '—';
-    fv.style.fontWeight = '600';
-    fv.style.color      = r.cobertura_pct !== null ? (r.cobertura_pct >= 100 ? '#008f4a' : '#c91a14') : '';
-    fe.textContent = r.n !== null ? formatearNumero(r.exceso) + ' CFM' : '—';
-    fe.style.color = r.n !== null ? (r.ok ? '#008f4a' : '#c91a14') : '';
-    fs.innerHTML   = r.n !== null ? `<span class="ico ${r.ok ? 'cok' : 'cerr'}" aria-label="${r.ok ? 'OK' : 'Insuficiente'}">${r.ok ? '✓' : '✗'}</span>` : '';
-  });
-  updateSum();
+function removeFromMix(id) {
+  state.mix = state.mix.filter(it => it.id !== id);
+  renderMix();
   calcProtection();
 }
 
-function updateSum() {
-  const valid = state.fans.filter(f => f.cfm > 0 && state.cfmReq > 0);
-  const sum = $('fan-sum');
-  if (!valid.length) { sum.innerHTML = ''; return; }
-  const res  = valid.map(f => Object.assign(calcFan(f), { f }));
-  const okList = res.filter(r => r.ok);
-  const best = okList.length ? okList.reduce((a, b) => b.n < a.n ? b : a) : null;
-  sum.innerHTML = res.map(r => {
-    const isBest = r === best;
-    const idx = state.fans.indexOf(r.f) + 1;
-    return `
-      <div class="fs">${escaparHtml(r.f.desc) || 'Opción ' + idx}:
-        <span class="fsv"> ${r.n} unid.</span> ×
-        <span class="fsv">${formatearNumero(r.f.cfm)} CFM</span> =
-        <span style="font-weight:700;color:${r.ok ? '#008f4a' : '#c91a14'}">${formatearNumero(r.cfm_logrado)} CFM</span>
-        ${isBest ? '<span style="font-size:10px;background:rgba(28,200,112,.14);color:#008f4a;border-radius:4px;padding:2px 7px;margin-left:6px;font-weight:700">menor cantidad</span>' : ''}
+function updateMixQty(id, qty) {
+  const it = state.mix.find(x => x.id === id);
+  if (!it) return;
+  it.cantidad = Math.max(0, Math.floor(parseFloat(qty) || 0));
+  renderMix();
+  calcProtection();
+}
+
+/**
+ * Aplica una sugerencia del motor (`sugerirMejoras`) mutando el
+ * estado del mix. La sugerencia trae `cambios[]` con accion =
+ * 'agregar' | 'quitar' | 'sustituir' (compuesto de quitar + agregar).
+ */
+async function applyMixSuggestion(idx) {
+  const sug = state.lastSuggestions[idx];
+  if (!sug || !Array.isArray(sug.cambios)) return;
+  const db = await ensureFanDb();
+  for (const c of sug.cambios) {
+    if (c.accion === 'quitar') {
+      state.mix = state.mix.filter(it => it.key !== c.key);
+    } else if (c.accion === 'agregar') {
+      const ex = state.mix.find(it => it.key === c.key);
+      if (ex) {
+        ex.cantidad += c.cantidad;
+      } else {
+        const f = db[c.key];
+        if (!f) continue;
+        state.mix.push({
+          id:    state.mixIdCnt++,
+          key:   c.key,
+          marca:        f.fan_marca || c.marca || '',
+          modelo:       f.fan_modelo || c.modelo || '',
+          cfm_unitario: +f.fan_cfm_nom || c.cfm_unitario || 0,
+          cantidad:     c.cantidad,
+          ficha:        Object.freeze({ ...f })
+        });
+      }
+    }
+  }
+  renderMix();
+  await calcProtection();
+}
+
+/**
+ * Renderiza la tabla del mix + banner de estado + panel de
+ * sugerencias. Usa `evaluarMixVentiladores` y `sugerirMejoras`
+ * del dominio puro como fuente de verdad.
+ */
+function renderMix() {
+  const focId = document.activeElement ? document.activeElement.id : null;
+  const tbody = $('mix-tbody');
+  if (!tbody) return;
+
+  // Tabla
+  if (state.mix.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--ink-4);font-style:italic;padding:18px">
+      Sin modelos agregados — seleccione uno arriba y haga click en "Agregar al mix".
+    </td></tr>`;
+  } else {
+    const evalCache = evaluarMixVentiladores({
+      items: state.mix.map(it => ({
+        key: it.key, modelo: it.modelo, marca: it.marca,
+        cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+      })),
+      cfm_requerido: state.cfmReq
+    });
+    tbody.innerHTML = state.mix.map((it, i) => {
+      const aporte = it.cfm_unitario * it.cantidad;
+      const aportePct = evalCache.cfm_aporte_total > 0
+        ? +(aporte / evalCache.cfm_aporte_total * 100).toFixed(1)
+        : 0;
+      return `<tr id="mr${it.id}">
+        <td style="color:var(--ink-4);font-size:11px;text-align:center">${i + 1}</td>
+        <td>${escaparHtml(it.marca)}</td>
+        <td>${escaparHtml(it.modelo)}</td>
+        <td class="tr mono">${formatearNumero(it.cfm_unitario)}</td>
+        <td class="tc">
+          <input id="mq${it.id}" type="number" class="mix-qty" value="${it.cantidad}"
+                 min="0" step="1" max="999" data-mix-qty="${it.id}"
+                 aria-label="Cantidad ${escaparHtml(it.modelo)}">
+        </td>
+        <td class="tr mono"><strong>${formatearNumero(aporte)}</strong> CFM</td>
+        <td class="tr mono">${aportePct.toFixed(1)}%</td>
+        <td class="tc"><button type="button" class="btn-rm-mix" data-mix-remove="${it.id}" aria-label="Quitar ${escaparHtml(it.modelo)} del mix">✕</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Pie de tabla con totales
+  const totQty = $('mix-total-qty');
+  const totCfm = $('mix-total-cfm');
+  const totPct = $('mix-total-pct');
+  if (totQty && totCfm && totPct) {
+    const sumQty = state.mix.reduce((s, it) => s + it.cantidad, 0);
+    const sumCfm = state.mix.reduce((s, it) => s + it.cantidad * it.cfm_unitario, 0);
+    totQty.textContent = sumQty || '—';
+    totCfm.textContent = sumQty ? formatearNumero(sumCfm) + ' CFM' : '— CFM';
+    totPct.textContent = sumQty ? '100%' : '—';
+  }
+
+  // Banner de estado + sugerencias
+  const evalRes = evaluarMixVentiladores({
+    items: state.mix.map(it => ({
+      key: it.key, modelo: it.modelo, marca: it.marca,
+      cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+    })),
+    cfm_requerido: state.cfmReq
+  });
+  state.lastEval = evalRes;
+  renderMixStatus(evalRes);
+  renderMixSuggestions(evalRes);
+
+  // Backwards-compat con la sección "Calculador de ventiladores"
+  // del informe legacy: mantenemos un alias `state.fans` derivado
+  // del mix actual para no romper helpers que aún lo lean.
+  state.fans = state.mix.map(it => ({
+    id: it.id, desc: `${it.marca} ${it.modelo}`.trim(), cfm: it.cfm_unitario
+  }));
+
+  if (focId) { const el = $(focId); if (el) el.focus(); }
+}
+
+function renderMixStatus(ev) {
+  const banner = $('mix-status');
+  if (!banner) return;
+  banner.classList.remove('is-aprobado', 'is-no-aprobado', 'is-sin-datos');
+  if (ev.estado === MIX_ESTADO.SIN_DATOS) {
+    banner.classList.add('is-sin-datos');
+    banner.innerHTML = `
+      <span class="mix-badge">Sin datos</span>
+      <span class="mix-msg">${escaparHtml(ev.mensaje)}</span>`;
+    return;
+  }
+  const cls = ev.aprobado ? 'is-aprobado' : 'is-no-aprobado';
+  const badge = ev.aprobado ? '✓ Aprobado' : '✗ No aprobado';
+  banner.classList.add(cls);
+  const kpi = ev.aprobado
+    ? `<div class="mix-kpi">Cobertura · <b>${ev.cobertura_pct.toFixed(1)}%</b></div>
+       <div class="mix-kpi">Exceso · <b>${formatearNumero(ev.exceso)} CFM</b></div>
+       <div class="mix-kpi">N total · <b>${ev.n_unidades_total}</b></div>`
+    : `<div class="mix-kpi">Cobertura · <b>${ev.cobertura_pct.toFixed(1)}%</b></div>
+       <div class="mix-kpi">Déficit · <b>${formatearNumero(ev.deficit)} CFM</b></div>
+       <div class="mix-kpi">N total · <b>${ev.n_unidades_total}</b></div>`;
+  banner.innerHTML = `
+    <span class="mix-badge">${badge}</span>
+    <span class="mix-msg">${escaparHtml(ev.mensaje)}</span>
+    <div class="mix-kpis">${kpi}</div>`;
+}
+
+async function renderMixSuggestions(ev) {
+  const panel = $('mix-suggestions');
+  if (!panel) return;
+  if (ev.estado !== MIX_ESTADO.NO_APROBADO) {
+    panel.hidden = true; panel.innerHTML = '';
+    state.lastSuggestions = [];
+    return;
+  }
+  const db = state.fanDb || await ensureFanDb();
+  const sugs = sugerirMejoras({
+    items: state.mix.map(it => ({
+      key: it.key, modelo: it.modelo, marca: it.marca,
+      cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+    })),
+    cfm_requerido: state.cfmReq,
+    fan_db: db,
+    max_sugerencias: 3
+  });
+  state.lastSuggestions = sugs;
+  if (sugs.length === 0) {
+    panel.hidden = false;
+    panel.innerHTML = `<div class="mix-sug-title">Sugerencias para alcanzar el CFM requerido</div>
+      <div style="font-size:13px;color:var(--ink-3);font-style:italic">
+        El catálogo no contiene combinaciones que cubran el déficit de ${formatearNumero(ev.deficit)} CFM con el mix actual. Considere agregar manualmente más unidades.
       </div>`;
-  }).join('');
-}
-
-function addFan() {
-  state.fans.push({ id: state.fanIdCnt++, desc: '', cfm: 0 });
-  renderFans();
-  setTimeout(() => { const el = $('fd' + (state.fanIdCnt - 1)); if (el) el.focus(); }, 30);
-}
-
-function removeFan(id) {
-  state.fans = state.fans.filter(f => f.id !== id);
-  renderFans();
+    return;
+  }
+  panel.hidden = false;
+  const labelEstrategia = (s) => ({
+    agregar_unidades: 'Agregar más unidades',
+    sustituir:        'Sustituir modelo más débil',
+    agregar_modelo:   'Agregar modelo nuevo'
+  }[s] || s);
+  panel.innerHTML = `
+    <div class="mix-sug-title">Sugerencias para cubrir el déficit (${formatearNumero(ev.deficit)} CFM)</div>
+    <div class="mix-sug-grid">
+      ${sugs.map((s, i) => `
+        <div class="mix-sug-card">
+          <div class="strat">${labelEstrategia(s.estrategia)}</div>
+          <div class="desc">${escaparHtml(s.descripcion)}</div>
+          <div class="kpi">CFM total resultante · <b>${formatearNumero(s.cfm_aporte_total)} CFM</b> · cobertura <b>${s.cobertura_pct.toFixed(1)}%</b> · exceso <b>${formatearNumero(s.exceso)} CFM</b></div>
+          <button type="button" data-mix-apply="${i}">Aplicar sugerencia</button>
+        </div>`).join('')}
+    </div>`;
 }
 
 /* ─── Compatibilidad mecánica ───────────────────────────────── */
@@ -335,13 +506,10 @@ function pintarComp({ val, desc, estado, title }, idVal, idDesc, idTitle) {
   }
 }
 
-/* ─── Protección eléctrica ──────────────────────────────────── */
+/* ─── Protección eléctrica (mix multi-modelo) ──────────────── */
 
 async function calcProtection() {
   const conn = getMotorConn();
-  const fanKey = $('fan_db_sel') ? $('fan_db_sel').value : '';
-  const db = fanKey ? await ensureFanDb() : null;
-  const fan = db && fanKey ? db[fanKey] : null;
 
   const noteEl = $('conn_note');
   if (noteEl) {
@@ -353,100 +521,123 @@ async function calcProtection() {
   const pf = $('prot-per-fan'), pt = $('prot-total'), ps = $('prot-summary');
   if (!pf || !pt || !ps) return;
 
-  if (!fan) {
-    const stub = '<p style="color:var(--ink-4);font-style:italic;padding:10px">Seleccione un ventilador desde la base de datos para calcular la protección eléctrica.</p>';
+  if (state.mix.length === 0) {
+    const stub = '<p style="color:var(--ink-4);font-style:italic;padding:10px">Agregue al menos un modelo de ventilador al mix para calcular la protección eléctrica.</p>';
     pf.innerHTML = stub; pt.innerHTML = stub; ps.innerHTML = '';
     return;
   }
 
-  const iF = extraerCorrienteFan(fan.fan_amp, conn);
-  if (iF === null || !Number.isFinite(iF)) {
-    pf.innerHTML = '<p class="cwrn" style="padding:8px">No se pudo extraer la corriente del ventilador seleccionado.</p>';
-    return;
-  }
+  // Construye items para `calcularProteccionMix` con la corriente
+  // unitaria extraída de la ficha snapshot de cada item del mix.
+  const itemsProt = state.mix.map(it => {
+    const iU = extraerCorrienteFan(it.ficha?.fan_amp, conn);
+    return {
+      key:           it.key,
+      modelo:        it.modelo,
+      marca:         it.marca,
+      cantidad:      it.cantidad,
+      amps_unitario: Number.isFinite(iU) ? iU : 0,
+      kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,   // P1 viene en W → kW
+      peso_unitario: +it.ficha?.fan_peso || 0
+    };
+  });
+  const r = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+  state.lastProteccion = r;
 
-  const f0    = state.fans && state.fans[0];
-  const nFans = (f0 && f0.cfm > 0 && state.cfmReq > 0) ? Math.ceil(state.cfmReq / f0.cfm) : 0;
-  const r     = calcularProteccionElectrica({ amps_por_fan: iF, n_fans: nFans });
-
-  pf.innerHTML = renderPerFanCard(fan, conn, iF, r);
-  pt.innerHTML = renderTotalCard(r, nFans, iF);
-  ps.innerHTML = renderListaMateriales(fan, conn, iF, r);
+  pf.innerHTML = renderProtPorGrupo(r, conn);
+  pt.innerHTML = renderProtTotal(r);
+  ps.innerHTML = renderListaMaterialesMix(r);
 }
 
-function renderPerFanCard(fan, conn, iF, r) {
-  const gm = r.guardamotor;
+function renderProtPorGrupo(r, conn) {
   const txtConn = conn === 'D' ? 'Δ Delta' : 'Y Estrella';
+  if (r.grupos.length === 0) {
+    return '<p style="color:var(--ink-4);font-style:italic;padding:10px">Sin grupos válidos · verifique las corrientes unitarias en la ficha técnica.</p>';
+  }
   return `
-    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
-      <div class="prot-card prot-card--ok" style="min-width:200px">
-        <div class="prot-label">Corriente por ventilador (${txtConn})</div>
-        <div class="prot-val">${iF.toFixed(2)} A</div>
-        <div class="prot-meta">${escaparHtml(fan.fan_modelo)} · ${conn === 'D' ? 'Δ' : 'Y'} · ${escaparHtml(fan.fan_hz || '?')} Hz</div>
-      </div>
-      <div class="prot-card prot-card--${gm ? 'ok' : 'err'}" style="min-width:280px">
-        <div class="prot-label">Guardamotor sugerido (1 por ventilador)</div>
-        ${gm ? `
-          <div class="prot-val">ABB ${gm.model}</div>
-          <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${iF.toFixed(2)} A</strong></div>
-          <div class="prot-meta">PID: ${gm.pid} · Ics=50 kA@400 V · Trip class 10A · 45 mm DIN</div>
-          <div class="prot-meta">Función desconexión integrada · Comp. temperatura · IEC/EN 60947-4-1</div>
-        ` : `<div class="prot-meta">Corriente ${iF.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
-      </div>
-      <div class="prot-card prot-card--info" style="min-width:240px">
-        <div class="prot-label">Contacto auxiliar SCADA (1 por guardamotor)</div>
-        <div class="prot-val">ABB ${r.aux_guardamotor.model}</div>
-        <div class="prot-meta">${r.aux_guardamotor.desc}</div>
-        <div class="prot-meta">PID: ${r.aux_guardamotor.pid} · 9 mm · Señalización falla / estado motor al SCADA</div>
-      </div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      ${r.grupos.map(g => {
+        const gm = g.guardamotor;
+        return `
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;padding:10px 12px;border:1px solid rgba(0,40,90,.10);border-radius:8px;background:rgba(255,255,255,.4)">
+          <div style="flex:1 1 220px;min-width:200px">
+            <div class="prot-label">Grupo · ${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</div>
+            <div class="prot-val">${g.cantidad} × ${g.amps_unitario.toFixed(2)} A (${txtConn})</div>
+            <div class="prot-meta">Corriente del grupo: <strong>${g.amps_grupo.toFixed(2)} A</strong> · ${g.cantidad} ventiladores</div>
+          </div>
+          <div style="flex:1 1 280px;min-width:240px">
+            <div class="prot-label">Guardamotor sugerido (${g.cantidad} unidad${g.cantidad === 1 ? '' : 'es'})</div>
+            ${gm ? `
+              <div class="prot-val">ABB ${gm.model}</div>
+              <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${g.amps_unitario.toFixed(2)} A</strong></div>
+              <div class="prot-meta">PID: ${gm.pid} · 45 mm DIN · IEC/EN 60947-4-1</div>
+            ` : `<div class="prot-meta cwrn">Corriente ${g.amps_unitario.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
+            <div class="prot-meta">+ ${g.cantidad}× <strong>ABB ${g.aux_guardamotor.model}</strong> · auxiliar SCADA · PID ${g.aux_guardamotor.pid}</div>
+          </div>
+        </div>`;
+      }).join('')}
     </div>`;
 }
 
-function renderTotalCard(r, nFans, iF) {
+function renderProtTotal(r) {
   const brk = r.breaker;
-  const n   = nFans || '?';
   return `
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
       <div class="prot-card prot-card--ok" style="min-width:200px">
         <div class="prot-label">Corriente total del sistema</div>
-        <div class="prot-val">${nFans ? r.amps_totales.toFixed(2) + ' A' : '—'}</div>
-        <div class="prot-meta">${n} ventiladores × ${iF.toFixed(2)} A</div>
+        <div class="prot-val">${r.amps_totales.toFixed(2)} A</div>
+        <div class="prot-meta">Σ de ${r.n_total} ventiladores en ${r.grupos.length} grupo${r.grupos.length === 1 ? '' : 's'}</div>
       </div>
       <div class="prot-card prot-card--info" style="min-width:200px">
         <div class="prot-label">Corriente mínima del breaker</div>
-        <div class="prot-val">${nFans ? r.amps_min_breaker.toFixed(2) + ' A' : '—'}</div>
+        <div class="prot-val">${r.amps_min_breaker.toFixed(2)} A</div>
         <div class="prot-meta">Factor seguridad NEC 430 (×1.25)</div>
       </div>
-      <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:280px">
+      <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:260px">
         <div class="prot-label">Breaker principal sugerido</div>
         ${brk ? `
           <div class="prot-val">ABB ${brk.model}</div>
           <div class="prot-meta">In = ${brk.in} A · 3P · Curva C · 6 kA</div>
           <div class="prot-meta">PID: ${brk.pid} · Pérdidas: ${brk.power_w} W</div>
-        ` : `<div class="prot-meta">${nFans ? `Corriente requerida ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (máx. 50 A). Consultar familia superior.` : 'Calcule el sistema para sugerir breaker.'}</div>`}
+        ` : `<div class="prot-meta cwrn">Corriente ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (50 A). Consultar familia superior.</div>`}
       </div>
-      <div class="prot-card prot-card--info" style="min-width:240px">
-        <div class="prot-label">Contacto auxiliar SCADA (1 por breaker)</div>
+      <div class="prot-card prot-card--info" style="min-width:220px">
+        <div class="prot-label">Auxiliar breaker SCADA (1 ud)</div>
         <div class="prot-val">ABB ${r.aux_breaker.model}</div>
-        <div class="prot-meta">${r.aux_breaker.desc}</div>
-        <div class="prot-meta">PID: ${r.aux_breaker.pid}</div>
+        <div class="prot-meta">PID: ${r.aux_breaker.pid} · ${r.aux_breaker.desc}</div>
       </div>
+      ${r.kw_totales > 0 ? `
+      <div class="prot-card prot-card--info" style="min-width:180px">
+        <div class="prot-label">Potencia eléctrica total</div>
+        <div class="prot-val">${r.kw_totales.toFixed(2)} kW</div>
+        <div class="prot-meta">Σ de potencias absorbidas P₁</div>
+      </div>` : ''}
+      ${r.peso_total > 0 ? `
+      <div class="prot-card prot-card--info" style="min-width:180px">
+        <div class="prot-label">Peso total motoventiladores</div>
+        <div class="prot-val">${r.peso_total.toFixed(1)} kg</div>
+        <div class="prot-meta">Σ por unidad × cantidad</div>
+      </div>` : ''}
     </div>`;
 }
 
-function renderListaMateriales(fan, conn, iF, r) {
+function renderListaMaterialesMix(r) {
   const items = [];
-  if (r.guardamotor)     items.push(`${r.n_fans || 1}× <strong>ABB ${r.guardamotor.model}</strong> · PID ${r.guardamotor.pid} · setting ${iF.toFixed(2)} A`);
-  if (r.aux_guardamotor) items.push(`${r.n_fans || 1}× <strong>ABB ${r.aux_guardamotor.model}</strong> · PID ${r.aux_guardamotor.pid} · contacto auxiliar SCADA`);
-  if (r.breaker)         items.push(`1× <strong>ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P`);
-  if (r.aux_breaker)     items.push(`1× <strong>ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
+  for (const g of r.grupos) {
+    items.push(`${g.cantidad}× <strong>${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</strong> · motoventilador`);
+    if (g.guardamotor) items.push(`${g.cantidad}× <strong>ABB ${g.guardamotor.model}</strong> · PID ${g.guardamotor.pid} · setting ${g.amps_unitario.toFixed(2)} A · guardamotor para ${escaparHtml(g.modelo)}`);
+    if (g.aux_guardamotor) items.push(`${g.cantidad}× <strong>ABB ${g.aux_guardamotor.model}</strong> · PID ${g.aux_guardamotor.pid} · auxiliar SCADA del guardamotor`);
+  }
+  if (r.breaker)     items.push(`1× <strong>ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema completo`);
+  if (r.aux_breaker) items.push(`1× <strong>ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
   if (!items.length) return '';
   return `
-    <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica</div>
+    <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica del mix</div>
     <ul style="margin:6px 0 0 18px;padding:0;color:var(--ink-2);font-size:13px;line-height:1.7">
       ${items.map(i => `<li>${i}</li>`).join('')}
     </ul>`;
 }
+
 
 /* ─── Zoom y rango del gráfico ──────────────────────────────── */
 
@@ -531,7 +722,10 @@ function upd() {
   $('cfm-disp').textContent     = formatearNumero(r.cfm_nivel_mar) + ' CFM';
   $('cfm-alt-disp').textContent = formatearNumero(r.cfm_corregido) + ' CFM';
 
-  updateCells();
+  // Recalcular tabla del mix (estado APROBADO/NO depende del CFM
+  // requerido) + protección eléctrica.
+  renderMix();
+  calcProtection();
   if (!state.chart) return;
   state.chart._interpPct = getPct();
   state.chart._onan      = r.onan;
@@ -859,6 +1053,168 @@ function radiadorDiagramSVG() {
   </svg>`;
 }
 
+/* ─── Modal "Registrar acción de mantenimiento" ─────────────── */
+//
+// Abre un modal que captura una descripción + estado + fechas, y
+// persiste un snapshot completo del cálculo en la colección
+// `acciones_refrigeracion` de Firestore. La pestaña "Consolidado
+// Sistemas de Refrigeración" suscribe a esa colección y refleja
+// la acción inmediatamente vía onSnapshot.
+
+function openModalAccion() {
+  const modal = $('modalAccion');
+  if (!modal) return;
+  if (state.mix.length === 0) {
+    alert('Agregue al menos un modelo al mix antes de registrar la acción.');
+    return;
+  }
+  // Pre-llenado: fecha de hoy + resumen del mix
+  const hoy = new Date().toISOString().slice(0, 10);
+  $('acc_fecha').value = hoy;
+  $('acc_estado').value = 'planificada';
+  $('acc_descripcion').value = '';
+  $('acc_observaciones').value = '';
+  $('acc_fecha_ej').value = '';
+  $('acc_status').textContent = '';
+  $('acc_status').className = 'sgm-modal-status';
+
+  // Resumen del cálculo
+  const resumen = $('modalAccionResumen');
+  if (resumen && state.lastEval) {
+    const ev = state.lastEval;
+    const matricula = (_val('mat_input').trim()) || '—';
+    const sub = _val('t_sub') || '—';
+    const aprobado = ev.aprobado;
+    resumen.innerHTML = `
+      <div><b>Transformador:</b> ${escaparHtml(matricula)} · <b>Subestación:</b> ${escaparHtml(sub)}</div>
+      <div><b>Mix:</b> ${state.mix.length} modelo(s) · ${ev.n_unidades_total} unidades · ${formatearNumero(ev.cfm_aporte_total)} CFM total</div>
+      <div><b>CFM requerido:</b> ${formatearNumero(state.cfmReq)} · <b>Cobertura:</b> ${ev.cobertura_pct !== null ? ev.cobertura_pct.toFixed(1) + '%' : '—'} · <b>Estado:</b> <span style="color:${aprobado ? '#1b5e20' : '#b71c1c'}">${aprobado ? '✓ APROBADO' : '✗ NO APROBADO'}</span></div>
+    `;
+  }
+  modal.hidden = false;
+  setTimeout(() => $('acc_descripcion')?.focus(), 50);
+}
+
+function closeModalAccion() {
+  const modal = $('modalAccion');
+  if (modal) modal.hidden = true;
+}
+
+async function guardarAccion() {
+  const status = $('acc_status');
+  const btnGuardar = $('btnGuardarAccion');
+  const setStatus = (msg, kind = 'info') => {
+    status.textContent = msg;
+    status.className = 'sgm-modal-status is-' + kind;
+  };
+  try {
+    btnGuardar.disabled = true;
+    setStatus('Guardando…', 'info');
+
+    // 1) Lectura del modal
+    const descripcion   = $('acc_descripcion').value.trim();
+    const estado        = $('acc_estado').value;
+    const fechaAccion   = $('acc_fecha').value;
+    const fechaEj       = $('acc_fecha_ej').value;
+    const observaciones = $('acc_observaciones').value.trim();
+
+    if (!descripcion || descripcion.length < 10) {
+      throw new Error('La descripción debe tener al menos 10 caracteres.');
+    }
+    if (!fechaAccion) throw new Error('La fecha de la acción es obligatoria.');
+
+    // 2) Lectura del formulario completo
+    const matricula = (_val('mat_input').trim()) || '';
+    if (!matricula) throw new Error('Selecciona un transformador (matrícula AFINIA) antes de registrar la acción.');
+
+    // 3) Snapshot del cálculo
+    const cfmCalc = calcularRefrigeracion({ kva_onan: getOnan(), pct: getPct(), alt: getAlt() });
+    const mixForEval = state.mix.map(it => ({
+      key: it.key, modelo: it.modelo, marca: it.marca,
+      cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+    }));
+    const evaluacion = evaluarMixVentiladores({ items: mixForEval, cfm_requerido: cfmCalc.cfm_nivel_mar });
+    const connKey = getMotorConn();
+    const itemsProt = state.mix.map(it => {
+      const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
+      return {
+        key: it.key, modelo: it.modelo, marca: it.marca, cantidad: it.cantidad,
+        amps_unitario: Number.isFinite(iU) ? iU : 0,
+        kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,
+        peso_unitario: +it.ficha?.fan_peso || 0
+      };
+    });
+    const proteccion = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    const compat = evaluarCompatibilidad({
+      A: parseFloat(_val('rad_A')), B: parseFloat(_val('rad_B')), C: parseFloat(_val('rad_C')),
+      diametro_mm: parseFloat(_val('fan_diam')), distancia_mm: parseFloat(_val('mon_dist')),
+      disposicion: _val('disposicion')
+    });
+
+    // 4) Identidad del usuario logueado
+    const session = window.__sgmSession || {};
+    const responsable_uid    = session.user?.uid || '';
+    const responsable_email  = session.user?.email || session.profile?.email || '';
+    const responsable_nombre = session.profile?.nombre || responsable_email || 'Responsable';
+
+    // 5) Payload final
+    const payload = {
+      transformador_id: matricula,        // El catálogo AFINIA usa la matrícula como ID
+      matricula,
+      proyecto:      _val('proyecto').trim(),
+      subestacion:   _val('t_sub'),
+      zona:          _val('t_zona'),
+      departamento:  _val('t_dept'),
+      grupo:         _val('t_grupo'),
+      serie:         _val('t_serie'),
+      refrigeracion: _val('t_refrig'),
+
+      kva_onan:      getOnan(),
+      kva_onaf:      getOnaf(),
+      pct:           getPct(),
+      altitud:       getAlt(),
+      cfm_requerido: cfmCalc.cfm_nivel_mar,
+      cfm_corregido: cfmCalc.cfm_corregido,
+
+      mix: state.mix.map(it => ({
+        key:          it.key,
+        marca:        it.marca,
+        modelo:       it.modelo,
+        cfm_unitario: it.cfm_unitario,
+        cantidad:     it.cantidad,
+        ficha:        { ...(it.ficha || {}) }      // unfreeze para serializar
+      })),
+      evaluacion,
+      proteccion,
+      compatibilidad: compat,
+
+      accion_descripcion: descripcion,
+      estado_accion:      estado,
+      fecha_accion:       fechaAccion,
+      fecha_ejecucion:    fechaEj || '',
+      observaciones,
+
+      responsable_uid,
+      responsable_nombre,
+      responsable_email
+    };
+
+    // 6) Persistir vía data layer (lazy import)
+    const mod = await import('./data/acciones_refrigeracion.js');
+    if (!mod.isReady()) {
+      throw new Error('Firebase no está configurado · contacte al administrador.');
+    }
+    const id = await mod.crear(payload, responsable_uid);
+    setStatus(`✓ Acción registrada con ID ${id}`, 'success');
+    setTimeout(closeModalAccion, 1500);
+  } catch (err) {
+    console.error('[acciones_refrigeracion] guardarAccion failed:', err);
+    setStatus('✗ ' + (err?.message || String(err)), 'error');
+  } finally {
+    btnGuardar.disabled = false;
+  }
+}
+
 function generateReport() {
   try {
     const win = window.open('', '_blank', 'width=1100,height=900');
@@ -931,67 +1287,153 @@ function generateReport() {
         <td>${escaparHtml(c.desc || '—')}</td>
       </tr>`;
 
-    // Tabla del calculador de ventiladores
-    const fanRows = state.fans.map((f, i) => {
-      const c = calcularUnidadesRequeridas({ cfm_total: state.cfmReq, cfm_fan: f.cfm });
-      return `<tr>
-        <td class="tc">${i + 1}</td>
-        <td>${escaparHtml(f.desc) || `Opción ${i + 1}`}</td>
-        <td class="tr mono">${f.cfm > 0 ? formatearNumero(f.cfm) : '—'}</td>
-        <td class="tc mono"><strong>${c.n ?? '—'}</strong></td>
-        <td class="tr mono">${c.n !== null ? formatearNumero(c.cfm_logrado) : '—'}</td>
-        <td class="tr mono">${c.cobertura_pct !== null ? c.cobertura_pct + '%' : '—'}</td>
-        <td class="tr mono">${c.n !== null ? formatearNumero(c.exceso) : '—'}</td>
-        <td class="tc">${c.n !== null ? (c.ok ? '<span class="ok">✓</span>' : '<span class="ko">✗</span>') : '—'}</td>
-      </tr>`;
-    }).join('') || '<tr><td colspan="8" class="tc" style="font-style:italic;color:#888;padding:14px">Sin opciones registradas</td></tr>';
+    // ── Mix: snapshot de evaluación + protección + sugerencias ──
+    //
+    // El informe lee state.mix como fuente de verdad. Si el director
+    // generó el informe sin agregar nada al mix, se cae con un aviso
+    // legible. Las funciones puras del dominio garantizan idempotencia.
+    const connKey = getMotorConn();
+    const mixForEval = state.mix.map(it => ({
+      key: it.key, modelo: it.modelo, marca: it.marca,
+      cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+    }));
+    const mixEval = evaluarMixVentiladores({
+      items: mixForEval,
+      cfm_requerido: state.cfmReq
+    });
+    const fanDb = state.fanDb || {};
+    const mixSugs = (mixEval.estado === MIX_ESTADO.NO_APROBADO)
+      ? sugerirMejoras({
+          items: mixForEval,
+          cfm_requerido: state.cfmReq,
+          fan_db: fanDb,
+          max_sugerencias: 3
+        })
+      : [];
 
-    // Mejor opción (la de menor número de unidades que cumple)
-    const fanResults = state.fans
-      .map(f => ({ f, ...calcularUnidadesRequeridas({ cfm_total: state.cfmReq, cfm_fan: f.cfm }) }))
-      .filter(r => r.ok);
-    const best = fanResults.length ? fanResults.reduce((a, b) => b.n < a.n ? b : a) : null;
+    // Filas del mix en la tabla del informe
+    const mixRows = state.mix.length === 0
+      ? `<tr><td colspan="7" class="tc" style="font-style:italic;color:#888;padding:14px">Sin modelos agregados al mix · use "Agregar al mix" en la calculadora antes de exportar.</td></tr>`
+      : mixEval.items.map((it, i) => `<tr>
+          <td class="tc">${i + 1}</td>
+          <td>${escaparHtml(it.marca)}</td>
+          <td>${escaparHtml(it.modelo)}</td>
+          <td class="tr mono">${formatearNumero(it.cfm_unitario)}</td>
+          <td class="tc mono"><strong>${it.cantidad}</strong></td>
+          <td class="tr mono"><strong>${formatearNumero(it.cfm_aporte)}</strong></td>
+          <td class="tr mono">${it.aporte_pct !== null ? it.aporte_pct.toFixed(1) + '%' : '—'}</td>
+        </tr>`).join('');
 
-    // Protección eléctrica (solo si hay datos)
-    const iF = extraerCorrienteFan(fan.amp, getMotorConn());
-    const f0 = state.fans[0];
-    const nF = (f0 && f0.cfm > 0 && state.cfmReq > 0) ? Math.ceil(state.cfmReq / f0.cfm) : 0;
+    // Protección eléctrica — agrupada por modelo via dominio puro
+    const itemsProt = state.mix.map(it => {
+      const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
+      return {
+        key:           it.key,
+        modelo:        it.modelo,
+        marca:         it.marca,
+        cantidad:      it.cantidad,
+        amps_unitario: Number.isFinite(iU) ? iU : 0,
+        kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,
+        peso_unitario: +it.ficha?.fan_peso || 0,
+        cosphi:        +it.ficha?.fan_cosphi || 0
+      };
+    });
+    const protMix = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+
+    // Suma de potencia aparente sobre los grupos: S_grupo = P_grupo / cosφ_grupo
+    const kvaTotalMix = itemsProt.reduce((s, it) => {
+      if (!it.cosphi || !it.kw_unitario || !it.cantidad) return s;
+      return s + (it.kw_unitario * it.cantidad / it.cosphi);
+    }, 0);
+
     let protBlock, materiales;
-    if (iF !== null && Number.isFinite(iF) && nF > 0) {
-      const p = calcularProteccionElectrica({ amps_por_fan: iF, n_fans: nF });
-      const kwTot = parseFloat(fan.kw) ? (parseFloat(fan.kw) * nF / 1000).toFixed(2) : '—';
-      const pesoTot = parseFloat(fan.peso) ? (parseFloat(fan.peso) * nF).toFixed(1) : '—';
-      const cosphi = parseFloat(fan.cosphi) || null;
-      const kvaTot = (parseFloat(fan.kw) && cosphi) ? (parseFloat(fan.kw) * nF / cosphi / 1000).toFixed(2) : null;
+    if (state.mix.length > 0 && protMix.amps_totales > 0) {
+      // Tabla resumen con grupos (una fila por modelo) + totales
+      const filasGrupos = protMix.grupos.map(g => `
+        <tr>
+          <td>${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</td>
+          <td class="tc mono">${g.cantidad}</td>
+          <td class="tr mono">${g.amps_unitario.toFixed(2)} A</td>
+          <td class="tr mono"><strong>${g.amps_grupo.toFixed(2)} A</strong></td>
+          <td class="mono">${g.guardamotor ? `${g.cantidad} × ABB ${g.guardamotor.model}` : 'Fuera de catálogo MS116'}</td>
+          <td class="mono">${g.guardamotor ? `setting ${g.amps_unitario.toFixed(2)} A · PID ${g.guardamotor.pid}` : '—'}</td>
+        </tr>`).join('');
       protBlock = `
-        <table class="rpt-table">
+        <table class="ft">
+          <thead>
+            <tr>
+              <th>Grupo · Marca / Modelo</th>
+              <th class="tc" style="width:50px">Cant.</th>
+              <th class="tr" style="width:80px">A / unidad</th>
+              <th class="tr" style="width:90px">A grupo</th>
+              <th>Guardamotor (1 por unidad)</th>
+              <th>Detalles</th>
+            </tr>
+          </thead>
+          <tbody>${filasGrupos}</tbody>
+          <tfoot>
+            <tr style="background:#f0f7ff;font-weight:600">
+              <td><strong>Σ Sistema completo (mix)</strong></td>
+              <td class="tc mono">${protMix.n_total}</td>
+              <td class="tr mono">—</td>
+              <td class="tr mono"><strong>${protMix.amps_totales.toFixed(2)} A</strong></td>
+              <td class="mono">1 × Breaker ${protMix.breaker ? 'ABB ' + protMix.breaker.model : '—'}</td>
+              <td class="mono">${protMix.breaker ? `In ${protMix.breaker.in} A · PID ${protMix.breaker.pid}` : 'Excede S203 (50 A)'}</td>
+            </tr>
+          </tfoot>
+        </table>
+        <table class="rpt-table" style="margin-top:8pt">
           <tbody>
             ${_row('Conexión motor', conn)}
-            ${_row('Corriente nominal por ventilador', iF.toFixed(2) + ' A', true)}
-            ${_row('Cantidad de ventiladores', nF + ' unidades', true)}
-            ${_row('Corriente total del sistema', p.amps_totales.toFixed(2) + ' A', true)}
-            ${_row('Corriente mínima del breaker (×1.25 NEC 430)', p.amps_min_breaker.toFixed(2) + ' A', true)}
-            ${_row('Potencia eléctrica total absorbida', kwTot + ' kW', true)}
-            ${kvaTot ? _row('Potencia aparente total (S = P/cos φ)', kvaTot + ' kVA', true) : ''}
-            ${_row('Peso total motoventiladores', pesoTot + ' kg', true)}
-            ${_row('Cantidad guardamotores',         nF + ' unidades', true)}
-            ${_row('Guardamotor sugerido',            p.guardamotor ? `${nF} × ABB ${p.guardamotor.model} · PID ${p.guardamotor.pid} · setting ${iF.toFixed(2)} A` : 'Fuera de catálogo MS116')}
-            ${_row('Cantidad breakers principales',   '1 unidad', true)}
-            ${_row('Breaker principal sugerido',      p.breaker ? `1 × ABB ${p.breaker.model} · ${p.breaker.in} A · PID ${p.breaker.pid} · pérdidas ${p.breaker.power_w} W` : 'Excede catálogo S203 (50 A) — consultar familia superior')}
-            ${_row('Cantidad auxiliares guardamotor', nF + ' unidades', true)}
-            ${_row('Auxiliar guardamotor (SCADA)',    `${nF} × ABB ${p.aux_guardamotor.model} · PID ${p.aux_guardamotor.pid}`)}
-            ${_row('Cantidad auxiliares breaker',     '1 unidad', true)}
-            ${_row('Auxiliar breaker (SCADA)',        `1 × ABB ${p.aux_breaker.model} · PID ${p.aux_breaker.pid}`)}
+            ${_row('Corriente total del sistema (Σ grupos)', protMix.amps_totales.toFixed(2) + ' A', true)}
+            ${_row('Corriente mínima del breaker (×1.25 NEC 430)', protMix.amps_min_breaker.toFixed(2) + ' A', true)}
+            ${_row('Potencia eléctrica total absorbida (Σ kW grupos)', protMix.kw_totales.toFixed(2) + ' kW', true)}
+            ${kvaTotalMix > 0 ? _row('Potencia aparente total (S = Σ P/cos φ)', kvaTotalMix.toFixed(2) + ' kVA', true) : ''}
+            ${_row('Peso total motoventiladores (Σ peso × cant)', protMix.peso_total.toFixed(1) + ' kg', true)}
+            ${_row('Auxiliar breaker (SCADA)', `1 × ABB ${protMix.aux_breaker.model} · PID ${protMix.aux_breaker.pid}`)}
           </tbody>
         </table>`;
-      // Lista de materiales con cantidades y PIDs
-      const items = [
-        { qty: nF, model: `Motoventilador ${escaparHtml(fan.marca)} ${escaparHtml(fan.modelo)}`, pid: escaparHtml(fan.nserie || '—'), notes: `${fan.diam || '?'} mm Ø · ${fan.cfm_nom || '?'} CFM · ${fan.hz || '?'} Hz` },
-        ...(p.guardamotor ? [{ qty: nF, model: `Guardamotor ABB ${p.guardamotor.model}`, pid: p.guardamotor.pid, notes: `Rango ajuste ${p.guardamotor.min}–${p.guardamotor.max} A · setting ${iF.toFixed(2)} A` }] : []),
-        ...(p.aux_guardamotor ? [{ qty: nF, model: `Auxiliar guardamotor ABB ${p.aux_guardamotor.model}`, pid: p.aux_guardamotor.pid, notes: p.aux_guardamotor.desc }] : []),
-        ...(p.breaker ? [{ qty: 1, model: `Breaker principal ABB ${p.breaker.model}`, pid: p.breaker.pid, notes: `In ${p.breaker.in} A · 3P · Curva C · 6 kA · pérdidas ${p.breaker.power_w} W` }] : []),
-        { qty: 1, model: `Auxiliar breaker ABB ${p.aux_breaker.model}`, pid: p.aux_breaker.pid, notes: p.aux_breaker.desc }
-      ];
+
+      // Lista de materiales agrupada por modelo + ítems del sistema
+      const items = [];
+      for (const g of protMix.grupos) {
+        const itGrupo = state.mix.find(x => x.key === g.key);
+        const fch = itGrupo?.ficha || {};
+        items.push({
+          qty: g.cantidad,
+          model: `Motoventilador ${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}`,
+          pid: escaparHtml(fch.fan_nserie || '—'),
+          notes: `${fch.fan_diam || '?'} mm Ø · ${fch.fan_cfm_nom || '?'} CFM · ${fch.fan_hz || '?'} Hz · grupo ${g.amps_grupo.toFixed(2)} A`
+        });
+        if (g.guardamotor) {
+          items.push({
+            qty: g.cantidad,
+            model: `Guardamotor ABB ${g.guardamotor.model} (para ${escaparHtml(g.modelo)})`,
+            pid: g.guardamotor.pid,
+            notes: `Rango ajuste ${g.guardamotor.min}–${g.guardamotor.max} A · setting ${g.amps_unitario.toFixed(2)} A`
+          });
+        }
+        items.push({
+          qty: g.cantidad,
+          model: `Auxiliar guardamotor ABB ${g.aux_guardamotor.model}`,
+          pid: g.aux_guardamotor.pid,
+          notes: g.aux_guardamotor.desc
+        });
+      }
+      if (protMix.breaker) {
+        items.push({
+          qty: 1,
+          model: `Breaker principal ABB ${protMix.breaker.model}`,
+          pid: protMix.breaker.pid,
+          notes: `In ${protMix.breaker.in} A · 3P · Curva C · 6 kA · pérdidas ${protMix.breaker.power_w} W · cubre toda la corriente del mix (${protMix.amps_totales.toFixed(2)} A)`
+        });
+      }
+      items.push({
+        qty: 1,
+        model: `Auxiliar breaker ABB ${protMix.aux_breaker.model}`,
+        pid: protMix.aux_breaker.pid,
+        notes: protMix.aux_breaker.desc
+      });
       materiales = `
         <table class="ft">
           <thead>
@@ -1013,8 +1455,8 @@ function generateReport() {
             </tr>`).join('')}</tbody>
         </table>`;
     } else {
-      protBlock  = '<p style="font-style:italic;color:#888">Sin ficha de ventilador completa para evaluar la protección eléctrica.</p>';
-      materiales = '<p style="font-style:italic;color:#888">Lista de materiales no disponible — complete la ficha del ventilador y los parámetros del cálculo.</p>';
+      protBlock  = '<p style="font-style:italic;color:#888">Sin modelos en el mix con corriente válida · agregue al menos un modelo del catálogo y verifique conexión Δ/Y.</p>';
+      materiales = '<p style="font-style:italic;color:#888">Lista de materiales no disponible · agregue modelos al mix antes de exportar.</p>';
     }
 
     // Pre-cómputos para mostrar fórmulas con valores reales sustituidos
@@ -1025,18 +1467,18 @@ function generateReport() {
     const fAltFmt = r.factor_altitud.toFixed(4);
     const slopeFmt= r.pendiente.toFixed(3);
     const pctFmt  = getPct().toFixed(1);
-    // Para §8 — fórmula N aplicada con la mejor opción si existe
-    const formulaSeleccion = best
+    // §8 — fórmula del mix aplicada (suma de aportes por modelo)
+    const formulaSeleccion = state.mix.length > 0
       ? `<div class="formula-box">
-           <div class="l">Fórmula aplicada</div>
-           <div class="sym">N = ⌈ CFM<sub>total</sub> ÷ CFM<sub>fan</sub> ⌉</div>
-           <div class="apply">N = ⌈ ${formatearNumero(state.cfmReq)} ÷ ${formatearNumero(best.f.cfm)} ⌉ <span class="arrow">→</span> N = <span class="res">${best.n} unidades</span></div>
-           <div class="apply">CFM logrado = ${best.n} × ${formatearNumero(best.f.cfm)} = <span class="res">${formatearNumero(best.cfm_logrado)} CFM</span> · cobertura <span class="res">${best.cobertura_pct}%</span></div>
+           <div class="l">Fórmula del mix aplicada</div>
+           <div class="sym">CFM<sub>mix</sub> = Σ (Cantidad<sub>i</sub> × CFM<sub>unitario,i</sub>) <span class="arrow">≥</span> CFM<sub>requerido</sub></div>
+           <div class="apply">CFM<sub>mix</sub> = ${state.mix.map(it => `${it.cantidad} × ${formatearNumero(it.cfm_unitario)}`).join(' + ')} <span class="arrow">→</span> <span class="res">${formatearNumero(mixEval.cfm_aporte_total)} CFM</span></div>
+           <div class="apply">CFM<sub>requerido</sub> = <span class="res">${formatearNumero(state.cfmReq)} CFM</span> · cobertura ${mixEval.cobertura_pct !== null ? mixEval.cobertura_pct.toFixed(1) + '%' : '—'} · ${mixEval.aprobado ? `exceso ${formatearNumero(mixEval.exceso)} CFM` : `déficit ${formatearNumero(mixEval.deficit)} CFM`}</div>
          </div>`
       : `<div class="formula-box">
            <div class="l">Fórmula aplicable</div>
-           <div class="sym">N = ⌈ CFM<sub>total</sub> ÷ CFM<sub>fan</sub> ⌉</div>
-           <div class="apply">Cargue al menos una opción de ventilador con CFM válido para sustituir.</div>
+           <div class="sym">CFM<sub>mix</sub> = Σ (Cantidad<sub>i</sub> × CFM<sub>unitario,i</sub>)</div>
+           <div class="apply">Agregue al menos un modelo del catálogo al mix antes de exportar el informe.</div>
          </div>`;
 
     // §3 — fórmulas del cálculo de refrigeración aplicadas
@@ -1058,33 +1500,40 @@ function generateReport() {
         <div class="apply">CFM<sub>alt</sub> = ${cfmFmt} × ${fAltFmt} <span class="arrow">→</span> <span class="res">${cfmAlt} CFM</span></div>
       </div>`;
 
-    // §9 — fórmulas eléctricas aplicadas (cuando hay ventilador)
+    // §9 — fórmulas eléctricas aplicadas (mix multi-modelo)
     let formulaProt = '';
-    if (iF !== null && Number.isFinite(iF) && nF > 0) {
-      const iTot = (nF * iF).toFixed(2);
-      const iMin = (nF * iF * 1.25).toFixed(2);
+    if (state.mix.length > 0 && protMix.amps_totales > 0) {
+      const sumGrupos = protMix.grupos
+        .map(g => `(${g.cantidad} × ${g.amps_unitario.toFixed(2)} A)`)
+        .join(' + ');
       formulaProt = `
         <div class="formula-box">
-          <div class="l">Corriente total del sistema</div>
-          <div class="sym">I<sub>total</sub> = N × I<sub>fan</sub></div>
-          <div class="apply">I<sub>total</sub> = ${nF} × ${iF.toFixed(2)} A <span class="arrow">→</span> <span class="res">${iTot} A</span></div>
+          <div class="l">Corriente total del sistema (suma de grupos)</div>
+          <div class="sym">I<sub>total</sub> = Σ (Cantidad<sub>i</sub> × I<sub>unitario,i</sub>)</div>
+          <div class="apply">I<sub>total</sub> = ${sumGrupos} <span class="arrow">→</span> <span class="res">${protMix.amps_totales.toFixed(2)} A</span></div>
         </div>
         <div class="formula-box">
-          <div class="l">Corriente mínima del breaker (NEC 430 — factor de seguridad ×1.25)</div>
+          <div class="l">Corriente mínima del breaker principal (NEC 430 — factor de seguridad ×1.25)</div>
           <div class="sym">I<sub>min,breaker</sub> = 1.25 × I<sub>total</sub></div>
-          <div class="apply">I<sub>min,breaker</sub> = 1.25 × ${iTot} A <span class="arrow">→</span> <span class="res">${iMin} A</span></div>
+          <div class="apply">I<sub>min,breaker</sub> = 1.25 × ${protMix.amps_totales.toFixed(2)} A <span class="arrow">→</span> <span class="res">${protMix.amps_min_breaker.toFixed(2)} A</span></div>
         </div>
-        ${parseFloat(fan.kw) ? `
+        ${protMix.kw_totales > 0 ? `
         <div class="formula-box">
-          <div class="l">Potencia eléctrica total absorbida</div>
-          <div class="sym">P<sub>total</sub> = N × P<sub>1,fan</sub></div>
-          <div class="apply">P<sub>total</sub> = ${nF} × ${fan.kw} W <span class="arrow">→</span> <span class="res">${(parseFloat(fan.kw) * nF / 1000).toFixed(2)} kW</span></div>
+          <div class="l">Potencia eléctrica total absorbida (Σ por grupo)</div>
+          <div class="sym">P<sub>total</sub> = Σ (Cantidad<sub>i</sub> × P<sub>1,i</sub>)</div>
+          <div class="apply">P<sub>total</sub> = <span class="res">${protMix.kw_totales.toFixed(2)} kW</span></div>
         </div>` : ''}
-        ${(parseFloat(fan.kw) && parseFloat(fan.cosphi)) ? `
+        ${kvaTotalMix > 0 ? `
         <div class="formula-box">
-          <div class="l">Potencia aparente total</div>
-          <div class="sym">S<sub>total</sub> = P<sub>total</sub> / cos φ</div>
-          <div class="apply">S<sub>total</sub> = ${(parseFloat(fan.kw) * nF / 1000).toFixed(2)} kW / ${fan.cosphi} <span class="arrow">→</span> <span class="res">${(parseFloat(fan.kw) * nF / parseFloat(fan.cosphi) / 1000).toFixed(2)} kVA</span></div>
+          <div class="l">Potencia aparente total (Σ por grupo / cos φ del grupo)</div>
+          <div class="sym">S<sub>total</sub> = Σ (P<sub>i</sub> / cos φ<sub>i</sub>)</div>
+          <div class="apply">S<sub>total</sub> = <span class="res">${kvaTotalMix.toFixed(2)} kVA</span></div>
+        </div>` : ''}
+        ${protMix.peso_total > 0 ? `
+        <div class="formula-box">
+          <div class="l">Peso total del conjunto motoventiladores</div>
+          <div class="sym">W<sub>total</sub> = Σ (Cantidad<sub>i</sub> × Peso<sub>unitario,i</sub>)</div>
+          <div class="apply">W<sub>total</sub> = <span class="res">${protMix.peso_total.toFixed(1)} kg</span></div>
         </div>` : ''}`;
     }
 
@@ -1477,46 +1926,61 @@ function generateReport() {
     </tbody>
   </table>
 
-  <!-- ── 5 · DATOS DEL MOTOVENTILADOR ───────────────────── -->
+  <!-- ── 5 · DATOS DE LOS MOTOVENTILADORES (mix multi-modelo) ── -->
   <section class="section-anchor">
-    <h2>5. Datos del motoventilador</h2>
-    <h3>Identificación y aerodinámica</h3>
-    <table class="rpt-table">
-      <tbody>
-        ${_row('Marca',                 fan.marca)}
-        ${_row('Modelo / Referencia',   fan.modelo)}
-        ${_row('N.° artículo / parte',  fan.nserie)}
-        ${_row('Tipo de pala',          fan.tipo)}
-        ${_row('Diámetro nominal (mm)', fan.diam,    true)}
-        ${_row('Número de aspas',       fan.aspas,   true)}
-        ${_row('RPM nominal',           fan.rpm,     true)}
-        ${_row('Posición de montaje',   fan.montaje)}
-        ${_row('Peso conjunto (kg)',    fan.peso,    true)}
-        ${_row('Caudal de entrada',     fan.flow_val ? `${fan.flow_val} ${ETIQUETAS_CAUDAL_ALT[fan.flow_unit] || fan.flow_unit}` : '—', true)}
-        ${_row('CFM nominal (ft³/min)', fan.cfm_nom, true)}
-        ${_row('Equivalente m³/s',      fan.m3s,     true)}
-      </tbody>
-    </table>
+    <h2>5. Datos de los motoventiladores del mix</h2>
+    <p class="meta">${state.mix.length === 0
+      ? 'Sin modelos agregados al mix · use "Agregar al mix" en la calculadora antes de exportar.'
+      : `El sistema combina <strong>${state.mix.length} modelo${state.mix.length === 1 ? '' : 's'}</strong> diferente${state.mix.length === 1 ? '' : 's'} de motoventilador. A continuación se detalla la ficha técnica completa de cada uno tal como fue cargada del catálogo certificado.`}
+    </p>
   </section>
-  <section class="section-anchor">
-    <h3>Motor eléctrico</h3>
-    <table class="rpt-table">
-      <tbody>
-        ${_row('Tensión nominal · conexión', fan.volt)}
-        ${_row('Frecuencia',                 fan.hz + ' Hz', true)}
-        ${_row('Potencia absorbida P₁',      fan.kw + ' W',  true)}
-        ${_row('Corriente nominal',          fan.amp,        true)}
-        ${_row('Factor de potencia cos φ',   fan.cosphi,     true)}
-        ${_row('Grado de protección',        fan.ip)}
-        ${_row('Clase de aislamiento',       fan.aislam)}
-        ${_row('Protección del motor',       fan.protmotor)}
-        ${_row('Temperatura mínima (°C)',    fan.tmin, true)}
-        ${_row('Sentido de rotación',        fan.sentido)}
-        ${_row('Certificación',              fan.cert)}
-        ${_row('Material palas / rotor',     fan.material)}
-      </tbody>
-    </table>
-  </section>
+  ${state.mix.map((it, idx) => {
+    const f = it.ficha || {};
+    const flow_unit = f.fan_flow_unit || '';
+    const flow_lbl = ETIQUETAS_CAUDAL_ALT[flow_unit] || flow_unit;
+    return `
+    <section class="section-anchor">
+      <h3>5.${idx + 1} · ${escaparHtml(it.marca)} ${escaparHtml(it.modelo)} · <span class="mono">${it.cantidad} unidad${it.cantidad === 1 ? '' : 'es'}</span></h3>
+      <p class="meta">Aporte de este modelo al mix: <strong class="mono">${formatearNumero(it.cantidad * it.cfm_unitario)} CFM</strong> (${it.cantidad} × ${formatearNumero(it.cfm_unitario)} CFM/u)</p>
+      <table class="rpt-table">
+        <tbody>
+          ${_row('Marca',                 it.marca)}
+          ${_row('Modelo / Referencia',   it.modelo)}
+          ${_row('N.° artículo / parte',  f.fan_nserie)}
+          ${_row('Tipo de pala',          f.fan_tipo_pala)}
+          ${_row('Diámetro nominal (mm)', f.fan_diam,    true)}
+          ${_row('Número de aspas',       f.fan_aspas,   true)}
+          ${_row('RPM nominal',           f.fan_rpm,     true)}
+          ${_row('Posición de montaje',   f.fan_montaje)}
+          ${_row('Peso unitario (kg)',    f.fan_peso,    true)}
+          ${_row('Peso del grupo (kg)',   f.fan_peso ? (f.fan_peso * it.cantidad).toFixed(1) : '—', true)}
+          ${_row('Caudal de entrada',     f.fan_flow_val ? `${f.fan_flow_val} ${flow_lbl}` : '—', true)}
+          ${_row('CFM nominal (ft³/min)', f.fan_cfm_nom, true)}
+          ${_row('Equivalente m³/s',      f.fan_m3s,     true)}
+        </tbody>
+      </table>
+    </section>
+    <section class="section-anchor">
+      <h3>5.${idx + 1}.1 · Motor eléctrico — ${escaparHtml(it.modelo)}</h3>
+      <table class="rpt-table">
+        <tbody>
+          ${_row('Tensión nominal · conexión', f.fan_volt)}
+          ${_row('Frecuencia',                 (f.fan_hz || '') + ' Hz', true)}
+          ${_row('Potencia absorbida P₁',      (f.fan_kw  || '') + ' W',  true)}
+          ${_row('Potencia del grupo (kW)',    f.fan_kw ? (f.fan_kw * it.cantidad / 1000).toFixed(2) : '—', true)}
+          ${_row('Corriente nominal',          f.fan_amp,        true)}
+          ${_row('Factor de potencia cos φ',   f.fan_cosphi,     true)}
+          ${_row('Grado de protección',        f.fan_ip)}
+          ${_row('Clase de aislamiento',       f.fan_aislam)}
+          ${_row('Protección del motor',       f.fan_protmotor)}
+          ${_row('Temperatura mínima (°C)',    f.fan_tmin, true)}
+          ${_row('Sentido de rotación',        f.fan_sentido)}
+          ${_row('Certificación',              f.fan_cert)}
+          ${_row('Material palas / rotor',     f.fan_material)}
+        </tbody>
+      </table>
+    </section>`;
+  }).join('')}
 
   <!-- ── 6 · MONTAJE SOBRE RADIADOR ─────────────────────── -->
   <section class="section-anchor">
@@ -1567,18 +2031,70 @@ function generateReport() {
     <thead>
       <tr>
         <th class="tc" style="width:30px">#</th>
-        <th>Descripción / modelo</th>
-        <th class="tr" style="width:80px">CFM/fan</th>
-        <th class="tc" style="width:65px">Unidades</th>
-        <th class="tr" style="width:90px">CFM logrado</th>
-        <th class="tr" style="width:70px">Cobertura</th>
-        <th class="tr" style="width:80px">Exceso</th>
-        <th class="tc" style="width:40px">OK</th>
+        <th>Marca</th>
+        <th>Modelo</th>
+        <th class="tr" style="width:90px">CFM / unidad</th>
+        <th class="tc" style="width:65px">Cantidad</th>
+        <th class="tr" style="width:120px">Aporte CFM</th>
+        <th class="tr" style="width:70px">Aporte %</th>
       </tr>
     </thead>
-    <tbody>${fanRows}</tbody>
+    <tbody>${mixRows}</tbody>
+    ${state.mix.length > 0 ? `<tfoot>
+      <tr style="background:#f0f7ff;font-weight:700">
+        <td colspan="4" class="tr">Σ Totales del mix</td>
+        <td class="tc mono">${mixEval.n_unidades_total}</td>
+        <td class="tr mono"><strong>${formatearNumero(mixEval.cfm_aporte_total)} CFM</strong></td>
+        <td class="tr mono">100%</td>
+      </tr>
+    </tfoot>` : ''}
   </table>
-  ${best ? `<div class="info-box"><strong>Recomendación:</strong> opción "${escaparHtml(best.f.desc) || `Opción ${state.fans.indexOf(best.f) + 1}`}" — <strong class="mono">${best.n} unidades</strong> de <strong class="mono">${formatearNumero(best.f.cfm)} CFM</strong> cubren el requerimiento con cobertura del <strong>${best.cobertura_pct}%</strong> y exceso de <strong class="mono">${formatearNumero(best.exceso)} CFM</strong>.<span class="best-mark">menor cantidad</span></div>` : ''}
+
+  <!-- Banner de estado del mix · APROBADO ✓ / NO APROBADO ✗ / SIN DATOS ── -->
+  ${state.mix.length > 0 ? `<div class="info-box" style="background:${
+    mixEval.aprobado ? '#e8f5e9' : '#ffebee'
+  };border-color:${
+    mixEval.aprobado ? '#81c784' : '#ef9a9a'
+  };color:${mixEval.aprobado ? '#1b5e20' : '#b71c1c'}">
+    <strong>${mixEval.aprobado ? '✓ Mix APROBADO' : '✗ Mix NO APROBADO'}:</strong>
+    ${escaparHtml(mixEval.mensaje)}
+    <br><span class="mono" style="font-size:7.5pt">Cobertura: <strong>${mixEval.cobertura_pct.toFixed(1)}%</strong> · ${
+      mixEval.aprobado
+        ? `Exceso: <strong>${formatearNumero(mixEval.exceso)} CFM</strong>`
+        : `Déficit: <strong>${formatearNumero(mixEval.deficit)} CFM</strong>`
+    } · Total ventiladores: <strong>${mixEval.n_unidades_total}</strong></span>
+  </div>` : ''}
+
+  <!-- Sugerencias del motor (solo si NO aprobado) ── -->
+  ${mixSugs.length > 0 ? `<section class="section-anchor">
+    <h3>Sugerencias para alcanzar el CFM requerido</h3>
+    <p class="meta">El sistema propone hasta 3 alternativas ordenadas por menor exceso (ajuste más fino primero) basadas en el catálogo certificado de motoventiladores.</p>
+    <table class="ft">
+      <thead>
+        <tr>
+          <th class="tc" style="width:30px">#</th>
+          <th style="width:90px">Estrategia</th>
+          <th>Acción propuesta</th>
+          <th class="tr" style="width:120px">CFM resultante</th>
+          <th class="tr" style="width:80px">Cobertura</th>
+          <th class="tr" style="width:80px">Exceso</th>
+        </tr>
+      </thead>
+      <tbody>${mixSugs.map((s, i) => `
+        <tr>
+          <td class="tc">${i + 1}</td>
+          <td><strong>${({
+            agregar_unidades: 'Agregar más unidades',
+            sustituir:        'Sustituir modelo débil',
+            agregar_modelo:   'Agregar modelo nuevo'
+          }[s.estrategia] || s.estrategia)}</strong></td>
+          <td>${escaparHtml(s.descripcion)}</td>
+          <td class="tr mono">${formatearNumero(s.cfm_aporte_total)} CFM</td>
+          <td class="tr mono">${s.cobertura_pct.toFixed(1)}%</td>
+          <td class="tr mono">${formatearNumero(s.exceso)} CFM</td>
+        </tr>`).join('')}</tbody>
+    </table>
+  </section>` : ''}
 
   <!-- ── 9 · PROTECCIÓN ELÉCTRICA ───────────────────────── -->
   <section class="section-anchor">
@@ -1775,27 +2291,34 @@ function bindEvents() {
   $('conn_D')?.addEventListener('change', calcProtection);
   $('conn_Y')?.addEventListener('change', calcProtection);
 
-  $('btnAddFan')?.addEventListener('click', addFan);
+  $('btnAddToMix')?.addEventListener('click', addToMix);
   $('btnExportReport')?.addEventListener('click', generateReport);
+  $('btnRegistrarAccion')?.addEventListener('click', openModalAccion);
+  $('btnGuardarAccion')?.addEventListener('click', guardarAccion);
   $('btnPrint')?.addEventListener('click', () => window.print());
 
-  // Delegación para inputs y botones generados dinámicamente en la tabla.
-  $('fan-tbody')?.addEventListener('input', (e) => {
-    const cfmId  = e.target?.dataset?.fanCfm;
-    const descId = e.target?.dataset?.fanDesc;
-    if (cfmId) {
-      const id = +cfmId;
-      const f = state.fans.find(x => x.id === id);
-      if (f) { f.cfm = +e.target.value || 0; updateCells(); }
-    } else if (descId) {
-      const id = +descId;
-      const f = state.fans.find(x => x.id === id);
-      if (f) f.desc = e.target.value;
-    }
+  // Cierre del modal: backdrop + botón ✕ + tecla Escape
+  document.querySelectorAll('[data-modal-close]').forEach(el => {
+    el.addEventListener('click', closeModalAccion);
   });
-  $('fan-tbody')?.addEventListener('click', (e) => {
-    const rid = e.target?.closest?.('[data-fan-remove]')?.dataset?.fanRemove;
-    if (rid) removeFan(+rid);
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('modalAccion')?.hidden) closeModalAccion();
+  });
+
+  // Delegación para los inputs de cantidad y botones de eliminar en
+  // la tabla del mix (filas dinámicas).
+  $('mix-tbody')?.addEventListener('input', (e) => {
+    const qtyId = e.target?.dataset?.mixQty;
+    if (qtyId) updateMixQty(+qtyId, e.target.value);
+  });
+  $('mix-tbody')?.addEventListener('click', (e) => {
+    const rid = e.target?.closest?.('[data-mix-remove]')?.dataset?.mixRemove;
+    if (rid) removeFromMix(+rid);
+  });
+  // Click sobre "Aplicar sugerencia" en el panel de sugerencias.
+  $('mix-suggestions')?.addEventListener('click', (e) => {
+    const idx = e.target?.closest?.('[data-mix-apply]')?.dataset?.mixApply;
+    if (idx !== undefined) applyMixSuggestion(+idx);
   });
 }
 
@@ -1825,7 +2348,7 @@ async function init() {
     await initMatSelect();
     bindEvents();
     initChart();
-    renderFans();
+    renderMix();
     upd();
     await calcProtection();
     bindReveal();

@@ -40,7 +40,11 @@ import {
   calcularYStep,
   calcularAutoRango,
   formatearNumero,
-  escaparHtml
+  escaparHtml,
+  MIX_ESTADO,
+  evaluarMixVentiladores,
+  sugerirMejoras,
+  calcularProteccionMix
 } from '../assets/js/domain/refrigeracion.js';
 
 /* ─── Constantes inmutables ─────────────────────────────────── */
@@ -397,4 +401,245 @@ test('escaparHtml escapa caracteres peligrosos', () => {
   assert.equal(escaparHtml(null), '');
   assert.equal(escaparHtml(undefined), '');
   assert.equal(escaparHtml(123), '123');
+});
+
+/* ─── Mix de ventiladores · multi-modelo con cantidades ──────── */
+
+test('MIX_ESTADO expone los 3 estados', () => {
+  assert.equal(MIX_ESTADO.APROBADO, 'aprobado');
+  assert.equal(MIX_ESTADO.NO_APROBADO, 'no_aprobado');
+  assert.equal(MIX_ESTADO.SIN_DATOS, 'sin_datos');
+});
+
+test('evaluarMixVentiladores: mix vacío o sin requerido devuelve sin_datos', () => {
+  const r1 = evaluarMixVentiladores({ items: [], cfm_requerido: 50000 });
+  assert.equal(r1.estado, 'sin_datos');
+  assert.equal(r1.aprobado, false);
+  const r2 = evaluarMixVentiladores({ items: [{ key: 'a', cfm_unitario: 5000, cantidad: 4 }], cfm_requerido: 0 });
+  assert.equal(r2.estado, 'sin_datos');
+});
+
+test('evaluarMixVentiladores: suma aportes y aprueba si cubre el requerido', () => {
+  const r = evaluarMixVentiladores({
+    items: [
+      { key: 'fn050', marca: 'ZIEHL-ABEGG', modelo: 'FN050', cfm_unitario: 4200, cantidad: 4 },
+      { key: 'fn063', marca: 'ZIEHL-ABEGG', modelo: 'FN063', cfm_unitario: 5933, cantidad: 8 },
+      { key: 'krenz', marca: 'KRENZ',       modelo: 'F20',   cfm_unitario: 7800, cantidad: 12 }
+    ],
+    cfm_requerido: 150000
+  });
+  assert.equal(r.cfm_aporte_total, 16800 + 47464 + 93600);
+  assert.equal(r.n_unidades_total, 24);
+  assert.equal(r.aprobado, true);
+  assert.equal(r.estado, 'aprobado');
+  assert.ok(r.cobertura_pct > 100);
+  assert.equal(r.deficit, 0);
+  assert.ok(r.exceso > 0);
+  assert.ok(r.mensaje.includes('aprobado'));
+});
+
+test('evaluarMixVentiladores: reporta no_aprobado con déficit cuando no cubre', () => {
+  const r = evaluarMixVentiladores({
+    items: [
+      { key: 'fn050', cfm_unitario: 4200, cantidad: 4 },
+      { key: 'fn063', cfm_unitario: 5933, cantidad: 8 }
+    ],
+    cfm_requerido: 159000
+  });
+  assert.equal(r.aprobado, false);
+  assert.equal(r.estado, 'no_aprobado');
+  assert.ok(r.deficit > 0);
+  assert.equal(r.exceso, 0);
+  assert.ok(r.cobertura_pct < 100);
+  assert.ok(r.mensaje.includes('NO aprobado'));
+});
+
+test('evaluarMixVentiladores: aporte_pct refleja contribución de cada modelo', () => {
+  const r = evaluarMixVentiladores({
+    items: [
+      { key: 'a', cfm_unitario: 5000, cantidad: 2 },
+      { key: 'b', cfm_unitario: 5000, cantidad: 2 }
+    ],
+    cfm_requerido: 10000
+  });
+  assert.equal(r.items[0].aporte_pct, 50.0);
+  assert.equal(r.items[1].aporte_pct, 50.0);
+});
+
+test('evaluarMixVentiladores: clamp de cantidades negativas a 0', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'x', cfm_unitario: 4000, cantidad: -3 }],
+    cfm_requerido: 10000
+  });
+  assert.equal(r.items[0].cantidad, 0);
+  assert.equal(r.cfm_aporte_total, 0);
+  assert.equal(r.estado, 'sin_datos');
+});
+
+test('sugerirMejoras: devuelve [] cuando el mix ya cubre', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 30 }],
+    cfm_requerido: 100000,
+    fan_db: { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } }
+  });
+  assert.deepEqual(sugs, []);
+});
+
+test('sugerirMejoras: devuelve [] sin cfm_requerido válido', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 4 }],
+    cfm_requerido: 0,
+    fan_db: {}
+  });
+  assert.deepEqual(sugs, []);
+});
+
+test('sugerirMejoras: estrategia agregar_unidades del modelo más eficiente del mix', () => {
+  const sugs = sugerirMejoras({
+    items: [
+      { key: 'fn050', marca: 'ZIEHL', modelo: 'FN050', cfm_unitario: 4200, cantidad: 4 },
+      { key: 'fn063', marca: 'ZIEHL', modelo: 'FN063', cfm_unitario: 5933, cantidad: 8 }
+    ],
+    cfm_requerido: 80000,
+    fan_db: {
+      fn050: { fan_marca: 'ZIEHL', fan_modelo: 'FN050', fan_cfm_nom: 4200 },
+      fn063: { fan_marca: 'ZIEHL', fan_modelo: 'FN063', fan_cfm_nom: 5933 }
+    }
+  });
+  const agregar = sugs.find(s => s.estrategia === 'agregar_unidades');
+  assert.ok(agregar, 'debe haber sugerencia agregar_unidades');
+  // El mejor del mix es FN063 (5933 CFM/u), no FN050
+  assert.equal(agregar.cambios[0].key, 'fn063');
+  assert.ok(agregar.aprobado);
+});
+
+test('sugerirMejoras: estrategia sustituir cambia el modelo más débil', () => {
+  const sugs = sugerirMejoras({
+    items: [
+      { key: 'small', marca: 'X', modelo: 'Small', cfm_unitario: 2000, cantidad: 10 }
+    ],
+    cfm_requerido: 50000,
+    fan_db: {
+      small:  { fan_marca: 'X', fan_modelo: 'Small',  fan_cfm_nom: 2000 },
+      medium: { fan_marca: 'X', fan_modelo: 'Medium', fan_cfm_nom: 4000 },
+      large:  { fan_marca: 'X', fan_modelo: 'Large',  fan_cfm_nom: 6000 }
+    },
+    max_sugerencias: 10
+  });
+  const sub = sugs.find(s => s.estrategia === 'sustituir');
+  assert.ok(sub, 'debe haber sugerencia sustituir');
+  assert.equal(sub.cambios.length, 2);
+  assert.equal(sub.cambios[0].accion, 'quitar');
+  assert.equal(sub.cambios[0].key, 'small');
+  assert.equal(sub.cambios[1].accion, 'agregar');
+  // El primer candidato que cubre debe ser medium (10 × 4000 = 40k < 50k → no cubre)
+  // entonces escoge large (10 × 6000 = 60k ≥ 50k → cubre)
+  assert.equal(sub.cambios[1].key, 'large');
+  assert.ok(sub.aprobado);
+});
+
+test('sugerirMejoras: estrategia agregar_modelo trae modelos que NO están en el mix', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'fn050', marca: 'ZIEHL', modelo: 'FN050', cfm_unitario: 4200, cantidad: 4 }],
+    cfm_requerido: 80000,
+    fan_db: {
+      fn050: { fan_marca: 'ZIEHL', fan_modelo: 'FN050', fan_cfm_nom: 4200 },
+      fn063: { fan_marca: 'ZIEHL', fan_modelo: 'FN063', fan_cfm_nom: 5933 },
+      krenz: { fan_marca: 'KRENZ', fan_modelo: 'F20',   fan_cfm_nom: 7800 }
+    }
+  });
+  const agregarMod = sugs.filter(s => s.estrategia === 'agregar_modelo');
+  assert.ok(agregarMod.length > 0, 'debe haber al menos una sugerencia agregar_modelo');
+  // Las sugerencias agregar_modelo NO deben mencionar fn050 (ya está en el mix)
+  for (const s of agregarMod) {
+    assert.notEqual(s.cambios[0].key, 'fn050');
+  }
+});
+
+test('sugerirMejoras: respeta max_sugerencias', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'small', cfm_unitario: 2000, cantidad: 4 }],
+    cfm_requerido: 100000,
+    fan_db: {
+      small:  { fan_marca: 'X', fan_modelo: 'S', fan_cfm_nom: 2000 },
+      medium: { fan_marca: 'X', fan_modelo: 'M', fan_cfm_nom: 4000 },
+      large:  { fan_marca: 'X', fan_modelo: 'L', fan_cfm_nom: 6000 },
+      xl:     { fan_marca: 'X', fan_modelo: 'XL', fan_cfm_nom: 8000 }
+    },
+    max_sugerencias: 2
+  });
+  assert.ok(sugs.length <= 2);
+});
+
+test('sugerirMejoras: ordena por menor exceso (ajuste más fino primero)', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 4000, cantidad: 5 }],
+    cfm_requerido: 30000,
+    fan_db: {
+      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000 },
+      b: { fan_marca: 'X', fan_modelo: 'B', fan_cfm_nom: 5000 },
+      c: { fan_marca: 'X', fan_modelo: 'C', fan_cfm_nom: 6000 }
+    }
+  });
+  for (let i = 1; i < sugs.length; i++) {
+    assert.ok(sugs[i - 1].exceso <= sugs[i].exceso, 'debe estar ordenado por exceso ASC');
+  }
+});
+
+test('calcularProteccionMix: mix vacío devuelve grupos vacío y totales en 0', () => {
+  const r = calcularProteccionMix({ items: [] });
+  assert.deepEqual(r.grupos, []);
+  assert.equal(r.n_total, 0);
+  assert.equal(r.amps_totales, 0);
+  assert.equal(r.amps_min_breaker, 0);
+  assert.equal(r.breaker, null);
+});
+
+test('calcularProteccionMix: agrupa por modelo · cada grupo lleva su guardamotor', () => {
+  const r = calcularProteccionMix({
+    items: [
+      { key: 'fn050', marca: 'ZIEHL', modelo: 'FN050', cantidad: 4, amps_unitario: 0.65, kw_unitario: 0.18, peso_unitario: 8.5 },
+      { key: 'fn063', marca: 'ZIEHL', modelo: 'FN063', cantidad: 8, amps_unitario: 1.13, kw_unitario: 0.30, peso_unitario: 14.2 }
+    ]
+  });
+  assert.equal(r.grupos.length, 2);
+  assert.equal(r.n_total, 12);
+  assert.ok(r.grupos[0].guardamotor); // 0.65 A → MS116-1.0
+  assert.ok(r.grupos[1].guardamotor); // 1.13 A → MS116-1.6
+  assert.equal(r.grupos[0].amps_grupo, +(4 * 0.65).toFixed(2));
+  assert.equal(r.grupos[1].amps_grupo, +(8 * 1.13).toFixed(2));
+  assert.equal(r.amps_totales, +(4 * 0.65 + 8 * 1.13).toFixed(2));
+  assert.equal(r.amps_min_breaker, +(r.amps_totales * 1.25).toFixed(2));
+  assert.ok(r.breaker, 'debe seleccionar un breaker S203');
+});
+
+test('calcularProteccionMix: kw y peso totales agregados', () => {
+  const r = calcularProteccionMix({
+    items: [
+      { key: 'a', cantidad: 4, amps_unitario: 1.0, kw_unitario: 0.20, peso_unitario: 10 },
+      { key: 'b', cantidad: 6, amps_unitario: 1.5, kw_unitario: 0.30, peso_unitario: 12 }
+    ]
+  });
+  assert.equal(r.kw_totales, +(4 * 0.20 + 6 * 0.30).toFixed(2));
+  assert.equal(r.peso_total, +(4 * 10 + 6 * 12).toFixed(2));
+});
+
+test('calcularProteccionMix: factor_seguridad personalizado', () => {
+  const r = calcularProteccionMix({
+    items: [{ key: 'a', cantidad: 4, amps_unitario: 1.0 }],
+    factor_seguridad: 1.5
+  });
+  assert.equal(r.amps_min_breaker, +(4.0 * 1.5).toFixed(2));
+});
+
+test('calcularProteccionMix: descarta items con cantidad o amperaje no positivos', () => {
+  const r = calcularProteccionMix({
+    items: [
+      { key: 'a', cantidad: 4, amps_unitario: 1.0 },
+      { key: 'b', cantidad: 0, amps_unitario: 2.0 },
+      { key: 'c', cantidad: 4, amps_unitario: 0 }
+    ]
+  });
+  assert.equal(r.grupos.length, 1);
+  assert.equal(r.grupos[0].key, 'a');
 });
