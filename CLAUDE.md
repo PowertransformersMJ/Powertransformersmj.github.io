@@ -267,6 +267,52 @@ salud de transformador, certificados de calibración, actas de
 brigada, etc. El mismo patrón flujo-natural + break-inside-avoid +
 captura-exhaustiva + BOM se reutiliza tal cual.
 
+**Refinamientos posteriores (sesión 2026-05-02 PM3):** después de
+revisar el primer informe AFINIA generado el director identificó
+tres errores adicionales que también deben evitarse:
+
+9. **Título h2 huérfano al final de página.** `break-after: avoid`
+   en el h2 NO basta — Chrome/Safari a veces lo ignoran si el bloque
+   siguiente es grande. Solución: envolver cada sección entera
+   (h2 + primera tabla/bloque) en un `<section class="section-anchor">`
+   con `break-inside: avoid`. Garantiza que el título y al menos su
+   primer contenido se mueven juntos a la siguiente hoja si no caben.
+
+10. **Fórmulas sin sustitución de valores.** Mostrar
+    `N = ⌈ CFM_total / CFM_fan ⌉` solo en forma simbólica es
+    insuficiente — el ingeniero necesita ver la fórmula APLICADA con
+    los valores reales del cálculo:
+      `N = ⌈ 159.000 ÷ 5.933 ⌉ → N = 27 unidades`
+    Patrón a usar: bloque `.formula-box` con dos líneas:
+    (a) fórmula simbólica en serif itálico (Cambria Math),
+    (b) fórmula sustituida con los inputs reales en mono + `→` + el
+    resultado destacado. Aplica a: pendiente Westinghouse, CFM
+    requerido (m × kVA), corrección altitud (e^(h/8500)), N de
+    ventiladores, corriente total (N × I), corriente mínima del
+    breaker (1.25 × I_total), potencia eléctrica (N × P₁), potencia
+    aparente (P/cos φ), peso conjunto (N × peso_unit). Toda fórmula
+    que se cite debe ir acompañada del cálculo numérico.
+
+11. **Diagrama de referencia A/B/C/D omitido.** El director siempre
+    espera ver el dibujo CAD del componente con las dimensiones
+    señalizadas, no solo la lista textual de qué significa cada
+    letra. Cuando el original tenga un diagrama (radiador con A=
+    altura, B=span obleas, C=ancho frente, D=tornillos del flanche;
+    o cualquier otro componente parametrizado por dimensiones), el
+    informe DEBE incluir el diagrama. Si no hay PNG disponible,
+    construirlo como SVG inline imitando el original (vista frontal
+    + vista en perspectiva o isométrica), con cotas codificadas por
+    color (mismo color que las leyendas del UI).
+
+**Lección de meta-proceso:** después de generar un informe nuevo, ANTES
+de cerrar la sesión, ejecutar mentalmente esta checklist:
+- ¿Fluye el contenido sin hojas en blanco?
+- ¿Cada h2 está visualmente con su contenido?
+- ¿Cada fórmula citada lleva su sustitución numérica?
+- ¿Cada componente con dimensiones lleva su diagrama?
+- ¿La lista de materiales tiene cantidades + PIDs?
+- ¿Los totales del sistema están todos calculados (kW, kVA, peso, A)?
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo

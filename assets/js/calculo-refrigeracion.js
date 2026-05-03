@@ -772,6 +772,93 @@ function _row(label, value, mono = false) {
   return `<tr><th>${escaparHtml(label)}</th><td${mono ? ' class="mono"' : ''}>${escaparHtml(v)}</td></tr>`;
 }
 
+/* SVG con la vista CAD del cuerpo de radiador (frontal + perspectiva)
+   con dimensiones A/B/C/D codificadas por color, replicando el modelo
+   de referencia AFINIA original. */
+function radiadorDiagramSVG() {
+  return `<svg viewBox="0 0 720 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama de referencia del cuerpo de radiador">
+    <!-- ── VISTA FRONTAL (cuerpo de obleas) ── -->
+    <g transform="translate(20, 20)">
+      <!-- Obleas (rectángulos verticales paralelos) -->
+      <rect x="0" y="22" width="240" height="220" fill="none" stroke="#222" stroke-width="0.8"/>
+      <g stroke="#444" stroke-width="0.55" fill="none">
+        ${Array.from({length: 22}, (_, i) => {
+          const x = 8 + i * 11;
+          return `<line x1="${x}" y1="28" x2="${x}" y2="236"/>`;
+        }).join('')}
+      </g>
+      <!-- Cabezales superior e inferior (codos/flanches) -->
+      <rect x="-14" y="6"   width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
+      <rect x="-14" y="234" width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
+      <rect x="232" y="6"   width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
+      <rect x="232" y="234" width="22" height="24" fill="none" stroke="#222" stroke-width="0.8"/>
+      <!-- Tubería conectora vertical izquierda -->
+      <line x1="-3" y1="30" x2="-3" y2="234" stroke="#222" stroke-width="0.6"/>
+      <line x1="243" y1="30" x2="243" y2="234" stroke="#222" stroke-width="0.6"/>
+
+      <!-- Dim B (verde) — distancia oblea inicial a oblea final, arriba -->
+      <g stroke="#2e7d32" stroke-width="1.2" fill="#2e7d32">
+        <line x1="8"   y1="-2" x2="8"   y2="22"/>
+        <line x1="239" y1="-2" x2="239" y2="22"/>
+        <line x1="8"   y1="6"  x2="239" y2="6"/>
+        <polygon points="8,6 14,3 14,9"/>
+        <polygon points="239,6 233,3 233,9"/>
+      </g>
+      <text x="124" y="-4" text-anchor="middle" fill="#2e7d32" font-size="22" font-weight="bold" font-family="Arial">B</text>
+
+      <!-- Dim A (rojo) — altura cuerpo radiador, lado derecho -->
+      <g stroke="#c62828" stroke-width="1.2" fill="#c62828">
+        <line x1="270" y1="22"  x2="282" y2="22"/>
+        <line x1="270" y1="242" x2="282" y2="242"/>
+        <line x1="276" y1="22"  x2="276" y2="242"/>
+        <polygon points="276,22 273,28 279,28"/>
+        <polygon points="276,242 273,236 279,236"/>
+      </g>
+      <text x="293" y="138" fill="#c62828" font-size="22" font-weight="bold" font-family="Arial">A</text>
+    </g>
+
+    <!-- ── VISTA EN PERSPECTIVA (cuerpo + flanche) ── -->
+    <g transform="translate(420, 20)">
+      <!-- Cuerpo principal en perspectiva isométrica -->
+      <polygon points="20,40 130,40 145,28 35,28" fill="#fff" stroke="#222" stroke-width="0.8"/>
+      <polygon points="130,40 145,28 145,238 130,250" fill="#f8f8f8" stroke="#222" stroke-width="0.8"/>
+      <polygon points="20,40 130,40 130,250 20,250" fill="#fff" stroke="#222" stroke-width="0.8"/>
+      <!-- Aletas del frente -->
+      <g stroke="#888" stroke-width="0.4" fill="none">
+        ${Array.from({length: 20}, (_, i) => {
+          const x = 24 + i * 5.5;
+          return `<line x1="${x}" y1="44" x2="${x}" y2="248"/>`;
+        }).join('')}
+      </g>
+      <!-- Tornillos del flanche superior -->
+      <circle cx="138" cy="14" r="2.5" fill="#222"/>
+      <circle cx="156" cy="6"  r="2.5" fill="#222"/>
+      <line x1="138" y1="14" x2="138" y2="28" stroke="#888" stroke-width="0.4"/>
+      <line x1="156" y1="6"  x2="156" y2="20" stroke="#888" stroke-width="0.4"/>
+
+      <!-- Dim C (rojo) — ancho de frente, lado izquierdo -->
+      <g stroke="#c62828" stroke-width="1.2" fill="#c62828">
+        <line x1="6"  y1="40"  x2="18" y2="40"/>
+        <line x1="6"  y1="250" x2="18" y2="250"/>
+        <line x1="12" y1="40"  x2="12" y2="250"/>
+        <polygon points="12,40 9,46 15,46"/>
+        <polygon points="12,250 9,244 15,244"/>
+      </g>
+      <text x="-8" y="148" fill="#c62828" font-size="22" font-weight="bold" font-family="Arial">C</text>
+
+      <!-- Dim D (cian) — distancia entre centros de tornillos -->
+      <g stroke="#0288d1" stroke-width="1.2" fill="#0288d1">
+        <line x1="138" y1="-4" x2="138" y2="14"/>
+        <line x1="156" y1="-4" x2="156" y2="6"/>
+        <line x1="138" y1="-2" x2="156" y2="-2"/>
+        <polygon points="138,-2 144,-5 144,1"/>
+        <polygon points="156,-2 150,-5 150,1"/>
+      </g>
+      <text x="147" y="-12" text-anchor="middle" fill="#0288d1" font-size="22" font-weight="bold" font-family="Arial">D</text>
+    </g>
+  </svg>`;
+}
+
 function generateReport() {
   try {
     const win = window.open('', '_blank', 'width=1100,height=900');
@@ -926,6 +1013,77 @@ function generateReport() {
       materiales = '<p style="font-style:italic;color:#888">Lista de materiales no disponible — complete la ficha del ventilador y los parámetros del cálculo.</p>';
     }
 
+    // Pre-cómputos para mostrar fórmulas con valores reales sustituidos
+    const onanFmt = formatearNumero(r.onan);
+    const cfmFmt  = formatearNumero(r.cfm_nivel_mar);
+    const cfmAlt  = formatearNumero(r.cfm_corregido);
+    const altFmt  = formatearNumero(getAlt());
+    const fAltFmt = r.factor_altitud.toFixed(4);
+    const slopeFmt= r.pendiente.toFixed(3);
+    const pctFmt  = getPct().toFixed(1);
+    // Para §8 — fórmula N aplicada con la mejor opción si existe
+    const formulaSeleccion = best
+      ? `<div class="formula-box">
+           <div class="l">Fórmula aplicada</div>
+           <div class="sym">N = ⌈ CFM<sub>total</sub> ÷ CFM<sub>fan</sub> ⌉</div>
+           <div class="apply">N = ⌈ ${formatearNumero(state.cfmReq)} ÷ ${formatearNumero(best.f.cfm)} ⌉ <span class="arrow">→</span> N = <span class="res">${best.n} unidades</span></div>
+           <div class="apply">CFM logrado = ${best.n} × ${formatearNumero(best.f.cfm)} = <span class="res">${formatearNumero(best.cfm_logrado)} CFM</span> · cobertura <span class="res">${best.cobertura_pct}%</span></div>
+         </div>`
+      : `<div class="formula-box">
+           <div class="l">Fórmula aplicable</div>
+           <div class="sym">N = ⌈ CFM<sub>total</sub> ÷ CFM<sub>fan</sub> ⌉</div>
+           <div class="apply">Cargue al menos una opción de ventilador con CFM válido para sustituir.</div>
+         </div>`;
+
+    // §3 — fórmulas del cálculo de refrigeración aplicadas
+    const formulaCalc = `
+      <div class="formula-box">
+        <div class="l">Pendiente Westinghouse interpolada</div>
+        <div class="sym">m(p) = m₁ + (m₂ − m₁) · (p − p₁) / (p₂ − p₁)</div>
+        <div class="apply">m(${pctFmt}%) = <span class="res">${slopeFmt} CFM/kVA</span> · interpolación lineal entre los puntos calibrados (115/125/133/166%)</div>
+      </div>
+      <div class="formula-box">
+        <div class="l">CFM requerido al nivel del mar</div>
+        <div class="sym">CFM₀ = m(p) × kVA<sub>ONAN</sub></div>
+        <div class="apply">CFM₀ = ${slopeFmt} × ${onanFmt} kVA <span class="arrow">→</span> <span class="res">${cfmFmt} CFM</span></div>
+      </div>
+      <div class="formula-box">
+        <div class="l">Factor de corrección por altitud (modelo ISA)</div>
+        <div class="sym">F<sub>alt</sub> = e<sup>(h / 8500)</sup>&nbsp;&nbsp;&nbsp;&nbsp;CFM<sub>alt</sub> = CFM₀ × F<sub>alt</sub></div>
+        <div class="apply">F<sub>alt</sub> = e<sup>(${altFmt} / 8500)</sup> = <span class="res">${fAltFmt}</span></div>
+        <div class="apply">CFM<sub>alt</sub> = ${cfmFmt} × ${fAltFmt} <span class="arrow">→</span> <span class="res">${cfmAlt} CFM</span></div>
+      </div>`;
+
+    // §9 — fórmulas eléctricas aplicadas (cuando hay ventilador)
+    let formulaProt = '';
+    if (iF !== null && Number.isFinite(iF) && nF > 0) {
+      const iTot = (nF * iF).toFixed(2);
+      const iMin = (nF * iF * 1.25).toFixed(2);
+      formulaProt = `
+        <div class="formula-box">
+          <div class="l">Corriente total del sistema</div>
+          <div class="sym">I<sub>total</sub> = N × I<sub>fan</sub></div>
+          <div class="apply">I<sub>total</sub> = ${nF} × ${iF.toFixed(2)} A <span class="arrow">→</span> <span class="res">${iTot} A</span></div>
+        </div>
+        <div class="formula-box">
+          <div class="l">Corriente mínima del breaker (NEC 430 — factor de seguridad ×1.25)</div>
+          <div class="sym">I<sub>min,breaker</sub> = 1.25 × I<sub>total</sub></div>
+          <div class="apply">I<sub>min,breaker</sub> = 1.25 × ${iTot} A <span class="arrow">→</span> <span class="res">${iMin} A</span></div>
+        </div>
+        ${parseFloat(fan.kw) ? `
+        <div class="formula-box">
+          <div class="l">Potencia eléctrica total absorbida</div>
+          <div class="sym">P<sub>total</sub> = N × P<sub>1,fan</sub></div>
+          <div class="apply">P<sub>total</sub> = ${nF} × ${fan.kw} W <span class="arrow">→</span> <span class="res">${(parseFloat(fan.kw) * nF / 1000).toFixed(2)} kW</span></div>
+        </div>` : ''}
+        ${(parseFloat(fan.kw) && parseFloat(fan.cosphi)) ? `
+        <div class="formula-box">
+          <div class="l">Potencia aparente total</div>
+          <div class="sym">S<sub>total</sub> = P<sub>total</sub> / cos φ</div>
+          <div class="apply">S<sub>total</sub> = ${(parseFloat(fan.kw) * nF / 1000).toFixed(2)} kW / ${fan.cosphi} <span class="arrow">→</span> <span class="res">${(parseFloat(fan.kw) * nF / parseFloat(fan.cosphi) / 1000).toFixed(2)} kVA</span></div>
+        </div>` : ''}`;
+    }
+
     const cssBase   = location.origin + location.pathname.replace(/\/[^\/]*$/, '/');
     const headerImg = '../assets/img/afinia/header.png';
     const footerImg = '../assets/img/afinia/footer.png';
@@ -971,13 +1129,26 @@ function generateReport() {
   .tr { text-align: right; }
 
   /* Bloques que NUNCA deben partirse entre páginas */
-  .keep, h2, h3, .kpi-grid, .cover-block, .info-box, .chart-block,
-  .rpt-table, .ft, .estado, .materiales {
+  .keep, .kpi-grid, .cover-block, .info-box, .chart-block,
+  .rpt-table, .ft, .estado, .materiales, .formula-box, .rad-diagram {
     break-inside: avoid;
     page-break-inside: avoid;
   }
-  /* h2 no debe quedar como última línea en una página */
-  h2 { break-after: avoid; page-break-after: avoid; }
+  /* Sección entera (título + primer bloque de contenido) se mantiene
+     unida vía .section-anchor — evita que el h2 quede solo al pie de
+     una página y su tabla salte a la siguiente. */
+  .section-anchor {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* h2/h3 nunca deben quedar como última línea de página */
+  h2, h3 {
+    break-after: avoid;
+    page-break-after: avoid;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  p, li { widows: 4; orphans: 4; }
 
   .cover-block {
     margin-top: 12pt;
@@ -1047,6 +1218,41 @@ function generateReport() {
   .chart-img { width: 100%; max-width: 6.2in; height: auto; }
   .chart-cap { font-size: 8pt; color: #666; margin-top: 4pt; font-style: italic; }
 
+  /* ── Fórmula simbólica + sustitución con valores reales ────── */
+  .formula-box {
+    margin: 8pt 0;
+    padding: 10pt 14pt; border-radius: 5pt;
+    background: #f5f8fc; border: 1px solid #d0dce8;
+    border-left: 3pt solid #1565c0;
+  }
+  .formula-box .l {
+    font-size: 8pt; font-weight: 700; color: #1565c0;
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4pt;
+  }
+  .formula-box .sym {
+    font-family: "Cambria Math", "Times New Roman", serif;
+    font-size: 12pt; font-style: italic; color: #1a1a1a;
+  }
+  .formula-box .apply {
+    margin-top: 4pt;
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 10pt; color: #1b5e20; font-variant-numeric: tabular-nums;
+  }
+  .formula-box .apply .arrow { color: #999; margin: 0 4pt; }
+  .formula-box .apply .res   { color: #c62828; font-weight: 700; }
+
+  /* ── Diagrama del radiador (SVG embebido) ───────────────────── */
+  .rad-diagram {
+    margin: 10pt 0; padding: 10pt 14pt 6pt;
+    border: 1px solid #d0dce8; border-radius: 5pt; background: #fff;
+  }
+  .rad-diagram svg { display: block; width: 100%; max-width: 6in; height: auto; margin: 0 auto; }
+  .rad-legend { margin-top: 6pt; display: grid; grid-template-columns: 1fr 1fr; gap: 3pt 12pt; font-size: 9pt; }
+  .rad-legend .lbl { display: inline-block; width: 14pt; text-align: center; font-weight: 700; color: #fff; border-radius: 50%; margin-right: 5pt; padding: 1pt 0; }
+  .lbl.a, .lbl.c { background: #c62828; }
+  .lbl.b         { background: #2e7d32; }
+  .lbl.d         { background: #0288d1; }
+
   /* ── Print: solo se imprime el .report sin sombras ─────────── */
   @media print {
     html, body { background: #fff; }
@@ -1093,33 +1299,37 @@ function generateReport() {
   </div>
 
   <!-- ── 1 · IDENTIFICACIÓN ─────────────────────────────── -->
-  <h2>1. Identificación del transformador</h2>
-  <table class="rpt-table">
-    <tbody>
-      ${_row('Matrícula AFINIA', matricula)}
-      ${_row('Serie',           t.serie)}
-      ${_row('Subestación',     t.sub)}
-      ${_row('Zona',            t.zona)}
-      ${_row('Departamento',    t.dept)}
-      ${_row('Grupo',           t.grupo)}
-      ${_row('Potencia placa',  t.kva)}
-      ${_row('Refrigeración actual', t.refrig)}
-    </tbody>
-  </table>
+  <section class="section-anchor">
+    <h2>1. Identificación del transformador</h2>
+    <table class="rpt-table">
+      <tbody>
+        ${_row('Matrícula AFINIA', matricula)}
+        ${_row('Serie',           t.serie)}
+        ${_row('Subestación',     t.sub)}
+        ${_row('Zona',            t.zona)}
+        ${_row('Departamento',    t.dept)}
+        ${_row('Grupo',           t.grupo)}
+        ${_row('Potencia placa',  t.kva)}
+        ${_row('Refrigeración actual', t.refrig)}
+      </tbody>
+    </table>
+  </section>
 
   <!-- ── 2 · PARÁMETROS DEL CÁLCULO ─────────────────────── -->
-  <h2>2. Parámetros del cálculo de refrigeración</h2>
-  <table class="rpt-table">
-    <tbody>
-      ${_row('Potencia ONAN base',          formatearNumero(r.onan)  + ' kVA', true)}
-      ${_row('Potencia ONAF objetivo',      formatearNumero(r.onaf)  + ' kVA', true)}
-      ${_row('Δ Potencia adicional',        formatearNumero(r.delta) + ' kVA', true)}
-      ${_row('Factor ONAF/ONAN',            getPct().toFixed(1) + ' %', true)}
-      ${_row('Pendiente Westinghouse',      r.pendiente.toFixed(3) + ' CFM/kVA', true)}
-      ${_row('Altitud de instalación',      getAlt() + ' m s.n.m.', true)}
-      ${_row('Factor corrección densidad ISA', r.factor_altitud.toFixed(4), true)}
-    </tbody>
-  </table>
+  <section class="section-anchor">
+    <h2>2. Parámetros del cálculo de refrigeración</h2>
+    <table class="rpt-table">
+      <tbody>
+        ${_row('Potencia ONAN base',          formatearNumero(r.onan)  + ' kVA', true)}
+        ${_row('Potencia ONAF objetivo',      formatearNumero(r.onaf)  + ' kVA', true)}
+        ${_row('Δ Potencia adicional',        formatearNumero(r.delta) + ' kVA', true)}
+        ${_row('Factor ONAF/ONAN',            getPct().toFixed(1) + ' %', true)}
+        ${_row('Pendiente Westinghouse',      r.pendiente.toFixed(3) + ' CFM/kVA', true)}
+        ${_row('Altitud de instalación',      getAlt() + ' m s.n.m.', true)}
+        ${_row('Factor corrección densidad ISA', r.factor_altitud.toFixed(4), true)}
+      </tbody>
+    </table>
+  </section>
 
   <div class="kpi-grid">
     <div class="kpi-card"><div class="l">ONAN</div><div class="v">${formatearNumero(r.onan)} kVA</div></div>
@@ -1130,8 +1340,11 @@ function generateReport() {
   </div>
 
   <!-- ── 3 · CURVAS WESTINGHOUSE ────────────────────────── -->
-  <h2>3. Curvas de enfriamiento adicional ONAF</h2>
-  <p class="meta">Punto de operación: <strong class="mono">${(r.onan / 1000).toFixed(1)} MVA · ${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · pendiente Westinghouse <strong class="mono">${r.pendiente.toFixed(3)} CFM/kVA</strong> al ${getPct().toFixed(1)} %.</p>
+  <section class="section-anchor">
+    <h2>3. Curvas de enfriamiento adicional ONAF</h2>
+    <p class="meta">Punto de operación: <strong class="mono">${(r.onan / 1000).toFixed(1)} MVA · ${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · pendiente Westinghouse <strong class="mono">${r.pendiente.toFixed(3)} CFM/kVA</strong> al ${getPct().toFixed(1)} %.</p>
+  </section>
+  ${formulaCalc}
   <div class="chart-block">
     ${chartImg
       ? `<img class="chart-img" src="${chartImg}" alt="Curvas de enfriamiento ONAF">`
@@ -1140,7 +1353,19 @@ function generateReport() {
   </div>
 
   <!-- ── 4 · DATOS MECÁNICOS DEL RADIADOR ───────────────── -->
-  <h2>4. Datos mecánicos del cuerpo de radiador</h2>
+  <section class="section-anchor">
+    <h2>4. Datos mecánicos del cuerpo de radiador</h2>
+    <p class="meta">Diagrama de referencia con las dimensiones A/B/C/D según convención AFINIA:</p>
+  </section>
+  <div class="rad-diagram">
+    ${radiadorDiagramSVG()}
+    <div class="rad-legend">
+      <div><span class="lbl a">A</span> Altura del cuerpo de radiador</div>
+      <div><span class="lbl b">B</span> Distancia entre oblea inicial y oblea final</div>
+      <div><span class="lbl c">C</span> Ancho de frente del cuerpo de radiador</div>
+      <div><span class="lbl d">D</span> Distancia entre centros de tornillos del flanche</div>
+    </div>
+  </div>
   <table class="rpt-table">
     <tbody>
       ${_row('A — Altura del cuerpo (mm)',                    rad.A,      true)}
@@ -1155,80 +1380,91 @@ function generateReport() {
   </table>
 
   <!-- ── 5 · DATOS DEL MOTOVENTILADOR ───────────────────── -->
-  <h2>5. Datos del motoventilador</h2>
-  <h3>Identificación y aerodinámica</h3>
-  <table class="rpt-table">
-    <tbody>
-      ${_row('Marca',                 fan.marca)}
-      ${_row('Modelo / Referencia',   fan.modelo)}
-      ${_row('N.° artículo / parte',  fan.nserie)}
-      ${_row('Tipo de pala',          fan.tipo)}
-      ${_row('Diámetro nominal (mm)', fan.diam,    true)}
-      ${_row('Número de aspas',       fan.aspas,   true)}
-      ${_row('RPM nominal',           fan.rpm,     true)}
-      ${_row('Posición de montaje',   fan.montaje)}
-      ${_row('Peso conjunto (kg)',    fan.peso,    true)}
-      ${_row('Caudal de entrada',     fan.flow_val ? `${fan.flow_val} ${ETIQUETAS_CAUDAL_ALT[fan.flow_unit] || fan.flow_unit}` : '—', true)}
-      ${_row('CFM nominal (ft³/min)', fan.cfm_nom, true)}
-      ${_row('Equivalente m³/s',      fan.m3s,     true)}
-    </tbody>
-  </table>
-  <h3>Motor eléctrico</h3>
-  <table class="rpt-table">
-    <tbody>
-      ${_row('Tensión nominal · conexión', fan.volt)}
-      ${_row('Frecuencia',                 fan.hz + ' Hz', true)}
-      ${_row('Potencia absorbida P₁',      fan.kw + ' W',  true)}
-      ${_row('Corriente nominal',          fan.amp,        true)}
-      ${_row('Factor de potencia cos φ',   fan.cosphi,     true)}
-      ${_row('Grado de protección',        fan.ip)}
-      ${_row('Clase de aislamiento',       fan.aislam)}
-      ${_row('Protección del motor',       fan.protmotor)}
-      ${_row('Temperatura mínima (°C)',    fan.tmin, true)}
-      ${_row('Sentido de rotación',        fan.sentido)}
-      ${_row('Certificación',              fan.cert)}
-      ${_row('Material palas / rotor',     fan.material)}
-    </tbody>
-  </table>
+  <section class="section-anchor">
+    <h2>5. Datos del motoventilador</h2>
+    <h3>Identificación y aerodinámica</h3>
+    <table class="rpt-table">
+      <tbody>
+        ${_row('Marca',                 fan.marca)}
+        ${_row('Modelo / Referencia',   fan.modelo)}
+        ${_row('N.° artículo / parte',  fan.nserie)}
+        ${_row('Tipo de pala',          fan.tipo)}
+        ${_row('Diámetro nominal (mm)', fan.diam,    true)}
+        ${_row('Número de aspas',       fan.aspas,   true)}
+        ${_row('RPM nominal',           fan.rpm,     true)}
+        ${_row('Posición de montaje',   fan.montaje)}
+        ${_row('Peso conjunto (kg)',    fan.peso,    true)}
+        ${_row('Caudal de entrada',     fan.flow_val ? `${fan.flow_val} ${ETIQUETAS_CAUDAL_ALT[fan.flow_unit] || fan.flow_unit}` : '—', true)}
+        ${_row('CFM nominal (ft³/min)', fan.cfm_nom, true)}
+        ${_row('Equivalente m³/s',      fan.m3s,     true)}
+      </tbody>
+    </table>
+  </section>
+  <section class="section-anchor">
+    <h3>Motor eléctrico</h3>
+    <table class="rpt-table">
+      <tbody>
+        ${_row('Tensión nominal · conexión', fan.volt)}
+        ${_row('Frecuencia',                 fan.hz + ' Hz', true)}
+        ${_row('Potencia absorbida P₁',      fan.kw + ' W',  true)}
+        ${_row('Corriente nominal',          fan.amp,        true)}
+        ${_row('Factor de potencia cos φ',   fan.cosphi,     true)}
+        ${_row('Grado de protección',        fan.ip)}
+        ${_row('Clase de aislamiento',       fan.aislam)}
+        ${_row('Protección del motor',       fan.protmotor)}
+        ${_row('Temperatura mínima (°C)',    fan.tmin, true)}
+        ${_row('Sentido de rotación',        fan.sentido)}
+        ${_row('Certificación',              fan.cert)}
+        ${_row('Material palas / rotor',     fan.material)}
+      </tbody>
+    </table>
+  </section>
 
   <!-- ── 6 · MONTAJE SOBRE RADIADOR ─────────────────────── -->
-  <h2>6. Montaje sobre radiador</h2>
-  <table class="rpt-table">
-    <tbody>
-      ${_row('Tipo de fijación',                       mon.tipo_fij)}
-      ${_row('Dirección del flujo',                    mon.flujo_dir)}
-      ${_row('Dimensiones marco (mm)',                 mon.marco)}
-      ${_row('Puntos de fijación',                     mon.npuntos,   true)}
-      ${_row('Tornillos tipo / Ø',                     mon.tornillos)}
-      ${_row('Separación ventilador–radiador (mm)',    mon.dist,      true)}
-      ${_row('Junta / sello perimetral',               mon.junta)}
-      ${_row('Observaciones de montaje',               mon.obs)}
-    </tbody>
-  </table>
+  <section class="section-anchor">
+    <h2>6. Montaje sobre radiador</h2>
+    <table class="rpt-table">
+      <tbody>
+        ${_row('Tipo de fijación',                       mon.tipo_fij)}
+        ${_row('Dirección del flujo',                    mon.flujo_dir)}
+        ${_row('Dimensiones marco (mm)',                 mon.marco)}
+        ${_row('Puntos de fijación',                     mon.npuntos,   true)}
+        ${_row('Tornillos tipo / Ø',                     mon.tornillos)}
+        ${_row('Separación ventilador–radiador (mm)',    mon.dist,      true)}
+        ${_row('Junta / sello perimetral',               mon.junta)}
+        ${_row('Observaciones de montaje',               mon.obs)}
+      </tbody>
+    </table>
+  </section>
 
   <!-- ── 7 · COMPATIBILIDAD MECÁNICA ────────────────────── -->
-  <h2>7. Análisis de compatibilidad mecánica</h2>
-  <table class="ft">
-    <thead>
-      <tr>
-        <th style="width:32%">Criterio</th>
-        <th style="width:18%">Valor</th>
-        <th style="width:14%">Estado</th>
-        <th>Diagnóstico</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${compatRow('C1', compat.c1, 'Cobertura del panel (covDim vs Ø)')}
-      ${compatRow('C2', compat.c2, 'Sección de flujo / altura vs Ø')}
-      ${compatRow('C3', compat.c3, 'Holgura ventilador–radiador')}
-      ${compatRow('C4', compat.c4, 'Relación A/Ø o B/Ø')}
-    </tbody>
-  </table>
+  <section class="section-anchor">
+    <h2>7. Análisis de compatibilidad mecánica</h2>
+    <table class="ft">
+      <thead>
+        <tr>
+          <th style="width:32%">Criterio</th>
+          <th style="width:18%">Valor</th>
+          <th style="width:14%">Estado</th>
+          <th>Diagnóstico</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${compatRow('C1', compat.c1, 'Cobertura del panel (covDim vs Ø)')}
+        ${compatRow('C2', compat.c2, 'Sección de flujo / altura vs Ø')}
+        ${compatRow('C3', compat.c3, 'Holgura ventilador–radiador')}
+        ${compatRow('C4', compat.c4, 'Relación A/Ø o B/Ø')}
+      </tbody>
+    </table>
+  </section>
   <div class="info-box"><strong>Conclusión:</strong> ${escaparHtml(compat.resumen.mensaje)}</div>
 
   <!-- ── 8 · SELECCIÓN DE MOTOVENTILADORES ──────────────── -->
-  <h2>8. Selección de motoventiladores · N = ⌈ CFM<sub>total</sub> / CFM<sub>fan</sub> ⌉</h2>
-  <p class="meta">CFM requerido a nivel del mar: <strong class="mono">${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · CFM corregido por altitud (${getAlt()} m): <strong class="mono">${formatearNumero(r.cfm_corregido)} CFM</strong></p>
+  <section class="section-anchor">
+    <h2>8. Selección de motoventiladores</h2>
+    <p class="meta">CFM requerido a nivel del mar: <strong class="mono">${formatearNumero(r.cfm_nivel_mar)} CFM</strong> · CFM corregido por altitud (${getAlt()} m): <strong class="mono">${formatearNumero(r.cfm_corregido)} CFM</strong></p>
+  </section>
+  ${formulaSeleccion}
   <table class="ft">
     <thead>
       <tr>
@@ -1247,12 +1483,18 @@ function generateReport() {
   ${best ? `<div class="info-box"><strong>Recomendación:</strong> opción "${escaparHtml(best.f.desc) || `Opción ${state.fans.indexOf(best.f) + 1}`}" — <strong class="mono">${best.n} unidades</strong> de <strong class="mono">${formatearNumero(best.f.cfm)} CFM</strong> cubren el requerimiento con cobertura del <strong>${best.cobertura_pct}%</strong> y exceso de <strong class="mono">${formatearNumero(best.exceso)} CFM</strong>.<span class="best-mark">menor cantidad</span></div>` : ''}
 
   <!-- ── 9 · PROTECCIÓN ELÉCTRICA ───────────────────────── -->
-  <h2>9. Circuito de protección eléctrica y mando</h2>
+  <section class="section-anchor">
+    <h2>9. Circuito de protección eléctrica y mando</h2>
+    <p class="meta">Aplicación de las fórmulas de dimensionamiento con los datos cargados:</p>
+  </section>
+  ${formulaProt}
   ${protBlock}
 
   <!-- ── 10 · LISTA DE MATERIALES ───────────────────────── -->
-  <h2 class="materiales">10. Lista de materiales</h2>
-  ${materiales}
+  <section class="section-anchor materiales">
+    <h2>10. Lista de materiales</h2>
+    ${materiales}
+  </section>
 
   <div class="info-box" style="margin-top:14pt">
     Documento generado automáticamente por SGM · TRANSPOWER. La validación
