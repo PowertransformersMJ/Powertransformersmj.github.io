@@ -1357,7 +1357,7 @@ panel de KPIs.
 | Post-plan polish            | **9 ciclos cerrados**: `v2.0.1` · `v2.0.2` · `v2.0.3` · `v2.0.4` · `v2.0.5` · `v2.0.6` · `v2.0.7` · `v2.0.8` (+ refactor `6accdb6`) |
 | Tests                       | **468 / 468 verdes** (135 suites, node --test) |
 | Lint HTML                   | limpio |
-| Último tag                  | (sin tag desde `v2.4.1` · trabajo visual continuo en `claude/set-background-image-nhgwM`) |
+| Último tag                  | (sin tag desde `v2.4.1` · trabajo visual continuo en `claude/set-background-image-nhgwM` · branch hotfix `claude/mira-feature-XqsGK` para v2.8.1) |
 | Tag previo                  | `v2.4.1` (deploy contrato 4125000143) |
 | Referencia normativa activa | MO.00418.DE-GAC-AX.01 Ed. 02 (14/10/2025) |
 | Sistema de diseño activo    | **AQUA LIGHT** · `assets/css/aqua-tokens.css` (inks Steel Navy oscuros que leen como negro corporativo + glass blanco perla translúcido) + `aqua-components.css` (sidebar aqua glass, topbar light glass, drilldown contratos 4 niveles con números como botones toggle) + `assets/js/aqua-shell.js` (markActive con hash matching) · body class="aqua" en todas las páginas |
@@ -1365,10 +1365,10 @@ panel de KPIs.
 | Service Worker              | **kill-switch** (`sw.js` se auto-desregistra) · PWA offline-first temporalmente desactivada |
 | Importador Suministros      | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 · `parsearArchivos({xlsmBuffer, XLSX})` |
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
-| Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) |
-| Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` (552 LOC, 44 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con header/footer en cada hoja vía `<thead>`/`<tfoot>` · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` · branch `claude/add-calculation-tool-LSoff` (10 commits) |
-| **Estado al 2026-05-02 PM** | Sesión Mantenimiento Brigada completa · 10 commits desde `4323ac4` hasta `2ee9a9c` en `claude/add-calculation-tool-LSoff`. Versión publicada en CHANGELOG: **v2.9.0**. CLAUDE.md ampliado con §0.1.2.1 (migración legacy SIN perder detalles) y §0.1.2.2 (informes imprimibles · 13 reglas + checklist). 497/497 tests verdes. Pendiente: revisión visual del director + merge a `main` + revocar PAT `ghp_nStu…GlTAA` cuando termine la jornada. |
-| Próxima movida              | Director valida visualmente el informe AFINIA en producción (header/footer repetidos por hoja vía thead/tfoot, fórmulas aplicadas, diagrama SVG del radiador, BOM completo) → mergea PR a `main` → opcional Vercel deploy → eventualmente ampliar el módulo "Mantenimiento Brigada" con nuevas calculadoras (cálculo de aceite, aterramiento, etc.) sin tocar el sidebar. |
+| Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) · **fix v2.8.1**: el data layer ahora rellena `codigo`+`estado` por defecto en `setDoc(merge:true)` para que el upload no falle con `permission-denied` cuando `/contratos/{cid}` no existe en Firestore |
+| Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` (552 LOC, 44 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con header/footer en cada hoja vía `<thead>`/`<tfoot>` · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` · branch `claude/add-calculation-tool-LSoff` (10 commits) · fix definitivo header/footer cross-navegador consolidado en `main` como `b4606cd` (PR #128, 2026-05-03) |
+| **Estado al 2026-05-03**    | Mantenimiento Brigada cerrado · 10 commits del módulo + fix `b4606cd` (PR #128) ya en `main`. v2.8.1 mergeada (PR #119, `e43aa42` → `8e1aa10`). 7 remisiones cargadas vía admin upload en `4123000081`. Versiones publicadas: **v2.5.0** → **v2.9.0**. CLAUDE.md ampliado con §0.1.2.1 (migración legacy SIN perder detalles) y §0.1.2.2 (informes imprimibles · 13 reglas + checklist). 497/497 tests verdes. Documentación: `docs/MANTENIMIENTO-BRIGADA.md` + `docs/UI-V3-DARKMODE.md` + `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` + esta §9. **Pendiente:** revocar PATs `ghp_nStu…GlTAA` (sesión brigada) + `ghp_n0Sy…` (v2.8.1) + `ghp_tFgz…` (PR #128). Cleanup de los 7 PDFs subidos por error al raíz del repo (commit `91f386c`). |
+| Próxima movida              | Director valida visualmente el informe AFINIA en producción (header/footer repetidos hoja a hoja, fórmulas aplicadas, diagrama SVG, BOM completo). Probar Reuniones de Seguimiento con el flujo de v2.8.0. Probar Información Contractual + Remisiones + Reuniones del contrato `4125000143` (verificar que `_conDefaultsContrato` cubre el caso CREATE). Eventualmente ampliar el módulo "Mantenimiento Brigada" con nuevas calculadoras (aceite, aterramiento, etc.) sin tocar el sidebar. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
@@ -1484,8 +1484,8 @@ integración SCADA, etc.):
 | Admin Information Contractual (v2.7.0) | Botón **"+ Agregar documento"** en cabecera de lista lateral · hover-action **trash** en cada doc · modales upload/delete con barra de progreso resumable · solo visibles para `rol === 'admin'` · wire a Firebase Storage (`uploadBytesResumable` + `deleteObject`) y Firestore (`setDoc` con merge en array) |
 | Importador Suministros | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 commit `c41d316` · `parsearArchivos({xlsmBuffer, XLSX})` |
 | Tag de release | (sin tag nuevo · branch activa `claude/set-background-image-nhgwM`) |
-| Versiones CHANGELOG | v2.5.0 · v2.5.1 · v2.6.0 · v2.6.1 · v2.7.0 (todas en sesión 2026-04-27) |
-| PRs mergeados a main esta jornada | #90 → #108+ (24+ PRs) |
+| Versiones CHANGELOG | v2.5.0 · v2.5.1 · v2.6.0 · v2.6.1 · v2.7.0 (sesión 2026-04-27) · v2.7.1 · v2.8.0 · **v2.8.1** (sesión 2026-05-01) |
+| PRs mergeados a main esta jornada | #90 → #119 (28+ PRs · #119 = hotfix admin upload v2.8.1) |
 | Sitio en producción | `ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/` (project page · NO el dominio raíz) |
 | Service Worker | **kill-switch** · `sw.js` se auto-desregistra y limpia caches al activarse · sin SW corriendo en producción |
 
@@ -1780,5 +1780,82 @@ anterior `c41d316`): el JSX
 `control_suministros-2.jsx` quedó retirado del flujo. La
 importación lee solo del `.xlsm`. Datos legacy (`/transformadores`,
 `/correcciones`) quedan en Firestore inmutables desde el importer.
+
+### 9.9 Hotfix admin upload · defaults codigo+estado en /contratos/{cid} (v2.8.1 · 2026-05-01)
+
+Bug de regresión revelado al lanzar Seguimiento Contractual (v2.8.0):
+el botón **"+ Agregar documento"** del modal admin caía con
+`Missing or insufficient permissions` después de que el upload a
+Firebase Storage llegara al 100 %. Reproducible al subir cualquier
+PDF a un contrato cuyo doc Firestore `/contratos/{cid}` no había
+sido dado de alta previamente con los campos canónicos.
+
+**Causa raíz** (`firestore.rules:418-430`):
+
+```javascript
+allow create: if isAdmin()
+              && request.resource.data.codigo is string
+              && request.resource.data.codigo.size() > 0
+              && request.resource.data.estado in
+                 ['vigente','suspendido','finalizado','en_liquidacion'];
+allow update: if isAdmin()
+              && request.resource.data.estado in
+                 ['vigente','suspendido','finalizado','en_liquidacion'];
+```
+
+El data layer hacía `setDoc(merge:true)` enviando solo
+`{[campo]: arr, [campoUpdatedAt]: ts}`. Con merge, el
+`request.resource.data` que evalúan las rules es el merged-post-state.
+Si el doc no existía o no tenía `estado` válido, el campo quedaba
+`undefined` post-merge y la cláusula `estado in [...]` fallaba.
+
+`4123000081` en v2.7.0 funcionaba porque su `/contratos/4123000081`
+tiene `estado: 'vigente'` legítimo. `4125000143` (más reciente, sin
+"Información Contractual" cargada antes) no tenía el doc poblado, y
+ningún flujo de v2.8.0 (Remisiones, Reuniones) lo había hecho.
+
+**Fix** (`assets/js/data/documentos_contractuales.js`): helper
+`_conDefaultsContrato(payload, cid, dataExistente)` que **respeta
+los valores existentes** (no pisa un `estado='suspendido'` real) y
+solo agrega defaults cuando faltan o son inválidos:
+
+```javascript
+function _conDefaultsContrato(payload, cid, dataExistente) {
+  const out = { ...payload };
+  if (!dataExistente.codigo) out.codigo = String(cid);
+  const ESTADOS_VALIDOS = ['vigente', 'suspendido', 'finalizado', 'en_liquidacion'];
+  if (!ESTADOS_VALIDOS.includes(dataExistente.estado)) out.estado = 'vigente';
+  return out;
+}
+```
+
+Aplicado en `subirDocumento` (línea 279) y `eliminarDocumento`
+(línea 342). Sin deploy de Firebase: el fix vive 100 % en JS.
+
+**Lección permanente para este patrón:** cuando un setDoc(merge:true)
+toca una colección con rules que exigen ciertos campos, hay que
+asegurarse de incluirlos en el payload — sea porque ya están en el
+doc existente (verificable con un `getDoc` previo), o porque el
+data layer los rellena con defaults seguros. Esta regla aplica a
+toda colección con enums obligatorios:
+- `/contratos/{cid}` → `codigo`, `estado` (afectado por v2.8.1)
+- `/transformadores/{id}` → schema_version, identificacion.codigo,
+  estado_servicio, etc. (no usa setDoc-merge desde data layer; se
+  construye payload completo en `crearTransformador`)
+- `/ordenes/{id}` → codigo, estado, tipo, prioridad (igual)
+
+**Verificación funcional:** las 7 remisiones (`REMISION 1.pdf` …
+`REMISION 7.pdf`) del contrato `4123000081` cargadas exitosamente
+vía admin upload. Visor PDF embebido renderiza. Categorización
+automática como "Remisiones" en la lista lateral.
+
+**Nota operativa para sesiones nuevas:** durante la jornada el
+director subió por error los 7 PDFs al raíz del repo via GitHub
+web (commit `91f386c`). No afecta el sistema (los PDFs reales viven
+en Firebase Storage tras el upload), pero quedaron como peso muerto
+del repo (~3 MB total). Cleanup pendiente en una versión futura.
+
+Branch del fix: `claude/mira-feature-XqsGK` · Commit: `e43aa42` ·
+PR: #119 · Merge a main: `8e1aa10`.
 
 
