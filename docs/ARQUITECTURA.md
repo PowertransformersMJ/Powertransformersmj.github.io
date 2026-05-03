@@ -75,6 +75,7 @@ desde Node para tests y desde el navegador para lógica en vivo.
 | `desempeno_aliados.js` | F33: `calcularDesempenoAliado` (score 0-100) + `rankingAliados`. |
 | `audit.js` | F35: `auditar` + `diffSimple` + **`persistirAuditoria(deps, entry)`** best-effort reutilizable. |
 | `importador.js` | F17: `parsearFilaTransformador` con recálculo HI + `procesarLibro`. |
+| `refrigeracion.js` | **v2.9 · Mantenimiento Brigada · Selección ONAF**. Funciones puras (44 tests): `interpolarPendiente` (Westinghouse 115/125/133/166%), `convertirCaudalACFM` (5 unidades), `factorCorreccionAltitud` (modelo ISA), `calcularRefrigeracion` (núcleo del cálculo), `calcularUnidadesRequeridas` (N=⌈total/fan⌉), `evaluarCompatibilidad` (4 criterios C1-C4), `extraerCorrienteFan`, `seleccionarGuardamotor` (catálogo MS116), `seleccionarBreaker` (catálogo S203), `calcularProteccionElectrica` (NEC 430 ×1.25), `calcularYStep` + `calcularAutoRango` (gráfico). Catálogos congelados: `MS116_DB` (13 modelos), `S203_DB` (4), `AUX_GUARDAMOTOR`/`AUX_BREAKER`, `PENDIENTES_WESTINGHOUSE` (Object.freeze). |
 
 ### 2.2 Data layer · `assets/js/data/`
 
@@ -101,6 +102,8 @@ dominio puro.
 | `parametros_criticidad.js` | `/parametros_sistema/criticidad` (F36 tope dinámico). |
 | `auditoria.js` | `/auditoria` — read-only con filtros. |
 | `importar.js` | `persistirImportacion` idempotente por código + log en `/importaciones`. Audit cableado. |
+| `refrigeracion-transformadores-afinia.js` | **v2.9** · catálogo congelado de 206 transformadores AFINIA (matrícula, serie, potencia, grupo, subestación, zona, departamento, refrigeración). Helper `buscarPorMatricula(matricula)`. NO va a Firestore — vive en repo. |
+| `refrigeracion-fan-db.js` | **v2.9** · catálogo congelado de 13 fichas técnicas de motoventiladores (ZIEHL-ABEGG ZN045/FN050/FN063/ZN063 + KRENZ F20). Helpers `buscarFan(key)` y `listarFans()`. NO va a Firestore. |
 
 ### 2.3 UIs
 
@@ -139,6 +142,20 @@ con modal CRUD. Todas usan `auth-guard.js` para gate por rol.
 13 páginas protegidas por login. `dashboard.html` y
 `matriz-riesgo.html` son las vistas operativas v2 principales.
 
+#### Mantenimiento Brigada (v2.9.0)
+
+Módulo top-level con `module-shell` + iframe lazy-load (mismo
+patrón que `Activos`, `Salud`, `Análisis`). Doc completa en
+[`docs/MANTENIMIENTO-BRIGADA.md`](MANTENIMIENTO-BRIGADA.md).
+
+| Página | Rol |
+|---|---|
+| `pages/mantenimiento-brigada.html` | Shell padre · ARIA tablist · 1 pestaña inicial "Sistema de Refrigeración" · future-proof para más calculadoras de brigada. |
+| `pages/calculo-refrigeracion.html` | Calculadora ONAN→ONAF · 84 IDs originales preservados del archivo legacy. Carga Chart.js 4.4.1 (CDN). |
+| `assets/js/calculo-refrigeracion.js` | UI binding + plugin Chart.js custom (cruceta roja Westinghouse + etiquetas SOBRE las curvas) + generador de informe AFINIA imprimible (Letter portrait con header/footer en cada hoja vía `<thead>`/`<tfoot>`). |
+| `assets/css/calculo-refrigeracion.css` | Estilos module-specific · 100% derivados de tokens AQUA · cero hard-coded. |
+| `assets/img/afinia/header.png` + `footer.png` | Logo + banda azul extraídos del template oficial `Formato Afinia.docx`. |
+
 ## 3. Rules y validación
 
 - **`firestore.rules`** — helpers por rol (`isSignedIn`, `hasProfile`,
@@ -161,7 +178,7 @@ npm run test:unit   # solo unit tests
 npm test            # lint HTML + tests
 ```
 
-**Clasificación de los 282 tests (81 suites):**
+**Clasificación de los 497 tests (130 suites):**
 
 - Schema v2 + UUCC CREG: `schema.test.js`
 - Sanitizadores: `transformador_schema.test.js` · `subestacion_schema.test.js`
@@ -183,6 +200,11 @@ npm test            # lint HTML + tests
 - Handler onMuestraCreate: `onmuestra_handler.test.js`
 - E2E chain: `integracion_e2e.test.js`
 - Audit persistir: `audit_persistir.test.js`
+- **Refrigeración (v2.9 · Mantenimiento Brigada)**: `refrigeracion.test.js`
+  · 44 tests · golden 24 MVA × 125 % = 48.000 CFM (verificación AFINIA),
+  conversiones de caudal, interpolación Westinghouse, corrección ISA,
+  N=⌈total/fan⌉, parser D/Y, MS116/S203 dentro y fuera de rango,
+  4 escenarios de compatibilidad geométrica, heurísticas yStep + autoRango.
 
 ## 5. Convenciones
 

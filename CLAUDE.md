@@ -304,6 +304,62 @@ tres errores adicionales que también deben evitarse:
     + vista en perspectiva o isométrica), con cotas codificadas por
     color (mismo color que las leyendas del UI).
 
+**Refinamiento adicional (sesión 2026-05-02 PM4):** después de
+varios intentos, el director sigue viendo el cuerpo del informe
+ENCIMA del header/footer en páginas internas. La causa raíz fue
+intentar usar `position: fixed` con `@page margin` y offsets
+negativos — Chrome lo soporta pero Firefox/Safari no de manera
+consistente, y el contenido se traslapaba en hojas 2+.
+
+12. **Encabezado/pie repetido por página · usar SIEMPRE
+    `<thead>` + `<tfoot>` con `display: table-header-group` /
+    `table-footer-group`.** Este patrón es el único 100% reliable
+    cross-navegador (Chrome, Firefox, Safari, Edge) para informes
+    paginados imprimibles:
+
+    ```html
+    <table class="report-doc">
+      <thead><tr><td class="page-header-cell">
+        <div class="page-header"></div>  <!-- logo Afinia -->
+      </td></tr></thead>
+      <tfoot><tr><td class="page-footer-cell">
+        <div class="page-footer">         <!-- banda azul + texto -->
+          <div class="ribbon"></div>
+          <div class="footer-text">CaribeMar...</div>
+        </div>
+      </td></tr></tfoot>
+      <tbody><tr><td class="body-cell">
+        ...todo el contenido del informe...
+      </td></tr></tbody>
+    </table>
+    ```
+
+    ```css
+    @page { size: letter portrait; margin: 0; }
+    table.report-doc { width: 8.5in; margin: 0 auto; }
+    table.report-doc thead { display: table-header-group; }
+    table.report-doc tfoot { display: table-footer-group; }
+    table.report-doc thead td.page-header-cell { height: 1.55in; }
+    table.report-doc tfoot td.page-footer-cell { height: 1.20in; }
+    table.report-doc tbody td.body-cell { padding: 0.10in 1.18in; }
+    ```
+
+    El navegador automáticamente:
+    - Repite el `thead` al inicio de cada hoja impresa
+    - Repite el `tfoot` al final de cada hoja impresa
+    - Reserva espacio para ambos en el flujo de paginación, así que
+      el contenido del `tbody` NUNCA puede traslaparse con header/
+      footer ni cortarse ambiguamente
+
+    Esto es lo que usan wkhtmltopdf, jsPDF, y prácticamente todo
+    motor de reportes corporativos. Es el "gold standard".
+
+13. **NO usar `position: fixed` para headers/footers de informes.**
+    Aunque funciona en Chrome con `@page margin` configurado, es
+    inconsistente en Firefox y Safari, y con frecuencia produce
+    el bug visible de "contenido encima del header en página 2+".
+    El método thead/tfoot es estricto y predecible.
+
 **Lección de meta-proceso:** después de generar un informe nuevo, ANTES
 de cerrar la sesión, ejecutar mentalmente esta checklist:
 - ¿Fluye el contenido sin hojas en blanco?
@@ -312,6 +368,7 @@ de cerrar la sesión, ejecutar mentalmente esta checklist:
 - ¿Cada componente con dimensiones lleva su diagrama?
 - ¿La lista de materiales tiene cantidades + PIDs?
 - ¿Los totales del sistema están todos calculados (kW, kVA, peso, A)?
+- ¿El header/footer se repite por hoja (vía thead/tfoot, no fixed)?
 
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
@@ -1309,8 +1366,9 @@ panel de KPIs.
 | Importador Suministros      | **Canal único Excel** (xlsm) · JSX retirado en v2.5.1 · `parsearArchivos({xlsmBuffer, XLSX})` |
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
 | Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) · **fix v2.8.1**: el data layer ahora rellena `codigo`+`estado` por defecto en `setDoc(merge:true)` para que el upload no falle con `permission-denied` cuando `/contratos/{cid}` no existe en Firestore |
-| **Estado al 2026-05-01 PM** | v2.8.1 mergeada (PR #119, commit `e43aa42` → merge `8e1aa10`). 7 remisiones cargadas vía admin upload en `4123000081` (`REMISION 1.pdf` … `REMISION 7.pdf` en Firebase Storage `contratos/4123000081/remisiones/`). Versiones publicadas en CHANGELOG esta jornada y la previa: **v2.5.0** → **v2.8.1**. Documentación completa en `docs/UI-V3-DARKMODE.md` + `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` + esta §9. **Pendiente:** revocar PAT `ghp_n0Sy…` (entregado para push del fix v2.8.1), eventual cleanup de los 7 PDFs subidos por error al raíz del repo (commit `91f386c`). |
-| Próxima movida              | Probar Reuniones de Seguimiento con el mismo flujo. Probar Información Contractual + Remisiones + Reuniones del contrato `4125000143` (verificar que el helper `_conDefaultsContrato` realmente cubre el caso CREATE). Cleanup de los 7 PDFs en el raíz del repo. |
+| Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` (552 LOC, 44 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con header/footer en cada hoja vía `<thead>`/`<tfoot>` · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` · branch `claude/add-calculation-tool-LSoff` (10 commits) · fix definitivo header/footer cross-navegador consolidado en `main` como `b4606cd` (PR #128, 2026-05-03) |
+| **Estado al 2026-05-03**    | Mantenimiento Brigada cerrado · 10 commits del módulo + fix `b4606cd` (PR #128) ya en `main`. v2.8.1 mergeada (PR #119, `e43aa42` → `8e1aa10`). 7 remisiones cargadas vía admin upload en `4123000081`. Versiones publicadas: **v2.5.0** → **v2.9.0**. CLAUDE.md ampliado con §0.1.2.1 (migración legacy SIN perder detalles) y §0.1.2.2 (informes imprimibles · 13 reglas + checklist). 497/497 tests verdes. Documentación: `docs/MANTENIMIENTO-BRIGADA.md` + `docs/UI-V3-DARKMODE.md` + `docs/MICROCIRUGIA-CONTRATOS-2026-04-27.md` + esta §9. **Pendiente:** revocar PATs `ghp_nStu…GlTAA` (sesión brigada) + `ghp_n0Sy…` (v2.8.1) + `ghp_tFgz…` (PR #128). Cleanup de los 7 PDFs subidos por error al raíz del repo (commit `91f386c`). |
+| Próxima movida              | Director valida visualmente el informe AFINIA en producción (header/footer repetidos hoja a hoja, fórmulas aplicadas, diagrama SVG, BOM completo). Probar Reuniones de Seguimiento con el flujo de v2.8.0. Probar Información Contractual + Remisiones + Reuniones del contrato `4125000143` (verificar que `_conDefaultsContrato` cubre el caso CREATE). Eventualmente ampliar el módulo "Mantenimiento Brigada" con nuevas calculadoras (aceite, aterramiento, etc.) sin tocar el sidebar. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
@@ -1374,6 +1432,9 @@ integración SCADA, etc.):
 - **Runbook operativo** → `docs/OPERACIONES.md`.
 - **Despliegue de Cloud Functions** → `docs/DEPLOY-FUNCTIONS.md`.
 - **Servicios externos (legacy)** → `docs/PLAN-SERVICIOS-EXTERNOS.md`.
+- **Mantenimiento Brigada · Selección ONAF** → `docs/MANTENIMIENTO-BRIGADA.md`
+  (arquitectura · dominio puro · catálogos AFINIA + ZIEHL-ABEGG ·
+   plantilla informe AFINIA · cómo extender).
 
 ---
 
