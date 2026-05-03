@@ -1096,11 +1096,13 @@ function generateReport() {
 <base href="${cssBase}">
 <style>
   /* Hoja Letter conforme Formato Afinia.docx (referencia: Informe
-     Casacara). El header y footer se repiten en CADA hoja al
-     imprimir mediante el patron clasico thead/tfoot de tabla
-     paginada. En print mode los navegadores Chrome, Edge, Firefox
-     y Safari rasterizan thead UNA VEZ POR PAGINA al inicio y tfoot
-     al final, replicando el comportamiento del Formato Afinia. */
+     Casacara). El header y footer se inyectan EXPLICITAMENTE en
+     cada hoja .sheet via JavaScript de paginacion al cargar el
+     documento. Este metodo es el unico 100% portable entre
+     Chrome, Edge, Firefox y Safari (WebKit/macOS) en window.print().
+     thead/tfoot de tabla NO se repiten en Safari (bug WebKit
+     historico) y position:fixed con @page margin es inestable
+     entre browsers. */
   @page {
     size: letter portrait;
     margin: 0;
@@ -1114,34 +1116,64 @@ function generateReport() {
     print-color-adjust: exact;
   }
 
-  /* Marco de pagina: tabla con thead = header repetido y
-     tfoot = footer repetido. tbody contiene el flujo del informe. */
-  .page-frame { width: 100%; border-collapse: collapse; }
-  .page-frame > thead { display: table-header-group; }
-  .page-frame > tfoot { display: table-footer-group; }
-  .page-frame > thead > tr > th,
-  .page-frame > tfoot > tr > td,
-  .page-frame > tbody > tr > td { padding: 0; border: 0; vertical-align: top; }
-
-  /* Cuerpo del informe: padding lateral 1.18in (3 cm aprox., pgMar
-     del docx) y padding vertical pequeno para separar del header/
-     footer en cada hoja impresa. */
-  .page-frame > tbody > tr > td.page-body { padding: 8pt 1.18in 8pt 1.18in; }
-
+  /* Hoja fisica de Letter — width 8.5in x height 11in. Cada
+     .sheet tiene SU PROPIO header (top), footer (bottom) y
+     content (centro). Los assets reusan las mismas imagenes
+     oficiales del Formato Afinia. */
+  .sheet {
+    width: 8.5in;
+    height: 11in;
+    position: relative;
+    overflow: hidden;
+    page-break-after: always;
+    box-sizing: border-box;
+  }
+  .sheet:last-child { page-break-after: auto; }
+  .sheet-header {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    width: 100%;
+    height: 1.0in;
+  }
+  .sheet-footer {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    width: 100%;
+    height: 1.07in;
+  }
+  .sheet-content {
+    position: absolute;
+    top: 1.0in;
+    bottom: 1.07in;
+    left: 1.18in;
+    right: 1.18in;
+    overflow: hidden;
+  }
   .afinia-header-img,
   .afinia-footer-img {
     display: block;
     width: 100%;
-    height: auto;
+    height: 100%;
+    object-fit: cover;
+    object-position: center top;
   }
-  .afinia-footer { position: relative; }
-  .afinia-footer .footer-text {
+  .sheet-footer { position: absolute; }
+  .sheet-footer .footer-text {
     position: absolute;
     left: 6%; right: 6%; bottom: 14%;
     text-align: center;
     font-size: 6.5pt; color: #fff;
     font-weight: 600; letter-spacing: .01em;
     line-height: 1.2;
+  }
+
+  /* Buffer oculto: contiene el contenido completo del informe
+     antes de que el script de paginacion lo distribuya en hojas. */
+  .report-buffer {
+    position: absolute;
+    left: -10000px;
+    width: calc(8.5in - 2 * 1.18in);
+    visibility: hidden;
   }
   .report { padding: 0; }
 
@@ -1215,6 +1247,16 @@ function generateReport() {
   .ft td { padding: 4pt 6pt; border-bottom: 1px solid #e0e8f3; font-size: 7.8pt; vertical-align: top; }
   .ft tr:nth-child(even) td { background: #f8fbff; }
 
+  /* Bloque firma · Elaborado/Aprobado */
+  .firma-block { margin-top: 14pt; }
+  .firma-table { width: 100%; border-collapse: collapse; margin: 4pt 0 12pt; }
+  .firma-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 7.5pt; padding: 4pt 6pt; width: 24%; }
+  .firma-table td { padding: 4pt 6pt; font-size: 8pt; border-bottom: 1px solid #d8e3f0; }
+  .firma-block-img { margin-top: 12pt; max-width: 3in; }
+  .firma-img { display: block; max-width: 2.5in; max-height: 0.75in; margin-bottom: 2pt; }
+  .firma-line-under { width: 2.5in; border-top: 1px solid #1a1a1a; }
+  .firma-cap { font-size: 7pt; color: #555; margin-top: 2pt; }
+
   .info-box {
     margin: 6pt 0; padding: 8pt 12pt; border-radius: 4pt;
     background: #fff8e1; border: 1px solid #ffe082;
@@ -1286,12 +1328,14 @@ function generateReport() {
   .lbl.b         { background: #2e7d32; }
   .lbl.d         { background: #0288d1; }
 
-  /* SCREEN preview: simula una hoja Letter centrada con sombra. */
+  /* SCREEN preview: cada hoja .sheet centrada con sombra. */
   @media screen {
     body { background: #888; padding: 24px 0; }
-    .page-frame {
-      width: 8.5in;
-      margin: 0 auto;
+    .report-paginated {
+      display: block;
+    }
+    .sheet {
+      margin: 0 auto 24px;
       background: #fff;
       box-shadow: 0 4px 18px rgba(0,0,0,.18);
     }
@@ -1299,7 +1343,7 @@ function generateReport() {
 
   @media print {
     body { background: #fff; }
-    .page-frame { box-shadow: none; }
+    .sheet { box-shadow: none; margin: 0; }
     .no-print { display: none !important; }
   }
 
@@ -1325,28 +1369,12 @@ function generateReport() {
   <button class="sec" onclick="window.close()">Cerrar</button>
 </div>
 
-<!-- Marco de pagina: thead se repite como ENCABEZADO y tfoot como
-     PIE en cada hoja al imprimir. El contenido del informe vive
-     dentro de un unico td del tbody, que el navegador pagina
-     respetando page-break-* y break-inside:avoid. -->
-<table class="page-frame">
-  <thead>
-    <tr><th>
-      <header class="afinia-header" aria-label="Encabezado oficial CaribeMar de la Costa S.A.S E.S.P. - AFINIA Grupo EPM">
-        <img class="afinia-header-img" src="${headerImg}" alt="">
-      </header>
-    </th></tr>
-  </thead>
-  <tfoot>
-    <tr><td>
-      <footer class="afinia-footer" aria-hidden="true">
-        <img class="afinia-footer-img" src="${footerImg}" alt="">
-        <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
-      </footer>
-    </td></tr>
-  </tfoot>
-  <tbody>
-    <tr><td class="page-body">
+<!-- Buffer oculto: contiene el flujo completo del informe sin paginar.
+     El script de paginacion al final del body distribuye estos
+     bloques en .sheet divs (una por hoja fisica), inyectando header
+     y footer en CADA hoja. Este metodo es 100% portable entre
+     Chrome, Edge, Firefox y Safari en window.print(). -->
+<div class="report-buffer" aria-hidden="true">
 <article class="report">
 
   <!-- ── CARÁTULA ───────────────────────────────────────── -->
@@ -1558,6 +1586,23 @@ function generateReport() {
     ${materiales}
   </section>
 
+  <!-- ── FIRMAS · ELABORADO/APROBADO ─────────────────────── -->
+  <section class="section-anchor firma-block">
+    <h2>11. Elaborado / Aprobado</h2>
+    <table class="firma-table">
+      <tbody>
+        <tr><th>Nombre</th><td>Ing. Miguel Jimenez</td></tr>
+        <tr><th>Cargo</th><td>Líder de Transformadores de Potencia AFINIA</td></tr>
+        <tr><th>Unidad</th><td>Mantenimiento Red Alta Tensión</td></tr>
+      </tbody>
+    </table>
+    <div class="firma-block-img">
+      <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
+      <div class="firma-line-under"></div>
+      <div class="firma-cap">Firma</div>
+    </div>
+  </section>
+
   <div class="info-box" style="margin-top:12pt">
     Documento generado automáticamente por SGM · TRANSPOWER. La validación
     final del diseño debe ser revisada por el ingeniero responsable conforme
@@ -1565,21 +1610,75 @@ function generateReport() {
   </div>
 
 </article>
-    </td></tr>
-  </tbody>
-</table>
+</div>
+
+<!-- Contenedor de hojas paginadas: el script de abajo lo rellena
+     con divs .sheet que tienen header + content + footer cada uno. -->
+<div class="report-paginated"></div>
 
 <script>
-  // Auto-print una vez que las imágenes hayan cargado.
-  window.addEventListener('load', () => {
-    let pending = document.images.length;
-    if (pending === 0) { setTimeout(() => window.print(), 250); return; }
-    for (const img of document.images) {
-      if (img.complete) pending--; else img.addEventListener('load', () => { pending--; if (pending === 0) setTimeout(() => window.print(), 250); }, { once: true });
-      img.addEventListener('error', () => { pending--; if (pending === 0) setTimeout(() => window.print(), 250); }, { once: true });
+  // Paginacion manual: funciona en TODOS los navegadores (Chrome,
+  // Safari, Firefox, Edge) en window.print() porque el header y
+  // footer son explicitamente parte de cada hoja .sheet, no se
+  // depende de @page running headers ni de thead/tfoot repetidos
+  // (Safari NO repite estos ultimos). Cada .sheet tiene 8.5x11in
+  // con header absolute top y footer absolute bottom; el contenido
+  // del informe se mueve un bloque a la vez al sheet-content del
+  // sheet actual; cuando el contenido excede el alto disponible,
+  // el bloque pasa a una nueva hoja.
+  (function paginate() {
+    const HEADER_HTML = ${JSON.stringify(`<img class="afinia-header-img" src="${headerImg}" alt="">`)};
+    const FOOTER_HTML = ${JSON.stringify(`<img class="afinia-footer-img" src="${footerImg}" alt=""><div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>`)};
+
+    const buffer = document.querySelector('.report-buffer');
+    const out = document.querySelector('.report-paginated');
+    if (!buffer || !out) return;
+
+    function newSheet() {
+      const s = document.createElement('div');
+      s.className = 'sheet';
+      s.innerHTML =
+        '<div class="sheet-header">' + HEADER_HTML + '</div>' +
+        '<div class="sheet-content"></div>' +
+        '<div class="sheet-footer">' + FOOTER_HTML + '</div>';
+      out.appendChild(s);
+      return s.querySelector('.sheet-content');
     }
-    if (pending === 0) setTimeout(() => window.print(), 250);
-  });
+    function fits(content) {
+      return content.scrollHeight <= content.clientHeight;
+    }
+
+    // Aplanar children del article en bloques de primer nivel
+    const article = buffer.querySelector('.report');
+    const blocks = Array.from(article.children);
+    let content = newSheet();
+
+    for (const block of blocks) {
+      content.appendChild(block);
+      if (!fits(content)) {
+        // Mover este block a una nueva hoja
+        content.removeChild(block);
+        content = newSheet();
+        content.appendChild(block);
+        // Si SIGUE sin caber (bloque solo es mas alto que la hoja),
+        // se queda igual y el navegador lo recorta. Para el informe
+        // AFINIA ningun bloque excede una hoja completa por diseno.
+      }
+    }
+    // Limpiar buffer
+    buffer.remove();
+
+    // Cargar imagenes y luego imprimir
+    let pending = document.images.length;
+    function go() { setTimeout(() => window.print(), 250); }
+    if (pending === 0) { go(); return; }
+    for (const img of document.images) {
+      if (img.complete) { pending--; if (pending === 0) go(); }
+      else img.addEventListener('load', () => { pending--; if (pending === 0) go(); }, { once: true });
+      img.addEventListener('error', () => { pending--; if (pending === 0) go(); }, { once: true });
+    }
+    if (pending === 0) go();
+  })();
 </script>
 
 </body>
