@@ -7,6 +7,202 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## v2.9.0 — Mantenimiento Brigada · Selección ONAF (2026-05-02)
+
+Nuevo módulo top-level **"Mantenimiento Brigada"** en el sidebar
+(grupo Operación, entre Órdenes y Contratos · icono Lucide
+`hard-hat`). Primera herramienta entregada: **calculadora de
+selección de sistema de refrigeración (ONAN → ONAF)** conforme
+IEEE C57.12.00-2015 · ANSI C57.12.91 · IEEE C57.91-2011 ·
+Westinghouse T&D Reference. Migración del archivo legacy
+monolítico `Calculo de Sistemas de refriegracion.html` (1917
+líneas inline) a la arquitectura canónica del proyecto: dominio
+puro / data layer / UI binding · 4 microfases con commits
+aislados.
+
+### Arquitectura
+
+- `pages/mantenimiento-brigada.html` · módulo padre `module-shell`
+  con tablist + iframe lazy-load (mismo patrón que `Activos`,
+  `Salud`, `Análisis`). 1 pestaña inicial "Sistema de Refrigeración",
+  future-proof para sumar más calculadoras de brigada sin tocar el
+  sidebar.
+- `pages/calculo-refrigeracion.html` · página hija con los 84 IDs
+  originales del archivo legacy preservados sin renombrar.
+- `assets/js/domain/refrigeracion.js` (552 LOC) · funciones puras
+  testables sin DOM: interpolación Westinghouse, conversión de
+  caudal a CFM (5 unidades), corrección ISA por altitud, núcleo
+  de cálculo, N=⌈total/fan⌉, evaluación de compatibilidad mecánica
+  (4 criterios C1-C4), parser de corriente "1.60 / 0.92 A (D/Y)",
+  selección guardamotor MS116 + breaker S203 con factor seguridad
+  NEC 430 ×1.25, heurística de auto-rango del gráfico.
+- `assets/js/data/refrigeracion-transformadores-afinia.js` · 206
+  transformadores AFINIA con matrícula, serie, potencia, grupo,
+  subestación, zona, departamento, refrigeración.
+- `assets/js/data/refrigeracion-fan-db.js` · 13 fichas técnicas de
+  motoventiladores (ZIEHL-ABEGG ZN045/FN050/FN063/ZN063 + KRENZ F20).
+- `assets/js/calculo-refrigeracion.js` · UI binding + Chart.js +
+  generador de informe. Carga lazy de los catálogos pesados.
+- `tests/refrigeracion.test.js` · 44 tests cubriendo la verificación
+  golden 24 MVA × 125 % = 48.000 CFM (calibración AFINIA original)
+  + las 16 funciones del dominio.
+
+### Calibración Westinghouse congelada (Object.freeze)
+
+```
+115% → 1.20 CFM/kVA
+125% → 2.00 CFM/kVA
+133% → 2.65 CFM/kVA
+166% → 4.25 CFM/kVA
+```
+
+Cualquier modificación accidental lanza `TypeError`. Verificación
+del modelo: 24 MVA × 125 % = 48.000 CFM (caso de control oficial).
+
+### Maquetación Aqua Liquid Glass
+
+`assets/css/calculo-refrigeracion.css` (~720 LOC) deriva 100 % de
+los tokens AQUA del proyecto (`aqua-tokens.css` · `aqua-components.css`).
+Cero color hard-coded. Adaptación del rediseño dark del bundle de
+Claude Design al sistema light-perla del proyecto:
+
+- 5 KPIs en grid con borde lateral coloreado (3px) + glow
+- 4 secciones mecánicas con header gradient diagonal (steel /
+  teal / purple / indigo)
+- Diagrama A/B/C/D con dots A=rojo · B=verde · C=rojo · D=cian
+  + glow shadow
+- 4 cards de compatibilidad con estados ok/warn/err/nd
+- Tabla de fans con estados visuales y botón "+" dashed
+- Calculador con header brand-deep + chip de fórmula
+
+### Gráfico Chart.js · 4 curvas Westinghouse
+
+Plugin custom `sgmCurveLabels` que dibuja:
+- Etiquetas SOBRE las curvas con ángulo calculado (115/125/133/166% OA RATING)
+- Etiqueta de la curva interpolada con sufijo "◀" cuando difiere
+- **Cruceta roja**: líneas dashed desde ambos ejes hasta el punto
+  de operación + puntos rojos en intersecciones + etiquetas
+  X.X MVA y XX.XXX CFM sobre los ejes (lectura visual directa
+  para validación del cálculo, fiel al original)
+- Leyenda en posición **inferior** (no superior · paridad fiel
+  con el original Westinghouse)
+- Tooltip con conversión kVA → MVA en tiempo real
+
+### Generador de informe técnico AFINIA
+
+`generateReport()` construye un documento HTML imprimible
+conforme al `Formato Afinia.docx` oficial extraído del repo:
+
+- Hoja Letter portrait (8.5″ × 11″)
+- **Header logo afinia · Grupo·epm** (1273×282 PNG) y **footer
+  banda azul curva www.afinia.com.co + dirección "CaribeMar de
+  la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio
+  Chambacú – Piso 1 / Cartagena."** repetidos en CADA hoja
+  impresa vía técnica `<table>` + `<thead>` con
+  `display: table-header-group` + `<tfoot>` con
+  `display: table-footer-group` (gold standard cross-navegador
+  · funciona en Chrome, Firefox, Safari, Edge sin excepciones).
+
+10 secciones del informe:
+
+1. Identificación del transformador (8 campos)
+2. Parámetros del cálculo + 5 KPIs
+3. Curvas Westinghouse · gráfico íntegro embebido como base64
+   PNG (sin riesgo de corte) + 3 fórmulas aplicadas con valores
+   reales (pendiente interpolada · CFM₀ = m × kVA · F_alt)
+4. Datos mecánicos del radiador con **diagrama SVG inline**
+   (vista frontal + perspectiva isométrica con cotas A/B/C/D
+   codificadas por color) + 8 campos de medidas
+5. Motoventilador · 12 campos aerodinámica + 12 motor eléctrico
+6. Montaje sobre radiador (8 campos)
+7. Análisis de compatibilidad mecánica (4 cards C1-C4 con
+   estados pill ok/warn/err/nd + diagnóstico textual + conclusión)
+8. Selección de motoventiladores · **fórmula N = ⌈ … ⌉ aplicada**
+   con valores reales + tabla con todas las opciones + recomendación
+   destacada
+9. Protección eléctrica · **5 fórmulas aplicadas** (I_total =
+   N × I, I_min = 1.25 × I_total NEC 430, P_total = N × P₁,
+   S_total = P/cos φ) + tabla con MS116 / S203 / auxiliares +
+   TODOS los totales del sistema
+10. Lista de materiales (BOM) con # · Cantidad · Componente ·
+    PID · Especificación · lista para emisión de OC
+
+### Datalist en "Nombre del proyecto"
+
+Dos opciones predefinidas (admite texto libre):
+- "Actualización y Repotenciación del Sistema de Refrigeración"
+- "Sistema de Refrigeración URE"
+
+### Reglas de paginación bulletproof
+
+Sin saltos `page-break-after: always` forzados (causaban hojas
+en blanco). Cada bloque atómico (gráfico, KPI grid, tabla,
+formula-box, rad-diagram) lleva `break-inside: avoid` +
+`page-break-inside: avoid`. Cada h2 envuelto en
+`<section class="section-anchor">` con `break-inside: avoid`
+para que nunca quede como "viuda" al pie de página sin su
+contenido. `widows: 4 / orphans: 4` en párrafos.
+
+### Animaciones y micro-interacciones
+
+- KPI count-up con easeOutCubic 480 ms cuando el valor cambia
+- Hover lift en `.calc-section` y `.kpi` con shimmer animado
+  sobre la barra accent
+- Reveal por scroll vía IntersectionObserver
+- Validación reactiva con shake animation + mensajes inline
+  cuando un input está fuera de su rango min/max
+- Manejo defensivo si Chart.js no carga del CDN (reintento +
+  mensaje al usuario)
+- Todo respeta `prefers-reduced-motion`
+
+### Memorizado en CLAUDE.md
+
+3 nuevas reglas permanentes:
+- §0.1.2.1 — Migrar archivos legacy SIN perder detalles visuales
+  (cruceta roja, posición leyenda, etiquetas de eje, etc.)
+- §0.1.2.2 — Generación de informes imprimibles (PDF/print) ·
+  13 reglas + checklist de cierre · plantilla del cliente como
+  fuente de verdad · header/footer SIEMPRE vía thead/tfoot
+  (NO position:fixed) · fórmulas con sustitución numérica · BOM
+  obligatorio · diagrama del componente cuando exista en el
+  original
+
+### Tests
+
+497 / 497 verdes (453 base + 44 nuevos del módulo refrigeración).
+html-validate limpio.
+
+### Commits
+
+10 commits aislados del módulo brigada desde `4323ac4` (F1 ·
+skeleton + sidebar). El fix definitivo del header/footer
+cross-navegador quedó consolidado en main como `b4606cd`
+(PR #128 · "informe AFINIA · header/footer SE REPITEN en cada
+hoja"), reemplazando una iteración anterior `2ee9a9c` que
+implementaba el mismo patrón thead/tfoot con CSS algo distinto.
+
+### Nuevos archivos
+
+- `pages/mantenimiento-brigada.html`
+- `pages/calculo-refrigeracion.html`
+- `assets/js/mantenimiento-brigada-shell.js`
+- `assets/js/calculo-refrigeracion.js`
+- `assets/js/domain/refrigeracion.js`
+- `assets/js/data/refrigeracion-transformadores-afinia.js`
+- `assets/js/data/refrigeracion-fan-db.js`
+- `assets/css/calculo-refrigeracion.css`
+- `assets/img/afinia/header.png`
+- `assets/img/afinia/footer.png`
+- `tests/refrigeracion.test.js`
+- `docs/MANTENIMIENTO-BRIGADA.md` (esta documentación)
+
+### Modificados
+
+- `assets/js/aqua-shell.js` (+1 línea entrada sidebar)
+- `CLAUDE.md` (§0.1.2.1, §0.1.2.2 nuevas)
+
+---
+
 ## v2.8.1 — Hotfix admin upload · defaults codigo+estado en /contratos/{cid} (2026-05-01)
 
 Bug reportado por el director justo después del lanzamiento v2.8.0.
