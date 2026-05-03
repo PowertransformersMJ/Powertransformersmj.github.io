@@ -174,8 +174,12 @@ html-validate limpio.
 
 ### Commits
 
-10 commits aislados desde `4323ac4` (F1 · skeleton + sidebar)
-hasta `2ee9a9c` (informe AFINIA · header/footer cross-navegador).
+10 commits aislados del módulo brigada desde `4323ac4` (F1 ·
+skeleton + sidebar). El fix definitivo del header/footer
+cross-navegador quedó consolidado en main como `b4606cd`
+(PR #128 · "informe AFINIA · header/footer SE REPITEN en cada
+hoja"), reemplazando una iteración anterior `2ee9a9c` que
+implementaba el mismo patrón thead/tfoot con CSS algo distinto.
 
 ### Nuevos archivos
 
@@ -198,6 +202,103 @@ hasta `2ee9a9c` (informe AFINIA · header/footer cross-navegador).
 - `CLAUDE.md` (§0.1.2.1, §0.1.2.2 nuevas)
 
 ---
+
+## v2.8.1 — Hotfix admin upload · defaults codigo+estado en /contratos/{cid} (2026-05-01)
+
+Bug reportado por el director justo después del lanzamiento v2.8.0.
+Al usar el botón **"+ Agregar documento"** desde
+`pages/contrato-info.html?id=…&tipo=remisiones` (o cualquier otro
+`tipo`), el upload llegaba al **100 % en Firebase Storage** y al
+final caía con `Missing or insufficient permissions`. Reproducible
+en cualquier contrato cuyo doc Firestore `/contratos/{cid}` no fue
+dado de alta previamente con los campos canónicos.
+
+### Causa raíz
+
+`firestore.rules:418-430` restringe `/contratos/{id}`:
+
+```javascript
+allow create: if isAdmin()
+              && request.resource.data.codigo is string
+              && request.resource.data.codigo.size() > 0
+              && request.resource.data.estado in
+                 ['vigente','suspendido','finalizado','en_liquidacion'];
+allow update: if isAdmin()
+              && request.resource.data.estado in
+                 ['vigente','suspendido','finalizado','en_liquidacion'];
+```
+
+`subirDocumento` y `eliminarDocumento` hacían:
+
+```javascript
+await setDoc(docRef, {
+  [campo]: arr,
+  [campoUpdatedAt]: serverTimestamp()
+}, { merge: true });
+```
+
+Con `merge: true`, el `request.resource.data` que evalúan las rules
+es el merged-post-state. Casos:
+
+- Doc no existe → CREATE → falta `codigo` y `estado` → ❌
+- Doc existe pero sin `estado` válido → UPDATE → `estado` post-merge
+  queda `undefined`, `estado in [...]` falla → ❌
+
+`4123000081` sí funcionaba porque su `/contratos/4123000081` tiene
+`estado: 'vigente'` en Firestore. `4125000143` (más reciente, sin
+"Información Contractual" cargada antes) no tenía el doc poblado.
+
+### Fix aplicado
+
+Helper interno `_conDefaultsContrato(payload, cid, dataExistente)`
+en `assets/js/data/documentos_contractuales.js` que **respeta los
+valores existentes** (no pisa un `estado='suspendido'` legítimo)
+y solo agrega defaults cuando faltan o son inválidos:
+
+```javascript
+function _conDefaultsContrato(payload, cid, dataExistente) {
+  const out = { ...payload };
+  if (!dataExistente.codigo) out.codigo = String(cid);
+  const ESTADOS_VALIDOS = ['vigente', 'suspendido', 'finalizado', 'en_liquidacion'];
+  if (!ESTADOS_VALIDOS.includes(dataExistente.estado)) out.estado = 'vigente';
+  return out;
+}
+```
+
+Aplicado en ambas operaciones de write a `/contratos/{cid}`
+(`subirDocumento` línea 279 y `eliminarDocumento` línea 342).
+
+### Verificación
+
+- ✅ Las 7 remisiones (`REMISION 1.pdf`–`REMISION 7.pdf`) del contrato
+  `4123000081` cargadas exitosamente vía el botón **"+ Agregar
+  documento"** del admin. Visor PDF embebido renderiza correctamente.
+  Categorización automática como "Remisiones".
+- ✅ Información Contractual de `4123000081` sigue funcionando (no
+  hay regresión — `estado: 'vigente'` ya estaba en el doc, el helper
+  no toca nada).
+- ✅ El flujo cubre los 3 canales documentales: `''` (Información
+  Contractual), `'remisiones'`, `'reuniones-seguimiento'`.
+
+### Sin deploy de Firebase
+
+Fix 100 % en data layer JavaScript. **No requiere** `firebase
+deploy --only firestore:rules` ni storage. GitHub Pages reconstruye
+automáticamente desde `main` tras merge.
+
+### Commit / PR
+
+- Commit: `e43aa42`
+- PR: [#119](https://github.com/ajimenezp99-jpg/LordPowerTransformersMJ.github.io/pull/119)
+- Merge a main: `8e1aa10`
+
+### Nota operativa
+
+En el commit `91f386c` el director subió por error los 7 archivos
+`REMISION X.pdf` al raíz del repo via GitHub web. No afecta el
+flujo (los PDFs reales viven en Firebase Storage tras el upload
+admin), pero quedaron como peso muerto. Cleanup pendiente en una
+versión futura.
 
 ## v2.8.0 — Seguimiento Contractual · Remisiones + Reuniones de Seguimiento (2026-05-01)
 
