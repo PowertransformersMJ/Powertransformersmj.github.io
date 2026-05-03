@@ -1278,7 +1278,8 @@ function generateReport() {
     margin: 8pt 0; padding: 8pt 12pt 5pt;
     border: 1px solid #d0dce8; border-radius: 4pt; background: #fff;
   }
-  .rad-diagram svg { display: block; width: 100%; max-width: 5.4in; height: auto; margin: 0 auto; }
+  .rad-diagram svg,
+  .rad-diagram-img { display: block; width: 100%; max-width: 5.4in; height: auto; margin: 0 auto; }
   .rad-legend { margin-top: 5pt; display: grid; grid-template-columns: 1fr 1fr; gap: 2pt 10pt; font-size: 7.5pt; }
   .rad-legend .lbl { display: inline-block; width: 12pt; text-align: center; font-weight: 700; color: #fff; border-radius: 50%; margin-right: 4pt; padding: 1pt 0; font-size: 7pt; }
   .lbl.a, .lbl.c { background: #c62828; }
@@ -1419,7 +1420,7 @@ function generateReport() {
     <p class="meta">Diagrama de referencia con las dimensiones A/B/C/D según convención AFINIA:</p>
   </section>
   <div class="rad-diagram">
-    ${radiadorDiagramSVG()}
+    <img class="rad-diagram-img" src="../assets/img/afinia/diagrama-radiador.png" alt="Diagrama de referencia del cuerpo de radiador con cotas A, B, C y D según convención AFINIA">
     <div class="rad-legend">
       <div><span class="lbl a">A</span> Altura del cuerpo de radiador</div>
       <div><span class="lbl b">B</span> Distancia entre oblea inicial y oblea final</div>
