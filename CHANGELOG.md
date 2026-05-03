@@ -16,6 +16,55 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Commit 5 · Tab "Consolidado Sistemas de Refrigeración" (2026-05-03)
+
+Nueva pestaña del módulo Mantenimiento Brigada para visualizar
+todas las acciones registradas en `acciones_refrigeracion` en
+realtime.
+
+- **`pages/mantenimiento-brigada.html`** · segunda tab agregada al
+  tablist: `data-tab="consolidado"` con icono Lucide `list-checks`
+  → `consolidado-refrigeracion.html` vía iframe lazy-load.
+- **`pages/consolidado-refrigeracion.html`** · página dedicada con:
+  - Cabecera con título + estado de sincronización + botón
+    **"Exportar CSV"**.
+  - 5 KPI cards con paleta semáforo: total acciones · aprobadas
+    o ejecutadas (verde) · planificadas o pendientes (naranja) ·
+    Σ kVA ONAF objetivo · Σ ventiladores totales del parque.
+  - Barra de filtros: búsqueda libre (matrícula / proyecto /
+    descripción / responsable) · estado · subestación (poblada
+    dinámicamente desde la suscripción) · zona · rango de fechas
+    (desde / hasta). Botón "Limpiar".
+  - Tabla con 15 columnas: fecha, matrícula, proyecto,
+    subestación, zona, ONAN, ONAF, mix (resumen "8× ZIEHL FN-063
+    + 4× ZIEHL FN-050"), CFM total, cobertura %, OK ✓/✗,
+    estado-pill (5 colores), responsable, acción (descripción
+    truncada con tooltip al título completo), acciones de fila.
+  - Acciones admin-only en cada fila: cambiar estado (prompt) /
+    eliminar (confirm).
+  - Banner de error visible si las rules o índices no están
+    desplegados (mensaje incluye comando exacto a ejecutar).
+- **`assets/js/consolidado-refrigeracion.js`** · UI binding:
+  - `suscribir()` del data layer al primer paint sin filtros
+    server-side (filtros se aplican cliente para no requerir
+    índices adicionales por combinación).
+  - Filtros cliente reactivos (input + change events).
+  - KPIs recalculados en cada cambio de filtro.
+  - Export CSV con BOM UTF-8 + 28 columnas planas (campos del
+    payload + agregados de `evaluacion`/`proteccion`).
+  - Detección de admin via `window.__sgmSession.profile.rol`.
+  - Cleanup de la suscripción en `beforeunload`.
+- Estilos inline en la página (paleta consistente con el resto
+  del módulo): KPIs glass + tabla con sticky header + estado-pills
+  por estado_accion + aprobado-pills verde/rojo.
+
+JS lint OK · HTML lint OK · 501/503 tests verdes.
+
+⚠ La pestaña requiere los deploys del commit 4 (rules + indexes
+para `acciones_refrigeracion`). Sin ellos los queries fallarán con
+`permission-denied` y/o `FAILED_PRECONDITION` con mensaje claro
+en el banner de error.
+
 ### Commit 4 · Persistencia · acciones_refrigeracion + botón "Registrar acción" (2026-05-03)
 
 Persistencia en Firestore de las acciones de mantenimiento del
