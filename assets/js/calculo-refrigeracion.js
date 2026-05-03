@@ -1096,13 +1096,16 @@ function generateReport() {
 <base href="${cssBase}">
 <style>
   /* ── Hoja Letter conforme Formato Afinia.docx ──────────────── */
-  /* @page sin márgenes — el patrón thead/tfoot del envoltorio
-     .afinia-page provee header/footer en CADA hoja impresa. Los
-     márgenes laterales del contenido se controlan con padding del
-     <td class="report-body">. */
+  /* @page con márgenes verticales que reservan espacio al header
+     (1.7in arriba) y al footer (1.3in abajo). En print mode los
+     elementos `position: fixed` con offsets POSITIVOS desde el
+     borde de la hoja se renderizan UNA VEZ POR PÁGINA — Chrome,
+     Edge, Firefox y Safari modernos respetan este comportamiento.
+     Esta es la técnica que usan html2pdf.js, jsPDF y Puppeteer
+     para encabezados/pies repetidos. */
   @page {
     size: letter portrait;
-    margin: 0;
+    margin: 1.7in 0 1.3in 0;
   }
   html, body {
     margin: 0; padding: 0;
@@ -1113,23 +1116,23 @@ function generateReport() {
     print-color-adjust: exact;
   }
 
-  /* ── HEADER + FOOTER se repiten en CADA hoja vía thead/tfoot ──
-     El navegador (Chrome/Edge/Firefox/Safari) imprime automática-
-     mente el contenido de <thead> al inicio de cada página y el
-     de <tfoot> al final, gracias al modo de tabla. Esto es el
-     mecanismo más robusto cross-browser para encabezados/pies
-     repetidos en CSS Paged Media. */
-  table.afinia-page {
+  /* ── HEADER + FOOTER fijos · se repiten en CADA hoja impresa ──
+     position: fixed con `top: 0`/`bottom: 0` se ancla al borde
+     físico de cada hoja en print mode. El navegador rasteriza el
+     elemento UNA VEZ POR PÁGINA, no una sola en todo el documento.
+     Los offsets son POSITIVOS (no negativos) para que la imagen
+     entre completa dentro del área del @page. */
+  .afinia-header {
+    position: fixed;
+    top: 0; left: 0; right: 0;
     width: 100%;
-    border-collapse: collapse;
-    margin: 0; padding: 0;
+    z-index: 100;
   }
-  table.afinia-page > thead { display: table-header-group; }
-  table.afinia-page > tfoot { display: table-footer-group; }
-  table.afinia-page > thead > tr > td,
-  table.afinia-page > tfoot > tr > td,
-  table.afinia-page > tbody > tr > td {
-    padding: 0; margin: 0; border: 0;
+  .afinia-footer {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    width: 100%;
+    z-index: 100;
   }
   .afinia-header-img,
   .afinia-footer-img {
@@ -1137,33 +1140,34 @@ function generateReport() {
     width: 100%;
     height: auto;
   }
-  .afinia-footer { position: relative; width: 100%; }
   .afinia-footer .footer-text {
     position: absolute;
-    left: 6%; right: 6%; bottom: 12%;
+    left: 6%; right: 6%; bottom: 14%;
     text-align: center;
-    font-size: 7.5pt; color: #fff;
+    font-size: 6.5pt; color: #fff;
     font-weight: 600; letter-spacing: .01em;
     line-height: 1.2;
   }
-  /* El cuerpo conserva los márgenes laterales del Formato Afinia
-     (1.18in = 3 cm aprox., conforme pgMar del docx oficial). */
-  td.report-body {
-    padding: 0.30in 1.18in 0.20in;
-    vertical-align: top;
+  /* El cuerpo del informe respeta los márgenes laterales del
+     Formato Afinia (1.18in = 3 cm aprox., conforme pgMar del
+     docx oficial) vía padding interno; los márgenes verticales
+     los maneja el @page para que el contenido nunca pise el
+     header/footer fixed. */
+  .report {
+    padding: 0 1.18in;
   }
 
-  /* ── Tipografía ────────────────────────────────────────────── */
-  h1 { font-size: 18pt; margin: 0 0 4pt; color: #0d3a73; letter-spacing: -.01em; }
-  h2 { font-size: 13pt; margin: 10pt 0 5pt; color: #0d3a73; padding-bottom: 3pt; border-bottom: 1px solid #5ba4d4; }
-  h3 { font-size: 11pt; margin: 7pt 0 3pt; color: #0d3a73; }
-  p, td, th { font-size: 10pt; line-height: 1.42; }
-  .meta { margin: 0 0 4pt; }
+  /* ── Tipografía · tamaños reducidos para mejor densidad ────── */
+  h1 { font-size: 13pt; margin: 0 0 3pt; color: #0d3a73; letter-spacing: -.01em; line-height: 1.25; }
+  h2 { font-size: 10pt; margin: 8pt 0 4pt; color: #0d3a73; padding-bottom: 2pt; border-bottom: 1px solid #5ba4d4; }
+  h3 { font-size: 9pt; margin: 6pt 0 2pt; color: #0d3a73; }
+  p, td, th { font-size: 8pt; line-height: 1.36; }
+  .meta { margin: 0 0 3pt; }
   /* Sección anchor: el primer h2/h3 dentro NO lleva margen-top
      extra, evita huecos cuando la sección entera salta de página. */
   .section-anchor > h2:first-child,
   .section-anchor > h3:first-child { margin-top: 0; }
-  .meta { font-size: 9pt; color: #666; margin-bottom: 4pt; }
+  .meta { font-size: 7.5pt; color: #666; margin-bottom: 3pt; }
   .mono { font-family: "Consolas", "Courier New", monospace; font-variant-numeric: tabular-nums; }
   .tc { text-align: center; }
   .tr { text-align: right; }
@@ -1192,41 +1196,41 @@ function generateReport() {
 
   .cover-block {
     margin-top: 12pt;
-    padding: 14pt 16pt; border-radius: 6pt;
+    padding: 10pt 12pt; border-radius: 5pt;
     background: linear-gradient(135deg, #e3f2fd 0%, #f5fafd 100%);
     border: 1px solid #90caf9;
   }
   .cover-block h1 { color: #0d3a73; }
-  .cover-block .proj { font-size: 13pt; font-weight: 600; color: #1258a0; margin-top: 6pt; }
-  .cover-block .ref  { font-size: 9pt; color: #555; margin-top: 4pt; line-height: 1.5; }
+  .cover-block .proj { font-size: 10.5pt; font-weight: 600; color: #1258a0; margin-top: 4pt; }
+  .cover-block .ref  { font-size: 7.5pt; color: #555; margin-top: 3pt; line-height: 1.4; }
 
   /* ── KPIs ──────────────────────────────────────────────────── */
-  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8pt; margin: 10pt 0; }
+  .kpi-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6pt; margin: 8pt 0; }
   .kpi-card {
-    border: 1px solid #b0cce8; border-radius: 5pt;
-    padding: 8pt 10pt; background: #f0f7ff;
-    border-left: 3pt solid #0d47a1;
+    border: 1px solid #b0cce8; border-radius: 4pt;
+    padding: 6pt 8pt; background: #f0f7ff;
+    border-left: 2.5pt solid #0d47a1;
   }
   .kpi-card.cfm { background: #f0fafd; border-left-color: #0277bd; }
   .kpi-card.alt { background: #f0fdf6; border-left-color: #1b5e20; }
-  .kpi-card .l { font-size: 8pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #555; margin-bottom: 4pt; }
-  .kpi-card .v { font-size: 13pt; font-weight: 700; color: #0d3a73; }
+  .kpi-card .l { font-size: 6.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #555; margin-bottom: 3pt; }
+  .kpi-card .v { font-size: 10.5pt; font-weight: 700; color: #0d3a73; }
 
   /* ── Tablas ────────────────────────────────────────────────── */
-  .rpt-table { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; }
-  .rpt-table th, .rpt-table td { padding: 4pt 8pt; border-bottom: 1px solid #d8e3f0; vertical-align: top; }
-  .rpt-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 9pt; width: 38%; }
-  .rpt-table td { font-size: 10pt; }
+  .rpt-table { width: 100%; border-collapse: collapse; margin: 3pt 0 6pt; }
+  .rpt-table th, .rpt-table td { padding: 3pt 6pt; border-bottom: 1px solid #d8e3f0; vertical-align: top; }
+  .rpt-table th { text-align: left; background: #ddeaf7; color: #0d3a73; font-weight: 600; font-size: 7.5pt; width: 38%; }
+  .rpt-table td { font-size: 8pt; }
 
-  .ft { width: 100%; border-collapse: collapse; margin-top: 6pt; }
-  .ft th { background: #0d3a73; color: #fff; padding: 5pt 7pt; text-align: left; font-size: 9pt; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
-  .ft td { padding: 5pt 7pt; border-bottom: 1px solid #e0e8f3; font-size: 9.5pt; vertical-align: top; }
+  .ft { width: 100%; border-collapse: collapse; margin-top: 5pt; }
+  .ft th { background: #0d3a73; color: #fff; padding: 4pt 6pt; text-align: left; font-size: 7.5pt; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .ft td { padding: 4pt 6pt; border-bottom: 1px solid #e0e8f3; font-size: 7.8pt; vertical-align: top; }
   .ft tr:nth-child(even) td { background: #f8fbff; }
 
   .info-box {
-    margin: 8pt 0; padding: 10pt 14pt; border-radius: 5pt;
+    margin: 6pt 0; padding: 8pt 12pt; border-radius: 4pt;
     background: #fff8e1; border: 1px solid #ffe082;
-    font-size: 9.5pt; color: #5d4037;
+    font-size: 7.8pt; color: #5d4037;
   }
   .info-box strong { color: #b85f00; }
 
@@ -1234,8 +1238,8 @@ function generateReport() {
   .ko { color: #b71c1c; font-weight: 700; }
 
   .estado {
-    display: inline-block; padding: 1pt 7pt; border-radius: 9pt;
-    font-size: 8pt; font-weight: 700; letter-spacing: .04em;
+    display: inline-block; padding: 1pt 6pt; border-radius: 8pt;
+    font-size: 6.5pt; font-weight: 700; letter-spacing: .04em;
   }
   .estado.est-ok   { background: #e8f5e9; color: #1b5e20; border: 1px solid #81c784; }
   .estado.est-warn { background: #fff3e0; color: #b85f00; border: 1px solid #ffb74d; }
@@ -1244,51 +1248,51 @@ function generateReport() {
 
   .best-mark {
     display: inline-block;
-    background: #1b5e20; color: #fff; padding: 2pt 7pt;
-    border-radius: 4pt; font-size: 8pt; font-weight: 700;
-    margin-left: 6pt;
+    background: #1b5e20; color: #fff; padding: 1pt 6pt;
+    border-radius: 3pt; font-size: 6.5pt; font-weight: 700;
+    margin-left: 5pt;
   }
 
   /* ── Bloque del gráfico (no se parte entre páginas) ────────── */
   .chart-block {
-    margin: 10pt 0; padding: 8pt 8pt 4pt;
-    border: 1px solid #b0cce8; border-radius: 5pt; background: #fff;
+    margin: 8pt 0; padding: 6pt 6pt 3pt;
+    border: 1px solid #b0cce8; border-radius: 4pt; background: #fff;
     text-align: center;
   }
-  .chart-img { width: 100%; max-width: 6.2in; height: auto; }
-  .chart-cap { font-size: 8pt; color: #666; margin-top: 4pt; font-style: italic; }
+  .chart-img { width: 100%; max-width: 5.6in; height: auto; }
+  .chart-cap { font-size: 6.5pt; color: #666; margin-top: 3pt; font-style: italic; }
 
   /* ── Fórmula simbólica + sustitución con valores reales ────── */
   .formula-box {
-    margin: 8pt 0;
-    padding: 10pt 14pt; border-radius: 5pt;
+    margin: 6pt 0;
+    padding: 8pt 12pt; border-radius: 4pt;
     background: #f5f8fc; border: 1px solid #d0dce8;
-    border-left: 3pt solid #1565c0;
+    border-left: 2.5pt solid #1565c0;
   }
   .formula-box .l {
-    font-size: 8pt; font-weight: 700; color: #1565c0;
-    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4pt;
+    font-size: 6.5pt; font-weight: 700; color: #1565c0;
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3pt;
   }
   .formula-box .sym {
     font-family: "Cambria Math", "Times New Roman", serif;
-    font-size: 12pt; font-style: italic; color: #1a1a1a;
+    font-size: 9.5pt; font-style: italic; color: #1a1a1a;
   }
   .formula-box .apply {
-    margin-top: 4pt;
+    margin-top: 3pt;
     font-family: "Consolas", "Courier New", monospace;
-    font-size: 10pt; color: #1b5e20; font-variant-numeric: tabular-nums;
+    font-size: 8pt; color: #1b5e20; font-variant-numeric: tabular-nums;
   }
-  .formula-box .apply .arrow { color: #999; margin: 0 4pt; }
+  .formula-box .apply .arrow { color: #999; margin: 0 3pt; }
   .formula-box .apply .res   { color: #c62828; font-weight: 700; }
 
   /* ── Diagrama del radiador (SVG embebido) ───────────────────── */
   .rad-diagram {
-    margin: 10pt 0; padding: 10pt 14pt 6pt;
-    border: 1px solid #d0dce8; border-radius: 5pt; background: #fff;
+    margin: 8pt 0; padding: 8pt 12pt 5pt;
+    border: 1px solid #d0dce8; border-radius: 4pt; background: #fff;
   }
-  .rad-diagram svg { display: block; width: 100%; max-width: 6in; height: auto; margin: 0 auto; }
-  .rad-legend { margin-top: 6pt; display: grid; grid-template-columns: 1fr 1fr; gap: 3pt 12pt; font-size: 9pt; }
-  .rad-legend .lbl { display: inline-block; width: 14pt; text-align: center; font-weight: 700; color: #fff; border-radius: 50%; margin-right: 5pt; padding: 1pt 0; }
+  .rad-diagram svg { display: block; width: 100%; max-width: 5.4in; height: auto; margin: 0 auto; }
+  .rad-legend { margin-top: 5pt; display: grid; grid-template-columns: 1fr 1fr; gap: 2pt 10pt; font-size: 7.5pt; }
+  .rad-legend .lbl { display: inline-block; width: 12pt; text-align: center; font-weight: 700; color: #fff; border-radius: 50%; margin-right: 4pt; padding: 1pt 0; font-size: 7pt; }
   .lbl.a, .lbl.c { background: #c62828; }
   .lbl.b         { background: #2e7d32; }
   .lbl.d         { background: #0288d1; }
@@ -1296,19 +1300,34 @@ function generateReport() {
   /* ── SCREEN preview vs PRINT ───────────────────────────────── */
   @media screen {
     body { background: #888; padding: 24px 0; }
-    table.afinia-page {
+    .report {
       width: 8.5in;
-      margin: 0 auto;
+      min-height: calc(11in - 1.7in - 1.3in);
+      margin: 1.7in auto 1.3in;
       background: #fff;
       box-shadow: 0 4px 18px rgba(0,0,0,.18);
+      padding-top: 0.20in;
+      padding-bottom: 0.20in;
     }
+    /* En screen el position:fixed muestra header/footer una vez
+       (preview); centrarlos respecto al .report. */
+    .afinia-header,
+    .afinia-footer {
+      width: 8.5in;
+      left: 50%; right: auto;
+      transform: translateX(-50%);
+    }
+    .afinia-header { top: 24px; }
+    .afinia-footer { bottom: 24px; }
   }
 
   @media print {
     body { background: #fff; }
-    table.afinia-page {
-      width: 100%;
+    .report {
+      width: auto;
+      margin: 0;
       box-shadow: none;
+      min-height: auto;
     }
     .no-print { display: none !important; }
   }
@@ -1335,25 +1354,28 @@ function generateReport() {
   <button class="sec" onclick="window.close()">Cerrar</button>
 </div>
 
-<!-- ENVOLTORIO AFINIA · header en <thead> + footer en <tfoot>.
-     Por especificación CSS Tables, el navegador repite thead al
-     inicio y tfoot al final de CADA página impresa. Es el patrón
-     más robusto cross-browser para "running headers" en print. -->
-<table class="afinia-page" role="presentation">
-  <thead>
-    <tr><td>
-      <img class="afinia-header-img" src="${headerImg}" alt="Encabezado oficial CaribeMar de la Costa S.A.S E.S.P. - AFINIA Grupo EPM">
-    </td></tr>
-  </thead>
-  <tbody>
-    <tr><td class="report-body">
+<!-- HEADER AFINIA · position:fixed con offsets POSITIVOS desde el
+     borde físico de la hoja. En print mode el navegador rasteriza
+     este elemento una vez por cada página, entrando dentro del
+     área que el @page reserva con margin-top: 1.7in. -->
+<header class="afinia-header" aria-label="Encabezado oficial CaribeMar de la Costa S.A.S E.S.P. - AFINIA Grupo EPM">
+  <img class="afinia-header-img" src="${headerImg}" alt="">
+</header>
+
+<!-- FOOTER AFINIA · mismo patrón que el header, anclado al borde
+     inferior con bottom:0 y respaldado por @page margin-bottom de
+     1.3in para no pisar el contenido del informe. -->
+<footer class="afinia-footer" aria-hidden="true">
+  <img class="afinia-footer-img" src="${footerImg}" alt="">
+  <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
+</footer>
 
 <article class="report">
 
   <!-- ── CARÁTULA ───────────────────────────────────────── -->
   <div class="cover-block">
     <div class="meta">CARIBEMAR DE LA COSTA S.A.S E.S.P · AFINIA Grupo EPM</div>
-    <h1>Informe técnico de selección ONAF</h1>
+    <h1>Informe Técnico de Actualización y Repotenciación del Sistema de Refrigeración</h1>
     <div class="proj">${escaparHtml(proyecto)}</div>
     <div class="ref">
       <strong>Generado:</strong> ${fechaIso} · ${horaIso}<br>
@@ -1559,25 +1581,13 @@ function generateReport() {
     ${materiales}
   </section>
 
-  <div class="info-box" style="margin-top:14pt">
+  <div class="info-box" style="margin-top:12pt">
     Documento generado automáticamente por SGM · TRANSPOWER. La validación
     final del diseño debe ser revisada por el ingeniero responsable conforme
     a IEEE C57.91 (cargabilidad) y al criterio de operación de la red AFINIA.
   </div>
 
 </article>
-
-    </td></tr>
-  </tbody>
-  <tfoot>
-    <tr><td>
-      <div class="afinia-footer" aria-hidden="true">
-        <img class="afinia-footer-img" src="${footerImg}" alt="">
-        <div class="footer-text">CaribeMar de la Costa S.A.S E.S.P. / Carrera 13B #26 – 78 Edificio Chambacú – Piso 1 / Cartagena.</div>
-      </div>
-    </td></tr>
-  </tfoot>
-</table>
 
 <script>
   // Auto-print una vez que las imágenes hayan cargado.
