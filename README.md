@@ -85,7 +85,8 @@ Mapa completo de navegación (leer en este orden ante cualquier duda):
 3. [`docs/MODELO-DATOS-v2.md`](./docs/MODELO-DATOS-v2.md) — diccionario completo del shape v2 (secciones, `salud_actual`, subcolecciones, §9 con todas las colecciones F17–F37).
 4. [`docs/OPERACIONES.md`](./docs/OPERACIONES.md) — runbook de bootstrap, uso diario por rol, troubleshooting.
 5. [`docs/DEPLOY-FUNCTIONS.md`](./docs/DEPLOY-FUNCTIONS.md) — despliegue de Cloud Functions F32 (firebase login, secret Resend, costos estimados).
-6. [`CHANGELOG.md`](./CHANGELOG.md) — release notes consolidadas v1.0 → v2.0.8.
+6. [`docs/MANTENIMIENTO-BRIGADA.md`](./docs/MANTENIMIENTO-BRIGADA.md) — **v2.9 · módulo Mantenimiento Brigada** · calculadora Selección ONAF (ONAN→ONAF) · arquitectura, dominio puro, catálogos AFINIA + ZIEHL-ABEGG, generador de informe AFINIA imprimible, cómo extender.
+7. [`CHANGELOG.md`](./CHANGELOG.md) — release notes consolidadas v1.0 → v2.9.0.
 
 ## CI/CD
 
@@ -335,6 +336,44 @@ Detalle completo en [`docs/MODELO-DATOS-v2.md`](./docs/MODELO-DATOS-v2.md).
 - Índices compuestos adicionales en `firestore.indexes.json`
   (`estado`, `tipo`, `prioridad`, `transformadorId`, cada uno combinado con
   `codigo DESC`).
+
+### Mantenimiento Brigada · Selección ONAF (v2.9.0)
+
+Nuevo módulo top-level en el sidebar (grupo Operación) con
+calculadoras y herramientas para la brigada de mantenimiento
+especializado.
+
+- **Primera herramienta entregada**: calculadora de selección
+  de sistema de refrigeración (conversión ONAN → ONAF) conforme
+  IEEE C57.12.00-2015 · ANSI C57.12.91 · IEEE C57.91-2011 ·
+  Westinghouse T&D Reference.
+- **Verificación oficial AFINIA**: 24 MVA × 125 % = 48.000 CFM
+  (caso de control congelado en `tests/refrigeracion.test.js`).
+- **Catálogos congelados**: 206 transformadores AFINIA + 13 fichas
+  técnicas de motoventiladores (ZIEHL-ABEGG ZN045/FN050/FN063/ZN063
+  + KRENZ F20) + 13 modelos de guardamotor ABB MS116 + 4 breakers
+  ABB S203 + auxiliares SCADA HK1-11 / S2C-H11L.
+- **Gráfico Chart.js** con plugin custom: 4 curvas Westinghouse
+  (115/125/133/166 % OA RATING) + curva interpolada al porcentaje
+  seleccionado + cruceta roja punteada al punto de operación con
+  etiquetas X.X MVA y XX.XXX CFM sobre los ejes.
+- **Generador de informe AFINIA** imprimible Letter portrait con
+  header/footer oficiales en cada hoja vía técnica `<thead>` +
+  `<tfoot>` (gold standard cross-navegador). 10 secciones con
+  fórmulas aplicadas (CFM₀ = m × kVA, F_alt = e^(h/8500),
+  N = ⌈total/fan⌉, I_total = N × I, I_min = 1.25 × I_total NEC 430,
+  P_total = N × P₁, S_total = P/cos φ), diagrama SVG inline del
+  radiador con cotas A/B/C/D codificadas por color, lista de
+  materiales completa con cantidades + PIDs.
+- **Datalist en "Nombre del proyecto"**: dos opciones predefinidas
+  ("Actualización y Repotenciación del Sistema de Refrigeración"
+  y "Sistema de Refrigeración URE") + texto libre admitido.
+- **Future-proof**: añadir más calculadoras (cálculo de aceite,
+  aterramiento, etc.) = nuevo botón en la tablist + iframe nuevo
+  · cero cambio en sidebar.
+
+Doc completa con arquitectura, casos golden, fórmulas, diagrama,
+cómo extender el módulo: [`docs/MANTENIMIENTO-BRIGADA.md`](./docs/MANTENIMIENTO-BRIGADA.md).
 
 ## Licencia
 
