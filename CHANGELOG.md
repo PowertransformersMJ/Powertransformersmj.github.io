@@ -16,6 +16,54 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Hotfix · Restaurar protección eléctrica como fallback legacy (2026-05-03 PM4)
+
+El director reportó que la sección **"Circuito de protección
+eléctrica y mando"** quedó VACÍA tras el refactor mix multi-modelo.
+Cuando él cargaba una ficha técnica desde el dropdown legacy
+(`#fan_db_sel`) sin agregar nada al mix, el detalle (guardamotores
+con cantidades + PIDs + breaker principal + auxiliares SCADA) ya
+no aparecía — solo veía el stub *"Agregue al menos un modelo de
+ventilador al mix para calcular la protección eléctrica"*.
+
+**Causa:** `calcProtection()` cortocircuitaba con un stub cuando
+`state.mix.length === 0`, eliminando la ruta legacy de cómputo
+con un solo modelo + N derivado (`calcularProteccionElectrica`).
+
+**Fix:** `calcProtection()` reescrita con 3 rutas:
+
+1. **Ruta 1 — Mix multi-modelo (≥1):** comportamiento del refactor.
+   Renderiza grupos por modelo + breaker principal único + BOM
+   agrupado (sin cambios respecto al commit 5).
+2. **Ruta 2 — Fallback legacy (mix vacío + dropdown cargado):**
+   restaura el comportamiento original v2.9.0 — cálculo con un
+   solo modelo del catálogo + N derivado de `cfm_requerido /
+   cfm_modelo`. Muestra las 3 cards (corriente por ventilador,
+   guardamotor sugerido + setting + PID, contacto auxiliar SCADA)
+   y la card "Corriente total del sistema" con breaker principal +
+   pérdidas + auxiliar. Lista de materiales con PIDs completos.
+   Pie de la sección con nota explícita: *"vista preview con el
+   modelo seleccionado · para combinar varios modelos en el mismo
+   transformador, agregue cada uno al mix arriba"*.
+3. **Ruta 3 — Sin datos:** placeholder INFORMATIVO con tarjetas
+   dashed mostrando el catálogo de componentes esperables
+   (Guardamotor MS116, Auxiliar HK1-11, Breaker S203, Auxiliar
+   S2C-H11L) con sus PIDs y rangos. Reemplaza el stub silencioso.
+
+Cambios:
+- `assets/js/calculo-refrigeracion.js` · `calcProtection()`
+  reescrita con las 3 rutas. Helpers nuevos:
+  `renderProtLegacyPerFan`, `renderProtLegacyTotal`,
+  `renderProtLegacyMateriales` (reciclan el código legacy v2.9.0
+  que había sido eliminado).
+- `CLAUDE.md` · regla permanente nueva **§0.1.2.4** *"Refactor
+  1→N NO debe vaciar la UI legacy"* con 5 puntos accionables y
+  catálogo de casos típicos. Regla nueva **§0.1.2.5** *"Lint local
+  con `npm run lint:html`, no `npx html-validate`"* documentando
+  el falso negativo del lint resuelto el mismo día.
+
+JS lint OK · HTML lint OK · 515 / 515 tests verdes.
+
 ### Commit 5 · Tab "Consolidado Sistemas de Refrigeración" (2026-05-03)
 
 Nueva pestaña del módulo Mantenimiento Brigada para visualizar

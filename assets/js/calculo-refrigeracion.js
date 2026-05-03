@@ -506,7 +506,20 @@ function pintarComp({ val, desc, estado, title }, idVal, idDesc, idTitle) {
   }
 }
 
-/* ─── Protección eléctrica (mix multi-modelo) ──────────────── */
+/* ─── Protección eléctrica (mix multi-modelo + fallback legacy) ─── */
+//
+// Comportamiento:
+//   1. Si state.mix.length >= 1 → cálculo agregado del mix con
+//      grupos por modelo + breaker principal único. Esta es la
+//      ruta principal del refactor 2026-05-03.
+//   2. Si state.mix.length === 0 PERO hay un modelo seleccionado
+//      en el dropdown técnico legacy `fan_db_sel` → preview con
+//      ESE modelo único + N derivado de CFM_requerido / CFM_modelo
+//      (comportamiento original v2.9.0). Mantiene continuidad de
+//      la funcionalidad legacy y muestra el detalle de protección
+//      sin obligar al usuario a entender el flujo nuevo del mix.
+//   3. Si no hay nada → placeholder con catálogo de componentes
+//      que aparecerán cuando el usuario cargue datos.
 
 async function calcProtection() {
   const conn = getMotorConn();
@@ -521,32 +534,160 @@ async function calcProtection() {
   const pf = $('prot-per-fan'), pt = $('prot-total'), ps = $('prot-summary');
   if (!pf || !pt || !ps) return;
 
-  if (state.mix.length === 0) {
-    const stub = '<p style="color:var(--ink-4);font-style:italic;padding:10px">Agregue al menos un modelo de ventilador al mix para calcular la protección eléctrica.</p>';
-    pf.innerHTML = stub; pt.innerHTML = stub; ps.innerHTML = '';
+  // ── Ruta 1 · Mix multi-modelo (refactor 2026-05-03) ──
+  if (state.mix.length >= 1) {
+    const itemsProt = state.mix.map(it => {
+      const iU = extraerCorrienteFan(it.ficha?.fan_amp, conn);
+      return {
+        key:           it.key,
+        modelo:        it.modelo,
+        marca:         it.marca,
+        cantidad:      it.cantidad,
+        amps_unitario: Number.isFinite(iU) ? iU : 0,
+        kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,
+        peso_unitario: +it.ficha?.fan_peso || 0
+      };
+    });
+    const r = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    state.lastProteccion = r;
+
+    pf.innerHTML = renderProtPorGrupo(r, conn);
+    pt.innerHTML = renderProtTotal(r);
+    ps.innerHTML = renderListaMaterialesMix(r);
     return;
   }
 
-  // Construye items para `calcularProteccionMix` con la corriente
-  // unitaria extraída de la ficha snapshot de cada item del mix.
-  const itemsProt = state.mix.map(it => {
-    const iU = extraerCorrienteFan(it.ficha?.fan_amp, conn);
-    return {
-      key:           it.key,
-      modelo:        it.modelo,
-      marca:         it.marca,
-      cantidad:      it.cantidad,
-      amps_unitario: Number.isFinite(iU) ? iU : 0,
-      kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,   // P1 viene en W → kW
-      peso_unitario: +it.ficha?.fan_peso || 0
-    };
-  });
-  const r = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
-  state.lastProteccion = r;
+  // ── Ruta 2 · Fallback legacy con modelo único del dropdown ──
+  const fanKey = $('fan_db_sel') ? $('fan_db_sel').value : '';
+  const db = fanKey ? await ensureFanDb() : null;
+  const fanLegacy = db && fanKey ? db[fanKey] : null;
+  if (fanLegacy) {
+    const iF = extraerCorrienteFan(fanLegacy.fan_amp, conn);
+    if (iF !== null && Number.isFinite(iF)) {
+      const nFans = (fanLegacy.fan_cfm_nom > 0 && state.cfmReq > 0)
+        ? Math.ceil(state.cfmReq / fanLegacy.fan_cfm_nom) : 0;
+      const r = calcularProteccionElectrica({ amps_por_fan: iF, n_fans: nFans });
+      pf.innerHTML = renderProtLegacyPerFan(fanLegacy, conn, iF, r);
+      pt.innerHTML = renderProtLegacyTotal(r, nFans, iF);
+      ps.innerHTML = renderProtLegacyMateriales(fanLegacy, conn, iF, r);
+      return;
+    }
+  }
 
-  pf.innerHTML = renderProtPorGrupo(r, conn);
-  pt.innerHTML = renderProtTotal(r);
-  ps.innerHTML = renderListaMaterialesMix(r);
+  // ── Ruta 3 · Sin datos · placeholder con catálogo de componentes ──
+  pf.innerHTML = `
+    <p style="color:var(--ink-4);font-style:italic;padding:6px 10px;margin:0 0 8px">
+      Cargue una ficha técnica desde la base de datos arriba (o agregue modelos al mix) para calcular cantidades, settings y PIDs.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)">
+      <div style="flex:1 1 240px;padding:8px 12px;border:1px dashed rgba(0,40,90,.20);border-radius:6px;background:rgba(255,255,255,.4)">
+        <strong style="color:var(--brand-deep)">Guardamotor ABB MS116</strong> (1 por ventilador)<br>
+        Rango ajuste: 0.10 … 32 A · Trip class 10A · 50 kA @ 400 V<br>
+        45 mm DIN · IEC/EN 60947-4-1
+      </div>
+      <div style="flex:1 1 240px;padding:8px 12px;border:1px dashed rgba(0,40,90,.20);border-radius:6px;background:rgba(255,255,255,.4)">
+        <strong style="color:var(--brand-deep)">Auxiliar HK1-11</strong> (1 por guardamotor)<br>
+        1NO+1NC · Montaje frontal · PID <span class="mono">1SAM201902R1001</span><br>
+        Señalización falla / estado motor al SCADA
+      </div>
+    </div>`;
+  pt.innerHTML = `
+    <p style="color:var(--ink-4);font-style:italic;padding:6px 10px;margin:0 0 8px">
+      La corriente total y el breaker principal se calcularán automáticamente con los datos del mix.
+    </p>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--ink-3)">
+      <div style="flex:1 1 240px;padding:8px 12px;border:1px dashed rgba(0,40,90,.20);border-radius:6px;background:rgba(255,255,255,.4)">
+        <strong style="color:var(--brand-deep)">Breaker principal ABB S203</strong> (1 para todo el sistema)<br>
+        Rango: 16 / 25 / 40 / 50 A · 3P · Curva C · 6 kA<br>
+        Dimensionado a 1.25 × I<sub>total</sub> (NEC 430)
+      </div>
+      <div style="flex:1 1 240px;padding:8px 12px;border:1px dashed rgba(0,40,90,.20);border-radius:6px;background:rgba(255,255,255,.4)">
+        <strong style="color:var(--brand-deep)">Auxiliar S2C-H11L</strong> (1 por breaker)<br>
+        1NO+1NC · Montaje lateral izquierdo S200 · PID <span class="mono">2CDS200936R0001</span><br>
+        Señalización falla / estado breaker al SCADA
+      </div>
+    </div>`;
+  ps.innerHTML = '';
+}
+
+/* ─── Renderers fallback legacy (modelo único) ─────────────── */
+
+function renderProtLegacyPerFan(fan, conn, iF, r) {
+  const gm = r.guardamotor;
+  const txtConn = conn === 'D' ? 'Δ Delta' : 'Y Estrella';
+  return `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
+      <div class="prot-card prot-card--ok" style="min-width:200px">
+        <div class="prot-label">Corriente por ventilador (${txtConn})</div>
+        <div class="prot-val">${iF.toFixed(2)} A</div>
+        <div class="prot-meta">${escaparHtml(fan.fan_modelo)} · ${conn === 'D' ? 'Δ' : 'Y'} · ${escaparHtml(fan.fan_hz || '?')} Hz</div>
+      </div>
+      <div class="prot-card prot-card--${gm ? 'ok' : 'err'}" style="min-width:280px">
+        <div class="prot-label">Guardamotor sugerido (1 por ventilador)</div>
+        ${gm ? `
+          <div class="prot-val">ABB ${gm.model}</div>
+          <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${iF.toFixed(2)} A</strong></div>
+          <div class="prot-meta">PID: ${gm.pid} · Ics=50 kA@400 V · Trip class 10A · 45 mm DIN</div>
+          <div class="prot-meta">Función desconexión integrada · Comp. temperatura · IEC/EN 60947-4-1</div>
+        ` : `<div class="prot-meta">Corriente ${iF.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
+      </div>
+      <div class="prot-card prot-card--info" style="min-width:240px">
+        <div class="prot-label">Contacto auxiliar SCADA (1 por guardamotor)</div>
+        <div class="prot-val">ABB ${r.aux_guardamotor.model}</div>
+        <div class="prot-meta">${r.aux_guardamotor.desc}</div>
+        <div class="prot-meta">PID: ${r.aux_guardamotor.pid} · 9 mm · Señalización falla / estado motor al SCADA</div>
+      </div>
+    </div>
+    <p style="margin-top:8px;font-size:11px;color:var(--ink-3);font-style:italic">
+      Vista preview con el modelo seleccionado del catálogo. <strong>Para combinar varios modelos</strong> en el mismo transformador, agregue cada uno al mix arriba con su cantidad: el cálculo se actualizará automáticamente con los grupos reales.
+    </p>`;
+}
+
+function renderProtLegacyTotal(r, nFans, iF) {
+  const brk = r.breaker;
+  const n = nFans || '?';
+  return `
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
+      <div class="prot-card prot-card--ok" style="min-width:200px">
+        <div class="prot-label">Corriente total del sistema</div>
+        <div class="prot-val">${nFans ? r.amps_totales.toFixed(2) + ' A' : '—'}</div>
+        <div class="prot-meta">${n} ventiladores × ${iF.toFixed(2)} A</div>
+      </div>
+      <div class="prot-card prot-card--info" style="min-width:200px">
+        <div class="prot-label">Corriente mínima del breaker</div>
+        <div class="prot-val">${nFans ? r.amps_min_breaker.toFixed(2) + ' A' : '—'}</div>
+        <div class="prot-meta">Factor seguridad NEC 430 (×1.25)</div>
+      </div>
+      <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:280px">
+        <div class="prot-label">Breaker principal sugerido</div>
+        ${brk ? `
+          <div class="prot-val">ABB ${brk.model}</div>
+          <div class="prot-meta">In = ${brk.in} A · 3P · Curva C · 6 kA</div>
+          <div class="prot-meta">PID: ${brk.pid} · Pérdidas: ${brk.power_w} W</div>
+        ` : `<div class="prot-meta">${nFans ? `Corriente requerida ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (máx. 50 A). Consultar familia superior.` : 'Calcule el sistema para sugerir breaker.'}</div>`}
+      </div>
+      <div class="prot-card prot-card--info" style="min-width:240px">
+        <div class="prot-label">Contacto auxiliar SCADA (1 por breaker)</div>
+        <div class="prot-val">ABB ${r.aux_breaker.model}</div>
+        <div class="prot-meta">${r.aux_breaker.desc}</div>
+        <div class="prot-meta">PID: ${r.aux_breaker.pid}</div>
+      </div>
+    </div>`;
+}
+
+function renderProtLegacyMateriales(fan, conn, iF, r) {
+  const items = [];
+  items.push(`${r.n_fans || 1}× <strong>Motoventilador ${escaparHtml(fan.fan_marca || '')} ${escaparHtml(fan.fan_modelo || '')}</strong> · PID ${escaparHtml(fan.fan_nserie || '—')} · ${fan.fan_diam || '?'} mm Ø · ${fan.fan_cfm_nom || '?'} CFM`);
+  if (r.guardamotor)     items.push(`${r.n_fans || 1}× <strong>Guardamotor ABB ${r.guardamotor.model}</strong> · PID ${r.guardamotor.pid} · setting ${iF.toFixed(2)} A · rango ${r.guardamotor.min}…${r.guardamotor.max} A`);
+  if (r.aux_guardamotor) items.push(`${r.n_fans || 1}× <strong>Auxiliar guardamotor ABB ${r.aux_guardamotor.model}</strong> · PID ${r.aux_guardamotor.pid} · contacto auxiliar SCADA`);
+  if (r.breaker)         items.push(`1× <strong>Breaker principal ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema · In ${r.breaker.in} A · Curva C · 6 kA · pérdidas ${r.breaker.power_w} W`);
+  if (r.aux_breaker)     items.push(`1× <strong>Auxiliar breaker ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
+  if (!items.length) return '';
+  return `
+    <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica (preview con modelo único)</div>
+    <ul style="margin:6px 0 0 18px;padding:0;color:var(--ink-2);font-size:13px;line-height:1.7">
+      ${items.map(i => `<li>${i}</li>`).join('')}
+    </ul>`;
 }
 
 function renderProtPorGrupo(r, conn) {
