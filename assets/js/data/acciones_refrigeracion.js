@@ -60,6 +60,66 @@ export function isReady() {
   return isFirebaseConfigured && !!getDbSafe();
 }
 
+/**
+ * Verifica si el UID dado tiene permisos de admin según las rules
+ * de Firestore. Devuelve `{ok: bool, motivo: string, perfil: obj}`
+ * con diagnóstico accionable. Útil para mostrar mensaje claro al
+ * usuario ANTES de intentar el write y obtener un genérico
+ * "permission-denied".
+ *
+ * Las rules consideran admin a:
+ *   · `/usuarios/{uid}` con `rol == 'admin'` y `activo == true`, O
+ *   · `/admins/{uid}` con cualquier doc (bootstrap legacy)
+ */
+export async function verificarPermisosAdmin(uid) {
+  if (!uid) {
+    return { ok: false, motivo: 'no_logueado', perfil: null,
+      mensaje: 'No hay sesión Firebase activa. Inicie sesión y vuelva a intentar.' };
+  }
+  const db = getDbSafe();
+  if (!db) {
+    return { ok: false, motivo: 'firebase_no_init', perfil: null,
+      mensaje: 'Firebase no está inicializado en esta sesión.' };
+  }
+  // Caso A · perfil en /usuarios/{uid} con rol admin activo
+  let perfilUsuarios = null;
+  try {
+    const snapU = await getDoc(doc(db, 'usuarios', uid));
+    if (snapU.exists()) {
+      perfilUsuarios = snapU.data();
+      if (perfilUsuarios.rol === 'admin' && perfilUsuarios.activo === true) {
+        return { ok: true, motivo: 'admin_via_usuarios', perfil: perfilUsuarios,
+          mensaje: 'Admin verificado vía /usuarios/{uid}.' };
+      }
+    }
+  } catch (err) {
+    // Las rules pueden bloquear lectura cruzada de /usuarios; si falla
+    // por permission-denied, intentamos el bootstrap legacy.
+    console.warn('[verificarPermisosAdmin] /usuarios lectura falló:', err);
+  }
+  // Caso B · bootstrap legacy en /admins/{uid}
+  try {
+    const snapA = await getDoc(doc(db, 'admins', uid));
+    if (snapA.exists()) {
+      return { ok: true, motivo: 'admin_via_admins_bootstrap', perfil: snapA.data(),
+        mensaje: 'Admin verificado vía bootstrap legacy /admins/{uid}.' };
+    }
+  } catch (err) {
+    console.warn('[verificarPermisosAdmin] /admins lectura falló:', err);
+  }
+  // No es admin
+  if (perfilUsuarios) {
+    return {
+      ok: false, motivo: 'no_admin', perfil: perfilUsuarios,
+      mensaje: `Su usuario existe en /usuarios/{${uid}} pero NO tiene rol admin (rol actual: "${perfilUsuarios.rol || 'sin definir'}", activo: ${perfilUsuarios.activo === true ? 'sí' : 'no'}). Pida al administrador que actualice su perfil con rol='admin' y activo=true.`
+    };
+  }
+  return {
+    ok: false, motivo: 'sin_perfil', perfil: null,
+    mensaje: `Su sesión Firebase (UID: ${uid}) NO tiene perfil en /usuarios/{uid} ni en /admins/{uid}. Pida al administrador que cree su perfil con rol='admin'.`
+  };
+}
+
 // `deepClean` se importa de `./_firestore_clean.js` · es la
 // función pura que elimina undefined/NaN de objetos anidados antes
 // de persistir en Firestore. Ver CLAUDE.md §0.1.2.6 (regla
