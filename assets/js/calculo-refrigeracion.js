@@ -17,6 +17,9 @@ import {
   calcularRefrigeracion, calcularUnidadesRequeridas,
   calcularProteccionElectrica, calcularProteccionMix,
   evaluarMixVentiladores, sugerirMejoras, MIX_ESTADO,
+  detectarFaltantes,
+  construirResumenJSON,
+  validarPuntoOperacion,
   extraerCorrienteFan,
   evaluarCompatibilidad, mensajeDisposicion, COMPAT_ESTADO,
   deduceOnafDesdeOnanYPct, deducePctDesdeOnanYOnaf,
@@ -52,6 +55,12 @@ function getOnan() { return parseFloat($('kva_onan').value) || 60000; }
 function getOnaf() { return parseFloat($('kva_onaf').value) || 79800; }
 function getPct()  { return parseFloat($('pct').value)      || 133; }
 function getAlt()  { return parseFloat($('alt').value)      || 0; }
+function getTolerancia() {
+  const v = parseFloat($('mix_tolerancia')?.value);
+  if (!Number.isFinite(v) || v < 0) return 0;
+  if (v > 100) return 100;
+  return v;
+}
 
 /**
  * Validación reactiva por input. Lee el atributo min/max declarado
@@ -336,7 +345,8 @@ function renderMix() {
         key: it.key, modelo: it.modelo, marca: it.marca,
         cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
       })),
-      cfm_requerido: state.cfmReq
+      cfm_requerido: state.cfmReq,
+      tolerancia_pct: getTolerancia()
     });
     tbody.innerHTML = state.mix.map((it, i) => {
       const aporte = it.cfm_unitario * it.cantidad;
@@ -378,7 +388,8 @@ function renderMix() {
       key: it.key, modelo: it.modelo, marca: it.marca,
       cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
     })),
-    cfm_requerido: state.cfmReq
+    cfm_requerido: state.cfmReq,
+    tolerancia_pct: getTolerancia()
   });
   state.lastEval = evalRes;
   renderMixStatus(evalRes);
@@ -408,12 +419,17 @@ function renderMixStatus(ev) {
   const cls = ev.aprobado ? 'is-aprobado' : 'is-no-aprobado';
   const badge = ev.aprobado ? '✓ Aprobado' : '✗ No aprobado';
   banner.classList.add(cls);
+  const tolKpi = (ev.tolerancia_pct || 0) > 0
+    ? `<div class="mix-kpi">Umbral · <b>${formatearNumero(ev.cfm_umbral)} CFM</b> <span style="color:var(--ink-3);font-weight:500">(tol ${ev.tolerancia_pct.toFixed(1)}%)</span></div>`
+    : '';
   const kpi = ev.aprobado
     ? `<div class="mix-kpi">Cobertura · <b>${ev.cobertura_pct.toFixed(1)}%</b></div>
        <div class="mix-kpi">Exceso · <b>${formatearNumero(ev.exceso)} CFM</b></div>
+       ${tolKpi}
        <div class="mix-kpi">N total · <b>${ev.n_unidades_total}</b></div>`
     : `<div class="mix-kpi">Cobertura · <b>${ev.cobertura_pct.toFixed(1)}%</b></div>
        <div class="mix-kpi">Déficit · <b>${formatearNumero(ev.deficit)} CFM</b></div>
+       ${tolKpi}
        <div class="mix-kpi">N total · <b>${ev.n_unidades_total}</b></div>`;
   banner.innerHTML = `
     <span class="mix-badge">${badge}</span>
@@ -437,7 +453,8 @@ async function renderMixSuggestions(ev) {
     })),
     cfm_requerido: state.cfmReq,
     fan_db: db,
-    max_sugerencias: 3
+    max_sugerencias: 5,
+    tolerancia_pct: getTolerancia()
   });
   state.lastSuggestions = sugs;
   if (sugs.length === 0) {
@@ -449,21 +466,49 @@ async function renderMixSuggestions(ev) {
     return;
   }
   panel.hidden = false;
-  const labelEstrategia = (s) => ({
-    agregar_unidades: 'Agregar más unidades',
-    sustituir:        'Sustituir modelo más débil',
-    agregar_modelo:   'Agregar modelo nuevo'
-  }[s] || s);
   panel.innerHTML = `
     <div class="mix-sug-title">Sugerencias para cubrir el déficit (${formatearNumero(ev.deficit)} CFM)</div>
     <div class="mix-sug-grid">
-      ${sugs.map((s, i) => `
-        <div class="mix-sug-card">
-          <div class="strat">${labelEstrategia(s.estrategia)}</div>
-          <div class="desc">${escaparHtml(s.descripcion)}</div>
-          <div class="kpi">CFM total resultante · <b>${formatearNumero(s.cfm_aporte_total)} CFM</b> · cobertura <b>${s.cobertura_pct.toFixed(1)}%</b> · exceso <b>${formatearNumero(s.exceso)} CFM</b></div>
-          <button type="button" data-mix-apply="${i}">Aplicar sugerencia</button>
-        </div>`).join('')}
+      ${sugs.map((s, i) => renderSugCard(s, i)).join('')}
+    </div>`;
+}
+
+const _LBL_ESTRATEGIA = Object.freeze({
+  agregar_unidades:         'Agregar más unidades',
+  sustituir:                'Sustituir modelo más débil',
+  agregar_modelo:           'Agregar modelo nuevo',
+  vfd_uprate:               'VFD · operar a mayor frecuencia',
+  optimizacion_aerodinamica:'Optimización aerodinámica del flujo'
+});
+const _LBL_FACTIBILIDAD = Object.freeze({
+  alta:  '🟢 ALTA',
+  media: '🟡 MEDIA',
+  baja:  '🟠 BAJA'
+});
+
+function renderSugCard(s, i) {
+  const sinCambios = !Array.isArray(s.cambios) || s.cambios.length === 0;
+  const apliBtn = sinCambios
+    ? `<button type="button" disabled title="Sugerencia informativa · sin cambio mecánico al mix" style="opacity:.5;cursor:not-allowed">Solo informativa</button>`
+    : `<button type="button" data-mix-apply="${i}">Aplicar sugerencia</button>`;
+  const aporteSign = s.impacto_estimado_cfm >= 0 ? '+' : '';
+  return `
+    <div class="mix-sug-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div class="strat">${_LBL_ESTRATEGIA[s.estrategia] || s.estrategia}</div>
+        <div class="fact" title="Factibilidad de implementación">${_LBL_FACTIBILIDAD[s.factibilidad] || s.factibilidad}</div>
+      </div>
+      <div class="desc">${escaparHtml(s.descripcion)}</div>
+      <div class="kpi">
+        CFM total resultante · <b>${formatearNumero(s.cfm_aporte_total)} CFM</b>
+        <span style="color:${s.aprobado ? '#1b5e20' : '#b71c1c'};font-weight:700">${aporteSign}${formatearNumero(s.impacto_estimado_cfm)} CFM</span>
+        · cobertura <b>${s.cobertura_pct.toFixed(1)}%</b>
+        · exceso <b>${formatearNumero(s.exceso)} CFM</b>
+      </div>
+      <div class="implic" style="font-size:11px;color:var(--ink-3);line-height:1.45;border-top:1px dashed rgba(0,40,90,.10);padding-top:6px;margin-top:4px">
+        <strong style="color:rgba(184,95,0,1)">Implicaciones:</strong> ${escaparHtml(s.implicaciones)}
+      </div>
+      ${apliBtn}
     </div>`;
 }
 
@@ -550,12 +595,17 @@ async function calcProtection() {
     });
     const r = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
     state.lastProteccion = r;
+    state.lastFaltantes  = detectarFaltantes({ mix: state.mix });
+    renderFaltantes(state.lastFaltantes);
 
     pf.innerHTML = renderProtPorGrupo(r, conn);
     pt.innerHTML = renderProtTotal(r);
     ps.innerHTML = renderListaMaterialesMix(r);
     return;
   }
+  // Sin mix · faltantes vacío
+  state.lastFaltantes = [];
+  renderFaltantes([]);
 
   // ── Ruta 2 · Fallback legacy con modelo único del dropdown ──
   const fanKey = $('fan_db_sel') ? $('fan_db_sel').value : '';
@@ -614,28 +664,48 @@ async function calcProtection() {
 
 function renderProtLegacyPerFan(fan, conn, iF, r) {
   const gm = r.guardamotor;
+  const ct = r.contactor;
+  const margenSetting = gm ? +((iF - gm.min) / (gm.max - gm.min) * 100).toFixed(1) : null;
   const txtConn = conn === 'D' ? 'Δ Delta' : 'Y Estrella';
+  // Memoria FLC con la fórmula sustituida cuando es posible
+  const flcMem = calcularFLC({
+    p_w:        +fan.fan_kw   || 0,
+    voltaje:    parseFloat(String(fan.fan_volt || '').match(/(\d+)\s*V/)?.[1]) || 400,
+    cosphi:     +fan.fan_cosphi || 0,
+    eficiencia: 0.85,
+    amps_directo: iF
+  });
   return `
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
-      <div class="prot-card prot-card--ok" style="min-width:200px">
-        <div class="prot-label">Corriente por ventilador (${txtConn})</div>
-        <div class="prot-val">${iF.toFixed(2)} A</div>
-        <div class="prot-meta">${escaparHtml(fan.fan_modelo)} · ${conn === 'D' ? 'Δ' : 'Y'} · ${escaparHtml(fan.fan_hz || '?')} Hz</div>
+      <div class="prot-card prot-card--ok" style="min-width:220px">
+        <div class="prot-label">Corriente nominal (FLC) por ventilador</div>
+        <div class="prot-val">${iF.toFixed(2)} A (${txtConn})</div>
+        <div class="prot-meta">${escaparHtml(fan.fan_modelo)} · ${escaparHtml(fan.fan_hz || '?')} Hz · ${escaparHtml(fan.fan_volt || '?')}</div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">${escaparHtml(flcMem.memoria)}</div>
       </div>
-      <div class="prot-card prot-card--${gm ? 'ok' : 'err'}" style="min-width:280px">
-        <div class="prot-label">Guardamotor sugerido (1 por ventilador)</div>
+      <div class="prot-card prot-card--${gm ? 'ok' : 'err'}" style="min-width:260px">
+        <div class="prot-label">Guardamotor MS116 (1 por ventilador)</div>
         ${gm ? `
           <div class="prot-val">ABB ${gm.model}</div>
-          <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${iF.toFixed(2)} A</strong></div>
+          <div class="prot-meta">Setting: <strong>${iF.toFixed(2)} A</strong> · rango ${gm.min}…${gm.max} A · margen del setting: <strong>${margenSetting}%</strong> del rango</div>
           <div class="prot-meta">PID: ${gm.pid} · Ics=50 kA@400 V · Trip class 10A · 45 mm DIN</div>
-          <div class="prot-meta">Función desconexión integrada · Comp. temperatura · IEC/EN 60947-4-1</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Norma NEC 430.32 · IEC 60947-4-1</div>
         ` : `<div class="prot-meta">Corriente ${iF.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
       </div>
-      <div class="prot-card prot-card--info" style="min-width:240px">
-        <div class="prot-label">Contacto auxiliar SCADA (1 por guardamotor)</div>
+      <div class="prot-card prot-card--${ct ? 'ok' : 'err'}" style="min-width:240px">
+        <div class="prot-label">Contactor ABB AF (1 por ventilador)</div>
+        ${ct ? `
+          <div class="prot-val">ABB ${ct.model}</div>
+          <div class="prot-meta">AC-3: <strong>${ct.ac3_a} A</strong> · ≤ ${ct.kw_400v} kW @ 400 V · margen: <strong>${ct.margen_pct}%</strong> sobre FLC</div>
+          <div class="prot-meta">PID: ${ct.pid} · Bobina: ${ct.bobina}</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tags SCADA: <strong>RUN</strong> · <strong>FAULT</strong> · <strong>READY</strong> · norma IEC 60947-4-1</div>
+        ` : `<div class="prot-meta cwrn">FLC ${iF.toFixed(2)} A excede catálogo AF (≤80 A). Consultar familia AX/AE.</div>`}
+      </div>
+      <div class="prot-card prot-card--info" style="min-width:220px">
+        <div class="prot-label">Auxiliar SCADA guardamotor</div>
         <div class="prot-val">ABB ${r.aux_guardamotor.model}</div>
         <div class="prot-meta">${r.aux_guardamotor.desc}</div>
-        <div class="prot-meta">PID: ${r.aux_guardamotor.pid} · 9 mm · Señalización falla / estado motor al SCADA</div>
+        <div class="prot-meta">PID: ${r.aux_guardamotor.pid}</div>
       </div>
     </div>
     <p style="margin-top:8px;font-size:11px;color:var(--ink-3);font-style:italic">
@@ -656,32 +726,35 @@ function renderProtLegacyTotal(r, nFans, iF) {
       <div class="prot-card prot-card--info" style="min-width:200px">
         <div class="prot-label">Corriente mínima del breaker</div>
         <div class="prot-val">${nFans ? r.amps_min_breaker.toFixed(2) + ' A' : '—'}</div>
-        <div class="prot-meta">Factor seguridad NEC 430 (×1.25)</div>
+        <div class="prot-meta">Factor seguridad NEC 430.52 (×1.25)</div>
       </div>
       <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:280px">
-        <div class="prot-label">Breaker principal sugerido</div>
+        <div class="prot-label">Breaker principal S203 (1 ud)</div>
         ${brk ? `
           <div class="prot-val">ABB ${brk.model}</div>
-          <div class="prot-meta">In = ${brk.in} A · 3P · Curva C · 6 kA</div>
+          <div class="prot-meta">In = <strong>${brk.in} A</strong> · 3P · <strong>Curva C</strong> (5–10 × In) · poder de corte <strong>6 kA</strong></div>
           <div class="prot-meta">PID: ${brk.pid} · Pérdidas: ${brk.power_w} W</div>
-        ` : `<div class="prot-meta">${nFans ? `Corriente requerida ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (máx. 50 A). Consultar familia superior.` : 'Calcule el sistema para sugerir breaker.'}</div>`}
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Coordinación: verificar selectividad con interruptor aguas arriba (típicamente MCCB ≥ 100 A en tablero general). Norma IEC 60947-2 · NEC 430.52</div>
+        ` : `<div class="prot-meta">${nFans ? `Corriente requerida ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (máx. 50 A). Consultar familia superior (XT1/XT2/Tmax).` : 'Calcule el sistema para sugerir breaker.'}</div>`}
       </div>
       <div class="prot-card prot-card--info" style="min-width:240px">
-        <div class="prot-label">Contacto auxiliar SCADA (1 por breaker)</div>
+        <div class="prot-label">Auxiliar breaker SCADA (1 ud)</div>
         <div class="prot-val">ABB ${r.aux_breaker.model}</div>
-        <div class="prot-meta">${r.aux_breaker.desc}</div>
         <div class="prot-meta">PID: ${r.aux_breaker.pid}</div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tag SCADA: <strong>TRIP</strong> (NC breaker auxiliar)</div>
       </div>
-    </div>`;
+    </div>
+    ${r.tags_scada ? renderSCADAblock(r.tags_scada) : ''}`;
 }
 
 function renderProtLegacyMateriales(fan, conn, iF, r) {
   const items = [];
   items.push(`${r.n_fans || 1}× <strong>Motoventilador ${escaparHtml(fan.fan_marca || '')} ${escaparHtml(fan.fan_modelo || '')}</strong> · PID ${escaparHtml(fan.fan_nserie || '—')} · ${fan.fan_diam || '?'} mm Ø · ${fan.fan_cfm_nom || '?'} CFM`);
   if (r.guardamotor)     items.push(`${r.n_fans || 1}× <strong>Guardamotor ABB ${r.guardamotor.model}</strong> · PID ${r.guardamotor.pid} · setting ${iF.toFixed(2)} A · rango ${r.guardamotor.min}…${r.guardamotor.max} A`);
+  if (r.contactor)       items.push(`${r.n_fans || 1}× <strong>Contactor ABB ${r.contactor.model}</strong> · PID ${r.contactor.pid} · AC-3 ${r.contactor.ac3_a} A · bobina ${r.contactor.bobina} (RUN/READY/FAULT al SCADA)`);
   if (r.aux_guardamotor) items.push(`${r.n_fans || 1}× <strong>Auxiliar guardamotor ABB ${r.aux_guardamotor.model}</strong> · PID ${r.aux_guardamotor.pid} · contacto auxiliar SCADA`);
   if (r.breaker)         items.push(`1× <strong>Breaker principal ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema · In ${r.breaker.in} A · Curva C · 6 kA · pérdidas ${r.breaker.power_w} W`);
-  if (r.aux_breaker)     items.push(`1× <strong>Auxiliar breaker ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
+  if (r.aux_breaker)     items.push(`1× <strong>Auxiliar breaker ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA (TRIP)`);
   if (!items.length) return '';
   return `
     <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica (preview con modelo único)</div>
@@ -697,26 +770,52 @@ function renderProtPorGrupo(r, conn) {
   }
   return `
     <div style="display:flex;flex-direction:column;gap:10px">
-      ${r.grupos.map(g => {
-        const gm = g.guardamotor;
-        return `
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;padding:10px 12px;border:1px solid rgba(0,40,90,.10);border-radius:8px;background:rgba(255,255,255,.4)">
-          <div style="flex:1 1 220px;min-width:200px">
-            <div class="prot-label">Grupo · ${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</div>
-            <div class="prot-val">${g.cantidad} × ${g.amps_unitario.toFixed(2)} A (${txtConn})</div>
-            <div class="prot-meta">Corriente del grupo: <strong>${g.amps_grupo.toFixed(2)} A</strong> · ${g.cantidad} ventiladores</div>
-          </div>
-          <div style="flex:1 1 280px;min-width:240px">
-            <div class="prot-label">Guardamotor sugerido (${g.cantidad} unidad${g.cantidad === 1 ? '' : 'es'})</div>
-            ${gm ? `
-              <div class="prot-val">ABB ${gm.model}</div>
-              <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${g.amps_unitario.toFixed(2)} A</strong></div>
-              <div class="prot-meta">PID: ${gm.pid} · 45 mm DIN · IEC/EN 60947-4-1</div>
-            ` : `<div class="prot-meta cwrn">Corriente ${g.amps_unitario.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
-            <div class="prot-meta">+ ${g.cantidad}× <strong>ABB ${g.aux_guardamotor.model}</strong> · auxiliar SCADA · PID ${g.aux_guardamotor.pid}</div>
-          </div>
-        </div>`;
-      }).join('')}
+      ${r.grupos.map(g => renderGrupoProtCard(g, txtConn)).join('')}
+    </div>`;
+}
+
+/**
+ * Renderiza la ficha de protección eléctrica de un grupo del mix.
+ * Cada grupo lleva: card de FLC, card de guardamotor, card de
+ * contactor (con tags SCADA RUN/FAULT/READY) y línea de auxiliar
+ * SCADA del guardamotor.
+ */
+function renderGrupoProtCard(g, txtConn) {
+  const gm = g.guardamotor;
+  const ct = g.contactor;
+  const margenSetting = gm ? +((g.amps_unitario - gm.min) / (gm.max - gm.min) * 100).toFixed(1) : null;
+  return `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;padding:10px 12px;border:1px solid rgba(0,40,90,.10);border-radius:8px;background:rgba(255,255,255,.4)">
+      <div style="flex:1 1 200px;min-width:180px">
+        <div class="prot-label">Grupo · ${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</div>
+        <div class="prot-val">${g.cantidad} × ${g.amps_unitario.toFixed(2)} A (${txtConn})</div>
+        <div class="prot-meta">FLC unitario: <strong>${g.amps_unitario.toFixed(2)} A</strong> · grupo total: <strong>${g.amps_grupo.toFixed(2)} A</strong></div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Lectura de placa fan_amp · norma NEMA MG-1 / IEC 60034</div>
+      </div>
+      <div style="flex:1 1 240px;min-width:220px">
+        <div class="prot-label">Guardamotor MS116 (${g.cantidad} u)</div>
+        ${gm ? `
+          <div class="prot-val">ABB ${gm.model}</div>
+          <div class="prot-meta">Setting: <strong>${g.amps_unitario.toFixed(2)} A</strong> · rango ${gm.min}…${gm.max} A · margen del setting: <strong>${margenSetting}%</strong> del rango</div>
+          <div class="prot-meta">PID: ${gm.pid} · 45 mm DIN · 50 kA @ 400 V</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Norma NEC 430.32 (×1.25 NEC) · IEC 60947-4-1</div>
+        ` : `<div class="prot-meta cwrn">Corriente ${g.amps_unitario.toFixed(2)} A fuera del rango MS116 (0.10…32 A). Consultar catálogo superior.</div>`}
+      </div>
+      <div style="flex:1 1 240px;min-width:220px">
+        <div class="prot-label">Contactor ABB AF (${g.cantidad} u)</div>
+        ${ct ? `
+          <div class="prot-val">ABB ${ct.model}</div>
+          <div class="prot-meta">AC-3: <strong>${ct.ac3_a} A</strong> · ≤ ${ct.kw_400v} kW @ 400 V · margen: <strong>${ct.margen_pct}%</strong> sobre FLC</div>
+          <div class="prot-meta">PID: ${ct.pid} · Bobina: ${ct.bobina}</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tags SCADA: <strong>RUN</strong> (NO contactor) · <strong>FAULT</strong> (NO MS116) · <strong>READY</strong> (NC MS116) · norma IEC 60947-4-1</div>
+        ` : `<div class="prot-meta cwrn">FLC ${g.amps_unitario.toFixed(2)} A excede catálogo AF (≤80 A). Consultar familia AX/AE.</div>`}
+      </div>
+      <div style="flex:1 1 200px;min-width:180px">
+        <div class="prot-label">Auxiliar SCADA guardamotor</div>
+        <div class="prot-val">ABB ${g.aux_guardamotor.model}</div>
+        <div class="prot-meta">${g.cantidad} u · ${g.aux_guardamotor.desc}</div>
+        <div class="prot-meta">PID: ${g.aux_guardamotor.pid}</div>
+      </div>
     </div>`;
 }
 
@@ -732,20 +831,22 @@ function renderProtTotal(r) {
       <div class="prot-card prot-card--info" style="min-width:200px">
         <div class="prot-label">Corriente mínima del breaker</div>
         <div class="prot-val">${r.amps_min_breaker.toFixed(2)} A</div>
-        <div class="prot-meta">Factor seguridad NEC 430 (×1.25)</div>
+        <div class="prot-meta">Factor seguridad NEC 430.52 (×1.25)</div>
       </div>
       <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:260px">
-        <div class="prot-label">Breaker principal sugerido</div>
+        <div class="prot-label">Breaker principal S203 (1 ud)</div>
         ${brk ? `
           <div class="prot-val">ABB ${brk.model}</div>
-          <div class="prot-meta">In = ${brk.in} A · 3P · Curva C · 6 kA</div>
+          <div class="prot-meta">In = <strong>${brk.in} A</strong> · 3P · <strong>Curva C</strong> (5–10 × In) · poder de corte <strong>6 kA</strong></div>
           <div class="prot-meta">PID: ${brk.pid} · Pérdidas: ${brk.power_w} W</div>
-        ` : `<div class="prot-meta cwrn">Corriente ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (50 A). Consultar familia superior.</div>`}
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Coordinación: verificar selectividad con interruptor aguas arriba (típicamente MCCB ≥ 100 A en tablero general). Norma IEC 60947-2 · NEC 430.52</div>
+        ` : `<div class="prot-meta cwrn">Corriente ${r.amps_min_breaker.toFixed(2)} A excede catálogo S203 (≤50 A). Consultar familia superior (XT1/XT2/Tmax).</div>`}
       </div>
       <div class="prot-card prot-card--info" style="min-width:220px">
         <div class="prot-label">Auxiliar breaker SCADA (1 ud)</div>
         <div class="prot-val">ABB ${r.aux_breaker.model}</div>
-        <div class="prot-meta">PID: ${r.aux_breaker.pid} · ${r.aux_breaker.desc}</div>
+        <div class="prot-meta">PID: ${r.aux_breaker.pid}</div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tag SCADA: <strong>TRIP</strong> (NC breaker auxiliar) · señaliza disparo del breaker principal</div>
       </div>
       ${r.kw_totales > 0 ? `
       <div class="prot-card prot-card--info" style="min-width:180px">
@@ -759,6 +860,98 @@ function renderProtTotal(r) {
         <div class="prot-val">${r.peso_total.toFixed(1)} kg</div>
         <div class="prot-meta">Σ por unidad × cantidad</div>
       </div>` : ''}
+    </div>
+    ${r.tags_scada ? renderSCADAblock(r.tags_scada) : ''}`;
+}
+
+/**
+ * Renderiza el banner de validación gráfica vs cálculo bajo el
+ * canvas de Chart.js. Microfase 6.
+ *
+ * Severidades:
+ *   ok   → verde discreto, mensaje "coincide con curva interpolada"
+ *   warn → naranja, delta 2-5% sobre la curva esperada
+ *   err  → rojo, delta > 5% o porcentaje fuera del rango calibrado
+ */
+function renderValidacionGrafica(v) {
+  const banner = $('valida-grafica');
+  if (!banner) return;
+  if (!v) {
+    banner.hidden = true; banner.innerHTML = '';
+    return;
+  }
+  banner.classList.remove('is-ok', 'is-warn', 'is-err');
+  banner.classList.add('is-' + v.severidad);
+  const badge = ({
+    ok:   '✓ Coherente con gráfica',
+    warn: '⚠ Discrepancia leve',
+    err:  '✗ Inconsistencia / extrapolación'
+  })[v.severidad] || v.severidad.toUpperCase();
+  banner.hidden = false;
+  banner.innerHTML = `
+    <span class="vg-badge">${badge}</span>
+    <span class="vg-msg">${escaparHtml(v.mensaje)}</span>
+    <span class="vg-kpi">CFM esperado: <b>${formatearNumero(v.cfm_esperado)}</b></span>
+    <span class="vg-kpi">Δ: <b>${v.delta_cfm >= 0 ? '+' : ''}${formatearNumero(v.delta_cfm)} CFM</b> · <b>${v.delta_pct_abs.toFixed(2)}%</b></span>
+    <span class="vg-kpi">Pendiente: <b>${v.pendiente_esperada.toFixed(3)}</b> CFM/kVA</span>`;
+}
+
+/**
+ * Renderiza el banner amarillo de faltantes en la sección de
+ * protección eléctrica. Se oculta cuando no hay faltantes.
+ * Agrupa por severidad (crítico → aviso → info) y por modelo.
+ */
+function renderFaltantes(faltantes) {
+  const banner = $('prot-faltantes');
+  if (!banner) return;
+  if (!Array.isArray(faltantes) || faltantes.length === 0) {
+    banner.hidden = true;
+    banner.innerHTML = '';
+    return;
+  }
+  const orden = { critico: 0, aviso: 1, info: 2 };
+  const sorted = [...faltantes].sort((a, b) =>
+    (orden[a.severidad] ?? 99) - (orden[b.severidad] ?? 99));
+  const nCrit = faltantes.filter(f => f.severidad === 'critico').length;
+  const nAvi  = faltantes.filter(f => f.severidad === 'aviso').length;
+  const nInf  = faltantes.filter(f => f.severidad === 'info').length;
+  banner.hidden = false;
+  banner.innerHTML = `
+    <div class="pf-title">
+      ⚠ Datos faltantes para cálculo eléctrico completo
+      <span style="font-weight:500;color:var(--ink-3);font-size:11px;margin-left:auto">
+        ${nCrit ? `${nCrit} crítico${nCrit === 1 ? '' : 's'} · ` : ''}${nAvi ? `${nAvi} aviso${nAvi === 1 ? '' : 's'} · ` : ''}${nInf ? `${nInf} info` : ''}
+      </span>
+    </div>
+    <ul class="pf-list">
+      ${sorted.map(f => `<li>
+        <span class="pf-sev ${f.severidad}">${f.severidad}</span>
+        ${escaparHtml(f.mensaje)}
+      </li>`).join('')}
+    </ul>
+    <div class="pf-foot">
+      La calculadora continúa con valores por defecto razonables.
+      ${nCrit ? '<strong>Los modelos marcados como crítico no pueden dimensionar protección eléctrica hasta cargar los datos.</strong>' : 'Cargue los datos del catálogo para mejorar la precisión del informe.'}
+    </div>`;
+}
+
+/**
+ * Bloque informativo con la lista canónica de tags SCADA (RUN /
+ * FAULT / TRIP / READY) + descripción y mapeo a contacto físico.
+ */
+function renderSCADAblock(tags) {
+  return `
+    <div style="margin-top:10px;padding:10px 12px;border:1px dashed rgba(13,71,161,.20);border-radius:8px;background:rgba(0,122,255,.04)">
+      <div class="prot-label" style="margin-bottom:6px">Lógica SCADA mínima · señales requeridas para integración</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:8px">
+        ${tags.map(t => `
+          <div style="font-size:11px;color:var(--ink-2);line-height:1.4">
+            <strong style="color:var(--brand-deep);font-family:var(--font-mono);font-size:11px">${t.tag}</strong>
+            <span style="color:var(--ink-3)"> · ${escaparHtml(t.contacto)}</span><br>
+            <span style="color:var(--ink-3);font-size:10px;font-style:italic">${escaparHtml(t.descripcion)}</span>
+          </div>`).join('')}
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--ink-3);font-style:italic">Norma IEEE C37.91 (protección de transformadores) · IEC 61850 (subestaciones automatizadas)</div>
     </div>`;
 }
 
@@ -766,11 +959,12 @@ function renderListaMaterialesMix(r) {
   const items = [];
   for (const g of r.grupos) {
     items.push(`${g.cantidad}× <strong>${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</strong> · motoventilador`);
-    if (g.guardamotor) items.push(`${g.cantidad}× <strong>ABB ${g.guardamotor.model}</strong> · PID ${g.guardamotor.pid} · setting ${g.amps_unitario.toFixed(2)} A · guardamotor para ${escaparHtml(g.modelo)}`);
+    if (g.guardamotor)     items.push(`${g.cantidad}× <strong>ABB ${g.guardamotor.model}</strong> · PID ${g.guardamotor.pid} · setting ${g.amps_unitario.toFixed(2)} A · guardamotor para ${escaparHtml(g.modelo)}`);
+    if (g.contactor)       items.push(`${g.cantidad}× <strong>ABB ${g.contactor.model}</strong> · PID ${g.contactor.pid} · contactor AC-3 ${g.contactor.ac3_a} A · bobina ${g.contactor.bobina} (RUN/READY/FAULT al SCADA)`);
     if (g.aux_guardamotor) items.push(`${g.cantidad}× <strong>ABB ${g.aux_guardamotor.model}</strong> · PID ${g.aux_guardamotor.pid} · auxiliar SCADA del guardamotor`);
   }
-  if (r.breaker)     items.push(`1× <strong>ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema completo`);
-  if (r.aux_breaker) items.push(`1× <strong>ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
+  if (r.breaker)     items.push(`1× <strong>ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema completo (Curva C · 6 kA)`);
+  if (r.aux_breaker) items.push(`1× <strong>ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA (TRIP)`);
   if (!items.length) return '';
   return `
     <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica del mix</div>
@@ -862,6 +1056,15 @@ function upd() {
   setKpi('v5', r.cfm_corregido, ' CFM');
   $('cfm-disp').textContent     = formatearNumero(r.cfm_nivel_mar) + ' CFM';
   $('cfm-alt-disp').textContent = formatearNumero(r.cfm_corregido) + ' CFM';
+
+  // Microfase 6 · validar coherencia gráfica vs cálculo
+  state.lastValidacion = validarPuntoOperacion({
+    onan_kva:      r.onan,
+    pct:           getPct(),
+    cfm_calculado: r.cfm_corregido,
+    alt_m:         getAlt()
+  });
+  renderValidacionGrafica(state.lastValidacion);
 
   // Recalcular tabla del mix (estado APROBADO/NO depende del CFM
   // requerido) + protección eléctrica.
@@ -1202,6 +1405,106 @@ function radiadorDiagramSVG() {
 // Sistemas de Refrigeración" suscribe a esa colección y refleja
 // la acción inmediatamente vía onSnapshot.
 
+/**
+ * Calcula el resumen estructurado del estado actual del cálculo.
+ * Lo usa exportarResumenJSON, guardarAccion y generateReport para
+ * persistir el mismo snapshot canónico.
+ *
+ * @returns {object|null}  El resumen JSON listo, o null si no hay mix.
+ */
+function calcularResumenActual() {
+  if (state.mix.length === 0) return null;
+  const cfmCalc = calcularRefrigeracion({ kva_onan: getOnan(), pct: getPct(), alt: getAlt() });
+  const tolerancia = getTolerancia();
+  const mixForEval = state.mix.map(it => ({
+    key: it.key, modelo: it.modelo, marca: it.marca,
+    cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+  }));
+  const evaluacion = evaluarMixVentiladores({
+    items: mixForEval,
+    cfm_requerido: cfmCalc.cfm_nivel_mar,
+    tolerancia_pct: tolerancia
+  });
+  const connKey = getMotorConn();
+  const itemsProt = state.mix.map(it => {
+    const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
+    return {
+      key: it.key, modelo: it.modelo, marca: it.marca, cantidad: it.cantidad,
+      amps_unitario: Number.isFinite(iU) ? iU : 0,
+      kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,
+      peso_unitario: +it.ficha?.fan_peso || 0
+    };
+  });
+  const proteccion = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+  const fanDb = state.fanDb || {};
+  const sugerencias = (evaluacion.estado === MIX_ESTADO.NO_APROBADO)
+    ? sugerirMejoras({
+        items: mixForEval,
+        cfm_requerido: cfmCalc.cfm_nivel_mar,
+        fan_db: fanDb,
+        max_sugerencias: 5,
+        tolerancia_pct: tolerancia
+      })
+    : [];
+  const faltantes = detectarFaltantes({ mix: state.mix });
+  const validacionGrafica = validarPuntoOperacion({
+    onan_kva:      cfmCalc.onan,
+    pct:           getPct(),
+    cfm_calculado: cfmCalc.cfm_corregido,
+    alt_m:         getAlt()
+  });
+  const session = window.__sgmSession || {};
+  const resumen = construirResumenJSON({
+    mix: state.mix,
+    evaluacion, proteccion, sugerencias, faltantes,
+    metadatos: {
+      transformador_id: (_val('mat_input').trim()) || '',
+      matricula:        (_val('mat_input').trim()) || '',
+      proyecto:         _val('proyecto').trim() || '',
+      subestacion:      _val('t_sub'),
+      zona:             _val('t_zona'),
+      departamento:     _val('t_dept'),
+      grupo:            _val('t_grupo'),
+      serie:            _val('t_serie'),
+      kva_onan:         getOnan(),
+      kva_onaf:         getOnaf(),
+      pct:              getPct(),
+      altitud:          getAlt(),
+      conexion_motor:   connKey,
+      responsable_uid:    session.user?.uid || '',
+      responsable_email:  session.user?.email || session.profile?.email || '',
+      responsable_nombre: session.profile?.nombre || ''
+    }
+  });
+  // Microfase 6 · adjunta validación de gráfica al resumen
+  resumen.validacion_grafica = validacionGrafica;
+  return resumen;
+}
+
+/**
+ * Exporta el resumen estructurado del cálculo actual como un
+ * archivo .json descargable con el shape exacto del prompt
+ * técnico del director (microfase 5).
+ */
+function exportarResumenJSON() {
+  if (state.mix.length === 0) {
+    alert('Agregue al menos un modelo al mix antes de exportar el resumen JSON.');
+    return;
+  }
+  const resumen = calcularResumenActual();
+  if (!resumen) return;
+  const blob = new Blob([JSON.stringify(resumen, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const matricula = (_val('mat_input').trim()) || 'sin-matricula';
+  const fecha = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `resumen-refrigeracion-${matricula}-${fecha}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
 function openModalAccion() {
   const modal = $('modalAccion');
   if (!modal) return;
@@ -1274,7 +1577,8 @@ async function guardarAccion() {
       key: it.key, modelo: it.modelo, marca: it.marca,
       cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
     }));
-    const evaluacion = evaluarMixVentiladores({ items: mixForEval, cfm_requerido: cfmCalc.cfm_nivel_mar });
+    const tolerancia = getTolerancia();
+    const evaluacion = evaluarMixVentiladores({ items: mixForEval, cfm_requerido: cfmCalc.cfm_nivel_mar, tolerancia_pct: tolerancia });
     const connKey = getMotorConn();
     const itemsProt = state.mix.map(it => {
       const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
@@ -1286,6 +1590,7 @@ async function guardarAccion() {
       };
     });
     const proteccion = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    const faltantes  = detectarFaltantes({ mix: state.mix });
     const compat = evaluarCompatibilidad({
       A: parseFloat(_val('rad_A')), B: parseFloat(_val('rad_B')), C: parseFloat(_val('rad_C')),
       diametro_mm: parseFloat(_val('fan_diam')), distancia_mm: parseFloat(_val('mon_dist')),
@@ -1316,6 +1621,7 @@ async function guardarAccion() {
       altitud:       getAlt(),
       cfm_requerido: cfmCalc.cfm_nivel_mar,
       cfm_corregido: cfmCalc.cfm_corregido,
+      tolerancia_pct: tolerancia,
 
       mix: state.mix.map(it => ({
         key:          it.key,
@@ -1328,6 +1634,9 @@ async function guardarAccion() {
       evaluacion,
       proteccion,
       compatibilidad: compat,
+      faltantes,
+      validacion_grafica: state.lastValidacion || null,
+      resumen_json: calcularResumenActual(),
 
       accion_descripcion: descripcion,
       estado_accion:      estado,
@@ -1440,7 +1749,8 @@ function generateReport() {
     }));
     const mixEval = evaluarMixVentiladores({
       items: mixForEval,
-      cfm_requerido: state.cfmReq
+      cfm_requerido: state.cfmReq,
+      tolerancia_pct: getTolerancia()
     });
     const fanDb = state.fanDb || {};
     const mixSugs = (mixEval.estado === MIX_ESTADO.NO_APROBADO)
@@ -1448,7 +1758,8 @@ function generateReport() {
           items: mixForEval,
           cfm_requerido: state.cfmReq,
           fan_db: fanDb,
-          max_sugerencias: 3
+          max_sugerencias: 5,
+          tolerancia_pct: getTolerancia()
         })
       : [];
 
@@ -1480,6 +1791,7 @@ function generateReport() {
       };
     });
     const protMix = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    const faltantesInforme = detectarFaltantes({ mix: state.mix });
 
     // Suma de potencia aparente sobre los grupos: S_grupo = P_grupo / cosφ_grupo
     const kvaTotalMix = itemsProt.reduce((s, it) => {
@@ -1496,19 +1808,19 @@ function generateReport() {
           <td class="tc mono">${g.cantidad}</td>
           <td class="tr mono">${g.amps_unitario.toFixed(2)} A</td>
           <td class="tr mono"><strong>${g.amps_grupo.toFixed(2)} A</strong></td>
-          <td class="mono">${g.guardamotor ? `${g.cantidad} × ABB ${g.guardamotor.model}` : 'Fuera de catálogo MS116'}</td>
-          <td class="mono">${g.guardamotor ? `setting ${g.amps_unitario.toFixed(2)} A · PID ${g.guardamotor.pid}` : '—'}</td>
+          <td class="mono" style="font-size:7.5pt">${g.guardamotor ? `${g.cantidad} × ABB ${g.guardamotor.model}<br>setting ${g.amps_unitario.toFixed(2)} A · PID ${g.guardamotor.pid}` : 'Fuera de catálogo MS116'}</td>
+          <td class="mono" style="font-size:7.5pt">${g.contactor ? `${g.cantidad} × ABB ${g.contactor.model}<br>AC-3 ${g.contactor.ac3_a} A · PID ${g.contactor.pid}` : 'Fuera AF · consultar AX/AE'}</td>
         </tr>`).join('');
       protBlock = `
         <table class="ft">
           <thead>
             <tr>
               <th>Grupo · Marca / Modelo</th>
-              <th class="tc" style="width:50px">Cant.</th>
-              <th class="tr" style="width:80px">A / unidad</th>
-              <th class="tr" style="width:90px">A grupo</th>
-              <th>Guardamotor (1 por unidad)</th>
-              <th>Detalles</th>
+              <th class="tc" style="width:40px">Cant.</th>
+              <th class="tr" style="width:65px">A / unidad</th>
+              <th class="tr" style="width:75px">A grupo</th>
+              <th style="width:155px">Guardamotor MS116</th>
+              <th style="width:140px">Contactor AF</th>
             </tr>
           </thead>
           <tbody>${filasGrupos}</tbody>
@@ -1518,8 +1830,7 @@ function generateReport() {
               <td class="tc mono">${protMix.n_total}</td>
               <td class="tr mono">—</td>
               <td class="tr mono"><strong>${protMix.amps_totales.toFixed(2)} A</strong></td>
-              <td class="mono">1 × Breaker ${protMix.breaker ? 'ABB ' + protMix.breaker.model : '—'}</td>
-              <td class="mono">${protMix.breaker ? `In ${protMix.breaker.in} A · PID ${protMix.breaker.pid}` : 'Excede S203 (50 A)'}</td>
+              <td class="mono" colspan="2" style="font-size:7.5pt">1 × Breaker ${protMix.breaker ? `ABB ${protMix.breaker.model} · In ${protMix.breaker.in} A · Curva C · 6 kA · PID ${protMix.breaker.pid}` : 'excede S203 (50 A)'} + 1 × Auxiliar SCADA ${protMix.aux_breaker.model}</td>
             </tr>
           </tfoot>
         </table>
@@ -1527,13 +1838,38 @@ function generateReport() {
           <tbody>
             ${_row('Conexión motor', conn)}
             ${_row('Corriente total del sistema (Σ grupos)', protMix.amps_totales.toFixed(2) + ' A', true)}
-            ${_row('Corriente mínima del breaker (×1.25 NEC 430)', protMix.amps_min_breaker.toFixed(2) + ' A', true)}
+            ${_row('Corriente mínima del breaker (×1.25 NEC 430.52)', protMix.amps_min_breaker.toFixed(2) + ' A', true)}
             ${_row('Potencia eléctrica total absorbida (Σ kW grupos)', protMix.kw_totales.toFixed(2) + ' kW', true)}
             ${kvaTotalMix > 0 ? _row('Potencia aparente total (S = Σ P/cos φ)', kvaTotalMix.toFixed(2) + ' kVA', true) : ''}
             ${_row('Peso total motoventiladores (Σ peso × cant)', protMix.peso_total.toFixed(1) + ' kg', true)}
-            ${_row('Auxiliar breaker (SCADA)', `1 × ABB ${protMix.aux_breaker.model} · PID ${protMix.aux_breaker.pid}`)}
+            ${_row('Coordinación', `Verificar selectividad con MCCB aguas arriba en tablero general (típico ≥ 100 A). Norma IEC 60947-2 · NEC 430.52`)}
           </tbody>
-        </table>`;
+        </table>
+        ${protMix.tags_scada ? `
+        <table class="ft" style="margin-top:8pt">
+          <thead>
+            <tr>
+              <th style="width:60px">Tag SCADA</th>
+              <th>Contacto físico</th>
+              <th>Descripción / función</th>
+            </tr>
+          </thead>
+          <tbody>${protMix.tags_scada.map(t => `
+            <tr>
+              <td class="mono"><strong>${t.tag}</strong></td>
+              <td>${escaparHtml(t.contacto)}</td>
+              <td>${escaparHtml(t.descripcion)}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        <p style="font-size:7pt;color:#666;font-style:italic;margin-top:3pt">Lógica SCADA mínima requerida para integración. Norma IEEE C37.91 · IEC 61850.</p>` : ''}
+        ${faltantesInforme.length > 0 ? `
+        <div style="margin-top:8pt;padding:6pt 10pt;background:#fff8e1;border-left:3pt solid #f57c00;border:1pt solid #ffe082;border-radius:3pt">
+          <div style="font-size:8pt;font-weight:700;color:#b85f00;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4pt">⚠ Datos faltantes para cálculo eléctrico completo</div>
+          <ul style="margin:0;padding-left:14pt;font-size:7.5pt;color:#5d4037;line-height:1.45">
+            ${faltantesInforme.map(f => `<li><strong style="color:${f.severidad === 'critico' ? '#b71c1c' : f.severidad === 'aviso' ? '#b85f00' : '#1565c0'}">[${f.severidad.toUpperCase()}]</strong> ${escaparHtml(f.mensaje)}</li>`).join('')}
+          </ul>
+          <p style="font-size:7pt;color:#666;font-style:italic;margin-top:4pt">El cálculo se ejecutó con valores por defecto cuando aplica. Verifique la ficha del catálogo certificado AFINIA para mejorar precisión.</p>
+        </div>` : ''}`;
 
       // Lista de materiales agrupada por modelo + ítems del sistema
       const items = [];
@@ -1551,7 +1887,15 @@ function generateReport() {
             qty: g.cantidad,
             model: `Guardamotor ABB ${g.guardamotor.model} (para ${escaparHtml(g.modelo)})`,
             pid: g.guardamotor.pid,
-            notes: `Rango ajuste ${g.guardamotor.min}–${g.guardamotor.max} A · setting ${g.amps_unitario.toFixed(2)} A`
+            notes: `Rango ajuste ${g.guardamotor.min}–${g.guardamotor.max} A · setting ${g.amps_unitario.toFixed(2)} A · IEC 60947-4-1`
+          });
+        }
+        if (g.contactor) {
+          items.push({
+            qty: g.cantidad,
+            model: `Contactor ABB ${g.contactor.model} (para ${escaparHtml(g.modelo)})`,
+            pid: g.contactor.pid,
+            notes: `AC-3 ${g.contactor.ac3_a} A · ≤ ${g.contactor.kw_400v} kW @ 400 V · bobina ${g.contactor.bobina} · tags SCADA RUN/READY/FAULT`
           });
         }
         items.push({
@@ -2209,30 +2553,34 @@ function generateReport() {
   <!-- Sugerencias del motor (solo si NO aprobado) ── -->
   ${mixSugs.length > 0 ? `<section class="section-anchor">
     <h3>Sugerencias para alcanzar el CFM requerido</h3>
-    <p class="meta">El sistema propone hasta 3 alternativas ordenadas por menor exceso (ajuste más fino primero) basadas en el catálogo certificado de motoventiladores.</p>
+    <p class="meta">El sistema propone hasta 5 alternativas ordenadas por factibilidad (alta → baja) basadas en el catálogo certificado de motoventiladores. Cada sugerencia incluye impacto estimado, factibilidad e implicaciones operativas.</p>
     <table class="ft">
       <thead>
         <tr>
-          <th class="tc" style="width:30px">#</th>
-          <th style="width:90px">Estrategia</th>
-          <th>Acción propuesta</th>
-          <th class="tr" style="width:120px">CFM resultante</th>
-          <th class="tr" style="width:80px">Cobertura</th>
-          <th class="tr" style="width:80px">Exceso</th>
+          <th class="tc" style="width:25px">#</th>
+          <th style="width:88px">Estrategia</th>
+          <th style="width:62px" class="tc">Factib.</th>
+          <th>Acción propuesta · implicaciones</th>
+          <th class="tr" style="width:90px">Δ CFM</th>
+          <th class="tr" style="width:90px">CFM resultante</th>
+          <th class="tr" style="width:65px">Cobertura</th>
         </tr>
       </thead>
       <tbody>${mixSugs.map((s, i) => `
         <tr>
           <td class="tc">${i + 1}</td>
           <td><strong>${({
-            agregar_unidades: 'Agregar más unidades',
-            sustituir:        'Sustituir modelo débil',
-            agregar_modelo:   'Agregar modelo nuevo'
+            agregar_unidades:           'Agregar unidades',
+            sustituir:                  'Sustituir modelo',
+            agregar_modelo:             'Agregar modelo',
+            vfd_uprate:                 'VFD / uprate RPM',
+            optimizacion_aerodinamica:  'Optimizar aerodinámica'
           }[s.estrategia] || s.estrategia)}</strong></td>
-          <td>${escaparHtml(s.descripcion)}</td>
+          <td class="tc"><span style="font-size:8.5pt;font-weight:700;color:${s.factibilidad === 'alta' ? '#1b5e20' : s.factibilidad === 'media' ? '#b85f00' : '#7b1fa2'}">${(s.factibilidad || '—').toUpperCase()}</span></td>
+          <td>${escaparHtml(s.descripcion)}<br><span style="font-size:7.5pt;color:#555;font-style:italic">${escaparHtml(s.implicaciones || '')}</span></td>
+          <td class="tr mono" style="color:${s.aprobado ? '#1b5e20' : '#b71c1c'};font-weight:700">${s.impacto_estimado_cfm >= 0 ? '+' : ''}${formatearNumero(s.impacto_estimado_cfm)}</td>
           <td class="tr mono">${formatearNumero(s.cfm_aporte_total)} CFM</td>
           <td class="tr mono">${s.cobertura_pct.toFixed(1)}%</td>
-          <td class="tr mono">${formatearNumero(s.exceso)} CFM</td>
         </tr>`).join('')}</tbody>
     </table>
   </section>` : ''}
@@ -2433,7 +2781,10 @@ function bindEvents() {
   $('conn_Y')?.addEventListener('change', calcProtection);
 
   $('btnAddToMix')?.addEventListener('click', addToMix);
+  // Cambio de tolerancia → recalcular banner + sugerencias en vivo
+  $('mix_tolerancia')?.addEventListener('input', () => { renderMix(); });
   $('btnExportReport')?.addEventListener('click', generateReport);
+  $('btnExportJson')?.addEventListener('click', exportarResumenJSON);
   $('btnRegistrarAccion')?.addEventListener('click', openModalAccion);
   $('btnGuardarAccion')?.addEventListener('click', guardarAccion);
   $('btnPrint')?.addEventListener('click', () => window.print());
