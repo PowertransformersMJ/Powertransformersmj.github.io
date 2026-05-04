@@ -255,6 +255,33 @@ export const AUX_GUARDAMOTOR = Object.freeze({
   desc:  '1NO+1NC · Clip-on MS116 · IEC/EN 60947-5-1'
 });
 
+/**
+ * Catálogo de contactores ABB AF (control AC-3 trifásico, 400 V).
+ * Selección por corriente AC-3 ≥ FLC × 1.15 (margen de servicio).
+ * Bobina universal AC/DC.
+ */
+export const CONTACTOR_AF_DB = Object.freeze([
+  { model: 'AF09', ac3_a:  9, kw_400v:  4.0, pid: '1SBL137001R1300', bobina: '24-60V AC/DC · universal' },
+  { model: 'AF12', ac3_a: 12, kw_400v:  5.5, pid: '1SBL157001R1300', bobina: '24-60V AC/DC · universal' },
+  { model: 'AF16', ac3_a: 16, kw_400v:  7.5, pid: '1SBL177001R1300', bobina: '24-60V AC/DC · universal' },
+  { model: 'AF26', ac3_a: 26, kw_400v: 11.0, pid: '1SBL237001R1300', bobina: '100-250V AC/DC · universal' },
+  { model: 'AF38', ac3_a: 38, kw_400v: 18.5, pid: '1SBL297001R1300', bobina: '100-250V AC/DC · universal' },
+  { model: 'AF65', ac3_a: 65, kw_400v: 30.0, pid: '1SBL387001R1300', bobina: '100-250V AC/DC · universal' },
+  { model: 'AF80', ac3_a: 80, kw_400v: 37.0, pid: '1SBL437001R1300', bobina: '100-250V AC/DC · universal' }
+]);
+
+/**
+ * Tags SCADA estándar para integración con sistema de control.
+ * Cada tag mapea una señal eléctrica a un contacto NO/NC físico.
+ * Aplica conforme IEEE C37.91 (protección de transformadores).
+ */
+export const TAGS_SCADA = Object.freeze([
+  { tag: 'RUN',    contacto: 'NO contactor',     descripcion: 'Cerrado cuando contactor energizado · indica motor en marcha' },
+  { tag: 'FAULT',  contacto: 'NO guardamotor',   descripcion: 'Cerrado cuando guardamotor disparó · alarma de sobrecarga térmica' },
+  { tag: 'TRIP',   contacto: 'NC breaker aux',   descripcion: 'Abierto cuando breaker disparó · falla mayor o cortocircuito' },
+  { tag: 'READY',  contacto: 'NC guardamotor',   descripcion: 'Abierto si hay falla · sistema listo para arranque cuando cerrado' }
+]);
+
 /** Contacto auxiliar SCADA para breaker S203. */
 export const AUX_BREAKER = Object.freeze({
   model: 'S2C-H11L',
@@ -302,6 +329,97 @@ export function seleccionarBreaker(amperaje_min) {
 }
 
 /**
+ * Selecciona contactor ABB AF cuya corriente AC-3 cubre FLC × factor
+ * de servicio (default 1.15 conforme AC-3 IEC 60947-4-1).
+ *
+ * @param {number} flc · corriente nominal del motor (FLC, A)
+ * @param {number} factor · margen de servicio (default 1.15)
+ * @returns {{model, ac3_a, kw_400v, pid, bobina, margen_pct}|null}
+ */
+export function seleccionarContactor(flc, factor = 1.15) {
+  const i = Number(flc);
+  const f = Number(factor) || 1.15;
+  if (!Number.isFinite(i) || i <= 0) return null;
+  const corrienteRequerida = i * f;
+  const sel = CONTACTOR_AF_DB.find(c => c.ac3_a >= corrienteRequerida);
+  if (!sel) return null;
+  return {
+    ...sel,
+    margen_pct: +((sel.ac3_a - i) / i * 100).toFixed(1)
+  };
+}
+
+/**
+ * Calcula la corriente nominal de un motor trifásico (FLC) a partir
+ * de su potencia, tensión, factor de potencia y eficiencia. Devuelve
+ * el FLC + memoria de cálculo (fórmula con valores reales sustituidos)
+ * para mostrar al usuario.
+ *
+ * Si se pasa `amps_directo` (lectura directa de placa), se usa ese
+ * valor y la memoria documenta "lectura directa de placa".
+ *
+ * Fórmula: FLC = P / (√3 × V × cos φ × η)
+ *   · P en watts (si se pasa hp se convierte: P = HP × 746)
+ *   · V tensión de línea (V)
+ *   · cos φ factor de potencia
+ *   · η eficiencia (0..1)
+ *
+ * @param {{
+ *   p_w?: number,
+ *   hp?: number,
+ *   voltaje?: number,
+ *   cosphi?: number,
+ *   eficiencia?: number,
+ *   amps_directo?: number|null
+ * }} input
+ * @returns {{
+ *   flc_a: number|null,
+ *   fuente: 'placa' | 'calculo' | 'sin_datos',
+ *   memoria: string,
+ *   parametros: object
+ * }}
+ */
+export function calcularFLC({ p_w, hp, voltaje, cosphi, eficiencia, amps_directo } = {}) {
+  // Ruta 1 · lectura directa de placa
+  const ad = Number(amps_directo);
+  if (Number.isFinite(ad) && ad > 0) {
+    return {
+      flc_a:      +ad.toFixed(2),
+      fuente:     'placa',
+      memoria:    `FLC = ${ad.toFixed(2)} A (lectura directa de placa del motor · tag fan_amp del catálogo certificado)`,
+      parametros: { amps_directo: ad }
+    };
+  }
+  // Ruta 2 · cálculo desde potencia
+  const Pw = Number(p_w) > 0 ? Number(p_w) : (Number(hp) > 0 ? Number(hp) * 746 : 0);
+  const V  = Number(voltaje)    || 0;
+  const cf = Number(cosphi)     || 0;
+  const eta= Number(eficiencia) || 0;
+  if (Pw > 0 && V > 0 && cf > 0 && eta > 0) {
+    const sqrt3 = Math.sqrt(3);
+    const flc = Pw / (sqrt3 * V * cf * eta);
+    const HPeq = (Pw / 746).toFixed(2);
+    return {
+      flc_a:      +flc.toFixed(2),
+      fuente:     'calculo',
+      memoria:    `FLC = P / (√3 × V × cos φ × η) = ${Pw.toFixed(0)} W / (√3 × ${V} V × ${cf} × ${eta}) → ${flc.toFixed(2)} A · equivalente ${HPeq} HP`,
+      parametros: { p_w: Pw, voltaje: V, cosphi: cf, eficiencia: eta, hp_eq: +HPeq }
+    };
+  }
+  return {
+    flc_a:      null,
+    fuente:     'sin_datos',
+    memoria:    'Sin datos suficientes para calcular FLC · faltan campos: ' + [
+      Pw <= 0 ? 'potencia (P_w o HP)' : null,
+      V  <= 0 ? 'voltaje' : null,
+      cf <= 0 ? 'cos φ'   : null,
+      eta<= 0 ? 'eficiencia (η)' : null
+    ].filter(Boolean).join(', '),
+    parametros: { p_w: Pw, voltaje: V, cosphi: cf, eficiencia: eta }
+  };
+}
+
+/**
  * Cálculo completo de protección eléctrica para un sistema de N
  * ventiladores idénticos.
  *
@@ -332,9 +450,11 @@ export function calcularProteccionElectrica({ amps_por_fan, n_fans, factor_segur
     amps_totales:    iT,
     amps_min_breaker: iM,
     guardamotor:     seleccionarGuardamotor(iF),
+    contactor:       seleccionarContactor(iF),
     breaker:         seleccionarBreaker(iM),
     aux_guardamotor: AUX_GUARDAMOTOR,
-    aux_breaker:     AUX_BREAKER
+    aux_breaker:     AUX_BREAKER,
+    tags_scada:      TAGS_SCADA
   };
 }
 
@@ -693,7 +813,8 @@ export function calcularProteccionMix({ items, factor_seguridad = 1.25 }) {
         amps_grupo: +(cant * iU).toFixed(2),
         kw_grupo:   +(cant * kwU).toFixed(2),
         peso_grupo: +(cant * pU).toFixed(2),
-        guardamotor: seleccionarGuardamotor(iU),
+        guardamotor:     seleccionarGuardamotor(iU),
+        contactor:       seleccionarContactor(iU),
         aux_guardamotor: AUX_GUARDAMOTOR
       };
     });
@@ -710,7 +831,8 @@ export function calcularProteccionMix({ items, factor_seguridad = 1.25 }) {
     kw_totales:       kwTot,
     peso_total:       pTot,
     breaker:          seleccionarBreaker(iMin),
-    aux_breaker:      AUX_BREAKER
+    aux_breaker:      AUX_BREAKER,
+    tags_scada:       TAGS_SCADA
   };
 }
 
