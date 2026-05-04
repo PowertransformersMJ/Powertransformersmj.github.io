@@ -604,6 +604,38 @@
 }
 .mix-suggestions .mix-sug-card button:hover { opacity: .85; }
 
+/* ─── Banner anti-duplicado en modal Registrar acción ──────── */
+.acc-duplicado {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: rgba(245, 124, 0, .08);
+  border: 1px solid rgba(245, 124, 0, .35);
+  border-left: 4px solid rgba(245, 124, 0, 1);
+  border-radius: 6px;
+  font: 500 12px var(--font-sans);
+  color: var(--ink-2);
+}
+.acc-duplicado[hidden] { display: none; }
+.acc-duplicado .acd-title {
+  font: 700 12px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .04em;
+  color: rgba(184, 95, 0, 1);
+  margin-bottom: 6px;
+}
+.acc-duplicado .acd-list {
+  margin: 6px 0 8px 16px;
+  padding: 0; font-size: 11px; line-height: 1.5;
+}
+.acc-duplicado .acd-list li { margin-bottom: 2px; }
+.acc-duplicado .acd-list .acd-fecha {
+  font: 600 11px var(--font-mono); color: var(--brand-deep);
+}
+.acc-duplicado .acd-hint {
+  margin: 6px 0 4px;
+  font-size: 12px;
+  color: var(--ink-2);
+}
+
 /* ─── Modal "Registrar acción de mantenimiento" ─────────────── */
 .sgm-modal {
   position: fixed; inset: 0;
