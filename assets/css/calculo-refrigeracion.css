@@ -579,6 +579,14 @@
   text-transform: uppercase; letter-spacing: .06em;
   color: rgba(184, 95, 0, 1);
 }
+.mix-suggestions .mix-sug-card .fact {
+  font: 700 9.5px var(--font-mono);
+  letter-spacing: .04em;
+  padding: 2px 8px; border-radius: 999px;
+  background: rgba(0,0,0,.04);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
 .mix-suggestions .mix-sug-card .desc { line-height: 1.4; color: var(--ink-1); }
 .mix-suggestions .mix-sug-card .kpi {
   font: 500 11px var(--font-mono); color: var(--ink-3);
