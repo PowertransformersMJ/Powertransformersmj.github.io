@@ -1087,6 +1087,85 @@ export function construirResumenJSON({ mix, evaluacion, proteccion, sugerencias 
   };
 }
 
+/**
+ * Valida la coherencia entre el punto de operación calculado y la
+ * gráfica Westinghouse. Hace dos chequeos:
+ *
+ *  · A · Rango calibrado: el porcentaje ONAF/ONAN está dentro del
+ *    rango cubierto por las curvas oficiales (115–166%). Si está
+ *    fuera, advierte que el cálculo es por extrapolación.
+ *
+ *  · B · Coherencia gráfica vs cálculo: calcula el CFM esperado
+ *    según la pendiente Westinghouse interpolada al porcentaje
+ *    seleccionado y lo compara con `cfm_calculado`. Si delta > 2%
+ *    emite warning; > 5% emite error.
+ *
+ * Útil cuando el usuario altera manualmente alguno de los inputs
+ * y el cálculo deja de ser consistente con la curva Westinghouse
+ * (típicamente cuando edita ONAF en lugar de %).
+ *
+ * @param {{
+ *   onan_kva: number,
+ *   pct: number,
+ *   cfm_calculado: number,
+ *   alt_m?: number
+ * }} input
+ * @returns {{
+ *   cfm_esperado: number,
+ *   cfm_calculado: number,
+ *   pendiente_esperada: number,
+ *   delta_cfm: number,
+ *   delta_pct_abs: number,
+ *   severidad: 'ok' | 'warn' | 'err',
+ *   rango_calibrado: boolean,
+ *   pct: number,
+ *   mensaje: string
+ * }}
+ */
+export function validarPuntoOperacion({ onan_kva, pct, cfm_calculado, alt_m = 0 }) {
+  const onan = Number(onan_kva) || 0;
+  const p    = Number(pct) || 0;
+  const cfmC = Number(cfm_calculado) || 0;
+  const alt  = Number(alt_m) || 0;
+  const pctMin = PENDIENTES_WESTINGHOUSE[0][0];
+  const pctMax = PENDIENTES_WESTINGHOUSE[PENDIENTES_WESTINGHOUSE.length - 1][0];
+  const dentroRango = p >= pctMin && p <= pctMax;
+  const slope = interpolarPendiente(p);
+  const cfmEsperadoBase = slope * onan;
+  const fAlt = factorCorreccionAltitud(alt);
+  const cfmEsperado = +(cfmEsperadoBase * fAlt).toFixed(2);
+  const delta = +(cfmC - cfmEsperado).toFixed(2);
+  const deltaAbs = cfmEsperado > 0 ? Math.abs(delta) / cfmEsperado * 100 : 0;
+  const deltaPct = +deltaAbs.toFixed(2);
+
+  // Severidad combinada (extrapolación domina)
+  let severidad, mensaje;
+  if (!dentroRango) {
+    severidad = 'err';
+    mensaje = `Porcentaje ${p.toFixed(1)}% FUERA del rango calibrado Westinghouse (${pctMin}…${pctMax}%). El cálculo es por extrapolación · revise valores ONAN/ONAF para volver al rango oficial.`;
+  } else if (deltaPct > 5) {
+    severidad = 'err';
+    mensaje = `Discrepancia gráfica vs cálculo: ${deltaPct.toFixed(2)}% (delta ${delta.toFixed(0)} CFM). Probable inconsistencia de inputs · verifique que ONAN, ONAF y % concuerden.`;
+  } else if (deltaPct > 2) {
+    severidad = 'warn';
+    mensaje = `Cálculo dentro de tolerancia de la curva Westinghouse (delta ${deltaPct.toFixed(2)}% / ${delta.toFixed(0)} CFM). Aceptable pero revise si esperaba coincidencia exacta.`;
+  } else {
+    severidad = 'ok';
+    mensaje = `Cálculo coincide con la curva Westinghouse interpolada al ${p.toFixed(1)}% (delta ${deltaPct.toFixed(2)}%).`;
+  }
+  return {
+    cfm_esperado:       cfmEsperado,
+    cfm_calculado:      +cfmC.toFixed(2),
+    pendiente_esperada: +slope.toFixed(3),
+    delta_cfm:          delta,
+    delta_pct_abs:      deltaPct,
+    severidad,
+    rango_calibrado:    dentroRango,
+    pct:                +p.toFixed(2),
+    mensaje
+  };
+}
+
 /* ─── Compatibilidad mecánica ───────────────────────────────── */
 
 /** Estados posibles de cada criterio de compatibilidad. */

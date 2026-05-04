@@ -700,6 +700,48 @@
   background: rgba(248, 250, 253, 1);
 }
 
+/* ─── Validación punto operación vs gráfica Westinghouse ──── */
+.valida-grafica {
+  margin: 8px 0 14px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font: 500 12px var(--font-sans);
+  border-left: 4px solid;
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+}
+.valida-grafica[hidden] { display: none; }
+.valida-grafica .vg-badge {
+  display: inline-block;
+  padding: 2px 9px; border-radius: 999px;
+  font: 700 10px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+}
+.valida-grafica .vg-msg { flex: 1 1 280px; line-height: 1.4; }
+.valida-grafica .vg-kpi {
+  font: 500 11px var(--font-mono);
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.valida-grafica .vg-kpi b { color: var(--ink-1); font-weight: 700; }
+.valida-grafica.is-ok {
+  background: rgba(46,125,50,.06);
+  border-left-color: rgba(46,125,50,.85);
+  color: rgba(31,100,33,1);
+}
+.valida-grafica.is-ok .vg-badge { background: rgba(46,125,50,.85); color: #fff; }
+.valida-grafica.is-warn {
+  background: rgba(245,124,0,.08);
+  border-left-color: rgba(245,124,0,.95);
+  color: rgba(184,95,0,1);
+}
+.valida-grafica.is-warn .vg-badge { background: rgba(245,124,0,.95); color: #fff; }
+.valida-grafica.is-err {
+  background: rgba(198,40,40,.08);
+  border-left-color: rgba(198,40,40,.95);
+  color: rgba(178,34,34,1);
+}
+.valida-grafica.is-err .vg-badge { background: rgba(198,40,40,.95); color: #fff; }
+
 /* ─── Banner de faltantes (cálculo eléctrico) ───────────────── */
 .prot-faltantes {
   margin: 10px 0 12px;
