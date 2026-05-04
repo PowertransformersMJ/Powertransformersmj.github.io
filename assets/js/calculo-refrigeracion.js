@@ -52,6 +52,12 @@ function getOnan() { return parseFloat($('kva_onan').value) || 60000; }
 function getOnaf() { return parseFloat($('kva_onaf').value) || 79800; }
 function getPct()  { return parseFloat($('pct').value)      || 133; }
 function getAlt()  { return parseFloat($('alt').value)      || 0; }
+function getTolerancia() {
+  const v = parseFloat($('mix_tolerancia')?.value);
+  if (!Number.isFinite(v) || v < 0) return 0;
+  if (v > 100) return 100;
+  return v;
+}
 
 /**
  * Validación reactiva por input. Lee el atributo min/max declarado
@@ -336,7 +342,8 @@ function renderMix() {
         key: it.key, modelo: it.modelo, marca: it.marca,
         cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
       })),
-      cfm_requerido: state.cfmReq
+      cfm_requerido: state.cfmReq,
+      tolerancia_pct: getTolerancia()
     });
     tbody.innerHTML = state.mix.map((it, i) => {
       const aporte = it.cfm_unitario * it.cantidad;
@@ -378,7 +385,8 @@ function renderMix() {
       key: it.key, modelo: it.modelo, marca: it.marca,
       cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
     })),
-    cfm_requerido: state.cfmReq
+    cfm_requerido: state.cfmReq,
+    tolerancia_pct: getTolerancia()
   });
   state.lastEval = evalRes;
   renderMixStatus(evalRes);
@@ -408,12 +416,17 @@ function renderMixStatus(ev) {
   const cls = ev.aprobado ? 'is-aprobado' : 'is-no-aprobado';
   const badge = ev.aprobado ? '✓ Aprobado' : '✗ No aprobado';
   banner.classList.add(cls);
+  const tolKpi = (ev.tolerancia_pct || 0) > 0
+    ? `<div class="mix-kpi">Umbral · <b>${formatearNumero(ev.cfm_umbral)} CFM</b> <span style="color:var(--ink-3);font-weight:500">(tol ${ev.tolerancia_pct.toFixed(1)}%)</span></div>`
+    : '';
   const kpi = ev.aprobado
     ? `<div class="mix-kpi">Cobertura · <b>${ev.cobertura_pct.toFixed(1)}%</b></div>
        <div class="mix-kpi">Exceso · <b>${formatearNumero(ev.exceso)} CFM</b></div>
+       ${tolKpi}
        <div class="mix-kpi">N total · <b>${ev.n_unidades_total}</b></div>`
     : `<div class="mix-kpi">Cobertura · <b>${ev.cobertura_pct.toFixed(1)}%</b></div>
        <div class="mix-kpi">Déficit · <b>${formatearNumero(ev.deficit)} CFM</b></div>
+       ${tolKpi}
        <div class="mix-kpi">N total · <b>${ev.n_unidades_total}</b></div>`;
   banner.innerHTML = `
     <span class="mix-badge">${badge}</span>
@@ -1274,7 +1287,8 @@ async function guardarAccion() {
       key: it.key, modelo: it.modelo, marca: it.marca,
       cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
     }));
-    const evaluacion = evaluarMixVentiladores({ items: mixForEval, cfm_requerido: cfmCalc.cfm_nivel_mar });
+    const tolerancia = getTolerancia();
+    const evaluacion = evaluarMixVentiladores({ items: mixForEval, cfm_requerido: cfmCalc.cfm_nivel_mar, tolerancia_pct: tolerancia });
     const connKey = getMotorConn();
     const itemsProt = state.mix.map(it => {
       const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
@@ -1316,6 +1330,7 @@ async function guardarAccion() {
       altitud:       getAlt(),
       cfm_requerido: cfmCalc.cfm_nivel_mar,
       cfm_corregido: cfmCalc.cfm_corregido,
+      tolerancia_pct: tolerancia,
 
       mix: state.mix.map(it => ({
         key:          it.key,
@@ -1440,7 +1455,8 @@ function generateReport() {
     }));
     const mixEval = evaluarMixVentiladores({
       items: mixForEval,
-      cfm_requerido: state.cfmReq
+      cfm_requerido: state.cfmReq,
+      tolerancia_pct: getTolerancia()
     });
     const fanDb = state.fanDb || {};
     const mixSugs = (mixEval.estado === MIX_ESTADO.NO_APROBADO)
@@ -2433,6 +2449,8 @@ function bindEvents() {
   $('conn_Y')?.addEventListener('change', calcProtection);
 
   $('btnAddToMix')?.addEventListener('click', addToMix);
+  // Cambio de tolerancia → recalcular banner + sugerencias en vivo
+  $('mix_tolerancia')?.addEventListener('input', () => { renderMix(); });
   $('btnExportReport')?.addEventListener('click', generateReport);
   $('btnRegistrarAccion')?.addEventListener('click', openModalAccion);
   $('btnGuardarAccion')?.addEventListener('click', guardarAccion);
