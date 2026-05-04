@@ -23,6 +23,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { deepClean } from './_firestore_clean.js';
 
 const COL_NAME = 'acciones_refrigeracion';
 
@@ -58,6 +59,11 @@ function docRef(id) { return doc(getDbSafe(), COL_NAME, id); }
 export function isReady() {
   return isFirebaseConfigured && !!getDbSafe();
 }
+
+// `deepClean` se importa de `./_firestore_clean.js` · es la
+// función pura que elimina undefined/NaN de objetos anidados antes
+// de persistir en Firestore. Ver CLAUDE.md §0.1.2.6 (regla
+// permanente desde 2026-05-03).
 
 /**
  * Sanitiza el payload antes de persistir. Devuelve un objeto limpio
@@ -172,7 +178,12 @@ export async function crear(data, uid) {
   payload.createdAt = serverTimestamp();
   payload.updatedAt = serverTimestamp();
   payload.createdBy = uid || payload.responsable_uid || null;
-  const ref = await addDoc(collRef(), payload);
+  // Deep-clean recursivo: elimina undefined/NaN de objetos y arrays
+  // anidados (mix[].ficha, evaluacion, proteccion, compatibilidad,
+  // resumen_json, validacion_grafica). Firestore rechaza undefined
+  // con error "permission-denied" engañoso (ver CLAUDE.md §0.1.2.6).
+  const limpio = deepClean(payload);
+  const ref = await addDoc(collRef(), limpio);
   return ref.id;
 }
 
@@ -187,7 +198,7 @@ export async function actualizar(id, parche) {
     throw new Error('estado_accion inválido');
   }
   payload.updatedAt = serverTimestamp();
-  await updateDoc(docRef(id), payload);
+  await updateDoc(docRef(id), deepClean(payload));
 }
 
 export async function actualizarEstado(id, estado, observaciones) {
