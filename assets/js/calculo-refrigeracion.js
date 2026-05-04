@@ -394,6 +394,7 @@ function renderMix() {
   state.lastEval = evalRes;
   renderMixStatus(evalRes);
   renderMixSuggestions(evalRes);
+  renderFichasMix();
 
   // Backwards-compat con la sección "Calculador de ventiladores"
   // del informe legacy: mantenemos un alias `state.fans` derivado
@@ -403,6 +404,88 @@ function renderMix() {
   }));
 
   if (focId) { const el = $(focId); if (el) el.focus(); }
+}
+
+/**
+ * Renderiza la subsección "Fichas técnicas del mix" dentro de la
+ * sección "Datos técnicos del motoventilador". Una ficha read-only
+ * compacta por cada modelo del mix con sus 24 campos canónicos del
+ * catálogo (identificación + aerodinámica + motor eléctrico).
+ *
+ * Cuando el mix está vacío, muestra mensaje informativo invitando
+ * a agregar al menos un modelo. NO bloquea ni oculta el editor
+ * manual legacy debajo (que sigue alimentando compatibilidad
+ * mecánica).
+ */
+function renderFichasMix() {
+  const wrap = $('fichas-mix-wrap');
+  if (!wrap) return;
+  if (!state.mix || state.mix.length === 0) {
+    wrap.innerHTML = `
+      <div style="padding:14px 16px;background:rgba(255,255,255,.4);border:1px dashed rgba(0,40,90,.18);border-radius:8px;color:var(--ink-3);font-style:italic;font-size:13px">
+        Sin modelos en el mix · agregue uno arriba para ver su ficha técnica completa aquí.
+      </div>`;
+    return;
+  }
+  wrap.innerHTML = state.mix.map((it, i) => renderFichaUnica(it, i + 1)).join('');
+}
+
+/**
+ * Renderiza una ficha técnica compacta read-only de un modelo del
+ * mix con todos los campos relevantes del catálogo.
+ */
+function renderFichaUnica(it, idx) {
+  const f = it.ficha || {};
+  const cell = (label, value) => `
+    <div class="fmf-cell">
+      <div class="fmf-l">${escaparHtml(label)}</div>
+      <div class="fmf-v">${value === undefined || value === null || value === '' ? '<span class="fmf-empty">—</span>' : escaparHtml(String(value))}</div>
+    </div>`;
+  return `
+    <div class="ficha-mix" style="margin-bottom:14px;padding:12px 14px;background:rgba(255,255,255,.55);border:1px solid rgba(13,71,161,.18);border-left:3px solid var(--brand);border-radius:8px">
+      <div class="ficha-mix-hdr" style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <div>
+          <div style="font:700 13px var(--font-mono);color:var(--brand-deep);text-transform:uppercase;letter-spacing:.04em">Ficha #${idx}</div>
+          <div style="font:600 15px var(--font-sans);color:var(--ink-1);margin-top:2px">${escaparHtml(it.marca || '')} ${escaparHtml(it.modelo || '')}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font:500 11px var(--font-mono);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em">Cantidad en mix</div>
+          <div style="font:700 18px var(--font-mono);color:var(--brand-deep)">${it.cantidad} u</div>
+          <div style="font:500 11px var(--font-mono);color:var(--ink-3)">aporte ${formatearNumero(it.cantidad * it.cfm_unitario)} CFM</div>
+        </div>
+      </div>
+
+      <div class="ficha-mix-grid">
+        ${cell('Marca',                 f.fan_marca || it.marca)}
+        ${cell('Modelo / Referencia',   f.fan_modelo || it.modelo)}
+        ${cell('N.° artículo / parte',  f.fan_nserie)}
+        ${cell('Tipo de pala',          f.fan_tipo_pala)}
+        ${cell('Diámetro nominal (mm)', f.fan_diam)}
+        ${cell('Número de aspas',       f.fan_aspas)}
+        ${cell('RPM nominal',           f.fan_rpm)}
+        ${cell('Posición de montaje',   f.fan_montaje)}
+        ${cell('Peso conjunto (kg)',    f.fan_peso)}
+        ${cell('Caudal entrada',        f.fan_flow_val ? `${f.fan_flow_val} ${ETIQUETAS_CAUDAL_ALT[f.fan_flow_unit] || f.fan_flow_unit || ''}`.trim() : null)}
+        ${cell('CFM nominal (ft³/min)', f.fan_cfm_nom)}
+        ${cell('Equivalente m³/s',      f.fan_m3s)}
+      </div>
+
+      <div class="calc-subsect" style="margin:10px 0 6px;font:700 11px var(--font-mono);color:var(--brand-deep);text-transform:uppercase;letter-spacing:.05em">Motor eléctrico</div>
+      <div class="ficha-mix-grid">
+        ${cell('Tensión · conexión',    f.fan_volt)}
+        ${cell('Frecuencia (Hz)',       f.fan_hz)}
+        ${cell('Potencia P₁ (W)',       f.fan_kw)}
+        ${cell('Corriente nominal (A)', f.fan_amp)}
+        ${cell('Factor de potencia',    f.fan_cosphi)}
+        ${cell('Grado de protección',   f.fan_ip)}
+        ${cell('Clase aislamiento',     f.fan_aislam)}
+        ${cell('Protección motor',      f.fan_protmotor)}
+        ${cell('Temperatura mín. (°C)', f.fan_tmin)}
+        ${cell('Sentido rotación',      f.fan_sentido)}
+        ${cell('Certificación',         f.fan_cert)}
+        ${cell('Material palas / rotor',f.fan_material)}
+      </div>
+    </div>`;
 }
 
 function renderMixStatus(ev) {
@@ -1729,10 +1812,24 @@ function generateReport() {
     const fechaIso = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
     const horaIso  = new Date().toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
-    // Snapshot del gráfico — convertir a base64 PNG con fondo blanco
+    // Snapshot del gráfico en alta resolución (3× DPR) para que en
+    // el informe se aprecien todos los rótulos, ticks, líneas
+    // punteadas y leyendas sin pixelado al imprimir o ampliar.
+    // Cambia devicePixelRatio temporalmente, fuerza resize, captura
+    // y restaura. Causa un breve flash en pantalla (aceptable solo
+    // al exportar).
     let chartImg = '';
     try {
-      if (state.chart) chartImg = state.chart.toBase64Image('image/png', 1);
+      if (state.chart) {
+        const oldDpr = state.chart.options.devicePixelRatio || 1;
+        state.chart.options.devicePixelRatio = 3;
+        state.chart.resize();
+        state.chart.update('none');
+        chartImg = state.chart.toBase64Image('image/png', 1);
+        state.chart.options.devicePixelRatio = oldDpr;
+        state.chart.resize();
+        state.chart.update('none');
+      }
     } catch (err) {
       console.warn('[informe] chart snapshot failed:', err);
     }
@@ -2245,7 +2342,7 @@ function generateReport() {
     border: 1px solid #b0cce8; border-radius: 4pt; background: #fff;
     text-align: center;
   }
-  .chart-img { width: 100%; max-width: 5.6in; height: auto; }
+  .chart-img { width: 100%; max-width: 6in; height: auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
   .chart-cap { font-size: 6.5pt; color: #666; margin-top: 3pt; font-style: italic; }
 
   /* ── Fórmula simbólica + sustitución con valores reales ────── */
