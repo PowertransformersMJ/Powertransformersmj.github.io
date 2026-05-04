@@ -16,6 +16,53 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Hotfix UI · Reordenar Mix antes que Datos técnicos + alta resolución gráfica informe (2026-05-03 PM12)
+
+Dos ajustes solicitados por el director:
+
+**1. Gráfica del informe AFINIA en alta resolución**
+- `assets/js/calculo-refrigeracion.js` · `generateReport()` ahora
+  cambia `state.chart.options.devicePixelRatio = 3` antes de
+  capturar la imagen base64, fuerza `chart.resize()` para que
+  Chart.js redibuje a 3× resolución, captura, y restaura el DPR
+  original. Causa un breve flash al exportar (aceptable).
+- CSS del informe · `.chart-img` aumenta `max-width` de 5.6in a
+  6in y agrega `image-rendering: -webkit-optimize-contrast` +
+  `image-rendering: crisp-edges` para que al imprimir o ampliar
+  no haya pixelado. Todos los rótulos, ticks, líneas punteadas,
+  legendas y curvas se aprecian nítidos.
+
+**2. Reordenar UI · Mix antes de Datos técnicos del motoventilador
+   y mostrar TODAS las fichas del mix**
+- `pages/calculo-refrigeracion.html` · sección "Mix de
+  motoventiladores" movida ANTES de "Datos técnicos del
+  motoventilador" (orden lógico: primero se elige qué modelos y
+  cuántos, después se ven sus fichas técnicas detalladas).
+- `pages/calculo-refrigeracion.html` · "Datos técnicos del
+  motoventilador" ahora trae al inicio un contenedor
+  `#fichas-mix-wrap` que se rellena dinámicamente con UNA ficha
+  read-only por cada modelo del mix (24 campos del catálogo:
+  identificación + aerodinámica + motor eléctrico).
+- El editor manual / preview legacy (selector `fan_db_sel` +
+  inputs editables) se mantiene debajo con su subsection title
+  explícito "Editor manual / preview de un modelo (opcional)" y
+  hint que aclara que alimenta compatibilidad mecánica + fallback
+  legacy de protección.
+- `assets/js/calculo-refrigeracion.js` · funciones nuevas
+  `renderFichasMix()` y `renderFichaUnica(it, idx)` que generan
+  cada ficha con cabecera (marca + modelo + cantidad + aporte
+  CFM) + grid de identificación con 12 campos + grid del motor
+  eléctrico con 12 campos. Se invoca desde `renderMix()` en cada
+  cambio del mix.
+- `assets/css/calculo-refrigeracion.css` · estilos nuevos
+  `.fichas-mix-wrap`, `.ficha-mix-grid` (auto-fit responsive),
+  `.fmf-cell`, `.fmf-l`, `.fmf-v`, `.fmf-empty`. Diseño compacto
+  con borde-left azul de marca que distingue cada ficha.
+
+570/570 tests verdes · HTML lint OK.
+
+Sin deploys Firebase requeridos.
+
 ### Hotfix post-plan · Deep-clean en data layer acciones_refrigeracion (2026-05-03 PM11)
 
 Bug de regresión revelado al probar el modal "Registrar acción de
