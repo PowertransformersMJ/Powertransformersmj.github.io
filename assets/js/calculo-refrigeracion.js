@@ -646,6 +646,13 @@ function dispoIlustrativaSVG(disp, opts = {}) {
  */
 function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 200, mix = [] } = {}) {
   const N = Math.max(1, Math.floor(rad_cant) || 1);
+  // Distribución por lados: la mitad va al lado A (superior), la
+  // otra mitad al lado B (inferior). Si N es impar, lado A se queda
+  // con 1 más. Cuerpos numerados secuencialmente: 1..ceilN/2 lado A,
+  // ceilN/2+1..N lado B.
+  const N_A = Math.ceil(N / 2);
+  const N_B = N - N_A;
+
   const PALETA_FANS = [
     { fill: '#fff3e0', stroke: '#e65100', accent: '#bf360c' },
     { fill: '#e8f5e9', stroke: '#1b5e20', accent: '#0d3d0f' },
@@ -654,80 +661,145 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
     { fill: '#fce4ec', stroke: '#ad1457', accent: '#78002e' },
     { fill: '#fff8e1', stroke: '#f57f17', accent: '#bc5100' }
   ];
-  // Asigna color por key de modelo (consistente entre renders)
   const colorPorKey = new Map();
   mix.forEach((it, i) => colorPorKey.set(it.key, PALETA_FANS[i % PALETA_FANS.length]));
 
-  // Layout: ancho variable según N cuerpos
-  const TANK_W = 60, TANK_X = 30;
-  const RAD_W = Math.max(80, Math.min(140, 700 / N));
-  const RAD_GAP = 12;
-  const RAD_X0 = TANK_X + TANK_W + 30;
-  const RAD_Y = 60;
-  const RAD_H = Math.min(220, Math.max(140, 220 * Math.min(1, A / 2000)));
-  const W = RAD_X0 + N * (RAD_W + RAD_GAP) + 200;   // espacio para leyenda
-  const H = RAD_Y + RAD_H + 220;                      // espacio inferior para fans laterales/leyenda
+  // Layout · vista cenital del transformador (planta).
+  // Tanque rectangular horizontal central · radiadores arriba y
+  // abajo del tanque · conservador cilíndrico en la parte superior
+  // izquierda · bujes AT izquierda + neutro centro + BT derecha.
+  const W = Math.max(900, 220 + Math.max(N_A, N_B, 1) * 100);
+  const H = 540;
+  const TANK_X = 80, TANK_Y = 220, TANK_W = W - 280, TANK_H = 120;
+  const RAD_W_each = (TANK_W - 24) / Math.max(N_A, N_B, 1);
+  const RAD_HEIGHT = 60;
+  const RAD_GAP = 6;
+  const RAD_A_Y = TANK_Y - RAD_HEIGHT - 10;
+  const RAD_B_Y = TANK_Y + TANK_H + 10;
+  const CONSERV_W = 240, CONSERV_H = 50;
+  const CONSERV_X = TANK_X + 40, CONSERV_Y = 60;
 
   const uid = 'tx_' + Math.random().toString(36).slice(2, 6);
+
   const defs = `
     <defs>
       <linearGradient id="${uid}_tank" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%" stop-color="#1976d2"/>
-        <stop offset="50%" stop-color="#0d47a1"/>
-        <stop offset="100%" stop-color="#082b66"/>
+        <stop offset="0%" stop-color="#f5f5f5"/>
+        <stop offset="50%" stop-color="#e0e0e0"/>
+        <stop offset="100%" stop-color="#bdbdbd"/>
       </linearGradient>
       <linearGradient id="${uid}_rad" x1="0%" y1="0%" x2="0%" y2="100%">
-        <stop offset="0%"  stop-color="#e3f2fd"/>
-        <stop offset="100%" stop-color="#90caf9"/>
+        <stop offset="0%" stop-color="#e8eef5"/>
+        <stop offset="100%" stop-color="#90a4ae"/>
       </linearGradient>
-      <filter id="${uid}_sh" x="-20%" y="-20%" width="140%" height="140%">
-        <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
-        <feOffset dx="1" dy="2" result="offsetblur"/>
-        <feComponentTransfer><feFuncA type="linear" slope="0.30"/></feComponentTransfer>
+      <linearGradient id="${uid}_radB" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#90a4ae"/>
+        <stop offset="100%" stop-color="#e8eef5"/>
+      </linearGradient>
+      <linearGradient id="${uid}_conserv" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%"  stop-color="#fafafa"/>
+        <stop offset="40%" stop-color="#eeeeee"/>
+        <stop offset="100%" stop-color="#bdbdbd"/>
+      </linearGradient>
+      <radialGradient id="${uid}_buje" cx="50%" cy="35%" r="55%">
+        <stop offset="0%"  stop-color="#fff"/>
+        <stop offset="40%" stop-color="#bcaaa4"/>
+        <stop offset="100%" stop-color="#5d4037"/>
+      </radialGradient>
+      <filter id="${uid}_sh" x="-10%" y="-10%" width="120%" height="120%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="1.5"/>
+        <feOffset dx="2" dy="3" result="offsetblur"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.32"/></feComponentTransfer>
         <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
       </filter>
+      <marker id="${uid}_arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+      </marker>
     </defs>`;
 
-  // ── Tanque ───────────────────────────────────────────────
+  // ── Conservador cilíndrico en la parte superior ─────────
+  const conservSvg = `
+    <g filter="url(#${uid}_sh)">
+      <ellipse cx="${CONSERV_X}" cy="${CONSERV_Y + CONSERV_H / 2}" rx="20" ry="${CONSERV_H / 2}" fill="url(#${uid}_conserv)" stroke="#666" stroke-width="0.8"/>
+      <rect x="${CONSERV_X}" y="${CONSERV_Y}" width="${CONSERV_W}" height="${CONSERV_H}" fill="url(#${uid}_conserv)" stroke="#666" stroke-width="0.8"/>
+      <ellipse cx="${CONSERV_X + CONSERV_W}" cy="${CONSERV_Y + CONSERV_H / 2}" rx="20" ry="${CONSERV_H / 2}" fill="url(#${uid}_conserv)" stroke="#666" stroke-width="0.8"/>
+      <rect x="${CONSERV_X + CONSERV_W * 0.45}" y="${CONSERV_Y + 4}" width="22" height="6" rx="1" fill="#fff" stroke="#666" stroke-width="0.6"/>
+      <circle cx="${CONSERV_X + CONSERV_W - 22}" cy="${CONSERV_Y + 12}" r="3" fill="#888" stroke="#444" stroke-width="0.4"/>
+    </g>
+    <text x="${CONSERV_X + CONSERV_W / 2}" y="${CONSERV_Y - 6}" text-anchor="middle" fill="#444" font-family="Arial" font-size="9" font-weight="600">TANQUE CONSERVADOR</text>
+    <line x1="${CONSERV_X + CONSERV_W * 0.7}" y1="${CONSERV_Y + CONSERV_H}" x2="${CONSERV_X + CONSERV_W * 0.7}" y2="${TANK_Y}" stroke="#666" stroke-width="2"/>`;
+
+  // ── Tanque principal con bujes y tapas ──────────────────
   const tankSvg = `
     <g filter="url(#${uid}_sh)">
-      <rect x="${TANK_X}" y="${RAD_Y - 10}" width="${TANK_W}" height="${RAD_H + 40}" rx="4" fill="url(#${uid}_tank)" stroke="#0d3a73" stroke-width="0.8"/>
-      <rect x="${TANK_X + 4}" y="${RAD_Y - 6}" width="${TANK_W - 8}" height="6" fill="#fff" opacity="0.18"/>
-      <text x="${TANK_X + TANK_W / 2}" y="${RAD_Y + RAD_H / 2}" text-anchor="middle" fill="#fff" font-family="Arial" font-size="10" font-weight="700" letter-spacing="0.6"
-            transform="rotate(-90 ${TANK_X + TANK_W / 2} ${RAD_Y + RAD_H / 2})">TRANSFORMADOR</text>
-    </g>
-    <!-- Bujes superiores ilustrativos -->
-    <g stroke="#0d3a73" stroke-width="0.8" fill="#bbdefb">
-      ${[0.25, 0.5, 0.75].map(p => {
+      <rect x="${TANK_X}" y="${TANK_Y}" width="${TANK_W}" height="${TANK_H}" rx="3" fill="url(#${uid}_tank)" stroke="#444" stroke-width="1.4"/>
+      ${[0.18, 0.42, 0.65].map(p => {
         const x = TANK_X + TANK_W * p;
-        return `<rect x="${x - 3}" y="${RAD_Y - 28}" width="6" height="20" rx="1"/><circle cx="${x}" cy="${RAD_Y - 30}" r="3" fill="#0d47a1"/>`;
+        const y = TANK_Y + TANK_H / 2;
+        return `
+          <rect x="${x}" y="${y - 18}" width="60" height="36" rx="1" fill="#f5f5f5" stroke="#888" stroke-width="0.6"/>
+          ${[0.1, 0.5, 0.9].flatMap(px => [0.15, 0.85].map(py => {
+            const tx = x + 60 * px, ty = y - 18 + 36 * py;
+            return `<circle cx="${tx}" cy="${ty}" r="1.4" fill="#666"/>`;
+          })).join('')}`;
       }).join('')}
+      ${[0.10, 0.18, 0.26].map((p, i) => {
+        const cx = TANK_X + TANK_W * p;
+        const cy = TANK_Y + TANK_H * 0.30;
+        return `
+          <g>
+            <ellipse cx="${cx}" cy="${cy + 14}" rx="14" ry="6" fill="#9e9e9e" opacity="0.4"/>
+            <circle cx="${cx}" cy="${cy}" r="14" fill="url(#${uid}_buje)" stroke="#3e2723" stroke-width="1"/>
+            <circle cx="${cx}" cy="${cy}" r="9" fill="#5d4037"/>
+            <circle cx="${cx}" cy="${cy}" r="4" fill="#3e2723"/>
+            <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="#fff" font-family="Arial" font-size="9" font-weight="700">${['L1','L2','L3'][i]}</text>
+          </g>`;
+      }).join('')}
+      <g>
+        <ellipse cx="${TANK_X + TANK_W * 0.42}" cy="${TANK_Y + TANK_H * 0.30 + 14}" rx="11" ry="5" fill="#9e9e9e" opacity="0.4"/>
+        <circle cx="${TANK_X + TANK_W * 0.42}" cy="${TANK_Y + TANK_H * 0.30}" r="11" fill="url(#${uid}_buje)" stroke="#3e2723" stroke-width="0.9"/>
+        <circle cx="${TANK_X + TANK_W * 0.42}" cy="${TANK_Y + TANK_H * 0.30}" r="6" fill="#5d4037"/>
+        <text x="${TANK_X + TANK_W * 0.42}" y="${TANK_Y + TANK_H * 0.30 + 3}" text-anchor="middle" fill="#fff" font-family="Arial" font-size="8" font-weight="700">N</text>
+      </g>
+      ${[0.78, 0.86, 0.94].map((p, i) => {
+        const cx = TANK_X + TANK_W * p;
+        const cy = TANK_Y + TANK_H * 0.30;
+        return `
+          <g>
+            <ellipse cx="${cx}" cy="${cy + 12}" rx="10" ry="5" fill="#9e9e9e" opacity="0.4"/>
+            <circle cx="${cx}" cy="${cy}" r="10" fill="url(#${uid}_buje)" stroke="#3e2723" stroke-width="0.9"/>
+            <circle cx="${cx}" cy="${cy}" r="6" fill="#5d4037"/>
+            <text x="${cx}" y="${cy + 3}" text-anchor="middle" fill="#fff" font-family="Arial" font-size="7" font-weight="700">${['X1','X2','X3'][i]}</text>
+          </g>`;
+      }).join('')}
+      <text x="${TANK_X + TANK_W * 0.18}" y="${TANK_Y + TANK_H * 0.65}" text-anchor="middle" fill="#444" font-family="Arial" font-size="7.5" font-weight="700" letter-spacing="0.06em">ALTA TENSIÓN</text>
+      <text x="${TANK_X + TANK_W * 0.86}" y="${TANK_Y + TANK_H * 0.65}" text-anchor="middle" fill="#444" font-family="Arial" font-size="7.5" font-weight="700" letter-spacing="0.06em">BAJA TENSIÓN</text>
+      <text x="${TANK_X + TANK_W / 2}" y="${TANK_Y + TANK_H * 0.92}" text-anchor="middle" fill="#444" font-family="Arial" font-size="8" font-weight="700" letter-spacing="0.1em">TANQUE PRINCIPAL · vista cenital</text>
     </g>`;
 
-  // ── Cuerpos de radiador ──────────────────────────────────
-  const cuerposSvg = Array.from({length: N}, (_, i) => {
-    const cuerpoNum = i + 1;
-    const x = RAD_X0 + i * (RAD_W + RAD_GAP);
+  // ── Helper · dibuja un cuerpo de radiador ──────────────
+  function radCuerpoSvg(x, y, w, h, num, ladoB, isHL) {
+    const fill = isHL ? '#fff3e0' : (ladoB ? `url(#${uid}_radB)` : `url(#${uid}_rad)`);
+    const stroke = isHL ? '#e65100' : '#37474f';
+    const aletas = Math.max(8, Math.floor(w / 5));
     return `
       <g filter="url(#${uid}_sh)">
-        <rect x="${x}" y="${RAD_Y}" width="${RAD_W}" height="${RAD_H}" rx="4" fill="url(#${uid}_rad)" stroke="#0d47a1" stroke-width="1.2"/>
-        <g stroke="#0d47a1" stroke-width="0.4" fill="none" opacity="0.7">
-          ${Array.from({length: 16}, (_, j) => {
-            const xLine = x + 4 + j * (RAD_W - 8) / 15;
-            return `<line x1="${xLine}" y1="${RAD_Y + 6}" x2="${xLine}" y2="${RAD_Y + RAD_H - 6}"/>`;
+        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${fill}" stroke="${stroke}" stroke-width="${isHL ? 1.8 : 1.2}"/>
+        <g stroke="${isHL ? '#bf360c' : '#37474f'}" stroke-width="0.5" fill="none" opacity="0.6">
+          ${Array.from({length: aletas}, (_, i) => {
+            const ax = x + 3 + i * (w - 6) / (aletas - 1);
+            return `<line x1="${ax}" y1="${y + 3}" x2="${ax}" y2="${y + h - 3}"/>`;
           }).join('')}
         </g>
-        <rect x="${x - 2}" y="${RAD_Y - 4}" width="${RAD_W + 4}" height="6" rx="1" fill="#0d47a1"/>
-        <rect x="${x - 2}" y="${RAD_Y + RAD_H - 2}" width="${RAD_W + 4}" height="6" rx="1" fill="#0d47a1"/>
+        <rect x="${x}" y="${y - 2}" width="${w}" height="3" rx="0.5" fill="${stroke}"/>
+        <rect x="${x}" y="${y + h - 1}" width="${w}" height="3" rx="0.5" fill="${stroke}"/>
+        ${ladoB
+          ? `<line x1="${x + w / 2}" y1="${y}" x2="${x + w / 2}" y2="${y - 8}" stroke="${stroke}" stroke-width="1.6"/>`
+          : `<line x1="${x + w / 2}" y1="${y + h}" x2="${x + w / 2}" y2="${y + h + 8}" stroke="${stroke}" stroke-width="1.6"/>`}
       </g>
-      <text x="${x + RAD_W / 2}" y="${RAD_Y + RAD_H / 2 - 2}" text-anchor="middle" fill="#0d3a73" font-family="Arial" font-size="11" font-weight="700">CUERPO</text>
-      <text x="${x + RAD_W / 2}" y="${RAD_Y + RAD_H / 2 + 12}" text-anchor="middle" fill="#0d3a73" font-family="Arial" font-size="14" font-weight="700">#${cuerpoNum}</text>`;
-  }).join('');
+      <text x="${x + w / 2}" y="${y + h / 2 + 3}" text-anchor="middle" fill="#0d3a73" font-family="Arial" font-size="9" font-weight="700">#${num}</text>`;
+  }
 
-  // ── Ventiladores instalados ──────────────────────────────
-  // Para cada cuerpo, agrupamos los ventiladores que se instalan
-  // ahí. Disposición lateral → al costado del cuerpo. Vertical →
-  // abajo del cuerpo (vertical_2 cubre 2 cuerpos consecutivos).
   /** @type {Map<number, Array<{it, color, dispKey}>>} */
   const ventiladoresPorCuerpo = new Map();
   for (const it of mix) {
@@ -741,71 +813,59 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
     }
   }
 
+  let radSvg = '';
+  for (let i = 0; i < N_A; i++) {
+    const num = i + 1;
+    const isHL = ventiladoresPorCuerpo.has(num);
+    const x = TANK_X + 12 + i * RAD_W_each;
+    const w = RAD_W_each - RAD_GAP;
+    radSvg += radCuerpoSvg(x, RAD_A_Y, w, RAD_HEIGHT, num, false, isHL);
+  }
+  for (let i = 0; i < N_B; i++) {
+    const num = N_A + i + 1;
+    const isHL = ventiladoresPorCuerpo.has(num);
+    const x = TANK_X + 12 + i * RAD_W_each;
+    const w = RAD_W_each - RAD_GAP;
+    radSvg += radCuerpoSvg(x, RAD_B_Y, w, RAD_HEIGHT, num, true, isHL);
+  }
+
+  // ── Ventiladores instalados ─────────────────────────────
   let fansSvg = '';
   for (const [cuerpoNum, fans] of ventiladoresPorCuerpo.entries()) {
     if (cuerpoNum < 1 || cuerpoNum > N) continue;
-    const x = RAD_X0 + (cuerpoNum - 1) * (RAD_W + RAD_GAP);
-    // Separar ventiladores laterales (al costado/derecha) vs verticales (abajo)
-    const laterales = fans.filter(f => f.dispKey === 'lateral');
-    const verticales = fans.filter(f => f.dispKey !== 'lateral');
+    const enLadoA = (cuerpoNum <= N_A);
+    const idxLado = enLadoA ? (cuerpoNum - 1) : (cuerpoNum - N_A - 1);
+    const x = TANK_X + 12 + idxLado * RAD_W_each;
+    const w = RAD_W_each - RAD_GAP;
+    const yRad = enLadoA ? RAD_A_Y : RAD_B_Y;
+    const yFanCenter = enLadoA ? (yRad - 22) : (yRad + RAD_HEIGHT + 22);
 
-    // Laterales · al costado derecho del cuerpo, apilados vertical
-    laterales.forEach((f, i) => {
-      const fanR = Math.min(28, RAD_W * 0.30);
-      const fanX = x + RAD_W + 18 + (i % 2) * (fanR * 2 + 8);   // si más de 1, segundo a la derecha
-      const fanY = RAD_Y + 30 + Math.floor(i / 2) * (fanR * 2 + 14);
-      if (fanY + fanR > RAD_Y + RAD_H - 10) return;   // se sale del cuerpo, omitir
-      fansSvg += _renderFanCircle(fanX, fanY, fanR, f.color, f.it.modelo, 'L');
-      // Flecha de flujo desde el ventilador hacia el radiador (←)
-      fansSvg += `<g stroke="${f.color.stroke}" stroke-width="1.6" fill="${f.color.stroke}" opacity="0.85">
-        <line x1="${fanX - fanR - 2}" y1="${fanY}" x2="${x + RAD_W + 6}" y2="${fanY}" marker-end="url(#${uid}_arrL)"/>
+    fans.forEach((f, i) => {
+      const totalEnCuerpo = fans.length;
+      const fanR = Math.min(18, w / Math.max(2, totalEnCuerpo) * 0.42);
+      const fanX = x + w * (i + 0.5) / Math.max(1, totalEnCuerpo);
+      const fanY = yFanCenter;
+      const sigil = ({ lateral: 'L', vertical_1: '↑', vertical_2: '↑↑' }[f.dispKey]) || '?';
+      fansSvg += _renderFanCircle(fanX, fanY, fanR, f.color, f.it.modelo, sigil);
+      const targetY = enLadoA ? (yRad + 4) : (yRad + RAD_HEIGHT - 4);
+      const arrowY1 = enLadoA ? (fanY + fanR + 2) : (fanY - fanR - 2);
+      fansSvg += `<g style="color:${f.color.stroke}">
+        <line x1="${fanX}" y1="${arrowY1}" x2="${fanX}" y2="${targetY}" stroke="${f.color.stroke}" stroke-width="1.6" marker-end="url(#${uid}_arrow)"/>
       </g>`;
-    });
-
-    // Verticales · abajo del cuerpo, en fila horizontal
-    verticales.forEach((f, i) => {
-      const totalV = verticales.length;
-      const fanR = Math.min(24, RAD_W / Math.max(2, totalV) * 0.42);
-      const fanX = x + RAD_W * (i + 0.5) / Math.max(1, totalV);
-      const fanY = RAD_Y + RAD_H + 24 + fanR;
-      const labelV2 = (f.dispKey === 'vertical_2') ? '↑↑' : '↑';
-      fansSvg += _renderFanCircle(fanX, fanY, fanR, f.color, f.it.modelo, labelV2);
-      // Flecha hacia arriba
-      fansSvg += `<g stroke="${f.color.stroke}" stroke-width="1.6" fill="${f.color.stroke}" opacity="0.85">
-        <line x1="${fanX}" y1="${fanY - fanR - 2}" x2="${fanX}" y2="${RAD_Y + RAD_H + 6}" marker-end="url(#${uid}_arrU)"/>
-      </g>`;
-      // Si es vertical_2 y tiene cuerpo siguiente, dibuja flechas también en el cuerpo siguiente
-      if (f.dispKey === 'vertical_2' && cuerpoNum + 1 <= N) {
-        const xN = RAD_X0 + cuerpoNum * (RAD_W + RAD_GAP);
-        // banda de marca sobre el cuerpo siguiente para indicar cobertura
-        fansSvg += `<rect x="${xN}" y="${RAD_Y}" width="${RAD_W}" height="${RAD_H}" fill="${f.color.fill}" opacity="0.18" stroke="${f.color.stroke}" stroke-width="1" stroke-dasharray="4,3"/>`;
-      }
     });
   }
 
-  // Markers para flechas
-  const arrows = `
-    <defs>
-      <marker id="${uid}_arrL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
-      </marker>
-      <marker id="${uid}_arrU" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
-        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
-      </marker>
-    </defs>`;
-
-  // ── Cota A (altura del cuerpo) ───────────────────────────
+  // ── Cota A y leyenda lateral ────────────────────────────
   const cotaSvg = `
-    <g stroke="#1565c0" stroke-width="0.8" fill="#1565c0" font-family="Arial" font-size="10" font-weight="700">
-      <line x1="${RAD_X0 - 14}" y1="${RAD_Y}" x2="${RAD_X0 - 14}" y2="${RAD_Y + RAD_H}" stroke-width="1.2"/>
-      <line x1="${RAD_X0 - 18}" y1="${RAD_Y}" x2="${RAD_X0 - 10}" y2="${RAD_Y}"/>
-      <line x1="${RAD_X0 - 18}" y1="${RAD_Y + RAD_H}" x2="${RAD_X0 - 10}" y2="${RAD_Y + RAD_H}"/>
-      <text x="${RAD_X0 - 22}" y="${RAD_Y + RAD_H / 2 + 4}" text-anchor="end">A=${Math.round(A)}mm</text>
+    <g stroke="#1565c0" stroke-width="0.8" fill="#1565c0" font-family="Arial" font-size="9" font-weight="700">
+      <line x1="${TANK_X - 30}" y1="${RAD_A_Y}" x2="${TANK_X - 30}" y2="${RAD_A_Y + RAD_HEIGHT}" stroke-width="1"/>
+      <line x1="${TANK_X - 34}" y1="${RAD_A_Y}" x2="${TANK_X - 26}" y2="${RAD_A_Y}"/>
+      <line x1="${TANK_X - 34}" y1="${RAD_A_Y + RAD_HEIGHT}" x2="${TANK_X - 26}" y2="${RAD_A_Y + RAD_HEIGHT}"/>
+      <text x="${TANK_X - 38}" y="${RAD_A_Y + RAD_HEIGHT / 2 + 3}" text-anchor="end">A=${Math.round(A)}mm</text>
     </g>`;
 
-  // ── Leyenda ──────────────────────────────────────────────
-  const legX = RAD_X0 + N * (RAD_W + RAD_GAP) + 16;
-  const legY = RAD_Y;
+  const legX = TANK_X + TANK_W + 18;
+  const legY = TANK_Y - 30;
   const legendSvg = `
     <g font-family="Arial" font-size="10">
       <text x="${legX}" y="${legY}" font-weight="700" fill="#0d3a73" font-size="11">LEYENDA</text>
@@ -817,19 +877,23 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
           <text x="${legX + 22}" y="${y - 1}" font-size="10" font-weight="700" fill="#1f3656">${escaparHtml(it.marca)} ${escaparHtml(it.modelo)}</text>
           <text x="${legX + 22}" y="${y + 12}" font-size="9" fill="#4d6485">${it.cantidad} u · ${({lateral:'lateral', vertical_1:'vertical 1', vertical_2:'vertical 2'}[it.disposicion]) || it.disposicion}</text>`;
       }).join('')}
-      <text x="${legX}" y="${legY + 18 + mix.length * 26 + 14}" font-size="9" fill="#4d6485" font-style="italic">${ventiladoresPorCuerpo.size} cuerpo(s) con ventilador(es) · ${N} cuerpos totales</text>
+      <text x="${legX}" y="${legY + 18 + mix.length * 26 + 14}" font-size="9" fill="#4d6485" font-style="italic">${ventiladoresPorCuerpo.size} cuerpo(s) con ventilador(es)</text>
+    </g>
+    <g font-family="Arial" font-size="8" font-weight="600" fill="#37474f">
+      <text x="${TANK_X - 60}" y="${RAD_A_Y - 4}" text-anchor="start">LADO A · cuerpos 1..${N_A}</text>
+      <text x="${TANK_X - 60}" y="${RAD_B_Y + RAD_HEIGHT + 14}" text-anchor="start">LADO B · cuerpos ${N_A + 1}..${N}</text>
     </g>`;
 
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Render integral del transformador con todos los radiadores y ventiladores instalados" style="width:100%;height:auto">
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Vista cenital del transformador con bujes, conservador, radiadores a ambos lados y ventiladores instalados según el mix" style="width:100%;height:auto">
     ${defs}
-    ${arrows}
     <rect x="0" y="0" width="${W}" height="${H}" fill="#f8fbff"/>
+    ${conservSvg}
     ${tankSvg}
-    ${cuerposSvg}
+    ${radSvg}
     ${cotaSvg}
     ${fansSvg}
     ${legendSvg}
-    <text x="20" y="${H - 12}" fill="#1565c0" font-size="9" font-weight="600" letter-spacing="0.04em" font-family="Arial">VISTA INTEGRAL · transformador con ${N} cuerpo${N === 1 ? '' : 's'} de radiador y ${mix.reduce((s, it) => s + (it.cantidad || 0), 0)} ventilador${mix.reduce((s, it) => s + (it.cantidad || 0), 0) === 1 ? '' : 'es'} del mix</text>
+    <text x="20" y="${H - 12}" fill="#1565c0" font-size="9" font-weight="600" letter-spacing="0.04em" font-family="Arial">VISTA CENITAL · transformador con ${N} cuerpos de radiador (${N_A} lado A · ${N_B} lado B) y ${mix.reduce((s, it) => s + (it.cantidad || 0), 0)} ventiladores del mix</text>
   </svg>`;
 }
 
