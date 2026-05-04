@@ -937,6 +937,156 @@ export function detectarFaltantes({ mix }) {
   return faltantes;
 }
 
+/**
+ * Construye un resumen JSON estructurado conforme al shape exacto
+ * del prompt técnico del director. Útil para integraciones,
+ * audit trail y handoff a herramientas externas (Excel, Power BI,
+ * sistemas ERP, sistemas SCADA, etc.).
+ *
+ * Shape de salida:
+ * {
+ *   selecciones[],          // un objeto por modelo del mix
+ *   cfm_requerido, cfm_total,
+ *   evaluacion: 'APROBADO' | 'REQUIERE AJUSTE',
+ *   razon: string breve,
+ *   estrategias_sugeridas[],
+ *   seleccion_electrica[],  // un objeto por grupo (modelo) con
+ *                           // guardamotor + contactor + breaker
+ *   faltantes[],            // strings descriptivos de campos faltantes
+ *   metadatos: { transformador_id, matricula, fecha_generacion,
+ *                tolerancia_pct, ... }
+ * }
+ *
+ * @param {{
+ *   mix: Array<{key, marca, modelo, cfm_unitario, cantidad, ficha?}>,
+ *   evaluacion: object,         // resultado de evaluarMixVentiladores
+ *   proteccion: object,         // resultado de calcularProteccionMix
+ *   sugerencias: Array<object>, // resultado de sugerirMejoras
+ *   faltantes: Array<object>,   // resultado de detectarFaltantes
+ *   metadatos?: object          // transformador_id, matricula, etc.
+ * }} input
+ * @returns {object}
+ */
+export function construirResumenJSON({ mix, evaluacion, proteccion, sugerencias = [], faltantes = [], metadatos = {} } = {}) {
+  const ev = evaluacion || {};
+  const pr = proteccion || {};
+  const mixList = Array.isArray(mix) ? mix : [];
+  const sugList = Array.isArray(sugerencias) ? sugerencias : [];
+  const fltList = Array.isArray(faltantes)   ? faltantes   : [];
+  const grupos  = Array.isArray(pr.grupos)   ? pr.grupos   : [];
+
+  // selecciones[] — una por modelo del mix
+  const selecciones = mixList.map(it => ({
+    id:        it.key || '',
+    marca:     it.marca || '',
+    modelo:    it.modelo || '',
+    cantidad:  Math.max(0, Math.floor(it.cantidad | 0)),
+    cfm_unit:  +it.cfm_unitario || 0,
+    cfm_total: +(it.cfm_unitario * it.cantidad).toFixed(2)
+  }));
+
+  // estrategias_sugeridas[] — extracto compacto de cada sugerencia
+  const estrategias_sugeridas = sugList.map(s => ({
+    descripcion:           s.descripcion || '',
+    impacto_estimado_cfm:  +s.impacto_estimado_cfm || 0,
+    implicaciones:         s.implicaciones || '',
+    factibilidad:          s.factibilidad  || '',
+    aprobado:              !!s.aprobado
+  }));
+
+  // seleccion_electrica[] — uno por grupo con guardamotor + contactor + breaker
+  const seleccion_electrica = grupos.map(g => {
+    const it = mixList.find(x => x.key === g.key);
+    const ficha = (it && it.ficha) || {};
+    const hp = (+ficha.fan_kw || 0) / 746;   // P_w → HP equivalente
+    return {
+      id_ventilador:  g.key || '',
+      marca:          g.marca || '',
+      modelo:         g.modelo || '',
+      cantidad:       g.cantidad,
+      potencia_hp:    +hp.toFixed(2),
+      flc_A:          +g.amps_unitario.toFixed(2),
+      guardamotor: g.guardamotor ? {
+        tipo:                 `ABB ${g.guardamotor.model}`,
+        corriente_ajustada_A: +g.amps_unitario.toFixed(2),
+        rango_A:              `${g.guardamotor.min}…${g.guardamotor.max}`,
+        pid:                  g.guardamotor.pid,
+        justificacion:        'Setting al FLC nominal del motor · NEC 430.32 · IEC 60947-4-1'
+      } : null,
+      contactor: g.contactor ? {
+        modelo_sugerido: `ABB ${g.contactor.model}`,
+        ac3_A:           g.contactor.ac3_a,
+        kw_400v:         g.contactor.kw_400v,
+        margen_pct:      g.contactor.margen_pct,
+        bobina:          g.contactor.bobina,
+        pid:             g.contactor.pid,
+        contactos_NO:    1,            // tag RUN
+        contactos_NC:    1,            // tag READY (vía aux MS116)
+        tags_SCADA:      ['RUN', 'FAULT', 'READY'],
+        justificacion:   'AC-3 ≥ FLC × 1.15 (margen de servicio) · IEC 60947-4-1'
+      } : null,
+      auxiliar_guardamotor: g.aux_guardamotor ? {
+        modelo_sugerido: `ABB ${g.aux_guardamotor.model}`,
+        pid:             g.aux_guardamotor.pid,
+        descripcion:     g.aux_guardamotor.desc
+      } : null
+    };
+  });
+
+  // breaker principal del sistema (1 ud)
+  const breaker_sistema = pr.breaker ? {
+    modelo_sugerido:    `ABB ${pr.breaker.model}`,
+    In_A:               pr.breaker.in,
+    curva:              'C',
+    poder_de_corte_kA:  6,
+    perdidas_W:         pr.breaker.power_w,
+    pid:                pr.breaker.pid,
+    auxiliar_SCADA: pr.aux_breaker ? {
+      modelo: `ABB ${pr.aux_breaker.model}`,
+      pid:    pr.aux_breaker.pid,
+      tag:    'TRIP'
+    } : null,
+    justificacion: 'Dimensionado a 1.25 × I_total (NEC 430.52). Verificar coordinación con MCCB aguas arriba en tablero general (IEC 60947-2).'
+  } : null;
+
+  // faltantes[] — strings compactos para listado rápido
+  const faltantesStr = fltList.map(f => `[${f.severidad.toUpperCase()}] ${f.campo} (${f.modelo || f.marca || f.key}) · ${f.mensaje}`);
+
+  // razón
+  let razon;
+  if (ev.estado === MIX_ESTADO.SIN_DATOS) {
+    razon = 'Sin datos suficientes · cargue al menos un modelo con cantidad y defina el CFM requerido.';
+  } else if (ev.aprobado) {
+    razon = `Mix aprobado · cobertura ${ev.cobertura_pct?.toFixed(1)}% sobre el requerido${ev.tolerancia_pct > 0 ? ` (tolerancia ${ev.tolerancia_pct}%)` : ''}.`;
+  } else {
+    razon = `Mix NO aprobado · faltan ${ev.deficit?.toFixed(0)} CFM (cobertura ${ev.cobertura_pct?.toFixed(1)}%)${ev.tolerancia_pct > 0 ? ` para alcanzar el umbral con tolerancia ${ev.tolerancia_pct}%` : ''}.`;
+  }
+
+  return {
+    selecciones,
+    cfm_requerido:        +(ev.cfm_requerido || 0),
+    cfm_total:            +(ev.cfm_aporte_total || 0),
+    cfm_umbral:           +(ev.cfm_umbral || ev.cfm_requerido || 0),
+    tolerancia_pct:       +(ev.tolerancia_pct || 0),
+    cobertura_pct:        ev.cobertura_pct ?? null,
+    deficit_cfm:          +(ev.deficit || 0),
+    exceso_cfm:           +(ev.exceso  || 0),
+    n_unidades_total:     ev.n_unidades_total | 0,
+    evaluacion:           ev.aprobado ? 'APROBADO' : 'REQUIERE AJUSTE',
+    razon,
+    estrategias_sugeridas,
+    seleccion_electrica,
+    breaker_sistema,
+    faltantes:            faltantesStr,
+    metadatos: {
+      ...metadatos,
+      fecha_generacion: new Date().toISOString(),
+      version_resumen:  '1.0',
+      norma_referencia: 'IEEE C57.91 · NEC 430 · IEC 60947 · IEEE C37.91'
+    }
+  };
+}
+
 /* ─── Compatibilidad mecánica ───────────────────────────────── */
 
 /** Estados posibles de cada criterio de compatibilidad. */

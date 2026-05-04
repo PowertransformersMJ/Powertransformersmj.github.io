@@ -49,7 +49,8 @@ import {
   TAGS_SCADA,
   seleccionarContactor,
   calcularFLC,
-  detectarFaltantes
+  detectarFaltantes,
+  construirResumenJSON
 } from '../assets/js/domain/refrigeracion.js';
 
 /* ─── Constantes inmutables ─────────────────────────────────── */
@@ -1003,4 +1004,137 @@ test('detectarFaltantes: mensajes incluyen marca + modelo para identificar', () 
     assert.ok(f.mensaje.includes('ZIEHL-ABEGG'));
     assert.ok(f.mensaje.includes('FN063-6DL'));
   }
+});
+
+/* ─── Microfase 5 · construirResumenJSON ──────────────────────── */
+
+test('construirResumenJSON: shape canónico con todas las claves del prompt', () => {
+  const r = construirResumenJSON({
+    mix: [
+      { key: 'a', marca: 'ZIEHL', modelo: 'FN050', cfm_unitario: 4873, cantidad: 4,
+        ficha: { fan_kw: 250, fan_amp: '0.65 A', fan_cosphi: 0.79 } }
+    ],
+    evaluacion: {
+      aprobado: true, estado: 'aprobado',
+      cfm_aporte_total: 19492, cfm_requerido: 18000, cfm_umbral: 18000,
+      cobertura_pct: 108.3, deficit: 0, exceso: 1492,
+      n_unidades_total: 4, tolerancia_pct: 0
+    },
+    proteccion: {
+      grupos: [{
+        key: 'a', marca: 'ZIEHL', modelo: 'FN050', cantidad: 4,
+        amps_unitario: 0.65, amps_grupo: 2.6,
+        guardamotor: { model: 'MS116-1.0', min: 0.63, max: 1.0, pid: '1SAM250000R1005' },
+        contactor:   { model: 'AF09', ac3_a: 9, kw_400v: 4, pid: 'PID-X', bobina: 'univ', margen_pct: 1284.6 },
+        aux_guardamotor: { model: 'HK1-11', pid: 'AUX-X', desc: '1NO+1NC' }
+      }],
+      breaker: { model: 'S203-C16 MTB', in: 16, pid: 'BRK-X', power_w: 7.5 },
+      aux_breaker: { model: 'S2C-H11L', pid: 'AUXB-X', desc: '1NO+1NC' }
+    },
+    sugerencias: [],
+    faltantes:   [],
+    metadatos:   { transformador_id: '4123XXX', matricula: '4123XXX' }
+  });
+  // Claves exigidas por el prompt
+  assert.ok(Array.isArray(r.selecciones));
+  assert.ok(typeof r.cfm_requerido === 'number');
+  assert.ok(typeof r.cfm_total === 'number');
+  assert.ok(['APROBADO', 'REQUIERE AJUSTE'].includes(r.evaluacion));
+  assert.ok(typeof r.razon === 'string');
+  assert.ok(Array.isArray(r.estrategias_sugeridas));
+  assert.ok(Array.isArray(r.seleccion_electrica));
+  assert.ok(Array.isArray(r.faltantes));
+  assert.ok(typeof r.metadatos === 'object');
+});
+
+test('construirResumenJSON: selecciones tiene la estructura correcta por modelo', () => {
+  const r = construirResumenJSON({
+    mix: [
+      { key: 'fn063', marca: 'ZIEHL', modelo: 'FN063', cfm_unitario: 5933, cantidad: 8 }
+    ],
+    evaluacion: { aprobado: true, cfm_aporte_total: 47464, cfm_requerido: 40000 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.equal(r.selecciones.length, 1);
+  assert.deepEqual(r.selecciones[0], {
+    id: 'fn063', marca: 'ZIEHL', modelo: 'FN063',
+    cantidad: 8, cfm_unit: 5933, cfm_total: 47464
+  });
+});
+
+test('construirResumenJSON: evaluación APROBADO vs REQUIERE AJUSTE', () => {
+  const r1 = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: true, cobertura_pct: 110 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.equal(r1.evaluacion, 'APROBADO');
+
+  const r2 = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: false, deficit: 5000, cobertura_pct: 80 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.equal(r2.evaluacion, 'REQUIERE AJUSTE');
+});
+
+test('construirResumenJSON: seleccion_electrica trae guardamotor + contactor + breaker por grupo', () => {
+  const r = construirResumenJSON({
+    mix: [{ key: 'a', marca: 'ZIEHL', modelo: 'FN050', cfm_unitario: 4873, cantidad: 4,
+            ficha: { fan_kw: 250 } }],
+    evaluacion: { aprobado: true, cfm_aporte_total: 19492, cfm_requerido: 18000 },
+    proteccion: {
+      grupos: [{
+        key: 'a', marca: 'ZIEHL', modelo: 'FN050', cantidad: 4,
+        amps_unitario: 0.65, amps_grupo: 2.6,
+        guardamotor: { model: 'MS116-1.0', min: 0.63, max: 1.0, pid: 'GM-PID' },
+        contactor:   { model: 'AF09', ac3_a: 9, kw_400v: 4, pid: 'CT-PID', bobina: 'univ', margen_pct: 1284 },
+        aux_guardamotor: { model: 'HK1-11', pid: 'AUX-PID', desc: '1NO+1NC' }
+      }],
+      breaker: { model: 'S203-C16', in: 16, pid: 'BRK-PID', power_w: 7.5 },
+      aux_breaker: { model: 'S2C-H11L', pid: 'AUXB-PID', desc: '1NO+1NC' }
+    }
+  });
+  const se = r.seleccion_electrica[0];
+  assert.equal(se.id_ventilador, 'a');
+  assert.equal(se.flc_A, 0.65);
+  assert.equal(se.guardamotor.tipo, 'ABB MS116-1.0');
+  assert.equal(se.contactor.modelo_sugerido, 'ABB AF09');
+  assert.deepEqual(se.contactor.tags_SCADA, ['RUN', 'FAULT', 'READY']);
+  // Breaker está a nivel raíz (1 ud para todo el sistema)
+  assert.equal(r.breaker_sistema.modelo_sugerido, 'ABB S203-C16');
+  assert.equal(r.breaker_sistema.curva, 'C');
+  assert.equal(r.breaker_sistema.poder_de_corte_kA, 6);
+  assert.equal(r.breaker_sistema.auxiliar_SCADA.tag, 'TRIP');
+});
+
+test('construirResumenJSON: faltantes se mapean a strings con severidad', () => {
+  const r = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: true },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null },
+    faltantes: [
+      { campo: 'fan_cosphi', severidad: 'aviso', modelo: 'FN050', mensaje: 'falta cos φ' }
+    ]
+  });
+  assert.equal(r.faltantes.length, 1);
+  assert.ok(r.faltantes[0].includes('[AVISO]'));
+  assert.ok(r.faltantes[0].includes('fan_cosphi'));
+  assert.ok(r.faltantes[0].includes('FN050'));
+});
+
+test('construirResumenJSON: metadatos incluye fecha_generacion + version_resumen', () => {
+  const r = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: true },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.ok(r.metadatos.fecha_generacion.match(/^\d{4}-\d{2}-\d{2}T/));
+  assert.equal(r.metadatos.version_resumen, '1.0');
+  assert.ok(r.metadatos.norma_referencia.includes('IEEE'));
+});
+
+test('construirResumenJSON: razón refleja tolerancia cuando aplica', () => {
+  const r = construirResumenJSON({
+    mix: [],
+    evaluacion: { aprobado: true, cobertura_pct: 96.2, tolerancia_pct: 5 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.ok(r.razon.includes('tolerancia 5'));
 });

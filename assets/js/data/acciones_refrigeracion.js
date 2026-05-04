@@ -93,6 +93,7 @@ function sanitizar(data) {
     proteccion:    data.proteccion || null,         // Objeto calcularProteccionMix
     compatibilidad: data.compatibilidad || null,    // Objeto evaluarCompatibilidad
     faltantes:     arr(data.faltantes),             // Array<{key, modelo, marca, campo, severidad, sustituto, mensaje}> (microfase 4)
+    resumen_json:  data.resumen_json || null,        // Snapshot estructurado conforme prompt técnico (microfase 5)
     radiador:      data.radiador     || null,
     motoventilador_principal: data.motoventilador_principal || null,
     montaje:       data.montaje      || null,
