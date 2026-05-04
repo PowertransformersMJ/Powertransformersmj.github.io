@@ -235,13 +235,124 @@
       </div>
     </section>
 
+    <!-- ── MIX DE MOTOVENTILADORES (multi-modelo) ──────────── -->
+    <!-- Ubicado ANTES de "Datos del motoventilador" porque el mix es
+         el origen del cálculo: primero se eligen los modelos con sus
+         cantidades, después se ven las fichas técnicas detalladas de
+         cada uno. -->
+    <div class="fan-hdr">
+      <div class="fan-hdr-t">Mix de motoventiladores</div>
+      <div class="fan-formula">CFM total mix = Σ (Cantidad<sub>i</sub> × CFM<sub>unitario,i</sub>) — debe cubrir el CFM requerido</div>
+      <div class="fan-meta">Combine modelos heterogéneos (ZIEHL FN-050, FN-063, KRENZ F20…) en el mismo transformador</div>
+    </div>
+    <div class="fan-body">
+      <div class="cfm-bar">
+        <span class="fs" style="font-weight: 700; color: var(--brand-deep)">CFM requerido (nivel mar):</span>
+        <span class="cpill cp-b" id="cfm-disp">— CFM</span>
+        <span class="fs" style="font-weight: 700; color: var(--cyan-deep)">CFM corregido altitud:</span>
+        <span class="cpill cp-g" id="cfm-alt-disp">— CFM</span>
+        <span class="fs" style="margin-left: auto; color: var(--ink-4); font-style: italic">⌈ ⌉ = entero superior siempre hacia arriba</span>
+      </div>
+
+      <!-- Selector + cantidad + agregar al mix -->
+      <div class="mix-add-bar" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 8px 0 12px; padding: 10px 12px; background: rgba(255,255,255,.5); border: 1px solid rgba(13, 71, 161, .18); border-radius: 8px;">
+        <div class="fld" style="flex: 1 1 320px; min-width: 280px">
+          <label for="mix_fan_sel">Modelo de ventilador a agregar</label>
+          <select id="mix_fan_sel" class="w-full">
+            <option value="">— Seleccione un modelo del catálogo —</option>
+            <optgroup label="── ZIEHL-ABEGG ZN045-4DL.2F.V7P2 — Ø450 mm · ZAplus ──">
+              <option value="zn045_50">ZN045-4DL.2F.V7P2 · 50 Hz · 1.260 rpm · 3.850 CFM</option>
+              <option value="zn045_60">ZN045-4DL.2F.V7P2 · 60 Hz · 1.330 rpm · 4.060 CFM</option>
+              <option value="zn045_60h">ZN045-4DL.2F.V7P2 · 60 Hz · 265/460 V · 1.430 rpm · 4.365 CFM</option>
+            </optgroup>
+            <optgroup label="── ZIEHL-ABEGG FN050-4DH.4I.A7P1 — Ø500 mm ──">
+              <option value="fn050_50">FN050-4DH.4I.A7P1 · 50 Hz · 1.290 rpm · 4.873 CFM</option>
+              <option value="fn050_60">FN050-4DH.4I.A7P1 · 60 Hz · 1.400 rpm · 5.403 CFM</option>
+              <option value="fn050_60h">FN050-4DH.4I.A7P1 · 60 Hz · 265/460 V · 1.480 rpm · 5.721 CFM</option>
+            </optgroup>
+            <optgroup label="── ZIEHL-ABEGG FN063-6DL.4I.A7P1 — Ø630 mm ──">
+              <option value="fn063_50">FN063-6DL.4I.A7P1 · 50 Hz · 830 rpm · 5.933 CFM</option>
+              <option value="fn063_60">FN063-6DL.4I.A7P1 · 60 Hz · 820 rpm · 6.357 CFM</option>
+              <option value="fn063_60h">FN063-6DL.4I.A7P1 · 60 Hz · 265/460 V · 900 rpm · 6.569 CFM</option>
+            </optgroup>
+            <optgroup label="── ZIEHL-ABEGG ZN063-6DL.4I.V7P1 — Ø630 mm · ZAplus ──">
+              <option value="zn063_50">ZN063-6DL.4I.V7P1 · 50 Hz · 890 rpm · 6.520 CFM</option>
+              <option value="zn063_60">ZN063-6DL.4I.V7P1 · 60 Hz · 940 rpm · 6.886 CFM</option>
+              <option value="zn063_60h">ZN063-6DL.4I.V7P1 · 60 Hz · 265/460 V · 1.010 rpm · 7.403 CFM</option>
+            </optgroup>
+            <optgroup label="── KRENZ &amp; CO. — Ø559 mm ──">
+              <option value="krenz_f20">F20-A10069 · 60 Hz · 1.140 rpm · 6.200 CFM</option>
+            </optgroup>
+          </select>
+        </div>
+        <div class="fld" style="flex: 0 0 110px">
+          <label for="mix_fan_qty">Cantidad</label>
+          <input type="number" id="mix_fan_qty" class="w90" value="1" min="1" max="999" step="1">
+        </div>
+        <div class="fld" style="flex: 0 0 130px">
+          <label for="mix_tolerancia">Tolerancia (%)</label>
+          <input type="number" id="mix_tolerancia" class="w90" value="5" min="0" max="100" step="0.5">
+          <span class="hint">Umbral mínimo aceptado · default 5%</span>
+        </div>
+        <button type="button" class="badd" id="btnAddToMix" style="height: 36px">+ Agregar al mix</button>
+      </div>
+
+      <!-- Tabla del mix -->
+      <div class="ft-wrap">
+        <table class="ft" id="mix-table">
+          <thead>
+            <tr>
+              <th scope="col" style="width: 26px">#</th>
+              <th scope="col">Marca</th>
+              <th scope="col">Modelo</th>
+              <th scope="col" style="width: 110px; text-align: right">CFM / unidad</th>
+              <th scope="col" style="width: 90px; text-align: center">Cantidad</th>
+              <th scope="col" style="width: 130px; text-align: right">Aporte CFM</th>
+              <th scope="col" style="width: 70px; text-align: right">Aporte %</th>
+              <th scope="col" style="width: 26px" aria-label="Acciones"></th>
+            </tr>
+          </thead>
+          <tbody id="mix-tbody"></tbody>
+          <tfoot>
+            <tr id="mix-totals" style="font-weight: 700; background: rgba(13,71,161,.04)">
+              <td></td>
+              <td colspan="3" style="text-align: right">Totales del mix</td>
+              <td id="mix-total-qty" style="text-align: center">—</td>
+              <td id="mix-total-cfm" style="text-align: right">— CFM</td>
+              <td id="mix-total-pct" style="text-align: right">100%</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+
+      <!-- Banner de estado APROBADO / NO APROBADO -->
+      <div id="mix-status" class="mix-status" role="status" aria-live="polite"></div>
+
+      <!-- Panel de sugerencias (visible solo si NO aprobado) -->
+      <div id="mix-suggestions" class="mix-suggestions" hidden></div>
+
+      <div class="fansum" id="fan-sum"></div>
+    </div>
+
     <!-- ── DATOS DEL MOTOVENTILADOR ──────────────────────── -->
     <section class="mec-sect" aria-labelledby="fan-stit">
       <div class="mec-hdr fan-s">
         <div class="mec-hdr-t" id="fan-stit">Datos técnicos del motoventilador</div>
-        <div class="mec-hdr-meta">Montaje sobre radiador · caudal en CFM (ft³/min) · conversiones automáticas</div>
+        <div class="mec-hdr-meta">Fichas de los modelos del mix · catálogo certificado ZIEHL-ABEGG / KRENZ</div>
       </div>
       <div class="mec-body">
+
+        <!-- Fichas técnicas READ-ONLY de cada modelo del mix · una por modelo -->
+        <div id="fichas-mix-wrap" class="fichas-mix-wrap"></div>
+
+        <!-- Editor manual / preview de un modelo (fallback legacy) -->
+        <div class="calc-subsect" style="margin-top: 16px">Editor manual / preview de un modelo (opcional)</div>
+        <p class="hint" style="margin: 4px 0 8px">
+          Use el selector debajo si quiere consultar la ficha de UN modelo del catálogo o ingresar datos manualmente.
+          Los valores aquí alimentan la <strong>compatibilidad mecánica</strong> (sec. 7) y el <strong>fallback legacy</strong> de protección eléctrica cuando el mix está vacío.
+          Para múltiples modelos, agréguelos arriba al mix.
+        </p>
 
         <!-- Selector base de datos -->
         <div class="fan-sel-bar">
@@ -471,102 +582,6 @@
         <div id="comp-summary"></div>
       </div>
     </section>
-
-    <!-- ── MIX DE MOTOVENTILADORES (multi-modelo) ──────────── -->
-    <div class="fan-hdr">
-      <div class="fan-hdr-t">Mix de motoventiladores</div>
-      <div class="fan-formula">CFM total mix = Σ (Cantidad<sub>i</sub> × CFM<sub>unitario,i</sub>) — debe cubrir el CFM requerido</div>
-      <div class="fan-meta">Combine modelos heterogéneos (ZIEHL FN-050, FN-063, KRENZ F20…) en el mismo transformador</div>
-    </div>
-    <div class="fan-body">
-      <div class="cfm-bar">
-        <span class="fs" style="font-weight: 700; color: var(--brand-deep)">CFM requerido (nivel mar):</span>
-        <span class="cpill cp-b" id="cfm-disp">— CFM</span>
-        <span class="fs" style="font-weight: 700; color: var(--cyan-deep)">CFM corregido altitud:</span>
-        <span class="cpill cp-g" id="cfm-alt-disp">— CFM</span>
-        <span class="fs" style="margin-left: auto; color: var(--ink-4); font-style: italic">⌈ ⌉ = entero superior siempre hacia arriba</span>
-      </div>
-
-      <!-- Selector + cantidad + agregar al mix -->
-      <div class="mix-add-bar" style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; margin: 8px 0 12px; padding: 10px 12px; background: rgba(255,255,255,.5); border: 1px solid rgba(13, 71, 161, .18); border-radius: 8px;">
-        <div class="fld" style="flex: 1 1 320px; min-width: 280px">
-          <label for="mix_fan_sel">Modelo de ventilador a agregar</label>
-          <select id="mix_fan_sel" class="w-full">
-            <option value="">— Seleccione un modelo del catálogo —</option>
-            <optgroup label="── ZIEHL-ABEGG ZN045-4DL.2F.V7P2 — Ø450 mm · ZAplus ──">
-              <option value="zn045_50">ZN045-4DL.2F.V7P2 · 50 Hz · 1.260 rpm · 3.850 CFM</option>
-              <option value="zn045_60">ZN045-4DL.2F.V7P2 · 60 Hz · 1.330 rpm · 4.060 CFM</option>
-              <option value="zn045_60h">ZN045-4DL.2F.V7P2 · 60 Hz · 265/460 V · 1.430 rpm · 4.365 CFM</option>
-            </optgroup>
-            <optgroup label="── ZIEHL-ABEGG FN050-4DH.4I.A7P1 — Ø500 mm ──">
-              <option value="fn050_50">FN050-4DH.4I.A7P1 · 50 Hz · 1.290 rpm · 4.873 CFM</option>
-              <option value="fn050_60">FN050-4DH.4I.A7P1 · 60 Hz · 1.400 rpm · 5.403 CFM</option>
-              <option value="fn050_60h">FN050-4DH.4I.A7P1 · 60 Hz · 265/460 V · 1.480 rpm · 5.721 CFM</option>
-            </optgroup>
-            <optgroup label="── ZIEHL-ABEGG FN063-6DL.4I.A7P1 — Ø630 mm ──">
-              <option value="fn063_50">FN063-6DL.4I.A7P1 · 50 Hz · 830 rpm · 5.933 CFM</option>
-              <option value="fn063_60">FN063-6DL.4I.A7P1 · 60 Hz · 820 rpm · 6.357 CFM</option>
-              <option value="fn063_60h">FN063-6DL.4I.A7P1 · 60 Hz · 265/460 V · 900 rpm · 6.569 CFM</option>
-            </optgroup>
-            <optgroup label="── ZIEHL-ABEGG ZN063-6DL.4I.V7P1 — Ø630 mm · ZAplus ──">
-              <option value="zn063_50">ZN063-6DL.4I.V7P1 · 50 Hz · 890 rpm · 6.520 CFM</option>
-              <option value="zn063_60">ZN063-6DL.4I.V7P1 · 60 Hz · 940 rpm · 6.886 CFM</option>
-              <option value="zn063_60h">ZN063-6DL.4I.V7P1 · 60 Hz · 265/460 V · 1.010 rpm · 7.403 CFM</option>
-            </optgroup>
-            <optgroup label="── KRENZ &amp; CO. — Ø559 mm ──">
-              <option value="krenz_f20">F20-A10069 · 60 Hz · 1.140 rpm · 6.200 CFM</option>
-            </optgroup>
-          </select>
-        </div>
-        <div class="fld" style="flex: 0 0 110px">
-          <label for="mix_fan_qty">Cantidad</label>
-          <input type="number" id="mix_fan_qty" class="w90" value="1" min="1" max="999" step="1">
-        </div>
-        <div class="fld" style="flex: 0 0 130px">
-          <label for="mix_tolerancia">Tolerancia (%)</label>
-          <input type="number" id="mix_tolerancia" class="w90" value="5" min="0" max="100" step="0.5">
-          <span class="hint">Umbral mínimo aceptado · default 5%</span>
-        </div>
-        <button type="button" class="badd" id="btnAddToMix" style="height: 36px">+ Agregar al mix</button>
-      </div>
-
-      <!-- Tabla del mix -->
-      <div class="ft-wrap">
-        <table class="ft" id="mix-table">
-          <thead>
-            <tr>
-              <th scope="col" style="width: 26px">#</th>
-              <th scope="col">Marca</th>
-              <th scope="col">Modelo</th>
-              <th scope="col" style="width: 110px; text-align: right">CFM / unidad</th>
-              <th scope="col" style="width: 90px; text-align: center">Cantidad</th>
-              <th scope="col" style="width: 130px; text-align: right">Aporte CFM</th>
-              <th scope="col" style="width: 70px; text-align: right">Aporte %</th>
-              <th scope="col" style="width: 26px" aria-label="Acciones"></th>
-            </tr>
-          </thead>
-          <tbody id="mix-tbody"></tbody>
-          <tfoot>
-            <tr id="mix-totals" style="font-weight: 700; background: rgba(13,71,161,.04)">
-              <td></td>
-              <td colspan="3" style="text-align: right">Totales del mix</td>
-              <td id="mix-total-qty" style="text-align: center">—</td>
-              <td id="mix-total-cfm" style="text-align: right">— CFM</td>
-              <td id="mix-total-pct" style="text-align: right">100%</td>
-              <td></td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-
-      <!-- Banner de estado APROBADO / NO APROBADO -->
-      <div id="mix-status" class="mix-status" role="status" aria-live="polite"></div>
-
-      <!-- Panel de sugerencias (visible solo si NO aprobado) -->
-      <div id="mix-suggestions" class="mix-suggestions" hidden></div>
-
-      <div class="fansum" id="fan-sum"></div>
-    </div>
 
     <!-- ── EXPORTAR / REGISTRAR ACCIÓN ─────────────────────── -->
     <div class="export-bar">
