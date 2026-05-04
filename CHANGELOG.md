@@ -16,6 +16,78 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 6 · Validación gráfica Westinghouse vs cálculo (2026-05-03 PM10) — CIERRE PLAN
+
+Sexta y última microfase. Cierra el plan de 6 microfases para
+alinear la calculadora ONAF con el prompt técnico del director.
+Detecta inconsistencias entre los inputs del usuario y la curva
+Westinghouse calibrada.
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Función pura nueva validarPuntoOperacion({onan_kva, pct,
+  cfm_calculado, alt_m}) hace 2 chequeos:
+  · A · Rango calibrado: el % está dentro del rango cubierto por
+    las curvas oficiales (115-166%). Fuera de eso → severidad
+    'err' por extrapolación.
+  · B · Coherencia gráfica vs cálculo: calcula CFM esperado
+    interpolando la pendiente Westinghouse al % seleccionado y
+    aplicando corrección de altitud. Compara con cfm_calculado.
+    Delta > 5% → 'err' (inconsistencia de inputs). Delta 2-5%
+    → 'warn'. Delta ≤ 2% → 'ok'.
+- Devuelve estructura compacta con cfm_esperado, cfm_calculado,
+  pendiente_esperada, delta_cfm, delta_pct_abs, severidad,
+  rango_calibrado, pct y mensaje humano.
+
+Tests: +6 (98 → 104 en refrigeración):
+- Caso golden 24 MVA × 125% = 48000 CFM (severidad 'ok')
+- Discrepancia leve (2-5%) → 'warn'
+- Discrepancia grande (>5%) → 'err'
+- % fuera del rango calibrado → 'err' por extrapolación
+- Aplica corrección de altitud al esperado
+- pendiente_esperada coincide con interpolarPendiente
+
+UI (pages/calculo-refrigeracion.html + assets/js/calculo-refrigeracion.js):
+- Contenedor nuevo #valida-grafica debajo del canvas Chart.js.
+  Hidden por defecto.
+- renderValidacionGrafica(v) muestra banner con badge ✓/⚠/✗,
+  mensaje, KPIs (CFM esperado, delta absoluto y %, pendiente
+  esperada). Color verde/naranja/rojo según severidad.
+- upd() invoca validarPuntoOperacion en cada cambio de input
+  (ONAN/ONAF/% / altitud) y persiste en state.lastValidacion.
+- calcularResumenActual() (helper microfase 5) adjunta el
+  resultado como campo `validacion_grafica` del resumen JSON
+  exportado.
+- guardarAccion enriquece payload con validacion_grafica.
+
+CSS:
+- .valida-grafica con 3 variantes (.is-ok verde, .is-warn
+  naranja, .is-err rojo).
+- .vg-badge pill, .vg-msg flexible, .vg-kpi monoespaciado.
+
+Data layer (assets/js/data/acciones_refrigeracion.js):
+- sanitizar() acepta data.validacion_grafica como objeto y lo
+  persiste para auditoría desde la tab Consolidado.
+
+557/557 tests verdes (+6) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+
+═══════════════════════════════════════════════════════════════
+PLAN DE 6 MICROFASES CERRADO
+═══════════════════════════════════════════════════════════════
+Resumen total:
+- Microfase 1: tolerancia_pct configurable
+- Microfase 2: 5 estrategias enriquecidas (incl. VFD,
+  optimización aerodinámica)
+- Microfase 3: FLC + contactor ABB AF + tags SCADA + coordinación
+- Microfase 4: detección de faltantes con 3 severidades
+- Microfase 5: snapshot JSON con shape exacto del prompt
+- Microfase 6: validación gráfica Westinghouse vs cálculo
+
+Tests acumulados: 557/557 verdes (vs 503 al inicio del plan).
+HTML lint limpio durante toda la sesión. Branch lista para merge
+a main tras validación final del director.
+
 ### Microfase 5 · Exportar resumen JSON estructurado (2026-05-03 PM9)
 
 Quinta microfase. Genera un snapshot JSON con el shape EXACTO del

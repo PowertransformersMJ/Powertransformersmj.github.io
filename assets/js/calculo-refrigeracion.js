@@ -19,6 +19,7 @@ import {
   evaluarMixVentiladores, sugerirMejoras, MIX_ESTADO,
   detectarFaltantes,
   construirResumenJSON,
+  validarPuntoOperacion,
   extraerCorrienteFan,
   evaluarCompatibilidad, mensajeDisposicion, COMPAT_ESTADO,
   deduceOnafDesdeOnanYPct, deducePctDesdeOnanYOnaf,
@@ -864,6 +865,38 @@ function renderProtTotal(r) {
 }
 
 /**
+ * Renderiza el banner de validación gráfica vs cálculo bajo el
+ * canvas de Chart.js. Microfase 6.
+ *
+ * Severidades:
+ *   ok   → verde discreto, mensaje "coincide con curva interpolada"
+ *   warn → naranja, delta 2-5% sobre la curva esperada
+ *   err  → rojo, delta > 5% o porcentaje fuera del rango calibrado
+ */
+function renderValidacionGrafica(v) {
+  const banner = $('valida-grafica');
+  if (!banner) return;
+  if (!v) {
+    banner.hidden = true; banner.innerHTML = '';
+    return;
+  }
+  banner.classList.remove('is-ok', 'is-warn', 'is-err');
+  banner.classList.add('is-' + v.severidad);
+  const badge = ({
+    ok:   '✓ Coherente con gráfica',
+    warn: '⚠ Discrepancia leve',
+    err:  '✗ Inconsistencia / extrapolación'
+  })[v.severidad] || v.severidad.toUpperCase();
+  banner.hidden = false;
+  banner.innerHTML = `
+    <span class="vg-badge">${badge}</span>
+    <span class="vg-msg">${escaparHtml(v.mensaje)}</span>
+    <span class="vg-kpi">CFM esperado: <b>${formatearNumero(v.cfm_esperado)}</b></span>
+    <span class="vg-kpi">Δ: <b>${v.delta_cfm >= 0 ? '+' : ''}${formatearNumero(v.delta_cfm)} CFM</b> · <b>${v.delta_pct_abs.toFixed(2)}%</b></span>
+    <span class="vg-kpi">Pendiente: <b>${v.pendiente_esperada.toFixed(3)}</b> CFM/kVA</span>`;
+}
+
+/**
  * Renderiza el banner amarillo de faltantes en la sección de
  * protección eléctrica. Se oculta cuando no hay faltantes.
  * Agrupa por severidad (crítico → aviso → info) y por modelo.
@@ -1023,6 +1056,15 @@ function upd() {
   setKpi('v5', r.cfm_corregido, ' CFM');
   $('cfm-disp').textContent     = formatearNumero(r.cfm_nivel_mar) + ' CFM';
   $('cfm-alt-disp').textContent = formatearNumero(r.cfm_corregido) + ' CFM';
+
+  // Microfase 6 · validar coherencia gráfica vs cálculo
+  state.lastValidacion = validarPuntoOperacion({
+    onan_kva:      r.onan,
+    pct:           getPct(),
+    cfm_calculado: r.cfm_corregido,
+    alt_m:         getAlt()
+  });
+  renderValidacionGrafica(state.lastValidacion);
 
   // Recalcular tabla del mix (estado APROBADO/NO depende del CFM
   // requerido) + protección eléctrica.
@@ -1405,8 +1447,14 @@ function calcularResumenActual() {
       })
     : [];
   const faltantes = detectarFaltantes({ mix: state.mix });
+  const validacionGrafica = validarPuntoOperacion({
+    onan_kva:      cfmCalc.onan,
+    pct:           getPct(),
+    cfm_calculado: cfmCalc.cfm_corregido,
+    alt_m:         getAlt()
+  });
   const session = window.__sgmSession || {};
-  return construirResumenJSON({
+  const resumen = construirResumenJSON({
     mix: state.mix,
     evaluacion, proteccion, sugerencias, faltantes,
     metadatos: {
@@ -1428,6 +1476,9 @@ function calcularResumenActual() {
       responsable_nombre: session.profile?.nombre || ''
     }
   });
+  // Microfase 6 · adjunta validación de gráfica al resumen
+  resumen.validacion_grafica = validacionGrafica;
+  return resumen;
 }
 
 /**
@@ -1584,6 +1635,7 @@ async function guardarAccion() {
       proteccion,
       compatibilidad: compat,
       faltantes,
+      validacion_grafica: state.lastValidacion || null,
       resumen_json: calcularResumenActual(),
 
       accion_descripcion: descripcion,
