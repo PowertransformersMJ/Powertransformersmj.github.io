@@ -1750,7 +1750,7 @@ function exportarResumenJSON() {
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
 }
 
-function openModalAccion() {
+async function openModalAccion() {
   const modal = $('modalAccion');
   if (!modal) return;
   if (state.mix.length === 0) {
@@ -1766,13 +1766,22 @@ function openModalAccion() {
   $('acc_fecha_ej').value = '';
   $('acc_status').textContent = '';
   $('acc_status').className = 'sgm-modal-status';
+  // Reset del bloque anti-duplicado
+  const dupWrap = $('acc_duplicado');
+  if (dupWrap) {
+    dupWrap.hidden = true;
+    $('acc_justificacion').value = '';
+    $('acc_justif_detalle').value = '';
+    $('acc_justif_detalle_wrap').style.display = 'none';
+  }
+  state.duplicadoInfo = null;
 
   // Resumen del cálculo
+  const matricula = (_val('mat_input').trim()) || '—';
+  const sub = _val('t_sub') || '—';
   const resumen = $('modalAccionResumen');
   if (resumen && state.lastEval) {
     const ev = state.lastEval;
-    const matricula = (_val('mat_input').trim()) || '—';
-    const sub = _val('t_sub') || '—';
     const aprobado = ev.aprobado;
     resumen.innerHTML = `
       <div><b>Transformador:</b> ${escaparHtml(matricula)} · <b>Subestación:</b> ${escaparHtml(sub)}</div>
@@ -1782,6 +1791,42 @@ function openModalAccion() {
   }
   modal.hidden = false;
   setTimeout(() => $('acc_descripcion')?.focus(), 50);
+
+  // Chequeo anti-duplicado: si ya hay acciones para esta matrícula,
+  // mostramos el banner amarillo con la lista y exigimos justificación.
+  try {
+    const mod = await import('./data/acciones_refrigeracion.js');
+    if (matricula && matricula !== '—' && mod.isReady && mod.isReady() && mod.existeAccionParaTransformador) {
+      const dup = await mod.existeAccionParaTransformador(matricula);
+      if (dup.existe) {
+        state.duplicadoInfo = dup;
+        renderBannerDuplicado(dup);
+      }
+    }
+  } catch (err) {
+    console.warn('[openModalAccion] chequeo duplicado falló:', err);
+  }
+}
+
+function renderBannerDuplicado(dup) {
+  const wrap = $('acc_duplicado');
+  const list = $('acc_duplicado_list');
+  if (!wrap || !list) return;
+  const labelEstadoLocal = (e) => ({
+    planificada: 'Planificada',
+    pendiente_aprobacion: 'Pendiente',
+    aprobada: 'Aprobada',
+    ejecutada: 'Ejecutada',
+    cancelada: 'Cancelada'
+  })[e] || e;
+  list.innerHTML = dup.ultimas.map(a => `
+    <li>
+      <span class="acd-fecha">${escaparHtml(a.fecha_accion || 's/f')}</span>
+      · <strong>${escaparHtml(labelEstadoLocal(a.estado_accion))}</strong>
+      · ${escaparHtml((a.accion_descripcion || '').slice(0, 90))}${(a.accion_descripcion || '').length > 90 ? '…' : ''}
+      ${a.es_re_registro ? '<span style="color:#b85f00;font-weight:700"> · re-registro</span>' : ''}
+    </li>`).join('');
+  wrap.hidden = false;
 }
 
 function closeModalAccion() {
@@ -1892,8 +1937,23 @@ async function guardarAccion() {
 
       responsable_uid,
       responsable_nombre,
-      responsable_email
+      responsable_email,
+
+      // Anti-duplicado · si el chequeo de openModalAccion detectó
+      // registros previos para esta matrícula, marcamos es_re_registro
+      // y persistimos la justificación elegida (regla 2026-05-04).
+      es_re_registro:           !!(state.duplicadoInfo && state.duplicadoInfo.existe),
+      justificacion_repeticion: ($('acc_justificacion')?.value || '').trim(),
+      justificacion_detalle:    ($('acc_justif_detalle')?.value || '').trim()
     };
+
+    // Validación cliente extra: si es re-registro, exigir justificación
+    if (payload.es_re_registro && !payload.justificacion_repeticion) {
+      throw new Error('Este transformador ya tiene acciones registradas. Seleccione la justificación de re-registro antes de guardar.');
+    }
+    if (payload.justificacion_repeticion === 'otro' && payload.justificacion_detalle.length < 10) {
+      throw new Error('La justificación "otro" requiere un detalle de al menos 10 caracteres.');
+    }
 
     // 6) Persistir vía data layer (lazy import)
     const mod = await import('./data/acciones_refrigeracion.js');
@@ -2579,6 +2639,45 @@ function generateReport() {
   .formula-box .apply .arrow { color: #999; margin: 0 3pt; }
   .formula-box .apply .res   { color: #c62828; font-weight: 700; }
 
+  /* ── Disposición mecánica por ventilador (sec 5.N) ───────── */
+  .dispo-block {
+    display: grid; grid-template-columns: 1fr 2.4in;
+    gap: 8pt; align-items: stretch;
+    margin: 4pt 0 8pt;
+    padding: 6pt 8pt;
+    background: #f0f7ff;
+    border: 1px solid #b0cce8; border-left: 2.5pt solid #0d47a1;
+    border-radius: 4pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .dispo-block .dispo-info {
+    display: flex; flex-direction: column; gap: 3pt;
+  }
+  .dispo-block .dispo-label {
+    font-size: 7pt; font-weight: 700; letter-spacing: .04em;
+    text-transform: uppercase; color: #555;
+  }
+  .dispo-block .dispo-value {
+    font-size: 9pt; color: #0d3a73;
+  }
+  .dispo-block .dispo-value strong { color: #0d3a73; }
+  .dispo-block .dispo-msg {
+    font-size: 7.5pt; color: #555; line-height: 1.35;
+    font-style: italic;
+  }
+  .dispo-block .dispo-svg {
+    background: #fff;
+    border: 1px solid #d0dce8;
+    border-radius: 3pt;
+    padding: 2pt;
+    display: flex; align-items: center; justify-content: center;
+    min-height: 1.4in;
+  }
+  .dispo-block .dispo-svg svg {
+    width: 100%; height: auto; max-height: 1.6in;
+  }
+
   /* ── Diagrama del radiador (SVG embebido) ───────────────────── */
   .rad-diagram {
     margin: 8pt 0; padding: 8pt 12pt 5pt;
@@ -2749,6 +2848,14 @@ function generateReport() {
     <section class="section-anchor">
       <h3>5.${idx + 1} · ${escaparHtml(it.marca)} ${escaparHtml(it.modelo)} · <span class="mono">${it.cantidad} unidad${it.cantidad === 1 ? '' : 'es'}</span></h3>
       <p class="meta">Aporte de este modelo al mix: <strong class="mono">${formatearNumero(it.cantidad * it.cfm_unitario)} CFM</strong> (${it.cantidad} × ${formatearNumero(it.cfm_unitario)} CFM/u)</p>
+      <div class="dispo-block">
+        <div class="dispo-info">
+          <div class="dispo-label">Disposición mecánica</div>
+          <div class="dispo-value"><strong>${escaparHtml(_LBL_DISPOSICION[it.disposicion] || _LBL_DISPOSICION.lateral)}</strong></div>
+          <div class="dispo-msg">${escaparHtml(mensajeDisposicion(it.disposicion || 'lateral'))}</div>
+        </div>
+        <div class="dispo-svg">${dispoIlustrativaSVG(it.disposicion || 'lateral')}</div>
+      </div>
       <table class="rpt-table">
         <tbody>
           ${_row('Marca',                 it.marca)}
@@ -3109,6 +3216,14 @@ function bindEvents() {
   $('btnExportJson')?.addEventListener('click', exportarResumenJSON);
   $('btnRegistrarAccion')?.addEventListener('click', openModalAccion);
   $('btnGuardarAccion')?.addEventListener('click', guardarAccion);
+
+  // Justificación de re-registro · cuando el usuario elige "otro",
+  // se muestra el textarea para detalle obligatorio (≥10 chars).
+  $('acc_justificacion')?.addEventListener('change', (e) => {
+    const wrap = $('acc_justif_detalle_wrap');
+    if (!wrap) return;
+    wrap.style.display = (e.target.value === 'otro') ? '' : 'none';
+  });
   $('btnPrint')?.addEventListener('click', () => window.print());
 
   // Cierre del modal: backdrop + botón ✕ + tecla Escape
