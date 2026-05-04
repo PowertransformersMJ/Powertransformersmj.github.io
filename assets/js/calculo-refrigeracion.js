@@ -211,9 +211,11 @@ function onPctCh() {
 async function addToMix() {
   const sel = $('mix_fan_sel');
   const qtyInput = $('mix_fan_qty');
+  const dispSel  = $('mix_fan_disposicion');
   if (!sel || !qtyInput) return;
   const key = sel.value;
   const qty = Math.max(1, Math.floor(parseFloat(qtyInput.value) || 1));
+  const dispVal = (dispSel && dispSel.value) || 'lateral';
   if (!key) {
     sel.focus();
     return;
@@ -224,6 +226,8 @@ async function addToMix() {
   const existente = state.mix.find(it => it.key === key);
   if (existente) {
     existente.cantidad += qty;
+    // Si la disposición fue cambiada, actualizar la del item existente.
+    if (dispVal) existente.disposicion = dispVal;
   } else {
     state.mix.push({
       id:    state.mixIdCnt++,
@@ -232,11 +236,16 @@ async function addToMix() {
       modelo:       f.fan_modelo || '',
       cfm_unitario: +f.fan_cfm_nom || 0,
       cantidad:     qty,
-      ficha:        Object.freeze({ ...f })   // snapshot inmutable de la ficha completa
+      disposicion:  dispVal,                  // disposición mecánica del item
+      ficha:        Object.freeze({ ...f })
     });
     // Sincronizar la ficha visible con el ÚLTIMO modelo agregado
     // (mantiene el flujo de compatibilidad mecánica + protección).
     syncFichaVisibleConKey(key, db);
+    // Reflejar la disposición seleccionada en el input global legacy
+    // para que la card de compatibilidad mecánica también la considere.
+    const dispLegacy = $('disposicion');
+    if (dispLegacy) dispLegacy.value = dispVal;
   }
   qtyInput.value = 1;
   renderMix();
@@ -431,6 +440,143 @@ function renderFichasMix() {
 }
 
 /**
+ * Devuelve un SVG inline ilustrativo de la disposición mecánica
+ * del ventilador sobre el radiador. Tres variantes:
+ *
+ *   · lateral     · vista frontal · obleas verticales · ventilador
+ *                   al lado soplando horizontal hacia el radiador
+ *   · vertical_1  · vista lateral · 1 cuerpo de radiador · ventilador
+ *                   debajo soplando hacia arriba
+ *   · vertical_2  · vista lateral · 2 cuerpos apilados · ventilador
+ *                   debajo soplando hacia arriba a través de los 2
+ *
+ * Diseño esquemático con líneas + flechas + etiquetas. Color azul de
+ * marca para el radiador y naranja para las flechas de flujo de aire.
+ */
+function dispoIlustrativaSVG(disp) {
+  const dispKey = disp || 'lateral';
+  if (dispKey === 'vertical_1') {
+    return `<svg viewBox="0 0 240 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Disposición vertical 1 cuerpo">
+      <!-- Tanque del transformador a la izquierda (ref) -->
+      <rect x="6" y="20" width="22" height="160" fill="#e3f2fd" stroke="#0d47a1" stroke-width="1"/>
+      <text x="17" y="100" text-anchor="middle" fill="#0d47a1" font-size="9" font-family="Arial" transform="rotate(-90 17 100)">TANQUE</text>
+      <!-- Cuerpo de radiador (vista lateral) -->
+      <rect x="40" y="35" width="105" height="100" fill="#fff" stroke="#0d47a1" stroke-width="1.6"/>
+      <g stroke="#0d47a1" stroke-width="0.6" fill="none">
+        ${Array.from({length: 18}, (_, i) => `<line x1="${40 + 1.5 + i * 5.7}" y1="40" x2="${40 + 1.5 + i * 5.7}" y2="130"/>`).join('')}
+      </g>
+      <text x="92" y="80" text-anchor="middle" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">RADIADOR</text>
+      <text x="92" y="92" text-anchor="middle" fill="#0d47a1" font-size="8" font-family="Arial">(1 cuerpo)</text>
+      <!-- Ventilador debajo (vista frontal · círculo con aspas) -->
+      <g transform="translate(92, 162)">
+        <circle r="20" fill="#fff3e0" stroke="#e65100" stroke-width="1.4"/>
+        <g stroke="#e65100" stroke-width="1" fill="none">
+          <path d="M 0,-16 Q 6,-10 0,0 Q -6,10 0,16"/>
+          <path d="M 16,0 Q 10,6 0,0 Q -10,-6 -16,0"/>
+        </g>
+        <circle r="3" fill="#e65100"/>
+      </g>
+      <text x="92" y="195" text-anchor="middle" fill="#e65100" font-size="8" font-family="Arial" font-weight="bold">VENTILADOR</text>
+      <!-- Flechas de flujo de aire ↑ -->
+      <g stroke="#e65100" stroke-width="1.5" fill="#e65100">
+        ${[58, 72, 92, 112, 128].map(x => `
+          <line x1="${x}" y1="142" x2="${x}" y2="135"/>
+          <polygon points="${x},132 ${x-3},138 ${x+3},138"/>
+        `).join('')}
+      </g>
+      <!-- Etiqueta lateral derecha -->
+      <text x="170" y="48" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">DISPOSICIÓN</text>
+      <text x="170" y="60" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">VERTICAL ↑</text>
+      <text x="170" y="74" fill="#555" font-size="8" font-family="Arial">1 cuerpo</text>
+      <text x="170" y="86" fill="#555" font-size="8" font-family="Arial">de radiador</text>
+      <text x="170" y="105" fill="#e65100" font-size="8" font-family="Arial" font-weight="bold">Crítico:</text>
+      <text x="170" y="117" fill="#e65100" font-size="8" font-family="Arial">A vs Ø ventilador</text>
+    </svg>`;
+  }
+  if (dispKey === 'vertical_2') {
+    return `<svg viewBox="0 0 240 230" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Disposición vertical 2 cuerpos">
+      <rect x="6" y="20" width="22" height="190" fill="#e3f2fd" stroke="#0d47a1" stroke-width="1"/>
+      <text x="17" y="115" text-anchor="middle" fill="#0d47a1" font-size="9" font-family="Arial" transform="rotate(-90 17 115)">TANQUE</text>
+      <!-- 2 cuerpos apilados con un gap mínimo -->
+      <rect x="40" y="20" width="105" height="80" fill="#fff" stroke="#0d47a1" stroke-width="1.6"/>
+      <g stroke="#0d47a1" stroke-width="0.6" fill="none">
+        ${Array.from({length: 18}, (_, i) => `<line x1="${40 + 1.5 + i * 5.7}" y1="24" x2="${40 + 1.5 + i * 5.7}" y2="96"/>`).join('')}
+      </g>
+      <text x="92" y="62" text-anchor="middle" fill="#0d47a1" font-size="8" font-family="Arial" font-weight="bold">RADIADOR 1</text>
+      <rect x="40" y="105" width="105" height="80" fill="#fff" stroke="#0d47a1" stroke-width="1.6"/>
+      <g stroke="#0d47a1" stroke-width="0.6" fill="none">
+        ${Array.from({length: 18}, (_, i) => `<line x1="${40 + 1.5 + i * 5.7}" y1="109" x2="${40 + 1.5 + i * 5.7}" y2="181"/>`).join('')}
+      </g>
+      <text x="92" y="147" text-anchor="middle" fill="#0d47a1" font-size="8" font-family="Arial" font-weight="bold">RADIADOR 2</text>
+      <!-- Ventilador debajo -->
+      <g transform="translate(92, 207)">
+        <circle r="20" fill="#fff3e0" stroke="#e65100" stroke-width="1.4"/>
+        <g stroke="#e65100" stroke-width="1" fill="none">
+          <path d="M 0,-16 Q 6,-10 0,0 Q -6,10 0,16"/>
+          <path d="M 16,0 Q 10,6 0,0 Q -10,-6 -16,0"/>
+        </g>
+        <circle r="3" fill="#e65100"/>
+      </g>
+      <!-- Flechas de flujo ↑ -->
+      <g stroke="#e65100" stroke-width="1.5" fill="#e65100">
+        ${[58, 72, 92, 112, 128].map(x => `
+          <line x1="${x}" y1="190" x2="${x}" y2="184"/>
+          <polygon points="${x},181 ${x-3},187 ${x+3},187"/>
+        `).join('')}
+      </g>
+      <text x="170" y="34" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">DISPOSICIÓN</text>
+      <text x="170" y="46" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">VERTICAL ↑</text>
+      <text x="170" y="60" fill="#555" font-size="8" font-family="Arial">2 cuerpos</text>
+      <text x="170" y="72" fill="#555" font-size="8" font-family="Arial">de radiador</text>
+      <text x="170" y="92" fill="#e65100" font-size="8" font-family="Arial" font-weight="bold">Crítico:</text>
+      <text x="170" y="104" fill="#e65100" font-size="8" font-family="Arial">2×A vs Ø ventilador</text>
+    </svg>`;
+  }
+  // lateral (default)
+  return `<svg viewBox="0 0 240 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Disposición lateral horizontal">
+    <!-- Tanque a la izquierda (ref) -->
+    <rect x="6" y="20" width="22" height="140" fill="#e3f2fd" stroke="#0d47a1" stroke-width="1"/>
+    <text x="17" y="90" text-anchor="middle" fill="#0d47a1" font-size="9" font-family="Arial" transform="rotate(-90 17 90)">TANQUE</text>
+    <!-- Cuerpo de radiador vista frontal (obleas paralelas) -->
+    <rect x="40" y="30" width="100" height="120" fill="#fff" stroke="#0d47a1" stroke-width="1.6"/>
+    <g stroke="#0d47a1" stroke-width="0.6" fill="none">
+      ${Array.from({length: 16}, (_, i) => `<line x1="${44 + i * 6}" y1="36" x2="${44 + i * 6}" y2="144"/>`).join('')}
+    </g>
+    <text x="90" y="100" text-anchor="middle" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">RADIADOR</text>
+    <text x="90" y="112" text-anchor="middle" fill="#0d47a1" font-size="8" font-family="Arial">(vista frontal)</text>
+    <!-- Ventilador a la derecha (vista frontal) -->
+    <g transform="translate(170, 90)">
+      <circle r="22" fill="#fff3e0" stroke="#e65100" stroke-width="1.4"/>
+      <g stroke="#e65100" stroke-width="1" fill="none">
+        <path d="M 0,-18 Q 7,-10 0,0 Q -7,10 0,18"/>
+        <path d="M 18,0 Q 10,7 0,0 Q -10,-7 -18,0"/>
+      </g>
+      <circle r="3" fill="#e65100"/>
+    </g>
+    <text x="170" y="125" text-anchor="middle" fill="#e65100" font-size="8" font-family="Arial" font-weight="bold">VENTILADOR</text>
+    <!-- Flechas de flujo ← (sopla hacia el radiador) -->
+    <g stroke="#e65100" stroke-width="1.5" fill="#e65100">
+      ${[60, 75, 90, 105].map(y => `
+        <line x1="158" y1="${y}" x2="148" y2="${y}"/>
+        <polygon points="146,${y} 152,${y-3} 152,${y+3}"/>
+      `).join('')}
+    </g>
+    <text x="200" y="42" fill="#0d47a1" font-size="9" font-family="Arial" font-weight="bold">LATERAL</text>
+    <text x="200" y="56" fill="#555" font-size="8" font-family="Arial">flujo</text>
+    <text x="200" y="68" fill="#555" font-size="8" font-family="Arial">horizontal</text>
+    <text x="200" y="92" fill="#e65100" font-size="8" font-family="Arial" font-weight="bold">Crítico:</text>
+    <text x="200" y="104" fill="#e65100" font-size="8" font-family="Arial">B (span)</text>
+    <text x="200" y="116" fill="#e65100" font-size="8" font-family="Arial">vs Ø vent.</text>
+  </svg>`;
+}
+
+const _LBL_DISPOSICION = Object.freeze({
+  lateral:    'Lateral · sopla horizontal',
+  vertical_1: 'Vertical ↑ · 1 cuerpo',
+  vertical_2: 'Vertical ↑ · 2 cuerpos'
+});
+
+/**
  * Renderiza una ficha técnica compacta read-only de un modelo del
  * mix con todos los campos relevantes del catálogo.
  */
@@ -452,6 +598,22 @@ function renderFichaUnica(it, idx) {
           <div style="font:500 11px var(--font-mono);color:var(--ink-3);text-transform:uppercase;letter-spacing:.06em">Cantidad en mix</div>
           <div style="font:700 18px var(--font-mono);color:var(--brand-deep)">${it.cantidad} u</div>
           <div style="font:500 11px var(--font-mono);color:var(--ink-3)">aporte ${formatearNumero(it.cantidad * it.cfm_unitario)} CFM</div>
+        </div>
+      </div>
+
+      <!-- Disposición mecánica (selector + render ilustrativo) -->
+      <div class="ficha-mix-dispo">
+        <div class="fmd-info">
+          <div class="fmd-l">Disposición mecánica</div>
+          <select class="fmd-select" data-mix-dispo="${it.id}">
+            <option value="lateral"${(it.disposicion === 'lateral') ? ' selected' : ''}>Lateral · sopla horizontal</option>
+            <option value="vertical_1"${(it.disposicion === 'vertical_1') ? ' selected' : ''}>Vertical ↑ · 1 cuerpo</option>
+            <option value="vertical_2"${(it.disposicion === 'vertical_2') ? ' selected' : ''}>Vertical ↑ · 2 cuerpos</option>
+          </select>
+          <div class="fmd-msg">${escaparHtml(_LBL_DISPOSICION[it.disposicion] || _LBL_DISPOSICION.lateral)}</div>
+        </div>
+        <div class="fmd-svg">
+          ${dispoIlustrativaSVG(it.disposicion || 'lateral')}
         </div>
       </div>
 
@@ -1712,6 +1874,7 @@ async function guardarAccion() {
         modelo:       it.modelo,
         cfm_unitario: it.cfm_unitario,
         cantidad:     it.cantidad,
+        disposicion:  it.disposicion || 'lateral',
         ficha:        { ...(it.ficha || {}) }      // unfreeze para serializar
       })),
       evaluacion,
@@ -2970,6 +3133,21 @@ function bindEvents() {
   $('mix-suggestions')?.addEventListener('click', (e) => {
     const idx = e.target?.closest?.('[data-mix-apply]')?.dataset?.mixApply;
     if (idx !== undefined) applyMixSuggestion(+idx);
+  });
+  // Cambio de disposición mecánica desde la ficha de un modelo
+  // del mix. Actualiza state.mix[i].disposicion y re-renderiza
+  // (incluye el SVG ilustrativo que cambia con la nueva opción).
+  $('fichas-mix-wrap')?.addEventListener('change', (e) => {
+    const id = e.target?.dataset?.mixDispo;
+    if (!id) return;
+    const it = state.mix.find(x => x.id === +id);
+    if (!it) return;
+    it.disposicion = e.target.value;
+    // Reflejar también en el input global legacy (compat mecánica)
+    const dispLegacy = $('disposicion');
+    if (dispLegacy) dispLegacy.value = it.disposicion;
+    renderMix();
+    checkCompat();
   });
 }
 
