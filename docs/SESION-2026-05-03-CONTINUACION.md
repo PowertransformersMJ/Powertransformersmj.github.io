@@ -15,9 +15,15 @@
 | 2 | **Hotfix CI lint** | `<th>` sin scope en consolidado · WCAG H63 | `f1a4403` |
 | 3 | **Hotfix protección eléctrica (3 rutas)** | Restaurar fallback legacy + placeholder informativo cuando mix vacío | `a3bc06b` |
 | 4 | **Plan microfases (6 commits)** | Tolerancia + estrategias + FLC/contactor/SCADA + faltantes + JSON + validación gráfica | `6a59912` → `58299c6` |
-| 5 | **Hotfix post-plan · deep-clean** | Firestore rechazaba undefined con `permission-denied` engañoso. Helper genérico + tests + regla permanente CLAUDE.md §0.1.2.6 | _este commit_ |
+| 5 | **Hotfix post-plan · deep-clean** | Firestore rechazaba undefined con `permission-denied` engañoso. Helper genérico + tests + regla permanente CLAUDE.md §0.1.2.6 | `e0ccffb` |
+| 6 | **UI reorder + gráfica HD primer intento** | Mix antes de Datos técnicos + ficha completa por modelo del mix + DPR 3 en captura del gráfico | `2662671` |
+| 7 | **Pre-chequeo permisos admin** | `verificarPermisosAdmin` lee `/usuarios/{uid}` antes del `addDoc` y muestra mensaje accionable | `c85eb41` |
+| 8 | **Diagnóstico exhaustivo + regla §0.1.2.7** | Distingue "rules desactualizadas" de "no admin"; regla permanente sobre re-deploy de `firestore.rules` | `525fc3c` |
+| 9 | **Gráfica HD/4K real** | Canvas 2400×1400 px × DPR 3 → ~7200×4200 efectivos (impresión a 300 dpi sin pixelado) | `08dcf03` |
+| 10 | **Documentación cierre sesión** | Handoff exhaustivo + 7 reglas permanentes en CLAUDE.md + tabla de comandos para retomar | `a35e97b` |
+| 11 | **Deploy rules confirmado** | Director ejecutó `firebase deploy --only firestore:rules` con éxito → bug del modal resuelto en producción | _no aplica · acción operativa del director_ |
 
-Total commits sesión: **15** en branch `claude/adjust-website-pages-8Ntwz`.
+Total commits sesión: **20+1 docs = 21** en branch `claude/adjust-website-pages-8Ntwz`.
 Tests acumulados: 503 → **570** (+67).
 HTML lint limpio durante toda la sesión.
 
@@ -314,12 +320,227 @@ contener `undefined` en campos opcionales del catálogo.
 
 ---
 
+## 6.bis · Bloque 6 · UI reorder + gráfica HD primer intento (`2662671`)
+
+**Reportes del director:**
+1. *"me gustaría que la gráfica en el informe se vea con mejor
+   resolución"*.
+2. *"me gustaría que en el apartado de Datos técnicos del
+   motoventilador aparezcan todos los seleccionados en el mix"*.
+3. *"queda mejor que el orden sea así, primero el mix, luego los
+   datos técnicos del motoventilador, este a su vez debe asociar
+   todos los datos de la ficha técnica"*.
+
+**Cambios:**
+
+1. **`pages/calculo-refrigeracion.html`** — sección "Mix de
+   motoventiladores" movida ANTES de "Datos técnicos del
+   motoventilador". Orden lógico: primero qué modelos y cuántos,
+   después sus fichas técnicas detalladas.
+
+2. **`pages/calculo-refrigeracion.html`** — "Datos técnicos del
+   motoventilador" ahora trae al inicio el contenedor
+   `#fichas-mix-wrap` que se rellena dinámicamente con UNA ficha
+   read-only por cada modelo del mix (24 campos del catálogo:
+   identificación + aerodinámica + motor eléctrico).
+
+3. **Editor manual / preview legacy** se mantiene debajo con título
+   explícito *"Editor manual / preview de un modelo (opcional)"* y
+   hint que aclara su rol (alimenta compatibilidad mecánica +
+   fallback legacy de protección).
+
+4. **`assets/js/calculo-refrigeracion.js`** — funciones nuevas
+   `renderFichasMix()` y `renderFichaUnica(it, idx)`. Cada ficha
+   con cabecera (marca + modelo + cantidad + aporte CFM) + grid
+   identificación + grid motor eléctrico.
+
+5. **`assets/css/calculo-refrigeracion.css`** — estilos nuevos
+   `.fichas-mix-wrap`, `.ficha-mix-grid`, `.fmf-cell`, `.fmf-l`,
+   `.fmf-v`, `.fmf-empty`.
+
+6. **Gráfica del informe (primer intento, insuficiente):**
+   - `generateReport()` setea `devicePixelRatio = 3` antes de
+     `toBase64Image`.
+   - CSS del informe `.chart-img` aumenta `max-width` 5.6in → 6in
+     + `image-rendering: crisp-edges`.
+
+---
+
+## 6.ter · Bloque 7 · Pre-chequeo de permisos admin (`c85eb41`)
+
+**Reporte del director:** captura del modal con error
+*"Permiso denegado al escribir en Firestore. Verifique: (1) que su
+sesión sea de admin..."*. Pidió: *"corrige este error"*.
+
+**Análisis:** el deep-clean ya estaba activo; el mensaje genérico
+no distinguía entre las 3 causas (no admin / rules no desplegadas
+/ undefined). Faltaba diagnóstico específico.
+
+**Solución implementada:**
+- Función nueva exportada `verificarPermisosAdmin(uid)` en
+  `assets/js/data/acciones_refrigeracion.js` que lee
+  `/usuarios/{uid}` y `/admins/{uid}` antes del `addDoc` y devuelve
+  `{ok, motivo, perfil, mensaje}` con diagnóstico:
+  · `'admin_via_usuarios'` o `'admin_via_admins_bootstrap'` (OK)
+  · `'no_logueado'` (sin sesión Firebase)
+  · `'no_admin'` (perfil existe pero rol≠admin o activo=false)
+  · `'sin_perfil'` (UID no tiene doc en `/usuarios` ni `/admins`)
+- `guardarAccion()` invoca la verificación antes de `mod.crear`.
+
+---
+
+## 6.quater · Bloque 8 · Diagnóstico exhaustivo + regla §0.1.2.7 (`525fc3c`)
+
+**Reporte del director (escenario complejo):** captura del modal
+con el MISMO mensaje genérico de las 3 causas a pesar de:
+- Deep-clean activo (descarta undefined).
+- Pre-chequeo cliente debería decir si NO es admin.
+
+**Análisis:** si el pre-chequeo cliente retorna `ok: true` (es
+admin) PERO el `addDoc` sigue fallando con permission-denied, la
+única causa restante es que **las rules en producción NO incluyen
+el match `/acciones_refrigeracion/{id}`**. Esto pasa cuando:
+1. El director ejecutó `firebase deploy --only firestore:indexes`
+   (commit microfase 4) pero olvidó `firestore:rules`.
+2. O la versión local de `firestore.rules` al momento del deploy
+   no tenía el match agregado.
+
+Sin el match, las rules caen al fallback final
+`match /{document=**}` con `allow read, write: if false` →
+**deny-all explícito** que la SDK reporta como permission-denied
+genérico.
+
+**Solución implementada:**
+
+1. **`guardarAccion()` enriquecido**:
+   - Guarda el resultado de `verificarPermisosAdmin` en
+     `window.__sgmDiag_lastPermisos`.
+   - Loguea el payload completo (truncado a 4 KB) antes del addDoc.
+   - Catch handler distingue dos sub-casos del permission-denied:
+     · Si pre-chequeo `ok: true` Y Firestore rechaza → mensaje
+       *"CAUSA MUY PROBABLE: las rules en producción NO incluyen
+       el match `/acciones_refrigeracion/{id}` (deploy
+       desactualizado). → ACCIÓN: `firebase deploy --only
+       firestore:rules`"*.
+     · Si pre-chequeo `ok: false` → causa es el rol del usuario.
+
+2. **CSS `.sgm-modal-status`**: `white-space: pre-wrap` +
+   `line-height: 1.55` para que el banner muestre los saltos de
+   línea del mensaje estructurado.
+
+3. **CLAUDE.md §0.1.2.7 (regla permanente nueva)**: *"Re-deploy
+   obligatorio de firestore.rules tras cualquier cambio en el
+   archivo"*. 6 reglas obligatorias:
+   - Avisar deploy con bloque `⚠ Requiere deploy manual`.
+   - Verificar la salida del CLI muestra *"released rules
+     firestore.rules to cloud.firestore"*.
+   - Ejecutar AMBOS comandos cuando aplica (rules + indexes).
+   - Comparar rules en Firebase Console vs repo.
+   - Mensaje accionable en UI con sugerencia de deploy.
+   - NUNCA asumir rules al día.
+
+---
+
+## 6.quinta · Bloque 9 · Gráfica HD/4K real (`08dcf03`)
+
+**Reporte del director (con dos capturas):**
+1. Cómo se ve en el informe — pequeña, pixelada, ilegible.
+2. Cómo se ve en la página UI — nítida, legible.
+
+Pidió: *"necesito que se vea en HD y 4K, la imagen representa alto
+valor en el informe"*.
+
+**Análisis:** el fix anterior solo aumentó `devicePixelRatio = 3`
+pero NO el tamaño físico del canvas. El canvas en pantalla es
+~600 × 360 px (limitado por su contenedor `.cw`). Aunque DPR sea 3,
+la base de resolución sigue siendo pequeña → ~1800 × 1080 efectivos.
+
+**Solución implementada:** **forzar tamaño físico explícito** del
+canvas antes de capturar:
+
+```javascript
+const oldDpr      = state.chart.options.devicePixelRatio || 1;
+const oldRespOpt  = state.chart.options.responsive;
+const oldMantOpt  = state.chart.options.maintainAspectRatio;
+const oldStyleW   = canvas.style.width;
+const oldStyleH   = canvas.style.height;
+
+state.chart.options.responsive          = false;
+state.chart.options.maintainAspectRatio = false;
+state.chart.options.devicePixelRatio    = 3;
+canvas.style.width  = '2400px';
+canvas.style.height = '1400px';
+state.chart.resize(2400, 1400);
+state.chart.update('none');
+
+chartImg = state.chart.toBase64Image('image/png', 1);
+
+// restaurar todo
+state.chart.options.responsive          = oldRespOpt;
+state.chart.options.maintainAspectRatio = oldMantOpt;
+state.chart.options.devicePixelRatio    = oldDpr;
+canvas.style.width  = oldStyleW;
+canvas.style.height = oldStyleH;
+state.chart.resize();
+state.chart.update('none');
+```
+
+Resultado efectivo: canvas físico 2400×1400 × DPR 3 → ~**7200×4200
+píxeles** (4K+, suficiente para impresión a 300 dpi y zoom digital
+sin pixelado).
+
+CSS del informe: `.chart-img max-width: 6.14in` (todo el ancho útil
+de la hoja Letter dentro de los márgenes laterales del template
+AFINIA: 8.5in − 2 × 1.18in). Padding del bloque reducido a
+`4pt 4pt 2pt`.
+
+Causa un flash visual breve (~0.3s) en pantalla durante el export
+porque el canvas se reescala temporalmente. Es aceptable porque
+solo se dispara al click de "Exportar informe técnico AFINIA".
+
+---
+
+## 6.sexta · Bloque 10 · Cierre de sesión · deploy de rules confirmado (2026-05-03 PM14)
+
+**Confirmación del director:** *"el deploy fue exitoso"*.
+
+Esto significa que las rules en producción ahora **SÍ incluyen** el
+match `/acciones_refrigeracion/{id}` agregado en microfase 4 (commit
+`a86a51f`). El bug histórico del *"Missing or insufficient
+permissions"* documentado en regla §0.1.2.7 queda **resuelto en
+producción**.
+
+**Estado de la rama tras el deploy:**
+
+- `firestore.rules` en repo y en producción: **sincronizadas**.
+- Match `/acciones_refrigeracion/{id}` con read/create/update/delete
+  según rol activo en producción.
+- Modal "Registrar acción de mantenimiento" debería persistir sin
+  errores de permisos.
+- Tab "Consolidado Sistemas de Refrigeración" debería listar
+  acciones registradas en realtime.
+
+**Pendiente del director (no crítico):**
+
+1. Hard-reload Cmd+Shift+R y validar el flujo end-to-end:
+   - Registrar acción de mantenimiento (debería persistir).
+   - Ver la acción aparecer en la tab Consolidado en realtime.
+   - Exportar informe AFINIA (verificar gráfica HD/4K legible).
+   - Exportar resumen JSON (verificar shape canónico).
+2. **Mergear** la branch `claude/adjust-website-pages-8Ntwz` a
+   `main` desde GitHub web cuando todo apruebe.
+3. **Post-merge:** revocar PATs históricos.
+4. **Cleanup** de los 7 PDFs subidos por error al raíz del repo
+   (commit `91f386c` previo).
+
+---
+
 ## 7. Estado al cierre de sesión 2026-05-03
 
 ### Branch
 
-`claude/adjust-website-pages-8Ntwz` — sincronizada con remoto, **15
-commits** desde último merge a `main`.
+`claude/adjust-website-pages-8Ntwz` — sincronizada con remoto, **20
+commits** desde último merge a `main`. Último commit: `08dcf03`.
 
 ### Tests
 
@@ -331,13 +552,32 @@ commits** desde último merge a `main`.
 
 ### Pendiente del director
 
-1. **Validar visualmente** que el modal "Registrar acción de
-   mantenimiento" ya guarda correctamente con el deep-clean.
-2. **Mergear** la branch a `main` desde GitHub (PR o GitHub
-   Desktop) cuando todas las microfases + el hotfix queden
-   aprobadas en producción.
-3. **Revocar PATs** históricos de la sesión.
-4. **Cleanup** de los 7 PDFs subidos por error al raíz del repo
+1. **⚠ EJECUTAR DEPLOY DE RULES** (acción obligatoria antes de
+   probar):
+   ```bash
+   cd ~/ruta/al/repo/LordPowerTransformersMJ.github.io
+   git pull origin claude/adjust-website-pages-8Ntwz
+   firebase deploy --only firestore:rules
+   ```
+   Verificar que la salida del CLI muestra:
+   ```
+   ✓ firestore: released rules firestore.rules to cloud.firestore
+   ✓ Deploy complete!
+   ```
+   Si solo dice *"deployed indexes"* sin *"released rules"*, el
+   deploy de rules NO se ejecutó y el modal "Registrar acción"
+   seguirá fallando con permission-denied.
+2. **Validar el modal "Registrar acción"** después del re-deploy
+   con hard-reload Cmd+Shift+R. Debe persistir y mostrar el ID en
+   verde.
+3. **Validar la gráfica del informe AFINIA** en HD/4K — debe verse
+   con todos los rótulos legibles, idéntica a la gráfica de la UI.
+4. **Validar el reorden UI** en la calculadora: primero Mix,
+   después Datos técnicos del motoventilador con N fichas.
+5. **Mergear** la branch a `main` desde GitHub cuando todo quede
+   aprobado en producción.
+6. **Revocar PATs** históricos de la sesión.
+7. **Cleanup** de los 7 PDFs subidos por error al raíz del repo
    (commit `91f386c` previo).
 
 ### Pendiente operativo (low-prio)
@@ -356,6 +596,7 @@ commits** desde último merge a `main`.
 | §0.1.2.4 | Refactor 1→N NO debe vaciar la UI legacy | Refactors de la calculadora ONAF, batches, multi-contrato, etc. |
 | §0.1.2.5 | Lint local con `npm run lint:html`, no `npx html-validate` | Cualquier sesión que modifique HTML |
 | §0.1.2.6 | Firestore rechaza undefined con error "permission-denied" engañoso | Cualquier data layer que persista objetos anidados |
+| §0.1.2.7 | Re-deploy obligatorio de `firestore.rules` tras cualquier cambio en el archivo | Cualquier modificación a `firestore.rules` (síntomas: pre-chequeo cliente OK + servidor rechaza) |
 
 ### Documentación de referencia (módulo Mantenimiento Brigada)
 
@@ -368,32 +609,144 @@ commits** desde último merge a `main`.
 
 ## 8. Cómo continuar en una sesión nueva
 
+### 8.1 · Bootstrap obligatorio al arrancar un chat nuevo
+
 Si arrancas un chat nuevo y el director te pide trabajar sobre
 Mantenimiento Brigada:
 
 1. **Lee este archivo completo** + CLAUDE.md §0 (permisos push) +
-   §0.1.2.4-6 (reglas permanentes) + §7 (estado actual).
-2. **Verifica** que estás en la branch `claude/adjust-website-pages-8Ntwz`
-   o ya está mergeada a `main`.
-3. **Verifica tests** con `npm install && npm run test:unit` (deben
-   ser 570/570 verdes).
-4. **Verifica lint** con `npm run lint:html` (exit 0).
-5. **NO toques** el shape del payload de `acciones_refrigeracion`
-   sin aplicar `deepClean` antes del write — Firestore lo rechazará
-   con `permission-denied` engañoso.
-6. **Si agregas funciones puras nuevas al dominio** que devuelvan
-   objetos con campos opcionales, **siempre** documenta en su
-   docstring que el caller debe pasar el output por `deepClean`
-   antes de persistir.
+   §0.1.2.1-7 (reglas permanentes, especial atención a §0.1.2.4
+   reorder UI legacy, §0.1.2.6 deep-clean Firestore, §0.1.2.7
+   re-deploy de rules) + §7 (estado actual).
+2. **Pídele al director un PAT clásico fresco** (scope `repo`)
+   para hacer push inline (regla §0.1). Sin token no hay push.
+3. **Verifica** la branch activa. Si `claude/adjust-website-pages-8Ntwz`
+   ya fue mergeada a `main`, trabaja desde una nueva feature
+   branch con prefijo `claude/...`. Si no, sigue en esa.
+4. **Verifica el estado** con:
+   ```bash
+   git fetch origin main && git log --oneline origin/main -10
+   ls assets/css/ assets/js/data/ assets/js/domain/
+   npm install --no-audit --no-fund
+   npm run test:unit            # debe ser 570/570 verdes
+   npm run lint:html            # debe ser exit 0
+   ```
+5. **Verifica deploys Firebase activos** mirando salida de
+   `firebase firestore:indexes` (en Mac del director, no aquí).
+   Las rules en producción deben coincidir con `firestore.rules`
+   del repo (regla §0.1.2.7).
+
+### 8.2 · Reglas duras de invariancia (no romper)
+
+- **NO toques** el shape del payload de `acciones_refrigeracion`
+  sin aplicar `deepClean` antes del write — Firestore lo rechazará
+  con `permission-denied` engañoso (regla §0.1.2.6).
+- **NO elimines rutas legacy** al refactorizar de 1→N entidades.
+  Mantén siempre fallback (regla §0.1.2.4).
+- **NO uses** `npx html-validate` — usa `npm run lint:html` con las
+  devDependencies del repo (regla §0.1.2.5).
+- **NO modifiques** `firestore.rules` sin avisar al director que
+  necesita ejecutar `firebase deploy --only firestore:rules` y
+  verificar la salida muestra *"released rules firestore.rules to
+  cloud.firestore"* (regla §0.1.2.7).
+- **NO toques** la calibración Westinghouse `PENDIENTES_WESTINGHOUSE`
+  (115%→1.20, 125%→2.00, 133%→2.65, 166%→4.25). Verificación
+  golden: 24 MVA × 125% = 48.000 CFM.
+- **NO toques** el header AFINIA `header_compact.png` ni el
+  footer `footer.png` ni la firma `firma-miguel-jimenez.png`.
+- **NO toques** el catálogo `FAN_DB` o
+  `TRANSFORMADORES_AFINIA` sin coordinar con el director.
+
+### 8.3 · Patrón de trabajo recomendado
+
+1. **Pide alcance claro** del director — feature, bug, mejora.
+2. **Si es feature nueva**, plantea un plan de microfases (3-6)
+   con preview ASCII, implementa una a una con commit aislado y
+   espera a que el director valide cada una antes de seguir.
+3. **Si es bug**, reproduce con test primero (TDD) o agrega test
+   regresión, después arregla, después documenta como regla
+   permanente si el patrón puede repetirse.
+4. **Cada commit termina con push** inline con PAT (regla §0.1)
+   y verificación que `git rev-parse HEAD origin/branch` muestren
+   el mismo SHA.
+5. **Documenta siempre**: CHANGELOG.md (entrada por commit) +
+   CLAUDE.md §7 (estado actual + próxima movida) +
+   docs/MANTENIMIENTO-BRIGADA.md si toca el módulo + nueva regla
+   permanente §0.1.2.X si descubres un patrón aplicable a futuras
+   sesiones.
+
+### 8.4 · Casos de uso típicos para próximas sesiones
+
+| Caso | Patrón sugerido |
+|---|---|
+| Nueva calculadora del módulo Brigada (aceite, aterramiento, sobrecarga TPT, etc.) | (1) tab nueva en `pages/mantenimiento-brigada.html` · (2) página `pages/calculo-XXX.html` con `module-shell` · (3) dominio puro `assets/js/domain/calculo-XXX.js` con tests · (4) UI binding `assets/js/calculo-XXX.js` · (5) persistencia opcional en `acciones_XXX` con rules + indexes · (6) tab consolidado opcional · (7) informe imprimible siguiendo regla §0.1.2.3 (paginación manual con `.sheet` divs) |
+| Bug en informe AFINIA | Usar regla §0.1.2.2 (13 reglas de informes imprimibles) + §0.1.2.3 (paginación Safari) · verificar siempre con `puppeteer` Y con Safari real antes de cerrar |
+| Cambio en rules Firestore | Avisar deploy (regla §0.1.1) + verificar salida CLI (regla §0.1.2.7) · si toca data layer existente con objetos anidados, agregar `deepClean` (§0.1.2.6) |
+| Refactor 1→N | Aplicar regla §0.1.2.4 estricta · mantener ruta legacy como fallback · placeholder informativo nunca silencioso |
+
+### 8.5 · Comandos útiles para retomar
+
+```bash
+# Estado actual del repo
+cd ~/LordPowerTransformersMJ.github.io
+git fetch origin
+git log --oneline origin/main..origin/claude/adjust-website-pages-8Ntwz
+git log --oneline origin/main -25
+
+# Verificar consistencia
+npm install --no-audit --no-fund
+npm run lint:html          # exit 0
+npm run test:unit          # 570/570 verdes
+
+# Si hay que retomar trabajo en la branch
+git checkout claude/adjust-website-pages-8Ntwz
+git pull origin claude/adjust-website-pages-8Ntwz
+
+# Deploy Firebase (siempre desde Mac del director)
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+firebase deploy --only storage
+firebase deploy --only functions
+
+# Servidor local de prueba
+python3 -m http.server 8000
+# → http://localhost:8000/pages/mantenimiento-brigada.html
+```
 
 ### Si el director reporta un bug visual
 
 1. Pide captura concreta.
 2. Antes de editar, abre la página local y reproduce.
-3. Diagnóstico: la regla §0.1.2.4 dice que no rompiste un flujo
-   legacy. La regla §0.1.2.5 dice que tus checks locales deben
-   usar `npm run lint:html` no `npx`. La regla §0.1.2.6 dice que
-   "permission-denied" puede ser undefined enmascarado.
+3. Diagnóstico:
+   - Regla §0.1.2.4: no rompiste un flujo legacy (refactor 1→N).
+   - Regla §0.1.2.5: tus checks locales deben usar `npm run
+     lint:html` no `npx`.
+
+### Si el director reporta `permission-denied` en Firestore
+
+Diagnóstico ordenado:
+
+1. **Causa A · undefined enmascarado** (regla §0.1.2.6) — verifica
+   que el data layer aplica `deepClean(payload)` antes de
+   `addDoc/setDoc/updateDoc`. Importar de
+   `assets/js/data/_firestore_clean.js`.
+
+2. **Causa B · usuario no es admin** — agrega un pre-chequeo con
+   `verificarPermisosAdmin(uid)` (patrón en
+   `assets/js/data/acciones_refrigeracion.js`) ANTES del write.
+   Devuelve `{ok, motivo, mensaje}` accionable.
+
+3. **Causa C · rules en producción desactualizadas** (regla
+   §0.1.2.7) — si pre-chequeo cliente dice `ok: true` pero servidor
+   rechaza, es deploy desactualizado. Pedir al director ejecutar
+   `firebase deploy --only firestore:rules` y verificar que la
+   salida muestra *"released rules firestore.rules to
+   cloud.firestore"*.
+
+4. **Causa D · tipos / enums** — verifica que el payload cumple
+   las rules: enums correctos (lowercase como `'planificada'`,
+   no `'Planificada'`), `is string`, `is list`, `size() > 0`,
+   etc.
 
 ### Si el director quiere otra calculadora del módulo brigada
 
