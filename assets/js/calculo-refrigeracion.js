@@ -216,6 +216,59 @@ function onPctCh() {
  * Si el modelo ya está en el mix, incrementa la cantidad existente
  * (caso "agregaste 4, ahora pones 2 más → quedan 6").
  */
+/**
+ * Genera el array de instalaciones default para un item del mix.
+ * Cada entrada representa UNA unidad física instalada y tiene:
+ *   · cuerpo · # de cuerpo de radiador (1-based)
+ *   · posicion · superior / centro / inferior (solo aplica a lateral)
+ *
+ * Distribución por defecto:
+ *   - Si hay menos unidades que cuerpos disponibles: round-robin
+ *     (1 ventilador por cuerpo).
+ *   - Si hay más: se reparten lo más equitativamente posible.
+ * El director puede reasignar manualmente desde la UI.
+ *
+ * @param {number} cantidad
+ * @param {string} disp 'lateral' | 'vertical_1' | 'vertical_2'
+ * @returns {Array<{cuerpo:number, posicion:string}>}
+ */
+function _generarInstalacionesDefault(cantidad, disp) {
+  const n = Math.max(1, Math.floor(cantidad || 1));
+  const radCant = Math.max(1, parseInt($('rad_cant')?.value, 10) || 1);
+  const posDefault = (disp === 'lateral') ? 'centro' : 'inferior';
+  return Array.from({length: n}, (_, i) => ({
+    cuerpo: ((i % radCant) + 1),       // round-robin: 1, 2, 3, ..., radCant, 1, 2, ...
+    posicion: posDefault
+  }));
+}
+
+/**
+ * Reajusta el array `instalaciones` cuando cambia la cantidad.
+ * Si cantidad sube, agrega nuevos items con cuerpo round-robin.
+ * Si baja, recorta los últimos.
+ */
+function _reajustarInstalaciones(it) {
+  if (!Array.isArray(it.instalaciones)) it.instalaciones = [];
+  const n = Math.max(1, Math.floor(it.cantidad || 1));
+  const radCant = Math.max(1, parseInt($('rad_cant')?.value, 10) || 1);
+  const posDefault = (it.disposicion === 'lateral') ? 'centro' : 'inferior';
+  while (it.instalaciones.length < n) {
+    const i = it.instalaciones.length;
+    it.instalaciones.push({
+      cuerpo: ((i % radCant) + 1),
+      posicion: posDefault
+    });
+  }
+  while (it.instalaciones.length > n) {
+    it.instalaciones.pop();
+  }
+  // Clamp cuerpos al rango actual de radCant
+  it.instalaciones.forEach(ins => {
+    if (ins.cuerpo > radCant) ins.cuerpo = radCant;
+    if (ins.cuerpo < 1) ins.cuerpo = 1;
+  });
+}
+
 async function addToMix() {
   const sel = $('mix_fan_sel');
   const qtyInput = $('mix_fan_qty');
@@ -250,6 +303,7 @@ async function addToMix() {
         cuerpo:   1,                           // # del cuerpo de radiador (1..rad_cant)
         posicion: dispVal === 'lateral' ? 'centro' : 'inferior'  // 'superior' | 'centro' | 'inferior'
       },
+      instalaciones: _generarInstalacionesDefault(qty, dispVal),  // array por unidad
       ficha:        Object.freeze({ ...f })
     });
     // Sincronizar la ficha visible con el ÚLTIMO modelo agregado
@@ -307,6 +361,7 @@ function updateMixQty(id, qty) {
   const it = state.mix.find(x => x.id === id);
   if (!it) return;
   it.cantidad = Math.max(0, Math.floor(parseFloat(qty) || 0));
+  _reajustarInstalaciones(it);
   renderMix();
   calcProtection();
 }
@@ -417,6 +472,7 @@ function renderMix() {
   renderMixStatus(evalRes);
   renderMixSuggestions(evalRes);
   renderFichasMix();
+  renderTransformadorIntegral();
 
   // Backwards-compat con la sección "Calculador de ventiladores"
   // del informe legacy: mantenemos un alias `state.fans` derivado
@@ -426,6 +482,28 @@ function renderMix() {
   }));
 
   if (focId) { const el = $(focId); if (el) el.focus(); }
+}
+
+/**
+ * Renderiza el SVG integral del transformador con todos los
+ * radiadores y ventiladores instalados según el mix actual.
+ * Se invoca desde renderMix() en cada cambio del mix o de las
+ * dimensiones del radiador.
+ */
+function renderTransformadorIntegral() {
+  const wrap = $('render-transformador');
+  if (!wrap) return;
+  if (!state.mix || state.mix.length === 0) {
+    wrap.innerHTML = `<div style="text-align:center;padding:40px;color:var(--ink-3);font-style:italic">Agregue al menos un modelo al mix para ver el render integral del transformador.</div>`;
+    return;
+  }
+  const radCantUI = Math.max(1, parseInt($('rad_cant')?.value, 10) || 1);
+  const A_ui = parseFloat($('rad_A')?.value) || 1500;
+  const B_ui = parseFloat($('rad_B')?.value) || 1100;
+  const C_ui = parseFloat($('rad_C')?.value) || 200;
+  wrap.innerHTML = renderTransformadorCompletoSVG({
+    rad_cant: radCantUI, A: A_ui, B: B_ui, C: C_ui, mix: state.mix
+  });
 }
 
 /**
@@ -546,6 +624,237 @@ function dispoIlustrativaSVG(disp, opts = {}) {
     return _renderVertical({ disp: dispKey, A, B, C, diametro_mm, rad_cant, ubicacion, defs, G, SH, FA });
   }
   return _renderLateral({ A, B, C, diametro_mm, rad_cant, ubicacion, defs, G, SH, FA });
+}
+
+/**
+ * Render INTEGRAL del transformador con TODOS los radiadores y
+ * TODOS los ventiladores instalados según las asignaciones del
+ * mix. Vista lateral panorámica con:
+ *   · Tanque del transformador (rectángulo azul oscuro vertical)
+ *   · N cuerpos de radiador en fila horizontal a la derecha
+ *   · Cada cuerpo numerado 1..N
+ *   · Cada ventilador del mix dibujado en SU cuerpo asignado
+ *   · Color del ventilador según el modelo (paleta de 6 colores)
+ *   · Leyenda al pie con marca + modelo + cantidad por modelo
+ *
+ * @param {{
+ *   rad_cant: number,
+ *   A: number, B: number, C: number,
+ *   mix: Array<{key, marca, modelo, cantidad, disposicion, instalaciones, ficha}>
+ * }} input
+ * @returns {string} SVG inline
+ */
+function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 200, mix = [] } = {}) {
+  const N = Math.max(1, Math.floor(rad_cant) || 1);
+  const PALETA_FANS = [
+    { fill: '#fff3e0', stroke: '#e65100', accent: '#bf360c' },
+    { fill: '#e8f5e9', stroke: '#1b5e20', accent: '#0d3d0f' },
+    { fill: '#f3e5f5', stroke: '#6a1b9a', accent: '#4a0072' },
+    { fill: '#e3f2fd', stroke: '#0d47a1', accent: '#002171' },
+    { fill: '#fce4ec', stroke: '#ad1457', accent: '#78002e' },
+    { fill: '#fff8e1', stroke: '#f57f17', accent: '#bc5100' }
+  ];
+  // Asigna color por key de modelo (consistente entre renders)
+  const colorPorKey = new Map();
+  mix.forEach((it, i) => colorPorKey.set(it.key, PALETA_FANS[i % PALETA_FANS.length]));
+
+  // Layout: ancho variable según N cuerpos
+  const TANK_W = 60, TANK_X = 30;
+  const RAD_W = Math.max(80, Math.min(140, 700 / N));
+  const RAD_GAP = 12;
+  const RAD_X0 = TANK_X + TANK_W + 30;
+  const RAD_Y = 60;
+  const RAD_H = Math.min(220, Math.max(140, 220 * Math.min(1, A / 2000)));
+  const W = RAD_X0 + N * (RAD_W + RAD_GAP) + 200;   // espacio para leyenda
+  const H = RAD_Y + RAD_H + 220;                      // espacio inferior para fans laterales/leyenda
+
+  const uid = 'tx_' + Math.random().toString(36).slice(2, 6);
+  const defs = `
+    <defs>
+      <linearGradient id="${uid}_tank" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="#1976d2"/>
+        <stop offset="50%" stop-color="#0d47a1"/>
+        <stop offset="100%" stop-color="#082b66"/>
+      </linearGradient>
+      <linearGradient id="${uid}_rad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%"  stop-color="#e3f2fd"/>
+        <stop offset="100%" stop-color="#90caf9"/>
+      </linearGradient>
+      <filter id="${uid}_sh" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="1.2"/>
+        <feOffset dx="1" dy="2" result="offsetblur"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.30"/></feComponentTransfer>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>`;
+
+  // ── Tanque ───────────────────────────────────────────────
+  const tankSvg = `
+    <g filter="url(#${uid}_sh)">
+      <rect x="${TANK_X}" y="${RAD_Y - 10}" width="${TANK_W}" height="${RAD_H + 40}" rx="4" fill="url(#${uid}_tank)" stroke="#0d3a73" stroke-width="0.8"/>
+      <rect x="${TANK_X + 4}" y="${RAD_Y - 6}" width="${TANK_W - 8}" height="6" fill="#fff" opacity="0.18"/>
+      <text x="${TANK_X + TANK_W / 2}" y="${RAD_Y + RAD_H / 2}" text-anchor="middle" fill="#fff" font-family="Arial" font-size="10" font-weight="700" letter-spacing="0.6"
+            transform="rotate(-90 ${TANK_X + TANK_W / 2} ${RAD_Y + RAD_H / 2})">TRANSFORMADOR</text>
+    </g>
+    <!-- Bujes superiores ilustrativos -->
+    <g stroke="#0d3a73" stroke-width="0.8" fill="#bbdefb">
+      ${[0.25, 0.5, 0.75].map(p => {
+        const x = TANK_X + TANK_W * p;
+        return `<rect x="${x - 3}" y="${RAD_Y - 28}" width="6" height="20" rx="1"/><circle cx="${x}" cy="${RAD_Y - 30}" r="3" fill="#0d47a1"/>`;
+      }).join('')}
+    </g>`;
+
+  // ── Cuerpos de radiador ──────────────────────────────────
+  const cuerposSvg = Array.from({length: N}, (_, i) => {
+    const cuerpoNum = i + 1;
+    const x = RAD_X0 + i * (RAD_W + RAD_GAP);
+    return `
+      <g filter="url(#${uid}_sh)">
+        <rect x="${x}" y="${RAD_Y}" width="${RAD_W}" height="${RAD_H}" rx="4" fill="url(#${uid}_rad)" stroke="#0d47a1" stroke-width="1.2"/>
+        <g stroke="#0d47a1" stroke-width="0.4" fill="none" opacity="0.7">
+          ${Array.from({length: 16}, (_, j) => {
+            const xLine = x + 4 + j * (RAD_W - 8) / 15;
+            return `<line x1="${xLine}" y1="${RAD_Y + 6}" x2="${xLine}" y2="${RAD_Y + RAD_H - 6}"/>`;
+          }).join('')}
+        </g>
+        <rect x="${x - 2}" y="${RAD_Y - 4}" width="${RAD_W + 4}" height="6" rx="1" fill="#0d47a1"/>
+        <rect x="${x - 2}" y="${RAD_Y + RAD_H - 2}" width="${RAD_W + 4}" height="6" rx="1" fill="#0d47a1"/>
+      </g>
+      <text x="${x + RAD_W / 2}" y="${RAD_Y + RAD_H / 2 - 2}" text-anchor="middle" fill="#0d3a73" font-family="Arial" font-size="11" font-weight="700">CUERPO</text>
+      <text x="${x + RAD_W / 2}" y="${RAD_Y + RAD_H / 2 + 12}" text-anchor="middle" fill="#0d3a73" font-family="Arial" font-size="14" font-weight="700">#${cuerpoNum}</text>`;
+  }).join('');
+
+  // ── Ventiladores instalados ──────────────────────────────
+  // Para cada cuerpo, agrupamos los ventiladores que se instalan
+  // ahí. Disposición lateral → al costado del cuerpo. Vertical →
+  // abajo del cuerpo (vertical_2 cubre 2 cuerpos consecutivos).
+  /** @type {Map<number, Array<{it, color, dispKey}>>} */
+  const ventiladoresPorCuerpo = new Map();
+  for (const it of mix) {
+    const color = colorPorKey.get(it.key);
+    const dispKey = it.disposicion || 'lateral';
+    const insts = it.instalaciones || [];
+    for (const ins of insts) {
+      const arr = ventiladoresPorCuerpo.get(ins.cuerpo) || [];
+      arr.push({ it, color, dispKey });
+      ventiladoresPorCuerpo.set(ins.cuerpo, arr);
+    }
+  }
+
+  let fansSvg = '';
+  for (const [cuerpoNum, fans] of ventiladoresPorCuerpo.entries()) {
+    if (cuerpoNum < 1 || cuerpoNum > N) continue;
+    const x = RAD_X0 + (cuerpoNum - 1) * (RAD_W + RAD_GAP);
+    // Separar ventiladores laterales (al costado/derecha) vs verticales (abajo)
+    const laterales = fans.filter(f => f.dispKey === 'lateral');
+    const verticales = fans.filter(f => f.dispKey !== 'lateral');
+
+    // Laterales · al costado derecho del cuerpo, apilados vertical
+    laterales.forEach((f, i) => {
+      const fanR = Math.min(28, RAD_W * 0.30);
+      const fanX = x + RAD_W + 18 + (i % 2) * (fanR * 2 + 8);   // si más de 1, segundo a la derecha
+      const fanY = RAD_Y + 30 + Math.floor(i / 2) * (fanR * 2 + 14);
+      if (fanY + fanR > RAD_Y + RAD_H - 10) return;   // se sale del cuerpo, omitir
+      fansSvg += _renderFanCircle(fanX, fanY, fanR, f.color, f.it.modelo, 'L');
+      // Flecha de flujo desde el ventilador hacia el radiador (←)
+      fansSvg += `<g stroke="${f.color.stroke}" stroke-width="1.6" fill="${f.color.stroke}" opacity="0.85">
+        <line x1="${fanX - fanR - 2}" y1="${fanY}" x2="${x + RAD_W + 6}" y2="${fanY}" marker-end="url(#${uid}_arrL)"/>
+      </g>`;
+    });
+
+    // Verticales · abajo del cuerpo, en fila horizontal
+    verticales.forEach((f, i) => {
+      const totalV = verticales.length;
+      const fanR = Math.min(24, RAD_W / Math.max(2, totalV) * 0.42);
+      const fanX = x + RAD_W * (i + 0.5) / Math.max(1, totalV);
+      const fanY = RAD_Y + RAD_H + 24 + fanR;
+      const labelV2 = (f.dispKey === 'vertical_2') ? '↑↑' : '↑';
+      fansSvg += _renderFanCircle(fanX, fanY, fanR, f.color, f.it.modelo, labelV2);
+      // Flecha hacia arriba
+      fansSvg += `<g stroke="${f.color.stroke}" stroke-width="1.6" fill="${f.color.stroke}" opacity="0.85">
+        <line x1="${fanX}" y1="${fanY - fanR - 2}" x2="${fanX}" y2="${RAD_Y + RAD_H + 6}" marker-end="url(#${uid}_arrU)"/>
+      </g>`;
+      // Si es vertical_2 y tiene cuerpo siguiente, dibuja flechas también en el cuerpo siguiente
+      if (f.dispKey === 'vertical_2' && cuerpoNum + 1 <= N) {
+        const xN = RAD_X0 + cuerpoNum * (RAD_W + RAD_GAP);
+        // banda de marca sobre el cuerpo siguiente para indicar cobertura
+        fansSvg += `<rect x="${xN}" y="${RAD_Y}" width="${RAD_W}" height="${RAD_H}" fill="${f.color.fill}" opacity="0.18" stroke="${f.color.stroke}" stroke-width="1" stroke-dasharray="4,3"/>`;
+      }
+    });
+  }
+
+  // Markers para flechas
+  const arrows = `
+    <defs>
+      <marker id="${uid}_arrL" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+      </marker>
+      <marker id="${uid}_arrU" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+        <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+      </marker>
+    </defs>`;
+
+  // ── Cota A (altura del cuerpo) ───────────────────────────
+  const cotaSvg = `
+    <g stroke="#1565c0" stroke-width="0.8" fill="#1565c0" font-family="Arial" font-size="10" font-weight="700">
+      <line x1="${RAD_X0 - 14}" y1="${RAD_Y}" x2="${RAD_X0 - 14}" y2="${RAD_Y + RAD_H}" stroke-width="1.2"/>
+      <line x1="${RAD_X0 - 18}" y1="${RAD_Y}" x2="${RAD_X0 - 10}" y2="${RAD_Y}"/>
+      <line x1="${RAD_X0 - 18}" y1="${RAD_Y + RAD_H}" x2="${RAD_X0 - 10}" y2="${RAD_Y + RAD_H}"/>
+      <text x="${RAD_X0 - 22}" y="${RAD_Y + RAD_H / 2 + 4}" text-anchor="end">A=${Math.round(A)}mm</text>
+    </g>`;
+
+  // ── Leyenda ──────────────────────────────────────────────
+  const legX = RAD_X0 + N * (RAD_W + RAD_GAP) + 16;
+  const legY = RAD_Y;
+  const legendSvg = `
+    <g font-family="Arial" font-size="10">
+      <text x="${legX}" y="${legY}" font-weight="700" fill="#0d3a73" font-size="11">LEYENDA</text>
+      ${mix.map((it, i) => {
+        const c = colorPorKey.get(it.key);
+        const y = legY + 18 + i * 26;
+        return `
+          <circle cx="${legX + 8}" cy="${y - 4}" r="7" fill="${c.fill}" stroke="${c.stroke}" stroke-width="1.4"/>
+          <text x="${legX + 22}" y="${y - 1}" font-size="10" font-weight="700" fill="#1f3656">${escaparHtml(it.marca)} ${escaparHtml(it.modelo)}</text>
+          <text x="${legX + 22}" y="${y + 12}" font-size="9" fill="#4d6485">${it.cantidad} u · ${({lateral:'lateral', vertical_1:'vertical 1', vertical_2:'vertical 2'}[it.disposicion]) || it.disposicion}</text>`;
+      }).join('')}
+      <text x="${legX}" y="${legY + 18 + mix.length * 26 + 14}" font-size="9" fill="#4d6485" font-style="italic">${ventiladoresPorCuerpo.size} cuerpo(s) con ventilador(es) · ${N} cuerpos totales</text>
+    </g>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Render integral del transformador con todos los radiadores y ventiladores instalados" style="width:100%;height:auto">
+    ${defs}
+    ${arrows}
+    <rect x="0" y="0" width="${W}" height="${H}" fill="#f8fbff"/>
+    ${tankSvg}
+    ${cuerposSvg}
+    ${cotaSvg}
+    ${fansSvg}
+    ${legendSvg}
+    <text x="20" y="${H - 12}" fill="#1565c0" font-size="9" font-weight="600" letter-spacing="0.04em" font-family="Arial">VISTA INTEGRAL · transformador con ${N} cuerpo${N === 1 ? '' : 's'} de radiador y ${mix.reduce((s, it) => s + (it.cantidad || 0), 0)} ventilador${mix.reduce((s, it) => s + (it.cantidad || 0), 0) === 1 ? '' : 'es'} del mix</text>
+  </svg>`;
+}
+
+/**
+ * Helper · dibuja un círculo de ventilador (carcasa + disco +
+ * aspas + motor) en (cx, cy) con radio R y paleta de color.
+ */
+function _renderFanCircle(cx, cy, R, color, label, sigil) {
+  return `
+    <g style="color:${color.stroke}">
+      <circle cx="${cx}" cy="${cy}" r="${R + 2}" fill="${color.accent}" opacity="0.95"/>
+      <circle cx="${cx}" cy="${cy}" r="${R}" fill="${color.fill}" stroke="${color.stroke}" stroke-width="1.2"/>
+      <g stroke="${color.stroke}" stroke-width="1" fill="none" opacity="0.85">
+        ${Array.from({length: 4}, (_, i) => {
+          const angle = (i * 90 + 30) * Math.PI / 180;
+          const x1 = cx + Math.cos(angle) * (R - 4);
+          const y1 = cy + Math.sin(angle) * (R - 4);
+          const cxc = cx + Math.cos(angle - 0.6) * (R * 0.45);
+          const cyc = cy + Math.sin(angle - 0.6) * (R * 0.45);
+          return `<path d="M ${cx},${cy} Q ${cxc},${cyc} ${x1},${y1}"/>`;
+        }).join('')}
+      </g>
+      <circle cx="${cx}" cy="${cy}" r="${Math.max(3, R * 0.22)}" fill="${color.accent}"/>
+      <text x="${cx}" y="${cy + R + 12}" text-anchor="middle" font-family="Arial" font-size="8" font-weight="700" fill="${color.stroke}">${sigil || ''}</text>
+    </g>`;
 }
 
 /* ─── Renderer LATERAL · vista frontal de obleas + ventilador ── */
@@ -818,6 +1127,26 @@ function renderFichaUnica(it, idx) {
                 <option value="inferior"${ubic.posicion === 'inferior' ? ' selected' : ''}>Posición inferior</option>
               </select>
             </div>
+
+            <!-- Asignación · cada unidad del modelo se asigna a un cuerpo específico -->
+            <div class="fmd-l" style="margin-top:8px">Asignación de unidades a cuerpos</div>
+            <p class="hint" style="margin: 2px 0 4px; font-size: 10px; color: var(--ink-3); font-style: italic">
+              ${it.disposicion === 'vertical_2'
+                ? 'Vertical 2 cuerpos: el ventilador cubre el cuerpo seleccionado + el siguiente. Si elige cuerpo 1, refrigera cuerpos 1 y 2.'
+                : it.disposicion === 'lateral'
+                  ? 'Lateral: pueden ir varios ventiladores al mismo cuerpo. Asigne cada unidad al cuerpo donde se instalará físicamente.'
+                  : 'Vertical 1 cuerpo: cada unidad refrigera 1 cuerpo de radiador.'}
+            </p>
+            <div class="fmd-instalaciones">
+              ${(it.instalaciones || []).map((ins, ui) => `
+                <div class="fmi-cell">
+                  <span class="fmi-l">Unidad ${ui + 1}</span>
+                  <select class="fmd-select fmi-cuerpo" data-mix-inst-cuerpo="${it.id}" data-mix-inst-idx="${ui}">
+                    ${Array.from({length: radCantUI}, (_, i) => `<option value="${i + 1}"${ins.cuerpo === (i + 1) ? ' selected' : ''}>Cuerpo #${i + 1}${it.disposicion === 'vertical_2' && (i + 1) < radCantUI ? ' + ' + (i + 2) : ''}</option>`).join('')}
+                  </select>
+                </div>`).join('')}
+            </div>
+
             <div class="fmd-msg" style="margin-top:4px">Render escalado a A=${Math.round(A_ui)} mm · B=${Math.round(B_ui)} mm · Ø=${Math.round(diam)} mm</div>
           </div>
           <div class="fmd-svg">
@@ -2210,6 +2539,7 @@ async function guardarAccion() {
         cantidad:     it.cantidad,
         disposicion:  it.disposicion || 'lateral',
         ubicacion:    it.ubicacion ? { ...it.ubicacion } : { lado: 'frontal', cuerpo: 1, posicion: 'centro' },
+        instalaciones: Array.isArray(it.instalaciones) ? it.instalaciones.map(i => ({ ...i })) : [],
         ficha:        { ...(it.ficha || {}) }      // unfreeze para serializar
       })),
       evaluacion,
@@ -3039,6 +3369,23 @@ function generateReport() {
     width: 100%; height: auto; max-height: 1.6in;
   }
 
+  /* ── Render integral del transformador (sec 4.bis) ───────── */
+  .render-tx-block {
+    margin: 6pt 0;
+    padding: 4pt;
+    background: #f8fbff;
+    border: 1px solid #b0cce8;
+    border-radius: 4pt;
+    text-align: center;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .render-tx-block svg {
+    width: 100%; height: auto; max-width: 6.14in;
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+  }
+
   /* ── Diagrama del radiador (SVG embebido) ───────────────────── */
   .rad-diagram {
     margin: 8pt 0; padding: 8pt 12pt 5pt;
@@ -3192,6 +3539,22 @@ function generateReport() {
       ${_row('Disposición mecánica del ventilador',            disp)}
     </tbody>
   </table>
+
+  <!-- ── 4.bis · VISTA INTEGRAL DEL TRANSFORMADOR ─────────── -->
+  ${state.mix.length > 0 ? `
+  <section class="section-anchor">
+    <h2>4.bis · Vista integral del transformador con ventiladores instalados</h2>
+    <p class="meta">Render escalado a las dimensiones del cuerpo de radiador (A=${rad.A || '—'} mm, B=${rad.B || '—'} mm) con la asignación específica de cada ventilador del mix a su cuerpo de radiador correspondiente. Sirve como referencia gráfica del montaje propuesto.</p>
+    <div class="render-tx-block">
+      ${renderTransformadorCompletoSVG({
+        rad_cant: parseInt(rad.cant, 10) || 1,
+        A: parseFloat(rad.A) || 1500,
+        B: parseFloat(rad.B) || 1100,
+        C: parseFloat(rad.C) || 200,
+        mix: state.mix
+      })}
+    </div>
+  </section>` : ''}
 
   <!-- ── 5 · DATOS DE LOS MOTOVENTILADORES (mix multi-modelo) ── -->
   <section class="section-anchor">
@@ -3620,6 +3983,12 @@ function bindEvents() {
   ['rad_A', 'rad_B', 'rad_C', 'rad_cant'].forEach(id =>
     $(id)?.addEventListener('input', () => renderMix())
   );
+  // Reajustar instalaciones[] de TODOS los items del mix cuando
+  // cambia rad_cant (los cuerpos asignados se clampan al rango
+  // nuevo y se rellena con round-robin si faltan).
+  $('rad_cant')?.addEventListener('input', () => {
+    state.mix.forEach(it => _reajustarInstalaciones(it));
+  });
   $('disposicion')?.addEventListener('change', checkCompat);
 
   $('fan_db_sel')?.addEventListener('change', onFanSelect);
@@ -3687,6 +4056,16 @@ function bindEvents() {
       }
       renderMix();
       checkCompat();
+      return;
+    }
+    // Asignación de instalación por unidad · cuerpo del radiador
+    if (ds.mixInstCuerpo) {
+      const it = state.mix.find(x => x.id === +ds.mixInstCuerpo);
+      const idx = parseInt(ds.mixInstIdx, 10);
+      if (it && Number.isInteger(idx) && it.instalaciones && it.instalaciones[idx]) {
+        it.instalaciones[idx].cuerpo = Math.max(1, parseInt(e.target.value, 10) || 1);
+        renderMix();
+      }
       return;
     }
     // Ubicación · lado / cuerpo / posición
