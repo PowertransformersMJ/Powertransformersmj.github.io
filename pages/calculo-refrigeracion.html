@@ -216,21 +216,20 @@
           </div>
         </div>
 
-        <!-- Pregunta disposición -->
-        <div class="q-banner">
-          <div class="q-banner-head">¿Cómo será la disposición mecánica del ventilador sobre el radiador?</div>
-          <div class="q-banner-body">
-            <div class="fld" style="flex: 1; min-width: 280px">
-              <label for="disposicion">Disposición mecánica</label>
-              <select id="disposicion">
-                <option value="">— Seleccionar disposición mecánica —</option>
-                <option value="lateral">Lateral — ventilador al costado del radiador · flujo horizontal · dimensión crítica: B (span obleas)</option>
-                <option value="vertical_1">Vertical ascendente — 1 cuerpo de radiador · flujo ↑ · dimensión crítica: A (altura)</option>
-                <option value="vertical_2">Vertical ascendente — 2 cuerpos de radiador · flujo ↑ · dimensión crítica: 2×A</option>
-              </select>
-            </div>
-            <div class="info-inline" id="disp-info"></div>
-          </div>
+        <!-- Selector de disposición OCULTO · cada ficha del mix tiene
+             su propia disposición editable. Este input legacy se
+             conserva como fuente de verdad interna para la card de
+             Compatibilidad mecánica + el render SVG global. Se
+             actualiza cuando el usuario cambia la disposición de
+             alguno de los items del mix. -->
+        <div class="q-banner" hidden aria-hidden="true">
+          <select id="disposicion">
+            <option value="">— Seleccionar disposición mecánica —</option>
+            <option value="lateral">Lateral</option>
+            <option value="vertical_1">Vertical ascendente · 1 cuerpo</option>
+            <option value="vertical_2">Vertical ascendente · 2 cuerpos</option>
+          </select>
+          <div id="disp-info"></div>
         </div>
       </div>
     </section>
