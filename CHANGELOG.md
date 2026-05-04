@@ -16,6 +16,83 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 3 · Selección eléctrica detallada (FLC + contactor AF + SCADA + coordinación) (2026-05-03 PM7)
+
+Tercera microfase del plan de 6. Amplía el cálculo eléctrico para
+cubrir el ciclo completo de protección + maniobra + señalización
+SCADA exigido por el prompt técnico del director.
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Catálogo nuevo CONTACTOR_AF_DB (7 modelos ABB AF: AF09, AF12,
+  AF16, AF26, AF38, AF65, AF80) con corriente AC-3, kW @ 400 V,
+  PID y tipo de bobina universal.
+- Constante TAGS_SCADA con 4 tags estándar (RUN, FAULT, TRIP,
+  READY) cada uno con contacto físico + descripción.
+- Función pura nueva seleccionarContactor(flc, factor=1.15) que
+  selecciona el AF cuya corriente AC-3 cubre FLC × margen de
+  servicio. Devuelve `margen_pct` calculado.
+- Función pura nueva calcularFLC({p_w, hp, voltaje, cosphi,
+  eficiencia, amps_directo}) con 3 rutas:
+  · placa: si pasamos amps_directo lo usamos sin cálculo
+  · cálculo: FLC = P / (√3 × V × cos φ × η) con memoria
+    (fórmula sustituida con valores reales)
+  · sin_datos: lista de campos faltantes
+- calcularProteccionMix devuelve cada grupo con campo `contactor`
+  + objeto `tags_scada` a nivel raíz.
+- calcularProteccionElectrica (legacy) devuelve también
+  `contactor` y `tags_scada`.
+
+Tests (tests/refrigeracion.test.js): +12 tests:
+- CONTACTOR_AF_DB tiene 7 modelos ordenados por AC-3
+- TAGS_SCADA expone los 4 tags estándar
+- seleccionarContactor cubre FLC × 1.15 (caso 0.65 / 8 / 25 A)
+- factor personalizable
+- fuera de catálogo → null
+- calcularFLC ruta 1 (placa)
+- calcularFLC ruta 2 (cálculo desde p_w)
+- calcularFLC acepta HP (× 746)
+- calcularFLC ruta 3 (sin datos) reporta faltantes
+- amps_directo tiene precedencia sobre cálculo
+- calcularProteccionMix incluye contactor + tags_scada
+- calcularProteccionElectrica también
+
+UI (assets/js/calculo-refrigeracion.js):
+- renderProtPorGrupo refactorizado a renderGrupoProtCard. Cada
+  card de grupo muestra ahora 4 columnas:
+  · Grupo + FLC + memoria de cálculo (norma NEMA MG-1 / IEC 60034)
+  · Guardamotor MS116 + setting + margen del setting % del rango
+    (NEC 430.32, IEC 60947-4-1)
+  · Contactor ABB AF + AC-3 + margen sobre FLC + tags SCADA
+    inline (RUN/FAULT/READY) con norma IEC 60947-4-1
+  · Auxiliar SCADA del guardamotor
+- renderProtTotal incluye al pie un bloque renderSCADAblock con
+  los 4 tags SCADA en grid responsive + norma IEEE C37.91 /
+  IEC 61850. La card del breaker incluye coordinación con MCCB
+  aguas arriba (norma IEC 60947-2 · NEC 430.52).
+- renderListaMaterialesMix añade el contactor por grupo al BOM.
+- renderProtLegacyPerFan reescrito con 4 cards (FLC + memoria
+  calcularFLC, MS116, AF, auxiliar SCADA).
+- renderProtLegacyTotal con bloque SCADA + nota de coordinación.
+- renderProtLegacyMateriales añade contactor al BOM.
+
+Informe AFINIA · sec 9 (Circuito de protección eléctrica):
+- Tabla principal amplía columna 'Detalles' por columnas
+  separadas Guardamotor MS116 + Contactor AF (modelo + AC-3 +
+  PID inline).
+- Tabla complementaria de KPIs incluye fila "Coordinación" con
+  nota explícita.
+- Sub-tabla nueva con los 4 tags SCADA + contacto + descripción.
+- BOM agrupado incluye contactor por grupo + nota tags al pie.
+
+CSS: sin cambios (reutiliza .prot-card existentes).
+
+536/536 tests verdes (+12) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+Próxima microfase (4): detección y reporte de "Faltantes" para
+cálculo eléctrico completo (banner amarillo cuando faltan
+potencia, eficiencia, voltaje, cos φ).
+
 ### Microfase 2 · Estrategias enriquecidas (5 tipos + factibilidad + implicaciones) (2026-05-03 PM6)
 
 Refactor del motor `sugerirMejoras` para alinearlo con el prompt

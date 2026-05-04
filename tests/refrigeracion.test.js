@@ -44,7 +44,11 @@ import {
   MIX_ESTADO,
   evaluarMixVentiladores,
   sugerirMejoras,
-  calcularProteccionMix
+  calcularProteccionMix,
+  CONTACTOR_AF_DB,
+  TAGS_SCADA,
+  seleccionarContactor,
+  calcularFLC
 } from '../assets/js/domain/refrigeracion.js';
 
 /* ─── Constantes inmutables ─────────────────────────────────── */
@@ -797,4 +801,114 @@ test('calcularProteccionMix: descarta items con cantidad o amperaje no positivos
   });
   assert.equal(r.grupos.length, 1);
   assert.equal(r.grupos[0].key, 'a');
+});
+
+/* ─── Microfase 3 · Contactores ABB AF + tags SCADA + FLC ────── */
+
+test('CONTACTOR_AF_DB tiene 7 modelos ordenados por corriente AC-3', () => {
+  assert.equal(CONTACTOR_AF_DB.length, 7);
+  for (let i = 1; i < CONTACTOR_AF_DB.length; i++) {
+    assert.ok(CONTACTOR_AF_DB[i].ac3_a > CONTACTOR_AF_DB[i - 1].ac3_a,
+      'catálogo debe estar ordenado por ac3_a ASC');
+  }
+  assert.equal(CONTACTOR_AF_DB[0].model, 'AF09');
+  assert.equal(CONTACTOR_AF_DB[6].model, 'AF80');
+  for (const c of CONTACTOR_AF_DB) {
+    assert.ok(c.model && c.ac3_a > 0 && c.kw_400v > 0 && c.pid && c.bobina);
+  }
+});
+
+test('TAGS_SCADA expone los 4 tags estándar (RUN/FAULT/TRIP/READY)', () => {
+  assert.equal(TAGS_SCADA.length, 4);
+  const tags = TAGS_SCADA.map(t => t.tag);
+  assert.deepEqual(tags, ['RUN', 'FAULT', 'TRIP', 'READY']);
+  for (const t of TAGS_SCADA) {
+    assert.ok(t.contacto && t.descripcion);
+  }
+});
+
+test('seleccionarContactor: cubre FLC × 1.15 (factor de servicio AC-3)', () => {
+  // FLC 0.65 A → × 1.15 = 0.75 → AF09 cubre con margen amplio
+  const c1 = seleccionarContactor(0.65);
+  assert.equal(c1.model, 'AF09');
+  assert.ok(c1.margen_pct > 1000);
+
+  // FLC 8 A → × 1.15 = 9.2 → AF12 (12 A) — no AF09 (9 A)
+  const c2 = seleccionarContactor(8);
+  assert.equal(c2.model, 'AF12');
+
+  // FLC 25 A → × 1.15 = 28.75 → AF38 (38 A) — AF26 (26 A) no alcanza
+  const c3 = seleccionarContactor(25);
+  assert.equal(c3.model, 'AF38');
+});
+
+test('seleccionarContactor: factor personalizable', () => {
+  // Sin margen (factor=1) → AF26 cubre 25 A directo
+  const c = seleccionarContactor(25, 1);
+  assert.equal(c.model, 'AF26');
+});
+
+test('seleccionarContactor: fuera de catálogo devuelve null', () => {
+  assert.equal(seleccionarContactor(100), null);
+  assert.equal(seleccionarContactor(0), null);
+  assert.equal(seleccionarContactor(-1), null);
+});
+
+test('calcularFLC: ruta 1 con lectura directa de placa', () => {
+  const r = calcularFLC({ amps_directo: 1.13 });
+  assert.equal(r.flc_a, 1.13);
+  assert.equal(r.fuente, 'placa');
+  assert.ok(r.memoria.includes('lectura directa'));
+});
+
+test('calcularFLC: ruta 2 con cálculo desde potencia', () => {
+  // Motor 250 W · 400 V · cos φ 0.79 · η 0.85 → FLC ≈ 0.54 A
+  const r = calcularFLC({ p_w: 250, voltaje: 400, cosphi: 0.79, eficiencia: 0.85 });
+  assert.equal(r.fuente, 'calculo');
+  assert.ok(r.flc_a > 0.45 && r.flc_a < 0.65);
+  assert.ok(r.memoria.includes('√3') && r.memoria.includes('250'));
+  assert.ok(r.parametros.hp_eq > 0);
+});
+
+test('calcularFLC: acepta HP en lugar de p_w (conversión × 746)', () => {
+  // 1 HP @ 400 V · cos φ 0.85 · η 0.85 → FLC ≈ 1.49 A
+  const r = calcularFLC({ hp: 1, voltaje: 400, cosphi: 0.85, eficiencia: 0.85 });
+  assert.equal(r.fuente, 'calculo');
+  assert.equal(r.parametros.p_w, 746);
+  assert.ok(r.flc_a > 1 && r.flc_a < 2);
+});
+
+test('calcularFLC: ruta 3 (sin datos) reporta campos faltantes', () => {
+  const r = calcularFLC({ p_w: 0, voltaje: 0, cosphi: 0, eficiencia: 0 });
+  assert.equal(r.flc_a, null);
+  assert.equal(r.fuente, 'sin_datos');
+  assert.ok(r.memoria.includes('faltan'));
+  assert.ok(r.memoria.includes('potencia'));
+});
+
+test('calcularFLC: amps_directo tiene precedencia sobre cálculo', () => {
+  const r = calcularFLC({ amps_directo: 2.5, p_w: 1000, voltaje: 400, cosphi: 0.85, eficiencia: 0.85 });
+  assert.equal(r.flc_a, 2.5);
+  assert.equal(r.fuente, 'placa');
+});
+
+test('calcularProteccionMix incluye contactor por grupo + tags_scada', () => {
+  const r = calcularProteccionMix({
+    items: [
+      { key: 'a', marca: 'X', modelo: 'A', cantidad: 4, amps_unitario: 0.65 },
+      { key: 'b', marca: 'X', modelo: 'B', cantidad: 8, amps_unitario: 1.13 }
+    ]
+  });
+  assert.ok(r.grupos[0].contactor, 'grupo 0 debe tener contactor');
+  assert.ok(r.grupos[1].contactor, 'grupo 1 debe tener contactor');
+  assert.equal(r.grupos[0].contactor.model, 'AF09');
+  assert.equal(r.grupos[1].contactor.model, 'AF09');
+  assert.equal(r.tags_scada.length, 4);
+});
+
+test('calcularProteccionElectrica (legacy) también incluye contactor + tags_scada', () => {
+  const r = calcularProteccionElectrica({ amps_por_fan: 1.13, n_fans: 8 });
+  assert.ok(r.contactor, 'debe haber contactor');
+  assert.equal(r.contactor.model, 'AF09');
+  assert.equal(r.tags_scada.length, 4);
 });

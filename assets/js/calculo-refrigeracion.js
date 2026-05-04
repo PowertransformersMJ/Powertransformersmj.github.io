@@ -656,28 +656,48 @@ async function calcProtection() {
 
 function renderProtLegacyPerFan(fan, conn, iF, r) {
   const gm = r.guardamotor;
+  const ct = r.contactor;
+  const margenSetting = gm ? +((iF - gm.min) / (gm.max - gm.min) * 100).toFixed(1) : null;
   const txtConn = conn === 'D' ? 'Δ Delta' : 'Y Estrella';
+  // Memoria FLC con la fórmula sustituida cuando es posible
+  const flcMem = calcularFLC({
+    p_w:        +fan.fan_kw   || 0,
+    voltaje:    parseFloat(String(fan.fan_volt || '').match(/(\d+)\s*V/)?.[1]) || 400,
+    cosphi:     +fan.fan_cosphi || 0,
+    eficiencia: 0.85,
+    amps_directo: iF
+  });
   return `
     <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:stretch">
-      <div class="prot-card prot-card--ok" style="min-width:200px">
-        <div class="prot-label">Corriente por ventilador (${txtConn})</div>
-        <div class="prot-val">${iF.toFixed(2)} A</div>
-        <div class="prot-meta">${escaparHtml(fan.fan_modelo)} · ${conn === 'D' ? 'Δ' : 'Y'} · ${escaparHtml(fan.fan_hz || '?')} Hz</div>
+      <div class="prot-card prot-card--ok" style="min-width:220px">
+        <div class="prot-label">Corriente nominal (FLC) por ventilador</div>
+        <div class="prot-val">${iF.toFixed(2)} A (${txtConn})</div>
+        <div class="prot-meta">${escaparHtml(fan.fan_modelo)} · ${escaparHtml(fan.fan_hz || '?')} Hz · ${escaparHtml(fan.fan_volt || '?')}</div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">${escaparHtml(flcMem.memoria)}</div>
       </div>
-      <div class="prot-card prot-card--${gm ? 'ok' : 'err'}" style="min-width:280px">
-        <div class="prot-label">Guardamotor sugerido (1 por ventilador)</div>
+      <div class="prot-card prot-card--${gm ? 'ok' : 'err'}" style="min-width:260px">
+        <div class="prot-label">Guardamotor MS116 (1 por ventilador)</div>
         ${gm ? `
           <div class="prot-val">ABB ${gm.model}</div>
-          <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${iF.toFixed(2)} A</strong></div>
+          <div class="prot-meta">Setting: <strong>${iF.toFixed(2)} A</strong> · rango ${gm.min}…${gm.max} A · margen del setting: <strong>${margenSetting}%</strong> del rango</div>
           <div class="prot-meta">PID: ${gm.pid} · Ics=50 kA@400 V · Trip class 10A · 45 mm DIN</div>
-          <div class="prot-meta">Función desconexión integrada · Comp. temperatura · IEC/EN 60947-4-1</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Norma NEC 430.32 · IEC 60947-4-1</div>
         ` : `<div class="prot-meta">Corriente ${iF.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
       </div>
-      <div class="prot-card prot-card--info" style="min-width:240px">
-        <div class="prot-label">Contacto auxiliar SCADA (1 por guardamotor)</div>
+      <div class="prot-card prot-card--${ct ? 'ok' : 'err'}" style="min-width:240px">
+        <div class="prot-label">Contactor ABB AF (1 por ventilador)</div>
+        ${ct ? `
+          <div class="prot-val">ABB ${ct.model}</div>
+          <div class="prot-meta">AC-3: <strong>${ct.ac3_a} A</strong> · ≤ ${ct.kw_400v} kW @ 400 V · margen: <strong>${ct.margen_pct}%</strong> sobre FLC</div>
+          <div class="prot-meta">PID: ${ct.pid} · Bobina: ${ct.bobina}</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tags SCADA: <strong>RUN</strong> · <strong>FAULT</strong> · <strong>READY</strong> · norma IEC 60947-4-1</div>
+        ` : `<div class="prot-meta cwrn">FLC ${iF.toFixed(2)} A excede catálogo AF (≤80 A). Consultar familia AX/AE.</div>`}
+      </div>
+      <div class="prot-card prot-card--info" style="min-width:220px">
+        <div class="prot-label">Auxiliar SCADA guardamotor</div>
         <div class="prot-val">ABB ${r.aux_guardamotor.model}</div>
         <div class="prot-meta">${r.aux_guardamotor.desc}</div>
-        <div class="prot-meta">PID: ${r.aux_guardamotor.pid} · 9 mm · Señalización falla / estado motor al SCADA</div>
+        <div class="prot-meta">PID: ${r.aux_guardamotor.pid}</div>
       </div>
     </div>
     <p style="margin-top:8px;font-size:11px;color:var(--ink-3);font-style:italic">
@@ -698,32 +718,35 @@ function renderProtLegacyTotal(r, nFans, iF) {
       <div class="prot-card prot-card--info" style="min-width:200px">
         <div class="prot-label">Corriente mínima del breaker</div>
         <div class="prot-val">${nFans ? r.amps_min_breaker.toFixed(2) + ' A' : '—'}</div>
-        <div class="prot-meta">Factor seguridad NEC 430 (×1.25)</div>
+        <div class="prot-meta">Factor seguridad NEC 430.52 (×1.25)</div>
       </div>
       <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:280px">
-        <div class="prot-label">Breaker principal sugerido</div>
+        <div class="prot-label">Breaker principal S203 (1 ud)</div>
         ${brk ? `
           <div class="prot-val">ABB ${brk.model}</div>
-          <div class="prot-meta">In = ${brk.in} A · 3P · Curva C · 6 kA</div>
+          <div class="prot-meta">In = <strong>${brk.in} A</strong> · 3P · <strong>Curva C</strong> (5–10 × In) · poder de corte <strong>6 kA</strong></div>
           <div class="prot-meta">PID: ${brk.pid} · Pérdidas: ${brk.power_w} W</div>
-        ` : `<div class="prot-meta">${nFans ? `Corriente requerida ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (máx. 50 A). Consultar familia superior.` : 'Calcule el sistema para sugerir breaker.'}</div>`}
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Coordinación: verificar selectividad con interruptor aguas arriba (típicamente MCCB ≥ 100 A en tablero general). Norma IEC 60947-2 · NEC 430.52</div>
+        ` : `<div class="prot-meta">${nFans ? `Corriente requerida ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (máx. 50 A). Consultar familia superior (XT1/XT2/Tmax).` : 'Calcule el sistema para sugerir breaker.'}</div>`}
       </div>
       <div class="prot-card prot-card--info" style="min-width:240px">
-        <div class="prot-label">Contacto auxiliar SCADA (1 por breaker)</div>
+        <div class="prot-label">Auxiliar breaker SCADA (1 ud)</div>
         <div class="prot-val">ABB ${r.aux_breaker.model}</div>
-        <div class="prot-meta">${r.aux_breaker.desc}</div>
         <div class="prot-meta">PID: ${r.aux_breaker.pid}</div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tag SCADA: <strong>TRIP</strong> (NC breaker auxiliar)</div>
       </div>
-    </div>`;
+    </div>
+    ${r.tags_scada ? renderSCADAblock(r.tags_scada) : ''}`;
 }
 
 function renderProtLegacyMateriales(fan, conn, iF, r) {
   const items = [];
   items.push(`${r.n_fans || 1}× <strong>Motoventilador ${escaparHtml(fan.fan_marca || '')} ${escaparHtml(fan.fan_modelo || '')}</strong> · PID ${escaparHtml(fan.fan_nserie || '—')} · ${fan.fan_diam || '?'} mm Ø · ${fan.fan_cfm_nom || '?'} CFM`);
   if (r.guardamotor)     items.push(`${r.n_fans || 1}× <strong>Guardamotor ABB ${r.guardamotor.model}</strong> · PID ${r.guardamotor.pid} · setting ${iF.toFixed(2)} A · rango ${r.guardamotor.min}…${r.guardamotor.max} A`);
+  if (r.contactor)       items.push(`${r.n_fans || 1}× <strong>Contactor ABB ${r.contactor.model}</strong> · PID ${r.contactor.pid} · AC-3 ${r.contactor.ac3_a} A · bobina ${r.contactor.bobina} (RUN/READY/FAULT al SCADA)`);
   if (r.aux_guardamotor) items.push(`${r.n_fans || 1}× <strong>Auxiliar guardamotor ABB ${r.aux_guardamotor.model}</strong> · PID ${r.aux_guardamotor.pid} · contacto auxiliar SCADA`);
   if (r.breaker)         items.push(`1× <strong>Breaker principal ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema · In ${r.breaker.in} A · Curva C · 6 kA · pérdidas ${r.breaker.power_w} W`);
-  if (r.aux_breaker)     items.push(`1× <strong>Auxiliar breaker ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
+  if (r.aux_breaker)     items.push(`1× <strong>Auxiliar breaker ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA (TRIP)`);
   if (!items.length) return '';
   return `
     <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica (preview con modelo único)</div>
@@ -739,26 +762,52 @@ function renderProtPorGrupo(r, conn) {
   }
   return `
     <div style="display:flex;flex-direction:column;gap:10px">
-      ${r.grupos.map(g => {
-        const gm = g.guardamotor;
-        return `
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;padding:10px 12px;border:1px solid rgba(0,40,90,.10);border-radius:8px;background:rgba(255,255,255,.4)">
-          <div style="flex:1 1 220px;min-width:200px">
-            <div class="prot-label">Grupo · ${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</div>
-            <div class="prot-val">${g.cantidad} × ${g.amps_unitario.toFixed(2)} A (${txtConn})</div>
-            <div class="prot-meta">Corriente del grupo: <strong>${g.amps_grupo.toFixed(2)} A</strong> · ${g.cantidad} ventiladores</div>
-          </div>
-          <div style="flex:1 1 280px;min-width:240px">
-            <div class="prot-label">Guardamotor sugerido (${g.cantidad} unidad${g.cantidad === 1 ? '' : 'es'})</div>
-            ${gm ? `
-              <div class="prot-val">ABB ${gm.model}</div>
-              <div class="prot-meta">Rango ajuste: ${gm.min}…${gm.max} A · Setting recomendado: <strong>${g.amps_unitario.toFixed(2)} A</strong></div>
-              <div class="prot-meta">PID: ${gm.pid} · 45 mm DIN · IEC/EN 60947-4-1</div>
-            ` : `<div class="prot-meta cwrn">Corriente ${g.amps_unitario.toFixed(2)} A fuera del rango MS116 estándar (0.10…32 A). Consultar catálogo.</div>`}
-            <div class="prot-meta">+ ${g.cantidad}× <strong>ABB ${g.aux_guardamotor.model}</strong> · auxiliar SCADA · PID ${g.aux_guardamotor.pid}</div>
-          </div>
-        </div>`;
-      }).join('')}
+      ${r.grupos.map(g => renderGrupoProtCard(g, txtConn)).join('')}
+    </div>`;
+}
+
+/**
+ * Renderiza la ficha de protección eléctrica de un grupo del mix.
+ * Cada grupo lleva: card de FLC, card de guardamotor, card de
+ * contactor (con tags SCADA RUN/FAULT/READY) y línea de auxiliar
+ * SCADA del guardamotor.
+ */
+function renderGrupoProtCard(g, txtConn) {
+  const gm = g.guardamotor;
+  const ct = g.contactor;
+  const margenSetting = gm ? +((g.amps_unitario - gm.min) / (gm.max - gm.min) * 100).toFixed(1) : null;
+  return `
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:stretch;padding:10px 12px;border:1px solid rgba(0,40,90,.10);border-radius:8px;background:rgba(255,255,255,.4)">
+      <div style="flex:1 1 200px;min-width:180px">
+        <div class="prot-label">Grupo · ${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</div>
+        <div class="prot-val">${g.cantidad} × ${g.amps_unitario.toFixed(2)} A (${txtConn})</div>
+        <div class="prot-meta">FLC unitario: <strong>${g.amps_unitario.toFixed(2)} A</strong> · grupo total: <strong>${g.amps_grupo.toFixed(2)} A</strong></div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Lectura de placa fan_amp · norma NEMA MG-1 / IEC 60034</div>
+      </div>
+      <div style="flex:1 1 240px;min-width:220px">
+        <div class="prot-label">Guardamotor MS116 (${g.cantidad} u)</div>
+        ${gm ? `
+          <div class="prot-val">ABB ${gm.model}</div>
+          <div class="prot-meta">Setting: <strong>${g.amps_unitario.toFixed(2)} A</strong> · rango ${gm.min}…${gm.max} A · margen del setting: <strong>${margenSetting}%</strong> del rango</div>
+          <div class="prot-meta">PID: ${gm.pid} · 45 mm DIN · 50 kA @ 400 V</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Norma NEC 430.32 (×1.25 NEC) · IEC 60947-4-1</div>
+        ` : `<div class="prot-meta cwrn">Corriente ${g.amps_unitario.toFixed(2)} A fuera del rango MS116 (0.10…32 A). Consultar catálogo superior.</div>`}
+      </div>
+      <div style="flex:1 1 240px;min-width:220px">
+        <div class="prot-label">Contactor ABB AF (${g.cantidad} u)</div>
+        ${ct ? `
+          <div class="prot-val">ABB ${ct.model}</div>
+          <div class="prot-meta">AC-3: <strong>${ct.ac3_a} A</strong> · ≤ ${ct.kw_400v} kW @ 400 V · margen: <strong>${ct.margen_pct}%</strong> sobre FLC</div>
+          <div class="prot-meta">PID: ${ct.pid} · Bobina: ${ct.bobina}</div>
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tags SCADA: <strong>RUN</strong> (NO contactor) · <strong>FAULT</strong> (NO MS116) · <strong>READY</strong> (NC MS116) · norma IEC 60947-4-1</div>
+        ` : `<div class="prot-meta cwrn">FLC ${g.amps_unitario.toFixed(2)} A excede catálogo AF (≤80 A). Consultar familia AX/AE.</div>`}
+      </div>
+      <div style="flex:1 1 200px;min-width:180px">
+        <div class="prot-label">Auxiliar SCADA guardamotor</div>
+        <div class="prot-val">ABB ${g.aux_guardamotor.model}</div>
+        <div class="prot-meta">${g.cantidad} u · ${g.aux_guardamotor.desc}</div>
+        <div class="prot-meta">PID: ${g.aux_guardamotor.pid}</div>
+      </div>
     </div>`;
 }
 
@@ -774,20 +823,22 @@ function renderProtTotal(r) {
       <div class="prot-card prot-card--info" style="min-width:200px">
         <div class="prot-label">Corriente mínima del breaker</div>
         <div class="prot-val">${r.amps_min_breaker.toFixed(2)} A</div>
-        <div class="prot-meta">Factor seguridad NEC 430 (×1.25)</div>
+        <div class="prot-meta">Factor seguridad NEC 430.52 (×1.25)</div>
       </div>
       <div class="prot-card prot-card--${brk ? 'ok' : 'err'}" style="min-width:260px">
-        <div class="prot-label">Breaker principal sugerido</div>
+        <div class="prot-label">Breaker principal S203 (1 ud)</div>
         ${brk ? `
           <div class="prot-val">ABB ${brk.model}</div>
-          <div class="prot-meta">In = ${brk.in} A · 3P · Curva C · 6 kA</div>
+          <div class="prot-meta">In = <strong>${brk.in} A</strong> · 3P · <strong>Curva C</strong> (5–10 × In) · poder de corte <strong>6 kA</strong></div>
           <div class="prot-meta">PID: ${brk.pid} · Pérdidas: ${brk.power_w} W</div>
-        ` : `<div class="prot-meta cwrn">Corriente ${r.amps_min_breaker.toFixed(2)} A excede el catálogo S203 (50 A). Consultar familia superior.</div>`}
+          <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Coordinación: verificar selectividad con interruptor aguas arriba (típicamente MCCB ≥ 100 A en tablero general). Norma IEC 60947-2 · NEC 430.52</div>
+        ` : `<div class="prot-meta cwrn">Corriente ${r.amps_min_breaker.toFixed(2)} A excede catálogo S203 (≤50 A). Consultar familia superior (XT1/XT2/Tmax).</div>`}
       </div>
       <div class="prot-card prot-card--info" style="min-width:220px">
         <div class="prot-label">Auxiliar breaker SCADA (1 ud)</div>
         <div class="prot-val">ABB ${r.aux_breaker.model}</div>
-        <div class="prot-meta">PID: ${r.aux_breaker.pid} · ${r.aux_breaker.desc}</div>
+        <div class="prot-meta">PID: ${r.aux_breaker.pid}</div>
+        <div class="prot-meta" style="font-size:10px;color:var(--ink-3);font-style:italic">Tag SCADA: <strong>TRIP</strong> (NC breaker auxiliar) · señaliza disparo del breaker principal</div>
       </div>
       ${r.kw_totales > 0 ? `
       <div class="prot-card prot-card--info" style="min-width:180px">
@@ -801,6 +852,27 @@ function renderProtTotal(r) {
         <div class="prot-val">${r.peso_total.toFixed(1)} kg</div>
         <div class="prot-meta">Σ por unidad × cantidad</div>
       </div>` : ''}
+    </div>
+    ${r.tags_scada ? renderSCADAblock(r.tags_scada) : ''}`;
+}
+
+/**
+ * Bloque informativo con la lista canónica de tags SCADA (RUN /
+ * FAULT / TRIP / READY) + descripción y mapeo a contacto físico.
+ */
+function renderSCADAblock(tags) {
+  return `
+    <div style="margin-top:10px;padding:10px 12px;border:1px dashed rgba(13,71,161,.20);border-radius:8px;background:rgba(0,122,255,.04)">
+      <div class="prot-label" style="margin-bottom:6px">Lógica SCADA mínima · señales requeridas para integración</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));gap:8px">
+        ${tags.map(t => `
+          <div style="font-size:11px;color:var(--ink-2);line-height:1.4">
+            <strong style="color:var(--brand-deep);font-family:var(--font-mono);font-size:11px">${t.tag}</strong>
+            <span style="color:var(--ink-3)"> · ${escaparHtml(t.contacto)}</span><br>
+            <span style="color:var(--ink-3);font-size:10px;font-style:italic">${escaparHtml(t.descripcion)}</span>
+          </div>`).join('')}
+      </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--ink-3);font-style:italic">Norma IEEE C37.91 (protección de transformadores) · IEC 61850 (subestaciones automatizadas)</div>
     </div>`;
 }
 
@@ -808,11 +880,12 @@ function renderListaMaterialesMix(r) {
   const items = [];
   for (const g of r.grupos) {
     items.push(`${g.cantidad}× <strong>${escaparHtml(g.marca)} ${escaparHtml(g.modelo)}</strong> · motoventilador`);
-    if (g.guardamotor) items.push(`${g.cantidad}× <strong>ABB ${g.guardamotor.model}</strong> · PID ${g.guardamotor.pid} · setting ${g.amps_unitario.toFixed(2)} A · guardamotor para ${escaparHtml(g.modelo)}`);
+    if (g.guardamotor)     items.push(`${g.cantidad}× <strong>ABB ${g.guardamotor.model}</strong> · PID ${g.guardamotor.pid} · setting ${g.amps_unitario.toFixed(2)} A · guardamotor para ${escaparHtml(g.modelo)}`);
+    if (g.contactor)       items.push(`${g.cantidad}× <strong>ABB ${g.contactor.model}</strong> · PID ${g.contactor.pid} · contactor AC-3 ${g.contactor.ac3_a} A · bobina ${g.contactor.bobina} (RUN/READY/FAULT al SCADA)`);
     if (g.aux_guardamotor) items.push(`${g.cantidad}× <strong>ABB ${g.aux_guardamotor.model}</strong> · PID ${g.aux_guardamotor.pid} · auxiliar SCADA del guardamotor`);
   }
-  if (r.breaker)     items.push(`1× <strong>ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema completo`);
-  if (r.aux_breaker) items.push(`1× <strong>ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA`);
+  if (r.breaker)     items.push(`1× <strong>ABB ${r.breaker.model}</strong> · PID ${r.breaker.pid} · breaker principal 3P del sistema completo (Curva C · 6 kA)`);
+  if (r.aux_breaker) items.push(`1× <strong>ABB ${r.aux_breaker.model}</strong> · PID ${r.aux_breaker.pid} · auxiliar S203 SCADA (TRIP)`);
   if (!items.length) return '';
   return `
     <div class="calc-subsect" style="margin-top:18px">Lista de materiales — protección eléctrica del mix</div>
@@ -1542,19 +1615,19 @@ function generateReport() {
           <td class="tc mono">${g.cantidad}</td>
           <td class="tr mono">${g.amps_unitario.toFixed(2)} A</td>
           <td class="tr mono"><strong>${g.amps_grupo.toFixed(2)} A</strong></td>
-          <td class="mono">${g.guardamotor ? `${g.cantidad} × ABB ${g.guardamotor.model}` : 'Fuera de catálogo MS116'}</td>
-          <td class="mono">${g.guardamotor ? `setting ${g.amps_unitario.toFixed(2)} A · PID ${g.guardamotor.pid}` : '—'}</td>
+          <td class="mono" style="font-size:7.5pt">${g.guardamotor ? `${g.cantidad} × ABB ${g.guardamotor.model}<br>setting ${g.amps_unitario.toFixed(2)} A · PID ${g.guardamotor.pid}` : 'Fuera de catálogo MS116'}</td>
+          <td class="mono" style="font-size:7.5pt">${g.contactor ? `${g.cantidad} × ABB ${g.contactor.model}<br>AC-3 ${g.contactor.ac3_a} A · PID ${g.contactor.pid}` : 'Fuera AF · consultar AX/AE'}</td>
         </tr>`).join('');
       protBlock = `
         <table class="ft">
           <thead>
             <tr>
               <th>Grupo · Marca / Modelo</th>
-              <th class="tc" style="width:50px">Cant.</th>
-              <th class="tr" style="width:80px">A / unidad</th>
-              <th class="tr" style="width:90px">A grupo</th>
-              <th>Guardamotor (1 por unidad)</th>
-              <th>Detalles</th>
+              <th class="tc" style="width:40px">Cant.</th>
+              <th class="tr" style="width:65px">A / unidad</th>
+              <th class="tr" style="width:75px">A grupo</th>
+              <th style="width:155px">Guardamotor MS116</th>
+              <th style="width:140px">Contactor AF</th>
             </tr>
           </thead>
           <tbody>${filasGrupos}</tbody>
@@ -1564,8 +1637,7 @@ function generateReport() {
               <td class="tc mono">${protMix.n_total}</td>
               <td class="tr mono">—</td>
               <td class="tr mono"><strong>${protMix.amps_totales.toFixed(2)} A</strong></td>
-              <td class="mono">1 × Breaker ${protMix.breaker ? 'ABB ' + protMix.breaker.model : '—'}</td>
-              <td class="mono">${protMix.breaker ? `In ${protMix.breaker.in} A · PID ${protMix.breaker.pid}` : 'Excede S203 (50 A)'}</td>
+              <td class="mono" colspan="2" style="font-size:7.5pt">1 × Breaker ${protMix.breaker ? `ABB ${protMix.breaker.model} · In ${protMix.breaker.in} A · Curva C · 6 kA · PID ${protMix.breaker.pid}` : 'excede S203 (50 A)'} + 1 × Auxiliar SCADA ${protMix.aux_breaker.model}</td>
             </tr>
           </tfoot>
         </table>
@@ -1573,13 +1645,30 @@ function generateReport() {
           <tbody>
             ${_row('Conexión motor', conn)}
             ${_row('Corriente total del sistema (Σ grupos)', protMix.amps_totales.toFixed(2) + ' A', true)}
-            ${_row('Corriente mínima del breaker (×1.25 NEC 430)', protMix.amps_min_breaker.toFixed(2) + ' A', true)}
+            ${_row('Corriente mínima del breaker (×1.25 NEC 430.52)', protMix.amps_min_breaker.toFixed(2) + ' A', true)}
             ${_row('Potencia eléctrica total absorbida (Σ kW grupos)', protMix.kw_totales.toFixed(2) + ' kW', true)}
             ${kvaTotalMix > 0 ? _row('Potencia aparente total (S = Σ P/cos φ)', kvaTotalMix.toFixed(2) + ' kVA', true) : ''}
             ${_row('Peso total motoventiladores (Σ peso × cant)', protMix.peso_total.toFixed(1) + ' kg', true)}
-            ${_row('Auxiliar breaker (SCADA)', `1 × ABB ${protMix.aux_breaker.model} · PID ${protMix.aux_breaker.pid}`)}
+            ${_row('Coordinación', `Verificar selectividad con MCCB aguas arriba en tablero general (típico ≥ 100 A). Norma IEC 60947-2 · NEC 430.52`)}
           </tbody>
-        </table>`;
+        </table>
+        ${protMix.tags_scada ? `
+        <table class="ft" style="margin-top:8pt">
+          <thead>
+            <tr>
+              <th style="width:60px">Tag SCADA</th>
+              <th>Contacto físico</th>
+              <th>Descripción / función</th>
+            </tr>
+          </thead>
+          <tbody>${protMix.tags_scada.map(t => `
+            <tr>
+              <td class="mono"><strong>${t.tag}</strong></td>
+              <td>${escaparHtml(t.contacto)}</td>
+              <td>${escaparHtml(t.descripcion)}</td>
+            </tr>`).join('')}</tbody>
+        </table>
+        <p style="font-size:7pt;color:#666;font-style:italic;margin-top:3pt">Lógica SCADA mínima requerida para integración. Norma IEEE C37.91 · IEC 61850.</p>` : ''}`;
 
       // Lista de materiales agrupada por modelo + ítems del sistema
       const items = [];
@@ -1597,7 +1686,15 @@ function generateReport() {
             qty: g.cantidad,
             model: `Guardamotor ABB ${g.guardamotor.model} (para ${escaparHtml(g.modelo)})`,
             pid: g.guardamotor.pid,
-            notes: `Rango ajuste ${g.guardamotor.min}–${g.guardamotor.max} A · setting ${g.amps_unitario.toFixed(2)} A`
+            notes: `Rango ajuste ${g.guardamotor.min}–${g.guardamotor.max} A · setting ${g.amps_unitario.toFixed(2)} A · IEC 60947-4-1`
+          });
+        }
+        if (g.contactor) {
+          items.push({
+            qty: g.cantidad,
+            model: `Contactor ABB ${g.contactor.model} (para ${escaparHtml(g.modelo)})`,
+            pid: g.contactor.pid,
+            notes: `AC-3 ${g.contactor.ac3_a} A · ≤ ${g.contactor.kw_400v} kW @ 400 V · bobina ${g.contactor.bobina} · tags SCADA RUN/READY/FAULT`
           });
         }
         items.push({
