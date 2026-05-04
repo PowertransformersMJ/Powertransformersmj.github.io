@@ -16,6 +16,66 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Feature · Disposición mecánica por item del mix + render ilustrativo SVG (2026-05-04 AM)
+
+Cada modelo del mix ahora lleva su PROPIA disposición mecánica
+(lateral / vertical_1 / vertical_2) y su ficha técnica muestra un
+**render ilustrativo SVG** del montaje correspondiente. Pedido del
+director: *"en el mix cuando seleccione el tipo de ventilador a su
+vez me pregunte como será la disposición mecánica, adicionalmente
+necesito un render ilustrativo para que sea más fácil de apreciar"*.
+
+UI · `pages/calculo-refrigeracion.html`:
+- Selector nuevo `#mix_fan_disposicion` en la barra "+ Agregar al
+  mix" entre cantidad y tolerancia, con 3 opciones (Lateral · sopla
+  horizontal / Vertical ↑ · 1 cuerpo / Vertical ↑ · 2 cuerpos) y
+  hint *"Orientación de instalación sobre radiador"*.
+
+JS · `assets/js/calculo-refrigeracion.js`:
+- `addToMix()` lee la disposición del nuevo selector y la guarda
+  como campo `disposicion` en cada item de `state.mix`. Si el
+  modelo ya estaba, actualiza la disposición del item existente.
+- Sincroniza el cambio con el input global legacy `#disposicion`
+  (mantiene compatibilidad con la card de Compatibilidad mecánica).
+- Función pura nueva `dispoIlustrativaSVG(disp)` que devuelve un
+  SVG inline esquemático según la disposición:
+  · `lateral` · vista frontal del radiador (rectángulo con líneas
+    verticales = obleas) + ventilador con aspas al lado derecho +
+    flechas naranja de flujo horizontal hacia el radiador.
+  · `vertical_1` · vista lateral del transformador con tanque
+    azul claro a la izquierda + 1 cuerpo de radiador + ventilador
+    debajo + flechas de flujo hacia arriba.
+  · `vertical_2` · igual al anterior pero con 2 cuerpos de
+    radiador apilados verticalmente.
+- Cada SVG incluye etiquetas con la disposición seleccionada y
+  la dimensión crítica (B / A / 2×A).
+- Constante `_LBL_DISPOSICION` con etiquetas humanizadas.
+- `renderFichaUnica(it, idx)` muestra ahora un bloque
+  `.ficha-mix-dispo` con grid de 2 columnas: izquierda con
+  selector inline de disposición + label + mensaje, derecha con
+  el render SVG.
+- Listener nuevo en `#fichas-mix-wrap` que captura el `change` del
+  selector inline y actualiza `state.mix[i].disposicion` →
+  re-render + sync con el input global + recálculo de
+  compatibilidad mecánica.
+- Payload de `acciones_refrigeracion`: cada item del mix incluye
+  campo `disposicion: 'lateral' | 'vertical_1' | 'vertical_2'`
+  para auditoría desde la tab Consolidado.
+
+CSS · `assets/css/calculo-refrigeracion.css`:
+- `.ficha-mix-dispo` · grid 2 columnas (1fr · 280px) que colapsa a
+  1 columna en pantallas <720px.
+- `.fmd-info`, `.fmd-l`, `.fmd-select`, `.fmd-msg`, `.fmd-svg` con
+  diseño consistente con el resto del módulo.
+- `.fmd-svg` con fondo blanco, borde azul claro y SVG escalado
+  responsive (max-height 220px).
+
+570/570 tests verdes · HTML lint OK.
+
+Sin deploys Firebase requeridos (la nueva clave `disposicion` en el
+mix no requiere cambios en rules ni indexes — es un campo libre
+dentro del array `mix[]` que las rules ya validan como `is list`).
+
 ### Hotfix · Diagnóstico exhaustivo de permission-denied + regla §0.1.2.7 (2026-05-03 PM13)
 
 El director sigue viendo permission-denied al guardar acción
