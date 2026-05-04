@@ -16,6 +16,65 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Hotfix post-plan · Deep-clean en data layer acciones_refrigeracion (2026-05-03 PM11)
+
+Bug de regresión revelado al probar el modal "Registrar acción de
+mantenimiento" después de cerrar el plan de 6 microfases. El
+director envió un payload con todo correcto (matrícula T1-M/M-CHG,
+mix válido de 2 modelos / 6 unidades, descripción de 100+ chars,
+estado planificada, fechas) y obtuvo *"Missing or insufficient
+permissions"* en el banner de error del modal.
+
+**Causa raíz:** Firestore Web SDK rechaza valores `undefined` con
+un error engañoso de `permission-denied` (en lugar del esperado
+`invalid-argument`). El sanitizador top-level del data layer no
+recurría a objetos anidados, así que el `mix[].ficha` y los
+snapshots `evaluacion` / `proteccion` / `compatibilidad` /
+`resumen_json` / `validacion_grafica` (microfases 4-5-6) podían
+contener `undefined` en campos opcionales del catálogo. Documentado
+extensamente en CLAUDE.md §0.1.2.6 como regla permanente.
+
+Cambios:
+- `assets/js/data/_firestore_clean.js` (nuevo) · helper genérico
+  `deepClean(value)` recursivo. Elimina `undefined`, `NaN`,
+  `Infinity`, `function`. Preserva `null`, `0`, `''`, `false`,
+  `Timestamp`, `FieldValue`. Mapea arrays + objetos planos.
+- `assets/js/data/acciones_refrigeracion.js` · importa `deepClean`
+  y lo aplica en `crear()` y `actualizar()` justo antes de
+  `addDoc()` / `updateDoc()`.
+- `assets/js/calculo-refrigeracion.js` · `guardarAccion()` mejora
+  el manejo de error: detecta `code: 'permission-denied'` o regex
+  `/permission/i` y muestra mensaje accionable con las 3 causas
+  probables (sesión admin, rules desplegadas, undefined en
+  payload). Misma lógica para `invalid-argument` y
+  `failed-precondition`.
+- `tests/acciones_refrigeracion_deepclean.test.js` (nuevo) · 13
+  tests cubriendo:
+  - undefined / null / primitivos preservados / NaN / Infinity
+  - function omitida
+  - Objeto plano elimina claves undefined
+  - Objeto anidado profundidad 3
+  - Array elimina items undefined / array de objetos
+  - Caso real con payload completo de acciones_refrigeracion
+  - Timestamp simulado (con toDate) preservado
+  - FieldValue simulado (con _methodName) preservado
+- `CLAUDE.md` · regla permanente nueva **§0.1.2.6** *"Firestore
+  rechaza undefined con error 'permission-denied' engañoso"* con:
+  · contexto del bug histórico
+  · causa raíz documentada (con referencia al issue de
+    firebase-js-sdk)
+  · síntomas a reconocer en futuras sesiones
+  · 5 reglas obligatorias (helper deepClean genérico, aplicar
+    antes de write, no confiar en sanitizador top-level, mensaje
+    de error accionable, tests obligatorios del helper)
+  · catálogo de data layers afectados (acciones_refrigeracion,
+    documentos_contractuales, muestras, ordenes, futuros del
+    módulo brigada).
+
+570/570 tests verdes (+13 del deep-clean) · HTML lint OK.
+
+**Sin deploys Firebase requeridos** (el cambio es 100% cliente).
+
 ### Microfase 6 · Validación gráfica Westinghouse vs cálculo (2026-05-03 PM10) — CIERRE PLAN
 
 Sexta y última microfase. Cierra el plan de 6 microfases para

@@ -615,6 +615,117 @@ push pasará. La diferencia entre exit 0 local y CI rojo es
 las devDependencies del repo instaladas, nunca con runners
 transitorios.
 
+### 0.1.2.6 Regla permanente · Firestore rechaza undefined con error "permission-denied" engañoso
+
+**Contexto del bug histórico (sesión 2026-05-03 PM11):** después de
+cerrar el plan de 6 microfases del módulo Mantenimiento Brigada, el
+director intentó **registrar una acción de mantenimiento** desde el
+modal y obtuvo el error visible *"Missing or insufficient
+permissions"*. Todos los campos visibles del payload cumplían con
+las rules (`transformador_id`, `matricula`, `accion_descripcion`
+≥10 chars, `estado_accion ∈ enum`, `mix.size() >= 1`,
+`fecha_accion` no vacío) y el director es admin con rol verificado.
+
+**Causa raíz:** el `sanitizar()` del data layer
+`assets/js/data/acciones_refrigeracion.js` solo limpia los campos
+TOP-LEVEL (transformador_id, matricula, etc.). Pero el payload
+incluye objetos anidados pesados con resultados de funciones puras
+del dominio:
+
+- `mix[].ficha` — snapshot del catálogo de motoventiladores. Si la
+  ficha del catálogo viene con campos opcionales (`fan_kw`,
+  `fan_cosphi`, `fan_volt`, etc.) que no aplican a ese modelo,
+  quedan `undefined` en el snapshot.
+- `evaluacion` — `evaluarMixVentiladores` puede devolver
+  `cobertura_pct: null` si no hay datos, pero también `deficit:
+  undefined` en branches específicos.
+- `proteccion` — `calcularProteccionMix` devuelve `breaker: null` o
+  `guardamotor: null` cuando excede catálogo. Ahí no hay problema,
+  PERO el `contactor` (microfase 3) puede ser `undefined` si lo
+  agregaste manualmente al objeto.
+- `compatibilidad` — `evaluarCompatibilidad` devuelve `c1.title`
+  como `undefined` cuando el caso no tiene título override.
+- `resumen_json` (microfase 5) — anida todos los anteriores.
+- `validacion_grafica` (microfase 6) — campos numéricos que en
+  edge cases pueden ser `NaN` (división por cero).
+
+**Por qué el error mensaje "permission-denied":** la SDK Web de
+Firestore intenta serializar el objeto antes de aplicar las rules.
+Cuando encuentra un `undefined`, no puede materializar el campo y
+**retorna un error genérico de permisos** en lugar del error de
+tipo real. Esto está documentado en
+[firebase/firebase-js-sdk#1551](https://github.com/firebase/firebase-js-sdk/issues/1551).
+El mensaje correcto sería *"FirebaseError: Function addDoc() called
+with invalid data. Unsupported field value: undefined"* pero la SDK
+**lo enmascara como permission-denied** en producción cuando hay
+muchos campos, especialmente con rules complejas.
+
+**Síntomas del bug a reconocer en futuras sesiones:**
+- El usuario ES admin (verificado por otros writes que funcionan).
+- Las rules están desplegadas (`firebase deploy --only firestore:rules`).
+- El payload top-level cumple todas las rules.
+- Pero el error es exactamente *"Missing or insufficient permissions"*.
+- El `console.error` muestra `code: 'permission-denied'` pero sin
+  detalle del campo problemático.
+
+**Regla permanente** para CUALQUIER data layer que persista objetos
+anidados resultado de funciones puras del dominio:
+
+1. **Crear un helper genérico `deepClean`** en
+   `assets/js/data/_firestore_clean.js` que recursivamente:
+   - Elimina claves con `undefined` (no las incluye en el output).
+   - Convierte `NaN` / `Infinity` en `undefined` (omitidos).
+   - Omite valores `function`.
+   - Preserva `null`, `0`, `''`, `false` (legítimos).
+   - Preserva objetos especiales de Firestore: `Timestamp`
+     (con `toDate`), `FieldValue` (con `_methodName`),
+     `GeoPoint`, `DocumentReference`.
+   - Mapea recursivamente arrays y objetos planos.
+
+2. **Aplicar `deepClean(payload)` JUSTO ANTES de `addDoc` /
+   `setDoc` / `updateDoc`** en cada función `crear()`,
+   `actualizar()`, `actualizarEstado()` del data layer.
+
+3. **NO confiar en el sanitizador top-level**. El sanitizador es
+   útil para tipos y defaults de campos planos, pero NO recurre
+   a objetos anidados.
+
+4. **Mejorar el manejo de errores en la UI** para que cuando el
+   código sea `permission-denied` o el mensaje incluya `permission`,
+   **sugerir explícitamente** revisar (a) sesión de admin, (b)
+   rules desplegadas, (c) **payload con undefined** (causa #1
+   silenciosa). Ver `guardarAccion()` en
+   `assets/js/calculo-refrigeracion.js` como referencia.
+
+5. **Tests obligatorios** del helper `deepClean` cubriendo:
+   - Primitivos (preserva `0`, `''`, `false`, `null`).
+   - `undefined`, `NaN`, `Infinity` → omitidos.
+   - Objetos anidados profundos (3+ niveles).
+   - Arrays con items `undefined` → filtrados.
+   - Objetos especiales Firestore (Timestamp, FieldValue).
+   - Caso real: payload completo con ficha de catálogo
+     incompleta.
+
+**Aplica también a:** cualquier data layer que persista output de
+funciones puras del dominio en Firestore. Casos típicos en este
+repo:
+- `acciones_refrigeracion` (afectado primero · 2026-05-03).
+- `documentos_contractuales` (snapshot de Storage metadata).
+- `muestras` (resultado de motor de salud + diagnóstico DGA).
+- `ordenes` (con historial inmutable).
+- Cualquier futuro data layer del módulo Mantenimiento Brigada.
+
+**Solución del bug original (commit `e7e1b0b` siguiente):**
+- Nuevo `assets/js/data/_firestore_clean.js` con función pura
+  exportada `deepClean(value)`.
+- `acciones_refrigeracion.js` importa `deepClean` y lo aplica en
+  `crear()` y `actualizar()` antes de `addDoc`/`updateDoc`.
+- `tests/acciones_refrigeracion_deepclean.test.js` con 13 tests
+  cubriendo todos los casos.
+- `guardarAccion()` mejora detección de error con mensaje accionable
+  específico para `permission-denied` listando las 3 causas
+  probables.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
