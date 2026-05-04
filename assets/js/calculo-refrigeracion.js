@@ -18,6 +18,7 @@ import {
   calcularProteccionElectrica, calcularProteccionMix,
   evaluarMixVentiladores, sugerirMejoras, MIX_ESTADO,
   detectarFaltantes,
+  construirResumenJSON,
   extraerCorrienteFan,
   evaluarCompatibilidad, mensajeDisposicion, COMPAT_ESTADO,
   deduceOnafDesdeOnanYPct, deducePctDesdeOnanYOnaf,
@@ -1362,6 +1363,97 @@ function radiadorDiagramSVG() {
 // Sistemas de Refrigeración" suscribe a esa colección y refleja
 // la acción inmediatamente vía onSnapshot.
 
+/**
+ * Calcula el resumen estructurado del estado actual del cálculo.
+ * Lo usa exportarResumenJSON, guardarAccion y generateReport para
+ * persistir el mismo snapshot canónico.
+ *
+ * @returns {object|null}  El resumen JSON listo, o null si no hay mix.
+ */
+function calcularResumenActual() {
+  if (state.mix.length === 0) return null;
+  const cfmCalc = calcularRefrigeracion({ kva_onan: getOnan(), pct: getPct(), alt: getAlt() });
+  const tolerancia = getTolerancia();
+  const mixForEval = state.mix.map(it => ({
+    key: it.key, modelo: it.modelo, marca: it.marca,
+    cfm_unitario: it.cfm_unitario, cantidad: it.cantidad
+  }));
+  const evaluacion = evaluarMixVentiladores({
+    items: mixForEval,
+    cfm_requerido: cfmCalc.cfm_nivel_mar,
+    tolerancia_pct: tolerancia
+  });
+  const connKey = getMotorConn();
+  const itemsProt = state.mix.map(it => {
+    const iU = extraerCorrienteFan(it.ficha?.fan_amp, connKey);
+    return {
+      key: it.key, modelo: it.modelo, marca: it.marca, cantidad: it.cantidad,
+      amps_unitario: Number.isFinite(iU) ? iU : 0,
+      kw_unitario:   (+it.ficha?.fan_kw / 1000) || 0,
+      peso_unitario: +it.ficha?.fan_peso || 0
+    };
+  });
+  const proteccion = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+  const fanDb = state.fanDb || {};
+  const sugerencias = (evaluacion.estado === MIX_ESTADO.NO_APROBADO)
+    ? sugerirMejoras({
+        items: mixForEval,
+        cfm_requerido: cfmCalc.cfm_nivel_mar,
+        fan_db: fanDb,
+        max_sugerencias: 5,
+        tolerancia_pct: tolerancia
+      })
+    : [];
+  const faltantes = detectarFaltantes({ mix: state.mix });
+  const session = window.__sgmSession || {};
+  return construirResumenJSON({
+    mix: state.mix,
+    evaluacion, proteccion, sugerencias, faltantes,
+    metadatos: {
+      transformador_id: (_val('mat_input').trim()) || '',
+      matricula:        (_val('mat_input').trim()) || '',
+      proyecto:         _val('proyecto').trim() || '',
+      subestacion:      _val('t_sub'),
+      zona:             _val('t_zona'),
+      departamento:     _val('t_dept'),
+      grupo:            _val('t_grupo'),
+      serie:            _val('t_serie'),
+      kva_onan:         getOnan(),
+      kva_onaf:         getOnaf(),
+      pct:              getPct(),
+      altitud:          getAlt(),
+      conexion_motor:   connKey,
+      responsable_uid:    session.user?.uid || '',
+      responsable_email:  session.user?.email || session.profile?.email || '',
+      responsable_nombre: session.profile?.nombre || ''
+    }
+  });
+}
+
+/**
+ * Exporta el resumen estructurado del cálculo actual como un
+ * archivo .json descargable con el shape exacto del prompt
+ * técnico del director (microfase 5).
+ */
+function exportarResumenJSON() {
+  if (state.mix.length === 0) {
+    alert('Agregue al menos un modelo al mix antes de exportar el resumen JSON.');
+    return;
+  }
+  const resumen = calcularResumenActual();
+  if (!resumen) return;
+  const blob = new Blob([JSON.stringify(resumen, null, 2)], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const matricula = (_val('mat_input').trim()) || 'sin-matricula';
+  const fecha = new Date().toISOString().slice(0, 10);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `resumen-refrigeracion-${matricula}-${fecha}.json`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 100);
+}
+
 function openModalAccion() {
   const modal = $('modalAccion');
   if (!modal) return;
@@ -1492,6 +1584,7 @@ async function guardarAccion() {
       proteccion,
       compatibilidad: compat,
       faltantes,
+      resumen_json: calcularResumenActual(),
 
       accion_descripcion: descripcion,
       estado_accion:      estado,
@@ -2639,6 +2732,7 @@ function bindEvents() {
   // Cambio de tolerancia → recalcular banner + sugerencias en vivo
   $('mix_tolerancia')?.addEventListener('input', () => { renderMix(); });
   $('btnExportReport')?.addEventListener('click', generateReport);
+  $('btnExportJson')?.addEventListener('click', exportarResumenJSON);
   $('btnRegistrarAccion')?.addEventListener('click', openModalAccion);
   $('btnGuardarAccion')?.addEventListener('click', guardarAccion);
   $('btnPrint')?.addEventListener('click', () => window.print());

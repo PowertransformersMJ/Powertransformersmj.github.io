@@ -16,6 +16,76 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 5 · Exportar resumen JSON estructurado (2026-05-03 PM9)
+
+Quinta microfase. Genera un snapshot JSON con el shape EXACTO del
+prompt técnico del director (selecciones / cfm_requerido / cfm_total
+/ evaluacion / razon / estrategias_sugeridas / seleccion_electrica /
+faltantes / metadatos). Útil para integraciones, audit trail y
+handoff a herramientas externas (Excel, Power BI, ERP, SCADA).
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Función pura nueva construirResumenJSON({mix, evaluacion,
+  proteccion, sugerencias, faltantes, metadatos}) que arma:
+  · selecciones[] · una entrada por modelo del mix con
+    {id, marca, modelo, cantidad, cfm_unit, cfm_total}
+  · cfm_requerido / cfm_total / cfm_umbral / tolerancia_pct /
+    cobertura_pct / deficit_cfm / exceso_cfm / n_unidades_total
+  · evaluacion · 'APROBADO' | 'REQUIERE AJUSTE'
+  · razon · texto humano refleja tolerancia si > 0
+  · estrategias_sugeridas[] · descripcion + impacto +
+    implicaciones + factibilidad + aprobado
+  · seleccion_electrica[] · uno por grupo (modelo) con
+    id_ventilador, marca, modelo, cantidad, potencia_hp, flc_A,
+    guardamotor {tipo, corriente_ajustada_A, rango_A, pid,
+    justificacion}, contactor {modelo_sugerido, ac3_A, kw_400v,
+    margen_pct, bobina, pid, contactos_NO, contactos_NC,
+    tags_SCADA, justificacion}, auxiliar_guardamotor
+  · breaker_sistema · 1 ud para todo el sistema con
+    {modelo_sugerido, In_A, curva, poder_de_corte_kA,
+    perdidas_W, pid, auxiliar_SCADA, justificacion}
+  · faltantes[] · strings compactos con [SEVERIDAD] + campo +
+    modelo + mensaje
+  · metadatos · transformador_id, matricula, proyecto,
+    subestacion, zona, depto, grupo, serie, kva_*, pct, altitud,
+    conexion_motor, responsable_uid/email/nombre,
+    fecha_generacion, version_resumen ('1.0'), norma_referencia.
+
+Tests: +7 (91 → 98 en refrigeración):
+- Shape canónico con todas las claves del prompt
+- selecciones tiene estructura correcta por modelo
+- evaluación APROBADO vs REQUIERE AJUSTE
+- seleccion_electrica trae guardamotor + contactor + breaker
+- faltantes mapeados a strings con severidad
+- metadatos incluye fecha_generacion + version_resumen
+- Razón refleja tolerancia cuando aplica
+
+UI (assets/js/calculo-refrigeracion.js + pages/calculo-refrigeracion.html):
+- Función nueva calcularResumenActual() que es helper común
+  reutilizado por exportarResumenJSON, guardarAccion (snapshot
+  persistido) y eventualmente generateReport. Captura todo el
+  estado actual + sesión del usuario + parámetros del cálculo.
+- Función nueva exportarResumenJSON() que descarga el snapshot
+  como .json con nombre `resumen-refrigeracion-{matricula}-{fecha}.json`.
+- Botón nuevo #btnExportJson (color púrpura) en la barra de
+  exportar, al lado de "Exportar informe AFINIA". Icono Lucide
+  `braces`.
+- guardarAccion enriquece el payload con `resumen_json:
+  calcularResumenActual()` para que el doc Firestore quede con
+  el snapshot canónico para el audit.
+
+Data layer (assets/js/data/acciones_refrigeracion.js):
+- sanitizar() acepta data.resumen_json como objeto, lo persiste
+  en el doc para que la tab Consolidado pueda exportar el
+  resumen sin recalcular.
+
+551/551 tests verdes (+7) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+Próxima microfase (6): comparación gráfica Westinghouse vs
+cálculo (validación punto de operación + warning si
+discrepancia > 2%).
+
 ### Microfase 4 · Detección de faltantes para cálculo eléctrico (2026-05-03 PM8)
 
 Cuarta microfase. Detecta y reporta campos faltantes en la ficha
