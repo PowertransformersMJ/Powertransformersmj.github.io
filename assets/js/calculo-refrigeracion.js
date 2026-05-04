@@ -1740,13 +1740,21 @@ async function guardarAccion() {
     // 6a) Pre-chequeo de permisos: leer /usuarios/{uid} antes del
     // addDoc para distinguir "no admin" de "payload con undefined"
     // de "rules no desplegadas". Mensaje accionable directo.
+    let permisos = null;
     if (responsable_uid) {
-      const permisos = await mod.verificarPermisosAdmin(responsable_uid);
+      permisos = await mod.verificarPermisosAdmin(responsable_uid);
       console.info('[acciones_refrigeracion] verificarPermisosAdmin:', permisos);
+      window.__sgmDiag_lastPermisos = permisos;
       if (!permisos.ok) {
         throw new Error(permisos.mensaje);
       }
     }
+    // Log del payload final para trazabilidad (truncado a 4 KB)
+    try {
+      const json = JSON.stringify(payload, null, 2);
+      console.info('[acciones_refrigeracion] payload a persistir (truncado):',
+        json.length > 4000 ? json.slice(0, 4000) + '\n... (truncado)' : json);
+    } catch {}
     const id = await mod.crear(payload, responsable_uid);
     setStatus(`✓ Acción registrada con ID ${id}`, 'success');
     setTimeout(closeModalAccion, 1500);
@@ -1755,12 +1763,16 @@ async function guardarAccion() {
     // Errores comunes de Firestore con mensajes accionables
     let msg = err?.message || String(err);
     const code = err?.code || '';
+    const permisosTxt = window.__sgmDiag_lastPermisos
+      ? ` (pre-chequeo admin: ok=${window.__sgmDiag_lastPermisos.ok}, motivo=${window.__sgmDiag_lastPermisos.motivo})`
+      : ' (pre-chequeo admin: no se ejecutó)';
     if (code === 'permission-denied' || /permission/i.test(msg)) {
-      msg = `Permiso denegado al escribir en Firestore. Verifique:
-        (1) que su sesión sea de admin (rol='admin' en /usuarios/{uid}),
-        (2) que firestore.rules esté desplegado: \`firebase deploy --only firestore:rules\`,
-        (3) que el payload no contenga campos undefined (deep-clean activo desde 2026-05-03).
-        Detalle técnico: ${err.message}`;
+      // Si el pre-chequeo dice OK pero Firestore rechaza, es que las
+      // rules en producción NO incluyen el match de acciones_refrigeracion.
+      const probableCausa = window.__sgmDiag_lastPermisos?.ok
+        ? `\n\nCAUSA MUY PROBABLE: las rules en producción NO incluyen el match /acciones_refrigeracion/{id} (deploy desactualizado).\n\n→ ACCIÓN REQUERIDA: ejecute desde la Mac del administrador:\n   firebase deploy --only firestore:rules\n\nDespués refresque la página con Cmd+Shift+R y vuelva a intentar.`
+        : '\n\nCAUSA: el pre-chequeo de admin falló (no eres admin en Firestore).';
+      msg = `Permiso denegado al escribir en Firestore${permisosTxt}.${probableCausa}\n\nDetalle técnico: ${err.message}`;
     } else if (code === 'invalid-argument' || /invalid/i.test(msg)) {
       msg = `Datos inválidos en el payload (Firestore rechazó undefined o NaN). El deep-clean debería haberlos quitado. Reporte el caso. Detalle: ${err.message}`;
     } else if (code === 'failed-precondition') {

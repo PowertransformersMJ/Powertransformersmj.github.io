@@ -677,6 +677,8 @@
   padding: 8px 10px; border-radius: 4px;
   font: 500 12px var(--font-sans);
   min-height: 0; transition: min-height .2s, padding .2s;
+  white-space: pre-wrap;          /* preserva saltos de línea en mensajes de error largos */
+  line-height: 1.55;
 }
 .sgm-modal-status.is-error {
   background: rgba(198, 40, 40, .08);
