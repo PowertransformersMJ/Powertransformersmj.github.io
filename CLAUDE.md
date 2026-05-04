@@ -726,6 +726,97 @@ repo:
   específico para `permission-denied` listando las 3 causas
   probables.
 
+### 0.1.2.7 Regla permanente · Re-deploy obligatorio de firestore.rules tras cualquier cambio en el archivo
+
+**Contexto del bug histórico (sesión 2026-05-03 PM13):** después de
+agregar el deep-clean (regla §0.1.2.6) + el pre-chequeo de admin
+con `verificarPermisosAdmin`, el director volvió a ver el error
+*"Permiso denegado al escribir en Firestore"* con el modal "Registrar
+acción de mantenimiento". El pre-chequeo cliente verificaba que el
+usuario era admin (rol='admin' + activo=true), pero el `addDoc`
+seguía siendo rechazado por las rules en producción.
+
+**Causa raíz:** las rules en producción NO incluían el match
+`/acciones_refrigeracion/{id}` agregado en microfase 4 (commit
+`a86a51f`). El deploy `firebase deploy --only firestore:rules` que
+el director ejecutó esa sesión **incluía los índices nuevos pero
+NO había aplicado el match nuevo** — probablemente porque el deploy
+fue hecho desde una copia local de `firestore.rules` que aún no
+tenía esa sección, o porque el director ejecutó solo
+`firebase deploy --only firestore:indexes` y no rules.
+
+Sin el match `/acciones_refrigeracion/{id}`, las rules caían al
+fallback final `match /{document=**}` con `allow read, write: if
+false` → **deny-all explícito**. La SDK Web reporta esto como
+`permission-denied` igual que cualquier otra rule violada, sin
+indicar que el match no existe.
+
+**Síntomas a reconocer:**
+- El usuario tiene rol admin verificado en `/usuarios/{uid}` y/o
+  `/admins/{uid}`.
+- Otros writes a colecciones existentes (ej. `/contratos/{cid}`)
+  funcionan.
+- Solo writes a la colección NUEVA fallan con permission-denied.
+- El pre-chequeo cliente `verificarPermisosAdmin` retorna `ok: true`.
+- Re-leer las rules en producción desde Firebase Console muestra
+  versión vieja (sin el match nuevo).
+
+**Regla permanente** para CUALQUIER sesión que modifique
+`firestore.rules`:
+
+1. **Detectar el cambio:** si el commit toca `firestore.rules`,
+   AVISAR al director con el bloque `⚠ Requiere deploy manual`
+   incluyendo el comando exacto:
+   ```bash
+   firebase deploy --only firestore:rules
+   ```
+   (regla §0.1.1).
+
+2. **Verificar el deploy fue exitoso:** después de deployar, el
+   director debe ver en la salida del CLI:
+   ```
+   ✓ firestore: released rules firestore.rules to cloud.firestore
+   ✓ Deploy complete!
+   ```
+   Si solo dice "deployed indexes" sin "released rules", el deploy
+   de rules NO se ejecutó.
+
+3. **El director debe ejecutar AMBOS** comandos cuando aplica:
+   ```bash
+   firebase deploy --only firestore:rules
+   firebase deploy --only firestore:indexes
+   ```
+   `firebase deploy --only firestore` ejecuta los dos juntos pero
+   trigger una pregunta sobre índices que el director debe
+   responder con N (regla §0.1.1).
+
+4. **Verificar las rules en producción** comparando contra el repo:
+   ```bash
+   # En Firebase Console:
+   # https://console.firebase.google.com/project/lordpowertransformersmj/firestore/rules
+   # → revisar que el contenido coincide con firestore.rules del repo
+   ```
+   Si NO coincide, ejecutar `firebase deploy --only firestore:rules`
+   nuevamente.
+
+5. **Mensaje accionable en la UI** cuando el pre-chequeo cliente
+   pasa pero Firestore rechaza con permission-denied:
+   *"CAUSA MUY PROBABLE: las rules en producción NO incluyen el
+   match /COLECCION/{id} (deploy desactualizado). → ACCIÓN: ejecute
+   `firebase deploy --only firestore:rules` desde la Mac."*
+
+   Implementado en `guardarAccion()` desde commit este (2026-05-03).
+
+6. **NUNCA asumir que las rules están desplegadas.** Siempre que
+   el director reporte permission-denied, el primer chequeo es
+   *"¿están las rules en producción al día con el repo?"*.
+
+**Solución del bug original (commit `b8e2f4d` siguiente):** el
+director ejecuta `firebase deploy --only firestore:rules` desde su
+Mac con la versión actual del repo. Verificación: la salida del
+CLI debe mostrar *"released rules firestore.rules to
+cloud.firestore"*. Después hard-reload Cmd+Shift+R y reintentar.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
