@@ -2229,28 +2229,65 @@ async function guardarAccion() {
       responsable_nombre,
       responsable_email,
 
-      // Anti-duplicado · si el chequeo de openModalAccion detectó
-      // registros previos para esta matrícula, marcamos es_re_registro
-      // y persistimos la justificación elegida (regla 2026-05-04).
-      es_re_registro:           !!(state.duplicadoInfo && state.duplicadoInfo.existe),
+      // Anti-duplicado · placeholder · se setea con valor real
+      // tras la query a Firestore en el paso 6a.
+      es_re_registro:           false,
       justificacion_repeticion: ($('acc_justificacion')?.value || '').trim(),
       justificacion_detalle:    ($('acc_justif_detalle')?.value || '').trim()
     };
-
-    // Validación cliente extra: si es re-registro, exigir justificación
-    if (payload.es_re_registro && !payload.justificacion_repeticion) {
-      throw new Error('Este transformador ya tiene acciones registradas. Seleccione la justificación de re-registro antes de guardar.');
-    }
-    if (payload.justificacion_repeticion === 'otro' && payload.justificacion_detalle.length < 10) {
-      throw new Error('La justificación "otro" requiere un detalle de al menos 10 caracteres.');
-    }
 
     // 6) Persistir vía data layer (lazy import)
     const mod = await import('./data/acciones_refrigeracion.js');
     if (!mod.isReady()) {
       throw new Error('Firebase no está configurado · contacte al administrador.');
     }
-    // 6a) Pre-chequeo de permisos: leer /usuarios/{uid} antes del
+
+    // 6a) ANTI-DUPLICADO · CHEQUEO DEFINITIVO en el momento del submit.
+    // No confiar en state.duplicadoInfo (puede estar desactualizado por
+    // race condition al abrir el modal o por query fallida silenciosa).
+    // Si la matrícula ya tiene acciones, exigir justificación válida
+    // como condición DURA antes de permitir el crear.
+    let dupCheck = { existe: false };
+    try {
+      if (matricula && mod.existeAccionParaTransformador) {
+        dupCheck = await mod.existeAccionParaTransformador(matricula);
+        console.info('[guardarAccion] chequeo anti-duplicado:', dupCheck);
+      }
+    } catch (err) {
+      console.error('[guardarAccion] chequeo anti-duplicado FALLÓ:', err);
+      throw new Error(
+        'No se pudo verificar si este transformador ya tiene acciones registradas. ' +
+        'No se puede continuar sin esa verificación (regla anti-duplicado). ' +
+        'Posibles causas: (1) índice de Firestore no desplegado · ejecute ' +
+        '`firebase deploy --only firestore:indexes`; (2) sin conexión. ' +
+        'Detalle técnico: ' + (err?.message || err)
+      );
+    }
+    if (dupCheck.existe) {
+      payload.es_re_registro = true;
+      // Refrescar el banner amarillo en la UI con los registros reales
+      state.duplicadoInfo = dupCheck;
+      renderBannerDuplicado(dupCheck);
+      // Validar que el usuario seleccionó una justificación válida
+      if (!payload.justificacion_repeticion) {
+        throw new Error(
+          `⚠ Este transformador (${matricula}) ya tiene ${dupCheck.count} acción(es) registrada(s). ` +
+          'Seleccione la JUSTIFICACIÓN DE RE-REGISTRO en el banner amarillo antes de guardar. ' +
+          'Esta verificación no se puede omitir.'
+        );
+      }
+      const VALIDAS = ['unidad_refrigeracion_averiada', 'reemplazo_por_garantia',
+                       'mantenimiento_programado_recurrente', 'cambio_de_diseno',
+                       'actualizacion_tecnica', 'otro'];
+      if (!VALIDAS.includes(payload.justificacion_repeticion)) {
+        throw new Error('La justificación de re-registro seleccionada no es válida.');
+      }
+      if (payload.justificacion_repeticion === 'otro' && payload.justificacion_detalle.length < 10) {
+        throw new Error('La justificación "otro" requiere un detalle de al menos 10 caracteres.');
+      }
+    }
+
+    // 6b) Pre-chequeo de permisos: leer /usuarios/{uid} antes del
     // addDoc para distinguir "no admin" de "payload con undefined"
     // de "rules no desplegadas". Mensaje accionable directo.
     let permisos = null;
