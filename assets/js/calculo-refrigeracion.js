@@ -1659,7 +1659,21 @@ async function guardarAccion() {
     setTimeout(closeModalAccion, 1500);
   } catch (err) {
     console.error('[acciones_refrigeracion] guardarAccion failed:', err);
-    setStatus('✗ ' + (err?.message || String(err)), 'error');
+    // Errores comunes de Firestore con mensajes accionables
+    let msg = err?.message || String(err);
+    const code = err?.code || '';
+    if (code === 'permission-denied' || /permission/i.test(msg)) {
+      msg = `Permiso denegado al escribir en Firestore. Verifique:
+        (1) que su sesión sea de admin (rol='admin' en /usuarios/{uid}),
+        (2) que firestore.rules esté desplegado: \`firebase deploy --only firestore:rules\`,
+        (3) que el payload no contenga campos undefined (deep-clean activo desde 2026-05-03).
+        Detalle técnico: ${err.message}`;
+    } else if (code === 'invalid-argument' || /invalid/i.test(msg)) {
+      msg = `Datos inválidos en el payload (Firestore rechazó undefined o NaN). El deep-clean debería haberlos quitado. Reporte el caso. Detalle: ${err.message}`;
+    } else if (code === 'failed-precondition') {
+      msg = `Falta un índice de Firestore. Ejecute: \`firebase deploy --only firestore:indexes\`. Detalle: ${err.message}`;
+    }
+    setStatus('✗ ' + msg, 'error');
   } finally {
     btnGuardar.disabled = false;
   }
