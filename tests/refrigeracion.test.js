@@ -50,7 +50,8 @@ import {
   seleccionarContactor,
   calcularFLC,
   detectarFaltantes,
-  construirResumenJSON
+  construirResumenJSON,
+  validarPuntoOperacion
 } from '../assets/js/domain/refrigeracion.js';
 
 /* ─── Constantes inmutables ─────────────────────────────────── */
@@ -1137,4 +1138,73 @@ test('construirResumenJSON: razón refleja tolerancia cuando aplica', () => {
     proteccion: { grupos: [], breaker: null, aux_breaker: null }
   });
   assert.ok(r.razon.includes('tolerancia 5'));
+});
+
+/* ─── Microfase 6 · validarPuntoOperacion ─────────────────────── */
+
+test('validarPuntoOperacion: caso golden 24 MVA × 125% = 48000 CFM (severidad ok)', () => {
+  // 24 MVA × pendiente 2.0 (125%) = 48000 CFM exactos
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 48000, alt_m: 0
+  });
+  assert.equal(r.severidad, 'ok');
+  assert.equal(r.cfm_esperado, 48000);
+  assert.equal(r.delta_cfm, 0);
+  assert.equal(r.delta_pct_abs, 0);
+  assert.equal(r.rango_calibrado, true);
+  assert.ok(r.mensaje.includes('coincide'));
+});
+
+test('validarPuntoOperacion: discrepancia leve (2-5%) → severidad warn', () => {
+  // Esperado 48000, calculado 49500 → delta 3.1%
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 49500, alt_m: 0
+  });
+  assert.equal(r.severidad, 'warn');
+  assert.ok(r.delta_pct_abs > 2 && r.delta_pct_abs <= 5);
+  assert.equal(r.rango_calibrado, true);
+});
+
+test('validarPuntoOperacion: discrepancia grande (>5%) → severidad err', () => {
+  // Esperado 48000, calculado 60000 → delta 25%
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 60000, alt_m: 0
+  });
+  assert.equal(r.severidad, 'err');
+  assert.ok(r.delta_pct_abs > 5);
+  assert.ok(r.mensaje.toLowerCase().includes('inconsistencia') || r.mensaje.toLowerCase().includes('discrepancia'));
+});
+
+test('validarPuntoOperacion: % fuera del rango calibrado (115–166) → err extrapolación', () => {
+  const r1 = validarPuntoOperacion({
+    onan_kva: 24000, pct: 110, cfm_calculado: 28000  // < 115%
+  });
+  assert.equal(r1.severidad, 'err');
+  assert.equal(r1.rango_calibrado, false);
+  assert.ok(r1.mensaje.includes('FUERA') || r1.mensaje.includes('extrapolación'));
+
+  const r2 = validarPuntoOperacion({
+    onan_kva: 24000, pct: 180, cfm_calculado: 110000  // > 166%
+  });
+  assert.equal(r2.severidad, 'err');
+  assert.equal(r2.rango_calibrado, false);
+});
+
+test('validarPuntoOperacion: aplica corrección de altitud al esperado', () => {
+  // 24 MVA × 125% = 48000 a nivel mar
+  // a 1500 m: factor altitud = e^(1500/8500) ≈ 1.193 → esperado ≈ 57264
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 57264, alt_m: 1500
+  });
+  // Debe coincidir con el cálculo corregido por altitud, no con el base
+  assert.equal(r.severidad, 'ok');
+  assert.ok(Math.abs(r.cfm_esperado - 57264) < 100);
+});
+
+test('validarPuntoOperacion: pendiente_esperada coincide con interpolarPendiente', () => {
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 133, cfm_calculado: 24000 * 2.65
+  });
+  assert.equal(r.pendiente_esperada, 2.65);
+  assert.equal(r.severidad, 'ok');
 });
