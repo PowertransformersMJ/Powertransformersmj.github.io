@@ -353,16 +353,23 @@ export const MIX_ESTADO = Object.freeze({
  * Permite mezclar modelos distintos en el mismo transformador (ej.:
  * 4 × FN-050 + 8 × FN-063 + 12 × Krenz F20).
  *
+ * Tolerancia: si `tolerancia_pct > 0` el umbral de aprobación se
+ * relaja a `cfm_requerido × (1 − tol/100)`. Útil para casos donde el
+ * proyecto admite cobertura mínima ej. 95% (tol=5).
+ *
  * @param {{
  *   items: Array<{key?:string, modelo?:string, marca?:string,
  *                 cfm_unitario:number, cantidad:number}>,
- *   cfm_requerido: number
+ *   cfm_requerido: number,
+ *   tolerancia_pct?: number
  * }} input
  * @returns {{
  *   items: Array<{key, modelo, marca, cfm_unitario, cantidad,
  *                 cfm_aporte, aporte_pct}>,
  *   cfm_aporte_total: number,
  *   cfm_requerido: number,
+ *   cfm_umbral: number,
+ *   tolerancia_pct: number,
  *   deficit: number,
  *   exceso: number,
  *   cobertura_pct: number|null,
@@ -372,8 +379,10 @@ export const MIX_ESTADO = Object.freeze({
  *   mensaje: string
  * }}
  */
-export function evaluarMixVentiladores({ items, cfm_requerido }) {
+export function evaluarMixVentiladores({ items, cfm_requerido, tolerancia_pct = 0 }) {
   const req = Number(cfm_requerido) || 0;
+  const tol = Math.max(0, Math.min(100, Number(tolerancia_pct) || 0));
+  const umbral = +(req * (1 - tol / 100)).toFixed(2);
   const list = Array.isArray(items) ? items : [];
   const detalle = list.map(it => {
     const cfmU = Math.max(0, Number(it.cfm_unitario) || 0);
@@ -396,23 +405,26 @@ export function evaluarMixVentiladores({ items, cfm_requerido }) {
   if (req <= 0 || total <= 0) {
     return {
       items: detalle, cfm_aporte_total: total, cfm_requerido: req,
+      cfm_umbral: umbral, tolerancia_pct: tol,
       deficit: 0, exceso: 0, cobertura_pct: null, n_unidades_total: nTotal,
       aprobado: false, estado: MIX_ESTADO.SIN_DATOS,
       mensaje: 'Cargue al menos un modelo con cantidad y defina el CFM requerido.'
     };
   }
   const cob = +(total / req * 100).toFixed(1);
-  const aprobado = total >= req;
-  const def = aprobado ? 0 : +(req - total).toFixed(2);
+  const aprobado = total >= umbral;
+  const def = aprobado ? 0 : +(umbral - total).toFixed(2);
   const exc = aprobado ? +(total - req).toFixed(2) : 0;
+  const tolMsg = tol > 0 ? ` (umbral ${(100 - tol).toFixed(1)}% con tolerancia ${tol.toFixed(1)}%)` : '';
   return {
     items: detalle, cfm_aporte_total: total, cfm_requerido: req,
+    cfm_umbral: umbral, tolerancia_pct: tol,
     deficit: def, exceso: exc, cobertura_pct: cob, n_unidades_total: nTotal,
     aprobado,
     estado: aprobado ? MIX_ESTADO.APROBADO : MIX_ESTADO.NO_APROBADO,
     mensaje: aprobado
-      ? `Mix aprobado · cobertura ${cob}% · exceso ${exc.toFixed(0)} CFM sobre el requerido.`
-      : `Mix NO aprobado · faltan ${def.toFixed(0)} CFM (cobertura ${cob}%). Ajuste cantidades o agregue modelos.`
+      ? `Mix aprobado${tolMsg} · cobertura ${cob}% · ${exc > 0 ? `exceso ${exc.toFixed(0)} CFM sobre el requerido` : 'cubre el umbral exacto'}.`
+      : `Mix NO aprobado · faltan ${def.toFixed(0)} CFM para alcanzar el umbral${tolMsg} (cobertura ${cob}%). Ajuste cantidades, agregue modelos o suba la tolerancia.`
   };
 }
 

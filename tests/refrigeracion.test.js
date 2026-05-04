@@ -476,6 +476,64 @@ test('evaluarMixVentiladores: clamp de cantidades negativas a 0', () => {
   assert.equal(r.estado, 'sin_datos');
 });
 
+test('evaluarMixVentiladores: tolerancia=0 (default) exige cobertura ≥100%', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }],   // 45000
+    cfm_requerido: 50000,
+    tolerancia_pct: 0
+  });
+  assert.equal(r.aprobado, false);
+  assert.equal(r.estado, 'no_aprobado');
+  assert.equal(r.cfm_umbral, 50000);
+  assert.equal(r.tolerancia_pct, 0);
+  assert.equal(r.deficit, 5000);
+  // Cuando tol=0 el mensaje NO debe llevar el bloque parentizado del umbral relajado
+  assert.ok(!r.mensaje.includes('con tolerancia'));
+});
+
+test('evaluarMixVentiladores: tolerancia=5 acepta cobertura ≥95%', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 10 }],  // 50000 vs req 52000 → 96.2%
+    cfm_requerido: 52000,
+    tolerancia_pct: 5
+  });
+  assert.equal(r.aprobado, true);                            // 50000 ≥ 52000 × 0.95 = 49400
+  assert.equal(r.estado, 'aprobado');
+  assert.equal(r.cfm_umbral, 49400);
+  assert.equal(r.tolerancia_pct, 5);
+  assert.ok(r.cobertura_pct < 100);                          // sigue por debajo del 100% nominal
+  assert.ok(r.mensaje.includes('umbral 95'));                // "(umbral 95.0% con tolerancia 5.0%)"
+  assert.ok(r.mensaje.includes('tolerancia 5'));
+});
+
+test('evaluarMixVentiladores: tolerancia=5 rechaza cobertura <95%', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }],   // 45000 vs req 50000 → 90%
+    cfm_requerido: 50000,
+    tolerancia_pct: 5
+  });
+  assert.equal(r.aprobado, false);                           // 45000 < 50000 × 0.95 = 47500
+  assert.equal(r.cfm_umbral, 47500);
+  assert.equal(r.deficit, 2500);                             // umbral − total
+  assert.ok(r.mensaje.includes('umbral 95'));
+});
+
+test('evaluarMixVentiladores: clamp de tolerancia fuera de rango', () => {
+  const r1 = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 10 }],
+    cfm_requerido: 50000,
+    tolerancia_pct: -10   // negativa → 0
+  });
+  assert.equal(r1.tolerancia_pct, 0);
+  const r2 = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 1 }],
+    cfm_requerido: 50000,
+    tolerancia_pct: 999   // > 100 → clamp a 100
+  });
+  assert.equal(r2.tolerancia_pct, 100);
+  assert.equal(r2.aprobado, true);                           // umbral = 0 → cualquier cosa cubre
+});
+
 test('sugerirMejoras: devuelve [] cuando el mix ya cubre', () => {
   const sugs = sugerirMejoras({
     items: [{ key: 'a', cfm_unitario: 5000, cantidad: 30 }],
