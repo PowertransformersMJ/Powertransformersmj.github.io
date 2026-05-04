@@ -1737,6 +1737,16 @@ async function guardarAccion() {
     if (!mod.isReady()) {
       throw new Error('Firebase no está configurado · contacte al administrador.');
     }
+    // 6a) Pre-chequeo de permisos: leer /usuarios/{uid} antes del
+    // addDoc para distinguir "no admin" de "payload con undefined"
+    // de "rules no desplegadas". Mensaje accionable directo.
+    if (responsable_uid) {
+      const permisos = await mod.verificarPermisosAdmin(responsable_uid);
+      console.info('[acciones_refrigeracion] verificarPermisosAdmin:', permisos);
+      if (!permisos.ok) {
+        throw new Error(permisos.mensaje);
+      }
+    }
     const id = await mod.crear(payload, responsable_uid);
     setStatus(`✓ Acción registrada con ID ${id}`, 'success');
     setTimeout(closeModalAccion, 1500);
