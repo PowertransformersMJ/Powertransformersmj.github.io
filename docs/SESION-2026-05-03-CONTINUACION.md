@@ -20,8 +20,10 @@
 | 7 | **Pre-chequeo permisos admin** | `verificarPermisosAdmin` lee `/usuarios/{uid}` antes del `addDoc` y muestra mensaje accionable | `c85eb41` |
 | 8 | **Diagnóstico exhaustivo + regla §0.1.2.7** | Distingue "rules desactualizadas" de "no admin"; regla permanente sobre re-deploy de `firestore.rules` | `525fc3c` |
 | 9 | **Gráfica HD/4K real** | Canvas 2400×1400 px × DPR 3 → ~7200×4200 efectivos (impresión a 300 dpi sin pixelado) | `08dcf03` |
+| 10 | **Documentación cierre sesión** | Handoff exhaustivo + 7 reglas permanentes en CLAUDE.md + tabla de comandos para retomar | `a35e97b` |
+| 11 | **Deploy rules confirmado** | Director ejecutó `firebase deploy --only firestore:rules` con éxito → bug del modal resuelto en producción | _no aplica · acción operativa del director_ |
 
-Total commits sesión: **20** en branch `claude/adjust-website-pages-8Ntwz`.
+Total commits sesión: **20+1 docs = 21** en branch `claude/adjust-website-pages-8Ntwz`.
 Tests acumulados: 503 → **570** (+67).
 HTML lint limpio durante toda la sesión.
 
@@ -498,6 +500,41 @@ solo se dispara al click de "Exportar informe técnico AFINIA".
 
 ---
 
+## 6.sexta · Bloque 10 · Cierre de sesión · deploy de rules confirmado (2026-05-03 PM14)
+
+**Confirmación del director:** *"el deploy fue exitoso"*.
+
+Esto significa que las rules en producción ahora **SÍ incluyen** el
+match `/acciones_refrigeracion/{id}` agregado en microfase 4 (commit
+`a86a51f`). El bug histórico del *"Missing or insufficient
+permissions"* documentado en regla §0.1.2.7 queda **resuelto en
+producción**.
+
+**Estado de la rama tras el deploy:**
+
+- `firestore.rules` en repo y en producción: **sincronizadas**.
+- Match `/acciones_refrigeracion/{id}` con read/create/update/delete
+  según rol activo en producción.
+- Modal "Registrar acción de mantenimiento" debería persistir sin
+  errores de permisos.
+- Tab "Consolidado Sistemas de Refrigeración" debería listar
+  acciones registradas en realtime.
+
+**Pendiente del director (no crítico):**
+
+1. Hard-reload Cmd+Shift+R y validar el flujo end-to-end:
+   - Registrar acción de mantenimiento (debería persistir).
+   - Ver la acción aparecer en la tab Consolidado en realtime.
+   - Exportar informe AFINIA (verificar gráfica HD/4K legible).
+   - Exportar resumen JSON (verificar shape canónico).
+2. **Mergear** la branch `claude/adjust-website-pages-8Ntwz` a
+   `main` desde GitHub web cuando todo apruebe.
+3. **Post-merge:** revocar PATs históricos.
+4. **Cleanup** de los 7 PDFs subidos por error al raíz del repo
+   (commit `91f386c` previo).
+
+---
+
 ## 7. Estado al cierre de sesión 2026-05-03
 
 ### Branch
@@ -572,23 +609,109 @@ commits** desde último merge a `main`. Último commit: `08dcf03`.
 
 ## 8. Cómo continuar en una sesión nueva
 
+### 8.1 · Bootstrap obligatorio al arrancar un chat nuevo
+
 Si arrancas un chat nuevo y el director te pide trabajar sobre
 Mantenimiento Brigada:
 
 1. **Lee este archivo completo** + CLAUDE.md §0 (permisos push) +
-   §0.1.2.4-6 (reglas permanentes) + §7 (estado actual).
-2. **Verifica** que estás en la branch `claude/adjust-website-pages-8Ntwz`
-   o ya está mergeada a `main`.
-3. **Verifica tests** con `npm install && npm run test:unit` (deben
-   ser 570/570 verdes).
-4. **Verifica lint** con `npm run lint:html` (exit 0).
-5. **NO toques** el shape del payload de `acciones_refrigeracion`
-   sin aplicar `deepClean` antes del write — Firestore lo rechazará
-   con `permission-denied` engañoso.
-6. **Si agregas funciones puras nuevas al dominio** que devuelvan
-   objetos con campos opcionales, **siempre** documenta en su
-   docstring que el caller debe pasar el output por `deepClean`
-   antes de persistir.
+   §0.1.2.1-7 (reglas permanentes, especial atención a §0.1.2.4
+   reorder UI legacy, §0.1.2.6 deep-clean Firestore, §0.1.2.7
+   re-deploy de rules) + §7 (estado actual).
+2. **Pídele al director un PAT clásico fresco** (scope `repo`)
+   para hacer push inline (regla §0.1). Sin token no hay push.
+3. **Verifica** la branch activa. Si `claude/adjust-website-pages-8Ntwz`
+   ya fue mergeada a `main`, trabaja desde una nueva feature
+   branch con prefijo `claude/...`. Si no, sigue en esa.
+4. **Verifica el estado** con:
+   ```bash
+   git fetch origin main && git log --oneline origin/main -10
+   ls assets/css/ assets/js/data/ assets/js/domain/
+   npm install --no-audit --no-fund
+   npm run test:unit            # debe ser 570/570 verdes
+   npm run lint:html            # debe ser exit 0
+   ```
+5. **Verifica deploys Firebase activos** mirando salida de
+   `firebase firestore:indexes` (en Mac del director, no aquí).
+   Las rules en producción deben coincidir con `firestore.rules`
+   del repo (regla §0.1.2.7).
+
+### 8.2 · Reglas duras de invariancia (no romper)
+
+- **NO toques** el shape del payload de `acciones_refrigeracion`
+  sin aplicar `deepClean` antes del write — Firestore lo rechazará
+  con `permission-denied` engañoso (regla §0.1.2.6).
+- **NO elimines rutas legacy** al refactorizar de 1→N entidades.
+  Mantén siempre fallback (regla §0.1.2.4).
+- **NO uses** `npx html-validate` — usa `npm run lint:html` con las
+  devDependencies del repo (regla §0.1.2.5).
+- **NO modifiques** `firestore.rules` sin avisar al director que
+  necesita ejecutar `firebase deploy --only firestore:rules` y
+  verificar la salida muestra *"released rules firestore.rules to
+  cloud.firestore"* (regla §0.1.2.7).
+- **NO toques** la calibración Westinghouse `PENDIENTES_WESTINGHOUSE`
+  (115%→1.20, 125%→2.00, 133%→2.65, 166%→4.25). Verificación
+  golden: 24 MVA × 125% = 48.000 CFM.
+- **NO toques** el header AFINIA `header_compact.png` ni el
+  footer `footer.png` ni la firma `firma-miguel-jimenez.png`.
+- **NO toques** el catálogo `FAN_DB` o
+  `TRANSFORMADORES_AFINIA` sin coordinar con el director.
+
+### 8.3 · Patrón de trabajo recomendado
+
+1. **Pide alcance claro** del director — feature, bug, mejora.
+2. **Si es feature nueva**, plantea un plan de microfases (3-6)
+   con preview ASCII, implementa una a una con commit aislado y
+   espera a que el director valide cada una antes de seguir.
+3. **Si es bug**, reproduce con test primero (TDD) o agrega test
+   regresión, después arregla, después documenta como regla
+   permanente si el patrón puede repetirse.
+4. **Cada commit termina con push** inline con PAT (regla §0.1)
+   y verificación que `git rev-parse HEAD origin/branch` muestren
+   el mismo SHA.
+5. **Documenta siempre**: CHANGELOG.md (entrada por commit) +
+   CLAUDE.md §7 (estado actual + próxima movida) +
+   docs/MANTENIMIENTO-BRIGADA.md si toca el módulo + nueva regla
+   permanente §0.1.2.X si descubres un patrón aplicable a futuras
+   sesiones.
+
+### 8.4 · Casos de uso típicos para próximas sesiones
+
+| Caso | Patrón sugerido |
+|---|---|
+| Nueva calculadora del módulo Brigada (aceite, aterramiento, sobrecarga TPT, etc.) | (1) tab nueva en `pages/mantenimiento-brigada.html` · (2) página `pages/calculo-XXX.html` con `module-shell` · (3) dominio puro `assets/js/domain/calculo-XXX.js` con tests · (4) UI binding `assets/js/calculo-XXX.js` · (5) persistencia opcional en `acciones_XXX` con rules + indexes · (6) tab consolidado opcional · (7) informe imprimible siguiendo regla §0.1.2.3 (paginación manual con `.sheet` divs) |
+| Bug en informe AFINIA | Usar regla §0.1.2.2 (13 reglas de informes imprimibles) + §0.1.2.3 (paginación Safari) · verificar siempre con `puppeteer` Y con Safari real antes de cerrar |
+| Cambio en rules Firestore | Avisar deploy (regla §0.1.1) + verificar salida CLI (regla §0.1.2.7) · si toca data layer existente con objetos anidados, agregar `deepClean` (§0.1.2.6) |
+| Refactor 1→N | Aplicar regla §0.1.2.4 estricta · mantener ruta legacy como fallback · placeholder informativo nunca silencioso |
+
+### 8.5 · Comandos útiles para retomar
+
+```bash
+# Estado actual del repo
+cd ~/LordPowerTransformersMJ.github.io
+git fetch origin
+git log --oneline origin/main..origin/claude/adjust-website-pages-8Ntwz
+git log --oneline origin/main -25
+
+# Verificar consistencia
+npm install --no-audit --no-fund
+npm run lint:html          # exit 0
+npm run test:unit          # 570/570 verdes
+
+# Si hay que retomar trabajo en la branch
+git checkout claude/adjust-website-pages-8Ntwz
+git pull origin claude/adjust-website-pages-8Ntwz
+
+# Deploy Firebase (siempre desde Mac del director)
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+firebase deploy --only storage
+firebase deploy --only functions
+
+# Servidor local de prueba
+python3 -m http.server 8000
+# → http://localhost:8000/pages/mantenimiento-brigada.html
+```
 
 ### Si el director reporta un bug visual
 
