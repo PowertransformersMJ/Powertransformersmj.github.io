@@ -16,6 +16,45 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 1 · Tolerancia configurable en evaluación del mix (2026-05-03 PM5)
+
+Primera microfase de un plan de 6 microfases para alinear la
+calculadora ONAF con el prompt técnico del director (selección
+estructurada de ventiladores + protección eléctrica + JSON output).
+
+- `assets/js/domain/refrigeracion.js` · `evaluarMixVentiladores`
+  acepta nuevo parámetro opcional `tolerancia_pct` (default 0).
+  Cuando `tolerancia_pct > 0` el umbral de aprobación se relaja
+  a `cfm_requerido × (1 − tol/100)` — útil cuando el proyecto
+  admite cobertura mínima ≥95% en lugar de ≥100% estricto.
+  Devuelve dos campos nuevos: `cfm_umbral` (CFM mínimo aceptado)
+  y `tolerancia_pct` (eco del valor aplicado, clampeado a 0…100).
+  El mensaje del banner ahora indica el umbral cuando hay
+  tolerancia activa: *"Mix aprobado (umbral 95.0% con tolerancia
+  5.0%) · cobertura 95.5% · exceso 0 CFM"*.
+- `pages/calculo-refrigeracion.html` · campo nuevo
+  `#mix_tolerancia` en la barra de mix con default **5%** (como
+  pidió el director en su prompt). Hint visible *"Umbral mínimo
+  aceptado · default 5%"*.
+- `assets/js/calculo-refrigeracion.js` · helper `getTolerancia()`
+  con clamp [0, 100]. Listener `input` que recalcula el banner +
+  sugerencias en vivo cuando el usuario cambia la tolerancia.
+  Propagado a las 3 llamadas de `evaluarMixVentiladores` (tabla,
+  banner, snapshot del informe) + persistencia (campo
+  `tolerancia_pct` en el doc `acciones_refrigeracion`). Banner
+  ampliado con KPI nuevo *"Umbral · X CFM (tol Y%)"* visible
+  solo cuando hay tolerancia configurada.
+- `tests/refrigeracion.test.js` · 4 tests nuevos cubriendo:
+  tol=0 default exige ≥100%, tol=5 acepta 96.2% (cobertura aún
+  bajo 100% nominal), tol=5 rechaza 90% (déficit calculado
+  contra el umbral relajado), clamp de valores fuera de rango
+  [-10 → 0 / 999 → 100].
+- 519 / 519 tests verdes · HTML lint OK.
+
+**Pendiente del director:** validar visualmente en producción.
+Próxima microfase (2): estrategias enriquecidas con VFD + paralelo/
+serie + `impacto_estimado_cfm` + `implicaciones` operativas/coste.
+
 ### Hotfix · Restaurar protección eléctrica como fallback legacy (2026-05-03 PM4)
 
 El director reportó que la sección **"Circuito de protección
