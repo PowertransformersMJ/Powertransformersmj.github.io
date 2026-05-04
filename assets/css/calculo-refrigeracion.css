@@ -704,6 +704,60 @@
 
 /* ─── Fichas técnicas read-only del mix ──────────────────── */
 .fichas-mix-wrap { display: flex; flex-direction: column; gap: 10px; }
+
+/* Bloque "Disposición mecánica" dentro de cada ficha del mix */
+.ficha-mix-dispo {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 12px;
+  align-items: stretch;
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: rgba(0, 122, 255, .04);
+  border: 1px solid rgba(13, 71, 161, .14);
+  border-radius: 6px;
+}
+.ficha-mix-dispo .fmd-info { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.ficha-mix-dispo .fmd-l {
+  font: 600 10px var(--font-mono);
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--ink-3);
+}
+.ficha-mix-dispo .fmd-select {
+  padding: 6px 10px;
+  border: 1px solid rgba(0, 40, 90, .15);
+  border-radius: 5px;
+  background: #fff;
+  font: 500 13px var(--font-sans);
+  color: var(--ink-1);
+}
+.ficha-mix-dispo .fmd-select:focus {
+  outline: 2px solid rgba(0, 122, 255, .35);
+  outline-offset: 1px;
+}
+.ficha-mix-dispo .fmd-msg {
+  font: 500 11px var(--font-mono);
+  color: var(--brand-deep);
+  font-style: italic;
+}
+.ficha-mix-dispo .fmd-svg {
+  display: flex; align-items: center; justify-content: center;
+  background: #fff;
+  border: 1px solid rgba(13, 71, 161, .12);
+  border-radius: 4px;
+  padding: 4px;
+  min-height: 160px;
+}
+.ficha-mix-dispo .fmd-svg svg {
+  width: 100%; height: auto; max-height: 220px;
+}
+@media (max-width: 720px) {
+  .ficha-mix-dispo {
+    grid-template-columns: 1fr;
+  }
+  .ficha-mix-dispo .fmd-svg { min-height: 140px; }
+}
+
 .ficha-mix-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
