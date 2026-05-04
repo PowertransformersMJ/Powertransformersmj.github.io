@@ -726,6 +726,129 @@ repo:
   específico para `permission-denied` listando las 3 causas
   probables.
 
+### 0.1.2.9 Regla permanente · Validaciones críticas en SUBMIT, no solo al abrir el formulario · doble línea de defensa en data layer
+
+**Contexto del bug histórico (sesión 2026-05-04 PM):** después de
+implementar el anti-duplicado para evitar registrar el mismo
+transformador dos veces sin justificación (regla anterior pedida
+por el director), el director reportó que **seguía pudiendo
+registrar 3 veces el mismo transformador T1-M/M-CHG sin que el
+sistema le exigiera justificación**. La validación falló
+silenciosamente.
+
+**Causas raíz (combinación de 3 problemas):**
+
+1. **El chequeo se hacía solo al ABRIR el modal** (`openModalAccion`),
+   no en el momento del SUBMIT (`guardarAccion`). El payload usaba
+   `state.duplicadoInfo` cacheado que dependía de:
+   - Que la query async `existeAccionParaTransformador` hubiera
+     completado antes del click "Guardar".
+   - Que la query no hubiera fallado silenciosamente (catch que
+     retornaba `{existe: false}` sin lanzar).
+
+2. **La query requería un índice compuesto** `transformador_id ASC
+   + fecha_accion DESC` que estaba en `firestore.indexes.json` pero
+   podía no estar desplegado en producción todavía.
+
+3. **No había segunda línea de defensa**: el data layer `crear()`
+   no verificaba el flag de re-registro vs los duplicados reales,
+   confiaba 100% en lo que envió la UI.
+
+**Resultado:** la UI mostraba el banner amarillo (a veces) pero el
+flag `es_re_registro` quedaba en `false` por race condition / query
+silenciosamente fallida → el `payload.es_re_registro` era `false`
+→ la validación `if (es_re_registro && !justificacion)` no se
+disparaba → el `addDoc` pasaba sin problemas.
+
+**Regla permanente** para CUALQUIER validación crítica
+(anti-duplicado, anti-fraude, integridad referencial, etc.):
+
+1. **Validar en el SUBMIT, no solo al abrir el formulario.** El
+   estado del modal/formulario NO es fuente de verdad para
+   validaciones de seguridad — el usuario puede haber abierto el
+   modal antes de que la query async completara, manipulado
+   campos, etc. Antes del `addDoc/setDoc/updateDoc` haz la query
+   de verificación EN VIVO.
+
+2. **Si la query de verificación falla, BLOQUEA el submit con
+   mensaje accionable.** No retornes `{existe: false}` silenciosa
+   — eso convierte un error en un permiso silencioso. Lanza error
+   con mensaje claro que indique al usuario qué hacer (ej.
+   "índice no desplegado · ejecute `firebase deploy --only
+   firestore:indexes`").
+
+3. **Doble línea de defensa en el data layer.** La UI puede tener
+   bugs, race conditions, o ser bypaseada (otros call sites,
+   tests, scripts). El data layer DEBE validar el invariante
+   independientemente:
+   - `crear()` invoca su propia verificación
+   - Si encuentra que el payload viola la regla, lanza error
+   - Esto protege contra `addDoc` desde cualquier origen
+
+4. **Mensaje del error explícito.** Cuando se bloquea por la
+   regla, el mensaje debe:
+   - Identificar la entidad violada (matrícula, ID, etc.)
+   - Listar las opciones válidas (catálogo de justificaciones, etc.)
+   - Indicar acción concreta del usuario para resolver
+   - NO usar texto genérico como "validación falló"
+
+5. **Logging para auditoría.** `console.info` del resultado de la
+   verificación de duplicado y `console.error` cuando falla la
+   query, para que cualquier inspección posterior tenga trazabilidad.
+
+**Patrón de implementación** (ref.: `guardarAccion()` y `crear()`
+en `acciones_refrigeracion.js`):
+
+```javascript
+// ── UI · validación en SUBMIT ──
+async function submitForm() {
+  // ... lectura del formulario ...
+  let dupCheck = { existe: false };
+  try {
+    dupCheck = await mod.existeRegistro(matricula);
+    console.info('[anti-duplicado] check:', dupCheck);
+  } catch (err) {
+    console.error('[anti-duplicado] FALLÓ:', err);
+    throw new Error('No se pudo verificar duplicado · BLOQUEO total · ' + err.message);
+  }
+  if (dupCheck.existe) {
+    if (!payload.justificacion) throw new Error('Justificación obligatoria · ...');
+    if (!VALIDAS.includes(payload.justificacion)) throw new Error('...');
+    payload.es_duplicado = true;
+  }
+  await mod.crear(payload);
+}
+
+// ── Data layer · doble defensa ──
+export async function crear(data, uid) {
+  const payload = sanitizar(data);
+  const errs = validar(payload);
+  if (errs.length) throw new Error(...);
+  // SEGUNDA LÍNEA · revalidar en data layer
+  const dup = await existeRegistro(payload.id);
+  if (dup.existe) {
+    if (!payload.es_duplicado) throw new Error('Anti-duplicado · ...');
+    if (!VALIDAS.includes(payload.justificacion)) throw new Error('...');
+  }
+  await addDoc(collRef(), deepClean(payload));
+}
+```
+
+**Aplica también a:** validaciones de unicidad, integridad
+referencial (FK), enums obligatorios, rango temporal, etc. Cualquier
+regla que el negocio considera invariante debe estar en AMBOS
+lugares (UI + data layer) con verificación en vivo, no cacheada.
+
+**Solución del bug original (commit `XXXXXXX` siguiente):**
+- `guardarAccion()` reescrito para llamar `existeAccionParaTransformador`
+  JUSTO ANTES del crear (no se usa más `state.duplicadoInfo` cacheado).
+- Si la query falla, BLOQUEA el submit con error explícito.
+- `crear()` en data layer agrega segunda línea de defensa: verifica
+  duplicados independientemente y bloquea con error si el payload
+  no lleva justificación válida.
+- Logging `console.info` del resultado del chequeo + `console.error`
+  cuando la query falla.
+
 ### 0.1.2.8 Regla permanente · Captura HD de Chart.js exige escalar también fontsize y lineWidth, NO solo el canvas
 
 **Contexto del bug histórico (sesión 2026-05-04 PM):** después de
