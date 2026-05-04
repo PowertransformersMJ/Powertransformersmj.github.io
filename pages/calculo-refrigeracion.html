@@ -168,6 +168,9 @@
     <!-- ── CANVAS DEL GRÁFICO ────────────────────────────── -->
     <div class="cw"><canvas id="cv"></canvas></div>
 
+    <!-- ── Validación punto operación vs gráfica Westinghouse (microfase 6) -->
+    <div id="valida-grafica" class="valida-grafica" hidden role="status" aria-live="polite"></div>
+
     <!-- ── DATOS DEL RADIADOR ────────────────────────────── -->
     <section class="mec-sect" aria-labelledby="rad-stit">
       <div class="mec-hdr rad">
@@ -415,6 +418,9 @@
           </div>
         </div>
 
+        <!-- Banner de faltantes para cálculo eléctrico (microfase 4) -->
+        <div id="prot-faltantes" class="prot-faltantes" hidden role="status" aria-live="polite"></div>
+
         <div class="calc-subsect">Protección individual por ventilador — guardamotor ABB MS116 + contacto auxiliar HK1-11 (SCADA)</div>
         <div id="prot-per-fan">
           <p style="color: var(--ink-4); font-style: italic; padding: 10px">
@@ -516,6 +522,11 @@
           <label for="mix_fan_qty">Cantidad</label>
           <input type="number" id="mix_fan_qty" class="w90" value="1" min="1" max="999" step="1">
         </div>
+        <div class="fld" style="flex: 0 0 130px">
+          <label for="mix_tolerancia">Tolerancia (%)</label>
+          <input type="number" id="mix_tolerancia" class="w90" value="5" min="0" max="100" step="0.5">
+          <span class="hint">Umbral mínimo aceptado · default 5%</span>
+        </div>
         <button type="button" class="badd" id="btnAddToMix" style="height: 36px">+ Agregar al mix</button>
       </div>
 
@@ -561,6 +572,9 @@
     <div class="export-bar">
       <button type="button" class="btn-exp" id="btnExportReport">
         <i data-lucide="file-text"></i> Exportar informe técnico AFINIA
+      </button>
+      <button type="button" class="btn-exp" id="btnExportJson" style="background: #6a1b9a">
+        <i data-lucide="braces"></i> Exportar resumen JSON
       </button>
       <button type="button" class="btn-exp" id="btnRegistrarAccion" style="background: #2e7d32">
         <i data-lucide="save"></i> Registrar acción de mantenimiento

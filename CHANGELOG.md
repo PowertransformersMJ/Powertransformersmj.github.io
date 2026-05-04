@@ -16,6 +16,397 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 6 · Validación gráfica Westinghouse vs cálculo (2026-05-03 PM10) — CIERRE PLAN
+
+Sexta y última microfase. Cierra el plan de 6 microfases para
+alinear la calculadora ONAF con el prompt técnico del director.
+Detecta inconsistencias entre los inputs del usuario y la curva
+Westinghouse calibrada.
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Función pura nueva validarPuntoOperacion({onan_kva, pct,
+  cfm_calculado, alt_m}) hace 2 chequeos:
+  · A · Rango calibrado: el % está dentro del rango cubierto por
+    las curvas oficiales (115-166%). Fuera de eso → severidad
+    'err' por extrapolación.
+  · B · Coherencia gráfica vs cálculo: calcula CFM esperado
+    interpolando la pendiente Westinghouse al % seleccionado y
+    aplicando corrección de altitud. Compara con cfm_calculado.
+    Delta > 5% → 'err' (inconsistencia de inputs). Delta 2-5%
+    → 'warn'. Delta ≤ 2% → 'ok'.
+- Devuelve estructura compacta con cfm_esperado, cfm_calculado,
+  pendiente_esperada, delta_cfm, delta_pct_abs, severidad,
+  rango_calibrado, pct y mensaje humano.
+
+Tests: +6 (98 → 104 en refrigeración):
+- Caso golden 24 MVA × 125% = 48000 CFM (severidad 'ok')
+- Discrepancia leve (2-5%) → 'warn'
+- Discrepancia grande (>5%) → 'err'
+- % fuera del rango calibrado → 'err' por extrapolación
+- Aplica corrección de altitud al esperado
+- pendiente_esperada coincide con interpolarPendiente
+
+UI (pages/calculo-refrigeracion.html + assets/js/calculo-refrigeracion.js):
+- Contenedor nuevo #valida-grafica debajo del canvas Chart.js.
+  Hidden por defecto.
+- renderValidacionGrafica(v) muestra banner con badge ✓/⚠/✗,
+  mensaje, KPIs (CFM esperado, delta absoluto y %, pendiente
+  esperada). Color verde/naranja/rojo según severidad.
+- upd() invoca validarPuntoOperacion en cada cambio de input
+  (ONAN/ONAF/% / altitud) y persiste en state.lastValidacion.
+- calcularResumenActual() (helper microfase 5) adjunta el
+  resultado como campo `validacion_grafica` del resumen JSON
+  exportado.
+- guardarAccion enriquece payload con validacion_grafica.
+
+CSS:
+- .valida-grafica con 3 variantes (.is-ok verde, .is-warn
+  naranja, .is-err rojo).
+- .vg-badge pill, .vg-msg flexible, .vg-kpi monoespaciado.
+
+Data layer (assets/js/data/acciones_refrigeracion.js):
+- sanitizar() acepta data.validacion_grafica como objeto y lo
+  persiste para auditoría desde la tab Consolidado.
+
+557/557 tests verdes (+6) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+
+═══════════════════════════════════════════════════════════════
+PLAN DE 6 MICROFASES CERRADO
+═══════════════════════════════════════════════════════════════
+Resumen total:
+- Microfase 1: tolerancia_pct configurable
+- Microfase 2: 5 estrategias enriquecidas (incl. VFD,
+  optimización aerodinámica)
+- Microfase 3: FLC + contactor ABB AF + tags SCADA + coordinación
+- Microfase 4: detección de faltantes con 3 severidades
+- Microfase 5: snapshot JSON con shape exacto del prompt
+- Microfase 6: validación gráfica Westinghouse vs cálculo
+
+Tests acumulados: 557/557 verdes (vs 503 al inicio del plan).
+HTML lint limpio durante toda la sesión. Branch lista para merge
+a main tras validación final del director.
+
+### Microfase 5 · Exportar resumen JSON estructurado (2026-05-03 PM9)
+
+Quinta microfase. Genera un snapshot JSON con el shape EXACTO del
+prompt técnico del director (selecciones / cfm_requerido / cfm_total
+/ evaluacion / razon / estrategias_sugeridas / seleccion_electrica /
+faltantes / metadatos). Útil para integraciones, audit trail y
+handoff a herramientas externas (Excel, Power BI, ERP, SCADA).
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Función pura nueva construirResumenJSON({mix, evaluacion,
+  proteccion, sugerencias, faltantes, metadatos}) que arma:
+  · selecciones[] · una entrada por modelo del mix con
+    {id, marca, modelo, cantidad, cfm_unit, cfm_total}
+  · cfm_requerido / cfm_total / cfm_umbral / tolerancia_pct /
+    cobertura_pct / deficit_cfm / exceso_cfm / n_unidades_total
+  · evaluacion · 'APROBADO' | 'REQUIERE AJUSTE'
+  · razon · texto humano refleja tolerancia si > 0
+  · estrategias_sugeridas[] · descripcion + impacto +
+    implicaciones + factibilidad + aprobado
+  · seleccion_electrica[] · uno por grupo (modelo) con
+    id_ventilador, marca, modelo, cantidad, potencia_hp, flc_A,
+    guardamotor {tipo, corriente_ajustada_A, rango_A, pid,
+    justificacion}, contactor {modelo_sugerido, ac3_A, kw_400v,
+    margen_pct, bobina, pid, contactos_NO, contactos_NC,
+    tags_SCADA, justificacion}, auxiliar_guardamotor
+  · breaker_sistema · 1 ud para todo el sistema con
+    {modelo_sugerido, In_A, curva, poder_de_corte_kA,
+    perdidas_W, pid, auxiliar_SCADA, justificacion}
+  · faltantes[] · strings compactos con [SEVERIDAD] + campo +
+    modelo + mensaje
+  · metadatos · transformador_id, matricula, proyecto,
+    subestacion, zona, depto, grupo, serie, kva_*, pct, altitud,
+    conexion_motor, responsable_uid/email/nombre,
+    fecha_generacion, version_resumen ('1.0'), norma_referencia.
+
+Tests: +7 (91 → 98 en refrigeración):
+- Shape canónico con todas las claves del prompt
+- selecciones tiene estructura correcta por modelo
+- evaluación APROBADO vs REQUIERE AJUSTE
+- seleccion_electrica trae guardamotor + contactor + breaker
+- faltantes mapeados a strings con severidad
+- metadatos incluye fecha_generacion + version_resumen
+- Razón refleja tolerancia cuando aplica
+
+UI (assets/js/calculo-refrigeracion.js + pages/calculo-refrigeracion.html):
+- Función nueva calcularResumenActual() que es helper común
+  reutilizado por exportarResumenJSON, guardarAccion (snapshot
+  persistido) y eventualmente generateReport. Captura todo el
+  estado actual + sesión del usuario + parámetros del cálculo.
+- Función nueva exportarResumenJSON() que descarga el snapshot
+  como .json con nombre `resumen-refrigeracion-{matricula}-{fecha}.json`.
+- Botón nuevo #btnExportJson (color púrpura) en la barra de
+  exportar, al lado de "Exportar informe AFINIA". Icono Lucide
+  `braces`.
+- guardarAccion enriquece el payload con `resumen_json:
+  calcularResumenActual()` para que el doc Firestore quede con
+  el snapshot canónico para el audit.
+
+Data layer (assets/js/data/acciones_refrigeracion.js):
+- sanitizar() acepta data.resumen_json como objeto, lo persiste
+  en el doc para que la tab Consolidado pueda exportar el
+  resumen sin recalcular.
+
+551/551 tests verdes (+7) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+Próxima microfase (6): comparación gráfica Westinghouse vs
+cálculo (validación punto de operación + warning si
+discrepancia > 2%).
+
+### Microfase 4 · Detección de faltantes para cálculo eléctrico (2026-05-03 PM8)
+
+Cuarta microfase. Detecta y reporta campos faltantes en la ficha
+técnica de cada modelo del mix que afectan el cálculo eléctrico,
+sin bloquear el flujo (la calculadora sigue con valores por defecto
+razonables).
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Función pura nueva detectarFaltantes({mix}) → devuelve array de
+  objetos {key, modelo, marca, campo, severidad, sustituto, mensaje}
+  por cada faltante. Tres severidades:
+  · critico · sin esto NO se puede calcular protección eléctrica
+    del modelo (ej. fan_amp + sin potencia ni voltaje para derivar).
+    Si esto pasa, los siguientes faltantes del mismo modelo se
+    omiten (cascada).
+  · aviso   · cálculo con valor por defecto razonable (ej. cos φ
+    asumido 0.85, η asumida 0.85, voltaje 400 V).
+  · info    · opcional, solo afecta exports (ej. fan_peso = null).
+- Heurística: corriente directa de placa fan_amp parsea el primer
+  número (formato "1.13/0.65 A (D/Y)"). Voltaje extraído del
+  string fan_volt (regex /(\d+)\s*V/).
+
+Tests: +7 (83 → 91 en refrigeración):
+- Mix vacío devuelve [].
+- Ficha completa no genera faltantes.
+- Severidad crítico cuando no hay placa ni datos para derivar.
+- Aviso cuando falta cos φ (sustituto 0.85).
+- Info cuando falta peso (no bloquea cálculo).
+- Omite items con cantidad <= 0.
+- Mensajes incluyen marca + modelo para identificar.
+
+UI (pages/calculo-refrigeracion.html + assets/js/calculo-refrigeracion.js):
+- Contenedor nuevo #prot-faltantes en la sección "Circuito de
+  protección eléctrica y mando", debajo del bloque de conexión
+  Δ/Y. Hidden por default.
+- Función nueva renderFaltantes(arr) que ordena por severidad
+  (crítico > aviso > info), muestra contador en el header
+  ("3 críticos · 2 avisos · 1 info"), lista cada faltante con
+  pill de severidad + mensaje accionable, y pie con hint
+  diferenciado: si hay críticos enfatiza que esos modelos no
+  pueden dimensionar protección.
+- calcProtection() invoca detectarFaltantes(state.mix) y
+  guarda en state.lastFaltantes; renderFaltantes(arr) en cada
+  cambio de mix o tolerancia.
+- guardarAccion() incluye campo nuevo `faltantes` en el payload.
+
+CSS:
+- .prot-faltantes con fondo amarillo crema + border-left naranja.
+- .pf-sev.critico (rojo), .pf-sev.aviso (naranja), .pf-sev.info
+  (azul) en pills.
+
+Data layer (assets/js/data/acciones_refrigeracion.js):
+- sanitizar() acepta data.faltantes como array, lo persiste en el
+  doc Firestore para auditoría posterior desde la tab Consolidado.
+
+Informe AFINIA · sec 9:
+- Bloque amarillo informativo bajo la tabla principal cuando hay
+  faltantes. Lista cada uno con badge [SEVERIDAD] coloreado (rojo
+  crítico, naranja aviso, azul info). Pie explica que el cálculo
+  se ejecutó con valores por defecto razonables.
+
+544/544 tests verdes (+8) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+Próxima microfase (5): exportar resumen JSON estructurado con shape
+exacto del prompt (selecciones, evaluacion, estrategias_sugeridas,
+seleccion_electrica, faltantes).
+
+### Microfase 3 · Selección eléctrica detallada (FLC + contactor AF + SCADA + coordinación) (2026-05-03 PM7)
+
+Tercera microfase del plan de 6. Amplía el cálculo eléctrico para
+cubrir el ciclo completo de protección + maniobra + señalización
+SCADA exigido por el prompt técnico del director.
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Catálogo nuevo CONTACTOR_AF_DB (7 modelos ABB AF: AF09, AF12,
+  AF16, AF26, AF38, AF65, AF80) con corriente AC-3, kW @ 400 V,
+  PID y tipo de bobina universal.
+- Constante TAGS_SCADA con 4 tags estándar (RUN, FAULT, TRIP,
+  READY) cada uno con contacto físico + descripción.
+- Función pura nueva seleccionarContactor(flc, factor=1.15) que
+  selecciona el AF cuya corriente AC-3 cubre FLC × margen de
+  servicio. Devuelve `margen_pct` calculado.
+- Función pura nueva calcularFLC({p_w, hp, voltaje, cosphi,
+  eficiencia, amps_directo}) con 3 rutas:
+  · placa: si pasamos amps_directo lo usamos sin cálculo
+  · cálculo: FLC = P / (√3 × V × cos φ × η) con memoria
+    (fórmula sustituida con valores reales)
+  · sin_datos: lista de campos faltantes
+- calcularProteccionMix devuelve cada grupo con campo `contactor`
+  + objeto `tags_scada` a nivel raíz.
+- calcularProteccionElectrica (legacy) devuelve también
+  `contactor` y `tags_scada`.
+
+Tests (tests/refrigeracion.test.js): +12 tests:
+- CONTACTOR_AF_DB tiene 7 modelos ordenados por AC-3
+- TAGS_SCADA expone los 4 tags estándar
+- seleccionarContactor cubre FLC × 1.15 (caso 0.65 / 8 / 25 A)
+- factor personalizable
+- fuera de catálogo → null
+- calcularFLC ruta 1 (placa)
+- calcularFLC ruta 2 (cálculo desde p_w)
+- calcularFLC acepta HP (× 746)
+- calcularFLC ruta 3 (sin datos) reporta faltantes
+- amps_directo tiene precedencia sobre cálculo
+- calcularProteccionMix incluye contactor + tags_scada
+- calcularProteccionElectrica también
+
+UI (assets/js/calculo-refrigeracion.js):
+- renderProtPorGrupo refactorizado a renderGrupoProtCard. Cada
+  card de grupo muestra ahora 4 columnas:
+  · Grupo + FLC + memoria de cálculo (norma NEMA MG-1 / IEC 60034)
+  · Guardamotor MS116 + setting + margen del setting % del rango
+    (NEC 430.32, IEC 60947-4-1)
+  · Contactor ABB AF + AC-3 + margen sobre FLC + tags SCADA
+    inline (RUN/FAULT/READY) con norma IEC 60947-4-1
+  · Auxiliar SCADA del guardamotor
+- renderProtTotal incluye al pie un bloque renderSCADAblock con
+  los 4 tags SCADA en grid responsive + norma IEEE C37.91 /
+  IEC 61850. La card del breaker incluye coordinación con MCCB
+  aguas arriba (norma IEC 60947-2 · NEC 430.52).
+- renderListaMaterialesMix añade el contactor por grupo al BOM.
+- renderProtLegacyPerFan reescrito con 4 cards (FLC + memoria
+  calcularFLC, MS116, AF, auxiliar SCADA).
+- renderProtLegacyTotal con bloque SCADA + nota de coordinación.
+- renderProtLegacyMateriales añade contactor al BOM.
+
+Informe AFINIA · sec 9 (Circuito de protección eléctrica):
+- Tabla principal amplía columna 'Detalles' por columnas
+  separadas Guardamotor MS116 + Contactor AF (modelo + AC-3 +
+  PID inline).
+- Tabla complementaria de KPIs incluye fila "Coordinación" con
+  nota explícita.
+- Sub-tabla nueva con los 4 tags SCADA + contacto + descripción.
+- BOM agrupado incluye contactor por grupo + nota tags al pie.
+
+CSS: sin cambios (reutiliza .prot-card existentes).
+
+536/536 tests verdes (+12) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+Próxima microfase (4): detección y reporte de "Faltantes" para
+cálculo eléctrico completo (banner amarillo cuando faltan
+potencia, eficiencia, voltaje, cos φ).
+
+### Microfase 2 · Estrategias enriquecidas (5 tipos + factibilidad + implicaciones) (2026-05-03 PM6)
+
+Refactor del motor `sugerirMejoras` para alinearlo con el prompt
+técnico del director: hasta 5 estrategias, cada una con `factibilidad`,
+`impacto_estimado_cfm` e `implicaciones` operativas/coste.
+
+- `assets/js/domain/refrigeracion.js` · `sugerirMejoras` reescrito:
+  - Mantiene las 3 estrategias existentes (`agregar_unidades`,
+    `sustituir`, `agregar_modelo`).
+  - Suma 2 estrategias nuevas:
+    - **`vfd_uprate`** · operar con variador de frecuencia. Si en el
+      catálogo existe variante de mayor frecuencia/RPM del mismo
+      modelo (ej. `fn063_50` → `fn063_60`) usa el CFM exacto de esa
+      variante; si no, asume factor 1.20 sobre el CFM nominal con
+      texto explícito en la descripción.
+    - **`optimizacion_aerodinamica`** · informativa. Aparece solo
+      cuando el déficit es > 10% del requerido. Estima +5–10%
+      adicional al rediseñar toma de aire / reducir restricciones
+      del flujo. Sin cambios automáticos al mix (`cambios = []`).
+  - Cada sugerencia retorna **3 campos nuevos**:
+    `impacto_estimado_cfm` (delta CFM versus mix actual),
+    `implicaciones` (texto sobre coste y consideraciones operativas),
+    `factibilidad` (`'alta' | 'media' | 'baja'`).
+  - Acepta nuevo parámetro `tolerancia_pct` (alineado con microfase 1).
+    Las sugerencias se evalúan contra `cfm_requerido × (1 − tol/100)`
+    en lugar del requerido estricto, así son coherentes con el banner.
+  - Default `max_sugerencias` sube de 3 → 5.
+  - **Ordenamiento nuevo:** primero las `aprobado=true`, luego por
+    factibilidad (alta > media > baja), luego por menor exceso. Antes
+    era solo por menor exceso.
+  - Factibilidad asignada por estrategia: `agregar_unidades=alta`
+    (mismo modelo, sin reingeniería); `sustituir=media` (recalcular
+    protección + verificar montaje); `agregar_modelo=media`
+    (más SKUs en inventario); `vfd_uprate=baja` (requiere VFD +
+    coordinación SCADA); `optimizacion_aerodinamica=baja` (requiere
+    ingeniería específica).
+- `tests/refrigeracion.test.js` · 5 tests nuevos:
+  - Ordenamiento por factibilidad (alta > media > baja).
+  - Cada sugerencia trae los 3 campos enriquecidos.
+  - `vfd_uprate` con variante en catálogo (50→60 Hz) → quitar+agregar.
+  - `vfd_uprate` genérica sin variante → `cambios=[]` + factor 1.20.
+  - `optimizacion_aerodinamica` solo aparece con déficit > 10%.
+  - Propagación de `tolerancia_pct` (sugerencias coherentes con el
+    banner de microfase 1).
+- UI · `renderSugCard` extraído como helper. Cada card del panel
+  de sugerencias ahora muestra:
+  - Header con título de la estrategia + badge de factibilidad
+    (🟢 ALTA / 🟡 MEDIA / 🟠 BAJA) en pill alineado a la derecha.
+  - Descripción de la acción.
+  - KPI con CFM resultante + delta `+X CFM` (verde si aprueba,
+    rojo si no) + cobertura + exceso.
+  - **Bloque "Implicaciones"** con texto sobre coste y consideraciones
+    operativas, separado por línea dashed.
+  - Botón "Aplicar sugerencia" deshabilitado en estrategias
+    informativas (`cambios=[]`) con tooltip explicativo.
+- Informe AFINIA · sec 8 sub-tabla de sugerencias amplía columnas
+  con **Factibilidad** + **Δ CFM** y muestra implicaciones bajo cada
+  descripción en cursiva. Header del panel actualizado: *"hasta 5
+  alternativas ordenadas por factibilidad (alta → baja)"*.
+- 524/524 tests verdes · HTML lint OK.
+
+**Pendiente director:** validar visualmente.
+Próxima microfase (3): selección eléctrica detallada con FLC + contactor
+ABB AF + tags SCADA + coordinación de protecciones.
+
+### Microfase 1 · Tolerancia configurable en evaluación del mix (2026-05-03 PM5)
+
+Primera microfase de un plan de 6 microfases para alinear la
+calculadora ONAF con el prompt técnico del director (selección
+estructurada de ventiladores + protección eléctrica + JSON output).
+
+- `assets/js/domain/refrigeracion.js` · `evaluarMixVentiladores`
+  acepta nuevo parámetro opcional `tolerancia_pct` (default 0).
+  Cuando `tolerancia_pct > 0` el umbral de aprobación se relaja
+  a `cfm_requerido × (1 − tol/100)` — útil cuando el proyecto
+  admite cobertura mínima ≥95% en lugar de ≥100% estricto.
+  Devuelve dos campos nuevos: `cfm_umbral` (CFM mínimo aceptado)
+  y `tolerancia_pct` (eco del valor aplicado, clampeado a 0…100).
+  El mensaje del banner ahora indica el umbral cuando hay
+  tolerancia activa: *"Mix aprobado (umbral 95.0% con tolerancia
+  5.0%) · cobertura 95.5% · exceso 0 CFM"*.
+- `pages/calculo-refrigeracion.html` · campo nuevo
+  `#mix_tolerancia` en la barra de mix con default **5%** (como
+  pidió el director en su prompt). Hint visible *"Umbral mínimo
+  aceptado · default 5%"*.
+- `assets/js/calculo-refrigeracion.js` · helper `getTolerancia()`
+  con clamp [0, 100]. Listener `input` que recalcula el banner +
+  sugerencias en vivo cuando el usuario cambia la tolerancia.
+  Propagado a las 3 llamadas de `evaluarMixVentiladores` (tabla,
+  banner, snapshot del informe) + persistencia (campo
+  `tolerancia_pct` en el doc `acciones_refrigeracion`). Banner
+  ampliado con KPI nuevo *"Umbral · X CFM (tol Y%)"* visible
+  solo cuando hay tolerancia configurada.
+- `tests/refrigeracion.test.js` · 4 tests nuevos cubriendo:
+  tol=0 default exige ≥100%, tol=5 acepta 96.2% (cobertura aún
+  bajo 100% nominal), tol=5 rechaza 90% (déficit calculado
+  contra el umbral relajado), clamp de valores fuera de rango
+  [-10 → 0 / 999 → 100].
+- 519 / 519 tests verdes · HTML lint OK.
+
+**Pendiente del director:** validar visualmente en producción.
+Próxima microfase (2): estrategias enriquecidas con VFD + paralelo/
+serie + `impacto_estimado_cfm` + `implicaciones` operativas/coste.
+
 ### Hotfix · Restaurar protección eléctrica como fallback legacy (2026-05-03 PM4)
 
 El director reportó que la sección **"Circuito de protección

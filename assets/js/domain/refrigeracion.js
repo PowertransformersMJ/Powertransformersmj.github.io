@@ -255,6 +255,33 @@ export const AUX_GUARDAMOTOR = Object.freeze({
   desc:  '1NO+1NC · Clip-on MS116 · IEC/EN 60947-5-1'
 });
 
+/**
+ * Catálogo de contactores ABB AF (control AC-3 trifásico, 400 V).
+ * Selección por corriente AC-3 ≥ FLC × 1.15 (margen de servicio).
+ * Bobina universal AC/DC.
+ */
+export const CONTACTOR_AF_DB = Object.freeze([
+  { model: 'AF09', ac3_a:  9, kw_400v:  4.0, pid: '1SBL137001R1300', bobina: '24-60V AC/DC · universal' },
+  { model: 'AF12', ac3_a: 12, kw_400v:  5.5, pid: '1SBL157001R1300', bobina: '24-60V AC/DC · universal' },
+  { model: 'AF16', ac3_a: 16, kw_400v:  7.5, pid: '1SBL177001R1300', bobina: '24-60V AC/DC · universal' },
+  { model: 'AF26', ac3_a: 26, kw_400v: 11.0, pid: '1SBL237001R1300', bobina: '100-250V AC/DC · universal' },
+  { model: 'AF38', ac3_a: 38, kw_400v: 18.5, pid: '1SBL297001R1300', bobina: '100-250V AC/DC · universal' },
+  { model: 'AF65', ac3_a: 65, kw_400v: 30.0, pid: '1SBL387001R1300', bobina: '100-250V AC/DC · universal' },
+  { model: 'AF80', ac3_a: 80, kw_400v: 37.0, pid: '1SBL437001R1300', bobina: '100-250V AC/DC · universal' }
+]);
+
+/**
+ * Tags SCADA estándar para integración con sistema de control.
+ * Cada tag mapea una señal eléctrica a un contacto NO/NC físico.
+ * Aplica conforme IEEE C37.91 (protección de transformadores).
+ */
+export const TAGS_SCADA = Object.freeze([
+  { tag: 'RUN',    contacto: 'NO contactor',     descripcion: 'Cerrado cuando contactor energizado · indica motor en marcha' },
+  { tag: 'FAULT',  contacto: 'NO guardamotor',   descripcion: 'Cerrado cuando guardamotor disparó · alarma de sobrecarga térmica' },
+  { tag: 'TRIP',   contacto: 'NC breaker aux',   descripcion: 'Abierto cuando breaker disparó · falla mayor o cortocircuito' },
+  { tag: 'READY',  contacto: 'NC guardamotor',   descripcion: 'Abierto si hay falla · sistema listo para arranque cuando cerrado' }
+]);
+
 /** Contacto auxiliar SCADA para breaker S203. */
 export const AUX_BREAKER = Object.freeze({
   model: 'S2C-H11L',
@@ -302,6 +329,97 @@ export function seleccionarBreaker(amperaje_min) {
 }
 
 /**
+ * Selecciona contactor ABB AF cuya corriente AC-3 cubre FLC × factor
+ * de servicio (default 1.15 conforme AC-3 IEC 60947-4-1).
+ *
+ * @param {number} flc · corriente nominal del motor (FLC, A)
+ * @param {number} factor · margen de servicio (default 1.15)
+ * @returns {{model, ac3_a, kw_400v, pid, bobina, margen_pct}|null}
+ */
+export function seleccionarContactor(flc, factor = 1.15) {
+  const i = Number(flc);
+  const f = Number(factor) || 1.15;
+  if (!Number.isFinite(i) || i <= 0) return null;
+  const corrienteRequerida = i * f;
+  const sel = CONTACTOR_AF_DB.find(c => c.ac3_a >= corrienteRequerida);
+  if (!sel) return null;
+  return {
+    ...sel,
+    margen_pct: +((sel.ac3_a - i) / i * 100).toFixed(1)
+  };
+}
+
+/**
+ * Calcula la corriente nominal de un motor trifásico (FLC) a partir
+ * de su potencia, tensión, factor de potencia y eficiencia. Devuelve
+ * el FLC + memoria de cálculo (fórmula con valores reales sustituidos)
+ * para mostrar al usuario.
+ *
+ * Si se pasa `amps_directo` (lectura directa de placa), se usa ese
+ * valor y la memoria documenta "lectura directa de placa".
+ *
+ * Fórmula: FLC = P / (√3 × V × cos φ × η)
+ *   · P en watts (si se pasa hp se convierte: P = HP × 746)
+ *   · V tensión de línea (V)
+ *   · cos φ factor de potencia
+ *   · η eficiencia (0..1)
+ *
+ * @param {{
+ *   p_w?: number,
+ *   hp?: number,
+ *   voltaje?: number,
+ *   cosphi?: number,
+ *   eficiencia?: number,
+ *   amps_directo?: number|null
+ * }} input
+ * @returns {{
+ *   flc_a: number|null,
+ *   fuente: 'placa' | 'calculo' | 'sin_datos',
+ *   memoria: string,
+ *   parametros: object
+ * }}
+ */
+export function calcularFLC({ p_w, hp, voltaje, cosphi, eficiencia, amps_directo } = {}) {
+  // Ruta 1 · lectura directa de placa
+  const ad = Number(amps_directo);
+  if (Number.isFinite(ad) && ad > 0) {
+    return {
+      flc_a:      +ad.toFixed(2),
+      fuente:     'placa',
+      memoria:    `FLC = ${ad.toFixed(2)} A (lectura directa de placa del motor · tag fan_amp del catálogo certificado)`,
+      parametros: { amps_directo: ad }
+    };
+  }
+  // Ruta 2 · cálculo desde potencia
+  const Pw = Number(p_w) > 0 ? Number(p_w) : (Number(hp) > 0 ? Number(hp) * 746 : 0);
+  const V  = Number(voltaje)    || 0;
+  const cf = Number(cosphi)     || 0;
+  const eta= Number(eficiencia) || 0;
+  if (Pw > 0 && V > 0 && cf > 0 && eta > 0) {
+    const sqrt3 = Math.sqrt(3);
+    const flc = Pw / (sqrt3 * V * cf * eta);
+    const HPeq = (Pw / 746).toFixed(2);
+    return {
+      flc_a:      +flc.toFixed(2),
+      fuente:     'calculo',
+      memoria:    `FLC = P / (√3 × V × cos φ × η) = ${Pw.toFixed(0)} W / (√3 × ${V} V × ${cf} × ${eta}) → ${flc.toFixed(2)} A · equivalente ${HPeq} HP`,
+      parametros: { p_w: Pw, voltaje: V, cosphi: cf, eficiencia: eta, hp_eq: +HPeq }
+    };
+  }
+  return {
+    flc_a:      null,
+    fuente:     'sin_datos',
+    memoria:    'Sin datos suficientes para calcular FLC · faltan campos: ' + [
+      Pw <= 0 ? 'potencia (P_w o HP)' : null,
+      V  <= 0 ? 'voltaje' : null,
+      cf <= 0 ? 'cos φ'   : null,
+      eta<= 0 ? 'eficiencia (η)' : null
+    ].filter(Boolean).join(', '),
+    parametros: { p_w: Pw, voltaje: V, cosphi: cf, eficiencia: eta }
+  };
+}
+
+/**
  * Cálculo completo de protección eléctrica para un sistema de N
  * ventiladores idénticos.
  *
@@ -332,9 +450,11 @@ export function calcularProteccionElectrica({ amps_por_fan, n_fans, factor_segur
     amps_totales:    iT,
     amps_min_breaker: iM,
     guardamotor:     seleccionarGuardamotor(iF),
+    contactor:       seleccionarContactor(iF),
     breaker:         seleccionarBreaker(iM),
     aux_guardamotor: AUX_GUARDAMOTOR,
-    aux_breaker:     AUX_BREAKER
+    aux_breaker:     AUX_BREAKER,
+    tags_scada:      TAGS_SCADA
   };
 }
 
@@ -353,16 +473,23 @@ export const MIX_ESTADO = Object.freeze({
  * Permite mezclar modelos distintos en el mismo transformador (ej.:
  * 4 × FN-050 + 8 × FN-063 + 12 × Krenz F20).
  *
+ * Tolerancia: si `tolerancia_pct > 0` el umbral de aprobación se
+ * relaja a `cfm_requerido × (1 − tol/100)`. Útil para casos donde el
+ * proyecto admite cobertura mínima ej. 95% (tol=5).
+ *
  * @param {{
  *   items: Array<{key?:string, modelo?:string, marca?:string,
  *                 cfm_unitario:number, cantidad:number}>,
- *   cfm_requerido: number
+ *   cfm_requerido: number,
+ *   tolerancia_pct?: number
  * }} input
  * @returns {{
  *   items: Array<{key, modelo, marca, cfm_unitario, cantidad,
  *                 cfm_aporte, aporte_pct}>,
  *   cfm_aporte_total: number,
  *   cfm_requerido: number,
+ *   cfm_umbral: number,
+ *   tolerancia_pct: number,
  *   deficit: number,
  *   exceso: number,
  *   cobertura_pct: number|null,
@@ -372,8 +499,10 @@ export const MIX_ESTADO = Object.freeze({
  *   mensaje: string
  * }}
  */
-export function evaluarMixVentiladores({ items, cfm_requerido }) {
+export function evaluarMixVentiladores({ items, cfm_requerido, tolerancia_pct = 0 }) {
   const req = Number(cfm_requerido) || 0;
+  const tol = Math.max(0, Math.min(100, Number(tolerancia_pct) || 0));
+  const umbral = +(req * (1 - tol / 100)).toFixed(2);
   const list = Array.isArray(items) ? items : [];
   const detalle = list.map(it => {
     const cfmU = Math.max(0, Number(it.cfm_unitario) || 0);
@@ -396,44 +525,63 @@ export function evaluarMixVentiladores({ items, cfm_requerido }) {
   if (req <= 0 || total <= 0) {
     return {
       items: detalle, cfm_aporte_total: total, cfm_requerido: req,
+      cfm_umbral: umbral, tolerancia_pct: tol,
       deficit: 0, exceso: 0, cobertura_pct: null, n_unidades_total: nTotal,
       aprobado: false, estado: MIX_ESTADO.SIN_DATOS,
       mensaje: 'Cargue al menos un modelo con cantidad y defina el CFM requerido.'
     };
   }
   const cob = +(total / req * 100).toFixed(1);
-  const aprobado = total >= req;
-  const def = aprobado ? 0 : +(req - total).toFixed(2);
+  const aprobado = total >= umbral;
+  const def = aprobado ? 0 : +(umbral - total).toFixed(2);
   const exc = aprobado ? +(total - req).toFixed(2) : 0;
+  const tolMsg = tol > 0 ? ` (umbral ${(100 - tol).toFixed(1)}% con tolerancia ${tol.toFixed(1)}%)` : '';
   return {
     items: detalle, cfm_aporte_total: total, cfm_requerido: req,
+    cfm_umbral: umbral, tolerancia_pct: tol,
     deficit: def, exceso: exc, cobertura_pct: cob, n_unidades_total: nTotal,
     aprobado,
     estado: aprobado ? MIX_ESTADO.APROBADO : MIX_ESTADO.NO_APROBADO,
     mensaje: aprobado
-      ? `Mix aprobado · cobertura ${cob}% · exceso ${exc.toFixed(0)} CFM sobre el requerido.`
-      : `Mix NO aprobado · faltan ${def.toFixed(0)} CFM (cobertura ${cob}%). Ajuste cantidades o agregue modelos.`
+      ? `Mix aprobado${tolMsg} · cobertura ${cob}% · ${exc > 0 ? `exceso ${exc.toFixed(0)} CFM sobre el requerido` : 'cubre el umbral exacto'}.`
+      : `Mix NO aprobado · faltan ${def.toFixed(0)} CFM para alcanzar el umbral${tolMsg} (cobertura ${cob}%). Ajuste cantidades, agregue modelos o suba la tolerancia.`
   };
 }
 
 /**
  * Genera sugerencias para alcanzar el CFM requerido cuando el mix
- * actual no aprueba. Aplica tres estrategias y devuelve hasta
- * `max_sugerencias` ordenadas por menor exceso (ajuste más fino).
+ * actual no aprueba. Aplica hasta cinco estrategias y devuelve hasta
+ * `max_sugerencias` ordenadas por factibilidad (alta > media > baja)
+ * y luego por menor exceso.
  *
  * Estrategias:
  *   1. agregar_unidades — agrega N unidades del modelo con mayor
- *      CFM unitario ya en el mix.
+ *      CFM unitario ya en el mix.  [factibilidad: alta]
  *   2. sustituir — sustituye el modelo de menor CFM unitario del
- *      mix por otro modelo del catálogo con mayor CFM.
+ *      mix por otro modelo del catálogo con mayor CFM.  [media]
  *   3. agregar_modelo — agrega N unidades de un modelo del catálogo
- *      que NO esté en el mix actual.
+ *      que NO esté en el mix actual.  [media]
+ *   4. vfd_uprate — operar con variador de frecuencia a mayor RPM.
+ *      Si existe variante de mayor frecuencia/RPM en el catálogo
+ *      (ej. fn063_50 → fn063_60) usa el CFM exacto de esa variante;
+ *      si no, asume factor 1.20 sobre el CFM nominal.  [baja]
+ *   5. optimizacion_aerodinamica — sugerencia informativa cuando el
+ *      déficit es > 10% del requerido. Estima +5–10% adicional al
+ *      optimizar toma de aire / reducir codos y restricciones.
+ *      [baja, sin cambios mecánicos cuantitativos]
+ *
+ * Cada sugerencia incluye:
+ *   - impacto_estimado_cfm: delta CFM versus el mix actual
+ *   - implicaciones: texto breve sobre coste y consideraciones
+ *     operativas
+ *   - factibilidad: 'alta' | 'media' | 'baja'
  *
  * @param {{
  *   items: Array<{key, modelo, marca, cfm_unitario, cantidad}>,
  *   cfm_requerido: number,
- *   fan_db: Record<string, {fan_marca, fan_modelo, fan_cfm_nom}>,
- *   max_sugerencias?: number
+ *   fan_db: Record<string, {fan_marca, fan_modelo, fan_cfm_nom, fan_hz, fan_rpm}>,
+ *   max_sugerencias?: number,
+ *   tolerancia_pct?: number
  * }} input
  * @returns {Array<{
  *   estrategia: string,
@@ -442,16 +590,21 @@ export function evaluarMixVentiladores({ items, cfm_requerido }) {
  *   cfm_aporte_total: number,
  *   cobertura_pct: number,
  *   exceso: number,
- *   aprobado: boolean
+ *   aprobado: boolean,
+ *   impacto_estimado_cfm: number,
+ *   implicaciones: string,
+ *   factibilidad: 'alta'|'media'|'baja'
  * }>}
  */
-export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias = 3 }) {
+export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias = 5, tolerancia_pct = 0 }) {
   const req = Number(cfm_requerido) || 0;
+  const tol = Math.max(0, Math.min(100, Number(tolerancia_pct) || 0));
+  const umbral = req * (1 - tol / 100);
   const mix = Array.isArray(items) ? items.filter(it => (it.cantidad | 0) > 0 && (it.cfm_unitario || 0) > 0) : [];
   const db  = (fan_db && typeof fan_db === 'object') ? fan_db : {};
   if (req <= 0) return [];
   const total = mix.reduce((s, it) => s + (it.cfm_unitario || 0) * (it.cantidad | 0), 0);
-  if (total >= req) return [];
+  if (total >= umbral) return [];
   const deficit = req - total;
   const sugerencias = [];
 
@@ -459,7 +612,8 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
   if (mix.length > 0) {
     const mejor = mix.reduce((a, b) => (b.cfm_unitario > a.cfm_unitario ? b : a));
     if (mejor.cfm_unitario > 0) {
-      const nExtra = Math.ceil(deficit / mejor.cfm_unitario);
+      const deficitUmbral = umbral - total;
+      const nExtra = Math.ceil(deficitUmbral / mejor.cfm_unitario);
       const nuevoTotal = total + nExtra * mejor.cfm_unitario;
       sugerencias.push({
         estrategia:  'agregar_unidades',
@@ -468,10 +622,13 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
           accion: 'agregar', key: mejor.key, modelo: mejor.modelo, marca: mejor.marca,
           cantidad: nExtra, cfm_unitario: mejor.cfm_unitario
         }],
-        cfm_aporte_total: +nuevoTotal.toFixed(2),
-        cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
-        exceso:           +(nuevoTotal - req).toFixed(2),
-        aprobado:         nuevoTotal >= req
+        cfm_aporte_total:     +nuevoTotal.toFixed(2),
+        cobertura_pct:        +(nuevoTotal / req * 100).toFixed(1),
+        exceso:               +(nuevoTotal - req).toFixed(2),
+        aprobado:             nuevoTotal >= umbral,
+        impacto_estimado_cfm: +(nExtra * mejor.cfm_unitario).toFixed(2),
+        implicaciones:        `Coste lineal por unidad. No requiere cambios de diseño ni reingeniería del montaje. Mismo guardamotor MS116 + auxiliares SCADA del modelo existente. Mayor consumo de espacio físico en gabinete.`,
+        factibilidad:         'alta'
       });
     }
   }
@@ -486,7 +643,7 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
       candidatos.sort((a, b) => a.cfm - b.cfm);
       for (const c of candidatos) {
         const nuevoTotal = total - debil.cantidad * debil.cfm_unitario + debil.cantidad * c.cfm;
-        if (nuevoTotal >= req) {
+        if (nuevoTotal >= umbral) {
           sugerencias.push({
             estrategia:  'sustituir',
             descripcion: `Sustituye los ${debil.cantidad} × ${debil.marca || ''} ${debil.modelo || debil.key} por ${debil.cantidad} × ${c.marca} ${c.modelo} (mayor CFM unitario: ${Math.round(c.cfm)} vs ${Math.round(debil.cfm_unitario)}).`,
@@ -494,12 +651,15 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
               { accion: 'quitar',   key: debil.key, modelo: debil.modelo, marca: debil.marca, cantidad: debil.cantidad, cfm_unitario: debil.cfm_unitario },
               { accion: 'agregar',  key: c.key,     modelo: c.modelo,     marca: c.marca,     cantidad: debil.cantidad, cfm_unitario: c.cfm }
             ],
-            cfm_aporte_total: +nuevoTotal.toFixed(2),
-            cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
-            exceso:           +(nuevoTotal - req).toFixed(2),
-            aprobado:         true
+            cfm_aporte_total:     +nuevoTotal.toFixed(2),
+            cobertura_pct:        +(nuevoTotal / req * 100).toFixed(1),
+            exceso:               +(nuevoTotal - req).toFixed(2),
+            aprobado:             true,
+            impacto_estimado_cfm: +(debil.cantidad * (c.cfm - debil.cfm_unitario)).toFixed(2),
+            implicaciones:        `Requiere recalcular protección eléctrica del modelo nuevo (corriente, guardamotor MS116, breaker). Diámetro y montaje pueden ser distintos: verificar compatibilidad mecánica con el cuerpo de radiador (sec. 7). Mismo conteo de unidades.`,
+            factibilidad:         'media'
           });
-          break; // primer candidato que cubra es el mínimo
+          break;
         }
       }
     }
@@ -510,10 +670,10 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
   const candidatosNuevos = Object.entries(db)
     .map(([k, d]) => ({ key: k, cfm: +d.fan_cfm_nom || 0, modelo: d.fan_modelo || '', marca: d.fan_marca || '' }))
     .filter(c => c.cfm > 0 && !enMix.has(c.key));
-  // Ordenar por CFM descendente para minimizar unidades agregadas
   candidatosNuevos.sort((a, b) => b.cfm - a.cfm);
   for (const c of candidatosNuevos) {
-    const nExtra = Math.ceil(deficit / c.cfm);
+    const deficitUmbral = Math.max(0, umbral - total);
+    const nExtra = Math.ceil(deficitUmbral / c.cfm);
     const nuevoTotal = total + nExtra * c.cfm;
     sugerencias.push({
       estrategia:  'agregar_modelo',
@@ -522,18 +682,91 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
         accion: 'agregar', key: c.key, modelo: c.modelo, marca: c.marca,
         cantidad: nExtra, cfm_unitario: c.cfm
       }],
-      cfm_aporte_total: +nuevoTotal.toFixed(2),
-      cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
-      exceso:           +(nuevoTotal - req).toFixed(2),
-      aprobado:         nuevoTotal >= req
+      cfm_aporte_total:     +nuevoTotal.toFixed(2),
+      cobertura_pct:        +(nuevoTotal / req * 100).toFixed(1),
+      exceso:               +(nuevoTotal - req).toFixed(2),
+      aprobado:             nuevoTotal >= umbral,
+      impacto_estimado_cfm: +(nExtra * c.cfm).toFixed(2),
+      implicaciones:        `Aumenta diversidad de repuestos en inventario (un SKU adicional). Requiere guardamotor MS116 dedicado + auxiliar SCADA por unidad nueva. Verificar compatibilidad mecánica con el radiador del lado donde se instalará.`,
+      factibilidad:         'media'
     });
     if (sugerencias.filter(s => s.estrategia === 'agregar_modelo').length >= 2) break;
   }
 
-  // Ordena por menor exceso (ajuste más fino) y limita
+  // ── 4) VFD / uprate por frecuencia o asunción +20% ──
+  // Busca variante del mismo modelo a mayor frecuencia (ej. _50 → _60).
+  if (mix.length > 0) {
+    const mejor = mix.reduce((a, b) => (b.cfm_unitario > a.cfm_unitario ? b : a));
+    const dbEntries = Object.entries(db);
+    // Heurística: el mismo modelo con clave que comparte prefijo
+    // (zn045_50, zn045_60, zn045_60h) y mayor CFM nominal.
+    const baseKey = (mejor.key || '').replace(/_(50|60|60h)$/, '');
+    const variantes = dbEntries
+      .map(([k, d]) => ({ key: k, cfm: +d.fan_cfm_nom || 0, modelo: d.fan_modelo || '', marca: d.fan_marca || '', hz: String(d.fan_hz || ''), rpm: +d.fan_rpm || 0 }))
+      .filter(v => v.key.startsWith(baseKey) && v.key !== mejor.key && v.cfm > mejor.cfm_unitario);
+    variantes.sort((a, b) => a.cfm - b.cfm);
+    const variante = variantes[0] || null;
+    let aporteVfd, descVfd, implicVfd, factor;
+    if (variante) {
+      aporteVfd = +(mejor.cantidad * (variante.cfm - mejor.cfm_unitario)).toFixed(2);
+      factor = +(variante.cfm / mejor.cfm_unitario).toFixed(2);
+      descVfd = `Operar el modelo ${mejor.marca} ${mejor.modelo} a ${variante.hz} Hz (variante ${variante.modelo} del catálogo: ${variante.rpm} RPM) con variador de frecuencia. CFM unitario sube de ${Math.round(mejor.cfm_unitario)} a ${Math.round(variante.cfm)} (factor ${factor}×).`;
+      implicVfd = `Requiere 1 VFD ABB ACS580 (o equiv.) por motor (~USD 800–1.500/u dependiendo HP). Mayor consumo eléctrico (~8% con uprate) + ruido + desgaste mecánico de aspas. Coordinar rampa de arranque con SCADA. Verificar tensión nominal del motor (algunas variantes 60h requieren 460 V).`;
+    } else {
+      // Asunción genérica: +20% CFM con VFD
+      factor = 1.20;
+      aporteVfd = +(mejor.cantidad * mejor.cfm_unitario * 0.20).toFixed(2);
+      descVfd = `Operar el modelo ${mejor.marca} ${mejor.modelo} con variador de frecuencia (VFD) para incrementar RPM ~20% (factor estimado 1.20×). CFM unitario estimado: ${Math.round(mejor.cfm_unitario)} → ${Math.round(mejor.cfm_unitario * 1.20)}.`;
+      implicVfd = `Requiere 1 VFD por motor + ingeniería específica para confirmar margen de RPM seguro del modelo (sin exceder rpm_max del rotor). Mayor consumo eléctrico, ruido y desgaste. Coordinar con fabricante del motor antes de implementar.`;
+    }
+    const nuevoTotalVfd = total + aporteVfd;
+    sugerencias.push({
+      estrategia:  'vfd_uprate',
+      descripcion: descVfd,
+      cambios: variante
+        ? [
+            { accion: 'quitar',  key: mejor.key,     modelo: mejor.modelo,    marca: mejor.marca,    cantidad: mejor.cantidad, cfm_unitario: mejor.cfm_unitario },
+            { accion: 'agregar', key: variante.key, modelo: variante.modelo, marca: variante.marca, cantidad: mejor.cantidad, cfm_unitario: variante.cfm }
+          ]
+        : [],   // sugerencia genérica · sin cambio aplicable mecánicamente
+      cfm_aporte_total:     +nuevoTotalVfd.toFixed(2),
+      cobertura_pct:        +(nuevoTotalVfd / req * 100).toFixed(1),
+      exceso:               +(nuevoTotalVfd - req).toFixed(2),
+      aprobado:             nuevoTotalVfd >= umbral,
+      impacto_estimado_cfm: aporteVfd,
+      implicaciones:        implicVfd,
+      factibilidad:         'baja'
+    });
+  }
+
+  // ── 5) Optimización aerodinámica (informativa, déficit > 10%) ──
+  if (deficit / req > 0.10) {
+    const aporteAero = +(total * 0.075).toFixed(2);  // estimación 7.5% promedio (5–10%)
+    const nuevoTotalAero = total + aporteAero;
+    sugerencias.push({
+      estrategia:  'optimizacion_aerodinamica',
+      descripcion: `Optimizar la aerodinámica del flujo: rediseñar toma de aire del compartimiento, reducir codos y restricciones del ducto interno del transformador. Estimación de ganancia: 5–10% del CFM nominal sin cambios al motoventilador.`,
+      cambios:     [],   // sin cambios al mix; requiere ingeniería específica
+      cfm_aporte_total:     +nuevoTotalAero.toFixed(2),
+      cobertura_pct:        +(nuevoTotalAero / req * 100).toFixed(1),
+      exceso:               +(nuevoTotalAero - req).toFixed(2),
+      aprobado:             nuevoTotalAero >= umbral,
+      impacto_estimado_cfm: aporteAero,
+      implicaciones:        `Sin cambios al motoventilador ni a la protección eléctrica. Requiere análisis CFD o intervención mecánica del cuerpo del transformador. Coste medio (USD 2.000–8.000) según alcance. Considerar solo si déficit es alto y el resto de estrategias no son viables.`,
+      factibilidad:         'baja'
+    });
+  }
+
+  // Ordena: aprobado=true primero, luego por factibilidad alta>media>baja,
+  // luego por menor exceso (ajuste más fino).
+  const fOrden = { alta: 0, media: 1, baja: 2 };
   return sugerencias
-    .filter(s => s.aprobado)
-    .sort((a, b) => a.exceso - b.exceso)
+    .sort((a, b) => {
+      if (a.aprobado !== b.aprobado) return a.aprobado ? -1 : 1;
+      const f = (fOrden[a.factibilidad] ?? 99) - (fOrden[b.factibilidad] ?? 99);
+      if (f !== 0) return f;
+      return Math.abs(a.exceso) - Math.abs(b.exceso);
+    })
     .slice(0, max_sugerencias);
 }
 
@@ -580,7 +813,8 @@ export function calcularProteccionMix({ items, factor_seguridad = 1.25 }) {
         amps_grupo: +(cant * iU).toFixed(2),
         kw_grupo:   +(cant * kwU).toFixed(2),
         peso_grupo: +(cant * pU).toFixed(2),
-        guardamotor: seleccionarGuardamotor(iU),
+        guardamotor:     seleccionarGuardamotor(iU),
+        contactor:       seleccionarContactor(iU),
         aux_guardamotor: AUX_GUARDAMOTOR
       };
     });
@@ -597,7 +831,338 @@ export function calcularProteccionMix({ items, factor_seguridad = 1.25 }) {
     kw_totales:       kwTot,
     peso_total:       pTot,
     breaker:          seleccionarBreaker(iMin),
-    aux_breaker:      AUX_BREAKER
+    aux_breaker:      AUX_BREAKER,
+    tags_scada:       TAGS_SCADA
+  };
+}
+
+/**
+ * Detecta campos faltantes o problemáticos en el mix para el cálculo
+ * eléctrico completo. Devuelve un array con un objeto por cada
+ * faltante, con severidad y mensaje accionable.
+ *
+ * Severidades:
+ *   · 'critico' · sin esto NO se puede calcular protección eléctrica
+ *     del modelo (ej. fan_amp + sin potencia ni voltaje para derivar)
+ *   · 'aviso'   · se calcula con valor por defecto razonable
+ *     (ej. cos φ asumido 0.85, η asumida 0.85)
+ *   · 'info'    · opcional, solo afecta exports / snapshot
+ *     (ej. fan_peso = null → no se computa peso total del grupo)
+ *
+ * @param {{ mix: Array<{key, marca, modelo, ficha, cantidad}> }} input
+ * @returns {Array<{
+ *   key, modelo, marca, campo, severidad, sustituto, mensaje
+ * }>}
+ */
+export function detectarFaltantes({ mix }) {
+  const lista = Array.isArray(mix) ? mix : [];
+  const faltantes = [];
+  for (const it of lista) {
+    if ((it.cantidad | 0) <= 0) continue;
+    const f = it.ficha || {};
+    const ref = `${it.marca || ''} ${it.modelo || it.key || '?'}`.trim();
+    const mk = it.key || '';
+
+    // Corriente directa de placa
+    const iPlaca = parseFloat(String(f.fan_amp || '').replace(/[^\d./]/g, '').split('/')[0]);
+    const tieneI = Number.isFinite(iPlaca) && iPlaca > 0;
+
+    // Potencia en W
+    const pw = +f.fan_kw || 0;
+    const tieneP = pw > 0;
+
+    // Voltaje (extraído del string "230/400V" → 400)
+    const vMatch = String(f.fan_volt || '').match(/(\d+)\s*V/);
+    const v = vMatch ? +vMatch[1] : 0;
+    const tieneV = v > 0;
+
+    const cosphi = +f.fan_cosphi || 0;
+    const tieneCos = cosphi > 0;
+
+    const peso = +f.fan_peso || 0;
+    const tienePeso = peso > 0;
+
+    // Crítico · ni placa ni datos suficientes para derivar FLC
+    if (!tieneI && !(tieneP && tieneV && tieneCos)) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_amp', severidad: 'critico',
+        sustituto: null,
+        mensaje: `${ref}: sin corriente nominal (fan_amp) ni datos para derivarla (potencia + voltaje + cos φ). El modelo no puede dimensionar protección eléctrica.`
+      });
+      // Si esto pasa, los siguientes faltantes son redundantes
+      continue;
+    }
+
+    // Aviso · cos φ asumido 0.85 si no viene
+    if (!tieneCos) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_cosphi', severidad: 'aviso',
+        sustituto: 0.85,
+        mensaje: `${ref}: falta cos φ. Cálculo de potencia aparente (kVA) asumió 0.85 por defecto. Carge el valor real desde la ficha técnica del fabricante.`
+      });
+    }
+
+    // Aviso · potencia (si solo hay placa y no kw, no se puede totalizar kW)
+    if (!tieneP) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_kw', severidad: 'aviso',
+        sustituto: 0,
+        mensaje: `${ref}: falta potencia absorbida P₁ (fan_kw). El cálculo de kW totales del grupo será 0 hasta cargar el valor.`
+      });
+    }
+
+    // Aviso · voltaje (si solo hay placa y no V, no se puede recalcular FLC alterno)
+    if (!tieneV && tieneP) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_volt', severidad: 'aviso',
+        sustituto: 400,
+        mensaje: `${ref}: falta tensión nominal (fan_volt). Verifique compatibilidad con tensión del tablero.`
+      });
+    }
+
+    // Info · peso (no impide cálculo)
+    if (!tienePeso) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_peso', severidad: 'info',
+        sustituto: 0,
+        mensaje: `${ref}: falta peso unitario (fan_peso). El peso total del grupo no se computará.`
+      });
+    }
+  }
+  return faltantes;
+}
+
+/**
+ * Construye un resumen JSON estructurado conforme al shape exacto
+ * del prompt técnico del director. Útil para integraciones,
+ * audit trail y handoff a herramientas externas (Excel, Power BI,
+ * sistemas ERP, sistemas SCADA, etc.).
+ *
+ * Shape de salida:
+ * {
+ *   selecciones[],          // un objeto por modelo del mix
+ *   cfm_requerido, cfm_total,
+ *   evaluacion: 'APROBADO' | 'REQUIERE AJUSTE',
+ *   razon: string breve,
+ *   estrategias_sugeridas[],
+ *   seleccion_electrica[],  // un objeto por grupo (modelo) con
+ *                           // guardamotor + contactor + breaker
+ *   faltantes[],            // strings descriptivos de campos faltantes
+ *   metadatos: { transformador_id, matricula, fecha_generacion,
+ *                tolerancia_pct, ... }
+ * }
+ *
+ * @param {{
+ *   mix: Array<{key, marca, modelo, cfm_unitario, cantidad, ficha?}>,
+ *   evaluacion: object,         // resultado de evaluarMixVentiladores
+ *   proteccion: object,         // resultado de calcularProteccionMix
+ *   sugerencias: Array<object>, // resultado de sugerirMejoras
+ *   faltantes: Array<object>,   // resultado de detectarFaltantes
+ *   metadatos?: object          // transformador_id, matricula, etc.
+ * }} input
+ * @returns {object}
+ */
+export function construirResumenJSON({ mix, evaluacion, proteccion, sugerencias = [], faltantes = [], metadatos = {} } = {}) {
+  const ev = evaluacion || {};
+  const pr = proteccion || {};
+  const mixList = Array.isArray(mix) ? mix : [];
+  const sugList = Array.isArray(sugerencias) ? sugerencias : [];
+  const fltList = Array.isArray(faltantes)   ? faltantes   : [];
+  const grupos  = Array.isArray(pr.grupos)   ? pr.grupos   : [];
+
+  // selecciones[] — una por modelo del mix
+  const selecciones = mixList.map(it => ({
+    id:        it.key || '',
+    marca:     it.marca || '',
+    modelo:    it.modelo || '',
+    cantidad:  Math.max(0, Math.floor(it.cantidad | 0)),
+    cfm_unit:  +it.cfm_unitario || 0,
+    cfm_total: +(it.cfm_unitario * it.cantidad).toFixed(2)
+  }));
+
+  // estrategias_sugeridas[] — extracto compacto de cada sugerencia
+  const estrategias_sugeridas = sugList.map(s => ({
+    descripcion:           s.descripcion || '',
+    impacto_estimado_cfm:  +s.impacto_estimado_cfm || 0,
+    implicaciones:         s.implicaciones || '',
+    factibilidad:          s.factibilidad  || '',
+    aprobado:              !!s.aprobado
+  }));
+
+  // seleccion_electrica[] — uno por grupo con guardamotor + contactor + breaker
+  const seleccion_electrica = grupos.map(g => {
+    const it = mixList.find(x => x.key === g.key);
+    const ficha = (it && it.ficha) || {};
+    const hp = (+ficha.fan_kw || 0) / 746;   // P_w → HP equivalente
+    return {
+      id_ventilador:  g.key || '',
+      marca:          g.marca || '',
+      modelo:         g.modelo || '',
+      cantidad:       g.cantidad,
+      potencia_hp:    +hp.toFixed(2),
+      flc_A:          +g.amps_unitario.toFixed(2),
+      guardamotor: g.guardamotor ? {
+        tipo:                 `ABB ${g.guardamotor.model}`,
+        corriente_ajustada_A: +g.amps_unitario.toFixed(2),
+        rango_A:              `${g.guardamotor.min}…${g.guardamotor.max}`,
+        pid:                  g.guardamotor.pid,
+        justificacion:        'Setting al FLC nominal del motor · NEC 430.32 · IEC 60947-4-1'
+      } : null,
+      contactor: g.contactor ? {
+        modelo_sugerido: `ABB ${g.contactor.model}`,
+        ac3_A:           g.contactor.ac3_a,
+        kw_400v:         g.contactor.kw_400v,
+        margen_pct:      g.contactor.margen_pct,
+        bobina:          g.contactor.bobina,
+        pid:             g.contactor.pid,
+        contactos_NO:    1,            // tag RUN
+        contactos_NC:    1,            // tag READY (vía aux MS116)
+        tags_SCADA:      ['RUN', 'FAULT', 'READY'],
+        justificacion:   'AC-3 ≥ FLC × 1.15 (margen de servicio) · IEC 60947-4-1'
+      } : null,
+      auxiliar_guardamotor: g.aux_guardamotor ? {
+        modelo_sugerido: `ABB ${g.aux_guardamotor.model}`,
+        pid:             g.aux_guardamotor.pid,
+        descripcion:     g.aux_guardamotor.desc
+      } : null
+    };
+  });
+
+  // breaker principal del sistema (1 ud)
+  const breaker_sistema = pr.breaker ? {
+    modelo_sugerido:    `ABB ${pr.breaker.model}`,
+    In_A:               pr.breaker.in,
+    curva:              'C',
+    poder_de_corte_kA:  6,
+    perdidas_W:         pr.breaker.power_w,
+    pid:                pr.breaker.pid,
+    auxiliar_SCADA: pr.aux_breaker ? {
+      modelo: `ABB ${pr.aux_breaker.model}`,
+      pid:    pr.aux_breaker.pid,
+      tag:    'TRIP'
+    } : null,
+    justificacion: 'Dimensionado a 1.25 × I_total (NEC 430.52). Verificar coordinación con MCCB aguas arriba en tablero general (IEC 60947-2).'
+  } : null;
+
+  // faltantes[] — strings compactos para listado rápido
+  const faltantesStr = fltList.map(f => `[${f.severidad.toUpperCase()}] ${f.campo} (${f.modelo || f.marca || f.key}) · ${f.mensaje}`);
+
+  // razón
+  let razon;
+  if (ev.estado === MIX_ESTADO.SIN_DATOS) {
+    razon = 'Sin datos suficientes · cargue al menos un modelo con cantidad y defina el CFM requerido.';
+  } else if (ev.aprobado) {
+    razon = `Mix aprobado · cobertura ${ev.cobertura_pct?.toFixed(1)}% sobre el requerido${ev.tolerancia_pct > 0 ? ` (tolerancia ${ev.tolerancia_pct}%)` : ''}.`;
+  } else {
+    razon = `Mix NO aprobado · faltan ${ev.deficit?.toFixed(0)} CFM (cobertura ${ev.cobertura_pct?.toFixed(1)}%)${ev.tolerancia_pct > 0 ? ` para alcanzar el umbral con tolerancia ${ev.tolerancia_pct}%` : ''}.`;
+  }
+
+  return {
+    selecciones,
+    cfm_requerido:        +(ev.cfm_requerido || 0),
+    cfm_total:            +(ev.cfm_aporte_total || 0),
+    cfm_umbral:           +(ev.cfm_umbral || ev.cfm_requerido || 0),
+    tolerancia_pct:       +(ev.tolerancia_pct || 0),
+    cobertura_pct:        ev.cobertura_pct ?? null,
+    deficit_cfm:          +(ev.deficit || 0),
+    exceso_cfm:           +(ev.exceso  || 0),
+    n_unidades_total:     ev.n_unidades_total | 0,
+    evaluacion:           ev.aprobado ? 'APROBADO' : 'REQUIERE AJUSTE',
+    razon,
+    estrategias_sugeridas,
+    seleccion_electrica,
+    breaker_sistema,
+    faltantes:            faltantesStr,
+    metadatos: {
+      ...metadatos,
+      fecha_generacion: new Date().toISOString(),
+      version_resumen:  '1.0',
+      norma_referencia: 'IEEE C57.91 · NEC 430 · IEC 60947 · IEEE C37.91'
+    }
+  };
+}
+
+/**
+ * Valida la coherencia entre el punto de operación calculado y la
+ * gráfica Westinghouse. Hace dos chequeos:
+ *
+ *  · A · Rango calibrado: el porcentaje ONAF/ONAN está dentro del
+ *    rango cubierto por las curvas oficiales (115–166%). Si está
+ *    fuera, advierte que el cálculo es por extrapolación.
+ *
+ *  · B · Coherencia gráfica vs cálculo: calcula el CFM esperado
+ *    según la pendiente Westinghouse interpolada al porcentaje
+ *    seleccionado y lo compara con `cfm_calculado`. Si delta > 2%
+ *    emite warning; > 5% emite error.
+ *
+ * Útil cuando el usuario altera manualmente alguno de los inputs
+ * y el cálculo deja de ser consistente con la curva Westinghouse
+ * (típicamente cuando edita ONAF en lugar de %).
+ *
+ * @param {{
+ *   onan_kva: number,
+ *   pct: number,
+ *   cfm_calculado: number,
+ *   alt_m?: number
+ * }} input
+ * @returns {{
+ *   cfm_esperado: number,
+ *   cfm_calculado: number,
+ *   pendiente_esperada: number,
+ *   delta_cfm: number,
+ *   delta_pct_abs: number,
+ *   severidad: 'ok' | 'warn' | 'err',
+ *   rango_calibrado: boolean,
+ *   pct: number,
+ *   mensaje: string
+ * }}
+ */
+export function validarPuntoOperacion({ onan_kva, pct, cfm_calculado, alt_m = 0 }) {
+  const onan = Number(onan_kva) || 0;
+  const p    = Number(pct) || 0;
+  const cfmC = Number(cfm_calculado) || 0;
+  const alt  = Number(alt_m) || 0;
+  const pctMin = PENDIENTES_WESTINGHOUSE[0][0];
+  const pctMax = PENDIENTES_WESTINGHOUSE[PENDIENTES_WESTINGHOUSE.length - 1][0];
+  const dentroRango = p >= pctMin && p <= pctMax;
+  const slope = interpolarPendiente(p);
+  const cfmEsperadoBase = slope * onan;
+  const fAlt = factorCorreccionAltitud(alt);
+  const cfmEsperado = +(cfmEsperadoBase * fAlt).toFixed(2);
+  const delta = +(cfmC - cfmEsperado).toFixed(2);
+  const deltaAbs = cfmEsperado > 0 ? Math.abs(delta) / cfmEsperado * 100 : 0;
+  const deltaPct = +deltaAbs.toFixed(2);
+
+  // Severidad combinada (extrapolación domina)
+  let severidad, mensaje;
+  if (!dentroRango) {
+    severidad = 'err';
+    mensaje = `Porcentaje ${p.toFixed(1)}% FUERA del rango calibrado Westinghouse (${pctMin}…${pctMax}%). El cálculo es por extrapolación · revise valores ONAN/ONAF para volver al rango oficial.`;
+  } else if (deltaPct > 5) {
+    severidad = 'err';
+    mensaje = `Discrepancia gráfica vs cálculo: ${deltaPct.toFixed(2)}% (delta ${delta.toFixed(0)} CFM). Probable inconsistencia de inputs · verifique que ONAN, ONAF y % concuerden.`;
+  } else if (deltaPct > 2) {
+    severidad = 'warn';
+    mensaje = `Cálculo dentro de tolerancia de la curva Westinghouse (delta ${deltaPct.toFixed(2)}% / ${delta.toFixed(0)} CFM). Aceptable pero revise si esperaba coincidencia exacta.`;
+  } else {
+    severidad = 'ok';
+    mensaje = `Cálculo coincide con la curva Westinghouse interpolada al ${p.toFixed(1)}% (delta ${deltaPct.toFixed(2)}%).`;
+  }
+  return {
+    cfm_esperado:       cfmEsperado,
+    cfm_calculado:      +cfmC.toFixed(2),
+    pendiente_esperada: +slope.toFixed(3),
+    delta_cfm:          delta,
+    delta_pct_abs:      deltaPct,
+    severidad,
+    rango_calibrado:    dentroRango,
+    pct:                +p.toFixed(2),
+    mensaje
   };
 }
 

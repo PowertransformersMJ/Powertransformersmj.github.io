@@ -44,7 +44,14 @@ import {
   MIX_ESTADO,
   evaluarMixVentiladores,
   sugerirMejoras,
-  calcularProteccionMix
+  calcularProteccionMix,
+  CONTACTOR_AF_DB,
+  TAGS_SCADA,
+  seleccionarContactor,
+  calcularFLC,
+  detectarFaltantes,
+  construirResumenJSON,
+  validarPuntoOperacion
 } from '../assets/js/domain/refrigeracion.js';
 
 /* ─── Constantes inmutables ─────────────────────────────────── */
@@ -476,6 +483,64 @@ test('evaluarMixVentiladores: clamp de cantidades negativas a 0', () => {
   assert.equal(r.estado, 'sin_datos');
 });
 
+test('evaluarMixVentiladores: tolerancia=0 (default) exige cobertura ≥100%', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }],   // 45000
+    cfm_requerido: 50000,
+    tolerancia_pct: 0
+  });
+  assert.equal(r.aprobado, false);
+  assert.equal(r.estado, 'no_aprobado');
+  assert.equal(r.cfm_umbral, 50000);
+  assert.equal(r.tolerancia_pct, 0);
+  assert.equal(r.deficit, 5000);
+  // Cuando tol=0 el mensaje NO debe llevar el bloque parentizado del umbral relajado
+  assert.ok(!r.mensaje.includes('con tolerancia'));
+});
+
+test('evaluarMixVentiladores: tolerancia=5 acepta cobertura ≥95%', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 10 }],  // 50000 vs req 52000 → 96.2%
+    cfm_requerido: 52000,
+    tolerancia_pct: 5
+  });
+  assert.equal(r.aprobado, true);                            // 50000 ≥ 52000 × 0.95 = 49400
+  assert.equal(r.estado, 'aprobado');
+  assert.equal(r.cfm_umbral, 49400);
+  assert.equal(r.tolerancia_pct, 5);
+  assert.ok(r.cobertura_pct < 100);                          // sigue por debajo del 100% nominal
+  assert.ok(r.mensaje.includes('umbral 95'));                // "(umbral 95.0% con tolerancia 5.0%)"
+  assert.ok(r.mensaje.includes('tolerancia 5'));
+});
+
+test('evaluarMixVentiladores: tolerancia=5 rechaza cobertura <95%', () => {
+  const r = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }],   // 45000 vs req 50000 → 90%
+    cfm_requerido: 50000,
+    tolerancia_pct: 5
+  });
+  assert.equal(r.aprobado, false);                           // 45000 < 50000 × 0.95 = 47500
+  assert.equal(r.cfm_umbral, 47500);
+  assert.equal(r.deficit, 2500);                             // umbral − total
+  assert.ok(r.mensaje.includes('umbral 95'));
+});
+
+test('evaluarMixVentiladores: clamp de tolerancia fuera de rango', () => {
+  const r1 = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 10 }],
+    cfm_requerido: 50000,
+    tolerancia_pct: -10   // negativa → 0
+  });
+  assert.equal(r1.tolerancia_pct, 0);
+  const r2 = evaluarMixVentiladores({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 1 }],
+    cfm_requerido: 50000,
+    tolerancia_pct: 999   // > 100 → clamp a 100
+  });
+  assert.equal(r2.tolerancia_pct, 100);
+  assert.equal(r2.aprobado, true);                           // umbral = 0 → cualquier cosa cubre
+});
+
 test('sugerirMejoras: devuelve [] cuando el mix ya cubre', () => {
   const sugs = sugerirMejoras({
     items: [{ key: 'a', cfm_unitario: 5000, cantidad: 30 }],
@@ -571,19 +636,116 @@ test('sugerirMejoras: respeta max_sugerencias', () => {
   assert.ok(sugs.length <= 2);
 });
 
-test('sugerirMejoras: ordena por menor exceso (ajuste más fino primero)', () => {
+test('sugerirMejoras: ordena por factibilidad alta>media>baja, luego por menor exceso', () => {
   const sugs = sugerirMejoras({
     items: [{ key: 'a', cfm_unitario: 4000, cantidad: 5 }],
     cfm_requerido: 30000,
     fan_db: {
-      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000 },
-      b: { fan_marca: 'X', fan_modelo: 'B', fan_cfm_nom: 5000 },
-      c: { fan_marca: 'X', fan_modelo: 'C', fan_cfm_nom: 6000 }
+      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000, fan_hz: '50', fan_rpm: 1000 },
+      b: { fan_marca: 'X', fan_modelo: 'B', fan_cfm_nom: 5000, fan_hz: '50', fan_rpm: 1000 },
+      c: { fan_marca: 'X', fan_modelo: 'C', fan_cfm_nom: 6000, fan_hz: '50', fan_rpm: 1000 }
     }
   });
+  // Las primeras posiciones deben ser de factibilidad 'alta' antes que 'media'/'baja'
+  const fOrden = { alta: 0, media: 1, baja: 2 };
   for (let i = 1; i < sugs.length; i++) {
-    assert.ok(sugs[i - 1].exceso <= sugs[i].exceso, 'debe estar ordenado por exceso ASC');
+    if (sugs[i - 1].aprobado === sugs[i].aprobado) {
+      assert.ok(
+        fOrden[sugs[i - 1].factibilidad] <= fOrden[sugs[i].factibilidad],
+        `Orden por factibilidad roto: ${sugs[i - 1].factibilidad} antes que ${sugs[i].factibilidad}`
+      );
+    }
   }
+});
+
+test('sugerirMejoras: cada sugerencia trae los 3 campos enriquecidos', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 4000, cantidad: 5 }],
+    cfm_requerido: 30000,
+    fan_db: {
+      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000, fan_hz: '50', fan_rpm: 1000 }
+    }
+  });
+  for (const s of sugs) {
+    assert.ok(typeof s.impacto_estimado_cfm === 'number', `${s.estrategia} debe tener impacto_estimado_cfm numérico`);
+    assert.ok(typeof s.implicaciones === 'string' && s.implicaciones.length > 10, `${s.estrategia} debe tener implicaciones string descriptivas`);
+    assert.ok(['alta', 'media', 'baja'].includes(s.factibilidad), `${s.estrategia} debe tener factibilidad válida`);
+  }
+});
+
+test('sugerirMejoras: estrategia vfd_uprate con variante en catálogo (50→60 Hz)', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'fn063_50', marca: 'ZIEHL', modelo: 'FN063', cfm_unitario: 5933, cantidad: 8 }],
+    cfm_requerido: 80000,
+    fan_db: {
+      fn063_50: { fan_marca: 'ZIEHL', fan_modelo: 'FN063', fan_cfm_nom: 5933, fan_hz: '50', fan_rpm: 830 },
+      fn063_60: { fan_marca: 'ZIEHL', fan_modelo: 'FN063', fan_cfm_nom: 6357, fan_hz: '60', fan_rpm: 820 }
+    }
+  });
+  const vfd = sugs.find(s => s.estrategia === 'vfd_uprate');
+  assert.ok(vfd, 'debe haber sugerencia vfd_uprate');
+  assert.equal(vfd.factibilidad, 'baja');
+  assert.equal(vfd.cambios.length, 2);
+  assert.equal(vfd.cambios[0].accion, 'quitar');
+  assert.equal(vfd.cambios[0].key, 'fn063_50');
+  assert.equal(vfd.cambios[1].accion, 'agregar');
+  assert.equal(vfd.cambios[1].key, 'fn063_60');
+  assert.ok(vfd.implicaciones.includes('VFD'));
+  assert.ok(vfd.impacto_estimado_cfm > 0);
+});
+
+test('sugerirMejoras: estrategia vfd_uprate genérica (sin variante en catálogo)', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'unico', marca: 'X', modelo: 'Solo', cfm_unitario: 5000, cantidad: 4 }],
+    cfm_requerido: 40000,
+    fan_db: {
+      unico: { fan_marca: 'X', fan_modelo: 'Solo', fan_cfm_nom: 5000, fan_hz: '60', fan_rpm: 1200 }
+    }
+  });
+  const vfd = sugs.find(s => s.estrategia === 'vfd_uprate');
+  assert.ok(vfd, 'debe haber sugerencia vfd_uprate genérica');
+  assert.equal(vfd.cambios.length, 0, 'genérica no aplica cambios mecánicos automáticos');
+  // Factor 1.20 sobre 4 × 5000 = 20000 → impacto = 0.20 × 20000 = 4000
+  assert.equal(vfd.impacto_estimado_cfm, 4000);
+  assert.ok(vfd.descripcion.includes('1.20'));
+});
+
+test('sugerirMejoras: estrategia optimizacion_aerodinamica solo aparece con déficit > 10%', () => {
+  // Caso 1: déficit ~5% → no aparece
+  const sugsBajoDeficit = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }],   // 45000 / 47000 → 4.3% déficit
+    cfm_requerido: 47000,
+    fan_db: { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } }
+  });
+  assert.equal(sugsBajoDeficit.find(s => s.estrategia === 'optimizacion_aerodinamica'), undefined);
+
+  // Caso 2: déficit ~30% → SÍ aparece
+  const sugsAltoDeficit = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 7 }],   // 35000 / 50000 → 30% déficit
+    cfm_requerido: 50000,
+    fan_db: { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } }
+  });
+  const aero = sugsAltoDeficit.find(s => s.estrategia === 'optimizacion_aerodinamica');
+  assert.ok(aero, 'con déficit alto debe aparecer optimizacion_aerodinamica');
+  assert.equal(aero.factibilidad, 'baja');
+  assert.equal(aero.cambios.length, 0);
+  assert.ok(aero.implicaciones.includes('CFD') || aero.implicaciones.includes('mecánica'));
+});
+
+test('sugerirMejoras: respeta tolerancia_pct al evaluar aprobación de cada sugerencia', () => {
+  // Mix actual está al 90% del requerido. Con tolerancia=0 ninguna sugerencia
+  // de "agregar 1 unidad mínima" aprueba. Con tolerancia=15% sí.
+  const items = [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }];   // 45000
+  const fanDb = { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } };
+
+  const sugsTol0 = sugerirMejoras({ items, cfm_requerido: 50000, fan_db: fanDb, tolerancia_pct: 0 });
+  // Con tol=0, agregar_unidades sugiere 1 extra (50000 ≥ 50000) → aprueba
+  const agregar0 = sugsTol0.find(s => s.estrategia === 'agregar_unidades');
+  assert.equal(agregar0.cambios[0].cantidad, 1);
+
+  const sugsTol15 = sugerirMejoras({ items, cfm_requerido: 50000, fan_db: fanDb, tolerancia_pct: 15 });
+  // Con tol=15, mix actual ya cubre umbral (45000 ≥ 42500) → no debería sugerir nada
+  assert.deepEqual(sugsTol15, []);
 });
 
 test('calcularProteccionMix: mix vacío devuelve grupos vacío y totales en 0', () => {
@@ -642,4 +804,407 @@ test('calcularProteccionMix: descarta items con cantidad o amperaje no positivos
   });
   assert.equal(r.grupos.length, 1);
   assert.equal(r.grupos[0].key, 'a');
+});
+
+/* ─── Microfase 3 · Contactores ABB AF + tags SCADA + FLC ────── */
+
+test('CONTACTOR_AF_DB tiene 7 modelos ordenados por corriente AC-3', () => {
+  assert.equal(CONTACTOR_AF_DB.length, 7);
+  for (let i = 1; i < CONTACTOR_AF_DB.length; i++) {
+    assert.ok(CONTACTOR_AF_DB[i].ac3_a > CONTACTOR_AF_DB[i - 1].ac3_a,
+      'catálogo debe estar ordenado por ac3_a ASC');
+  }
+  assert.equal(CONTACTOR_AF_DB[0].model, 'AF09');
+  assert.equal(CONTACTOR_AF_DB[6].model, 'AF80');
+  for (const c of CONTACTOR_AF_DB) {
+    assert.ok(c.model && c.ac3_a > 0 && c.kw_400v > 0 && c.pid && c.bobina);
+  }
+});
+
+test('TAGS_SCADA expone los 4 tags estándar (RUN/FAULT/TRIP/READY)', () => {
+  assert.equal(TAGS_SCADA.length, 4);
+  const tags = TAGS_SCADA.map(t => t.tag);
+  assert.deepEqual(tags, ['RUN', 'FAULT', 'TRIP', 'READY']);
+  for (const t of TAGS_SCADA) {
+    assert.ok(t.contacto && t.descripcion);
+  }
+});
+
+test('seleccionarContactor: cubre FLC × 1.15 (factor de servicio AC-3)', () => {
+  // FLC 0.65 A → × 1.15 = 0.75 → AF09 cubre con margen amplio
+  const c1 = seleccionarContactor(0.65);
+  assert.equal(c1.model, 'AF09');
+  assert.ok(c1.margen_pct > 1000);
+
+  // FLC 8 A → × 1.15 = 9.2 → AF12 (12 A) — no AF09 (9 A)
+  const c2 = seleccionarContactor(8);
+  assert.equal(c2.model, 'AF12');
+
+  // FLC 25 A → × 1.15 = 28.75 → AF38 (38 A) — AF26 (26 A) no alcanza
+  const c3 = seleccionarContactor(25);
+  assert.equal(c3.model, 'AF38');
+});
+
+test('seleccionarContactor: factor personalizable', () => {
+  // Sin margen (factor=1) → AF26 cubre 25 A directo
+  const c = seleccionarContactor(25, 1);
+  assert.equal(c.model, 'AF26');
+});
+
+test('seleccionarContactor: fuera de catálogo devuelve null', () => {
+  assert.equal(seleccionarContactor(100), null);
+  assert.equal(seleccionarContactor(0), null);
+  assert.equal(seleccionarContactor(-1), null);
+});
+
+test('calcularFLC: ruta 1 con lectura directa de placa', () => {
+  const r = calcularFLC({ amps_directo: 1.13 });
+  assert.equal(r.flc_a, 1.13);
+  assert.equal(r.fuente, 'placa');
+  assert.ok(r.memoria.includes('lectura directa'));
+});
+
+test('calcularFLC: ruta 2 con cálculo desde potencia', () => {
+  // Motor 250 W · 400 V · cos φ 0.79 · η 0.85 → FLC ≈ 0.54 A
+  const r = calcularFLC({ p_w: 250, voltaje: 400, cosphi: 0.79, eficiencia: 0.85 });
+  assert.equal(r.fuente, 'calculo');
+  assert.ok(r.flc_a > 0.45 && r.flc_a < 0.65);
+  assert.ok(r.memoria.includes('√3') && r.memoria.includes('250'));
+  assert.ok(r.parametros.hp_eq > 0);
+});
+
+test('calcularFLC: acepta HP en lugar de p_w (conversión × 746)', () => {
+  // 1 HP @ 400 V · cos φ 0.85 · η 0.85 → FLC ≈ 1.49 A
+  const r = calcularFLC({ hp: 1, voltaje: 400, cosphi: 0.85, eficiencia: 0.85 });
+  assert.equal(r.fuente, 'calculo');
+  assert.equal(r.parametros.p_w, 746);
+  assert.ok(r.flc_a > 1 && r.flc_a < 2);
+});
+
+test('calcularFLC: ruta 3 (sin datos) reporta campos faltantes', () => {
+  const r = calcularFLC({ p_w: 0, voltaje: 0, cosphi: 0, eficiencia: 0 });
+  assert.equal(r.flc_a, null);
+  assert.equal(r.fuente, 'sin_datos');
+  assert.ok(r.memoria.includes('faltan'));
+  assert.ok(r.memoria.includes('potencia'));
+});
+
+test('calcularFLC: amps_directo tiene precedencia sobre cálculo', () => {
+  const r = calcularFLC({ amps_directo: 2.5, p_w: 1000, voltaje: 400, cosphi: 0.85, eficiencia: 0.85 });
+  assert.equal(r.flc_a, 2.5);
+  assert.equal(r.fuente, 'placa');
+});
+
+test('calcularProteccionMix incluye contactor por grupo + tags_scada', () => {
+  const r = calcularProteccionMix({
+    items: [
+      { key: 'a', marca: 'X', modelo: 'A', cantidad: 4, amps_unitario: 0.65 },
+      { key: 'b', marca: 'X', modelo: 'B', cantidad: 8, amps_unitario: 1.13 }
+    ]
+  });
+  assert.ok(r.grupos[0].contactor, 'grupo 0 debe tener contactor');
+  assert.ok(r.grupos[1].contactor, 'grupo 1 debe tener contactor');
+  assert.equal(r.grupos[0].contactor.model, 'AF09');
+  assert.equal(r.grupos[1].contactor.model, 'AF09');
+  assert.equal(r.tags_scada.length, 4);
+});
+
+test('calcularProteccionElectrica (legacy) también incluye contactor + tags_scada', () => {
+  const r = calcularProteccionElectrica({ amps_por_fan: 1.13, n_fans: 8 });
+  assert.ok(r.contactor, 'debe haber contactor');
+  assert.equal(r.contactor.model, 'AF09');
+  assert.equal(r.tags_scada.length, 4);
+});
+
+/* ─── Microfase 4 · Detección de faltantes ───────────────────── */
+
+test('detectarFaltantes: mix vacío devuelve []', () => {
+  assert.deepEqual(detectarFaltantes({ mix: [] }), []);
+  assert.deepEqual(detectarFaltantes({ mix: undefined }), []);
+});
+
+test('detectarFaltantes: ficha completa no genera faltantes', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A', fan_kw: 300, fan_volt: '230/400V', fan_cosphi: 0.85, fan_peso: 14.2 }
+    }]
+  });
+  assert.deepEqual(r, []);
+});
+
+test('detectarFaltantes: severidad crítico cuando no hay placa ni datos para derivar', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { /* todo vacío */ }
+    }]
+  });
+  assert.equal(r.length, 1);
+  assert.equal(r[0].severidad, 'critico');
+  assert.equal(r[0].campo, 'fan_amp');
+});
+
+test('detectarFaltantes: aviso cuando falta cos φ (asume 0.85)', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A', fan_kw: 300, fan_volt: '400V', fan_peso: 14 }
+    }]
+  });
+  const fCos = r.find(x => x.campo === 'fan_cosphi');
+  assert.ok(fCos, 'debe reportar fan_cosphi faltante');
+  assert.equal(fCos.severidad, 'aviso');
+  assert.equal(fCos.sustituto, 0.85);
+  assert.ok(fCos.mensaje.includes('0.85'));
+});
+
+test('detectarFaltantes: info cuando falta peso (no bloquea cálculo)', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A', fan_kw: 300, fan_volt: '400V', fan_cosphi: 0.85 }
+    }]
+  });
+  const fPeso = r.find(x => x.campo === 'fan_peso');
+  assert.ok(fPeso, 'debe reportar fan_peso faltante');
+  assert.equal(fPeso.severidad, 'info');
+});
+
+test('detectarFaltantes: omite items con cantidad <= 0', () => {
+  const r = detectarFaltantes({
+    mix: [
+      { key: 'a', marca: 'X', modelo: 'A', cantidad: 0, ficha: {} },
+      { key: 'b', marca: 'X', modelo: 'B', cantidad: 4, ficha: {} }
+    ]
+  });
+  assert.equal(r.length, 1);                 // solo 'b'
+  assert.equal(r[0].modelo, 'B');
+});
+
+test('detectarFaltantes: agrupa varios faltantes del mismo modelo', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A' /* falta cos φ, kw, volt, peso */ }
+    }]
+  });
+  const campos = r.map(x => x.campo).sort();
+  assert.deepEqual(campos, ['fan_cosphi', 'fan_kw', 'fan_peso']);
+  // (fan_volt no aparece porque tieneP=false → no se evalúa la rama de aviso de voltaje)
+});
+
+test('detectarFaltantes: mensajes incluyen marca + modelo para identificar', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'fn063', marca: 'ZIEHL-ABEGG', modelo: 'FN063-6DL', cantidad: 8,
+      ficha: { fan_amp: '1.13 A' }
+    }]
+  });
+  for (const f of r) {
+    assert.ok(f.mensaje.includes('ZIEHL-ABEGG'));
+    assert.ok(f.mensaje.includes('FN063-6DL'));
+  }
+});
+
+/* ─── Microfase 5 · construirResumenJSON ──────────────────────── */
+
+test('construirResumenJSON: shape canónico con todas las claves del prompt', () => {
+  const r = construirResumenJSON({
+    mix: [
+      { key: 'a', marca: 'ZIEHL', modelo: 'FN050', cfm_unitario: 4873, cantidad: 4,
+        ficha: { fan_kw: 250, fan_amp: '0.65 A', fan_cosphi: 0.79 } }
+    ],
+    evaluacion: {
+      aprobado: true, estado: 'aprobado',
+      cfm_aporte_total: 19492, cfm_requerido: 18000, cfm_umbral: 18000,
+      cobertura_pct: 108.3, deficit: 0, exceso: 1492,
+      n_unidades_total: 4, tolerancia_pct: 0
+    },
+    proteccion: {
+      grupos: [{
+        key: 'a', marca: 'ZIEHL', modelo: 'FN050', cantidad: 4,
+        amps_unitario: 0.65, amps_grupo: 2.6,
+        guardamotor: { model: 'MS116-1.0', min: 0.63, max: 1.0, pid: '1SAM250000R1005' },
+        contactor:   { model: 'AF09', ac3_a: 9, kw_400v: 4, pid: 'PID-X', bobina: 'univ', margen_pct: 1284.6 },
+        aux_guardamotor: { model: 'HK1-11', pid: 'AUX-X', desc: '1NO+1NC' }
+      }],
+      breaker: { model: 'S203-C16 MTB', in: 16, pid: 'BRK-X', power_w: 7.5 },
+      aux_breaker: { model: 'S2C-H11L', pid: 'AUXB-X', desc: '1NO+1NC' }
+    },
+    sugerencias: [],
+    faltantes:   [],
+    metadatos:   { transformador_id: '4123XXX', matricula: '4123XXX' }
+  });
+  // Claves exigidas por el prompt
+  assert.ok(Array.isArray(r.selecciones));
+  assert.ok(typeof r.cfm_requerido === 'number');
+  assert.ok(typeof r.cfm_total === 'number');
+  assert.ok(['APROBADO', 'REQUIERE AJUSTE'].includes(r.evaluacion));
+  assert.ok(typeof r.razon === 'string');
+  assert.ok(Array.isArray(r.estrategias_sugeridas));
+  assert.ok(Array.isArray(r.seleccion_electrica));
+  assert.ok(Array.isArray(r.faltantes));
+  assert.ok(typeof r.metadatos === 'object');
+});
+
+test('construirResumenJSON: selecciones tiene la estructura correcta por modelo', () => {
+  const r = construirResumenJSON({
+    mix: [
+      { key: 'fn063', marca: 'ZIEHL', modelo: 'FN063', cfm_unitario: 5933, cantidad: 8 }
+    ],
+    evaluacion: { aprobado: true, cfm_aporte_total: 47464, cfm_requerido: 40000 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.equal(r.selecciones.length, 1);
+  assert.deepEqual(r.selecciones[0], {
+    id: 'fn063', marca: 'ZIEHL', modelo: 'FN063',
+    cantidad: 8, cfm_unit: 5933, cfm_total: 47464
+  });
+});
+
+test('construirResumenJSON: evaluación APROBADO vs REQUIERE AJUSTE', () => {
+  const r1 = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: true, cobertura_pct: 110 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.equal(r1.evaluacion, 'APROBADO');
+
+  const r2 = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: false, deficit: 5000, cobertura_pct: 80 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.equal(r2.evaluacion, 'REQUIERE AJUSTE');
+});
+
+test('construirResumenJSON: seleccion_electrica trae guardamotor + contactor + breaker por grupo', () => {
+  const r = construirResumenJSON({
+    mix: [{ key: 'a', marca: 'ZIEHL', modelo: 'FN050', cfm_unitario: 4873, cantidad: 4,
+            ficha: { fan_kw: 250 } }],
+    evaluacion: { aprobado: true, cfm_aporte_total: 19492, cfm_requerido: 18000 },
+    proteccion: {
+      grupos: [{
+        key: 'a', marca: 'ZIEHL', modelo: 'FN050', cantidad: 4,
+        amps_unitario: 0.65, amps_grupo: 2.6,
+        guardamotor: { model: 'MS116-1.0', min: 0.63, max: 1.0, pid: 'GM-PID' },
+        contactor:   { model: 'AF09', ac3_a: 9, kw_400v: 4, pid: 'CT-PID', bobina: 'univ', margen_pct: 1284 },
+        aux_guardamotor: { model: 'HK1-11', pid: 'AUX-PID', desc: '1NO+1NC' }
+      }],
+      breaker: { model: 'S203-C16', in: 16, pid: 'BRK-PID', power_w: 7.5 },
+      aux_breaker: { model: 'S2C-H11L', pid: 'AUXB-PID', desc: '1NO+1NC' }
+    }
+  });
+  const se = r.seleccion_electrica[0];
+  assert.equal(se.id_ventilador, 'a');
+  assert.equal(se.flc_A, 0.65);
+  assert.equal(se.guardamotor.tipo, 'ABB MS116-1.0');
+  assert.equal(se.contactor.modelo_sugerido, 'ABB AF09');
+  assert.deepEqual(se.contactor.tags_SCADA, ['RUN', 'FAULT', 'READY']);
+  // Breaker está a nivel raíz (1 ud para todo el sistema)
+  assert.equal(r.breaker_sistema.modelo_sugerido, 'ABB S203-C16');
+  assert.equal(r.breaker_sistema.curva, 'C');
+  assert.equal(r.breaker_sistema.poder_de_corte_kA, 6);
+  assert.equal(r.breaker_sistema.auxiliar_SCADA.tag, 'TRIP');
+});
+
+test('construirResumenJSON: faltantes se mapean a strings con severidad', () => {
+  const r = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: true },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null },
+    faltantes: [
+      { campo: 'fan_cosphi', severidad: 'aviso', modelo: 'FN050', mensaje: 'falta cos φ' }
+    ]
+  });
+  assert.equal(r.faltantes.length, 1);
+  assert.ok(r.faltantes[0].includes('[AVISO]'));
+  assert.ok(r.faltantes[0].includes('fan_cosphi'));
+  assert.ok(r.faltantes[0].includes('FN050'));
+});
+
+test('construirResumenJSON: metadatos incluye fecha_generacion + version_resumen', () => {
+  const r = construirResumenJSON({
+    mix: [], evaluacion: { aprobado: true },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.ok(r.metadatos.fecha_generacion.match(/^\d{4}-\d{2}-\d{2}T/));
+  assert.equal(r.metadatos.version_resumen, '1.0');
+  assert.ok(r.metadatos.norma_referencia.includes('IEEE'));
+});
+
+test('construirResumenJSON: razón refleja tolerancia cuando aplica', () => {
+  const r = construirResumenJSON({
+    mix: [],
+    evaluacion: { aprobado: true, cobertura_pct: 96.2, tolerancia_pct: 5 },
+    proteccion: { grupos: [], breaker: null, aux_breaker: null }
+  });
+  assert.ok(r.razon.includes('tolerancia 5'));
+});
+
+/* ─── Microfase 6 · validarPuntoOperacion ─────────────────────── */
+
+test('validarPuntoOperacion: caso golden 24 MVA × 125% = 48000 CFM (severidad ok)', () => {
+  // 24 MVA × pendiente 2.0 (125%) = 48000 CFM exactos
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 48000, alt_m: 0
+  });
+  assert.equal(r.severidad, 'ok');
+  assert.equal(r.cfm_esperado, 48000);
+  assert.equal(r.delta_cfm, 0);
+  assert.equal(r.delta_pct_abs, 0);
+  assert.equal(r.rango_calibrado, true);
+  assert.ok(r.mensaje.includes('coincide'));
+});
+
+test('validarPuntoOperacion: discrepancia leve (2-5%) → severidad warn', () => {
+  // Esperado 48000, calculado 49500 → delta 3.1%
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 49500, alt_m: 0
+  });
+  assert.equal(r.severidad, 'warn');
+  assert.ok(r.delta_pct_abs > 2 && r.delta_pct_abs <= 5);
+  assert.equal(r.rango_calibrado, true);
+});
+
+test('validarPuntoOperacion: discrepancia grande (>5%) → severidad err', () => {
+  // Esperado 48000, calculado 60000 → delta 25%
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 60000, alt_m: 0
+  });
+  assert.equal(r.severidad, 'err');
+  assert.ok(r.delta_pct_abs > 5);
+  assert.ok(r.mensaje.toLowerCase().includes('inconsistencia') || r.mensaje.toLowerCase().includes('discrepancia'));
+});
+
+test('validarPuntoOperacion: % fuera del rango calibrado (115–166) → err extrapolación', () => {
+  const r1 = validarPuntoOperacion({
+    onan_kva: 24000, pct: 110, cfm_calculado: 28000  // < 115%
+  });
+  assert.equal(r1.severidad, 'err');
+  assert.equal(r1.rango_calibrado, false);
+  assert.ok(r1.mensaje.includes('FUERA') || r1.mensaje.includes('extrapolación'));
+
+  const r2 = validarPuntoOperacion({
+    onan_kva: 24000, pct: 180, cfm_calculado: 110000  // > 166%
+  });
+  assert.equal(r2.severidad, 'err');
+  assert.equal(r2.rango_calibrado, false);
+});
+
+test('validarPuntoOperacion: aplica corrección de altitud al esperado', () => {
+  // 24 MVA × 125% = 48000 a nivel mar
+  // a 1500 m: factor altitud = e^(1500/8500) ≈ 1.193 → esperado ≈ 57264
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 125, cfm_calculado: 57264, alt_m: 1500
+  });
+  // Debe coincidir con el cálculo corregido por altitud, no con el base
+  assert.equal(r.severidad, 'ok');
+  assert.ok(Math.abs(r.cfm_esperado - 57264) < 100);
+});
+
+test('validarPuntoOperacion: pendiente_esperada coincide con interpolarPendiente', () => {
+  const r = validarPuntoOperacion({
+    onan_kva: 24000, pct: 133, cfm_calculado: 24000 * 2.65
+  });
+  assert.equal(r.pendiente_esperada, 2.65);
+  assert.equal(r.severidad, 'ok');
 });
