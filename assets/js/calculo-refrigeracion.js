@@ -27,6 +27,14 @@ import {
   formatearNumero, escaparHtml
 } from './domain/refrigeracion.js';
 
+import {
+  HERRAMIENTAS_INSUMOS,
+  EPP_ELEMENTOS,
+  MONTAJE_MECANICO_POR_VENTILADOR,
+  MONTAJE_ELECTRICO_POR_VENTILADOR,
+  consolidarMateriales
+} from './data/materiales-afinia.js';
+
 const $ = (id) => document.getElementById(id);
 
 /* ─── Estado UI mutable (mínimo) ────────────────────────────── */
@@ -1760,6 +1768,74 @@ function _row(label, value, mono = false) {
   return `<tr><th>${escaparHtml(label)}</th><td${mono ? ' class="mono"' : ''}>${escaparHtml(v)}</td></tr>`;
 }
 
+/**
+ * Renderiza tabla de un catálogo de materiales (herramientas /
+ * EPP / mecánico / eléctrico). Solo muestra cantidad por unidad.
+ * Los items con cantidad: null se imprimen con badge "variable".
+ *
+ * @param {Array<{producto, spec, unidad, cantidad}>} catalogo
+ * @param {boolean} mostrarTotal · si true, agrega columna "total"
+ *                                 multiplicada por N (no usado aún)
+ */
+function _renderTablaMateriales(catalogo, _mostrarTotal) {
+  return `
+    <table class="ft">
+      <thead>
+        <tr>
+          <th class="tc" style="width:30px">#</th>
+          <th>Producto</th>
+          <th style="width:160px">Especificación / Referencia</th>
+          <th style="width:60px">Unidad</th>
+          <th class="tr" style="width:80px">Cant. unitaria</th>
+        </tr>
+      </thead>
+      <tbody>${catalogo.map((it, i) => `
+        <tr>
+          <td class="tc">${i + 1}</td>
+          <td>${escaparHtml(it.producto)}</td>
+          <td>${escaparHtml(it.spec)}</td>
+          <td>${escaparHtml(it.unidad)}</td>
+          <td class="tr mono">${it.cantidad === null || it.cantidad === undefined ? '<span style="color:#b85f00;font-style:italic">variable</span>' : formatearNumero(it.cantidad)}</td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
+/**
+ * Renderiza tabla consolidada multiplicando cantidad × N para
+ * los items con cantidad numérica. Items con cantidad: null se
+ * marcan como "variable · ajustar al caso" y no se totalizan.
+ *
+ * @param {Array<{producto, spec, unidad, cantidad}>} catalogo
+ * @param {number} nVentiladores
+ */
+function _renderTablaConsolidada(catalogo, nVentiladores) {
+  const consolidado = consolidarMateriales(catalogo, nVentiladores);
+  return `
+    <table class="ft">
+      <thead>
+        <tr>
+          <th class="tc" style="width:30px">#</th>
+          <th>Producto</th>
+          <th style="width:160px">Especificación / Referencia</th>
+          <th style="width:60px">Unidad</th>
+          <th class="tr" style="width:80px">Por vent.</th>
+          <th class="tr" style="width:80px">× ${nVentiladores}</th>
+          <th class="tr" style="width:90px">Total proyecto</th>
+        </tr>
+      </thead>
+      <tbody>${consolidado.map((it, i) => `
+        <tr>
+          <td class="tc">${i + 1}</td>
+          <td>${escaparHtml(it.producto)}</td>
+          <td>${escaparHtml(it.spec)}</td>
+          <td>${escaparHtml(it.unidad)}</td>
+          <td class="tr mono">${it.cantidad_unitaria === null || it.cantidad_unitaria === undefined ? '<span style="color:#b85f00;font-style:italic">var.</span>' : formatearNumero(it.cantidad_unitaria)}</td>
+          <td class="tr mono">${nVentiladores}</td>
+          <td class="tr mono"><strong>${it.total === null || it.total === undefined ? '<span style="color:#b85f00;font-style:italic">ajustar</span>' : formatearNumero(it.total)}</strong></td>
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
+
 /* SVG con la vista CAD del cuerpo de radiador (frontal + perspectiva)
    con dimensiones A/B/C/D codificadas por color, replicando el modelo
    de referencia AFINIA original. ViewBox extendido en Y negativo para
@@ -3239,13 +3315,58 @@ function generateReport() {
 
   <!-- ── 10 · LISTA DE MATERIALES ───────────────────────── -->
   <section class="section-anchor materiales">
-    <h2>10. Lista de materiales</h2>
+    <h2>10. Lista de materiales · protección eléctrica</h2>
     ${materiales}
+  </section>
+
+  <!-- ── 11 · HERRAMIENTAS E INSUMOS (estándar) ─────────── -->
+  <section class="section-anchor materiales">
+    <h2>11. Listado de herramientas e insumos</h2>
+    <p class="meta">Conjunto estándar para la operación de montaje. NO se multiplica por número de ventiladores · una sola dotación cubre toda la intervención.</p>
+    ${_renderTablaMateriales(HERRAMIENTAS_INSUMOS, false)}
+  </section>
+
+  <!-- ── 12 · ELEMENTOS DE PROTECCIÓN PERSONAL (estándar) ─ -->
+  <section class="section-anchor materiales">
+    <h2>12. Elementos de protección personal</h2>
+    <p class="meta">Dotación estándar de seguridad para la brigada. NO se multiplica por número de ventiladores.</p>
+    <table class="ft">
+      <thead><tr><th class="tc" style="width:30px">#</th><th>Elemento</th></tr></thead>
+      <tbody>${EPP_ELEMENTOS.map((e, i) => `
+        <tr>
+          <td class="tc">${i + 1}</td>
+          <td>${escaparHtml(e)}</td>
+        </tr>`).join('')}</tbody>
+    </table>
+  </section>
+
+  <!-- ── 13 · MATERIAL MONTAJE MECÁNICO POR VENTILADOR ──── -->
+  <section class="section-anchor materiales">
+    <h2>13. Material para montaje mecánico, por ventilador</h2>
+    <p class="meta">Materiales requeridos por cada motoventilador instalado. Items con cantidad fija se totalizan en la sección 15 multiplicando por el número total de ventiladores del mix (${mixEval.n_unidades_total || 0}). Items con cantidad variable se ajustan según el caso (longitud de tubería, distancia, etc.).</p>
+    ${_renderTablaMateriales(MONTAJE_MECANICO_POR_VENTILADOR, false)}
+  </section>
+
+  <!-- ── 14 · MATERIAL MONTAJE ELÉCTRICO POR VENTILADOR ─── -->
+  <section class="section-anchor materiales">
+    <h2>14. Material para montaje eléctrico, por ventilador</h2>
+    <p class="meta">Materiales requeridos por cada motoventilador instalado. Items con cantidad fija se totalizan en la sección 15 multiplicando por el número total de ventiladores del mix (${mixEval.n_unidades_total || 0}). Items con cantidad variable se ajustan según el caso (longitud de cable, n. de puntos de conexión, etc.).</p>
+    ${_renderTablaMateriales(MONTAJE_ELECTRICO_POR_VENTILADOR, false)}
+  </section>
+
+  <!-- ── 15 · CONSOLIDADO TOTAL · MONTAJE MECÁNICO + ELÉCTRICO ─ -->
+  <section class="section-anchor materiales">
+    <h2>15. Consolidado total de materiales · ${mixEval.n_unidades_total || 0} ventilador${(mixEval.n_unidades_total || 0) === 1 ? '' : 'es'} del mix</h2>
+    <p class="meta">Cantidades totales del montaje mecánico y eléctrico para todo el sistema. Items con cantidad variable mantienen marca <em>"variable"</em>. Esta tabla es la base para emisión de orden de compra del proyecto.</p>
+    <h3 style="margin-top:8pt">15.1 · Total montaje mecánico</h3>
+    ${_renderTablaConsolidada(MONTAJE_MECANICO_POR_VENTILADOR, mixEval.n_unidades_total || 0)}
+    <h3 style="margin-top:8pt">15.2 · Total montaje eléctrico</h3>
+    ${_renderTablaConsolidada(MONTAJE_ELECTRICO_POR_VENTILADOR, mixEval.n_unidades_total || 0)}
   </section>
 
   <!-- ── FIRMAS · ELABORADO/APROBADO ─────────────────────── -->
   <section class="section-anchor firma-block">
-    <h2>11. Elaborado / Aprobado</h2>
+    <h2>16. Elaborado / Aprobado</h2>
     <div class="firma-data">
       <div class="firma-pair"><div class="firma-key">Elaborado / Aprobado</div><div class="firma-val">Ing. Miguel Jimenez</div></div>
       <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Líder de Transformadores de Potencia AFINIA</div></div>
