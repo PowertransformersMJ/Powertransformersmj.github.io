@@ -1740,13 +1740,21 @@ async function guardarAccion() {
     // 6a) Pre-chequeo de permisos: leer /usuarios/{uid} antes del
     // addDoc para distinguir "no admin" de "payload con undefined"
     // de "rules no desplegadas". Mensaje accionable directo.
+    let permisos = null;
     if (responsable_uid) {
-      const permisos = await mod.verificarPermisosAdmin(responsable_uid);
+      permisos = await mod.verificarPermisosAdmin(responsable_uid);
       console.info('[acciones_refrigeracion] verificarPermisosAdmin:', permisos);
+      window.__sgmDiag_lastPermisos = permisos;
       if (!permisos.ok) {
         throw new Error(permisos.mensaje);
       }
     }
+    // Log del payload final para trazabilidad (truncado a 4 KB)
+    try {
+      const json = JSON.stringify(payload, null, 2);
+      console.info('[acciones_refrigeracion] payload a persistir (truncado):',
+        json.length > 4000 ? json.slice(0, 4000) + '\n... (truncado)' : json);
+    } catch {}
     const id = await mod.crear(payload, responsable_uid);
     setStatus(`✓ Acción registrada con ID ${id}`, 'success');
     setTimeout(closeModalAccion, 1500);
@@ -1755,12 +1763,16 @@ async function guardarAccion() {
     // Errores comunes de Firestore con mensajes accionables
     let msg = err?.message || String(err);
     const code = err?.code || '';
+    const permisosTxt = window.__sgmDiag_lastPermisos
+      ? ` (pre-chequeo admin: ok=${window.__sgmDiag_lastPermisos.ok}, motivo=${window.__sgmDiag_lastPermisos.motivo})`
+      : ' (pre-chequeo admin: no se ejecutó)';
     if (code === 'permission-denied' || /permission/i.test(msg)) {
-      msg = `Permiso denegado al escribir en Firestore. Verifique:
-        (1) que su sesión sea de admin (rol='admin' en /usuarios/{uid}),
-        (2) que firestore.rules esté desplegado: \`firebase deploy --only firestore:rules\`,
-        (3) que el payload no contenga campos undefined (deep-clean activo desde 2026-05-03).
-        Detalle técnico: ${err.message}`;
+      // Si el pre-chequeo dice OK pero Firestore rechaza, es que las
+      // rules en producción NO incluyen el match de acciones_refrigeracion.
+      const probableCausa = window.__sgmDiag_lastPermisos?.ok
+        ? `\n\nCAUSA MUY PROBABLE: las rules en producción NO incluyen el match /acciones_refrigeracion/{id} (deploy desactualizado).\n\n→ ACCIÓN REQUERIDA: ejecute desde la Mac del administrador:\n   firebase deploy --only firestore:rules\n\nDespués refresque la página con Cmd+Shift+R y vuelva a intentar.`
+        : '\n\nCAUSA: el pre-chequeo de admin falló (no eres admin en Firestore).';
+      msg = `Permiso denegado al escribir en Firestore${permisosTxt}.${probableCausa}\n\nDetalle técnico: ${err.message}`;
     } else if (code === 'invalid-argument' || /invalid/i.test(msg)) {
       msg = `Datos inválidos en el payload (Firestore rechazó undefined o NaN). El deep-clean debería haberlos quitado. Reporte el caso. Detalle: ${err.message}`;
     } else if (code === 'failed-precondition') {
@@ -1828,15 +1840,40 @@ function generateReport() {
     // Cambia devicePixelRatio temporalmente, fuerza resize, captura
     // y restaura. Causa un breve flash en pantalla (aceptable solo
     // al exportar).
+    // Snapshot HD/4K del gráfico para el informe AFINIA. La gráfica
+    // es de alto valor en el documento, así que se renderiza a
+    // 2400 × 1400 px de canvas físico × DPR 3 = ~7200 × 4200 efectivos
+    // (suficiente para impresión a 300 dpi y zoom digital sin
+    // pixelado). Causa un flash visual breve al exportar (aceptable
+    // porque solo se dispara al hacer click en "Exportar informe").
     let chartImg = '';
     try {
       if (state.chart) {
-        const oldDpr = state.chart.options.devicePixelRatio || 1;
-        state.chart.options.devicePixelRatio = 3;
-        state.chart.resize();
+        const canvas        = state.chart.canvas;
+        const oldDpr        = state.chart.options.devicePixelRatio || 1;
+        const oldRespOpt    = state.chart.options.responsive;
+        const oldMantOpt    = state.chart.options.maintainAspectRatio;
+        const oldStyleW     = canvas.style.width;
+        const oldStyleH     = canvas.style.height;
+
+        // Desactivar responsive temporalmente para que resize() respete
+        // el tamaño que pasamos sin re-encajar al contenedor.
+        state.chart.options.responsive            = false;
+        state.chart.options.maintainAspectRatio   = false;
+        state.chart.options.devicePixelRatio      = 3;
+        canvas.style.width  = '2400px';
+        canvas.style.height = '1400px';
+        state.chart.resize(2400, 1400);
         state.chart.update('none');
+
         chartImg = state.chart.toBase64Image('image/png', 1);
-        state.chart.options.devicePixelRatio = oldDpr;
+
+        // Restaurar tamaño y opciones originales
+        state.chart.options.responsive            = oldRespOpt;
+        state.chart.options.maintainAspectRatio   = oldMantOpt;
+        state.chart.options.devicePixelRatio      = oldDpr;
+        canvas.style.width  = oldStyleW;
+        canvas.style.height = oldStyleH;
         state.chart.resize();
         state.chart.update('none');
       }
@@ -2352,7 +2389,8 @@ function generateReport() {
     border: 1px solid #b0cce8; border-radius: 4pt; background: #fff;
     text-align: center;
   }
-  .chart-img { width: 100%; max-width: 6in; height: auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+  .chart-img { width: 100%; max-width: 6.14in; height: auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+  .chart-block { padding: 4pt 4pt 2pt; }
   .chart-cap { font-size: 6.5pt; color: #666; margin-top: 3pt; font-style: italic; }
 
   /* ── Fórmula simbólica + sustitución con valores reales ────── */

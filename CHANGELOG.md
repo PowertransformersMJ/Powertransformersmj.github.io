@@ -16,6 +16,60 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Hotfix · Diagnóstico exhaustivo de permission-denied + regla §0.1.2.7 (2026-05-03 PM13)
+
+El director sigue viendo permission-denied al guardar acción
+después de aplicar el deep-clean (§0.1.2.6) y el pre-chequeo de
+admin (commit anterior). Causa: el `verificarPermisosAdmin` cliente
+retorna `ok: true` (es admin) pero el `addDoc` falla con
+permission-denied del servidor. Esto ocurre cuando las rules en
+producción NO incluyen el match `/acciones_refrigeracion/{id}`
+(deploy desactualizado), y caen al fallback `match /{document=**}`
+con `allow read, write: if false`.
+
+Cambios:
+- `assets/js/calculo-refrigeracion.js` · `guardarAccion()`:
+  - Guarda el resultado de `verificarPermisosAdmin` en
+    `window.__sgmDiag_lastPermisos` para diagnóstico cruzado.
+  - Loguea el payload completo (truncado a 4 KB) antes del addDoc
+    para trazabilidad.
+  - Catch handler para `permission-denied` ahora distingue:
+    · Si `pre-chequeo ok=true` Y Firestore rechaza → causa
+      probable es deploy de rules desactualizado. Mensaje
+      accionable: *"CAUSA MUY PROBABLE: las rules en producción
+      NO incluyen el match /acciones_refrigeracion/{id} (deploy
+      desactualizado). → ACCIÓN: `firebase deploy --only
+      firestore:rules`"*.
+    · Si `pre-chequeo ok=false` → causa es el rol del usuario.
+- `assets/css/calculo-refrigeracion.css` · `.sgm-modal-status`
+  acepta `white-space: pre-wrap` + `line-height: 1.55` para que
+  el banner de error muestre los saltos de línea del mensaje
+  estructurado correctamente.
+- `CLAUDE.md` · regla permanente nueva **§0.1.2.7** *"Re-deploy
+  obligatorio de firestore.rules tras cualquier cambio en el
+  archivo"* con:
+  · Contexto del bug histórico
+  · Causa raíz documentada (rules viejas en producción + fallback
+    deny-all + SDK reporta permission-denied igual que rule
+    violada).
+  · Síntomas a reconocer (otros writes funcionan, solo el nuevo
+    falla, pre-chequeo cliente OK pero servidor rechaza).
+  · 6 reglas obligatorias (avisar deploy, verificar salida CLI,
+    ejecutar AMBOS comandos, comparar rules en Firebase Console
+    vs repo, mensaje accionable en UI, nunca asumir rules al día).
+
+⚠ Requiere deploy manual del director (regla §0.1.1):
+```bash
+firebase deploy --only firestore:rules
+```
+
+Verificación: la salida debe mostrar *"released rules
+firestore.rules to cloud.firestore"* y *"Deploy complete!"*. Si
+solo dice "deployed indexes" o nada de rules, el deploy NO se
+ejecutó.
+
+570/570 tests verdes · HTML lint OK.
+
 ### Hotfix UI · Reordenar Mix antes que Datos técnicos + alta resolución gráfica informe (2026-05-03 PM12)
 
 Dos ajustes solicitados por el director:
