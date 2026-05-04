@@ -183,7 +183,7 @@ function sanitizar(data) {
     cfm_requerido:   n(data.cfm_requerido),
     cfm_corregido:   n(data.cfm_corregido),
 
-    mix:           arr(data.mix),                  // Array<{key, marca, modelo, cfm_unitario, cantidad, ficha}>
+    mix:           arr(data.mix),                  // Array<{key, marca, modelo, cfm_unitario, cantidad, disposicion, ubicacion:{lado,cuerpo,posicion}, ficha}>
     evaluacion:    data.evaluacion || null,         // Objeto evaluarMixVentiladores
     proteccion:    data.proteccion || null,         // Objeto calcularProteccionMix
     compatibilidad: data.compatibilidad || null,    // Objeto evaluarCompatibilidad
