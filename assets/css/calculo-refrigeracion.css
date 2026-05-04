@@ -772,6 +772,16 @@
   color: var(--brand-deep);
   font-style: italic;
 }
+.ficha-mix-dispo .fmd-ubic-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+.ficha-mix-dispo .fmd-ubic-grid select { font-size: 12px; }
+.ficha-mix-dispo .fmd-ubic-grid select:disabled {
+  opacity: .55; background: rgba(0,0,0,.04);
+}
 .ficha-mix-dispo .fmd-svg {
   display: flex; align-items: center; justify-content: center;
   background: #fff;
