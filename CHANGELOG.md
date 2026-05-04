@@ -16,6 +16,74 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 4 · Detección de faltantes para cálculo eléctrico (2026-05-03 PM8)
+
+Cuarta microfase. Detecta y reporta campos faltantes en la ficha
+técnica de cada modelo del mix que afectan el cálculo eléctrico,
+sin bloquear el flujo (la calculadora sigue con valores por defecto
+razonables).
+
+Dominio (assets/js/domain/refrigeracion.js):
+- Función pura nueva detectarFaltantes({mix}) → devuelve array de
+  objetos {key, modelo, marca, campo, severidad, sustituto, mensaje}
+  por cada faltante. Tres severidades:
+  · critico · sin esto NO se puede calcular protección eléctrica
+    del modelo (ej. fan_amp + sin potencia ni voltaje para derivar).
+    Si esto pasa, los siguientes faltantes del mismo modelo se
+    omiten (cascada).
+  · aviso   · cálculo con valor por defecto razonable (ej. cos φ
+    asumido 0.85, η asumida 0.85, voltaje 400 V).
+  · info    · opcional, solo afecta exports (ej. fan_peso = null).
+- Heurística: corriente directa de placa fan_amp parsea el primer
+  número (formato "1.13/0.65 A (D/Y)"). Voltaje extraído del
+  string fan_volt (regex /(\d+)\s*V/).
+
+Tests: +7 (83 → 91 en refrigeración):
+- Mix vacío devuelve [].
+- Ficha completa no genera faltantes.
+- Severidad crítico cuando no hay placa ni datos para derivar.
+- Aviso cuando falta cos φ (sustituto 0.85).
+- Info cuando falta peso (no bloquea cálculo).
+- Omite items con cantidad <= 0.
+- Mensajes incluyen marca + modelo para identificar.
+
+UI (pages/calculo-refrigeracion.html + assets/js/calculo-refrigeracion.js):
+- Contenedor nuevo #prot-faltantes en la sección "Circuito de
+  protección eléctrica y mando", debajo del bloque de conexión
+  Δ/Y. Hidden por default.
+- Función nueva renderFaltantes(arr) que ordena por severidad
+  (crítico > aviso > info), muestra contador en el header
+  ("3 críticos · 2 avisos · 1 info"), lista cada faltante con
+  pill de severidad + mensaje accionable, y pie con hint
+  diferenciado: si hay críticos enfatiza que esos modelos no
+  pueden dimensionar protección.
+- calcProtection() invoca detectarFaltantes(state.mix) y
+  guarda en state.lastFaltantes; renderFaltantes(arr) en cada
+  cambio de mix o tolerancia.
+- guardarAccion() incluye campo nuevo `faltantes` en el payload.
+
+CSS:
+- .prot-faltantes con fondo amarillo crema + border-left naranja.
+- .pf-sev.critico (rojo), .pf-sev.aviso (naranja), .pf-sev.info
+  (azul) en pills.
+
+Data layer (assets/js/data/acciones_refrigeracion.js):
+- sanitizar() acepta data.faltantes como array, lo persiste en el
+  doc Firestore para auditoría posterior desde la tab Consolidado.
+
+Informe AFINIA · sec 9:
+- Bloque amarillo informativo bajo la tabla principal cuando hay
+  faltantes. Lista cada uno con badge [SEVERIDAD] coloreado (rojo
+  crítico, naranja aviso, azul info). Pie explica que el cálculo
+  se ejecutó con valores por defecto razonables.
+
+544/544 tests verdes (+8) · HTML lint OK.
+
+Pendiente director: validar visualmente.
+Próxima microfase (5): exportar resumen JSON estructurado con shape
+exacto del prompt (selecciones, evaluacion, estrategias_sugeridas,
+seleccion_electrica, faltantes).
+
 ### Microfase 3 · Selección eléctrica detallada (FLC + contactor AF + SCADA + coordinación) (2026-05-03 PM7)
 
 Tercera microfase del plan de 6. Amplía el cálculo eléctrico para
