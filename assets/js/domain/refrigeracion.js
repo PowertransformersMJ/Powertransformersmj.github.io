@@ -430,22 +430,38 @@ export function evaluarMixVentiladores({ items, cfm_requerido, tolerancia_pct = 
 
 /**
  * Genera sugerencias para alcanzar el CFM requerido cuando el mix
- * actual no aprueba. Aplica tres estrategias y devuelve hasta
- * `max_sugerencias` ordenadas por menor exceso (ajuste más fino).
+ * actual no aprueba. Aplica hasta cinco estrategias y devuelve hasta
+ * `max_sugerencias` ordenadas por factibilidad (alta > media > baja)
+ * y luego por menor exceso.
  *
  * Estrategias:
  *   1. agregar_unidades — agrega N unidades del modelo con mayor
- *      CFM unitario ya en el mix.
+ *      CFM unitario ya en el mix.  [factibilidad: alta]
  *   2. sustituir — sustituye el modelo de menor CFM unitario del
- *      mix por otro modelo del catálogo con mayor CFM.
+ *      mix por otro modelo del catálogo con mayor CFM.  [media]
  *   3. agregar_modelo — agrega N unidades de un modelo del catálogo
- *      que NO esté en el mix actual.
+ *      que NO esté en el mix actual.  [media]
+ *   4. vfd_uprate — operar con variador de frecuencia a mayor RPM.
+ *      Si existe variante de mayor frecuencia/RPM en el catálogo
+ *      (ej. fn063_50 → fn063_60) usa el CFM exacto de esa variante;
+ *      si no, asume factor 1.20 sobre el CFM nominal.  [baja]
+ *   5. optimizacion_aerodinamica — sugerencia informativa cuando el
+ *      déficit es > 10% del requerido. Estima +5–10% adicional al
+ *      optimizar toma de aire / reducir codos y restricciones.
+ *      [baja, sin cambios mecánicos cuantitativos]
+ *
+ * Cada sugerencia incluye:
+ *   - impacto_estimado_cfm: delta CFM versus el mix actual
+ *   - implicaciones: texto breve sobre coste y consideraciones
+ *     operativas
+ *   - factibilidad: 'alta' | 'media' | 'baja'
  *
  * @param {{
  *   items: Array<{key, modelo, marca, cfm_unitario, cantidad}>,
  *   cfm_requerido: number,
- *   fan_db: Record<string, {fan_marca, fan_modelo, fan_cfm_nom}>,
- *   max_sugerencias?: number
+ *   fan_db: Record<string, {fan_marca, fan_modelo, fan_cfm_nom, fan_hz, fan_rpm}>,
+ *   max_sugerencias?: number,
+ *   tolerancia_pct?: number
  * }} input
  * @returns {Array<{
  *   estrategia: string,
@@ -454,16 +470,21 @@ export function evaluarMixVentiladores({ items, cfm_requerido, tolerancia_pct = 
  *   cfm_aporte_total: number,
  *   cobertura_pct: number,
  *   exceso: number,
- *   aprobado: boolean
+ *   aprobado: boolean,
+ *   impacto_estimado_cfm: number,
+ *   implicaciones: string,
+ *   factibilidad: 'alta'|'media'|'baja'
  * }>}
  */
-export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias = 3 }) {
+export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias = 5, tolerancia_pct = 0 }) {
   const req = Number(cfm_requerido) || 0;
+  const tol = Math.max(0, Math.min(100, Number(tolerancia_pct) || 0));
+  const umbral = req * (1 - tol / 100);
   const mix = Array.isArray(items) ? items.filter(it => (it.cantidad | 0) > 0 && (it.cfm_unitario || 0) > 0) : [];
   const db  = (fan_db && typeof fan_db === 'object') ? fan_db : {};
   if (req <= 0) return [];
   const total = mix.reduce((s, it) => s + (it.cfm_unitario || 0) * (it.cantidad | 0), 0);
-  if (total >= req) return [];
+  if (total >= umbral) return [];
   const deficit = req - total;
   const sugerencias = [];
 
@@ -471,7 +492,8 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
   if (mix.length > 0) {
     const mejor = mix.reduce((a, b) => (b.cfm_unitario > a.cfm_unitario ? b : a));
     if (mejor.cfm_unitario > 0) {
-      const nExtra = Math.ceil(deficit / mejor.cfm_unitario);
+      const deficitUmbral = umbral - total;
+      const nExtra = Math.ceil(deficitUmbral / mejor.cfm_unitario);
       const nuevoTotal = total + nExtra * mejor.cfm_unitario;
       sugerencias.push({
         estrategia:  'agregar_unidades',
@@ -480,10 +502,13 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
           accion: 'agregar', key: mejor.key, modelo: mejor.modelo, marca: mejor.marca,
           cantidad: nExtra, cfm_unitario: mejor.cfm_unitario
         }],
-        cfm_aporte_total: +nuevoTotal.toFixed(2),
-        cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
-        exceso:           +(nuevoTotal - req).toFixed(2),
-        aprobado:         nuevoTotal >= req
+        cfm_aporte_total:     +nuevoTotal.toFixed(2),
+        cobertura_pct:        +(nuevoTotal / req * 100).toFixed(1),
+        exceso:               +(nuevoTotal - req).toFixed(2),
+        aprobado:             nuevoTotal >= umbral,
+        impacto_estimado_cfm: +(nExtra * mejor.cfm_unitario).toFixed(2),
+        implicaciones:        `Coste lineal por unidad. No requiere cambios de diseño ni reingeniería del montaje. Mismo guardamotor MS116 + auxiliares SCADA del modelo existente. Mayor consumo de espacio físico en gabinete.`,
+        factibilidad:         'alta'
       });
     }
   }
@@ -498,7 +523,7 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
       candidatos.sort((a, b) => a.cfm - b.cfm);
       for (const c of candidatos) {
         const nuevoTotal = total - debil.cantidad * debil.cfm_unitario + debil.cantidad * c.cfm;
-        if (nuevoTotal >= req) {
+        if (nuevoTotal >= umbral) {
           sugerencias.push({
             estrategia:  'sustituir',
             descripcion: `Sustituye los ${debil.cantidad} × ${debil.marca || ''} ${debil.modelo || debil.key} por ${debil.cantidad} × ${c.marca} ${c.modelo} (mayor CFM unitario: ${Math.round(c.cfm)} vs ${Math.round(debil.cfm_unitario)}).`,
@@ -506,12 +531,15 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
               { accion: 'quitar',   key: debil.key, modelo: debil.modelo, marca: debil.marca, cantidad: debil.cantidad, cfm_unitario: debil.cfm_unitario },
               { accion: 'agregar',  key: c.key,     modelo: c.modelo,     marca: c.marca,     cantidad: debil.cantidad, cfm_unitario: c.cfm }
             ],
-            cfm_aporte_total: +nuevoTotal.toFixed(2),
-            cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
-            exceso:           +(nuevoTotal - req).toFixed(2),
-            aprobado:         true
+            cfm_aporte_total:     +nuevoTotal.toFixed(2),
+            cobertura_pct:        +(nuevoTotal / req * 100).toFixed(1),
+            exceso:               +(nuevoTotal - req).toFixed(2),
+            aprobado:             true,
+            impacto_estimado_cfm: +(debil.cantidad * (c.cfm - debil.cfm_unitario)).toFixed(2),
+            implicaciones:        `Requiere recalcular protección eléctrica del modelo nuevo (corriente, guardamotor MS116, breaker). Diámetro y montaje pueden ser distintos: verificar compatibilidad mecánica con el cuerpo de radiador (sec. 7). Mismo conteo de unidades.`,
+            factibilidad:         'media'
           });
-          break; // primer candidato que cubra es el mínimo
+          break;
         }
       }
     }
@@ -522,10 +550,10 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
   const candidatosNuevos = Object.entries(db)
     .map(([k, d]) => ({ key: k, cfm: +d.fan_cfm_nom || 0, modelo: d.fan_modelo || '', marca: d.fan_marca || '' }))
     .filter(c => c.cfm > 0 && !enMix.has(c.key));
-  // Ordenar por CFM descendente para minimizar unidades agregadas
   candidatosNuevos.sort((a, b) => b.cfm - a.cfm);
   for (const c of candidatosNuevos) {
-    const nExtra = Math.ceil(deficit / c.cfm);
+    const deficitUmbral = Math.max(0, umbral - total);
+    const nExtra = Math.ceil(deficitUmbral / c.cfm);
     const nuevoTotal = total + nExtra * c.cfm;
     sugerencias.push({
       estrategia:  'agregar_modelo',
@@ -534,18 +562,91 @@ export function sugerirMejoras({ items, cfm_requerido, fan_db, max_sugerencias =
         accion: 'agregar', key: c.key, modelo: c.modelo, marca: c.marca,
         cantidad: nExtra, cfm_unitario: c.cfm
       }],
-      cfm_aporte_total: +nuevoTotal.toFixed(2),
-      cobertura_pct:    +(nuevoTotal / req * 100).toFixed(1),
-      exceso:           +(nuevoTotal - req).toFixed(2),
-      aprobado:         nuevoTotal >= req
+      cfm_aporte_total:     +nuevoTotal.toFixed(2),
+      cobertura_pct:        +(nuevoTotal / req * 100).toFixed(1),
+      exceso:               +(nuevoTotal - req).toFixed(2),
+      aprobado:             nuevoTotal >= umbral,
+      impacto_estimado_cfm: +(nExtra * c.cfm).toFixed(2),
+      implicaciones:        `Aumenta diversidad de repuestos en inventario (un SKU adicional). Requiere guardamotor MS116 dedicado + auxiliar SCADA por unidad nueva. Verificar compatibilidad mecánica con el radiador del lado donde se instalará.`,
+      factibilidad:         'media'
     });
     if (sugerencias.filter(s => s.estrategia === 'agregar_modelo').length >= 2) break;
   }
 
-  // Ordena por menor exceso (ajuste más fino) y limita
+  // ── 4) VFD / uprate por frecuencia o asunción +20% ──
+  // Busca variante del mismo modelo a mayor frecuencia (ej. _50 → _60).
+  if (mix.length > 0) {
+    const mejor = mix.reduce((a, b) => (b.cfm_unitario > a.cfm_unitario ? b : a));
+    const dbEntries = Object.entries(db);
+    // Heurística: el mismo modelo con clave que comparte prefijo
+    // (zn045_50, zn045_60, zn045_60h) y mayor CFM nominal.
+    const baseKey = (mejor.key || '').replace(/_(50|60|60h)$/, '');
+    const variantes = dbEntries
+      .map(([k, d]) => ({ key: k, cfm: +d.fan_cfm_nom || 0, modelo: d.fan_modelo || '', marca: d.fan_marca || '', hz: String(d.fan_hz || ''), rpm: +d.fan_rpm || 0 }))
+      .filter(v => v.key.startsWith(baseKey) && v.key !== mejor.key && v.cfm > mejor.cfm_unitario);
+    variantes.sort((a, b) => a.cfm - b.cfm);
+    const variante = variantes[0] || null;
+    let aporteVfd, descVfd, implicVfd, factor;
+    if (variante) {
+      aporteVfd = +(mejor.cantidad * (variante.cfm - mejor.cfm_unitario)).toFixed(2);
+      factor = +(variante.cfm / mejor.cfm_unitario).toFixed(2);
+      descVfd = `Operar el modelo ${mejor.marca} ${mejor.modelo} a ${variante.hz} Hz (variante ${variante.modelo} del catálogo: ${variante.rpm} RPM) con variador de frecuencia. CFM unitario sube de ${Math.round(mejor.cfm_unitario)} a ${Math.round(variante.cfm)} (factor ${factor}×).`;
+      implicVfd = `Requiere 1 VFD ABB ACS580 (o equiv.) por motor (~USD 800–1.500/u dependiendo HP). Mayor consumo eléctrico (~8% con uprate) + ruido + desgaste mecánico de aspas. Coordinar rampa de arranque con SCADA. Verificar tensión nominal del motor (algunas variantes 60h requieren 460 V).`;
+    } else {
+      // Asunción genérica: +20% CFM con VFD
+      factor = 1.20;
+      aporteVfd = +(mejor.cantidad * mejor.cfm_unitario * 0.20).toFixed(2);
+      descVfd = `Operar el modelo ${mejor.marca} ${mejor.modelo} con variador de frecuencia (VFD) para incrementar RPM ~20% (factor estimado 1.20×). CFM unitario estimado: ${Math.round(mejor.cfm_unitario)} → ${Math.round(mejor.cfm_unitario * 1.20)}.`;
+      implicVfd = `Requiere 1 VFD por motor + ingeniería específica para confirmar margen de RPM seguro del modelo (sin exceder rpm_max del rotor). Mayor consumo eléctrico, ruido y desgaste. Coordinar con fabricante del motor antes de implementar.`;
+    }
+    const nuevoTotalVfd = total + aporteVfd;
+    sugerencias.push({
+      estrategia:  'vfd_uprate',
+      descripcion: descVfd,
+      cambios: variante
+        ? [
+            { accion: 'quitar',  key: mejor.key,     modelo: mejor.modelo,    marca: mejor.marca,    cantidad: mejor.cantidad, cfm_unitario: mejor.cfm_unitario },
+            { accion: 'agregar', key: variante.key, modelo: variante.modelo, marca: variante.marca, cantidad: mejor.cantidad, cfm_unitario: variante.cfm }
+          ]
+        : [],   // sugerencia genérica · sin cambio aplicable mecánicamente
+      cfm_aporte_total:     +nuevoTotalVfd.toFixed(2),
+      cobertura_pct:        +(nuevoTotalVfd / req * 100).toFixed(1),
+      exceso:               +(nuevoTotalVfd - req).toFixed(2),
+      aprobado:             nuevoTotalVfd >= umbral,
+      impacto_estimado_cfm: aporteVfd,
+      implicaciones:        implicVfd,
+      factibilidad:         'baja'
+    });
+  }
+
+  // ── 5) Optimización aerodinámica (informativa, déficit > 10%) ──
+  if (deficit / req > 0.10) {
+    const aporteAero = +(total * 0.075).toFixed(2);  // estimación 7.5% promedio (5–10%)
+    const nuevoTotalAero = total + aporteAero;
+    sugerencias.push({
+      estrategia:  'optimizacion_aerodinamica',
+      descripcion: `Optimizar la aerodinámica del flujo: rediseñar toma de aire del compartimiento, reducir codos y restricciones del ducto interno del transformador. Estimación de ganancia: 5–10% del CFM nominal sin cambios al motoventilador.`,
+      cambios:     [],   // sin cambios al mix; requiere ingeniería específica
+      cfm_aporte_total:     +nuevoTotalAero.toFixed(2),
+      cobertura_pct:        +(nuevoTotalAero / req * 100).toFixed(1),
+      exceso:               +(nuevoTotalAero - req).toFixed(2),
+      aprobado:             nuevoTotalAero >= umbral,
+      impacto_estimado_cfm: aporteAero,
+      implicaciones:        `Sin cambios al motoventilador ni a la protección eléctrica. Requiere análisis CFD o intervención mecánica del cuerpo del transformador. Coste medio (USD 2.000–8.000) según alcance. Considerar solo si déficit es alto y el resto de estrategias no son viables.`,
+      factibilidad:         'baja'
+    });
+  }
+
+  // Ordena: aprobado=true primero, luego por factibilidad alta>media>baja,
+  // luego por menor exceso (ajuste más fino).
+  const fOrden = { alta: 0, media: 1, baja: 2 };
   return sugerencias
-    .filter(s => s.aprobado)
-    .sort((a, b) => a.exceso - b.exceso)
+    .sort((a, b) => {
+      if (a.aprobado !== b.aprobado) return a.aprobado ? -1 : 1;
+      const f = (fOrden[a.factibilidad] ?? 99) - (fOrden[b.factibilidad] ?? 99);
+      if (f !== 0) return f;
+      return Math.abs(a.exceso) - Math.abs(b.exceso);
+    })
     .slice(0, max_sugerencias);
 }
 

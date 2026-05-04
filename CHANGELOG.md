@@ -16,6 +16,71 @@ un mismo transformador 24 MVA). Estado actual: dominio puro listo
 + tests verdes. Pendientes: UI · informe · persistencia · tab
 consolidado.
 
+### Microfase 2 · Estrategias enriquecidas (5 tipos + factibilidad + implicaciones) (2026-05-03 PM6)
+
+Refactor del motor `sugerirMejoras` para alinearlo con el prompt
+técnico del director: hasta 5 estrategias, cada una con `factibilidad`,
+`impacto_estimado_cfm` e `implicaciones` operativas/coste.
+
+- `assets/js/domain/refrigeracion.js` · `sugerirMejoras` reescrito:
+  - Mantiene las 3 estrategias existentes (`agregar_unidades`,
+    `sustituir`, `agregar_modelo`).
+  - Suma 2 estrategias nuevas:
+    - **`vfd_uprate`** · operar con variador de frecuencia. Si en el
+      catálogo existe variante de mayor frecuencia/RPM del mismo
+      modelo (ej. `fn063_50` → `fn063_60`) usa el CFM exacto de esa
+      variante; si no, asume factor 1.20 sobre el CFM nominal con
+      texto explícito en la descripción.
+    - **`optimizacion_aerodinamica`** · informativa. Aparece solo
+      cuando el déficit es > 10% del requerido. Estima +5–10%
+      adicional al rediseñar toma de aire / reducir restricciones
+      del flujo. Sin cambios automáticos al mix (`cambios = []`).
+  - Cada sugerencia retorna **3 campos nuevos**:
+    `impacto_estimado_cfm` (delta CFM versus mix actual),
+    `implicaciones` (texto sobre coste y consideraciones operativas),
+    `factibilidad` (`'alta' | 'media' | 'baja'`).
+  - Acepta nuevo parámetro `tolerancia_pct` (alineado con microfase 1).
+    Las sugerencias se evalúan contra `cfm_requerido × (1 − tol/100)`
+    en lugar del requerido estricto, así son coherentes con el banner.
+  - Default `max_sugerencias` sube de 3 → 5.
+  - **Ordenamiento nuevo:** primero las `aprobado=true`, luego por
+    factibilidad (alta > media > baja), luego por menor exceso. Antes
+    era solo por menor exceso.
+  - Factibilidad asignada por estrategia: `agregar_unidades=alta`
+    (mismo modelo, sin reingeniería); `sustituir=media` (recalcular
+    protección + verificar montaje); `agregar_modelo=media`
+    (más SKUs en inventario); `vfd_uprate=baja` (requiere VFD +
+    coordinación SCADA); `optimizacion_aerodinamica=baja` (requiere
+    ingeniería específica).
+- `tests/refrigeracion.test.js` · 5 tests nuevos:
+  - Ordenamiento por factibilidad (alta > media > baja).
+  - Cada sugerencia trae los 3 campos enriquecidos.
+  - `vfd_uprate` con variante en catálogo (50→60 Hz) → quitar+agregar.
+  - `vfd_uprate` genérica sin variante → `cambios=[]` + factor 1.20.
+  - `optimizacion_aerodinamica` solo aparece con déficit > 10%.
+  - Propagación de `tolerancia_pct` (sugerencias coherentes con el
+    banner de microfase 1).
+- UI · `renderSugCard` extraído como helper. Cada card del panel
+  de sugerencias ahora muestra:
+  - Header con título de la estrategia + badge de factibilidad
+    (🟢 ALTA / 🟡 MEDIA / 🟠 BAJA) en pill alineado a la derecha.
+  - Descripción de la acción.
+  - KPI con CFM resultante + delta `+X CFM` (verde si aprueba,
+    rojo si no) + cobertura + exceso.
+  - **Bloque "Implicaciones"** con texto sobre coste y consideraciones
+    operativas, separado por línea dashed.
+  - Botón "Aplicar sugerencia" deshabilitado en estrategias
+    informativas (`cambios=[]`) con tooltip explicativo.
+- Informe AFINIA · sec 8 sub-tabla de sugerencias amplía columnas
+  con **Factibilidad** + **Δ CFM** y muestra implicaciones bajo cada
+  descripción en cursiva. Header del panel actualizado: *"hasta 5
+  alternativas ordenadas por factibilidad (alta → baja)"*.
+- 524/524 tests verdes · HTML lint OK.
+
+**Pendiente director:** validar visualmente.
+Próxima microfase (3): selección eléctrica detallada con FLC + contactor
+ABB AF + tags SCADA + coordinación de protecciones.
+
 ### Microfase 1 · Tolerancia configurable en evaluación del mix (2026-05-03 PM5)
 
 Primera microfase de un plan de 6 microfases para alinear la

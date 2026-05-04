@@ -450,7 +450,8 @@ async function renderMixSuggestions(ev) {
     })),
     cfm_requerido: state.cfmReq,
     fan_db: db,
-    max_sugerencias: 3
+    max_sugerencias: 5,
+    tolerancia_pct: getTolerancia()
   });
   state.lastSuggestions = sugs;
   if (sugs.length === 0) {
@@ -462,21 +463,49 @@ async function renderMixSuggestions(ev) {
     return;
   }
   panel.hidden = false;
-  const labelEstrategia = (s) => ({
-    agregar_unidades: 'Agregar más unidades',
-    sustituir:        'Sustituir modelo más débil',
-    agregar_modelo:   'Agregar modelo nuevo'
-  }[s] || s);
   panel.innerHTML = `
     <div class="mix-sug-title">Sugerencias para cubrir el déficit (${formatearNumero(ev.deficit)} CFM)</div>
     <div class="mix-sug-grid">
-      ${sugs.map((s, i) => `
-        <div class="mix-sug-card">
-          <div class="strat">${labelEstrategia(s.estrategia)}</div>
-          <div class="desc">${escaparHtml(s.descripcion)}</div>
-          <div class="kpi">CFM total resultante · <b>${formatearNumero(s.cfm_aporte_total)} CFM</b> · cobertura <b>${s.cobertura_pct.toFixed(1)}%</b> · exceso <b>${formatearNumero(s.exceso)} CFM</b></div>
-          <button type="button" data-mix-apply="${i}">Aplicar sugerencia</button>
-        </div>`).join('')}
+      ${sugs.map((s, i) => renderSugCard(s, i)).join('')}
+    </div>`;
+}
+
+const _LBL_ESTRATEGIA = Object.freeze({
+  agregar_unidades:         'Agregar más unidades',
+  sustituir:                'Sustituir modelo más débil',
+  agregar_modelo:           'Agregar modelo nuevo',
+  vfd_uprate:               'VFD · operar a mayor frecuencia',
+  optimizacion_aerodinamica:'Optimización aerodinámica del flujo'
+});
+const _LBL_FACTIBILIDAD = Object.freeze({
+  alta:  '🟢 ALTA',
+  media: '🟡 MEDIA',
+  baja:  '🟠 BAJA'
+});
+
+function renderSugCard(s, i) {
+  const sinCambios = !Array.isArray(s.cambios) || s.cambios.length === 0;
+  const apliBtn = sinCambios
+    ? `<button type="button" disabled title="Sugerencia informativa · sin cambio mecánico al mix" style="opacity:.5;cursor:not-allowed">Solo informativa</button>`
+    : `<button type="button" data-mix-apply="${i}">Aplicar sugerencia</button>`;
+  const aporteSign = s.impacto_estimado_cfm >= 0 ? '+' : '';
+  return `
+    <div class="mix-sug-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div class="strat">${_LBL_ESTRATEGIA[s.estrategia] || s.estrategia}</div>
+        <div class="fact" title="Factibilidad de implementación">${_LBL_FACTIBILIDAD[s.factibilidad] || s.factibilidad}</div>
+      </div>
+      <div class="desc">${escaparHtml(s.descripcion)}</div>
+      <div class="kpi">
+        CFM total resultante · <b>${formatearNumero(s.cfm_aporte_total)} CFM</b>
+        <span style="color:${s.aprobado ? '#1b5e20' : '#b71c1c'};font-weight:700">${aporteSign}${formatearNumero(s.impacto_estimado_cfm)} CFM</span>
+        · cobertura <b>${s.cobertura_pct.toFixed(1)}%</b>
+        · exceso <b>${formatearNumero(s.exceso)} CFM</b>
+      </div>
+      <div class="implic" style="font-size:11px;color:var(--ink-3);line-height:1.45;border-top:1px dashed rgba(0,40,90,.10);padding-top:6px;margin-top:4px">
+        <strong style="color:rgba(184,95,0,1)">Implicaciones:</strong> ${escaparHtml(s.implicaciones)}
+      </div>
+      ${apliBtn}
     </div>`;
 }
 
@@ -1464,7 +1493,8 @@ function generateReport() {
           items: mixForEval,
           cfm_requerido: state.cfmReq,
           fan_db: fanDb,
-          max_sugerencias: 3
+          max_sugerencias: 5,
+          tolerancia_pct: getTolerancia()
         })
       : [];
 
@@ -2225,30 +2255,34 @@ function generateReport() {
   <!-- Sugerencias del motor (solo si NO aprobado) ── -->
   ${mixSugs.length > 0 ? `<section class="section-anchor">
     <h3>Sugerencias para alcanzar el CFM requerido</h3>
-    <p class="meta">El sistema propone hasta 3 alternativas ordenadas por menor exceso (ajuste más fino primero) basadas en el catálogo certificado de motoventiladores.</p>
+    <p class="meta">El sistema propone hasta 5 alternativas ordenadas por factibilidad (alta → baja) basadas en el catálogo certificado de motoventiladores. Cada sugerencia incluye impacto estimado, factibilidad e implicaciones operativas.</p>
     <table class="ft">
       <thead>
         <tr>
-          <th class="tc" style="width:30px">#</th>
-          <th style="width:90px">Estrategia</th>
-          <th>Acción propuesta</th>
-          <th class="tr" style="width:120px">CFM resultante</th>
-          <th class="tr" style="width:80px">Cobertura</th>
-          <th class="tr" style="width:80px">Exceso</th>
+          <th class="tc" style="width:25px">#</th>
+          <th style="width:88px">Estrategia</th>
+          <th style="width:62px" class="tc">Factib.</th>
+          <th>Acción propuesta · implicaciones</th>
+          <th class="tr" style="width:90px">Δ CFM</th>
+          <th class="tr" style="width:90px">CFM resultante</th>
+          <th class="tr" style="width:65px">Cobertura</th>
         </tr>
       </thead>
       <tbody>${mixSugs.map((s, i) => `
         <tr>
           <td class="tc">${i + 1}</td>
           <td><strong>${({
-            agregar_unidades: 'Agregar más unidades',
-            sustituir:        'Sustituir modelo débil',
-            agregar_modelo:   'Agregar modelo nuevo'
+            agregar_unidades:           'Agregar unidades',
+            sustituir:                  'Sustituir modelo',
+            agregar_modelo:             'Agregar modelo',
+            vfd_uprate:                 'VFD / uprate RPM',
+            optimizacion_aerodinamica:  'Optimizar aerodinámica'
           }[s.estrategia] || s.estrategia)}</strong></td>
-          <td>${escaparHtml(s.descripcion)}</td>
+          <td class="tc"><span style="font-size:8.5pt;font-weight:700;color:${s.factibilidad === 'alta' ? '#1b5e20' : s.factibilidad === 'media' ? '#b85f00' : '#7b1fa2'}">${(s.factibilidad || '—').toUpperCase()}</span></td>
+          <td>${escaparHtml(s.descripcion)}<br><span style="font-size:7.5pt;color:#555;font-style:italic">${escaparHtml(s.implicaciones || '')}</span></td>
+          <td class="tr mono" style="color:${s.aprobado ? '#1b5e20' : '#b71c1c'};font-weight:700">${s.impacto_estimado_cfm >= 0 ? '+' : ''}${formatearNumero(s.impacto_estimado_cfm)}</td>
           <td class="tr mono">${formatearNumero(s.cfm_aporte_total)} CFM</td>
           <td class="tr mono">${s.cobertura_pct.toFixed(1)}%</td>
-          <td class="tr mono">${formatearNumero(s.exceso)} CFM</td>
         </tr>`).join('')}</tbody>
     </table>
   </section>` : ''}
