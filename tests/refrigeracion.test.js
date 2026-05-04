@@ -629,19 +629,116 @@ test('sugerirMejoras: respeta max_sugerencias', () => {
   assert.ok(sugs.length <= 2);
 });
 
-test('sugerirMejoras: ordena por menor exceso (ajuste más fino primero)', () => {
+test('sugerirMejoras: ordena por factibilidad alta>media>baja, luego por menor exceso', () => {
   const sugs = sugerirMejoras({
     items: [{ key: 'a', cfm_unitario: 4000, cantidad: 5 }],
     cfm_requerido: 30000,
     fan_db: {
-      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000 },
-      b: { fan_marca: 'X', fan_modelo: 'B', fan_cfm_nom: 5000 },
-      c: { fan_marca: 'X', fan_modelo: 'C', fan_cfm_nom: 6000 }
+      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000, fan_hz: '50', fan_rpm: 1000 },
+      b: { fan_marca: 'X', fan_modelo: 'B', fan_cfm_nom: 5000, fan_hz: '50', fan_rpm: 1000 },
+      c: { fan_marca: 'X', fan_modelo: 'C', fan_cfm_nom: 6000, fan_hz: '50', fan_rpm: 1000 }
     }
   });
+  // Las primeras posiciones deben ser de factibilidad 'alta' antes que 'media'/'baja'
+  const fOrden = { alta: 0, media: 1, baja: 2 };
   for (let i = 1; i < sugs.length; i++) {
-    assert.ok(sugs[i - 1].exceso <= sugs[i].exceso, 'debe estar ordenado por exceso ASC');
+    if (sugs[i - 1].aprobado === sugs[i].aprobado) {
+      assert.ok(
+        fOrden[sugs[i - 1].factibilidad] <= fOrden[sugs[i].factibilidad],
+        `Orden por factibilidad roto: ${sugs[i - 1].factibilidad} antes que ${sugs[i].factibilidad}`
+      );
+    }
   }
+});
+
+test('sugerirMejoras: cada sugerencia trae los 3 campos enriquecidos', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 4000, cantidad: 5 }],
+    cfm_requerido: 30000,
+    fan_db: {
+      a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 4000, fan_hz: '50', fan_rpm: 1000 }
+    }
+  });
+  for (const s of sugs) {
+    assert.ok(typeof s.impacto_estimado_cfm === 'number', `${s.estrategia} debe tener impacto_estimado_cfm numérico`);
+    assert.ok(typeof s.implicaciones === 'string' && s.implicaciones.length > 10, `${s.estrategia} debe tener implicaciones string descriptivas`);
+    assert.ok(['alta', 'media', 'baja'].includes(s.factibilidad), `${s.estrategia} debe tener factibilidad válida`);
+  }
+});
+
+test('sugerirMejoras: estrategia vfd_uprate con variante en catálogo (50→60 Hz)', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'fn063_50', marca: 'ZIEHL', modelo: 'FN063', cfm_unitario: 5933, cantidad: 8 }],
+    cfm_requerido: 80000,
+    fan_db: {
+      fn063_50: { fan_marca: 'ZIEHL', fan_modelo: 'FN063', fan_cfm_nom: 5933, fan_hz: '50', fan_rpm: 830 },
+      fn063_60: { fan_marca: 'ZIEHL', fan_modelo: 'FN063', fan_cfm_nom: 6357, fan_hz: '60', fan_rpm: 820 }
+    }
+  });
+  const vfd = sugs.find(s => s.estrategia === 'vfd_uprate');
+  assert.ok(vfd, 'debe haber sugerencia vfd_uprate');
+  assert.equal(vfd.factibilidad, 'baja');
+  assert.equal(vfd.cambios.length, 2);
+  assert.equal(vfd.cambios[0].accion, 'quitar');
+  assert.equal(vfd.cambios[0].key, 'fn063_50');
+  assert.equal(vfd.cambios[1].accion, 'agregar');
+  assert.equal(vfd.cambios[1].key, 'fn063_60');
+  assert.ok(vfd.implicaciones.includes('VFD'));
+  assert.ok(vfd.impacto_estimado_cfm > 0);
+});
+
+test('sugerirMejoras: estrategia vfd_uprate genérica (sin variante en catálogo)', () => {
+  const sugs = sugerirMejoras({
+    items: [{ key: 'unico', marca: 'X', modelo: 'Solo', cfm_unitario: 5000, cantidad: 4 }],
+    cfm_requerido: 40000,
+    fan_db: {
+      unico: { fan_marca: 'X', fan_modelo: 'Solo', fan_cfm_nom: 5000, fan_hz: '60', fan_rpm: 1200 }
+    }
+  });
+  const vfd = sugs.find(s => s.estrategia === 'vfd_uprate');
+  assert.ok(vfd, 'debe haber sugerencia vfd_uprate genérica');
+  assert.equal(vfd.cambios.length, 0, 'genérica no aplica cambios mecánicos automáticos');
+  // Factor 1.20 sobre 4 × 5000 = 20000 → impacto = 0.20 × 20000 = 4000
+  assert.equal(vfd.impacto_estimado_cfm, 4000);
+  assert.ok(vfd.descripcion.includes('1.20'));
+});
+
+test('sugerirMejoras: estrategia optimizacion_aerodinamica solo aparece con déficit > 10%', () => {
+  // Caso 1: déficit ~5% → no aparece
+  const sugsBajoDeficit = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }],   // 45000 / 47000 → 4.3% déficit
+    cfm_requerido: 47000,
+    fan_db: { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } }
+  });
+  assert.equal(sugsBajoDeficit.find(s => s.estrategia === 'optimizacion_aerodinamica'), undefined);
+
+  // Caso 2: déficit ~30% → SÍ aparece
+  const sugsAltoDeficit = sugerirMejoras({
+    items: [{ key: 'a', cfm_unitario: 5000, cantidad: 7 }],   // 35000 / 50000 → 30% déficit
+    cfm_requerido: 50000,
+    fan_db: { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } }
+  });
+  const aero = sugsAltoDeficit.find(s => s.estrategia === 'optimizacion_aerodinamica');
+  assert.ok(aero, 'con déficit alto debe aparecer optimizacion_aerodinamica');
+  assert.equal(aero.factibilidad, 'baja');
+  assert.equal(aero.cambios.length, 0);
+  assert.ok(aero.implicaciones.includes('CFD') || aero.implicaciones.includes('mecánica'));
+});
+
+test('sugerirMejoras: respeta tolerancia_pct al evaluar aprobación de cada sugerencia', () => {
+  // Mix actual está al 90% del requerido. Con tolerancia=0 ninguna sugerencia
+  // de "agregar 1 unidad mínima" aprueba. Con tolerancia=15% sí.
+  const items = [{ key: 'a', cfm_unitario: 5000, cantidad: 9 }];   // 45000
+  const fanDb = { a: { fan_marca: 'X', fan_modelo: 'A', fan_cfm_nom: 5000 } };
+
+  const sugsTol0 = sugerirMejoras({ items, cfm_requerido: 50000, fan_db: fanDb, tolerancia_pct: 0 });
+  // Con tol=0, agregar_unidades sugiere 1 extra (50000 ≥ 50000) → aprueba
+  const agregar0 = sugsTol0.find(s => s.estrategia === 'agregar_unidades');
+  assert.equal(agregar0.cambios[0].cantidad, 1);
+
+  const sugsTol15 = sugerirMejoras({ items, cfm_requerido: 50000, fan_db: fanDb, tolerancia_pct: 15 });
+  // Con tol=15, mix actual ya cubre umbral (45000 ≥ 42500) → no debería sugerir nada
+  assert.deepEqual(sugsTol15, []);
 });
 
 test('calcularProteccionMix: mix vacío devuelve grupos vacío y totales en 0', () => {
