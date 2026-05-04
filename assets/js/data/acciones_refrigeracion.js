@@ -317,6 +317,44 @@ export async function crear(data, uid) {
   const payload = sanitizar(data);
   const errs = validar(payload);
   if (errs.length) throw new Error('Validación acción de refrigeración:\n  · ' + errs.join('\n  · '));
+
+  // ANTI-DUPLICADO · segunda línea de defensa en el data layer.
+  // Aunque la UI hace su propio chequeo en guardarAccion, aquí
+  // verificamos de nuevo. Si ya existen acciones para esta
+  // matrícula y el payload no marca es_re_registro=true con una
+  // justificación válida, RECHAZAMOS el create.
+  // Esto previene cualquier write desde otros call sites o tests
+  // que olviden el chequeo de UI.
+  const dup = await existeAccionParaTransformador(payload.transformador_id);
+  if (dup.existe) {
+    if (!payload.es_re_registro) {
+      throw new Error(
+        `Anti-duplicado · transformador ${payload.transformador_id} ya tiene ` +
+        `${dup.count} acción(es) registrada(s). El payload debe llevar ` +
+        `es_re_registro=true + justificacion_repeticion válida.`
+      );
+    }
+    if (!JUSTIFICACIONES_VALIDAS.includes(payload.justificacion_repeticion)) {
+      throw new Error(
+        `Anti-duplicado · re-registro detectado pero justificacion_repeticion ` +
+        `inválida: "${payload.justificacion_repeticion}". Valores válidos: ` +
+        JUSTIFICACIONES_VALIDAS.join(', ')
+      );
+    }
+    if (payload.justificacion_repeticion === JUSTIFICACIONES_REREGISTRO.OTRO
+        && (!payload.justificacion_detalle || payload.justificacion_detalle.length < 10)) {
+      throw new Error(
+        'Anti-duplicado · justificación "otro" requiere detalle ≥10 caracteres.'
+      );
+    }
+  } else if (payload.es_re_registro) {
+    // El cliente marcó es_re_registro=true pero no hay duplicados.
+    // Lo dejamos pasar (no es una violación) pero corregimos el flag.
+    payload.es_re_registro = false;
+    payload.justificacion_repeticion = '';
+    payload.justificacion_detalle = '';
+  }
+
   payload.createdAt = serverTimestamp();
   payload.updatedAt = serverTimestamp();
   payload.createdBy = uid || payload.responsable_uid || null;
