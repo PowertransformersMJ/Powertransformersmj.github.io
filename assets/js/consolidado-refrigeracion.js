@@ -120,7 +120,10 @@ function renderTabla(rows) {
       <td class="tc"><span class="aprobado-pill ${aprobado ? 'si' : 'no'}">${aprobado ? '✓' : '✗'}</span></td>
       <td><span class="estado-pill ${r.estado_accion || ''}">${escaparHtml(labelEstado(r.estado_accion))}</span></td>
       <td>${escaparHtml(r.responsable_nombre || r.responsable_email || '—')}</td>
-      <td title="${escaparHtml(r.accion_descripcion || '')}">${escaparHtml((r.accion_descripcion || '').slice(0, 80))}${(r.accion_descripcion || '').length > 80 ? '…' : ''}</td>
+      <td title="${escaparHtml(r.accion_descripcion || '')}">
+        ${r.es_re_registro ? `<span style="display:inline-block;padding:1px 6px;border-radius:3px;background:rgba(245,124,0,.18);color:#b85f00;font:700 9px monospace;letter-spacing:.04em;margin-right:4px" title="Re-registro · ${escaparHtml(r.justificacion_repeticion || '')}${r.justificacion_detalle ? ' · ' + escaparHtml(r.justificacion_detalle) : ''}">RE-REG</span>` : ''}
+        ${escaparHtml((r.accion_descripcion || '').slice(0, 80))}${(r.accion_descripcion || '').length > 80 ? '…' : ''}
+      </td>
       <td class="row-actions">
         ${adm ? `
           <button type="button" data-action="estado" data-id="${r.id}" title="Cambiar estado">⇆</button>
@@ -212,7 +215,8 @@ function exportarCsv() {
     'cfm_aporte_total', 'cobertura_pct', 'aprobado',
     'amps_totales', 'kw_totales', 'peso_total',
     'estado_accion', 'responsable_nombre', 'responsable_email',
-    'accion_descripcion', 'observaciones', 'fecha_ejecucion'
+    'accion_descripcion', 'observaciones', 'fecha_ejecucion',
+    'es_re_registro', 'justificacion_repeticion', 'justificacion_detalle'
   ];
   const escCsv = (v) => {
     const s = (v == null) ? '' : String(v);
@@ -236,7 +240,8 @@ function exportarCsv() {
       ev.cfm_aporte_total, ev.cobertura_pct, ev.aprobado,
       pr.amps_totales, pr.kw_totales, pr.peso_total,
       r.estado_accion, r.responsable_nombre, r.responsable_email,
-      r.accion_descripcion, r.observaciones, r.fecha_ejecucion
+      r.accion_descripcion, r.observaciones, r.fecha_ejecucion,
+      r.es_re_registro, r.justificacion_repeticion, r.justificacion_detalle
     ];
     lineas.push(fila.map(escCsv).join(','));
   }

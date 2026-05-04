@@ -38,6 +38,35 @@ export const ESTADOS_ACCION = Object.freeze({
 
 const ESTADOS_VALIDOS = Object.values(ESTADOS_ACCION);
 
+/**
+ * Catálogo de justificaciones para registrar una NUEVA acción sobre
+ * un transformador que YA tiene acciones registradas. Sin alguna de
+ * estas justificaciones, el modal bloquea el guardado para evitar
+ * duplicados accidentales.
+ */
+export const JUSTIFICACIONES_REREGISTRO = Object.freeze({
+  UNIDAD_AVERIADA:       'unidad_refrigeracion_averiada',
+  REEMPLAZO_GARANTIA:    'reemplazo_por_garantia',
+  MANTENIMIENTO_RECURRENTE: 'mantenimiento_programado_recurrente',
+  CAMBIO_DISENO:         'cambio_de_diseno',
+  ACTUALIZACION_TECNICA: 'actualizacion_tecnica',
+  OTRO:                  'otro'
+});
+
+const JUSTIFICACIONES_VALIDAS = Object.values(JUSTIFICACIONES_REREGISTRO);
+
+/** Etiqueta humanizada de la justificación para mostrar en UI. */
+export function labelJustificacionRereg(j) {
+  return ({
+    unidad_refrigeracion_averiada:        'Unidad de refrigeración averiada',
+    reemplazo_por_garantia:               'Reemplazo por reclamación de garantía',
+    mantenimiento_programado_recurrente:  'Mantenimiento programado recurrente',
+    cambio_de_diseno:                     'Cambio de diseño / repotenciación',
+    actualizacion_tecnica:                'Actualización técnica del sistema',
+    otro:                                 'Otro (especificar en el detalle)'
+  })[j] || j;
+}
+
 /** Etiqueta humanizada para el dropdown de estado. */
 export function labelEstado(s) {
   return ({
@@ -174,7 +203,15 @@ function sanitizar(data) {
 
     responsable_uid:    s(data.responsable_uid),
     responsable_nombre: s(data.responsable_nombre),
-    responsable_email:  s(data.responsable_email)
+    responsable_email:  s(data.responsable_email),
+
+    // Anti-duplicado · si esta es una NUEVA acción para un
+    // transformador que ya tenía registros, debe llevar la
+    // justificación de re-registro (regla anti-duplicado 2026-05-04).
+    es_re_registro:           !!data.es_re_registro,
+    justificacion_repeticion: JUSTIFICACIONES_VALIDAS.includes(data.justificacion_repeticion)
+                                ? data.justificacion_repeticion : '',
+    justificacion_detalle:    s(data.justificacion_detalle)
   };
 }
 
@@ -195,6 +232,16 @@ export function validar(data) {
   if (!data.fecha_accion) errs.push('fecha_accion es obligatoria');
   if (!Array.isArray(data.mix) || data.mix.length === 0) {
     errs.push('mix debe contener al menos un modelo de ventilador');
+  }
+  // Anti-duplicado: si es re-registro, debe llevar justificación válida
+  if (data.es_re_registro) {
+    if (!JUSTIFICACIONES_VALIDAS.includes(data.justificacion_repeticion)) {
+      errs.push('justificacion_repeticion es obligatoria cuando ya existe una acción registrada para este transformador');
+    }
+    if (data.justificacion_repeticion === JUSTIFICACIONES_REREGISTRO.OTRO
+        && (!data.justificacion_detalle || data.justificacion_detalle.length < 10)) {
+      errs.push('justificacion_detalle es obligatoria (min 10 chars) cuando la justificación es "otro"');
+    }
   }
   return errs;
 }
@@ -229,6 +276,41 @@ export function suscribir(filtros = {}, onData, onError) {
 export async function obtener(id) {
   const s = await getDoc(docRef(id));
   return s.exists() ? { id: s.id, ...s.data() } : null;
+}
+
+/**
+ * Verifica si ya existen acciones registradas para un transformador
+ * (por matrícula AFINIA = transformador_id). Si hay, devuelve el
+ * conteo y los IDs de las últimas 5 para mostrar al usuario antes
+ * de permitir un nuevo registro.
+ *
+ * @param {string} transformadorId  · matrícula AFINIA
+ * @returns {Promise<{existe: boolean, count: number, ultimas: Array<{id, fecha_accion, accion_descripcion, estado_accion}>}>}
+ */
+export async function existeAccionParaTransformador(transformadorId) {
+  if (!transformadorId) return { existe: false, count: 0, ultimas: [] };
+  try {
+    const snap = await getDocs(query(
+      collRef(),
+      where('transformador_id', '==', transformadorId),
+      orderBy('fecha_accion', 'desc'),
+      limit(5)
+    ));
+    const ultimas = snap.docs.map(d => {
+      const data = d.data();
+      return {
+        id: d.id,
+        fecha_accion:       data.fecha_accion       || '',
+        accion_descripcion: data.accion_descripcion || '',
+        estado_accion:      data.estado_accion      || '',
+        es_re_registro:     !!data.es_re_registro
+      };
+    });
+    return { existe: ultimas.length > 0, count: ultimas.length, ultimas };
+  } catch (err) {
+    console.warn('[existeAccionParaTransformador] query falló:', err);
+    return { existe: false, count: 0, ultimas: [], error: err.message };
+  }
 }
 
 export async function crear(data, uid) {
