@@ -1840,15 +1840,40 @@ function generateReport() {
     // Cambia devicePixelRatio temporalmente, fuerza resize, captura
     // y restaura. Causa un breve flash en pantalla (aceptable solo
     // al exportar).
+    // Snapshot HD/4K del gráfico para el informe AFINIA. La gráfica
+    // es de alto valor en el documento, así que se renderiza a
+    // 2400 × 1400 px de canvas físico × DPR 3 = ~7200 × 4200 efectivos
+    // (suficiente para impresión a 300 dpi y zoom digital sin
+    // pixelado). Causa un flash visual breve al exportar (aceptable
+    // porque solo se dispara al hacer click en "Exportar informe").
     let chartImg = '';
     try {
       if (state.chart) {
-        const oldDpr = state.chart.options.devicePixelRatio || 1;
-        state.chart.options.devicePixelRatio = 3;
-        state.chart.resize();
+        const canvas        = state.chart.canvas;
+        const oldDpr        = state.chart.options.devicePixelRatio || 1;
+        const oldRespOpt    = state.chart.options.responsive;
+        const oldMantOpt    = state.chart.options.maintainAspectRatio;
+        const oldStyleW     = canvas.style.width;
+        const oldStyleH     = canvas.style.height;
+
+        // Desactivar responsive temporalmente para que resize() respete
+        // el tamaño que pasamos sin re-encajar al contenedor.
+        state.chart.options.responsive            = false;
+        state.chart.options.maintainAspectRatio   = false;
+        state.chart.options.devicePixelRatio      = 3;
+        canvas.style.width  = '2400px';
+        canvas.style.height = '1400px';
+        state.chart.resize(2400, 1400);
         state.chart.update('none');
+
         chartImg = state.chart.toBase64Image('image/png', 1);
-        state.chart.options.devicePixelRatio = oldDpr;
+
+        // Restaurar tamaño y opciones originales
+        state.chart.options.responsive            = oldRespOpt;
+        state.chart.options.maintainAspectRatio   = oldMantOpt;
+        state.chart.options.devicePixelRatio      = oldDpr;
+        canvas.style.width  = oldStyleW;
+        canvas.style.height = oldStyleH;
         state.chart.resize();
         state.chart.update('none');
       }
@@ -2364,7 +2389,8 @@ function generateReport() {
     border: 1px solid #b0cce8; border-radius: 4pt; background: #fff;
     text-align: center;
   }
-  .chart-img { width: 100%; max-width: 6in; height: auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+  .chart-img { width: 100%; max-width: 6.14in; height: auto; image-rendering: -webkit-optimize-contrast; image-rendering: crisp-edges; }
+  .chart-block { padding: 4pt 4pt 2pt; }
   .chart-cap { font-size: 6.5pt; color: #666; margin-top: 3pt; font-style: italic; }
 
   /* ── Fórmula simbólica + sustitución con valores reales ────── */
