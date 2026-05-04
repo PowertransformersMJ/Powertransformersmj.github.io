@@ -1579,6 +1579,10 @@ const chartPlugin = {
     const ip   = chart._interpPct || 133;
     const onan = chart._onan;
     const cfm  = chart._cfm;
+    // Escala dinámica de fonts/líneas para snapshot HD del informe.
+    // En pantalla = 1.0; al exportar a PNG se sube a ~3 para que los
+    // textos no se vean diminutos en el canvas 2400×1400 px.
+    const s = chart._exportScale || 1;
     const labelKva = (onan && onan >= xs.min && onan <= xs.max)
       ? Math.min(onan * 1.12, xs.max * 0.87)
       : (xs.min + xs.max) * 0.55;
@@ -1592,16 +1596,20 @@ const chartPlugin = {
       const px2 = xs.getPixelForValue(Math.min(labelKva + 8000, xs.max));
       const py2 = ys.getPixelForValue(slope * Math.min(labelKva + 8000, xs.max));
       const angle = Math.atan2(py2 - py, px2 - px);
+      const fontPx = 10 * s;
+      const padX   = 4 * s;
+      const padY   = 12 * s;
+      const offY   = 9 * s;
       ctx.save();
-      ctx.translate(px, py - 9);
+      ctx.translate(px, py - offY);
       ctx.rotate(angle);
-      ctx.font = (bold ? 'bold ' : '') + '10px -apple-system, "SF Pro", Inter, sans-serif';
+      ctx.font = (bold ? 'bold ' : '') + `${fontPx}px -apple-system, "SF Pro", Inter, sans-serif`;
       const tw = ctx.measureText(label).width;
       ctx.fillStyle  = 'rgba(255,255,255,0.92)';
-      ctx.fillRect(-tw / 2 - 4, -12, tw + 8, 13);
+      ctx.fillRect(-tw / 2 - padX, -padY - 1, tw + padX * 2, padY + 1);
       ctx.strokeStyle = color;
-      ctx.lineWidth   = 0.8;
-      ctx.strokeRect(-tw / 2 - 4, -12, tw + 8, 13);
+      ctx.lineWidth   = 0.8 * s;
+      ctx.strokeRect(-tw / 2 - padX, -padY - 1, tw + padX * 2, padY + 1);
       ctx.fillStyle  = color;
       ctx.textAlign  = 'center';
       ctx.textBaseline = 'bottom';
@@ -1629,21 +1637,21 @@ const chartPlugin = {
       const lft = chart.chartArea.left;
 
       ctx.strokeStyle = '#C00000';
-      ctx.lineWidth   = 1.2;
-      ctx.setLineDash([6, 4]);
+      ctx.lineWidth   = 1.2 * s;
+      ctx.setLineDash([6 * s, 4 * s]);
       ctx.beginPath(); ctx.moveTo(xPx, bot); ctx.lineTo(xPx, yPx); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(lft, yPx); ctx.lineTo(xPx, yPx); ctx.stroke();
       ctx.setLineDash([]);
 
       ctx.fillStyle = '#C00000';
-      ctx.beginPath(); ctx.arc(xPx, bot, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.beginPath(); ctx.arc(lft, yPx, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(xPx, bot, 4 * s, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(lft, yPx, 4 * s, 0, Math.PI * 2); ctx.fill();
 
-      ctx.font = 'bold 10px -apple-system, "SF Pro", Inter, sans-serif';
+      ctx.font = `bold ${10 * s}px -apple-system, "SF Pro", Inter, sans-serif`;
       ctx.textAlign = 'left';
       ctx.textBaseline = 'bottom';
-      ctx.fillText(`${(onan / 1000).toFixed(1)} MVA`, xPx + 6, bot - 4);
-      ctx.fillText(`${formatearNumero(cfm)} CFM`, lft + 6, yPx - 4);
+      ctx.fillText(`${(onan / 1000).toFixed(1)} MVA`, xPx + 6 * s, bot - 4 * s);
+      ctx.fillText(`${formatearNumero(cfm)} CFM`, lft + 6 * s, yPx - 4 * s);
     }
     ctx.restore();
   }
@@ -2349,36 +2357,70 @@ function generateReport() {
     // es de alto valor en el documento, así que se renderiza a
     // 2400 × 1400 px de canvas físico × DPR 3 = ~7200 × 4200 efectivos
     // (suficiente para impresión a 300 dpi y zoom digital sin
-    // pixelado). Causa un flash visual breve al exportar (aceptable
-    // porque solo se dispara al hacer click en "Exportar informe").
+    // pixelado). ADEMÁS escalamos los font sizes y line widths
+    // proporcionalmente (factor 3) para que los textos del eje,
+    // títulos, leyenda y etiquetas de las curvas se aprecien
+    // legibles en el canvas grande (sin esto los textos se ven
+    // diminutos vs el resto de la imagen).
     let chartImg = '';
     try {
       if (state.chart) {
+        const FS = 3;  // factor de escala de fuentes y line widths
         const canvas        = state.chart.canvas;
         const oldDpr        = state.chart.options.devicePixelRatio || 1;
         const oldRespOpt    = state.chart.options.responsive;
         const oldMantOpt    = state.chart.options.maintainAspectRatio;
         const oldStyleW     = canvas.style.width;
         const oldStyleH     = canvas.style.height;
+        // Backup de fontsizes y borderwidth de los datasets
+        const oXTitle  = state.chart.options.scales.x.title.font.size;
+        const oXTicks  = state.chart.options.scales.x.ticks.font.size;
+        const oYTitle  = state.chart.options.scales.y.title.font.size;
+        const oYTicks  = state.chart.options.scales.y.ticks.font.size;
+        const oLegend  = state.chart.options.plugins.legend.labels.font.size;
+        const oBoxW    = state.chart.options.plugins.legend.labels.boxWidth;
+        const oPad     = state.chart.options.plugins.legend.labels.padding;
+        const oBorders = state.chart.data.datasets.map(d => d.borderWidth);
+        const oPoints  = state.chart.data.datasets.map(d => d.pointRadius);
 
-        // Desactivar responsive temporalmente para que resize() respete
-        // el tamaño que pasamos sin re-encajar al contenedor.
+        // Aplicar escala
         state.chart.options.responsive            = false;
         state.chart.options.maintainAspectRatio   = false;
         state.chart.options.devicePixelRatio      = 3;
         canvas.style.width  = '2400px';
         canvas.style.height = '1400px';
+        state.chart.options.scales.x.title.font.size = (oXTitle || 11) * FS;
+        state.chart.options.scales.x.ticks.font.size = (oXTicks || 8)  * FS;
+        state.chart.options.scales.y.title.font.size = (oYTitle || 11) * FS;
+        state.chart.options.scales.y.ticks.font.size = (oYTicks || 9)  * FS;
+        state.chart.options.plugins.legend.labels.font.size = (oLegend || 10) * FS;
+        state.chart.options.plugins.legend.labels.boxWidth  = (oBoxW   || 22) * 1.6;
+        state.chart.options.plugins.legend.labels.padding   = (oPad    || 10) * 1.8;
+        state.chart.data.datasets.forEach(d => { d.borderWidth = (d.borderWidth || 1.4) * 2.2; });
+        state.chart.data.datasets.forEach(d => { if (d.pointRadius != null) d.pointRadius = (d.pointRadius || 0) * 2; });
+        state.chart._exportScale = FS;     // leído por el plugin sgmCurveLabels
+
         state.chart.resize(2400, 1400);
         state.chart.update('none');
 
         chartImg = state.chart.toBase64Image('image/png', 1);
 
-        // Restaurar tamaño y opciones originales
+        // Restaurar
         state.chart.options.responsive            = oldRespOpt;
         state.chart.options.maintainAspectRatio   = oldMantOpt;
         state.chart.options.devicePixelRatio      = oldDpr;
         canvas.style.width  = oldStyleW;
         canvas.style.height = oldStyleH;
+        state.chart.options.scales.x.title.font.size = oXTitle;
+        state.chart.options.scales.x.ticks.font.size = oXTicks;
+        state.chart.options.scales.y.title.font.size = oYTitle;
+        state.chart.options.scales.y.ticks.font.size = oYTicks;
+        state.chart.options.plugins.legend.labels.font.size = oLegend;
+        state.chart.options.plugins.legend.labels.boxWidth  = oBoxW;
+        state.chart.options.plugins.legend.labels.padding   = oPad;
+        state.chart.data.datasets.forEach((d, i) => { d.borderWidth = oBorders[i]; });
+        state.chart.data.datasets.forEach((d, i) => { if (d.pointRadius != null) d.pointRadius = oPoints[i]; });
+        state.chart._exportScale = 1;
         state.chart.resize();
         state.chart.update('none');
       }

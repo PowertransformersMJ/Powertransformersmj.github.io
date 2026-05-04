@@ -726,6 +726,100 @@ repo:
   específico para `permission-denied` listando las 3 causas
   probables.
 
+### 0.1.2.8 Regla permanente · Captura HD de Chart.js exige escalar también fontsize y lineWidth, NO solo el canvas
+
+**Contexto del bug histórico (sesión 2026-05-04 PM):** después de
+implementar la captura HD/4K de la gráfica (canvas 2400×1400 ×
+DPR 3 = ~7200×4200 efectivos), el director reportó que la gráfica
+en el informe **se veía pixelada/ilegible** con todos los textos
+diminutos: rótulos de eje, leyenda, etiquetas de las curvas
+(115% / 125% / 133% / 166% OA RATING) y valores de la cruceta
+roja (24.094 CFM, 9.5 MVA) eran tan pequeños que no se leían.
+
+**Causa raíz:** las opciones de Chart.js usan **font sizes en
+píxeles absolutos** (10px legend, 11px títulos, 8-9px ticks). El
+plugin `afterDraw` también hardcodea `'10px ...'` y line widths
+fijos. Cuando el canvas físico crece de ~600×360 a 2400×1400 px,
+esos 10px representan una fracción mucho menor del canvas:
+600×360 → 10px = 2.8% del alto → legible.
+2400×1400 → 10px = 0.7% del alto → diminuto.
+
+**Regla permanente:** cuando se aumente el tamaño físico del
+canvas de Chart.js para una captura de alta resolución, hay que
+**escalar proporcionalmente TODOS los siguientes elementos**:
+
+1. **Font sizes de las opciones de Chart.js**:
+   - `scales.x.title.font.size`
+   - `scales.x.ticks.font.size`
+   - `scales.y.title.font.size`
+   - `scales.y.ticks.font.size`
+   - `plugins.legend.labels.font.size`
+   - `plugins.tooltip.bodyFont.size` (si aplica)
+   - `plugins.title.font.size` (si aplica)
+2. **Line widths de los datasets**:
+   - `dataset.borderWidth` × ~2.2 (para que las curvas se vean del
+     mismo grosor relativo)
+   - `dataset.pointRadius` × ~2 (para los marcadores)
+3. **Tamaño de los box de leyenda**:
+   - `plugins.legend.labels.boxWidth` × ~1.6
+   - `plugins.legend.labels.padding` × ~1.8
+4. **TODO lo que dibuje el plugin custom `afterDraw`**:
+   - `ctx.font` con tamaño en px → multiplicar por `s`
+   - `ctx.lineWidth` → multiplicar por `s`
+   - `setLineDash([6, 4])` → multiplicar cada valor por `s`
+   - `ctx.arc(x, y, R, ...)` → multiplicar `R` por `s`
+   - Padding de etiquetas (`tw / 2 + padX`) → multiplicar por `s`
+5. **Pasar el factor al plugin** vía `chart._exportScale`. El
+   plugin lee `const s = chart._exportScale || 1;` y multiplica
+   por `s` cada dimensión.
+
+**Patrón de implementación** (referencia: `generateReport()` en
+`assets/js/calculo-refrigeracion.js`):
+
+```javascript
+const FS = 3;  // factor de escala
+// 1) Backup de TODOS los font sizes y line widths
+const oXTitle  = chart.options.scales.x.title.font.size;
+const oXTicks  = chart.options.scales.x.ticks.font.size;
+// ... resto de backups
+const oBorders = chart.data.datasets.map(d => d.borderWidth);
+
+// 2) Aplicar escala
+chart.options.scales.x.title.font.size = (oXTitle || 11) * FS;
+chart.options.scales.x.ticks.font.size = (oXTicks || 8)  * FS;
+// ... resto de aplicación
+chart.data.datasets.forEach(d => { d.borderWidth = (d.borderWidth || 1.4) * 2.2; });
+chart._exportScale = FS;
+
+// 3) Resize + update + capture
+chart.resize(2400, 1400);
+chart.update('none');
+const chartImg = chart.toBase64Image('image/png', 1);
+
+// 4) Restaurar TODO al estado original
+chart.options.scales.x.title.font.size = oXTitle;
+chart.options.scales.x.ticks.font.size = oXTicks;
+chart.data.datasets.forEach((d, i) => { d.borderWidth = oBorders[i]; });
+chart._exportScale = 1;
+chart.resize();
+chart.update('none');
+```
+
+**NUNCA** hagas captura HD subiendo solo `devicePixelRatio` o solo
+el tamaño del canvas — el resultado se verá pixelado o con textos
+ilegibles. La regla es **proporcionalidad total**: si subiste el
+canvas 4×, todos los elementos visuales deben subir 3-4× también.
+
+**Aplica también a:** futuras gráficas en el módulo (curvas TPT
+de sobrecarga, curvas FAA Arrhenius, gráficas de muestras DGA,
+KPIs del dashboard ejecutivo, etc.).
+
+**Verificación visual obligatoria** antes de cerrar el commit:
+generar el informe, abrir el PNG embebido (clic derecho → ver
+imagen) y verificar a tamaño real que TODOS los textos se leen
+sin esfuerzo. Si requiere zoom para leerlos, el factor de escala
+es insuficiente.
+
 ### 0.1.2.7 Regla permanente · Re-deploy obligatorio de firestore.rules tras cualquier cambio en el archivo
 
 **Contexto del bug histórico (sesión 2026-05-03 PM13):** después de
