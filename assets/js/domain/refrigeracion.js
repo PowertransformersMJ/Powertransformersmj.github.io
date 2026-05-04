@@ -836,6 +836,107 @@ export function calcularProteccionMix({ items, factor_seguridad = 1.25 }) {
   };
 }
 
+/**
+ * Detecta campos faltantes o problemáticos en el mix para el cálculo
+ * eléctrico completo. Devuelve un array con un objeto por cada
+ * faltante, con severidad y mensaje accionable.
+ *
+ * Severidades:
+ *   · 'critico' · sin esto NO se puede calcular protección eléctrica
+ *     del modelo (ej. fan_amp + sin potencia ni voltaje para derivar)
+ *   · 'aviso'   · se calcula con valor por defecto razonable
+ *     (ej. cos φ asumido 0.85, η asumida 0.85)
+ *   · 'info'    · opcional, solo afecta exports / snapshot
+ *     (ej. fan_peso = null → no se computa peso total del grupo)
+ *
+ * @param {{ mix: Array<{key, marca, modelo, ficha, cantidad}> }} input
+ * @returns {Array<{
+ *   key, modelo, marca, campo, severidad, sustituto, mensaje
+ * }>}
+ */
+export function detectarFaltantes({ mix }) {
+  const lista = Array.isArray(mix) ? mix : [];
+  const faltantes = [];
+  for (const it of lista) {
+    if ((it.cantidad | 0) <= 0) continue;
+    const f = it.ficha || {};
+    const ref = `${it.marca || ''} ${it.modelo || it.key || '?'}`.trim();
+    const mk = it.key || '';
+
+    // Corriente directa de placa
+    const iPlaca = parseFloat(String(f.fan_amp || '').replace(/[^\d./]/g, '').split('/')[0]);
+    const tieneI = Number.isFinite(iPlaca) && iPlaca > 0;
+
+    // Potencia en W
+    const pw = +f.fan_kw || 0;
+    const tieneP = pw > 0;
+
+    // Voltaje (extraído del string "230/400V" → 400)
+    const vMatch = String(f.fan_volt || '').match(/(\d+)\s*V/);
+    const v = vMatch ? +vMatch[1] : 0;
+    const tieneV = v > 0;
+
+    const cosphi = +f.fan_cosphi || 0;
+    const tieneCos = cosphi > 0;
+
+    const peso = +f.fan_peso || 0;
+    const tienePeso = peso > 0;
+
+    // Crítico · ni placa ni datos suficientes para derivar FLC
+    if (!tieneI && !(tieneP && tieneV && tieneCos)) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_amp', severidad: 'critico',
+        sustituto: null,
+        mensaje: `${ref}: sin corriente nominal (fan_amp) ni datos para derivarla (potencia + voltaje + cos φ). El modelo no puede dimensionar protección eléctrica.`
+      });
+      // Si esto pasa, los siguientes faltantes son redundantes
+      continue;
+    }
+
+    // Aviso · cos φ asumido 0.85 si no viene
+    if (!tieneCos) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_cosphi', severidad: 'aviso',
+        sustituto: 0.85,
+        mensaje: `${ref}: falta cos φ. Cálculo de potencia aparente (kVA) asumió 0.85 por defecto. Carge el valor real desde la ficha técnica del fabricante.`
+      });
+    }
+
+    // Aviso · potencia (si solo hay placa y no kw, no se puede totalizar kW)
+    if (!tieneP) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_kw', severidad: 'aviso',
+        sustituto: 0,
+        mensaje: `${ref}: falta potencia absorbida P₁ (fan_kw). El cálculo de kW totales del grupo será 0 hasta cargar el valor.`
+      });
+    }
+
+    // Aviso · voltaje (si solo hay placa y no V, no se puede recalcular FLC alterno)
+    if (!tieneV && tieneP) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_volt', severidad: 'aviso',
+        sustituto: 400,
+        mensaje: `${ref}: falta tensión nominal (fan_volt). Verifique compatibilidad con tensión del tablero.`
+      });
+    }
+
+    // Info · peso (no impide cálculo)
+    if (!tienePeso) {
+      faltantes.push({
+        key: mk, modelo: it.modelo || '', marca: it.marca || '',
+        campo: 'fan_peso', severidad: 'info',
+        sustituto: 0,
+        mensaje: `${ref}: falta peso unitario (fan_peso). El peso total del grupo no se computará.`
+      });
+    }
+  }
+  return faltantes;
+}
+
 /* ─── Compatibilidad mecánica ───────────────────────────────── */
 
 /** Estados posibles de cada criterio de compatibilidad. */

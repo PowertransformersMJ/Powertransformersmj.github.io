@@ -48,7 +48,8 @@ import {
   CONTACTOR_AF_DB,
   TAGS_SCADA,
   seleccionarContactor,
-  calcularFLC
+  calcularFLC,
+  detectarFaltantes
 } from '../assets/js/domain/refrigeracion.js';
 
 /* ─── Constantes inmutables ─────────────────────────────────── */
@@ -911,4 +912,95 @@ test('calcularProteccionElectrica (legacy) también incluye contactor + tags_sca
   assert.ok(r.contactor, 'debe haber contactor');
   assert.equal(r.contactor.model, 'AF09');
   assert.equal(r.tags_scada.length, 4);
+});
+
+/* ─── Microfase 4 · Detección de faltantes ───────────────────── */
+
+test('detectarFaltantes: mix vacío devuelve []', () => {
+  assert.deepEqual(detectarFaltantes({ mix: [] }), []);
+  assert.deepEqual(detectarFaltantes({ mix: undefined }), []);
+});
+
+test('detectarFaltantes: ficha completa no genera faltantes', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A', fan_kw: 300, fan_volt: '230/400V', fan_cosphi: 0.85, fan_peso: 14.2 }
+    }]
+  });
+  assert.deepEqual(r, []);
+});
+
+test('detectarFaltantes: severidad crítico cuando no hay placa ni datos para derivar', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { /* todo vacío */ }
+    }]
+  });
+  assert.equal(r.length, 1);
+  assert.equal(r[0].severidad, 'critico');
+  assert.equal(r[0].campo, 'fan_amp');
+});
+
+test('detectarFaltantes: aviso cuando falta cos φ (asume 0.85)', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A', fan_kw: 300, fan_volt: '400V', fan_peso: 14 }
+    }]
+  });
+  const fCos = r.find(x => x.campo === 'fan_cosphi');
+  assert.ok(fCos, 'debe reportar fan_cosphi faltante');
+  assert.equal(fCos.severidad, 'aviso');
+  assert.equal(fCos.sustituto, 0.85);
+  assert.ok(fCos.mensaje.includes('0.85'));
+});
+
+test('detectarFaltantes: info cuando falta peso (no bloquea cálculo)', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A', fan_kw: 300, fan_volt: '400V', fan_cosphi: 0.85 }
+    }]
+  });
+  const fPeso = r.find(x => x.campo === 'fan_peso');
+  assert.ok(fPeso, 'debe reportar fan_peso faltante');
+  assert.equal(fPeso.severidad, 'info');
+});
+
+test('detectarFaltantes: omite items con cantidad <= 0', () => {
+  const r = detectarFaltantes({
+    mix: [
+      { key: 'a', marca: 'X', modelo: 'A', cantidad: 0, ficha: {} },
+      { key: 'b', marca: 'X', modelo: 'B', cantidad: 4, ficha: {} }
+    ]
+  });
+  assert.equal(r.length, 1);                 // solo 'b'
+  assert.equal(r[0].modelo, 'B');
+});
+
+test('detectarFaltantes: agrupa varios faltantes del mismo modelo', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'a', marca: 'X', modelo: 'A', cantidad: 4,
+      ficha: { fan_amp: '1.13 A' /* falta cos φ, kw, volt, peso */ }
+    }]
+  });
+  const campos = r.map(x => x.campo).sort();
+  assert.deepEqual(campos, ['fan_cosphi', 'fan_kw', 'fan_peso']);
+  // (fan_volt no aparece porque tieneP=false → no se evalúa la rama de aviso de voltaje)
+});
+
+test('detectarFaltantes: mensajes incluyen marca + modelo para identificar', () => {
+  const r = detectarFaltantes({
+    mix: [{
+      key: 'fn063', marca: 'ZIEHL-ABEGG', modelo: 'FN063-6DL', cantidad: 8,
+      ficha: { fan_amp: '1.13 A' }
+    }]
+  });
+  for (const f of r) {
+    assert.ok(f.mensaje.includes('ZIEHL-ABEGG'));
+    assert.ok(f.mensaje.includes('FN063-6DL'));
+  }
 });

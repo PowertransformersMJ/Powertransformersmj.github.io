@@ -17,6 +17,7 @@ import {
   calcularRefrigeracion, calcularUnidadesRequeridas,
   calcularProteccionElectrica, calcularProteccionMix,
   evaluarMixVentiladores, sugerirMejoras, MIX_ESTADO,
+  detectarFaltantes,
   extraerCorrienteFan,
   evaluarCompatibilidad, mensajeDisposicion, COMPAT_ESTADO,
   deduceOnafDesdeOnanYPct, deducePctDesdeOnanYOnaf,
@@ -592,12 +593,17 @@ async function calcProtection() {
     });
     const r = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
     state.lastProteccion = r;
+    state.lastFaltantes  = detectarFaltantes({ mix: state.mix });
+    renderFaltantes(state.lastFaltantes);
 
     pf.innerHTML = renderProtPorGrupo(r, conn);
     pt.innerHTML = renderProtTotal(r);
     ps.innerHTML = renderListaMaterialesMix(r);
     return;
   }
+  // Sin mix · faltantes vacío
+  state.lastFaltantes = [];
+  renderFaltantes([]);
 
   // ── Ruta 2 · Fallback legacy con modelo único del dropdown ──
   const fanKey = $('fan_db_sel') ? $('fan_db_sel').value : '';
@@ -854,6 +860,45 @@ function renderProtTotal(r) {
       </div>` : ''}
     </div>
     ${r.tags_scada ? renderSCADAblock(r.tags_scada) : ''}`;
+}
+
+/**
+ * Renderiza el banner amarillo de faltantes en la sección de
+ * protección eléctrica. Se oculta cuando no hay faltantes.
+ * Agrupa por severidad (crítico → aviso → info) y por modelo.
+ */
+function renderFaltantes(faltantes) {
+  const banner = $('prot-faltantes');
+  if (!banner) return;
+  if (!Array.isArray(faltantes) || faltantes.length === 0) {
+    banner.hidden = true;
+    banner.innerHTML = '';
+    return;
+  }
+  const orden = { critico: 0, aviso: 1, info: 2 };
+  const sorted = [...faltantes].sort((a, b) =>
+    (orden[a.severidad] ?? 99) - (orden[b.severidad] ?? 99));
+  const nCrit = faltantes.filter(f => f.severidad === 'critico').length;
+  const nAvi  = faltantes.filter(f => f.severidad === 'aviso').length;
+  const nInf  = faltantes.filter(f => f.severidad === 'info').length;
+  banner.hidden = false;
+  banner.innerHTML = `
+    <div class="pf-title">
+      ⚠ Datos faltantes para cálculo eléctrico completo
+      <span style="font-weight:500;color:var(--ink-3);font-size:11px;margin-left:auto">
+        ${nCrit ? `${nCrit} crítico${nCrit === 1 ? '' : 's'} · ` : ''}${nAvi ? `${nAvi} aviso${nAvi === 1 ? '' : 's'} · ` : ''}${nInf ? `${nInf} info` : ''}
+      </span>
+    </div>
+    <ul class="pf-list">
+      ${sorted.map(f => `<li>
+        <span class="pf-sev ${f.severidad}">${f.severidad}</span>
+        ${escaparHtml(f.mensaje)}
+      </li>`).join('')}
+    </ul>
+    <div class="pf-foot">
+      La calculadora continúa con valores por defecto razonables.
+      ${nCrit ? '<strong>Los modelos marcados como crítico no pueden dimensionar protección eléctrica hasta cargar los datos.</strong>' : 'Cargue los datos del catálogo para mejorar la precisión del informe.'}
+    </div>`;
 }
 
 /**
@@ -1402,6 +1447,7 @@ async function guardarAccion() {
       };
     });
     const proteccion = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    const faltantes  = detectarFaltantes({ mix: state.mix });
     const compat = evaluarCompatibilidad({
       A: parseFloat(_val('rad_A')), B: parseFloat(_val('rad_B')), C: parseFloat(_val('rad_C')),
       diametro_mm: parseFloat(_val('fan_diam')), distancia_mm: parseFloat(_val('mon_dist')),
@@ -1445,6 +1491,7 @@ async function guardarAccion() {
       evaluacion,
       proteccion,
       compatibilidad: compat,
+      faltantes,
 
       accion_descripcion: descripcion,
       estado_accion:      estado,
@@ -1599,6 +1646,7 @@ function generateReport() {
       };
     });
     const protMix = calcularProteccionMix({ items: itemsProt, factor_seguridad: 1.25 });
+    const faltantesInforme = detectarFaltantes({ mix: state.mix });
 
     // Suma de potencia aparente sobre los grupos: S_grupo = P_grupo / cosφ_grupo
     const kvaTotalMix = itemsProt.reduce((s, it) => {
@@ -1668,7 +1716,15 @@ function generateReport() {
               <td>${escaparHtml(t.descripcion)}</td>
             </tr>`).join('')}</tbody>
         </table>
-        <p style="font-size:7pt;color:#666;font-style:italic;margin-top:3pt">Lógica SCADA mínima requerida para integración. Norma IEEE C37.91 · IEC 61850.</p>` : ''}`;
+        <p style="font-size:7pt;color:#666;font-style:italic;margin-top:3pt">Lógica SCADA mínima requerida para integración. Norma IEEE C37.91 · IEC 61850.</p>` : ''}
+        ${faltantesInforme.length > 0 ? `
+        <div style="margin-top:8pt;padding:6pt 10pt;background:#fff8e1;border-left:3pt solid #f57c00;border:1pt solid #ffe082;border-radius:3pt">
+          <div style="font-size:8pt;font-weight:700;color:#b85f00;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4pt">⚠ Datos faltantes para cálculo eléctrico completo</div>
+          <ul style="margin:0;padding-left:14pt;font-size:7.5pt;color:#5d4037;line-height:1.45">
+            ${faltantesInforme.map(f => `<li><strong style="color:${f.severidad === 'critico' ? '#b71c1c' : f.severidad === 'aviso' ? '#b85f00' : '#1565c0'}">[${f.severidad.toUpperCase()}]</strong> ${escaparHtml(f.mensaje)}</li>`).join('')}
+          </ul>
+          <p style="font-size:7pt;color:#666;font-style:italic;margin-top:4pt">El cálculo se ejecutó con valores por defecto cuando aplica. Verifique la ficha del catálogo certificado AFINIA para mejorar precisión.</p>
+        </div>` : ''}`;
 
       // Lista de materiales agrupada por modelo + ítems del sistema
       const items = [];
