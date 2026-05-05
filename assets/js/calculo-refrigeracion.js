@@ -501,9 +501,185 @@ function renderTransformadorIntegral() {
   const A_ui = parseFloat($('rad_A')?.value) || 1500;
   const B_ui = parseFloat($('rad_B')?.value) || 1100;
   const C_ui = parseFloat($('rad_C')?.value) || 200;
-  wrap.innerHTML = renderTransformadorCompletoSVG({
-    rad_cant: radCantUI, A: A_ui, B: B_ui, C: C_ui, mix: state.mix
+  wrap.innerHTML = `
+    <div style="margin:0 0 8px 0;padding:8px 12px;background:rgba(13,71,161,.08);border-left:3px solid #0d47a1;border-radius:4px;font-size:12px;color:#0d3a73">
+      <strong>💡 Asignación interactiva:</strong> haga clic en cualquier cuerpo de radiador (#1, #2, #3…) para asignar o quitar ventiladores en ese cuerpo.
+    </div>
+    ${renderTransformadorCompletoSVG({
+      rad_cant: radCantUI, A: A_ui, B: B_ui, C: C_ui, mix: state.mix
+    })}`;
+  // Wire click handlers en cada cuerpo de radiador clickeable.
+  wrap.querySelectorAll('.render-cuerpo-clickable').forEach(g => {
+    const cuerpoNum = parseInt(g.dataset.cuerpo, 10);
+    g.addEventListener('click', () => abrirAsignacionCuerpo(cuerpoNum));
+    g.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' || ev.key === ' ') {
+        ev.preventDefault();
+        abrirAsignacionCuerpo(cuerpoNum);
+      }
+    });
   });
+}
+
+/* ─── Asignación interactiva de ventiladores por cuerpo ──────── */
+//
+// Cuando el usuario hace clic en un cuerpo de radiador desde el
+// render integral, se abre un modal compacto que permite ajustar
+// cuántos ventiladores de CADA modelo del mix están instalados
+// en ese cuerpo. Conserva la cantidad TOTAL del mix item (los
+// botones [+] / [-] solo redistribuyen entre cuerpos, no cambian
+// la cantidad).
+
+function _contarEnCuerpo(it, cuerpoNum) {
+  return (it.instalaciones || []).filter(x => x.cuerpo === cuerpoNum).length;
+}
+
+/** [+] Asigna 1 unidad de `mixIdx` al cuerpo `cuerpoNum`,
+ *  tomándola de OTRO cuerpo (el más cargado, para balancear). */
+function asignarMasAlCuerpo(mixIdx, cuerpoNum) {
+  const it = state.mix[mixIdx];
+  if (!it) return false;
+  const radCant = Math.max(1, parseInt($('rad_cant')?.value, 10) || 1);
+  if (cuerpoNum < 1 || cuerpoNum > radCant) return false;
+  if (!Array.isArray(it.instalaciones) || it.instalaciones.length === 0) return false;
+  const counts = new Map();
+  for (let c = 1; c <= radCant; c++) counts.set(c, 0);
+  it.instalaciones.forEach(x => counts.set(x.cuerpo, (counts.get(x.cuerpo) || 0) + 1));
+  let donor = null, donorCount = 0;
+  for (const [c, k] of counts.entries()) {
+    if (c === cuerpoNum) continue;
+    if (k > donorCount) { donor = c; donorCount = k; }
+  }
+  if (donor === null) return false;
+  const idx = it.instalaciones.findIndex(x => x.cuerpo === donor);
+  if (idx === -1) return false;
+  it.instalaciones[idx].cuerpo = cuerpoNum;
+  return true;
+}
+
+/** [-] Quita 1 unidad de `mixIdx` del cuerpo `cuerpoNum`,
+ *  reasignándola al cuerpo MENOS cargado (excluyendo este). */
+function quitarDelCuerpo(mixIdx, cuerpoNum) {
+  const it = state.mix[mixIdx];
+  if (!it) return false;
+  const radCant = Math.max(1, parseInt($('rad_cant')?.value, 10) || 1);
+  if (radCant <= 1) return false;
+  if (!Array.isArray(it.instalaciones) || it.instalaciones.length === 0) return false;
+  const idx = it.instalaciones.findIndex(x => x.cuerpo === cuerpoNum);
+  if (idx === -1) return false;
+  const counts = new Map();
+  for (let c = 1; c <= radCant; c++) counts.set(c, 0);
+  it.instalaciones.forEach((x, i) => {
+    if (i !== idx) counts.set(x.cuerpo, (counts.get(x.cuerpo) || 0) + 1);
+  });
+  let target = 1, targetCount = Infinity;
+  for (let c = 1; c <= radCant; c++) {
+    if (c === cuerpoNum) continue;
+    if (counts.get(c) < targetCount) { targetCount = counts.get(c); target = c; }
+  }
+  it.instalaciones[idx].cuerpo = target;
+  return true;
+}
+
+function _renderModalAsignacion(cuerpoNum) {
+  const radCant = Math.max(1, parseInt($('rad_cant')?.value, 10) || 1);
+  const ladoLabel = (cuerpoNum <= Math.ceil(radCant / 2)) ? 'LADO A' : 'LADO B';
+  const filas = state.mix.map((it, i) => {
+    const enEsteCuerpo = _contarEnCuerpo(it, cuerpoNum);
+    const distrib = Array.from({length: radCant}, (_, c) => {
+      const k = _contarEnCuerpo(it, c + 1);
+      return k > 0 ? `#${c + 1}=${k}` : null;
+    }).filter(Boolean).join(' · ');
+    const dispLabel = ({lateral:'lateral', vertical_1:'vertical 1', vertical_2:'vertical 2'}[it.disposicion]) || it.disposicion || '—';
+    return `
+      <div class="asig-fila" data-mix-idx="${i}">
+        <div class="asig-fila-head">
+          <strong>${escaparHtml(it.marca)} ${escaparHtml(it.modelo)}</strong>
+          <span class="asig-fila-meta">${it.cantidad} u total · ${dispLabel}</span>
+        </div>
+        <div class="asig-fila-ctrls">
+          <button type="button" class="asig-btn asig-btn-minus" data-act="minus" aria-label="Quitar 1 ventilador de este cuerpo">−</button>
+          <div class="asig-cuenta"><strong>${enEsteCuerpo}</strong> en este cuerpo</div>
+          <button type="button" class="asig-btn asig-btn-plus" data-act="plus" aria-label="Asignar 1 ventilador a este cuerpo">+</button>
+        </div>
+        <div class="asig-fila-distrib">Distribución: ${distrib || '<em>sin asignar</em>'}</div>
+      </div>`;
+  }).join('');
+
+  return `
+    <div class="asig-overlay" id="asigOverlay">
+      <div class="asig-modal" role="dialog" aria-modal="true" aria-labelledby="asigTitle">
+        <div class="asig-header">
+          <h3 id="asigTitle">Cuerpo #${cuerpoNum} <span class="asig-lado">· ${ladoLabel}</span></h3>
+          <button type="button" class="asig-close" id="asigClose" aria-label="Cerrar">×</button>
+        </div>
+        <div class="asig-hint">
+          Use [+] / [−] para asignar o quitar ventiladores en este cuerpo. La cantidad total de cada
+          modelo se conserva — solo se redistribuye entre los ${radCant} cuerpos disponibles.
+        </div>
+        <div class="asig-body">
+          ${state.mix.length === 0
+            ? `<div style="padding:20px;text-align:center;color:#888">No hay modelos en el mix.</div>`
+            : filas}
+        </div>
+        <div class="asig-footer">
+          <button type="button" class="asig-cerrar-btn" id="asigCerrar">Listo</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function abrirAsignacionCuerpo(cuerpoNum) {
+  cerrarAsignacionCuerpo();
+  document.body.insertAdjacentHTML('beforeend', _renderModalAsignacion(cuerpoNum));
+  const overlay = document.getElementById('asigOverlay');
+  if (!overlay) return;
+
+  const recargar = () => {
+    const next = _renderModalAsignacion(cuerpoNum);
+    const tmp = document.createElement('div');
+    tmp.innerHTML = next;
+    const newBody = tmp.querySelector('.asig-body');
+    const cur = overlay.querySelector('.asig-body');
+    if (newBody && cur) cur.innerHTML = newBody.innerHTML;
+    bindFilas();
+  };
+
+  const bindFilas = () => {
+    overlay.querySelectorAll('.asig-fila').forEach(fila => {
+      const mixIdx = parseInt(fila.dataset.mixIdx, 10);
+      fila.querySelector('[data-act="plus"]').addEventListener('click', () => {
+        if (asignarMasAlCuerpo(mixIdx, cuerpoNum)) {
+          renderMix();
+          recargar();
+        }
+      });
+      fila.querySelector('[data-act="minus"]').addEventListener('click', () => {
+        if (quitarDelCuerpo(mixIdx, cuerpoNum)) {
+          renderMix();
+          recargar();
+        }
+      });
+    });
+  };
+
+  overlay.addEventListener('click', (ev) => {
+    if (ev.target === overlay) cerrarAsignacionCuerpo();
+  });
+  document.getElementById('asigClose').addEventListener('click', cerrarAsignacionCuerpo);
+  document.getElementById('asigCerrar').addEventListener('click', cerrarAsignacionCuerpo);
+  document.addEventListener('keydown', _onAsigEsc);
+  bindFilas();
+}
+
+function cerrarAsignacionCuerpo() {
+  const overlay = document.getElementById('asigOverlay');
+  if (overlay) overlay.remove();
+  document.removeEventListener('keydown', _onAsigEsc);
+}
+
+function _onAsigEsc(ev) {
+  if (ev.key === 'Escape') cerrarAsignacionCuerpo();
 }
 
 /**
@@ -661,15 +837,21 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
   mix.forEach((it, i) => colorPorKey.set(it.key, PALETA_FANS[i % PALETA_FANS.length]));
 
   const W = Math.max(1080, 280 + Math.max(N_A, N_B, 1) * 110);
-  const H = 600;
-  const TANK_X = 100, TANK_Y = 240, TANK_W = W - 320, TANK_H = 130;
+  const H = 640;
+  const TANK_X = 100, TANK_Y = 290, TANK_W = W - 320, TANK_H = 130;
   const RAD_W_each = (TANK_W - 24) / Math.max(N_A, N_B, 1);
   const RAD_HEIGHT = 75;
   const RAD_GAP = 4;
   const RAD_A_Y = TANK_Y - RAD_HEIGHT - 14;
   const RAD_B_Y = TANK_Y + TANK_H + 14;
-  const CONSERV_W = 280, CONSERV_H = 56;
-  const CONSERV_X = TANK_X + 50, CONSERV_Y = 50;
+  // Conservador · cilindro horizontal MONTADO SOBRE EL BANCO DE
+  // RADIADORES LADO A (no centrado sobre el tanque). En la foto
+  // de referencia del director el conservador es paralelo al
+  // banco de radiadores y queda ENCIMA de ellos en vista cenital.
+  const CONSERV_W = TANK_W * 0.62;
+  const CONSERV_H = 46;
+  const CONSERV_X = TANK_X + TANK_W * 0.08;
+  const CONSERV_Y = 36;
 
   const uid = 'tx_' + Math.random().toString(36).slice(2, 6);
 
@@ -732,20 +914,35 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
       </marker>
     </defs>`;
 
+  // Conservador montado sobre el banco de radiadores lado A,
+  // paralelo a los radiadores. Soportes verticales (2) bajan
+  // hasta el tanque (no a los radiadores) — réplica del montaje
+  // típico de Lord Power: cuna de soporte fijada al tanque,
+  // tubería de igualación de presión hacia el tanque principal.
+  const _supX1 = CONSERV_X + CONSERV_W * 0.18;
+  const _supX2 = CONSERV_X + CONSERV_W * 0.78;
+  const _supY  = TANK_Y - 4;
   const conservSvg = `
     <g filter="url(#${uid}_sh2)">
-      <ellipse cx="${CONSERV_X}" cy="${CONSERV_Y + CONSERV_H / 2}" rx="22" ry="${CONSERV_H / 2}" fill="url(#${uid}_conservCap)" stroke="#444" stroke-width="1"/>
+      <line x1="${_supX1}" y1="${CONSERV_Y + CONSERV_H}" x2="${_supX1}" y2="${_supY}" stroke="#5d4037" stroke-width="3.2" stroke-linecap="round"/>
+      <line x1="${_supX2}" y1="${CONSERV_Y + CONSERV_H}" x2="${_supX2}" y2="${_supY}" stroke="#5d4037" stroke-width="3.2" stroke-linecap="round"/>
+      <rect x="${_supX1 - 8}" y="${_supY - 4}" width="16" height="6" rx="1" fill="#5d4037"/>
+      <rect x="${_supX2 - 8}" y="${_supY - 4}" width="16" height="6" rx="1" fill="#5d4037"/>
+      <ellipse cx="${CONSERV_X}" cy="${CONSERV_Y + CONSERV_H / 2}" rx="20" ry="${CONSERV_H / 2}" fill="url(#${uid}_conservCap)" stroke="#444" stroke-width="1"/>
       <rect x="${CONSERV_X}" y="${CONSERV_Y}" width="${CONSERV_W}" height="${CONSERV_H}" fill="url(#${uid}_conserv)" stroke="#444" stroke-width="1"/>
-      <ellipse cx="${CONSERV_X + CONSERV_W}" cy="${CONSERV_Y + CONSERV_H / 2}" rx="22" ry="${CONSERV_H / 2}" fill="url(#${uid}_conservCap)" stroke="#444" stroke-width="1"/>
-      <rect x="${CONSERV_X + CONSERV_W * 0.25}" y="${CONSERV_Y + 4}" width="38" height="10" rx="2" fill="#fff" stroke="#444" stroke-width="0.6"/>
-      <line x1="${CONSERV_X + CONSERV_W * 0.25 + 28}" y1="${CONSERV_Y + 4}" x2="${CONSERV_X + CONSERV_W * 0.25 + 28}" y2="${CONSERV_Y + 14}" stroke="#d32f2f" stroke-width="1.2"/>
-      <circle cx="${CONSERV_X + CONSERV_W - 30}" cy="${CONSERV_Y + 14}" r="5" fill="#9e9e9e" stroke="#444" stroke-width="0.5"/>
-      <circle cx="${CONSERV_X + CONSERV_W - 30}" cy="${CONSERV_Y + 14}" r="2.5" fill="#444"/>
+      <ellipse cx="${CONSERV_X + CONSERV_W}" cy="${CONSERV_Y + CONSERV_H / 2}" rx="20" ry="${CONSERV_H / 2}" fill="url(#${uid}_conservCap)" stroke="#444" stroke-width="1"/>
+      <rect x="${CONSERV_X + 6}" y="${CONSERV_Y + 4}" width="${CONSERV_W - 12}" height="${CONSERV_H * 0.22}" rx="2" fill="#fff" opacity="0.50"/>
+      <rect x="${CONSERV_X + CONSERV_W * 0.30}" y="${CONSERV_Y + 6}" width="34" height="10" rx="2" fill="#fff" stroke="#444" stroke-width="0.6"/>
+      <line x1="${CONSERV_X + CONSERV_W * 0.30 + 25}" y1="${CONSERV_Y + 6}" x2="${CONSERV_X + CONSERV_W * 0.30 + 25}" y2="${CONSERV_Y + 16}" stroke="#d32f2f" stroke-width="1.2"/>
+      <text x="${CONSERV_X + CONSERV_W * 0.30 - 4}" y="${CONSERV_Y + 14}" text-anchor="end" fill="#444" font-family="Arial" font-size="6">NIV</text>
+      <circle cx="${CONSERV_X + CONSERV_W - 36}" cy="${CONSERV_Y + 14}" r="5" fill="#fff8e1" stroke="#f57f17" stroke-width="0.8"/>
+      <circle cx="${CONSERV_X + CONSERV_W - 36}" cy="${CONSERV_Y + 14}" r="2.2" fill="#f57f17"/>
+      <text x="${CONSERV_X + CONSERV_W - 36}" y="${CONSERV_Y + 28}" text-anchor="middle" fill="#444" font-family="Arial" font-size="6">RES</text>
+      <circle cx="${CONSERV_X + 18}" cy="${CONSERV_Y + CONSERV_H + 8}" r="3.5" fill="#9e9e9e" stroke="#444" stroke-width="0.5"/>
+      <line x1="${CONSERV_X + 18}" y1="${CONSERV_Y + CONSERV_H + 11.5}" x2="${CONSERV_X + 18}" y2="${CONSERV_Y + CONSERV_H + 28}" stroke="#5d4037" stroke-width="2.4"/>
     </g>
-    <text x="${CONSERV_X + CONSERV_W / 2}" y="${CONSERV_Y - 6}" text-anchor="middle" fill="#444" font-family="Arial" font-size="9" font-weight="600">TANQUE CONSERVADOR · sílica gel</text>
-    <line x1="${CONSERV_X + CONSERV_W * 0.65}" y1="${CONSERV_Y + CONSERV_H}" x2="${CONSERV_X + CONSERV_W * 0.65}" y2="${TANK_Y - 12}" stroke="#666" stroke-width="3.5" stroke-linecap="round"/>
-    <line x1="${CONSERV_X + CONSERV_W * 0.65}" y1="${CONSERV_Y + CONSERV_H}" x2="${CONSERV_X + CONSERV_W * 0.65}" y2="${TANK_Y - 12}" stroke="#9e9e9e" stroke-width="1.5"/>
-    <rect x="${CONSERV_X + CONSERV_W * 0.65 - 14}" y="${TANK_Y - 14}" width="28" height="6" rx="1" fill="#666" stroke="#333" stroke-width="0.6"/>`;
+    <text x="${CONSERV_X + CONSERV_W / 2}" y="${CONSERV_Y - 6}" text-anchor="middle" fill="#444" font-family="Arial" font-size="10" font-weight="700" letter-spacing="0.04em">TANQUE CONSERVADOR</text>
+    <text x="${CONSERV_X + CONSERV_W / 2}" y="${CONSERV_Y - 18}" text-anchor="middle" fill="#888" font-family="Arial" font-size="7" font-style="italic">aceite + sílica gel · respiradero deshidratante</text>`;
 
   const tankSvg = `
     <g filter="url(#${uid}_sh2)">
@@ -810,22 +1007,26 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
     const aletas = Math.max(10, Math.floor(w / 4.5));
     const aletaFill = isHL ? `url(#${uid}_aletaHL)` : `url(#${uid}_aleta)`;
     return `
-      <g filter="url(#${uid}_sh)">
-        <rect x="${x + 2}" y="${y + h + 1}" width="${w - 2}" height="4" rx="1" fill="#000" opacity="0.25"/>
-        <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${fillTop}" stroke="${stroke}" stroke-width="${isHL ? 1.8 : 1.2}"/>
-        ${Array.from({length: aletas}, (_, i) => {
-          const ax = x + 2 + i * (w - 4) / (aletas - 1);
-          const aw = (w - 4) / aletas * 0.7;
-          return `<rect x="${ax - aw / 2}" y="${y + 4}" width="${aw}" height="${h - 8}" fill="${aletaFill}" stroke="${stroke}" stroke-width="0.3" opacity="${isHL ? 0.95 : 0.85}"/>`;
-        }).join('')}
-        <rect x="${x - 2}" y="${y - 3}" width="${w + 4}" height="5" rx="1" fill="${stroke}"/>
-        <rect x="${x - 2}" y="${y + h - 2}" width="${w + 4}" height="5" rx="1" fill="${stroke}"/>
-        ${ladoB
-          ? `<line x1="${x + w / 2}" y1="${y}" x2="${x + w / 2}" y2="${y - 12}" stroke="${stroke}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${x + w / 2}" cy="${y - 12}" r="2.5" fill="${stroke}"/>`
-          : `<line x1="${x + w / 2}" y1="${y + h}" x2="${x + w / 2}" y2="${y + h + 12}" stroke="${stroke}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${x + w / 2}" cy="${y + h + 12}" r="2.5" fill="${stroke}"/>`}
-      </g>
-      <rect x="${x + w / 2 - 14}" y="${y + h / 2 - 8}" width="28" height="16" rx="2" fill="${isHL ? '#fff3e0' : 'rgba(255,255,255,0.92)'}" stroke="${stroke}" stroke-width="0.6"/>
-      <text x="${x + w / 2}" y="${y + h / 2 + 3}" text-anchor="middle" fill="${isHL ? '#bf360c' : '#0d3a73'}" font-family="Arial" font-size="9" font-weight="700">#${num}</text>`;
+      <g class="render-cuerpo-clickable" data-cuerpo="${num}" style="cursor:pointer" tabindex="0" role="button" aria-label="Cuerpo ${num} · clic para asignar ventiladores">
+        <title>Cuerpo #${num} · clic para asignar ventiladores</title>
+        <g filter="url(#${uid}_sh)">
+          <rect x="${x + 2}" y="${y + h + 1}" width="${w - 2}" height="4" rx="1" fill="#000" opacity="0.25"/>
+          <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="2" fill="${fillTop}" stroke="${stroke}" stroke-width="${isHL ? 1.8 : 1.2}"/>
+          ${Array.from({length: aletas}, (_, i) => {
+            const ax = x + 2 + i * (w - 4) / (aletas - 1);
+            const aw = (w - 4) / aletas * 0.7;
+            return `<rect x="${ax - aw / 2}" y="${y + 4}" width="${aw}" height="${h - 8}" fill="${aletaFill}" stroke="${stroke}" stroke-width="0.3" opacity="${isHL ? 0.95 : 0.85}"/>`;
+          }).join('')}
+          <rect x="${x - 2}" y="${y - 3}" width="${w + 4}" height="5" rx="1" fill="${stroke}"/>
+          <rect x="${x - 2}" y="${y + h - 2}" width="${w + 4}" height="5" rx="1" fill="${stroke}"/>
+          ${ladoB
+            ? `<line x1="${x + w / 2}" y1="${y}" x2="${x + w / 2}" y2="${y - 12}" stroke="${stroke}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${x + w / 2}" cy="${y - 12}" r="2.5" fill="${stroke}"/>`
+            : `<line x1="${x + w / 2}" y1="${y + h}" x2="${x + w / 2}" y2="${y + h + 12}" stroke="${stroke}" stroke-width="2.6" stroke-linecap="round"/><circle cx="${x + w / 2}" cy="${y + h + 12}" r="2.5" fill="${stroke}"/>`}
+        </g>
+        <rect x="${x + w / 2 - 16}" y="${y + h / 2 - 9}" width="32" height="18" rx="2" fill="${isHL ? '#fff3e0' : 'rgba(255,255,255,0.92)'}" stroke="${stroke}" stroke-width="0.8"/>
+        <text x="${x + w / 2}" y="${y + h / 2 + 4}" text-anchor="middle" fill="${isHL ? '#bf360c' : '#0d3a73'}" font-family="Arial" font-size="10" font-weight="700">#${num}</text>
+        <text x="${x + w / 2}" y="${ladoB ? (y + h + 22) : (y - 8)}" text-anchor="middle" fill="${isHL ? '#bf360c' : '#0d3a73'}" font-family="Arial" font-size="6.5" font-weight="600" opacity="0.55">+ ventilador</text>
+      </g>`;
   }
 
   /** @type {Map<number, Array<{it, color, dispKey}>>} */
