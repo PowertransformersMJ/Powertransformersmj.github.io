@@ -1131,6 +1131,91 @@ físico (transformador, radiador, motor, switchgear, etc.):
 - Hint banner sobre el render: *"💡 clic en cualquier cuerpo
   para asignar ventiladores"*.
 
+### 0.1.2.11 Regla permanente · Foto de referencia → embeber con `<image>`, NUNCA redibujar en SVG
+
+**Contexto del bug histórico (sesión 2026-05-05):** después de
+documentar la regla §0.1.2.10 ("foto de referencia MANDA"), aún
+así caí en el anti-patrón de **reinterpretar** la foto del director
+como SVG dibujado a mano alzada (gradientes, bujes simulados,
+ABB texto sintético, etc.). El director respondió de inmediato:
+*"el render debe verse tal cual como esta en el repositorio estas
+alterando la imagen"*.
+
+El problema: redibujar una foto en SVG **siempre** introduce
+"interpretación creativa" — colores ligeramente distintos,
+proporciones aproximadas, detalles inventados o suprimidos. Por
+muy fiel que se intente, NO es el original. El director quiere
+ver SU foto, no una versión "estilo el original".
+
+**Regla permanente** para CUALQUIER caso donde el director
+provea una imagen (foto JPG/PNG, ilustración técnica, screenshot
+de catálogo, etc.) y pida que se use como render visual:
+
+1. **NO redibujar en SVG.** Por más detallado que parezca el
+   resultado, será una aproximación, no la imagen del director.
+   Cualquier redibujado es alteración.
+
+2. **Embeber la imagen original con `<image href="...">`** dentro
+   del SVG (o `<img src="...">` si es HTML directo). El SVG sirve
+   como contenedor para las anotaciones (cotas, etiquetas,
+   highlights interactivos) pero el contenido visual es la
+   imagen original sin tocar.
+
+3. **Archivar la imagen** en una ruta dedicada del repo
+   (`assets/img/refs/<descripcion>.png`) para que esté disponible
+   tras el deploy. NO usar URLs externas (Imgur, Drive, Discord,
+   WhatsApp CDN) que pueden caducar.
+
+4. **Si necesitas ajustar tamaño/relación de aspecto:** usar
+   `width`/`height` del `<image>` + `preserveAspectRatio="xMidYMid
+   meet"` para que la imagen entera se vea sin deformación.
+   NUNCA recortar, redimensionar destructivamente, o
+   "recolorear" la imagen original.
+
+5. **Solo agregar encima:** título superior, footer con cotas
+   numéricas, y opcionalmente regiones interactivas invisibles
+   (`<rect fill="transparent">` con `cursor:pointer`) para
+   permitir clicks. Nada que altere la apariencia de la imagen
+   subyacente.
+
+6. **Anti-patrón a EVITAR aunque parezca tentador:**
+   - "Voy a redibujarla mejor con gradientes futuristas" → **NO**.
+   - "Voy a hacer mi versión que respete el espíritu" → **NO**.
+   - "Voy a animar partes con SVG vectorial" → **NO sin el OK
+     explícito del director**.
+   - "La foto es de baja resolución, mejor reconstruirla" →
+     **NO** — si la calidad es insuficiente, pídele al director
+     una versión de mayor resolución.
+
+7. **Excepción legítima:** SVG vectorial sí es apropiado cuando
+   el director NO ha provisto foto de referencia y la imagen no
+   existe (ej.: render esquemático de un cálculo, diagrama de
+   bloques, gráfico de Chart.js). En ese caso el SVG es la
+   fuente de verdad, no una copia.
+
+**Solución del bug original (commit `75d1d13`):**
+- `_renderLateral` reescrito de ~210 líneas SVG redibujado a
+  ~25 líneas que solo hacen `<image href="../assets/img/refs/
+  lateral-transformador-ABB-ref.png">` + título arriba + cotas
+  abajo.
+- Imagen archivada en `assets/img/refs/` (no en root del repo).
+- Eliminadas todas las referencias a "ABB", "rivets", "bujes
+  porcelana", etc. que eran reconstrucción manual.
+
+**Síntomas para reconocer en futuras sesiones:**
+- El director dice *"alteraste la imagen"*, *"no es como está
+  en el repo"*, *"esto no se parece a la foto"*.
+- El SVG tiene >50 líneas reproduciendo elementos visuales
+  (gradientes, paths complejos, círculos en patrones, etc.)
+  que claramente intentan imitar una foto.
+- Hay un archivo PNG/JPG en el repo con el mismo contenido
+  visual que el SVG está redibujando.
+
+**Aplica también a:** ilustraciones de catálogo de fabricante
+(Ziehl-Abegg, Krenz, ABB, Siemens) que el director suba como
+referencia, screenshots de pantallas legacy, fotos de placas de
+características, diagramas unifilares oficiales del cliente, etc.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
@@ -2128,8 +2213,9 @@ panel de KPIs.
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
 | Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) · **fix v2.8.1**: el data layer ahora rellena `codigo`+`estado` por defecto en `setDoc(merge:true)` para que el upload no falle con `permission-denied` cuando `/contratos/{cid}` no existe en Firestore |
 | Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02 · refactor mix multi-modelo en curso desde 2026-05-03) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` con **mix multi-modelo de ventiladores** (`evaluarMixVentiladores` + `sugerirMejoras` + `calcularProteccionMix`, 62 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con paginación manual `.sheet` divs (regla §0.1.2.3) · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` § 4.3. |
+| **Estado al 2026-05-05 (sesión render visual + interactividad)** | Branch `claude/adjust-website-pages-8Ntwz` con commits adicionales esta sesión sobre el render integral del transformador (módulo Mantenimiento Brigada · Selección ONAF). Cadena de iteraciones: (a) `aaa2425` render integral cenital base con asignación por unidad → (b) `183f864` radiadores a ambos lados (lado A arriba, lado B abajo) + bujes AT/BT + conservador → (c) `1dc3528` 3D realista (bujes apilados con porcelana, gradientes, sombras, cabezales, aletas individuales) → (d) `110404e` interactividad click-en-cuerpo + conservador sobre banco lado A + regla permanente §0.1.2.10 → (e) `96ebb0b` conservador sobre tanque + render lateral redibujado tipo foto Lord Power/ABB → (f) **`75d1d13` (último)** conservador ENTRE lado A y lado B (apoyado sobre la tapa del tanque, en el área central) + render lateral usa la **foto real del repositorio TAL CUAL** vía `<image>` (no SVG redibujado). Imagen de referencia archivada en `assets/img/refs/lateral-transformador-ABB-ref.png` (Lord Power/ABB · vista lateral con conservador, radiador, ventilador frontal, bujes). **CLAUDE.md ampliado con regla permanente §0.1.2.10** (fidelidad + interactividad obligatorias cuando hay foto de referencia). **570 / 570 tests verdes + HTML lint OK** durante toda la sesión. Doc handoff: `docs/SESION-2026-05-05.md`. |
 | **Estado al 2026-05-03 (cierre + deploy OK)** | Branch `claude/adjust-website-pages-8Ntwz` con **21 commits** desde último merge. Plan de 6 microfases CERRADO + 9 hotfixes/refinements + 1 commit docs. Último commit: `a35e97b` (handoff actualizado). Resumen: refactor mix multi-modelo (5) → CI lint scope (`f1a4403`) → fallback legacy protección (`a3bc06b`) → 6 microfases (tolerancia / estrategias VFD-aerodinámica / FLC+contactor AF+SCADA+coordinación / faltantes / JSON estructurado / validación gráfica) → deep-clean Firestore (`e0ccffb`) → UI reorder + gráfica DPR3 (`2662671`) → pre-chequeo permisos admin (`c85eb41`) → diagnóstico exhaustivo + regla §0.1.2.7 (`525fc3c`) → gráfica HD/4K canvas 2400×1400 (`08dcf03`) → docs handoff (`a35e97b`). **✅ Director confirmó deploy exitoso de `firebase deploy --only firestore:rules`** — rules en producción ahora incluyen match `/acciones_refrigeracion/{id}`, el bug del modal está resuelto. Versiones publicadas: **v2.5.0** → **v2.9.0**. CLAUDE.md ampliado con **7 reglas permanentes nuevas** §0.1.2.1 a §0.1.2.7. **570 / 570 tests verdes** + HTML lint OK durante toda la sesión. Documentación: `docs/MANTENIMIENTO-BRIGADA.md` § 4.3 a 4.7 + `docs/SESION-2026-05-03-CONTINUACION.md` (handoff exhaustivo de toda la sesión con 10 bloques + reglas permanentes + cómo continuar). |
-| Próxima movida              | (1) Director hace hard-reload Cmd+Shift+R y valida flujo end-to-end: registrar acción → ver en tab Consolidado → exportar informe AFINIA con gráfica HD/4K → exportar resumen JSON. (2) Mergear branch `claude/adjust-website-pages-8Ntwz` a `main` cuando apruebe. (3) Post-merge: revocar PATs históricos + cleanup 7 PDFs raíz del repo (commit `91f386c`). (4) Próxima sesión: extender módulo Mantenimiento Brigada con nuevas calculadoras (aceite, aterramiento, etc.) reutilizando el patrón establecido (dominio puro + tests + UI binding + persistencia + tab consolidado + informe imprimible). |
+| Próxima movida              | (1) Director hace hard-reload Cmd+Shift+R y valida (a) render integral del transformador con conservador entre lado A/B + click-en-cuerpo funciona, (b) render lateral por ventilador muestra la foto real del repo. (2) Mergear branch `claude/adjust-website-pages-8Ntwz` a `main` cuando apruebe. (3) Post-merge: revocar PATs históricos + cleanup 7 PDFs raíz del repo (commit `91f386c`). (4) Próxima sesión: extender módulo Mantenimiento Brigada con nuevas calculadoras (aceite, aterramiento, etc.) reutilizando el patrón establecido (dominio puro + tests + UI binding + persistencia + tab consolidado + informe imprimible). |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
