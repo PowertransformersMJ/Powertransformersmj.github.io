@@ -1034,6 +1034,103 @@ Mac con la versión actual del repo. Verificación: la salida del
 CLI debe mostrar *"released rules firestore.rules to
 cloud.firestore"*. Después hard-reload Cmd+Shift+R y reintentar.
 
+### 0.1.2.10 Regla permanente · Render visual con foto de referencia · fidelidad + interactividad obligatorias
+
+**Contexto del bug histórico (sesión 2026-05-05):** durante la
+construcción del render integral del transformador en la calculadora
+de refrigeración, el director compartió una foto real de un
+transformador de potencia (vista cenital · Lord Power) y pidió que
+el render se asemejara. Cometí dos errores que requirieron tres
+iteraciones para corregir:
+
+1. **Render esquemático en vez de realista.** Primer intento: solo
+   rectángulos planos sin gradientes ni profundidad. El director
+   respondió: *"no estas haciendo el reinder como te lo pedi, la
+   image de referencia no se parece en nada a lo que me estas
+   ilustrando"*.
+
+2. **Conservador en posición incorrecta.** Lo coloqué CENTRADO sobre
+   el tanque principal con tubería vertical. La foto de referencia
+   muestra el conservador montado SOBRE EL BANCO DE RADIADORES, lado
+   AT, paralelo a ellos, soportado por una cuna fijada al tanque
+   (no al centro).
+
+3. **No-interactividad.** Las asignaciones de "qué ventilador en
+   qué cuerpo" se hacían solo desde dropdowns auxiliares en otra
+   sección. El director pidió: *"aun no me permites desde render
+   ubicar los ventiladores ami voluntad desde [el render]"*.
+
+**Regla permanente** para CUALQUIER render visual de un activo
+físico (transformador, radiador, motor, switchgear, etc.):
+
+1. **Si el director comparte foto de referencia, la foto MANDA.**
+   - Antes de codificar el render, descomponer la foto en
+     elementos: tipo de cuerpo, posición relativa, escala, color
+     dominante, montaje (cuna, brida, soportes). Anotar en el
+     comentario del SVG.
+   - Si tienes dudas sobre posición de algún elemento, **pregunta
+     antes de inventar**. Especialmente para elementos auxiliares
+     (conservador, BRT, panel de control, descargadores).
+   - **Anti-patrón:** asumir posición "típica" sin verificar. El
+     conservador puede estar centrado, lateral, sobre radiadores
+     A o B, en cuna o en pedestal. La foto te lo dice.
+
+2. **Detalles 3D NO son opcionales en un render que comunica
+   "real".** Aplicar siempre:
+   - **Gradientes lineales y radiales** en superficies metálicas
+     (tanque, radiadores, conservador, bujes).
+   - **Sombras proyectadas** con `feGaussianBlur` + offset positivo
+     (mínimo `dx="2" dy="4"`).
+   - **Capas apiladas** para simular volumen 3D (ej.: bujes de
+     porcelana = 4 ellipses ascendentes).
+   - **Highlights** en zonas iluminadas (rectángulo blanco a 50%
+     opacidad en la mitad superior del cuerpo).
+   - **Detalles funcionales reales:** placas de inspección con
+     tornillería, indicador de nivel, respiradero, brida de
+     conexión, cabezales superior/inferior de radiador, aletas
+     individuales (no solo líneas).
+
+3. **El render de cualquier conjunto seleccionable DEBE ser
+   interactivo.** Si el render representa entidades que el usuario
+   asigna (ventiladores en cuerpos, fases en bornes, breakers en
+   slots, sensores en taps, etc.):
+   - Cada entidad clickeable lleva `data-<entidad>="N"` +
+     `style="cursor:pointer"` + `tabindex="0"` + `role="button"` +
+     `<title>` informativo (accesibilidad).
+   - Click → modal o popover con controles para asignar/quitar.
+   - Cambio en el modal → re-render del conjunto + re-cálculo
+     de cualquier KPI dependiente.
+   - Esc / clic afuera / botón close → cierra el modal.
+   - **Anti-patrón:** dejar el render como decorativo y forzar al
+     usuario a reasignar desde dropdowns externos. Si el usuario
+     ve el cuerpo, espera poder interactuar con él.
+
+4. **Verificación obligatoria antes de cerrar el commit:**
+   - Abrir la página en el browser, agregar 2-3 modelos al mix,
+     hacer clic en cada cuerpo y verificar que el modal abre.
+   - Asignar/quitar ventiladores y verificar que el conteo total
+     se mantiene (invariante de la cantidad).
+   - Comparar visualmente contra la foto de referencia que el
+     director compartió. Si algo se ve diferente, ajustar antes
+     de pushear.
+
+5. **Iteraciones esperadas:** la fidelidad visual rara vez se
+   logra en un solo intento. Esperar 2-3 rondas de feedback con
+   el director antes de declarar el render terminado. Cada ronda
+   debe acercar más al fotografía de referencia.
+
+**Solución del bug original (commit siguiente):**
+- Reposicionar conservador sobre el banco de radiadores lado A
+  con cuna de soporte (2 columnas hasta el tanque).
+- Cada radiador wrap en `<g class="render-cuerpo-clickable"
+  data-cuerpo="N" tabindex="0" role="button">`.
+- Modal `abrirAsignacionCuerpo(N)` con controles +/- por modelo
+  + función de rebalanceo `asignarMasAlCuerpo` /
+  `quitarDelCuerpo` que conserva la cantidad total y redistribuye
+  hacia el cuerpo más/menos cargado.
+- Hint banner sobre el render: *"💡 clic en cualquier cuerpo
+  para asignar ventiladores"*.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
