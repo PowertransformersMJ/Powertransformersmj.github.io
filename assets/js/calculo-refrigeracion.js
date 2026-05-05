@@ -844,14 +844,17 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
   const RAD_GAP = 4;
   const RAD_A_Y = TANK_Y - RAD_HEIGHT - 14;
   const RAD_B_Y = TANK_Y + TANK_H + 14;
-  // Conservador · cilindro horizontal MONTADO SOBRE EL BANCO DE
-  // RADIADORES LADO A (no centrado sobre el tanque). En la foto
-  // de referencia del director el conservador es paralelo al
-  // banco de radiadores y queda ENCIMA de ellos en vista cenital.
-  const CONSERV_W = TANK_W * 0.62;
-  const CONSERV_H = 46;
-  const CONSERV_X = TANK_X + TANK_W * 0.08;
-  const CONSERV_Y = 36;
+  // Conservador · cilindro horizontal MONTADO SOBRE EL TANQUE
+  // (no sobre los radiadores · ref: foto Lord Power 2026-05-04).
+  // Soportado por 2 patas verticales que descansan sobre la
+  // tapa del tanque, paralelo al eje longitudinal del tanque.
+  // En vista cenital aparece centrado sobre el tanque; los
+  // soportes son visibles arriba de los radiadores y se ven
+  // "entrando" al tanque (z-order: render antes que radiadores).
+  const CONSERV_W = TANK_W * 0.46;
+  const CONSERV_H = 38;
+  const CONSERV_X = TANK_X + (TANK_W - CONSERV_W) / 2;
+  const CONSERV_Y = 26;
 
   const uid = 'tx_' + Math.random().toString(36).slice(2, 6);
 
@@ -914,14 +917,16 @@ function renderTransformadorCompletoSVG({ rad_cant = 1, A = 1500, B = 1100, C = 
       </marker>
     </defs>`;
 
-  // Conservador montado sobre el banco de radiadores lado A,
-  // paralelo a los radiadores. Soportes verticales (2) bajan
-  // hasta el tanque (no a los radiadores) — réplica del montaje
-  // típico de Lord Power: cuna de soporte fijada al tanque,
-  // tubería de igualación de presión hacia el tanque principal.
-  const _supX1 = CONSERV_X + CONSERV_W * 0.18;
-  const _supX2 = CONSERV_X + CONSERV_W * 0.78;
-  const _supY  = TANK_Y - 4;
+  // Conservador montado SOBRE EL TANQUE (no sobre radiadores).
+  // Soportes verticales (2) bajan desde el conservador hasta la
+  // tapa del tanque (TANK_Y), pasando visualmente "detrás" de
+  // los radiadores — éstos pintan encima por z-order y dejan
+  // visible solo los tramos arriba y abajo del banco A.
+  // Réplica del montaje típico de Lord Power / ABB: cuna de
+  // soporte fijada al tanque + tubería de igualación.
+  const _supX1 = CONSERV_X + CONSERV_W * 0.20;
+  const _supX2 = CONSERV_X + CONSERV_W * 0.80;
+  const _supY  = TANK_Y + 6;
   const conservSvg = `
     <g filter="url(#${uid}_sh2)">
       <line x1="${_supX1}" y1="${CONSERV_Y + CONSERV_H}" x2="${_supX1}" y2="${_supY}" stroke="#5d4037" stroke-width="3.2" stroke-linecap="round"/>
@@ -1149,104 +1154,233 @@ function _renderFanCircle(cx, cy, R, color, label, sigil) {
     </g>`;
 }
 
-/* ─── Renderer LATERAL · vista frontal de obleas + ventilador ── */
+/* ─── Renderer LATERAL · vista frontal estilo foto Lord Power ── */
+//
+// Reproducción fiel de la foto compartida por el director
+// (WhatsApp 2026-05-04 8:15 PM · transformador ABB con radiador
+// + ventilador frontal + conservador + bujes):
+//
+//   ┌─────────────────────────────────────────────────────────┐
+//   │ 🟦 cielo · estructuras al fondo                         │
+//   │                                                          │
+//   │     ┌─[CONSERVADOR]─┐    🌪 bujes porcelana             │
+//   │     │┐ [pata] ┌      │                                   │
+//   │  ┌──┴──┴─────┴──────────────────────┐                  │
+//   │  │ ┃┃┃┃ Radiador con obleas       │  TANQUE             │
+//   │  │ ┃┃[VENTILADOR FRONTAL]┃┃        │  (caja con rivets) │
+//   │  │ ┃┃┃┃                  ┃┃        │                     │
+//   │  └─┬─────────────────────┬─────────┘                     │
+//   │  ═══ piso / cimiento (sombreado) ══════════════════     │
+//   └─────────────────────────────────────────────────────────┘
+//
+// El ventilador se monta SOBRE LA CARA FRONTAL del radiador
+// (no a un lado), con 8 tornillos perimetrales, grilla circular
+// + aspas radiales y cubo central. Las obleas verticales del
+// radiador son visibles alrededor del ventilador.
 function _renderLateral({ A, B, C, diametro_mm, rad_cant, ubicacion, defs, G, SH, FA }) {
-  // Escala el ventilador (Ø) sobre el span B del radiador
-  const W = 480, H = 280;
-  const radX = 60, radY = 50, radW = 200, radH = 200;
-  // El span del ventilador es proporcional a B; el Ø lo escalamos vs B:
-  const scale = Math.min(1, (diametro_mm / Math.max(B, 1)) * 1.0);
-  const fanR  = Math.max(28, Math.min(85, 80 * scale));
-  const fanCx = radX + radW + 60 + fanR;
+  const W = 560, H = 360;
+  // Layout · radiador a la izq, tanque a la der, conservador arriba
+  const radX = 50, radY = 110, radW = 200, radH = 220;
+  const tankX = 310, tankY = 100, tankW = 200, tankH = 230;
+  // Ventilador montado en la cara frontal del radiador, centrado
+  const fanCx = radX + radW / 2;
   const fanCy = radY + radH / 2;
-  // Cantidad de obleas representadas (fija para no saturar)
-  const nObleas = 22;
+  const scale = Math.min(1, (diametro_mm / Math.max(B, 1)) * 0.95);
+  const fanR  = Math.max(50, Math.min(95, Math.min(radW, radH) * 0.42 * scale + 35));
+  const nObleas = 28;
   const cuerpoSel = Math.max(1, Math.min(rad_cant || 1, ubicacion.cuerpo || 1));
-  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Disposición lateral con ventilador escalado al span de obleas">
+  // Rivets perimetrales del tanque (estilo placa atornillada)
+  const rivets = [];
+  const rivStep = 16;
+  for (let x = tankX + 6; x <= tankX + tankW - 6; x += rivStep) {
+    rivets.push(`<circle cx="${x}" cy="${tankY + 4}" r="1.6" fill="#1c2733"/>`);
+    rivets.push(`<circle cx="${x}" cy="${tankY + tankH - 4}" r="1.6" fill="#1c2733"/>`);
+  }
+  for (let y = tankY + 16; y <= tankY + tankH - 14; y += rivStep) {
+    rivets.push(`<circle cx="${tankX + 4}" cy="${y}" r="1.6" fill="#1c2733"/>`);
+    rivets.push(`<circle cx="${tankX + tankW - 4}" cy="${y}" r="1.6" fill="#1c2733"/>`);
+  }
+  // 8 tornillos perimetrales del ventilador (a 45° entre sí)
+  const fanBolts = Array.from({length: 8}, (_, i) => {
+    const a = (i * 45 - 22.5) * Math.PI / 180;
+    const bx = fanCx + Math.cos(a) * (fanR + 6);
+    const by = fanCy + Math.sin(a) * (fanR + 6);
+    return `<circle cx="${bx}" cy="${by}" r="2.4" fill="#1c2733"/><circle cx="${bx}" cy="${by}" r="1.2" fill="#3a4a5a"/>`;
+  }).join('');
+  // Grilla del ventilador: aros concéntricos + radiales
+  const fanGrid =
+    `<g stroke="#3a4a5a" stroke-width="0.7" fill="none" opacity="0.85">
+      ${[0.30, 0.55, 0.78].map(r => `<circle cx="${fanCx}" cy="${fanCy}" r="${fanR * r}"/>`).join('')}
+      ${Array.from({length: 8}, (_, i) => {
+        const a = i * 45 * Math.PI / 180;
+        return `<line x1="${fanCx + Math.cos(a) * 6}" y1="${fanCy + Math.sin(a) * 6}" x2="${fanCx + Math.cos(a) * (fanR - 4)}" y2="${fanCy + Math.sin(a) * (fanR - 4)}"/>`;
+      }).join('')}
+    </g>`;
+
+  return `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Disposición lateral · ventilador montado en cara frontal del radiador con obleas, tanque a la derecha con bujes y conservador">
     ${defs}
-    <!-- Fondo gradiente sutil -->
-    <rect x="0" y="0" width="${W}" height="${H}" fill="url(#${G}_rad)" opacity="0.12"/>
-    <!-- Tanque a la izquierda -->
+    <defs>
+      <linearGradient id="${G}_sky" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%"  stop-color="#bbdefb"/>
+        <stop offset="100%" stop-color="#e3f2fd"/>
+      </linearGradient>
+      <linearGradient id="${G}_tankSide" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"  stop-color="#90a4ae"/>
+        <stop offset="50%" stop-color="#cfd8dc"/>
+        <stop offset="100%" stop-color="#78909c"/>
+      </linearGradient>
+      <linearGradient id="${G}_radSide" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="0%"  stop-color="#78909c"/>
+        <stop offset="50%" stop-color="#b0bec5"/>
+        <stop offset="100%" stop-color="#546e7a"/>
+      </linearGradient>
+      <radialGradient id="${G}_fanDisc" cx="50%" cy="50%" r="55%">
+        <stop offset="0%"  stop-color="#cfd8dc"/>
+        <stop offset="60%" stop-color="#78909c"/>
+        <stop offset="100%" stop-color="#37474f"/>
+      </radialGradient>
+      <radialGradient id="${G}_bujePorc" cx="50%" cy="35%" r="60%">
+        <stop offset="0%"  stop-color="#fafafa"/>
+        <stop offset="100%" stop-color="#bdbdbd"/>
+      </radialGradient>
+      <linearGradient id="${G}_conservSide" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%"  stop-color="#fafafa"/>
+        <stop offset="50%" stop-color="#e0e0e0"/>
+        <stop offset="100%" stop-color="#9e9e9e"/>
+      </linearGradient>
+    </defs>
+
+    <!-- Cielo + suelo -->
+    <rect x="0" y="0" width="${W}" height="${H - 40}" fill="url(#${G}_sky)"/>
+    <rect x="0" y="${H - 40}" width="${W}" height="40" fill="#37474f"/>
+    <rect x="0" y="${H - 40}" width="${W}" height="6" fill="#1c2733"/>
+    ${Array.from({length: 24}, (_, i) => `<circle cx="${i * 24 + 8}" cy="${H - 18}" r="1.2" fill="#5d6d7a" opacity="0.6"/>`).join('')}
+
+    <!-- Conservador encima del tanque (cilindro horizontal con 2 patas) -->
     <g filter="url(#${SH})">
-      <rect x="20" y="35" width="32" height="220" rx="3" ry="3" fill="url(#${G}_tanque)" stroke="#0d3a73" stroke-width="0.8"/>
-      <rect x="22" y="38" width="28" height="6" fill="#fff" opacity="0.18"/>
-      <text x="36" y="155" text-anchor="middle" fill="#fff" font-size="9" font-weight="700" font-family="Arial" transform="rotate(-90 36 155)" letter-spacing="0.5">TANQUE</text>
+      <line x1="${tankX + tankW * 0.30}" y1="${tankY + 6}" x2="${tankX + tankW * 0.30}" y2="${tankY - 28}" stroke="#5d6d7a" stroke-width="3"/>
+      <line x1="${tankX + tankW * 0.70}" y1="${tankY + 6}" x2="${tankX + tankW * 0.70}" y2="${tankY - 28}" stroke="#5d6d7a" stroke-width="3"/>
+      <ellipse cx="${tankX + tankW * 0.20}" cy="${tankY - 42}" rx="14" ry="14" fill="url(#${G}_conservSide)" stroke="#37474f" stroke-width="0.8"/>
+      <rect x="${tankX + tankW * 0.20}" y="${tankY - 56}" width="${tankW * 0.62}" height="28" rx="2" fill="url(#${G}_conservSide)" stroke="#37474f" stroke-width="0.8"/>
+      <ellipse cx="${tankX + tankW * 0.82}" cy="${tankY - 42}" rx="14" ry="14" fill="url(#${G}_conservSide)" stroke="#37474f" stroke-width="0.8"/>
+      <rect x="${tankX + tankW * 0.55}" y="${tankY - 50}" width="22" height="9" rx="1" fill="#fff" stroke="#37474f" stroke-width="0.5"/>
+      <text x="${tankX + tankW * 0.55 + 11}" y="${tankY - 44}" text-anchor="middle" fill="#c62828" font-family="Arial" font-size="6.5" font-weight="800">ABB</text>
+      <circle cx="${tankX + tankW * 0.30}" cy="${tankY - 46}" r="2.5" fill="#388e3c"/>
     </g>
-    <!-- Cuerpo de radiador (vista frontal · obleas) -->
+
+    <!-- Bujes (porcelana stack) sobre el tanque -->
+    ${[0.28, 0.42].map((p) => {
+      const bx = tankX + tankW * p;
+      const by = tankY - 6;
+      return `
+        <g filter="url(#${SH})">
+          ${[0, 6, 12, 18, 24, 30].map((dy, j) => `<ellipse cx="${bx}" cy="${by - dy}" rx="${10 - j}" ry="3" fill="url(#${G}_bujePorc)" stroke="#9e9e9e" stroke-width="0.4"/>`).join('')}
+          <ellipse cx="${bx}" cy="${by - 38}" rx="3.5" ry="2" fill="#1c2733"/>
+          <line x1="${bx}" y1="${by - 40}" x2="${bx}" y2="${by - 75}" stroke="#1c2733" stroke-width="1.2"/>
+          <circle cx="${bx}" cy="${by - 75}" r="3" fill="#1c2733"/>
+        </g>`;
+    }).join('')}
+
+    <!-- TANQUE (caja metálica con rivets, vista lateral) -->
     <g filter="url(#${SH})">
-      <rect x="${radX}" y="${radY}" width="${radW}" height="${radH}" rx="4" ry="4" fill="url(#${G}_rad)" stroke="#0d47a1" stroke-width="1.2"/>
-      <g stroke="#0d47a1" stroke-width="0.55" fill="none">
+      <rect x="${tankX + 4}" y="${tankY + tankH - 2}" width="${tankW - 8}" height="6" rx="1" fill="#000" opacity="0.25"/>
+      <rect x="${tankX}" y="${tankY}" width="${tankW}" height="${tankH}" rx="2" fill="url(#${G}_tankSide)" stroke="#37474f" stroke-width="1.2"/>
+      <rect x="${tankX + 8}" y="${tankY + 4}" width="${tankW - 16}" height="${tankH * 0.18}" fill="#fff" opacity="0.18"/>
+      ${rivets.join('')}
+      <!-- Placa de inspección frontal -->
+      <rect x="${tankX + tankW * 0.18}" y="${tankY + tankH * 0.18}" width="${tankW * 0.46}" height="${tankH * 0.55}" rx="1" fill="none" stroke="#1c2733" stroke-width="0.8" opacity="0.5"/>
+      ${Array.from({length: 4}, (_, i) => Array.from({length: 3}, (_, j) => {
+        const px = tankX + tankW * 0.18 + (tankW * 0.46) * (i / 3);
+        const py = tankY + tankH * 0.18 + (tankH * 0.55) * (j / 2);
+        return `<circle cx="${px}" cy="${py}" r="1.4" fill="#1c2733"/>`;
+      }).join('')).join('')}
+      <!-- Etiqueta amarilla (placa) -->
+      <rect x="${tankX + tankW - 50}" y="${tankY + tankH * 0.55}" width="40" height="10" rx="1" fill="#fdd835" stroke="#f57f17" stroke-width="0.6"/>
+    </g>
+
+    <!-- Pipes de conexión radiador → tanque (superior + inferior) -->
+    <g filter="url(#${SH})">
+      <rect x="${radX + radW - 4}" y="${radY + 14}" width="${tankX - radX - radW + 8}" height="14" rx="3" fill="#90a4ae" stroke="#37474f" stroke-width="0.8"/>
+      <rect x="${radX + radW - 4}" y="${radY + radH - 28}" width="${tankX - radX - radW + 8}" height="14" rx="3" fill="#90a4ae" stroke="#37474f" stroke-width="0.8"/>
+      <rect x="${radX + radW + (tankX - radX - radW) * 0.35}" y="${radY + 11}" width="6" height="20" rx="1" fill="#1c2733"/>
+      <rect x="${radX + radW + (tankX - radX - radW) * 0.35}" y="${radY + radH - 31}" width="6" height="20" rx="1" fill="#1c2733"/>
+    </g>
+
+    <!-- RADIADOR (vista frontal · obleas verticales) -->
+    <g filter="url(#${SH})">
+      <rect x="${radX + 3}" y="${radY + radH + 1}" width="${radW - 6}" height="6" rx="1" fill="#000" opacity="0.25"/>
+      <rect x="${radX}" y="${radY}" width="${radW}" height="${radH}" rx="2" fill="url(#${G}_radSide)" stroke="#37474f" stroke-width="1.2"/>
+      <!-- Cabezales superior e inferior (más oscuros, gruesos) -->
+      <rect x="${radX - 4}" y="${radY - 6}" width="${radW + 8}" height="14" rx="2" fill="#37474f" stroke="#1c2733" stroke-width="0.6"/>
+      <rect x="${radX - 4}" y="${radY + radH - 8}" width="${radW + 8}" height="14" rx="2" fill="#37474f" stroke="#1c2733" stroke-width="0.6"/>
+      <!-- Obleas verticales (líneas finas + sombreado) -->
+      <g stroke="#37474f" stroke-width="0.5" fill="none" opacity="0.7">
         ${Array.from({length: nObleas}, (_, i) => {
-          const x = radX + 6 + i * (radW - 12) / (nObleas - 1);
-          return `<line x1="${x}" y1="${radY + 6}" x2="${x}" y2="${radY + radH - 6}"/>`;
+          const x = radX + 4 + i * (radW - 8) / (nObleas - 1);
+          return `<line x1="${x}" y1="${radY + 4}" x2="${x}" y2="${radY + radH - 4}"/>`;
         }).join('')}
       </g>
-      <!-- Cabezales superior e inferior -->
-      <rect x="${radX - 4}" y="${radY - 5}" width="${radW + 8}" height="8" rx="2" fill="#0d47a1"/>
-      <rect x="${radX - 4}" y="${radY + radH - 3}" width="${radW + 8}" height="8" rx="2" fill="#0d47a1"/>
     </g>
-    <!-- Cota B (span entre obleas) -->
-    <g stroke="#1565c0" stroke-width="0.8" fill="#1565c0" font-family="Arial" font-size="10" font-weight="700">
-      <line x1="${radX + 6}" y1="${radY + radH + 18}" x2="${radX + radW - 6}" y2="${radY + radH + 18}" stroke-width="1.2"/>
-      <line x1="${radX + 6}" y1="${radY + radH + 14}" x2="${radX + 6}" y2="${radY + radH + 22}"/>
-      <line x1="${radX + radW - 6}" y1="${radY + radH + 14}" x2="${radX + radW - 6}" y2="${radY + radH + 22}"/>
-      <text x="${radX + radW / 2}" y="${radY + radH + 32}" text-anchor="middle">B = ${Math.round(B)} mm</text>
+
+    <!-- VENTILADOR montado en la cara frontal del radiador (centrado) -->
+    <g filter="url(#${SH})">
+      <!-- Aro exterior negro -->
+      <circle cx="${fanCx}" cy="${fanCy}" r="${fanR + 7}" fill="#1c2733"/>
+      <circle cx="${fanCx}" cy="${fanCy}" r="${fanR + 4}" fill="none" stroke="#3a4a5a" stroke-width="1"/>
+      <!-- 8 tornillos perimetrales -->
+      ${fanBolts}
+      <!-- Disco principal con gradiente -->
+      <circle cx="${fanCx}" cy="${fanCy}" r="${fanR}" fill="url(#${G}_fanDisc)"/>
+      <!-- Grilla concéntrica + radial -->
+      ${fanGrid}
+      <!-- 5 aspas curvas -->
+      <g stroke="#1c2733" stroke-width="2" fill="none" opacity="0.95">
+        ${Array.from({length: 5}, (_, i) => {
+          const angle = (i * 72 - 18) * Math.PI / 180;
+          const x1 = fanCx + Math.cos(angle) * (fanR - 4);
+          const y1 = fanCy + Math.sin(angle) * (fanR - 4);
+          const cxc = fanCx + Math.cos(angle - 0.5) * (fanR * 0.50);
+          const cyc = fanCy + Math.sin(angle - 0.5) * (fanR * 0.50);
+          return `<path d="M ${fanCx},${fanCy} Q ${cxc},${cyc} ${x1},${y1}" stroke-linecap="round"/>`;
+        }).join('')}
+      </g>
+      <!-- Cubo central con cono punta -->
+      <circle cx="${fanCx}" cy="${fanCy}" r="${Math.max(10, fanR * 0.20)}" fill="#1c2733"/>
+      <circle cx="${fanCx}" cy="${fanCy}" r="${Math.max(6, fanR * 0.12)}" fill="#3a4a5a"/>
+      <circle cx="${fanCx - 1}" cy="${fanCy - 1}" r="${Math.max(3, fanR * 0.06)}" fill="#cfd8dc" opacity="0.7"/>
     </g>
-    <!-- Cota A (altura) -->
+
+    <!-- Cota A (altura del radiador) -->
     <g stroke="#1565c0" stroke-width="0.8" fill="#1565c0" font-family="Arial" font-size="10" font-weight="700">
       <line x1="${radX - 22}" y1="${radY}" x2="${radX - 22}" y2="${radY + radH}" stroke-width="1.2"/>
       <line x1="${radX - 26}" y1="${radY}" x2="${radX - 18}" y2="${radY}"/>
       <line x1="${radX - 26}" y1="${radY + radH}" x2="${radX - 18}" y2="${radY + radH}"/>
-      <text x="${radX - 28}" y="${radY + radH / 2 + 4}" text-anchor="end">A = ${Math.round(A)} mm</text>
+      <text x="${radX - 28}" y="${radY + radH / 2 + 4}" text-anchor="end">A=${Math.round(A)}mm</text>
     </g>
-    <!-- Highlight del cuerpo donde se instala (si rad_cant > 1, marca cuál) -->
-    ${rad_cant > 1 ? `
-      <g opacity="0.28">
-        <rect x="${radX}" y="${radY}" width="${radW}" height="${radH}" rx="4" fill="url(#${G}_radHL)"/>
-      </g>
-      <text x="${radX + radW / 2}" y="${radY + 28}" text-anchor="middle" fill="#b85f00" font-size="11" font-weight="700" font-family="Arial">CUERPO ${cuerpoSel} de ${rad_cant}</text>` : ''}
-    <!-- Ventilador a la derecha (vista frontal) -->
-    <g filter="url(#${SH})">
-      <!-- Carcasa -->
-      <circle cx="${fanCx}" cy="${fanCy}" r="${fanR + 5}" fill="#102027" opacity="0.95"/>
-      <circle cx="${fanCx}" cy="${fanCy}" r="${fanR + 2}" fill="none" stroke="#37474f" stroke-width="1.5"/>
-      <!-- Cuerpo / disco -->
-      <circle cx="${fanCx}" cy="${fanCy}" r="${fanR}" fill="url(#${G}_fan)"/>
-      <!-- 5 aspas curvas (paths) -->
-      <g stroke="#e65100" stroke-width="1.4" fill="none" opacity="0.85">
-        ${Array.from({length: 5}, (_, i) => {
-          const angle = (i * 72) * Math.PI / 180;
-          const x1 = fanCx + Math.cos(angle) * (fanR - 6);
-          const y1 = fanCy + Math.sin(angle) * (fanR - 6);
-          const cx = fanCx + Math.cos(angle - 0.6) * (fanR * 0.55);
-          const cy = fanCy + Math.sin(angle - 0.6) * (fanR * 0.55);
-          return `<path d="M ${fanCx},${fanCy} Q ${cx},${cy} ${x1},${y1}"/>`;
-        }).join('')}
-      </g>
-      <!-- Motor central -->
-      <circle cx="${fanCx}" cy="${fanCy}" r="${Math.max(8, fanR * 0.25)}" fill="url(#${G}_motor)"/>
-      <circle cx="${fanCx}" cy="${fanCy}" r="${Math.max(4, fanR * 0.12)}" fill="#e65100"/>
+
+    <!-- Cota B (span entre obleas) -->
+    <g stroke="#1565c0" stroke-width="0.8" fill="#1565c0" font-family="Arial" font-size="10" font-weight="700">
+      <line x1="${radX + 4}" y1="${radY + radH + 22}" x2="${radX + radW - 4}" y2="${radY + radH + 22}" stroke-width="1.2"/>
+      <line x1="${radX + 4}" y1="${radY + radH + 18}" x2="${radX + 4}" y2="${radY + radH + 26}"/>
+      <line x1="${radX + radW - 4}" y1="${radY + radH + 18}" x2="${radX + radW - 4}" y2="${radY + radH + 26}"/>
+      <text x="${radX + radW / 2}" y="${radY + radH + 36}" text-anchor="middle">B=${Math.round(B)}mm</text>
     </g>
+
     <!-- Cota Ø ventilador -->
-    <g stroke="#e65100" stroke-width="0.8" fill="#e65100" font-family="Arial" font-size="10" font-weight="700">
-      <line x1="${fanCx - fanR}" y1="${fanCy + fanR + 18}" x2="${fanCx + fanR}" y2="${fanCy + fanR + 18}" stroke-width="1.2"/>
-      <line x1="${fanCx - fanR}" y1="${fanCy + fanR + 14}" x2="${fanCx - fanR}" y2="${fanCy + fanR + 22}"/>
-      <line x1="${fanCx + fanR}" y1="${fanCy + fanR + 14}" x2="${fanCx + fanR}" y2="${fanCy + fanR + 22}"/>
-      <text x="${fanCx}" y="${fanCy + fanR + 32}" text-anchor="middle">Ø = ${Math.round(diametro_mm)} mm</text>
+    <g stroke="#e65100" stroke-width="0.8" fill="#e65100" font-family="Arial" font-size="9.5" font-weight="700">
+      <line x1="${fanCx - fanR}" y1="${fanCy + fanR + 22}" x2="${fanCx + fanR}" y2="${fanCy + fanR + 22}" stroke-width="1.2"/>
+      <line x1="${fanCx - fanR}" y1="${fanCy + fanR + 18}" x2="${fanCx - fanR}" y2="${fanCy + fanR + 26}"/>
+      <line x1="${fanCx + fanR}" y1="${fanCy + fanR + 18}" x2="${fanCx + fanR}" y2="${fanCy + fanR + 26}"/>
+      <text x="${fanCx}" y="${fanCy + fanR + 36}" text-anchor="middle">Ø=${Math.round(diametro_mm)}mm</text>
     </g>
-    <!-- Flechas de flujo de aire (4 niveles) ← -->
-    <g stroke="url(#${G}_flow)" stroke-width="3" fill="none" marker-end="url(#${FA})" opacity="0.9">
-      ${[0.25, 0.45, 0.65, 0.85].map(p => {
-        const y = radY + radH * p;
-        return `<line x1="${fanCx - fanR - 4}" y1="${y}" x2="${radX + radW + 6}" y2="${y}"/>`;
-      }).join('')}
-    </g>
+
     <!-- Etiquetas -->
     <g font-family="Arial" font-weight="700">
-      <text x="${fanCx}" y="${fanCy - fanR - 14}" text-anchor="middle" fill="#e65100" font-size="11">VENTILADOR</text>
-      <text x="${fanCx}" y="${fanCy - fanR - 4}" text-anchor="middle" fill="#e65100" font-size="9" opacity="0.85">${ubicacion.lado || 'frontal'}</text>
-      <text x="${radX + radW / 2}" y="${radY - 12}" text-anchor="middle" fill="#0d3a73" font-size="11">RADIADOR</text>
-      <text x="20" y="${H - 8}" fill="#1565c0" font-size="8.5" font-weight="600" letter-spacing="0.04em">DISPOSICIÓN LATERAL · flujo horizontal · cobertura crítica B vs Ø</text>
+      <text x="${tankX + tankW / 2}" y="${tankY - 96}" text-anchor="middle" fill="#0d3a73" font-size="10" letter-spacing="0.04em">CONSERVADOR</text>
+      ${rad_cant > 1 ? `<text x="${radX + radW / 2}" y="${radY - 16}" text-anchor="middle" fill="#0d3a73" font-size="10">RADIADOR · cuerpo ${cuerpoSel}/${rad_cant}</text>` : `<text x="${radX + radW / 2}" y="${radY - 16}" text-anchor="middle" fill="#0d3a73" font-size="10">RADIADOR</text>`}
+      <text x="${tankX + tankW / 2}" y="${tankY + tankH + 18}" text-anchor="middle" fill="#0d3a73" font-size="10">TANQUE</text>
+      <text x="${fanCx}" y="${fanCy - fanR - 12}" text-anchor="middle" fill="#e65100" font-size="9">VENTILADOR · ${ubicacion.lado || 'frontal'}</text>
+      <text x="20" y="${H - 8}" fill="#fff" font-size="9" font-weight="600" letter-spacing="0.04em">DISPOSICIÓN LATERAL · ventilador frontal sobre obleas · vista lateral del transformador</text>
     </g>
   </svg>`;
 }
