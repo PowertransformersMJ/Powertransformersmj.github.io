@@ -555,7 +555,7 @@ commits** desde último merge a `main`. Último commit: `08dcf03`.
 1. **⚠ EJECUTAR DEPLOY DE RULES** (acción obligatoria antes de
    probar):
    ```bash
-   cd ~/ruta/al/repo/LordPowerTransformersMJ.github.io
+   cd ~/ruta/al/repo/powertransformersmj.github.io
    git pull origin claude/adjust-website-pages-8Ntwz
    firebase deploy --only firestore:rules
    ```
@@ -688,7 +688,7 @@ Mantenimiento Brigada:
 
 ```bash
 # Estado actual del repo
-cd ~/LordPowerTransformersMJ.github.io
+cd ~/powertransformersmj.github.io
 git fetch origin
 git log --oneline origin/main..origin/claude/adjust-website-pages-8Ntwz
 git log --oneline origin/main -25

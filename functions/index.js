@@ -151,7 +151,7 @@ export const cronAlertasDiarias = onSchedule(
               `<li><code style="background:#eef3fb;padding:2px 6px;border-radius:4px;font-size:13px">${a.tipo}</code> &nbsp; ${a.titulo}</li>`
             ).join('')}
           </ul>
-          ${criticas.length > 30 ? `<p style="color:#6a7c98;font-size:13px;margin-top:12px">…y ${criticas.length - 30} más. Revisa todas en <a href="https://ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/pages/alertas.html" style="color:#3570e8">la plataforma</a>.</p>` : ''}
+          ${criticas.length > 30 ? `<p style="color:#6a7c98;font-size:13px;margin-top:12px">…y ${criticas.length - 30} más. Revisa todas en <a href="https://powertransformersmj.github.io/pages/alertas.html" style="color:#3570e8">la plataforma</a>.</p>` : ''}
           <hr style="border:none;border-top:1px solid #e4e9f2;margin:20px 0">
           <p style="color:#6a7c98;font-size:12px;margin:0">
             MO.00418.DE-GAC-AX.01 Ed. 02 · CARIBEMAR DE LA COSTA S.A.S E.S.P · Afinia · Grupo EPM

@@ -49,7 +49,7 @@ export const CATEGORIAS_DOC = {
 };
 
 // Raíz del proyecto resuelta desde import.meta.url. Soporta project
-// pages (ajimenezp99-jpg.github.io/repo/) sin asumir el path. Este
+// pages (powertransformersmj.github.io/repo/) sin asumir el path. Este
 // archivo vive en assets/js/data/, así que ../../../ apunta al root.
 const BASE_HREF = new URL('../../../', import.meta.url).href;
 
