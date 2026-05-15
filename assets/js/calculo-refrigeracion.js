@@ -123,12 +123,24 @@ async function ensureFanDb() {
 /* ─── Identificación: matrícula AFINIA ──────────────────────── */
 
 async function initMatSelect() {
-  const list = await ensureTransformers();
-  const dl = $('mat_list');
-  if (!dl) return;
-  dl.innerHTML = list.map(t =>
-    `<option value="${escaparHtml(t.MATRICULA)}">${escaparHtml(t.MATRICULA)} — ${escaparHtml(t.SUBESTACION)} (${t['POTENCIA (KVA)']} kVA)</option>`
-  ).join('');
+  const hint = $('mat_hint');
+  try {
+    const list = await ensureTransformers();
+    const dl = $('mat_list');
+    if (!dl) {
+      if (hint) hint.textContent = 'ERROR: datalist no encontrado en DOM';
+      return;
+    }
+    dl.innerHTML = list.map(t =>
+      `<option value="${escaparHtml(t.MATRICULA)}">${escaparHtml(t.MATRICULA)} — ${escaparHtml(t.SUBESTACION)} (${t['POTENCIA (KVA)']} kVA)</option>`
+    ).join('');
+    if (hint) hint.textContent = `${list.length} matrículas cargadas · escribe T1, BYC, CHG…`;
+    console.info('[calculo-refrigeracion] initMatSelect OK · ' + list.length + ' matrículas');
+  } catch (err) {
+    if (hint) hint.textContent = 'ERROR cargando matrículas: ' + (err && err.message || err);
+    console.error('[calculo-refrigeracion] initMatSelect falló:', err);
+    throw err;
+  }
 }
 
 async function onMatChange() {
