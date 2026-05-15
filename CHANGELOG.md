@@ -1224,7 +1224,7 @@ automáticamente desde `main` tras merge.
 ### Commit / PR
 
 - Commit: `e43aa42`
-- PR: [#119](https://github.com/ajimenezp99-jpg/LordPowerTransformersMJ.github.io/pull/119)
+- PR: [#119](https://github.com/PowertransformersMJ/powertransformersmj.github.io/pull/119)
 - Merge a main: `8e1aa10`
 
 ### Nota operativa
@@ -1469,8 +1469,8 @@ Causa raíz: `urlDocumento(cid, slug)` devolvía la cadena RELATIVA
 `location.href` de la página, dando:
 
 ```
-https://.../LordPowerTransformersMJ.github.io/pages/assets/docs/...
-                                              ^^^^^ pages/ sobrando
+https://.../powertransformersmj.github.io/pages/assets/docs/...
+                                          ^^^^^ pages/ sobrando
 ```
 
 GitHub Pages 404 porque el path real es sin `pages/` en medio.
@@ -1761,9 +1761,9 @@ Refactor visual completo del shell sobre la nueva foto de fondo
 5. **`bindTreeToggle()` forzando expand-all** impedía colapsar
    árboles por default. Fix: respetar el `aria-expanded` inicial
    del botón caret.
-6. **Project page URL** (`ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/`)
-   distinta de user page (`ajimenezp99-jpg.github.io/`). La user
-   page retorna 404. Documentado en CLAUDE.md §9.7.
+6. **User page URL** (`powertransformersmj.github.io/`)
+   sirve directamente el repo `powertransformersmj.github.io`.
+   Documentado en CLAUDE.md §9.7.
 
 ### Archivos clave
 

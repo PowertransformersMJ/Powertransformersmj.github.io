@@ -93,7 +93,7 @@
       '/pages/about.html':                   'pages/recursos.html#tab=about'
     };
     // Match contra el suffix del pathname (acepta cualquier prefijo de
-    // base path, p.ej. /LordPowerTransformersMJ.github.io/).
+    // base path, p.ej. /powertransformersmj.github.io/).
     const cleanPath = location.pathname;
     for (const [legacy, target] of Object.entries(LEGACY_REDIRECTS)) {
       if (cleanPath.endsWith(legacy)) {
