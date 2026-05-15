@@ -50,10 +50,12 @@
       <div class="calc-row">
         <div class="fld">
           <label for="mat_input">Búsqueda por matrícula</label>
-          <select id="mat_input" class="w200">
-            <option value="">— Cargando matrículas… —</option>
-          </select>
-          <span class="hint" id="mat_hint">Selecciona una matrícula para autocompletar los demás campos</span>
+          <div class="combo-wrap">
+            <input type="text" id="mat_input" class="w200" placeholder="Escribí T1, CHG, BYC…" autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="mat_listbox" aria-haspopup="listbox">
+            <!-- [html-validate-disable-next prefer-native-element: combobox custom, no usar <select> nativo porque el usuario necesita escritura libre + filtro en vivo] -->
+            <ul id="mat_listbox" class="combo-list" role="listbox" hidden></ul>
+          </div>
+          <span class="hint" id="mat_hint">Escribí parte de la matrícula, subestación o departamento · navega con ↑↓ y Enter</span>
         </div>
         <div class="fld fld-ro">
           <label for="t_serie">Serie</label>
