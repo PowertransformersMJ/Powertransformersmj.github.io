@@ -50,9 +50,10 @@
       <div class="calc-row">
         <div class="fld">
           <label for="mat_input">Búsqueda por matrícula</label>
-          <input type="text" id="mat_input" list="mat_list" class="w200" placeholder="Ej: T1A-A/M-BYC">
-          <datalist id="mat_list"></datalist>
-          <span class="hint" id="mat_hint">Cargando catálogo de matrículas…</span>
+          <select id="mat_input" class="w200">
+            <option value="">— Cargando matrículas… —</option>
+          </select>
+          <span class="hint" id="mat_hint">Selecciona una matrícula para autocompletar los demás campos</span>
         </div>
         <div class="fld fld-ro">
           <label for="t_serie">Serie</label>
