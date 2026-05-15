@@ -124,38 +124,105 @@ async function ensureFanDb() {
 
 async function initMatSelect() {
   const hint = $('mat_hint');
-  const sel = $('mat_input');
+  const inp  = $('mat_input');
+  const list = $('mat_listbox');
   try {
-    const list = await ensureTransformers();
-    if (!sel) {
-      if (hint) hint.textContent = 'ERROR: selector no encontrado en DOM';
+    const catalogo = await ensureTransformers();
+    if (!inp || !list) {
+      if (hint) hint.textContent = 'ERROR: combobox no encontrado en DOM';
       return;
     }
-    // Agrupar por zona (BOLIVAR / ORIENTE / OCCIDENTE) y ordenar matrículas dentro de cada grupo
-    const porZona = {};
-    for (const t of list) {
-      const zona = (t.ZONA || 'OTRAS').toUpperCase();
-      if (!porZona[zona]) porZona[zona] = [];
-      porZona[zona].push(t);
-    }
-    const zonasOrden = ['BOLIVAR', 'ORIENTE', 'OCCIDENTE', ...Object.keys(porZona).filter(z => !['BOLIVAR','ORIENTE','OCCIDENTE'].includes(z))];
-    let html = '<option value="">— Selecciona una matrícula (' + list.length + ' disponibles) —</option>';
-    for (const zona of zonasOrden) {
-      const grupo = porZona[zona];
-      if (!grupo || !grupo.length) continue;
-      grupo.sort((a, b) => String(a.MATRICULA).localeCompare(String(b.MATRICULA)));
-      html += `<optgroup label="${escaparHtml(zona)} (${grupo.length})">`;
-      for (const t of grupo) {
-        html += `<option value="${escaparHtml(t.MATRICULA)}">${escaparHtml(t.MATRICULA)} — ${escaparHtml(t.SUBESTACION)} (${t['POTENCIA (KVA)']} kVA · ${escaparHtml(t.REFRIGERACION || '—')})</option>`;
+    // Estado del combobox accesible desde los handlers
+    const state = { catalogo, vistos: [], idx: -1 };
+    inp.__matState = state;
+
+    const norm = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+
+    function render(items) {
+      state.vistos = items;
+      state.idx = items.length ? 0 : -1;
+      if (!items.length) {
+        list.innerHTML = '<li class="empty" role="option" aria-disabled="true">Sin coincidencias para "' + escaparHtml(inp.value) + '"</li>';
+      } else {
+        list.innerHTML = items.slice(0, 30).map((t, i) =>
+          `<li role="option" data-mat="${escaparHtml(t.MATRICULA)}" aria-selected="${i === 0 ? 'true' : 'false'}">` +
+            `<b>${escaparHtml(t.MATRICULA)}</b> — ${escaparHtml(t.SUBESTACION)}` +
+            `<span class="sub">${escaparHtml(t.ZONA)} · ${escaparHtml(t.DEPARTAMENTO)} · ${escaparHtml(String(t['POTENCIA (KVA)']))} kVA · ${escaparHtml(t.REFRIGERACION || '—')}</span>` +
+          '</li>'
+        ).join('');
+        if (items.length > 30) list.innerHTML += '<li class="empty" aria-disabled="true">… y ' + (items.length - 30) + ' más · refiná la búsqueda</li>';
       }
-      html += '</optgroup>';
+      list.hidden = false;
+      inp.setAttribute('aria-expanded', 'true');
     }
-    sel.innerHTML = html;
-    if (hint) hint.textContent = `${list.length} matrículas cargadas · selecciona una para autocompletar`;
-    console.info('[calculo-refrigeracion] initMatSelect OK · ' + list.length + ' matrículas');
+    function close() {
+      list.hidden = true;
+      inp.setAttribute('aria-expanded', 'false');
+      state.idx = -1;
+    }
+    function filtrar(q) {
+      const Q = norm(q);
+      if (!Q) return catalogo.slice(0, 30);
+      return catalogo.filter(t =>
+        norm(t.MATRICULA).includes(Q) ||
+        norm(t.SUBESTACION).includes(Q) ||
+        norm(t.DEPARTAMENTO).includes(Q) ||
+        norm(t.ZONA).includes(Q) ||
+        norm(t.SERIE).includes(Q)
+      );
+    }
+    function selectByIndex(i) {
+      const items = list.querySelectorAll('li[data-mat]');
+      items.forEach((el, k) => el.setAttribute('aria-selected', k === i ? 'true' : 'false'));
+      const target = items[i];
+      if (target) target.scrollIntoView({ block: 'nearest' });
+      state.idx = i;
+    }
+    function commit(matricula) {
+      inp.value = matricula;
+      close();
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    // INPUT: filtra mientras tipea
+    inp.addEventListener('input', () => render(filtrar(inp.value)));
+    // FOCUS: abre el listbox con los primeros 30 o filtrados
+    inp.addEventListener('focus', () => render(filtrar(inp.value)));
+    // BLUR: cierra (con delay para permitir click en items)
+    inp.addEventListener('blur', () => setTimeout(close, 150));
+    // CLICK en item
+    list.addEventListener('mousedown', (ev) => {
+      const li = ev.target.closest('li[data-mat]');
+      if (!li) return;
+      ev.preventDefault();
+      commit(li.getAttribute('data-mat'));
+    });
+    // TECLADO: ↑↓ Enter Esc
+    inp.addEventListener('keydown', (ev) => {
+      if (list.hidden) return;
+      const items = state.vistos.slice(0, 30);
+      if (ev.key === 'ArrowDown') {
+        ev.preventDefault();
+        if (!items.length) return;
+        selectByIndex(Math.min(state.idx + 1, items.length - 1));
+      } else if (ev.key === 'ArrowUp') {
+        ev.preventDefault();
+        if (!items.length) return;
+        selectByIndex(Math.max(state.idx - 1, 0));
+      } else if (ev.key === 'Enter') {
+        if (state.idx >= 0 && items[state.idx]) {
+          ev.preventDefault();
+          commit(items[state.idx].MATRICULA);
+        }
+      } else if (ev.key === 'Escape') {
+        close();
+      }
+    });
+
+    if (hint) hint.textContent = `${catalogo.length} matrículas cargadas · escribí parte de la matrícula, subestación o departamento`;
+    console.info('[calculo-refrigeracion] initMatSelect OK · ' + catalogo.length + ' matrículas · combobox custom');
   } catch (err) {
     if (hint) hint.textContent = 'ERROR cargando matrículas: ' + (err && err.message || err);
-    if (sel) sel.innerHTML = '<option value="">— Error al cargar —</option>';
     console.error('[calculo-refrigeracion] initMatSelect falló:', err);
     throw err;
   }
