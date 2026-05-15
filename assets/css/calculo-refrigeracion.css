@@ -100,6 +100,59 @@
   font-family: var(--font-mono); font-size: 9.5px;
   color: var(--ink-4); font-style: italic;
 }
+
+/* Combobox custom para búsqueda de matrícula */
+.combo-wrap { position: relative; }
+.combo-list {
+  position: absolute;
+  top: calc(100% + 2px);
+  left: 0;
+  z-index: 60;
+  margin: 0;
+  padding: 4px 0;
+  list-style: none;
+  width: max(260px, 100%);
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(255,255,255,.98);
+  border: 1px solid rgba(0,40,90,.20);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0,40,90,.18),
+              0 0 0 1px rgba(255,255,255,.5) inset;
+  backdrop-filter: blur(8px);
+  font-size: 12px;
+}
+.combo-list[hidden] { display: none !important; }
+.combo-list li {
+  padding: 6px 12px;
+  cursor: pointer;
+  color: var(--ink-1);
+  line-height: 1.4;
+  border-bottom: 1px solid rgba(0,40,90,.04);
+  user-select: none;
+}
+.combo-list li:last-child { border-bottom: 0; }
+.combo-list li b {
+  color: var(--brand-deep);
+  font-weight: 700;
+}
+.combo-list li .sub {
+  display: block;
+  font-size: 10.5px;
+  color: var(--ink-3);
+  margin-top: 1px;
+}
+.combo-list li:hover,
+.combo-list li[aria-selected="true"] {
+  background: rgba(0,122,255,.10);
+}
+.combo-list .empty {
+  padding: 10px 12px;
+  color: var(--ink-3);
+  font-style: italic;
+  cursor: default;
+}
+.combo-list .empty:hover { background: transparent; }
 .fld-ro input {
   background: rgba(0,122,255,.06) !important;
   border-color: rgba(0,122,255,.20) !important;
