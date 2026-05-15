@@ -544,6 +544,99 @@ Editar `pages/calculo-refrigeracion.html` § datalist `proyecto_list`:
 </datalist>
 ```
 
+> **Nota:** `proyecto_list` sigue siendo `<datalist>` porque es un campo
+> de texto libre con solo ~3 opciones sugeridas — el usuario suele
+> escribir un nombre nuevo. NO confundir con el campo "Búsqueda por
+> matrícula" que SÍ usa combobox custom (ver § 7.4) porque tiene 206
+> opciones cerradas y `<datalist>` fallaba en Safari/iframe.
+
+### 7.4 Combobox de matrícula AFINIA (2026-05-15)
+
+El campo **"Búsqueda por matrícula"** del § Identificación del
+transformador es un **combobox custom** (no `<datalist>`) por la
+regla permanente §0.1.2.12 del CLAUDE.md.
+
+**Arquitectura:**
+
+- HTML: `<input type="text" id="mat_input" role="combobox">` +
+  `<ul id="mat_listbox" role="listbox">` dentro de `<div class="combo-wrap">`
+- CSS: `.combo-wrap` / `.combo-list` en
+  `assets/css/calculo-refrigeracion.css` líneas 99-156
+- JS: `initMatSelect()` en
+  `assets/js/calculo-refrigeracion.js` (~ línea 125)
+- Catálogo: `assets/js/data/refrigeracion-transformadores-afinia.js`
+  (206 entradas, sincronizadas con `Salud de Activos 2026.xlsx` hoja
+  `TX_Potencia`)
+
+**Búsqueda multi-campo** — filtra por substring case-insensitive en:
+- `MATRICULA` (ej. `T1-M/M-CHG` o solo `CHG`)
+- `SUBESTACION` (ej. `chiriguana` o `chiriguán`, normalize NFD ignora acentos)
+- `DEPARTAMENTO` (ej. `cesar`, `bolívar`, `magdalena`)
+- `ZONA` (ej. `oriente`, `bolivar`, `occidente`)
+- `SERIE` (ej. `N339380`)
+
+**Eventos wireados:**
+
+| Evento | Handler |
+|---|---|
+| `input` | filtra catálogo y rerenderea lista |
+| `focus` | abre lista con primeros 30 o filtrados |
+| `blur` (con 150ms delay) | cierra lista |
+| `mousedown` en `<li>` | `commit()` + `dispatchEvent(change)` |
+| `keydown` ↑↓ | navega por la lista (scrollIntoView) |
+| `keydown` Enter | selecciona el item activo |
+| `keydown` Esc | cierra lista |
+
+**Compatibilidad con resto del módulo** — el `commit()` despacha
+`new Event('change', { bubbles: true })` para que el handler existente
+`onMatChange()` (registrado vía `addEventListener('change', ...)`)
+autocomplete los 7 campos readonly (Serie, Subestación, Zona,
+Departamento, Grupo, Potencia, Refrigeración) + recalcule los KPIs
+ONAN/ONAF. Todos los call sites de `mat_input.value` (registro de
+acción, exportar JSON, generar informe, anti-duplicado) siguen
+funcionando idénticos.
+
+**Tope de resultados visibles:** 30 items + indicador `… y N más ·
+refiná la búsqueda` cuando hay más coincidencias. Sin tope, render
+de 200+ entradas se vuelve lento en cada `input`.
+
+**Lint exception:** el `<ul role="listbox">` dispara la regla
+`prefer-native-element` de html-validate. Suprimida con comentario
+inline en `pages/calculo-refrigeracion.html` línea 55:
+
+```html
+<!-- [html-validate-disable-next prefer-native-element: combobox custom...] -->
+```
+
+**Para añadir/modificar matrículas:** editar
+`Salud de Activos 2026.xlsx` hoja `TX_Potencia` y luego regenerar
+`assets/js/data/refrigeracion-transformadores-afinia.js` con un
+script Node (referencia rápida abajo). El catálogo congelado existe
+para que el módulo cargue sin depender de Firestore — los 206 trafos
+son catálogo cerrado de AFINIA.
+
+```bash
+# Regenerar catálogo desde Excel
+node -e "
+const XLSX = require('xlsx');
+const wb = XLSX.readFile('Salud de Activos 2026.xlsx');
+const ws = wb.Sheets['TX_Potencia'];
+const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
+const out = rows.filter(r => r.MATRICULA && String(r.MATRICULA).trim())
+  .map(r => ({
+    SERIE: r.SERIE != null ? String(r.SERIE) : '',
+    'POTENCIA (KVA)': r['POTENCIA (KVA)'] != null ? String(r['POTENCIA (KVA)']) : '',
+    GRUPO: String(r.GRUPO || '').trim(),
+    SUBESTACION: String(r.SUBESTACION || '').trim(),
+    MATRICULA: String(r.MATRICULA).trim(),
+    ZONA: String(r.ZONA || '').trim(),
+    DEPARTAMENTO: String(r.DEPARTAMENTO || '').trim(),
+    REFRIGERACION: String(r.REFRIGERACION || '').trim()
+  }));
+console.log('export const TRANSFORMADORES_AFINIA = Object.freeze(' + JSON.stringify(out) + ');');
+"
+```
+
 ---
 
 ## 9. Decisiones del director (NO re-debatir)
