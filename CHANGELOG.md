@@ -7,6 +7,156 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## Migración de repositorio + combobox custom de matrículas (2026-05-15)
+
+Sesión doble: migración GitHub al nuevo repositorio
+`PowertransformersMJ/powertransformersmj.github.io` (preservando
+identidad Firebase intacta) y resolución definitiva del bug de
+visualización del dropdown de matrículas en Mantenimiento Brigada ·
+Selección ONAF.
+
+### Migración del repositorio · GitHub refs sin tocar Firebase
+
+Reemplazos selectivos en 14 archivos:
+
+- `LordPowerTransformersMJ.github.io` (repo viejo) → `powertransformersmj.github.io`
+- `ajimenezp99-jpg/...` (URL `github.com/USER/REPO`) → `PowertransformersMJ/...`
+- `ajimenezp99-jpg.github.io` (user page legacy) → `powertransformersmj.github.io`
+
+Tocados: `index.html`, `home.html` (canonical/OG/Twitter), `sitemap.xml`,
+`robots.txt`, `package.json` (homepage + repository.url), `functions/index.js`
+(link en email de alertas), `assets/js/aqua-shell.js` (comentario base path),
+`assets/js/data/documentos_contractuales.js` (comentario project pages),
+`CHANGELOG.md`, `CLAUDE.md` y 4 archivos en `docs/`.
+
+**Preservados intactos** (Firebase project ID, NO son GitHub):
+- `.firebaserc` · `"default": "lordpowertransformersmj"`
+- `assets/js/firebase-config.js` · `projectId`, `authDomain`,
+  `storageBucket` con dominio `lordpowertransformersmj.firebaseapp.com` y
+  `lordpowertransformersmj.firebasestorage.app`
+- URLs `console.firebase.google.com/project/lordpowertransformersmj/...`
+- Comandos `firebase use lordpowertransformersmj` en `docs/DEPLOY-FUNCTIONS.md`
+- Output esperado del CLI `Now using alias default (lordpowertransformersmj)`
+
+El sitio se sirve desde el nuevo dominio user page `powertransformersmj.github.io`
+mientras que Firebase Auth/Firestore/Storage siguen apuntando al mismo proyecto
+backend `lordpowertransformersmj`. La sesión y los datos persisten sin
+migración de backend.
+
+Commit raíz: `8942ecb`. PR: #1 (mergeado a `main` como `bae9a36`).
+
+### Bug · `<datalist>` no muestra dropdown en Safari (regresión histórica)
+
+**Síntoma:** en `Mantenimiento Brigada · Sistema de Refrigeración`, el
+campo `Búsqueda por matrícula` (`<input list="mat_list">` + `<datalist>`)
+no mostraba opciones al hacer click o escribir. Los KPIs del cálculo
+sí mostraban valores (60.000 kVA / 79.800 kVA / etc.) confirmando que
+`initMatSelect()` se ejecutaba sin lanzar excepción — el datalist
+se poblaba pero el browser no renderizaba el dropdown.
+
+**Causa raíz:** combinación de tres factores:
+
+1. **Safari + `autocomplete="off"`** · cuando se usa `autocomplete="off"`
+   en un `<input list="...">`, Safari suprime el dropdown del datalist
+   (no solo el autofill de formularios). Es un bug histórico de WebKit
+   sin fix oficial.
+2. **Iframe sandbox** · la página `mantenimiento-brigada.html` carga
+   `calculo-refrigeracion.html` en un `<iframe>` lazy con `data-src`.
+   Algunos browsers tienen comportamiento errático para `<datalist>`
+   dentro de iframes same-origin.
+3. **Extensiones de privacidad/autofill** (1Password, AdGuard, etc.)
+   interceptan el evento focus del input y bloquean dropdowns nativos.
+
+**Diagnóstico aplicado** (commit `690df96`, PR #2):
+
+- Hint dinámico `id="mat_hint"` que muestra en runtime:
+  - `Cargando catálogo de matrículas…` mientras importa el módulo
+  - `206 matrículas cargadas · escribe T1, BYC, CHG…` si init OK
+  - `ERROR cargando matrículas: <mensaje>` si falla el import
+  - `ERROR: datalist no encontrado en DOM` si el elemento no existe
+- Quitar `autocomplete="off"` (Safari quirk)
+- `console.info` / `console.error` con prefijo `[calculo-refrigeracion]`
+
+El hint permitió al director ver visualmente que las 206 matrículas
+cargaban correctamente, confirmando que el problema era el render
+del dropdown nativo, no la carga de datos.
+
+### Solución definitiva · Combobox custom
+
+Tres iteraciones convergiendo en la solución universal:
+
+1. **Commit `c570f21`** · reemplazar `<input list>` + `<datalist>` por un
+   `<select>` con `<optgroup>` por zona (BOLIVAR / ORIENTE / OCCIDENTE).
+   Funcionó pero solo permite seleccionar de la lista — no escritura libre.
+
+2. **Commit `f646651`** · combobox custom completo con escritura libre + filtro en vivo:
+   - HTML · `<input type="text" role="combobox">` + `<ul role="listbox">`
+   - CSS · `.combo-wrap` (relative) + `.combo-list` (absolute, blur, glass,
+     max-height 320px con scroll, hover y aria-selected highlight)
+   - JS · `initMatSelect()` reescrito:
+     - Filtra con `String.normalize('NFD')` para ignorar acentos
+     - Match por substring case-insensitive en MATRICULA, SUBESTACION,
+       DEPARTAMENTO, ZONA o SERIE (5 campos de búsqueda)
+     - Eventos: `input` (filtrar), `focus` (abrir), `blur` (cerrar con
+       150ms de delay para permitir click en items), `mousedown` en `<li>`
+       (commit + dispatch change), `keydown` (↑↓ navega · Enter selecciona
+       · Esc cierra)
+     - Tope de 30 resultados visibles + indicador `… y N más · refiná
+       la búsqueda`
+     - `commit()` despacha `new Event('change', { bubbles: true })` que
+       sigue invocando el handler `onMatChange` existente que autocompleta
+       Serie, Subestación, Zona, Departamento, Grupo, Potencia, Refrigeración
+       y recalcula los KPIs ONAN/ONAF
+
+**Ejemplos de búsqueda que funcionan:**
+- `T1-M/M-CHG` (matrícula completa) → match exacto
+- `CHG` (substring matrícula) → `T1-M/M-CHG · CHIRIGUANA`
+- `chiriguana` (con o sin acentos) → mismo resultado por subestación
+- `cesar` (departamento) → todos los del Cesar
+- `oriente` (zona) → toda la zona ORIENTE
+- `N339380` (serie) → encuentra por serie
+
+**Funciona en 100% de browsers** (Safari, Chrome, Firefox, Edge) sin
+dependencia del `<datalist>` nativo. Sin impacto en los call sites de
+`mat_input.value` (registro de acción, exportar JSON, generar informe,
+anti-duplicado) porque siguen usando `.value` del input.
+
+### Verificación de catálogo · Excel como fuente de verdad
+
+El usuario subió `Salud de Activos 2026.xlsx` al raíz del repo (commit
+`f475ee9` directo a main). Hoja `TX_Potencia` con 211 filas (206 con
+MATRICULA válida).
+
+Comparación con el catálogo congelado actual
+`assets/js/data/refrigeracion-transformadores-afinia.js`:
+
+| Métrica | Excel | Catálogo congelado |
+|---|---|---|
+| Total matrículas | 206 | 206 |
+| Solo en Excel (faltan) | 0 | — |
+| Solo en catálogo (sobran) | — | 0 |
+| Matrículas con datos distintos | 0 | — |
+| `T1-M/M-CHG` (referencia del informe) | ✅ CHIRIGUANA · ORIENTE · CESAR · ONAF · 12500 kVA | ✅ idem |
+
+El catálogo congelado y el Excel son **idénticos campo a campo**. No
+hubo que regenerar nada — el binding ya estaba correcto.
+
+Duplicado conocido: `T1-M/M-CAC` aparece dos veces en el Excel (2
+transformadores en CAÑO COLORADO). No es bug del catálogo, es así en
+la fuente.
+
+### Commits y PRs
+
+| Commit | PR | Descripción |
+|---|---|---|
+| `8942ecb` | [#1](https://github.com/PowertransformersMJ/Powertransformersmj.github.io/pull/1) | chore(repo): migrar referencias GitHub al nuevo repositorio |
+| `690df96` | [#2](https://github.com/PowertransformersMJ/Powertransformersmj.github.io/pull/2) | fix(brigada): diagnóstico visible del cargador de matrículas + quitar autocomplete=off |
+| `f475ee9` | (direct push) | Add files via upload (Excel + replay de mi fix) |
+| `c570f21` | [#3](https://github.com/PowertransformersMJ/Powertransformersmj.github.io/pull/3) | fix(brigada): reemplazar input+datalist por `<select>` con optgroup por zona |
+| `f646651` | [#4](https://github.com/PowertransformersMJ/Powertransformersmj.github.io/pull/4) | feat(brigada): combobox custom para Búsqueda por matrícula |
+
+
+
 ## En curso · Mix multi-modelo en Selección ONAF (2026-05-03)
 
 Trabajo en curso para soportar **combinación de varios modelos de
