@@ -72,7 +72,7 @@ Orden recomendado (replicado como asistente visual en
 ### 1.1 Prerrequisitos
 
 - Cuenta Firebase plan **Blaze** (solo si se activan Cloud Functions).
-- Acceso al repo `ajimenezp99-jpg/LordPowerTransformersMJ.github.io`.
+- Acceso al repo `PowertransformersMJ/powertransformersmj.github.io`.
 - Excel oficial "Salud de Activos 2026.xlsx".
 - PAT clásico de GitHub con scope `repo` para push desde Claude Code.
 
@@ -305,7 +305,7 @@ archivo; no hay dependencia cruzada entre suites.
 
 - **Procedimiento vigente:** MO.00418.DE-GAC-AX.01 Ed. 02 (14/10/2025)
 - **Operador:** CARIBEMAR DE LA COSTA S.A.S E.S.P (Afinia · Grupo EPM)
-- **Repo:** `github.com/ajimenezp99-jpg/LordPowerTransformersMJ.github.io`
+- **Repo:** `github.com/PowertransformersMJ/powertransformersmj.github.io`
 - **Rama activa:** `claude/review-phase-16-plan-mhPgg`
 - **Issues / mejoras:** crear issue en el repo o pedir al
   siguiente Claude que lo aborde.

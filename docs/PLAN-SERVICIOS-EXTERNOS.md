@@ -113,7 +113,7 @@ Se abrirá su navegador → inicie sesión con la misma cuenta Google del proyec
 ### 2.3 Enlazar el proyecto local
 Ubíquese en la carpeta del repo:
 ```
-cd ruta\a\LordPowerTransformersMJ.github.io
+cd ruta\a\powertransformersmj.github.io
 ```
 (En Windows puede arrastrar la carpeta a la terminal después de `cd `.)
 Verifique el alias ya configurado:
@@ -191,7 +191,7 @@ Para cada miembro:
 **Objetivo:** que el sitio esté en Internet.
 
 ### 4.1 Habilitar GitHub Pages
-1. En GitHub → repo `LordPowerTransformersMJ.github.io` → **Settings** → **Pages**.
+1. En GitHub → repo `powertransformersmj.github.io` → **Settings** → **Pages**.
 2. Source: **Deploy from a branch**.
 3. Branch: `main` · Folder: `/ (root)` · **Save**.
 
@@ -202,7 +202,7 @@ hacia `main`, revisarlo y hacer merge.
 
 ### 4.3 Autorizar el dominio público en Firebase
 1. Console → Authentication → **Settings** → **Authorized domains**.
-2. Pulse **Add domain** y agregue `lordpowertransformersmj.github.io` (o el
+2. Pulse **Add domain** y agregue `powertransformersmj.github.io` (o el
    dominio final que GitHub le dé).
 
 ### Criterio de cierre de la Sesión 4
@@ -265,15 +265,14 @@ hacia `main`, revisarlo y hacer merge.
   Miguel Jimenez" y rol `admin`.
 - [x] **Sesión 4 — GitHub Pages** · 2026-04-19 ·
   Pages activado desde rama `main` / carpeta `root`.
-  URL pública: `https://ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/`
-  (project page, NO user page — el repo no se llama
-  `ajimenezp99-jpg.github.io`).
+  URL pública: `https://powertransformersmj.github.io/`
+  (user page — el repo se llama `powertransformersmj.github.io`).
   **Fix aplicado (commit `28aa1c4`, PR #18):** rutas absolutas
   `/index.html` y `/home.html` rotas en project page. Ahora se
   calculan dinámicamente desde `import.meta.url` en
   `session-guard.js` y `admin-auth.js`; `index.html` usa la ruta
   relativa `home.html`. Funciona igual en root y subpath.
-  Dominio `ajimenezp99-jpg.github.io` autorizado en Firebase Auth
+  Dominio `powertransformersmj.github.io` autorizado en Firebase Auth
   → Settings (recomendado para recuperación de contraseña y
   compatibilidad con providers futuros).
 - [ ] **Sesión 5 — Vercel** · _postergada_ · Se activará cuando

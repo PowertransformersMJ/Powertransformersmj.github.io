@@ -11,4 +11,4 @@ Disallow: /admin/
 Disallow: /home.html
 Disallow: /pages/
 
-Sitemap: https://lordpowertransformersmj.github.io/sitemap.xml
+Sitemap: https://powertransformersmj.github.io/sitemap.xml
