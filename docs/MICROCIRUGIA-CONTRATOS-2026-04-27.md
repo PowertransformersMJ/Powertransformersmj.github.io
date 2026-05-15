@@ -440,7 +440,7 @@ Lista de colecciones afectadas por este patrón (verificadas a
 
 - Branch: `claude/mira-feature-XqsGK`
 - Commit: `e43aa42`
-- PR: [#119](https://github.com/ajimenezp99-jpg/LordPowerTransformersMJ.github.io/pull/119)
+- PR: [#119](https://github.com/PowertransformersMJ/powertransformersmj.github.io/pull/119)
 - Merge a main: `8e1aa10`
 - CHANGELOG: v2.8.1
 - CLAUDE.md: §9.9
