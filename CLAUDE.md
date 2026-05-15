@@ -24,7 +24,7 @@ push a GitHub están restringidos a lectura**:
 
 **Fix permanente (pendiente de acción del dueño del repo):**
 conceder permiso **Contents: Read & write** al GitHub App de
-Claude Code sobre `ajimenezp99-jpg/lordpowertransformersmj.github.io`
+Claude Code sobre `PowertransformersMJ/powertransformersmj.github.io`
 en *GitHub → Settings → Applications → Installed GitHub Apps*. Mientras
 no se haga, los dos primeros canales seguirán fallando con 403.
 
@@ -1683,7 +1683,7 @@ independientes, cada una con commit aislado:
 #### ✅ Fase 13 — Pulido (SEO + accesibilidad)
 
 - **SEO.**
-  - `robots.txt` con `Allow: /`, `Allow: /index.html`, `Allow: /assets/` y `Disallow: /admin/`, `/home.html`, `/pages/` (zona interna/admin), más línea `Sitemap:` apuntando a `https://lordpowertransformersmj.github.io/sitemap.xml`.
+  - `robots.txt` con `Allow: /`, `Allow: /index.html`, `Allow: /assets/` y `Disallow: /admin/`, `/home.html`, `/pages/` (zona interna/admin), más línea `Sitemap:` apuntando a `https://powertransformersmj.github.io/sitemap.xml`.
   - `sitemap.xml` con una única URL (la landing pública); el resto del sitio queda detrás del gate y se marca `noindex` en sus páginas.
   - `index.html` con bloque completo de **Open Graph** (`og:type=website`, `og:site_name`, `og:locale=es_CO`, `og:url`, `og:title`, `og:description`, `og:image`) + **Twitter Card** (`summary`) + `<link rel="canonical">` + `<meta name="theme-color" content="#040c14">` + `<meta name="color-scheme" content="dark">` + `<meta name="robots" content="index, follow">`.
   - **JSON-LD Organization schema** embebido al final de `index.html` con `name`, `url`, `logo`, `areaServed` (Bolívar, Córdoba, Sucre, Cesar, Magdalena como `AdministrativeArea`) y `knowsAbout` (ISO 50001, IEEE C57.12, IEC 60076, RETIE, NTC-IEC 60364, CIGRE WG A2, Transformadores de potencia, Análisis RAM).
@@ -2333,7 +2333,7 @@ integración SCADA, etc.):
 | Tag de release | (sin tag nuevo · branch activa `claude/set-background-image-nhgwM`) |
 | Versiones CHANGELOG | v2.5.0 · v2.5.1 · v2.6.0 · v2.6.1 · v2.7.0 (sesión 2026-04-27) · v2.7.1 · v2.8.0 · **v2.8.1** (sesión 2026-05-01) |
 | PRs mergeados a main esta jornada | #90 → #119 (28+ PRs · #119 = hotfix admin upload v2.8.1) |
-| Sitio en producción | `ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/` (project page · NO el dominio raíz) |
+| Sitio en producción | `powertransformersmj.github.io/` (user page) |
 | Service Worker | **kill-switch** · `sw.js` se auto-desregistra y limpia caches al activarse · sin SW corriendo en producción |
 
 ### 9.2 Decisiones del director (NO re-debatir)
@@ -2510,7 +2510,7 @@ integración SCADA, etc.):
 - Si la foto es HEIC, **convertir a JPEG/WebP** antes de comprometerla.
   Chrome/Firefox no la renderizan como background-image.
 - Si el director reporta "todo sigue igual" después de un deploy,
-  verificar via `curl https://ajimenezp99-jpg.github.io/LordPowerTransformersMJ.github.io/assets/css/...`
+  verificar via `curl https://powertransformersmj.github.io/assets/css/...`
   qué CSS está realmente en el servidor. Si el CSS está bien, el
   problema es cache local del navegador. El kill-switch SW de esta
   sesión resolvió eso definitivamente.
@@ -2524,10 +2524,9 @@ integración SCADA, etc.):
   el sidebar es solo navegación. El contenido va en el panel
   principal (`<main class="app-main">`). NO replicar tabs del
   contrato en sidebar.
-- Si el sitio no carga: verificar URL real (project page subpath
-  `LordPowerTransformersMJ.github.io/`, NO dominio raíz
-  `ajimenezp99-jpg.github.io/`). El user página `ajimenezp99-jpg.github.io/`
-  retorna 404 — el repo se sirve en project page.
+- Si el sitio no carga: verificar URL real (user page
+  `powertransformersmj.github.io/`). El repo se sirve como user page
+  porque el nombre del repo coincide con el dominio.
 
 ### 9.8 Microcirugía Suministros · Información Contractual (v2.6.0 · 2026-04-27 PM3)
 
