@@ -1216,6 +1216,108 @@ de catálogo, etc.) y pida que se use como render visual:
 referencia, screenshots de pantallas legacy, fotos de placas de
 características, diagramas unifilares oficiales del cliente, etc.
 
+### 0.1.2.12 Regla permanente · NO usar `<datalist>` para componentes de búsqueda · combobox custom es el patrón canónico
+
+**Contexto del bug histórico (sesión 2026-05-15):** el campo "Búsqueda
+por matrícula" del módulo Mantenimiento Brigada · Selección ONAF estaba
+implementado con `<input list="mat_list">` + `<datalist>` poblado vía
+JS con 206 entradas del catálogo AFINIA. En Safari y en algunos Chrome
+con extensiones de privacidad/autofill el dropdown NUNCA se mostraba al
+hacer click o tipear. Los KPIs computaban valores correctos (init
+completaba sin throw) pero el browser no renderizaba las opciones del
+datalist. El director invirtió ~30 min intentando diagnosticarlo sin
+poder usar DevTools del iframe.
+
+**Causa raíz (combinación de 3 factores):**
+
+1. **Safari + `autocomplete="off"`** — cuando un `<input list="...">`
+   lleva `autocomplete="off"`, Safari suprime el dropdown del datalist
+   (no solo el autofill de formularios). Es un bug histórico de WebKit
+   sin fix oficial.
+2. **`<datalist>` dentro de iframe** — comportamiento errático
+   cross-browser. El módulo Brigada vive en un iframe lazy-loaded por
+   `module-shell.js`, y eso amplifica los quirks del componente nativo.
+3. **Extensiones de privacidad/autofill** (1Password, AdGuard, varias
+   antitracking) interceptan focus del input y bloquean dropdowns
+   nativos como medida anti-fingerprinting.
+
+**Regla permanente** para CUALQUIER componente de búsqueda / autocompletar
+en este proyecto:
+
+1. **NO usar `<input list="X">` + `<datalist id="X">`** como solución.
+   Es frágil entre browsers y a extensiones del usuario.
+
+2. **SÍ usar combobox custom** con este patrón (ver
+   `pages/calculo-refrigeracion.html` + `assets/js/calculo-refrigeracion.js`
+   función `initMatSelect()` como referencia canónica):
+
+   ```html
+   <div class="combo-wrap">
+     <input type="text" id="X_input" autocomplete="off" spellcheck="false"
+            role="combobox" aria-autocomplete="list" aria-expanded="false"
+            aria-controls="X_listbox" aria-haspopup="listbox">
+     <ul id="X_listbox" class="combo-list" role="listbox" hidden></ul>
+   </div>
+   ```
+
+   ```javascript
+   // Filtrar con normalize NFD para ignorar acentos
+   const norm = (s) => String(s || '').normalize('NFD')
+                       .replace(/[\u0300-\u036f]/g, '').toUpperCase();
+   // Eventos requeridos:
+   // - input: filter + render
+   // - focus: render initial (primeros 30 o filtrados)
+   // - blur: setTimeout(close, 150) para permitir click en items
+   // - mousedown en <li>: commit (ev.preventDefault porque blur cierra)
+   // - keydown: ArrowUp/Down navega, Enter selecciona, Escape cierra
+   // commit() debe disparar:
+   //   inp.dispatchEvent(new Event('change', { bubbles: true }))
+   // para que los handlers downstream existentes (autocompletar campos
+   // dependientes, registrar cambios, etc.) sigan funcionando idénticos.
+   ```
+
+3. **CSS** con `.combo-wrap { position: relative }` + lista absoluta
+   debajo. Ver `assets/css/calculo-refrigeracion.css` líneas 99-156
+   como referencia (max-height con scroll, glass blur, hover y
+   aria-selected highlight).
+
+4. **Tope de resultados visibles** — máximo 30 items + indicador
+   "… y N más · refiná la búsqueda" cuando hay más. Sin tope, listas
+   de 200+ entradas se vuelven lentas de renderear en cada input.
+
+5. **Lint:** el `<ul role="listbox">` dispara la regla `prefer-native-element`
+   de html-validate. Suprimir solo en esa línea con:
+   ```html
+   <!-- [html-validate-disable-next prefer-native-element: combobox custom, no usar <select> nativo porque el usuario necesita escritura libre + filtro en vivo] -->
+   ```
+
+6. **Búsqueda multi-campo** — filtrar por substring case-insensitive
+   en TODOS los campos relevantes (matrícula, subestación, departamento,
+   zona, serie). El usuario no recuerda matrículas por código, recuerda
+   por "ese de Chiriguana" o "el del Cesar".
+
+7. **Compatibilidad downstream** — los call sites que leen `inp.value`
+   y los `addEventListener('change', handler)` funcionan idénticos con
+   este patrón, así que NO hay que refactorizar el resto del módulo.
+
+**Anti-patrón a EVITAR:**
+
+- Pensar "solo es un autocomplete simple, `<datalist>` alcanza".
+- Asumir que un comportamiento que funciona en Chrome del desarrollador
+  funciona en Safari del usuario.
+- Agregar `autocomplete="off"` a un `<input list>` "para limpiar autofill".
+
+**Solución del bug original (commit `f646651`):** el campo de matrícula
+ahora es un combobox custom con escritura libre + filtro en vivo por
+matrícula, subestación, departamento, zona o serie, navegación con teclado
+(↑↓ Enter Esc), tope de 30 resultados, ARIA completo. Reusa el handler
+existente `onMatChange` despachando `new Event('change')` en `commit()`.
+
+**Aplica también a:** cualquier futuro campo de búsqueda/selección en
+módulos del proyecto donde la lista de opciones supere ~10 entradas:
+catálogos de transformadores, suministros, contratos, marcas, modelos
+de ventilador, técnicos, etc.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
@@ -2213,9 +2315,10 @@ panel de KPIs.
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
 | Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) · **fix v2.8.1**: el data layer ahora rellena `codigo`+`estado` por defecto en `setDoc(merge:true)` para que el upload no falle con `permission-denied` cuando `/contratos/{cid}` no existe en Firestore |
 | Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02 · refactor mix multi-modelo en curso desde 2026-05-03) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` con **mix multi-modelo de ventiladores** (`evaluarMixVentiladores` + `sugerirMejoras` + `calcularProteccionMix`, 62 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con paginación manual `.sheet` divs (regla §0.1.2.3) · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` § 4.3. |
+| **Estado al 2026-05-15 (migración GitHub + combobox matrículas)** | **Repo migrado** de `ajimenezp99-jpg/LordPowerTransformersMJ.github.io` a `PowertransformersMJ/powertransformersmj.github.io` (user page directa, sin subruta `project page`). Sitio en producción: `https://powertransformersmj.github.io/`. Refs Firebase (`lordpowertransformersmj` como `projectId` · `authDomain` · `storageBucket`) PRESERVADAS intactas para que Auth/Firestore/Storage sigan apuntando al mismo backend sin migración. Commits relevantes esta jornada en branch `claude/bold-zhukovsky-43e5a1`: `8942ecb` migración refs GitHub (14 archivos, 36 ins / 38 del) · `690df96` diagnóstico visible matrículas (hint dinámico + console.info + quitar autocomplete=off) · `c570f21` `<select>` con optgroup por zona (intermedio) · **`f646651` combobox custom completo con escritura libre + filtro en vivo** (HTML + CSS `.combo-wrap`/`.combo-list` + JS `initMatSelect` reescrito con normalize NFD, búsqueda multi-campo, ↑↓ Enter Esc, ARIA combobox/listbox, tope 30 + indicador "… y N más"). **Catálogo 206 matrículas AFINIA verificado idéntico al Excel `Salud de Activos 2026.xlsx`** (subido a raíz en `f475ee9`). Bug raíz documentado: `<datalist>` no renderea dropdown en Safari + iframe + extensiones de privacidad. **Regla permanente nueva §0.1.2.12** prohíbe `<datalist>` para componentes de búsqueda y consagra el combobox custom como patrón canónico del proyecto. PRs #1, #2, #3, #4 mergeados sucesivamente esta jornada. Director confirmó funcionamiento: *"comprobado, por favor documenta todo"*. |
 | **Estado al 2026-05-05 (sesión render visual + interactividad)** | Branch `claude/adjust-website-pages-8Ntwz` con commits adicionales esta sesión sobre el render integral del transformador (módulo Mantenimiento Brigada · Selección ONAF). Cadena de iteraciones: (a) `aaa2425` render integral cenital base con asignación por unidad → (b) `183f864` radiadores a ambos lados (lado A arriba, lado B abajo) + bujes AT/BT + conservador → (c) `1dc3528` 3D realista (bujes apilados con porcelana, gradientes, sombras, cabezales, aletas individuales) → (d) `110404e` interactividad click-en-cuerpo + conservador sobre banco lado A + regla permanente §0.1.2.10 → (e) `96ebb0b` conservador sobre tanque + render lateral redibujado tipo foto Lord Power/ABB → (f) **`75d1d13` (último)** conservador ENTRE lado A y lado B (apoyado sobre la tapa del tanque, en el área central) + render lateral usa la **foto real del repositorio TAL CUAL** vía `<image>` (no SVG redibujado). Imagen de referencia archivada en `assets/img/refs/lateral-transformador-ABB-ref.png` (Lord Power/ABB · vista lateral con conservador, radiador, ventilador frontal, bujes). **CLAUDE.md ampliado con regla permanente §0.1.2.10** (fidelidad + interactividad obligatorias cuando hay foto de referencia). **570 / 570 tests verdes + HTML lint OK** durante toda la sesión. Doc handoff: `docs/SESION-2026-05-05.md`. |
 | **Estado al 2026-05-03 (cierre + deploy OK)** | Branch `claude/adjust-website-pages-8Ntwz` con **21 commits** desde último merge. Plan de 6 microfases CERRADO + 9 hotfixes/refinements + 1 commit docs. Último commit: `a35e97b` (handoff actualizado). Resumen: refactor mix multi-modelo (5) → CI lint scope (`f1a4403`) → fallback legacy protección (`a3bc06b`) → 6 microfases (tolerancia / estrategias VFD-aerodinámica / FLC+contactor AF+SCADA+coordinación / faltantes / JSON estructurado / validación gráfica) → deep-clean Firestore (`e0ccffb`) → UI reorder + gráfica DPR3 (`2662671`) → pre-chequeo permisos admin (`c85eb41`) → diagnóstico exhaustivo + regla §0.1.2.7 (`525fc3c`) → gráfica HD/4K canvas 2400×1400 (`08dcf03`) → docs handoff (`a35e97b`). **✅ Director confirmó deploy exitoso de `firebase deploy --only firestore:rules`** — rules en producción ahora incluyen match `/acciones_refrigeracion/{id}`, el bug del modal está resuelto. Versiones publicadas: **v2.5.0** → **v2.9.0**. CLAUDE.md ampliado con **7 reglas permanentes nuevas** §0.1.2.1 a §0.1.2.7. **570 / 570 tests verdes** + HTML lint OK durante toda la sesión. Documentación: `docs/MANTENIMIENTO-BRIGADA.md` § 4.3 a 4.7 + `docs/SESION-2026-05-03-CONTINUACION.md` (handoff exhaustivo de toda la sesión con 10 bloques + reglas permanentes + cómo continuar). |
-| Próxima movida              | (1) Director hace hard-reload Cmd+Shift+R y valida (a) render integral del transformador con conservador entre lado A/B + click-en-cuerpo funciona, (b) render lateral por ventilador muestra la foto real del repo. (2) Mergear branch `claude/adjust-website-pages-8Ntwz` a `main` cuando apruebe. (3) Post-merge: revocar PATs históricos + cleanup 7 PDFs raíz del repo (commit `91f386c`). (4) Próxima sesión: extender módulo Mantenimiento Brigada con nuevas calculadoras (aceite, aterramiento, etc.) reutilizando el patrón establecido (dominio puro + tests + UI binding + persistencia + tab consolidado + informe imprimible). |
+| Próxima movida              | (1) Mergear el PR del combobox + documentación (último commit `f646651` + commits de docs). (2) Próxima sesión: aplicar el patrón combobox custom de §0.1.2.12 a otros campos de búsqueda del proyecto (catálogos de suministros, contratos, marcas, modelos de ventilador, técnicos) reemplazando cualquier `<datalist>` legacy que quede. (3) Extender módulo Mantenimiento Brigada con nuevas calculadoras (aceite, aterramiento, etc.) reutilizando el patrón establecido (dominio puro + tests + UI binding + persistencia + tab consolidado + informe imprimible). |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
