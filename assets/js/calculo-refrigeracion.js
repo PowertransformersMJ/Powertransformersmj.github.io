@@ -124,20 +124,38 @@ async function ensureFanDb() {
 
 async function initMatSelect() {
   const hint = $('mat_hint');
+  const sel = $('mat_input');
   try {
     const list = await ensureTransformers();
-    const dl = $('mat_list');
-    if (!dl) {
-      if (hint) hint.textContent = 'ERROR: datalist no encontrado en DOM';
+    if (!sel) {
+      if (hint) hint.textContent = 'ERROR: selector no encontrado en DOM';
       return;
     }
-    dl.innerHTML = list.map(t =>
-      `<option value="${escaparHtml(t.MATRICULA)}">${escaparHtml(t.MATRICULA)} — ${escaparHtml(t.SUBESTACION)} (${t['POTENCIA (KVA)']} kVA)</option>`
-    ).join('');
-    if (hint) hint.textContent = `${list.length} matrículas cargadas · escribe T1, BYC, CHG…`;
+    // Agrupar por zona (BOLIVAR / ORIENTE / OCCIDENTE) y ordenar matrículas dentro de cada grupo
+    const porZona = {};
+    for (const t of list) {
+      const zona = (t.ZONA || 'OTRAS').toUpperCase();
+      if (!porZona[zona]) porZona[zona] = [];
+      porZona[zona].push(t);
+    }
+    const zonasOrden = ['BOLIVAR', 'ORIENTE', 'OCCIDENTE', ...Object.keys(porZona).filter(z => !['BOLIVAR','ORIENTE','OCCIDENTE'].includes(z))];
+    let html = '<option value="">— Selecciona una matrícula (' + list.length + ' disponibles) —</option>';
+    for (const zona of zonasOrden) {
+      const grupo = porZona[zona];
+      if (!grupo || !grupo.length) continue;
+      grupo.sort((a, b) => String(a.MATRICULA).localeCompare(String(b.MATRICULA)));
+      html += `<optgroup label="${escaparHtml(zona)} (${grupo.length})">`;
+      for (const t of grupo) {
+        html += `<option value="${escaparHtml(t.MATRICULA)}">${escaparHtml(t.MATRICULA)} — ${escaparHtml(t.SUBESTACION)} (${t['POTENCIA (KVA)']} kVA · ${escaparHtml(t.REFRIGERACION || '—')})</option>`;
+      }
+      html += '</optgroup>';
+    }
+    sel.innerHTML = html;
+    if (hint) hint.textContent = `${list.length} matrículas cargadas · selecciona una para autocompletar`;
     console.info('[calculo-refrigeracion] initMatSelect OK · ' + list.length + ' matrículas');
   } catch (err) {
     if (hint) hint.textContent = 'ERROR cargando matrículas: ' + (err && err.message || err);
+    if (sel) sel.innerHTML = '<option value="">— Error al cargar —</option>';
     console.error('[calculo-refrigeracion] initMatSelect falló:', err);
     throw err;
   }
