@@ -24,6 +24,17 @@ const arrStr = (v) => {
   return v.map((x) => str(x)).filter(Boolean);
 };
 
+/**
+ * Patrón de validación para fan_db_key — debe matchear las claves del
+ * objeto FAN_DB de `assets/js/data/refrigeracion-fan-db.js`: lowercase
+ * + dígitos + underscore (ej. `fn050_60h`, `zn063_50`, `krenz_f20`).
+ *
+ * Validamos formato pero NO existencia (eso lo hace el mapeo en
+ * `suministros_fan_db_map.js`) para no introducir dependencia circular
+ * domain → data.
+ */
+export const FAN_DB_KEY_PATTERN = /^[a-z][a-z0-9_]*$/;
+
 export function sanitizarSuministro(input) {
   const src = input || {};
   const codigo = str(src.codigo).toUpperCase();
@@ -37,7 +48,13 @@ export function sanitizarSuministro(input) {
     stock_inicial:        (stockIni == null || stockIni < 0) ? 0 : stockIni,
     valor_unitario:       (() => { const n = num(src.valor_unitario); return (n == null || n < 0) ? 0 : n; })(),
     marcas_disponibles:   arrStr(src.marcas_disponibles),
-    observaciones:        str(src.observaciones)
+    observaciones:        str(src.observaciones),
+    // Enlace opcional con catálogo FAN_DB para motoventiladores.
+    // Si está presente, conecta el suministro con una ficha técnica
+    // del módulo Mantenimiento Brigada · Selección ONAF para validar
+    // stock contractual antes de agregar al mix de refrigeración y
+    // generar movimientos automáticos al cerrar acciones de campo.
+    fan_db_key:           str(src.fan_db_key).toLowerCase()
   };
 }
 
@@ -66,6 +83,11 @@ export function validarSuministro(doc) {
   }
   if (typeof doc.valor_unitario !== 'number' || doc.valor_unitario < 0) {
     errs.push('valor_unitario debe ser número >= 0.');
+  }
+  // fan_db_key es OPCIONAL. Si está presente, debe matchear el patrón
+  // de claves del FAN_DB. La existencia se verifica en el mapeo.
+  if (doc.fan_db_key && !FAN_DB_KEY_PATTERN.test(doc.fan_db_key)) {
+    errs.push(`fan_db_key inválido: "${doc.fan_db_key}". Esperado lowercase + dígitos + underscore (ej. "fn050_60h", "krenz_f20").`);
   }
   return errs;
 }
