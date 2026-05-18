@@ -223,6 +223,40 @@ export const FAN_DB = Object.freeze({
     fan_tmin:-20, fan_peso:0,
     fan_cert:'OSHA compliant · NEMA 48 frame · Eje SS-416 Ø15.9mm · AMCA 300-08',
   },
+  // ── ZN063-6EL.4M.V7P1  N°177801/30E6  Ø630mm · MONOFÁSICO ────────────────
+  // Datos del PDF "Ventilador-Axial-ZN063-2.pdf" (ficha técnica oficial ZA).
+  // Variante 1∼230V con capacitor permanente 16µF/400V (PSC). En contrato
+  // 4125000143 corresponde al "Motoventilador Tipo 3" (S05).
+  // CFM nominal: el PDF entrega caudal a Eta opt (7080 m³/h ≈ 4167 CFM) que
+  // NO es Pstat=0 como el resto del FAN_DB. Es el valor más confiable disponible;
+  // el caudal libre podría ser ligeramente mayor (5-10%) pero requiere curva
+  // característica completa que el PDF no incluye.
+  zn063_mono_50: {
+    fan_marca:'ZIEHL-ABEGG', fan_modelo:'ZN063-6EL.4M.V7P1', fan_nserie:'177801/30E6',
+    fan_tipo_pala:'ZAplus axial fan with sickle blades · Aluminio',
+    fan_diam:630, fan_aspas:6, fan_rpm:950, fan_montaje:'H/Vu/Vo',
+    fan_flow_val:null, fan_flow_unit:'cfm', fan_cfm_nom:null, fan_m3s:null,
+    fan_volt:'1~230V ±10%', fan_hz:'50',
+    fan_kw:700, fan_amp:'3.30 A (1∼) · Cap. 16µF/400V', fan_cosphi:0.65,
+    fan_ip:'IP54', fan_aislam:'THCL155 · Special impregnation HV',
+    fan_protmotor:'thermal contact',
+    fan_material:'Aluminio RAL 9005 (jet black) · 3 coat paint clase 4',
+    fan_sentido:'Horario (CW) visto desde motor', fan_tmin:-25, fan_peso:23.90,
+    fan_cert:'ErP 2015 · UL/CSA E111399 ZA-155',
+  },
+  zn063_mono_60: {
+    fan_marca:'ZIEHL-ABEGG', fan_modelo:'ZN063-6EL.4M.V7P1', fan_nserie:'177801/30E6',
+    fan_tipo_pala:'ZAplus axial fan with sickle blades · Aluminio',
+    fan_diam:630, fan_aspas:6, fan_rpm:1000, fan_montaje:'H/Vu/Vo',
+    fan_flow_val:4167, fan_flow_unit:'cfm', fan_cfm_nom:4167, fan_m3s:1.967,
+    fan_volt:'1~230V ±10%', fan_hz:'60',
+    fan_kw:980, fan_amp:'4.60 A (1∼) · Cap. 16µF/400V', fan_cosphi:0.65,
+    fan_ip:'IP54', fan_aislam:'THCL155 · Special impregnation HV',
+    fan_protmotor:'thermal contact',
+    fan_material:'Aluminio RAL 9005 (jet black) · 3 coat paint clase 4',
+    fan_sentido:'Horario (CW) visto desde motor', fan_tmin:-25, fan_peso:23.90,
+    fan_cert:'ErP 2015 · UL/CSA E111399 ZA-155',
+  },
 });
 
 
