@@ -43,27 +43,34 @@ import { FAN_DB } from '../../assets/js/data/refrigeracion-fan-db.js';
  *     ENERGINN + ZIEHL ABEGG como opciones elegibles)
  *   - unidad (opcional): corrección de la unidad si la actual está mal
  */
+// Valores unitarios extraídos del PDF "044-comunicacion-aceptacion-
+// de-oferta-4125000143-1.pdf" (precios fijos sin IVA confirmados
+// con el director).
 export const MAPEO_4125000143 = Object.freeze([
   {
     codigo: 'S03',
     fan_db_key: 'fn063_60',
-    marcas: ['ZIEHL ABEGG', 'ENERGINN']
+    marcas: ['ZIEHL ABEGG', 'ENERGINN'],
+    valor_unitario: 5935453
   },
   {
     codigo: 'S04',
     fan_db_key: 'fn050_60',
-    marcas: ['ZIEHL ABEGG', 'ENERGINN']
+    marcas: ['ZIEHL ABEGG', 'ENERGINN'],
+    valor_unitario: 5064165
   },
   {
     codigo: 'S05',
     fan_db_key: 'zn063_mono_60',
-    marcas: ['ZIEHL ABEGG', 'ENERGINN']
+    marcas: ['ZIEHL ABEGG', 'ENERGINN'],
+    valor_unitario: 5826865
   },
   {
     codigo: 'S06',
     fan_db_key: 'zn045_60',
     marcas: ['ZIEHL ABEGG', 'ENERGINN'],
-    unidad: 'Und'  // corrige el Excel local que tenía "mts"
+    unidad: 'Und',          // corrige el Excel local que tenía "mts"
+    valor_unitario: 3763525
   }
 ]);
 
@@ -118,6 +125,13 @@ export function aplicarTipificacion(suministro, mapeo) {
     next.unidad = mapeo.unidad;
   }
 
+  // valor_unitario (corrección opcional · del PDF de aceptación de oferta).
+  // Solo pisamos si está definido en el mapeo Y difiere de lo actual.
+  if (typeof mapeo.valor_unitario === 'number' && mapeo.valor_unitario >= 0
+      && next.valor_unitario !== mapeo.valor_unitario) {
+    next.valor_unitario = mapeo.valor_unitario;
+  }
+
   // Re-sanitizar para garantizar shape canónico final.
   return sanitizarSuministro(next);
 }
@@ -135,6 +149,9 @@ export function necesitaTipificar(suministro, mapeo) {
 
   if (mapeo.fan_db_key && suministro.fan_db_key !== mapeo.fan_db_key) return true;
   if (mapeo.unidad && suministro.unidad !== mapeo.unidad) return true;
+  if (typeof mapeo.valor_unitario === 'number'
+      && mapeo.valor_unitario >= 0
+      && suministro.valor_unitario !== mapeo.valor_unitario) return true;
 
   if (Array.isArray(mapeo.marcas) && mapeo.marcas.length) {
     const actuales = new Set(

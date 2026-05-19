@@ -716,11 +716,13 @@ async function addToMix() {
       }
     }
   }
-  const existente = state.mix.find(it => it.key === key);
+  // Microfase 5 fix · identidad compuesta (key + disposicion).
+  // Si ya hay un item con el MISMO modelo Y misma disposición, sumar
+  // la cantidad. Si es el mismo modelo pero distinta disposición,
+  // crear una fila nueva (el director pidió que se discriminen).
+  const existente = state.mix.find(it => it.key === key && it.disposicion === dispVal);
   if (existente) {
     existente.cantidad += qty;
-    // Si la disposición fue cambiada, actualizar la del item existente.
-    if (dispVal) existente.disposicion = dispVal;
   } else {
     state.mix.push({
       id:    state.mixIdCnt++,
@@ -843,9 +845,15 @@ function renderMix() {
   const tbody = $('mix-tbody');
   if (!tbody) return;
 
+  // Helper humanizar disposición
+  const labelDisp = (d) => ({
+    lateral:     'Lateral · sopla horizontal',
+    vertical_1:  'Vertical ↑ · 1 cuerpo',
+    vertical_2:  'Vertical ↑↑ · 2 cuerpos'
+  })[d] || (d || '—');
   // Tabla
   if (state.mix.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;color:var(--ink-4);font-style:italic;padding:18px">
+    tbody.innerHTML = `<tr><td colspan="9" style="text-align:center;color:var(--ink-4);font-style:italic;padding:18px">
       Sin modelos agregados — seleccione uno arriba y haga click en "Agregar al mix".
     </td></tr>`;
   } else {
@@ -866,6 +874,7 @@ function renderMix() {
         <td style="color:var(--ink-4);font-size:11px;text-align:center">${i + 1}</td>
         <td>${escaparHtml(it.marca)}</td>
         <td>${escaparHtml(it.modelo)}</td>
+        <td style="font-size:11px; color:var(--ink-2)">${escaparHtml(labelDisp(it.disposicion))}</td>
         <td class="tr mono">${formatearNumero(it.cfm_unitario)}</td>
         <td class="tc">
           <input id="mq${it.id}" type="number" class="mix-qty" value="${it.cantidad}"

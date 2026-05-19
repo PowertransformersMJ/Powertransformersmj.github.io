@@ -114,14 +114,26 @@ describe('aplicarTipificacion · función pura', () => {
 });
 
 describe('necesitaTipificar · detector de cambios pendientes', () => {
-  test('false cuando todo está al día', () => {
+  test('false cuando todo está al día (fan_db_key + marcas + valor_unitario)', () => {
+    const s = sanitizarSuministro({
+      codigo: 'S03', nombre: 'Tipo 1', unidad: 'Und',
+      contrato_id: '4125000143',
+      fan_db_key: 'fn063_60',
+      marcas_disponibles: ['ZIEHL ABEGG', 'ENERGINN'],
+      valor_unitario: 5935453  // del PDF 044 de aceptación de oferta
+    });
+    assert.equal(necesitaTipificar(s, MAPEO_4125000143[0]), false);
+  });
+
+  test('true si falta valor_unitario del mapeo', () => {
     const s = sanitizarSuministro({
       codigo: 'S03', nombre: 'Tipo 1', unidad: 'Und',
       contrato_id: '4125000143',
       fan_db_key: 'fn063_60',
       marcas_disponibles: ['ZIEHL ABEGG', 'ENERGINN']
+      // valor_unitario: 0 (default del sanitizador) → diff del mapeo (5935453)
     });
-    assert.equal(necesitaTipificar(s, MAPEO_4125000143[0]), false);
+    assert.equal(necesitaTipificar(s, MAPEO_4125000143[0]), true);
   });
 
   test('true si falta fan_db_key', () => {
@@ -212,7 +224,8 @@ describe('ejecutarTipificacion · runner defensivo', () => {
     const tipificado = sanitizarSuministro({
       codigo: 'S03', nombre: 'Tipo 1', unidad: 'Und',
       contrato_id: '4125000143', fan_db_key: 'fn063_60',
-      marcas_disponibles: ['ZIEHL ABEGG', 'ENERGINN']
+      marcas_disponibles: ['ZIEHL ABEGG', 'ENERGINN'],
+      valor_unitario: 5935453  // tipificado completo con valor del mapeo
     });
     const writes = [];
     const r = await ejecutarTipificacion({
