@@ -80,7 +80,7 @@ describe('planificarMovimientosEgreso · casos del contrato 4125', () => {
     assert.equal(r.movimientos[0].matricula,      'T1-M/M-CHG');
     assert.equal(r.movimientos[0].subestacion,    'CHIRIGUANA');
     assert.equal(r.movimientos[0]._meta.fecha,    '2026-05-20');
-    assert.equal(r.movimientos[0]._meta.referencia, 'accion_refrig:acc_001:fn063_60');
+    assert.equal(r.movimientos[0]._meta.referencia, 'accion_refrig:acc_001:S03');
     assert.ok(r.movimientos[0].observaciones.includes('CHIRIGUANA'));
     assert.ok(r.movimientos[0].observaciones.includes('Motoventilador Tipo 1 (FN063)'));
     assert.equal(r.movimientos[0]._meta.accion_id, 'acc_001');
@@ -163,7 +163,7 @@ describe('planificarMovimientosEgreso · casos del contrato 4125', () => {
     assert.equal(r.movimientos[0].anio, 2026);
   });
 
-  test('observación incluye trazabilidad inversa (accion id + nombre)', () => {
+  test('observación incluye trazabilidad inversa (accion id + nombre + distribución)', () => {
     const accion = accionFake({
       mix: [{ key: 'fn063_60', modelo: 'FN063', cantidad: 4, disposicion: 'lateral' }]
     });
@@ -174,7 +174,36 @@ describe('planificarMovimientosEgreso · casos del contrato 4125', () => {
     const obs = r.movimientos[0].observaciones;
     assert.ok(obs.includes('acc_XYZ'));
     assert.ok(obs.includes('Motoventilador Tipo 1 (FN063)'));
-    assert.ok(obs.includes('disposición lateral'));
+    // El nuevo formato agregado lista "4u lateral" (sin la palabra "disposición")
+    assert.ok(obs.includes('4u lateral'));
+  });
+
+  test('AGRUPADO · mismo modelo con disposiciones distintas → UN solo mov con cantidad sumada', () => {
+    const accion = accionFake({
+      mix: [
+        { key: 'fn050_60', modelo: 'FN050', cantidad: 4, disposicion: 'lateral' },
+        { key: 'fn050_60', modelo: 'FN050', cantidad: 2, disposicion: 'vertical_1' }
+      ]
+    });
+    const indice = indiceFake([
+      { fan_db_key: 'fn050_60', codigo_suministro: 'S04', contrato_id: '4125000143', nombre_contractual: 'Motoventilador Tipo 2 (FN050)', stock_actual: 32, valor_unitario: 5064165 }
+    ]);
+    const r = planificarMovimientosEgreso({ accion, accionId: 'acc_AGG', indiceStocks: indice, contratoStock: '4125000143' });
+    // UN solo movimiento agregado, no 2.
+    assert.equal(r.movimientos.length, 1);
+    assert.equal(r.movimientos[0].suministro_id, 'S04');
+    assert.equal(r.movimientos[0].cantidad, 6);  // 4 + 2
+    assert.equal(r.movimientos[0].valor_unitario, 5064165);
+    assert.equal(r.movimientos[0].valor_total, 6 * 5064165);
+    // La distribución por disposición se preserva en _meta para trazabilidad
+    assert.equal(r.movimientos[0]._meta.distribucion.length, 2);
+    assert.equal(r.movimientos[0]._meta.distribucion[0].disposicion, 'lateral');
+    assert.equal(r.movimientos[0]._meta.distribucion[0].cantidad, 4);
+    assert.equal(r.movimientos[0]._meta.distribucion[1].disposicion, 'vertical_1');
+    assert.equal(r.movimientos[0]._meta.distribucion[1].cantidad, 2);
+    // Observación incluye la distribución detallada
+    assert.ok(r.movimientos[0].observaciones.includes('4u lateral'));
+    assert.ok(r.movimientos[0].observaciones.includes('2u vertical_1'));
   });
 });
 
