@@ -132,6 +132,36 @@
       </fieldset>
 
       <fieldset class="form-fieldset">
+        <legend class="form-fieldset-title">Integración con Mantenimiento Brigada (Selección ONAF)</legend>
+        <div class="form-group" style="margin: 0">
+          <label class="form-label" for="fFanDbKey">Modelo del FAN_DB (motoventiladores)</label>
+          <select class="form-select" id="fFanDbKey">
+            <option value="">— No es motoventilador / sin tipificar —</option>
+            <optgroup label="── Variantes operativas AFINIA (60 Hz · 230/400V) ──">
+              <option value="fn063_60">fn063_60 · Motoventilador Tipo 1 (FN063) · ZIEHL FN063-6DL.4I.A7P1 trifásico</option>
+              <option value="fn050_60">fn050_60 · Motoventilador Tipo 2 (FN050) · ZIEHL FN050-4DH.4I.A7P1 trifásico</option>
+              <option value="zn063_mono_60">zn063_mono_60 · Motoventilador Tipo 3 (ZN063) · ZIEHL ZN063-6EL.4M.V7P1 monofásico</option>
+              <option value="zn045_60">zn045_60 · Motoventilador Tipo 4 (ZN045) · ZIEHL ZN045-4DL.2F.V7P2 trifásico</option>
+            </optgroup>
+            <optgroup label="── Variantes adicionales (50 Hz / 265-460V / KRENZ) ──">
+              <option value="fn063_50">fn063_50 · ZIEHL FN063 · 50 Hz · 230/400V</option>
+              <option value="fn063_60h">fn063_60h · ZIEHL FN063 · 60 Hz · 265/460V (HV)</option>
+              <option value="fn050_50">fn050_50 · ZIEHL FN050 · 50 Hz · 230/400V</option>
+              <option value="fn050_60h">fn050_60h · ZIEHL FN050 · 60 Hz · 265/460V (HV)</option>
+              <option value="zn045_50">zn045_50 · ZIEHL ZN045 · 50 Hz · 230/400V</option>
+              <option value="zn045_60h">zn045_60h · ZIEHL ZN045 · 60 Hz · 265/460V (HV)</option>
+              <option value="zn063_50">zn063_50 · ZIEHL ZN063 trifásico · 50 Hz · 230/400V</option>
+              <option value="zn063_60">zn063_60 · ZIEHL ZN063 trifásico · 60 Hz · 230/400V</option>
+              <option value="zn063_60h">zn063_60h · ZIEHL ZN063 trifásico · 60 Hz · 265/460V (HV)</option>
+              <option value="zn063_mono_50">zn063_mono_50 · ZIEHL ZN063 monofásico · 50 Hz</option>
+              <option value="krenz_f20">krenz_f20 · KRENZ F20-A10069 · 60 Hz · 208-230V</option>
+            </optgroup>
+          </select>
+          <small style="display:block; margin-top:6px; color:var(--ink-3); font-size:11.5px; font-style:italic">Vincula este suministro con el catálogo de motoventiladores del módulo Brigada. Solo aplica si el suministro es un motoventilador.</small>
+        </div>
+      </fieldset>
+
+      <fieldset class="form-fieldset">
         <legend class="form-fieldset-title">Notas</legend>
         <div class="form-group" style="margin: 0">
           <label class="form-label" for="fObs">Observaciones</label>
