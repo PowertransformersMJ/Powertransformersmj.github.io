@@ -1318,6 +1318,132 @@ módulos del proyecto donde la lista de opciones supere ~10 entradas:
 catálogos de transformadores, suministros, contratos, marcas, modelos
 de ventilador, técnicos, etc.
 
+### 0.1.2.13 Regla permanente · Integración cross-módulo · dominio puro + idempotencia + trazabilidad bidireccional
+
+**Contexto (sesión 2026-05-18):** se integró Mantenimiento Brigada
+(Selección ONAF) con el catálogo contractual de Suministros para que
+el cálculo del mix de motoventiladores muestre stock en vivo, bloquee
+selecciones imposibles y genere movimientos de egreso automáticamente
+al cerrar la acción. Se cerró en 7 microfases sin romper código
+existente. El patrón resultante se documenta acá como **canónico**
+para futuras integraciones cross-módulo del proyecto.
+
+**Cuándo aplicar esta regla:** cualquier sesión donde se necesite que
+un módulo A *escriba o lea* datos consolidados en un módulo B (ej.
+Brigada → Movimientos, Salud → Acciones, Auditoría → cualquier módulo).
+
+**Patrón obligatorio:**
+
+1. **Funciones puras en `assets/js/domain/`** que toman las listas
+   crudas de ambos módulos y devuelven el resultado computado. NO
+   importan Firebase ni hacen I/O. Son testables con `node --test`
+   y reutilizables desde admin SDK, web SDK o mocks.
+   Ejemplos canónicos:
+   - `domain/refrigeracion_stock_index.js` (Brigada ← Suministros)
+   - `domain/movimientos_brigada_planner.js` (Brigada → Movimientos)
+   - `domain/dashboard_brigada_kpis.js` (Dashboard ← Brigada)
+   - `domain/suministros_fan_db_map.js` (catálogos cruzados)
+
+2. **Data layers thin en `assets/js/data/`** que orquestan las
+   queries Firestore y delegan a las funciones puras del dominio.
+   Tres patrones de I/O:
+   - **One-shot:** `cargar...(filtros)` con `getDocs`
+   - **Realtime:** `suscribir...(filtros, onData, onError)` con
+     `onSnapshot`, devolviendo unsubscribe. Si combina varias
+     suscripciones, debounce ~200ms en el `emit()` para no
+     rerender en cascada cuando ambas listas se actualizan
+     casi simultáneamente.
+   - **Orquestador transaccional:** funciones tipo
+     `generarMovimientosPorAccion()` que leen, planifican (con
+     función pura), y escriben en bucle secuencial con manejo
+     de errores por ítem.
+
+3. **Idempotencia explícita por marcador persistente.** Cualquier
+   operación cross-módulo que tenga side-effects (crear, modificar,
+   notificar) DEBE poder ejecutarse N veces produciendo el mismo
+   resultado. El marcador NO es transiente — vive en el doc.
+   Ejemplos:
+   - Acciones de refrigeración: campo
+     `movimientos_brigada_generados: bool` + array
+     `movimientos_brigada_refs: string[]` con IDs creados
+   - Detector: función pura `yaGenero...()` que lee el flag
+   - Si está activo → no re-ejecutar, devolver reporte "idempotente"
+
+4. **Trazabilidad bidireccional obligatoria.** El módulo origen
+   debe poder volver al destino y viceversa:
+   - Origen → Destino: campo array con IDs (ej.
+     `movimientos_brigada_refs[]` en la acción)
+   - Destino → Origen: identificador embebido en
+     `observaciones` o campo equivalente (ej.
+     `"Acción {accionId} · transformador {mat} · ..."`)
+   - Detector heurístico en función pura para clasificar
+     registros del destino (ej. `esEgresoDeBrigada(mov)` por
+     prefijo de `observaciones`)
+
+5. **Hook no-bloqueante en el data layer del módulo A.** Cuando
+   el módulo A persiste el cambio que dispara la integración
+   (ej. `actualizarEstado(id, 'ejecutada')`), después del write
+   exitoso se invoca el orquestador con `try/catch` que SOLO
+   loguea. **Nunca re-lanzar el error** — el cambio del módulo
+   A ya está persistido y un fallo de la integración no debe
+   revertir esa operación. El usuario admin puede reintentar
+   manualmente desde la UI.
+
+6. **Tests de la función pura sin Firebase.** Cobertura mínima
+   por función pura:
+   - Input vacío / null → no throw, retorna estructura vacía
+   - Casos felices de cada flujo
+   - Casos de error: huérfanos, colisiones, stock negativo,
+     contrato mismatch
+   - Idempotencia: re-aplicar no duplica
+   - Edge cases del schema (cantidad 0/negativa, fechas inválidas)
+
+7. **UI con 3 estados visuales mínimos** cuando muestra datos
+   cross-módulo:
+   - **OK** → estado verde + dato
+   - **Bloqueo** → estado rojo + razón + CTA al módulo destino
+   - **Fuera de scope** → estado neutro + texto explicativo
+   Modal accesible para bloqueos (role="alertdialog", aria-modal,
+   aria-labelledby, Escape, clic afuera, auto-focus).
+
+8. **Selector explícito de contexto cuando aplique.** Si la
+   integración depende de un parámetro externo (ej. contrato
+   activo), agregar un selector visible en la UI con default
+   desde URL query string (`?contratoId=`) o cualquier otro
+   contexto. El selector debe poder cambiar en runtime y
+   cancelar/reabrir suscripciones realtime.
+
+**Anti-patrones a EVITAR:**
+
+- ❌ Importar Firebase desde `domain/` (rompe testabilidad pura)
+- ❌ Side-effects sin marcador persistente (re-ejecutar duplica)
+- ❌ Re-lanzar error en hook downstream (rompe write upstream)
+- ❌ Trazabilidad solo en una dirección (pierdes auditoría inversa)
+- ❌ Tests con Firebase real (lentos, flaky, no aislados)
+- ❌ Mezclar lógica de presentación en funciones puras (pierde
+   reusabilidad)
+- ❌ Hacer 1 query por suministro cuando se puede traer toda la
+   lista del contrato en 1 query y agrupar en cliente
+
+**Solución del caso original (commits `c0ade02`, `54d69f3`,
+`613cbae`, `a9d6da0`):**
+
+- M3: badge stock en vivo (lectura realtime cross-módulo)
+- M4: bloqueo de selección con modal accesible (validación
+  síncrona en cliente)
+- M5: egreso automático al cerrar acción (hook no-bloqueante +
+  idempotencia con flag + trazabilidad bidireccional)
+- M6: widget dashboard (función pura computarKpisBrigada +
+  suscripción a acciones + render con escHtml/fmtInt/fmtCOP)
+
+Total artefactos del patrón: 4 funciones puras dominio, 2 data
+layers I/O, 1 orquestador transaccional, 4 archivos de tests
+con 61 tests cubriendo desde unit hasta integración con mocks.
+
+**Aplica también a:** futuras integraciones del proyecto:
+Brigada ↔ Órdenes de trabajo, Salud ↔ Plan de inversión,
+Auditoría ↔ cualquier módulo, RBAC ↔ permisos por contrato, etc.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
@@ -2315,10 +2441,11 @@ panel de KPIs.
 | Información Contractual     | `pages/contrato-info.html?id=NNN` · nube documental con visor PDF embebido (iframe nativo) · 13 PDFs servidos desde `assets/docs/contratos/{cid}/` · admin upload + delete via Firebase Storage (v2.7.0) |
 | Seguimiento Contractual     | Misma página `pages/contrato-info.html?id=NNN&tipo=X` parametrizada por `tipo` ∈ {`remisiones`, `reuniones-seguimiento`} · Storage `contratos/{cid}/{tipo}/` · Firestore `documentos_{tipo}[]` · admin upload/delete reutiliza el flujo de Información Contractual (v2.8.0 · 2026-05-01) · **fix v2.8.1**: el data layer ahora rellena `codigo`+`estado` por defecto en `setDoc(merge:true)` para que el upload no falle con `permission-denied` cuando `/contratos/{cid}` no existe en Firestore |
 | Mantenimiento Brigada       | **Calculadora Selección ONAF** (v2.9.0 · 2026-05-02 · refactor mix multi-modelo en curso desde 2026-05-03) · `pages/mantenimiento-brigada.html` con `module-shell` + tab "Sistema de Refrigeración" → `pages/calculo-refrigeracion.html` · dominio puro `assets/js/domain/refrigeracion.js` con **mix multi-modelo de ventiladores** (`evaluarMixVentiladores` + `sugerirMejoras` + `calcularProteccionMix`, 62 tests) · 2 catálogos (206 transformadores AFINIA + 13 fichas ZIEHL-ABEGG/KRENZ) · Chart.js con cruceta roja + leyenda abajo · informe AFINIA imprimible Letter con paginación manual `.sheet` divs (regla §0.1.2.3) · 10 secciones + fórmulas aplicadas + diagrama SVG A/B/C/D + BOM. Doc: `docs/MANTENIMIENTO-BRIGADA.md` § 4.3. |
+| **Estado al 2026-05-18 (integración Contratos ↔ Brigada · 7 microfases)** | Branch `claude/bold-zhukovsky-43e5a1` con **7 microfases** que cierran la integración end-to-end entre Mantenimiento Brigada (Selección ONAF) y los Contratos de Suministros: **M1** (`64af542`) schema extendido `fan_db_key` + 3 helpers puros + 24 tests · **M1.5** (`39073ec`) ZN063 monofásico al FAN_DB (2 fichas nuevas: `zn063_mono_50/60`) · **M2** (`cc848fe`) tipificación oficial 4125000143 con FAN_CONTRACTUAL poblado (4 tipos) + script Node `tipificar-suministros-fan-db.js` + 29 tests · **M3** (`c0ade02`) badge de stock en vivo en dropdowns + selector de contrato + 18 tests · **M4** (`54d69f3`) bloqueo "+Agregar al mix" si excede stock + modal accesible con CTA · **M5** (`613cbae`) egreso automático en /movimientos al cerrar acción + trazabilidad bidireccional + 15 tests · **M6** (`a9d6da0`) widget "Consumo por Mantenimiento Brigada" en dashboard del contrato + 14 tests · **M7** (este commit) CHANGELOG completo + regla permanente nueva §0.1.2.13 sobre integración cross-módulo (8 reglas + 7 anti-patrones). Tipificación contrato 4125 cerrada con datos del director y 4 PDFs ZIEHL-ABEGG: Tipo 1 (FN063 trifásico 60Hz 230V · stock 36 · S03), Tipo 2 (FN050 trifásico 60Hz 230V · stock 32 · S04), Tipo 3 (ZN063 monofásico 60Hz 230V · stock 0 · S05), Tipo 4 (ZN045 trifásico 60Hz 230V · stock 1 · S06 + corrección unidad mts→Und). Marcas duales ENERGINN+ZIEHL ABEGG en los 4 tipos. **670/670 tests verdes** durante toda la sesión + lint HTML limpio. **5 funciones puras de dominio** nuevas + **2 data layers I/O** + **1 orquestador transaccional** + **4 archivos de tests** con 90 tests totales del flujo cross-módulo. Director instrucción explícita: *"continuar sin parar"*. Sin impacto en producción hasta merge del PR. |
 | **Estado al 2026-05-15 (migración GitHub + combobox matrículas)** | **Repo migrado** de `ajimenezp99-jpg/LordPowerTransformersMJ.github.io` a `PowertransformersMJ/powertransformersmj.github.io` (user page directa, sin subruta `project page`). Sitio en producción: `https://powertransformersmj.github.io/`. Refs Firebase (`lordpowertransformersmj` como `projectId` · `authDomain` · `storageBucket`) PRESERVADAS intactas para que Auth/Firestore/Storage sigan apuntando al mismo backend sin migración. Commits relevantes esta jornada en branch `claude/bold-zhukovsky-43e5a1`: `8942ecb` migración refs GitHub (14 archivos, 36 ins / 38 del) · `690df96` diagnóstico visible matrículas (hint dinámico + console.info + quitar autocomplete=off) · `c570f21` `<select>` con optgroup por zona (intermedio) · **`f646651` combobox custom completo con escritura libre + filtro en vivo** (HTML + CSS `.combo-wrap`/`.combo-list` + JS `initMatSelect` reescrito con normalize NFD, búsqueda multi-campo, ↑↓ Enter Esc, ARIA combobox/listbox, tope 30 + indicador "… y N más"). **Catálogo 206 matrículas AFINIA verificado idéntico al Excel `Salud de Activos 2026.xlsx`** (subido a raíz en `f475ee9`). Bug raíz documentado: `<datalist>` no renderea dropdown en Safari + iframe + extensiones de privacidad. **Regla permanente nueva §0.1.2.12** prohíbe `<datalist>` para componentes de búsqueda y consagra el combobox custom como patrón canónico del proyecto. PRs #1, #2, #3, #4 mergeados sucesivamente esta jornada. Director confirmó funcionamiento: *"comprobado, por favor documenta todo"*. |
 | **Estado al 2026-05-05 (sesión render visual + interactividad)** | Branch `claude/adjust-website-pages-8Ntwz` con commits adicionales esta sesión sobre el render integral del transformador (módulo Mantenimiento Brigada · Selección ONAF). Cadena de iteraciones: (a) `aaa2425` render integral cenital base con asignación por unidad → (b) `183f864` radiadores a ambos lados (lado A arriba, lado B abajo) + bujes AT/BT + conservador → (c) `1dc3528` 3D realista (bujes apilados con porcelana, gradientes, sombras, cabezales, aletas individuales) → (d) `110404e` interactividad click-en-cuerpo + conservador sobre banco lado A + regla permanente §0.1.2.10 → (e) `96ebb0b` conservador sobre tanque + render lateral redibujado tipo foto Lord Power/ABB → (f) **`75d1d13` (último)** conservador ENTRE lado A y lado B (apoyado sobre la tapa del tanque, en el área central) + render lateral usa la **foto real del repositorio TAL CUAL** vía `<image>` (no SVG redibujado). Imagen de referencia archivada en `assets/img/refs/lateral-transformador-ABB-ref.png` (Lord Power/ABB · vista lateral con conservador, radiador, ventilador frontal, bujes). **CLAUDE.md ampliado con regla permanente §0.1.2.10** (fidelidad + interactividad obligatorias cuando hay foto de referencia). **570 / 570 tests verdes + HTML lint OK** durante toda la sesión. Doc handoff: `docs/SESION-2026-05-05.md`. |
 | **Estado al 2026-05-03 (cierre + deploy OK)** | Branch `claude/adjust-website-pages-8Ntwz` con **21 commits** desde último merge. Plan de 6 microfases CERRADO + 9 hotfixes/refinements + 1 commit docs. Último commit: `a35e97b` (handoff actualizado). Resumen: refactor mix multi-modelo (5) → CI lint scope (`f1a4403`) → fallback legacy protección (`a3bc06b`) → 6 microfases (tolerancia / estrategias VFD-aerodinámica / FLC+contactor AF+SCADA+coordinación / faltantes / JSON estructurado / validación gráfica) → deep-clean Firestore (`e0ccffb`) → UI reorder + gráfica DPR3 (`2662671`) → pre-chequeo permisos admin (`c85eb41`) → diagnóstico exhaustivo + regla §0.1.2.7 (`525fc3c`) → gráfica HD/4K canvas 2400×1400 (`08dcf03`) → docs handoff (`a35e97b`). **✅ Director confirmó deploy exitoso de `firebase deploy --only firestore:rules`** — rules en producción ahora incluyen match `/acciones_refrigeracion/{id}`, el bug del modal está resuelto. Versiones publicadas: **v2.5.0** → **v2.9.0**. CLAUDE.md ampliado con **7 reglas permanentes nuevas** §0.1.2.1 a §0.1.2.7. **570 / 570 tests verdes** + HTML lint OK durante toda la sesión. Documentación: `docs/MANTENIMIENTO-BRIGADA.md` § 4.3 a 4.7 + `docs/SESION-2026-05-03-CONTINUACION.md` (handoff exhaustivo de toda la sesión con 10 bloques + reglas permanentes + cómo continuar). |
-| Próxima movida              | (1) Mergear el PR del combobox + documentación (último commit `f646651` + commits de docs). (2) Próxima sesión: aplicar el patrón combobox custom de §0.1.2.12 a otros campos de búsqueda del proyecto (catálogos de suministros, contratos, marcas, modelos de ventilador, técnicos) reemplazando cualquier `<datalist>` legacy que quede. (3) Extender módulo Mantenimiento Brigada con nuevas calculadoras (aceite, aterramiento, etc.) reutilizando el patrón establecido (dominio puro + tests + UI binding + persistencia + tab consolidado + informe imprimible). |
+| Próxima movida              | (1) Mergear el PR completo de la integración Contratos↔Brigada (commits M1 → M7). (2) Después del merge, **ejecutar el script `scripts/migrate/tipificar-suministros-fan-db.js`** contra Firestore desde la Mac del director (con firebase-admin) para setear `fan_db_key` en S03/S04/S05/S06 del contrato 4125000143 + corregir unidad S06 (mts→Und) + marcas duales. Snippet documentado en CHANGELOG sección "Cómo aplicar la tipificación a Firestore en producción". Correr primero con `dryRun:true` para preview, después con `dryRun:false`. (3) Test manual del ciclo completo en producción: abrir `pages/mantenimiento-brigada.html?contratoId=4125000143`, seleccionar matrícula, agregar mix con T1+T2 → ver badges, agregar 100 unidades para forzar bloqueo → ver modal, cerrar acción → verificar movimientos en /movimientos del contrato + widget del dashboard. (4) Próxima sesión: aplicar la misma integración cross-módulo §0.1.2.13 a otros pares de módulos del proyecto (Salud↔Plan de Inversión, Órdenes↔Movimientos, etc.). (5) Pendiente del 4123000081: el director dijo *"permíteme escoger si es FN-063 o FN-050"* — definir flujo de selección runtime para ese contrato. |
 | Servicios dinámicos activos | Firebase (Auth + Firestore + Storage) · Cloud Functions deployable (F32 stubs + cron/Resend) |
 
 ### 7.1 Inventario del repo post-v2.0.8
