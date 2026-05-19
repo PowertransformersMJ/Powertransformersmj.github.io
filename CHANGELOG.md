@@ -7,6 +7,165 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## Integración Contratos · Suministros ↔ Mantenimiento Brigada (2026-05-18)
+
+Sesión iniciada para conectar dos módulos: el catálogo contractual
+de suministros (con stock_inicial pactado + movimientos) y el cálculo
+Selección ONAF de Mantenimiento Brigada (que produce mixes de
+motoventiladores). Objetivo final del director:
+
+> *"Desde la interfaz yo pueda ver en tiempo real cuántas unidades
+> disponibles tengo, y si no tengo disponible no me permita
+> seleccionarlo y me dé un aviso. Esto debe reflejarse a su vez en
+> el dashboard de control y gestión operativa."*
+
+> *"Cuando la brigada efectúe una acción, se consolide en el apartado
+> de Movimientos con toda la información asociada."*
+
+Plan de 7 microfases acordado. Esta sesión cierra las primeras 3.
+
+### Microfase 1 · Schema extendido (commit `64af542`)
+
+Schema y helpers puros sin tocar UI ni producción. Permite que cuando
+llegue el mapeo del director, se enchufe sin refactor adicional.
+
+- `assets/js/domain/suministro_schema.js` — campo opcional `fan_db_key`
+  al sanitizador (lowercase + trim) + nueva constante exportada
+  `FAN_DB_KEY_PATTERN = /^[a-z][a-z0-9_]*$/`. Validador rechaza formato
+  inválido (mayúsculas, guiones, espacios) pero acepta el campo
+  ausente (es opcional).
+- `assets/js/data/refrigeracion-fan-contractual.js` (nuevo) — mapping
+  `fan_db_key → nombre_contractual` tipo *"Motoventilador Tipo N (MODELO)"*
+  + helpers `nombreContractualFan(key)` y `tieneNombreContractual(key)`.
+- `assets/js/domain/suministros_fan_db_map.js` (nuevo) — 3 funciones puras:
+  · `resolverFanDesdeSuministro(suministro)` devuelve un objeto
+    enriquecido `{fan_db_key, ficha, nombre_contractual, contrato_id,
+    codigo_suministro, stock_inicial, valor_unitario}` o null.
+  · `indexarSuministrosPorFanKey(suministros)` para lookup O(1) cuando
+    se popula el dropdown del cálculo Selección ONAF; reporta colisiones.
+  · `cobertura(suministros)` para reporte de tipificación faltante.
+- `tests/suministros_fan_db_map.test.js` con 24 tests.
+
+### Microfase 1.5 · ZN063 monofásico al FAN_DB (commit `39073ec`)
+
+El director identificó que el Tipo 3 del contrato 4125000143 es un
+ZN063 **monofásico**, pero el FAN_DB solo tenía la familia trifásica
+`ZN063-6DL.4I.V7P1`. Necesitaba agregarse la nueva familia
+`ZN063-6EL.4M.V7P1` con conexión 1∼230V + capacitor permanente.
+
+Datos extraídos del PDF oficial ZIEHL-ABEGG (`Ventilador-Axial-ZN063-2.pdf`):
+
+- `assets/js/data/refrigeracion-fan-db.js` (+34 líneas):
+  - `zn063_mono_50` · 1∼230V 50Hz · P1=700W · 3.30A · cap 16µF/400V · ~950 rpm
+  - `zn063_mono_60` · 1∼230V 60Hz · P1=980W · 4.60A · cap 16µF/400V · 1000 rpm
+  - Comunes: Ø630mm · IP54 · THCL155 · Special impregnation HV · thermal
+    contact · RAL 9005 jet black · peso 23.90 kg · Tmin -25°C · ErP 2015 · UL/CSA
+
+Total claves FAN_DB: 13 → 15. El FAN_DB ahora soporta las 4 familias
+del contrato 4125000143.
+
+Nota: el PDF no entrega caudal a Pstat=0 (solo a Eta opt 7080 m³/h ≈
+4167 CFM). Documentado en el comentario in-file.
+
+### Microfase 2 · Tipificación oficial + script one-shot (commit ?)
+
+Director confirmó la tipificación completa del contrato 4125000143
+después de revisar las fichas técnicas:
+
+| Suministro | Stock | fan_db_key | Nombre contractual | Modelo PDF |
+|---|---|---|---|---|
+| **S03** | 36 | `fn063_60` | Motoventilador Tipo 1 (FN063) | ZIEHL FN063-6DL.4I.A7P1 |
+| **S04** | 32 | `fn050_60` | Motoventilador Tipo 2 (FN050) | ZIEHL FN050-4DH.4I.A7P1 |
+| **S05** | 0  | `zn063_mono_60` | Motoventilador Tipo 3 (ZN063) | ZIEHL ZN063-6EL.4M.V7P1 (monofásico) |
+| **S06** | 1  | `zn045_60` | Motoventilador Tipo 4 (ZN045) | ZIEHL ZN045-4DL.2F.V7P2 |
+
+Tensión auxiliar AFINIA: **220 V** → motores conectados Delta a 230V
+(no la versión HV 265/460V). Por eso los trifásicos usan claves `_60`
+y no `_60h`. Decisión confirmada por el director (opción A).
+
+Marcas dual: el director pidió que **ENERGINN y ZIEHL ABEGG sean
+ambas elegibles** en cualquier motoventilador. El mapeo agrega ambas
+al campo `marcas_disponibles` de cada suministro.
+
+Correcciones aplicadas al S06: unidad `mts` → `Und` (estaba mal
+capturada en el Excel original `Gestion_Suministros_Transformadores_4125000143.xlsm`).
+
+#### Artefactos
+
+- `assets/js/data/refrigeracion-fan-contractual.js` — `FAN_CONTRACTUAL`
+  poblado con los 4 tipos canónicos del contrato 4125.
+- `scripts/migrate/tipificar-suministros-fan-db.js` (nuevo):
+  - `MAPEO_4125000143` con los 4 suministros congelados.
+  - `MAPEO_4123000081` vacío hasta confirmación del director (dijo
+    *"en 4123 solo tipo 1 pero permíteme escoger si es FN-063 o FN-050"*).
+  - `aplicarTipificacion(suministro, mapeo)` función pura · valida que
+    `fan_db_key` exista en FAN_DB · agrega marcas sin duplicar · corrige
+    unidad si aplica · re-sanitiza shape final.
+  - `necesitaTipificar(suministro, mapeo)` detector de cambios pendientes
+    para idempotencia (no escribe si ya está al día).
+  - `ejecutarTipificacion({mapeo, contratoId, read, write, log, dryRun,
+    limite})` runner defensivo con adaptador de I/O arbitrario (web SDK,
+    admin SDK, mock de tests). Reporta `{escaneados, tipificados, sinCambio,
+    faltantes, errores, lista}`.
+- `tests/tipificar_suministros_fan_db.test.js` — 29 tests cubriendo:
+  · constantes MAPEO_4125 (4 entradas, claves válidas, marcas duales,
+    corrección S06, orden de códigos)
+  · aplicarTipificacion (agrega fan_db_key, marcas sin duplicar,
+    corrección unidad S06, throw si fan_db_key huérfano, preserva campos
+    no tocados, input null)
+  · necesitaTipificar (detección por fan_db_key, marca, unidad)
+  · ejecutarTipificacion (procesa los 4, dryRun no escribe, faltantes sin
+    throw, idempotencia, validaciones de opts, límite)
+
+Total tests: 594 → 623 verdes. Sin regresiones.
+
+### Cómo aplicar la tipificación a Firestore en producción
+
+Cuando el director quiera ejecutar la tipificación contra Firestore,
+correr desde Node con admin SDK (o desde un script web con el SDK web):
+
+```javascript
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import {
+  MAPEO_4125000143,
+  ejecutarTipificacion
+} from './scripts/migrate/tipificar-suministros-fan-db.js';
+import { composeDocId } from './assets/js/domain/contratos.js';
+
+const app  = initializeApp({ credential: cert('./service-account.json') });
+const db   = getFirestore(app);
+const SUMS = db.collection('suministros');
+
+const reporte = await ejecutarTipificacion({
+  mapeo: MAPEO_4125000143,
+  contratoId: '4125000143',
+  read: async (cid, codigo) => {
+    const ref = SUMS.doc(composeDocId(cid, codigo));
+    const snap = await ref.get();
+    return snap.exists ? snap.data() : null;
+  },
+  write: async (cid, codigo, next) => {
+    await SUMS.doc(composeDocId(cid, codigo)).set(next, { merge: true });
+  },
+  dryRun: false      // poner true para preview sin escribir
+});
+
+console.log(reporte);
+```
+
+### Próximas microfases (pendientes)
+
+| # | Microfase | Estado |
+|---|---|---|
+| 3 | UI Selección ONAF · cargar suministros del contrato activo + badge stock por modelo | pendiente |
+| 4 | Bloquear "Agregar al mix" si cantidad excede stock disponible + aviso | pendiente |
+| 5 | Egreso automático en `/movimientos` al cerrar acción de refrigeración | pendiente |
+| 6 | Widget nuevo en Dashboard del contrato: "Consumo por mantenimiento de refrigeración" | pendiente |
+| 7 | Documentación final + regla permanente en CLAUDE.md sobre integración cross-módulo | pendiente |
+
+
+
 ## Migración de repositorio + combobox custom de matrículas (2026-05-15)
 
 Sesión doble: migración GitHub al nuevo repositorio

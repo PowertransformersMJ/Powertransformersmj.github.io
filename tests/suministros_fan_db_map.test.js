@@ -124,14 +124,24 @@ describe('resolverFanDesdeSuministro', () => {
     assert.equal(enlace.ficha.fan_modelo, 'FN050-4DH.4I.A7P1');
   });
 
+  test('nombre_contractual usa FAN_CONTRACTUAL si el key está tipificado', () => {
+    const sum = sanitizarSuministro({
+      codigo: 'S03', nombre: 'Motoventiladores Tipo 1', unidad: 'Und',
+      contrato_id: '4125000143', fan_db_key: 'fn063_60'
+    });
+    const enlace = resolverFanDesdeSuministro(sum);
+    // FAN_CONTRACTUAL tipifica fn063_60 como Motoventilador Tipo 1 (FN063).
+    assert.equal(enlace.nombre_contractual, 'Motoventilador Tipo 1 (FN063)');
+  });
+
   test('nombre_contractual fallback a marca+modelo si no hay tipificación', () => {
     const sum = sanitizarSuministro({
       codigo: 'S07', nombre: 'Motoventilador KRENZ', unidad: 'Und',
       contrato_id: '4125000143', fan_db_key: 'krenz_f20'
     });
     const enlace = resolverFanDesdeSuministro(sum);
-    // FAN_CONTRACTUAL está vacío (pendiente tipificación con el director).
-    // El helper debe caer al fallback "marca modelo".
+    // krenz_f20 no está en FAN_CONTRACTUAL (no es parte del contrato 4125).
+    // El helper cae al fallback "marca modelo".
     assert.ok(enlace.nombre_contractual.includes('KRENZ'));
     assert.ok(enlace.nombre_contractual.includes('F20'));
   });
@@ -197,14 +207,47 @@ describe('cobertura', () => {
   });
 });
 
-describe('nombreContractualFan · placeholder vacío hasta tipificación con director', () => {
-  test('FAN_CONTRACTUAL arranca vacío en la Microfase 1', () => {
-    assert.equal(Object.keys(FAN_CONTRACTUAL).length, 0,
-      'FAN_CONTRACTUAL debe arrancar vacío y poblarse en la Microfase 2 con el mapeo del director');
+describe('FAN_CONTRACTUAL · tipificación Microfase 2 (contrato 4125000143)', () => {
+  test('FAN_CONTRACTUAL tiene los 4 tipos del contrato 4125000143', () => {
+    assert.equal(Object.keys(FAN_CONTRACTUAL).length, 4,
+      'Microfase 2 popula los 4 tipos del contrato 4125: fn063_60, fn050_60, zn063_mono_60, zn045_60');
   });
 
-  test('nombreContractualFan devuelve null cuando no está tipificado', () => {
+  test('Tipo 1 (FN063 trifásico 60Hz 230/400V) tipificado', () => {
+    assert.equal(nombreContractualFan('fn063_60'), 'Motoventilador Tipo 1 (FN063)');
+    assert.equal(tieneNombreContractual('fn063_60'), true);
+  });
+
+  test('Tipo 2 (FN050 trifásico 60Hz 230/400V) tipificado', () => {
+    assert.equal(nombreContractualFan('fn050_60'), 'Motoventilador Tipo 2 (FN050)');
+    assert.equal(tieneNombreContractual('fn050_60'), true);
+  });
+
+  test('Tipo 3 (ZN063 monofásico 60Hz 230V) tipificado', () => {
+    assert.equal(nombreContractualFan('zn063_mono_60'), 'Motoventilador Tipo 3 (ZN063)');
+    assert.equal(tieneNombreContractual('zn063_mono_60'), true);
+  });
+
+  test('Tipo 4 (ZN045 trifásico 60Hz 230/400V) tipificado', () => {
+    assert.equal(nombreContractualFan('zn045_60'), 'Motoventilador Tipo 4 (ZN045)');
+    assert.equal(tieneNombreContractual('zn045_60'), true);
+  });
+
+  test('Variantes HV (_60h) NO tipificadas (AFINIA usa auxiliares 220V)', () => {
     assert.equal(nombreContractualFan('fn050_60h'), null);
+    assert.equal(nombreContractualFan('fn063_60h'), null);
+    assert.equal(nombreContractualFan('zn045_60h'), null);
+    assert.equal(tieneNombreContractual('fn050_60h'), false);
+  });
+
+  test('Variantes 50Hz NO tipificadas (Colombia opera 60Hz)', () => {
+    assert.equal(nombreContractualFan('fn050_50'), null);
+    assert.equal(nombreContractualFan('fn063_50'), null);
+    assert.equal(nombreContractualFan('zn045_50'), null);
+    assert.equal(nombreContractualFan('zn063_mono_50'), null);
+  });
+
+  test('Modelos fuera del contrato (KRENZ F20) NO tipificados', () => {
     assert.equal(nombreContractualFan('krenz_f20'), null);
   });
 
@@ -212,10 +255,5 @@ describe('nombreContractualFan · placeholder vacío hasta tipificación con dir
     assert.equal(nombreContractualFan(''), null);
     assert.equal(nombreContractualFan(null), null);
     assert.equal(nombreContractualFan(undefined), null);
-  });
-
-  test('tieneNombreContractual es false en Microfase 1', () => {
-    assert.equal(tieneNombreContractual('fn050_60h'), false);
-    assert.equal(tieneNombreContractual(''), false);
   });
 });
