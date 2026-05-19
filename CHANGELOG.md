@@ -247,6 +247,136 @@ Trazabilidad bidireccional:
 - Movimiento → Acción: campo `observaciones` con `"Acción {id} · transformador {mat}…"`
 - Acción → Movimientos: array `movimientos_brigada_refs[]` con códigos MOV-YYYY-NNNN
 
+### Refinamientos post-merge (2026-05-18 PM2-PM4)
+
+Después del merge inicial de M1-M7, el director reportó 4 issues que
+revelaron antipatrones de diseño y bugs en el flujo end-to-end. Cada
+uno cerró con commit aislado + regla permanente en CLAUDE.md cuando
+aplicaba.
+
+#### Issue A · Tipificación con UI admin (commit `f8ee8a5`)
+
+Primer issue tras merge: banner "0 motoventiladores tipificados" y
+todos los modelos en "Fuera de contrato" porque ningún suministro
+tenía `fan_db_key`. Mi primera respuesta fue *"andá al admin a
+editar los 4 suministros"* (anti-patrón). Antes del director correr
+los pasos, me lo flagueé y agregué selector `fFanDbKey` al modal
+admin como solución intermedia.
+
+#### Issue B · Auto-tipificación + regla §0.1.2.14 (commit `b2e27a3`)
+
+Tras intentar tipificar via UI admin, el director respondió:
+> *"sigue igual, revisa que no exista un error de ser asi, por
+> favor memorizalo para q no sea repetido"*
+
+**Regla permanente nueva §0.1.2.14** en CLAUDE.md: *"NO dejar pasos
+manuales del director post-merge para 'encender' una integración"*.
+Solución técnica:
+
+- Banner accionable de **UN solo click** "Tipificar automáticamente"
+- Aparece cuando `state.contratoStock === '4125000143'` y faltan
+  suministros con `fan_db_key` mapeado
+- El click invoca el script `tipificar-suministros-fan-db.js`
+  cliente-side via `suministros.actualizar()` (NO requiere
+  firebase-admin), aplicando los 4 mappings + correcciones de S06
+- Tras éxito, la suscripción realtime detecta cambios y refresca
+  badges automáticamente
+
+#### Issue C · Hook en crear() de acciones (commit `89379f4`)
+
+Tras tipificar y ejecutar una acción de Brigada, el director vio el
+Histórico del contrato sin movimientos:
+> *"no se reflejo nada de lo que se ejecuto en el modulo de
+> mantenimiento brigada"*
+
+**Bug raíz:** el hook de generación de movimientos (Microfase 5)
+estaba SOLO en `actualizarEstado()`. Cuando `guardarAccion()` crea
+una acción NUEVA ya en `estado='ejecutada'` (no transita
+planificada→ejecutada), entra por `crear()` que NO hookeaba.
+
+**Fix:**
+- `crear()` ahora replica el mismo hook que `actualizarEstado()`:
+  si `estado_accion === 'ejecutada'` y hay `contrato_stock_id`,
+  lazy-import `movimientos_brigada.js` + invocar
+  `generarMovimientosPorAccion()`
+- Feedback visible inmediato tras guardar la acción:
+  - ✅ `"Acción XYZ guardada · N movimiento(s) generado(s) · revísalos
+    en pestaña Histórico"`
+  - ⚠ `"Acción guardada · 0 movimientos · verifica fan_db_key (click
+    en banner Tipificar)"`
+- Modal time-to-close aumentado 1500ms → 4500ms para leer el feedback
+
+#### Issue D · Valor económico + identidad de mix + detector parcial (commits `8780f77` + `XXXXXX`)
+
+Tras lograr el primer movimiento (MOV-2026-0001 con cantidad 6 de
+S04 FN050), el director vio 3 problemas:
+
+1. Columna VALOR (COP) del histórico mostraba "—" (valor 0)
+2. Si seleccionaba `4 FN050 lateral + 2 FN050 vertical`, el mix
+   fusionaba todo como 1 fila perdiendo la disposición
+3. El render no diferenciaba disposiciones distintas
+
+**Fix integral (commit `8780f77`):**
+
+1. **Valor económico:**
+   - `MAPEO_4125000143` ahora incluye `valor_unitario` por suministro
+     (S03: 5.935.453 · S04: 5.064.165 · S05: 5.826.865 · S06: 3.763.525
+     extraídos del PDF 044 de aceptación de oferta)
+   - `aplicarTipificacion()` setea `valor_unitario` si difiere del actual
+   - `necesitaTipificar()` detecta inconsistencia
+   - Planner propaga `valor_unitario` + `valor_total = cantidad ×
+     unitario` a cada movimiento generado
+   - El histórico, dashboard del contrato y widget "Consumo por
+     Brigada" ahora muestran COP reales
+
+2. **Mix por identidad compuesta:**
+   - `addToMix()` busca existente por `(key, disposicion)` no solo
+     `key`. 4 lateral + 2 vertical → 2 filas separadas
+   - Tabla del mix tiene columna "Disposición" con label humanizado
+     (Lateral · sopla horizontal / Vertical ↑ · 1 cuerpo / etc.)
+   - El planner AGRUPA items del mix por `entry.codigo_suministro`
+     al generar movimientos. Razón: el contrato no entiende de
+     disposiciones; solo importa el stock del suministro. UN solo
+     movimiento `S04` con cantidad=6 + observación detallada
+     "4u lateral + 2u vertical_1" + `_meta.distribucion[]` para
+     trazabilidad fina
+
+3. **Render:** ya tenía sigils 'L'/'↑'/'↑↑' por dispKey. Con el fix
+   de identidad compuesta, los items separados se asignan a cuerpos
+   distintos automáticamente.
+
+**Refinamiento del detector del banner (commit `XXXXXX` siguiente):**
+
+Tras el commit `8780f77`, el director seguía viendo el dashboard
+con `VALOR CONTRATO: $0` y todos los KPIs económicos en $0. El
+banner amarillo NO reaparecía porque su criterio era *"conFanKey
+=== 0"*. Pero los suministros YA tenían `fan_db_key` (de la primera
+tipificación) — solo les faltaba `valor_unitario`.
+
+**Anti-patrón identificado:** el detector solo veía "todo o nada".
+Tras agregar campos nuevos al mapeo, los suministros quedaron en
+estado parcial sin disparar re-tipificación.
+
+**Refinamiento aplicado a §0.1.2.14:** el banner debe disparar
+cuando **CUALQUIER atributo del mapeo difiere** del valor actual, no
+solo cuando falta `fan_db_key`. Iterar el mapeo completo y comparar
+cada campo (`fan_db_key`, `valor_unitario`, `unidad`, `marcas`).
+Mostrar **detalle granular** de qué se va a corregir por cada
+suministro (no solo "tipificar todo"):
+
+```
+⚠ 4 suministro(s) del contrato 4125000143 necesitan corrección.
+  · S03: valor_unitario ($0 → $5.935.453)
+  · S04: valor_unitario ($0 → $5.064.165)
+  · S05: valor_unitario ($0 → $5.826.865)
+  · S06: valor_unitario ($0 → $3.763.525)
+  [Botón: Tipificar y corregir todo]
+```
+
+`evaluarAutoTipificacion()` reescrita para hacer N llamadas
+`obtener()` (una por entry del mapeo) + comparar campo a campo +
+construir la lista de "pendientes" + render con `<ul>` de motivos.
+
 ### Microfase 6 · Widget "Consumo por Mantenimiento Brigada" (commit `a9d6da0`)
 
 Cierra el ciclo de OBSERVABILIDAD. El dashboard del contrato muestra
