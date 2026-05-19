@@ -218,6 +218,84 @@ async function refrescarStocksFan() {
  * Si NO hay índice (contrato no seleccionado), restaura el texto
  * original guardado en `data-base-text` y des-deshabilita todos.
  */
+/**
+ * Muestra un modal explicativo cuando el usuario intenta agregar al
+ * mix una cantidad que excede el stock disponible del contrato.
+ *
+ * Incluye CTA "Abrir contrato" que navega al dashboard del contrato
+ * en una pestaña nueva, para que el director pueda revisar
+ * movimientos o solicitar reposición sin perder el cálculo en curso.
+ *
+ * @param {object} info
+ * @param {string} info.nombre        · "Motoventilador Tipo 1 (FN063)"
+ * @param {string} info.codigoSum     · "S03"
+ * @param {string} info.contratoId    · "4125000143"
+ * @param {number} info.stockActual   · stock total del suministro
+ * @param {number} info.yaEnMix       · unidades ya agregadas al mix actual
+ * @param {number} info.solicitado    · unidades adicionales pedidas
+ * @param {number} info.disponible    · diferencia stock - ya en mix (clamp 0)
+ */
+function avisarSinStock(info) {
+  // Si ya existe un modal abierto, ciérralo antes.
+  document.querySelectorAll('.stock-modal-overlay').forEach(el => el.remove());
+
+  const overlay = document.createElement('div');
+  overlay.className = 'stock-modal-overlay';
+  overlay.setAttribute('role', 'alertdialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'stock-modal-title');
+  overlay.style.cssText =
+    'position:fixed; inset:0; z-index:9000; display:flex; align-items:center; justify-content:center;' +
+    'background:rgba(8,18,35,.55); backdrop-filter:blur(4px); padding:20px;';
+
+  const dialog = document.createElement('div');
+  dialog.style.cssText =
+    'max-width:520px; width:100%; background:#fff; border:1px solid rgba(255,59,48,.30);' +
+    'border-radius:12px; padding:20px 22px; box-shadow:0 20px 50px rgba(0,0,0,.30); font-family:var(--font-sans, system-ui)';
+  const stockOK = info.disponible > 0;
+  dialog.innerHTML =
+    '<div style="display:flex; align-items:center; gap:10px; margin-bottom:12px">' +
+      '<span style="font-size:24px">⛔</span>' +
+      '<h3 id="stock-modal-title" style="margin:0; font-size:17px; color:#c00">Stock contractual insuficiente</h3>' +
+    '</div>' +
+    '<p style="margin:0 0 14px; color:#1a1a1a; font-size:14px; line-height:1.5">' +
+      'No se puede agregar al mix <strong>' + escaparHtml(info.nombre) + '</strong> ' +
+      'porque excede el stock disponible en el contrato.' +
+    '</p>' +
+    '<div style="background:rgba(0,40,90,.04); border:1px solid rgba(0,40,90,.12); border-radius:8px; padding:10px 12px; margin-bottom:14px; font-size:13px; line-height:1.7">' +
+      '<div><strong>Contrato:</strong> ' + escaparHtml(info.contratoId) + ' · ítem ' + escaparHtml(info.codigoSum) + '</div>' +
+      '<div><strong>Stock total pactado:</strong> ' + info.stockActual + ' unidades</div>' +
+      '<div><strong>Ya en el mix actual:</strong> ' + info.yaEnMix + ' unidades</div>' +
+      '<div><strong>Solicitaste agregar:</strong> ' + info.solicitado + ' unidades</div>' +
+      '<div style="margin-top:6px; padding-top:6px; border-top:1px solid rgba(0,40,90,.08)"><strong>Margen disponible:</strong> ' +
+        (stockOK
+          ? '<span style="color:#0a7a2a">' + info.disponible + ' unidades</span> · podés agregar hasta esa cantidad'
+          : '<span style="color:#c00">0 unidades</span> · el mix ya consume todo el stock pactado') +
+      '</div>' +
+    '</div>' +
+    '<div style="display:flex; gap:10px; justify-content:flex-end">' +
+      '<a href="../pages/contrato.html?id=' + encodeURIComponent(info.contratoId) +
+        '" target="_blank" rel="noopener" ' +
+        'style="padding:8px 14px; border:1px solid rgba(13,71,161,.30); border-radius:6px; background:rgba(0,122,255,.06); color:#0d47a1; font-size:13px; text-decoration:none; font-weight:600">' +
+        'Abrir contrato ↗' +
+      '</a>' +
+      '<button type="button" class="stock-modal-close" style="padding:8px 14px; border:none; border-radius:6px; background:#0d47a1; color:#fff; font-size:13px; font-weight:600; cursor:pointer">' +
+        'Entendido' +
+      '</button>' +
+    '</div>';
+
+  overlay.appendChild(dialog);
+  document.body.appendChild(overlay);
+  const close = () => overlay.remove();
+  dialog.querySelector('.stock-modal-close').addEventListener('click', close);
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+  document.addEventListener('keydown', function onEsc(ev) {
+    if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', onEsc); }
+  });
+  // Focus management
+  setTimeout(() => dialog.querySelector('.stock-modal-close')?.focus(), 50);
+}
+
 async function enriquecerDropdownsFanConStock() {
   const { badgeTexto, debeDeshabilitarse } =
     await import('./domain/refrigeracion_stock_index.js');
@@ -514,6 +592,34 @@ async function addToMix() {
   const db = await ensureFanDb();
   const f = db[key];
   if (!f) return;
+  // Microfase 4 · Validación de stock contractual antes de agregar al mix.
+  // Solo bloquea si:
+  //   1. Hay contrato base de stock seleccionado (state.contratoStock no vacío)
+  //   2. El fan_db_key está tipificado en el contrato (existe en porFanKey)
+  //   3. La cantidad pedida + lo ya en el mix excede el stock disponible
+  // Modelos fuera del contrato (no tipificados) pasan sin chequeo.
+  if (state.contratoStock && state.stocksFan && state.stocksFan.porFanKey) {
+    const entry = state.stocksFan.porFanKey.get(key);
+    if (entry) {
+      const yaEnMix = state.mix
+        .filter(it => it.key === key)
+        .reduce((sum, it) => sum + it.cantidad, 0);
+      const totalSolicitado = yaEnMix + qty;
+      if (totalSolicitado > entry.stock_actual) {
+        const disponible = Math.max(0, entry.stock_actual - yaEnMix);
+        avisarSinStock({
+          nombre:      entry.nombre_contractual,
+          codigoSum:   entry.codigo_suministro,
+          contratoId:  entry.contrato_id,
+          stockActual: entry.stock_actual,
+          yaEnMix,
+          solicitado:  qty,
+          disponible
+        });
+        return;
+      }
+    }
+  }
   const existente = state.mix.find(it => it.key === key);
   if (existente) {
     existente.cantidad += qty;
