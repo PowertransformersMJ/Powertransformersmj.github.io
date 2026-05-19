@@ -211,7 +211,17 @@ function sanitizar(data) {
     es_re_registro:           !!data.es_re_registro,
     justificacion_repeticion: JUSTIFICACIONES_VALIDAS.includes(data.justificacion_repeticion)
                                 ? data.justificacion_repeticion : '',
-    justificacion_detalle:    s(data.justificacion_detalle)
+    justificacion_detalle:    s(data.justificacion_detalle),
+
+    // ── Microfase 5 · Trazabilidad cross-módulo Brigada → Suministros ──
+    // Vinculan esta acción con el contrato del que se generan los
+    // movimientos de egreso al pasar a estado=ejecutada.
+    contrato_stock_id:               s(data.contrato_stock_id),
+    movimientos_brigada_generados:    !!data.movimientos_brigada_generados,
+    movimientos_brigada_refs:         Array.isArray(data.movimientos_brigada_refs)
+                                        ? data.movimientos_brigada_refs.map(x => s(x)).filter(Boolean)
+                                        : [],
+    movimientos_brigada_generados_at: s(data.movimientos_brigada_generados_at)
   };
 }
 
@@ -391,6 +401,32 @@ export async function actualizarEstado(id, estado, observaciones) {
     parche.fecha_ejecucion = new Date().toISOString().slice(0, 10);
   }
   await actualizar(id, parche);
+
+  // Microfase 5 · al ejecutar una acción, generar automáticamente
+  // los movimientos de EGRESO en el contrato de suministros vinculado.
+  // No bloqueamos el cambio de estado si la generación falla — el
+  // director puede reintentar desde la UI admin.
+  if (estado === ESTADOS_ACCION.EJECUTADA) {
+    try {
+      const accion = await obtener(id);
+      if (accion && accion.contrato_stock_id && !accion.movimientos_brigada_generados) {
+        const { generarMovimientosPorAccion } = await import('./movimientos_brigada.js');
+        const reporte = await generarMovimientosPorAccion({
+          accionId:      id,
+          contratoStock: accion.contrato_stock_id,
+          uid:           accion.responsable_uid || null
+        });
+        if (!reporte.ok) {
+          console.warn('[acciones_refrigeracion] generación de movimientos parcial:', reporte);
+        } else {
+          console.info('[acciones_refrigeracion] movimientos generados:', reporte.movimientosCreados);
+        }
+      }
+    } catch (err) {
+      // Logueamos pero NO re-lanzamos para no romper el cambio de estado.
+      console.error('[acciones_refrigeracion] fallo en hook de movimientos:', err);
+    }
+  }
 }
 
 export async function eliminar(id) {
