@@ -154,15 +154,126 @@ const reporte = await ejecutarTipificacion({
 console.log(reporte);
 ```
 
-### Próximas microfases (pendientes)
+### Microfase 3 · Badge de stock en vivo en dropdowns (commit `c0ade02`)
 
-| # | Microfase | Estado |
-|---|---|---|
-| 3 | UI Selección ONAF · cargar suministros del contrato activo + badge stock por modelo | pendiente |
-| 4 | Bloquear "Agregar al mix" si cantidad excede stock disponible + aviso | pendiente |
-| 5 | Egreso automático en `/movimientos` al cerrar acción de refrigeración | pendiente |
-| 6 | Widget nuevo en Dashboard del contrato: "Consumo por mantenimiento de refrigeración" | pendiente |
-| 7 | Documentación final + regla permanente en CLAUDE.md sobre integración cross-módulo | pendiente |
+Primer eslabón VISIBLE de la integración. En la UI del cálculo Selección
+ONAF, los 2 dropdowns de motoventiladores (`#mix_fan_sel` para agregar
+al mix y `#fan_db_sel` para ver ficha) muestran el stock disponible en
+tiempo real desde Firestore, con 3 estados visuales:
+
+- `Motoventilador Tipo 1 (FN063) · ✓ 36 disponibles` (verde, habilitado)
+- `Motoventilador Tipo 3 (ZN063) · ⛔ Sin stock · contrato 4125000143` (deshabilitado)
+- `KRENZ F20-A10069 · ✗ Fuera de contrato` (informativo, habilitado)
+
+#### Artefactos
+
+- `assets/js/domain/refrigeracion_stock_index.js` (nuevo · función pura):
+  - `construirIndiceStocksFan(suministros, movimientos)` → `{porFanKey, colisiones, resumen}`
+  - Agrupa movimientos por suministro_id en 1 pasada; computa stock con
+    `stock_calculo.computarStockDesdeMovimientos` por cada motoventilador
+    tipificado; filtra suministros no-motoventilador (Coraza, Radiadores)
+  - `badgeTexto(entry)` · 3 estados visuales
+  - `debeDeshabilitarse(entry)` · política de bloqueo
+- `assets/js/data/refrigeracion-stock-loader.js` (nuevo · I/O):
+  - `cargarStocksFan(contrato_id)` one-shot
+  - `suscribirStocksFan(cid, onData, onError)` realtime con onSnapshot
+    de suministros + movimientos, debounce 200ms para evitar
+    rerender en cascada
+  - `contratosDisponibles()` lista congelada (4123, 4125)
+- `pages/calculo-refrigeracion.html` · nueva barra "Contrato base de
+  stock" con `<select id="contrato_stock_sel">` arriba del mix
+- `assets/js/calculo-refrigeracion.js`:
+  - `initContratoStockSelect()` popula selector + lee `?contratoId=` URL
+  - `onContratoStockChange()` cancela suscripción previa + recarga
+  - `refrescarStocksFan()` usa suscribirStocksFan (fallback one-shot)
+  - `enriquecerDropdownsFanConStock()` modifica option.text + disabled
+    + title, guardando texto base en `data-base-text` para restaurar
+- `tests/refrigeracion_stock_index.test.js` · 18 tests
+
+### Microfase 4 · Bloquear "Agregar al mix" si excede stock (commit `54d69f3`)
+
+Cierra el feedback al usuario. Cuando intenta agregar al mix una
+cantidad que excede el stock disponible del contrato, modal explicativo
+con CTA al contrato:
+
+- Encabezado "⛔ Stock contractual insuficiente"
+- Detalles: contrato, ítem, stock pactado, ya en mix, solicitado,
+  margen disponible (verde o rojo según)
+- Botón "Abrir contrato ↗" → `pages/contrato.html?id=CID` pestaña nueva
+- Botón "Entendido" + Esc + clic afuera para cerrar
+- Auto-focus al botón para keyboard
+- `role="alertdialog"` + `aria-modal` + `aria-labelledby`
+
+Política: solo bloquea cuando hay tipificación Y stock insuficiente.
+Modelos fuera de contrato pasan (permite carga manual de datos).
+
+### Microfase 5 · Egreso automático al cerrar acción (commit `613cbae`)
+
+Cierra el ciclo de ESCRITURA. Cuando `acciones.actualizarEstado(id, 'ejecutada')`
+se invoca, se generan automáticamente movimientos de EGRESO en
+`/movimientos` del contrato vinculado.
+
+#### Artefactos
+
+- `assets/js/domain/movimientos_brigada_planner.js` (nuevo · función pura):
+  - `planificarMovimientosEgreso({accion, accionId, indiceStocks, contratoStock})`
+  - Cada movimiento incluye: suministro_id, contrato_id, anio, tipo='EGRESO',
+    cantidad, marca, transformador_id, matricula, subestacion, zona,
+    departamento, usuario (responsable_uid), observaciones detalladas
+    con trace al accion_id, `_meta` interno (fecha, referencia, fan_db_key)
+  - Items fuera del catálogo → `fueraDeContrato[]` (no se generan)
+  - Items con stock insuficiente → planificados pero reportados
+    (la transacción los rechaza si `permitirNegativo=false`)
+  - `yaGeneroMovimientos(accion)` detector de idempotencia
+  - `parcheoTrazabilidad(movIds)` → `{generados, refs[], generados_at}`
+- `assets/js/data/movimientos_brigada.js` (nuevo · orquestador):
+  - `generarMovimientosPorAccion({accionId, contratoStock, uid})`
+  - Lee acción → idempotente si ya generados
+  - `cargarStocksFan(cid)` índice fresco al momento del cierre
+  - Itera secuencial `movimientos.crear()` por cada planificado
+  - Tras generar, `acciones.actualizar(id, parcheoTrazabilidad)`
+- `assets/js/data/acciones_refrigeracion.js`:
+  - Sanitizar acepta 4 campos nuevos: `contrato_stock_id`,
+    `movimientos_brigada_generados`, `movimientos_brigada_refs[]`,
+    `movimientos_brigada_generados_at`
+  - `actualizarEstado(id, EJECUTADA, obs)` ahora hookea la generación
+    de movs (lazy import + try/catch que no bloquea el cambio de estado)
+- `assets/js/calculo-refrigeracion.js`:
+  - `guardarAccion()` incluye `contrato_stock_id: state.contratoStock`
+    en el payload, para que el hook sepa contra qué contrato generar
+- `tests/movimientos_brigada_planner.test.js` · 15 tests
+
+Trazabilidad bidireccional:
+- Movimiento → Acción: campo `observaciones` con `"Acción {id} · transformador {mat}…"`
+- Acción → Movimientos: array `movimientos_brigada_refs[]` con códigos MOV-YYYY-NNNN
+
+### Microfase 6 · Widget "Consumo por Mantenimiento Brigada" (commit `a9d6da0`)
+
+Cierra el ciclo de OBSERVABILIDAD. El dashboard del contrato muestra
+una sección dedicada con KPIs y rankings del consumo automático.
+
+#### Artefactos
+
+- `assets/js/domain/dashboard_brigada_kpis.js` (nuevo · función pura):
+  - `esEgresoDeBrigada(mov)` · heurística por substring en observaciones
+  - `computarKpisBrigada({acciones, movimientos, topN=5})` devuelve:
+    - `totales`: ejecutadas, planificadas, movs generados, unidades
+    - `topModelos`: top N por unidades + costo COP
+    - `accionesRecientes`: top 5 con flag de generación, ordenadas DESC
+      por fecha_ejecucion, con `mixResumen` tipo "FN063×4 · FN050×2"
+    - `pendientesPorEjecutar`: planificadas/aprobadas con mix > 0
+  - Excluye canceladas de los contadores
+- `pages/suministros-dashboard.html` · nueva sección con 4 KPI cards
+  + 2 tablas (top modelos · acciones recientes) antes de Vista Cruzada
+- `assets/js/suministros-dashboard-public.js`:
+  - Suscripción a `acciones_refrigeracion.suscribir()` con filtro
+    cliente por `contrato_stock_id` (el data layer no soporta server-side)
+  - `renderWidgetBrigada()` invoca `computarKpisBrigada` + escribe en
+    los nodos del HTML con escHtml/fmtInt/fmtCOP existentes
+  - `recomputarTodo()` llama al widget además de los otros 3 renders
+  - `beforeunload` cancela `unsubAccionesBrig`
+- `tests/dashboard_brigada_kpis.test.js` · 14 tests
+
 
 
 
