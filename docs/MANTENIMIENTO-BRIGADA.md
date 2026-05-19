@@ -637,6 +637,128 @@ console.log('export const TRANSFORMADORES_AFINIA = Object.freeze(' + JSON.string
 "
 ```
 
+### 7.5 Integración con catálogo de Suministros (2026-05-18 · M1–M7)
+
+El módulo Mantenimiento Brigada · Sistema de Refrigeración está
+integrado al catálogo de Suministros de los contratos vigentes
+(`4123000081` y `4125000143`) en 4 puntos de contacto. Esta sección
+explica el flujo end-to-end y los artefactos.
+
+#### Flujo completo
+
+1. **Usuario abre el cálculo** → selecciona contrato base de stock
+   (barra arriba del mix). Default: lee `?contratoId=` del URL.
+2. **Carga suscripción realtime** de suministros + movimientos del
+   contrato → `cargarStocksFan(cid)` agrupa por suministro y computa
+   stock disponible por cada `fan_db_key` tipificado.
+3. **Dropdowns de motoventiladores** (`#mix_fan_sel` y `#fan_db_sel`)
+   se enriquecen con badge:
+   - `Motoventilador Tipo 1 (FN063) · ✓ 36 disponibles`
+   - `Motoventilador Tipo 3 (ZN063) · ⛔ Sin stock`
+   - `Modelo Y · ✗ Fuera de contrato` (informativo)
+4. **Usuario agrega al mix** → si el total (ya en mix + solicitado)
+   excede stock_actual, modal de bloqueo con CTA al contrato. Modelos
+   fuera de contrato pasan sin chequeo.
+5. **Usuario cierra la acción** (`estado_accion='ejecutada'`) →
+   hook automático en `actualizarEstado()` invoca
+   `generarMovimientosPorAccion(accionId, contratoStock)`:
+   - Lee la acción + carga índice fresco de stocks
+   - Planifica un movimiento de EGRESO por cada item del mix tipificado
+   - Crea cada mov con `movimientos.crear()` (transacción atómica)
+   - Marca la acción con `movimientos_brigada_generados=true` +
+     `movimientos_brigada_refs[]` con IDs creados
+6. **Dashboard del contrato** suscrito a acciones del contrato →
+   widget "Consumo por Mantenimiento Brigada" muestra:
+   - 4 KPIs: ejecutadas, planificadas, movs generados, unidades consumidas
+   - Top 5 modelos más consumidos (con costo COP)
+   - Top 5 acciones recientes con `mixResumen`
+
+#### Artefactos por capa
+
+**Dominio puro (testables sin Firebase):**
+
+| Archivo | Función exportada |
+|---|---|
+| `assets/js/domain/suministro_schema.js` | `sanitizarSuministro` extendido con `fan_db_key` |
+| `assets/js/domain/suministros_fan_db_map.js` | `resolverFanDesdeSuministro`, `indexarSuministrosPorFanKey`, `cobertura` |
+| `assets/js/domain/refrigeracion_stock_index.js` | `construirIndiceStocksFan`, `badgeTexto`, `debeDeshabilitarse` |
+| `assets/js/domain/movimientos_brigada_planner.js` | `planificarMovimientosEgreso`, `yaGeneroMovimientos`, `parcheoTrazabilidad` |
+| `assets/js/domain/dashboard_brigada_kpis.js` | `computarKpisBrigada`, `esEgresoDeBrigada` |
+
+**Data layer I/O:**
+
+| Archivo | Funciones exportadas |
+|---|---|
+| `assets/js/data/refrigeracion-fan-contractual.js` | `FAN_CONTRACTUAL`, `nombreContractualFan`, `tieneNombreContractual` |
+| `assets/js/data/refrigeracion-stock-loader.js` | `cargarStocksFan`, `suscribirStocksFan`, `contratosDisponibles` |
+| `assets/js/data/movimientos_brigada.js` | `generarMovimientosPorAccion` |
+
+**Tipificación congelada del 4125000143** (en `FAN_CONTRACTUAL`):
+
+| Suministro | Stock | fan_db_key | Nombre contractual | Modelo PDF |
+|---|---|---|---|---|
+| **S03** | 36 | `fn063_60` | Motoventilador Tipo 1 (FN063) | ZIEHL FN063-6DL.4I.A7P1 trifásico |
+| **S04** | 32 | `fn050_60` | Motoventilador Tipo 2 (FN050) | ZIEHL FN050-4DH.4I.A7P1 trifásico |
+| **S05** | 0 | `zn063_mono_60` | Motoventilador Tipo 3 (ZN063) | ZIEHL ZN063-6EL.4M.V7P1 monofásico |
+| **S06** | 1 | `zn045_60` | Motoventilador Tipo 4 (ZN045) | ZIEHL ZN045-4DL.2F.V7P2 trifásico |
+
+Marcas duales en los 4 tipos: ENERGINN + ZIEHL ABEGG.
+
+Tensión auxiliar AFINIA: **220 V** → trifásicos conectados Delta a
+230/400V (claves `_60`, no `_60h`). Frecuencia 60 Hz (Colombia).
+
+#### Cómo aplicar la tipificación a Firestore en producción
+
+Script Node `scripts/migrate/tipificar-suministros-fan-db.js`.
+Ejecutar desde la Mac del director con `firebase-admin`:
+
+```javascript
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import {
+  MAPEO_4125000143,
+  ejecutarTipificacion
+} from './scripts/migrate/tipificar-suministros-fan-db.js';
+import { composeDocId } from './assets/js/domain/contratos.js';
+
+const app  = initializeApp({ credential: cert('./service-account.json') });
+const db   = getFirestore(app);
+const SUMS = db.collection('suministros');
+
+const reporte = await ejecutarTipificacion({
+  mapeo: MAPEO_4125000143,
+  contratoId: '4125000143',
+  read: async (cid, codigo) => {
+    const ref = SUMS.doc(composeDocId(cid, codigo));
+    const snap = await ref.get();
+    return snap.exists ? snap.data() : null;
+  },
+  write: async (cid, codigo, next) => {
+    await SUMS.doc(composeDocId(cid, codigo)).set(next, { merge: true });
+  },
+  dryRun: false      // poner true para preview sin escribir
+});
+
+console.log(reporte);
+```
+
+El script es idempotente: re-ejecutarlo no genera escrituras
+adicionales si los suministros ya tienen `fan_db_key`.
+
+#### Tests de la integración
+
+| Archivo | Tests |
+|---|---|
+| `tests/suministros_fan_db_map.test.js` | 24 |
+| `tests/tipificar_suministros_fan_db.test.js` | 29 |
+| `tests/refrigeracion_stock_index.test.js` | 18 |
+| `tests/movimientos_brigada_planner.test.js` | 15 |
+| `tests/dashboard_brigada_kpis.test.js` | 14 |
+| **Total** | **100 tests** |
+
+Patrón canónico documentado en CLAUDE.md §0.1.2.13 (regla
+permanente sobre integración cross-módulo).
+
 ---
 
 ## 9. Decisiones del director (NO re-debatir)
