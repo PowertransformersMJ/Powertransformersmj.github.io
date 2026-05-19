@@ -23,14 +23,25 @@
 
 /** @type {Readonly<Record<string, string>>} */
 export const FAN_CONTRACTUAL = Object.freeze({
-  // Placeholder · pendiente de tipificación con el director.
-  // Formato esperado: 'fan_db_key': 'Motoventilador Tipo N (MODELO)'
+  // Tipificación oficial confirmada con el director (2026-05-18)
+  // para el contrato 4125000143 · "SUMINISTRO DE ELEMENTOS Y ACCESORIOS
+  // PARA TRANSFORMADORES DE POTENCIA" · AFINIA Grupo EPM.
   //
-  // Ejemplo (a confirmar):
-  // fn063_60:    'Motoventilador Tipo 1 (FN063)',
-  // fn050_60h:   'Motoventilador Tipo 2 (FN050)',
-  // zn045_60:    'Motoventilador Tipo 3 (ZN045)',
-  // krenz_f20:   'Motoventilador Tipo 4 (KRENZ F20)',
+  // Tensión auxiliar AFINIA: 220 V → motores ZIEHL conectados Delta a
+  // 230/400V (no la versión HV 265/460V). Por eso los trifásicos usan
+  // las claves _60 (60 Hz Colombia) y NO las _60h.
+  //
+  // El monofásico Tipo 3 es la familia nueva agregada en Microfase 1.5
+  // (modelo ZN063-6EL.4M.V7P1, distinto a ZN063-6DL.4I.V7P1 trifásico).
+
+  fn063_60:       'Motoventilador Tipo 1 (FN063)',
+  fn050_60:       'Motoventilador Tipo 2 (FN050)',
+  zn063_mono_60:  'Motoventilador Tipo 3 (ZN063)',
+  zn045_60:       'Motoventilador Tipo 4 (ZN045)',
+
+  // Variantes adicionales del FAN_DB (HV 265/460V o 50Hz) quedan sin
+  // tipificación porque no se compraron en este contrato. Si en un
+  // contrato futuro se necesitan, agregar el mapeo aquí.
 });
 
 /**
