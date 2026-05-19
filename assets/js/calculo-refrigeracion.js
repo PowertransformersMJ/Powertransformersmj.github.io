@@ -3103,7 +3103,12 @@ async function guardarAccion() {
       // tras la query a Firestore en el paso 6a.
       es_re_registro:           false,
       justificacion_repeticion: ($('acc_justificacion')?.value || '').trim(),
-      justificacion_detalle:    ($('acc_justif_detalle')?.value || '').trim()
+      justificacion_detalle:    ($('acc_justif_detalle')?.value || '').trim(),
+
+      // Microfase 5 · vínculo con el contrato de suministros
+      // para generar egresos automáticos cuando esta acción
+      // pase a estado=ejecutada.
+      contrato_stock_id:        state.contratoStock || ''
     };
 
     // 6) Persistir vía data layer (lazy import)
