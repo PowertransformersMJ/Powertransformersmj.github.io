@@ -158,6 +158,66 @@
     </div>
   </div>
 
+  <!-- ── Consumo por Mantenimiento Brigada (Microfase 6) ────────── -->
+  <h2 class="section-head">Consumo por Mantenimiento Brigada · Sistema de Refrigeración</h2>
+  <div class="kpi-grid" style="margin-bottom: 14px">
+    <div class="kpi-card">
+      <div class="kpi-label">Acciones ejecutadas</div>
+      <div class="kpi-value" id="kBrigAccionesEj">—</div>
+      <div class="kpi-foot" style="font-size: 11px; color: var(--ink-3); margin-top: 4px">con egresos generados automáticamente</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Acciones planificadas</div>
+      <div class="kpi-value" id="kBrigAccionesPl">—</div>
+      <div class="kpi-foot" style="font-size: 11px; color: var(--ink-3); margin-top: 4px">pendientes de ejecutar</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Movimientos de brigada</div>
+      <div class="kpi-value" id="kBrigMovs">—</div>
+      <div class="kpi-foot" style="font-size: 11px; color: var(--ink-3); margin-top: 4px">egresos automáticos generados</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Unidades consumidas</div>
+      <div class="kpi-value" id="kBrigUnidades">—</div>
+      <div class="kpi-foot" style="font-size: 11px; color: var(--ink-3); margin-top: 4px">motoventiladores instalados</div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h3>Top 5 modelos más consumidos por brigada</h3>
+      <table class="tbl-min" id="tblBrigTopModelos" style="width:100%; font-size:13px">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(0,40,90,.10)">
+            <th scope="col" style="text-align:left; padding:6px 8px">Suministro</th>
+            <th scope="col" style="text-align:left; padding:6px 8px">Modelo</th>
+            <th scope="col" style="text-align:right; padding:6px 8px">Unidades</th>
+            <th scope="col" style="text-align:right; padding:6px 8px">Costo (COP)</th>
+          </tr>
+        </thead>
+        <tbody id="tBrigTopModelos">
+          <tr><td colspan="4" style="padding:8px; color:var(--ink-3); font-style:italic">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="chart-card">
+      <h3>Últimas 5 acciones ejecutadas</h3>
+      <table class="tbl-min" id="tblBrigAcciones" style="width:100%; font-size:13px">
+        <thead>
+          <tr style="border-bottom:1px solid rgba(0,40,90,.10)">
+            <th scope="col" style="text-align:left; padding:6px 8px">Fecha</th>
+            <th scope="col" style="text-align:left; padding:6px 8px">Matrícula</th>
+            <th scope="col" style="text-align:left; padding:6px 8px">Subestación</th>
+            <th scope="col" style="text-align:left; padding:6px 8px">Mix consumido</th>
+            <th scope="col" style="text-align:right; padding:6px 8px">Total</th>
+          </tr>
+        </thead>
+        <tbody id="tBrigAcciones">
+          <tr><td colspan="5" style="padding:8px; color:var(--ink-3); font-style:italic">Cargando…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Vista cruzada -->
   <h2 class="section-head">Vista cruzada</h2>
   <div class="inv-toolbar">

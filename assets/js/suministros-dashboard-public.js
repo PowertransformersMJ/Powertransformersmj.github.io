@@ -11,8 +11,10 @@
 
 import { suscribirStockGlobal, suscribir as suscribirMovimientos, isReady } from '../js/data/movimientos.js';
 import { suscribir as suscribirSuministros } from '../js/data/suministros.js';
+import { suscribir as suscribirAccionesRefrig } from '../js/data/acciones_refrigeracion.js';
 import { estadoStock, ESTADOS_STOCK } from '../js/domain/schema.js';
-import { withContratoFiltro } from '../js/ui/contrato-context.js';
+import { computarKpisBrigada } from '../js/domain/dashboard_brigada_kpis.js';
+import { withContratoFiltro, getContratoActivo } from '../js/ui/contrato-context.js';
 
 const $ = (id) => document.getElementById(id);
 const info = $('infoBox');
@@ -47,8 +49,10 @@ const cruzadoCount = $('cruzadoCount');
 let cacheStockGlobal = [];   // [{...sumDoc, stock: {inicial, ingresado, egresado, actual}}]
 let cacheMovs = [];
 let cacheSums = [];
+let cacheAccionesBrig = [];  // Microfase 6 · acciones de refrigeración del contrato
 let configCache = null;
 let unsubStock = null, unsubMovs = null, unsubSums = null;
+let unsubAccionesBrig = null;
 let charts = {};
 
 // Helpers
@@ -307,6 +311,55 @@ function recomputarTodo() {
   renderTabla();
   renderCharts();
   renderCruzado();
+  renderWidgetBrigada();
+}
+
+/* ─── Microfase 6 · Widget "Consumo por Mantenimiento Brigada" ─── */
+
+function renderWidgetBrigada() {
+  const kpi = computarKpisBrigada({
+    acciones:    cacheAccionesBrig,
+    movimientos: cacheMovs,
+    topN:        5
+  });
+  const setText = (id, val) => { const el = $(id); if (el) el.textContent = val; };
+  setText('kBrigAccionesEj', fmtInt(kpi.totales.accionesEjecutadas));
+  setText('kBrigAccionesPl', fmtInt(kpi.totales.accionesPlanificadas));
+  setText('kBrigMovs',       fmtInt(kpi.totales.movimientosGenerados));
+  setText('kBrigUnidades',   fmtInt(kpi.totales.unidadesConsumidas));
+
+  const tTop = $('tBrigTopModelos');
+  if (tTop) {
+    if (!kpi.topModelos.length) {
+      tTop.innerHTML = '<tr><td colspan="4" style="padding:8px; color:var(--ink-3); font-style:italic">Sin consumo de brigada registrado aún</td></tr>';
+    } else {
+      tTop.innerHTML = kpi.topModelos.map((m) =>
+        '<tr style="border-bottom:1px solid rgba(0,40,90,.05)">' +
+          '<td style="padding:6px 8px; font-family:var(--font-mono); font-size:12px">' + escHtml(m.suministro_id) + '</td>' +
+          '<td style="padding:6px 8px">' + escHtml(m.nombre) + '</td>' +
+          '<td style="padding:6px 8px; text-align:right; font-weight:600">' + fmtInt(m.unidades) + '</td>' +
+          '<td style="padding:6px 8px; text-align:right; color:var(--ink-2)">' + fmtCOP(m.costo) + '</td>' +
+        '</tr>'
+      ).join('');
+    }
+  }
+
+  const tAcc = $('tBrigAcciones');
+  if (tAcc) {
+    if (!kpi.accionesRecientes.length) {
+      tAcc.innerHTML = '<tr><td colspan="5" style="padding:8px; color:var(--ink-3); font-style:italic">Sin acciones ejecutadas con egresos automáticos</td></tr>';
+    } else {
+      tAcc.innerHTML = kpi.accionesRecientes.map((a) =>
+        '<tr style="border-bottom:1px solid rgba(0,40,90,.05)">' +
+          '<td style="padding:6px 8px; font-family:var(--font-mono); font-size:12px">' + escHtml(a.fecha) + '</td>' +
+          '<td style="padding:6px 8px; font-weight:600">' + escHtml(a.matricula || '—') + '</td>' +
+          '<td style="padding:6px 8px">' + escHtml(a.subestacion || '—') + '</td>' +
+          '<td style="padding:6px 8px; font-family:var(--font-mono); font-size:12px">' + escHtml(a.mixResumen) + '</td>' +
+          '<td style="padding:6px 8px; text-align:right; font-weight:700">' + fmtInt(a.totalU) + '</td>' +
+        '</tr>'
+      ).join('');
+    }
+  }
 }
 
 function arrancar() {
@@ -314,9 +367,10 @@ function arrancar() {
     showInfo('⚠ Firebase no configurado.', 'err');
     return;
   }
-  if (unsubStock) try { unsubStock(); } catch (_) {}
-  if (unsubMovs)  try { unsubMovs(); }  catch (_) {}
-  if (unsubSums)  try { unsubSums(); }  catch (_) {}
+  if (unsubStock)         try { unsubStock(); }         catch (_) {}
+  if (unsubMovs)          try { unsubMovs(); }          catch (_) {}
+  if (unsubSums)          try { unsubSums(); }          catch (_) {}
+  if (unsubAccionesBrig)  try { unsubAccionesBrig(); }  catch (_) {}
 
   const filtros = withContratoFiltro();
   unsubStock = suscribirStockGlobal(filtros, ({ suministros, config }) => {
@@ -335,12 +389,25 @@ function arrancar() {
     cacheSums = rows;
     recomputarTodo();
   }, (err) => console.warn('[sums]', err));
+
+  // Microfase 6 · acciones de refrigeración del contrato para los
+  // KPIs del widget "Consumo por Brigada".
+  // Filtra por contrato_stock_id en cliente porque el data layer
+  // de acciones no soporta el filtro server-side todavía.
+  unsubAccionesBrig = suscribirAccionesRefrig({}, (rows) => {
+    const cidActivo = getContratoActivo();
+    cacheAccionesBrig = cidActivo
+      ? rows.filter(a => a.contrato_stock_id === cidActivo)
+      : rows;
+    renderWidgetBrigada();
+  }, (err) => console.warn('[brig-acciones]', err));
 }
 
 window.addEventListener('beforeunload', () => {
-  if (unsubStock) try { unsubStock(); } catch (_) {}
-  if (unsubMovs)  try { unsubMovs(); }  catch (_) {}
-  if (unsubSums)  try { unsubSums(); }  catch (_) {}
+  if (unsubStock)        try { unsubStock(); }        catch (_) {}
+  if (unsubMovs)         try { unsubMovs(); }         catch (_) {}
+  if (unsubSums)         try { unsubSums(); }         catch (_) {}
+  if (unsubAccionesBrig) try { unsubAccionesBrig(); } catch (_) {}
   for (const k of Object.keys(charts)) destroyChart(k);
 });
 
