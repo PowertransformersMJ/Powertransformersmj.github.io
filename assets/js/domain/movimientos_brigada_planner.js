@@ -59,6 +59,17 @@ export function planificarMovimientosEgreso({ accion, accionId, indiceStocks, co
                    new Date().toISOString().slice(0, 10);
   const responsable = String(accion.responsable_uid || '');
 
+  // AGRUPAR items del mix por `entry.codigo_suministro` para que dos
+  // items con la misma fan_db_key (ej. 4 FN050 lateral + 2 FN050
+  // vertical) generen UN SOLO movimiento de egreso del MISMO
+  // suministro S04 (6u total). La disposición es metadata operativa
+  // del montaje; el contrato no la entiende — solo le importa el
+  // stock_actual del suministro.
+  //
+  // La granularidad por disposición se preserva en `observaciones`
+  // detalladas + `_meta.distribucion[]` para trazabilidad.
+  const porSuministro = new Map();
+
   for (const item of accion.mix) {
     if (!item || !item.key) continue;
     const fanKey = String(item.key).toLowerCase();
@@ -72,51 +83,79 @@ export function planificarMovimientosEgreso({ accion, accionId, indiceStocks, co
     }
 
     // Sanity: el contrato del entry debe coincidir con el contrato activo.
-    // Si no coincide, no movemos stock del contrato equivocado.
     if (contratoStock && entry.contrato_id && entry.contrato_id !== contratoStock) {
       fueraDeContrato.push({ key: fanKey, modelo: String(item.modelo || ''), cantidad });
       continue;
     }
 
+    const sid = entry.codigo_suministro;
+    const prev = porSuministro.get(sid);
+    if (prev) {
+      prev.cantidad += cantidad;
+      prev.distribucion.push({
+        fan_db_key:  fanKey,
+        disposicion: String(item.disposicion || ''),
+        cantidad
+      });
+    } else {
+      porSuministro.set(sid, {
+        entry,
+        cantidad,
+        marca: String(item.marca || '').toUpperCase(),
+        distribucion: [{
+          fan_db_key:  fanKey,
+          disposicion: String(item.disposicion || ''),
+          cantidad
+        }]
+      });
+    }
+  }
+
+  // Construir 1 movimiento por suministro consolidado.
+  const anio = parseInt(String(fechaIso).slice(0, 4), 10);
+  const anioOk = Number.isInteger(anio) ? anio : new Date().getFullYear();
+
+  for (const [sid, agg] of porSuministro) {
+    const { entry, cantidad, marca, distribucion } = agg;
+
     if (entry.stock_actual < cantidad) {
-      sinStock.push({ key: fanKey, cantidad, stock_actual: entry.stock_actual });
-      // Igual planificamos el movimiento — la transacción de
-      // crearMovimiento lo rechazará si permitirNegativo=false, y el
-      // operador verá el error explícito. NO silenciamos el caso.
+      sinStock.push({
+        key: distribucion[0].fan_db_key,
+        cantidad,
+        stock_actual: entry.stock_actual
+      });
     }
 
-    const anio = parseInt(String(fechaIso).slice(0, 4), 10);
+    const valU = Number(entry.valor_unitario) || 0;
     movimientos.push({
-      suministro_id:     entry.codigo_suministro,
+      suministro_id:     sid,
       suministro_nombre: entry.nombre_contractual,
       contrato_id:       entry.contrato_id,
-      anio:              Number.isInteger(anio) ? anio : new Date().getFullYear(),
+      anio:              anioOk,
       tipo:              'EGRESO',
       cantidad,
-      marca:             String(item.marca || '').toUpperCase(),
-      // Datos del activo intervenido — útiles para reportes de
-      // consumo por matrícula/zona/depto en el dashboard del contrato.
+      valor_unitario:    valU,
+      valor_total:       valU * cantidad,
+      marca,
       transformador_id:  String(accion.transformador_id || ''),
       matricula:         String(accion.matricula || ''),
       subestacion:       String(accion.subestacion || ''),
       zona:              String(accion.zona || ''),
       departamento:      String(accion.departamento || ''),
-      // Identificación operativa del movimiento.
       usuario:           responsable,
       odt:               String(accion.odt || ''),
-      observaciones:     armarObservacion(accion, entry, item, accionId),
-      // Campos derivados internos (no se persisten directos, los lee
-      // el data layer para construir referencias / audit / trace).
+      observaciones:     armarObservacionAgregada(accion, entry, distribucion, accionId),
       _meta: {
         accion_id:           accionId,
-        fan_db_key:          fanKey,
+        fan_db_key:          distribucion[0].fan_db_key,
         nombre_contractual:  entry.nombre_contractual,
-        codigo_suministro:   entry.codigo_suministro,
+        codigo_suministro:   sid,
         contrato_id:         entry.contrato_id,
         cantidad,
         stock_previo:        entry.stock_actual,
         fecha:               fechaIso,
-        referencia:          `accion_refrig:${accionId}:${fanKey}`
+        referencia:          `accion_refrig:${accionId}:${sid}`,
+        distribucion        // [{fan_db_key, disposicion, cantidad}]
       }
     });
   }
@@ -124,14 +163,18 @@ export function planificarMovimientosEgreso({ accion, accionId, indiceStocks, co
   return { movimientos, fueraDeContrato, sinStock };
 }
 
-function armarObservacion(accion, entry, item, accionId) {
+function armarObservacionAgregada(accion, entry, distribucion, accionId) {
+  // Detalle de cómo se distribuyó por disposición: "4u lateral + 2u vertical_1"
+  const detalle = distribucion
+    .filter(d => d.cantidad > 0)
+    .map(d => d.disposicion ? `${d.cantidad}u ${d.disposicion}` : `${d.cantidad}u`)
+    .join(' + ');
   const partes = [
     `Acción ${accionId}`,
     accion.matricula ? `transformador ${accion.matricula}` : null,
     accion.subestacion ? `S/E ${accion.subestacion}` : null,
     entry.nombre_contractual,
-    `${item.cantidad} u`,
-    item.disposicion ? `disposición ${item.disposicion}` : null,
+    detalle,
     accion.accion_descripcion ? `· ${accion.accion_descripcion}` : null
   ].filter(Boolean);
   return partes.join(' · ');
