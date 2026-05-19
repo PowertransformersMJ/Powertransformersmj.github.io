@@ -213,14 +213,20 @@ async function refrescarStocksFan() {
 }
 
 /**
- * Regla §0.1.2.14: si el contrato activo tiene tipificación congelada
- * en MAPEO_4125000143 pero la suscripción reporta 0 motoventiladores
- * tipificados en Firestore, mostrar un banner accionable de UN solo
- * click para aplicar la tipificación automáticamente.
+ * Regla §0.1.2.14: detecta si el contrato activo tiene SUMINISTROS
+ * INCONSISTENTES con el MAPEO congelado (faltan fan_db_key, marcas
+ * duales, valor_unitario, etc.) y muestra un banner accionable de
+ * UN solo click para aplicar la tipificación + correcciones.
  *
- * NO ejecutamos silenciosamente porque la operación escribe en
+ * El detector compara cada entry del MAPEO contra el suministro real:
+ *   · Sin fan_db_key                          → necesita tipificar
+ *   · valor_unitario distinto del PDF oferta  → necesita actualizar
+ *   · Marcas duales no presentes              → necesita merge
+ *   · Unidad incorrecta (S06 con "mts")       → necesita corregir
+ *
+ * NO ejecuta silenciosamente porque la operación escribe en
  * Firestore y queremos que el director vea explícitamente qué se va
- * a aplicar (4 suministros, sus mappings, sus correcciones).
+ * a aplicar.
  */
 async function evaluarAutoTipificacion(cid, indice) {
   const host = $('autoTipificarBanner');
@@ -230,21 +236,63 @@ async function evaluarAutoTipificacion(cid, indice) {
     host.style.display = 'none';
     return;
   }
-  // Si ya hay motoventiladores tipificados, no insistir.
-  if (indice && indice.resumen && indice.resumen.conFanKey > 0) {
+
+  // Detectar tipificación incompleta: comparar el mapeo contra los
+  // valores reales del índice. Lista qué falta por cada suministro.
+  let pendientes = [];
+  try {
+    const script = await import('../../scripts/migrate/tipificar-suministros-fan-db.js');
+    const sumData = await import('./data/suministros.js');
+    const { composeDocId } = await import('./domain/contratos.js');
+    for (const m of script.MAPEO_4125000143) {
+      const id = composeDocId(cid, m.codigo);
+      let actual = null;
+      try { actual = await sumData.obtener(id); } catch {}
+      if (!actual) {
+        pendientes.push({ codigo: m.codigo, motivo: 'no existe en Firestore' });
+        continue;
+      }
+      const motivos = [];
+      if (actual.fan_db_key !== m.fan_db_key) motivos.push('fan_db_key');
+      if (typeof m.valor_unitario === 'number' && actual.valor_unitario !== m.valor_unitario) {
+        motivos.push(`valor_unitario ($${actual.valor_unitario || 0} → $${m.valor_unitario.toLocaleString('es-CO')})`);
+      }
+      if (m.unidad && actual.unidad !== m.unidad) motivos.push(`unidad (${actual.unidad}→${m.unidad})`);
+      if (Array.isArray(m.marcas) && m.marcas.length) {
+        const actualSet = new Set((actual.marcas_disponibles || []).map(s => String(s).trim()));
+        const faltantes = m.marcas.filter(mk => !actualSet.has(mk));
+        if (faltantes.length) motivos.push(`marcas (${faltantes.join('+')})`);
+      }
+      if (motivos.length) pendientes.push({ codigo: m.codigo, motivos });
+    }
+  } catch (err) {
+    console.warn('[auto-tipificar] detector falló:', err);
     host.innerHTML = '';
     host.style.display = 'none';
     return;
   }
+
+  if (pendientes.length === 0) {
+    host.innerHTML = '';
+    host.style.display = 'none';
+    return;
+  }
+
+  const detalleHtml = pendientes.map(p => {
+    if (p.motivo) return `<li><strong>${p.codigo}</strong>: ${escaparHtml(p.motivo)}</li>`;
+    return `<li><strong>${p.codigo}</strong>: actualizar ${p.motivos.map(m => escaparHtml(m)).join(', ')}</li>`;
+  }).join('');
+
   host.style.display = 'block';
   host.innerHTML =
-    '<div style="background:rgba(255,180,0,.10); border:1px solid rgba(255,140,0,.40); border-radius:8px; padding:10px 14px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin: 4px 0 0">' +
-      '<span style="font-size:20px">⚠</span>' +
+    '<div style="background:rgba(255,180,0,.10); border:1px solid rgba(255,140,0,.40); border-radius:8px; padding:10px 14px; display:flex; gap:12px; align-items:flex-start; flex-wrap:wrap; margin: 4px 0 0">' +
+      '<span style="font-size:20px; flex-shrink:0">⚠</span>' +
       '<div style="flex:1 1 320px; font-size:13px; line-height:1.5">' +
-        '<strong>Los 4 motoventiladores del contrato 4125000143 no están tipificados todavía.</strong> ' +
-        'El sistema necesita vincularlos al catálogo del cálculo (FAN_DB) para mostrar stock en vivo y bloquear selecciones imposibles.' +
+        `<strong>${pendientes.length} suministro(s) del contrato 4125000143 necesitan tipificación o corrección.</strong> ` +
+        'El sistema requiere fan_db_key + valor_unitario + marcas duales para mostrar stock, valor económico en COP y bloquear selecciones imposibles.' +
+        `<ul style="margin:6px 0 0 18px; padding:0; font-size:12px; color:var(--ink-2)">${detalleHtml}</ul>` +
       '</div>' +
-      '<button type="button" id="btnAutoTipificar" style="padding:8px 14px; border:none; border-radius:6px; background:#0d47a1; color:#fff; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap">Tipificar automáticamente</button>' +
+      '<button type="button" id="btnAutoTipificar" style="padding:8px 14px; border:none; border-radius:6px; background:#0d47a1; color:#fff; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap; flex-shrink:0">Tipificar y corregir todo</button>' +
       '<span id="autoTipificarStatus" style="flex-basis:100%; font-size:12px; color:var(--ink-3); font-style:italic"></span>' +
     '</div>';
   $('btnAutoTipificar')?.addEventListener('click', () => aplicarAutoTipificacion(cid), { once: true });
