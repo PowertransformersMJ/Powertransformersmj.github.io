@@ -180,6 +180,7 @@ async function refrescarStocksFan() {
     state.stocksFan = null;
     enriquecerDropdownsFanConStock();
     if (resumenEl) resumenEl.textContent = 'Sin contrato seleccionado · los modelos del catálogo no muestran stock';
+    ocultarBannerAutoTipificar();
     return;
   }
   if (resumenEl) resumenEl.textContent = 'Cargando stocks…';
@@ -192,6 +193,7 @@ async function refrescarStocksFan() {
         enriquecerDropdownsFanConStock();
         if (resumenEl) resumenEl.textContent =
           `${indice.resumen.conFanKey} motoventiladores tipificados · ${indice.resumen.conStock} con stock · ${indice.resumen.sinStock} sin stock`;
+        evaluarAutoTipificacion(cid, indice);
       }, (err) => {
         if (resumenEl) resumenEl.textContent = 'Error al cargar stocks: ' + (err.message || err);
         console.error('[stocks-fan] suscribir:', err);
@@ -202,10 +204,104 @@ async function refrescarStocksFan() {
       enriquecerDropdownsFanConStock();
       if (resumenEl) resumenEl.textContent =
         `${indice.resumen.conFanKey} motoventiladores tipificados · ${indice.resumen.conStock} con stock · ${indice.resumen.sinStock} sin stock`;
+      evaluarAutoTipificacion(cid, indice);
     }
   } catch (err) {
     if (resumenEl) resumenEl.textContent = 'Error al cargar stocks: ' + (err.message || err);
     console.error('[stocks-fan] refrescar:', err);
+  }
+}
+
+/**
+ * Regla §0.1.2.14: si el contrato activo tiene tipificación congelada
+ * en MAPEO_4125000143 pero la suscripción reporta 0 motoventiladores
+ * tipificados en Firestore, mostrar un banner accionable de UN solo
+ * click para aplicar la tipificación automáticamente.
+ *
+ * NO ejecutamos silenciosamente porque la operación escribe en
+ * Firestore y queremos que el director vea explícitamente qué se va
+ * a aplicar (4 suministros, sus mappings, sus correcciones).
+ */
+async function evaluarAutoTipificacion(cid, indice) {
+  const host = $('autoTipificarBanner');
+  if (!host) return;
+  if (cid !== '4125000143') {  // único contrato con mapeo congelado hoy
+    host.innerHTML = '';
+    host.style.display = 'none';
+    return;
+  }
+  // Si ya hay motoventiladores tipificados, no insistir.
+  if (indice && indice.resumen && indice.resumen.conFanKey > 0) {
+    host.innerHTML = '';
+    host.style.display = 'none';
+    return;
+  }
+  host.style.display = 'block';
+  host.innerHTML =
+    '<div style="background:rgba(255,180,0,.10); border:1px solid rgba(255,140,0,.40); border-radius:8px; padding:10px 14px; display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin: 4px 0 0">' +
+      '<span style="font-size:20px">⚠</span>' +
+      '<div style="flex:1 1 320px; font-size:13px; line-height:1.5">' +
+        '<strong>Los 4 motoventiladores del contrato 4125000143 no están tipificados todavía.</strong> ' +
+        'El sistema necesita vincularlos al catálogo del cálculo (FAN_DB) para mostrar stock en vivo y bloquear selecciones imposibles.' +
+      '</div>' +
+      '<button type="button" id="btnAutoTipificar" style="padding:8px 14px; border:none; border-radius:6px; background:#0d47a1; color:#fff; font-size:13px; font-weight:600; cursor:pointer; white-space:nowrap">Tipificar automáticamente</button>' +
+      '<span id="autoTipificarStatus" style="flex-basis:100%; font-size:12px; color:var(--ink-3); font-style:italic"></span>' +
+    '</div>';
+  $('btnAutoTipificar')?.addEventListener('click', () => aplicarAutoTipificacion(cid), { once: true });
+}
+
+function ocultarBannerAutoTipificar() {
+  const host = $('autoTipificarBanner');
+  if (host) { host.innerHTML = ''; host.style.display = 'none'; }
+}
+
+async function aplicarAutoTipificacion(cid) {
+  const btn = $('btnAutoTipificar');
+  const statusEl = $('autoTipificarStatus');
+  if (btn) { btn.disabled = true; btn.textContent = 'Tipificando…'; }
+  if (statusEl) statusEl.textContent = 'Aplicando tipificación + correcciones del contrato ' + cid + '…';
+  try {
+    const [script, sumData] = await Promise.all([
+      import('../../scripts/migrate/tipificar-suministros-fan-db.js'),
+      import('./data/suministros.js')
+    ]);
+    const { composeDocId } = await import('./domain/contratos.js');
+    const reporte = await script.ejecutarTipificacion({
+      mapeo:       script.MAPEO_4125000143,
+      contratoId:  cid,
+      read:        async (cid2, codigo) => {
+        const id = composeDocId(cid2, codigo);
+        return await sumData.obtener(id);
+      },
+      write:       async (cid2, codigo, next) => {
+        const id = composeDocId(cid2, codigo);
+        await sumData.actualizar(id, next);
+      },
+      log:         (msg) => console.info(msg),
+      dryRun:      false
+    });
+    if (reporte.tipificados > 0) {
+      if (statusEl) statusEl.textContent =
+        `✓ ${reporte.tipificados} suministros tipificados · ${reporte.sinCambio} ya estaban OK · ${reporte.faltantes.length} no existen en Firestore · ${reporte.errores.length} errores`;
+      // La suscripción realtime detecta los cambios y refresca los
+      // badges automáticamente. Banner se oculta al actualizar
+      // indice.resumen.conFanKey > 0.
+    } else if (reporte.faltantes.length > 0) {
+      if (statusEl) statusEl.textContent =
+        `⚠ Los suministros ${reporte.faltantes.join(', ')} no existen en Firestore · cargá el catálogo en /admin/suministros-catalogo.html primero`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Tipificar automáticamente'; }
+    } else if (reporte.errores.length > 0) {
+      if (statusEl) statusEl.textContent =
+        `✗ Falló: ${reporte.errores.map(e => e.error).join(' · ')}`;
+      if (btn) { btn.disabled = false; btn.textContent = 'Reintentar'; }
+    } else {
+      if (statusEl) statusEl.textContent =
+        `Sin cambios pendientes · todos los suministros ya estaban tipificados`;
+    }
+  } catch (err) {
+    console.error('[auto-tipificar]', err);
+    if (statusEl) statusEl.textContent = '✗ Error: ' + (err.message || err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Reintentar'; }
   }
 }
 
