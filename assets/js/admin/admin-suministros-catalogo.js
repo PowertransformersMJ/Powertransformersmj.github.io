@@ -29,6 +29,7 @@ const fUnidadMain = $('fUnidadMain');
 const fStockInicial = $('fStockInicial');
 const fValorUnitario = $('fValorUnitario');
 const fObs        = $('fObs');
+const fFanDbKey   = $('fFanDbKey');
 const marcasChipsEdit = $('marcasChipsEdit');
 const marcasInputRow  = $('marcasInputRow');
 const fNuevaMarca = $('fNuevaMarca');
@@ -174,6 +175,7 @@ function fillForm(s) {
   fStockInicial.value = s.stock_inicial ?? 0;
   fValorUnitario.value = s.valor_unitario ?? 0;
   fObs.value    = s.observaciones || '';
+  if (fFanDbKey) fFanDbKey.value = String(s.fan_db_key || '').toLowerCase();
   suministroEnEdicion = s;
   // Mostrar las marcas del array como provisional, mientras la query realtime trae las reales.
   const arr = Array.isArray(s.marcas_disponibles) ? s.marcas_disponibles : [];
@@ -189,7 +191,8 @@ function readForm() {
     unidad:         fUnidadMain.value,
     stock_inicial:  +fStockInicial.value || 0,
     valor_unitario: +fValorUnitario.value || 0,
-    observaciones:  fObs.value.trim()
+    observaciones:  fObs.value.trim(),
+    fan_db_key:     fFanDbKey ? String(fFanDbKey.value || '').trim().toLowerCase() : ''
   };
 }
 
