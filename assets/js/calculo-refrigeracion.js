@@ -54,7 +54,11 @@ const state = {
   fanDb:     null,             // cargado lazy
   transformers: null,          // cargado lazy
   chart:     null,
-  lastSuggestions: []          // cache para applyMixSuggestion
+  lastSuggestions: [],         // cache para applyMixSuggestion
+  // ── Microfase 3 · integración con catálogo de Suministros ──
+  contratoStock:   '',         // contrato_id activo para chequeo de stock
+  stocksFan:       null,       // { porFanKey: Map, colisiones, resumen } cacheado
+  unsubStocks:     null        // unsubscribe del listener realtime
 };
 
 /* ─── Helpers ───────────────────────────────────────────────── */
@@ -118,6 +122,135 @@ async function ensureFanDb() {
   const mod = await import('./data/refrigeracion-fan-db.js');
   state.fanDb = mod.FAN_DB;
   return state.fanDb;
+}
+
+/* ─── Microfase 3 · Integración con catálogo de Suministros ─── */
+
+/**
+ * Popula el selector de contrato base de stock con la lista de
+ * contratos disponibles + lee el query string ?contratoId= si está
+ * presente y lo selecciona por defecto.
+ */
+async function initContratoStockSelect() {
+  const sel = $('contrato_stock_sel');
+  if (!sel) return;
+  let contratos = [];
+  try {
+    const mod = await import('./data/refrigeracion-stock-loader.js');
+    contratos = mod.contratosDisponibles();
+  } catch (err) {
+    console.warn('[calculo-refrigeracion] no se pudieron cargar contratos:', err);
+    return;
+  }
+  for (const c of contratos) {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.label;
+    sel.appendChild(opt);
+  }
+  // Default desde query string ?contratoId=
+  try {
+    const cidUrl = new URLSearchParams(window.location.search).get('contratoId');
+    if (cidUrl && contratos.some(c => c.id === cidUrl)) {
+      sel.value = cidUrl;
+      state.contratoStock = cidUrl;
+    }
+  } catch { /* sin window.location · entorno no-browser */ }
+  sel.addEventListener('change', onContratoStockChange);
+  // Cargar stocks iniciales si hay contrato seleccionado.
+  if (state.contratoStock) await refrescarStocksFan();
+}
+
+async function onContratoStockChange() {
+  const sel = $('contrato_stock_sel');
+  state.contratoStock = sel ? sel.value : '';
+  // Cancelar suscripción anterior si existe.
+  if (typeof state.unsubStocks === 'function') {
+    try { state.unsubStocks(); } catch {}
+    state.unsubStocks = null;
+  }
+  state.stocksFan = null;
+  await refrescarStocksFan();
+}
+
+async function refrescarStocksFan() {
+  const cid = state.contratoStock;
+  const resumenEl = $('contrato_stock_resumen');
+  if (!cid) {
+    state.stocksFan = null;
+    enriquecerDropdownsFanConStock();
+    if (resumenEl) resumenEl.textContent = 'Sin contrato seleccionado · los modelos del catálogo no muestran stock';
+    return;
+  }
+  if (resumenEl) resumenEl.textContent = 'Cargando stocks…';
+  try {
+    const loader = await import('./data/refrigeracion-stock-loader.js');
+    // Si hay sesión Firebase activa, suscripción realtime; si no, one-shot.
+    if (typeof loader.suscribirStocksFan === 'function') {
+      state.unsubStocks = loader.suscribirStocksFan(cid, (indice) => {
+        state.stocksFan = indice;
+        enriquecerDropdownsFanConStock();
+        if (resumenEl) resumenEl.textContent =
+          `${indice.resumen.conFanKey} motoventiladores tipificados · ${indice.resumen.conStock} con stock · ${indice.resumen.sinStock} sin stock`;
+      }, (err) => {
+        if (resumenEl) resumenEl.textContent = 'Error al cargar stocks: ' + (err.message || err);
+        console.error('[stocks-fan] suscribir:', err);
+      });
+    } else {
+      const indice = await loader.cargarStocksFan(cid);
+      state.stocksFan = indice;
+      enriquecerDropdownsFanConStock();
+      if (resumenEl) resumenEl.textContent =
+        `${indice.resumen.conFanKey} motoventiladores tipificados · ${indice.resumen.conStock} con stock · ${indice.resumen.sinStock} sin stock`;
+    }
+  } catch (err) {
+    if (resumenEl) resumenEl.textContent = 'Error al cargar stocks: ' + (err.message || err);
+    console.error('[stocks-fan] refrescar:', err);
+  }
+}
+
+/**
+ * Enriquece los `<option>` de los 2 dropdowns de motoventiladores
+ * (`#mix_fan_sel` y `#fan_db_sel`) con el badge de stock. Modifica
+ * el text del option y la propiedad `disabled` según el índice
+ * cacheado en `state.stocksFan`.
+ *
+ * Si NO hay índice (contrato no seleccionado), restaura el texto
+ * original guardado en `data-base-text` y des-deshabilita todos.
+ */
+async function enriquecerDropdownsFanConStock() {
+  const { badgeTexto, debeDeshabilitarse } =
+    await import('./domain/refrigeracion_stock_index.js');
+  const indice = state.stocksFan;
+
+  for (const selId of ['mix_fan_sel', 'fan_db_sel']) {
+    const sel = $(selId);
+    if (!sel) continue;
+    const opts = sel.querySelectorAll('option[value]');
+    for (const opt of opts) {
+      const key = opt.value;
+      if (!key) continue;  // "— Ingresar manualmente —" / "— Seleccione —"
+      // Guardar el texto base la primera vez (sin badge).
+      if (!opt.dataset.baseText) opt.dataset.baseText = opt.textContent;
+      const baseText = opt.dataset.baseText;
+      if (!indice) {
+        opt.textContent = baseText;
+        opt.disabled = false;
+        opt.removeAttribute('title');
+        continue;
+      }
+      const entry = indice.porFanKey.get(key) || null;
+      opt.textContent = `${baseText} ${badgeTexto(entry)}`;
+      opt.disabled = debeDeshabilitarse(entry);
+      if (entry && entry.stock_actual <= 0) {
+        opt.title = `Sin stock disponible en el contrato ${entry.contrato_id} (suministro ${entry.codigo_suministro})`;
+      } else if (!entry) {
+        opt.title = 'Modelo fuera del catálogo contractual seleccionado';
+      } else {
+        opt.title = `${entry.stock_actual} unidades disponibles · suministro ${entry.codigo_suministro}`;
+      }
+    }
+  }
 }
 
 /* ─── Identificación: matrícula AFINIA ──────────────────────── */
@@ -4419,6 +4552,12 @@ async function init() {
     upd();
     await calcProtection();
     bindReveal();
+    // Microfase 3 · selector de contrato + carga de stocks por fan_db_key.
+    // No await porque no bloquea el cálculo; si falla, los dropdowns
+    // siguen funcionando sin badge.
+    initContratoStockSelect().catch((err) => {
+      console.warn('[calculo-refrigeracion] integración stocks no disponible:', err);
+    });
   } catch (err) {
     console.error('[calculo-refrigeracion] init error:', err);
     // Mostrar mensaje al usuario sin colgarse
