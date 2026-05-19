@@ -1551,6 +1551,43 @@ página por primera vez sin haber tocado nada?"*. La respuesta debe
 ser *"funciona"* o *"un banner explica + 1 click soluciona"*.
 **Nunca** *"el director debe hacer N pasos manuales"*.
 
+**Refinamiento (2026-05-18 PM4) · Bug del detector parcial:** la
+primera implementación del banner detectaba *"falta tipificación"*
+solo cuando `conFanKey === 0` (ningún suministro tipificado). Pero
+después de un primer click, si más tarde se agregaba un campo nuevo
+al mapeo (ej. `valor_unitario` agregado al MAPEO_4125000143 en el
+commit `8780f77`), el banner NO reaparecía porque ya había
+`conFanKey > 0`. El director quedó con tipificación parcial sin
+saberlo: fan_db_key OK, pero valor_unitario en $0 → KPIs económicos
+en $0 en el dashboard. **Falla del detector**.
+
+**Regla refinada para el detector:** el banner debe disparar cuando
+**CUALQUIER atributo del mapeo congelado** difiere del valor actual
+en Firestore, no solo cuando `conFanKey === 0`. Iterar el mapeo
+completo y comparar cada campo:
+- `fan_db_key` distinto/vacío → necesita aplicar
+- `valor_unitario` del mapeo distinto del actual → necesita actualizar
+- `unidad` corregida en mapeo distinta de actual → necesita corregir
+- `marcas` del mapeo no presentes en `marcas_disponibles` → necesita merge
+
+Además, el banner debe **mostrar el detalle** de qué se va a
+actualizar por cada suministro (no solo "tipificar todo"), para que
+el director sepa exactamente qué cambia. Ejemplo:
+```
+⚠ 4 suministro(s) del contrato 4125000143 necesitan corrección.
+  · S03: valor_unitario ($0 → $5.935.453)
+  · S04: valor_unitario ($0 → $5.064.165)
+  · S05: valor_unitario ($0 → $5.826.865)
+  · S06: valor_unitario ($0 → $3.763.525)
+  [Botón: Tipificar y corregir todo]
+```
+
+Esto permite que cuando se agreguen campos nuevos al mapeo congelado
+en commits futuros (ej. agregar `proveedor_default` o
+`fecha_caducidad` al MAPEO_4125000143), el banner los detecte y
+solucione de un click, sin escribir un nuevo script de migración
+cada vez.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
