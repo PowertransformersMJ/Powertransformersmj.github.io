@@ -1444,6 +1444,113 @@ con 61 tests cubriendo desde unit hasta integración con mocks.
 Brigada ↔ Órdenes de trabajo, Salud ↔ Plan de inversión,
 Auditoría ↔ cualquier módulo, RBAC ↔ permisos por contrato, etc.
 
+### 0.1.2.14 Regla permanente · NO dejar pasos manuales del director post-merge para "encender" una integración
+
+**Contexto del bug histórico (sesión 2026-05-18 PM2):** después de
+cerrar las 7 microfases de la integración Contratos↔Brigada (commits
+M1-M7), el director mergeó el PR y abrió la página del cálculo
+esperando ver los badges de stock funcionando. En su lugar todos los
+modelos aparecieron como *"✗ Fuera de contrato"*. Le dije:
+
+> *"Pasos para vos (5 min después del merge): 1) entrar al admin, 2)
+> editar S03 fan_db_key, 3) editar S04, 4) editar S05, 5) editar S06,
+> 6) corregir unidad de S06, 7) verificar badges"*
+
+El director respondió correctamente: *"sigue igual, revisa que no
+exista un error de ser asi, por favor memorizalo para q no sea
+repetido"*. **Tenía toda la razón:** dejarle 7 pasos manuales para
+"encender" una integración que él pidió como automática es **falla
+de diseño**, no falla suya. Una integración no está completa hasta
+que funciona end-to-end SIN intervención manual del director después
+del merge.
+
+**Regla permanente** para CUALQUIER integración cross-módulo,
+migración de schema, o feature nueva que requiera datos consolidados
+en Firestore:
+
+1. **PROHIBIDO** decirle al director *"andá al admin, editá N items,
+   confirmá X cosas, después verificá Y"* después de un merge.
+   Si la feature requiere data nueva en Firestore, esa data debe
+   aplicarse automáticamente o quedar accionable con UN solo click.
+
+2. **Cuatro estrategias válidas** (en orden de preferencia):
+   - **Auto-aplicación silenciosa al primer load:** si el código
+     detecta que un dato esperado no existe pero hay un mapeo
+     congelado disponible (ej. `MAPEO_4125000143`), aplicarlo
+     automáticamente. Idempotente. Loguear en consola pero NO
+     pedir confirmación.
+   - **Banner accionable con UN click:** si la auto-aplicación
+     silenciosa es riesgosa, mostrar un banner amigable
+     *"Detecté que los 4 motoventiladores del contrato 4125 no
+     están tipificados todavía. ¿Tipificarlos automáticamente?
+     [Botón: Tipificar ahora]"*. UN solo click hace TODO el
+     trabajo (los N items en batch, con dryRun preview opcional).
+   - **Cloud Functions trigger** que detecte el evento (deploy,
+     primera lectura, etc.) y aplique el cambio server-side.
+     Requiere Functions activas y deploy del admin SDK.
+   - **Script CI/CD** que corre en el pipeline al hacer push a
+     `main`. Idempotente. Reporta en GitHub Actions.
+
+3. **NUNCA** confiar en *"se lo voy a explicar bien al director"*.
+   Tu mensaje de 10 líneas con pasos detallados va a olvidarse,
+   confundirse o saltar pasos. Si la integración requiere
+   intervención humana, **codeá la intervención en la UI**.
+
+4. **Detectar el caso vacío** activamente. Si una página del frontend
+   asume que ciertos datos existen en Firestore y no es así, NO debe
+   fallar silenciosamente con "vacío". Debe:
+   - Mostrar mensaje amistoso explicando qué falta
+   - Ofrecer ACCIÓN para arreglarlo (UN botón, NO N pasos)
+   - Loguear con suficiente detalle para diagnóstico
+
+5. **Tests de la primera vez (cold start):** además de testear el
+   estado feliz (datos completos), incluir tests del cold start:
+   contrato existe pero sin tipificación, suministros existen pero
+   sin `fan_db_key`, etc. Cada uno debe tener un path UX bien
+   definido (no error, no vacío silencioso).
+
+**Anti-patrón EVITAR:**
+
+```
+❌ "Solución que acabo de pushear: extendí la UI admin para que
+   tengas un selector. Pasos para vos:
+   1. Mergeá el PR
+   2. Andá a la URL del admin
+   3. Editá cada uno de estos 4 suministros…
+   4. Aprovecha de corregir S06…
+   5. Volvé al cálculo y verificá…"
+```
+
+**Patrón correcto:**
+
+```
+✅ "Auto-detección al primer load: si no hay tipificación, se aplica
+   sola en background. Te aparece un banner verde:
+   'Se tipificaron 4 motoventiladores del contrato 4125000143
+   automáticamente'. Si querés revisarlos, click en
+   /admin/suministros-catalogo.html."
+```
+
+**Solución del bug original (commit `XXXXXX` siguiente):**
+
+- Detección en `refrescarStocksFan()`: si `resumen.conFanKey === 0`
+  pero el contrato activo tiene mapeo congelado en
+  `MAPEO_4125000143`, ofrecer auto-aplicación con banner inline.
+- Banner con botón único *"Tipificar 4 motoventiladores"* que
+  invoca `ejecutarTipificacion()` con el data layer
+  `suministros.actualizar` (cliente, no admin SDK).
+- Tras éxito, recarga índice de stocks + enriquece dropdowns sin
+  refresh manual.
+- Idempotente: si todos están tipificados, no se muestra el banner.
+
+**Aplica también a:** cualquier feature futura del proyecto que
+introduzca un schema extendido, un mapping congelado, una seed,
+una migración de datos, o una configuración inicial. La pregunta
+de control: *"¿Qué pasa cuando el director merguea y abre la
+página por primera vez sin haber tocado nada?"*. La respuesta debe
+ser *"funciona"* o *"un banner explica + 1 click soluciona"*.
+**Nunca** *"el director debe hacer N pasos manuales"*.
+
 ### 0.1.3 Regla permanente · Multi-contrato N5 · docId compuesto en suministros
 
 **Contexto del bug histórico (sesión 2026-04-27 PM5):** el módulo
