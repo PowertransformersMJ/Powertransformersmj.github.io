@@ -374,6 +374,39 @@ export async function crear(data, uid) {
   // con error "permission-denied" engañoso (ver CLAUDE.md §0.1.2.6).
   const limpio = deepClean(payload);
   const ref = await addDoc(collRef(), limpio);
+
+  // Microfase 5 (regla §0.1.2.14) · si la acción se crea YA en estado
+  // EJECUTADA (vs transitando de planificada→ejecutada vía
+  // actualizarEstado), igual debe disparar el hook que genera los
+  // movimientos de egreso en el contrato vinculado. Sin esto, las
+  // acciones creadas-ejecutadas saltean el ciclo de movimientos.
+  if (payload.estado_accion === ESTADOS_ACCION.EJECUTADA
+      && payload.contrato_stock_id
+      && !payload.movimientos_brigada_generados) {
+    try {
+      const { generarMovimientosPorAccion } = await import('./movimientos_brigada.js');
+      const reporte = await generarMovimientosPorAccion({
+        accionId:      ref.id,
+        contratoStock: payload.contrato_stock_id,
+        uid:           uid || payload.responsable_uid || null
+      });
+      if (!reporte.ok) {
+        console.warn('[acciones_refrigeracion.crear] generación de movimientos parcial:', reporte);
+      } else {
+        console.info('[acciones_refrigeracion.crear] movimientos generados:', reporte.movimientosCreados);
+      }
+      // Exponer el reporte en una propiedad del id para que la UI
+      // pueda leerlo y mostrar feedback. NO modifica el id en sí
+      // (sigue siendo string normal); solo agrega metadata como
+      // string-like-property accesible vía closure si se necesita.
+      // En este caso devolvemos el id directo y la UI vuelve a leer
+      // el doc para ver `movimientos_brigada_refs`.
+    } catch (err) {
+      console.error('[acciones_refrigeracion.crear] fallo en hook de movimientos:', err);
+      // No re-lanzamos: el doc de acción ya está persistido.
+    }
+  }
+
   return ref.id;
 }
 

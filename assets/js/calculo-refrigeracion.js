@@ -3278,7 +3278,37 @@ async function guardarAccion() {
     } catch {}
     const id = await mod.crear(payload, responsable_uid);
     setStatus(`✓ Acción registrada con ID ${id}`, 'success');
-    setTimeout(closeModalAccion, 1500);
+
+    // Microfase 5 + regla §0.1.2.14 · feedback visible si la acción
+    // se guardó YA en ejecutada y debió disparar movimientos.
+    // Re-leemos el doc para ver si el hook crear→generarMovimientos
+    // dejó refs en `movimientos_brigada_refs`.
+    if (payload.estado_accion === 'ejecutada' && payload.contrato_stock_id) {
+      // Pequeño delay para dar tiempo al hook de completar la
+      // generación + update con refs (corre dentro de crear()).
+      setTimeout(async () => {
+        try {
+          const accion = await mod.obtener(id);
+          const refs = (accion && Array.isArray(accion.movimientos_brigada_refs))
+            ? accion.movimientos_brigada_refs : [];
+          if (refs.length > 0) {
+            setStatus(
+              `✓ Acción ${id} guardada · ${refs.length} movimiento(s) de egreso generado(s) en el contrato ${payload.contrato_stock_id} · revísalos en pestaña Histórico`,
+              'success'
+            );
+          } else {
+            setStatus(
+              `✓ Acción ${id} guardada · ⚠ 0 movimientos generados · verifica que los suministros del contrato ${payload.contrato_stock_id} tengan fan_db_key (click en banner "Tipificar automáticamente" arriba)`,
+              'warn'
+            );
+          }
+        } catch (err) {
+          console.warn('[guardarAccion] no se pudo verificar movs generados:', err);
+        }
+      }, 1500);
+    }
+
+    setTimeout(closeModalAccion, 4500);
   } catch (err) {
     console.error('[acciones_refrigeracion] guardarAccion failed:', err);
     // Errores comunes de Firestore con mensajes accionables
