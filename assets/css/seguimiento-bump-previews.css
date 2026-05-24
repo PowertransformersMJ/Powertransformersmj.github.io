@@ -1,0 +1,127 @@
+/* ═══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Previews del bump chart (3 variantes)
+   Estilos específicos solo para pages/seguimiento-bump-previews.html
+═══════════════════════════════════════════════════════════════ */
+
+.preview-section {
+  margin-bottom: 32px;
+}
+.preview-section + .preview-section {
+  border-top: 1px dashed rgba(255,255,255,.45);
+  padding-top: 32px;
+}
+
+.preview-label {
+  margin-bottom: 16px;
+  padding: 14px 18px;
+  background: linear-gradient(135deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,.30) 100%);
+  backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,.6);
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0,40,90,.08);
+}
+.preview-label h2 {
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: #0d1f38;
+  margin: 4px 0 4px;
+  letter-spacing: -0.01em;
+}
+.preview-label p {
+  font-size: 12.5px;
+  color: #1f3656;
+  margin: 0;
+  line-height: 1.5;
+}
+.preview-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: #007aff;
+  color: #fff;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.preview-tag.amber  { background: #f59e0b; }
+.preview-tag.purple { background: #7c3aed; }
+
+/* Preview card: fondo blanco sólido + sombra fuerte para destacar
+   sobre la escena aqua. */
+.preview-card {
+  background: #ffffff;
+  box-shadow: 0 12px 32px rgba(0,40,90,.14), 0 4px 12px rgba(0,40,90,.08);
+  border: 1px solid rgba(13,31,56,.06);
+}
+
+/* ===== VARIANTE A: tabla zebra ===== */
+#tbl-a tbody tr:nth-child(odd)  td { background: #fafbfc; }
+#tbl-a tbody tr:nth-child(even) td { background: #fff; }
+#tbl-a tbody tr:hover td { background: #eff6ff; }
+
+/* ===== VARIANTE C: bump chart + cards laterales ===== */
+.variant-c-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 18px;
+}
+@media (max-width: 1100px) {
+  .variant-c-layout { grid-template-columns: 1fr; }
+}
+.rank-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--slate-200);
+  border-left: 4px solid var(--slate-300);
+  box-shadow: 0 1px 4px rgba(0,40,90,.06);
+}
+.rank-card:last-child { margin-bottom: 0; }
+.rank-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.rank-card-pos {
+  font-family: 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.rank-card-delta {
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  display: inline-block;
+}
+.rank-card-delta.up   { background: var(--red-50);   color: var(--red); }
+.rank-card-delta.down { background: var(--green-50); color: var(--green-700); }
+.rank-card-delta.same { background: var(--slate-100); color: var(--slate-500); }
+.rank-card-delta.new  { background: #EDE9FE; color: var(--purple); }
+.rank-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slate-800);
+  margin-bottom: 2px;
+}
+.rank-card-zona { margin-bottom: 8px; }
+.rank-card-spark {
+  margin-bottom: 8px;
+  height: 22px;
+  overflow: hidden;
+}
+.rank-card-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 10.5px;
+  color: var(--slate-600);
+  flex-wrap: wrap;
+}
+.rank-card-meta b { color: var(--slate-800); font-weight: 700; }
