@@ -8,6 +8,14 @@ export function renderMonthTable(dataset, zona, met = 'saidi') {
   const mets = metricasActivas(met);
   const M = dataset.meses || [];
 
+  // Actualiza el subtítulo del card según métrica activa
+  const titulo = document.getElementById('month-titulo-met');
+  if (titulo) {
+    titulo.textContent = mets.length > 1
+      ? '(SAIDI_E h-eq + SAIFI_E int-eq)'
+      : `(${metricaNombre(mets[0])} ${metricaUnidad(mets[0])})`;
+  }
+
   const thead = document.querySelector('#month-table thead');
   if (thead) {
     thead.innerHTML =
