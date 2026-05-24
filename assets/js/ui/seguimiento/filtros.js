@@ -153,12 +153,21 @@ export function inicializarFiltros() {
     });
   });
 
-  // Top N del ranking
+  // Top N del ranking (conservado por compat con HTML antiguos)
   document.querySelectorAll('#rank-topn-seg .seg-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       document.querySelectorAll('#rank-topn-seg .seg-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       store.setRankTopN(parseInt(btn.dataset.n, 10));
+    });
+  });
+
+  // Selector A/B/C de la variante visual del bump chart
+  document.querySelectorAll('#bump-variant-seg .seg-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#bump-variant-seg .seg-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      store.setBumpVariant(btn.dataset.variant);
     });
   });
 }
