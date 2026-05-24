@@ -15,6 +15,7 @@ const _state = {
   loadedFiles: [],                      // historial de archivos
   topTab: 'all',                        // 'all' | 'voltage' | 'current' | 'power'
   rankTopN: 10,                          // Top N para bump chart
+  bumpVariant: 'A',                     // 'A' (spline + anotaciones) | 'B' (heatmap rank) | 'C' (step + cards laterales)
   trendScope: 'auto',                   // 'auto' | 'hourly' | 'daily'
   persistMode: '?',                     // 'indexeddb' | 'localstorage' | 'none'
   filtros: filtrosVacios(),
@@ -77,6 +78,7 @@ export const store = {
 
   setTopTab(tab)         { _state.topTab = tab;         notify(); },
   setRankTopN(n)         { _state.rankTopN = n;         notify(); },
+  setBumpVariant(v)      { _state.bumpVariant = v;      notify(); },
   setTrendScope(scope)   { _state.trendScope = scope;   notify(); },
   setPersistMode(mode)   { _state.persistMode = mode;   notify(); },
 

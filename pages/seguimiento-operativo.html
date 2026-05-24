@@ -224,27 +224,35 @@
       </div>
 
       <!-- ===== ROW 3b: RANKING DE EVOLUCIÓN DÍA A DÍA ===== -->
-      <div class="card" style="margin-bottom:14px">
+      <div class="card rank-evo-card" style="margin-bottom:14px">
         <h3>
           <span><span class="icon" style="background:var(--purple)"></span>Evolución de posición en el ranking · día a día</span>
-          <span>
-            <span class="seg" id="rank-topn-seg">
-              <button class="seg-btn" data-n="5">Top 5</button>
-              <button class="seg-btn active" data-n="10">Top 10</button>
-              <button class="seg-btn" data-n="15">Top 15</button>
+          <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="seg" id="bump-variant-seg" title="Cambia entre las 3 propuestas visuales">
+              <button class="seg-btn active" data-variant="A" title="Spline + Top 5 + anotaciones">Vista A · Líneas</button>
+              <button class="seg-btn"        data-variant="B" title="Heatmap rank día × transformador">Vista B · Heatmap</button>
+              <button class="seg-btn"        data-variant="C" title="Step + cards laterales">Vista C · Detalle</button>
             </span>
             <span class="pill" id="rank-evo-pill">—</span>
           </span>
         </h3>
+        <p class="small" style="margin:-4px 0 12px;color:var(--slate-500)">
+          Elige la presentación que prefieras del segmento. <strong>Vista A</strong>: trayectoria suave del Top 5 con nombres inline ·
+          <strong>Vista B</strong>: matriz día × transformador (rojo = peor) ·
+          <strong>Vista C</strong>: líneas escalonadas + cards individuales con sparkline.
+        </p>
         <div id="rank-evo-empty" style="display:none;text-align:center;padding:40px;color:var(--slate-400);font-size:13px">
           Se necesitan al menos <strong>2 días</strong> de datos para mostrar la evolución del ranking.<br>
           <span class="small">Carga más archivos SOE diarios en la sección de ingesta para ver la trayectoria de cada transformador.</span>
         </div>
         <div id="rank-evo-content">
-          <div id="bump-chart" class="chart-tall"></div>
+          <div class="rank-evo-main">
+            <div id="bump-chart" class="chart-tall"></div>
+            <div id="cards-c" style="display:none"></div>
+          </div>
           <div class="small" style="color:var(--slate-500);margin:6px 0 14px">
-            Cada línea es un transformador. Eje vertical = posición (1 arriba = más violaciones). Una línea que
-            <strong>sube hacia el #1</strong> indica un equipo que empeora relativamente; una que baja, que mejora.
+            Cada línea/celda representa un transformador. Eje vertical (o color en la vista B) = posición · <strong>1 = peor (más violaciones)</strong>.
+            Una trayectoria que sube hacia el #1 indica un equipo que empeora relativamente; la que baja, que mejora.
           </div>
           <table id="rank-evo-table">
             <thead><tr>
