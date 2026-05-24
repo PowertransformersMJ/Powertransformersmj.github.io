@@ -126,6 +126,18 @@
             <span><span class="icon" style="background:var(--red)"></span>Contribución mensual por grupo de causa</span>
             <span class="pill" id="stack-pill">—</span>
           </h3>
+          <div class="grp-filter" id="grp-filter" role="group" aria-label="Filtro de grupos de causa">
+            <button type="button" class="grp-chip is-on" data-grp="Sobrecarga/Deslastre" aria-pressed="true">
+              <i style="background:var(--red)"></i><span>Sobrecarga/Deslastre</span>
+            </button>
+            <button type="button" class="grp-chip is-on" data-grp="Racionamiento/Deficit" aria-pressed="true">
+              <i style="background:var(--purple)"></i><span>Racionamiento/Déficit</span>
+            </button>
+            <button type="button" class="grp-chip is-on" data-grp="Otras causas" aria-pressed="true">
+              <i style="background:#CBD5E1"></i><span>Otras causas</span>
+            </button>
+            <span class="grp-filter-hint">clic para mostrar/ocultar · afecta también Variación % y Tabla mensual</span>
+          </div>
           <div id="chart-stack" class="chart"></div>
         </div>
       </div>
