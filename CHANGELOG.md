@@ -7,6 +7,85 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## Módulo · Indicadores de Calidad · SAIDI_E / SAIFI_E (2026-05-24)
+
+Sesión que cierra el refactor F40 del archivo legacy
+`SAIDI_SAIFI Deslastre por Capacidad de Transformacion.html` (4.8 MB
+con Plotly inline + dataset embebido) a una arquitectura modular
+embebida en el shell aqua. Branch `claude/indicadores-calidad-refactor`,
+10 commits secuenciales:
+
+### Commits
+
+| Hash | Tipo | Resumen |
+|---|---|---|
+| `0c132c1` | feat | Refactor inicial · 24 archivos · 1.557 líneas · dominio puro + data layer + 10 renderers + tests · sidebar item "Indicadores de Calidad" debajo de "Seguimiento Operativo" con icono `trending-up`. |
+| `0c90979` | feat | Upload Excel/JSON con IndexedDB + mini-card en HTML + 3 URLs candidatas para baseline fetch + banner #calidad-error visible + safeRender por chart. |
+| `9596fcd` | fix | `Object.freeze` rompía Plotly con *"Attempted to assign to readonly property"* — convertido `FONT/LAYOUT_BASE/PLOTLY_CFG` a funciones factory que devuelven objetos frescos mutables. |
+| `08d4273` | style | Paleta heatmap más legible · 7 stops mint → rojo oscuro · valores impresos en cada celda · separadores xgap/ygap. |
+| `9bb2508` | fix | Margen superior del heatmap subido a 50px para que los meses (Ene/Feb/…/May) no queden recortados. |
+| `a351e50` | feat | **Selector global SAIDI/SAIFI/Ambos** + unidades CREG correctas (h-eq y int-eq) en ejes, KPIs, hovertemplate del heatmap, notas OLS de la proyección. |
+| `84c442e` | fix | Serie temporal, proyección, insight y KPIs ahora **respetan la métrica seleccionada**. Proyección de SAIFI se recalcula on-the-fly con `calcularProyeccionOLS`. Insight cambia vocabulario "indisponibilidad/duración" ↔ "frecuencia". Títulos del card dinámicos. |
+| `173c75a` | feat | **Chips de filtro de grupos de causa** en el card "Contribución mensual" — toggle Sobrecarga/Deslastre · Racionamiento/Déficit · Otras causas con cascada al stack + varmom + month-table. |
+| `59d3a7a` | fix | Heatmap dual SAIDI/SAIFI apilado verticalmente (no horizontal) para que los nombres largos del eje Y no se solapen con la colorbar del vecino. |
+| `059346c` | fix | Sustituye el Plotly subplot 2-filas (con `layout.height: 760px` que rompía la grilla externa) por **dos divs independientes apilados** en el mismo card. Cada heatmap es un `Plotly.react` aparte con su altura normal de 420 px. |
+
+### Resultado
+
+- **Sidebar:** item "Indicadores de Calidad" con icono `trending-up`
+  debajo de "Seguimiento Operativo".
+- **Dataset baseline:** `assets/data/indicadores-calidad-baseline.json`
+  (9.9 KB · 4 zonas · 11 categorías · proyecciones OLS de SAIDI).
+- **Dominio puro** (3 archivos): `saidi_config.js`, `saidi_calculo.js`,
+  `saidi_proyeccion.js`. Funciones factory para layout/font porque
+  Plotly muta. Cálculo OLS con bandas IC95% (Student's t).
+- **Data layer**: `indicadores_calidad.js` con `cargarBaselineLocal`
+  robusto (3 URLs candidatas) y `suscribirIndicadoresCalidad` sobre
+  `/indicadores_calidad/global`.
+- **Upload manual**: mini-card con drag&drop · acepta JSON (mismo
+  shape que el baseline) o XLSX con 4 hojas (META, KPI, ZONAS,
+  PROYECCION). Persistencia local en IndexedDB · botón "Reiniciar al
+  baseline" para descartar. SheetJS lazy desde CDN.
+- **Selector global de métrica** con 3 modos (SAIDI · SAIFI · Ambos)
+  que actualiza en cascada los 10 elementos del dashboard:
+    - KPI band (6 tarjetas adaptadas)
+    - Insight ejecutivo (vocabulario y cifras según métrica)
+    - Serie temporal (1 o 2 líneas, doble eje en Ambos)
+    - Stack mensual (barras agrupadas en Ambos)
+    - Participación acumulada (h-bars grouped en Ambos)
+    - Variación % mes a mes (2 o 4 series con dash distintivo)
+    - Top categorías (1 o 2 columnas según métrica)
+    - Heatmap (1 panel o 2 divs apilados con altura 420 px c/u)
+    - Proyección OLS (recalcula SAIFI on-the-fly · doble eje en Ambos)
+    - Tabla mensual agregada (3 filas o 6 con bandas)
+- **Filtro de grupos de causa**: 3 chips toggleables en el card de
+  Contribución mensual con cascada al stack + varmom + tabla mensual.
+- **Unidades CREG 015/2018**: `h-eq` para SAIDI · `int-eq` para
+  SAIFI · presentes en cada eje, label, hovertemplate, KPI delta.
+- **Plotly retirado del bundle inicial** (~3.7 MB inline) → CDN lazy
+  en boot.
+- **752/752 tests verdes · lint limpio** durante toda la sesión.
+
+### Documentación
+
+`docs/INDICADORES-CALIDAD.md` con arquitectura completa, semántica
+CREG, flujo de carga, formato de upload, reglas Firestore esperadas,
+guía de extensión y backlog.
+
+### Lección permanente aplicada
+
+- **Plotly no es input-only** · muta internamente los objetos
+  `layout`, `font`, `marker`. Cualquier objeto `Object.freeze` pasado
+  a Plotly.react/newPlot rompe con
+  *"Attempted to assign to readonly property"*. Solución del proyecto:
+  funciones factory que devuelven copias frescas.
+- **Apilamiento vertical de Plotly subplots** con `layout.height`
+  inline grande rompe la grilla externa del dashboard padre.
+  Estrategia que funciona: dos divs **independientes** lado a lado
+  (cada uno con `Plotly.react` propio) en lugar de subplots internos.
+
+
+
 ## Integración Contratos · Suministros ↔ Mantenimiento Brigada (2026-05-18)
 
 Sesión iniciada para conectar dos módulos: el catálogo contractual
