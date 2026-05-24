@@ -14,8 +14,9 @@ const _state = {
   allEvents: [],                        // SEED ∪ extra (dedup)
   loadedFiles: [],                      // historial de archivos
   topTab: 'all',                        // 'all' | 'voltage' | 'current' | 'power'
-  rankTopN: 10,                          // Top N para bump chart
+  rankTopN: 10,                          // Top N para bump chart (5 | 10 | 15)
   bumpVariant: 'A',                     // 'A' (spline + anotaciones) | 'B' (heatmap rank) | 'C' (step + cards laterales)
+  selectedSid: null,                    // sid del transformador seleccionado para ver detalle (o null)
   trendScope: 'auto',                   // 'auto' | 'hourly' | 'daily'
   persistMode: '?',                     // 'indexeddb' | 'localstorage' | 'none'
   filtros: filtrosVacios(),
@@ -79,6 +80,7 @@ export const store = {
   setTopTab(tab)         { _state.topTab = tab;         notify(); },
   setRankTopN(n)         { _state.rankTopN = n;         notify(); },
   setBumpVariant(v)      { _state.bumpVariant = v;      notify(); },
+  setSelectedSid(sid)    { _state.selectedSid = sid;    notify(); },
   setTrendScope(scope)   { _state.trendScope = scope;   notify(); },
   setPersistMode(mode)   { _state.persistMode = mode;   notify(); },
 
