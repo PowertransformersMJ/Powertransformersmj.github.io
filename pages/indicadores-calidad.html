@@ -66,6 +66,33 @@
         La proyección Jun–Dic es referencial (OLS sobre 5 puntos), no predictiva.
       </div>
 
+      <!-- ===== BANNER DE ERROR ===== -->
+      <div id="calidad-error" class="warn-strip" style="display:none;background:#FEE2E2;border-color:#DC2626;color:#7F1D1D"></div>
+
+      <!-- ===== SECCIÓN DE CARGA ===== -->
+      <div class="upload-card" id="upload-card">
+        <h3>
+          <span><span class="icon" style="background:var(--teal);width:6px;height:14px;display:inline-block;margin-right:8px;vertical-align:-2px;border-radius:1px"></span>
+                Actualizar datos · cargar Excel o JSON</span>
+          <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="pill" id="upload-source-pill">baseline integrado</span>
+            <button class="btn btn-ghost" id="btn-reset-baseline" title="Vuelve al dataset embebido y borra lo cargado localmente">↺ Reiniciar al baseline</button>
+          </span>
+        </h3>
+        <div class="upload-row">
+          <input type="file" id="file-input" accept=".json,.xlsx,.xls" title="Selecciona un archivo .json o .xlsx">
+          <button class="btn btn-primary" id="btn-upload">⬆ Cargar archivo</button>
+        </div>
+        <div class="small" style="color:var(--slate-500);margin-bottom:6px">
+          <b>Formato JSON:</b> mismo shape que el baseline integrado (estructura
+          <code>{ meses, meses_full, zonas, cats_order, kpi, proj_global }</code>).
+          <br>
+          <b>Formato Excel (.xlsx):</b> con hojas <code>META</code>, <code>KPI</code>, <code>ZONAS</code> y <code>PROYECCION</code> pre-agregadas.
+          El archivo se procesa <b>en tu navegador</b> y se guarda localmente (IndexedDB) — no se sube a internet.
+        </div>
+        <div class="upload-log" id="upload-log" style="display:none;background:#0B1220;color:#86efac;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:11px;padding:10px;border-radius:5px;max-height:140px;overflow-y:auto"></div>
+      </div>
+
       <!-- ===== FILTROS ===== -->
       <div class="filters">
         <label for="f-zona">Zona operativa</label>

@@ -17,9 +17,33 @@ import {
   doc, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
-const BASELINE_URL = new URL('../../data/indicadores-calidad-baseline.json', import.meta.url).href;
+// El baseline vive en /assets/data/. Calculamos la URL relativa al pathname
+// actual (más predecible que import.meta.url cuando hay base-tags o roots
+// distintos). Si todo falla, intentamos también con import.meta.url como
+// fallback de último recurso.
+function candidatasBaselineURL() {
+  const out = [];
+  try {
+    out.push(new URL('../../data/indicadores-calidad-baseline.json', import.meta.url).href);
+  } catch (_) { /* import.meta no disponible en algún entorno */ }
+  // Resolución por pathname — funciona en GitHub Pages bajo /pages/x.html
+  const path = (typeof location !== 'undefined') ? location.pathname : '';
+  if (path.includes('/pages/')) {
+    out.push('../assets/data/indicadores-calidad-baseline.json');
+  } else {
+    out.push('assets/data/indicadores-calidad-baseline.json');
+  }
+  // Absoluto desde root
+  out.push('/assets/data/indicadores-calidad-baseline.json');
+  return [...new Set(out)];
+}
 
 let _baselineCache = null;
+let _ultimoError = null;
+
+export function ultimoErrorBaseline() {
+  return _ultimoError;
+}
 
 /**
  * Carga el baseline JSON. Cachea en memoria.
@@ -28,10 +52,25 @@ let _baselineCache = null;
  */
 export async function cargarBaselineLocal() {
   if (_baselineCache) return _baselineCache;
-  const res = await fetch(BASELINE_URL, { cache: 'force-cache' });
-  if (!res.ok) throw new Error('Baseline Indicadores de Calidad no disponible (HTTP ' + res.status + ')');
-  _baselineCache = await res.json();
-  return _baselineCache;
+  const urls = candidatasBaselineURL();
+  let ultimo = null;
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: 'force-cache' });
+      if (!res.ok) {
+        ultimo = new Error(`HTTP ${res.status} en ${url}`);
+        continue;
+      }
+      _baselineCache = await res.json();
+      console.info('[calidad] baseline cargado desde:', url);
+      _ultimoError = null;
+      return _baselineCache;
+    } catch (e) {
+      ultimo = e;
+    }
+  }
+  _ultimoError = ultimo;
+  throw new Error('Baseline Indicadores de Calidad no disponible · ' + (ultimo && ultimo.message ? ultimo.message : 'sin red'));
 }
 
 function firestoreListo() {

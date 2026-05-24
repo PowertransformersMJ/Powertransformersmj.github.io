@@ -1,14 +1,19 @@
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Indicadores de Calidad · SHELL
 // ──────────────────────────────────────────────────────────────
-// Boot del dashboard. Carga Plotly lazy desde CDN, hidrata el
-// store con baseline + Firestore realtime cuando esté disponible,
-// y orquesta los renderers vía store.on.
+// Boot del dashboard. Hidrata el store en este orden:
+//   1. IndexedDB (si el usuario cargó un archivo previamente)
+//   2. Baseline JSON local (assets/data/...)
+//   3. Firestore realtime cuando esté configurado/poblado
+//
+// Cada render va en try/catch para que un fallo individual no
+// rompa la cadena. Errores visibles en banner #calidad-error.
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
 import { inicializarFiltros, pintarSelectorZona, actualizarPill } from './filtros.js';
-import { suscribirIndicadoresCalidad } from '../../data/indicadores_calidad.js';
+import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
+import { inicializarPersistencia, limpiarPersistencia, handleFile } from './upload.js';
 
 import { renderKPIs }       from './renderers/kpis.js';
 import { renderInsight }    from './renderers/insight.js';
@@ -20,6 +25,8 @@ import { renderTop }        from './renderers/top.js';
 import { renderHeatmap }    from './renderers/heatmap.js';
 import { renderProyeccion } from './renderers/proyeccion.js';
 import { renderMonthTable } from './renderers/month-table.js';
+
+const $ = (sel) => document.querySelector(sel);
 
 const PLOTLY_CDN = 'https://cdn.plot.ly/plotly-2.35.2.min.js';
 let _plotlyPromise = null;
@@ -41,46 +48,191 @@ function loadPlotly() {
   return _plotlyPromise;
 }
 
-function renderAll(state) {
-  const { dataset, zona, met } = state;
-  if (!dataset) return;
-  // Asegurar que el select de zona esté poblado (idempotente)
-  pintarSelectorZona();
-  actualizarPill();
-  // Sincroniza UI con state (por si el dataset cambió y la zona actual ya no existe)
-  const zSel = document.getElementById('f-zona');
-  if (zSel && zSel.value !== zona) zSel.value = zona;
-  const mSel = document.getElementById('f-met');
-  if (mSel && mSel.value !== met) mSel.value = met;
-
-  renderKPIs(dataset, zona, met);
-  renderInsight(dataset, zona);
-  renderSerie(dataset, zona);
-  renderStack(dataset, zona, met);
-  renderPart(dataset, zona, met);
-  renderVarMoM(dataset, zona, met);
-  renderTop(dataset, zona, met);
-  renderHeatmap(dataset, zona, met);
-  renderProyeccion(dataset, zona);
-  renderMonthTable(dataset, zona);
+// ── UI helpers para errores y log ────────────────────────────
+function mostrarError(msg) {
+  const banner = $('#calidad-error');
+  if (!banner) return;
+  banner.style.display = 'block';
+  banner.innerHTML = '⚠ ' + msg;
+}
+function ocultarError() {
+  const banner = $('#calidad-error');
+  if (banner) banner.style.display = 'none';
+}
+function log(level, msg) {
+  const out = $('#upload-log');
+  if (!out) return;
+  out.classList.add('show');
+  out.style.display = 'block';
+  const line = document.createElement('div');
+  if (level === 'err')  line.className = 'err';
+  if (level === 'info') line.className = 'info';
+  if (level === 'ok')   line.className = 'ok';
+  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+}
+function actualizarSourcePill(source, meta) {
+  const pill = $('#upload-source-pill');
+  if (!pill) return;
+  if (source === 'upload' && meta?.nombre) {
+    pill.textContent = `archivo: ${meta.nombre}`;
+    pill.className = 'pill green';
+  } else if (source === 'firestore') {
+    pill.textContent = 'fuente: Firestore';
+    pill.className = 'pill green';
+  } else if (source === 'baseline') {
+    pill.textContent = 'baseline integrado';
+    pill.className = 'pill';
+  } else {
+    pill.textContent = 'sin datos';
+    pill.className = 'pill red';
+  }
 }
 
+// Cada renderer envuelto en try/catch independiente
+function safeRender(name, fn) {
+  try { fn(); }
+  catch (e) {
+    console.error(`[calidad/render:${name}]`, e);
+    log('err', `Render ${name} falló: ${e.message}`);
+  }
+}
+
+function renderAll(state) {
+  const { dataset, zona, met, source } = state;
+  if (!dataset) return;
+  ocultarError();
+  safeRender('selector-zona', () => pintarSelectorZona());
+  safeRender('pill-filtro',  () => actualizarPill());
+  actualizarSourcePill(source, state._meta);
+
+  // Sincroniza selects con state
+  const zSel = $('#f-zona'); if (zSel && zSel.value !== zona) zSel.value = zona;
+  const mSel = $('#f-met');  if (mSel && mSel.value !== met)  mSel.value = met;
+
+  safeRender('kpis',        () => renderKPIs(dataset, zona, met));
+  safeRender('insight',     () => renderInsight(dataset, zona));
+  safeRender('serie',       () => renderSerie(dataset, zona));
+  safeRender('stack',       () => renderStack(dataset, zona, met));
+  safeRender('part',        () => renderPart(dataset, zona, met));
+  safeRender('varmom',      () => renderVarMoM(dataset, zona, met));
+  safeRender('top',         () => renderTop(dataset, zona, met));
+  safeRender('heatmap',     () => renderHeatmap(dataset, zona, met));
+  safeRender('proyeccion',  () => renderProyeccion(dataset, zona));
+  safeRender('month-table', () => renderMonthTable(dataset, zona));
+}
+
+// ── Listeners de upload ─────────────────────────────────────
+function bindUpload() {
+  const fileInput = $('#file-input');
+  const btnUp     = $('#btn-upload');
+  const btnReset  = $('#btn-reset-baseline');
+  const card      = $('#upload-card');
+
+  async function procesarArchivo(file) {
+    log('info', `Procesando ${file.name} (${(file.size / 1024).toFixed(1)} kB)…`);
+    try {
+      const { dataset, meta } = await handleFile(file);
+      store.state._meta = meta;
+      log('ok', `✓ Cargado: ${meta.nombre} · ${Object.keys(dataset.zonas).length} zonas · ${dataset.cats_order.length} categorías`);
+    } catch (e) {
+      log('err', e.message);
+      mostrarError('No se pudo cargar el archivo: ' + e.message);
+    }
+  }
+
+  if (btnUp) btnUp.addEventListener('click', async () => {
+    const files = fileInput?.files;
+    if (!files || files.length === 0) {
+      log('err', 'Selecciona un archivo primero');
+      return;
+    }
+    await procesarArchivo(files[0]);
+  });
+
+  if (fileInput) fileInput.addEventListener('change', async (e) => {
+    if (e.target.files[0]) await procesarArchivo(e.target.files[0]);
+  });
+
+  if (btnReset) btnReset.addEventListener('click', async () => {
+    if (!confirm('Esto borrará el archivo cargado localmente y volverá al baseline integrado. ¿Continuar?')) return;
+    await limpiarPersistencia();
+    try {
+      const baseline = await cargarBaselineLocal();
+      store.state._meta = null;
+      store.setDataset(baseline, 'baseline');
+      log('ok', '↺ Volvió al baseline integrado');
+    } catch (e) {
+      mostrarError('Reinicio falló: ' + e.message);
+    }
+  });
+
+  // Drag & drop
+  if (card) {
+    ['dragenter', 'dragover'].forEach(ev =>
+      card.addEventListener(ev, e => { e.preventDefault(); card.classList.add('drag'); }));
+    ['dragleave', 'drop'].forEach(ev =>
+      card.addEventListener(ev, e => { e.preventDefault(); card.classList.remove('drag'); }));
+    card.addEventListener('drop', async e => {
+      if (e.dataTransfer?.files?.length) await procesarArchivo(e.dataTransfer.files[0]);
+    });
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// Boot
+// ══════════════════════════════════════════════════════════════
 async function boot() {
   inicializarFiltros();
-
-  // 1) Plotly lazy
-  try { await loadPlotly(); }
-  catch (e) { console.warn('[calidad-shell] Plotly no disponible:', e); }
-
-  // 2) Render reactivo
+  bindUpload();
   store.on(renderAll);
 
-  // 3) Suscripción a la data (baseline + Firestore realtime)
+  // 1) Plotly lazy (no bloquea: si falla, KPIs/insight/tabla renderean igual)
+  try { await loadPlotly(); }
+  catch (e) {
+    console.warn('[calidad-shell] Plotly no disponible:', e);
+    log('err', 'No se pudo cargar Plotly desde CDN. Las gráficas no se mostrarán pero los KPIs y tablas sí.');
+  }
+
+  // 2) IndexedDB (dataset cargado previamente por el usuario)
+  let restaurado = false;
+  try {
+    const persist = await inicializarPersistencia();
+    if (persist.dataset) {
+      store.state._meta = persist.meta || null;
+      store.setDataset(persist.dataset, 'upload');
+      log('ok', `Dataset previamente cargado restaurado: ${persist.meta?.nombre || 'sin nombre'}`);
+      restaurado = true;
+    }
+  } catch (e) {
+    console.warn('[calidad-shell] IndexedDB falló:', e);
+  }
+
+  // 3) Baseline (siempre intentamos cargar, incluso si ya hay dataset
+  //    de IndexedDB, para que Firestore tenga un fallback fresco)
+  if (!restaurado) {
+    try {
+      const baseline = await cargarBaselineLocal();
+      store.setDataset(baseline, 'baseline');
+    } catch (e) {
+      console.error('[calidad-shell] baseline no cargó:', e);
+      mostrarError(
+        'No se pudo cargar el dataset base. Carga un archivo .json o .xlsx manualmente arriba, ' +
+        'o revisa la conexión a internet. Detalle: ' + e.message
+      );
+    }
+  }
+
+  // 4) Firestore realtime (opcional)
   let _unsub = null;
   try {
     _unsub = suscribirIndicadoresCalidad(({ source, dataset }) => {
       if (!dataset) return;
-      store.setDataset(dataset, source);
+      // Firestore solo gana si no hay upload local
+      if (store.state.source !== 'upload') {
+        store.setDataset(dataset, source);
+      }
     });
   } catch (e) {
     console.warn('[calidad-shell] no se pudo abrir suscripción:', e);
