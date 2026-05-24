@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Seguimiento Operativo · SCADA U1/U2 · SGM · TRANSPOWER</title>
+<meta name="description" content="Dashboard de seguimiento operativo: violaciones SCADA U1/U2 sobre el parque de transformadores de potencia.">
+<meta name="robots" content="noindex,nofollow">
+
+<!--
+  SGM · TRANSPOWER — Seguimiento Operativo · SCADA U1/U2 Tracking
+  Refactor F39: archivo standalone original (8.7 MB · libs + dataset
+  inline) reescrito como arquitectura modular.
+
+  · CSS                  → assets/css/seguimiento-scada.css
+  · Dataset baseline     → assets/data/seguimiento-scada-baseline.json
+                           (cargado lazy vía fetch)
+  · Dominio puro         → assets/js/domain/scada_*.js
+  · Data layer           → assets/js/data/seguimiento_scada{,_excel,_storage}.js
+                           (Firestore realtime + IndexedDB + parsers SOE)
+  · UI · store / filtros → assets/js/ui/seguimiento/{state,filtros,upload}.js
+  · UI · renderers       → assets/js/ui/seguimiento/renderers/*.js
+  · Shell · entrypoint   → assets/js/ui/seguimiento/seguimiento-shell.js
+
+  Plotly / SheetJS / SparkMD5 se cargan LAZY desde CDN en boot/upload.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/seguimiento-scada.css">
+</head>
+<body class="scada-shell">
+
+<div class="topbar">
+  <div>
+    <h1>⚡ SCADA U1/U2 Violation Tracking · CARIBEMAR DE LA COSTA</h1>
+    <div class="subtitle" id="subtitle">Cargando metadatos…</div>
+  </div>
+  <div class="meta">
+    <span class="badge badge-red" id="status-badge">CRITICAL ALERT</span>
+    <div style="margin-top:6px" id="meta-info">—</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ===== SECCIÓN DE CARGA ACUMULATIVA ===== -->
+  <div class="upload-card" id="upload-card">
+    <h3>
+      <span><span class="icon" style="background:var(--teal);width:6px;height:14px;display:inline-block;margin-right:8px;vertical-align:-2px;border-radius:1px"></span>
+            Ingesta acumulativa de eventos SOE</span>
+      <span>
+        <span class="pill" id="storage-pill">detectando almacenamiento…</span>
+        <button class="btn btn-ghost" id="btn-clear-all" title="Borra todo el histórico acumulado, conserva el dataset base">Reiniciar histórico</button>
+      </span>
+    </h3>
+
+    <div class="upload-row">
+      <input type="file" id="file-input" accept=".xlsb,.xlsx,.xls,.csv,.jsonl,.json"
+             multiple title="Selecciona uno o varios archivos">
+      <button class="btn btn-primary" id="btn-upload">⬆ Cargar y acumular</button>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--slate-600)">
+        <input type="checkbox" id="chk-soe-filter" checked>
+        Aplicar filtro automático SOE (F=swTr* · col.A vacía · APPEAR · U1/U2)
+      </label>
+    </div>
+
+    <div class="small" style="color:var(--slate-500);margin-bottom:8px">
+      Formatos soportados: <code>.xlsb</code> (SOE original ABB), <code>.xlsx</code>, <code>.csv</code>, <code>.jsonl</code>.
+      Filtro automático: columna <code>F (B3)</code> que empiece por <code>swTr</code>, columna <code>A</code> vacía,
+      <code>STATUS=APPEAR</code> y <code>TAG ∈ (U1,U2)</code>.
+      Deduplicación por <code>event_id</code>. Los datos se almacenan localmente en el navegador — no salen del equipo.
+    </div>
+
+    <div class="upload-stats">
+      <div class="upload-stat seed">
+        <div class="lbl">Dataset base (embebido)</div>
+        <div class="val" id="stat-seed">—</div>
+      </div>
+      <div class="upload-stat added">
+        <div class="lbl">Acumulado en navegador</div>
+        <div class="val" id="stat-added">—</div>
+      </div>
+      <div class="upload-stat total">
+        <div class="lbl">Total activo en dashboard</div>
+        <div class="val" id="stat-total">—</div>
+      </div>
+      <div class="upload-stat">
+        <div class="lbl">Archivos cargados</div>
+        <div class="val" id="stat-files">0</div>
+      </div>
+    </div>
+
+    <div class="upload-log" id="upload-log"></div>
+
+    <div class="history-list" id="history-list"></div>
+  </div>
+
+  <!-- ===== FILTRO GLOBAL + INDICADORES POR ZONA ===== -->
+  <div class="card" style="margin-bottom:14px">
+    <h3>
+      <span><span class="icon" style="background:var(--blue)"></span>Filtros globales · período y zona</span>
+      <span class="pill" id="scope-pill">acumulado total · todas las zonas</span>
+    </h3>
+
+    <!-- Selector de período temporal -->
+    <div class="filters" style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--slate-200)">
+      <label>Período</label>
+      <div class="seg" id="date-mode-seg">
+        <button class="seg-btn active" data-mode="all">Acumulado total</button>
+        <button class="seg-btn" data-mode="cutoff">Acumulado hasta…</button>
+        <button class="seg-btn" data-mode="single">Día específico</button>
+        <button class="seg-btn" data-mode="range">Rango de fechas</button>
+      </div>
+      <span id="date-cutoff-wrap" style="display:none;align-items:center;gap:6px">
+        <label>Hasta</label>
+        <input type="date" id="date-cutoff">
+      </span>
+      <span id="date-single-wrap" style="display:none;align-items:center;gap:6px">
+        <label>Fecha</label>
+        <input type="date" id="date-single">
+      </span>
+      <span id="date-range-wrap" style="display:none;align-items:center;gap:6px">
+        <label>Desde</label><input type="date" id="date-from">
+        <label>Hasta</label><input type="date" id="date-to">
+      </span>
+      <span class="small" style="color:var(--slate-500)" id="date-info">—</span>
+    </div>
+
+    <!-- Filtro de zona -->
+    <div class="filters" style="margin-bottom:14px">
+      <label>Zona operativa</label>
+      <select id="g-zona"><option value="">Todas las zonas</option></select>
+      <button class="btn btn-ghost" id="btn-clear-scope">Limpiar todo</button>
+      <span class="small" style="color:var(--slate-500)">Estos filtros afectan KPIs, Top 10, gráficos y tabla.</span>
+    </div>
+    <div>
+      <div class="small" style="font-weight:600;color:var(--slate-600);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">
+        Indicadores por zona · clic para filtrar</div>
+      <div id="zona-indicators" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px"></div>
+    </div>
+  </div>
+
+  <!-- ===== KPI BAND ===== -->
+  <div class="kpi-grid" id="kpi-grid"></div>
+
+  <!-- ===== ROW 1: TOP 10 CON TABS POR MAGNITUD ===== -->
+  <div class="grid-2">
+    <div class="card">
+      <h3>
+        <span><span class="icon" style="background:var(--red)"></span>Top 10 transformadores por violaciones</span>
+        <span class="pill" id="top10-period-pill">—</span>
+      </h3>
+      <div class="tabs" id="top10-tabs">
+        <button class="tab active" data-mag="all">Todas <span class="count" id="tabct-all">—</span></button>
+        <button class="tab" data-mag="voltage">Tensiones <span class="count" id="tabct-voltage">—</span></button>
+        <button class="tab" data-mag="current">Corrientes <span class="count" id="tabct-current">—</span></button>
+        <button class="tab" data-mag="power">Potencias <span class="count" id="tabct-power">—</span></button>
+      </div>
+      <table id="top10-table">
+        <thead><tr>
+          <th scope="col">#</th><th scope="col">Transformador</th><th scope="col">kV</th><th scope="col">Zona</th>
+          <th scope="col" class="num">U1</th><th scope="col" class="num">U2</th><th scope="col" class="num">Total</th>
+          <th scope="col" class="num">Máx Δ</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="small" style="margin-top:8px;color:var(--slate-500)" id="top10-detail">—</div>
+    </div>
+
+    <div class="card">
+      <h3>
+        <span><span class="icon" style="background:var(--blue)"></span>Tendencia · violaciones U1 vs U2</span>
+        <span>
+          <select id="trend-scope" style="padding:3px 7px;border:1px solid var(--slate-300);border-radius:4px;font-size:11px">
+            <option value="auto">Automático</option>
+            <option value="hourly">Por hora</option>
+            <option value="daily">Por día</option>
+          </select>
+          <span class="pill" id="trend-pill">—</span>
+        </span>
+      </h3>
+      <div id="trend-chart" class="chart"></div>
+    </div>
+  </div>
+
+  <!-- ===== ROW 2: DISTRIBUCIONES ===== -->
+  <div class="grid-3">
+    <div class="card">
+      <h3><span><span class="icon" style="background:var(--teal)"></span>Por zona operativa</span></h3>
+      <div id="zona-chart" class="chart" style="height:300px"></div>
+    </div>
+    <div class="card">
+      <h3><span><span class="icon" style="background:var(--purple)"></span>Por parámetro SCADA</span></h3>
+      <div id="param-chart" class="chart" style="height:300px"></div>
+    </div>
+    <div class="card">
+      <h3><span><span class="icon" style="background:var(--amber)"></span>U1 vs U2 (severidad)</span></h3>
+      <div id="u1u2-chart" class="chart" style="height:300px"></div>
+    </div>
+  </div>
+
+  <!-- ===== ROW 3: HEATMAP ===== -->
+  <div class="card" style="margin-bottom:14px">
+    <h3>
+      <span><span class="icon" style="background:var(--navy)"></span>Heatmap · Top 15 subestaciones × Parámetro</span>
+      <span class="pill">conteo de violaciones</span>
+    </h3>
+    <div id="heatmap-chart" class="chart-tall"></div>
+  </div>
+
+  <!-- ===== ROW 3b: RANKING DE EVOLUCIÓN DÍA A DÍA ===== -->
+  <div class="card" style="margin-bottom:14px">
+    <h3>
+      <span><span class="icon" style="background:var(--purple)"></span>Evolución de posición en el ranking · día a día</span>
+      <span>
+        <span class="seg" id="rank-topn-seg">
+          <button class="seg-btn" data-n="5">Top 5</button>
+          <button class="seg-btn active" data-n="10">Top 10</button>
+          <button class="seg-btn" data-n="15">Top 15</button>
+        </span>
+        <span class="pill" id="rank-evo-pill">—</span>
+      </span>
+    </h3>
+    <div id="rank-evo-empty" style="display:none;text-align:center;padding:40px;color:var(--slate-400);font-size:13px">
+      Se necesitan al menos <strong>2 días</strong> de datos para mostrar la evolución del ranking.<br>
+      <span class="small">Carga más archivos SOE diarios en la sección de ingesta para ver la trayectoria de cada transformador.</span>
+    </div>
+    <div id="rank-evo-content">
+      <div id="bump-chart" class="chart-tall"></div>
+      <div class="small" style="color:var(--slate-500);margin:6px 0 14px">
+        Cada línea es un transformador. Eje vertical = posición (1 arriba = más violaciones). Una línea que
+        <strong>sube hacia el #1</strong> indica un equipo que empeora relativamente; una que baja, que mejora.
+      </div>
+      <table id="rank-evo-table">
+        <thead><tr>
+          <th scope="col">Pos.</th><th scope="col">Δ vs día anterior</th><th scope="col">Transformador</th><th scope="col">Zona</th>
+          <th scope="col" class="num">Violaciones</th><th scope="col" class="num">Mejor</th><th scope="col" class="num">Peor</th><th scope="col">Tendencia</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ===== ROW 4: TABLA FILTRABLE ===== -->
+  <div class="card">
+    <h3>
+      <span><span class="icon" style="background:var(--red)"></span>Eventos · explorador con filtros</span>
+      <span class="pill" id="filter-count">—</span>
+    </h3>
+    <div class="filters">
+      <label for="f-mag">Magnitud</label>
+      <select id="f-mag">
+        <option value="">Todas</option>
+        <option value="voltage">Tensiones</option>
+        <option value="current">Corrientes</option>
+        <option value="power">Potencias</option>
+      </select>
+      <label for="f-sub">Subestación</label><select id="f-sub"><option value="">Todas</option></select>
+      <label for="f-asset">swTrafo</label><select id="f-asset"><option value="">Todos</option></select>
+      <label for="f-kv">kV</label><select id="f-kv"><option value="">Todos</option></select>
+      <label for="f-zona">Zona</label><select id="f-zona"><option value="">Todas</option></select>
+      <label for="f-unit">Unit</label><select id="f-unit"><option value="">U1+U2</option><option>U1</option><option>U2</option></select>
+      <label for="f-minv">Δ mínimo</label><input type="number" id="f-minv" step="0.01" placeholder="0" style="width:80px">
+      <button class="btn btn-primary" id="btn-export">⬇ Exportar CSV</button>
+    </div>
+    <div class="scroll-table">
+      <table id="events-table">
+        <thead><tr>
+          <th scope="col">Fecha</th><th scope="col">Hora</th><th scope="col">Subestación</th><th scope="col">swTrafo</th><th scope="col">kV</th><th scope="col">Zona</th>
+          <th scope="col">Parámetro</th><th scope="col">U</th>
+          <th scope="col" class="num">Medido</th><th scope="col" class="num">Límite</th><th scope="col" class="num">Δ</th><th scope="col" class="num">Δ %</th>
+        </tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">
+    <strong>Fuente:</strong> SOE diario ABB NCS — filtro <code>B3 LIKE swTrafo% AND STATUS=APPEAR AND TAG IN (U1,U2)</code><br>
+    Datos del seed: <code>SOE_18_May_2026_SP7.xlsb</code> · Lo que cargues se guarda de forma persistente en el navegador (IndexedDB) y se conserva al cerrar y reabrir.
+    Sin envío de datos a internet.
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="module" src="../assets/js/ui/seguimiento/seguimiento-shell.js"></script>
+</body>
+</html>
