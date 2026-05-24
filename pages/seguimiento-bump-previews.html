@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f4f6fb">
+<meta name="color-scheme" content="light">
+<title>Previews · Ranking diario · SGM · TRANSPOWER</title>
+<meta name="description" content="3 variantes visuales del segmento Evolución de posición en el ranking · día a día.">
+
+<link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+<script type="module" src="../assets/js/auth/page-guard.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/seguimiento-scada.css"/>
+<link rel="stylesheet" href="../assets/css/seguimiento-bump-previews.css"/>
+</head>
+<body class="aqua">
+
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Operación / Seguimiento Operativo / Propuestas visuales</div>
+    <h1 class="page-title">Propuestas · Ranking <em>diario</em></h1>
+    <p class="page-subtitle">
+      3 variantes visuales del segmento <strong>Evolución de posición en el ranking · día a día</strong> para tu evaluación.
+      Datos sintéticos derivados del SEED (1 día real) expandidos a 20 días con perturbación determinística — solo para apreciar la trayectoria en cada propuesta.
+      Cuando elijas una, la aplico al dashboard de Seguimiento Operativo.
+    </p>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       VARIANTE A — "Card sólido enfocado"
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="scada-shell preview-section">
+    <div class="preview-label">
+      <span class="preview-tag">Variante A</span>
+      <h2>Card sólido enfocado · Top 5 con anotaciones inline</h2>
+      <p>
+        Fondo blanco opaco y sombra para destacar sobre la escena aqua.
+        Paleta restringida a 5 colores corporativos contrastantes (rojo · azul · teal · ámbar · violeta).
+        Líneas curvas (spline) con marcadores prominentes. Etiquetas de fechas humanizadas (<code>MIE 14</code>).
+        Nombre del transformador anclado al final de cada línea — sin leyenda separada.
+        Tabla con zebra rows y sparkline a color (verde = mejor, rojo = peor).
+      </p>
+    </div>
+    <div class="container">
+      <div class="card preview-card">
+        <h3>
+          <span><span class="icon" style="background:var(--purple)"></span>Evolución de posición · Top 5</span>
+          <span class="pill" id="pill-a">20 días · sintético</span>
+        </h3>
+        <div id="bump-a" class="chart-tall"></div>
+        <table id="tbl-a" style="margin-top:14px">
+          <thead><tr>
+            <th scope="col">Pos.</th>
+            <th scope="col">Δ día ant.</th>
+            <th scope="col">Transformador</th>
+            <th scope="col">Zona</th>
+            <th scope="col" class="num">Viol.</th>
+            <th scope="col" class="num">Mejor</th>
+            <th scope="col" class="num">Peor</th>
+            <th scope="col">Tendencia</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       VARIANTE B — "Heatmap rank día × transformador"
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="scada-shell preview-section">
+    <div class="preview-label">
+      <span class="preview-tag amber">Variante B</span>
+      <h2>Heatmap rank · día × transformador</h2>
+      <p>
+        Reemplaza el bump chart por un <strong>heatmap</strong>: filas = los 10 transformadores top, columnas = los 20 días.
+        Cada celda muestra la posición en el ranking ese día con color codificado (rojo oscuro = #1 / peor; verde = #10 / mejor del bloque).
+        Mucho más legible para detectar quién empeora cada día sin las líneas cruzadas del bump.
+        La tabla de detalle se conserva tal cual.
+      </p>
+    </div>
+    <div class="container">
+      <div class="card preview-card">
+        <h3>
+          <span><span class="icon" style="background:var(--amber)"></span>Posición diaria · Top 10</span>
+          <span class="pill" id="pill-b">20 días · sintético</span>
+        </h3>
+        <div id="bump-b" style="width:100%;height:480px"></div>
+        <table id="tbl-b" style="margin-top:14px">
+          <thead><tr>
+            <th scope="col">Pos.</th>
+            <th scope="col">Δ día ant.</th>
+            <th scope="col">Transformador</th>
+            <th scope="col">Zona</th>
+            <th scope="col" class="num">Viol.</th>
+            <th scope="col" class="num">Mejor</th>
+            <th scope="col" class="num">Peor</th>
+            <th scope="col">Tendencia</th>
+          </tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ════════════════════════════════════════════════════════════════
+       VARIANTE C — "Stepped lines + cards laterales"
+       ════════════════════════════════════════════════════════════════ -->
+  <section class="scada-shell preview-section">
+    <div class="preview-label">
+      <span class="preview-tag purple">Variante C</span>
+      <h2>Líneas escalonadas + cards laterales · enfoque dual</h2>
+      <p>
+        Bump chart con líneas <strong>STEP</strong> (horizontales/verticales, sin diagonales) — los cambios de posición se ven como saltos limpios día a día.
+        Top 5 destacado en color; resto del Top 15 en gris translúcido al fondo para mantener contexto sin saturar.
+        A la derecha del gráfico, una <strong>columna de cards individuales</strong> con cada uno de los Top 5: posición grande, delta, sparkline a tamaño completo y conteo de violaciones.
+      </p>
+    </div>
+    <div class="container">
+      <div class="card preview-card">
+        <h3>
+          <span><span class="icon" style="background:var(--purple)"></span>Trayectoria + detalle por equipo</span>
+          <span class="pill" id="pill-c">20 días · sintético</span>
+        </h3>
+        <div class="variant-c-layout">
+          <div id="bump-c" class="chart-tall"></div>
+          <div id="cards-c"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="page-header" style="margin-top:32px">
+    <p class="page-subtitle">
+      <strong>¿Cuál prefieres?</strong> Avísame con la letra (A, B o C) y la aplico al dashboard de Seguimiento Operativo en el siguiente commit.
+      Si quieres mezclar elementos (p.ej. "el gráfico de C con la tabla de A"), también lo hacemos.
+    </p>
+  </div>
+
+</main>
+
+<script type="module" src="../assets/js/ui/seguimiento/previews/bump-previews.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
