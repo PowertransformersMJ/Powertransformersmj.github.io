@@ -11,7 +11,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
-import { inicializarFiltros, pintarSelectorZona, actualizarPill } from './filtros.js';
+import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos } from './filtros.js';
 import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
 import { inicializarPersistencia, limpiarPersistencia, handleFile } from './upload.js';
 
@@ -103,8 +103,9 @@ function renderAll(state) {
   const { dataset, zona, met, source } = state;
   if (!dataset) return;
   ocultarError();
-  safeRender('selector-zona', () => pintarSelectorZona());
-  safeRender('pill-filtro',  () => actualizarPill());
+  safeRender('selector-zona',  () => pintarSelectorZona());
+  safeRender('pill-filtro',    () => actualizarPill());
+  safeRender('chips-grupos',   () => sincronizarChipsGrupos());
   actualizarSourcePill(source, state._meta);
 
   // Sincroniza selects con state
