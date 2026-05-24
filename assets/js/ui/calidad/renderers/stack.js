@@ -2,6 +2,7 @@
 
 import { $, GCOL, GRUPOS, layoutBase, plotlyCfg, metricaLabel, metricasActivas } from './_helpers.js';
 import { gruposDeZona } from '../../../domain/saidi_calculo.js';
+import { store } from '../state.js';
 
 // Color por grupo + métrica · en SAIFI usamos tonos más claros para
 // diferenciar visualmente sin perder identidad cromática.
@@ -15,13 +16,15 @@ export function renderStack(dataset, zona, met) {
   if (typeof Plotly === 'undefined' || !dataset) return;
   const mets = metricasActivas(met);
   const isAmbos = mets.length > 1;
+  const activos = store.state.gruposActivos;
+  const gruposVisible = GRUPOS.filter(g => activos.has(g));
 
   const traces = [];
   mets.forEach((m) => {
     const grp = gruposDeZona(dataset, zona, m);
     const palette = m === 'saifi' ? GCOL_SAIFI : GCOL;
     const sufijo = isAmbos ? (m === 'saidi' ? ' · SAIDI_E (h-eq)' : ' · SAIFI_E (int-eq)') : '';
-    GRUPOS.forEach(g => {
+    gruposVisible.forEach(g => {
       traces.push({
         x: dataset.meses, y: grp[g] || [],
         name: g + sufijo,
