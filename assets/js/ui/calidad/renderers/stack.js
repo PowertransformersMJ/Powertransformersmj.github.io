@@ -1,6 +1,6 @@
 // Renderer · Stack barras mensuales por grupo de causa
 
-import { $, GCOL, GRUPOS, LAYOUT_BASE, PLOTLY_CFG, metricaNombre, metKey } from './_helpers.js';
+import { $, GCOL, GRUPOS, layoutBase, plotlyCfg, metricaNombre } from './_helpers.js';
 import { gruposDeZona } from '../../../domain/saidi_calculo.js';
 
 export function renderStack(dataset, zona, met) {
@@ -10,10 +10,10 @@ export function renderStack(dataset, zona, met) {
     x: dataset.meses, y: grp[g] || [], name: g,
     type: 'bar', marker: { color: GCOL[g] },
   }));
-  Plotly.react('chart-stack', traces, {
-    ...LAYOUT_BASE, barmode: 'stack',
-    yaxis: { ...LAYOUT_BASE.yaxis, title: { text: metricaNombre(met), font: { size: 10 } } },
-  }, PLOTLY_CFG);
+  const layout = layoutBase();
+  layout.barmode = 'stack';
+  layout.yaxis = { ...layout.yaxis, title: { text: metricaNombre(met), font: { size: 10 } } };
+  Plotly.react('chart-stack', traces, layout, plotlyCfg());
   const pill = $('#stack-pill');
   if (pill) pill.textContent = metricaNombre(met);
 }
