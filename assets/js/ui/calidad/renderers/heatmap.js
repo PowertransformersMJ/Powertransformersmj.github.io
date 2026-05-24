@@ -27,9 +27,11 @@ export function renderHeatmap(dataset, zona, met) {
   // los valores < 0.005 para no ensuciar visualmente).
   const text = z.map(row => row.map(v => (v == null || +v < 0.005) ? '' : (+v).toFixed(2)));
   const layout = layoutBase();
-  layout.margin = { l: 240, r: 70, t: 14, b: 30 };
+  // Margen superior generoso porque los ticks de meses van arriba
+  // (side:'top'); 50px deja espacio cómodo para "Ene/Feb/Mar/Abr/May".
+  layout.margin = { l: 240, r: 70, t: 50, b: 20 };
   layout.yaxis = { tickfont: { size: 9 }, automargin: true };
-  layout.xaxis = { side: 'top', tickfont: { size: 11 } };
+  layout.xaxis = { side: 'top', tickfont: { size: 12, color: '#0F172A' }, ticks: 'outside', ticklen: 4, automargin: true };
   Plotly.react('chart-heat', [{
     z, x: dataset.meses, y: cats, type: 'heatmap',
     colorscale: HEAT_COLORSCALE,
