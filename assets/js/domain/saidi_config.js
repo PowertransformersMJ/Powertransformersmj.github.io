@@ -50,27 +50,37 @@ export function grupoCorto(cat) {
   return String(cat).includes('Racion') ? 'rac' : 'sob';
 }
 
-// Tipografía y layout base Plotly
-export const FONT = Object.freeze({
-  family: '-apple-system, "Segoe UI", Inter, Roboto, sans-serif',
-  size: 11,
-  color: '#475569',
-});
+// Tipografía y layout base Plotly.
+//
+// IMPORTANTE: Plotly MUTA internamente los objetos `layout` y `font`
+// que recibe (les agrega defaults, recalcula tamaños, etc.). Por eso
+// estas no son constantes congeladas sino FUNCIONES factory que
+// devuelven un objeto FRESCO cada vez — usar Object.freeze rompería
+// el render con "Attempted to assign to readonly property".
 
-export const LAYOUT_BASE = Object.freeze({
-  font: FONT,
-  paper_bgcolor: '#fff',
-  plot_bgcolor: '#fff',
-  margin: { l: 48, r: 16, t: 10, b: 36 },
-  xaxis: { gridcolor: '#F1F5F9', zeroline: false },
-  yaxis: { gridcolor: '#F1F5F9', zeroline: false },
-  legend: { orientation: 'h', y: -0.18, font: { size: 10 } },
-});
+export function font() {
+  return {
+    family: '-apple-system, "Segoe UI", Inter, Roboto, sans-serif',
+    size: 11,
+    color: '#475569',
+  };
+}
 
-export const PLOTLY_CFG = Object.freeze({
-  responsive: true,
-  displayModeBar: false,
-});
+export function layoutBase() {
+  return {
+    font: font(),
+    paper_bgcolor: '#fff',
+    plot_bgcolor: '#fff',
+    margin: { l: 48, r: 16, t: 10, b: 36 },
+    xaxis: { gridcolor: '#F1F5F9', zeroline: false },
+    yaxis: { gridcolor: '#F1F5F9', zeroline: false },
+    legend: { orientation: 'h', y: -0.18, font: { size: 10 } },
+  };
+}
+
+export function plotlyCfg() {
+  return { responsive: true, displayModeBar: false };
+}
 
 // Etiquetas de métricas
 export const METRICAS = Object.freeze({
