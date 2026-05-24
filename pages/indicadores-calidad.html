@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f4f6fb">
+<meta name="color-scheme" content="light">
+<title>SGM · TRANSPOWER — Indicadores de Calidad</title>
+<meta name="description" content="Dashboard de Indicadores de Calidad: SAIDI_E y SAIFI_E por zona operativa con proyección OLS y desglose por causa.">
+
+<!--
+  SGM · TRANSPOWER — Indicadores de Calidad · SAIDI_E / SAIFI_E
+  Refactor F40: archivo standalone original (4.8 MB · Plotly + dataset
+  inline) reescrito como arquitectura modular embebida en el shell
+  aqua del proyecto.
+
+  · CSS                  → assets/css/indicadores-calidad.css (scope .saidi-shell)
+  · Dataset baseline     → assets/data/indicadores-calidad-baseline.json
+  · Dominio puro         → assets/js/domain/saidi_{config,calculo,proyeccion}.js
+  · Data layer           → assets/js/data/indicadores_calidad.js (Firestore realtime)
+  · UI · store / filtros → assets/js/ui/calidad/{state,filtros}.js
+  · UI · renderers       → assets/js/ui/calidad/renderers/*.js
+  · Shell · entrypoint   → assets/js/ui/calidad/calidad-shell.js
+-->
+
+<link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+<script type="module" src="../assets/js/auth/page-guard.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/indicadores-calidad.css"/>
+</head>
+<body class="aqua">
+
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Operación / Indicadores de Calidad</div>
+    <h1 class="page-title">Indicadores de <em>Calidad</em></h1>
+    <p class="page-subtitle">
+      Dashboard SAIDI_E / SAIFI_E por zona operativa con desglose por grupo de causa,
+      proyección OLS Jun–Dic con IC95% y escenarios optimista / pesimista.
+      Ene–May 2026 · mayo parcial (hasta 18-may).
+    </p>
+  </div>
+
+  <div class="saidi-shell">
+    <div class="container">
+
+      <!-- ===== STATUS HEADER ===== -->
+      <div class="card saidi-status">
+        <div>
+          <h2>⚡ Capacidad de Transformación · Impacto en SAIDI_E / SAIFI_E</h2>
+          <div class="subtitle" id="subtitle">Sobrecarga · Deslastre · Racionamiento por déficit — 2026</div>
+        </div>
+        <div class="saidi-status-meta">
+          <span class="badge badge-red" id="status-badge">TENDENCIA CRÍTICA</span>
+          <div id="meta-info">Ene–May 2026 · mayo parcial (hasta 18-may)</div>
+        </div>
+      </div>
+
+      <div class="warn-strip">
+        ⚠ Mayo es parcial (registros hasta el día 18): subestima el total mensual y sesga la proyección a la baja.
+        La proyección Jun–Dic es referencial (OLS sobre 5 puntos), no predictiva.
+      </div>
+
+      <!-- ===== FILTROS ===== -->
+      <div class="filters">
+        <label for="f-zona">Zona operativa</label>
+        <select id="f-zona"></select>
+        <label for="f-met" style="margin-left:14px">Métrica</label>
+        <select id="f-met">
+          <option value="saidi">SAIDI_E (duración)</option>
+          <option value="saifi">SAIFI_E (frecuencia)</option>
+        </select>
+        <span class="pill" id="filter-pill" style="margin-left:auto">—</span>
+      </div>
+
+      <!-- ===== KPI BAND ===== -->
+      <div class="kpi-grid" id="kpi-grid"></div>
+
+      <!-- ===== INSIGHT EJECUTIVO ===== -->
+      <div class="insight" id="insight"></div>
+
+      <!-- ===== ROW 1: SERIE + STACK ===== -->
+      <div class="grid-2">
+        <div class="card">
+          <h3>
+            <span><span class="icon" style="background:var(--blue)"></span>Serie temporal del sistema</span>
+            <span class="pill" id="serie-pill">SAIDI_E + SAIFI_E</span>
+          </h3>
+          <div id="chart-serie" class="chart"></div>
+        </div>
+        <div class="card">
+          <h3>
+            <span><span class="icon" style="background:var(--red)"></span>Contribución mensual por grupo de causa</span>
+            <span class="pill" id="stack-pill">—</span>
+          </h3>
+          <div id="chart-stack" class="chart"></div>
+        </div>
+      </div>
+
+      <!-- ===== ROW 2: PARTICIPACIÓN + VAR MOM + TOP ===== -->
+      <div class="grid-3">
+        <div class="card">
+          <h3><span><span class="icon" style="background:var(--teal)"></span>Participación acumulada por categoría</span></h3>
+          <div id="chart-part" class="chart" style="height:320px"></div>
+        </div>
+        <div class="card">
+          <h3><span><span class="icon" style="background:var(--purple)"></span>Variación % mes a mes</span></h3>
+          <div id="chart-var" class="chart" style="height:320px"></div>
+        </div>
+        <div class="card">
+          <h3>
+            <span><span class="icon" style="background:var(--amber)"></span>Top categorías objetivo</span>
+            <span class="pill" id="top-pill">—</span>
+          </h3>
+          <div style="max-height:320px;overflow-y:auto">
+            <table id="top-table">
+              <thead><tr>
+                <th scope="col">#</th>
+                <th scope="col">Categoría</th>
+                <th scope="col">Grupo</th>
+                <th scope="col" class="num">Acum.</th>
+                <th scope="col" class="num">%</th>
+              </tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== ROW 3: HEATMAP ===== -->
+      <div class="card" style="margin-bottom:14px">
+        <h3>
+          <span><span class="icon" style="background:var(--navy)"></span>Heatmap · Categoría objetivo × Mes</span>
+          <span class="pill" id="heat-pill">—</span>
+        </h3>
+        <div id="chart-heat" class="chart-tall"></div>
+      </div>
+
+      <!-- ===== ROW 4: PROYECCIÓN + TABLA MENSUAL ===== -->
+      <div class="grid-2">
+        <div class="card">
+          <h3>
+            <span><span class="icon" style="background:var(--red)"></span>Proyección Jun–Dic · grupo Sobrecarga/Deslastre</span>
+            <span class="pill red" id="proj-pill">REFERENCIAL</span>
+          </h3>
+          <div id="chart-proj" class="chart"></div>
+          <div class="small" id="proj-note" style="margin-top:8px"></div>
+        </div>
+        <div class="card">
+          <h3><span><span class="icon" style="background:var(--green)"></span>Tabla mensual agregada (SAIDI_E)</span></h3>
+          <div style="max-height:380px;overflow-y:auto">
+            <table id="month-table"><thead></thead><tbody></tbody></table>
+          </div>
+        </div>
+      </div>
+
+      <div class="footer">
+        Fuente: <code>INTERRUPCIONES_2026_CONSOLIDADO_PRELIMINARES.xlsx</code> · 137.211 registros · mes derivado de F_ALTA ·
+        Proyección OLS (5 puntos) con IC 95% · escenarios base / optimista −10% / pesimista +10% ·
+        Datos preliminares sujetos a reclasificación.
+      </div>
+
+    </div>
+  </div>
+
+</main>
+
+<script type="module" src="../assets/js/ui/calidad/calidad-shell.js"></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,156 @@
+/* ═══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Indicadores de Calidad · SAIDI_E / SAIFI_E
+   Estilos extraídos del archivo standalone original (F40 refactor)
+   Tokens propios del módulo (--navy / --slate-* / --red / --amber
+   / --green / --teal / --purple). Semáforo invariante:
+     rojo    = Sobrecarga/Deslastre (controlable)
+     púrpura = Racionamiento/Déficit
+     slate   = Otras causas
+═══════════════════════════════════════════════════════════════ */
+
+:root {
+  --navy:#0F172A; --slate-800:#1E293B; --slate-700:#334155; --slate-600:#475569;
+  --slate-500:#64748B; --slate-400:#94A3B8; --slate-300:#CBD5E1; --slate-200:#E2E8F0;
+  --slate-100:#F1F5F9; --slate-50:#F8FAFC; --slate-900:#0B1220;
+  --red:#DC2626; --red-50:#FEE2E2; --red-700:#B91C1C; --red-900:#7F1D1D;
+  --amber:#F59E0B; --amber-50:#FEF3C7;
+  --green:#16A34A; --green-50:#F0FDF4; --green-100:#DCFCE7; --green-700:#15803D;
+  --blue:#2563EB; --blue-50:#DBEAFE;
+  --teal:#0D9488; --teal-50:#CCFBF1;
+  --purple:#7C3AED; --purple-50:#EDE9FE;
+}
+.saidi-shell, .saidi-shell * { box-sizing: border-box; }
+.saidi-shell {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
+  color: var(--slate-800);
+  line-height: 1.5;
+}
+
+/* Status header (reemplaza al topbar negro standalone) */
+.saidi-shell .saidi-status {
+  margin-bottom: 14px;
+  display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;
+}
+.saidi-shell .saidi-status h2 {
+  font-size: 14px; font-weight: 700; color: var(--slate-700); margin: 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.saidi-shell .saidi-status .subtitle {
+  font-size: 11px; color: var(--slate-500); margin-top: 4px;
+}
+.saidi-shell .saidi-status-meta { text-align: right; }
+.saidi-shell .saidi-status-meta #meta-info {
+  font-size: 11px; color: var(--slate-600); margin-top: 6px;
+}
+.saidi-shell .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: .5px; }
+.saidi-shell .badge-red   { background: var(--red);   color: #fff; }
+.saidi-shell .badge-amber { background: var(--amber); color: #fff; }
+
+/* Container interno: ocupa todo el ancho del aqua page-container */
+.saidi-shell .container { width: 100%; max-width: none; margin: 0; padding: 0; }
+
+/* Warning strip (mayo parcial) */
+.saidi-shell .warn-strip {
+  background: var(--amber-50); border: 1px solid var(--amber); color: #92400E;
+  font-size: 11px; padding: 8px 14px; border-radius: 6px; margin-bottom: 14px; font-weight: 600;
+}
+
+/* KPI band */
+.saidi-shell .kpi-grid {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 18px;
+}
+@media (max-width: 1200px) { .saidi-shell .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 700px)  { .saidi-shell .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+.saidi-shell .kpi {
+  background: #fff; border-radius: 8px; padding: 14px 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06); border-left: 4px solid var(--slate-300);
+}
+.saidi-shell .kpi.red    { border-left-color: var(--red); }
+.saidi-shell .kpi.amber  { border-left-color: var(--amber); }
+.saidi-shell .kpi.blue   { border-left-color: var(--blue); }
+.saidi-shell .kpi.teal   { border-left-color: var(--teal); }
+.saidi-shell .kpi.purple { border-left-color: var(--purple); }
+.saidi-shell .kpi.green  { border-left-color: var(--green); }
+.saidi-shell .kpi .label { font-size: 10px; color: var(--slate-500); text-transform: uppercase; letter-spacing: .8px; font-weight: 600; }
+.saidi-shell .kpi .value { font-size: 26px; font-weight: 700; color: var(--slate-800); margin-top: 4px; line-height: 1.1; }
+.saidi-shell .kpi .value.smaller { font-size: 18px; }
+.saidi-shell .kpi .delta { font-size: 11px; color: var(--slate-500); margin-top: 2px; }
+
+/* Grid layouts */
+.saidi-shell .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+.saidi-shell .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+@media (max-width: 1100px) { .saidi-shell .grid-2, .saidi-shell .grid-3 { grid-template-columns: 1fr; } }
+
+/* Cards */
+.saidi-shell .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+.saidi-shell .card h3 {
+  font-size: 13px; font-weight: 700; color: var(--slate-700); margin: 0 0 12px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;
+}
+.saidi-shell .card h3 .icon {
+  display: inline-block; width: 6px; height: 14px; background: var(--teal);
+  margin-right: 8px; vertical-align: -2px; border-radius: 1px;
+}
+.saidi-shell .card .pill {
+  font-size: 10px; background: var(--slate-100); color: var(--slate-600);
+  padding: 2px 7px; border-radius: 10px; font-weight: 600;
+}
+.saidi-shell .card .pill.green { background: var(--green-100); color: var(--green-700); }
+.saidi-shell .card .pill.red   { background: var(--red-50);   color: var(--red-700); }
+
+/* Tables */
+.saidi-shell table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.saidi-shell th {
+  text-align: left; padding: 8px 6px; background: var(--slate-50); color: var(--slate-600);
+  font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--slate-200);
+}
+.saidi-shell td { padding: 7px 6px; border-bottom: 1px solid var(--slate-100); }
+.saidi-shell tr:hover td { background: var(--slate-50); }
+.saidi-shell .rank { font-weight: 700; color: var(--slate-400); font-size: 11px; width: 24px; }
+.saidi-shell .rank-1 { color: var(--red); font-size: 13px; }
+.saidi-shell .rank-2 { color: var(--amber); font-size: 13px; }
+.saidi-shell .rank-3 { color: var(--amber); font-size: 12px; }
+.saidi-shell .grp-pill {
+  display: inline-block; padding: 2px 7px; border-radius: 3px; font-size: 10px; font-weight: 700;
+}
+.saidi-shell .g-sob { background: var(--red-50);    color: var(--red-900); }
+.saidi-shell .g-rac { background: var(--purple-50); color: var(--purple); }
+.saidi-shell .num { font-variant-numeric: tabular-nums; text-align: right; font-weight: 600; }
+.saidi-shell .num-bad { color: var(--red); font-weight: 700; }
+.saidi-shell .small { font-size: 10px; color: var(--slate-500); }
+
+/* Chart heights */
+.saidi-shell .chart { width: 100%; height: 340px; }
+.saidi-shell .chart-tall { width: 100%; height: 420px; }
+
+/* Filters */
+.saidi-shell .filters {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center;
+  background: #fff; padding: 12px 16px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.saidi-shell .filters label {
+  font-size: 11px; color: var(--slate-600); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .5px;
+}
+.saidi-shell .filters select {
+  padding: 6px 10px; border: 1px solid var(--slate-300); border-radius: 5px;
+  font-size: 12px; background: #fff;
+}
+
+/* Insight card */
+.saidi-shell .insight {
+  background: linear-gradient(135deg, #fff 0%, var(--slate-50) 100%);
+  border-left: 4px solid var(--teal);
+  border-radius: 8px; padding: 14px 18px; margin-bottom: 14px;
+  box-shadow: 0 1px 3px rgba(0,0,0,.06);
+}
+.saidi-shell .insight b { color: var(--navy); }
+
+/* Footer */
+.saidi-shell .footer {
+  margin-top: 20px; padding: 14px; text-align: center; font-size: 11px; color: var(--slate-500);
+}
+.saidi-shell .footer code {
+  background: var(--slate-200); padding: 1px 5px; border-radius: 3px; font-size: 10px;
+}
