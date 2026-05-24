@@ -10,9 +10,42 @@
 
 import { BUMP_COLORS } from '../../../domain/scada_config.js';
 import {
-  buildDailyRanking, calcularHistorial, deltaPosicion, rankSparkline,
+  buildDailyRanking, deltaPosicion,
 } from '../../../domain/scada_ranking.js';
 import { store } from '../state.js';
+
+// ── historialClamped(rankInfo, topN) ─────────────────────────
+// Como `calcularHistorial` del dominio, pero descarta los días
+// en que el equipo cayó FUERA del Top N. Así los "mejor/peor"
+// y la sparkline quedan acotados al universo visible (sin ruido
+// del tipo #150 que es "fuera del top en algún día").
+//
+// SEMÁNTICA OPERATIVA (importante):
+//   En SCADA, rank=1 es el equipo con MÁS violaciones (peor
+//   estado operativo). rank=N es el con menos (mejor). Por
+//   eso "mejor histórico" = max(ranks) y "peor histórico" =
+//   min(ranks). Las columnas y stats se renombran abajo
+//   aplicando esa inversión.
+function historialClamped(rankInfo, topN) {
+  const { dates, ranking, metaBy } = rankInfo;
+  const hist = {};
+  for (const sid of metaBy.keys()) {
+    const series = dates.map(d => {
+      const r = ranking[d].find(z => z.sid === sid);
+      return r && r.rank <= topN ? r.rank : null;
+    });
+    const valid = series.filter(x => x !== null);
+    if (valid.length) {
+      hist[sid] = {
+        // Notación matemática (no operativa)
+        rankMin: Math.min(...valid),  // = PEOR estado operativo (más viol.)
+        rankMax: Math.max(...valid),  // = MEJOR estado operativo (menos viol.)
+        series,
+      };
+    }
+  }
+  return hist;
+}
 
 const $ = (sel) => document.querySelector(sel);
 
@@ -30,7 +63,10 @@ function fmtFechaCorta(date) {
   return `${wd} ${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// Sparkline coloreado (verde mejor → rojo peor)
+// Sparkline coloreado.
+// Convención SCADA: rank=1 = MÁS violaciones = peor estado operativo.
+// El bloque ALTO representa rank=1 (peor) en color ROJO; el bloque
+// BAJO representa rank=N (mejor estado operativo) en VERDE.
 function gradientSparkline(series) {
   const blocks = '▁▂▃▄▅▆▇█';
   const valid = series.filter(x => x !== null);
@@ -38,12 +74,15 @@ function gradientSparkline(series) {
   const max = Math.max(...valid), min = Math.min(...valid);
   return series.map(r => {
     if (r === null) return '<span style="color:#CBD5E1"> </span>';
+    // norm=1 cuando rank=min (rank=1 = peor estado). Bloque alto + rojo.
+    // norm=0 cuando rank=max (mejor estado).                Bloque bajo + verde.
     const norm = max === min ? 0.5 : (max - r) / (max - min);
     const idx = Math.round(norm * (blocks.length - 1));
     const block = blocks[idx];
-    const r1 = Math.round(220 + (-220 + 22) * norm);
-    const g1 = Math.round(38  + (-38  + 163) * norm);
-    const b1 = Math.round(38  + (-38  + 74)  * norm);
+    // Color: norm=1 → rojo (220,38,38); norm=0 → verde (22,163,74)
+    const r1 = Math.round(22  + (220 - 22)  * norm);
+    const g1 = Math.round(163 + (38  - 163) * norm);
+    const b1 = Math.round(74  + (38  - 74)  * norm);
     return `<span style="color:rgb(${r1},${g1},${b1})">${block}</span>`;
   }).join('');
 }
@@ -55,7 +94,8 @@ function nombreDeSid(rankInfo, sid) {
 
 // ── Tabla resumen común a las 3 variantes (A y B la usan,
 //    C la oculta y muestra cards laterales). ─────────────────
-function renderTablaResumen({ dates, ranking, metaBy }, sidsTop, paleta) {
+function renderTablaResumen(rankInfo, sidsTop, paleta) {
+  const { dates, ranking } = rankInfo;
   const tbody = document.querySelector('#rank-evo-table tbody');
   if (!tbody) return;
   if (dates.length < 2) { tbody.innerHTML = ''; return; }
@@ -63,25 +103,28 @@ function renderTablaResumen({ dates, ranking, metaBy }, sidsTop, paleta) {
   const prevD = dates[dates.length - 2];
   const prevRank = {};
   for (const r of ranking[prevD]) prevRank[r.sid] = r.rank;
-  const hist = calcularHistorial({ dates, ranking, metaBy });
+  const hist = historialClamped(rankInfo, store.state.rankTopN);
   const filas = ranking[lastD].filter(r => sidsTop.includes(r.sid));
   const { selectedSid } = store.state;
   tbody.innerHTML = filas.map((r) => {
     const { delta, cls } = deltaPosicion(r.rank, prevRank[r.sid]);
-    const h = hist[r.sid];
+    const h = hist[r.sid] || { rankMin: r.rank, rankMax: r.rank, series: [] };
     const rb = r.rank <= 3 ? `rank-badge r${r.rank}` : 'rank-badge';
     const idx = sidsTop.indexOf(r.sid);
     const color = paleta[idx % paleta.length];
     const dot = `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:8px;vertical-align:middle"></span>`;
     const isSelected = selectedSid === r.sid;
+    // SEMÁNTICA OPERATIVA:
+    //   "Mejor" = posición más ALTA históricamente = menos violaciones = rankMax.
+    //   "Peor"  = posición más BAJA históricamente = más violaciones = rankMin.
     return `<tr data-sid="${r.sid}" class="rank-row${isSelected ? ' is-selected' : ''}" style="cursor:pointer">
       <td><span class="${rb}">${r.rank}</span></td>
       <td><span class="rank-delta ${cls}">${delta}</span></td>
       <td>${dot}<strong>${r.name}</strong></td>
       <td><span class="zona-pill">${r.zona || '—'}</span></td>
       <td class="num">${r.count.toLocaleString()}</td>
-      <td class="num">#${h.best}</td>
-      <td class="num">#${h.worst}</td>
+      <td class="num">#${h.rankMax}</td>
+      <td class="num">#${h.rankMin}</td>
       <td style="font-family:'JetBrains Mono',monospace;font-size:14px;letter-spacing:-1px">${gradientSparkline(h.series)}</td>
     </tr>`;
   }).join('');
@@ -347,7 +390,7 @@ function renderVariantC(rankInfo) {
   const prevD = dates[dates.length - 2];
   const prevRank = {};
   for (const r of ranking[prevD]) prevRank[r.sid] = r.rank;
-  const hist = calcularHistorial({ dates, ranking, metaBy });
+  const hist = historialClamped(rankInfo, store.state.rankTopN);
 
   const host = $('#cards-c');
   if (host) {
@@ -356,8 +399,10 @@ function renderVariantC(rankInfo) {
       const r = ranking[lastD].find(z => z.sid === sid);
       if (!r) return '';
       const { delta, cls } = deltaPosicion(r.rank, prevRank[sid]);
-      const h = hist[sid];
+      const h = hist[sid] || { rankMin: r.rank, rankMax: r.rank, series: [] };
       const isSelected = selectedSid === sid;
+      // mejor = rankMax (posición más alta = menos violaciones)
+      // peor  = rankMin (posición más baja = más violaciones)
       return `<div class="rank-card${isSelected ? ' is-selected' : ''}" data-sid="${sid}" style="border-left-color:${color};cursor:pointer">
         <div class="rank-card-head">
           <div class="rank-card-pos" style="color:${color}">#${r.rank}</div>
@@ -365,11 +410,11 @@ function renderVariantC(rankInfo) {
         </div>
         <div class="rank-card-name">${r.name}</div>
         <div class="rank-card-zona"><span class="zona-pill">${r.zona || '—'}</span></div>
-        <div class="rank-card-spark" style="color:${color};font-family:'JetBrains Mono',monospace;font-size:18px;letter-spacing:-2px;line-height:1">${rankSparkline(h.series)}</div>
+        <div class="rank-card-spark" style="color:${color};font-family:'JetBrains Mono',monospace;font-size:18px;letter-spacing:-2px;line-height:1">${gradientSparkline(h.series)}</div>
         <div class="rank-card-meta">
           <span><b>${r.count.toLocaleString()}</b> viol.</span>
-          <span>mejor <b>#${h.best}</b></span>
-          <span>peor <b>#${h.worst}</b></span>
+          <span>mejor <b>#${h.rankMax}</b></span>
+          <span>peor <b>#${h.rankMin}</b></span>
         </div>
       </div>`;
     }).join('');
@@ -398,7 +443,7 @@ function bindCardClicks() {
 function renderDetalle(rankInfo) {
   const panel = $('#rank-detail');
   if (!panel) return;
-  const { selectedSid } = store.state;
+  const { selectedSid, rankTopN } = store.state;
   if (!selectedSid) {
     panel.hidden = true;
     panel.innerHTML = '';
@@ -412,59 +457,87 @@ function renderDetalle(rankInfo) {
   }
   panel.hidden = false;
 
-  // Trayectoria día por día
+  // Trayectoria día por día — solo se cuentan los días en que el
+  // equipo estuvo dentro del Top N visible. Los demás aparecen
+  // como "fuera" para no contaminar el rango.
   const trayectoria = dates.map(d => {
     const r = ranking[d].find(z => z.sid === selectedSid);
-    return { date: d, rank: r ? r.rank : null, count: r ? r.count : null };
+    const inTop = r && r.rank <= rankTopN;
+    return {
+      date: d,
+      rank: inTop ? r.rank : null,
+      count: r ? r.count : null,
+      outside: r && !inTop ? r.rank : null,  // posición real cuando está fuera del Top N
+    };
   });
   const validas = trayectoria.filter(t => t.rank !== null);
   if (!validas.length) {
-    panel.innerHTML = `<div style="text-align:center;padding:20px;color:var(--slate-400)">Sin presencia en el ranking para este equipo.</div>`;
+    panel.innerHTML = `<div style="text-align:center;padding:20px;color:var(--slate-400)">Sin presencia en el Top ${rankTopN} para este equipo.</div>`;
+    const closeBtn0 = `<button type="button" class="btn btn-ghost" id="rank-detail-close">✕ Quitar selección</button>`;
+    panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:20px"><span style="color:var(--slate-500)">${meta.name} sin presencia en el Top ${rankTopN}.</span>${closeBtn0}</div>`;
+    const c0 = $('#rank-detail-close');
+    if (c0) c0.addEventListener('click', () => store.setSelectedSid(null));
     return;
   }
 
-  const best = Math.min(...validas.map(t => t.rank));
-  const worst = Math.max(...validas.map(t => t.rank));
-  const avg = (validas.reduce((s, t) => s + t.rank, 0) / validas.length).toFixed(1);
+  // SEMÁNTICA OPERATIVA invertida:
+  //   rank=1 = más violaciones = peor estado operativo.
+  //   "Mejor"  = posición más ALTA históricamente (menos viol.).
+  //   "Peor"   = posición más BAJA históricamente (más viol.).
+  const peor   = Math.min(...validas.map(t => t.rank));   // rank más bajo
+  const mejor  = Math.max(...validas.map(t => t.rank));   // rank más alto
+  const avg    = (validas.reduce((s, t) => s + t.rank, 0) / validas.length).toFixed(1);
   const totalViol = validas.reduce((s, t) => s + (t.count || 0), 0);
   const firstRank = validas[0].rank;
-  const lastRank = validas[validas.length - 1].rank;
-  const tendencia = firstRank - lastRank; // > 0 = mejoró (bajó en el ranking de violaciones)
+  const lastRank  = validas[validas.length - 1].rank;
+  // tendencia operativa:
+  //   lastRank > firstRank  → bajó al fondo del ranking → menos violaciones → MEJORÓ
+  //   lastRank < firstRank  → subió al top del ranking  → más violaciones   → EMPEORÓ
+  const tendencia = lastRank - firstRank;
 
   // Recorrido por día con deltas
   const filas = [];
   let prev = null;
   for (const t of trayectoria) {
-    let deltaHTML = '';
+    let deltaHTML = '', posHTML;
     if (t.rank === null) {
       deltaHTML = '<span class="rank-delta same" style="opacity:.5">fuera</span>';
-    } else if (prev === null) {
-      deltaHTML = '<span class="rank-delta new">inicio</span>';
+      posHTML = t.outside
+        ? `<span style="color:var(--slate-400);font-size:11px">fuera del Top ${rankTopN} (#${t.outside})</span>`
+        : '<span style="color:var(--slate-400)">—</span>';
+      prev = null;  // reinicia para el siguiente delta
     } else {
-      const d = prev - t.rank;
-      if (d > 0)      deltaHTML = `<span class="rank-delta up">▲ ${d}</span>`;
-      else if (d < 0) deltaHTML = `<span class="rank-delta down">▼ ${Math.abs(d)}</span>`;
-      else            deltaHTML = '<span class="rank-delta same">=</span>';
+      posHTML = `<span class="rank-badge ${t.rank<=3?'r'+t.rank:''}">${t.rank}</span>`;
+      if (prev === null) {
+        deltaHTML = '<span class="rank-delta new">inicio</span>';
+      } else {
+        const dRank = prev - t.rank;
+        // dRank > 0 → rank bajó = subió al top = MÁS violaciones = empeoró
+        // dRank < 0 → rank subió = bajó del top = MENOS violaciones = mejoró
+        if (dRank > 0)      deltaHTML = `<span class="rank-delta up">▲ ${dRank} (peor)</span>`;
+        else if (dRank < 0) deltaHTML = `<span class="rank-delta down">▼ ${Math.abs(dRank)} (mejor)</span>`;
+        else                deltaHTML = '<span class="rank-delta same">=</span>';
+      }
+      prev = t.rank;
     }
     filas.push(`<tr>
       <td style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--slate-600)">${t.date}</td>
-      <td>${t.rank ? `<span class="rank-badge ${t.rank<=3?'r'+t.rank:''}">${t.rank}</span>` : '<span style="color:var(--slate-400)">—</span>'}</td>
+      <td>${posHTML}</td>
       <td>${deltaHTML}</td>
       <td class="num">${t.count != null ? t.count.toLocaleString() : '—'}</td>
     </tr>`);
-    if (t.rank !== null) prev = t.rank;
   }
 
   const tendenciaTxt = tendencia > 0
-    ? `<span style="color:var(--green-700);font-weight:700">▼ Mejoró ${tendencia} pos.</span> (bajó en el ranking de violaciones)`
+    ? `<span style="color:var(--green-700);font-weight:700">▼ Mejoró ${tendencia} pos.</span> (bajó del top de violaciones)`
     : tendencia < 0
-    ? `<span style="color:var(--red);font-weight:700">▲ Empeoró ${Math.abs(tendencia)} pos.</span> (subió en el ranking de violaciones)`
+    ? `<span style="color:var(--red);font-weight:700">▲ Empeoró ${Math.abs(tendencia)} pos.</span> (subió en el top de violaciones)`
     : `<span style="color:var(--slate-500);font-weight:700">= Sin cambio neto</span>`;
 
   panel.innerHTML = `
     <div class="rank-detail-head">
       <div>
-        <div class="rank-detail-tag">Trayectoria del equipo</div>
+        <div class="rank-detail-tag">Trayectoria del equipo · acotada al Top ${rankTopN}</div>
         <h4>${meta.name}</h4>
         <div class="rank-detail-meta">
           <span class="zona-pill">${meta.zona || '—'}</span>
@@ -475,20 +548,20 @@ function renderDetalle(rankInfo) {
     </div>
 
     <div class="rank-detail-stats">
-      <div class="rank-detail-stat" style="border-left-color:var(--red)">
-        <div class="lbl">Mejor posición (peor)</div>
-        <div class="val">#${best}</div>
-      </div>
       <div class="rank-detail-stat" style="border-left-color:var(--green)">
-        <div class="lbl">Peor posición (mejor)</div>
-        <div class="val">#${worst}</div>
+        <div class="lbl">Mejor estado (menos viol.)</div>
+        <div class="val">#${mejor}</div>
+      </div>
+      <div class="rank-detail-stat" style="border-left-color:var(--red)">
+        <div class="lbl">Peor estado (más viol.)</div>
+        <div class="val">#${peor}</div>
       </div>
       <div class="rank-detail-stat" style="border-left-color:var(--blue)">
         <div class="lbl">Posición promedio</div>
         <div class="val">#${avg}</div>
       </div>
       <div class="rank-detail-stat" style="border-left-color:var(--purple)">
-        <div class="lbl">Violaciones totales</div>
+        <div class="lbl">Viol. en días dentro del top</div>
         <div class="val">${totalViol.toLocaleString()}</div>
       </div>
     </div>
@@ -506,7 +579,6 @@ function renderDetalle(rankInfo) {
     </table>
   `;
 
-  // Botón cerrar
   const closeBtn = $('#rank-detail-close');
   if (closeBtn) closeBtn.addEventListener('click', () => store.setSelectedSid(null));
 }
