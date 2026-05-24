@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Salud de Activos por Zona · SGM · TRANSPOWER</title>
+<title>Salud de Activos · SGM · TRANSPOWER</title>
 <meta name="description" content="Dashboard de salud de activos del parque de transformadores de potencia por zona, departamento y tipo de activo. Metodología MO.00418.DE-GAC-AX.01.">
 <meta name="robots" content="noindex,nofollow">
 
@@ -37,28 +37,28 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Exo+2:wght@300;400;500;600&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
 :root{
-  --bg:#eef2f8; --bg-2:#f6f9fc; --panel:#ffffff; --panel-2:#f5f8fc;
-  --line:rgba(20,52,84,.12); --line-soft:rgba(20,52,84,.07);
-  --ink:#13212f; --ink-dim:#5a6b7d; --ink-faint:#93a1b2;
-  --accent:#0aa6bd; --accent-2:#df8a0c;
-  --chart-grid:rgba(20,52,84,.10);
-  --shadow:0 1px 2px rgba(20,52,84,.06),0 10px 26px rgba(20,52,84,.05);
+  --bg:#f4f6fb; --bg-2:#e9eef8; --panel:#ffffff; --panel-2:#f7f9fd;
+  --line:rgba(13,31,56,.12); --line-soft:rgba(13,31,56,.06);
+  --ink:#0d1f38; --ink-dim:#4d6485; --ink-faint:#8093ad;
+  --accent:#007aff; --accent-2:#ffb800;
+  --chart-grid:rgba(13,31,56,.10);
+  --shadow:0 1px 2px rgba(0,40,90,.06),0 10px 26px rgba(0,40,90,.05);
   /* Semáforo de salud (MO.00418 Tabla 11) */
-  --h1:#15b566; /* Muy Bueno  (HI 1) */
+  --h1:#1cc870; /* Muy Bueno  (HI 1) */
   --h2:#7fbf12; /* Bueno      (HI 2) */
-  --h3:#efb000; /* Medio      (HI 3) */
-  --h4:#f17d1c; /* Pobre      (HI 4) */
-  --h5:#e22f47; /* Muy Pobre  (HI 5) */
-  --radius:12px;
-  --mono:'Share Tech Mono',monospace;
-  --disp:'Rajdhani',sans-serif;
-  --body:'Exo 2',sans-serif;
+  --h3:#ffb800; /* Medio      (HI 3) */
+  --h4:#ff9500; /* Pobre      (HI 4) */
+  --h5:#ff3b30; /* Muy Pobre  (HI 5) */
+  --radius:14px;
+  --mono:'JetBrains Mono','SF Mono',Menlo,monospace;
+  --disp:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+  --body:'Inter',-apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;
 }
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
@@ -67,33 +67,14 @@ body{
   font-weight:400; line-height:1.55; min-height:100vh;
   -webkit-font-smoothing:antialiased;
   background-image:
-    linear-gradient(var(--line-soft) 1px,transparent 1px),
-    linear-gradient(90deg,var(--line-soft) 1px,transparent 1px),
-    radial-gradient(1100px 560px at 85% -8%, rgba(10,166,189,.08), transparent 60%);
-  background-size:48px 48px,48px 48px,100% 100%;
+    radial-gradient(ellipse 90% 60% at 12% 4%,   rgba(0,122,255,.08) 0%, transparent 60%),
+    radial-gradient(ellipse 70% 50% at 88% 10%,  rgba(0,184,212,.07) 0%, transparent 65%),
+    radial-gradient(ellipse 80% 50% at 50% 100%, rgba(48,209,176,.06) 0%, transparent 70%),
+    linear-gradient(180deg, #f7f9fd 0%, #eef3fa 50%, #e6edf7 100%);
 }
 body::after{content:none}
 a{color:var(--accent);text-decoration:none}
 .mono{font-family:var(--mono)}
-
-/* ---------- top bar ---------- */
-header.topbar{
-  position:sticky; top:0; z-index:50;
-  display:flex; align-items:center; gap:18px;
-  padding:14px 26px; background:rgba(255,255,255,.86);
-  backdrop-filter:blur(10px); border-bottom:1px solid var(--line);
-}
-.brand{display:flex;align-items:center;gap:12px}
-.brand .mark{
-  width:36px;height:36px;border-radius:9px;
-  display:grid;place-items:center;color:#fff;font-family:var(--disp);
-  font-weight:700;font-size:19px;background:linear-gradient(135deg,#0aa6bd,#13c3da);
-  box-shadow:0 5px 14px rgba(10,166,189,.34);
-}
-.brand b{font-family:var(--disp);font-weight:700;letter-spacing:.14em;font-size:16px;color:var(--ink)}
-.brand span{color:var(--ink-dim);font-family:var(--mono);font-size:11px;letter-spacing:.12em}
-.crumbs{margin-left:auto;color:var(--ink-dim);font-family:var(--mono);font-size:11.5px;letter-spacing:.08em}
-.crumbs b{color:var(--accent)}
 
 /* ---------- layout ---------- */
 .wrap{max-width:1320px;margin:0 auto;padding:26px}
@@ -388,22 +369,11 @@ footer.foot b{color:var(--ink-dim)}
 </head>
 <body>
 
-<header class="topbar">
-  <div class="brand">
-    <div class="mark">⚡</div>
-    <div>
-      <b>SGM · TRANSPOWER</b><br>
-      <span>GESTIÓN DE MANTENIMIENTO ESPECIALIZADO</span>
-    </div>
-  </div>
-  <nav class="crumbs">SALUD DE ACTIVOS / <b>POR ZONA</b></nav>
-</header>
-
 <main class="wrap">
 
   <div class="page-head">
     <div>
-      <h1>Salud de Activos <i>·</i> por Zona</h1>
+      <h1>Salud de Activos</h1>
       <p>Estado de condición del parque de transformadores de potencia, segmentado por zona operativa, departamento y tipo de activo. Índice de Salud (HI) calculado por promedio ponderado de las 7 variables conforme a la metodología oficial.</p>
     </div>
     <div class="norm-tag">REF. <b>MO.00418.DE-GAC-AX.01</b> Ed. 02 · §4.2 / §4.3</div>
