@@ -4,7 +4,7 @@
 
 import { store } from './state.js';
 import { listarZonas } from '../../domain/saidi_calculo.js';
-import { zonaLabel, metricaNombre } from '../../domain/saidi_config.js';
+import { zonaLabel, metricaTitulo } from '../../domain/saidi_config.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -27,7 +27,7 @@ export function actualizarPill() {
   const pill = $('#filter-pill');
   if (!pill) return;
   const { zona, met } = store.state;
-  pill.textContent = `${zonaLabel(zona)} · ${metricaNombre(met)}`;
+  pill.textContent = `${zonaLabel(zona)} · ${metricaTitulo(met)}`;
 }
 
 let _bound = false;
