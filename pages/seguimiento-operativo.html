@@ -228,8 +228,13 @@
         <h3>
           <span><span class="icon" style="background:var(--purple)"></span>Evolución de posición en el ranking · día a día</span>
           <span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <span class="seg" id="rank-topn-seg" title="Cantidad de transformadores a mostrar">
+              <button class="seg-btn" data-n="5">Top 5</button>
+              <button class="seg-btn active" data-n="10">Top 10</button>
+              <button class="seg-btn" data-n="15">Top 15</button>
+            </span>
             <span class="seg" id="bump-variant-seg" title="Cambia entre las 3 propuestas visuales">
-              <button class="seg-btn active" data-variant="A" title="Spline + Top 5 + anotaciones">Vista A · Líneas</button>
+              <button class="seg-btn active" data-variant="A" title="Spline + anotaciones inline">Vista A · Líneas</button>
               <button class="seg-btn"        data-variant="B" title="Heatmap rank día × transformador">Vista B · Heatmap</button>
               <button class="seg-btn"        data-variant="C" title="Step + cards laterales">Vista C · Detalle</button>
             </span>
@@ -237,9 +242,11 @@
           </span>
         </h3>
         <p class="small" style="margin:-4px 0 12px;color:var(--slate-500)">
-          Elige la presentación que prefieras del segmento. <strong>Vista A</strong>: trayectoria suave del Top 5 con nombres inline ·
+          Elige la cantidad de equipos (Top 5/10/15) y la presentación visual.
+          <strong>Vista A</strong>: trayectoria suave con nombres inline ·
           <strong>Vista B</strong>: matriz día × transformador (rojo = peor) ·
-          <strong>Vista C</strong>: líneas escalonadas + cards individuales con sparkline.
+          <strong>Vista C</strong>: líneas escalonadas + cards individuales.
+          <strong>Haz clic en una línea o fila</strong> para ver la trayectoria detallada de un equipo.
         </p>
         <div id="rank-evo-empty" style="display:none;text-align:center;padding:40px;color:var(--slate-400);font-size:13px">
           Se necesitan al menos <strong>2 días</strong> de datos para mostrar la evolución del ranking.<br>
@@ -254,6 +261,9 @@
             Cada línea/celda representa un transformador. Eje vertical (o color en la vista B) = posición · <strong>1 = peor (más violaciones)</strong>.
             Una trayectoria que sube hacia el #1 indica un equipo que empeora relativamente; la que baja, que mejora.
           </div>
+
+          <!-- Panel detalle del equipo seleccionado -->
+          <div id="rank-detail" class="rank-detail" hidden></div>
           <table id="rank-evo-table">
             <thead><tr>
               <th scope="col">Pos.</th><th scope="col">Δ vs día anterior</th><th scope="col">Transformador</th><th scope="col">Zona</th>
