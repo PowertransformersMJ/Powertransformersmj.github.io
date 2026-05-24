@@ -165,6 +165,7 @@
         <a href="${u('home.html')}" class="sb-item" data-key="home"><span class="i"><i data-lucide="layout-dashboard"></i></span>Inicio</a>
         <a href="${u('pages/activos.html')}" class="sb-item" data-key="activos"><span class="i"><i data-lucide="database"></i></span>Salud de Activos</a>
         <a href="${u('pages/seguimiento-operativo.html')}" class="sb-item" data-key="seguimiento"><span class="i"><i data-lucide="activity"></i></span>Seguimiento Operativo</a>
+        <a href="${u('pages/indicadores-calidad.html')}" class="sb-item" data-key="calidad"><span class="i"><i data-lucide="trending-up"></i></span>Indicadores de Calidad</a>
         <a href="${u('pages/ordenes.html')}" class="sb-item" data-key="ordenes"><span class="i"><i data-lucide="clipboard-list"></i></span>Órdenes</a>
         <a href="${u('pages/mantenimiento-brigada.html')}" class="sb-item" data-key="mantenimiento-brigada"><span class="i"><i data-lucide="hard-hat"></i></span>Mantenimiento Brigada</a>
         <div class="sb-tree" data-tree-key="contratos">
