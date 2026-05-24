@@ -274,8 +274,36 @@ export async function parseOneFile(file, applyFilter, onLog) {
   if (ext === 'xlsb' || ext === 'xlsx' || ext === 'xls') {
     const XLSX = await loadSheetJS();
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    let wb;
+    try {
+      wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    } catch (e) {
+      const msg = String((e && e.message) || e);
+      // ECMA-376 encryption / Information Rights Management / DRM:
+      // SheetJS Community no soporta archivos protegidos.
+      if (/Encrypt|EncryptionInfo|password/i.test(msg)) {
+        // Reintento con flags permisivos por si el archivo solo
+        // trae el flag de encryption pero el contenido es legible.
+        try {
+          wb = XLSX.read(buf, { type: 'array', cellDates: false, password: '', WTF: false });
+        } catch (_) {
+          throw new Error(
+            `El archivo .${ext} tiene protección/encryption (ECMA-376) y SheetJS Community no puede abrirlo. ` +
+            `Opciones para resolverlo · ` +
+            `(1) usa el .xlsb del mismo SOE — el formato binario nativo funciona sin problema · ` +
+            `(2) abre el .xlsx en Excel, ve a "Archivo → Información → Proteger documento" y quita la protección, ` +
+            `luego guarda otra vez como "Libro de Excel" · ` +
+            `(3) exporta el SOE diario como .csv o .xlsb desde el sistema NCS directamente.`
+          );
+        }
+      } else {
+        throw new Error(`No se pudo leer ${file.name}: ${msg}`);
+      }
+    }
     const sheetName = wb.SheetNames.includes('SOE') ? 'SOE' : wb.SheetNames[0];
+    if (!sheetName) {
+      throw new Error(`El archivo no contiene hojas legibles. Verifica que sea un SOE válido.`);
+    }
     const ws = wb.Sheets[sheetName];
     const rows = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '' });
     if (onLog) onLog('info', `  hoja: '${sheetName}' · ${rows.length.toLocaleString()} filas`);
