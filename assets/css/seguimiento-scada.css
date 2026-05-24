@@ -22,30 +22,37 @@
   --purple:#7C3AED; --purple-50:#EDE9FE;
   --slate-900:#0F172A;
 }
-* { box-sizing: border-box; }
 .scada-shell, .scada-shell * { box-sizing: border-box; }
 .scada-shell {
   font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, sans-serif;
-  background: var(--slate-100);
   color: var(--slate-800);
   line-height: 1.5;
-  min-height: 100vh;
 }
 
-/* TOPBAR */
-.scada-shell .topbar {
-  background: linear-gradient(90deg, var(--navy), var(--slate-800));
-  color: #fff; padding: 14px 24px; box-shadow: 0 2px 8px rgba(0,0,0,.15);
-  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;
+/* Status header (reemplaza al topbar negro standalone) */
+.scada-shell .scada-status {
+  margin-bottom: 14px;
+  display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 16px;
 }
-.scada-shell .topbar h1 { font-size: 18px; font-weight: 700; letter-spacing: .3px; margin: 0; }
-.scada-shell .topbar .subtitle { font-size: 11px; color: var(--slate-300); margin-top: 3px; }
-.scada-shell .topbar .meta { font-size: 11px; color: var(--slate-300); text-align: right; }
+.scada-shell .scada-status h2 {
+  font-size: 14px; font-weight: 700; color: var(--slate-700); margin: 0;
+  display: flex; align-items: center; gap: 8px;
+}
+.scada-shell .scada-status .subtitle {
+  font-size: 11px; color: var(--slate-500); margin-top: 4px;
+}
+.scada-shell .scada-status-meta { text-align: right; }
+.scada-shell .scada-status-meta #meta-info {
+  font-size: 11px; color: var(--slate-600); margin-top: 6px;
+}
 .scada-shell .badge { display: inline-block; padding: 3px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; letter-spacing: .5px; }
-.scada-shell .badge-red { background: var(--red); color: #fff; }
+.scada-shell .badge-red   { background: var(--red);   color: #fff; }
 .scada-shell .badge-amber { background: var(--amber); color: #fff; }
 .scada-shell .badge-green { background: var(--green); color: #fff; }
-.scada-shell .container { max-width: 1600px; margin: 0 auto; padding: 18px; }
+
+/* Container interno: ocupa todo el ancho disponible del aqua page-container.
+   El padding/margin ya lo controla <main class="app-main page-container">. */
+.scada-shell .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 
 /* KPI BAND */
 .scada-shell .kpi-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 18px; }
