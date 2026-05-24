@@ -48,28 +48,42 @@ export function renderHeatmap(dataset, zona, met) {
   const pill = $('#heat-pill');
 
   if (isAmbos) {
-    // Dos heatmaps lado a lado · panel izq SAIDI · panel der SAIFI
+    // En modo "ambos" apilamos los heatmaps VERTICALMENTE (uno sobre
+    // otro) en lugar de lado a lado. Las etiquetas largas de las
+    // categorías en el eje Y necesitan todo el ancho izquierdo y se
+    // solapaban con la colorbar del panel vecino en layout horizontal.
     const trSaidi = buildHeatTrace(dataset, zona, 'saidi', {
       xaxis: 'x',  yaxis: 'y',
-      colorbar: { x: 0.46, len: 0.95, y: 0.5 },
+      colorbar: { x: 1.02, y: 0.78, len: 0.42, yanchor: 'middle' },
     });
     const trSaifi = buildHeatTrace(dataset, zona, 'saifi', {
       xaxis: 'x2', yaxis: 'y2',
-      colorbar: { x: 1.02, len: 0.95, y: 0.5 },
+      colorbar: { x: 1.02, y: 0.22, len: 0.42, yanchor: 'middle' },
     });
-    layout.margin = { l: 220, r: 90, t: 60, b: 20 };
-    layout.grid = { rows: 1, columns: 2, pattern: 'independent', xgap: 0.18 };
-    layout.xaxis  = { domain: [0.00, 0.42], side: 'top', tickfont: { size: 11, color: '#0F172A' }, title: { text: 'SAIDI_E (h-eq)', font: { size: 11 }, standoff: 14 } };
-    layout.yaxis  = { tickfont: { size: 9 }, automargin: true };
-    layout.xaxis2 = { domain: [0.55, 0.97], side: 'top', tickfont: { size: 11, color: '#0F172A' }, title: { text: 'SAIFI_E (int-eq)', font: { size: 11 }, standoff: 14 } };
-    layout.yaxis2 = { tickfont: { size: 9 }, automargin: true, anchor: 'x2' };
+    // Crece la altura para acomodar dos paneles cómodos
+    layout.height = 760;
+    layout.margin = { l: 240, r: 110, t: 60, b: 30 };
+    // Grid 2 filas × 1 columna · ygap genera el espacio para los
+    // títulos de cada panel y los meses repetidos arriba del SAIFI.
+    layout.xaxis  = { anchor: 'y',  side: 'top', tickfont: { size: 11, color: '#0F172A' },
+                      title: { text: 'SAIDI_E (h-eq) · meses', font: { size: 11, color: '#2563EB' }, standoff: 12 } };
+    layout.yaxis  = { domain: [0.56, 1.00], anchor: 'x', tickfont: { size: 9 }, automargin: true };
+    layout.xaxis2 = { anchor: 'y2', side: 'top', tickfont: { size: 11, color: '#0F172A' },
+                      title: { text: 'SAIFI_E (int-eq) · meses', font: { size: 11, color: '#F59E0B' }, standoff: 12 } };
+    layout.yaxis2 = { domain: [0.00, 0.44], anchor: 'x2', tickfont: { size: 9 }, automargin: true };
     Plotly.react('chart-heat', [trSaidi, trSaifi], layout, plotlyCfg());
+    // Ajusta el contenedor para que respete la altura mayor
+    const host = document.getElementById('chart-heat');
+    if (host) host.style.height = '760px';
     if (pill) pill.textContent = 'SAIDI_E (h-eq) + SAIFI_E (int-eq)';
   } else {
     layout.margin = { l: 240, r: 70, t: 50, b: 20 };
     layout.yaxis = { tickfont: { size: 9 }, automargin: true };
     layout.xaxis = { side: 'top', tickfont: { size: 12, color: '#0F172A' }, ticks: 'outside', ticklen: 4, automargin: true };
     Plotly.react('chart-heat', [buildHeatTrace(dataset, zona, met)], layout, plotlyCfg());
+    // Vuelve a la altura del .chart-tall (420px del CSS) tras estar en modo dual
+    const host = document.getElementById('chart-heat');
+    if (host) host.style.height = '';
     if (pill) pill.textContent = metricaLabel(met) + ' absoluto';
   }
 }
