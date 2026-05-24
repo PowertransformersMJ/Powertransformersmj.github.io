@@ -54,6 +54,79 @@
    El padding/margin ya lo controla <main class="app-main page-container">. */
 .scada-shell .container { width: 100%; max-width: none; margin: 0; padding: 0; }
 
+/* ===== RANKING DE EVOLUCIÓN · layouts por variante ===== */
+.scada-shell .rank-evo-card .rank-evo-main { width: 100%; }
+/* Variante C: layout dual gráfico + cards laterales */
+.scada-shell #rank-evo-content.layout-dual .rank-evo-main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 18px;
+}
+@media (max-width: 1100px) {
+  .scada-shell #rank-evo-content.layout-dual .rank-evo-main {
+    grid-template-columns: 1fr;
+  }
+}
+/* Cards laterales (variante C) */
+.scada-shell .rank-card {
+  background: #fff;
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  border: 1px solid var(--slate-200);
+  border-left: 4px solid var(--slate-300);
+  box-shadow: 0 1px 4px rgba(0,40,90,.06);
+}
+.scada-shell .rank-card:last-child { margin-bottom: 0; }
+.scada-shell .rank-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.scada-shell .rank-card-pos {
+  font-family: 'Inter', sans-serif;
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+.scada-shell .rank-card-delta {
+  font-weight: 700;
+  font-size: 11px;
+  padding: 3px 9px;
+  border-radius: 5px;
+  display: inline-block;
+}
+.scada-shell .rank-card-delta.up   { background: var(--red-50);   color: var(--red); }
+.scada-shell .rank-card-delta.down { background: var(--green-50); color: var(--green-700); }
+.scada-shell .rank-card-delta.same { background: var(--slate-100); color: var(--slate-500); }
+.scada-shell .rank-card-delta.new  { background: #EDE9FE; color: var(--purple); }
+.scada-shell .rank-card-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--slate-800);
+  margin-bottom: 2px;
+}
+.scada-shell .rank-card-zona { margin-bottom: 8px; }
+.scada-shell .rank-card-spark {
+  margin-bottom: 8px;
+  height: 22px;
+  overflow: hidden;
+}
+.scada-shell .rank-card-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 10.5px;
+  color: var(--slate-600);
+  flex-wrap: wrap;
+}
+.scada-shell .rank-card-meta b { color: var(--slate-800); font-weight: 700; }
+/* Tabla resumen con zebra (variantes A y B) */
+.scada-shell #rank-evo-table tbody tr:nth-child(odd)  td { background: #fafbfc; }
+.scada-shell #rank-evo-table tbody tr:nth-child(even) td { background: #fff; }
+.scada-shell #rank-evo-table tbody tr:hover td { background: #eff6ff; }
+
 /* KPI BAND */
 .scada-shell .kpi-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 18px; }
 @media (max-width: 1200px) { .scada-shell .kpi-grid { grid-template-columns: repeat(4, 1fr); } }
