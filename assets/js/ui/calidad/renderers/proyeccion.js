@@ -12,7 +12,7 @@ export function renderProyeccion(dataset, zona) {
   const projIdx = M.slice(4);
 
   const layout = layoutBase();
-  layout.yaxis = { ...layout.yaxis, title: { text: 'SAIDI_E grupo', font: { size: 10 } } };
+  layout.yaxis = { ...layout.yaxis, title: { text: 'SAIDI_E grupo (h-eq)', font: { size: 10 } } };
   layout.shapes = [{ type: 'line', x0: 4, x1: 4, y0: 0, y1: 1, yref: 'paper',
     line: { color: '#CBD5E1', dash: 'dot', width: 1 } }];
 
