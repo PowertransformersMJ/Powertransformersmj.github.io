@@ -112,14 +112,14 @@ function renderAll(state) {
   const mSel = $('#f-met');  if (mSel && mSel.value !== met)  mSel.value = met;
 
   safeRender('kpis',        () => renderKPIs(dataset, zona, met));
-  safeRender('insight',     () => renderInsight(dataset, zona));
-  safeRender('serie',       () => renderSerie(dataset, zona));
+  safeRender('insight',     () => renderInsight(dataset, zona, met));
+  safeRender('serie',       () => renderSerie(dataset, zona, met));
   safeRender('stack',       () => renderStack(dataset, zona, met));
   safeRender('part',        () => renderPart(dataset, zona, met));
   safeRender('varmom',      () => renderVarMoM(dataset, zona, met));
   safeRender('top',         () => renderTop(dataset, zona, met));
   safeRender('heatmap',     () => renderHeatmap(dataset, zona, met));
-  safeRender('proyeccion',  () => renderProyeccion(dataset, zona));
+  safeRender('proyeccion',  () => renderProyeccion(dataset, zona, met));
   safeRender('month-table', () => renderMonthTable(dataset, zona, met));
 }
 
