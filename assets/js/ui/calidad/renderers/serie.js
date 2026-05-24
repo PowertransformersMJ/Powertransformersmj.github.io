@@ -8,8 +8,9 @@ export function renderSerie(dataset, zona) {
   const saidi = totalSerieDeZona(dataset, zona, 'saidi');
   const saifi = totalSerieDeZona(dataset, zona, 'saifi');
   const layout = layoutBase();
-  layout.yaxis = { ...layout.yaxis, title: { text: 'SAIDI_E', font: { size: 10 } } };
-  layout.yaxis2 = { overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)', title: { text: 'SAIFI_E', font: { size: 10 } } };
+  layout.yaxis  = { ...layout.yaxis,  title: { text: 'SAIDI_E (h-eq)',   font: { size: 10, color: '#2563EB' } } };
+  layout.yaxis2 = { overlaying: 'y', side: 'right', gridcolor: 'rgba(0,0,0,0)',
+                    title: { text: 'SAIFI_E (int-eq)', font: { size: 10, color: '#F59E0B' } } };
   Plotly.react('chart-serie', [
     {
       x: dataset.meses, y: saidi, name: 'SAIDI_E',
