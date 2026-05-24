@@ -30,6 +30,19 @@ export function actualizarPill() {
   pill.textContent = `${zonaLabel(zona)} · ${metricaTitulo(met)}`;
 }
 
+// Sincroniza el estado visual (is-on / is-off) de los chips de grupos
+// con store.state.gruposActivos.
+export function sincronizarChipsGrupos() {
+  const activos = store.state.gruposActivos;
+  document.querySelectorAll('#grp-filter .grp-chip').forEach(btn => {
+    const g = btn.dataset.grp;
+    const on = activos.has(g);
+    btn.classList.toggle('is-on', on);
+    btn.classList.toggle('is-off', !on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+}
+
 let _bound = false;
 export function inicializarFiltros() {
   if (_bound) return;
@@ -38,4 +51,12 @@ export function inicializarFiltros() {
   const mSel = $('#f-met');
   if (zSel) zSel.addEventListener('change', () => store.setZona(zSel.value));
   if (mSel) mSel.addEventListener('change', () => store.setMet(mSel.value));
+
+  // Chips de filtro de grupos de causa
+  document.querySelectorAll('#grp-filter .grp-chip').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const g = btn.dataset.grp;
+      if (g) store.toggleGrupo(g);
+    });
+  });
 }

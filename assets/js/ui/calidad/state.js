@@ -5,10 +5,17 @@
 // suscriben con `store.on(fn)` y se ejecutan en cada cambio.
 // ══════════════════════════════════════════════════════════════
 
+const GRUPOS_CANON = ['Sobrecarga/Deslastre', 'Racionamiento/Deficit', 'Otras causas'];
+
 const _state = {
   dataset: null,    // { meses, meses_full, zonas, cats_order, kpi, proj_global }
   zona: 'TODAS',
   met:  'saidi',
+  // Grupos de causa activos (filtros de chips). Por default los 3 están
+  // visibles; el usuario puede ocultarlos con click en los chips del card
+  // "Contribución mensual por grupo de causa". Afecta también la
+  // gráfica de variación % y la tabla mensual.
+  gruposActivos: new Set(GRUPOS_CANON),
   source: 'empty',  // 'baseline' | 'firestore' | 'empty'
 };
 
@@ -35,4 +42,22 @@ export const store = {
 
   setZona(z)  { _state.zona = z; notify(); },
   setMet(m)   { _state.met  = m; notify(); },
+
+  toggleGrupo(g) {
+    if (_state.gruposActivos.has(g)) _state.gruposActivos.delete(g);
+    else _state.gruposActivos.add(g);
+    notify();
+  },
+
+  setGruposActivos(setOrArr) {
+    _state.gruposActivos = new Set(setOrArr);
+    notify();
+  },
+
+  resetGruposActivos() {
+    _state.gruposActivos = new Set(GRUPOS_CANON);
+    notify();
+  },
 };
+
+export const GRUPOS_DISPONIBLES = GRUPOS_CANON;

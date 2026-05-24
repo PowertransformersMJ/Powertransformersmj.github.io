@@ -55,6 +55,37 @@
   font-size: 11px; padding: 8px 14px; border-radius: 6px; margin-bottom: 14px; font-weight: 600;
 }
 
+/* Chips de filtro de grupos de causa · header del card "Contribución mensual" */
+.saidi-shell .grp-filter {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin: -4px 0 12px;
+}
+.saidi-shell .grp-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px; border-radius: 14px;
+  border: 1px solid var(--slate-300); background: #fff;
+  font-size: 11px; font-weight: 600; color: var(--slate-700);
+  cursor: pointer; transition: opacity .15s, background .15s, border-color .15s;
+  font-family: inherit;
+}
+.saidi-shell .grp-chip i {
+  display: inline-block; width: 9px; height: 9px; border-radius: 50%;
+  flex-shrink: 0;
+}
+.saidi-shell .grp-chip:hover { background: var(--slate-50); border-color: var(--slate-400); }
+.saidi-shell .grp-chip.is-off {
+  opacity: 0.45;
+  background: var(--slate-100);
+}
+.saidi-shell .grp-chip.is-off span { text-decoration: line-through; }
+.saidi-shell .grp-chip:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+.saidi-shell .grp-filter-hint {
+  font-size: 10px; color: var(--slate-500); margin-left: 4px;
+}
+
 /* Upload card (carga de Excel / JSON) */
 .saidi-shell .upload-card {
   background: linear-gradient(135deg, #fff 0%, var(--slate-50) 100%);
