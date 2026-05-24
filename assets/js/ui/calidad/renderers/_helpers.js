@@ -2,7 +2,7 @@
 // Helpers comunes de los renderers del módulo Indicadores de Calidad
 // ══════════════════════════════════════════════════════════════
 
-import { COLORS, GCOL, FONT, LAYOUT_BASE, PLOTLY_CFG, categoriaColor, grupoCorto, GRUPOS, metricaNombre, metKey } from '../../../domain/saidi_config.js';
+import { COLORS, GCOL, font, layoutBase, plotlyCfg, categoriaColor, grupoCorto, GRUPOS, metricaNombre, metKey } from '../../../domain/saidi_config.js';
 
 export const $ = (s) => document.querySelector(s);
 
@@ -14,4 +14,4 @@ export function fmt(v, d = 3) {
   });
 }
 
-export { COLORS, GCOL, FONT, LAYOUT_BASE, PLOTLY_CFG, categoriaColor, grupoCorto, GRUPOS, metricaNombre, metKey };
+export { COLORS, GCOL, font, layoutBase, plotlyCfg, categoriaColor, grupoCorto, GRUPOS, metricaNombre, metKey };
