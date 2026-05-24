@@ -120,7 +120,7 @@ function renderAll(state) {
   safeRender('top',         () => renderTop(dataset, zona, met));
   safeRender('heatmap',     () => renderHeatmap(dataset, zona, met));
   safeRender('proyeccion',  () => renderProyeccion(dataset, zona));
-  safeRender('month-table', () => renderMonthTable(dataset, zona));
+  safeRender('month-table', () => renderMonthTable(dataset, zona, met));
 }
 
 // ── Listeners de upload ─────────────────────────────────────
