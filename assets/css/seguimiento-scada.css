@@ -125,7 +125,127 @@
 /* Tabla resumen con zebra (variantes A y B) */
 .scada-shell #rank-evo-table tbody tr:nth-child(odd)  td { background: #fafbfc; }
 .scada-shell #rank-evo-table tbody tr:nth-child(even) td { background: #fff; }
-.scada-shell #rank-evo-table tbody tr:hover td { background: #eff6ff; }
+.scada-shell #rank-evo-table tbody tr.rank-row { cursor: pointer; transition: background .12s; }
+.scada-shell #rank-evo-table tbody tr.rank-row:hover td { background: #eff6ff; }
+.scada-shell #rank-evo-table tbody tr.rank-row.is-selected td {
+  background: #DBEAFE;
+  border-top: 1px solid var(--blue);
+  border-bottom: 1px solid var(--blue);
+}
+
+/* Card seleccionada (Variante C) */
+.scada-shell .rank-card.is-selected {
+  box-shadow: 0 0 0 2px var(--blue), 0 4px 12px rgba(0,40,90,.12);
+}
+
+/* ===== PANEL DETALLE DEL EQUIPO SELECCIONADO ===== */
+.scada-shell .rank-detail {
+  margin-top: 18px;
+  padding: 18px;
+  background: linear-gradient(135deg, #f7f9fd 0%, #eef3fa 100%);
+  border: 1px solid var(--slate-200);
+  border-radius: 10px;
+  animation: rankDetailIn .25s ease-out;
+}
+@keyframes rankDetailIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+.scada-shell .rank-detail-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+  padding-bottom: 12px;
+  border-bottom: 1px dashed var(--slate-300);
+}
+.scada-shell .rank-detail-tag {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--blue);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+.scada-shell .rank-detail-head h4 {
+  font-family: 'Inter', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--slate-800);
+  margin: 4px 0 8px;
+  letter-spacing: -0.01em;
+}
+.scada-shell .rank-detail-meta {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--slate-600);
+}
+.scada-shell .rank-detail-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.scada-shell .rank-detail-stat {
+  background: #fff;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border-left: 3px solid var(--slate-400);
+  box-shadow: 0 1px 3px rgba(0,40,90,.06);
+}
+.scada-shell .rank-detail-stat .lbl {
+  font-size: 9.5px;
+  color: var(--slate-500);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: .5px;
+}
+.scada-shell .rank-detail-stat .val {
+  font-family: 'Inter', sans-serif;
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--slate-800);
+  margin-top: 4px;
+  letter-spacing: -0.02em;
+}
+.scada-shell .rank-detail-sparkbig {
+  background: #fff;
+  padding: 14px 18px;
+  border-radius: 8px;
+  border: 1px solid var(--slate-200);
+  text-align: center;
+  overflow-x: auto;
+}
+.scada-shell .rank-detail-table {
+  width: 100%;
+  background: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--slate-200);
+}
+.scada-shell .rank-detail-table thead th {
+  background: var(--slate-50);
+  color: var(--slate-700);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--slate-200);
+}
+.scada-shell .rank-detail-table tbody td {
+  padding: 7px 12px;
+  border-bottom: 1px solid var(--slate-100);
+  font-size: 12px;
+}
+.scada-shell .rank-detail-table tbody tr:last-child td { border-bottom: none; }
+.scada-shell .rank-detail-table tbody tr:hover td { background: var(--slate-50); }
 
 /* KPI BAND */
 .scada-shell .kpi-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 18px; }
