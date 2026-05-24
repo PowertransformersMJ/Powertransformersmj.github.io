@@ -1,6 +1,6 @@
 // Renderer · Proyección OLS Jun–Dic con IC95% y 3 escenarios
 
-import { $, COLORS, LAYOUT_BASE, PLOTLY_CFG, fmt } from './_helpers.js';
+import { $, COLORS, layoutBase, plotlyCfg, fmt } from './_helpers.js';
 import { proyeccionDeZona } from '../../../domain/saidi_calculo.js';
 
 export function renderProyeccion(dataset, zona) {
@@ -10,6 +10,11 @@ export function renderProyeccion(dataset, zona) {
   const M = dataset.meses_full;
   const realIdx = M.slice(0, 5);
   const projIdx = M.slice(4);
+
+  const layout = layoutBase();
+  layout.yaxis = { ...layout.yaxis, title: { text: 'SAIDI_E grupo', font: { size: 10 } } };
+  layout.shapes = [{ type: 'line', x0: 4, x1: 4, y0: 0, y1: 1, yref: 'paper',
+    line: { color: '#CBD5E1', dash: 'dot', width: 1 } }];
 
   Plotly.react('chart-proj', [
     { x: M, y: p.ci_sup, name: 'IC95% sup', type: 'scatter', mode: 'lines',
@@ -30,12 +35,7 @@ export function renderProyeccion(dataset, zona) {
       type: 'scatter', mode: 'lines+markers',
       line: { color: COLORS.RED, width: 1.8, dash: 'dash' },
       marker: { size: 5, symbol: 'triangle-down' } },
-  ], {
-    ...LAYOUT_BASE,
-    yaxis: { ...LAYOUT_BASE.yaxis, title: { text: 'SAIDI_E grupo', font: { size: 10 } } },
-    shapes: [{ type: 'line', x0: 4, x1: 4, y0: 0, y1: 1, yref: 'paper',
-      line: { color: '#CBD5E1', dash: 'dot', width: 1 } }],
-  }, PLOTLY_CFG);
+  ], layout, plotlyCfg());
 
   const accB = p.base.slice(5).reduce((a, b) => a + b, 0);
   const accO = p.opt .slice(5).reduce((a, b) => a + b, 0);
