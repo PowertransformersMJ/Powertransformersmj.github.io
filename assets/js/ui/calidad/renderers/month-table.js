@@ -2,6 +2,7 @@
 
 import { fmt, metricasActivas, metricaUnidad, metricaNombre } from './_helpers.js';
 import { gruposDeZona, sumSerie, totalSerieDeZona } from '../../../domain/saidi_calculo.js';
+import { store } from '../state.js';
 
 export function renderMonthTable(dataset, zona, met = 'saidi') {
   if (!dataset) return;
@@ -24,11 +25,12 @@ export function renderMonthTable(dataset, zona, met = 'saidi') {
       `<th scope="col" class="num">Total</th></tr>`;
   }
 
+  const activos = store.state.gruposActivos;
   const rowsDef = [
     ['Sobrecarga/Deslastre',  'g-sob'],
     ['Racionamiento/Deficit', 'g-rac'],
     ['Otras causas',          ''],
-  ];
+  ].filter(([g]) => activos.has(g));
 
   let body = '';
   mets.forEach((m, idx) => {
