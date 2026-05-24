@@ -55,6 +55,36 @@
   font-size: 11px; padding: 8px 14px; border-radius: 6px; margin-bottom: 14px; font-weight: 600;
 }
 
+/* Upload card (carga de Excel / JSON) */
+.saidi-shell .upload-card {
+  background: linear-gradient(135deg, #fff 0%, var(--slate-50) 100%);
+  border: 2px dashed var(--slate-300); border-radius: 8px; padding: 16px;
+  margin-bottom: 14px; position: relative;
+}
+.saidi-shell .upload-card.drag { border-color: var(--teal); background: var(--teal-50); }
+.saidi-shell .upload-card h3 {
+  font-size: 13px; font-weight: 700; color: var(--slate-700); margin: 0 0 10px;
+  display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+}
+.saidi-shell .upload-row {
+  display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-bottom: 8px;
+}
+.saidi-shell .upload-row input[type=file] {
+  padding: 6px; border: 1px solid var(--slate-300); border-radius: 5px;
+  font-size: 12px; background: #fff; flex: 1; min-width: 240px;
+}
+.saidi-shell .btn {
+  padding: 7px 14px; border: none; border-radius: 5px; cursor: pointer;
+  font-size: 11px; font-weight: 600; transition: opacity .15s;
+}
+.saidi-shell .btn:hover { opacity: .85; }
+.saidi-shell .btn-primary { background: var(--teal); color: #fff; }
+.saidi-shell .btn-ghost   { background: var(--slate-200); color: var(--slate-700); }
+.saidi-shell .upload-log.show { display: block !important; }
+.saidi-shell .upload-log .err  { color: #fca5a5; }
+.saidi-shell .upload-log .info { color: #7dd3fc; }
+.saidi-shell .upload-log .ok   { color: #86efac; }
+
 /* KPI band */
 .saidi-shell .kpi-grid {
   display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 18px;
