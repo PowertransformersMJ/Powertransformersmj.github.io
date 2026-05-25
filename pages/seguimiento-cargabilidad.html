@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>SGM · TRANSPOWER — Cargabilidad de Transformadores</title>
+<meta name="description" content="Dashboard de Cargabilidad de Transformadores: monitoreo de ampacidad vs. límite SCADA por devanado P/S/T.">
+
+<!--
+  SGM · TRANSPOWER — Seguimiento Operativo · Cargabilidad
+  Refactor F41: archivo standalone original (500 KB con fuente Sora
+  Base64 inline + dataset embebido) reescrito como arquitectura
+  modular embebida como tab del card "Seguimiento Operativo".
+
+  · CSS                  → assets/css/seguimiento-cargabilidad.css (scope .carga-shell)
+  · Dataset baseline     → assets/data/seguimiento-cargabilidad-baseline.json (102 KB · 206 trafos)
+  · Dominio puro         → assets/js/domain/cargabilidad_{config,severidad,filtros}.js
+  · Data layer           → assets/js/data/seguimiento_cargabilidad.js (Firestore realtime)
+  · UI · store / filtros → assets/js/ui/cargabilidad/{state,filtros,live,modal,export}.js
+  · UI · renderers       → assets/js/ui/cargabilidad/renderers/*.js
+  · Shell · entrypoint   → assets/js/ui/cargabilidad/cargabilidad-shell.js
+
+  Conservamos el ENTORNO DARK del archivo legacy (fondo aqua/teal
+  con radial-gradients + glass) porque vive dentro de un iframe del
+  card "Seguimiento Operativo" — no contamina el shell aqua light
+  del dashboard padre.
+-->
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../assets/css/seguimiento-cargabilidad.css">
+</head>
+<body class="carga-shell">
+
+<div class="app">
+  <!-- header -->
+  <div class="hd">
+    <div style="display:flex;align-items:center;gap:15px">
+      <div class="logo"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#06222A" stroke-width="2.4" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg></div>
+      <div>
+        <div class="disp" style="font-size:23px;font-weight:800">Cargabilidad de Transformadores de Potencia</div>
+        <div class="tag" style="margin-top:2px">Monitoreo de ampacidad vs. límite SCADA · Primario · Secundario · Terciario</div>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="pill bg-ok" style="font-size:12px"><span class="dot" id="liveDot" style="background:var(--ink3);color:var(--ok)"></span><span id="ago">datos estáticos (snapshot)</span></span>
+      <span class="pill" style="background:rgba(255,255,255,.07);color:var(--ink2);font-size:12px">🕑 <span class="mono" id="clock"></span></span>
+      <button class="btn" id="liveBtn" type="button">▶ Activar tiempo real</button>
+      <button class="btn" id="exportBtn" type="button">⬇ Exportar CSV</button>
+    </div>
+  </div>
+
+  <!-- filtros -->
+  <div class="glass filters">
+    <span class="tag" style="align-self:center;margin-right:2px">Filtros</span>
+    <div class="fgroup"><label for="search">Buscar</label><input type="text" id="search" placeholder="Subestación, matrícula, depto…"></div>
+    <div class="fgroup"><label for="fZona">Zona</label><select id="fZona"></select></div>
+    <div class="fgroup"><label for="fDep">Departamento</label><select id="fDep"></select></div>
+    <div class="fgroup"><label for="fGrupo">Grupo</label><select id="fGrupo"></select></div>
+    <div class="fgroup">
+      <label for="fDev">Devanado</label>
+      <select id="fDev">
+        <option value="all">Todos (máx.)</option>
+        <option value="P">Primario</option>
+        <option value="S">Secundario</option>
+        <option value="T">Terciario</option>
+      </select>
+    </div>
+    <div class="fgroup">
+      <label>Severidad</label>
+      <div style="display:flex;gap:6px">
+        <button type="button" class="chip-f f-cri active" data-sev="cri" aria-pressed="true">Crítico</button>
+        <button type="button" class="chip-f f-ale active" data-sev="ale" aria-pressed="true">Alerta</button>
+        <button type="button" class="chip-f f-avi active" data-sev="avi" aria-pressed="true">Aviso</button>
+        <button type="button" class="chip-f f-ok  active" data-sev="ok"  aria-pressed="true">Normal</button>
+      </div>
+    </div>
+    <div style="flex:1"></div>
+    <button class="btn" id="reset" type="button" style="align-self:flex-end">↺ Limpiar</button>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- overview row -->
+  <div class="grid2">
+    <div class="glass panel">
+      <h3>Concentración por zona operativa <span class="tag">click para filtrar</span></h3>
+      <div id="zonebars"></div>
+    </div>
+    <div class="glass panel">
+      <h3>Distribución de la flota</h3>
+      <div id="donut"></div>
+    </div>
+  </div>
+
+  <!-- tabla + heatmap -->
+  <div class="grid2" style="grid-template-columns:1.7fr 1fr;align-items:start">
+    <div class="glass panel">
+      <h3>Tabla priorizada de intervención <span class="tag mono" id="tcount"></span></h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr>
+            <th data-k="sub" scope="col">Equipo / Matrícula</th>
+            <th data-k="zona" scope="col">Zona</th>
+            <th scope="col">Devan.</th>
+            <th data-k="cmax" scope="col">I medida</th>
+            <th scope="col">Ampac.</th>
+            <th data-k="cmax" scope="col">% Ampacidad</th>
+            <th scope="col">Lím SCADA</th>
+            <th scope="col">Estado</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="muted" style="margin-top:10px">
+        ⚠ indica que la corriente medida supera el límite configurado en SCADA · click en una fila para ver el detalle del equipo.
+      </div>
+    </div>
+    <div class="glass panel">
+      <h3>Heatmap por devanado <span class="tag">Top 10 · P·S·T</span></h3>
+      <div id="heatmap"></div>
+      <div class="legend" style="margin-top:14px">
+        <span><span class="dot" style="background:var(--ok);color:var(--ok);margin-right:5px"></span>&lt;80%</span>
+        <span><span class="dot" style="background:var(--avi);color:var(--avi);margin-right:5px"></span>80–95%</span>
+        <span><span class="dot" style="background:var(--ale);color:var(--ale);margin-right:5px"></span>95–100%</span>
+        <span><span class="dot" style="background:var(--cri);color:var(--cri);margin-right:5px"></span>&gt;100%</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="muted" style="text-align:center;margin-top:6px">Fuente: Cargabilidad_TX_completado_v2.xlsx · 206 transformadores · 145 subestaciones · Estética Aqua Liquid Glass</div>
+</div>
+
+<!-- modal detalle -->
+<div class="carga-overlay" id="overlay">
+  <div class="modal">
+    <button class="close" id="modalClose" type="button" aria-label="Cerrar detalle">✕</button>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script type="module" src="../assets/js/ui/cargabilidad/cargabilidad-shell.js"></script>
+</body>
+</html>
