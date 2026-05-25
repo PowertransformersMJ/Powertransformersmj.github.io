@@ -3985,8 +3985,26 @@ function generateReport() {
   .ft td { padding: 4pt 6pt; border-bottom: 1px solid #e0e8f3; font-size: 7.8pt; vertical-align: top; }
   .ft tr:nth-child(even) td { background: #f8fbff; }
 
-  /* Bloque firma · Elaborado/Aprobado · formato etiqueta/valor lineal */
+  /* Bloque firma · Elaborado/Aprobado + Ejecutado por · 2 columnas */
   .firma-block { margin-top: 14pt; }
+  .firma-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28pt;
+    margin-top: 8pt;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .firma-col { break-inside: avoid; page-break-inside: avoid; }
+  .firma-block-img--empty .firma-space-firma {
+    /* Espacio en blanco prudente para la firma manuscrita en
+       el documento exportado (~0.75in alto · igual a max-height
+       de la imagen de Miguel para que ambas columnas queden
+       balanceadas visualmente). */
+    height: 0.75in;
+    width: 2.5in;
+    display: block;
+  }
   .firma-data { margin: 6pt 0 12pt; }
   .firma-pair { margin-bottom: 6pt; }
   .firma-key {
@@ -4534,18 +4552,38 @@ function generateReport() {
     ${_renderTablaConsolidada(MONTAJE_ELECTRICO_POR_VENTILADOR, mixEval.n_unidades_total || 0)}
   </section>
 
-  <!-- ── FIRMAS · ELABORADO/APROBADO ─────────────────────── -->
+  <!-- ── FIRMAS · ELABORADO/APROBADO + EJECUTADO POR ─────── -->
   <section class="section-anchor firma-block">
-    <h2>16. Elaborado / Aprobado</h2>
-    <div class="firma-data">
-      <div class="firma-pair"><div class="firma-key">Elaborado / Aprobado</div><div class="firma-val">Ing. Miguel Jimenez</div></div>
-      <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Líder de Transformadores de Potencia AFINIA</div></div>
-      <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Mantenimiento Red Alta Tensión</div></div>
-    </div>
-    <div class="firma-block-img">
-      <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
-      <div class="firma-line-under"></div>
-      <div class="firma-cap">Firma</div>
+    <h2>16. Elaborado / Aprobado · Ejecutado por</h2>
+
+    <div class="firma-grid">
+      <!-- Columna 1: Elaborado / Aprobado (Miguel Jimenez · con firma) -->
+      <div class="firma-col">
+        <div class="firma-data">
+          <div class="firma-pair"><div class="firma-key">Elaborado / Aprobado</div><div class="firma-val">Ing. Miguel Jimenez</div></div>
+          <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Líder de Transformadores de Potencia AFINIA</div></div>
+          <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Mantenimiento Red Alta Tensión</div></div>
+        </div>
+        <div class="firma-block-img">
+          <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
+          <div class="firma-line-under"></div>
+          <div class="firma-cap">Firma</div>
+        </div>
+      </div>
+
+      <!-- Columna 2: Ejecutado por (Brayan Parra · espacio para firmar) -->
+      <div class="firma-col">
+        <div class="firma-data">
+          <div class="firma-pair"><div class="firma-key">Ejecutado por</div><div class="firma-val">Ing. Brayan Parra</div></div>
+          <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Analista de Transformadores de Potencia 1</div></div>
+          <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Transformadores AT Afinia</div></div>
+        </div>
+        <div class="firma-block-img firma-block-img--empty">
+          <div class="firma-space-firma" aria-hidden="true"></div>
+          <div class="firma-line-under"></div>
+          <div class="firma-cap">Firma</div>
+        </div>
+      </div>
     </div>
   </section>
 
