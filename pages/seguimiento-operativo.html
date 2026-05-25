@@ -338,7 +338,8 @@
 
       <div role="tabpanel" data-tab-panel="cargabilidad" hidden>
         <iframe class="tab-iframe" data-src="seguimiento-cargabilidad.html"
-                title="Cargabilidad de Transformadores" loading="lazy"></iframe>
+                title="Cargabilidad de Transformadores" loading="lazy"
+                style="height:1450px;min-height:1450px;border:none;"></iframe>
       </div><!-- /tabpanel cargabilidad -->
 
     </div><!-- /tab-panels -->
@@ -352,6 +353,28 @@
 <script type="module">
   import { initModuleShell } from '../assets/js/ui/module-shell.js';
   initModuleShell('seguimientoTabs', { defaultTab: 'scada' });
+</script>
+
+<!-- Auto-resize del iframe de Cargabilidad: escucha postMessage del
+     hijo y ajusta la altura del <iframe> dinámicamente para que el
+     dashboard se aprecie completo sin scroll interno. -->
+<script>
+(function escucharResizeHijo() {
+  window.addEventListener('message', (e) => {
+    if (!e || !e.data || e.data.type !== 'iframe-resize') return;
+    if (e.data.source !== 'cargabilidad') return;
+    const h = parseInt(e.data.height, 10);
+    if (!Number.isFinite(h) || h < 200) return;
+    const iframe = document.querySelector(
+      '[data-tab-panel="cargabilidad"] iframe.tab-iframe'
+    );
+    if (iframe) {
+      // +12px de padding por las sombras/borders del card
+      iframe.style.height = (h + 12) + 'px';
+      iframe.style.minHeight = 'auto';
+    }
+  });
+})();
 </script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>

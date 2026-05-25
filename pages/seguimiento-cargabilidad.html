@@ -143,5 +143,40 @@
 </div>
 
 <script type="module" src="../assets/js/ui/cargabilidad/cargabilidad-shell.js"></script>
+
+<!-- Auto-resize del iframe · notifica la altura del contenido al
+     parent (seguimiento-operativo.html) cada vez que cambia el
+     layout interno. Sin esto el iframe queda con altura fija y
+     el contenido queda con scroll innecesario. -->
+<script>
+(function autoResizeAlPadre() {
+  if (window.parent === window) return;  // no estamos en iframe
+  let ultimoH = 0;
+  function reportar() {
+    // Altura del contenido completo del documento (incluyendo overflow)
+    const h = Math.max(
+      document.body.scrollHeight,
+      document.documentElement.scrollHeight,
+      document.body.offsetHeight,
+      document.documentElement.offsetHeight
+    );
+    if (Math.abs(h - ultimoH) < 4) return;
+    ultimoH = h;
+    window.parent.postMessage({ type: 'iframe-resize', source: 'cargabilidad', height: h }, '*');
+  }
+  // Observa cambios de layout en el body
+  if (typeof ResizeObserver !== 'undefined') {
+    const ro = new ResizeObserver(reportar);
+    ro.observe(document.body);
+  }
+  // Eventos de respaldo
+  window.addEventListener('load',   reportar);
+  window.addEventListener('resize', reportar);
+  // Re-medir cuando el contenido inicial se hidrata (chips, KPIs, etc.)
+  setTimeout(reportar, 100);
+  setTimeout(reportar, 600);
+  setTimeout(reportar, 1500);
+})();
+</script>
 </body>
 </html>
