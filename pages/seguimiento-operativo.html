@@ -31,6 +31,7 @@
 <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
 <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
 <link rel="stylesheet" href="../assets/css/seguimiento-scada.css"/>
+<link rel="stylesheet" href="../assets/css/tabs.css"/>
 </head>
 <body class="aqua">
 
@@ -40,12 +41,26 @@
     <div class="breadcrumb">Operación / Seguimiento Operativo</div>
     <h1 class="page-title">Seguimiento <em>Operativo</em></h1>
     <p class="page-subtitle">
-      Dashboard de violaciones SCADA U1/U2 sobre el parque de transformadores de potencia.
-      Ingesta SOE diaria · deduplicación por <code>event_id</code> · persistencia local (IndexedDB).
+      Monitoreo en tiempo real del parque de transformadores · violaciones SCADA U1/U2 y
+      cargabilidad vs. límite operativo por devanado.
     </p>
   </div>
 
-  <div class="scada-shell">
+  <!-- ===== TABS: SCADA · Cargabilidad ===== -->
+  <div class="sgm-tabs" id="seguimientoTabs">
+    <div role="tablist" class="tab-bar" aria-label="Secciones del módulo Seguimiento Operativo">
+      <button type="button" role="tab" data-tab="scada" aria-selected="true">
+        <span class="i"><i data-lucide="activity"></i></span>SCADA U1/U2
+      </button>
+      <button type="button" role="tab" data-tab="cargabilidad" aria-selected="false">
+        <span class="i"><i data-lucide="gauge"></i></span>Cargabilidad
+      </button>
+    </div>
+
+    <div class="tab-panels">
+
+      <div role="tabpanel" data-tab-panel="scada">
+        <div class="scada-shell">
     <div class="container">
 
       <!-- ===== STATUS HEADER ===== -->
@@ -317,14 +332,27 @@
         Sin envío de datos a internet.
       </div>
 
-    </div>
-  </div>
+        </div><!-- /.container -->
+      </div><!-- /.scada-shell -->
+      </div><!-- /tabpanel scada -->
+
+      <div role="tabpanel" data-tab-panel="cargabilidad" hidden>
+        <iframe class="tab-iframe" data-src="seguimiento-cargabilidad.html"
+                title="Cargabilidad de Transformadores" loading="lazy"></iframe>
+      </div><!-- /tabpanel cargabilidad -->
+
+    </div><!-- /tab-panels -->
+  </div><!-- /sgm-tabs -->
 
 </main>
 
 <div class="toast" id="toast"></div>
 
 <script type="module" src="../assets/js/ui/seguimiento/seguimiento-shell.js"></script>
+<script type="module">
+  import { initModuleShell } from '../assets/js/ui/module-shell.js';
+  initModuleShell('seguimientoTabs', { defaultTab: 'scada' });
+</script>
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>
 <script src="../assets/js/aqua-shell.js" defer></script>
