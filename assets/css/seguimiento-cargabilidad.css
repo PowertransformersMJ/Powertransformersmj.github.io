@@ -1,0 +1,363 @@
+/* ═══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Seguimiento Operativo · Cargabilidad
+   Estilos extraídos del archivo legacy (F41 refactor)
+   ────────────────────────────────────────────────────────────────
+   Conservamos el fondo OSCURO del archivo original (radial-gradients
+   en aqua + teal) porque la página vive dentro de un iframe del card
+   "Seguimiento Operativo" — no contamina el shell aqua light del
+   dashboard padre.
+
+   Semáforo normativo INVARIANTE:
+     · cri (rojo)    → cargabilidad > 100%   (sobrecarga)
+     · ale (ámbar)   → 95–100%               (alerta)
+     · avi (naranja) → 80–95%                (aviso preventivo)
+     · ok  (verde)   → < 80%                 (normal)
+     · nd  (gris)    → sin dato
+
+   Fuente Sora: cargada via Google Fonts (no Base64 inline) para
+   reducir el peso del bundle de ~450 KB a una request cacheable
+   con preconnect.
+═══════════════════════════════════════════════════════════════ */
+
+/* Reset scoped */
+.carga-shell, .carga-shell *,
+.carga-overlay, .carga-overlay * {
+  margin: 0; padding: 0; box-sizing: border-box;
+}
+
+:root {
+  --aqua:  #5EEAD4;
+  --aqua2: #22D3EE;
+  --teal:  #2DD4BF;
+  --ok:    #34D399;
+  --avi:   #FBBF24;
+  --ale:   #FB923C;
+  --cri:   #FB5070;
+  --ink:   #EAFBF7;
+  --ink2:  #9FC9C8;
+  --ink3:  #6E9A9C;
+  --glassb: rgba(255,255,255,.16);
+}
+
+.carga-shell {
+  font-family: 'Manrope', system-ui, sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+  background:
+    radial-gradient(1200px 700px at 78% -8%, rgba(34,211,238,.30), transparent 60%),
+    radial-gradient(1000px 800px at 8% 100%, rgba(94,234,212,.20), transparent 55%),
+    radial-gradient(700px 600px at 100% 90%, rgba(20,90,110,.5),   transparent 60%),
+    linear-gradient(155deg, #06222A 0%, #0A2E38 45%, #0C3A43 100%);
+  background-attachment: fixed;
+}
+.carga-shell::before {
+  content: ''; position: fixed; width: 520px; height: 520px; left: -140px; top: 120px;
+  border-radius: 50%; z-index: 0; pointer-events: none;
+  background: radial-gradient(circle at 35% 35%, rgba(94,234,212,.35), transparent 65%);
+  filter: blur(30px);
+}
+.carga-shell::after {
+  content: ''; position: fixed; width: 460px; height: 460px; right: -100px; bottom: -140px;
+  border-radius: 50%; z-index: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 40%, rgba(34,211,238,.32), transparent 65%);
+  filter: blur(34px);
+}
+
+.carga-shell .app {
+  position: relative; z-index: 2;
+  max-width: 1640px; margin: 0 auto;
+  padding: 22px 26px 50px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+
+.carga-shell .glass {
+  background: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.045));
+  border: 1px solid var(--glassb);
+  border-radius: 22px;
+  box-shadow: 0 18px 50px -18px rgba(0,0,0,.5),
+              inset 0 1px 0 rgba(255,255,255,.28),
+              inset 0 -18px 40px -28px rgba(0,0,0,.45);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  position: relative; overflow: hidden;
+}
+.carga-shell .glass::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 38%;
+  background: linear-gradient(180deg, rgba(255,255,255,.14), transparent);
+  pointer-events: none;
+}
+
+.carga-shell h1, .carga-shell h2, .carga-shell h3, .carga-shell .disp {
+  font-family: 'Sora', sans-serif; letter-spacing: -.01em;
+}
+.carga-shell .mono { font-variant-numeric: tabular-nums; }
+.carga-shell .tag {
+  font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 700;
+}
+.carga-shell .pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.carga-shell .dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  display: inline-block; box-shadow: 0 0 10px currentColor; flex-shrink: 0;
+}
+
+/* Colores semáforo */
+.carga-shell .c-ok  { color: var(--ok); }
+.carga-shell .c-avi { color: var(--avi); }
+.carga-shell .c-ale { color: var(--ale); }
+.carga-shell .c-cri { color: var(--cri); }
+.carga-shell .bg-ok   { background: rgba(52,211,153,.16); color: #9BF3D3; }
+.carga-shell .bg-avi  { background: rgba(251,191,36,.16); color: #FCD879; }
+.carga-shell .bg-ale  { background: rgba(251,146,60,.18); color: #FDC197; }
+.carga-shell .bg-cri  { background: rgba(251,80,112,.2);  color: #FFB0BF; }
+.carga-shell .bg-info { background: rgba(34,211,238,.14); color: #A5ECF7; }
+
+/* Header */
+.carga-shell .hd {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; flex-wrap: wrap;
+}
+.carga-shell .logo {
+  width: 46px; height: 46px; border-radius: 14px;
+  background: linear-gradient(145deg, var(--aqua), var(--aqua2));
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 8px 24px -6px var(--aqua2),
+              inset 0 1px 0 rgba(255,255,255,.6);
+  flex-shrink: 0;
+}
+.carga-shell .btn {
+  padding: 8px 14px; border-radius: 11px;
+  font-size: 12.5px; font-weight: 700;
+  border: 1px solid var(--glassb);
+  background: rgba(255,255,255,.07);
+  color: var(--ink); cursor: pointer; transition: .15s;
+  white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: inherit;
+}
+.carga-shell .btn:hover { background: rgba(255,255,255,.14); }
+.carga-shell .btn.on {
+  background: linear-gradient(145deg, var(--aqua), var(--aqua2));
+  color: #06222A; border-color: transparent;
+}
+.carga-shell .btn.live {
+  background: linear-gradient(145deg, var(--ok), #10B981);
+  color: #04231A; border-color: transparent;
+}
+
+/* Filtros */
+.carga-shell .filters {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 14px 18px;
+}
+.carga-shell .fgroup { display: flex; flex-direction: column; gap: 4px; }
+.carga-shell .fgroup label {
+  font-size: 9.5px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 700; padding-left: 3px;
+}
+.carga-shell select,
+.carga-shell input[type=text] {
+  font-family: 'Manrope', system-ui, sans-serif;
+  font-size: 12.5px; color: var(--ink);
+  background: rgba(255,255,255,.08);
+  border: 1px solid var(--glassb);
+  border-radius: 10px; padding: 8px 11px;
+  outline: none; cursor: pointer;
+}
+.carga-shell select option { background: #0A2E38; color: var(--ink); }
+.carga-shell input[type=text] { cursor: text; min-width: 180px; }
+.carga-shell input[type=text]::placeholder { color: var(--ink3); }
+.carga-shell .chip-f {
+  padding: 7px 13px; border-radius: 10px;
+  font-size: 11.5px; font-weight: 700; cursor: pointer;
+  border: 1px solid var(--glassb);
+  background: rgba(255,255,255,.06); color: var(--ink2);
+  transition: .15s; user-select: none;
+}
+.carga-shell .chip-f.active { color: #06222A; border-color: transparent; }
+.carga-shell .chip-f.f-cri.active { background: var(--cri); color: #fff; }
+.carga-shell .chip-f.f-ale.active { background: var(--ale); color: #06222A; }
+.carga-shell .chip-f.f-avi.active { background: var(--avi); color: #06222A; }
+.carga-shell .chip-f.f-ok.active  { background: var(--ok);  color: #06222A; }
+
+/* KPIs */
+.carga-shell .kpis { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; }
+.carga-shell .kpi  { padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; }
+.carga-shell .kpi .n { font-family: 'Sora', sans-serif; font-size: 34px; font-weight: 800; line-height: 1; }
+.carga-shell .kpi .u { font-size: 13px; color: var(--ink2); font-weight: 700; }
+.carga-shell .kpi .s { font-size: 11px; color: var(--ink2); }
+
+.carga-shell .grid2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+.carga-shell .panel { padding: 20px 22px; }
+.carga-shell .panel h3 {
+  font-size: 15px; font-weight: 700; margin-bottom: 14px;
+  display: flex; justify-content: space-between; align-items: center;
+}
+
+/* Tabla */
+.carga-shell table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.carga-shell thead th {
+  position: sticky; top: 0; text-align: left; padding: 9px 8px;
+  font-size: 10px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 700; cursor: pointer;
+  background: rgba(8,40,48,.85); backdrop-filter: blur(8px);
+  user-select: none; white-space: nowrap;
+}
+.carga-shell thead th:hover { color: var(--aqua); }
+.carga-shell tbody td {
+  padding: 9px 8px; border-bottom: 1px solid rgba(255,255,255,.06);
+  vertical-align: middle;
+}
+.carga-shell tbody tr { cursor: pointer; transition: .12s; }
+.carga-shell tbody tr:hover { background: rgba(94,234,212,.08); }
+.carga-shell .tbl-wrap {
+  max-height: 430px; overflow-y: auto; border-radius: 14px;
+}
+.carga-shell .tbl-wrap::-webkit-scrollbar { width: 8px; }
+.carga-shell .tbl-wrap::-webkit-scrollbar-thumb { background: rgba(255,255,255,.16); border-radius: 8px; }
+
+.carga-shell .bar {
+  height: 7px; border-radius: 4px;
+  background: rgba(255,255,255,.08); overflow: hidden;
+  position: relative; min-width: 70px;
+}
+.carga-shell .bar > i {
+  position: absolute; height: 100%; border-radius: 4px; display: block;
+}
+
+/* Heatmap */
+.carga-shell .hm-cell {
+  height: 34px; border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 800; font-size: 12.5px;
+  border: 1px solid rgba(255,255,255,.08);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Modal */
+.carga-overlay {
+  position: fixed; inset: 0; z-index: 50;
+  background: rgba(4,20,26,.66);
+  backdrop-filter: blur(8px);
+  display: none; align-items: flex-start; justify-content: center;
+  padding: 30px; overflow-y: auto;
+  color: var(--ink);
+  font-family: 'Manrope', system-ui, sans-serif;
+}
+.carga-overlay.show { display: flex; }
+.carga-overlay .modal {
+  width: 100%; max-width: 1320px;
+  display: flex; flex-direction: column; gap: 16px;
+  animation: carga-pop .25s ease;
+}
+@keyframes carga-pop {
+  from { opacity: 0; transform: translateY(14px) scale(.99); }
+  to   { opacity: 1; transform: none; }
+}
+.carga-overlay .close {
+  position: absolute; top: 16px; right: 18px;
+  width: 34px; height: 34px; border-radius: 10px;
+  background: rgba(255,255,255,.1);
+  border: 1px solid var(--glassb);
+  color: var(--ink); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  z-index: 5;
+}
+.carga-overlay .close:hover { background: rgba(251,80,112,.3); }
+.carga-overlay .glass {
+  background: linear-gradient(150deg, rgba(255,255,255,.11), rgba(255,255,255,.045));
+  border: 1px solid var(--glassb);
+  border-radius: 22px;
+  box-shadow: 0 18px 50px -18px rgba(0,0,0,.5),
+              inset 0 1px 0 rgba(255,255,255,.28),
+              inset 0 -18px 40px -28px rgba(0,0,0,.45);
+  backdrop-filter: blur(20px) saturate(150%);
+  -webkit-backdrop-filter: blur(20px) saturate(150%);
+  position: relative; overflow: hidden;
+}
+
+.carga-shell .spec { display: flex; flex-direction: column; gap: 3px; }
+.carga-shell .spec .k {
+  font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 700;
+}
+.carga-shell .spec .v {
+  font-family: 'Sora', sans-serif; font-weight: 700; font-size: 14px;
+}
+.carga-overlay .spec { display: flex; flex-direction: column; gap: 3px; }
+.carga-overlay .spec .k {
+  font-size: 9px; letter-spacing: .08em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 700;
+}
+.carga-overlay .spec .v {
+  font-family: 'Sora', sans-serif; font-weight: 700; font-size: 14px;
+}
+.carga-overlay .pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 4px 11px; border-radius: 999px;
+  font-size: 11.5px; font-weight: 700; white-space: nowrap;
+}
+.carga-overlay .bg-ok   { background: rgba(52,211,153,.16); color: #9BF3D3; }
+.carga-overlay .bg-avi  { background: rgba(251,191,36,.16); color: #FCD879; }
+.carga-overlay .bg-ale  { background: rgba(251,146,60,.18); color: #FDC197; }
+.carga-overlay .bg-cri  { background: rgba(251,80,112,.2);  color: #FFB0BF; }
+.carga-overlay .bg-info { background: rgba(34,211,238,.14); color: #A5ECF7; }
+.carga-overlay .tag {
+  font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase;
+  color: var(--ink3); font-weight: 700;
+}
+.carga-overlay .mono { font-variant-numeric: tabular-nums; }
+.carga-overlay .disp { font-family: 'Sora', sans-serif; letter-spacing: -.01em; }
+.carga-overlay .btn {
+  padding: 8px 14px; border-radius: 11px;
+  font-size: 12.5px; font-weight: 700;
+  border: 1px solid var(--glassb);
+  background: rgba(255,255,255,.07);
+  color: var(--ink); cursor: pointer; transition: .15s;
+  display: inline-flex; align-items: center; gap: 7px;
+  font-family: inherit;
+}
+.carga-overlay .btn:hover { background: rgba(255,255,255,.14); }
+.carga-overlay .btn.on {
+  background: linear-gradient(145deg, var(--aqua), var(--aqua2));
+  color: #06222A; border-color: transparent;
+}
+.carga-overlay .bar {
+  height: 7px; border-radius: 4px;
+  background: rgba(255,255,255,.08); overflow: hidden;
+  position: relative; min-width: 70px;
+}
+.carga-overlay .bar > i {
+  position: absolute; height: 100%; border-radius: 4px; display: block;
+}
+
+.carga-shell .wf-step { display: flex; gap: 13px; }
+.carga-shell .wf-num,
+.carga-overlay .wf-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-family: 'Sora', sans-serif; font-weight: 800; font-size: 12px;
+  flex-shrink: 0;
+}
+.carga-overlay .wf-step { display: flex; gap: 13px; }
+
+.carga-shell .fade  { animation: carga-fade .4s ease; }
+.carga-shell .flash { animation: carga-flash .6s ease; }
+@keyframes carga-fade  { from { opacity: .4; } to { opacity: 1; } }
+@keyframes carga-flash { 0% { background: rgba(94,234,212,.18); } 100% { background: transparent; } }
+
+@media (max-width: 1100px) {
+  .carga-shell .kpis  { grid-template-columns: repeat(3, 1fr); }
+  .carga-shell .grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 680px) {
+  .carga-shell .kpis { grid-template-columns: repeat(2, 1fr); }
+}
+.carga-shell .muted { color: var(--ink3); font-size: 11px; }
+.carga-shell .legend { display: flex; gap: 14px; font-size: 11px; color: var(--ink2); flex-wrap: wrap; }
