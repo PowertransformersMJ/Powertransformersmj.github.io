@@ -3437,6 +3437,7 @@ function generateReport() {
       tornillos: _val('mon_tornillos'), dist:      _val('mon_dist'),
       junta:     _val('mon_junta'),     obs:       _val('mon_obs')
     };
+    const ejecutadoPor = (_val('ejecutado_por').trim()) || 'Ing. Brayan Parra';
     const disp = _val('disposicion').trim() || '—';
     const conn = getMotorConn() === 'D' ? 'Δ Delta (D)' : 'Y Estrella (Y)';
     const fechaIso = new Date().toLocaleDateString('es-CO', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -4574,8 +4575,8 @@ function generateReport() {
       <!-- Columna 2: Ejecutado por (Brayan Parra · espacio para firmar) -->
       <div class="firma-col">
         <div class="firma-data">
-          <div class="firma-pair"><div class="firma-key">Ejecutado por</div><div class="firma-val">Ing. Brayan Parra</div></div>
-          <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Analista de Transformadores de Potencia 1</div></div>
+          <div class="firma-pair"><div class="firma-key">Ejecutado por</div><div class="firma-val">${ejecutadoPor}</div></div>
+          <div class="firma-pair"><div class="firma-key">Cargo</div><div class="firma-val">Analista de Transformadores de Potencia</div></div>
           <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Transformadores AT Afinia</div></div>
         </div>
         <div class="firma-block-img firma-block-img--empty">
