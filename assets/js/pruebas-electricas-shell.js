@@ -2,7 +2,7 @@
 // SGM · TRANSPOWER — Pruebas Eléctricas · Shell / Controlador
 // ──────────────────────────────────────────────────────────────
 // Entrypoint de la página pages/pruebas-electricas.html. Orquesta:
-//   · data layer en vivo (onSnapshot · SEED_LOCAL sin backend)
+//   · data layer en vivo (onSnapshot)
 //   · componentes UI (semáforo, tablas, gráficas)
 //   · ficha de identidad y KPIs del parque
 //   · modal de carga de informe (serie → PDF → confirmar)
@@ -12,16 +12,15 @@
 // los componentes de assets/js/ui/pruebas/. Aquí solo se conecta el
 // flujo de datos con el DOM.
 //
-// Nota sobre gráficas: el schema del informe persiste el valor
-// sintetizado por prueba (no el detalle por fase del PDF), de modo
-// que las 6 gráficas usan los datasets de referencia del tablero
-// (mountCharts sin serie → DEF) para conservar EXACTAMENTE el
-// aspecto original. La matriz, tablas e historial sí se derivan de
-// los informes en vivo.
+// Interfaz en tiempo real · solo datos reales: TODO lo que se ve
+// (matriz, tablas, historial y las 6 gráficas) se deriva de los
+// informes que el usuario sube. Sin informes → estado vacío. No hay
+// dataset de demostración ni unidad seed: si Firebase no está activo
+// o no hay informes, no aparece nada.
 // ══════════════════════════════════════════════════════════════
 
 import {
-  SEED_LOCAL, isReady,
+  isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme
 } from './data/pruebas_electricas.js';
@@ -31,7 +30,7 @@ import {
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
 import { renderInformes, mountTablas } from './ui/pruebas/tabla-pruebas.js';
-import { mountCharts } from './ui/pruebas/grafico-svg.js';
+import { mountCharts, derivarSeries } from './ui/pruebas/grafico-svg.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
 const state = {
@@ -116,8 +115,8 @@ function renderInformesUI(informes) {
   // Tablas de detalle por prueba
   mountTablas(state.informes, document);
 
-  // Gráficas (datasets de referencia del tablero · ver nota de cabecera)
-  mountCharts(null, document);
+  // Gráficas derivadas de los informes en vivo (sin datos → estado vacío)
+  mountCharts(derivarSeries(state.informes), document);
 
   // Historial + KPI de conteo
   renderInformes($('reportlist'), state.informes, {
@@ -253,10 +252,12 @@ function arrancar() {
     },
     (err) => {
       console.warn('[pruebas-electricas] unidades', err);
-      state.unidades = [{ id: SEED_LOCAL.unidad.serie, ...SEED_LOCAL.unidad }];
+      // Interfaz en tiempo real · solo datos reales: sin backend no hay
+      // unidad de demostración. Queda el parque vacío con el tile "+".
+      state.unidades = [];
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
-      seleccionarUnidad(state.unidades[0]);
+      seleccionarUnidad(null);
     }
   );
 }

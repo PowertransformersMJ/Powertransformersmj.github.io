@@ -10,11 +10,10 @@
 //     · subcol /informes/{informeId}           → informe por año
 //   Storage  pruebas_electricas/{unidadId}/{filename}  → PDF original
 //
-// Diseño adaptable a fuente local o Firestore:
+// Interfaz en tiempo real · SOLO datos reales:
 //   · Si Firebase está configurado → onSnapshot en vivo.
-//   · Si NO → cae a un seed local (SEED_LOCAL) replicando la unidad
-//     173523-15510 del tablero original, para que la vista funcione
-//     sin backend y los tests no requieran red.
+//   · Si NO → se emite lista vacía. NO hay seed de demostración: la
+//     vista no muestra nada hasta que el usuario suba informes.
 //
 // Las funciones de escritura sanitizan con el schema de dominio y
 // limpian undefined/NaN con deepClean antes de persistir
@@ -38,44 +37,6 @@ import {
 const COL_UNIDADES = 'pruebas_electricas';
 const SUBCOL_INFORMES = 'informes';
 
-/* ─── Seed local · unidad real 173523-15510 del tablero ───────── */
-// Solo se usa cuando Firebase NO está configurado. Mantiene la vista
-// operativa offline y alimenta los tests de integración con un mock
-// determinístico (mismos números que las gráficas del tablero).
-export const SEED_LOCAL = Object.freeze({
-  unidad: sanitizarUnidad({
-    serie: '173523-15510',
-    fabricante: 'Siemens',
-    ano_fabricacion: 1998,
-    potencia: '22.5 / 30 MVA',
-    tensiones: '110/34.5/13.8 kV',
-    grupo_conexion: 'YNyn0d1',
-    refrigeracion: 'ONAN/ONAF',
-    frecuencia: '60 Hz · 3φ',
-    cliente: 'Electricaribe',
-    ubicacion: 'S/E La Jagua, Cesar',
-    subestacion: 'La Jagua'
-  }),
-  informes: [2012, 2014, 2020].map((ano, i) => sanitizarInforme({
-    unidadId: '173523-15510',
-    serie: '173523-15510',
-    ano,
-    tand: [
-      { code: 'CH',  valor_pct: [0.39, 0.42, 0.146][i] },
-      { code: 'CHL', valor_pct: [0.27, 0.34, 0.100][i] },
-      { code: 'CL',  valor_pct: [1.23, 1.52, 0.192][i] },
-      { code: 'CLT', valor_pct: [0.24, 0.32, 0.089][i] },
-      { code: 'CT',  valor_pct: [0.49, 0.67, 0.334][i] },
-      { code: 'CHT', valor_pct: [0.54, 0.66, 0.054][i] }
-    ],
-    excitacion:  { delta_pct: [4.41, 4.83, 3.02][i], corriente_ma: 12 },
-    relacion:    { desviacion_pct: [0.13, 0.31, 0.23][i] },
-    resistencia: { desbalance_pct: [2, 3, null][i], verificar: i === 2 },
-    aislamiento: { gohm: [null, 2.5, null][i] },
-    collar:      { mw: [49, 56, 57.9][i] }
-  }))
-});
-
 /* ─── Estado de la capa ───────────────────────────────────────── */
 export function isReady() {
   return isFirebaseConfigured && !!getDbSafe();
@@ -94,13 +55,14 @@ function collInformes(unidadId) {
 /* ─── Lectura en tiempo real ──────────────────────────────────── */
 
 /**
- * Suscribe a la lista de unidades. Si no hay Firebase, emite el seed
- * local una vez y devuelve un unsubscribe no-op.
+ * Suscribe a la lista de unidades. Sin Firebase emite lista vacía una
+ * vez (interfaz en tiempo real · solo datos reales) y devuelve un
+ * unsubscribe no-op.
  * @returns {function} unsubscribe
  */
 export function suscribirUnidades(onData, onError) {
   if (!isReady()) {
-    Promise.resolve().then(() => onData([{ id: SEED_LOCAL.unidad.serie, ...SEED_LOCAL.unidad }]));
+    Promise.resolve().then(() => onData([]));
     return () => {};
   }
   return onSnapshot(
@@ -112,16 +74,12 @@ export function suscribirUnidades(onData, onError) {
 
 /**
  * Suscribe a los informes de una unidad, ordenados por año asc.
- * Sin Firebase → emite el seed local de esa serie.
+ * Sin Firebase → emite lista vacía (solo datos reales).
  * @returns {function} unsubscribe
  */
 export function suscribirInformes(unidadId, onData, onError) {
   if (!isReady()) {
-    Promise.resolve().then(() => onData(
-      SEED_LOCAL.informes
-        .filter((r) => !unidadId || r.serie === unidadId)
-        .map((r, i) => ({ id: `seed-${r.ano}-${i}`, ...r }))
-    ));
+    Promise.resolve().then(() => onData([]));
     return () => {};
   }
   return onSnapshot(
@@ -132,20 +90,13 @@ export function suscribirInformes(unidadId, onData, onError) {
 }
 
 export async function obtenerUnidad(id) {
-  if (!isReady()) {
-    return id === SEED_LOCAL.unidad.serie
-      ? { id, ...SEED_LOCAL.unidad } : null;
-  }
+  if (!isReady()) return null;
   const s = await getDoc(unidadRef(id));
   return s.exists() ? { id: s.id, ...s.data() } : null;
 }
 
 export async function listarInformes(unidadId) {
-  if (!isReady()) {
-    return SEED_LOCAL.informes
-      .filter((r) => !unidadId || r.serie === unidadId)
-      .map((r, i) => ({ id: `seed-${r.ano}-${i}`, ...r }));
-  }
+  if (!isReady()) return [];
   const snap = await getDocs(query(collInformes(unidadId), orderBy('ano', 'asc')));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
