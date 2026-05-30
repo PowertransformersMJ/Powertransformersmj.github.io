@@ -170,10 +170,17 @@ function arrancar() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   Modal de carga de informe (serie → PDF → confirmar)
+   Modal de carga de informe (serie → PDFs+año → confirmar)
+   ──────────────────────────────────────────────────────────────
+   Soporta VARIOS informes en una sola sesión: el paso 1 fija la
+   serie (común a todos), el paso 2 adjunta N PDFs y a cada uno se
+   le asigna su año (el año discrimina cada informe), y el paso 3
+   confirma y almacena todos secuencialmente.
    ══════════════════════════════════════════════════════════════ */
 
-const UP = { step: 1, serie: '', ano: null, file: null, textoPdf: '', store: true };
+// item: { id, file, ano, textoPdf }
+const UP = { step: 1, serie: '', items: [], store: true };
+let _itemSeq = 0;
 
 function toast(msg, kind) {
   const t = $('toast');
@@ -195,10 +202,17 @@ function setStepbar() {
 function openUpload() {
   UP.step = 1;
   UP.serie = (state.unidadActiva && state.unidadActiva.serie) || '';
-  UP.ano = null; UP.file = null; UP.textoPdf = '';
+  UP.items = [];
+  _itemSeq = 0;
   const ov = $('ov');
   if (ov) ov.classList.add('on');
   renderModal();
+}
+
+/* ¿Todos los ítems tienen un año válido? */
+function itemsListos() {
+  return UP.items.length > 0 &&
+    UP.items.every((it) => Number.isInteger(it.ano) && it.ano >= 1950 && it.ano <= 2100);
 }
 
 function closeUpload() {
@@ -212,58 +226,88 @@ function renderModal() {
   const title = $('mTitle');
   if (!body) return;
   if (UP.step === 1) {
-    if (title) title.textContent = 'Cargar informe · datos';
+    if (title) title.textContent = 'Cargar informes · serie';
     body.innerHTML =
       `<div class="flbl">Número de serie de la unidad</div>` +
       `<input class="inp" id="serIn" value="${esc(UP.serie)}" placeholder="173523-15510">` +
-      `<div class="flbl" style="margin-top:14px">Año del informe</div>` +
-      `<input class="inp" id="anoIn" type="number" min="1950" max="2100" value="${UP.ano || ''}" placeholder="2024">` +
+      `<p class="muted small" style="margin-top:10px">La serie es común a todos los informes que adjuntes. ` +
+      `En el siguiente paso podrás añadir varios PDF, cada uno con su propio año.</p>` +
       `<div class="mfoot">` +
       `<button class="btn btn-ghost" id="mCancel">Cancelar</button>` +
       `<button class="btn btn-primary" id="mNext1">Continuar</button></div>`;
     $('mCancel').onclick = closeUpload;
     $('mNext1').onclick = () => {
       UP.serie = $('serIn').value.trim();
-      UP.ano = parseInt($('anoIn').value, 10) || null;
       if (!UP.serie) return toast('Ingresa el número de serie.', 'warn');
-      if (!UP.ano) return toast('Ingresa el año del informe.', 'warn');
       UP.step = 2; renderModal();
     };
   } else if (UP.step === 2) {
-    if (title) title.textContent = 'Cargar informe · PDF';
+    if (title) title.textContent = 'Cargar informes · PDF y año';
+    const lista = UP.items.map((it) => {
+      const anoVal = it.ano == null ? '' : it.ano;
+      return `<div class="fitem" data-id="${it.id}">` +
+        `<span class="fi-doc">📄</span>` +
+        `<span class="fi-name" title="${esc(it.file.name)}">${esc(it.file.name)}</span>` +
+        `<input class="fi-ano" type="number" min="1950" max="2100" ` +
+        `data-id="${it.id}" value="${anoVal}" placeholder="Año">` +
+        `<button class="fi-del" data-id="${it.id}" title="Quitar">✕</button></div>`;
+    }).join('');
     body.innerHTML =
-      `<div class="drop" id="drop">Arrastra el PDF aquí o haz clic para elegirlo</div>` +
-      `<input type="file" id="fileIn" accept="application/pdf" style="display:none">` +
-      (UP.file ? `<div class="picked">📄 ${esc(UP.file.name)}</div>` : '') +
+      `<div class="drop" id="drop">Arrastra uno o varios PDF aquí o haz clic para elegirlos</div>` +
+      `<input type="file" id="fileIn" accept="application/pdf" multiple style="display:none">` +
+      (UP.items.length
+        ? `<div class="flist">${lista}</div>`
+        : `<p class="muted small" style="margin-top:10px">Aún no has adjuntado informes.</p>`) +
       `<div class="mfoot">` +
       `<button class="btn btn-ghost" id="mBack2">Atrás</button>` +
-      `<button class="btn btn-primary" id="mNext2"${UP.file ? '' : ' disabled'}>Continuar</button></div>`;
+      `<button class="btn btn-primary" id="mNext2"${itemsListos() ? '' : ' disabled'}>Continuar</button></div>`;
     const drop = $('drop'); const fileIn = $('fileIn');
     drop.onclick = () => fileIn.click();
     drop.ondragover = (e) => { e.preventDefault(); drop.classList.add('drag'); };
     drop.ondragleave = () => drop.classList.remove('drag');
     drop.ondrop = (e) => {
       e.preventDefault(); drop.classList.remove('drag');
-      if (e.dataTransfer.files[0]) elegirArchivo(e.dataTransfer.files[0]);
+      agregarArchivos(e.dataTransfer.files);
     };
-    fileIn.onchange = () => { if (fileIn.files[0]) elegirArchivo(fileIn.files[0]); };
+    fileIn.onchange = () => { agregarArchivos(fileIn.files); };
+    body.querySelectorAll('.fi-ano').forEach((inp) => {
+      inp.onchange = inp.oninput = () => {
+        const it = UP.items.find((x) => x.id === Number(inp.dataset.id));
+        if (it) it.ano = parseInt(inp.value, 10) || null;
+        const nx = $('mNext2'); if (nx) nx.disabled = !itemsListos();
+      };
+    });
+    body.querySelectorAll('.fi-del').forEach((btn) => {
+      btn.onclick = () => {
+        UP.items = UP.items.filter((x) => x.id !== Number(btn.dataset.id));
+        renderModal();
+      };
+    });
     $('mBack2').onclick = () => { UP.step = 1; renderModal(); };
-    $('mNext2').onclick = () => { if (UP.file) { UP.step = 3; renderModal(); } };
+    $('mNext2').onclick = () => { if (itemsListos()) { UP.step = 3; renderModal(); } };
   } else {
-    if (title) title.textContent = 'Cargar informe · confirmar';
-    const chk = confirmarSerie(UP.serie, UP.textoPdf);
-    const verdict = !UP.textoPdf
-      ? `<div class="verdict wn"><span>⚠</span><span>No se pudo leer el texto del PDF; verifica manualmente la serie.</span></div>`
-      : chk.coincide
-        ? `<div class="verdict gd"><span>✓</span><span>La serie <b>${esc(UP.serie)}</b> coincide con la impresa en el PDF.</span></div>`
-        : `<div class="verdict bd"><span>✕</span><span>La serie <b>${esc(UP.serie)}</b> NO se encontró en el PDF. Revisa antes de almacenar.</span></div>`;
+    if (title) title.textContent = 'Cargar informes · confirmar';
+    const filas = UP.items
+      .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0))
+      .map((it) => {
+        const chk = confirmarSerie(UP.serie, it.textoPdf);
+        const verdict = !it.textoPdf
+          ? `<span class="verdict wn"><span>⚠</span><span>Serie no verificada</span></span>`
+          : chk.coincide
+            ? `<span class="verdict gd"><span>✓</span><span>Serie coincide</span></span>`
+            : `<span class="verdict bd"><span>✕</span><span>Serie NO hallada</span></span>`;
+        return `<div class="crow">` +
+          `<span class="cr-ano">${esc(it.ano)}</span>` +
+          `<span class="cr-name" title="${esc(it.file.name)}">${esc(it.file.name)}</span>` +
+          verdict + `</div>`;
+      }).join('');
     body.innerHTML =
-      `<div class="cmp">` +
-      `<div class="cbox"><div class="ch">Serie ingresada</div><div class="cv">${esc(UP.serie)}</div></div>` +
-      `<div class="cbox"><div class="ch">Año</div><div class="cv">${esc(UP.ano)}</div></div></div>` +
-      verdict +
+      `<div class="cmp" style="grid-template-columns:1fr">` +
+      `<div class="cbox"><div class="ch">Serie ingresada</div><div class="cv">${esc(UP.serie)}</div></div></div>` +
+      `<div class="flbl" style="margin-top:12px">Informes a almacenar (${UP.items.length})</div>` +
+      `<div class="clist">${filas}</div>` +
       `<label class="chk"><input type="checkbox" id="store" ${UP.store ? 'checked' : ''}>` +
-      `<span>Almacenar el informe y su PDF original (si Firebase está activo).</span></label>` +
+      `<span>Almacenar los informes y sus PDF originales (si Firebase está activo).</span></label>` +
       `<label class="chk"><input type="checkbox" id="chk">` +
       `<span>Confirmo que los datos son correctos.</span></label>` +
       `<div class="mfoot">` +
@@ -276,15 +320,28 @@ function renderModal() {
   }
 }
 
-async function elegirArchivo(file) {
-  UP.file = file;
-  UP.textoPdf = '';
+/* Añade uno o varios archivos a UP.items (descarta no-PDF) y extrae
+   el texto de cada uno en segundo plano para confirmar la serie. */
+function agregarArchivos(fileList) {
+  const archivos = Array.from(fileList || [])
+    .filter((f) => f && f.type === 'application/pdf');
+  if (!archivos.length) {
+    toast('Adjunta archivos PDF.', 'warn');
+    return;
+  }
+  archivos.forEach((file) => {
+    const item = { id: ++_itemSeq, file, ano: null, textoPdf: '' };
+    UP.items.push(item);
+    extraerTexto(item);
+  });
   renderModal();
-  // Extracción de texto con pdf.js (si está disponible) para confirmar serie
+}
+
+async function extraerTexto(item) {
   try {
     const pdfjs = window.pdfjsLib;
-    if (pdfjs && file.type === 'application/pdf') {
-      const buf = await file.arrayBuffer();
+    if (pdfjs && item.file.type === 'application/pdf') {
+      const buf = await item.file.arrayBuffer();
       const pdf = await pdfjs.getDocument({ data: buf }).promise;
       let texto = '';
       const maxPag = Math.min(pdf.numPages, 4);
@@ -293,7 +350,7 @@ async function elegirArchivo(file) {
         const tc = await page.getTextContent();
         texto += ' ' + tc.items.map((it) => it.str).join(' ');
       }
-      UP.textoPdf = texto;
+      item.textoPdf = texto;
     }
   } catch (err) {
     console.warn('[pruebas-electricas] no se pudo extraer texto del PDF', err);
@@ -303,31 +360,39 @@ async function elegirArchivo(file) {
 async function storeReport() {
   const unidadId = UP.serie;
   const body = $('mBody');
-  body.innerHTML = `<div class="proc"><div class="spin"></div>` +
+  const total = UP.items.length;
+  const procHtml = (i) => `<div class="proc"><div class="spin"></div>` +
     `<div class="bigp">Procesando…</div>` +
-    `<p class="muted small">Guardando informe ${esc(UP.ano)} de ${esc(UP.serie)}.</p></div>`;
+    `<p class="muted small">Guardando informe ${i} de ${total} de ${esc(UP.serie)}.</p></div>`;
+  body.innerHTML = procHtml(1);
   try {
     if (UP.store && isReady()) {
-      let pdfMeta = null;
-      if (UP.file) pdfMeta = await subirPDF(unidadId, UP.file);
-      const informe = sanitizarInforme({
-        unidadId, serie: UP.serie, ano: UP.ano,
-        pdf: pdfMeta ? { ...pdfMeta, estado: 'pendiente_extraccion' } : undefined
-      });
       const uid = (window.__sgmSession && window.__sgmSession.user && window.__sgmSession.user.uid) || null;
-      await crearInforme(unidadId, informe, uid);
+      const ordenados = UP.items.slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+      let i = 0;
+      for (const item of ordenados) {
+        i += 1;
+        body.innerHTML = procHtml(i);
+        let pdfMeta = null;
+        if (item.file) pdfMeta = await subirPDF(unidadId, item.file);
+        const informe = sanitizarInforme({
+          unidadId, serie: UP.serie, ano: item.ano,
+          pdf: pdfMeta ? { ...pdfMeta, estado: 'pendiente_extraccion' } : undefined
+        });
+        await crearInforme(unidadId, informe, uid);
+      }
       body.innerHTML = `<div class="proc"><div class="okc">✓</div>` +
-        `<div class="bigp">Informe almacenado</div>` +
+        `<div class="bigp">${total === 1 ? 'Informe almacenado' : `${total} informes almacenados`}</div>` +
         `<p class="muted small">La matriz y las tablas se actualizarán en vivo.</p></div>`;
       setTimeout(closeUpload, 1400);
-      toast(`Informe ${UP.ano} almacenado.`);
+      toast(total === 1 ? 'Informe almacenado.' : `${total} informes almacenados.`);
     } else {
       body.innerHTML = `<div class="proc"><div class="okc">✓</div>` +
         `<div class="bigp">Modo demostración</div>` +
-        `<p class="muted small">Firebase no está activo: el informe no se persistió. ` +
+        `<p class="muted small">Firebase no está activo: los informes no se persistieron. ` +
         `Conecta el backend para almacenar.</p></div>`;
       setTimeout(closeUpload, 1800);
-      toast('Sin backend: informe no persistido.', 'warn');
+      toast('Sin backend: informes no persistidos.', 'warn');
     }
   } catch (err) {
     console.error('[pruebas-electricas] storeReport', err);
@@ -335,7 +400,7 @@ async function storeReport() {
       `<p class="muted small">${esc(err.message || err)}</p>` +
       `<div class="mfoot"><button class="btn btn-ghost" id="mClose">Cerrar</button></div></div>`;
     const c = $('mClose'); if (c) c.onclick = closeUpload;
-    toast('Error al almacenar el informe.', 'warn');
+    toast('Error al almacenar los informes.', 'warn');
   }
 }
 
