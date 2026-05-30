@@ -26,7 +26,7 @@ import {
   crearInforme, subirPDF
 } from './data/pruebas_electricas.js';
 import {
-  sanitizarInforme, confirmarSerie
+  sanitizarInforme, confirmarSerie, detectarAno
 } from './domain/pruebas_electricas_schema.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
 import { renderInformes, mountTablas } from './ui/pruebas/tabla-pruebas.js';
@@ -243,20 +243,28 @@ function renderModal() {
     };
   } else if (UP.step === 2) {
     if (title) title.textContent = 'Cargar informes · PDF y año';
+    const faltanAno = UP.items.some((it) => it.ano == null);
     const lista = UP.items.map((it) => {
       const anoVal = it.ano == null ? '' : it.ano;
-      return `<div class="fitem" data-id="${it.id}">` +
+      const flag = it.ano == null ? ' fi-falta' : '';
+      return `<div class="fitem${flag}" data-id="${it.id}">` +
         `<span class="fi-doc">📄</span>` +
         `<span class="fi-name" title="${esc(it.file.name)}">${esc(it.file.name)}</span>` +
         `<input class="fi-ano" type="number" min="1950" max="2100" ` +
         `data-id="${it.id}" value="${anoVal}" placeholder="Año">` +
         `<button class="fi-del" data-id="${it.id}" title="Quitar">✕</button></div>`;
     }).join('');
+    const hint = UP.items.length
+      ? `<p class="muted small" style="margin:2px 0 10px">El año se detecta automáticamente del informe; ` +
+        (faltanAno
+          ? `escribe el año de los que aparecen resaltados.</p>`
+          : `puedes corregirlo si hace falta.</p>`)
+      : '';
     body.innerHTML =
       `<div class="drop" id="drop">Arrastra uno o varios PDF aquí o haz clic para elegirlos</div>` +
       `<input type="file" id="fileIn" accept="application/pdf" multiple style="display:none">` +
       (UP.items.length
-        ? `<div class="flist">${lista}</div>`
+        ? hint + `<div class="flist">${lista}</div>`
         : `<p class="muted small" style="margin-top:10px">Aún no has adjuntado informes.</p>`) +
       `<div class="mfoot">` +
       `<button class="btn btn-ghost" id="mBack2">Atrás</button>` +
@@ -330,7 +338,9 @@ function agregarArchivos(fileList) {
     return;
   }
   archivos.forEach((file) => {
-    const item = { id: ++_itemSeq, file, ano: null, textoPdf: '' };
+    // Año deducido del nombre de archivo (determinista) antes de leer el PDF.
+    const porNombre = detectarAno({ filename: file.name });
+    const item = { id: ++_itemSeq, file, ano: porNombre.ano, textoPdf: '' };
     UP.items.push(item);
     extraerTexto(item);
   });
@@ -355,6 +365,12 @@ async function extraerTexto(item) {
   } catch (err) {
     console.warn('[pruebas-electricas] no se pudo extraer texto del PDF', err);
   }
+  // Si el nombre no dio año, intentar deducirlo del contenido del PDF.
+  if (item.ano == null) {
+    const det = detectarAno({ texto: item.textoPdf, filename: item.file.name });
+    item.ano = det.ano;
+  }
+  if (UP.step === 2) renderModal();
 }
 
 async function storeReport() {

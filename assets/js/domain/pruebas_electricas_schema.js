@@ -152,3 +152,70 @@ export function confirmarSerie(serieIngresada, textoPdf) {
   const encontrada = norm(texto).includes(norm(serie));
   return { coincide: encontrada, serieIngresada: serie, encontrada };
 }
+
+const ANO_MIN = 1950;
+const ANO_MAX = 2100;
+
+/** ¿es un año plausible para un informe? */
+function anoValido(y) {
+  return Number.isInteger(y) && y >= ANO_MIN && y <= ANO_MAX;
+}
+
+/** Convierte una fecha compacta (YYYYMMDD o YYMMDD) en su año, o null. */
+function anoDeFechaCompacta(digits) {
+  let y, m, d;
+  if (digits.length === 8) {
+    y = +digits.slice(0, 4); m = +digits.slice(4, 6); d = +digits.slice(6, 8);
+  } else if (digits.length === 6) {
+    y = 2000 + +digits.slice(0, 2); m = +digits.slice(2, 4); d = +digits.slice(4, 6);
+  } else {
+    return null;
+  }
+  if (!anoValido(y) || m < 1 || m > 12 || d < 1 || d > 31) return null;
+  return y;
+}
+
+/**
+ * Detecta el año del informe SIN pedírselo al usuario. Prioriza la
+ * fecha compacta con la que arrancan los nombres de archivo del
+ * tablero (YYMMDD o YYYYMMDD, ej. "130823-…" → 2013, "20250510 …" →
+ * 2025) por ser determinista, y cae al texto del PDF (fechas
+ * dd/mm/aaaa o aaaa-mm-dd, y como último recurso el año de 4 cifras
+ * más reciente dentro del rango).
+ * @param {{texto?:string, filename?:string}} src
+ * @returns {{ano:number|null, fuente:'filename'|'texto-fecha'|'texto-ano'|null}}
+ */
+export function detectarAno(src) {
+  const filename = str(src && src.filename);
+  const texto = str(src && src.texto);
+
+  // 1) Fecha compacta al inicio del nombre de archivo.
+  const mPref = filename.match(/^\s*(\d{6,8})/);
+  if (mPref) {
+    const y = anoDeFechaCompacta(mPref[1]);
+    if (y != null) return { ano: y, fuente: 'filename' };
+  }
+
+  // 2) Fecha completa en el texto (dd/mm/aaaa, dd-mm-aaaa o aaaa-mm-dd).
+  let m;
+  const dmy = /\b(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})\b/g;
+  while ((m = dmy.exec(texto))) {
+    const y = +m[3];
+    if (anoValido(y)) return { ano: y, fuente: 'texto-fecha' };
+  }
+  const ymd = /\b(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})\b/g;
+  while ((m = ymd.exec(texto))) {
+    const y = +m[1];
+    if (anoValido(y)) return { ano: y, fuente: 'texto-fecha' };
+  }
+
+  // 3) Cualquier año de 4 cifras en rango: el más reciente.
+  const sueltos = [];
+  const re = /\b(19[5-9]\d|20\d\d|2100)\b/g;
+  while ((m = re.exec(texto))) sueltos.push(+m[1]);
+  if (sueltos.length) {
+    return { ano: Math.max(...sueltos), fuente: 'texto-ano' };
+  }
+
+  return { ano: null, fuente: null };
+}
