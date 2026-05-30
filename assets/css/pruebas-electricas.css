@@ -151,6 +151,8 @@
 .pe-scope .btn-sm.danger:hover{background:rgba(200,50,60,.08);border-color:#b3303c;color:#8f2530;}
 .pe-scope .btn-sm:disabled{opacity:.5;cursor:not-allowed;}
 .pe-scope .r-pending{background:rgba(15,138,153,.04);}
+.pe-scope .pe-del-bar{display:flex;gap:8px;justify-content:flex-end;margin:0 0 10px;}
+.pe-scope .pe-chk{width:15px;height:15px;cursor:pointer;accent-color:var(--pe-teal);}
 
 /* modal · overlay vive fuera de .pe-scope (es fixed full-screen),
    pero se prefija pe- para aislar de cualquier modal de Aqua */
