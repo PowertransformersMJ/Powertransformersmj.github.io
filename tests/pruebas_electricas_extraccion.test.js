@@ -64,15 +64,49 @@ describe('extraerMediciones · tan δ por código', () => {
     const m = extraerMediciones(texto);
     assert.equal(m.tand.find((t) => t.code === 'CL'), undefined);
   });
+  test('formato columnar Doble: %PF = 3º número desde el final', () => {
+    // Fila real: "CODE kV mA Watts %PF CorrFctr Cap"
+    const texto = 'CH 10.0 5.231 0.020 0.39 0.998 4.123';
+    const m = extraerMediciones(texto);
+    const byCode = Object.fromEntries(m.tand.map((t) => [t.code, t.valor_pct]));
+    assert.equal(byCode.CH, 0.39);
+  });
+  test('formato columnar Doble: descarta filas combinadas "X + Y"', () => {
+    const texto = 'CH + CHL 10.0 8.0 0.5 5.50 0.99 7.0  CH 10.0 5.2 0.02 0.39 0.99 4.1';
+    const m = extraerMediciones(texto);
+    const byCode = Object.fromEntries(m.tand.map((t) => [t.code, t.valor_pct]));
+    assert.equal(byCode.CH, 0.39);   // gana la fila aislada, no el 5.50 combinado
+  });
+  test('formato GST/UST: tan δ es el número antes de "%", no la nF', () => {
+    const texto = 'GST g - A+B CH 2.6776 nF 0.1518 % GST g - A+B CH 2.6780 nF 0.1456 %';
+    const m = extraerMediciones(texto);
+    const byCode = Object.fromEntries(m.tand.map((t) => [t.code, t.valor_pct]));
+    // toma la ÚLTIMA ocurrencia (definitiva), nunca la capacitancia
+    assert.equal(byCode.CH, 0.1456);
+  });
+  test('formato GST/UST: no toma capacitancia de fila combinada CH+CHL', () => {
+    const texto = 'GST CH+CHL 8.8528 nF 0.1135 %';
+    const m = extraerMediciones(texto);
+    const byCode = Object.fromEntries(m.tand.map((t) => [t.code, t.valor_pct]));
+    assert.equal(byCode.CH, undefined);   // 8.8528 nF NO es tan δ
+    assert.equal(byCode.CHL, undefined);
+  });
+  test('formato GST/UST: código partido por pdf.js ("c hl" → CHL)', () => {
+    const texto = 'UST - A C HL 6.1764 nF 0.0996 %';
+    const m = extraerMediciones(texto);
+    const byCode = Object.fromEntries(m.tand.map((t) => [t.code, t.valor_pct]));
+    assert.equal(byCode.CHL, 0.0996);
+  });
 });
 
 describe('extraerMediciones · excitación', () => {
-  test('Δ% calculado de tres corrientes en mA', () => {
+  test('Δ% entre las dos fases mayores (no max−min)', () => {
     const texto = 'Corriente de excitacion: H1 10 mA H2 11 mA H3 12 mA';
     const m = extraerMediciones(texto);
-    // (12-10)/12*100 = 16.7
+    // El desbalance normativo es entre las dos fases MAYORES:
+    // (12−11)/12·100 = 8.33 (la fase central cae naturalmente).
     assert.equal(m.excitacion.corriente_ma, 12);
-    assert.equal(m.excitacion.delta_pct, 16.7);
+    assert.equal(m.excitacion.delta_pct, 8.33);
     assert.ok(m._diagnostico.campos.includes('excitacion'));
   });
   test('Δ% declarado explícito gana sobre el cálculo', () => {
