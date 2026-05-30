@@ -22,9 +22,11 @@ import {
 } from '../assets/js/domain/pruebas_electricas_schema.js';
 import { calificarPrueba } from '../assets/js/ui/pruebas/semaforo.js';
 
-/* ─── Reconstrucción del seed (idéntico a SEED_LOCAL del data layer) ── */
-// Si el data layer cambia su seed, este fixture debe seguirlo para que
-// el test refleje lo que la vista muestra offline.
+/* ─── Fixture de informes para los tests ──────────────────────────── */
+// El data layer ya NO tiene seed de demostración (interfaz en tiempo
+// real · solo datos reales). Este fixture es propio del test: ejercita
+// el sanitizador del dominio y la calificación de la UI con un set
+// representativo, sin acoplarse al data layer.
 function seedInformes() {
   return [2012, 2014, 2020].map((ano, i) => sanitizarInforme({
     unidadId: '173523-15510', serie: '173523-15510', ano,
