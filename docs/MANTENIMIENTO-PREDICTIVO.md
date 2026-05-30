@@ -37,7 +37,7 @@ original.
 │  pruebas_         │ │  pruebas_            │ │  semaforo.js     │
 │  electricas_      │ │  electricas.js       │ │  tabla-pruebas.js│
 │  semaforo.js      │ │   · onSnapshot live  │ │  grafico-svg.js  │
-│  pruebas_         │ │   · SEED_LOCAL fallbk│ │                  │
+│  pruebas_         │ │   · solo datos reales│ │                  │
 │  electricas_      │ │   · sanitiza+deepClean│ │ (sin Firebase;   │
 │  schema.js        │ │  _firestore_clean.js │ │  puro DOM/SVG)   │
 │ (sin Firebase ·   │ │                      │ │                  │
@@ -49,7 +49,7 @@ original.
 |---|---|---|---|
 | **Dominio** | `assets/js/domain/pruebas_electricas_semaforo.js` | Calificadores + umbrales **congelados** del semáforo (reglas de negocio). | ❌ ninguna |
 | **Dominio** | `assets/js/domain/pruebas_electricas_schema.js` | Sanitizadores y validadores de `unidad` e `informe`. | ❌ ninguna |
-| **Datos** | `assets/js/data/pruebas_electricas.js` | Lectura realtime (`onSnapshot`), escritura (sanitiza + `deepClean`), Storage (PDF). Fallback `SEED_LOCAL`. | ✅ (CDN gstatic) |
+| **Datos** | `assets/js/data/pruebas_electricas.js` | Lectura realtime (`onSnapshot`), escritura (sanitiza + `deepClean`), Storage (PDF). Sin Firebase → emite vacío (solo datos reales, sin seed). | ✅ (CDN gstatic) |
 | **UI** | `assets/js/ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js` | Render puro a DOM/SVG. | ❌ ninguna |
 | **Controlador** | `assets/js/pruebas-electricas-shell.js` | Entrypoint: cablea datos ↔ UI, KPIs, modal de carga. | indirecta |
 | **Vista** | `pages/pruebas-electricas.html` | Marcado + carga de scripts. | — |
@@ -57,9 +57,10 @@ original.
 
 **Por qué esta separación:** el dominio y la UI no importan Firebase,
 así que se prueban con `node --test` sin red. La capa de datos es el
-único punto acoplado al SDK (importado por CDN gstatic), y queda
-intercambiable: la vista funciona offline con `SEED_LOCAL` y en vivo
-con Firestore sin tocar UI ni dominio.
+único punto acoplado al SDK (importado por CDN gstatic). Es una
+interfaz en tiempo real · solo datos reales: sin Firebase configurado
+las suscripciones emiten listas vacías (estado vacío en la vista) y
+con Firestore se llenan en vivo, sin tocar UI ni dominio.
 
 ---
 
@@ -123,18 +124,20 @@ las mismas reglas.
 
 ---
 
-## 4. Fuente de datos: local vs Firestore
+## 4. Fuente de datos: solo datos reales (interfaz en tiempo real)
 
-La capa `data/pruebas_electricas.js` es **adaptable** sin cambios en la UI:
+La capa `data/pruebas_electricas.js` muestra **únicamente** lo que el
+usuario sube; no hay dataset de demostración:
 
 - **Firebase configurado** (`isReady()` → `isFirebaseConfigured && getDbSafe()`):
   `suscribirUnidades` / `suscribirInformes` usan `onSnapshot` en vivo.
-- **Sin Firebase:** caen a `SEED_LOCAL` — la unidad real `173523-15510`
-  del tablero original con 3 informes (2012, 2014, 2020), con los
-  mismos números que alimentan las gráficas. El `unsubscribe` es no-op.
+- **Sin Firebase:** las suscripciones emiten una lista vacía una sola
+  vez (`onData([])`) y devuelven un `unsubscribe` no-op; `obtenerUnidad`
+  retorna `null` y `listarInformes` retorna `[]`.
 
-Esto permite (a) que la vista funcione offline sin backend, (b) que
-los tests de integración usen un mock determinístico sin red.
+Consecuencia: sin informes cargados la vista queda en estado vacío
+(parque sin unidades, gráficas "Sin informes cargados", tablas e
+historial vacíos). Todo lo visible se deriva de los informes reales.
 
 ---
 
@@ -147,9 +150,10 @@ npm run test:unit     # node --test tests/*.test.js
 - `tests/pruebas_electricas_semaforo.test.js` — valores **límite** de
   cada calificador + `estadoGlobal` + congelado de `UMBRALES`
   (regresión de reglas de negocio).
-- `tests/pruebas_electricas_data.test.js` — integración del `SEED_LOCAL`
-  y schema (piezas sin dependencia del CDN; el módulo de datos completo
-  no se importa en Node porque trae el SDK Firebase desde gstatic).
+- `tests/pruebas_electricas_data.test.js` — sanitizadores del schema y
+  calificación de la UI con un fixture propio (piezas sin dependencia
+  del CDN; el módulo de datos completo no se importa en Node porque
+  trae el SDK Firebase desde gstatic).
 
 ---
 
