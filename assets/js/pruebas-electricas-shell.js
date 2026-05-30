@@ -23,7 +23,7 @@
 import {
   SEED_LOCAL, isReady,
   suscribirUnidades, suscribirInformes,
-  crearInforme, subirPDF
+  guardarUnidad, crearInforme, subirPDF
 } from './data/pruebas_electricas.js';
 import {
   sanitizarInforme, confirmarSerie, detectarAno
@@ -236,9 +236,18 @@ function renderModal() {
       `<button class="btn btn-ghost" id="mCancel">Cancelar</button>` +
       `<button class="btn btn-primary" id="mNext1">Continuar</button></div>`;
     $('mCancel').onclick = closeUpload;
-    $('mNext1').onclick = () => {
+    $('mNext1').onclick = async () => {
       UP.serie = $('serIn').value.trim();
       if (!UP.serie) return toast('Ingresa el número de serie.', 'warn');
+      // Materializa el doc padre de la unidad (docId = serie) en cuanto
+      // se confirma la serie. Un padre con solo subcolección es
+      // "fantasma" en Firestore y NO aparece en suscribirUnidades; al
+      // hacer merge aquí, cualquier informe ya cargado bajo esta serie
+      // (p. ej. los previos a este arreglo) emerge en tiempo real.
+      if (isReady()) {
+        try { await guardarUnidad({ serie: UP.serie }); }
+        catch (e) { console.warn('[pruebas] no se pudo materializar la unidad:', e); }
+      }
       UP.step = 2; renderModal();
     };
   } else if (UP.step === 2) {
@@ -384,6 +393,11 @@ async function storeReport() {
   try {
     if (UP.store && isReady()) {
       const uid = (window.__sgmSession && window.__sgmSession.user && window.__sgmSession.user.uid) || null;
+      // Materializa el doc de la unidad (docId = serie) antes de los
+      // informes: un padre con solo subcolección es "fantasma" en
+      // Firestore y NO aparece en la query de suscribirUnidades, así
+      // que sin esto la unidad nunca se vería en el parque en vivo.
+      await guardarUnidad({ serie: unidadId });
       const ordenados = UP.items.slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
       let i = 0;
       for (const item of ordenados) {
