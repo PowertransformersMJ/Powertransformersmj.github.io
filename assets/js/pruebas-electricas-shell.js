@@ -401,7 +401,9 @@ async function extraerTexto(item) {
       const buf = await item.file.arrayBuffer();
       const pdf = await pdfjs.getDocument({ data: buf }).promise;
       let texto = '';
-      const maxPag = Math.min(pdf.numPages, 4);
+      // Las mediciones (tan δ, excitación, etc.) viven en páginas
+      // intermedias (4–8 típicamente); leer todo el informe acotado.
+      const maxPag = Math.min(pdf.numPages, 30);
       for (let i = 1; i <= maxPag; i++) {
         const page = await pdf.getPage(i);
         const tc = await page.getTextContent();

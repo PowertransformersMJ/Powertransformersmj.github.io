@@ -74,21 +74,113 @@ function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&'); }
 function tandDeCodigo(texto, alias) {
   for (const a of alias) {
     const tok = escapeRe(a);
-    // límite de palabra a ambos lados para alias cortos tipo "cl"
-    const re = new RegExp(`(?:^|[^a-z0-9])${tok}(?![a-z0-9])[^\\d\\n]{0,24}?${NUM}\\s*%?`, 'i');
+    // límite de palabra a ambos lados para alias cortos tipo "cl".
+    // El '+' también delimita: en una fila combinada "CH + CHL" el
+    // "ch" precede a un '+' y el "chl" sigue a un '+'; ninguno debe
+    // tomarse como medición aislada (su número es de la combinación).
+    const re = new RegExp(`(?:^|[^a-z0-9+])${tok}(?![a-z0-9+])[^\\d\\n]{0,24}?${NUM}\\s*%?`, 'i');
     const m = texto.match(re);
     if (m) {
       const v = parseNum(m[1]);
+      // Rechaza capacitancias (formato GST/UST "… nF …"): el número
+      // tomado no debe ir seguido de "nF" (eso sería pico-faradios,
+      // no el factor de potencia). Evita el falso positivo 8.85.
+      const resto = texto.slice(m.index + m[0].length, m.index + m[0].length + 6);
+      if (/^\s*n\s*f/i.test(resto)) continue;
       if (v != null && v >= 0 && v <= 10) return { valor_pct: v, alias: a };
     }
   }
   return null;
 }
 
+/* ─── tan δ · formato puente capacitancia GST/UST (vendor 2020) ──── */
+// Otra familia de informe lineariza así:
+//   "<CODE> <Capacitancia> nF <tanδ> %"
+// donde el tan δ es el número JUSTO ANTES de "%". pdf.js parte algunos
+// códigos ("c hl"→CHL, "c l"→CL, "cl t"→CLT) y el informe los repite
+// por pasos de tensión: la ÚLTIMA ocurrencia es la definitiva. Las
+// filas combinadas ("X + Y") se descartan (no son aislamiento puro) y
+// el código "CTH" del informe equivale a CHT (AT-BT) del tablero.
+const TAND_GSTUST = {
+  CH:  ['c\\s*h'],
+  CHL: ['c\\s*h\\s*l'],
+  CL:  ['c\\s*l'],
+  CLT: ['c\\s*l\\s*t'],
+  CT:  ['c\\s*t'],
+  CHT: ['c\\s*t\\s*h', 'c\\s*h\\s*t']
+};
+
+function extraerTandGstUst(texto) {
+  if (!/\bn\s*f\b/i.test(texto)) return {};   // formato no presente
+  const out = {};
+  for (const code of Object.keys(TAND_GSTUST)) {
+    let val = null;
+    for (const pat of TAND_GSTUST[code]) {
+      // grupo 1 = capacitancia (nF) · grupo 2 = tan δ (% antes de "%")
+      const re = new RegExp(`(?:^|[^a-z0-9+])${pat}\\s+${NUM}\\s*n\\s*f\\s+${NUM}\\s*%`, 'gi');
+      let m;
+      while ((m = re.exec(texto)) != null) {
+        const v = parseNum(m[2]);
+        if (v != null && v >= 0 && v <= 10) val = v;   // la última gana
+      }
+    }
+    if (val != null) out[code] = val;
+  }
+  return out;
+}
+
+/* ─── tan δ · formato columnar Doble (M-series 2012/2014) ──────── */
+// pdf.js linealiza la tabla del informe Doble en orden de fila:
+//   "CODE [kV] mA Watts %PF CorrFctr Cap"
+// El %PF (factor de potencia corregido = tan δ) es el TERCER número
+// desde el final de la corrida numérica de una fila de código AISLADO.
+// Deben descartarse las filas combinadas ("X + Y") y las de medición
+// auxiliar ("X(UST)" → token "chl(ust)" ≠ "chl"). La regla del tercio
+// final es robusta a que la columna kV aparezca o no en la fila.
+const CODES_TAND = ['ch', 'chl', 'cl', 'clt', 'ct', 'cht'];
+
+function esTokenNumerico(tok) {
+  return /^-?\d[\d.,]*$/.test(tok);
+}
+
+function extraerTandColumnar(texto) {
+  const toks = texto.split(/\s+/).filter(Boolean);
+  const out = {};
+  for (let i = 0; i < toks.length; i++) {
+    const code = toks[i];
+    if (!CODES_TAND.includes(code)) continue;
+    const up = code.toUpperCase();
+    if (out[up] != null) continue;                 // primera fila aislada gana
+    const prev = i > 0 ? toks[i - 1] : '';
+    const next = i + 1 < toks.length ? toks[i + 1] : '';
+    if (prev === '+' || next === '+') continue;     // fila combinada "X + Y"
+    if (!esTokenNumerico(next)) continue;           // debe iniciar corrida numérica
+    const run = [];
+    let j = i + 1;
+    while (j < toks.length && esTokenNumerico(toks[j])) { run.push(toks[j]); j++; }
+    if (run.length < 3) continue;
+    const pf = parseNum(run[run.length - 3]);
+    if (pf != null && pf >= 0 && pf <= 10) out[up] = pf;
+  }
+  return out;
+}
+
 function extraerTand(texto) {
   const out = [];
   const traza = {};
+  const col = extraerTandColumnar(texto);
+  const gst = extraerTandGstUst(texto);
   for (const code of Object.keys(ALIAS_TAND)) {
+    if (col[code] != null) {
+      out.push({ code, valor_pct: col[code] });
+      traza[code] = `${col[code]}% (columnar Doble)`;
+      continue;
+    }
+    if (gst[code] != null) {
+      out.push({ code, valor_pct: gst[code] });
+      traza[code] = `${gst[code]}% (puente GST/UST)`;
+      continue;
+    }
     const hit = tandDeCodigo(texto, ALIAS_TAND[code]);
     if (hit) {
       out.push({ code, valor_pct: hit.valor_pct });
@@ -117,35 +209,75 @@ function tras(texto, etiquetas, { min, max, unidad } = {}) {
 }
 
 /* ─── Corriente de excitación · Δ entre fases ─────────────────── */
+// El desbalance normativo es entre las DOS fases mayores del devanado
+// AT (la fase central cae naturalmente más baja): Δ = (mayor − 2ª
+// mayor) / mayor · 100. NO (max−min)/max.
+function deltaDosMayores(corrientes) {
+  const desc = corrientes.slice().sort((a, b) => b - a);
+  if (desc.length < 2 || desc[0] <= 0) return null;
+  return Math.round(((desc[0] - desc[1]) / desc[0]) * 100 * 100) / 100;
+}
+
 function extraerExcitacion(texto) {
   const traza = {};
-  // (a) Δ% declarado explícitamente cerca de "excitacion".
   let delta = null;
+  let corriente_ma = null;
+
+  // (a) Δ% declarado explícitamente cerca de "excitacion".
   const reDelta = new RegExp(
     `(?:corriente de )?excitacion[^%]{0,80}?(?:delta|diferencia|desbalance|variacion|%\\s*dif)[^\\d]{0,20}?${NUM}\\s*%`, 'i');
-  let m = texto.match(reDelta);
-  if (m) { delta = parseNum(m[1]); traza.delta = `${delta}% (declarado)`; }
+  const md = texto.match(reDelta);
+  if (md) { delta = parseNum(md[1]); traza.delta = `${delta}% (declarado)`; }
 
-  // (b) Tres corrientes de fase en mA → Δ = (max−min)/max·100.
-  let corriente_ma = null;
-  const reBloque = new RegExp(`excitacion[\\s\\S]{0,200}`, 'i');
-  const blk = (texto.match(reBloque) || [''])[0];
-  const mas = [...blk.matchAll(new RegExp(`${NUM}\\s*m\\s*a\\b`, 'gi'))]
-    .map((x) => parseNum(x[1])).filter((v) => v != null && v >= 0 && v < 100000);
-  if (mas.length >= 3) {
-    const tres = mas.slice(0, 3);
-    const mx = Math.max(...tres), mn = Math.min(...tres);
-    corriente_ma = mx;
-    if (delta == null && mx > 0) {
-      delta = ((mx - mn) / mx) * 100;
-      delta = Math.round(delta * 10) / 10;
-      traza.delta = `${delta}% (calculado de ${tres.join('/')} mA)`;
+  // (b) Formato columnar Doble: la cabecera "mA Watts mA Watts mA
+  //     Watts" precede a la fila "<test> <kV> <H1mA> <H1W> <H2mA>
+  //     <H2W> <H3mA> <H3W>". Las corrientes son las columnas mA
+  //     (offsets 2,4,6 del run). Se busca en TODO el texto: el bloque
+  //     de datos vive lejos del primer título "excitación".
+  if (delta == null) {
+    // La cabecera puede traer una columna divisoria de una letra entre
+    // grupos ("mA Watts X mA Watts X …", vista en informes 2014); se
+    // tolera como token opcional de una sola letra.
+    const div = '(?:\\s+[a-z](?![a-z]))?';
+    const mh = texto.match(new RegExp(
+      `m\\s*a\\s+watts${div}\\s+m\\s*a\\s+watts${div}\\s+m\\s*a\\s+watts${div}([\\s\\S]{0,160})`, 'i'));
+    if (mh) {
+      const nums = [...mh[1].matchAll(new RegExp(NUM, 'g'))]
+        .map((x) => parseNum(x[1])).filter((v) => v != null);
+      if (nums.length >= 8) {
+        const fases = [nums[2], nums[4], nums[6]].filter((v) => v >= 0 && v < 100000);
+        if (fases.length === 3) {
+          corriente_ma = Math.max(...fases);
+          delta = deltaDosMayores(fases);
+          if (delta != null) {
+            traza.delta = `${delta}% (columnar Doble · fases ${fases.join('/')} mA)`;
+            traza.corriente_ma = `${corriente_ma} mA`;
+          }
+        }
+      }
     }
-    traza.corriente_ma = `${corriente_ma} mA`;
-  } else if (mas.length) {
-    corriente_ma = Math.max(...mas);
-    traza.corriente_ma = `${corriente_ma} mA`;
   }
+
+  // (c) Fallback: corrientes etiquetadas con "mA" cerca de excitación.
+  if (delta == null || corriente_ma == null) {
+    const reBloque = new RegExp(`excitacion[\\s\\S]{0,200}`, 'i');
+    const blk = (texto.match(reBloque) || [''])[0];
+    const mas = [...blk.matchAll(new RegExp(`${NUM}\\s*m\\s*a\\b`, 'gi'))]
+      .map((x) => parseNum(x[1])).filter((v) => v != null && v >= 0 && v < 100000);
+    if (mas.length >= 3) {
+      const tres = mas.slice(0, 3);
+      corriente_ma = Math.max(...tres);
+      if (delta == null) {
+        delta = deltaDosMayores(tres);
+        if (delta != null) traza.delta = `${delta}% (calculado de ${tres.join('/')} mA)`;
+      }
+      traza.corriente_ma = `${corriente_ma} mA`;
+    } else if (mas.length && corriente_ma == null) {
+      corriente_ma = Math.max(...mas);
+      traza.corriente_ma = `${corriente_ma} mA`;
+    }
+  }
+
   return { excitacion: { delta_pct: delta, corriente_ma }, traza };
 }
 
