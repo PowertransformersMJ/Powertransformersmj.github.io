@@ -28,6 +28,7 @@ import {
 import {
   sanitizarInforme, confirmarSerie, detectarAno
 } from './domain/pruebas_electricas_schema.js';
+import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
 import { renderInformes, mountTablas } from './ui/pruebas/tabla-pruebas.js';
 import { mountCharts } from './ui/pruebas/grafico-svg.js';
@@ -405,9 +406,20 @@ async function storeReport() {
         body.innerHTML = procHtml(i);
         let pdfMeta = null;
         if (item.file) pdfMeta = await subirPDF(unidadId, item.file);
+        // Extrae las 6 mediciones del texto del PDF (pdf.js ya lo dejó
+        // en item.textoPdf). La traza _diagnostico ayuda a calibrar las
+        // expresiones contra PDFs reales sin adivinar a ciegas.
+        const med = extraerMediciones(item.textoPdf || '');
+        const { _diagnostico, ...mediciones } = med;
+        console.info(`[pruebas-electricas] extracción ${esc(UP.serie)} · ${item.ano || 's/a'} →`,
+          _diagnostico.campos.length ? _diagnostico.campos.join(', ') : 'sin datos',
+          _diagnostico.traza);
         const informe = sanitizarInforme({
           unidadId, serie: UP.serie, ano: item.ano,
-          pdf: pdfMeta ? { ...pdfMeta, estado: 'pendiente_extraccion' } : undefined
+          ...mediciones,
+          pdf: pdfMeta
+            ? { ...pdfMeta, estado: _diagnostico.campos.length ? 'extraido' : 'pendiente_extraccion' }
+            : undefined
         });
         await crearInforme(unidadId, informe, uid);
       }
