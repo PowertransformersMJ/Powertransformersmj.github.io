@@ -107,11 +107,16 @@ export function renderInformes(cont, informes, opts = {}) {
   const del = !!opts.canDelete;
   const rows = docs.map((inf) => {
     const equipos = Array.isArray(inf.equipos) ? inf.equipos.join(', ') : (inf.equipos || '');
+    const selCell = del
+      ? `<td class="num"><input type="checkbox" class="pe-chk" data-sel="${esc(inf.id)}" ` +
+        `data-ano="${esc(inf.ano)}" aria-label="Seleccionar informe ${esc(inf.ano)}"></td>`
+      : '';
     const delCell = del
       ? `<td><button type="button" class="btn-sm danger" data-del="${esc(inf.id)}" ` +
         `data-ano="${esc(inf.ano)}" title="Eliminar este informe">🗑 Eliminar</button></td>`
       : '';
     return `<tr>` +
+      selCell +
       `<td>${fechaLabel(inf)}</td>` +
       `<td>${esc(inf.ejecutante) || '—'}</td>` +
       `<td class="muted small">${esc(equipos) || '—'}</td>` +
@@ -121,9 +126,20 @@ export function renderInformes(cont, informes, opts = {}) {
       delCell +
       `</tr>`;
   }).join('');
+  const toolbar = del
+    ? `<div class="pe-del-bar">` +
+      `<button type="button" class="btn-sm" data-del-sel title="Eliminar los informes marcados">` +
+      `🗑 Eliminar seleccionados</button>` +
+      `<button type="button" class="btn-sm danger" data-del-all title="Eliminar TODOS los informes de esta unidad">` +
+      `⚠ Eliminar todos</button>` +
+      `</div>`
+    : '';
   cont.innerHTML =
+    toolbar +
     `<div class="tblwrap"><table class="dt">` +
-    `<thead><tr><th>Fecha</th><th>Ejecutante</th><th>Equipos</th>` +
+    `<thead><tr>` +
+    (del ? '<th class="num"><input type="checkbox" data-sel-all aria-label="Seleccionar todos"></th>' : '') +
+    `<th>Fecha</th><th>Ejecutante</th><th>Equipos</th>` +
     `<th>Serie en PDF</th><th>Estado</th><th>Informe (PDF)</th>` +
     (del ? '<th>Eliminar</th>' : '') + `</tr></thead>` +
     `<tbody>${rows}</tbody></table></div>`;
