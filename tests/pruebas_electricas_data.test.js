@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import {
   sanitizarUnidad, validarUnidad,
   sanitizarInforme, validarInforme,
-  confirmarSerie, CONFIGS_TAND
+  confirmarSerie, detectarAno, CONFIGS_TAND
 } from '../assets/js/domain/pruebas_electricas_schema.js';
 import { calificarPrueba } from '../assets/js/ui/pruebas/semaforo.js';
 
@@ -115,6 +115,49 @@ describe('confirmarSerie (paso 3 del flujo de carga)', () => {
   });
   test('serie vacía → no coincide', () => {
     assert.equal(confirmarSerie('', 'cualquier texto').coincide, false);
+  });
+});
+
+describe('detectarAno (auto-detección del año por informe)', () => {
+  test('prefijo YYMMDD en el nombre de archivo → año 20YY', () => {
+    const r = detectarAno({ filename: '130823-pruebas.pdf' });
+    assert.equal(r.ano, 2013);
+    assert.equal(r.fuente, 'filename');
+  });
+  test('prefijo YYYYMMDD en el nombre de archivo → año exacto', () => {
+    const r = detectarAno({ filename: '20250510 informe AT.pdf' });
+    assert.equal(r.ano, 2025);
+    assert.equal(r.fuente, 'filename');
+  });
+  test('el nombre de archivo gana sobre el texto del PDF', () => {
+    const r = detectarAno({ filename: '200314-x.pdf', texto: 'fecha 01/01/1999' });
+    assert.equal(r.ano, 2020);
+    assert.equal(r.fuente, 'filename');
+  });
+  test('texto dd/mm/yyyy cuando el nombre no trae fecha', () => {
+    const r = detectarAno({ filename: 'informe.pdf', texto: 'Realizado el 14/06/2021 en sitio' });
+    assert.equal(r.ano, 2021);
+    assert.equal(r.fuente, 'texto-fecha');
+  });
+  test('texto yyyy-mm-dd', () => {
+    const r = detectarAno({ filename: 'x.pdf', texto: 'Fecha 2023-02-09' });
+    assert.equal(r.ano, 2023);
+    assert.equal(r.fuente, 'texto-fecha');
+  });
+  test('sin fecha completa → año suelto más reciente en rango', () => {
+    const r = detectarAno({ texto: 'comparativa 2014 vs 2023 del activo' });
+    assert.equal(r.ano, 2023);
+    assert.equal(r.fuente, 'texto-ano');
+  });
+  test('prefijo de fecha inválida (mes 99) no se acepta', () => {
+    const r = detectarAno({ filename: '139923-x.pdf', texto: '' });
+    assert.equal(r.ano, null);
+    assert.equal(r.fuente, null);
+  });
+  test('sin pistas → null', () => {
+    const r = detectarAno({ filename: 'documento.pdf', texto: 'sin fechas aquí' });
+    assert.equal(r.ano, null);
+    assert.equal(r.fuente, null);
   });
 });
 
