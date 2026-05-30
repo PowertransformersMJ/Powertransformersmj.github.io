@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f4f6fb">
+<meta name="color-scheme" content="light">
+<title>SGM · TRANSPOWER — Pruebas Eléctricas</title>
+<meta name="description" content="Mantenimiento Predictivo · Pruebas Eléctricas: calificación normativa por prueba y año del parque de transformadores de potencia, alimentada en vivo desde Firestore.">
+
+<!--
+  SGM · TRANSPOWER — Mantenimiento Predictivo · Pruebas Eléctricas
+  Refactor del archivo estático "Tablero Dinámico de Pruebas
+  Eléctricas.html" (TransformerOps) a arquitectura modular embebida
+  en el shell aqua del proyecto (sidebar + topbar + escena de fondo).
+
+  · CSS                  → assets/css/pruebas-electricas.css (scope .pe-scope)
+  · Dominio puro         → assets/js/domain/pruebas_electricas_{semaforo,schema}.js
+  · Data layer (vivo)    → assets/js/data/pruebas_electricas.js (onSnapshot · SEED_LOCAL)
+  · UI · componentes     → assets/js/ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js
+  · Shell · entrypoint   → assets/js/pruebas-electricas-shell.js
+
+  El semáforo normativo (colores, umbrales, reglas) se preserva tal
+  cual del tablero original. La matriz, tablas e historial se derivan
+  de los informes Firestore en vivo; las gráficas usan los datasets
+  del tablero (números reales de la unidad) cuando el informe no trae
+  el detalle por fase (el schema persiste el valor sintetizado).
+-->
+
+<link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+<script type="module" src="../assets/js/auth/page-guard.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css"/>
+</head>
+<body class="aqua">
+
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Mantenimiento Predictivo / Pruebas Eléctricas</div>
+    <h1 class="page-title">Pruebas <em>Eléctricas</em></h1>
+    <p class="page-subtitle">
+      Calificación normativa por prueba y año · tangente δ, excitación, relación,
+      resistencia, aislamiento y collar caliente. Derivada en vivo de los informes
+      cargados por unidad.
+    </p>
+  </div>
+
+  <div class="pe-scope">
+
+    <!-- ===== Resumen del parque ===== -->
+    <section id="parque">
+      <h2>Resumen del parque</h2>
+      <p>Visión consolidada de las unidades con pruebas eléctricas registradas y su estado normativo vigente.</p>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kpi-unidades">1</div><div class="l">Transformadores</div></div>
+        <div class="kpi"><div class="v" id="kpi-subestaciones">1</div><div class="l">Subestaciones</div></div>
+        <div class="kpi"><div class="v" id="kpi-informes">—</div><div class="l">Informes acumulados</div></div>
+        <div class="kpi ok"><div class="v" id="kpi-estado">—</div><div class="l">Estado vigente</div></div>
+      </div>
+      <div class="tgrid" id="parque-grid">
+        <button type="button" class="addtile" onclick="openUpload()">
+          <span class="pl">＋</span>
+          <span>Cargar informe</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- ===== Carga de informe ===== -->
+    <section id="carga">
+      <h2>Carga de informe</h2>
+      <div class="card">
+        <p><b>1.</b> Confirma el número de serie de la unidad.</p>
+        <p><b>2.</b> Adjunta el PDF del informe (se valida la serie impresa).</p>
+        <p><b>3.</b> Confirma y almacena: la matriz y las tablas se actualizan en vivo.</p>
+        <button class="btn btn-primary" onclick="openUpload()">＋ Cargar informe</button>
+      </div>
+      <p class="muted small">El PDF original queda accesible desde el historial de la unidad. La calificación se recalcula con el dominio normativo, no se toma del documento.</p>
+    </section>
+
+    <!-- ===== Calificación global ===== -->
+    <section id="calif">
+      <h2>Calificación global por prueba y año</h2>
+      <div class="callout warn">
+        <div class="ttl">Hallazgo principal</div>
+        Tangente δ de la configuración CL superó el límite del 1 % en 2012 y 2014, con recuperación en 2020. La resistencia del devanado AT 2020 quedó marcada como “a verificar”.
+      </div>
+      <div class="matrix" id="matrix"><p class="muted small">Cargando calificación…</p></div>
+      <p class="muted small">Cada celda se calcula a partir del informe del año; el color sigue el semáforo normativo (verde · ámbar · naranja · rojo).</p>
+    </section>
+
+    <!-- ===== Identidad de la unidad ===== -->
+    <section id="identidad">
+      <h2>Identidad de la unidad</h2>
+      <div class="idgrid" id="idgrid"><p class="muted small">Cargando ficha…</p></div>
+    </section>
+
+    <!-- ===== Informes de la unidad ===== -->
+    <section id="informes">
+      <h2>Informes de la unidad <span class="norm">acceso al PDF original</span></h2>
+      <p class="muted small">Historial de informes cargados, con la serie detectada en el PDF y el enlace al documento.</p>
+      <div id="reportlist"><p class="muted small">Cargando informes…</p></div>
+    </section>
+
+    <!-- ===== Nomenclatura ===== -->
+    <section id="nomencl">
+      <h2>Nomenclatura y secciones de aislamiento</h2>
+      <div class="tblwrap"><table class="dt">
+        <thead><tr><th scope="col">Devanado</th><th scope="col">Tensión</th><th scope="col">Conexión</th><th scope="col">Fase A</th><th scope="col">Fase B (central)</th><th scope="col">Fase C</th><th scope="col">Neutro</th></tr></thead>
+        <tbody>
+          <tr><td>AT</td><td>110 kV</td><td>YN</td><td><span class="ph pa">H1</span></td><td><span class="ph pb">H2</span></td><td><span class="ph pc">H3</span></td><td><span class="ph pn">H0</span></td></tr>
+          <tr><td>MT</td><td>34.5 kV</td><td>yn</td><td><span class="ph pa">X1</span></td><td><span class="ph pb">X2</span></td><td><span class="ph pc">X3</span></td><td><span class="ph pn">X0</span></td></tr>
+          <tr><td>BT</td><td>13.8 kV</td><td>d1</td><td><span class="ph pa">Y1</span></td><td><span class="ph pb">Y2</span></td><td><span class="ph pc">Y3</span></td><td><span class="muted2">—</span></td></tr>
+        </tbody>
+      </table></div>
+      <h4>Tangente δ — secciones de aislamiento</h4>
+      <div class="tblwrap"><table class="dt">
+        <thead><tr><th scope="col">Config.</th><th scope="col">Aislamiento entre</th><th scope="col">Detalle</th></tr></thead>
+        <tbody>
+          <tr><td class="cfg">CH</td><td class="assoc">AT ↔ tierra</td><td class="muted small">Alta tensión contra masa</td></tr>
+          <tr><td class="cfg">CL</td><td class="assoc">MT ↔ tierra</td><td class="muted small">Media tensión contra masa</td></tr>
+          <tr><td class="cfg">CT</td><td class="assoc">BT ↔ tierra</td><td class="muted small">Baja tensión contra masa</td></tr>
+          <tr><td class="cfg">CHL</td><td class="assoc">AT ↔ MT</td><td class="muted small">Entre alta y media</td></tr>
+          <tr><td class="cfg">CLT</td><td class="assoc">MT ↔ BT</td><td class="muted small">Entre media y baja</td></tr>
+          <tr><td class="cfg">CHT</td><td class="assoc">AT ↔ BT</td><td class="muted small">Entre alta y baja</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+    <!-- ===== Tangente δ ===== -->
+    <section id="tand">
+      <h2>Tangente δ (factor de disipación) <span class="norm">IEEE 62 · C57.12.90 · C57.19.100</span></h2>
+      <div class="chartbox"><div id="c-tand"></div></div>
+      <div class="legend">
+        <span class="lg"><i style="background:#1e4e79"></i>CH</span>
+        <span class="lg"><i style="background:#6398c4"></i>CHL</span>
+        <span class="lg"><i style="background:#c0392b"></i>CL</span>
+        <span class="lg"><i style="background:#b07d12"></i>CLT</span>
+        <span class="lg"><i style="background:#1f7a4d"></i>CT</span>
+        <span class="lg"><i style="background:#6b4f9e"></i>CHT</span>
+        <span class="lg muted small">rojo: límite 1 % · ámbar: guía 0.5 %</span>
+      </div>
+      <div id="t-tand"></div>
+    </section>
+
+    <!-- ===== Corriente de excitación ===== -->
+    <section id="excit">
+      <h2>Corriente de excitación <span class="norm">IEEE Std 62</span></h2>
+      <div class="chartbox"><div id="c-exc"></div></div>
+      <div class="legend">
+        <span class="lg"><i style="background:#0f8a99"></i>Desbalance entre fases ext.</span>
+        <span class="lg muted small">rojo 10 % · ámbar 5 %</span>
+      </div>
+      <div id="t-exc"></div>
+    </section>
+
+    <!-- ===== Relación de transformación ===== -->
+    <section id="relacion">
+      <h2>Relación de transformación <span class="norm">IEC 60076-1 · C57.152-2013</span></h2>
+      <div class="chartbox"><div id="c-rel"></div></div>
+      <div class="legend">
+        <span class="lg"><i style="background:#1e4e79"></i>AT-MT</span>
+        <span class="lg"><i style="background:#6b4f9e"></i>AT-Terc</span>
+        <span class="lg muted small">rojo: límite ±0.5 %</span>
+      </div>
+      <div id="t-rel"></div>
+    </section>
+
+    <!-- ===== Resistencia de devanados ===== -->
+    <section id="resist">
+      <h2>Resistencia de devanados <span class="norm">IEC 60076-1 · IEEE 62</span></h2>
+      <div class="callout warn">
+        <div class="ttl">Dato a verificar</div>
+        En 2020 la fase central del AT midió 847.22 mΩ frente a ≈ 946 mΩ (≈ 11 %), probable error de digitación (947.22). El semáforo la marca como “verificar”.
+      </div>
+      <div class="chartbox"><div id="c-res"></div></div>
+      <div class="legend">
+        <span class="lg"><i style="background:#1e4e79"></i>AT</span>
+        <span class="lg"><i style="background:#1f7a4d"></i>MT</span>
+        <span class="lg"><i style="background:#6b4f9e"></i>BT</span>
+        <span class="lg muted small">rojo 5 % · barra rayada = verificar</span>
+      </div>
+      <div id="t-res"></div>
+    </section>
+
+    <!-- ===== Resistencia de aislamiento ===== -->
+    <section id="aislam">
+      <h2>Resistencia de aislamiento <span class="norm">Tabla NETA / fabricante</span></h2>
+      <div class="chartbox"><div id="c-ins"></div></div>
+      <div class="legend">
+        <span class="lg"><i style="background:#0f8a99"></i>Resistencia (GΩ)</span>
+        <span class="lg muted small">rojo: mínimo 1 GΩ</span>
+      </div>
+      <div id="t-ins"></div>
+    </section>
+
+    <!-- ===== Collar caliente / bujes ===== -->
+    <section id="collar">
+      <h2>Collar caliente / bujes <span class="norm">Test Data Reference Book (sec. 8)</span></h2>
+      <div class="chartbox"><div id="c-col"></div></div>
+      <div class="legend">
+        <span class="lg"><i style="background:#1f7a4d"></i>Pérdida máx (mW)</span>
+        <span class="lg muted small">rojo: límite 100 mW</span>
+      </div>
+      <div id="t-col"></div>
+    </section>
+
+    <!-- ===== Criterios normativos ===== -->
+    <section id="criterios">
+      <h2>Criterios de calificación</h2>
+      <div class="tblwrap"><table class="dt">
+        <thead><tr><th scope="col">Ensayo</th><th scope="col">Criterio</th><th scope="col">Norma</th></tr></thead>
+        <tbody>
+          <tr><td>Tangente δ</td><td>≤0.5 bueno · 0.5–0.7 normal · 0.7–1 investigar · &gt;1 excesivo</td><td class="muted small">IEEE 62 · C57.12.90</td></tr>
+          <tr><td>Corriente de excitación</td><td>I&lt;50 mA → Δ&lt;10 % · I&gt;50 mA → Δ&lt;5 %</td><td class="muted small">IEEE 62</td></tr>
+          <tr><td>Relación de transformación</td><td>≤ ±0.5 %</td><td class="muted small">IEC 60076-1 · C57.152</td></tr>
+          <tr><td>Resistencia de devanados</td><td>≤5 % corregido por temperatura</td><td class="muted small">IEC 60076-1 · IEEE 62</td></tr>
+          <tr><td>Resistencia de aislamiento</td><td>≥1 GΩ</td><td class="muted small">NETA</td></tr>
+          <tr><td>Collar caliente</td><td>&lt;100 mW</td><td class="muted small">Test Data Reference Book</td></tr>
+        </tbody>
+      </table></div>
+    </section>
+
+  </div><!-- /.pe-scope -->
+
+</main>
+
+<!-- ===== Modal de carga ===== -->
+<div class="pe-overlay" id="ov">
+  <div class="modal">
+    <div class="modal-head">
+      <span class="t" id="mTitle">Cargar informe</span>
+      <button class="x" onclick="closeUpload()" aria-label="Cerrar">✕</button>
+    </div>
+    <div class="stepbar">
+      <div class="sbi" id="sb1"></div>
+      <div class="sbi" id="sb2"></div>
+      <div class="sbi" id="sb3"></div>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+  </div>
+</div>
+<div class="pe-toast" id="toast"></div>
+<div class="pe-tip" id="tip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+<script type="module" src="../assets/js/pruebas-electricas-shell.js"></script>
+</body>
+</html>
