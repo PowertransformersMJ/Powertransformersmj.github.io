@@ -648,6 +648,28 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // ── Pruebas Eléctricas (Mantenimiento Predictivo) ──
+    // Unidad = transformador con su ficha de identidad; subcolección
+    // `informes` = un doc por año/ensayo con el resumen escalar de cada
+    // prueba (tand[] + excitacion/relacion/resistencia/aislamiento/collar)
+    // y el PDF original en Storage. Lectura para el equipo, escritura admin.
+    match /pruebas_electricas/{id} {
+      allow read: if isTeamMember();
+      allow create: if isAdmin()
+                    && request.resource.data.serie is string
+                    && request.resource.data.serie.size() > 0;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+
+      match /informes/{informeId} {
+        allow read: if isTeamMember();
+        allow create: if isAdmin()
+                      && request.resource.data.ano is number;
+        allow update: if isAdmin();
+        allow delete: if isAdmin();
+      }
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

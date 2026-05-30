@@ -86,7 +86,8 @@ Mapa completo de navegación (leer en este orden ante cualquier duda):
 4. [`docs/OPERACIONES.md`](./docs/OPERACIONES.md) — runbook de bootstrap, uso diario por rol, troubleshooting.
 5. [`docs/DEPLOY-FUNCTIONS.md`](./docs/DEPLOY-FUNCTIONS.md) — despliegue de Cloud Functions F32 (firebase login, secret Resend, costos estimados).
 6. [`docs/MANTENIMIENTO-BRIGADA.md`](./docs/MANTENIMIENTO-BRIGADA.md) — **v2.9 · módulo Mantenimiento Brigada** · calculadora Selección ONAF (ONAN→ONAF) · arquitectura, dominio puro, catálogos AFINIA + ZIEHL-ABEGG, generador de informe AFINIA imprimible, cómo extender.
-7. [`CHANGELOG.md`](./CHANGELOG.md) — release notes consolidadas v1.0 → v2.9.0.
+7. [`docs/MANTENIMIENTO-PREDICTIVO.md`](./docs/MANTENIMIENTO-PREDICTIVO.md) — **módulo Pruebas Eléctricas** · refactor del tablero TransformerOps a capas dominio/data/UI/shell · semáforo normativo congelado · Firestore realtime con fallback `SEED_LOCAL` · scripts npm · cómo extender.
+8. [`CHANGELOG.md`](./CHANGELOG.md) — release notes consolidadas v1.0 → v2.9.0.
 
 ## CI/CD
 
