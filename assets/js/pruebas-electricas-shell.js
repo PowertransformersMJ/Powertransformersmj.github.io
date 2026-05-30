@@ -23,7 +23,7 @@
 import {
   SEED_LOCAL, isReady,
   suscribirUnidades, suscribirInformes,
-  guardarUnidad, crearInforme, subirPDF
+  guardarUnidad, crearInforme, subirPDF, eliminarInforme
 } from './data/pruebas_electricas.js';
 import {
   sanitizarInforme, confirmarSerie, detectarAno
@@ -98,6 +98,14 @@ function refrescarKpisParque() {
 
 /* ─── Render de los informes de la unidad activa ──────────────── */
 
+// Borrar informes es operación admin: las rules exigen isAdmin() y el
+// botón solo se muestra con backend activo (los informes del seed son
+// de solo lectura y no tienen doc real que eliminar).
+function esAdmin() {
+  const s = window.__sgmSession;
+  return !!(s && (s.role === 'admin' || (s.profile && s.profile.rol === 'admin')));
+}
+
 function renderInformesUI(informes) {
   state.informes = informes || [];
   const u = state.unidadActiva || {};
@@ -114,7 +122,8 @@ function renderInformesUI(informes) {
   // Historial + KPI de conteo
   renderInformes($('reportlist'), state.informes, {
     serieUnidad: u.serie,
-    kpiEl: $('kpi-informes')
+    kpiEl: $('kpi-informes'),
+    canDelete: isReady() && esAdmin()
   });
 
   // KPI estado vigente
@@ -147,9 +156,37 @@ function seleccionarUnidad(u) {
   escucharInformes(u ? (u.id || u.serie) : null);
 }
 
+/* ─── Borrado de informes (delegación sobre #reportlist) ──────── */
+
+async function onClickReportlist(ev) {
+  const btn = ev.target.closest('[data-del]');
+  if (!btn) return;
+  const informeId = btn.getAttribute('data-del');
+  const ano = btn.getAttribute('data-ano') || '';
+  const u = state.unidadActiva || {};
+  const unidadId = u.id || u.serie;
+  if (!informeId || !unidadId) return;
+  if (!window.confirm(`¿Eliminar el informe ${ano} de la serie ${u.serie || unidadId}?\n` +
+      `Esta acción no se puede deshacer.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Eliminando…';
+  try {
+    await eliminarInforme(unidadId, informeId);
+    toast(`Informe ${ano} eliminado.`);
+    // La suscripción onSnapshot refresca la tabla sola.
+  } catch (err) {
+    console.error('[pruebas-electricas] eliminarInforme', err);
+    btn.disabled = false;
+    btn.textContent = '🗑 Eliminar';
+    toast('No se pudo eliminar el informe.', 'warn');
+  }
+}
+
 /* ─── Arranque ────────────────────────────────────────────────── */
 
 function arrancar() {
+  const rl = $('reportlist');
+  if (rl) rl.addEventListener('click', onClickReportlist);
   suscribirUnidades(
     (unidades) => {
       state.unidades = unidades || [];
