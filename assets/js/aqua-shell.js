@@ -267,6 +267,10 @@
         </div>
       </div>
       <div class="sb-group">
+        <div class="sb-group-title">Mantenimiento Predictivo</div>
+        <a href="${u('pages/pruebas-electricas.html')}" class="sb-item" data-key="pruebas-electricas"><span class="i"><i data-lucide="gauge"></i></span>Pruebas Eléctricas</a>
+      </div>
+      <div class="sb-group">
         <div class="sb-group-title">Análisis</div>
         <a href="${u('pages/analisis.html')}" class="sb-item" data-key="analisis"><span class="i"><i data-lucide="bar-chart-3"></i></span>Análisis e Indicadores</a>
       </div>
