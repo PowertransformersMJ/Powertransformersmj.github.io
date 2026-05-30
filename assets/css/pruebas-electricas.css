@@ -153,7 +153,8 @@
    pero se prefija pe- para aislar de cualquier modal de Aqua */
 .pe-overlay{position:fixed;inset:0;background:rgba(20,33,52,.55);backdrop-filter:blur(3px);z-index:100;display:none;align-items:center;justify-content:center;padding:20px;}
 .pe-overlay.on{display:flex;}
-.pe-overlay .modal{width:530px;max-width:100%;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(16,32,52,.22);font-family:'Source Sans 3',system-ui,sans-serif;color:#1b2733;}
+.pe-overlay .modal{width:530px;max-width:100%;max-height:calc(100vh - 40px);max-height:calc(100dvh - 40px);display:flex;flex-direction:column;background:#fff;border-radius:14px;overflow:hidden;box-shadow:0 18px 50px rgba(16,32,52,.22);font-family:'Source Sans 3',system-ui,sans-serif;color:#1b2733;}
+.pe-overlay .modal-head,.pe-overlay .stepbar{flex:none;}
 .pe-overlay .modal-head{padding:18px 22px;border-bottom:1px solid #dde3ea;display:flex;align-items:center;gap:12px;background:#f6f8fb;}
 .pe-overlay .modal-head .t{font-family:'Archivo','Source Sans 3',sans-serif;font-weight:800;font-size:1.05rem;color:#16365c;}
 .pe-overlay .modal-head .x{margin-left:auto;cursor:pointer;color:#8a97a5;font-size:1.2rem;background:none;border:none;line-height:1;}
@@ -161,7 +162,7 @@
 .pe-overlay .sbi{flex:1;height:4px;border-radius:99px;background:#eef2f7;}
 .pe-overlay .sbi.act{background:#0f8a99;}
 .pe-overlay .sbi.done{background:#1f7a4d;}
-.pe-overlay .modal-body{padding:18px 22px 22px;}
+.pe-overlay .modal-body{padding:18px 22px 22px;flex:1 1 auto;overflow-y:auto;min-height:0;}
 .pe-overlay .flbl{font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.72rem;color:#5b6876;letter-spacing:.03em;margin:6px 0 8px;}
 .pe-overlay .inp{width:100%;background:#fff;border:1px solid #dde3ea;border-radius:8px;padding:11px 13px;color:#1b2733;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.95rem;}
 .pe-overlay .inp:focus{outline:none;border-color:#0f8a99;box-shadow:0 0 0 3px rgba(15,138,153,.12);}
@@ -171,6 +172,8 @@
 /* lista de PDFs adjuntos (paso 2 · multi-informe) */
 .pe-overlay .flist{display:flex;flex-direction:column;gap:8px;margin-bottom:6px;}
 .pe-overlay .fitem{display:flex;align-items:center;gap:9px;background:#f6f8fb;border:1px solid #dde3ea;border-radius:8px;padding:8px 10px;}
+.pe-overlay .fitem.fi-falta{background:#fdf6e7;border-color:#e6c772;}
+.pe-overlay .fitem.fi-falta .fi-ano{border-color:#b07d12;color:#8a6210;}
 .pe-overlay .fi-doc{color:#1e4e79;flex:none;}
 .pe-overlay .fi-name{flex:1;min-width:0;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.76rem;color:#16365c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .pe-overlay .fi-ano{flex:none;width:86px;background:#fff;border:1px solid #dde3ea;border-radius:7px;padding:7px 9px;color:#1b2733;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.82rem;}
