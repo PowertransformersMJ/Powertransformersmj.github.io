@@ -17,15 +17,16 @@
 
   · CSS                  → assets/css/pruebas-electricas.css (scope .pe-scope)
   · Dominio puro         → assets/js/domain/pruebas_electricas_{semaforo,schema}.js
-  · Data layer (vivo)    → assets/js/data/pruebas_electricas.js (onSnapshot · SEED_LOCAL)
+  · Data layer (vivo)    → assets/js/data/pruebas_electricas.js (onSnapshot · solo datos reales)
   · UI · componentes     → assets/js/ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js
   · Shell · entrypoint   → assets/js/pruebas-electricas-shell.js
 
   El semáforo normativo (colores, umbrales, reglas) se preserva tal
-  cual del tablero original. La matriz, tablas e historial se derivan
-  de los informes Firestore en vivo; las gráficas usan los datasets
-  del tablero (números reales de la unidad) cuando el informe no trae
-  el detalle por fase (el schema persiste el valor sintetizado).
+  cual del tablero original. La matriz, tablas, historial y gráficas
+  se derivan EXCLUSIVAMENTE de los informes Firestore en vivo
+  (interfaz en tiempo real · solo datos reales). Sin informes
+  cargados → estado vacío. No hay dataset de demostración ni unidad
+  seed: nada aparece hasta que el usuario sube informes.
 -->
 
 <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
@@ -85,10 +86,6 @@
     <!-- ===== Calificación global ===== -->
     <section id="calif">
       <h2>Calificación global por prueba y año</h2>
-      <div class="callout warn">
-        <div class="ttl">Hallazgo principal</div>
-        Tangente δ de la configuración CL superó el límite del 1 % en 2012 y 2014, con recuperación en 2020. La resistencia del devanado AT 2020 quedó marcada como “a verificar”.
-      </div>
       <div class="matrix" id="matrix"><p class="muted small">Cargando calificación…</p></div>
       <p class="muted small">Cada celda se calcula a partir del informe del año; el color sigue el semáforo normativo (verde · ámbar · naranja · rojo).</p>
     </section>
@@ -173,10 +170,6 @@
     <!-- ===== Resistencia de devanados ===== -->
     <section id="resist">
       <h2>Resistencia de devanados <span class="norm">IEC 60076-1 · IEEE 62</span></h2>
-      <div class="callout warn">
-        <div class="ttl">Dato a verificar</div>
-        En 2020 la fase central del AT midió 847.22 mΩ frente a ≈ 946 mΩ (≈ 11 %), probable error de digitación (947.22). El semáforo la marca como “verificar”.
-      </div>
       <div class="chartbox"><div id="c-res"></div></div>
       <div class="legend">
         <span class="lg"><i style="background:#1e4e79"></i>AT</span>
