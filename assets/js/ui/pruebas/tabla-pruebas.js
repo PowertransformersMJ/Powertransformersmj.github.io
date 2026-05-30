@@ -92,7 +92,9 @@ function serieEnPdf(inf, serieUnidad) {
  * Renderiza el historial de informes y actualiza el KPI de conteo.
  * @param {HTMLElement} cont   contenedor de la tabla (#reportlist)
  * @param {Array} informes
- * @param {object} [opts]      { serieUnidad, kpiEl }
+ * @param {object} [opts]      { serieUnidad, kpiEl, canDelete }
+ *   canDelete → añade columna "Eliminar" con botón por fila
+ *   (el shell escucha el click vía delegación en data-del/data-ano).
  */
 export function renderInformes(cont, informes, opts = {}) {
   const docs = ordenarPorAno(informes).reverse(); // más recientes primero
@@ -102,8 +104,13 @@ export function renderInformes(cont, informes, opts = {}) {
     cont.innerHTML = `<p class="muted small">Aún no hay informes cargados para esta unidad.</p>`;
     return;
   }
+  const del = !!opts.canDelete;
   const rows = docs.map((inf) => {
     const equipos = Array.isArray(inf.equipos) ? inf.equipos.join(', ') : (inf.equipos || '');
+    const delCell = del
+      ? `<td><button type="button" class="btn-sm danger" data-del="${esc(inf.id)}" ` +
+        `data-ano="${esc(inf.ano)}" title="Eliminar este informe">🗑 Eliminar</button></td>`
+      : '';
     return `<tr>` +
       `<td>${fechaLabel(inf)}</td>` +
       `<td>${esc(inf.ejecutante) || '—'}</td>` +
@@ -111,12 +118,14 @@ export function renderInformes(cont, informes, opts = {}) {
       `<td>${serieEnPdf(inf, opts.serieUnidad)}</td>` +
       `<td>${badgeEstadoInforme(inf)}</td>` +
       `<td>${accionesPdf(inf)}</td>` +
+      delCell +
       `</tr>`;
   }).join('');
   cont.innerHTML =
     `<div class="tblwrap"><table class="dt">` +
     `<thead><tr><th>Fecha</th><th>Ejecutante</th><th>Equipos</th>` +
-    `<th>Serie en PDF</th><th>Estado</th><th>Informe (PDF)</th></tr></thead>` +
+    `<th>Serie en PDF</th><th>Estado</th><th>Informe (PDF)</th>` +
+    (del ? '<th>Eliminar</th>' : '') + `</tr></thead>` +
     `<tbody>${rows}</tbody></table></div>`;
 }
 

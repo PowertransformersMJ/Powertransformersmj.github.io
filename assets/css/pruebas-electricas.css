@@ -147,6 +147,9 @@
 .pe-scope .btn-sm:hover{border-color:var(--pe-teal);color:var(--pe-navy);}
 .pe-scope .btn-sm.dl{border-color:var(--pe-navy-2);color:var(--pe-navy-2);}
 .pe-scope .btn-sm.dl:hover{background:var(--pe-surface-2);}
+.pe-scope .btn-sm.danger{border-color:rgba(200,50,60,.5);color:#b3303c;}
+.pe-scope .btn-sm.danger:hover{background:rgba(200,50,60,.08);border-color:#b3303c;color:#8f2530;}
+.pe-scope .btn-sm:disabled{opacity:.5;cursor:not-allowed;}
 .pe-scope .r-pending{background:rgba(15,138,153,.04);}
 
 /* modal · overlay vive fuera de .pe-scope (es fixed full-screen),
