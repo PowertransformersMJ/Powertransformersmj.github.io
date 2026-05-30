@@ -1,0 +1,124 @@
+// ══════════════════════════════════════════════════════════════
+// SGM · TRANSPOWER — Pruebas Eléctricas · Componente Semáforo
+// ──────────────────────────────────────────────────────────────
+// Renderiza la "Calificación global por prueba y año" (matriz del
+// tablero) calculando CADA celda con el dominio puro
+// (pruebas_electricas_semaforo.js). NO contiene reglas de negocio:
+// solo presentación. Cambia de "datos hard-codeados" a "calificación
+// derivada de los informes Firestore en vivo".
+//
+// Cada celda usa las clases del tablero original:
+//   <span class="cellbox b-X"><span class="dot x"></span>texto</span>
+// donde b-X / dot x vienen de ESTADOS (clase + dot) del dominio.
+// ══════════════════════════════════════════════════════════════
+
+import {
+  ESTADOS,
+  calificarTanDelta, calificarExcitacion, calificarRelacion,
+  calificarResistencia, calificarAislamiento, calificarCollar,
+  estadoGlobal
+} from '../../domain/pruebas_electricas_semaforo.js';
+
+/* ─── Definición de filas de la matriz (orden del tablero) ────── */
+// `criterio` es el texto de la columna "Criterio" (igual al tablero).
+const FILAS = [
+  { key: 'tand',        label: 'Tangente δ (devanados)',         criterio: '≤1% (CL)' },
+  { key: 'excitacion',  label: 'Corriente de excitación',        criterio: 'Δfases <10%' },
+  { key: 'relacion',    label: 'Relación de transformación',     criterio: '±0.5%' },
+  { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤5%' },
+  { key: 'aislamiento', label: 'Resistencia de aislamiento (CC)', criterio: '≥1 GΩ' },
+  { key: 'collar',      label: 'Collar caliente / bujes',         criterio: '<100 mW' }
+];
+
+/* ─── Calificación de un informe por tipo de prueba ───────────── */
+// Devuelve { estado, texto } para una prueba dada de un informe.
+function calificarPrueba(key, inf) {
+  if (!inf) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+  switch (key) {
+    case 'tand': {
+      // tan δ: la peor configuración medida define la celda.
+      const arr = Array.isArray(inf.tand) ? inf.tand : [];
+      const medidas = arr.filter((t) => t.valor_pct != null);
+      if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      let peor = ESTADOS.VERDE;
+      medidas.forEach((t) => {
+        const e = calificarTanDelta(t.valor_pct);
+        if (e.nivel > peor.nivel) peor = e;
+      });
+      // Muestra el valor máximo medido (la configuración más exigente).
+      const maxVal = Math.max(...medidas.map((t) => t.valor_pct));
+      return { estado: peor, texto: `${maxVal.toFixed(2)}%` };
+    }
+    case 'excitacion': {
+      const d = inf.excitacion || {};
+      if (d.delta_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      return { estado: calificarExcitacion(d.delta_pct, d.corriente_ma), texto: `${d.delta_pct.toFixed(1)}%` };
+    }
+    case 'relacion': {
+      const d = inf.relacion || {};
+      if (d.desviacion_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      return { estado: calificarRelacion(d.desviacion_pct), texto: `${d.desviacion_pct.toFixed(2)}%` };
+    }
+    case 'resistencia': {
+      const d = inf.resistencia || {};
+      const e = calificarResistencia(d.desbalance_pct, d.verificar);
+      if (d.verificar) return { estado: e, texto: 'verificar' };
+      if (d.desbalance_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.desbalance_pct.toFixed(1)}%` };
+    }
+    case 'aislamiento': {
+      const d = inf.aislamiento || {};
+      if (d.gohm == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      const e = calificarAislamiento(d.gohm);
+      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.gohm.toFixed(2)}GΩ` };
+    }
+    case 'collar': {
+      const d = inf.collar || {};
+      if (d.mw == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      const e = calificarCollar(d.mw);
+      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.mw.toFixed(0)}mW` };
+    }
+    default:
+      return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+  }
+}
+
+function cellHtml(estado, texto) {
+  return `<span class="cellbox ${estado.clase}"><span class="dot ${estado.dot}"></span>${texto}</span>`;
+}
+
+/**
+ * Renderiza la matriz de calificación a partir de los informes.
+ * @param {HTMLElement} cont contenedor (.matrix)
+ * @param {Array} informes informes ordenados por año asc
+ */
+export function renderMatriz(cont, informes) {
+  if (!cont) return;
+  const docs = (informes || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const anos = docs.map((d) => d.ano);
+  const head = `<tr><th>Tipo de prueba</th>${anos.map((a) => `<th>${a}</th>`).join('')}<th>Criterio</th></tr>`;
+  const body = FILAS.map((fila) => {
+    const celdas = docs.map((inf) => {
+      const { estado, texto } = calificarPrueba(fila.key, inf);
+      return `<td>${cellHtml(estado, texto)}</td>`;
+    }).join('');
+    return `<tr><td class="cfg">${fila.label}</td>${celdas}<td class="muted small">${fila.criterio}</td></tr>`;
+  }).join('');
+  cont.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
+}
+
+/**
+ * Estado global del informe más reciente (para el chip "vigente").
+ * @param {Array} informes
+ * @returns {object} estado del dominio (peor prueba del último informe)
+ */
+export function estadoVigente(informes) {
+  const docs = (informes || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const ult = docs[docs.length - 1];
+  if (!ult) return ESTADOS.NEUTRAL;
+  const estados = {};
+  FILAS.forEach((f) => { estados[f.key] = calificarPrueba(f.key, ult).estado; });
+  return estadoGlobal(estados);
+}
+
+export { calificarPrueba };
