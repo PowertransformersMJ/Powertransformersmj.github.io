@@ -158,15 +158,69 @@ function seleccionarUnidad(u) {
 
 /* ─── Borrado de informes (delegación sobre #reportlist) ──────── */
 
+// Elimina una lista de informes en secuencia y reporta el resultado.
+async function borrarVarios(unidadId, ids) {
+  let ok = 0;
+  for (const id of ids) {
+    try { await eliminarInforme(unidadId, id); ok += 1; }
+    catch (err) { console.error('[pruebas-electricas] eliminarInforme', id, err); }
+  }
+  return ok;
+}
+
 async function onClickReportlist(ev) {
+  const u = state.unidadActiva || {};
+  const unidadId = u.id || u.serie;
+  if (!unidadId) return;
+  const serieTxt = u.serie || unidadId;
+  const rl = $('reportlist');
+
+  // ── "Seleccionar todos" ──
+  const selAll = ev.target.closest('[data-sel-all]');
+  if (selAll) {
+    const marcado = selAll.checked;
+    rl.querySelectorAll('.pe-chk').forEach((c) => { c.checked = marcado; });
+    return;
+  }
+
+  // ── "Eliminar todos" ──
+  const allBtn = ev.target.closest('[data-del-all]');
+  if (allBtn) {
+    const total = (state.informes || []).length;
+    if (!total) return toast('No hay informes para eliminar.', 'warn');
+    if (!window.confirm(`¿Eliminar TODOS los ${total} informes de la serie ${serieTxt}?\n` +
+        `Esta acción no se puede deshacer.`)) return;
+    allBtn.disabled = true;
+    allBtn.textContent = 'Eliminando…';
+    const ids = (state.informes || []).map((i) => i.id).filter(Boolean);
+    const ok = await borrarVarios(unidadId, ids);
+    toast(`${ok} de ${ids.length} informe(s) eliminado(s).`, ok === ids.length ? undefined : 'warn');
+    // onSnapshot refresca la tabla sola.
+    return;
+  }
+
+  // ── "Eliminar seleccionados" ──
+  const selBtn = ev.target.closest('[data-del-sel]');
+  if (selBtn) {
+    const ids = Array.from(rl.querySelectorAll('.pe-chk:checked'))
+      .map((c) => c.getAttribute('data-sel')).filter(Boolean);
+    if (!ids.length) return toast('Marca al menos un informe.', 'warn');
+    if (!window.confirm(`¿Eliminar ${ids.length} informe(s) seleccionado(s) de la serie ${serieTxt}?\n` +
+        `Esta acción no se puede deshacer.`)) return;
+    selBtn.disabled = true;
+    selBtn.textContent = 'Eliminando…';
+    const ok = await borrarVarios(unidadId, ids);
+    toast(`${ok} de ${ids.length} informe(s) eliminado(s).`, ok === ids.length ? undefined : 'warn');
+    return;
+  }
+
+  // ── Borrado uno a uno (botón por fila) ──
   const btn = ev.target.closest('[data-del]');
   if (!btn) return;
   const informeId = btn.getAttribute('data-del');
   const ano = btn.getAttribute('data-ano') || '';
-  const u = state.unidadActiva || {};
-  const unidadId = u.id || u.serie;
-  if (!informeId || !unidadId) return;
-  if (!window.confirm(`¿Eliminar el informe ${ano} de la serie ${u.serie || unidadId}?\n` +
+  if (!informeId) return;
+  if (!window.confirm(`¿Eliminar el informe ${ano} de la serie ${serieTxt}?\n` +
       `Esta acción no se puede deshacer.`)) return;
   btn.disabled = true;
   btn.textContent = 'Eliminando…';
