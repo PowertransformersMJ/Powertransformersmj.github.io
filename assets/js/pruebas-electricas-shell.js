@@ -180,16 +180,16 @@ function marcarLibroActivo() {
   });
 }
 
-// Clic en una tarjeta del parque → selecciona esa serie (sincroniza el
-// <select> y dispara el render completo de la unidad).
+// Clic en una tarjeta del parque → selecciona esa serie (refleja la serie
+// en el campo de búsqueda y dispara el render completo de la unidad).
 function onClickParque(ev) {
   const btn = ev.target.closest('[data-serie]');
   if (!btn) return;
   const v = btn.getAttribute('data-serie');
   const u = state.unidades.find((x) => (x.serie || x.id) === v);
   if (!u) return;
-  const sel = $('serieSelect');
-  if (sel) sel.value = v;
+  const inp = $('serieInput');
+  if (inp) inp.value = v;
   seleccionarUnidad(u);
   // Abrir un libro lleva al Tablero, donde se ilustra toda la información
   // de la unidad (matriz, identidad, tablas y gráficas de las pruebas).
@@ -296,24 +296,6 @@ function renderVacioSeleccion() {
   }
 }
 
-/* ─── Selector de serie (gobierna ambas pestañas) ─────────────── */
-// Pobla el <select> con las series del parque, conservando la opción
-// elegida si la serie sigue presente tras un refresh en vivo.
-function poblarSelectorSerie(unidades) {
-  const sel = $('serieSelect');
-  if (!sel) return;
-  const actual = sel.value;
-  const opts = ['<option value="">— Selecciona una serie —</option>']
-    .concat((unidades || []).map((u) => {
-      const v = esc(u.serie || u.id);
-      return `<option value="${v}">${v}</option>`;
-    }));
-  sel.innerHTML = opts.join('');
-  if (actual && (unidades || []).some((u) => (u.serie || u.id) === actual)) {
-    sel.value = actual;
-  }
-}
-
 /* ─── Borrado de informes (delegación sobre #reportlist) ──────── */
 
 // Elimina una lista de informes en secuencia y reporta el resultado.
@@ -414,28 +396,29 @@ function arrancar() {
   if (rl) rl.addEventListener('click', onClickReportlist);
   const pg = $('parque-grid');
   if (pg) pg.addEventListener('click', onClickParque);
-  const sel = $('serieSelect');
-  if (sel) sel.addEventListener('change', () => {
-    const v = sel.value;
-    const u = v ? state.unidades.find((x) => (x.serie || x.id) === v) : null;
-    seleccionarUnidad(u);
-  });
-  // Búsqueda de libros (números de serie) en la biblioteca · filtra en vivo.
-  const buscar = $('libSearch');
-  if (buscar) {
-    buscar.addEventListener('input', () => {
-      state.filtroBiblioteca = buscar.value || '';
+  // Campo único de "Número de serie": digitable, no seleccionable. Filtra
+  // los libros de la biblioteca en vivo y, al coincidir con una unidad,
+  // abre su tablero. No usa <select> ni <datalist> (CLAUDE.md §0.1.2.12).
+  const inp = $('serieInput');
+  if (inp) {
+    inp.addEventListener('input', () => {
+      state.filtroBiblioteca = inp.value || '';
       renderParqueGrid(state.unidades);
+      // Coincidencia exacta con una serie → selecciona esa unidad en vivo.
+      const v = norm(inp.value).trim();
+      const u = v
+        ? state.unidades.find((x) => norm(x.serie || x.id).trim() === v)
+        : null;
+      seleccionarUnidad(u || null);
     });
     // Enter: si hay una única coincidencia, ábrela directo en el tablero.
-    buscar.addEventListener('keydown', (ev) => {
+    inp.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Enter') return;
       ev.preventDefault();
       const hits = filtrarUnidades(state.unidades);
       if (hits.length === 1) {
         const u = hits[0];
-        const s = $('serieSelect');
-        if (s) s.value = u.serie || u.id;
+        inp.value = u.serie || u.id;
         seleccionarUnidad(u);
         irAlTablero();
       }
@@ -446,7 +429,6 @@ function arrancar() {
       state.unidades = mergeUnidades(unidades);
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
-      poblarSelectorSerie(state.unidades);
       sincronizarSeleccion();
     },
     (err) => {
@@ -456,7 +438,6 @@ function arrancar() {
       state.unidades = mergeUnidades([]);
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
-      poblarSelectorSerie(state.unidades);
       sincronizarSeleccion();
     }
   );
@@ -494,7 +475,10 @@ function setStepbar() {
 
 function openUpload() {
   UP.step = 1;
-  UP.serie = (state.unidadActiva && state.unidadActiva.serie) || '';
+  // La carga se asocia a la serie indicada en el campo "Número de serie";
+  // si está vacío, cae a la unidad abierta (si la hay).
+  const tecleada = ($('serieInput') && $('serieInput').value.trim()) || '';
+  UP.serie = tecleada || (state.unidadActiva && state.unidadActiva.serie) || '';
   UP.items = [];
   _itemSeq = 0;
   const ov = $('ov');
