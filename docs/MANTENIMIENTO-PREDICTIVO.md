@@ -84,9 +84,44 @@ initModuleShell('pruebasTabs', { defaultTab: 'tablero' });
 
 `module-shell` aporta ARIA, navegación por teclado, hash routing
 (`#tab=informes`) y ocultamiento de tabs `data-admin` para no-admins.
-**El controlador no cambia:** `renderInformes($('reportlist'), …)` y la
-delegación de borrado siguen apuntando a `#reportlist`, que funciona
-igual esté en el tab que esté (los paneles ocultos reciben innerHTML).
+La delegación de borrado y `renderInformes($('reportlist'), …)` siguen
+apuntando a `#reportlist`, que funciona igual esté en el tab que esté
+(los paneles ocultos reciben innerHTML).
+
+### 1.2 Selector de serie · ilustración bajo demanda
+
+Entre el `.page-header` y los tabs vive una barra `.pe-serie-bar` con un
+`<select id="serieSelect">` (no `<datalist>` · regla §0.1.2.12) que
+**gobierna ambas pestañas**. El módulo no ilustra ninguna unidad hasta
+que el usuario elige una serie; por defecto (`value=""`) las secciones
+de unidad quedan en estado vacío con un prompt.
+
+Qué permanece **siempre visible** (no depende de la selección):
+
+- KPIs del parque `kpi-unidades` y `kpi-subestaciones`.
+- La grilla del parque `#parque-grid` con una tarjeta por unidad.
+
+Qué se ilustra **solo tras seleccionar una serie**:
+
+- Identidad `#idgrid`, calificación/matriz `#matrix`, las 6 tablas
+  `t-*` + gráficas `c-*`, el historial `#reportlist` y los KPIs de la
+  unidad `kpi-informes` / `kpi-estado`.
+
+A diferencia de versiones previas, **el controlador sí cambió**:
+`arrancar()` ya **no auto-selecciona** la primera unidad. El flujo de
+selección vive en `pruebas-electricas-shell.js`:
+
+| Función | Rol |
+|---|---|
+| `poblarSelectorSerie(unidades)` | Reconstruye las `<option>` del `#serieSelect` (preserva el valor elegido si sigue existiendo). |
+| `sincronizarSeleccion()` | Tras cada snapshot, re-localiza la unidad activa por `id\|serie`; si no hay → `seleccionarUnidad(null)`. Nunca auto-elige. |
+| `renderVacioSeleccion()` | Cancela la suscripción de informes, limpia `t-*`/`c-*`, deja prompt en `matrix`/`idgrid`/`reportlist` y resetea `kpi-informes`/`kpi-estado` a "—". |
+| `onClickParque(ev)` | Una tarjeta del parque (`button.det[data-serie]`) fija `#serieSelect.value` y dispara `seleccionarUnidad(u)`. |
+
+`seleccionarUnidad(u)` hace short-circuit: si `u` es `null` llama a
+`renderVacioSeleccion()` y retorna; con unidad real renderiza identidad
+y reabre `escucharInformes(u.id\|serie)`. El `change` del `#serieSelect`
+busca la unidad por serie (o `null`) y delega en `seleccionarUnidad`.
 
 ---
 
