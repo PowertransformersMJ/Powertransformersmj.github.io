@@ -52,14 +52,17 @@
     </p>
   </div>
 
-  <!-- ===== Selector de serie · gobierna ambas pestañas ===== -->
+  <!-- ===== Número de serie · barra de búsqueda · gobierna ambas pestañas ===== -->
   <div class="pe-scope">
     <div class="pe-serie-bar">
-      <label for="serieSelect" class="pe-serie-lbl">Número de serie</label>
-      <select id="serieSelect" class="pe-serie-sel" aria-label="Número de serie de la unidad">
-        <option value="">— Selecciona una serie —</option>
-      </select>
-      <span class="pe-serie-hint muted small">Selecciona la serie para ilustrar el tablero y los informes.</span>
+      <label for="serieInput" class="pe-serie-lbl">Número de serie</label>
+      <div class="pe-serie-search">
+        <i data-lucide="search" aria-hidden="true"></i>
+        <input type="search" id="serieInput" class="pe-serie-input" autocomplete="off" spellcheck="false"
+               placeholder="Escribe el número de serie…"
+               aria-label="Número de serie de la unidad">
+      </div>
+      <span class="pe-serie-hint muted small">Escribe la serie para ubicar su libro en la biblioteca y abrir el tablero.</span>
     </div>
   </div>
 
@@ -84,15 +87,9 @@
   <div class="pe-scope">
     <section id="biblioteca">
       <h2>Biblioteca de unidades</h2>
-      <p>Cada libro es un número de serie. Abre uno para ir al tablero y consultar todas sus pruebas e histórico de informes.</p>
+      <p>Cada libro es un número de serie. Ábrelo para ir al tablero y consultar todas sus pruebas e histórico de informes. Usa el campo <b>Número de serie</b> de arriba para ubicar un libro o crear uno nuevo al cargar un informe.</p>
       <div class="pe-library">
-        <div class="pe-lib-search">
-          <i data-lucide="search" aria-hidden="true"></i>
-          <input type="search" id="libSearch" autocomplete="off" spellcheck="false"
-                 placeholder="Buscar número de serie…"
-                 aria-label="Buscar libro por número de serie">
-        </div>
-        <p class="pe-lib-hint">Escribe el número de serie para ubicar el libro · selecciónalo para abrir su tablero · el último libro carga un nuevo informe.</p>
+        <p class="pe-lib-hint">Filtra los libros desde el campo <b>Número de serie</b> · selecciona uno para abrir su tablero · el último libro carga un nuevo informe a la serie indicada.</p>
         <div class="pe-shelf" id="parque-grid">
           <button type="button" class="pe-book pe-book-add" onclick="openUpload()" title="Cargar informe de una unidad">
             <span class="pe-addbook-plus" aria-hidden="true">＋</span>
