@@ -13,10 +13,13 @@
 // flujo de datos con el DOM.
 //
 // Interfaz en tiempo real · solo datos reales: TODO lo que se ve
-// (matriz, tablas, historial y las 6 gráficas) se deriva de los
-// informes que el usuario sube. Sin informes → estado vacío. No hay
-// dataset de demostración ni unidad seed: si Firebase no está activo
-// o no hay informes, no aparece nada.
+// (matriz, tablas, historial y las 6 gráficas) se deriva de informes
+// reales. La unidad 173523-15510 trae 3 informes BASE históricos
+// (curados en pruebas_electricas_seed.js, valores tal cual el tablero
+// de referencia) que se inyectan como punto de partida de la
+// tendencia; los informes que el usuario suba al MISMO número de serie
+// se anexan en vivo encima del seed. Los informes base son de solo
+// lectura (PDF descargable, no eliminables). No hay datos inventados.
 // ══════════════════════════════════════════════════════════════
 
 import {
@@ -24,6 +27,7 @@ import {
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme
 } from './data/pruebas_electricas.js';
+import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
   sanitizarInforme, confirmarSerie, detectarAno
 } from './domain/pruebas_electricas_schema.js';
@@ -41,6 +45,35 @@ const state = {
 };
 
 const $ = (id) => document.getElementById(id);
+
+/* ─── Seed: unidad + 3 informes base (datos reales históricos) ─── */
+// La capa de datos emite [] cuando Firebase no está activo ("solo datos
+// reales"). Los 3 informes base SON datos reales, así que se inyectan
+// como punto de partida de la tendencia tanto offline como con backend.
+// El merge respeta lo que venga en vivo: una unidad/informe en Firestore
+// con la misma serie/año pisa al seed (el usuario corrigió o reemplazó).
+
+function mergeUnidades(live) {
+  const out = unidadesSeed();
+  const idx = new Map(out.map((u, i) => [u.id || u.serie, i]));
+  (live || []).forEach((u) => {
+    const k = u.id || u.serie;
+    if (idx.has(k)) out[idx.get(k)] = { ...out[idx.get(k)], ...u };
+    else out.push(u);
+  });
+  return out;
+}
+
+// Combina los informes base (marcados _seed → solo lectura) con los
+// que llegan en vivo. La clave es el año: un informe en vivo del mismo
+// año reemplaza al del seed.
+function mergeInformes(unidadId, live) {
+  const base = informesSeed(unidadId);
+  if (!base.length) return live || [];
+  const byAno = new Map(base.map((i) => [i.ano, { ...i, _seed: true }]));
+  (live || []).forEach((i) => { byAno.set(i.ano, i); });
+  return Array.from(byAno.values()).sort((a, b) => (a.ano || 0) - (b.ano || 0));
+}
 
 /* ─── KPIs y ficha de identidad ───────────────────────────────── */
 
@@ -141,10 +174,10 @@ function escucharInformes(unidadId) {
   if (state.unsubInformes) { state.unsubInformes(); state.unsubInformes = null; }
   state.unsubInformes = suscribirInformes(
     unidadId,
-    (informes) => renderInformesUI(informes),
+    (informes) => renderInformesUI(mergeInformes(unidadId, informes)),
     (err) => {
       console.warn('[pruebas-electricas] informes', err);
-      renderInformesUI([]);
+      renderInformesUI(mergeInformes(unidadId, []));
     }
   );
 }
@@ -185,13 +218,15 @@ async function onClickReportlist(ev) {
   // ── "Eliminar todos" ──
   const allBtn = ev.target.closest('[data-del-all]');
   if (allBtn) {
-    const total = (state.informes || []).length;
-    if (!total) return toast('No hay informes para eliminar.', 'warn');
+    // Los informes base (_seed) son de solo lectura: no se eliminan.
+    const eliminables = (state.informes || []).filter((i) => !i._seed && i.id);
+    const total = eliminables.length;
+    if (!total) return toast('No hay informes eliminables (los base son de solo lectura).', 'warn');
     if (!window.confirm(`¿Eliminar TODOS los ${total} informes de la serie ${serieTxt}?\n` +
         `Esta acción no se puede deshacer.`)) return;
     allBtn.disabled = true;
     allBtn.textContent = 'Eliminando…';
-    const ids = (state.informes || []).map((i) => i.id).filter(Boolean);
+    const ids = eliminables.map((i) => i.id);
     const ok = await borrarVarios(unidadId, ids);
     toast(`${ok} de ${ids.length} informe(s) eliminado(s).`, ok === ids.length ? undefined : 'warn');
     // onSnapshot refresca la tabla sola.
@@ -242,7 +277,7 @@ function arrancar() {
   if (rl) rl.addEventListener('click', onClickReportlist);
   suscribirUnidades(
     (unidades) => {
-      state.unidades = unidades || [];
+      state.unidades = mergeUnidades(unidades);
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
       // Selecciona la primera unidad (o re-selecciona la activa si sigue presente)
@@ -252,12 +287,12 @@ function arrancar() {
     },
     (err) => {
       console.warn('[pruebas-electricas] unidades', err);
-      // Interfaz en tiempo real · solo datos reales: sin backend no hay
-      // unidad de demostración. Queda el parque vacío con el tile "+".
-      state.unidades = [];
+      // Sin backend solo queda el seed: la unidad base con sus 3 informes
+      // históricos como punto de partida de la tendencia.
+      state.unidades = mergeUnidades([]);
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
-      seleccionarUnidad(null);
+      seleccionarUnidad(state.unidades[0] || null);
     }
   );
 }

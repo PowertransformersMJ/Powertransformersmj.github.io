@@ -50,33 +50,52 @@ function calificarPrueba(key, inf) {
       return { estado: peor, texto: `${maxVal.toFixed(2)}%` };
     }
     case 'excitacion': {
+      // excitación es un OBJETO con la Δ ext % del devanado AT.
       const d = inf.excitacion || {};
-      if (d.delta_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      return { estado: calificarExcitacion(d.delta_pct, d.corriente_ma), texto: `${d.delta_pct.toFixed(1)}%` };
+      if (d.delta_ext_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      return { estado: calificarExcitacion(d.delta_ext_pct), texto: `${d.delta_ext_pct.toFixed(2)}%` };
     }
     case 'relacion': {
-      const d = inf.relacion || {};
-      if (d.desviacion_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      return { estado: calificarRelacion(d.desviacion_pct), texto: `${d.desviacion_pct.toFixed(2)}%` };
+      // relación es un ARRAY de pares (AT–MT, AT–Terc.); la peor desviación define la celda.
+      const arr = Array.isArray(inf.relacion) ? inf.relacion : [];
+      const medidas = arr.filter((r) => r.desviacion_pct != null);
+      if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      let peor = ESTADOS.VERDE, maxAbs = 0;
+      medidas.forEach((r) => {
+        const abs = Math.abs(r.desviacion_pct);
+        if (abs > maxAbs) maxAbs = abs;
+        const e = calificarRelacion(r.desviacion_pct);
+        if (e.nivel > peor.nivel) peor = e;
+      });
+      return { estado: peor, texto: `${maxAbs.toFixed(2)}%` };
     }
     case 'resistencia': {
-      const d = inf.resistencia || {};
-      const e = calificarResistencia(d.desbalance_pct, d.verificar);
-      if (d.verificar) return { estado: e, texto: 'verificar' };
-      if (d.desbalance_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.desbalance_pct.toFixed(1)}%` };
+      // resistencia es un ARRAY por devanado (AT/MT/BT); peor Δ máx + flags.
+      const arr = Array.isArray(inf.resistencia) ? inf.resistencia : [];
+      if (!arr.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      const flag = arr.some((r) => r.verificar);
+      const medidas = arr.filter((r) => !r.no_medido && r.delta_max_pct != null);
+      const maxDelta = medidas.length ? Math.max(...medidas.map((r) => r.delta_max_pct)) : null;
+      const e = calificarResistencia(maxDelta, flag);
+      if (flag) return { estado: e, texto: 'verificar' };
+      if (maxDelta == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${maxDelta.toFixed(2)}%` };
     }
     case 'aislamiento': {
-      const d = inf.aislamiento || {};
-      if (d.gohm == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      const e = calificarAislamiento(d.gohm);
-      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.gohm.toFixed(2)}GΩ` };
+      // aislamiento es un ARRAY por par; el valor mínimo (peor) define la celda.
+      const arr = Array.isArray(inf.aislamiento) ? inf.aislamiento : [];
+      const medidas = arr.filter((a) => a.gohm != null);
+      if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      const min = Math.min(...medidas.map((a) => a.gohm));
+      const e = calificarAislamiento(min);
+      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${min.toFixed(2)}GΩ` };
     }
     case 'collar': {
+      // collar es un OBJETO con max_mw (pérdidas máximas en bujes).
       const d = inf.collar || {};
-      if (d.mw == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      const e = calificarCollar(d.mw);
-      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.mw.toFixed(0)}mW` };
+      if (d.max_mw == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      const e = calificarCollar(d.max_mw);
+      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.max_mw.toFixed(0)}mW` };
     }
     default:
       return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
