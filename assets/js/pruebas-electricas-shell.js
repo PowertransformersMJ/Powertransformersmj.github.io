@@ -41,10 +41,15 @@ const state = {
   unidades: [],
   unidadActiva: null,
   informes: [],
-  unsubInformes: null
+  unsubInformes: null,
+  filtroBiblioteca: ''
 };
 
 const $ = (id) => document.getElementById(id);
+
+// Normaliza texto para búsqueda: minúsculas + sin acentos (NFD).
+const norm = (s) => String(s == null ? '' : s)
+  .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
 /* ─── Seed: unidad + 3 informes base (datos reales históricos) ─── */
 // La capa de datos emite [] cuando Firebase no está activo ("solo datos
@@ -122,12 +127,29 @@ function spineFor(serie) {
   return SPINES[h % SPINES.length];
 }
 
+// Filtra las unidades de la biblioteca por el texto buscado (serie,
+// fabricante, ubicación, cliente o subestación · sin acentos).
+function filtrarUnidades(unidades) {
+  const q = norm(state.filtroBiblioteca).trim();
+  if (!q) return unidades || [];
+  return (unidades || []).filter((u) => {
+    const blob = norm([u.serie, u.id, u.fabricante, u.ubicacion, u.cliente, u.subestacion]
+      .filter(Boolean).join(' '));
+    return blob.includes(q);
+  });
+}
+
 // Renderiza la biblioteca: cada unidad es un libro cuyo lomo muestra el
 // número de serie. Al abrirlo (clic) se ilustra su histórico de informes.
 function renderParqueGrid(unidades) {
   const grid = $('parque-grid');
   if (!grid) return;
-  const books = (unidades || []).map((u) => {
+  const filtradas = filtrarUnidades(unidades);
+  const sinResultados = state.filtroBiblioteca.trim() && filtradas.length === 0;
+  const aviso = sinResultados
+    ? `<p class="pe-lib-empty">Ningún libro coincide con “${esc(state.filtroBiblioteca.trim())}”.</p>`
+    : '';
+  const books = filtradas.map((u) => {
     const serie = u.serie || u.id;
     const meta = [u.fabricante, u.potencia].filter(Boolean).join(' · ');
     const [s1, s2] = spineFor(serie);
@@ -144,7 +166,7 @@ function renderParqueGrid(unidades) {
     `onclick="openUpload()" title="Cargar informe de una unidad">` +
     `<span class="pe-addbook-plus" aria-hidden="true">＋</span>` +
     `<span class="pe-addbook-lbl">Cargar informe</span></button>`;
-  grid.innerHTML = books + addBook;
+  grid.innerHTML = aviso + books + addBook;
   marcarLibroActivo();
 }
 
@@ -398,6 +420,27 @@ function arrancar() {
     const u = v ? state.unidades.find((x) => (x.serie || x.id) === v) : null;
     seleccionarUnidad(u);
   });
+  // Búsqueda de libros (números de serie) en la biblioteca · filtra en vivo.
+  const buscar = $('libSearch');
+  if (buscar) {
+    buscar.addEventListener('input', () => {
+      state.filtroBiblioteca = buscar.value || '';
+      renderParqueGrid(state.unidades);
+    });
+    // Enter: si hay una única coincidencia, ábrela directo en el tablero.
+    buscar.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Enter') return;
+      ev.preventDefault();
+      const hits = filtrarUnidades(state.unidades);
+      if (hits.length === 1) {
+        const u = hits[0];
+        const s = $('serieSelect');
+        if (s) s.value = u.serie || u.id;
+        seleccionarUnidad(u);
+        irAlTablero();
+      }
+    });
+  }
   suscribirUnidades(
     (unidades) => {
       state.unidades = mergeUnidades(unidades);

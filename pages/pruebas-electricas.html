@@ -86,7 +86,13 @@
       <h2>Biblioteca de unidades</h2>
       <p>Cada libro es un número de serie. Abre uno para ir al tablero y consultar todas sus pruebas e histórico de informes.</p>
       <div class="pe-library">
-        <p class="pe-lib-hint">Selecciona un libro para abrir su tablero · el último libro carga un nuevo informe.</p>
+        <div class="pe-lib-search">
+          <i data-lucide="search" aria-hidden="true"></i>
+          <input type="search" id="libSearch" autocomplete="off" spellcheck="false"
+                 placeholder="Buscar número de serie…"
+                 aria-label="Buscar libro por número de serie">
+        </div>
+        <p class="pe-lib-hint">Escribe el número de serie para ubicar el libro · selecciónalo para abrir su tablero · el último libro carga un nuevo informe.</p>
         <div class="pe-shelf" id="parque-grid">
           <button type="button" class="pe-book pe-book-add" onclick="openUpload()" title="Cargar informe de una unidad">
             <span class="pe-addbook-plus" aria-hidden="true">＋</span>
