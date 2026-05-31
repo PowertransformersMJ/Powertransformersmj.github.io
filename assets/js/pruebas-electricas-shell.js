@@ -106,21 +106,56 @@ function renderIdentidad(u) {
   }).join('');
 }
 
+// Paleta de lomos para los libros de la biblioteca. El color se asigna de
+// forma determinista por hash de la serie: misma serie → mismo lomo siempre,
+// sin inventar ningún dato (es puramente presentacional).
+const SPINES = [
+  ['#16365c', '#0f2741'], ['#0f8a99', '#0a5b66'], ['#7a3b2e', '#52271d'],
+  ['#3d5a3a', '#273a25'], ['#5a3d6e', '#3a2748'], ['#8a6d1f', '#5c4814'],
+  ['#1e4e79', '#143553'], ['#2e6b5e', '#1d453c']
+];
+
+function spineFor(serie) {
+  const s = String(serie || '');
+  let h = 0;
+  for (let i = 0; i < s.length; i += 1) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return SPINES[h % SPINES.length];
+}
+
+// Renderiza la biblioteca: cada unidad es un libro cuyo lomo muestra el
+// número de serie. Al abrirlo (clic) se ilustra su histórico de informes.
 function renderParqueGrid(unidades) {
   const grid = $('parque-grid');
   if (!grid) return;
-  const tile = `<button type="button" class="addtile" onclick="openUpload()">` +
-    `<span class="pl">＋</span><span>Cargar informe</span></button>`;
-  const cards = unidades.map((u) => {
-    const d = [u.fabricante, u.potencia, u.tensiones].filter(Boolean).join(' · ');
-    const loc = [u.ubicacion, u.cliente].filter(Boolean).join(' · ');
-    const serie = esc(u.serie || u.id);
-    return `<div class="ucard">` +
-      `<div class="ser">${serie}</div>` +
-      `<div class="d">${esc(d)}${loc ? '<br>' + esc(loc) : ''}</div>` +
-      `<button type="button" class="det" data-serie="${serie}">Ver identidad →</button></div>`;
+  const books = (unidades || []).map((u) => {
+    const serie = u.serie || u.id;
+    const meta = [u.fabricante, u.potencia].filter(Boolean).join(' · ');
+    const [s1, s2] = spineFor(serie);
+    return `<button type="button" class="pe-book" data-serie="${esc(serie)}" ` +
+      `style="--spine:${s1};--spine2:${s2}" ` +
+      `title="Abrir histórico de ${esc(serie)}">` +
+      `<span class="pe-book-head" aria-hidden="true"></span>` +
+      `<span class="pe-book-label"><span class="pe-book-serie">${esc(serie)}</span>` +
+      (meta ? `<span class="pe-book-maker">${esc(meta)}</span>` : '') +
+      `</span>` +
+      `<span class="pe-book-foot" aria-hidden="true"></span></button>`;
   }).join('');
-  grid.innerHTML = cards + tile;
+  const addBook = `<button type="button" class="pe-book pe-book-add" ` +
+    `onclick="openUpload()" title="Cargar informe de una unidad">` +
+    `<span class="pe-addbook-plus" aria-hidden="true">＋</span>` +
+    `<span class="pe-addbook-lbl">Cargar informe</span></button>`;
+  grid.innerHTML = books + addBook;
+  marcarLibroActivo();
+}
+
+// Resalta el libro de la unidad activa (estado .is-open).
+function marcarLibroActivo() {
+  const grid = $('parque-grid');
+  if (!grid) return;
+  const act = state.unidadActiva ? (state.unidadActiva.serie || state.unidadActiva.id) : null;
+  grid.querySelectorAll('.pe-book[data-serie]').forEach((b) => {
+    b.classList.toggle('is-open', !!act && b.getAttribute('data-serie') === act);
+  });
 }
 
 // Clic en una tarjeta del parque → selecciona esa serie (sincroniza el
@@ -134,6 +169,11 @@ function onClickParque(ev) {
   const sel = $('serieSelect');
   if (sel) sel.value = v;
   seleccionarUnidad(u);
+  // Lleva la vista al interior del libro (matriz de calificación) tras abrir.
+  const dst = $('calif');
+  if (dst && dst.scrollIntoView) {
+    dst.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
 }
 
 function refrescarKpisParque() {
@@ -198,6 +238,7 @@ function escucharInformes(unidadId) {
 
 function seleccionarUnidad(u) {
   state.unidadActiva = u;
+  marcarLibroActivo();
   if (!u) { renderVacioSeleccion(); return; }
   renderIdentidad(u);
   escucharInformes(u.id || u.serie);

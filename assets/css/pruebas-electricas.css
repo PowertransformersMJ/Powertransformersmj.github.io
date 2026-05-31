@@ -74,6 +74,91 @@
 .pe-scope .addtile:hover{border-color:var(--pe-teal);color:var(--pe-navy);background:var(--pe-surface-2);}
 .pe-scope .addtile .pl{font-size:1.6rem;color:var(--pe-teal);}
 
+/* ══ Biblioteca virtual · estantería de unidades ════════════════
+   Los "libros" son los números de serie; al abrir uno (clic) se
+   ilustra el tablero y se despliega el histórico de informes de esa
+   serie. Cada lomo lleva un color determinista (hash de la serie) y
+   reposa sobre una repisa de madera dibujada con el ::after de cada
+   libro (los planks contiguos se solapan y forman una línea continua
+   por fila, sin importar cuántos libros haya ni cómo envuelvan).
+   ════════════════════════════════════════════════════════════════ */
+.pe-scope .pe-library{
+  background:
+    radial-gradient(130% 90% at 50% -10%,rgba(255,255,255,.55),transparent 62%),
+    linear-gradient(180deg,#efe7d8,#e2d6bf);
+  border:1px solid var(--pe-border);border-radius:14px;
+  box-shadow:var(--pe-shadow),inset 0 1px 0 rgba(255,255,255,.6);
+  padding:30px 24px 36px;
+}
+.pe-scope .pe-lib-hint{
+  font-family:var(--pe-mono);font-size:.72rem;color:#7a6a4d;
+  letter-spacing:.02em;margin:0 0 22px;
+}
+.pe-scope .pe-shelf{
+  display:flex;flex-wrap:wrap;align-items:flex-end;
+  column-gap:9px;row-gap:36px;min-height:200px;
+}
+.pe-scope .pe-book{
+  position:relative;appearance:none;-webkit-appearance:none;
+  width:60px;height:190px;flex:none;padding:0;cursor:pointer;color:#fff;
+  border:none;border-radius:3px 7px 7px 3px;
+  background:linear-gradient(100deg,var(--spine,#16365c),var(--spine2,#0f2741) 92%);
+  box-shadow:
+    inset -7px 0 10px -6px rgba(0,0,0,.55),
+    inset 5px 0 7px -5px rgba(255,255,255,.35),
+    0 10px 16px -8px rgba(16,32,52,.5);
+  transition:transform .18s cubic-bezier(.2,.8,.2,1),box-shadow .18s;
+  transform-origin:bottom center;
+}
+.pe-scope .pe-book::after{
+  content:"";position:absolute;left:-7px;right:-7px;bottom:-19px;height:15px;
+  background:linear-gradient(180deg,#cda878,#a17a47);border-radius:2px;
+  box-shadow:0 7px 11px -3px rgba(16,32,52,.4);
+}
+.pe-scope .pe-book-head,.pe-scope .pe-book-foot{
+  position:absolute;left:6px;right:6px;height:7px;border-radius:2px;
+  background:rgba(255,255,255,.22);
+}
+.pe-scope .pe-book-head{top:12px;}
+.pe-scope .pe-book-foot{bottom:12px;}
+.pe-scope .pe-book-label{
+  position:absolute;inset:26px 0;display:flex;align-items:center;justify-content:center;
+  gap:10px;writing-mode:vertical-rl;text-orientation:mixed;
+}
+.pe-scope .pe-book-serie{
+  font-family:var(--pe-disp);font-weight:800;font-size:.92rem;letter-spacing:.04em;
+  white-space:nowrap;text-shadow:0 1px 2px rgba(0,0,0,.35);
+}
+.pe-scope .pe-book-maker{
+  font-family:var(--pe-mono);font-size:.6rem;letter-spacing:.03em;white-space:nowrap;
+  color:rgba(255,255,255,.78);
+}
+.pe-scope .pe-book:hover{transform:translateY(-7px);}
+.pe-scope .pe-book:focus-visible{
+  outline:none;transform:translateY(-7px);
+  box-shadow:inset -7px 0 10px -6px rgba(0,0,0,.55),0 0 0 3px rgba(15,138,153,.5),0 12px 18px -8px rgba(16,32,52,.55);
+}
+.pe-scope .pe-book.is-open{transform:translateY(-16px);}
+.pe-scope .pe-book.is-open::before{
+  content:"";position:absolute;left:6px;right:6px;top:-6px;height:4px;border-radius:3px;
+  background:var(--pe-teal);box-shadow:0 0 10px rgba(15,138,153,.7);
+}
+/* libro "añadir" · ranura vacía punteada al final de la repisa */
+.pe-scope .pe-book-add{
+  background:rgba(255,255,255,.45);border:2px dashed #b9a988;color:#7a6a4d;
+  border-radius:6px;box-shadow:none;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+}
+.pe-scope .pe-book-add:hover{
+  border-color:var(--pe-teal);color:var(--pe-navy);
+  background:rgba(255,255,255,.72);transform:translateY(-7px);
+}
+.pe-scope .pe-addbook-plus{font-size:1.5rem;color:var(--pe-teal);line-height:1;}
+.pe-scope .pe-addbook-lbl{font-family:var(--pe-mono);font-size:.62rem;text-align:center;line-height:1.3;}
+@media (max-width:640px){
+  .pe-scope .pe-book,.pe-scope .pe-book-add{width:52px;height:168px;}
+}
+
 /* identity */
 .pe-scope .idgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:1px;background:var(--pe-border);border:1px solid var(--pe-border);border-radius:12px;overflow:hidden;box-shadow:var(--pe-shadow);}
 .pe-scope .idcell{background:var(--pe-surface);padding:13px 16px;}

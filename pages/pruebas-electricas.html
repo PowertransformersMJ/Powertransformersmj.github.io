@@ -81,19 +81,22 @@
 
     <!-- ===== Resumen del parque ===== -->
     <section id="parque">
-      <h2>Resumen del parque</h2>
-      <p>Visión consolidada de las unidades con pruebas eléctricas registradas y su estado normativo vigente.</p>
+      <h2>Biblioteca de unidades</h2>
+      <p>Cada libro es un número de serie. Ábrelo para consultar el histórico de informes de esa unidad y su estado normativo vigente.</p>
       <div class="kpis">
         <div class="kpi"><div class="v" id="kpi-unidades">1</div><div class="l">Transformadores</div></div>
         <div class="kpi"><div class="v" id="kpi-subestaciones">1</div><div class="l">Subestaciones</div></div>
         <div class="kpi"><div class="v" id="kpi-informes">—</div><div class="l">Informes acumulados</div></div>
         <div class="kpi ok"><div class="v" id="kpi-estado">—</div><div class="l">Estado vigente</div></div>
       </div>
-      <div class="tgrid" id="parque-grid">
-        <button type="button" class="addtile" onclick="openUpload()">
-          <span class="pl">＋</span>
-          <span>Cargar informe</span>
-        </button>
+      <div class="pe-library">
+        <p class="pe-lib-hint">Selecciona un libro para abrir su histórico · el último libro carga un nuevo informe.</p>
+        <div class="pe-shelf" id="parque-grid">
+          <button type="button" class="pe-book pe-book-add" onclick="openUpload()" title="Cargar informe de una unidad">
+            <span class="pe-addbook-plus" aria-hidden="true">＋</span>
+            <span class="pe-addbook-lbl">Cargar informe</span>
+          </button>
+        </div>
       </div>
     </section>
 
