@@ -3,8 +3,7 @@
 Refactor del tablero estático **"Tablero Dinámico de Pruebas
 Eléctricas.html"** (TransformerOps) a un módulo modular, dinámico y
 escalable sobre el stack del proyecto (HTML/CSS/JS vanilla + Firebase
-Firestore en tiempo real + Auth + Storage), integrado al sistema de
-diseño **Aqua**.
+Firestore en tiempo real + Auth + Storage).
 
 El objetivo del refactor: eliminar la dependencia del Excel/archivo
 estático, separar interfaz / estilos / procesamiento de datos en
@@ -12,15 +11,29 @@ piezas reutilizables y testeables, y preservar **exactamente** el
 diseño visual y la lógica del **semáforo normativo** del tablero
 original.
 
+**Cascarón visual (chrome) · idéntico al tablero original.** El
+director pidió que la página se viera *"idéntica al archivo HTML al
+momento de subir la interfaz"*. Por eso la página NO usa el shell de
+Aqua (topbar/sidebar de la plataforma): porta el **chrome standalone
+TransformerOps** del archivo de referencia — `appbar` (topbar 60px con
+marca "TransformerOps" + chip "Cliente · Electricaribe" + avatar) +
+`layout` (grid 236px sidebar + 1fr) + `side` (nav sticky: Parque /
+Unidad 173523-15510 / Pruebas) + `crumb` (breadcrumb). El chrome vive
+en `assets/css/pruebas-electricas.css` scoped bajo `body.pe-app`, con
+las fuentes de referencia (Archivo + Source Sans 3 + IBM Plex Mono).
+La capa de datos sigue siendo dinámica (Firestore en vivo): el chrome
+es solo el cascarón visual 1:1 con el HTML original.
+
 ---
 
 ## 1. Arquitectura (separación en capas)
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│ pages/pruebas-electricas.html        (vista · page-module Aqua)│
+│ pages/pruebas-electricas.html  (vista · chrome TransformerOps) │
 │   · page-guard.js  → gate de sesión Firebase Auth              │
-│   · aqua-shell.js  → topbar + sidebar inyectados               │
+│   · chrome standalone (appbar+side+crumb) en el propio HTML    │
+│     + CSS scoped body.pe-app (NO aqua-shell)                   │
 │   · <link> assets/css/pruebas-electricas.css                   │
 └───────────────┬────────────────────────────────────────────────┘
                 │ importa (ESM)
@@ -53,8 +66,8 @@ original.
 | **Datos** | `assets/js/data/pruebas_electricas.js` | Lectura realtime (`onSnapshot`), escritura (sanitiza + `deepClean`), Storage (PDF). Sin Firebase → emite vacío (solo datos reales, sin seed). | ✅ (CDN gstatic) |
 | **UI** | `assets/js/ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js` | Render puro a DOM/SVG. | ❌ ninguna |
 | **Controlador** | `assets/js/pruebas-electricas-shell.js` | Entrypoint: cablea datos ↔ UI, KPIs, modal de carga. | indirecta |
-| **Vista** | `pages/pruebas-electricas.html` | Marcado + carga de scripts. | — |
-| **Estilos** | `assets/css/pruebas-electricas.css` | Visual del módulo (scope `.pe-scope`), idéntico al original. | — |
+| **Vista** | `pages/pruebas-electricas.html` | Marcado + chrome standalone (appbar/side/crumb) + carga de scripts. `body.pe-app`, sin aqua-shell. | — |
+| **Estilos** | `assets/css/pruebas-electricas.css` | Visual del módulo: chrome standalone (scope `body.pe-app`) + contenido (scope `.pe-scope`), idéntico al original. | — |
 
 **Por qué esta separación:** el dominio y la UI no importan Firebase,
 así que se prueban con `node --test` sin red. La capa de datos es el
