@@ -32,15 +32,20 @@ PDFs descargables · semáforo normativo congelado. Branch
 | `7f70be3` | fix | Extracción exhaustiva de las 6 pruebas + relación column-major. |
 | `1341db8` | docs | Documenta el motor de extracción del PDF (§10 de la guía). |
 | `7ed832d` | feat | Seed de 3 informes base (2012/2014/2020 · serie 173523-15510) como línea de tendencia + 3 PDFs descargables. |
-| `eb475fa` | feat | **Chrome TransformerOps standalone idéntico al tablero.** La página monta el cascarón visual del archivo de referencia (appbar + sidebar + layout + crumb) en vez del shell de Aqua, scoped bajo `body.pe-app`, con las fuentes originales (Archivo + Source Sans 3 + IBM Plex Mono). Retira lucide/aqua.js/aqua-shell.js. La capa de datos sigue siendo dinámica. |
+| `eb475fa` | feat | (revertido) Chrome TransformerOps standalone (`body.pe-app`, appbar + sidebar + layout propios). |
+| `4a64a1b` | docs | (revertido) Documentación del chrome standalone. |
+| _(este)_ | revert | **Integración en el shell de Aqua, como Seguimiento Operativo.** Se revierte el chrome standalone: la página vuelve a `<body class="aqua">` + `<main class="app-main page-container">` con `page-header` (breadcrumb + título), topbar y sidebar inyectados por `aqua-shell.js`. El módulo deja de verse como una interfaz aparte y se aprecia como el resto de la plataforma. La capa de datos dinámica se conserva intacta. |
 
 ### Resultado
 
-- **Vista 1:1 con el original al cargar.** Por instrucción explícita
-  del director (*"idéntico al archivo HTML al momento de subir la
-  interfaz"*), la página NO usa el shell de Aqua: porta el chrome
-  standalone TransformerOps. El cascarón es visualmente idéntico al
-  HTML de referencia; la capa de datos es dinámica.
+- **Integrado en la plataforma, como Seguimiento Operativo.** Por
+  instrucción explícita del director (*"todo debería poder apreciarse
+  como lo demás, toma como ejemplo el seguimiento operativo"*), la
+  página usa el shell de Aqua: misma topbar + sidebar + `page-header`
+  que el resto de módulos. El contenido del tablero (KPIs, identidad,
+  tablas, semáforo, gráficas, modal de carga) vive scoped bajo
+  `.pe-scope` para no colisionar con los tokens de Aqua. La capa de
+  datos es dinámica.
 - **Capas:** dominio puro (`domain/pruebas_electricas_{semaforo,schema,
   extraccion}.js`, sin Firebase, testeable en Node) · data layer
   (`data/pruebas_electricas.js`, `onSnapshot` + Storage + `deepClean`)
