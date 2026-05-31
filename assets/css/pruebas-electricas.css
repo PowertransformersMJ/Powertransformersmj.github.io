@@ -16,56 +16,7 @@
    Clases del semáforo preservadas EXACTAMENTE (reglas de negocio
    visuales): cell-g/cell-a/cell-o/cell-r · b-g/b-a/b-o/b-r/b-n/b-new
    · cellbox + dot g/a/o/r/n.
-
-   Chrome TransformerOps (appbar + sidebar + layout + crumb): la
-   página de Pruebas Eléctricas se renderiza IDÉNTICA al tablero
-   estático original al cargar la interfaz. Por eso este archivo
-   también porta el chrome standalone (no el shell de Aqua), scoped
-   bajo `body.pe-app`. La capa de datos sigue siendo dinámica
-   (Firestore en vivo) — solo el cascarón visual replica el HTML.
    ══════════════════════════════════════════════════════════════ */
-
-/* ── Chrome standalone · réplica fiel del tablero TransformerOps ── */
-body.pe-app{
-  --bg:#eef1f5;--surface:#ffffff;--surface-2:#f6f8fb;--surface-3:#eef2f7;
-  --border:#dde3ea;
-  --ink:#1b2733;--muted:#5b6876;--faint:#8a97a5;--muted2:#a7b1bc;
-  --navy:#16365c;--navy-2:#1e4e79;--teal:#0f8a99;
-  --mono:'IBM Plex Mono',ui-monospace,Menlo,monospace;
-  --sans:'Source Sans 3',system-ui,sans-serif;--disp:'Archivo',var(--sans);
-  margin:0;background:var(--bg);color:var(--ink);
-  font-family:var(--sans);font-size:15.5px;line-height:1.6;
-  -webkit-font-smoothing:antialiased;
-}
-body.pe-app{scroll-behavior:smooth;}
-
-.appbar{position:sticky;top:0;z-index:40;height:60px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;padding:0 22px;box-shadow:0 1px 0 rgba(16,32,52,.02);}
-.brand{display:flex;align-items:center;gap:12px;}
-.mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(140deg,var(--navy),var(--navy-2) 60%,var(--teal));display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(22,54,92,.3);}
-.brand .nm{font-family:var(--disp);font-weight:800;font-size:1.12rem;color:var(--navy);letter-spacing:-.01em;line-height:1;}
-.brand .tg{font-family:var(--mono);font-size:.64rem;color:var(--faint);letter-spacing:.04em;text-transform:uppercase;margin-top:2px;}
-.abright{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.chip{font-family:var(--mono);font-size:.72rem;color:var(--muted);background:var(--surface-2);border:1px solid var(--border);border-radius:99px;padding:6px 12px;}
-.avatar{width:32px;height:32px;border-radius:50%;background:var(--navy);color:#fff;font-family:var(--disp);font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center;}
-
-.layout{display:grid;grid-template-columns:236px 1fr;align-items:start;}
-.side{position:sticky;top:60px;height:calc(100vh - 60px);overflow-y:auto;background:var(--surface);border-right:1px solid var(--border);padding:20px 14px;}
-.side .lbl{font-family:var(--mono);font-size:.62rem;letter-spacing:.18em;text-transform:uppercase;color:var(--muted2);padding:0 10px;margin:14px 0 8px;}
-.side .lbl:first-child{margin-top:0;}
-.side a{display:block;font-size:.9rem;color:var(--muted);padding:8px 11px;border-radius:8px;transition:.14s;font-weight:500;}
-.side a:hover{background:var(--surface-2);color:var(--ink);}
-.side a.head{color:var(--navy);}
-.content{padding:30px 34px 90px;max-width:1080px;}
-.crumb{font-family:var(--mono);font-size:.74rem;color:var(--faint);margin-bottom:22px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
-.crumb b{color:var(--navy-2);}
-.crumb .sep{color:#c4ccd5;}
-
-@media (max-width:920px){
-  .layout{grid-template-columns:1fr;}
-  .side{position:static;height:auto;border-right:none;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;gap:4px;}
-  .side .lbl{width:100%;}
-  .content{padding:24px 18px 80px;}
-}
 
 .pe-scope{
   --pe-surface:#ffffff;--pe-surface-2:#f6f8fb;--pe-surface-3:#eef2f7;
