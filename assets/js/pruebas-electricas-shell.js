@@ -114,12 +114,26 @@ function renderParqueGrid(unidades) {
   const cards = unidades.map((u) => {
     const d = [u.fabricante, u.potencia, u.tensiones].filter(Boolean).join(' · ');
     const loc = [u.ubicacion, u.cliente].filter(Boolean).join(' · ');
+    const serie = esc(u.serie || u.id);
     return `<div class="ucard">` +
-      `<div class="ser">${esc(u.serie || u.id)}</div>` +
+      `<div class="ser">${serie}</div>` +
       `<div class="d">${esc(d)}${loc ? '<br>' + esc(loc) : ''}</div>` +
-      `<a class="det" href="#identidad">Ver identidad →</a></div>`;
+      `<button type="button" class="det" data-serie="${serie}">Ver identidad →</button></div>`;
   }).join('');
   grid.innerHTML = cards + tile;
+}
+
+// Clic en una tarjeta del parque → selecciona esa serie (sincroniza el
+// <select> y dispara el render completo de la unidad).
+function onClickParque(ev) {
+  const btn = ev.target.closest('[data-serie]');
+  if (!btn) return;
+  const v = btn.getAttribute('data-serie');
+  const u = state.unidades.find((x) => (x.serie || x.id) === v);
+  if (!u) return;
+  const sel = $('serieSelect');
+  if (sel) sel.value = v;
+  seleccionarUnidad(u);
 }
 
 function refrescarKpisParque() {
@@ -184,8 +198,51 @@ function escucharInformes(unidadId) {
 
 function seleccionarUnidad(u) {
   state.unidadActiva = u;
+  if (!u) { renderVacioSeleccion(); return; }
   renderIdentidad(u);
-  escucharInformes(u ? (u.id || u.serie) : null);
+  escucharInformes(u.id || u.serie);
+}
+
+/* ─── Estado vacío: nada se ilustra hasta elegir una serie ────── */
+// Todo el interior del módulo (matriz, identidad, tablas, gráficas e
+// historial) se deriva de una unidad. Sin serie seleccionada se muestra
+// un prompt en cada contenedor y se resetean los KPIs por unidad.
+function renderVacioSeleccion() {
+  if (state.unsubInformes) { state.unsubInformes(); state.unsubInformes = null; }
+  state.informes = [];
+  const prompt = '<p class="muted small">Selecciona un número de serie para ilustrar esta sección.</p>';
+  // Contenedores que se vacían por completo (tablas y gráficas)
+  ['t-tand', 't-exc', 't-rel', 't-res', 't-ins', 't-col',
+   'c-tand', 'c-exc', 'c-rel', 'c-res', 'c-ins', 'c-col'].forEach((id) => {
+    const el = $(id); if (el) el.innerHTML = '';
+  });
+  // Contenedores con prompt explícito
+  ['matrix', 'idgrid', 'reportlist'].forEach((id) => {
+    const el = $(id); if (el) el.innerHTML = prompt;
+  });
+  if ($('kpi-informes')) $('kpi-informes').textContent = '—';
+  if ($('kpi-estado')) {
+    $('kpi-estado').textContent = '—';
+    $('kpi-estado').title = '';
+  }
+}
+
+/* ─── Selector de serie (gobierna ambas pestañas) ─────────────── */
+// Pobla el <select> con las series del parque, conservando la opción
+// elegida si la serie sigue presente tras un refresh en vivo.
+function poblarSelectorSerie(unidades) {
+  const sel = $('serieSelect');
+  if (!sel) return;
+  const actual = sel.value;
+  const opts = ['<option value="">— Selecciona una serie —</option>']
+    .concat((unidades || []).map((u) => {
+      const v = esc(u.serie || u.id);
+      return `<option value="${v}">${v}</option>`;
+    }));
+  sel.innerHTML = opts.join('');
+  if (actual && (unidades || []).some((u) => (u.serie || u.id) === actual)) {
+    sel.value = actual;
+  }
 }
 
 /* ─── Borrado de informes (delegación sobre #reportlist) ──────── */
@@ -272,18 +329,35 @@ async function onClickReportlist(ev) {
 
 /* ─── Arranque ────────────────────────────────────────────────── */
 
+// Re-sincroniza el render con la serie elegida en el <select>: si la
+// serie activa sigue en el parque la mantiene; si no, vuelve al vacío.
+// NO auto-selecciona ninguna unidad: nada se ilustra hasta que el
+// usuario elige una serie.
+function sincronizarSeleccion() {
+  if (!state.unidadActiva) { seleccionarUnidad(null); return; }
+  const k = state.unidadActiva.id || state.unidadActiva.serie;
+  const actual = state.unidades.find((u) => (u.id || u.serie) === k);
+  seleccionarUnidad(actual || null);
+}
+
 function arrancar() {
   const rl = $('reportlist');
   if (rl) rl.addEventListener('click', onClickReportlist);
+  const pg = $('parque-grid');
+  if (pg) pg.addEventListener('click', onClickParque);
+  const sel = $('serieSelect');
+  if (sel) sel.addEventListener('change', () => {
+    const v = sel.value;
+    const u = v ? state.unidades.find((x) => (x.serie || x.id) === v) : null;
+    seleccionarUnidad(u);
+  });
   suscribirUnidades(
     (unidades) => {
       state.unidades = mergeUnidades(unidades);
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
-      // Selecciona la primera unidad (o re-selecciona la activa si sigue presente)
-      const actual = state.unidadActiva &&
-        state.unidades.find((u) => (u.id || u.serie) === (state.unidadActiva.id || state.unidadActiva.serie));
-      seleccionarUnidad(actual || state.unidades[0] || null);
+      poblarSelectorSerie(state.unidades);
+      sincronizarSeleccion();
     },
     (err) => {
       console.warn('[pruebas-electricas] unidades', err);
@@ -292,7 +366,8 @@ function arrancar() {
       state.unidades = mergeUnidades([]);
       renderParqueGrid(state.unidades);
       refrescarKpisParque();
-      seleccionarUnidad(state.unidades[0] || null);
+      poblarSelectorSerie(state.unidades);
+      sincronizarSeleccion();
     }
   );
 }

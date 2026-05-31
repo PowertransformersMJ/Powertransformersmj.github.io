@@ -58,10 +58,18 @@
 .pe-scope .kpi.ok .v{color:var(--pe-green);}
 
 .pe-scope .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;}
+
+/* Selector de serie · gobierna ambas pestañas */
+.pe-scope .pe-serie-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--pe-surface);border:1px solid var(--pe-border);border-radius:12px;box-shadow:var(--pe-shadow);padding:14px 18px;margin-bottom:18px;}
+.pe-scope .pe-serie-lbl{font-family:var(--pe-mono);font-size:.7rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;}
+.pe-scope .pe-serie-sel{font-family:var(--pe-mono);font-size:.92rem;color:var(--pe-ink);background:var(--pe-surface-2);border:1px solid var(--pe-border);border-radius:9px;padding:9px 12px;min-width:220px;cursor:pointer;}
+.pe-scope .pe-serie-sel:focus{outline:none;border-color:var(--pe-teal);box-shadow:0 0 0 3px rgba(15,138,153,.18);}
+.pe-scope .pe-serie-hint{margin-left:auto;}
+.pe-scope .ucard .det{appearance:none;border:none;background:none;cursor:pointer;font-family:inherit;padding:0;}
 .pe-scope .ucard{background:var(--pe-surface);border:1px solid var(--pe-border);border-radius:12px;box-shadow:var(--pe-shadow);padding:18px 20px;}
 .pe-scope .ucard .ser{font-family:var(--pe-disp);font-weight:800;font-size:1.2rem;color:var(--pe-navy);}
 .pe-scope .ucard .d{font-family:var(--pe-mono);font-size:.73rem;color:var(--pe-muted);margin:7px 0 12px;line-height:1.7;}
-.pe-scope .ucard a.det{font-family:var(--pe-mono);font-size:.76rem;color:var(--pe-teal);}
+.pe-scope .ucard .det{font-family:var(--pe-mono);font-size:.76rem;color:var(--pe-teal);}
 .pe-scope .addtile{width:100%;appearance:none;-webkit-appearance:none;border:2px dashed var(--pe-border);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--pe-faint);font-family:var(--pe-mono);font-size:.82rem;cursor:pointer;min-height:160px;transition:.15s;background:var(--pe-surface);text-align:center;line-height:1.5;}
 .pe-scope .addtile:hover{border-color:var(--pe-teal);color:var(--pe-navy);background:var(--pe-surface-2);}
 .pe-scope .addtile .pl{font-size:1.6rem;color:var(--pe-teal);}
