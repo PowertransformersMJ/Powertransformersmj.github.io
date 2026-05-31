@@ -69,13 +69,16 @@ export const COL = Object.freeze({
 });
 
 /* ─── Derivación de series desde informes (eje de años dinámico) ─
- * Proyecta los informes que el usuario subió a un objeto `serie`.
- * El schema persiste escalares sintetizados por prueba, así que
- * resistencia y aislamiento salen como un valor por año.
+ * Proyecta los informes Firestore (schema v2) a un objeto `serie` con
+ * la MISMA forma que el tablero de referencia: tendencia año a año
+ * sobre la misma gráfica. Cada prueba conserva su detalle:
+ *   · tand        → 6 secciones (CH/CHL/CL/CLT/CT/CHT), valor por año
+ *   · excitacion  → Δ ext. (%) por año (línea)
+ *   · relacion    → DOS series por año: AT–MT (navy) y AT–Terc. (purple)
+ *   · resistencia → barras agrupadas AT/MT/BT por año (con flag/no medido)
+ *   · aislamiento → FOTO del informe más reciente: una barra por par
+ *   · collar      → pérdida máx (mW) por año (línea)
  * @param {Array} informes
- * @returns {{anos:number[], tand:Object, excitacion:Array,
- *            relacion:Array, resistencia:Array, aislamiento:Array,
- *            collar:Array}}
  */
 export function derivarSeries(informes) {
   const docs = (informes || [])
@@ -83,6 +86,8 @@ export function derivarSeries(informes) {
     .slice()
     .sort((a, b) => a.ano - b.ano);
   const anos = docs.map((d) => d.ano);
+
+  // 1) tan δ — un valor por sección y por año.
   const tand = {};
   CONFIGS_TAND.forEach((cfg) => {
     tand[cfg.code] = docs.map((inf) => {
@@ -90,19 +95,52 @@ export function derivarSeries(informes) {
       return t && t.valor_pct != null ? t.valor_pct : null;
     });
   });
-  const excitacion = docs.map((i) => (i.excitacion && i.excitacion.delta_pct != null ? i.excitacion.delta_pct : null));
-  const relacion = docs.map((i) => (i.relacion && i.relacion.desviacion_pct != null ? i.relacion.desviacion_pct : null));
+
+  // 2) Excitación — Δ ext. (%) por año.
+  const excitacion = docs.map((i) =>
+    (i.excitacion && i.excitacion.delta_ext_pct != null) ? i.excitacion.delta_ext_pct : null);
+
+  // 3) Relación — dos series (AT–MT, AT–Terc.) por año.
+  const relValor = (inf, matcher) => {
+    const filas = Array.isArray(inf.relacion) ? inf.relacion : [];
+    const fila = filas.find((r) => matcher(String(r.asociado || '').toUpperCase()));
+    return fila && fila.desviacion_pct != null ? Math.abs(fila.desviacion_pct) : null;
+  };
+  const relacion = {
+    atmt:  docs.map((i) => relValor(i, (a) => a.startsWith('MT'))),
+    atter: docs.map((i) => relValor(i, (a) => a.includes('TER')))
+  };
+
+  // 4) Resistencia — barras agrupadas AT/MT/BT por año.
+  const resBar = (inf, dev) => {
+    const filas = Array.isArray(inf.resistencia) ? inf.resistencia : [];
+    const fila = filas.find((r) => String(r.devanado || '').toUpperCase() === dev);
+    if (!fila) return null;
+    if (fila.no_medido) return { v: null, flag: false, no_medido: true };
+    return { v: fila.delta_max_pct, flag: !!fila.verificar, no_medido: false };
+  };
   const resistencia = docs.map((i) => ({
     ano: i.ano,
-    v: i.resistencia && i.resistencia.desbalance_pct != null ? i.resistencia.desbalance_pct : null,
-    flag: !!(i.resistencia && i.resistencia.verificar)
+    AT: resBar(i, 'AT'),
+    MT: resBar(i, 'MT'),
+    BT: resBar(i, 'BT')
   }));
-  const aislamiento = docs.map((i) => ({
-    ano: i.ano,
-    v: i.aislamiento && i.aislamiento.gohm != null ? i.aislamiento.gohm : null
-  }));
-  const collar = docs.map((i) => (i.collar && i.collar.mw != null ? i.collar.mw : null));
-  return { anos, tand, excitacion, relacion, resistencia, aislamiento, collar };
+
+  // 5) Aislamiento — FOTO del informe más reciente con datos (por par).
+  const ultimoIns = [...docs].reverse()
+    .find((i) => Array.isArray(i.aislamiento) && i.aislamiento.length);
+  const aislamiento = ultimoIns
+    ? ultimoIns.aislamiento.map((a) => ({
+        label: `${a.devanado}–${a.asociado}`,
+        v: a.gohm != null ? a.gohm : null
+      }))
+    : [];
+  const aislamientoAno = ultimoIns ? ultimoIns.ano : null;
+
+  // 6) Collar — pérdida máx (mW) por año.
+  const collar = docs.map((i) => (i.collar && i.collar.max_mw != null ? i.collar.max_mw : null));
+
+  return { anos, tand, excitacion, relacion, resistencia, aislamiento, aislamientoAno, collar };
 }
 
 /* ─── Helpers de eje dinámico + estado vacío ──────────────────── */
@@ -210,13 +248,14 @@ export function chartExc(serie) {
 
 /* ══════════════════════════════════════════════════════════════
  * Gráfica 3 · Relación de transformación · desviación vs placa
- * límite rojo 0.5 % · ymax 0.6 · serie escalar por año
+ * límite rojo 0.5 % · ymax 0.6 · DOS series de tendencia:
+ *   AT–MT (navy) y AT–Terc. (purple) — tal cual el tablero.
  * ══════════════════════════════════════════════════════════════ */
 export function chartRel(serie) {
   const W = 720, H = 230, L = 44, R = 18, T = 16, B = 40, ymax = 0.6;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const anos = serie.anos;
-  const pts = (serie.relacion || []).map((y, i) => ({ x: anos[i], y })).filter((p) => p.y != null);
+  const rel = serie.relacion || { atmt: [], atter: [] };
   const X = mkX(anos, W, L, R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
   [0, 0.25, 0.5].forEach((g) => {
@@ -229,32 +268,50 @@ export function chartRel(serie) {
     tx(svg, L - 8, yy + 4, g.toFixed(2) + '%', { 'text-anchor': 'end', fill: g === 0.5 ? COL.lim : '#8a97a5' });
   });
   anos.forEach((yr) => tx(svg, X(yr), H - B + 22, yr, { 'text-anchor': 'middle', 'font-size': 11 }));
-  for (let i = 0; i < pts.length - 1; i++) {
-    svg.appendChild(el('line', {
-      x1: X(pts[i].x), y1: Y(pts[i].y), x2: X(pts[i + 1].x), y2: Y(pts[i + 1].y),
-      stroke: COL.navy, 'stroke-width': 2.2, 'stroke-linecap': 'round'
-    }));
-  }
-  pts.forEach((p) => {
-    const d = el('circle', { cx: X(p.x), cy: Y(p.y), r: 4.5, fill: COL.navy });
-    d.setAttribute('class', 'gpt');
-    d.addEventListener('mouseenter', (e) => showTip(e, `<b>Desviación</b> · ${p.x}<br>desv = ${p.y.toFixed(2)} %`));
-    d.addEventListener('mousemove', moveTip);
-    d.addEventListener('mouseleave', hideTip);
-    svg.appendChild(d);
+
+  const series = [
+    { key: 'atmt',  label: 'AT–MT',    c: COL.navy },
+    { key: 'atter', label: 'AT–Terc.', c: COL.purple }
+  ];
+  series.forEach((s) => {
+    const pts = (rel[s.key] || []).map((y, i) => ({ x: anos[i], y })).filter((p) => p.y != null);
+    for (let i = 0; i < pts.length - 1; i++) {
+      svg.appendChild(el('line', {
+        x1: X(pts[i].x), y1: Y(pts[i].y), x2: X(pts[i + 1].x), y2: Y(pts[i + 1].y),
+        stroke: s.c, 'stroke-width': 2.2, 'stroke-linecap': 'round'
+      }));
+    }
+    pts.forEach((p) => {
+      const d = el('circle', { cx: X(p.x), cy: Y(p.y), r: 4.5, fill: s.c });
+      d.setAttribute('class', 'gpt');
+      d.addEventListener('mouseenter', (e) => showTip(e, `<b>${s.label}</b> · ${p.x}<br>desv = ${p.y.toFixed(2)} %`));
+      d.addEventListener('mousemove', moveTip);
+      d.addEventListener('mouseleave', hideTip);
+      svg.appendChild(d);
+    });
+  });
+
+  // Leyenda (esquina superior derecha).
+  let lx = W - R - 150;
+  series.forEach((s) => {
+    svg.appendChild(el('rect', { x: lx, y: T - 2, width: 14, height: 4, rx: 2, fill: s.c }));
+    tx(svg, lx + 18, T + 3, s.label, { 'font-size': 10, fill: '#5b6876' });
+    lx += 75;
   });
   return svg;
 }
 
 /* ══════════════════════════════════════════════════════════════
  * Gráfica 4 · Resistencia de devanados · desbalance por año
- * límite rojo 5 % · ymax 6 · barra escalar por año
+ * límite rojo 5 % · ymax 6 · barras AGRUPADAS AT/MT/BT por año
+ *   AT navy · MT green · BT purple (tal cual el tablero)
  * barra flag → patrón hatch ámbar + ⚠ ("a verificar")
+ * barra no medida → marca "n/m"
  * ══════════════════════════════════════════════════════════════ */
 export function chartRes(serie) {
   const W = 720, H = 260, L = 42, R = 16, T = 16, B = 44, ymax = 6;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
-  const bars = serie.resistencia || [];
+  const grupos = serie.resistencia || [];
   const Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
   [0, 2.5, 5].forEach((g) => {
@@ -271,23 +328,44 @@ export function chartRes(serie) {
   pat.appendChild(el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: COL.guide, 'stroke-width': 2 }));
   defs.appendChild(pat);
   svg.appendChild(defs);
-  const gw = (W - L - R) / bars.length, bw = Math.min(gw * 0.45, 54);
-  bars.forEach((b, i) => {
-    const cx = L + i * gw + gw / 2, x = cx - bw / 2;
-    if (b.v != null) {
+
+  const cmap = { AT: COL.navy, MT: COL.green, BT: COL.purple };
+  const devs = ['AT', 'MT', 'BT'];
+  const gw = (W - L - R) / Math.max(grupos.length, 1);
+  const bw = Math.min((gw * 0.7) / devs.length, 22);
+  const cluster = bw * devs.length + (devs.length - 1) * 4;
+
+  grupos.forEach((grp, gi) => {
+    const cx = L + gi * gw + gw / 2;
+    const startX = cx - cluster / 2;
+    devs.forEach((dev, di) => {
+      const b = grp[dev];
+      const x = startX + di * (bw + 4);
+      if (b && b.no_medido) {
+        tx(svg, x + bw / 2, Y(0) - 6, 'n/m', { 'text-anchor': 'middle', 'font-size': 8, fill: '#a9b4c0' });
+        return;
+      }
+      if (!b || b.v == null) return;
       const vv = Math.max(b.v, 0.04);
       const y = Y(vv), h = (H - T - B) - (y - T);
-      const rect = el('rect', { x, y, width: bw, height: h, rx: 2, fill: b.flag ? 'url(#pe-hatch)' : COL.navy });
+      const rect = el('rect', { x, y, width: bw, height: h, rx: 2, fill: b.flag ? 'url(#pe-hatch)' : cmap[dev] });
       rect.setAttribute('class', 'gpt');
-      rect.addEventListener('mouseenter', (e) => showTip(e, `${b.ano}<br>Δ ${b.flag ? '(a verificar) ' : ''}= ${b.v.toFixed(2)} %`));
+      rect.addEventListener('mouseenter', (e) =>
+        showTip(e, `<b>${dev}</b> · ${grp.ano}<br>Δ ${b.flag ? '(a verificar) ' : ''}= ${b.v.toFixed(2)} %`));
       rect.addEventListener('mousemove', moveTip);
       rect.addEventListener('mouseleave', hideTip);
       svg.appendChild(rect);
-      tx(svg, cx, y - 5, b.flag ? '⚠' : b.v.toFixed(1), { 'text-anchor': 'middle', 'font-size': 9, fill: b.flag ? COL.guide : '#5b6876' });
-    } else {
-      tx(svg, cx, Y(0) - 8, 'n/d', { 'text-anchor': 'middle', 'font-size': 9, fill: '#a9b4c0' });
-    }
-    tx(svg, cx, H - B + 22, b.ano, { 'text-anchor': 'middle', 'font-size': 11 });
+      if (b.flag) tx(svg, x + bw / 2, y - 4, '⚠', { 'text-anchor': 'middle', 'font-size': 9, fill: COL.guide });
+    });
+    tx(svg, cx, H - B + 22, grp.ano, { 'text-anchor': 'middle', 'font-size': 11 });
+  });
+
+  // Leyenda AT/MT/BT.
+  let lx = W - R - 150;
+  devs.forEach((dev) => {
+    svg.appendChild(el('rect', { x: lx, y: T - 2, width: 12, height: 8, rx: 2, fill: cmap[dev] }));
+    tx(svg, lx + 16, T + 5, dev, { 'font-size': 10, fill: '#5b6876' });
+    lx += 48;
   });
   return svg;
 }
@@ -310,14 +388,14 @@ export function chartIns(serie) {
     }));
     tx(svg, L - 8, yy + 4, g, { 'text-anchor': 'end', fill: g === 1 ? COL.lim : '#8a97a5' });
   });
-  const gw = (W - L - R) / bars.length, bw = Math.min(gw * 0.45, 54);
+  const gw = (W - L - R) / bars.length, bw = Math.min(gw * 0.55, 48);
   bars.forEach((b, i) => {
     const cx = L + i * gw + gw / 2, x = cx - bw / 2;
     if (b.v != null) {
       const y = Y(b.v), h = (H - T - B) - (y - T);
       const rect = el('rect', { x, y, width: bw, height: h, rx: 2, fill: COL.teal });
       rect.setAttribute('class', 'gpt');
-      rect.addEventListener('mouseenter', (e) => showTip(e, `${b.ano}<br>${b.v.toFixed(2)} GΩ`));
+      rect.addEventListener('mouseenter', (e) => showTip(e, `${b.label}<br>${b.v.toFixed(2)} GΩ`));
       rect.addEventListener('mousemove', moveTip);
       rect.addEventListener('mouseleave', hideTip);
       svg.appendChild(rect);
@@ -325,9 +403,12 @@ export function chartIns(serie) {
     } else {
       tx(svg, cx, Y(0) - 8, 'n/d', { 'text-anchor': 'middle', 'font-size': 9, fill: '#a9b4c0' });
     }
-    tx(svg, cx, H - B + 18, b.ano, { 'text-anchor': 'middle', 'font-size': 11 });
+    tx(svg, cx, H - B + 18, b.label, { 'text-anchor': 'middle', 'font-size': 10 });
   });
   tx(svg, L - 8, T - 4, 'GΩ', { 'text-anchor': 'end', 'font-size': 9 });
+  if (serie.aislamientoAno) {
+    tx(svg, W - R, T - 4, `Foto ${serie.aislamientoAno}`, { 'text-anchor': 'end', 'font-size': 9, fill: '#8a97a5' });
+  }
   return svg;
 }
 
