@@ -66,8 +66,11 @@
   <!-- ===== TABS: Tablero · Informes cargados ===== -->
   <div class="sgm-tabs" id="pruebasTabs">
     <div role="tablist" class="tab-bar" aria-label="Secciones del módulo Pruebas Eléctricas">
-      <button type="button" role="tab" data-tab="tablero" aria-selected="true">
+      <button type="button" role="tab" data-tab="tablero" aria-selected="false">
         <span class="i"><i data-lucide="layout-dashboard"></i></span>Tablero
+      </button>
+      <button type="button" role="tab" data-tab="biblioteca" aria-selected="true">
+        <span class="i"><i data-lucide="library"></i></span>Biblioteca
       </button>
       <button type="button" role="tab" data-tab="informes" aria-selected="false">
         <span class="i"><i data-lucide="files"></i></span>Informes cargados
@@ -76,27 +79,37 @@
 
     <div class="tab-panels">
 
-      <div role="tabpanel" data-tab-panel="tablero">
+      <!-- ===== Panel: Biblioteca virtual ===== -->
+      <div role="tabpanel" data-tab-panel="biblioteca">
   <div class="pe-scope">
-
-    <!-- ===== Resumen del parque ===== -->
-    <section id="parque">
+    <section id="biblioteca">
       <h2>Biblioteca de unidades</h2>
-      <p>Cada libro es un número de serie. Ábrelo para consultar el histórico de informes de esa unidad y su estado normativo vigente.</p>
-      <div class="kpis">
-        <div class="kpi"><div class="v" id="kpi-unidades">1</div><div class="l">Transformadores</div></div>
-        <div class="kpi"><div class="v" id="kpi-subestaciones">1</div><div class="l">Subestaciones</div></div>
-        <div class="kpi"><div class="v" id="kpi-informes">—</div><div class="l">Informes acumulados</div></div>
-        <div class="kpi ok"><div class="v" id="kpi-estado">—</div><div class="l">Estado vigente</div></div>
-      </div>
+      <p>Cada libro es un número de serie. Abre uno para ir al tablero y consultar todas sus pruebas e histórico de informes.</p>
       <div class="pe-library">
-        <p class="pe-lib-hint">Selecciona un libro para abrir su histórico · el último libro carga un nuevo informe.</p>
+        <p class="pe-lib-hint">Selecciona un libro para abrir su tablero · el último libro carga un nuevo informe.</p>
         <div class="pe-shelf" id="parque-grid">
           <button type="button" class="pe-book pe-book-add" onclick="openUpload()" title="Cargar informe de una unidad">
             <span class="pe-addbook-plus" aria-hidden="true">＋</span>
             <span class="pe-addbook-lbl">Cargar informe</span>
           </button>
         </div>
+      </div>
+    </section>
+  </div>
+      </div>
+
+      <div role="tabpanel" data-tab-panel="tablero">
+  <div class="pe-scope">
+
+    <!-- ===== Resumen de la unidad ===== -->
+    <section id="parque">
+      <h2>Resumen de la unidad</h2>
+      <p>Indicadores del parque y del informe vigente de la unidad abierta. Cambia de unidad desde la pestaña <b>Biblioteca</b>.</p>
+      <div class="kpis">
+        <div class="kpi"><div class="v" id="kpi-unidades">1</div><div class="l">Transformadores</div></div>
+        <div class="kpi"><div class="v" id="kpi-subestaciones">1</div><div class="l">Subestaciones</div></div>
+        <div class="kpi"><div class="v" id="kpi-informes">—</div><div class="l">Informes acumulados</div></div>
+        <div class="kpi ok"><div class="v" id="kpi-estado">—</div><div class="l">Estado vigente</div></div>
       </div>
     </section>
 
@@ -283,7 +296,7 @@
 <script src="../assets/js/aqua-shell.js" defer></script>
 <script type="module">
   import { initModuleShell } from '../assets/js/ui/module-shell.js';
-  initModuleShell('pruebasTabs', { defaultTab: 'tablero' });
+  initModuleShell('pruebasTabs', { defaultTab: 'biblioteca' });
 </script>
 <script type="module" src="../assets/js/pruebas-electricas-shell.js"></script>
 </body>
