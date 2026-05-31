@@ -63,6 +63,31 @@ interfaz en tiempo real · solo datos reales: sin Firebase configurado
 las suscripciones emiten listas vacías (estado vacío en la vista) y
 con Firestore se llenan en vivo, sin tocar UI ni dominio.
 
+### 1.1 Pestañas del módulo (`module-shell`)
+
+La vista usa el sistema de tabs reutilizable del proyecto
+(`assets/css/tabs.css` + `assets/js/ui/{tabs,module-shell}.js`). El
+contenedor `.sgm-tabs#pruebasTabs` divide el módulo en dos paneles,
+cada uno scoped bajo `.pe-scope`:
+
+| Tab (`data-tab`) | Contenido |
+|---|---|
+| `tablero` | Resumen del parque (KPIs), carga de informe, calificación global, identidad de la unidad, nomenclatura, las 6 gráficas + tablas y los criterios normativos. |
+| `informes` | Historial `#reportlist` con los informes cargados de la unidad (serie en PDF + enlace al documento), **incluidos los 3 informes base** ya presentes en el módulo (2012/2014/2020 · serie 173523-15510). |
+
+Inicialización en el footer de la página:
+
+```js
+import { initModuleShell } from '../assets/js/ui/module-shell.js';
+initModuleShell('pruebasTabs', { defaultTab: 'tablero' });
+```
+
+`module-shell` aporta ARIA, navegación por teclado, hash routing
+(`#tab=informes`) y ocultamiento de tabs `data-admin` para no-admins.
+**El controlador no cambia:** `renderInformes($('reportlist'), …)` y la
+delegación de borrado siguen apuntando a `#reportlist`, que funciona
+igual esté en el tab que esté (los paneles ocultos reciben innerHTML).
+
 ---
 
 ## 2. Semáforo normativo (regla de negocio congelada)
