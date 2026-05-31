@@ -35,6 +35,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
 <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/tabs.css"/>
 <link rel="stylesheet" href="../assets/css/pruebas-electricas.css"/>
 </head>
 <body class="aqua">
@@ -51,6 +52,20 @@
     </p>
   </div>
 
+  <!-- ===== TABS: Tablero · Informes cargados ===== -->
+  <div class="sgm-tabs" id="pruebasTabs">
+    <div role="tablist" class="tab-bar" aria-label="Secciones del módulo Pruebas Eléctricas">
+      <button type="button" role="tab" data-tab="tablero" aria-selected="true">
+        <span class="i"><i data-lucide="layout-dashboard"></i></span>Tablero
+      </button>
+      <button type="button" role="tab" data-tab="informes" aria-selected="false">
+        <span class="i"><i data-lucide="files"></i></span>Informes cargados
+      </button>
+    </div>
+
+    <div class="tab-panels">
+
+      <div role="tabpanel" data-tab-panel="tablero">
   <div class="pe-scope">
 
     <!-- ===== Resumen del parque ===== -->
@@ -94,13 +109,6 @@
     <section id="identidad">
       <h2>Identidad de la unidad</h2>
       <div class="idgrid" id="idgrid"><p class="muted small">Cargando ficha…</p></div>
-    </section>
-
-    <!-- ===== Informes de la unidad ===== -->
-    <section id="informes">
-      <h2>Informes de la unidad <span class="norm">acceso al PDF original</span></h2>
-      <p class="muted small">Historial de informes cargados, con la serie detectada en el PDF y el enlace al documento.</p>
-      <div id="reportlist"><p class="muted small">Cargando informes…</p></div>
     </section>
 
     <!-- ===== Nomenclatura ===== -->
@@ -219,6 +227,21 @@
     </section>
 
   </div><!-- /.pe-scope -->
+      </div><!-- /[data-tab-panel=tablero] -->
+
+      <div role="tabpanel" data-tab-panel="informes" hidden>
+        <div class="pe-scope">
+          <!-- ===== Informes de la unidad ===== -->
+          <section id="informes">
+            <h2>Informes de la unidad <span class="norm">acceso al PDF original</span></h2>
+            <p class="muted small">Historial de informes cargados, con la serie detectada en el PDF y el enlace al documento. Incluye los informes base ya presentes en el módulo.</p>
+            <div id="reportlist"><p class="muted small">Cargando informes…</p></div>
+          </section>
+        </div><!-- /.pe-scope -->
+      </div><!-- /[data-tab-panel=informes] -->
+
+    </div><!-- /.tab-panels -->
+  </div><!-- /.sgm-tabs -->
 
 </main>
 
@@ -244,6 +267,10 @@
 <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>
 <script src="../assets/js/aqua-shell.js" defer></script>
+<script type="module">
+  import { initModuleShell } from '../assets/js/ui/module-shell.js';
+  initModuleShell('pruebasTabs', { defaultTab: 'tablero' });
+</script>
 <script type="module" src="../assets/js/pruebas-electricas-shell.js"></script>
 </body>
 </html>
