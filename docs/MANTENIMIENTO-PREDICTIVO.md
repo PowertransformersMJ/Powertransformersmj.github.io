@@ -49,6 +49,7 @@ original.
 |---|---|---|---|
 | **Dominio** | `assets/js/domain/pruebas_electricas_semaforo.js` | Calificadores + umbrales **congelados** del semáforo (reglas de negocio). | ❌ ninguna |
 | **Dominio** | `assets/js/domain/pruebas_electricas_schema.js` | Sanitizadores y validadores de `unidad` e `informe`. | ❌ ninguna |
+| **Dominio** | `assets/js/domain/pruebas_electricas_extraccion.js` | Extrae las 6 mediciones del texto del PDF (`extraerMediciones`). Política conservadora + `_diagnostico.campos`. | ❌ ninguna |
 | **Datos** | `assets/js/data/pruebas_electricas.js` | Lectura realtime (`onSnapshot`), escritura (sanitiza + `deepClean`), Storage (PDF). Sin Firebase → emite vacío (solo datos reales, sin seed). | ✅ (CDN gstatic) |
 | **UI** | `assets/js/ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js` | Render puro a DOM/SVG. | ❌ ninguna |
 | **Controlador** | `assets/js/pruebas-electricas-shell.js` | Entrypoint: cablea datos ↔ UI, KPIs, modal de carga. | indirecta |
@@ -206,3 +207,129 @@ server-side (firebase-admin, seeds, migraciones). Copiar a `.env`
 - **Migrar el seed a Firestore:** poblar `/pruebas_electricas` y
   subcolección `informes`; al estar configurado Firebase, la vista
   conmuta a realtime automáticamente.
+
+---
+
+## 10. Extracción automática del PDF (pdf.js)
+
+Toda la lógica de extracción vive en
+`domain/pruebas_electricas_extraccion.js` (puro · sin pdf.js ni
+Firebase · testeable con `node --test`). El shell extrae el texto
+del PDF con **pdf.js v3.11.174** (CDN) y lo pasa a
+`extraerMediciones(textoPdf)`, que devuelve las 6 mediciones más
+un bloque `_diagnostico`:
+
+```js
+{
+  tand: [{ code, valor_pct }, …],
+  excitacion:  { delta_pct, corriente_ma },
+  relacion:    { desviacion_pct },
+  resistencia: { desbalance_pct, verificar },
+  aislamiento: { gohm },
+  collar:      { mw },
+  _diagnostico: { campos: [...], traza: {...} }
+}
+```
+
+> **Regla del badge "procesado":** un informe pasa a
+> `estado='extraido'` (badge **procesado**) **si y solo si**
+> `_diagnostico.campos.length > 0`. Si no se reconoció ninguna de
+> las 6 pruebas, queda **pendiente de extracción** (mejor pendiente
+> que un color equivocado en el semáforo).
+
+### 10.1 Normalización del texto
+
+- **`normalizar(t)`** — NFD + quita marcas combinantes (acentos),
+  `\u00a0`→espacio, colapsa `[ \t\r\n]+` a un solo espacio y baja a
+  minúsculas. **El parser ve una sola cadena larga**: los saltos de
+  línea NO sobreviven, así que toda heurística trabaja por ventanas
+  de texto, no por líneas. (Ω **no** es diacrítico → se conserva.)
+- **`parseNum(s)`** — admite coma o punto decimal y desambigua
+  miles (`1.234,5` y `1,234.5` → `1234.5`).
+- **`NUM`** — patrón de número tolerante a separadores reutilizado
+  por todas las estrategias.
+
+### 10.2 Los 3 formatos de tan δ
+
+El extractor de tan δ prueba en este orden de prioridad y se queda
+con el primero que produzca códigos:
+
+1. **Doble M-4100** — formato columnar detectado por el token
+   `fctr`; el `%PF` es el **3.º número desde el final** de la fila.
+2. **Puente / Omicron** — filas con `nF`/`pF` + `%`; el tan δ es el
+   número **antes del `%`**, nunca la capacitancia (`nF`). Toma la
+   **última** ocurrencia por código (la definitiva). Descarta filas
+   combinadas (`CH+CHL`).
+3. **Columnar genérico** — `CODE kV mA Watts %PF CorrFctr Cap`; el
+   `%PF` es el 3.º desde el final. Descarta filas combinadas `X + Y`.
+
+En todos los casos se descartan valores fuera del rango plausible
+(`> 10 %` no es un tan δ creíble) y se evita confundir `cl` dentro
+de palabras (`clase`, `ciclo`).
+
+### 10.3 Relación de transformación · extractor "% dif" (column-major)
+
+El reto de la relación es que muchos informes la presentan en
+**tablas column-major**: pdftotext/pdf.js intercalan verticalmente
+las relaciones (≥ 1.5) con sus desviaciones (decimales < 1.5).
+Estrategia en dos fases:
+
+1. **Etiqueta directa** — busca `relacion de transformacion … (error|
+   desviacion|deviation)` y toma el valor en rango `[-10, 10]`.
+2. **Tabla "% dif"** (fallback column-major) — localiza cada
+   encabezado `% dif` **precedido por `relacion`**, recorre la
+   región hasta `observacion`/`norma aplicable` y junta los números
+   **con separador decimal** y magnitud `0 < |x| < 1.5`. La
+   desviación es el **máximo** de esos candidatos.
+
+> **Distinción clave (origen de un bug):** las tablas de relación
+> usan el encabezado **`% dif`**, mientras que la **excitación** usa
+> `desviacion %`. Esto separa con seguridad ambos bloques — sin esta
+> ancla, la excitación de R3 (`DESVIACION %` −3.x) se colaría como
+> relación. Además se exige separador decimal (excluye taps/tensiones
+> enteras) y se corta antes del umbral normativo `±0,5%` para no
+> contaminar con ese `0.5`.
+
+### 10.4 Excitación, resistencia, aislamiento, collar
+
+- **Excitación** — 5 estrategias: Δ% declarado explícito (gana sobre
+  el cálculo), corrientes por fase → `deltaDosMayores` (Δ entre las
+  **dos fases mayores**, no max−min), y una estrategia genérica
+  `NUM mA`. La fase central cae naturalmente; el desbalance normativo
+  es entre las dos mayores.
+- **Resistencia** — desbalance `%` + bandera `verificar` cuando hay
+  marca de "a confirmar / verificar" cerca del bloque de resistencia.
+- **Aislamiento** — toma el **mínimo** en GΩ del bloque, saltando
+  valores con `> < ≥ min max`; si solo hay MΩ, normaliza a GΩ
+  (`÷1000`).
+- **Collar caliente** — el **mayor** valor en mW del bloque (o
+  Watts × 1000).
+
+### 10.5 Calibración verificada (9 informes reales)
+
+El extractor se calibró contra los 9 informes de campo (texto
+extraído con pdftotext como proxy de pdf.js). Resultado actual:
+
+| # | Informe | `campos` reconocidos | Badge |
+|---|---|---|---|
+| 1 | MPT045 DRM 2025 | (ninguno) | pendiente |
+| 2 | MPT044 2025 | (ninguno) | pendiente |
+| 3 | 230910 PYE 2023 (Omicron) | `tand`, `excitacion`, `aislamiento` | procesado |
+| 4 | 230910 DRM 2023 | (ninguno) | pendiente |
+| 5 | 230521 PYE 2023 | `tand`, `relacion` (0.19 %) | procesado |
+| 6 | 210418 2021 | `relacion` (0.29 %) | procesado |
+| 7 | 200622 2021 | `tand`, `relacion` (0.23 %) | procesado |
+| 8 | 140609 2014 (Doble) | `tand`, `excitacion`, `aislamiento`, `collar` | procesado |
+| 9 | 130823 2013 (Doble) | `tand`, `excitacion`, `collar` | procesado |
+
+Los informes 1, 2 y 4 quedan legítimamente vacíos (su texto no
+contiene las pruebas en un formato reconocible) → **pendiente**,
+nunca un valor inventado.
+
+### 10.6 Política conservadora
+
+Ante la duda, `null`. El contrato (verificado por
+`tests/pruebas_electricas_extraccion.test.js`): texto sin pistas →
+todo `null`/vacío y `_diagnostico.campos = []`; texto vacío o `null`
+no lanza. Cualquier ajuste a una heurística debe pasar la suite
+sintética + re-verificar la tabla §10.5.
