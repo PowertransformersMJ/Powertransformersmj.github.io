@@ -34,7 +34,8 @@ PDFs descargables · semáforo normativo congelado. Branch
 | `7ed832d` | feat | Seed de 3 informes base (2012/2014/2020 · serie 173523-15510) como línea de tendencia + 3 PDFs descargables. |
 | `eb475fa` | feat | (revertido) Chrome TransformerOps standalone (`body.pe-app`, appbar + sidebar + layout propios). |
 | `4a64a1b` | docs | (revertido) Documentación del chrome standalone. |
-| _(este)_ | revert | **Integración en el shell de Aqua, como Seguimiento Operativo.** Se revierte el chrome standalone: la página vuelve a `<body class="aqua">` + `<main class="app-main page-container">` con `page-header` (breadcrumb + título), topbar y sidebar inyectados por `aqua-shell.js`. El módulo deja de verse como una interfaz aparte y se aprecia como el resto de la plataforma. La capa de datos dinámica se conserva intacta. |
+| `98dbbf2` | revert | **Integración en el shell de Aqua, como Seguimiento Operativo.** Se revierte el chrome standalone: la página vuelve a `<body class="aqua">` + `<main class="app-main page-container">` con `page-header` (breadcrumb + título), topbar y sidebar inyectados por `aqua-shell.js`. El módulo deja de verse como una interfaz aparte y se aprecia como el resto de la plataforma. La capa de datos dinámica se conserva intacta. |
+| _(este)_ | feat | **Pestaña "Informes cargados".** El módulo se divide en dos tabs (`.sgm-tabs#pruebasTabs` con `module-shell`): **Tablero** (KPIs, calificación, identidad, tablas, semáforo, gráficas) e **Informes cargados** (historial `#reportlist` con los informes que se van subiendo, incluidos los 3 base ya visibles en el módulo · serie 173523-15510). Cada panel scoped bajo `.pe-scope`. Sin cambios en el controlador: `#reportlist` y la delegación de borrado funcionan igual en cualquier tab. |
 
 ### Resultado
 
@@ -46,6 +47,11 @@ PDFs descargables · semáforo normativo congelado. Branch
   tablas, semáforo, gráficas, modal de carga) vive scoped bajo
   `.pe-scope` para no colisionar con los tokens de Aqua. La capa de
   datos es dinámica.
+- **Dos pestañas (`module-shell`):** **Tablero** con la calificación,
+  identidad, tablas y gráficas; **Informes cargados** con el historial
+  de informes (`#reportlist`) que reposa los PDFs que se van subiendo,
+  incluidos los 3 informes base ya presentes en el módulo. Navegación
+  por hash (`#tab=informes`), ARIA y teclado heredados de `tabs.js`.
 - **Capas:** dominio puro (`domain/pruebas_electricas_{semaforo,schema,
   extraccion}.js`, sin Firebase, testeable en Node) · data layer
   (`data/pruebas_electricas.js`, `onSnapshot` + Storage + `deepClean`)
