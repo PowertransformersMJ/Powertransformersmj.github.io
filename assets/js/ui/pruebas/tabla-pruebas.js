@@ -78,7 +78,7 @@ function accionesPdf(inf) {
 }
 
 function serieEnPdf(inf, serieUnidad) {
-  const det = inf.pdf && inf.pdf.serie_detectada;
+  const det = inf.serie_en_pdf;
   if (det) return esc(det);
   const pendiente = inf.pdf && inf.pdf.estado &&
     inf.pdf.estado !== 'extraido' && inf.pdf.estado !== 'procesado';
@@ -106,14 +106,20 @@ export function renderInformes(cont, informes, opts = {}) {
   }
   const del = !!opts.canDelete;
   const rows = docs.map((inf) => {
-    const equipos = Array.isArray(inf.equipos) ? inf.equipos.join(', ') : (inf.equipos || '');
+    const equipos = Array.isArray(inf.equipos) ? inf.equipos.join(', ') : (inf.equipo || inf.equipos || '');
+    // Los informes base (_seed) son de solo lectura: ni checkbox ni botón
+    // de borrado; en su lugar una marca "base" no interactiva.
     const selCell = del
-      ? `<td class="num"><input type="checkbox" class="pe-chk" data-sel="${esc(inf.id)}" ` +
-        `data-ano="${esc(inf.ano)}" aria-label="Seleccionar informe ${esc(inf.ano)}"></td>`
+      ? (inf._seed
+        ? `<td class="num"><span class="muted2" title="Informe base · solo lectura">🔒</span></td>`
+        : `<td class="num"><input type="checkbox" class="pe-chk" data-sel="${esc(inf.id)}" ` +
+          `data-ano="${esc(inf.ano)}" aria-label="Seleccionar informe ${esc(inf.ano)}"></td>`)
       : '';
     const delCell = del
-      ? `<td><button type="button" class="btn-sm danger" data-del="${esc(inf.id)}" ` +
-        `data-ano="${esc(inf.ano)}" title="Eliminar este informe">🗑 Eliminar</button></td>`
+      ? (inf._seed
+        ? `<td><span class="badge b-n">base</span></td>`
+        : `<td><button type="button" class="btn-sm danger" data-del="${esc(inf.id)}" ` +
+          `data-ano="${esc(inf.ano)}" title="Eliminar este informe">🗑 Eliminar</button></td>`)
       : '';
     return `<tr>` +
       selCell +

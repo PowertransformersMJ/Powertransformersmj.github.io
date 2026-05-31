@@ -38,20 +38,26 @@ function seedInformes() {
       { code: 'CT',  valor_pct: [0.49, 0.67, 0.334][i] },
       { code: 'CHT', valor_pct: [0.54, 0.66, 0.054][i] }
     ],
-    excitacion:  { delta_pct: [4.41, 4.83, 3.02][i], corriente_ma: 12 },
-    relacion:    { desviacion_pct: [0.13, 0.31, 0.23][i] },
-    resistencia: { desbalance_pct: [2, 3, null][i], verificar: i === 2 },
-    aislamiento: { gohm: [null, 2.5, null][i] },
-    collar:      { mw: [49, 56, 57.9][i] }
+    excitacion:  { devanado: 'AT', delta_ext_pct: [4.41, 4.83, 3.02][i] },
+    relacion:    [{ devanado: 'AT', asociado: 'MT', desviacion_pct: [0.13, 0.31, 0.23][i] }],
+    resistencia: [
+      { devanado: 'AT', delta_max_pct: [0.76, 0.22, 0.04][i], verificar: i === 2 },
+      { devanado: 'MT', delta_max_pct: [0.95, 0.15, 0.20][i] },
+      { devanado: 'BT', delta_max_pct: [1.01, 0.35, null][i], no_medido: i === 2 }
+    ],
+    aislamiento: i === 1
+      ? [{ devanado: 'P', asociado: 'Tierra', gohm: 2.5 }]
+      : [],
+    collar:      { max_mw: [49, 56, 57.9][i] }
   }));
 }
 
 describe('sanitizarUnidad', () => {
-  test('mapea campos y fija schema_version=1', () => {
+  test('mapea campos y fija schema_version=2', () => {
     const u = sanitizarUnidad({ serie: ' 173523-15510 ', ano_fabricacion: '1998' });
     assert.equal(u.serie, '173523-15510');     // trim
     assert.equal(u.ano_fabricacion, 1998);     // int
-    assert.equal(u.schema_version, 1);
+    assert.equal(u.schema_version, 2);
   });
   test('campos ausentes caen a strings vacíos / null', () => {
     const u = sanitizarUnidad({});
@@ -82,13 +88,16 @@ describe('sanitizarInforme', () => {
     assert.equal(inf.tand[0].code, 'CH');
     assert.equal(inf.tand[0].valor_pct, 0.39);  // coma → punto
   });
-  test('pdf.estado por defecto = pendiente_extraccion', () => {
+  test('pdf.estado por defecto = cargado', () => {
     const inf = sanitizarInforme({ serie: 'S', ano: 2020 });
-    assert.equal(inf.pdf.estado, 'pendiente_extraccion');
+    assert.equal(inf.pdf.estado, 'cargado');
   });
   test('flag verificar se castea a bool', () => {
-    const inf = sanitizarInforme({ serie: 'S', ano: 2020, resistencia: { verificar: 'true' } });
-    assert.equal(inf.resistencia.verificar, true);
+    const inf = sanitizarInforme({
+      serie: 'S', ano: 2020,
+      resistencia: [{ devanado: 'AT', verificar: 'true' }]
+    });
+    assert.equal(inf.resistencia[0].verificar, true);
   });
 });
 
