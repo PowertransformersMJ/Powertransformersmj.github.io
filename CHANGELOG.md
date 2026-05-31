@@ -7,6 +7,52 @@ Formato inspirado en [Keep a Changelog](https://keepachangelog.com/).
 Semver por tag. Pulido post-v2.0 incrementa el patch (v2.0.1,
 v2.0.2, …) sin promesas de incompatibilidad.
 
+## Módulo · Mantenimiento Predictivo · Pruebas Eléctricas (2026-05-31)
+
+Refactor del tablero estático **"Tablero Dinámico de Pruebas
+Eléctricas.html"** (TransformerOps) a un módulo modular y dinámico:
+interfaz en tiempo real (Firestore `onSnapshot`) · solo datos reales ·
+PDFs descargables · semáforo normativo congelado. Branch
+`claude/pruebas-electricas-firestore`.
+
+### Commits
+
+| Hash | Tipo | Resumen |
+|---|---|---|
+| `552672a` | feat | Módulo Pruebas Eléctricas modular: dominio puro (semáforo + schema) + data layer Firestore realtime + UI (semáforo/tablas/SVG) + tests. |
+| `0ebb8a9` | feat | Adjuntar varios informes con su año por archivo en el modal de carga. |
+| `2441bce` | feat | Auto-detección del año por informe (filename YYMMDD/YYYYMMDD o texto del PDF) + modal scrollable. |
+| `b4f4035` | fix | Regla Storage faltante causaba `storage/unauthorized` al cargar informes. |
+| `d7c59e5` | fix | Materializa el doc padre de la unidad para que la carga sea realtime. |
+| `b6861ee` | feat | Extracción automática de las 6 mediciones desde el texto del PDF (pdf.js). |
+| `75c23df` | feat | Segmento admin para eliminar informes. |
+| `855f9f2` | fix | Calibra el extractor PDF contra los formatos reales de campo. |
+| `6219622` | feat | Borrado masivo y parcial de informes (checkbox + selección). |
+| `c438294` | feat | Interfaz en tiempo real · solo datos reales (sin seed de demostración). |
+| `7f70be3` | fix | Extracción exhaustiva de las 6 pruebas + relación column-major. |
+| `1341db8` | docs | Documenta el motor de extracción del PDF (§10 de la guía). |
+| `7ed832d` | feat | Seed de 3 informes base (2012/2014/2020 · serie 173523-15510) como línea de tendencia + 3 PDFs descargables. |
+| `eb475fa` | feat | **Chrome TransformerOps standalone idéntico al tablero.** La página monta el cascarón visual del archivo de referencia (appbar + sidebar + layout + crumb) en vez del shell de Aqua, scoped bajo `body.pe-app`, con las fuentes originales (Archivo + Source Sans 3 + IBM Plex Mono). Retira lucide/aqua.js/aqua-shell.js. La capa de datos sigue siendo dinámica. |
+
+### Resultado
+
+- **Vista 1:1 con el original al cargar.** Por instrucción explícita
+  del director (*"idéntico al archivo HTML al momento de subir la
+  interfaz"*), la página NO usa el shell de Aqua: porta el chrome
+  standalone TransformerOps. El cascarón es visualmente idéntico al
+  HTML de referencia; la capa de datos es dinámica.
+- **Capas:** dominio puro (`domain/pruebas_electricas_{semaforo,schema,
+  extraccion}.js`, sin Firebase, testeable en Node) · data layer
+  (`data/pruebas_electricas.js`, `onSnapshot` + Storage + `deepClean`)
+  · UI (`ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js`, render
+  puro) · controlador (`pruebas-electricas-shell.js`).
+- **Visualización en tendencia:** todos los informes de una serie en
+  una gráfica, años en el eje X.
+- **Semáforo congelado** por `tests/pruebas_electricas_semaforo.test.js`.
+- **Extractor PDF conservador:** ante la duda, `null` — nunca un valor
+  inventado. Calibrado contra 9 informes reales (§10.5 de la guía).
+- Documentación: `docs/MANTENIMIENTO-PREDICTIVO.md`.
+
 ## Módulo · Indicadores de Calidad · SAIDI_E / SAIFI_E (2026-05-24)
 
 Sesión que cierra el refactor F40 del archivo legacy
