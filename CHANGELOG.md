@@ -35,7 +35,8 @@ PDFs descargables · semáforo normativo congelado. Branch
 | `eb475fa` | feat | (revertido) Chrome TransformerOps standalone (`body.pe-app`, appbar + sidebar + layout propios). |
 | `4a64a1b` | docs | (revertido) Documentación del chrome standalone. |
 | `98dbbf2` | revert | **Integración en el shell de Aqua, como Seguimiento Operativo.** Se revierte el chrome standalone: la página vuelve a `<body class="aqua">` + `<main class="app-main page-container">` con `page-header` (breadcrumb + título), topbar y sidebar inyectados por `aqua-shell.js`. El módulo deja de verse como una interfaz aparte y se aprecia como el resto de la plataforma. La capa de datos dinámica se conserva intacta. |
-| _(este)_ | feat | **Pestaña "Informes cargados".** El módulo se divide en dos tabs (`.sgm-tabs#pruebasTabs` con `module-shell`): **Tablero** (KPIs, calificación, identidad, tablas, semáforo, gráficas) e **Informes cargados** (historial `#reportlist` con los informes que se van subiendo, incluidos los 3 base ya visibles en el módulo · serie 173523-15510). Cada panel scoped bajo `.pe-scope`. Sin cambios en el controlador: `#reportlist` y la delegación de borrado funcionan igual en cualquier tab. |
+| `43f5ea8` | feat | **Pestaña "Informes cargados".** El módulo se divide en dos tabs (`.sgm-tabs#pruebasTabs` con `module-shell`): **Tablero** (KPIs, calificación, identidad, tablas, semáforo, gráficas) e **Informes cargados** (historial `#reportlist` con los informes que se van subiendo, incluidos los 3 base ya visibles en el módulo · serie 173523-15510). Cada panel scoped bajo `.pe-scope`. Sin cambios en el controlador: `#reportlist` y la delegación de borrado funcionan igual en cualquier tab. |
+| _(este)_ | feat | **Gating por número de serie.** Todo el interior del módulo se ilustra solo después de elegir una serie en un `<select id="serieSelect">` que gobierna ambas pestañas (colocado entre `page-header` y `.sgm-tabs`, scoped en `.pe-scope`). Por defecto NO hay selección: matriz, identidad, tablas, gráficas e historial muestran un prompt ("Selecciona un número de serie…") y los KPIs por unidad (`kpi-informes`/`kpi-estado`) quedan en "—". El controlador deja de auto-seleccionar la primera unidad (`arrancar` ya no llama `seleccionarUnidad(state.unidades[0])`): nuevas `renderVacioSeleccion`, `poblarSelectorSerie`, `sincronizarSeleccion` + handler `change` del select. Las tarjetas del parque (`.det`, ahora `<button data-serie>`) también seleccionan su serie. Los KPIs de flota (`kpi-unidades`/`kpi-subestaciones`) y la grilla del parque siguen visibles siempre. Sin `<datalist>` (§0.1.2.12). Para esta unidad la serie es `173523-15510`. |
 
 ### Resultado
 
@@ -57,6 +58,13 @@ PDFs descargables · semáforo normativo congelado. Branch
   (`data/pruebas_electricas.js`, `onSnapshot` + Storage + `deepClean`)
   · UI (`ui/pruebas/{semaforo,tabla-pruebas,grafico-svg}.js`, render
   puro) · controlador (`pruebas-electricas-shell.js`).
+- **Selección de serie obligatoria:** un `<select id="serieSelect">`
+  sobre las pestañas gobierna todo el módulo. Sin serie elegida nada se
+  ilustra (prompt en cada sección + KPIs por unidad en "—"); al elegir
+  una serie —p. ej. `173523-15510`— se renderiza la matriz, identidad,
+  tablas, gráficas e historial de esa unidad. Las tarjetas del parque
+  también seleccionan su serie. Patrón Safari-safe (`<select>`, no
+  `<datalist>`, §0.1.2.12).
 - **Visualización en tendencia:** todos los informes de una serie en
   una gráfica, años en el eje X.
 - **Semáforo congelado** por `tests/pruebas_electricas_semaforo.test.js`.
