@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="es" data-aqua>
+<html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -33,23 +33,47 @@
 <script type="module" src="../assets/js/auth/page-guard.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
-<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700;800;900&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="../assets/css/pruebas-electricas.css"/>
 </head>
-<body class="aqua">
+<body class="pe-app">
 
-<main class="app-main page-container">
-
-  <div class="page-header">
-    <div class="breadcrumb">Mantenimiento Predictivo / Pruebas Eléctricas</div>
-    <h1 class="page-title">Pruebas <em>Eléctricas</em></h1>
-    <p class="page-subtitle">
-      Calificación normativa por prueba y año · tangente δ, excitación, relación,
-      resistencia, aislamiento y collar caliente. Derivada en vivo de los informes
-      cargados por unidad.
-    </p>
+<header class="appbar">
+  <div class="brand">
+    <span class="mark"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 13h6l-1 9 9-12h-6l1-8z" fill="#fff" opacity="0.95"/></svg></span>
+    <div>
+      <div class="nm">TransformerOps</div>
+      <div class="tg">Gestión de parque · transformadores de potencia</div>
+    </div>
   </div>
+  <div class="abright">
+    <span class="chip">Cliente · Electricaribe</span>
+    <span class="avatar">SE</span>
+  </div>
+</header>
+
+<div class="layout">
+  <aside class="side">
+    <div class="lbl">Parque</div>
+    <a href="#parque" class="head">Resumen del parque</a>
+    <a href="#carga">Carga de informe</a>
+    <div class="lbl">Unidad 173523-15510</div>
+    <a href="#calif">Calificación global</a>
+    <a href="#identidad">Identidad</a>
+    <a href="#informes">Informes (PDF)</a>
+    <a href="#nomencl">Nomenclatura</a>
+    <div class="lbl">Pruebas</div>
+    <a href="#tand">Tangente δ</a>
+    <a href="#excit">Corriente de excitación</a>
+    <a href="#relacion">Relación de transformación</a>
+    <a href="#resist">Resistencia de devanados</a>
+    <a href="#aislam">Aislamiento (CC)</a>
+    <a href="#collar">Collar caliente / Bujes</a>
+    <a href="#criterios">Criterios</a>
+  </aside>
+
+  <main class="content">
+    <div class="crumb">Parque <span class="sep">›</span> S/E La Jagua <span class="sep">›</span> <b>173523-15510</b> <span class="sep">·</span> unidad en vista</div>
 
   <div class="pe-scope">
 
@@ -220,7 +244,8 @@
 
   </div><!-- /.pe-scope -->
 
-</main>
+  </main>
+</div><!-- /.layout -->
 
 <!-- ===== Modal de carga ===== -->
 <div class="pe-overlay" id="ov">
@@ -241,9 +266,6 @@
 <div class="pe-tip" id="tip"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js" defer></script>
-<script src="../assets/js/aqua.js" defer></script>
-<script src="../assets/js/aqua-shell.js" defer></script>
 <script type="module" src="../assets/js/pruebas-electricas-shell.js"></script>
 </body>
 </html>
