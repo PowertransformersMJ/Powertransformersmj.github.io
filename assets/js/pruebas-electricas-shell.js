@@ -169,11 +169,17 @@ function onClickParque(ev) {
   const sel = $('serieSelect');
   if (sel) sel.value = v;
   seleccionarUnidad(u);
-  // Lleva la vista al interior del libro (matriz de calificación) tras abrir.
-  const dst = $('calif');
-  if (dst && dst.scrollIntoView) {
-    dst.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
+  // Abrir un libro lleva al Tablero, donde se ilustra toda la información
+  // de la unidad (matriz, identidad, tablas y gráficas de las pruebas).
+  irAlTablero();
+}
+
+// Cambia a la pestaña Tablero activando su botón (delega en module-shell).
+function irAlTablero() {
+  const tab = document.querySelector('#pruebasTabs [role="tab"][data-tab="tablero"]');
+  if (tab) tab.click();
+  const top = document.querySelector('#pruebasTabs');
+  if (top && top.scrollIntoView) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function refrescarKpisParque() {
