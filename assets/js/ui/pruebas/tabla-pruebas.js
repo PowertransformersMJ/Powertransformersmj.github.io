@@ -208,7 +208,8 @@ const RESUMEN = {
   relacion:    { valHead: 'Desv. (%)',  caption: 'Desviación de la relación medida respecto a placa. Límite ±0.5%.' },
   resistencia: { valHead: 'Δ máx (%)',  caption: 'Desbalance entre fases del devanado. Límite ≤5%. "verificar" = dato sospechoso de digitación.' },
   aislamiento: { valHead: 'GΩ',         caption: 'Resistencia de aislamiento CC. Mínimo aceptable ≥1 GΩ.' },
-  collar:      { valHead: 'mW',         caption: 'Pérdidas máximas en bujes (collar caliente). Límite <100 mW.' }
+  collar:      { valHead: 'mW',         caption: 'Pérdidas máximas en bujes (collar caliente). Límite <100 mW.' },
+  drm:         { valHead: 'Tiempo (ms)', caption: 'Resistencia dinámica del conmutador (DRM/OLTC). Ventana normal de transición 40–70 ms.' }
 };
 
 /**
@@ -237,11 +238,60 @@ export function renderTablaResumen(key, cont, informes) {
     `</table></div>`;
 }
 
+/* ─── 2c) Identidad del conmutador (DRM/OLTC) ─────────────────── */
+
+// Campos de identidad del conmutador medidos en la prueba DRM. Solo se
+// muestran los que el informe trae con dato real (sin inventar nada).
+const DRM_CAMPOS = [
+  { key: 'fabricante',        label: 'Fabricante' },
+  { key: 'tipo',             label: 'Tipo' },
+  { key: 'serial',           label: 'Serial' },
+  { key: 'posiciones',       label: 'Posiciones' },
+  { key: 'operaciones',      label: 'Operaciones' },
+  { key: 'pos_nominal',      label: 'Posición nominal' },
+  { key: 'tension_ui_v',     label: 'Tensión Uᵢ (V)' },
+  { key: 'corriente_iu_a',   label: 'Corriente Iᵤ (A)' },
+  { key: 'r_conmutacion_ohm', label: 'R conmutación (Ω)' }
+];
+
+/**
+ * Renderiza la ficha de identidad del conmutador del informe más
+ * reciente que traiga datos DRM. Si ningún informe trae conmutador,
+ * no pinta nada (queda vacío · sin inventar).
+ * @param {HTMLElement} cont
+ * @param {Array} informes
+ */
+export function renderTablaDrmIdentidad(cont, informes) {
+  if (!cont) return;
+  const docs = ordenarPorAno(informes).reverse(); // más reciente primero
+  const conDrm = docs.find((inf) => {
+    const c = inf.drm && inf.drm.conmutador;
+    return c && DRM_CAMPOS.some((f) => c[f.key] != null && c[f.key] !== '');
+  });
+  if (!conDrm) {
+    cont.innerHTML = '';
+    return;
+  }
+  const c = conDrm.drm.conmutador;
+  const filas = DRM_CAMPOS
+    .filter((f) => c[f.key] != null && c[f.key] !== '')
+    .map((f) => `<tr><td class="assoc">${esc(f.label)}</td><td class="num">${esc(c[f.key])}</td></tr>`)
+    .join('');
+  if (!filas) { cont.innerHTML = ''; return; }
+  cont.innerHTML =
+    `<div class="tblwrap"><table class="dt">` +
+    `<thead><tr><th>Conmutador (OLTC)</th><th class="num">${esc(conDrm.ano)}</th></tr></thead>` +
+    `<tbody>${filas}</tbody>` +
+    `<caption>Identidad del conmutador medida en la prueba DRM (informe ${esc(conDrm.ano)}).</caption>` +
+    `</table></div>`;
+}
+
 /* ─── Montaje conjunto por id de contenedor ───────────────────── */
 
 /**
  * Monta todas las tablas de detalle en sus contenedores (por id).
- * Ids esperados en la página: t-tand, t-exc, t-rel, t-res, t-ins, t-col.
+ * Ids esperados en la página: t-tand, t-exc, t-rel, t-res, t-ins, t-col,
+ * t-drm (resumen tiempo de transición) y t-drm-id (identidad conmutador).
  * @param {Array} informes
  * @param {Document|HTMLElement} [root=document]
  */
@@ -253,4 +303,6 @@ export function mountTablas(informes, root = document) {
   renderTablaResumen('resistencia', byId('t-res'), informes);
   renderTablaResumen('aislamiento', byId('t-ins'), informes);
   renderTablaResumen('collar',      byId('t-col'), informes);
+  renderTablaResumen('drm',         byId('t-drm'), informes);
+  renderTablaDrmIdentidad(byId('t-drm-id'), informes);
 }

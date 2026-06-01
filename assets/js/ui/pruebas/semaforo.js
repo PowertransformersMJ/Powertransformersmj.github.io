@@ -16,6 +16,7 @@ import {
   ESTADOS,
   calificarTanDelta, calificarExcitacion, calificarRelacion,
   calificarResistencia, calificarAislamiento, calificarCollar,
+  calificarDrm,
   estadoGlobal
 } from '../../domain/pruebas_electricas_semaforo.js';
 
@@ -27,7 +28,8 @@ const FILAS = [
   { key: 'relacion',    label: 'Relación de transformación',     criterio: '±0.5%' },
   { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤5%' },
   { key: 'aislamiento', label: 'Resistencia de aislamiento (CC)', criterio: '≥1 GΩ' },
-  { key: 'collar',      label: 'Collar caliente / bujes',         criterio: '<100 mW' }
+  { key: 'collar',      label: 'Collar caliente / bujes',         criterio: '<100 mW' },
+  { key: 'drm',         label: 'DRM · conmutador (OLTC)',         criterio: '40–70 ms' }
 ];
 
 /* ─── Calificación de un informe por tipo de prueba ───────────── */
@@ -96,6 +98,19 @@ function calificarPrueba(key, inf) {
       if (d.max_mw == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
       const e = calificarCollar(d.max_mw);
       return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.max_mw.toFixed(0)}mW` };
+    }
+    case 'drm': {
+      // drm es un OBJETO con la ventana de tiempos de transición (ms).
+      const d = inf.drm || {};
+      if (d.tiempo_min_ms == null && d.tiempo_max_ms == null) {
+        return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+      }
+      const e = calificarDrm(d.tiempo_min_ms, d.tiempo_max_ms);
+      const lo = d.tiempo_min_ms, hi = d.tiempo_max_ms;
+      const texto = (lo != null && hi != null && lo !== hi)
+        ? `${lo.toFixed(0)}–${hi.toFixed(0)}ms`
+        : `${(hi ?? lo).toFixed(0)}ms`;
+      return { estado: e, texto };
     }
     default:
       return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
