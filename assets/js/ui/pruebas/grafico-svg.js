@@ -140,7 +140,19 @@ export function derivarSeries(informes) {
   // 6) Collar — pérdida máx (mW) por año.
   const collar = docs.map((i) => (i.collar && i.collar.max_mw != null ? i.collar.max_mw : null));
 
-  return { anos, tand, excitacion, relacion, resistencia, aislamiento, aislamientoAno, collar };
+  // 7) DRM — ventana de tiempo de transición del conmutador (ms) por año.
+  //    Cada año aporta [min, max]; se grafica como banda/whisker contra
+  //    la ventana normal 40–70 ms.
+  const drm = docs.map((i) => {
+    const d = i.drm || {};
+    return {
+      ano: i.ano,
+      lo: d.tiempo_min_ms != null ? d.tiempo_min_ms : null,
+      hi: d.tiempo_max_ms != null ? d.tiempo_max_ms : null
+    };
+  });
+
+  return { anos, tand, excitacion, relacion, resistencia, aislamiento, aislamientoAno, collar, drm };
 }
 
 /* ─── Helpers de eje dinámico + estado vacío ──────────────────── */
@@ -451,10 +463,64 @@ export function chartCol(serie) {
   return svg;
 }
 
+/* ══════════════════════════════════════════════════════════════
+ * Gráfica 7 · DRM · tiempo de transición del conmutador (OLTC)
+ * ventana normal 40–70 ms (rojo) · guías ámbar 45/65 · ymax 80
+ *   por año: banda [min,max] verde/ámbar/rojo según la ventana.
+ * ══════════════════════════════════════════════════════════════ */
+export function chartDrm(serie) {
+  const W = 720, H = 250, L = 44, R = 18, T = 16, B = 40, ymax = 80;
+  if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
+  const grupos = (serie.drm || []).filter((g) => g && (g.lo != null || g.hi != null));
+  if (!grupos.length) return emptyState(W, H, 'Sin datos DRM (conmutador)');
+  const anos = grupos.map((g) => g.ano);
+  const X = mkX(anos, W, L, R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
+  // Cuadrícula + líneas de ventana normal (40 y 70 rojo · guías 45/65 ámbar).
+  [0, 20, 40, 45, 65, 70, 80].forEach((g) => {
+    const yy = Y(g);
+    const esLimite = (g === 40 || g === 70);
+    const esGuia = (g === 45 || g === 65);
+    svg.appendChild(el('line', {
+      x1: L, y1: yy, x2: W - R, y2: yy,
+      stroke: esLimite ? COL.lim : (esGuia ? COL.guide : COL.grid), 'stroke-width': 1,
+      'stroke-dasharray': (esLimite || esGuia) ? '5 4' : '', opacity: esGuia ? 0.55 : 1
+    }));
+    if (g === 0 || g === 40 || g === 70 || g === 80) {
+      tx(svg, L - 8, yy + 4, g, { 'text-anchor': 'end', fill: esLimite ? COL.lim : '#8a97a5' });
+    }
+  });
+  tx(svg, L - 8, T - 4, 'ms', { 'text-anchor': 'end', 'font-size': 9 });
+  const gw = (W - L - R) / Math.max(grupos.length, 1);
+  const bw = Math.min(gw * 0.34, 26);
+  grupos.forEach((g, gi) => {
+    const cx = anos.length <= 1 ? L + (W - L - R) / 2 : X(g.ano);
+    const lo = g.lo != null ? g.lo : g.hi;
+    const hi = g.hi != null ? g.hi : g.lo;
+    const fuera = (lo < 40 || hi > 70);
+    const guia = (lo < 45 || hi > 65);
+    const c = fuera ? COL.lim : (guia ? COL.guide : COL.green);
+    const yTop = Y(hi), yBot = Y(lo);
+    const h = Math.max(yBot - yTop, 3);
+    const rect = el('rect', { x: cx - bw / 2, y: yTop, width: bw, height: h, rx: 3, fill: c, opacity: 0.85 });
+    rect.setAttribute('class', 'gpt');
+    const rango = (lo !== hi) ? `${lo}–${hi} ms` : `${hi} ms`;
+    rect.addEventListener('mouseenter', (e) => showTip(e, `<b>DRM</b> · ${g.ano}<br>transición = ${rango}`));
+    rect.addEventListener('mousemove', moveTip);
+    rect.addEventListener('mouseleave', hideTip);
+    svg.appendChild(rect);
+    tx(svg, cx, yTop - 5, rango, { 'text-anchor': 'middle', 'font-size': 9, fill: '#5b6876' });
+    tx(svg, cx, H - B + 22, g.ano, { 'text-anchor': 'middle', 'font-size': 11 });
+  });
+  // Leyenda ventana normal.
+  tx(svg, W - R, T + 3, 'ventana normal 40–70 ms', { 'text-anchor': 'end', 'font-size': 10, fill: '#5b6876' });
+  return svg;
+}
+
 /* ─── Mapa id-contenedor → función gráfica ────────────────────── */
 const FACTORIES = {
   'c-tand': chartTanDelta, 'c-exc': chartExc, 'c-rel': chartRel,
-  'c-res': chartRes, 'c-ins': chartIns, 'c-col': chartCol
+  'c-res': chartRes, 'c-ins': chartIns, 'c-col': chartCol, 'c-drm': chartDrm
 };
 
 /**

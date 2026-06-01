@@ -18,9 +18,10 @@ import assert from 'node:assert/strict';
 import {
   sanitizarUnidad, validarUnidad,
   sanitizarInforme, validarInforme,
-  confirmarSerie, detectarAno, CONFIGS_TAND
+  confirmarSerie, detectarAno, CONFIGS_TAND, TIPOS_PRUEBA
 } from '../assets/js/domain/pruebas_electricas_schema.js';
 import { calificarPrueba } from '../assets/js/ui/pruebas/semaforo.js';
+import { informesSeed } from '../assets/js/data/pruebas_electricas_seed.js';
 
 /* ─── Fixture de informes para los tests ──────────────────────────── */
 // El data layer ya NO tiene seed de demostración (interfaz en tiempo
@@ -204,5 +205,92 @@ describe('CONFIGS_TAND congelado', () => {
     assert.equal(CONFIGS_TAND.length, 6);
     assert.deepEqual(CONFIGS_TAND.map((c) => c.code),
       ['CH', 'CHL', 'CL', 'CLT', 'CT', 'CHT']);
+  });
+});
+
+describe('sanitizarInforme · familia DRM (conmutador OLTC)', () => {
+  // Informe estilo 2025: DRM del conmutador + TTR + R, SIN tan δ.
+  const raw = {
+    serie: '173523-15510', ano: 2025, tipo: 'base',
+    tand: [], excitacion: {}, aislamiento: [], collar: {},
+    relacion:    [{ devanado: 'AT', asociado: 'AT–MT/BT (TTR)', desviacion_pct: 0.40 }],
+    resistencia: [{ devanado: 'Devanados (AT/MT/BT)', verificar: true }],
+    drm: {
+      conmutador: { fabricante: 'MR', tipo: 'V III 200 Y-76', serial: '145981',
+                    posiciones: 21, operaciones: 383208, pos_nominal: 11,
+                    tension_ui_v: 220, corriente_iu_a: 322, r_conmutacion_ohm: 1.1 },
+      tiempo_min_ms: 56, tiempo_max_ms: 66, transiciones: []
+    }
+  };
+  test('preserva la identidad del conmutador y la ventana de tiempos', () => {
+    const s = sanitizarInforme(raw);
+    assert.equal(s.drm.conmutador.serial, '145981');
+    assert.equal(s.drm.conmutador.posiciones, 21);
+    assert.equal(s.drm.conmutador.operaciones, 383208);
+    assert.equal(s.drm.tiempo_min_ms, 56);
+    assert.equal(s.drm.tiempo_max_ms, 66);
+  });
+  test('deriva los extremos desde las transiciones si faltan', () => {
+    const s = sanitizarInforme({ ...raw, drm: {
+      transiciones: [{ posicion: '10-11', tiempo_ms: 58 }, { posicion: '11-12', tiempo_ms: 64 }]
+    }});
+    assert.equal(s.drm.tiempo_min_ms, 58);
+    assert.equal(s.drm.tiempo_max_ms, 64);
+  });
+  test('infiere tipo_prueba = mixto (rel + res + drm, sin tan δ)', () => {
+    assert.equal(sanitizarInforme(raw).tipo_prueba, TIPOS_PRUEBA.MIXTO);
+  });
+  test('solo DRM → tipo_prueba = drm_oltc', () => {
+    const s = sanitizarInforme({ serie: 'X', ano: 2025, drm: {
+      conmutador: { serial: '145981' }, tiempo_min_ms: 56, tiempo_max_ms: 66
+    }});
+    assert.equal(s.tipo_prueba, TIPOS_PRUEBA.DRM_OLTC);
+  });
+});
+
+describe('validarInforme · DRM', () => {
+  test('rechaza tiempo de transición negativo', () => {
+    const errs = validarInforme({ serie: 'X', ano: 2025, drm: { tiempo_min_ms: -5 } });
+    assert.ok(errs.some((e) => /no puede ser negativo/.test(e)));
+  });
+  test('rechaza ventana invertida (máximo < mínimo)', () => {
+    const errs = validarInforme({ serie: 'X', ano: 2025,
+      drm: { tiempo_min_ms: 66, tiempo_max_ms: 56 } });
+    assert.ok(errs.some((e) => /no puede ser menor que el mínimo/.test(e)));
+  });
+});
+
+describe('informesSeed · informe real 2025 (DRM + TTR + R)', () => {
+  const informes = informesSeed('173523-15510');
+  const r2025 = informes.find((i) => i.ano === 2025);
+
+  test('el seed incluye el informe 2025 sobre la misma serie', () => {
+    assert.ok(r2025, 'debe existir el informe 2025');
+    assert.equal(r2025.serie, '173523-15510');
+  });
+  test('conserva la identidad real del conmutador (sin inventar)', () => {
+    assert.equal(r2025.drm.conmutador.serial, '145981');
+    assert.equal(r2025.drm.conmutador.tipo, 'V III 200 Y-76');
+    assert.equal(r2025.drm.tiempo_min_ms, 56);
+    assert.equal(r2025.drm.tiempo_max_ms, 66);
+  });
+  test('no fabrica detalle por transición ni PDF inexistente', () => {
+    assert.deepEqual(r2025.drm.transiciones, []);
+    assert.equal(r2025.pdf.downloadURL, '');
+    assert.equal(r2025.pdf.storagePath, '');
+  });
+  test('DRM 56–66 ms → ámbar (66 > guía 65)', () => {
+    assert.equal(calificarPrueba('drm', r2025).estado.clase, 'b-a');
+  });
+  test('relación TTR 0.40% dentro de ±0.5% (= 80% del límite) → verde', () => {
+    assert.equal(calificarPrueba('relacion', r2025).estado.clase, 'b-g');
+  });
+  test('resistencia marcada verificar → ámbar (número a confirmar)', () => {
+    assert.equal(calificarPrueba('resistencia', r2025).estado.clase, 'b-a');
+  });
+  test('pruebas no medidas en 2025 (tan δ, excitación, collar) → neutral', () => {
+    assert.equal(calificarPrueba('tand', r2025).estado.clase, 'b-n');
+    assert.equal(calificarPrueba('excitacion', r2025).estado.clase, 'b-n');
+    assert.equal(calificarPrueba('collar', r2025).estado.clase, 'b-n');
   });
 });
