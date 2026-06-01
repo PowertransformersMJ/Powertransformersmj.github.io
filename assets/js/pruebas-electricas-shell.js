@@ -492,15 +492,17 @@ function openUpload() {
   renderModal();
 }
 
-/* ¿Todos los ítems tienen un año válido? */
+/* ¿Todos los ítems tienen un año válido y terminaron de leerse? */
 function itemsListos() {
   return UP.items.length > 0 &&
-    UP.items.every((it) => Number.isInteger(it.ano) && it.ano >= 1950 && it.ano <= 2100);
+    UP.items.every((it) => !it.leyendo &&
+      Number.isInteger(it.ano) && it.ano >= 1950 && it.ano <= 2100);
 }
 
 function closeUpload() {
   const ov = $('ov');
   if (ov) ov.classList.remove('on');
+  liberarOCR();
 }
 
 function renderModal() {
@@ -539,9 +541,11 @@ function renderModal() {
     const lista = UP.items.map((it) => {
       const anoVal = it.ano == null ? '' : it.ano;
       const flag = it.ano == null ? ' fi-falta' : '';
+      const icono = esImagen(it.file) ? '🖼️' : '📄';
       return `<div class="fitem${flag}" data-id="${it.id}">` +
-        `<span class="fi-doc">📄</span>` +
-        `<span class="fi-name" title="${esc(it.file.name)}">${esc(it.file.name)}</span>` +
+        `<span class="fi-doc">${icono}</span>` +
+        `<span class="fi-name" title="${esc(it.file.name)}">${esc(it.file.name)}` +
+        `<span class="fi-status" data-status="${it.id}">${esc(it.estado || '')}</span></span>` +
         `<input class="fi-ano" type="number" min="1950" max="2100" ` +
         `data-id="${it.id}" value="${anoVal}" placeholder="Año">` +
         `<button class="fi-del" data-id="${it.id}" title="Quitar">✕</button></div>`;
@@ -553,8 +557,8 @@ function renderModal() {
           : `puedes corregirlo si hace falta.</p>`)
       : '';
     body.innerHTML =
-      `<div class="drop" id="drop">Arrastra uno o varios PDF aquí o haz clic para elegirlos</div>` +
-      `<input type="file" id="fileIn" accept="application/pdf" multiple style="display:none">` +
+      `<div class="drop" id="drop">Arrastra uno o varios informes (PDF o imagen) aquí o haz clic para elegirlos</div>` +
+      `<input type="file" id="fileIn" accept="application/pdf,image/*" multiple style="display:none">` +
       (UP.items.length
         ? hint + `<div class="flist">${lista}</div>`
         : `<p class="muted small" style="margin-top:10px">Aún no has adjuntado informes.</p>`) +
@@ -620,29 +624,140 @@ function renderModal() {
   }
 }
 
-/* Añade uno o varios archivos a UP.items (descarta no-PDF) y extrae
-   el texto de cada uno en segundo plano para confirmar la serie. */
+const RE_IMG = /^image\//;
+function esImagen(file) { return !!file && RE_IMG.test(file.type || ''); }
+function esPdf(file) { return !!file && file.type === 'application/pdf'; }
+
+/* Añade uno o varios archivos a UP.items (PDF o imagen) y extrae el
+   texto de cada uno en segundo plano (capa de texto o, si el documento
+   es un escaneo, OCR) para confirmar la serie y deducir el año. */
 function agregarArchivos(fileList) {
   const archivos = Array.from(fileList || [])
-    .filter((f) => f && f.type === 'application/pdf');
+    .filter((f) => esPdf(f) || esImagen(f));
   if (!archivos.length) {
-    toast('Adjunta archivos PDF.', 'warn');
+    toast('Adjunta informes en PDF o imagen.', 'warn');
     return;
   }
   archivos.forEach((file) => {
-    // Año deducido del nombre de archivo (determinista) antes de leer el PDF.
+    // Año deducido del nombre de archivo (determinista) antes de leer.
     const porNombre = detectarAno({ filename: file.name });
-    const item = { id: ++_itemSeq, file, ano: porNombre.ano, textoPdf: '' };
+    const item = {
+      id: ++_itemSeq, file, ano: porNombre.ano,
+      textoPdf: '', leyendo: true, ocr: false, estado: 'En cola…'
+    };
     UP.items.push(item);
     extraerTexto(item);
   });
   renderModal();
 }
 
+/* Un informe escaneado (imagen sin capa de texto) deja una capa de
+   texto vacía o casi vacía. Si pdf.js devuelve menos de ~60 caracteres
+   alfanuméricos en todo el documento, lo tratamos como escaneo y
+   pasamos a OCR. */
+function textoEsPobre(texto) {
+  const alfa = String(texto || '').replace(/[^0-9a-zA-ZáéíóúüñÁÉÍÓÚÜÑ]/g, '');
+  return alfa.length < 60;
+}
+
+/* Refresca el rótulo de estado de un item sin re-renderizar todo el
+   modal (el re-render perdería el foco de los inputs de año). */
+function setItemEstado(item, txt) {
+  item.estado = txt;
+  if (UP.step !== 2) return;
+  const node = document.querySelector(`[data-status="${item.id}"]`);
+  if (node) node.textContent = txt;
+}
+
+/* ─── OCR (Tesseract.js) · carga perezosa desde CDN ───────────────
+   Solo se descarga la primera vez que un informe lo necesita (un
+   escaneo o una imagen). El worker se reutiliza entre informes y se
+   libera al cerrar el modal. */
+let _tessPromise = null;
+let _ocrWorker = null;
+
+function cargarTesseract() {
+  if (window.Tesseract) return Promise.resolve(window.Tesseract);
+  if (_tessPromise) return _tessPromise;
+  _tessPromise = new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    s.onload = () => resolve(window.Tesseract);
+    s.onerror = () => reject(new Error('No se pudo cargar el motor OCR.'));
+    document.head.appendChild(s);
+  });
+  return _tessPromise;
+}
+
+async function obtenerWorkerOCR() {
+  if (_ocrWorker) return _ocrWorker;
+  const Tesseract = await cargarTesseract();
+  // 'spa' = español (los informes son en español); incluye números.
+  _ocrWorker = await Tesseract.createWorker('spa');
+  return _ocrWorker;
+}
+
+function liberarOCR() {
+  if (_ocrWorker) {
+    try { _ocrWorker.terminate(); } catch (_) { /* noop */ }
+    _ocrWorker = null;
+  }
+}
+
+/* Renderiza una página pdf.js a un canvas para alimentar el OCR. La
+   escala ~2.2 sube la resolución efectiva: el texto pequeño de las
+   tablas de medición se reconoce mucho mejor que a escala 1. */
+async function paginaACanvas(page, escala = 2.2) {
+  const viewport = page.getViewport({ scale: escala });
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  const ctx = canvas.getContext('2d');
+  await page.render({ canvasContext: ctx, viewport }).promise;
+  return canvas;
+}
+
+async function ocrPaginas(pdf, item) {
+  const worker = await obtenerWorkerOCR();
+  let texto = '';
+  const maxPag = Math.min(pdf.numPages, 30);
+  for (let i = 1; i <= maxPag; i++) {
+    setItemEstado(item, `Leyendo escaneo (OCR) · página ${i} de ${maxPag}…`);
+    const page = await pdf.getPage(i);
+    const canvas = await paginaACanvas(page);
+    const { data } = await worker.recognize(canvas);
+    texto += ' ' + (data.text || '');
+    // Liberar el canvas grande lo antes posible.
+    canvas.width = canvas.height = 0;
+  }
+  return texto;
+}
+
+async function ocrImagen(file, item) {
+  const worker = await obtenerWorkerOCR();
+  setItemEstado(item, 'Leyendo imagen (OCR)…');
+  const url = URL.createObjectURL(file);
+  try {
+    const { data } = await worker.recognize(url);
+    return data.text || '';
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+/* Extrae el texto de un informe para confirmar la serie, deducir el
+   año y alimentar al extractor de mediciones. Estrategia:
+   1. PDF con capa de texto → pdf.js (rápido, exacto).
+   2. PDF escaneado (capa de texto pobre) → OCR de cada página.
+   3. Imagen (jpg/png/…) → OCR directo.
+   El extractor de mediciones es conservador (rótulo + rango + ancla
+   "%"): aun con ruido de OCR, prefiere dejar un valor vacío antes que
+   asignar uno equivocado, así cada prueba mantiene su dato correcto. */
 async function extraerTexto(item) {
   try {
     const pdfjs = window.pdfjsLib;
-    if (pdfjs && item.file.type === 'application/pdf') {
+    if (item.file.type === 'application/pdf' && pdfjs) {
+      setItemEstado(item, 'Leyendo PDF…');
       const buf = await item.file.arrayBuffer();
       const pdf = await pdfjs.getDocument({ data: buf }).promise;
       let texto = '';
@@ -654,15 +769,29 @@ async function extraerTexto(item) {
         const tc = await page.getTextContent();
         texto += ' ' + tc.items.map((it) => it.str).join(' ');
       }
+      if (textoEsPobre(texto)) {
+        // Escaneo sin capa de texto → OCR de las páginas renderizadas.
+        item.ocr = true;
+        texto = await ocrPaginas(pdf, item);
+      }
       item.textoPdf = texto;
+    } else if (esImagen(item.file)) {
+      item.ocr = true;
+      item.textoPdf = await ocrImagen(item.file, item);
     }
   } catch (err) {
-    console.warn('[pruebas-electricas] no se pudo extraer texto del PDF', err);
+    console.warn('[pruebas-electricas] no se pudo extraer texto del informe', err);
   }
-  // Si el nombre no dio año, intentar deducirlo del contenido del PDF.
+  // Si el nombre no dio año, intentar deducirlo del contenido leído.
   if (item.ano == null) {
     const det = detectarAno({ texto: item.textoPdf, filename: item.file.name });
     item.ano = det.ano;
+  }
+  item.leyendo = false;
+  if (item.textoPdf && !textoEsPobre(item.textoPdf)) {
+    setItemEstado(item, item.ocr ? 'Leído por OCR ✓' : 'Texto extraído ✓');
+  } else {
+    setItemEstado(item, 'Sin texto legible · se asignará la serie indicada');
   }
   if (UP.step === 2) renderModal();
 }
@@ -690,9 +819,10 @@ async function storeReport() {
         body.innerHTML = procHtml(i);
         let pdfMeta = null;
         if (item.file) pdfMeta = await subirPDF(unidadId, item.file);
-        // Extrae las 6 mediciones del texto del PDF (pdf.js ya lo dejó
-        // en item.textoPdf). La traza _diagnostico ayuda a calibrar las
-        // expresiones contra PDFs reales sin adivinar a ciegas.
+        // Extrae las 6 mediciones del texto del informe (capa de texto
+        // del PDF u OCR del escaneo/imagen, ya dejado en item.textoPdf).
+        // La traza _diagnostico ayuda a calibrar las expresiones contra
+        // informes reales sin adivinar a ciegas.
         const med = extraerMediciones(item.textoPdf || '');
         const { _diagnostico, ...mediciones } = med;
         console.info(`[pruebas-electricas] extracción ${esc(UP.serie)} · ${item.ano || 's/a'} →`,
