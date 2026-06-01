@@ -79,10 +79,17 @@ function accionesPdf(inf) {
     ? `<button type="button" class="btn-sm reproc" data-reproc="${esc(inf.id)}" ` +
       `data-ano="${esc(inf.ano)}" title="Volver a leer el informe almacenado (OCR)">↻ Reprocesar</button>`
     : '';
+  // Editar datos: captura manual de los valores reales leídos del PDF.
+  // Solo para informes vivos (los base/seed son de solo lectura).
+  const editar = !inf._seed
+    ? `<button type="button" class="btn-sm edit" data-edit="${esc(inf.id)}" ` +
+      `title="Digitar manualmente los valores del informe">✎ Editar datos</button>`
+    : '';
   return `<div class="acts">` +
     `<a class="btn-sm" href="${u}" target="_blank" rel="noopener">↗ Abrir</a>` +
     `<a class="btn-sm dl" href="${u}" download rel="noopener">⤓ Descargar PDF</a>` +
     reproc +
+    editar +
     `</div>`;
 }
 

@@ -30,7 +30,7 @@ import {
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
-  sanitizarInforme, confirmarSerie, detectarAno
+  sanitizarInforme, validarInforme, confirmarSerie, detectarAno
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
@@ -423,6 +423,17 @@ async function onClickReportlist(ev) {
       const detalle = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : '';
       toast(`No se pudo reprocesar el informe${detalle}.`, 'warn');
     }
+    return;
+  }
+
+  // ── Editar datos (captura manual de valores leídos del PDF) ──
+  const ed = ev.target.closest('[data-edit]');
+  if (ed) {
+    const informeId = ed.getAttribute('data-edit');
+    const inf = (state.informes || []).find((i) => i.id === informeId);
+    if (!inf) return toast('No se encontró el informe a editar.', 'warn');
+    if (inf._seed) return toast('Los informes base son de solo lectura.', 'warn');
+    openEditor(unidadId, inf);
     return;
   }
 
@@ -969,6 +980,325 @@ async function storeReport() {
       `<div class="mfoot"><button class="btn btn-ghost" id="mClose">Cerrar</button></div></div>`;
     const c = $('mClose'); if (c) c.onclick = closeUpload;
     toast('Error al almacenar los informes.', 'warn');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   Editor de datos · captura manual de un informe
+   ──────────────────────────────────────────────────────────────
+   Los informes subidos son escaneos: el OCR del navegador no extrae
+   sus valores de forma fiable, así que el tablero queda vacío. En vez
+   de inventar números, este editor permite transcribir a mano lo que
+   el ingeniero lee en el PDF. Reusa el overlay #ov/#mBody/#mTitle (no
+   el flujo de carga). Al guardar persiste con actualizarInforme y el
+   onSnapshot refresca matriz, tablas y gráficas en vivo.
+   ══════════════════════════════════════════════════════════════ */
+
+const CONFIGS_TAND = ['CH', 'CHL', 'CL', 'CLT', 'CT', 'CHT'];
+const DEVANADOS_RES = ['AT', 'MT', 'BT'];
+const ED = { unidadId: '', informeId: '', inf: null, model: null };
+
+// número editable → string para el input (null/undefined → '')
+function nstr(v) { return v == null ? '' : String(v); }
+// string del input → número o null (admite coma decimal)
+function nparse(v) {
+  if (v == null) return null;
+  const s = String(v).trim().replace(',', '.');
+  if (s === '') return null;
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;
+}
+
+// Construye el modelo editable desde un informe existente.
+function modeloDesdeInforme(inf) {
+  const tand = {};
+  CONFIGS_TAND.forEach((c) => { tand[c] = ''; });
+  (inf.tand || []).forEach((t) => {
+    if (t && t.code && Object.prototype.hasOwnProperty.call(tand, t.code)) {
+      tand[t.code] = nstr(t.valor_pct);
+    }
+  });
+  const res = DEVANADOS_RES.map((dev) => {
+    const r = (inf.resistencia || []).find((x) => (x.devanado || '').toUpperCase() === dev) || {};
+    return {
+      devanado: dev,
+      delta_max_pct: nstr(r.delta_max_pct),
+      verificar: !!r.verificar,
+      no_medido: !!r.no_medido
+    };
+  });
+  const rel = (inf.relacion || []).map((r) => ({
+    devanado: r.devanado || 'AT',
+    asociado: r.asociado || '',
+    desviacion_pct: nstr(r.desviacion_pct)
+  }));
+  if (!rel.length) rel.push({ devanado: 'AT', asociado: 'MT', desviacion_pct: '' });
+  const ais = (inf.aislamiento || []).map((a) => ({
+    devanado: a.devanado || '',
+    asociado: a.asociado || '',
+    gohm: nstr(a.gohm)
+  }));
+  const drm = inf.drm || {};
+  const drmOn = drm.tiempo_min_ms != null || drm.tiempo_max_ms != null;
+  return {
+    ano: nstr(inf.ano),
+    fecha: inf.fecha || '',
+    ejecutante: inf.ejecutante || '',
+    equipo: inf.equipo || '',
+    tand,
+    excitacion_delta: nstr(inf.excitacion && inf.excitacion.delta_ext_pct),
+    relacion: rel,
+    resistencia: res,
+    aislamiento: ais,
+    collar_mw: nstr(inf.collar && inf.collar.max_mw),
+    drmOn,
+    drm_min: nstr(drm.tiempo_min_ms),
+    drm_max: nstr(drm.tiempo_max_ms)
+  };
+}
+
+function openEditor(unidadId, inf) {
+  ED.unidadId = unidadId;
+  ED.informeId = inf.id;
+  ED.inf = inf;
+  ED.model = modeloDesdeInforme(inf);
+  const ov = $('ov');
+  if (ov) {
+    ov.classList.add('on');
+    const sb = ov.querySelector('.stepbar');
+    if (sb) sb.style.display = 'none'; // el editor no es multipaso
+  }
+  renderEditor();
+}
+
+// Vuelca lo escrito en el DOM al modelo antes de un re-render
+// (añadir/quitar fila) para no perder lo ya tecleado.
+function cosecharEditor() {
+  const m = ED.model;
+  if (!m) return;
+  const g = (id) => { const e = $(id); return e ? e.value : ''; };
+  m.ano = g('ed_ano');
+  m.fecha = g('ed_fecha');
+  m.ejecutante = g('ed_ejec');
+  m.equipo = g('ed_equipo');
+  CONFIGS_TAND.forEach((c) => { m.tand[c] = g('ed_tand_' + c); });
+  m.excitacion_delta = g('ed_exc');
+  m.collar_mw = g('ed_collar');
+  m.resistencia.forEach((r, i) => {
+    r.delta_max_pct = g('ed_res_d_' + i);
+    const v = $('ed_res_v_' + i); if (v) r.verificar = v.checked;
+    const n = $('ed_res_n_' + i); if (n) r.no_medido = n.checked;
+  });
+  m.relacion.forEach((r, i) => {
+    r.devanado = g('ed_rel_dev_' + i);
+    r.asociado = g('ed_rel_aso_' + i);
+    r.desviacion_pct = g('ed_rel_d_' + i);
+  });
+  m.aislamiento.forEach((a, i) => {
+    a.devanado = g('ed_ais_dev_' + i);
+    a.asociado = g('ed_ais_aso_' + i);
+    a.gohm = g('ed_ais_g_' + i);
+  });
+  const on = $('ed_drm_on'); if (on) m.drmOn = on.checked;
+  m.drm_min = g('ed_drm_min');
+  m.drm_max = g('ed_drm_max');
+}
+
+function renderEditor() {
+  const m = ED.model;
+  const body = $('mBody');
+  const title = $('mTitle');
+  if (!body || !m) return;
+  if (title) title.textContent = `Editar datos · ${esc(ED.inf.ano || ED.inf.id)}`;
+
+  const tandInputs = CONFIGS_TAND.map((c) =>
+    `<label class="ed-cell"><span>${c}</span>` +
+    `<input class="inp" id="ed_tand_${c}" type="text" inputmode="decimal" ` +
+    `value="${esc(m.tand[c])}" placeholder="%"></label>`
+  ).join('');
+
+  const resRows = m.resistencia.map((r, i) =>
+    `<div class="ed-row" style="grid-template-columns:48px 1fr auto auto">` +
+    `<span class="ed-dev">${r.devanado}</span>` +
+    `<input class="inp" id="ed_res_d_${i}" type="text" inputmode="decimal" ` +
+    `value="${esc(r.delta_max_pct)}" placeholder="desbalance %">` +
+    `<label class="ed-flag"><input type="checkbox" id="ed_res_v_${i}" ${r.verificar ? 'checked' : ''}> verificar</label>` +
+    `<label class="ed-flag"><input type="checkbox" id="ed_res_n_${i}" ${r.no_medido ? 'checked' : ''}> no medido</label>` +
+    `</div>`
+  ).join('');
+
+  const relRows = m.relacion.map((r, i) =>
+    `<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr auto" data-rel="${i}">` +
+    `<input class="inp" id="ed_rel_dev_${i}" type="text" value="${esc(r.devanado)}" placeholder="Devanado (AT)">` +
+    `<input class="inp" id="ed_rel_aso_${i}" type="text" value="${esc(r.asociado)}" placeholder="Asociado (MT / Terc.)">` +
+    `<input class="inp" id="ed_rel_d_${i}" type="text" inputmode="decimal" value="${esc(r.desviacion_pct)}" placeholder="desv. %">` +
+    `<button type="button" class="fi-del" data-rel-del="${i}" title="Quitar">✕</button>` +
+    `</div>`
+  ).join('');
+
+  const aisRows = m.aislamiento.length
+    ? m.aislamiento.map((a, i) =>
+        `<div class="ed-row" style="grid-template-columns:1fr 1fr 1fr auto" data-ais="${i}">` +
+        `<input class="inp" id="ed_ais_dev_${i}" type="text" value="${esc(a.devanado)}" placeholder="Devanado (P)">` +
+        `<input class="inp" id="ed_ais_aso_${i}" type="text" value="${esc(a.asociado)}" placeholder="Asociado (Tierra)">` +
+        `<input class="inp" id="ed_ais_g_${i}" type="text" inputmode="decimal" value="${esc(a.gohm)}" placeholder="GΩ">` +
+        `<button type="button" class="fi-del" data-ais-del="${i}" title="Quitar">✕</button>` +
+        `</div>`
+      ).join('')
+    : `<p class="muted small" style="margin:0 0 8px">Sin medidas de aislamiento. Agrega una si el informe las trae.</p>`;
+
+  body.innerHTML =
+    `<p class="muted small" style="margin:0 0 14px">Transcribe los valores tal como aparecen en el PDF. ` +
+    `Deja en blanco lo que el informe no mida (mejor vacío que inventado). La calificación se recalcula sola.</p>` +
+
+    `<div class="ed-grid2">` +
+    `<label class="ed-cell"><span>Año</span><input class="inp" id="ed_ano" type="text" inputmode="numeric" value="${esc(m.ano)}" placeholder="2025"></label>` +
+    `<label class="ed-cell"><span>Fecha</span><input class="inp" id="ed_fecha" type="text" value="${esc(m.fecha)}" placeholder="09/08/2025"></label>` +
+    `</div>` +
+    `<div class="ed-grid2">` +
+    `<label class="ed-cell"><span>Ejecutante</span><input class="inp" id="ed_ejec" type="text" value="${esc(m.ejecutante)}" placeholder="Applus"></label>` +
+    `<label class="ed-cell"><span>Equipo</span><input class="inp" id="ed_equipo" type="text" value="${esc(m.equipo)}" placeholder="DOBLE M4100"></label>` +
+    `</div>` +
+
+    `<div class="flbl" style="margin-top:14px">tan δ por sección (%)</div>` +
+    `<div class="ed-tand">${tandInputs}</div>` +
+
+    `<div class="ed-grid2" style="margin-top:14px">` +
+    `<label class="ed-cell"><span>Excitación · Δ corr. máx (%)</span><input class="inp" id="ed_exc" type="text" inputmode="decimal" value="${esc(m.excitacion_delta)}" placeholder="4.41"></label>` +
+    `<label class="ed-cell"><span>Collar caliente · máx (mW)</span><input class="inp" id="ed_collar" type="text" inputmode="decimal" value="${esc(m.collar_mw)}" placeholder="49"></label>` +
+    `</div>` +
+
+    `<div class="flbl" style="margin-top:14px">Relación de transformación · desviación (%)</div>` +
+    `<div id="ed_rel">${relRows}</div>` +
+    `<button type="button" class="btn btn-ghost btn-sm" id="ed_rel_add" style="margin-top:6px">+ Añadir relación</button>` +
+
+    `<div class="flbl" style="margin-top:14px">Resistencia de devanados · desbalance (%)</div>` +
+    `<div id="ed_res">${resRows}</div>` +
+
+    `<div class="flbl" style="margin-top:14px">Resistencia de aislamiento (GΩ)</div>` +
+    `<div id="ed_ais">${aisRows}</div>` +
+    `<button type="button" class="btn btn-ghost btn-sm" id="ed_ais_add" style="margin-top:6px">+ Añadir aislamiento</button>` +
+
+    `<label class="chk" style="margin-top:16px"><input type="checkbox" id="ed_drm_on" ${m.drmOn ? 'checked' : ''}>` +
+    `<span>Este informe incluye prueba DRM del conmutador (OLTC).</span></label>` +
+    `<div class="ed-grid2" id="ed_drm_box" style="${m.drmOn ? '' : 'display:none'}">` +
+    `<label class="ed-cell"><span>Tiempo transición mín (ms)</span><input class="inp" id="ed_drm_min" type="text" inputmode="decimal" value="${esc(m.drm_min)}" placeholder="56"></label>` +
+    `<label class="ed-cell"><span>Tiempo transición máx (ms)</span><input class="inp" id="ed_drm_max" type="text" inputmode="decimal" value="${esc(m.drm_max)}" placeholder="66"></label>` +
+    `</div>` +
+
+    `<div class="mfoot">` +
+    `<button class="btn btn-ghost" id="ed_cancel">Cancelar</button>` +
+    `<button class="btn btn-primary" id="ed_save">Guardar datos</button></div>`;
+
+  $('ed_cancel').onclick = closeUpload;
+  $('ed_save').onclick = saveEditor;
+  $('ed_rel_add').onclick = () => {
+    cosecharEditor();
+    m.relacion.push({ devanado: 'AT', asociado: '', desviacion_pct: '' });
+    renderEditor();
+  };
+  $('ed_ais_add').onclick = () => {
+    cosecharEditor();
+    m.aislamiento.push({ devanado: '', asociado: '', gohm: '' });
+    renderEditor();
+  };
+  const drmOn = $('ed_drm_on');
+  if (drmOn) drmOn.onchange = () => {
+    const box = $('ed_drm_box');
+    if (box) box.style.display = drmOn.checked ? '' : 'none';
+  };
+  body.querySelectorAll('[data-rel-del]').forEach((b) => {
+    b.onclick = () => {
+      cosecharEditor();
+      m.relacion.splice(Number(b.dataset.relDel), 1);
+      if (!m.relacion.length) m.relacion.push({ devanado: 'AT', asociado: 'MT', desviacion_pct: '' });
+      renderEditor();
+    };
+  });
+  body.querySelectorAll('[data-ais-del]').forEach((b) => {
+    b.onclick = () => {
+      cosecharEditor();
+      m.aislamiento.splice(Number(b.dataset.aisDel), 1);
+      renderEditor();
+    };
+  });
+}
+
+// Arma el parche normativo desde el modelo editado, lo valida y lo persiste.
+async function saveEditor() {
+  cosecharEditor();
+  const m = ED.model;
+  const inf = ED.inf;
+  const tand = CONFIGS_TAND.map((c) => ({ code: c, valor_pct: nparse(m.tand[c]) }));
+  const relacion = m.relacion
+    .filter((r) => (r.asociado || '').trim() !== '' || nparse(r.desviacion_pct) != null)
+    .map((r) => ({
+      devanado: (r.devanado || 'AT').trim() || 'AT',
+      asociado: (r.asociado || '').trim(),
+      desviacion_pct: nparse(r.desviacion_pct)
+    }));
+  const resistencia = m.resistencia
+    .filter((r) => nparse(r.delta_max_pct) != null || r.verificar || r.no_medido)
+    .map((r) => {
+      const o = { devanado: r.devanado };
+      if (r.no_medido) o.no_medido = true;
+      else o.delta_max_pct = nparse(r.delta_max_pct);
+      if (r.verificar) o.verificar = true;
+      return o;
+    });
+  const aislamiento = m.aislamiento
+    .filter((a) => (a.devanado || '').trim() !== '' && nparse(a.gohm) != null)
+    .map((a) => ({
+      devanado: (a.devanado || '').trim(),
+      asociado: (a.asociado || '').trim(),
+      gohm: nparse(a.gohm)
+    }));
+  const excDelta = nparse(m.excitacion_delta);
+  const collarMw = nparse(m.collar_mw);
+  const entrada = {
+    unidadId: ED.unidadId,
+    serie: inf.serie || ED.unidadId,
+    serie_en_pdf: inf.serie_en_pdf || '',
+    tipo: inf.tipo,
+    tipo_prueba: inf.tipo_prueba,
+    ano: nparse(m.ano),
+    fecha: (m.fecha || '').trim(),
+    ejecutante: (m.ejecutante || '').trim(),
+    equipo: (m.equipo || '').trim(),
+    tand,
+    excitacion: excDelta == null ? {} : { devanado: 'AT', delta_ext_pct: excDelta },
+    relacion,
+    resistencia,
+    aislamiento,
+    collar: collarMw == null ? {} : { max_mw: collarMw },
+    pdf: inf.pdf ? { ...inf.pdf, estado: 'procesado' } : undefined
+  };
+  if (m.drmOn) {
+    const lo = nparse(m.drm_min);
+    const hi = nparse(m.drm_max);
+    entrada.drm = {
+      conmutador: (inf.drm && inf.drm.conmutador) || {},
+      tiempo_min_ms: lo,
+      tiempo_max_ms: hi,
+      transiciones: (inf.drm && inf.drm.transiciones) || []
+    };
+  }
+
+  const limpio = sanitizarInforme(entrada);
+  const errs = validarInforme(limpio);
+  if (errs.length) return toast(errs[0], 'warn');
+
+  const btn = $('ed_save');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando…'; }
+  try {
+    await actualizarInforme(ED.unidadId, ED.informeId, limpio);
+    toast(`Datos del informe ${limpio.ano || ''} guardados.`);
+    closeUpload(); // onSnapshot refresca matriz, tablas y gráficas
+  } catch (err) {
+    console.error('[pruebas-electricas] saveEditor', err);
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar datos'; }
+    const detalle = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : '';
+    toast(`No se pudieron guardar los datos${detalle}.`, 'warn');
   }
 }
 
