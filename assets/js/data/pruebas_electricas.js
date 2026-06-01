@@ -155,7 +155,8 @@ export async function subirPDF(unidadId, file, onProgress) {
     await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
   const filename = (file && file.name) ? file.name : `informe-${Date.now()}.pdf`;
   const storagePath = `${COL_UNIDADES}/${unidadId}/${filename}`;
-  const task = uploadBytesResumable(sref(storage, storagePath), file, { contentType: 'application/pdf' });
+  const contentType = (file && file.type) || 'application/pdf';
+  const task = uploadBytesResumable(sref(storage, storagePath), file, { contentType });
   return new Promise((resolve, reject) => {
     task.on('state_changed',
       (snap) => {
