@@ -71,9 +71,18 @@ function accionesPdf(inf) {
   const url = inf.pdf && inf.pdf.downloadURL;
   if (!url) return '<span class="muted2">—</span>';
   const u = esc(url);
+  // Reprocesar: solo para informes vivos (no base) que quedaron
+  // pendientes de extracción (p. ej. escaneos subidos antes del OCR).
+  const pendiente = inf.pdf && inf.pdf.estado &&
+    inf.pdf.estado !== 'extraido' && inf.pdf.estado !== 'procesado';
+  const reproc = (!inf._seed && pendiente)
+    ? `<button type="button" class="btn-sm reproc" data-reproc="${esc(inf.id)}" ` +
+      `data-ano="${esc(inf.ano)}" title="Volver a leer el informe almacenado (OCR)">↻ Reprocesar</button>`
+    : '';
   return `<div class="acts">` +
     `<a class="btn-sm" href="${u}" target="_blank" rel="noopener">↗ Abrir</a>` +
     `<a class="btn-sm dl" href="${u}" download rel="noopener">⤓ Descargar PDF</a>` +
+    reproc +
     `</div>`;
 }
 

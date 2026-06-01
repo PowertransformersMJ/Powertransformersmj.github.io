@@ -25,7 +25,7 @@
 import {
   isReady,
   suscribirUnidades, suscribirInformes,
-  guardarUnidad, crearInforme, subirPDF, eliminarInforme
+  guardarUnidad, crearInforme, subirPDF, eliminarInforme, actualizarInforme
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
@@ -359,6 +359,51 @@ async function onClickReportlist(ev) {
     selBtn.textContent = 'Eliminando…';
     const ok = await borrarVarios(unidadId, ids);
     toast(`${ok} de ${ids.length} informe(s) eliminado(s).`, ok === ids.length ? undefined : 'warn');
+    return;
+  }
+
+  // ── Reprocesar (re-leer el PDF/imagen ya almacenado, sin re-subir) ──
+  const rep = ev.target.closest('[data-reproc]');
+  if (rep) {
+    const informeId = rep.getAttribute('data-reproc');
+    const inf = (state.informes || []).find((i) => i.id === informeId);
+    if (!inf || !inf.pdf || !inf.pdf.downloadURL) {
+      return toast('Este informe no tiene archivo para reprocesar.', 'warn');
+    }
+    const etiqOrig = rep.textContent;
+    rep.disabled = true;
+    rep.textContent = '↻ Reprocesando…';
+    try {
+      const resp = await fetch(inf.pdf.downloadURL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const blob = await resp.blob();
+      const tipo = blob.type || inf.pdf.mime || 'application/pdf';
+      const nombre = inf.pdf.filename || `${serieTxt}-${inf.ano || ''}`;
+      const archivo = new File([blob], nombre, { type: tipo });
+      const setEstado = (t) => { rep.textContent = `↻ ${t}`; };
+      const { texto } = await leerTextoArchivo(archivo, setEstado);
+      const med = extraerMediciones(texto || '');
+      const { _diagnostico, ...mediciones } = med;
+      const conf = confirmarSerie(serieTxt, texto);
+      const parche = {
+        ...mediciones,
+        serie_en_pdf: conf.encontrada ? serieTxt : (inf.serie_en_pdf || ''),
+        pdf: { ...inf.pdf, estado: _diagnostico.campos.length ? 'extraido' : 'pendiente_extraccion' }
+      };
+      await actualizarInforme(unidadId, informeId, parche);
+      console.info(`[pruebas-electricas] reproceso ${esc(serieTxt)} · ${inf.ano || 's/a'} →`,
+        _diagnostico.campos.length ? _diagnostico.campos.join(', ') : 'sin datos');
+      toast(_diagnostico.campos.length
+        ? `Informe ${inf.ano || ''} reprocesado · ${_diagnostico.campos.length} dato(s) extraído(s).`
+        : `Informe ${inf.ano || ''} reprocesado · sin texto legible.`,
+        _diagnostico.campos.length ? undefined : 'warn');
+      // onSnapshot refresca la tabla sola.
+    } catch (err) {
+      console.error('[pruebas-electricas] reprocesar', err);
+      rep.disabled = false;
+      rep.textContent = etiqOrig;
+      toast('No se pudo reprocesar el informe.', 'warn');
+    }
     return;
   }
 
@@ -717,12 +762,12 @@ async function paginaACanvas(page, escala = 2.2) {
   return canvas;
 }
 
-async function ocrPaginas(pdf, item) {
+async function ocrPaginasPdf(pdf, setEstado) {
   const worker = await obtenerWorkerOCR();
   let texto = '';
   const maxPag = Math.min(pdf.numPages, 30);
   for (let i = 1; i <= maxPag; i++) {
-    setItemEstado(item, `Leyendo escaneo (OCR) · página ${i} de ${maxPag}…`);
+    setEstado(`Leyendo escaneo (OCR) · página ${i} de ${maxPag}…`);
     const page = await pdf.getPage(i);
     const canvas = await paginaACanvas(page);
     const { data } = await worker.recognize(canvas);
@@ -733,9 +778,9 @@ async function ocrPaginas(pdf, item) {
   return texto;
 }
 
-async function ocrImagen(file, item) {
+async function ocrImagenBlob(file, setEstado) {
   const worker = await obtenerWorkerOCR();
-  setItemEstado(item, 'Leyendo imagen (OCR)…');
+  setEstado('Leyendo imagen (OCR)…');
   const url = URL.createObjectURL(file);
   try {
     const { data } = await worker.recognize(url);
@@ -745,40 +790,50 @@ async function ocrImagen(file, item) {
   }
 }
 
-/* Extrae el texto de un informe para confirmar la serie, deducir el
-   año y alimentar al extractor de mediciones. Estrategia:
+/* Lee el texto de un archivo (File o Blob descargado de Storage) para
+   confirmar la serie, deducir el año y alimentar al extractor de
+   mediciones. Estrategia común a la carga y al reprocesado:
    1. PDF con capa de texto → pdf.js (rápido, exacto).
    2. PDF escaneado (capa de texto pobre) → OCR de cada página.
    3. Imagen (jpg/png/…) → OCR directo.
    El extractor de mediciones es conservador (rótulo + rango + ancla
    "%"): aun con ruido de OCR, prefiere dejar un valor vacío antes que
-   asignar uno equivocado, así cada prueba mantiene su dato correcto. */
+   asignar uno equivocado, así cada prueba mantiene su dato correcto.
+   Devuelve { texto, ocr }. */
+async function leerTextoArchivo(file, setEstado) {
+  const aviso = setEstado || (() => {});
+  let texto = '';
+  let ocr = false;
+  const pdfjs = window.pdfjsLib;
+  const tipo = (file && file.type) || '';
+  if (tipo === 'application/pdf' && pdfjs) {
+    aviso('Leyendo PDF…');
+    const buf = await file.arrayBuffer();
+    const pdf = await pdfjs.getDocument({ data: buf }).promise;
+    // Las mediciones (tan δ, excitación, etc.) viven en páginas
+    // intermedias (4–8 típicamente); leer todo el informe acotado.
+    const maxPag = Math.min(pdf.numPages, 30);
+    for (let i = 1; i <= maxPag; i++) {
+      const page = await pdf.getPage(i);
+      const tc = await page.getTextContent();
+      texto += ' ' + tc.items.map((it) => it.str).join(' ');
+    }
+    if (textoEsPobre(texto)) {
+      ocr = true;
+      texto = await ocrPaginasPdf(pdf, aviso);
+    }
+  } else if (RE_IMG.test(tipo)) {
+    ocr = true;
+    texto = await ocrImagenBlob(file, aviso);
+  }
+  return { texto, ocr };
+}
+
 async function extraerTexto(item) {
   try {
-    const pdfjs = window.pdfjsLib;
-    if (item.file.type === 'application/pdf' && pdfjs) {
-      setItemEstado(item, 'Leyendo PDF…');
-      const buf = await item.file.arrayBuffer();
-      const pdf = await pdfjs.getDocument({ data: buf }).promise;
-      let texto = '';
-      // Las mediciones (tan δ, excitación, etc.) viven en páginas
-      // intermedias (4–8 típicamente); leer todo el informe acotado.
-      const maxPag = Math.min(pdf.numPages, 30);
-      for (let i = 1; i <= maxPag; i++) {
-        const page = await pdf.getPage(i);
-        const tc = await page.getTextContent();
-        texto += ' ' + tc.items.map((it) => it.str).join(' ');
-      }
-      if (textoEsPobre(texto)) {
-        // Escaneo sin capa de texto → OCR de las páginas renderizadas.
-        item.ocr = true;
-        texto = await ocrPaginas(pdf, item);
-      }
-      item.textoPdf = texto;
-    } else if (esImagen(item.file)) {
-      item.ocr = true;
-      item.textoPdf = await ocrImagen(item.file, item);
-    }
+    const { texto, ocr } = await leerTextoArchivo(item.file, (t) => setItemEstado(item, t));
+    item.textoPdf = texto;
+    item.ocr = ocr;
   } catch (err) {
     console.warn('[pruebas-electricas] no se pudo extraer texto del informe', err);
   }
