@@ -10,6 +10,7 @@ import {
   ESTADOS, UMBRALES,
   calificarTanDelta, calificarExcitacion, calificarRelacion,
   calificarResistencia, calificarAislamiento, calificarCollar,
+  calificarDrm,
   estadoGlobal
 } from '../assets/js/domain/pruebas_electricas_semaforo.js';
 
@@ -130,6 +131,31 @@ describe('calificarCollar (< 100 mW)', () => {
   });
   test('sin dato → neutral', () => {
     assert.equal(calificarCollar(null).clase, 'b-n');
+  });
+});
+
+describe('calificarDrm (ventana de transición 40–70 ms del conmutador)', () => {
+  test('ambos extremos dentro de [45,65] → verde', () => {
+    assert.equal(calificarDrm(56, 66).clase, 'b-a'); // 66 > 65 → ámbar
+    assert.equal(calificarDrm(46, 64).clase, 'b-g');
+    assert.equal(calificarDrm(45, 65).clase, 'b-g'); // guías inclusivas
+  });
+  test('cerca del borde (entre guía y límite) → ámbar', () => {
+    assert.equal(calificarDrm(44, 60).clase, 'b-a'); // 44 < 45
+    assert.equal(calificarDrm(50, 66).clase, 'b-a'); // 66 > 65
+    assert.equal(calificarDrm(40, 70).clase, 'b-a'); // exactamente en los límites
+  });
+  test('fuera de la ventana [40,70] → rojo', () => {
+    assert.equal(calificarDrm(39, 60).clase, 'b-r');
+    assert.equal(calificarDrm(50, 71).clase, 'b-r');
+  });
+  test('un solo extremo conocido se evalúa solo', () => {
+    assert.equal(calificarDrm(56, null).clase, 'b-g'); // 56 dentro de guías
+    assert.equal(calificarDrm(null, 66).clase, 'b-a'); // 66 > 65
+  });
+  test('sin datos → neutral', () => {
+    assert.equal(calificarDrm(null, null).clase, 'b-n');
+    assert.equal(calificarDrm(undefined, undefined).clase, 'b-n');
   });
 });
 

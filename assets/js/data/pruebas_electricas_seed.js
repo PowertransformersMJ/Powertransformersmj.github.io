@@ -150,6 +150,67 @@ const INFORMES_RAW = [
       size:        796647,
       estado:      'procesado'
     }
+  },
+  // ── 2025 · familia distinta de pruebas (no es el predictivo de tan δ) ──
+  // Dos informes reales de mayo/2025 sobre el MISMO número de serie, de
+  // familia distinta a los predictivos 2012/2014/2020: MPT045 (DRM del
+  // conmutador OLTC · IEEE C57.152-2013) + MPT044 (TTR / relación ·
+  // IEEE C57.12.00-2015) + resistencia óhmica de devanados. Se consolidan
+  // en UN solo informe 2025. Solo se cargan los valores REALES de resumen
+  // del reporte; el detalle por fase no se publica en el reporte, así que
+  // `transiciones`/`fases` quedan vacíos (mejor vacío que inventado).
+  {
+    id:           'r2025',
+    unidadId:     UNIDAD_ID,
+    serie:        UNIDAD_ID,
+    ano:          2025,
+    fecha:        'Mayo 2025',
+    ejecutante:   '',
+    equipo:       'IEEE C57.152-2013 (DRM) · IEEE C57.12.00-2015 (TTR)',
+    serie_en_pdf: UNIDAD_ID,
+    tipo:         'base',
+    tipo_prueba:  'mixto',
+    // tan δ / excitación / aislamiento / collar NO se midieron este año.
+    tand:         [],
+    excitacion:   {},
+    // TTR (MPT044): desviación máxima favorable < ±0.5%.
+    relacion:     [
+      { devanado: 'AT', asociado: 'AT–MT/BT (TTR)', desviacion_pct: 0.40 }
+    ],
+    // Resistencia óhmica de devanados (favorable bajo tolerancia 5%);
+    // el reporte no tabula el desbalance exacto por fase → se marca
+    // "verificar" (dato presente, número a confirmar contra el PDF).
+    resistencia:  [
+      { devanado: 'Devanados (AT/MT/BT)', verificar: true }
+    ],
+    aislamiento:  [],
+    collar:       {},
+    // DRM del conmutador (MPT045): ventana de transición 56–66 ms (OK).
+    drm: {
+      conmutador: {
+        fabricante:        'MR',
+        tipo:              'V III 200 Y-76',
+        serial:            '145981',
+        posiciones:        21,
+        operaciones:       383208,
+        pos_nominal:       11,
+        tension_ui_v:      220,
+        corriente_iu_a:    322,
+        r_conmutacion_ohm: 1.1
+      },
+      tiempo_min_ms: 56,
+      tiempo_max_ms: 66,
+      transiciones:  []
+    },
+    pdf: {
+      // Códigos reales de los reportes (MPT044 TTR + MPT045 DRM). El PDF
+      // se enlazará al subirlo a Storage; aquí solo la referencia.
+      filename:    'MPT045 (DRM · OLTC) + MPT044 (TTR) · Mayo 2025',
+      downloadURL: '',
+      storagePath: '',
+      size:        null,
+      estado:      'procesado'
+    }
   }
 ];
 
