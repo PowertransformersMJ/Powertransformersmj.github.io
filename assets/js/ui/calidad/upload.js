@@ -39,6 +39,7 @@
 
 import { store } from './state.js';
 import { calcularProyeccionOLS } from '../../domain/saidi_proyeccion.js';
+import { clasificarGrupoCausa } from '../../domain/saidi_config.js';
 
 const SHEETJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 let _sheetjsPromise = null;
@@ -187,6 +188,44 @@ function aplicarTipoZona(z, tipo, valores) {
   else if (/^cat_saifi_/.test(tipo)) z.cat_saifi[tipo.replace(/^cat_saifi_/, '')] = valores;
 }
 
+// Suma elemento a elemento la serie `src` sobre `dest` (mismo largo).
+function sumarSeries(dest, src) {
+  for (let i = 0; i < src.length; i++) dest[i] = (dest[i] || 0) + (+src[i] || 0);
+  return dest;
+}
+
+// Deriva los 3 grupos canónicos (y el total) sumando las categorías
+// cargadas, usando el CLASIFICADOR CANÓNICO clasificarGrupoCausa.
+// Este es el criterio único de extracción: cada categoría del documento
+// (las 13 causas listadas y cualquier otra) cae en su grupo y queda
+// representada en el stack / KPIs / proyección — SIN cambiar la forma
+// de ilustrar. No pisa series de grupo/total provistas explícitamente.
+function derivarGruposDesdeCategorias(z, N) {
+  for (const met of ['saidi', 'saifi']) {
+    const cats = z[`cat_${met}`] || {};
+    const catNames = Object.keys(cats);
+    if (!catNames.length) continue;
+
+    const grpVacio = Object.values(z[`grp_${met}`]).every(s => !s || !s.length);
+    const totVacio = !z[`total_${met}`] || !z[`total_${met}`].length;
+    if (!grpVacio && !totVacio) continue;
+
+    const acumGrp = {
+      'Sobrecarga/Deslastre':  new Array(N).fill(0),
+      'Racionamiento/Deficit': new Array(N).fill(0),
+      'Otras causas':          new Array(N).fill(0),
+    };
+    const acumTot = new Array(N).fill(0);
+    for (const cat of catNames) {
+      const serie = cats[cat] || [];
+      sumarSeries(acumGrp[clasificarGrupoCausa(cat)], serie);
+      sumarSeries(acumTot, serie);
+    }
+    if (grpVacio) z[`grp_${met}`] = acumGrp;
+    if (totVacio) z[`total_${met}`] = acumTot;
+  }
+}
+
 // ── Parser Excel ─────────────────────────────────────────────
 // Espera 4 hojas: META, KPI, ZONAS, PROYECCION (case-insensitive).
 // Si alguna falta, lanza error indicando cuál.
@@ -242,6 +281,10 @@ async function parsearExcel(file) {
     if (!zonas[zona]) zonas[zona] = nuevaZona();
     aplicarTipoZona(zonas[zona], tipo, valores);
   }
+
+  // Criterio de extracción: si una zona trae solo categorías, derivar
+  // sus grupos + total para que el documento se aprecie completo.
+  for (const z of Object.values(zonas)) derivarGruposDesdeCategorias(z, N);
 
   // PROYECCION → filas por zona con base, opt, pes, ci_inf, ci_sup, r2, slope, pval
   const proyRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetByName.PROYECCION], { header: 1 });
@@ -316,6 +359,11 @@ async function parsearCSV(file) {
   if (!zonas.TODAS) {
     throw new Error('CSV · falta la zona "TODAS" (fila con col A = TODAS)');
   }
+
+  // Criterio de extracción: si el CSV solo trae categorías (las 13
+  // causas u otras), derivar grupos + total por zona con el
+  // clasificador canónico — manteniendo la forma de ilustrar.
+  for (const z of Object.values(zonas)) derivarGruposDesdeCategorias(z, N);
 
   // meses_full = 12 meses canónicos (el módulo proyecta a Diciembre).
   const meses_full = MESES_CANON.slice();
