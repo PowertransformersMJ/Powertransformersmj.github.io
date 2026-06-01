@@ -256,6 +256,22 @@ prueba conserva su dato correspondiente**. Si el informe no trae serie,
 se acepta la serie tecleada en el paso 1 (decisión explícita del
 operador). La subida a Storage usa el `contentType` real del archivo.
 
+Las tres rutas viven en una función reutilizable
+`leerTextoArchivo(file, setEstado) → {texto, ocr}`, compartida por la
+carga (`extraerTexto`) y por el **reprocesado** en sitio.
+
+**Reprocesar informes ya cargados.** Un informe subido antes de que
+existiera el OCR queda con `pdf.estado: 'pendiente_extraccion'` y sin
+mediciones. La tabla del historial muestra entonces un botón
+**↻ Reprocesar** (solo en informes vivos no-base con `downloadURL`). El
+shell descarga el archivo almacenado (`fetch(pdf.downloadURL)` →
+`File` con su `contentType`), lo pasa por `leerTextoArchivo`, extrae las
+mediciones y actualiza el informe **en sitio** con
+`actualizarInforme(unidadId, informeId, parche)` — sin borrar ni volver
+a subir. Si la lectura arroja datos, `pdf.estado` pasa a `'extraido'`;
+si no, se mantiene `'pendiente_extraccion'`. `onSnapshot` refresca la
+tabla sola.
+
 ### 3.4 Dashboard de KPIs (nuevo)
 
 Pruebas por periodo · transformadores con alertas · antigüedad
