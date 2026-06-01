@@ -69,15 +69,21 @@ function mergeUnidades(live) {
   return out;
 }
 
-// Combina los informes base (marcados _seed → solo lectura) con los
-// que llegan en vivo. La clave es el año: un informe en vivo del mismo
-// año reemplaza al del seed.
+// Combina los informes base (marcados _seed → solo lectura) con los que
+// llegan en vivo. Un informe en vivo cuyo año coincide con el de un seed
+// reemplaza a ese seed; pero DOS informes en vivo NUNCA se colapsan entre
+// sí: cada uno es un documento Firestore con id propio y debe conservarse
+// (subir 6 PDFs guarda 6 informes, aunque compartan año o no traigan año).
 function mergeInformes(unidadId, live) {
+  const liveArr = (live || []).slice();
+  const orden = (a, b) => (a.ano || 0) - (b.ano || 0);
   const base = informesSeed(unidadId);
-  if (!base.length) return live || [];
-  const byAno = new Map(base.map((i) => [i.ano, { ...i, _seed: true }]));
-  (live || []).forEach((i) => { byAno.set(i.ano, i); });
-  return Array.from(byAno.values()).sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  if (!base.length) return liveArr.sort(orden);
+  const anosLive = new Set(liveArr.map((i) => i.ano).filter((a) => a != null));
+  const seed = base
+    .filter((i) => !anosLive.has(i.ano))
+    .map((i) => ({ ...i, _seed: true }));
+  return seed.concat(liveArr).sort(orden);
 }
 
 /* ─── KPIs y ficha de identidad ───────────────────────────────── */
