@@ -233,10 +233,28 @@ Hoy: tabs **Tablero** + **Informes**. Propuesta de tabs finales:
 ### 3.3 Carga de prueba/informe — *drag-and-drop*
 
 Zona de arrastre + selección manual. Flujo (conserva el actual):
-1. Elegir/confirmar serie. 2. Soltar archivo(s). 3. El extractor lee la
-serie y la fecha del PDF y **confirma coincidencia** (`confirmarSerie`,
-`detectarAno`). 4. Captura de mediciones (form exhaustivo o import). 5.
-Guardar → `onSnapshot` refresca todo.
+1. Elegir/confirmar serie. 2. Soltar archivo(s) — **PDF o imagen**. 3. El
+extractor lee la serie y la fecha del informe y **confirma coincidencia**
+(`confirmarSerie`, `detectarAno`). 4. Captura de mediciones (form
+exhaustivo o import). 5. Guardar → `onSnapshot` refresca todo.
+
+**Lectura del texto del informe (`extraerTexto`).** Tres rutas según el
+archivo, todas alimentan al mismo extractor conservador de mediciones:
+1. **PDF con capa de texto** → `pdf.js` (`getTextContent`), rápido y
+   exacto.
+2. **PDF escaneado** (capa de texto pobre, `<60` caracteres
+   alfanuméricos) → se renderiza cada página a canvas (`escala 2.2`) y se
+   aplica **OCR con Tesseract.js** (`spa`).
+3. **Imagen** (jpg/png/…) → OCR directo sobre el archivo.
+
+Tesseract.js se carga **perezosamente** desde CDN solo cuando un informe
+lo necesita; el worker se reutiliza entre informes y se libera al cerrar
+el modal (`liberarOCR`). El extractor de mediciones es conservador
+(rótulo + rango plausible + ancla `%`): aun con ruido de OCR prefiere
+dejar un valor vacío antes que asignar uno equivocado, de modo que **cada
+prueba conserva su dato correspondiente**. Si el informe no trae serie,
+se acepta la serie tecleada en el paso 1 (decisión explícita del
+operador). La subida a Storage usa el `contentType` real del archivo.
 
 ### 3.4 Dashboard de KPIs (nuevo)
 
