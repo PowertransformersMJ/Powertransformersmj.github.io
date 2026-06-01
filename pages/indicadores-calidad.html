@@ -80,14 +80,16 @@
           </span>
         </h3>
         <div class="upload-row">
-          <input type="file" id="file-input" accept=".json,.xlsx,.xls" title="Selecciona un archivo .json o .xlsx">
+          <input type="file" id="file-input" accept=".json,.xlsx,.xls,.xlsb,.xlsm,.csv" title="Selecciona un archivo .json, .xlsx, .xlsm o .csv">
           <button class="btn btn-primary" id="btn-upload">⬆ Cargar archivo</button>
         </div>
         <div class="small" style="color:var(--slate-500);margin-bottom:6px">
           <b>Formato JSON:</b> mismo shape que el baseline integrado (estructura
           <code>{ meses, meses_full, zonas, cats_order, kpi, proj_global }</code>).
           <br>
-          <b>Formato Excel (.xlsx):</b> con hojas <code>META</code>, <code>KPI</code>, <code>ZONAS</code> y <code>PROYECCION</code> pre-agregadas.
+          <b>Formato Excel (.xlsx / .xlsm):</b> con hojas <code>META</code>, <code>KPI</code>, <code>ZONAS</code> y <code>PROYECCION</code> pre-agregadas (los .xlsm se leen igual; las macros se ignoran).
+          <br>
+          <b>Formato CSV:</b> una sola tabla tipo hoja <code>ZONAS</code> — columnas <code>zona,tipo,Ene,Feb,…</code>. El módulo deriva los meses, las categorías y recalcula la proyección automáticamente.
           El archivo se procesa <b>en tu navegador</b> y se guarda localmente (IndexedDB) — no se sube a internet.
         </div>
         <div class="upload-log" id="upload-log" style="display:none;background:#0B1220;color:#86efac;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:11px;padding:10px;border-radius:5px;max-height:140px;overflow-y:auto"></div>
