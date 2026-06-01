@@ -31,15 +31,50 @@ y proyecta el escenario Jun–Dic con regresión OLS + bandas IC95%.
 | **Otras causas** | ⬜ slate `#CBD5E1` | Resto · meteorología, vegetación, terceros, etc. |
 
 Estos colores son **invariantes** en todos los charts del módulo. El
-clasificador `categoriaColor()` en `domain/saidi_config.js` mapea cada
-una de las 11 categorías canónicas a uno de estos 3 grupos.
+clasificador canónico `clasificarGrupoCausa()` en
+`domain/saidi_config.js` mapea cada categoría a uno de estos 3 grupos;
+`categoriaColor()` y `grupoCorto()` derivan de él.
 
-> **Quirk preservado del original (regla §0.1.2.1):** la función
-> `categoriaColor()` clasifica "Deslastre…" como rojo por un match
-> accidental con "STR" en la regla `toUpperCase().includes('STR')`
-> (DESLA**STR**E contiene STR). Se mantiene idéntico al archivo
-> standalone original para no romper el semáforo visual; documentado
-> en `tests/saidi_calculo.test.js`.
+#### Criterio único de extracción de causas
+
+Cada vez que se carga un documento, toda categoría se clasifica con
+`clasificarGrupoCausa(cat)` (normaliza acentos + caja):
+
+| Si la categoría contiene… | Grupo | Color |
+|---|---|---|
+| `racion` (evaluado **primero**) | Racionamiento/Deficit | 🟣 púrpura |
+| `sobrecarga` o `deslastre` | Sobrecarga/Deslastre | 🔴 rojo |
+| resto | Otras causas | ⬜ slate (ámbar en barras de categoría) |
+
+`CAUSAS_CANON` (en `saidi_config.js`) lista las 13 causas oficiales de
+Afinia/XM cubiertas por este criterio:
+
+```
+Deslastre de carga por capacidad de transformacion
+Deslastre por Capacidad de Transformacion trafo SDL
+Deslastre por capacidad SDL
+Deslastre por capacidad de transporte
+Deslastre por capacidad sdl
+Racionamiento Programado por Deficit STN
+Racionamiento de Emergencia por Deficit STN
+Racionamiento de Emergencia por Deficit del STR
+SOBRECARGA TRAFO SDL
+Sobrecarga
+Sobrecarga activo del SDL
+Sobrecarga de trafo de conexion al STN
+Sobrecarga del STR
+```
+
+> El orden importa: **Racionamiento se evalúa antes que Sobrecarga**
+> para que `Racionamiento de Emergencia por Deficit del STR` quede en
+> púrpura (antes caía en rojo por el match accidental con "STR").
+
+**Auto-derivación al cargar (Excel + CSV).** Si un documento trae solo
+filas de categoría (`cat_saidi_*` / `cat_saifi_*`) y sin filas de grupo
+o total, `upload.js` agrega las categorías en sus grupos canónicos y
+calcula el total, de modo que el stack, los KPIs y la proyección se
+aprecian completos **sin cambiar la forma de ilustrar**. La derivación
+no pisa series de grupo/total provistas explícitamente en el documento.
 
 ### 1.3 Zonas operativas
 
@@ -468,8 +503,10 @@ Cobertura:
   reproducir `slope ≈ 0.1897` y `0.0687` respectivamente · IC95%
   encierra base · escenarios ±10% · edge cases (serie constante,
   lineal perfecta, con nulls, <2 puntos).
-- **Config**: `categoriaColor` documenta el quirk "Deslastre matchea
-  STR" del original.
+- **Config**: `clasificarGrupoCausa` (criterio único causa→grupo),
+  `categoriaColor` (Racion→púrpura · Sobrecarga/Deslastre→rojo ·
+  resto→ámbar) y `CAUSAS_CANON` (las 13 causas oficiales mapean a un
+  grupo controlable).
 
 ---
 
