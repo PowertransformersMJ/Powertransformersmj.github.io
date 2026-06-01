@@ -5,7 +5,7 @@ import {
   sumSerie, avgSerie, growthPct, varMoM,
   catTotals, gruposDeZona, categoriasDeZona, totalSerieDeZona, proyeccionDeZona, listarZonas,
 } from '../assets/js/domain/saidi_calculo.js';
-import { categoriaColor, grupoCorto, metKey, metricaNombre, COLORS } from '../assets/js/domain/saidi_config.js';
+import { categoriaColor, grupoCorto, metKey, metricaNombre, COLORS, clasificarGrupoCausa, CAUSAS_CANON } from '../assets/js/domain/saidi_config.js';
 
 // ── sumSerie ──────────────────────────────────────────────────
 test('sumSerie suma valores y skipea nulls', () => {
@@ -163,6 +163,40 @@ test('grupoCorto: Racion → "rac", otros → "sob"', () => {
   assert.equal(grupoCorto('Racion. Emergencia Deficit STN'), 'rac');
   assert.equal(grupoCorto('SOBRECARGA TRAFO SDL'), 'sob');
   assert.equal(grupoCorto('Deslastre cap. transporte'), 'sob');
+});
+
+// ── Clasificador canónico de causas ───────────────────────────
+test('clasificarGrupoCausa: racionamiento (aun con STR) → Racionamiento/Deficit', () => {
+  assert.equal(clasificarGrupoCausa('Racionamiento Programado por Deficit STN'), 'Racionamiento/Deficit');
+  assert.equal(clasificarGrupoCausa('Racionamiento de Emergencia por Deficit STN'), 'Racionamiento/Deficit');
+  // Regresión: "del STR" no debe arrastrar a Sobrecarga/Deslastre por el match "STR".
+  assert.equal(clasificarGrupoCausa('Racionamiento de Emergencia por Deficit del STR'), 'Racionamiento/Deficit');
+});
+
+test('clasificarGrupoCausa: sobrecarga y deslastre → Sobrecarga/Deslastre', () => {
+  assert.equal(clasificarGrupoCausa('SOBRECARGA TRAFO SDL'), 'Sobrecarga/Deslastre');
+  assert.equal(clasificarGrupoCausa('Sobrecarga'), 'Sobrecarga/Deslastre');
+  assert.equal(clasificarGrupoCausa('Sobrecarga del STR'), 'Sobrecarga/Deslastre');
+  assert.equal(clasificarGrupoCausa('Deslastre de carga por capacidad de transformacion'), 'Sobrecarga/Deslastre');
+});
+
+test('clasificarGrupoCausa: sin match → Otras causas', () => {
+  assert.equal(clasificarGrupoCausa('Mantenimiento'), 'Otras causas');
+  assert.equal(clasificarGrupoCausa(''), 'Otras causas');
+  assert.equal(clasificarGrupoCausa(null), 'Otras causas');
+});
+
+test('CAUSAS_CANON: las 13 causas mapean a Racionamiento o Sobrecarga/Deslastre', () => {
+  assert.equal(CAUSAS_CANON.length, 13);
+  for (const causa of CAUSAS_CANON) {
+    const g = clasificarGrupoCausa(causa);
+    assert.notEqual(g, 'Otras causas', `"${causa}" no debería caer en Otras causas`);
+  }
+});
+
+// Regresión del bug Racionamiento+STR en el color de barra.
+test('categoriaColor: Racionamiento ... del STR → púrpura (no rojo)', () => {
+  assert.equal(categoriaColor('Racionamiento de Emergencia por Deficit del STR'), COLORS.PURPLE);
 });
 
 test('metKey concatena prefijo + métrica', () => {

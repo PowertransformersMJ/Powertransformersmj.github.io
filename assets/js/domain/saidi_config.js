@@ -34,20 +34,63 @@ export const GRUPOS = Object.freeze([
   'Sobrecarga/Deslastre',
 ]);
 
-// Clasificador de categoría → color de barra (heatmap, top, etc.)
-//   - "SOBRE..." / "Sobrecarga" / contiene "STR"  → ROJO  (sobrecarga)
-//   - contiene "Racion"                            → PÚRPURA (racionamiento)
-//   - resto                                        → ÁMBAR (deslastre)
+// Catálogo canónico de causas que el módulo extrae y agrupa cada vez
+// que se carga un documento. Son los nombres tal cual aparecen en las
+// fuentes de Afinia/XM; el clasificador los normaliza (acentos + caja)
+// para mapearlos a uno de los 3 grupos canónicos del dashboard.
+export const CAUSAS_CANON = Object.freeze([
+  'Deslastre de carga por capacidad de transformacion',
+  'Deslastre por Capacidad de Transformacion trafo SDL',
+  'Deslastre por capacidad SDL',
+  'Deslastre por capacidad de transporte',
+  'Deslastre por capacidad sdl',
+  'Racionamiento Programado por Deficit STN',
+  'Racionamiento de Emergencia por Deficit STN',
+  'Racionamiento de Emergencia por Deficit del STR',
+  'SOBRECARGA TRAFO SDL',
+  'Sobrecarga',
+  'Sobrecarga activo del SDL',
+  'Sobrecarga de trafo de conexion al STN',
+  'Sobrecarga del STR',
+]);
+
+// Normaliza una cadena: minúsculas + sin acentos (para comparar causas
+// con escritura inconsistente — mayúsculas, tildes, "Deficit"/"Déficit").
+function _norm(s) {
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+// CLASIFICADOR CANÓNICO causa → grupo del dashboard.
+// Único criterio de extracción para las 13 causas (CAUSAS_CANON) y
+// cualquier otra que llegue en un documento cargado.
+//   - contiene "racion"                        → 'Racionamiento/Deficit'
+//   - contiene "sobrecarga" o "deslastre"      → 'Sobrecarga/Deslastre'
+//   - resto                                    → 'Otras causas'
+// El orden importa: "Racion..." se evalúa PRIMERO para que
+// "Racionamiento ... del STR" no caiga en el grupo rojo por el match STR.
+export function clasificarGrupoCausa(cat) {
+  const n = _norm(cat);
+  if (n.includes('racion')) return 'Racionamiento/Deficit';
+  if (n.includes('sobrecarga') || n.includes('deslastre')) return 'Sobrecarga/Deslastre';
+  return 'Otras causas';
+}
+
+// Clasificador de categoría → color de barra (heatmap, top, etc.).
+// Deriva del grupo canónico: Sobrecarga/Deslastre→ROJO,
+// Racionamiento/Deficit→PÚRPURA, resto→ÁMBAR (fallback de categoría).
 export function categoriaColor(cat) {
-  const u = String(cat).toUpperCase();
-  if (u.includes('SOBRE') || cat === 'Sobrecarga' || u.includes('STR')) return COLORS.RED;
-  if (String(cat).includes('Racion')) return COLORS.PURPLE;
+  const g = clasificarGrupoCausa(cat);
+  if (g === 'Sobrecarga/Deslastre')  return COLORS.RED;
+  if (g === 'Racionamiento/Deficit') return COLORS.PURPLE;
   return COLORS.AMBER;
 }
 
 // Clasificador grupo abreviado (pill de la tabla top)
 export function grupoCorto(cat) {
-  return String(cat).includes('Racion') ? 'rac' : 'sob';
+  return clasificarGrupoCausa(cat) === 'Racionamiento/Deficit' ? 'rac' : 'sob';
 }
 
 // Tipografía y layout base Plotly.
