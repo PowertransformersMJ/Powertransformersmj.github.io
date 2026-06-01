@@ -40,6 +40,24 @@ const int = (v) => {
   return n == null ? null : Math.trunc(n);
 };
 
+/**
+ * Familias de prueba que puede contener un informe. No todos los
+ * números de serie reciben la misma batería: unos llevan el predictivo
+ * completo (las 6 pruebas centradas en tan δ), otros solo DRM del
+ * conmutador, otros relación (TTR) o resistencia óhmica de devanados.
+ * El discriminador `tipo_prueba` del informe describe QUÉ se midió.
+ */
+export const TIPOS_PRUEBA = Object.freeze({
+  PREDICTIVO_COMPLETO:   'predictivo_completo', // tan δ + excit + rel + res + aisl + collar
+  TAN_DELTA:             'tan_delta',
+  DRM_OLTC:              'drm_oltc',             // resistencia dinámica del conmutador
+  RESISTENCIA_DEVANADOS: 'resistencia_devanados',
+  TTR:                   'ttr',                  // relación de transformación
+  MIXTO:                 'mixto'                 // combinación (p. ej. DRM + TTR + R)
+});
+
+const TIPOS_PRUEBA_SET = new Set(Object.values(TIPOS_PRUEBA));
+
 /** Configuraciones de aislamiento para tan δ (códigos del tablero). */
 export const CONFIGS_TAND = Object.freeze([
   { code: 'CH',  entre: 'AT ↔ tierra' },
@@ -58,7 +76,8 @@ export const CRITERIOS = Object.freeze({
   relacion:    'Desviación ≤ ±0.5% respecto a placa',
   resistencia: 'Desbalance entre fases ≤ 5% (corregido por temperatura)',
   aislamiento: 'Mínimo según clase de tensión (≥1 GΩ en este equipo)',
-  collar:      'Pérdidas < 100 mW'
+  collar:      'Pérdidas < 100 mW',
+  drm:         'Tiempo de transición del conmutador 40–70 ms · sin discontinuidades'
 });
 
 /* ─── Calificadores puros (devuelven una etiqueta de semáforo) ───── */
@@ -108,6 +127,32 @@ export function calificarCollar(mw) {
   const v = num(mw);
   if (v == null) return 'n/d';
   return v < 100 ? 'OK' : 'alto';
+}
+
+/* Rango normal del tiempo de transición del conmutador (ms). El DRM
+ * (resistencia dinámica) valida que el paso entre tomas sea limpio y
+ * dentro de ventana; fuera de [40, 70] ms hay riesgo de contacto. */
+export const DRM_TIEMPO_MS = Object.freeze({ min: 40, max: 70 });
+
+/** tiempo de transición DRM (ms) → OK | fuera */
+export function calificarDrmTiempo(ms) {
+  const v = num(ms);
+  if (v == null) return 'n/d';
+  return (v >= DRM_TIEMPO_MS.min && v <= DRM_TIEMPO_MS.max) ? 'OK' : 'fuera';
+}
+
+/**
+ * Calificación global del DRM a partir de la ventana de tiempos de
+ * transición medida (min/max). Si cualquier extremo cae fuera de
+ * [40,70] ms → 'fuera'; si no hay datos → 'n/d'.
+ */
+export function calificarDrm(tiempo_min_ms, tiempo_max_ms) {
+  const lo = num(tiempo_min_ms);
+  const hi = num(tiempo_max_ms);
+  if (lo == null && hi == null) return 'n/d';
+  const cLo = lo == null ? 'OK' : calificarDrmTiempo(lo);
+  const cHi = hi == null ? 'OK' : calificarDrmTiempo(hi);
+  return (cLo === 'OK' && cHi === 'OK') ? 'OK' : 'fuera';
 }
 
 /* ─── Identidad de la unidad ──────────────────────────────────── */
@@ -316,10 +361,97 @@ function sanitizarCollar(input) {
   };
 }
 
+/**
+ * 7) DRM — Resistencia Dinámica del conmutador (OLTC). Guarda la
+ * identidad del conmutador (fabricante, tipo, serial, posiciones,
+ * operaciones, posición nominal, datos eléctricos), la ventana de
+ * tiempos de transición (min/max en ms) y un detalle opcional por
+ * fase/posición. NO se inventan números: cuando solo se conoce el
+ * resumen (rango de tiempos), `transiciones[]` queda vacío.
+ */
+function sanitizarTransicionDrm(t) {
+  const tiempo_ms = num(t.tiempo_ms);
+  return {
+    posicion:   str(t.posicion),     // "10→11", "11→12"
+    fase:       str(t.fase),         // A / B / C
+    tiempo_ms,
+    sentido:    str(t.sentido),      // "subir" / "bajar"
+    calif:      str(t.calif) || calificarDrmTiempo(tiempo_ms)
+  };
+}
+
+function sanitizarDrm(input) {
+  const src = input || {};
+  const transiciones = Array.isArray(src.transiciones)
+    ? src.transiciones.map(sanitizarTransicionDrm).filter((t) => t.tiempo_ms != null || t.posicion)
+    : [];
+  let tiempo_min_ms = num(src.tiempo_min_ms);
+  let tiempo_max_ms = num(src.tiempo_max_ms);
+  // Si hay detalle por transición pero no se dieron los extremos, derivarlos.
+  const medidos = transiciones.map((t) => t.tiempo_ms).filter((v) => v != null);
+  if (tiempo_min_ms == null && medidos.length) tiempo_min_ms = Math.min(...medidos);
+  if (tiempo_max_ms == null && medidos.length) tiempo_max_ms = Math.max(...medidos);
+  return {
+    conmutador: {
+      fabricante:   str(src.conmutador && src.conmutador.fabricante),   // "MR"
+      tipo:         str(src.conmutador && src.conmutador.tipo),         // "V III 200 Y-76"
+      serial:       str(src.conmutador && src.conmutador.serial),       // "145981"
+      posiciones:   int(src.conmutador && src.conmutador.posiciones),   // 21
+      operaciones:  int(src.conmutador && src.conmutador.operaciones),  // 383208
+      pos_nominal:  int(src.conmutador && src.conmutador.pos_nominal),  // 11
+      tension_ui_v: num(src.conmutador && src.conmutador.tension_ui_v), // 220
+      corriente_iu_a: num(src.conmutador && src.conmutador.corriente_iu_a), // 322
+      r_conmutacion_ohm: num(src.conmutador && src.conmutador.r_conmutacion_ohm) // 1.1
+    },
+    tiempo_min_ms,
+    tiempo_max_ms,
+    transiciones,
+    calif: str(src.calif) || calificarDrm(tiempo_min_ms, tiempo_max_ms)
+  };
+}
+
 /* ─── Informe individual (un año / una visita) ────────────────── */
+
+/**
+ * Deriva el tipo_prueba a partir de qué mediciones trae el informe,
+ * cuando el origen no lo declara explícitamente. Un informe con las
+ * 6 pruebas centradas en tan δ es 'predictivo_completo'; uno que solo
+ * trae DRM es 'drm_oltc'; varias familias sin tan δ → 'mixto'.
+ */
+function inferirTipoPrueba(s) {
+  const fams = [];
+  if (s.tand.length) fams.push('tand');
+  if (s.excitacion.fases.length || s.excitacion.delta_ext_pct != null) fams.push('exc');
+  if (s.relacion.length) fams.push('rel');
+  if (s.resistencia.length) fams.push('res');
+  if (s.aislamiento.length) fams.push('aisl');
+  if (s.collar.bujes.length || s.collar.max_mw != null) fams.push('collar');
+  const tieneDrm = (s.drm.tiempo_min_ms != null || s.drm.tiempo_max_ms != null ||
+                    s.drm.transiciones.length || s.drm.conmutador.serial);
+  if (tieneDrm) fams.push('drm');
+  if (!fams.length) return TIPOS_PRUEBA.PREDICTIVO_COMPLETO;
+  if (fams.includes('tand')) return TIPOS_PRUEBA.PREDICTIVO_COMPLETO;
+  if (fams.length === 1) {
+    if (fams[0] === 'drm') return TIPOS_PRUEBA.DRM_OLTC;
+    if (fams[0] === 'rel') return TIPOS_PRUEBA.TTR;
+    if (fams[0] === 'res') return TIPOS_PRUEBA.RESISTENCIA_DEVANADOS;
+  }
+  return TIPOS_PRUEBA.MIXTO;
+}
 
 export function sanitizarInforme(input) {
   const src = input || {};
+  const tand        = sanitizarTand(src.tand);
+  const excitacion  = sanitizarExcitacion(src.excitacion);
+  const relacion    = sanitizarRelacion(src.relacion);
+  const resistencia = sanitizarResistencia(src.resistencia);
+  const aislamiento = sanitizarAislamiento(src.aislamiento);
+  const collar      = sanitizarCollar(src.collar);
+  const drm         = sanitizarDrm(src.drm);
+  const tipoDecl = str(src.tipo_prueba).toLowerCase();
+  const tipo_prueba = TIPOS_PRUEBA_SET.has(tipoDecl)
+    ? tipoDecl
+    : inferirTipoPrueba({ tand, excitacion, relacion, resistencia, aislamiento, collar, drm });
   return {
     schema_version: 2,
     unidadId:   str(src.unidadId),
@@ -330,13 +462,15 @@ export function sanitizarInforme(input) {
     equipo:     str(src.equipo ?? src.equipment), // "DOBLE M4100 · …"
     serie_en_pdf: str(src.serie_en_pdf), // serie detectada en el PDF (o '')
     tipo:       str(src.tipo) || 'informe', // base | informe
+    tipo_prueba,                            // qué familia(s) de prueba contiene
     // ── mediciones por prueba (detalle exhaustivo) ──
-    tand:        sanitizarTand(src.tand),
-    excitacion:  sanitizarExcitacion(src.excitacion),
-    relacion:    sanitizarRelacion(src.relacion),
-    resistencia: sanitizarResistencia(src.resistencia),
-    aislamiento: sanitizarAislamiento(src.aislamiento),
-    collar:      sanitizarCollar(src.collar),
+    tand,
+    excitacion,
+    relacion,
+    resistencia,
+    aislamiento,
+    collar,
+    drm,
     // ── PDF original (Firebase Storage o ruta del repo) ──
     pdf: {
       storagePath: str(src.pdf && src.pdf.storagePath),
@@ -365,6 +499,13 @@ export function validarInforme(inf) {
     if (a.gohm != null && a.gohm < 0) {
       errs.push(`Aislamiento ${a.devanado}↔${a.asociado} no puede ser negativo.`);
     }
+  }
+  if (s.drm.tiempo_min_ms != null && s.drm.tiempo_min_ms < 0) {
+    errs.push('El tiempo de transición DRM no puede ser negativo.');
+  }
+  if (s.drm.tiempo_min_ms != null && s.drm.tiempo_max_ms != null &&
+      s.drm.tiempo_max_ms < s.drm.tiempo_min_ms) {
+    errs.push('El tiempo máximo DRM no puede ser menor que el mínimo.');
   }
   return errs;
 }

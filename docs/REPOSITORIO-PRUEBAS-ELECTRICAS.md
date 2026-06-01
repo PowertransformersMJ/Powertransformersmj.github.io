@@ -138,6 +138,9 @@ tocar el frontend.
   "ano": 2020,
   "fecha": "2020-08-23",
   "tipo": "informe",                 // base | informe
+  "tipo_prueba": "predictivo_completo", // discriminador de familia:
+  //   predictivo_completo | tan_delta | drm_oltc | resistencia_devanados
+  //   | ttr | mixto  (inferido de las mediciones presentes si no se declara)
   "ejecutante": "Applus",            // técnico/empresa responsable
   "equipo": "DOBLE M4100 · …",       // equipo utilizado
   "temperatura_c": 28,               // condiciones (nuevo v3)
@@ -152,6 +155,13 @@ tocar el frontend.
   "resistencia": [ /* AT/MT/BT en mΩ */ ],
   "aislamiento": [ /* GΩ por par/tierra */ ],
   "collar":      { /* pérdida mW por buje */ },
+  "drm": {                           // Resistencia Dinámica del conmutador (OLTC)
+    "conmutador": { /* fabricante, tipo, serial, posiciones, operaciones,
+                       pos_nominal, tension_ui_v, corriente_iu_a, r_conmutacion_ohm */ },
+    "tiempo_min_ms": 56,             // ventana de transición medida (ms)
+    "tiempo_max_ms": 66,             // norma: 40–70 ms · guías ámbar 45/65
+    "transiciones": [ /* detalle por posición si el reporte lo publica */ ]
+  },
 
   // ── tipos de prueba adicionales (nuevo v3) ──
   "dga_aceite":  { /* gases disueltos ppm + diagnóstico Duval */ },
@@ -438,7 +448,7 @@ importador de inventario existente).
 | `fecha` (dd/mm/aaaa) | `informes.fecha` + `ano` | normaliza a ISO; `ano` derivado |
 | `ejecutante` | `informes.ejecutante` | texto |
 | `equipo` | `informes.equipo` | texto |
-| `prueba` | enrutador | `tand|excitacion|relacion|resistencia|aislamiento|collar|dga|tierra|dp` |
+| `prueba` | enrutador | `tand|excitacion|relacion|resistencia|aislamiento|collar|drm|dga|tierra|dp` |
 | `seccion`/`fase`/`devanado` | sub-llave de la prueba | según tipo |
 | `valor` | medición | numérico (coma→punto) |
 | `unidad` | unidad de la medición | `%`, `mΩ`, `GΩ`, `mW`, `ppm`, `Ω`, `pC` |

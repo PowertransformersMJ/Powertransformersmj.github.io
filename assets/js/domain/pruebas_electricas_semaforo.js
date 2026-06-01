@@ -80,6 +80,15 @@ export const UMBRALES = Object.freeze({
   collar: Object.freeze({
     limite: 100,       // ≥ 100 mW → rojo
     ymax: 110
+  }),
+  // DRM · Resistencia Dinámica del conmutador (OLTC) — IEEE C57.152
+  // Tiempo de transición entre tomas dentro de [40, 70] ms.
+  drm: Object.freeze({
+    min: 40,           // < 40 ms → rojo (transición demasiado rápida)
+    max: 70,           // > 70 ms → rojo (contacto lento / desgaste)
+    guiaBaja: 45,
+    guiaAlta: 65,
+    ymax: 80
   })
 });
 
@@ -182,6 +191,27 @@ export function calificarCollar(mW) {
   return ESTADOS.VERDE;
 }
 
+/**
+ * DRM · tiempo de transición del conmutador (ms).
+ * REGLA DE NEGOCIO: dentro de [40, 70] ms está en norma. Fuera de esa
+ * ventana → rojo (transición sospechosa). Cerca de los bordes (guías
+ * 45/65 ms) → ámbar (vigilar tendencia). Se evalúa la ventana medida
+ * (min/max); el peor extremo define el estado.
+ * @param {number} tiempoMinMs extremo inferior de la ventana medida
+ * @param {number} tiempoMaxMs extremo superior de la ventana medida
+ */
+export function calificarDrm(tiempoMinMs, tiempoMaxMs) {
+  const lo = esNulo(tiempoMinMs) ? null : tiempoMinMs;
+  const hi = esNulo(tiempoMaxMs) ? null : tiempoMaxMs;
+  if (lo == null && hi == null) return ESTADOS.NEUTRAL;
+  const u = UMBRALES.drm;
+  const min = lo == null ? hi : lo;
+  const max = hi == null ? lo : hi;
+  if (min < u.min || max > u.max) return ESTADOS.ROJO;
+  if (min < u.guiaBaja || max > u.guiaAlta) return ESTADOS.AMBAR;
+  return ESTADOS.VERDE;
+}
+
 /* ─── Mapa de calificadores por clave de prueba ───────────────── */
 export const CALIFICADORES = Object.freeze({
   tand: calificarTanDelta,
@@ -189,7 +219,8 @@ export const CALIFICADORES = Object.freeze({
   relacion: calificarRelacion,
   resistencia: calificarResistencia,
   aislamiento: calificarAislamiento,
-  collar: calificarCollar
+  collar: calificarCollar,
+  drm: calificarDrm
 });
 
 /**
