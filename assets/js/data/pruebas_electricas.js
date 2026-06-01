@@ -172,3 +172,20 @@ export async function subirPDF(unidadId, file, onProgress) {
     );
   });
 }
+
+/**
+ * Descarga el binario de un informe ya almacenado para reprocesarlo
+ * sin volver a subirlo. Usa `getBlob` del SDK de Storage (el mismo
+ * transporte que la subida, ya autorizado) en vez de un `fetch`
+ * directo de la downloadURL, que el navegador bloquea por CORS.
+ * @param {string} storagePath  ruta del objeto en Storage
+ * @returns {Promise<Blob>}
+ */
+export async function descargarBlobInforme(storagePath) {
+  const storage = getStorageSafe();
+  if (!storage) throw new Error('Firebase Storage no inicializado.');
+  if (!storagePath) throw new Error('El informe no tiene ruta de almacenamiento.');
+  const { ref: sref, getBlob } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
+  return getBlob(sref(storage, storagePath));
+}

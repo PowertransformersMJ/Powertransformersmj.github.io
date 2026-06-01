@@ -25,7 +25,8 @@
 import {
   isReady,
   suscribirUnidades, suscribirInformes,
-  guardarUnidad, crearInforme, subirPDF, eliminarInforme, actualizarInforme
+  guardarUnidad, crearInforme, subirPDF, eliminarInforme, actualizarInforme,
+  descargarBlobInforme
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
@@ -374,11 +375,23 @@ async function onClickReportlist(ev) {
     rep.disabled = true;
     rep.textContent = '↻ Reprocesando…';
     try {
-      const resp = await fetch(inf.pdf.downloadURL);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      const blob = await resp.blob();
-      const tipo = blob.type || inf.pdf.mime || 'application/pdf';
-      const nombre = inf.pdf.filename || `${serieTxt}-${inf.ano || ''}`;
+      const nombre = inf.pdf.filename || `${serieTxt}-${inf.ano || ''}.pdf`;
+      // El tipo lo decide la extensión (los blobs viejos vienen como
+      // application/octet-stream y no se podrían enrutar por su .type).
+      const tipo = mimePorNombre(nombre) || 'application/pdf';
+      let blob;
+      try {
+        // Vía SDK de Storage (mismo transporte que la subida, ya
+        // autorizado): evita el bloqueo CORS de un fetch directo.
+        blob = await descargarBlobInforme(inf.pdf.storagePath);
+      } catch (errBlob) {
+        // Respaldo: fetch de la downloadURL (funciona si el bucket
+        // tiene CORS configurado para GET desde este origen).
+        console.warn('[pruebas-electricas] getBlob falló, intento fetch', errBlob);
+        const resp = await fetch(inf.pdf.downloadURL);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        blob = await resp.blob();
+      }
       const archivo = new File([blob], nombre, { type: tipo });
       const setEstado = (t) => { rep.textContent = `↻ ${t}`; };
       const { texto } = await leerTextoArchivo(archivo, setEstado);
@@ -402,7 +415,8 @@ async function onClickReportlist(ev) {
       console.error('[pruebas-electricas] reprocesar', err);
       rep.disabled = false;
       rep.textContent = etiqOrig;
-      toast('No se pudo reprocesar el informe.', 'warn');
+      const detalle = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : '';
+      toast(`No se pudo reprocesar el informe${detalle}.`, 'warn');
     }
     return;
   }
@@ -672,6 +686,24 @@ function renderModal() {
 const RE_IMG = /^image\//;
 function esImagen(file) { return !!file && RE_IMG.test(file.type || ''); }
 function esPdf(file) { return !!file && file.type === 'application/pdf'; }
+
+// Deduce el MIME por la extensión del nombre. Los informes subidos
+// antes del fix de contentType quedaron como application/octet-stream
+// en Storage, así que el blob descargado no se puede enrutar por su
+// .type: la extensión del archivo manda para reprocesar.
+function mimePorNombre(nombre) {
+  const ext = String(nombre || '').toLowerCase().match(/\.([a-z0-9]+)$/);
+  switch (ext && ext[1]) {
+    case 'pdf': return 'application/pdf';
+    case 'png': return 'image/png';
+    case 'jpg': case 'jpeg': return 'image/jpeg';
+    case 'webp': return 'image/webp';
+    case 'gif': return 'image/gif';
+    case 'bmp': return 'image/bmp';
+    case 'tif': case 'tiff': return 'image/tiff';
+    default: return '';
+  }
+}
 
 /* Añade uno o varios archivos a UP.items (PDF o imagen) y extrae el
    texto de cada uno en segundo plano (capa de texto o, si el documento
