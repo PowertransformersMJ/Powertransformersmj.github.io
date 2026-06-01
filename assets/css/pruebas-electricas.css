@@ -281,7 +281,9 @@
 .pe-overlay .fitem.fi-falta{background:#fdf6e7;border-color:#e6c772;}
 .pe-overlay .fitem.fi-falta .fi-ano{border-color:#b07d12;color:#8a6210;}
 .pe-overlay .fi-doc{color:#1e4e79;flex:none;}
-.pe-overlay .fi-name{flex:1;min-width:0;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.76rem;color:#16365c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pe-overlay .fi-name{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.76rem;color:#16365c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pe-overlay .fi-status{font-family:inherit;font-size:.68rem;color:#5a7088;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pe-overlay .fi-status:empty{display:none;}
 .pe-overlay .fi-ano{flex:none;width:86px;background:#fff;border:1px solid #dde3ea;border-radius:7px;padding:7px 9px;color:#1b2733;font-family:'IBM Plex Mono',ui-monospace,Menlo,monospace;font-size:.82rem;}
 .pe-overlay .fi-ano:focus{outline:none;border-color:#0f8a99;box-shadow:0 0 0 3px rgba(15,138,153,.12);}
 .pe-overlay .fi-del{flex:none;background:none;border:none;color:#8a97a5;font-size:.95rem;cursor:pointer;padding:4px 6px;border-radius:6px;transition:.15s;}
