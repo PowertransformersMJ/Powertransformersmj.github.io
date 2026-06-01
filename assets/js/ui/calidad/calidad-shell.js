@@ -219,7 +219,7 @@ async function boot() {
     } catch (e) {
       console.error('[calidad-shell] baseline no cargó:', e);
       mostrarError(
-        'No se pudo cargar el dataset base. Carga un archivo .json o .xlsx manualmente arriba, ' +
+        'No se pudo cargar el dataset base. Carga un archivo .json, .xlsx, .xlsm o .csv manualmente arriba, ' +
         'o revisa la conexión a internet. Detalle: ' + e.message
       );
     }
