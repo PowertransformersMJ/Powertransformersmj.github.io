@@ -394,7 +394,12 @@ async function onClickReportlist(ev) {
       }
       const archivo = new File([blob], nombre, { type: tipo });
       const setEstado = (t) => { rep.textContent = `↻ ${t}`; };
-      const { texto } = await leerTextoArchivo(archivo, setEstado);
+      const { texto } = await conTiempoLimite(
+        leerTextoArchivo(archivo, setEstado),
+        120000,
+        'No se pudo leer el informe en 2 min (descarga u OCR del escaneo). ' +
+        'Sube un PDF con capa de texto o ingresa los datos manualmente.'
+      );
       const med = extraerMediciones(texto || '');
       const { _diagnostico, ...mediciones } = med;
       const conf = confirmarSerie(serieTxt, texto);
@@ -781,6 +786,22 @@ function liberarOCR() {
   }
 }
 
+/* Acota una lectura a un tope de tiempo. Un escaneo pesado (descarga
+   del motor OCR ~15 MB + reconocimiento de hasta 30 páginas) puede
+   tardar muchos minutos; sin este tope el botón "Reprocesando…" se
+   queda colgado para siempre. Al vencer libera el worker y rechaza
+   con un mensaje accionable que el catch del handler muestra. */
+function conTiempoLimite(promesa, ms, mensaje) {
+  let id;
+  const limite = new Promise((_, reject) => {
+    id = setTimeout(() => {
+      liberarOCR();
+      reject(new Error(mensaje || `lectura agotada (${Math.round(ms / 1000)} s)`));
+    }, ms);
+  });
+  return Promise.race([promesa, limite]).finally(() => clearTimeout(id));
+}
+
 /* Renderiza una página pdf.js a un canvas para alimentar el OCR. La
    escala ~2.2 sube la resolución efectiva: el texto pequeño de las
    tablas de medición se reconoce mucho mejor que a escala 1. */
@@ -863,7 +884,11 @@ async function leerTextoArchivo(file, setEstado) {
 
 async function extraerTexto(item) {
   try {
-    const { texto, ocr } = await leerTextoArchivo(item.file, (t) => setItemEstado(item, t));
+    const { texto, ocr } = await conTiempoLimite(
+      leerTextoArchivo(item.file, (t) => setItemEstado(item, t)),
+      120000,
+      'lectura agotada (2 min)'
+    );
     item.textoPdf = texto;
     item.ocr = ocr;
   } catch (err) {
