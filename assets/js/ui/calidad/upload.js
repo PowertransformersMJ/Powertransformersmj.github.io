@@ -1,8 +1,9 @@
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Indicadores de Calidad · UPLOAD HANDLER
 // ──────────────────────────────────────────────────────────────
-// Acepta archivos JSON (con shape del baseline) o Excel XLSX
-// (con hoja "ZONAS" pre-agregada) y reemplaza el dataset del
+// Acepta archivos JSON (con shape del baseline), Excel
+// (XLSX/XLS/XLSB/XLSM con las 4 hojas pre-agregadas) o CSV (una
+// sola tabla tipo hoja "ZONAS") y reemplaza el dataset del
 // dashboard. Persiste en IndexedDB para que se mantenga entre
 // recargas y permite "Reiniciar al baseline" para descartar.
 //
@@ -10,7 +11,7 @@
 //   Mismo shape exacto que assets/data/indicadores-calidad-baseline.json:
 //   { meses, meses_full, zonas: {TODAS, BOLIVAR, …}, cats_order, kpi, proj_global }
 //
-// FORMATO EXCEL (opcional)
+// FORMATO EXCEL (.xlsx / .xls / .xlsb / .xlsm)
 //   Hoja "META":  A1=meses[0..N], B1=meses_full[0..N]
 //   Hoja "KPI":   pares clave-valor (saidi_tot, sob_pct, etc.)
 //   Hoja "ZONAS": filas por zona con columnas total_saidi_ene..,
@@ -20,10 +21,24 @@
 //                       ci_inf, ci_sup, r2, slope, pval
 //
 //   Si el Excel no tiene este formato, el parser intenta inferir
-//   con tolerancia y reporta qué falta.
+//   con tolerancia y reporta qué falta. Los .xlsm (Excel con
+//   macros) se leen igual que un .xlsx — las macros se ignoran.
+//
+// FORMATO CSV (una sola tabla = hoja "ZONAS")
+//   Mismo criterio que la hoja ZONAS del Excel, en una sola tabla
+//   plana. Cabecera opcional:  zona,tipo,Ene,Feb,Mar,Abr,May
+//   Filas:  TODAS,total_saidi,1.2,1.3,…
+//           TODAS,grp_saidi_Sobrecarga/Deslastre,…
+//           TODAS,cat_saidi_SOBRECARGA TRAFO SDL,…
+//   Como un CSV no puede llevar las 4 hojas, el parser deriva
+//   `meses` de la cabecera (o por posición), `cats_order` de las
+//   filas cat_saidi de TODAS y recalcula la proyección OLS por
+//   zona con calcularProyeccionOLS — manteniendo el mismo criterio
+//   del módulo.
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
+import { calcularProyeccionOLS } from '../../domain/saidi_proyeccion.js';
 
 const SHEETJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 let _sheetjsPromise = null;
@@ -149,6 +164,29 @@ async function parsearJSON(file) {
   return obj;
 }
 
+// ── Helpers de zona (compartidos Excel + CSV) ────────────────
+const MESES_CANON = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+
+function nuevaZona() {
+  return {
+    total_saidi: [], total_saifi: [],
+    grp_saidi: { 'Sobrecarga/Deslastre': [], 'Racionamiento/Deficit': [], 'Otras causas': [] },
+    grp_saifi: { 'Sobrecarga/Deslastre': [], 'Racionamiento/Deficit': [], 'Otras causas': [] },
+    cat_saidi: {}, cat_saifi: {},
+    proj: null,
+  };
+}
+
+// Aplica una fila `tipo` con sus valores mensuales a la zona z.
+function aplicarTipoZona(z, tipo, valores) {
+  if (tipo === 'total_saidi')        z.total_saidi = valores;
+  else if (tipo === 'total_saifi')   z.total_saifi = valores;
+  else if (/^grp_saidi_/.test(tipo)) z.grp_saidi[tipo.replace(/^grp_saidi_/, '')] = valores;
+  else if (/^grp_saifi_/.test(tipo)) z.grp_saifi[tipo.replace(/^grp_saifi_/, '')] = valores;
+  else if (/^cat_saidi_/.test(tipo)) z.cat_saidi[tipo.replace(/^cat_saidi_/, '')] = valores;
+  else if (/^cat_saifi_/.test(tipo)) z.cat_saifi[tipo.replace(/^cat_saifi_/, '')] = valores;
+}
+
 // ── Parser Excel ─────────────────────────────────────────────
 // Espera 4 hojas: META, KPI, ZONAS, PROYECCION (case-insensitive).
 // Si alguna falta, lanza error indicando cuál.
@@ -201,29 +239,8 @@ async function parsearExcel(file) {
     const tipo = String(row[1] || '').trim();
     if (!zona || !tipo) continue;
     const valores = row.slice(2, 2 + N).map(v => +v || 0);
-    if (!zonas[zona]) {
-      zonas[zona] = {
-        total_saidi: [], total_saifi: [],
-        grp_saidi: { 'Sobrecarga/Deslastre': [], 'Racionamiento/Deficit': [], 'Otras causas': [] },
-        grp_saifi: { 'Sobrecarga/Deslastre': [], 'Racionamiento/Deficit': [], 'Otras causas': [] },
-        cat_saidi: {}, cat_saifi: {},
-        proj: null,
-      };
-    }
-    const z = zonas[zona];
-    if (tipo === 'total_saidi')      z.total_saidi = valores;
-    else if (tipo === 'total_saifi') z.total_saifi = valores;
-    else if (/^grp_saidi_/.test(tipo)) {
-      const grupo = tipo.replace(/^grp_saidi_/, '');
-      z.grp_saidi[grupo] = valores;
-    } else if (/^grp_saifi_/.test(tipo)) {
-      const grupo = tipo.replace(/^grp_saifi_/, '');
-      z.grp_saifi[grupo] = valores;
-    } else if (/^cat_saidi_/.test(tipo)) {
-      z.cat_saidi[tipo.replace(/^cat_saidi_/, '')] = valores;
-    } else if (/^cat_saifi_/.test(tipo)) {
-      z.cat_saifi[tipo.replace(/^cat_saifi_/, '')] = valores;
-    }
+    if (!zonas[zona]) zonas[zona] = nuevaZona();
+    aplicarTipoZona(zonas[zona], tipo, valores);
   }
 
   // PROYECCION → filas por zona con base, opt, pes, ci_inf, ci_sup, r2, slope, pval
@@ -257,16 +274,83 @@ async function parsearExcel(file) {
   };
 }
 
+// ── Parser CSV ───────────────────────────────────────────────
+// Una sola tabla plana equivalente a la hoja ZONAS del Excel.
+// Cabecera opcional (col A == "zona"). Deriva meses, cats_order y
+// recalcula la proyección OLS por zona — manteniendo el criterio
+// del módulo (kpi queda vacío; los renderers lo computan de zonas).
+async function parsearCSV(file) {
+  const XLSX = await loadSheetJS();
+  const text = await file.text();
+  const wb = XLSX.read(text, { type: 'string' });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  if (!sheet) throw new Error('CSV vacío o ilegible');
+  const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false });
+  if (!rows.length) throw new Error('CSV sin filas');
+
+  // Detectar cabecera (col A == "zona") para derivar `meses`.
+  let meses = null;
+  let dataRows = rows;
+  if (String(rows[0][0] || '').trim().toLowerCase() === 'zona') {
+    meses = rows[0].slice(2).filter(v => v != null && v !== '').map(String);
+    dataRows = rows.slice(1);
+  }
+
+  // Inferir N (cantidad de meses) de la fila de datos más ancha.
+  let N = meses ? meses.length : 0;
+  if (!N) {
+    for (const row of dataRows) N = Math.max(N, row.length - 2);
+    meses = MESES_CANON.slice(0, N);
+  }
+  if (N < 1) throw new Error('CSV sin columnas de meses · usa zona,tipo,Ene,Feb,…');
+
+  const zonas = {};
+  for (const row of dataRows) {
+    const zona = String(row[0] || '').trim().toUpperCase();
+    const tipo = String(row[1] || '').trim();
+    if (!zona || !tipo) continue;
+    const valores = row.slice(2, 2 + N).map(v => +v || 0);
+    if (!zonas[zona]) zonas[zona] = nuevaZona();
+    aplicarTipoZona(zonas[zona], tipo, valores);
+  }
+  if (!zonas.TODAS) {
+    throw new Error('CSV · falta la zona "TODAS" (fila con col A = TODAS)');
+  }
+
+  // meses_full = 12 meses canónicos (el módulo proyecta a Diciembre).
+  const meses_full = MESES_CANON.slice();
+  const cats_order = Object.keys(zonas.TODAS.cat_saidi || {});
+
+  // Recalcular proyección OLS por zona sobre SAIDI grupo Sob/Desl.
+  for (const z of Object.values(zonas)) {
+    const serie = z.grp_saidi['Sobrecarga/Deslastre'] || [];
+    z.proj = serie.length >= 2
+      ? calcularProyeccionOLS(serie, meses_full.length)
+      : null;
+  }
+
+  return {
+    meses,
+    meses_full,
+    zonas,
+    cats_order,
+    kpi: {},
+    proj_global: zonas.TODAS.proj || null,
+  };
+}
+
 // ── handleFile (punto de entrada) ────────────────────────────
 export async function handleFile(file) {
   const ext = file.name.toLowerCase().split('.').pop();
   let dataset;
   if (ext === 'json') {
     dataset = await parsearJSON(file);
-  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsb') {
+  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsb' || ext === 'xlsm') {
     dataset = await parsearExcel(file);
+  } else if (ext === 'csv') {
+    dataset = await parsearCSV(file);
   } else {
-    throw new Error('Extensión no soportada · usa .json o .xlsx');
+    throw new Error('Extensión no soportada · usa .json, .xlsx, .xlsm o .csv');
   }
   const meta = {
     nombre: file.name,
