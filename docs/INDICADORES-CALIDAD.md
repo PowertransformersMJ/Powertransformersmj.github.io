@@ -105,10 +105,13 @@ assets/js/ui/calidad/
 │                                            - 8 setters + notify()
 ├── filtros.js                              ← controlador zona + métrica + chips
 │                                            grupos · sincronizarChipsGrupos()
-├── upload.js                               ← carga manual JSON/Excel:
+├── upload.js                               ← carga manual JSON/Excel/CSV:
 │                                            - parsearJSON(file) con validación
 │                                            - parsearExcel(file) · 4 hojas
 │                                              (META, KPI, ZONAS, PROYECCION)
+│                                              (.xlsx/.xls/.xlsb/.xlsm)
+│                                            - parsearCSV(file) · tabla ZONAS
+│                                              (deriva meses/cats/proj OLS)
 │                                            - SheetJS lazy CDN
 │                                            - IndexedDB persistencia local
 │                                              (sobrevive recargas hasta
@@ -266,7 +269,7 @@ Validación obligatoria: deben existir `meses`, `meses_full`, `zonas`
 (con al menos `TODAS`), y `cats_order`. Si falta algo, mensaje
 accionable indicando exactamente qué.
 
-### 5.2 Excel (.xlsx)
+### 5.2 Excel (.xlsx / .xls / .xlsb / .xlsm)
 
 4 hojas con nombres fijos (case-insensitive):
 
@@ -277,9 +280,41 @@ accionable indicando exactamente qué.
 | `ZONAS` | Filas `zona | tipo | val_ene | val_feb | …` donde `tipo` ∈ {`total_saidi`, `total_saifi`, `grp_saidi_<grupo>`, `grp_saifi_<grupo>`, `cat_saidi_<cat>`, `cat_saifi_<cat>`} |
 | `PROYECCION` | Filas `zona | tipo | val_ene | … | val_dic` donde `tipo` ∈ {`real`, `base`, `opt`, `pes`, `ci_inf`, `ci_sup`, `r2`, `slope`, `pval`} |
 
-SheetJS se carga lazy desde CDN solo al primer upload de Excel.
+SheetJS se carga lazy desde CDN solo al primer upload de Excel. Los
+`.xlsm` (Excel habilitado para macros) se leen igual que un `.xlsx`;
+las macros se ignoran.
 
-### 5.3 Persistencia
+### 5.3 CSV (una sola tabla = hoja `ZONAS`)
+
+Como un CSV no puede llevar las 4 hojas, **mantiene el mismo criterio
+del módulo** usando una sola tabla plana equivalente a la hoja `ZONAS`:
+
+```csv
+zona,tipo,Ene,Feb,Mar,Abr,May
+TODAS,total_saidi,1.20,1.31,1.18,1.25,1.40
+TODAS,total_saifi,0.80,0.82,0.79,0.85,0.90
+TODAS,grp_saidi_Sobrecarga/Deslastre,0.40,0.45,0.42,0.48,0.55
+TODAS,grp_saidi_Racionamiento/Deficit,0.30,...
+TODAS,cat_saidi_SOBRECARGA TRAFO SDL,...
+BOLIVAR,total_saidi,...
+```
+
+- La **cabecera es opcional**: si la col A de la primera fila dice
+  `zona`, se usa para nombrar los meses; si no, se infieren por
+  posición (`Ene`, `Feb`, …).
+- Debe existir la zona `TODAS` (col A = `TODAS`).
+- `meses_full` se fija a los 12 meses canónicos.
+- `cats_order` se deriva de las filas `cat_saidi_*` de `TODAS`.
+- La **proyección OLS se recalcula por zona** con
+  `calcularProyeccionOLS` sobre la serie SAIDI del grupo
+  `Sobrecarga/Deslastre` (idéntico al criterio interno del módulo).
+- `kpi` queda vacío: los renderers computan los KPIs a partir de
+  `zonas`, no del bloque `kpi`.
+
+SheetJS también parsea el CSV (`XLSX.read(text, {type:'string'})`)
+para manejar el quoting correctamente.
+
+### 5.4 Persistencia
 
 Lo cargado se guarda en **IndexedDB** (DB `calidad_db_v1`, store `kv`,
 keys `dataset` y `meta`). Sobrevive recargas hasta que el usuario:
@@ -288,7 +323,7 @@ keys `dataset` y `meta`). Sobrevive recargas hasta que el usuario:
 - Click en **"↺ Reiniciar al baseline"** (borra el cache y vuelve al
   dataset integrado)
 
-### 5.4 Pill de fuente
+### 5.5 Pill de fuente
 
 El subtítulo del card de upload indica la fuente activa:
 
