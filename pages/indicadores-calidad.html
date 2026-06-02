@@ -190,6 +190,35 @@
         </div>
       </div>
 
+      <!-- ===== ROW 2.5: RANKING TOP 10 SUBESTACIONES ===== -->
+      <div class="card" style="margin-bottom:14px">
+        <h3>
+          <span><span class="icon" style="background:var(--amber)"></span>Ranking TOP 10 · aporte por subestación (NB_SUBESTACION)</span>
+          <span class="pill" id="rank-subest-pill">—</span>
+        </h3>
+        <div class="filters" style="margin-bottom:10px">
+          <label for="rank-zona">Zona</label>
+          <select id="rank-zona"></select>
+          <label for="rank-mes" style="margin-left:14px">Mes</label>
+          <select id="rank-mes">
+            <option value="">Todos los meses</option>
+          </select>
+          <span class="small" style="margin-left:auto;color:var(--slate-500)">ordena según la métrica activa arriba</span>
+        </div>
+        <div style="max-height:420px;overflow-y:auto">
+          <table id="rank-subest-table">
+            <thead><tr>
+              <th scope="col">#</th>
+              <th scope="col">Subestación</th>
+              <th scope="col" class="num">SAIDI (h-eq)</th>
+              <th scope="col" class="num">SAIFI (int-eq)</th>
+              <th scope="col" class="num">%</th>
+            </tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+
       <!-- ===== ROW 3: HEATMAP ===== -->
       <div class="card" style="margin-bottom:14px">
         <h3>
