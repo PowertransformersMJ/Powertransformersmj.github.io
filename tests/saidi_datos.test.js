@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   colIdx, mesDesdeValor, detectarColumnaFecha, agregarDatosCrudos,
-  COLS_DATOS_DEFAULT, MESES_CANON,
+  COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
 } from '../assets/js/domain/saidi_datos.js';
 
 // ── colIdx ────────────────────────────────────────────────────
@@ -221,4 +221,75 @@ test('MESES_CANON tiene 12 meses en orden', () => {
   assert.equal(MESES_CANON.length, 12);
   assert.equal(MESES_CANON[0], 'Ene');
   assert.equal(MESES_CANON[11], 'Dic');
+});
+
+// ── filtrarCausasCanonicas ────────────────────────────────────
+// Construye un dataset ya agregado con causas canónicas Y no canónicas
+// mezcladas en cada zona, simulando un baseline / cache / pre-agregado
+// que llegó SIN filtrar. El chokepoint store.setDataset lo limpia.
+function datasetMixto() {
+  const zona = () => ({
+    total_saidi: [0, 0], total_saifi: [0, 0],
+    grp_saidi: {}, grp_saifi: {},
+    cat_saidi: {
+      'Sobrecarga':          [3, 4],   // canónica
+      'SOBRECARGA TRAFO SDL': [10, 2],  // canónica
+      'Ramajeo':             [99, 99], // NO canónica → debe desaparecer
+      'AVISO DE PELIGRO':    [50, 50], // NO canónica → debe desaparecer
+    },
+    cat_saifi: {
+      'Sobrecarga':          [0.3, 0.4],
+      'SOBRECARGA TRAFO SDL': [0.1, 0.1],
+      'Ramajeo':             [9, 9],
+    },
+    proj: null,
+  });
+  return {
+    meses: ['Ene', 'Feb'],
+    meses_full: MESES_CANON.slice(),
+    zonas: { TODAS: zona(), BOLIVAR: zona(), OCCIDENTE: zona(), ORIENTE: zona() },
+    cats_order: ['Ramajeo', 'AVISO DE PELIGRO', 'SOBRECARGA TRAFO SDL', 'Sobrecarga'],
+    proj_global: null,
+  };
+}
+
+test('filtrarCausasCanonicas elimina causas fuera del catálogo de 13', () => {
+  const out = filtrarCausasCanonicas(datasetMixto());
+  const cats = Object.keys(out.zonas.TODAS.cat_saidi);
+  assert.ok(cats.includes('Sobrecarga'));
+  assert.ok(cats.includes('SOBRECARGA TRAFO SDL'));
+  assert.ok(!cats.includes('Ramajeo'));
+  assert.ok(!cats.includes('AVISO DE PELIGRO'));
+  // cats_order no debe contener causas no canónicas
+  assert.ok(!out.cats_order.includes('Ramajeo'));
+  assert.ok(!out.cats_order.includes('AVISO DE PELIGRO'));
+});
+
+test('filtrarCausasCanonicas re-deriva grupos y totales desde cats filtradas', () => {
+  const out = filtrarCausasCanonicas(datasetMixto());
+  const z = out.zonas.TODAS;
+  // Sobrecarga(3,4) + SOBRECARGA TRAFO SDL(10,2) = (13, 6) en el grupo rojo
+  assert.deepEqual(z.grp_saidi['Sobrecarga/Deslastre'], [13, 6]);
+  // total = solo causas canónicas, sin Ramajeo(99,99) ni AVISO(50,50)
+  assert.deepEqual(z.total_saidi, [13, 6]);
+});
+
+test('filtrarCausasCanonicas ordena cats_order por aporte SAIDI desc', () => {
+  const out = filtrarCausasCanonicas(datasetMixto());
+  // SOBRECARGA TRAFO SDL=12 > Sobrecarga=7
+  assert.equal(out.cats_order[0], 'SOBRECARGA TRAFO SDL');
+  assert.equal(out.cats_order[1], 'Sobrecarga');
+});
+
+test('filtrarCausasCanonicas es idempotente', () => {
+  const once = filtrarCausasCanonicas(datasetMixto());
+  const twice = filtrarCausasCanonicas(once);
+  assert.deepEqual(twice.cats_order, once.cats_order);
+  assert.deepEqual(twice.zonas.TODAS.cat_saidi, once.zonas.TODAS.cat_saidi);
+});
+
+test('filtrarCausasCanonicas tolera dataset nulo o sin zonas', () => {
+  assert.equal(filtrarCausasCanonicas(null), null);
+  const sinZonas = { meses: [], zonas: null };
+  assert.equal(filtrarCausasCanonicas(sinZonas), sinZonas);
 });
