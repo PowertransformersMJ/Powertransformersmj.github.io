@@ -63,6 +63,22 @@ function _norm(s) {
     .toLowerCase();
 }
 
+// Colapsa espacios además de quitar acentos/mayúsculas, para comparar
+// nombres de causa robustamente contra el catálogo de las 13.
+function _normCausa(s) {
+  return _norm(s).replace(/\s+/g, ' ').trim();
+}
+
+// Conjunto normalizado de las 13 causas canónicas (CAUSAS_CANON).
+const _CAUSAS_CANON_SET = new Set(CAUSAS_CANON.map(_normCausa));
+
+// ¿La causa cruda es UNA de las 13 del catálogo? Único criterio de
+// EXTRACCIÓN del módulo: cualquier otra causa (Lluvias, Mantenimiento,
+// Red de BT, etc.) NO se incluye en el dashboard.
+export function esCausaCanonica(cat) {
+  return _CAUSAS_CANON_SET.has(_normCausa(cat));
+}
+
 // CLASIFICADOR CANÓNICO causa → grupo del dashboard.
 // Único criterio de extracción para las 13 causas (CAUSAS_CANON) y
 // cualquier otra que llegue en un documento cargado.
