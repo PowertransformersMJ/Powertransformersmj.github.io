@@ -120,6 +120,32 @@ export function serieDiariaDeZona(dataset, zona, met, mesIdx) {
   return Array.isArray(serie) ? serie : null;
 }
 
+// ── Ranking de subestaciones por aporte SAIDI_E / SAIFI_E ────
+// Lee dataset.subests[zona] (solo lo produce el path crudo de la hoja
+// DATOS, vía la columna NB_SUBESTACION · AW). Suma el aporte de cada
+// subestación sobre TODOS los meses presentes (mesIdx == null) o sobre
+// un único mes-calendario (mesIdx 0–11). Devuelve [{sub, saidi, saifi}]
+// con aporte > 0 en la métrica activa, ordenado descendente por `met`.
+// Si el dataset no trae `subests`, devuelve [] (la UI muestra vacío).
+export function rankingSubestaciones(dataset, zona, met = 'saidi', mesIdx = null) {
+  const subs = dataset?.subests?.[zona];
+  if (!subs || typeof subs !== 'object') return [];
+  const out = [];
+  for (const [sub, par] of Object.entries(subs)) {
+    const sumOne = (serie) => {
+      if (!Array.isArray(serie)) return 0;
+      if (mesIdx == null) return sumSerie(serie);
+      return +serie[mesIdx] || 0;
+    };
+    const saidi = sumOne(par?.saidi);
+    const saifi = sumOne(par?.saifi);
+    if (saidi > 0 || saifi > 0) out.push({ sub, saidi, saifi });
+  }
+  const k = met === 'saifi' ? 'saifi' : 'saidi';
+  out.sort((a, b) => b[k] - a[k]);
+  return out;
+}
+
 // ── Proyección de la zona ────────────────────────────────────
 export function proyeccionDeZona(dataset, zona) {
   return dataset?.zonas?.[zona]?.proj || null;
