@@ -103,6 +103,39 @@ export function mesDesdeValor(v) {
   return null;
 }
 
+// ── Día del mes desde un valor de celda ──────────────────────
+// Misma lógica de interpretación que mesDesdeValor, pero devuelve el
+// día del mes (1–31) cuando el valor lleva fecha con día explícito.
+// Los formatos sin día (mm/yyyy, nombre de mes) devuelven null porque
+// no aportan resolución diaria. Devuelve 1–31 o null.
+export function diaDesdeValor(v) {
+  if (v == null || v === '') return null;
+
+  if (v instanceof Date && !isNaN(v.getTime())) return v.getDate();
+
+  if (typeof v === 'number' && isFinite(v)) {
+    if (v >= 20000 && v < 100000) {
+      const d = new Date(Math.round((v - 25569) * 86400 * 1000));
+      if (!isNaN(d.getTime())) return d.getUTCDate();
+    }
+    return null;
+  }
+
+  const s = String(v).trim();
+  if (!s) return null;
+
+  // yyyy-mm-dd  o  yyyy/mm/dd  → 3er grupo = día
+  let m = s.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/);
+  if (m) { const dia = +m[3]; return dia >= 1 && dia <= 31 ? dia : null; }
+
+  // dd/mm/yyyy  o  dd-mm-yyyy  → 1er grupo = día
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})/);
+  if (m) { const dia = +m[1]; return dia >= 1 && dia <= 31 ? dia : null; }
+
+  // mm/yyyy y nombres de mes no tienen día.
+  return null;
+}
+
 // ── Autodetección de la columna de fecha ─────────────────────
 // Puntúa cada columna por tasa de celdas interpretables como fecha
 // (mesDesdeValor != null) sobre una muestra, más un bonus si el
@@ -330,6 +363,17 @@ export function agregarDatosCrudos(rows, opts = {}) {
   // Pre-creamos las 3 zonas operativas para que el selector las muestre.
   for (const zk of ['BOLIVAR', 'ORIENTE', 'OCCIDENTE']) zonas[zk] = nuevaZona();
 
+  // Detalle diario por zona × mes-calendario (0–11) × día (1–31).
+  // dias[zonaKey][mesIdx] = { saidi: number[31], saifi: number[31] }.
+  // Solo lo produce este path crudo (la hoja DATOS trae la fecha
+  // exacta del evento); baseline/CSV/pre-agregado no lo tienen.
+  const dias = { TODAS: {}, BOLIVAR: {}, ORIENTE: {}, OCCIDENTE: {} };
+  function diaSerie(zk, met, mIdx) {
+    const z = dias[zk];
+    if (!z[mIdx]) z[mIdx] = { saidi: new Array(31).fill(0), saifi: new Array(31).fill(0) };
+    return z[mIdx][met];
+  }
+
   const mesesPresentes = new Set();
   let procesadas = 0;
   let descartadasMes = 0;
@@ -359,11 +403,17 @@ export function agregarDatosCrudos(rows, opts = {}) {
     const saifi = +row[cIdx.saifi] || 0;
 
     mesesPresentes.add(mIdx);
+    const dia = diaDesdeValor(row[cIdx.fecha]);  // 1–31 o null
     const zonaKey = normalizarZona(row[cIdx.zona]);
-    const destinos = zonaKey ? [zonas.TODAS, zonas[zonaKey]] : [zonas.TODAS];
-    for (const z of destinos) {
+    const zonaKeys = zonaKey ? ['TODAS', zonaKey] : ['TODAS'];
+    for (const zk of zonaKeys) {
+      const z = zonas[zk];
       catSerie(z, 'saidi', causa)[mIdx] += saidi;
       catSerie(z, 'saifi', causa)[mIdx] += saifi;
+      if (dia != null) {
+        diaSerie(zk, 'saidi', mIdx)[dia - 1] += saidi;
+        diaSerie(zk, 'saifi', mIdx)[dia - 1] += saifi;
+      }
     }
     procesadas++;
   }
@@ -417,11 +467,17 @@ export function agregarDatosCrudos(rows, opts = {}) {
     return sb - sa;
   });
 
+  // Índices de calendario (0–11) paralelos a `meses` para mapear el
+  // selector de mes al detalle diario, que está keyed por mes-calendario.
+  const mesesIdxFull = meses.map((_, i) => minMes + i);
+
   const dataset = {
     meses,
     meses_full,
+    mesesIdx: mesesIdxFull,
     zonas,
     cats_order,
+    dias,
     kpi: {},
     proj_global: zonas.TODAS.proj || null,
   };
