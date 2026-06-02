@@ -33,6 +33,7 @@ test('COLS_DATOS_DEFAULT coincide con el mapeo del director', () => {
   assert.equal(COLS_DATOS_DEFAULT.saidi,   colIdx('AK'));
   assert.equal(COLS_DATOS_DEFAULT.dia,     colIdx('BB'));  // 53 · día
   assert.equal(COLS_DATOS_DEFAULT.zona,    colIdx('BG'));
+  assert.equal(COLS_DATOS_DEFAULT.subest,  colIdx('AW'));  // 48 · NB_SUBESTACION
 });
 
 // ── mesDesdeValor ─────────────────────────────────────────────
@@ -375,6 +376,57 @@ test('agregarDatosCrudos sigue funcionando con fecha única (retrocompat)', () =
   const { dataset } = agregarDatosCrudos(rows);
   assert.deepEqual(dataset.meses, ['Ene']);
   assert.equal(dataset.dias.BOLIVAR[0].saidi[9], 1.0);  // día 10 → idx 9
+});
+
+// ── agregarDatosCrudos · subestaciones (NB_SUBESTACION · AW) ───
+function filaSub({ periodo, causa, saifi, saidi, zona, subest }) {
+  const r = new Array(59).fill('');
+  r[COLS_DATOS_DEFAULT.periodo] = periodo;
+  r[COLS_DATOS_DEFAULT.causa]   = causa;
+  r[COLS_DATOS_DEFAULT.saifi]   = saifi;
+  r[COLS_DATOS_DEFAULT.saidi]   = saidi;
+  r[COLS_DATOS_DEFAULT.zona]    = zona;
+  r[COLS_DATOS_DEFAULT.subest]  = subest;
+  return r;
+}
+
+test('agregarDatosCrudos acumula aporte por subestación (zona×mes)', () => {
+  const rows = [
+    headerRow(),
+    filaSub({ periodo: 1, causa: 'SOBRECARGA TRAFO SDL', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR', subest: 'SE Cartagena' }),
+    filaSub({ periodo: 1, causa: 'SOBRECARGA TRAFO SDL', saifi: 0.2, saidi: 2.0, zona: 'BOLIVAR', subest: 'SE Cartagena' }),
+    filaSub({ periodo: 2, causa: 'SOBRECARGA TRAFO SDL', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR', subest: 'SE Mamonal' }),
+  ];
+  const { dataset, reporte } = agregarDatosCrudos(rows);
+
+  assert.ok(dataset.subests, 'el dataset debe traer subests');
+  // Agregado en TODAS + en la zona
+  assert.equal(dataset.subests.TODAS['SE Cartagena'].saidi[0], 3.0);   // Ene = 1+2
+  assert.equal(dataset.subests.BOLIVAR['SE Cartagena'].saidi[0], 3.0);
+  assert.equal(dataset.subests.BOLIVAR['SE Cartagena'].saifi[0], 0.1 + 0.2);
+  assert.equal(dataset.subests.BOLIVAR['SE Mamonal'].saidi[1], 5.0);   // Feb
+  // El reporte cuenta subestaciones distintas
+  assert.equal(reporte.subestaciones, 2);
+});
+
+test('agregarDatosCrudos ignora filas sin NB_SUBESTACION para subests', () => {
+  const rows = [
+    headerRow(),
+    filaSub({ periodo: 1, causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR', subest: '' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  assert.deepEqual(Object.keys(dataset.subests.TODAS), []);
+});
+
+test('filtrarCausasCanonicas preserva subests', () => {
+  const rows = [
+    headerRow(),
+    filaSub({ periodo: 1, causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR', subest: 'SE X' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  const filtrado = filtrarCausasCanonicas(dataset);
+  assert.ok(filtrado.subests, 'subests debe sobrevivir al chokepoint');
+  assert.equal(filtrado.subests.BOLIVAR['SE X'].saidi[0], 1.0);
 });
 
 test('filtrarCausasCanonicas preserva dias y mesesIdx', () => {
