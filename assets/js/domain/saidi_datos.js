@@ -12,6 +12,7 @@
 //   · SAIDI_E     → columna AK (idx 36)
 //   · DIA         → columna BB (idx 53)  ← día del mes del evento
 //   · ZONA        → columna BG (idx 58)
+//   · NB_SUBEST   → columna AW (idx 48)  ← nombre de la subestación
 //   · Mes/Día     → de PERIODO (AC) y DIA (BB). Si faltan, se cae a
 //                   una columna de fecha única autodetectada (fecha:-1).
 //
@@ -38,6 +39,7 @@ export const COLS_DATOS_DEFAULT = Object.freeze({
   saidi:   36,  // AK
   dia:     53,  // BB — día del mes (1–31)
   zona:    58,  // BG
+  subest:  48,  // AW — NB_SUBESTACION
   fecha:   -1,  // -1 = autodetectar columna de fecha única (fallback)
 });
 
@@ -407,6 +409,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     saidi:   opts.saidi   != null ? opts.saidi   : COLS_DATOS_DEFAULT.saidi,
     dia:     opts.dia     != null ? opts.dia     : COLS_DATOS_DEFAULT.dia,
     zona:    opts.zona    != null ? opts.zona    : COLS_DATOS_DEFAULT.zona,
+    subest:  opts.subest  != null ? opts.subest  : COLS_DATOS_DEFAULT.subest,
     fecha:   opts.fecha   != null ? opts.fecha   : COLS_DATOS_DEFAULT.fecha,
   };
 
@@ -441,6 +444,17 @@ export function agregarDatosCrudos(rows, opts = {}) {
     const z = dias[zk];
     if (!z[mIdx]) z[mIdx] = { saidi: new Array(31).fill(0), saifi: new Array(31).fill(0) };
     return z[mIdx][met];
+  }
+
+  // Aporte por subestación (NB_SUBESTACION · AW) por zona × mes-calendario.
+  // subests[zonaKey][nombreSubest] = { saidi: number[12], saifi: number[12] }
+  // (indexado por mes-calendario 0–11). Alimenta el ranking TOP 10
+  // filtrable por mes y zona. Solo lo produce este path crudo.
+  const subests = { TODAS: {}, BOLIVAR: {}, ORIENTE: {}, OCCIDENTE: {} };
+  function subSerie(zk, sub, met) {
+    const z = subests[zk];
+    if (!z[sub]) z[sub] = { saidi: new Array(N).fill(0), saifi: new Array(N).fill(0) };
+    return z[sub][met];
   }
 
   const mesesPresentes = new Set();
@@ -481,6 +495,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     if (dia == null && tieneFecha) dia = diaDesdeValor(row[cIdx.fecha]);  // 1–31 o null
     const zonaKey = normalizarZona(row[cIdx.zona]);
     const zonaKeys = zonaKey ? ['TODAS', zonaKey] : ['TODAS'];
+    const sub = cIdx.subest >= 0 ? String(row[cIdx.subest] ?? '').trim() : '';
     for (const zk of zonaKeys) {
       const z = zonas[zk];
       catSerie(z, 'saidi', causa)[mIdx] += saidi;
@@ -488,6 +503,10 @@ export function agregarDatosCrudos(rows, opts = {}) {
       if (dia != null) {
         diaSerie(zk, 'saidi', mIdx)[dia - 1] += saidi;
         diaSerie(zk, 'saifi', mIdx)[dia - 1] += saifi;
+      }
+      if (sub) {
+        subSerie(zk, sub, 'saidi')[mIdx] += saidi;
+        subSerie(zk, sub, 'saifi')[mIdx] += saifi;
       }
     }
     procesadas++;
@@ -554,6 +573,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     zonas,
     cats_order,
     dias,
+    subests,
     kpi: {},
     proj_global: zonas.TODAS.proj || null,
   };
@@ -567,6 +587,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     descartadasFiltro,
     meses,
     causas: cats_order.length,
+    subestaciones: Object.keys(subests.TODAS).length,
   };
 
   return { dataset, reporte };

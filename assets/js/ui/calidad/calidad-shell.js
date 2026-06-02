@@ -11,7 +11,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
-import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo, pintarSelectorMes, sincronizarSerieMes } from './filtros.js';
+import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo, pintarSelectorMes, sincronizarSerieMes, pintarSelectorRankZona, pintarSelectorRankMes, sincronizarRank } from './filtros.js';
 import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
 import { inicializarPersistencia, limpiarPersistencia, handleFiles } from './upload.js';
 
@@ -22,6 +22,7 @@ import { renderStack }      from './renderers/stack.js';
 import { renderPart }       from './renderers/part.js';
 import { renderVarMoM }     from './renderers/varmom.js';
 import { renderTop }        from './renderers/top.js';
+import { renderRankSubest } from './renderers/rank-subest.js';
 import { renderHeatmap }    from './renderers/heatmap.js';
 import { renderProyeccion } from './renderers/proyeccion.js';
 import { renderMonthTable } from './renderers/month-table.js';
@@ -100,7 +101,7 @@ function safeRender(name, fn) {
 }
 
 function renderAll(state) {
-  const { dataset, zona, met, source, serieModo, serieMes } = state;
+  const { dataset, zona, met, source, serieModo, serieMes, rankZona, rankMes } = state;
   if (!dataset) return;
   ocultarError();
   safeRender('selector-zona',  () => pintarSelectorZona());
@@ -108,6 +109,7 @@ function renderAll(state) {
   safeRender('chips-grupos',   () => sincronizarChipsGrupos());
   safeRender('serie-modo',     () => sincronizarSerieModo());
   safeRender('serie-mes',      () => { pintarSelectorMes(); sincronizarSerieMes(); });
+  safeRender('rank-filtros',   () => { pintarSelectorRankZona(); pintarSelectorRankMes(); sincronizarRank(); });
   actualizarSourcePill(source, state._meta);
 
   // Sincroniza selects con state
@@ -121,6 +123,7 @@ function renderAll(state) {
   safeRender('part',        () => renderPart(dataset, zona, met));
   safeRender('varmom',      () => renderVarMoM(dataset, zona, met));
   safeRender('top',         () => renderTop(dataset, zona, met));
+  safeRender('rank-subest', () => renderRankSubest(dataset, met, rankZona, rankMes));
   safeRender('heatmap',     () => renderHeatmap(dataset, zona, met));
   safeRender('proyeccion',  () => renderProyeccion(dataset, zona, met));
   safeRender('month-table', () => renderMonthTable(dataset, zona, met));

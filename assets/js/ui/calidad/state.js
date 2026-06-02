@@ -26,6 +26,11 @@ const _state = {
   // null = vista mensual normal; entero 0–11 (mes-calendario) = vista
   // día a día de ese mes. Solo aplica si el dataset trae `dias`.
   serieMes: null,
+  // Filtros propios del card "Ranking TOP 10 de subestaciones" (no
+  // tocan los filtros globales). rankZona = zona de la tabla; rankMes
+  // = null (todos los meses) o entero 0–11 (mes-calendario único).
+  rankZona: 'TODAS',
+  rankMes: null,
   source: 'empty',  // 'baseline' | 'firestore' | 'empty'
 };
 
@@ -58,6 +63,10 @@ export const store = {
       );
       if (!tieneDias) _state.serieMes = null;
     }
+    // Validar zona del ranking vs dataset; fallback a TODAS.
+    if (_state.dataset?.zonas && !_state.dataset.zonas[_state.rankZona]) {
+      _state.rankZona = 'TODAS';
+    }
     notify();
   },
 
@@ -67,6 +76,13 @@ export const store = {
   setSerieMes(m) {
     const n = (m == null || m === '') ? null : +m;
     _state.serieMes = (n == null || !Number.isFinite(n)) ? null : Math.max(0, Math.min(11, Math.trunc(n)));
+    notify();
+  },
+
+  setRankZona(z) { _state.rankZona = z || 'TODAS'; notify(); },
+  setRankMes(m) {
+    const n = (m == null || m === '') ? null : +m;
+    _state.rankMes = (n == null || !Number.isFinite(n)) ? null : Math.max(0, Math.min(11, Math.trunc(n)));
     notify();
   },
 
