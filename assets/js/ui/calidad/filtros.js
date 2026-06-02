@@ -61,18 +61,20 @@ function _datasetTieneDias(ds) {
   ));
 }
 
-// Llena el selector de mes (#serie-mes) con los meses del dataset. Solo
-// se muestra si el dataset trae detalle diario; si no, se oculta todo
-// el bloque para no ofrecer una opción que no produce nada.
+// Llena el selector de mes (#serie-mes) con los meses del dataset. El
+// selector se muestra SIEMPRE (para que la función sea descubrible);
+// el hint cambia según haya o no detalle diario. Si no lo hay, al
+// elegir un mes la gráfica muestra un estado vacío que pide cargar el
+// Excel de origen (hoja DATOS) — único path que produce el día a día.
 export function pintarSelectorMes() {
   const wrap = $('#serie-mes-wrap');
   const sel = $('#serie-mes');
+  const hint = $('#serie-mes-hint');
   const ds = store.state.dataset;
   if (!wrap || !sel || !ds) return;
 
   const tieneDias = _datasetTieneDias(ds);
-  wrap.style.display = tieneDias ? '' : 'none';
-  if (!tieneDias) return;
+  wrap.style.display = '';
 
   const meses = ds.meses || [];
   const mesesIdx = ds.mesesIdx || meses.map((_, i) => i);
@@ -85,6 +87,12 @@ export function pintarSelectorMes() {
     o.textContent = etiqueta;
     sel.appendChild(o);
   });
+
+  if (hint) {
+    hint.textContent = tieneDias
+      ? 'elige un mes para ver el día a día'
+      : 'el día a día requiere cargar el Excel de origen (hoja DATOS)';
+  }
 }
 
 // Sincroniza el valor del select con store.state.serieMes.
