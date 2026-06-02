@@ -5,6 +5,8 @@
 // suscriben con `store.on(fn)` y se ejecutan en cada cambio.
 // ══════════════════════════════════════════════════════════════
 
+import { filtrarCausasCanonicas } from '../../domain/saidi_datos.js';
+
 const GRUPOS_CANON = ['Sobrecarga/Deslastre', 'Racionamiento/Deficit', 'Otras causas'];
 
 const _state = {
@@ -31,10 +33,14 @@ export const store = {
   on(fn) { _listeners.add(fn); return () => _listeners.delete(fn); },
 
   setDataset(dataset, source = 'baseline') {
-    _state.dataset = dataset || null;
+    // CHOKEPOINT ÚNICO · el filtro de las 13 causas canónicas se aplica
+    // aquí para TODA fuente (baseline, upload Excel/CSV/JSON, cache
+    // IndexedDB). Así el dashboard nunca muestra causas fuera del catálogo,
+    // sin importar por qué ruta llegó el dataset.
+    _state.dataset = dataset ? filtrarCausasCanonicas(dataset) : null;
     _state.source = source;
     // Validar zona seleccionada vs dataset; fallback a TODAS
-    if (dataset && dataset.zonas && !dataset.zonas[_state.zona]) {
+    if (_state.dataset && _state.dataset.zonas && !_state.dataset.zonas[_state.zona]) {
       _state.zona = 'TODAS';
     }
     notify();
