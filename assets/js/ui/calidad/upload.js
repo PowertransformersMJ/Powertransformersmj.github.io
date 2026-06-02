@@ -39,7 +39,13 @@
 
 import { store } from './state.js';
 import { calcularProyeccionOLS } from '../../domain/saidi_proyeccion.js';
-import { clasificarGrupoCausa } from '../../domain/saidi_config.js';
+import {
+  MESES_CANON,
+  nuevaZona,
+  aplicarTipoZona,
+  derivarGruposDesdeCategorias,
+  agregarDatosCrudos,
+} from '../../domain/saidi_datos.js';
 
 const SHEETJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 let _sheetjsPromise = null;
@@ -165,87 +171,49 @@ async function parsearJSON(file) {
   return obj;
 }
 
-// ── Helpers de zona (compartidos Excel + CSV) ────────────────
-const MESES_CANON = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-
-function nuevaZona() {
-  return {
-    total_saidi: [], total_saifi: [],
-    grp_saidi: { 'Sobrecarga/Deslastre': [], 'Racionamiento/Deficit': [], 'Otras causas': [] },
-    grp_saifi: { 'Sobrecarga/Deslastre': [], 'Racionamiento/Deficit': [], 'Otras causas': [] },
-    cat_saidi: {}, cat_saifi: {},
-    proj: null,
-  };
-}
-
-// Aplica una fila `tipo` con sus valores mensuales a la zona z.
-function aplicarTipoZona(z, tipo, valores) {
-  if (tipo === 'total_saidi')        z.total_saidi = valores;
-  else if (tipo === 'total_saifi')   z.total_saifi = valores;
-  else if (/^grp_saidi_/.test(tipo)) z.grp_saidi[tipo.replace(/^grp_saidi_/, '')] = valores;
-  else if (/^grp_saifi_/.test(tipo)) z.grp_saifi[tipo.replace(/^grp_saifi_/, '')] = valores;
-  else if (/^cat_saidi_/.test(tipo)) z.cat_saidi[tipo.replace(/^cat_saidi_/, '')] = valores;
-  else if (/^cat_saifi_/.test(tipo)) z.cat_saifi[tipo.replace(/^cat_saifi_/, '')] = valores;
-}
-
-// Suma elemento a elemento la serie `src` sobre `dest` (mismo largo).
-function sumarSeries(dest, src) {
-  for (let i = 0; i < src.length; i++) dest[i] = (dest[i] || 0) + (+src[i] || 0);
-  return dest;
-}
-
-// Deriva los 3 grupos canónicos (y el total) sumando las categorías
-// cargadas, usando el CLASIFICADOR CANÓNICO clasificarGrupoCausa.
-// Este es el criterio único de extracción: cada categoría del documento
-// (las 13 causas listadas y cualquier otra) cae en su grupo y queda
-// representada en el stack / KPIs / proyección — SIN cambiar la forma
-// de ilustrar. No pisa series de grupo/total provistas explícitamente.
-function derivarGruposDesdeCategorias(z, N) {
-  for (const met of ['saidi', 'saifi']) {
-    const cats = z[`cat_${met}`] || {};
-    const catNames = Object.keys(cats);
-    if (!catNames.length) continue;
-
-    const grpVacio = Object.values(z[`grp_${met}`]).every(s => !s || !s.length);
-    const totVacio = !z[`total_${met}`] || !z[`total_${met}`].length;
-    if (!grpVacio && !totVacio) continue;
-
-    const acumGrp = {
-      'Sobrecarga/Deslastre':  new Array(N).fill(0),
-      'Racionamiento/Deficit': new Array(N).fill(0),
-      'Otras causas':          new Array(N).fill(0),
-    };
-    const acumTot = new Array(N).fill(0);
-    for (const cat of catNames) {
-      const serie = cats[cat] || [];
-      sumarSeries(acumGrp[clasificarGrupoCausa(cat)], serie);
-      sumarSeries(acumTot, serie);
-    }
-    if (grpVacio) z[`grp_${met}`] = acumGrp;
-    if (totVacio) z[`total_${met}`] = acumTot;
-  }
-}
+// ── Helpers de zona (importados de domain/saidi_datos.js) ────
+// MESES_CANON, nuevaZona, aplicarTipoZona, derivarGruposDesdeCategorias
+// viven ahora en el módulo de dominio puro para poder testearlos sin DOM.
 
 // ── Parser Excel ─────────────────────────────────────────────
-// Espera 4 hojas: META, KPI, ZONAS, PROYECCION (case-insensitive).
-// Si alguna falta, lanza error indicando cuál.
+// Dos formatos soportados:
+//   1. PRE-AGREGADO · 4 hojas META/KPI/ZONAS/PROYECCION → parsearExcelPreAgregado
+//   2. CRUDO · hoja DATOS con registros evento a evento  → agregarDatosCrudos
+// Detecta cuál según las hojas presentes.
 async function parsearExcel(file) {
   const XLSX = await loadSheetJS();
   const buf = await file.arrayBuffer();
-  const wb = XLSX.read(buf, { type: 'array', cellDates: false });
 
-  // Localizar hojas (case-insensitive)
-  const sheetByName = {};
-  for (const name of wb.SheetNames) sheetByName[name.toUpperCase()] = name;
-  const need = ['META', 'KPI', 'ZONAS', 'PROYECCION'];
-  const missing = need.filter(n => !sheetByName[n]);
-  if (missing.length) {
-    throw new Error(
-      'Excel sin formato esperado · faltan hojas: ' + missing.join(', ') + ' · ' +
-      'hojas detectadas: ' + wb.SheetNames.join(', ')
-    );
+  // Primera lectura ligera para inspeccionar nombres de hojas.
+  const wbProbe = XLSX.read(buf, { type: 'array', cellDates: false, sheetRows: 1, bookSheets: true });
+  const upper = {};
+  for (const name of wbProbe.SheetNames) upper[name.toUpperCase()] = name;
+
+  const tienePreAgg = ['META', 'KPI', 'ZONAS', 'PROYECCION'].every(n => upper[n]);
+  if (tienePreAgg) {
+    const wb = XLSX.read(buf, { type: 'array', cellDates: false });
+    return parsearExcelPreAgregado(XLSX, wb, upper);
   }
 
+  if (upper.DATOS) {
+    // Documento real de trabajo: leemos la hoja DATOS cruda con fechas
+    // nativas y la agregamos con el criterio de extracción.
+    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[upper.DATOS], { header: 1, blankrows: false });
+    const { dataset, reporte } = agregarDatosCrudos(rows);
+    console.info('[calidad/upload] DATOS agregado:', reporte);
+    return dataset;
+  }
+
+  throw new Error(
+    'Excel sin formato reconocido · se esperaba la hoja "DATOS" (documento de ' +
+    'trabajo) o las 4 hojas META/KPI/ZONAS/PROYECCION (pre-agregado) · ' +
+    'hojas detectadas: ' + wbProbe.SheetNames.join(', ')
+  );
+}
+
+// ── Parser Excel · formato pre-agregado (4 hojas) ────────────
+function parsearExcelPreAgregado(XLSX, wb, sheetByName) {
   // META → meses + meses_full
   const metaRows = XLSX.utils.sheet_to_json(wb.Sheets[sheetByName.META], { header: 1 });
   const meses      = (metaRows.find(r => /meses$/i.test(String(r[0]))) || []).slice(1).filter(Boolean).map(String);
