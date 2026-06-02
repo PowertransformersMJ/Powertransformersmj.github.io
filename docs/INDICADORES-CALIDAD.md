@@ -142,8 +142,11 @@ assets/js/ui/calidad/
 │                                            grupos · sincronizarChipsGrupos()
 ├── upload.js                               ← carga manual JSON/Excel/CSV:
 │                                            - parsearJSON(file) con validación
-│                                            - parsearExcel(file) · 4 hojas
-│                                              (META, KPI, ZONAS, PROYECCION)
+│                                            - parsearExcel(file) · detecta formato:
+│                                              · 4 hojas pre-agregadas
+│                                                (META, KPI, ZONAS, PROYECCION)
+│                                              · hoja DATOS cruda → agregarDatosCrudos
+│                                                (domain/saidi_datos.js)
 │                                              (.xlsx/.xls/.xlsb/.xlsm)
 │                                            - parsearCSV(file) · tabla ZONAS
 │                                              (deriva meses/cats/proj OLS)
@@ -318,6 +321,47 @@ accionable indicando exactamente qué.
 SheetJS se carga lazy desde CDN solo al primer upload de Excel. Los
 `.xlsm` (Excel habilitado para macros) se leen igual que un `.xlsx`;
 las macros se ignoran.
+
+### 5.2.1 Excel crudo · hoja `DATOS` (documento real de trabajo)
+
+El documento operativo (`Data de Analisis.xlsx`) **no viene
+pre-agregado**: trae las hojas `META` y `DATOS`, donde `DATOS` es el
+universo de eventos registro por registro. Cuando `parsearExcel`
+detecta que NO están las 4 hojas pre-agregadas pero SÍ existe `DATOS`,
+ruta el archivo al agregador puro `domain/saidi_datos.js`
+(`agregarDatosCrudos`), que suma SAIDI_E / SAIFI_E **por mes × zona ×
+causa** y produce el mismo shape del baseline.
+
+Mapeo de columnas (0-based · `COLS_DATOS_DEFAULT`):
+
+| Variable | Columna Excel | Índice |
+|---|---|---|
+| Causa 2 | `N` | 13 |
+| SAIFI_E | `AJ` | 35 |
+| SAIDI_E | `AK` | 36 |
+| ZONA CONFIRMADA | `BG` | 58 |
+| Mes | **autodetectado** | — |
+
+- **El mes se extrae del archivo:** `detectarColumnaFecha` puntúa cada
+  columna por la tasa de celdas interpretables como fecha
+  (`mesDesdeValor`: `Date` nativo, serial Excel ≥ 20000, `dd/mm/yyyy`,
+  `yyyy-mm-dd`, `mm/yyyy`, nombres de mes en español) + bonus si el
+  encabezado dice `fecha|periodo|mes`.
+- **La causa cruda se conserva como nombre de categoría** (no se
+  renombra) — "mantener la forma de ilustrar". Es solo un criterio de
+  extracción; los 13 nombres de causa quedan como categorías y se
+  clasifican en los 3 grupos canónicos con `clasificarGrupoCausa`.
+- Las series se acumulan a 12 meses y se **recortan al rango de meses
+  realmente presente** (`[min..max]`) para que el eje no muestre meses
+  futuros vacíos.
+- La **proyección OLS se recalcula por zona** igual que en el CSV.
+- Filas sin fecha interpretable o sin causa se descartan; el `reporte`
+  devuelto (logueado a consola) trae `procesadas`,
+  `descartadasMes`, `descartadasCausa`, `columnaFecha`, `meses` y
+  `causas` para trazabilidad.
+
+Cobertura de tests: `tests/saidi_datos.test.js` (`colIdx`,
+`mesDesdeValor`, `detectarColumnaFecha`, `agregarDatosCrudos`).
 
 ### 5.3 CSV (una sola tabla = hoja `ZONAS`)
 
