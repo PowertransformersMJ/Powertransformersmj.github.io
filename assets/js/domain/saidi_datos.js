@@ -7,10 +7,13 @@
 //
 // Mapeo de columnas (provisto por el director · 0-based):
 //   · Causa 2     → columna N  (idx 13)
+//   · PERIODO     → columna AC (idx 28)  ← mes del evento
 //   · SAIFI_E     → columna AJ (idx 35)
 //   · SAIDI_E     → columna AK (idx 36)
+//   · DIA         → columna BB (idx 53)  ← día del mes del evento
 //   · ZONA        → columna BG (idx 58)
-//   · Mes         → autodetectado de una columna de fecha
+//   · Mes/Día     → de PERIODO (AC) y DIA (BB). Si faltan, se cae a
+//                   una columna de fecha única autodetectada (fecha:-1).
 //
 // Cada registro suma su SAIDI_E / SAIFI_E al mes × zona × causa.
 // La causa cruda se preserva como nombre de categoría (no se renombra)
@@ -29,11 +32,13 @@ export const MESES_CANON = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ag
 
 // Defaults de columnas (0-based) del documento real de trabajo.
 export const COLS_DATOS_DEFAULT = Object.freeze({
-  causa: 13,  // N
-  saifi: 35,  // AJ
-  saidi: 36,  // AK
-  zona:  58,  // BG
-  fecha: -1,  // -1 = autodetectar
+  causa:   13,  // N
+  periodo: 28,  // AC — mes del evento (1–12, nombre, o fecha)
+  saifi:   35,  // AJ
+  saidi:   36,  // AK
+  dia:     53,  // BB — día del mes (1–31)
+  zona:    58,  // BG
+  fecha:   -1,  // -1 = autodetectar columna de fecha única (fallback)
 });
 
 // Convierte letras de columna Excel ("A", "N", "AJ", "BG") a índice
@@ -134,6 +139,61 @@ export function diaDesdeValor(v) {
 
   // mm/yyyy y nombres de mes no tienen día.
   return null;
+}
+
+// ── Mes desde la columna PERIODO (AC) ────────────────────────
+// La hoja DATOS parte la fecha en dos columnas: PERIODO (mes) y DIA.
+// PERIODO puede venir como entero 1–12, como "1".."12", como nombre de
+// mes, o como una fecha completa. Devuelve índice 0–11 o null.
+export function mesDesdePeriodo(v) {
+  if (v == null || v === '') return null;
+
+  // Date nativo → intérprete general.
+  if (v instanceof Date) return mesDesdeValor(v);
+
+  // Entero 1–12 directo (caso más común de la columna PERIODO).
+  if (typeof v === 'number' && isFinite(v)) {
+    if (Number.isInteger(v) && v >= 1 && v <= 12) return v - 1;
+    // Serial Excel o cualquier otro número → delega a mesDesdeValor.
+    return mesDesdeValor(v);
+  }
+
+  const s = String(v).trim();
+  if (!s) return null;
+
+  // "1".."12" como texto plano (sin separadores de fecha).
+  if (/^\d{1,2}$/.test(s)) {
+    const mes = +s;
+    return mes >= 1 && mes <= 12 ? mes - 1 : null;
+  }
+
+  // Fecha completa o nombre de mes → reusa el intérprete general.
+  return mesDesdeValor(s);
+}
+
+// ── Día desde la columna DIA (BB) ────────────────────────────
+// DIA suele venir como entero 1–31. Acepta también "1".."31" texto, o
+// una fecha completa (delega a diaDesdeValor). Devuelve 1–31 o null.
+export function diaDesdeColumna(v) {
+  if (v == null || v === '') return null;
+
+  // Date nativo → intérprete general.
+  if (v instanceof Date) return diaDesdeValor(v);
+
+  if (typeof v === 'number' && isFinite(v)) {
+    if (Number.isInteger(v) && v >= 1 && v <= 31) return v;
+    return diaDesdeValor(v);
+  }
+
+  const s = String(v).trim();
+  if (!s) return null;
+
+  if (/^\d{1,2}$/.test(s)) {
+    const dia = +s;
+    return dia >= 1 && dia <= 31 ? dia : null;
+  }
+
+  return diaDesdeValor(s);
 }
 
 // ── Autodetección de la columna de fecha ─────────────────────
@@ -341,20 +401,29 @@ export function agregarDatosCrudos(rows, opts = {}) {
   }
 
   const cIdx = {
-    causa: opts.causa != null ? opts.causa : COLS_DATOS_DEFAULT.causa,
-    saifi: opts.saifi != null ? opts.saifi : COLS_DATOS_DEFAULT.saifi,
-    saidi: opts.saidi != null ? opts.saidi : COLS_DATOS_DEFAULT.saidi,
-    zona:  opts.zona  != null ? opts.zona  : COLS_DATOS_DEFAULT.zona,
-    fecha: opts.fecha != null ? opts.fecha : COLS_DATOS_DEFAULT.fecha,
+    causa:   opts.causa   != null ? opts.causa   : COLS_DATOS_DEFAULT.causa,
+    periodo: opts.periodo != null ? opts.periodo : COLS_DATOS_DEFAULT.periodo,
+    saifi:   opts.saifi   != null ? opts.saifi   : COLS_DATOS_DEFAULT.saifi,
+    saidi:   opts.saidi   != null ? opts.saidi   : COLS_DATOS_DEFAULT.saidi,
+    dia:     opts.dia     != null ? opts.dia     : COLS_DATOS_DEFAULT.dia,
+    zona:    opts.zona    != null ? opts.zona    : COLS_DATOS_DEFAULT.zona,
+    fecha:   opts.fecha   != null ? opts.fecha   : COLS_DATOS_DEFAULT.fecha,
   };
 
+  // El mes sale de PERIODO (AC) y el día de DIA (BB). Si esas columnas
+  // no resuelven, caemos a una columna de fecha única autodetectada.
+  // Solo intentamos autodetectar fecha si PERIODO no es utilizable, para
+  // no fallar cuando la hoja sí trae PERIODO/DIA pero ninguna fecha única.
+  const ancho = rows.reduce((w, row) => Math.max(w, (row || []).length), 0);
+  const periodoUsable = cIdx.periodo >= 0 && cIdx.periodo < ancho;
   if (cIdx.fecha == null || cIdx.fecha < 0) {
     cIdx.fecha = detectarColumnaFecha(rows);
   }
-  if (cIdx.fecha < 0) {
+  if (cIdx.fecha < 0 && !periodoUsable) {
     throw new Error(
-      'No se pudo detectar una columna de fecha en la hoja DATOS · ' +
-      'agrega una columna con fechas (dd/mm/yyyy, yyyy-mm-dd) o un mes.'
+      'No se pudo obtener el mes en la hoja DATOS · ' +
+      'se esperaba la columna PERIODO (AC) o una columna de fecha ' +
+      '(dd/mm/yyyy, yyyy-mm-dd).'
     );
   }
 
@@ -387,9 +456,13 @@ export function agregarDatosCrudos(rows, opts = {}) {
     return z[key][cat];
   }
 
+  const tieneFecha = cIdx.fecha >= 0;
+
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r] || [];
-    const mIdx = mesDesdeValor(row[cIdx.fecha]);
+    // Mes: primero PERIODO (AC); si no resuelve, la fecha única.
+    let mIdx = cIdx.periodo >= 0 ? mesDesdePeriodo(row[cIdx.periodo]) : null;
+    if (mIdx == null && tieneFecha) mIdx = mesDesdeValor(row[cIdx.fecha]);
     if (mIdx == null) { descartadasMes++; continue; }
 
     const causa = String(row[cIdx.causa] ?? '').trim();
@@ -403,7 +476,9 @@ export function agregarDatosCrudos(rows, opts = {}) {
     const saifi = +row[cIdx.saifi] || 0;
 
     mesesPresentes.add(mIdx);
-    const dia = diaDesdeValor(row[cIdx.fecha]);  // 1–31 o null
+    // Día: primero DIA (BB); si no resuelve, lo extrae de la fecha única.
+    let dia = cIdx.dia >= 0 ? diaDesdeColumna(row[cIdx.dia]) : null;
+    if (dia == null && tieneFecha) dia = diaDesdeValor(row[cIdx.fecha]);  // 1–31 o null
     const zonaKey = normalizarZona(row[cIdx.zona]);
     const zonaKeys = zonaKey ? ['TODAS', zonaKey] : ['TODAS'];
     for (const zk of zonaKeys) {
@@ -422,9 +497,10 @@ export function agregarDatosCrudos(rows, opts = {}) {
     throw new Error(
       'La hoja DATOS no produjo registros de las 13 causas filtradas · ' +
       `descartadas: ${descartadasFiltro} por causa fuera del catálogo, ` +
-      `${descartadasMes} sin fecha, ${descartadasCausa} sin causa · ` +
-      `revisa el mapeo de columnas (causa=${cIdx.causa}, saidi=${cIdx.saidi}, ` +
-      `saifi=${cIdx.saifi}, zona=${cIdx.zona}, fecha=${cIdx.fecha}).`
+      `${descartadasMes} sin mes, ${descartadasCausa} sin causa · ` +
+      `revisa el mapeo de columnas (causa=${cIdx.causa}, periodo=${cIdx.periodo}, ` +
+      `saidi=${cIdx.saidi}, saifi=${cIdx.saifi}, dia=${cIdx.dia}, ` +
+      `zona=${cIdx.zona}, fecha=${cIdx.fecha}).`
     );
   }
 
