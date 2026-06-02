@@ -86,6 +86,29 @@
   font-size: 10px; color: var(--slate-500); margin-left: 4px;
 }
 
+/* Segmentado "Por meses / Acumulado" de la serie temporal */
+.saidi-shell .serie-modo {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  margin: -4px 0 12px;
+}
+.saidi-shell .serie-seg {
+  padding: 4px 12px; border-radius: 14px;
+  border: 1px solid var(--slate-300); background: #fff;
+  font-size: 11px; font-weight: 600; color: var(--slate-700);
+  cursor: pointer; font-family: inherit;
+  transition: background .15s, border-color .15s, color .15s;
+}
+.saidi-shell .serie-seg:hover { background: var(--slate-50); border-color: var(--slate-400); }
+.saidi-shell .serie-seg.is-on {
+  background: var(--blue); border-color: var(--blue); color: #fff;
+}
+.saidi-shell .serie-seg:focus-visible {
+  outline: 2px solid var(--blue); outline-offset: 2px;
+}
+.saidi-shell .serie-modo-hint {
+  font-size: 10px; color: var(--slate-500); margin-left: 4px;
+}
+
 /* Upload card (carga de Excel / JSON) */
 .saidi-shell .upload-card {
   background: linear-gradient(135deg, #fff 0%, var(--slate-50) 100%);

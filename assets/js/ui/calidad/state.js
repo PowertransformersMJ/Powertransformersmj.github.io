@@ -18,6 +18,10 @@ const _state = {
   // "Contribución mensual por grupo de causa". Afecta también la
   // gráfica de variación % y la tabla mensual.
   gruposActivos: new Set(GRUPOS_CANON),
+  // Modo de la serie temporal: 'mes' (valor mensual) | 'acum' (suma
+  // acumulada mes a mes). Afecta solo al chart "Serie temporal del
+  // sistema"; el resto de gráficas conserva su lógica.
+  serieModo: 'mes',
   source: 'empty',  // 'baseline' | 'firestore' | 'empty'
 };
 
@@ -48,6 +52,7 @@ export const store = {
 
   setZona(z)  { _state.zona = z; notify(); },
   setMet(m)   { _state.met  = m; notify(); },
+  setSerieModo(m) { _state.serieModo = (m === 'acum' ? 'acum' : 'mes'); notify(); },
 
   toggleGrupo(g) {
     if (_state.gruposActivos.has(g)) _state.gruposActivos.delete(g);
