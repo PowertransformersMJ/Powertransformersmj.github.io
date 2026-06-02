@@ -13,7 +13,7 @@
 import { store } from './state.js';
 import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos } from './filtros.js';
 import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
-import { inicializarPersistencia, limpiarPersistencia, handleFile } from './upload.js';
+import { inicializarPersistencia, limpiarPersistencia, handleFiles } from './upload.js';
 
 import { renderKPIs }       from './renderers/kpis.js';
 import { renderInsight }    from './renderers/insight.js';
@@ -131,15 +131,21 @@ function bindUpload() {
   const btnReset  = $('#btn-reset-baseline');
   const card      = $('#upload-card');
 
-  async function procesarArchivo(file) {
-    log('info', `Procesando ${file.name} (${(file.size / 1024).toFixed(1)} kB)…`);
+  async function procesarArchivos(fileList) {
+    const files = Array.from(fileList || []);
+    if (!files.length) {
+      log('err', 'Selecciona al menos un archivo primero');
+      return;
+    }
+    const nombres = files.map(f => `${f.name} (${(f.size / 1024).toFixed(1)} kB)`).join(' + ');
+    log('info', `Procesando ${files.length === 1 ? '' : files.length + ' archivos: '}${nombres}…`);
     try {
-      const { dataset, meta } = await handleFile(file);
+      const { dataset, meta } = await handleFiles(files);
       store.state._meta = meta;
       log('ok', `✓ Cargado: ${meta.nombre} · ${Object.keys(dataset.zonas).length} zonas · ${dataset.cats_order.length} categorías`);
     } catch (e) {
       log('err', e.message);
-      mostrarError('No se pudo cargar el archivo: ' + e.message);
+      mostrarError('No se pudieron cargar los archivos: ' + e.message);
     }
   }
 
@@ -149,11 +155,11 @@ function bindUpload() {
       log('err', 'Selecciona un archivo primero');
       return;
     }
-    await procesarArchivo(files[0]);
+    await procesarArchivos(files);
   });
 
   if (fileInput) fileInput.addEventListener('change', async (e) => {
-    if (e.target.files[0]) await procesarArchivo(e.target.files[0]);
+    if (e.target.files?.length) await procesarArchivos(e.target.files);
   });
 
   if (btnReset) btnReset.addEventListener('click', async () => {
@@ -176,7 +182,7 @@ function bindUpload() {
     ['dragleave', 'drop'].forEach(ev =>
       card.addEventListener(ev, e => { e.preventDefault(); card.classList.remove('drag'); }));
     card.addEventListener('drop', async e => {
-      if (e.dataTransfer?.files?.length) await procesarArchivo(e.dataTransfer.files[0]);
+      if (e.dataTransfer?.files?.length) await procesarArchivos(e.dataTransfer.files);
     });
   }
 }
