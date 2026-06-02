@@ -21,7 +21,7 @@
 // Funciones PURAS · sin DOM · sin I/O · testeables con node --test.
 // ══════════════════════════════════════════════════════════════
 
-import { clasificarGrupoCausa } from './saidi_config.js';
+import { clasificarGrupoCausa, esCausaCanonica } from './saidi_config.js';
 import { calcularProyeccionOLS } from './saidi_proyeccion.js';
 
 // 12 meses canónicos (orden del eje del dashboard).
@@ -256,6 +256,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
   let procesadas = 0;
   let descartadasMes = 0;
   let descartadasCausa = 0;
+  let descartadasFiltro = 0;
 
   // Asegura que una zona tenga la categoría inicializada a 12 ceros.
   function catSerie(z, met, cat) {
@@ -272,6 +273,10 @@ export function agregarDatosCrudos(rows, opts = {}) {
     const causa = String(row[cIdx.causa] ?? '').trim();
     if (!causa) { descartadasCausa++; continue; }
 
+    // Único criterio de extracción: solo las 13 causas canónicas.
+    // Cualquier otra (Lluvias, Mantenimiento, Red de BT, …) se descarta.
+    if (!esCausaCanonica(causa)) { descartadasFiltro++; continue; }
+
     const saidi = +row[cIdx.saidi] || 0;
     const saifi = +row[cIdx.saifi] || 0;
 
@@ -287,9 +292,11 @@ export function agregarDatosCrudos(rows, opts = {}) {
 
   if (!procesadas) {
     throw new Error(
-      'La hoja DATOS no produjo registros válidos · revisa el mapeo de columnas ' +
-      `(causa=${cIdx.causa}, saidi=${cIdx.saidi}, saifi=${cIdx.saifi}, ` +
-      `zona=${cIdx.zona}, fecha=${cIdx.fecha}).`
+      'La hoja DATOS no produjo registros de las 13 causas filtradas · ' +
+      `descartadas: ${descartadasFiltro} por causa fuera del catálogo, ` +
+      `${descartadasMes} sin fecha, ${descartadasCausa} sin causa · ` +
+      `revisa el mapeo de columnas (causa=${cIdx.causa}, saidi=${cIdx.saidi}, ` +
+      `saifi=${cIdx.saifi}, zona=${cIdx.zona}, fecha=${cIdx.fecha}).`
     );
   }
 
@@ -347,6 +354,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     procesadas,
     descartadasMes,
     descartadasCausa,
+    descartadasFiltro,
     meses,
     causas: cats_order.length,
   };
