@@ -22,6 +22,10 @@ const _state = {
   // acumulada mes a mes). Afecta solo al chart "Serie temporal del
   // sistema"; el resto de gráficas conserva su lógica.
   serieModo: 'mes',
+  // Mes seleccionado para el detalle diario del chart "Serie temporal":
+  // null = vista mensual normal; entero 0–11 (mes-calendario) = vista
+  // día a día de ese mes. Solo aplica si el dataset trae `dias`.
+  serieMes: null,
   source: 'empty',  // 'baseline' | 'firestore' | 'empty'
 };
 
@@ -47,12 +51,24 @@ export const store = {
     if (_state.dataset && _state.dataset.zonas && !_state.dataset.zonas[_state.zona]) {
       _state.zona = 'TODAS';
     }
+    // Si el nuevo dataset no trae detalle diario, volver a vista mensual.
+    if (_state.serieMes != null) {
+      const tieneDias = _state.dataset?.dias && Object.keys(_state.dataset.dias).some(
+        zk => _state.dataset.dias[zk] && Object.keys(_state.dataset.dias[zk]).length
+      );
+      if (!tieneDias) _state.serieMes = null;
+    }
     notify();
   },
 
   setZona(z)  { _state.zona = z; notify(); },
   setMet(m)   { _state.met  = m; notify(); },
   setSerieModo(m) { _state.serieModo = (m === 'acum' ? 'acum' : 'mes'); notify(); },
+  setSerieMes(m) {
+    const n = (m == null || m === '') ? null : +m;
+    _state.serieMes = (n == null || !Number.isFinite(n)) ? null : Math.max(0, Math.min(11, Math.trunc(n)));
+    notify();
+  },
 
   toggleGrupo(g) {
     if (_state.gruposActivos.has(g)) _state.gruposActivos.delete(g);

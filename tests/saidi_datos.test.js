@@ -2,7 +2,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  colIdx, mesDesdeValor, detectarColumnaFecha, agregarDatosCrudos,
+  colIdx, mesDesdeValor, diaDesdeValor, detectarColumnaFecha, agregarDatosCrudos,
   COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
 } from '../assets/js/domain/saidi_datos.js';
 
@@ -210,6 +210,77 @@ test('agregarDatosCrudos lanza si no hay registros válidos', () => {
     fila({ fecha: 'x', causa: '', saifi: 0, saidi: 0, zona: '' }),
   ];
   assert.throws(() => agregarDatosCrudos(rows), /No se pudo detectar una columna de fecha|no produjo registros/);
+});
+
+// ── diaDesdeValor ─────────────────────────────────────────────
+test('diaDesdeValor interpreta Date nativo', () => {
+  assert.equal(diaDesdeValor(new Date(2026, 0, 15)), 15);
+  assert.equal(diaDesdeValor(new Date(2026, 4, 1)), 1);
+});
+
+test('diaDesdeValor interpreta dd/mm/yyyy', () => {
+  assert.equal(diaDesdeValor('15/01/2026'), 15);
+  assert.equal(diaDesdeValor('01/05/2026'), 1);
+  assert.equal(diaDesdeValor('28-02-2026'), 28);
+});
+
+test('diaDesdeValor interpreta yyyy-mm-dd', () => {
+  assert.equal(diaDesdeValor('2026-03-10'), 10);
+  assert.equal(diaDesdeValor('2026/12/31'), 31);
+});
+
+test('diaDesdeValor interpreta serial Excel', () => {
+  assert.equal(diaDesdeValor(46037), 15);  // 2026-01-15
+});
+
+test('diaDesdeValor devuelve null ante basura', () => {
+  assert.equal(diaDesdeValor(''), null);
+  assert.equal(diaDesdeValor(null), null);
+  assert.equal(diaDesdeValor('hola'), null);
+  assert.equal(diaDesdeValor('04/2026'), null);  // mm/yyyy no trae día
+});
+
+// ── agregarDatosCrudos · detalle diario ───────────────────────
+test('agregarDatosCrudos acumula detalle diario por zona×mes', () => {
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/01/2026', causa: 'SOBRECARGA TRAFO SDL', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '10/01/2026', causa: 'SOBRECARGA TRAFO SDL', saifi: 0.2, saidi: 2.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '20/01/2026', causa: 'SOBRECARGA TRAFO SDL', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+
+  assert.ok(dataset.dias, 'el dataset debe traer detalle diario');
+  // mesIdx 0 = Enero. Día 10 (índice 9) = 1.0 + 2.0; día 20 (índice 19) = 5.0
+  const bolEne = dataset.dias.BOLIVAR[0];
+  assert.equal(bolEne.saidi[9], 3.0);
+  assert.equal(bolEne.saidi[19], 5.0);
+  assert.equal(bolEne.saifi[9], 0.1 + 0.2);
+  // TODAS agrega
+  assert.equal(dataset.dias.TODAS[0].saidi[9], 3.0);
+});
+
+test('agregarDatosCrudos expone mesesIdx paralelo a meses', () => {
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/02/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '10/04/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  // meses = Feb..Abr (recortado a [minMes..maxMes]) → idx 1,2,3
+  assert.deepEqual(dataset.mesesIdx, [1, 2, 3]);
+  assert.equal(dataset.meses.length, dataset.mesesIdx.length);
+});
+
+test('filtrarCausasCanonicas preserva dias y mesesIdx', () => {
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  const filtrado = filtrarCausasCanonicas(dataset);
+  assert.ok(filtrado.dias, 'dias debe sobrevivir al chokepoint');
+  assert.ok(Array.isArray(filtrado.mesesIdx), 'mesesIdx debe sobrevivir');
 });
 
 test('agregarDatosCrudos lanza ante hoja vacía', () => {
