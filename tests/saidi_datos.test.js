@@ -2,7 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  colIdx, mesDesdeValor, diaDesdeValor, detectarColumnaFecha, agregarDatosCrudos,
+  colIdx, mesDesdeValor, diaDesdeValor, mesDesdePeriodo, diaDesdeColumna,
+  detectarColumnaFecha, agregarDatosCrudos,
   COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
 } from '../assets/js/domain/saidi_datos.js';
 
@@ -26,10 +27,12 @@ test('colIdx es case-insensitive y rechaza basura', () => {
 });
 
 test('COLS_DATOS_DEFAULT coincide con el mapeo del director', () => {
-  assert.equal(COLS_DATOS_DEFAULT.causa, colIdx('N'));
-  assert.equal(COLS_DATOS_DEFAULT.saifi, colIdx('AJ'));
-  assert.equal(COLS_DATOS_DEFAULT.saidi, colIdx('AK'));
-  assert.equal(COLS_DATOS_DEFAULT.zona,  colIdx('BG'));
+  assert.equal(COLS_DATOS_DEFAULT.causa,   colIdx('N'));
+  assert.equal(COLS_DATOS_DEFAULT.periodo, colIdx('AC'));  // 28 · mes
+  assert.equal(COLS_DATOS_DEFAULT.saifi,   colIdx('AJ'));
+  assert.equal(COLS_DATOS_DEFAULT.saidi,   colIdx('AK'));
+  assert.equal(COLS_DATOS_DEFAULT.dia,     colIdx('BB'));  // 53 · día
+  assert.equal(COLS_DATOS_DEFAULT.zona,    colIdx('BG'));
 });
 
 // ── mesDesdeValor ─────────────────────────────────────────────
@@ -270,6 +273,108 @@ test('agregarDatosCrudos expone mesesIdx paralelo a meses', () => {
   // meses = Feb..Abr (recortado a [minMes..maxMes]) → idx 1,2,3
   assert.deepEqual(dataset.mesesIdx, [1, 2, 3]);
   assert.equal(dataset.meses.length, dataset.mesesIdx.length);
+});
+
+// ── mesDesdePeriodo / diaDesdeColumna ─────────────────────────
+test('mesDesdePeriodo interpreta entero 1–12', () => {
+  assert.equal(mesDesdePeriodo(1), 0);
+  assert.equal(mesDesdePeriodo(5), 4);
+  assert.equal(mesDesdePeriodo(12), 11);
+});
+
+test('mesDesdePeriodo interpreta "1".."12" como texto', () => {
+  assert.equal(mesDesdePeriodo('1'), 0);
+  assert.equal(mesDesdePeriodo('04'), 3);
+  assert.equal(mesDesdePeriodo('12'), 11);
+});
+
+test('mesDesdePeriodo cae a mesDesdeValor para fechas y nombres', () => {
+  assert.equal(mesDesdePeriodo('Marzo'), 2);
+  assert.equal(mesDesdePeriodo('2026-05-10'), 4);
+  assert.equal(mesDesdePeriodo(new Date(2026, 1, 1)), 1);
+});
+
+test('mesDesdePeriodo devuelve null ante basura o fuera de rango', () => {
+  assert.equal(mesDesdePeriodo(''), null);
+  assert.equal(mesDesdePeriodo(null), null);
+  assert.equal(mesDesdePeriodo(0), null);
+  assert.equal(mesDesdePeriodo(13), null);
+});
+
+test('diaDesdeColumna interpreta entero 1–31 y texto', () => {
+  assert.equal(diaDesdeColumna(1), 1);
+  assert.equal(diaDesdeColumna(28), 28);
+  assert.equal(diaDesdeColumna('15'), 15);
+  assert.equal(diaDesdeColumna(31), 31);
+});
+
+test('diaDesdeColumna cae a diaDesdeValor para fechas completas', () => {
+  assert.equal(diaDesdeColumna('10/01/2026'), 10);
+  assert.equal(diaDesdeColumna(new Date(2026, 0, 22)), 22);
+});
+
+test('diaDesdeColumna devuelve null ante basura o fuera de rango', () => {
+  assert.equal(diaDesdeColumna(''), null);
+  assert.equal(diaDesdeColumna(0), null);
+  assert.equal(diaDesdeColumna(32), null);
+  assert.equal(diaDesdeColumna('hola'), null);
+});
+
+// ── agregarDatosCrudos · columnas PERIODO (AC) + DIA (BB) ──────
+// La hoja DATOS real parte la fecha en PERIODO (mes) y DIA (día). Sin
+// columna de fecha única. filaPD las puebla y deja fecha vacía en col 0.
+function filaPD({ periodo, dia, causa, saifi, saidi, zona }) {
+  const r = new Array(59).fill('');
+  r[COLS_DATOS_DEFAULT.periodo] = periodo;
+  r[COLS_DATOS_DEFAULT.dia]     = dia;
+  r[COLS_DATOS_DEFAULT.causa]   = causa;
+  r[COLS_DATOS_DEFAULT.saifi]   = saifi;
+  r[COLS_DATOS_DEFAULT.saidi]   = saidi;
+  r[COLS_DATOS_DEFAULT.zona]    = zona;
+  return r;
+}
+
+test('agregarDatosCrudos lee mes de PERIODO y día de DIA (sin fecha única)', () => {
+  const rows = [
+    headerRow(),
+    filaPD({ periodo: 1,  dia: 10, causa: 'SOBRECARGA TRAFO SDL', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+    filaPD({ periodo: 1,  dia: 10, causa: 'SOBRECARGA TRAFO SDL', saifi: 0.2, saidi: 2.0, zona: 'BOLIVAR' }),
+    filaPD({ periodo: 1,  dia: 20, causa: 'SOBRECARGA TRAFO SDL', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR' }),
+    filaPD({ periodo: 2,  dia: 5,  causa: 'Racionamiento de Emergencia por Deficit STN', saifi: 0.3, saidi: 3.0, zona: 'ORIENTE' }),
+  ];
+  const { dataset, reporte } = agregarDatosCrudos(rows);
+
+  assert.equal(reporte.procesadas, 4);
+  assert.deepEqual(dataset.meses, ['Ene', 'Feb']);
+
+  // Mes desde PERIODO: Ene SAIDI BOLIVAR = 1+2+5 = 8
+  assert.equal(dataset.zonas.BOLIVAR.cat_saidi['SOBRECARGA TRAFO SDL'][0], 8.0);
+
+  // Día desde DIA: día 10 (idx 9) = 1+2=3, día 20 (idx 19) = 5
+  const bolEne = dataset.dias.BOLIVAR[0];
+  assert.equal(bolEne.saidi[9], 3.0);
+  assert.equal(bolEne.saidi[19], 5.0);
+  assert.equal(bolEne.saifi[9], 0.1 + 0.2);
+});
+
+test('agregarDatosCrudos acepta PERIODO por nombre de mes', () => {
+  const rows = [
+    headerRow(),
+    filaPD({ periodo: 'Marzo', dia: 3, causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  assert.deepEqual(dataset.mesesIdx, [2]);  // Marzo
+  assert.equal(dataset.dias.BOLIVAR[2].saidi[2], 1.0);  // día 3 → idx 2
+});
+
+test('agregarDatosCrudos sigue funcionando con fecha única (retrocompat)', () => {
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  assert.deepEqual(dataset.meses, ['Ene']);
+  assert.equal(dataset.dias.BOLIVAR[0].saidi[9], 1.0);  // día 10 → idx 9
 });
 
 test('filtrarCausasCanonicas preserva dias y mesesIdx', () => {
