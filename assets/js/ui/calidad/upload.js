@@ -387,23 +387,99 @@ async function parsearCSV(file) {
   };
 }
 
-// ── handleFile (punto de entrada) ────────────────────────────
-export async function handleFile(file) {
+// Dispatcher por extensión → dataset parseado.
+async function parsearArchivo(file) {
   const ext = file.name.toLowerCase().split('.').pop();
-  let dataset;
-  if (ext === 'json') {
-    dataset = await parsearJSON(file);
-  } else if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsb' || ext === 'xlsm') {
-    dataset = await parsearExcel(file);
-  } else if (ext === 'csv') {
-    dataset = await parsearCSV(file);
-  } else {
-    throw new Error('Extensión no soportada · usa .json, .xlsx, .xlsm o .csv');
+  if (ext === 'json') return parsearJSON(file);
+  if (ext === 'xlsx' || ext === 'xls' || ext === 'xlsb' || ext === 'xlsm') return parsearExcel(file);
+  if (ext === 'csv') return parsearCSV(file);
+  throw new Error(`Extensión no soportada (${file.name}) · usa .json, .xlsx, .xlsm o .csv`);
+}
+
+// Combina N datasets en uno solo (p. ej. un .xlsm + un .csv
+// complementarios). Estrategia "no pisar lo no vacío":
+//   - totals / grupos: gana la serie no vacía (archivos complementarios
+//     por métrica o por zona se unen sin colisión)
+//   - categorías: unión por nombre (la última gana ante mismo nombre)
+//   - tras unir, deriva grupos+total para métricas aún vacías y
+//     recalcula la proyección OLS por zona
+function mergeZona(dest, src) {
+  for (const k of ['total_saidi', 'total_saifi']) {
+    if (Array.isArray(src[k]) && src[k].length) dest[k] = src[k];
   }
+  for (const gk of ['grp_saidi', 'grp_saifi']) {
+    for (const g of Object.keys(src[gk] || {})) {
+      if (Array.isArray(src[gk][g]) && src[gk][g].length) dest[gk][g] = src[gk][g];
+    }
+  }
+  for (const ck of ['cat_saidi', 'cat_saifi']) {
+    for (const c of Object.keys(src[ck] || {})) dest[ck][c] = src[ck][c];
+  }
+  if (src.proj && !dest.proj) dest.proj = src.proj;
+}
+
+function combinarDatasets(list) {
+  const meses_full = MESES_CANON.slice();
+  let meses = [];
+  for (const d of list) if ((d.meses || []).length > meses.length) meses = d.meses;
+  const N = meses.length || MESES_CANON.length;
+
+  const zonas = {};
+  for (const d of list) {
+    for (const [zname, zsrc] of Object.entries(d.zonas || {})) {
+      if (!zonas[zname]) zonas[zname] = nuevaZona();
+      mergeZona(zonas[zname], zsrc);
+    }
+  }
+  if (!zonas.TODAS) {
+    throw new Error('Los archivos combinados no incluyen la zona "TODAS"');
+  }
+
+  for (const z of Object.values(zonas)) derivarGruposDesdeCategorias(z, N);
+  for (const z of Object.values(zonas)) {
+    if (z.proj) continue;
+    const serie = z.grp_saidi['Sobrecarga/Deslastre'] || [];
+    z.proj = serie.length >= 2 ? calcularProyeccionOLS(serie, meses_full.length) : null;
+  }
+
+  const cats_order = Object.keys(zonas.TODAS.cat_saidi || {});
+  return {
+    meses: meses.length ? meses : MESES_CANON.slice(0, N),
+    meses_full,
+    zonas,
+    cats_order,
+    kpi: {},
+    proj_global: zonas.TODAS.proj || null,
+  };
+}
+
+// ── handleFile (un solo archivo) ─────────────────────────────
+export async function handleFile(file) {
+  const dataset = await parsearArchivo(file);
   const meta = {
     nombre: file.name,
     size: file.size,
     cargadoAt: new Date().toISOString(),
+  };
+  await persistirDataset(dataset, meta);
+  store.setDataset(dataset, 'upload');
+  return { dataset, meta };
+}
+
+// ── handleFiles (uno o varios · p. ej. .xlsm + .csv juntos) ───
+export async function handleFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) throw new Error('No se seleccionó ningún archivo');
+  if (files.length === 1) return handleFile(files[0]);
+
+  const datasets = [];
+  for (const f of files) datasets.push(await parsearArchivo(f));
+  const dataset = combinarDatasets(datasets);
+  const meta = {
+    nombre: files.map(f => f.name).join(' + '),
+    size: files.reduce((a, f) => a + (f.size || 0), 0),
+    cargadoAt: new Date().toISOString(),
+    archivos: files.length,
   };
   await persistirDataset(dataset, meta);
   store.setDataset(dataset, 'upload');
