@@ -196,12 +196,12 @@ test('agregarDatosCrudos calcula proyección OLS por zona', () => {
 test('agregarDatosCrudos ordena cats_order por aporte SAIDI desc', () => {
   const rows = [
     headerRow(),
-    fila({ fecha: '10/01/2026', causa: 'Causa chica', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
-    fila({ fecha: '10/01/2026', causa: 'Causa grande', saifi: 0.1, saidi: 9.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '10/01/2026', causa: 'Sobrecarga',          saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '10/01/2026', causa: 'SOBRECARGA TRAFO SDL', saifi: 0.1, saidi: 9.0, zona: 'BOLIVAR' }),
   ];
   const { dataset } = agregarDatosCrudos(rows);
-  assert.equal(dataset.cats_order[0], 'Causa grande');
-  assert.equal(dataset.cats_order[1], 'Causa chica');
+  assert.equal(dataset.cats_order[0], 'SOBRECARGA TRAFO SDL');
+  assert.equal(dataset.cats_order[1], 'Sobrecarga');
 });
 
 test('agregarDatosCrudos lanza si no hay registros válidos', () => {
