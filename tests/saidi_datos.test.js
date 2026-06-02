@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   colIdx, mesDesdeValor, diaDesdeValor, mesDesdePeriodo, diaDesdeColumna,
-  detectarColumnaFecha, agregarDatosCrudos,
+  detectarColumnaFecha, detectarColumnaPorHeader, agregarDatosCrudos,
   COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
 } from '../assets/js/domain/saidi_datos.js';
 
@@ -416,6 +416,38 @@ test('agregarDatosCrudos ignora filas sin NB_SUBESTACION para subests', () => {
   ];
   const { dataset } = agregarDatosCrudos(rows);
   assert.deepEqual(Object.keys(dataset.subests.TODAS), []);
+});
+
+test('detectarColumnaPorHeader encuentra NB_SUBESTACION por nombre', () => {
+  const header = new Array(10).fill('');
+  header[4] = 'NB_SUBESTACION';
+  const rows = [header, new Array(10).fill('x')];
+  assert.equal(detectarColumnaPorHeader(rows, /nb[_ ]?subest/), 4);
+});
+
+test('detectarColumnaPorHeader es tolerante a tildes/espacios/case', () => {
+  const header = new Array(6).fill('');
+  header[2] = 'Nb Subestación';
+  assert.equal(detectarColumnaPorHeader([header], /nb[_ ]?subest/), 2);
+  assert.equal(detectarColumnaPorHeader([['a', 'b']], /nb[_ ]?subest/), -1);
+});
+
+test('agregarDatosCrudos detecta NB_SUBESTACION fuera de AW por encabezado', () => {
+  // Subestación en columna 5 (no AW=48) y header NB_SUBESTACION ahí.
+  const header = new Array(59).fill('');
+  header[5] = 'NB_SUBESTACION';
+  const mkRow = (sub) => {
+    const r = new Array(59).fill('');
+    r[COLS_DATOS_DEFAULT.periodo] = 1;
+    r[COLS_DATOS_DEFAULT.causa]   = 'SOBRECARGA TRAFO SDL';
+    r[COLS_DATOS_DEFAULT.saifi]   = 0.1;
+    r[COLS_DATOS_DEFAULT.saidi]   = 2.0;
+    r[COLS_DATOS_DEFAULT.zona]    = 'BOLIVAR';
+    r[5] = sub;
+    return r;
+  };
+  const { dataset } = agregarDatosCrudos([header, mkRow('SE Turbaco')]);
+  assert.equal(dataset.subests.BOLIVAR['SE Turbaco'].saidi[0], 2.0);
 });
 
 test('filtrarCausasCanonicas preserva subests', () => {

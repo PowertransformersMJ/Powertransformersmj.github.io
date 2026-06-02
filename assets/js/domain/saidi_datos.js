@@ -245,6 +245,26 @@ export function detectarColumnaFecha(rows, { muestra = 400, umbral = 0.5 } = {})
   return mejorCol;
 }
 
+// ── Detección de columna por nombre de encabezado ────────────
+// Escanea las primeras filas (encabezado puede no estar en la 0) buscando
+// una celda cuyo texto normalizado (sin tildes, lower) matchee `regex`.
+// Devuelve el índice 0-based de la columna, o -1 si no hay match. Se usa
+// como fallback robusto cuando la columna no está en la posición fija
+// esperada (p. ej. NB_SUBESTACION fuera de AW por un Excel reordenado).
+export function detectarColumnaPorHeader(rows, regex, { filas = 6 } = {}) {
+  if (!Array.isArray(rows) || rows.length < 1) return -1;
+  const tope = Math.min(filas, rows.length);
+  for (let r = 0; r < tope; r++) {
+    const row = rows[r] || [];
+    for (let c = 0; c < row.length; c++) {
+      const txt = String(row[c] ?? '')
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+      if (txt && regex.test(txt)) return c;
+    }
+  }
+  return -1;
+}
+
 // ── Helpers de zona (compartidos con el upload handler) ──────
 export function nuevaZona() {
   return {
@@ -412,6 +432,16 @@ export function agregarDatosCrudos(rows, opts = {}) {
     subest:  opts.subest  != null ? opts.subest  : COLS_DATOS_DEFAULT.subest,
     fecha:   opts.fecha   != null ? opts.fecha   : COLS_DATOS_DEFAULT.fecha,
   };
+
+  // NB_SUBESTACION (AW por defecto) · fallback robusto por nombre de
+  // encabezado. Si el llamador no fijó la columna explícitamente y la
+  // posición fija AW no trae el encabezado NB_SUBESTACION, escaneamos las
+  // primeras filas buscando /NB[_ ]?SUBEST/ y usamos esa columna. Así el
+  // ranking puebla aunque el Excel venga reordenado. Sin match, queda AW.
+  if (opts.subest == null) {
+    const detectada = detectarColumnaPorHeader(rows, /nb[_ ]?subest/);
+    if (detectada >= 0) cIdx.subest = detectada;
+  }
 
   // El mes sale de PERIODO (AC) y el día de DIA (BB). Si esas columnas
   // no resuelven, caemos a una columna de fecha única autodetectada.

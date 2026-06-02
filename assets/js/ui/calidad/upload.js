@@ -195,11 +195,15 @@ async function parsearExcel(file) {
     return parsearExcelPreAgregado(XLSX, wb, upper);
   }
 
-  if (upper.DATOS) {
+  // Hoja DATOS: nombre exacto o cualquier hoja que lo contenga
+  // ("BASE DATOS", "DATOS 2026", …).
+  const nombreDatos = upper.DATOS
+    || wbProbe.SheetNames.find(n => /datos/i.test(n));
+  if (nombreDatos) {
     // Documento real de trabajo: leemos la hoja DATOS cruda con fechas
     // nativas y la agregamos con el criterio de extracción.
     const wb = XLSX.read(buf, { type: 'array', cellDates: true });
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[upper.DATOS], { header: 1, blankrows: false });
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[nombreDatos], { header: 1, blankrows: false });
     const { dataset, reporte } = agregarDatosCrudos(rows);
     console.info('[calidad/upload] DATOS agregado:', reporte);
     return dataset;
