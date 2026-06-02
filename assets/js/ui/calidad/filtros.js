@@ -43,6 +43,17 @@ export function sincronizarChipsGrupos() {
   });
 }
 
+// Sincroniza el estado visual del segmentado "Por meses / Acumulado"
+// con store.state.serieModo.
+export function sincronizarSerieModo() {
+  const modo = store.state.serieModo || 'mes';
+  document.querySelectorAll('#serie-modo .serie-seg').forEach(btn => {
+    const on = btn.dataset.modo === modo;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+}
+
 let _bound = false;
 export function inicializarFiltros() {
   if (_bound) return;
@@ -51,6 +62,13 @@ export function inicializarFiltros() {
   const mSel = $('#f-met');
   if (zSel) zSel.addEventListener('change', () => store.setZona(zSel.value));
   if (mSel) mSel.addEventListener('change', () => store.setMet(mSel.value));
+
+  // Segmentado de modo de la serie temporal
+  document.querySelectorAll('#serie-modo .serie-seg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.modo) store.setSerieModo(btn.dataset.modo);
+    });
+  });
 
   // Chips de filtro de grupos de causa
   document.querySelectorAll('#grp-filter .grp-chip').forEach(btn => {
