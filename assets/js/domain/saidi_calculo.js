@@ -109,6 +109,17 @@ export function totalSerieDeZona(dataset, zona, met) {
   return z[met === 'saifi' ? 'total_saifi' : 'total_saidi'] || [];
 }
 
+// ── Serie diaria de la zona para un mes-calendario (0–11) ────
+// Devuelve el array de 31 días (índice 0 = día 1) con el total del
+// mes para la métrica, o null si el dataset no trae detalle diario
+// (solo el path crudo de la hoja DATOS lo produce).
+export function serieDiariaDeZona(dataset, zona, met, mesIdx) {
+  const d = dataset?.dias?.[zona]?.[mesIdx];
+  if (!d) return null;
+  const serie = met === 'saifi' ? d.saifi : d.saidi;
+  return Array.isArray(serie) ? serie : null;
+}
+
 // ── Proyección de la zona ────────────────────────────────────
 export function proyeccionDeZona(dataset, zona) {
   return dataset?.zonas?.[zona]?.proj || null;
