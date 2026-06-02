@@ -138,18 +138,34 @@ test('agregarDatosCrudos suma SAIDI/SAIFI por mes×zona×causa', () => {
   assert.equal(todas.cat_saidi['Racionamiento de Emergencia por Deficit STN'][1], 3.0);
 });
 
-test('agregarDatosCrudos clasifica causas en sus 3 grupos', () => {
+test('agregarDatosCrudos clasifica causas canónicas en sus grupos', () => {
   const rows = [
     headerRow(),
     fila({ fecha: '10/01/2026', causa: 'SOBRECARGA TRAFO SDL', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
     fila({ fecha: '10/01/2026', causa: 'Racionamiento Programado por Deficit STN', saifi: 0.2, saidi: 2.0, zona: 'BOLIVAR' }),
-    fila({ fecha: '10/01/2026', causa: 'Mantenimiento programado', saifi: 0.3, saidi: 3.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '10/01/2026', causa: 'Deslastre por capacidad SDL', saifi: 0.3, saidi: 3.0, zona: 'BOLIVAR' }),
   ];
   const { dataset } = agregarDatosCrudos(rows);
   const g = dataset.zonas.TODAS.grp_saidi;
-  assert.equal(g['Sobrecarga/Deslastre'][0], 1.0);
+  assert.equal(g['Sobrecarga/Deslastre'][0], 1.0 + 3.0);  // SOBRECARGA + Deslastre
   assert.equal(g['Racionamiento/Deficit'][0], 2.0);
-  assert.equal(g['Otras causas'][0], 3.0);
+  assert.equal(g['Otras causas'][0], 0);  // ninguna de las 13 cae aquí
+});
+
+test('agregarDatosCrudos SOLO incluye las 13 causas del catálogo', () => {
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/01/2026', causa: 'Sobrecarga',            saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '11/01/2026', causa: 'Lluvias',               saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '12/01/2026', causa: 'Red de BT',             saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '13/01/2026', causa: 'Mantenimiento Trafo de Conexion al STN', saifi: 0.5, saidi: 5.0, zona: 'ORIENTE' }),
+    fila({ fecha: '14/01/2026', causa: 'sobrecarga del str',    saifi: 0.2, saidi: 2.0, zona: 'ORIENTE' }),
+  ];
+  const { dataset, reporte } = agregarDatosCrudos(rows);
+  assert.equal(reporte.procesadas, 2);        // Sobrecarga + sobrecarga del str
+  assert.equal(reporte.descartadasFiltro, 3); // Lluvias, Red de BT, Mantenimiento
+  assert.deepEqual(dataset.cats_order.sort(), ['Sobrecarga', 'sobrecarga del str']);
+  assert.equal('Lluvias' in dataset.zonas.TODAS.cat_saidi, false);
 });
 
 test('agregarDatosCrudos descarta filas sin fecha o sin causa válida', () => {
