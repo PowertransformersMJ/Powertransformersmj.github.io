@@ -125,6 +125,11 @@
             <span><span class="icon" style="background:var(--blue)"></span>Serie temporal del sistema</span>
             <span class="pill" id="serie-pill">SAIDI_E + SAIFI_E</span>
           </h3>
+          <div class="serie-modo" id="serie-modo" role="group" aria-label="Modo de la serie temporal">
+            <button type="button" class="serie-seg is-on" data-modo="mes" aria-pressed="true">Por meses</button>
+            <button type="button" class="serie-seg" data-modo="acum" aria-pressed="false">Acumulado</button>
+            <span class="serie-modo-hint">acumulado suma mes a mes · aplica a SAIDI y SAIFI</span>
+          </div>
           <div id="chart-serie" class="chart"></div>
         </div>
         <div class="card">

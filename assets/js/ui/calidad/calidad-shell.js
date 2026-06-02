@@ -11,7 +11,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
-import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos } from './filtros.js';
+import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo } from './filtros.js';
 import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
 import { inicializarPersistencia, limpiarPersistencia, handleFiles } from './upload.js';
 
@@ -100,12 +100,13 @@ function safeRender(name, fn) {
 }
 
 function renderAll(state) {
-  const { dataset, zona, met, source } = state;
+  const { dataset, zona, met, source, serieModo } = state;
   if (!dataset) return;
   ocultarError();
   safeRender('selector-zona',  () => pintarSelectorZona());
   safeRender('pill-filtro',    () => actualizarPill());
   safeRender('chips-grupos',   () => sincronizarChipsGrupos());
+  safeRender('serie-modo',     () => sincronizarSerieModo());
   actualizarSourcePill(source, state._meta);
 
   // Sincroniza selects con state
@@ -114,7 +115,7 @@ function renderAll(state) {
 
   safeRender('kpis',        () => renderKPIs(dataset, zona, met));
   safeRender('insight',     () => renderInsight(dataset, zona, met));
-  safeRender('serie',       () => renderSerie(dataset, zona, met));
+  safeRender('serie',       () => renderSerie(dataset, zona, met, serieModo));
   safeRender('stack',       () => renderStack(dataset, zona, met));
   safeRender('part',        () => renderPart(dataset, zona, met));
   safeRender('varmom',      () => renderVarMoM(dataset, zona, met));
