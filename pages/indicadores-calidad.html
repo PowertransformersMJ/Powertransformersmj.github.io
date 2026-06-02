@@ -91,6 +91,8 @@
           <br>
           <b>Formato CSV:</b> una sola tabla tipo hoja <code>ZONAS</code> — columnas <code>zona,tipo,Ene,Feb,…</code>. El módulo deriva los meses, las categorías y recalcula la proyección automáticamente.
           <br>
+          <b>Formato Excel crudo (hoja <code>DATOS</code>):</b> tu documento de trabajo registro por registro. El módulo agrega solo, sumando SAIDI_E / SAIFI_E por mes × zona × causa. Mapeo de columnas: <code>Causa 2 = N</code>, <code>SAIFI_E = AJ</code>, <code>SAIDI_E = AK</code>, <code>ZONA CONFIRMADA = BG</code>; el <b>mes se extrae automáticamente</b> de la columna de fecha. La causa cruda se conserva como categoría y los 3 grupos (Sobrecarga/Deslastre · Racionamiento/Déficit · Otras) se derivan solos.
+          <br>
           <b>Varios archivos a la vez:</b> puedes adjuntar dos o más archivos (por ejemplo un <code>.xlsm</code> y un <code>.csv</code>) — se combinan en un solo dataset (los valores no vacíos de cada archivo prevalecen y las categorías se unen por nombre).
           El archivo se procesa <b>en tu navegador</b> y se guarda localmente (IndexedDB) — no se sube a internet.
         </div>
