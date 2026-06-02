@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   sumSerie, avgSerie, growthPct, varMoM,
   catTotals, gruposDeZona, categoriasDeZona, totalSerieDeZona, proyeccionDeZona, listarZonas,
+  rankingSubestaciones,
 } from '../assets/js/domain/saidi_calculo.js';
 import { categoriaColor, grupoCorto, metKey, metricaNombre, COLORS, clasificarGrupoCausa, CAUSAS_CANON } from '../assets/js/domain/saidi_config.js';
 
@@ -208,4 +209,58 @@ test('metricaNombre devuelve etiqueta humana', () => {
   assert.equal(metricaNombre('saidi'), 'SAIDI_E');
   assert.equal(metricaNombre('saifi'), 'SAIFI_E');
   assert.equal(metricaNombre('xxx'), 'SAIDI_E');  // fallback
+});
+
+// ── rankingSubestaciones ──────────────────────────────────────
+function dsConSubests() {
+  return {
+    subests: {
+      TODAS: {
+        'SE Alfa':  { saidi: [1, 2, 0, ...Array(9).fill(0)], saifi: [0.5, 1, 0, ...Array(9).fill(0)] },
+        'SE Beta':  { saidi: [5, 0, 0, ...Array(9).fill(0)], saifi: [0.1, 0, 0, ...Array(9).fill(0)] },
+        'SE Gamma': { saidi: new Array(12).fill(0),          saifi: new Array(12).fill(0) },
+      },
+      BOLIVAR: {
+        'SE Alfa': { saidi: [1, 2, 0, ...Array(9).fill(0)], saifi: [0.5, 1, 0, ...Array(9).fill(0)] },
+      },
+    },
+  };
+}
+
+test('rankingSubestaciones suma todos los meses y ordena desc por SAIDI', () => {
+  const r = rankingSubestaciones(dsConSubests(), 'TODAS', 'saidi', null);
+  assert.equal(r.length, 2);            // Gamma queda fuera (aporte 0)
+  assert.equal(r[0].sub, 'SE Beta');    // 5 > 3
+  assert.equal(r[0].saidi, 5);
+  assert.equal(r[1].sub, 'SE Alfa');
+  assert.equal(r[1].saidi, 3);
+});
+
+test('rankingSubestaciones ordena por SAIFI cuando met=saifi', () => {
+  const r = rankingSubestaciones(dsConSubests(), 'TODAS', 'saifi', null);
+  assert.equal(r[0].sub, 'SE Alfa');    // 1.5 > 0.1
+  assert.equal(Math.abs(r[0].saifi - 1.5) < 1e-9, true);
+});
+
+test('rankingSubestaciones filtra por mes-calendario', () => {
+  const r = rankingSubestaciones(dsConSubests(), 'TODAS', 'saidi', 0);  // mes 0
+  assert.equal(r[0].sub, 'SE Beta');    // mes0: Beta 5 > Alfa 1
+  assert.equal(r[0].saidi, 5);
+  assert.equal(r[1].saidi, 1);
+  const r2 = rankingSubestaciones(dsConSubests(), 'TODAS', 'saidi', 1);  // mes 1
+  assert.equal(r2.length, 1);           // solo Alfa aporta en mes1
+  assert.equal(r2[0].sub, 'SE Alfa');
+  assert.equal(r2[0].saidi, 2);
+});
+
+test('rankingSubestaciones respeta la zona', () => {
+  const r = rankingSubestaciones(dsConSubests(), 'BOLIVAR', 'saidi', null);
+  assert.equal(r.length, 1);
+  assert.equal(r[0].sub, 'SE Alfa');
+});
+
+test('rankingSubestaciones devuelve [] sin subests o zona ausente', () => {
+  assert.deepEqual(rankingSubestaciones({}, 'TODAS', 'saidi', null), []);
+  assert.deepEqual(rankingSubestaciones(null, 'TODAS', 'saidi', null), []);
+  assert.deepEqual(rankingSubestaciones(dsConSubests(), 'OCCIDENTE', 'saidi', null), []);
 });

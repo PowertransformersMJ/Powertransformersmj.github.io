@@ -103,6 +103,49 @@ export function sincronizarSerieMes() {
   sel.value = (v == null) ? '' : String(v);
 }
 
+// Llena el selector de zona del ranking de subestaciones con las zonas
+// del dataset (misma lista que el filtro global de zona).
+export function pintarSelectorRankZona() {
+  const sel = $('#rank-zona');
+  if (!sel || !store.state.dataset) return;
+  const zonas = listarZonas(store.state.dataset);
+  const cur = store.state.rankZona;
+  sel.innerHTML = '';
+  zonas.forEach(z => {
+    const o = document.createElement('option');
+    o.value = z;
+    o.textContent = zonaLabel(z);
+    sel.appendChild(o);
+  });
+  if (zonas.includes(cur)) sel.value = cur;
+}
+
+// Llena el selector de mes del ranking con los meses del dataset.
+export function pintarSelectorRankMes() {
+  const sel = $('#rank-mes');
+  const ds = store.state.dataset;
+  if (!sel || !ds) return;
+  const meses = ds.meses || [];
+  const mesesIdx = ds.mesesIdx || meses.map((_, i) => i);
+  sel.innerHTML = '<option value="">Todos los meses</option>';
+  meses.forEach((etiqueta, i) => {
+    const idx = mesesIdx[i];
+    if (idx == null) return;
+    const o = document.createElement('option');
+    o.value = String(idx);
+    o.textContent = etiqueta;
+    sel.appendChild(o);
+  });
+}
+
+// Sincroniza ambos selects del ranking con el estado.
+export function sincronizarRank() {
+  const zSel = $('#rank-zona');
+  if (zSel && store.state.rankZona) zSel.value = store.state.rankZona;
+  const mSel = $('#rank-mes');
+  if (mSel) mSel.value = (store.state.rankMes == null) ? '' : String(store.state.rankMes);
+}
+
 let _bound = false;
 export function inicializarFiltros() {
   if (_bound) return;
@@ -130,4 +173,10 @@ export function inicializarFiltros() {
       if (g) store.toggleGrupo(g);
     });
   });
+
+  // Selectores del ranking de subestaciones (zona + mes propios)
+  const rZona = $('#rank-zona');
+  if (rZona) rZona.addEventListener('change', () => store.setRankZona(rZona.value));
+  const rMes = $('#rank-mes');
+  if (rMes) rMes.addEventListener('change', () => store.setRankMes(rMes.value));
 }
