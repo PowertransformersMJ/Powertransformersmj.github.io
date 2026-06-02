@@ -205,6 +205,84 @@ export function derivarGruposDesdeCategorias(z, N) {
   }
 }
 
+// ── Filtro de las 13 causas canónicas a nivel de DATASET ─────
+// Garantía de extracción independiente del formato de origen: dado un
+// dataset YA construido (baseline, pre-agregado, CSV, caché de IndexedDB
+// o DATOS crudo), descarta de cada zona toda categoría que NO sea una de
+// las 13 causas del catálogo y RE-DERIVA grupos + total + proyección +
+// cats_order desde las categorías filtradas. Así el módulo SOLO muestra
+// las 13 causas, sin importar de dónde venga el dataset.
+//
+// Si una zona no trae categorías (solo grupos/total pre-agregados sin
+// desglose), se preserva tal cual — no hay con qué filtrar.
+export function filtrarCausasCanonicas(dataset) {
+  if (!dataset || !dataset.zonas || typeof dataset.zonas !== 'object') return dataset;
+
+  // N = nº de meses. Preferimos meses; si falta, inferimos del serie más larga.
+  let N = Array.isArray(dataset.meses) ? dataset.meses.length : 0;
+  if (!N) {
+    for (const z of Object.values(dataset.zonas)) {
+      for (const met of ['saidi', 'saifi']) {
+        for (const serie of Object.values(z?.[`cat_${met}`] || {})) {
+          if (Array.isArray(serie)) N = Math.max(N, serie.length);
+        }
+        const tot = z?.[`total_${met}`];
+        if (Array.isArray(tot)) N = Math.max(N, tot.length);
+      }
+    }
+  }
+  const Mfull = Array.isArray(dataset.meses_full) ? dataset.meses_full.length : MESES_CANON.length;
+
+  const zonas = {};
+  for (const [zname, z] of Object.entries(dataset.zonas)) {
+    const zf = nuevaZona();
+    let tieneCats = false;
+
+    for (const met of ['saidi', 'saifi']) {
+      const cats = z?.[`cat_${met}`] || {};
+      for (const [cat, serie] of Object.entries(cats)) {
+        if (esCausaCanonica(cat)) {
+          zf[`cat_${met}`][cat] = Array.isArray(serie) ? serie.slice() : [];
+          tieneCats = true;
+        }
+      }
+    }
+
+    if (tieneCats) {
+      // Re-derivar grupos + total SOLO desde las categorías canónicas.
+      derivarGruposDesdeCategorias(zf, N);
+      const sob = zf.grp_saidi['Sobrecarga/Deslastre'] || [];
+      zf.proj = sob.length >= 2 ? calcularProyeccionOLS(sob, Mfull) : (z.proj || null);
+    } else {
+      // Sin desglose por categoría: no hay forma de filtrar; preservar.
+      zf.total_saidi = Array.isArray(z?.total_saidi) ? z.total_saidi.slice() : [];
+      zf.total_saifi = Array.isArray(z?.total_saifi) ? z.total_saifi.slice() : [];
+      for (const gk of ['grp_saidi', 'grp_saifi']) {
+        for (const g of Object.keys(z?.[gk] || {})) {
+          zf[gk][g] = Array.isArray(z[gk][g]) ? z[gk][g].slice() : [];
+        }
+      }
+      zf.proj = z?.proj || null;
+    }
+    zonas[zname] = zf;
+  }
+
+  // cats_order desde TODAS, por aporte SAIDI descendente.
+  const catsTodas = zonas.TODAS?.cat_saidi || {};
+  const cats_order = Object.keys(catsTodas).sort((a, b) => {
+    const sa = (catsTodas[a] || []).reduce((x, y) => x + (+y || 0), 0);
+    const sb = (catsTodas[b] || []).reduce((x, y) => x + (+y || 0), 0);
+    return sb - sa;
+  });
+
+  return {
+    ...dataset,
+    zonas,
+    cats_order,
+    proj_global: zonas.TODAS?.proj || dataset.proj_global || null,
+  };
+}
+
 // Normaliza el texto de zona a una de las claves canónicas o '' si no
 // corresponde a ninguna (en cuyo caso solo cuenta para TODAS).
 function normalizarZona(raw) {
