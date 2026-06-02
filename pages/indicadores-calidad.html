@@ -130,6 +130,13 @@
             <button type="button" class="serie-seg" data-modo="acum" aria-pressed="false">Acumulado</button>
             <span class="serie-modo-hint">acumulado suma mes a mes · aplica a SAIDI y SAIFI</span>
           </div>
+          <div class="serie-mes-wrap" id="serie-mes-wrap">
+            <label for="serie-mes">Detalle:</label>
+            <select id="serie-mes" class="serie-mes-select" aria-label="Mes para ver el detalle diario">
+              <option value="">Todos los meses (vista mensual)</option>
+            </select>
+            <span class="serie-mes-hint">elige un mes para ver el comportamiento día a día</span>
+          </div>
           <div id="chart-serie" class="chart"></div>
         </div>
         <div class="card">
