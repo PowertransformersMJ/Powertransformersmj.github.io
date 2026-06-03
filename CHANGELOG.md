@@ -153,6 +153,42 @@ guía de extensión y backlog.
   Estrategia que funciona: dos divs **independientes** lado a lado
   (cada uno con `Plotly.react` propio) en lugar de subplots internos.
 
+### Continuación (2026-06-03) · upload multi-archivo, 13 causas, serie diaria y ranking TOP 10
+
+Trabajo posterior sobre el mismo módulo en la branch
+`claude/pruebas-electricas-firestore`: ampliar las fuentes de carga,
+consolidar el filtro de las 13 causas oficiales en un único
+chokepoint, agregar detalle día a día y un ranking de subestaciones.
+
+| Hash | Tipo | Resumen |
+|---|---|---|
+| `8deae5d` | feat | Soporte de upload en CSV y XLSM (además de JSON/XLSX). |
+| `7c72046` | feat | Clasificador canónico de causas + auto-derivación de grupos al cargar. |
+| `ceaecc8` | feat | Adjuntar varios archivos a la vez (`.xlsm` + `.csv`). |
+| `f3e2593` | feat | Cargar la hoja **DATOS** cruda (evento por evento) y agregar SAIDI/SAIFI automáticamente (`domain/saidi_datos.js`). |
+| `6bf8ac3` | test | Cobertura del filtro de las 13 causas canónicas. |
+| `afd1ab9` | fix | Filtro de las 13 causas aplicado en el chokepoint · todas las fuentes lo heredan. |
+| `10428f2` | feat | Serie temporal · toggle **Por meses / Acumulado**. |
+| `d1a38c0` | feat | Selector de mes con detalle día a día en la serie temporal. |
+| `87415b5` | fix | Selector de mes siempre visible + hint según haya detalle diario. |
+| `f95cda1` | feat | Día a día desde columnas **PERIODO (AC)** y **DIA (BB)**. |
+| `9b9db1c` | feat | **Ranking TOP 10 de subestaciones por aporte SAIDI_E/SAIFI_E.** Card nuevo con filtros propios (por zona y por mes) independientes de los globales. Lee `dataset.subests` (producido solo por la ruta DATOS cruda) y ordena por aporte con `% share`. `rankingSubestaciones()` en `saidi_calculo.js`, estado `rankZona`/`rankMes` + setters en `state.js`, selectores en `filtros.js`, renderer `renderers/rank-subest.js`. Hereda exactamente el filtro de 13 causas (la acumulación de `subests` corre después de `esCausaCanonica`). |
+| `3f3513a` | fix | **Ranking vacío · robustez de detección.** El subest se resolvía por índice fijo AW/48 y la hoja DATOS exigía nombre exacto, así que datasets con la columna en otra posición o la hoja con nombre parcial no producían `subests`. Nueva `detectarColumnaPorHeader(rows, /nb[_ ]?subest/)` como fallback por nombre de encabezado (tolerante a tildes/espacios/case) + detección de la hoja DATOS por coincidencia parcial (`/datos/i`). +3 tests. |
+| _(este)_ | docs | Documentación del ranking y los fixes en `docs/INDICADORES-CALIDAD.md` (§5.2.1 mapeo de columnas, §5.2.2 ranking TOP 10, §2 árbol de arquitectura, §10 conteos de tests) + esta entrada del CHANGELOG. |
+
+**Notas operativas:**
+
+- El ranking **solo se puebla desde el Excel crudo (hoja DATOS,
+  evento por evento)**. El baseline JSON, el Excel pre-agregado
+  (META/KPI/ZONAS/PROYECCION) y el CSV son agregados mensuales sin
+  detalle por subestación → muestran empty-state. Para ver el
+  ranking hay que cargar el archivo crudo (no baseline / pre-agregado
+  / cache previa de IndexedDB).
+- **Paridad de filtro confirmada:** `esCausaCanonica` (las 13 causas
+  de `CAUSAS_CANON`) corre en `saidi_datos.js` antes de acumular
+  `subests`, así que el ranking refleja exactamente las mismas
+  causas que el resto del dashboard.
+- **942/942 tests verdes · lint limpio.**
 
 
 ## Integración Contratos · Suministros ↔ Mantenimiento Brigada (2026-05-18)

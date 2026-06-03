@@ -108,6 +108,9 @@ assets/js/domain/   (PURO · sin DOM ni I/O · testeable con node --test)
 │                                              (Plotly muta objetos · no usar Object.freeze)
 │                                            - metricaNombre(), metricaUnidad(),
 │                                              metricaTitulo(), metKey()
+│                                            - CAUSAS_CANON (13 causas oficiales) +
+│                                              esCausaCanonica() + filtrarCausasCanonicas()
+│                                              (normaliza NFD + lowercase + colapsa espacios)
 ├── saidi_calculo.js                       ← agregadores PUROS:
 │                                            - sumSerie(serie)
 │                                            - avgSerie(serie)
@@ -118,12 +121,27 @@ assets/js/domain/   (PURO · sin DOM ni I/O · testeable con node --test)
 │                                            - totalSerieDeZona
 │                                            - proyeccionDeZona
 │                                            - listarZonas(dataset)
-└── saidi_proyeccion.js                    ← calcularProyeccionOLS(real, N):
-                                             regresión lineal mínimos cuadrados
-                                             con intervalos IC95% (Student's t)
-                                             y escenarios opt/pes (±10%).
-                                             SAIDI usa el bloque precalculado;
-                                             SAIFI se recalcula on-the-fly.
+│                                            - rankingSubestaciones(dataset, zona, met,
+│                                              mesIdx) → TOP por aporte + % share
+│                                              (lee dataset.subests · respeta el filtro
+│                                              de 13 causas heredado de saidi_datos)
+├── saidi_proyeccion.js                    ← calcularProyeccionOLS(real, N):
+│                                            regresión lineal mínimos cuadrados
+│                                            con intervalos IC95% (Student's t)
+│                                            y escenarios opt/pes (±10%).
+│                                            SAIDI usa el bloque precalculado;
+│                                            SAIFI se recalcula on-the-fly.
+└── saidi_datos.js                         ← agregador del Excel crudo (hoja DATOS):
+                                             - agregarDatosCrudos(rows) → dataset + reporte
+                                             - aplica esCausaCanonica (13 causas) ANTES
+                                               de acumular zonas/cats/subests
+                                             - produce subests {TODAS,BOLIVAR,ORIENTE,
+                                               OCCIDENTE}[sub] = {saidi[12],saifi[12]}
+                                               (única fuente del ranking TOP 10)
+                                             - detectarColumnaFecha() +
+                                               detectarColumnaPorHeader(rows, regex)
+                                               (fallback NB_SUBESTACION por nombre si
+                                               no está en AW/48)
 
 assets/js/data/
 └── indicadores_calidad.js                 ← suscribirIndicadoresCalidad():
@@ -137,9 +155,15 @@ assets/js/ui/calidad/
 ├── state.js                                ← store publish/subscribe minimal:
 │                                            - dataset, zona, met, source
 │                                            - gruposActivos (Set: chips filtro)
-│                                            - 8 setters + notify()
+│                                            - serieModo, serieMes (selector serie)
+│                                            - rankZona, rankMes (filtros propios del
+│                                              ranking TOP 10 · independientes de los
+│                                              globales) + setRankZona/setRankMes
+│                                            - 11 setters + notify()
 ├── filtros.js                              ← controlador zona + métrica + chips
-│                                            grupos · sincronizarChipsGrupos()
+│                                            grupos · sincronizarChipsGrupos() +
+│                                            pintarSelectorRankZona/RankMes +
+│                                            sincronizarRank() (selectores del ranking)
 ├── upload.js                               ← carga manual JSON/Excel/CSV:
 │                                            - parsearJSON(file) con validación
 │                                            - parsearExcel(file) · detecta formato:
@@ -165,7 +189,7 @@ assets/js/ui/calidad/
 │                                               cada uno como fallback del anterior)
 │                                            5) muestra banner #calidad-error si
 │                                               todo falla
-└── renderers/                              ← 10 renderers + 1 _helpers común
+└── renderers/                              ← 11 renderers + 1 _helpers común
     ├── _helpers.js                          ← reexports + fmt(v, d) + metricaLabel +
     │                                          metricasActivas(met) → ['saidi','saifi']
     │                                          cuando met='ambos'
@@ -191,17 +215,29 @@ assets/js/ui/calidad/
     ├── proyeccion.js                        ← OLS Jun–Dic con IC95% + 3 escenarios
     │                                          · recalcula SAIFI on-the-fly · doble
     │                                          eje Y en modo Ambos
-    └── month-table.js                       ← tabla mensual agregada · filas
-                                               filtradas por gruposActivos · filas
-                                               duplicadas con bandas grises cuando
-                                               met=Ambos
+    ├── month-table.js                       ← tabla mensual agregada · filas
+    │                                          filtradas por gruposActivos · filas
+    │                                          duplicadas con bandas grises cuando
+    │                                          met=Ambos
+    └── rank-subest.js                        ← ranking TOP 10 de subestaciones por
+                                               aporte (NB_SUBESTACION) · usa
+                                               rankingSubestaciones() · filtros propios
+                                               rankZona/rankMes · barra de % share ·
+                                               empty-state si el dataset no trae subests
+                                               (baseline/pre-agregado/CSV)
 
 tests/
-├── saidi_calculo.test.js                   ← 21 tests · agregadores + helpers
-└── saidi_proyeccion.test.js                ← 10 tests · OLS vs baseline real ·
-                                              R² · IC95% · escenarios ±10% ·
-                                              edge cases (serie constante, nulls,
-                                              <2 puntos)
+├── saidi_calculo.test.js                   ← 31 tests · agregadores + helpers +
+│                                            rankingSubestaciones (orden, % share,
+│                                            filtro por zona/mes, dataset sin subests)
+├── saidi_proyeccion.test.js                ← 10 tests · OLS vs baseline real ·
+│                                            R² · IC95% · escenarios ±10% ·
+│                                            edge cases (serie constante, nulls,
+│                                            <2 puntos)
+└── saidi_datos.test.js                     ← 50 tests · agregarDatosCrudos · filtro
+                                              13 causas · acumulación subests ·
+                                              detectarColumnaFecha/PorHeader ·
+                                              fallback NB_SUBESTACION fuera de AW
 ```
 
 ---
@@ -337,10 +373,25 @@ Mapeo de columnas (0-based · `COLS_DATOS_DEFAULT`):
 | Variable | Columna Excel | Índice |
 |---|---|---|
 | Causa 2 | `N` | 13 |
+| PERIODO (mes) | `AC` | 28 |
 | SAIFI_E | `AJ` | 35 |
 | SAIDI_E | `AK` | 36 |
+| `NB_SUBESTACION` | `AW` | 48 |
+| DIA | `BB` | 53 |
 | ZONA CONFIRMADA | `BG` | 58 |
-| Mes | **autodetectado** | — |
+| Mes (fallback) | **autodetectado** | — |
+
+- **El nombre de la hoja es tolerante:** `parsearExcel` ruta al
+  agregador crudo si existe una hoja llamada exactamente `DATOS` **o
+  cualquier hoja cuyo nombre lo contenga** (`/datos/i` → "BASE DATOS",
+  "DATOS 2026", …).
+- **`NB_SUBESTACION` se detecta por encabezado además de por posición
+  fija.** Si el llamador no fija la columna y la posición `AW` no trae
+  el encabezado esperado, `agregarDatosCrudos` escanea las primeras
+  filas buscando `/nb[_ ]?subest/` (sin tildes, sin caja, espacios
+  colapsados) con `detectarColumnaPorHeader` y usa esa columna; sin
+  match queda en `AW`. Así el ranking puebla aunque el Excel venga
+  reordenado.
 
 - **El mes se extrae del archivo:** `detectarColumnaFecha` puntúa cada
   columna por la tasa de celdas interpretables como fecha
@@ -361,7 +412,48 @@ Mapeo de columnas (0-based · `COLS_DATOS_DEFAULT`):
   `causas` para trazabilidad.
 
 Cobertura de tests: `tests/saidi_datos.test.js` (`colIdx`,
-`mesDesdeValor`, `detectarColumnaFecha`, `agregarDatosCrudos`).
+`mesDesdeValor`, `detectarColumnaFecha`, `detectarColumnaPorHeader`,
+`agregarDatosCrudos`).
+
+### 5.2.2 Ranking TOP 10 · aporte por subestación
+
+La tarjeta **"Ranking TOP 10 · aporte por subestación
+(NB_SUBESTACION)"** lista las 10 subestaciones con mayor aporte a
+SAIDI_E / SAIFI_E, **filtrable por zona y por mes** con sus propios
+selectores (independientes de los filtros globales).
+
+- **Detalle por subestación · solo del path crudo `DATOS`.** El bloque
+  `subests` lo produce **únicamente** `agregarDatosCrudos`. El baseline
+  JSON, el Excel pre-agregado (4 hojas) y el CSV son agregados
+  mensuales sin desglose por subestación → la tarjeta muestra el estado
+  vacío *"requiere cargar el Excel de origen (hoja DATOS · columna
+  NB_SUBESTACION)"*.
+- **Mismo filtro de 13 causas que el resto del dashboard.** En el bucle
+  de filas, `esCausaCanonica(causa)` descarta la fila **antes** de
+  acumular `subests`, así que el ranking solo refleja el aporte de las
+  13 causas canónicas. Una fila fuera del catálogo (Lluvias,
+  Mantenimiento, Red de BT, …) nunca entra al ranking.
+- **Shape acumulado** (espeja `dias`):
+  `subests[zonaKey][nombreSubest] = { saidi: number[12], saifi: number[12] }`,
+  indexado por mes-calendario 0–11. Las 4 zonas (`TODAS`, `BOLIVAR`,
+  `ORIENTE`, `OCCIDENTE`) se crean siempre como `{}`.
+- **Cálculo del orden** (`rankingSubestaciones` en
+  `domain/saidi_calculo.js`): lee `dataset.subests[rankZona]`, suma
+  todos los meses (`rankMes == null`) o un solo mes, filtra aporte > 0
+  y ordena descendente por la **métrica global activa**
+  (`metricasActivas(met)[0]` → `saidi` o `saifi`). La columna `%` es la
+  participación de esa métrica sobre el total filtrado.
+- **Estado / UI:** `rankZona` / `rankMes` viven en `ui/calidad/state.js`
+  (con setters `setRankZona` / `setRankMes`); `filtros.js` puebla los
+  selectores (`pintarSelectorRankZona`, `pintarSelectorRankMes`,
+  `sincronizarRank`) y el renderer `renderers/rank-subest.js` pinta la
+  tabla. La cabecera (pill) muestra `zona · mes · métrica`.
+
+Cobertura de tests: `tests/saidi_datos.test.js` (acumulación de
+`subests`, detección de `NB_SUBESTACION` por encabezado, `subests`
+sobrevive a `filtrarCausasCanonicas`) + `tests/saidi_calculo.test.js`
+(`rankingSubestaciones`: orden, filtro por mes/zona, métrica activa,
+dataset sin `subests`).
 
 ### 5.3 CSV (una sola tabla = hoja `ZONAS`)
 
@@ -533,9 +625,10 @@ los otros renderers. Los errores se loggean en consola + banner
 ## 10. Tests
 
 ```bash
-npm test                                  # lint + 752/752 tests
-node --test tests/saidi_calculo.test.js   # 21 tests · agregadores
+npm test                                  # lint + 942/942 tests
+node --test tests/saidi_calculo.test.js   # 31 tests · agregadores + ranking
 node --test tests/saidi_proyeccion.test.js # 10 tests · OLS
+node --test tests/saidi_datos.test.js     # 50 tests · Excel crudo + subests
 ```
 
 Cobertura:
@@ -551,6 +644,14 @@ Cobertura:
   `categoriaColor` (Racion→púrpura · Sobrecarga/Deslastre→rojo ·
   resto→ámbar) y `CAUSAS_CANON` (las 13 causas oficiales mapean a un
   grupo controlable).
+- **Excel crudo (`saidi_datos`)**: `agregarDatosCrudos` aplica el
+  filtro de 13 causas antes de acumular zonas/cats/subests ·
+  `detectarColumnaFecha` / `detectarColumnaPorHeader` (fallback de
+  NB_SUBESTACION por nombre cuando no está en AW/48) · acumulación
+  de `subests` que sobrevive a `filtrarCausasCanonicas`.
+- **Ranking (`rankingSubestaciones`)**: orden por aporte, cálculo de
+  `% share`, filtro por zona y por mes, y dataset sin `subests`
+  (devuelve lista vacía → empty-state).
 
 ---
 
