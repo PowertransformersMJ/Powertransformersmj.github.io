@@ -1,0 +1,28 @@
+[
+  { "query": "Build me a CRM for my real estate agency", "should_trigger": true, "note": "direct, real estate" },
+  { "query": "Necesito un CRM para mi inmobiliaria", "should_trigger": true, "note": "direct ES, real estate" },
+  { "query": "Quiero un CRM para mi concesionario de carros usados y nuevos", "should_trigger": true, "note": "direct ES, dealership" },
+  { "query": "Build a dealership CRM to manage leads, inventory and the sales process", "should_trigger": true, "note": "dealership ops" },
+  { "query": "Create a sales pipeline app to track deals and contacts", "should_trigger": true, "note": "pipeline/contacts" },
+  { "query": "Necesito un sistema de gestión de clientes con seguimiento de ventas", "should_trigger": true, "note": "ES gestión de clientes" },
+  { "query": "Help me build a lead management system with a WhatsApp inbox", "should_trigger": true, "note": "lead mgmt + WhatsApp" },
+  { "query": "I want a web app to track my customers, deals and follow-ups", "should_trigger": true, "note": "indirect, no 'CRM' word" },
+  { "query": "Add a sales pipeline and lead scoring to my existing app", "should_trigger": true, "note": "add CRM module" },
+  { "query": "Quiero gestionar mis contactos, oportunidades y citas en una plataforma", "should_trigger": true, "note": "indirect ES" },
+  { "query": "Build a contact and deal management system on Firebase", "should_trigger": true, "note": "Firebase CRM" },
+  { "query": "Necesito una plataforma para administrar leads de Fincaraíz y hacer seguimiento", "should_trigger": true, "note": "RE portal leads" },
+  { "query": "Design a CRM with a kanban deal board and a reporting dashboard", "should_trigger": true, "note": "design CRM" },
+  { "query": "Build software for my car dealership to manage test drives, trade-ins and follow-ups", "should_trigger": true, "note": "dealership ops, no 'CRM' word" },
+
+  { "query": "Recommend a good CRM software for my small business", "should_trigger": false, "note": "wants a recommendation, not to BUILD one" },
+  { "query": "What is a CRM and why do I need one?", "should_trigger": false, "note": "informational" },
+  { "query": "Build a landing page for my car dealership", "should_trigger": false, "note": "marketing page, not a CRM" },
+  { "query": "Design a logo for my real estate agency", "should_trigger": false, "note": "design, not CRM; 'real estate' alone must not trigger" },
+  { "query": "Build an e-commerce store with a shopping cart and checkout", "should_trigger": false, "note": "commerce, not CRM" },
+  { "query": "Create a Trello-style project management board with tasks", "should_trigger": false, "note": "PM tool, not customer/lead mgmt" },
+  { "query": "Write a cold email to a sales prospect", "should_trigger": false, "note": "copywriting, not building software" },
+  { "query": "Help me fix a bug in my Firestore security rules", "should_trigger": false, "note": "debugging Firebase, not building a CRM" },
+  { "query": "Build a personal portfolio website", "should_trigger": false, "note": "unrelated" },
+  { "query": "Create a to-do list app", "should_trigger": false, "note": "unrelated" },
+  { "query": "Set up a newsletter signup form for my blog", "should_trigger": false, "note": "marketing form, not CRM" }
+]
