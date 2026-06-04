@@ -1,0 +1,120 @@
+/* =============================================================================
+   crm-architect — Design Tokens
+   The single source of truth for the CRM look & feel. Override --brand-* and the
+   logo per client. Themes via [data-theme] on <html>. See references/core/ux-ui-design-system.md
+   ========================================================================== */
+
+:root {
+  /* ---- brand (override per client) ---- */
+  --brand-50:  #eef4ff;  --brand-100: #dbe7ff; --brand-200: #b9d0ff;
+  --brand-300: #8ab0ff;  --brand-400: #5a8bff; --brand-500: #2f6bff;
+  --brand-600: #1f53e0;  --brand-700: #1841b4; --brand-800: #163a8f;
+  --brand-900: #16356f;
+
+  /* ---- neutrals ---- */
+  --neutral-0:#ffffff; --neutral-50:#f8fafc; --neutral-100:#f1f5f9;
+  --neutral-200:#e2e8f0; --neutral-300:#cbd5e1; --neutral-400:#94a3b8;
+  --neutral-500:#64748b; --neutral-600:#475569; --neutral-700:#334155;
+  --neutral-800:#1e293b; --neutral-900:#0f172a; --neutral-950:#020617;
+
+  /* ---- semantic status ---- */
+  --success:#16a34a; --success-bg:#dcfce7;
+  --warning:#d97706; --warning-bg:#fef3c7;
+  --danger:#dc2626;  --danger-bg:#fee2e2;
+  --info:#2563eb;    --info-bg:#dbeafe;
+
+  /* ---- surface / text / border roles (light defaults) ---- */
+  --bg:            var(--neutral-50);
+  --surface:       var(--neutral-0);
+  --surface-2:     var(--neutral-100);
+  --text:          var(--neutral-900);
+  --text-secondary:var(--neutral-600);
+  --text-muted:    var(--neutral-400);
+  --border:        var(--neutral-200);
+  --border-strong: var(--neutral-300);
+  --brand-primary: var(--brand-600);
+  --brand-contrast:#ffffff;
+  --focus-ring:    0 0 0 3px rgba(47,107,255,.35);
+
+  /* ---- pipeline stage / rating palette ---- */
+  --stage-new:#64748b; --stage-qualified:#2563eb; --stage-proposal:#7c3aed;
+  --stage-negotiation:#d97706; --stage-won:#16a34a; --stage-lost:#dc2626;
+  --rating-hot:#dc2626; --rating-warm:#d97706; --rating-cold:#2563eb;
+
+  /* ---- spacing (4-pt) ---- */
+  --space-0:0; --space-1:2px; --space-2:4px; --space-3:8px; --space-4:12px;
+  --space-5:16px; --space-6:20px; --space-7:24px; --space-8:32px;
+  --space-9:40px; --space-10:48px; --space-12:64px;
+
+  /* ---- typography ---- */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+  --fs-xs:.75rem; --fs-sm:.875rem; --fs-md:1rem; --fs-lg:1.125rem;
+  --fs-xl:1.25rem; --fs-2xl:1.5rem; --fs-3xl:2rem;
+  --fw-regular:400; --fw-medium:500; --fw-semibold:600; --fw-bold:700;
+  --lh-tight:1.2; --lh-normal:1.5; --lh-loose:1.7;
+
+  /* ---- radius / shadow / elevation ---- */
+  --radius-xs:4px; --radius-sm:6px; --radius-md:10px; --radius-lg:14px;
+  --radius-xl:20px; --radius-pill:999px; --radius-circle:50%;
+  --shadow-xs:0 1px 2px rgba(15,23,42,.06);
+  --shadow-sm:0 2px 6px rgba(15,23,42,.08);
+  --shadow-md:0 6px 16px rgba(15,23,42,.10);
+  --shadow-lg:0 12px 32px rgba(15,23,42,.14);
+  --shadow-focus:var(--focus-ring);
+
+  /* ---- z-index scale ---- */
+  --z-base:0; --z-dropdown:1000; --z-sticky:1100; --z-drawer:1200;
+  --z-modal:1300; --z-toast:1400; --z-tooltip:1500; --z-max:9999;
+
+  /* ---- motion ---- */
+  --ease-snap:cubic-bezier(.2,0,0,1);
+  --ease-spring:cubic-bezier(.34,1.56,.64,1);
+  --dur-fast:120ms; --dur-base:200ms; --dur-slow:320ms;
+
+  /* ---- layout ---- */
+  --sidebar-w:248px; --sidebar-w-collapsed:64px; --header-h:60px;
+  --content-max:1440px;
+
+  /* ---- breakpoints (for reference in JS/container queries) ---- */
+  --bp-sm:480px; --bp-md:768px; --bp-lg:1024px; --bp-xl:1280px;
+}
+
+/* ---- DARK THEME ---- */
+[data-theme="dark"] {
+  --bg:            var(--neutral-950);
+  --surface:       var(--neutral-900);
+  --surface-2:     var(--neutral-800);
+  --text:          var(--neutral-100);
+  --text-secondary:var(--neutral-400);
+  --text-muted:    var(--neutral-500);
+  --border:        #1e2a44;
+  --border-strong: #2b3a5c;
+  --brand-primary: var(--brand-400);
+  --shadow-xs:0 1px 2px rgba(0,0,0,.4);
+  --shadow-sm:0 2px 6px rgba(0,0,0,.45);
+  --shadow-md:0 6px 16px rgba(0,0,0,.5);
+  --shadow-lg:0 12px 32px rgba(0,0,0,.55);
+}
+
+/* ---- HIGH CONTRAST (WCAG AAA target) ---- */
+[data-theme="high-contrast"] {
+  --bg:#000000; --surface:#000000; --surface-2:#0a0a0a;
+  --text:#ffffff; --text-secondary:#ffffff; --text-muted:#e5e5e5;
+  --border:#ffffff; --border-strong:#ffffff;
+  --brand-primary:#ffd84d; --brand-contrast:#000000;
+  --success:#4ade80; --warning:#facc15; --danger:#ff6b6b; --info:#60a5fa;
+}
+
+/* ---- base reset hooks ---- */
+* { box-sizing:border-box; }
+body {
+  margin:0; font-family:var(--font-sans); font-size:var(--fs-md);
+  line-height:var(--lh-normal); color:var(--text); background:var(--bg);
+  -webkit-font-smoothing:antialiased; font-feature-settings:"kern","liga","tnum";
+}
+:focus-visible { outline:none; box-shadow:var(--focus-ring); border-radius:var(--radius-sm); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration:.01ms!important; transition-duration:.01ms!important; }
+}

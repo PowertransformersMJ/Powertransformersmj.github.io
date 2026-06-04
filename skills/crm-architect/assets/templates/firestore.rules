@@ -1,0 +1,189 @@
+rules_version = '2';
+
+// =============================================================================
+// crm-architect — Firestore Security Rules (org-scoped, RBAC, versioned, audited)
+// Deny by default. Authorization lives HERE (and in Functions), never the UI.
+// Test with the emulator: own org OK, other org denied, cross-tenant denied.
+// Deploy: firebase deploy --only firestore:rules   (NOT auto-applied from repo)
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---- helpers ----
+    function isSignedIn()   { return request.auth != null; }
+    function orgOf()        { return request.auth.token.orgId; }
+    function roleOf()       { return request.auth.token.role; }
+    function inOrg(oid)     { return isSignedIn() && orgOf() == oid; }
+    function hasRole(roles) { return isSignedIn() && (roleOf() in roles); }
+    function uid()          { return request.auth.uid; }
+
+    function isOwner()      { return resource.data.ownerId == uid(); }
+    function willOwn()      { return request.resource.data.ownerId == uid(); }
+    function unchanged(f)   { return request.resource.data[f] == resource.data[f]; }
+    function isCreate()     { return resource == null; }
+    function bumpsVersion() {
+      return request.resource.data._version == resource.data._version + 1;
+    }
+    // editor roles that may create/edit business records
+    function isEditor()  { return hasRole(['super_admin','admin','manager','agent','bdc']); }
+    function isManager() { return hasRole(['super_admin','admin','manager']); }
+    function isAdmin()   { return hasRole(['super_admin','admin']); }
+    function isSuper()   { return hasRole(['super_admin']); }
+
+    // Shared validation for a business record create/update.
+    function validCreate(orgId) {
+      return inOrg(orgId)
+        && request.resource.data.orgId == orgId
+        && request.resource.data._version == 1
+        && request.resource.data.createdBy == uid();
+    }
+    function validUpdate() {
+      // super_admin may bypass version bump; everyone else must bump & keep invariants
+      return (isSuper() || bumpsVersion())
+        && unchanged('orgId')
+        && unchanged('createdBy')
+        && unchanged('createdAt');
+    }
+    // record-level write permission: managers+ for any, owners for their own
+    function canWriteRecord() { return isManager() || isOwner(); }
+
+    // =========================================================================
+    match /orgs/{orgId} {
+
+      // The org/tenant doc
+      allow read:  if inOrg(orgId);
+      allow create: if isSignedIn() && request.resource.data.ownerUid == uid(); // bootstrap
+      allow update, delete: if inOrg(orgId) && isSuper();
+
+      // ---- internal users ----
+      match /users/{userId} {
+        allow read:   if inOrg(orgId);
+        allow create, update, delete: if inOrg(orgId) && isAdmin();
+        // a user may update limited fields of their own profile:
+        allow update: if inOrg(orgId) && userId == uid()
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['name','photoURL','phone','preferences','twoFactorEnabled','updatedAt']);
+      }
+
+      // ---- business records: leads / contacts / accounts / deals / quotes /
+      //      activities / properties / vehicles / testDrives / tradeIns ----
+      match /leads/{id}        { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate()
+                                               && (isManager() || unchanged('ownerId'));
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      match /contacts/{id}     { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate()
+                                               && (isManager() || unchanged('ownerId'));
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      match /accounts/{id}     { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate();
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      match /deals/{id}        { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate()
+                                               && (isManager() || unchanged('ownerId'));
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      match /quotes/{id}       { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate();
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      match /products/{id}     { allow read: if inOrg(orgId);
+                                 allow write: if inOrg(orgId) && isAdmin(); }
+
+      match /properties/{id}   { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate();
+                                 allow delete: if inOrg(orgId) && isAdmin();
+                                 match /showings/{sid} {
+                                   allow read: if inOrg(orgId);
+                                   allow write: if inOrg(orgId) && isEditor(); } }
+
+      match /vehicles/{id}     { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && canWriteRecord() && validUpdate();
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      match /testDrives/{id}   { allow read: if inOrg(orgId);
+                                 allow write: if inOrg(orgId) && isEditor(); }
+      match /tradeIns/{id}     { allow read: if inOrg(orgId);
+                                 allow write: if inOrg(orgId) && isEditor(); }
+      match /serviceAppointments/{id} { allow read: if inOrg(orgId);
+                                 allow write: if inOrg(orgId) && isEditor(); }
+
+      // ---- activities ----
+      match /activities/{id}   { allow read: if inOrg(orgId);
+                                 allow create: if validCreate(orgId) && isEditor();
+                                 allow update: if inOrg(orgId) && (isManager() || isOwner()) && validUpdate();
+                                 allow delete: if inOrg(orgId) && isAdmin(); }
+
+      // ---- conversations + messages ----
+      match /conversations/{cid} {
+        allow read:   if inOrg(orgId);
+        allow create, update: if inOrg(orgId) && isEditor();
+        allow delete: if inOrg(orgId) && isAdmin();
+        match /messages/{mid} {
+          allow read:   if inOrg(orgId);
+          // user/bot/system messages from clients; agent messages require editor
+          allow create: if inOrg(orgId)
+            && (request.resource.data.from in ['user','bot','system']
+                || (request.resource.data.from == 'agent' && isEditor()));
+          allow update, delete: if inOrg(orgId) && isAdmin();
+        }
+      }
+
+      // ---- campaigns + members ----
+      match /campaigns/{id} {
+        allow read:  if inOrg(orgId);
+        allow write: if inOrg(orgId) && isEditor();
+        match /members/{mid} { allow read: if inOrg(orgId);
+                               allow write: if inOrg(orgId) && isEditor(); }
+      }
+
+      // ---- config (pipelines, fields, automations, roles, reports, settings) ----
+      match /config/{doc} {
+        allow read:  if inOrg(orgId);
+        allow write: if inOrg(orgId) && isAdmin();
+        // bot/automation may increment usage counters on a config doc:
+        allow update: if inOrg(orgId)
+          && request.resource.data.diff(resource.data).affectedKeys()
+               .hasOnly(['usageCount','lastUsedAt']);
+      }
+
+      // ---- counters / analytics (written by Functions; read by all in org) ----
+      match /counters/{doc}   { allow read: if inOrg(orgId); allow write: if false; }
+      match /analytics/{doc}  { allow read: if inOrg(orgId); allow write: if false; }
+
+      // ---- audit log: immutable, admins read ----
+      match /auditLog/{id} {
+        allow read:   if inOrg(orgId) && isAdmin();
+        allow create: if inOrg(orgId);
+        allow update, delete: if false;
+      }
+
+      // ---- automation log: immutable, admins read ----
+      match /automationLog/{id} {
+        allow read:   if inOrg(orgId) && isAdmin();
+        allow create: if inOrg(orgId);
+        allow update, delete: if isSuper();
+      }
+
+      // ---- data-subject requests (Habeas Data / GDPR) ----
+      match /dataRequests/{id} {
+        allow read:   if inOrg(orgId) && isAdmin();
+        allow create: if inOrg(orgId);            // a person/agent can file one
+        allow update: if inOrg(orgId) && isAdmin();
+        allow delete: if false;
+      }
+    }
+    // anything not matched above is DENIED by default.
+  }
+}

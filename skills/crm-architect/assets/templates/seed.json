@@ -1,0 +1,66 @@
+{
+  "//": "crm-architect seed/demo data. Load with a seed script into orgs/{orgId}/... Adapt orgId, vertical and pipelines per client.",
+  "org": {
+    "id": "demo", "name": "Empresa Demo", "vertical": "generic",
+    "locale": "es-CO", "currency": "COP", "timezone": "America/Bogota",
+    "branding": { "primaryColor": "#2f6bff" }
+  },
+  "users": [
+    { "uid": "u_admin", "email": "admin@demo.com", "name": "Admin Demo", "role": "super_admin", "status": "active" },
+    { "uid": "u_ana",   "email": "ana@demo.com",   "name": "Ana Gómez",  "role": "agent", "status": "active", "quota": 50000000 },
+    { "uid": "u_luis",  "email": "luis@demo.com",  "name": "Luis Pérez", "role": "agent", "status": "active", "quota": 50000000 }
+  ],
+  "config": {
+    "pipelines": {
+      "pipelines": [
+        { "id": "sales", "name": "Ventas", "entity": "deal", "default": true, "rottingDays": 14,
+          "stages": [
+            { "id": "new",        "name": "Nuevo",       "probability": 10,  "order": 1, "type": "open" },
+            { "id": "qualified",  "name": "Calificado",  "probability": 25,  "order": 2, "type": "open" },
+            { "id": "proposal",   "name": "Propuesta",   "probability": 50,  "order": 3, "type": "open" },
+            { "id": "negotiation","name": "Negociación", "probability": 75,  "order": 4, "type": "open" },
+            { "id": "won",        "name": "Ganado",      "probability": 100, "order": 5, "type": "won" },
+            { "id": "lost",       "name": "Perdido",     "probability": 0,   "order": 6, "type": "lost" }
+          ] }
+      ]
+    },
+    "fields/lead": [
+      { "key": "presupuesto", "label": "Presupuesto", "type": "currency", "group": "Calificación", "order": 1, "showInList": true },
+      { "key": "interes",     "label": "Interés",     "type": "select", "options": ["Alto","Medio","Bajo"], "order": 2 }
+    ]
+  },
+  "leads": [
+    { "id": "l1", "orgId": "demo", "lastName": "Rodríguez", "firstName": "Carlos", "fullName": "Carlos Rodríguez",
+      "email": "carlos@example.com", "phone": "+573001112233", "source": "whatsapp", "status": "new",
+      "rating": "warm", "score": 62, "ownerId": "u_ana", "ownerName": "Ana Gómez",
+      "consent": { "whatsapp": true, "askedAt": "2026-06-01T10:00:00Z", "source": "web_form" }, "_version": 1 }
+  ],
+  "contacts": [
+    { "id": "c1", "orgId": "demo", "lastName": "Martínez", "firstName": "Laura", "fullName": "Laura Martínez",
+      "email": "laura@example.com", "phone": "+573004445566", "type": "buyer",
+      "ownerId": "u_luis", "ownerName": "Luis Pérez", "lifecycleStage": "lead", "_version": 1 }
+  ],
+  "deals": [
+    { "id": "d1", "orgId": "demo", "name": "Deal Laura Martínez", "primaryContactId": "c1",
+      "primaryContactName": "Laura Martínez", "pipelineId": "sales", "stageId": "qualified",
+      "stageName": "Calificado", "status": "open", "amount": 32000000, "currency": "COP",
+      "probability": 25, "weightedAmount": 8000000, "expectedCloseDate": "2026-07-15",
+      "ownerId": "u_luis", "ownerName": "Luis Pérez", "_version": 1 }
+  ],
+  "activities": [
+    { "id": "a1", "orgId": "demo", "type": "call", "subject": "Llamada de seguimiento",
+      "status": "open", "priority": "high", "dueAt": "2026-06-04T15:00:00Z",
+      "relatedTo": { "type": "deal", "id": "d1", "name": "Deal Laura Martínez" },
+      "ownerId": "u_luis", "ownerName": "Luis Pérez", "_version": 1 }
+  ],
+  "verticalSamples": {
+    "property": { "id": "p1", "orgId": "demo", "type": "apartamento", "operation": "venta",
+      "status": "disponible", "price": 320000000, "currency": "COP", "area": 78,
+      "bedrooms": 3, "bathrooms": 2, "parking": 1, "stratum": 4,
+      "address": { "city": "Cartagena", "neighborhood": "Manga" }, "_version": 1 },
+    "vehicle": { "id": "v1", "orgId": "demo", "condition": "used", "make": "Toyota", "model": "Hilux",
+      "year": 2020, "bodyType": "pickup", "mileage": 48000, "transmission": "Automática",
+      "fuel": "Diesel", "price": 145000000, "currency": "COP", "status": "disponible",
+      "stockNumber": "ALT-0001", "_version": 1 }
+  }
+}

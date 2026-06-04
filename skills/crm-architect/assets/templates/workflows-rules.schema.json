@@ -1,0 +1,110 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://crm-architect/schemas/automation-rule.json",
+  "title": "CRM Automation Rule",
+  "description": "Config for one rule in the crm-architect automation engine. Stored under orgs/{orgId}/config/automations. See references/core/automation-engine.md",
+  "type": "object",
+  "required": ["id", "name", "enabled", "entity", "trigger", "actions"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "enabled": { "type": "boolean", "default": true },
+    "entity": {
+      "type": "string",
+      "description": "Collection the rule watches",
+      "examples": ["lead", "contact", "deal", "conversation", "property", "vehicle"]
+    },
+    "trigger": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["onCreate", "onUpdate", "onDelete", "onStageChange", "onStatusChange", "scheduled", "inbound", "scoreThreshold", "manual"]
+        },
+        "field": { "type": "string", "description": "For onUpdate: only fire when this field changes" },
+        "cron": { "type": "string", "description": "For scheduled: cron expression" },
+        "relativeTo": { "type": "string", "description": "e.g. 'expectedCloseDate' for time-based" },
+        "offsetMinutes": { "type": "integer", "description": "+/- minutes from relativeTo" },
+        "threshold": { "type": "number", "description": "For scoreThreshold" }
+      }
+    },
+    "conditions": { "$ref": "#/definitions/conditionGroup" },
+    "actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/definitions/action" }
+    },
+    "limits": {
+      "type": "object",
+      "properties": {
+        "maxPerHour": { "type": "integer" },
+        "maxPerEvent": { "type": "integer", "default": 10, "description": "Cycle protection cap" }
+      }
+    }
+  },
+  "definitions": {
+    "conditionGroup": {
+      "type": "object",
+      "properties": {
+        "all": { "type": "array", "items": { "$ref": "#/definitions/condition" } },
+        "any": { "type": "array", "items": { "$ref": "#/definitions/condition" } }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "required": ["field", "op"],
+      "properties": {
+        "field": { "type": "string" },
+        "op": { "enum": ["eq", "neq", "gt", "lt", "gte", "lte", "in", "contains", "isEmpty", "changed", "changedTo", "before", "after"] },
+        "value": {}
+      }
+    },
+    "action": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": [
+            "updateField", "createRecord", "deleteRecord", "convertLead",
+            "assignOwner", "addTag", "removeTag", "changeStage", "changeStatus",
+            "createTask", "setReminder", "sendEmail", "sendWhatsApp", "sendSMS",
+            "notifyUser", "callWebhook", "wait", "branch", "enqueueRule",
+            "startSequence", "stopSequence", "recalcScore",
+            "aiSummarize", "aiDraftReply", "aiNextBestAction"
+          ]
+        },
+        "strategy": { "enum": ["roundRobin", "loadBased", "territory", "specific"], "description": "for assignOwner" },
+        "pool": { "type": "string", "description": "team/pool id for assignOwner" },
+        "to": { "type": "string", "description": "recipient field/path (e.g. lead.phone)" },
+        "template": { "type": "string", "description": "message template id" },
+        "subject": { "type": "string" },
+        "dueInMin": { "type": "integer" },
+        "assignTo": { "type": "string", "description": "owner | <userId> | <role>" },
+        "field": { "type": "string" },
+        "value": {},
+        "url": { "type": "string" },
+        "delayMinutes": { "type": "integer", "description": "for wait" },
+        "ifTrue": { "type": "array", "items": { "$ref": "#/definitions/action" } },
+        "ifFalse": { "type": "array", "items": { "$ref": "#/definitions/action" } }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "lead-assign-rr",
+      "name": "Asignar leads nuevos (round-robin)",
+      "enabled": true,
+      "entity": "lead",
+      "trigger": { "type": "onCreate" },
+      "conditions": { "all": [ { "field": "status", "op": "eq", "value": "new" } ] },
+      "actions": [
+        { "type": "assignOwner", "strategy": "roundRobin", "pool": "sales" },
+        { "type": "createTask", "subject": "Llamar al nuevo lead", "dueInMin": 30, "assignTo": "owner" },
+        { "type": "sendWhatsApp", "template": "bienvenida", "to": "lead.phone" }
+      ],
+      "limits": { "maxPerEvent": 10 }
+    }
+  ]
+}
