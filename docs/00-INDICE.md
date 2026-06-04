@@ -45,6 +45,7 @@
 | 🛠️ ¿Qué skill tengo para X? / mapa de skills | 🛠️ `docs/skills-inventory.md` + 🎯 `40-LOBULOS §Recursos Externos` |
 | 🛰️ Decisión fuerte / cara de revertir / fork 50-50 → ¿2ª opinión? | 🛰️ `docs/15-CONSEJO-EXTERNO.md` (cuándo + qué tier del provider externo configurado en §0) |
 | 🌱 Crear / sugerir una SKILL nueva (capacidad portable) | 🎯 `40-LOBULOS-DOMINIO` §Reflejo de Sugerencia de Skills + Skill `skill-creator` |
+| 🤖 Extracción de PDFs con IA / Claude API / tool use / costos LLM | 🧪 `30-LECCIONES` (L-20/L-21) + 📚 `99` §3 (ADR-003) + Skill `claude-api` |
 | El "por qué" de una decisión / detalle de un § | tabla "§ → línea" abajo → 📚 `99-HISTORIAL-ADR.md` |
 
 ---
@@ -58,6 +59,7 @@
 |---|---|---|
 | §1 | ADR-001 — Instalación del cerebro neuronal documental (7 fases + auditoría) | 20 |
 | §2 | ADR-002 — Activación local de 24 skills repo-only en `.claude/skills/` | 42 |
+| §3 | ADR-003 — Extracción de informes de Pruebas Eléctricas con IA (Claude) vía Cloud Function | 64 |
 
 ---
 
