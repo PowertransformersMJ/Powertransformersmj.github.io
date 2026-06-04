@@ -56,7 +56,7 @@
 
 | § | Tema | Línea |
 |---|---|---|
-| _(sin entradas — primera tarea aún no cerrada como ADR)_ | | |
+| §1 | ADR-001 — Instalación del cerebro neuronal documental (7 fases + auditoría) | 20 |
 
 ---
 
