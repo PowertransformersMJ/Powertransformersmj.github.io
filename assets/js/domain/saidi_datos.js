@@ -413,9 +413,10 @@ export function filtrarCausasCanonicas(dataset) {
 //                                     (esCausaSobrecarga), sin Racionamiento
 //   · '<nombre de causa>'          → una sola causa exacta
 // Re-deriva grupos + total + proyección + cats_order desde las categorías
-// que sobreviven. El spread `...dataset` preserva prog / dias / subests /
-// meses / mesesIdx (prog es a nivel de fila, no por categoría, así que NO
-// se re-divide con este filtro: sobrevive intacto).
+// que sobreviven. El spread `...dataset` preserva dias / subests / meses /
+// mesesIdx / progCat. El aporte `prog` (programado/no-programado) SÍ se
+// re-agrega: se recalcula desde progCat sumando solo las causas incluidas,
+// para que el filtro CAUSA2 aísle el impacto prog/no-prog por causa.
 export function filtrarPorCausa2(dataset, causa2) {
   const sel = causa2 == null ? CAUSA2_TODAS : causa2;
   if (sel === CAUSA2_TODAS) return dataset;
@@ -458,12 +459,45 @@ export function filtrarPorCausa2(dataset, causa2) {
     return sb - sa;
   });
 
+  // Re-agrega el aporte programado/no-programado sumando SOLO las causas
+  // incluidas por el filtro CAUSA2. Si el dataset no trae progCat (baseline
+  // o ruta vieja), conserva el prog original intacto (vía spread).
+  const prog = dataset.progCat
+    ? reagregarProgPorCausa(dataset.progCat, incluir)
+    : dataset.prog;
+
   return {
     ...dataset,
     zonas,
     cats_order,
+    prog,
     proj_global: zonas.TODAS?.proj || null,
   };
+}
+
+// Suma el desglose prog/no-prog (progCat[zonaKey][causa]) sobre las causas
+// que cumplen el predicado `incluir`, devolviendo el shape prog estándar
+// (prog[zonaKey] = { programado:{saidi,saifi}, no_programado:{...} }).
+function reagregarProgPorCausa(progCat, incluir) {
+  const out = {};
+  for (const [zk, porCausa] of Object.entries(progCat || {})) {
+    let N = 0;
+    for (const pc of Object.values(porCausa)) {
+      N = Math.max(N, (pc?.programado?.saidi || []).length);
+    }
+    const acc = nuevaProg(N);
+    for (const [causa, pc] of Object.entries(porCausa)) {
+      if (!incluir(causa)) continue;
+      for (const pk of ['programado', 'no_programado']) {
+        for (const met of ['saidi', 'saifi']) {
+          const src = pc?.[pk]?.[met] || [];
+          for (let i = 0; i < src.length; i++) acc[pk][met][i] += (+src[i] || 0);
+        }
+      }
+    }
+    out[zk] = acc;
+  }
+  return out;
 }
 
 // Normaliza el texto de zona a una de las claves canónicas o '' si no
@@ -634,6 +668,16 @@ export function agregarDatosCrudos(rows, opts = {}) {
     OCCIDENTE: nuevaProg(N),
   };
 
+  // Mismo desglose programado/no-programado pero abierto POR CAUSA, para
+  // que el filtro CAUSA2 pueda re-agregar el aporte prog/no-prog sumando
+  // solo las causas incluidas. progCat[zonaKey][causa] = nuevaProg(N).
+  const progCat = { TODAS: {}, BOLIVAR: {}, ORIENTE: {}, OCCIDENTE: {} };
+  function progCatSerie(zk, causa) {
+    const z = progCat[zk];
+    if (!z[causa]) z[causa] = nuevaProg(N);
+    return z[causa];
+  }
+
   const mesesPresentes = new Set();
   let procesadas = 0;
   let descartadasMes = 0;
@@ -705,6 +749,9 @@ export function agregarDatosCrudos(rows, opts = {}) {
       if (progKey) {
         prog[zk][progKey].saidi[mIdx] += saidi;
         prog[zk][progKey].saifi[mIdx] += saifi;
+        const pc = progCatSerie(zk, causa);
+        pc[progKey].saidi[mIdx] += saidi;
+        pc[progKey].saifi[mIdx] += saifi;
       }
     }
     procesadas++;
@@ -748,6 +795,16 @@ export function agregarDatosCrudos(rows, opts = {}) {
     }
   }
 
+  // Recortar el desglose prog/no-prog por causa al mismo rango.
+  for (const zk of Object.keys(progCat)) {
+    for (const causa of Object.keys(progCat[zk])) {
+      for (const pk of ['programado', 'no_programado']) {
+        progCat[zk][causa][pk].saidi = recortar(progCat[zk][causa][pk].saidi);
+        progCat[zk][causa][pk].saifi = recortar(progCat[zk][causa][pk].saifi);
+      }
+    }
+  }
+
   // Derivar los 3 grupos + total por zona con el clasificador canónico.
   for (const z of Object.values(zonas)) derivarGruposDesdeCategorias(z, span);
 
@@ -781,6 +838,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     dias,
     subests,
     prog,
+    progCat,
     kpi: {},
     proj_global: zonas.TODAS.proj || null,
   };
