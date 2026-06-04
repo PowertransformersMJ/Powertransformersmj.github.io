@@ -165,7 +165,7 @@
       <!-- ===== ROW 1.5: PROGRAMADO vs NO-PROGRAMADO + META ===== -->
       <div class="card" style="margin-bottom:14px">
         <h3>
-          <span><span class="icon" style="background:var(--teal)"></span>Aporte programado vs no-programado · línea META</span>
+          <span><span class="icon" style="background:var(--teal)"></span>Aporte programado vs no-programado · META vs causado</span>
           <span class="pill" id="chart-prog-pill">—</span>
         </h3>
         <div class="serie-modo" id="prog-modo" role="group" aria-label="Modo del aporte programado vs no-programado">
@@ -173,12 +173,17 @@
           <button type="button" class="serie-seg" data-modo="acum" aria-pressed="false">Acumulado</button>
           <span class="serie-modo-hint">acumulado suma mes a mes el aporte a la fecha</span>
         </div>
-        <div class="filters" style="margin-bottom:10px">
-          <label for="meta-saidi">META SAIDI_E (h-eq)</label>
-          <input type="number" id="meta-saidi" min="0" step="0.001" placeholder="objetivo" style="width:120px">
-          <label for="meta-saifi" style="margin-left:14px">META SAIFI_E (int-eq)</label>
-          <input type="number" id="meta-saifi" min="0" step="0.001" placeholder="objetivo" style="width:120px">
-          <span class="small" style="margin-left:auto;color:var(--slate-500)">la línea META usa la métrica activa · barras desde la hoja DATOS (CLASIFICACION_CREG_063)</span>
+        <div class="serie-modo" id="prog-series" role="group" aria-label="Series visibles programado / no programado" style="margin-top:6px">
+          <button type="button" class="serie-seg is-on" data-serie="nop" aria-pressed="true">No programado</button>
+          <button type="button" class="serie-seg is-on" data-serie="prog" aria-pressed="true">Programado</button>
+          <span class="serie-modo-hint">cada chip oculta su barra causada y su línea META</span>
+        </div>
+        <div class="filters" style="margin-bottom:10px;margin-top:6px">
+          <label for="meta-saidi">Objetivo SAIDI_E (h-eq)</label>
+          <input type="number" id="meta-saidi" min="0" step="0.001" placeholder="opcional" style="width:120px">
+          <label for="meta-saifi" style="margin-left:14px">Objetivo SAIFI_E (int-eq)</label>
+          <input type="number" id="meta-saifi" min="0" step="0.001" placeholder="opcional" style="width:120px">
+          <span class="small" style="margin-left:auto;color:var(--slate-500)">barras = causado (hoja DATOS · CLASIFICACION_CREG_063) · líneas dashed = META (hoja META) · usa la métrica y zona activas</span>
         </div>
         <div id="chart-prog" class="chart"></div>
       </div>

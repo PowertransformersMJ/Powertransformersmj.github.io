@@ -97,6 +97,20 @@ export function sincronizarProgModo() {
   });
 }
 
+// Sincroniza los chips de serie (programado / no programado) del chart
+// prog/no-prog con store.state.progSeries.
+export function sincronizarProgSeries() {
+  const ser = store.state.progSeries || { prog: true, nop: true };
+  document.querySelectorAll('#prog-series .serie-seg').forEach(btn => {
+    const key = btn.dataset.serie;
+    const on = key === 'prog' ? ser.prog !== false
+             : key === 'nop'  ? ser.nop  !== false
+             : false;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+}
+
 // ¿El dataset trae detalle diario? (solo el path crudo de la hoja DATOS).
 function _datasetTieneDias(ds) {
   return !!(ds?.dias && Object.keys(ds.dias).some(
@@ -226,6 +240,16 @@ export function inicializarFiltros() {
   document.querySelectorAll('#prog-modo .serie-seg').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.modo) store.setProgModo(btn.dataset.modo);
+    });
+  });
+
+  // Chips de serie del chart prog/no-prog (programado / no programado)
+  document.querySelectorAll('#prog-series .serie-seg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const s = btn.dataset.serie;
+      if (s !== 'prog' && s !== 'nop') return;
+      const cur = store.state.progSeries || { prog: true, nop: true };
+      store.setProgSerie(s, !cur[s]);
     });
   });
 
