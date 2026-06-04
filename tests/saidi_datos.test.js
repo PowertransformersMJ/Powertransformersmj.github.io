@@ -6,6 +6,7 @@ import {
   detectarColumnaFecha, detectarColumnaPorHeader, agregarDatosCrudos,
   COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
   filtrarPorCausa2, CAUSA2_SOBRECARGA, CAUSA2_TODAS,
+  agregarMetaProg,
 } from '../assets/js/domain/saidi_datos.js';
 
 // ── colIdx ────────────────────────────────────────────────────
@@ -765,4 +766,93 @@ test('filtrarPorCausa2: progCat sobrevive al filtro (para re-cruces posteriores)
   const ds = datasetCausa2ProgCat();
   const out = filtrarPorCausa2(ds, 'Sobrecarga');
   assert.deepEqual(out.progCat, ds.progCat);
+});
+
+// ── agregarMetaProg (hoja META plana · prog/no-prog por PERIODO×ZONA) ──
+function metaRowsBase() {
+  return [
+    ['PERIODO', 'ZONA', 'CLASIFICACION_CREG_063', 'META SAIDI_E', 'META SAIFI_E'],
+    ['202601', 'BOLIVAR', 'NO PROGRAMADA NO EXCLUIDA', 0.02, 0.04],
+    ['202601', 'BOLIVAR', 'PROGRAMADAS NO EXCLUIDA', 0.01, 0.03],
+    ['202601', 'OCCIDENTE', 'NO PROGRAMADA NO EXCLUIDA', 0.07, 0.10],
+    ['202601', 'OCCIDENTE', 'PROGRAMADAS NO EXCLUIDA', 0.05, 0.02],
+    ['202602', 'ORIENTE', 'NO PROGRAMADA NO EXCLUIDA', 0.18, 0.12],
+    ['202602', 'ORIENTE', 'PROGRAMADAS NO EXCLUIDA', 0.09, 0.06],
+  ];
+}
+
+test('agregarMetaProg mapea CLASIFICACION a programado/no_programado', () => {
+  const ds = agregarMetaProg(metaRowsBase());
+  // BOLIVAR mes 0 (ENE)
+  assert.equal(ds.prog.BOLIVAR.no_programado.saidi[0], 0.02);
+  assert.equal(ds.prog.BOLIVAR.programado.saidi[0], 0.01);
+  assert.equal(ds.prog.BOLIVAR.no_programado.saifi[0], 0.04);
+  assert.equal(ds.prog.BOLIVAR.programado.saifi[0], 0.03);
+});
+
+test('agregarMetaProg deriva la zona TODAS sumando las 3 zonas', () => {
+  const ds = agregarMetaProg(metaRowsBase());
+  // ENE no_programado SAIDI: BOLIVAR 0.02 + OCCIDENTE 0.07 + ORIENTE 0 = 0.09
+  assert.ok(Math.abs(ds.prog.TODAS.no_programado.saidi[0] - 0.09) < 1e-9);
+  // ENE programado SAIDI: 0.01 + 0.05 + 0 = 0.06
+  assert.ok(Math.abs(ds.prog.TODAS.programado.saidi[0] - 0.06) < 1e-9);
+  // FEB no_programado SAIDI: solo ORIENTE 0.18
+  assert.ok(Math.abs(ds.prog.TODAS.no_programado.saidi[1] - 0.18) < 1e-9);
+});
+
+test('agregarMetaProg recorta al rango de meses presentes (ENE..FEB)', () => {
+  const ds = agregarMetaProg(metaRowsBase());
+  assert.deepEqual(ds.meses, ['Ene', 'Feb']);
+  assert.deepEqual(ds.mesesIdx, [0, 1]);
+  assert.equal(ds.prog.BOLIVAR.programado.saidi.length, 2);
+});
+
+test('agregarMetaProg deriva totales por zona = programado + no_programado', () => {
+  const ds = agregarMetaProg(metaRowsBase());
+  // OCCIDENTE total SAIDI ENE = 0.07 + 0.05 = 0.12
+  assert.ok(Math.abs(ds.zonas.OCCIDENTE.total_saidi[0] - 0.12) < 1e-9);
+  // TODAS total SAIFI ENE = (0.04+0.03)+(0.10+0.02) = 0.19
+  assert.ok(Math.abs(ds.zonas.TODAS.total_saifi[0] - 0.19) < 1e-9);
+});
+
+test('agregarMetaProg detecta columnas por encabezado (orden tolerante)', () => {
+  const rows = [
+    ['ZONA', 'META SAIFI_E', 'CLASIFICACION_CREG_063', 'PERIODO', 'META SAIDI_E'],
+    ['BOLIVAR', 0.04, 'NO PROGRAMADA NO EXCLUIDA', '202603', 0.02],
+    ['BOLIVAR', 0.03, 'PROGRAMADAS NO EXCLUIDA', '202603', 0.01],
+  ];
+  const ds = agregarMetaProg(rows);
+  assert.deepEqual(ds.meses, ['Mar']);
+  assert.equal(ds.prog.BOLIVAR.no_programado.saidi[0], 0.02);
+  assert.equal(ds.prog.BOLIVAR.programado.saifi[0], 0.03);
+});
+
+test('agregarMetaProg ignora PERIODO no YYYYMM y zonas fuera de catálogo', () => {
+  const rows = [
+    ['PERIODO', 'ZONA', 'CLASIFICACION_CREG_063', 'META SAIDI_E', 'META SAIFI_E'],
+    ['2026-01', 'BOLIVAR', 'NO PROGRAMADA NO EXCLUIDA', 9, 9],   // periodo inválido
+    ['202601', 'CARIBE', 'NO PROGRAMADA NO EXCLUIDA', 9, 9],     // zona inválida
+    ['202601', 'BOLIVAR', 'NO PROGRAMADA NO EXCLUIDA', 0.02, 0.04],
+  ];
+  const ds = agregarMetaProg(rows);
+  assert.equal(ds.prog.BOLIVAR.no_programado.saidi[0], 0.02);
+  assert.equal(ds.prog.TODAS.no_programado.saidi[0], 0.02);  // CARIBE descartado
+});
+
+test('agregarMetaProg lanza si faltan columnas obligatorias', () => {
+  assert.throws(() => agregarMetaProg([['FOO', 'BAR'], ['a', 'b']]), /faltan columnas/);
+});
+
+test('agregarMetaProg lanza si no hay filas válidas', () => {
+  const rows = [
+    ['PERIODO', 'ZONA', 'CLASIFICACION_CREG_063', 'META SAIDI_E', 'META SAIFI_E'],
+    ['bad', 'BOLIVAR', 'NO PROGRAMADA NO EXCLUIDA', 1, 1],
+  ];
+  assert.throws(() => agregarMetaProg(rows), /ninguna fila válida/);
+});
+
+test('agregarMetaProg deja cats_order vacío (META no trae categorías)', () => {
+  const ds = agregarMetaProg(metaRowsBase());
+  assert.deepEqual(ds.cats_order, []);
+  assert.equal(ds.proj_global, null);
 });
