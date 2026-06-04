@@ -45,6 +45,7 @@ import {
   aplicarTipoZona,
   derivarGruposDesdeCategorias,
   agregarDatosCrudos,
+  agregarMetaProg,
 } from '../../domain/saidi_datos.js';
 
 const SHEETJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
@@ -193,6 +194,25 @@ async function parsearExcel(file) {
   if (tienePreAgg) {
     const wb = XLSX.read(buf, { type: 'array', cellDates: false });
     return parsearExcelPreAgregado(XLSX, wb, upper);
+  }
+
+  // Vía rápida · hoja META plana (PERIODO × ZONA × CLASIFICACION_CREG_063
+  // con META SAIDI_E / SAIFI_E). Es la fuente del aporte programado /
+  // no-programado por zona y mes (la hoja DASHBOARD es su pivote). Se lee
+  // SOLO esa hoja para no parsear la hoja DATOS (54 MB) cuando lo que se
+  // necesita es el segmento prog/no-prog filtrable por zona/mes/métrica.
+  if (upper.META) {
+    const wbMeta = XLSX.read(buf, { type: 'array', cellDates: false, sheets: [upper.META] });
+    const metaRows = XLSX.utils.sheet_to_json(
+      wbMeta.Sheets[upper.META], { header: 1, blankrows: false, defval: '' });
+    const head = (metaRows[0] || []).map(h => String(h || '').toUpperCase());
+    const esMetaProg = head.some(h => h.includes('PERIODO'))
+      && head.some(h => h.includes('CLASIFIC'));
+    if (esMetaProg) {
+      const dataset = agregarMetaProg(metaRows);
+      console.info('[calidad/upload] META prog/no-prog agregado · meses:', dataset.meses.length);
+      return dataset;
+    }
   }
 
   // Hoja DATOS: nombre exacto o cualquier hoja que lo contenga
