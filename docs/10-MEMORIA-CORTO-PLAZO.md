@@ -15,18 +15,29 @@
 
 ## 🎯 Foco actual
 
-> 🧠 **Cerebro neuronal recién instalado** sobre SGM·TRANSPOWER (2026-06-04). El
-> CLAUDE.md monolítico previo (3081 líneas) quedó cuarentenado en
-> `_legacy/CLAUDE-previo.md` — sigue siendo la fuente histórica más rica (plan
-> F0–F37, 14 reglas §0.1.2.*, handoff visual §9). El cerebro nuevo cosechó lo
-> esencial en §1 + `05` + `20` + `30`; el resto se consulta on-demand desde el legacy.
+> 🧠 **Cerebro neuronal instalado + auditado** sobre SGM·TRANSPOWER (2026-06-04).
+> Instalación cerrada como **ADR-001** (`99-HISTORIAL` línea 20). El CLAUDE.md
+> monolítico previo (3081 líneas) quedó cuarentenado en `_legacy/CLAUDE-previo.md`
+> — sigue siendo la fuente histórica más rica (plan F0–F37, 14 reglas §0.1.2.*,
+> handoff visual §9). Lo esencial se cosechó en §1 + `05` + `20` + `30`; el resto
+> se consulta on-demand desde el legacy.
 >
-> No hay tarea de producto en curso. Esperar pedido del director (feature, bugfix
-> o deploy) y seguir el árbol de decisión `_legacy/CLAUDE-previo.md §7.2`.
+> **✅ Cerebro commiteado local como `8a6db90`** (`feat(cerebro): instalar sistema
+> de memoria neuronal documental`) vía GitHub Desktop — incluyó `skills/` (290
+> archivos tracked). **⏳ PENDIENTE menor**: este lote de docs de cierre (`00`, `05`,
+> `10`, `99` — el ADR-001 + índice + auditoría) quedó modificado DESPUÉS de ese
+> commit → el director debe hacer un 2º commit pequeño con ellos. **⏳ Verificar
+> push**: confirmar que `8a6db90` (+ el commit de cierre) llegaron a `origin/main`
+> para que GitHub Pages deploye. NO requiere deploy Firebase (no se tocó
+> rules/indexes/storage/functions).
+>
+> Tras eso: no hay tarea de producto en curso. Esperar pedido del director
+> y seguir el árbol de decisión `_legacy/CLAUDE-previo.md §7.2`.
 >
 > **🚫 Callejones sin salida**: (1) NO usar canales MCP/`git push` del runtime para
 > escribir — dan 403; solo PAT inline funciona. (2) NO asumir que las reglas/índices
-> Firebase están desplegados — el director deploya a mano.
+> Firebase están desplegados — el director deploya a mano. (3) En scripts del cerebro,
+> NUNCA `2>NUL` (Windows) — crea archivo literal `NUL` en macOS; usar `2>/dev/null` (ver M-01).
 
 ---
 
@@ -52,3 +63,5 @@
 
 - **2026-06-04** — Instalado el cerebro neuronal (7 fases). CLAUDE.md previo → cuarentena. Cosechado §1/05/20/30 con datos reales del proyecto.
 - **2026-06-04** — Auditoría holística post-instalación: limpieza de `CEREBRO NUEVO/` (3.3 MB fuente redundante) + `NUL` (artefacto 0-byte). brain:check SANO, cero huérfanos, 15 hojas técnicas referenciadas, rutas del proyecto verificadas, frescura `05` ↔ git real OK. TODO-03 detectado stale → marcado ✅ (ya resuelto por commit `18a25c6`).
+- **2026-06-04** — Bug `M-01` corregido: `brain-check.mjs:171` usaba `2>NUL` (Windows) → recreaba archivo `NUL` en cada corrida; cambiado a `2>/dev/null`, verificado que no se recrea. Lección en `30 §Meta`.
+- **2026-06-04** — Cierre: instalación consolidada como ADR-001 (`99` + fila en `00`). El director commiteó el cerebro como `8a6db90` vía GitHub Desktop (incluyó `skills/`). Queda 2º commit pendiente con los docs de cierre (00/05/10/99) + verificar push a `origin/main`.
