@@ -858,3 +858,114 @@ export function agregarDatosCrudos(rows, opts = {}) {
 
   return { dataset, reporte };
 }
+
+// ── Agregador · hoja META (tabla plana prog/no-prog por PERIODO×ZONA) ──
+// La hoja META de "Data de Analisis.xlsx" trae una fila por
+// PERIODO (YYYYMM) × ZONA × CLASIFICACION_CREG_063 con META SAIDI_E y
+// META SAIFI_E. Es la fuente autoritativa del aporte programado /
+// no-programado: la hoja DASHBOARD es solo su pivote visual. Se parsea
+// como vía rápida para poblar `dataset.prog` SIN tocar la hoja DATOS
+// (54 MB, impracticable en navegador). Deriva además los totales por
+// zona (programado + no-programado) para que serie/KPI no queden vacías;
+// las categorías y el cruce CAUSA2 quedan vacíos (la META no los trae).
+//
+// `rows` es array-of-arrays (XLSX header:1) incluyendo el encabezado.
+export function agregarMetaProg(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) {
+    throw new Error('Hoja META vacía o sin filas de datos');
+  }
+  const N = MESES_CANON.length;
+
+  // Detección de columnas por encabezado (tolerante a orden y acentos).
+  const head = (rows[0] || []).map(h => String(h || '').trim().toUpperCase());
+  const findCol = (...pats) => head.findIndex(h => pats.some(p => h.includes(p)));
+  const cPeriodo = findCol('PERIODO');
+  const cZona    = findCol('ZONA');
+  const cClas    = findCol('CLASIFIC');
+  const cSaidi   = findCol('SAIDI');
+  const cSaifi   = findCol('SAIFI');
+  if (cPeriodo < 0 || cZona < 0 || cClas < 0 || (cSaidi < 0 && cSaifi < 0)) {
+    throw new Error(
+      'Hoja META · faltan columnas PERIODO / ZONA / CLASIFICACION / SAIDI_E / SAIFI_E'
+    );
+  }
+
+  const prog = {
+    TODAS:     nuevaProg(N),
+    BOLIVAR:   nuevaProg(N),
+    ORIENTE:   nuevaProg(N),
+    OCCIDENTE: nuevaProg(N),
+  };
+  const ZONAS_VALIDAS = new Set(['BOLIVAR', 'ORIENTE', 'OCCIDENTE']);
+  const mesesPresentes = new Set();
+
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r] || [];
+    const per = String(row[cPeriodo] == null ? '' : row[cPeriodo]).trim();
+    const mm = /^(\d{4})(\d{2})$/.exec(per);
+    if (!mm) continue;
+    const mIdx = (+mm[2]) - 1;
+    if (mIdx < 0 || mIdx > 11) continue;
+
+    const zk = String(row[cZona] || '').trim().toUpperCase();
+    if (!ZONAS_VALIDAS.has(zk)) continue;
+
+    // "NO PROGRAMADA…" → no_programado; "PROGRAMADA(S)…" → programado.
+    const clas = String(row[cClas] || '').trim().toUpperCase();
+    const progKey = clas.startsWith('NO PROGRAMADA') ? 'no_programado'
+                  : clas.startsWith('PROGRAMADA')    ? 'programado'
+                  : null;
+    if (!progKey) continue;
+
+    const saidi = cSaidi >= 0 ? (+row[cSaidi] || 0) : 0;
+    const saifi = cSaifi >= 0 ? (+row[cSaifi] || 0) : 0;
+    for (const z of [zk, 'TODAS']) {
+      prog[z][progKey].saidi[mIdx] += saidi;
+      prog[z][progKey].saifi[mIdx] += saifi;
+    }
+    mesesPresentes.add(mIdx);
+  }
+
+  if (!mesesPresentes.size) {
+    throw new Error(
+      'Hoja META · ninguna fila válida (se esperaba PERIODO YYYYMM + ZONA + CLASIFICACION_CREG_063)'
+    );
+  }
+
+  // Recorte al rango de meses con datos (primer..último mes presente).
+  const minMes = Math.min(...mesesPresentes);
+  const maxMes = Math.max(...mesesPresentes);
+  const meses = MESES_CANON.slice(minMes, maxMes + 1);
+  const mesesIdx = [];
+  for (let i = minMes; i <= maxMes; i++) mesesIdx.push(i);
+
+  const recortar = (arr) => arr.slice(minMes, maxMes + 1);
+  for (const zk of Object.keys(prog)) {
+    for (const pk of ['programado', 'no_programado']) {
+      prog[zk][pk].saidi = recortar(prog[zk][pk].saidi);
+      prog[zk][pk].saifi = recortar(prog[zk][pk].saifi);
+    }
+  }
+
+  // Totales por zona = programado + no-programado por mes. Las categorías
+  // quedan vacías (la META no las desglosa); serie/KPI muestran el total.
+  const zonas = {};
+  for (const zk of Object.keys(prog)) {
+    const z = nuevaZona();
+    const p = prog[zk];
+    z.total_saidi = p.programado.saidi.map((v, i) => v + p.no_programado.saidi[i]);
+    z.total_saifi = p.programado.saifi.map((v, i) => v + p.no_programado.saifi[i]);
+    zonas[zk] = z;
+  }
+
+  return {
+    meses,
+    meses_full: MESES_CANON.slice(),
+    mesesIdx,
+    zonas,
+    cats_order: [],
+    prog,
+    kpi: {},
+    proj_global: null,
+  };
+}
