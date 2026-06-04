@@ -11,7 +11,7 @@
 | Señal | Valor |
 |---|---|
 | **Build** | 🟢 tests verdes (`node --test`) + lint HTML limpio al último cierre. |
-| **Versión** | `v2.4.1` (último tag) · trabajo visual/funcional posterior sin tag nuevo. |
+| **Versión** | `v2.4.1` (último tag) · cerebro neuronal v1.0.0 instalado y commiteado local (`8a6db90`, ADR-001). Docs de cierre (00/05/10/99) en commit aparte pendiente (ver `10`). |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `main` (verificado 2026-06-04). `main` solo se toca con pedido explícito. |
 | **Producción** | `main` → auto-deploy GitHub Pages (`pages.yml`) en `https://powertransformersmj.github.io/`. Último commit `e372c6c` (Merge PR #92). |
