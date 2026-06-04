@@ -26,7 +26,7 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, actualizarInforme,
-  descargarBlobInforme
+  descargarBlobInforme, extraerConIA
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
@@ -534,7 +534,14 @@ function arrancar() {
    ══════════════════════════════════════════════════════════════ */
 
 // item: { id, file, ano, textoPdf }
-const UP = { step: 1, serie: '', items: [], store: true };
+// Modelos de IA disponibles para la extracción (cascada). El valor debe
+// coincidir con la allowlist de la Cloud Function extraerPruebasElectricasIA.
+const MODELOS_IA = [
+  { id: 'claude-sonnet-4-6', label: 'Sonnet 4.6 · equilibrado (recomendado)' },
+  { id: 'claude-opus-4-7',   label: 'Opus 4.7 · máxima precisión (PDFs difíciles)' },
+  { id: 'claude-haiku-4-5',  label: 'Haiku 4.5 · rápido y económico' }
+];
+const UP = { step: 1, serie: '', items: [], store: true, usarIA: true, modelId: 'claude-sonnet-4-6' };
 let _itemSeq = 0;
 
 function toast(msg, kind) {
@@ -687,12 +694,23 @@ function renderModal() {
       `<div class="clist">${filas}</div>` +
       `<label class="chk"><input type="checkbox" id="store" ${UP.store ? 'checked' : ''}>` +
       `<span>Almacenar los informes y sus PDF originales (si Firebase está activo).</span></label>` +
+      `<label class="chk"><input type="checkbox" id="usarIA" ${UP.usarIA ? 'checked' : ''}>` +
+      `<span>Extraer las mediciones con IA (lee el PDF completo). Si falla o no hay saldo, se usa el lector local.</span></label>` +
+      `<div class="flbl" id="iaModeloWrap" style="margin-top:10px${UP.usarIA ? '' : ';display:none'}">Modelo de IA` +
+      `<select class="inp" id="iaModelo" style="margin-top:6px">` +
+      MODELOS_IA.map((m) => `<option value="${m.id}"${m.id === UP.modelId ? ' selected' : ''}>${esc(m.label)}</option>`).join('') +
+      `</select></div>` +
       `<label class="chk"><input type="checkbox" id="chk">` +
       `<span>Confirmo que los datos son correctos.</span></label>` +
       `<div class="mfoot">` +
       `<button class="btn btn-ghost" id="mBack3">Atrás</button>` +
       `<button class="btn btn-primary" id="mStore" disabled>Almacenar</button></div>`;
     $('store').onchange = (e) => { UP.store = e.target.checked; };
+    $('usarIA').onchange = (e) => {
+      UP.usarIA = e.target.checked;
+      const w = $('iaModeloWrap'); if (w) w.style.display = UP.usarIA ? '' : 'none';
+    };
+    $('iaModelo').onchange = (e) => { UP.modelId = e.target.value; };
     $('chk').onchange = (e) => { $('mStore').disabled = !e.target.checked; };
     $('mBack3').onclick = () => { UP.step = 2; renderModal(); };
     $('mStore').onclick = storeReport;
@@ -946,17 +964,45 @@ async function storeReport() {
         // del PDF u OCR del escaneo/imagen, ya dejado en item.textoPdf).
         // La traza _diagnostico ayuda a calibrar las expresiones contra
         // informes reales sin adivinar a ciegas.
-        const med = extraerMediciones(item.textoPdf || '');
-        const { _diagnostico, ...mediciones } = med;
-        console.info(`[pruebas-electricas] extracción ${esc(UP.serie)} · ${item.ano || 's/a'} →`,
-          _diagnostico.campos.length ? _diagnostico.campos.join(', ') : 'sin datos',
-          _diagnostico.traza);
+        // Extracción de mediciones. Preferencia: IA (Claude lee el PDF
+        // nativo, agnóstica al formato) → si falla/sin saldo, fallback al
+        // lector local regex/OCR. El editor manual queda como última red.
+        let mediciones = null;
+        let estado = 'pendiente_extraccion';
+        let anoIA = null;
+        if (UP.usarIA && pdfMeta && pdfMeta.storagePath && esPdf(item.file)) {
+          try {
+            setItemEstado(item, 'Analizando con IA…');
+            const r = await extraerConIA({
+              unidadId, serie: UP.serie,
+              storagePath: pdfMeta.storagePath, filename: pdfMeta.filename,
+              modelId: UP.modelId
+            });
+            mediciones = r.mediciones || {};
+            anoIA = mediciones.ano != null ? mediciones.ano : null;
+            estado = 'extraido_ia';
+            console.info(`[pruebas-electricas] IA ${r.modelUsed} ${esc(UP.serie)} · ${anoIA || item.ano || 's/a'} · tokens`, r.usage);
+          } catch (err) {
+            console.warn('[pruebas-electricas] IA falló, fallback al lector local', err);
+            toast('IA no disponible: se usó el lector local.', 'warn');
+          }
+        }
+        if (!mediciones) {
+          // Extrae las 6 mediciones del texto del informe (capa de texto
+          // del PDF u OCR del escaneo/imagen, ya dejado en item.textoPdf).
+          const med = extraerMediciones(item.textoPdf || '');
+          const { _diagnostico, ...rest } = med;
+          mediciones = rest;
+          estado = _diagnostico.campos.length ? 'extraido' : 'pendiente_extraccion';
+          console.info(`[pruebas-electricas] extracción ${esc(UP.serie)} · ${item.ano || 's/a'} →`,
+            _diagnostico.campos.length ? _diagnostico.campos.join(', ') : 'sin datos',
+            _diagnostico.traza);
+        }
         const informe = sanitizarInforme({
-          unidadId, serie: UP.serie, ano: item.ano,
           ...mediciones,
-          pdf: pdfMeta
-            ? { ...pdfMeta, estado: _diagnostico.campos.length ? 'extraido' : 'pendiente_extraccion' }
-            : undefined
+          unidadId, serie: UP.serie,
+          ano: anoIA != null ? anoIA : item.ano,
+          pdf: pdfMeta ? { ...pdfMeta, estado } : undefined
         });
         await crearInforme(unidadId, informe, uid);
       }
