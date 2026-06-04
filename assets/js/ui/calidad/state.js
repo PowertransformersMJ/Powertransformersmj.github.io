@@ -30,6 +30,10 @@ const _state = {
   // de cada mes) | 'acum' (aporte acumulado a la fecha, suma mes a mes).
   // Independiente de serieModo; solo afecta el chart prog.
   progModo: 'mes',
+  // Series visibles del card prog/no-prog. Permite filtrar "programado" /
+  // "no programado" de forma independiente (cada chip oculta la barra y su
+  // línea META correspondiente). Ambas activas por defecto.
+  progSeries: { prog: true, nop: true },
   // Filtros propios del card "Ranking TOP 10 de subestaciones" (no
   // tocan los filtros globales). rankZona = zona de la tabla; rankMes
   // = null (todos los meses) o entero 0–11 (mes-calendario único).
@@ -88,6 +92,15 @@ export const store = {
   setMet(m)   { _state.met  = m; notify(); },
   setSerieModo(m) { _state.serieModo = (m === 'acum' ? 'acum' : 'mes'); notify(); },
   setProgModo(m)  { _state.progModo  = (m === 'acum' ? 'acum' : 'mes'); notify(); },
+  setProgSerie(serie, on) {
+    if (serie !== 'prog' && serie !== 'nop') return;
+    const next = { ...(_state.progSeries || { prog: true, nop: true }) };
+    next[serie] = !!on;
+    // Nunca dejar ambas apagadas: el chart quedaría vacío.
+    if (!next.prog && !next.nop) next[serie === 'prog' ? 'nop' : 'prog'] = true;
+    _state.progSeries = next;
+    notify();
+  },
   setSerieMes(m) {
     const n = (m == null || m === '') ? null : +m;
     _state.serieMes = (n == null || !Number.isFinite(n)) ? null : Math.max(0, Math.min(11, Math.trunc(n)));

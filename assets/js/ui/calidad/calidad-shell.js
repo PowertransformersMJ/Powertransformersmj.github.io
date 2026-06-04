@@ -11,7 +11,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
-import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo, sincronizarProgModo, pintarSelectorMes, sincronizarSerieMes, pintarSelectorRankZona, pintarSelectorRankMes, sincronizarRank, pintarSelectorCausa2, sincronizarMeta } from './filtros.js';
+import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo, sincronizarProgModo, sincronizarProgSeries, pintarSelectorMes, sincronizarSerieMes, pintarSelectorRankZona, pintarSelectorRankMes, sincronizarRank, pintarSelectorCausa2, sincronizarMeta } from './filtros.js';
 import { filtrarPorCausa2 } from '../../domain/saidi_datos.js';
 import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
 import { inicializarPersistencia, limpiarPersistencia, handleFiles } from './upload.js';
@@ -103,7 +103,7 @@ function safeRender(name, fn) {
 }
 
 function renderAll(state) {
-  const { dataset, zona, met, source, serieModo, serieMes, rankZona, rankMes, causa2, metaSaidi, metaSaifi, progModo } = state;
+  const { dataset, zona, met, source, serieModo, serieMes, rankZona, rankMes, causa2, metaSaidi, metaSaifi, progModo, progSeries } = state;
   if (!dataset) return;
   ocultarError();
   safeRender('selector-zona',  () => pintarSelectorZona());
@@ -113,6 +113,7 @@ function renderAll(state) {
   safeRender('serie-modo',     () => sincronizarSerieModo());
   safeRender('serie-mes',      () => { pintarSelectorMes(); sincronizarSerieMes(); });
   safeRender('prog-modo',      () => sincronizarProgModo());
+  safeRender('prog-series',    () => sincronizarProgSeries());
   safeRender('meta',           () => sincronizarMeta());
   safeRender('rank-filtros',   () => { pintarSelectorRankZona(); pintarSelectorRankMes(); sincronizarRank(); });
   actualizarSourcePill(source, state._meta);
@@ -131,7 +132,7 @@ function renderAll(state) {
   safeRender('kpis',        () => renderKPIs(viewDS, zona, met));
   safeRender('insight',     () => renderInsight(viewDS, zona, met));
   safeRender('serie',       () => renderSerie(viewDS, zona, met, serieModo, serieMes));
-  safeRender('prog',        () => renderProg(viewDS, zona, met, metaSaidi, metaSaifi, progModo));
+  safeRender('prog',        () => renderProg(viewDS, zona, met, metaSaidi, metaSaifi, progModo, progSeries));
   safeRender('stack',       () => renderStack(viewDS, zona, met));
   safeRender('part',        () => renderPart(viewDS, zona, met));
   safeRender('varmom',      () => renderVarMoM(viewDS, zona, met));
