@@ -40,7 +40,13 @@ function vacio(motivo) {
   Plotly.react('chart-prog', [], layout, plotlyCfg());
 }
 
-export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaSaifi = null) {
+// Suma corrida mes a mes (aporte acumulado a la fecha).
+function acumular(arr) {
+  let s = 0;
+  return arr.map(v => (s += (+v || 0)));
+}
+
+export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaSaifi = null, progModo = 'mes') {
   if (typeof Plotly === 'undefined' || !dataset) return;
 
   const pill = $('#chart-prog-pill');
@@ -57,13 +63,19 @@ export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaS
   // de métrica sigue mandando para el resto de gráficas.
   const m = metricasActivas(met)[0];
   const meses = dataset.meses || [];
-  const progS = (p.programado?.[m]    || []).map(v => +v || 0);
-  const nopS  = (p.no_programado?.[m] || []).map(v => +v || 0);
+  const progMes = (p.programado?.[m]    || []).map(v => +v || 0);
+  const nopMes  = (p.no_programado?.[m] || []).map(v => +v || 0);
   const meta  = m === 'saidi' ? metaSaidi : metaSaifi;
+
+  // 'acum' → aporte a la fecha (suma corrida); 'mes' → aporte del mes.
+  const acum  = progModo === 'acum';
+  const progS = acum ? acumular(progMes) : progMes;
+  const nopS  = acum ? acumular(nopMes)  : nopMes;
+  const sufModo = acum ? ' · acumulado' : '';
 
   const layout = layoutBase();
   layout.barmode = 'group';
-  layout.yaxis = { ...layout.yaxis, title: { text: SUF[m], font: { size: 10 } } };
+  layout.yaxis = { ...layout.yaxis, title: { text: SUF[m] + sufModo, font: { size: 10 } } };
 
   const traces = [
     {
@@ -91,10 +103,11 @@ export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaS
   Plotly.react('chart-prog', traces, layout, plotlyCfg());
 
   if (pill) {
+    // Totales a la fecha (independiente del modo, son las sumas completas).
     const tot = (a) => a.reduce((x, y) => x + y, 0);
-    const tp = tot(progS), tn = tot(nopS);
+    const tp = tot(progMes), tn = tot(nopMes);
     const total = tp + tn;
     const pctN = total > 0 ? Math.round((tn / total) * 100) : 0;
-    pill.textContent = `${SUF[m]} · no-prog ${pctN}%`;
+    pill.textContent = `${SUF[m]} · no-prog ${pctN}%${sufModo}`;
   }
 }
