@@ -57,6 +57,18 @@ export function getStorageSafe() {
   return app ? getStorage(app) : null;
 }
 
+// Cloud Functions (HTTPS Callable). Región fija = la de los triggers v2
+// del proyecto (southamerica-east1); debe coincidir con functions/index.js
+// o el callable responde 'not-found'. Carga el SDK de Functions on-demand
+// para no penalizar a las vistas que no invocan funciones.
+export async function getFunctionsSafe() {
+  const app = initApp();
+  if (!app) return null;
+  const { getFunctions } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js');
+  return getFunctions(app, 'southamerica-east1');
+}
+
 export { isFirebaseConfigured };
 
 // Prueba de conexión opcional (solo cuando se carga manualmente).

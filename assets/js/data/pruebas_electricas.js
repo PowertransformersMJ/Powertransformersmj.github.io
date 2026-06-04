@@ -27,7 +27,7 @@ import {
   onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
-import { getDbSafe, getStorageSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { getDbSafe, getStorageSafe, getFunctionsSafe, isFirebaseConfigured } from '../firebase-init.js';
 import { deepClean } from './_firestore_clean.js';
 import {
   sanitizarUnidad, validarUnidad,
@@ -188,4 +188,34 @@ export async function descargarBlobInforme(storagePath) {
   const { ref: sref, getBlob } =
     await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
   return getBlob(sref(storage, storagePath));
+}
+
+/**
+ * Extracción de mediciones con IA (Claude vía Cloud Function onCall). El
+ * PDF ya está en Storage (subirPDF); aquí solo se pasa su ruta + el
+ * modelo elegido. La función lo lee server-side, lo manda a Claude como
+ * documento nativo y devuelve las mediciones en la MISMA forma que
+ * consume sanitizarInforme(). Lanza si no hay backend, sin sesión, sin
+ * saldo o si la IA falla — el llamador hace fallback al extractor local.
+ * @param {{unidadId:string, serie:string, storagePath:string, filename?:string, modelId?:string}} payload
+ * @returns {Promise<{mediciones:object, modelUsed:string, usage:object}>}
+ */
+export async function extraerConIA(payload) {
+  if (!isReady()) throw new Error('Firebase no inicializado.');
+  if (!payload || !payload.storagePath) throw new Error('Falta la ruta del PDF.');
+  const functions = await getFunctionsSafe();
+  if (!functions) throw new Error('Cloud Functions no disponible.');
+  const { httpsCallable } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js');
+  const fn = httpsCallable(functions, 'extraerPruebasElectricasIA');
+  const res = await fn({
+    unidadId:    payload.unidadId,
+    serie:       payload.serie,
+    storagePath: payload.storagePath,
+    filename:    payload.filename || '',
+    modelId:     payload.modelId || ''
+  });
+  const data = res && res.data;
+  if (!data || !data.mediciones) throw new Error('La IA no devolvió mediciones.');
+  return data;
 }

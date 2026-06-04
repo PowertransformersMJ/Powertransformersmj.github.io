@@ -523,3 +523,17 @@ Reusa el patrón de `domain/importador.js` + `data/importar.js`.
 > Cada microfase preserva lo verde (864/864 tests + lint) y mantiene
 > intacto lo que hoy se aprecia (selector de serie, tablero por unidad,
 > gráficas de tendencia, informes base de `173523-15510`).
+
+---
+
+## 13. Extracción con IA (Claude) — ADR-003 (2026-06-04)
+
+Reemplaza/complementa al extractor regex para PDFs sin formato fijo. **Flujo de carga real**:
+
+`pages/pruebas-electricas.html` (modal) → `pruebas-electricas-shell.js#storeReport`:
+1. `subirPDF(unidadId, file)` → PDF a Storage `pruebas_electricas/{serie}/{filename}` → `{storagePath,…}`.
+2. Si `UP.usarIA` y es PDF → `extraerConIA({storagePath, modelId})` (`data/pruebas_electricas.js`) → `httpsCallable('extraerPruebasElectricasIA')` (región `southamerica-east1` vía `firebase-init.js#getFunctionsSafe`).
+3. **Cloud Function** `functions/index.js#extraerPruebasElectricasIA` (onCall, secret `LLM_API_KEY`): descarga el PDF de Storage (admin SDK) → Claude (`@anthropic-ai/sdk`) con **documento PDF nativo** + **tool use forzado** `registrar_pruebas_electricas` (su `input_schema` espeja `sanitizarInforme`) + **prompt caching** del system. Devuelve `{mediciones, modelUsed, usage}` crudo.
+4. Si la IA falla → fallback `extraerMediciones` (regex/OCR). En ambos casos → `sanitizarInforme` → `crearInforme`. Última red: editor manual.
+
+**Modelos** (cascada, allowlist en la función): `claude-sonnet-4-6` (def) · `claude-opus-4-7` (escalación) · `claude-haiku-4-5`. **La IA NO califica** — solo extrae números crudos; el semáforo lo deriva el dominio. Contrato fijado por `tests/pruebas_electricas_ia.test.js`. Detalle del "por qué" → `99` §3. **Requiere deploy del director** (función + secret, `05`/`10` TODO-04). Esto cubre la microfase **P6** del roadmap §12 (entrada por IA en vez de endpoints REST manuales).

@@ -15,7 +15,7 @@
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `main` (verificado 2026-06-04). `main` solo se toca con pedido explícito. |
 | **Producción** | `main` → auto-deploy GitHub Pages (`pages.yml`) en `https://powertransformersmj.github.io/`. Último commit `e372c6c` (Merge PR #92). |
-| **Deploys backend pendientes** | ⚠️ los 4 canales Firebase (rules / indexes / storage / functions) NO tienen auto-deploy — el director los corre a mano en su Mac (ver `CLAUDE.md §1` + `docs/30-LECCIONES.md`). |
+| **Deploys backend pendientes** | ⚠️ los 4 canales Firebase (rules / indexes / storage / functions) NO tienen auto-deploy — el director los corre a mano en su Mac (ver `CLAUDE.md §1` + `docs/30-LECCIONES.md`). **🆕 PENDIENTE (ADR-003 / TODO-04)**: desplegar función `extraerPruebasElectricasIA` + secret `LLM_API_KEY` (`cd functions && npm install` → `firebase functions:secrets:set LLM_API_KEY` → `firebase deploy --only functions:extraerPruebasElectricasIA`). |
 
 ## ⚠️ Flags de riesgo activos
 - **Push restringido** (L-01): runtime da 403; único canal es `git push https://USER:TOKEN@github.com/...` con PAT inline. **Deploys Firebase manuales** (L-09): tocar `rules`/`indexes`/`storage`/`functions` exige avisar `firebase deploy` en el mismo turno (`CLAUDE.md §1`).

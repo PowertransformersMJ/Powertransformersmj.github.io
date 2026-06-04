@@ -58,3 +58,26 @@
 **2.6 Archivos** — *Nuevos (NO versionados, ver 2.7)*: `.claude/skills/{24 carpetas}`. *Modificados*: `docs/skills-inventory.md` (estado real), `docs/{00,10,30,99}` (consolidación). *INTACTOS*: `skills/` (fuente), todo `assets/`/`pages/`/`admin/`/`functions/`.
 
 **2.7 Doctrina aplicada + nota de wiring** — Reflejo de Captura + Frescura (§G.4). **`.claude/` está gitignorado a propósito** (`.gitignore:22` — "memoria local, nunca al repo"), por eso las 24 skills son **local-only**: si se re-clona el repo hay que re-correr el copy (la fuente vive en `skills/`, que SÍ está tracked). Receta reusable extraída → `L-19` en `30-LECCIONES`. La activación exige **reiniciar Claude Code** (escaneo de skills es solo en boot; no hay carga en caliente). Sin cache bump (no aplica §4).
+
+---
+
+## 3. ADR-003 — Extracción de informes de Pruebas Eléctricas con IA (Claude) vía Cloud Function
+
+> Pedido del director (2026-06-04): *"Montar un LLM (Opus + Sonnet) que analice
+> los PDF de pruebas eléctricas que sube el admin —sin formato estandarizado— y
+> los lleve al tablero bien organizados, independientemente del PDF. Ya cargué
+> créditos en platform.claude.com."* (Trigger 🛰️ Decisión Fuerte + Skill `claude-api`.)
+
+**3.1 Causa raíz / motivación** — El extractor `assets/js/domain/pruebas_electricas_extraccion.js` es regex/heurístico rígido: solo acierta en PDFs con layout ideal y deja `null` en informes de otros laboratorios (política conservadora correcta, pero cobertura pobre). El schema y los calificadores normativos (`pruebas_electricas_schema.js`) ya son exhaustivos y testeados — lo único que faltaba era una extracción agnóstica al formato.
+
+**3.2 Solución estructural** — Cloud Function v2 `onCall` **`extraerPruebasElectricasIA`** (región `southamerica-east1`, secret `LLM_API_KEY`): recibe `{storagePath, filename, modelId}`, **descarga el PDF nativo desde Storage server-side** (el cliente ya lo subió con `subirPDF` antes de extraer → evita el límite de payload del callable y deja que Claude *vea* tablas/escaneos), y lo envía a Claude con **(a) documento PDF nativo**, **(b) tool use forzado** (`registrar_pruebas_electricas`, cuyo `input_schema` espeja la "bolsa de mediciones" de `sanitizarInforme`), **(c) prompt caching** en el system prompt (pericia de dominio de las 7 familias). La función NO califica ni sanitiza: devuelve el `tool_use.input` crudo; el cliente sigue llamando `sanitizarInforme` + `crearInforme` igual que antes (un solo punto de verdad para el semáforo). Cascada de modelos: `claude-sonnet-4-6` por defecto, `claude-opus-4-7` escalación, `claude-haiku-4-5` económico. Fallback en capas: **IA → extractor regex local → editor manual** (ya existente). Selector de modelo + toggle "Usar IA" en el paso 3 del modal de carga.
+
+**3.3 No-regresión** — `pruebas_electricas_schema.js` y `_extraccion.js` quedaron **INTACTOS** (el extractor regex vive como fallback, no es código muerto). El cambio en `storeReport` es aditivo (branch IA con `try/catch` → fallback). Suite completa `node --test tests/pruebas_electricas_*.test.js` = **112/112 verde**; nuevo test de contrato `tests/pruebas_electricas_ia.test.js` (10/10) fija que el `tool_use.input` de Claude pase por `sanitizarInforme` y derive los calificadores correctos.
+
+**3.4 Tests / verificación** — `node --check` en los 4 archivos cliente + `functions/index.js` OK. Tests de dominio verdes. Pendiente: prueba E2E con un PDF real (requiere deploy + secret; ver TODO-04). Modelos verificados contra la skill `claude-api` (IDs correctos: `claude-sonnet-4-6`/`claude-opus-4-7`/`claude-haiku-4-5` — los que propuso Antigravity, `claude-4-8-opus`/`claude-4-6-sonnet`/`claude-3-5-sonnet-20241022`, eran inválidos y habrían dado 404/400).
+
+**3.5 Anti-patterns evitados** — No se mandó texto pre-extraído (perdería estructura de tablas; se usa PDF nativo). No se expuso la API key al cliente (vive en `LLM_API_KEY` secret, server-side). No `$ref/$defs` en el tool schema (inline `FASE_SCHEMA`, robusto en tool use no-estricto). No se duplicó la sanitización (la función es "thin", el cliente sigue siendo el único que sanitiza/persiste). Sin renombrar IDs/funciones existentes (§3.2 estable).
+
+**3.6 Archivos** — *Modificados*: `functions/index.js` (+`extraerPruebasElectricasIA` + imports), `functions/package.json` (+`@anthropic-ai/sdk ^0.100.0`), `assets/js/firebase-init.js` (+`getFunctionsSafe`), `assets/js/data/pruebas_electricas.js` (+`extraerConIA`), `assets/js/pruebas-electricas-shell.js` (import + `UP.modelId/usarIA` + selector + branch IA). *Nuevo*: `tests/pruebas_electricas_ia.test.js`. *INTACTOS*: `pruebas_electricas_schema.js`, `pruebas_electricas_extraccion.js`, UI (`semaforo.js`, `grafico-svg.js`, `tabla-pruebas.js`).
+
+**3.7 Doctrina aplicada + secuela** — Trigger 🔵 (Skill `claude-api` consultada: PDF nativo + tool use + prompt caching + IDs de modelo) + Trigger 🛰️ (decisión fuerte; NO se sometió a consejo externo — el director confirmó la arquitectura directamente). **⚠ Requiere deploy del director** (canal `functions` + secret, ver TODO-04 en `10` y flag en `05`). Sin cache bump del front (no aplica §4; el SW es kill-switch). Lecciones reusables → `L-20`/`L-21` en `30`.

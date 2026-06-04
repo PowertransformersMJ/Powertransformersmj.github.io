@@ -13,6 +13,7 @@
     "shell":  "firebase functions:shell"
   },
   "dependencies": {
+    "@anthropic-ai/sdk":  "^0.100.0",
     "firebase-admin":     "^13.0.2",
     "firebase-functions": "^6.3.2"
   },
