@@ -86,6 +86,17 @@ export function sincronizarSerieModo() {
   });
 }
 
+// Sincroniza el estado visual del segmentado "Por meses / Acumulado"
+// del chart programado vs no-programado con store.state.progModo.
+export function sincronizarProgModo() {
+  const modo = store.state.progModo || 'mes';
+  document.querySelectorAll('#prog-modo .serie-seg').forEach(btn => {
+    const on = btn.dataset.modo === modo;
+    btn.classList.toggle('is-on', on);
+    btn.setAttribute('aria-pressed', String(on));
+  });
+}
+
 // ¿El dataset trae detalle diario? (solo el path crudo de la hoja DATOS).
 function _datasetTieneDias(ds) {
   return !!(ds?.dias && Object.keys(ds.dias).some(
@@ -208,6 +219,13 @@ export function inicializarFiltros() {
   document.querySelectorAll('#serie-modo .serie-seg').forEach(btn => {
     btn.addEventListener('click', () => {
       if (btn.dataset.modo) store.setSerieModo(btn.dataset.modo);
+    });
+  });
+
+  // Segmentado de modo del chart programado vs no-programado
+  document.querySelectorAll('#prog-modo .serie-seg').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.dataset.modo) store.setProgModo(btn.dataset.modo);
     });
   });
 

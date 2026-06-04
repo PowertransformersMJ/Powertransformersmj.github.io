@@ -26,6 +26,10 @@ const _state = {
   // null = vista mensual normal; entero 0–11 (mes-calendario) = vista
   // día a día de ese mes. Solo aplica si el dataset trae `dias`.
   serieMes: null,
+  // Modo del chart "Aporte programado vs no-programado": 'mes' (aporte
+  // de cada mes) | 'acum' (aporte acumulado a la fecha, suma mes a mes).
+  // Independiente de serieModo; solo afecta el chart prog.
+  progModo: 'mes',
   // Filtros propios del card "Ranking TOP 10 de subestaciones" (no
   // tocan los filtros globales). rankZona = zona de la tabla; rankMes
   // = null (todos los meses) o entero 0–11 (mes-calendario único).
@@ -83,6 +87,7 @@ export const store = {
   setZona(z)  { _state.zona = z; notify(); },
   setMet(m)   { _state.met  = m; notify(); },
   setSerieModo(m) { _state.serieModo = (m === 'acum' ? 'acum' : 'mes'); notify(); },
+  setProgModo(m)  { _state.progModo  = (m === 'acum' ? 'acum' : 'mes'); notify(); },
   setSerieMes(m) {
     const n = (m == null || m === '') ? null : +m;
     _state.serieMes = (n == null || !Number.isFinite(n)) ? null : Math.max(0, Math.min(11, Math.trunc(n)));
