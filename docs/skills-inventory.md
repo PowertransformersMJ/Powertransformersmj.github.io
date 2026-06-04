@@ -21,7 +21,31 @@
 - Algunas son **"repo-only"** (⚠️): NO hay contraparte instalada → invocarlas vía `Skill` fallaría; sirven como documentación/fuente.
 - **Anomalías estructurales** (🔧) NO romperían la config (el repo no es la fuente), pero ensucian el repo y romperían la carga **si algún día** se cablea `skills/` como plugin.
 
-**Leyenda Disp.**: ✅ contraparte instalada usable vía `Skill` · ⚠️ repo-only (no instalada) · 🔧 anomalía estructural (no carga tal cual).
+**Leyenda Disp.**: ✅ contraparte instalada usable vía `Skill` · 🟩 staged local en `.claude/skills/` (activa tras reinicio, ver §Estado real) · ⚠️ repo-only (no instalada) · 🔧 anomalía estructural (no carga tal cual).
+
+---
+
+## 📍 Estado real de activación (auditado 2026-06-04 · ADR-002)
+
+> **Corrección importante**: las tablas de abajo marcaban con ✅ varias skills de
+> **diseño/UX** (`frontend-design`, `impeccable`, `emil-design-eng`, el bundle taste, etc.)
+> que en realidad NO estaban en la interfaz — eran **repo-only**. Auditoría de solape real:
+> **56** skills del repo SÍ tenían contraparte en el bundle `anthropic-skills:*`; **24** eran
+> repo-only. Esas 24 se **staged a `.claude/skills/`** (`name` del frontmatter como nombre de
+> carpeta) y cargan **tras reiniciar Claude Code**. Receta → `30-LECCIONES L-19`.
+
+**🟩 Las 24 ahora staged localmente** (verificadas activas tras reinicio):
+`accessibility-audit`, `animate`, `frontend-design`, `impeccable`, `emil-design-eng`,
+`design-taste-frontend` (+`-v1`), `redesign-existing-projects`, `minimalist-ui`,
+`industrial-brutalist-ui`, `high-end-visual-design`, `brandkit`, `stitch-design-taste`,
+`gpt-taste`, `image-to-code`, `imagegen-frontend-web`, `imagegen-frontend-mobile`,
+`full-output-enforcement`, `ecommerce`, `crm-architect`, `claude-automation-recommender`,
+`claude-md-improver`, `session-report`, `llm-council`.
+
+**Notas**: `canvas-design-creative` SÍ está en el bundle (✅, no fue necesario stagearla).
+`code-modernization` (plugin) y `code-simplifier` (subagente) NO se pueden activar como skill
+— sin `SKILL.md`; el built-in `simplify` cubre el segundo. **Persistencia**: `.claude/` está
+gitignorado → estas 24 son **local-only**; al re-clonar, re-correr el copy (la fuente vive en `skills/`).
 
 ---
 
