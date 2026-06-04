@@ -169,6 +169,8 @@ assets/js/ui/calidad/
 │                                            - parsearExcel(file) · detecta formato:
 │                                              · 4 hojas pre-agregadas
 │                                                (META, KPI, ZONAS, PROYECCION)
+│                                              · hoja META plana (PERIODO+CLASIFIC)
+│                                                → agregarMetaProg (fast-path prog)
 │                                              · hoja DATOS cruda → agregarDatosCrudos
 │                                                (domain/saidi_datos.js)
 │                                              (.xlsx/.xls/.xlsb/.xlsm)
@@ -448,6 +450,41 @@ Mapeo de columnas (0-based · `COLS_DATOS_DEFAULT`):
 Cobertura de tests: `tests/saidi_datos.test.js` (`colIdx`,
 `mesDesdeValor`, `detectarColumnaFecha`, `detectarColumnaPorHeader`,
 `agregarDatosCrudos`).
+
+### 5.2.2 Excel crudo · hoja `META` plana (fast-path programado/no-prog)
+
+El mismo `Data de Analisis.xlsx` trae una hoja `META` **plana** (tabla
+de 73 filas) que es la fuente autoritativa del desglose
+programado/no-programado y la pivot de la hoja `DASHBOARD`. Estructura:
+
+| Columna | Contenido |
+|---|---|
+| `PERIODO` | `YYYYMM` (`202601`..`202612`) |
+| `ZONA` | `BOLIVAR` · `OCCIDENTE` · `ORIENTE` |
+| `CLASIFICACION_CREG_063` | `NO PROGRAMADA NO EXCLUIDA` · `PROGRAMADA NO EXCLUIDA` |
+| `META SAIDI_E` | aporte SAIDI_E (h/usuario) |
+| `META SAIFI_E` | aporte SAIFI_E (interr/usuario) |
+
+`parsearExcel` detecta esta META por encabezado (contiene `PERIODO` +
+`CLASIFIC`) y la rutea al fast-path `agregarMetaProg(rows)` en
+`domain/saidi_datos.js`, **leyendo solo la hoja META** (`{ sheets:
+[upper.META] }`) — nunca parsea la hoja `DATOS` de ~54 MB.
+
+`agregarMetaProg` puebla `dataset.prog[zonaKey] = {
+programado:{saidi[],saifi[]}, no_programado:{saidi[],saifi[]} }` por
+`BOLIVAR` / `OCCIDENTE` / `ORIENTE` + `TODAS` derivada (suma de las 3),
+recorta al rango de meses presente (`[min..max]`) y deriva
+`total_saidi` / `total_saifi` por zona (`programado + no_programado`)
+para que las series y KPIs rendericen. Habilita el filtro por **zona,
+mes, programado/no-programado y SAIDI/SAIFI** (mensual + acumulado) que
+pidió el director, replicando el criterio de la hoja `DASHBOARD`.
+
+**Tradeoff de diseño:** la META plana no trae categorías ni el cruce
+CAUSA2, así que `cats_order: []` (charts de categoría vacíos) y no hay
+`progCat` (el cruce CAUSA2 solo existe vía `agregarDatosCrudos` sobre
+`DATOS`). Los renderers degradan con `safeRender` sin romper el
+dashboard. Cobertura: `tests/saidi_datos.test.js` (10 tests de
+`agregarMetaProg`).
 
 #### Filtros opcionales a nivel de fila
 
