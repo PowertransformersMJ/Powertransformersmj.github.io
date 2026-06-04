@@ -46,6 +46,7 @@ import {
   derivarGruposDesdeCategorias,
   agregarDatosCrudos,
   agregarMetaProg,
+  adjuntarMetaObjetivo,
 } from '../../domain/saidi_datos.js';
 
 const SHEETJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
@@ -196,27 +197,13 @@ async function parsearExcel(file) {
     return parsearExcelPreAgregado(XLSX, wb, upper);
   }
 
-  // Vía rápida · hoja META plana (PERIODO × ZONA × CLASIFICACION_CREG_063
-  // con META SAIDI_E / SAIFI_E). Es la fuente del aporte programado /
-  // no-programado por zona y mes (la hoja DASHBOARD es su pivote). Se lee
-  // SOLO esa hoja para no parsear la hoja DATOS (54 MB) cuando lo que se
-  // necesita es el segmento prog/no-prog filtrable por zona/mes/métrica.
-  if (upper.META) {
-    const wbMeta = XLSX.read(buf, { type: 'array', cellDates: false, sheets: [upper.META] });
-    const metaRows = XLSX.utils.sheet_to_json(
-      wbMeta.Sheets[upper.META], { header: 1, blankrows: false, defval: '' });
-    const head = (metaRows[0] || []).map(h => String(h || '').toUpperCase());
-    const esMetaProg = head.some(h => h.includes('PERIODO'))
-      && head.some(h => h.includes('CLASIFIC'));
-    if (esMetaProg) {
-      const dataset = agregarMetaProg(metaRows);
-      console.info('[calidad/upload] META prog/no-prog agregado · meses:', dataset.meses.length);
-      return dataset;
-    }
-  }
-
   // Hoja DATOS: nombre exacto o cualquier hoja que lo contenga
-  // ("BASE DATOS", "DATOS 2026", …).
+  // ("BASE DATOS", "DATOS 2026", …). SIEMPRE tiene prioridad: produce el
+  // dataset COMPLETO (categorías, ranking de subestaciones, KPIs,
+  // proyección + el desglose prog/no-prog desde CLASIFICACION_CREG_063).
+  // La hoja META, si existe, se adjunta como OVERLAY de objetivo (la
+  // línea META vs. lo causado) sin reemplazar nada. Sustituir el dataset
+  // DATOS por la META rompería el resto del módulo (regla §0.1.2.4).
   const nombreDatos = upper.DATOS
     || wbProbe.SheetNames.find(n => /datos/i.test(n));
   if (nombreDatos) {
@@ -226,7 +213,43 @@ async function parsearExcel(file) {
     const rows = XLSX.utils.sheet_to_json(wb.Sheets[nombreDatos], { header: 1, blankrows: false });
     const { dataset, reporte } = agregarDatosCrudos(rows);
     console.info('[calidad/upload] DATOS agregado:', reporte);
+
+    // Overlay META · objetivo por mes para el segmento prog/no-prog.
+    if (upper.META) {
+      try {
+        const metaRows = XLSX.utils.sheet_to_json(
+          wb.Sheets[upper.META], { header: 1, blankrows: false, defval: '' });
+        const head = (metaRows[0] || []).map(h => String(h || '').toUpperCase());
+        const esMetaProg = head.some(h => h.includes('PERIODO'))
+          && head.some(h => h.includes('CLASIFIC'));
+        if (esMetaProg) {
+          adjuntarMetaObjetivo(dataset, metaRows);
+          console.info('[calidad/upload] overlay META adjuntado al dataset DATOS');
+        }
+      } catch (err) {
+        console.warn('[calidad/upload] no se pudo adjuntar overlay META:', err);
+      }
+    }
     return dataset;
+  }
+
+  // Vía rápida · SOLO hoja META plana (sin DATOS). Reproduce el pivote
+  // DASHBOARD prog/no-prog cuando no hay hoja DATOS que agregar.
+  if (upper.META) {
+    const wbMeta = XLSX.read(buf, { type: 'array', cellDates: false, sheets: [upper.META] });
+    const metaRows = XLSX.utils.sheet_to_json(
+      wbMeta.Sheets[upper.META], { header: 1, blankrows: false, defval: '' });
+    const head = (metaRows[0] || []).map(h => String(h || '').toUpperCase());
+    const esMetaProg = head.some(h => h.includes('PERIODO'))
+      && head.some(h => h.includes('CLASIFIC'));
+    if (esMetaProg) {
+      const dataset = agregarMetaProg(metaRows);
+      // En la vía META-only el aporte ES el objetivo: lo reflejamos también
+      // como overlay para que la línea META aparezca sobre las barras.
+      try { adjuntarMetaObjetivo(dataset, metaRows); } catch { /* no-op */ }
+      console.info('[calidad/upload] META prog/no-prog agregado · meses:', dataset.meses.length);
+      return dataset;
+    }
   }
 
   throw new Error(

@@ -46,8 +46,23 @@ function acumular(arr) {
   return arr.map(v => (s += (+v || 0)));
 }
 
-export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaSaifi = null, progModo = 'mes') {
+// Overlay META por mes (objetivo) para una zona/métrica/serie, alineado a
+// `dataset.meses`. Devuelve el array de objetivo o null si no hay overlay.
+function metaSerie(dataset, zona, m, serieKey) {
+  const o = dataset?.metaObjetivo?.[zona]?.[serieKey]?.[m];
+  if (!Array.isArray(o)) return null;
+  return o.some(v => (+v || 0) !== 0) ? o.map(v => +v || 0) : null;
+}
+
+export function renderProg(
+  dataset, zona, met = 'saidi',
+  metaSaidi = null, metaSaifi = null, progModo = 'mes',
+  series = { prog: true, nop: true },
+) {
   if (typeof Plotly === 'undefined' || !dataset) return;
+
+  const verProg = series?.prog !== false;
+  const verNop  = series?.nop  !== false;
 
   const pill = $('#chart-prog-pill');
   const p = progDeZona(dataset, zona);
@@ -58,35 +73,33 @@ export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaS
   const m = metricasActivas(met)[0];
   const meses = dataset.meses || [];
   const meta  = m === 'saidi' ? metaSaidi : metaSaifi;
+  const acum  = progModo === 'acum';
+  const aplicar = (arr) => acum ? acumular(arr) : arr;
 
-  // La META es independiente del desglose programado/no-programado: se
-  // dibuja como línea de referencia siempre que haya un valor finito > 0.
+  // Objetivo manual (input del card): línea horizontal de referencia.
   const metaNum = (meta == null || meta === '') ? null : +meta;
-  const metaValida = metaNum != null && Number.isFinite(metaNum) && metaNum > 0 && meses.length;
-
-  // Traza reutilizable de la línea META (horizontal, dashed).
-  const trazaMeta = () => ({
+  const metaManualOk = metaNum != null && Number.isFinite(metaNum) && metaNum > 0 && meses.length;
+  const trazaMetaManual = () => ({
     x: meses, y: meses.map(() => metaNum),
-    name: `META (${metaNum})`,
+    name: `Objetivo manual (${metaNum})`,
     type: 'scatter', mode: 'lines',
-    line: { color: COLORS.RED, width: 2, dash: 'dash' },
-    hovertemplate: `META: ${metaNum}<extra></extra>`,
+    line: { color: COLORS.RED, width: 2, dash: 'dot' },
+    hovertemplate: `Objetivo: ${metaNum}<extra></extra>`,
   });
 
   if (!p) {
     // Sin desglose programado/no-programado (baseline o pre-agregado, sin
-    // la hoja DATOS). Si hay META la dibujamos igual para que sea
-    // apreciable; las barras requieren cargar el Excel de origen.
-    if (metaValida) {
+    // la hoja DATOS). Si hay objetivo manual lo dibujamos igual.
+    if (metaManualOk) {
       const layout = layoutBase();
       layout.yaxis = { ...layout.yaxis, title: { text: SUF[m], font: { size: 10 } } };
       layout.annotations = [{
-        text: 'Línea META · el desglose programado / no-programado requiere el Excel de origen (hoja DATOS)',
+        text: 'Objetivo manual · el desglose programado / no-programado requiere el Excel de origen (hoja DATOS)',
         showarrow: false, xref: 'paper', yref: 'paper', x: 0.5, y: 1.06,
         font: { size: 10, color: '#64748B' }, align: 'center',
       }];
-      Plotly.react('chart-prog', [trazaMeta()], layout, plotlyCfg());
-      if (pill) pill.textContent = `META ${metaNum} · sin desglose`;
+      Plotly.react('chart-prog', [trazaMetaManual()], layout, plotlyCfg());
+      if (pill) pill.textContent = `objetivo ${metaNum} · sin desglose`;
       return;
     }
     vacio('Sin desglose programado / no-programado<br>' +
@@ -97,39 +110,63 @@ export function renderProg(dataset, zona, met = 'saidi', metaSaidi = null, metaS
 
   const progMes = (p.programado?.[m]    || []).map(v => +v || 0);
   const nopMes  = (p.no_programado?.[m] || []).map(v => +v || 0);
-
-  // 'acum' → aporte a la fecha (suma corrida); 'mes' → aporte del mes.
-  const acum  = progModo === 'acum';
-  const progS = acum ? acumular(progMes) : progMes;
-  const nopS  = acum ? acumular(nopMes)  : nopMes;
   const sufModo = acum ? ' · acumulado' : '';
 
   const layout = layoutBase();
   layout.barmode = 'group';
   layout.yaxis = { ...layout.yaxis, title: { text: SUF[m] + sufModo, font: { size: 10 } } };
 
-  const traces = [
-    {
-      x: meses, y: nopS, name: 'No programado',
-      type: 'bar', marker: { color: COLORS.AMBER },
-    },
-    {
-      x: meses, y: progS, name: 'Programado',
-      type: 'bar', marker: { color: COLORS.TEAL },
-    },
-  ];
+  // META por mes desde el overlay (objetivo de la hoja META), alineada a
+  // las barras causadas → "el match entre la meta y lo causado".
+  const metaNop  = metaSerie(dataset, zona, m, 'no_programado');
+  const metaProg = metaSerie(dataset, zona, m, 'programado');
+  let hayOverlay = false;
 
-  // Línea META (horizontal, dashed) cuando hay un valor finito > 0.
-  if (metaValida) traces.push(trazaMeta());
+  const traces = [];
+  if (verNop) {
+    traces.push({
+      x: meses, y: aplicar(nopMes), name: 'No programado (causado)',
+      type: 'bar', marker: { color: COLORS.AMBER },
+    });
+    if (metaNop) {
+      hayOverlay = true;
+      traces.push({
+        x: meses, y: aplicar(metaNop), name: 'META No programado',
+        type: 'scatter', mode: 'lines+markers',
+        line: { color: COLORS.AMBER, width: 2, dash: 'dash' },
+        marker: { size: 5, color: COLORS.AMBER },
+        hovertemplate: 'META no-prog: %{y:.4f}<extra></extra>',
+      });
+    }
+  }
+  if (verProg) {
+    traces.push({
+      x: meses, y: aplicar(progMes), name: 'Programado (causado)',
+      type: 'bar', marker: { color: COLORS.TEAL },
+    });
+    if (metaProg) {
+      hayOverlay = true;
+      traces.push({
+        x: meses, y: aplicar(metaProg), name: 'META Programado',
+        type: 'scatter', mode: 'lines+markers',
+        line: { color: COLORS.TEAL, width: 2, dash: 'dash' },
+        marker: { size: 5, color: COLORS.TEAL },
+        hovertemplate: 'META prog: %{y:.4f}<extra></extra>',
+      });
+    }
+  }
+
+  // Objetivo manual (input) como línea de referencia adicional.
+  if (metaManualOk) traces.push(trazaMetaManual());
 
   Plotly.react('chart-prog', traces, layout, plotlyCfg());
 
   if (pill) {
-    // Totales a la fecha (independiente del modo, son las sumas completas).
     const tot = (a) => a.reduce((x, y) => x + y, 0);
     const tp = tot(progMes), tn = tot(nopMes);
     const total = tp + tn;
     const pctN = total > 0 ? Math.round((tn / total) * 100) : 0;
-    pill.textContent = `${SUF[m]} · no-prog ${pctN}%${sufModo}`;
+    const tagMeta = hayOverlay ? ' · META vs causado' : '';
+    pill.textContent = `${SUF[m]} · no-prog ${pctN}%${sufModo}${tagMeta}`;
   }
 }

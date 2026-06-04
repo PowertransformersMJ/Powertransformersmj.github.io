@@ -870,7 +870,13 @@ export function agregarDatosCrudos(rows, opts = {}) {
 // las categorías y el cruce CAUSA2 quedan vacíos (la META no los trae).
 //
 // `rows` es array-of-arrays (XLSX header:1) incluyendo el encabezado.
-export function agregarMetaProg(rows) {
+//
+// Builder compartido · construye el desglose prog/no-prog a 12 meses
+// (índice absoluto Ene=0 … Dic=11) por zona desde la tabla plana META.
+// Lo usan `agregarMetaProg` (fallback META-only) y `extraerMetaObjetivo`
+// (overlay sobre el dataset DATOS). Devuelve arrays a 12 posiciones sin
+// recortar y el set de meses con al menos una fila válida.
+function _construirProgMeta(rows) {
   if (!Array.isArray(rows) || rows.length < 2) {
     throw new Error('Hoja META vacía o sin filas de datos');
   }
@@ -931,6 +937,11 @@ export function agregarMetaProg(rows) {
       'Hoja META · ninguna fila válida (se esperaba PERIODO YYYYMM + ZONA + CLASIFICACION_CREG_063)'
     );
   }
+  return { prog, mesesPresentes };
+}
+
+export function agregarMetaProg(rows) {
+  const { prog, mesesPresentes } = _construirProgMeta(rows);
 
   // Recorte al rango de meses con datos (primer..último mes presente).
   const minMes = Math.min(...mesesPresentes);
@@ -968,4 +979,48 @@ export function agregarMetaProg(rows) {
     kpi: {},
     proj_global: null,
   };
+}
+
+// ── Overlay META · objetivo por mes para el segmento prog/no-prog ──
+// Extrae de la hoja META el objetivo (META SAIDI_E / META SAIFI_E) a 12
+// meses absolutos por zona, SIN recortar. Es la fuente de la línea META
+// que se superpone sobre las barras causadas (desde DATOS) para que el
+// director vea "el match entre la meta y lo causado hasta la fecha".
+// Estructura: `{ ZONA: { programado:{saidi[12],saifi[12]},
+//   no_programado:{saidi[12],saifi[12]} } }` + `mesesIdx` (meses con dato).
+export function extraerMetaObjetivo(rows) {
+  const { prog, mesesPresentes } = _construirProgMeta(rows);
+  const mesesIdx = [...mesesPresentes].sort((a, b) => a - b);
+  return { metaObjetivo: prog, mesesIdx };
+}
+
+// Adjunta el overlay META a un dataset ya agregado desde DATOS, alineando
+// el objetivo a 12 meses absolutos a las posiciones de `dataset.meses`
+// (que pueden estar recortadas). Tolera fallos de parseo de la META: si
+// la hoja no se puede leer, deja el dataset intacto y registra el motivo.
+export function adjuntarMetaObjetivo(dataset, metaRows) {
+  if (!dataset || !Array.isArray(metaRows)) return dataset;
+  let metaObjetivo;
+  try {
+    ({ metaObjetivo } = extraerMetaObjetivo(metaRows));
+  } catch (err) {
+    dataset.metaObjetivoMotivo = String(err && err.message || err);
+    return dataset;
+  }
+  // Índices absolutos paralelos a dataset.meses (Ene=0 … Dic=11).
+  const idxAbs = Array.isArray(dataset.mesesIdx) && dataset.mesesIdx.length
+    ? dataset.mesesIdx
+    : (dataset.meses || []).map((mm) => MESES_CANON.indexOf(mm));
+
+  const alinear = (arr12) => idxAbs.map((abs) => (abs >= 0 ? (+arr12[abs] || 0) : 0));
+  const overlay = {};
+  for (const zk of Object.keys(metaObjetivo)) {
+    const p = metaObjetivo[zk];
+    overlay[zk] = {
+      programado:    { saidi: alinear(p.programado.saidi),    saifi: alinear(p.programado.saifi) },
+      no_programado: { saidi: alinear(p.no_programado.saidi), saifi: alinear(p.no_programado.saifi) },
+    };
+  }
+  dataset.metaObjetivo = overlay;
+  return dataset;
 }
