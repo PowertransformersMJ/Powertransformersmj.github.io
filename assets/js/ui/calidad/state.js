@@ -31,6 +31,16 @@ const _state = {
   // = null (todos los meses) o entero 0–11 (mes-calendario único).
   rankZona: 'TODAS',
   rankMes: null,
+  // Filtro CAUSA2: '' = todas las causas; '__SOBRECARGA__' = filtro madre
+  // (las 13 causas de sobrecarga/deslastre de transporte); o el nombre
+  // exacto de UNA causa del catálogo. Estrecha TODAS las gráficas que
+  // consumen categorías (stack, participación, var %, top, heatmap, tabla).
+  causa2: '',
+  // Valor META (objetivo) editable de la gráfica programado vs
+  // no-programado. Uno por métrica; null = sin línea META. No deriva
+  // de los datos, lo fija el usuario en los inputs del card.
+  metaSaidi: null,
+  metaSaifi: null,
   source: 'empty',  // 'baseline' | 'firestore' | 'empty'
 };
 
@@ -76,6 +86,16 @@ export const store = {
   setSerieMes(m) {
     const n = (m == null || m === '') ? null : +m;
     _state.serieMes = (n == null || !Number.isFinite(n)) ? null : Math.max(0, Math.min(11, Math.trunc(n)));
+    notify();
+  },
+
+  setCausa2(c) { _state.causa2 = (c == null) ? '' : String(c); notify(); },
+
+  setMeta(met, v) {
+    const n = (v == null || v === '') ? null : +v;
+    const val = (n == null || !Number.isFinite(n) || n < 0) ? null : n;
+    if (met === 'saifi') _state.metaSaifi = val;
+    else _state.metaSaidi = val;
     notify();
   },
 

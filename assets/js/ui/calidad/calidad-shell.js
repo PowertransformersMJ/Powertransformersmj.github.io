@@ -11,13 +11,15 @@
 // ══════════════════════════════════════════════════════════════
 
 import { store } from './state.js';
-import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo, pintarSelectorMes, sincronizarSerieMes, pintarSelectorRankZona, pintarSelectorRankMes, sincronizarRank } from './filtros.js';
+import { inicializarFiltros, pintarSelectorZona, actualizarPill, sincronizarChipsGrupos, sincronizarSerieModo, pintarSelectorMes, sincronizarSerieMes, pintarSelectorRankZona, pintarSelectorRankMes, sincronizarRank, pintarSelectorCausa2, sincronizarMeta } from './filtros.js';
+import { filtrarPorCausa2 } from '../../domain/saidi_datos.js';
 import { suscribirIndicadoresCalidad, cargarBaselineLocal } from '../../data/indicadores_calidad.js';
 import { inicializarPersistencia, limpiarPersistencia, handleFiles } from './upload.js';
 
 import { renderKPIs }       from './renderers/kpis.js';
 import { renderInsight }    from './renderers/insight.js';
 import { renderSerie }      from './renderers/serie.js';
+import { renderProg }       from './renderers/prog.js';
 import { renderStack }      from './renderers/stack.js';
 import { renderPart }       from './renderers/part.js';
 import { renderVarMoM }     from './renderers/varmom.js';
@@ -101,14 +103,16 @@ function safeRender(name, fn) {
 }
 
 function renderAll(state) {
-  const { dataset, zona, met, source, serieModo, serieMes, rankZona, rankMes } = state;
+  const { dataset, zona, met, source, serieModo, serieMes, rankZona, rankMes, causa2, metaSaidi, metaSaifi } = state;
   if (!dataset) return;
   ocultarError();
   safeRender('selector-zona',  () => pintarSelectorZona());
+  safeRender('selector-causa', () => pintarSelectorCausa2());
   safeRender('pill-filtro',    () => actualizarPill());
   safeRender('chips-grupos',   () => sincronizarChipsGrupos());
   safeRender('serie-modo',     () => sincronizarSerieModo());
   safeRender('serie-mes',      () => { pintarSelectorMes(); sincronizarSerieMes(); });
+  safeRender('meta',           () => sincronizarMeta());
   safeRender('rank-filtros',   () => { pintarSelectorRankZona(); pintarSelectorRankMes(); sincronizarRank(); });
   actualizarSourcePill(source, state._meta);
 
@@ -116,17 +120,24 @@ function renderAll(state) {
   const zSel = $('#f-zona'); if (zSel && zSel.value !== zona) zSel.value = zona;
   const mSel = $('#f-met');  if (mSel && mSel.value !== met)  mSel.value = met;
 
-  safeRender('kpis',        () => renderKPIs(dataset, zona, met));
-  safeRender('insight',     () => renderInsight(dataset, zona, met));
-  safeRender('serie',       () => renderSerie(dataset, zona, met, serieModo, serieMes));
-  safeRender('stack',       () => renderStack(dataset, zona, met));
-  safeRender('part',        () => renderPart(dataset, zona, met));
-  safeRender('varmom',      () => renderVarMoM(dataset, zona, met));
-  safeRender('top',         () => renderTop(dataset, zona, met));
+  // VIEW DATASET · estrechado al filtro CAUSA2 (Todas / SOBRECARGA / causa
+  // única). Todas las gráficas que consumen categorías leen de aquí para
+  // que el filtro madre aísle el aporte por sobrecarga/deslastre. El spread
+  // de filtrarPorCausa2 preserva prog / dias / subests intactos.
+  const viewDS = filtrarPorCausa2(dataset, causa2);
+
+  safeRender('kpis',        () => renderKPIs(viewDS, zona, met));
+  safeRender('insight',     () => renderInsight(viewDS, zona, met));
+  safeRender('serie',       () => renderSerie(viewDS, zona, met, serieModo, serieMes));
+  safeRender('prog',        () => renderProg(dataset, zona, met, metaSaidi, metaSaifi));
+  safeRender('stack',       () => renderStack(viewDS, zona, met));
+  safeRender('part',        () => renderPart(viewDS, zona, met));
+  safeRender('varmom',      () => renderVarMoM(viewDS, zona, met));
+  safeRender('top',         () => renderTop(viewDS, zona, met));
   safeRender('rank-subest', () => renderRankSubest(dataset, met, rankZona, rankMes));
-  safeRender('heatmap',     () => renderHeatmap(dataset, zona, met));
-  safeRender('proyeccion',  () => renderProyeccion(dataset, zona, met));
-  safeRender('month-table', () => renderMonthTable(dataset, zona, met));
+  safeRender('heatmap',     () => renderHeatmap(viewDS, zona, met));
+  safeRender('proyeccion',  () => renderProyeccion(viewDS, zona, met));
+  safeRender('month-table', () => renderMonthTable(viewDS, zona, met));
 }
 
 // ── Listeners de upload ─────────────────────────────────────

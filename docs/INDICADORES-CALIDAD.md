@@ -200,6 +200,10 @@ assets/js/ui/calidad/
     │                                          vocabulario y datos según métrica)
     ├── serie.js                             ← line chart SAIDI_E o SAIFI_E del sistema
     │                                          · doble eje en modo Ambos
+    ├── prog.js                              ← barras agrupadas programado (teal) vs
+    │                                          no-programado (ámbar) + línea META roja
+    │                                          dashed · usa dataset.prog · empty-state
+    │                                          si el dataset no trae desglose (baseline)
     ├── stack.js                             ← barras agrupadas por grupo de causa
     │                                          (filtrado por gruposActivos del store)
     ├── part.js                              ← barras h-bar por categoría · grouped
@@ -264,6 +268,7 @@ Al cambiar el selector, cada renderer se adapta:
 | **KPI band** | 6 tarjetas h-eq | 6 tarjetas int-eq | 6 tarjetas: 2 sistema + 2 Sob/Desl × 2 métricas |
 | **Insight** | vocabulario "duración / indisponibilidad" | "frecuencia / interrupciones" | menciona ambas |
 | **Serie temporal** | 1 línea azul (h-eq) | 1 línea ámbar (int-eq) | doble eje Y |
+| **Programado/META** | barras SAIDI h-eq + META | barras SAIFI int-eq + META | usa SAIDI (métrica principal) |
 | **Stack mensual** | barras apiladas h-eq | barras apiladas int-eq | barras agrupadas (offsetgroup) por métrica |
 | **Participación** | h-bars h-eq | h-bars int-eq | h-bars grouped 2 series |
 | **Variación %** | 2 líneas (Sob/Desl + Otras) | 2 líneas | 4 líneas con dash distintivo |
@@ -305,6 +310,35 @@ El estado vive en `store.state.gruposActivos` (Set inicial con los 3).
 KPIs, insight, serie temporal, participación acumulada, top
 categorías, heatmap, proyección — no dependen de grupos específicos
 sino del agregado completo de cada métrica.
+
+### 4.3 Filtro madre CAUSA2 (selector `#f-causa`)
+
+Selector independiente de los chips de grupo. Estrecha **todas** las
+gráficas que consumen categorías (stack, participación, var %, top,
+heatmap, tabla mensual) a un subconjunto de causas. Tres modos:
+
+| Valor del select | Constante | Comportamiento |
+|---|---|---|
+| `Todas las causas` | `''` (`CAUSA2_TODAS`) | Sin filtro · dataset completo |
+| `SOBRECARGA (filtro madre · 13 causas)` | `__SOBRECARGA__` (`CAUSA2_SOBRECARGA`) | Solo las causas Sobrecarga/Deslastre de transporte (`esCausaSobrecarga`), **sin** Racionamiento |
+| `<nombre exacto de una causa>` | el nombre | Aísla una sola causa del catálogo |
+
+- **Implementación pura:** `filtrarPorCausa2(dataset, causa2)` en
+  `domain/saidi_datos.js` re-deriva grupos + total + proyección OLS +
+  `cats_order` desde las categorías que sobreviven. El spread
+  `...dataset` **preserva `prog` / `dias` / `subests` / `meses`
+  intactos** (esos bloques son a nivel de fila, no por categoría).
+- **Chokepoint de render:** `calidad-shell.js#renderAll` construye
+  `const viewDS = filtrarPorCausa2(dataset, causa2)` una sola vez y lo
+  pasa a todos los renderers de categoría. `rank-subest` y `prog` usan
+  el `dataset` original (son causa-independientes).
+- **Opciones derivadas del dataset COMPLETO.** `pintarSelectorCausa2`
+  en `filtros.js` llena el select desde `store.state.dataset.cats_order`
+  (no del view filtrado) para que la lista no se reduzca al elegir una
+  causa. Si la selección actual deja de ser válida, vuelve a "Todas".
+- **Estado:** `store.state.causa2` + `setCausa2(c)`. La pill de filtro
+  global (`#filter-pill`) anexa ` · SOBRECARGA` o ` · <causa>` al
+  resumen `zona · métrica`.
 
 ---
 
@@ -414,6 +448,30 @@ Mapeo de columnas (0-based · `COLS_DATOS_DEFAULT`):
 Cobertura de tests: `tests/saidi_datos.test.js` (`colIdx`,
 `mesDesdeValor`, `detectarColumnaFecha`, `detectarColumnaPorHeader`,
 `agregarDatosCrudos`).
+
+#### Filtros opcionales a nivel de fila
+
+Antes de acumular cualquier evento, `agregarDatosCrudos` aplica 4
+filtros de fila. **Un evento solo entra a las series si cumple TODOS
+los que tengan su columna resuelta** (override explícito en `opts` o
+encabezado detectado). Si una columna no existe (hojas viejas, tests),
+ese filtro queda inactivo y no descarta nada (`FILTROS_FILA_SPEC`):
+
+| Filtro | Columna Excel | Regex de encabezado | Valores aceptados |
+|---|---|---|---|
+| `clas_creg` | `BC` (54) | `clasificacion.*creg\|.*063` | `NO PROGRAMADA NO EXCLUIDA`, `PROGRAMADA NO EXCLUIDA` |
+| `sui` | — | `^sui$` | `SI` |
+| `area_macro` | `BD` (55) | `area.*gestion.*macro` | `TRANSPORTE` |
+| `min` | `BE` (56) | `^min$` | `INC` |
+
+- La comparación normaliza con `normalizarFiltro` (sin tildes,
+  MAYÚSCULAS, espacios colapsados, recortado), así que `"Transporte"`,
+  `"TRANSPORTE "` y `"transporte"` comparan igual.
+- `resolverFiltrosFila(rows, opts)` resuelve la columna de cada filtro:
+  índice numérico en `opts` o `detectarColumnaPorHeader` por regex.
+- Estos filtros son **independientes** del filtro de 13 causas
+  canónicas (`esCausaCanonica`) y del filtro CAUSA2 (§4.3): los de fila
+  recortan el universo crudo; los de causa recortan categorías.
 
 ### 5.2.2 Ranking TOP 10 · aporte por subestación
 
@@ -597,9 +655,57 @@ Separadores `xgap: 2 ygap: 2` entre celdas para distinguir cada tile.
 
 ---
 
-## 9. Reglas técnicas relevantes
+## 9. Chart Aporte programado vs no-programado · línea META
 
-### 9.1 Plotly muta los objetos layout/font
+Card **"Aporte programado vs no-programado · línea META"**
+(`renderers/prog.js`): desglosa el aporte SAIDI_E / SAIFI_E entre
+eventos **PROGRAMADOS** y **NO PROGRAMADOS** por mes, con una línea
+META interactiva editable.
+
+### 9.1 Origen del dato
+
+- La clasificación sale de la columna `CLASIFICACION_CREG_063` (`BC`)
+  de la hoja DATOS: un valor que empieza por `PROGRAMADA` cuenta como
+  programado; `NO PROGRAMADA` como no programado.
+- `agregarDatosCrudos` puebla
+  `dataset.prog[zonaKey] = { programado:{saidi[12],saifi[12]},
+  no_programado:{saidi[12],saifi[12]} }` (claves `TODAS`, `BOLIVAR`,
+  `ORIENTE`, `OCCIDENTE`), recortado al rango de meses presente.
+- **Solo el path crudo (hoja DATOS) lo trae.** El baseline JSON, el
+  Excel pre-agregado y el CSV no tienen desglose programado →
+  `progDeZona` devuelve null y el renderer muestra el estado vacío
+  *"carga el Excel de origen (hoja DATOS · columna
+  CLASIFICACION_CREG_063)"*.
+
+### 9.2 Render
+
+- **Barras agrupadas** (`barmode: 'group'`): no-programado en ámbar
+  (`COLORS.AMBER`), programado en teal (`COLORS.TEAL`).
+- Traza **UNA métrica**. En modo `ambos` usa SAIDI_E como principal
+  (`metricasActivas(met)[0]`) porque la META suele expresarse en SAIDI;
+  la pill nota qué métrica está activa.
+- La **pill** muestra `<métrica> · no-prog NN%` (porcentaje del aporte
+  no-programado sobre el total).
+
+### 9.3 Línea META
+
+- META es **estado de UI por métrica**, NO se deriva del dato:
+  `store.state.metaSaidi` / `metaSaifi`, fijados por el usuario en los
+  inputs `#meta-saidi` / `#meta-saifi` del card.
+- Setter `setMeta(met, v)` en `state.js` (clampa a número finito ≥ 0;
+  vacío/negativo → `null` = sin línea).
+- `sincronizarMeta()` en `filtros.js` refleja el estado en los inputs,
+  **sin pisar el input enfocado** (`document.activeElement`) para no
+  saltar el cursor mientras se escribe.
+- Cuando hay META finita > 0, se traza como **scatter horizontal
+  dashed rojo** (`COLORS.RED`) a y constante en todos los meses, con
+  entrada en leyenda y hover `META: <valor>`.
+
+---
+
+## 10. Reglas técnicas relevantes
+
+### 10.1 Plotly muta los objetos layout/font
 
 `Object.freeze(LAYOUT_BASE)` rompe el render con
 *"Attempted to assign to readonly property"*. Por eso `font()`,
@@ -607,13 +713,13 @@ Separadores `xgap: 2 ygap: 2` entre celdas para distinguir cada tile.
 objetos frescos cada vez. Aplica a cualquier integración futura de
 Plotly en el proyecto.
 
-### 9.2 Fetch del baseline con múltiples candidatos
+### 10.2 Fetch del baseline con múltiples candidatos
 
 `cargarBaselineLocal()` prueba 3 URLs (import.meta.url relativa,
 pathname relativo, ruta absoluta) hasta encontrar la que sirve.
 Imprescindible en GitHub Pages bajo subrutas dinámicas.
 
-### 9.3 safeRender por chart
+### 10.3 safeRender por chart
 
 `calidad-shell.js#renderAll` envuelve cada renderer en su propio
 try/catch. Un fallo aislado (ej. dataset con campo faltante) no rompe
@@ -622,10 +728,10 @@ los otros renderers. Los errores se loggean en consola + banner
 
 ---
 
-## 10. Tests
+## 11. Tests
 
 ```bash
-npm test                                  # lint + 942/942 tests
+npm test                                  # lint + 955/955 tests
 node --test tests/saidi_calculo.test.js   # 31 tests · agregadores + ranking
 node --test tests/saidi_proyeccion.test.js # 10 tests · OLS
 node --test tests/saidi_datos.test.js     # 50 tests · Excel crudo + subests
@@ -655,9 +761,9 @@ Cobertura:
 
 ---
 
-## 11. Cómo extender
+## 12. Cómo extender
 
-### 11.1 Agregar una nueva categoría
+### 12.1 Agregar una nueva categoría
 
 1. Agregar el nombre exacto a `dataset.cats_order` (orden canónico).
 2. Agregar la serie correspondiente en `zonas.*.cat_saidi` y
@@ -666,7 +772,7 @@ Cobertura:
    `categoriaColor()` en `domain/saidi_config.js`.
 4. Regenerar el baseline o subir Excel con la nueva categoría.
 
-### 11.2 Agregar un cuarto grupo de causa
+### 12.2 Agregar un cuarto grupo de causa
 
 1. Editar `domain/saidi_config.js`:
    - Agregar al objeto `GCOL` el color del grupo
@@ -678,7 +784,7 @@ Cobertura:
    `GRP_COLOR` y `GRP_DASH_*` correspondientes.
 5. Editar `renderers/month-table.js`: agregar fila al `rowsDef`.
 
-### 11.3 Agregar un nuevo chart
+### 12.3 Agregar un nuevo chart
 
 1. Crear `assets/js/ui/calidad/renderers/mi-chart.js` con función
    `renderMiChart(dataset, zona, met)`.
@@ -692,7 +798,7 @@ Cobertura:
 
 ---
 
-## 12. Backlog (post-v1)
+## 13. Backlog (post-v1)
 
 - **Ranking de zonas/categorías** con sparkline de tendencia mensual
   (similar al bump chart de Seguimiento Operativo).
@@ -707,7 +813,7 @@ Cobertura:
 
 ---
 
-## 13. Referencias
+## 14. Referencias
 
 - Archivo legacy: `SAIDI_SAIFI Deslastre por Capacidad de Transformacion.html`
   (conservado en raíz · 4.8 MB intactos).
