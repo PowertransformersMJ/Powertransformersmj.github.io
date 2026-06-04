@@ -130,3 +130,18 @@ Antes de eliminar código presuntamente muerto: cero refs internas (`grep` en HT
 > **📏 Capacidad (`CLAUDE.md §G.5`): ~350 líneas.** Al acercarse, SHARD por categoría
 > → ej. extraer la sección "Git / refactor" a `docs/31-LECCIONES-GIT.md`, registrarla
 > en `CLAUDE.md §0` + `00-INDICE`, y dejar aquí un puntero a la hija. Nada huérfano.
+
+---
+
+## 🤖 IA / Claude API (Anthropic)
+
+### L-20 · IDs de modelo Claude: forma exacta y cascada por costo
+Los IDs válidos son `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5` (alias sin sufijo de fecha — NO inventar `claude-4-8-opus`, `claude-3-5-sonnet-20241022` ni "Opus 4.8/Sonnet 4.7": no existen, dan 404/400). Verificar SIEMPRE contra la skill **`claude-api`** (`shared/models.md`) antes de codear, no contra memoria de entrenamiento. Para extracción/clasificación: **Sonnet 4.6 por defecto** (mejor $/calidad + visión), **Opus 4.7 solo escalación** en PDFs ambiguos, **Haiku 4.5** para lo simple. Opus en cada documento es caro e innecesario. Allowlist server-side + default seguro (la función `extraerPruebasElectricasIA` rechaza cualquier `modelId` fuera del set).
+
+### L-21 · Extracción de PDFs variables con Claude (patrón de la plataforma)
+Receta para llevar PDFs sin formato fijo a un schema estructurado, sin exponer la API key ni romper el front:
+1. **Cloud Function `onCall`** (firebase-functions/v2/https) con el secret **`LLM_API_KEY`** (`defineSecret`) — la key NUNCA va al cliente. Región DEBE coincidir con el resto de funciones del proyecto (`southamerica-east1`) y con `getFunctions(app, REGION)` del cliente, o el callable da `not-found`.
+2. **PDF nativo, no texto**: el cliente sube el PDF a Storage (ya lo hace `subirPDF`) y pasa solo `storagePath`; la función lo **descarga server-side** (`getStorage().bucket().file(path).download()` → base64) y lo manda como bloque `{type:'document', source:{type:'base64', media_type:'application/pdf'}}`. Así Claude ve tablas/layout/escaneos (mejor que texto plano) y se evita el límite de payload del callable.
+3. **Tool use forzado** (`tool_choice:{type:'tool', name:...}`) con `input_schema` que **espeja el sanitizador del dominio** → el JSON sale con la forma exacta que consume `sanitizarInforme`. NO calcular calificaciones/semáforo en la IA: que devuelva números crudos y el dominio derive el color (un solo punto de verdad). Inline los sub-objetos repetidos (no `$ref/$defs` — poco fiable en tool use no-estricto).
+4. **Prompt caching** (`cache_control:{type:'ephemeral'}` en el system) sobre la pericia de dominio (estable) → ~80% menos costo de input en cargas repetidas. El PDF (volátil) va en `messages`, después del prefijo cacheado.
+5. **Fallback en capas**: IA → extractor local existente → editor manual. La función es "thin" (devuelve `tool_use.input` crudo); el cliente sigue sanitizando/persistiendo igual (mínima superficie de cambio, anti-regresión). Contrato fijado por test puro `tests/pruebas_electricas_ia.test.js` (sin red ni Firebase).

@@ -15,6 +15,8 @@
 
 ## 🎯 Foco actual
 
+> 🤖 **Extracción de Pruebas Eléctricas con IA (Claude) — código completo + tests, PENDIENTE DEPLOY** (2026-06-04, **ADR-003** `99` línea 64). Cloud Function `extraerPruebasElectricasIA` (PDF nativo desde Storage → tool use forzado → `sanitizarInforme`) + selector de modelo (Sonnet 4.6 def / Opus 4.7 / Haiku 4.5) en el modal + fallback regex→manual. 112/112 tests verdes + contrato IA `tests/pruebas_electricas_ia.test.js`. **⚠ Requiere que el director despliegue (TODO-04)**: `cd functions && npm install`; `firebase functions:secrets:set LLM_API_KEY` (key de platform.claude.com); `firebase deploy --only functions:extraerPruebasElectricasIA`. El front (shell/data/init) va por GitHub Pages (push a `main`). Skill `claude-api` consultada. 🚫 NO mandar texto pre-extraído (PDF nativo), NO exponer la key al cliente.
+>
 > 🧠 **Cerebro neuronal instalado + auditado** sobre SGM·TRANSPOWER (2026-06-04).
 > Instalación cerrada como **ADR-001** (`99-HISTORIAL` línea 20). El CLAUDE.md
 > monolítico previo (3081 líneas) quedó cuarentenado en `_legacy/CLAUDE-previo.md`
@@ -54,6 +56,7 @@
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 en Firestore (script `scripts/migrate/tipificar-suministros-fan-db.js`, correr `dryRun` primero) | 🔮 abierto | director corre el script en su Mac |
 | **TODO-02** | Definir flujo de selección runtime FN-063 vs FN-050 para el contrato 4123000081 (pedido del director) | 🔮 abierto | requiere brief del director |
 | **TODO-03** | Cleanup: PDFs `REMISION N.pdf` subidos por error al raíz del repo | ✅ resuelto (commit `18a25c6` "limpieza basura raíz · 25 archivos · ~9.4 MB") — verificado 2026-06-04: cero PDFs en raíz | — |
+| **TODO-04** | Desplegar IA de Pruebas Eléctricas (ADR-003 §3): `cd functions && npm install` → `firebase functions:secrets:set LLM_API_KEY` → `firebase deploy --only functions:extraerPruebasElectricasIA`. Luego push del front a `main` (shell/data/firebase-init). Probar E2E con un PDF real. | 🔮 abierto | director deploya en su Mac + tiene la API key |
 
 ---
 
@@ -69,4 +72,5 @@
 - **2026-06-04** — Auditoría holística post-instalación: limpieza de `CEREBRO NUEVO/` (3.3 MB fuente redundante) + `NUL` (artefacto 0-byte). brain:check SANO, cero huérfanos, 15 hojas técnicas referenciadas, rutas del proyecto verificadas, frescura `05` ↔ git real OK. TODO-03 detectado stale → marcado ✅ (ya resuelto por commit `18a25c6`).
 - **2026-06-04** — Bug `M-01` corregido: `brain-check.mjs:171` usaba `2>NUL` (Windows) → recreaba archivo `NUL` en cada corrida; cambiado a `2>/dev/null`, verificado que no se recrea. Lección en `30 §Meta`.
 - **2026-06-04** — Cierre: instalación consolidada como ADR-001 (`99` + fila en `00`). El director commiteó el cerebro como `8a6db90` vía GitHub Desktop (incluyó `skills/`). Queda 2º commit pendiente con los docs de cierre (00/05/10/99) + verificar push a `origin/main`.
+- **2026-06-04** — IA Pruebas Eléctricas (ADR-003): implementada Cloud Function `extraerPruebasElectricasIA` (onCall, `southamerica-east1`, secret `LLM_API_KEY`) que lee el PDF nativo desde Storage y fuerza tool use de Claude espejando `sanitizarInforme`; prompt caching del system; cascada Sonnet 4.6/Opus 4.7/Haiku 4.5. Cliente: `getFunctionsSafe` + `extraerConIA` + selector en modal + branch IA→fallback en `storeReport`. Corregidos los IDs de modelo inválidos del prompt de Antigravity. 112/112 + nuevo test de contrato (10/10). Pendiente deploy (TODO-04).
 - **2026-06-04** — Skills: auditoría de solape repo↔interfaz (56 ya instaladas / 24 repo-only). Las 24 staged a `.claude/skills/` con `name` del frontmatter; bundle `taste-skill-main` desglosado en 13 sub-skills; `code-modernization`/`code-simplifier` excluidas (no son skills). Director reinició → `crm-architect` probada OK. Consolidado como **ADR-002** (`99` línea 42 + fila en `00`) + lección `L-19` (`30`) + `skills-inventory.md` corregido. `.claude/` gitignorado → activación local-only.

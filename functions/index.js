@@ -25,8 +25,12 @@
 
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore }   from 'firebase-admin/firestore';
+import { getStorage }     from 'firebase-admin/storage';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onSchedule }        from 'firebase-functions/v2/scheduler';
+import { onCall, HttpsError } from 'firebase-functions/v2/https';
+import { defineSecret }       from 'firebase-functions/params';
+import Anthropic from '@anthropic-ai/sdk';
 
 // Lógica pura del dominio (módulos sin imports de Firebase SDK).
 // La carpeta ./domain/ se sincroniza automáticamente desde
@@ -179,5 +183,287 @@ export const cronAlertasDiarias = onSchedule(
     });
 
     console.log('[cronAlertasDiarias] Email encolado en /mail:', criticas.length, 'alertas.');
+  }
+);
+
+// ══════════════════════════════════════════════════════════════
+// extraerPruebasElectricasIA — extracción de informes con Claude
+// ──────────────────────────────────────────────────────────────
+// onCall (HTTPS Callable) que lee un PDF de pruebas eléctricas desde
+// Firebase Storage, lo envía a Claude como DOCUMENTO NATIVO (la IA ve
+// tablas, layout y escaneos) y fuerza una herramienta de extracción que
+// devuelve las mediciones en la MISMA forma que consume
+// domain/pruebas_electricas_schema.js → sanitizarInforme(). El cliente
+// (pruebas-electricas-shell.js) sigue sanitizando y persistiendo igual:
+// esta función solo reemplaza al extractor regex cuando hay saldo/IA.
+//
+// Modelos en cascada (el cliente elige; aquí se valida contra allowlist):
+//   · claude-sonnet-4-6  (por defecto — extracción + visión, mejor $/calidad)
+//   · claude-opus-4-7    (escalación — PDFs ambiguos)
+//   · claude-haiku-4-5   (barato — informes simples)
+//
+// Secreto: LLM_API_KEY (Anthropic). Configurar antes de desplegar:
+//   firebase functions:secrets:set LLM_API_KEY
+//   firebase deploy --only functions:extraerPruebasElectricasIA
+// ══════════════════════════════════════════════════════════════
+
+const LLM_API_KEY = defineSecret('LLM_API_KEY');
+
+const MODELOS_IA = new Set(['claude-sonnet-4-6', 'claude-opus-4-7', 'claude-haiku-4-5']);
+const MODELO_IA_DEFAULT = 'claude-sonnet-4-6';
+
+// Prefijo estable (system) → se cachea con cache_control. Es la pericia
+// de dominio que hace la extracción AGNÓSTICA al formato del PDF.
+const SYSTEM_PRUEBAS_IA = `Eres un ingeniero experto en pruebas eléctricas de transformadores de potencia. Tu tarea es leer un informe de laboratorio en PDF (de CUALQUIER laboratorio, formato, idioma o diseño: tablas, texto corrido o escaneo) y extraer sus mediciones de forma estructurada, llamando SIEMPRE a la herramienta "registrar_pruebas_electricas".
+
+REGLAS INVIOLABLES:
+1. NO inventes datos. Si una prueba o un valor no aparece en el PDF, deja su arreglo vacío u omite ese campo. Es preferible un campo vacío a un valor equivocado.
+2. Transcribe los números TAL CUAL aparecen (convierte coma decimal a punto). No redondees ni "corrijas".
+3. NO calcules la calificación/semáforo: el sistema lo deriva de los valores. Solo extrae los números crudos.
+4. Mapea sinónimos y variantes de cada laboratorio a la nomenclatura canónica de abajo.
+
+DEVANADOS: AT (alta tensión / H / primario), MT (media / X / secundario), BT (baja / Y / terciario). Fases A/B/C (o U/V/W, R/S/T, H1/H2/H3). TAP = posición del conmutador.
+
+LAS 7 FAMILIAS DE PRUEBA Y SUS UNIDADES:
+
+1) TANGENTE DELTA (factor de potencia / tan δ / FP / power factor) — en %, POR SECCIÓN de aislamiento (no por fase). Códigos canónicos:
+   · CH  = AT ↔ tierra        · CHL = AT ↔ MT
+   · CL  = MT ↔ tierra        · CLT = MT ↔ BT
+   · CT  = BT ↔ tierra        · CHT = AT ↔ BT
+   (UST/GST/GSTg son modos de medición; mapea a la sección que corresponda.)
+
+2) CORRIENTE DE EXCITACIÓN (excitation current / corriente de magnetización) — por fase A/B/C del devanado AT, en mA, con TAP. Reporta cada fase y, si está, el desbalance Δ% entre las dos fases mayores (delta_ext_pct).
+
+3) RELACIÓN DE TRANSFORMACIÓN (TTR / turns ratio / relación) — filas por par de devanados. Cada fila trae 3 fases o un valor global. Reporta la desviación % respecto a la nominal/placa (desviacion_pct) si aparece.
+
+4) RESISTENCIA DE DEVANADOS (winding resistance / resistencia óhmica) — filas AT/MT/BT, fases en mΩ (o Ω/µΩ: indica la unidad). Reporta el desbalance máximo entre fases (delta_max_pct) si aparece. Marca verificar=true si el informe señala el dato como dudoso, y no_medido=true si declara que no se midió.
+
+5) RESISTENCIA DE AISLAMIENTO (insulation resistance / Megger / IR) — por par de devanados o a tierra, en GΩ (convierte MΩ→GΩ: 1000 MΩ = 1 GΩ). asociado = "Tierra"/"MT"/"BT".
+
+6) COLLAR CALIENTE / BUJES (hot collar / bushing power factor) — pérdida en mW. Reporta el máximo (max_mw) y el detalle por buje (etiqueta H0/X1/Y3…, fase, devanado, corriente i_ua en µA, pérdida mw en mW).
+
+7) DRM / RESISTENCIA DINÁMICA DEL CONMUTADOR (OLTC / dynamic resistance) — identidad del conmutador (fabricante, tipo, serial, posiciones, operaciones, posición nominal, datos eléctricos) y la ventana de tiempos de transición en ms (tiempo_min_ms / tiempo_max_ms) + detalle por transición si está. Si solo hay un rango resumido, deja transiciones vacío.
+
+METADATOS DEL INFORME: ano (año de la prueba, de la fecha del informe), fecha (texto tal cual), ejecutante (laboratorio/empresa que ejecutó), equipo (instrumento usado, p. ej. "DOBLE M4100"), serie_en_pdf (número de serie del transformador que aparezca en el PDF), tipo_prueba (déjalo vacío salvo que el informe lo declare; el sistema lo infiere).`;
+
+// Fase individual con terminal real — se inlinea en cada prueba que la usa.
+const FASE_SCHEMA = {
+  type: 'object',
+  properties: {
+    fase: { type: ['string', 'null'], description: 'A / B / C.' },
+    valor: { type: ['number', 'null'] },
+    term: { type: ['string', 'null'], description: 'Terminal(es), ej. "H1–PN", "r–s".' },
+    verificar: { type: ['boolean', 'null'], description: 'Dato a confirmar.' }
+  }
+};
+
+const HERRAMIENTA_PRUEBAS = {
+  name: 'registrar_pruebas_electricas',
+  description: 'Registra las mediciones extraídas de un informe de pruebas eléctricas de un transformador de potencia. Llama a esta herramienta exactamente una vez con todo lo que hayas podido leer del PDF.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      ano: { type: ['integer', 'null'], description: 'Año de la prueba (de la fecha del informe).' },
+      fecha: { type: ['string', 'null'], description: 'Fecha del informe, texto tal cual (ej. "23/08/2012").' },
+      ejecutante: { type: ['string', 'null'], description: 'Laboratorio/empresa que ejecutó (ej. "Applus").' },
+      equipo: { type: ['string', 'null'], description: 'Instrumento usado (ej. "DOBLE M4100").' },
+      serie_en_pdf: { type: ['string', 'null'], description: 'Número de serie del transformador hallado en el PDF.' },
+      tipo_prueba: { type: ['string', 'null'], enum: ['predictivo_completo', 'tan_delta', 'drm_oltc', 'resistencia_devanados', 'ttr', 'mixto', null], description: 'Solo si el informe lo declara explícitamente; si no, null (el sistema lo infiere).' },
+      tand: {
+        type: 'array', description: 'Tangente δ por sección de aislamiento, en %.',
+        items: {
+          type: 'object',
+          properties: {
+            code: { type: 'string', enum: ['CH', 'CHL', 'CL', 'CLT', 'CT', 'CHT'], description: 'Sección de aislamiento.' },
+            entre: { type: ['string', 'null'], description: 'Aislamiento entre (ej. "AT ↔ tierra").' },
+            valor_pct: { type: ['number', 'null'], description: 'Valor en %.' }
+          },
+          required: ['code']
+        }
+      },
+      excitacion: {
+        type: 'object', description: 'Corriente de excitación por fase del devanado AT, en mA.',
+        properties: {
+          devanado: { type: ['string', 'null'] },
+          ref: { type: ['string', 'null'], description: 'Referencia (ej. "N (H0)").' },
+          tap: { type: ['string', 'null'] },
+          delta_ext_pct: { type: ['number', 'null'], description: 'Desbalance % entre las 2 fases mayores.' },
+          fases: { type: 'array', items: FASE_SCHEMA }
+        }
+      },
+      relacion: {
+        type: 'array', description: 'Relación de transformación (TTR), filas por par de devanados.',
+        items: {
+          type: 'object',
+          properties: {
+            devanado: { type: ['string', 'null'] },
+            asociado: { type: ['string', 'null'], description: 'Devanado asociado (ej. "MT", "BT (Terc.)").' },
+            tap: { type: ['string', 'null'] },
+            global: { type: ['number', 'null'], description: 'Valor global si no hay 3 fases.' },
+            global_term: { type: ['string', 'null'] },
+            desviacion_pct: { type: ['number', 'null'], description: 'Desviación % respecto a placa.' },
+            fases: { type: 'array', items: FASE_SCHEMA }
+          }
+        }
+      },
+      resistencia: {
+        type: 'array', description: 'Resistencia de devanados, filas AT/MT/BT en mΩ.',
+        items: {
+          type: 'object',
+          properties: {
+            ano_tap: { type: ['string', 'null'] },
+            devanado: { type: ['string', 'null'] },
+            conexion: { type: ['string', 'null'], description: 'Ej. "fase–N", "fase–fase (Δ)".' },
+            unidad: { type: ['string', 'null'], description: 'mΩ / Ω / µΩ.' },
+            delta_max_pct: { type: ['number', 'null'], description: 'Desbalance máximo entre fases, %.' },
+            verificar: { type: ['boolean', 'null'] },
+            no_medido: { type: ['boolean', 'null'] },
+            fases: { type: 'array', items: FASE_SCHEMA }
+          }
+        }
+      },
+      aislamiento: {
+        type: 'array', description: 'Resistencia de aislamiento (CC), en GΩ.',
+        items: {
+          type: 'object',
+          properties: {
+            devanado: { type: ['string', 'null'] },
+            asociado: { type: ['string', 'null'], description: 'Ej. "Tierra", "MT", "BT".' },
+            gohm: { type: ['number', 'null'], description: 'Valor en GΩ (convierte MΩ→GΩ).' }
+          }
+        }
+      },
+      collar: {
+        type: 'object', description: 'Collar caliente / bujes, pérdida en mW.',
+        properties: {
+          max_mw: { type: ['number', 'null'], description: 'Pérdida máxima del año, en mW.' },
+          bujes: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                buje: { type: ['string', 'null'], description: 'Etiqueta (ej. "H0", "X1").' },
+                fase: { type: ['string', 'null'] },
+                fase_label: { type: ['string', 'null'] },
+                devanado: { type: ['string', 'null'] },
+                i_ua: { type: ['number', 'null'], description: 'Corriente de salida en µA.' },
+                mw: { type: ['number', 'null'], description: 'Pérdida en mW.' }
+              }
+            }
+          }
+        }
+      },
+      drm: {
+        type: 'object', description: 'DRM / resistencia dinámica del conmutador (OLTC).',
+        properties: {
+          conmutador: {
+            type: 'object',
+            properties: {
+              fabricante: { type: ['string', 'null'] },
+              tipo: { type: ['string', 'null'] },
+              serial: { type: ['string', 'null'] },
+              posiciones: { type: ['integer', 'null'] },
+              operaciones: { type: ['integer', 'null'] },
+              pos_nominal: { type: ['integer', 'null'] },
+              tension_ui_v: { type: ['number', 'null'] },
+              corriente_iu_a: { type: ['number', 'null'] },
+              r_conmutacion_ohm: { type: ['number', 'null'] }
+            }
+          },
+          tiempo_min_ms: { type: ['number', 'null'] },
+          tiempo_max_ms: { type: ['number', 'null'] },
+          transiciones: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                posicion: { type: ['string', 'null'], description: 'Ej. "10→11".' },
+                fase: { type: ['string', 'null'] },
+                tiempo_ms: { type: ['number', 'null'] },
+                sentido: { type: ['string', 'null'], description: '"subir" / "bajar".' }
+              }
+            }
+          }
+        }
+      }
+    },
+    required: []
+  }
+};
+
+export const extraerPruebasElectricasIA = onCall(
+  {
+    region: 'southamerica-east1',
+    secrets: [LLM_API_KEY],
+    timeoutSeconds: 300,
+    memory: '512MiB'
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
+    }
+    const { storagePath, filename, modelId } = request.data || {};
+    if (!storagePath || typeof storagePath !== 'string') {
+      throw new HttpsError('invalid-argument', 'Falta storagePath del PDF.');
+    }
+    const model = MODELOS_IA.has(modelId) ? modelId : MODELO_IA_DEFAULT;
+
+    // 1) Descargar el PDF nativo desde Storage (server-side: sin límite
+    //    de payload del callable; el PDF ya fue subido por el cliente).
+    let pdfBase64;
+    try {
+      const [buf] = await getStorage().bucket().file(storagePath).download();
+      pdfBase64 = buf.toString('base64');
+    } catch (e) {
+      throw new HttpsError('not-found', `No se pudo leer el PDF en Storage: ${e.message}`);
+    }
+
+    // 2) Claude: PDF nativo + tool use forzado + prompt caching del system.
+    const client = new Anthropic({ apiKey: LLM_API_KEY.value() });
+    let message;
+    try {
+      message = await client.messages.create({
+        model,
+        max_tokens: 16000,
+        system: [
+          { type: 'text', text: SYSTEM_PRUEBAS_IA, cache_control: { type: 'ephemeral' } }
+        ],
+        tools: [HERRAMIENTA_PRUEBAS],
+        tool_choice: { type: 'tool', name: 'registrar_pruebas_electricas' },
+        messages: [
+          {
+            role: 'user',
+            content: [
+              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+              { type: 'text', text: `Extrae TODAS las mediciones de este informe de pruebas eléctricas (archivo: ${filename || 'informe.pdf'}) y regístralas con la herramienta. Si una prueba no aparece, deja su arreglo vacío; NO inventes valores.` }
+            ]
+          }
+        ]
+      });
+    } catch (e) {
+      throw new HttpsError('internal', `Claude API: ${e.message || e}`);
+    }
+
+    const toolBlock = (message.content || []).find(
+      (b) => b.type === 'tool_use' && b.name === 'registrar_pruebas_electricas'
+    );
+    if (!toolBlock) {
+      throw new HttpsError('internal', 'La IA no devolvió datos estructurados.');
+    }
+
+    const u = message.usage || {};
+    console.info('[extraerPruebasElectricasIA]', model, storagePath,
+      `in=${u.input_tokens || 0} out=${u.output_tokens || 0} cacheR=${u.cache_read_input_tokens || 0} cacheW=${u.cache_creation_input_tokens || 0}`);
+
+    return {
+      mediciones: toolBlock.input,
+      modelUsed: model,
+      usage: {
+        input: u.input_tokens || 0,
+        output: u.output_tokens || 0,
+        cache_read: u.cache_read_input_tokens || 0,
+        cache_write: u.cache_creation_input_tokens || 0
+      }
+    };
   }
 );
