@@ -100,6 +100,13 @@ Antes de eliminar código presuntamente muerto: cero refs internas (`grep` en HT
 
 ---
 
+## 🛠️ Claude Code / harness (skills, config)
+
+### L-19 · Activar una skill repo-only = copiar su `SKILL.md` a `.claude/skills/<name>/` + reiniciar
+`skills/` del repo **NO es la fuente** de lo que Claude carga; el bundle `anthropic-skills:*` viene del entorno. Para activar una skill que solo existe en `skills/` (repo-only): copiar su carpeta a `.claude/skills/<name>/`, donde `<name>` = el **`name` del frontmatter** (NO el nombre de la carpeta fuente — pueden diferir, ej. `brutalist-skill` → `industrial-brutalist-ui`; sácalo con `grep -m1 '^name:' SKILL.md`). Claude Code escanea esa ruta **solo en boot** → no hay carga en caliente, **el director debe reiniciar**. Gotchas: (1) bundles con varias skills anidadas (ej. `taste-skill-main/<sub>/SKILL.md`) → copiar cada subcarpeta por separado, no la raíz; (2) carpetas que son **plugin** (`code-modernization`) o **subagente** (`code-simplifier`) NO tienen `SKILL.md` → no cargan como skill; (3) NO re-stagear skills que ya están en el bundle → colisión de `name`. Validar: `find .claude/skills -name SKILL.md` + chequear `name`+`description` en cada una. **Ojo persistencia**: `.claude/` está gitignorado (`.gitignore:22`) → lo copiado es **local-only**; si se re-clona el repo, re-correr el copy (la fuente sobrevive en `skills/`, que sí está tracked). (Ref: ADR-002, `99`.)
+
+---
+
 ## 🪞 Meta: fallos del propio cerebro (Reflejo de Autocrítica `CLAUDE.md §G.4`)
 
 > El cerebro se critica a SÍ MISMO: dónde una neurona/regla **causó un error o me

@@ -57,6 +57,7 @@
 | § | Tema | Línea |
 |---|---|---|
 | §1 | ADR-001 — Instalación del cerebro neuronal documental (7 fases + auditoría) | 20 |
+| §2 | ADR-002 — Activación local de 24 skills repo-only en `.claude/skills/` | 42 |
 
 ---
 

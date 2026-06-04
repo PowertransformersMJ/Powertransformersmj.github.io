@@ -36,3 +36,25 @@
 **1.6 Archivos** — *Nuevos*: `_legacy/`, `docs/{00,05,10,15,20,30,40,99}*.md`, `docs/INSTALACION-CEREBRO.md`, `docs/skills-inventory.md`, `githooks/`, `scripts/brain-check.mjs`, `skills/`. *Modificados*: `CLAUDE.md` (monolito → router), `package.json` (+script). *INTACTOS*: todo `assets/`, `pages/`, `admin/`, `functions/`, `firestore.*`, `storage.rules`.
 
 **1.7 Doctrina aplicada + secuela** — Reflejo de Cierre + Auto-auditoría (§G.4). Secuela: bug `M-01` detectado y corregido en la auditoría post-instalación (`brain-check.mjs` usaba `2>NUL` de Windows → ensuciaba la raíz con archivo `NUL`; corregido a `2>/dev/null`). `TODO-03` detectado stale (PDFs ya borrados por `18a25c6`) → marcado resuelto. Sin cache bump (no aplica §4).
+
+---
+
+## 2. ADR-002 — Activación local de 24 skills repo-only en `.claude/skills/`
+
+> Pedido del director (2026-06-04): *"En el repo hay muchísimas skills cargadas,
+> algunas ya están en mi interfaz y otras no. Revísate, dime cuáles están y cuáles
+> no… ¿puedes auto-instalarlas tú o me toca manual?… TODAS… commitea para reiniciar."*
+
+**2.1 Causa raíz / motivación** — `skills/` del repo (74 carpetas, 83 `SKILL.md` únicos) **NO es la fuente** de las skills que Claude carga en sesión (esas vienen del bundle `anthropic-skills:*` del entorno + plugins de `~/.claude`). Auditoría de solape: **56** skills del repo ya tenían contraparte instalada; **24** eran **repo-only** (invocarlas vía `Skill` habría fallado). El director las quería todas usables.
+
+**2.2 Solución estructural** — Staging local: copiar las 24 carpetas repo-only a `.claude/skills/<name>/` (ruta que Claude Code escanea al **arrancar**). Cada carpeta destino se nombró con el **`name` real del frontmatter** (no el nombre de la carpeta fuente — ej. `taste-skill-main/brutalist-skill` → `industrial-brutalist-ui`). El bundle `taste-skill-main` se desglosó en sus 13 sub-skills (cada una tiene su propio `SKILL.md`). Excluidas correctamente: `code-modernization` (plugin) y `code-simplifier` (subagente) — no tienen `SKILL.md`, no cargan como skill (ya existe el built-in `simplify`).
+
+**2.3 No-regresión** — Operación 100% aditiva: nada de `skills/` ni de producto fue tocado. Las 56 ya-instaladas NO se re-copiaron (evita colisión de `name` con el bundle `anthropic-skills:*`). Verificación post-reinicio: `Skill crm-architect` ejecutó OK → las 24 cargaron.
+
+**2.4 Tests / verificación** — `find .claude/skills -name SKILL.md` → 24, todas con `name`+`description` válidos (linter ad-hoc: 0 problemas). Tras reinicio del director: 24 carpetas intactas en disco + invocación real de `crm-architect` exitosa.
+
+**2.5 Anti-patterns evitados** — No force-add contra `.gitignore` (ver 2.7). No re-stagear las 56 ya disponibles (ruido + colisión). No copiar la raíz `taste-skill-main` como una sola skill (habría ocultado 13). No inventar nombres de carpeta (se usó el `name` del frontmatter, garantiza match con el id que Claude Code resuelve).
+
+**2.6 Archivos** — *Nuevos (NO versionados, ver 2.7)*: `.claude/skills/{24 carpetas}`. *Modificados*: `docs/skills-inventory.md` (estado real), `docs/{00,10,30,99}` (consolidación). *INTACTOS*: `skills/` (fuente), todo `assets/`/`pages/`/`admin/`/`functions/`.
+
+**2.7 Doctrina aplicada + nota de wiring** — Reflejo de Captura + Frescura (§G.4). **`.claude/` está gitignorado a propósito** (`.gitignore:22` — "memoria local, nunca al repo"), por eso las 24 skills son **local-only**: si se re-clona el repo hay que re-correr el copy (la fuente vive en `skills/`, que SÍ está tracked). Receta reusable extraída → `L-19` en `30-LECCIONES`. La activación exige **reiniciar Claude Code** (escaneo de skills es solo en boot; no hay carga en caliente). Sin cache bump (no aplica §4).
