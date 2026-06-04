@@ -465,26 +465,48 @@ programado/no-programado y la pivot de la hoja `DASHBOARD`. Estructura:
 | `META SAIDI_E` | aporte SAIDI_E (h/usuario) |
 | `META SAIFI_E` | aporte SAIFI_E (interr/usuario) |
 
-`parsearExcel` detecta esta META por encabezado (contiene `PERIODO` +
-`CLASIFIC`) y la rutea al fast-path `agregarMetaProg(rows)` en
-`domain/saidi_datos.js`, **leyendo solo la hoja META** (`{ sheets:
-[upper.META] }`) — nunca parsea la hoja `DATOS` de ~54 MB.
+`parsearExcel` usa la META de **dos** maneras según el archivo traiga o
+no la hoja `DATOS`:
 
-`agregarMetaProg` puebla `dataset.prog[zonaKey] = {
-programado:{saidi[],saifi[]}, no_programado:{saidi[],saifi[]} }` por
-`BOLIVAR` / `OCCIDENTE` / `ORIENTE` + `TODAS` derivada (suma de las 3),
-recorta al rango de meses presente (`[min..max]`) y deriva
-`total_saidi` / `total_saifi` por zona (`programado + no_programado`)
-para que las series y KPIs rendericen. Habilita el filtro por **zona,
-mes, programado/no-programado y SAIDI/SAIFI** (mensual + acumulado) que
-pidió el director, replicando el criterio de la hoja `DASHBOARD`.
+**A) Archivo con hoja `DATOS` (caso normal) · META = objetivo superpuesto.**
+`agregarDatosCrudos(DATOS)` produce el dataset completo (categorías,
+ranking, KPIs, proyección, `prog` causado desde
+`CLASIFICACION_CREG_063`). Luego, si existe la hoja `META`,
+`adjuntarMetaObjetivo(dataset, metaRows)` adjunta
+`dataset.metaObjetivo[zonaKey] = { programado:{saidi[],saifi[]},
+no_programado:{saidi[],saifi[]} }` **alineado por mes absoluto** a las
+posiciones de `dataset.meses` (vía `mesesIdx`). La META **no reemplaza
+nada** (regla §0.1.2.4): es una capa de *objetivo* que el chart
+prog/no-prog dibuja como línea dashed sobre las barras *causadas*, dando
+"el match entre la meta y lo causado hasta la fecha" que pidió el
+director. Si la META no parsea, se registra `dataset.metaObjetivoMotivo`
+y el dataset queda intacto.
 
-**Tradeoff de diseño:** la META plana no trae categorías ni el cruce
-CAUSA2, así que `cats_order: []` (charts de categoría vacíos) y no hay
-`progCat` (el cruce CAUSA2 solo existe vía `agregarDatosCrudos` sobre
-`DATOS`). Los renderers degradan con `safeRender` sin romper el
-dashboard. Cobertura: `tests/saidi_datos.test.js` (10 tests de
-`agregarMetaProg`).
+**B) Archivo solo-META (fallback, sin hoja `DATOS`) · fast-path.**
+`agregarMetaProg(rows)` lee solo la hoja META y puebla
+`dataset.prog[zonaKey]` + `total_saidi`/`total_saifi` por zona
+(`programado + no_programado`), recortando al rango de meses presente.
+Mantiene viable un archivo que no traiga el `DATOS` de ~54 MB. Tras
+ello también intenta `adjuntarMetaObjetivo` para que la línea objetivo
+coincida con sus propias barras.
+
+**Builder compartido:** ambos caminos derivan de `_construirProgMeta(rows)`
+(detección de columnas por encabezado tolerante a orden/acentos, zonas
+`BOLIVAR`/`OCCIDENTE`/`ORIENTE` + `TODAS`, mapeo `NO PROGRAMADA…` →
+`no_programado` / `PROGRAMADA(S)…` → `programado`), que devuelve arrays a
+12 meses absolutos sin recortar. `agregarMetaProg` recorta; `extraerMetaObjetivo`
+no recorta (el overlay se alinea después a `dataset.meses`).
+
+**Filtros habilitados:** zona, mes, programado/no-programado y
+SAIDI/SAIFI (mensual + acumulado). Los chips `#prog-series` togglean la
+visibilidad de cada serie (barra causada + su línea META) sin dejar
+ambas apagadas (`store.setProgSerie`).
+
+**Tradeoff (solo caso B):** la META plana no trae categorías ni el cruce
+CAUSA2, así que `cats_order: []` y no hay `progCat`. Los renderers
+degradan con `safeRender` sin romper el dashboard. Cobertura:
+`tests/saidi_datos.test.js` (`agregarMetaProg`, `extraerMetaObjetivo`,
+`adjuntarMetaObjetivo`).
 
 #### Filtros opcionales a nivel de fila
 
@@ -692,12 +714,14 @@ Separadores `xgap: 2 ygap: 2` entre celdas para distinguir cada tile.
 
 ---
 
-## 9. Chart Aporte programado vs no-programado · línea META
+## 9. Chart Aporte programado vs no-programado · META vs causado
 
-Card **"Aporte programado vs no-programado · línea META"**
+Card **"Aporte programado vs no-programado · META vs causado"**
 (`renderers/prog.js`): desglosa el aporte SAIDI_E / SAIFI_E entre
-eventos **PROGRAMADOS** y **NO PROGRAMADOS** por mes, con una línea
-META interactiva editable.
+eventos **PROGRAMADOS** y **NO PROGRAMADOS** por mes (barras = lo
+*causado*), superpone la **línea META** (objetivo de la hoja META)
+para el match meta-vs-causado, y admite una línea de objetivo manual
+editable. Chips `#prog-series` togglean cada serie (no-prog / prog).
 
 ### 9.1 Origen del dato
 
@@ -716,27 +740,44 @@ META interactiva editable.
 
 ### 9.2 Render
 
-- **Barras agrupadas** (`barmode: 'group'`): no-programado en ámbar
-  (`COLORS.AMBER`), programado en teal (`COLORS.TEAL`).
+- **Barras agrupadas** (`barmode: 'group'`) = lo *causado*:
+  no-programado en ámbar (`COLORS.AMBER`) etiquetada "No programado
+  (causado)", programado en teal (`COLORS.TEAL`) etiquetada "Programado
+  (causado)".
+- Chips `#prog-series` controlan `store.state.progSeries = { prog, nop }`
+  (setter `setProgSerie`, nunca deja ambas apagadas). Una serie oculta
+  esconde su barra **y** su línea META.
+- Modo mensual / acumulado (`progModo`): en `acum` cada serie se acumula
+  mes a mes (`acumular`).
 - Traza **UNA métrica**. En modo `ambos` usa SAIDI_E como principal
   (`metricasActivas(met)[0]`) porque la META suele expresarse en SAIDI;
   la pill nota qué métrica está activa.
-- La **pill** muestra `<métrica> · no-prog NN%` (porcentaje del aporte
-  no-programado sobre el total).
+- La **pill** muestra `<métrica> · no-prog NN%` (+ `· acumulado` y
+  `· META vs causado` cuando aplica).
 
-### 9.3 Línea META
+### 9.3 Línea META (objetivo de la hoja META) · el match meta-vs-causado
 
-- META es **estado de UI por métrica**, NO se deriva del dato:
-  `store.state.metaSaidi` / `metaSaifi`, fijados por el usuario en los
-  inputs `#meta-saidi` / `#meta-saifi` del card.
-- Setter `setMeta(met, v)` en `state.js` (clampa a número finito ≥ 0;
-  vacío/negativo → `null` = sin línea).
-- `sincronizarMeta()` en `filtros.js` refleja el estado en los inputs,
-  **sin pisar el input enfocado** (`document.activeElement`) para no
-  saltar el cursor mientras se escribe.
-- Cuando hay META finita > 0, se traza como **scatter horizontal
-  dashed rojo** (`COLORS.RED`) a y constante en todos los meses, con
-  entrada en leyenda y hover `META: <valor>`.
+- El objetivo por mes sale de `dataset.metaObjetivo[zona][serieKey][m]`
+  (poblado por `adjuntarMetaObjetivo` desde la hoja META, §5.2.2),
+  alineado por mes a las barras causadas.
+- `metaSerie(dataset, zona, m, serieKey)` devuelve el array objetivo o
+  `null` si no hay overlay para esa zona/métrica/serie.
+- Se traza como **scatter `lines+markers` dashed** del mismo color que
+  su barra (ámbar para no-prog, teal para prog), de modo que el director
+  vea el objetivo encima de lo causado mes a mes ("el match entre la
+  meta y lo causado hasta la fecha"). Activa el sufijo `· META vs
+  causado` en la pill.
+
+### 9.4 Objetivo manual (línea de referencia opcional)
+
+- Estado de UI por métrica, NO se deriva del dato: `store.state.metaSaidi`
+  / `metaSaifi`, fijados en los inputs `#meta-saidi` / `#meta-saifi`.
+- Setter `setMeta(met, v)` (clampa a número finito ≥ 0; vacío/negativo →
+  `null` = sin línea). `sincronizarMeta()` refleja el estado en los
+  inputs **sin pisar el input enfocado** (`document.activeElement`).
+- Cuando hay valor finito > 0, se traza como **scatter horizontal dashed
+  rojo** (`COLORS.RED`) a y constante, con hover `Objetivo: <valor>`.
+  Convive con las líneas META de la hoja (son capas distintas).
 
 ---
 

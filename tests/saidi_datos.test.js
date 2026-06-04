@@ -6,7 +6,7 @@ import {
   detectarColumnaFecha, detectarColumnaPorHeader, agregarDatosCrudos,
   COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
   filtrarPorCausa2, CAUSA2_SOBRECARGA, CAUSA2_TODAS,
-  agregarMetaProg,
+  agregarMetaProg, extraerMetaObjetivo, adjuntarMetaObjetivo,
 } from '../assets/js/domain/saidi_datos.js';
 
 // ── colIdx ────────────────────────────────────────────────────
@@ -855,4 +855,67 @@ test('agregarMetaProg deja cats_order vacío (META no trae categorías)', () => 
   const ds = agregarMetaProg(metaRowsBase());
   assert.deepEqual(ds.cats_order, []);
   assert.equal(ds.proj_global, null);
+});
+
+// ── extraerMetaObjetivo (overlay objetivo a 12 meses absolutos) ──
+test('extraerMetaObjetivo devuelve objetivo a 12 meses absolutos sin recortar', () => {
+  const { metaObjetivo, mesesIdx } = extraerMetaObjetivo(metaRowsBase());
+  // mesesIdx = meses con dato (ENE=0, FEB=1) ordenados
+  assert.deepEqual(mesesIdx, [0, 1]);
+  // Arrays a 12 posiciones (no recortados)
+  assert.equal(metaObjetivo.BOLIVAR.no_programado.saidi.length, 12);
+  // ENE absoluto = idx 0
+  assert.equal(metaObjetivo.BOLIVAR.no_programado.saidi[0], 0.02);
+  assert.equal(metaObjetivo.BOLIVAR.programado.saidi[0], 0.01);
+  // FEB absoluto = idx 1 (ORIENTE)
+  assert.equal(metaObjetivo.ORIENTE.no_programado.saidi[1], 0.18);
+  // Meses sin dato quedan en 0
+  assert.equal(metaObjetivo.BOLIVAR.no_programado.saidi[5], 0);
+});
+
+// ── adjuntarMetaObjetivo (alinea overlay a dataset.meses recortado) ──
+test('adjuntarMetaObjetivo alinea el objetivo a las posiciones de dataset.meses', () => {
+  // Dataset DATOS recortado a [FEB, MAR] (mesesIdx absolutos [1, 2])
+  const dataset = { meses: ['Feb', 'Mar'], mesesIdx: [1, 2] };
+  const metaRows = [
+    ['PERIODO', 'ZONA', 'CLASIFICACION_CREG_063', 'META SAIDI_E', 'META SAIFI_E'],
+    ['202602', 'BOLIVAR', 'NO PROGRAMADA NO EXCLUIDA', 0.5, 0.6],
+    ['202603', 'BOLIVAR', 'PROGRAMADAS NO EXCLUIDA', 0.7, 0.8],
+  ];
+  const out = adjuntarMetaObjetivo(dataset, metaRows);
+  assert.strictEqual(out, dataset);
+  // FEB (posición 0 del dataset) → no_programado
+  assert.equal(out.metaObjetivo.BOLIVAR.no_programado.saidi[0], 0.5);
+  assert.equal(out.metaObjetivo.BOLIVAR.no_programado.saifi[0], 0.6);
+  // MAR (posición 1 del dataset) → programado
+  assert.equal(out.metaObjetivo.BOLIVAR.programado.saidi[1], 0.7);
+  assert.equal(out.metaObjetivo.BOLIVAR.programado.saifi[1], 0.8);
+  // Longitud paralela a dataset.meses (2)
+  assert.equal(out.metaObjetivo.BOLIVAR.no_programado.saidi.length, 2);
+});
+
+test('adjuntarMetaObjetivo deriva mesesIdx desde meses cuando no viene', () => {
+  const dataset = { meses: ['Ene'] };  // sin mesesIdx
+  const metaRows = [
+    ['PERIODO', 'ZONA', 'CLASIFICACION_CREG_063', 'META SAIDI_E', 'META SAIFI_E'],
+    ['202601', 'OCCIDENTE', 'NO PROGRAMADA NO EXCLUIDA', 0.11, 0.12],
+  ];
+  const out = adjuntarMetaObjetivo(dataset, metaRows);
+  assert.equal(out.metaObjetivo.OCCIDENTE.no_programado.saidi[0], 0.11);
+});
+
+test('adjuntarMetaObjetivo no rompe el dataset si la META es inválida', () => {
+  const dataset = { meses: ['Ene'], mesesIdx: [0], zonas: { TODAS: {} } };
+  const out = adjuntarMetaObjetivo(dataset, [['FOO', 'BAR'], ['a', 'b']]);
+  // Dataset intacto + motivo registrado, sin overlay
+  assert.strictEqual(out, dataset);
+  assert.equal(out.metaObjetivo, undefined);
+  assert.ok(typeof out.metaObjetivoMotivo === 'string' && out.metaObjetivoMotivo.length);
+});
+
+test('adjuntarMetaObjetivo tolera dataset nulo o metaRows no-array', () => {
+  assert.equal(adjuntarMetaObjetivo(null, []), null);
+  const ds = { meses: ['Ene'] };
+  assert.strictEqual(adjuntarMetaObjetivo(ds, null), ds);
+  assert.equal(ds.metaObjetivo, undefined);
 });
