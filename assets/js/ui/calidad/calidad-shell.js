@@ -123,14 +123,15 @@ function renderAll(state) {
 
   // VIEW DATASET · estrechado al filtro CAUSA2 (Todas / SOBRECARGA / causa
   // única). Todas las gráficas que consumen categorías leen de aquí para
-  // que el filtro madre aísle el aporte por sobrecarga/deslastre. El spread
-  // de filtrarPorCausa2 preserva prog / dias / subests intactos.
+  // que el filtro madre aísle el aporte por sobrecarga/deslastre. El aporte
+  // prog/no-prog se re-agrega desde progCat sumando solo las causas
+  // incluidas; dias / subests se preservan intactos vía spread.
   const viewDS = filtrarPorCausa2(dataset, causa2);
 
   safeRender('kpis',        () => renderKPIs(viewDS, zona, met));
   safeRender('insight',     () => renderInsight(viewDS, zona, met));
   safeRender('serie',       () => renderSerie(viewDS, zona, met, serieModo, serieMes));
-  safeRender('prog',        () => renderProg(dataset, zona, met, metaSaidi, metaSaifi, progModo));
+  safeRender('prog',        () => renderProg(viewDS, zona, met, metaSaidi, metaSaifi, progModo));
   safeRender('stack',       () => renderStack(viewDS, zona, met));
   safeRender('part',        () => renderPart(viewDS, zona, met));
   safeRender('varmom',      () => renderVarMoM(viewDS, zona, met));
