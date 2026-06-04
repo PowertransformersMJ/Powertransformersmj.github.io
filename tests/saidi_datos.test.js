@@ -307,6 +307,23 @@ test('prog: existe con ceros aunque la columna CREG no resuelva', () => {
   assert.equal(dataset.prog.TODAS.no_programado.saidi[0], 0);
 });
 
+test('progCat: desglose programado/no-programado abierto por causa', () => {
+  const rows = [
+    headerRow(),
+    filaFiltro({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR', ...OK, clas: 'NO PROGRAMADA NO EXCLUIDA' }),
+    filaFiltro({ fecha: '20/01/2026', causa: 'Sobrecarga', saifi: 0.4, saidi: 4.0, zona: 'BOLIVAR', ...OK, clas: 'PROGRAMADA NO EXCLUIDA' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows, OPTS_FILTROS);
+  assert.ok(dataset.progCat, 'dataset debe exponer progCat');
+  const pc = dataset.progCat.BOLIVAR['Sobrecarga'];
+  assert.equal(pc.no_programado.saidi[0], 1.0);
+  assert.equal(pc.programado.saidi[0], 4.0);
+  assert.equal(pc.programado.saifi[0], 0.4);
+  // TODAS agrega la misma causa
+  assert.equal(dataset.progCat.TODAS['Sobrecarga'].programado.saidi[0], 4.0);
+  assert.equal(dataset.progCat.TODAS['Sobrecarga'].no_programado.saidi[0], 1.0);
+});
+
 // ── diaDesdeValor ─────────────────────────────────────────────
 test('diaDesdeValor interpreta Date nativo', () => {
   assert.equal(diaDesdeValor(new Date(2026, 0, 15)), 15);
@@ -706,11 +723,46 @@ test('filtrarPorCausa2 con causa única conserva solo esa causa', () => {
   assert.deepEqual(out.cats_order, ['Sobrecarga']);
 });
 
-test('filtrarPorCausa2 preserva prog / subests / dias (datos de fila) vía spread', () => {
-  const ds = datasetCausa2();
+test('filtrarPorCausa2 preserva prog (sin progCat) / subests / dias vía spread', () => {
+  const ds = datasetCausa2();  // sin progCat → prog se conserva intacto
   const out = filtrarPorCausa2(ds, CAUSA2_SOBRECARGA);
   assert.deepEqual(out.prog, ds.prog);
   assert.deepEqual(out.subests, ds.subests);
   assert.deepEqual(out.dias, ds.dias);
   assert.deepEqual(out.mesesIdx, ds.mesesIdx);
+});
+
+// Dataset con progCat (desglose prog/no-prog por causa) para verificar que
+// el filtro CAUSA2 re-agrega el aporte sumando solo las causas incluidas.
+function datasetCausa2ProgCat() {
+  const ds = datasetCausa2();
+  ds.progCat = {
+    TODAS: {
+      'Sobrecarga':                               { programado: { saidi: [2, 2], saifi: [0.2, 0.2] }, no_programado: { saidi: [1, 1], saifi: [0.1, 0.1] } },
+      'SOBRECARGA TRAFO SDL':                     { programado: { saidi: [5, 5], saifi: [0.5, 0.5] }, no_programado: { saidi: [3, 3], saifi: [0.3, 0.3] } },
+      'Racionamiento Programado por Deficit STN': { programado: { saidi: [9, 9], saifi: [0.9, 0.9] }, no_programado: { saidi: [7, 7], saifi: [0.7, 0.7] } },
+    },
+    BOLIVAR: {}, OCCIDENTE: {}, ORIENTE: {},
+  };
+  return ds;
+}
+
+test('filtrarPorCausa2: prog se re-agrega desde progCat (causa única)', () => {
+  const out = filtrarPorCausa2(datasetCausa2ProgCat(), 'Sobrecarga');
+  assert.deepEqual(out.prog.TODAS.programado.saidi, [2, 2]);
+  assert.deepEqual(out.prog.TODAS.no_programado.saidi, [1, 1]);
+  assert.deepEqual(out.prog.TODAS.programado.saifi, [0.2, 0.2]);
+});
+
+test('filtrarPorCausa2: prog SOBRECARGA suma solo causas de sobrecarga desde progCat', () => {
+  const out = filtrarPorCausa2(datasetCausa2ProgCat(), CAUSA2_SOBRECARGA);
+  // Sobrecarga(2,2) + SOBRECARGA TRAFO SDL(5,5) = (7,7); Racionamiento excluido
+  assert.deepEqual(out.prog.TODAS.programado.saidi, [7, 7]);
+  assert.deepEqual(out.prog.TODAS.no_programado.saidi, [4, 4]);  // 1 + 3
+});
+
+test('filtrarPorCausa2: progCat sobrevive al filtro (para re-cruces posteriores)', () => {
+  const ds = datasetCausa2ProgCat();
+  const out = filtrarPorCausa2(ds, 'Sobrecarga');
+  assert.deepEqual(out.progCat, ds.progCat);
 });
