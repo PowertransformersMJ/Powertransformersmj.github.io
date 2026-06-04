@@ -25,8 +25,14 @@
 // Funciones PURAS · sin DOM · sin I/O · testeables con node --test.
 // ══════════════════════════════════════════════════════════════
 
-import { clasificarGrupoCausa, esCausaCanonica } from './saidi_config.js';
+import { clasificarGrupoCausa, esCausaCanonica, esCausaSobrecarga } from './saidi_config.js';
 import { calcularProyeccionOLS } from './saidi_proyeccion.js';
+
+// Sentinel del filtro madre "SOBRECARGA" (CAUSA2). Distinto de cualquier
+// nombre de causa real (incl. 'Sobrecarga') para no colisionar al elegir
+// una causa individual en el selector.
+export const CAUSA2_TODAS = '';
+export const CAUSA2_SOBRECARGA = '__SOBRECARGA__';
 
 // 12 meses canónicos (orden del eje del dashboard).
 export const MESES_CANON = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
@@ -398,6 +404,68 @@ export function filtrarCausasCanonicas(dataset) {
   };
 }
 
+// ── Filtro CAUSA2 a nivel de DATASET ─────────────────────────
+// Estrecha el dataset (ya filtrado a las 13 causas canónicas) a un
+// subconjunto de categorías según el selector CAUSA2:
+//   · CAUSA2_TODAS ('')            → sin filtro (devuelve el dataset tal cual)
+//   · CAUSA2_SOBRECARGA            → filtro madre: las 13 causas de
+//                                     sobrecarga/deslastre de transporte
+//                                     (esCausaSobrecarga), sin Racionamiento
+//   · '<nombre de causa>'          → una sola causa exacta
+// Re-deriva grupos + total + proyección + cats_order desde las categorías
+// que sobreviven. El spread `...dataset` preserva prog / dias / subests /
+// meses / mesesIdx (prog es a nivel de fila, no por categoría, así que NO
+// se re-divide con este filtro: sobrevive intacto).
+export function filtrarPorCausa2(dataset, causa2) {
+  const sel = causa2 == null ? CAUSA2_TODAS : causa2;
+  if (sel === CAUSA2_TODAS) return dataset;
+  if (!dataset || !dataset.zonas || typeof dataset.zonas !== 'object') return dataset;
+
+  let N = Array.isArray(dataset.meses) ? dataset.meses.length : 0;
+  if (!N) {
+    for (const z of Object.values(dataset.zonas)) {
+      for (const serie of Object.values(z?.cat_saidi || {})) {
+        if (Array.isArray(serie)) N = Math.max(N, serie.length);
+      }
+    }
+  }
+  const Mfull = Array.isArray(dataset.meses_full) ? dataset.meses_full.length : MESES_CANON.length;
+
+  // Predicado de pertenencia: filtro madre vs causa única exacta.
+  const incluir = sel === CAUSA2_SOBRECARGA
+    ? (cat) => esCausaSobrecarga(cat)
+    : (cat) => cat === sel;
+
+  const zonas = {};
+  for (const [zname, z] of Object.entries(dataset.zonas)) {
+    const zf = nuevaZona();
+    for (const met of ['saidi', 'saifi']) {
+      const cats = z?.[`cat_${met}`] || {};
+      for (const [cat, serie] of Object.entries(cats)) {
+        if (incluir(cat)) zf[`cat_${met}`][cat] = Array.isArray(serie) ? serie.slice() : [];
+      }
+    }
+    derivarGruposDesdeCategorias(zf, N);
+    const sob = zf.grp_saidi['Sobrecarga/Deslastre'] || [];
+    zf.proj = sob.length >= 2 ? calcularProyeccionOLS(sob, Mfull) : null;
+    zonas[zname] = zf;
+  }
+
+  const catsTodas = zonas.TODAS?.cat_saidi || {};
+  const cats_order = Object.keys(catsTodas).sort((a, b) => {
+    const sa = (catsTodas[a] || []).reduce((x, y) => x + (+y || 0), 0);
+    const sb = (catsTodas[b] || []).reduce((x, y) => x + (+y || 0), 0);
+    return sb - sa;
+  });
+
+  return {
+    ...dataset,
+    zonas,
+    cats_order,
+    proj_global: zonas.TODAS?.proj || null,
+  };
+}
+
 // Normaliza el texto de zona a una de las claves canónicas o '' si no
 // corresponde a ninguna (en cuyo caso solo cuenta para TODAS).
 function normalizarZona(raw) {
@@ -406,6 +474,61 @@ function normalizarZona(raw) {
   if (n.includes('ORIENTE')) return 'ORIENTE';
   if (n.includes('OCCIDENTE')) return 'OCCIDENTE';
   return '';
+}
+
+// Normaliza el valor de una celda de filtro: sin tildes, MAYÚSCULAS,
+// espacios colapsados, recortado. Así "Transporte", "TRANSPORTE " y
+// "transporte" comparan igual contra el valor esperado.
+function normalizarFiltro(v) {
+  return String(v ?? '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase().replace(/\s+/g, ' ').trim();
+}
+
+// Catálogo de filtros opcionales a nivel de fila (hoja DATOS real). Cada
+// uno se aplica SOLO si su columna se resuelve (override explícito en
+// `opts` o encabezado detectado). Si la columna no existe (hojas viejas,
+// tests), el filtro queda inactivo y no descarta nada.
+//   · CLASIFICACION_CREG_063 (BC) ∈ {NO PROGRAMADA NO EXCLUIDA, PROGRAMADA NO EXCLUIDA}
+//   · SUI = SI
+//   · AREA_GESTION_MACRO (BD) = TRANSPORTE
+//   · MIN (BE) = INC
+const FILTROS_FILA_SPEC = [
+  { key: 'clas_creg',  regex: /clasificacion.*creg|clasificacion.*063/, valores: ['NO PROGRAMADA NO EXCLUIDA', 'PROGRAMADA NO EXCLUIDA'] },
+  { key: 'sui',        regex: /^sui$/,                                   valores: ['SI'] },
+  { key: 'area_macro', regex: /area.*gestion.*macro/,                   valores: ['TRANSPORTE'] },
+  { key: 'min',        regex: /^min$/,                                  valores: ['INC'] },
+];
+
+// Resuelve qué filtros de fila están activos: override explícito en opts
+// (índice numérico) o detección por encabezado. Devuelve [{key, col,
+// valores:Set}] solo para los que tienen columna resuelta.
+function resolverFiltrosFila(rows, opts) {
+  const activos = [];
+  for (const spec of FILTROS_FILA_SPEC) {
+    let col = -1;
+    if (typeof opts[spec.key] === 'number' && opts[spec.key] >= 0) {
+      col = opts[spec.key];
+    } else if (opts[spec.key] !== -1) {
+      col = detectarColumnaPorHeader(rows, spec.regex);
+    }
+    if (col >= 0) {
+      activos.push({ key: spec.key, col, valores: new Set(spec.valores.map(normalizarFiltro)) });
+    }
+  }
+  return activos;
+}
+
+// Shape de aporte programado / no-programado por zona × mes-calendario.
+// prog[zonaKey] = { programado: {saidi[12],saifi[12]}, no_programado: {...} }.
+// La clasificación sale de CLASIFICACION_CREG_063 (BC): un valor que
+// empieza por "PROGRAMADA" cuenta como programado; "NO PROGRAMADA" como
+// no programado. Solo se puebla si la columna está resuelta.
+function nuevaProg(N) {
+  return {
+    programado:    { saidi: new Array(N).fill(0), saifi: new Array(N).fill(0) },
+    no_programado: { saidi: new Array(N).fill(0), saifi: new Array(N).fill(0) },
+  };
 }
 
 // ── Agregador principal ──────────────────────────────────────
@@ -442,6 +565,20 @@ export function agregarDatosCrudos(rows, opts = {}) {
     const detectada = detectarColumnaPorHeader(rows, /nb[_ ]?subest/);
     if (detectada >= 0) cIdx.subest = detectada;
   }
+
+  // Filtros opcionales a nivel de fila (CLASIFICACION_CREG_063, SUI,
+  // AREA_GESTION_MACRO, MIN). Solo recortan la extracción si su columna
+  // se resuelve por encabezado u override; si faltan, quedan inactivos.
+  const filtrosFila = resolverFiltrosFila(rows, opts);
+
+  // Columna de CLASIFICACION_CREG_063 para el desglose programado /
+  // no-programado, independiente de que el filtro esté activo.
+  const colClas = (() => {
+    const f = filtrosFila.find(x => x.key === 'clas_creg');
+    if (f) return f.col;
+    if (typeof opts.clas_creg === 'number' && opts.clas_creg >= 0) return opts.clas_creg;
+    return detectarColumnaPorHeader(rows, /clasificacion.*creg|clasificacion.*063/);
+  })();
 
   // El mes sale de PERIODO (AC) y el día de DIA (BB). Si esas columnas
   // no resuelven, caemos a una columna de fecha única autodetectada.
@@ -487,11 +624,22 @@ export function agregarDatosCrudos(rows, opts = {}) {
     return z[sub][met];
   }
 
+  // Aporte programado / no-programado por zona × mes-calendario (0–11).
+  // Solo se puebla si CLASIFICACION_CREG_063 (colClas) está resuelta.
+  // Alimenta la gráfica programado vs no-programado con línea META.
+  const prog = {
+    TODAS:     nuevaProg(N),
+    BOLIVAR:   nuevaProg(N),
+    ORIENTE:   nuevaProg(N),
+    OCCIDENTE: nuevaProg(N),
+  };
+
   const mesesPresentes = new Set();
   let procesadas = 0;
   let descartadasMes = 0;
   let descartadasCausa = 0;
   let descartadasFiltro = 0;
+  let descartadasFiltroFila = 0;
 
   // Asegura que una zona tenga la categoría inicializada a 12 ceros.
   function catSerie(z, met, cat) {
@@ -512,12 +660,28 @@ export function agregarDatosCrudos(rows, opts = {}) {
     const causa = String(row[cIdx.causa] ?? '').trim();
     if (!causa) { descartadasCausa++; continue; }
 
+    // Filtros opcionales a nivel de fila (CLASIFICACION_CREG_063, SUI,
+    // AREA_GESTION_MACRO, MIN). El evento solo entra si cumple TODOS los
+    // filtros activos. Inactivos cuando su columna no se resolvió.
+    let descartarFila = false;
+    for (const f of filtrosFila) {
+      if (!f.valores.has(normalizarFiltro(row[f.col]))) { descartarFila = true; break; }
+    }
+    if (descartarFila) { descartadasFiltroFila++; continue; }
+
     // Único criterio de extracción: solo las 13 causas canónicas.
     // Cualquier otra (Lluvias, Mantenimiento, Red de BT, …) se descarta.
     if (!esCausaCanonica(causa)) { descartadasFiltro++; continue; }
 
     const saidi = +row[cIdx.saidi] || 0;
     const saifi = +row[cIdx.saifi] || 0;
+
+    // Programado / no-programado desde CLASIFICACION_CREG_063: un valor
+    // que empieza por "NO PROGRAMADA" es no-programado; por "PROGRAMADA",
+    // programado. Cualquier otro (o columna ausente) no se desglosa.
+    const clasN = colClas >= 0 ? normalizarFiltro(row[colClas]) : '';
+    const progKey = clasN.startsWith('NO PROGRAMADA') ? 'no_programado'
+      : (clasN.startsWith('PROGRAMADA') ? 'programado' : null);
 
     mesesPresentes.add(mIdx);
     // Día: primero DIA (BB); si no resuelve, lo extrae de la fecha única.
@@ -537,6 +701,10 @@ export function agregarDatosCrudos(rows, opts = {}) {
       if (sub) {
         subSerie(zk, sub, 'saidi')[mIdx] += saidi;
         subSerie(zk, sub, 'saifi')[mIdx] += saifi;
+      }
+      if (progKey) {
+        prog[zk][progKey].saidi[mIdx] += saidi;
+        prog[zk][progKey].saifi[mIdx] += saifi;
       }
     }
     procesadas++;
@@ -572,6 +740,14 @@ export function agregarDatosCrudos(rows, opts = {}) {
     }
   }
 
+  // Recortar las series programado/no-programado al mismo rango [min..max].
+  for (const zk of Object.keys(prog)) {
+    for (const pk of ['programado', 'no_programado']) {
+      prog[zk][pk].saidi = recortar(prog[zk][pk].saidi);
+      prog[zk][pk].saifi = recortar(prog[zk][pk].saifi);
+    }
+  }
+
   // Derivar los 3 grupos + total por zona con el clasificador canónico.
   for (const z of Object.values(zonas)) derivarGruposDesdeCategorias(z, span);
 
@@ -604,6 +780,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     cats_order,
     dias,
     subests,
+    prog,
     kpi: {},
     proj_global: zonas.TODAS.proj || null,
   };
@@ -615,6 +792,7 @@ export function agregarDatosCrudos(rows, opts = {}) {
     descartadasMes,
     descartadasCausa,
     descartadasFiltro,
+    descartadasFiltroFila,
     meses,
     causas: cats_order.length,
     subestaciones: Object.keys(subests.TODAS).length,

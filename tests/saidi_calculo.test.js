@@ -6,7 +6,7 @@ import {
   catTotals, gruposDeZona, categoriasDeZona, totalSerieDeZona, proyeccionDeZona, listarZonas,
   rankingSubestaciones,
 } from '../assets/js/domain/saidi_calculo.js';
-import { categoriaColor, grupoCorto, metKey, metricaNombre, COLORS, clasificarGrupoCausa, CAUSAS_CANON } from '../assets/js/domain/saidi_config.js';
+import { categoriaColor, grupoCorto, metKey, metricaNombre, COLORS, clasificarGrupoCausa, CAUSAS_CANON, CAUSAS_SOBRECARGA, esCausaSobrecarga } from '../assets/js/domain/saidi_config.js';
 
 // ── sumSerie ──────────────────────────────────────────────────
 test('sumSerie suma valores y skipea nulls', () => {
@@ -187,12 +187,46 @@ test('clasificarGrupoCausa: sin match → Otras causas', () => {
   assert.equal(clasificarGrupoCausa(null), 'Otras causas');
 });
 
-test('CAUSAS_CANON: las 13 causas mapean a Racionamiento o Sobrecarga/Deslastre', () => {
-  assert.equal(CAUSAS_CANON.length, 13);
+test('CAUSAS_CANON: las 16 causas mapean a Racionamiento o Sobrecarga/Deslastre', () => {
+  assert.equal(CAUSAS_CANON.length, 16);
   for (const causa of CAUSAS_CANON) {
     const g = clasificarGrupoCausa(causa);
     assert.notEqual(g, 'Otras causas', `"${causa}" no debería caer en Otras causas`);
   }
+});
+
+// ── Filtro madre SOBRECARGA (CAUSA2) ──────────────────────────
+test('CAUSAS_SOBRECARGA: 13 causas, todas Sobrecarga/Deslastre (sin Racionamiento)', () => {
+  assert.equal(CAUSAS_SOBRECARGA.length, 13);
+  for (const causa of CAUSAS_SOBRECARGA) {
+    assert.equal(clasificarGrupoCausa(causa), 'Sobrecarga/Deslastre',
+      `"${causa}" debería ser Sobrecarga/Deslastre`);
+  }
+});
+
+test('CAUSAS_SOBRECARGA es subconjunto de CAUSAS_CANON', () => {
+  for (const causa of CAUSAS_SOBRECARGA) {
+    assert.ok(CAUSAS_CANON.includes(causa), `"${causa}" debería estar en CAUSAS_CANON`);
+  }
+});
+
+test('esCausaSobrecarga: reconoce las 13 causas madre (robusto a tildes/caja/espacios)', () => {
+  for (const causa of CAUSAS_SOBRECARGA) {
+    assert.ok(esCausaSobrecarga(causa), `"${causa}" debería caer bajo SOBRECARGA`);
+  }
+  // Variantes con tildes, caja y espacios colapsados
+  assert.ok(esCausaSobrecarga('SOBRECARGA'));
+  assert.ok(esCausaSobrecarga('  sobrecarga   del   STR  '));
+  assert.ok(esCausaSobrecarga('Deslastre por capacidad de transporte'));
+});
+
+test('esCausaSobrecarga: excluye Racionamiento y causas fuera del catálogo', () => {
+  assert.ok(!esCausaSobrecarga('Racionamiento Programado por Deficit STN'));
+  assert.ok(!esCausaSobrecarga('Racionamiento de Emergencia por Deficit del STR'));
+  assert.ok(!esCausaSobrecarga('Mantenimiento'));
+  assert.ok(!esCausaSobrecarga('Lluvias'));
+  assert.ok(!esCausaSobrecarga(''));
+  assert.ok(!esCausaSobrecarga(null));
 });
 
 // Regresión del bug Racionamiento+STR en el color de barra.

@@ -42,6 +42,8 @@ export const CAUSAS_CANON = Object.freeze([
   'Deslastre de carga por capacidad de transformacion',
   'Deslastre por Capacidad de Transformacion trafo SDL',
   'Deslastre por capacidad SDL',
+  'Deslastre por capacidad de TC SDL (x13.8kV) / Cable de Potencia SDL (x13.8kV)',
+  'Deslastre por capacidad de TC SDL (x34.5kV) / Cable de Potencia SDL (x34.5kV)',
   'Deslastre por capacidad de transporte',
   'Deslastre por capacidad sdl',
   'Racionamiento Programado por Deficit STN',
@@ -50,8 +52,30 @@ export const CAUSAS_CANON = Object.freeze([
   'SOBRECARGA TRAFO SDL',
   'Sobrecarga',
   'Sobrecarga activo del SDL',
+  'Sobrecarga de linea del STR',
   'Sobrecarga de trafo de conexion al STN',
   'Sobrecarga del STR',
+]);
+
+// FILTRO MADRE "SOBRECARGA" (CAUSA2) · las 13 causas que el director
+// agrupa bajo un único filtro para aislar el aporte por sobrecarga /
+// deslastre de transporte. Es un subconjunto de CAUSAS_CANON (excluye
+// las 3 causas de Racionamiento). El selector de CAUSA2 ofrece este
+// agregado además de cada causa individual presente en los datos.
+export const CAUSAS_SOBRECARGA = Object.freeze([
+  'Deslastre de carga por capacidad de transformacion',
+  'Deslastre por Capacidad de Transformacion trafo SDL',
+  'Deslastre por capacidad SDL',
+  'Deslastre por capacidad de TC SDL (x13.8kV) / Cable de Potencia SDL (x13.8kV)',
+  'Deslastre por capacidad de TC SDL (x34.5kV) / Cable de Potencia SDL (x34.5kV)',
+  'Deslastre por capacidad de transporte',
+  'Deslastre por capacidad sdl',
+  'Sobrecarga',
+  'Sobrecarga activo del SDL',
+  'Sobrecarga de linea del STR',
+  'Sobrecarga de trafo de conexion al STN',
+  'Sobrecarga del STR',
+  'SOBRECARGA TRAFO SDL',
 ]);
 
 // Normaliza una cadena: minúsculas + sin acentos (para comparar causas
@@ -77,6 +101,16 @@ const _CAUSAS_CANON_SET = new Set(CAUSAS_CANON.map(_normCausa));
 // Red de BT, etc.) NO se incluye en el dashboard.
 export function esCausaCanonica(cat) {
   return _CAUSAS_CANON_SET.has(_normCausa(cat));
+}
+
+// Conjunto normalizado del filtro madre SOBRECARGA (CAUSAS_SOBRECARGA).
+const _CAUSAS_SOBRECARGA_SET = new Set(CAUSAS_SOBRECARGA.map(_normCausa));
+
+// ¿La causa cae bajo el filtro madre "SOBRECARGA"? (las 12+1 causas de
+// sobrecarga/deslastre de transporte, sin Racionamiento). Comparación
+// robusta a tildes, mayúsculas y espacios colapsados.
+export function esCausaSobrecarga(cat) {
+  return _CAUSAS_SOBRECARGA_SET.has(_normCausa(cat));
 }
 
 // CLASIFICADOR CANÓNICO causa → grupo del dashboard.

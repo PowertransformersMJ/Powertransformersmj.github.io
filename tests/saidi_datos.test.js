@@ -5,6 +5,7 @@ import {
   colIdx, mesDesdeValor, diaDesdeValor, mesDesdePeriodo, diaDesdeColumna,
   detectarColumnaFecha, detectarColumnaPorHeader, agregarDatosCrudos,
   COLS_DATOS_DEFAULT, MESES_CANON, filtrarCausasCanonicas,
+  filtrarPorCausa2, CAUSA2_SOBRECARGA, CAUSA2_TODAS,
 } from '../assets/js/domain/saidi_datos.js';
 
 // ── colIdx ────────────────────────────────────────────────────
@@ -214,6 +215,96 @@ test('agregarDatosCrudos lanza si no hay registros válidos', () => {
     fila({ fecha: 'x', causa: '', saifi: 0, saidi: 0, zona: '' }),
   ];
   assert.throws(() => agregarDatosCrudos(rows), /No se pudo detectar una columna de fecha|no produjo registros/);
+});
+
+// ── Filtros opcionales a nivel de fila (Part A) ───────────────
+// Columnas de filtro extra: clas_creg@59 (BC), sui@60, area_macro@61
+// (BD), min@62 (BE). Se activan vía override numérico en opts.
+const OPTS_FILTROS = { clas_creg: 59, sui: 60, area_macro: 61, min: 62 };
+function filaFiltro({ fecha, causa, saifi, saidi, zona, clas, sui, area, min }) {
+  const r = fila({ fecha, causa, saifi, saidi, zona });
+  r[59] = clas; r[60] = sui; r[61] = area; r[62] = min;
+  return r;
+}
+// Valores que pasan TODOS los filtros.
+const OK = { clas: 'NO PROGRAMADA NO EXCLUIDA', sui: 'SI', area: 'TRANSPORTE', min: 'INC' };
+
+test('filtros de fila: solo entran eventos que cumplen los 4 filtros', () => {
+  const rows = [
+    headerRow(),
+    filaFiltro({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR', ...OK }),
+    // Falla SUI
+    filaFiltro({ fecha: '11/01/2026', causa: 'Sobrecarga', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR', ...OK, sui: 'NO' }),
+    // Falla AREA_GESTION_MACRO
+    filaFiltro({ fecha: '12/01/2026', causa: 'Sobrecarga', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR', ...OK, area: 'DISTRIBUCION' }),
+    // Falla MIN
+    filaFiltro({ fecha: '13/01/2026', causa: 'Sobrecarga', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR', ...OK, min: 'EXC' }),
+    // Falla CLASIFICACION_CREG_063
+    filaFiltro({ fecha: '14/01/2026', causa: 'Sobrecarga', saifi: 0.5, saidi: 5.0, zona: 'BOLIVAR', ...OK, clas: 'PROGRAMADA EXCLUIDA' }),
+    // PROGRAMADA NO EXCLUIDA sí pasa el filtro CREG
+    filaFiltro({ fecha: '15/01/2026', causa: 'Sobrecarga', saifi: 0.2, saidi: 2.0, zona: 'BOLIVAR', ...OK, clas: 'PROGRAMADA NO EXCLUIDA' }),
+  ];
+  const { dataset, reporte } = agregarDatosCrudos(rows, OPTS_FILTROS);
+  assert.equal(reporte.procesadas, 2);             // OK + PROGRAMADA NO EXCLUIDA
+  assert.equal(reporte.descartadasFiltroFila, 4);  // SUI, AREA, MIN, CREG-excluida
+  assert.equal(dataset.zonas.TODAS.cat_saidi['Sobrecarga'][0], 1.0 + 2.0);
+});
+
+test('filtros de fila: robustos a tildes, caja y espacios', () => {
+  const rows = [
+    headerRow(),
+    filaFiltro({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR',
+      clas: '  no programada no excluida ', sui: 'si', area: 'Transporte', min: ' inc ' }),
+  ];
+  const { reporte } = agregarDatosCrudos(rows, OPTS_FILTROS);
+  assert.equal(reporte.procesadas, 1);
+  assert.equal(reporte.descartadasFiltroFila, 0);
+});
+
+test('filtros de fila: INACTIVOS cuando las columnas no existen', () => {
+  // Sin opts: las filas de 59 anchos no traen encabezados BC/BD/BE/SUI,
+  // así que ningún filtro se activa y nada se descarta por ese motivo.
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+    fila({ fecha: '11/01/2026', causa: 'Sobrecarga', saifi: 0.2, saidi: 2.0, zona: 'ORIENTE' }),
+  ];
+  const { reporte } = agregarDatosCrudos(rows);
+  assert.equal(reporte.procesadas, 2);
+  assert.equal(reporte.descartadasFiltroFila, 0);
+});
+
+// ── Desglose programado / no-programado (Part C) ──────────────
+test('prog: clasifica SAIDI/SAIFI en programado vs no_programado por CREG', () => {
+  const rows = [
+    headerRow(),
+    filaFiltro({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR', ...OK, clas: 'NO PROGRAMADA NO EXCLUIDA' }),
+    filaFiltro({ fecha: '20/01/2026', causa: 'Sobrecarga', saifi: 0.4, saidi: 4.0, zona: 'BOLIVAR', ...OK, clas: 'PROGRAMADA NO EXCLUIDA' }),
+    filaFiltro({ fecha: '15/02/2026', causa: 'Sobrecarga', saifi: 0.2, saidi: 2.0, zona: 'ORIENTE', ...OK, clas: 'NO PROGRAMADA NO EXCLUIDA' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows, OPTS_FILTROS);
+  const p = dataset.prog;
+  // BOLIVAR Ene
+  assert.equal(p.BOLIVAR.no_programado.saidi[0], 1.0);
+  assert.equal(p.BOLIVAR.programado.saidi[0], 4.0);
+  assert.equal(p.BOLIVAR.no_programado.saifi[0], 0.1);
+  // TODAS agrega ambas zonas: Ene + Feb
+  assert.equal(p.TODAS.no_programado.saidi[0], 1.0);  // Ene
+  assert.equal(p.TODAS.no_programado.saidi[1], 2.0);  // Feb ORIENTE
+  assert.equal(p.TODAS.programado.saidi[0], 4.0);
+  // Series recortadas al rango [Ene..Feb] = 2 meses
+  assert.equal(p.TODAS.no_programado.saidi.length, 2);
+});
+
+test('prog: existe con ceros aunque la columna CREG no resuelva', () => {
+  const rows = [
+    headerRow(),
+    fila({ fecha: '10/01/2026', causa: 'Sobrecarga', saifi: 0.1, saidi: 1.0, zona: 'BOLIVAR' }),
+  ];
+  const { dataset } = agregarDatosCrudos(rows);
+  assert.ok(dataset.prog, 'dataset debe exponer prog');
+  assert.equal(dataset.prog.TODAS.programado.saidi[0], 0);
+  assert.equal(dataset.prog.TODAS.no_programado.saidi[0], 0);
 });
 
 // ── diaDesdeValor ─────────────────────────────────────────────
@@ -552,4 +643,74 @@ test('filtrarCausasCanonicas tolera dataset nulo o sin zonas', () => {
   assert.equal(filtrarCausasCanonicas(null), null);
   const sinZonas = { meses: [], zonas: null };
   assert.equal(filtrarCausasCanonicas(sinZonas), sinZonas);
+});
+
+// ── filtrarPorCausa2 ──────────────────────────────────────────
+// Dataset ya canónico: mezcla causas de sobrecarga/deslastre con una de
+// Racionamiento, más prog/subests/dias para verificar que sobreviven al
+// filtro (son a nivel de fila, no por categoría).
+function datasetCausa2() {
+  const zona = () => ({
+    total_saidi: [], total_saifi: [],
+    grp_saidi: {}, grp_saifi: {},
+    cat_saidi: {
+      'Sobrecarga':                          [3, 4],   // sobrecarga
+      'SOBRECARGA TRAFO SDL':                [10, 2],  // sobrecarga
+      'Racionamiento Programado por Deficit STN': [5, 5], // NO sobrecarga
+    },
+    cat_saifi: {
+      'Sobrecarga':                          [0.3, 0.4],
+      'SOBRECARGA TRAFO SDL':                [0.1, 0.1],
+      'Racionamiento Programado por Deficit STN': [0.5, 0.5],
+    },
+    proj: null,
+  });
+  return {
+    meses: ['Ene', 'Feb'],
+    meses_full: MESES_CANON.slice(),
+    mesesIdx: [0, 1],
+    zonas: { TODAS: zona(), BOLIVAR: zona(), OCCIDENTE: zona(), ORIENTE: zona() },
+    cats_order: ['SOBRECARGA TRAFO SDL', 'Racionamiento Programado por Deficit STN', 'Sobrecarga'],
+    dias: { TODAS: { 0: { saidi: [1], saifi: [1] } } },
+    subests: { TODAS: { 'SE-1': { saidi: [9, 9], saifi: [1, 1] } } },
+    prog: { TODAS: { programado: { saidi: [2, 2], saifi: [1, 1] }, no_programado: { saidi: [3, 3], saifi: [1, 1] } } },
+    proj_global: null,
+  };
+}
+
+test('filtrarPorCausa2 con TODAS devuelve el dataset sin tocar', () => {
+  const ds = datasetCausa2();
+  assert.equal(filtrarPorCausa2(ds, CAUSA2_TODAS), ds);
+  assert.equal(filtrarPorCausa2(ds, ''), ds);
+  assert.equal(filtrarPorCausa2(ds, null), ds);
+});
+
+test('filtrarPorCausa2 SOBRECARGA conserva solo las causas de sobrecarga', () => {
+  const out = filtrarPorCausa2(datasetCausa2(), CAUSA2_SOBRECARGA);
+  const cats = Object.keys(out.zonas.TODAS.cat_saidi);
+  assert.ok(cats.includes('Sobrecarga'));
+  assert.ok(cats.includes('SOBRECARGA TRAFO SDL'));
+  assert.ok(!cats.includes('Racionamiento Programado por Deficit STN'));
+  // total re-derivado = Sobrecarga(3,4)+SOBRECARGA TRAFO SDL(10,2) = (13,6)
+  assert.deepEqual(out.zonas.TODAS.total_saidi, [13, 6]);
+  assert.deepEqual(out.zonas.TODAS.grp_saidi['Sobrecarga/Deslastre'], [13, 6]);
+  // El grupo Racionamiento queda en ceros
+  assert.deepEqual(out.zonas.TODAS.grp_saidi['Racionamiento/Deficit'], [0, 0]);
+});
+
+test('filtrarPorCausa2 con causa única conserva solo esa causa', () => {
+  const out = filtrarPorCausa2(datasetCausa2(), 'Sobrecarga');
+  const cats = Object.keys(out.zonas.TODAS.cat_saidi);
+  assert.deepEqual(cats, ['Sobrecarga']);
+  assert.deepEqual(out.zonas.TODAS.total_saidi, [3, 4]);
+  assert.deepEqual(out.cats_order, ['Sobrecarga']);
+});
+
+test('filtrarPorCausa2 preserva prog / subests / dias (datos de fila) vía spread', () => {
+  const ds = datasetCausa2();
+  const out = filtrarPorCausa2(ds, CAUSA2_SOBRECARGA);
+  assert.deepEqual(out.prog, ds.prog);
+  assert.deepEqual(out.subests, ds.subests);
+  assert.deepEqual(out.dias, ds.dias);
+  assert.deepEqual(out.mesesIdx, ds.mesesIdx);
 });
