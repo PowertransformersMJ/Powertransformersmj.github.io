@@ -1,0 +1,60 @@
+# =============================================================================
+# crm-architect — CI/CD: deploy hosting + Firestore rules/indexes + Functions
+# Put at .github/workflows/deploy.yml in the generated CRM repo.
+# Secrets needed (repo settings → Secrets): FIREBASE_SERVICE_ACCOUNT (JSON),
+# FIREBASE_PROJECT_ID. Function secrets are managed via `firebase functions:secrets`.
+# =============================================================================
+name: Deploy CRM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # Install + build the frontend (skip if pure static)
+      - name: Install & build web
+        run: |
+          if [ -f package.json ]; then npm ci && npm run build --if-present; fi
+
+      # Install Functions deps
+      - name: Install functions
+        run: |
+          if [ -d functions ]; then cd functions && npm ci; fi
+
+      - name: Install Firebase CLI
+        run: npm i -g firebase-tools
+
+      - name: Authenticate
+        run: |
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      # Rules & indexes are NOT auto-applied — deploy them explicitly.
+      - name: Deploy Firestore rules & indexes
+        run: firebase deploy --only firestore:rules,firestore:indexes --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+
+      - name: Deploy Functions
+        run: |
+          if [ -d functions ]; then firebase deploy --only functions --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive; fi
+
+      - name: Deploy Hosting
+        run: firebase deploy --only hosting --project "${{ secrets.FIREBASE_PROJECT_ID }}" --non-interactive
+
+      # Optional: bump a CACHE_VERSION file / service worker to invalidate clients
+      # - name: Bump cache version
+      #   run: node scripts/bump_cache_version.mjs
