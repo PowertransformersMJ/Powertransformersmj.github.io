@@ -24,12 +24,16 @@
 >
 > **✅ Cerebro commiteado local como `8a6db90`** (`feat(cerebro): instalar sistema
 > de memoria neuronal documental`) vía GitHub Desktop — incluyó `skills/` (290
-> archivos tracked). **⏳ PENDIENTE menor**: este lote de docs de cierre (`00`, `05`,
-> `10`, `99` — el ADR-001 + índice + auditoría) quedó modificado DESPUÉS de ese
-> commit → el director debe hacer un 2º commit pequeño con ellos. **⏳ Verificar
-> push**: confirmar que `8a6db90` (+ el commit de cierre) llegaron a `origin/main`
-> para que GitHub Pages deploye. NO requiere deploy Firebase (no se tocó
-> rules/indexes/storage/functions).
+> archivos tracked). **⏳ PENDIENTE menor**: los docs de cierre del ADR-001 (`00`,
+> `05`, `10`, `99`) **+ los del ADR-002** (`00`, `10`, `30`, `99`, `skills-inventory.md`)
+> quedaron modificados DESPUÉS de `8a6db90` → el director debe hacer un commit con
+> ellos. **⏳ Verificar push**: confirmar que llegaron a `origin/main` para que GitHub
+> Pages deploye. NO requiere deploy Firebase (no se tocó rules/indexes/storage/functions).
+>
+> **🛠️ Skills (ADR-002, 2026-06-04)**: 24 skills repo-only quedaron staged en
+> `.claude/skills/` y **activas tras reinicio** (probado con `crm-architect`). ⚠️ Son
+> **local-only** (`.claude/` gitignorado) → si se re-clona el repo, re-correr el copy
+> (fuente en `skills/`, receta en `30 L-19`). Las 56 ya-instaladas no se tocaron.
 >
 > Tras eso: no hay tarea de producto en curso. Esperar pedido del director
 > y seguir el árbol de decisión `_legacy/CLAUDE-previo.md §7.2`.
@@ -65,3 +69,4 @@
 - **2026-06-04** — Auditoría holística post-instalación: limpieza de `CEREBRO NUEVO/` (3.3 MB fuente redundante) + `NUL` (artefacto 0-byte). brain:check SANO, cero huérfanos, 15 hojas técnicas referenciadas, rutas del proyecto verificadas, frescura `05` ↔ git real OK. TODO-03 detectado stale → marcado ✅ (ya resuelto por commit `18a25c6`).
 - **2026-06-04** — Bug `M-01` corregido: `brain-check.mjs:171` usaba `2>NUL` (Windows) → recreaba archivo `NUL` en cada corrida; cambiado a `2>/dev/null`, verificado que no se recrea. Lección en `30 §Meta`.
 - **2026-06-04** — Cierre: instalación consolidada como ADR-001 (`99` + fila en `00`). El director commiteó el cerebro como `8a6db90` vía GitHub Desktop (incluyó `skills/`). Queda 2º commit pendiente con los docs de cierre (00/05/10/99) + verificar push a `origin/main`.
+- **2026-06-04** — Skills: auditoría de solape repo↔interfaz (56 ya instaladas / 24 repo-only). Las 24 staged a `.claude/skills/` con `name` del frontmatter; bundle `taste-skill-main` desglosado en 13 sub-skills; `code-modernization`/`code-simplifier` excluidas (no son skills). Director reinició → `crm-architect` probada OK. Consolidado como **ADR-002** (`99` línea 42 + fila en `00`) + lección `L-19` (`30`) + `skills-inventory.md` corregido. `.claude/` gitignorado → activación local-only.
