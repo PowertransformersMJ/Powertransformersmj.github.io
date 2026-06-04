@@ -5,6 +5,7 @@
 import { store } from './state.js';
 import { listarZonas } from '../../domain/saidi_calculo.js';
 import { zonaLabel, metricaTitulo } from '../../domain/saidi_config.js';
+import { CAUSA2_SOBRECARGA } from '../../domain/saidi_datos.js';
 
 const $ = (s) => document.querySelector(s);
 
@@ -26,8 +27,39 @@ export function pintarSelectorZona() {
 export function actualizarPill() {
   const pill = $('#filter-pill');
   if (!pill) return;
-  const { zona, met } = store.state;
-  pill.textContent = `${zonaLabel(zona)} · ${metricaTitulo(met)}`;
+  const { zona, met, causa2 } = store.state;
+  let txt = `${zonaLabel(zona)} · ${metricaTitulo(met)}`;
+  if (causa2 === CAUSA2_SOBRECARGA) txt += ' · SOBRECARGA';
+  else if (causa2) txt += ` · ${causa2}`;
+  pill.textContent = txt;
+}
+
+// Llena el selector CAUSA2 (#f-causa) con: "Todas", el filtro madre
+// "SOBRECARGA" y cada causa individual presente en el dataset. Las
+// opciones se derivan del dataset COMPLETO (store.state.dataset.cats_order),
+// no del view filtrado, para que la lista no se reduzca al elegir una causa.
+export function pintarSelectorCausa2() {
+  const sel = $('#f-causa');
+  const ds = store.state.dataset;
+  if (!sel || !ds) return;
+  const cur = store.state.causa2 || '';
+  const cats = Array.isArray(ds.cats_order) ? ds.cats_order : [];
+
+  sel.innerHTML = '';
+  const opt = (value, label) => {
+    const o = document.createElement('option');
+    o.value = value;
+    o.textContent = label;
+    sel.appendChild(o);
+  };
+  opt('', 'Todas las causas');
+  opt(CAUSA2_SOBRECARGA, 'SOBRECARGA (filtro madre · 13 causas)');
+  cats.forEach(c => opt(c, c));
+
+  // Conserva la selección si sigue siendo válida; si no, vuelve a "Todas".
+  const valido = cur === '' || cur === CAUSA2_SOBRECARGA || cats.includes(cur);
+  sel.value = valido ? cur : '';
+  if (!valido && store.state.causa2 !== '') store.setCausa2('');
 }
 
 // Sincroniza el estado visual (is-on / is-off) de los chips de grupos
@@ -95,6 +127,19 @@ export function pintarSelectorMes() {
   }
 }
 
+// Sincroniza los inputs META (SAIDI / SAIFI) con el estado. No pisa el
+// valor mientras el usuario está escribiendo en el input (foco activo).
+export function sincronizarMeta() {
+  const setIf = (sel, val) => {
+    const inp = $(sel);
+    if (!inp || document.activeElement === inp) return;
+    const want = (val == null) ? '' : String(val);
+    if (inp.value !== want) inp.value = want;
+  };
+  setIf('#meta-saidi', store.state.metaSaidi);
+  setIf('#meta-saifi', store.state.metaSaifi);
+}
+
 // Sincroniza el valor del select con store.state.serieMes.
 export function sincronizarSerieMes() {
   const sel = $('#serie-mes');
@@ -155,6 +200,10 @@ export function inicializarFiltros() {
   if (zSel) zSel.addEventListener('change', () => store.setZona(zSel.value));
   if (mSel) mSel.addEventListener('change', () => store.setMet(mSel.value));
 
+  // Selector CAUSA2 (Todas / SOBRECARGA madre / causa individual)
+  const cSel = $('#f-causa');
+  if (cSel) cSel.addEventListener('change', () => store.setCausa2(cSel.value));
+
   // Segmentado de modo de la serie temporal
   document.querySelectorAll('#serie-modo .serie-seg').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -165,6 +214,12 @@ export function inicializarFiltros() {
   // Selector de mes para el detalle diario de la serie temporal
   const mesSel = $('#serie-mes');
   if (mesSel) mesSel.addEventListener('change', () => store.setSerieMes(mesSel.value));
+
+  // Inputs META de la gráfica programado vs no-programado
+  const metaSaidiInp = $('#meta-saidi');
+  if (metaSaidiInp) metaSaidiInp.addEventListener('input', () => store.setMeta('saidi', metaSaidiInp.value));
+  const metaSaifiInp = $('#meta-saifi');
+  if (metaSaifiInp) metaSaifiInp.addEventListener('input', () => store.setMeta('saifi', metaSaifiInp.value));
 
   // Chips de filtro de grupos de causa
   document.querySelectorAll('#grp-filter .grp-chip').forEach(btn => {
