@@ -955,6 +955,7 @@ async function storeReport() {
       await guardarUnidad({ serie: unidadId });
       const ordenados = UP.items.slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
       let i = 0;
+      let identidadGuardada = false; // la placa se guarda una sola vez (primer informe que la traiga)
       for (const item of ordenados) {
         i += 1;
         body.innerHTML = procHtml(i);
@@ -980,6 +981,18 @@ async function storeReport() {
             });
             mediciones = r.mediciones || {};
             anoIA = mediciones.ano != null ? mediciones.ano : null;
+            // La IA también leyó la placa de características: enriquece el
+            // doc de la unidad (fabricante, potencia, tensiones, etc.) una
+            // sola vez. guardarUnidad usa merge + deepClean → no pisa lo ya
+            // guardado con vacíos. Falla suave: no aborta el informe.
+            if (mediciones.unidad && !identidadGuardada) {
+              try {
+                await guardarUnidad({ serie: unidadId, ...mediciones.unidad });
+                identidadGuardada = true;
+              } catch (e) {
+                console.warn('[pruebas-electricas] no se pudo guardar la identidad de la unidad', e);
+              }
+            }
             estado = 'extraido_ia';
             console.info(`[pruebas-electricas] IA ${r.modelUsed} ${esc(UP.serie)} · ${anoIA || item.ano || 's/a'} · tokens`, r.usage);
           } catch (err) {

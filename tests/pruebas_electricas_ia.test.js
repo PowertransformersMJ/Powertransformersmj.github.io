@@ -15,7 +15,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  sanitizarInforme, validarInforme, TIPOS_PRUEBA
+  sanitizarInforme, validarInforme, sanitizarUnidad, TIPOS_PRUEBA
 } from '../assets/js/domain/pruebas_electricas_schema.js';
 
 // Output representativo de Claude (forma exacta del tool_use.input que
@@ -117,6 +117,46 @@ describe('IA → sanitizarInforme · contrato', () => {
       pdf: { storagePath: 'pruebas_electricas/200718/x.pdf', filename: 'x.pdf', estado: 'extraido_ia' }
     });
     assert.equal(inf2.pdf.estado, 'extraido_ia');
+  });
+});
+
+describe('IA → sanitizarUnidad · identidad desde la placa', () => {
+  // El objeto "unidad" que la IA lee de la placa de características y que el
+  // shell pasa a guardarUnidad → sanitizarUnidad. Fija que esos campos lleguen
+  // a la ficha de identidad del tablero (caso real: Siemens 266762).
+  const UNIDAD_IA = {
+    fabricante: 'SIEMENS',
+    ano_fabricacion: 2006,
+    potencia: '5000 / 6000 kVA',
+    tensiones: '34.5 / 13.8 kV',
+    grupo_conexion: 'Dyn5',
+    refrigeracion: 'ONAN / ONAF',
+    frecuencia: '60 Hz',
+    fases: '3',
+    cliente: 'Afinia Grupo EPM',
+    ubicacion: 'Puerto Libertador',
+    subestacion: 'Puerto Libertador'
+  };
+
+  test('la placa leída por la IA puebla la identidad de la unidad', () => {
+    const u = sanitizarUnidad({ serie: '266762', ...UNIDAD_IA });
+    assert.equal(u.serie, '266762');
+    assert.equal(u.fabricante, 'SIEMENS');
+    assert.equal(u.ano_fabricacion, 2006);
+    assert.equal(u.potencia, '5000 / 6000 kVA');
+    assert.equal(u.tensiones, '34.5 / 13.8 kV');
+    assert.equal(u.grupo_conexion, 'Dyn5');
+    assert.equal(u.refrigeracion, 'ONAN / ONAF');
+    assert.equal(u.frecuencia, '60 Hz');
+    assert.equal(u.cliente, 'Afinia Grupo EPM');
+    assert.equal(u.ubicacion, 'Puerto Libertador');
+  });
+
+  test('placa ausente → identidad vacía válida (solo serie), sin romper', () => {
+    const u = sanitizarUnidad({ serie: '266762' });
+    assert.equal(u.serie, '266762');
+    assert.equal(u.fabricante, '');
+    assert.equal(u.ano_fabricacion, null);
   });
 });
 
