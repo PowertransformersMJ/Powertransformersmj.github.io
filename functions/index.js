@@ -244,7 +244,9 @@ LAS 7 FAMILIAS DE PRUEBA Y SUS UNIDADES:
 
 7) DRM / RESISTENCIA DINÁMICA DEL CONMUTADOR (OLTC / dynamic resistance) — identidad del conmutador (fabricante, tipo, serial, posiciones, operaciones, posición nominal, datos eléctricos) y la ventana de tiempos de transición en ms (tiempo_min_ms / tiempo_max_ms) + detalle por transición si está. Si solo hay un rango resumido, deja transiciones vacío.
 
-METADATOS DEL INFORME: ano (año de la prueba, de la fecha del informe), fecha (texto tal cual), ejecutante (laboratorio/empresa que ejecutó), equipo (instrumento usado, p. ej. "DOBLE M4100"), serie_en_pdf (número de serie del transformador que aparezca en el PDF), tipo_prueba (déjalo vacío salvo que el informe lo declare; el sistema lo infiere).`;
+METADATOS DEL INFORME: ano (año de la prueba, de la fecha del informe), fecha (texto tal cual), ejecutante (laboratorio/empresa que ejecutó), equipo (instrumento usado, p. ej. "DOBLE M4100"), serie_en_pdf (número de serie del transformador que aparezca en el PDF), tipo_prueba (déjalo vacío salvo que el informe lo declare; el sistema lo infiere).
+
+IDENTIDAD DE LA UNIDAD (objeto "unidad"): lee la PLACA DE CARACTERÍSTICAS / tabla "Características principales" del transformador y extrae sus datos. fabricante (ej. "SIEMENS"), ano_fabricacion (año de fabricación de la placa, NO el de la prueba — ej. 2006), potencia (texto tal cual con unidad, ej. "5000 / 6000 kVA"), tensiones (primaria/secundaria/terciaria, ej. "34.5 / 13.8 kV"), grupo_conexion (ej. "Dyn5"), refrigeracion (ej. "ONAN / ONAF"), frecuencia (ej. "60 Hz"), fases (ej. "3" o "3φ"), cliente (ej. "Afinia Grupo EPM"), ubicacion (sitio/municipio), subestacion (nombre de la S/E). Si la placa no aparece o un campo falta, déjalo vacío — no inventes.`;
 
 // Fase individual con terminal real — se inlinea en cada prueba que la usa.
 const FASE_SCHEMA = {
@@ -269,6 +271,23 @@ const HERRAMIENTA_PRUEBAS = {
       equipo: { type: ['string', 'null'], description: 'Instrumento usado (ej. "DOBLE M4100").' },
       serie_en_pdf: { type: ['string', 'null'], description: 'Número de serie del transformador hallado en el PDF.' },
       tipo_prueba: { type: ['string', 'null'], enum: ['predictivo_completo', 'tan_delta', 'drm_oltc', 'resistencia_devanados', 'ttr', 'mixto', null], description: 'Solo si el informe lo declara explícitamente; si no, null (el sistema lo infiere).' },
+      unidad: {
+        type: 'object',
+        description: 'Identidad del transformador, leída de la PLACA DE CARACTERÍSTICAS / tabla "Características principales". Deja vacío lo que no aparezca; no inventes.',
+        properties: {
+          fabricante:     { type: ['string', 'null'], description: 'Ej. "SIEMENS".' },
+          ano_fabricacion:{ type: ['integer', 'null'], description: 'Año de fabricación de la placa (NO el de la prueba).' },
+          potencia:       { type: ['string', 'null'], description: 'Ej. "5000 / 6000 kVA".' },
+          tensiones:      { type: ['string', 'null'], description: 'Ej. "34.5 / 13.8 kV".' },
+          grupo_conexion: { type: ['string', 'null'], description: 'Ej. "Dyn5".' },
+          refrigeracion:  { type: ['string', 'null'], description: 'Ej. "ONAN / ONAF".' },
+          frecuencia:     { type: ['string', 'null'], description: 'Ej. "60 Hz".' },
+          fases:          { type: ['string', 'null'], description: 'Ej. "3".' },
+          cliente:        { type: ['string', 'null'], description: 'Ej. "Afinia Grupo EPM".' },
+          ubicacion:      { type: ['string', 'null'], description: 'Sitio / municipio.' },
+          subestacion:    { type: ['string', 'null'], description: 'Nombre de la subestación.' }
+        }
+      },
       tand: {
         type: 'array', description: 'Tangente δ por sección de aislamiento, en %.',
         items: {
