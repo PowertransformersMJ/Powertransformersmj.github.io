@@ -41,7 +41,36 @@
 .pe-scope .hl{color:var(--pe-navy-2);font-weight:700;}
 .pe-scope .hl2{color:var(--pe-teal);font-weight:600;}
 
-.pe-scope section{margin-bottom:42px;scroll-margin-top:74px;}
+.pe-scope section{margin-bottom:24px;scroll-margin-top:84px;}
+
+/* ── Secciones del TABLERO como paneles legibles ───────────────────
+   El fondo global es una foto fija a pantalla completa (.aqua-power-scene,
+   aqua-components.css). Sin superficie propia, los títulos h2/h4 y los
+   textos de cada sección caían sobre la foto y quedaban ilegibles. Cada
+   sección del tablero pasa a ser un panel sólido (título + contenido sobre
+   blanco); la foto se ve solo en los márgenes → estética "liquid glass"
+   pero legible. Scope acotado al panel tablero para NO tocar la biblioteca. */
+[data-tab-panel="tablero"] .pe-scope > section{
+  background:var(--pe-surface);
+  border:1px solid var(--pe-border);
+  border-radius:16px;
+  box-shadow:var(--pe-shadow);
+  padding:22px 24px;
+}
+@media (max-width:640px){
+  [data-tab-panel="tablero"] .pe-scope > section{padding:18px 16px;border-radius:14px;}
+}
+/* Evita "tarjeta dentro de tarjeta": dentro del panel los contenedores
+   internos pierden su sombra propia. La tabla conserva su borde (delinea
+   columnas); la gráfica fluye sin marco. */
+[data-tab-panel="tablero"] .pe-scope > section .chartbox{
+  background:transparent;border:none;box-shadow:none;border-radius:0;
+  padding:6px 0 0;margin:8px 0 0;
+}
+[data-tab-panel="tablero"] .pe-scope > section .tblwrap,
+[data-tab-panel="tablero"] .pe-scope > section .matrix,
+[data-tab-panel="tablero"] .pe-scope > section .idgrid,
+[data-tab-panel="tablero"] .pe-scope > section .callout{box-shadow:none;}
 .pe-scope h2{font-family:var(--pe-disp);font-weight:800;font-size:1.42rem;color:var(--pe-navy);letter-spacing:-.01em;margin:0 0 16px;padding-bottom:12px;border-bottom:1px solid var(--pe-border);display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;}
 .pe-scope h2 .norm{font-family:var(--pe-mono);font-size:.64rem;font-weight:500;color:var(--pe-faint);letter-spacing:.03em;margin-left:auto;}
 .pe-scope h3{font-family:var(--pe-disp);font-weight:700;font-size:1.02rem;color:var(--pe-ink);margin:22px 0 10px;}
