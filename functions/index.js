@@ -221,6 +221,8 @@ REGLAS INVIOLABLES:
 2. Transcribe los números TAL CUAL aparecen (convierte coma decimal a punto). No redondees ni "corrijas".
 3. NO calcules la calificación/semáforo: el sistema lo deriva de los valores. Solo extrae los números crudos.
 4. Mapea sinónimos y variantes de cada laboratorio a la nomenclatura canónica de abajo.
+5. EXHAUSTIVIDAD: recorre TODO el documento, página por página, hasta el final. Extrae TODAS las familias de prueba que aparezcan — NO te detengas tras la primera (p.ej. factor de potencia). Cada prueba que el informe liste en su índice o realice DEBE quedar registrada. La identidad/placa suele estar en las primeras páginas.
+6. DATOS POR POSICIÓN DE TAP/CONMUTADOR: muchos informes reportan excitación, relación y/o resistencia de devanados para VARIAS posiciones de TAP (p.ej. 17 filas, una por posición del conmutador). NUNCA dejes esas pruebas vacías por eso: elige la posición REPRESENTATIVA — la nominal si se indica, o la de PEOR caso (mayor desviación/desbalance) — y reporta sus fases A/B/C con esos valores + la desviación o desbalance MÁXIMO de toda la prueba. Es preferible el peor caso que dejarlo en blanco. Lo mismo para informes con varios devanados (AT/MT/BT): rellena cada uno.
 
 DEVANADOS: AT (alta tensión / H / primario), MT (media / X / secundario), BT (baja / Y / terciario). Fases A/B/C (o U/V/W, R/S/T, H1/H2/H3). TAP = posición del conmutador.
 
@@ -443,7 +445,7 @@ export const extraerPruebasElectricasIA = onCall(
     try {
       message = await client.messages.create({
         model,
-        max_tokens: 16000,
+        max_tokens: 32000,
         system: [
           { type: 'text', text: SYSTEM_PRUEBAS_IA, cache_control: { type: 'ephemeral' } }
         ],

@@ -137,6 +137,37 @@ export async function eliminarInforme(unidadId, informeId) {
   await deleteDoc(doc(getDbSafe(), COL_UNIDADES, unidadId, SUBCOL_INFORMES, informeId));
 }
 
+/**
+ * Elimina una UNIDAD completa (un "libro"): todos sus informes, los PDF
+ * originales en Storage (carpeta pruebas_electricas/{unidadId}/) y el doc
+ * de la unidad. Operación admin (las rules exigen isAdmin()). Irreversible.
+ * @param {string} unidadId  serie / docId de la unidad
+ */
+export async function eliminarUnidad(unidadId) {
+  if (!isReady()) throw new Error('Firebase no inicializado.');
+  if (!unidadId) throw new Error('Falta el id de la unidad.');
+  // 1) Borra todos los informes de la subcolección.
+  const snap = await getDocs(collInformes(unidadId));
+  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  // 2) Borra los PDF originales en Storage (toda la carpeta de la unidad).
+  const storage = getStorageSafe();
+  if (storage) {
+    try {
+      const { ref: sref, listAll, deleteObject } =
+        await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
+      const carpeta = sref(storage, `${COL_UNIDADES}/${unidadId}`);
+      const listado = await listAll(carpeta);
+      await Promise.all(listado.items.map((it) => deleteObject(it).catch(() => {})));
+    } catch (err) {
+      // Storage es secundario: si falla la limpieza de PDF, igual se borra
+      // el doc (no bloquear la eliminación de la unidad por un PDF huérfano).
+      console.warn('[pruebas_electricas.eliminarUnidad] limpieza Storage', err);
+    }
+  }
+  // 3) Borra el doc de la unidad.
+  await deleteDoc(unidadRef(unidadId));
+}
+
 /* ─── Storage · PDF original ──────────────────────────────────── */
 
 /**
