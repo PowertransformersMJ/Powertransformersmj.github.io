@@ -21,6 +21,9 @@ Thumbs.db
 # Claude Code (worktrees, sesiones, memoria local — nunca al repo)
 .claude/
 
+# Artefactos de depuración / QA (PDFs reales de cliente, capturas) — NUNCA al repo público
+Debug/
+
 # Build / caches
 .cache/
 .parcel-cache/
