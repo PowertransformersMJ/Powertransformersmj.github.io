@@ -25,7 +25,7 @@
 import {
   isReady,
   suscribirUnidades, suscribirInformes,
-  guardarUnidad, crearInforme, subirPDF, eliminarInforme, actualizarInforme,
+  guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
   descargarBlobInforme, extraerConIA
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
@@ -86,6 +86,10 @@ function mergeInformes(unidadId, live) {
     .map((i) => ({ ...i, _seed: true }));
   return seed.concat(liveArr).sort(orden);
 }
+
+// Series de los libros BASE (seed): son de solo lectura y NO se eliminan.
+const SERIES_SEED = new Set(unidadesSeed().map((u) => String(u.serie || u.id)));
+function esSeedSerie(serie) { return SERIES_SEED.has(String(serie)); }
 
 /* ─── KPIs y ficha de identidad ───────────────────────────────── */
 
@@ -156,11 +160,14 @@ function renderParqueGrid(unidades) {
   const aviso = sinResultados
     ? `<p class="pe-lib-empty">Ningún libro coincide con “${esc(state.filtroBiblioteca.trim())}”.</p>`
     : '';
+  // Un libro es eliminable si NO es base (seed), hay backend y el usuario
+  // es admin (las rules de Firestore/Storage también lo exigen).
+  const puedeBorrar = isReady() && esAdmin();
   const books = filtradas.map((u) => {
     const serie = u.serie || u.id;
     const meta = [u.fabricante, u.potencia].filter(Boolean).join(' · ');
     const [s1, s2] = spineFor(serie);
-    return `<button type="button" class="pe-book" data-serie="${esc(serie)}" ` +
+    const book = `<button type="button" class="pe-book" data-serie="${esc(serie)}" ` +
       `style="--spine:${s1};--spine2:${s2}" ` +
       `title="Abrir histórico de ${esc(serie)}">` +
       `<span class="pe-book-head" aria-hidden="true"></span>` +
@@ -168,6 +175,11 @@ function renderParqueGrid(unidades) {
       (meta ? `<span class="pe-book-maker">${esc(meta)}</span>` : '') +
       `</span>` +
       `<span class="pe-book-foot" aria-hidden="true"></span></button>`;
+    const del = (puedeBorrar && !esSeedSerie(serie))
+      ? `<button type="button" class="pe-book-del" data-del="${esc(serie)}" ` +
+        `title="Eliminar libro ${esc(serie)}" aria-label="Eliminar libro ${esc(serie)}">×</button>`
+      : '';
+    return `<div class="pe-book-wrap">${book}${del}</div>`;
   }).join('');
   const addBook = `<button type="button" class="pe-book pe-book-add" ` +
     `onclick="openUpload()" title="Cargar informe de una unidad">` +
@@ -190,6 +202,14 @@ function marcarLibroActivo() {
 // Clic en una tarjeta del parque → selecciona esa serie (refleja la serie
 // en el campo de búsqueda y dispara el render completo de la unidad).
 function onClickParque(ev) {
+  // ── Eliminar libro (botón rojo sobre el lomo) ──
+  const del = ev.target.closest('[data-del]');
+  if (del) {
+    ev.preventDefault();
+    ev.stopPropagation();
+    onEliminarLibro(del.getAttribute('data-del'));
+    return;
+  }
   const btn = ev.target.closest('[data-serie]');
   if (!btn) return;
   const v = btn.getAttribute('data-serie');
@@ -201,6 +221,31 @@ function onClickParque(ev) {
   // Abrir un libro lleva al Tablero, donde se ilustra toda la información
   // de la unidad (matriz, identidad, tablas y gráficas de las pruebas).
   irAlTablero();
+}
+
+// Elimina un libro completo (unidad + informes + PDF). Admin + backend.
+async function onEliminarLibro(serie) {
+  if (!serie) return;
+  if (esSeedSerie(serie)) return toast('Los libros base son de solo lectura.', 'warn');
+  if (!isReady()) return toast('Sin backend: no se puede eliminar.', 'warn');
+  if (!esAdmin()) return toast('Solo un administrador puede eliminar libros.', 'warn');
+  if (!window.confirm(
+    `¿Eliminar el libro ${serie} con TODOS sus informes y PDF?\n` +
+    `Esta acción no se puede deshacer.`)) return;
+  try {
+    await eliminarUnidad(serie);
+    toast(`Libro ${serie} eliminado.`);
+    // Si era la unidad abierta, limpia la selección (las suscripciones en
+    // vivo refrescan la repisa y vacían el tablero).
+    const act = state.unidadActiva && (state.unidadActiva.serie || state.unidadActiva.id);
+    if (act === serie) {
+      state.unidadActiva = null;
+      const inp = $('serieInput'); if (inp) inp.value = '';
+    }
+  } catch (err) {
+    console.error('[pruebas-electricas] eliminarUnidad', err);
+    toast('No se pudo eliminar el libro.', 'warn');
+  }
 }
 
 // Cambia a la pestaña Tablero activando su botón (delega en module-shell).
