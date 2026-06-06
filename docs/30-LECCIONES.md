@@ -154,3 +154,14 @@ Las 7 gráficas de `assets/js/ui/pruebas/grafico-svg.js` tenían el máximo del 
 
 ### L-24 · Extracción IA: completitud en informes densos / multi-TAP
 Síntoma: con un informe de otro laboratorio (slides, 3 devanados, 17 posiciones de TAP) y modelo **Sonnet**, solo se extrajo tan δ; excitación/relación/resistencia/aislamiento/identidad salieron vacíos. Causa: (1) las pruebas vienen POR posición de TAP (17 filas) que no encajan en el schema de valor único → el modelo las dejó vacías; (2) modelos menos capaces (Sonnet) rinden peor que Opus en formatos densos. **Receta**: instruir explícitamente en el system prompt → "recorre TODO el documento, extrae TODAS las familias, NO te detengas tras la primera; para datos por TAP elige la posición representativa/peor caso y rellena; nunca dejar vacío lo que aparece". Subir `max_tokens` (16k→32k) como seguro. **Para informes densos, preferir Opus 4.7** (en la 1ª prueba real Opus extrajo un Applus completo perfecto; Sonnet falló el EMS denso). Pendiente mayor: extender el schema a series POR TAP (curvas como el informe original) — es cambio de schema+render, no solo prompt.
+
+### L-25 · Purgar archivos sensibles del historial git (filter-repo)
+Si se commiteó por error algo que no debía (PDFs de cliente, secretos) — sobre todo en repo PÚBLICO — sacarlo del HEAD no basta: queda en commits viejos. Receta segura:
+1. **Respaldo primero**: `git bundle create /tmp/backup-$(date +%s).bundle --all` (snapshot completo restaurable con `git clone`).
+2. Registrar los SHAs actuales de las ramas afectadas (`git branch -a --contains <commit-que-lo-añadió>`) para rollback.
+3. Instalar: `pip3 install --user git-filter-repo` (queda en `~/Library/Python/3.9/bin/git-filter-repo`).
+4. Reescribir: `~/Library/Python/3.9/bin/git-filter-repo --invert-paths --path "Debug/" --force` (quita esa ruta de TODA la historia y todas las refs; cambia SHAs solo en commits que la contenían o descienden de ellos).
+5. filter-repo **elimina el remoto `origin`** por seguridad → re-agregarlo: `git remote add origin <url>`.
+6. Verificar: `git rev-list --objects --all | grep -c "Debug/"` debe dar 0.
+7. **Force-push** de cada rama afectada que esté en origin (lo hace el director; force-push a `main` es la op más peligrosa, NUNCA Claude la dispara). Solo las ramas que existen en origin necesitan push (las claude/* locales no).
+**Caveats**: GitHub puede cachear los commits viejos/forks tras el force-push (para datos críticos, pedir a GitHub Support); tratar lo expuesto como ya-comprometido. Quien tenga clon debe re-clonar.
