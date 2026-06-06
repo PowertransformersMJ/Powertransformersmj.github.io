@@ -171,30 +171,69 @@ function emptyState(W, H, msg) {
 }
 function sinDatos(serie) { return !serie || !Array.isArray(serie.anos) || serie.anos.length === 0; }
 
+/* ─── Eje Y dinámico (evita que barras/puntos se salgan del marco) ──
+ * El bug: los ejes tenían un máximo FIJO (p.ej. aislamiento ymax=4); un
+ * valor real mayor (5.72 GΩ) hacía que la barra/punto se dibujara por
+ * encima del marco. `ejeMax` calcula un techo que SIEMPRE contiene tanto
+ * los datos (con 15% de aire) como la línea límite, sin bajar de un piso
+ * "bonito". `ticksY` genera líneas de cuadrícula redondeadas hasta ese
+ * techo, y `drawGridY` las pinta + las líneas límite (rojo) y guía
+ * (ámbar) en su valor exacto. Así ninguna gráfica se desborda. */
+export function ejeMax(valores, limite, piso) {
+  const vals = (valores || []).filter((v) => v != null && isFinite(v));
+  const dataMax = vals.length ? Math.max(...vals) : 0;
+  const need = Math.max(dataMax * 1.15, (limite || 0) * 1.1, piso || 0);
+  return need > 0 ? need : (piso || 1);
+}
+export function ticksY(ymax, n) {
+  n = n || 4;
+  const rawStep = (ymax || 1) / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(rawStep || 1)));
+  const norm = rawStep / mag;
+  const nice = norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10;
+  const step = nice * mag;
+  const out = [];
+  for (let g = 0; g <= ymax + step * 0.001; g += step) out.push(+g.toFixed(4));
+  return out;
+}
+function drawGridY(svg, ymax, Y, geom, opts) {
+  const { L, R, W } = geom;
+  const o = opts || {};
+  const fmt = o.fmt || ((v) => String(v));
+  ticksY(ymax).forEach((g) => {
+    const yy = Y(g);
+    svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: COL.grid, 'stroke-width': 1 }));
+    tx(svg, L - 8, yy + 4, fmt(g), { 'text-anchor': 'end', fill: '#8a97a5' });
+  });
+  if (o.guia != null && o.guia <= ymax) {
+    const yy = Y(o.guia);
+    svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: COL.guide, 'stroke-width': 1, 'stroke-dasharray': '5 4', opacity: 0.6 }));
+  }
+  if (o.lim != null && o.lim <= ymax) {
+    const yy = Y(o.lim);
+    svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: COL.lim, 'stroke-width': 1, 'stroke-dasharray': '5 4' }));
+    tx(svg, L - 8, yy + 4, fmt(o.lim), { 'text-anchor': 'end', fill: COL.lim });
+  }
+}
+
 /* ══════════════════════════════════════════════════════════════
  * Gráfica 1 · Tangente δ / factor de potencia (6 configuraciones)
  * límite rojo 1.0 % · guía ámbar 0.5 % · ymax 1.6
  * ══════════════════════════════════════════════════════════════ */
 export function chartTanDelta(serie) {
-  const W = 720, H = 300, L = 46, R = 18, T = 16, B = 40, ymax = 1.6;
+  const W = 720, H = 300, L = 46, R = 18, T = 16, B = 40;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const anos = serie.anos, src = serie.tand || {};
-  const X = mkX(anos, W, L, R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const data = {
     CH:  { c: COL.CH,  v: src.CH  }, CHL: { c: COL.CHL, v: src.CHL },
     CL:  { c: COL.CL,  v: src.CL  }, CLT: { c: COL.CLT, v: src.CLT },
     CT:  { c: COL.CT,  v: src.CT  }, CHT: { c: COL.CHT, v: src.CHT }
   };
+  const todos = Object.values(data).flatMap((d) => Array.isArray(d.v) ? d.v : []);
+  const ymax = ejeMax(todos, 1.0, 1.6);
+  const X = mkX(anos, W, L, R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
-  [0, 0.5, 1.0, 1.5].forEach((g) => {
-    const yy = Y(g);
-    svg.appendChild(el('line', {
-      x1: L, y1: yy, x2: W - R, y2: yy,
-      stroke: g === 1 ? COL.lim : (g === 0.5 ? COL.guide : COL.grid), 'stroke-width': 1,
-      'stroke-dasharray': (g === 1 || g === 0.5) ? '5 4' : '', opacity: g === 0.5 ? 0.55 : 1
-    }));
-    tx(svg, L - 8, yy + 4, g.toFixed(1), { 'text-anchor': 'end', fill: g === 1 ? COL.lim : '#8a97a5' });
-  });
+  drawGridY(svg, ymax, Y, { L, R, W }, { lim: 1.0, guia: 0.5, fmt: (v) => v.toFixed(1) });
   anos.forEach((yr) => tx(svg, X(yr), H - B + 22, yr, { 'text-anchor': 'middle', 'font-size': 11 }));
   for (const k in data) {
     const d = data[k];
@@ -224,20 +263,13 @@ export function chartTanDelta(serie) {
  * límite rojo 10 % · guía ámbar 5 % · ymax 12
  * ══════════════════════════════════════════════════════════════ */
 export function chartExc(serie) {
-  const W = 720, H = 250, L = 42, R = 18, T = 16, B = 40, ymax = 12;
+  const W = 720, H = 250, L = 42, R = 18, T = 16, B = 40;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const anos = serie.anos, v = serie.excitacion || [];
+  const ymax = ejeMax(v, 10, 12);
   const X = mkX(anos, W, L, R), Y = (val) => T + (1 - val / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
-  [0, 5, 10].forEach((g) => {
-    const yy = Y(g);
-    svg.appendChild(el('line', {
-      x1: L, y1: yy, x2: W - R, y2: yy,
-      stroke: g === 10 ? COL.lim : (g === 5 ? COL.guide : COL.grid), 'stroke-width': 1,
-      'stroke-dasharray': g > 0 ? '5 4' : '', opacity: g === 5 ? 0.55 : 1
-    }));
-    tx(svg, L - 8, yy + 4, g + '%', { 'text-anchor': 'end', fill: g === 10 ? COL.lim : '#8a97a5' });
-  });
+  drawGridY(svg, ymax, Y, { L, R, W }, { lim: 10, guia: 5, fmt: (g) => g + '%' });
   anos.forEach((yr) => tx(svg, X(yr), H - B + 22, yr, { 'text-anchor': 'middle', 'font-size': 11 }));
   for (let i = 0; i < v.length - 1; i++) {
     if (v[i] == null || v[i + 1] == null) continue;
@@ -264,21 +296,14 @@ export function chartExc(serie) {
  *   AT–MT (navy) y AT–Terc. (purple) — tal cual el tablero.
  * ══════════════════════════════════════════════════════════════ */
 export function chartRel(serie) {
-  const W = 720, H = 230, L = 44, R = 18, T = 16, B = 40, ymax = 0.6;
+  const W = 720, H = 230, L = 44, R = 18, T = 16, B = 40;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const anos = serie.anos;
   const rel = serie.relacion || { atmt: [], atter: [] };
+  const ymax = ejeMax([...(rel.atmt || []), ...(rel.atter || [])], 0.5, 0.6);
   const X = mkX(anos, W, L, R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
-  [0, 0.25, 0.5].forEach((g) => {
-    const yy = Y(g);
-    svg.appendChild(el('line', {
-      x1: L, y1: yy, x2: W - R, y2: yy,
-      stroke: g === 0.5 ? COL.lim : COL.grid, 'stroke-width': 1,
-      'stroke-dasharray': g === 0.5 ? '5 4' : ''
-    }));
-    tx(svg, L - 8, yy + 4, g.toFixed(2) + '%', { 'text-anchor': 'end', fill: g === 0.5 ? COL.lim : '#8a97a5' });
-  });
+  drawGridY(svg, ymax, Y, { L, R, W }, { lim: 0.5, fmt: (v) => v.toFixed(2) + '%' });
   anos.forEach((yr) => tx(svg, X(yr), H - B + 22, yr, { 'text-anchor': 'middle', 'font-size': 11 }));
 
   const series = [
@@ -321,19 +346,14 @@ export function chartRel(serie) {
  * barra no medida → marca "n/m"
  * ══════════════════════════════════════════════════════════════ */
 export function chartRes(serie) {
-  const W = 720, H = 260, L = 42, R = 16, T = 16, B = 44, ymax = 6;
+  const W = 720, H = 260, L = 42, R = 16, T = 16, B = 44;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const grupos = serie.resistencia || [];
+  const todasRes = grupos.flatMap((g) => ['AT', 'MT', 'BT'].map((d) => (g[d] && g[d].v != null) ? g[d].v : null));
+  const ymax = ejeMax(todasRes, 5, 6);
   const Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
-  [0, 2.5, 5].forEach((g) => {
-    const yy = Y(g);
-    svg.appendChild(el('line', {
-      x1: L, y1: yy, x2: W - R, y2: yy,
-      stroke: g === 5 ? COL.lim : COL.grid, 'stroke-width': 1, 'stroke-dasharray': g === 5 ? '5 4' : ''
-    }));
-    tx(svg, L - 8, yy + 4, g.toFixed(1) + '%', { 'text-anchor': 'end', fill: g === 5 ? COL.lim : '#8a97a5' });
-  });
+  drawGridY(svg, ymax, Y, { L, R, W }, { lim: 5, fmt: (g) => g.toFixed(1) + '%' });
   const defs = el('defs', {});
   const pat = el('pattern', { id: 'pe-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
   pat.appendChild(el('rect', { width: 6, height: 6, fill: '#f1e2c0' }));
@@ -387,19 +407,13 @@ export function chartRes(serie) {
  * límite rojo 1 GΩ · ymax 4 · barras teal escalares por año
  * ══════════════════════════════════════════════════════════════ */
 export function chartIns(serie) {
-  const W = 720, H = 250, L = 44, R = 16, T = 16, B = 44, ymax = 4;
+  const W = 720, H = 250, L = 44, R = 16, T = 16, B = 44;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const bars = serie.aislamiento || [];
+  const ymax = ejeMax(bars.map((b) => b.v), 1, 4);
   const Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
-  [0, 1, 2, 3, 4].forEach((g) => {
-    const yy = Y(g);
-    svg.appendChild(el('line', {
-      x1: L, y1: yy, x2: W - R, y2: yy,
-      stroke: g === 1 ? COL.lim : COL.grid, 'stroke-width': 1, 'stroke-dasharray': g === 1 ? '5 4' : ''
-    }));
-    tx(svg, L - 8, yy + 4, g, { 'text-anchor': 'end', fill: g === 1 ? COL.lim : '#8a97a5' });
-  });
+  drawGridY(svg, ymax, Y, { L, R, W }, { lim: 1, fmt: (g) => String(+g.toFixed(1)) });
   const gw = (W - L - R) / bars.length, bw = Math.min(gw * 0.55, 48);
   bars.forEach((b, i) => {
     const cx = L + i * gw + gw / 2, x = cx - bw / 2;
@@ -429,19 +443,13 @@ export function chartIns(serie) {
  * límite rojo 100 mW · ymax 110 · línea verde
  * ══════════════════════════════════════════════════════════════ */
 export function chartCol(serie) {
-  const W = 720, H = 240, L = 44, R = 18, T = 16, B = 40, ymax = 110;
+  const W = 720, H = 240, L = 44, R = 18, T = 16, B = 40;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const anos = serie.anos, v = serie.collar || [];
+  const ymax = ejeMax(v, 100, 110);
   const X = mkX(anos, W, L, R), Y = (val) => T + (1 - val / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
-  [0, 50, 100].forEach((g) => {
-    const yy = Y(g);
-    svg.appendChild(el('line', {
-      x1: L, y1: yy, x2: W - R, y2: yy,
-      stroke: g === 100 ? COL.lim : COL.grid, 'stroke-width': 1, 'stroke-dasharray': g === 100 ? '5 4' : ''
-    }));
-    tx(svg, L - 8, yy + 4, g, { 'text-anchor': 'end', fill: g === 100 ? COL.lim : '#8a97a5' });
-  });
+  drawGridY(svg, ymax, Y, { L, R, W }, { lim: 100, fmt: (g) => String(Math.round(g)) });
   tx(svg, L - 8, T - 4, 'mW', { 'text-anchor': 'end', 'font-size': 9 });
   anos.forEach((yr) => tx(svg, X(yr), H - B + 22, yr, { 'text-anchor': 'middle', 'font-size': 11 }));
   for (let i = 0; i < v.length - 1; i++) {
@@ -469,10 +477,11 @@ export function chartCol(serie) {
  *   por año: banda [min,max] verde/ámbar/rojo según la ventana.
  * ══════════════════════════════════════════════════════════════ */
 export function chartDrm(serie) {
-  const W = 720, H = 250, L = 44, R = 18, T = 16, B = 40, ymax = 80;
+  const W = 720, H = 250, L = 44, R = 18, T = 16, B = 40;
   if (sinDatos(serie)) return emptyState(W, H, 'Sin informes cargados');
   const grupos = (serie.drm || []).filter((g) => g && (g.lo != null || g.hi != null));
   if (!grupos.length) return emptyState(W, H, 'Sin datos DRM (conmutador)');
+  const ymax = ejeMax(grupos.flatMap((g) => [g.lo, g.hi]), 70, 80);
   const anos = grupos.map((g) => g.ano);
   const X = mkX(anos, W, L, R), Y = (v) => T + (1 - v / ymax) * (H - T - B);
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
