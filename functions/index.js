@@ -439,28 +439,50 @@ export const extraerPruebasElectricasIA = onCall(
       throw new HttpsError('not-found', `No se pudo leer el PDF en Storage: ${e.message}`);
     }
 
-    // 2) Claude: PDF nativo + tool use forzado + prompt caching del system.
+    // 2) Claude: PDF nativo + prompt caching del system.
+    //    CLAVE (completitud): tool_choice 'auto' + adaptive thinking permiten
+    //    que el modelo RAZONE recorriendo las 22 páginas antes de emitir el
+    //    JSON. Con la herramienta FORZADA, el thinking se desactiva y el
+    //    modelo se "conforma" extrayendo solo lo más visible (tan δ) → por eso
+    //    fallaba en informes densos. Streaming evita que outputs largos corten.
     const client = new Anthropic({ apiKey: LLM_API_KEY.value() });
+    const userMsg =
+      `Analiza este informe de pruebas eléctricas COMPLETO, página por página, de ` +
+      `principio a fin (archivo: ${filename || 'informe.pdf'}). Un informe típico trae VARIAS ` +
+      `pruebas (factor de potencia/tan δ, corriente de excitación, relación de transformación, ` +
+      `resistencia de devanados, resistencia de aislamiento, collar/bushing, y a veces DRM). ` +
+      `Extrae TODAS las que aparezcan — NO te detengas tras la primera. Para pruebas con muchas ` +
+      `posiciones de TAP/conmutador, usa la posición representativa o de PEOR caso. Lee también la ` +
+      `placa de características para la identidad. Solo deja vacía una prueba si REALMENTE no está ` +
+      `en el documento. Cuando termines de analizarlo todo, llama UNA vez a la herramienta ` +
+      `registrar_pruebas_electricas con TODO lo extraído.`;
+    const params = {
+      model,
+      max_tokens: 32000,
+      system: [
+        { type: 'text', text: SYSTEM_PRUEBAS_IA, cache_control: { type: 'ephemeral' } }
+      ],
+      tools: [HERRAMIENTA_PRUEBAS],
+      tool_choice: { type: 'auto' },
+      messages: [
+        {
+          role: 'user',
+          content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
+            { type: 'text', text: userMsg }
+          ]
+        }
+      ]
+    };
+    // Thinking + effort solo en modelos que lo soportan (Opus 4.7 / Sonnet 4.6).
+    if (model === 'claude-opus-4-7' || model === 'claude-sonnet-4-6') {
+      params.thinking = { type: 'adaptive' };
+      params.output_config = { effort: 'high' };
+    }
     let message;
     try {
-      message = await client.messages.create({
-        model,
-        max_tokens: 32000,
-        system: [
-          { type: 'text', text: SYSTEM_PRUEBAS_IA, cache_control: { type: 'ephemeral' } }
-        ],
-        tools: [HERRAMIENTA_PRUEBAS],
-        tool_choice: { type: 'tool', name: 'registrar_pruebas_electricas' },
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdfBase64 } },
-              { type: 'text', text: `Extrae TODAS las mediciones de este informe de pruebas eléctricas (archivo: ${filename || 'informe.pdf'}) y regístralas con la herramienta. Si una prueba no aparece, deja su arreglo vacío; NO inventes valores.` }
-            ]
-          }
-        ]
-      });
+      const stream = client.messages.stream(params);
+      message = await stream.finalMessage();
     } catch (e) {
       throw new HttpsError('internal', `Claude API: ${e.message || e}`);
     }
