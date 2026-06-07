@@ -13,28 +13,40 @@
 
 ---
 
-## 🎯 Foco actual
+## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-06 por contexto lleno)
 
-> 🤖 **Pruebas Eléctricas con IA (Claude) + tablero detallado — VIVO** (ADR-003/004 en `99`).
-> La Cloud Function `extraerPruebasElectricasIA` (PDF nativo → `auto` tool + adaptive
-> thinking + streaming → `sanitizarInforme`) está **desplegada**; el tablero ya renderiza
-> el detalle completo (fases/terminal/TAP/bujes), eje Y dinámico y eliminar libros.
+> **TEMA VIVO: Pruebas Eléctricas con IA (Claude) → tablero que grafica TODO el PDF.**
+> Recorrido: ADR-003 (función IA), ADR-004 (tablero detallado + fix completitud), ADR-006
+> (tablero FLEXIBLE "bloques"). Todo commiteado y **pusheado** (`origin/DESARROLLO=3f8bbdd`;
+> `origin/main≈106c359`). Función `extraerPruebasElectricasIA` **desplegada** con `auto`+thinking.
 >
-> **Pendientes vivos:**
-> 1. **Director**: push `DESARROLLO` + merge a `main` (front: tablas detalladas + fixes de
->    gráficas + eliminar libros) → GitHub Pages.
-> 2. **Validar extracción** con 1 PDF real (Sonnet) tras el fix de completitud (auto+thinking):
->    confirmar que ya extrae TODAS las pruebas, no solo tan δ. Las tablas detalladas se ven en
->    el seed **173523** sin gastar créditos.
-> 3. **Extras de la maqueta** (pendientes, aditivos): callout de hallazgo, barras rayadas
->    "verificar" en gráficas, lista dinámica de informes/PDF. Opcionales mayores: nomenclatura
->    dinámica, bushing PF como familia propia, schema por-TAP (curvas por posición).
+> **Estado:** función IA viva · tablas detalladas + eje dinámico + eliminar libros vivos ·
+> tablero flexible **Fase 1 hecha** (motor de bloques + render genérico + 125/125 tests).
+>
+> **PRÓXIMOS PASOS (en orden):**
+> 1. **Validar extracción E2E** (TODO-05): subir 1 PDF real con **Sonnet**, confirmar que extrae
+>    TODAS las pruebas (no solo tan δ). Si falla → `firebase functions:log --only extraerPruebasElectricasIA`.
+> 2. **Fase 2 bloques** (TODO-06, ADR-006): que la función EMITA `bloques` (ampliar `HERRAMIENTA_PRUEBAS`
+>    con array de bloques) + escriba JSON a Storage `pruebas_electricas/{unidadId}/{informeId}.bloques.json`;
+>    data layer `cargarBloques`/persistencia.
+> 3. **Fase 3 bloques**: sección en la página + `mountBloques` con carga perezosa desde Storage →
+>    bushing, capacitancia (pF), DAR, tip-up y **gráficas de línea** salen "gratis" del modelo genérico.
+> 4. Extras maqueta: callout de hallazgo, barras rayadas "verificar", lista dinámica de informes.
+>
+> **MAPA DE ARCHIVOS CLAVE** (ubicar rápido):
+> · Función IA: `functions/index.js#extraerPruebasElectricasIA` · Contrato bloques (acotado):
+> `assets/js/domain/pruebas_electricas_bloques.js` · Render genérico: `assets/js/ui/pruebas/grafico-generico.js`
+> · Schema normativo: `assets/js/domain/pruebas_electricas_schema.js` · Cliente: `assets/js/data/pruebas_electricas.js`
+> (`extraerConIA`/`eliminarUnidad`) + shell `assets/js/pruebas-electricas-shell.js#storeReport` · Tablas:
+> `ui/pruebas/tabla-pruebas.js` · Gráficas año: `ui/pruebas/grafico-svg.js` (`ejeMax/ticksY`) · Maqueta spec:
+> `~/Downloads/Tablero Dinamico de Pruebas Electricas.html` (NO en repo).
 >
 > **Flujo git (ADR-005)**: Claude commitea + deploya; el director pushea. Claude NUNCA force-push a `main`.
 >
 > **🚫 Callejones sin salida**: (1) push del runtime da 403 → solo el director pushea (L-01).
-> (2) Herramienta tool_choice **FORZADA mata el thinking** → extracción incompleta en docs
-> densos; usar `auto` + adaptive thinking (L-26). (3) `2>NUL` recrea `NUL` en macOS → `2>/dev/null` (M-01).
+> (2) tool_choice **FORZADO mata el thinking** → extracción incompleta en docs densos; usar `auto`+thinking (L-26).
+> (3) `2>NUL` recrea `NUL` en macOS → `2>/dev/null` (M-01). (4) NO inflar el doc Firestore con el detalle
+> pesado → va a Storage JSON lazy (ADR-006).
 
 ---
 
