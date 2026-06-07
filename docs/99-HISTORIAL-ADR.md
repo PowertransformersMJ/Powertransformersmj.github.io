@@ -169,3 +169,30 @@
 **7.6 Archivos** — *Modificados*: `functions/index.js` (resumen + log `[IA-DIAG]` + return `diagnostico`; antes: timeout 540s/1GiB L-27 + tool `bloques`/`verificar`), `assets/js/data/pruebas_electricas.js` (`guardar/cargarBloques`→Firestore + limpieza), `assets/js/pruebas-electricas-shell.js` (pasa `diag` + `panelDiagnostico` admin), `assets/css/pruebas-electricas.css` (`.pe-diag*`), `firestore.rules` (subcolección `diagnostico`). *Intactos*: dominio `bloques` + render genérico.
 
 **7.7 Doctrina + evolución** — Decisión Fuerte (Trigger 🛰️) aprobada por el director. Lecciones: **L-29** (Storage CORS → Firestore para datos leídos por el browser). **Open follow-up (siguiente sesión)**: con el diagnóstico ya capturando el crudo, atacar la **extracción incompleta** (el informe real solo extrajo tan δ; el resto de pruebas vacías pese a auto+thinking+effort+540s — el `[IA-DIAG]` dirá si es prompt, modelo o token budget). Sin cache bump (no aplica §4).
+
+---
+
+## 8. ADR-008 — Tablero de Pruebas Eléctricas: pipeline de bloques completo + rediseño IA-primaria + render interactivo
+
+> Director (2026-06-06/07): *"un tablero capaz de graficar TODO… ir MÁS ALLÁ del informe — esa es la razón de la IA… te doy libertad de dar forma y magia, acompañada de la interpretación de la API."*
+
+**8.1 Causa raíz** — La plantilla rígida (7 secciones fijas, escalar por prueba, series temporales por año) era el límite y la fuente de errores: con UN informe las curvas salían como puntos solitarios; el render forzaba unidades fijas ("(mΩ)" sobre datos en Ω); el semáforo del collar daba "OK" falso (ver 8.2). El subsistema de diagnóstico (ADR-007) reveló que **la IA (Opus 4.7) extrae EXCELENTE** (9 bloques, curvas de 17 TAPs, bujes, DAR, capacitancias, hasta cazó un error de digitación del laboratorio) → el problema era de **presentación**, no de extracción.
+
+**8.2 Decisiones / cambios** —
+- **Pipeline de bloques (completa ADR-006 Fases 2-3 + extras, desplegado)**: la función emite `bloques` (curva COMPLETA por TAP) + `verificar` por punto + `limite_desbalance` por bloque + **análisis crítico OBLIGATORIO** en `observaciones`; el cliente persiste el diagnóstico en Firestore (ADR-007). Render genérico pinta línea/barra multi-serie con eje dinámico, hatch de "verificar", callout de análisis.
+- **IA = vista PRIMARIA** (rediseño): se RETIRARON las 7 secciones rígidas; los **bloques son el cuerpo** del informe ("Resultados del informe"). El **scorecard se DERIVA de los bloques** (`renderScorecard`: calif de la IA por familia presente — una sola fuente de verdad, sin "OK" fantasma).
+- **Fix raíz collar** (`sanitizarCollar`): `max_mw` quedaba **0** con bujes sin `mw` (informe sin hot-collar) → "OK" falso; ahora `null`→n/d.
+- **Render interactivo (lotes)**: (a) **auto-rango del eje Y** en curvas (zoom a [min,max]+pad, no aplastar contra 0); (b) **tabla por-TAP autogenerada** de las series (`tablaDeSeries`: TAP|Fase A|B|C); (c) **filtro por fase** (chips A/B/C que repintan el SVG); (d) **chart de desviación** (`bloqueDesviacion`) con **física por prueba**: excitación = Δ entre las dos fases laterales mayores (la central es menor por geometría del núcleo); relación/resistencia = desviación de CADA fase vs promedio (3 líneas) contra banda ±límite.
+- **Encabezado del informe** (ensayo/ejecutante/instrumento/fecha) + **nomenclatura dinámica** (deriva devanados de `tensiones`+`grupo_conexion`, parser `parseGrupo`).
+- **UX**: libro demo seed (173523-15510) **retirado** del parque (no se inyecta; exports quedan como fixtures de tests); **estado vacío** del tablero (`#tablero-scope.is-empty`); **pestañas** reordenadas (Biblioteca→Tablero).
+- **Evolución multi-año (Etapa 3)**: scorecard condicional — 1 informe → derivado de bloques; >1 → matriz canónica multi-año (columnas por año) + bloques agrupados por año.
+
+**8.3 No-regresión** — Aditivo salvo la retirada de las secciones rígidas (redundantes y con errores). IDs/funciones exportadas intactos; `mountTablas`/`mountCharts` retirados del shell. Dominio `bloques` extendido (`limite_desbalance`) sin romper. `prueba` de la IA NO es estable (tand↔tan_delta) → **aliasear** (L-31).
+
+**8.4 Tests / verificación** — `node --test` 997/997 en cada lote. lint HTML OK. Función re-desplegada (prompt + schema). **Math de desviación verificada contra el informe real** (excitación 3.12%/1.07% = informe 3.0%/1.06%; relación TAP6 fase C −0.80% rompe ±0.5%). Falta validación VISUAL en vivo (re-carga del director).
+
+**8.5 Anti-patterns evitados** — NO forzar datos ricos en casillas rígidas; NO una métrica de desviación genérica ciega (la física difiere por prueba); NO confiar en la estabilidad de las claves del LLM (alias); NO truncar el análisis crítico (cap `observaciones` 240→1200).
+
+**8.6 Archivos** — `pages/pruebas-electricas.html` (retiro secciones, estado vacío, tabs, nomencl dinámica), `assets/js/pruebas-electricas-shell.js` (scorecard derivado, encabezado, nomenclatura, seed off, FAMILIAS_SCORE), `assets/js/ui/pruebas/grafico-generico.js` (auto-rango, tabla series, filtro fase, desviación), `assets/js/domain/pruebas_electricas_bloques.js` (`limite_desbalance`, cap obs 1200), `assets/js/domain/pruebas_electricas_schema.js` (fix collar), `functions/index.js` (prompt: limite_desbalance/IP/análisis), `assets/css/pruebas-electricas.css`.
+
+**8.7 Doctrina + evolución** — "La IA interpreta, no transcribe": el render exprime lo que la API ya da y, donde falta dato (IP = R10min, no presente en este informe), se le pide a la IA. **Iterativo**: con cada informe cargado se afinan extracción y presentación. **Pendiente de validación VISUAL** (re-carga 450108) → la versión guardada tiene cálculos/textos viejos; el scorecard se corrige solo al recargar el sitio. Sin cache bump (no aplica §4).
