@@ -117,13 +117,18 @@ function svgBloque(bloque) {
     const tipVerif = (p) => p.verificar ? ' <span style="color:#b07d12">(a verificar)</span>' : '';
     if (esBarra) {
       const bw = Math.min((innerW / n) * 0.7 / series.length, 26);
+      // Etiqueta el valor sobre la barra solo en series únicas y pocas
+      // categorías (en barras agrupadas se amontonan → se deja al tooltip).
+      const etiquetar = series.length === 1 && cats.length <= 14;
+      const fmtBar = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(2));
       pts.forEach((p) => {
         const cx = xAt(p.i) - (series.length * bw) / 2 + si * bw + bw / 2;
         const yy = Y(p.y), h = (H - T - B) - (yy - T);
         const rect = el('rect', { x: cx - bw / 2, y: yy, width: bw, height: Math.max(h, 0), rx: 2, fill: p.verificar ? 'url(#peh-hatch)' : color });
         hookTip(rect, `<b>${esc(s.nombre)}</b> · ${esc(p.x)}<br>${esc(p.y)}${bloque.unidad ? ' ' + esc(bloque.unidad) : ''}${tipVerif(p)}`);
         svg.appendChild(rect);
-        if (p.verificar) tx(svg, cx - bw / 2, yy - 5, '⚠', { 'text-anchor': 'middle', 'font-size': 10, fill: COL.guide });
+        if (p.verificar) tx(svg, cx, yy - 5, '⚠', { 'text-anchor': 'middle', 'font-size': 10, fill: COL.guide });
+        else if (etiquetar) tx(svg, cx, yy - 4, fmtBar(p.y), { 'text-anchor': 'middle', 'font-size': 9, fill: COL.ink });
       });
     } else {
       // línea (o dispersión): polilínea + puntos.
