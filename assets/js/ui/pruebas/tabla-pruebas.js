@@ -245,6 +245,160 @@ export function renderTablaResumen(key, cont, informes) {
     `</table></div>`;
 }
 
+/* ─── 2b-bis) Tablas DETALLADAS por prueba (full granularidad) ────
+   Muestran TODO el detalle que el schema guarda (fases A/B/C + terminal,
+   TAP, par de devanados, bujes individuales, Δ%), no solo el escalar
+   resumido. Replican el detalle de la maqueta de referencia. */
+
+// Badge de calificación a partir del string que guarda el schema
+// (bueno/OK/normal → verde · investigar/revisar/verificar → ámbar ·
+//  excesivo/fuera/bajo/alto → rojo).
+function califBadge(calif) {
+  const c = String(calif || '').toLowerCase().trim();
+  let cls = 'b-n';
+  if (['bueno', 'ok', 'normal'].includes(c)) cls = 'b-g';
+  else if (['investigar', 'revisar', 'verificar', 'no medido'].includes(c)) cls = 'b-a';
+  else if (['excesivo', 'fuera', 'bajo', 'alto'].includes(c)) cls = 'b-r';
+  return `<span class="badge ${cls}">${esc(calif || 'n/d')}</span>`;
+}
+function nv(v) { return (v == null || v === '') ? '—' : esc(v); }
+// Celda de fase: valor + terminal real como subtítulo (ej. "H1–PN").
+function celdaFase(f) {
+  if (!f || f.valor == null) return '<td class="num muted2">—</td>';
+  const term = f.term ? `<div class="term">${esc(f.term)}</div>` : '';
+  return `<td class="num">${esc(f.valor)}${term}</td>`;
+}
+function fasePorLetra(fases, letra) {
+  return (Array.isArray(fases) ? fases : [])
+    .find((f) => String(f.fase || '').toUpperCase() === letra) || null;
+}
+function envuelve(cont, head, body, caption) {
+  cont.innerHTML =
+    `<div class="tblwrap"><table class="dt"><thead>${head}</thead>` +
+    `<tbody>${body}</tbody><caption>${caption}</caption></table></div>`;
+}
+function sinFilas(cont, cols, msg) {
+  envuelve(cont, `<tr><th>${msg}</th></tr>`, '', '');
+  cont.innerHTML = `<p class="muted small">${esc(msg)}</p>`;
+}
+
+// Excitación: por fase A/B/C (mA) con terminal, TAP, ref, Δ ext.
+export function renderTablaExcitacion(cont, informes) {
+  if (!cont) return;
+  const docs = ordenarPorAno(informes).filter((i) => i.excitacion &&
+    ((i.excitacion.fases && i.excitacion.fases.length) || i.excitacion.delta_ext_pct != null));
+  if (!docs.length) return sinFilas(cont, 9, 'Sin datos de corriente de excitación.');
+  const body = docs.map((inf) => {
+    const e = inf.excitacion || {};
+    const A = fasePorLetra(e.fases, 'A'), B = fasePorLetra(e.fases, 'B'), C = fasePorLetra(e.fases, 'C');
+    return `<tr><td>${nv(inf.ano)}</td><td>${nv(e.devanado || 'AT')}</td>` +
+      `<td>${nv(e.ref)}</td><td>${nv(e.tap)}</td>` +
+      celdaFase(A) + celdaFase(B) + celdaFase(C) +
+      `<td class="num">${e.delta_ext_pct != null ? esc(e.delta_ext_pct) : '—'}</td>` +
+      `<td>${califBadge(e.calif)}</td></tr>`;
+  }).join('');
+  envuelve(cont,
+    `<tr><th>Año</th><th>Devanado</th><th>Ref.</th><th>TAP</th>` +
+    `<th class="num">Fase A</th><th class="num">Fase B (central)</th><th class="num">Fase C</th>` +
+    `<th class="num">Δ ext. (%)</th><th>Calif.</th></tr>`,
+    body,
+    'Corriente de excitación por fase (mA). Δ = desbalance entre las dos fases mayores; límite 10% (5% si I≥50 mA).');
+}
+
+// Relación de transformación: filas por par de devanados (fases o global), TAP, desviación.
+export function renderTablaRelacion(cont, informes) {
+  if (!cont) return;
+  const docs = ordenarPorAno(informes);
+  const filas = [];
+  docs.forEach((inf) => {
+    (Array.isArray(inf.relacion) ? inf.relacion : []).forEach((r) => {
+      const A = fasePorLetra(r.fases, 'A'), B = fasePorLetra(r.fases, 'B'), C = fasePorLetra(r.fases, 'C');
+      const tieneFases = (r.fases && r.fases.length);
+      const medida = tieneFases
+        ? `${celdaFase(A)}${celdaFase(B)}${celdaFase(C)}`
+        : `<td class="num" colspan="3">${r.global != null ? esc(r.global) : '—'}` +
+          (r.global_term ? `<div class="term">${esc(r.global_term)}</div>` : '') + `</td>`;
+      filas.push(`<tr><td>${nv(inf.ano)}</td><td>${nv(r.devanado)}</td><td>${nv(r.asociado)}</td>` +
+        `<td>${nv(r.tap)}</td>${medida}` +
+        `<td class="num">${r.desviacion_pct != null ? esc(r.desviacion_pct) : '—'}</td>` +
+        `<td>${califBadge(r.calif)}</td></tr>`);
+    });
+  });
+  if (!filas.length) return sinFilas(cont, 8, 'Sin datos de relación de transformación.');
+  envuelve(cont,
+    `<tr><th>Año</th><th>Devanado</th><th>Asociado</th><th>TAP</th>` +
+    `<th class="num">Fase A</th><th class="num">Fase B</th><th class="num">Fase C / global</th>` +
+    `<th class="num">Desv. (%)</th><th>Calif.</th></tr>`,
+    filas.join(''),
+    'Relación de transformación (TTR) por par de devanados. Desviación vs placa; límite ±0.5%.');
+}
+
+// Resistencia de devanados: filas por devanado (AT/MT/BT), fases (mΩ), Δ máx, verificar.
+export function renderTablaResistencia(cont, informes) {
+  if (!cont) return;
+  const docs = ordenarPorAno(informes);
+  const filas = [];
+  docs.forEach((inf) => {
+    (Array.isArray(inf.resistencia) ? inf.resistencia : []).forEach((r) => {
+      const A = fasePorLetra(r.fases, 'A'), B = fasePorLetra(r.fases, 'B'), C = fasePorLetra(r.fases, 'C');
+      const flag = r.verificar ? ' <span class="badge b-a">verificar</span>' : '';
+      filas.push(`<tr><td>${nv(r.ano_tap || inf.ano)}</td><td>${nv(r.devanado)}</td>` +
+        `<td>${nv(r.conexion)}</td>${celdaFase(A)}${celdaFase(B)}${celdaFase(C)}` +
+        `<td class="num">${r.delta_max_pct != null ? esc(r.delta_max_pct) : '—'}</td>` +
+        `<td>${califBadge(r.calif)}${flag}</td></tr>`);
+    });
+  });
+  if (!filas.length) return sinFilas(cont, 8, 'Sin datos de resistencia de devanados.');
+  envuelve(cont,
+    `<tr><th>Año (TAP)</th><th>Devanado</th><th>Conexión</th>` +
+    `<th class="num">Fase A</th><th class="num">Fase B</th><th class="num">Fase C</th>` +
+    `<th class="num">Δ máx (%)</th><th>Calif.</th></tr>`,
+    filas.join(''),
+    'Resistencia óhmica de devanados (mΩ salvo indicación). Desbalance entre fases; límite ≤5%.');
+}
+
+// Resistencia de aislamiento: filas por par de devanados / tierra (GΩ).
+export function renderTablaAislamiento(cont, informes) {
+  if (!cont) return;
+  const docs = ordenarPorAno(informes);
+  const filas = [];
+  docs.forEach((inf) => {
+    (Array.isArray(inf.aislamiento) ? inf.aislamiento : []).forEach((a) => {
+      filas.push(`<tr><td>${nv(inf.ano)}</td><td>${nv(a.devanado)}</td><td>${nv(a.asociado)}</td>` +
+        `<td class="num">${a.gohm != null ? esc(a.gohm) : '—'}</td>` +
+        `<td>${califBadge(a.calif)}</td></tr>`);
+    });
+  });
+  if (!filas.length) return sinFilas(cont, 5, 'Sin datos de resistencia de aislamiento.');
+  envuelve(cont,
+    `<tr><th>Año</th><th>Devanado</th><th>Asociado</th><th class="num">GΩ</th><th>Calif.</th></tr>`,
+    filas.join(''),
+    'Resistencia de aislamiento (CC) por par de devanados / tierra. Mínimo aceptable ≥1 GΩ.');
+}
+
+// Collar caliente: fila por BUJE individual (I µA + pérdida mW) + máximo.
+export function renderTablaCollar(cont, informes) {
+  if (!cont) return;
+  const docs = ordenarPorAno(informes);
+  const filas = [];
+  docs.forEach((inf) => {
+    const col = inf.collar || {};
+    (Array.isArray(col.bujes) ? col.bujes : []).forEach((b) => {
+      filas.push(`<tr><td>${nv(inf.ano)}</td><td class="cfg">${nv(b.buje)}</td>` +
+        `<td>${nv(b.fase_label || b.fase)}</td><td>${nv(b.devanado)}</td>` +
+        `<td class="num">${b.i_ua != null ? esc(b.i_ua) : '—'}</td>` +
+        `<td class="num">${b.mw != null ? esc(b.mw) : '—'}</td>` +
+        `<td>${califBadge(b.calif)}</td></tr>`);
+    });
+  });
+  if (!filas.length) return sinFilas(cont, 7, 'Sin datos de collar caliente / bujes.');
+  envuelve(cont,
+    `<tr><th>Año</th><th>Buje</th><th>Fase</th><th>Devanado</th>` +
+    `<th class="num">I salida (µA)</th><th class="num">Pérdida (mW)</th><th>Calif.</th></tr>`,
+    filas.join(''),
+    'Collar caliente por buje individual. Pérdidas; límite <100 mW.');
+}
+
 /* ─── 2c) Identidad del conmutador (DRM/OLTC) ─────────────────── */
 
 // Campos de identidad del conmutador medidos en la prueba DRM. Solo se
@@ -305,11 +459,11 @@ export function renderTablaDrmIdentidad(cont, informes) {
 export function mountTablas(informes, root = document) {
   const byId = (id) => root.getElementById ? root.getElementById(id) : root.querySelector('#' + id);
   renderTablaTand(byId('t-tand'), informes);
-  renderTablaResumen('excitacion',  byId('t-exc'), informes);
-  renderTablaResumen('relacion',    byId('t-rel'), informes);
-  renderTablaResumen('resistencia', byId('t-res'), informes);
-  renderTablaResumen('aislamiento', byId('t-ins'), informes);
-  renderTablaResumen('collar',      byId('t-col'), informes);
-  renderTablaResumen('drm',         byId('t-drm'), informes);
+  renderTablaExcitacion(byId('t-exc'), informes);
+  renderTablaRelacion(byId('t-rel'), informes);
+  renderTablaResistencia(byId('t-res'), informes);
+  renderTablaAislamiento(byId('t-ins'), informes);
+  renderTablaCollar(byId('t-col'), informes);
+  renderTablaResumen('drm',         byId('t-drm'), informes); // DRM: resumen tiempo
   renderTablaDrmIdentidad(byId('t-drm-id'), informes);
 }
