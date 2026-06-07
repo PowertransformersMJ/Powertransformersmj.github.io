@@ -366,6 +366,13 @@ async function montarBloques(unidadId, informes) {
   }
   if (!alguno) cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
 
+  // Encabezado del informe vigente (quién ejecutó, con qué instrumento, cuándo)
+  // — metadata que la IA ya extrae y antes se desperdiciaba.
+  if (alguno) {
+    const enc = encabezadoInforme(ordenados[0]);
+    if (enc) cont.insertBefore(enc, cont.firstChild);
+  }
+
   // Scorecard derivado de la lectura IA del informe VIGENTE (el más reciente
   // con bloques) → sobreescribe la matriz canónica con la calificación fiel.
   const vigente = ordenados.find((inf) => {
@@ -373,6 +380,29 @@ async function montarBloques(unidadId, informes) {
     return d && d.bloques && d.bloques.length;
   });
   if (vigente) renderScorecard($('matrix'), state.bloquesCache.get(vigente.id), vigente);
+}
+
+// Tira de metadata del informe (ensayo, ejecutante, instrumento, fecha).
+const TIPOS_PRUEBA_LBL = {
+  predictivo_completo: 'Mantenimiento predictivo (completo)',
+  tan_delta: 'Tangente δ', drm_oltc: 'DRM · conmutador (OLTC)',
+  resistencia_devanados: 'Resistencia de devanados', ttr: 'Relación de transformación',
+  mixto: 'Ensayos mixtos'
+};
+function encabezadoInforme(inf) {
+  if (!inf) return null;
+  const campos = [
+    ['Ensayo', TIPOS_PRUEBA_LBL[inf.tipo_prueba] || inf.tipo_prueba],
+    ['Ejecutó', inf.ejecutante],
+    ['Instrumento', inf.equipo],
+    ['Fecha', inf.fecha || (inf.ano ? String(inf.ano) : '')]
+  ].filter(([, v]) => v);
+  if (!campos.length) return null;
+  const el = document.createElement('div');
+  el.className = 'pe-informe-meta';
+  el.innerHTML = campos.map(([k, v]) =>
+    `<span class="pe-meta-item"><span class="pe-meta-k">${esc(k)}</span>${esc(v)}</span>`).join('');
+  return el;
 }
 
 /* ─── Scorecard derivado de los bloques (lectura IA = fuente de verdad) ─── */
