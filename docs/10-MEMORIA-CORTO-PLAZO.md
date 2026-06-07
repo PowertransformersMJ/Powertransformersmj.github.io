@@ -75,5 +75,6 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-07** — **2 fixes de biblioteca (revisan ADR-009 §9.2):** (1) **click en libro YA NO salta al tablero** → despliega el hub "Libro abierto" (opciones Ver tablero/Ver tendencia) y hace scrollIntoView (`onClickParque`). El atajo serieInput+Enter sí sigue yendo al tablero (deliberado). (2) **Dedupe de serie**: `normalizarSerie` (dominio, sin espacios/guiones, mayúsculas; refactor de `confirmarSerie`) + en `storeReport` se reutiliza el libro existente cuya serie normalizada coincide → evita partir la tendencia por formato (`173523-15510` vs `17352315510`). Backward-compatible (NO cambia docId existente, solo compara). +5 tests `normalizarSerie`. **1036/1036 verde + lint.** ⚠️ Sin verificar en navegador. Pendiente commit+push (director). NO se auto-extrae la serie del PDF para auto-enrutar (mejora futura posible).
 - **2026-06-07** — **Tendencia F2+F3 → consolidado en ADR-010 (`99 §10`)** + fila en `00` + L-35 en `30`. F2 (franja-timeline determinista, `estadoInforme`/`lineaTiempoInformes`) + F3 (narrativa por IA on-demand, CF `narrativaTendenciaIA` desplegada, sin PDF). **EN PRODUCCIÓN** (F2 PR #130, F3 PR #131, `main 75daf29`). 1031/1031 verde. ⚠️ Falta confirmación visual del director (UI gated). `10` podado, `05` al día, brain:check SANO.
 - **2026-06-07** — Arco del tablero → ADR-009 (`99 §9`). EN PRODUCCIÓN (PR #129).
