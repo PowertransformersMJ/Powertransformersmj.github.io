@@ -26,7 +26,7 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
-  descargarBlobInforme, extraerConIA
+  descargarBlobInforme, extraerConIA, guardarBloques
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
@@ -1016,6 +1016,7 @@ async function storeReport() {
         let mediciones = null;
         let estado = 'pendiente_extraccion';
         let anoIA = null;
+        let bloquesIA = null;
         if (UP.usarIA && pdfMeta && pdfMeta.storagePath && esPdf(item.file)) {
           try {
             setItemEstado(item, 'Analizando con IA…');
@@ -1025,6 +1026,7 @@ async function storeReport() {
               modelId: UP.modelId
             });
             mediciones = r.mediciones || {};
+            bloquesIA = Array.isArray(r.bloques) ? r.bloques : null;
             anoIA = mediciones.ano != null ? mediciones.ano : null;
             // La IA también leyó la placa de características: enriquece el
             // doc de la unidad (fabricante, potencia, tensiones, etc.) una
@@ -1062,7 +1064,16 @@ async function storeReport() {
           ano: anoIA != null ? anoIA : item.ano,
           pdf: pdfMeta ? { ...pdfMeta, estado } : undefined
         });
-        await crearInforme(unidadId, informe, uid);
+        const nuevoId = await crearInforme(unidadId, informe, uid);
+        // Detalle gráfico pesado (ADR-006) → JSON en Storage, carga perezosa.
+        // Falla suave: un informe se almacena aunque sus bloques no se persistan.
+        if (bloquesIA && bloquesIA.length) {
+          try {
+            await guardarBloques(unidadId, nuevoId, bloquesIA);
+          } catch (e) {
+            console.warn('[pruebas-electricas] no se pudieron guardar los bloques', e);
+          }
+        }
       }
       body.innerHTML = `<div class="proc"><div class="okc">✓</div>` +
         `<div class="bigp">${total === 1 ? 'Informe almacenado' : `${total} informes almacenados`}</div>` +

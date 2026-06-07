@@ -26,10 +26,12 @@
 > **PRÓXIMOS PASOS (en orden):**
 > 1. **Validar extracción E2E** (TODO-05): subir 1 PDF real con **Sonnet**, confirmar que extrae
 >    TODAS las pruebas (no solo tan δ). Si falla → `firebase functions:log --only extraerPruebasElectricasIA`.
-> 2. **Fase 2 bloques** (TODO-06, ADR-006): que la función EMITA `bloques` (ampliar `HERRAMIENTA_PRUEBAS`
->    con array de bloques) + escriba JSON a Storage `pruebas_electricas/{unidadId}/{informeId}.bloques.json`;
->    data layer `cargarBloques`/persistencia.
-> 3. **Fase 3 bloques**: sección en la página + `mountBloques` con carga perezosa desde Storage →
+> 2. **Fase 2 bloques** (TODO-06, ADR-006): **HECHA + DESPLEGADA (2026-06-06)** — función emite `bloques`
+>    (tool `HERRAMIENTA_PRUEBAS` ampliado + system prompt) y los DEVUELVE; data layer `guardarBloques`/
+>    `cargarBloques` (JSON a Storage `…/{informeId}.bloques.json`, carga perezosa, re-sanitiza con dominio);
+>    shell persiste tras `crearInforme` (falla suave). storage.rules YA cubre `.bloques.json` (sin cambio).
+>    Commiteada (falta **push del director**). **PENDIENTE: validar E2E la versión nueva (TODO-05) + Fase 3.**
+> 3. **Fase 3 bloques**: sección en la página + `mountBloques` con carga perezosa (`cargarBloques`) →
 >    bushing, capacitancia (pF), DAR, tip-up y **gráficas de línea** salen "gratis" del modelo genérico.
 > 4. Extras maqueta: callout de hallazgo, barras rayadas "verificar", lista dinámica de informes.
 >
@@ -59,7 +61,7 @@
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (script `scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
 | **TODO-05** | Validar extracción IA E2E (1 PDF real, Sonnet) tras fix auto+thinking | 🔄 en curso | prueba del director |
-| **TODO-06** | Tablero flexible "bloques" (ADR-006): **Fase 1 ✅** (dominio `bloques` + render genérico + tests). **Fase 2** (función emite `bloques` + escribe JSON a Storage + data layer cargar/guardar) y **Fase 3** (sección en página + carga perezosa; bushing/capacitancia/DAR/tip-up). | 🔄 Fase 1 hecha | construir Fase 2/3 |
+| **TODO-06** | Tablero flexible "bloques" (ADR-006): **Fase 1 ✅** (dominio `bloques` + render genérico + tests). **Fase 2 ✅ código** (función emite `bloques` + data layer `guardar/cargarBloques` + shell persiste; sin commit/deploy aún). **Fase 3** (sección en página + carga perezosa; bushing/capacitancia/DAR/tip-up). | 🔄 Fase 2 código hecho | commit+deploy Fase 2 · construir Fase 3 |
 
 > Cerrados y consolidados: **TODO-03** (cleanup raíz) y **TODO-04** (IA Pruebas Eléctricas) → ver ADR-003/004 en `99`.
 
@@ -73,6 +75,8 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-06** — **Fase 2 bloques DESPLEGADA**: `firebase deploy --only functions:extraerPruebasElectricasIA` OK (*Successful update operation*, southamerica-east1). Commit creado por Claude; **falta push del director**. El director valida E2E la versión nueva (TODO-05). Decisión del director: deployar ya y validar la versión nueva (opción 2).
+- **2026-06-06** — **Fase 2 bloques (código)**: función `extraerPruebasElectricasIA` ahora emite `bloques` (property aditivo en `HERRAMIENTA_PRUEBAS` + guía en system prompt: curva COMPLETA, complementa NO reemplaza los campos canónicos) y los devuelve en la respuesta. Data layer: `guardarBloques(unidadId, informeId, raw)` (sanitiza con dominio → JSON a Storage `…/{informeId}.bloques.json`, no escribe si vacío) + `cargarBloques` (lazy, re-sanitiza). Shell `storeReport` persiste tras `crearInforme` (captura `informeId`, falla suave). **Hallazgo de diseño**: la función NO conoce el `informeId` (lo crea el cliente DESPUÉS de extraer) → el cliente persiste, la función solo devuelve. storage.rules ya cubre `.bloques.json`. lint OK · 996/996 tests verde. **SIN commit/deploy** (deploy cambia extracción pendiente de validar TODO-05 → decisión del director).
 - **2026-06-06** — Tablero flexible "bloques de análisis" (ADR-006, arquitecto): Fase 1 — dominio genérico `pruebas_electricas_bloques.js` (acotado/versionado) + motor de render `grafico-generico.js` (línea/barra multi-serie, eje dinámico) + 11 tests (suite 125/125). Decisión clave: detalle pesado a JSON en Storage (lazy), resumen liviano en Firestore. Pendiente Fase 2/3 (extracción emite bloques + integración).
 
 - **2026-06-06** — **Consolidación de cerebro** (a pedido del director, que notó que no se estaba consolidando): la obra de Pruebas Eléctricas (IA + tablero detallado + eliminar libros + fixes de gráficas) → **ADR-004**; gobernanza (purga de `Debug/` del historial + nuevo flujo commit/deploy/push) → **ADR-005**. Filas en `00`, `05` refrescado, `10` podado, lecciones L-20..L-26. brain:check SANO.

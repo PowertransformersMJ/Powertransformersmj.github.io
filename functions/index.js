@@ -248,7 +248,9 @@ LAS 7 FAMILIAS DE PRUEBA Y SUS UNIDADES:
 
 METADATOS DEL INFORME: ano (año de la prueba, de la fecha del informe), fecha (texto tal cual), ejecutante (laboratorio/empresa que ejecutó), equipo (instrumento usado, p. ej. "DOBLE M4100"), serie_en_pdf (número de serie del transformador que aparezca en el PDF), tipo_prueba (déjalo vacío salvo que el informe lo declare; el sistema lo infiere).
 
-IDENTIDAD DE LA UNIDAD (objeto "unidad"): lee la PLACA DE CARACTERÍSTICAS / tabla "Características principales" del transformador y extrae sus datos. fabricante (ej. "SIEMENS"), ano_fabricacion (año de fabricación de la placa, NO el de la prueba — ej. 2006), potencia (texto tal cual con unidad, ej. "5000 / 6000 kVA"), tensiones (primaria/secundaria/terciaria, ej. "34.5 / 13.8 kV"), grupo_conexion (ej. "Dyn5"), refrigeracion (ej. "ONAN / ONAF"), frecuencia (ej. "60 Hz"), fases (ej. "3" o "3φ"), cliente (ej. "Afinia Grupo EPM"), ubicacion (sitio/municipio), subestacion (nombre de la S/E). Si la placa no aparece o un campo falta, déjalo vacío — no inventes.`;
+IDENTIDAD DE LA UNIDAD (objeto "unidad"): lee la PLACA DE CARACTERÍSTICAS / tabla "Características principales" del transformador y extrae sus datos. fabricante (ej. "SIEMENS"), ano_fabricacion (año de fabricación de la placa, NO el de la prueba — ej. 2006), potencia (texto tal cual con unidad, ej. "5000 / 6000 kVA"), tensiones (primaria/secundaria/terciaria, ej. "34.5 / 13.8 kV"), grupo_conexion (ej. "Dyn5"), refrigeracion (ej. "ONAN / ONAF"), frecuencia (ej. "60 Hz"), fases (ej. "3" o "3φ"), cliente (ej. "Afinia Grupo EPM"), ubicacion (sitio/municipio), subestacion (nombre de la S/E). Si la placa no aparece o un campo falta, déjalo vacío — no inventes.
+
+BLOQUES GRÁFICOS (arreglo "bloques") — representación FLEXIBLE para el tablero: además de los campos canónicos de arriba (que alimentan la matriz normativa), construye un "bloque" por cada prueba graficable del informe. Cada bloque es una visualización autocontenida: titulo, unidad del eje Y, eje_x, tipo de grafica (linea para evolución por TAP/buje; barra para comparativas), una o más series (p.ej. una por fase) con TODOS sus puntos (x = posición de TAP o etiqueta; y = valor) y, si existe, su tabla de detalle TAL CUAL el informe. A diferencia de los campos canónicos (que piden la posición representativa/peor caso), aquí SÍ incluye la curva COMPLETA — todas las posiciones de TAP, todos los bujes — porque el tablero las grafica. Añade limite/guia (líneas normativas) e invertir=true cuando el límite es un MÍNIMO (ej. aislamiento ≥ 1 GΩ). Este arreglo es ADICIONAL y no debe reducir la exhaustividad de los campos canónicos. Crea bloques también para pruebas SIN campo canónico arriba (DGA, SFRA, capacitancia, DAR/PI, etc.). Si una prueba no tiene datos numéricos graficables, no le hagas bloque.`;
 
 // Fase individual con terminal real — se inlinea en cada prueba que la usa.
 const FASE_SCHEMA = {
@@ -406,6 +408,56 @@ const HERRAMIENTA_PRUEBAS = {
             }
           }
         }
+      },
+      bloques: {
+        type: 'array',
+        description: 'Representación FLEXIBLE y COMPLETA para graficar (ADR-006). Complementa — NO reemplaza — los campos canónicos de arriba: aquí va el detalle GRÁFICO íntegro de cada prueba (TODAS las posiciones de TAP, TODOS los bujes, etc.), incluso pruebas sin campo canónico (DGA, SFRA, etc.). Un bloque = una visualización (una prueba). Omite este arreglo si el informe no tiene series graficables.',
+        items: {
+          type: 'object',
+          properties: {
+            prueba: { type: ['string', 'null'], description: 'Clave de familia (ej. "excitacion", "bushing", "relacion").' },
+            titulo: { type: 'string', description: 'Título visible del bloque (obligatorio).' },
+            unidad: { type: ['string', 'null'], description: 'Unidad del eje Y, ej. "mA" | "GΩ" | "pF" | "%".' },
+            eje_x: { type: ['string', 'null'], description: 'Etiqueta del eje X, ej. "Posición del TAP" | "Buje".' },
+            grafica: { type: ['string', 'null'], enum: ['linea', 'barra', 'dispersion', null], description: 'Tipo de gráfica (línea para curvas por TAP; barra para comparativas).' },
+            series: {
+              type: 'array',
+              description: 'Una serie por curva/grupo (ej. una por fase A/B/C).',
+              items: {
+                type: 'object',
+                properties: {
+                  nombre: { type: ['string', 'null'], description: 'Ej. "Fase A".' },
+                  color: { type: ['string', 'null'], description: 'Opcional; el render asigna paleta si falta.' },
+                  puntos: {
+                    type: 'array',
+                    description: 'Puntos (x,y). x puede ser número (TAP) o etiqueta (par de devanados).',
+                    items: {
+                      type: 'object',
+                      properties: {
+                        x: { type: ['number', 'string', 'null'] },
+                        y: { type: ['number', 'null'] }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            tabla: {
+              type: 'object',
+              description: 'Tabla de detalle genérica (texto), tal cual el informe.',
+              properties: {
+                columnas: { type: 'array', items: { type: ['string', 'null'] } },
+                filas: { type: 'array', items: { type: 'array', items: { type: ['string', 'number', 'null'] } } }
+              }
+            },
+            limite: { type: ['number', 'null'], description: 'Línea roja: límite normativo.' },
+            guia: { type: ['number', 'null'], description: 'Línea ámbar: valor guía.' },
+            invertir: { type: ['boolean', 'null'], description: 'true si el límite es MÍNIMO (ej. aislamiento ≥ 1 GΩ).' },
+            calif: { type: ['string', 'null'], description: 'Calificación global del bloque.' },
+            observaciones: { type: ['string', 'null'], description: 'Narrativa del laboratorio (para callout).' }
+          },
+          required: ['titulo']
+        }
       }
     },
     required: []
@@ -498,8 +550,10 @@ export const extraerPruebasElectricasIA = onCall(
     console.info('[extraerPruebasElectricasIA]', model, storagePath,
       `in=${u.input_tokens || 0} out=${u.output_tokens || 0} cacheR=${u.cache_read_input_tokens || 0} cacheW=${u.cache_creation_input_tokens || 0}`);
 
+    const entrada = toolBlock.input || {};
     return {
-      mediciones: toolBlock.input,
+      mediciones: entrada,
+      bloques: Array.isArray(entrada.bloques) ? entrada.bloques : [],
       modelUsed: model,
       usage: {
         input: u.input_tokens || 0,
