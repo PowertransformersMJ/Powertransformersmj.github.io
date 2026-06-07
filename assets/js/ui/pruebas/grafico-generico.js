@@ -435,9 +435,9 @@ export function renderBloque(bloque) {
 
   // Gráfica principal (subtítulo "qué muestra/qué evalúa" + chips de filtro + SVG).
   const ejeLabel = bloque.eje_x || 'posición';
-  const magnitud = bloque.unidad ? `valores (${bloque.unidad})` : 'valores';
+  const magnitud = bloque.unidad ? `Valores (${bloque.unidad})` : 'Valores';
   card.appendChild(chartCap(
-    `Medición por fase · ${magnitud} vs ${ejeLabel}`,
+    `${magnitud} vs ${ejeLabel}`,
     evaluaPrincipal(bloque) || 'Evalúa la tendencia y la simetría entre fases.'
   ));
   card.appendChild(montarGrafica(bloque));
