@@ -207,27 +207,53 @@ function tablaDeSeries(bloque) {
   return { columnas, filas };
 }
 
-/* ─── Bloque derivado: desviación (desbalance) entre fases por categoría ─── */
-// En cada x (TAP) calcula Δ% = (max−min)/|prom| × 100 entre las fases. Es la
-// lectura "más allá del informe": muestra el desbalance contra su límite
-// normativo (bloque.limite_desbalance). Requiere ≥2 series (fases).
+/* ─── Bloque derivado: desviación entre fases por categoría (TAP) ─── */
+// La semántica del desbalance DIFIERE por prueba (física del transformador):
+//  · EXCITACIÓN: la fase central es naturalmente MENOR (núcleo de 3 columnas);
+//    el criterio IEEE compara las DOS corrientes más altas (laterales) → 1 línea.
+//  · RELACIÓN / RESISTENCIA: las 3 fases deben ser iguales → se grafica la
+//    desviación de CADA fase respecto al promedio entre fases (3 líneas) contra
+//    la banda ±límite, para ver cuál fase se aparta y en qué TAP.
 function bloqueDesviacion(bloque) {
   const series = bloque.series || [];
   const { cats } = ejeX(series);
   const mapas = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.y])));
-  const puntos = cats.map((c) => {
-    const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null);
-    if (vals.length < 2) return null;
-    const mx = Math.max(...vals), mn = Math.min(...vals);
-    const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
-    const d = prom ? ((mx - mn) / Math.abs(prom)) * 100 : null;
-    return d == null ? null : { x: c, y: +d.toFixed(3) };
-  }).filter(Boolean);
+  const lim = bloque.limite_desbalance;
+
+  if (bloque.prueba === 'excitacion') {
+    const puntos = cats.map((c) => {
+      const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null).sort((a, b) => b - a);
+      if (vals.length < 2 || !vals[1]) return null;
+      return { x: c, y: +(((vals[0] - vals[1]) / Math.abs(vals[1])) * 100).toFixed(3) };
+    }).filter(Boolean);
+    return {
+      titulo: 'Desviación entre fases laterales por TAP (%)',
+      unidad: '%', eje_x: bloque.eje_x, grafica: 'linea', limite: lim,
+      series: [{ nombre: 'Δ dos fases mayores', puntos }]
+    };
+  }
+
+  // Desviación de cada fase vs el promedio entre fases, por TAP.
+  const devSeries = series.map((s, si) => {
+    const puntos = cats.map((c) => {
+      const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null);
+      const v = mapas[si].get(String(c));
+      if (v == null || vals.length < 2) return null;
+      const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
+      if (!prom) return null;
+      const pt = { x: c, y: +(((v - prom) / Math.abs(prom)) * 100).toFixed(3) };
+      const orig = (s.puntos || []).find((pp) => String(pp.x) === String(c));
+      if (orig && orig.verificar) pt.verificar = true;
+      return pt;
+    }).filter(Boolean);
+    return { nombre: s.nombre, color: s.color, puntos };
+  });
   return {
-    titulo: 'Desviación entre fases por TAP (%)',
+    titulo: 'Desviación de cada fase por TAP (%)',
     unidad: '%', eje_x: bloque.eje_x, grafica: 'linea',
-    limite: bloque.limite_desbalance,
-    series: [{ nombre: 'Δ entre fases', puntos }]
+    limite: lim != null ? lim : null,
+    guia: lim != null ? -lim : null,   // banda ±límite
+    series: devSeries
   };
 }
 
@@ -318,13 +344,14 @@ export function renderBloque(bloque) {
   // (el desbalance es inherentemente entre todas las fases).
   if (filtrable && bloque.limite_desbalance != null) {
     const dev = bloqueDesviacion(bloque);
-    if (dev.series[0].puntos.length) {
+    if (dev.series.some((s) => s.puntos.length)) {
       const svg = svgBloque(dev);
       if (svg) {
         const cap = document.createElement('div');
         cap.className = 'muted small';
         cap.style.cssText = 'margin:10px 0 4px';
-        cap.textContent = `Desviación entre fases por TAP — criterio ≤ ${dev.limite}%`;
+        const crit = dev.guia != null ? `±${bloque.limite_desbalance}%` : `≤ ${bloque.limite_desbalance}%`;
+        cap.textContent = `${dev.titulo} — criterio ${crit}`;
         const box = document.createElement('div');
         box.className = 'chartbox';
         box.appendChild(svg);
