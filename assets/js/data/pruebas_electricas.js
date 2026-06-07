@@ -261,16 +261,23 @@ export async function guardarBloques(unidadId, informeId, bloquesRaw, diag) {
   if (!unidadId || !informeId) throw new Error('Falta unidadId o informeId.');
   const limpio = sanitizarBloques(bloquesRaw);
   const d = diag || {};
-  const payload = deepClean({
+  // Firestore NO admite arrays anidados (L-30), y `bloques[].tabla.filas` es
+  // array de arrays. Se serializa TODO el diagnóstico a un string JSON en un
+  // solo campo → inmune a arrays anidados/undefined, y sigue en Firestore (sin
+  // CORS). El render lo re-parsea a la lectura.
+  const payload = {
     schema_version: limpio.schema_version,
     bloques: limpio.bloques,
     modelo: d.modelo || null,
     usage: d.usage || null,
     resumen: d.resumen || null,
-    mediciones_raw: d.mediciones_raw || null,
+    mediciones_raw: d.mediciones_raw || null
+  };
+  await setDoc(diagRef(unidadId, informeId), {
+    payload: JSON.stringify(payload),
+    n_bloques: limpio.bloques.length,
     ts: serverTimestamp()
   });
-  await setDoc(diagRef(unidadId, informeId), payload);
   return { count: limpio.bloques.length };
 }
 
@@ -289,13 +296,19 @@ export async function cargarBloques(unidadId, informeId) {
     const snap = await getDoc(diagRef(unidadId, informeId));
     if (!snap.exists()) return null;
     const d = snap.data() || {};
+    // Compat: payload nuevo (string JSON, L-30) o formato previo (campos sueltos).
+    let p = d;
+    if (typeof d.payload === 'string') {
+      try { p = JSON.parse(d.payload); } catch { p = {}; }
+    }
+    const limpio = sanitizarBloques(p.bloques);
     return {
-      schema_version: sanitizarBloques(d.bloques).schema_version,
-      bloques: sanitizarBloques(d.bloques).bloques,
-      modelo: d.modelo || null,
-      usage: d.usage || null,
-      resumen: d.resumen || null,
-      mediciones_raw: d.mediciones_raw || null
+      schema_version: limpio.schema_version,
+      bloques: limpio.bloques,
+      modelo: p.modelo || null,
+      usage: p.usage || null,
+      resumen: p.resumen || null,
+      mediciones_raw: p.mediciones_raw || null
     };
   } catch (err) {
     console.warn('[pruebas_electricas.cargarBloques]', err);
