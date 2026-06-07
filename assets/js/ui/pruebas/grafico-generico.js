@@ -305,49 +305,19 @@ const BADGE = (calif) => {
 };
 
 /**
- * Renderiza UN bloque como tarjeta (título + gráfica + observaciones + tabla).
- * @param {object} bloque  bloque ya sanitizado
- * @returns {HTMLElement}
+ * Monta una gráfica (chips de filtro por fase + SVG) para un bloque. El filtro
+ * por fase opera sobre series (curvas) o categorías (barras), y se aplica a
+ * CUALQUIER gráfica con fases — incluida la gráfica DERIVADA de desviación.
+ * @param {object} bloque  bloque (o sub-bloque de desviación) a graficar
+ * @returns {DocumentFragment} chips (si aplica) + chartbox
  */
-export function renderBloque(bloque) {
-  const card = document.createElement('section');
-  card.className = 'pe-bloque';
-  const norm = bloque.prueba ? `<span class="norm">${esc(bloque.prueba)}</span>` : '';
-  let html = `<h2>${esc(bloque.titulo)} ${BADGE(bloque.calif)} ${norm}</h2>`;
-  if (bloque.observaciones) {
-    // Callout de hallazgo: ámbar ("Dato a verificar") cuando la calificación o
-    // algún punto pide confirmación humana; "Análisis de la IA" si no.
-    const algunVerif = (bloque.series || []).some((s) => (s.puntos || []).some((p) => p.verificar));
-    const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
-    html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Análisis de la IA'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
-  }
-  // Criterio de evaluación VERIFICABLE: fórmula aplicada + umbral + norma
-  // (autoritativo, lo adjunta el shell desde el dominio normativo — no la IA).
-  // Permite confirmar POR QUÉ el bloque tiene su calificación.
-  const cr = bloque.criterio;
-  if (cr && (cr.formula || cr.umbral || cr.norma)) {
-    html += '<div class="pe-criterio">'
-      + (cr.formula ? `<span class="pe-cr-item"><b>Fórmula</b> ${esc(cr.formula)}</span>` : '')
-      + (cr.umbral ? `<span class="pe-cr-item"><b>Criterio</b> ${esc(cr.umbral)}</span>` : '')
-      + (cr.norma ? `<span class="pe-cr-item"><b>Norma</b> ${esc(cr.norma)}</span>` : '')
-      + '</div>';
-  }
-  html += '<div class="pe-fase-chips" data-chips></div>';
-  html += '<div class="chartbox" data-chart></div>';
-  // Tabla: la propia del bloque o, para curvas sin tabla, una derivada de las
-  // series (todos los valores por posición de TAP).
-  const tabla = (bloque.tabla && bloque.tabla.filas && bloque.tabla.filas.length)
-    ? bloque.tabla
-    : ((bloque.grafica !== 'barra') ? tablaDeSeries(bloque) : bloque.tabla);
-  html += tablaBloque(tabla);
-  card.innerHTML = html;
-
-  const chart = card.querySelector('[data-chart]');
-  const chipsBox = card.querySelector('[data-chips]');
+function montarGrafica(bloque) {
+  const frag = document.createDocumentFragment();
+  const chipsBox = document.createElement('div');
+  chipsBox.className = 'pe-fase-chips';
+  const chart = document.createElement('div');
+  chart.className = 'chartbox';
   const series = bloque.series || [];
-  // Filtro por fase en CUALQUIER gráfica con fases: en curvas la fase es la
-  // serie; en barras (bujes, resistencia MT/BT) la fase es la categoría del eje
-  // X. detectarFases() decide el modo y el render filtra en consecuencia.
   const { cats } = ejeX(series);
   const { modo, fases } = detectarFases(bloque, cats);
   const activas = new Set(fases.map((f) => f.key)); // fases visibles
@@ -387,34 +357,71 @@ export function renderBloque(bloque) {
       });
       chipsBox.appendChild(b);
     });
-  } else {
-    chipsBox.remove();
+    frag.appendChild(chipsBox);
   }
   pintar();
-  if (!chart.firstChild) chart.remove();
+  if (chart.firstChild) frag.appendChild(chart);
+  return frag;
+}
 
-  // Chart derivado de desviación entre fases (curvas por TAP con criterio de
-  // desbalance). Solo aplica al modo 'serie' (fases como curvas). Independiente
-  // del filtro (el desbalance es inherentemente entre todas las fases).
+/**
+ * Renderiza UN bloque como tarjeta (título + gráfica + observaciones + tabla).
+ * @param {object} bloque  bloque ya sanitizado
+ * @returns {HTMLElement}
+ */
+export function renderBloque(bloque) {
+  const card = document.createElement('section');
+  card.className = 'pe-bloque';
+  const norm = bloque.prueba ? `<span class="norm">${esc(bloque.prueba)}</span>` : '';
+  let html = `<h2>${esc(bloque.titulo)} ${BADGE(bloque.calif)} ${norm}</h2>`;
+  if (bloque.observaciones) {
+    // Callout de hallazgo: ámbar ("Dato a verificar") cuando la calificación o
+    // algún punto pide confirmación humana; "Análisis de la IA" si no.
+    const algunVerif = (bloque.series || []).some((s) => (s.puntos || []).some((p) => p.verificar));
+    const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
+    html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Análisis de la IA'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
+  }
+  // Criterio de evaluación VERIFICABLE: fórmula aplicada + umbral + norma
+  // (autoritativo, lo adjunta el shell desde el dominio normativo — no la IA).
+  // Permite confirmar POR QUÉ el bloque tiene su calificación.
+  const cr = bloque.criterio;
+  if (cr && (cr.formula || cr.umbral || cr.norma)) {
+    html += '<div class="pe-criterio">'
+      + (cr.formula ? `<span class="pe-cr-item"><b>Fórmula</b> ${esc(cr.formula)}</span>` : '')
+      + (cr.umbral ? `<span class="pe-cr-item"><b>Criterio</b> ${esc(cr.umbral)}</span>` : '')
+      + (cr.norma ? `<span class="pe-cr-item"><b>Norma</b> ${esc(cr.norma)}</span>` : '')
+      + '</div>';
+  }
+  card.innerHTML = html;
+
+  // Gráfica principal (chips de filtro por fase + SVG).
+  card.appendChild(montarGrafica(bloque));
+
+  // Gráfica DERIVADA de desviación entre fases (curvas por TAP con criterio de
+  // desbalance). Pasa por montarGrafica → también es filtrable por fase
+  // (relación/resistencia: 3 series de fase; excitación: 1 serie Δ, sin chips).
+  const { modo } = detectarFases(bloque, ejeX(bloque.series || []).cats);
   if (modo === 'serie' && bloque.limite_desbalance != null) {
     const dev = bloqueDesviacion(bloque);
     if (dev.series.some((s) => s.puntos.length)) {
-      const svg = svgBloque(dev);
-      if (svg) {
-        const cap = document.createElement('div');
-        cap.className = 'muted small';
-        cap.style.cssText = 'margin:10px 0 4px';
-        const crit = dev.guia != null ? `±${bloque.limite_desbalance}%` : `≤ ${bloque.limite_desbalance}%`;
-        cap.textContent = `${dev.titulo} — criterio ${crit}`;
-        const box = document.createElement('div');
-        box.className = 'chartbox';
-        box.appendChild(svg);
-        const tabla = chart.parentNode.querySelector('.tblwrap');
-        if (tabla) { card.insertBefore(cap, tabla); card.insertBefore(box, tabla); }
-        else { card.appendChild(cap); card.appendChild(box); }
-      }
+      const cap = document.createElement('div');
+      cap.className = 'muted small';
+      cap.style.cssText = 'margin:10px 0 4px';
+      const crit = dev.guia != null ? `±${bloque.limite_desbalance}%` : `≤ ${bloque.limite_desbalance}%`;
+      cap.textContent = `${dev.titulo} — criterio ${crit}`;
+      card.appendChild(cap);
+      card.appendChild(montarGrafica(dev));
     }
   }
+
+  // Tabla: la propia del bloque (la IA la transcribe COMPLETA del informe) o,
+  // para curvas sin tabla, una derivada de las series (valores por TAP).
+  const tabla = (bloque.tabla && bloque.tabla.filas && bloque.tabla.filas.length)
+    ? bloque.tabla
+    : ((bloque.grafica !== 'barra') ? tablaDeSeries(bloque) : bloque.tabla);
+  const tblHtml = tablaBloque(tabla);
+  if (tblHtml) card.insertAdjacentHTML('beforeend', tblHtml);
+
   return card;
 }
 
