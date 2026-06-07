@@ -192,10 +192,12 @@ export function derivarTablaTAP(bloque) {
       let d = null;
       if (nums.length >= 2) {
         if (bloque.prueba === 'excitacion') {
-          // Criterio IEEE: entre las DOS corrientes laterales (mayores). La fase
-          // central es naturalmente menor (núcleo de 3 columnas) → se excluye.
+          // Criterio IEEE: % entre las DOS corrientes laterales (mayores) —
+          // Δ = (I_mayor − I_2ª) / I_mayor × 100. Se divide entre la MAYOR (como
+          // el informe del laboratorio). La fase central es naturalmente menor
+          // (núcleo de 3 columnas) → se excluye del cálculo.
           const sorted = nums.slice().sort((a, b) => b - a);
-          d = sorted[1] ? ((sorted[0] - sorted[1]) / Math.abs(sorted[1])) * 100 : null;
+          d = sorted[0] ? ((sorted[0] - sorted[1]) / Math.abs(sorted[0])) * 100 : null;
         } else {
           // Relación / resistencia: máxima desviación de una fase vs el promedio.
           const prom = nums.reduce((a, b) => a + b, 0) / nums.length;
