@@ -29,7 +29,8 @@ import {
   descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques
 } from './data/pruebas_electricas.js';
 import {
-  sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE
+  sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE,
+  minNetaGohm, kvAT
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
@@ -85,10 +86,12 @@ function desbalanceDe(prueba) {
   return null;
 }
 // Enriquece cada bloque (copia superficial; no muta el cache): adjunta el
-// `criterio` verificable y, si la IA no lo dio, el `limite_desbalance` normativo
-// del dominio (para la gráfica de desviación + la columna Evaluación derivada).
-function conCriterios(data) {
+// `criterio` verificable, el `limite_desbalance` normativo del dominio (si la IA
+// no lo dio) y, para aislamiento, el mínimo NETA por CLASE DE TENSIÓN (no el
+// genérico ≥1 GΩ): a 110 kV el mínimo son decenas de GΩ → recalifica "pobre".
+function conCriterios(data, kv) {
   const bloques = (data && data.bloques) || [];
+  const minNeta = minNetaGohm(kv);
   return {
     ...data,
     bloques: bloques.map((b) => {
@@ -100,9 +103,22 @@ function conCriterios(data) {
         const u = desbalanceDe(b.prueba);
         if (u != null) out.limite_desbalance = u;
       }
+      // Aislamiento (bloque en GΩ): límite = mínimo NETA de la clase de tensión.
+      if (minNeta != null && norm(b.prueba).includes('aisl') && /g\s*Ω|gohm/i.test(b.unidad || '')) {
+        out.limite = minNeta;
+        out.invertir = true; // el límite es un MÍNIMO (mayor es mejor)
+        const ys = (b.series || []).flatMap((s) => (s.puntos || []).map((p) => p.y)).filter((v) => v != null);
+        const peor = ys.length ? Math.min(...ys) : null;
+        if (peor != null && peor < minNeta) out.calif = 'investigar'; // por debajo de NETA → pobre
+      }
       return out;
     })
   };
+}
+// Tensión AT (kV) de la unidad activa, para el mínimo NETA de aislamiento.
+function kvUnidadActiva() {
+  const u = state.unidadActiva || {};
+  return kvAT(u.tensiones || (u.identidad && u.identidad.tensiones));
 }
 
 /* ─── Seed: unidad + 3 informes base (datos reales históricos) ─── */
@@ -363,7 +379,7 @@ function renderTendenciaUI(informes) {
     ? `<p class="muted small">Solo hay ${n} informe cargado para esta unidad: cada gráfica muestra un punto. Carga informes de otras fechas para trazar la tendencia y revelar degradación.</p>`
     : `<p class="muted small">${n} informes en el tiempo · una línea por ensayo contra su umbral normativo.</p>`;
   cont.innerHTML = aviso + '<div id="tendencia-bloques"></div>';
-  mountBloques($('tendencia-bloques'), conCriterios({ bloques }));
+  mountBloques($('tendencia-bloques'), conCriterios({ bloques }, kvUnidadActiva()));
 }
 
 function renderInformesUI(informes) {
@@ -447,7 +463,7 @@ async function montarBloques(unidadId, informes) {
     grupo.appendChild(h);
     if (tieneBloques) {
       const box = document.createElement('div');
-      mountBloques(box, conCriterios(data));
+      mountBloques(box, conCriterios(data, kvUnidadActiva()));
       grupo.appendChild(box);
     } else {
       const vacio = document.createElement('p');
@@ -475,7 +491,11 @@ async function montarBloques(unidadId, informes) {
     const d = state.bloquesCache.get(inf.id);
     return d && d.bloques && d.bloques.length;
   });
-  if (vigente && reales.length <= 1) renderScorecard($('matrix'), state.bloquesCache.get(vigente.id), vigente);
+  if (vigente && reales.length <= 1) {
+    // Enriquecido (no crudo) para que el scorecard refleje la recalificación
+    // normativa — p.ej. aislamiento "pobre" por debajo del mínimo NETA.
+    renderScorecard($('matrix'), conCriterios(state.bloquesCache.get(vigente.id), kvUnidadActiva()), vigente);
+  }
 }
 
 // Tira de metadata del informe (ensayo, ejecutante, instrumento, fecha).
