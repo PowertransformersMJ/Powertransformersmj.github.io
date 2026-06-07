@@ -287,6 +287,17 @@
 .pe-scope .callout .ttl{font-family:var(--pe-mono);font-size:.7rem;letter-spacing:.06em;text-transform:uppercase;color:var(--pe-teal);margin-bottom:6px;}
 .pe-scope .callout.warn .ttl{color:var(--pe-orange);}
 
+/* narrativa de tendencia (F3): lectura en prosa generada por IA, on-demand */
+.pe-scope .pe-narrativa{margin:18px 0;padding:14px 18px;border:1px solid var(--pe-border);border-left:3px solid var(--pe-teal);border-radius:10px;background:var(--pe-surface);box-shadow:var(--pe-shadow);}
+.pe-scope .pe-narrativa-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;}
+.pe-scope .pe-narrativa-head h4{margin:0;font-size:.95rem;}
+.pe-scope .pe-narrativa-head .norm{font-family:var(--pe-mono);font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;margin-left:6px;}
+.pe-scope #narrativa-cont{font-size:.9rem;line-height:1.5;color:var(--pe-ink,#2b3a48);}
+.pe-scope #narrativa-cont p{margin:0 0 8px;}
+.pe-scope #narrativa-cont ul{margin:0 0 8px;padding-left:20px;}
+.pe-scope #narrativa-cont li{margin:2px 0;}
+.pe-scope #narrativa-cont strong{color:var(--pe-navy-2,var(--pe-ink));}
+
 /* criterio de evaluación verificable (fórmula + umbral + norma · autoritativo) */
 .pe-scope .pe-criterio{display:flex;flex-wrap:wrap;gap:6px 18px;margin:0 0 12px;padding:9px 14px;border:1px dashed var(--pe-border);border-radius:9px;background:var(--pe-surface-2,var(--pe-surface));font-size:.78rem;color:var(--pe-muted);}
 .pe-scope .pe-cr-item{display:inline-flex;gap:6px;align-items:baseline;}
