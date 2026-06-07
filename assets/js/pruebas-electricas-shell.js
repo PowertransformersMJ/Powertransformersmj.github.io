@@ -36,6 +36,7 @@ import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
 import { ESTADOS } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
+import { bloquesTendencia } from './domain/pruebas_electricas_tendencia.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
 const state = {
@@ -340,6 +341,30 @@ function esAdmin() {
   return !!(s && (s.role === 'admin' || (s.profile && s.profile.rol === 'admin')));
 }
 
+// Tendencia temporal (pestaña "Tendencia"): una gráfica por métrica clave, su
+// evolución a lo largo de los informes del transformador vs su umbral. Reusa el
+// render genérico de bloques. Determinista (campos canónicos, no IA).
+function renderTendenciaUI(informes) {
+  const cont = $('tendencia-cont');
+  if (!cont) return;
+  const docs = (informes || []).filter(Boolean);
+  if (!docs.length) {
+    cont.innerHTML = '<p class="muted small">Selecciona un libro para ver su tendencia.</p>';
+    return;
+  }
+  const bloques = bloquesTendencia(docs);
+  if (!bloques.length) {
+    cont.innerHTML = '<p class="muted small">Sin métricas tendenciables en los informes de esta unidad.</p>';
+    return;
+  }
+  const n = docs.length;
+  const aviso = n < 2
+    ? `<p class="muted small">Solo hay ${n} informe cargado para esta unidad: cada gráfica muestra un punto. Carga informes de otras fechas para trazar la tendencia y revelar degradación.</p>`
+    : `<p class="muted small">${n} informes en el tiempo · una línea por ensayo contra su umbral normativo.</p>`;
+  cont.innerHTML = aviso + '<div id="tendencia-bloques"></div>';
+  mountBloques($('tendencia-bloques'), conCriterios({ bloques }));
+}
+
 function renderInformesUI(informes) {
   state.informes = informes || [];
   const u = state.unidadActiva || {};
@@ -350,6 +375,10 @@ function renderInformesUI(informes) {
   // errores de mapeo rígido — ADR-007 / rediseño). Las secciones de detalle
   // rígidas se retiraron: el cuerpo del informe son los bloques.
   renderMatriz($('matrix'), state.informes);
+
+  // Tendencia temporal (multi-informe): evolución de la métrica clave de cada
+  // prueba vs su umbral. Determinista desde los campos canónicos (no IA).
+  renderTendenciaUI(state.informes);
 
   // Historial + KPI de conteo
   renderInformes($('reportlist'), state.informes, {

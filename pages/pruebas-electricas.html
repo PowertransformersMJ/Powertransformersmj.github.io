@@ -75,6 +75,9 @@
       <button type="button" role="tab" data-tab="tablero" aria-selected="false">
         <span class="i"><i data-lucide="layout-dashboard"></i></span>Tablero
       </button>
+      <button type="button" role="tab" data-tab="tendencia" aria-selected="false">
+        <span class="i"><i data-lucide="trending-up"></i></span>Tendencia
+      </button>
       <button type="button" role="tab" data-tab="informes" aria-selected="false">
         <span class="i"><i data-lucide="files"></i></span>Informes cargados
       </button>
@@ -187,6 +190,17 @@
           </section>
         </div><!-- /.pe-scope -->
       </div><!-- /[data-tab-panel=informes] -->
+
+      <!-- ===== Panel: Tendencia temporal (multi-informe) ===== -->
+      <div role="tabpanel" data-tab-panel="tendencia" hidden>
+        <div class="pe-scope">
+          <section id="tendencia">
+            <h2>Tendencia en el tiempo <span class="norm">evolución por ensayo</span></h2>
+            <p class="muted small">Evolución de la métrica clave de cada prueba a lo largo de los informes del transformador, contra su umbral normativo. Con un solo informe verás un punto; al cargar más informes (de distintas fechas) se traza la tendencia y se revela cualquier degradación.</p>
+            <div id="tendencia-cont"><p class="muted small">Selecciona un libro para ver su tendencia.</p></div>
+          </section>
+        </div><!-- /.pe-scope -->
+      </div><!-- /[data-tab-panel=tendencia] -->
 
     </div><!-- /.tab-panels -->
   </div><!-- /.sgm-tabs -->
