@@ -352,11 +352,15 @@ function sanitizarCollar(input) {
   }).filter((b) => b.buje) : [];
   let max_mw = num(src.max_mw);
   if (max_mw == null && bujes.length) {
-    max_mw = bujes.reduce((mx, b) => (b.mw != null && b.mw > mx) ? b.mw : mx, 0);
+    // Solo derivar max_mw si AL MENOS un buje trae mw real. Antes el reduce
+    // arrancaba en 0 → con bujes sin mw (informe sin hot-collar, p.ej. PF C1)
+    // devolvía 0 → "OK" falso. Sin mw real, max_mw queda null → n/d.
+    const conMw = bujes.filter((b) => b.mw != null);
+    max_mw = conMw.length ? conMw.reduce((mx, b) => (b.mw > mx ? b.mw : mx), 0) : null;
   }
   return {
     max_mw,
-    calif: str(src.calif) || calificarCollar(max_mw),
+    calif: str(src.calif) || (max_mw != null ? calificarCollar(max_mw) : ''),
     bujes
   };
 }
