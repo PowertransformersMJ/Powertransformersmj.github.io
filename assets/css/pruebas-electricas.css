@@ -279,6 +279,15 @@
 .pe-scope #bloques-cont .pe-bloque-grupo > h3{font-family:var(--pe-mono);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);margin:0 0 8px;}
 .pe-scope .pe-bloque{border:1px solid var(--pe-border);border-radius:12px;background:var(--pe-surface);box-shadow:var(--pe-shadow);padding:16px 18px;margin:12px 0;}
 .pe-scope .pe-bloque > h2{font-size:1rem;margin:0 0 10px;}
+/* panel diagnóstico (interpretación cruda IA · admin, ADR-007) */
+.pe-scope .pe-diag{border:1px dashed var(--pe-border);border-radius:10px;background:var(--pe-surface);margin:10px 0;padding:6px 12px;}
+.pe-scope .pe-diag > summary{cursor:pointer;font-family:var(--pe-mono);font-size:.72rem;color:var(--pe-muted);letter-spacing:.03em;}
+.pe-scope .pe-diag-chips{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0;}
+.pe-scope .pe-diag-chip{font-family:var(--pe-mono);font-size:.68rem;padding:2px 8px;border-radius:999px;background:rgba(31,122,77,.10);color:#1f7a4d;}
+.pe-scope .pe-diag-chip.is-zero{background:rgba(192,57,43,.10);color:var(--pe-red);}
+.pe-scope .pe-diag-bar{margin:6px 0;}
+.pe-scope .btn-sm{padding:4px 10px;font-size:.72rem;}
+.pe-scope .pe-diag-json{max-height:340px;overflow:auto;background:#0d1b2a;color:#cfe3f5;border-radius:8px;padding:12px;font-family:var(--pe-mono);font-size:.7rem;line-height:1.45;white-space:pre;}
 
 /* charts */
 .pe-scope .chartbox{background:var(--pe-surface);border:1px solid var(--pe-border);border-radius:12px;box-shadow:var(--pe-shadow);padding:18px 18px 10px;margin:14px 0;}

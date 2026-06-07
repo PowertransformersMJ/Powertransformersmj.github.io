@@ -146,3 +146,26 @@
 **6.6 Archivos** — *Nuevos*: `assets/js/domain/pruebas_electricas_bloques.js`, `assets/js/ui/pruebas/grafico-generico.js`, `tests/pruebas_electricas_bloques.test.js`. *Pendientes (Fase 2/3)*: `functions/index.js` (tool + Storage JSON), `data/pruebas_electricas.js` (cargar/guardar bloques), `pages/pruebas-electricas.html` + shell (sección + lazy load), `storage.rules` (si aplica).
 
 **6.7 Doctrina + evolución** — Decisión Fuerte (Trigger 🛰️) aprobada por el director. **Evolución documentada**: migrar la extracción de `onCall` a **trigger por evento de Storage** (upload PDF → onFinalize → extrae → escribe resumen+JSON → cliente lo ve por `onSnapshot`) para desacoplar carga↔extracción y sobrevivir desconexiones; diseñado, no forzado hoy. Sin cache bump (no aplica §4).
+
+---
+
+## 7. ADR-007 — Subsistema de diagnóstico de extracción + bloques a Firestore (revisión de ADR-006 §6.2)
+
+> Director (2026-06-06): *"tú eres ciego a las interpretaciones que da la api de Claude… diseña algo para almacenar la interpretación del análisis del PDF vs lo que se grafica y lo que yo te muestro… seguimos gastando dinero sin soluciones."*
+
+**7.1 Causa raíz** — Dos fallos descubiertos validando E2E (informe real Applus 22 págs, SIEMENS 266762): (a) **los bloques no se mostraban** — `cargarBloques` leía el JSON de Storage con `getBytes`, pero el bucket `firebasestorage.app` NO tiene CORS para el origen GitHub Pages → el navegador bloquea TODA lectura (la escritura sí pasa). La decisión "Storage JSON" de ADR-006 §6.2 era inviable para lectura desde browser. (b) **Ceguera de observabilidad**: la interpretación cruda de Claude (tool output) era efímera (solo se logueaban tokens) → imposible saber QUÉ interpretó vs qué se graficó → se iteraba a ciegas quemando dinero de API.
+
+**7.2 Decisiones de arquitectura** —
+- **Bloques + interpretación cruda a Firestore, NO Storage** (revisa ADR-006 §6.2): subcolección **perezosa** `/pruebas_electricas/{unidadId}/informes/{informeId}/diagnostico/ia`. La suscripción viva consulta la colección `informes`, NO la subcolección → **no infla la matriz** (igual objetivo que ADR-006, pero **sin CORS**: Firestore usa otro transporte). Se lee solo al abrir el análisis (`getDoc`). Riesgo 1 MiB/doc acotado por los `LIMITES` del dominio.
+- **Captura cruda server-side (des-ciega a Claude Code)**: la función loguea `[IA-DIAG]` (JSON estructurado: modelo, stop_reason, usage, **resumen de conteos** por prueba/bloque, `mediciones_raw`, `bloques_raw`; cap ~200 KB) a Cloud Logging → legible con `firebase functions:log` SIN re-correr la IA (coste 0). El `resumen` revela de un vistazo si la IA soltó pruebas.
+- **Panel admin "Interpretación de la IA"** en el tablero: chips de conteos + tokens + JSON crudo colapsable + "Copiar JSON". El triángulo de comparación: PDF (lo lee Claude Code) ↔ interpretación (`[IA-DIAG]`/export) ↔ render (screenshots del director).
+
+**7.3 No-regresión** — Aditivo salvo el cambio de persistencia (Storage→Firestore): `guardar/cargarBloques` mantienen firma (cargar gana campos `modelo/usage/resumen/mediciones_raw`); `montarBloques` sigue pintando `data.bloques`. Limpieza explícita del doc `diagnostico/ia` en `eliminarInforme`/`eliminarUnidad` (Firestore no cascadea). IDs/funciones exportadas intactos. Informes viejos con JSON en Storage (era DB5) quedan ilegibles por CORS igual → no se migran; si se requiere, re-extraer.
+
+**7.4 Tests / verificación** — `node --test` 997/997 (sin nuevos tests de dominio; la lógica nueva es I/O Firestore + DOM, no unit-testeable sin Firebase, consistente con la capa de datos). `node --check` en función/data/shell. lint HTML OK. Función + `firestore.rules` desplegadas (southamerica-east1). **Pendiente**: 1 corrida E2E para validar el triángulo.
+
+**7.5 Anti-patterns evitados** — NO seguir iterando a ciegas (se construye observabilidad ANTES de la próxima corrida paga). NO configurar CORS del bucket (más superficie/operación) cuando Firestore resuelve lectura sin CORS y co-localiza el diagnóstico. NO inflar el doc del informe (subcolección perezosa). NO confiar ciego en el LLM (se sigue sanitizando con `LIMITES`).
+
+**7.6 Archivos** — *Modificados*: `functions/index.js` (resumen + log `[IA-DIAG]` + return `diagnostico`; antes: timeout 540s/1GiB L-27 + tool `bloques`/`verificar`), `assets/js/data/pruebas_electricas.js` (`guardar/cargarBloques`→Firestore + limpieza), `assets/js/pruebas-electricas-shell.js` (pasa `diag` + `panelDiagnostico` admin), `assets/css/pruebas-electricas.css` (`.pe-diag*`), `firestore.rules` (subcolección `diagnostico`). *Intactos*: dominio `bloques` + render genérico.
+
+**7.7 Doctrina + evolución** — Decisión Fuerte (Trigger 🛰️) aprobada por el director. Lecciones: **L-29** (Storage CORS → Firestore para datos leídos por el browser). **Open follow-up (siguiente sesión)**: con el diagnóstico ya capturando el crudo, atacar la **extracción incompleta** (el informe real solo extrajo tan δ; el resto de pruebas vacías pese a auto+thinking+effort+540s — el `[IA-DIAG]` dirá si es prompt, modelo o token budget). Sin cache bump (no aplica §4).

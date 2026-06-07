@@ -556,16 +556,51 @@ export const extraerPruebasElectricasIA = onCall(
       `in=${u.input_tokens || 0} out=${u.output_tokens || 0} cacheR=${u.cache_read_input_tokens || 0} cacheW=${u.cache_creation_input_tokens || 0}`);
 
     const entrada = toolBlock.input || {};
+    const bloquesRaw = Array.isArray(entrada.bloques) ? entrada.bloques : [];
+    const usage = {
+      input: u.input_tokens || 0,
+      output: u.output_tokens || 0,
+      cache_read: u.cache_read_input_tokens || 0,
+      cache_write: u.cache_creation_input_tokens || 0
+    };
+
+    // ── Diagnóstico de extracción (ADR-007) ──
+    // Resumen de conteos: de un vistazo revela si la IA soltó pruebas
+    // (todos en 0 salvo n_tand = el bug de extracción incompleta).
+    const resumen = {
+      n_tand:             (entrada.tand || []).length,
+      n_excitacion_fases: ((entrada.excitacion || {}).fases || []).length,
+      n_relacion:         (entrada.relacion || []).length,
+      n_resistencia:      (entrada.resistencia || []).length,
+      n_aislamiento:      (entrada.aislamiento || []).length,
+      n_bujes:            ((entrada.collar || {}).bujes || []).length,
+      drm:                !!(entrada.drm && ((entrada.drm.transiciones || []).length || entrada.drm.tiempo_min_ms != null || entrada.drm.conmutador)),
+      n_bloques:          bloquesRaw.length,
+      n_series:           bloquesRaw.reduce((a, b) => a + ((b && b.series) || []).length, 0),
+      n_puntos:           bloquesRaw.reduce((a, b) => a + ((b && b.series) || []).reduce((s, se) => s + ((se && se.puntos) || []).length, 0), 0)
+    };
+    const diagnostico = { modelo: model, stop_reason: message.stop_reason || null, usage, resumen };
+
+    // Log estructurado [IA-DIAG] → legible con `firebase functions:log` para
+    // depurar QUÉ interpretó Claude vs el PDF, SIN re-correr la IA (coste 0).
+    // Cap por el límite de tamaño de entrada de log (~256 KB): si el crudo es
+    // grande, se loguea sin bloques_raw (resumen + canónicos bastan).
+    try {
+      const full = JSON.stringify({ ...diagnostico, mediciones_raw: entrada, bloques_raw: bloquesRaw });
+      const safe = full.length > 200000
+        ? JSON.stringify({ ...diagnostico, mediciones_raw: entrada, bloques_raw: `[truncado: ${bloquesRaw.length} bloques]` })
+        : full;
+      console.info('[IA-DIAG]', safe);
+    } catch (e) {
+      console.warn('[IA-DIAG] no se pudo serializar el diagnóstico:', e && e.message);
+    }
+
     return {
       mediciones: entrada,
-      bloques: Array.isArray(entrada.bloques) ? entrada.bloques : [],
+      bloques: bloquesRaw,
       modelUsed: model,
-      usage: {
-        input: u.input_tokens || 0,
-        output: u.output_tokens || 0,
-        cache_read: u.cache_read_input_tokens || 0,
-        cache_write: u.cache_creation_input_tokens || 0
-      }
+      usage,
+      diagnostico
     };
   }
 );
