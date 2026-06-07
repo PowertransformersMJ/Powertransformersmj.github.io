@@ -106,7 +106,7 @@ export function sanitizarBloque(b) {
     limite_desbalance: num(src.limite_desbalance), // criterio de desbalance entre fases (%)
     invertir:      src.invertir === true,   // límite es MÍNIMO (p.ej. aislamiento ≥1 GΩ)
     calif:         str(src.calif, 40),      // calificación global del bloque
-    observaciones: str(src.observaciones)   // narrativa del laboratorio (para callout)
+    observaciones: str(src.observaciones, 1200) // análisis crítico de la IA (cap amplio: el tope TXT de 240 lo cortaba a media frase)
   };
 }
 
