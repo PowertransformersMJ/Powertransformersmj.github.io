@@ -770,7 +770,28 @@ function sincronizarSeleccion() {
   seleccionarUnidad(actual || null);
 }
 
+// Llena la tabla "Criterios de calificación" (Ensayo|Fórmula|Criterio|Norma)
+// desde el dominio normativo (CRITERIOS_NORMA) — fuente única, no HTML estático.
+function renderCriteriosNorma() {
+  const tb = $('criterios-norma-tbody');
+  if (!tb) return;
+  const LABELS = {
+    tand: 'Tangente δ / FP', bushing: 'Factor de potencia de bujes (C1)',
+    excitacion: 'Corriente de excitación', relacion: 'Relación de transformación',
+    resistencia: 'Resistencia de devanados', aislamiento: 'Resistencia de aislamiento',
+    collar: 'Collar caliente', drm: 'DRM · conmutador (OLTC)'
+  };
+  const orden = ['tand', 'bushing', 'excitacion', 'relacion', 'resistencia', 'aislamiento', 'collar', 'drm'];
+  const filas = orden.filter((k) => CRITERIOS_NORMA[k]).map((k) => {
+    const c = CRITERIOS_NORMA[k];
+    return `<tr><td>${esc(LABELS[k] || k)}</td><td class="muted small">${esc(c.formula || '—')}</td>`
+      + `<td>${esc(c.umbral || '—')}</td><td class="muted small">${esc(c.norma || '—')}</td></tr>`;
+  }).join('');
+  tb.innerHTML = filas || '<tr><td colspan="4" class="muted small">Sin criterios.</td></tr>';
+}
+
 function arrancar() {
+  renderCriteriosNorma();
   const rl = $('reportlist');
   if (rl) rl.addEventListener('click', onClickReportlist);
   const pg = $('parque-grid');

@@ -44,3 +44,8 @@ storage-debug.log*
 ui-debug.log*
 *-debug.log
 .runtimeconfig.json
+
+# Informes de cliente para consulta local (NO publicar en GitHub Pages — confidencial AFINIA)
+# Carpetas de referencia por serial (450108, etc.). Quedan en disco para que Claude
+# las consulte, pero NO se commitean (el user-page es público).
+450108/
