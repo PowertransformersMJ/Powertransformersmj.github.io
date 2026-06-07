@@ -4,7 +4,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bloquesTendencia, METRICAS_TENDENCIA } from '../assets/js/domain/pruebas_electricas_tendencia.js';
+import { bloquesTendencia, METRICAS_TENDENCIA, resumenTendenciaParaIA } from '../assets/js/domain/pruebas_electricas_tendencia.js';
 
 // Dos informes del mismo transformador en años distintos (la tan δ empeora).
 const INFORMES = [
@@ -71,5 +71,31 @@ describe('bloquesTendencia · agregación temporal por métrica', () => {
   test('sin informes → []', () => {
     assert.deepEqual(bloquesTendencia([]), []);
     assert.deepEqual(bloquesTendencia(null), []);
+  });
+});
+
+describe('resumenTendenciaParaIA (F3 · payload compacto para la IA)', () => {
+  test('arma una entrada por métrica con umbral, dirección y serie {x,y}', () => {
+    const r = resumenTendenciaParaIA(INFORMES);
+    assert.ok(r.length, 'debe haber métricas');
+    const tand = r.find((m) => /Tangente/i.test(m.metrica));
+    assert.ok(tand, 'incluye tan δ');
+    assert.equal(tand.unidad, '%');
+    assert.equal(tand.limite, 1);
+    assert.equal(tand.invertir, false);
+    assert.deepEqual(tand.puntos.map((p) => p.x), [2023, 2025]);
+    const ais = r.find((m) => /Aislamiento/i.test(m.metrica));
+    assert.equal(ais.invertir, true); // el límite es un mínimo
+  });
+  test('quita el prefijo "Tendencia —" del nombre de la métrica', () => {
+    const r = resumenTendenciaParaIA(INFORMES);
+    assert.ok(r.every((m) => !/^Tendencia/.test(m.metrica)));
+  });
+  test('un solo informe → [] (no hay evolución que narrar)', () => {
+    assert.deepEqual(resumenTendenciaParaIA([INFORMES[0]]), []);
+  });
+  test('sin informes → []', () => {
+    assert.deepEqual(resumenTendenciaParaIA([]), []);
+    assert.deepEqual(resumenTendenciaParaIA(null), []);
   });
 });

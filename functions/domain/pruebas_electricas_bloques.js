@@ -169,6 +169,11 @@ export function derivarTablaTAP(bloque) {
     if (!ek.has(k)) { ek.add(k); extraKeys.push(k); }
   }
 
+  // Clave `extra` que YA es la desviación reportada por el informe (p.ej. "%DIF"
+  // en relación = desviación vs placa). Si existe, la columna Desv. la usa en vez
+  // de derivarla vs promedio (consistente con la gráfica de desviación).
+  const devKey = extraKeys.find((k) => /%?\s*dif|desviaci|\bdesv\b/i.test(k)) || null;
+
   const esMultiFase = series.length >= 2;
   const lim = num(bloque.limite_desbalance);
   const addDesv = esMultiFase;
@@ -190,7 +195,17 @@ export function derivarTablaTAP(bloque) {
     if (addDesv) {
       const nums = vals.filter((v) => v != null);
       let d = null;
-      if (nums.length >= 2) {
+      if (devKey) {
+        // El informe ya reporta la desviación por fila (%DIF vs placa): el peor
+        // caso entre fases (mayor magnitud, conservando el signo) define la celda.
+        let worst = null;
+        for (let si = 0; si < series.length; si++) {
+          const ex = mapEx[si].get(key);
+          const dv = ex && typeof ex[devKey] === 'number' ? ex[devKey] : null;
+          if (dv != null && (worst == null || Math.abs(dv) > Math.abs(worst))) worst = dv;
+        }
+        d = worst;
+      } else if (nums.length >= 2) {
         if (bloque.prueba === 'excitacion') {
           // Criterio IEEE: % entre las DOS corrientes laterales (mayores) —
           // Δ = (I_mayor − I_2ª) / I_mayor × 100. Se divide entre la MAYOR (como
