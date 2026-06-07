@@ -279,6 +279,13 @@
 .pe-scope #bloques-cont .pe-bloque-grupo > h3{font-family:var(--pe-mono);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);margin:0 0 8px;}
 .pe-scope .pe-bloque{border:1px solid var(--pe-border);border-radius:12px;background:var(--pe-surface);box-shadow:var(--pe-shadow);padding:16px 18px;margin:12px 0;}
 .pe-scope .pe-bloque > h2{font-size:1rem;margin:0 0 10px;}
+/* chips de filtro por fase (curvas multi-serie) */
+.pe-scope .pe-fase-chips{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 10px;}
+.pe-scope .pe-fase-chip{font-family:inherit;font-size:.72rem;padding:3px 11px;border-radius:999px;border:1px solid var(--pe-border);background:var(--pe-surface);color:var(--pe-muted);cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:border-color .12s,color .12s;}
+.pe-scope .pe-fase-chip::before{content:'';width:9px;height:9px;border-radius:50%;background:var(--c,#888);opacity:.3;}
+.pe-scope .pe-fase-chip.is-on{color:var(--pe-ink,#2b3a48);border-color:var(--c,#888);}
+.pe-scope .pe-fase-chip.is-on::before{opacity:1;}
+
 /* estado vacío del tablero (sin libro seleccionado) */
 #tablero-empty{display:none;}
 #tablero-scope.is-empty > section{display:none;}
