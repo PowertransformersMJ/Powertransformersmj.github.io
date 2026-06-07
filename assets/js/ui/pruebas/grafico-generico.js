@@ -65,16 +65,46 @@ function ejeX(series) {
   return { cats, allNum };
 }
 
+/* ─── Ticks para un rango arbitrario [lo,hi] (líneas con auto-rango) ─── */
+function ticksRange(lo, hi, n) {
+  const out = [], step = (hi - lo) / n;
+  for (let i = 0; i <= n; i++) out.push(lo + step * i);
+  return out;
+}
+const fmtTick = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)));
+
 /* ─── Construye el SVG de un bloque ──────────────────────────── */
 function svgBloque(bloque) {
   const W = 720, H = 280, L = 48, R = 18, T = 18, B = 46;
   const series = bloque.series || [];
   if (!series.length) return null;
   const { cats, allNum } = ejeX(series);
-  const ys = series.flatMap((s) => s.puntos.map((p) => p.y));
-  const piso = (bloque.limite != null) ? bloque.limite * 1.2 : (Math.max(0, ...ys.filter((v) => v != null)) || 1);
-  const ymax = ejeMax(ys, bloque.limite, piso);
-  const Y = (v) => T + (1 - v / ymax) * (H - T - B);
+  const esBarra = bloque.grafica === 'barra';
+  const ys = series.flatMap((s) => s.puntos.map((p) => p.y)).filter((v) => v != null);
+
+  // Eje Y. Barras: base en 0 (comparación visual correcta). Líneas: AUTO-RANGE
+  // a los datos (zoom) para que la variación real se vea, en vez de aplastar la
+  // curva contra un eje desde 0 (curvas de TAP: excitación, relación, resistencia).
+  let ymin, ymax, ticks;
+  if (esBarra || ys.length < 2) {
+    ymin = 0;
+    const piso = (bloque.limite != null) ? bloque.limite * 1.2 : (Math.max(0, ...ys) || 1);
+    ymax = ejeMax(ys, bloque.limite, piso);
+    ticks = ticksY(ymax);
+  } else {
+    const dmin = Math.min(...ys), dmax = Math.max(...ys);
+    const span = (dmax - dmin) || Math.abs(dmax) * 0.1 || 1;
+    const pad = span * 0.15;
+    ymin = dmin - pad; ymax = dmax + pad;
+    // Incluir límite/guía en el rango SOLO si caen cerca de los datos (mismo
+    // orden) — si no (p.ej. límite de desviación % vs valor de ratio), se omite
+    // del eje de valores para no aplastar la curva.
+    const cerca = (v) => v != null && v >= dmin - span && v <= dmax + span;
+    if (cerca(bloque.limite)) ymax = Math.max(ymax, bloque.limite + pad * 0.5);
+    if (cerca(bloque.guia)) ymin = Math.min(ymin, bloque.guia - pad * 0.5);
+    ticks = ticksRange(ymin, ymax, 4);
+  }
+  const Y = (v) => T + (1 - (v - ymin) / (ymax - ymin)) * (H - T - B);
   // X categórico: cada categoría a un slot equiespaciado (líneas y barras).
   const n = Math.max(cats.length, 1);
   const innerW = W - L - R;
@@ -90,16 +120,17 @@ function svgBloque(bloque) {
   pat.appendChild(el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: COL.guide, 'stroke-width': 2 }));
   defs.appendChild(pat); svg.appendChild(defs);
   // Cuadrícula + ticks Y dinámicos.
-  for (const g of ticksY(ymax)) {
+  for (const g of ticks) {
     const yy = Y(g);
     svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: COL.grid, 'stroke-width': 1 }));
-    tx(svg, L - 8, yy + 4, String(+g.toFixed(2)), { 'text-anchor': 'end' });
+    tx(svg, L - 8, yy + 4, fmtTick(g), { 'text-anchor': 'end' });
   }
-  // Línea guía (ámbar) y límite (rojo).
-  if (bloque.guia != null && bloque.guia <= ymax) {
+  // Línea guía (ámbar) y límite (rojo) — solo si caen dentro del rango visible.
+  const enRango = (v) => v != null && v >= ymin && v <= ymax;
+  if (enRango(bloque.guia)) {
     svg.appendChild(el('line', { x1: L, y1: Y(bloque.guia), x2: W - R, y2: Y(bloque.guia), stroke: COL.guide, 'stroke-width': 1, 'stroke-dasharray': '5 4', opacity: 0.6 }));
   }
-  if (bloque.limite != null && bloque.limite <= ymax) {
+  if (enRango(bloque.limite)) {
     svg.appendChild(el('line', { x1: L, y1: Y(bloque.limite), x2: W - R, y2: Y(bloque.limite), stroke: COL.lim, 'stroke-width': 1, 'stroke-dasharray': '5 4' }));
     tx(svg, W - R, Y(bloque.limite) - 4, `límite ${bloque.limite}${bloque.unidad ? ' ' + bloque.unidad : ''}`, { 'text-anchor': 'end', fill: COL.lim, 'font-size': 9 });
   }
@@ -109,7 +140,6 @@ function svgBloque(bloque) {
   if (bloque.eje_x) tx(svg, (L + W - R) / 2, H - 6, bloque.eje_x, { 'text-anchor': 'middle', 'font-size': 10, fill: COL.ink });
   if (bloque.unidad) tx(svg, L - 8, T - 6, bloque.unidad, { 'text-anchor': 'end', 'font-size': 9 });
 
-  const esBarra = bloque.grafica === 'barra';
   series.forEach((s, si) => {
     const color = s.color || PALETA[si % PALETA.length];
     const pts = s.puntos.filter((p) => p.y != null).map((p) => ({ i: catIdx.get(String(p.x)), x: p.x, y: p.y, verificar: p.verificar }))
@@ -161,6 +191,22 @@ function svgBloque(bloque) {
   return svg;
 }
 
+/* ─── Tabla por categoría derivada de las series (curvas sin tabla) ─── */
+// Para las curvas por TAP (excitación/relación/resistencia) la IA pone los
+// datos en `series`, no en `tabla`. Se arma la tabla "X | serie1 | serie2 …"
+// (TAP | Fase A | Fase B | Fase C) para que TODOS los valores por posición
+// sean visibles, no solo la curva.
+function tablaDeSeries(bloque) {
+  const series = bloque.series || [];
+  if (!series.length) return { columnas: [], filas: [] };
+  const { cats } = ejeX(series);
+  const mapas = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.y])));
+  const columnas = [bloque.eje_x || 'X', ...series.map((s) => s.nombre || '—')];
+  const filas = cats.map((c) => [String(c),
+    ...mapas.map((m) => { const v = m.get(String(c)); return v == null ? '' : v; })]);
+  return { columnas, filas };
+}
+
 /* ─── Tabla de detalle del bloque ────────────────────────────── */
 function tablaBloque(tabla) {
   if (!tabla || (!tabla.filas.length && !tabla.columnas.length)) return '';
@@ -194,10 +240,15 @@ export function renderBloque(bloque) {
     // algún punto pide confirmación humana; informativo ("Hallazgo") si no.
     const algunVerif = (bloque.series || []).some((s) => (s.puntos || []).some((p) => p.verificar));
     const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
-    html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Hallazgo'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
+    html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Análisis de la IA'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
   }
   html += `<div class="chartbox" data-chart></div>`;
-  html += tablaBloque(bloque.tabla);
+  // Tabla: la propia del bloque o, para curvas sin tabla, una derivada de las
+  // series (todos los valores por posición de TAP).
+  const tabla = (bloque.tabla && bloque.tabla.filas && bloque.tabla.filas.length)
+    ? bloque.tabla
+    : ((bloque.grafica !== 'barra') ? tablaDeSeries(bloque) : bloque.tabla);
+  html += tablaBloque(tabla);
   card.innerHTML = html;
   const chart = card.querySelector('[data-chart]');
   const svg = svgBloque(bloque);
