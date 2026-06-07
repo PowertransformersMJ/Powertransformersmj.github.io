@@ -28,8 +28,8 @@
 
 ## 🔧 Operaciones de Git / refactor
 
-### L-01 · Push solo con PAT inline
-Los canales de push del runtime (`git push` vía proxy, `mcp__github__*`) dan **403** en este repo. Único canal que funciona: `git push https://USER:TOKEN@github.com/USER/REPO.git BRANCH:BRANCH` con un PAT clásico (scope `repo`) del dueño. El `local_proxy` resetea el remote entre invocaciones → NO sirve `git remote set-url`; pasar la URL con token inline en CADA push. **Jamás** escribir el token a archivo/commit/PR/log; redactar con `sed 's|ghp_[A-Za-z0-9]*|ghp_****|g'`. Si no hay token visible y hay commits pendientes, pedirlo al dueño. (Full: `_legacy §0.1`.)
+### L-01 · El push lo hace el director (el runtime da 403)
+Los canales de push del runtime (`git push` vía proxy, `mcp__github__*`) dan **403** en este repo. **Flujo vigente (ADR-005)**: Claude commitea + deploya; **el director hace los `git push`** (GitHub Desktop o su terminal con sus credenciales). Claude NUNCA force-push a `main`. Si alguna vez se necesitara push desde el runtime, el único canal que funcionaría es `git push https://USER:TOKEN@github.com/USER/REPO.git BRANCH:BRANCH` con PAT clásico del dueño inline (el `local_proxy` resetea el remote → pasar la URL con token en CADA push). **Jamás** escribir el token a archivo/commit/PR/log; redactar con `sed 's|ghp_[A-Za-z0-9]*|ghp_****|g'`. (Full: `_legacy §0.1`.)
 
 ### L-02 · `main` solo con pedido explícito
 No tocar `main` salvo orden directa del director.
@@ -60,8 +60,8 @@ Redibujar una foto del director como SVG siempre la "altera" (colores, proporcio
 
 ## 🔥 Backend / infra / entorno
 
-### L-09 · Deploys Firebase son MANUALES
-Si modifico `firestore.rules` / `firestore.indexes.json` / `storage.rules` / `functions/*`, AVISAR al director el comando `firebase deploy --only X` en el MISMO turno + incluir bloque "⚠ Requiere deploy" al final del commit message. Sin deploy: queries fallan con `permission-denied` (rules), `FAILED_PRECONDITION` (índices) o corre código viejo (functions). (Full: `_legacy §0.1.1`.)
+### L-09 · Deploys Firebase los ejecuta Claude (flujo ADR-005, desde 2026-06-06)
+Al modificar `firestore.rules` / `firestore.indexes.json` / `storage.rules` / `functions/*`, **Claude ejecuta** `firebase deploy --only X` (firebase CLI local autenticado), **anuncia el deploy en el MISMO turno** (acción de producción) y verifica el resultado. Sin deploy: queries fallan con `permission-denied` (rules), `FAILED_PRECONDITION` (índices) o corre código viejo (functions). El **director hace los push**; Claude NUNCA force-push a `main`. (Antes era manual del director — ver ADR-005 en `99 §5`. Full histórico: `_legacy §0.1.1`.)
 
 ### L-10 · Firestore rechaza `undefined` con un `permission-denied` ENGAÑOSO
 Cuando un payload tiene campos `undefined`/`NaN` (típico en objetos anidados de funciones puras), la SDK Web los enmascara como `permission-denied` aunque seas admin y las rules estén bien. Receta: helper `deepClean(payload)` (en `assets/js/data/_firestore_clean.js`) que recursivamente omite `undefined`/`NaN`/`Infinity`/funciones, preserva `null`/`0`/`''`/`false` y objetos Firestore (Timestamp/FieldValue/GeoPoint/DocumentReference). Aplicar JUSTO antes de `addDoc`/`setDoc`/`updateDoc`. (Full: `_legacy §0.1.2.6`.)
