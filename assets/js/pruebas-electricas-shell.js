@@ -33,7 +33,7 @@ import {
   minNetaGohm, kvAT
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
+import { renderMatriz, estadoVigente, lineaTiempoInformes } from './ui/pruebas/semaforo.js';
 import { ESTADOS } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
@@ -358,9 +358,30 @@ function esAdmin() {
   return !!(s && (s.role === 'admin' || (s.profile && s.profile.rol === 'admin')));
 }
 
-// Tendencia temporal (pestaña "Tendencia"): una gráfica por métrica clave, su
-// evolución a lo largo de los informes del transformador vs su umbral. Reusa el
-// render genérico de bloques. Determinista (campos canónicos, no IA).
+// Franja-timeline (F2): cronología de informes de la unidad, cada nodo con su
+// estado global (peor prueba) y el más reciente marcado "vigente". Determinista
+// (misma calificación que la matriz, vía lineaTiempoInformes). De un vistazo
+// muestra la historia de la unidad y si va degradando.
+function timelineHtml(informes) {
+  const linea = lineaTiempoInformes(informes);
+  if (linea.length < 2) return ''; // con un solo punto no hay cronología que mostrar
+  const nodos = linea.map((p) => {
+    const et = p.ano != null ? String(p.ano) : (p.fecha || '—');
+    const sub = p.vigente ? 'vigente' : '';
+    const titulo = `${et} · ${p.estado.etiqueta || ''}`;
+    return `<li class="pe-tl-nodo${p.vigente ? ' is-vigente' : ''}" title="${esc(titulo)}">`
+      + `<span class="pe-tl-dot dot ${p.estado.dot}"></span>`
+      + `<span class="pe-tl-ano">${esc(et)}</span>`
+      + (sub ? `<span class="pe-tl-sub">${sub}</span>` : '')
+      + '</li>';
+  }).join('');
+  return `<ol class="pe-timeline" aria-label="Cronología de informes de la unidad">${nodos}</ol>`;
+}
+
+// Tendencia temporal (pestaña "Tendencia"): franja-timeline de informes (F2) +
+// una gráfica por métrica clave, su evolución a lo largo de los informes del
+// transformador vs su umbral. Reusa el render genérico de bloques. Determinista
+// (campos canónicos, no IA).
 function renderTendenciaUI(informes) {
   const cont = $('tendencia-cont');
   if (!cont) return;
@@ -378,7 +399,7 @@ function renderTendenciaUI(informes) {
   const aviso = n < 2
     ? `<p class="muted small">Solo hay ${n} informe cargado para esta unidad: cada gráfica muestra un punto. Carga informes de otras fechas para trazar la tendencia y revelar degradación.</p>`
     : `<p class="muted small">${n} informes en el tiempo · una línea por ensayo contra su umbral normativo.</p>`;
-  cont.innerHTML = aviso + '<div id="tendencia-bloques"></div>';
+  cont.innerHTML = aviso + timelineHtml(docs) + '<div id="tendencia-bloques"></div>';
   mountBloques($('tendencia-bloques'), conCriterios({ bloques }, kvUnidadActiva()));
 }
 
