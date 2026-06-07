@@ -81,3 +81,43 @@
 **3.6 Archivos** — *Modificados*: `functions/index.js` (+`extraerPruebasElectricasIA` + imports), `functions/package.json` (+`@anthropic-ai/sdk ^0.100.0`), `assets/js/firebase-init.js` (+`getFunctionsSafe`), `assets/js/data/pruebas_electricas.js` (+`extraerConIA`), `assets/js/pruebas-electricas-shell.js` (import + `UP.modelId/usarIA` + selector + branch IA). *Nuevo*: `tests/pruebas_electricas_ia.test.js`. *INTACTOS*: `pruebas_electricas_schema.js`, `pruebas_electricas_extraccion.js`, UI (`semaforo.js`, `grafico-svg.js`, `tabla-pruebas.js`).
 
 **3.7 Doctrina aplicada + secuela** — Trigger 🔵 (Skill `claude-api` consultada: PDF nativo + tool use + prompt caching + IDs de modelo) + Trigger 🛰️ (decisión fuerte; NO se sometió a consejo externo — el director confirmó la arquitectura directamente). **⚠ Requiere deploy del director** (canal `functions` + secret, ver TODO-04 en `10` y flag en `05`). Sin cache bump del front (no aplica §4; el SW es kill-switch). Lecciones reusables → `L-20`/`L-21` en `30`.
+
+---
+
+## 4. ADR-004 — Pruebas Eléctricas: extracción IA robusta + identidad + tablero detallado
+
+> Iteraciones del director (2026-06-04 → 06): *"que el LLM lleve cualquier PDF al tablero completo… aún hay errores, no muestra toda la información… la plataforma está limitada para que la inteligencia de la IA se desenvuelva."*
+
+**4.1 Causa raíz** — Tres limitaciones, NO la capacidad del modelo: (a) la identidad de la unidad no se extraía (el tool solo sacaba el informe, no la placa); (b) **la extracción se "conformaba"** en informes densos (22 págs, 17 TAPs): salía solo tan δ — causa real = `tool_choice` FORZADO desactiva el thinking, el modelo debe emitir el JSON de un golpe sin razonar (L-26); (c) **el tablero descartaba el detalle** que el schema sí guarda: `renderTablaResumen` mostraba solo `Año|valor|calif`, tirando fases/terminales/TAP/bujes.
+
+**4.2 Solución** — (a) Tool + system prompt ganan objeto `unidad` (lee placa); el shell hace `guardarUnidad(merge)`. (b) Llamada a Claude: `tool_choice:'auto'` + `thinking:adaptive` + `effort:high` (Opus 4.7/Sonnet 4.6) + **streaming** → el modelo recorre todo el PDF razonando y luego emite todo; prompt de recorrido completo + valor representativo/peor-caso por TAP. (c) Renderizadores **detallados** (`tabla-pruebas.js`): excitación por fase A/B/C+terminal+TAP+Δ; relación por par; resistencia por devanado+fases+verificar; aislamiento por par/tierra; collar por buje individual. (d) Gráficas: eje Y dinámico `ejeMax/ticksY/drawGridY` para que las barras no se salgan (L-23).
+
+**4.3 No-regresión** — Schema (`pruebas_electricas_schema.js`) y extractor regex INTACTOS (fallback). Cambios aditivos. 114/114 tests + nuevo contrato IA↔schema (`tests/pruebas_electricas_ia.test.js`) + helpers de eje testeados en node.
+
+**4.4 Tests / verificación** — `node --test` 114/114; `node --check` en función y cliente; helpers `ejeMax/ticksY` verificados. Pendiente: validación E2E del fix de completitud con 1 PDF real (Sonnet) — ver TODO en `10`. Las tablas detalladas se verifican en el seed 173523 sin gastar créditos.
+
+**4.5 Anti-patterns evitados** — No herramienta forzada para extracción compleja (mata el thinking, L-26); no texto pre-extraído (PDF nativo); no exponer la API key (secret `LLM_API_KEY`); no inventar (representativo/peor-caso). IDs de modelo correctos (`claude-sonnet-4-6`/`claude-opus-4-7`/`claude-haiku-4-5`).
+
+**4.6 Archivos** — `functions/index.js` (tool `unidad`, auto+thinking+streaming, prompt), `functions/package.json` (+@anthropic-ai/sdk), `assets/js/firebase-init.js` (getFunctionsSafe), `assets/js/data/pruebas_electricas.js` (extraerConIA, eliminarUnidad), `assets/js/pruebas-electricas-shell.js`, `assets/js/ui/pruebas/tabla-pruebas.js` (tablas detalladas), `assets/js/ui/pruebas/grafico-svg.js` (eje dinámico), `assets/css/pruebas-electricas.css`. Lecciones L-20..L-26.
+
+**4.7 Doctrina + deploys** — Skill `claude-api` (PDF nativo + tool use + caching + IDs). **Función re-desplegada por Claude** (southamerica-east1, nuevo flujo ADR-005). Front por push del director. Pendiente menor: callout de hallazgo, barras rayadas, lista dinámica de informes.
+
+---
+
+## 5. ADR-005 — Gobernanza: purga de Debug/ del historial + flujo commit/deploy/push
+
+> Director (2026-06-06): *"de ahora en adelante tú haces los commits y deploys, yo los push"* + *"purga el historial de Debug"*.
+
+**5.1 Causa raíz** — (a) La carpeta `Debug/` (19 archivos, 8.8 MB, **PDFs reales de clientes** Afinia/EMS + capturas) estaba versionada en el repo PÚBLICO, incluido el árbol de `origin/main` → exposición de datos. (b) El push del runtime da 403 (L-01); se redefine quién hace qué.
+
+**5.2 Solución** — (a) `Debug/` a `.gitignore` + `git rm --cached`; **purga de historial** con `git-filter-repo --invert-paths --path Debug/` (respaldo en bundle previo); force-push de `main`+`DESARROLLO` por el director. Receta `L-25`. (b) Nuevo flujo: **Claude commitea + deploya** (firebase CLI local), **el director pushea** (GitHub Desktop / terminal). Memoria `feedback_workflow_deploy_commit_push`.
+
+**5.3 No-regresión** — `--cached`/bundle no borran archivos en disco; tras force-push, `origin/main` quedó 0 blobs Debug + con las features (verificado). filter-repo quita `origin` → re-agregado + upstream restaurado.
+
+**5.4 Tests / verificación** — `git rev-list --objects --all|grep Debug` = 0 local y en origin; `origin/main` con `eliminarUnidad`+`ejeMax` y 0 Debug.
+
+**5.5 Anti-patterns evitados** — Claude NUNCA hace force-push a main (lo dispara el director); respaldo antes de reescribir; `--force-with-lease`. NO `git add -A` (archivos específicos).
+
+**5.6 Archivos** — `.gitignore` (+Debug/), historial reescrito. Memoria de flujo + `L-25`.
+
+**5.7 Doctrina + caveat** — Límite de guardián (respaldo > reescribir). GitHub puede cachear commits viejos tras el force-push; datos tratados como ya-expuestos. `CLAUDE.md §1`/`L-01`/`L-09` describen el modelo viejo (director deploya); ahora Claude deploya — pendiente actualizar esa redacción en una pasada futura.

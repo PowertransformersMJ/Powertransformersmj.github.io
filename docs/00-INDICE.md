@@ -60,6 +60,8 @@
 | §1 | ADR-001 — Instalación del cerebro neuronal documental (7 fases + auditoría) | 20 |
 | §2 | ADR-002 — Activación local de 24 skills repo-only en `.claude/skills/` | 42 |
 | §3 | ADR-003 — Extracción de informes de Pruebas Eléctricas con IA (Claude) vía Cloud Function | 64 |
+| §4 | ADR-004 — Pruebas Eléctricas: extracción IA robusta + identidad + tablero detallado | 87 |
+| §5 | ADR-005 — Gobernanza: purga de Debug/ del historial + flujo commit/deploy/push | 107 |
 
 ---
 
