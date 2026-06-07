@@ -28,9 +28,10 @@
 > fórmula. **Pestaña Tendencia (F1)** + **Biblioteca como HUB** (informes + PDF + accesos Tablero/Tendencia).
 > **Workflow de auditoría por sección**: `scripts/audit-bloques-pruebas.mjs` + hoja `workflow-auditoria-secciones-pruebas.md`.
 >
-> **PRÓXIMO (cuando el director retome):** Tendencia **Fases 2-3** (biblioteca como timeline de informes +
-> narrativa de tendencia por IA); seguir validando/afinando secciones con informes reales; confirmar con el
-> director los valores NETA exactos si su edición de la norma difiere de la tabla estándar usada.
+> **PRÓXIMO:** Tendencia **F2 HECHA localmente** (franja-timeline de informes — falta commit+push). Falta **F3**
+> (narrativa de tendencia por IA, on-demand): director confirmó arrancar por F2; F3 queda a decidir
+> (recomendación: función dedicada `narrativaTendenciaIA` + botón on-demand con cacheo por unidad). Seguir
+> validando/afinando secciones con informes reales; confirmar valores NETA exactos si la edición de la norma del director difiere.
 >
 > **MAPA DE ARCHIVOS CLAVE**: Función IA `functions/index.js#extraerPruebasElectricasIA` (prompt: canal `extra`
 > + auto-chequeo) · Render genérico `assets/js/ui/pruebas/grafico-generico.js` (`bloquesDeExtra`/`chartCap`/desviación) ·
@@ -74,4 +75,5 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-07** — **Arco del tablero (lotes 4–8 + workflow + tendencia + biblioteca-hub) → consolidado en ADR-009 (`99 §9`)** + fila en `00` + lecciones L-32/L-33/L-34 en `30`. EN PRODUCCIÓN (PR #128, `main 7f2b61b`). `node --test` 1018/1018 + lint. Canal `extra` verificado por auditor (JSON-2). `05` refrescado, `10` podado a este handoff. brain:check SANO.
+- **2026-06-07** — **Tendencia F2 (franja-timeline de informes) IMPLEMENTADA** (sin IA, determinista). `estadoInforme`+`lineaTiempoInformes` puras en `ui/pruebas/semaforo.js` (reusan `calificarPrueba` → cero divergencia con la matriz); `renderTendenciaUI` pinta `<ol.pe-timeline>` arriba de las gráficas (un nodo/informe coloreado por peor prueba, último=vigente); CSS `.pe-timeline/.pe-tl-*`; test nuevo `tests/pruebas_electricas_timeline.test.js`. **1027/1027 verde + lint OK**. ⚠️ Sin probar en navegador (gated Auth+Firestore). **PENDIENTE: commit (Claude) + push (director).** Falta **F3** (narrativa de tendencia por IA, on-demand). Origin sigue en `4592f57`.
+- **2026-06-07** — Arco del tablero (lotes 4–8 + workflow + tendencia + biblioteca-hub) → consolidado en ADR-009 (`99 §9`) + fila en `00` + L-32/L-33/L-34 en `30`. EN PRODUCCIÓN (PR #129, `main 4592f57`).

@@ -142,17 +142,45 @@ export function renderMatriz(cont, informes) {
 }
 
 /**
+ * Estado global de UN informe (peor prueba). Mismo criterio que la matriz:
+ * califica cada FILA con `calificarPrueba` y reduce con `estadoGlobal`.
+ * @param {object} inf un informe con sus campos canónicos
+ * @returns {object} estado del dominio (clase/dot/nivel/etiqueta)
+ */
+export function estadoInforme(inf) {
+  if (!inf) return ESTADOS.NEUTRAL;
+  const estados = {};
+  FILAS.forEach((f) => { estados[f.key] = calificarPrueba(f.key, inf).estado; });
+  return estadoGlobal(estados);
+}
+
+/**
  * Estado global del informe más reciente (para el chip "vigente").
  * @param {Array} informes
  * @returns {object} estado del dominio (peor prueba del último informe)
  */
 export function estadoVigente(informes) {
   const docs = (informes || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
-  const ult = docs[docs.length - 1];
-  if (!ult) return ESTADOS.NEUTRAL;
-  const estados = {};
-  FILAS.forEach((f) => { estados[f.key] = calificarPrueba(f.key, ult).estado; });
-  return estadoGlobal(estados);
+  return estadoInforme(docs[docs.length - 1]);
+}
+
+/**
+ * Cronología de informes para la franja-timeline de la pestaña Tendencia.
+ * Cada nodo lleva su estado global (peor prueba) y un marcador de vigente.
+ * Función pura (sin DOM): ordena por año ascendente.
+ * @param {Array} informes
+ * @returns {Array<{ano:(number|null), fecha:(string|null), estado:object, vigente:boolean}>}
+ */
+export function lineaTiempoInformes(informes) {
+  const docs = (informes || []).filter(Boolean)
+    .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const ultimo = docs.length - 1;
+  return docs.map((inf, i) => ({
+    ano: (inf.ano != null) ? inf.ano : null,
+    fecha: inf.fecha ? String(inf.fecha) : null,
+    estado: estadoInforme(inf),
+    vigente: i === ultimo
+  }));
 }
 
 export { calificarPrueba };
