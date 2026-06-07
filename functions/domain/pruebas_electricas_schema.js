@@ -91,7 +91,7 @@ export const CRITERIOS_NORMA = Object.freeze({
   excitacion:  { formula: 'Δ% = (I_lateral_mayor − I_lateral_menor) / I_lateral_menor × 100', umbral: 'Δ<10% (I<50 mA) · Δ<5% (I≥50 mA)', norma: 'IEEE Std 62 · ANSI/IEEE C57.12.90' },
   relacion:    { formula: '%DIF = (relación medida − relación teórica) / relación teórica × 100', umbral: '±0.5% respecto a placa', norma: 'IEEE C57.152-2013 §7.2.10' },
   resistencia: { formula: 'Δ% = (R_fase − R_promedio) / R_promedio × 100 (corregida a 75 °C)', umbral: '≤5% entre fases', norma: 'IEEE C57.152-2013 · IEEE 62.2-2004' },
-  aislamiento: { formula: 'R_aisl a 1 min · DAR = R(1 min) / R(30 s)', umbral: '≥1 GΩ (mínimo por clase de tensión)', norma: 'ANSI/NETA 2021 tabla 100.5' },
+  aislamiento: { formula: 'R_aisl a 1 min ≥ mínimo NETA por clase de tensión · DAR = R(1 min)/R(30 s)', umbral: 'mín. por clase: 13.8 kV → 5 GΩ · 34.5 kV → 15 GΩ · 110 kV → 30 GΩ', norma: 'ANSI/NETA 2021 tabla 100.5' },
   bushing:     { formula: 'tan δ del buje % · Capacitancia medida vs valor de placa', umbral: 'tan δ <1% · Cap dentro de ±5–10% de placa', norma: 'IEEE C57.19.100' },
   collar:      { formula: 'Pérdida del collar caliente por buje (mW)', umbral: '<100 mW', norma: 'Test Data Reference Book' },
   drm:         { formula: 'Tiempo de transición del conmutador por paso (ms)', umbral: '40–70 ms · sin discontinuidades', norma: 'IEEE C57.152-2013' }
@@ -108,6 +108,35 @@ export const UMBRAL_DESBALANCE = Object.freeze({
   relacion: 0.5,
   resistencia: 5
 });
+
+/* ─── Resistencia de aislamiento: mínimo NETA por clase de tensión ──────
+ * ANSI/NETA MTS tabla 100.5: el mínimo recomendado de resistencia de aislamiento
+ * ESCALA con la tensión nominal del devanado. El genérico ≥1 GΩ solo aplica a
+ * clases bajas; para 110 kV el mínimo es del orden de decenas de GΩ → por eso un
+ * transformador de 110 kV con 5–6 GΩ se considera POBRE (no "aceptable"). Valores
+ * (GΩ) de la tabla estándar por clase de tensión nominal (kV). */
+export const NETA_IR_MIN_GOHM = Object.freeze([
+  { kv: 1, gohm: 0.1 }, { kv: 2.5, gohm: 0.5 }, { kv: 5, gohm: 1 },
+  { kv: 8, gohm: 2 }, { kv: 15, gohm: 5 }, { kv: 25, gohm: 10 },
+  { kv: 34.5, gohm: 15 }, { kv: 46, gohm: 20 }, { kv: 69, gohm: 25 }, { kv: 115, gohm: 30 }
+]);
+
+/** Mínimo NETA (GΩ) para una tensión nominal (kV). El equipo se clasifica por su
+ * CLASE: se redondea hacia ARRIBA al escalón ≥ kv (un devanado de 13.8 kV es
+ * clase 15 kV; uno de 110 kV es clase 115 kV). */
+export function minNetaGohm(kv) {
+  const v = num(kv);
+  if (v == null) return null;
+  for (const r of NETA_IR_MIN_GOHM) if (v <= r.kv) return r.gohm;
+  return NETA_IR_MIN_GOHM[NETA_IR_MIN_GOHM.length - 1].gohm; // por encima del máximo tabulado
+}
+
+/** Extrae la tensión AT (kV, el primer/mayor valor) de "110 / 34.5 / 13.8 kV". */
+export function kvAT(tensiones) {
+  const nums = String(tensiones == null ? '' : tensiones).match(/\d+(?:\.\d+)?/g);
+  if (!nums || !nums.length) return null;
+  return Math.max(...nums.map(Number));
+}
 
 /* ─── Calificadores puros (devuelven una etiqueta de semáforo) ───── */
 

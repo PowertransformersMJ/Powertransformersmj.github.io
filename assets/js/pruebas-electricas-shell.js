@@ -26,7 +26,7 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
-  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques
+  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques, narrarTendencia
 } from './data/pruebas_electricas.js';
 import {
   sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE,
@@ -37,7 +37,7 @@ import { renderMatriz, estadoVigente, lineaTiempoInformes } from './ui/pruebas/s
 import { ESTADOS } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
-import { bloquesTendencia } from './domain/pruebas_electricas_tendencia.js';
+import { bloquesTendencia, resumenTendenciaParaIA } from './domain/pruebas_electricas_tendencia.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
 const state = {
@@ -48,7 +48,10 @@ const state = {
   filtroBiblioteca: '',
   // Cache de bloques por informeId (carga perezosa desde Storage, ADR-006):
   // onSnapshot re-renderiza en cada cambio; el cache evita refetch del JSON.
-  bloquesCache: new Map()
+  bloquesCache: new Map(),
+  // Cache de narrativa de tendencia (F3) por clave unidad+nº de informes:
+  // on-demand, no se re-pide a la IA mientras la unidad no cambie de informes.
+  narrativaCache: new Map()
 };
 
 const $ = (id) => document.getElementById(id);
@@ -399,8 +402,92 @@ function renderTendenciaUI(informes) {
   const aviso = n < 2
     ? `<p class="muted small">Solo hay ${n} informe cargado para esta unidad: cada gráfica muestra un punto. Carga informes de otras fechas para trazar la tendencia y revelar degradación.</p>`
     : `<p class="muted small">${n} informes en el tiempo · una línea por ensayo contra su umbral normativo.</p>`;
-  cont.innerHTML = aviso + timelineHtml(docs) + '<div id="tendencia-bloques"></div>';
+  cont.innerHTML = aviso + timelineHtml(docs)
+    + narrativaSectionHtml(docs)
+    + '<div id="tendencia-bloques"></div>';
   mountBloques($('tendencia-bloques'), conCriterios({ bloques }, kvUnidadActiva()));
+  pintarNarrativaCache(docs); // restaura la narrativa ya generada para esta unidad
+}
+
+/* ─── Narrativa de tendencia por IA (F3, on-demand) ───────────── */
+// Clave de cache: unidad + nº de informes → si entra un informe nuevo, la
+// narrativa cacheada se invalida (la clave cambia) y se vuelve a ofrecer.
+function narrativaKey(informes) {
+  const u = state.unidadActiva || {};
+  return `${u.id || u.serie || '-'}#${(informes || []).length}`;
+}
+
+// Convierte la narrativa (markdown breve de la IA) a HTML SEGURO: escapa todo,
+// luego reaplica negritas **x**, viñetas "- " y saltos de línea. Nada de innerHTML
+// con texto crudo del modelo (anti-XSS).
+function narrativaToHtml(texto) {
+  const lineas = String(texto || '').split('\n');
+  let html = '';
+  let enLista = false;
+  for (const raw of lineas) {
+    const l = raw.trim();
+    const conNegrita = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    if (/^[-*]\s+/.test(l)) {
+      if (!enLista) { html += '<ul>'; enLista = true; }
+      html += `<li>${conNegrita(l.replace(/^[-*]\s+/, ''))}</li>`;
+    } else {
+      if (enLista) { html += '</ul>'; enLista = false; }
+      if (l) html += `<p>${conNegrita(l)}</p>`;
+    }
+  }
+  if (enLista) html += '</ul>';
+  return html;
+}
+
+// Sección de la narrativa: botón on-demand + contenedor. Solo se ofrece si hay
+// tendencia real (>=2 puntos en alguna métrica); con un solo informe no aplica.
+function narrativaSectionHtml(informes) {
+  if (!resumenTendenciaParaIA(informes).length) return '';
+  return '<section class="pe-narrativa" id="narrativa-sec">'
+    + '<div class="pe-narrativa-head">'
+    + '<h4>Narrativa de tendencia <span class="norm">lectura por IA</span></h4>'
+    + '<button type="button" class="btn-sm" id="btn-narrar">'
+    + '<span class="i"><i data-lucide="sparkles"></i></span> Generar narrativa</button>'
+    + '</div>'
+    + '<div id="narrativa-cont"><p class="muted small">Genera una lectura en prosa de la evolución: qué métrica degrada, a qué ritmo y qué vigilar.</p></div>'
+    + '</section>';
+}
+
+// Repinta la narrativa cacheada (si existe) al re-renderizar la unidad.
+function pintarNarrativaCache(informes) {
+  const cont = $('narrativa-cont');
+  if (!cont) return;
+  const cache = state.narrativaCache.get(narrativaKey(informes));
+  if (cache) cont.innerHTML = narrativaToHtml(cache);
+}
+
+async function onGenerarNarrativa() {
+  const btn = $('btn-narrar');
+  const cont = $('narrativa-cont');
+  if (!btn || !cont) return;
+  const informes = state.informes || [];
+  const key = narrativaKey(informes);
+  const cacheado = state.narrativaCache.get(key);
+  if (cacheado) { cont.innerHTML = narrativaToHtml(cacheado); return; }
+  const metricas = resumenTendenciaParaIA(informes);
+  if (!metricas.length) {
+    cont.innerHTML = '<p class="muted small">No hay tendencia suficiente para narrar (se requieren 2+ informes).</p>';
+    return;
+  }
+  btn.disabled = true;
+  cont.innerHTML = '<p class="muted small">Generando narrativa con IA…</p>';
+  try {
+    const u = state.unidadActiva || {};
+    const res = await narrarTendencia({ serie: u.serie || u.id, metricas });
+    state.narrativaCache.set(key, res.narrativa);
+    cont.innerHTML = narrativaToHtml(res.narrativa);
+  } catch (err) {
+    console.warn('[pruebas-electricas] narrarTendencia', err);
+    cont.innerHTML = `<p class="muted small">No se pudo generar la narrativa: ${esc(err && err.message || 'error')}.</p>`;
+  } finally {
+    btn.disabled = false;
+    if (window.lucide && window.lucide.createIcons) window.lucide.createIcons();
+  }
 }
 
 function renderInformesUI(informes) {
@@ -874,6 +961,12 @@ function arrancar() {
   renderCriteriosNorma();
   const rl = $('reportlist');
   if (rl) rl.addEventListener('click', onClickReportlist);
+  // Narrativa de tendencia (F3): botón on-demand, delegado en el contenedor
+  // (se re-crea en cada render de la pestaña Tendencia).
+  const tc = $('tendencia-cont');
+  if (tc) tc.addEventListener('click', (e) => {
+    if (e.target.closest('#btn-narrar')) onGenerarNarrativa();
+  });
   // Hub del libro abierto: botones "Ver tablero / Ver tendencia".
   const libro = $('biblioteca-libro');
   if (libro) libro.addEventListener('click', (e) => {

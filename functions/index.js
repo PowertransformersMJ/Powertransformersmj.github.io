@@ -638,3 +638,88 @@ export const extraerPruebasElectricasIA = onCall(
     };
   }
 );
+
+// ══════════════════════════════════════════════════════════════
+// NARRATIVA DE TENDENCIA (F3) — lectura en prosa de la evolución
+// ──────────────────────────────────────────────────────────────
+// NO lee PDFs: recibe el resumen YA extraído (determinista, cliente:
+// resumenTendenciaParaIA) — series temporales por métrica vs su umbral —
+// y redacta un diagnóstico de tendencia. Entrada chica → función barata
+// (sin visión, sin thinking, timeout corto).
+// ══════════════════════════════════════════════════════════════
+const SYSTEM_NARRATIVA_TENDENCIA = `Eres un ingeniero experto en mantenimiento predictivo de transformadores de potencia. Recibes la EVOLUCIÓN en el tiempo de las métricas clave de un transformador (ya medidas, una serie por ensayo, contra su umbral normativo) y redactas un diagnóstico de TENDENCIA en español técnico claro.
+
+REGLAS:
+1. Básate SOLO en los números dados. No inventes valores ni causas que no se deduzcan de la serie.
+2. Cada métrica trae su umbral y dirección: si "invertir" es true el umbral es un MÍNIMO (estar POR DEBAJO es malo, p.ej. aislamiento); si es false el umbral es un MÁXIMO (estar POR ENCIMA es malo, p.ej. tan δ, desbalances).
+3. Identifica qué métricas DEGRADAN (empeoran informe a informe), a qué ritmo y cuán cerca/lejos del límite están; cuáles están ESTABLES; y si alguna ya CRUZÓ el umbral.
+4. Si una métrica tiene un solo punto, dilo: no hay tendencia, solo una foto.
+5. Sé conciso y accionable. Cierra con una recomendación priorizada (qué vigilar, qué ensayo repetir, urgencia).
+
+FORMATO (markdown breve): un párrafo de "Estado general", luego viñetas por métrica relevante, y una línea final "Recomendación:". Máximo ~200 palabras. No uses tablas.`;
+
+export const narrativaTendenciaIA = onCall(
+  {
+    region: 'southamerica-east1',
+    secrets: [LLM_API_KEY],
+    // Entrada chica (números, sin PDF) → respuesta corta. 120 s sobra; el
+    // cliente espera lo mismo (ver narrarTendencia en la capa de datos).
+    timeoutSeconds: 120,
+    memory: '512MiB'
+  },
+  async (request) => {
+    if (!request.auth) {
+      throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
+    }
+    const { serie, metricas, modelId } = request.data || {};
+    if (!Array.isArray(metricas) || !metricas.length) {
+      throw new HttpsError('invalid-argument', 'Falta el resumen de tendencia (metricas).');
+    }
+    const model = MODELOS_IA.has(modelId) ? modelId : MODELO_IA_DEFAULT;
+
+    // Resumen textual COMPACTO: una línea por métrica con su umbral, dirección
+    // y la serie de puntos (año: valor). Determinista, sin re-leer nada.
+    const lineas = metricas.map((m) => {
+      const dir = m.invertir ? `mínimo ${m.limite}${m.unidad}` : `máximo ${m.limite}${m.unidad}`;
+      const serieTxt = (Array.isArray(m.puntos) ? m.puntos : [])
+        .map((p) => `${p.x}: ${p.y}${m.unidad || ''}`).join(' · ');
+      return `- ${m.metrica} (umbral ${dir}): ${serieTxt}`;
+    }).join('\n');
+    const userMsg =
+      `Transformador serie ${serie || 's/d'}. Evolución de sus métricas de prueba ` +
+      `eléctrica a lo largo de los informes (cronológico):\n\n${lineas}\n\n` +
+      `Redacta el diagnóstico de tendencia siguiendo tu formato.`;
+
+    const client = new Anthropic({ apiKey: LLM_API_KEY.value() });
+    let message;
+    try {
+      message = await client.messages.create({
+        model,
+        max_tokens: 1200,
+        system: [
+          { type: 'text', text: SYSTEM_NARRATIVA_TENDENCIA, cache_control: { type: 'ephemeral' } }
+        ],
+        messages: [{ role: 'user', content: userMsg }]
+      });
+    } catch (e) {
+      throw new HttpsError('internal', `Claude API: ${e.message || e}`);
+    }
+
+    const narrativa = (message.content || [])
+      .filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+    if (!narrativa) {
+      throw new HttpsError('internal', 'La IA no devolvió narrativa.');
+    }
+    const u = message.usage || {};
+    const usage = {
+      input: u.input_tokens || 0,
+      output: u.output_tokens || 0,
+      cache_read: u.cache_read_input_tokens || 0,
+      cache_write: u.cache_creation_input_tokens || 0
+    };
+    console.info('[narrativaTendenciaIA]', model, serie || '-',
+      `metricas=${metricas.length} in=${usage.input} out=${usage.output}`);
+
+    return { narrativa, modelUsed: model, usage };
+  }
+);

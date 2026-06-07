@@ -349,3 +349,33 @@ export async function extraerConIA(payload) {
   if (!data || !data.mediciones) throw new Error('La IA no devolvió mediciones.');
   return data;
 }
+
+/**
+ * Narrativa de tendencia con IA (F3 · Cloud Function narrativaTendenciaIA). NO
+ * sube PDFs: recibe el resumen YA extraído (resumenTendenciaParaIA) y devuelve
+ * un texto con el diagnóstico de evolución. Entrada chica → timeout corto.
+ * Lanza si no hay backend, sin sesión, o si la IA falla (el llamador lo muestra).
+ * @param {{serie?:string, metricas:Array, modelId?:string}} payload
+ * @returns {Promise<{narrativa:string, modelUsed:string, usage:object}>}
+ */
+export async function narrarTendencia(payload) {
+  if (!isReady()) throw new Error('Firebase no inicializado.');
+  if (!payload || !Array.isArray(payload.metricas) || !payload.metricas.length) {
+    throw new Error('Sin datos de tendencia para narrar.');
+  }
+  const functions = await getFunctionsSafe();
+  if (!functions) throw new Error('Cloud Functions no disponible.');
+  const { httpsCallable } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js');
+  // timeout explícito 120 s (default del SDK 70 s): igual al timeoutSeconds de
+  // la función. Entrada chica, pero el modelo puede tardar en redactar.
+  const fn = httpsCallable(functions, 'narrativaTendenciaIA', { timeout: 120000 });
+  const res = await fn({
+    serie:    payload.serie || '',
+    metricas: payload.metricas,
+    modelId:  payload.modelId || ''
+  });
+  const data = res && res.data;
+  if (!data || !data.narrativa) throw new Error('La IA no devolvió narrativa.');
+  return data;
+}

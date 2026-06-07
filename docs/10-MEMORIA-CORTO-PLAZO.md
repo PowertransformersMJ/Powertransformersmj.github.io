@@ -28,10 +28,10 @@
 > fórmula. **Pestaña Tendencia (F1)** + **Biblioteca como HUB** (informes + PDF + accesos Tablero/Tendencia).
 > **Workflow de auditoría por sección**: `scripts/audit-bloques-pruebas.mjs` + hoja `workflow-auditoria-secciones-pruebas.md`.
 >
-> **PRÓXIMO:** Tendencia **F2 HECHA localmente** (franja-timeline de informes — falta commit+push). Falta **F3**
-> (narrativa de tendencia por IA, on-demand): director confirmó arrancar por F2; F3 queda a decidir
-> (recomendación: función dedicada `narrativaTendenciaIA` + botón on-demand con cacheo por unidad). Seguir
-> validando/afinando secciones con informes reales; confirmar valores NETA exactos si la edición de la norma del director difiere.
+> **PRÓXIMO:** Tendencia **F2 + F3 code-complete** (timeline + narrativa IA). F2 commiteada (`a8f32a3`); F3 sin
+> commitear aún. CF `narrativaTendenciaIA` **DESPLEGADA**. ⚠️ Sin verificar en navegador. **Falta: commit F3 →
+> push de ambos (director) → verificar narrativa en vivo → consolidar ADR-010** (cerrar arco Tendencia F1-F3).
+> Luego: seguir validando secciones con informes reales; confirmar valores NETA si la edición de la norma del director difiere.
 >
 > **MAPA DE ARCHIVOS CLAVE**: Función IA `functions/index.js#extraerPruebasElectricasIA` (prompt: canal `extra`
 > + auto-chequeo) · Render genérico `assets/js/ui/pruebas/grafico-generico.js` (`bloquesDeExtra`/`chartCap`/desviación) ·
@@ -75,5 +75,6 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-07** — **Tendencia F3 (narrativa de tendencia por IA) IMPLEMENTADA + CF DESPLEGADA.** Función dedicada `narrativaTendenciaIA` (functions/index.js; onCall southamerica-east1, default sonnet, timeout 120s/512MiB, **sin PDF**: recibe el resumen ya extraído). Dominio `resumenTendenciaParaIA(informes)` (payload compacto desde `bloquesTendencia`, []  si <2 puntos) + 4 tests. Capa datos `narrarTendencia(payload)` (httpsCallable, timeout 120s). Shell: botón on-demand `#btn-narrar` en pestaña Tendencia + render con `narrativaToHtml` (markdown-lite ANTI-XSS: escapa y reaplica) + **cache por unidad** (`state.narrativaCache`, clave unidad+nº informes → se invalida al entrar informe nuevo). CSS `.pe-narrativa`. **1031/1031 verde + lint**. ⚠️ **Sin probar en navegador (gated Auth+Firestore) ni en prod.** PENDIENTE: commit F3 (Claude) + push de a8f32a3 (F2) y F3 (director) → verificar en vivo → ADR-010.
 - **2026-06-07** — **Tendencia F2 (franja-timeline de informes) IMPLEMENTADA** (sin IA, determinista). `estadoInforme`+`lineaTiempoInformes` puras en `ui/pruebas/semaforo.js` (reusan `calificarPrueba` → cero divergencia con la matriz); `renderTendenciaUI` pinta `<ol.pe-timeline>` arriba de las gráficas (un nodo/informe coloreado por peor prueba, último=vigente); CSS `.pe-timeline/.pe-tl-*`; test nuevo `tests/pruebas_electricas_timeline.test.js`. **1027/1027 verde + lint OK**. ⚠️ Sin probar en navegador (gated Auth+Firestore). **PENDIENTE: commit (Claude) + push (director).** Falta **F3** (narrativa de tendencia por IA, on-demand). Origin sigue en `4592f57`.
 - **2026-06-07** — Arco del tablero (lotes 4–8 + workflow + tendencia + biblioteca-hub) → consolidado en ADR-009 (`99 §9`) + fila en `00` + L-32/L-33/L-34 en `30`. EN PRODUCCIÓN (PR #129, `main 4592f57`).
