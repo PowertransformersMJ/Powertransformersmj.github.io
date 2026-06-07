@@ -207,6 +207,30 @@ function tablaDeSeries(bloque) {
   return { columnas, filas };
 }
 
+/* ─── Bloque derivado: desviación (desbalance) entre fases por categoría ─── */
+// En cada x (TAP) calcula Δ% = (max−min)/|prom| × 100 entre las fases. Es la
+// lectura "más allá del informe": muestra el desbalance contra su límite
+// normativo (bloque.limite_desbalance). Requiere ≥2 series (fases).
+function bloqueDesviacion(bloque) {
+  const series = bloque.series || [];
+  const { cats } = ejeX(series);
+  const mapas = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.y])));
+  const puntos = cats.map((c) => {
+    const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null);
+    if (vals.length < 2) return null;
+    const mx = Math.max(...vals), mn = Math.min(...vals);
+    const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
+    const d = prom ? ((mx - mn) / Math.abs(prom)) * 100 : null;
+    return d == null ? null : { x: c, y: +d.toFixed(3) };
+  }).filter(Boolean);
+  return {
+    titulo: 'Desviación entre fases por TAP (%)',
+    unidad: '%', eje_x: bloque.eje_x, grafica: 'linea',
+    limite: bloque.limite_desbalance,
+    series: [{ nombre: 'Δ entre fases', puntos }]
+  };
+}
+
 /* ─── Tabla de detalle del bloque ────────────────────────────── */
 function tablaBloque(tabla) {
   if (!tabla || (!tabla.filas.length && !tabla.columnas.length)) return '';
@@ -288,6 +312,28 @@ export function renderBloque(bloque) {
   }
   pintar();
   if (!chart.firstChild) chart.remove();
+
+  // Chart derivado de desviación entre fases (cuando hay criterio de desbalance
+  // y ≥2 fases). Se grafica vs su límite normativo. Independiente del filtro
+  // (el desbalance es inherentemente entre todas las fases).
+  if (filtrable && bloque.limite_desbalance != null) {
+    const dev = bloqueDesviacion(bloque);
+    if (dev.series[0].puntos.length) {
+      const svg = svgBloque(dev);
+      if (svg) {
+        const cap = document.createElement('div');
+        cap.className = 'muted small';
+        cap.style.cssText = 'margin:10px 0 4px';
+        cap.textContent = `Desviación entre fases por TAP — criterio ≤ ${dev.limite}%`;
+        const box = document.createElement('div');
+        box.className = 'chartbox';
+        box.appendChild(svg);
+        const tabla = chart.parentNode.querySelector('.tblwrap');
+        if (tabla) { card.insertBefore(cap, tabla); card.insertBefore(box, tabla); }
+        else { card.appendChild(cap); card.appendChild(box); }
+      }
+    }
+  }
   return card;
 }
 
