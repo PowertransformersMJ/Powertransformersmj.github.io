@@ -29,7 +29,7 @@ import {
   descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques
 } from './data/pruebas_electricas.js';
 import {
-  sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA
+  sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
@@ -72,10 +72,36 @@ function criterioDe(prueba) {
   if (p.includes('drm') || p.includes('oltc') || p.includes('conmutad')) return CRITERIOS_NORMA.drm;
   return null;
 }
-// Adjunta `criterio` a cada bloque (copia superficial; no muta el cache).
+// Resuelve el umbral de desbalance normativo (%) de un bloque por su familia.
+function desbalanceDe(prueba) {
+  const p = norm(prueba);
+  if (!p) return null;
+  if (p in UMBRAL_DESBALANCE) return UMBRAL_DESBALANCE[p];
+  if (p.includes('excit')) return UMBRAL_DESBALANCE.excitacion;
+  if (p.includes('relac')) return UMBRAL_DESBALANCE.relacion;
+  if (p.includes('aisl')) return null;
+  if (p.includes('resist')) return UMBRAL_DESBALANCE.resistencia;
+  return null;
+}
+// Enriquece cada bloque (copia superficial; no muta el cache): adjunta el
+// `criterio` verificable y, si la IA no lo dio, el `limite_desbalance` normativo
+// del dominio (para la gráfica de desviación + la columna Evaluación derivada).
 function conCriterios(data) {
   const bloques = (data && data.bloques) || [];
-  return { ...data, bloques: bloques.map((b) => { const c = criterioDe(b && b.prueba); return c ? { ...b, criterio: c } : b; }) };
+  return {
+    ...data,
+    bloques: bloques.map((b) => {
+      if (!b) return b;
+      const out = { ...b };
+      const c = criterioDe(b.prueba);
+      if (c) out.criterio = c;
+      if (out.limite_desbalance == null && b.grafica !== 'barra' && (b.series || []).length >= 2) {
+        const u = desbalanceDe(b.prueba);
+        if (u != null) out.limite_desbalance = u;
+      }
+      return out;
+    })
+  };
 }
 
 /* ─── Seed: unidad + 3 informes base (datos reales históricos) ─── */

@@ -6,7 +6,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  sanitizarBloques, sanitizarBloque, sanitizarSerie, LIMITES, BLOQUES_SCHEMA_VERSION
+  sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -92,5 +92,70 @@ describe('sanitizarBloques · robustez', () => {
     assert.equal(pts[0].verificar, true);
     assert.ok(!('verificar' in pts[1])); // punto limpio
     assert.ok(!('verificar' in pts[2])); // false no se persiste
+  });
+});
+
+describe('derivarTablaTAP · tabla completa derivada de las series', () => {
+  // Excitación: 3 fases (A y C laterales, B central-menor) + extra P(W).
+  const exc = {
+    prueba: 'excitacion', eje_x: 'Posición del TAP', limite_desbalance: 10,
+    series: [
+      { nombre: 'Fase A', puntos: [{ x: 1, y: 17.964, extra: { 'P (W)': 156.367 } }, { x: 2, y: 18.356, extra: { 'P (W)': 158.378 } }] },
+      { nombre: 'Fase B', puntos: [{ x: 1, y: 11.623 }, { x: 2, y: 11.881 }] },
+      { nombre: 'Fase C', puntos: [{ x: 1, y: 18.525, extra: { 'P (W)': 158.868 } }, { x: 2, y: 18.831, extra: { 'P (W)': 160.524 } }] }
+    ]
+  };
+
+  test('columnas: TAP + fases + extra×fase + Desv. % + Eval.', () => {
+    const t = derivarTablaTAP(exc);
+    assert.deepEqual(t.columnas, [
+      'Posición del TAP', 'Fase A', 'Fase B', 'Fase C',
+      'P (W) · Fase A', 'P (W) · Fase B', 'P (W) · Fase C',
+      'Desv. %', 'Eval.'
+    ]);
+  });
+
+  test('Desviación de excitación = entre las DOS laterales mayores (no la central)', () => {
+    const t = derivarTablaTAP(exc);
+    const fila1 = t.filas[0];
+    // mayores: C=18.525, A=17.964 → (18.525-17.964)/17.964*100 = 3.123%
+    assert.equal(fila1[fila1.length - 2], 3.123);
+    assert.equal(fila1[fila1.length - 1], 'OK'); // 3.12 ≤ 10
+  });
+
+  test('extra se ubica en su columna por fase; fase sin extra queda vacía', () => {
+    const t = derivarTablaTAP(exc);
+    const fila1 = t.filas[0];
+    assert.equal(fila1[4], 156.367); // P(W) Fase A
+    assert.equal(fila1[5], '');      // P(W) Fase B (no traía extra)
+    assert.equal(fila1[6], 158.868); // P(W) Fase C
+  });
+
+  test('Evaluación = verificar cuando la desviación supera el umbral', () => {
+    const res = {
+      prueba: 'resistencia', eje_x: 'TAP', limite_desbalance: 5,
+      series: [
+        { nombre: 'Fase A', puntos: [{ x: 1, y: 100 }] },
+        { nombre: 'Fase B', puntos: [{ x: 1, y: 100 }] },
+        { nombre: 'Fase C', puntos: [{ x: 1, y: 120 }] } // promedio ~106.7 → C se aparta ~12.5%
+      ]
+    };
+    const fila = derivarTablaTAP(res).filas[0];
+    assert.equal(fila[fila.length - 1], 'verificar');
+  });
+
+  test('sin umbral: columna Desv. % presente, Eval. ausente', () => {
+    const t = derivarTablaTAP({ prueba: 'relacion', eje_x: 'TAP', series: exc.series.slice(0, 3) });
+    assert.ok(t.columnas.includes('Desv. %'));
+    assert.ok(!t.columnas.includes('Eval.'));
+  });
+
+  test('serie única (sin fases): sin Desv. ni Eval.', () => {
+    const t = derivarTablaTAP({ eje_x: 'Config', series: [{ nombre: 'DAR', puntos: [{ x: 'AT-MT', y: 1.2 }] }] });
+    assert.deepEqual(t.columnas, ['Config', 'DAR']);
+  });
+
+  test('sin series → tabla vacía', () => {
+    assert.deepEqual(derivarTablaTAP({ series: [] }), { columnas: [], filas: [] });
   });
 });
