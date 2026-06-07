@@ -33,9 +33,14 @@ import {
   sanitizarUnidad, validarUnidad,
   sanitizarInforme, validarInforme
 } from '../domain/pruebas_electricas_schema.js';
+import { sanitizarBloques } from '../domain/pruebas_electricas_bloques.js';
 
 const COL_UNIDADES = 'pruebas_electricas';
 const SUBCOL_INFORMES = 'informes';
+
+// Detalle pesado (bloques de análisis, ADR-006) NO infla el doc Firestore:
+// vive como JSON en Storage, junto al PDF de la unidad, con carga perezosa.
+const bloquesPath = (unidadId, informeId) => `${COL_UNIDADES}/${unidadId}/${informeId}.bloques.json`;
 
 /* ─── Estado de la capa ───────────────────────────────────────── */
 export function isReady() {
@@ -221,6 +226,58 @@ export async function descargarBlobInforme(storagePath) {
   return getBlob(sref(storage, storagePath));
 }
 
+/* ─── Storage · Bloques de análisis (detalle pesado, ADR-006) ─── */
+
+/**
+ * Persiste los bloques de análisis de un informe como JSON en Storage
+ * (desacople lectura ligera ↔ detalle pesado: el doc Firestore NO se
+ * infla). Sanitiza/acota con el dominio antes de escribir — la salida del
+ * LLM es semi-confiable. Si no hay bloques útiles, NO escribe y devuelve
+ * null (informe sin gráficas flexibles, normal).
+ * @param {string} unidadId  serie de la unidad
+ * @param {string} informeId id del doc del informe (de crearInforme)
+ * @param {Array}  bloquesRaw arreglo crudo de bloques (de la IA)
+ * @returns {Promise<{storagePath:string, count:number}|null>}
+ */
+export async function guardarBloques(unidadId, informeId, bloquesRaw) {
+  if (!unidadId || !informeId) throw new Error('Falta unidadId o informeId.');
+  const limpio = sanitizarBloques(bloquesRaw);
+  if (!limpio.bloques.length) return null;
+  const storage = getStorageSafe();
+  if (!storage) throw new Error('Firebase Storage no inicializado.');
+  const { ref: sref, uploadString } =
+    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
+  const storagePath = bloquesPath(unidadId, informeId);
+  await uploadString(sref(storage, storagePath), JSON.stringify(limpio), 'raw',
+    { contentType: 'application/json' });
+  return { storagePath, count: limpio.bloques.length };
+}
+
+/**
+ * Carga perezosa de los bloques de un informe desde Storage. Re-sanitiza a
+ * la lectura (defensa en profundidad: el JSON pudo escribirse con otra
+ * versión del schema). Devuelve {schema_version, bloques} o null si el
+ * informe no tiene bloques (404 = informe previo a ADR-006 o sin gráficas).
+ * @param {string} unidadId
+ * @param {string} informeId
+ * @returns {Promise<{schema_version:number, bloques:Array}|null>}
+ */
+export async function cargarBloques(unidadId, informeId) {
+  const storage = getStorageSafe();
+  if (!storage || !unidadId || !informeId) return null;
+  try {
+    const { ref: sref, getBytes } =
+      await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
+    const buf = await getBytes(sref(storage, bloquesPath(unidadId, informeId)));
+    const json = JSON.parse(new TextDecoder().decode(buf));
+    return sanitizarBloques(json && json.bloques);
+  } catch (err) {
+    // 404/no encontrado = informe sin bloques: la vista cae a las tablas
+    // normativas. No es error de aplicación.
+    return null;
+  }
+}
+
 /**
  * Extracción de mediciones con IA (Claude vía Cloud Function onCall). El
  * PDF ya está en Storage (subirPDF); aquí solo se pasa su ruta + el
@@ -229,7 +286,7 @@ export async function descargarBlobInforme(storagePath) {
  * consume sanitizarInforme(). Lanza si no hay backend, sin sesión, sin
  * saldo o si la IA falla — el llamador hace fallback al extractor local.
  * @param {{unidadId:string, serie:string, storagePath:string, filename?:string, modelId?:string}} payload
- * @returns {Promise<{mediciones:object, modelUsed:string, usage:object}>}
+ * @returns {Promise<{mediciones:object, bloques?:Array, modelUsed:string, usage:object}>}
  */
 export async function extraerConIA(payload) {
   if (!isReady()) throw new Error('Firebase no inicializado.');
