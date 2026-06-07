@@ -35,7 +35,10 @@
 >    `montarBloques` en el shell: carga perezosa con `cargarBloques` por informe REAL (no seed), cache por
 >    informeId (anti-refetch en onSnapshot), render agrupado por año vía `mountBloques` (Fase 1). Frontend
 >    puro → SIN deploy de función, solo push del director. **Falta validar render en vivo (acoplado al E2E).**
-> 4. Extras maqueta: callout de hallazgo, barras rayadas "verificar", lista dinámica de informes.
+> 4. **Extras maqueta: HECHOS (2026-06-06)** — callout de hallazgo (título `.ttl` + variante `warn` por
+>    `calif`/punto a verificar) + barras/puntos **rayados** (patrón `hatch` SVG) sobre `verificar=true`.
+>    Campo `verificar` añadido al punto (dominio + función emite + redeploy). "Lista dinámica de informes"
+>    ya existía (`renderInformes`/`reportlist`). **Falta solo push + validar E2E.**
 >
 > **MAPA DE ARCHIVOS CLAVE** (ubicar rápido):
 > · Función IA: `functions/index.js#extraerPruebasElectricasIA` · Contrato bloques (acotado):
@@ -77,6 +80,7 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-06** — **Extras maqueta bloques**: (1) callout de hallazgo en `renderBloque` — título `.ttl` + variante `warn` ("Dato a verificar") cuando `calif` o algún punto pide confirmación (clases `.callout.warn/.ttl` ya en CSS). (2) Patrón `hatch` SVG: barras `fill:url(#peh-hatch)` + ⚠ y puntos de línea como anillo ámbar hueco cuando `verificar=true`. Campo `verificar` (bool, solo si true) añadido al punto en el dominio (`sanitizarPunto`) + test (997/997); función emite `verificar` por punto (schema + system prompt) y **re-desplegada** (southamerica-east1). "Lista dinámica de informes" ya existía. SIN domain test roto (deepEqual `{x,y}` intacto porque el flag se omite si es false).
 - **2026-06-06** — **Fase 3 bloques (frontend)**: sección `#bloques` en `pages/pruebas-electricas.html` (antes de Criterios) + estilos `.pe-bloque`/`.pe-bloque-grupo` en el CSS. Shell: `montarBloques(unidadId, informes)` — carga perezosa `cargarBloques` de cada informe REAL (filtra `_seed`), `state.bloquesCache` por informeId (onSnapshot re-renderiza; no refetch), guarda anti-carrera (aborta si la unidad cambió), render agrupado por año desc vía `mountBloques` (Fase 1). Cache se limpia en `seleccionarUnidad`; contenedor se vacía en `renderVacioSeleccion`. Frontend puro → SIN deploy. lint+tests 996/996. **Falta push + validar render en vivo (necesita informe real con bloques en Storage = el E2E aplazado).**
 - **2026-06-06** — **Fase 2 bloques DESPLEGADA**: `firebase deploy --only functions:extraerPruebasElectricasIA` OK (*Successful update operation*, southamerica-east1). Commit creado por Claude; **falta push del director**. El director valida E2E la versión nueva (TODO-05). Decisión del director: deployar ya y validar la versión nueva (opción 2).
 - **2026-06-06** — **Fase 2 bloques (código)**: función `extraerPruebasElectricasIA` ahora emite `bloques` (property aditivo en `HERRAMIENTA_PRUEBAS` + guía en system prompt: curva COMPLETA, complementa NO reemplaza los campos canónicos) y los devuelve en la respuesta. Data layer: `guardarBloques(unidadId, informeId, raw)` (sanitiza con dominio → JSON a Storage `…/{informeId}.bloques.json`, no escribe si vacío) + `cargarBloques` (lazy, re-sanitiza). Shell `storeReport` persiste tras `crearInforme` (captura `informeId`, falla suave). **Hallazgo de diseño**: la función NO conoce el `informeId` (lo crea el cliente DESPUÉS de extraer) → el cliente persiste, la función solo devuelve. storage.rules ya cubre `.bloques.json`. lint OK · 996/996 tests verde. **SIN commit/deploy** (deploy cambia extracción pendiente de validar TODO-05 → decisión del director).

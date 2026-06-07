@@ -82,4 +82,15 @@ describe('sanitizarBloques · robustez', () => {
     const b = sanitizarBloque({ titulo: 'T', series: [{ nombre: 's', puntos: [{ x: 1, y: '0,51' }] }] });
     assert.equal(b.series[0].puntos[0].y, 0.51);
   });
+  test('verificar=true marca el punto; se omite cuando falta o es false', () => {
+    const b = sanitizarBloque({ titulo: 'T', grafica: 'barra', series: [{ nombre: 's', puntos: [
+      { x: 1, y: 5, verificar: true },
+      { x: 2, y: 6 },
+      { x: 3, y: 7, verificar: false }
+    ] }] });
+    const pts = b.series[0].puntos;
+    assert.equal(pts[0].verificar, true);
+    assert.ok(!('verificar' in pts[1])); // punto limpio
+    assert.ok(!('verificar' in pts[2])); // false no se persiste
+  });
 });

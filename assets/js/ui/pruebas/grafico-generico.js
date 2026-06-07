@@ -82,6 +82,13 @@ function svgBloque(bloque) {
   const catIdx = new Map(cats.map((c, i) => [String(c), i]));
 
   const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
+  // Patrón rayado (hatch) para valores marcados "a verificar" (confirmación
+  // humana pendiente) — mismo lenguaje visual que la maqueta.
+  const defs = el('defs', {});
+  const pat = el('pattern', { id: 'peh-hatch', width: 6, height: 6, patternUnits: 'userSpaceOnUse', patternTransform: 'rotate(45)' });
+  pat.appendChild(el('rect', { width: 6, height: 6, fill: '#f1e2c0' }));
+  pat.appendChild(el('line', { x1: 0, y1: 0, x2: 0, y2: 6, stroke: COL.guide, 'stroke-width': 2 }));
+  defs.appendChild(pat); svg.appendChild(defs);
   // Cuadrícula + ticks Y dinámicos.
   for (const g of ticksY(ymax)) {
     const yy = Y(g);
@@ -105,16 +112,18 @@ function svgBloque(bloque) {
   const esBarra = bloque.grafica === 'barra';
   series.forEach((s, si) => {
     const color = s.color || PALETA[si % PALETA.length];
-    const pts = s.puntos.filter((p) => p.y != null).map((p) => ({ i: catIdx.get(String(p.x)), x: p.x, y: p.y }))
+    const pts = s.puntos.filter((p) => p.y != null).map((p) => ({ i: catIdx.get(String(p.x)), x: p.x, y: p.y, verificar: p.verificar }))
       .filter((p) => p.i != null);
+    const tipVerif = (p) => p.verificar ? ' <span style="color:#b07d12">(a verificar)</span>' : '';
     if (esBarra) {
       const bw = Math.min((innerW / n) * 0.7 / series.length, 26);
       pts.forEach((p) => {
         const cx = xAt(p.i) - (series.length * bw) / 2 + si * bw + bw / 2;
         const yy = Y(p.y), h = (H - T - B) - (yy - T);
-        const rect = el('rect', { x: cx - bw / 2, y: yy, width: bw, height: Math.max(h, 0), rx: 2, fill: color });
-        hookTip(rect, `<b>${esc(s.nombre)}</b> · ${esc(p.x)}<br>${esc(p.y)}${bloque.unidad ? ' ' + esc(bloque.unidad) : ''}`);
+        const rect = el('rect', { x: cx - bw / 2, y: yy, width: bw, height: Math.max(h, 0), rx: 2, fill: p.verificar ? 'url(#peh-hatch)' : color });
+        hookTip(rect, `<b>${esc(s.nombre)}</b> · ${esc(p.x)}<br>${esc(p.y)}${bloque.unidad ? ' ' + esc(bloque.unidad) : ''}${tipVerif(p)}`);
         svg.appendChild(rect);
+        if (p.verificar) tx(svg, cx - bw / 2, yy - 5, '⚠', { 'text-anchor': 'middle', 'font-size': 10, fill: COL.guide });
       });
     } else {
       // línea (o dispersión): polilínea + puntos.
@@ -123,8 +132,11 @@ function svgBloque(bloque) {
         svg.appendChild(el('polyline', { points: d, fill: 'none', stroke: color, 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
       }
       pts.forEach((p) => {
-        const dot = el('circle', { cx: xAt(p.i), cy: Y(p.y), r: 3.6, fill: color });
-        hookTip(dot, `<b>${esc(s.nombre)}</b> · ${esc(p.x)}<br>${esc(p.y)}${bloque.unidad ? ' ' + esc(bloque.unidad) : ''}`);
+        // "verificar" → punto hueco con anillo ámbar (señal de confirmación).
+        const dot = p.verificar
+          ? el('circle', { cx: xAt(p.i), cy: Y(p.y), r: 4, fill: '#fff', stroke: COL.guide, 'stroke-width': 2 })
+          : el('circle', { cx: xAt(p.i), cy: Y(p.y), r: 3.6, fill: color });
+        hookTip(dot, `<b>${esc(s.nombre)}</b> · ${esc(p.x)}<br>${esc(p.y)}${bloque.unidad ? ' ' + esc(bloque.unidad) : ''}${tipVerif(p)}`);
         svg.appendChild(dot);
       });
     }
@@ -172,7 +184,13 @@ export function renderBloque(bloque) {
   card.className = 'pe-bloque';
   const norm = bloque.prueba ? `<span class="norm">${esc(bloque.prueba)}</span>` : '';
   let html = `<h2>${esc(bloque.titulo)} ${BADGE(bloque.calif)} ${norm}</h2>`;
-  if (bloque.observaciones) html += `<div class="callout">${esc(bloque.observaciones)}</div>`;
+  if (bloque.observaciones) {
+    // Callout de hallazgo: ámbar ("Dato a verificar") cuando la calificación o
+    // algún punto pide confirmación humana; informativo ("Hallazgo") si no.
+    const algunVerif = (bloque.series || []).some((s) => (s.puntos || []).some((p) => p.verificar));
+    const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
+    html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Hallazgo'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
+  }
   html += `<div class="chartbox" data-chart></div>`;
   html += tablaBloque(bloque.tabla);
   card.innerHTML = html;

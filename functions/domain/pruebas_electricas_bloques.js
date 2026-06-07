@@ -52,10 +52,15 @@ const arr = (v) => Array.isArray(v) ? v : [];
 export function sanitizarPunto(p) {
   const src = p || {};
   const xNum = num(src.x);
-  return {
+  const out = {
     x: xNum != null ? xNum : str(src.x, 40), // número si se puede; si no, etiqueta
     y: num(src.y)
   };
+  // "verificar": el informe marca este valor como dudoso / a confirmar → el
+  // render lo dibuja RAYADO (hatch). Se omite cuando es false para mantener
+  // los puntos limpios ({x,y}) y el JSON liviano.
+  if (src.verificar === true) out.verificar = true;
+  return out;
 }
 
 /* ─── Serie (una línea / un grupo de barras) ─────────────────── */
