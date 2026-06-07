@@ -121,3 +121,28 @@
 **5.6 Archivos** — `.gitignore` (+Debug/), historial reescrito. Memoria de flujo + `L-25`.
 
 **5.7 Doctrina + caveat** — Límite de guardián (respaldo > reescribir). GitHub puede cachear commits viejos tras el force-push; datos tratados como ya-expuestos. `CLAUDE.md §1`/`L-01`/`L-09` describen el modelo viejo (director deploya); ahora Claude deploya — pendiente actualizar esa redacción en una pasada futura.
+
+---
+
+## 6. ADR-006 — Tablero flexible "bloques de análisis" (modelo agnóstico + render genérico)
+
+> Director (2026-06-06): *"un tablero capaz de mostrar todo, graficar todo lo que la IA analice… que no tenga límites para plasmar su interpretación… piensa como arquitecto de software (escala, seguridad, costo, mantenibilidad, evolución)."*
+
+**6.1 Causa raíz** — El modelo de datos era una **plantilla rígida** (7 pruebas fijas × 1 escalar). Aunque Claude lea el detalle real (17 posiciones de TAP × fases × pares, capacitancia pF, DAR, bushing), no había DÓNDE ponerlo → la plataforma, no la IA, era el límite. Soportar un formato nuevo exigía tocar código (no escala en mantenibilidad).
+
+**6.2 Decisiones de arquitectura** —
+- **Modelo genérico versionado** (`domain/pruebas_electricas_bloques.js`): un informe puede llevar N `bloques`, cada uno = `{prueba, titulo, unidad, eje_x, grafica(linea/barra/dispersion), series:[{nombre,color,puntos:[{x,y}]}], tabla, limite, guia, invertir, calif, observaciones}`. La IA define la estructura; el código no conoce ninguna prueba concreta → **cero código por formato nuevo** (DGA/SFRA/bushing/n-TAP). `schema_version` para migrar.
+- **Render genérico** (`ui/pruebas/grafico-generico.js`): dibuja cualquier bloque (línea/barra multi-serie, eje Y dinámico reusando `ejeMax/ticksY`, tooltips, límite/guía) + tabla. Es el motor "sin límites".
+- **Desacople de almacenamiento (escala/costo)**: el RESUMEN normativo (matriz/semáforo/lista) sigue en el doc Firestore (liviano, va en el `onSnapshot`). El DETALLE pesado (`bloques`) NO infla el doc → se persiste como **JSON en Storage** (`pruebas_electricas/{unidadId}/{informeId}.bloques.json`), inmutable, cacheable, **cargado perezosamente** al abrir el tablero. Respeta el límite de 1 MiB de Firestore y evita arrastrar MB en cada lectura de la biblioteca.
+- **Extraer-una-vez, renderizar-muchas**: Claude (lo caro) corre 1 vez por carga; resultado persistido. Cada vista es lectura gratis.
+- **Seguridad/validación desde el diseño**: `sanitizarBloques` es DEFENSIVO y **ACOTADO** (`LIMITES`: 24 bloques, 16 series, 64 puntos, 80 filas, 18 cols, 240 chars) — la salida del LLM es semi-confiable; nunca se persiste sin acotar (protege Firestore/Storage/render de payloads abusivos). Auth ya exigida; secret en Secret Manager.
+
+**6.3 No-regresión / fases** — Aditivo: la matriz/semáforo y las tablas detalladas actuales se conservan; los bloques se SUMAN. **Fase 1 (este ADR, hecha)**: dominio `bloques` + render genérico + tests (125/125). **Fase 2 (pendiente)**: la función emite `bloques` (tool ampliado) + escribe el JSON a Storage; data layer `cargarBloques`/persistencia. **Fase 3 (pendiente)**: sección en la página + carga perezosa; bushing/capacitancia/DAR/tip-up salen "gratis" del modelo genérico.
+
+**6.4 Tests** — `tests/pruebas_electricas_bloques.test.js` (11): forma, acotamiento (caps), robustez ante basura, x numérico (TAP) y etiqueta (par). Suite 125/125. `node --check` en dominio y render.
+
+**6.5 Anti-patterns evitados** — NO sobre-ingeniería: el contexto real es Firebase + sitio estático + equipo pequeño; el cuello de botella es volumen de datos por documento, no usuarios concurrentes → se desacopla detalle/resumen y se acota, sin meter colas/microservicios que no aportan. NO confiar ciego en el LLM (acotar). NO inflar el doc Firestore con el detalle.
+
+**6.6 Archivos** — *Nuevos*: `assets/js/domain/pruebas_electricas_bloques.js`, `assets/js/ui/pruebas/grafico-generico.js`, `tests/pruebas_electricas_bloques.test.js`. *Pendientes (Fase 2/3)*: `functions/index.js` (tool + Storage JSON), `data/pruebas_electricas.js` (cargar/guardar bloques), `pages/pruebas-electricas.html` + shell (sección + lazy load), `storage.rules` (si aplica).
+
+**6.7 Doctrina + evolución** — Decisión Fuerte (Trigger 🛰️) aprobada por el director. **Evolución documentada**: migrar la extracción de `onCall` a **trigger por evento de Storage** (upload PDF → onFinalize → extrae → escribe resumen+JSON → cliente lo ve por `onSnapshot`) para desacoplar carga↔extracción y sobrevivir desconexiones; diseñado, no forzado hoy. Sin cache bump (no aplica §4).
