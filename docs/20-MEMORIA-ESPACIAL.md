@@ -69,7 +69,8 @@
 - `DEPLOY-FUNCTIONS.md` — despliegue de Cloud Functions.
 - `MANTENIMIENTO-BRIGADA.md` — módulo Selección ONAF (dominio refrigeración, catálogos AFINIA + ZIEHL-ABEGG, informe imprimible).
 - `MANTENIMIENTO-PREDICTIVO.md` · `INDICADORES-CALIDAD.md` · `PLAN-SUMINISTROS.md` · `REPOSITORIO-PRUEBAS-ELECTRICAS.md` — módulos/dominios específicos.
-- **Extracción IA de PDFs (Pruebas Eléctricas)** — Cloud Function `functions/index.js#extraerPruebasElectricasIA` (PDF nativo desde Storage → `auto` tool + adaptive thinking + streaming → `sanitizarInforme`); cliente `data/pruebas_electricas.js#extraerConIA` (+ `eliminarUnidad`); render detallado `ui/pruebas/tabla-pruebas.js` + gráficas `ui/pruebas/grafico-svg.js` (eje Y dinámico). Detalle → `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` + ADRs `99 §3/§4`.
+- **Extracción IA de PDFs (Pruebas Eléctricas)** — Cloud Function `functions/index.js#extraerPruebasElectricasIA` (PDF nativo desde Storage → `auto` tool + adaptive thinking + streaming → `sanitizarInforme`); cliente `data/pruebas_electricas.js#extraerConIA` (+ `eliminarUnidad`); render detallado `ui/pruebas/tabla-pruebas.js` + gráficas `ui/pruebas/grafico-svg.js` (eje Y dinámico). Tablero IA-primaria (bloques): render genérico `ui/pruebas/grafico-generico.js` + dominio `domain/pruebas_electricas_bloques.js` (`derivarTablaTAP`/`bloquesDeExtra`/canal `extra`). Detalle → `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` + ADRs `99 §3/§4/§8`.
+  - **Workflow de auditoría/completitud por sección** (detectar→clasificar→corregir→verificar; auditor `scripts/audit-bloques-pruebas.mjs`) → hoja `workflow-auditoria-secciones-pruebas.md`.
 - `CONTRATO_4125000143_ANALISIS.md` · `MICROCIRUGIA-CONTRATOS-2026-04-27.md` — contratos.
 - `UI-V3-DARKMODE.md` — handoff del sistema visual (histórico; el activo es AQUA LIGHT).
 - `PLAN-SERVICIOS-EXTERNOS.md` — servicios externos (legacy).
