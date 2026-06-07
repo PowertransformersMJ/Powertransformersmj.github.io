@@ -103,6 +103,7 @@ export function sanitizarBloque(b) {
     tabla,
     limite:        num(src.limite),         // línea roja (límite normativo)
     guia:          num(src.guia),           // línea ámbar (guía)
+    limite_desbalance: num(src.limite_desbalance), // criterio de desbalance entre fases (%)
     invertir:      src.invertir === true,   // límite es MÍNIMO (p.ej. aislamiento ≥1 GΩ)
     calif:         str(src.calif, 40),      // calificación global del bloque
     observaciones: str(src.observaciones)   // narrativa del laboratorio (para callout)
