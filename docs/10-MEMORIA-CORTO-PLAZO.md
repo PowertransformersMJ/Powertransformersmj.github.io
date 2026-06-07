@@ -60,7 +60,7 @@
 |---|---|---|---|
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (script `scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
-| **TODO-07** | **Validación VISUAL del tablero (ADR-008) — lote 4 (commit `a790f94`)**: director (1) **pushea `a790f94`** (DESARROLLO→Pages: filtro por fase en barras + franja de criterio verificable) y (2) **re-corre 450108** (función ya deployada → tablas de TAP completas + recalcula scorecard/desviación viejos en un solo re-run). Luego pasa panel/JSON para siguiente lote. Discrepancia a confirmar: resistencia ≤3% (informe) vs ≤5% (criterio/scorecard). | 🔄 abierto | push + re-corrida + feedback del director |
+| **TODO-07** | **Validación VISUAL del tablero (ADR-008) — lote 4 (commit `a790f94`)**: director (1) **pushea `a790f94`** (DESARROLLO→Pages: filtro por fase en barras + franja de criterio verificable) y (2) **re-corre 450108** (función ya deployada → tablas de TAP completas + recalcula scorecard/desviación viejos en un solo re-run). Luego pasa panel/JSON para siguiente lote. (Umbral resistencia ≤5% IEEE 62.2/C57.152 confirmado por el director — sin cambio de código.) | 🔄 abierto | push + re-corrida + feedback del director |
 
 > Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05** (E2E: la IA extrae excelente) y **TODO-06** (bloques Fases 1-3 + extras) → **ADR-008** en `99`.
 
