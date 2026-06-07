@@ -11,7 +11,7 @@
 | Señal | Valor |
 |---|---|
 | **Build** | 🟢 `npm test` (lint + `node --test tests/*`) 996/996 verde (2026-06-06). |
-| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004); tablero flexible "bloques" **Fase 1** + **Fase 2 DESPLEGADA** (función emite `bloques` + data layer guardar/cargar + shell persiste; falta Fase 3 + validar E2E) (ADR-006). Secret `LLM_API_KEY` configurado. |
+| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004); tablero flexible "bloques" **Fases 1-3 hechas** (función emite `bloques` desplegada + data layer + shell persiste y monta sección lazy por año; falta push + validar render E2E) (ADR-006). Secret `LLM_API_KEY` configurado. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-06. |
 | **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` ≈ `106c359` (sin `Debug/`, con features; el director mergea desde DESARROLLO). `origin/DESARROLLO` = `3f8bbdd`. |
