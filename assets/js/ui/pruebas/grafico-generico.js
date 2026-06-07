@@ -237,12 +237,13 @@ export function renderBloque(bloque) {
   let html = `<h2>${esc(bloque.titulo)} ${BADGE(bloque.calif)} ${norm}</h2>`;
   if (bloque.observaciones) {
     // Callout de hallazgo: ámbar ("Dato a verificar") cuando la calificación o
-    // algún punto pide confirmación humana; informativo ("Hallazgo") si no.
+    // algún punto pide confirmación humana; "Análisis de la IA" si no.
     const algunVerif = (bloque.series || []).some((s) => (s.puntos || []).some((p) => p.verificar));
     const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
     html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Análisis de la IA'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
   }
-  html += `<div class="chartbox" data-chart></div>`;
+  html += '<div class="pe-fase-chips" data-chips></div>';
+  html += '<div class="chartbox" data-chart></div>';
   // Tabla: la propia del bloque o, para curvas sin tabla, una derivada de las
   // series (todos los valores por posición de TAP).
   const tabla = (bloque.tabla && bloque.tabla.filas && bloque.tabla.filas.length)
@@ -250,9 +251,43 @@ export function renderBloque(bloque) {
     : ((bloque.grafica !== 'barra') ? tablaDeSeries(bloque) : bloque.tabla);
   html += tablaBloque(tabla);
   card.innerHTML = html;
+
   const chart = card.querySelector('[data-chart]');
-  const svg = svgBloque(bloque);
-  if (svg) chart.appendChild(svg); else chart.remove();
+  const chipsBox = card.querySelector('[data-chips]');
+  const series = bloque.series || [];
+  // Filtro por fase: solo en curvas multi-serie (excitación/relación/resistencia
+  // por TAP). Las barras no se filtran (la comparación es el punto).
+  const filtrable = bloque.grafica !== 'barra' && series.length > 1;
+  const activas = new Set(series.map((_, i) => i));
+
+  const pintar = () => {
+    chart.innerHTML = '';
+    const sub = filtrable ? { ...bloque, series: series.filter((_, i) => activas.has(i)) } : bloque;
+    const svg = svgBloque(sub);
+    if (svg) chart.appendChild(svg);
+  };
+
+  if (filtrable) {
+    series.forEach((s, i) => {
+      const c = s.color || PALETA[i % PALETA.length];
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pe-fase-chip is-on';
+      b.style.setProperty('--c', c);
+      b.textContent = s.nombre || `Serie ${i + 1}`;
+      b.addEventListener('click', () => {
+        if (activas.has(i)) { if (activas.size > 1) activas.delete(i); } // nunca dejar 0
+        else activas.add(i);
+        b.classList.toggle('is-on', activas.has(i));
+        pintar();
+      });
+      chipsBox.appendChild(b);
+    });
+  } else {
+    chipsBox.remove();
+  }
+  pintar();
+  if (!chart.firstChild) chart.remove();
   return card;
 }
 
