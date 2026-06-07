@@ -118,9 +118,10 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
   test('Desviación de excitación = entre las DOS laterales mayores (no la central)', () => {
     const t = derivarTablaTAP(exc);
     const fila1 = t.filas[0];
-    // mayores: C=18.525, A=17.964 → (18.525-17.964)/17.964*100 = 3.123%
-    assert.equal(fila1[fila1.length - 2], 3.123);
-    assert.equal(fila1[fila1.length - 1], 'OK'); // 3.12 ≤ 10
+    // laterales mayores C=18.525, A=17.964 → (18.525-17.964)/18.525*100 = 3.028%
+    // (÷ la MAYOR, como el informe del laboratorio: TAP1 = 3.0%)
+    assert.equal(fila1[fila1.length - 2], 3.028);
+    assert.equal(fila1[fila1.length - 1], 'OK'); // 3.03 ≤ 10
   });
 
   test('extra se ubica en su columna por fase; fase sin extra queda vacía', () => {

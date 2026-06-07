@@ -217,8 +217,9 @@ function bloqueDesviacion(bloque) {
   if (bloque.prueba === 'excitacion') {
     const puntos = cats.map((c) => {
       const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null).sort((a, b) => b - a);
-      if (vals.length < 2 || !vals[1]) return null;
-      return { x: c, y: +(((vals[0] - vals[1]) / Math.abs(vals[1])) * 100).toFixed(3) };
+      if (vals.length < 2 || !vals[0]) return null;
+      // Δ entre las dos laterales mayores, dividido entre la MAYOR (como el informe).
+      return { x: c, y: +(((vals[0] - vals[1]) / Math.abs(vals[0])) * 100).toFixed(3) };
     }).filter(Boolean);
     return {
       titulo: 'Desviación entre fases laterales por TAP (%)',
@@ -358,6 +359,31 @@ function montarGrafica(bloque) {
   return frag;
 }
 
+/* ─── Bloques derivados: magnitudes secundarias (extra) por fase ──────
+ * Una curva por TAP puede traer, además del valor graficado, otra magnitud por
+ * punto en `extra` (p.ej. Potencia (W) en excitación). Se grafica cada clave
+ * `extra` como su propia curva multi-fase con su escala. La tabla ya las incluye
+ * como columnas (derivarTablaTAP). */
+function bloquesDeExtra(bloque) {
+  const series = bloque.series || [];
+  const keys = []; const seen = new Set();
+  for (const s of series) for (const p of (s.puntos || [])) {
+    if (p.extra) for (const k of Object.keys(p.extra)) {
+      if (typeof p.extra[k] === 'number' && !seen.has(k)) { seen.add(k); keys.push(k); }
+    }
+  }
+  return keys.map((k) => ({
+    key: k,
+    bloque: {
+      titulo: k, unidad: '', eje_x: bloque.eje_x, grafica: 'linea',
+      series: series.map((s) => ({
+        nombre: s.nombre, color: s.color,
+        puntos: (s.puntos || []).filter((p) => p.extra && typeof p.extra[k] === 'number').map((p) => ({ x: p.x, y: p.extra[k] }))
+      })).filter((s) => s.puntos.length)
+    }
+  })).filter((e) => e.bloque.series.length);
+}
+
 /**
  * Renderiza UN bloque como tarjeta (título + gráfica + observaciones + tabla).
  * @param {object} bloque  bloque ya sanitizado
@@ -406,6 +432,17 @@ export function renderBloque(bloque) {
       card.appendChild(cap);
       card.appendChild(montarGrafica(dev));
     }
+  }
+
+  // Gráficas DERIVADAS de magnitudes secundarias (extra): p.ej. Potencia (W) en
+  // excitación. Una curva multi-fase por cada clave extra, con su propia escala.
+  for (const ex of bloquesDeExtra(bloque)) {
+    const cap = document.createElement('div');
+    cap.className = 'muted small';
+    cap.style.cssText = 'margin:10px 0 4px';
+    cap.textContent = ex.key;
+    card.appendChild(cap);
+    card.appendChild(montarGrafica(ex.bloque));
   }
 
   // Tabla: la propia del bloque (la IA la transcribe COMPLETA del informe) o,
