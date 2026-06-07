@@ -60,6 +60,18 @@ export function sanitizarPunto(p) {
   // render lo dibuja RAYADO (hatch). Se omite cuando es false para mantener
   // los puntos limpios ({x,y}) y el JSON liviano.
   if (src.verificar === true) out.verificar = true;
+  // "extra": valores secundarios del informe que NO se grafican pero SÍ van a la
+  // tabla de detalle (p.ej. Potencia W, tensión aplicada, R.Referencia). La IA
+  // los adjunta INLINE al punto que ya extrae — más fiable que re-emitir toda la
+  // tabla. Mapa {etiqueta: número}, acotado.
+  if (src.extra && typeof src.extra === 'object' && !Array.isArray(src.extra)) {
+    const e = {};
+    for (const k of Object.keys(src.extra).slice(0, 8)) {
+      const v = num(src.extra[k]);
+      if (v != null) e[str(k, 40)] = v;
+    }
+    if (Object.keys(e).length) out.extra = e;
+  }
   return out;
 }
 
@@ -122,4 +134,79 @@ export function sanitizarBloques(input) {
     .map(sanitizarBloque)
     .filter((b) => b.titulo && (b.series.length || b.tabla.filas.length));
   return { schema_version: BLOQUES_SCHEMA_VERSION, bloques };
+}
+
+/* ─── Tabla de detalle COMPLETA derivada de las series (curvas por TAP) ──
+ * La IA emite las curvas en `series` ({x:TAP, y:valor}) pero NO re-emite la
+ * tabla ancha del informe (probado: omite `tabla` en bloques de curva). Por eso
+ * la construimos AQUÍ, de forma DETERMINISTA, para "ir más allá" del valor por
+ * fase. Columnas: TAP · valor por fase · [columnas `extra` que la IA adjunte al
+ * punto: Potencia W, tensión, R.Ref…] · Desviación % (derivada, física por
+ * prueba) · Evaluación (derivada del umbral de desbalance). Función pura.
+ * @param {object} bloque  bloque sanitizado (con series)
+ * @returns {{columnas:string[], filas:Array<Array>}}
+ */
+export function derivarTablaTAP(bloque) {
+  const series = (bloque && bloque.series || []).filter((s) => (s.puntos || []).length);
+  if (!series.length) return { columnas: [], filas: [] };
+
+  // Orden de categorías X (TAPs): numérico si todas lo son.
+  const xs = []; const vistos = new Set(); let allNum = true;
+  for (const s of series) for (const p of s.puntos) {
+    const k = String(p.x);
+    if (!vistos.has(k)) { vistos.add(k); xs.push(p.x); }
+    if (typeof p.x !== 'number') allNum = false;
+  }
+  if (allNum) xs.sort((a, b) => a - b);
+
+  const mapY = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.y])));
+  const mapEx = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.extra || null])));
+  const phaseNames = series.map((s) => s.nombre || '—');
+
+  // Claves `extra` en orden de aparición (Potencia W, tensión, R.Ref…).
+  const extraKeys = []; const ek = new Set();
+  for (const s of series) for (const p of s.puntos) if (p.extra) for (const k of Object.keys(p.extra)) {
+    if (!ek.has(k)) { ek.add(k); extraKeys.push(k); }
+  }
+
+  const esMultiFase = series.length >= 2;
+  const lim = num(bloque.limite_desbalance);
+  const addDesv = esMultiFase;
+  const addEval = esMultiFase && lim != null;
+
+  const columnas = [bloque.eje_x || 'X', ...phaseNames];
+  for (const k of extraKeys) for (const pn of phaseNames) columnas.push(`${k} · ${pn}`);
+  if (addDesv) columnas.push('Desv. %');
+  if (addEval) columnas.push('Eval.');
+
+  const filas = xs.map((x) => {
+    const key = String(x);
+    const vals = mapY.map((m) => { const v = m.get(key); return v == null ? null : v; });
+    const row = [key, ...vals.map((v) => v == null ? '' : v)];
+    for (const k of extraKeys) for (let si = 0; si < series.length; si++) {
+      const ex = mapEx[si].get(key);
+      row.push(ex && ex[k] != null ? ex[k] : '');
+    }
+    if (addDesv) {
+      const nums = vals.filter((v) => v != null);
+      let d = null;
+      if (nums.length >= 2) {
+        if (bloque.prueba === 'excitacion') {
+          // Criterio IEEE: entre las DOS corrientes laterales (mayores). La fase
+          // central es naturalmente menor (núcleo de 3 columnas) → se excluye.
+          const sorted = nums.slice().sort((a, b) => b - a);
+          d = sorted[1] ? ((sorted[0] - sorted[1]) / Math.abs(sorted[1])) * 100 : null;
+        } else {
+          // Relación / resistencia: máxima desviación de una fase vs el promedio.
+          const prom = nums.reduce((a, b) => a + b, 0) / nums.length;
+          d = prom ? Math.max(...nums.map((v) => Math.abs((v - prom) / prom) * 100)) : null;
+        }
+      }
+      row.push(d == null ? '' : +d.toFixed(3));
+      if (addEval) row.push(d == null ? '' : (Math.abs(d) <= lim ? 'OK' : 'verificar'));
+    }
+    return row.slice(0, LIMITES.COLS);
+  });
+
+  return { columnas: columnas.slice(0, LIMITES.COLS), filas };
 }

@@ -12,6 +12,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { ejeMax, ticksY } from './grafico-svg.js';
+import { derivarTablaTAP } from '../../domain/pruebas_electricas_bloques.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 // Paleta estable (se asigna por índice cuando la serie no trae color).
@@ -197,14 +198,7 @@ function svgBloque(bloque) {
 // (TAP | Fase A | Fase B | Fase C) para que TODOS los valores por posición
 // sean visibles, no solo la curva.
 function tablaDeSeries(bloque) {
-  const series = bloque.series || [];
-  if (!series.length) return { columnas: [], filas: [] };
-  const { cats } = ejeX(series);
-  const mapas = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.y])));
-  const columnas = [bloque.eje_x || 'X', ...series.map((s) => s.nombre || '—')];
-  const filas = cats.map((c) => [String(c),
-    ...mapas.map((m) => { const v = m.get(String(c)); return v == null ? '' : v; })]);
-  return { columnas, filas };
+  return derivarTablaTAP(bloque);
 }
 
 /* ─── Bloque derivado: desviación entre fases por categoría (TAP) ─── */
