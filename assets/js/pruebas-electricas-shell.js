@@ -126,6 +126,36 @@ function renderIdentidad(u) {
   }).join('');
 }
 
+// Separa un grupo vectorial ("YNyn0yn0" → ["YN","yn0","yn0"]) en la conexión
+// de cada devanado: AT (mayúsculas iniciales) + los devanados de BT (grupos
+// minúscula+dígito). Best-effort: si no parsea, deja el string completo.
+function parseGrupo(g) {
+  const s = String(g || '').trim();
+  if (!s) return [];
+  const m = s.match(/^([A-Z]+\d*)(.*)$/);
+  if (!m) return [s];
+  return [m[1], ...((m[2].match(/[a-z]+\d*/g)) || [])];
+}
+
+// Tabla de nomenclatura derivada de la unidad (tensiones + grupo de conexión),
+// en vez de valores fijos que no siempre matchean el transformador.
+function renderNomenclatura(u) {
+  const tb = $('nomencl-body');
+  if (!tb) return;
+  const tens = String((u && u.tensiones) || '').split('/').map((x) => x.replace(/kv/i, '').trim()).filter(Boolean);
+  const grupos = parseGrupo(u && u.grupo_conexion);
+  const DEV = [['AT', 'H'], ['MT', 'X'], ['BT', 'Y']];
+  tb.innerHTML = DEV.map(([dev, t], i) => {
+    const tension = tens[i] ? `${tens[i]} kV` : '—';
+    const conx = grupos[i] || '—';
+    const tieneN = /n/i.test(conx);
+    const ph = (n) => `<span class="ph ${n === 0 ? 'pn' : ['pa', 'pb', 'pc'][n - 1]}">${t}${n}</span>`;
+    return `<tr><td>${esc(dev)}</td><td>${esc(tension)}</td><td>${esc(conx)}</td>` +
+      `<td>${ph(1)}</td><td>${ph(2)}</td><td>${ph(3)}</td>` +
+      `<td>${tieneN ? ph(0) : '<span class="muted2">—</span>'}</td></tr>`;
+  }).join('');
+}
+
 // Paleta de lomos para los libros de la biblioteca. El color se asigna de
 // forma determinista por hash de la serie: misma serie → mismo lomo siempre,
 // sin inventar ningún dato (es puramente presentacional).
@@ -373,13 +403,15 @@ async function montarBloques(unidadId, informes) {
     if (enc) cont.insertBefore(enc, cont.firstChild);
   }
 
-  // Scorecard derivado de la lectura IA del informe VIGENTE (el más reciente
-  // con bloques) → sobreescribe la matriz canónica con la calificación fiel.
+  // Scorecard. Con UN solo informe → derivado de la lectura IA (fiel, sin los
+  // errores del mapeo rígido). Con VARIOS → se conserva la matriz canónica
+  // multi-año (columnas por año = evolución, Etapa 3) ya renderizada en
+  // renderInformesUI; no se sobreescribe.
   const vigente = ordenados.find((inf) => {
     const d = state.bloquesCache.get(inf.id);
     return d && d.bloques && d.bloques.length;
   });
-  if (vigente) renderScorecard($('matrix'), state.bloquesCache.get(vigente.id), vigente);
+  if (vigente && reales.length <= 1) renderScorecard($('matrix'), state.bloquesCache.get(vigente.id), vigente);
 }
 
 // Tira de metadata del informe (ensayo, ejecutante, instrumento, fecha).
@@ -505,6 +537,7 @@ function seleccionarUnidad(u) {
   marcarLibroActivo();
   if (!u) { renderVacioSeleccion(); return; }
   renderIdentidad(u);
+  renderNomenclatura(u);
   escucharInformes(u.id || u.serie);
 }
 
