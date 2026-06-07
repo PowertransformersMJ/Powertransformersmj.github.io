@@ -10,15 +10,15 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) 997/997 verde (2026-06-06). |
-| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004); tablero flexible "bloques" **Fases 1-3 + extras** (ADR-006) + **subsistema de diagnóstico ADR-007** (bloques→Firestore por CORS, log `[IA-DIAG]`, panel admin "interpretación cruda"). Secret `LLM_API_KEY` configurado. |
+| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) 997/997 verde (2026-06-07). |
+| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude): tablero **rediseñado IA-primaria** (ADR-008) — bloques = cuerpo, scorecard derivado, render interactivo (auto-rango, filtro por fase, tabla por TAP, chart de desviación por física de prueba, análisis crítico). Sobre ADR-006 (bloques) + ADR-007 (diagnóstico). Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
-| **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-06. |
-| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` = `8b2cafc` (incluye bloques Fases 2-3 + extras + fixes timeout/X; `git fetch` 2026-06-06). `origin/DESARROLLO` = `121fbc8` (= HEAD, en sync). El director pushea/mergea con rapidez. |
-| **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1, re-deploy 2026-06-06: `bloques`+`verificar`, **timeout 540s, memoria 1GiB** tras timeout en PDF escaneado — L-27). **Flujo nuevo (ADR-005)**: Claude commitea + deploya (firebase CLI local); el **director hace los push**. Force-push a `main` solo el director. |
+| **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-07. |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` = `6a384db`; `origin/DESARROLLO` = `b42b8aa` (= HEAD del código, en sync y mergeado; `git fetch` 2026-06-07). **Pendiente push**: el commit de consolidación del cerebro. |
+| **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1; última: prompt con `limite_desbalance`/IP/análisis crítico; timeout 540s, 1GiB — L-27). **Flujo (ADR-005)**: Claude commitea+deploya (firebase CLI local); el **director pushea**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos
-- **Flujo git (ADR-005)**: Claude commitea+deploya, el director pushea (runtime da 403, L-01); Claude NUNCA force-push a `main`. **Validación E2E + diagnóstico (ADR-007)**: con informe real Applus (22 págs) la extracción salió **incompleta** (solo tan δ; resto vacío) y los bloques **no se veían** (Storage CORS, L-29). Hecho: subsistema de diagnóstico desplegado (log `[IA-DIAG]` + bloques→Firestore + panel admin). **Open follow-up: extracción incompleta** — re-correr 1 vez y leer `firebase functions:log` `[IA-DIAG]` para diagnosticar (prompt/modelo/tokens).
+- **Flujo git (ADR-005)**: Claude commitea+deploya, el director pushea (runtime 403, L-01); nunca force-push a `main`. **Pendiente VISUAL (ADR-008, TODO-07)**: el tablero rediseñado + desviación correcta + análisis sin truncar **solo se ven al RE-CARGAR 450108 una vez** (la versión guardada tiene cálculos/textos viejos; el scorecard se corrige al recargar). La extracción de la IA es EXCELENTE (no es el cuello de botella); falta el OK visual + siguiente feedback. Math de desviación ya verificada.
 
 ## 🧩 Sub-sistemas (resumen)
 - Frontend estático (HTML/CSS/JS vanilla) ✅ · Firebase (Auth + Firestore + Storage) ✅ · Cloud Functions desplegables (F32) ✅ · Vercel `/api` ✅ · PWA/SW ⛔ desactivada.
