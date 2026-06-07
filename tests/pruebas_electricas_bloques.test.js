@@ -159,4 +159,18 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
   test('sin series → tabla vacía', () => {
     assert.deepEqual(derivarTablaTAP({ series: [] }), { columnas: [], filas: [] });
   });
+
+  test('relación: Desv. usa el %DIF reportado (peor caso firmado), no el promedio', () => {
+    const rel = {
+      prueba: 'relacion', eje_x: 'TAP', limite_desbalance: 0.5,
+      series: [
+        { nombre: 'Fase A', puntos: [{ x: 6, y: 3.3057, extra: { '%DIF': -0.07 } }] },
+        { nombre: 'Fase B', puntos: [{ x: 6, y: 3.3059, extra: { '%DIF': -0.06 } }] },
+        { nombre: 'Fase C', puntos: [{ x: 6, y: 3.2663, extra: { '%DIF': -1.26 } }] }
+      ]
+    };
+    const fila = derivarTablaTAP(rel).filas[0];
+    assert.equal(fila[fila.length - 2], -1.26);      // peor %DIF, conservando el signo
+    assert.equal(fila[fila.length - 1], 'verificar'); // |1.26| > 0.5
+  });
 });

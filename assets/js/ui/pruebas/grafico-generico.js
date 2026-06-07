@@ -228,28 +228,54 @@ function bloqueDesviacion(bloque) {
     };
   }
 
-  // Desviación de cada fase vs el promedio entre fases, por TAP.
+  // Si el informe YA reporta la desviación por fila (p.ej. relación trae "%DIF"
+  // en `extra` = desviación vs placa/teórica), úsala DIRECTO: ESA es la que
+  // corresponde al criterio (±X% vs placa). Solo si no existe se deriva la
+  // desviación de cada fase vs el promedio entre fases (caso resistencia:
+  // criterio "≤X% entre fases", sin %DIF en el informe).
+  const devKey = extraDevKey(series);
   const devSeries = series.map((s, si) => {
-    const puntos = cats.map((c) => {
-      const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null);
-      const v = mapas[si].get(String(c));
-      if (v == null || vals.length < 2) return null;
-      const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
-      if (!prom) return null;
-      const pt = { x: c, y: +(((v - prom) / Math.abs(prom)) * 100).toFixed(3) };
-      const orig = (s.puntos || []).find((pp) => String(pp.x) === String(c));
-      if (orig && orig.verificar) pt.verificar = true;
-      return pt;
-    }).filter(Boolean);
+    let puntos;
+    if (devKey) {
+      puntos = (s.puntos || [])
+        .filter((p) => p.extra && typeof p.extra[devKey] === 'number')
+        .map((p) => { const pt = { x: p.x, y: p.extra[devKey] }; if (p.verificar) pt.verificar = true; return pt; });
+    } else {
+      puntos = cats.map((c) => {
+        const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null);
+        const v = mapas[si].get(String(c));
+        if (v == null || vals.length < 2) return null;
+        const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
+        if (!prom) return null;
+        const pt = { x: c, y: +(((v - prom) / Math.abs(prom)) * 100).toFixed(3) };
+        const orig = (s.puntos || []).find((pp) => String(pp.x) === String(c));
+        if (orig && orig.verificar) pt.verificar = true;
+        return pt;
+      }).filter(Boolean);
+    }
     return { nombre: s.nombre, color: s.color, puntos };
   });
   return {
-    titulo: 'Desviación de cada fase por TAP (%)',
+    titulo: devKey
+      ? `Desviación por fase reportada (${devKey}) por TAP`
+      : 'Desviación de cada fase vs promedio por TAP (%)',
     unidad: '%', eje_x: bloque.eje_x, grafica: 'linea',
     limite: lim != null ? lim : null,
     guia: lim != null ? -lim : null,   // banda ±límite
     series: devSeries
   };
+}
+
+// Detecta una clave `extra` que YA es la desviación reportada por el informe
+// (p.ej. "%DIF" en relación). Devuelve la clave o null.
+const _DEV_KEY = /%?\s*dif|desviaci|\bdesv\b/i;
+function extraDevKey(series) {
+  for (const s of (series || [])) for (const p of (s.puntos || [])) {
+    if (p.extra) for (const k of Object.keys(p.extra)) {
+      if (typeof p.extra[k] === 'number' && _DEV_KEY.test(k)) return k;
+    }
+  }
+  return null;
 }
 
 /* ─── Tabla de detalle del bloque ────────────────────────────── */
