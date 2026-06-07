@@ -266,6 +266,35 @@ function tablaBloque(tabla) {
   return `<div class="tblwrap"><table class="dt">${head}${body}</table></div>`;
 }
 
+/* ─── Detección de la dimensión "fase" de un bloque ──────────── */
+// La fase puede vivir en las SERIES (curvas por TAP: una serie por fase) o en
+// las CATEGORÍAS del eje X (barras: una barra por fase, p.ej. bujes H1/H2/H3,
+// resistencia MT/BT por fase A/B/C). Detectamos dónde está para ofrecer el
+// filtro por fase en CUALQUIER gráfica que tenga fases, no solo en las curvas.
+function faseDe(label) {
+  const s = String(label == null ? '' : label);
+  const m = s.match(/fase\s*([abc])\b/i) || s.match(/^\s*([abc])\s*$/i);
+  return m ? m[1].toUpperCase() : null;
+}
+// Devuelve { modo:'serie'|'cat'|null, fases:[{key,label,color}] }.
+function detectarFases(bloque, cats) {
+  const series = bloque.series || [];
+  const fasesSerie = series.map((s) => faseDe(s.nombre)).filter(Boolean);
+  if (fasesSerie.length >= 2) {
+    const fases = series
+      .map((s, i) => ({ key: String(i), label: s.nombre || `Serie ${i + 1}`, color: s.color || PALETA[i % PALETA.length] }))
+      .filter((_, i) => faseDe(series[i].nombre));
+    return { modo: 'serie', fases };
+  }
+  const mapa = new Map(); // 'A' → primer color asignado
+  cats.forEach((c) => { const f = faseDe(c); if (f && !mapa.has(f)) mapa.set(f, null); });
+  if (mapa.size >= 2) {
+    const fases = [...mapa.keys()].sort().map((k, i) => ({ key: k, label: `Fase ${k}`, color: PALETA[i % PALETA.length] }));
+    return { modo: 'cat', fases };
+  }
+  return { modo: null, fases: [] };
+}
+
 const BADGE = (calif) => {
   const c = String(calif || '').toLowerCase();
   let cls = 'b-n';
@@ -292,6 +321,17 @@ export function renderBloque(bloque) {
     const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
     html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Análisis de la IA'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
   }
+  // Criterio de evaluación VERIFICABLE: fórmula aplicada + umbral + norma
+  // (autoritativo, lo adjunta el shell desde el dominio normativo — no la IA).
+  // Permite confirmar POR QUÉ el bloque tiene su calificación.
+  const cr = bloque.criterio;
+  if (cr && (cr.formula || cr.umbral || cr.norma)) {
+    html += '<div class="pe-criterio">'
+      + (cr.formula ? `<span class="pe-cr-item"><b>Fórmula</b> ${esc(cr.formula)}</span>` : '')
+      + (cr.umbral ? `<span class="pe-cr-item"><b>Criterio</b> ${esc(cr.umbral)}</span>` : '')
+      + (cr.norma ? `<span class="pe-cr-item"><b>Norma</b> ${esc(cr.norma)}</span>` : '')
+      + '</div>';
+  }
   html += '<div class="pe-fase-chips" data-chips></div>';
   html += '<div class="chartbox" data-chart></div>';
   // Tabla: la propia del bloque o, para curvas sin tabla, una derivada de las
@@ -305,30 +345,44 @@ export function renderBloque(bloque) {
   const chart = card.querySelector('[data-chart]');
   const chipsBox = card.querySelector('[data-chips]');
   const series = bloque.series || [];
-  // Filtro por fase: solo en curvas multi-serie (excitación/relación/resistencia
-  // por TAP). Las barras no se filtran (la comparación es el punto).
-  const filtrable = bloque.grafica !== 'barra' && series.length > 1;
-  const activas = new Set(series.map((_, i) => i));
+  // Filtro por fase en CUALQUIER gráfica con fases: en curvas la fase es la
+  // serie; en barras (bujes, resistencia MT/BT) la fase es la categoría del eje
+  // X. detectarFases() decide el modo y el render filtra en consecuencia.
+  const { cats } = ejeX(series);
+  const { modo, fases } = detectarFases(bloque, cats);
+  const activas = new Set(fases.map((f) => f.key)); // fases visibles
 
   const pintar = () => {
     chart.innerHTML = '';
-    const sub = filtrable ? { ...bloque, series: series.filter((_, i) => activas.has(i)) } : bloque;
+    let sub = bloque;
+    if (modo === 'serie') {
+      sub = { ...bloque, series: series.filter((_, i) => activas.has(String(i))) };
+    } else if (modo === 'cat') {
+      // Oculta los puntos cuya categoría es una fase no seleccionada; los puntos
+      // sin fase (otras categorías) se conservan siempre.
+      sub = {
+        ...bloque,
+        series: series.map((s) => ({
+          ...s,
+          puntos: (s.puntos || []).filter((p) => { const f = faseDe(p.x); return !f || activas.has(f); })
+        }))
+      };
+    }
     const svg = svgBloque(sub);
     if (svg) chart.appendChild(svg);
   };
 
-  if (filtrable) {
-    series.forEach((s, i) => {
-      const c = s.color || PALETA[i % PALETA.length];
+  if (modo) {
+    fases.forEach((f) => {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'pe-fase-chip is-on';
-      b.style.setProperty('--c', c);
-      b.textContent = s.nombre || `Serie ${i + 1}`;
+      b.style.setProperty('--c', f.color);
+      b.textContent = f.label;
       b.addEventListener('click', () => {
-        if (activas.has(i)) { if (activas.size > 1) activas.delete(i); } // nunca dejar 0
-        else activas.add(i);
-        b.classList.toggle('is-on', activas.has(i));
+        if (activas.has(f.key)) { if (activas.size > 1) activas.delete(f.key); } // nunca dejar 0
+        else activas.add(f.key);
+        b.classList.toggle('is-on', activas.has(f.key));
         pintar();
       });
       chipsBox.appendChild(b);
@@ -339,10 +393,10 @@ export function renderBloque(bloque) {
   pintar();
   if (!chart.firstChild) chart.remove();
 
-  // Chart derivado de desviación entre fases (cuando hay criterio de desbalance
-  // y ≥2 fases). Se grafica vs su límite normativo. Independiente del filtro
-  // (el desbalance es inherentemente entre todas las fases).
-  if (filtrable && bloque.limite_desbalance != null) {
+  // Chart derivado de desviación entre fases (curvas por TAP con criterio de
+  // desbalance). Solo aplica al modo 'serie' (fases como curvas). Independiente
+  // del filtro (el desbalance es inherentemente entre todas las fases).
+  if (modo === 'serie' && bloque.limite_desbalance != null) {
     const dev = bloqueDesviacion(bloque);
     if (dev.series.some((s) => s.puntos.length)) {
       const svg = svgBloque(dev);
