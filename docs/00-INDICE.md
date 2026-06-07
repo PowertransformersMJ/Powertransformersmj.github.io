@@ -64,6 +64,7 @@
 | §5 | ADR-005 — Gobernanza: purga de Debug/ del historial + flujo commit/deploy/push | 107 |
 | §6 | ADR-006 — Tablero flexible "bloques de análisis" (modelo agnóstico + render genérico) | 127 |
 | §7 | ADR-007 — Subsistema de diagnóstico de extracción + bloques a Firestore (revisión ADR-006) | 152 |
+| §8 | ADR-008 — Tablero Pruebas Eléctricas: pipeline bloques completo + rediseño IA-primaria + render interactivo | 175 |
 
 ---
 
