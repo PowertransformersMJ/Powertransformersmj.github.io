@@ -37,10 +37,15 @@ import { sanitizarBloques } from '../domain/pruebas_electricas_bloques.js';
 
 const COL_UNIDADES = 'pruebas_electricas';
 const SUBCOL_INFORMES = 'informes';
+const SUBCOL_DIAG = 'diagnostico';
 
-// Detalle pesado (bloques de análisis, ADR-006) NO infla el doc Firestore:
-// vive como JSON en Storage, junto al PDF de la unidad, con carga perezosa.
-const bloquesPath = (unidadId, informeId) => `${COL_UNIDADES}/${unidadId}/${informeId}.bloques.json`;
+// Diagnóstico de extracción (ADR-007): bloques + interpretación CRUDA de la IA
+// viven en una subcolección perezosa del informe (NO en Storage: el bucket no
+// tiene CORS para lectura desde el navegador, y NO en el doc del informe: lo
+// inflaría en la suscripción viva de la matriz). Se lee solo al abrir el
+// análisis (getDoc), nunca en el onSnapshot de la lista.
+const diagRef = (unidadId, informeId) =>
+  doc(getDbSafe(), COL_UNIDADES, unidadId, SUBCOL_INFORMES, informeId, SUBCOL_DIAG, 'ia');
 
 /* ─── Estado de la capa ───────────────────────────────────────── */
 export function isReady() {
@@ -139,6 +144,9 @@ export async function actualizarInforme(unidadId, informeId, parche) {
 }
 
 export async function eliminarInforme(unidadId, informeId) {
+  // Firestore no cascadea subcolecciones: borrar el diagnóstico (ADR-007)
+  // primero para no dejar un doc huérfano. Best-effort: no bloquea el borrado.
+  await deleteDoc(diagRef(unidadId, informeId)).catch(() => {});
   await deleteDoc(doc(getDbSafe(), COL_UNIDADES, unidadId, SUBCOL_INFORMES, informeId));
 }
 
@@ -151,9 +159,14 @@ export async function eliminarInforme(unidadId, informeId) {
 export async function eliminarUnidad(unidadId) {
   if (!isReady()) throw new Error('Firebase no inicializado.');
   if (!unidadId) throw new Error('Falta el id de la unidad.');
-  // 1) Borra todos los informes de la subcolección.
+  // 1) Borra todos los informes de la subcolección + su diagnóstico (ADR-007:
+  //    Firestore no cascadea subcolecciones, así que el doc diagnostico/ia se
+  //    borra explícitamente para no quedar huérfano).
   const snap = await getDocs(collInformes(unidadId));
-  await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+  await Promise.all(snap.docs.flatMap((d) => [
+    deleteDoc(diagRef(unidadId, d.id)).catch(() => {}),
+    deleteDoc(d.ref)
+  ]));
   // 2) Borra los PDF originales en Storage (toda la carpeta de la unidad).
   const storage = getStorageSafe();
   if (storage) {
@@ -226,54 +239,66 @@ export async function descargarBlobInforme(storagePath) {
   return getBlob(sref(storage, storagePath));
 }
 
-/* ─── Storage · Bloques de análisis (detalle pesado, ADR-006) ─── */
+/* ─── Diagnóstico de extracción (bloques + interpretación cruda, ADR-007) ─── */
 
 /**
- * Persiste los bloques de análisis de un informe como JSON en Storage
- * (desacople lectura ligera ↔ detalle pesado: el doc Firestore NO se
- * infla). Sanitiza/acota con el dominio antes de escribir — la salida del
- * LLM es semi-confiable. Si no hay bloques útiles, NO escribe y devuelve
- * null (informe sin gráficas flexibles, normal).
- * @param {string} unidadId  serie de la unidad
- * @param {string} informeId id del doc del informe (de crearInforme)
+ * Persiste el diagnóstico de extracción de un informe en Firestore
+ * (subcolección perezosa `diagnostico/ia`): los bloques sanitizados + la
+ * interpretación CRUDA de la IA (mediciones, resumen de conteos, modelo,
+ * usage) para poder comparar "lo que el PDF dice ↔ lo que Claude interpretó ↔
+ * lo que se grafica". Se escribe SIEMPRE que la IA corrió — aunque no haya
+ * bloques útiles — porque un diagnóstico vacío también es señal (revela que la
+ * IA no produjo gráficas). NO va a Storage (CORS) ni al doc del informe (lo
+ * inflaría en la suscripción viva).
+ * @param {string} unidadId
+ * @param {string} informeId  id del doc del informe (de crearInforme)
  * @param {Array}  bloquesRaw arreglo crudo de bloques (de la IA)
- * @returns {Promise<{storagePath:string, count:number}|null>}
+ * @param {{modelo?:string, usage?:object, resumen?:object, mediciones_raw?:object}} [diag]
+ * @returns {Promise<{count:number}>}
  */
-export async function guardarBloques(unidadId, informeId, bloquesRaw) {
+export async function guardarBloques(unidadId, informeId, bloquesRaw, diag) {
+  if (!isReady()) throw new Error('Firebase no inicializado.');
   if (!unidadId || !informeId) throw new Error('Falta unidadId o informeId.');
   const limpio = sanitizarBloques(bloquesRaw);
-  if (!limpio.bloques.length) return null;
-  const storage = getStorageSafe();
-  if (!storage) throw new Error('Firebase Storage no inicializado.');
-  const { ref: sref, uploadString } =
-    await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
-  const storagePath = bloquesPath(unidadId, informeId);
-  await uploadString(sref(storage, storagePath), JSON.stringify(limpio), 'raw',
-    { contentType: 'application/json' });
-  return { storagePath, count: limpio.bloques.length };
+  const d = diag || {};
+  const payload = deepClean({
+    schema_version: limpio.schema_version,
+    bloques: limpio.bloques,
+    modelo: d.modelo || null,
+    usage: d.usage || null,
+    resumen: d.resumen || null,
+    mediciones_raw: d.mediciones_raw || null,
+    ts: serverTimestamp()
+  });
+  await setDoc(diagRef(unidadId, informeId), payload);
+  return { count: limpio.bloques.length };
 }
 
 /**
- * Carga perezosa de los bloques de un informe desde Storage. Re-sanitiza a
- * la lectura (defensa en profundidad: el JSON pudo escribirse con otra
- * versión del schema). Devuelve {schema_version, bloques} o null si el
- * informe no tiene bloques (404 = informe previo a ADR-006 o sin gráficas).
+ * Carga perezosa del diagnóstico de un informe desde Firestore (sin CORS).
+ * Re-sanitiza los bloques a la lectura (defensa en profundidad). Devuelve
+ * `{schema_version, bloques, modelo, usage, resumen, mediciones_raw}` o null
+ * si el informe no tiene diagnóstico (previo a ADR-007 o sin extracción IA).
  * @param {string} unidadId
  * @param {string} informeId
- * @returns {Promise<{schema_version:number, bloques:Array}|null>}
+ * @returns {Promise<object|null>}
  */
 export async function cargarBloques(unidadId, informeId) {
-  const storage = getStorageSafe();
-  if (!storage || !unidadId || !informeId) return null;
+  if (!isReady() || !unidadId || !informeId) return null;
   try {
-    const { ref: sref, getBytes } =
-      await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
-    const buf = await getBytes(sref(storage, bloquesPath(unidadId, informeId)));
-    const json = JSON.parse(new TextDecoder().decode(buf));
-    return sanitizarBloques(json && json.bloques);
+    const snap = await getDoc(diagRef(unidadId, informeId));
+    if (!snap.exists()) return null;
+    const d = snap.data() || {};
+    return {
+      schema_version: sanitizarBloques(d.bloques).schema_version,
+      bloques: sanitizarBloques(d.bloques).bloques,
+      modelo: d.modelo || null,
+      usage: d.usage || null,
+      resumen: d.resumen || null,
+      mediciones_raw: d.mediciones_raw || null
+    };
   } catch (err) {
-    // 404/no encontrado = informe sin bloques: la vista cae a las tablas
-    // normativas. No es error de aplicación.
+    console.warn('[pruebas_electricas.cargarBloques]', err);
     return null;
   }
 }
