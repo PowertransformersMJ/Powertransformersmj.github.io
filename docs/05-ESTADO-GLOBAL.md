@@ -10,11 +10,11 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `node --test` 114/114 verde (último cierre 2026-06-06). |
-| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004). Secret `LLM_API_KEY` configurado. |
+| **Build** | 🟢 `node --test` 125/125 verde (cierre 2026-06-06). |
+| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004); tablero flexible "bloques" **Fase 1** hecha (ADR-006). Secret `LLM_API_KEY` configurado. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
-| **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → PR/merge a `main` (producción). Verificado 2026-06-06. |
-| **Producción** | `main` → GitHub Pages (`pages.yml`). Tras force-push 2026-06-06, `origin/main` = `1678809` (sin `Debug/`, con features). |
+| **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-06. |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` ≈ `106c359` (sin `Debug/`, con features; el director mergea desde DESARROLLO). `origin/DESARROLLO` = `3f8bbdd`. |
 | **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1). **Flujo nuevo (ADR-005)**: Claude commitea + deploya (firebase CLI local); el **director hace los push**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos
