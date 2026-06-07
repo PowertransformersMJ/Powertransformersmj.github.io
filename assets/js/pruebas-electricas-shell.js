@@ -427,7 +427,7 @@ function encabezadoInforme(inf) {
 // las pruebas REALMENTE presentes en el informe (sin "OK" fantasma por mapeo
 // rígido). El estado sale de la calificación que la IA emite por bloque.
 const FAMILIAS_SCORE = [
-  { keys: ['tand'],                            label: 'Tan δ / FP · aislamiento del transformador', criterio: 'FP ≤ 1%' },
+  { keys: ['tand', 'tan_delta'],               label: 'Tan δ / FP · aislamiento del transformador', criterio: 'FP ≤ 1%' },
   { keys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes (C1)',           criterio: 'PF < 1%' },
   { keys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δfases < 10%' },
   { keys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5%' },
