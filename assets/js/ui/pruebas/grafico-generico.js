@@ -360,16 +360,19 @@ function montarGrafica(bloque) {
 }
 
 /* ─── Bloques derivados: magnitudes secundarias (extra) por fase ──────
- * Una curva por TAP puede traer, además del valor graficado, otra magnitud por
- * punto en `extra` (p.ej. Potencia (W) en excitación). Se grafica cada clave
- * `extra` como su propia curva multi-fase con su escala. La tabla ya las incluye
- * como columnas (derivarTablaTAP). */
+ * Una curva por TAP puede traer, además del valor graficado, otras magnitudes
+ * por punto en `extra`. TODAS van a la TABLA (derivarTablaTAP). Pero NO todas
+ * merecen su propia gráfica: R.Ref ≈ R.Medida (duplicaría la curva principal),
+ * Tensión/Relación teórica son entradas monótonas, %DIF ya es la desviación. Por
+ * eso SOLO se grafica una magnitud DISTINTA y diagnóstica: la POTENCIA (su propia
+ * escala, p.ej. excitación). Lista ampliable si surge otra magnitud graficable. */
+const EXTRA_GRAFICABLE = /poten|\(\s*w\s*\)|\bk?w\b|\bk?va\b/i;
 function bloquesDeExtra(bloque) {
   const series = bloque.series || [];
   const keys = []; const seen = new Set();
   for (const s of series) for (const p of (s.puntos || [])) {
     if (p.extra) for (const k of Object.keys(p.extra)) {
-      if (typeof p.extra[k] === 'number' && !seen.has(k)) { seen.add(k); keys.push(k); }
+      if (typeof p.extra[k] === 'number' && EXTRA_GRAFICABLE.test(k) && !seen.has(k)) { seen.add(k); keys.push(k); }
     }
   }
   return keys.map((k) => ({
@@ -382,6 +385,22 @@ function bloquesDeExtra(bloque) {
       })).filter((s) => s.puntos.length)
     }
   })).filter((e) => e.bloque.series.length);
+}
+
+/* Subtítulo de una gráfica: QUÉ muestra (título) + QUÉ evalúa (sub). El director
+ * pidió que cada gráfica detalle a qué corresponde y qué está evaluando. */
+function chartCap(titulo, evalua) {
+  const d = document.createElement('div');
+  d.className = 'pe-chart-cap';
+  d.innerHTML = `<span class="pe-chart-ttl">${esc(titulo)}</span>`
+    + (evalua ? `<span class="pe-chart-sub">${esc(evalua)}</span>` : '');
+  return d;
+}
+// "Qué evalúa" de la gráfica principal, derivado del criterio normativo del bloque.
+function evaluaPrincipal(bloque) {
+  const cr = bloque.criterio;
+  if (cr && (cr.umbral || cr.norma)) return `Evalúa: ${[cr.umbral, cr.norma].filter(Boolean).join(' · ')}`;
+  return '';
 }
 
 /**
@@ -414,7 +433,13 @@ export function renderBloque(bloque) {
   }
   card.innerHTML = html;
 
-  // Gráfica principal (chips de filtro por fase + SVG).
+  // Gráfica principal (subtítulo "qué muestra/qué evalúa" + chips de filtro + SVG).
+  const ejeLabel = bloque.eje_x || 'posición';
+  const magnitud = bloque.unidad ? `valores (${bloque.unidad})` : 'valores';
+  card.appendChild(chartCap(
+    `Medición por fase · ${magnitud} vs ${ejeLabel}`,
+    evaluaPrincipal(bloque) || 'Evalúa la tendencia y la simetría entre fases.'
+  ));
   card.appendChild(montarGrafica(bloque));
 
   // Gráfica DERIVADA de desviación entre fases (curvas por TAP con criterio de
@@ -424,24 +449,17 @@ export function renderBloque(bloque) {
   if (modo === 'serie' && bloque.limite_desbalance != null) {
     const dev = bloqueDesviacion(bloque);
     if (dev.series.some((s) => s.puntos.length)) {
-      const cap = document.createElement('div');
-      cap.className = 'muted small';
-      cap.style.cssText = 'margin:10px 0 4px';
       const crit = dev.guia != null ? `±${bloque.limite_desbalance}%` : `≤ ${bloque.limite_desbalance}%`;
-      cap.textContent = `${dev.titulo} — criterio ${crit}`;
-      card.appendChild(cap);
+      const norma = bloque.criterio && bloque.criterio.norma ? ` (${bloque.criterio.norma})` : '';
+      card.appendChild(chartCap(dev.titulo, `Evalúa el desbalance entre fases contra el criterio ${crit}${norma}.`));
       card.appendChild(montarGrafica(dev));
     }
   }
 
-  // Gráficas DERIVADAS de magnitudes secundarias (extra): p.ej. Potencia (W) en
-  // excitación. Una curva multi-fase por cada clave extra, con su propia escala.
+  // Gráficas DERIVADAS de magnitudes secundarias graficables (extra): p.ej.
+  // Potencia (W) en excitación. Una curva multi-fase por su propia escala.
   for (const ex of bloquesDeExtra(bloque)) {
-    const cap = document.createElement('div');
-    cap.className = 'muted small';
-    cap.style.cssText = 'margin:10px 0 4px';
-    cap.textContent = ex.key;
-    card.appendChild(cap);
+    card.appendChild(chartCap(`${ex.key} por fase`, 'Magnitud complementaria del informe, por fase.'));
     card.appendChild(montarGrafica(ex.bloque));
   }
 
