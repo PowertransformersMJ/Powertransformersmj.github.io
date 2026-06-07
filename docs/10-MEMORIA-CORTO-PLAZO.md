@@ -31,8 +31,10 @@
 >    `cargarBloques` (JSON a Storage `…/{informeId}.bloques.json`, carga perezosa, re-sanitiza con dominio);
 >    shell persiste tras `crearInforme` (falla suave). storage.rules YA cubre `.bloques.json` (sin cambio).
 >    Commiteada (falta **push del director**). **PENDIENTE: validar E2E la versión nueva (TODO-05) + Fase 3.**
-> 3. **Fase 3 bloques**: sección en la página + `mountBloques` con carga perezosa (`cargarBloques`) →
->    bushing, capacitancia (pF), DAR, tip-up y **gráficas de línea** salen "gratis" del modelo genérico.
+> 3. **Fase 3 bloques**: **HECHA (2026-06-06, sin push aún)** — sección `#bloques` en la página +
+>    `montarBloques` en el shell: carga perezosa con `cargarBloques` por informe REAL (no seed), cache por
+>    informeId (anti-refetch en onSnapshot), render agrupado por año vía `mountBloques` (Fase 1). Frontend
+>    puro → SIN deploy de función, solo push del director. **Falta validar render en vivo (acoplado al E2E).**
 > 4. Extras maqueta: callout de hallazgo, barras rayadas "verificar", lista dinámica de informes.
 >
 > **MAPA DE ARCHIVOS CLAVE** (ubicar rápido):
@@ -61,7 +63,7 @@
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (script `scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
 | **TODO-05** | Validar extracción IA E2E (1 PDF real, Sonnet) tras fix auto+thinking | 🔄 en curso | prueba del director |
-| **TODO-06** | Tablero flexible "bloques" (ADR-006): **Fase 1 ✅** (dominio `bloques` + render genérico + tests). **Fase 2 ✅ código** (función emite `bloques` + data layer `guardar/cargarBloques` + shell persiste; sin commit/deploy aún). **Fase 3** (sección en página + carga perezosa; bushing/capacitancia/DAR/tip-up). | 🔄 Fase 2 código hecho | commit+deploy Fase 2 · construir Fase 3 |
+| **TODO-06** | Tablero flexible "bloques" (ADR-006): **Fase 1 ✅** (dominio + render genérico). **Fase 2 ✅ desplegada** (función emite `bloques` + data layer + shell persiste). **Fase 3 ✅** (sección `#bloques` + `montarBloques` lazy/cache/por-año). Falta: **push del director + validar render en vivo (E2E)** + extras maqueta opcionales. | 🔄 Fases 1-3 hechas | push + validar E2E |
 
 > Cerrados y consolidados: **TODO-03** (cleanup raíz) y **TODO-04** (IA Pruebas Eléctricas) → ver ADR-003/004 en `99`.
 
@@ -75,6 +77,7 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-06** — **Fase 3 bloques (frontend)**: sección `#bloques` en `pages/pruebas-electricas.html` (antes de Criterios) + estilos `.pe-bloque`/`.pe-bloque-grupo` en el CSS. Shell: `montarBloques(unidadId, informes)` — carga perezosa `cargarBloques` de cada informe REAL (filtra `_seed`), `state.bloquesCache` por informeId (onSnapshot re-renderiza; no refetch), guarda anti-carrera (aborta si la unidad cambió), render agrupado por año desc vía `mountBloques` (Fase 1). Cache se limpia en `seleccionarUnidad`; contenedor se vacía en `renderVacioSeleccion`. Frontend puro → SIN deploy. lint+tests 996/996. **Falta push + validar render en vivo (necesita informe real con bloques en Storage = el E2E aplazado).**
 - **2026-06-06** — **Fase 2 bloques DESPLEGADA**: `firebase deploy --only functions:extraerPruebasElectricasIA` OK (*Successful update operation*, southamerica-east1). Commit creado por Claude; **falta push del director**. El director valida E2E la versión nueva (TODO-05). Decisión del director: deployar ya y validar la versión nueva (opción 2).
 - **2026-06-06** — **Fase 2 bloques (código)**: función `extraerPruebasElectricasIA` ahora emite `bloques` (property aditivo en `HERRAMIENTA_PRUEBAS` + guía en system prompt: curva COMPLETA, complementa NO reemplaza los campos canónicos) y los devuelve en la respuesta. Data layer: `guardarBloques(unidadId, informeId, raw)` (sanitiza con dominio → JSON a Storage `…/{informeId}.bloques.json`, no escribe si vacío) + `cargarBloques` (lazy, re-sanitiza). Shell `storeReport` persiste tras `crearInforme` (captura `informeId`, falla suave). **Hallazgo de diseño**: la función NO conoce el `informeId` (lo crea el cliente DESPUÉS de extraer) → el cliente persiste, la función solo devuelve. storage.rules ya cubre `.bloques.json`. lint OK · 996/996 tests verde. **SIN commit/deploy** (deploy cambia extracción pendiente de validar TODO-05 → decisión del director).
 - **2026-06-06** — Tablero flexible "bloques de análisis" (ADR-006, arquitecto): Fase 1 — dominio genérico `pruebas_electricas_bloques.js` (acotado/versionado) + motor de render `grafico-generico.js` (línea/barra multi-serie, eje dinámico) + 11 tests (suite 125/125). Decisión clave: detalle pesado a JSON en Storage (lazy), resumen liviano en Firestore. Pendiente Fase 2/3 (extracción emite bloques + integración).
