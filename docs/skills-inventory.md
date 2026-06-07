@@ -186,6 +186,26 @@ gitignorado → estas 24 son **local-only**; al re-clonar, re-correr el copy (la
 
 ---
 
+## ⚡ Pruebas Eléctricas (project-specific — construidas in-house)
+
+> A diferencia del resto del catálogo (terceros, portables), estas son **del proyecto**:
+> criterios AFINIA/NETA aterrizados al schema del tablero. Viven SOLO en `skills/pruebas-electricas/`
+> (no hay contraparte de bundle). Lóbulo madre con las decisiones: **`docs/49-PRUEBAS-ELECTRICAS.md`**.
+> Patrón: `SKILL.md` + 4 neuronas `references/` (teoría/cálculos/criterios/diagnóstico) + `_conocimiento/`
+> compartido (tablas NETA). Disp. 🏠 = repo-only del proyecto.
+
+| Skill (carpeta) | Para qué | Disp. |
+|---|---|---|
+| `resistencia-aislamiento` | IR · DAR · PI: corrección de temp a 20 °C + criterio NETA por clase + diagnóstico de humedad | 🏠 ✅ ejemplar completa |
+| `relacion-transformacion`, `corriente-excitacion`, `resistencia-devanados`, `factor-potencia-aislamiento`, `factor-potencia-bujes`, `resistencia-aislamiento-nucleo`, `reactancia-dispersion`, `sfra`, `cambiador-tomas-ltc`, `analisis-aceite`, `dga`, `dfr-respuesta-dielectrica` | resto de la batería 7.2.2 | 🏠 ✅ completas (4 neuronas c/u) |
+
+> **3 marcos compartidos** en `_conocimiento/` que toda skill referencia: `marco-normativo-multinorma.md`
+> (evaluar con varias normas a la vez), `diagnostico-integrado-bateria.md` (convergencia cross-test),
+> `gestion-mantenimiento-predictivo.md` (veredicto → acción + intervalo). Valores `⚠️ verificar` pendientes
+> de confirmar contra la edición de norma del director → `docs/49-PRUEBAS-ELECTRICAS.md`.
+
+---
+
 ## ✅ Cómo usar este catálogo
 
 1. **Trigger 🔵 (`CLAUDE.md §G.2`)** dispara: el cliente pide análisis especializado.

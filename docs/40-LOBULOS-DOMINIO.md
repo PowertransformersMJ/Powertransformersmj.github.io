@@ -29,6 +29,7 @@
 | **46** | Escalabilidad | "audita escalabilidad", "arquitectura", "modernización código", "refactor estructural" | 🟢 vacío | Anti-deuda técnica, patrones, módulos, límites. |
 | **47** | Copywriting | "audita copy", "voz", "tono", "headlines", "CTAs", "mensajes" | 🟢 vacío | Tono de marca, microcopy, headlines, CTAs, mensajes de error. |
 | **48** | Accesibilidad (a11y) | "audita a11y", "WCAG", "lectores de pantalla", "teclado", "contraste" | 🟢 vacío | ARIA, contraste, navegación teclado, alt texts, foco visible, prefers-reduced-motion. |
+| **49** | Pruebas Eléctricas / Diagnóstico | "pruebas eléctricas", "megóhmetro", "IR/PI/DAR", "FP/tan δ", "DGA", "SFRA", "criterios/cálculos/diagnóstico de transformadores" | 🟠 **activo** → `docs/49-PRUEBAS-ELECTRICAS.md` | Cálculos, criterios NETA/IEEE y diagnóstico de la batería de ensayos a tx de potencia. Hogar de las skills `skills/pruebas-electricas/*`. |
 
 **Categorías futuras**: cualquier dominio nuevo que el cliente pida análisis
 (ej. analytics/49, marketing/50, devops/51) se agrega aquí + se crea el
@@ -85,7 +86,12 @@ Distinto de crear un lóbulo: aquí proponemos crear una **skill** nueva.
 5. La instalo en `skills/<nombre>/`.
 6. La **registro** en el lóbulo relevante (sección "Skills consultadas") + en `00-INDICE` (ruta del dominio) + actualizo `skills-inventory.md`.
 
-**Skills creadas así (registro vacío)**: _(añadir entradas a medida que se generen)_
+**Skills creadas así**:
+- **`skills/pruebas-electricas/*`** (2026-06-07, vía `skill-creator`) — familia de skills
+  **project-specific** (NO portables: criterios AFINIA/NETA aterrizados al schema del tablero).
+  Ejemplar completa: `resistencia-aislamiento` (IR·DAR·PI). Documentadas en el lóbulo
+  **`49-PRUEBAS-ELECTRICAS`** + catálogo en `skills-inventory.md`. Pendiente: replicar el patrón
+  de 4 neuronas a las 12 pruebas restantes tras validación del director.
 
 ---
 
