@@ -581,6 +581,11 @@ export const extraerPruebasElectricasIA = onCall(
     };
     const diagnostico = { modelo: model, stop_reason: message.stop_reason || null, usage, resumen };
 
+    // Log CHICO de resumen → SIEMPRE cabe en la ventana de `firebase functions:log`
+    // (el volcado grande [IA-DIAG] a veces no aparece por tamaño). Los conteos
+    // bastan para saber al instante si la IA soltó pruebas.
+    console.info('[IA-DIAG-RESUMEN]', JSON.stringify({ modelo: model, stop_reason: message.stop_reason || null, usage, resumen }));
+
     // Log estructurado [IA-DIAG] → legible con `firebase functions:log` para
     // depurar QUÉ interpretó Claude vs el PDF, SIN re-correr la IA (coste 0).
     // Cap por el límite de tamaño de entrada de log (~256 KB): si el crudo es
