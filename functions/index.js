@@ -469,8 +469,12 @@ export const extraerPruebasElectricasIA = onCall(
   {
     region: 'southamerica-east1',
     secrets: [LLM_API_KEY],
-    timeoutSeconds: 300,
-    memory: '512MiB'
+    // 9 min: un escaneo denso con thinking + extracción de bloques excede los
+    // 300 s previos. Gen2 admite hasta 3600 s. El cliente espera 540 s (igual).
+    timeoutSeconds: 540,
+    // 1 GiB (gen2 acopla más CPU → base64 + visión más rápidos) y margen para
+    // el PDF base64 (~5 MB) + el stream de la respuesta.
+    memory: '1GiB'
   },
   async (request) => {
     if (!request.auth) {
