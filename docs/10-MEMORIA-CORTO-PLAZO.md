@@ -60,7 +60,7 @@
 |---|---|---|---|
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (script `scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
-| **TODO-07** | **Validación VISUAL del tablero rediseñado (ADR-008)**: el director **re-carga 450108 una vez** → confirma en vivo desviación correcta + análisis sin truncar + scorecard tan δ; luego pasa panel/JSON para el siguiente lote de ajustes. (Math ya verificada; extracción de la IA excelente.) | 🔄 abierto | re-carga + feedback del director |
+| **TODO-07** | **Validación VISUAL del tablero (ADR-008) — lote 4 (commit `a790f94`)**: director (1) **pushea `a790f94`** (DESARROLLO→Pages: filtro por fase en barras + franja de criterio verificable) y (2) **re-corre 450108** (función ya deployada → tablas de TAP completas + recalcula scorecard/desviación viejos en un solo re-run). Luego pasa panel/JSON para siguiente lote. Discrepancia a confirmar: resistencia ≤3% (informe) vs ≤5% (criterio/scorecard). | 🔄 abierto | push + re-corrida + feedback del director |
 
 > Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05** (E2E: la IA extrae excelente) y **TODO-06** (bloques Fases 1-3 + extras) → **ADR-008** en `99`.
 
@@ -74,4 +74,5 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-07** — **Lote 4 (feedback del director sobre 450108, commit `a790f94`)**: comparé el informe PDF completo (29 págs) vs el tablero. (1) Filtro por fase ahora en TODAS las gráficas: curvas (fase=serie) y barras (fase=categoría: bujes H1/H2/H3, resistencia MT/BT) vía `detectarFases()` en `grafico-generico.js`. (2) Criterio verificable por bloque (fórmula+umbral+norma) = `CRITERIOS_NORMA` en `pruebas_electricas_schema.js`, lo adjunta el shell por familia (`criterioDe`/`conCriterios`), render en franja `.pe-criterio`. (3) Tablas de TAP incompletas: el render derivaba tabla skinny de las series (solo fase A/B/C); reforcé prompt+schema de la IA para que emita la `tabla` COMPLETA (Potencia W, %DIF, R.Ref, Desviación, Evaluación, voltajes) — requiere re-extract. Función **deployada**. Tests 997/997 + lint verde. **Pend**: director pushea `a790f94` + re-corre 450108.
 - **2026-06-07** — **Cierre de sesión + consolidación**: todo el arco del tablero de Pruebas Eléctricas (pipeline de bloques completo Fases 2-3 + extras, subsistema de diagnóstico, rediseño IA-primaria Etapas 1-3, render interactivo, prompt IA, correcciones) → consolidado en **ADR-008** (`99 §8`) + fila en `00`. Lecciones nuevas L-27..L-31 en `30`. `05` refrescado. `10` podado a este handoff. brain:check SANO. **Único pendiente vivo: TODO-07 (validación visual del director re-cargando 450108).**
