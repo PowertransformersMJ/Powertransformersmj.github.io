@@ -69,11 +69,11 @@
   <!-- ===== TABS: Tablero · Informes cargados ===== -->
   <div class="sgm-tabs" id="pruebasTabs">
     <div role="tablist" class="tab-bar" aria-label="Secciones del módulo Pruebas Eléctricas">
-      <button type="button" role="tab" data-tab="tablero" aria-selected="false">
-        <span class="i"><i data-lucide="layout-dashboard"></i></span>Tablero
-      </button>
       <button type="button" role="tab" data-tab="biblioteca" aria-selected="true">
         <span class="i"><i data-lucide="library"></i></span>Biblioteca
+      </button>
+      <button type="button" role="tab" data-tab="tablero" aria-selected="false">
+        <span class="i"><i data-lucide="layout-dashboard"></i></span>Tablero
       </button>
       <button type="button" role="tab" data-tab="informes" aria-selected="false">
         <span class="i"><i data-lucide="files"></i></span>Informes cargados
@@ -102,7 +102,13 @@
       </div>
 
       <div role="tabpanel" data-tab-panel="tablero">
-  <div class="pe-scope">
+  <div class="pe-scope is-empty" id="tablero-scope">
+
+    <!-- Estado vacío: sin libro seleccionado, el tablero no muestra datos. -->
+    <div id="tablero-empty" class="pe-empty">
+      <h2>Ningún libro abierto</h2>
+      <p class="muted">Selecciona un libro en la pestaña <b>Biblioteca</b> (o escribe su número de serie) para ver su tablero de resultados.</p>
+    </div>
 
     <!-- ===== Resumen de la unidad ===== -->
     <section id="parque">

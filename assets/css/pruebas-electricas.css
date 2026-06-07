@@ -279,6 +279,12 @@
 .pe-scope #bloques-cont .pe-bloque-grupo > h3{font-family:var(--pe-mono);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);margin:0 0 8px;}
 .pe-scope .pe-bloque{border:1px solid var(--pe-border);border-radius:12px;background:var(--pe-surface);box-shadow:var(--pe-shadow);padding:16px 18px;margin:12px 0;}
 .pe-scope .pe-bloque > h2{font-size:1rem;margin:0 0 10px;}
+/* estado vacío del tablero (sin libro seleccionado) */
+#tablero-empty{display:none;}
+#tablero-scope.is-empty > section{display:none;}
+#tablero-scope.is-empty #tablero-empty{display:block;text-align:center;padding:56px 20px;}
+#tablero-scope #tablero-empty h2{margin:0 0 8px;}
+
 /* encabezado de metadata del informe (rediseño Etapa 2) */
 .pe-scope .pe-informe-meta{display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 16px;margin:0 0 16px;border:1px solid var(--pe-border);border-left:3px solid var(--pe-teal);border-radius:10px;background:var(--pe-surface);box-shadow:var(--pe-shadow);}
 .pe-scope .pe-meta-item{font-size:.86rem;color:var(--pe-ink, #2b3a48);}

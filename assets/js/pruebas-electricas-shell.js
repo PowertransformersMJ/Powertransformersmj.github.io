@@ -28,7 +28,6 @@ import {
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
   descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques
 } from './data/pruebas_electricas.js';
-import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
   sanitizarInforme, validarInforme, confirmarSerie, detectarAno
 } from './domain/pruebas_electricas_schema.js';
@@ -63,36 +62,22 @@ const norm = (s) => String(s == null ? '' : s)
 // El merge respeta lo que venga en vivo: una unidad/informe en Firestore
 // con la misma serie/año pisa al seed (el usuario corrigió o reemplazó).
 
+// El libro demo (seed 173523-15510) se RETIRÓ del parque (2026-06-06, a pedido
+// del director): el tablero muestra SOLO unidades reales cargadas. Los exports
+// del seed se conservan como fixtures de tests; aquí ya no se inyectan.
 function mergeUnidades(live) {
-  const out = unidadesSeed();
-  const idx = new Map(out.map((u, i) => [u.id || u.serie, i]));
-  (live || []).forEach((u) => {
-    const k = u.id || u.serie;
-    if (idx.has(k)) out[idx.get(k)] = { ...out[idx.get(k)], ...u };
-    else out.push(u);
-  });
-  return out;
+  return (live || []).slice();
 }
 
-// Combina los informes base (marcados _seed → solo lectura) con los que
-// llegan en vivo. Un informe en vivo cuyo año coincide con el de un seed
-// reemplaza a ese seed; pero DOS informes en vivo NUNCA se colapsan entre
-// sí: cada uno es un documento Firestore con id propio y debe conservarse
+// Cada informe en vivo es un documento Firestore con id propio y se conserva
 // (subir 6 PDFs guarda 6 informes, aunque compartan año o no traigan año).
 function mergeInformes(unidadId, live) {
-  const liveArr = (live || []).slice();
-  const orden = (a, b) => (a.ano || 0) - (b.ano || 0);
-  const base = informesSeed(unidadId);
-  if (!base.length) return liveArr.sort(orden);
-  const anosLive = new Set(liveArr.map((i) => i.ano).filter((a) => a != null));
-  const seed = base
-    .filter((i) => !anosLive.has(i.ano))
-    .map((i) => ({ ...i, _seed: true }));
-  return seed.concat(liveArr).sort(orden);
+  void unidadId;
+  return (live || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
 }
 
-// Series de los libros BASE (seed): son de solo lectura y NO se eliminan.
-const SERIES_SEED = new Set(unidadesSeed().map((u) => String(u.serie || u.id)));
+// Ya no hay libros base de solo lectura → todos los libros reales son borrables.
+const SERIES_SEED = new Set();
 function esSeedSerie(serie) { return SERIES_SEED.has(String(serie)); }
 
 /* ─── KPIs y ficha de identidad ───────────────────────────────── */
@@ -535,6 +520,9 @@ function seleccionarUnidad(u) {
   state.unidadActiva = u;
   state.bloquesCache.clear(); // cache de bloques es por unidad: invalida al cambiar
   marcarLibroActivo();
+  // Sin libro seleccionado el tablero no muestra datos (solo el estado vacío).
+  const scope = $('tablero-scope');
+  if (scope) scope.classList.toggle('is-empty', !u);
   if (!u) { renderVacioSeleccion(); return; }
   renderIdentidad(u);
   renderNomenclatura(u);
