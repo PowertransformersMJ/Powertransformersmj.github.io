@@ -14,7 +14,7 @@
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude): tablero **rediseñado IA-primaria** (ADR-008) — bloques = cuerpo, scorecard derivado, render interactivo. **Lote 4 (2026-06-07, commit `a790f94`, pend. push+re-extract)**: filtro por fase en TODAS las gráficas (curvas=serie, barras=categoría: bujes/resistencia MT-BT), criterio verificable por bloque (fórmula+umbral+norma, `CRITERIOS_NORMA` en dominio), y prompt IA exige tabla de TAP COMPLETA (Potencia W, %DIF, R.Ref, Desviación, Evaluación). Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-07. |
-| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` = `6a384db`; `origin/DESARROLLO` = `b42b8aa`; **HEAD local = `a790f94`** (lote 4, sin pushear). **Pendiente push (director)**: commit de consolidación del cerebro previo + `a790f94`. |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). `git fetch` 2026-06-07: `origin/main` = `a535534` (**lote 4 mergeado y EN PRODUCCIÓN**); `origin/DESARROLLO` = `c7bd4eb`; **HEAD local = `bfc6bfa`** (lote 5 sin pushear: `04f0c2f` código + `bfc6bfa` cerebro). **Pendiente push (director)**: lote 5. |
 | **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1; última 2026-06-07: prompt exige **tabla de TAP completa**, sobre `limite_desbalance`/IP/análisis crítico; timeout 540s, 1GiB — L-27). **Flujo (ADR-005)**: Claude commitea+deploya (firebase CLI local); el **director pushea**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos
