@@ -118,9 +118,8 @@
 
     <!-- ===== Calificación global ===== -->
     <section id="calif">
-      <h2>Calificación global por prueba y año</h2>
+      <h2>Calificación global por prueba</h2>
       <div class="matrix" id="matrix"><p class="muted small">Cargando calificación…</p></div>
-      <p class="muted small">Cada celda se calcula a partir del informe del año; el color sigue el semáforo normativo (verde · ámbar · naranja · rojo).</p>
     </section>
 
     <!-- ===== Identidad de la unidad ===== -->
@@ -154,99 +153,11 @@
       </table></div>
     </section>
 
-    <!-- ===== Tangente δ ===== -->
-    <section id="tand">
-      <h2>Tangente δ (factor de disipación) <span class="norm">IEEE 62 · C57.12.90 · C57.19.100</span></h2>
-      <div class="chartbox"><div id="c-tand"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#1e4e79"></i>CH</span>
-        <span class="lg"><i style="background:#6398c4"></i>CHL</span>
-        <span class="lg"><i style="background:#c0392b"></i>CL</span>
-        <span class="lg"><i style="background:#b07d12"></i>CLT</span>
-        <span class="lg"><i style="background:#1f7a4d"></i>CT</span>
-        <span class="lg"><i style="background:#6b4f9e"></i>CHT</span>
-        <span class="lg muted small">rojo: límite 1 % · ámbar: guía 0.5 %</span>
-      </div>
-      <div id="t-tand"></div>
-    </section>
-
-    <!-- ===== Corriente de excitación ===== -->
-    <section id="excit">
-      <h2>Corriente de excitación <span class="norm">IEEE Std 62</span></h2>
-      <div class="chartbox"><div id="c-exc"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#0f8a99"></i>Desbalance entre fases ext.</span>
-        <span class="lg muted small">rojo 10 % · ámbar 5 %</span>
-      </div>
-      <div id="t-exc"></div>
-    </section>
-
-    <!-- ===== Relación de transformación ===== -->
-    <section id="relacion">
-      <h2>Relación de transformación <span class="norm">IEC 60076-1 · C57.152-2013</span></h2>
-      <div class="chartbox"><div id="c-rel"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#1e4e79"></i>AT-MT</span>
-        <span class="lg"><i style="background:#6b4f9e"></i>AT-Terc</span>
-        <span class="lg muted small">rojo: límite ±0.5 %</span>
-      </div>
-      <div id="t-rel"></div>
-    </section>
-
-    <!-- ===== Resistencia de devanados ===== -->
-    <section id="resist">
-      <h2>Resistencia de devanados <span class="norm">IEC 60076-1 · IEEE 62</span></h2>
-      <div class="chartbox"><div id="c-res"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#1e4e79"></i>AT</span>
-        <span class="lg"><i style="background:#1f7a4d"></i>MT</span>
-        <span class="lg"><i style="background:#6b4f9e"></i>BT</span>
-        <span class="lg muted small">rojo 5 % · barra rayada = verificar</span>
-      </div>
-      <div id="t-res"></div>
-    </section>
-
-    <!-- ===== Resistencia de aislamiento ===== -->
-    <section id="aislam">
-      <h2>Resistencia de aislamiento <span class="norm">Tabla NETA / fabricante</span></h2>
-      <div class="chartbox"><div id="c-ins"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#0f8a99"></i>Resistencia (GΩ)</span>
-        <span class="lg muted small">rojo: mínimo 1 GΩ</span>
-      </div>
-      <div id="t-ins"></div>
-    </section>
-
-    <!-- ===== Collar caliente / bujes ===== -->
-    <section id="collar">
-      <h2>Collar caliente / bujes <span class="norm">Test Data Reference Book (sec. 8)</span></h2>
-      <div class="chartbox"><div id="c-col"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#1f7a4d"></i>Pérdida máx (mW)</span>
-        <span class="lg muted small">rojo: límite 100 mW</span>
-      </div>
-      <div id="t-col"></div>
-    </section>
-
-    <!-- ===== DRM · Resistencia dinámica del conmutador (OLTC) ===== -->
-    <section id="drm">
-      <h2>DRM · conmutador (OLTC) <span class="norm">IEEE C57.152-2013</span></h2>
-      <div class="chartbox"><div id="c-drm"></div></div>
-      <div class="legend">
-        <span class="lg"><i style="background:#1f7a4d"></i>Dentro de ventana</span>
-        <span class="lg"><i style="background:#b07d12"></i>Cerca del borde</span>
-        <span class="lg"><i style="background:#c0392b"></i>Fuera de ventana</span>
-        <span class="lg muted small">ventana normal de transición 40–70 ms</span>
-      </div>
-      <div id="t-drm"></div>
-      <div id="t-drm-id"></div>
-    </section>
-
-    <!-- ===== Análisis detallado (bloques flexibles · IA) ===== -->
+    <!-- ===== Resultados del informe (lectura IA · bloques) ===== -->
     <section id="bloques">
-      <h2>Análisis detallado <span class="norm">extracción IA · todo el informe</span></h2>
-      <p class="muted small">Gráficas y tablas que la IA extrae del PDF más allá de las familias normativas (curvas por posición de TAP, bujes, capacitancia, DAR/PI, etc.). Se cargan bajo demanda desde el informe.</p>
-      <div id="bloques-cont"><p class="muted small">Selecciona una serie para ver su análisis detallado.</p></div>
+      <h2>Resultados del informe <span class="norm">lectura IA · todo el documento</span></h2>
+      <p class="muted small">Cada prueba se grafica y tabula tal como la interpretó la IA del informe de laboratorio (curvas por posición de TAP, secciones de aislamiento, bujes, capacitancia, DAR/PI). Se carga bajo demanda del informe vigente.</p>
+      <div id="bloques-cont"><p class="muted small">Selecciona una serie para ver los resultados del informe.</p></div>
     </section>
 
     <!-- ===== Criterios normativos ===== -->
