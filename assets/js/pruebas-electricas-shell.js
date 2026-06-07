@@ -26,7 +26,7 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
-  descargarBlobInforme, extraerConIA, guardarBloques
+  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques
 } from './data/pruebas_electricas.js';
 import { unidadesSeed, informesSeed } from './data/pruebas_electricas_seed.js';
 import {
@@ -36,6 +36,7 @@ import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
 import { renderInformes, mountTablas } from './ui/pruebas/tabla-pruebas.js';
 import { mountCharts, derivarSeries } from './ui/pruebas/grafico-svg.js';
+import { mountBloques } from './ui/pruebas/grafico-generico.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
 const state = {
@@ -43,7 +44,10 @@ const state = {
   unidadActiva: null,
   informes: [],
   unsubInformes: null,
-  filtroBiblioteca: ''
+  filtroBiblioteca: '',
+  // Cache de bloques por informeId (carga perezosa desde Storage, ADR-006):
+  // onSnapshot re-renderiza en cada cambio; el cache evita refetch del JSON.
+  bloquesCache: new Map()
 };
 
 const $ = (id) => document.getElementById(id);
@@ -302,6 +306,53 @@ function renderInformesUI(informes) {
     kpiEstado.textContent = txt;
     kpiEstado.title = ult ? `Informe vigente ${ult.ano}` : '';
   }
+
+  // Análisis detallado (bloques flexibles, ADR-006): carga perezosa async,
+  // no bloquea el render normativo de arriba.
+  montarBloques(u.id || u.serie, state.informes);
+}
+
+/**
+ * Monta el "Análisis detallado": carga perezosa los bloques (JSON en
+ * Storage, ADR-006) de cada informe REAL de la unidad y los pinta agrupados
+ * por año (más reciente primero), reusando el render genérico de Fase 1.
+ * Los informes seed no tienen bloques. Cache por informeId: onSnapshot
+ * re-renderiza seguido y no debe refetchear el JSON. Falla suave.
+ */
+async function montarBloques(unidadId, informes) {
+  const cont = $('bloques-cont');
+  if (!cont) return;
+  const reales = (informes || []).filter((i) => i && i.id && !i._seed);
+  if (!isReady() || !unidadId || !reales.length) {
+    cont.innerHTML = '<p class="muted small">Sin análisis detallado para esta unidad.</p>';
+    return;
+  }
+  await Promise.all(reales.map(async (inf) => {
+    if (state.bloquesCache.has(inf.id)) return;
+    try { state.bloquesCache.set(inf.id, await cargarBloques(unidadId, inf.id)); }
+    catch { state.bloquesCache.set(inf.id, null); }
+  }));
+  // La unidad pudo cambiar mientras cargaba: aborta si ya no es la activa.
+  const act = state.unidadActiva && (state.unidadActiva.id || state.unidadActiva.serie);
+  if (act !== unidadId) return;
+  const ordenados = reales.slice().sort((a, b) => (b.ano || 0) - (a.ano || 0));
+  cont.innerHTML = '';
+  let alguno = false;
+  for (const inf of ordenados) {
+    const data = state.bloquesCache.get(inf.id);
+    if (!data || !data.bloques || !data.bloques.length) continue;
+    alguno = true;
+    const grupo = document.createElement('div');
+    grupo.className = 'pe-bloque-grupo';
+    const h = document.createElement('h3');
+    h.textContent = `Informe ${inf.ano || 's/a'}`;
+    grupo.appendChild(h);
+    const box = document.createElement('div');
+    mountBloques(box, data);
+    grupo.appendChild(box);
+    cont.appendChild(grupo);
+  }
+  if (!alguno) cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
 }
 
 function escucharInformes(unidadId) {
@@ -318,6 +369,7 @@ function escucharInformes(unidadId) {
 
 function seleccionarUnidad(u) {
   state.unidadActiva = u;
+  state.bloquesCache.clear(); // cache de bloques es por unidad: invalida al cambiar
   marcarLibroActivo();
   if (!u) { renderVacioSeleccion(); return; }
   renderIdentidad(u);
@@ -341,6 +393,9 @@ function renderVacioSeleccion() {
   ['matrix', 'idgrid', 'reportlist'].forEach((id) => {
     const el = $(id); if (el) el.innerHTML = prompt;
   });
+  if ($('bloques-cont')) {
+    $('bloques-cont').innerHTML = '<p class="muted small">Selecciona una serie para ver su análisis detallado.</p>';
+  }
   if ($('kpi-informes')) $('kpi-informes').textContent = '—';
   if ($('kpi-estado')) {
     $('kpi-estado').textContent = '—';
