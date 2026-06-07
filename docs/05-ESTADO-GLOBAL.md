@@ -10,11 +10,11 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) 1018/1018 verde (2026-06-07, hasta aislamiento NETA). |
+| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1027/1027 verde** (2026-06-07, +9 Tendencia F2 timeline). |
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude): tablero **IA-primaria**. **Arco ADR-003→009 EN PRODUCCIÓN** (PR #128): completitud DETERMINISTA (`derivarTablaTAP` + canal `extra` verificado), workflow de auditoría por sección, excitación (Potencia + desviación ÷mayor), relación (desviación = %DIF), **aislamiento NETA por clase** (110 kV→30 GΩ), subtítulos + criterios con fórmula, **pestaña Tendencia (F1)**, **Biblioteca-hub** (informes + PDF). Detalle → `99 §9`. Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-07. |
-| **Producción** | `main` → GitHub Pages (`pages.yml`). `git fetch` 2026-06-07: `origin/main` = `7f2b61b` (**arco ADR-003→009 EN PRODUCCIÓN**, PR #128); `origin/DESARROLLO` = `f2533da` = HEAD local (en sync, mergeado). Nada pendiente de push. |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). `git fetch` 2026-06-07: `origin/main` = `4592f57` (PR #129, incluye consolidación cerebro ADR-009; arco del tablero ADR-003→009 EN PRODUCCIÓN desde PR #128). `origin/DESARROLLO` = `172c305` = HEAD. **Cambios LOCALES sin commitear: Tendencia F2 (franja-timeline)** — 4 archivos (`ui/pruebas/semaforo.js`, `pruebas-electricas-shell.js`, `pruebas-electricas.css`, test nuevo). Pendiente: commit (Claude) + push (director). |
 | **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1; última 2026-06-07: prompt pivotado al **canal `extra` por punto** + schema `point.extra`, sobre `limite_desbalance`/IP/análisis crítico; timeout 540s, 1GiB — L-27). **Flujo (ADR-005)**: Claude commitea+deploya (firebase CLI local); el **director pushea**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos

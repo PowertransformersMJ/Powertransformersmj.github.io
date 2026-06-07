@@ -292,6 +292,17 @@
 .pe-scope .pe-cr-item{display:inline-flex;gap:6px;align-items:baseline;}
 .pe-scope .pe-cr-item b{font-family:var(--pe-mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;}
 
+/* franja-timeline de informes (F2): cronología de la unidad, un nodo por
+   informe coloreado por su estado global (peor prueba) · el último = vigente */
+.pe-scope .pe-timeline{display:flex;flex-wrap:wrap;align-items:flex-start;gap:0;list-style:none;margin:14px 0 18px;padding:0;}
+.pe-scope .pe-tl-nodo{position:relative;flex:1 1 0;min-width:64px;display:flex;flex-direction:column;align-items:center;gap:5px;padding:0 4px;text-align:center;}
+.pe-scope .pe-tl-nodo::before{content:"";position:absolute;top:6px;left:-50%;width:100%;height:2px;background:var(--pe-line);z-index:0;}
+.pe-scope .pe-tl-nodo:first-child::before{display:none;}
+.pe-scope .pe-tl-dot{position:relative;z-index:1;width:14px;height:14px;box-shadow:0 0 0 3px var(--pe-surface);}
+.pe-scope .pe-tl-nodo.is-vigente .pe-tl-dot{width:16px;height:16px;outline:2px solid var(--pe-teal);outline-offset:2px;}
+.pe-scope .pe-tl-ano{font-family:var(--pe-mono);font-size:.72rem;font-weight:600;color:var(--pe-ink,#2b3a48);}
+.pe-scope .pe-tl-sub{font-family:var(--pe-mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);}
+
 /* subtítulo por gráfica: qué muestra (título) + qué evalúa (sub) */
 .pe-scope .pe-chart-cap{margin:14px 0 2px;}
 .pe-scope .pe-chart-cap .pe-chart-ttl{display:block;font-family:var(--pe-mono);font-size:.74rem;font-weight:600;letter-spacing:.03em;color:var(--pe-ink,#2b3a48);}
