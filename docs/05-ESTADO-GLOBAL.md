@@ -15,10 +15,10 @@
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-06. |
 | **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` ≈ `106c359` (sin `Debug/`, con features; el director mergea desde DESARROLLO). `origin/DESARROLLO` = `3f8bbdd`. |
-| **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1, re-deploy 2026-06-06 con `bloques`). **Flujo nuevo (ADR-005)**: Claude commitea + deploya (firebase CLI local); el **director hace los push**. Force-push a `main` solo el director. |
+| **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1, re-deploy 2026-06-06: `bloques`+`verificar`, **timeout 540s, memoria 1GiB** tras timeout en PDF escaneado — L-27). **Flujo nuevo (ADR-005)**: Claude commitea + deploya (firebase CLI local); el **director hace los push**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos
-- **Flujo git (ADR-005)**: Claude commitea+deploya, el director pushea (runtime da 403, L-01); Claude NUNCA force-push a `main`. **Validación pendiente**: fix de completitud de extracción (auto+thinking, ADR-004) requiere 1 prueba E2E real antes de uso masivo.
+- **Flujo git (ADR-005)**: Claude commitea+deploya, el director pushea (runtime da 403, L-01); Claude NUNCA force-push a `main`. **Validación E2E en curso (director)**: 1er intento (DB5.pdf, 5 págs escaneadas) **falló por timeout** (callable 70s default + función 300s) → fix L-27 (timeouts 540s + 1GiB) desplegado; **falta reintentar la subida**.
 
 ## 🧩 Sub-sistemas (resumen)
 - Frontend estático (HTML/CSS/JS vanilla) ✅ · Firebase (Auth + Firestore + Storage) ✅ · Cloud Functions desplegables (F32) ✅ · Vercel `/api` ✅ · PWA/SW ⛔ desactivada.
