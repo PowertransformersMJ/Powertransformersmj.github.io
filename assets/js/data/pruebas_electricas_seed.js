@@ -221,7 +221,7 @@ export function unidadSeed() {
   return { id: UNIDAD_ID, ...sanitizarUnidad(UNIDAD_RAW) };
 }
 
-/** Lista de unidades base (hoy: una sola). */
+/** Unidad base sanitizada (con id para el grid de parque). */
 export function unidadesSeed() {
   return [unidadSeed()];
 }
