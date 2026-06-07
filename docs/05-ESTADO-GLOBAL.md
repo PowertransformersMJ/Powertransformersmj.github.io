@@ -10,15 +10,15 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 tests verdes (`node --test`) + lint HTML limpio al último cierre. |
-| **Versión** | `v2.4.1` (último tag) · cerebro neuronal v1.0.0 instalado y commiteado local (`8a6db90`, ADR-001). Docs de cierre (00/05/10/99) en commit aparte pendiente (ver `10`). |
+| **Build** | 🟢 `node --test` 114/114 verde (último cierre 2026-06-06). |
+| **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004). Secret `LLM_API_KEY` configurado. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
-| **Branch activa** | `main` (verificado 2026-06-04). `main` solo se toca con pedido explícito. |
-| **Producción** | `main` → auto-deploy GitHub Pages (`pages.yml`) en `https://powertransformersmj.github.io/`. Último commit `e372c6c` (Merge PR #92). |
-| **Deploys backend pendientes** | ⚠️ los 4 canales Firebase (rules / indexes / storage / functions) NO tienen auto-deploy — el director los corre a mano en su Mac (ver `CLAUDE.md §1` + `docs/30-LECCIONES.md`). **🆕 PENDIENTE (ADR-003 / TODO-04)**: desplegar función `extraerPruebasElectricasIA` + secret `LLM_API_KEY` (`cd functions && npm install` → `firebase functions:secrets:set LLM_API_KEY` → `firebase deploy --only functions:extraerPruebasElectricasIA`). |
+| **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → PR/merge a `main` (producción). Verificado 2026-06-06. |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). Tras force-push 2026-06-06, `origin/main` = `1678809` (sin `Debug/`, con features). |
+| **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1). **Flujo nuevo (ADR-005)**: Claude commitea + deploya (firebase CLI local); el **director hace los push**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos
-- **Push restringido** (L-01): runtime da 403; único canal es `git push https://USER:TOKEN@github.com/...` con PAT inline. **Deploys Firebase manuales** (L-09): tocar `rules`/`indexes`/`storage`/`functions` exige avisar `firebase deploy` en el mismo turno (`CLAUDE.md §1`).
+- **Flujo git (ADR-005)**: Claude commitea+deploya, el director pushea (runtime da 403, L-01); Claude NUNCA force-push a `main`. **Validación pendiente**: fix de completitud de extracción (auto+thinking, ADR-004) requiere 1 prueba E2E real antes de uso masivo.
 
 ## 🧩 Sub-sistemas (resumen)
 - Frontend estático (HTML/CSS/JS vanilla) ✅ · Firebase (Auth + Firestore + Storage) ✅ · Cloud Functions desplegables (F32) ✅ · Vercel `/api` ✅ · PWA/SW ⛔ desactivada.
