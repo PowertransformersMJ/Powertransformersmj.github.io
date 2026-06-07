@@ -80,6 +80,23 @@ export const CRITERIOS = Object.freeze({
   drm:         'Tiempo de transición del conmutador 40–70 ms · sin discontinuidades'
 });
 
+/* ─── Criterio VERIFICABLE por familia (fórmula + umbral + norma) ───
+ * Lo consume el tablero de bloques (grafico-generico) para que el cliente
+ * pueda CONFIRMAR por qué cada prueba recibe su calificación: muestra la
+ * fórmula aplicada, el umbral usado por el scorecard y la norma de respaldo.
+ * Fuente: normas citadas en los informes + UMBRALES del semáforo. El umbral
+ * coincide a propósito con el que evalúa el scorecard (consistencia). */
+export const CRITERIOS_NORMA = Object.freeze({
+  tand:        { formula: 'tan δ % = pérdidas / (V·I) × 100, por sección de aislamiento', umbral: '≤1% (≤0.5 bueno · 0.5–0.7 normal · 0.7–1 investigar)', norma: 'IEEE 62 · ANSI/IEEE C57.12.90' },
+  excitacion:  { formula: 'Δ% = (I_lateral_mayor − I_lateral_menor) / I_lateral_menor × 100', umbral: 'Δ<10% (I<50 mA) · Δ<5% (I≥50 mA)', norma: 'IEEE Std 62 · ANSI/IEEE C57.12.90' },
+  relacion:    { formula: '%DIF = (relación medida − relación teórica) / relación teórica × 100', umbral: '±0.5% respecto a placa', norma: 'IEEE C57.152-2013 §7.2.10' },
+  resistencia: { formula: 'Δ% = (R_fase − R_promedio) / R_promedio × 100 (corregida a 75 °C)', umbral: '≤5% entre fases', norma: 'IEEE C57.152-2013 · IEEE 62.2-2004' },
+  aislamiento: { formula: 'R_aisl a 1 min · DAR = R(1 min) / R(30 s)', umbral: '≥1 GΩ (mínimo por clase de tensión)', norma: 'ANSI/NETA 2021 tabla 100.5' },
+  bushing:     { formula: 'tan δ del buje % · Capacitancia medida vs valor de placa', umbral: 'tan δ <1% · Cap dentro de ±5–10% de placa', norma: 'IEEE C57.19.100' },
+  collar:      { formula: 'Pérdida del collar caliente por buje (mW)', umbral: '<100 mW', norma: 'Test Data Reference Book' },
+  drm:         { formula: 'Tiempo de transición del conmutador por paso (ms)', umbral: '40–70 ms · sin discontinuidades', norma: 'IEEE C57.152-2013' }
+});
+
 /* ─── Calificadores puros (devuelven una etiqueta de semáforo) ───── */
 
 /** tan δ (%) → bueno | normal | investigar | excesivo */

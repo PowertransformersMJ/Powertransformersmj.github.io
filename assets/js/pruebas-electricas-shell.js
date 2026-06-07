@@ -29,7 +29,7 @@ import {
   descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques
 } from './data/pruebas_electricas.js';
 import {
-  sanitizarInforme, validarInforme, confirmarSerie, detectarAno
+  sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
@@ -54,6 +54,29 @@ const $ = (id) => document.getElementById(id);
 // Normaliza texto para búsqueda: minúsculas + sin acentos (NFD).
 const norm = (s) => String(s == null ? '' : s)
   .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+// Resuelve el criterio normativo (fórmula+umbral+norma) de un bloque a partir
+// de su clave de familia (tolerante a sinónimos de la IA: tan_delta, bushing_*,
+// oltc…). Autoritativo desde el dominio, NO del texto de la IA.
+function criterioDe(prueba) {
+  const p = norm(prueba);
+  if (!p) return null;
+  if (CRITERIOS_NORMA[p]) return CRITERIOS_NORMA[p];
+  if (p.includes('tan')) return CRITERIOS_NORMA.tand;
+  if (p.includes('excit')) return CRITERIOS_NORMA.excitacion;
+  if (p.includes('relac')) return CRITERIOS_NORMA.relacion;
+  if (p.includes('aisl')) return CRITERIOS_NORMA.aislamiento;
+  if (p.includes('resist')) return CRITERIOS_NORMA.resistencia;
+  if (p.includes('bush') || p.includes('buje')) return CRITERIOS_NORMA.bushing;
+  if (p.includes('collar')) return CRITERIOS_NORMA.collar;
+  if (p.includes('drm') || p.includes('oltc') || p.includes('conmutad')) return CRITERIOS_NORMA.drm;
+  return null;
+}
+// Adjunta `criterio` a cada bloque (copia superficial; no muta el cache).
+function conCriterios(data) {
+  const bloques = (data && data.bloques) || [];
+  return { ...data, bloques: bloques.map((b) => { const c = criterioDe(b && b.prueba); return c ? { ...b, criterio: c } : b; }) };
+}
 
 /* ─── Seed: unidad + 3 informes base (datos reales históricos) ─── */
 // La capa de datos emite [] cuando Firebase no está activo ("solo datos
@@ -368,7 +391,7 @@ async function montarBloques(unidadId, informes) {
     grupo.appendChild(h);
     if (tieneBloques) {
       const box = document.createElement('div');
-      mountBloques(box, data);
+      mountBloques(box, conCriterios(data));
       grupo.appendChild(box);
     } else {
       const vacio = document.createElement('p');
