@@ -577,6 +577,16 @@ function arrancar() {
   if (rl) rl.addEventListener('click', onClickReportlist);
   const pg = $('parque-grid');
   if (pg) pg.addEventListener('click', onClickParque);
+  // La "X" de eliminar libros (y los borrados por informe) dependen de
+  // esAdmin() → window.__sgmSession, que el session-guard resuelve de forma
+  // ASÍNCRONA (auth + fetch del perfil). Si el snapshot de unidades renderiza
+  // ANTES de que el rol esté listo, la X no aparece (intermitencia por
+  // carrera). Al resolverse la sesión, re-render para que esAdmin() ya sea
+  // verdadero. Si la sesión ya estaba lista, el primer render ya mostró la X.
+  window.addEventListener('sgm:session-ready', () => {
+    renderParqueGrid(state.unidades);
+    if (state.unidadActiva) renderInformesUI(state.informes);
+  });
   // Campo único de "Número de serie": digitable, no seleccionable. Filtra
   // los libros de la biblioteca en vivo y, al coincidir con una unidad,
   // abre su tablero. No usa <select> ni <datalist> (CLAUDE.md §0.1.2.12).
