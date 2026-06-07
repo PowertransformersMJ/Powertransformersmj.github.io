@@ -573,6 +573,19 @@ export function validarInforme(inf) {
 }
 
 /**
+ * Clave canónica de un número de serie: sin espacios ni guiones (incluye los
+ * guiones Unicode \u2010-\u2015) y en mayúsculas. Dos formatos del MISMO serie
+ * (`173523-15510` vs `17352315510`) colapsan a la misma clave → permite agrupar
+ * informes del mismo transformador aunque se teclee con distinto formato.
+ * NO se usa como docId (no rompe datos existentes): solo para COMPARAR.
+ * @param {string} serie
+ * @returns {string}
+ */
+export function normalizarSerie(serie) {
+  return str(serie).replace(/[\s\u2010-\u2015-]/g, '').toUpperCase();
+}
+
+/**
  * Verifica que la serie detectada en el PDF coincide con la ingresada
  * por el usuario (paso 3 del flujo de carga del tablero original).
  * @param {string} serieIngresada serie tecleada antes de cargar
@@ -583,8 +596,7 @@ export function confirmarSerie(serieIngresada, textoPdf) {
   const serie = str(serieIngresada);
   const texto = str(textoPdf);
   if (!serie) return { coincide: false, serieIngresada: serie, encontrada: false };
-  const norm = (x) => x.replace(/[\s\u2010-\u2015-]/g, '').toUpperCase();
-  const encontrada = norm(texto).includes(norm(serie));
+  const encontrada = normalizarSerie(texto).includes(normalizarSerie(serie));
   return { coincide: encontrada, serieIngresada: serie, encontrada };
 }
 

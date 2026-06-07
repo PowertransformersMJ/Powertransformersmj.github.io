@@ -18,7 +18,7 @@ import assert from 'node:assert/strict';
 import {
   sanitizarUnidad, validarUnidad,
   sanitizarInforme, validarInforme,
-  confirmarSerie, detectarAno, CONFIGS_TAND, TIPOS_PRUEBA
+  confirmarSerie, detectarAno, CONFIGS_TAND, TIPOS_PRUEBA, normalizarSerie
 } from '../assets/js/domain/pruebas_electricas_schema.js';
 import { calificarPrueba } from '../assets/js/ui/pruebas/semaforo.js';
 import { informesSeed } from '../assets/js/data/pruebas_electricas_seed.js';
@@ -127,6 +127,28 @@ describe('confirmarSerie (paso 3 del flujo de carga)', () => {
   });
   test('serie vacía → no coincide', () => {
     assert.equal(confirmarSerie('', 'cualquier texto').coincide, false);
+  });
+});
+
+describe('normalizarSerie (clave canónica para agrupar el mismo transformador)', () => {
+  test('colapsa guiones y espacios a la misma clave', () => {
+    assert.equal(normalizarSerie('173523-15510'), '17352315510');
+    assert.equal(normalizarSerie('173523 15510'), '17352315510');
+    assert.equal(normalizarSerie(' 173523-15510 '), '17352315510');
+  });
+  test('mismo serie con distinto formato → misma clave (no parte la tendencia)', () => {
+    assert.equal(normalizarSerie('173523-15510'), normalizarSerie('17352315510'));
+  });
+  test('mayúsculas: normaliza el caso', () => {
+    assert.equal(normalizarSerie('ab-12cd'), 'AB12CD');
+  });
+  test('series distintas → claves distintas', () => {
+    assert.notEqual(normalizarSerie('173523-15510'), normalizarSerie('999999'));
+  });
+  test('vacío/nulo → cadena vacía', () => {
+    assert.equal(normalizarSerie(''), '');
+    assert.equal(normalizarSerie(null), '');
+    assert.equal(normalizarSerie(undefined), '');
   });
 });
 

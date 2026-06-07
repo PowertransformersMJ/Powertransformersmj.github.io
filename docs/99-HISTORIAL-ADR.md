@@ -222,3 +222,23 @@
 **9.6 Archivos** — `domain/pruebas_electricas_bloques.js` (`derivarTablaTAP`, `extra`, `devKey`), `domain/pruebas_electricas_schema.js` (`CRITERIOS_NORMA`, `UMBRAL_DESBALANCE`, NETA), `domain/pruebas_electricas_tendencia.js` (nuevo), `ui/pruebas/grafico-generico.js` (`bloquesDeExtra`, `chartCap`, desviación %DIF), `pruebas-electricas-shell.js` (`conCriterios`, `renderTendenciaUI`, biblioteca-hub, `renderCriteriosNorma`), `pages/pruebas-electricas.html`, `assets/css/pruebas-electricas.css`, `functions/index.js` (prompt), `scripts/audit-bloques-pruebas.mjs` (nuevo), hoja `workflow-auditoria-secciones-pruebas.md` (nueva).
 
 **9.7 Doctrina + evolución** — "Lo computable, derívalo en cliente; lo único-del-PDF, pásalo por `extra`; los umbrales normativos, por dominio." **Pendientes (Fases 2-3 de tendencia)**: biblioteca como timeline de informes + narrativa de tendencia por IA. Sin cache bump (no aplica §4).
+
+## 10. ADR-010 — Tendencia F2 + F3: franja-timeline de informes + narrativa de tendencia por IA
+
+> Director (2026-06-07): cerrar el arco de Tendencia pendiente de ADR-009 §9.7. Arrancar por F2 (determinista), luego F3 (IA on-demand, función dedicada + cacheo por unidad). **EN PRODUCCIÓN** (F2 PR #130, F3 PR #131, `main` `75daf29`). ⚠️ Verificación VISUAL en vivo pendiente del director (la UI está gated por Auth+Firestore; Claude no pudo probar en navegador).
+
+**10.1 Causa raíz** — La pestaña Tendencia (ADR-009 F1) graficaba la evolución por métrica, pero (a) el historial de la unidad era una lista plana sin lectura de un vistazo de "cómo va la salud informe a informe", y (b) interpretar las series exigía criterio de ingeniería que el usuario no siempre tiene a mano.
+
+**10.2 Decisiones / cambios** —
+- **F2 · franja-timeline (determinista, sin IA)**: `estadoInforme(inf)` + `lineaTiempoInformes(informes)` en `ui/pruebas/semaforo.js` (puras) reusan EXACTAMENTE `calificarPrueba`+`estadoGlobal` → el estado por nodo NUNCA diverge de la matriz. `renderTendenciaUI` pinta `<ol.pe-timeline>` (un nodo/informe, color = peor prueba, último = "vigente") arriba de las gráficas. `estadoVigente` refactorizado para delegar en `estadoInforme`.
+- **F3 · narrativa por IA (on-demand, barata)**: Cloud Function dedicada `narrativaTendenciaIA` (onCall, southamerica-east1, sonnet por defecto, 120s/512MiB, sin visión/thinking) que **NO re-lee PDFs** — recibe el resumen numérico ya extraído. Dominio `resumenTendenciaParaIA(informes)` arma el payload compacto desde `bloquesTendencia` ([] si <2 puntos). Capa datos `narrarTendencia(payload)` (httpsCallable, timeout 120s). Shell: botón `#btn-narrar` + `narrativaToHtml` (markdown-lite ANTI-XSS: escapa y reaplica) + **cache por unidad** (`state.narrativaCache`, clave unidad+nº informes → se invalida con informe nuevo). CSS `.pe-narrativa`.
+
+**10.3 No-regresión** — Aditivo. `estadoVigente` conserva su firma/semántica (delega en `estadoInforme`). Sin renombres de exports. El botón se renderiza dinámico (sin HTML estático nuevo). `functions/domain` re-sincronizado por el predeploy (idéntico a `assets/js/domain`).
+
+**10.4 Tests / verificación** — `node --test` **1031/1031** + lint. Nuevos: `tests/pruebas_electricas_timeline.test.js` (9: estadoInforme/estadoVigente/lineaTiempoInformes) + 4 en `pruebas_electricas_tendencia.test.js` (resumenTendenciaParaIA). CF desplegada OK (create operation). ⚠️ Sin verificación de UI en navegador (gated).
+
+**10.5 Anti-patterns evitados** — NO duplicar la lógica de calificación para el timeline (reusar `calificarPrueba` → cero divergencia); NO re-subir el PDF para análisis SECUNDARIO (mandar datos ya extraídos → función barata, L-35); NO innerHTML del texto crudo del modelo (markdown-lite anti-XSS); NO auto-llamar a la IA en cada apertura (on-demand + cache por unidad → costo controlado).
+
+**10.6 Archivos** — `ui/pruebas/semaforo.js` (`estadoInforme`, `lineaTiempoInformes`), `domain/pruebas_electricas_tendencia.js` (`resumenTendenciaParaIA`), `data/pruebas_electricas.js` (`narrarTendencia`), `pruebas-electricas-shell.js` (`timelineHtml`, `narrativaSectionHtml`, `onGenerarNarrativa`, `state.narrativaCache`), `functions/index.js` (`narrativaTendenciaIA` + `SYSTEM_NARRATIVA_TENDENCIA`), `assets/css/pruebas-electricas.css` (`.pe-timeline`/`.pe-tl-*`/`.pe-narrativa`), tests nuevos.
+
+**10.7 Doctrina + evolución** — "Extracción (PDF→datos) es cara y se hace una vez; razonar SOBRE datos (datos→prosa) es barato y on-demand: nunca re-subas la fuente cruda para lo segundo" (L-35). Cierra el arco Tendencia F1-F3. Sin cache bump (no aplica §4). Próximo: confirmación visual del director + seguir validando secciones con informes reales.

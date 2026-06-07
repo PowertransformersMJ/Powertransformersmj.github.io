@@ -30,7 +30,7 @@ import {
 } from './data/pruebas_electricas.js';
 import {
   sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE,
-  minNetaGohm, kvAT
+  minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes } from './ui/pruebas/semaforo.js';
@@ -306,9 +306,11 @@ function onClickParque(ev) {
   const inp = $('serieInput');
   if (inp) inp.value = v;
   seleccionarUnidad(u);
-  // Abrir un libro lleva al Tablero, donde se ilustra toda la información
-  // de la unidad (matriz, identidad, tablas y gráficas de las pruebas).
-  irAlTablero();
+  // Abrir un libro NO salta al tablero: despliega el hub "Libro abierto" con sus
+  // opciones (Ver tablero / Ver tendencia + informes/PDF) para que el usuario
+  // decida qué hacer. Se hace visible y se trae a la vista.
+  const libro = $('biblioteca-libro');
+  if (libro && libro.scrollIntoView) libro.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 // Elimina un libro completo (unidad + informes + PDF). Admin + backend.
@@ -1455,7 +1457,15 @@ async function extraerTexto(item) {
 }
 
 async function storeReport() {
-  const unidadId = UP.serie;
+  // Dedupe de serie: si ya existe un libro cuya serie NORMALIZADA coincide con
+  // la tecleada (mismo transformador escrito con otro formato de guiones/espacios),
+  // se reutiliza su docId existente → los informes se agrupan en el MISMO libro y
+  // la tendencia no se parte en dos. Si no hay match, se usa la serie tal cual.
+  const claveSerie = normalizarSerie(UP.serie);
+  const existente = (state.unidades || []).find(
+    (u) => normalizarSerie(u.serie || u.id) === claveSerie
+  );
+  const unidadId = (existente && (existente.serie || existente.id)) || UP.serie;
   const body = $('mBody');
   const total = UP.items.length;
   const procHtml = (i) => `<div class="proc"><div class="spin"></div>` +
