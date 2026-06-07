@@ -34,8 +34,8 @@ import {
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { renderMatriz, estadoVigente } from './ui/pruebas/semaforo.js';
-import { renderInformes, mountTablas } from './ui/pruebas/tabla-pruebas.js';
-import { mountCharts, derivarSeries } from './ui/pruebas/grafico-svg.js';
+import { ESTADOS } from './domain/pruebas_electricas_semaforo.js';
+import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
@@ -280,14 +280,12 @@ function renderInformesUI(informes) {
   state.informes = informes || [];
   const u = state.unidadActiva || {};
 
-  // Matriz de calificación (semáforo)
+  // Scorecard: arranca con la matriz canónica (multi-año) como base/fallback;
+  // si el informe vigente trae bloques de la IA, montarBloques la SOBREESCRIBE
+  // con el scorecard derivado de la lectura IA (fuente de verdad, sin los
+  // errores de mapeo rígido — ADR-007 / rediseño). Las secciones de detalle
+  // rígidas se retiraron: el cuerpo del informe son los bloques.
   renderMatriz($('matrix'), state.informes);
-
-  // Tablas de detalle por prueba
-  mountTablas(state.informes, document);
-
-  // Gráficas derivadas de los informes en vivo (sin datos → estado vacío)
-  mountCharts(derivarSeries(state.informes), document);
 
   // Historial + KPI de conteo
   renderInformes($('reportlist'), state.informes, {
@@ -367,6 +365,64 @@ async function montarBloques(unidadId, informes) {
     cont.appendChild(grupo);
   }
   if (!alguno) cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
+
+  // Scorecard derivado de la lectura IA del informe VIGENTE (el más reciente
+  // con bloques) → sobreescribe la matriz canónica con la calificación fiel.
+  const vigente = ordenados.find((inf) => {
+    const d = state.bloquesCache.get(inf.id);
+    return d && d.bloques && d.bloques.length;
+  });
+  if (vigente) renderScorecard($('matrix'), state.bloquesCache.get(vigente.id), vigente);
+}
+
+/* ─── Scorecard derivado de los bloques (lectura IA = fuente de verdad) ─── */
+// Familias normativas → claves de bloque que las representan. Solo se muestran
+// las pruebas REALMENTE presentes en el informe (sin "OK" fantasma por mapeo
+// rígido). El estado sale de la calificación que la IA emite por bloque.
+const FAMILIAS_SCORE = [
+  { keys: ['tand'],                            label: 'Tangente δ (FP)',                criterio: 'FP ≤ 1%' },
+  { keys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes',    criterio: 'PF < 1%' },
+  { keys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δfases < 10%' },
+  { keys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5%' },
+  { keys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δfases ≤ 5%' },
+  { keys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ 1 GΩ' },
+  { keys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' }
+];
+
+// Mapea la calificación textual de la IA a un estado del semáforo.
+function estadoDeCalif(calif, hayVerificar) {
+  const c = String(calif || '').toLowerCase();
+  if (hayVerificar || /verificar|investigar|revisar|sospech/.test(c)) return ESTADOS.AMBAR;
+  if (/excesivo|fuera|alto|bajo|pobre|deficiente|peligro|falla|cr[ií]tic/.test(c)) return ESTADOS.ROJO;
+  if (/satisfactorio|\bok\b|normal|favorable|dentro|bueno|aceptable/.test(c)) return ESTADOS.VERDE;
+  return ESTADOS.NEUTRAL;
+}
+
+function renderScorecard(cont, data, inf) {
+  if (!cont) return;
+  const bloques = (data && data.bloques) || [];
+  if (!bloques.length) return; // sin bloques: conserva el fallback canónico
+  const filas = FAMILIAS_SCORE.map((fam) => {
+    const bs = bloques.filter((b) => fam.keys.includes(b.prueba));
+    if (!bs.length) return null;
+    const hayVerif = bs.some((b) => (b.series || []).some((s) => (s.puntos || []).some((p) => p.verificar)));
+    let peor = ESTADOS.VERDE, calif = '';
+    bs.forEach((b) => {
+      const e = estadoDeCalif(b.calif, hayVerif);
+      if (e.nivel > peor.nivel) peor = e;
+      if (!calif && b.calif) calif = b.calif;
+    });
+    if (hayVerif && ESTADOS.AMBAR.nivel > peor.nivel) peor = ESTADOS.AMBAR;
+    return { label: fam.label, criterio: fam.criterio, estado: peor, texto: calif || 'medido' };
+  }).filter(Boolean);
+  if (!filas.length) return;
+  const cap = inf ? `Informe ${inf.ano || 's/a'} · calificación según la lectura IA del documento` : 'Calificación según la lectura IA';
+  const body = filas.map((f) =>
+    `<tr><td class="cfg">${esc(f.label)}</td>` +
+    `<td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${esc(f.texto)}</span></td>` +
+    `<td class="muted small">${esc(f.criterio)}</td></tr>`).join('');
+  cont.innerHTML = `<table><thead><tr><th>Prueba</th><th>Calificación</th><th>Criterio</th></tr></thead><tbody>${body}</tbody></table>` +
+    `<p class="muted small" style="margin-top:8px">${esc(cap)}</p>`;
 }
 
 /**
@@ -430,12 +486,8 @@ function renderVacioSeleccion() {
   if (state.unsubInformes) { state.unsubInformes(); state.unsubInformes = null; }
   state.informes = [];
   const prompt = '<p class="muted small">Selecciona un número de serie para ilustrar esta sección.</p>';
-  // Contenedores que se vacían por completo (tablas y gráficas)
-  ['t-tand', 't-exc', 't-rel', 't-res', 't-ins', 't-col',
-   'c-tand', 'c-exc', 'c-rel', 'c-res', 'c-ins', 'c-col'].forEach((id) => {
-    const el = $(id); if (el) el.innerHTML = '';
-  });
-  // Contenedores con prompt explícito
+  // Contenedores con prompt explícito (las secciones de detalle rígidas se
+  // retiraron; el cuerpo del informe son los bloques).
   ['matrix', 'idgrid', 'reportlist'].forEach((id) => {
     const el = $(id); if (el) el.innerHTML = prompt;
   });
