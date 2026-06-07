@@ -667,6 +667,16 @@ service cloud.firestore {
                       && request.resource.data.ano is number;
         allow update: if isAdmin();
         allow delete: if isAdmin();
+
+        // Diagnóstico de extracción (ADR-007): bloques + interpretación cruda
+        // de la IA. Subcolección perezosa (no se lee en la suscripción viva).
+        // Las reglas NO cascadean → match explícito. Lectura para el equipo,
+        // escritura solo admin.
+        match /diagnostico/{d} {
+          allow read: if isTeamMember();
+          allow create, update: if isAdmin();
+          allow delete: if isAdmin();
+        }
       }
     }
 

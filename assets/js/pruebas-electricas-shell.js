@@ -313,11 +313,12 @@ function renderInformesUI(informes) {
 }
 
 /**
- * Monta el "Análisis detallado": carga perezosa los bloques (JSON en
- * Storage, ADR-006) de cada informe REAL de la unidad y los pinta agrupados
- * por año (más reciente primero), reusando el render genérico de Fase 1.
- * Los informes seed no tienen bloques. Cache por informeId: onSnapshot
- * re-renderiza seguido y no debe refetchear el JSON. Falla suave.
+ * Monta el "Análisis detallado": carga perezosa el diagnóstico de extracción
+ * (bloques + interpretación cruda, Firestore ADR-007) de cada informe REAL de
+ * la unidad y lo pinta agrupado por año (más reciente primero), reusando el
+ * render genérico de Fase 1. Para admin añade el panel de interpretación cruda
+ * (ADR-007). Los informes seed no tienen diagnóstico. Cache por informeId:
+ * onSnapshot re-renderiza seguido y no debe refetchear. Falla suave.
  */
 async function montarBloques(unidadId, informes) {
   const cont = $('bloques-cont');
@@ -335,24 +336,69 @@ async function montarBloques(unidadId, informes) {
   // La unidad pudo cambiar mientras cargaba: aborta si ya no es la activa.
   const act = state.unidadActiva && (state.unidadActiva.id || state.unidadActiva.serie);
   if (act !== unidadId) return;
+  const admin = esAdmin();
   const ordenados = reales.slice().sort((a, b) => (b.ano || 0) - (a.ano || 0));
   cont.innerHTML = '';
   let alguno = false;
   for (const inf of ordenados) {
     const data = state.bloquesCache.get(inf.id);
-    if (!data || !data.bloques || !data.bloques.length) continue;
+    if (!data) continue;                       // sin diagnóstico: nada que mostrar
+    const tieneBloques = !!(data.bloques && data.bloques.length);
+    // Admin ve el grupo aunque no haya gráficas (para inspeccionar el crudo);
+    // el resto solo si hay bloques que pintar.
+    if (!tieneBloques && !admin) continue;
     alguno = true;
     const grupo = document.createElement('div');
     grupo.className = 'pe-bloque-grupo';
     const h = document.createElement('h3');
     h.textContent = `Informe ${inf.ano || 's/a'}`;
     grupo.appendChild(h);
-    const box = document.createElement('div');
-    mountBloques(box, data);
-    grupo.appendChild(box);
+    if (tieneBloques) {
+      const box = document.createElement('div');
+      mountBloques(box, data);
+      grupo.appendChild(box);
+    } else {
+      const vacio = document.createElement('p');
+      vacio.className = 'muted small';
+      vacio.textContent = 'La IA no produjo gráficas para este informe.';
+      grupo.appendChild(vacio);
+    }
+    if (admin) grupo.appendChild(panelDiagnostico(data, inf));
     cont.appendChild(grupo);
   }
   if (!alguno) cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
+}
+
+/**
+ * Panel admin "Interpretación de la IA" (ADR-007): resumen de conteos + modelo
+ * + tokens + el JSON crudo (mediciones + bloques) colapsable, con botón para
+ * copiarlo. Es el ojo del diagnóstico: deja VER qué interpretó Claude vs lo
+ * que se graficó, y exportarlo para compartir.
+ */
+function panelDiagnostico(data, inf) {
+  const r = data.resumen || {};
+  const u = data.usage || {};
+  const chips = [
+    ['tan δ', r.n_tand], ['exc. fases', r.n_excitacion_fases], ['relación', r.n_relacion],
+    ['resist.', r.n_resistencia], ['aislam.', r.n_aislamiento], ['bujes', r.n_bujes],
+    ['DRM', r.drm ? '✓' : 0], ['bloques', r.n_bloques], ['series', r.n_series], ['puntos', r.n_puntos]
+  ].map(([k, v]) => `<span class="pe-diag-chip${(v === 0 || v == null) ? ' is-zero' : ''}">${k}: ${v == null ? '—' : v}</span>`).join('');
+  const crudo = { resumen: data.resumen, modelo: data.modelo, usage: data.usage, mediciones: data.mediciones_raw, bloques: data.bloques };
+  const json = JSON.stringify(crudo, null, 2);
+  const det = document.createElement('details');
+  det.className = 'pe-diag';
+  det.innerHTML =
+    `<summary>Interpretación de la IA (cruda) · ${esc(data.modelo || 's/modelo')} · ` +
+    `in ${u.input || 0} / out ${u.output || 0} tok</summary>` +
+    `<div class="pe-diag-chips">${chips}</div>` +
+    `<div class="pe-diag-bar"><button type="button" class="btn btn-ghost btn-sm" data-diag-copy>Copiar JSON</button></div>` +
+    `<pre class="pe-diag-json">${esc(json)}</pre>`;
+  const btn = det.querySelector('[data-diag-copy]');
+  if (btn) btn.addEventListener('click', async () => {
+    try { await navigator.clipboard.writeText(json); toast('Interpretación copiada al portapapeles.'); }
+    catch { toast('No se pudo copiar (revisa permisos del navegador).', 'warn'); }
+  });
+  return det;
 }
 
 function escucharInformes(unidadId) {
@@ -1082,6 +1128,7 @@ async function storeReport() {
         let estado = 'pendiente_extraccion';
         let anoIA = null;
         let bloquesIA = null;
+        let diagIA = null;
         if (UP.usarIA && pdfMeta && pdfMeta.storagePath && esPdf(item.file)) {
           try {
             setItemEstado(item, 'Analizando con IA…');
@@ -1091,7 +1138,10 @@ async function storeReport() {
               modelId: UP.modelId
             });
             mediciones = r.mediciones || {};
-            bloquesIA = Array.isArray(r.bloques) ? r.bloques : null;
+            bloquesIA = Array.isArray(r.bloques) ? r.bloques : [];
+            // Diagnóstico de extracción (ADR-007): resumen+usage del server +
+            // la interpretación cruda (mediciones) para persistir e inspeccionar.
+            diagIA = { ...(r.diagnostico || {}), mediciones_raw: mediciones };
             anoIA = mediciones.ano != null ? mediciones.ano : null;
             // La IA también leyó la placa de características: enriquece el
             // doc de la unidad (fabricante, potencia, tensiones, etc.) una
@@ -1130,13 +1180,15 @@ async function storeReport() {
           pdf: pdfMeta ? { ...pdfMeta, estado } : undefined
         });
         const nuevoId = await crearInforme(unidadId, informe, uid);
-        // Detalle gráfico pesado (ADR-006) → JSON en Storage, carga perezosa.
-        // Falla suave: un informe se almacena aunque sus bloques no se persistan.
-        if (bloquesIA && bloquesIA.length) {
+        // Diagnóstico de extracción (ADR-007) → Firestore subcol perezosa.
+        // Se persiste SIEMPRE que la IA corrió (aunque bloques esté vacío): el
+        // diagnóstico vacío también es señal. Falla suave: el informe queda
+        // almacenado aunque el diagnóstico no se persista.
+        if (diagIA) {
           try {
-            await guardarBloques(unidadId, nuevoId, bloquesIA);
+            await guardarBloques(unidadId, nuevoId, bloquesIA || [], diagIA);
           } catch (e) {
-            console.warn('[pruebas-electricas] no se pudieron guardar los bloques', e);
+            console.warn('[pruebas-electricas] no se pudo guardar el diagnóstico de extracción', e);
           }
         }
       }
