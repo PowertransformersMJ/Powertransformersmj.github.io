@@ -1199,7 +1199,16 @@ async function leerTextoArchivo(file, setEstado) {
   if (tipo === 'application/pdf' && pdfjs) {
     aviso('Leyendo PDF…');
     const buf = await file.arrayBuffer();
-    const pdf = await pdfjs.getDocument({ data: buf }).promise;
+    // cMaps + standard fonts del MISMO CDN/versión del worker (3.11.174): sin
+    // esto pdf.js emite "fetchStandardFontData failed (FoxitSymbol.pfb)" y puede
+    // perder glifos de fuentes embebidas al extraer texto.
+    const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
+    const pdf = await pdfjs.getDocument({
+      data: buf,
+      cMapUrl: `${PDFJS_CDN}/cmaps/`,
+      cMapPacked: true,
+      standardFontDataUrl: `${PDFJS_CDN}/standard_fonts/`
+    }).promise;
     // Las mediciones (tan δ, excitación, etc.) viven en páginas
     // intermedias (4–8 típicamente); leer todo el informe acotado.
     const maxPag = Math.min(pdf.numPages, 30);
