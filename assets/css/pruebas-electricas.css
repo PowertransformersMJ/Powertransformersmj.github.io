@@ -279,6 +279,11 @@
 .pe-scope .pe-cr-item{display:inline-flex;gap:6px;align-items:baseline;}
 .pe-scope .pe-cr-item b{font-family:var(--pe-mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;}
 
+/* subtítulo por gráfica: qué muestra (título) + qué evalúa (sub) */
+.pe-scope .pe-chart-cap{margin:14px 0 2px;}
+.pe-scope .pe-chart-cap .pe-chart-ttl{display:block;font-family:var(--pe-mono);font-size:.74rem;font-weight:600;letter-spacing:.03em;color:var(--pe-ink,#2b3a48);}
+.pe-scope .pe-chart-cap .pe-chart-sub{display:block;font-size:.72rem;color:var(--pe-muted);margin-top:1px;}
+
 /* bloques flexibles (análisis detallado · IA) */
 .pe-scope #bloques-cont .pe-bloque-grupo{margin:18px 0;}
 .pe-scope #bloques-cont .pe-bloque-grupo > h3{font-family:var(--pe-mono);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);margin:0 0 8px;}
