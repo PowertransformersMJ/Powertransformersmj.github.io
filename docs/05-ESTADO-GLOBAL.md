@@ -14,7 +14,7 @@
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude) + tablero detallado VIVO (ADR-003/004); tablero flexible "bloques" **Fases 1-3 + extras hechos** (función emite `bloques`+`verificar` desplegada + data layer + shell monta sección lazy por año + callout/barras rayadas; falta push + validar render E2E) (ADR-006). Secret `LLM_API_KEY` configurado. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-06. |
-| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` ≈ `106c359` (sin `Debug/`, con features; el director mergea desde DESARROLLO). `origin/DESARROLLO` = `3f8bbdd`. |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` = `8b2cafc` (incluye bloques Fases 2-3 + extras + fixes timeout/X; `git fetch` 2026-06-06). `origin/DESARROLLO` = `121fbc8` (= HEAD, en sync). El director pushea/mergea con rapidez. |
 | **Deploys backend** | Cloud Function `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1, re-deploy 2026-06-06: `bloques`+`verificar`, **timeout 540s, memoria 1GiB** tras timeout en PDF escaneado — L-27). **Flujo nuevo (ADR-005)**: Claude commitea + deploya (firebase CLI local); el **director hace los push**. Force-push a `main` solo el director. |
 
 ## ⚠️ Flags de riesgo activos
