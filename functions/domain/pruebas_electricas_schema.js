@@ -97,6 +97,18 @@ export const CRITERIOS_NORMA = Object.freeze({
   drm:         { formula: 'Tiempo de transición del conmutador por paso (ms)', umbral: '40–70 ms · sin discontinuidades', norma: 'IEEE C57.152-2013' }
 });
 
+/* ─── Umbral de desbalance entre fases por familia (% MÁXIMO) ───────
+ * Criterio normativo del desbalance entre fases en las curvas por TAP. Es
+ * DOMINIO (no se delega a la IA): el shell lo adjunta a cada bloque como
+ * `limite_desbalance` si la IA no lo emitió, para que el tablero grafique la
+ * desviación contra su límite y derive la columna Evaluación. excitación 10%
+ * (I<50 mA), relación ±0.5%, resistencia ≤5% (IEEE 62.2/C57.152). */
+export const UMBRAL_DESBALANCE = Object.freeze({
+  excitacion: 10,
+  relacion: 0.5,
+  resistencia: 5
+});
+
 /* ─── Calificadores puros (devuelven una etiqueta de semáforo) ───── */
 
 /** tan δ (%) → bueno | normal | investigar | excesivo */
