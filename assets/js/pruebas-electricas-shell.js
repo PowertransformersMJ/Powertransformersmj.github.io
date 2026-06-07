@@ -317,13 +317,14 @@ async function onEliminarLibro(serie) {
   }
 }
 
-// Cambia a la pestaña Tablero activando su botón (delega en module-shell).
-function irAlTablero() {
-  const tab = document.querySelector('#pruebasTabs [role="tab"][data-tab="tablero"]');
+// Cambia de pestaña activando su botón (el motor de tabs delega en module-shell).
+function irATab(name) {
+  const tab = document.querySelector(`#pruebasTabs [role="tab"][data-tab="${name}"]`);
   if (tab) tab.click();
   const top = document.querySelector('#pruebasTabs');
   if (top && top.scrollIntoView) top.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+function irAlTablero() { irATab('tablero'); }
 
 function refrescarKpisParque() {
   if ($('kpi-unidades')) $('kpi-unidades').textContent = String(state.unidades.length || 0);
@@ -602,6 +603,11 @@ function seleccionarUnidad(u) {
   const scope = $('tablero-scope');
   if (scope) scope.classList.toggle('is-empty', !u);
   if (!u) { renderVacioSeleccion(); return; }
+  // Hub del libro abierto en la Biblioteca (acceso a tablero/tendencia + informes/PDF).
+  const libro = $('biblioteca-libro');
+  if (libro) libro.hidden = false;
+  const blSerie = $('bl-serie');
+  if (blSerie) blSerie.textContent = u.serie || u.id || '—';
   renderIdentidad(u);
   renderNomenclatura(u);
   escucharInformes(u.id || u.serie);
@@ -628,6 +634,10 @@ function renderVacioSeleccion() {
     $('kpi-estado').textContent = '—';
     $('kpi-estado').title = '';
   }
+  // Oculta el hub del libro abierto (no hay unidad seleccionada).
+  const libro = $('biblioteca-libro');
+  if (libro) libro.hidden = true;
+  if ($('tendencia-cont')) $('tendencia-cont').innerHTML = '<p class="muted small">Selecciona un libro para ver su tendencia.</p>';
 }
 
 /* ─── Borrado de informes (delegación sobre #reportlist) ──────── */
@@ -823,6 +833,12 @@ function arrancar() {
   renderCriteriosNorma();
   const rl = $('reportlist');
   if (rl) rl.addEventListener('click', onClickReportlist);
+  // Hub del libro abierto: botones "Ver tablero / Ver tendencia".
+  const libro = $('biblioteca-libro');
+  if (libro) libro.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-goto]');
+    if (btn) irATab(btn.getAttribute('data-goto'));
+  });
   const pg = $('parque-grid');
   if (pg) pg.addEventListener('click', onClickParque);
   // La "X" de eliminar libros (y los borrados por informe) dependen de

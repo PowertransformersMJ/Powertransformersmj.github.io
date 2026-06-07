@@ -78,9 +78,6 @@
       <button type="button" role="tab" data-tab="tendencia" aria-selected="false">
         <span class="i"><i data-lucide="trending-up"></i></span>Tendencia
       </button>
-      <button type="button" role="tab" data-tab="informes" aria-selected="false">
-        <span class="i"><i data-lucide="files"></i></span>Informes cargados
-      </button>
     </div>
 
     <div class="tab-panels">
@@ -100,6 +97,20 @@
           </button>
         </div>
       </div>
+
+      <!-- Libro abierto: hub de la unidad seleccionada (acceso a todo + PDF) -->
+      <section id="biblioteca-libro" hidden>
+        <div class="pe-libro-head">
+          <h3>Libro abierto · <span id="bl-serie">—</span></h3>
+          <div class="pe-libro-acciones">
+            <button type="button" class="btn-sm" data-goto="tablero"><span class="i"><i data-lucide="layout-dashboard"></i></span> Ver tablero</button>
+            <button type="button" class="btn-sm" data-goto="tendencia"><span class="i"><i data-lucide="trending-up"></i></span> Ver tendencia</button>
+          </div>
+        </div>
+        <h4>Informes de la unidad <span class="norm">acceso y descarga del PDF</span></h4>
+        <p class="muted small">Historial de informes de este transformador, con la serie detectada en el PDF y el enlace al documento original. Incluye los informes base del módulo.</p>
+        <div id="reportlist"><p class="muted small">Cargando informes…</p></div>
+      </section>
     </section>
   </div>
       </div>
@@ -179,17 +190,6 @@
 
   </div><!-- /.pe-scope -->
       </div><!-- /[data-tab-panel=tablero] -->
-
-      <div role="tabpanel" data-tab-panel="informes" hidden>
-        <div class="pe-scope">
-          <!-- ===== Informes de la unidad ===== -->
-          <section id="informes">
-            <h2>Informes de la unidad <span class="norm">acceso al PDF original</span></h2>
-            <p class="muted small">Historial de informes cargados, con la serie detectada en el PDF y el enlace al documento. Incluye los informes base ya presentes en el módulo.</p>
-            <div id="reportlist"><p class="muted small">Cargando informes…</p></div>
-          </section>
-        </div><!-- /.pe-scope -->
-      </div><!-- /[data-tab-panel=informes] -->
 
       <!-- ===== Panel: Tendencia temporal (multi-informe) ===== -->
       <div role="tabpanel" data-tab-panel="tendencia" hidden>

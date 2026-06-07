@@ -135,6 +135,19 @@
   display:flex;flex-wrap:wrap;align-items:flex-end;
   column-gap:9px;row-gap:36px;min-height:200px;
 }
+/* Hub del libro abierto (acceso a tablero/tendencia + informes/PDF) */
+.pe-scope #biblioteca-libro{
+  margin-top:22px;padding:18px 20px;border:1px solid var(--pe-border);
+  border-radius:14px;background:var(--pe-surface);box-shadow:var(--pe-shadow);
+}
+.pe-scope .pe-libro-head{
+  display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;
+  gap:10px;margin-bottom:12px;
+}
+.pe-scope .pe-libro-head h3{margin:0;font-size:1rem;}
+.pe-scope #bl-serie{font-family:var(--pe-mono);color:var(--pe-teal);}
+.pe-scope .pe-libro-acciones{display:flex;flex-wrap:wrap;gap:8px;}
+.pe-scope #biblioteca-libro h4{margin:14px 0 4px;font-size:.86rem;}
 .pe-scope .pe-book{
   position:relative;appearance:none;-webkit-appearance:none;
   width:60px;height:190px;flex:none;padding:0;cursor:pointer;color:#fff;
