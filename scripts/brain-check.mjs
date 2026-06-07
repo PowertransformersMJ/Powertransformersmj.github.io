@@ -226,12 +226,32 @@ if (existsSync(leccionesPath)) {
   else warn(`refs L-/M- COLGANTES (sin def en 30): ${dangling.join(', ')} → definir o corregir`);
 }
 
-// 5c) Hojas docs/*.md referenciadas en CLAUDE.md deben existir
+// 5c) Hojas docs/*.md enlazadas con ruta `docs/...` en CLAUDE.md (curado) deben existir.
+//     (Escanear las demás neuronas daría falsos positivos por ejemplos en prosa,
+//      p.ej. "shard a docs/31-LECCIONES-GIT.md" — el chequeo 6 cubre lo inverso.)
+const docFiles = readdirSync(DOCS).filter((f) => f.endsWith('.md'));
+const docTexts = Object.fromEntries(docFiles.map((f) => [f, read(join(DOCS, f))]));
 const refDocs = new Set([...claude.matchAll(/docs\/([\w-]+\.md)/g)].map((m) => m[1]));
 const PLACEHOLDER = /^NN-|NOMBRE|<tema>|<carpeta>/; // plantillas de neurogénesis, no archivos reales
 const missingDocs = [...refDocs].filter((f) => !PLACEHOLDER.test(f) && !existsSync(join(DOCS, f)));
 if (!missingDocs.length) ok(`hojas docs/*.md referenciadas en CLAUDE.md (${refDocs.size}) existen`);
 else warn(`hojas referenciadas en CLAUDE.md INEXISTENTES: ${missingDocs.join(', ')}`);
+
+// 6) Huérfanos INVERSOS: toda docs/*.md debe estar enlazada desde alguna otra neurona
+//    (las core viven en CLAUDE.md §0 → chequeo 1; las hojas de detalle cuelgan de su
+//    neurona madre, p.ej. 20-ESPACIAL). Atrapa "hoja existe pero nadie la conoce".
+console.log('\n6) Hojas huérfanas (existen en disco pero nadie las enlaza):');
+const CORE_NEURONS = new Set([
+  '00-INDICE.md', '05-ESTADO-GLOBAL.md', '10-MEMORIA-CORTO-PLAZO.md', '15-CONSEJO-EXTERNO.md',
+  '20-MEMORIA-ESPACIAL.md', '30-LECCIONES.md', '40-LOBULOS-DOMINIO.md', '99-HISTORIAL-ADR.md',
+]);
+let orphanSheets = 0;
+for (const f of docFiles) {
+  if (CORE_NEURONS.has(f) || /^4[1-9]-/.test(f)) continue; // core → §0; lóbulos → chequeo 1
+  const mentioned = claude.includes(f) || docFiles.some((g) => g !== f && docTexts[g].includes(f));
+  if (!mentioned) { warn(`${f} HUÉRFANA → enlazar desde su neurona madre (p.ej. 20-ESPACIAL)`); orphanSheets++; }
+}
+if (!orphanSheets) ok(`cero hojas huérfanas (${docFiles.length - CORE_NEURONS.size} hojas de detalle, todas enlazadas)`);
 
 console.log(`\n${problems === 0 ? '✅ CEREBRO SANO' : '⚠️  ' + problems + ' problema(s) — revisar antes de avanzar'}\n`);
 process.exit(problems ? 1 : 0);
