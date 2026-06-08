@@ -81,21 +81,21 @@ describe('calificarRelacion (|Δ| ≤ 0.5%)', () => {
   });
 });
 
-describe('calificarResistencia (desbalance ≤ 5%, flag verificar)', () => {
+describe('calificarResistencia (desbalance ≤ 2%, NETA §7.2.2.D.8, flag verificar)', () => {
   test('flag verificar tiene prioridad → ámbar aunque el número esté en rango', () => {
     assert.equal(calificarResistencia(1, true).clase, 'b-a');
     assert.equal(calificarResistencia(null, true).clase, 'b-a');
   });
-  test('dentro de norma', () => {
+  test('dentro de norma (≤1.6%)', () => {
     assert.equal(calificarResistencia(0).clase, 'b-g');
-    assert.equal(calificarResistencia(4).clase, 'b-g');
+    assert.equal(calificarResistencia(1.6).clase, 'b-g');
   });
-  test('cerca del límite (>4%) → ámbar', () => {
-    assert.equal(calificarResistencia(4.5).clase, 'b-a');
-    assert.equal(calificarResistencia(5).clase, 'b-a');
+  test('cerca del límite (>1.6%) → ámbar', () => {
+    assert.equal(calificarResistencia(1.8).clase, 'b-a');
+    assert.equal(calificarResistencia(2).clase, 'b-a');
   });
-  test('fuera de norma → rojo', () => {
-    assert.equal(calificarResistencia(5.1).clase, 'b-r');
+  test('fuera de norma (>2%) → rojo', () => {
+    assert.equal(calificarResistencia(2.1).clase, 'b-r');
   });
   test('sin dato → neutral', () => {
     assert.equal(calificarResistencia(null).clase, 'b-n');
@@ -188,7 +188,7 @@ describe('UMBRALES congelados (regresión de reglas de negocio)', () => {
     assert.equal(UMBRALES.excitacion.deltaBajaCorriente, 10);
     assert.equal(UMBRALES.excitacion.deltaAltaCorriente, 5);
     assert.equal(UMBRALES.relacion.limite, 0.5);
-    assert.equal(UMBRALES.resistencia.limite, 5);
+    assert.equal(UMBRALES.resistencia.limite, 2);
     assert.equal(UMBRALES.aislamiento.minGohm, 1);
     assert.equal(UMBRALES.collar.limite, 100);
   });
