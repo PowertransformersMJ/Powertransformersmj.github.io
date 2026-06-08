@@ -76,6 +76,7 @@
 | §16 | ADR-016 — "Reprocesar" asíncrono observable: persistencia server-side + estado durable (en_curso/ok/error) + badge en vivo | 353 |
 | §17 | ADR-017 — Causa raíz del reproceso colgado: timeout INTERNO por intento (abort del stream) + watchdog global + 2 GiB | 375 |
 | §18 | ADR-018 — Fallo real "Claude API: terminated" = bodyTimeout de undici (5 min) corta el stream largo → dispatcher sin bodyTimeout (undici@6) | 398 |
+| §19 | ADR-019 — 504/deadline-exceeded: bug del presupuesto de reintento (2.º intento sin sitio → SIGKILL) + timeoutSeconds 900→1500 para máxima calidad | 420 |
 
 ---
 

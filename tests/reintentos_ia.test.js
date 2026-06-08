@@ -141,6 +141,48 @@ describe('conReintentosIA — política de reintento', () => {
     assert.equal(eventos[0].intento, 1);
     assert.equal(eventos[1].intento, 2);
   });
+
+  test('intentoMaxMs (ADR-019): NO reintenta si no hay sitio para un intento ENTERO, aunque sobre para el backoff', async () => {
+    // Reproduce el bug del 504: el 1.er intento (largo) se aborta consumiendo casi
+    // todo el presupuesto; queda holgura para el backoff (~2 s) pero NO para otro
+    // intento entero. Antes arrancaba un 2.º intento que corría hasta el SIGKILL.
+    let n = 0;
+    let t = 0;
+    const ahora = () => t;
+    await assert.rejects(
+      conReintentosIA(async () => {
+        n++;
+        t += 1320000; // un intento "largo" consume 22 min
+        throw err({ code: 'ia_timeout', transitorio: true, message: 'timeout' });
+      }, {
+        intentos: 2, baseMs: 1500, intentoMaxMs: 1320000,
+        deadlineMs: 1440000, margenMs: 5000, ahora, dormirFn: sinDormir,
+      }),
+      /timeout/
+    );
+    // Tras el 1.er intento (t=1.32M, restante=120k) NO hay sitio para otro intento
+    // entero (1.32M) → relanza. Sin el fix, arrancaba un 2.º (n=2) → 504.
+    assert.equal(n, 1);
+  });
+
+  test('intentoMaxMs: SÍ reintenta si el fallo es RÁPIDO (queda sitio para un intento entero)', async () => {
+    let n = 0;
+    let t = 0;
+    const ahora = () => t;
+    await assert.rejects(
+      conReintentosIA(async () => {
+        n++;
+        t += 3000; // falla rápido (3 s): un 529 transitorio
+        throw err({ status: 529, message: 'overloaded' });
+      }, {
+        intentos: 2, baseMs: 1500, intentoMaxMs: 1320000,
+        deadlineMs: 1440000, margenMs: 5000, ahora, dormirFn: sinDormir,
+      }),
+      /overloaded/
+    );
+    // 1.er intento falla a los 3 s → queda holgura para un intento entero → reintenta.
+    assert.equal(n, 2);
+  });
 });
 
 describe('conTimeoutAbortable — acota el intento y aborta el cuelgue (ADR-017)', () => {

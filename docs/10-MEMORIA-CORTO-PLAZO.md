@@ -32,14 +32,20 @@
 > fecha** (re-cargar no duplica, L-39); **reproceso SERVER-SIDE** con contador (L-40) + **backfill INSTANTÁNEO**
 > de campos canónicos desde el diagnóstico guardado, sin IA (L-43).
 >
+> **🎯 DECISIÓN DEL DIRECTOR (2026-06-08): "Reprocesar" = OPCIÓN A · MÁXIMA CALIDAD.** Ante el trade-off
+> velocidad↔completitud, eligió EXPLÍCITAMENTE conservar `output_config.effort:'high'` + `thinking:adaptive` (Opus 4.7):
+> el reproceso de un informe DENSO (p.ej. EMS 450108) tarda **~7–12 min** pero extrae COMPLETO. ⛔ **NO bajar el effort
+> ni cambiar a un modelo más rápido para acelerar** — es una elección deliberada (son datos de ingeniería de transformador).
+> El estado terminal está garantizado (ADR-017) y el badge es durable/no bloqueante (ADR-016): el director puede navegar y
+> volver. La lentitud es ESPERADA, no un bug.
+>
 > **PRÓXIMO / pendientes:**
-> 1. ✅ **CERRADO (TODO-09 → ADR-015)**: "Reprocesar" 100% funcional — reintento con backoff de fallos
->    transitorios de la IA server-side (`functions/reintentos.mjs`), timeout 540→900 s. CF DESPLEGADA; frontend
->    a producción tras push del director. Ahora solo falla por causa ajena a la IA/código (sin saldo, PDF ilegible, infra).
+> 1. ✅ **CERRADO (TODO-09 → ADR-015..018)**: "Reprocesar" funcional. Reintento (ADR-015) + asíncrono observable/estado
+>    durable (ADR-016) + timeout interno por intento/watchdog/2GiB (ADR-017) + **fix "terminated" = bodyTimeout de undici,
+>    dispatcher sin bodyTimeout** (ADR-018). Solo falla por causa ajena (sin saldo, PDF ilegible, infra) con motivo claro.
 > 2. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
 >    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
-> 3. El director iba a **abrir el libro 450108** (push ya hecho) → el backfill poblará identidad/bujes de 2021/2023 solo.
-> 4. Validar más secciones con informes reales. **TODO-01/02** abiertos (refrigeración/contratos, no del tablero).
+> 3. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
 > Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`
@@ -88,21 +94,15 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-018 · El fallo REAL: "Claude API: terminated"** (visto por fin en la consola del director). Es el
-  **bodyTimeout de undici (~5 min)** que corta el stream largo de Opus en informes densos (el `timeout` del SDK es OTRA
-  capa, no lo cubre). Fix: cliente Anthropic con `fetchOptions.dispatcher = new Agent({bodyTimeout:0, headersTimeout:0})`
-  (dep `undici@^6`); `terminated`/`UND_ERR_*` clasificados transitorios; ATTEMPT_MS 400→760s; SDK timeout 840s. `effort:high`
-  CONSERVADO (fix de transporte, no de modelo). 1097/1097 verde. **CF DESPLEGADA**. Lección **L-47**. ⚠️ El director valida
-  que reprocesar un informe denso ya NO da "terminated" y completa.
-- **2026-06-08** — **ADR-017 · CAUSA RAÍZ del reproceso colgado**: `await` desnudo sobre `stream.finalMessage()` SIN
-  timeout por intento → si la IA se cuelga, la plataforma mata la función a 900s sin correr `catch` → el estado queda
-  `'en_curso'` para siempre. Fix DEFINITIVO: `conTimeoutAbortable` (AbortController + `Promise.race`) aborta el stream
-  colgado a los 400s → `TimeoutIA` transitorio → reintenta o cae a 'error' limpio; `intentos:2`, presupuesto < 900s;
-  **watchdog global** (870s escribe 'error' si sigue viva); **memoria 1→2 GiB** (anti-OOM). 1096/1096 verde (+5 tests,
-  incl. cuelgue acotado). **CF DESPLEGADA**. Lección **L-46** (nunca `await` desnudo sobre stream de IA). Frontend a prod
-  tras push. ⚠️ El director valida en navegador que el badge ahora SÍ pasa a procesado/⚠ falló.
-- **Arco "Reprocesar" (consolidado en `99`, todo desplegado)**: **ADR-015** reintento con backoff (L-44) · **ADR-016**
-  asíncrono observable: persistencia server-side + estado durable `reproceso.{estado}` + badge en vivo (L-45, EN PROD) ·
-  **ADR-017** timeout interno por intento + watchdog + 2GiB: ya no se cuelga (L-46). ADR-018 (arriba) cierra el fallo real.
+- **2026-06-08** — **ADR-019 · 504/deadline-exceeded** (causa real, vista en consola completa). DOBLE: (A) bug del presupuesto
+  de reintento — el gate solo exigía sitio para el backoff, no para un intento ENTERO → tras abortar el 1.er intento largo
+  arrancaba un 2.º que corría hasta el SIGKILL (900s) → 504; fix `intentoMaxMs`. (B) 900s insuficiente para máxima calidad →
+  `timeoutSeconds 900→1500`, ATTEMPT_MS 22min, cliente 1500s, watchdog/SDK acordes. `effort:high` CONSERVADO. 1099/1099 verde
+  (+2 tests del gate). **CF DESPLEGADA**. L-48. ⚠️ El director valida que el EMS ya NO da 504 y COMPLETA (12–22 min, esperado).
+- **Arco "Reprocesar" (consolidado en `99`, todo desplegado; secuencia de causas REALES encontradas una a una)**:
+  **ADR-015** reintento con backoff (L-44) · **ADR-016** asíncrono observable: persistencia server-side + estado durable
+  `reproceso.{estado}` + badge en vivo (L-45, EN PROD) · **ADR-017** `await` desnudo sin timeout por intento → cuelgue →
+  SIGKILL sin estado: `conTimeoutAbortable` + watchdog + 2GiB (L-46) · **ADR-018** "terminated" = bodyTimeout de undici (~5 min)
+  corta el stream largo → dispatcher sin bodyTimeout (`undici@^6`), L-47. ADR-019 (arriba) cierra el 504.
 - Anterior (consolidado en `99`): arco tablero **ADR-010→ADR-014 + L-35..L-43** TODO EN PRODUCCIÓN (Tendencia F2/F3,
   veredicto MULTI-NORMA, bujes canónico, identidad por informe/trafo móvil, long-polling, upsert, reproceso server-side, backfill).
