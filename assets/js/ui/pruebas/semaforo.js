@@ -14,11 +14,10 @@
 
 import {
   ESTADOS,
-  calificarTanDelta, calificarExcitacion, calificarRelacion,
-  calificarResistencia, calificarAislamiento, calificarCollar,
   calificarDrm,
   estadoGlobal
 } from '../../domain/pruebas_electricas_semaforo.js';
+import { evaluarMultiNorma, metricaPrueba } from '../../domain/pruebas_electricas_multinorma.js';
 
 /* ─── Definición de filas de la matriz (orden del tablero) ────── */
 // `criterio` es el texto de la columna "Criterio" (igual al tablero).
@@ -26,105 +25,48 @@ const FILAS = [
   { key: 'tand',        label: 'Tangente δ (devanados)',         criterio: '≤1% (CL)' },
   { key: 'excitacion',  label: 'Corriente de excitación',        criterio: 'Δfases <10%' },
   { key: 'relacion',    label: 'Relación de transformación',     criterio: '±0.5%' },
-  { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤5%' },
+  { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤2%' },
   { key: 'aislamiento', label: 'Resistencia de aislamiento (CC)', criterio: '≥1 GΩ' },
   { key: 'collar',      label: 'Collar caliente / bujes',         criterio: '<100 mW' },
   { key: 'drm',         label: 'DRM · conmutador (OLTC)',         criterio: '40–70 ms' }
 ];
 
 /* ─── Calificación de un informe por tipo de prueba ───────────── */
-// Devuelve { estado, texto } para una prueba dada de un informe.
-// `opts.minNeta` (GΩ): mínimo de aislamiento por CLASE DE TENSIÓN (NETA 100.5)
-// para la unidad; si se pasa, el aislamiento se califica contra ese mínimo (no
-// el genérico ≥1 GΩ). El veredicto SIEMPRE sale de los valores medidos vs la
-// norma — nunca de la calificación textual del laboratorio/IA.
+// Devuelve { estado, texto }. El veredicto es el CONSOLIDADO multi-norma (el más
+// conservador entre todas las normas aplicables) sobre la métrica peor-caso —
+// NUNCA la calificación textual del laboratorio/IA (L-36 / ADR-012). El detalle
+// por norma se obtiene aparte con `evaluarMultiNorma` (panel del bloque).
+// `opts.minNeta` (GΩ): mínimo de aislamiento por clase de tensión (óptica "por clase").
+function textoMetrica(key, m, estado) {
+  if (estado === ESTADOS.VERDE) return 'OK';
+  if (key === 'aislamiento') return `${m.toFixed(2)}GΩ`;
+  if (key === 'collar') return `${m.toFixed(0)}mW`;
+  return `${m.toFixed(2)}%`;
+}
+
 function calificarPrueba(key, inf, opts = {}) {
   if (!inf) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-  switch (key) {
-    case 'tand': {
-      // tan δ: la peor configuración medida define la celda.
-      const arr = Array.isArray(inf.tand) ? inf.tand : [];
-      const medidas = arr.filter((t) => t.valor_pct != null);
-      if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      let peor = ESTADOS.VERDE;
-      medidas.forEach((t) => {
-        const e = calificarTanDelta(t.valor_pct);
-        if (e.nivel > peor.nivel) peor = e;
-      });
-      // Muestra el valor máximo medido (la configuración más exigente).
-      const maxVal = Math.max(...medidas.map((t) => t.valor_pct));
-      return { estado: peor, texto: `${maxVal.toFixed(2)}%` };
-    }
-    case 'excitacion': {
-      // excitación es un OBJETO con la Δ ext % del devanado AT.
-      const d = inf.excitacion || {};
-      if (d.delta_ext_pct == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      return { estado: calificarExcitacion(d.delta_ext_pct), texto: `${d.delta_ext_pct.toFixed(2)}%` };
-    }
-    case 'relacion': {
-      // relación es un ARRAY de pares (AT–MT, AT–Terc.); la peor desviación define la celda.
-      const arr = Array.isArray(inf.relacion) ? inf.relacion : [];
-      const medidas = arr.filter((r) => r.desviacion_pct != null);
-      if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      let peor = ESTADOS.VERDE, maxAbs = 0;
-      medidas.forEach((r) => {
-        const abs = Math.abs(r.desviacion_pct);
-        if (abs > maxAbs) maxAbs = abs;
-        const e = calificarRelacion(r.desviacion_pct);
-        if (e.nivel > peor.nivel) peor = e;
-      });
-      return { estado: peor, texto: `${maxAbs.toFixed(2)}%` };
-    }
-    case 'resistencia': {
-      // resistencia es un ARRAY por devanado (AT/MT/BT); peor Δ máx + flags.
-      const arr = Array.isArray(inf.resistencia) ? inf.resistencia : [];
-      if (!arr.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      const flag = arr.some((r) => r.verificar);
-      const medidas = arr.filter((r) => !r.no_medido && r.delta_max_pct != null);
-      const maxDelta = medidas.length ? Math.max(...medidas.map((r) => r.delta_max_pct)) : null;
-      const e = calificarResistencia(maxDelta, flag);
-      if (flag) return { estado: e, texto: 'verificar' };
-      if (maxDelta == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${maxDelta.toFixed(2)}%` };
-    }
-    case 'aislamiento': {
-      // aislamiento es un ARRAY por par; el valor mínimo (peor) define la celda.
-      const arr = Array.isArray(inf.aislamiento) ? inf.aislamiento : [];
-      const medidas = arr.filter((a) => a.gohm != null);
-      if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      const min = Math.min(...medidas.map((a) => a.gohm));
-      // Criterio NETA por CLASE DE TENSIÓN si se conoce el mínimo de la clase
-      // (opts.minNeta); si no, cae al genérico ≥1 GΩ. A 110 kV el mínimo son
-      // decenas de GΩ → 5–6 GΩ medidos = "investigar".
-      const minNeta = (opts && typeof opts.minNeta === 'number') ? opts.minNeta : null;
-      const e = minNeta != null
-        ? (min < minNeta ? ESTADOS.NARANJA : ESTADOS.VERDE)
-        : calificarAislamiento(min);
-      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${min.toFixed(2)}GΩ` };
-    }
-    case 'collar': {
-      // collar es un OBJETO con max_mw (pérdidas máximas en bujes).
-      const d = inf.collar || {};
-      if (d.max_mw == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      const e = calificarCollar(d.max_mw);
-      return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${d.max_mw.toFixed(0)}mW` };
-    }
-    case 'drm': {
-      // drm es un OBJETO con la ventana de tiempos de transición (ms).
-      const d = inf.drm || {};
-      if (d.tiempo_min_ms == null && d.tiempo_max_ms == null) {
-        return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-      }
-      const e = calificarDrm(d.tiempo_min_ms, d.tiempo_max_ms);
-      const lo = d.tiempo_min_ms, hi = d.tiempo_max_ms;
-      const texto = (lo != null && hi != null && lo !== hi)
-        ? `${lo.toFixed(0)}–${hi.toFixed(0)}ms`
-        : `${(hi ?? lo).toFixed(0)}ms`;
-      return { estado: e, texto };
-    }
-    default:
-      return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+  // DRM conserva su lógica de ventana de tiempos (no es un umbral multi-norma simple).
+  if (key === 'drm') {
+    const d = inf.drm || {};
+    if (d.tiempo_min_ms == null && d.tiempo_max_ms == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+    const e = calificarDrm(d.tiempo_min_ms, d.tiempo_max_ms);
+    const lo = d.tiempo_min_ms, hi = d.tiempo_max_ms;
+    const texto = (lo != null && hi != null && lo !== hi)
+      ? `${lo.toFixed(0)}–${hi.toFixed(0)}ms`
+      : `${(hi ?? lo).toFixed(0)}ms`;
+    return { estado: e, texto };
   }
+  // Resistencia con lectura marcada `verificar` por el informe/IA: dato a
+  // confirmar → ámbar (señal de calidad de dato), se preserva sobre el valor.
+  if (key === 'resistencia' && Array.isArray(inf.resistencia) && inf.resistencia.some((r) => r && r.verificar)) {
+    return { estado: ESTADOS.AMBAR, texto: 'verificar' };
+  }
+  const m = metricaPrueba(key, inf);
+  if (m == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
+  const mn = evaluarMultiNorma(key, m, { minClase: (typeof opts.minNeta === 'number') ? opts.minNeta : null });
+  const estado = (mn && mn.consolidado) ? mn.consolidado : ESTADOS.NEUTRAL;
+  return { estado, texto: textoMetrica(key, m, estado) };
 }
 
 function cellHtml(estado, texto) {

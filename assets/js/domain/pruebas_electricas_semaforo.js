@@ -63,11 +63,11 @@ export const UMBRALES = Object.freeze({
     limite: 0.5,       // |Δ%| > 0.5 → rojo
     ymax: 0.6
   }),
-  // Resistencia de devanados — IEC 60076-1 · IEEE 62
-  // Desbalance entre fases ≤ 5% (corregido por temperatura)
+  // Resistencia de devanados — ANSI/NETA ATS §7.2.2.D.8 (IEEE C57.152 método)
+  // Desbalance entre fases ≤ 2% (corregido a temperatura; o vs fábrica)
   resistencia: Object.freeze({
-    limite: 5,         // desbalance% > 5 → rojo
-    ymax: 6
+    limite: 2,         // desbalance% > 2 → rojo (NETA D.8)
+    ymax: 3
   }),
   // Resistencia de aislamiento (CC) — NETA / fabricante
   // Mínimo ≥ 1 GΩ para esta clase de tensión

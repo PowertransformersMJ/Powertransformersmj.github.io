@@ -303,6 +303,22 @@
 .pe-scope .pe-cr-item{display:inline-flex;gap:6px;align-items:baseline;}
 .pe-scope .pe-cr-item b{font-family:var(--pe-mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;}
 
+/* panel multi-norma: veredicto por cada norma + consolidado + divergencias */
+.pe-scope .pe-multinorma{margin:0 0 14px;padding:11px 14px;border:1px solid var(--pe-border);border-radius:10px;background:var(--pe-surface);box-shadow:var(--pe-shadow);}
+.pe-scope .pe-mn-head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;justify-content:space-between;font-family:var(--pe-mono);font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;margin-bottom:8px;}
+.pe-scope .pe-mn-cons{color:var(--pe-muted);}
+.pe-scope .pe-mn-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:5px;}
+.pe-scope .pe-mn-list li{display:grid;grid-template-columns:minmax(140px,1.2fr) minmax(120px,1.6fr) auto;gap:6px 12px;align-items:baseline;font-size:.8rem;border-bottom:1px solid var(--pe-line);padding-bottom:5px;}
+.pe-scope .pe-mn-list li:last-child{border-bottom:none;padding-bottom:0;}
+.pe-scope .mn-norma{font-weight:600;color:var(--pe-ink,#2b3a48);}
+.pe-scope .mn-umbral{color:var(--pe-muted);font-size:.76rem;}
+.pe-scope .mn-v{display:inline-flex;align-items:center;gap:6px;font-family:var(--pe-mono);font-size:.72rem;}
+.pe-scope .mn-nota{color:var(--pe-muted);font-size:.72rem;}
+.pe-scope .mn-div{margin:8px 0 0;font-size:.76rem;color:var(--pe-orange);}
+.pe-scope .mn-rec{margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--pe-border);font-size:.82rem;color:var(--pe-ink,#2b3a48);line-height:1.45;}
+.pe-scope .mn-rec b{font-family:var(--pe-mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;margin-right:6px;}
+@media (max-width:560px){.pe-scope .pe-mn-list li{grid-template-columns:1fr;gap:2px;}}
+
 /* franja-timeline de informes (F2): cronología de la unidad, un nodo por
    informe coloreado por su estado global (peor prueba) · el último = vigente */
 .pe-scope .pe-timeline{display:flex;flex-wrap:wrap;align-items:flex-start;gap:0;list-style:none;margin:14px 0 18px;padding:0;}

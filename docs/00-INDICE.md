@@ -69,6 +69,7 @@
 | §9 | ADR-009 — Tablero Pruebas Eléctricas: completitud determinista, workflow de auditoría, tendencia y Biblioteca-hub | 200 |
 | §10 | ADR-010 — Tendencia F2+F3: franja-timeline de informes + narrativa de tendencia por IA (on-demand) | 226 |
 | §11 | ADR-011 — Veredicto 100% normativo (scorecard vs norma, no informe) + NETA por clase unificada + desviación general de resistencia | 246 |
+| §12 | ADR-012 — Evaluación MULTI-NORMA (veredicto por cada norma + consolidado conservador + divergencias) | 267 |
 
 ---
 

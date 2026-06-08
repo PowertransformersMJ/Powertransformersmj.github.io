@@ -13,6 +13,9 @@
 
 import { ejeMax, ticksY } from './grafico-svg.js';
 import { derivarTablaTAP } from '../../domain/pruebas_electricas_bloques.js';
+import { ESTADOS } from '../../domain/pruebas_electricas_semaforo.js';
+import { evaluarMultiNorma } from '../../domain/pruebas_electricas_multinorma.js';
+import { recomendarPrueba } from '../../domain/pruebas_electricas_recomendaciones.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 // Paleta estable (se asigna por índice cuando la serie no trae color).
@@ -350,6 +353,88 @@ const BADGE = (calif) => {
   return calif ? `<span class="badge ${cls}">${esc(calif)}</span>` : '';
 };
 
+// Métrica peor-caso + familia + contexto de un bloque, para alimentar el motor
+// multi-norma. NO usa el texto de la IA. Devuelve {family, valor, ctx} o null.
+//   · aislamiento (invertir): mínimo medido (GΩ) + minClase = bloque.limite
+//   · tan δ / bujes: peor tan δ medido (%)
+//   · collar: peor pérdida (mW)
+//   · curvas por TAP: peor desbalance entre fases (resistencia = (máx−mín)/prom;
+//     excitación/relación = la desviación que ya grafica `bloqueDesviacion`)
+function devMaxFamilia(bloque, family) {
+  const dev = (family === 'resistencia') ? bloqueDesviacionGeneral(bloque) : bloqueDesviacion(bloque);
+  const ds = (dev.series || []).flatMap((s) => (s.puntos || []).map((pt) => Math.abs(pt.y)))
+    .filter((v) => typeof v === 'number');
+  return ds.length ? Math.max(...ds) : null;
+}
+function metricaBloque(bloque) {
+  if (!bloque) return null;
+  const p = String(bloque.prueba || '').toLowerCase();
+  const ys = (bloque.series || []).flatMap((s) => (s.puntos || []).map((pt) => pt.y))
+    .filter((v) => typeof v === 'number');
+  if (bloque.invertir === true || /aisl/.test(p)) {
+    return ys.length ? { family: 'aislamiento', valor: Math.min(...ys), ctx: { minClase: bloque.limite != null ? bloque.limite : null } } : null;
+  }
+  if (/tan|tand/.test(p)) return ys.length ? { family: 'tand', valor: Math.max(...ys), ctx: {} } : null;
+  if (/bushing|buje/.test(p)) return ys.length ? { family: 'bushing', valor: Math.max(...ys), ctx: {} } : null;
+  if (/collar/.test(p)) return ys.length ? { family: 'collar', valor: Math.max(...ys), ctx: {} } : null;
+  if (bloque.limite_desbalance != null) {
+    let family = null;
+    if (/excit/.test(p)) family = 'excitacion';
+    else if (/relac/.test(p)) family = 'relacion';
+    else if (/resist/.test(p)) family = 'resistencia';
+    if (!family) return null;
+    const v = devMaxFamilia(bloque, family);
+    return v == null ? null : { family, valor: v, ctx: {} };
+  }
+  return null;
+}
+
+// Evaluación multi-norma del bloque (consolidado + ópticas por norma). null si
+// no hay métrica reconocible.
+function multiNormaBloque(bloque) {
+  const m = metricaBloque(bloque);
+  if (!m) return null;
+  return evaluarMultiNorma(m.family, m.valor, m.ctx);
+}
+
+// Badge del bloque: veredicto CONSOLIDADO multi-norma (el más conservador). Cae
+// al texto de la IA solo si no se puede derivar.
+function badgeBloque(bloque) {
+  const mn = multiNormaBloque(bloque);
+  if (!mn || mn.consolidado === ESTADOS.NEUTRAL) return BADGE(bloque.calif);
+  return `<span class="badge ${mn.consolidado.clase}">${esc(mn.consolidado.etiqueta)}</span>`;
+}
+
+// Panel "Evaluación multi-norma": una línea por norma con su umbral y veredicto,
+// el consolidado y una nota si las normas divergen. Es el corazón del pedido del
+// director: mostrar las distintas calificaciones según cada norma.
+function panelMultiNorma(bloque) {
+  const m = metricaBloque(bloque);
+  if (!m) return '';
+  const mn = evaluarMultiNorma(m.family, m.valor, m.ctx);
+  if (!mn) return '';
+  const filas = mn.opticas.map((o) => {
+    const v = (o.estado && o.estado.nivel >= 0)
+      ? `<span class="mn-v ${o.estado.clase}"><span class="dot ${o.estado.dot}"></span>${esc(o.estado.etiqueta)}</span>`
+      : '<span class="mn-v muted small">—</span>';
+    const nota = o.nota ? ` <span class="mn-nota">· ${esc(o.nota)}</span>` : '';
+    return `<li><span class="mn-norma">${esc(o.norma)}</span><span class="mn-umbral">${esc(o.umbral || '')}</span>${v}${nota}</li>`;
+  }).join('');
+  const cons = mn.consolidado && mn.consolidado.nivel >= 0
+    ? `<span class="mn-v ${mn.consolidado.clase}"><span class="dot ${mn.consolidado.dot}"></span>${esc(mn.consolidado.etiqueta)}</span>`
+    : '—';
+  const div = mn.divergen
+    ? '<p class="mn-div">⊳ Las normas divergen — el consolidado toma el criterio más conservador (la seguridad pesa sobre el "pasa por poco").</p>'
+    : '';
+  // Sugerencia de diagnóstico (qué investigar / cómo determinar el estado),
+  // conforme a la skill. Aparece siempre: aprueba → seguimiento; investigar/
+  // rechaza/faltante → acción correlacionada.
+  const rec = recomendarPrueba(m.family, { estado: mn.consolidado, divergen: mn.divergen });
+  const recHtml = rec ? `<p class="mn-rec"><b>Recomendación</b> ${esc(rec)}</p>` : '';
+  return `<div class="pe-multinorma"><div class="pe-mn-head">Evaluación multi-norma <span class="pe-mn-cons">consolidado: ${cons}</span></div>`
+    + `<ul class="pe-mn-list">${filas}</ul>${div}${recHtml}</div>`;
+}
+
 /**
  * Monta una gráfica (chips de filtro por fase + SVG) para un bloque. El filtro
  * por fase opera sobre series (curvas) o categorías (barras), y se aplica a
@@ -463,7 +548,7 @@ export function renderBloque(bloque) {
   const card = document.createElement('section');
   card.className = 'pe-bloque';
   const norm = bloque.prueba ? `<span class="norm">${esc(bloque.prueba)}</span>` : '';
-  let html = `<h2>${esc(bloque.titulo)} ${BADGE(bloque.calif)} ${norm}</h2>`;
+  let html = `<h2>${esc(bloque.titulo)} ${badgeBloque(bloque)} ${norm}</h2>`;
   if (bloque.observaciones) {
     // Callout de hallazgo: ámbar ("Dato a verificar") cuando la calificación o
     // algún punto pide confirmación humana; "Análisis de la IA" si no.
@@ -471,13 +556,19 @@ export function renderBloque(bloque) {
     const warn = algunVerif || /verificar|investigar|revisar|excesivo|fuera|alto|bajo|pobre/i.test(bloque.calif || '');
     html += `<div class="callout${warn ? ' warn' : ''}"><div class="ttl">${warn ? 'Dato a verificar' : 'Análisis de la IA'}</div><p style="margin:0">${esc(bloque.observaciones)}</p></div>`;
   }
-  // Criterio de evaluación VERIFICABLE: fórmula aplicada + umbral + norma
-  // (autoritativo, lo adjunta el shell desde el dominio normativo — no la IA).
-  // Permite confirmar POR QUÉ el bloque tiene su calificación.
+  // Criterio VERIFICABLE: la fórmula aplicada + el panel MULTI-NORMA (veredicto
+  // por cada norma + consolidado + divergencias). El veredicto sale del valor vs
+  // la norma, no de la IA (L-36 / ADR-012). Si el bloque no tiene métrica
+  // reconocible, cae al criterio único (umbral/norma) que adjunta el shell.
   const cr = bloque.criterio;
-  if (cr && (cr.formula || cr.umbral || cr.norma)) {
+  if (cr && cr.formula) {
+    html += `<div class="pe-criterio"><span class="pe-cr-item"><b>Fórmula</b> ${esc(cr.formula)}</span></div>`;
+  }
+  const panel = panelMultiNorma(bloque);
+  if (panel) {
+    html += panel;
+  } else if (cr && (cr.umbral || cr.norma)) {
     html += '<div class="pe-criterio">'
-      + (cr.formula ? `<span class="pe-cr-item"><b>Fórmula</b> ${esc(cr.formula)}</span>` : '')
       + (cr.umbral ? `<span class="pe-cr-item"><b>Criterio</b> ${esc(cr.umbral)}</span>` : '')
       + (cr.norma ? `<span class="pe-cr-item"><b>Norma</b> ${esc(cr.norma)}</span>` : '')
       + '</div>';
