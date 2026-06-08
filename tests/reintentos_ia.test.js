@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 
 import {
   esErrorTransitorioIA, retrasoBackoff, conReintentosIA, IA_STATUS_TRANSITORIOS,
+  conTimeoutAbortable, TimeoutIA,
 } from '../functions/reintentos.mjs';
 
 const err = (props) => Object.assign(new Error(props.message || 'x'), props);
@@ -131,5 +132,56 @@ describe('conReintentosIA — política de reintento', () => {
     assert.equal(eventos.length, 2);
     assert.equal(eventos[0].intento, 1);
     assert.equal(eventos[1].intento, 2);
+  });
+});
+
+describe('conTimeoutAbortable — acota el intento y aborta el cuelgue (ADR-017)', () => {
+  test('resuelve si el trabajo termina antes del timeout', async () => {
+    const r = await conTimeoutAbortable(async () => 'ok', 1000);
+    assert.equal(r, 'ok');
+  });
+
+  test('un trabajo que SE CUELGA (nunca resuelve) rechaza con TimeoutIA y ABORTA el signal', async () => {
+    let abortado = false;
+    await assert.rejects(
+      conTimeoutAbortable((signal) => new Promise((resolve) => {
+        // se cuelga: nunca resuelve por sí mismo. Solo el abort lo libera.
+        signal.addEventListener('abort', () => { abortado = true; resolve('tarde'); });
+      }), 30),
+      (e) => e instanceof TimeoutIA && e.code === 'ia_timeout' && e.transitorio === true
+    );
+    assert.equal(abortado, true, 'el signal debe abortarse al vencer el timeout');
+  });
+
+  test('propaga el error real del trabajo si falla antes del timeout', async () => {
+    await assert.rejects(
+      conTimeoutAbortable(async () => { throw err({ status: 401, message: 'auth' }); }, 1000),
+      /auth/
+    );
+  });
+
+  test('TimeoutIA es transitorio para esErrorTransitorioIA → reintentable', () => {
+    assert.equal(esErrorTransitorioIA(new TimeoutIA(400000)), true);
+    assert.equal(esErrorTransitorioIA({ transitorio: true }), true);
+    assert.equal(esErrorTransitorioIA(err({ name: 'AbortError' })), true);
+    assert.equal(esErrorTransitorioIA(err({ message: 'The operation was aborted' })), true);
+  });
+
+  test('integración: un cuelgue acotado por intento + reintento → termina en error (NUNCA cuelga)', async () => {
+    // Simula el patrón real de la CF: cada intento se cuelga; conTimeoutAbortable
+    // lo aborta → TimeoutIA (transitorio) → conReintentosIA reintenta hasta agotar
+    // y RELANZA. Lo clave: la promesa SIEMPRE se asienta (no queda colgada).
+    let intentos = 0;
+    await assert.rejects(
+      conReintentosIA(
+        () => conTimeoutAbortable((signal) => new Promise((resolve) => {
+          intentos++;
+          signal.addEventListener('abort', () => resolve('tarde'));
+        }), 20),
+        { intentos: 2, baseMs: 1, dormirFn: async () => {} }
+      ),
+      (e) => e instanceof TimeoutIA
+    );
+    assert.equal(intentos, 2);
   });
 });

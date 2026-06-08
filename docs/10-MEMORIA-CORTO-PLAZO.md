@@ -88,6 +88,13 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-08** — **ADR-017 · CAUSA RAÍZ del reproceso colgado**: `await` desnudo sobre `stream.finalMessage()` SIN
+  timeout por intento → si la IA se cuelga, la plataforma mata la función a 900s sin correr `catch` → el estado queda
+  `'en_curso'` para siempre. Fix DEFINITIVO: `conTimeoutAbortable` (AbortController + `Promise.race`) aborta el stream
+  colgado a los 400s → `TimeoutIA` transitorio → reintenta o cae a 'error' limpio; `intentos:2`, presupuesto < 900s;
+  **watchdog global** (870s escribe 'error' si sigue viva); **memoria 1→2 GiB** (anti-OOM). 1096/1096 verde (+5 tests,
+  incl. cuelgue acotado). **CF DESPLEGADA**. Lección **L-46** (nunca `await` desnudo sobre stream de IA). Frontend a prod
+  tras push. ⚠️ El director valida en navegador que el badge ahora SÍ pasa a procesado/⚠ falló.
 - **2026-06-08** — **ADR-016 · "Reprocesar" asíncrono observable** (cierra el dolor real de TODO-09: "no se aprecia si
   terminó o hubo problemas"). La CF `extraerPruebasElectricasIA` ahora, con `informeId`, PERSISTE server-side (admin SDK,
   reusando el dominio) + escribe estado durable `reproceso.{estado:en_curso|ok|error}`; la fila lo refleja en vivo
@@ -95,10 +102,6 @@
   puros al dominio: `derivarBushing` (de shell), `deepClean` (`domain/firestore_clean.js` + re-export). **CF DESPLEGADA**.
   1091/1091 verde (+4 derivarBushing). Lección L-45. Frontend a prod tras push del director. ⚠️ Validar el badge en navegador.
 - **2026-06-08** — **TODO-09 → ADR-015**: reintento con backoff de fallos transitorios de la IA server-side
-  (`functions/reintentos.mjs` puro + 14 tests; `maxRetries:0`; `timeoutSeconds 540→900`). CF DESPLEGADA. L-44.
-- **2026-06-08** — **Sesión consolidada: arco tablero ADR-010→ADR-014 + L-35..L-43, TODO EN PRODUCCIÓN** (`main f3951b4`).
-  Hitos: Tendencia F2/F3 (ADR-010) · veredicto normativo + NETA unificada (ADR-011) · evaluación MULTI-NORMA (ADR-012)
-  · bujes canónico + tendencia alto nivel (ADR-013) · identidad por informe / trafo móvil (ADR-014). + fixes:
-  Firestore long-polling (L-38), upsert por fecha (L-39), reproceso server-side (L-40), badge estado (L-41),
-  columna Evaluación/OK fuera (L-42), backfill instantáneo (L-43). 1073/1073 verde. `extraerPruebasElectricasIA`
-  re-desplegada (prompt sin Evaluación) + `narrativaTendenciaIA` desplegada. brain:check SANO.
+  (`functions/reintentos.mjs` puro; `maxRetries:0`; `timeoutSeconds 540→900`). CF DESPLEGADA. L-44.
+- Anterior (consolidado en `99`): arco tablero **ADR-010→ADR-014 + L-35..L-43** TODO EN PRODUCCIÓN (Tendencia F2/F3,
+  veredicto MULTI-NORMA, bujes canónico, identidad por informe/trafo móvil, long-polling, upsert, reproceso server-side, backfill).
