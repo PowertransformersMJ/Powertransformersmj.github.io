@@ -9,93 +9,90 @@
 >
 > **Convención de handoff (relevo a ventana nueva)**: el "Foco actual" debe incluir
 > **🚫 Callejones sin salida** — qué se probó que FALLÓ y NO reintentar, con el porqué.
-> Le ahorra al próximo "tú" repetir errores ya descartados (relevo curado > `/compact`).
 
 ---
 
-## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-07)
+## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-08)
 
-> **TEMA: Tablero de Pruebas Eléctricas con IA — "ir MÁS ALLÁ del informe".**
-> **Arco COMPLETO consolidado en ADR-003→ADR-009 y EN PRODUCCIÓN** (`origin/main=7f2b61b`, PR #128;
-> `origin/DESARROLLO=f2533da=HEAD`, en sync). Detalle: `00`→`99 §3..§9`.
+> **TEMA: Tablero de Pruebas Eléctricas con IA — evaluación + diagnóstico MULTI-NORMA.**
+> **Arco COMPLETO consolidado en ADR-003→ADR-014 y EN PRODUCCIÓN** (`origin/main=f3951b4`,
+> `origin/DESARROLLO=a4a029e=HEAD`, en sync, nada pendiente de push). Detalle: `00`→`99 §3..§14`.
 >
-> **Qué hay hoy (todo en prod):** la IA (Opus 4.7) extrae EXCELENTE; tablero **IA-primaria** (bloques =
-> cuerpo, scorecard derivado). **Completitud DETERMINISTA** (ADR-009): `derivarTablaTAP` arma la tabla por
-> TAP desde las series + Desviación/Evaluación derivadas en cliente; la IA aporta lo único-del-PDF por el
-> **canal `extra`** (Potencia/Tensión/Relación teórica/%DIF/R.Ref — **VERIFICADO** por el auditor). Excitación
-> con Potencia graficada + desviación ÷mayor; relación con desviación = %DIF (vs placa); **aislamiento conforme
-> a NETA por clase** (110 kV→30 GΩ → los 5–6 GΩ medidos = "pobre"). Subtítulos por gráfica + criterios con
-> fórmula. **Pestaña Tendencia (F1)** + **Biblioteca como HUB** (informes + PDF + accesos Tablero/Tendencia).
-> **Workflow de auditoría por sección**: `scripts/audit-bloques-pruebas.mjs` + hoja `workflow-auditoria-secciones-pruebas.md`.
+> **Qué hace el tablero HOY (todo en prod):** la IA (Opus 4.7/Sonnet 4.6) extrae el PDF →
+> tablero **IA-primaria** (bloques = cuerpo; tablas = DATOS). **El VEREDICTO es 100% NORMATIVO**
+> (del VALOR vs norma, NUNCA del texto de la IA, L-36): motor **MULTI-NORMA** `pruebas_electricas_multinorma.js`
+> evalúa cada prueba contra CADA norma aplicable → panel "Evaluación multi-norma" por bloque
+> (veredicto por norma + **consolidado conservador** + divergencias) + **capa de diagnóstico/recomendaciones**
+> `pruebas_electricas_recomendaciones.js` (sugerencia accionable por prueba, ADR-012). Alimenta scorecard/KPI/
+> matriz/timeline/badges (fuente única `calificarPrueba` → consolidado). **FP de bujes CANÓNICO** discriminado
+> (ADR-013). **Identidad/placa CONGELADA por informe** → aislamiento NETA por la clase del PROPIO ensayo
+> (trafo móvil doble config 63.5 kV/110 kV, ADR-014). **Tablas SIN columna "Evaluación/OK"** (strip por encabezado
+> Y contenido, L-42). **Tendencia de alto nivel**: panel "Diagnóstico de la unidad" (veredicto vigente + tendencia
+> ▲/▼ + recomendación) + franja-timeline (F2) + narrativa por IA on-demand (F3). **Biblioteca-hub**; **upsert por
+> fecha** (re-cargar no duplica, L-39); **reproceso SERVER-SIDE** con contador (L-40) + **backfill INSTANTÁNEO**
+> de campos canónicos desde el diagnóstico guardado, sin IA (L-43).
 >
-> **PRÓXIMO:** **Veredicto 100% NORMATIVO completo → ADR-011 (`99 §11`, L-36)**: scorecard/KPI/matriz/tendencia +
-> **badges por bloque** derivan del VALOR vs norma (no del texto IA); aislamiento NETA por clase + **resistencia ≤2%
-> (NETA §7.2.2.D.8, vía skill)** en el dominio; `conCriterios` sobrescribe el `limite_desbalance` de la IA; +gráfica de
-> desviación general en resistencia. Decisiones del director RESUELTAS (resistencia 2% / relación por-valor / badges
-> normativos). Sin commitear aún (commits locales `5d2cdfd` + este). ⚠️ MO.00418 por clase sigue `verificar` (TODO-08).
-> Luego: validar más secciones con informes reales; TODO-01/02 abiertos.
+> **PRÓXIMO / pendientes:**
+> 1. **OFERTA ABIERTA sin responder**: añadir **reintento automático** a "Reprocesar" ante fallo transitorio
+>    (la CF dio un 500 puntual; reprocesar FUNCIONA —validado en logs— pero depende de la IA y a veces falla).
+>    El director cerró la sesión antes de decidir. NO es bloqueante (el backfill cubre el caso común).
+> 2. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
+>    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
+> 3. El director iba a **abrir el libro 450108** (push ya hecho) → el backfill poblará identidad/bujes de 2021/2023 solo.
+> 4. Validar más secciones con informes reales. **TODO-01/02** abiertos (refrigeración/contratos, no del tablero).
 >
-> **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js#extraerPruebasElectricasIA` (extracción, canal `extra`)
-> + `#narrativaTendenciaIA` (F3, narrativa sin PDF) · Render genérico `assets/js/ui/pruebas/grafico-generico.js` ·
-> Dominio bloques `…/pruebas_electricas_bloques.js` (`derivarTablaTAP`/`extra`) · Tendencia `…/pruebas_electricas_tendencia.js`
-> (`bloquesTendencia`/`resumenTendenciaParaIA`) · Semáforo `ui/pruebas/semaforo.js` (`estadoInforme`/`lineaTiempoInformes`) ·
-> Schema `…_schema.js` (`CRITERIOS_NORMA`/`NETA_IR_MIN_GOHM`) · Capa datos `data/pruebas_electricas.js` (`narrarTendencia`) ·
-> Shell `pruebas-electricas-shell.js` (`renderTendenciaUI`/`timelineHtml`/`onGenerarNarrativa`/`narrativaCache`) ·
-> Página `pages/pruebas-electricas.html` · CSS `…/pruebas-electricas.css` · Auditor `scripts/audit-bloques-pruebas.mjs`. Ref local gitignored: `450108/`.
+> **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
+> Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`
+> (`evaluarMultiNorma`/`metricaPrueba`) · **recomendaciones** `domain/pruebas_electricas_recomendaciones.js` ·
+> Tendencia `domain/pruebas_electricas_tendencia.js` (`analisisTendencia`/`bloquesTendencia`) · Bloques
+> `domain/pruebas_electricas_bloques.js` (`derivarTablaTAP`/`quitarColumnasVeredicto`) · Schema `…_schema.js`
+> (`sanitizarBushing`/`sanitizarIdentidad`/`NETA_IR_MIN_GOHM`/`minNetaGohm`/`kvAT`) · Semáforo `ui/pruebas/semaforo.js`
+> (`calificarPrueba` delega + `minNetaDe`) · Render `ui/pruebas/grafico-generico.js` (`panelMultiNorma`/`badgeBloque`) ·
+> Tabla `ui/pruebas/tabla-pruebas.js` (`esPendienteExtraccion`) · Shell `pruebas-electricas-shell.js`
+> (`renderScorecard`/`diagnosticoUnidadHtml`/`storeReport` upsert/`backfillCanonicos`/`kvDeInforme`/reproceso) ·
+> Capa datos `data/pruebas_electricas.js` (`narrarTendencia`/`eliminarPDF`/`listarInformes`) · `firebase-init.js`
+> (Firestore `experimentalAutoDetectLongPolling`). Lóbulo dominio **`49-PRUEBAS-ELECTRICAS`** + skills `skills/pruebas-electricas/*` (13).
 >
 > **Flujo git (ADR-005)**: Claude commitea + deploya; el director pushea/mergea. Claude NUNCA force-push a `main`.
 >
 > **🚫 Callejones sin salida (curados)**: (1) push del runtime da 403 → solo el director pushea (L-01).
-> (2) `httpsCallable` default 70s → `timeout` explícito cliente+server (L-27). (3) Storage NO se LEE del browser
-> sin CORS → datos legibles a **Firestore** (L-29). (4) Firestore prohíbe arrays anidados → string JSON (L-30).
-> (5) UI gated por rol → re-render en `sgm:session-ready` (L-28). (6) clave `prueba` de la IA NO estable
-> (tand↔tan_delta) → **aliasear** (L-31). (7) el LLM OMITE estructura redundante (tabla ancha) aunque insistas →
-> derivar en cliente + `extra` inline (L-32/L-33). (8) NO graficar toda clave `extra` (duplica/ensucia: R.Ref≈R)
-> → curar (L-34). (9) desviación NO genérica: excitación ÷ lateral mayor, relación = %DIF (vs placa), resistencia
-> vs promedio. (10) aislamiento NO es ≥1 GΩ genérico → mínimo NETA por clase de tensión.
+> (2) Storage NO se LEE del browser sin CORS → la CF lee el PDF server-side; el reproceso TAMBIÉN (L-29/L-40); datos a Firestore.
+> (3) Firestore: arrays anidados prohibidos → string JSON (L-30); transport error 400 → auto-long-polling (L-38).
+> (4) clave `prueba` de la IA NO estable → aliasear (L-31); el LLM omite tabla ancha → derivar en cliente + `extra` (L-32/L-33).
+> (5) Veredicto NUNCA del texto IA, siempre VALOR vs norma multi-norma (L-36/L-37); ninguna columna "OK" en tablas (L-42).
+> (6) Backfill de campos derivables: NO re-correr la IA (lenta), derivar de lo guardado (L-43). Reproceso IA = 2–5 min (Opus).
+> (7) Aislamiento NO genérico ≥1 GΩ → mínimo NETA por CLASE; y por la clase del PROPIO informe (trafo móvil, ADR-014).
+> (8) `calificarResistencia(v, ctx)`: el 2º arg es `flagVerificar` → al reusar como `evaluar`, envolver `(v)=>calificar(v)` (L-37).
+> (9) Allowlists de strings frágiles (estado `extraido_ia`, columna `Resultado`) → detectar por prefijo/contenido (L-41/L-42).
 
 ---
 
 ## 📋 Pendientes abiertos (TODO-NN)
 
-> Al cerrar uno: ✅ + link al ADR §NN, y retirarlo en la próxima poda.
-
 | ID | Item | Estado | Bloqueo |
 |---|---|---|---|
-| **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (script `scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
+| **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
-| **TODO-08** | Skills `pruebas-electricas`: **13/13 creadas** (patrón 4 neuronas + 3 marcos compartidos). Falta: director **valida** + **confirma los valores `⚠️ verificar`** (lobe 49 §Valores a verificar) contra su edición de norma → fijar en `03-…` + schema del tablero; ingerir más normas. | 🔄 en validación | director valida + entrega docs/edición de norma |
+| **TODO-08** | Skills `pruebas-electricas` (13/13). Falta: director **valida** + confirma los valores `⚠️ verificar` (lobe 49) contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR) → fijarlos en el motor multi-norma. | 🔄 en validación | director entrega edición de norma |
+| **TODO-09** | ¿Reintento automático en "Reprocesar" ante 500 transitorio? (oferta abierta, no decidida; no bloqueante) | 🔮 abierto | decisión del director |
 
-> Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** (arco del tablero: completitud determinista, workflow de auditoría, excitación/relación/aislamiento, tendencia F1, biblioteca-hub) → **ADR-009** (EN PRODUCCIÓN, PR #128).
+> Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** → ADR-009.
 
 ---
 
 ## 🔮 Contexto estratégico
 
-- Plan v2.2 (F16–F37) **cerrado** en tag `v2.0.0`; ciclos de pulido hasta `v2.4.1`. Modo "features puntuales + bugfixes de campo".
-- `_legacy/CLAUDE-previo.md` = referencia histórica (14 reglas §0.1.2.* condensadas en `30-LECCIONES`).
+- Plan v2.2 (F16–F37) **cerrado** en `v2.0.0`; ahora "features puntuales + bugfixes de campo".
+- `_legacy/CLAUDE-previo.md` = referencia histórica (14 reglas condensadas en `30-LECCIONES`).
 - Skills en `skills/` (catálogo paralelo); auditoría especializada se activa con **Trigger 🔵**.
+- **Nota config (no código)**: aviso "domain not authorized for OAuth" → agregar `powertransformersmj.github.io` en
+  Firebase console → Auth → Settings → Authorized domains (solo afecta login Google/popup; email/password OK).
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **Backfill instantáneo de canónicos (L-43) — el reproceso con IA es lento (2–5 min) para esto.** El reproceso (re-extracción Opus) tardaba demasiado solo para poblar identidad/bujes en informes viejos. Fix: `backfillCanonicos` en `montarBloques` deriva identidad (de `mediciones_raw.unidad`) y bujes (`derivarBushing(bloques)`) del **diagnóstico YA guardado**, sin IA, instantáneo y silencioso → al abrir la unidad, 2021/2023 toman su placa/bujes sin reprocesar. El reproceso con IA queda para re-extracción genuina (con contador). 1073/1073 verde.
-- **2026-06-08** — **Reproceso VALIDADO + feedback de progreso.** El director no veía si el reproceso avanzaba/terminaba (>2 min). Verificado en `firebase functions:log`: el reproceso del 2023 llegó (auth VALID 02:30:49) y TERMINÓ OK (02:33:31, opus-4-7, 8 bloques, 243 puntos) → ~2m42s. NO está colgado: Opus + razonamiento sobre PDF denso tarda 1–3 min. Fix UX: botón con **contador** (`↻ Reprocesando con IA… m:ss`) + toast claro al terminar (`✓ … en Ns · N bloques`) + `✓ Reprocesado`. 1073/1073 verde.
-- **2026-06-08** — **"Reprocesar" ahora visible en informes YA procesados.** Efecto colateral del fix de badge (L-41): al pasar a "procesado", el botón Reprocesar (gateado a pendientes) desaparecía → el director no podía reprocesar para poblar identidad/bujes. Fix: `accionesPdf` muestra Reprocesar para CUALQUIER informe vivo con PDF en Storage (no solo pendientes); re-extrae IA server-side. 1073/1073 verde.
-- **2026-06-08** — **Identidad por informe → ADR-014 (`99 §14`).** El director adjuntó las 2 PLACAS de la serie 450108: NO era inconsistencia, es UN trafo MÓVIL de doble config (AT triángulo 63.5 kV Dyn1 / AT estrella 110 kV YNyn0). Fix: `sanitizarIdentidad` + campo `identidad` (placa plana) congelado en cada informe (carga + reproceso); `calificarPrueba` evalúa el aislamiento contra la clase del PROPIO informe (`minNetaDe`: 63.5→25 GΩ, 110→30 GΩ), no la "última identidad"; `kvDeInforme` en los bloques; encabezado muestra Config·Subestación. 1073/1073 verde. **PENDIENTE: reprocesar 2021/2023 para poblar `identidad`** (el reproceso server-side ya lo hace).
-- **2026-06-08** — **Auditoría informe 2021 (Applus/Bocagrande) → fix robustez veredicto (L-42) + 1 inconsistencia de datos flagueada.** (a) El 2021 usa "Resultado: OK" y "Evaluación: Correcto" → mi strip solo cazaba "Evaluación". Ahora `quitarColumnasVeredicto` (dominio, testeable) detecta por encabezado (incl. Resultado/Concepto/Dictamen) Y por contenido (todas las celdas = OK/Correcto/Satisfactorio/Vigilar…). +6 tests. 1069/1069 verde. (b) **⚠️ INCONSISTENCIA DE IDENTIDAD (decisión del director)**: serie 450108 tiene placa DISTINTA en los 2 informes — 2021: **63.5/13.8 kV, Dyn1yn1, Bocagrande**; 2023: **110/34.5/13.8 kV, YNyn0yn0, Membrillal**. Es un TRAFO MÓVIL → ¿misma unidad reconfigurada en otra subestación, o dos unidades? `guardarUnidad` MERGE last-wins → la identidad mostrada (y el kvAT para aislamiento NETA por clase) depende del último guardado. El director debe confirmar.
-- **2026-06-08** — **Quitada la columna "Evaluación/OK" de las tablas (L-42).** El director: el "OK" por fila no era normativo (lo emitía la IA porque el prompt lo pedía). Fix en 3 capas: (1) prompt sin "Evaluación" + **re-deploy `extraerPruebasElectricasIA`**; (2) `derivarTablaTAP` ya no añade "Eval." (mantiene Desv. %); (3) `tablaBloque` strip defensivo de columnas de veredicto → arregla los informes ya guardados (2021/2023) sin re-extraer. El veredicto vive SOLO en el panel multi-norma. Tests de bloques migrados. 1063/1063 verde. Sin commitear (excepto deploy ya hecho).
-- **2026-06-08** — **Fix badge de estado (L-41).** Bug: informes con `estado: extraido_ia` (la IA, en carga y reproceso) se mostraban "pendiente de extracción" + botón Reprocesar siempre visible, porque el chequeo era allowlist exacta `extraido`/`procesado`. Helper único `esPendienteExtraccion` (`!startsWith('extraido') && !== 'procesado'`) en `tabla-pruebas.js` (badge+reprocesar+serie). Ahora un informe extraído/reprocesado muestra "procesado" (verde) y oculta Reprocesar → se puede CONSTATAR el reproceso. 1063/1063 verde. Sin commitear.
-- **2026-06-08** — **Fix reprocesar = server-side (L-40).** El director vio CORS rojo + informes "pendiente de extracción" al reprocesar: el botón descargaba el PDF al navegador (`getBlob`/`fetch`) → CORS (L-29) → fallaba. Ahora reprocesar re-llama `extraerConIA({storagePath})` (la CF lee el PDF en el servidor, sin CORS, con IA) + re-deriva bujes + `actualizarInforme`/`guardarBloques` mismo id + invalida `bloquesCache`. Reprocesar 2021/2023 ahora puebla el bujes canónico SIN re-subir. `descargarBlobInforme` quedó sin uso en el shell (removido del import; "Descargar PDF" es `<a download>`). 1063/1063 verde. Sin commitear.
-- **2026-06-08** — **Upsert de informes por fecha (L-39, refina ADR-013).** Re-cargar el mismo informe ya no duplica: `storeReport` detecta por fecha exacta (fallback año) y `window.confirm` ofrece REEMPLAZAR (borra el viejo: `eliminarInforme`+`eliminarPDF`) o crear nuevo. Nuevo `eliminarPDF` en la capa de datos. Permite re-cargar 2021/2023 limpio para poblar el bushing canónico. 1063/1063 verde. Sin commitear.
-- **2026-06-08** — **ADR-013: FP de bujes canónico + Tendencia de ALTO NIVEL.** El director: el FP de bujes no se discriminaba al inicio (vivía solo en el bloque) y la tendencia se veía básica. (1) `sanitizarBushing`+campo canónico `bushing:{fp_max_pct,dc1_max_pct}`, derivado al guardar (`derivarBushing` del bloque) → fila bushing en matriz + métrica en motor/tendencia. (2) Scorecard del vigente SIEMPRE arriba (se quitó `reales<=1`) → discrimina FP transformador y bujes. (3) `analisisTendencia` (multi-norma por métrica + recomendación + tendencia empeora/mejora + Δ) → panel "Diagnóstico de la unidad" en Tendencia; límites corregidos (resistencia 2). 1063/1063 verde. Sin commitear. ⚠️ Los 2 informes ya cargados (2021/2023) necesitan RE-CARGA para poblar `bushing` canónico en matriz/tendencia (el detalle ya se ve en el bloque del Tablero).
-- **2026-06-08** — **Fix robustez Firestore (L-38).** El director reportó error rojo en consola al cargar informes (`WebChannel RPC 'Listen' transport errored 400`). Diagnóstico: los informes 450108 (2021+2023) SÍ cargaron (libros visibles); el error es del transporte streaming de Firestore en redes/proxies. Fix: `firebase-init.js#getDbSafe` → `initializeFirestore(app, {experimentalAutoDetectLongPolling:true})` (memoizado + fallback). 1059/1059 verde. Sin commitear. **Nota para el director (config, no código)**: aviso "domain not authorized for OAuth" = agregar `powertransformersmj.github.io` en Firebase console → Auth → Settings → Authorized domains (solo afecta login Google/popup; email/password OK).
-- **2026-06-07** — **Capa de DIAGNÓSTICO / recomendaciones (extiende ADR-012).** A pedido del director: todas las pruebas se diagnostican conforme a la skill y, donde no hay veredicto definitivo, se deja una SUGERENCIA para investigar/determinar el estado. Nuevo `pruebas_electricas_recomendaciones.js` (`recomendarPrueba` por familia × nivel aprueba/investigar/rechaza/faltante, con correlaciones cruzadas + principio "1 hallazgo=investigar, 2 convergentes=diagnóstico" + intervalos; fallback genérico). Render "Recomendación" en el panel multi-norma de cada bloque (prefijo de divergencia). +7 tests. **1059/1059 verde.** Sin commitear.
-- **2026-06-07** — **Evaluación MULTI-NORMA → ADR-012 (`99 §12`) + L-37.** Aclaración del director: NETA NO es la definitiva; mostrar el veredicto bajo CADA norma + consolidado conservador + divergencias (marco de la skill `marco-normativo-multinorma.md`). Motor de dominio `pruebas_electricas_multinorma.js` (`CRITERIOS_MULTINORMA`/`evaluarMultiNorma`/`metricaPrueba`) = fuente única: `calificarPrueba` delega al consolidado (scorecard/KPI/matriz/timeline coherentes); panel "Evaluación multi-norma" por bloque (`panelMultiNorma`) + badge=consolidado. Caso testigo aislamiento 110 kV (pasa piso NETA 5 GΩ / falla por clase 30 GΩ). Efecto: tan δ 0.5–0.7 ahora "investigar" por NETA 100.3. Gotcha corregido: no filtrar `ctx` como 2º arg de `calificarResistencia` (→flag). **1052/1052 verde + lint.** Sin commitear. ⚠️ por-clase MO.00418/PI-DAR/C1 siguen `verificar` (TODO-08).
-- **2026-06-07** — **ADR-011 completado: las 3 decisiones del director RESUELTAS** (misma sesión). (1) **resistencia ≤2%** (apoyo skill `resistencia-devanados/03`: NETA §7.2.2.D.8; precedencia fábrica>MO.00418>NETA) — fijado en UMBRAL_DESBALANCE/CRITERIOS/CRITERIOS_NORMA/UMBRALES (5→2) + `conCriterios` SOBRESCRIBE el `limite_desbalance` de la IA (emitía 5). (2) **relación por-valor** (1.26%→fuera de norma; el flag `verificar` NO degrada). (3) **badges por bloque NORMATIVOS** (`calificarBloque`/`badgeBloque` en grafico-generico; aislamiento NETA, FP/bujes bandas IEEE 62, collar mW, curvas desbalance). Tests resistencia migrados 5→2%. **1040/1040 verde + lint.** Sin commitear.
-- **2026-06-07** — **Veredicto 100% NORMATIVO → ADR-011 (`99 §11`) + L-36.** A pedido del director (todo criterio basado en normas, independiente de la calif del informe) + su confirmación visual (PDF tablero) + extracción real JSON-3 (450108). `renderScorecard` ya NO lee `b.calif` de la IA: deriva de `calificarPrueba(valor vs norma)` + bujes desde tan δ medido; aislamiento **NETA por clase unificado en el dominio** (`opts.minNeta` en calificarPrueba/estadoInforme/estadoVigente/lineaTiempoInformes/renderMatriz) → scorecard/KPI/matriz/timeline coherentes (resuelta la contradicción KPI rojo vs scorecard verde). +`bloqueDesviacionGeneral` (curva única desbalance máx entre fases por TAP + criterio) en resistencia. Eliminado `estadoDeCalif`. **1040/1040 verde + lint.** Sin commitear. **DECISIONES del director**: resistencia 2% NETA D.8 vs 5% código; relación `verificar`→¿AMBAR?; badges por bloque ¿recomputar?
-- **2026-06-07** — **Skills `pruebas-electricas` — LAS 13 COMPLETAS.** Replicado el patrón enriquecido a las 12 restantes vía **4 agentes en paralelo** (grupos: electromagnético / FP-dieléctrico / mecánico-impedancia / química-aceite). +3er marco compartido `_conocimiento/gestion-mantenimiento-predictivo.md` (veredicto→acción preventiva/correctiva + urgencia criticidad×severidad + intervalo de re-ensayo CBM/PdM). Total **65 .md** (13×5). Verificado: 13 carpetas ×5 archivos, `name`=carpeta, 0 links rotos, wiring de los 3 marcos en cada skill (03→multinorma, 04→integrado+predictivo), sin `.DS_Store`. README a ✅; lobe 49 con tabla de skills + **lista consolidada de valores `⚠️ verificar`** para el director (criterios por clase MO.00418, ppm percentil C57.104-2019, bandas SFRA, etc.). brain:check SANO. Sin commit aún. **PRÓXIMO**: director valida + confirma los valores `verificar` contra su edición de norma → fijarlos en `03-…` + schema del tablero.
-- **2026-06-07** — **Skills `pruebas-electricas` — capa MULTI-NORMA + diagnóstico integrado** (a pedido del director: el patrón de 4 neuronas no bastaba para criterio robusto). +2 neuronas compartidas: `_conocimiento/marco-normativo-multinorma.md` (evaluar con varias normas a la vez: NETA/IEEE C57.152/IEC/interno/fábrica + precedencia + reconciliación = peor verdicto + mostrar divergencias) y `diagnostico-integrado-bateria.md` (convergencia cross-test: no condenar con 1 prueba). Ejemplar `resistencia-aislamiento` migrada a salida multi-norma (03/04/SKILL.md). **Accuracy grabada**: IEC 60076-3 NO da umbrales de IR (es withstand/PD); escala PI 2–4 viene de IEEE 43 (rotativas, excluye tx) → apoyo por analogía, criterio duro NETA PI≥1.0 + C57.152 PI≥1.5. El 110kV→30GΩ ahora se reporta junto al piso NETA 5GΩ (ambas ópticas). Lobe 49 + README actualizados. brain:check SANO. Sin commit aún.
-- **2026-06-07** — **Iniciativa Skills `pruebas-electricas` (scaffold + ejemplar).** Creada carpeta `skills/pruebas-electricas/` vía `skill-creator`: README maestro (13 skills ↔ batería NETA 7.2.2) + `_conocimiento/` compartido (backbone 7.2.2 + tablas 100.1/100.3/100.4/100.5/100.14 literales) + **skill ejemplar COMPLETA `resistencia-aislamiento`** (SKILL.md + 4 neuronas teoría/cálculos/criterios/diagnóstico, base NETA ATS-2025 §7.2.2 + IEEE C57.152, web research PI/DAR). Lóbulo de dominio nuevo **`49-PRUEBAS-ELECTRICAS`** (registrado en `40` registry + `00` routing + `skills-inventory`). ⚠️ `110 kV→30 GΩ` (NETA_IR_MIN_GOHM) **pendiente de verificar** vs edición de norma del director. **PRÓXIMO**: director valida la ejemplar → replicar patrón de 4 neuronas a las 12 restantes (TODO-08). .DS_Store removidos. Aún sin commit (director pushea).
-- **2026-06-07** — **2 fixes de biblioteca (revisan ADR-009 §9.2):** (1) **click en libro YA NO salta al tablero** → despliega el hub "Libro abierto" (opciones Ver tablero/Ver tendencia) y hace scrollIntoView (`onClickParque`). El atajo serieInput+Enter sí sigue yendo al tablero (deliberado). (2) **Dedupe de serie**: `normalizarSerie` (dominio, sin espacios/guiones, mayúsculas; refactor de `confirmarSerie`) + en `storeReport` se reutiliza el libro existente cuya serie normalizada coincide → evita partir la tendencia por formato (`173523-15510` vs `17352315510`). Backward-compatible (NO cambia docId existente, solo compara). +5 tests `normalizarSerie`. **1036/1036 verde + lint.** ⚠️ Sin verificar en navegador. Pendiente commit+push (director). NO se auto-extrae la serie del PDF para auto-enrutar (mejora futura posible).
-- **2026-06-07** — **Tendencia F2+F3 → consolidado en ADR-010 (`99 §10`)** + fila en `00` + L-35 en `30`. F2 (franja-timeline determinista, `estadoInforme`/`lineaTiempoInformes`) + F3 (narrativa por IA on-demand, CF `narrativaTendenciaIA` desplegada, sin PDF). **EN PRODUCCIÓN** (F2 PR #130, F3 PR #131, `main 75daf29`). 1031/1031 verde. ⚠️ Falta confirmación visual del director (UI gated). `10` podado, `05` al día, brain:check SANO.
-- **2026-06-07** — Arco del tablero → ADR-009 (`99 §9`). EN PRODUCCIÓN (PR #129).
+- **2026-06-08** — **Sesión consolidada: arco tablero ADR-010→ADR-014 + L-35..L-43, TODO EN PRODUCCIÓN** (`main f3951b4`).
+  Hitos: Tendencia F2/F3 (ADR-010) · veredicto normativo + NETA unificada (ADR-011) · evaluación MULTI-NORMA (ADR-012)
+  · bujes canónico + tendencia alto nivel (ADR-013) · identidad por informe / trafo móvil (ADR-014). + fixes:
+  Firestore long-polling (L-38), upsert por fecha (L-39), reproceso server-side (L-40), badge estado (L-41),
+  columna Evaluación/OK fuera (L-42), backfill instantáneo (L-43). 1073/1073 verde. `extraerPruebasElectricasIA`
+  re-desplegada (prompt sin Evaluación) + `narrativaTendenciaIA` desplegada. brain:check SANO.
