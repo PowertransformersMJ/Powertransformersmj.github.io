@@ -77,6 +77,8 @@
 | §17 | ADR-017 — Causa raíz del reproceso colgado: timeout INTERNO por intento (abort del stream) + watchdog global + 2 GiB | 375 |
 | §18 | ADR-018 — Fallo real "Claude API: terminated" = bodyTimeout de undici (5 min) corta el stream largo → dispatcher sin bodyTimeout (undici@6) | 398 |
 | §19 | ADR-019 — 504/deadline-exceeded: bug del presupuesto de reintento (2.º intento sin sitio → SIGKILL) + timeoutSeconds 900→1500 para máxima calidad | 420 |
+| §20 | ADR-020 — RETIRO de "Reprocesar" (costo > valor; re-extraer = re-subir). CF queda solo-CARGA; se conserva la robustez de transporte | 440 |
+| §21 | ADR-021 — Previsualización al colisionar por fecha: comparar "ya guardado" vs "nuevo" (+ abrir PDF) antes de reemplazar | 462 |
 
 ---
 
