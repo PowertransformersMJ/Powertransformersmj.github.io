@@ -88,11 +88,14 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **TODO-09 → ADR-015**: "Reprocesar" 100% funcional. Reintento con backoff de fallos transitorios
-  de la IA server-side (`functions/reintentos.mjs` puro + 14 tests; `esErrorTransitorioIA`/`conReintentosIA` con
-  presupuesto `deadlineMs`); CF `extraerPruebasElectricasIA` con `maxRetries:0` + wrap + `timeoutSeconds 540→900`;
-  cliente timeout 540000→900000. **CF DESPLEGADA** (Successful update). 1087/1087 verde. Lección L-44. Frontend a prod
-  tras push del director. brain:check pendiente de re-correr.
+- **2026-06-08** — **ADR-016 · "Reprocesar" asíncrono observable** (cierra el dolor real de TODO-09: "no se aprecia si
+  terminó o hubo problemas"). La CF `extraerPruebasElectricasIA` ahora, con `informeId`, PERSISTE server-side (admin SDK,
+  reusando el dominio) + escribe estado durable `reproceso.{estado:en_curso|ok|error}`; la fila lo refleja en vivo
+  (onSnapshot), sobrevive recargas, no bloquea, guard de stale (16 min). Cliente = trigger+observe (no persiste). Helpers
+  puros al dominio: `derivarBushing` (de shell), `deepClean` (`domain/firestore_clean.js` + re-export). **CF DESPLEGADA**.
+  1091/1091 verde (+4 derivarBushing). Lección L-45. Frontend a prod tras push del director. ⚠️ Validar el badge en navegador.
+- **2026-06-08** — **TODO-09 → ADR-015**: reintento con backoff de fallos transitorios de la IA server-side
+  (`functions/reintentos.mjs` puro + 14 tests; `maxRetries:0`; `timeoutSeconds 540→900`). CF DESPLEGADA. L-44.
 - **2026-06-08** — **Sesión consolidada: arco tablero ADR-010→ADR-014 + L-35..L-43, TODO EN PRODUCCIÓN** (`main f3951b4`).
   Hitos: Tendencia F2/F3 (ADR-010) · veredicto normativo + NETA unificada (ADR-011) · evaluación MULTI-NORMA (ADR-012)
   · bujes canónico + tendencia alto nivel (ADR-013) · identidad por informe / trafo móvil (ADR-014). + fixes:
