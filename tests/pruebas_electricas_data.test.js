@@ -229,9 +229,11 @@ describe('integración datos → semáforo (seed = tablero original)', () => {
     assert.equal(calificarPrueba('resistencia', byAno(2020)).estado.clase, 'b-a');
     assert.equal(calificarPrueba('resistencia', byAno(2020)).texto, 'verificar');
   });
-  test('aislamiento sin dato → neutral; con 2.5 GΩ → verde', () => {
+  test('aislamiento sin dato → neutral; con 2.5 GΩ → investigar (< piso NETA 100.5 = 5 GΩ para >5 kV)', () => {
     assert.equal(calificarPrueba('aislamiento', byAno(2012)).estado.clase, 'b-n');
-    assert.equal(calificarPrueba('aislamiento', byAno(2014)).estado.clase, 'b-g');
+    // 2.5 GΩ está por DEBAJO del piso absoluto NETA Tabla 100.5 (5 GΩ, >5 kV
+    // líquido) → investigar (multi-norma, no el genérico ≥1 GΩ).
+    assert.equal(calificarPrueba('aislamiento', byAno(2014)).estado.clase, 'b-o');
   });
   test('collar siempre por debajo de 100 mW (verde toda la serie)', () => {
     informes.forEach((inf) => {
