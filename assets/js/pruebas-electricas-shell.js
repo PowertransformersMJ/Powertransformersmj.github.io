@@ -26,7 +26,7 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
-  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques, narrarTendencia,
+  extraerConIA, guardarBloques, cargarBloques, narrarTendencia,
   listarInformes, eliminarPDF
 } from './data/pruebas_electricas.js';
 import {
@@ -885,53 +885,45 @@ async function onClickReportlist(ev) {
   if (rep) {
     const informeId = rep.getAttribute('data-reproc');
     const inf = (state.informes || []).find((i) => i.id === informeId);
-    if (!inf || !inf.pdf || !inf.pdf.downloadURL) {
+    if (!inf || !inf.pdf || !inf.pdf.storagePath) {
       return toast('Este informe no tiene archivo para reprocesar.', 'warn');
     }
     const etiqOrig = rep.textContent;
     rep.disabled = true;
     rep.textContent = '↻ Reprocesando…';
     try {
-      const nombre = inf.pdf.filename || `${serieTxt}-${inf.ano || ''}.pdf`;
-      // El tipo lo decide la extensión (los blobs viejos vienen como
-      // application/octet-stream y no se podrían enrutar por su .type).
-      const tipo = mimePorNombre(nombre) || 'application/pdf';
-      let blob;
-      try {
-        // Vía SDK de Storage (mismo transporte que la subida, ya
-        // autorizado): evita el bloqueo CORS de un fetch directo.
-        blob = await descargarBlobInforme(inf.pdf.storagePath);
-      } catch (errBlob) {
-        // Respaldo: fetch de la downloadURL (funciona si el bucket
-        // tiene CORS configurado para GET desde este origen).
-        console.warn('[pruebas-electricas] getBlob falló, intento fetch', errBlob);
-        const resp = await fetch(inf.pdf.downloadURL);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        blob = await resp.blob();
-      }
-      const archivo = new File([blob], nombre, { type: tipo });
-      const setEstado = (t) => { rep.textContent = `↻ ${t}`; };
-      const { texto } = await conTiempoLimite(
-        leerTextoArchivo(archivo, setEstado),
-        120000,
-        'No se pudo leer el informe en 2 min (descarga u OCR del escaneo). ' +
-        'Sube un PDF con capa de texto o ingresa los datos manualmente.'
+      // Re-extracción con IA SERVER-SIDE: la Cloud Function lee el PDF desde
+      // Storage en el servidor (NO se descarga al navegador → sin CORS, L-29) y
+      // re-extrae con la misma calidad que la carga. Re-deriva el FP de bujes
+      // canónico, así reprocesar puebla bujes sin necesidad de re-subir.
+      const r = await conTiempoLimite(
+        extraerConIA({
+          unidadId, serie: inf.serie || serieTxt,
+          storagePath: inf.pdf.storagePath, filename: inf.pdf.filename || ''
+        }),
+        540000,
+        'La IA no respondió en 9 min. Intenta de nuevo.'
       );
-      const med = extraerMediciones(texto || '');
-      const { _diagnostico, ...mediciones } = med;
-      const conf = confirmarSerie(serieTxt, texto);
-      const parche = {
+      const mediciones = r.mediciones || {};
+      const bloquesIA = Array.isArray(r.bloques) ? r.bloques : [];
+      if (mediciones.unidad) {
+        try { await guardarUnidad({ serie: unidadId, ...mediciones.unidad }); } catch (e) { console.warn('[pruebas-electricas] identidad', e); }
+      }
+      const parche = sanitizarInforme({
         ...mediciones,
-        serie_en_pdf: conf.encontrada ? serieTxt : (inf.serie_en_pdf || ''),
-        pdf: { ...inf.pdf, estado: _diagnostico.campos.length ? 'extraido' : 'pendiente_extraccion' }
-      };
+        unidadId, serie: inf.serie || serieTxt,
+        ano: mediciones.ano != null ? mediciones.ano : inf.ano,
+        fecha: mediciones.fecha || inf.fecha,
+        bushing: derivarBushing(bloquesIA),
+        pdf: { ...inf.pdf, estado: 'extraido_ia' }
+      });
       await actualizarInforme(unidadId, informeId, parche);
-      console.info(`[pruebas-electricas] reproceso ${esc(serieTxt)} · ${inf.ano || 's/a'} →`,
-        _diagnostico.campos.length ? _diagnostico.campos.join(', ') : 'sin datos');
-      toast(_diagnostico.campos.length
-        ? `Informe ${inf.ano || ''} reprocesado · ${_diagnostico.campos.length} dato(s) extraído(s).`
-        : `Informe ${inf.ano || ''} reprocesado · sin texto legible.`,
-        _diagnostico.campos.length ? undefined : 'warn');
+      try {
+        await guardarBloques(unidadId, informeId, bloquesIA, { ...(r.diagnostico || {}), mediciones_raw: mediciones });
+      } catch (e) { console.warn('[pruebas-electricas] guardarBloques (reproceso)', e); }
+      state.bloquesCache.delete(informeId); // fuerza recarga del análisis con lo nuevo
+      console.info(`[pruebas-electricas] reproceso IA ${esc(serieTxt)} · ${inf.ano || 's/a'} · tokens`, r.usage);
+      toast(`Informe ${inf.ano || ''} reprocesado con IA.`);
       // onSnapshot refresca la tabla sola.
     } catch (err) {
       console.error('[pruebas-electricas] reprocesar', err);
