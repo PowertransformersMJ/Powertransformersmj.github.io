@@ -446,19 +446,34 @@ function diagnosticoUnidadHtml(docs) {
   }, {});
   const chip = (clase, lbl) => cuenta[clase] ? `<span class="pe-diag-chip ${clase}">${cuenta[clase]} ${lbl}</span>` : '';
   const chips = chip('b-g', 'dentro de norma') + chip('b-a', 'vigilar') + chip('b-o', 'investigar') + chip('b-r', 'fuera de norma') + chip('b-n', 'sin dato');
-  const filas = analisis.map((m) => {
+  // Resaltar lo RELEVANTE: ordenar (relevantes primero, peor estado antes) y abrir
+  // sus filas; cada fila lleva la ACCIÓN clasificada (preventiva/predictiva/correctiva).
+  const ordenadas = analisis.slice().sort((a, b) =>
+    (Number(b.relevante) - Number(a.relevante)) ||
+    (((b.estado && b.estado.nivel) ?? -1) - ((a.estado && a.estado.nivel) ?? -1)));
+  const filas = ordenadas.map((m) => {
     const badge = m.estado ? `<span class="badge ${m.estado.clase}">${esc(m.estado.etiqueta)}</span>` : '<span class="badge b-n">s/d</span>';
     const div = m.divergen ? '<span class="pe-diag-div" title="Las normas divergen">⊳</span>' : '';
-    return `<details class="pe-diag-row"><summary><span class="pe-diag-m">${esc(m.titulo)}</span> ${badge} ${trendMarker(m)} ${div}</summary>`
-      + `<p class="pe-diag-rec"><b>Recomendación</b> ${esc(m.recomendacion)}</p></details>`;
+    const acc = m.accion || {};
+    const accBadge = `<span class="badge ${esc(acc.clase || 'b-n')}" title="Acción de mantenimiento">${esc(acc.etiqueta || '—')}</span>`;
+    const rel = m.relevante ? '<span title="Cambio relevante" style="color:#dc2626;font-weight:700">●</span> ' : '';
+    const hi = m.relevante ? ' style="border-left:3px solid #dc2626;padding-left:8px"' : '';
+    return `<details class="pe-diag-row"${m.relevante ? ' open' : ''}${hi}><summary>${rel}<span class="pe-diag-m">${esc(m.titulo)}</span> ${badge} ${accBadge} ${trendMarker(m)} ${div}</summary>`
+      + `<p class="pe-diag-rec"><b>${esc(acc.etiqueta || 'Acción')} · criterio + diagnóstico</b> — ${esc(acc.texto || m.recomendacion)}</p></details>`;
   }).join('');
+  const relevantes = analisis.filter((m) => m.relevante).map((m) => m.titulo);
   const empeoran = analisis.filter((m) => m.tendencia === 'empeora').map((m) => m.titulo);
-  const aviso = empeoran.length
-    ? `<p class="pe-diag-watch">⚠ Empeorando vs informe previo: ${esc(empeoran.join(' · '))}. La tendencia pesa tanto como el valor (IEEE C57.152).</p>`
+  const aviso = (relevantes.length || empeoran.length)
+    ? `<p class="pe-diag-watch">⚠ ${relevantes.length ? `Cambios relevantes: ${esc(relevantes.join(' · '))}. ` : ''}${empeoran.length ? `Empeorando vs informe previo: ${esc(empeoran.join(' · '))}. ` : ''}La tendencia pesa tanto como el valor (IEEE C57.152).</p>`
     : '';
+  const leyenda = '<p class="muted small" style="margin:6px 0 0">Acción: '
+    + '<span class="badge b-g">Preventiva</span> rutina · '
+    + '<span class="badge b-a">Predictiva</span> vigilar tendencia · '
+    + '<span class="badge b-r">Correctiva</span> fuera de norma · '
+    + '<span class="badge b-n">Diagnóstica</span> confirmar medición</p>';
   return '<section class="pe-diagnostico">'
-    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto vigente multi-norma + tendencia</span></div>'
-    + `<div class="pe-diag-chips">${chips}</div>${aviso}<div class="pe-diag-list">${filas}</div></section>`;
+    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto vigente multi-norma + tendencia + acción</span></div>'
+    + `<div class="pe-diag-chips">${chips}</div>${aviso}<div class="pe-diag-list">${filas}</div>${leyenda}</section>`;
 }
 
 /* ─── Narrativa de tendencia por IA (F3, on-demand) ───────────── */
@@ -742,6 +757,7 @@ const FAMILIAS_SCORE = [
   { key: 'relacion',    blockKeys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5% vs placa (IEEE C57.152 §7.2.10 / NETA 7.2.2)' },
   { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)' },
   { key: 'aislamiento', blockKeys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ mínimo NETA por clase' },
+  { key: 'collar',      blockKeys: ['collar'],                          label: 'Collar caliente / pérdidas en bujes', criterio: '< 100 mW' },
   { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' }
 ];
 
@@ -762,24 +778,32 @@ function renderScorecard(cont, data, inf) {
   if (!bloques.length) return; // sin bloques: conserva el fallback canónico
   const kv = kvDeInforme(inf); // clase del PROPIO informe (config móvil)
   const minNeta = minNetaGohm(kv);
+  // SIEMPRE se listan TODAS las pruebas, cada una en su fila INDEPENDIENTE — el FP
+  // de bujes (C1) separado del FP del transformador. Una prueba sin dato medido
+  // NO se oculta ni se fusiona: se marca "No realizada" (su ausencia es señal,
+  // independiente de si se hizo o no ese año). (Decisión del director; no tocar.)
   const filas = FAMILIAS_SCORE.map((fam) => {
     const r = (fam.key === 'bushing')
       ? estadoBushing(bloques)
       : calificarPrueba(fam.key, inf, { minNeta });
-    if (!r || r.estado === ESTADOS.NEUTRAL) return null; // sin dato medido → no se muestra
     const criterio = (fam.key === 'aislamiento' && minNeta != null)
       ? `≥ ${minNeta} GΩ · NETA 100.5 (clase ${kv} kV)`
       : fam.criterio;
+    if (!r || r.estado === ESTADOS.NEUTRAL) {
+      return { label: fam.label, criterio, estado: ESTADOS.NEUTRAL, texto: 'No realizada' };
+    }
     return { label: fam.label, criterio, estado: r.estado, texto: r.texto };
-  }).filter(Boolean);
-  if (!filas.length) return;
+  });
   const cap = inf
-    ? `Informe ${inf.ano || 's/a'} · calificación DERIVADA de los valores medidos contra los criterios normativos — independiente de la calificación del laboratorio.`
+    ? `Informe ${inf.ano || 's/a'} · calificación DERIVADA de los valores medidos contra los criterios normativos — independiente de la calificación del laboratorio. Las pruebas no realizadas se listan igual.`
     : 'Calificación derivada de las normas.';
   const body = filas.map((f) => {
-    const detalle = (f.texto && f.texto !== 'OK') ? ` · ${esc(f.texto)}` : '';
+    const esNd = f.estado === ESTADOS.NEUTRAL;
+    const contenido = esNd
+      ? esc(f.texto)
+      : `${esc(f.estado.etiqueta)}${(f.texto && f.texto !== 'OK') ? ` · ${esc(f.texto)}` : ''}`;
     return `<tr><td class="cfg">${esc(f.label)}</td>` +
-      `<td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${esc(f.estado.etiqueta)}${detalle}</span></td>` +
+      `<td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${contenido}</span></td>` +
       `<td class="muted small">${esc(f.criterio)}</td></tr>`;
   }).join('');
   cont.innerHTML = `<table><thead><tr><th>Prueba</th><th>Calificación normativa</th><th>Criterio · norma</th></tr></thead><tbody>${body}</tbody></table>` +

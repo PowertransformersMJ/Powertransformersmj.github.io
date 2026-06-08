@@ -74,6 +74,27 @@ function nivelDe(estado) {
   return 'investigar';
 }
 
+// Tipo de acción de mantenimiento por nivel de veredicto (taxonomía CBM/PdM):
+//   aprueba → PREVENTIVA (rutina programada, prevenir antes del problema)
+//   investigar → PREDICTIVA (basada en condición/tendencia, anticipar la falla)
+//   rechaza → CORRECTIVA (corregir una falla ya presente)
+//   faltante → DIAGNÓSTICA (confirmar la medición antes de concluir)
+const TIPO_ACCION = Object.freeze({
+  aprueba:    { tipo: 'preventiva',  etiqueta: 'Preventiva',  clase: 'b-g' },
+  investigar: { tipo: 'predictiva',  etiqueta: 'Predictiva',  clase: 'b-a' },
+  rechaza:    { tipo: 'correctiva',  etiqueta: 'Correctiva',  clase: 'b-r' },
+  faltante:   { tipo: 'diagnostica', etiqueta: 'Diagnóstica', clase: 'b-n' }
+});
+
+function textoNivel(familia, nivel, divergen) {
+  const set = RECOMENDACIONES[familia] || RECOMENDACIONES._generico;
+  let txt = set[nivel] || RECOMENDACIONES._generico[nivel];
+  if (divergen && nivel !== 'faltante') {
+    txt = `Las normas divergen — prima el criterio más conservador. ${txt}`;
+  }
+  return txt;
+}
+
 /**
  * Recomendación de diagnóstico para una prueba según su veredicto consolidado.
  * @param {string} familia
@@ -81,13 +102,31 @@ function nivelDe(estado) {
  * @returns {string}
  */
 export function recomendarPrueba(familia, ctx = {}) {
-  const set = RECOMENDACIONES[familia] || RECOMENDACIONES._generico;
-  const nivel = nivelDe(ctx.estado);
-  let txt = set[nivel] || RECOMENDACIONES._generico[nivel];
-  if (ctx.divergen && nivel !== 'faltante') {
-    txt = `Las normas divergen — prima el criterio más conservador. ${txt}`;
-  }
-  return txt;
+  return textoNivel(familia, nivelDe(ctx.estado), ctx.divergen);
 }
 
-export { RECOMENDACIONES };
+/**
+ * Acción de mantenimiento CLASIFICADA (predictiva/preventiva/correctiva/diagnóstica)
+ * para una prueba, sensible a la TENDENCIA: una prueba verde pero que EMPEORA
+ * notablemente (≥5% relativo informe a informe) sube a PREDICTIVA (vigilar la
+ * deriva, IEEE C57.152: la tendencia manda sobre el valor puntual). Marca
+ * `relevante` los cambios que merecen resalte (fuera de norma, marginal, o deriva).
+ * @param {string} familia
+ * @param {{estado:object, tendencia?:string, delta?:number, divergen?:boolean}} ctx
+ * @returns {{tipo:string, etiqueta:string, clase:string, relevante:boolean, texto:string}}
+ */
+export function accionPrueba(familia, ctx = {}) {
+  let nivel = nivelDe(ctx.estado);
+  const empeoraFuerte = ctx.tendencia === 'empeora' && Math.abs(Number(ctx.delta) || 0) >= 5;
+  if (nivel === 'aprueba' && empeoraFuerte) nivel = 'investigar';
+  const t = TIPO_ACCION[nivel];
+  return {
+    tipo: t.tipo,
+    etiqueta: t.etiqueta,
+    clase: t.clase,
+    relevante: nivel === 'rechaza' || nivel === 'investigar',
+    texto: textoNivel(familia, nivel, ctx.divergen)
+  };
+}
+
+export { RECOMENDACIONES, TIPO_ACCION };
