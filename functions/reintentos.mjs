@@ -25,8 +25,10 @@ export function esErrorTransitorioIA(e) {
   // SDK Anthropic: APIConnectionError / APIConnectionTimeoutError / abort no traen status.
   const name = String(e.name || '');
   if (/Connection|Timeout|Abort/i.test(name)) return true;
-  const msg = String(e.message || e);
-  return /overload|rate.?limit|timed?.?out|abort|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|EAI_AGAIN|socket hang up|stream (?:error|disconnect|interrupt)|temporar|overloaded|\b50[234]\b|\b529\b/i.test(msg);
+  // `cause` de undici (TypeError: terminated) lleva el código real (UND_ERR_*).
+  const causeCode = String((e.cause && (e.cause.code || e.cause.message)) || '');
+  const msg = String(e.message || e) + ' ' + causeCode;
+  return /overload|rate.?limit|timed?.?out|abort|terminated|premature|other side closed|socket|UND_ERR|body ?timeout|headers ?timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|EAI_AGAIN|socket hang up|stream (?:error|disconnect|interrupt)|temporar|overloaded|\b50[234]\b|\b529\b/i.test(msg);
 }
 
 // Error de TIMEOUT interno por intento (el stream de la IA se colgó y lo

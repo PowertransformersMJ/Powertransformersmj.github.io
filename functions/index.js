@@ -31,7 +31,17 @@ import { onSchedule }        from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret }       from 'firebase-functions/params';
 import Anthropic from '@anthropic-ai/sdk';
+import { Agent } from 'undici';
 import { conReintentosIA, conTimeoutAbortable } from './reintentos.mjs';
+
+// Dispatcher HTTP para la IA con el bodyTimeout/headersTimeout DESACTIVADOS
+// (ADR-018). Causa raíz del fallo "Claude API: terminated": el bodyTimeout por
+// defecto de undici (~5 min) corta el stream de Claude cuando la extracción de un
+// informe denso (Opus + thinking + effort alto) tarda más de 5 min → el SDK
+// lanza "terminated". Aquí la respuesta puede tardar lo que necesite; el límite
+// real lo ponen el timeout interno por intento (conTimeoutAbortable) + el
+// timeoutSeconds (900 s) de la función. Módulo-level → se reusa entre invocaciones.
+const IA_DISPATCHER = new Agent({ bodyTimeout: 0, headersTimeout: 0, keepAliveTimeout: 60000 });
 
 // Lógica pura del dominio (módulos sin imports de Firebase SDK).
 // La carpeta ./domain/ se sincroniza automáticamente desde
@@ -636,7 +646,15 @@ export const extraerPruebasElectricasIA = onCall(
     //    fallaba en informes densos. Streaming evita que outputs largos corten.
     // maxRetries: 0 → el reintento lo gobierna conReintentosIA (presupuesto de
     // tiempo + "no tool block" = transitorio), no el backoff opaco del SDK.
-    const client = new Anthropic({ apiKey: LLM_API_KEY.value(), maxRetries: 0 });
+    // fetchOptions.dispatcher → sin bodyTimeout (ADR-018): el stream largo de la
+    // extracción densa no se corta a los 5 min ("terminated"). timeout del SDK a
+    // 14 min (≥ ATTEMPT_MS) para que tampoco aborte antes que nuestro control.
+    const client = new Anthropic({
+      apiKey: LLM_API_KEY.value(),
+      maxRetries: 0,
+      timeout: 840000,
+      fetchOptions: { dispatcher: IA_DISPATCHER }
+    });
     const userMsg =
       `Analiza este informe de pruebas eléctricas COMPLETO, página por página, de ` +
       `principio a fin (archivo: ${filename || 'informe.pdf'}). Un informe típico trae VARIAS ` +
@@ -680,7 +698,12 @@ export const extraerPruebasElectricasIA = onCall(
     // el stream colgado a los ATTEMPT_MS → se vuelve un error transitorio →
     // reintenta o cae a 'error' limpio. Un stream no se reusa: cada intento abre
     // uno NUEVO. Presupuesto total acotado MUY por debajo de los 900 s.
-    const ATTEMPT_MS = 400000; // 6.7 min por intento (cubre 2–5 min reales + margen)
+    // ATTEMPT_MS generoso (12.7 min): ya sin bodyTimeout de undici (ADR-018), un
+    // intento puede correr lo que la extracción densa necesite. Patrón "un intento
+    // generoso + reintento SOLO si falla rápido": si el 1.er intento se cuelga y
+    // consume su ventana, ya no hay presupuesto (deadlineMs) para un 2.º → cae a
+    // 'error' limpio; si falla rápido (transitorio), sí reintenta.
+    const ATTEMPT_MS = 760000;
     const inicioIA = Date.now();
     let message;
     try {
@@ -697,7 +720,7 @@ export const extraerPruebasElectricasIA = onCall(
       }, ATTEMPT_MS), {
         intentos: 2,
         baseMs: 1500,
-        deadlineMs: inicioIA + 820000, // 2×400 s + persistencia < 900 s (SIGKILL)
+        deadlineMs: inicioIA + 800000, // 1 intento largo + retry-solo-si-falla-rápido < 900 s (SIGKILL)
         onReintento: ({ intento, intentos, espera, error }) =>
           console.warn(`[extraerPruebasElectricasIA] reintento ${intento}/${intentos} tras fallo transitorio (${error.status || error.code || ''} ${error.message || error}); espera ${Math.round(espera)}ms`),
       });
