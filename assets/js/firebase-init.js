@@ -17,7 +17,7 @@ import { initializeApp, getApps, getApp as _getApp }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
 import { getAuth }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js';
-import { getFirestore }
+import { initializeFirestore, getFirestore }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { getStorage }
   from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
@@ -47,9 +47,24 @@ export function getAuthSafe() {
   return app ? getAuth(app) : null;
 }
 
+// Instancia única de Firestore con auto-detección de long-polling: en redes/
+// proxies/antivirus que rompen el streaming WebChannel, el SDK lo detecta y cae
+// a long-polling automáticamente → elimina el error "RPC 'Listen' stream
+// transport errored (400)" y robustece la conexión en tiempo real (onSnapshot).
+// `initializeFirestore` DEBE llamarse antes del primer `getFirestore`; se
+// memoiza y, si otra ruta ya inicializó la BD, cae al default sin romper.
+let _db = null;
 export function getDbSafe() {
   const app = initApp();
-  return app ? getFirestore(app) : null;
+  if (!app) return null;
+  if (!_db) {
+    try {
+      _db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+    } catch (e) {
+      _db = getFirestore(app);
+    }
+  }
+  return _db;
 }
 
 export function getStorageSafe() {
