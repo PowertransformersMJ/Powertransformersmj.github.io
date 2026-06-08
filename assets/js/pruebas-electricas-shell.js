@@ -26,7 +26,8 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
-  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques, narrarTendencia
+  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques, narrarTendencia,
+  listarInformes, eliminarPDF
 } from './data/pruebas_electricas.js';
 import {
   sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE,
@@ -37,7 +38,7 @@ import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } fro
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
-import { bloquesTendencia, resumenTendenciaParaIA } from './domain/pruebas_electricas_tendencia.js';
+import { bloquesTendencia, resumenTendenciaParaIA, analisisTendencia } from './domain/pruebas_electricas_tendencia.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
 const state = {
@@ -407,11 +408,47 @@ function renderTendenciaUI(informes) {
   const aviso = n < 2
     ? `<p class="muted small">Solo hay ${n} informe cargado para esta unidad: cada gráfica muestra un punto. Carga informes de otras fechas para trazar la tendencia y revelar degradación.</p>`
     : `<p class="muted small">${n} informes en el tiempo · una línea por ensayo contra su umbral normativo.</p>`;
-  cont.innerHTML = aviso + timelineHtml(docs)
+  cont.innerHTML = aviso
+    + diagnosticoUnidadHtml(docs)
+    + timelineHtml(docs)
     + narrativaSectionHtml(docs)
     + '<div id="tendencia-bloques"></div>';
   mountBloques($('tendencia-bloques'), conCriterios({ bloques }, kvUnidadActiva()));
   pintarNarrativaCache(docs); // restaura la narrativa ya generada para esta unidad
+}
+
+/* ─── Diagnóstico de la unidad (cabecera de Tendencia) ───────────
+ * Síntesis de ALTO NIVEL: por métrica, el veredicto vigente multi-norma + la
+ * dirección de la tendencia (empeora/mejora/estable + Δ) + la recomendación
+ * (plegable). Da el "estado de la unidad de un vistazo" + qué vigilar. */
+function trendMarker(m) {
+  if (m.tendencia == null) return '<span class="pe-diag-trend b-n">— sin histórico</span>';
+  const arrow = m.tendencia === 'empeora' ? '▲' : (m.tendencia === 'mejora' ? '▼' : '→');
+  const cls = m.tendencia === 'empeora' ? 'b-r' : (m.tendencia === 'mejora' ? 'b-g' : 'b-n');
+  const d = (m.delta != null && m.delta !== 0) ? ` ${m.delta > 0 ? '+' : ''}${m.delta}${esc(m.unidad)}` : '';
+  return `<span class="pe-diag-trend ${cls}">${arrow} ${m.tendencia}${d}</span>`;
+}
+function diagnosticoUnidadHtml(docs) {
+  const analisis = analisisTendencia(docs, { minClase: minNetaGohm(kvUnidadActiva()) });
+  if (!analisis.length) return '';
+  const cuenta = analisis.reduce((a, m) => {
+    const c = m.estado ? m.estado.clase : 'b-n'; a[c] = (a[c] || 0) + 1; return a;
+  }, {});
+  const chip = (clase, lbl) => cuenta[clase] ? `<span class="pe-diag-chip ${clase}">${cuenta[clase]} ${lbl}</span>` : '';
+  const chips = chip('b-g', 'dentro de norma') + chip('b-a', 'vigilar') + chip('b-o', 'investigar') + chip('b-r', 'fuera de norma') + chip('b-n', 'sin dato');
+  const filas = analisis.map((m) => {
+    const badge = m.estado ? `<span class="badge ${m.estado.clase}">${esc(m.estado.etiqueta)}</span>` : '<span class="badge b-n">s/d</span>';
+    const div = m.divergen ? '<span class="pe-diag-div" title="Las normas divergen">⊳</span>' : '';
+    return `<details class="pe-diag-row"><summary><span class="pe-diag-m">${esc(m.titulo)}</span> ${badge} ${trendMarker(m)} ${div}</summary>`
+      + `<p class="pe-diag-rec"><b>Recomendación</b> ${esc(m.recomendacion)}</p></details>`;
+  }).join('');
+  const empeoran = analisis.filter((m) => m.tendencia === 'empeora').map((m) => m.titulo);
+  const aviso = empeoran.length
+    ? `<p class="pe-diag-watch">⚠ Empeorando vs informe previo: ${esc(empeoran.join(' · '))}. La tendencia pesa tanto como el valor (IEEE C57.152).</p>`
+    : '';
+  return '<section class="pe-diagnostico">'
+    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto vigente multi-norma + tendencia</span></div>'
+    + `<div class="pe-diag-chips">${chips}</div>${aviso}<div class="pe-diag-list">${filas}</div></section>`;
 }
 
 /* ─── Narrativa de tendencia por IA (F3, on-demand) ───────────── */
@@ -604,9 +641,11 @@ async function montarBloques(unidadId, informes) {
     const d = state.bloquesCache.get(inf.id);
     return d && d.bloques && d.bloques.length;
   });
-  if (vigente && reales.length <= 1) {
-    // Enriquecido (no crudo) para que el scorecard refleje la recalificación
-    // normativa — p.ej. aislamiento "pobre" por debajo del mínimo NETA.
+  if (vigente) {
+    // Scorecard del informe VIGENTE SIEMPRE arriba (aunque haya varios informes):
+    // discrimina cada prueba — incluido el FP de bujes (C1) aparte del FP del
+    // transformador. La evolución multi-año vive en la pestaña Tendencia.
+    // Enriquecido (no crudo) → refleja la recalificación normativa (NETA por clase).
     renderScorecard($('matrix'), conCriterios(state.bloquesCache.get(vigente.id), kvUnidadActiva()), vigente);
   }
 }
@@ -1467,6 +1506,46 @@ async function extraerTexto(item) {
   if (UP.step === 2) renderModal();
 }
 
+// Deriva la métrica canónica de bujes desde los bloques de la IA (el FP de bujes
+// vive en el bloque "bushing", no en las mediciones canónicas): peor tan δ
+// medido + peor ΔC1 vs placa (capacitancia). Devuelve null si no hay bloque.
+function derivarBushing(bloques) {
+  const bs = (Array.isArray(bloques) ? bloques : []).filter((b) => b && /bushing|buje/i.test(b.prueba || ''));
+  if (!bs.length) return null;
+  let fpMax = null, dc1Max = null;
+  for (const b of bs) {
+    for (const s of (b.series || [])) {
+      for (const p of (s.puntos || [])) {
+        if (typeof p.y === 'number') fpMax = (fpMax == null) ? p.y : Math.max(fpMax, p.y);
+        const ex = p.extra || {};
+        const placa = Number(ex['Cap. placa (pF)'] ?? ex['Cap placa (pF)']);
+        const med = Number(ex['Cap. medida (pF)'] ?? ex['Cap medida (pF)']);
+        if (Number.isFinite(placa) && placa && Number.isFinite(med)) {
+          const d = Math.abs((med - placa) / placa) * 100;
+          dc1Max = (dc1Max == null) ? d : Math.max(dc1Max, d);
+        }
+      }
+    }
+  }
+  if (fpMax == null && dc1Max == null) return null;
+  return {
+    fp_max_pct: fpMax != null ? +fpMax.toFixed(4) : null,
+    dc1_max_pct: dc1Max != null ? +dc1Max.toFixed(3) : null
+  };
+}
+
+// Busca un informe YA existente de la unidad que sea "el mismo": por FECHA exacta
+// (dd/mm/aaaa, ignorando espacios) y, si el nuevo no trae fecha, por AÑO. Devuelve
+// el informe existente o null. Dos ensayos de fechas distintas del mismo año NO
+// colapsan (sólo se igualan por fecha exacta).
+function fechaKey(s) { return String(s == null ? '' : s).replace(/\s/g, ''); }
+function buscarInformeExistente(lista, fecha, ano) {
+  const fk = fechaKey(fecha);
+  if (fk) return (lista || []).find((e) => fechaKey(e.fecha) === fk) || null;
+  if (ano != null) return (lista || []).find((e) => e.ano === ano) || null;
+  return null;
+}
+
 async function storeReport() {
   // Dedupe de serie: si ya existe un libro cuya serie NORMALIZADA coincide con
   // la tecleada (mismo transformador escrito con otro formato de guiones/espacios),
@@ -1491,6 +1570,9 @@ async function storeReport() {
       // Firestore y NO aparece en la query de suscribirUnidades, así
       // que sin esto la unidad nunca se vería en el parque en vivo.
       await guardarUnidad({ serie: unidadId });
+      // Informes ya existentes de la unidad → para detectar re-carga del MISMO
+      // (por fecha exacta / año) y ofrecer reemplazar en vez de duplicar.
+      const existentesUnidad = await listarInformes(unidadId).catch(() => []);
       const ordenados = UP.items.slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
       let i = 0;
       let identidadGuardada = false; // la placa se guarda una sola vez (primer informe que la traiga)
@@ -1559,9 +1641,33 @@ async function storeReport() {
           ...mediciones,
           unidadId, serie: UP.serie,
           ano: anoIA != null ? anoIA : item.ano,
+          // FP de bujes canónico (la IA solo lo trae en el bloque): se deriva el
+          // peor tan δ y la peor ΔC1 vs placa → discrimina bujes del transformador.
+          bushing: derivarBushing(bloquesIA),
           pdf: pdfMeta ? { ...pdfMeta, estado } : undefined
         });
+        // Upsert por fecha/año: si ya existe el MISMO informe, preguntar si
+        // REEMPLAZAR (borra el anterior + su PDF) o crear uno nuevo. Evita
+        // duplicados al re-cargar; el director tiene el control.
+        const prev = buscarInformeExistente(existentesUnidad, informe.fecha, informe.ano);
+        if (prev) {
+          const etq = informe.fecha || (informe.ano != null ? String(informe.ano) : 's/f');
+          const reemplazar = window.confirm(
+            `Ya existe un informe de ${etq} para la serie ${UP.serie}.\n\n` +
+            `Aceptar = REEMPLAZAR (se borra el anterior y su PDF).\n` +
+            `Cancelar = crear uno NUEVO (quedarán ambos).`
+          );
+          if (reemplazar) {
+            if (prev.pdf && prev.pdf.storagePath) await eliminarPDF(prev.pdf.storagePath).catch(() => {});
+            await eliminarInforme(unidadId, prev.id).catch((e) => console.warn('[pruebas-electricas] no se pudo borrar el informe a reemplazar', e));
+            const idx = existentesUnidad.findIndex((e) => e.id === prev.id);
+            if (idx >= 0) existentesUnidad.splice(idx, 1);
+          }
+        }
         const nuevoId = await crearInforme(unidadId, informe, uid);
+        // Registra el nuevo en la lista local para detectar duplicados de los
+        // SIGUIENTES items del mismo lote.
+        existentesUnidad.push({ id: nuevoId, fecha: informe.fecha, ano: informe.ano, pdf: informe.pdf });
         // Diagnóstico de extracción (ADR-007) → Firestore subcol perezosa.
         // Se persiste SIEMPRE que la IA corrió (aunque bloques esté vacío): el
         // diagnóstico vacío también es señal. Falla suave: el informe queda

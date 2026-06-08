@@ -15,6 +15,9 @@
 // Funciones puras, sin DOM ni Firestore. Testeable con node --test.
 // ══════════════════════════════════════════════════════════════
 
+import { evaluarMultiNorma } from './pruebas_electricas_multinorma.js';
+import { recomendarPrueba } from './pruebas_electricas_recomendaciones.js';
+
 const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
 
 /* Escalar representativo de una prueba en UN informe (mismo criterio que el
@@ -26,6 +29,8 @@ function escalar(key, inf) {
       const a = (Array.isArray(inf.tand) ? inf.tand : []).map((t) => numOrNull(t.valor_pct)).filter((v) => v != null);
       return a.length ? Math.max(...a) : null;
     }
+    case 'bushing':
+      return numOrNull(inf.bushing && inf.bushing.fp_max_pct);
     case 'excitacion':
       return numOrNull(inf.excitacion && inf.excitacion.delta_ext_pct);
     case 'relacion': {
@@ -52,9 +57,10 @@ function escalar(key, inf) {
  * (invertir=true cuando el límite es un MÍNIMO, p.ej. aislamiento ≥ 1 GΩ). */
 export const METRICAS_TENDENCIA = Object.freeze([
   { key: 'tand',        prueba: 'tand',        titulo: 'Tangente δ máxima',                 unidad: '%',  limite: 1 },
+  { key: 'bushing',     prueba: 'bushing',     titulo: 'FP de bujes (C1) máximo',           unidad: '%',  limite: 1 },
   { key: 'excitacion',  prueba: 'excitacion',  titulo: 'Desbalance de corriente de excitación', unidad: '%',  limite: 10 },
   { key: 'relacion',    prueba: 'relacion',    titulo: 'Desviación de relación (máxima)',    unidad: '%',  limite: 0.5 },
-  { key: 'resistencia', prueba: 'resistencia', titulo: 'Desbalance de resistencia (máximo)', unidad: '%',  limite: 5 },
+  { key: 'resistencia', prueba: 'resistencia', titulo: 'Desbalance de resistencia (máximo)', unidad: '%',  limite: 2 },
   { key: 'aislamiento', prueba: 'aislamiento', titulo: 'Aislamiento mínimo (1 min)',         unidad: 'GΩ', limite: 1, invertir: true },
   { key: 'collar',      prueba: 'collar',      titulo: 'Collar caliente (pérdida máxima)',   unidad: 'mW', limite: 100 }
 ]);
@@ -119,4 +125,48 @@ export function resumenTendenciaParaIA(informes) {
   // Sin al menos una métrica con 2+ puntos no hay evolución que narrar.
   const hayTendencia = conSerie.some((m) => m.puntos.length >= 2);
   return hayTendencia ? conSerie : [];
+}
+
+/**
+ * ANÁLISIS de tendencia de ALTO NIVEL: por métrica, la serie temporal + el
+ * veredicto MULTI-NORMA del valor vigente + la recomendación de diagnóstico + la
+ * dirección de la tendencia (empeora/mejora/estable) y el Δ vs el informe previo.
+ * Es el insumo del diagnóstico de la unidad (no solo "una línea contra un umbral").
+ * @param {Array} informes
+ * @param {object} [ctx] {minClase} mínimo de aislamiento por clase de tensión
+ * @returns {Array<object>}
+ */
+export function analisisTendencia(informes, ctx = {}) {
+  const docs = (Array.isArray(informes) ? informes : []).filter(Boolean)
+    .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  if (!docs.length) return [];
+  const minClase = (ctx && typeof ctx.minClase === 'number') ? ctx.minClase : null;
+  return METRICAS_TENDENCIA.map((m) => {
+    const puntos = docs.map((inf) => {
+      const y = escalar(m.key, inf);
+      return y == null ? null : { x: ejeX(inf), y: +y.toFixed(4) };
+    }).filter(Boolean);
+    if (!puntos.length) return null;
+    const vigente = puntos[puntos.length - 1].y;
+    const previo = puntos.length > 1 ? puntos[puntos.length - 2].y : null;
+    const mn = evaluarMultiNorma(m.key, vigente, { minClase });
+    const estado = mn ? mn.consolidado : null;
+    const recomendacion = recomendarPrueba(m.key, { estado, divergen: mn && mn.divergen });
+    let delta = null, tendencia = null;
+    if (previo != null) {
+      delta = +(vigente - previo).toFixed(4);
+      const estable = Math.abs(delta) <= Math.abs(previo) * 0.02; // ±2% relativo
+      if (estable) tendencia = 'estable';
+      else {
+        const empeora = m.invertir ? (delta < 0) : (delta > 0); // aislamiento: bajar = empeorar
+        tendencia = empeora ? 'empeora' : 'mejora';
+      }
+    }
+    return {
+      key: m.key, titulo: m.titulo, unidad: m.unidad, invertir: m.invertir === true,
+      puntos, vigente, previo, delta, tendencia,
+      estado, divergen: !!(mn && mn.divergen), opticas: mn ? mn.opticas : [],
+      recomendacion
+    };
+  }).filter(Boolean);
 }
