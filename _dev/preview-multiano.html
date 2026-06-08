@@ -3,55 +3,78 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>DEV · Multi-año por prueba (función real)</title>
+<title>DEV · Multi-año por prueba (año global + fase por gráfica)</title>
 <link rel="stylesheet" href="../assets/css/aqua-tokens.css">
 <link rel="stylesheet" href="../assets/css/aqua-components.css">
 <link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
 <style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
 </head>
 <body>
-<h1>DEV · Cada prueba con TODOS los años (función REAL bloquesMultiAno → mountBloques)</h1>
+<h1>DEV · Multi-año (conserva fases · color por año · filtro año global + fase por gráfica)</h1>
 <div id="pe-consolidado"></div>
 
 <script type="module">
-import { renderBloque } from '../assets/js/ui/pruebas/grafico-generico.js';
+import { svgBloque } from '../assets/js/ui/pruebas/grafico-generico.js';
 import { bloquesMultiAno } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
-// Mock de informes con sus bloques (como salen de la IA: por fase). bloquesMultiAno
-// los agrupa por prueba con una serie por año (peor fase por X).
-const fase = (base, n, drift) => ({ puntos: Array.from({ length: n }, (_, i) => ({ x: i + 1, y: +(base + i * 0.4 + drift).toFixed(2) })) });
-const excit = (drift) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación', unidad: 'mA', eje_x: 'Posición del TAP', grafica: 'linea', limite: 30,
-  series: [{ nombre: 'Fase A', ...fase(18, 9, drift) }, { nombre: 'Fase B', ...fase(11, 9, drift) }, { nombre: 'Fase C', ...fase(18.5, 9, drift) }] });
-const relac = (drift) => ({ prueba: 'relacion', titulo: 'Relación de transformación · desviación', unidad: '%', eje_x: 'Posición del TAP', grafica: 'linea', limite: 0.5, guia: 0.3,
-  series: [{ nombre: 'Fase A', ...fase(0.1, 9, drift * 0.05) }] });
-const aisla = (drift) => ({ prueba: 'aislamiento', titulo: 'Resistencia de aislamiento', unidad: 'GΩ', eje_x: 'Configuración', grafica: 'barra', limite: 30,
-  series: [{ nombre: 'CH', puntos: [{ x: 'AT-T', y: 42 - drift }, { x: 'MT-T', y: 38 - drift }] }] });
+// Mock REALISTA: 3 informes (2019/2021/2023) con bloques por fase (como la IA).
+const tap = (base, n, step, drift) => Array.from({ length: n }, (_, i) => ({ x: i + 1, y: +(base + i * step + drift).toFixed(3) }));
+const excit = (d) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación', unidad: 'mA', eje_x: 'Posición del TAP', grafica: 'linea', limite: 30,
+  series: [{ nombre: 'Fase A', puntos: tap(18, 9, 0.5, d) }, { nombre: 'Fase B', puntos: tap(11, 9, 0.5, d) }, { nombre: 'Fase C', puntos: tap(18.5, 9, 0.5, d) }] });
+// Relación: desviaciones PEQUEÑAS, casi todas BAJO el límite 0.5% (cumplen).
+const relac = (d) => ({ prueba: 'relacion', titulo: 'Relación de transformación · desviación', unidad: '%', eje_x: 'Posición del TAP', grafica: 'linea', limite: 0.5, guia: 0.3,
+  series: [{ nombre: 'Fase A', puntos: tap(0.12, 9, 0.01, d) }, { nombre: 'Fase B', puntos: tap(0.10, 9, 0.012, d) }, { nombre: 'Fase C', puntos: tap(0.15, 9, 0.008, d) }] });
+const aisla = (d) => ({ prueba: 'aislamiento', titulo: 'Resistencia de aislamiento', unidad: 'GΩ', eje_x: 'Configuración', grafica: 'barra', limite: 30,
+  series: [{ nombre: 'CH', puntos: [{ x: 'AT-T', y: 42 - d }, { x: 'MT-T', y: 38 - d }] }] });
 
 const informes = [
   { ano: 2019, bloques: [excit(0), relac(0), aisla(0)] },
-  { ano: 2021, bloques: [excit(0.7), relac(0.6), aisla(3)] },
-  { ano: 2023, bloques: [excit(1.5), relac(1.4), aisla(7)] }
+  { ano: 2021, bloques: [excit(0.6), relac(0.04), aisla(3)] },
+  { ano: 2023, bloques: [excit(1.4), relac(0.09), aisla(7)] }
 ];
 
+// ── replica de montarMultiAno (shell) para validar el render ──
+const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777'];
 const cont = document.getElementById('pe-consolidado');
 const bloques = bloquesMultiAno(informes);
-cont.innerHTML = '<p class="muted small" style="margin:0 0 8px">Cada gráfica es una prueba; chips de Años = filtro por prueba.</p>';
-for (const b of bloques) {
-  const anos = b.series.map((s) => s.nombre);
-  const activos = new Set(anos);
-  const wrap = document.createElement('div'); wrap.className = 'pe-bloque-grupo';
-  const bar = document.createElement('div'); bar.className = 'pe-fase-chips';
-  bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px';
-  bar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Años:', style: 'font-size:12px;color:#475569' }));
-  const card = document.createElement('div');
-  const pintar = () => { card.innerHTML = ''; card.appendChild(renderBloque({ ...b, series: b.series.filter((s) => activos.has(s.nombre)) })); };
-  anos.forEach((a) => {
-    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pe-fase-chip is-on'; btn.textContent = a;
-    btn.addEventListener('click', () => { if (activos.has(a)) { if (activos.size > 1) activos.delete(a); } else activos.add(a); btn.classList.toggle('is-on', activos.has(a)); pintar(); });
-    bar.appendChild(btn);
-  });
-  wrap.appendChild(bar); wrap.appendChild(card); cont.appendChild(wrap); pintar();
-}
+const anosAll = [...new Set(bloques.flatMap((b) => b.series.map((s) => s._ano)))].sort();
+const colorAno = (a) => COLORES_ANO[Math.max(0, anosAll.indexOf(a)) % COLORES_ANO.length];
+const selY = new Set(anosAll);
+
+cont.innerHTML = '';
+const gbar = document.createElement('div'); gbar.className = 'pe-fase-chips';
+gbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
+gbar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Años (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
+const host = document.createElement('div');
+const pintarTodo = () => {
+  host.innerHTML = '';
+  for (const b of bloques) {
+    const fases = [...new Set(b.series.map((s) => s._fase).filter(Boolean))];
+    if (!b._selF) b._selF = new Set(fases);
+    const selF = b._selF;
+    const wrap = document.createElement('div'); wrap.className = 'pe-bloque-grupo';
+    wrap.appendChild(Object.assign(document.createElement('h3'), { textContent: b.titulo }));
+    const chartBox = document.createElement('div'); chartBox.className = 'chartbox';
+    const repintar = () => {
+      chartBox.innerHTML = '';
+      const series = b.series.filter((s) => selY.has(s._ano) && (!fases.length || selF.has(s._fase))).map((s) => ({ ...s, color: colorAno(s._ano) }));
+      const svg = series.length ? svgBloque({ ...b, series }) : null;
+      if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin series.</p>';
+    };
+    if (fases.length > 1) {
+      const fbar = document.createElement('div'); fbar.className = 'pe-fase-chips';
+      fbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px';
+      fbar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Fases:', style: 'font-size:12px;color:#475569' }));
+      fases.forEach((f) => { const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pe-fase-chip' + (selF.has(f) ? ' is-on' : ''); btn.textContent = f;
+        btn.addEventListener('click', () => { if (selF.has(f)) { if (selF.size > 1) selF.delete(f); } else selF.add(f); btn.classList.toggle('is-on', selF.has(f)); repintar(); }); fbar.appendChild(btn); });
+      wrap.appendChild(fbar);
+    }
+    wrap.appendChild(chartBox); host.appendChild(wrap); repintar();
+  }
+};
+anosAll.forEach((a) => { const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pe-fase-chip' + (selY.has(a) ? ' is-on' : ''); btn.textContent = a; btn.style.setProperty('--c', colorAno(a));
+  btn.addEventListener('click', () => { if (selY.has(a)) { if (selY.size > 1) selY.delete(a); } else selY.add(a); btn.classList.toggle('is-on', selY.has(a)); pintarTodo(); }); gbar.appendChild(btn); });
+cont.appendChild(gbar); cont.appendChild(host); pintarTodo();
 window.__ready = true;
 </script>
 </body>

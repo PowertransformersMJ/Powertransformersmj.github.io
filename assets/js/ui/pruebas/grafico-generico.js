@@ -78,7 +78,7 @@ function ticksRange(lo, hi, n) {
 const fmtTick = (v) => (Math.abs(v) >= 100 ? v.toFixed(0) : (Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(2)));
 
 /* ─── Construye el SVG de un bloque ──────────────────────────── */
-function svgBloque(bloque) {
+export function svgBloque(bloque) {
   const W = 720, H = 280, L = 48, R = 18, T = 18, B = 46;
   const series = bloque.series || [];
   if (!series.length) return null;

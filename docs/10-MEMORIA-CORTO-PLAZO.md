@@ -98,11 +98,12 @@
   (P1) **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato → el FP de bujes "desaparecía";
   ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto INTACTO.** (Tendencia)
   `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica + resalta relevantes. **(Tablero MULTI-AÑO, ADR-024 —
-  corrige la mala interpretación de barras de ADR-023)**: por PRUEBA, una gráfica con una LÍNEA por AÑO superpuestas + **chips de
-  año por prueba** (`bloquesMultiAno` dominio + `montarMultiAno` shell). **Validado con WORKFLOW DE PREVIEW** (`scripts/dev-server.mjs`
-  + `.claude/launch.json` + `_dev/preview-multiano.html` + Claude Preview MCP) — atrapó que la leyenda SVG no filtraba (L-49).
-  1110/1110 verde. 🚫 **NO romper la calificación global** (memoria `feedback_calificacion_global_por_prueba.md`).
-  ⚙️ **Preview workflow disponible** para validar UI: `preview_start name:static` → `preview_eval`/`preview_screenshot` (L-49).
+  ADR-024→**ADR-025 v2** tras feedback)**: por PRUEBA, gráfica con TODOS los años superpuestos **conservando FASES** (año×fase,
+  valores reales — la reducción "peor fase" distorsionaba) + **filtro de año GLOBAL** (todas las pruebas) + **fase por gráfica**,
+  color por año (`bloquesMultiAno`+`montarMultiAno`+`svgBloque` exportado). **(Tendencia v2)**: `cambiosAnoAno` (historial de
+  saltos) + `proyectarTendencia` (ajuste lineal → años a cruzar el límite). 1119/1119 verde. 🚫 **NO romper la calificación
+  global** (memoria `feedback_calificacion_global_por_prueba.md`).
+  ⚙️ **Preview workflow** para validar UI (L-49): `preview_start name:static` → `preview_eval`/`preview_screenshot`; harness `_dev/preview-multiano.html`.
 - **2026-06-08** — **ADR-020 RETIRO de "Reprocesar"** (costo > valor; re-extraer = re-subir): se quitó el botón + handler +
   el modo-reproceso de la CF (queda **solo-CARGA**) + **ADR-021 previsualización al colisionar por fecha** (modal
   `confirmarUpsert`: "ya guardado" vs "nuevo" + abrir PDF → reemplazar/crear-nuevo, no un `confirm` ciego). 1099/1099 verde.

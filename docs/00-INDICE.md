@@ -82,6 +82,7 @@
 | §22 | ADR-022 — Calificación global muestra TODAS las pruebas (no oculta/fusiona, FP bujes separado) + Tendencia con acción clasificada (predictiva/preventiva/correctiva) | 480 |
 | §23 | ADR-023 — Tablero: vista CONSOLIDADA % del límite (SUPERSEDED por ADR-024 — mala interpretación) | 500 |
 | §24 | ADR-024 — Tablero MULTI-AÑO: cada prueba con todos los años superpuestos + filtro de año por prueba; **workflow de PREVIEW** (dev-server + harness) | 518 |
+| §25 | ADR-025 — Multi-año v2 (feedback): conserva FASES + valores reales + filtro de año GLOBAL + fase por gráfica; Tendencia con cambios año-a-año + PROYECCIÓN | 539 |
 
 ---
 

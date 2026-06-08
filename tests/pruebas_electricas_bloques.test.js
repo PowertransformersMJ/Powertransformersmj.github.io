@@ -248,12 +248,12 @@ describe('derivarBushing · FP canónico (peor tan δ + peor ΔC1 vs placa) — 
   });
 });
 
-describe('bloquesMultiAno · una serie por AÑO por prueba (todos los años superpuestos)', () => {
+describe('bloquesMultiAno · año × fase superpuestos (conserva fases y valores reales)', () => {
   const inf = (ano, bloques) => ({ ano, bloques });
   const exc = (vals) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación', unidad: 'mA', eje_x: 'TAP', grafica: 'linea', limite: 30,
     series: [{ nombre: 'Fase A', puntos: vals.map((y, i) => ({ x: i + 1, y })) }] });
 
-  test('agrupa por familia: cada año → una serie (nombre = año), ordenadas asc', () => {
+  test('agrupa por familia: serie por (año × fase), nombre "<año> · <fase>", ordenadas por año', () => {
     const out = bloquesMultiAno([
       inf(2023, [exc([20, 21])]),
       inf(2021, [exc([18, 19])])
@@ -262,42 +262,39 @@ describe('bloquesMultiAno · una serie por AÑO por prueba (todos los años supe
     const b = out[0];
     assert.equal(b.prueba, 'excitacion');
     assert.equal(b.series.length, 2);
-    assert.deepEqual(b.series.map((s) => s.nombre), ['2021', '2023']); // orden asc
+    assert.deepEqual(b.series.map((s) => s.nombre), ['2021 · Fase A', '2023 · Fase A']);
+    assert.deepEqual(b.series.map((s) => s._ano), ['2021', '2023']);
+    assert.deepEqual(b.series.map((s) => s._fase), ['Fase A', 'Fase A']);
     assert.equal(b.limite, 30);
-    assert.deepEqual(b.series[1].puntos, [{ x: 1, y: 20 }, { x: 2, y: 21 }]);
   });
 
-  test('serie representativa = PEOR fase por X (máx por defecto)', () => {
+  test('CONSERVA todas las fases (NO reduce): valores reales por fase', () => {
     const multi = { prueba: 'excitacion', titulo: 'Exc', unidad: 'mA', grafica: 'linea',
       series: [
         { nombre: 'A', puntos: [{ x: 1, y: 10 }, { x: 2, y: 12 }] },
         { nombre: 'B', puntos: [{ x: 1, y: 15 }, { x: 2, y: 9 }] }
       ] };
     const out = bloquesMultiAno([{ ano: 2022, bloques: [multi] }]);
-    assert.deepEqual(out[0].series[0].puntos, [{ x: 1, y: 15 }, { x: 2, y: 12 }]); // peor (máx) por X
+    assert.equal(out[0].series.length, 2); // A y B, ambas conservadas
+    const fa = out[0].series.find((s) => s._fase === 'A');
+    const fb = out[0].series.find((s) => s._fase === 'B');
+    assert.deepEqual(fa.puntos, [{ x: 1, y: 10 }, { x: 2, y: 12 }]); // valor real de A
+    assert.deepEqual(fb.puntos, [{ x: 1, y: 15 }, { x: 2, y: 9 }]);  // valor real de B
   });
 
-  test('aislamiento: peor = MÍNIMO (bajar es malo)', () => {
-    const ais = { prueba: 'aislamiento', titulo: 'IR', unidad: 'GΩ', grafica: 'barra',
-      series: [
-        { nombre: 'CH', puntos: [{ x: 'AT-T', y: 30 }] },
-        { nombre: 'CL', puntos: [{ x: 'AT-T', y: 12 }] }
-      ] };
-    const out = bloquesMultiAno([{ ano: 2022, bloques: [ais] }]);
-    assert.equal(out[0].series[0].puntos[0].y, 12); // mínimo (peor) en aislamiento
+  test('varios años × varias fases: número de series = Σ fases por año', () => {
+    const dosFases = (y) => ({ prueba: 'relacion', titulo: 'Relación', unidad: '%', grafica: 'linea', limite: 0.5,
+      series: [{ nombre: 'A', puntos: [{ x: 1, y }] }, { nombre: 'B', puntos: [{ x: 1, y: y + 0.05 }] }] });
+    const out = bloquesMultiAno([inf(2020, [dosFases(0.1)]), inf(2022, [dosFases(0.2)])]);
+    assert.equal(out[0].series.length, 4); // 2 años × 2 fases
+    assert.deepEqual([...new Set(out[0].series.map((s) => s._ano))].sort(), ['2020', '2022']);
+    assert.deepEqual([...new Set(out[0].series.map((s) => s._fase))].sort(), ['A', 'B']);
   });
 
-  test('varias familias en distintos años; ignora bloques sin familia reconocida', () => {
-    const rel = { prueba: 'relacion', titulo: 'Relación', unidad: '%', grafica: 'linea',
-      series: [{ nombre: 'A', puntos: [{ x: 1, y: 0.2 }] }] };
+  test('ignora bloques sin familia reconocida (p.ej. sfra)', () => {
     const desconocido = { prueba: 'sfra', titulo: 'SFRA', series: [{ nombre: 'x', puntos: [{ x: 1, y: 1 }] }] };
-    const out = bloquesMultiAno([
-      inf(2020, [exc([18]), rel]),
-      inf(2022, [exc([20]), desconocido])
-    ]);
-    const claves = out.map((b) => b.prueba).sort();
-    assert.deepEqual(claves, ['excitacion', 'relacion']); // sfra ignorado
-    assert.equal(out.find((b) => b.prueba === 'excitacion').series.length, 2);
+    const out = bloquesMultiAno([inf(2020, [exc([18]), desconocido])]);
+    assert.deepEqual(out.map((b) => b.prueba), ['excitacion']);
   });
 
   test('entrada vacía / basura no rompe', () => {

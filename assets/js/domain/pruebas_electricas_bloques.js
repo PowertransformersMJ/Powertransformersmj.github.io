@@ -313,27 +313,12 @@ function familiaMA(bloque) {
   return FAMILIAS_MA.find((f) => f.re.test(p)) || null;
 }
 
-// Serie REPRESENTATIVA de un bloque (un valor por X): el PEOR de todas sus fases
-// en cada X (máx, o mín si `inv`). Así cada AÑO queda en UNA línea comparable.
-function serieRepresentativa(bloque, inv) {
-  const porX = new Map();
-  for (const s of (bloque.series || [])) {
-    for (const p of (s.puntos || [])) {
-      if (p == null || p.x == null || typeof p.y !== 'number') continue;
-      const k = String(p.x);
-      const cur = porX.get(k);
-      if (cur == null) porX.set(k, { x: p.x, y: p.y });
-      else cur.y = inv ? Math.min(cur.y, p.y) : Math.max(cur.y, p.y);
-    }
-  }
-  return [...porX.values()];
-}
-
 /**
- * Construye, por FAMILIA de prueba, UN bloque cuyas series son los AÑOS (una
- * línea por informe) → "todas las pruebas con todos los años superpuestos".
- * Cada año se reduce a su curva representativa (peor fase por X). El render
- * genérico (mountBloques) ya da los chips para filtrar años POR PRUEBA.
+ * Construye, por FAMILIA de prueba, UN bloque que superpone TODOS los años. Para
+ * NO degradar el detalle ni distorsionar valores, conserva CADA FASE de cada año
+ * como su propia serie (valores REALES, sin reducir) → series = año × fase. Cada
+ * serie queda etiquetada con `_ano` y `_fase` para poder filtrar por AÑO y por
+ * FASE en la UI. El nombre visible es "<año> · <fase>".
  * @param {Array<{ano:(number|null), bloques:Array}>} items informes con sus bloques ya cargados
  * @returns {Array<object>} bloques multi-año (uno por familia con datos)
  */
@@ -344,25 +329,35 @@ export function bloquesMultiAno(items) {
     for (const b of ((it && it.bloques) || [])) {
       const f = familiaMA(b);
       if (!f) continue;
-      const pts = serieRepresentativa(b, f.inv);
-      if (!pts.length) continue;
       if (!fam.has(f.key)) {
         fam.set(f.key, {
           prueba: f.key, titulo: b.titulo || f.key, unidad: b.unidad || '',
           eje_x: b.eje_x || '', grafica: b.grafica === 'barra' ? 'barra' : 'linea',
           limite: b.limite != null ? b.limite : null, guia: b.guia != null ? b.guia : null,
-          inv: f.inv, _anos: []
+          limite_desbalance: b.limite_desbalance != null ? b.limite_desbalance : null,
+          _series: []
         });
       }
-      fam.get(f.key)._anos.push({ ano, puntos: pts });
+      const g = fam.get(f.key);
+      for (const s of (b.series || [])) {
+        const puntos = (s.puntos || []).filter((p) => p && p.x != null && typeof p.y === 'number');
+        if (!puntos.length) continue;
+        g._series.push({ ano, fase: String(s.nombre || ''), puntos });
+      }
     }
   }
   return [...fam.values()]
     .map((g) => {
-      const series = g._anos
+      const series = g._series
         .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0))
-        .map((a) => ({ nombre: a.ano != null ? String(a.ano) : 's/a', puntos: a.puntos }));
-      const { _anos, inv, ...resto } = g;
+        .map((s) => {
+          const anoTxt = s.ano != null ? String(s.ano) : 's/a';
+          return {
+            nombre: s.fase ? `${anoTxt} · ${s.fase}` : anoTxt,
+            _ano: anoTxt, _fase: s.fase, puntos: s.puntos
+          };
+        });
+      const { _series, ...resto } = g;
       return { ...resto, series };
     })
     .filter((b) => b.series.length);
