@@ -15,8 +15,8 @@
 ## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-08)
 
 > **TEMA: Tablero de Pruebas Eléctricas con IA — evaluación + diagnóstico MULTI-NORMA.**
-> **Arco COMPLETO consolidado en ADR-003→ADR-014 y EN PRODUCCIÓN** (`origin/main=f3951b4`,
-> `origin/DESARROLLO=a4a029e=HEAD`, en sync, nada pendiente de push). Detalle: `00`→`99 §3..§14`.
+> **Arco COMPLETO consolidado en ADR-003→ADR-014 y EN PRODUCCIÓN** (`origin/main=295de3e` merge PR #144,
+> `origin/DESARROLLO=18566fa=HEAD`, en sync, nada pendiente de push). Detalle: `00`→`99 §3..§14`.
 >
 > **Qué hace el tablero HOY (todo en prod):** la IA (Opus 4.7/Sonnet 4.6) extrae el PDF →
 > tablero **IA-primaria** (bloques = cuerpo; tablas = DATOS). **El VEREDICTO es 100% NORMATIVO**
@@ -33,9 +33,9 @@
 > de campos canónicos desde el diagnóstico guardado, sin IA (L-43).
 >
 > **PRÓXIMO / pendientes:**
-> 1. **OFERTA ABIERTA sin responder**: añadir **reintento automático** a "Reprocesar" ante fallo transitorio
->    (la CF dio un 500 puntual; reprocesar FUNCIONA —validado en logs— pero depende de la IA y a veces falla).
->    El director cerró la sesión antes de decidir. NO es bloqueante (el backfill cubre el caso común).
+> 1. ✅ **CERRADO (TODO-09 → ADR-015)**: "Reprocesar" 100% funcional — reintento con backoff de fallos
+>    transitorios de la IA server-side (`functions/reintentos.mjs`), timeout 540→900 s. CF DESPLEGADA; frontend
+>    a producción tras push del director. Ahora solo falla por causa ajena a la IA/código (sin saldo, PDF ilegible, infra).
 > 2. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
 >    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
 > 3. El director iba a **abrir el libro 450108** (push ya hecho) → el backfill poblará identidad/bujes de 2021/2023 solo.
@@ -74,9 +74,7 @@
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
 | **TODO-08** | Skills `pruebas-electricas` (13/13). Falta: director **valida** + confirma los valores `⚠️ verificar` (lobe 49) contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR) → fijarlos en el motor multi-norma. | 🔄 en validación | director entrega edición de norma |
-| **TODO-09** | ¿Reintento automático en "Reprocesar" ante 500 transitorio? (oferta abierta, no decidida; no bloqueante) | 🔮 abierto | decisión del director |
-
-> Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** → ADR-009.
+> Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** → ADR-009 · **TODO-09** → ADR-015 (reintento IA en "Reprocesar").
 
 ---
 
@@ -90,6 +88,11 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-08** — **TODO-09 → ADR-015**: "Reprocesar" 100% funcional. Reintento con backoff de fallos transitorios
+  de la IA server-side (`functions/reintentos.mjs` puro + 14 tests; `esErrorTransitorioIA`/`conReintentosIA` con
+  presupuesto `deadlineMs`); CF `extraerPruebasElectricasIA` con `maxRetries:0` + wrap + `timeoutSeconds 540→900`;
+  cliente timeout 540000→900000. **CF DESPLEGADA** (Successful update). 1087/1087 verde. Lección L-44. Frontend a prod
+  tras push del director. brain:check pendiente de re-correr.
 - **2026-06-08** — **Sesión consolidada: arco tablero ADR-010→ADR-014 + L-35..L-43, TODO EN PRODUCCIÓN** (`main f3951b4`).
   Hitos: Tendencia F2/F3 (ADR-010) · veredicto normativo + NETA unificada (ADR-011) · evaluación MULTI-NORMA (ADR-012)
   · bujes canónico + tendencia alto nivel (ADR-013) · identidad por informe / trafo móvil (ADR-014). + fixes:

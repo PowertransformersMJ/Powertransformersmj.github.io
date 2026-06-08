@@ -226,3 +226,35 @@ export function derivarTablaTAP(bloque) {
 
   return { columnas: columnas.slice(0, LIMITES.COLS), filas };
 }
+
+/* ─── Quitar columnas de VEREDICTO de una tabla (L-42) ──────────
+ * El veredicto sale del panel multi-norma (valor vs cada norma), NUNCA de un
+ * "OK"/"Correcto" por fila que ponga la IA o el laboratorio. Cada laboratorio
+ * nombra distinto esa columna ("Evaluación", "Resultado", "Concepto"…), así que
+ * se detecta por DOS vías: el encabezado, O que TODAS sus celdas no vacías sean
+ * palabras de veredicto (OK/Correcto/Satisfactorio/Investigar/…). Pura, testeable. */
+const COL_VEREDICTO_HEADER = /evaluaci|calificaci|veredicto|resultado|concepto|dictamen|diagn[oó]stic|^\s*eval\.?\s*$/i;
+const CELDA_VEREDICTO = /^(ok|correcto|satisfactorio|bueno|aprueba|aprobado|rechaza|rechazado|investigar|vigilar|a\s+vigilar|verificar|pobre|deficiente|aceptable|favorable|no\s+ok|n\s*\/?\s*[ad])$/i;
+function esColumnaVeredicto(header, celdas) {
+  if (COL_VEREDICTO_HEADER.test(String(header == null ? '' : header))) return true;
+  const noVacias = (celdas || []).map((c) => String(c == null ? '' : c).trim()).filter((c) => c !== '');
+  return noVacias.length > 0 && noVacias.every((c) => CELDA_VEREDICTO.test(c));
+}
+
+/**
+ * Devuelve {columnas, filas} sin las columnas de veredicto (L-42).
+ * @param {{columnas:string[], filas:Array<Array>}} tabla
+ * @returns {{columnas:string[], filas:Array<Array>}}
+ */
+export function quitarColumnasVeredicto(tabla) {
+  const cols = (tabla && tabla.columnas) || [];
+  const filas = (tabla && tabla.filas) || [];
+  if (!cols.length) return { columnas: cols, filas };
+  const drop = [];
+  for (let i = 0; i < cols.length; i++) {
+    if (esColumnaVeredicto(cols[i], filas.map((f) => f[i]))) drop.push(i);
+  }
+  if (!drop.length) return { columnas: cols, filas };
+  const quitar = (arr) => arr.filter((_, i) => !drop.includes(i));
+  return { columnas: quitar(cols), filas: filas.map(quitar) };
+}
