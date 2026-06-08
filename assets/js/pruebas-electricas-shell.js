@@ -34,6 +34,7 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
+import { derivarBushing } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
@@ -934,7 +935,7 @@ async function onClickReportlist(ev) {
     return;
   }
 
-  // ── Reprocesar (re-leer el PDF/imagen ya almacenado, sin re-subir) ──
+  // ── Reprocesar (ADR-016: trigger + observe; la CF persiste y marca estado) ──
   const rep = ev.target.closest('[data-reproc]');
   if (rep) {
     const informeId = rep.getAttribute('data-reproc');
@@ -942,63 +943,28 @@ async function onClickReportlist(ev) {
     if (!inf || !inf.pdf || !inf.pdf.storagePath) {
       return toast('Este informe no tiene archivo para reprocesar.', 'warn');
     }
-    const etiqOrig = rep.textContent;
+    // No persistimos en el cliente ni bloqueamos con un contador: la Cloud
+    // Function re-extrae SERVER-SIDE (lee el PDF de Storage sin CORS, L-29),
+    // PERSISTE el resultado ella misma y escribe el ESTADO DURABLE en el informe.
+    // La fila lo refleja en vivo (onSnapshot): "Reprocesando…" → "procesado" o
+    // "⚠ Error: motivo". Sobrevive a recargas y no obliga a esperar mirando.
     rep.disabled = true;
-    // Contador de progreso: la re-extracción con IA (Opus, razonamiento sobre el
-    // PDF) tarda típicamente 1–3 min en informes densos. Mostrar el tiempo
-    // transcurrido le da CERTEZA al usuario de que avanza (no está colgado).
-    const t0 = Date.now();
-    const fmt = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
-    const tick = () => { rep.textContent = `↻ Reprocesando con IA… ${fmt(Date.now() - t0)}`; };
-    tick();
-    const timer = setInterval(tick, 1000);
-    let ok = false;
+    rep.textContent = '↻ Enviando…';
+    state.bloquesCache.delete(informeId); // el análisis se recargará con lo nuevo
     try {
-      // Re-extracción con IA SERVER-SIDE: la Cloud Function lee el PDF desde
-      // Storage en el servidor (NO se descarga al navegador → sin CORS, L-29) y
-      // re-extrae con la misma calidad que la carga. Re-deriva el FP de bujes
-      // canónico + la identidad/placa, así reprocesar actualiza sin re-subir.
-      const r = await conTiempoLimite(
-        extraerConIA({
-          unidadId, serie: inf.serie || serieTxt,
-          storagePath: inf.pdf.storagePath, filename: inf.pdf.filename || ''
-        }),
-        900000,
-        'La IA no respondió en 15 min. Intenta de nuevo.'
-      );
-      const mediciones = r.mediciones || {};
-      const bloquesIA = Array.isArray(r.bloques) ? r.bloques : [];
-      if (mediciones.unidad) {
-        try { await guardarUnidad({ serie: unidadId, ...mediciones.unidad }); } catch (e) { console.warn('[pruebas-electricas] identidad', e); }
-      }
-      const parche = sanitizarInforme({
-        ...mediciones,
+      const r = await extraerConIA({
         unidadId, serie: inf.serie || serieTxt,
-        ano: mediciones.ano != null ? mediciones.ano : inf.ano,
-        fecha: mediciones.fecha || inf.fecha,
-        bushing: derivarBushing(bloquesIA),
-        identidad: mediciones.unidad || inf.identidad,
-        pdf: { ...inf.pdf, estado: 'extraido_ia' }
+        storagePath: inf.pdf.storagePath, filename: inf.pdf.filename || '',
+        informeId
       });
-      await actualizarInforme(unidadId, informeId, parche);
-      try {
-        await guardarBloques(unidadId, informeId, bloquesIA, { ...(r.diagnostico || {}), mediciones_raw: mediciones });
-      } catch (e) { console.warn('[pruebas-electricas] guardarBloques (reproceso)', e); }
-      state.bloquesCache.delete(informeId); // fuerza recarga del análisis con lo nuevo
-      ok = true;
-      const segs = Math.round((Date.now() - t0) / 1000);
-      const nb = bloquesIA.length;
-      console.info(`[pruebas-electricas] reproceso IA ${esc(serieTxt)} · ${inf.ano || 's/a'} · ${segs}s · ${nb} bloques`, r.usage);
-      toast(`✓ Informe ${inf.ano || ''} reprocesado con IA en ${segs}s · ${nb} bloque(s). Datos actualizados.`);
-      // onSnapshot refresca la tabla sola.
+      console.info(`[pruebas-electricas] reproceso IA ${esc(serieTxt)} · ${inf.ano || 's/a'} · ${r && r.n_bloques} bloques`, r && r.usage);
+      toast(`✓ Informe ${inf.ano || ''} reprocesado. Datos actualizados.`);
     } catch (err) {
       console.error('[pruebas-electricas] reprocesar', err);
       const detalle = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : '';
+      // El estado durable 'error' ya quedó escrito en el informe por la CF; la
+      // fila lo muestra aunque este toast se pierda (recarga/navegación).
       toast(`No se pudo reprocesar el informe${detalle}.`, 'warn');
-    } finally {
-      clearInterval(timer);
-      rep.disabled = false;
-      rep.textContent = ok ? '✓ Reprocesado' : etiqOrig;
     }
     return;
   }
@@ -1569,31 +1535,6 @@ async function extraerTexto(item) {
 // Deriva la métrica canónica de bujes desde los bloques de la IA (el FP de bujes
 // vive en el bloque "bushing", no en las mediciones canónicas): peor tan δ
 // medido + peor ΔC1 vs placa (capacitancia). Devuelve null si no hay bloque.
-function derivarBushing(bloques) {
-  const bs = (Array.isArray(bloques) ? bloques : []).filter((b) => b && /bushing|buje/i.test(b.prueba || ''));
-  if (!bs.length) return null;
-  let fpMax = null, dc1Max = null;
-  for (const b of bs) {
-    for (const s of (b.series || [])) {
-      for (const p of (s.puntos || [])) {
-        if (typeof p.y === 'number') fpMax = (fpMax == null) ? p.y : Math.max(fpMax, p.y);
-        const ex = p.extra || {};
-        const placa = Number(ex['Cap. placa (pF)'] ?? ex['Cap placa (pF)']);
-        const med = Number(ex['Cap. medida (pF)'] ?? ex['Cap medida (pF)']);
-        if (Number.isFinite(placa) && placa && Number.isFinite(med)) {
-          const d = Math.abs((med - placa) / placa) * 100;
-          dc1Max = (dc1Max == null) ? d : Math.max(dc1Max, d);
-        }
-      }
-    }
-  }
-  if (fpMax == null && dc1Max == null) return null;
-  return {
-    fp_max_pct: fpMax != null ? +fpMax.toFixed(4) : null,
-    dc1_max_pct: dc1Max != null ? +dc1Max.toFixed(3) : null
-  };
-}
-
 // Busca un informe YA existente de la unidad que sea "el mismo": por FECHA exacta
 // (dd/mm/aaaa, ignorando espacios) y, si el nuevo no trae fecha, por AÑO. Devuelve
 // el informe existente o null. Dos ensayos de fechas distintas del mismo año NO
