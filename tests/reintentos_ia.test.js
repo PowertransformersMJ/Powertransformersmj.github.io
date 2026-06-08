@@ -44,6 +44,14 @@ describe('esErrorTransitorioIA — clasificación transitorio vs permanente', ()
     assert.equal(esErrorTransitorioIA(err({ message: 'Overloaded' })), true);
   });
 
+  test('undici "terminated" / body timeout (incl. cause.code) → true (ADR-018)', () => {
+    // El caso real: TypeError: terminated con cause UND_ERR_BODY_TIMEOUT.
+    assert.equal(esErrorTransitorioIA(err({ message: 'terminated' })), true);
+    assert.equal(esErrorTransitorioIA(Object.assign(new TypeError('terminated'), { cause: { code: 'UND_ERR_BODY_TIMEOUT' } })), true);
+    assert.equal(esErrorTransitorioIA(err({ message: 'fetch failed', cause: { message: 'other side closed' } })), true);
+    assert.equal(esErrorTransitorioIA(err({ message: 'terminated', cause: { code: 'UND_ERR_HEADERS_TIMEOUT' } })), true);
+  });
+
   test('null/undefined y errores sin pistas → false', () => {
     assert.equal(esErrorTransitorioIA(null), false);
     assert.equal(esErrorTransitorioIA(undefined), false);
