@@ -6,7 +6,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION
+  sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION,
+  quitarColumnasVeredicto
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -178,5 +179,37 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
     // Desv. % es la ÚLTIMA columna (ya no hay "Eval."): el peor %DIF firmado.
     // El veredicto (|1.26| > 0.5 → fuera de norma) lo da el panel multi-norma.
     assert.equal(fila[fila.length - 1], -1.26);
+  });
+});
+
+describe('quitarColumnasVeredicto (L-42 · ninguna columna OK/Correcto)', () => {
+  test('quita por ENCABEZADO "Evaluación" (informe 2023)', () => {
+    const t = { columnas: ['Buje', 'Tan δ medida (%)', 'Evaluación'], filas: [['H1', 0.42, 'OK'], ['H2', 0.45, 'OK']] };
+    const r = quitarColumnasVeredicto(t);
+    assert.deepEqual(r.columnas, ['Buje', 'Tan δ medida (%)']);
+    assert.deepEqual(r.filas, [['H1', 0.42], ['H2', 0.45]]);
+  });
+  test('quita por ENCABEZADO "Resultado" (informe 2021 · Applus)', () => {
+    const t = { columnas: ['Configuración', 'R (GΩ)', 'Resultado'], filas: [['AT-BT', 18.38, 'OK'], ['AT-T', 12.63, 'OK']] };
+    const r = quitarColumnasVeredicto(t);
+    assert.deepEqual(r.columnas, ['Configuración', 'R (GΩ)']);
+  });
+  test('quita por CONTENIDO aunque el encabezado sea raro (todas las celdas = veredicto)', () => {
+    const t = { columnas: ['Devanado', 'Δ%', 'Dictamen X'], filas: [['AT', 0.5, 'Correcto'], ['BT', 0.52, 'Satisfactorio']] };
+    const r = quitarColumnasVeredicto(t);
+    assert.deepEqual(r.columnas, ['Devanado', 'Δ%']);
+  });
+  test('NO quita columnas de DATOS (Modo GST/UST, números)', () => {
+    const t = { columnas: ['#', 'Modo', 'Cap (pF)', 'Tan δ (%)'], filas: [[1, 'GST', 5734, 0.18], [2, 'UST', 3500, 0.20]] };
+    const r = quitarColumnasVeredicto(t);
+    assert.deepEqual(r.columnas, ['#', 'Modo', 'Cap (pF)', 'Tan δ (%)']);
+  });
+  test('"A vigilar"/"Investigar" también cuentan como veredicto', () => {
+    const t = { columnas: ['Buje', 'DF%', 'Estado'], filas: [['U', 0.61, 'A vigilar'], ['V', 0.79, 'Investigar']] };
+    const r = quitarColumnasVeredicto(t);
+    assert.deepEqual(r.columnas, ['Buje', 'DF%']);
+  });
+  test('sin columnas → devuelve igual', () => {
+    assert.deepEqual(quitarColumnasVeredicto({ columnas: [], filas: [] }), { columnas: [], filas: [] });
   });
 });
