@@ -151,6 +151,24 @@ export async function eliminarInforme(unidadId, informeId) {
 }
 
 /**
+ * Borra UN PDF puntual de Storage por su `storagePath` (best-effort). Se usa al
+ * REEMPLAZAR un informe (upsert por fecha) para no dejar el PDF viejo huérfano.
+ * @param {string} storagePath
+ */
+export async function eliminarPDF(storagePath) {
+  if (!storagePath) return;
+  const storage = getStorageSafe();
+  if (!storage) return;
+  try {
+    const { ref: sref, deleteObject } =
+      await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js');
+    await deleteObject(sref(storage, storagePath));
+  } catch (err) {
+    console.warn('[pruebas_electricas.eliminarPDF]', err);
+  }
+}
+
+/**
  * Elimina una UNIDAD completa (un "libro"): todos sus informes, los PDF
  * originales en Storage (carpeta pruebas_electricas/{unidadId}/) y el doc
  * de la unidad. Operación admin (las rules exigen isAdmin()). Irreversible.
