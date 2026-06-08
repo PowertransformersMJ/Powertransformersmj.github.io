@@ -175,14 +175,14 @@ export function derivarTablaTAP(bloque) {
   const devKey = extraKeys.find((k) => /%?\s*dif|desviaci|\bdesv\b/i.test(k)) || null;
 
   const esMultiFase = series.length >= 2;
-  const lim = num(bloque.limite_desbalance);
   const addDesv = esMultiFase;
-  const addEval = esMultiFase && lim != null;
+  // NO se añade columna de veredicto/Evaluación: el VEREDICTO es del panel
+  // multi-norma (valor vs cada norma + consolidado), nunca un "OK" por fila
+  // (ni de la IA ni derivado) — L-36/L-42. La tabla es DATOS (incl. Desv. %).
 
   const columnas = [bloque.eje_x || 'X', ...phaseNames];
   for (const k of extraKeys) for (const pn of phaseNames) columnas.push(`${k} · ${pn}`);
   if (addDesv) columnas.push('Desv. %');
-  if (addEval) columnas.push('Eval.');
 
   const filas = xs.map((x) => {
     const key = String(x);
@@ -220,7 +220,6 @@ export function derivarTablaTAP(bloque) {
         }
       }
       row.push(d == null ? '' : +d.toFixed(3));
-      if (addEval) row.push(d == null ? '' : (Math.abs(d) <= lim ? 'OK' : 'verificar'));
     }
     return row.slice(0, LIMITES.COLS);
   });

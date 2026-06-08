@@ -12,7 +12,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { ejeMax, ticksY } from './grafico-svg.js';
-import { derivarTablaTAP } from '../../domain/pruebas_electricas_bloques.js';
+import { derivarTablaTAP, quitarColumnasVeredicto } from '../../domain/pruebas_electricas_bloques.js';
 import { ESTADOS } from '../../domain/pruebas_electricas_semaforo.js';
 import { evaluarMultiNorma } from '../../domain/pruebas_electricas_multinorma.js';
 import { recomendarPrueba } from '../../domain/pruebas_electricas_recomendaciones.js';
@@ -307,11 +307,16 @@ function extraDevKey(series) {
 }
 
 /* ─── Tabla de detalle del bloque ────────────────────────────── */
+// Quita columnas de VEREDICTO que la IA o el informe incluyan (cada laboratorio
+// las nombra distinto: "Evaluación", "Resultado", "Concepto"… con "OK"/"Correcto"):
+// el veredicto es del panel multi-norma, NUNCA un "OK" por fila no normativo
+// (L-36/L-42). La tabla muestra DATOS medidos (incl. la Desviación %, un dato).
 function tablaBloque(tabla) {
   if (!tabla || (!tabla.filas.length && !tabla.columnas.length)) return '';
-  const head = tabla.columnas.length
-    ? `<thead><tr>${tabla.columnas.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead>` : '';
-  const body = `<tbody>${tabla.filas.map((f) => `<tr>${f.map((c) => `<td class="num">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  const { columnas, filas } = quitarColumnasVeredicto(tabla);
+  const head = columnas.length
+    ? `<thead><tr>${columnas.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead>` : '';
+  const body = `<tbody>${filas.map((f) => `<tr>${f.map((c) => `<td class="num">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
   return `<div class="tblwrap"><table class="dt">${head}${body}</table></div>`;
 }
 

@@ -429,6 +429,32 @@ function sanitizarCollar(input) {
  * tendencia. La IA lo emite en el bloque "bushing"; el shell deriva el peor
  * tan δ y la peor ΔC1 vs placa al guardar. `null` si el informe no trae bujes.
  */
+/**
+ * Identidad/placa CONGELADA en el informe (no solo en la unidad): un transformador
+ * MÓVIL de doble configuración (p.ej. serie 450108: AT en triángulo 63.5 kV Dyn1
+ * vs AT en estrella 110 kV YNyn0) tiene PLACA distinta por despliegue. Guardar la
+ * placa en cada informe permite evaluar cada ensayo contra SU clase de tensión
+ * (aislamiento NETA por clase) sin que la última carga sobrescriba a las demás.
+ * Subconjunto PLANO (sin arrays) → seguro para Firestore. Null si no hay datos.
+ */
+function sanitizarIdentidad(input) {
+  const s = input || {};
+  const out = {
+    tensiones:       str(s.tensiones),
+    grupo_conexion:  str(s.grupo_conexion),
+    potencia:        str(s.potencia),
+    fabricante:      str(s.fabricante),
+    ano_fabricacion: int(s.ano_fabricacion),
+    subestacion:     str(s.subestacion),
+    ubicacion:       str(s.ubicacion),
+    refrigeracion:   str(s.refrigeracion),
+    frecuencia:      str(s.frecuencia),
+    fases:           str(s.fases)
+  };
+  const algo = Object.values(out).some((v) => v != null && v !== '');
+  return algo ? out : null;
+}
+
 function sanitizarBushing(input) {
   const src = input || {};
   const fp_max_pct = num(src.fp_max_pct);
@@ -524,6 +550,7 @@ export function sanitizarInforme(input) {
   const aislamiento = sanitizarAislamiento(src.aislamiento);
   const collar      = sanitizarCollar(src.collar);
   const bushing     = sanitizarBushing(src.bushing);
+  const identidad   = sanitizarIdentidad(src.identidad);
   const drm         = sanitizarDrm(src.drm);
   const tipoDecl = str(src.tipo_prueba).toLowerCase();
   const tipo_prueba = TIPOS_PRUEBA_SET.has(tipoDecl)
@@ -548,6 +575,7 @@ export function sanitizarInforme(input) {
     aislamiento,
     collar,
     ...(bushing ? { bushing } : {}),
+    ...(identidad ? { identidad } : {}), // placa CONGELADA del informe (config móvil)
     drm,
     // ── PDF original (Firebase Storage o ruta del repo) ──
     pdf: {

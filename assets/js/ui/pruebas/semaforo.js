@@ -18,6 +18,18 @@ import {
   estadoGlobal
 } from '../../domain/pruebas_electricas_semaforo.js';
 import { evaluarMultiNorma, metricaPrueba } from '../../domain/pruebas_electricas_multinorma.js';
+import { minNetaGohm, kvAT } from '../../domain/pruebas_electricas_schema.js';
+
+// Mínimo NETA de aislamiento por CLASE para un informe: prioriza la placa
+// CONGELADA del propio informe (config móvil — cada despliegue su tensión), y
+// cae a `opts.minNeta` (kv de la unidad) si el informe no trae identidad.
+function minNetaDe(inf, opts) {
+  if (inf && inf.identidad && inf.identidad.tensiones) {
+    const m = minNetaGohm(kvAT(inf.identidad.tensiones));
+    if (m != null) return m;
+  }
+  return (opts && typeof opts.minNeta === 'number') ? opts.minNeta : null;
+}
 
 /* ─── Definición de filas de la matriz (orden del tablero) ────── */
 // `criterio` es el texto de la columna "Criterio" (igual al tablero).
@@ -65,7 +77,9 @@ function calificarPrueba(key, inf, opts = {}) {
   }
   const m = metricaPrueba(key, inf);
   if (m == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
-  const mn = evaluarMultiNorma(key, m, { minClase: (typeof opts.minNeta === 'number') ? opts.minNeta : null });
+  // Aislamiento: clase de tensión del PROPIO informe (placa congelada) → cada
+  // ensayo de un trafo móvil se evalúa contra SU clase (63.5 kV vs 110 kV).
+  const mn = evaluarMultiNorma(key, m, { minClase: minNetaDe(inf, opts) });
   const estado = (mn && mn.consolidado) ? mn.consolidado : ESTADOS.NEUTRAL;
   return { estado, texto: textoMetrica(key, m, estado) };
 }
