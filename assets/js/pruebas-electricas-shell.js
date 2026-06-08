@@ -36,6 +36,7 @@ import {
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
 import { derivarBushing } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
+import { metricaPrueba } from './domain/pruebas_electricas_multinorma.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
@@ -557,6 +558,106 @@ async function onGenerarNarrativa() {
   }
 }
 
+/* ─── Vista consolidada: TODAS las pruebas en una gráfica ────────
+ * Cada prueba se normaliza a "% de su límite normativo" (misma unidad para
+ * todas → comparables en un solo eje): 100% = en el límite. El usuario elige
+ * el AÑO (informe) y qué pruebas incluir; el rango del eje se AUTO-AJUSTA a las
+ * pruebas seleccionadas. Es ADITIVA: no toca la calificación global ni el motor
+ * del veredicto (reusa metricaPrueba + calificarPrueba). DRM se omite (su criterio
+ * es una ventana de tiempo, no un límite único). */
+const LIM_CONSOLIDADO = Object.freeze({
+  tand:        { lim: 1,    unidad: '%',  label: 'Tan δ / FP devanados' },
+  bushing:     { lim: 1,    unidad: '%',  label: 'FP de bujes (C1)' },
+  excitacion:  { lim: 10,   unidad: '%',  label: 'Excitación · Δ fases' },
+  relacion:    { lim: 0.5,  unidad: '%',  label: 'Relación · desviación' },
+  resistencia: { lim: 2,    unidad: '%',  label: 'Resistencia · Δ fases' },
+  aislamiento: { lim: null, unidad: 'GΩ', label: 'Aislamiento (IR)' }, // límite = mínimo NETA por clase
+  collar:      { lim: 100,  unidad: 'mW', label: 'Collar / bujes' }
+});
+const ORDEN_CONSOLIDADO = ['tand', 'bushing', 'excitacion', 'relacion', 'resistencia', 'aislamiento', 'collar'];
+const COLOR_ESTADO = { 'b-g': '#16a34a', 'b-a': '#d97706', 'b-o': '#ea580c', 'b-r': '#dc2626', 'b-n': '#94a3b8' };
+
+function renderConsolidado(informes) {
+  const cont = $('pe-consolidado');
+  if (!cont) return;
+  const docs = (informes || []).filter((i) => i && !i._seed).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  if (!docs.length) { cont.innerHTML = '<p class="muted small">Sin informes para graficar.</p>'; return; }
+  // Selección persistente entre re-renders (onSnapshot re-llama esta función).
+  const sel = state.consolidadoSel || (state.consolidadoSel = { ano: null, tests: null });
+  if (sel.ano == null || !docs.some((d) => d.ano === sel.ano)) sel.ano = docs[docs.length - 1].ano;
+  if (!(sel.tests instanceof Set)) sel.tests = new Set(ORDEN_CONSOLIDADO);
+  const inf = docs.find((d) => d.ano === sel.ano) || docs[docs.length - 1];
+  const minNeta = minNetaGohm(kvDeInforme(inf));
+
+  const filas = ORDEN_CONSOLIDADO.map((key) => {
+    const def = LIM_CONSOLIDADO[key];
+    const lim = key === 'aislamiento' ? minNeta : def.lim;
+    const val = metricaPrueba(key, inf);
+    const on = sel.tests.has(key);
+    const pct = (val != null && lim) ? +(val / lim * 100).toFixed(1) : null;
+    const estado = pct != null ? calificarPrueba(key, inf, { minNeta }).estado : null;
+    return { key, def, lim, val, pct, estado, on };
+  });
+  const visibles = filas.filter((f) => f.on && f.pct != null);
+  const maxPct = Math.max(110, ...visibles.map((f) => f.pct));   // rango auto-ajustable
+  const lineLeft = +(100 / maxPct * 100).toFixed(1);             // posición del límite (100%)
+
+  const anos = docs.map((d) => d.ano).filter((a) => a != null);
+  const selAno = `<label style="font-size:13px;color:#334155">Año del informe&nbsp;`
+    + `<select data-consol-ano style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">`
+    + anos.map((a) => `<option value="${esc(a)}"${a === sel.ano ? ' selected' : ''}>${esc(a)}</option>`).join('')
+    + `</select></label>`;
+  const chips = filas.map((f) => {
+    const activo = f.on;
+    const tieneDato = f.pct != null;
+    const bg = activo ? (tieneDato ? '#0f172a' : '#64748b') : '#fff';
+    const col = activo ? '#fff' : '#334155';
+    const extra = tieneDato ? '' : ' · sin dato';
+    return `<button type="button" data-consol-test="${esc(f.key)}" `
+      + `style="padding:4px 10px;border:1px solid #cbd5e1;border-radius:999px;font-size:12px;cursor:pointer;background:${bg};color:${col}">`
+      + `${esc(f.def.label)}${extra}</button>`;
+  }).join('');
+
+  const barras = filas.filter((f) => f.on).map((f) => {
+    const sinDato = f.pct == null;
+    const color = sinDato ? '#cbd5e1' : (COLOR_ESTADO[f.estado.clase] || '#94a3b8');
+    const w = sinDato ? 0 : Math.min(100, +(f.pct / maxPct * 100).toFixed(1));
+    const valor = sinDato
+      ? '<span style="color:#94a3b8">No realizada</span>'
+      : `${esc(f.val)} ${esc(f.def.unidad)} · <b>${esc(f.pct)}%</b> del límite`;
+    return `<div style="display:flex;align-items:center;gap:10px">`
+      + `<span style="width:170px;min-width:170px;font-size:12px;color:#334155">${esc(f.def.label)}</span>`
+      + `<div style="flex:1;background:#f1f5f9;border-radius:6px;height:22px;position:relative;overflow:hidden">`
+      +   `<div style="width:${w}%;background:${color};height:100%;border-radius:6px 0 0 6px"></div>`
+      +   `<div style="position:absolute;top:0;bottom:0;left:${lineLeft}%;width:2px;background:#0f172a;opacity:.45" title="Límite (100%)"></div>`
+      + `</div>`
+      + `<span style="width:170px;min-width:170px;font-size:12px;color:#0f172a;text-align:right">${valor}</span>`
+      + `</div>`;
+  }).join('');
+
+  cont.innerHTML =
+    `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px">${selAno}`
+    + `<div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div></div>`
+    + `<div style="display:flex;flex-direction:column;gap:8px">${barras || '<p class="muted small">Selecciona al menos una prueba con datos.</p>'}</div>`
+    + `<p class="muted small" style="margin-top:10px">Cada barra es el valor de la prueba como <b>% de su límite</b> (línea = 100% = en el límite); color = veredicto multi-norma. El eje se ajusta a las pruebas seleccionadas. Informe ${esc(inf.ano || 's/a')} · clase ${esc(kvDeInforme(inf) || '—')} kV.</p>`;
+
+  if (!cont._consolWired) {
+    cont._consolWired = true;
+    cont.addEventListener('change', (e) => {
+      const s = e.target.closest('[data-consol-ano]');
+      if (s) { state.consolidadoSel.ano = Number(s.value); renderConsolidado(state.informes); }
+    });
+    cont.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-consol-test]');
+      if (!b) return;
+      const k = b.getAttribute('data-consol-test');
+      const setT = state.consolidadoSel.tests;
+      if (setT.has(k)) setT.delete(k); else setT.add(k);
+      renderConsolidado(state.informes);
+    });
+  }
+}
+
 function renderInformesUI(informes) {
   state.informes = informes || [];
   const u = state.unidadActiva || {};
@@ -567,6 +668,10 @@ function renderInformesUI(informes) {
   // errores de mapeo rígido — ADR-007 / rediseño). Las secciones de detalle
   // rígidas se retiraron: el cuerpo del informe son los bloques.
   renderMatriz($('matrix'), state.informes, { minNeta: minNetaGohm(kvUnidadActiva()) });
+
+  // Vista consolidada: todas las pruebas en una gráfica (% del límite), con
+  // selector de año + pruebas y rango auto-ajustable. Aditiva (no toca la matriz).
+  renderConsolidado(state.informes);
 
   // Tendencia temporal (multi-informe): evolución de la métrica clave de cada
   // prueba vs su umbral. Determinista desde los campos canónicos (no IA).
@@ -671,6 +776,7 @@ async function montarBloques(unidadId, informes) {
     alguno = true;
     const grupo = document.createElement('div');
     grupo.className = 'pe-bloque-grupo';
+    grupo.setAttribute('data-bloque-ano', inf.ano != null ? String(inf.ano) : '');
     const h = document.createElement('h3');
     h.textContent = `Informe ${inf.ano || 's/a'}`;
     grupo.appendChild(h);
@@ -694,6 +800,34 @@ async function montarBloques(unidadId, informes) {
   if (alguno) {
     const enc = encabezadoInforme(ordenados[0]);
     if (enc) cont.insertBefore(enc, cont.firstChild);
+  }
+
+  // Filtro de AÑO para las gráficas detalladas: toggle de visibilidad de los
+  // grupos por año (no re-renderiza ni toca el scorecard ni la calificación
+  // global). Solo si hay >1 año con gráficas. Selección persistente.
+  const anosBloque = [...new Set(
+    cont.querySelectorAll('.pe-bloque-grupo'))]
+    .map((g) => g.getAttribute('data-bloque-ano')).filter((a) => a);
+  if (anosBloque.length > 1) {
+    const sel = (state.bloquesAnoFiltro && anosBloque.includes(String(state.bloquesAnoFiltro)))
+      ? String(state.bloquesAnoFiltro) : 'todos';
+    const bar = document.createElement('div');
+    bar.style.cssText = 'margin-bottom:10px;font-size:13px;color:#334155';
+    bar.innerHTML = 'Año del informe&nbsp;<select data-bloques-ano '
+      + 'style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">'
+      + `<option value="todos"${sel === 'todos' ? ' selected' : ''}>Todos</option>`
+      + anosBloque.map((a) => `<option value="${esc(a)}"${sel === a ? ' selected' : ''}>${esc(a)}</option>`).join('')
+      + '</select>';
+    cont.insertBefore(bar, cont.firstChild);
+    const aplicar = (ano) => cont.querySelectorAll('.pe-bloque-grupo').forEach((g) => {
+      const a = g.getAttribute('data-bloque-ano');
+      g.style.display = (!ano || ano === 'todos' || a === ano) ? '' : 'none';
+    });
+    aplicar(sel);
+    bar.querySelector('[data-bloques-ano]').addEventListener('change', (e) => {
+      state.bloquesAnoFiltro = e.target.value;
+      aplicar(e.target.value);
+    });
   }
 
   // Scorecard. Con UN solo informe → derivado de la lectura IA (fiel, sin los
