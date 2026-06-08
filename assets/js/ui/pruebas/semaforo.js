@@ -34,7 +34,11 @@ const FILAS = [
 
 /* ─── Calificación de un informe por tipo de prueba ───────────── */
 // Devuelve { estado, texto } para una prueba dada de un informe.
-function calificarPrueba(key, inf) {
+// `opts.minNeta` (GΩ): mínimo de aislamiento por CLASE DE TENSIÓN (NETA 100.5)
+// para la unidad; si se pasa, el aislamiento se califica contra ese mínimo (no
+// el genérico ≥1 GΩ). El veredicto SIEMPRE sale de los valores medidos vs la
+// norma — nunca de la calificación textual del laboratorio/IA.
+function calificarPrueba(key, inf, opts = {}) {
   if (!inf) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
   switch (key) {
     case 'tand': {
@@ -89,7 +93,13 @@ function calificarPrueba(key, inf) {
       const medidas = arr.filter((a) => a.gohm != null);
       if (!medidas.length) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
       const min = Math.min(...medidas.map((a) => a.gohm));
-      const e = calificarAislamiento(min);
+      // Criterio NETA por CLASE DE TENSIÓN si se conoce el mínimo de la clase
+      // (opts.minNeta); si no, cae al genérico ≥1 GΩ. A 110 kV el mínimo son
+      // decenas de GΩ → 5–6 GΩ medidos = "investigar".
+      const minNeta = (opts && typeof opts.minNeta === 'number') ? opts.minNeta : null;
+      const e = minNeta != null
+        ? (min < minNeta ? ESTADOS.NARANJA : ESTADOS.VERDE)
+        : calificarAislamiento(min);
       return { estado: e, texto: e === ESTADOS.VERDE ? 'OK' : `${min.toFixed(2)}GΩ` };
     }
     case 'collar': {
@@ -126,17 +136,20 @@ function cellHtml(estado, texto) {
  * @param {HTMLElement} cont contenedor (.matrix)
  * @param {Array} informes informes ordenados por año asc
  */
-export function renderMatriz(cont, informes) {
+export function renderMatriz(cont, informes, opts = {}) {
   if (!cont) return;
   const docs = (informes || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
   const anos = docs.map((d) => d.ano);
   const head = `<tr><th>Tipo de prueba</th>${anos.map((a) => `<th>${a}</th>`).join('')}<th>Criterio</th></tr>`;
+  const minNeta = (opts && typeof opts.minNeta === 'number') ? opts.minNeta : null;
   const body = FILAS.map((fila) => {
     const celdas = docs.map((inf) => {
-      const { estado, texto } = calificarPrueba(fila.key, inf);
+      const { estado, texto } = calificarPrueba(fila.key, inf, opts);
       return `<td>${cellHtml(estado, texto)}</td>`;
     }).join('');
-    return `<tr><td class="cfg">${fila.label}</td>${celdas}<td class="muted small">${fila.criterio}</td></tr>`;
+    // Criterio de aislamiento dinámico: mínimo NETA por clase de tensión.
+    const crit = (fila.key === 'aislamiento' && minNeta != null) ? `≥ ${minNeta} GΩ` : fila.criterio;
+    return `<tr><td class="cfg">${fila.label}</td>${celdas}<td class="muted small">${crit}</td></tr>`;
   }).join('');
   cont.innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table>`;
 }
@@ -147,21 +160,22 @@ export function renderMatriz(cont, informes) {
  * @param {object} inf un informe con sus campos canónicos
  * @returns {object} estado del dominio (clase/dot/nivel/etiqueta)
  */
-export function estadoInforme(inf) {
+export function estadoInforme(inf, opts = {}) {
   if (!inf) return ESTADOS.NEUTRAL;
   const estados = {};
-  FILAS.forEach((f) => { estados[f.key] = calificarPrueba(f.key, inf).estado; });
+  FILAS.forEach((f) => { estados[f.key] = calificarPrueba(f.key, inf, opts).estado; });
   return estadoGlobal(estados);
 }
 
 /**
  * Estado global del informe más reciente (para el chip "vigente").
  * @param {Array} informes
+ * @param {object} [opts] {minNeta} mínimo NETA de aislamiento por clase
  * @returns {object} estado del dominio (peor prueba del último informe)
  */
-export function estadoVigente(informes) {
+export function estadoVigente(informes, opts = {}) {
   const docs = (informes || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
-  return estadoInforme(docs[docs.length - 1]);
+  return estadoInforme(docs[docs.length - 1], opts);
 }
 
 /**
@@ -171,14 +185,14 @@ export function estadoVigente(informes) {
  * @param {Array} informes
  * @returns {Array<{ano:(number|null), fecha:(string|null), estado:object, vigente:boolean}>}
  */
-export function lineaTiempoInformes(informes) {
+export function lineaTiempoInformes(informes, opts = {}) {
   const docs = (informes || []).filter(Boolean)
     .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
   const ultimo = docs.length - 1;
   return docs.map((inf, i) => ({
     ano: (inf.ano != null) ? inf.ano : null,
     fecha: inf.fecha ? String(inf.fecha) : null,
-    estado: estadoInforme(inf),
+    estado: estadoInforme(inf, opts),
     vigente: i === ultimo
   }));
 }

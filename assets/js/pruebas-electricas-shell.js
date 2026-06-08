@@ -33,8 +33,8 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { renderMatriz, estadoVigente, lineaTiempoInformes } from './ui/pruebas/semaforo.js';
-import { ESTADOS } from './domain/pruebas_electricas_semaforo.js';
+import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
+import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques } from './ui/pruebas/grafico-generico.js';
 import { bloquesTendencia, resumenTendenciaParaIA } from './domain/pruebas_electricas_tendencia.js';
@@ -368,7 +368,7 @@ function esAdmin() {
 // (misma calificación que la matriz, vía lineaTiempoInformes). De un vistazo
 // muestra la historia de la unidad y si va degradando.
 function timelineHtml(informes) {
-  const linea = lineaTiempoInformes(informes);
+  const linea = lineaTiempoInformes(informes, { minNeta: minNetaGohm(kvUnidadActiva()) });
   if (linea.length < 2) return ''; // con un solo punto no hay cronología que mostrar
   const nodos = linea.map((p) => {
     const et = p.ano != null ? String(p.ano) : (p.fecha || '—');
@@ -501,7 +501,7 @@ function renderInformesUI(informes) {
   // con el scorecard derivado de la lectura IA (fuente de verdad, sin los
   // errores de mapeo rígido — ADR-007 / rediseño). Las secciones de detalle
   // rígidas se retiraron: el cuerpo del informe son los bloques.
-  renderMatriz($('matrix'), state.informes);
+  renderMatriz($('matrix'), state.informes, { minNeta: minNetaGohm(kvUnidadActiva()) });
 
   // Tendencia temporal (multi-informe): evolución de la métrica clave de cada
   // prueba vs su umbral. Determinista desde los campos canónicos (no IA).
@@ -514,8 +514,8 @@ function renderInformesUI(informes) {
     canDelete: isReady() && esAdmin()
   });
 
-  // KPI estado vigente
-  const est = estadoVigente(state.informes);
+  // KPI estado vigente (NETA-aware: aislamiento por clase de tensión)
+  const est = estadoVigente(state.informes, { minNeta: minNetaGohm(kvUnidadActiva()) });
   const docs = state.informes.slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
   const ult = docs[docs.length - 1];
   const kpiEstado = $('kpi-estado');
@@ -631,53 +631,61 @@ function encabezadoInforme(inf) {
   return el;
 }
 
-/* ─── Scorecard derivado de los bloques (lectura IA = fuente de verdad) ─── */
-// Familias normativas → claves de bloque que las representan. Solo se muestran
-// las pruebas REALMENTE presentes en el informe (sin "OK" fantasma por mapeo
-// rígido). El estado sale de la calificación que la IA emite por bloque.
+/* ─── Scorecard NORMATIVO (veredicto derivado de valores vs norma) ─── */
+// El veredicto SIEMPRE sale de los valores medidos contra el criterio normativo
+// (dominio), NUNCA de la calificación textual del laboratorio/IA. Solo se
+// muestran las pruebas REALMENTE presentes (sin "OK" fantasma).
+//   · canónicas (tand/excitacion/relacion/resistencia/aislamiento/drm): vía
+//     `calificarPrueba` sobre las mediciones (aislamiento = NETA por clase).
+//   · bujes (C1): derivado del peor tan δ medido del bloque vs el límite norma.
 const FAMILIAS_SCORE = [
-  { keys: ['tand', 'tan_delta'],               label: 'Tan δ / FP · aislamiento del transformador', criterio: 'FP ≤ 1%' },
-  { keys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes (C1)',           criterio: 'PF < 1%' },
-  { keys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δfases < 10%' },
-  { keys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5%' },
-  { keys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δfases ≤ 5%' },
-  { keys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ 1 GΩ' },
-  { keys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' }
+  { key: 'tand',        blockKeys: ['tand', 'tan_delta'],               label: 'Tan δ / FP · aislamiento del transformador', criterio: 'FP ≤ 1% (IEEE 62)' },
+  { key: 'bushing',     blockKeys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes (C1)',           criterio: 'tan δ ≤ 1% (IEEE 62 / C57.19.100)' },
+  { key: 'excitacion',  blockKeys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δ fases ≤ 10% (IEEE C57.152)' },
+  { key: 'relacion',    blockKeys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5% vs placa (IEEE C57.152 §7.2.10 / NETA 7.2.2)' },
+  { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 5% (IEEE 62.2 / C57.152)' },
+  { key: 'aislamiento', blockKeys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ mínimo NETA por clase' },
+  { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' }
 ];
 
-// Mapea la calificación textual de la IA a un estado del semáforo.
-function estadoDeCalif(calif, hayVerificar) {
-  const c = String(calif || '').toLowerCase();
-  if (hayVerificar || /verificar|investigar|revisar|sospech/.test(c)) return ESTADOS.AMBAR;
-  if (/excesivo|fuera|alto|bajo|pobre|deficiente|peligro|falla|cr[ií]tic/.test(c)) return ESTADOS.ROJO;
-  if (/satisfactorio|\bok\b|normal|favorable|dentro|bueno|aceptable/.test(c)) return ESTADOS.VERDE;
-  return ESTADOS.NEUTRAL;
+// Veredicto NORMATIVO del bloque de bujes: peor tan δ medido vs el límite (mismo
+// criterio que tan δ del transformador, IEEE 62). No usa el texto de la IA.
+function estadoBushing(bloques) {
+  const ys = bloques.filter((b) => b && /bushing/.test(b.prueba || ''))
+    .flatMap((b) => (b.series || []).flatMap((s) => (s.puntos || []).map((p) => p.y)))
+    .filter((v) => typeof v === 'number');
+  if (!ys.length) return null;
+  const max = Math.max(...ys);
+  return { estado: calificarTanDelta(max), texto: `${max.toFixed(2)}%` };
 }
 
 function renderScorecard(cont, data, inf) {
   if (!cont) return;
   const bloques = (data && data.bloques) || [];
   if (!bloques.length) return; // sin bloques: conserva el fallback canónico
+  const kv = kvUnidadActiva();
+  const minNeta = minNetaGohm(kv);
   const filas = FAMILIAS_SCORE.map((fam) => {
-    const bs = bloques.filter((b) => fam.keys.includes(b.prueba));
-    if (!bs.length) return null;
-    const hayVerif = bs.some((b) => (b.series || []).some((s) => (s.puntos || []).some((p) => p.verificar)));
-    let peor = ESTADOS.VERDE, calif = '';
-    bs.forEach((b) => {
-      const e = estadoDeCalif(b.calif, hayVerif);
-      if (e.nivel > peor.nivel) peor = e;
-      if (!calif && b.calif) calif = b.calif;
-    });
-    if (hayVerif && ESTADOS.AMBAR.nivel > peor.nivel) peor = ESTADOS.AMBAR;
-    return { label: fam.label, criterio: fam.criterio, estado: peor, texto: calif || 'medido' };
+    const r = (fam.key === 'bushing')
+      ? estadoBushing(bloques)
+      : calificarPrueba(fam.key, inf, { minNeta });
+    if (!r || r.estado === ESTADOS.NEUTRAL) return null; // sin dato medido → no se muestra
+    const criterio = (fam.key === 'aislamiento' && minNeta != null)
+      ? `≥ ${minNeta} GΩ · NETA 100.5 (clase ${kv} kV)`
+      : fam.criterio;
+    return { label: fam.label, criterio, estado: r.estado, texto: r.texto };
   }).filter(Boolean);
   if (!filas.length) return;
-  const cap = inf ? `Informe ${inf.ano || 's/a'} · calificación según la lectura IA del documento` : 'Calificación según la lectura IA';
-  const body = filas.map((f) =>
-    `<tr><td class="cfg">${esc(f.label)}</td>` +
-    `<td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${esc(f.texto)}</span></td>` +
-    `<td class="muted small">${esc(f.criterio)}</td></tr>`).join('');
-  cont.innerHTML = `<table><thead><tr><th>Prueba</th><th>Calificación</th><th>Criterio</th></tr></thead><tbody>${body}</tbody></table>` +
+  const cap = inf
+    ? `Informe ${inf.ano || 's/a'} · calificación DERIVADA de los valores medidos contra los criterios normativos — independiente de la calificación del laboratorio.`
+    : 'Calificación derivada de las normas.';
+  const body = filas.map((f) => {
+    const detalle = (f.texto && f.texto !== 'OK') ? ` · ${esc(f.texto)}` : '';
+    return `<tr><td class="cfg">${esc(f.label)}</td>` +
+      `<td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${esc(f.estado.etiqueta)}${detalle}</span></td>` +
+      `<td class="muted small">${esc(f.criterio)}</td></tr>`;
+  }).join('');
+  cont.innerHTML = `<table><thead><tr><th>Prueba</th><th>Calificación normativa</th><th>Criterio · norma</th></tr></thead><tbody>${body}</tbody></table>` +
     `<p class="muted small" style="margin-top:8px">${esc(cap)}</p>`;
 }
 
