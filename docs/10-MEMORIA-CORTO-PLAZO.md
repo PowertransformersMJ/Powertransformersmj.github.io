@@ -94,21 +94,15 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-018 · El fallo REAL: "Claude API: terminated"** (visto por fin en la consola del director). Es el
-  **bodyTimeout de undici (~5 min)** que corta el stream largo de Opus en informes densos (el `timeout` del SDK es OTRA
-  capa, no lo cubre). Fix: cliente Anthropic con `fetchOptions.dispatcher = new Agent({bodyTimeout:0, headersTimeout:0})`
-  (dep `undici@^6`); `terminated`/`UND_ERR_*` clasificados transitorios; ATTEMPT_MS 400→760s; SDK timeout 840s. `effort:high`
-  CONSERVADO (fix de transporte, no de modelo). 1097/1097 verde. **CF DESPLEGADA**. Lección **L-47**. ⚠️ El director valida
-  que reprocesar un informe denso ya NO da "terminated" y completa.
-- **2026-06-08** — **ADR-017 · CAUSA RAÍZ del reproceso colgado**: `await` desnudo sobre `stream.finalMessage()` SIN
-  timeout por intento → si la IA se cuelga, la plataforma mata la función a 900s sin correr `catch` → el estado queda
-  `'en_curso'` para siempre. Fix DEFINITIVO: `conTimeoutAbortable` (AbortController + `Promise.race`) aborta el stream
-  colgado a los 400s → `TimeoutIA` transitorio → reintenta o cae a 'error' limpio; `intentos:2`, presupuesto < 900s;
-  **watchdog global** (870s escribe 'error' si sigue viva); **memoria 1→2 GiB** (anti-OOM). 1096/1096 verde (+5 tests,
-  incl. cuelgue acotado). **CF DESPLEGADA**. Lección **L-46** (nunca `await` desnudo sobre stream de IA). Frontend a prod
-  tras push. ⚠️ El director valida en navegador que el badge ahora SÍ pasa a procesado/⚠ falló.
-- **Arco "Reprocesar" (consolidado en `99`, todo desplegado)**: **ADR-015** reintento con backoff (L-44) · **ADR-016**
-  asíncrono observable: persistencia server-side + estado durable `reproceso.{estado}` + badge en vivo (L-45, EN PROD) ·
-  **ADR-017** timeout interno por intento + watchdog + 2GiB: ya no se cuelga (L-46). ADR-018 (arriba) cierra el fallo real.
+- **2026-06-08** — **ADR-019 · 504/deadline-exceeded** (causa real, vista en consola completa). DOBLE: (A) bug del presupuesto
+  de reintento — el gate solo exigía sitio para el backoff, no para un intento ENTERO → tras abortar el 1.er intento largo
+  arrancaba un 2.º que corría hasta el SIGKILL (900s) → 504; fix `intentoMaxMs`. (B) 900s insuficiente para máxima calidad →
+  `timeoutSeconds 900→1500`, ATTEMPT_MS 22min, cliente 1500s, watchdog/SDK acordes. `effort:high` CONSERVADO. 1099/1099 verde
+  (+2 tests del gate). **CF DESPLEGADA**. L-48. ⚠️ El director valida que el EMS ya NO da 504 y COMPLETA (12–22 min, esperado).
+- **Arco "Reprocesar" (consolidado en `99`, todo desplegado; secuencia de causas REALES encontradas una a una)**:
+  **ADR-015** reintento con backoff (L-44) · **ADR-016** asíncrono observable: persistencia server-side + estado durable
+  `reproceso.{estado}` + badge en vivo (L-45, EN PROD) · **ADR-017** `await` desnudo sin timeout por intento → cuelgue →
+  SIGKILL sin estado: `conTimeoutAbortable` + watchdog + 2GiB (L-46) · **ADR-018** "terminated" = bodyTimeout de undici (~5 min)
+  corta el stream largo → dispatcher sin bodyTimeout (`undici@^6`), L-47. ADR-019 (arriba) cierra el 504.
 - Anterior (consolidado en `99`): arco tablero **ADR-010→ADR-014 + L-35..L-43** TODO EN PRODUCCIÓN (Tendencia F2/F3,
   veredicto MULTI-NORMA, bujes canónico, identidad por informe/trafo móvil, long-polling, upsert, reproceso server-side, backfill).
