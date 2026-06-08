@@ -19,13 +19,46 @@ export const IA_STATUS_TRANSITORIOS = new Set([408, 409, 425, 429, 500, 502, 503
 // reintenta; false = permanente/externo, se relanza.
 export function esErrorTransitorioIA(e) {
   if (!e) return false;
+  if (e.transitorio === true) return true; // TimeoutIA interno / abort por watchdog
   const status = e.status ?? e.statusCode ?? (e.response && e.response.status);
   if (status != null && IA_STATUS_TRANSITORIOS.has(Number(status))) return true;
-  // SDK Anthropic: APIConnectionError / APIConnectionTimeoutError no traen status.
+  // SDK Anthropic: APIConnectionError / APIConnectionTimeoutError / abort no traen status.
   const name = String(e.name || '');
-  if (/Connection|Timeout/i.test(name)) return true;
+  if (/Connection|Timeout|Abort/i.test(name)) return true;
   const msg = String(e.message || e);
-  return /overload|rate.?limit|timed?.?out|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|EAI_AGAIN|socket hang up|stream (?:error|disconnect|interrupt)|temporar|overloaded|\b50[234]\b|\b529\b/i.test(msg);
+  return /overload|rate.?limit|timed?.?out|abort|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EPIPE|EAI_AGAIN|socket hang up|stream (?:error|disconnect|interrupt)|temporar|overloaded|\b50[234]\b|\b529\b/i.test(msg);
+}
+
+// Error de TIMEOUT interno por intento (el stream de la IA se colgó y lo
+// abortamos). Es TRANSITORIO (reintentable) — marca la bandera para que
+// esErrorTransitorioIA lo trate como tal sin depender del texto.
+export class TimeoutIA extends Error {
+  constructor(ms) {
+    super(`La IA no respondió en ${Math.round(ms / 1000)} s (intento abortado)`);
+    this.name = 'TimeoutIA';
+    this.code = 'ia_timeout';
+    this.transitorio = true;
+  }
+}
+
+// Acota `fabricarConSignal(signal)` a `ms`: si excede, ABORTA el signal (cancela
+// el stream colgado de la IA → libera la conexión) y rechaza con TimeoutIA. Es
+// la pieza CLAVE contra el cuelgue infinito: sin esto, un stream que no responde
+// ni falla deja la función corriendo hasta el SIGKILL de la plataforma (900 s)
+// → no corre ningún catch → el reproceso queda colgado en 'en_curso' para siempre.
+export async function conTimeoutAbortable(fabricarConSignal, ms) {
+  const ac = new AbortController();
+  let timer;
+  const trabajo = Promise.resolve().then(() => fabricarConSignal(ac.signal));
+  trabajo.catch(() => {}); // evita unhandledRejection si abortamos tras el timeout
+  const limite = new Promise((_, reject) => {
+    timer = setTimeout(() => { try { ac.abort(); } catch { /* noop */ } reject(new TimeoutIA(ms)); }, ms);
+  });
+  try {
+    return await Promise.race([trabajo, limite]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
