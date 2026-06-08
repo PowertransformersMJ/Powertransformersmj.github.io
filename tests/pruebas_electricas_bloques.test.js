@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import {
   sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION,
-  quitarColumnasVeredicto, derivarBushing
+  quitarColumnasVeredicto, derivarBushing, bloquesMultiAno
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -245,5 +245,63 @@ describe('derivarBushing · FP canónico (peor tan δ + peor ΔC1 vs placa) — 
     ] }] }]);
     assert.equal(r.fp_max_pct, 0.4);
     assert.equal(r.dc1_max_pct, null);
+  });
+});
+
+describe('bloquesMultiAno · informe × fase superpuestos (conserva fases y NO colapsa años)', () => {
+  const inf = (ano, fecha, bloques) => ({ ano, fecha, id: fecha, bloques });
+  const exc = (vals) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación', unidad: 'mA', eje_x: 'TAP', grafica: 'linea', limite: 30,
+    series: [{ nombre: 'Fase A', puntos: vals.map((y, i) => ({ x: i + 1, y })) }] });
+
+  test('una serie por (informe × fase); etiqueta con fecha; _rep único; ordenadas por año', () => {
+    const out = bloquesMultiAno([
+      inf(2023, '09/11/2023', [exc([20, 21])]),
+      inf(2021, '18/01/2021', [exc([18, 19])])
+    ]);
+    assert.equal(out.length, 1);
+    const b = out[0];
+    assert.equal(b.series.length, 2);
+    assert.deepEqual(b.series.map((s) => s.nombre), ['18/01/2021 · Fase A', '09/11/2023 · Fase A']);
+    assert.deepEqual(b.series.map((s) => s._ano), ['2021', '2023']);
+  });
+
+  test('REGRESIÓN: DOS informes del MISMO año NO se colapsan (cada uno su serie/_rep)', () => {
+    const out = bloquesMultiAno([
+      inf(2021, '18/01/2021', [exc([18])]),
+      inf(2021, '20/09/2021', [exc([19])])
+    ]);
+    const b = out[0];
+    assert.equal(b.series.length, 2, 'ambos informes de 2021 deben aparecer');
+    assert.deepEqual(b.series.map((s) => s._rep).sort(), ['18/01/2021', '20/09/2021']);
+    assert.deepEqual(b.series.map((s) => s._repLabel).sort(), ['18/01/2021', '20/09/2021']);
+    // mismos _ano pero _rep distintos → no colapsan
+    assert.deepEqual([...new Set(b.series.map((s) => s._ano))], ['2021']);
+    assert.equal(new Set(b.series.map((s) => s._rep)).size, 2);
+  });
+
+  test('CONSERVA todas las fases (NO reduce): valores reales por fase', () => {
+    const multi = { prueba: 'excitacion', titulo: 'Exc', unidad: 'mA', grafica: 'linea',
+      series: [
+        { nombre: 'A', puntos: [{ x: 1, y: 10 }, { x: 2, y: 12 }] },
+        { nombre: 'B', puntos: [{ x: 1, y: 15 }, { x: 2, y: 9 }] }
+      ] };
+    const out = bloquesMultiAno([{ ano: 2022, fecha: '01/01/2022', id: 'r1', bloques: [multi] }]);
+    assert.equal(out[0].series.length, 2);
+    const fa = out[0].series.find((s) => s._fase === 'A');
+    const fb = out[0].series.find((s) => s._fase === 'B');
+    assert.deepEqual(fa.puntos, [{ x: 1, y: 10 }, { x: 2, y: 12 }]);
+    assert.deepEqual(fb.puntos, [{ x: 1, y: 15 }, { x: 2, y: 9 }]);
+  });
+
+  test('ignora bloques sin familia reconocida (p.ej. sfra)', () => {
+    const desconocido = { prueba: 'sfra', titulo: 'SFRA', series: [{ nombre: 'x', puntos: [{ x: 1, y: 1 }] }] };
+    const out = bloquesMultiAno([inf(2020, '01/01/2020', [exc([18]), desconocido])]);
+    assert.deepEqual(out.map((b) => b.prueba), ['excitacion']);
+  });
+
+  test('entrada vacía / basura no rompe', () => {
+    assert.deepEqual(bloquesMultiAno([]), []);
+    assert.deepEqual(bloquesMultiAno(null), []);
+    assert.doesNotThrow(() => bloquesMultiAno([{ ano: 2020, bloques: null }, {}]));
   });
 });

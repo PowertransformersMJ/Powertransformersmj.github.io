@@ -94,13 +94,18 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-022 + ADR-023 (pedido director, 3 partes COMPLETAS, frontend; valida en navegador)**: (P1) la
-  **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato (`return null`) → el FP de bujes
-  "desaparecía" (su queja); ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto
-  INTACTO.** (D) **Tendencia**: `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica (sensible a deriva) +
-  resalta relevantes. (3.ª) **Vista consolidada** del Tablero (`renderConsolidado` #pe-consolidado): todas las pruebas en una
-  gráfica = **% de su límite**, color = veredicto multi-norma, selector año+pruebas, **rango auto-ajustable** + **filtro de año**
-  en bloques. ADITIVO. 1105/1105 verde. 🚫 **NO romper la calificación global** (memoria `feedback_calificacion_global_por_prueba.md`).
+- **2026-06-08** — **ADR-022 (P1+Tendencia) + ADR-024 (multi-año), pedido del director (frontend; valida en navegador)**:
+  (P1) **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato → el FP de bujes "desaparecía";
+  ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto INTACTO.** (Tendencia)
+  `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica + resalta relevantes. **(Tablero MULTI-AÑO, ADR-024 —
+  ADR-024→**ADR-025 v2**→**ADR-026 fix regresión** tras feedback)**: por PRUEBA, gráfica con TODOS los **INFORMES** superpuestos
+  (clave por **informe**, no por año — **ADR-026** corrige que 2 ensayos de 2021 en la serie 450108 se colapsaban; ahora 7 chips
+  distintos, identidad/color/filtro por informe) **conservando FASES** (informe×fase,
+  valores reales — la reducción "peor fase" distorsionaba) + **filtro de año GLOBAL** (todas las pruebas) + **fase por gráfica**,
+  color por año (`bloquesMultiAno`+`montarMultiAno`+`svgBloque` exportado). **(Tendencia v2)**: `cambiosAnoAno` (historial de
+  saltos) + `proyectarTendencia` (ajuste lineal → años a cruzar el límite). 1119/1119 verde. 🚫 **NO romper la calificación
+  global** (memoria `feedback_calificacion_global_por_prueba.md`).
+  ⚙️ **Preview workflow** para validar UI (L-49): `preview_start name:static` → `preview_eval`/`preview_screenshot`; harness `_dev/preview-multiano.html`.
 - **2026-06-08** — **ADR-020 RETIRO de "Reprocesar"** (costo > valor; re-extraer = re-subir): se quitó el botón + handler +
   el modo-reproceso de la CF (queda **solo-CARGA**) + **ADR-021 previsualización al colisionar por fecha** (modal
   `confirmarUpsert`: "ya guardado" vs "nuevo" + abrir PDF → reemplazar/crear-nuevo, no un `confirm` ciego). 1099/1099 verde.

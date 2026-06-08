@@ -291,3 +291,78 @@ export function derivarBushing(bloques) {
     dc1_max_pct: dc1Max != null ? +dc1Max.toFixed(3) : null
   };
 }
+
+// Familias de prueba para la vista MULTI-AÑO (clave canónica + dirección del
+// "peor caso" + si su gráfica es de barras). `inv:true` = peor es el MÍNIMO
+// (aislamiento: bajar es malo); el resto, peor = MÁXIMO.
+const FAMILIAS_MA = [
+  { key: 'tand',        re: /tan|fp.*(devan|aisl|transform)|factor de potencia(?!.*buje)/i, inv: false },
+  { key: 'bushing',     re: /bushing|buje/i,                inv: false },
+  { key: 'excitacion',  re: /excitaci/i,                    inv: false },
+  { key: 'relacion',    re: /relaci/i,                      inv: false },
+  { key: 'resistencia', re: /resist.*(devan|arroll)|^resistencia/i, inv: false },
+  { key: 'aislamiento', re: /aislamiento|megado|\bIR\b/i,   inv: true },
+  { key: 'collar',      re: /collar/i,                      inv: false }
+];
+
+function familiaMA(bloque) {
+  const p = String((bloque && (bloque.prueba || bloque.titulo)) || '').toLowerCase();
+  // Coincidencia directa por clave canónica primero.
+  const directa = FAMILIAS_MA.find((f) => f.key === p);
+  if (directa) return directa;
+  return FAMILIAS_MA.find((f) => f.re.test(p)) || null;
+}
+
+/**
+ * Construye, por FAMILIA de prueba, UN bloque que superpone TODOS los INFORMES
+ * del libro. Clave de identidad = el INFORME (no el año), para que DOS informes
+ * del MISMO año NO se colapsen (caso real: serie 450108 con 2 ensayos en 2021).
+ * Conserva CADA FASE de cada informe como su propia serie (valores REALES, sin
+ * reducir). Cada serie se etiqueta con `_rep` (id del informe), `_repLabel`
+ * (fecha o año, para mostrar), `_ano` y `_fase` → filtrable por INFORME y por FASE.
+ * El nombre visible es "<fecha|año> · <fase>".
+ * @param {Array<{ano:(number|null), fecha?:string, id?:string, bloques:Array}>} items
+ * @returns {Array<object>} bloques multi-informe (uno por familia con datos)
+ */
+export function bloquesMultiAno(items) {
+  const fam = new Map();
+  for (const it of (Array.isArray(items) ? items : [])) {
+    const ano = it && it.ano;
+    const repLabel = (it && it.fecha) || (ano != null ? String(ano) : 's/a');
+    // Identidad ÚNICA por informe: id > fecha > (año + orden). Sin esto, dos
+    // informes del mismo año compartirían clave y se solaparían.
+    const rep = (it && it.id != null && String(it.id)) || (it && it.fecha) || repLabel;
+    for (const b of ((it && it.bloques) || [])) {
+      const f = familiaMA(b);
+      if (!f) continue;
+      if (!fam.has(f.key)) {
+        fam.set(f.key, {
+          prueba: f.key, titulo: b.titulo || f.key, unidad: b.unidad || '',
+          eje_x: b.eje_x || '', grafica: b.grafica === 'barra' ? 'barra' : 'linea',
+          limite: b.limite != null ? b.limite : null, guia: b.guia != null ? b.guia : null,
+          limite_desbalance: b.limite_desbalance != null ? b.limite_desbalance : null,
+          _series: []
+        });
+      }
+      const g = fam.get(f.key);
+      for (const s of (b.series || [])) {
+        const puntos = (s.puntos || []).filter((p) => p && p.x != null && typeof p.y === 'number');
+        if (!puntos.length) continue;
+        g._series.push({ rep, repLabel, ano, fase: String(s.nombre || ''), puntos });
+      }
+    }
+  }
+  return [...fam.values()]
+    .map((g) => {
+      const series = g._series
+        .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0) || String(a.repLabel).localeCompare(String(b.repLabel)))
+        .map((s) => ({
+          nombre: s.fase ? `${s.repLabel} · ${s.fase}` : s.repLabel,
+          _rep: s.rep, _repLabel: s.repLabel, _ano: s.ano != null ? String(s.ano) : 's/a',
+          _fase: s.fase, puntos: s.puntos
+        }));
+      const { _series, ...resto } = g;
+      return { ...resto, series };
+    })
+    .filter((b) => b.series.length);
+}

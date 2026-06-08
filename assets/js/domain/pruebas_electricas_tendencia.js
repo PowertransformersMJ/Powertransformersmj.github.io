@@ -147,6 +147,11 @@ export function analisisTendencia(informes, ctx = {}) {
       return y == null ? null : { x: ejeX(inf), y: +y.toFixed(4) };
     }).filter(Boolean);
     if (!puntos.length) return null;
+    // Cambios AÑO A AÑO (todo el historial, no solo el último) + PROYECCIÓN de la
+    // tendencia (ajuste lineal → años hasta cruzar el límite al ritmo actual).
+    const cambios = cambiosAnoAno(puntos, m.invertir === true);
+    const limProy = m.key === 'aislamiento' ? minClase : LIM_PROY[m.key];
+    const proyeccion = proyectarTendencia(puntos, limProy != null ? limProy : null, m.invertir === true);
     const vigente = puntos[puntos.length - 1].y;
     const previo = puntos.length > 1 ? puntos[puntos.length - 2].y : null;
     const mn = evaluarMultiNorma(m.key, vigente, { minClase });
@@ -168,9 +173,67 @@ export function analisisTendencia(informes, ctx = {}) {
     const accion = accionPrueba(m.key, { estado, tendencia, delta: deltaRel, divergen: !!(mn && mn.divergen) });
     return {
       key: m.key, titulo: m.titulo, unidad: m.unidad, invertir: m.invertir === true,
-      puntos, vigente, previo, delta, deltaRel, tendencia,
+      puntos, vigente, previo, delta, deltaRel, tendencia, cambios, proyeccion,
       estado, divergen: !!(mn && mn.divergen), opticas: mn ? mn.opticas : [],
       recomendacion, accion, relevante: accion.relevante
     };
   }).filter(Boolean);
+}
+
+// Límite "titular" por métrica para la proyección (aislamiento usa minClase).
+const LIM_PROY = Object.freeze({ tand: 1, bushing: 1, excitacion: 10, relacion: 0.5, resistencia: 2, collar: 100 });
+
+/**
+ * Cambios AÑO A AÑO de una serie: por cada par consecutivo, Δ absoluto y relativo
+ * y la dirección (empeora/mejora/estable, ±2% relativo). `invertir`=true → bajar
+ * es empeorar (aislamiento).
+ * @returns {Array<{de:*, a:*, delta:number, deltaRel:(number|null), dir:string}>}
+ */
+export function cambiosAnoAno(puntos, invertir) {
+  const out = [];
+  const ps = Array.isArray(puntos) ? puntos : [];
+  for (let i = 1; i < ps.length; i++) {
+    const a = ps[i - 1], b = ps[i];
+    const delta = +(b.y - a.y).toFixed(4);
+    const deltaRel = a.y !== 0 ? +(delta / a.y * 100).toFixed(1) : null;
+    const estable = Math.abs(deltaRel || 0) <= 2;
+    const empeora = invertir ? (delta < 0) : (delta > 0);
+    out.push({ de: a.x, a: b.x, delta, deltaRel, dir: estable ? 'estable' : (empeora ? 'empeora' : 'mejora') });
+  }
+  return out;
+}
+
+/**
+ * PROYECCIÓN de la tendencia: ajuste lineal (mínimos cuadrados) sobre (año, valor)
+ * → pendiente por año y, si se acerca al límite, ESTIMA cuántos años faltan para
+ * cruzarlo al ritmo actual. Devuelve {texto, pendiente, anosACruzar, yaFuera}.
+ * @param {Array<{x:*, y:number}>} puntos
+ * @param {number|null} limite  límite normativo (null si no aplica)
+ * @param {boolean} invertir    true = el límite es un MÍNIMO (bajar es malo)
+ */
+export function proyectarTendencia(puntos, limite, invertir) {
+  const ps = Array.isArray(puntos) ? puntos : [];
+  if (ps.length < 2) return { texto: 'Un solo informe: aún no hay tendencia (solo una foto).', pendiente: null, anosACruzar: null, yaFuera: false };
+  const xs = [], ys = [];
+  ps.forEach((p, i) => { const x = Number(p.x); xs.push(Number.isFinite(x) ? x : i); ys.push(p.y); });
+  const n = xs.length;
+  const sx = xs.reduce((a, b) => a + b, 0), sy = ys.reduce((a, b) => a + b, 0);
+  const sxx = xs.reduce((a, b) => a + b * b, 0), sxy = xs.reduce((a, b, i) => a + b * ys[i], 0);
+  const den = n * sxx - sx * sx;
+  if (den === 0) return { texto: 'Sin pendiente calculable.', pendiente: null, anosACruzar: null, yaFuera: false };
+  const m = (n * sxy - sx * sy) / den;
+  const ult = ys[ys.length - 1];
+  const yaFuera = limite != null && (invertir ? ult < limite : ult > limite);
+  const haciaLimite = invertir ? m < 0 : m > 0;
+  let anosACruzar = null;
+  if (limite != null && haciaLimite && Math.abs(m) > 1e-9 && !yaFuera) {
+    const a = (limite - ult) / m;
+    if (a >= 0) anosACruzar = +a.toFixed(1);
+  }
+  let texto;
+  if (yaFuera) texto = 'Ya fuera de norma — priorizar la acción correctiva.';
+  else if (anosACruzar != null) texto = `Al ritmo actual (~${Math.abs(+m.toFixed(3))}/año) cruzaría el límite en ~${anosACruzar} año(s).`;
+  else if (haciaLimite) texto = 'Se acerca lentamente al límite; mantener vigilancia.';
+  else texto = 'Tendencia estable o favorable; sin proyección de cruce.';
+  return { texto, pendiente: +m.toFixed(4), anosACruzar, yaFuera };
 }

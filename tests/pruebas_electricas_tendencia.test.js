@@ -4,7 +4,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bloquesTendencia, METRICAS_TENDENCIA, resumenTendenciaParaIA, analisisTendencia } from '../assets/js/domain/pruebas_electricas_tendencia.js';
+import { bloquesTendencia, METRICAS_TENDENCIA, resumenTendenciaParaIA, analisisTendencia, cambiosAnoAno, proyectarTendencia } from '../assets/js/domain/pruebas_electricas_tendencia.js';
 
 // Dos informes del mismo transformador en años distintos (la tan δ empeora).
 const INFORMES = [
@@ -128,5 +128,57 @@ describe('analisisTendencia (diagnóstico de alto nivel por métrica)', () => {
   test('sin informes → []', () => {
     assert.deepEqual(analisisTendencia([]), []);
     assert.deepEqual(analisisTendencia(null), []);
+  });
+});
+
+describe('cambiosAnoAno · todo el historial de cambios', () => {
+  test('un par por año consecutivo, con Δ, Δrel y dirección', () => {
+    const c = cambiosAnoAno([{ x: 2019, y: 0.2 }, { x: 2021, y: 0.3 }, { x: 2023, y: 0.6 }], false);
+    assert.equal(c.length, 2);
+    assert.deepEqual(c[0], { de: 2019, a: 2021, delta: 0.1, deltaRel: 50, dir: 'empeora' });
+    assert.equal(c[1].dir, 'empeora');
+  });
+  test('estable si |Δrel| ≤ 2%', () => {
+    const c = cambiosAnoAno([{ x: 2019, y: 100 }, { x: 2021, y: 101 }], false);
+    assert.equal(c[0].dir, 'estable');
+  });
+  test('aislamiento (invertir): bajar = empeora', () => {
+    const c = cambiosAnoAno([{ x: 2019, y: 40 }, { x: 2021, y: 30 }], true);
+    assert.equal(c[0].dir, 'empeora');
+  });
+  test('serie de 1 punto → sin cambios', () => {
+    assert.deepEqual(cambiosAnoAno([{ x: 2020, y: 1 }], false), []);
+  });
+});
+
+describe('proyectarTendencia · ajuste lineal + años hasta cruzar el límite', () => {
+  test('tendencia creciente hacia un MÁX → estima años a cruzar', () => {
+    // y = 0.1, 0.2, 0.3 en 2019/2021/2023 (pendiente 0.05/año), límite 0.5
+    const p = proyectarTendencia([{ x: 2019, y: 0.1 }, { x: 2021, y: 0.2 }, { x: 2023, y: 0.3 }], 0.5, false);
+    assert.equal(p.pendiente, 0.05);
+    assert.equal(p.anosACruzar, 4); // (0.5-0.3)/0.05 = 4 años desde 2023
+    assert.equal(p.yaFuera, false);
+    assert.match(p.texto, /cruzaría el límite en ~4/);
+  });
+  test('ya fuera de norma (sobre el máx) → correctiva', () => {
+    const p = proyectarTendencia([{ x: 2019, y: 0.4 }, { x: 2021, y: 0.6 }], 0.5, false);
+    assert.equal(p.yaFuera, true);
+    assert.match(p.texto, /fuera de norma/i);
+  });
+  test('aislamiento (invertir): bajando hacia el mínimo → estima cruce', () => {
+    // 40 → 35 → 30 (pendiente -2.5/año), límite (mín) 25
+    const p = proyectarTendencia([{ x: 2019, y: 40 }, { x: 2021, y: 35 }, { x: 2023, y: 30 }], 25, true);
+    assert.ok(p.pendiente < 0);
+    assert.equal(p.anosACruzar, 2); // (25-30)/(-2.5) = 2
+  });
+  test('estable/favorable → sin proyección de cruce', () => {
+    const p = proyectarTendencia([{ x: 2019, y: 0.2 }, { x: 2021, y: 0.1 }], 0.5, false);
+    assert.equal(p.anosACruzar, null);
+    assert.match(p.texto, /estable|favorable/i);
+  });
+  test('un solo informe → solo una foto', () => {
+    const p = proyectarTendencia([{ x: 2020, y: 0.3 }], 0.5, false);
+    assert.match(p.texto, /una foto|un solo/i);
+    assert.equal(p.anosACruzar, null);
   });
 });

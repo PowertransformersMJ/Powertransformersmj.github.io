@@ -513,4 +513,62 @@
 
 **23.5 Archivos** — MODIFICADOS: `pages/pruebas-electricas.html` (sección `#consolidado`/`#pe-consolidado`), `assets/js/pruebas-electricas-shell.js` (`renderConsolidado` + `LIM_CONSOLIDADO`/`COLOR_ESTADO`, llamada en `renderInformesUI`, filtro de año en `montarBloques`, import `metricaPrueba`). INTACTOS: calificación global, multinorma, render de bloques/matriz.
 
-**23.6 Doctrina + evolución** — "Para comparar magnitudes de distintas unidades en una sola gráfica, normaliza a una unidad común con SIGNIFICADO (aquí: % del límite normativo, 100% = el límite) y deja que el eje se ajuste a la selección. Filtrar = togglear visibilidad, no re-renderizar." Sin lección nueva. Sin cache bump. Completa el pedido de 3 partes (ADR-022 + ADR-023).
+**23.6 Doctrina + evolución** — "Para comparar magnitudes de distintas unidades en una sola gráfica, normaliza a una unidad común con SIGNIFICADO (aquí: % del límite normativo, 100% = el límite) y deja que el eje se ajuste a la selección. Filtrar = togglear visibilidad, no re-renderizar." **SUPERSEDED por ADR-024** (la interpretación correcta era otra). Sin cache bump.
+
+## 24. ADR-024 — Tablero MULTI-AÑO: cada prueba con TODOS los años superpuestos (+ filtro de año por prueba) — validado con workflow de PREVIEW
+
+> Director (2026-06-08), corrigiéndome: "**cuando me refería a que se vieran todas las pruebas en la misma gráfica es que todos los años aparezcan plasmados en la misma gráfica** — corriente de excitación que se vean todos los años conforme a los informes anexados, relación, etc., **todas las pruebas**. Los filtros de cada año deben ser posibles **en cada prueba**. Apóyate con tus habilidades, skill/plugins. **Implementa workflow para que sea un trabajo más preciso**." ADR-023 (barras "% del límite" de un año) era una MALA interpretación. **Frontend; en prod tras push.**
+
+**24.1 Interpretación correcta** — Por PRUEBA, UNA gráfica con una LÍNEA por AÑO (informe) superpuestas en el mismo eje (X = TAP/config) → se compara la evolución de cada ensayo entre años. Filtro de año POR PRUEBA (chips que muestran/ocultan cada año en ESA gráfica). No barras de "todas las pruebas juntas".
+
+**24.2 Workflow de PRECISIÓN (lo que el director pidió) — clave de este ADR** — Se montó un **preview**: `scripts/dev-server.mjs` (servidor estático Node — `python http.server` lo bloquea el sandbox) + `.claude/launch.json` + harness `_dev/preview-multiano.html` con datos MOCK. Se VALIDÓ el render en el navegador (Claude Preview MCP) ANTES de cablear a la app. **Atrapó un defecto invisible al código**: la leyenda "2019/2021/2023" del SVG NO eran chips de filtro (el render genérico solo genera chips de FASE, no de año) → `.pe-fase-chip` = 0. Sin el preview se habría enviado "sin filtro de año" otra vez. Con el preview: se confirmó `filtra: 6→5 líneas` al clic en un año.
+
+**24.3 Decisiones / cambios** —
+- **Dominio puro** `bloquesMultiAno(items)` (`pruebas_electricas_bloques.js`, testeado): agrupa los bloques por FAMILIA de prueba y produce, por familia, un bloque con una serie por AÑO (nombre = año), reduciendo cada año a su curva REPRESENTATIVA = peor fase por X (máx; mín en aislamiento). Ignora familias no reconocidas; robusto ante basura.
+- **`montarMultiAno`** (shell, en `#pe-consolidado`): por cada bloque multi-año, renderiza la gráfica con `renderBloque` + **chips de AÑO propios** (la leyenda del SVG no filtra) que togglean qué años se ven y re-renderizan el bloque filtrado. Se llama al final de `montarBloques` (necesita las curvas ya cargadas en `state.bloquesCache`).
+- Se **RETIRÓ** la vista de barras "% del límite" de ADR-023 (`renderConsolidado`/`LIM_CONSOLIDADO`/`COLOR_ESTADO`) y el **dropdown de año global** de los bloques (causaba "años vacíos" — el filtro ahora es POR PRUEBA, por chips).
+
+**24.4 No-regresión** — ADITIVO sobre las gráficas; NO toca la calificación global ni el motor del veredicto (reusa `renderBloque`/`mountBloques` existentes). `node --test` **1110/1110** (+5 `bloquesMultiAno`: agrupa por familia, serie=año ordenada, representativa=peor fase, aislamiento=mín, ignora desconocidas, basura). Lint OK. **Preview**: render + filtro validados visualmente.
+
+**24.5 Anti-patterns evitados** — NO asumir que una leyenda es un filtro (se verificó en el navegador); NO re-interpretar a ciegas un pedido ambiguo dos veces (se validó con preview/mock antes de cablear); NO un dropdown global que deja años vacíos (filtro por prueba).
+
+**24.6 Archivos** — NUEVOS: `scripts/dev-server.mjs`, `.claude/launch.json`, `_dev/preview-multiano.html` (workflow de preview). MODIFICADOS: `assets/js/domain/pruebas_electricas_bloques.js` (`bloquesMultiAno`+helpers), `assets/js/pruebas-electricas-shell.js` (`montarMultiAno`; -barras; -dropdown buggy; import `renderBloque`/`bloquesMultiAno`), `pages/pruebas-electricas.html` (título sección multi-año), `tests/pruebas_electricas_bloques.test.js`. INTACTOS: calificación global, multinorma, render de bloques.
+
+**24.7 Doctrina + evolución** — "Para trabajo de UI con requisito ambiguo: monta un PREVIEW con datos mock y VALÍDALO en el navegador antes de cablear a la app — atrapa lo que el código no muestra (p.ej. que una leyenda no filtra). Una 'leyenda' no es un 'filtro' hasta verificarlo." Lección → L-49. Sin cache bump. (Las gráficas detalladas por informe siguen abajo como drill-down.)
+
+## 25. ADR-025 — Multi-año v2 (feedback del director): conserva FASES + valores reales + filtro de año GLOBAL + fase por gráfica; Tendencia con cambios año-a-año + PROYECCIÓN
+
+> Director (2026-06-08, revisando el preview de ADR-024): (1) "quitaste la opción de filtrar por fases, no debes desmejorar"; (2) "en relación los valores están mal extraídos, ninguna cumple — antes se veían bien"; (3) "el filtro de año aplica para TODAS las pruebas del libro"; (4) "en Tendencia deben reposar los cambios relevantes año tras año y un análisis de cómo se proyecta". Validado todo con el workflow de PREVIEW (ADR-024/L-49). **Frontend; en prod tras push.**
+
+**25.1 Causa raíz** — ADR-024 reducía cada año a UNA curva "peor fase por X" → (1) perdía las fases (no se podían filtrar) y (2) DISTORSIONABA valores (en relación, tomar el máx entre fases sobreestimaba; con un mock irreal parecía "ninguna cumple"). La extracción IA NO cambió — el defecto era de PRESENTACIÓN (la reducción).
+
+**25.2 Decisiones / cambios** —
+- **(1+2) Conservar fases + valores reales** (`bloquesMultiAno` reescrita): NO reduce; produce una serie por **año × fase** (etiquetas `_ano`/`_fase`, nombre "<año> · <fase>"), con los valores REALES de cada fase. Tests actualizados (conserva fases, no distorsiona).
+- **(3) Filtro de año GLOBAL** + **fase por gráfica** (`montarMultiAno` reescrita): chips de **año arriba** que aplican a TODAS las pruebas del libro (`state.multiAnoYears`), + chips de **fase en cada gráfica** (`b._selF`). Color por AÑO consistente entre gráficas (compara la evolución). Se exportó `svgBloque` (grafico-generico) para renderizar la gráfica con filtros propios (la leyenda del render genérico no filtra años, L-49). Validado en preview: año global 18→12 líneas (quita un año de todas), fase 6→4 (solo esa gráfica), relación bajo el límite 0.5%.
+- **(4) Tendencia: cambios AÑO A AÑO + PROYECCIÓN** (`tendencia.js`): `cambiosAnoAno(puntos, invertir)` (todo el historial: Δ/Δ%/dirección por par consecutivo) + `proyectarTendencia(puntos, limite, invertir)` (ajuste lineal mínimos cuadrados → pendiente/año y **años estimados hasta cruzar el límite** al ritmo actual; "ya fuera de norma" si aplica). `analisisTendencia` los adjunta; el diagnóstico de la unidad muestra los saltos año a año (badges ▲/▼/→ con Δ%) + la proyección por métrica.
+
+**25.3 No-regresión** — Las gráficas detalladas por informe (drill-down) intactas (su filtro de fase sigue). `svgBloque` solo se EXPORTÓ (sin cambio de lógica). NO toca calificación global ni motor del veredicto. `node --test` **1119/1119** (+ cambiosAnoAno + proyectarTendencia; bloquesMultiAno actualizado a año×fase). Lint OK.
+
+**25.4 Verificación** — Preview (Claude MCP): estructura (año global + fases A/B/C por gráfica + aislamiento sin fases), valores reales (relación bajo límite), y AMBOS filtros por conteo de líneas antes/después de clic. ⚠️ Validación final sobre datos reales: el director.
+
+**25.5 Anti-patterns evitados** — NO reducir/colapsar series (perdía fases y distorsionaba); NO confundir un defecto de presentación con uno de extracción (la IA no cambió); proyección por ajuste lineal explícito (no "a ojo").
+
+**25.6 Archivos** — MODIFICADOS: `assets/js/domain/pruebas_electricas_bloques.js` (`bloquesMultiAno` → año×fase), `assets/js/pruebas-electricas-shell.js` (`montarMultiAno` v2: año global + fase por gráfica + color por año; diagnóstico con cambios año-a-año + proyección; import `svgBloque`), `assets/js/ui/pruebas/grafico-generico.js` (export `svgBloque`), `assets/js/domain/pruebas_electricas_tendencia.js` (`cambiosAnoAno`/`proyectarTendencia` + en `analisisTendencia`), tests (bloques, tendencia), `_dev/preview-multiano.html`. INTACTOS: calificación global, multinorma, gráficas por informe.
+
+**25.7 Doctrina + evolución** — "No reduzcas/colapses datos para 'simplificar' una vista comparativa — conserva las dimensiones reales (fase) y deja que el usuario filtre; reducir distorsiona y se confunde con 'mala extracción'. Un análisis de tendencia útil incluye el historial de cambios AÑO A AÑO y una PROYECCIÓN cuantitativa (ajuste lineal → años a cruzar el límite), no solo el último Δ." Sin lección nueva (preview en L-49). Sin cache bump.
+
+## 26. ADR-026 — Regresión: el multi-año colapsaba informes del MISMO año → identidad por INFORME (no por año)
+
+> Director (2026-06-08, frustrado por **costo de tokens/IA**): "antes se podían apreciar **7 informes** de la serie 450108; cuando trabajaste el filtro dejaron de apreciarse todos. Corrige, **memoriza y no repitas estos errores de alto costo**." Basado en el preview. **Frontend; en prod tras push.**
+
+**26.1 Causa raíz** — `bloquesMultiAno`/`montarMultiAno` (ADR-025) agrupaban y filtraban las series por **AÑO** (`_ano`). La serie 450108 tiene **2 ensayos en 2021** (18/01 y 20/09); al usar el año como clave, ambos compartían etiqueta/color y un solo chip → se "fundían" en uno. Reproducido en el preview: 7 informes (2 en 2021) → solo **6 chips** y dos series "2021 · Fase A" indistinguibles.
+
+**26.2 Decisiones / cambios** — Identidad por **INFORME**, no por año. `bloquesMultiAno`: cada serie lleva `_rep` (id del informe, ÚNICO), `_repLabel` (FECHA o año, para mostrar) además de `_ano`/`_fase`; nombre "<fecha> · <fase>"; orden por (año, fecha). `montarMultiAno`: el filtro GLOBAL es por **informe** (chips con la FECHA, `state.multiAnoReps`), color **por informe** (distinto cada uno); el filtro de fase por gráfica intacto. Resultado validado en preview: **7 chips** (incl. 18/01/2021 y 20/09/2021 separados), 21 líneas con etiquetas únicas, el filtro global quita un informe de TODAS las gráficas (42→36 líneas).
+
+**26.3 No-regresión** — Solo cambia la CLAVE (año→informe) y el etiquetado/color; la conservación de fases + valores reales (ADR-025) intacta. NO toca calificación global ni motor. `node --test` **1119/1119** (test nuevo: 2 informes del mismo año NO colapsan, `_rep` distintos). Lint OK.
+
+**26.4 Anti-patterns evitados** — NO usar como clave un atributo que varios registros comparten (año) cuando la unidad real es otra (el informe); NO "arreglar" a ciegas — se REPRODUJO el caso real (7 informes, 2 en 2021) en el preview antes de tocar, fijando la causa exacta (ahorra tokens); verificar antes/después que TODO lo visible sigue visible.
+
+**26.5 Archivos** — MODIFICADOS: `assets/js/domain/pruebas_electricas_bloques.js` (`bloquesMultiAno` → clave por informe, `_rep`/`_repLabel`), `assets/js/pruebas-electricas-shell.js` (`montarMultiAno` → filtro/color por informe), `tests/pruebas_electricas_bloques.test.js`, `_dev/preview-multiano.html`. INTACTOS: calificación global, multinorma, tendencia, gráficas por informe.
+
+**26.6 Doctrina + evolución** — "La clave de identidad de una serie/fila es la ENTIDAD real (el informe), no un atributo agregable (el año) — si varios comparten ese atributo, se colapsan y desaparecen. Y al añadir/reescribir una vista, verificar que lo que ANTES se veía sigue viéndose (contar antes/después en el preview)." Memorizado (feedback persistente: `feedback_no_regresiones_visibilidad.md`). Sin lección nueva (refuerza L-49). Sin cache bump.

@@ -34,12 +34,11 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { derivarBushing } from './domain/pruebas_electricas_bloques.js';
+import { derivarBushing, bloquesMultiAno } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
-import { metricaPrueba } from './domain/pruebas_electricas_multinorma.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
-import { mountBloques } from './ui/pruebas/grafico-generico.js';
+import { mountBloques, svgBloque } from './ui/pruebas/grafico-generico.js';
 import { bloquesTendencia, resumenTendenciaParaIA, analisisTendencia } from './domain/pruebas_electricas_tendencia.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
@@ -459,7 +458,20 @@ function diagnosticoUnidadHtml(docs) {
     const accBadge = `<span class="badge ${esc(acc.clase || 'b-n')}" title="Acción de mantenimiento">${esc(acc.etiqueta || '—')}</span>`;
     const rel = m.relevante ? '<span title="Cambio relevante" style="color:#dc2626;font-weight:700">●</span> ' : '';
     const hi = m.relevante ? ' style="border-left:3px solid #dc2626;padding-left:8px"' : '';
+    // Cambios AÑO A AÑO (todo el historial) — cada salto con su dirección.
+    const flecha = (d) => d === 'empeora' ? '▲' : (d === 'mejora' ? '▼' : '→');
+    const cls = (d) => d === 'empeora' ? 'b-r' : (d === 'mejora' ? 'b-g' : 'b-n');
+    const cambios = (m.cambios && m.cambios.length)
+      ? `<div class="pe-diag-cambios" style="margin:4px 0;font-size:12px;color:#475569">Año a año: `
+        + m.cambios.map((c) => `<span class="badge ${cls(c.dir)}" style="margin:0 2px">${esc(c.de)}→${esc(c.a)} ${flecha(c.dir)}${c.deltaRel != null ? ` ${c.deltaRel > 0 ? '+' : ''}${esc(c.deltaRel)}%` : ''}</span>`).join('')
+        + `</div>`
+      : '';
+    // PROYECCIÓN de la tendencia (a dónde va al ritmo actual).
+    const proy = m.proyeccion
+      ? `<p class="pe-diag-rec" style="margin:2px 0 0"><b>Proyección</b> — ${esc(m.proyeccion.texto)}</p>`
+      : '';
     return `<details class="pe-diag-row"${m.relevante ? ' open' : ''}${hi}><summary>${rel}<span class="pe-diag-m">${esc(m.titulo)}</span> ${badge} ${accBadge} ${trendMarker(m)} ${div}</summary>`
+      + cambios + proy
       + `<p class="pe-diag-rec"><b>${esc(acc.etiqueta || 'Acción')} · criterio + diagnóstico</b> — ${esc(acc.texto || m.recomendacion)}</p></details>`;
   }).join('');
   const relevantes = analisis.filter((m) => m.relevante).map((m) => m.titulo);
@@ -473,7 +485,7 @@ function diagnosticoUnidadHtml(docs) {
     + '<span class="badge b-r">Correctiva</span> fuera de norma · '
     + '<span class="badge b-n">Diagnóstica</span> confirmar medición</p>';
   return '<section class="pe-diagnostico">'
-    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto vigente multi-norma + tendencia + acción</span></div>'
+    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto + cambios año a año + proyección + acción</span></div>'
     + `<div class="pe-diag-chips">${chips}</div>${aviso}<div class="pe-diag-list">${filas}</div>${leyenda}</section>`;
 }
 
@@ -558,104 +570,117 @@ async function onGenerarNarrativa() {
   }
 }
 
-/* ─── Vista consolidada: TODAS las pruebas en una gráfica ────────
- * Cada prueba se normaliza a "% de su límite normativo" (misma unidad para
- * todas → comparables en un solo eje): 100% = en el límite. El usuario elige
- * el AÑO (informe) y qué pruebas incluir; el rango del eje se AUTO-AJUSTA a las
- * pruebas seleccionadas. Es ADITIVA: no toca la calificación global ni el motor
- * del veredicto (reusa metricaPrueba + calificarPrueba). DRM se omite (su criterio
- * es una ventana de tiempo, no un límite único). */
-const LIM_CONSOLIDADO = Object.freeze({
-  tand:        { lim: 1,    unidad: '%',  label: 'Tan δ / FP devanados' },
-  bushing:     { lim: 1,    unidad: '%',  label: 'FP de bujes (C1)' },
-  excitacion:  { lim: 10,   unidad: '%',  label: 'Excitación · Δ fases' },
-  relacion:    { lim: 0.5,  unidad: '%',  label: 'Relación · desviación' },
-  resistencia: { lim: 2,    unidad: '%',  label: 'Resistencia · Δ fases' },
-  aislamiento: { lim: null, unidad: 'GΩ', label: 'Aislamiento (IR)' }, // límite = mínimo NETA por clase
-  collar:      { lim: 100,  unidad: 'mW', label: 'Collar / bujes' }
-});
-const ORDEN_CONSOLIDADO = ['tand', 'bushing', 'excitacion', 'relacion', 'resistencia', 'aislamiento', 'collar'];
-const COLOR_ESTADO = { 'b-g': '#16a34a', 'b-a': '#d97706', 'b-o': '#ea580c', 'b-r': '#dc2626', 'b-n': '#94a3b8' };
+/* ─── Vista MULTI-AÑO: cada prueba con TODOS los INFORMES superpuestos ───────
+ * Una gráfica por prueba; superpone TODOS los INFORMES del libro CONSERVANDO las
+ * fases (una línea por informe×fase, valores REALES sin reducir → no degrada ni
+ * distorsiona). Clave = el INFORME (no el año): dos ensayos del MISMO año NO se
+ * colapsan (serie 450108 tiene 2 en 2021). Filtros: INFORME **global** (chips
+ * arriba con la fecha, aplican a TODAS las pruebas del libro) + FASE **por
+ * gráfica**. Color por INFORME (consistente entre gráficas). ADITIVA: NO toca la
+ * calificación global ni el motor (reusa `svgBloque` + `bloquesMultiAno`). */
+const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777', '#0f766e', '#9333ea'];
 
-function renderConsolidado(informes) {
+function montarMultiAno() {
   const cont = $('pe-consolidado');
   if (!cont) return;
-  const docs = (informes || []).filter((i) => i && !i._seed).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
-  if (!docs.length) { cont.innerHTML = '<p class="muted small">Sin informes para graficar.</p>'; return; }
-  // Selección persistente entre re-renders (onSnapshot re-llama esta función).
-  const sel = state.consolidadoSel || (state.consolidadoSel = { ano: null, tests: null });
-  if (sel.ano == null || !docs.some((d) => d.ano === sel.ano)) sel.ano = docs[docs.length - 1].ano;
-  if (!(sel.tests instanceof Set)) sel.tests = new Set(ORDEN_CONSOLIDADO);
-  const inf = docs.find((d) => d.ano === sel.ano) || docs[docs.length - 1];
-  const minNeta = minNetaGohm(kvDeInforme(inf));
-
-  const filas = ORDEN_CONSOLIDADO.map((key) => {
-    const def = LIM_CONSOLIDADO[key];
-    const lim = key === 'aislamiento' ? minNeta : def.lim;
-    const val = metricaPrueba(key, inf);
-    const on = sel.tests.has(key);
-    const pct = (val != null && lim) ? +(val / lim * 100).toFixed(1) : null;
-    const estado = pct != null ? calificarPrueba(key, inf, { minNeta }).estado : null;
-    return { key, def, lim, val, pct, estado, on };
-  });
-  const visibles = filas.filter((f) => f.on && f.pct != null);
-  const maxPct = Math.max(110, ...visibles.map((f) => f.pct));   // rango auto-ajustable
-  const lineLeft = +(100 / maxPct * 100).toFixed(1);             // posición del límite (100%)
-
-  const anos = docs.map((d) => d.ano).filter((a) => a != null);
-  const selAno = `<label style="font-size:13px;color:#334155">Año del informe&nbsp;`
-    + `<select data-consol-ano style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">`
-    + anos.map((a) => `<option value="${esc(a)}"${a === sel.ano ? ' selected' : ''}>${esc(a)}</option>`).join('')
-    + `</select></label>`;
-  const chips = filas.map((f) => {
-    const activo = f.on;
-    const tieneDato = f.pct != null;
-    const bg = activo ? (tieneDato ? '#0f172a' : '#64748b') : '#fff';
-    const col = activo ? '#fff' : '#334155';
-    const extra = tieneDato ? '' : ' · sin dato';
-    return `<button type="button" data-consol-test="${esc(f.key)}" `
-      + `style="padding:4px 10px;border:1px solid #cbd5e1;border-radius:999px;font-size:12px;cursor:pointer;background:${bg};color:${col}">`
-      + `${esc(f.def.label)}${extra}</button>`;
-  }).join('');
-
-  const barras = filas.filter((f) => f.on).map((f) => {
-    const sinDato = f.pct == null;
-    const color = sinDato ? '#cbd5e1' : (COLOR_ESTADO[f.estado.clase] || '#94a3b8');
-    const w = sinDato ? 0 : Math.min(100, +(f.pct / maxPct * 100).toFixed(1));
-    const valor = sinDato
-      ? '<span style="color:#94a3b8">No realizada</span>'
-      : `${esc(f.val)} ${esc(f.def.unidad)} · <b>${esc(f.pct)}%</b> del límite`;
-    return `<div style="display:flex;align-items:center;gap:10px">`
-      + `<span style="width:170px;min-width:170px;font-size:12px;color:#334155">${esc(f.def.label)}</span>`
-      + `<div style="flex:1;background:#f1f5f9;border-radius:6px;height:22px;position:relative;overflow:hidden">`
-      +   `<div style="width:${w}%;background:${color};height:100%;border-radius:6px 0 0 6px"></div>`
-      +   `<div style="position:absolute;top:0;bottom:0;left:${lineLeft}%;width:2px;background:#0f172a;opacity:.45" title="Límite (100%)"></div>`
-      + `</div>`
-      + `<span style="width:170px;min-width:170px;font-size:12px;color:#0f172a;text-align:right">${valor}</span>`
-      + `</div>`;
-  }).join('');
-
-  cont.innerHTML =
-    `<div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:10px">${selAno}`
-    + `<div style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div></div>`
-    + `<div style="display:flex;flex-direction:column;gap:8px">${barras || '<p class="muted small">Selecciona al menos una prueba con datos.</p>'}</div>`
-    + `<p class="muted small" style="margin-top:10px">Cada barra es el valor de la prueba como <b>% de su límite</b> (línea = 100% = en el límite); color = veredicto multi-norma. El eje se ajusta a las pruebas seleccionadas. Informe ${esc(inf.ano || 's/a')} · clase ${esc(kvDeInforme(inf) || '—')} kV.</p>`;
-
-  if (!cont._consolWired) {
-    cont._consolWired = true;
-    cont.addEventListener('change', (e) => {
-      const s = e.target.closest('[data-consol-ano]');
-      if (s) { state.consolidadoSel.ano = Number(s.value); renderConsolidado(state.informes); }
-    });
-    cont.addEventListener('click', (e) => {
-      const b = e.target.closest('[data-consol-test]');
-      if (!b) return;
-      const k = b.getAttribute('data-consol-test');
-      const setT = state.consolidadoSel.tests;
-      if (setT.has(k)) setT.delete(k); else setT.add(k);
-      renderConsolidado(state.informes);
-    });
+  const docs = (state.informes || []).filter((i) => i && i.id && !i._seed)
+    .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const items = docs.map((inf) => {
+    const d = state.bloquesCache.get(inf.id);
+    return { ano: inf.ano, fecha: inf.fecha, id: inf.id, bloques: (d && d.bloques) || [] };
+  }).filter((it) => it.bloques.length);
+  const bloques = bloquesMultiAno(items);
+  if (!bloques.length) {
+    cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
+    return;
   }
+  // TODOS los informes presentes en el libro (filtro GLOBAL). Identidad = _rep
+  // (no el año → no colapsa dos del mismo año); etiqueta = fecha/año; color fijo por informe.
+  const repInfo = new Map();
+  for (const b of bloques) for (const s of b.series) if (!repInfo.has(s._rep)) repInfo.set(s._rep, { label: s._repLabel, ano: s._ano });
+  const repsAll = [...repInfo.keys()].sort((a, c) => {
+    const A = repInfo.get(a), C = repInfo.get(c);
+    return (Number(A.ano) || 0) - (Number(C.ano) || 0) || String(A.label).localeCompare(String(C.label));
+  });
+  const colorRep = (r) => COLORES_ANO[Math.max(0, repsAll.indexOf(r)) % COLORES_ANO.length];
+  if (!(state.multiAnoReps instanceof Set) || ![...state.multiAnoReps].every((r) => repsAll.includes(r)) || !state.multiAnoReps.size)
+    state.multiAnoReps = new Set(repsAll);
+  const selR = state.multiAnoReps;
+
+  cont.innerHTML = '';
+  const intro = document.createElement('p');
+  intro.className = 'muted small'; intro.style.margin = '0 0 6px';
+  intro.innerHTML = `Cada gráfica es una prueba con <b>todos los informes superpuestos</b> (una línea por fase de cada informe, `
+    + `valores reales; color por informe). ${repsAll.length} informe(s) en el libro. Filtra por <b>informe</b> abajo `
+    + `(aplica a TODAS las pruebas) y por <b>fase</b> en cada gráfica.`;
+  cont.appendChild(intro);
+
+  const gbar = document.createElement('div');
+  gbar.className = 'pe-fase-chips';
+  gbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
+  gbar.appendChild(Object.assign(document.createElement('span'),
+    { textContent: 'Informes (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
+  const host = document.createElement('div');
+
+  const pintarTodo = () => {
+    host.innerHTML = '';
+    for (const b of bloques) {
+      const fases = [...new Set(b.series.map((s) => s._fase).filter(Boolean))];
+      if (!b._selF) b._selF = new Set(fases);
+      const selF = b._selF;
+      const wrap = document.createElement('div'); wrap.className = 'pe-bloque-grupo';
+      const h = document.createElement('h3'); h.textContent = b.titulo;
+      wrap.appendChild(h);
+      const chartBox = document.createElement('div'); chartBox.className = 'chartbox';
+      const repintar = () => {
+        chartBox.innerHTML = '';
+        const series = b.series
+          .filter((s) => selR.has(s._rep) && (!fases.length || selF.has(s._fase)))
+          .map((s) => ({ ...s, color: colorRep(s._rep) }));
+        const svg = series.length ? svgBloque({ ...b, series }) : null;
+        if (svg) chartBox.appendChild(svg);
+        else chartBox.innerHTML = '<p class="muted small">Sin series para los filtros activos.</p>';
+      };
+      if (fases.length > 1) {
+        const fbar = document.createElement('div');
+        fbar.className = 'pe-fase-chips';
+        fbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px';
+        fbar.appendChild(Object.assign(document.createElement('span'),
+          { textContent: 'Fases:', style: 'font-size:12px;color:#475569' }));
+        fases.forEach((f) => {
+          const btn = document.createElement('button'); btn.type = 'button';
+          btn.className = 'pe-fase-chip' + (selF.has(f) ? ' is-on' : '');
+          btn.textContent = f;
+          btn.addEventListener('click', () => {
+            if (selF.has(f)) { if (selF.size > 1) selF.delete(f); } else selF.add(f);
+            btn.classList.toggle('is-on', selF.has(f)); repintar();
+          });
+          fbar.appendChild(btn);
+        });
+        wrap.appendChild(fbar);
+      }
+      wrap.appendChild(chartBox);
+      host.appendChild(wrap);
+      repintar();
+    }
+  };
+
+  repsAll.forEach((r) => {
+    const info = repInfo.get(r) || {};
+    const btn = document.createElement('button'); btn.type = 'button';
+    btn.className = 'pe-fase-chip' + (selR.has(r) ? ' is-on' : '');
+    btn.textContent = info.label || r;
+    btn.title = `Informe ${info.label || r}`;
+    btn.style.setProperty('--c', colorRep(r));
+    btn.addEventListener('click', () => {
+      if (selR.has(r)) { if (selR.size > 1) selR.delete(r); } else selR.add(r);
+      btn.classList.toggle('is-on', selR.has(r)); pintarTodo();
+    });
+    gbar.appendChild(btn);
+  });
+  cont.appendChild(gbar);
+  cont.appendChild(host);
+  pintarTodo();
 }
 
 function renderInformesUI(informes) {
@@ -668,10 +693,6 @@ function renderInformesUI(informes) {
   // errores de mapeo rígido — ADR-007 / rediseño). Las secciones de detalle
   // rígidas se retiraron: el cuerpo del informe son los bloques.
   renderMatriz($('matrix'), state.informes, { minNeta: minNetaGohm(kvUnidadActiva()) });
-
-  // Vista consolidada: todas las pruebas en una gráfica (% del límite), con
-  // selector de año + pruebas y rango auto-ajustable. Aditiva (no toca la matriz).
-  renderConsolidado(state.informes);
 
   // Tendencia temporal (multi-informe): evolución de la métrica clave de cada
   // prueba vs su umbral. Determinista desde los campos canónicos (no IA).
@@ -802,33 +823,11 @@ async function montarBloques(unidadId, informes) {
     if (enc) cont.insertBefore(enc, cont.firstChild);
   }
 
-  // Filtro de AÑO para las gráficas detalladas: toggle de visibilidad de los
-  // grupos por año (no re-renderiza ni toca el scorecard ni la calificación
-  // global). Solo si hay >1 año con gráficas. Selección persistente.
-  const anosBloque = [...new Set(
-    cont.querySelectorAll('.pe-bloque-grupo'))]
-    .map((g) => g.getAttribute('data-bloque-ano')).filter((a) => a);
-  if (anosBloque.length > 1) {
-    const sel = (state.bloquesAnoFiltro && anosBloque.includes(String(state.bloquesAnoFiltro)))
-      ? String(state.bloquesAnoFiltro) : 'todos';
-    const bar = document.createElement('div');
-    bar.style.cssText = 'margin-bottom:10px;font-size:13px;color:#334155';
-    bar.innerHTML = 'Año del informe&nbsp;<select data-bloques-ano '
-      + 'style="padding:4px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:13px">'
-      + `<option value="todos"${sel === 'todos' ? ' selected' : ''}>Todos</option>`
-      + anosBloque.map((a) => `<option value="${esc(a)}"${sel === a ? ' selected' : ''}>${esc(a)}</option>`).join('')
-      + '</select>';
-    cont.insertBefore(bar, cont.firstChild);
-    const aplicar = (ano) => cont.querySelectorAll('.pe-bloque-grupo').forEach((g) => {
-      const a = g.getAttribute('data-bloque-ano');
-      g.style.display = (!ano || ano === 'todos' || a === ano) ? '' : 'none';
-    });
-    aplicar(sel);
-    bar.querySelector('[data-bloques-ano]').addEventListener('change', (e) => {
-      state.bloquesAnoFiltro = e.target.value;
-      aplicar(e.target.value);
-    });
-  }
+  // Vista MULTI-AÑO (cada prueba con todos los años superpuestos): se monta aquí
+  // porque necesita las curvas ya cargadas en `state.bloquesCache`. El filtro de
+  // año va POR PRUEBA (chips de la leyenda de cada gráfica), no un dropdown global
+  // que dejaba años vacíos.
+  montarMultiAno();
 
   // Scorecard. Con UN solo informe → derivado de la lectura IA (fiel, sin los
   // errores del mapeo rígido). Con VARIOS → se conserva la matriz canónica
