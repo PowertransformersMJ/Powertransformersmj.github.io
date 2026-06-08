@@ -307,11 +307,21 @@ function extraDevKey(series) {
 }
 
 /* ─── Tabla de detalle del bloque ────────────────────────────── */
+// Quita columnas de VEREDICTO ("Evaluación"/"Eval"/"Calificación") que la IA o
+// el informe incluyan: el veredicto es del panel multi-norma (valor vs cada
+// norma + consolidado), NUNCA un "OK" por fila no normativo (L-36/L-42). La
+// tabla muestra DATOS medidos (incluida la Desviación %, que es un dato).
+const COL_VERDICTO = /evaluaci|calificaci|veredicto|^\s*eval\.?\s*$/i;
 function tablaBloque(tabla) {
   if (!tabla || (!tabla.filas.length && !tabla.columnas.length)) return '';
-  const head = tabla.columnas.length
-    ? `<thead><tr>${tabla.columnas.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead>` : '';
-  const body = `<tbody>${tabla.filas.map((f) => `<tr>${f.map((c) => `<td class="num">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
+  const cols = tabla.columnas || [];
+  const drop = cols.map((c, i) => (COL_VERDICTO.test(String(c)) ? i : -1)).filter((i) => i >= 0);
+  const quitar = (arr) => arr.filter((_, i) => !drop.includes(i));
+  const columnas = drop.length ? quitar(cols) : cols;
+  const filas = drop.length ? (tabla.filas || []).map(quitar) : (tabla.filas || []);
+  const head = columnas.length
+    ? `<thead><tr>${columnas.map((c) => `<th>${esc(c)}</th>`).join('')}</tr></thead>` : '';
+  const body = `<tbody>${filas.map((f) => `<tr>${f.map((c) => `<td class="num">${esc(c)}</td>`).join('')}</tr>`).join('')}</tbody>`;
   return `<div class="tblwrap"><table class="dt">${head}${body}</table></div>`;
 }
 
