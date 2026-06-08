@@ -80,7 +80,8 @@
 | §20 | ADR-020 — RETIRO de "Reprocesar" (costo > valor; re-extraer = re-subir). CF queda solo-CARGA; se conserva la robustez de transporte | 440 |
 | §21 | ADR-021 — Previsualización al colisionar por fecha: comparar "ya guardado" vs "nuevo" (+ abrir PDF) antes de reemplazar | 462 |
 | §22 | ADR-022 — Calificación global muestra TODAS las pruebas (no oculta/fusiona, FP bujes separado) + Tendencia con acción clasificada (predictiva/preventiva/correctiva) | 480 |
-| §23 | ADR-023 — Tablero: vista CONSOLIDADA (todas las pruebas en una gráfica, % del límite, selector + rango auto) + filtro de año | 500 |
+| §23 | ADR-023 — Tablero: vista CONSOLIDADA % del límite (SUPERSEDED por ADR-024 — mala interpretación) | 500 |
+| §24 | ADR-024 — Tablero MULTI-AÑO: cada prueba con todos los años superpuestos + filtro de año por prueba; **workflow de PREVIEW** (dev-server + harness) | 518 |
 
 ---
 

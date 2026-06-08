@@ -291,3 +291,79 @@ export function derivarBushing(bloques) {
     dc1_max_pct: dc1Max != null ? +dc1Max.toFixed(3) : null
   };
 }
+
+// Familias de prueba para la vista MULTI-AÑO (clave canónica + dirección del
+// "peor caso" + si su gráfica es de barras). `inv:true` = peor es el MÍNIMO
+// (aislamiento: bajar es malo); el resto, peor = MÁXIMO.
+const FAMILIAS_MA = [
+  { key: 'tand',        re: /tan|fp.*(devan|aisl|transform)|factor de potencia(?!.*buje)/i, inv: false },
+  { key: 'bushing',     re: /bushing|buje/i,                inv: false },
+  { key: 'excitacion',  re: /excitaci/i,                    inv: false },
+  { key: 'relacion',    re: /relaci/i,                      inv: false },
+  { key: 'resistencia', re: /resist.*(devan|arroll)|^resistencia/i, inv: false },
+  { key: 'aislamiento', re: /aislamiento|megado|\bIR\b/i,   inv: true },
+  { key: 'collar',      re: /collar/i,                      inv: false }
+];
+
+function familiaMA(bloque) {
+  const p = String((bloque && (bloque.prueba || bloque.titulo)) || '').toLowerCase();
+  // Coincidencia directa por clave canónica primero.
+  const directa = FAMILIAS_MA.find((f) => f.key === p);
+  if (directa) return directa;
+  return FAMILIAS_MA.find((f) => f.re.test(p)) || null;
+}
+
+// Serie REPRESENTATIVA de un bloque (un valor por X): el PEOR de todas sus fases
+// en cada X (máx, o mín si `inv`). Así cada AÑO queda en UNA línea comparable.
+function serieRepresentativa(bloque, inv) {
+  const porX = new Map();
+  for (const s of (bloque.series || [])) {
+    for (const p of (s.puntos || [])) {
+      if (p == null || p.x == null || typeof p.y !== 'number') continue;
+      const k = String(p.x);
+      const cur = porX.get(k);
+      if (cur == null) porX.set(k, { x: p.x, y: p.y });
+      else cur.y = inv ? Math.min(cur.y, p.y) : Math.max(cur.y, p.y);
+    }
+  }
+  return [...porX.values()];
+}
+
+/**
+ * Construye, por FAMILIA de prueba, UN bloque cuyas series son los AÑOS (una
+ * línea por informe) → "todas las pruebas con todos los años superpuestos".
+ * Cada año se reduce a su curva representativa (peor fase por X). El render
+ * genérico (mountBloques) ya da los chips para filtrar años POR PRUEBA.
+ * @param {Array<{ano:(number|null), bloques:Array}>} items informes con sus bloques ya cargados
+ * @returns {Array<object>} bloques multi-año (uno por familia con datos)
+ */
+export function bloquesMultiAno(items) {
+  const fam = new Map();
+  for (const it of (Array.isArray(items) ? items : [])) {
+    const ano = it && it.ano;
+    for (const b of ((it && it.bloques) || [])) {
+      const f = familiaMA(b);
+      if (!f) continue;
+      const pts = serieRepresentativa(b, f.inv);
+      if (!pts.length) continue;
+      if (!fam.has(f.key)) {
+        fam.set(f.key, {
+          prueba: f.key, titulo: b.titulo || f.key, unidad: b.unidad || '',
+          eje_x: b.eje_x || '', grafica: b.grafica === 'barra' ? 'barra' : 'linea',
+          limite: b.limite != null ? b.limite : null, guia: b.guia != null ? b.guia : null,
+          inv: f.inv, _anos: []
+        });
+      }
+      fam.get(f.key)._anos.push({ ano, puntos: pts });
+    }
+  }
+  return [...fam.values()]
+    .map((g) => {
+      const series = g._anos
+        .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0))
+        .map((a) => ({ nombre: a.ano != null ? String(a.ano) : 's/a', puntos: a.puntos }));
+      const { _anos, inv, ...resto } = g;
+      return { ...resto, series };
+    })
+    .filter((b) => b.series.length);
+}

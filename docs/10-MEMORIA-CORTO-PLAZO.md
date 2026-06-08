@@ -94,13 +94,15 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-022 + ADR-023 (pedido director, 3 partes COMPLETAS, frontend; valida en navegador)**: (P1) la
-  **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato (`return null`) → el FP de bujes
-  "desaparecía" (su queja); ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto
-  INTACTO.** (D) **Tendencia**: `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica (sensible a deriva) +
-  resalta relevantes. (3.ª) **Vista consolidada** del Tablero (`renderConsolidado` #pe-consolidado): todas las pruebas en una
-  gráfica = **% de su límite**, color = veredicto multi-norma, selector año+pruebas, **rango auto-ajustable** + **filtro de año**
-  en bloques. ADITIVO. 1105/1105 verde. 🚫 **NO romper la calificación global** (memoria `feedback_calificacion_global_por_prueba.md`).
+- **2026-06-08** — **ADR-022 (P1+Tendencia) + ADR-024 (multi-año), pedido del director (frontend; valida en navegador)**:
+  (P1) **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato → el FP de bujes "desaparecía";
+  ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto INTACTO.** (Tendencia)
+  `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica + resalta relevantes. **(Tablero MULTI-AÑO, ADR-024 —
+  corrige la mala interpretación de barras de ADR-023)**: por PRUEBA, una gráfica con una LÍNEA por AÑO superpuestas + **chips de
+  año por prueba** (`bloquesMultiAno` dominio + `montarMultiAno` shell). **Validado con WORKFLOW DE PREVIEW** (`scripts/dev-server.mjs`
+  + `.claude/launch.json` + `_dev/preview-multiano.html` + Claude Preview MCP) — atrapó que la leyenda SVG no filtraba (L-49).
+  1110/1110 verde. 🚫 **NO romper la calificación global** (memoria `feedback_calificacion_global_por_prueba.md`).
+  ⚙️ **Preview workflow disponible** para validar UI: `preview_start name:static` → `preview_eval`/`preview_screenshot` (L-49).
 - **2026-06-08** — **ADR-020 RETIRO de "Reprocesar"** (costo > valor; re-extraer = re-subir): se quitó el botón + handler +
   el modo-reproceso de la CF (queda **solo-CARGA**) + **ADR-021 previsualización al colisionar por fecha** (modal
   `confirmarUpsert`: "ya guardado" vs "nuevo" + abrir PDF → reemplazar/crear-nuevo, no un `confirm` ciego). 1099/1099 verde.

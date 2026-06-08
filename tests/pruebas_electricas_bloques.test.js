@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import {
   sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION,
-  quitarColumnasVeredicto, derivarBushing
+  quitarColumnasVeredicto, derivarBushing, bloquesMultiAno
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -245,5 +245,64 @@ describe('derivarBushing · FP canónico (peor tan δ + peor ΔC1 vs placa) — 
     ] }] }]);
     assert.equal(r.fp_max_pct, 0.4);
     assert.equal(r.dc1_max_pct, null);
+  });
+});
+
+describe('bloquesMultiAno · una serie por AÑO por prueba (todos los años superpuestos)', () => {
+  const inf = (ano, bloques) => ({ ano, bloques });
+  const exc = (vals) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación', unidad: 'mA', eje_x: 'TAP', grafica: 'linea', limite: 30,
+    series: [{ nombre: 'Fase A', puntos: vals.map((y, i) => ({ x: i + 1, y })) }] });
+
+  test('agrupa por familia: cada año → una serie (nombre = año), ordenadas asc', () => {
+    const out = bloquesMultiAno([
+      inf(2023, [exc([20, 21])]),
+      inf(2021, [exc([18, 19])])
+    ]);
+    assert.equal(out.length, 1);
+    const b = out[0];
+    assert.equal(b.prueba, 'excitacion');
+    assert.equal(b.series.length, 2);
+    assert.deepEqual(b.series.map((s) => s.nombre), ['2021', '2023']); // orden asc
+    assert.equal(b.limite, 30);
+    assert.deepEqual(b.series[1].puntos, [{ x: 1, y: 20 }, { x: 2, y: 21 }]);
+  });
+
+  test('serie representativa = PEOR fase por X (máx por defecto)', () => {
+    const multi = { prueba: 'excitacion', titulo: 'Exc', unidad: 'mA', grafica: 'linea',
+      series: [
+        { nombre: 'A', puntos: [{ x: 1, y: 10 }, { x: 2, y: 12 }] },
+        { nombre: 'B', puntos: [{ x: 1, y: 15 }, { x: 2, y: 9 }] }
+      ] };
+    const out = bloquesMultiAno([{ ano: 2022, bloques: [multi] }]);
+    assert.deepEqual(out[0].series[0].puntos, [{ x: 1, y: 15 }, { x: 2, y: 12 }]); // peor (máx) por X
+  });
+
+  test('aislamiento: peor = MÍNIMO (bajar es malo)', () => {
+    const ais = { prueba: 'aislamiento', titulo: 'IR', unidad: 'GΩ', grafica: 'barra',
+      series: [
+        { nombre: 'CH', puntos: [{ x: 'AT-T', y: 30 }] },
+        { nombre: 'CL', puntos: [{ x: 'AT-T', y: 12 }] }
+      ] };
+    const out = bloquesMultiAno([{ ano: 2022, bloques: [ais] }]);
+    assert.equal(out[0].series[0].puntos[0].y, 12); // mínimo (peor) en aislamiento
+  });
+
+  test('varias familias en distintos años; ignora bloques sin familia reconocida', () => {
+    const rel = { prueba: 'relacion', titulo: 'Relación', unidad: '%', grafica: 'linea',
+      series: [{ nombre: 'A', puntos: [{ x: 1, y: 0.2 }] }] };
+    const desconocido = { prueba: 'sfra', titulo: 'SFRA', series: [{ nombre: 'x', puntos: [{ x: 1, y: 1 }] }] };
+    const out = bloquesMultiAno([
+      inf(2020, [exc([18]), rel]),
+      inf(2022, [exc([20]), desconocido])
+    ]);
+    const claves = out.map((b) => b.prueba).sort();
+    assert.deepEqual(claves, ['excitacion', 'relacion']); // sfra ignorado
+    assert.equal(out.find((b) => b.prueba === 'excitacion').series.length, 2);
+  });
+
+  test('entrada vacía / basura no rompe', () => {
+    assert.deepEqual(bloquesMultiAno([]), []);
+    assert.deepEqual(bloquesMultiAno(null), []);
+    assert.doesNotThrow(() => bloquesMultiAno([{ ano: 2020, bloques: null }, {}]));
   });
 });

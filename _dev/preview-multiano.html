@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Multi-año por prueba (función real)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+<h1>DEV · Cada prueba con TODOS los años (función REAL bloquesMultiAno → mountBloques)</h1>
+<div id="pe-consolidado"></div>
+
+<script type="module">
+import { renderBloque } from '../assets/js/ui/pruebas/grafico-generico.js';
+import { bloquesMultiAno } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+// Mock de informes con sus bloques (como salen de la IA: por fase). bloquesMultiAno
+// los agrupa por prueba con una serie por año (peor fase por X).
+const fase = (base, n, drift) => ({ puntos: Array.from({ length: n }, (_, i) => ({ x: i + 1, y: +(base + i * 0.4 + drift).toFixed(2) })) });
+const excit = (drift) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación', unidad: 'mA', eje_x: 'Posición del TAP', grafica: 'linea', limite: 30,
+  series: [{ nombre: 'Fase A', ...fase(18, 9, drift) }, { nombre: 'Fase B', ...fase(11, 9, drift) }, { nombre: 'Fase C', ...fase(18.5, 9, drift) }] });
+const relac = (drift) => ({ prueba: 'relacion', titulo: 'Relación de transformación · desviación', unidad: '%', eje_x: 'Posición del TAP', grafica: 'linea', limite: 0.5, guia: 0.3,
+  series: [{ nombre: 'Fase A', ...fase(0.1, 9, drift * 0.05) }] });
+const aisla = (drift) => ({ prueba: 'aislamiento', titulo: 'Resistencia de aislamiento', unidad: 'GΩ', eje_x: 'Configuración', grafica: 'barra', limite: 30,
+  series: [{ nombre: 'CH', puntos: [{ x: 'AT-T', y: 42 - drift }, { x: 'MT-T', y: 38 - drift }] }] });
+
+const informes = [
+  { ano: 2019, bloques: [excit(0), relac(0), aisla(0)] },
+  { ano: 2021, bloques: [excit(0.7), relac(0.6), aisla(3)] },
+  { ano: 2023, bloques: [excit(1.5), relac(1.4), aisla(7)] }
+];
+
+const cont = document.getElementById('pe-consolidado');
+const bloques = bloquesMultiAno(informes);
+cont.innerHTML = '<p class="muted small" style="margin:0 0 8px">Cada gráfica es una prueba; chips de Años = filtro por prueba.</p>';
+for (const b of bloques) {
+  const anos = b.series.map((s) => s.nombre);
+  const activos = new Set(anos);
+  const wrap = document.createElement('div'); wrap.className = 'pe-bloque-grupo';
+  const bar = document.createElement('div'); bar.className = 'pe-fase-chips';
+  bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px';
+  bar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Años:', style: 'font-size:12px;color:#475569' }));
+  const card = document.createElement('div');
+  const pintar = () => { card.innerHTML = ''; card.appendChild(renderBloque({ ...b, series: b.series.filter((s) => activos.has(s.nombre)) })); };
+  anos.forEach((a) => {
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pe-fase-chip is-on'; btn.textContent = a;
+    btn.addEventListener('click', () => { if (activos.has(a)) { if (activos.size > 1) activos.delete(a); } else activos.add(a); btn.classList.toggle('is-on', activos.has(a)); pintar(); });
+    bar.appendChild(btn);
+  });
+  wrap.appendChild(bar); wrap.appendChild(card); cont.appendChild(wrap); pintar();
+}
+window.__ready = true;
+</script>
+</body>
+</html>
