@@ -127,6 +127,13 @@ function kvUnidadActiva() {
   const u = state.unidadActiva || {};
   return kvAT(u.tensiones || (u.identidad && u.identidad.tensiones));
 }
+// Tensión AT (kV) de UN informe: prioriza la placa CONGELADA del informe (config
+// móvil: cada despliegue su tensión); cae a la de la unidad activa. Así los
+// bloques de cada informe se evalúan contra SU clase de tensión.
+function kvDeInforme(inf) {
+  const k = inf && inf.identidad && kvAT(inf.identidad.tensiones);
+  return (k != null) ? k : kvUnidadActiva();
+}
 
 /* ─── Seed: unidad + 3 informes base (datos reales históricos) ─── */
 // La capa de datos emite [] cuando Firebase no está activo ("solo datos
@@ -429,7 +436,9 @@ function trendMarker(m) {
   return `<span class="pe-diag-trend ${cls}">${arrow} ${m.tendencia}${d}</span>`;
 }
 function diagnosticoUnidadHtml(docs) {
-  const analisis = analisisTendencia(docs, { minClase: minNetaGohm(kvUnidadActiva()) });
+  // El veredicto vigente usa la clase del informe MÁS RECIENTE (su placa).
+  const vigente = (docs || []).slice().sort((a, b) => (a.ano || 0) - (b.ano || 0)).pop();
+  const analisis = analisisTendencia(docs, { minClase: minNetaGohm(kvDeInforme(vigente)) });
   if (!analisis.length) return '';
   const cuenta = analisis.reduce((a, m) => {
     const c = m.estado ? m.estado.clase : 'b-n'; a[c] = (a[c] || 0) + 1; return a;
@@ -613,7 +622,7 @@ async function montarBloques(unidadId, informes) {
     grupo.appendChild(h);
     if (tieneBloques) {
       const box = document.createElement('div');
-      mountBloques(box, conCriterios(data, kvUnidadActiva()));
+      mountBloques(box, conCriterios(data, kvDeInforme(inf)));
       grupo.appendChild(box);
     } else {
       const vacio = document.createElement('p');
@@ -646,7 +655,7 @@ async function montarBloques(unidadId, informes) {
     // discrimina cada prueba — incluido el FP de bujes (C1) aparte del FP del
     // transformador. La evolución multi-año vive en la pestaña Tendencia.
     // Enriquecido (no crudo) → refleja la recalificación normativa (NETA por clase).
-    renderScorecard($('matrix'), conCriterios(state.bloquesCache.get(vigente.id), kvUnidadActiva()), vigente);
+    renderScorecard($('matrix'), conCriterios(state.bloquesCache.get(vigente.id), kvDeInforme(vigente)), vigente);
   }
 }
 
@@ -659,10 +668,17 @@ const TIPOS_PRUEBA_LBL = {
 };
 function encabezadoInforme(inf) {
   if (!inf) return null;
+  const id = inf.identidad || {};
+  const config = (id.tensiones || id.grupo_conexion)
+    ? [id.tensiones, id.grupo_conexion].filter(Boolean).join(' · ')
+    : '';
   const campos = [
     ['Ensayo', TIPOS_PRUEBA_LBL[inf.tipo_prueba] || inf.tipo_prueba],
     ['Ejecutó', inf.ejecutante],
     ['Instrumento', inf.equipo],
+    // Config del informe (trafo móvil: placa por despliegue, p.ej. "110/34.5/13.8 kV · YNyn0yn0").
+    ['Config', config],
+    ['Subestación', id.subestacion],
     ['Fecha', inf.fecha || (inf.ano ? String(inf.ano) : '')]
   ].filter(([, v]) => v);
   if (!campos.length) return null;
@@ -705,7 +721,7 @@ function renderScorecard(cont, data, inf) {
   if (!cont) return;
   const bloques = (data && data.bloques) || [];
   if (!bloques.length) return; // sin bloques: conserva el fallback canónico
-  const kv = kvUnidadActiva();
+  const kv = kvDeInforme(inf); // clase del PROPIO informe (config móvil)
   const minNeta = minNetaGohm(kv);
   const filas = FAMILIAS_SCORE.map((fam) => {
     const r = (fam.key === 'bushing')
@@ -915,6 +931,7 @@ async function onClickReportlist(ev) {
         ano: mediciones.ano != null ? mediciones.ano : inf.ano,
         fecha: mediciones.fecha || inf.fecha,
         bushing: derivarBushing(bloquesIA),
+        identidad: mediciones.unidad || inf.identidad,
         pdf: { ...inf.pdf, estado: 'extraido_ia' }
       });
       await actualizarInforme(unidadId, informeId, parche);
@@ -1636,6 +1653,8 @@ async function storeReport() {
           // FP de bujes canónico (la IA solo lo trae en el bloque): se deriva el
           // peor tan δ y la peor ΔC1 vs placa → discrimina bujes del transformador.
           bushing: derivarBushing(bloquesIA),
+          // Placa CONGELADA del informe (config móvil: cada despliegue su placa).
+          identidad: mediciones.unidad,
           pdf: pdfMeta ? { ...pdfMeta, estado } : undefined
         });
         // Upsert por fecha/año: si ya existe el MISMO informe, preguntar si

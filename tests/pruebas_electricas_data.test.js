@@ -170,6 +170,29 @@ describe('calificarPrueba aislamiento NETA por clase de tensión (opts.minNeta)'
   });
 });
 
+describe('aislamiento usa la CLASE del PROPIO informe (placa congelada · trafo móvil)', () => {
+  // Mismo serie, 2 configs: 110 kV (clase 115 → 30 GΩ) vs 63.5 kV (clase 69 → 25 GΩ).
+  test('config 110 kV (Wye): 18 GΩ < 30 → investigar', () => {
+    const inf = { aislamiento: [{ gohm: 18 }], identidad: { tensiones: '110 / 34.5 / 13.8 kV' } };
+    assert.equal(calificarPrueba('aislamiento', inf).estado.clase, 'b-o');
+  });
+  test('config 63.5 kV (Delta): 18 GΩ < 25 → investigar (clase 69, no 115)', () => {
+    const inf = { aislamiento: [{ gohm: 18 }], identidad: { tensiones: '63.5 / 13.8 kV' } };
+    assert.equal(calificarPrueba('aislamiento', inf).estado.clase, 'b-o');
+  });
+  test('config 63.5 kV: 26 GΩ ≥ 25 → dentro de norma (pero a 110 kV sería investigar)', () => {
+    const inf63 = { aislamiento: [{ gohm: 26 }], identidad: { tensiones: '63.5 / 13.8 kV' } };
+    const inf110 = { aislamiento: [{ gohm: 26 }], identidad: { tensiones: '110 / 34.5 / 13.8 kV' } };
+    assert.equal(calificarPrueba('aislamiento', inf63).estado.clase, 'b-g');  // ≥25
+    assert.equal(calificarPrueba('aislamiento', inf110).estado.clase, 'b-o'); // <30
+  });
+  test('la identidad del informe MANDA sobre opts.minNeta (clase de la unidad)', () => {
+    // Informe 63.5 kV (25 GΩ) aunque la unidad esté en 110 kV (opts 30): usa 25.
+    const inf = { aislamiento: [{ gohm: 26 }], identidad: { tensiones: '63.5 / 13.8 kV' } };
+    assert.equal(calificarPrueba('aislamiento', inf, { minNeta: 30 }).estado.clase, 'b-g');
+  });
+});
+
 describe('detectarAno (auto-detección del año por informe)', () => {
   test('prefijo YYMMDD en el nombre de archivo → año 20YY', () => {
     const r = detectarAno({ filename: '130823-pruebas.pdf' });

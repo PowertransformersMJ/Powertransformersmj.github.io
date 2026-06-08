@@ -10,11 +10,11 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1063/1063 verde** (2026-06-08, +bujes canónico + tendencia alto nivel). |
+| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1073/1073 verde** (2026-06-08, +identidad por informe / trafo móvil). |
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA (Claude): tablero **IA-primaria**. **Arco ADR-003→010 EN PRODUCCIÓN**: completitud DETERMINISTA (`derivarTablaTAP`+canal `extra`), workflow de auditoría, excitación/relación/aislamiento NETA, criterios con fórmula, **Tendencia F1-F3** (gráficas + **franja-timeline** + **narrativa por IA on-demand**), **Biblioteca-hub**. Detalle → `99 §9`+`§10`. Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-07. |
-| **Producción** | `main` → GitHub Pages (`pages.yml`). `git fetch` 2026-06-08: `origin/main` = `8769588` (ADR-013 bujes + tendencia alto nivel + upsert + reproceso server-side + badge fix EN PRODUCCIÓN). `origin/DESARROLLO` = `48ba3a0`. **HEAD local `ba440a8` (quitar columna Evaluación/OK de tablas) → pendiente push.** |
+| **Producción** | `main` → GitHub Pages (`pages.yml`). `origin/main` = `8769588` (hasta ADR-013 + badge fix). **Commits locales pendientes de push**: `ba440a8` (quitar col. Evaluación/OK), `bda12b0` (strip robusto Resultado/OK), ADR-014 (identidad por informe). |
 | **Deploys backend** | (1) `extraerPruebasElectricasIA` **DESPLEGADA** (southamerica-east1; canal `extra` por punto; **re-deploy 2026-06-08: prompt SIN columna "Evaluación/OK"** — la IA solo emite datos crudos, L-42; timeout 540s/1GiB — L-27). (2) `narrativaTendenciaIA` **DESPLEGADA** (southamerica-east1; F3, narrativa sin PDF, default sonnet, 120s/512MiB). Secret `LLM_API_KEY` ok. Firestore con `experimentalAutoDetectLongPolling` (L-38). **Flujo (ADR-005)**: Claude commitea+deploya; el **director pushea**. |
 
 ## ⚠️ Flags de riesgo activos

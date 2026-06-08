@@ -71,6 +71,7 @@
 | §11 | ADR-011 — Veredicto 100% normativo (scorecard vs norma, no informe) + NETA por clase unificada + desviación general de resistencia | 246 |
 | §12 | ADR-012 — Evaluación MULTI-NORMA (veredicto por cada norma + consolidado conservador + divergencias) | 267 |
 | §13 | ADR-013 — FP de bujes canónico (discriminado) + Tendencia de alto nivel (diagnóstico multi-norma por métrica) | 290 |
+| §14 | ADR-014 — Identidad/placa CONGELADA por informe (trafo móvil doble config: aislamiento por clase del propio ensayo) | 311 |
 
 ---
 
