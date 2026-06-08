@@ -584,12 +584,11 @@ export const extraerPruebasElectricasIA = onCall(
   {
     region: 'southamerica-east1',
     secrets: [LLM_API_KEY],
-    // 15 min: un escaneo denso con thinking + extracción de bloques tarda 1–4 min,
-    // y el reintento de un fallo transitorio de la IA (TODO-09) puede sumar otra
-    // pasada → margen para ~2 intentos lentos sin abortar. Gen2 admite 3600 s. El
-    // cliente espera 900 s (igual). El presupuesto real de los reintentos se acota
-    // por deadlineMs (820 s) para dejar margen al post-proceso antes del timeout.
-    timeoutSeconds: 900,
+    // 25 min (ADR-019): a MÁXIMA CALIDAD (effort:high, decisión del director) un
+    // escaneo denso (EMS 450108) supera los 12–13 min → con 900 s daba 504 +
+    // deadline-exceeded. Gen2 admite 3600 s. El cliente espera lo mismo (1500 s).
+    // El presupuesto interno (deadlineMs + ATTEMPT_MS) lo acota MUY por debajo.
+    timeoutSeconds: 1500,
     // 1 GiB (gen2 acopla más CPU → base64 + visión más rápidos) y margen para
     // el PDF base64 (~5 MB) + el stream de la respuesta.
     // 2 GiB (gen2 acopla más CPU → base64 + visión + thinking más rápidos y con
@@ -621,7 +620,7 @@ export const extraerPruebasElectricasIA = onCall(
       guardTimer = setTimeout(() => {
         marcarReproceso(unidadId, informeId, 'error',
           'El servidor agotó el tiempo de procesamiento. Reintenta (informe muy denso).').catch(() => {});
-      }, 870000);
+      }, 1440000);
       if (typeof guardTimer.unref === 'function') guardTimer.unref();
     }
     const limpiarGuard = () => { if (guardTimer) { clearTimeout(guardTimer); guardTimer = null; } };
@@ -652,7 +651,7 @@ export const extraerPruebasElectricasIA = onCall(
     const client = new Anthropic({
       apiKey: LLM_API_KEY.value(),
       maxRetries: 0,
-      timeout: 840000,
+      timeout: 1440000, // ≥ ATTEMPT_MS (22 min); nuestro control aborta antes
       fetchOptions: { dispatcher: IA_DISPATCHER }
     });
     const userMsg =
@@ -698,12 +697,12 @@ export const extraerPruebasElectricasIA = onCall(
     // el stream colgado a los ATTEMPT_MS → se vuelve un error transitorio →
     // reintenta o cae a 'error' limpio. Un stream no se reusa: cada intento abre
     // uno NUEVO. Presupuesto total acotado MUY por debajo de los 900 s.
-    // ATTEMPT_MS generoso (12.7 min): ya sin bodyTimeout de undici (ADR-018), un
-    // intento puede correr lo que la extracción densa necesite. Patrón "un intento
-    // generoso + reintento SOLO si falla rápido": si el 1.er intento se cuelga y
-    // consume su ventana, ya no hay presupuesto (deadlineMs) para un 2.º → cae a
-    // 'error' limpio; si falla rápido (transitorio), sí reintenta.
-    const ATTEMPT_MS = 760000;
+    // ATTEMPT_MS generoso (22 min): a máxima calidad un escaneo denso puede
+    // necesitarlo (ADR-019). Patrón "un intento largo + reintento SOLO si falla
+    // rápido": `intentoMaxMs` evita el bug que arrancaba un 2.º intento sin sitio
+    // (corría hasta el SIGKILL → 504). Si el 1.º se aborta por timeout, ya no hay
+    // presupuesto para otro intento ENTERO → 'error' limpio; si falla rápido, reintenta.
+    const ATTEMPT_MS = 1320000;
     const inicioIA = Date.now();
     let message;
     try {
@@ -720,7 +719,8 @@ export const extraerPruebasElectricasIA = onCall(
       }, ATTEMPT_MS), {
         intentos: 2,
         baseMs: 1500,
-        deadlineMs: inicioIA + 800000, // 1 intento largo + retry-solo-si-falla-rápido < 900 s (SIGKILL)
+        intentoMaxMs: ATTEMPT_MS, // no reintentar sin sitio para un intento ENTERO (ADR-019)
+        deadlineMs: inicioIA + 1440000, // 1 intento largo + retry-solo-si-falla-rápido < 1500 s
         onReintento: ({ intento, intentos, espera, error }) =>
           console.warn(`[extraerPruebasElectricasIA] reintento ${intento}/${intentos} tras fallo transitorio (${error.status || error.code || ''} ${error.message || error}); espera ${Math.round(espera)}ms`),
       });

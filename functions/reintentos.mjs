@@ -80,7 +80,7 @@ export function retrasoBackoff(i, { baseMs = 1500, maxMs = 30000, retryAfterMs =
 // `dormirFn` son inyectables para test.
 export async function conReintentosIA(fabricar, {
   intentos = 4, baseMs = 1500, maxMs = 30000, deadlineMs = null,
-  margenMs = 5000, ahora = Date.now, dormirFn = dormir, onReintento = null,
+  margenMs = 5000, intentoMaxMs = 0, ahora = Date.now, dormirFn = dormir, onReintento = null,
 } = {}) {
   let ultimo;
   for (let i = 0; i < intentos; i++) {
@@ -97,9 +97,14 @@ export async function conReintentosIA(fabricar, {
       });
       if (deadlineMs != null) {
         const restante = deadlineMs - ahora();
-        // Sin margen para otro intento → relanzar (lo retoma "Reprocesar" a mano).
-        if (restante <= espera + margenMs) throw e;
-        espera = Math.min(espera, Math.max(0, restante - margenMs));
+        // BUG histórico (ADR-019): antes solo se exigía sitio para el BACKOFF
+        // (~2 s), no para un INTENTO COMPLETO más. Con intentos largos, tras
+        // abortar el 1.º por timeout SÍ había sitio para el backoff → arrancaba un
+        // 2.º intento que corría hasta el SIGKILL (900 s) de la función → 504 +
+        // deadline-exceeded. Ahora se exige presupuesto para un intento ENTERO
+        // (`intentoMaxMs`) + backoff + margen; si no, se relanza (error limpio).
+        if (restante <= espera + intentoMaxMs + margenMs) throw e;
+        espera = Math.min(espera, Math.max(0, restante - intentoMaxMs - margenMs));
       }
       if (onReintento) onReintento({ intento: i + 1, intentos, espera, error: e });
       await dormirFn(espera);

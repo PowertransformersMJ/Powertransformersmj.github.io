@@ -356,12 +356,11 @@ export async function extraerConIA(payload) {
   if (!functions) throw new Error('Cloud Functions no disponible.');
   const { httpsCallable } =
     await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js');
-  // timeout explícito (15 min): el default del SDK es 70 s y un PDF escaneado
-  // denso con thinking + extracción de bloques tarda más → sin esto el cliente
-  // abortaba (deadline-exceeded) y caía al lector local. Debe ser ≥ el
-  // timeoutSeconds de la función (900 s, que ahora incluye margen para reintentar
-  // un fallo transitorio de la IA server-side, TODO-09) para esperar al servidor.
-  const fn = httpsCallable(functions, 'extraerPruebasElectricasIA', { timeout: 900000 });
+  // timeout explícito (25 min, ADR-019): a máxima calidad (effort:high) un escaneo
+  // denso supera los 12–13 min; con 15 min el cliente daba deadline-exceeded. Debe
+  // ser ≥ el timeoutSeconds de la función (1500 s) para esperar al servidor. El
+  // reproceso es no bloqueante (badge durable) → la espera larga no congela la UI.
+  const fn = httpsCallable(functions, 'extraerPruebasElectricasIA', { timeout: 1500000 });
   const res = await fn({
     unidadId:    payload.unidadId,
     serie:       payload.serie,
