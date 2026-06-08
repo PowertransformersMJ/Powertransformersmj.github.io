@@ -98,7 +98,9 @@
   (P1) **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato → el FP de bujes "desaparecía";
   ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto INTACTO.** (Tendencia)
   `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica + resalta relevantes. **(Tablero MULTI-AÑO, ADR-024 —
-  ADR-024→**ADR-025 v2** tras feedback)**: por PRUEBA, gráfica con TODOS los años superpuestos **conservando FASES** (año×fase,
+  ADR-024→**ADR-025 v2**→**ADR-026 fix regresión** tras feedback)**: por PRUEBA, gráfica con TODOS los **INFORMES** superpuestos
+  (clave por **informe**, no por año — **ADR-026** corrige que 2 ensayos de 2021 en la serie 450108 se colapsaban; ahora 7 chips
+  distintos, identidad/color/filtro por informe) **conservando FASES** (informe×fase,
   valores reales — la reducción "peor fase" distorsionaba) + **filtro de año GLOBAL** (todas las pruebas) + **fase por gráfica**,
   color por año (`bloquesMultiAno`+`montarMultiAno`+`svgBloque` exportado). **(Tendencia v2)**: `cambiosAnoAno` (historial de
   saltos) + `proyectarTendencia` (ajuste lineal → años a cruzar el límite). 1119/1119 verde. 🚫 **NO romper la calificación

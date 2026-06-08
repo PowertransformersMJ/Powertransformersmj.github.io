@@ -570,14 +570,15 @@ async function onGenerarNarrativa() {
   }
 }
 
-/* ─── Vista MULTI-AÑO: cada prueba con TODOS los años superpuestos ───────
- * Una gráfica por prueba; superpone TODOS los años CONSERVANDO las fases (una
- * línea por año×fase, valores REALES sin reducir → no degrada ni distorsiona).
- * Filtros: AÑO **global** (chips arriba, aplican a TODAS las pruebas del libro) +
- * FASE **por gráfica**. Color por AÑO (consistente entre gráficas) para comparar
- * la evolución. ADITIVA: NO toca la calificación global ni el motor del veredicto
- * (reusa `svgBloque` + `bloquesMultiAno`). Se llama tras cargar los bloques. */
-const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777'];
+/* ─── Vista MULTI-AÑO: cada prueba con TODOS los INFORMES superpuestos ───────
+ * Una gráfica por prueba; superpone TODOS los INFORMES del libro CONSERVANDO las
+ * fases (una línea por informe×fase, valores REALES sin reducir → no degrada ni
+ * distorsiona). Clave = el INFORME (no el año): dos ensayos del MISMO año NO se
+ * colapsan (serie 450108 tiene 2 en 2021). Filtros: INFORME **global** (chips
+ * arriba con la fecha, aplican a TODAS las pruebas del libro) + FASE **por
+ * gráfica**. Color por INFORME (consistente entre gráficas). ADITIVA: NO toca la
+ * calificación global ni el motor (reusa `svgBloque` + `bloquesMultiAno`). */
+const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777', '#0f766e', '#9333ea'];
 
 function montarMultiAno() {
   const cont = $('pe-consolidado');
@@ -586,32 +587,39 @@ function montarMultiAno() {
     .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
   const items = docs.map((inf) => {
     const d = state.bloquesCache.get(inf.id);
-    return { ano: inf.ano, bloques: (d && d.bloques) || [] };
+    return { ano: inf.ano, fecha: inf.fecha, id: inf.id, bloques: (d && d.bloques) || [] };
   }).filter((it) => it.bloques.length);
   const bloques = bloquesMultiAno(items);
   if (!bloques.length) {
-    cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer por año. Abre/sube informes con análisis IA.</p>';
+    cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;
   }
-  // Todos los años presentes en el libro (para el filtro GLOBAL). Color fijo por año.
-  const anosAll = [...new Set(bloques.flatMap((b) => b.series.map((s) => s._ano)))].sort();
-  const colorAno = (a) => COLORES_ANO[Math.max(0, anosAll.indexOf(a)) % COLORES_ANO.length];
-  if (!(state.multiAnoYears instanceof Set) || ![...state.multiAnoYears].every((y) => anosAll.includes(y)) || !state.multiAnoYears.size)
-    state.multiAnoYears = new Set(anosAll);
-  const selY = state.multiAnoYears;
+  // TODOS los informes presentes en el libro (filtro GLOBAL). Identidad = _rep
+  // (no el año → no colapsa dos del mismo año); etiqueta = fecha/año; color fijo por informe.
+  const repInfo = new Map();
+  for (const b of bloques) for (const s of b.series) if (!repInfo.has(s._rep)) repInfo.set(s._rep, { label: s._repLabel, ano: s._ano });
+  const repsAll = [...repInfo.keys()].sort((a, c) => {
+    const A = repInfo.get(a), C = repInfo.get(c);
+    return (Number(A.ano) || 0) - (Number(C.ano) || 0) || String(A.label).localeCompare(String(C.label));
+  });
+  const colorRep = (r) => COLORES_ANO[Math.max(0, repsAll.indexOf(r)) % COLORES_ANO.length];
+  if (!(state.multiAnoReps instanceof Set) || ![...state.multiAnoReps].every((r) => repsAll.includes(r)) || !state.multiAnoReps.size)
+    state.multiAnoReps = new Set(repsAll);
+  const selR = state.multiAnoReps;
 
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.className = 'muted small'; intro.style.margin = '0 0 6px';
-  intro.innerHTML = 'Cada gráfica es una prueba con <b>todos los años superpuestos</b> (una línea por fase y año, valores reales; '
-    + 'color por año). Filtra por <b>año</b> abajo (aplica a TODAS las pruebas) y por <b>fase</b> en cada gráfica.';
+  intro.innerHTML = `Cada gráfica es una prueba con <b>todos los informes superpuestos</b> (una línea por fase de cada informe, `
+    + `valores reales; color por informe). ${repsAll.length} informe(s) en el libro. Filtra por <b>informe</b> abajo `
+    + `(aplica a TODAS las pruebas) y por <b>fase</b> en cada gráfica.`;
   cont.appendChild(intro);
 
   const gbar = document.createElement('div');
   gbar.className = 'pe-fase-chips';
   gbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
   gbar.appendChild(Object.assign(document.createElement('span'),
-    { textContent: 'Años (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
+    { textContent: 'Informes (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
   const host = document.createElement('div');
 
   const pintarTodo = () => {
@@ -627,8 +635,8 @@ function montarMultiAno() {
       const repintar = () => {
         chartBox.innerHTML = '';
         const series = b.series
-          .filter((s) => selY.has(s._ano) && (!fases.length || selF.has(s._fase)))
-          .map((s) => ({ ...s, color: colorAno(s._ano) }));
+          .filter((s) => selR.has(s._rep) && (!fases.length || selF.has(s._fase)))
+          .map((s) => ({ ...s, color: colorRep(s._rep) }));
         const svg = series.length ? svgBloque({ ...b, series }) : null;
         if (svg) chartBox.appendChild(svg);
         else chartBox.innerHTML = '<p class="muted small">Sin series para los filtros activos.</p>';
@@ -657,14 +665,16 @@ function montarMultiAno() {
     }
   };
 
-  anosAll.forEach((a) => {
+  repsAll.forEach((r) => {
+    const info = repInfo.get(r) || {};
     const btn = document.createElement('button'); btn.type = 'button';
-    btn.className = 'pe-fase-chip' + (selY.has(a) ? ' is-on' : '');
-    btn.textContent = a;
-    btn.style.setProperty('--c', colorAno(a));
+    btn.className = 'pe-fase-chip' + (selR.has(r) ? ' is-on' : '');
+    btn.textContent = info.label || r;
+    btn.title = `Informe ${info.label || r}`;
+    btn.style.setProperty('--c', colorRep(r));
     btn.addEventListener('click', () => {
-      if (selY.has(a)) { if (selY.size > 1) selY.delete(a); } else selY.add(a);
-      btn.classList.toggle('is-on', selY.has(a)); pintarTodo();
+      if (selR.has(r)) { if (selR.size > 1) selR.delete(r); } else selR.add(r);
+      btn.classList.toggle('is-on', selR.has(r)); pintarTodo();
     });
     gbar.appendChild(btn);
   });

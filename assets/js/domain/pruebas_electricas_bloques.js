@@ -314,18 +314,24 @@ function familiaMA(bloque) {
 }
 
 /**
- * Construye, por FAMILIA de prueba, UN bloque que superpone TODOS los años. Para
- * NO degradar el detalle ni distorsionar valores, conserva CADA FASE de cada año
- * como su propia serie (valores REALES, sin reducir) → series = año × fase. Cada
- * serie queda etiquetada con `_ano` y `_fase` para poder filtrar por AÑO y por
- * FASE en la UI. El nombre visible es "<año> · <fase>".
- * @param {Array<{ano:(number|null), bloques:Array}>} items informes con sus bloques ya cargados
- * @returns {Array<object>} bloques multi-año (uno por familia con datos)
+ * Construye, por FAMILIA de prueba, UN bloque que superpone TODOS los INFORMES
+ * del libro. Clave de identidad = el INFORME (no el año), para que DOS informes
+ * del MISMO año NO se colapsen (caso real: serie 450108 con 2 ensayos en 2021).
+ * Conserva CADA FASE de cada informe como su propia serie (valores REALES, sin
+ * reducir). Cada serie se etiqueta con `_rep` (id del informe), `_repLabel`
+ * (fecha o año, para mostrar), `_ano` y `_fase` → filtrable por INFORME y por FASE.
+ * El nombre visible es "<fecha|año> · <fase>".
+ * @param {Array<{ano:(number|null), fecha?:string, id?:string, bloques:Array}>} items
+ * @returns {Array<object>} bloques multi-informe (uno por familia con datos)
  */
 export function bloquesMultiAno(items) {
   const fam = new Map();
   for (const it of (Array.isArray(items) ? items : [])) {
     const ano = it && it.ano;
+    const repLabel = (it && it.fecha) || (ano != null ? String(ano) : 's/a');
+    // Identidad ÚNICA por informe: id > fecha > (año + orden). Sin esto, dos
+    // informes del mismo año compartirían clave y se solaparían.
+    const rep = (it && it.id != null && String(it.id)) || (it && it.fecha) || repLabel;
     for (const b of ((it && it.bloques) || [])) {
       const f = familiaMA(b);
       if (!f) continue;
@@ -342,21 +348,19 @@ export function bloquesMultiAno(items) {
       for (const s of (b.series || [])) {
         const puntos = (s.puntos || []).filter((p) => p && p.x != null && typeof p.y === 'number');
         if (!puntos.length) continue;
-        g._series.push({ ano, fase: String(s.nombre || ''), puntos });
+        g._series.push({ rep, repLabel, ano, fase: String(s.nombre || ''), puntos });
       }
     }
   }
   return [...fam.values()]
     .map((g) => {
       const series = g._series
-        .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0))
-        .map((s) => {
-          const anoTxt = s.ano != null ? String(s.ano) : 's/a';
-          return {
-            nombre: s.fase ? `${anoTxt} · ${s.fase}` : anoTxt,
-            _ano: anoTxt, _fase: s.fase, puntos: s.puntos
-          };
-        });
+        .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0) || String(a.repLabel).localeCompare(String(b.repLabel)))
+        .map((s) => ({
+          nombre: s.fase ? `${s.repLabel} · ${s.fase}` : s.repLabel,
+          _rep: s.rep, _repLabel: s.repLabel, _ano: s.ano != null ? String(s.ano) : 's/a',
+          _fase: s.fase, puntos: s.puntos
+        }));
       const { _series, ...resto } = g;
       return { ...resto, series };
     })

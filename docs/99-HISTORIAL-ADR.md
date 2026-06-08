@@ -556,3 +556,19 @@
 **25.6 Archivos** — MODIFICADOS: `assets/js/domain/pruebas_electricas_bloques.js` (`bloquesMultiAno` → año×fase), `assets/js/pruebas-electricas-shell.js` (`montarMultiAno` v2: año global + fase por gráfica + color por año; diagnóstico con cambios año-a-año + proyección; import `svgBloque`), `assets/js/ui/pruebas/grafico-generico.js` (export `svgBloque`), `assets/js/domain/pruebas_electricas_tendencia.js` (`cambiosAnoAno`/`proyectarTendencia` + en `analisisTendencia`), tests (bloques, tendencia), `_dev/preview-multiano.html`. INTACTOS: calificación global, multinorma, gráficas por informe.
 
 **25.7 Doctrina + evolución** — "No reduzcas/colapses datos para 'simplificar' una vista comparativa — conserva las dimensiones reales (fase) y deja que el usuario filtre; reducir distorsiona y se confunde con 'mala extracción'. Un análisis de tendencia útil incluye el historial de cambios AÑO A AÑO y una PROYECCIÓN cuantitativa (ajuste lineal → años a cruzar el límite), no solo el último Δ." Sin lección nueva (preview en L-49). Sin cache bump.
+
+## 26. ADR-026 — Regresión: el multi-año colapsaba informes del MISMO año → identidad por INFORME (no por año)
+
+> Director (2026-06-08, frustrado por **costo de tokens/IA**): "antes se podían apreciar **7 informes** de la serie 450108; cuando trabajaste el filtro dejaron de apreciarse todos. Corrige, **memoriza y no repitas estos errores de alto costo**." Basado en el preview. **Frontend; en prod tras push.**
+
+**26.1 Causa raíz** — `bloquesMultiAno`/`montarMultiAno` (ADR-025) agrupaban y filtraban las series por **AÑO** (`_ano`). La serie 450108 tiene **2 ensayos en 2021** (18/01 y 20/09); al usar el año como clave, ambos compartían etiqueta/color y un solo chip → se "fundían" en uno. Reproducido en el preview: 7 informes (2 en 2021) → solo **6 chips** y dos series "2021 · Fase A" indistinguibles.
+
+**26.2 Decisiones / cambios** — Identidad por **INFORME**, no por año. `bloquesMultiAno`: cada serie lleva `_rep` (id del informe, ÚNICO), `_repLabel` (FECHA o año, para mostrar) además de `_ano`/`_fase`; nombre "<fecha> · <fase>"; orden por (año, fecha). `montarMultiAno`: el filtro GLOBAL es por **informe** (chips con la FECHA, `state.multiAnoReps`), color **por informe** (distinto cada uno); el filtro de fase por gráfica intacto. Resultado validado en preview: **7 chips** (incl. 18/01/2021 y 20/09/2021 separados), 21 líneas con etiquetas únicas, el filtro global quita un informe de TODAS las gráficas (42→36 líneas).
+
+**26.3 No-regresión** — Solo cambia la CLAVE (año→informe) y el etiquetado/color; la conservación de fases + valores reales (ADR-025) intacta. NO toca calificación global ni motor. `node --test` **1119/1119** (test nuevo: 2 informes del mismo año NO colapsan, `_rep` distintos). Lint OK.
+
+**26.4 Anti-patterns evitados** — NO usar como clave un atributo que varios registros comparten (año) cuando la unidad real es otra (el informe); NO "arreglar" a ciegas — se REPRODUJO el caso real (7 informes, 2 en 2021) en el preview antes de tocar, fijando la causa exacta (ahorra tokens); verificar antes/después que TODO lo visible sigue visible.
+
+**26.5 Archivos** — MODIFICADOS: `assets/js/domain/pruebas_electricas_bloques.js` (`bloquesMultiAno` → clave por informe, `_rep`/`_repLabel`), `assets/js/pruebas-electricas-shell.js` (`montarMultiAno` → filtro/color por informe), `tests/pruebas_electricas_bloques.test.js`, `_dev/preview-multiano.html`. INTACTOS: calificación global, multinorma, tendencia, gráficas por informe.
+
+**26.6 Doctrina + evolución** — "La clave de identidad de una serie/fila es la ENTIDAD real (el informe), no un atributo agregable (el año) — si varios comparten ese atributo, se colapsan y desaparecen. Y al añadir/reescribir una vista, verificar que lo que ANTES se veía sigue viéndose (contar antes/después en el preview)." Memorizado (feedback persistente: `feedback_no_regresiones_visibilidad.md`). Sin lección nueva (refuerza L-49). Sin cache bump.
