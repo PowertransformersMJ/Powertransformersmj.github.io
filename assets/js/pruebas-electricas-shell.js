@@ -26,7 +26,8 @@ import {
   isReady,
   suscribirUnidades, suscribirInformes,
   guardarUnidad, crearInforme, subirPDF, eliminarInforme, eliminarUnidad, actualizarInforme,
-  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques, narrarTendencia
+  descargarBlobInforme, extraerConIA, guardarBloques, cargarBloques, narrarTendencia,
+  listarInformes, eliminarPDF
 } from './data/pruebas_electricas.js';
 import {
   sanitizarInforme, validarInforme, confirmarSerie, detectarAno, CRITERIOS_NORMA, UMBRAL_DESBALANCE,
@@ -1533,6 +1534,18 @@ function derivarBushing(bloques) {
   };
 }
 
+// Busca un informe YA existente de la unidad que sea "el mismo": por FECHA exacta
+// (dd/mm/aaaa, ignorando espacios) y, si el nuevo no trae fecha, por AÑO. Devuelve
+// el informe existente o null. Dos ensayos de fechas distintas del mismo año NO
+// colapsan (sólo se igualan por fecha exacta).
+function fechaKey(s) { return String(s == null ? '' : s).replace(/\s/g, ''); }
+function buscarInformeExistente(lista, fecha, ano) {
+  const fk = fechaKey(fecha);
+  if (fk) return (lista || []).find((e) => fechaKey(e.fecha) === fk) || null;
+  if (ano != null) return (lista || []).find((e) => e.ano === ano) || null;
+  return null;
+}
+
 async function storeReport() {
   // Dedupe de serie: si ya existe un libro cuya serie NORMALIZADA coincide con
   // la tecleada (mismo transformador escrito con otro formato de guiones/espacios),
@@ -1557,6 +1570,9 @@ async function storeReport() {
       // Firestore y NO aparece en la query de suscribirUnidades, así
       // que sin esto la unidad nunca se vería en el parque en vivo.
       await guardarUnidad({ serie: unidadId });
+      // Informes ya existentes de la unidad → para detectar re-carga del MISMO
+      // (por fecha exacta / año) y ofrecer reemplazar en vez de duplicar.
+      const existentesUnidad = await listarInformes(unidadId).catch(() => []);
       const ordenados = UP.items.slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
       let i = 0;
       let identidadGuardada = false; // la placa se guarda una sola vez (primer informe que la traiga)
@@ -1630,7 +1646,28 @@ async function storeReport() {
           bushing: derivarBushing(bloquesIA),
           pdf: pdfMeta ? { ...pdfMeta, estado } : undefined
         });
+        // Upsert por fecha/año: si ya existe el MISMO informe, preguntar si
+        // REEMPLAZAR (borra el anterior + su PDF) o crear uno nuevo. Evita
+        // duplicados al re-cargar; el director tiene el control.
+        const prev = buscarInformeExistente(existentesUnidad, informe.fecha, informe.ano);
+        if (prev) {
+          const etq = informe.fecha || (informe.ano != null ? String(informe.ano) : 's/f');
+          const reemplazar = window.confirm(
+            `Ya existe un informe de ${etq} para la serie ${UP.serie}.\n\n` +
+            `Aceptar = REEMPLAZAR (se borra el anterior y su PDF).\n` +
+            `Cancelar = crear uno NUEVO (quedarán ambos).`
+          );
+          if (reemplazar) {
+            if (prev.pdf && prev.pdf.storagePath) await eliminarPDF(prev.pdf.storagePath).catch(() => {});
+            await eliminarInforme(unidadId, prev.id).catch((e) => console.warn('[pruebas-electricas] no se pudo borrar el informe a reemplazar', e));
+            const idx = existentesUnidad.findIndex((e) => e.id === prev.id);
+            if (idx >= 0) existentesUnidad.splice(idx, 1);
+          }
+        }
         const nuevoId = await crearInforme(unidadId, informe, uid);
+        // Registra el nuevo en la lista local para detectar duplicados de los
+        // SIGUIENTES items del mismo lote.
+        existentesUnidad.push({ id: nuevoId, fecha: informe.fecha, ano: informe.ano, pdf: informe.pdf });
         // Diagnóstico de extracción (ADR-007) → Firestore subcol perezosa.
         // Se persiste SIEMPRE que la IA corrió (aunque bloques esté vacío): el
         // diagnóstico vacío también es señal. Falla suave: el informe queda
