@@ -52,11 +52,19 @@ function ordenarPorAno(informes) {
 
 /* ─── 1) Historial de informes (#reportlist + KPI) ────────────── */
 
+// ¿El informe quedó pendiente de extracción? Se considera PROCESADO cualquier
+// estado que empiece por "extraido" (incluye `extraido_ia` de la IA) o
+// "procesado". Antes el chequeo solo aceptaba `extraido`/`procesado` exactos →
+// los informes extraídos con IA (`extraido_ia`) se mostraban como "pendiente".
+function esPendienteExtraccion(inf) {
+  const e = inf && inf.pdf && inf.pdf.estado;
+  if (!e) return false;
+  return !String(e).startsWith('extraido') && e !== 'procesado';
+}
+
 // `kind`: 'pending' (PDF cargado sin extraer) vs procesado.
 function badgeEstadoInforme(inf) {
-  const pendiente = inf.pdf && inf.pdf.estado &&
-    inf.pdf.estado !== 'extraido' && inf.pdf.estado !== 'procesado';
-  return pendiente
+  return esPendienteExtraccion(inf)
     ? '<span class="badge b-a">pendiente de extracción</span>'
     : '<span class="badge b-g">procesado</span>';
 }
@@ -73,9 +81,7 @@ function accionesPdf(inf) {
   const u = esc(url);
   // Reprocesar: solo para informes vivos (no base) que quedaron
   // pendientes de extracción (p. ej. escaneos subidos antes del OCR).
-  const pendiente = inf.pdf && inf.pdf.estado &&
-    inf.pdf.estado !== 'extraido' && inf.pdf.estado !== 'procesado';
-  const reproc = (!inf._seed && pendiente)
+  const reproc = (!inf._seed && esPendienteExtraccion(inf))
     ? `<button type="button" class="btn-sm reproc" data-reproc="${esc(inf.id)}" ` +
       `data-ano="${esc(inf.ano)}" title="Volver a leer el informe almacenado (OCR)">↻ Reprocesar</button>`
     : '';
@@ -96,9 +102,7 @@ function accionesPdf(inf) {
 function serieEnPdf(inf, serieUnidad) {
   const det = inf.serie_en_pdf;
   if (det) return esc(det);
-  const pendiente = inf.pdf && inf.pdf.estado &&
-    inf.pdf.estado !== 'extraido' && inf.pdf.estado !== 'procesado';
-  if (pendiente) {
+  if (esPendienteExtraccion(inf)) {
     return `<span class="muted2">no detectada · asignada ${esc(serieUnidad || '')}</span>`;
   }
   return '<span class="muted2">no impresa</span>';
