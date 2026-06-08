@@ -79,11 +79,12 @@ function accionesPdf(inf) {
   const url = inf.pdf && inf.pdf.downloadURL;
   if (!url) return '<span class="muted2">—</span>';
   const u = esc(url);
-  // Reprocesar: solo para informes vivos (no base) que quedaron
-  // pendientes de extracción (p. ej. escaneos subidos antes del OCR).
-  const reproc = (!inf._seed && esPendienteExtraccion(inf))
+  // Reprocesar: disponible para CUALQUIER informe vivo con PDF en Storage (no
+  // solo pendientes). Re-extrae con IA server-side → refresca con la lógica/
+  // campos actuales (identidad por placa, FP de bujes canónico, etc.) sin re-subir.
+  const reproc = (!inf._seed && inf.pdf && inf.pdf.storagePath)
     ? `<button type="button" class="btn-sm reproc" data-reproc="${esc(inf.id)}" ` +
-      `data-ano="${esc(inf.ano)}" title="Volver a leer el informe almacenado (OCR)">↻ Reprocesar</button>`
+      `data-ano="${esc(inf.ano)}" title="Re-extraer el informe con IA (servidor) y actualizar sus datos">↻ Reprocesar</button>`
     : '';
   // Editar datos: captura manual de los valores reales leídos del PDF.
   // Solo para informes vivos (los base/seed son de solo lectura).
