@@ -84,6 +84,7 @@
 | §24 | ADR-024 — Tablero MULTI-AÑO: cada prueba con todos los años superpuestos + filtro de año por prueba; **workflow de PREVIEW** (dev-server + harness) | 518 |
 | §25 | ADR-025 — Multi-año v2 (feedback): conserva FASES + valores reales + filtro de año GLOBAL + fase por gráfica; Tendencia con cambios año-a-año + PROYECCIÓN | 539 |
 | §26 | ADR-026 — Regresión: el multi-año colapsaba informes del MISMO año → identidad por INFORME (no por año); verificar antes/después | 560 |
+| §27 | ADR-027 — Multi-año muestra TODAS las pruebas ELÉCTRICAS (SFRA/reactancia/IR-núcleo/LTC/DFR con familia genérica, no solo las 7); el ACEITE (DGA) queda EXCLUIDO; criterios/datos se surfacean, no se fabrican | 578 |
 
 ---
 

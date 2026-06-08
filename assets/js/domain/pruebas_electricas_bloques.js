@@ -305,12 +305,30 @@ const FAMILIAS_MA = [
   { key: 'collar',      re: /collar/i,                      inv: false }
 ];
 
+// Pruebas que NO son ELÉCTRICAS: análisis FÍSICO-QUÍMICO del aceite (DGA/gases
+// disueltos, fisicoquímicos, furanos, humedad del papel…). Este tablero es de
+// PRUEBAS ELÉCTRICAS (el director: "esto es pruebas eléctricas y no análisis de
+// aceite"). Aunque la IA llegara a extraer una tabla de aceite de un informe
+// mixto, NO debe contaminar el tablero eléctrico → se excluye del multi-año.
+const ES_NO_ELECTRICA = /\bdga\b|gas(es)?\s*disuelt|cromatograf|aceite|fisicoqu[ií]mic|\bfisico\b|furan|humedad.*papel|tensi[oó]n\s*interfacial|\bift\b|acidez/i;
+
 function familiaMA(bloque) {
   const p = String((bloque && (bloque.prueba || bloque.titulo)) || '').toLowerCase();
   // Coincidencia directa por clave canónica primero.
   const directa = FAMILIAS_MA.find((f) => f.key === p);
   if (directa) return directa;
-  return FAMILIAS_MA.find((f) => f.re.test(p)) || null;
+  const reMatch = FAMILIAS_MA.find((f) => f.re.test(p));
+  if (reMatch) return reMatch;
+  // Excluir análisis de aceite (no es prueba eléctrica) — ver ES_NO_ELECTRICA.
+  if (ES_NO_ELECTRICA.test(p)) return null;
+  // Fallback GENÉRICO (ADR-027): cualquier OTRA prueba ELÉCTRICA presente en el
+  // informe (SFRA, reactancia de dispersión, IR de núcleo, LTC/DRM, DFR…) NO se
+  // descarta — obtiene su PROPIA familia keyed por su clave canónica/título, para
+  // que TODA prueba eléctrica ejecutada en cualquier año se aprecie en el multi-
+  // año (el director: "todos se puedan apreciar en el tablero"). La gráfica
+  // genérica (`svgBloque`) ya pinta cualquier {x,y} + su límite/guía si la trae.
+  const base = p.trim().replace(/\s+/g, ' ');
+  return base ? { key: `otros:${base}`, inv: false, generic: true } : null;
 }
 
 /**

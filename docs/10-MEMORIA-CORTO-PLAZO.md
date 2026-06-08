@@ -40,12 +40,14 @@
 > para la CARGA** (que extrae los mismos informes densos, 12–22 min).
 >
 > **PRÓXIMO / pendientes:**
-> 1. ✅ **CERRADO (TODO-09 → ADR-015..018)**: "Reprocesar" funcional. Reintento (ADR-015) + asíncrono observable/estado
->    durable (ADR-016) + timeout interno por intento/watchdog/2GiB (ADR-017) + **fix "terminated" = bodyTimeout de undici,
->    dispatcher sin bodyTimeout** (ADR-018). Solo falla por causa ajena (sin saldo, PDF ilegible, infra) con motivo claro.
-> 2. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
+> 1. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
 >    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
-> 3. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
+> 2. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
+> 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→027)**: cada prueba con todos los informes superpuestos + filtro informe global + fase
+>    por gráfica (ADR-024/025); fix colapso por año → identidad por informe (ADR-026); **multi-año muestra TODA prueba ELÉCTRICA,
+>    no solo las 7** — SFRA/reactancia/etc. con familia genérica; el **ACEITE/DGA queda EXCLUIDO** (guardia de dominio, L-50); criterios
+>    surfaceados sin fabricar (ADR-027). **Frontend, validado en preview; pendiente PUSH.** ⛔ NO dañar la calificación global por prueba.
+> (Cerrado y consolidado: TODO-09 "Reprocesar" → ADR-015..018, luego RETIRADO en ADR-020.)
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
 > Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`

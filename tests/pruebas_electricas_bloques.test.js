@@ -293,10 +293,44 @@ describe('bloquesMultiAno · informe × fase superpuestos (conserva fases y NO c
     assert.deepEqual(fb.puntos, [{ x: 1, y: 15 }, { x: 2, y: 9 }]);
   });
 
-  test('ignora bloques sin familia reconocida (p.ej. sfra)', () => {
-    const desconocido = { prueba: 'sfra', titulo: 'SFRA', series: [{ nombre: 'x', puntos: [{ x: 1, y: 1 }] }] };
-    const out = bloquesMultiAno([inf(2020, '01/01/2020', [exc([18]), desconocido])]);
+  test('ADR-027: una prueba FUERA de las 7 familias (SFRA) SÍ se incluye como familia genérica propia', () => {
+    const sfra = { prueba: 'sfra', titulo: 'SFRA — Respuesta en frecuencia', unidad: 'dB', eje_x: 'Hz',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 10, y: -2 }, { x: 100, y: -5 }] }] };
+    const out = bloquesMultiAno([inf(2020, '01/01/2020', [exc([18]), sfra])]);
+    const pruebas = out.map((b) => b.prueba).sort();
+    assert.deepEqual(pruebas, ['excitacion', 'otros:sfra'], 'excitación + SFRA genérica');
+    const gSfra = out.find((b) => b.prueba === 'otros:sfra');
+    assert.equal(gSfra.titulo, 'SFRA — Respuesta en frecuencia', 'conserva el título legible del bloque');
+    assert.equal(gSfra.series.length, 1);
+    assert.equal(gSfra.series[0]._fase, 'Fase A');
+  });
+
+  test('ADR-027: la MISMA prueba genérica se superpone entre informes/años (no fragmenta)', () => {
+    const sfra = (y) => ({ prueba: 'sfra', titulo: 'SFRA', unidad: 'dB',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 10, y }] }] });
+    const out = bloquesMultiAno([
+      inf(2021, '01/01/2021', [sfra(-2)]),
+      inf(2023, '01/01/2023', [sfra(-4)])
+    ]);
+    assert.equal(out.length, 1, 'una sola gráfica SFRA');
+    assert.equal(out[0].series.length, 2, 'ambos años superpuestos');
+    assert.deepEqual(out[0].series.map((s) => s._ano), ['2021', '2023']);
+  });
+
+  test('bloque sin prueba NI título no crea familia fantasma', () => {
+    const vacio = { series: [{ nombre: 'x', puntos: [{ x: 1, y: 1 }] }] };
+    const out = bloquesMultiAno([inf(2020, '01/01/2020', [exc([18]), vacio])]);
     assert.deepEqual(out.map((b) => b.prueba), ['excitacion']);
+  });
+
+  test('ADR-027: análisis de ACEITE (DGA, gases disueltos, furanos) NO contamina el tablero ELÉCTRICO', () => {
+    const aceite = [
+      { prueba: 'dga', titulo: 'DGA · gases disueltos', series: [{ nombre: 'ppm', puntos: [{ x: 'H2', y: 12 }] }] },
+      { prueba: 'analisis_aceite', titulo: 'Fisicoquímicos del aceite', series: [{ nombre: 'x', puntos: [{ x: 'Acidez', y: 0.02 }] }] },
+      { prueba: 'furanos', titulo: 'Furanos (humedad del papel)', series: [{ nombre: 'x', puntos: [{ x: '2FAL', y: 0.5 }] }] }
+    ];
+    const out = bloquesMultiAno([inf(2020, '01/01/2020', [exc([18]), ...aceite])]);
+    assert.deepEqual(out.map((b) => b.prueba), ['excitacion'], 'solo la prueba eléctrica; el aceite se excluye');
   });
 
   test('entrada vacía / basura no rompe', () => {
