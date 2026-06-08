@@ -79,6 +79,7 @@
 | §19 | ADR-019 — 504/deadline-exceeded: bug del presupuesto de reintento (2.º intento sin sitio → SIGKILL) + timeoutSeconds 900→1500 para máxima calidad | 420 |
 | §20 | ADR-020 — RETIRO de "Reprocesar" (costo > valor; re-extraer = re-subir). CF queda solo-CARGA; se conserva la robustez de transporte | 440 |
 | §21 | ADR-021 — Previsualización al colisionar por fecha: comparar "ya guardado" vs "nuevo" (+ abrir PDF) antes de reemplazar | 462 |
+| §22 | ADR-022 — Calificación global muestra TODAS las pruebas (no oculta/fusiona, FP bujes separado) + Tendencia con acción clasificada (predictiva/preventiva/correctiva) | 480 |
 
 ---
 
