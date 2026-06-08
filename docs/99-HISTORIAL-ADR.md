@@ -307,3 +307,24 @@
 **13.6 Archivos** — `domain/pruebas_electricas_schema.js` (`sanitizarBushing`+campo), `domain/pruebas_electricas_tendencia.js` (`bushing` en escalar/METRICAS + `analisisTendencia`), `domain/pruebas_electricas_multinorma.js` (`metricaPrueba` bushing), `ui/pruebas/semaforo.js` (fila bushing en FILAS), `pruebas-electricas-shell.js` (`derivarBushing`, scorecard siempre, `diagnosticoUnidadHtml`/`trendMarker`), `assets/css/pruebas-electricas.css` (`.pe-diagnostico`/`.pe-diag-*`), tests.
 
 **13.7 Doctrina + evolución** — "Cada prueba se evalúa Y se diagnostica conforme a la skill; donde no hay veredicto definitivo, se deja una recomendación — y la tendencia (degradación vs baseline) pesa tanto como el valor." Bujes discriminado en todo el flujo. **Re-carga LIMPIA (upsert, L-39)**: `storeReport` detecta si ya existe el MISMO informe por **fecha exacta** (fallback a año) y pregunta (`window.confirm`) **REEMPLAZAR** (borra el anterior + su PDF vía `eliminarInforme`+`eliminarPDF`) o **crear nuevo** — re-cargar 2021/2023 para poblar el `bushing` canónico ya no duplica. Dos ensayos de fechas distintas del mismo año NO colapsan. Sin cache bump.
+
+## 14. ADR-014 — Identidad/placa CONGELADA por informe (trafo móvil de doble configuración)
+
+> Director (2026-06-08): adjuntó las DOS placas de la serie 450108 para aclarar la "inconsistencia" detectada en ADR-013/auditoría. **No era error**: es UN transformador MÓVIL de doble configuración (tipo cKLTM 14511-17, fab. 05/2020): AT en **TRIÁNGULO → 63.509 kV, Dyn1yn1** (Bocagrande 2021) y AT en **ESTRELLA → 110 kV, YNyn0yn0** (Membrillal 2023). Misma unidad, dos placas reales según conexión de la AT. **EN PRODUCCIÓN tras push.**
+
+**14.1 Causa raíz** — La identidad (tensiones/grupo) vivía SOLO en el doc de la unidad (`guardarUnidad`, merge last-wins) → no determinista y, peor, el **aislamiento NETA por CLASE de tensión** usaba el kV de la unidad (última carga) para TODOS los informes. Un trafo móvil con 63.5 kV (clase 69 → 25 GΩ) y 110 kV (clase 115 → 30 GΩ) se evaluaba mal: el ensayo del 2021 contra la clase del 2023 (o viceversa).
+
+**14.2 Decisiones / cambios** —
+- **Placa CONGELADA por informe**: `sanitizarIdentidad` (subconjunto PLANO: tensiones, grupo_conexion, potencia, fabricante, año, subestación, ubicación, refrigeración, frecuencia, fases) → campo `identidad` en `sanitizarInforme`. `storeReport` y el **reproceso** lo guardan desde `mediciones.unidad`. Cada ensayo conserva SU placa.
+- **Aislamiento por clase del PROPIO informe**: `calificarPrueba` deriva el mínimo NETA de `inf.identidad.tensiones` (`minNetaDe`: placa del informe → `minNetaGohm(kvAT)`); cae a `opts.minNeta` (unidad) si el informe no trae identidad. Así matriz, scorecard, KPI y tendencia evalúan cada informe contra SU clase, automáticamente. Los bloques de detalle usan `kvDeInforme(inf)` (`conCriterios`).
+- **Display**: la tira de metadata del informe muestra "Config" (tensiones · grupo) y "Subestación" → se ve a qué configuración corresponde cada ensayo.
+
+**14.3 No-regresión** — `identidad` aditivo (spread condicional; null si no hay). Informes guardados ANTES no tienen identidad → caen al kv de la unidad (comportamiento previo) hasta re-cargar/reprocesar (el reproceso server-side lo puebla sin re-subir). `opts.minNeta` se conserva como fallback. Sin renombres de exports.
+
+**14.4 Tests / verificación** — `node --test` **1073/1073** + lint. Nuevos: aislamiento usa la clase del informe (110 kV→30, 63.5 kV→25; la identidad del informe MANDA sobre `opts.minNeta`); `sanitizarIdentidad`. ⚠️ Sin verificación de UI en navegador (gated).
+
+**14.5 Anti-patterns evitados** — NO una sola identidad por unidad para un activo de doble config (cada informe su placa); NO evaluar por clase con el kV de "la última carga"; NO arrays anidados en `identidad` (subconjunto plano, Firestore-safe, L-30).
+
+**14.6 Archivos** — `domain/pruebas_electricas_schema.js` (`sanitizarIdentidad` + campo `identidad`), `ui/pruebas/semaforo.js` (`minNetaDe`, `calificarPrueba` usa la placa del informe), `pruebas-electricas-shell.js` (`kvDeInforme`, `identidad` en carga/reproceso, `conCriterios` por informe, `encabezadoInforme` muestra Config/Subestación), tests.
+
+**14.7 Doctrina + evolución** — "El activo puede tener varias placas (móvil/reconfigurable): congela la identidad EN cada ensayo y evalúa cada uno contra SU clase — nunca contra la 'última identidad' de la unidad." **Pendiente**: re-cargar/REPROCESAR 2021 y 2023 para poblar su `identidad` (el reproceso server-side ya lo hace). Sin cache bump.
