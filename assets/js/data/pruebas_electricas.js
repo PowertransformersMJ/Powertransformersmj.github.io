@@ -341,13 +341,8 @@ export async function cargarBloques(unidadId, informeId) {
  * documento nativo y devuelve las mediciones en la MISMA forma que
  * consume sanitizarInforme(). Lanza si no hay backend, sin sesión, sin
  * saldo o si la IA falla — el llamador hace fallback al extractor local.
- * Con `informeId` la función opera en MODO REPROCESO (ADR-016): persiste el
- * resultado server-side y escribe el estado durable en el informe; devuelve un
- * ack `{persisted, estado, n_bloques}` (sin `mediciones`, el cliente NO guarda).
- * Sin `informeId` = MODO CARGA: devuelve los datos crudos para que el cliente
- * persista con su lógica de upsert/confirmación.
- * @param {{unidadId:string, serie:string, storagePath:string, filename?:string, modelId?:string, informeId?:string}} payload
- * @returns {Promise<object>}
+ * @param {{unidadId:string, serie:string, storagePath:string, filename?:string, modelId?:string}} payload
+ * @returns {Promise<{mediciones:object, bloques?:Array, modelUsed:string, usage:object}>}
  */
 export async function extraerConIA(payload) {
   if (!isReady()) throw new Error('Firebase no inicializado.');
@@ -357,22 +352,18 @@ export async function extraerConIA(payload) {
   const { httpsCallable } =
     await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-functions.js');
   // timeout explícito (25 min, ADR-019): a máxima calidad (effort:high) un escaneo
-  // denso supera los 12–13 min; con 15 min el cliente daba deadline-exceeded. Debe
-  // ser ≥ el timeoutSeconds de la función (1500 s) para esperar al servidor. El
-  // reproceso es no bloqueante (badge durable) → la espera larga no congela la UI.
+  // denso supera los 12–13 min; con menos el cliente daba deadline-exceeded. Debe
+  // ser ≥ el timeoutSeconds de la función (1500 s) para esperar al servidor.
   const fn = httpsCallable(functions, 'extraerPruebasElectricasIA', { timeout: 1500000 });
   const res = await fn({
     unidadId:    payload.unidadId,
     serie:       payload.serie,
     storagePath: payload.storagePath,
     filename:    payload.filename || '',
-    modelId:     payload.modelId || '',
-    informeId:   payload.informeId || ''
+    modelId:     payload.modelId || ''
   });
   const data = res && res.data;
-  if (!data) throw new Error('La función no devolvió datos.');
-  // Modo reproceso: ack server-side (sin mediciones). Modo carga: exige mediciones.
-  if (!payload.informeId && !data.mediciones) throw new Error('La IA no devolvió mediciones.');
+  if (!data || !data.mediciones) throw new Error('La IA no devolvió mediciones.');
   return data;
 }
 

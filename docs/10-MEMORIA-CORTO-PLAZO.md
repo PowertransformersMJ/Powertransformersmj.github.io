@@ -32,12 +32,12 @@
 > fecha** (re-cargar no duplica, L-39); **reproceso SERVER-SIDE** con contador (L-40) + **backfill INSTANTÁNEO**
 > de campos canónicos desde el diagnóstico guardado, sin IA (L-43).
 >
-> **🎯 DECISIÓN DEL DIRECTOR (2026-06-08): "Reprocesar" = OPCIÓN A · MÁXIMA CALIDAD.** Ante el trade-off
-> velocidad↔completitud, eligió EXPLÍCITAMENTE conservar `output_config.effort:'high'` + `thinking:adaptive` (Opus 4.7):
-> el reproceso de un informe DENSO (p.ej. EMS 450108) tarda **~7–12 min** pero extrae COMPLETO. ⛔ **NO bajar el effort
-> ni cambiar a un modelo más rápido para acelerar** — es una elección deliberada (son datos de ingeniería de transformador).
-> El estado terminal está garantizado (ADR-017) y el badge es durable/no bloqueante (ADR-016): el director puede navegar y
-> volver. La lentitud es ESPERADA, no un bug.
+> **🎯 "Reprocesar" RETIRADO (ADR-020, 2026-06-08).** El director concluyó que reprocesar **sale más costoso que
+> eliminar + re-subir el informe** (misma extracción IA, pero llamada larga y frágil a cortes de red). Se eliminó el botón
+> + handler + el modo-reproceso de la CF. ⛔ **NO re-introducir "Reprocesar"** sin pedido explícito del director. Para
+> re-extraer: **volver a subir el PDF** (upsert por fecha, L-39); para refrescar campos canónicos: **backfill sin IA** (L-43).
+> La **máxima calidad** (`effort:high`) y toda la robustez de transporte (reintento/timeout/dispatcher undici) **se conservan
+> para la CARGA** (que extrae los mismos informes densos, 12–22 min).
 >
 > **PRÓXIMO / pendientes:**
 > 1. ✅ **CERRADO (TODO-09 → ADR-015..018)**: "Reprocesar" funcional. Reintento (ADR-015) + asíncrono observable/estado
@@ -94,15 +94,12 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-019 · 504/deadline-exceeded** (causa real, vista en consola completa). DOBLE: (A) bug del presupuesto
-  de reintento — el gate solo exigía sitio para el backoff, no para un intento ENTERO → tras abortar el 1.er intento largo
-  arrancaba un 2.º que corría hasta el SIGKILL (900s) → 504; fix `intentoMaxMs`. (B) 900s insuficiente para máxima calidad →
-  `timeoutSeconds 900→1500`, ATTEMPT_MS 22min, cliente 1500s, watchdog/SDK acordes. `effort:high` CONSERVADO. 1099/1099 verde
-  (+2 tests del gate). **CF DESPLEGADA**. L-48. ⚠️ El director valida que el EMS ya NO da 504 y COMPLETA (12–22 min, esperado).
-- **Arco "Reprocesar" (consolidado en `99`, todo desplegado; secuencia de causas REALES encontradas una a una)**:
-  **ADR-015** reintento con backoff (L-44) · **ADR-016** asíncrono observable: persistencia server-side + estado durable
-  `reproceso.{estado}` + badge en vivo (L-45, EN PROD) · **ADR-017** `await` desnudo sin timeout por intento → cuelgue →
-  SIGKILL sin estado: `conTimeoutAbortable` + watchdog + 2GiB (L-46) · **ADR-018** "terminated" = bodyTimeout de undici (~5 min)
-  corta el stream largo → dispatcher sin bodyTimeout (`undici@^6`), L-47. ADR-019 (arriba) cierra el 504.
+- **2026-06-08** — **ADR-020 RETIRO de "Reprocesar"** (costo > valor; re-extraer = re-subir): se quitó el botón + handler +
+  el modo-reproceso de la CF (queda **solo-CARGA**) + **ADR-021 previsualización al colisionar por fecha** (modal
+  `confirmarUpsert`: "ya guardado" vs "nuevo" + abrir PDF → reemplazar/crear-nuevo, no un `confirm` ciego). 1099/1099 verde.
+  **CF DESPLEGADA** (solo-CARGA). ⚠️ El director valida el modal en navegador. Frontend a prod tras push.
+- **Arco "Reprocesar" (HISTÓRICO — retirado en ADR-020; en `99`)**: la robustez de transporte que dejó —reintento con
+  presupuesto (L-44/L-48), timeout interno abortable (L-46), dispatcher undici sin bodyTimeout/"terminated" (L-47)— **se
+  conserva para la CARGA**. ADR-015→019 cuentan la secuencia de causas reales (cuelgue→terminated→504) por si reaparecen en carga.
 - Anterior (consolidado en `99`): arco tablero **ADR-010→ADR-014 + L-35..L-43** TODO EN PRODUCCIÓN (Tendencia F2/F3,
   veredicto MULTI-NORMA, bujes canónico, identidad por informe/trafo móvil, long-polling, upsert, reproceso server-side, backfill).

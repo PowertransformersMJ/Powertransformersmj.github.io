@@ -436,3 +436,43 @@
 **19.6 Archivos** — MODIFICADOS: `functions/reintentos.mjs` (`intentoMaxMs` + gate corregido), `functions/index.js` (1500 s, ATTEMPT_MS 22 min, watchdog/deadline/SDK-timeout acordes, pasa `intentoMaxMs`), `assets/js/data/pruebas_electricas.js` (cliente 1500000), `tests/reintentos_ia.test.js`. INTACTOS: dominio, persistencia, render, modo CARGA, `effort:high`, dispatcher undici (ADR-018).
 
 **19.7 Doctrina + evolución** — "Al reintentar una operación CARA bajo un presupuesto de tiempo, reserva sitio para un intento ENTERO, no solo para el backoff — si no, el último reintento se pasa del límite duro (en una Cloud Function = SIGKILL → 504). Y dimensiona `timeoutSeconds` al PEOR caso real de la operación (máxima calidad sobre el documento más denso), no al caso típico." Lección → L-48. Sin cache bump. **Si el EMS aún excede 22 min**: subir más `timeoutSeconds`/ATTEMPT_MS (gen2 hasta 3600 s) o reconsiderar Opción B con el director.
+
+## 20. ADR-020 — RETIRO de "Reprocesar": el costo supera el valor (re-extraer = volver a subir el PDF)
+
+> Director (2026-06-08), tras el arco ADR-015→019: "noto que **seleccionar reprocesar sale más costoso que eliminar e ingresar el informe nuevamente**; no genera valor tener la posibilidad de regenerar si es más costoso que ingresar el informe nuevamente." Y, con la consola: el reproceso seguía dando `La conexión de red se perdió` (una llamada de 12–25 min es frágil a cortes de red/proxy). Decisión de PRODUCTO: **eliminar el botón "Reprocesar".** **CF DESPLEGADA (solo-CARGA); frontend en prod tras push.**
+
+**20.1 Causa raíz (de producto, no bug)** — "Reprocesar" corría la MISMA extracción IA que una carga nueva (mismo costo de 12–22 min a máxima calidad) y como llamada larga sincrónica era frágil (red/proxy la cortan → `network connection lost`). Su única ventaja real —re-extraer sin tener el PDF a mano— casi no aplica: el director siempre tiene los PDFs. El valor barato (refrescar campos canónicos sin IA) ya lo da el **backfill** (L-43), no el reproceso. Conclusión: el botón no justifica su costo/complejidad.
+
+**20.2 Decisiones / cambios** —
+- **Frontend**: se retira el botón "Reprocesar" (`tabla-pruebas.js#accionesPdf`), el handler `data-reproc` (`pruebas-electricas-shell.js`) y los estados de badge de reproceso (`reprocesando/interrumpido/falló`) → el badge vuelve a `pendiente/procesado`.
+- **Cloud Function**: se elimina el **modo-reproceso** (ADR-016/017): `marcarReproceso`, `persistirReproceso`, `refInforme`, el watchdog global, los params `unidadId/informeId` y las marcas de estado. La función queda **solo-CARGA** ("thin": devuelve datos crudos; el cliente persiste). Se SIGUE conservando toda la robustez de transporte (reintento con presupuesto, timeout interno abortable, dispatcher sin bodyTimeout de undici, `timeoutSeconds:1500`, 2 GiB) porque **la carga usa la MISMA función** y también extrae informes densos.
+- **`extraerConIA`** (data) vuelve a su forma simple (sin `informeId`/ack de reproceso).
+- Se retira también la dep de la CF a los sanitizadores del dominio (`sanitizarInforme/Unidad/Bloques`, `derivarBushing`, `deepClean`, `FieldValue`) que solo usaba la persistencia server-side. (`derivarBushing`/`deepClean` siguen en `domain/` porque los usa el FRONTEND — carga + backfill.)
+
+**20.3 No-regresión** — CARGA intacta (es el camino que ahora importa); upsert por fecha (L-39) y backfill (L-43) intactos. `node --test` **1099/1099** (los tests de `reintentos.mjs`/`derivarBushing` siguen válidos: la carga los usa). Sin renombres de exports usados por el frontend.
+
+**20.4 Tests / verificación** — `node --test` 1099/1099 + lint. `node --check` de los archivos tocados OK. **CF desplegada** (solo-CARGA). ⚠️ Ventana transitoria: el frontend viejo (con botón) sobre la CF nueva → un clic en Reprocesar es un NO-OP (extrae y no guarda); se cierra al pushear el frontend (botón retirado). El director casi no usa el botón.
+
+**20.5 Anti-patterns evitados** — NO conservar una feature cara solo porque "ya está hecha" (sunk cost); NO dejar código muerto (se removió el modo-reproceso completo, no solo el botón); NO tirar la robustez de transporte (la carga la sigue necesitando).
+
+**20.6 Archivos** — MODIFICADOS: `assets/js/ui/pruebas/tabla-pruebas.js` (sin botón ni badges de reproceso), `assets/js/pruebas-electricas-shell.js` (sin handler), `assets/js/data/pruebas_electricas.js` (`extraerConIA` simple), `functions/index.js` (solo-CARGA; -modo reproceso; -imports dominio/FieldValue). INTACTOS: carga/upsert/backfill, robustez IA (reintentos/timeout/dispatcher), dominio (`derivarBushing`/`deepClean` usados por el frontend).
+
+**20.7 Doctrina + evolución** — "Una feature que cuesta MÁS que su alternativa simple (aquí: re-extraer = volver a subir) y añade superficie/fragilidad debe RETIRARSE, no seguir parcheándose. El trabajo de robustez no se pierde si protege también al camino que se queda (la carga)." Sin lección nueva (es decisión de producto; la robustez ya está en L-44..L-48). Sin cache bump.
+
+## 21. ADR-021 — Previsualización al colisionar por fecha: comparar "ya guardado" vs "nuevo" antes de reemplazar
+
+> Director (2026-06-08): "en este segmento me gustaría que me permitas una **previsualización detallada** para constatar si se trata de un mismo informe o informes distintos en la misma fecha." (El upsert por fecha, L-39, mostraba un `window.confirm` ciego: REEMPLAZAR vs NUEVO sin ver QUÉ.) **Frontend; en prod tras push.**
+
+**21.1 Causa raíz** — `storeReport` resolvía la colisión por fecha con un `window.confirm` que solo decía "ya existe un informe de DD/MM/AAAA" → el director no podía distinguir si el guardado y el nuevo eran el MISMO ensayo (reemplazar) o dos ensayos DISTINTOS de la misma fecha (crear ambos) sin información.
+
+**21.2 Decisiones / cambios** — Nuevo modal `confirmarUpsert(prev, nuevo, serie, item)` (`pruebas-electricas-shell.js`): overlay propio (no reusa `#ov`, ocupado por la carga) que muestra **lado a lado** "YA GUARDADO" vs "NUEVO (a cargar)" con Fecha · Ejecutante · Equipos · Serie en PDF · Pruebas detectadas, + **"↗ Abrir PDF guardado"** (downloadURL) para inspeccionar, + el nombre del archivo nuevo. Devuelve `'reemplazar' | 'nuevo'`. Escape/clic-fondo = `'nuevo'` (no destructivo, igual default que el confirm previo). Estilos inline → sin dependencia de CSS nuevo. Reemplaza el `window.confirm` en `storeReport`.
+
+**21.3 No-regresión** — La lógica de reemplazo (borrar prev + su PDF) / crear-nuevo es la MISMA; solo cambia la UI de decisión. Sin cambios de datos. `buscarInformeExistente`/upsert intactos.
+
+**21.4 Tests / verificación** — `node --test` 1099/1099 + lint + `node --check` OK. ⚠️ **Sin verificación de UI en navegador (admin gated)** → el director valida el render del modal y el flujo (reemplazar/crear/abrir PDF).
+
+**21.5 Anti-patterns evitados** — NO un `confirm` ciego para una decisión DESTRUCTIVA (reemplazar borra el anterior); NO reusar el overlay de carga (estaba ocupado); fallback no destructivo (Escape = crear nuevo, no reemplazar).
+
+**21.6 Archivos** — MODIFICADO: `assets/js/pruebas-electricas-shell.js` (`confirmarUpsert` + cableado en `storeReport`).
+
+**21.7 Doctrina + evolución** — "Antes de una acción DESTRUCTIVA con ambigüedad (reemplazar un registro que 'coincide'), dale al usuario la EVIDENCIA para decidir (previsualización lado a lado + abrir el original), no un sí/no ciego." Sin lección nueva. Sin cache bump.
