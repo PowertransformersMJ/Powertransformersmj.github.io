@@ -26,7 +26,7 @@ const FILAS = [
   { key: 'tand',        label: 'Tangente δ (devanados)',         criterio: '≤1% (CL)' },
   { key: 'excitacion',  label: 'Corriente de excitación',        criterio: 'Δfases <10%' },
   { key: 'relacion',    label: 'Relación de transformación',     criterio: '±0.5%' },
-  { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤5%' },
+  { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤2%' },
   { key: 'aislamiento', label: 'Resistencia de aislamiento (CC)', criterio: '≥1 GΩ' },
   { key: 'collar',      label: 'Collar caliente / bujes',         criterio: '<100 mW' },
   { key: 'drm',         label: 'DRM · conmutador (OLTC)',         criterio: '40–70 ms' }

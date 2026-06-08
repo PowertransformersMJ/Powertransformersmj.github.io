@@ -102,7 +102,10 @@ function conCriterios(data, kv) {
       const out = { ...b };
       const c = criterioDe(b.prueba);
       if (c) out.criterio = c;
-      if (out.limite_desbalance == null && b.grafica !== 'barra' && (b.series || []).length >= 2) {
+      // El criterio de desbalance es de DOMINIO (normativo), NO el que emita la
+      // IA: si el dominio tiene umbral para esta prueba, SOBRESCRIBE el de la IA
+      // (p.ej. resistencia: NETA 2%, aunque la IA haya puesto 5%). L-36.
+      if (b.grafica !== 'barra' && (b.series || []).length >= 2) {
         const u = desbalanceDe(b.prueba);
         if (u != null) out.limite_desbalance = u;
       }
@@ -643,7 +646,7 @@ const FAMILIAS_SCORE = [
   { key: 'bushing',     blockKeys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes (C1)',           criterio: 'tan δ ≤ 1% (IEEE 62 / C57.19.100)' },
   { key: 'excitacion',  blockKeys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δ fases ≤ 10% (IEEE C57.152)' },
   { key: 'relacion',    blockKeys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5% vs placa (IEEE C57.152 §7.2.10 / NETA 7.2.2)' },
-  { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 5% (IEEE 62.2 / C57.152)' },
+  { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)' },
   { key: 'aislamiento', blockKeys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ mínimo NETA por clase' },
   { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' }
 ];

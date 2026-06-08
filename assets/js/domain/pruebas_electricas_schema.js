@@ -74,7 +74,7 @@ export const CRITERIOS = Object.freeze({
   tand:        '≤0.5% bueno · 0.5–0.7 normal · 0.7–1 investigar · >1 excesivo',
   excitacion:  'I<50 mA → Δ<10% · I>50 mA → Δ<5% (2 fases mayores)',
   relacion:    'Desviación ≤ ±0.5% respecto a placa',
-  resistencia: 'Desbalance entre fases ≤ 5% (corregido por temperatura)',
+  resistencia: 'Desbalance entre fases ≤ 2% (NETA §7.2.2.D.8, corregido por temperatura)',
   aislamiento: 'Mínimo según clase de tensión (≥1 GΩ en este equipo)',
   collar:      'Pérdidas < 100 mW',
   drm:         'Tiempo de transición del conmutador 40–70 ms · sin discontinuidades'
@@ -90,7 +90,7 @@ export const CRITERIOS_NORMA = Object.freeze({
   tand:        { formula: 'tan δ % = pérdidas / (V·I) × 100, por sección de aislamiento', umbral: '≤1% (≤0.5 bueno · 0.5–0.7 normal · 0.7–1 investigar)', norma: 'IEEE 62 · ANSI/IEEE C57.12.90' },
   excitacion:  { formula: 'Δ% = (I_lateral_mayor − I_lateral_menor) / I_lateral_menor × 100', umbral: 'Δ<10% (I<50 mA) · Δ<5% (I≥50 mA)', norma: 'IEEE Std 62 · ANSI/IEEE C57.12.90' },
   relacion:    { formula: '%DIF = (relación medida − relación teórica) / relación teórica × 100', umbral: '±0.5% respecto a placa', norma: 'IEEE C57.152-2013 §7.2.10' },
-  resistencia: { formula: 'Δ% = (R_fase − R_promedio) / R_promedio × 100 (corregida a 75 °C)', umbral: '≤5% entre fases', norma: 'IEEE C57.152-2013 · IEEE 62.2-2004' },
+  resistencia: { formula: 'Δ% entre fases = (R_máx − R_mín) / R_prom × 100 (corregida a Ts)', umbral: '≤2% entre fases (o vs fábrica)', norma: 'ANSI/NETA ATS §7.2.2.D.8 · IEEE C57.152 (método)' },
   aislamiento: { formula: 'R_aisl a 1 min ≥ mínimo NETA por clase de tensión · DAR = R(1 min)/R(30 s)', umbral: 'mín. por clase: 13.8 kV → 5 GΩ · 34.5 kV → 15 GΩ · 110 kV → 30 GΩ', norma: 'ANSI/NETA 2021 tabla 100.5' },
   bushing:     { formula: 'tan δ del buje % · Capacitancia medida vs valor de placa', umbral: 'tan δ <1% · Cap dentro de ±5–10% de placa', norma: 'IEEE C57.19.100' },
   collar:      { formula: 'Pérdida del collar caliente por buje (mW)', umbral: '<100 mW', norma: 'Test Data Reference Book' },
@@ -102,11 +102,11 @@ export const CRITERIOS_NORMA = Object.freeze({
  * DOMINIO (no se delega a la IA): el shell lo adjunta a cada bloque como
  * `limite_desbalance` si la IA no lo emitió, para que el tablero grafique la
  * desviación contra su límite y derive la columna Evaluación. excitación 10%
- * (I<50 mA), relación ±0.5%, resistencia ≤5% (IEEE 62.2/C57.152). */
+ * (I<50 mA), relación ±0.5%, resistencia ≤2% (NETA ATS §7.2.2.D.8). */
 export const UMBRAL_DESBALANCE = Object.freeze({
   excitacion: 10,
   relacion: 0.5,
-  resistencia: 5
+  resistencia: 2
 });
 
 /* ─── Resistencia de aislamiento: mínimo NETA por clase de tensión ──────

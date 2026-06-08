@@ -13,6 +13,7 @@
 
 import { ejeMax, ticksY } from './grafico-svg.js';
 import { derivarTablaTAP } from '../../domain/pruebas_electricas_bloques.js';
+import { ESTADOS, calificarTanDelta, calificarCollar } from '../../domain/pruebas_electricas_semaforo.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 // Paleta estable (se asigna por índice cuando la serie no trae color).
@@ -350,6 +351,48 @@ const BADGE = (calif) => {
   return calif ? `<span class="badge ${cls}">${esc(calif)}</span>` : '';
 };
 
+// Veredicto NORMATIVO de un bloque: derivado de los valores medidos contra el
+// criterio de la norma (NO del texto de la IA). L-36 / ADR-011.
+//   · aislamiento (invertir): mínimo medido vs mínimo NETA por clase (bloque.limite)
+//   · FP/tan δ y bujes: peor tan δ medido (bandas IEEE 62)
+//   · collar: peor pérdida (mW)
+//   · curvas por TAP: peor desbalance entre fases vs `limite_desbalance`
+function calificarBloque(bloque) {
+  if (!bloque) return null;
+  const p = String(bloque.prueba || '').toLowerCase();
+  const ys = (bloque.series || []).flatMap((s) => (s.puntos || []).map((pt) => pt.y))
+    .filter((v) => typeof v === 'number');
+  if (bloque.invertir === true && bloque.limite != null) {
+    if (!ys.length) return null;
+    return Math.min(...ys) < bloque.limite ? ESTADOS.NARANJA : ESTADOS.VERDE;
+  }
+  if (/tan|tand|bushing/.test(p)) {
+    return ys.length ? calificarTanDelta(Math.max(...ys)) : null;
+  }
+  if (/collar/.test(p)) {
+    return ys.length ? calificarCollar(Math.max(...ys)) : null;
+  }
+  if (bloque.limite_desbalance != null) {
+    const dev = bloqueDesviacion(bloque);
+    const ds = (dev.series || []).flatMap((s) => (s.puntos || []).map((pt) => Math.abs(pt.y)))
+      .filter((v) => typeof v === 'number');
+    if (!ds.length) return null;
+    const max = Math.max(...ds), lim = bloque.limite_desbalance;
+    if (max > lim) return ESTADOS.ROJO;
+    if (max > lim * 0.8) return ESTADOS.AMBAR;
+    return ESTADOS.VERDE;
+  }
+  return null;
+}
+
+// Badge del bloque: veredicto normativo (valor vs norma). Cae al texto de la IA
+// solo si no se puede derivar (bloque sin valores/criterio reconocible).
+function badgeBloque(bloque) {
+  const e = calificarBloque(bloque);
+  if (!e || e === ESTADOS.NEUTRAL) return BADGE(bloque.calif);
+  return `<span class="badge ${e.clase}">${esc(e.etiqueta)}</span>`;
+}
+
 /**
  * Monta una gráfica (chips de filtro por fase + SVG) para un bloque. El filtro
  * por fase opera sobre series (curvas) o categorías (barras), y se aplica a
@@ -463,7 +506,7 @@ export function renderBloque(bloque) {
   const card = document.createElement('section');
   card.className = 'pe-bloque';
   const norm = bloque.prueba ? `<span class="norm">${esc(bloque.prueba)}</span>` : '';
-  let html = `<h2>${esc(bloque.titulo)} ${BADGE(bloque.calif)} ${norm}</h2>`;
+  let html = `<h2>${esc(bloque.titulo)} ${badgeBloque(bloque)} ${norm}</h2>`;
   if (bloque.observaciones) {
     // Callout de hallazgo: ámbar ("Dato a verificar") cuando la calificación o
     // algún punto pide confirmación humana; "Análisis de la IA" si no.
