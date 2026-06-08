@@ -906,12 +906,20 @@ async function onClickReportlist(ev) {
     }
     const etiqOrig = rep.textContent;
     rep.disabled = true;
-    rep.textContent = '↻ Reprocesando…';
+    // Contador de progreso: la re-extracción con IA (Opus, razonamiento sobre el
+    // PDF) tarda típicamente 1–3 min en informes densos. Mostrar el tiempo
+    // transcurrido le da CERTEZA al usuario de que avanza (no está colgado).
+    const t0 = Date.now();
+    const fmt = (ms) => { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+    const tick = () => { rep.textContent = `↻ Reprocesando con IA… ${fmt(Date.now() - t0)}`; };
+    tick();
+    const timer = setInterval(tick, 1000);
+    let ok = false;
     try {
       // Re-extracción con IA SERVER-SIDE: la Cloud Function lee el PDF desde
       // Storage en el servidor (NO se descarga al navegador → sin CORS, L-29) y
       // re-extrae con la misma calidad que la carga. Re-deriva el FP de bujes
-      // canónico, así reprocesar puebla bujes sin necesidad de re-subir.
+      // canónico + la identidad/placa, así reprocesar actualiza sin re-subir.
       const r = await conTiempoLimite(
         extraerConIA({
           unidadId, serie: inf.serie || serieTxt,
@@ -939,15 +947,20 @@ async function onClickReportlist(ev) {
         await guardarBloques(unidadId, informeId, bloquesIA, { ...(r.diagnostico || {}), mediciones_raw: mediciones });
       } catch (e) { console.warn('[pruebas-electricas] guardarBloques (reproceso)', e); }
       state.bloquesCache.delete(informeId); // fuerza recarga del análisis con lo nuevo
-      console.info(`[pruebas-electricas] reproceso IA ${esc(serieTxt)} · ${inf.ano || 's/a'} · tokens`, r.usage);
-      toast(`Informe ${inf.ano || ''} reprocesado con IA.`);
+      ok = true;
+      const segs = Math.round((Date.now() - t0) / 1000);
+      const nb = bloquesIA.length;
+      console.info(`[pruebas-electricas] reproceso IA ${esc(serieTxt)} · ${inf.ano || 's/a'} · ${segs}s · ${nb} bloques`, r.usage);
+      toast(`✓ Informe ${inf.ano || ''} reprocesado con IA en ${segs}s · ${nb} bloque(s). Datos actualizados.`);
       // onSnapshot refresca la tabla sola.
     } catch (err) {
       console.error('[pruebas-electricas] reprocesar', err);
-      rep.disabled = false;
-      rep.textContent = etiqOrig;
       const detalle = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : '';
       toast(`No se pudo reprocesar el informe${detalle}.`, 'warn');
+    } finally {
+      clearInterval(timer);
+      rep.disabled = false;
+      rep.textContent = ok ? '✓ Reprocesado' : etiqOrig;
     }
     return;
   }
