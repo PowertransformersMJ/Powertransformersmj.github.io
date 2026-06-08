@@ -72,6 +72,7 @@
 | §12 | ADR-012 — Evaluación MULTI-NORMA (veredicto por cada norma + consolidado conservador + divergencias) | 267 |
 | §13 | ADR-013 — FP de bujes canónico (discriminado) + Tendencia de alto nivel (diagnóstico multi-norma por métrica) | 290 |
 | §14 | ADR-014 — Identidad/placa CONGELADA por informe (trafo móvil doble config: aislamiento por clase del propio ensayo) | 311 |
+| §15 | ADR-015 — "Reprocesar" 100% funcional: reintento con backoff de fallos transitorios de la IA (server-side) + presupuesto de tiempo | 332 |
 
 ---
 

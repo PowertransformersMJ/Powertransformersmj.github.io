@@ -31,6 +31,7 @@ import { onSchedule }        from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret }       from 'firebase-functions/params';
 import Anthropic from '@anthropic-ai/sdk';
+import { conReintentosIA } from './reintentos.mjs';
 
 // Lógica pura del dominio (módulos sin imports de Firebase SDK).
 // La carpeta ./domain/ se sincroniza automáticamente desde
@@ -498,9 +499,12 @@ export const extraerPruebasElectricasIA = onCall(
   {
     region: 'southamerica-east1',
     secrets: [LLM_API_KEY],
-    // 9 min: un escaneo denso con thinking + extracción de bloques excede los
-    // 300 s previos. Gen2 admite hasta 3600 s. El cliente espera 540 s (igual).
-    timeoutSeconds: 540,
+    // 15 min: un escaneo denso con thinking + extracción de bloques tarda 1–4 min,
+    // y el reintento de un fallo transitorio de la IA (TODO-09) puede sumar otra
+    // pasada → margen para ~2 intentos lentos sin abortar. Gen2 admite 3600 s. El
+    // cliente espera 900 s (igual). El presupuesto real de los reintentos se acota
+    // por deadlineMs (820 s) para dejar margen al post-proceso antes del timeout.
+    timeoutSeconds: 900,
     // 1 GiB (gen2 acopla más CPU → base64 + visión más rápidos) y margen para
     // el PDF base64 (~5 MB) + el stream de la respuesta.
     memory: '1GiB'
@@ -531,7 +535,9 @@ export const extraerPruebasElectricasIA = onCall(
     //    JSON. Con la herramienta FORZADA, el thinking se desactiva y el
     //    modelo se "conforma" extrayendo solo lo más visible (tan δ) → por eso
     //    fallaba en informes densos. Streaming evita que outputs largos corten.
-    const client = new Anthropic({ apiKey: LLM_API_KEY.value() });
+    // maxRetries: 0 → el reintento lo gobierna conReintentosIA (presupuesto de
+    // tiempo + "no tool block" = transitorio), no el backoff opaco del SDK.
+    const client = new Anthropic({ apiKey: LLM_API_KEY.value(), maxRetries: 0 });
     const userMsg =
       `Analiza este informe de pruebas eléctricas COMPLETO, página por página, de ` +
       `principio a fin (archivo: ${filename || 'informe.pdf'}). Un informe típico trae VARIAS ` +
@@ -565,11 +571,33 @@ export const extraerPruebasElectricasIA = onCall(
       params.thinking = { type: 'adaptive' };
       params.output_config = { effort: 'high' };
     }
+    // Reintento con backoff (TODO-09): un fallo TRANSITORIO de la IA (429/500/529
+    // overloaded, corte de stream) o que el modelo NO llame la herramienta es un
+    // hipo de la IA, no del PDF ni del código → se reintenta. Un stream no se
+    // reusa: cada intento abre uno NUEVO. Presupuesto acotado al timeout de la CF.
+    const inicioIA = Date.now();
     let message;
     try {
-      const stream = client.messages.stream(params);
-      message = await stream.finalMessage();
+      message = await conReintentosIA(async () => {
+        const stream = client.messages.stream(params);
+        const msg = await stream.finalMessage();
+        const tiene = (msg.content || []).some(
+          (b) => b.type === 'tool_use' && b.name === 'registrar_pruebas_electricas'
+        );
+        // Sin tool_use: el modelo se "conformó" (hipo transitorio, L-26) →
+        // marcar 529 para que el reintento lo absorba en vez de fallar duro.
+        if (!tiene) { const err = new Error('La IA no devolvió datos estructurados.'); err.status = 529; throw err; }
+        return msg;
+      }, {
+        intentos: 4,
+        baseMs: 1500,
+        deadlineMs: inicioIA + 820000, // dentro del timeoutSeconds 900 de la CF
+        onReintento: ({ intento, intentos, espera, error }) =>
+          console.warn(`[extraerPruebasElectricasIA] reintento ${intento}/${intentos} tras fallo transitorio (${error.status || ''} ${error.message || error}); espera ${Math.round(espera)}ms`),
+      });
     } catch (e) {
+      // Permanente/externo o presupuesto agotado: el fallo es ajeno a la IA
+      // (sin saldo, PDF ilegible, infra) → relanzar; "Reprocesar" es reintentable.
       throw new HttpsError('internal', `Claude API: ${e.message || e}`);
     }
 
