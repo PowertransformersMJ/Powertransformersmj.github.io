@@ -24,7 +24,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { initializeApp } from 'firebase-admin/app';
-import { getFirestore }   from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getStorage }     from 'firebase-admin/storage';
 import { onDocumentCreated } from 'firebase-functions/v2/firestore';
 import { onSchedule }        from 'firebase-functions/v2/scheduler';
@@ -37,6 +37,12 @@ import { conReintentosIA } from './reintentos.mjs';
 // La carpeta ./domain/ se sincroniza automáticamente desde
 // ../assets/js/domain/ por functions/prepare-deploy.mjs (predeploy hook).
 import { snapshotSaludCompleto } from './domain/salud_activos.js';
+// Dominio puro de Pruebas Eléctricas (sincronizado a ./domain/ por el predeploy)
+// para que el REPROCESO persista server-side reusando la MISMA lógica que el
+// cliente → una sola fuente de verdad (sin divergencia de sanitización).
+import { sanitizarInforme, sanitizarUnidad } from './domain/pruebas_electricas_schema.js';
+import { sanitizarBloques, derivarBushing } from './domain/pruebas_electricas_bloques.js';
+import { deepClean } from './domain/firestore_clean.js';
 
 // Compute mínimo de alertas críticas para el cron (subconjunto v2).
 // Las reglas v1 ricas viven en assets/js/data/alertas.js (browser).
@@ -495,6 +501,75 @@ const HERRAMIENTA_PRUEBAS = {
   }
 };
 
+// ── Persistencia server-side del REPROCESO (ADR-016) ──────────────
+// Antes el reproceso devolvía los datos al NAVEGADOR y el cliente los
+// guardaba; si el cliente se desconectaba/recargaba/agotaba el tiempo, el
+// trabajo se perdía y el estado quedaba ambiguo ("transcurre el tiempo y no
+// se aprecia si terminó o hubo problemas"). Ahora la función PERSISTE ella
+// misma (admin SDK) y escribe un ESTADO DURABLE en el informe → la fila lo
+// refleja en vivo (onSnapshot), sobrevive a recargas, y no bloquea al usuario.
+const refInforme = (unidadId, informeId) =>
+  getFirestore().collection('pruebas_electricas').doc(unidadId)
+    .collection('informes').doc(informeId);
+
+// Marca el estado del reproceso (reemplaza el mapa `reproceso` completo para
+// no dejar campos viejos: motivo/fin de un intento previo). Best-effort.
+async function marcarReproceso(unidadId, informeId, estado, motivo) {
+  if (!unidadId || !informeId) return;
+  const rep = { estado, ts: FieldValue.serverTimestamp() };
+  if (estado === 'en_curso') rep.inicio = FieldValue.serverTimestamp();
+  else rep.fin = FieldValue.serverTimestamp();
+  if (motivo) rep.motivo = String(motivo).slice(0, 280);
+  try { await refInforme(unidadId, informeId).update({ reproceso: rep }); }
+  catch (e) { console.warn('[reproceso] no se pudo marcar estado', estado, e && e.message); }
+}
+
+// Persiste el resultado de la re-extracción en el MISMO informe (reusa los
+// sanitizadores del dominio = idéntico al cliente). Escribe: doc del informe
+// (parche + estado reproceso 'ok'), subcolección diagnostico/ia (bloques +
+// crudo) y enriquece la unidad con la placa. Lanza si la escritura falla.
+async function persistirReproceso(unidadId, informeId, model, entrada, bloquesRaw, usage, resumen) {
+  const inforRef = refInforme(unidadId, informeId);
+  const snap = await inforRef.get();
+  const inf = snap.exists ? (snap.data() || {}) : {};
+  const parche = sanitizarInforme({
+    ...entrada,
+    unidadId,
+    serie: inf.serie || entrada.serie,
+    ano:   entrada.ano != null ? entrada.ano : inf.ano,
+    fecha: entrada.fecha || inf.fecha,
+    bushing:  derivarBushing(bloquesRaw),
+    identidad: entrada.unidad || inf.identidad,
+    pdf: { ...(inf.pdf || {}), estado: 'extraido_ia' }
+  });
+  // 1) Informe: parche de mediciones + estado reproceso 'ok' (misma escritura).
+  await inforRef.update(deepClean({
+    ...parche,
+    updatedAt: FieldValue.serverTimestamp(),
+    reproceso: { estado: 'ok', fin: FieldValue.serverTimestamp(), ts: FieldValue.serverTimestamp(), modelo: model }
+  }));
+  // 2) Diagnóstico (subcolección): bloques sanitizados + crudo (string JSON, L-30).
+  const limpio = sanitizarBloques(bloquesRaw);
+  const payload = {
+    schema_version: limpio.schema_version, bloques: limpio.bloques,
+    modelo: model, usage, resumen, mediciones_raw: entrada
+  };
+  await inforRef.collection('diagnostico').doc('ia').set({
+    payload: JSON.stringify(payload),
+    n_bloques: limpio.bloques.length,
+    ts: FieldValue.serverTimestamp()
+  });
+  // 3) Enriquecer la unidad con la placa (best-effort, no bloquea el reproceso).
+  if (entrada.unidad) {
+    try {
+      const uPayload = sanitizarUnidad({ serie: unidadId, ...entrada.unidad });
+      await getFirestore().collection('pruebas_electricas').doc(unidadId)
+        .set(deepClean({ ...uPayload, updatedAt: FieldValue.serverTimestamp() }), { merge: true });
+    } catch (e) { console.warn('[reproceso] enriquecer unidad', e && e.message); }
+  }
+  return { n_bloques: limpio.bloques.length };
+}
+
 export const extraerPruebasElectricasIA = onCall(
   {
     region: 'southamerica-east1',
@@ -513,11 +588,16 @@ export const extraerPruebasElectricasIA = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
     }
-    const { storagePath, filename, modelId } = request.data || {};
+    const { storagePath, filename, modelId, unidadId, informeId } = request.data || {};
     if (!storagePath || typeof storagePath !== 'string') {
       throw new HttpsError('invalid-argument', 'Falta storagePath del PDF.');
     }
     const model = MODELOS_IA.has(modelId) ? modelId : MODELO_IA_DEFAULT;
+    // Modo REPROCESO (ADR-016): con informeId la función persiste el resultado
+    // ella misma y escribe el estado durable. Sin informeId = modo CARGA (devuelve
+    // los datos al cliente, que persiste con su lógica de upsert/confirmación).
+    const esReproceso = !!(unidadId && informeId);
+    if (esReproceso) await marcarReproceso(unidadId, informeId, 'en_curso');
 
     // 1) Descargar el PDF nativo desde Storage (server-side: sin límite
     //    de payload del callable; el PDF ya fue subido por el cliente).
@@ -526,6 +606,7 @@ export const extraerPruebasElectricasIA = onCall(
       const [buf] = await getStorage().bucket().file(storagePath).download();
       pdfBase64 = buf.toString('base64');
     } catch (e) {
+      if (esReproceso) await marcarReproceso(unidadId, informeId, 'error', `PDF en Storage: ${e.message}`);
       throw new HttpsError('not-found', `No se pudo leer el PDF en Storage: ${e.message}`);
     }
 
@@ -597,7 +678,8 @@ export const extraerPruebasElectricasIA = onCall(
       });
     } catch (e) {
       // Permanente/externo o presupuesto agotado: el fallo es ajeno a la IA
-      // (sin saldo, PDF ilegible, infra) → relanzar; "Reprocesar" es reintentable.
+      // (sin saldo, PDF ilegible, infra) → marcar estado durable + relanzar.
+      if (esReproceso) await marcarReproceso(unidadId, informeId, 'error', `IA: ${e.message || e}`);
       throw new HttpsError('internal', `Claude API: ${e.message || e}`);
     }
 
@@ -657,6 +739,19 @@ export const extraerPruebasElectricasIA = onCall(
       console.warn('[IA-DIAG] no se pudo serializar el diagnóstico:', e && e.message);
     }
 
+    // Modo REPROCESO (ADR-016): persistir server-side + estado durable. El
+    // cliente NO vuelve a guardar; la fila refleja 'ok'/'error' vía onSnapshot.
+    if (esReproceso) {
+      try {
+        const { n_bloques } = await persistirReproceso(unidadId, informeId, model, entrada, bloquesRaw, usage, resumen);
+        return { persisted: true, estado: 'ok', modelUsed: model, n_bloques, usage };
+      } catch (e) {
+        await marcarReproceso(unidadId, informeId, 'error', `Persistencia: ${e.message || e}`);
+        throw new HttpsError('internal', `Persistencia del reproceso: ${e.message || e}`);
+      }
+    }
+
+    // Modo CARGA: devolver los datos crudos; el cliente persiste (upsert/confirm).
     return {
       mediciones: entrada,
       bloques: bloquesRaw,

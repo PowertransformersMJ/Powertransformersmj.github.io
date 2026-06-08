@@ -341,8 +341,13 @@ export async function cargarBloques(unidadId, informeId) {
  * documento nativo y devuelve las mediciones en la MISMA forma que
  * consume sanitizarInforme(). Lanza si no hay backend, sin sesión, sin
  * saldo o si la IA falla — el llamador hace fallback al extractor local.
- * @param {{unidadId:string, serie:string, storagePath:string, filename?:string, modelId?:string}} payload
- * @returns {Promise<{mediciones:object, bloques?:Array, modelUsed:string, usage:object}>}
+ * Con `informeId` la función opera en MODO REPROCESO (ADR-016): persiste el
+ * resultado server-side y escribe el estado durable en el informe; devuelve un
+ * ack `{persisted, estado, n_bloques}` (sin `mediciones`, el cliente NO guarda).
+ * Sin `informeId` = MODO CARGA: devuelve los datos crudos para que el cliente
+ * persista con su lógica de upsert/confirmación.
+ * @param {{unidadId:string, serie:string, storagePath:string, filename?:string, modelId?:string, informeId?:string}} payload
+ * @returns {Promise<object>}
  */
 export async function extraerConIA(payload) {
   if (!isReady()) throw new Error('Firebase no inicializado.');
@@ -362,10 +367,13 @@ export async function extraerConIA(payload) {
     serie:       payload.serie,
     storagePath: payload.storagePath,
     filename:    payload.filename || '',
-    modelId:     payload.modelId || ''
+    modelId:     payload.modelId || '',
+    informeId:   payload.informeId || ''
   });
   const data = res && res.data;
-  if (!data || !data.mediciones) throw new Error('La IA no devolvió mediciones.');
+  if (!data) throw new Error('La función no devolvió datos.');
+  // Modo reproceso: ack server-side (sin mediciones). Modo carga: exige mediciones.
+  if (!payload.informeId && !data.mediciones) throw new Error('La IA no devolvió mediciones.');
   return data;
 }
 

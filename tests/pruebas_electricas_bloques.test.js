@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import {
   sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION,
-  quitarColumnasVeredicto
+  quitarColumnasVeredicto, derivarBushing
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -211,5 +211,39 @@ describe('quitarColumnasVeredicto (L-42 · ninguna columna OK/Correcto)', () => 
   });
   test('sin columnas → devuelve igual', () => {
     assert.deepEqual(quitarColumnasVeredicto({ columnas: [], filas: [] }), { columnas: [], filas: [] });
+  });
+});
+
+describe('derivarBushing · FP canónico (peor tan δ + peor ΔC1 vs placa) — ADR-016', () => {
+  const bloqueBuje = (puntos) => ({ prueba: 'bushing', titulo: 'Bujes', series: [{ nombre: 'C1', puntos }] });
+
+  test('sin bloques de buje → null', () => {
+    assert.equal(derivarBushing([]), null);
+    assert.equal(derivarBushing([{ prueba: 'excitacion', series: [] }]), null);
+    assert.equal(derivarBushing(null), null);
+  });
+
+  test('toma el PEOR tan δ (y máx) entre puntos/series', () => {
+    const r = derivarBushing([bloqueBuje([{ x: 1, y: 0.31 }, { x: 2, y: 0.55 }, { x: 3, y: 0.28 }])]);
+    assert.equal(r.fp_max_pct, 0.55);
+    assert.equal(r.dc1_max_pct, null); // sin capacitancias → sin ΔC1
+  });
+
+  test('ΔC1 = |medida - placa| / placa * 100, peor caso', () => {
+    const r = derivarBushing([bloqueBuje([
+      { x: 1, y: 0.3, extra: { 'Cap. placa (pF)': 400, 'Cap. medida (pF)': 404 } }, // 1.0%
+      { x: 2, y: 0.3, extra: { 'Cap placa (pF)': 400, 'Cap medida (pF)': 410 } }     // 2.5% (alias sin punto)
+    ])]);
+    assert.equal(r.dc1_max_pct, 2.5);
+    assert.equal(r.fp_max_pct, 0.3);
+  });
+
+  test('reconoce "buje" además de "bushing"; ignora placa 0 o no numérica', () => {
+    const r = derivarBushing([{ prueba: 'Buje C1', series: [{ puntos: [
+      { x: 1, y: 0.4, extra: { 'Cap. placa (pF)': 0, 'Cap. medida (pF)': 10 } },     // placa 0 → ignora ΔC1
+      { x: 2, y: 0.2, extra: { 'Cap. placa (pF)': 'x', 'Cap. medida (pF)': 10 } }    // no numérica → ignora
+    ] }] }]);
+    assert.equal(r.fp_max_pct, 0.4);
+    assert.equal(r.dc1_max_pct, null);
   });
 });

@@ -62,8 +62,50 @@ function esPendienteExtraccion(inf) {
   return !String(e).startsWith('extraido') && e !== 'procesado';
 }
 
-// `kind`: 'pending' (PDF cargado sin extraer) vs procesado.
+// Estado durable del REPROCESO server-side (ADR-016). El informe trae un mapa
+// `reproceso: {estado, inicio, fin, motivo}` que la Cloud Function escribe. Se
+// lee aquí para que la fila muestre un estado TERMINAL claro (en vivo, vía
+// onSnapshot, sobreviviendo a recargas). Si quedó 'en_curso' más que el tope de
+// la CF (900 s + margen) → 'interrumpido' (la llamada murió; el usuario reintenta).
+const REPROC_STALE_MS = 16 * 60 * 1000;
+function tsMs(t) {
+  if (!t) return 0;
+  if (typeof t.toMillis === 'function') return t.toMillis();
+  if (typeof t.seconds === 'number') return t.seconds * 1000;
+  const n = Date.parse(t); return Number.isFinite(n) ? n : 0;
+}
+function horaCorta(ms) {
+  if (!ms) return '';
+  try { return new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
+}
+function reprocEstado(inf) {
+  const r = inf && inf.reproceso;
+  if (!r || !r.estado) return null;
+  if (r.estado === 'en_curso') {
+    const desde = tsMs(r.inicio || r.ts);
+    if (desde && (Date.now() - desde) > REPROC_STALE_MS) return { estado: 'interrumpido' };
+    return { estado: 'en_curso', desde };
+  }
+  if (r.estado === 'error') return { estado: 'error', motivo: r.motivo || '', fin: tsMs(r.fin || r.ts) };
+  return { estado: r.estado }; // 'ok'
+}
+
+// `kind`: 'pending' (PDF cargado sin extraer) vs procesado, con overlay del
+// estado de reproceso (reprocesando / interrumpido / error) cuando aplica.
 function badgeEstadoInforme(inf) {
+  const re = reprocEstado(inf);
+  if (re && re.estado === 'en_curso') {
+    const d = re.desde ? ` desde ${horaCorta(re.desde)}` : '';
+    return `<span class="badge b-a">⟳ reprocesando…${esc(d)}</span>`;
+  }
+  if (re && re.estado === 'interrumpido') {
+    return '<span class="badge b-o" title="El reproceso anterior no terminó (se interrumpió). Vuelve a intentar.">⚠ reproceso interrumpido</span>';
+  }
+  if (re && re.estado === 'error') {
+    const t = re.motivo ? ` (${re.motivo})` : '';
+    return `<span class="badge b-r" title="${esc('Reproceso falló' + t)}">⚠ reproceso falló</span>`;
+  }
   return esPendienteExtraccion(inf)
     ? '<span class="badge b-a">pendiente de extracción</span>'
     : '<span class="badge b-g">procesado</span>';
@@ -82,9 +124,15 @@ function accionesPdf(inf) {
   // Reprocesar: disponible para CUALQUIER informe vivo con PDF en Storage (no
   // solo pendientes). Re-extrae con IA server-side → refresca con la lógica/
   // campos actuales (identidad por placa, FP de bujes canónico, etc.) sin re-subir.
+  // Mientras un reproceso está EN CURSO (estado durable), el botón se bloquea
+  // (ADR-016) para no lanzar dos a la vez; se reactiva al terminar (ok/error).
+  const re = reprocEstado(inf);
+  const enCurso = re && re.estado === 'en_curso';
   const reproc = (!inf._seed && inf.pdf && inf.pdf.storagePath)
-    ? `<button type="button" class="btn-sm reproc" data-reproc="${esc(inf.id)}" ` +
-      `data-ano="${esc(inf.ano)}" title="Re-extraer el informe con IA (servidor) y actualizar sus datos">↻ Reprocesar</button>`
+    ? (enCurso
+      ? `<button type="button" class="btn-sm reproc" disabled title="Reproceso en curso en el servidor — la fila se actualizará sola al terminar">↻ Reprocesando…</button>`
+      : `<button type="button" class="btn-sm reproc" data-reproc="${esc(inf.id)}" ` +
+        `data-ano="${esc(inf.ano)}" title="Re-extraer el informe con IA (servidor) y actualizar sus datos">↻ Reprocesar</button>`)
     : '';
   // Editar datos: captura manual de los valores reales leídos del PDF.
   // Solo para informes vivos (los base/seed son de solo lectura).

@@ -258,3 +258,36 @@ export function quitarColumnasVeredicto(tabla) {
   const quitar = (arr) => arr.filter((_, i) => !drop.includes(i));
   return { columnas: quitar(cols), filas: filas.map(quitar) };
 }
+
+/**
+ * Deriva el FP de bujes CANÓNICO (peor tan δ y peor desviación de C1 vs placa)
+ * a partir de los bloques de bushing/buje (ADR-013). Puro y portable: lo usan
+ * el shell (carga/reproceso cliente) y la Cloud Function (reproceso server-side)
+ * → una sola fuente de verdad. `null` si el informe no trae bujes.
+ * @param {Array} bloques
+ * @returns {{fp_max_pct:number|null, dc1_max_pct:number|null}|null}
+ */
+export function derivarBushing(bloques) {
+  const bs = (Array.isArray(bloques) ? bloques : []).filter((b) => b && /bushing|buje/i.test(b.prueba || ''));
+  if (!bs.length) return null;
+  let fpMax = null, dc1Max = null;
+  for (const b of bs) {
+    for (const s of (b.series || [])) {
+      for (const p of (s.puntos || [])) {
+        if (typeof p.y === 'number') fpMax = (fpMax == null) ? p.y : Math.max(fpMax, p.y);
+        const ex = p.extra || {};
+        const placa = Number(ex['Cap. placa (pF)'] ?? ex['Cap placa (pF)']);
+        const med = Number(ex['Cap. medida (pF)'] ?? ex['Cap medida (pF)']);
+        if (Number.isFinite(placa) && placa && Number.isFinite(med)) {
+          const d = Math.abs((med - placa) / placa) * 100;
+          dc1Max = (dc1Max == null) ? d : Math.max(dc1Max, d);
+        }
+      }
+    }
+  }
+  if (fpMax == null && dc1Max == null) return null;
+  return {
+    fp_max_pct: fpMax != null ? +fpMax.toFixed(4) : null,
+    dc1_max_pct: dc1Max != null ? +dc1Max.toFixed(3) : null
+  };
+}
