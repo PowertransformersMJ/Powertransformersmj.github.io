@@ -38,7 +38,7 @@ import { derivarBushing, bloquesMultiAno } from './domain/pruebas_electricas_blo
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
-import { mountBloques, renderBloque } from './ui/pruebas/grafico-generico.js';
+import { mountBloques, svgBloque } from './ui/pruebas/grafico-generico.js';
 import { bloquesTendencia, resumenTendenciaParaIA, analisisTendencia } from './domain/pruebas_electricas_tendencia.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
@@ -458,7 +458,20 @@ function diagnosticoUnidadHtml(docs) {
     const accBadge = `<span class="badge ${esc(acc.clase || 'b-n')}" title="Acción de mantenimiento">${esc(acc.etiqueta || '—')}</span>`;
     const rel = m.relevante ? '<span title="Cambio relevante" style="color:#dc2626;font-weight:700">●</span> ' : '';
     const hi = m.relevante ? ' style="border-left:3px solid #dc2626;padding-left:8px"' : '';
+    // Cambios AÑO A AÑO (todo el historial) — cada salto con su dirección.
+    const flecha = (d) => d === 'empeora' ? '▲' : (d === 'mejora' ? '▼' : '→');
+    const cls = (d) => d === 'empeora' ? 'b-r' : (d === 'mejora' ? 'b-g' : 'b-n');
+    const cambios = (m.cambios && m.cambios.length)
+      ? `<div class="pe-diag-cambios" style="margin:4px 0;font-size:12px;color:#475569">Año a año: `
+        + m.cambios.map((c) => `<span class="badge ${cls(c.dir)}" style="margin:0 2px">${esc(c.de)}→${esc(c.a)} ${flecha(c.dir)}${c.deltaRel != null ? ` ${c.deltaRel > 0 ? '+' : ''}${esc(c.deltaRel)}%` : ''}</span>`).join('')
+        + `</div>`
+      : '';
+    // PROYECCIÓN de la tendencia (a dónde va al ritmo actual).
+    const proy = m.proyeccion
+      ? `<p class="pe-diag-rec" style="margin:2px 0 0"><b>Proyección</b> — ${esc(m.proyeccion.texto)}</p>`
+      : '';
     return `<details class="pe-diag-row"${m.relevante ? ' open' : ''}${hi}><summary>${rel}<span class="pe-diag-m">${esc(m.titulo)}</span> ${badge} ${accBadge} ${trendMarker(m)} ${div}</summary>`
+      + cambios + proy
       + `<p class="pe-diag-rec"><b>${esc(acc.etiqueta || 'Acción')} · criterio + diagnóstico</b> — ${esc(acc.texto || m.recomendacion)}</p></details>`;
   }).join('');
   const relevantes = analisis.filter((m) => m.relevante).map((m) => m.titulo);
@@ -472,7 +485,7 @@ function diagnosticoUnidadHtml(docs) {
     + '<span class="badge b-r">Correctiva</span> fuera de norma · '
     + '<span class="badge b-n">Diagnóstica</span> confirmar medición</p>';
   return '<section class="pe-diagnostico">'
-    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto vigente multi-norma + tendencia + acción</span></div>'
+    + '<div class="pe-diag-head">Diagnóstico de la unidad <span class="norm">veredicto + cambios año a año + proyección + acción</span></div>'
     + `<div class="pe-diag-chips">${chips}</div>${aviso}<div class="pe-diag-list">${filas}</div>${leyenda}</section>`;
 }
 
@@ -558,13 +571,14 @@ async function onGenerarNarrativa() {
 }
 
 /* ─── Vista MULTI-AÑO: cada prueba con TODOS los años superpuestos ───────
- * Una gráfica por prueba; una LÍNEA por año (informe), superpuestas en el mismo
- * eje → se compara la evolución de cada ensayo a través de los años. El render
- * genérico (mountBloques) provee los chips de la leyenda para mostrar/ocultar
- * años POR PRUEBA. Cada año se reduce a su curva representativa (peor fase por X)
- * vía `bloquesMultiAno` (dominio puro, testeado). ADITIVA: NO toca la calificación
- * global ni el motor del veredicto. Se llama tras cargar los bloques (usa esas
- * curvas), por eso vive al final de `montarBloques`. */
+ * Una gráfica por prueba; superpone TODOS los años CONSERVANDO las fases (una
+ * línea por año×fase, valores REALES sin reducir → no degrada ni distorsiona).
+ * Filtros: AÑO **global** (chips arriba, aplican a TODAS las pruebas del libro) +
+ * FASE **por gráfica**. Color por AÑO (consistente entre gráficas) para comparar
+ * la evolución. ADITIVA: NO toca la calificación global ni el motor del veredicto
+ * (reusa `svgBloque` + `bloquesMultiAno`). Se llama tras cargar los bloques. */
+const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777'];
+
 function montarMultiAno() {
   const cont = $('pe-consolidado');
   if (!cont) return;
@@ -579,43 +593,84 @@ function montarMultiAno() {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer por año. Abre/sube informes con análisis IA.</p>';
     return;
   }
-  cont.innerHTML = '<p class="muted small" style="margin:0 0 8px">Cada gráfica es una prueba; cada línea es un año (informe). '
-    + 'Usa los chips de <b>Años</b> para mostrar/ocultar cada año por prueba. La línea es el PEOR caso entre fases de ese año.</p>';
-  for (const b of bloques) {
-    const anos = b.series.map((s) => s.nombre);
-    const activos = new Set(anos);
-    const wrap = document.createElement('div');
-    wrap.className = 'pe-bloque-grupo';
-    // Chips de AÑO POR PRUEBA: togglean qué años se ven en ESTA gráfica (el
-    // render genérico solo trae chips de FASE, no de año → se añaden aquí).
-    const bar = document.createElement('div');
-    bar.className = 'pe-fase-chips';
-    bar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px';
-    bar.appendChild(Object.assign(document.createElement('span'),
-      { textContent: 'Años:', style: 'font-size:12px;color:#475569;margin-right:2px' }));
-    const card = document.createElement('div');
-    const pintar = () => {
-      card.innerHTML = '';
-      const sub = { ...b, series: b.series.filter((s) => activos.has(s.nombre)) };
-      card.appendChild(renderBloque(sub));
-    };
-    anos.forEach((a) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'pe-fase-chip is-on';
-      btn.textContent = a;
-      btn.addEventListener('click', () => {
-        if (activos.has(a)) { if (activos.size > 1) activos.delete(a); } else activos.add(a);
-        btn.classList.toggle('is-on', activos.has(a));
-        pintar();
-      });
-      bar.appendChild(btn);
+  // Todos los años presentes en el libro (para el filtro GLOBAL). Color fijo por año.
+  const anosAll = [...new Set(bloques.flatMap((b) => b.series.map((s) => s._ano)))].sort();
+  const colorAno = (a) => COLORES_ANO[Math.max(0, anosAll.indexOf(a)) % COLORES_ANO.length];
+  if (!(state.multiAnoYears instanceof Set) || ![...state.multiAnoYears].every((y) => anosAll.includes(y)) || !state.multiAnoYears.size)
+    state.multiAnoYears = new Set(anosAll);
+  const selY = state.multiAnoYears;
+
+  cont.innerHTML = '';
+  const intro = document.createElement('p');
+  intro.className = 'muted small'; intro.style.margin = '0 0 6px';
+  intro.innerHTML = 'Cada gráfica es una prueba con <b>todos los años superpuestos</b> (una línea por fase y año, valores reales; '
+    + 'color por año). Filtra por <b>año</b> abajo (aplica a TODAS las pruebas) y por <b>fase</b> en cada gráfica.';
+  cont.appendChild(intro);
+
+  const gbar = document.createElement('div');
+  gbar.className = 'pe-fase-chips';
+  gbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
+  gbar.appendChild(Object.assign(document.createElement('span'),
+    { textContent: 'Años (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
+  const host = document.createElement('div');
+
+  const pintarTodo = () => {
+    host.innerHTML = '';
+    for (const b of bloques) {
+      const fases = [...new Set(b.series.map((s) => s._fase).filter(Boolean))];
+      if (!b._selF) b._selF = new Set(fases);
+      const selF = b._selF;
+      const wrap = document.createElement('div'); wrap.className = 'pe-bloque-grupo';
+      const h = document.createElement('h3'); h.textContent = b.titulo;
+      wrap.appendChild(h);
+      const chartBox = document.createElement('div'); chartBox.className = 'chartbox';
+      const repintar = () => {
+        chartBox.innerHTML = '';
+        const series = b.series
+          .filter((s) => selY.has(s._ano) && (!fases.length || selF.has(s._fase)))
+          .map((s) => ({ ...s, color: colorAno(s._ano) }));
+        const svg = series.length ? svgBloque({ ...b, series }) : null;
+        if (svg) chartBox.appendChild(svg);
+        else chartBox.innerHTML = '<p class="muted small">Sin series para los filtros activos.</p>';
+      };
+      if (fases.length > 1) {
+        const fbar = document.createElement('div');
+        fbar.className = 'pe-fase-chips';
+        fbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:2px 0 6px';
+        fbar.appendChild(Object.assign(document.createElement('span'),
+          { textContent: 'Fases:', style: 'font-size:12px;color:#475569' }));
+        fases.forEach((f) => {
+          const btn = document.createElement('button'); btn.type = 'button';
+          btn.className = 'pe-fase-chip' + (selF.has(f) ? ' is-on' : '');
+          btn.textContent = f;
+          btn.addEventListener('click', () => {
+            if (selF.has(f)) { if (selF.size > 1) selF.delete(f); } else selF.add(f);
+            btn.classList.toggle('is-on', selF.has(f)); repintar();
+          });
+          fbar.appendChild(btn);
+        });
+        wrap.appendChild(fbar);
+      }
+      wrap.appendChild(chartBox);
+      host.appendChild(wrap);
+      repintar();
+    }
+  };
+
+  anosAll.forEach((a) => {
+    const btn = document.createElement('button'); btn.type = 'button';
+    btn.className = 'pe-fase-chip' + (selY.has(a) ? ' is-on' : '');
+    btn.textContent = a;
+    btn.style.setProperty('--c', colorAno(a));
+    btn.addEventListener('click', () => {
+      if (selY.has(a)) { if (selY.size > 1) selY.delete(a); } else selY.add(a);
+      btn.classList.toggle('is-on', selY.has(a)); pintarTodo();
     });
-    wrap.appendChild(bar);
-    wrap.appendChild(card);
-    cont.appendChild(wrap);
-    pintar();
-  }
+    gbar.appendChild(btn);
+  });
+  cont.appendChild(gbar);
+  cont.appendChild(host);
+  pintarTodo();
 }
 
 function renderInformesUI(informes) {
