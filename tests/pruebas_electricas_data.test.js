@@ -152,6 +152,24 @@ describe('normalizarSerie (clave canónica para agrupar el mismo transformador)'
   });
 });
 
+describe('calificarPrueba aislamiento NETA por clase de tensión (opts.minNeta)', () => {
+  const inf = { aislamiento: [{ gohm: 5.5 }, { gohm: 6.0 }, { gohm: 5.0 }] };
+  test('sin minNeta → criterio genérico ≥1 GΩ (5 GΩ pasa → verde)', () => {
+    assert.equal(calificarPrueba('aislamiento', inf).estado.clase, 'b-g');
+  });
+  test('minNeta 30 (clase 110 kV) → 5 GΩ < 30 → investigar (naranja)', () => {
+    assert.equal(calificarPrueba('aislamiento', inf, { minNeta: 30 }).estado.clase, 'b-o');
+  });
+  test('minNeta 5 → el peor (5 GΩ) NO es < 5 → dentro de norma (verde)', () => {
+    assert.equal(calificarPrueba('aislamiento', inf, { minNeta: 5 }).estado.clase, 'b-g');
+  });
+  test('el veredicto sale del valor medido, no de ninguna calificación textual', () => {
+    // Aunque el informe dijera "Satisfactorio", 5 GΩ < 30 GΩ → investigar.
+    const r = calificarPrueba('aislamiento', { aislamiento: [{ gohm: 5.0 }], calif: 'Satisfactorio' }, { minNeta: 30 });
+    assert.equal(r.estado.clase, 'b-o');
+  });
+});
+
 describe('detectarAno (auto-detección del año por informe)', () => {
   test('prefijo YYMMDD en el nombre de archivo → año 20YY', () => {
     const r = detectarAno({ filename: '130823-pruebas.pdf' });

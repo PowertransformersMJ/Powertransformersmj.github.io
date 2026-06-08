@@ -266,6 +266,31 @@ function bloqueDesviacion(bloque) {
   };
 }
 
+/* ─── Bloque derivado: desviación GENERAL entre fases por TAP ─── */
+// Una sola curva: el desbalance MÁXIMO entre fases en cada posición ((máx−mín)
+// ÷ promedio × 100), contra el criterio de desbalance. Resume "de un vistazo"
+// cuánto se separan las fases en todo el recorrido del conmutador y si en algún
+// TAP roza el límite — complementa las 3 curvas por fase. Usado en resistencia.
+function bloqueDesviacionGeneral(bloque) {
+  const series = bloque.series || [];
+  const { cats } = ejeX(series);
+  const mapas = series.map((s) => new Map((s.puntos || []).map((p) => [String(p.x), p.y])));
+  const puntos = cats.map((c) => {
+    const vals = mapas.map((m) => m.get(String(c))).filter((v) => v != null);
+    if (vals.length < 2) return null;
+    const prom = vals.reduce((a, b) => a + b, 0) / vals.length;
+    if (!prom) return null;
+    const max = Math.max(...vals), min = Math.min(...vals);
+    return { x: c, y: +(((max - min) / Math.abs(prom)) * 100).toFixed(3) };
+  }).filter(Boolean);
+  return {
+    titulo: 'Desviación general entre fases por TAP (%)',
+    unidad: '%', eje_x: bloque.eje_x, grafica: 'linea',
+    limite: bloque.limite_desbalance,
+    series: [{ nombre: 'Desbalance máx (máx−mín)/prom', puntos }]
+  };
+}
+
 // Detecta una clave `extra` que YA es la desviación reportada por el informe
 // (p.ej. "%DIF" en relación). Devuelve la clave o null.
 const _DEV_KEY = /%?\s*dif|desviaci|\bdesv\b/i;
@@ -479,6 +504,18 @@ export function renderBloque(bloque) {
       const norma = bloque.criterio && bloque.criterio.norma ? ` (${bloque.criterio.norma})` : '';
       card.appendChild(chartCap(dev.titulo, `Evalúa el desbalance entre fases contra el criterio ${crit}${norma}.`));
       card.appendChild(montarGrafica(dev));
+    }
+    // Resistencia de devanados: además, una curva ÚNICA de desviación GENERAL
+    // (desbalance máx entre fases por TAP) contra su criterio — el desbalance
+    // entre fases es el criterio rector de esta prueba (IEEE 62.2 / C57.152).
+    if (bloque.prueba === 'resistencia') {
+      const gen = bloqueDesviacionGeneral(bloque);
+      if (gen.series.some((s) => s.puntos.length)) {
+        const norma = bloque.criterio && bloque.criterio.norma ? ` (${bloque.criterio.norma})` : '';
+        card.appendChild(chartCap(gen.titulo,
+          `Desbalance máximo entre fases en cada TAP contra el criterio ≤ ${bloque.limite_desbalance}%${norma}.`));
+        card.appendChild(montarGrafica(gen));
+      }
     }
   }
 
