@@ -23,6 +23,7 @@ import { evaluarMultiNorma, metricaPrueba } from '../../domain/pruebas_electrica
 // `criterio` es el texto de la columna "Criterio" (igual al tablero).
 const FILAS = [
   { key: 'tand',        label: 'Tangente δ (devanados)',         criterio: '≤1% (CL)' },
+  { key: 'bushing',     label: 'Factor de potencia de bujes (C1)', criterio: 'tan δ ≤1%' },
   { key: 'excitacion',  label: 'Corriente de excitación',        criterio: 'Δfases <10%' },
   { key: 'relacion',    label: 'Relación de transformación',     criterio: '±0.5%' },
   { key: 'resistencia', label: 'Resistencia de devanados',       criterio: 'Δfases ≤2%' },
