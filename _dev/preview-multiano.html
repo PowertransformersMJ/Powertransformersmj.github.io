@@ -26,6 +26,13 @@ const relac = (d) => ({ prueba: 'relacion', titulo: 'Relación de transformació
   series: [{ nombre: 'Fase A', puntos: tap(0.12, 9, 0.01, d) }, { nombre: 'Fase B', puntos: tap(0.10, 9, 0.012, d) }, { nombre: 'Fase C', puntos: tap(0.15, 9, 0.008, d) }] });
 const aisla = (d) => ({ prueba: 'aislamiento', titulo: 'Resistencia de aislamiento', unidad: 'GΩ', eje_x: 'Configuración', grafica: 'barra', limite: 30,
   series: [{ nombre: 'CH', puntos: [{ x: 'AT-T', y: 42 - d }, { x: 'MT-T', y: 38 - d }] }] });
+// NOTA: este harness es SOLO para validar el RENDER del componente de forma
+// aislada (la app real está tras Firebase/admin). Los valores son sintéticos del
+// dev-harness; NO representan ningún informe real. La feature de ADR-027 (mostrar
+// pruebas eléctricas fuera de las 7 canónicas, p.ej. SFRA) se verifica en los
+// TESTS UNITARIOS (tests/pruebas_electricas_bloques.test.js), no aquí — para NO
+// simular pruebas que no estén en los informes del director. En PRODUCCIÓN el
+// tablero muestra EXACTAMENTE las pruebas que la IA extrajo de cada informe.
 
 // 7 informes (como la serie 450108). OJO: dos comparten año 2021 (fechas distintas)
 // → reproduce el bug de "no se aprecian todos" al agrupar por año.
