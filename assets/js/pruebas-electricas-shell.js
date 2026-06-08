@@ -587,6 +587,39 @@ function renderInformesUI(informes) {
  * (ADR-007). Los informes seed no tienen diagnóstico. Cache por informeId:
  * onSnapshot re-renderiza seguido y no debe refetchear. Falla suave.
  */
+// Rellena los campos canónicos NUEVOS (identidad/placa + FP de bujes) de un
+// informe a partir de su diagnóstico YA almacenado (sin re-llamar a la IA). Solo
+// actúa si faltan y el diagnóstico los tiene → migración silenciosa e instantánea
+// de informes guardados antes de ADR-013/014.
+async function backfillCanonicos(unidadId, inf) {
+  if (!inf || !inf.id) return;
+  const diag = state.bloquesCache.get(inf.id);
+  if (!diag) return;
+  const parche = {};
+  // Identidad/placa: de mediciones_raw.unidad (la placa que leyó la IA).
+  const u = (diag.mediciones_raw && diag.mediciones_raw.unidad) || null;
+  if (!inf.identidad && u && (u.tensiones || u.grupo_conexion)) {
+    parche.identidad = {
+      tensiones: u.tensiones || '', grupo_conexion: u.grupo_conexion || '',
+      potencia: u.potencia || '', fabricante: u.fabricante || '',
+      ano_fabricacion: (u.ano_fabricacion != null ? u.ano_fabricacion : null),
+      subestacion: u.subestacion || '', ubicacion: u.ubicacion || '',
+      refrigeracion: u.refrigeracion || '', frecuencia: u.frecuencia || '', fases: u.fases || ''
+    };
+  }
+  // FP de bujes canónico: derivado de los bloques almacenados.
+  if (!inf.bushing && diag.bloques && diag.bloques.length) {
+    const b = derivarBushing(diag.bloques);
+    if (b) parche.bushing = b;
+  }
+  if (!Object.keys(parche).length) return;
+  try {
+    await actualizarInforme(unidadId, inf.id, parche);
+    Object.assign(inf, parche); // refleja en memoria sin esperar el onSnapshot
+    console.info(`[pruebas-electricas] backfill ${inf.ano || 's/a'}:`, Object.keys(parche).join(', '));
+  } catch (e) { console.warn('[pruebas-electricas] backfill', e); }
+}
+
 async function montarBloques(unidadId, informes) {
   const cont = $('bloques-cont');
   if (!cont) return;
@@ -600,6 +633,11 @@ async function montarBloques(unidadId, informes) {
     try { state.bloquesCache.set(inf.id, await cargarBloques(unidadId, inf.id)); }
     catch { state.bloquesCache.set(inf.id, null); }
   }));
+  // Backfill INSTANTÁNEO (sin IA) de los campos canónicos nuevos (identidad/placa
+  // + FP de bujes) en informes guardados ANTES de ADR-013/014: se derivan del
+  // diagnóstico YA almacenado (mediciones_raw + bloques). Evita tener que
+  // reprocesar (2–5 min de IA) solo para poblar estos campos. Best-effort.
+  await Promise.all(reales.map((inf) => backfillCanonicos(unidadId, inf)));
   // La unidad pudo cambiar mientras cargaba: aborta si ya no es la activa.
   const act = state.unidadActiva && (state.unidadActiva.id || state.unidadActiva.serie);
   if (act !== unidadId) return;
