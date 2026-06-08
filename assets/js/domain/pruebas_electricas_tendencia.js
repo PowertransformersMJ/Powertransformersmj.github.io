@@ -16,7 +16,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { evaluarMultiNorma } from './pruebas_electricas_multinorma.js';
-import { recomendarPrueba } from './pruebas_electricas_recomendaciones.js';
+import { recomendarPrueba, accionPrueba } from './pruebas_electricas_recomendaciones.js';
 
 const numOrNull = (v) => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
 
@@ -152,9 +152,10 @@ export function analisisTendencia(informes, ctx = {}) {
     const mn = evaluarMultiNorma(m.key, vigente, { minClase });
     const estado = mn ? mn.consolidado : null;
     const recomendacion = recomendarPrueba(m.key, { estado, divergen: mn && mn.divergen });
-    let delta = null, tendencia = null;
+    let delta = null, deltaRel = null, tendencia = null;
     if (previo != null) {
       delta = +(vigente - previo).toFixed(4);
+      deltaRel = previo !== 0 ? +(delta / previo * 100).toFixed(2) : null; // % relativo informe→informe
       const estable = Math.abs(delta) <= Math.abs(previo) * 0.02; // ±2% relativo
       if (estable) tendencia = 'estable';
       else {
@@ -162,11 +163,14 @@ export function analisisTendencia(informes, ctx = {}) {
         tendencia = empeora ? 'empeora' : 'mejora';
       }
     }
+    // Acción de mantenimiento CLASIFICADA (predictiva/preventiva/correctiva/
+    // diagnóstica), sensible a la tendencia (verde que empeora fuerte → predictiva).
+    const accion = accionPrueba(m.key, { estado, tendencia, delta: deltaRel, divergen: !!(mn && mn.divergen) });
     return {
       key: m.key, titulo: m.titulo, unidad: m.unidad, invertir: m.invertir === true,
-      puntos, vigente, previo, delta, tendencia,
+      puntos, vigente, previo, delta, deltaRel, tendencia,
       estado, divergen: !!(mn && mn.divergen), opticas: mn ? mn.opticas : [],
-      recomendacion
+      recomendacion, accion, relevante: accion.relevante
     };
   }).filter(Boolean);
 }

@@ -10,7 +10,7 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1099/1099 verde** (2026-06-08, +RETIRO de "Reprocesar" (ADR-020) + previsualización al colisionar por fecha (ADR-021)). |
+| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1105/1105 verde** (2026-06-08, +calificación global muestra TODAS las pruebas + Tendencia con acción clasificada predictiva/preventiva/correctiva, ADR-022). |
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA: tablero **IA-primaria**, **veredicto 100% MULTI-NORMA** (valor vs cada norma + consolidado + recomendación, NUNCA texto IA). **Arco ADR-003→014 EN PRODUCCIÓN**: extracción IA + canal `extra`, multi-norma + diagnóstico, **bujes canónico**, **identidad/placa por informe** (trafo móvil doble config → aislamiento por clase del propio ensayo), tablas SIN col. "Evaluación/OK", **Tendencia alto nivel** (diagnóstico unidad + timeline + narrativa IA), biblioteca-hub, upsert por fecha, reproceso server-side + backfill instantáneo. Detalle → `99 §9..§14`. Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-08. |
