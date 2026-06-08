@@ -10,7 +10,7 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1119/1119 verde** (2026-06-08, +multi-año v2: conserva fases + valores reales + filtro de año GLOBAL + fase por gráfica; Tendencia con cambios año-a-año + proyección, ADR-025). |
+| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1119/1119 verde** (2026-06-08, +fix regresión: multi-año por INFORME, no por año — 2 ensayos del mismo año ya NO se colapsan; identidad/color/filtro por informe, ADR-026). |
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA: tablero **IA-primaria**, **veredicto 100% MULTI-NORMA** (valor vs cada norma + consolidado + recomendación, NUNCA texto IA). **Arco ADR-003→014 EN PRODUCCIÓN**: extracción IA + canal `extra`, multi-norma + diagnóstico, **bujes canónico**, **identidad/placa por informe** (trafo móvil doble config → aislamiento por clase del propio ensayo), tablas SIN col. "Evaluación/OK", **Tendencia alto nivel** (diagnóstico unidad + timeline + narrativa IA), biblioteca-hub, upsert por fecha, reproceso server-side + backfill instantáneo. Detalle → `99 §9..§14`. Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-08. |

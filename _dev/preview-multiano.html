@@ -27,24 +27,32 @@ const relac = (d) => ({ prueba: 'relacion', titulo: 'Relación de transformació
 const aisla = (d) => ({ prueba: 'aislamiento', titulo: 'Resistencia de aislamiento', unidad: 'GΩ', eje_x: 'Configuración', grafica: 'barra', limite: 30,
   series: [{ nombre: 'CH', puntos: [{ x: 'AT-T', y: 42 - d }, { x: 'MT-T', y: 38 - d }] }] });
 
+// 7 informes (como la serie 450108). OJO: dos comparten año 2021 (fechas distintas)
+// → reproduce el bug de "no se aprecian todos" al agrupar por año.
 const informes = [
-  { ano: 2019, bloques: [excit(0), relac(0), aisla(0)] },
-  { ano: 2021, bloques: [excit(0.6), relac(0.04), aisla(3)] },
-  { ano: 2023, bloques: [excit(1.4), relac(0.09), aisla(7)] }
+  { ano: 2017, fecha: '10/03/2017', bloques: [excit(-0.4), relac(-0.02), aisla(-2)] },
+  { ano: 2018, fecha: '05/06/2018', bloques: [excit(-0.1), relac(0.0), aisla(-1)] },
+  { ano: 2019, fecha: '12/05/2019', bloques: [excit(0), relac(0.0), aisla(0)] },
+  { ano: 2021, fecha: '18/01/2021', bloques: [excit(0.6), relac(0.04), aisla(3)] },
+  { ano: 2021, fecha: '20/09/2021', bloques: [excit(0.7), relac(0.05), aisla(3.5)] },
+  { ano: 2022, fecha: '14/07/2022', bloques: [excit(1.0), relac(0.06), aisla(5)] },
+  { ano: 2023, fecha: '09/11/2023', bloques: [excit(1.4), relac(0.09), aisla(7)] }
 ];
 
-// ── replica de montarMultiAno (shell) para validar el render ──
-const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777'];
+// ── replica de montarMultiAno (shell, por INFORME) para validar el render ──
+const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777', '#0f766e', '#9333ea'];
 const cont = document.getElementById('pe-consolidado');
-const bloques = bloquesMultiAno(informes);
-const anosAll = [...new Set(bloques.flatMap((b) => b.series.map((s) => s._ano)))].sort();
-const colorAno = (a) => COLORES_ANO[Math.max(0, anosAll.indexOf(a)) % COLORES_ANO.length];
-const selY = new Set(anosAll);
+const bloques = bloquesMultiAno(informes.map(i => ({ ...i, id: i.id || i.fecha })));
+const repInfo = new Map();
+for (const b of bloques) for (const s of b.series) if (!repInfo.has(s._rep)) repInfo.set(s._rep, { label: s._repLabel, ano: s._ano });
+const repsAll = [...repInfo.keys()].sort((a, c) => (Number(repInfo.get(a).ano) || 0) - (Number(repInfo.get(c).ano) || 0) || String(repInfo.get(a).label).localeCompare(String(repInfo.get(c).label)));
+const colorRep = (r) => COLORES_ANO[Math.max(0, repsAll.indexOf(r)) % COLORES_ANO.length];
+const selR = new Set(repsAll);
 
 cont.innerHTML = '';
 const gbar = document.createElement('div'); gbar.className = 'pe-fase-chips';
 gbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
-gbar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Años (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
+gbar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Informes (' + repsAll.length + '):', style: 'font-size:12px;color:#475569' }));
 const host = document.createElement('div');
 const pintarTodo = () => {
   host.innerHTML = '';
@@ -57,7 +65,7 @@ const pintarTodo = () => {
     const chartBox = document.createElement('div'); chartBox.className = 'chartbox';
     const repintar = () => {
       chartBox.innerHTML = '';
-      const series = b.series.filter((s) => selY.has(s._ano) && (!fases.length || selF.has(s._fase))).map((s) => ({ ...s, color: colorAno(s._ano) }));
+      const series = b.series.filter((s) => selR.has(s._rep) && (!fases.length || selF.has(s._fase))).map((s) => ({ ...s, color: colorRep(s._rep) }));
       const svg = series.length ? svgBloque({ ...b, series }) : null;
       if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin series.</p>';
     };
@@ -72,8 +80,8 @@ const pintarTodo = () => {
     wrap.appendChild(chartBox); host.appendChild(wrap); repintar();
   }
 };
-anosAll.forEach((a) => { const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pe-fase-chip' + (selY.has(a) ? ' is-on' : ''); btn.textContent = a; btn.style.setProperty('--c', colorAno(a));
-  btn.addEventListener('click', () => { if (selY.has(a)) { if (selY.size > 1) selY.delete(a); } else selY.add(a); btn.classList.toggle('is-on', selY.has(a)); pintarTodo(); }); gbar.appendChild(btn); });
+repsAll.forEach((r) => { const info = repInfo.get(r); const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'pe-fase-chip' + (selR.has(r) ? ' is-on' : ''); btn.textContent = info.label; btn.style.setProperty('--c', colorRep(r));
+  btn.addEventListener('click', () => { if (selR.has(r)) { if (selR.size > 1) selR.delete(r); } else selR.add(r); btn.classList.toggle('is-on', selR.has(r)); pintarTodo(); }); gbar.appendChild(btn); });
 cont.appendChild(gbar); cont.appendChild(host); pintarTodo();
 window.__ready = true;
 </script>
