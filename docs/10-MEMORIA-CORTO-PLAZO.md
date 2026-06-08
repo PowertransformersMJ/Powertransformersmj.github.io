@@ -32,14 +32,20 @@
 > fecha** (re-cargar no duplica, L-39); **reproceso SERVER-SIDE** con contador (L-40) + **backfill INSTANTÁNEO**
 > de campos canónicos desde el diagnóstico guardado, sin IA (L-43).
 >
+> **🎯 DECISIÓN DEL DIRECTOR (2026-06-08): "Reprocesar" = OPCIÓN A · MÁXIMA CALIDAD.** Ante el trade-off
+> velocidad↔completitud, eligió EXPLÍCITAMENTE conservar `output_config.effort:'high'` + `thinking:adaptive` (Opus 4.7):
+> el reproceso de un informe DENSO (p.ej. EMS 450108) tarda **~7–12 min** pero extrae COMPLETO. ⛔ **NO bajar el effort
+> ni cambiar a un modelo más rápido para acelerar** — es una elección deliberada (son datos de ingeniería de transformador).
+> El estado terminal está garantizado (ADR-017) y el badge es durable/no bloqueante (ADR-016): el director puede navegar y
+> volver. La lentitud es ESPERADA, no un bug.
+>
 > **PRÓXIMO / pendientes:**
-> 1. ✅ **CERRADO (TODO-09 → ADR-015)**: "Reprocesar" 100% funcional — reintento con backoff de fallos
->    transitorios de la IA server-side (`functions/reintentos.mjs`), timeout 540→900 s. CF DESPLEGADA; frontend
->    a producción tras push del director. Ahora solo falla por causa ajena a la IA/código (sin saldo, PDF ilegible, infra).
+> 1. ✅ **CERRADO (TODO-09 → ADR-015..018)**: "Reprocesar" funcional. Reintento (ADR-015) + asíncrono observable/estado
+>    durable (ADR-016) + timeout interno por intento/watchdog/2GiB (ADR-017) + **fix "terminated" = bodyTimeout de undici,
+>    dispatcher sin bodyTimeout** (ADR-018). Solo falla por causa ajena (sin saldo, PDF ilegible, infra) con motivo claro.
 > 2. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
 >    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
-> 3. El director iba a **abrir el libro 450108** (push ya hecho) → el backfill poblará identidad/bujes de 2021/2023 solo.
-> 4. Validar más secciones con informes reales. **TODO-01/02** abiertos (refrigeración/contratos, no del tablero).
+> 3. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
 > Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`
