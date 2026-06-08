@@ -963,8 +963,8 @@ async function onClickReportlist(ev) {
           unidadId, serie: inf.serie || serieTxt,
           storagePath: inf.pdf.storagePath, filename: inf.pdf.filename || ''
         }),
-        540000,
-        'La IA no respondió en 9 min. Intenta de nuevo.'
+        900000,
+        'La IA no respondió en 15 min. Intenta de nuevo.'
       );
       const mediciones = r.mediciones || {};
       const bloquesIA = Array.isArray(r.bloques) ? r.bloques : [];
