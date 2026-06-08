@@ -15,6 +15,7 @@ import { ejeMax, ticksY } from './grafico-svg.js';
 import { derivarTablaTAP } from '../../domain/pruebas_electricas_bloques.js';
 import { ESTADOS } from '../../domain/pruebas_electricas_semaforo.js';
 import { evaluarMultiNorma } from '../../domain/pruebas_electricas_multinorma.js';
+import { recomendarPrueba } from '../../domain/pruebas_electricas_recomendaciones.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 // Paleta estable (se asigna por índice cuando la serie no trae color).
@@ -408,7 +409,9 @@ function badgeBloque(bloque) {
 // el consolidado y una nota si las normas divergen. Es el corazón del pedido del
 // director: mostrar las distintas calificaciones según cada norma.
 function panelMultiNorma(bloque) {
-  const mn = multiNormaBloque(bloque);
+  const m = metricaBloque(bloque);
+  if (!m) return '';
+  const mn = evaluarMultiNorma(m.family, m.valor, m.ctx);
   if (!mn) return '';
   const filas = mn.opticas.map((o) => {
     const v = (o.estado && o.estado.nivel >= 0)
@@ -423,8 +426,13 @@ function panelMultiNorma(bloque) {
   const div = mn.divergen
     ? '<p class="mn-div">⊳ Las normas divergen — el consolidado toma el criterio más conservador (la seguridad pesa sobre el "pasa por poco").</p>'
     : '';
+  // Sugerencia de diagnóstico (qué investigar / cómo determinar el estado),
+  // conforme a la skill. Aparece siempre: aprueba → seguimiento; investigar/
+  // rechaza/faltante → acción correlacionada.
+  const rec = recomendarPrueba(m.family, { estado: mn.consolidado, divergen: mn.divergen });
+  const recHtml = rec ? `<p class="mn-rec"><b>Recomendación</b> ${esc(rec)}</p>` : '';
   return `<div class="pe-multinorma"><div class="pe-mn-head">Evaluación multi-norma <span class="pe-mn-cons">consolidado: ${cons}</span></div>`
-    + `<ul class="pe-mn-list">${filas}</ul>${div}</div>`;
+    + `<ul class="pe-mn-list">${filas}</ul>${div}${recHtml}</div>`;
 }
 
 /**

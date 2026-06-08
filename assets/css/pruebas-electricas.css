@@ -315,6 +315,8 @@
 .pe-scope .mn-v{display:inline-flex;align-items:center;gap:6px;font-family:var(--pe-mono);font-size:.72rem;}
 .pe-scope .mn-nota{color:var(--pe-muted);font-size:.72rem;}
 .pe-scope .mn-div{margin:8px 0 0;font-size:.76rem;color:var(--pe-orange);}
+.pe-scope .mn-rec{margin:8px 0 0;padding-top:8px;border-top:1px dashed var(--pe-border);font-size:.82rem;color:var(--pe-ink,#2b3a48);line-height:1.45;}
+.pe-scope .mn-rec b{font-family:var(--pe-mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;margin-right:6px;}
 @media (max-width:560px){.pe-scope .pe-mn-list li{grid-template-columns:1fr;gap:2px;}}
 
 /* franja-timeline de informes (F2): cronología de la unidad, un nodo por
