@@ -4,13 +4,14 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { bloquesTendencia, METRICAS_TENDENCIA, resumenTendenciaParaIA } from '../assets/js/domain/pruebas_electricas_tendencia.js';
+import { bloquesTendencia, METRICAS_TENDENCIA, resumenTendenciaParaIA, analisisTendencia } from '../assets/js/domain/pruebas_electricas_tendencia.js';
 
 // Dos informes del mismo transformador en años distintos (la tan δ empeora).
 const INFORMES = [
   {
     ano: 2023,
     tand: [{ valor_pct: 0.51 }, { valor_pct: 0.20 }],
+    bushing: { fp_max_pct: 0.42 },
     excitacion: { delta_ext_pct: 3.0 },
     relacion: [{ desviacion_pct: -0.14 }, { desviacion_pct: 0.06 }],
     resistencia: [{ delta_max_pct: 1.07 }, { delta_max_pct: 0.43 }],
@@ -20,6 +21,7 @@ const INFORMES = [
   {
     ano: 2025,
     tand: [{ valor_pct: 0.78 }],
+    bushing: { fp_max_pct: 0.55 },
     excitacion: { delta_ext_pct: 2.4 },
     relacion: [{ desviacion_pct: 0.21 }],
     resistencia: [{ delta_max_pct: 1.2 }],
@@ -97,5 +99,34 @@ describe('resumenTendenciaParaIA (F3 · payload compacto para la IA)', () => {
   test('sin informes → []', () => {
     assert.deepEqual(resumenTendenciaParaIA([]), []);
     assert.deepEqual(resumenTendenciaParaIA(null), []);
+  });
+});
+
+describe('analisisTendencia (diagnóstico de alto nivel por métrica)', () => {
+  test('por métrica: veredicto vigente multi-norma + recomendación + tendencia/Δ', () => {
+    const a = analisisTendencia(INFORMES, { minClase: 30 });
+    const tand = a.find((m) => m.key === 'tand');
+    assert.ok(tand);
+    // vigente = 0.78 → NETA 100.3 (>0.5) investiga → consolidado naranja
+    assert.equal(tand.estado.clase, 'b-o');
+    assert.equal(tand.vigente, 0.78);
+    // 0.51 → 0.78 (sube) = empeora (más tan δ es peor)
+    assert.equal(tand.tendencia, 'empeora');
+    assert.ok(tand.delta > 0);
+    assert.match(tand.recomendacion, /\w+/);
+  });
+  test('aislamiento: bajar de 5.0 a 4.5 GΩ = empeora (invertir) y < piso NETA → investigar', () => {
+    const a = analisisTendencia(INFORMES, { minClase: 30 });
+    const ais = a.find((m) => m.key === 'aislamiento');
+    assert.equal(ais.tendencia, 'empeora'); // bajó → peor
+    assert.equal(ais.estado.clase, 'b-o');  // 4.5 < 5 piso NETA → investigar
+  });
+  test('bushing entra como métrica propia (FP de bujes discriminado)', () => {
+    const a = analisisTendencia(INFORMES, { minClase: 30 });
+    assert.ok(a.find((m) => m.key === 'bushing'));
+  });
+  test('sin informes → []', () => {
+    assert.deepEqual(analisisTendencia([]), []);
+    assert.deepEqual(analisisTendencia(null), []);
   });
 });

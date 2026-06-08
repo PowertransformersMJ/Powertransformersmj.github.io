@@ -70,6 +70,7 @@
 | §10 | ADR-010 — Tendencia F2+F3: franja-timeline de informes + narrativa de tendencia por IA (on-demand) | 226 |
 | §11 | ADR-011 — Veredicto 100% normativo (scorecard vs norma, no informe) + NETA por clase unificada + desviación general de resistencia | 246 |
 | §12 | ADR-012 — Evaluación MULTI-NORMA (veredicto por cada norma + consolidado conservador + divergencias) | 267 |
+| §13 | ADR-013 — FP de bujes canónico (discriminado) + Tendencia de alto nivel (diagnóstico multi-norma por métrica) | 290 |
 
 ---
 

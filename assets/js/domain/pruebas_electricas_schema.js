@@ -424,6 +424,20 @@ function sanitizarCollar(input) {
 }
 
 /**
+ * 6b) Factor de potencia de BUJES (C1) — métrica canónica para que el FP de los
+ * bujes aparezca DISCRIMINADO del FP del transformador en matriz/scorecard/
+ * tendencia. La IA lo emite en el bloque "bushing"; el shell deriva el peor
+ * tan δ y la peor ΔC1 vs placa al guardar. `null` si el informe no trae bujes.
+ */
+function sanitizarBushing(input) {
+  const src = input || {};
+  const fp_max_pct = num(src.fp_max_pct);
+  const dc1_max_pct = num(src.dc1_max_pct); // peor variación de capacitancia vs placa
+  if (fp_max_pct == null && dc1_max_pct == null) return null;
+  return { fp_max_pct, dc1_max_pct };
+}
+
+/**
  * 7) DRM — Resistencia Dinámica del conmutador (OLTC). Guarda la
  * identidad del conmutador (fabricante, tipo, serial, posiciones,
  * operaciones, posición nominal, datos eléctricos), la ventana de
@@ -509,6 +523,7 @@ export function sanitizarInforme(input) {
   const resistencia = sanitizarResistencia(src.resistencia);
   const aislamiento = sanitizarAislamiento(src.aislamiento);
   const collar      = sanitizarCollar(src.collar);
+  const bushing     = sanitizarBushing(src.bushing);
   const drm         = sanitizarDrm(src.drm);
   const tipoDecl = str(src.tipo_prueba).toLowerCase();
   const tipo_prueba = TIPOS_PRUEBA_SET.has(tipoDecl)
@@ -532,6 +547,7 @@ export function sanitizarInforme(input) {
     resistencia,
     aislamiento,
     collar,
+    ...(bushing ? { bushing } : {}),
     drm,
     // ── PDF original (Firebase Storage o ruta del repo) ──
     pdf: {

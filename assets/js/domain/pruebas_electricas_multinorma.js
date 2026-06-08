@@ -117,6 +117,8 @@ export function metricaPrueba(key, inf) {
       const a = (Array.isArray(inf.tand) ? inf.tand : []).map((t) => num(t.valor_pct)).filter((v) => v != null);
       return a.length ? Math.max(...a) : null;
     }
+    case 'bushing':
+      return num(inf.bushing && inf.bushing.fp_max_pct);
     case 'excitacion':
       return num(inf.excitacion && inf.excitacion.delta_ext_pct);
     case 'relacion': {

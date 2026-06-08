@@ -330,6 +330,23 @@
 .pe-scope .pe-tl-ano{font-family:var(--pe-mono);font-size:.72rem;font-weight:600;color:var(--pe-ink,#2b3a48);}
 .pe-scope .pe-tl-sub{font-family:var(--pe-mono);font-size:.6rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);}
 
+/* diagnóstico de la unidad (cabecera de Tendencia): veredicto vigente + tendencia */
+.pe-scope .pe-diagnostico{margin:0 0 18px;padding:14px 18px;border:1px solid var(--pe-border);border-left:3px solid var(--pe-teal);border-radius:12px;background:var(--pe-surface);box-shadow:var(--pe-shadow);}
+.pe-scope .pe-diag-head{font-family:var(--pe-mono);font-size:.74rem;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--pe-ink,#2b3a48);margin-bottom:10px;}
+.pe-scope .pe-diag-head .norm{font-size:.62rem;color:var(--pe-muted);text-transform:none;letter-spacing:0;margin-left:8px;}
+.pe-scope .pe-diag-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px;}
+.pe-scope .pe-diag-chip{font-family:var(--pe-mono);font-size:.7rem;padding:3px 10px;border-radius:20px;}
+.pe-scope .pe-diag-watch{margin:0 0 10px;font-size:.8rem;color:var(--pe-orange);}
+.pe-scope .pe-diag-list{display:flex;flex-direction:column;gap:2px;}
+.pe-scope .pe-diag-row{border-top:1px solid var(--pe-line);}
+.pe-scope .pe-diag-row summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:7px 0;cursor:pointer;list-style:none;}
+.pe-scope .pe-diag-row summary::-webkit-details-marker{display:none;}
+.pe-scope .pe-diag-m{flex:1 1 200px;font-weight:600;color:var(--pe-ink,#2b3a48);font-size:.86rem;}
+.pe-scope .pe-diag-trend{font-family:var(--pe-mono);font-size:.7rem;padding:2px 8px;border-radius:6px;}
+.pe-scope .pe-diag-div{color:var(--pe-orange);font-weight:700;}
+.pe-scope .pe-diag-rec{margin:0 0 9px;padding:8px 12px;background:var(--pe-surface-2,var(--pe-surface));border-radius:8px;font-size:.82rem;line-height:1.45;color:var(--pe-ink,#2b3a48);}
+.pe-scope .pe-diag-rec b{font-family:var(--pe-mono);font-size:.62rem;letter-spacing:.05em;text-transform:uppercase;color:var(--pe-teal);font-weight:600;margin-right:6px;}
+
 /* subtítulo por gráfica: qué muestra (título) + qué evalúa (sub) */
 .pe-scope .pe-chart-cap{margin:14px 0 2px;}
 .pe-scope .pe-chart-cap .pe-chart-ttl{display:block;font-family:var(--pe-mono);font-size:.74rem;font-weight:600;letter-spacing:.03em;color:var(--pe-ink,#2b3a48);}
