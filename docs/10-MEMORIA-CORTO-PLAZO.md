@@ -94,13 +94,13 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-022** (pedido director, 2 de 3 partes): **(P1) Calificación global muestra TODAS las pruebas**
-  — el scorecard ocultaba las pruebas sin dato (`return null`) → el FP de bujes "desaparecía" (su queja "dejas una sola");
-  ahora lista todas, "No realizada" donde no hay dato, FP bujes separado, +collar. **Motor del veredicto INTACTO.**
-  **(D) Tendencia**: `accionPrueba` clasifica acción **predictiva/preventiva/correctiva/diagnóstica** (sensible a deriva),
-  resalta cambios relevantes. 1105/1105 verde. ⚠️ El director valida en navegador. **⏳ FALTA la 3ª parte: gráfica
-  CONSOLIDADA del Tablero (todas las pruebas en una, % del límite, selector + rango auto) + filtro de año.**
-  🚫 **NO romper la calificación global** (memoria persistente `feedback_calificacion_global_por_prueba.md`).
+- **2026-06-08** — **ADR-022 + ADR-023 (pedido director, 3 partes COMPLETAS, frontend; valida en navegador)**: (P1) la
+  **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato (`return null`) → el FP de bujes
+  "desaparecía" (su queja); ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto
+  INTACTO.** (D) **Tendencia**: `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica (sensible a deriva) +
+  resalta relevantes. (3.ª) **Vista consolidada** del Tablero (`renderConsolidado` #pe-consolidado): todas las pruebas en una
+  gráfica = **% de su límite**, color = veredicto multi-norma, selector año+pruebas, **rango auto-ajustable** + **filtro de año**
+  en bloques. ADITIVO. 1105/1105 verde. 🚫 **NO romper la calificación global** (memoria `feedback_calificacion_global_por_prueba.md`).
 - **2026-06-08** — **ADR-020 RETIRO de "Reprocesar"** (costo > valor; re-extraer = re-subir): se quitó el botón + handler +
   el modo-reproceso de la CF (queda **solo-CARGA**) + **ADR-021 previsualización al colisionar por fecha** (modal
   `confirmarUpsert`: "ya guardado" vs "nuevo" + abrir PDF → reemplazar/crear-nuevo, no un `confirm` ciego). 1099/1099 verde.
