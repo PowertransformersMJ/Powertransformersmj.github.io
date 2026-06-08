@@ -31,7 +31,7 @@ import { onSchedule }        from 'firebase-functions/v2/scheduler';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { defineSecret }       from 'firebase-functions/params';
 import Anthropic from '@anthropic-ai/sdk';
-import { conReintentosIA } from './reintentos.mjs';
+import { conReintentosIA, conTimeoutAbortable } from './reintentos.mjs';
 
 // Lógica pura del dominio (módulos sin imports de Firebase SDK).
 // La carpeta ./domain/ se sincroniza automáticamente desde
@@ -582,7 +582,9 @@ export const extraerPruebasElectricasIA = onCall(
     timeoutSeconds: 900,
     // 1 GiB (gen2 acopla más CPU → base64 + visión más rápidos) y margen para
     // el PDF base64 (~5 MB) + el stream de la respuesta.
-    memory: '1GiB'
+    // 2 GiB (gen2 acopla más CPU → base64 + visión + thinking más rápidos y con
+    // margen anti-OOM; un OOM-kill tampoco corre catch → dejaría el estado colgado).
+    memory: '2GiB'
   },
   async (request) => {
     if (!request.auth) {
@@ -599,6 +601,21 @@ export const extraerPruebasElectricasIA = onCall(
     const esReproceso = !!(unidadId && informeId);
     if (esReproceso) await marcarReproceso(unidadId, informeId, 'en_curso');
 
+    // WATCHDOG GLOBAL (ADR-017): garantía DEFINITIVA de que la fila nunca queda
+    // colgada en 'reprocesando'. Si pase lo que pase (cuelgue de Storage, IA o
+    // Firestore) nos acercamos al límite de plataforma (900 s), escribimos 'error'
+    // ANTES del SIGKILL. Se cancela al terminar normal. Defensa en profundidad: el
+    // timeout por-intento de la IA (abajo) ya acota el cuelgue más probable.
+    let guardTimer = null;
+    if (esReproceso) {
+      guardTimer = setTimeout(() => {
+        marcarReproceso(unidadId, informeId, 'error',
+          'El servidor agotó el tiempo de procesamiento. Reintenta (informe muy denso).').catch(() => {});
+      }, 870000);
+      if (typeof guardTimer.unref === 'function') guardTimer.unref();
+    }
+    const limpiarGuard = () => { if (guardTimer) { clearTimeout(guardTimer); guardTimer = null; } };
+
     // 1) Descargar el PDF nativo desde Storage (server-side: sin límite
     //    de payload del callable; el PDF ya fue subido por el cliente).
     let pdfBase64;
@@ -606,6 +623,7 @@ export const extraerPruebasElectricasIA = onCall(
       const [buf] = await getStorage().bucket().file(storagePath).download();
       pdfBase64 = buf.toString('base64');
     } catch (e) {
+      limpiarGuard();
       if (esReproceso) await marcarReproceso(unidadId, informeId, 'error', `PDF en Storage: ${e.message}`);
       throw new HttpsError('not-found', `No se pudo leer el PDF en Storage: ${e.message}`);
     }
@@ -652,15 +670,22 @@ export const extraerPruebasElectricasIA = onCall(
       params.thinking = { type: 'adaptive' };
       params.output_config = { effort: 'high' };
     }
-    // Reintento con backoff (TODO-09): un fallo TRANSITORIO de la IA (429/500/529
-    // overloaded, corte de stream) o que el modelo NO llame la herramienta es un
-    // hipo de la IA, no del PDF ni del código → se reintenta. Un stream no se
-    // reusa: cada intento abre uno NUEVO. Presupuesto acotado al timeout de la CF.
+    // Reintento con backoff (TODO-09) + TIMEOUT INTERNO POR INTENTO (ADR-017):
+    // un fallo TRANSITORIO (429/500/529 overloaded, corte de stream) o que el
+    // modelo NO llame la herramienta es un hipo de la IA → se reintenta. PERO el
+    // peor caso es que el stream se CUELGUE (ni responde ni falla): sin timeout
+    // interno el `await` no retorna nunca → la plataforma mata la función a los
+    // 900 s → ningún catch corre → el reproceso queda 'en_curso' para siempre
+    // (causa raíz del "no se aprecia si terminó"). `conTimeoutAbortable` aborta
+    // el stream colgado a los ATTEMPT_MS → se vuelve un error transitorio →
+    // reintenta o cae a 'error' limpio. Un stream no se reusa: cada intento abre
+    // uno NUEVO. Presupuesto total acotado MUY por debajo de los 900 s.
+    const ATTEMPT_MS = 400000; // 6.7 min por intento (cubre 2–5 min reales + margen)
     const inicioIA = Date.now();
     let message;
     try {
-      message = await conReintentosIA(async () => {
-        const stream = client.messages.stream(params);
+      message = await conReintentosIA(() => conTimeoutAbortable(async (signal) => {
+        const stream = client.messages.stream(params, { signal });
         const msg = await stream.finalMessage();
         const tiene = (msg.content || []).some(
           (b) => b.type === 'tool_use' && b.name === 'registrar_pruebas_electricas'
@@ -669,17 +694,21 @@ export const extraerPruebasElectricasIA = onCall(
         // marcar 529 para que el reintento lo absorba en vez de fallar duro.
         if (!tiene) { const err = new Error('La IA no devolvió datos estructurados.'); err.status = 529; throw err; }
         return msg;
-      }, {
-        intentos: 4,
+      }, ATTEMPT_MS), {
+        intentos: 2,
         baseMs: 1500,
-        deadlineMs: inicioIA + 820000, // dentro del timeoutSeconds 900 de la CF
+        deadlineMs: inicioIA + 820000, // 2×400 s + persistencia < 900 s (SIGKILL)
         onReintento: ({ intento, intentos, espera, error }) =>
-          console.warn(`[extraerPruebasElectricasIA] reintento ${intento}/${intentos} tras fallo transitorio (${error.status || ''} ${error.message || error}); espera ${Math.round(espera)}ms`),
+          console.warn(`[extraerPruebasElectricasIA] reintento ${intento}/${intentos} tras fallo transitorio (${error.status || error.code || ''} ${error.message || error}); espera ${Math.round(espera)}ms`),
       });
     } catch (e) {
-      // Permanente/externo o presupuesto agotado: el fallo es ajeno a la IA
-      // (sin saldo, PDF ilegible, infra) → marcar estado durable + relanzar.
-      if (esReproceso) await marcarReproceso(unidadId, informeId, 'error', `IA: ${e.message || e}`);
+      // Permanente/externo, timeout interno o presupuesto agotado → marcar estado
+      // durable con motivo CLARO + relanzar. NUNCA se queda colgado en 'en_curso'.
+      limpiarGuard();
+      const motivo = (e && (e.code === 'ia_timeout' || e.name === 'TimeoutIA'))
+        ? 'La IA no respondió a tiempo (informe muy denso). Reintenta.'
+        : `IA: ${e.message || e}`;
+      if (esReproceso) await marcarReproceso(unidadId, informeId, 'error', motivo);
       throw new HttpsError('internal', `Claude API: ${e.message || e}`);
     }
 
@@ -687,6 +716,8 @@ export const extraerPruebasElectricasIA = onCall(
       (b) => b.type === 'tool_use' && b.name === 'registrar_pruebas_electricas'
     );
     if (!toolBlock) {
+      limpiarGuard();
+      if (esReproceso) await marcarReproceso(unidadId, informeId, 'error', 'La IA no devolvió datos estructurados.');
       throw new HttpsError('internal', 'La IA no devolvió datos estructurados.');
     }
 
@@ -744,14 +775,17 @@ export const extraerPruebasElectricasIA = onCall(
     if (esReproceso) {
       try {
         const { n_bloques } = await persistirReproceso(unidadId, informeId, model, entrada, bloquesRaw, usage, resumen);
+        limpiarGuard();
         return { persisted: true, estado: 'ok', modelUsed: model, n_bloques, usage };
       } catch (e) {
+        limpiarGuard();
         await marcarReproceso(unidadId, informeId, 'error', `Persistencia: ${e.message || e}`);
         throw new HttpsError('internal', `Persistencia del reproceso: ${e.message || e}`);
       }
     }
 
     // Modo CARGA: devolver los datos crudos; el cliente persiste (upsert/confirm).
+    limpiarGuard();
     return {
       mediciones: entrada,
       bloques: bloquesRaw,
