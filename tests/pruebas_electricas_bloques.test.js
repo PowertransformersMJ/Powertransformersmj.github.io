@@ -106,22 +106,23 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
     ]
   };
 
-  test('columnas: TAP + fases + extra×fase + Desv. % + Eval.', () => {
+  test('columnas: TAP + fases + extra×fase + Desv. % (SIN columna de veredicto/Eval.)', () => {
     const t = derivarTablaTAP(exc);
     assert.deepEqual(t.columnas, [
       'Posición del TAP', 'Fase A', 'Fase B', 'Fase C',
       'P (W) · Fase A', 'P (W) · Fase B', 'P (W) · Fase C',
-      'Desv. %', 'Eval.'
+      'Desv. %'
     ]);
+    assert.ok(!t.columnas.some((c) => /eval|veredicto|calific/i.test(c)));
   });
 
   test('Desviación de excitación = entre las DOS laterales mayores (no la central)', () => {
     const t = derivarTablaTAP(exc);
     const fila1 = t.filas[0];
     // laterales mayores C=18.525, A=17.964 → (18.525-17.964)/18.525*100 = 3.028%
-    // (÷ la MAYOR, como el informe del laboratorio: TAP1 = 3.0%)
-    assert.equal(fila1[fila1.length - 2], 3.028);
-    assert.equal(fila1[fila1.length - 1], 'OK'); // 3.03 ≤ 10
+    // (÷ la MAYOR, como el informe del laboratorio: TAP1 = 3.0%). Es la ÚLTIMA
+    // columna: ya no hay "Eval." (el veredicto es del panel multi-norma, L-42).
+    assert.equal(fila1[fila1.length - 1], 3.028);
   });
 
   test('extra se ubica en su columna por fase; fase sin extra queda vacía', () => {
@@ -132,7 +133,7 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
     assert.equal(fila1[6], 158.868); // P(W) Fase C
   });
 
-  test('Evaluación = verificar cuando la desviación supera el umbral', () => {
+  test('la Desv. % es la última columna y es un DATO (no un veredicto "OK")', () => {
     const res = {
       prueba: 'resistencia', eje_x: 'TAP', limite_desbalance: 5,
       series: [
@@ -141,14 +142,18 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
         { nombre: 'Fase C', puntos: [{ x: 1, y: 120 }] } // promedio ~106.7 → C se aparta ~12.5%
       ]
     };
-    const fila = derivarTablaTAP(res).filas[0];
-    assert.equal(fila[fila.length - 1], 'verificar');
+    const t = derivarTablaTAP(res);
+    assert.equal(t.columnas[t.columnas.length - 1], 'Desv. %');
+    assert.ok(!t.columnas.some((c) => /eval|veredicto|calific/i.test(c)));
+    const fila = t.filas[0];
+    // la celda es el número de desviación, NO "OK"/"verificar"
+    assert.equal(typeof fila[fila.length - 1], 'number');
   });
 
-  test('sin umbral: columna Desv. % presente, Eval. ausente', () => {
+  test('sin umbral: columna Desv. % presente, sin columna de veredicto', () => {
     const t = derivarTablaTAP({ prueba: 'relacion', eje_x: 'TAP', series: exc.series.slice(0, 3) });
     assert.ok(t.columnas.includes('Desv. %'));
-    assert.ok(!t.columnas.includes('Eval.'));
+    assert.ok(!t.columnas.some((c) => /eval|veredicto|calific/i.test(c)));
   });
 
   test('serie única (sin fases): sin Desv. ni Eval.', () => {
@@ -170,7 +175,8 @@ describe('derivarTablaTAP · tabla completa derivada de las series', () => {
       ]
     };
     const fila = derivarTablaTAP(rel).filas[0];
-    assert.equal(fila[fila.length - 2], -1.26);      // peor %DIF, conservando el signo
-    assert.equal(fila[fila.length - 1], 'verificar'); // |1.26| > 0.5
+    // Desv. % es la ÚLTIMA columna (ya no hay "Eval."): el peor %DIF firmado.
+    // El veredicto (|1.26| > 0.5 → fuera de norma) lo da el panel multi-norma.
+    assert.equal(fila[fila.length - 1], -1.26);
   });
 });
