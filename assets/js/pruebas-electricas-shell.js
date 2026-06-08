@@ -935,39 +935,6 @@ async function onClickReportlist(ev) {
     return;
   }
 
-  // ── Reprocesar (ADR-016: trigger + observe; la CF persiste y marca estado) ──
-  const rep = ev.target.closest('[data-reproc]');
-  if (rep) {
-    const informeId = rep.getAttribute('data-reproc');
-    const inf = (state.informes || []).find((i) => i.id === informeId);
-    if (!inf || !inf.pdf || !inf.pdf.storagePath) {
-      return toast('Este informe no tiene archivo para reprocesar.', 'warn');
-    }
-    // No persistimos en el cliente ni bloqueamos con un contador: la Cloud
-    // Function re-extrae SERVER-SIDE (lee el PDF de Storage sin CORS, L-29),
-    // PERSISTE el resultado ella misma y escribe el ESTADO DURABLE en el informe.
-    // La fila lo refleja en vivo (onSnapshot): "Reprocesando…" → "procesado" o
-    // "⚠ Error: motivo". Sobrevive a recargas y no obliga a esperar mirando.
-    rep.disabled = true;
-    rep.textContent = '↻ Enviando…';
-    state.bloquesCache.delete(informeId); // el análisis se recargará con lo nuevo
-    try {
-      const r = await extraerConIA({
-        unidadId, serie: inf.serie || serieTxt,
-        storagePath: inf.pdf.storagePath, filename: inf.pdf.filename || '',
-        informeId
-      });
-      console.info(`[pruebas-electricas] reproceso IA ${esc(serieTxt)} · ${inf.ano || 's/a'} · ${r && r.n_bloques} bloques`, r && r.usage);
-      toast(`✓ Informe ${inf.ano || ''} reprocesado. Datos actualizados.`);
-    } catch (err) {
-      console.error('[pruebas-electricas] reprocesar', err);
-      const detalle = (err && (err.code || err.message)) ? ` (${err.code || err.message})` : '';
-      // El estado durable 'error' ya quedó escrito en el informe por la CF; la
-      // fila lo muestra aunque este toast se pierda (recarga/navegación).
-      toast(`No se pudo reprocesar el informe${detalle}.`, 'warn');
-    }
-    return;
-  }
 
   // ── Editar datos (captura manual de valores leídos del PDF) ──
   const ed = ev.target.closest('[data-edit]');
@@ -1547,6 +1514,68 @@ function buscarInformeExistente(lista, fecha, ano) {
   return null;
 }
 
+// Modal de PREVISUALIZACIÓN para la colisión por fecha: muestra el informe YA
+// GUARDADO vs el NUEVO lado a lado (fecha, ejecutante, equipos, serie en PDF,
+// pruebas detectadas) + un enlace para ABRIR el PDF guardado, para que el director
+// constate si es el MISMO informe (reemplazar) o uno DISTINTO en la misma fecha
+// (crear nuevo). Devuelve 'reemplazar' | 'nuevo'. Escape/fondo = 'nuevo' (no
+// destructivo, igual que el confirm previo). Estilos inline → no depende de CSS.
+function confirmarUpsert(prev, nuevo, serie, item) {
+  return new Promise((resolve) => {
+    const fmt = (v) => esc(v == null || v === '' ? '—' : String(v));
+    const pruebas = (inf) => fmt(String(inf.tipo_prueba || '').replace(/_/g, ' ') || '—');
+    const filename = (item && item.file && item.file.name) || (nuevo.pdf && nuevo.pdf.filename) || '—';
+    const fila = (k, v) =>
+      `<div style="display:flex;gap:8px;padding:3px 0;border-bottom:1px solid #f1f5f9">` +
+      `<span style="min-width:96px;color:#64748b;font-size:12px">${k}</span>` +
+      `<span style="font-size:13px;color:#0f172a;word-break:break-word">${v}</span></div>`;
+    const col = (titulo, inf, extra) =>
+      `<div style="flex:1;min-width:240px;border:1px solid #e2e8f0;border-radius:10px;padding:12px;background:#fff">` +
+      `<div style="font-weight:700;font-size:12px;letter-spacing:.04em;color:#334155;margin-bottom:8px">${titulo}</div>` +
+      fila('Fecha', fmt(inf.fecha || inf.ano)) +
+      fila('Ejecutante', fmt(inf.ejecutante)) +
+      fila('Equipos', fmt(inf.equipo)) +
+      fila('Serie en PDF', fmt(inf.serie_en_pdf)) +
+      fila('Pruebas', pruebas(inf)) +
+      (extra ? `<div style="margin-top:10px">${extra}</div>` : '') +
+      `</div>`;
+    const abrirPrev = (prev.pdf && prev.pdf.downloadURL)
+      ? `<a class="btn btn-ghost btn-sm" href="${esc(prev.pdf.downloadURL)}" target="_blank" rel="noopener">↗ Abrir PDF guardado</a>`
+      : '<span style="color:#94a3b8;font-size:12px">PDF no disponible</span>';
+    const ov = document.createElement('div');
+    ov.setAttribute('style',
+      'position:fixed;inset:0;z-index:10000;background:rgba(15,23,42,.55);' +
+      'display:flex;align-items:center;justify-content:center;padding:20px');
+    ov.innerHTML =
+      `<div role="dialog" aria-modal="true" aria-label="Confirmar carga de informe" ` +
+      `style="background:#fff;border-radius:14px;max-width:680px;width:100%;` +
+      `box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;font-family:inherit">` +
+        `<div style="padding:16px 20px;border-bottom:1px solid #e2e8f0">` +
+          `<div style="font-weight:700;color:#0f172a">Misma fecha (${fmt(nuevo.fecha || nuevo.ano)}) · serie ${esc(serie)}</div>` +
+          `<div style="color:#64748b;font-size:12px;margin-top:4px">Ya hay un informe con esta fecha. Compara y decide si es el ` +
+          `<b>mismo</b> (reemplazar) o uno <b>distinto</b> en la misma fecha (crear nuevo).</div>` +
+        `</div>` +
+        `<div style="display:flex;gap:14px;flex-wrap:wrap;padding:16px 20px;background:#f8fafc">` +
+          col('YA GUARDADO', prev, abrirPrev) +
+          col('NUEVO (a cargar)', nuevo, `<div style="color:#64748b;font-size:12px">Archivo: ${fmt(filename)}</div>`) +
+        `</div>` +
+        `<div style="display:flex;gap:10px;justify-content:flex-end;padding:14px 20px;border-top:1px solid #e2e8f0;flex-wrap:wrap">` +
+          `<button type="button" class="btn btn-ghost" data-ups="nuevo">Son distintos · crear nuevo</button>` +
+          `<button type="button" class="btn btn-primary" data-ups="reemplazar">Es el mismo · reemplazar</button>` +
+        `</div>` +
+      `</div>`;
+    const cerrar = (val) => { document.removeEventListener('keydown', onKey); ov.remove(); resolve(val); };
+    const onKey = (e) => { if (e.key === 'Escape') cerrar('nuevo'); };
+    ov.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ups]');
+      if (b) return cerrar(b.getAttribute('data-ups'));
+      if (e.target === ov) cerrar('nuevo'); // clic en el fondo = no destructivo
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(ov);
+  });
+}
+
 async function storeReport() {
   // Dedupe de serie: si ya existe un libro cuya serie NORMALIZADA coincide con
   // la tecleada (mismo transformador escrito con otro formato de guiones/espacios),
@@ -1654,13 +1683,10 @@ async function storeReport() {
         // duplicados al re-cargar; el director tiene el control.
         const prev = buscarInformeExistente(existentesUnidad, informe.fecha, informe.ano);
         if (prev) {
-          const etq = informe.fecha || (informe.ano != null ? String(informe.ano) : 's/f');
-          const reemplazar = window.confirm(
-            `Ya existe un informe de ${etq} para la serie ${UP.serie}.\n\n` +
-            `Aceptar = REEMPLAZAR (se borra el anterior y su PDF).\n` +
-            `Cancelar = crear uno NUEVO (quedarán ambos).`
-          );
-          if (reemplazar) {
+          // Previsualización lado a lado (guardado vs nuevo) para constatar si es
+          // el MISMO informe o uno DISTINTO en la misma fecha (ADR-021).
+          const decision = await confirmarUpsert(prev, informe, UP.serie, item);
+          if (decision === 'reemplazar') {
             if (prev.pdf && prev.pdf.storagePath) await eliminarPDF(prev.pdf.storagePath).catch(() => {});
             await eliminarInforme(unidadId, prev.id).catch((e) => console.warn('[pruebas-electricas] no se pudo borrar el informe a reemplazar', e));
             const idx = existentesUnidad.findIndex((e) => e.id === prev.id);
