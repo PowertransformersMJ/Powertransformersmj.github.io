@@ -739,7 +739,7 @@
 
 **36.3 No-regresión / Workflow** — Validado en `_dev/preview-bloques.html` (réplica del detalle, con el MISMO filtro) usando datos REALES: informe 19/01/2024 estrella → `contieneTanDelta=false` y SIGUEN visibles bujes, excitación, relación AT/MT y AT/BT, resistencia AT y MT/BT, aislamiento Megger; selector intacto. Sin errores de consola. `npm test` **1146/1146**. Lint HTML 0.
 
-**36.4 Doctrina (meta)** — "Cuando el director señala con pantallazos un ELEMENTO dentro de un contenedor, el objetivo es ESE elemento, no el contenedor. El encabezado de sección en el tope de un scroll es contexto, no parte del pedido. Ante duda de alcance en un BORRADO: retira lo MÍNIMO señalado (defecto conservador), nunca el contenedor — borrar de más destruye valor ajeno al pedido. Reforzado: validar el cambio con el harness ANTES de declararlo hecho (aquí el harness sí era testeable, a diferencia de la página tras auth)." Ver L-51 (30-LECCIONES) + memoria de feedback.
+**36.4 Doctrina (meta)** — "Cuando el director señala con pantallazos un ELEMENTO dentro de un contenedor, el objetivo es ESE elemento, no el contenedor. El encabezado de sección en el tope de un scroll es contexto, no parte del pedido. Ante duda de alcance en un BORRADO: retira lo MÍNIMO señalado (defecto conservador), nunca el contenedor — borrar de más destruye valor ajeno al pedido. Reforzado: validar el cambio con el harness ANTES de declararlo hecho (aquí el harness sí era testeable, a diferencia de la página tras auth)." Ver L-51 (30-LECCIONES) + memoria de feedback. Ver también L-52 (valor implausible = artefacto).
 
 ---
 
@@ -768,3 +768,35 @@
 **38.4 Pendientes de la auditoría (no implementados, decisión del director)** — #2 localización del defecto por modo (CH/CL/CHL→dónde), #3 tendencia de capacitancia (pF), #5 pendiente/tasa con bandera predictiva, #6 baseline de fábrica. Ver `49 §Auditoría`.
 
 **38.5 Doctrina** — "Una auditoría de dominio (Trigger 🔵) se hace CON la skill (criterios/cálculos/diagnóstico) y aterrizada al DATO REAL disponible: el tip-up era computable porque el informe ya traía 2 tensiones — valor nuevo sin pedir más datos. Lo que falta (corrección de T) se DECLARA como caveat, no se inventa. Registrar los hallazgos en el lóbulo para que la próxima ronda continúe sin re-auditar."
+
+---
+
+## 39. ADR-039 — FP/tan δ: localización del defecto por modo (CH/CL/CHL…) + causa probable (gap #2 de la auditoría)
+
+> Continuación de la auditoría 🔵 (ADR-038): el director pidió "continuar" con los gaps. Se implementa #2: traducir "qué sección está alta" en "DÓNDE está el problema" + causa probable (skill `factor-potencia-aislamiento` 04-diagnostico). **Frontend; en prod tras push.**
+
+**39.1 Helpers puros (exportados/testeados)** — `localizacionDe(sec)`: mapea el código de sección al aislamiento que mide (H=AT, L=MT/BT, T=Terciario): `CH`=AT↔tierra, `CHL`=AT↔MT (entre devanados), `CH+CHL+CHT`=AT total a tierra (GST). `causaProbableDe(sec)`: causa + corroboración de la skill 04 (entre-devanados→humedad/defecto + IR del par/reactancia; a-tierra H→AT/bujes + FP buje/hot-collar; L→MT/BT + FP buje/IR lazo; combo→aislar por UST).
+
+**39.2 Integración** — `analizarTand` añade `localizadas`: secciones cuyo PEOR valor supera la guía estricta (NETA 0.5%), ordenadas desc, con `{sec, y, rep, donde, causa}`. `renderAnalisis` añade un bloque "Localización del hallazgo" (lista las secciones sobre guía con dónde+causa; si ninguna: "aislamiento homogéneo entre modos, sin defecto localizado"). Orden del análisis: norma → conclusión → **localización** → tip-up → caveat 20 °C.
+
+**39.3 Verificación (workflow)** — `_dev/preview-tand.html` con datos REALES (450108): localiza **CL — MT/BT ↔ tierra · 0.5135% (sobre guía 0.5%): defecto localizado en MT/BT a tierra o sus bujes — corroborar con FP de buje e IR del lazo** (la única sección sobre la guía estricta NETA, aunque cumple IEEE 1%). 6 tests nuevos (localizacionDe a-tierra/entre-devanados/GST; causaProbableDe; localizadas con y sin sección sobre guía). `npm test` **1157/1157**. Lint 0. Sin errores de consola.
+
+**39.4 Pendientes de la auditoría** — #3 tendencia de capacitancia (pF), #5 pendiente/tasa con bandera predictiva, #6 baseline de fábrica (ver `49 §Auditoría`).
+
+**39.5 Doctrina** — "El veredicto (pasa/no pasa) cobra valor de DECISIÓN cuando además dice DÓNDE y QUÉ corroborar. El código de sección de aislamiento ya codifica la localización (focos H/L/T); traducirlo es una capa pura y testeable sobre el dato existente, sin pedir más datos." Cierra el gap #2.
+
+---
+
+## 40. ADR-040 — FP/tan δ: pendiente predictiva por sección (#5) + baseline-proxy (#6); capacitancia (#3) DESCARTADA por artefacto de datos
+
+> Continuación de la auditoría 🔵 (el director: "continúa con todo hasta finalizar"). Se cierran los gaps #5, #6 y se resuelve #3 con integridad. **Frontend; en prod tras push.**
+
+**40.1 #5 Pendiente por sección** — `analizarTand.subiendo`: para cada sección, peor tan δ por informe (cronológico); si `Δ(último−baseline) > PEND_UMBRAL` (0.05% ⚠️ verificar) la sección está "al alza sostenida" → se vigila aunque cumpla la guía (la pendiente condena, skill 03§E). El análisis muestra "Tendencia por sección". Validado 450108: 5 al alza, encabeza **CL +0.2535%** (0.26→0.5135) — coincide con el peor caso global.
+
+**40.2 #6 Baseline-proxy** — Sin dato de fábrica/commissioning (precedencia 1 de la skill 03), el informe más antiguo visible es la referencia de tendencia; el análisis lo declara explícito ("sin baseline de fábrica/commissioning") para no confundir un proxy con el baseline real.
+
+**40.3 #3 Capacitancia — DESCARTADA (integridad de datos)** — Se implementó la comparación de capacitancia (pF) vs baseline, pero el **workflow la cazó**: arrojaba **CHL −91.4%, CL −89.3%** — cambios de ~10x físicamente imposibles. Causa raíz verificada en los fixtures: los informes usan **esquemas de medida distintos** (2021: combos `CH+CHL`/`CL+CLH` de 2 devanados; 2023: `CH+CHL+CHT` de 3 devanados, modos GST/UST diferentes) → la misma ETIQUETA de sección NO mide la misma capacitancia (CHL: 2233.5 pF en 2021 vs 191.9 pF en 2023). Comparar pF entre informes así = **falsa alarma**. Decisión: **NO mostrar** la comparación (se eliminó `capDe`/`caps`/`capResumen`); en su lugar, un **caveat** explica por qué y qué haría falta (extracción POR MODO). El tan δ (ratio) sí es comparable; la capacitancia (absoluta, mode-dependiente) no, con este dato.
+
+**40.4 Verificación (workflow)** — `_dev/preview-tand.html` con datos REALES: análisis muestra tip-up + pendiente (#5: 5 al alza, CL líder) + baseline (#6) + caveat de T y de capacitancia; **sin la falsa alarma −91%** (`contieneCapAlarma=false`). 5 tests (#5/#6: sin baseline con 1 informe; al alza→subiendo+baseline; plano→subiendo vacío). Se retiraron los 3 tests de `capResumen`. `npm test` **1160/1160**. Lint 0. Sin errores de consola.
+
+**40.5 Doctrina** — "El workflow no solo valida que algo se VE: valida que el dato es VERDADERO. Un resultado físicamente implausible (capacitancia −91%) es señal de artefacto, no de hallazgo — antes de mostrarlo, RCA en el dato (aquí: esquemas/modos de medida distintos bajo la misma etiqueta). Mejor un caveat honesto ('no comparable con este dato') que una falsa alarma. Una métrica RATIO (tan δ) tolera diferencias de modo que una ABSOLUTA (pF) no." Refuerza memoria 'no fabricar/ verificar' + L-49 (preview). Cierra la auditoría FP/tan δ (gaps #1/#2/#4/#5/#6 hechos; #3 descartado con causa).
