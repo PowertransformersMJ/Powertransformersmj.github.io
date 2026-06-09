@@ -650,3 +650,17 @@
 **30.2 Refactor (testabilidad)** — El modal se **extrajo del shell a `assets/js/ui/pruebas/modal-upsert.js`** (`confirmarUpsert`, + su `esc` local). Motivo: el shell auto-ejecuta `arrancar()` al cargar (Firebase + DOM) → no es importable en un harness; un módulo aislado SÍ. Mismo patrón que `tand-panel.js` (ADR-029). Validado en `_dev/preview-upsert.html`: ambos botones presentes, el "nuevo" abre un blob, el modal NO se cierra al abrirlo, y la decisión resuelve `nuevo`/`reemplazar`. `npm test` 1141/1141.
 
 **30.3 Doctrina** — "Para decidir entre dos opciones (reemplazar vs crear), dale al usuario la EVIDENCIA de ambas (abrir los dos PDFs), no solo una. Un PDF aún sin subir se previsualiza con un blob URL del File local — no hace falta subirlo primero. Extraer una pieza de UI del shell a su propio módulo cuando el shell no es importable en harness = poder validarla con preview (L-49)."
+
+---
+
+## 31. ADR-031 — Tan δ "Por devanado": leyenda LIMPIA por informe + criterio normativo VISIBLE con veredicto
+
+> Director (2026-06-09, sobre la vista "Por devanado" de ADR-029): "esto está muy desordenado, dale mayor orden y organización para poder interpretar los resultados. Por otra parte NO veo criterios de evaluación basados en norma." **Frontend; en prod tras push.**
+
+**31.1 Causa raíz** — La vista "Por devanado" reusaba `svgBloque` con una serie por **(informe × tensión)** → la leyenda generaba ~8 entradas con nombres largos ("03/11/2021 · delta · Tan δ @ 2 kV") que se desbordaban horizontalmente = desorden. Y el criterio normativo no estaba ROTULADO (las líneas límite/guía existían pero sin citar norma ni veredicto).
+
+**31.2 Solución** — Render PROPIO `svgPorDevanado(secs, tensList, repsVis)` (reemplaza el `svgBloque` en la rama 'seccion'; el import de `svgBloque` se eliminó, ya no se usa). (a) **Leyenda limpia POR INFORME**: un swatch+rótulo por informe (color por informe), envuelta en filas; la tensión NO multiplica la leyenda → se distingue por opacidad (barra llena = 1ª tensión, tenue = 2ª) con una nota de una línea. (b) **Criterio normativo `CRIT = {limite:1, guia:0.5, norma:'IEEE 62 / C57.152'}`**: líneas de límite (rotulada "límite 1% · IEEE 62 / C57.152") y guía (0.5%); cada barra evaluada → barras que SUPERAN el límite en ROJO con borde; tooltip por barra cita estado ("dentro de norma" / "sobre guía" / "SUPERA límite") + norma. (c) **Veredicto en el caption**: "N/M dentro de norma · K sobre guía · J SUPERA límite".
+
+**31.3 No-regresión / verificación** — Validado en `_dev/preview-tand.html` con DATOS REALES (4 informes, 60 mediciones): leyenda = 4 entradas por informe (antes ~8 por serie), líneas de criterio rotuladas con la norma, veredicto "58/60 dentro de norma · 2 sobre guía". Sin errores de consola. `npm test` **1141/1141**. INTACTO: vista "Tendencia", filtros, scorecard, multinorma.
+
+**31.4 Doctrina** — "Una leyenda debe identificar la dimensión que el color codifica (informe), no el producto cartesiano de dimensiones (informe×tensión) — las otras dimensiones se distinguen por opacidad/patrón + una nota, no multiplicando entradas. Un criterio normativo debe ser VISIBLE en la propia gráfica: líneas rotuladas con la norma + veredicto por dato + conteo agregado, no solo un umbral implícito." Refuerza L-49 (preview con datos reales).
