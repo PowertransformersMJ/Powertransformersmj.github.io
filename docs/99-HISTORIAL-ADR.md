@@ -713,7 +713,7 @@
 
 ---
 
-## 35. ADR-035 — Retiro de la sección "Resultados del informe" (detalle por informe) — reversible, sin destruir el motor
+## 35. ADR-035 — Retiro de la sección "Resultados del informe" (detalle por informe) — reversible, sin destruir el motor ⚠️ CORREGIDO/REVERTIDO por ADR-036 (sobre-retiro: el director solo pedía el bloque tan δ)
 
 > Director (2026-06-09, vía pantallazos): "también elimina esto" — la sección "Resultados del informe" (selector de informe + detalle completo del informe vigente: análisis IA, evaluación multi-norma, recomendación, gráfica "Valores vs Sección" y la tabla de 24 filas de tan δ). **Frontend; en prod tras push.**
 
@@ -726,3 +726,17 @@
 **35.4 Verificación** — `node --check` OK (guard con llaves balanceadas; `montarMultiAno()`/scorecard alcanzables con flag en false). `npx html-validate pages/pruebas-electricas.html` 0. `npm test` **1146/1146**. ⚠️ La PÁGINA autenticada NO se pudo ejercitar en el preview (Firebase redirige a login `index.html`); validación por syntax+lint+tests+lectura de flujo, no por UI en vivo.
 
 **35.5 Doctrina** — "Cuando una sección comparte su función de montaje con dependencias vivas (carga de cache, otras vistas, scorecard), NO borres la función: aísla el render con un flag y oculta el contenedor. Distinguir 'lo que se ve' de 'lo que se ejecuta' permite retirar la vista sin desintegrar el motor. Si la vista vive tras auth y el preview no puede entrar, decláralo explícito (validación parcial)." Refuerza memoria 'no destruir lo logrado'.
+
+---
+
+## 36. ADR-036 — CORRIGE ADR-035: solo se retira el BLOQUE tan δ del detalle por informe, NO toda la sección
+
+> Director (2026-06-09): "noté que eliminaste más de lo que te pedí; solo tenías que eliminar lo que te indiqué… borraste de más. Corrige, memoriza y analiza." **Frontend; en prod tras push.**
+
+**36.1 Qué salió mal (RCA)** — En ADR-035 interpreté "elimina esto / lo que indico en los pantallazos" como retirar TODA la sección "Resultados del informe". Pero los pantallazos enfocaban el **bloque tan δ** ("Factor de Potencia / Tan δ — Aislamiento por secciones": análisis IA + evaluación multi-norma + gráfica + tabla); el encabezado de la sección sólo era el tope del scroll. Al ocultar la sección entera maté el detalle de bujes, excitación, relación, resistencia y aislamiento de ese MISMO informe (validado: el informe 19/01/2024 estrella tiene 6+ bloques no-tan δ).
+
+**36.2 Corrección** — Revertido el flag `MOSTRAR_RESULTADOS_INFORME` + `<section hidden>` (la sección "Resultados del informe" y el selector VUELVEN). En `pintarDetalle` (shell) se filtra SOLO el bloque tan δ antes de `mountBloques`: `bloques.filter(b => !(familiaMA(b)?.key === 'tand'))` — el tan δ ya vive condensado en su panel dedicado (ADR-029/031/032), así que se quita del detalle para no duplicarlo. Si un informe quedara sin bloques tras el filtro, se muestra una nota que remite al panel condensado.
+
+**36.3 No-regresión / Workflow** — Validado en `_dev/preview-bloques.html` (réplica del detalle, con el MISMO filtro) usando datos REALES: informe 19/01/2024 estrella → `contieneTanDelta=false` y SIGUEN visibles bujes, excitación, relación AT/MT y AT/BT, resistencia AT y MT/BT, aislamiento Megger; selector intacto. Sin errores de consola. `npm test` **1146/1146**. Lint HTML 0.
+
+**36.4 Doctrina (meta)** — "Cuando el director señala con pantallazos un ELEMENTO dentro de un contenedor, el objetivo es ESE elemento, no el contenedor. El encabezado de sección en el tope de un scroll es contexto, no parte del pedido. Ante duda de alcance en un BORRADO: retira lo MÍNIMO señalado (defecto conservador), nunca el contenedor — borrar de más destruye valor ajeno al pedido. Reforzado: validar el cambio con el harness ANTES de declararlo hecho (aquí el harness sí era testeable, a diferencia de la página tras auth)." Ver L-51 (30-LECCIONES) + memoria de feedback.
