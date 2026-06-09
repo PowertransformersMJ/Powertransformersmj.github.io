@@ -43,10 +43,12 @@
 > 1. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
 >    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
 > 2. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
-> 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→027)**: cada prueba con todos los informes superpuestos + filtro informe global + fase
->    por gráfica (ADR-024/025); fix colapso por año → identidad por informe (ADR-026); **multi-año muestra TODA prueba ELÉCTRICA,
->    no solo las 7** — SFRA/reactancia/etc. con familia genérica; el **ACEITE/DGA queda EXCLUIDO** (guardia de dominio, L-50); criterios
->    surfaceados sin fabricar (ADR-027). **Frontend, validado en preview; pendiente PUSH.** ⛔ NO dañar la calificación global por prueba.
+> 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→028)**: superposición + filtro + fase (024/025); identidad por informe (026); TODA prueba
+>    ELÉCTRICA con familia genérica + ACEITE/DGA excluido (027, L-50); **ADR-028 = TENDENCIA año a año**: 1 gráfica por SUB-PRUEBA (par de
+>    devanados, no fusiona escalas Ω/mΩ ni AT/MT vs AT/BT), **TODOS los años por defecto**, orden cronológico + `etiquetaFecha` uniforme,
+>    toggle "Solo último". **Validado con 5 informes REALES de la 450108** (PDFs del director → `_dev/fixtures/450108-*.json`, incl. tan δ
+>    por sección). **Frontend, validado en preview; pendiente PUSH.** ⛔ NO dañar calificación global / criterios / gráficas de desviación
+>    (`grafico-generico.js` intacto). Trafo MÓVIL cambia config/tensión por año (ADR-014) → keying por devanado, no por título.
 > (Cerrado y consolidado: TODO-09 "Reprocesar" → ADR-015..018, luego RETIRADO en ADR-020.)
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
@@ -82,6 +84,7 @@
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
 | **TODO-08** | Skills `pruebas-electricas` (13/13). Falta: director **valida** + confirma los valores `⚠️ verificar` (lobe 49) contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR) → fijarlos en el motor multi-norma. | 🔄 en validación | director entrega edición de norma |
+| **TODO-10** | Skills `transformadores-potencia` (EQUIPO, lobe 50). Hoy: 1 ejemplar completa (`identificacion-tipo-transformador`, 4 neuronas) + scaffold (README + 3 marcos). **EG ingerido** (39 MB; Cap 6 protecciones/refrigeración plasmado en marco fundamentos §E; mapa de capítulos en lobe 50). Falta: director **valida** la arquitectura de 11 skills antes de replicar a las 10 restantes; lectura dirigida EG Cap 2.4.5/2.4.6 (cargabilidad IEEE C57.91); luego commit (Claude commitea, director pushea). | 🔄 ejemplar lista + EG ingerido, esperando validación | director valida arquitectura |
 > Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** → ADR-009 · **TODO-09** → ADR-015 (reintento IA en "Reprocesar").
 
 ---
@@ -96,24 +99,19 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-08** — **ADR-022 (P1+Tendencia) + ADR-024 (multi-año), pedido del director (frontend; valida en navegador)**:
-  (P1) **calificación global muestra TODAS las pruebas** — el scorecard ocultaba las sin dato → el FP de bujes "desaparecía";
-  ahora lista todas, "No realizada" donde falta, FP bujes separado, +collar. **Motor del veredicto INTACTO.** (Tendencia)
-  `accionPrueba` clasifica predictiva/preventiva/correctiva/diagnóstica + resalta relevantes. **(Tablero MULTI-AÑO, ADR-024 —
-  ADR-024→**ADR-025 v2**→**ADR-026 fix regresión** tras feedback)**: por PRUEBA, gráfica con TODOS los **INFORMES** superpuestos
-  (clave por **informe**, no por año — **ADR-026** corrige que 2 ensayos de 2021 en la serie 450108 se colapsaban; ahora 7 chips
-  distintos, identidad/color/filtro por informe) **conservando FASES** (informe×fase,
-  valores reales — la reducción "peor fase" distorsionaba) + **filtro de año GLOBAL** (todas las pruebas) + **fase por gráfica**,
-  color por año (`bloquesMultiAno`+`montarMultiAno`+`svgBloque` exportado). **(Tendencia v2)**: `cambiosAnoAno` (historial de
-  saltos) + `proyectarTendencia` (ajuste lineal → años a cruzar el límite). 1119/1119 verde. 🚫 **NO romper la calificación
-  global** (memoria `feedback_calificacion_global_por_prueba.md`).
-  ⚙️ **Preview workflow** para validar UI (L-49): `preview_start name:static` → `preview_eval`/`preview_screenshot`; harness `_dev/preview-multiano.html`.
-- **2026-06-08** — **ADR-020 RETIRO de "Reprocesar"** (costo > valor; re-extraer = re-subir): se quitó el botón + handler +
-  el modo-reproceso de la CF (queda **solo-CARGA**) + **ADR-021 previsualización al colisionar por fecha** (modal
-  `confirmarUpsert`: "ya guardado" vs "nuevo" + abrir PDF → reemplazar/crear-nuevo, no un `confirm` ciego). 1099/1099 verde.
-  **CF DESPLEGADA** (solo-CARGA). ⚠️ El director valida el modal en navegador. Frontend a prod tras push.
-- **Arco "Reprocesar" (HISTÓRICO — retirado en ADR-020; en `99`)**: la robustez de transporte que dejó —reintento con
-  presupuesto (L-44/L-48), timeout interno abortable (L-46), dispatcher undici sin bodyTimeout/"terminated" (L-47)— **se
-  conserva para la CARGA**. ADR-015→019 cuentan la secuencia de causas reales (cuelgue→terminated→504) por si reaparecen en carga.
-- Anterior (consolidado en `99`): arco tablero **ADR-010→ADR-014 + L-35..L-43** TODO EN PRODUCCIÓN (Tendencia F2/F3,
-  veredicto MULTI-NORMA, bujes canónico, identidad por informe/trafo móvil, long-polling, upsert, reproceso server-side, backfill).
+- **2026-06-07** — **Nueva familia de skills `transformadores-potencia` (EQUIPO) + lóbulo 50** (pedido del director,
+  vía `skill-creator`): conceptos/criterios/particularidades de tx de potencia para mejorar **cálculos** e
+  **identificación de tipo** (bidevanado / bi+compensación / tridevanado / auto). Construido: **scaffold**
+  (`skills/transformadores-potencia/README.md` + 3 marcos `_conocimiento/`: fundamentos, marco-normativo-tx,
+  convenciones-calculo) + **skill ejemplar completa** `identificacion-tipo-transformador` (SKILL.md + 4 neuronas
+  01-teoría/02-cálculos/03-criterios/04-diagnóstico). Base: **ABB Service Handbook** (legible) + investigación web
+  (IEEE C57.158/.12.00/.90/.70, IEC 60076-1). ⚠️ **EG PDF 108.6 MB > límite 100 MB → bloqueado**, director debe
+  partirlo. Registrado: lóbulo **`50-TRANSFORMADORES-POTENCIA`** + `40-LOBULOS` + `00-INDICE` + `skills-inventory`.
+  **TODO-10** abierto: director valida arquitectura de 11 skills antes de replicar; luego commit (Claude commitea,
+  director pushea). Frontera con lobe 49: 50=EQUIPO, 49=ENSAYOS (se cruzan, no se duplican).
+- **2026-06-08** — Arco tablero pruebas-eléctricas **consolidado en `99` (ADR-010→ADR-027) + lecciones L-35..L-50**, TODO en
+  prod salvo el multi-año (frontend, pendiente PUSH). Hitos: calificación global muestra TODAS las pruebas (FP bujes separado,
+  motor del veredicto INTACTO); `accionPrueba` (predictiva/preventiva/correctiva/diagnóstica); tablero MULTI-AÑO por informe×fase
+  (no por año) + filtro de año global; `proyectarTendencia` (años a cruzar el límite); RETIRO de "Reprocesar" (costo>valor, re-subir
+  = re-extraer) dejando la CF **solo-CARGA** con su robustez de transporte; modal `confirmarUpsert` al colisionar por fecha.
+  🚫 **NO romper la calificación global por prueba** (memoria `feedback_calificacion_global_por_prueba.md`). Preview UI: L-49.

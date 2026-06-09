@@ -1,0 +1,199 @@
+{
+  "_nota": "DATO REAL extraído del PDF por subagente — verificar",
+  "ano": 2023,
+  "fecha": "09/11/2023",
+  "id": "450108-2023-11-09",
+  "serie": "450108",
+  "identidad": {
+    "fabricante": "SIEMENS",
+    "ano_fabricacion": 2020,
+    "potencia": "20 MVA",
+    "tensiones": "110 / 34.5 / 13.8 kV",
+    "grupo_conexion": "YNyn0yn0",
+    "refrigeracion": "OFAF",
+    "frecuencia": "60 Hz",
+    "fases": "3",
+    "cliente": "Afinia",
+    "subestacion": "Membrillal",
+    "ubicacion": "Bolívar"
+  },
+  "bloques": [
+    {
+      "prueba": "bushing",
+      "titulo": "Factor de potencia de bujes AT (C1 - UST)",
+      "unidad": "%",
+      "eje_x": "Buje",
+      "grafica": "barra",
+      "limite": 1,
+      "guia": 0.5,
+      "limite_desbalance": null,
+      "invertir": false,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Tan δ (%)", "puntos": [
+          { "x": "H1", "y": 0.4205, "extra": { "Cap. placa (pF)": 186, "Cap. medida (pF)": 183.8, "Tan δ placa (%)": 0.367, "Tensión (V)": 10000 } },
+          { "x": "H2", "y": 0.4474, "extra": { "Cap. placa (pF)": 187, "Cap. medida (pF)": 185.8, "Tan δ placa (%)": 0.373, "Tensión (V)": 10000 } },
+          { "x": "H3", "y": 0.4354, "extra": { "Cap. placa (pF)": 186, "Cap. medida (pF)": 183.8, "Tan δ placa (%)": 0.354, "Tensión (V)": 10000 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "tand",
+      "titulo": "Factor de potencia / Tan δ por sección de aislamiento",
+      "unidad": "%",
+      "eje_x": "Sección",
+      "grafica": "barra",
+      "limite": 1,
+      "guia": 0.5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Tan δ @ 10 kV", "puntos": [
+          { "x": "CH+CHL+CHT", "y": 0.2006, "extra": { "Cap (pF)": 9418.1, "Tensión (V)": 10000 } },
+          { "x": "CH", "y": 0.1943, "extra": { "Cap (pF)": 3232.8, "Tensión (V)": 10000 } },
+          { "x": "CHL", "y": 0.2463, "extra": { "Cap (pF)": 191.9, "Tensión (V)": 10000 } },
+          { "x": "CHT", "y": 0.2023, "extra": { "Cap (pF)": 5993.4, "Tensión (V)": 10000 } },
+          { "x": "CL+CLT+CLH", "y": 0.2375, "extra": { "Cap (pF)": 10558.7, "Tensión (V)": 10000 } },
+          { "x": "CL", "y": 0.5135, "extra": { "Cap (pF)": 910.2, "Tensión (V)": 10000 } },
+          { "x": "CLT", "y": 0.2275, "extra": { "Cap (pF)": 3654.5, "Tensión (V)": 10000 } },
+          { "x": "CLH", "y": 0.2381, "extra": { "Cap (pF)": 192.1, "Tensión (V)": 10000 } },
+          { "x": "CT+CTH+CTL", "y": 0.2359, "extra": { "Cap (pF)": 11995.7, "Tensión (V)": 7000 } },
+          { "x": "CT", "y": 0.2398, "extra": { "Cap (pF)": 8149.0, "Tensión (V)": 7000 } },
+          { "x": "CTH", "y": 0.2019, "extra": { "Cap (pF)": 5993.6, "Tensión (V)": 7000 } },
+          { "x": "CTL", "y": 0.2277, "extra": { "Cap (pF)": 3654.6, "Tensión (V)": 7000 } }
+        ] },
+        { "nombre": "Tan δ @ 2 kV", "puntos": [
+          { "x": "CH+CHL+CHT", "y": 0.1497, "extra": { "Cap (pF)": 9416.7, "Tensión (V)": 2000 } },
+          { "x": "CH", "y": 0.1915, "extra": { "Cap (pF)": 3231.8, "Tensión (V)": 2000 } },
+          { "x": "CHL", "y": 0.2455, "extra": { "Cap (pF)": 191.9, "Tensión (V)": 2000 } },
+          { "x": "CHT", "y": 0.202, "extra": { "Cap (pF)": 5991.4, "Tensión (V)": 2000 } },
+          { "x": "CL+CLT+CLH", "y": 0.2372, "extra": { "Cap (pF)": 10556.9, "Tensión (V)": 2000 } },
+          { "x": "CL", "y": 0.5133, "extra": { "Cap (pF)": 910.2, "Tensión (V)": 2000 } },
+          { "x": "CLT", "y": 0.1708, "extra": { "Cap (pF)": 3653.9, "Tensión (V)": 2000 } },
+          { "x": "CLH", "y": 0.2378, "extra": { "Cap (pF)": 192.1, "Tensión (V)": 2000 } },
+          { "x": "CT+CTH+CTL", "y": 0.2359, "extra": { "Cap (pF)": 11995.7, "Tensión (V)": 2000 } },
+          { "x": "CT", "y": 0.2386, "extra": { "Cap (pF)": 8146.2, "Tensión (V)": 2000 } },
+          { "x": "CTH", "y": 0.2014, "extra": { "Cap (pF)": 5991.2, "Tensión (V)": 2000 } },
+          { "x": "CTL", "y": 0.2277, "extra": { "Cap (pF)": 3653.2, "Tensión (V)": 2000 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "excitacion",
+      "titulo": "Corriente de excitación AT por TAP - 10 kV",
+      "unidad": "mA",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 10,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 17.964, "extra": { "P (W)": 156.367 } }, { "x": 2, "y": 18.356, "extra": { "P (W)": 158.378 } }, { "x": 3, "y": 18.78, "extra": { "P (W)": 160.738 } }, { "x": 4, "y": 19.248, "extra": { "P (W)": 163.498 } }, { "x": 5, "y": 19.756, "extra": { "P (W)": 166.664 } }, { "x": 6, "y": 20.311, "extra": { "P (W)": 170.269 } }, { "x": 7, "y": 20.912, "extra": { "P (W)": 174.328 } }, { "x": 8, "y": 21.564, "extra": { "P (W)": 178.869 } }, { "x": 9, "y": 22.257, "extra": { "P (W)": 183.881 } }, { "x": 10, "y": 22.615, "extra": { "P (W)": 187.206 } }, { "x": 11, "y": 23.185, "extra": { "P (W)": 190.564 } }, { "x": 12, "y": 23.802, "extra": { "P (W)": 194.394 } }, { "x": 13, "y": 24.47, "extra": { "P (W)": 198.710 } }, { "x": 14, "y": 25.194, "extra": { "P (W)": 203.572 } }, { "x": 15, "y": 25.975, "extra": { "P (W)": 209.001 } }, { "x": 16, "y": 26.816, "extra": { "P (W)": 215.036 } }, { "x": 17, "y": 27.722, "extra": { "P (W)": 221.734 } }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 11.623, "extra": { "P (W)": 106.652 } }, { "x": 2, "y": 11.881, "extra": { "P (W)": 108.105 } }, { "x": 3, "y": 12.173, "extra": { "P (W)": 109.840 } }, { "x": 4, "y": 12.501, "extra": { "P (W)": 111.891 } }, { "x": 5, "y": 12.864, "extra": { "P (W)": 114.257 } }, { "x": 6, "y": 13.266, "extra": { "P (W)": 116.980 } }, { "x": 7, "y": 13.706, "extra": { "P (W)": 120.071 } }, { "x": 8, "y": 14.187, "extra": { "P (W)": 123.547 } }, { "x": 9, "y": 14.579, "extra": { "P (W)": 127.559 } }, { "x": 10, "y": 14.946, "extra": { "P (W)": 129.585 } }, { "x": 11, "y": 15.357, "extra": { "P (W)": 131.986 } }, { "x": 12, "y": 15.809, "extra": { "P (W)": 134.764 } }, { "x": 13, "y": 16.306, "extra": { "P (W)": 137.965 } }, { "x": 14, "y": 16.85, "extra": { "P (W)": 141.618 } }, { "x": 15, "y": 17.444, "extra": { "P (W)": 145.759 } }, { "x": 16, "y": 18.094, "extra": { "P (W)": 150.443 } }, { "x": 17, "y": 18.841, "extra": { "P (W)": 155.869 } }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 18.525, "extra": { "P (W)": 158.868 } }, { "x": 2, "y": 18.831, "extra": { "P (W)": 160.524 } }, { "x": 3, "y": 19.233, "extra": { "P (W)": 162.860 } }, { "x": 4, "y": 19.683, "extra": { "P (W)": 165.610 } }, { "x": 5, "y": 20.177, "extra": { "P (W)": 168.756 } }, { "x": 6, "y": 20.717, "extra": { "P (W)": 172.336 } }, { "x": 7, "y": 21.303, "extra": { "P (W)": 176.351 } }, { "x": 8, "y": 21.935, "extra": { "P (W)": 180.827 } }, { "x": 9, "y": 22.618, "extra": { "P (W)": 185.809 } }, { "x": 10, "y": 22.983, "extra": { "P (W)": 189.149 } }, { "x": 11, "y": 23.54, "extra": { "P (W)": 192.528 } }, { "x": 12, "y": 24.146, "extra": { "P (W)": 196.361 } }, { "x": 13, "y": 24.807, "extra": { "P (W)": 200.707 } }, { "x": 14, "y": 25.516, "extra": { "P (W)": 205.535 } }, { "x": 15, "y": 26.29, "extra": { "P (W)": 210.982 } }, { "x": 16, "y": 27.123, "extra": { "P (W)": 217.015 } }, { "x": 17, "y": 28.018, "extra": { "P (W)": 223.694 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "relacion",
+      "titulo": "Relación de transformación AT/MT (T1=110 kV, T2=34.5 kV)",
+      "unidad": "",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 0.5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 3.5024, "extra": { "%DIF": -0.14 } }, { "x": 2, "y": 3.463, "extra": { "%DIF": -0.13 } }, { "x": 3, "y": 3.4238, "extra": { "%DIF": -0.11 } }, { "x": 4, "y": 3.3846, "extra": { "%DIF": -0.09 } }, { "x": 5, "y": 3.3451, "extra": { "%DIF": -0.08 } }, { "x": 6, "y": 3.3057, "extra": { "%DIF": -0.07 } }, { "x": 7, "y": 3.2664, "extra": { "%DIF": -0.05 } }, { "x": 8, "y": 3.2272, "extra": { "%DIF": -0.03 } }, { "x": 9, "y": 3.1877, "extra": { "%DIF": -0.02 } }, { "x": 10, "y": 3.1483, "extra": { "%DIF": -0.01 } }, { "x": 11, "y": 3.1091, "extra": { "%DIF": 0.01 } }, { "x": 12, "y": 3.0696, "extra": { "%DIF": 0.03 } }, { "x": 13, "y": 3.0304, "extra": { "%DIF": 0.05 } }, { "x": 14, "y": 2.9912, "extra": { "%DIF": 0.07 } }, { "x": 15, "y": 2.9519, "extra": { "%DIF": 0.09 } }, { "x": 16, "y": 2.9127, "extra": { "%DIF": 0.11 } }, { "x": 17, "y": 2.8731, "extra": { "%DIF": 0.12 } }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 3.5022, "extra": { "%DIF": -0.14 } }, { "x": 2, "y": 3.4631, "extra": { "%DIF": -0.12 } }, { "x": 3, "y": 3.4239, "extra": { "%DIF": -0.11 } }, { "x": 4, "y": 3.3845, "extra": { "%DIF": -0.09 } }, { "x": 5, "y": 3.3451, "extra": { "%DIF": -0.08 } }, { "x": 6, "y": 3.3059, "extra": { "%DIF": -0.06 } }, { "x": 7, "y": 3.2663, "extra": { "%DIF": -0.06 } }, { "x": 8, "y": 3.271, "extra": { "%DIF": -0.03 } }, { "x": 9, "y": 3.1878, "extra": { "%DIF": -0.02 } }, { "x": 10, "y": 3.1484, "extra": { "%DIF": -0.01 } }, { "x": 11, "y": 3.1091, "extra": { "%DIF": 0.01 } }, { "x": 12, "y": 3.0697, "extra": { "%DIF": 0.03 } }, { "x": 13, "y": 3.0305, "extra": { "%DIF": 0.05 } }, { "x": 14, "y": 2.9913, "extra": { "%DIF": 0.07 } }, { "x": 15, "y": 2.952, "extra": { "%DIF": 0.09 } }, { "x": 16, "y": 2.9127, "extra": { "%DIF": 0.11 } }, { "x": 17, "y": 2.8733, "extra": { "%DIF": 0.13 } }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 3.5023, "extra": { "%DIF": -0.14 } }, { "x": 2, "y": 3.4631, "extra": { "%DIF": -0.12 } }, { "x": 3, "y": 3.4238, "extra": { "%DIF": -0.11 } }, { "x": 4, "y": 3.3845, "extra": { "%DIF": -0.09 } }, { "x": 5, "y": 3.345, "extra": { "%DIF": -0.08 } }, { "x": 6, "y": 3.2663, "extra": { "%DIF": -1.26 } }, { "x": 7, "y": 3.2664, "extra": { "%DIF": -0.05 } }, { "x": 8, "y": 3.227, "extra": { "%DIF": -0.04 } }, { "x": 9, "y": 3.1877, "extra": { "%DIF": -0.02 } }, { "x": 10, "y": 3.1483, "extra": { "%DIF": -0.01 } }, { "x": 11, "y": 3.1091, "extra": { "%DIF": 0.01 } }, { "x": 12, "y": 3.0697, "extra": { "%DIF": 0.03 } }, { "x": 13, "y": 3.0303, "extra": { "%DIF": 0.04 } }, { "x": 14, "y": 2.9912, "extra": { "%DIF": 0.07 } }, { "x": 15, "y": 2.9519, "extra": { "%DIF": 0.09 } }, { "x": 16, "y": 2.9125, "extra": { "%DIF": 0.11 } }, { "x": 17, "y": 2.8733, "extra": { "%DIF": 0.13 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "relacion",
+      "titulo": "Relación de transformación AT/BT (T1=110 kV, T2=13.8 kV)",
+      "unidad": "",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 0.5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 8.764, "extra": { "%DIF": -0.05 } }, { "x": 2, "y": 8.6656, "extra": { "%DIF": -0.03 } }, { "x": 3, "y": 8.5669, "extra": { "%DIF": -0.02 } }, { "x": 4, "y": 8.4684, "extra": { "%DIF": -0.01 } }, { "x": 5, "y": 8.37, "extra": { "%DIF": 0.01 } }, { "x": 6, "y": 8.2715, "extra": { "%DIF": 0.02 } }, { "x": 7, "y": 8.1729, "extra": { "%DIF": 0.03 } }, { "x": 8, "y": 8.0747, "extra": { "%DIF": 0.05 } }, { "x": 9, "y": 7.9761, "extra": { "%DIF": 0.06 } }, { "x": 10, "y": 7.8774, "extra": { "%DIF": 0.08 } }, { "x": 11, "y": 7.7792, "extra": { "%DIF": 0.1 } }, { "x": 12, "y": 7.6806, "extra": { "%DIF": 0.11 } }, { "x": 13, "y": 7.5823, "extra": { "%DIF": 0.13 } }, { "x": 14, "y": 7.4838, "extra": { "%DIF": 0.15 } }, { "x": 15, "y": 7.3852, "extra": { "%DIF": 0.16 } }, { "x": 16, "y": 7.2872, "extra": { "%DIF": 0.19 } }, { "x": 17, "y": 7.1887, "extra": { "%DIF": 0.21 } }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 8.7643, "extra": { "%DIF": -0.04 } }, { "x": 2, "y": 8.6655, "extra": { "%DIF": -0.04 } }, { "x": 3, "y": 8.5671, "extra": { "%DIF": -0.02 } }, { "x": 4, "y": 8.4683, "extra": { "%DIF": -0.01 } }, { "x": 5, "y": 8.3701, "extra": { "%DIF": 0.01 } }, { "x": 6, "y": 8.2716, "extra": { "%DIF": 0.02 } }, { "x": 7, "y": 8.1732, "extra": { "%DIF": 0.04 } }, { "x": 8, "y": 8.0746, "extra": { "%DIF": 0.05 } }, { "x": 9, "y": 7.9761, "extra": { "%DIF": 0.06 } }, { "x": 10, "y": 7.8777, "extra": { "%DIF": 0.08 } }, { "x": 11, "y": 7.7793, "extra": { "%DIF": 0.1 } }, { "x": 12, "y": 7.6808, "extra": { "%DIF": 0.11 } }, { "x": 13, "y": 7.5823, "extra": { "%DIF": 0.13 } }, { "x": 14, "y": 7.4841, "extra": { "%DIF": 0.15 } }, { "x": 15, "y": 7.3856, "extra": { "%DIF": 0.17 } }, { "x": 16, "y": 7.287, "extra": { "%DIF": 0.18 } }, { "x": 17, "y": 7.1886, "extra": { "%DIF": 0.2 } }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 8.764, "extra": { "%DIF": -0.05 } }, { "x": 2, "y": 8.6656, "extra": { "%DIF": -0.03 } }, { "x": 3, "y": 8.5669, "extra": { "%DIF": -0.02 } }, { "x": 4, "y": 8.4684, "extra": { "%DIF": -0.01 } }, { "x": 5, "y": 8.3699, "extra": { "%DIF": 0 } }, { "x": 6, "y": 8.2714, "extra": { "%DIF": 0.02 } }, { "x": 7, "y": 8.1728, "extra": { "%DIF": 0.03 } }, { "x": 8, "y": 8.0744, "extra": { "%DIF": 0.05 } }, { "x": 9, "y": 7.9759, "extra": { "%DIF": 0.06 } }, { "x": 10, "y": 7.8775, "extra": { "%DIF": 0.08 } }, { "x": 11, "y": 7.7789, "extra": { "%DIF": 0.09 } }, { "x": 12, "y": 7.6803, "extra": { "%DIF": 0.11 } }, { "x": 13, "y": 7.5822, "extra": { "%DIF": 0.13 } }, { "x": 14, "y": 7.4838, "extra": { "%DIF": 0.15 } }, { "x": 15, "y": 7.3853, "extra": { "%DIF": 0.17 } }, { "x": 16, "y": 7.2871, "extra": { "%DIF": 0.19 } }, { "x": 17, "y": 7.1886, "extra": { "%DIF": 0.2 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "resistencia",
+      "titulo": "Resistencia de devanados AT por TAP (referida a 75 °C)",
+      "unidad": "Ω",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 2.21 }, { "x": 2, "y": 2.192 }, { "x": 3, "y": 2.173 }, { "x": 4, "y": 2.155 }, { "x": 5, "y": 2.136 }, { "x": 6, "y": 2.118 }, { "x": 7, "y": 2.1 }, { "x": 8, "y": 2.082 }, { "x": 9, "y": 2.06 }, { "x": 10, "y": 2.081 }, { "x": 11, "y": 2.099 }, { "x": 12, "y": 2.118 }, { "x": 13, "y": 2.136 }, { "x": 14, "y": 2.154 }, { "x": 15, "y": 2.172 }, { "x": 16, "y": 2.191 }, { "x": 17, "y": 2.209 }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 2.217 }, { "x": 2, "y": 2.198 }, { "x": 3, "y": 2.18 }, { "x": 4, "y": 2.162 }, { "x": 5, "y": 2.143 }, { "x": 6, "y": 2.125 }, { "x": 7, "y": 2.107 }, { "x": 8, "y": 2.089 }, { "x": 9, "y": 2.068 }, { "x": 10, "y": 2.088 }, { "x": 11, "y": 2.107 }, { "x": 12, "y": 2.125 }, { "x": 13, "y": 2.143 }, { "x": 14, "y": 2.162 }, { "x": 15, "y": 2.18 }, { "x": 16, "y": 2.199 }, { "x": 17, "y": 2.218 }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 2.23 }, { "x": 2, "y": 2.211 }, { "x": 3, "y": 2.193 }, { "x": 4, "y": 2.175 }, { "x": 5, "y": 2.156 }, { "x": 6, "y": 2.138 }, { "x": 7, "y": 2.12 }, { "x": 8, "y": 2.102 }, { "x": 9, "y": 2.082 }, { "x": 10, "y": 2.102 }, { "x": 11, "y": 2.12 }, { "x": 12, "y": 2.138 }, { "x": 13, "y": 2.157 }, { "x": 14, "y": 2.175 }, { "x": 15, "y": 2.194 }, { "x": 16, "y": 2.212 }, { "x": 17, "y": 2.23 }
+        ] }
+      ]
+    },
+    {
+      "prueba": "resistencia",
+      "titulo": "Resistencia de devanados MT y BT (referida a 75 °C)",
+      "unidad": "mΩ",
+      "eje_x": "Devanado / Fase",
+      "grafica": "barra",
+      "limite_desbalance": 5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "MT - Fase A", "puntos": [ { "x": "MT-A", "y": 161.742 } ] },
+        { "nombre": "MT - Fase B", "puntos": [ { "x": "MT-B", "y": 161.119 } ] },
+        { "nombre": "MT - Fase C", "puntos": [ { "x": "MT-C", "y": 161.819 } ] },
+        { "nombre": "BT - Fase A", "puntos": [ { "x": "BT-A", "y": 19.336 } ] },
+        { "nombre": "BT - Fase B", "puntos": [ { "x": "BT-B", "y": 19.351 } ] },
+        { "nombre": "BT - Fase C", "puntos": [ { "x": "BT-C", "y": 19.436 } ] }
+      ]
+    },
+    {
+      "prueba": "aislamiento",
+      "titulo": "Resistencia de aislamiento (Megger a 1 min)",
+      "unidad": "GΩ",
+      "eje_x": "Configuración",
+      "grafica": "barra",
+      "limite": 1,
+      "guia": 5,
+      "invertir": true,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Aislamiento (GΩ)", "puntos": [
+          { "x": "AT–MT", "y": 6.01, "extra": { "DAR": 1.29 } },
+          { "x": "AT–BT", "y": 6.17, "extra": { "DAR": 1.1 } },
+          { "x": "AT–T", "y": 5.52, "extra": { "DAR": 1.3 } },
+          { "x": "MT–BT", "y": 5.41, "extra": { "DAR": 1.21 } },
+          { "x": "MT–T", "y": 5, "extra": { "DAR": 1.12 } },
+          { "x": "BT–T", "y": 5.09, "extra": { "DAR": 1.2 } }
+        ] }
+      ]
+    }
+  ]
+}

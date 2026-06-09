@@ -1,0 +1,211 @@
+{
+  "_nota": "DATO REAL extraído del PDF por subagente — verificar",
+  "ano": 2022,
+  "fecha": "18/01/2022",
+  "id": "450108-2022-01-18",
+  "serie": "450108",
+  "identidad": {
+    "fabricante": "SIEMENS",
+    "ano_fabricacion": 2020,
+    "potencia": "20 MVA",
+    "tensiones": "110 / 34.5 / 13.8 kV",
+    "grupo_conexion": "YNyn0yn0 / Dyn1yn1",
+    "refrigeracion": "OFAF",
+    "frecuencia": "60 Hz",
+    "fases": "3",
+    "cliente": "Afinia",
+    "subestacion": "Membrillal",
+    "ubicacion": "Bolívar"
+  },
+  "bloques": [
+    {
+      "prueba": "excitacion",
+      "titulo": "Corriente de excitación por TAP - 10 kV",
+      "unidad": "mA",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 10,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 24.439, "extra": { "P (W)": 151.5834 } },
+          { "x": "9B", "y": 28.159, "extra": { "P (W)": 178.2998 } },
+          { "x": 17, "y": 33.07, "extra": { "P (W)": 214.553 } }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 17.4, "extra": { "P (W)": 102.4281 } },
+          { "x": "9B", "y": 20.297, "extra": { "P (W)": 123.1846 } },
+          { "x": 17, "y": 24.19, "extra": { "P (W)": 150.9314 } }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 23.786, "extra": { "P (W)": 148.172 } },
+          { "x": "9B", "y": 27.692, "extra": { "P (W)": 175.8947 } },
+          { "x": 17, "y": 33.512, "extra": { "P (W)": 214.8981 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "relacion",
+      "titulo": "Relación de transformación AT/MT (110 kV vs 34.5 kV)",
+      "unidad": "",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 0.5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 3.5004, "extra": { "%DIF": 0.19 } },
+          { "x": "9B", "y": 3.1866, "extra": { "%DIF": 0.06 } },
+          { "x": 17, "y": 2.8715, "extra": { "%DIF": 0.07 } }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 3.5001, "extra": { "%DIF": 0.2 } },
+          { "x": "9B", "y": 3.1859, "extra": { "%DIF": 0.08 } },
+          { "x": 17, "y": 2.8716, "extra": { "%DIF": 0.07 } }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 3.501, "extra": { "%DIF": 0.18 } },
+          { "x": "9B", "y": 3.1859, "extra": { "%DIF": 0.08 } },
+          { "x": 17, "y": 2.872, "extra": { "%DIF": 0.09 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "relacion",
+      "titulo": "Relación de transformación AT/BT (110 kV vs 13.8 kV)",
+      "unidad": "",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 0.5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 8.7681, "extra": { "%DIF": 0.1 } },
+          { "x": "9B", "y": 7.9696, "extra": { "%DIF": 0.02 } },
+          { "x": 17, "y": 7.1849, "extra": { "%DIF": 0.15 } }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 8.7565, "extra": { "%DIF": 0.13 } },
+          { "x": "9B", "y": 7.9712, "extra": { "%DIF": 0.0 } },
+          { "x": 17, "y": 7.1825, "extra": { "%DIF": 0.12 } }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 8.7564, "extra": { "%DIF": 0.13 } },
+          { "x": "9B", "y": 7.9713, "extra": { "%DIF": 0.0 } },
+          { "x": 17, "y": 7.1826, "extra": { "%DIF": 0.12 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "resistencia",
+      "titulo": "Resistencia de devanados AT por TAP (R medida)",
+      "unidad": "Ω",
+      "eje_x": "Posición del TAP",
+      "grafica": "linea",
+      "limite_desbalance": 5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Fase A", "puntos": [
+          { "x": 1, "y": 1.4748 },
+          { "x": "9B", "y": 1.3753 },
+          { "x": 17, "y": 1.4746 }
+        ] },
+        { "nombre": "Fase B", "puntos": [
+          { "x": 1, "y": 1.4776 },
+          { "x": "9B", "y": 1.3783 },
+          { "x": 17, "y": 1.4776 }
+        ] },
+        { "nombre": "Fase C", "puntos": [
+          { "x": 1, "y": 1.4815 },
+          { "x": "9B", "y": 1.3824 },
+          { "x": 17, "y": 1.4814 }
+        ] }
+      ]
+    },
+    {
+      "prueba": "resistencia",
+      "titulo": "Resistencia de devanados MT y BT (R medida)",
+      "unidad": "mΩ",
+      "eje_x": "Devanado / Fase",
+      "grafica": "barra",
+      "limite_desbalance": 5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "MT - Fase A", "puntos": [ { "x": "MT-A", "y": 161.38 } ] },
+        { "nombre": "MT - Fase B", "puntos": [ { "x": "MT-B", "y": 160.75 } ] },
+        { "nombre": "MT - Fase C", "puntos": [ { "x": "MT-C", "y": 161.45 } ] },
+        { "nombre": "BT - Fase A", "puntos": [ { "x": "BT-A", "y": 19.282 } ] },
+        { "nombre": "BT - Fase B", "puntos": [ { "x": "BT-B", "y": 19.309 } ] },
+        { "nombre": "BT - Fase C", "puntos": [ { "x": "BT-C", "y": 19.389 } ] }
+      ]
+    },
+    {
+      "prueba": "aislamiento",
+      "titulo": "Resistencia de aislamiento (Megger a 1 min)",
+      "unidad": "GΩ",
+      "eje_x": "Configuración",
+      "grafica": "barra",
+      "limite": 1,
+      "guia": 5,
+      "invertir": true,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Aislamiento (GΩ)", "puntos": [
+          { "x": "AT–MT", "y": 16.79, "extra": { "DAR": 1.15 } },
+          { "x": "AT–BT", "y": 15.05, "extra": { "DAR": 1.24 } },
+          { "x": "AT–T", "y": 15.97, "extra": { "DAR": 1.25 } },
+          { "x": "MT–BT", "y": 13.97, "extra": { "DAR": 1.15 } },
+          { "x": "MT–T", "y": 13.1, "extra": { "DAR": 1.33 } },
+          { "x": "BT–T", "y": 9.25, "extra": { "DAR": 1.04 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "bushing",
+      "titulo": "Factor de potencia de bujes AT (C1)",
+      "unidad": "%",
+      "eje_x": "Buje",
+      "grafica": "barra",
+      "limite": 1,
+      "guia": 0.5,
+      "limite_desbalance": null,
+      "invertir": false,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Tan δ (%)", "puntos": [
+          { "x": "1U", "y": 0.644, "extra": { "Cap. placa C1 (pF)": 186, "Cap. medida C1 (pF)": 186.14, "Tan δ placa C1 (%)": 0.354, "Cap. placa C2 (pF)": 243, "Cap. medida C2 (pF)": 182.6, "Fp C2 (%)": 0.1894, "Tensión (kV)": 10 } },
+          { "x": "1V", "y": 0.4042, "extra": { "Cap. placa C1 (pF)": 187, "Cap. medida C1 (pF)": 184.61, "Tan δ placa C1 (%)": 0.373, "Cap. placa C2 (pF)": 259, "Cap. medida C2 (pF)": 182.71, "Fp C2 (%)": 0.2099, "Tensión (kV)": 10 } },
+          { "x": "1W", "y": 0.3019, "extra": { "Cap. placa C1 (pF)": 186, "Cap. medida C1 (pF)": 184.11, "Tan δ placa C1 (%)": 0.367, "Cap. placa C2 (pF)": 239, "Cap. medida C2 (pF)": 180.72, "Fp C2 (%)": 0.0967, "Tensión (kV)": 10 } }
+        ] }
+      ]
+    },
+    {
+      "prueba": "tand",
+      "titulo": "Factor de potencia / Tan δ por sección de aislamiento",
+      "unidad": "%",
+      "eje_x": "Sección",
+      "grafica": "barra",
+      "limite": 1,
+      "guia": 0.5,
+      "calif": "SATISFACTORIA",
+      "series": [
+        { "nombre": "Tan δ @ 10 kV", "puntos": [
+          { "x": "CH", "y": 0.1201, "extra": { "Cap (nF)": 3.1295 } },
+          { "x": "CHL", "y": 0.1201, "extra": { "Cap (nF)": 5.9798 } },
+          { "x": "CL", "y": 0.1488, "extra": { "Cap (nF)": 6.8936 } },
+          { "x": "CLT", "y": 0.1354, "extra": { "Cap (nF)": 3.648 } },
+          { "x": "CT", "y": 0.1531, "extra": { "Cap (nF)": 6.508 } },
+          { "x": "CHT", "y": 0.1405, "extra": { "Cap (nF)": 5.456 } }
+        ] },
+        { "nombre": "Tan δ @ 2 kV", "puntos": [
+          { "x": "CH", "y": 0.119, "extra": { "Cap (nF)": 3.1289 } },
+          { "x": "CHL", "y": 0.119, "extra": { "Cap (nF)": 5.9838 } },
+          { "x": "CL", "y": 0.1476, "extra": { "Cap (nF)": 6.8982 } },
+          { "x": "CLT", "y": 0.134, "extra": { "Cap (nF)": 3.6505 } },
+          { "x": "CT", "y": 0.1505, "extra": { "Cap (nF)": 6.508 } },
+          { "x": "CHT", "y": 0.1402, "extra": { "Cap (nF)": 5.456 } }
+        ] }
+      ]
+    }
+  ]
+}
