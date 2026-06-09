@@ -138,3 +138,25 @@ describe('analizarTand · localización (secciones sobre guía 0.5%)', () => {
     assert.match(r.localizadas[0].causa, /ENTRE devanados/);
   });
 });
+
+describe('analizarTand · pendiente por sección / baseline (#5/#6)', () => {
+  const t10 = ['Tan δ @ 10 kV'];
+  test('un solo informe → sin baseline ni pendiente', () => {
+    const r = analizarTand([rep('a', '2021', [['CH', 0.2]])], ['CH'], t10);
+    assert.equal(r.baseline, null);
+    assert.equal(r.subiendo, null);
+  });
+  test('pendiente al alza sostenida → en subiendo; baseline = informe más antiguo', () => {
+    const a = rep('a', '2021', [['CH', 0.2]]);
+    const r = analizarTand([a, rep('b', '2023', [['CH', 0.4]])], ['CH'], t10);
+    assert.equal(r.subiendo.length, 1);
+    assert.equal(r.subiendo[0].sec, 'CH');
+    assert.equal(r.subiendo[0].delta, 0.2);
+    assert.equal(r.baseline, a); // el más antiguo (primer rep visible)
+  });
+  test('pendiente plana → subiendo vacío (pero no null con ≥2 informes)', () => {
+    const r = analizarTand([rep('a', '2021', [['CH', 0.30]]), rep('b', '2023', [['CH', 0.31]])], ['CH'], t10);
+    assert.ok(Array.isArray(r.subiendo));
+    assert.equal(r.subiendo.length, 0); // Δ0.01 ≤ 0.05
+  });
+});

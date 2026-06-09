@@ -39,6 +39,12 @@ const NORMAS_TAND = [
 // No requiere corrección de T (es una diferencia a igual temperatura). ADR-038.
 // ⚠️ umbral a VERIFICAR contra la edición de norma del director (la práctica usa ~0.1%).
 const TIPUP_UMBRAL = 0.1;
+// #5 Pendiente: una sección que SUBE sostenida condena aunque siga ≤guía (skill 03§E).
+// Umbral ⚠️ a VERIFICAR contra la edición de norma del director. ADR-040.
+// (#3 capacitancia: NO se compara entre informes — los esquemas de medida difieren entre
+//  ensayos (combos de 2 vs 3 devanados, GST/UST) → la misma etiqueta de sección no mide lo
+//  mismo y comparar pF daría falsas alarmas. Requiere extracción POR MODO. Ver lóbulo 49.)
+const PEND_UMBRAL = 0.05; // % de subida de tan δ (baseline→último) que cuenta como "al alza"
 const kvDe = (t) => { const m = String(t).match(/([\d.]+)\s*kV/i); return m ? parseFloat(m[1]) : null; };
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const NS = 'http://www.w3.org/2000/svg';
@@ -150,14 +156,25 @@ export function analizarTand(repsVis, secs, tens) {
   M.forEach((m) => { if (!peorPorSec[m.sec] || m.y > peorPorSec[m.sec].y) peorPorSec[m.sec] = m; });
   const localizadas = Object.values(peorPorSec).filter((m) => m.y > GUIA).sort((a, b) => b.y - a.y)
     .map((m) => ({ sec: m.sec, y: m.y, rep: m.rep, donde: localizacionDe(m.sec), causa: causaProbableDe(m.sec) }));
-  return { M, peor, porNorma, tendencia, tipups, tipResumen, localizadas, guia: GUIA };
+  // #5 Pendiente por sección: peor tan δ por informe (cronológico); subida sostenida = vigilar.
+  const pendPorSec = (secs || []).map((sec) => {
+    const serie = (repsVis || []).map((r) => { const ys = (tens || []).map((t) => { const s = r.bloque.series.find((x) => x.nombre === t); const p = s && s.puntos.find((pp) => String(pp.x) === sec); return p && typeof p.y === 'number' ? p.y : null; }).filter((v) => v != null);
+      return ys.length ? { rep: r, y: Math.max(...ys) } : null; }).filter(Boolean);
+    if (serie.length < 2) return null;
+    const ini = serie[0], fin = serie[serie.length - 1];
+    return { sec, ini, fin, delta: Math.round((fin.y - ini.y) * 1e4) / 1e4 };
+  }).filter(Boolean);
+  const subiendo = pendPorSec.length ? pendPorSec.filter((x) => x.delta > PEND_UMBRAL).sort((a, b) => b.delta - a.delta) : null;
+  // #6 Baseline: sin dato de fábrica/commissioning → el informe más antiguo es la referencia.
+  const baseline = (repsVis && repsVis.length >= 2) ? repsVis[0] : null;
+  return { M, peor, porNorma, tendencia, tipups, tipResumen, localizadas, guia: GUIA, subiendo, baseline };
 }
 
 // Pinta el bloque "Análisis conforme a norma" (sellos + veredicto por norma + conclusión).
 function renderAnalisis(box, datos) {
   box.innerHTML = '';
   if (!datos) { box.innerHTML = '<p class="muted small">Sin mediciones para analizar con los filtros activos.</p>'; return; }
-  const { M, peor, porNorma, tendencia, tipResumen, localizadas, guia } = datos;
+  const { M, peor, porNorma, tendencia, tipResumen, localizadas, guia, subiendo, baseline } = datos;
   const card = document.createElement('div'); card.className = 'pe-analisis';
   const head = document.createElement('div'); head.className = 'pe-analisis-head';
   head.innerHTML = `<span>Análisis conforme a norma</span><span class="pe-analisis-n">${M.length} mediciones evaluadas</span>`;
@@ -186,7 +203,8 @@ function renderAnalisis(box, datos) {
   const l1 = document.createElement('div'); l1.className = 'pe-concl-frase'; l1.textContent = frase;
   const l2 = document.createElement('div'); l2.className = 'pe-concl-meta';
   l2.textContent = `Peor medición: ${peor.y}% · ${peor.sec} · ${peor.rep.label}${peor.rep.config ? ' (' + peor.rep.config + ')' : ''} · ${peor.tension}.` +
-    (tendencia ? ` Tendencia del peor caso: ${tendencia.ini.max}% (${tendencia.ini.rep.label}) → ${tendencia.fin.max}% (${tendencia.fin.rep.label}) · ${tendencia.dir}.` : '');
+    (tendencia ? ` Tendencia del peor caso: ${tendencia.ini.max}% (${tendencia.ini.rep.label}) → ${tendencia.fin.max}% (${tendencia.fin.rep.label}) · ${tendencia.dir}.` : '') +
+    (baseline ? ` Referencia de tendencia: informe más antiguo (${baseline.label}) — sin baseline de fábrica/commissioning.` : '');
   concl.append(l1, l2); card.appendChild(concl);
   // Localización del hallazgo: traduce "qué sección está alta" en "DÓNDE" + causa probable.
   const loc = document.createElement('div'); loc.className = 'pe-analisis-loc';
@@ -210,10 +228,19 @@ function renderAnalisis(box, datos) {
       `<span class="muted">umbral ±${TIPUP_UMBRAL}% ⚠️ a verificar.</span>`;
     card.appendChild(tip);
   }
+  // #5 Pendiente por sección: la subida sostenida condena aunque el FP siga ≤ guía (skill 03§E).
+  if (subiendo) {
+    const pd = document.createElement('div'); pd.className = 'pe-analisis-extra';
+    pd.innerHTML = subiendo.length
+      ? `<b>Tendencia por sección</b>: ${subiendo.length} al alza sostenida (vigilar aunque cumplan) — ` + esc(subiendo.slice(0, 3).map((x) => `${x.sec} +${x.delta}% (${x.ini.rep.label}→${x.fin.rep.label})`).join(', ')) + `. <span class="muted">la pendiente pesa tanto como el valor (skill 03§E).</span>`
+      : `<b>Tendencia por sección</b>: ninguna sección con ascenso sostenido (pendientes planas o a la baja).`;
+    card.appendChild(pd);
+  }
   // Caveat de corrección de temperatura (skill 02§2/03): NO se inventa T → se declara.
   const cav = document.createElement('div'); cav.className = 'pe-analisis-cav';
   cav.innerHTML = '⚠️ Valores <b>como medidos</b>: el informe no registra temperatura, por lo que no se aplica corrección a 20 °C. ' +
-    'El criterio NETA/IEEE asume FP₂₀ — un FP alto a temperatura elevada puede mejorar al corregir. Capturar T del ensayo + factor del fabricante afinaría el veredicto.';
+    'El criterio NETA/IEEE asume FP₂₀ — un FP alto a temperatura elevada puede mejorar al corregir. Capturar T del ensayo + factor del fabricante afinaría el veredicto. ' +
+    '<b>Capacitancia</b>: no se compara entre informes — los esquemas de medida difieren entre ensayos (combos de 2 vs 3 devanados, modos GST/UST), así que la misma etiqueta de sección no mide lo mismo; requiere extracción por modo para evitar falsas alarmas.';
   card.appendChild(cav);
   box.appendChild(card);
 }

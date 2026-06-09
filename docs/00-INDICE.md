@@ -98,6 +98,7 @@
 | §37 | ADR-037 — Reorden HTML: "Identidad de la unidad" reubicada justo debajo de "Resumen de la unidad" (render por ID, sin tocar JS) | 746 |
 | §38 | ADR-038 — FP/tan δ: vista **Tip-up** (ΔFP=FP@alta−FP@baja, detecta ionización/PD vs humedad; `svgTipUp`+`analizarTand`) + **caveat 20 °C** (sin T → se declara, no se inventa). Auditoría 🔵 skill factor-potencia-aislamiento (gaps #2/#3/#5/#6 en lóbulo 49) | 758 |
 | §39 | ADR-039 — FP/tan δ: **localización del defecto por modo** (`localizacionDe`/`causaProbableDe`: CH→AT↔tierra, CHL→entre devanados…) + bloque "Localización del hallazgo" para secciones sobre guía 0.5% (gap #2) | 774 |
+| §40 | ADR-040 — FP/tan δ: **pendiente predictiva por sección** (#5, `subiendo`) + **baseline-proxy** (#6) + capacitancia (#3) **DESCARTADA** (artefacto: pF no comparable entre esquemas/modos de medida → caveat, no falsa alarma). Cierra auditoría FP | 790 |
 
 ---
 
