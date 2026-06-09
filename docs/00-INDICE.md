@@ -92,6 +92,7 @@
 | §31 | ADR-031 — Tan δ "Por devanado": render propio `svgPorDevanado` (leyenda LIMPIA por informe, no por informe×tensión) + criterio normativo VISIBLE (`CRIT` IEEE 62/C57.152, guía 0.5%/límite 1%) con veredicto por barra y en el caption | 656 |
 | §32 | ADR-032 — Tan δ "Análisis conforme a norma": sellos/emblemas ESTILIZADOS propios (NETA + IEEE, no logotipos oficiales) + `analizarTand` (puro, exportado) con veredicto multi-norma, peor medición y tendencia; conclusión conservadora | 670 |
 | §33 | ADR-033 — Retiro selectivo del overlay genérico vía `FAMILIAS_EXCLUIDAS_OVERLAY` (Set exportado, fuente única shell↔harness): se quitan excitacion/relacion/resistencia/aislamiento; datos y motor intactos (no destructivo) | 686 |
+| §34 | ADR-034 — Retiro TOTAL del overlay genérico: +bushing/collar en el Set + predicado `excluidaDelOverlay` con regla `^otros:` (SFRA). Sección "Demás pruebas" ya no se renderiza; panel tan δ = única vista multi-año. Reversible | 700 |
 
 ---
 
