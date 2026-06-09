@@ -90,6 +90,7 @@
 | §29 | ADR-029 — Tan δ de devanados CONDENSADO en panel único filtrable (`ui/pruebas/tand-panel.js`): tendencia año tras año en BARRAS + filtros año/grupo/tensión/devanado + "Todos los años"; excluye tand del genérico | 628 |
 | §30 | ADR-030 — Modal de colisión por fecha abre AMBOS PDFs (guardado + nuevo vía blob URL) para comparar antes de decidir; modal extraído a `ui/pruebas/modal-upsert.js` | 644 |
 | §31 | ADR-031 — Tan δ "Por devanado": render propio `svgPorDevanado` (leyenda LIMPIA por informe, no por informe×tensión) + criterio normativo VISIBLE (`CRIT` IEEE 62/C57.152, guía 0.5%/límite 1%) con veredicto por barra y en el caption | 656 |
+| §32 | ADR-032 — Tan δ "Análisis conforme a norma": sellos/emblemas ESTILIZADOS propios (NETA + IEEE, no logotipos oficiales) + `analizarTand` (puro, exportado) con veredicto multi-norma, peor medición y tendencia; conclusión conservadora | 670 |
 
 ---
 
