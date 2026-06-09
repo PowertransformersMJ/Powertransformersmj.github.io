@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import {
   sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION,
-  quitarColumnasVeredicto, derivarBushing, bloquesMultiAno, etiquetaFecha, ordenInforme
+  quitarColumnasVeredicto, derivarBushing, bloquesMultiAno, etiquetaFecha, ordenInforme, configInforme
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -404,5 +404,37 @@ describe('etiquetaFecha · normaliza formatos dispares a DD/MM/YYYY', () => {
   });
   test('el mismo día en formatos distintos colapsa a una etiqueta', () => {
     assert.equal(etiquetaFecha('2022/05/02'), etiquetaFecha('02/05/2022'));
+  });
+});
+
+describe('configInforme · estrella/delta para desambiguar mismo día', () => {
+  test('grupo de conexión HV: D→delta, Y→estrella', () => {
+    assert.equal(configInforme({ identidad: { grupo_conexion: 'Dyn1yn1' } }), 'delta');
+    assert.equal(configInforme({ identidad: { grupo_conexion: 'YNyn0yn0' } }), 'estrella');
+  });
+  test('config explícito gana; sin nada → ""', () => {
+    assert.equal(configInforme({ config: 'estrella', identidad: { grupo_conexion: 'Dyn1' } }), 'estrella');
+    assert.equal(configInforme({}), '');
+    assert.equal(configInforme(null), '');
+  });
+});
+
+describe('ADR-028: desambiguación de informes del MISMO día (trafo móvil estrella/delta)', () => {
+  const exc = (v) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación AT', unidad: 'mA', grafica: 'linea',
+    series: [{ nombre: 'Fase A', puntos: [{ x: 1, y: v }] }] });
+  test('dos informes de la MISMA fecha → chips con su config (estrella/delta)', () => {
+    const out = bloquesMultiAno([
+      { ano: 2024, fecha: '19/01/2024', id: 'e', identidad: { grupo_conexion: 'YNyn0yn0' }, bloques: [exc(24)] },
+      { ano: 2024, fecha: '19/01/2024', id: 'd', identidad: { grupo_conexion: 'Dyn1yn1' }, bloques: [exc(25)] }
+    ]);
+    const labels = out[0].series.map((s) => s._repLabel).sort();
+    assert.deepEqual(labels, ['19/01/2024 · delta', '19/01/2024 · estrella'], 'cada uno con su config');
+  });
+  test('fecha ÚNICA → etiqueta limpia (sin config)', () => {
+    const out = bloquesMultiAno([
+      { ano: 2024, fecha: '19/01/2024', id: 'e', identidad: { grupo_conexion: 'YNyn0yn0' }, bloques: [exc(24)] },
+      { ano: 2021, fecha: '03/11/2021', id: 'x', identidad: { grupo_conexion: 'Dyn1' }, bloques: [exc(20)] }
+    ]);
+    assert.deepEqual(out[0].series.map((s) => s._repLabel), ['03/11/2021', '19/01/2024'], 'sin sufijo si no colisiona');
   });
 });

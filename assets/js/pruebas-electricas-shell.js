@@ -34,7 +34,7 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { derivarBushing, bloquesMultiAno, ordenInforme } from './domain/pruebas_electricas_bloques.js';
+import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
@@ -587,7 +587,9 @@ function montarMultiAno() {
     .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0));
   const items = docs.map((inf) => {
     const d = state.bloquesCache.get(inf.id);
-    return { ano: inf.ano, fecha: inf.fecha, id: inf.id, bloques: (d && d.bloques) || [] };
+    // `config` (estrella/delta del grupo de conexión) → desambigua dos informes
+    // del MISMO día (trafo móvil doble config, ADR-014/028).
+    return { ano: inf.ano, fecha: inf.fecha, id: inf.id, config: configInforme(inf), bloques: (d && d.bloques) || [] };
   }).filter((it) => it.bloques.length);
   const bloques = bloquesMultiAno(items);
   if (!bloques.length) {
