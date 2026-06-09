@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 
 import {
   sanitizarBloques, sanitizarBloque, sanitizarSerie, derivarTablaTAP, LIMITES, BLOQUES_SCHEMA_VERSION,
-  quitarColumnasVeredicto, derivarBushing, bloquesMultiAno
+  quitarColumnasVeredicto, derivarBushing, bloquesMultiAno, etiquetaFecha, ordenInforme
 } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Bloque representativo de la IA: excitación 17 TAPs × 3 fases (curva de línea).
@@ -323,6 +323,50 @@ describe('bloquesMultiAno · informe × fase superpuestos (conserva fases y NO c
     assert.deepEqual(out.map((b) => b.prueba), ['excitacion']);
   });
 
+  test('ADR-028: sub-pruebas DISTINTAS de la misma familia NO se fusionan (relación AT/MT vs AT/BT → 2 gráficas)', () => {
+    const relAtMt = { prueba: 'relacion', titulo: 'Relación de transformación AT/MT (T1=66 kV, T2=34.5 kV)', unidad: '', eje_x: 'TAP', grafica: 'linea',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 9, y: 3.1886 }] }] };
+    const relAtBt = { prueba: 'relacion', titulo: 'Relación de transformación AT/BT (T1=66 kV, T2=13.8 kV)', unidad: '', eje_x: 'TAP', grafica: 'linea',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 9, y: 7.9777 }] }] };
+    const out = bloquesMultiAno([inf(2024, '19/01/2024', [relAtMt, relAtBt])]);
+    assert.equal(out.length, 2, 'dos gráficas de relación separadas (no una fusionada)');
+    assert.ok(out.every((b) => b.prueba === 'relacion'));
+    assert.ok(out.some((b) => /AT\/MT/.test(b.titulo)) && out.some((b) => /AT\/BT/.test(b.titulo)));
+  });
+
+  test('ADR-028: resistencia AT-por-TAP (Ω) y MT/BT (mΩ, barra) NO se mezclan (uds/escalas distintas)', () => {
+    const resAt = { prueba: 'resistencia', titulo: 'Resistencia de devanados AT por TAP (referida a 75 °C)', unidad: 'Ω', grafica: 'linea',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 9, y: 1.378 }] }] };
+    const resMtBt = { prueba: 'resistencia', titulo: 'Resistencia de devanados MT y BT (referida a 75 °C)', unidad: 'mΩ', grafica: 'barra',
+      series: [{ nombre: 'MT - Fase A', puntos: [{ x: 'MT-A', y: 161.453 }] }] };
+    const out = bloquesMultiAno([inf(2024, '19/01/2024', [resAt, resMtBt])]);
+    assert.equal(out.length, 2, 'dos gráficas de resistencia separadas');
+    const at = out.find((b) => /AT por TAP/.test(b.titulo));
+    const mtbt = out.find((b) => /MT y BT/.test(b.titulo));
+    assert.equal(at.unidad, 'Ω'); assert.equal(at.grafica, 'linea');
+    assert.equal(mtbt.unidad, 'mΩ'); assert.equal(mtbt.grafica, 'barra');
+  });
+
+  test('ADR-028: dos informes del MISMO año se ordenan por FECHA real (no lexicográfica)', () => {
+    const exc2 = (v) => ({ prueba: 'excitacion', titulo: 'Corriente de excitación AT', unidad: 'mA', grafica: 'linea',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 1, y: v }] }] });
+    // 18/01/2022 (enero) debe ir ANTES que 02/05/2022 (mayo), aunque "02"<"18".
+    const out = bloquesMultiAno([
+      inf(2022, '02/05/2022', [exc2(20)]),
+      inf(2022, '18/01/2022', [exc2(18)])
+    ]);
+    assert.deepEqual(out[0].series.map((s) => s._repLabel), ['18/01/2022', '02/05/2022'], 'enero antes que mayo');
+  });
+
+  test('ADR-028: la MISMA sub-prueba (mismo título) SÍ se superpone entre años', () => {
+    const rel = (y, v) => ({ prueba: 'relacion', titulo: 'Relación de transformación AT/MT (T1=66 kV, T2=34.5 kV)', unidad: '', grafica: 'linea',
+      series: [{ nombre: 'Fase A', puntos: [{ x: 9, y: v }] }] });
+    const out = bloquesMultiAno([inf(2022, '01/01/2022', [rel(2022, 3.188)]), inf(2024, '19/01/2024', [rel(2024, 3.189)])]);
+    assert.equal(out.length, 1, 'una sola gráfica AT/MT con ambos años');
+    assert.equal(out[0].series.length, 2);
+    assert.deepEqual(out[0].series.map((s) => s._ano), ['2022', '2024']);
+  });
+
   test('ADR-027: análisis de ACEITE (DGA, gases disueltos, furanos) NO contamina el tablero ELÉCTRICO', () => {
     const aceite = [
       { prueba: 'dga', titulo: 'DGA · gases disueltos', series: [{ nombre: 'ppm', puntos: [{ x: 'H2', y: 12 }] }] },
@@ -337,5 +381,28 @@ describe('bloquesMultiAno · informe × fase superpuestos (conserva fases y NO c
     assert.deepEqual(bloquesMultiAno([]), []);
     assert.deepEqual(bloquesMultiAno(null), []);
     assert.doesNotThrow(() => bloquesMultiAno([{ ano: 2020, bloques: null }, {}]));
+  });
+});
+
+describe('etiquetaFecha · normaliza formatos dispares a DD/MM/YYYY', () => {
+  test('DD/MM/YYYY se conserva (con padding)', () => {
+    assert.equal(etiquetaFecha('18/01/2022'), '18/01/2022');
+    assert.equal(etiquetaFecha('2/5/2022'), '02/05/2022');
+  });
+  test('YYYY/MM/DD → DD/MM/YYYY', () => {
+    assert.equal(etiquetaFecha('2022/05/02'), '02/05/2022');
+    assert.equal(etiquetaFecha('2024-01-19'), '19/01/2024');
+  });
+  test('con nombre de mes en español (orden flexible)', () => {
+    assert.equal(etiquetaFecha('Enero 19 del 2024'), '19/01/2024');
+    assert.equal(etiquetaFecha('19 de enero de 2024'), '19/01/2024');
+  });
+  test('desconocido → tal cual; vacío → año', () => {
+    assert.equal(etiquetaFecha('s/f'), 's/f');
+    assert.equal(etiquetaFecha('', 2023), '2023');
+    assert.equal(etiquetaFecha(null, 2021), '2021');
+  });
+  test('el mismo día en formatos distintos colapsa a una etiqueta', () => {
+    assert.equal(etiquetaFecha('2022/05/02'), etiquetaFecha('02/05/2022'));
   });
 });

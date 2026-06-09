@@ -34,7 +34,7 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { derivarBushing, bloquesMultiAno } from './domain/pruebas_electricas_bloques.js';
+import { derivarBushing, bloquesMultiAno, ordenInforme } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
@@ -600,9 +600,16 @@ function montarMultiAno() {
   for (const b of bloques) for (const s of b.series) if (!repInfo.has(s._rep)) repInfo.set(s._rep, { label: s._repLabel, ano: s._ano });
   const repsAll = [...repInfo.keys()].sort((a, c) => {
     const A = repInfo.get(a), C = repInfo.get(c);
-    return (Number(A.ano) || 0) - (Number(C.ano) || 0) || String(A.label).localeCompare(String(C.label));
+    return ordenInforme(A.label, A.ano) - ordenInforme(C.label, C.ano);
   });
   const colorRep = (r) => COLORES_ANO[Math.max(0, repsAll.indexOf(r)) % COLORES_ANO.length];
+  // POR DEFECTO: TODOS los años superpuestos = la TENDENCIA año a año completa
+  // (lo que el director pidió ver de entrada: "tendencia año a año para todas las
+  // pruebas"). Cada sub-prueba está en su propia gráfica (no se mezclan escalas),
+  // así que el overlay es legible. Los chips permiten ENFOCAR a uno o varios años;
+  // el toggle alterna Todos ↔ solo el más reciente. ADR-028. `repsAll` asc → el
+  // último es el más reciente.
+  const masReciente = repsAll[repsAll.length - 1];
   if (!(state.multiAnoReps instanceof Set) || ![...state.multiAnoReps].every((r) => repsAll.includes(r)) || !state.multiAnoReps.size)
     state.multiAnoReps = new Set(repsAll);
   const selR = state.multiAnoReps;
@@ -610,16 +617,16 @@ function montarMultiAno() {
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.className = 'muted small'; intro.style.margin = '0 0 6px';
-  intro.innerHTML = `Cada gráfica es una prueba con <b>todos los informes superpuestos</b> (una línea por fase de cada informe, `
-    + `valores reales; color por informe). ${repsAll.length} informe(s) en el libro. Filtra por <b>informe</b> abajo `
-    + `(aplica a TODAS las pruebas) y por <b>fase</b> en cada gráfica.`;
+  intro.innerHTML = `Cada gráfica es una prueba con <b>todos los años superpuestos</b> (la tendencia año a año; color por año). `
+    + `${repsAll.length} informe(s) en el libro. <b>Enfoca</b> con los chips de abajo (uno o varios años), `
+    + `usa <b>"Solo último"</b> para ver solo el más reciente, y filtra por <b>fase</b> en cada gráfica.`;
   cont.appendChild(intro);
 
   const gbar = document.createElement('div');
   gbar.className = 'pe-fase-chips';
   gbar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
   gbar.appendChild(Object.assign(document.createElement('span'),
-    { textContent: 'Informes (todas las pruebas):', style: 'font-size:12px;color:#475569' }));
+    { textContent: 'Años (suma para comparar):', style: 'font-size:12px;color:#475569' }));
   const host = document.createElement('div');
 
   const pintarTodo = () => {
@@ -665,6 +672,26 @@ function montarMultiAno() {
     }
   };
 
+  // Chips por año/informe + un toggle con etiqueta DINÁMICA: si están TODOS
+  // seleccionados (defecto) ofrece "Solo último"; si no, ofrece "Todos". Así el
+  // botón siempre dice la acción disponible (más claro que un "Todos" fijo).
+  const yearBtns = new Map();
+  const allBtn = document.createElement('button'); allBtn.type = 'button';
+  allBtn.className = 'pe-fase-chip';
+  const syncAll = () => {
+    const todos = selR.size === repsAll.length;
+    allBtn.classList.toggle('is-on', todos && repsAll.length > 1);
+    allBtn.textContent = todos ? 'Solo último' : 'Todos';
+    allBtn.title = todos ? 'Ver solo el informe más reciente' : 'Ver todos los años (tendencia completa)';
+  };
+  allBtn.addEventListener('click', () => {
+    if (selR.size === repsAll.length) { selR.clear(); if (masReciente != null) selR.add(masReciente); }
+    else repsAll.forEach((r) => selR.add(r));
+    yearBtns.forEach((b, r) => b.classList.toggle('is-on', selR.has(r)));
+    syncAll(); pintarTodo();
+  });
+  gbar.appendChild(allBtn);
+
   repsAll.forEach((r) => {
     const info = repInfo.get(r) || {};
     const btn = document.createElement('button'); btn.type = 'button';
@@ -674,10 +701,12 @@ function montarMultiAno() {
     btn.style.setProperty('--c', colorRep(r));
     btn.addEventListener('click', () => {
       if (selR.has(r)) { if (selR.size > 1) selR.delete(r); } else selR.add(r);
-      btn.classList.toggle('is-on', selR.has(r)); pintarTodo();
+      btn.classList.toggle('is-on', selR.has(r)); syncAll(); pintarTodo();
     });
+    yearBtns.set(r, btn);
     gbar.appendChild(btn);
   });
+  syncAll();
   cont.appendChild(gbar);
   cont.appendChild(host);
   pintarTodo();
