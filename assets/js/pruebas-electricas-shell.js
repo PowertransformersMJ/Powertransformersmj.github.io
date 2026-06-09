@@ -34,7 +34,7 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha } from './domain/pruebas_electricas_bloques.js';
+import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha, familiaMA } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
@@ -596,12 +596,13 @@ function montarMultiAno() {
   // (tendencia año tras año + filtros año/grupo/tensión/devanado) — ADR-029, a
   // pedido del director: "todo el tan δ se aprecia AQUÍ, no más gráficas de tan δ".
   // Por eso se EXCLUYE la familia 'tand' del overlay genérico de abajo.
+  const esTand = (b) => { const f = familiaMA(b); return !!f && f.key === 'tand'; }; // reconoce tan/FP/factor de potencia (no solo "tan")
   const tandItems = docs.map((inf) => {
     const d = state.bloquesCache.get(inf.id);
-    const t = ((d && d.bloques) || []).find((b) => b && /^tan/i.test(b.prueba || ''));
+    const t = ((d && d.bloques) || []).find(esTand);
     return t ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), bloque: t } : null;
   }).filter(Boolean);
-  const bloques = bloquesMultiAno(items).filter((b) => !/^tan/i.test(b.prueba || ''));
+  const bloques = bloquesMultiAno(items).filter((b) => b.prueba !== 'tand');
   if (!bloques.length && !tandItems.length) {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;

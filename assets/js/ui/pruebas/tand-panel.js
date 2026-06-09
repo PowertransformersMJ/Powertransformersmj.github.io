@@ -17,8 +17,10 @@
 
 import { svgBloque } from './grafico-generico.js';
 
-const COLORES = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777', '#0f766e', '#9333ea'];
-const PAL_SEC = ['#1e4e79', '#0f8a99', '#c0392b', '#b07d12', '#1f7a4d', '#6b4f9e', '#6398c4', '#a93226', '#2e7d32', '#8e44ad', '#d35400', '#16a085', '#c2185b', '#5d6d7e'];
+// Paleta EJECUTIVA / gerencial: tonos sobrios y diferenciables (azules, verdeazulados,
+// pizarra, tierra apagada) — sin colores chillones, apta para reportería de dirección.
+const COLORES = ['#1f3a5f', '#2c6e72', '#6d597a', '#a4694f', '#46734b', '#5d6d7e', '#7a5c4b', '#355c7d', '#4a7c59', '#8c5a6e'];
+const PAL_SEC = ['#1f3a5f', '#2c6e72', '#a4694f', '#6d597a', '#46734b', '#5d6d7e', '#355c7d', '#8c5a3f', '#4a7c59', '#7a5c6e', '#2f5b66', '#9a7b46', '#566b8a', '#6b4f59'];
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
 
@@ -61,7 +63,9 @@ export function montarPanelTand(cont, items) {
   const seccPorDev = ORDEN_DEV.map((d) => ({ dev: d, secs: secciones.filter((s) => devanadoDe(s) === d) })).filter((g) => g.secs.length);
 
   const sel = { rep: new Set(reps.map((r) => r.id)), grupo: new Set(grupos), tension: new Set(tensiones), seccion: new Set(secciones) };
-  let modo = 'tendencia';
+  // POR DEFECTO: DEVANADOS en el eje X (cada sección rotulada = precisión sobre qué
+  // devanado es y contra qué, sin suponer por color) — el director lo prefiere así.
+  let modo = 'seccion';
 
   cont.innerHTML = '';
   // ── Tarjeta de filtros ───────────────────────────────────
@@ -127,8 +131,8 @@ export function montarPanelTand(cont, items) {
       for (const r of repsVis) for (const s of r.bloque.series) { if (!sel.tension.has(s.nombre)) continue;
         const puntos = s.puntos.filter((p) => sel.seccion.has(String(p.x)) && typeof p.y === 'number');
         if (puntos.length) series.push({ nombre: `${r.label}${r.config ? ' · ' + r.config : ''} · ${s.nombre}`, color: r.color, puntos }); }
-      svg = series.length ? svgBloque({ grafica: 'barra', unidad: '%', eje_x: 'Sección de aislamiento', limite: 1, guia: 0.5, series }) : null;
-      cap.textContent = 'Comparar por sección: eje X = sección, una barra por (informe × tensión), con límite 1% / guía 0.5%.';
+      svg = series.length ? svgBloque({ grafica: 'barra', unidad: '%', eje_x: 'Sección de aislamiento (devanado vs devanado)', limite: 1, guia: 0.5, series }) : null;
+      cap.textContent = `Por devanado: eje X = sección de aislamiento ROTULADA (precisión de qué devanado es y contra qué); una barra por informe (color por año, ver leyenda${tens.length > 1 ? ' · 2 tensiones por sección' : ''}). Cada barra vs el límite 1% / guía 0.5%.`;
     }
     if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin datos para los filtros activos.</p>';
     contadores.forEach((fn) => fn());
@@ -184,7 +188,7 @@ export function montarPanelTand(cont, items) {
   vistaBar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Vista:', style: 'font-size:12px;font-weight:600;color:#475569;margin-right:4px' }));
   const mkVista = (key, txt) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pe-fase-chip' + (modo === key ? ' is-on' : ''); b.textContent = txt;
     b.addEventListener('click', () => { modo = key; [...vistaBar.querySelectorAll('.pe-fase-chip')].forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); pintar(); }); return b; };
-  vistaBar.append(mkVista('tendencia', 'Tendencia año tras año'), mkVista('agrupada', 'Comparar por sección'));
+  vistaBar.append(mkVista('seccion', 'Por devanado (secciones en X)'), mkVista('tendencia', 'Tendencia (años en X)'));
 
   cont.appendChild(card);
   cont.appendChild(vistaBar);
