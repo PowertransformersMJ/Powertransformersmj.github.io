@@ -10,17 +10,20 @@
 //   · COMPARAR por sección (barras): eje X = sección, barras por informe.
 // El director: "todo el tan δ se condensa AQUÍ, no más gráficas de tan δ".
 //
-// Reusa svgBloque para la vista "comparar". La vista "tendencia" tiene su propio
-// render de barras (eje temporal). Sin estado global; el estado de filtros vive
-// en la closure del panel. DOM puro; testeable el helper `devanadoDe`.
+// Ambas vistas tienen render de barras propio: "tendencia" (eje temporal) y "por
+// devanado" (eje X = sección, leyenda limpia por informe + criterio normativo).
+// Sin estado global; el estado de filtros vive en la closure del panel. DOM puro;
+// testeable el helper `devanadoDe`.
 // ══════════════════════════════════════════════════════════════
-
-import { svgBloque } from './grafico-generico.js';
 
 // Paleta EJECUTIVA / gerencial: tonos sobrios y diferenciables (azules, verdeazulados,
 // pizarra, tierra apagada) — sin colores chillones, apta para reportería de dirección.
 const COLORES = ['#1f3a5f', '#2c6e72', '#6d597a', '#a4694f', '#46734b', '#5d6d7e', '#7a5c4b', '#355c7d', '#4a7c59', '#8c5a6e'];
 const PAL_SEC = ['#1f3a5f', '#2c6e72', '#a4694f', '#6d597a', '#46734b', '#5d6d7e', '#355c7d', '#8c5a3f', '#4a7c59', '#7a5c6e', '#2f5b66', '#9a7b46', '#566b8a', '#6b4f59'];
+// Criterio normativo del factor de potencia / tan δ de aislamiento de devanados.
+// IEEE Std 62 / C57.152: tan δ corregido a 20 °C ≤ 0.5% es típico de aislamiento
+// nuevo/sano (guía); > 1% se considera deteriorado y exige investigación (límite).
+const CRIT = { limite: 1, guia: 0.5, norma: 'IEEE 62 / C57.152' };
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
 
@@ -119,20 +122,85 @@ export function montarPanelTand(cont, items) {
     return svg;
   }
 
+  // Vista POR DEVANADO (barras): eje X = sección de aislamiento ROTULADA, barras por
+  // informe (color por INFORME, no por informe×tensión → leyenda limpia). Cada barra
+  // se evalúa vs el criterio normativo (CRIT): dentro de norma / sobre guía / supera
+  // límite. Devuelve {svg, total, sobre, guia} para que el caption cite el veredicto.
+  function svgPorDevanado(secs, tensList, repsVis) {
+    if (!repsVis.length || !secs.length || !tensList.length) return null;
+    // Combos (informe × tensión) que aportan al menos una barra; color SIEMPRE por informe.
+    const combos = [];
+    repsVis.forEach((r) => tensList.forEach((t, tIdx) => {
+      const s = r.bloque.series.find((x) => x.nombre === t);
+      if (s && secs.some((sec) => { const p = s.puntos.find((pp) => String(pp.x) === sec); return p && typeof p.y === 'number'; }))
+        combos.push({ rep: r, tension: t, tenue: tIdx > 0, color: r.color });
+    }));
+    if (!combos.length) return null;
+    const allY = [];
+    secs.forEach((sec) => combos.forEach((c) => { const s = c.rep.bloque.series.find((x) => x.nombre === c.tension); const p = s && s.puntos.find((pp) => String(pp.x) === sec); if (p && typeof p.y === 'number') allY.push(p.y); }));
+    if (!allY.length) return null;
+    const W = 920, L = 54, R = 16, B = 60;
+    // Leyenda LIMPIA por informe (un swatch por informe, envuelta en filas).
+    const repsConDato = repsVis.filter((r) => combos.some((c) => c.rep.id === r.id));
+    const legItems = repsConDato.map((r) => ({ color: r.color, txt: `${r.label}${r.config ? ' · ' + r.config : ''}` }));
+    const legRows = []; let row = [], lx = L;
+    legItems.forEach((it) => { const w = 18 + it.txt.length * 6 + 16; if (lx + w > W - R && row.length) { legRows.push(row); row = []; lx = L; } row.push({ ...it, x: lx }); lx += w; });
+    if (row.length) legRows.push(row);
+    const tensNote = tensList.length > 1;
+    const T = legRows.length * 16 + (tensNote ? 16 : 4) + 10, H = T + 250;
+    const ymax = Math.max(Math.max(...allY) * 1.12, 1.05);
+    const Y = (v) => T + (1 - v / ymax) * (H - T - B);
+    const n = secs.length, innerW = W - L - R, X = (i) => L + (i + 0.5) * (innerW / n);
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
+    // Leyenda por informe.
+    legRows.forEach((r, ri) => { const y = 12 + ri * 16; r.forEach((it) => {
+      svg.appendChild(el('rect', { x: it.x, y: y - 8, width: 11, height: 11, rx: 2, fill: it.color }));
+      const tx = el('text', { x: it.x + 16, y: y + 1, fill: '#5b6876', 'font-size': 10 }); tx.textContent = it.txt; svg.appendChild(tx); }); });
+    if (tensNote) { const ty = 12 + legRows.length * 16; const tx = el('text', { x: L, y: ty, fill: '#8a97a5', 'font-size': 9 }); tx.textContent = `Tensión de prueba — barra llena: ${tensList[0]} · barra tenue: ${tensList[1]}`; svg.appendChild(tx); }
+    // Rejilla + eje Y.
+    for (let i = 0; i <= 4; i++) { const v = ymax * i / 4, yy = Y(v); svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: '#e7ebf0' }));
+      const tx = el('text', { x: L - 8, y: yy + 4, fill: '#8a97a5', 'font-size': 10, 'text-anchor': 'end', 'font-family': 'IBM Plex Mono, monospace' }); tx.textContent = v.toFixed(2); svg.appendChild(tx); }
+    // Líneas de criterio normativo (rotuladas con la norma).
+    [[CRIT.limite, '#c0392b', `límite ${CRIT.limite}% · ${CRIT.norma}`], [CRIT.guia, '#b07d12', `guía ${CRIT.guia}%`]].forEach(([v, c, lbl]) => { if (v <= ymax) {
+      svg.appendChild(el('line', { x1: L, y1: Y(v), x2: W - R, y2: Y(v), stroke: c, 'stroke-width': 1, 'stroke-dasharray': '5 4' }));
+      const tx = el('text', { x: W - R, y: Y(v) - 4, fill: c, 'font-size': 9, 'text-anchor': 'end' }); tx.textContent = lbl; svg.appendChild(tx); } });
+    // Etiquetas de sección (eje X) + título.
+    secs.forEach((sec, i) => { const tx = el('text', { x: X(i), y: H - B + 18, fill: '#5b6876', 'font-size': 10, 'text-anchor': 'middle', 'font-family': 'IBM Plex Mono, monospace' }); tx.textContent = sec; svg.appendChild(tx); });
+    svg.appendChild(Object.assign(el('text', { x: (L + W - R) / 2, y: H - 6, fill: '#5b6876', 'font-size': 10, 'text-anchor': 'middle' }), { textContent: 'Sección de aislamiento (devanado vs devanado) →' }));
+    // Barras (agrupadas por sección) + veredicto normativo por barra.
+    const slotW = innerW / Math.max(n, 1), nb = combos.length, bw = Math.min(slotW * 0.82 / Math.max(nb, 1), 18), y0 = Y(0);
+    let total = 0, sobre = 0, enGuia = 0;
+    secs.forEach((sec, i) => { combos.forEach((c, k) => {
+      const s = c.rep.bloque.series.find((x) => x.nombre === c.tension); const p = s && s.puntos.find((pp) => String(pp.x) === sec);
+      if (!p || typeof p.y !== 'number') return;
+      total++; const over = p.y > CRIT.limite, warn = !over && p.y > CRIT.guia; if (over) sobre++; else if (warn) enGuia++;
+      const cx = X(i) - (nb * bw) / 2 + (k + 0.5) * bw, yy = Y(p.y);
+      const rect = el('rect', { x: cx - bw / 2, y: yy, width: Math.max(bw - 1, 1), height: Math.max(y0 - yy, 0), fill: over ? '#c0392b' : c.color, rx: 1 });
+      if (c.tenue) rect.setAttribute('opacity', '0.55');
+      if (over) { rect.setAttribute('stroke', '#7f1d1d'); rect.setAttribute('stroke-width', '1'); }
+      const estado = over ? 'SUPERA límite (1%)' : warn ? 'sobre guía (0.5%)' : 'dentro de norma';
+      rect.appendChild(el('title', {})).textContent = `${sec} · ${c.rep.label}${c.rep.config ? ' · ' + c.rep.config : ''} · ${c.tension}: ${p.y}% — ${estado} [${CRIT.norma}]`;
+      svg.appendChild(rect); }); });
+    return { svg, total, sobre, guia: enGuia };
+  }
+
   const pintar = () => {
     chartBox.innerHTML = '';
     const repsVis = repsVisibles(), secs = seccionesVis(), tens = tensionesVis();
     let svg = null;
     if (modo === 'tendencia') {
       svg = svgTendencia(secs, tens, repsVis);
-      cap.textContent = `Tendencia año tras año: eje X = informe (en el tiempo), BARRAS por sección (color por sección) — la misma sección queda alineada entre años para leer su evolución. ${tens.length > 1 ? 'Tensión: barra llena = ' + tens[0] + ', tenue = ' + tens[1] + '. ' : ''}Cada barra vs el límite 1% / guía 0.5%.`;
+      cap.textContent = `Tendencia año tras año: eje X = informe (en el tiempo), BARRAS por sección (color por sección) — la misma sección queda alineada entre años para leer su evolución. ${tens.length > 1 ? 'Tensión: barra llena = ' + tens[0] + ', tenue = ' + tens[1] + '. ' : ''}Criterio ${CRIT.norma}: guía ${CRIT.guia}% / límite ${CRIT.limite}%.`;
     } else {
-      const series = [];
-      for (const r of repsVis) for (const s of r.bloque.series) { if (!sel.tension.has(s.nombre)) continue;
-        const puntos = s.puntos.filter((p) => sel.seccion.has(String(p.x)) && typeof p.y === 'number');
-        if (puntos.length) series.push({ nombre: `${r.label}${r.config ? ' · ' + r.config : ''} · ${s.nombre}`, color: r.color, puntos }); }
-      svg = series.length ? svgBloque({ grafica: 'barra', unidad: '%', eje_x: 'Sección de aislamiento (devanado vs devanado)', limite: 1, guia: 0.5, series }) : null;
-      cap.textContent = `Por devanado: eje X = sección de aislamiento ROTULADA (precisión de qué devanado es y contra qué); una barra por informe (color por año, ver leyenda${tens.length > 1 ? ' · 2 tensiones por sección' : ''}). Cada barra vs el límite 1% / guía 0.5%.`;
+      const r = svgPorDevanado(secs, tens, repsVis);
+      svg = r && r.svg;
+      if (r) {
+        const ok = r.total - r.sobre - r.guia;
+        const partes = [`${ok}/${r.total} dentro de norma`];
+        if (r.guia) partes.push(`${r.guia} sobre guía (>${CRIT.guia}%)`);
+        if (r.sobre) partes.push(`${r.sobre} SUPERA límite (>${CRIT.limite}%, en rojo)`);
+        cap.textContent = `Por devanado: eje X = sección de aislamiento ROTULADA (precisión de qué devanado es y contra qué); barras por informe (color por informe, ver leyenda${tens.length > 1 ? ' · 2 tensiones: llena/tenue' : ''}). Criterio ${CRIT.norma} — guía ${CRIT.guia}% / límite ${CRIT.limite}%. Veredicto: ${partes.join(' · ')}.`;
+      }
     }
     if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin datos para los filtros activos.</p>';
     contadores.forEach((fn) => fn());
