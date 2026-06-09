@@ -305,6 +305,15 @@ const FAMILIAS_MA = [
   { key: 'collar',      re: /collar/i,                      inv: false }
 ];
 
+// Familias que NO se pintan en el overlay genérico "Demás pruebas · todos los años":
+//   · 'tand' → tiene su propio panel condensado y filtrable (ADR-029), no se duplica.
+//   · 'excitacion','relacion','resistencia','aislamiento' → el director pidió RETIRARLAS
+//     del overlay genérico (ADR-033): su evaluación normativa vive en el scorecard
+//     multi-norma + el selector por informe; estas gráficas superpuestas ya no aportan.
+// Para volver a mostrar una (o retirar otra), basta editar este conjunto — los datos y
+// el motor NO se tocan, sólo qué se pinta en ese overlay. Fuente única (shell + harness).
+export const FAMILIAS_EXCLUIDAS_OVERLAY = new Set(['tand', 'excitacion', 'relacion', 'resistencia', 'aislamiento']);
+
 // Pruebas que NO son ELÉCTRICAS: análisis FÍSICO-QUÍMICO del aceite (DGA/gases
 // disueltos, fisicoquímicos, furanos, humedad del papel…). Este tablero es de
 // PRUEBAS ELÉCTRICAS (el director: "esto es pruebas eléctricas y no análisis de
