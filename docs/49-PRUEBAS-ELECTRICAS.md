@@ -118,7 +118,7 @@ del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no
 5. **Pendiente/tasa de cambio con bandera predictiva** (03§E): la pendiente condena aunque FP≤0.5%; hoy solo hay tendencia del peor caso.
 6. **Baseline de fábrica/commissioning** (03 precedencia 1): no existe en data → usar el informe más antiguo como proxy + marcar "sin baseline de fábrica".
 
-Estado: #1 (tip-up) + #4 (caveat 20 °C) **IMPLEMENTADOS** (ADR-038); #2 (localización por modo) **IMPLEMENTADO** (ADR-039: `localizacionDe`/`causaProbableDe` + bloque "Localización del hallazgo"; validado 450108 → localiza CL MT/BT↔tierra 0.5135%). **Pendientes (decisión del director)**: #3 tendencia de capacitancia (pF), #5 pendiente/tasa predictiva, #6 baseline de fábrica.
+Estado: **AUDITORÍA CERRADA** (ADR-038→040). #1 tip-up + #4 caveat 20 °C (ADR-038); #2 localización por modo (ADR-039); #5 pendiente predictiva por sección + #6 baseline-proxy (ADR-040). **#3 capacitancia DESCARTADA con causa**: comparar pF entre informes da artefactos (CHL −91%) porque los esquemas/modos de medida difieren (combos 2 vs 3 devanados, GST/UST) → la misma etiqueta de sección no mide lo mismo; el tan δ (ratio) sí es comparable, la capacitancia (absoluta) no. Para habilitar #3 haría falta **extracción POR MODO** (capturar GST/UST/GSTg por sección). Validado todo con workflow + datos REALES 450108.
 
 ## Pendientes / próxima ronda
 
