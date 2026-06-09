@@ -828,6 +828,13 @@ function etiquetasInformes(infos) {
   return out;
 }
 
+// ADR-035: la sección "Resultados del informe" (detalle por informe: análisis IA +
+// evaluación multi-norma + recomendación + gráficas + tablas) se RETIRA a pedido del
+// director. REVERSIBLE: poner en `true` (y quitar `hidden` de <section id="bloques">).
+// NO se destruye nada: la carga de datos + `montarMultiAno()` (panel tan δ) + el
+// scorecard SIGUEN ejecutándose; la evaluación multi-norma sigue viva en el scorecard.
+const MOSTRAR_RESULTADOS_INFORME = false;
+
 async function montarBloques(unidadId, informes) {
   const cont = $('bloques-cont');
   if (!cont) return;
@@ -860,6 +867,7 @@ async function montarBloques(unidadId, informes) {
     const d = state.bloquesCache.get(inf.id);
     return d && (admin || (d.bloques && d.bloques.length));
   });
+  if (MOSTRAR_RESULTADOS_INFORME) {
   cont.innerHTML = '';
   if (!mostrables.length) {
     cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
@@ -913,6 +921,7 @@ async function montarBloques(unidadId, informes) {
     cont.appendChild(detalle);
     pintarDetalle();
   }
+  } // fin guard MOSTRAR_RESULTADOS_INFORME (ADR-035)
 
   // Vista MULTI-AÑO (cada prueba con todos los años superpuestos): se monta aquí
   // porque necesita las curvas ya cargadas en `state.bloquesCache`. El filtro de
