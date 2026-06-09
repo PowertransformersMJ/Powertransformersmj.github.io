@@ -1,0 +1,75 @@
+{
+  "_nota": "DATO REAL extraído del PDF de SFRA por subagente — verificar. Conexión DELTA: este informe SOLO ensaya el devanado de 66 kV (primario, conexión delta) — mide entre fases H1-H2, H2-H3, H3-H1 (Open), no contra neutro. Secundario (34.5 kV) y terciario (13.8 kV) NO se ensayaron en este informe (tabla RESULTADOS los deja en -------). Las trazas SFRA (magnitud dB + fase vs frecuencia) están SOLO como gráficas-imagen en el informe; NO hay tabla numérica dB-Hz, por eso NO se crearon series de curva (sería inventar). SÍ hay tablas tabuladas de coeficientes de correlación DL/T911-2004 (RLF, RMF, RHF) + diagnóstico NCEPRI (factor E) por cada comparación de fases. Norma aplicable: DL/T911-2004 con equipo FRANEO 800 (S/N FN284B / 102312246).",
+  "ano": 2024,
+  "fecha": "19/01/2024",
+  "id": "450108-2024-01-19-sfra-delta",
+  "nombre": "240119 SFRA TRAFO MOVIL conexion delta NS 450108",
+  "serie": "450108",
+  "identidad": {
+    "fabricante": "SIEMENS",
+    "ano_fabricacion": 2020,
+    "potencia": "20 MVA",
+    "tensiones": "66000 / 34500 / 13800 V",
+    "grupo_conexion": "Dyn1yn1",
+    "refrigeracion": "OFAF",
+    "frecuencia": "60 Hz",
+    "fases": "3",
+    "posiciones_tap": 17,
+    "cliente": "Afinia",
+    "subestacion": "Membrillal",
+    "ubicacion": "Bolívar",
+    "norma": "DL/T911-2004",
+    "equipo_prueba": "FRANEO 800 (FN284B / 102312246)",
+    "temperatura_ambiente": "34°C",
+    "temperatura_aceite": "34°C",
+    "humedad_relativa": "81 %"
+  },
+  "bloques": [
+    {
+      "prueba": "sfra",
+      "titulo": "Coeficientes de correlación SFRA por comparación de devanados (DL/T911-2004)",
+      "unidad": "CC",
+      "eje_x": "Banda",
+      "grafica": "barra",
+      "_fuente": "Tablas DL/T911-2004 de cada slide de COMPARACION (no estimadas de gráfica). RLF=banda baja, RMF=banda media, RHF=banda alta; E=factor de evaluación NCEPRI. Veredicto DL/T911 y NCEPRI en extra del primer punto de cada serie. Conexión delta: solo devanado 66 kV, comparación entre fases H1-H2, H2-H3, H3-H1 (Open).",
+      "series": [
+        { "nombre": "66 kV: (H1-H2) vs (H2-H3)", "puntos": [
+          { "x": "RLF", "y": 1.1, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Deformación leve", "E": 3.66 } },
+          { "x": "RMF", "y": 1.83 },
+          { "x": "RHF", "y": 0.39 }
+        ] },
+        { "nombre": "66 kV: (H1-H2) vs (H3-H1)", "puntos": [
+          { "x": "RLF", "y": 1.36, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 1.9 } },
+          { "x": "RMF", "y": 2.07 },
+          { "x": "RHF", "y": 0.32 }
+        ] },
+        { "nombre": "66 kV: (H2-H3) vs (H3-H1)", "puntos": [
+          { "x": "RLF", "y": 0.91, "extra": { "DL/T911-2004": "Deformación obvia", "NCEPRI": "Devanado normal", "E": 2.78 } },
+          { "x": "RMF", "y": 2.36 },
+          { "x": "RHF", "y": 1.97 }
+        ] }
+      ]
+    },
+    {
+      "prueba": "sfra",
+      "titulo": "Resultados SFRA por devanado (admitancia de circuito abierto)",
+      "unidad": "",
+      "eje_x": "Devanado",
+      "grafica": "barra",
+      "_fuente": "Slide RESULTADOS (resumen final). Valores cualitativos, no numéricos. Solo se ensayó el primario (66 kV) en este informe delta; secundario y terciario aparecen como ------- (no ensayados).",
+      "series": [
+        { "nombre": "Diagnóstico SFRA", "puntos": [
+          { "x": "Primario (66 kV)", "y": null, "extra": { "DL/T911-2004": "Deformación obvia", "NCEPRI": "Devanado normal" } },
+          { "x": "Secundario (34.5 kV)", "y": null, "extra": { "DL/T911-2004": "No ensayado", "NCEPRI": "No ensayado" } },
+          { "x": "Terciario (13.8 kV)", "y": null, "extra": { "DL/T911-2004": "No ensayado", "NCEPRI": "No ensayado" } }
+        ] }
+      ]
+    }
+  ],
+  "_trazas_solo_grafica": [
+    "66 kV magnitud+fase: H1-H2 (Open), H2-H3 (Open), H3-H1 (Open) — cada traza en su propia slide.",
+    "COMPARACION 66 kV (superposición de 2 fases + curva de diferencia naranja): (H1-H2) vs (H2-H3), (H1-H2) vs (H3-H1), (H2-H3) vs (H3-H1).",
+    "Eje X de las gráficas: 100 Hz a ~2 MHz (escala log). Eje Y magnitud: dB. Eje Y fase: grados.",
+    "NO transcritas como series: el informe no incluye los puntos numéricos, solo la imagen de la curva."
+  ]
+}
