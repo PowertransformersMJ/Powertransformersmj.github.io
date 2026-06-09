@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Modal upsert — abrir AMBOS PDFs</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+<h1>DEV · Modal de colisión por fecha — abrir guardado + nuevo</h1>
+<button id="abrir" class="btn btn-primary">Abrir modal (mock)</button>
+<pre id="out" style="margin-top:16px;color:#334155"></pre>
+
+<script type="module">
+import { confirmarUpsert } from '../assets/js/ui/pruebas/modal-upsert.js';
+
+const out = document.getElementById('out');
+// Mock File local del PDF nuevo (un blob pequeño con tipo pdf).
+const fileNuevo = new File([new Blob(['%PDF-1.4 mock'], { type: 'application/pdf' })], '240119-conexion-delta.pdf', { type: 'application/pdf' });
+const prev = { fecha: '19/01/2024', ejecutante: '', equipo: '', serie_en_pdf: '', tipo_prueba: '', pdf: { downloadURL: 'https://example.com/guardado.pdf' } };
+const nuevo = { fecha: '19/01/2024', ejecutante: 'EMS - Enterprise Management Services', equipo: 'CPC 100 / CPTD 12 / Megger MIT1525', serie_en_pdf: '450108', tipo_prueba: 'predictivo_completo' };
+const item = { file: fileNuevo };
+
+// Stub window.open para capturar qué PDF se abre, sin abrir pestañas.
+window.__abiertos = [];
+const realOpen = window.open;
+window.open = (url) => { window.__abiertos.push(String(url).startsWith('blob:') ? 'blob(nuevo)' : url); return null; };
+
+document.getElementById('abrir').addEventListener('click', async () => {
+  out.textContent = 'modal abierto…';
+  const r = await confirmarUpsert(prev, nuevo, '450108', item);
+  out.textContent = 'decisión: ' + r + ' · PDFs abiertos: ' + JSON.stringify(window.__abiertos);
+});
+
+// Auto-test para el harness (sin clic manual).
+window.__test = async () => {
+  window.__abiertos = [];
+  const p = confirmarUpsert(prev, nuevo, '450108', item);
+  await new Promise((r) => setTimeout(r, 30));
+  const ov = document.querySelector('[role="dialog"]').parentElement;
+  const btnGuardado = [...ov.querySelectorAll('a')].find((a) => /guardado/i.test(a.textContent));
+  const btnNuevo = ov.querySelector('[data-abrir-nuevo]');
+  btnNuevo && btnNuevo.click(); // abrir el nuevo (no debe cerrar)
+  const modalSiguePresente = !!document.querySelector('[data-abrir-nuevo]');
+  ov.querySelector('[data-ups="nuevo"]').click(); // decidir distinto
+  const decision = await p;
+  return JSON.stringify({
+    tieneBtnGuardado: !!btnGuardado, hrefGuardado: btnGuardado?.getAttribute('href'),
+    tieneBtnNuevo: !!btnNuevo, abrioNuevo: window.__abiertos, modalSiguePresenteTrasAbrir: modalSiguePresente, decision
+  });
+};
+window.__ready = true;
+</script>
+</body>
+</html>

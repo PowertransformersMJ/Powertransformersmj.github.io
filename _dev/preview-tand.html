@@ -19,11 +19,18 @@
 import { montarPanelTand } from '../assets/js/ui/pruebas/tand-panel.js';
 import { etiquetaFecha, configInforme, ordenInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
+// TODOS los informes del libro (como en la app) — el panel debe FILTRAR y mostrar
+// solo los que tienen tan δ de devanados (4 de 9). Valida el caso real del director.
 const FIXTURES = [
   './fixtures/450108-2021-11-03.json',
   './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-01-18-sfra.json',
   './fixtures/450108-2022-05-02.json',
-  './fixtures/450108-2023-11-09.json'
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json',
+  './fixtures/450108-2024-01-19-sfra-estrella.json',
+  './fixtures/450108-2024-01-19-sfra-delta.json'
 ];
 
 (async () => {
