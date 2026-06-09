@@ -93,7 +93,8 @@
 | §32 | ADR-032 — Tan δ "Análisis conforme a norma": sellos/emblemas ESTILIZADOS propios (NETA + IEEE, no logotipos oficiales) + `analizarTand` (puro, exportado) con veredicto multi-norma, peor medición y tendencia; conclusión conservadora | 670 |
 | §33 | ADR-033 — Retiro selectivo del overlay genérico vía `FAMILIAS_EXCLUIDAS_OVERLAY` (Set exportado, fuente única shell↔harness): se quitan excitacion/relacion/resistencia/aislamiento; datos y motor intactos (no destructivo) | 686 |
 | §34 | ADR-034 — Retiro TOTAL del overlay genérico: +bushing/collar en el Set + predicado `excluidaDelOverlay` con regla `^otros:` (SFRA). Sección "Demás pruebas" ya no se renderiza; panel tan δ = única vista multi-año. Reversible | 700 |
-| §35 | ADR-035 — Retiro de la sección "Resultados del informe" (detalle por informe) vía flag `MOSTRAR_RESULTADOS_INFORME=false` + `<section hidden>`; NO se borra `montarBloques` (carga cache + montarMultiAno + scorecard siguen vivos). Reversible | 716 |
+| §35 | ADR-035 — Retiro de la sección "Resultados del informe" (detalle por informe) vía flag `MOSTRAR_RESULTADOS_INFORME=false` + `<section hidden>`; NO se borra `montarBloques` (carga cache + montarMultiAno + scorecard siguen vivos). Reversible. ⚠️ CORREGIDO por §36 | 716 |
+| §36 | ADR-036 — CORRIGE §35: revertido el retiro de la sección; solo se filtra el BLOQUE tan δ del detalle por informe (ya vive en su panel). Lección anti sobre-retiro (L-51) | 732 |
 
 ---
 
