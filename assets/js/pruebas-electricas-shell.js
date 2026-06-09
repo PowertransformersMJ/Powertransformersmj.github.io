@@ -34,7 +34,7 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme } from './domain/pruebas_electricas_bloques.js';
+import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
@@ -793,6 +793,17 @@ async function backfillCanonicos(unidadId, inf) {
   } catch (e) { console.warn('[pruebas-electricas] backfill', e); }
 }
 
+// Etiquetas de informe con desambiguación estrella/delta del mismo día (ADR-028):
+// si dos informes coinciden en fecha, se añade su config (estrella/delta). Map id→etiqueta.
+function etiquetasInformes(infos) {
+  const meta = (infos || []).map((inf) => ({ id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), config: configInforme(inf) }));
+  const cnt = {};
+  for (const m of meta) cnt[m.label] = (cnt[m.label] || 0) + 1;
+  const out = new Map();
+  for (const m of meta) out.set(m.id, (cnt[m.label] > 1 && m.config) ? `${m.label} · ${m.config}` : m.label);
+  return out;
+}
+
 async function montarBloques(unidadId, informes) {
   const cont = $('bloques-cont');
   if (!cont) return;
@@ -815,43 +826,68 @@ async function montarBloques(unidadId, informes) {
   const act = state.unidadActiva && (state.unidadActiva.id || state.unidadActiva.serie);
   if (act !== unidadId) return;
   const admin = esAdmin();
-  const ordenados = reales.slice().sort((a, b) => (b.ano || 0) - (a.ano || 0));
+  const ordenados = reales.slice().sort((a, b) => (b.ano || 0) - (a.ano || 0)); // vigente primero
+  // Informes mostrables (con diagnóstico; admin ve también los sin gráficas, para
+  // inspeccionar el crudo). El director NO quiere TODOS apilados verticalmente: se
+  // muestra UNO a la vez (defecto = vigente) con su detalle COMPLETO — gráficas +
+  // TABLAS + veredicto — y un SELECTOR de chips para ver cualquier informe (sus
+  // tablas) individualmente. La tendencia entre años vive en el multi-año (abajo).
+  const mostrables = ordenados.filter((inf) => {
+    const d = state.bloquesCache.get(inf.id);
+    return d && (admin || (d.bloques && d.bloques.length));
+  });
   cont.innerHTML = '';
-  let alguno = false;
-  for (const inf of ordenados) {
-    const data = state.bloquesCache.get(inf.id);
-    if (!data) continue;                       // sin diagnóstico: nada que mostrar
-    const tieneBloques = !!(data.bloques && data.bloques.length);
-    // Admin ve el grupo aunque no haya gráficas (para inspeccionar el crudo);
-    // el resto solo si hay bloques que pintar.
-    if (!tieneBloques && !admin) continue;
-    alguno = true;
-    const grupo = document.createElement('div');
-    grupo.className = 'pe-bloque-grupo';
-    grupo.setAttribute('data-bloque-ano', inf.ano != null ? String(inf.ano) : '');
-    const h = document.createElement('h3');
-    h.textContent = `Informe ${inf.ano || 's/a'}`;
-    grupo.appendChild(h);
-    if (tieneBloques) {
-      const box = document.createElement('div');
-      mountBloques(box, conCriterios(data, kvDeInforme(inf)));
-      grupo.appendChild(box);
-    } else {
-      const vacio = document.createElement('p');
-      vacio.className = 'muted small';
-      vacio.textContent = 'La IA no produjo gráficas para este informe.';
-      grupo.appendChild(vacio);
-    }
-    if (admin) grupo.appendChild(panelDiagnostico(data, inf));
-    cont.appendChild(grupo);
-  }
-  if (!alguno) cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
-
-  // Encabezado del informe vigente (quién ejecutó, con qué instrumento, cuándo)
-  // — metadata que la IA ya extrae y antes se desperdiciaba.
-  if (alguno) {
-    const enc = encabezadoInforme(ordenados[0]);
-    if (enc) cont.insertBefore(enc, cont.firstChild);
+  if (!mostrables.length) {
+    cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
+  } else {
+    // Etiquetas con desambiguación estrella/delta del mismo día (ADR-028).
+    const etq = etiquetasInformes(mostrables);
+    let selId = mostrables[0].id; // vigente por defecto
+    const selBar = document.createElement('div');
+    selBar.className = 'pe-fase-chips';
+    selBar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
+    selBar.appendChild(Object.assign(document.createElement('span'),
+      { textContent: 'Informe:', style: 'font-size:12px;color:#475569' }));
+    const detalle = document.createElement('div');
+    const pintarDetalle = () => {
+      detalle.innerHTML = '';
+      const inf = mostrables.find((i) => i.id === selId) || mostrables[0];
+      const data = state.bloquesCache.get(inf.id);
+      const enc = encabezadoInforme(inf);
+      if (enc) detalle.appendChild(enc);
+      const grupo = document.createElement('div');
+      grupo.className = 'pe-bloque-grupo';
+      grupo.setAttribute('data-bloque-ano', inf.ano != null ? String(inf.ano) : '');
+      const h = document.createElement('h3');
+      h.textContent = `Informe ${etq.get(inf.id) || inf.ano || 's/a'}`;
+      grupo.appendChild(h);
+      if (data && data.bloques && data.bloques.length) {
+        const box = document.createElement('div');
+        mountBloques(box, conCriterios(data, kvDeInforme(inf)));
+        grupo.appendChild(box);
+      } else {
+        grupo.appendChild(Object.assign(document.createElement('p'),
+          { className: 'muted small', textContent: 'La IA no produjo gráficas para este informe.' }));
+      }
+      if (admin) grupo.appendChild(panelDiagnostico(data, inf));
+      detalle.appendChild(grupo);
+    };
+    mostrables.forEach((inf) => {
+      const btn = document.createElement('button'); btn.type = 'button';
+      btn.className = 'pe-fase-chip' + (inf.id === selId ? ' is-on' : '');
+      btn.textContent = etq.get(inf.id) || String(inf.ano || 's/a');
+      btn.title = `Ver detalle y tablas del informe ${etq.get(inf.id) || inf.ano || ''}`;
+      btn.addEventListener('click', () => {
+        selId = inf.id;
+        [...selBar.querySelectorAll('.pe-fase-chip')].forEach((b) => b.classList.remove('is-on'));
+        btn.classList.add('is-on');
+        pintarDetalle();
+      });
+      selBar.appendChild(btn);
+    });
+    cont.appendChild(selBar);
+    cont.appendChild(detalle);
+    pintarDetalle();
   }
 
   // Vista MULTI-AÑO (cada prueba con todos los años superpuestos): se monta aquí
