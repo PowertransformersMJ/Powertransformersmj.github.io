@@ -307,12 +307,20 @@ const FAMILIAS_MA = [
 
 // Familias que NO se pintan en el overlay genérico "Demás pruebas · todos los años":
 //   · 'tand' → tiene su propio panel condensado y filtrable (ADR-029), no se duplica.
-//   · 'excitacion','relacion','resistencia','aislamiento' → el director pidió RETIRARLAS
-//     del overlay genérico (ADR-033): su evaluación normativa vive en el scorecard
-//     multi-norma + el selector por informe; estas gráficas superpuestas ya no aportan.
-// Para volver a mostrar una (o retirar otra), basta editar este conjunto — los datos y
-// el motor NO se tocan, sólo qué se pinta en ese overlay. Fuente única (shell + harness).
-export const FAMILIAS_EXCLUIDAS_OVERLAY = new Set(['tand', 'excitacion', 'relacion', 'resistencia', 'aislamiento']);
+//   · 'excitacion','relacion','resistencia','aislamiento' → retiradas (ADR-033).
+//   · 'bushing','collar' → retiradas (ADR-034).
+// Su evaluación normativa vive en el scorecard multi-norma + el selector por informe;
+// estas gráficas superpuestas ya no aportan. Para volver a mostrar una, basta sacar su
+// clave de aquí — los datos y el motor NO se tocan, sólo qué se pinta. Fuente única.
+export const FAMILIAS_EXCLUIDAS_OVERLAY = new Set(['tand', 'excitacion', 'relacion', 'resistencia', 'aislamiento', 'bushing', 'collar']);
+
+// Predicado ÚNICO de exclusión del overlay (shell + harness). Además de las familias
+// canónicas de arriba, retira los genéricos `otros:*` (p.ej. SFRA por devanado) — el
+// director: "eliminemos esto" (ADR-034). Con todo excluido, el overlay genérico queda
+// vacío y el panel tan δ es la única vista multi-año. REVERSIBLE: quitar la regla/clave.
+export function excluidaDelOverlay(prueba) {
+  return FAMILIAS_EXCLUIDAS_OVERLAY.has(prueba) || /^otros:/.test(String(prueba == null ? '' : prueba));
+}
 
 // Pruebas que NO son ELÉCTRICAS: análisis FÍSICO-QUÍMICO del aceite (DGA/gases
 // disueltos, fisicoquímicos, furanos, humedad del papel…). Este tablero es de

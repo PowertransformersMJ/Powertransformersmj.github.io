@@ -694,3 +694,19 @@
 **33.3 Verificación** — `_dev/preview-multiano.html` con datos REALES (9 fixtures): el overlay genérico pasó a mostrar SOLO `Factor de potencia de bujes AT (C1-UST)` (bushing) y `Coeficientes SFRA (DL/T911)` (otros:sfra) — ninguna de las 5 retiradas; panel tan δ + su "Análisis conforme a norma" intactos. Sin errores de consola. `npm test` **1146/1146**. INTACTO: scorecard, selector, multinorma, KPIs.
 
 **33.4 Doctrina** — "Para ocultar/retirar elementos de una vista, usa una LISTA DE EXCLUSIÓN declarativa y de fuente única (compartida shell↔harness), no borres el pipeline ni los datos: retirar de la vista ≠ destruir la capacidad. Así el cambio es reversible (editar un Set) y el preview valida exactamente lo que verá producción." Refuerza ADR-029 (condensar/enfocar) + memoria 'no destruir lo logrado'.
+
+---
+
+## 34. ADR-034 — Retiro TOTAL del overlay genérico "Demás pruebas" (bujes + collar + SFRA): panel tan δ = única vista multi-año
+
+> Director (2026-06-09, tras ADR-033, mostrando lo que quedaba): "eliminemos esto por favor" — capturas de bujes (Tan δ C1 UST), collar caliente a bujes y SFRA por devanado (110/34.5/13.8 kV). **Frontend; en prod tras push.**
+
+**34.1 Decisión** — Se completan las exclusiones del overlay: `FAMILIAS_EXCLUIDAS_OVERLAY` suma `bushing` y `collar`; y un **predicado único** `excluidaDelOverlay(prueba)` añade la regla `^otros:` → retira también los genéricos SFRA por devanado (claves `otros:sfra …`). Con todo excluido, el overlay genérico queda VACÍO → la sección "Demás pruebas · todos los años" ya no se renderiza y el **panel tan δ condensado** (ADR-029/031/032) es la ÚNICA vista multi-año.
+
+**34.2 No destructivo** — Igual que ADR-033: NO se borra extracción, motor multinorma ni datos; sólo se deja de PINTAR. Bujes/collar/SFRA siguen evaluándose en el **scorecard multi-norma** (SFRA tiene su criterio DL/T911 por banda) + **selector por informe**. REVERSIBLE: quitar una clave del Set o la regla `^otros:` reactiva su gráfica.
+
+**34.3 Sincronía shell↔harness** — El shell ya retornaba antes del header si `!bloques.length`; se replicó esa guarda en `_dev/preview-multiano.html` (antes pintaba el header "Demás pruebas" aunque el overlay quedara vacío) → ahora el preview valida EXACTO lo que ve producción.
+
+**34.4 Verificación** — `_dev/preview-multiano.html` con 9 fixtures REALES: `headers=[]`, `graficasGenericas=[]`, sección "Demás pruebas" AUSENTE, intro/chips de año ausentes; panel tan δ + "Análisis conforme a norma" intactos. Sin errores de consola. `npm test` **1146/1146**. INTACTO: scorecard, selector, multinorma, KPIs.
+
+**34.5 Doctrina** — "Cuando una vista entera deja de aportar, retírala con el MISMO mecanismo declarativo de exclusión (no un parche aparte) y replica la guarda de 'sección vacía' en TODOS los renderers (shell + harness) para que no quede un encabezado huérfano. Retirar la vista ≠ destruir la capacidad: el dato y la evaluación siguen vivos en scorecard/selector." Cierra el arco ADR-029→034 (condensar + depurar el multi-año).
