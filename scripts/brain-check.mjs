@@ -70,11 +70,11 @@ const lobeRegistryPath = join(DOCS, '40-LOBULOS-DOMINIO.md');
 const lobeRegistry = existsSync(lobeRegistryPath) ? read(lobeRegistryPath) : '';
 
 // 1) Neuronas huérfanas: toda docs/NN-*.md debe estar referenciada en CLAUDE.md
-//    (excepto lóbulos hijos 41-49, que se registran en 40-LOBULOS-DOMINIO).
+//    (excepto lóbulos hijos 41-50, que se registran en 40-LOBULOS-DOMINIO).
 console.log('1) Neuronas huérfanas (registradas en CLAUDE.md / 40-LOBULOS):');
 const neurons = readdirSync(DOCS).filter((f) => /^\d{2}-.*\.md$/.test(f));
 for (const n of neurons) {
-  const isChildLobe = /^4[1-9]-/.test(n); // 41..49 = lóbulos de dominio hijos
+  const isChildLobe = /^(4[1-9]|50)-/.test(n); // 41..50 = lóbulos de dominio hijos
   if (claude.includes(n)) ok(`${n}`);
   else if (isChildLobe && lobeRegistry.includes(n)) ok(`${n} (lóbulo hijo → 40-LOBULOS-DOMINIO)`);
   else if (isChildLobe) warn(`${n} lóbulo hijo NO registrado en 40-LOBULOS-DOMINIO`);

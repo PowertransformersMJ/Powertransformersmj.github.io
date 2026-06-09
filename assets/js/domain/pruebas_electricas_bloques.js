@@ -385,14 +385,25 @@ export function configInforme(it) {
   const textos = [it && it.nombre, it && it.archivo, it && it.pdf, it && it.titulo, it && it.tipo_prueba,
     id.configuracion, id.conexion, id.montaje].map((t) => String(t == null ? '' : t).toLowerCase())
     .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-  if (/\bdelta\b/.test(textos)) return 'delta';
-  if (/\bestrella\b|\bwye\b|\bstar\b/.test(textos)) return 'estrella';
-  const gc = String((it && it.grupo_conexion) || id.grupo_conexion || '').trim();
-  if (!gc) return '';
-  const h = gc[0].toUpperCase();
-  if (h === 'D') return 'delta';
-  if (h === 'Y') return 'estrella';
-  return gc.split(/[^A-Za-z0-9]/)[0] || '';
+  // TIPO de ensayo ESPECIAL: cuando un mismo día hay varios PDFs (un libro de
+  // pruebas eléctricas Y un libro de SFRA aparte) comparten fecha+config → hay que
+  // distinguir también por el tipo de ensayo del nombre/título.
+  let tipo = '';
+  if (/\bsfra\b|respuesta en frecuencia/.test(textos)) tipo = 'SFRA';
+  else if (/\bdfr\b/.test(textos)) tipo = 'DFR';
+  // CONFIG de conexión: rótulo del texto (despliegue) primero; el grupo de placa
+  // (nameplate) es del DISEÑO y puede no coincidir → solo como último recurso.
+  let conf = '';
+  if (/\bdelta\b/.test(textos)) conf = 'delta';
+  else if (/\bestrella\b|\bwye\b|\bstar\b/.test(textos)) conf = 'estrella';
+  if (!conf) {
+    const gc = String((it && it.grupo_conexion) || id.grupo_conexion || '').trim();
+    if (gc) {
+      const h = gc[0].toUpperCase();
+      conf = h === 'D' ? 'delta' : h === 'Y' ? 'estrella' : (gc.split(/[^A-Za-z0-9]/)[0] || '');
+    }
+  }
+  return [tipo, conf].filter(Boolean).join(' ');
 }
 
 const DEVANADOS = ['at', 'mt', 'bt'];
