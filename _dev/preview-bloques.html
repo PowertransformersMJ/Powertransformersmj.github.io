@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Resultados del informe — selector (un informe a la vez + tablas)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+<h1>DEV · "Resultados del informe" — UN informe a la vez + selector (tablas siempre accesibles)</h1>
+<p style="color:#64748b;font-size:13px;max-width:62ch">Réplica del nuevo <code>montarBloques</code> con datos REALES: por defecto el vigente; el selector cambia el informe mostrado (sus gráficas + TABLAS). NO apila todos.</p>
+<section id="bloques">
+  <h2>Resultados del informe</h2>
+  <div id="bloques-cont"></div>
+</section>
+
+<script type="module">
+import { mountBloques } from '../assets/js/ui/pruebas/grafico-generico.js';
+import { etiquetaFecha, configInforme, ordenInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+
+function etiquetasInformes(infos) {
+  const meta = infos.map((inf) => ({ id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), config: configInforme(inf) }));
+  const cnt = {};
+  for (const m of meta) cnt[m.label] = (cnt[m.label] || 0) + 1;
+  const out = new Map();
+  for (const m of meta) out.set(m.id, (cnt[m.label] > 1 && m.config) ? `${m.label} · ${m.config}` : m.label);
+  return out;
+}
+
+(async () => {
+  const infos = [];
+  for (const url of FIXTURES) {
+    try { const j = await (await fetch(url + '?v=' + Date.now())).json();
+      infos.push({ id: j.id, ano: j.ano, fecha: j.fecha, nombre: j.nombre, identidad: j.identidad, bloques: j.bloques || [] });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  // vigente primero (igual que el shell)
+  infos.sort((a, b) => (b.ano || 0) - (a.ano || 0) || ordenInforme(etiquetaFecha(b.fecha, b.ano), b.ano) - ordenInforme(etiquetaFecha(a.fecha, a.ano), a.ano));
+  const cont = document.getElementById('bloques-cont');
+  const etq = etiquetasInformes(infos);
+  let selId = infos[0].id;
+
+  const selBar = document.createElement('div'); selBar.className = 'pe-fase-chips';
+  selBar.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px';
+  selBar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Informe:', style: 'font-size:12px;color:#475569' }));
+  const detalle = document.createElement('div');
+
+  const pintar = () => {
+    detalle.innerHTML = '';
+    const inf = infos.find((i) => i.id === selId) || infos[0];
+    const grupo = document.createElement('div'); grupo.className = 'pe-bloque-grupo';
+    grupo.appendChild(Object.assign(document.createElement('h3'), { textContent: `Informe ${etq.get(inf.id)}` }));
+    const box = document.createElement('div');
+    mountBloques(box, { bloques: inf.bloques });
+    grupo.appendChild(box);
+    detalle.appendChild(grupo);
+  };
+
+  infos.forEach((inf) => {
+    const btn = document.createElement('button'); btn.type = 'button';
+    btn.className = 'pe-fase-chip' + (inf.id === selId ? ' is-on' : '');
+    btn.textContent = etq.get(inf.id);
+    btn.addEventListener('click', () => { selId = inf.id; [...selBar.querySelectorAll('.pe-fase-chip')].forEach((b) => b.classList.remove('is-on')); btn.classList.add('is-on'); pintar(); });
+    selBar.appendChild(btn);
+  });
+  cont.appendChild(selBar); cont.appendChild(detalle); pintar();
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
