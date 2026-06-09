@@ -740,3 +740,15 @@
 **36.3 No-regresión / Workflow** — Validado en `_dev/preview-bloques.html` (réplica del detalle, con el MISMO filtro) usando datos REALES: informe 19/01/2024 estrella → `contieneTanDelta=false` y SIGUEN visibles bujes, excitación, relación AT/MT y AT/BT, resistencia AT y MT/BT, aislamiento Megger; selector intacto. Sin errores de consola. `npm test` **1146/1146**. Lint HTML 0.
 
 **36.4 Doctrina (meta)** — "Cuando el director señala con pantallazos un ELEMENTO dentro de un contenedor, el objetivo es ESE elemento, no el contenedor. El encabezado de sección en el tope de un scroll es contexto, no parte del pedido. Ante duda de alcance en un BORRADO: retira lo MÍNIMO señalado (defecto conservador), nunca el contenedor — borrar de más destruye valor ajeno al pedido. Reforzado: validar el cambio con el harness ANTES de declararlo hecho (aquí el harness sí era testeable, a diferencia de la página tras auth)." Ver L-51 (30-LECCIONES) + memoria de feedback.
+
+---
+
+## 37. ADR-037 — Reubicar "Identidad de la unidad" justo debajo de "Resumen de la unidad"
+
+> Director (2026-06-09): "me gustaría que este segmento [Identidad de la unidad] aparezca debajo de Resumen de la unidad." **Frontend; en prod tras push.**
+
+**37.1 Cambio** — Reorden de secciones estáticas en `pages/pruebas-electricas.html`: la `<section id="identidad">` se mueve de su posición (era 4.ª, tras Calificación global y el multi-año) a justo después de `<section id="parque">` ("Resumen de la unidad"). Nuevo orden: Resumen → **Identidad** → Calificación global → Cada prueba·todos los años → Nomenclatura → Resultados del informe.
+
+**37.2 No-regresión** — Sólo se movió el bloque HTML; el JS puebla `#idgrid` por ID (orden-independiente), no se tocó. Verificado: un único `id="identidad"`, secuencia de secciones correcta, `html-validate` 0. ⚠️ La página vive tras Firebase Auth (el preview redirige a login), así que la verificación es estructural (grep de orden + lint), no UI en vivo.
+
+**37.3 Doctrina** — "Un reorden de presentación se hace moviendo el bloque en el HTML estático cuando el render se hace por ID (no por orden del DOM); no requiere tocar JS. Si la vista vive tras auth y el preview no entra, declara la validación como estructural." 
