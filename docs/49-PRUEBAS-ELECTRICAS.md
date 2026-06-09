@@ -118,7 +118,7 @@ del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no
 5. **Pendiente/tasa de cambio con bandera predictiva** (03§E): la pendiente condena aunque FP≤0.5%; hoy solo hay tendencia del peor caso.
 6. **Baseline de fábrica/commissioning** (03 precedencia 1): no existe en data → usar el informe más antiguo como proxy + marcar "sin baseline de fábrica".
 
-Estado: #1 (tip-up) y #4 (caveat 20 °C) **IMPLEMENTADOS** (ADR-038, 2026-06-09): vista Tip-up con ΔFP por sección + clasificación ioniza/tipdown/plano + caveat de T en el análisis; validado con 450108 (30/30 planas). **Pendientes (decisión del director)**: #2 localización del defecto por modo, #3 tendencia de capacitancia (pF), #5 pendiente/tasa predictiva, #6 baseline de fábrica.
+Estado: #1 (tip-up) + #4 (caveat 20 °C) **IMPLEMENTADOS** (ADR-038); #2 (localización por modo) **IMPLEMENTADO** (ADR-039: `localizacionDe`/`causaProbableDe` + bloque "Localización del hallazgo"; validado 450108 → localiza CL MT/BT↔tierra 0.5135%). **Pendientes (decisión del director)**: #3 tendencia de capacitancia (pF), #5 pendiente/tasa predictiva, #6 baseline de fábrica.
 
 ## Pendientes / próxima ronda
 
