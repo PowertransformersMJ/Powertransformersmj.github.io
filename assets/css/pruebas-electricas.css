@@ -553,3 +553,6 @@
 .pe-conclusion.pe-ok{background:#f0fdf4;}
 .pe-conclusion.pe-warn{background:#fffbeb;}
 .pe-conclusion.pe-bad{background:#fef2f2;}
+.pe-analisis-extra{padding:10px 16px;border-top:1px solid #eef2f7;font-size:12.5px;color:#334155;line-height:1.5;}
+.pe-analisis-extra .muted{color:#94a3b8;}
+.pe-analisis-cav{padding:9px 16px;border-top:1px solid #eef2f7;background:#fcfbf4;font-size:12px;color:#7c6f3a;line-height:1.5;}

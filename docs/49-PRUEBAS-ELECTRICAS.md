@@ -103,6 +103,23 @@ director (MO.00418 Ed. 02 / IEEE / NETA) y luego fijar en `03-…` + el schema d
 - **DGA**: ppm exactos del percentil 90/95 por gas (IEEE C57.104-2019 Tablas 1/2, no públicos); cortes de Rogers/Doernenburg/Duval.
 - **DFR**: escala de % humedad del papel (2/3/4.5 %, CIGRE TB 349/414).
 
+## 🔎 Auditoría del panel FP/tan δ (2026-06-09) — gaps de diagnóstico vs la skill
+
+Skill consultada: `factor-potencia-aislamiento` (02-calculos, 03-criterios, 04-diagnostico).
+Datos REALES verificados (fixtures 450108): cada punto trae `Tan δ @10 kV` **y** `@2 kV` por
+sección + `Cap (pF)` en `punto.extra`; **NO** hay temperatura registrada en el informe.
+
+Lo que el panel YA cubre: veredicto multi-norma (NETA 0.5% / IEEE 1%), peor medición, tendencia
+del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no implementados)**:
+1. **Tip-up `ΔFP = FP@10kV − FP@2kV` por sección** (skill §D + 02§3): detecta ionización en voids/PD (ΔFP↑) o humedad superficial / tierra de núcleo faltante (ΔFP↓) — mecanismo INVISIBLE al FP absoluto. **Computable YA con dato real, sin corrección de T** (es diferencia a igual T). MÁXIMO valor/factibilidad.
+2. **Localización del defecto por modo** (04-diagnostico): CH alto=AT↔tierra/bujes · CL=MT↔tierra · CHL=entre AT-MT · CHT=AT-BT… → traduce "qué sección alta" en "dónde está el defecto". Decisión accionable.
+3. **Tendencia de capacitancia `Cap (pF)` por sección** (02§4): cambio de C = alteración geométrica (desplazamiento/humedad), complementa SFRA. Dato real disponible.
+4. **Corrección a 20 °C — caveat + captura de T** (02§2, 03): hoy se compara FP CRUDO vs 0.5/1% SIN corregir a 20 °C (la skill exige corregir SIEMPRE). No hay T → NO fabricar; mostrar caveat "valores como medidos" + capturar T+factor del fabricante en extracción futura. Correctitud normativa.
+5. **Pendiente/tasa de cambio con bandera predictiva** (03§E): la pendiente condena aunque FP≤0.5%; hoy solo hay tendencia del peor caso.
+6. **Baseline de fábrica/commissioning** (03 precedencia 1): no existe en data → usar el informe más antiguo como proxy + marcar "sin baseline de fábrica".
+
+Estado: #1 (tip-up) y #4 (caveat 20 °C) **IMPLEMENTADOS** (ADR-038, 2026-06-09): vista Tip-up con ΔFP por sección + clasificación ioniza/tipdown/plano + caveat de T en el análisis; validado con 450108 (30/30 planas). **Pendientes (decisión del director)**: #2 localización del defecto por modo, #3 tendencia de capacitancia (pF), #5 pendiente/tasa predictiva, #6 baseline de fábrica.
+
 ## Pendientes / próxima ronda
 
 - Validación del director sobre la skill ejemplar (¿el patrón de 4 neuronas le sirve?) antes
