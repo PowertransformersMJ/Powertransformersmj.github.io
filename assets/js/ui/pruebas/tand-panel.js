@@ -24,6 +24,16 @@ const PAL_SEC = ['#1f3a5f', '#2c6e72', '#a4694f', '#6d597a', '#46734b', '#5d6d7e
 // IEEE Std 62 / C57.152: tan δ corregido a 20 °C ≤ 0.5% es típico de aislamiento
 // nuevo/sano (guía); > 1% se considera deteriorado y exige investigación (límite).
 const CRIT = { limite: 1, guia: 0.5, norma: 'IEEE 62 / C57.152' };
+// Catálogo MULTI-NORMA del tan δ (espejo del motor `pruebas_electricas_multinorma.js`):
+// NETA es la más estricta (≤0.5% = guía); IEEE marca el límite de deterioro (≤1%).
+// Cada barra/medición se evalúa contra AMBAS (veredicto conservador). `acron` se usa
+// en el sello/emblema; son emblemas ESTILIZADOS propios (no los logotipos oficiales
+// registrados — evita uso de marca de terceros), con la referencia exacta al estándar.
+const NORMAS_TAND = [
+  { id: 'neta', acron: 'NETA', nom: 'ANSI/NETA', sub: 'ATS · Tabla 100.3', umbral: 0.5, criterio: '≤ 0.5%', color: '#2c6e72' },
+  { id: 'ieee', acron: 'IEEE', nom: 'IEEE', sub: 'Std 62 / C57.152', umbral: 1, criterio: '≤ 1%', color: '#1f3a5f' },
+];
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
 
@@ -44,6 +54,78 @@ const chip = (txt, on, onClick, color) => {
   b.dataset.k = txt;
   b.addEventListener('click', () => onClick(b)); return b;
 };
+
+// Emblema/sello ESTILIZADO de una norma (medalla de certificación) — símbolo propio,
+// no el logotipo registrado. SVG inline (sin red, sin dependencias).
+function medallaNorma(color, acron) {
+  const s = el('svg', { viewBox: '0 0 48 58', width: '44', height: '54', 'aria-hidden': 'true' });
+  s.appendChild(el('path', { d: 'M17 39 L13 56 L24 50 L35 56 L31 39 Z', fill: color, opacity: '0.85' }));
+  s.appendChild(el('circle', { cx: '24', cy: '22', r: '20', fill: '#fff', stroke: color, 'stroke-width': '2.5' }));
+  s.appendChild(el('circle', { cx: '24', cy: '22', r: '15.5', fill: 'none', stroke: color, 'stroke-width': '1', opacity: '0.45' }));
+  const t = el('text', { x: '24', y: '26', 'text-anchor': 'middle', 'font-size': acron.length > 4 ? '8.5' : '10.5', 'font-weight': '800', fill: color, 'font-family': 'system-ui, sans-serif' });
+  t.textContent = acron; s.appendChild(t);
+  return s;
+}
+
+// Análisis MULTI-NORMA de tan δ a partir de las mediciones VISIBLES (filtros activos).
+// Puro y testeable: no toca el DOM, solo agrega y clasifica datos REALES (sin inventar).
+// @returns {null|{M, peor, porNorma, tendencia}}
+export function analizarTand(repsVis, secs, tens) {
+  const M = [];
+  (repsVis || []).forEach((r) => (tens || []).forEach((t) => {
+    const s = r.bloque.series.find((x) => x.nombre === t); if (!s) return;
+    (secs || []).forEach((sec) => { const p = s.puntos.find((pp) => String(pp.x) === sec); if (p && typeof p.y === 'number') M.push({ rep: r, sec, tension: t, y: p.y }); });
+  }));
+  if (!M.length) return null;
+  const peor = M.reduce((a, b) => (b.y > a.y ? b : a));
+  const porNorma = NORMAS_TAND.map((nm) => {
+    const cumplen = M.filter((m) => m.y <= nm.umbral).length;
+    return { nm, cumplen, superan: M.length - cumplen, total: M.length };
+  });
+  const porRep = (repsVis || []).map((r) => { const ys = M.filter((m) => m.rep.id === r.id).map((m) => m.y); return ys.length ? { rep: r, max: Math.max(...ys) } : null; }).filter(Boolean);
+  let tendencia = null;
+  if (porRep.length >= 2) { const ini = porRep[0], fin = porRep[porRep.length - 1], d = fin.max - ini.max;
+    tendencia = { ini, fin, delta: d, dir: Math.abs(d) < 0.03 ? 'estable' : d > 0 ? 'al alza' : 'a la baja' }; }
+  return { M, peor, porNorma, tendencia };
+}
+
+// Pinta el bloque "Análisis conforme a norma" (sellos + veredicto por norma + conclusión).
+function renderAnalisis(box, datos) {
+  box.innerHTML = '';
+  if (!datos) { box.innerHTML = '<p class="muted small">Sin mediciones para analizar con los filtros activos.</p>'; return; }
+  const { M, peor, porNorma, tendencia } = datos;
+  const card = document.createElement('div'); card.className = 'pe-analisis';
+  const head = document.createElement('div'); head.className = 'pe-analisis-head';
+  head.innerHTML = `<span>Análisis conforme a norma</span><span class="pe-analisis-n">${M.length} mediciones evaluadas</span>`;
+  card.appendChild(head);
+  const sellos = document.createElement('div'); sellos.className = 'pe-sellos';
+  porNorma.forEach(({ nm, cumplen, superan, total }) => {
+    const c = document.createElement('div'); c.className = 'pe-sello-card'; c.style.setProperty('--c', nm.color);
+    c.appendChild(medallaNorma(nm.color, nm.acron));
+    const cls = superan === 0 ? 'ok' : (cumplen / total >= 0.8 ? 'warn' : 'bad');
+    const info = document.createElement('div'); info.className = 'pe-sello-info';
+    info.innerHTML =
+      `<div class="pe-sello-nom">${esc(nm.nom)}</div>` +
+      `<div class="pe-sello-sub">${esc(nm.sub)}</div>` +
+      `<div class="pe-sello-crit">tan δ ${esc(nm.criterio)}</div>` +
+      `<div class="pe-sello-res pe-${cls}"><b>${cumplen}/${total}</b> cumplen${superan ? ` · ${superan} sobre criterio` : ''}</div>`;
+    c.appendChild(info); sellos.appendChild(c);
+  });
+  card.appendChild(sellos);
+  let nivel, frase;
+  if (peor.y <= 0.5) { nivel = 'ok'; frase = 'Aislamiento SANO: todas las mediciones cumplen incluso el criterio más estricto (NETA ≤ 0.5%).'; }
+  else if (peor.y <= 1) { nivel = 'warn'; const band = M.filter((m) => m.y > 0.5).length;
+    frase = `Conforme a IEEE (≤ 1%): todas las mediciones pasan. ${band} medición(es) en 0.5–1% (zona de investigación IEEE / sobre el criterio NETA): vigilar tendencia.`; }
+  else { nivel = 'bad'; const sup = M.filter((m) => m.y > 1).length;
+    frase = `Atención: ${sup} medición(es) SUPERAN el límite IEEE (≤ 1%) — aislamiento posiblemente deteriorado, requiere investigación.`; }
+  const concl = document.createElement('div'); concl.className = `pe-conclusion pe-${nivel}`;
+  const l1 = document.createElement('div'); l1.className = 'pe-concl-frase'; l1.textContent = frase;
+  const l2 = document.createElement('div'); l2.className = 'pe-concl-meta';
+  l2.textContent = `Peor medición: ${peor.y}% · ${peor.sec} · ${peor.rep.label}${peor.rep.config ? ' (' + peor.rep.config + ')' : ''} · ${peor.tension}.` +
+    (tendencia ? ` Tendencia del peor caso: ${tendencia.ini.max}% (${tendencia.ini.rep.label}) → ${tendencia.fin.max}% (${tendencia.fin.rep.label}) · ${tendencia.dir}.` : '');
+  concl.append(l1, l2); card.appendChild(concl);
+  box.appendChild(card);
+}
 
 /**
  * Monta el panel de tan δ en `cont`.
@@ -80,6 +162,7 @@ export function montarPanelTand(cont, items) {
 
   const cap = Object.assign(document.createElement('p'), { className: 'muted small', style: 'margin:2px 0 8px' });
   const chartBox = document.createElement('div'); chartBox.className = 'chartbox';
+  const analisisBox = document.createElement('div'); analisisBox.className = 'pe-analisis-box';
 
   const repsVisibles = () => reps.filter((r) => sel.rep.has(r.id) && (!grupos.length || sel.grupo.has(r.config)));
   const seccionesVis = () => secciones.filter((s) => sel.seccion.has(s));
@@ -203,6 +286,7 @@ export function montarPanelTand(cont, items) {
       }
     }
     if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin datos para los filtros activos.</p>';
+    renderAnalisis(analisisBox, analizarTand(repsVis, secs, tens));
     contadores.forEach((fn) => fn());
   };
 
@@ -262,5 +346,6 @@ export function montarPanelTand(cont, items) {
   cont.appendChild(vistaBar);
   cont.appendChild(cap);
   cont.appendChild(chartBox);
+  cont.appendChild(analisisBox);
   pintar();
 }

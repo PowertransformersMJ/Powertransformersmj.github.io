@@ -530,3 +530,26 @@
 .pe-subsec-row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;}
 .pe-subsec-lbl{font-size:11px;color:#64748b;min-width:64px;font-weight:600;}
 @media (max-width:720px){ .pe-fgrupo{grid-template-columns:1fr;} }
+
+/* ── Análisis conforme a norma (tan δ): sellos/emblemas + veredicto + conclusión ── */
+.pe-analisis-box{margin-top:14px;}
+.pe-analisis{border:1px solid #e2e8f0;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.pe-analisis-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 16px;background:#f8fafc;border-bottom:1px solid #eef2f7;font-size:13px;font-weight:700;letter-spacing:.02em;color:#1e293b;text-transform:uppercase;}
+.pe-analisis-n{font-weight:600;color:#64748b;font-size:11.5px;text-transform:none;letter-spacing:0;font-variant-numeric:tabular-nums;}
+.pe-sellos{display:flex;gap:14px;flex-wrap:wrap;padding:14px 16px;}
+.pe-sello-card{display:flex;gap:12px;align-items:center;flex:1;min-width:240px;border:1px solid #e7ebf0;border-left:4px solid var(--c);border-radius:10px;padding:10px 14px;background:#fbfdfe;}
+.pe-sello-card svg{flex:none;}
+.pe-sello-info{display:flex;flex-direction:column;gap:1px;}
+.pe-sello-nom{font-weight:800;color:var(--c);font-size:14px;letter-spacing:.02em;}
+.pe-sello-sub{color:#64748b;font-size:11px;}
+.pe-sello-crit{color:#334155;font-size:12px;font-weight:600;margin-top:2px;}
+.pe-sello-res{font-size:12px;margin-top:3px;color:#475569;font-variant-numeric:tabular-nums;}
+.pe-conclusion{padding:12px 16px;border-top:1px solid #eef2f7;}
+.pe-concl-frase{font-size:13px;font-weight:600;color:#0f172a;}
+.pe-concl-meta{font-size:12px;color:#64748b;margin-top:4px;font-variant-numeric:tabular-nums;}
+.pe-ok{color:#15803d;}
+.pe-warn{color:#b45309;}
+.pe-bad{color:#b91c1c;}
+.pe-conclusion.pe-ok{background:#f0fdf4;}
+.pe-conclusion.pe-warn{background:#fffbeb;}
+.pe-conclusion.pe-bad{background:#fef2f2;}
