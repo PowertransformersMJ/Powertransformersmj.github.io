@@ -34,7 +34,7 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
-import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha, familiaMA } from './domain/pruebas_electricas_bloques.js';
+import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha, familiaMA, FAMILIAS_EXCLUIDAS_OVERLAY } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
@@ -603,7 +603,7 @@ function montarMultiAno() {
     const t = ((d && d.bloques) || []).find(esTand);
     return t ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), bloque: t } : null;
   }).filter(Boolean);
-  const bloques = bloquesMultiAno(items).filter((b) => b.prueba !== 'tand');
+  const bloques = bloquesMultiAno(items).filter((b) => !FAMILIAS_EXCLUIDAS_OVERLAY.has(b.prueba));
   if (!bloques.length && !tandItems.length) {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;
