@@ -664,3 +664,19 @@
 **31.3 No-regresión / verificación** — Validado en `_dev/preview-tand.html` con DATOS REALES (4 informes, 60 mediciones): leyenda = 4 entradas por informe (antes ~8 por serie), líneas de criterio rotuladas con la norma, veredicto "58/60 dentro de norma · 2 sobre guía". Sin errores de consola. `npm test` **1141/1141**. INTACTO: vista "Tendencia", filtros, scorecard, multinorma.
 
 **31.4 Doctrina** — "Una leyenda debe identificar la dimensión que el color codifica (informe), no el producto cartesiano de dimensiones (informe×tensión) — las otras dimensiones se distinguen por opacidad/patrón + una nota, no multiplicando entradas. Un criterio normativo debe ser VISIBLE en la propia gráfica: líneas rotuladas con la norma + veredicto por dato + conteo agregado, no solo un umbral implícito." Refuerza L-49 (preview con datos reales).
+
+---
+
+## 32. ADR-032 — Tan δ: bloque "Análisis conforme a norma" con sellos/emblemas multi-norma + veredicto y conclusión
+
+> Director (2026-06-09, sobre el panel tan δ): "necesito que me muestre un análisis basado en los resultados conforme a la norma; me gustaría apreciar logos de las normas (imagen o símbolo)." **Frontend; en prod tras push.**
+
+**32.1 Decisión** — Bajo el panel tan δ se añade un bloque **"Análisis conforme a norma"** (`renderAnalisis`, `analisisBox`) que se recalcula con los filtros activos. Catálogo `NORMAS_TAND` (espejo del motor `pruebas_electricas_multinorma.js`): **ANSI/NETA ATS Tabla 100.3 (≤0.5%)** + **IEEE Std 62 / C57.152 (≤1%)** — NETA es la guía estricta (= la línea "guía 0.5%" del gráfico), IEEE el límite de deterioro (= "límite 1%"). Cada norma se muestra como **sello/emblema** (medalla de certificación en SVG inline, `medallaNorma`) con su veredicto: `N/M cumplen · K sobre criterio`.
+
+**32.2 Símbolos de norma (decisión de marca)** — Los "logos" son **emblemas ESTILIZADOS propios** (medalla: cinta + doble anillo + acrónimo), NO los logotipos oficiales registrados de IEEE/NETA → evita uso indebido de marca de terceros, sin red ni dependencias, color por norma. Se documentó el porqué al director.
+
+**32.3 Análisis (datos REALES, sin inventar)** — `analizarTand(repsVis, secs, tens)` (PURO, exportado y testeado) agrega las mediciones VISIBLES: cuenta cumplimiento por norma, halla la **peor medición** (valor · sección · informe · tensión) y la **tendencia del peor caso** entre el informe más antiguo y el más reciente (estable/al alza/a la baja). La conclusión es **conservadora multi-norma**: SANO (≤0.5% todas) / Conforme IEEE con N en 0.5–1% a vigilar / Atención si alguna supera 1%. Validado con 450108: NETA 58/60, IEEE 60/60, peor 0.5135% (CL, 09/11/2023), tendencia al alza → banner "vigilar".
+
+**32.4 No-regresión / verificación** — `_dev/preview-tand.html` con datos reales: 2 sellos con medalla (44×54, cinta+anillos+acrónimo), border-left por norma, conclusión amber "warn". `analizarTand` con 5 tests nuevos (null sin datos, ≤0.5% cumple ambas, 0.5–1% cumple IEEE/supera NETA, >1% supera ambas, tendencia). `npm test` **1146/1146**. Lint HTML 0. Sin errores de consola. INTACTO: gráficas tendencia/por-devanado, filtros, scorecard.
+
+**32.5 Doctrina** — "Un análisis 'conforme a norma' debe ser MULTI-NORMA y conservador (cumple la estricta vs cumple el límite), anclado en el dato real (peor medición + tendencia), no en una etiqueta genérica. Para 'mostrar la norma' usa un emblema ESTILIZADO propio + la cita exacta del estándar, nunca el logotipo registrado de un tercero. El análisis se recalcula con los filtros para ser coherente con lo que se ve." Refuerza ADR-011/012 (veredicto multi-norma) + memoria 'no fabricar datos'.
