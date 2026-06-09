@@ -10,7 +10,7 @@
 
 | Señal | Valor |
 |---|---|
-| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1121/1121 verde** (2026-06-08, +multi-año muestra TODA prueba: SFRA/DGA/etc. con familia genérica, no solo las 7 canónicas — criterios se surfacean, no se fabrican, ADR-027). |
+| **Build** | 🟢 `npm test` (lint + `node --test tests/*`) **1135/1135 verde** (2026-06-08, +multi-año TENDENCIA año a año: 1 gráfica por SUB-PRUEBA (par de devanados, no fusiona escalas), TODOS los años por defecto, orden cronológico + etiquetas uniformes + **desambiguación estrella/delta del mismo día**; validado con 6 informes REALES 450108 (incl. 2024 delta) + tan δ por sección, ADR-028). |
 | **Versión** | `v2.4.1` + cerebro v1.0.0. Pruebas Eléctricas con IA: tablero **IA-primaria**, **veredicto 100% MULTI-NORMA** (valor vs cada norma + consolidado + recomendación, NUNCA texto IA). **Arco ADR-003→014 EN PRODUCCIÓN**: extracción IA + canal `extra`, multi-norma + diagnóstico, **bujes canónico**, **identidad/placa por informe** (trafo móvil doble config → aislamiento por clase del propio ensayo), tablas SIN col. "Evaluación/OK", **Tendencia alto nivel** (diagnóstico unidad + timeline + narrativa IA), biblioteca-hub, upsert por fecha, reproceso server-side + backfill instantáneo. Detalle → `99 §9..§14`. Secret `LLM_API_KEY` ok. |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA offline desactivada a propósito). |
 | **Branch activa** | `DESARROLLO-/-PROYECTO-MJ` (dev) → merge a `main` (producción). Verificado 2026-06-08. |

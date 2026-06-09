@@ -331,55 +331,173 @@ function familiaMA(bloque) {
   return base ? { key: `otros:${base}`, inv: false, generic: true } : null;
 }
 
+// Discriminador ESTRUCTURAL de un bloque para el multi-año: identifica la
+// SUB-PRUEBA por su PAR DE DEVANADOS (AT/MT vs AT/BT…) + tipo de gráfica,
+// IGNORANDO números (kV, °C, TAP) y redacción del laboratorio. Así la MISMA
+// sub-prueba se superpone entre años aunque el trafo MÓVIL se haya desplegado a
+// tensiones DISTINTAS (2021: 63.5/13.8 kV · 2023: 110/34.5/13.8 · 2024: 66/…,
+// ADR-014) o el informe titule distinto ("…referida a 75 °C", "AT 66 kV"…); pero
+// sub-pruebas DISTINTAS del mismo informe (relación AT/MT vs AT/BT; resistencia
+// AT en Ω vs MT/BT en mΩ) van a gráficas SEPARADAS (no se fusionan escalas/uds).
+// Pura. El par de devanados es estable año a año; el título completo NO lo es.
+// Normaliza la fecha de un informe a "DD/MM/YYYY" para una etiqueta UNIFORME en
+// los chips/leyenda. Los informes vienen con formatos dispares según el lab/IA
+// ("18/01/2022", "2022/05/02", "Enero 19 del 2024", "19 de enero de 2024") → sin
+// esto el MISMO día se ve como informes distintos. Si no reconoce el formato,
+// devuelve el texto tal cual (o el año). Pura.
+const _MESES_ES = { enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6, julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12 };
+const _pad2 = (n) => String(n).padStart(2, '0');
+export function etiquetaFecha(fecha, ano) {
+  const s = String(fecha == null ? '' : fecha).trim();
+  if (!s) return ano != null ? String(ano) : 's/a';
+  let m;
+  if ((m = s.match(/^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$/))) return `${_pad2(m[1])}/${_pad2(m[2])}/${m[3]}`;      // DD/MM/YYYY
+  if ((m = s.match(/^(\d{4})[/.\-](\d{1,2})[/.\-](\d{1,2})$/))) return `${_pad2(m[3])}/${_pad2(m[2])}/${m[1]}`;      // YYYY/MM/DD
+  const low = s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');                                       // con nombre de mes (es)
+  const mes = Object.keys(_MESES_ES).find((k) => low.includes(k));
+  const dia = low.match(/\b(\d{1,2})\b/), anio = low.match(/\b(\d{4})\b/);
+  if (mes && dia && anio) return `${_pad2(dia[1])}/${_pad2(_MESES_ES[mes])}/${anio[1]}`;
+  return s;
+}
+
+// Orden CRONOLÓGICO real de un informe por su etiqueta "DD/MM/YYYY" → AAAAMMDD.
+// Sin esto, ordenar por string pone "02/05/2022" ANTES que "18/01/2022" (mayo
+// antes que enero) — orden lexicográfico, no de fecha. Cae al año si no matchea.
+export function ordenInforme(repLabel, ano) {
+  // Match del PREFIJO de fecha (sin anclar al final): la etiqueta puede llevar un
+  // sufijo de config (" · estrella") cuando dos informes coinciden en fecha.
+  const m = String(repLabel == null ? '' : repLabel).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (m) return Number(m[3]) * 10000 + Number(m[2]) * 100 + Number(m[1]);
+  return (Number(ano) || 0) * 10000;
+}
+
+// Etiqueta corta de CONFIGURACIÓN de un informe para desambiguar dos del MISMO día
+// (trafo móvil: misma prueba el mismo día en estrella vs delta, ADR-014/028).
+// Prioridad: (1) `config` explícito; (2) un rótulo "estrella/delta" hallado en los
+// textos del informe (nombre de archivo, título…) — la config de DESPLIEGUE vive ahí,
+// NO en el grupo de placa (nameplate), que es del DISEÑO y puede no coincidir; (3) como
+// último recurso, el grupo de conexión (HV: D→delta, Y→estrella). '' si no hay nada.
+const _id = (it) => (it && it.identidad) || {};
+export function configInforme(it) {
+  const c = (it && it.config != null) ? String(it.config).trim() : '';
+  if (c) return c;
+  const id = _id(it);
+  const textos = [it && it.nombre, it && it.archivo, it && it.pdf, it && it.titulo, it && it.tipo_prueba,
+    id.configuracion, id.conexion, id.montaje].map((t) => String(t == null ? '' : t).toLowerCase())
+    .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/\bdelta\b/.test(textos)) return 'delta';
+  if (/\bestrella\b|\bwye\b|\bstar\b/.test(textos)) return 'estrella';
+  const gc = String((it && it.grupo_conexion) || id.grupo_conexion || '').trim();
+  if (!gc) return '';
+  const h = gc[0].toUpperCase();
+  if (h === 'D') return 'delta';
+  if (h === 'Y') return 'estrella';
+  return gc.split(/[^A-Za-z0-9]/)[0] || '';
+}
+
+const DEVANADOS = ['at', 'mt', 'bt'];
+function discriminadorBloque(b) {
+  const t = String((b && (b.titulo || b.prueba)) || '')
+    .toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  // Par de devanados del título. Si el informe NO lo declara (algunos laboratorios
+  // titulan "Corriente de excitación por TAP" sin "AT"), se asume AT = lado
+  // PRIMARIO (el más ensayado) → así la MISMA prueba AT no se fragmenta entre años
+  // por una diferencia de redacción; la excitación/relación MT sí se distingue
+  // porque SÍ trae "MT" en el título.
+  const w = DEVANADOS.filter((k) => new RegExp(`\\b${k}\\b`).test(t)).join('') || 'at';
+  const g = (b && b.grafica === 'barra') ? 'barra' : 'linea';
+  return `${w}|${g}`;
+}
+
 /**
- * Construye, por FAMILIA de prueba, UN bloque que superpone TODOS los INFORMES
- * del libro. Clave de identidad = el INFORME (no el año), para que DOS informes
- * del MISMO año NO se colapsen (caso real: serie 450108 con 2 ensayos en 2021).
+ * Construye UN bloque multi-año por SUB-PRUEBA (familia + identidad de título),
+ * superponiendo TODOS los INFORMES del libro. Dos claves de identidad:
+ *  · El GRUPO (qué gráfica) = familia + título estructural → sub-pruebas distintas
+ *    (relación AT/MT vs AT/BT; resistencia AT en Ω vs MT/BT en mΩ) van a gráficas
+ *    SEPARADAS, nunca fusionadas con escalas/uds mezcladas (ADR-028).
+ *  · La SERIE (qué línea) = el INFORME (no el año), para que DOS informes del MISMO
+ *    año NO se colapsen (serie 450108 con 2 ensayos en 2021, ADR-026).
  * Conserva CADA FASE de cada informe como su propia serie (valores REALES, sin
- * reducir). Cada serie se etiqueta con `_rep` (id del informe), `_repLabel`
- * (fecha o año, para mostrar), `_ano` y `_fase` → filtrable por INFORME y por FASE.
- * El nombre visible es "<fecha|año> · <fase>".
+ * reducir), etiquetada con `_rep`/`_repLabel`/`_ano`/`_fase` (filtrable). El nombre
+ * visible es "<fecha|año> · <fase>".
  * @param {Array<{ano:(number|null), fecha?:string, id?:string, bloques:Array}>} items
- * @returns {Array<object>} bloques multi-informe (uno por familia con datos)
+ * @returns {Array<object>} bloques multi-informe (uno por sub-prueba con datos)
  */
 export function bloquesMultiAno(items) {
   const fam = new Map();
+  const repMeta = new Map(); // rep → {label, config, ano} para desambiguar colisiones de fecha
   for (const it of (Array.isArray(items) ? items : [])) {
     const ano = it && it.ano;
-    const repLabel = (it && it.fecha) || (ano != null ? String(ano) : 's/a');
-    // Identidad ÚNICA por informe: id > fecha > (año + orden). Sin esto, dos
-    // informes del mismo año compartirían clave y se solaparían.
+    const repLabel = etiquetaFecha(it && it.fecha, ano); // etiqueta UNIFORME DD/MM/YYYY
+    // Identidad ÚNICA por informe: id > fecha cruda > etiqueta. Sin esto, dos
+    // informes del mismo año compartirían clave y se solaparían. (La identidad usa
+    // la fecha CRUDA, no la normalizada, para no fundir estrella+delta del mismo día.)
     const rep = (it && it.id != null && String(it.id)) || (it && it.fecha) || repLabel;
+    if (!repMeta.has(rep)) repMeta.set(rep, { label: repLabel, config: configInforme(it), ano });
     for (const b of ((it && it.bloques) || [])) {
       const f = familiaMA(b);
       if (!f) continue;
-      if (!fam.has(f.key)) {
-        fam.set(f.key, {
+      // Clave de GRUPO fina: familia + par de devanados + tipo de gráfica (no
+      // solo la familia) → separa sub-pruebas con escalas/uds distintas, pero
+      // superpone la MISMA sub-prueba entre años (tensiones/títulos distintos).
+      const gkey = `${f.key}|${discriminadorBloque(b)}`;
+      if (!fam.has(gkey)) {
+        fam.set(gkey, {
           prueba: f.key, titulo: b.titulo || f.key, unidad: b.unidad || '',
           eje_x: b.eje_x || '', grafica: b.grafica === 'barra' ? 'barra' : 'linea',
           limite: b.limite != null ? b.limite : null, guia: b.guia != null ? b.guia : null,
           limite_desbalance: b.limite_desbalance != null ? b.limite_desbalance : null,
-          _series: []
+          _ord: fam.size, _tAno: (ano != null ? ano : -Infinity), _series: []
         });
       }
-      const g = fam.get(f.key);
+      const g = fam.get(gkey);
+      // El encabezado del grupo usa el título/metadatos del informe MÁS RECIENTE
+      // (el despliegue vigente del trafo móvil), no el del más antiguo que creó el
+      // grupo — más representativo de la config actual.
+      if (ano != null && ano >= g._tAno) {
+        g._tAno = ano;
+        if (b.titulo) g.titulo = b.titulo;
+        if (b.unidad) g.unidad = b.unidad;
+        if (b.eje_x) g.eje_x = b.eje_x;
+        if (b.limite != null) g.limite = b.limite;
+        if (b.guia != null) g.guia = b.guia;
+        if (b.limite_desbalance != null) g.limite_desbalance = b.limite_desbalance;
+      }
       for (const s of (b.series || [])) {
         const puntos = (s.puntos || []).filter((p) => p && p.x != null && typeof p.y === 'number');
         if (!puntos.length) continue;
-        g._series.push({ rep, repLabel, ano, fase: String(s.nombre || ''), puntos });
+        g._series.push({ rep, ano, fase: String(s.nombre || ''), puntos });
       }
     }
   }
+  // Etiqueta FINAL por informe: si dos+ informes comparten la misma fecha (trafo
+  // móvil: estrella y delta el MISMO día), se les añade la config para distinguir
+  // los chips ("19/01/2024 · estrella" vs "· delta"). Si la fecha es única, queda
+  // limpia. Sin config disponible para desempatar, se deja la fecha tal cual.
+  const porFecha = new Map();
+  for (const [rep, m] of repMeta) {
+    if (!porFecha.has(m.label)) porFecha.set(m.label, []);
+    porFecha.get(m.label).push(rep);
+  }
+  const etiqFinal = (rep) => {
+    const m = repMeta.get(rep) || {};
+    const colisiona = (porFecha.get(m.label) || []).length > 1;
+    return (colisiona && m.config) ? `${m.label} · ${m.config}` : (m.label || rep);
+  };
   return [...fam.values()]
     .map((g) => {
       const series = g._series
-        .slice().sort((a, b) => (a.ano || 0) - (b.ano || 0) || String(a.repLabel).localeCompare(String(b.repLabel)))
-        .map((s) => ({
-          nombre: s.fase ? `${s.repLabel} · ${s.fase}` : s.repLabel,
-          _rep: s.rep, _repLabel: s.repLabel, _ano: s.ano != null ? String(s.ano) : 's/a',
-          _fase: s.fase, puntos: s.puntos
-        }));
-      const { _series, ...resto } = g;
+        .slice().sort((a, b) => ordenInforme(etiqFinal(a.rep), a.ano) - ordenInforme(etiqFinal(b.rep), b.ano))
+        .map((s) => {
+          const lbl = etiqFinal(s.rep);
+          return {
+            nombre: s.fase ? `${lbl} · ${s.fase}` : lbl,
+            _rep: s.rep, _repLabel: lbl, _ano: s.ano != null ? String(s.ano) : 's/a',
+            _fase: s.fase, puntos: s.puntos
+          };
+        });
+      const { _series, _ord, _tAno, ...resto } = g;
+      void _ord; void _tAno;
       return { ...resto, series };
     })
     .filter((b) => b.series.length);

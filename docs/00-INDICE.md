@@ -43,6 +43,7 @@
 | 🔵 Audita COPY / voz / tono / CTAs | 🎯 `40-LOBULOS-DOMINIO` → 47-COPYWRITING (on-demand) + Skill tool (`copywriting`, `copy-editing`) |
 | 🔵 Audita ACCESIBILIDAD / WCAG / a11y | 🎯 `40-LOBULOS-DOMINIO` → 48-ACCESIBILIDAD (on-demand) + Skill **`accessibility-audit`** (framework WCAG 2.2 AA) |
 | 🔵 Cálculos / criterios / diagnóstico de PRUEBAS ELÉCTRICAS (IR/PI/DAR, FP/tan δ, DGA, SFRA, relación, excitación…) | 🎯 `40-LOBULOS-DOMINIO` → **49-PRUEBAS-ELECTRICAS** (on-demand) + skills `skills/pruebas-electricas/*` (vía tool `Skill`) |
+| 🔵 TIPO de transformador (bidevanado/tridevanado/auto/compensación), grupo vectorial, cálculos nominales/relación/impedancia del EQUIPO | 🎯 `40-LOBULOS-DOMINIO` → **50-TRANSFORMADORES-POTENCIA** (on-demand) + skills `skills/transformadores-potencia/*` (vía tool `Skill`) |
 | 🛠️ ¿Qué skill tengo para X? / mapa de skills | 🛠️ `docs/skills-inventory.md` + 🎯 `40-LOBULOS §Recursos Externos` |
 | 🛰️ Decisión fuerte / cara de revertir / fork 50-50 → ¿2ª opinión? | 🛰️ `docs/15-CONSEJO-EXTERNO.md` (cuándo + qué tier del provider externo configurado en §0) |
 | 🌱 Crear / sugerir una SKILL nueva (capacidad portable) | 🎯 `40-LOBULOS-DOMINIO` §Reflejo de Sugerencia de Skills + Skill `skill-creator` |
@@ -85,6 +86,7 @@
 | §25 | ADR-025 — Multi-año v2 (feedback): conserva FASES + valores reales + filtro de año GLOBAL + fase por gráfica; Tendencia con cambios año-a-año + PROYECCIÓN | 539 |
 | §26 | ADR-026 — Regresión: el multi-año colapsaba informes del MISMO año → identidad por INFORME (no por año); verificar antes/después | 560 |
 | §27 | ADR-027 — Multi-año muestra TODAS las pruebas ELÉCTRICAS (SFRA/reactancia/IR-núcleo/LTC/DFR con familia genérica, no solo las 7); el ACEITE (DGA) queda EXCLUIDO; criterios/datos se surfacean, no se fabrican | 578 |
+| §28 | ADR-028 — Multi-año TENDENCIA año a año: 1 gráfica por SUB-PRUEBA (par de devanados, no fusiona escalas), TODOS los años por defecto, orden cronológico + etiquetas uniformes; validado con 5 informes REALES 450108 (+ tan δ por sección) | 600 |
 
 ---
 
