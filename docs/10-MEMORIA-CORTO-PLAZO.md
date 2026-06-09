@@ -43,15 +43,13 @@
 > 1. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
 >    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
 > 2. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
-> 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→028)**: superposición + filtro + fase (024/025); identidad por informe (026); TODA prueba
->    ELÉCTRICA con familia genérica + ACEITE/DGA excluido (027, L-50); **ADR-028 = TENDENCIA año a año**: 1 gráfica por SUB-PRUEBA (par de
->    devanados, no fusiona escalas Ω/mΩ ni AT/MT vs AT/BT), **TODOS los años por defecto**, orden cronológico + `etiquetaFecha` uniforme,
->    toggle "Solo último", **desambiguación estrella/delta del mismo día** (config del NOMBRE, no del nameplate — verificado: ambas config
->    comparten grupo de placa). **+ "Resultados del informe" = UN informe a la vez + SELECTOR de chips** (no apila; tablas por selección;
->    `etiquetasInformes`/`montarBloques` refactor). Validado con 6 informes REALES 450108 (incl. 2024 delta + tan δ por sección). **Commits en
->    DESARROLLO; falta PUSH.** ⛔ NO dañar calificación global / criterios / desviación (`grafico-generico.js` intacto). Trafo MÓVIL cambia
->    config/tensión por año (ADR-014) → keying por devanado, no por título. **PENDIENTE: validar SFRA** (PDFs aparte `240119…SFRA…`/`220118…SFRA`;
->    extracción bloqueada por límite de uso ~23:00; §28.10) — ¿dato tabulado (CC por banda) o solo imagen? El código ya lo soporta (ADR-027).
+> 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→029, detalle en `99 §24-29`)** — multi-año = TENDENCIA año a año, 1 gráfica por SUB-PRUEBA (keying por
+>    par de devanados, no por título, ADR-028); "Resultados del informe" = UN informe a la vez + SELECTOR (no apila); desambiguación estrella/delta del
+>    mismo día (config del NOMBRE, no nameplate); **SFRA visible** (3 informes, coef. DL/T911; trazas dB-Hz son solo imagen → no inventar); **scorecard
+>    añade SFRA+DFR**; **ADR-029: tan δ de devanados CONDENSADO** en `ui/pruebas/tand-panel.js` (tendencia año tras año en BARRAS + filtros año/grupo/
+>    tensión/devanado + "Todos los años"; excluido del genérico; mismo módulo en tablero+harness). 6 eléctricos + 3 SFRA reales en `_dev/fixtures/`.
+>    **Frontend; FALTA PUSH.** ⛔ NO dañar calificación global / criterios / desviación (`grafico-generico.js` intacto). ⚠️ tan δ "acumulado" = TENDENCIA
+>    temporal, NO apilar. Trafo MÓVIL cambia config/tensión por despliegue (ADR-014). **PENDIENTE menor**: validar en la APP tras push.
 > (Cerrado y consolidado: TODO-09 "Reprocesar" → ADR-015..018, luego RETIRADO en ADR-020.)
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.

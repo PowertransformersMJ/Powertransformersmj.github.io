@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Tan δ / FP — panel condensado (módulo tand-panel.js)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+<h1>DEV · Factor de Potencia / Tan δ — panel condensado (datos REALES 450108)</h1>
+<p style="color:#64748b;font-size:13px;max-width:72ch">Valida el módulo <code>ui/pruebas/tand-panel.js</code> (el MISMO que usará el tablero): tendencia año tras año (barras) + filtros año/grupo/tensión/devanado + "Todos los años".</p>
+<h2>Factor de Potencia / Tan δ — devanados</h2>
+<div id="panel"></div>
+
+<script type="module">
+import { montarPanelTand } from '../assets/js/ui/pruebas/tand-panel.js';
+import { etiquetaFecha, configInforme, ordenInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json'
+];
+
+(async () => {
+  const items = [];
+  for (const url of FIXTURES) {
+    try { const j = await (await fetch(url + '?v=' + Date.now())).json();
+      const t = (j.bloques || []).find((b) => b.prueba === 'tand');
+      if (!t) continue;
+      items.push({ id: j.id, label: etiquetaFecha(j.fecha, j.ano), ano: j.ano, config: configInforme(j), bloque: t });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  items.sort((a, b) => ordenInforme(a.label, a.ano) - ordenInforme(b.label, b.ano));
+  montarPanelTand(document.getElementById('panel'), items);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

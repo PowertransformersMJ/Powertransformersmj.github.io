@@ -39,6 +39,7 @@ import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } fro
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques, svgBloque } from './ui/pruebas/grafico-generico.js';
+import { montarPanelTand } from './ui/pruebas/tand-panel.js';
 import { bloquesTendencia, resumenTendenciaParaIA, analisisTendencia } from './domain/pruebas_electricas_tendencia.js';
 
 /* ─── Estado de la vista ──────────────────────────────────────── */
@@ -591,11 +592,30 @@ function montarMultiAno() {
     // del MISMO día (trafo móvil doble config, ADR-014/028).
     return { ano: inf.ano, fecha: inf.fecha, id: inf.id, config: configInforme(inf), bloques: (d && d.bloques) || [] };
   }).filter((it) => it.bloques.length);
-  const bloques = bloquesMultiAno(items);
-  if (!bloques.length) {
+  // El FACTOR DE POTENCIA / tan δ de devanados se CONDENSA en su propio panel
+  // (tendencia año tras año + filtros año/grupo/tensión/devanado) — ADR-029, a
+  // pedido del director: "todo el tan δ se aprecia AQUÍ, no más gráficas de tan δ".
+  // Por eso se EXCLUYE la familia 'tand' del overlay genérico de abajo.
+  const tandItems = docs.map((inf) => {
+    const d = state.bloquesCache.get(inf.id);
+    const t = ((d && d.bloques) || []).find((b) => b && /^tan/i.test(b.prueba || ''));
+    return t ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), bloque: t } : null;
+  }).filter(Boolean);
+  const bloques = bloquesMultiAno(items).filter((b) => !/^tan/i.test(b.prueba || ''));
+  if (!bloques.length && !tandItems.length) {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;
   }
+  cont.innerHTML = '';
+  // Panel tan δ condensado (primero, prominente).
+  if (tandItems.length) {
+    const sec = document.createElement('section'); sec.className = 'pe-tand-seccion'; sec.style.margin = '0 0 18px';
+    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Factor de Potencia / Tan δ — devanados', style: 'margin:0 0 8px' }));
+    const host = document.createElement('div'); sec.appendChild(host);
+    cont.appendChild(sec);
+    montarPanelTand(host, tandItems);
+  }
+  if (!bloques.length) return; // solo tan δ → listo
   // TODOS los informes presentes en el libro (filtro GLOBAL). Identidad = _rep
   // (no el año → no colapsa dos del mismo año); etiqueta = fecha/año; color fijo por informe.
   const repInfo = new Map();
@@ -616,7 +636,9 @@ function montarMultiAno() {
     state.multiAnoReps = new Set(repsAll);
   const selR = state.multiAnoReps;
 
-  cont.innerHTML = '';
+  // (cont ya fue limpiado arriba y puede contener el panel tan δ; aquí se APILA el
+  // resto de pruebas, sin borrar lo anterior.)
+  if (tandItems.length) cont.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Demás pruebas · todos los años', style: 'margin:6px 0 8px' }));
   const intro = document.createElement('p');
   intro.className = 'muted small'; intro.style.margin = '0 0 6px';
   intro.innerHTML = `Cada gráfica es una prueba con <b>todos los años superpuestos</b> (la tendencia año a año; color por año). `
