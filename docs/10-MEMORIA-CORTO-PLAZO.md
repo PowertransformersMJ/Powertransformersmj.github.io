@@ -46,9 +46,12 @@
 > 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→028)**: superposición + filtro + fase (024/025); identidad por informe (026); TODA prueba
 >    ELÉCTRICA con familia genérica + ACEITE/DGA excluido (027, L-50); **ADR-028 = TENDENCIA año a año**: 1 gráfica por SUB-PRUEBA (par de
 >    devanados, no fusiona escalas Ω/mΩ ni AT/MT vs AT/BT), **TODOS los años por defecto**, orden cronológico + `etiquetaFecha` uniforme,
->    toggle "Solo último". **Validado con 5 informes REALES de la 450108** (PDFs del director → `_dev/fixtures/450108-*.json`, incl. tan δ
->    por sección). **Frontend, validado en preview; pendiente PUSH.** ⛔ NO dañar calificación global / criterios / gráficas de desviación
->    (`grafico-generico.js` intacto). Trafo MÓVIL cambia config/tensión por año (ADR-014) → keying por devanado, no por título.
+>    toggle "Solo último", **desambiguación estrella/delta del mismo día** (config del NOMBRE, no del nameplate — verificado: ambas config
+>    comparten grupo de placa). **+ "Resultados del informe" = UN informe a la vez + SELECTOR de chips** (no apila; tablas por selección;
+>    `etiquetasInformes`/`montarBloques` refactor). Validado con 6 informes REALES 450108 (incl. 2024 delta + tan δ por sección). **Commits en
+>    DESARROLLO; falta PUSH.** ⛔ NO dañar calificación global / criterios / desviación (`grafico-generico.js` intacto). Trafo MÓVIL cambia
+>    config/tensión por año (ADR-014) → keying por devanado, no por título. **PENDIENTE: validar SFRA** (PDFs aparte `240119…SFRA…`/`220118…SFRA`;
+>    extracción bloqueada por límite de uso ~23:00; §28.10) — ¿dato tabulado (CC por banda) o solo imagen? El código ya lo soporta (ADR-027).
 > (Cerrado y consolidado: TODO-09 "Reprocesar" → ADR-015..018, luego RETIRADO en ADR-020.)
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
@@ -84,7 +87,7 @@
 | **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
 | **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
 | **TODO-08** | Skills `pruebas-electricas` (13/13). Falta: director **valida** + confirma los valores `⚠️ verificar` (lobe 49) contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR) → fijarlos en el motor multi-norma. | 🔄 en validación | director entrega edición de norma |
-| **TODO-10** | Skills `transformadores-potencia` (EQUIPO, lobe 50). Hoy: 1 ejemplar completa (`identificacion-tipo-transformador`, 4 neuronas) + scaffold (README + 3 marcos). **EG ingerido** (39 MB; Cap 6 protecciones/refrigeración plasmado en marco fundamentos §E; mapa de capítulos en lobe 50). Falta: director **valida** la arquitectura de 11 skills antes de replicar a las 10 restantes; lectura dirigida EG Cap 2.4.5/2.4.6 (cargabilidad IEEE C57.91); luego commit (Claude commitea, director pushea). | 🔄 ejemplar lista + EG ingerido, esperando validación | director valida arquitectura |
+| **TODO-10** | Skills `transformadores-potencia` (EQUIPO, lobe 50). Hoy: 1 ejemplar completa (`identificacion-tipo-transformador`, 4 neuronas) + scaffold (README + 3 marcos). **EG + ABB leídos completos** (subagentes); tipificación ABB (excitación/5-limb/6-cap) integrada en la ejemplar (`01 §B`, `03 §E`); resto EG destilado en lobe 50 (papel/cargabilidad → `gestion-vida-activo`; aceite/DGA → lobe 49). Falta: director **valida** arquitectura de 11 skills antes de replicar a las 10 restantes; luego commit (Claude commitea, director pushea). ⚠️ tablas EG [ILEGIBLES] (Transequipos + C57.104) `⚠️ verificar`. | 🔄 ejemplar reforzada, esperando validación | director valida arquitectura |
 > Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** → ADR-009 · **TODO-09** → ADR-015 (reintento IA en "Reprocesar").
 
 ---
@@ -99,16 +102,15 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-07** — **Nueva familia de skills `transformadores-potencia` (EQUIPO) + lóbulo 50** (pedido del director,
-  vía `skill-creator`): conceptos/criterios/particularidades de tx de potencia para mejorar **cálculos** e
-  **identificación de tipo** (bidevanado / bi+compensación / tridevanado / auto). Construido: **scaffold**
-  (`skills/transformadores-potencia/README.md` + 3 marcos `_conocimiento/`: fundamentos, marco-normativo-tx,
-  convenciones-calculo) + **skill ejemplar completa** `identificacion-tipo-transformador` (SKILL.md + 4 neuronas
-  01-teoría/02-cálculos/03-criterios/04-diagnóstico). Base: **ABB Service Handbook** (legible) + investigación web
-  (IEEE C57.158/.12.00/.90/.70, IEC 60076-1). ⚠️ **EG PDF 108.6 MB > límite 100 MB → bloqueado**, director debe
-  partirlo. Registrado: lóbulo **`50-TRANSFORMADORES-POTENCIA`** + `40-LOBULOS` + `00-INDICE` + `skills-inventory`.
-  **TODO-10** abierto: director valida arquitectura de 11 skills antes de replicar; luego commit (Claude commitea,
-  director pushea). Frontera con lobe 49: 50=EQUIPO, 49=ENSAYOS (se cruzan, no se duplican).
+- **2026-06-07/09** — **Familia de skills `transformadores-potencia` (EQUIPO) COMPLETA (11/11) + lóbulo 50**. Director
+  aprobó replicar (2026-06-08) → 2026-06-09 construidas las 11 (cada una `SKILL.md` + 4 neuronas): identificacion-tipo
+  (ejemplar), grupo-vectorial, calculos-nominales, impedancia-cortocircuito, placa-caracteristica, regulacion-tomas,
+  sistema-refrigeracion, construccion-nucleo-devanados, bujes-y-accesorios, gestion-vida-activo, modos-falla-diagnostico
+  (integrador, mapa síntoma→ensayo→lóbulo). EG+ABB leídos completos; tipificación ABB en la ejemplar (excitación 3/5-limb/
+  delta `03 §E.2`; 5-limb baja Z0 `03 §E.1`; 6-capacitancias `01 §B`); papel/DP/hot-spot/Montsinger → `gestion-vida-activo`;
+  aceite/DGA → lobe 49. Detalle → `50-TRANSFORMADORES-POTENCIA` (+ README/`skills-inventory` al día). brain:check SANO.
+  ⚠️ Tablas EG [ILEGIBLES] (Transequipos + C57.104) + valores `⚠️ verificar` pendientes del director.
+  🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`** (Claude commitea; el director pushea).
 - **2026-06-08** — Arco tablero pruebas-eléctricas **consolidado en `99` (ADR-010→ADR-027) + lecciones L-35..L-50**, TODO en
   prod salvo el multi-año (frontend, pendiente PUSH). Hitos: calificación global muestra TODAS las pruebas (FP bujes separado,
   motor del veredicto INTACTO); `accionPrueba` (predictiva/preventiva/correctiva/diagnóstica); tablero MULTI-AÑO por informe×fase
