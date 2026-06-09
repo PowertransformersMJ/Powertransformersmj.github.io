@@ -12,11 +12,14 @@
 
 ---
 
-## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-08)
+## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-09)
 
-> **TEMA: Tablero de Pruebas Eléctricas con IA — evaluación + diagnóstico MULTI-NORMA.**
-> **Arco COMPLETO consolidado en ADR-003→ADR-014 y EN PRODUCCIÓN** (`origin/main=295de3e` merge PR #144,
-> `origin/DESARROLLO=18566fa=HEAD`, en sync, nada pendiente de push). Detalle: `00`→`99 §3..§14`.
+> **TEMA: Tablero de Pruebas Eléctricas con IA — panel tan δ + auditoría FP/tan δ.**
+> **Arco tablero base (ADR-003→014) EN PRODUCCIÓN.** **Esta sesión (ADR-029→040, 16 commits
+> `d5d974e`→`e696af6` en rama dev) FALTA PUSH** (Claude commitea, el director pushea; refs locales
+> STALE → `git fetch` antes de afirmar estado). Detalle: `00`→`99 §29..§40`. ✅ Validado todo con
+> workflow (`_dev/preview-*.html`) + datos REALES 450108; **pendiente validar en la APP tras push**
+> (la página vive tras Firebase Auth → el preview no entra; sólo harness).
 >
 > **Qué hace el tablero HOY (todo en prod):** la IA (Opus 4.7/Sonnet 4.6) extrae el PDF →
 > tablero **IA-primaria** (bloques = cuerpo; tablas = DATOS). **El VEREDICTO es 100% NORMATIVO**
@@ -39,18 +42,24 @@
 > La **máxima calidad** (`effort:high`) y toda la robustez de transporte (reintento/timeout/dispatcher undici) **se conservan
 > para la CARGA** (que extrae los mismos informes densos, 12–22 min).
 >
-> **PRÓXIMO / pendientes:**
-> 1. **⚠️ verificar (TODO-08)**: umbrales por clase **MO.00418** (resistencia/aislamiento/relación), banda **C1 de
->    bujes**, **PI/DAR** — entran como una óptica más cuando el director pase su edición de norma / los informes traigan PI/DAR.
-> 2. Validar más secciones con informes reales (libro 450108 en validación). **TODO-01/02** abiertos (refrigeración/contratos).
-> 3. ✅ **Arco MULTI-AÑO del tablero (ADR-024→029, detalle en `99 §24-29`)** — multi-año = TENDENCIA año a año, 1 gráfica por SUB-PRUEBA (keying por
->    par de devanados, no por título, ADR-028); "Resultados del informe" = UN informe a la vez + SELECTOR (no apila); desambiguación estrella/delta del
->    mismo día (config del NOMBRE, no nameplate); **SFRA visible** (3 informes, coef. DL/T911; trazas dB-Hz son solo imagen → no inventar); **scorecard
->    añade SFRA+DFR**; **ADR-029: tan δ de devanados CONDENSADO** en `ui/pruebas/tand-panel.js` (tendencia año tras año en BARRAS + filtros año/grupo/
->    tensión/devanado + "Todos los años"; excluido del genérico; mismo módulo en tablero+harness). 6 eléctricos + 3 SFRA reales en `_dev/fixtures/`.
->    **Frontend; FALTA PUSH.** ⛔ NO dañar calificación global / criterios / desviación (`grafico-generico.js` intacto). ⚠️ tan δ "acumulado" = TENDENCIA
->    temporal, NO apilar. Trafo MÓVIL cambia config/tensión por despliegue (ADR-014). **PENDIENTE menor**: validar en la APP tras push.
-> (Cerrado y consolidado: TODO-09 "Reprocesar" → ADR-015..018, luego RETIRADO en ADR-020.)
+> **ARCO DE ESTA SESIÓN (ADR-029→040, FALTA PUSH) — panel tan δ `ui/pruebas/tand-panel.js` + análisis:**
+> - **Panel tan δ condensado** (ADR-029/031/032): vistas **Por devanado** (secciones en X, leyenda limpia por
+>   informe, criterio NETA0.5%/IEEE1% visible) · **Tendencia** (años en X) · **Tip-up (ΔFP)**. Bloque **"Análisis
+>   conforme a norma"** (`analizarTand`, puro/testeado): sellos/emblemas ESTILIZADOS propios (NETA+IEEE, NO logos
+>   oficiales) + veredicto multi-norma + peor medición + localización + tip-up + pendiente + caveats.
+> - **Overlay genérico "Demás pruebas" RETIRADO** (ADR-033/034) vía `excluidaDelOverlay` (familias + regla `^otros:`);
+>   panel tan δ = única vista multi-año. Reversible; datos/motor intactos (scorecard evalúa todo).
+> - **"Resultados del informe" CONSERVADA**; sólo se filtra el bloque tan δ del detalle por informe (ADR-036 corrige
+>   el sobre-retiro de ADR-035 → **L-51**). **"Identidad de la unidad" reubicada** bajo "Resumen de la unidad" (ADR-037).
+> - **Auditoría FP/tan δ 🔵 (skill `factor-potencia-aislamiento`) CERRADA** (ADR-038/039/040, lobe 49 §Auditoría):
+>   #1 tip-up, #2 localización por modo (`localizacionDe`/`causaProbableDe`), #4 caveat 20 °C (sin T → se declara),
+>   #5 pendiente predictiva por sección, #6 baseline-proxy. **#3 capacitancia DESCARTADA** (el workflow cazó −91% =
+>   artefacto: pF no comparable entre esquemas/modos de medida → **L-52**; habilitarlo exige extracción POR MODO).
+> - ⚠️ Umbrales `TIPUP_UMBRAL 0.1` / `PEND_UMBRAL 0.05` **a verificar** con el director. ⛔ NO dañar calificación
+>   global / scorecard / `grafico-generico.js`. Trafo MÓVIL cambia config/tensión por despliegue (ADR-014).
+>
+> **OTROS pendientes:** TODO-08 (⚠️ verificar umbrales MO.00418/C1 bujes/PI-DAR) · TODO-01/02 (refrigeración/contratos)
+> · TODO-10 (skills `transformadores-potencia` esperan validación + commit). #3 capacitancia → extracción por modo.
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
 > Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`
@@ -66,15 +75,11 @@
 >
 > **Flujo git (ADR-005)**: Claude commitea + deploya; el director pushea/mergea. Claude NUNCA force-push a `main`.
 >
-> **🚫 Callejones sin salida (curados)**: (1) push del runtime da 403 → solo el director pushea (L-01).
-> (2) Storage NO se LEE del browser sin CORS → la CF lee el PDF server-side; el reproceso TAMBIÉN (L-29/L-40); datos a Firestore.
-> (3) Firestore: arrays anidados prohibidos → string JSON (L-30); transport error 400 → auto-long-polling (L-38).
-> (4) clave `prueba` de la IA NO estable → aliasear (L-31); el LLM omite tabla ancha → derivar en cliente + `extra` (L-32/L-33).
-> (5) Veredicto NUNCA del texto IA, siempre VALOR vs norma multi-norma (L-36/L-37); ninguna columna "OK" en tablas (L-42).
-> (6) Backfill de campos derivables: NO re-correr la IA (lenta), derivar de lo guardado (L-43). Reproceso IA = 2–5 min (Opus).
-> (7) Aislamiento NO genérico ≥1 GΩ → mínimo NETA por CLASE; y por la clase del PROPIO informe (trafo móvil, ADR-014).
-> (8) `calificarResistencia(v, ctx)`: el 2º arg es `flagVerificar` → al reusar como `evaluar`, envolver `(v)=>calificar(v)` (L-37).
-> (9) Allowlists de strings frágiles (estado `extraido_ia`, columna `Resultado`) → detectar por prefijo/contenido (L-41/L-42).
+> **🚫 Callejones sin salida (curados, detalle en `30`)**: push runtime 403→solo director pushea (L-01) · Storage no se lee del
+> browser sin CORS→CF server-side (L-29/L-40) · Firestore sin arrays anidados (L-30) + auto-long-polling (L-38) · clave IA no estable→aliasear
+> (L-31), LLM omite tabla ancha→derivar+`extra` (L-32/L-33) · veredicto SIEMPRE valor vs norma, nunca texto IA, sin col."OK" (L-36/L-37/L-42) ·
+> backfill derivable sin re-correr IA (L-43) · aislamiento por CLASE del propio informe (ADR-014) · allowlists frágiles→detectar por prefijo/contenido
+> (L-41) · **borrar de menos > borrar de más** (L-51) · valor implausible=artefacto, no hallazgo (L-52).
 
 ---
 
@@ -100,18 +105,14 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-07/09** — **Familia de skills `transformadores-potencia` (EQUIPO) COMPLETA (11/11) + lóbulo 50**. Director
-  aprobó replicar (2026-06-08) → 2026-06-09 construidas las 11 (cada una `SKILL.md` + 4 neuronas): identificacion-tipo
-  (ejemplar), grupo-vectorial, calculos-nominales, impedancia-cortocircuito, placa-caracteristica, regulacion-tomas,
-  sistema-refrigeracion, construccion-nucleo-devanados, bujes-y-accesorios, gestion-vida-activo, modos-falla-diagnostico
-  (integrador, mapa síntoma→ensayo→lóbulo). EG+ABB leídos completos; tipificación ABB en la ejemplar (excitación 3/5-limb/
-  delta `03 §E.2`; 5-limb baja Z0 `03 §E.1`; 6-capacitancias `01 §B`); papel/DP/hot-spot/Montsinger → `gestion-vida-activo`;
-  aceite/DGA → lobe 49. Detalle → `50-TRANSFORMADORES-POTENCIA` (+ README/`skills-inventory` al día). brain:check SANO.
-  ⚠️ Tablas EG [ILEGIBLES] (Transequipos + C57.104) + valores `⚠️ verificar` pendientes del director.
-  🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`** (Claude commitea; el director pushea).
-- **2026-06-08** — Arco tablero pruebas-eléctricas **consolidado en `99` (ADR-010→ADR-027) + lecciones L-35..L-50**, TODO en
-  prod salvo el multi-año (frontend, pendiente PUSH). Hitos: calificación global muestra TODAS las pruebas (FP bujes separado,
-  motor del veredicto INTACTO); `accionPrueba` (predictiva/preventiva/correctiva/diagnóstica); tablero MULTI-AÑO por informe×fase
-  (no por año) + filtro de año global; `proyectarTendencia` (años a cruzar el límite); RETIRO de "Reprocesar" (costo>valor, re-subir
-  = re-extraer) dejando la CF **solo-CARGA** con su robustez de transporte; modal `confirmarUpsert` al colisionar por fecha.
-  🚫 **NO romper la calificación global por prueba** (memoria `feedback_calificacion_global_por_prueba.md`). Preview UI: L-49.
+- **2026-06-09** — **Sesión panel tan δ + auditoría FP (ADR-029→040, 16 commits en dev, FALTA PUSH).** Construido el
+  panel tan δ condensado (3 vistas + análisis multi-norma con sellos), retirado el overlay genérico "Demás pruebas"
+  (reversible), corregido un **sobre-retiro** (oculté toda "Resultados del informe" cuando el director solo pedía el
+  bloque tan δ → ADR-036, **L-51 + memoria `feedback_no_sobre_retiro`**), reubicada "Identidad", y CERRADA la
+  auditoría FP/tan δ con la skill (tip-up/localización/pendiente/baseline + caveat 20 °C; **#3 capacitancia descartada
+  por artefacto −91%, L-52**). Todo validado con workflow + datos reales; falta validar en la APP tras push. Tests 1160/1160.
+- **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
+  [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
+  + validación de arquitectura (TODO-10).
+- **2026-06-08** — Arco tablero pruebas-eléctricas **consolidado en `99` (ADR-010→027) + lecciones L-35..L-50** (TODO en prod
+  salvo el multi-año). 🚫 **NO romper la calificación global por prueba** (`feedback_calificacion_global_por_prueba`); preview UI L-49.
