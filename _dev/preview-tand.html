@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Tan δ / FP — una gráfica, panel de filtros profesional</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; }
+  /* ── Panel de filtros profesional ─────────────────────────── */
+  .pe-filtros { background:#fff; border:1px solid #e2e8f0; border-radius:12px; box-shadow:0 1px 2px rgba(15,23,42,.04); overflow:hidden; margin:0 0 16px; }
+  .pe-filtros-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; background:#f8fafc; border-bottom:1px solid #eef2f7; }
+  .pe-filtros-head .ttl { font-size:13px; font-weight:700; letter-spacing:.02em; color:#1e293b; text-transform:uppercase; display:flex; align-items:center; gap:8px; }
+  .pe-filtros-head .ttl svg { width:15px; height:15px; stroke:#64748b; }
+  .pe-reset { font-size:12px; color:#475569; background:#fff; border:1px solid #e2e8f0; border-radius:7px; padding:4px 10px; cursor:pointer; }
+  .pe-reset:hover { background:#f1f5f9; }
+  .pe-fgrupo { display:grid; grid-template-columns:200px 1fr; gap:10px 16px; align-items:start; padding:12px 16px; border-top:1px solid #f1f5f9; }
+  .pe-fgrupo:first-of-type { border-top:0; }
+  .pe-fgrupo-cab { display:flex; flex-direction:column; gap:4px; }
+  .pe-fgrupo-lbl { font-size:12.5px; font-weight:600; color:#334155; }
+  .pe-fgrupo-meta { display:flex; align-items:center; gap:8px; }
+  .pe-fgrupo-cnt { font-size:11px; color:#94a3b8; font-variant-numeric:tabular-nums; }
+  .pe-fgrupo-todos { font-size:11px; color:#2563eb; background:none; border:0; cursor:pointer; padding:0; }
+  .pe-fgrupo-todos:hover { text-decoration:underline; }
+  .pe-fgrupo-chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .pe-subsec { display:flex; flex-direction:column; gap:6px; }
+  .pe-subsec-row { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .pe-subsec-lbl { font-size:11px; color:#64748b; min-width:64px; font-weight:600; }
+</style>
+</head>
+<body>
+<h1>DEV · Factor de Potencia / Tan δ — UNA gráfica, panel de filtros</h1>
+<p style="color:#64748b;font-size:13px;max-width:72ch">Paso 2 (harness): panel de filtros con organización profesional — año/informe, grupo de conexión, tensión de prueba y devanado/sección (agrupada por devanado). Cada grupo con contador y "todos"; botón Restablecer. Datos REALES (450108).</p>
+<div id="panel"></div>
+
+<script type="module">
+import { svgBloque } from '../assets/js/ui/pruebas/grafico-generico.js';
+import { etiquetaFecha, configInforme, ordenInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json'
+];
+const COLORES = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777'];
+
+// Devanado al que pertenece una sección de aislamiento (1ª letra tras la C).
+function devanadoDe(sec) {
+  const s = String(sec).toUpperCase();
+  if (/^C?H/.test(s) && !/^C?[LT]/.test(s)) return 'AT (H)';
+  if (/^C?L/.test(s)) return 'MT/BT (L)';
+  if (/^C?T/.test(s)) return 'Terciario (T)';
+  if (s.includes('+')) return 'Combinadas';
+  return 'Otras';
+}
+
+const chip = (txt, on, onClick, color) => {
+  const b = document.createElement('button'); b.type = 'button';
+  b.className = 'pe-fase-chip' + (on ? ' is-on' : ''); b.textContent = txt;
+  if (color) b.style.setProperty('--c', color);
+  b.dataset.k = txt;
+  b.addEventListener('click', () => onClick(b)); return b;
+};
+
+(async () => {
+  const reps = [];
+  for (const url of FIXTURES) {
+    try { const j = await (await fetch(url + '?v=' + Date.now())).json();
+      const t = (j.bloques || []).find((b) => b.prueba === 'tand');
+      if (!t) continue;
+      reps.push({ id: j.id, label: etiquetaFecha(j.fecha, j.ano), ano: j.ano, config: configInforme(j) || '—', bloque: t });
+    } catch (e) { console.error(e); }
+  }
+  reps.sort((a, b) => ordenInforme(a.label, a.ano) - ordenInforme(b.label, b.ano));
+  reps.forEach((r, i) => { r.color = COLORES[i % COLORES.length]; });
+
+  const tensiones = [...new Set(reps.flatMap((r) => r.bloque.series.map((s) => s.nombre)))].sort();
+  const secciones = [...new Set(reps.flatMap((r) => r.bloque.series.flatMap((s) => s.puntos.map((p) => String(p.x)))))];
+  const grupos = [...new Set(reps.map((r) => r.config))];
+  // Secciones agrupadas por devanado (orden alto nivel).
+  const ORDEN_DEV = ['AT (H)', 'MT/BT (L)', 'Terciario (T)', 'Combinadas', 'Otras'];
+  const seccPorDev = ORDEN_DEV.map((d) => ({ dev: d, secs: secciones.filter((s) => devanadoDe(s) === d) })).filter((g) => g.secs.length);
+
+  const sel = {
+    rep: new Set(reps.map((r) => r.id)),
+    grupo: new Set(grupos),
+    tension: new Set(tensiones),
+    seccion: new Set(secciones)
+  };
+
+  const panel = document.getElementById('panel');
+  panel.appendChild(Object.assign(document.createElement('h2'), { textContent: 'Factor de Potencia / Tan δ — secciones de aislamiento' }));
+
+  // ── Tarjeta de filtros ────────────────────────────────────
+  const card = document.createElement('div'); card.className = 'pe-filtros';
+  const head = document.createElement('div'); head.className = 'pe-filtros-head';
+  head.innerHTML = `<span class="ttl"><svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h18M6 12h12M10 19h4"/></svg>Filtros</span>`;
+  const reset = document.createElement('button'); reset.className = 'pe-reset'; reset.textContent = 'Restablecer';
+  head.appendChild(reset); card.appendChild(head);
+
+  // ── Toggle de vista: Agrupada ↔ Acumulada por año ──────────
+  let modo = 'tendencia';
+  const vistaBar = document.createElement('div'); vistaBar.className = 'fbar'; vistaBar.style.margin = '0 0 6px';
+  vistaBar.appendChild(Object.assign(document.createElement('span'), { className: 'lbl', textContent: 'Vista:', style: 'min-width:auto;font-weight:600;color:#475569;font-size:12px;margin-right:4px' }));
+  const mkVista = (key, txt) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pe-fase-chip' + (modo === key ? ' is-on' : ''); b.textContent = txt;
+    b.addEventListener('click', () => { modo = key; [...vistaBar.querySelectorAll('.pe-fase-chip')].forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); pintar(); }); return b; };
+  vistaBar.append(mkVista('tendencia', 'Tendencia año tras año'), mkVista('agrupada', 'Comparar por sección'));
+  const cap = Object.assign(document.createElement('p'), { className: 'muted small', style: 'margin:2px 0 8px' });
+
+  const chartBox = document.createElement('div'); chartBox.className = 'chartbox';
+  const repsVisibles = () => reps.filter((r) => sel.rep.has(r.id) && sel.grupo.has(r.config));
+  const seccionesVis = () => secciones.filter((s) => sel.seccion.has(s));
+  const tensionesVis = () => tensiones.filter((t) => sel.tension.has(t));
+
+  // Renderizador de TENDENCIA año tras año: eje X = año/informe, una línea por
+  // sección (evolución en el tiempo). Cada valor vs el límite 1% tiene sentido.
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
+  const PAL_SEC = ['#1e4e79', '#0f8a99', '#c0392b', '#b07d12', '#1f7a4d', '#6b4f9e', '#6398c4', '#a93226', '#2e7d32', '#8e44ad', '#d35400', '#16a085', '#c2185b', '#5d6d7e'];
+  function svgTendencia(secs, tensList, repsVis) {
+    if (!repsVis.length || !secs.length || !tensList.length) return null;
+    const xs = repsVis; // ya ordenados por fecha
+    const lines = [];
+    secs.forEach((sec, sIdx) => { const color = PAL_SEC[sIdx % PAL_SEC.length];
+      tensList.forEach((t, tIdx) => { const pts = [];
+        xs.forEach((r, i) => { const s = r.bloque.series.find((x) => x.nombre === t); const p = s && s.puntos.find((pp) => String(pp.x) === sec); if (p && typeof p.y === 'number') pts.push({ i, value: p.y }); });
+        if (pts.length) lines.push({ sec, tension: t, color, dash: tIdx > 0 ? '5 4' : null, pts });
+      }); });
+    if (!lines.length) return null;
+    const allY = lines.flatMap((l) => l.pts.map((p) => p.value));
+    const W = 920, H = 340, L = 54, R = 16, T = 24, B = 60;
+    const ymax = Math.max(Math.max(...allY) * 1.12, 1.05);
+    const Y = (v) => T + (1 - v / ymax) * (H - T - B);
+    const n = xs.length, innerW = W - L - R, X = (i) => L + (n === 1 ? innerW / 2 : (i + 0.5) * (innerW / n));
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
+    for (let i = 0; i <= 4; i++) { const v = ymax * i / 4, yy = Y(v); svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: '#e7ebf0' }));
+      const tx = el('text', { x: L - 8, y: yy + 4, fill: '#8a97a5', 'font-size': 10, 'text-anchor': 'end', 'font-family': 'IBM Plex Mono, monospace' }); tx.textContent = v.toFixed(2); svg.appendChild(tx); }
+    [[1, '#c0392b', 'límite 1%'], [0.5, '#b07d12', 'guía 0.5%']].forEach(([v, c, lbl]) => { if (v <= ymax) {
+      svg.appendChild(el('line', { x1: L, y1: Y(v), x2: W - R, y2: Y(v), stroke: c, 'stroke-width': 1, 'stroke-dasharray': '5 4' }));
+      const tx = el('text', { x: W - R, y: Y(v) - 4, fill: c, 'font-size': 9, 'text-anchor': 'end' }); tx.textContent = lbl; svg.appendChild(tx); } });
+    xs.forEach((r, i) => { const tx = el('text', { x: X(i), y: H - B + 18, fill: '#8a97a5', 'font-size': 10, 'text-anchor': 'middle', 'font-family': 'IBM Plex Mono, monospace' }); tx.textContent = r.label; svg.appendChild(tx); });
+    svg.appendChild(Object.assign(el('text', { x: (L + W - R) / 2, y: H - 6, fill: '#5b6876', 'font-size': 10, 'text-anchor': 'middle' }), { textContent: 'Año / informe →' }));
+    // BARRAS agrupadas por año: cada combo (sección × tensión) ocupa una posición
+    // FIJA dentro del slot del año → la misma sección queda alineada entre años,
+    // y se lee la evolución siguiendo el mismo color de año a año.
+    const nCombos = lines.length, slotW = innerW / Math.max(n, 1);
+    const bw = Math.min(slotW * 0.84 / Math.max(nCombos, 1), 16);
+    const y0 = Y(0);
+    lines.forEach((l, k) => { l.pts.forEach((p) => {
+      const cx = X(p.i) - (nCombos * bw) / 2 + (k + 0.5) * bw, yy = Y(p.value);
+      const rect = el('rect', { x: cx - bw / 2, y: yy, width: Math.max(bw - 0.5, 1), height: Math.max(y0 - yy, 0), fill: l.color, rx: 1 });
+      if (l.dash) rect.setAttribute('opacity', '0.5'); // 2ª tensión (2 kV) más tenue para distinguir
+      rect.appendChild(el('title', {})).textContent = `${l.sec} · ${l.tension} · ${xs[p.i].label}: ${p.value}%`;
+      svg.appendChild(rect); }); });
+    let lx = L; secs.forEach((sec, sIdx) => { if (!lines.some((l) => l.sec === sec)) return; const color = PAL_SEC[sIdx % PAL_SEC.length];
+      if (lx > W - 90) return; svg.appendChild(el('rect', { x: lx, y: T - 16, width: 12, height: 4, rx: 2, fill: color }));
+      const t = el('text', { x: lx + 16, y: T - 12, fill: '#5b6876', 'font-size': 9 }); t.textContent = sec; svg.appendChild(t); lx += 22 + sec.length * 6; });
+    return svg;
+  }
+
+  const pintar = () => {
+    chartBox.innerHTML = '';
+    const repsVis = repsVisibles(), secs = seccionesVis(), tens = tensionesVis();
+    let svg = null;
+    if (modo === 'tendencia') {
+      svg = svgTendencia(secs, tens, repsVis);
+      cap.textContent = `Tendencia año tras año: eje X = informe (en el tiempo), BARRAS por SECCIÓN (color por sección) — la misma sección queda alineada entre años para leer su evolución. ${tens.length > 1 ? 'Tensión: barra llena = ' + tens[0] + ', tenue = ' + tens[1] + '. ' : ''}Cada barra vs el límite 1% / guía 0.5%.`;
+    } else {
+      const series = [];
+      for (const r of repsVis) for (const s of r.bloque.series) { if (!sel.tension.has(s.nombre)) continue;
+        const puntos = s.puntos.filter((p) => sel.seccion.has(String(p.x)) && typeof p.y === 'number');
+        if (puntos.length) series.push({ nombre: `${r.label}${r.config !== '—' ? ' · ' + r.config : ''} · ${s.nombre}`, color: r.color, puntos }); }
+      svg = series.length ? svgBloque({ grafica: 'barra', unidad: '%', eje_x: 'Sección de aislamiento', limite: 1, guia: 0.5, series }) : null;
+      cap.textContent = 'Barras lado a lado: una barra por (informe × tensión) en cada sección, con límite 1% / guía 0.5%.';
+    }
+    if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin datos para los filtros activos.</p>';
+    actualizarContadores();
+  };
+
+  const contadores = [];
+  const actualizarContadores = () => contadores.forEach((fn) => fn());
+
+  // Construye un grupo de filtro estándar (label + contador + "todos" + chips).
+  function grupoFiltro(label, items, setSel, opts = {}) {
+    const g = document.createElement('div'); g.className = 'pe-fgrupo';
+    const cab = document.createElement('div'); cab.className = 'pe-fgrupo-cab';
+    cab.appendChild(Object.assign(document.createElement('span'), { className: 'pe-fgrupo-lbl', textContent: label }));
+    const meta = document.createElement('div'); meta.className = 'pe-fgrupo-meta';
+    const cnt = Object.assign(document.createElement('span'), { className: 'pe-fgrupo-cnt' });
+    const todos = Object.assign(document.createElement('button'), { className: 'pe-fgrupo-todos', textContent: 'todos' });
+    meta.append(cnt, todos); cab.appendChild(meta); g.appendChild(cab);
+    const chipsWrap = document.createElement('div');
+    const btns = new Map();
+    const onToggle = (key, btn) => { if (setSel.has(key)) { if (setSel.size > 1) setSel.delete(key); } else setSel.add(key); btn.classList.toggle('is-on', setSel.has(key)); pintar(); };
+    if (opts.sub) { // sección agrupada por devanado
+      chipsWrap.className = 'pe-subsec';
+      for (const sub of opts.sub) {
+        const row = document.createElement('div'); row.className = 'pe-subsec-row';
+        row.appendChild(Object.assign(document.createElement('span'), { className: 'pe-subsec-lbl', textContent: sub.dev }));
+        sub.secs.forEach((s) => { const b = chip(s, setSel.has(s), (btn) => onToggle(s, btn)); btns.set(s, b); row.appendChild(b); });
+        chipsWrap.appendChild(row);
+      }
+    } else {
+      chipsWrap.className = 'pe-fgrupo-chips';
+      // Chip "Todos" destacado (quick-select de toda la dimensión).
+      if (opts.todosChip) {
+        const all = (opts.keys || items.map((it) => it.key ?? it));
+        const tb = chip(opts.todosChip, setSel.size === all.length, () => { all.forEach((k) => setSel.add(k)); btns.forEach((b, k) => b.classList.toggle('is-on', setSel.has(k))); pintar(); });
+        tb.style.fontWeight = '700'; tb.dataset.todos = '1';
+        chipsWrap.appendChild(tb);
+        contadores.push(() => tb.classList.toggle('is-on', setSel.size === all.length));
+      }
+      items.forEach((it) => { const key = it.key ?? it; const b = chip(it.label ?? it, setSel.has(key), (btn) => onToggle(key, btn), it.color); btns.set(key, b); chipsWrap.appendChild(b); });
+    }
+    g.appendChild(chipsWrap);
+    todos.addEventListener('click', () => { const all = (opts.keys || items.map((it) => it.key ?? it)); const full = setSel.size === all.length; setSel.clear(); if (!full) all.forEach((k) => setSel.add(k)); else setSel.add(all[all.length - 1]); btns.forEach((b, k) => b.classList.toggle('is-on', setSel.has(k))); pintar(); });
+    contadores.push(() => { const all = (opts.keys || items.map((it) => it.key ?? it)); cnt.textContent = `${setSel.size}/${all.length}`; });
+    card.appendChild(g);
+    return btns;
+  }
+
+  const bRep = grupoFiltro('Año / informe', reps.map((r) => ({ key: r.id, label: `${r.label}${r.config !== '—' ? ' · ' + r.config : ''}`, color: r.color })), sel.rep, { keys: reps.map((r) => r.id), todosChip: 'Todos los años' });
+  const bGr = grupoFiltro('Grupo de conexión', grupos, sel.grupo, { keys: grupos });
+  const bTen = grupoFiltro('Tensión de prueba', tensiones, sel.tension, { keys: tensiones });
+  const bSec = grupoFiltro('Devanado / sección', null, sel.seccion, { sub: seccPorDev, keys: secciones });
+
+  reset.addEventListener('click', () => {
+    sel.rep = new Set(reps.map((r) => r.id)); sel.grupo = new Set(grupos); sel.tension = new Set(tensiones); sel.seccion = new Set(secciones);
+    [[bRep, sel.rep], [bGr, sel.grupo], [bTen, sel.tension], [bSec, sel.seccion]].forEach(([btns, s]) => btns.forEach((b, k) => b.classList.add('is-on')));
+    // re-sincroniza por si acaso
+    bRep.forEach((b, k) => b.classList.toggle('is-on', sel.rep.has(k)));
+    bGr.forEach((b, k) => b.classList.toggle('is-on', sel.grupo.has(k)));
+    bTen.forEach((b, k) => b.classList.toggle('is-on', sel.tension.has(k)));
+    bSec.forEach((b, k) => b.classList.toggle('is-on', sel.seccion.has(k)));
+    pintar();
+  });
+
+  panel.appendChild(card);
+  panel.appendChild(vistaBar);
+  panel.appendChild(cap);
+  panel.appendChild(chartBox);
+  pintar();
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
