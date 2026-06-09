@@ -828,13 +828,6 @@ function etiquetasInformes(infos) {
   return out;
 }
 
-// ADR-035: la sección "Resultados del informe" (detalle por informe: análisis IA +
-// evaluación multi-norma + recomendación + gráficas + tablas) se RETIRA a pedido del
-// director. REVERSIBLE: poner en `true` (y quitar `hidden` de <section id="bloques">).
-// NO se destruye nada: la carga de datos + `montarMultiAno()` (panel tan δ) + el
-// scorecard SIGUEN ejecutándose; la evaluación multi-norma sigue viva en el scorecard.
-const MOSTRAR_RESULTADOS_INFORME = false;
-
 async function montarBloques(unidadId, informes) {
   const cont = $('bloques-cont');
   if (!cont) return;
@@ -867,7 +860,6 @@ async function montarBloques(unidadId, informes) {
     const d = state.bloquesCache.get(inf.id);
     return d && (admin || (d.bloques && d.bloques.length));
   });
-  if (MOSTRAR_RESULTADOS_INFORME) {
   cont.innerHTML = '';
   if (!mostrables.length) {
     cont.innerHTML = '<p class="muted small">Esta unidad aún no tiene análisis detallado extraído por IA.</p>';
@@ -894,9 +886,21 @@ async function montarBloques(unidadId, informes) {
       h.textContent = `Informe ${etq.get(inf.id) || inf.ano || 's/a'}`;
       grupo.appendChild(h);
       if (data && data.bloques && data.bloques.length) {
-        const box = document.createElement('div');
-        mountBloques(box, conCriterios(data, kvDeInforme(inf)));
-        grupo.appendChild(box);
+        // El factor de potencia / tan δ de devanados se muestra CONDENSADO en su panel
+        // dedicado (ADR-029/031/032); se excluye del detalle por informe para no
+        // duplicarlo (ADR-036, corrige el sobre-retiro de ADR-035). El resto de bloques
+        // del informe (bujes, relación, resistencia, aislamiento…) se conservan.
+        const esTand = (b) => { const f = familiaMA(b); return !!f && f.key === 'tand'; };
+        const datos = conCriterios(data, kvDeInforme(inf));
+        const sinTand = { ...datos, bloques: (datos.bloques || []).filter((b) => !esTand(b)) };
+        if (sinTand.bloques.length) {
+          const box = document.createElement('div');
+          mountBloques(box, sinTand);
+          grupo.appendChild(box);
+        } else {
+          grupo.appendChild(Object.assign(document.createElement('p'),
+            { className: 'muted small', textContent: 'El factor de potencia / tan δ de este informe se aprecia en el panel condensado de arriba.' }));
+        }
       } else {
         grupo.appendChild(Object.assign(document.createElement('p'),
           { className: 'muted small', textContent: 'La IA no produjo gráficas para este informe.' }));
@@ -921,7 +925,6 @@ async function montarBloques(unidadId, informes) {
     cont.appendChild(detalle);
     pintarDetalle();
   }
-  } // fin guard MOSTRAR_RESULTADOS_INFORME (ADR-035)
 
   // Vista MULTI-AÑO (cada prueba con todos los años superpuestos): se monta aquí
   // porque necesita las curvas ya cargadas en `state.bloquesCache`. El filtro de
