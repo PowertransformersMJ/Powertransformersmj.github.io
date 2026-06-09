@@ -89,6 +89,7 @@
 | §28 | ADR-028 — Multi-año TENDENCIA año a año: 1 gráfica por SUB-PRUEBA (par de devanados, no fusiona escalas), TODOS los años por defecto, orden cronológico + etiquetas uniformes; validado con 5 informes REALES 450108 (+ tan δ por sección) | 600 |
 | §29 | ADR-029 — Tan δ de devanados CONDENSADO en panel único filtrable (`ui/pruebas/tand-panel.js`): tendencia año tras año en BARRAS + filtros año/grupo/tensión/devanado + "Todos los años"; excluye tand del genérico | 628 |
 | §30 | ADR-030 — Modal de colisión por fecha abre AMBOS PDFs (guardado + nuevo vía blob URL) para comparar antes de decidir; modal extraído a `ui/pruebas/modal-upsert.js` | 644 |
+| §31 | ADR-031 — Tan δ "Por devanado": render propio `svgPorDevanado` (leyenda LIMPIA por informe, no por informe×tensión) + criterio normativo VISIBLE (`CRIT` IEEE 62/C57.152, guía 0.5%/límite 1%) con veredicto por barra y en el caption | 656 |
 
 ---
 
