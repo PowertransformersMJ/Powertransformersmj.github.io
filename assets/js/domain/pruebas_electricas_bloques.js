@@ -463,9 +463,11 @@ export function bloquesMultiAno(items) {
       }
       const g = fam.get(gkey);
       // El encabezado del grupo usa el título/metadatos del informe MÁS RECIENTE
-      // (el despliegue vigente del trafo móvil), no el del más antiguo que creó el
-      // grupo — más representativo de la config actual.
-      if (ano != null && ano >= g._tAno) {
+      // que APORTE datos graficables (el despliegue vigente del trafo móvil) — un
+      // bloque sin series numéricas (p.ej. "Resultados SFRA por devanado", todo
+      // cualitativo) NO debe ganar el título sobre el de datos ("Coeficientes…").
+      const tieneDatos = (b.series || []).some((s) => (s.puntos || []).some((p) => p && p.x != null && typeof p.y === 'number'));
+      if (tieneDatos && ano != null && ano >= g._tAno) {
         g._tAno = ano;
         if (b.titulo) g.titulo = b.titulo;
         if (b.unidad) g.unidad = b.unidad;

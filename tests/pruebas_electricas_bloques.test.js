@@ -358,6 +358,17 @@ describe('bloquesMultiAno · informe × fase superpuestos (conserva fases y NO c
     assert.deepEqual(out[0].series.map((s) => s._repLabel), ['18/01/2022', '02/05/2022'], 'enero antes que mayo');
   });
 
+  test('ADR-028: el título del grupo viene de un bloque CON datos (no de uno cualitativo y:null)', () => {
+    const conDatos = { prueba: 'sfra', titulo: 'Coeficientes de correlación SFRA', grafica: 'barra',
+      series: [{ nombre: 'U-V', puntos: [{ x: 'RLF', y: 1.1 }] }] };
+    const sinDatos = { prueba: 'sfra', titulo: 'Resultados SFRA por devanado', grafica: 'barra',
+      series: [{ nombre: 'primario', puntos: [{ x: 'primario', y: null }] }] };
+    // El cualitativo va DESPUÉS (mismo año) → no debe robar el título.
+    const out = bloquesMultiAno([inf(2024, '19/01/2024', [conDatos, sinDatos])]);
+    assert.equal(out.length, 1);
+    assert.equal(out[0].titulo, 'Coeficientes de correlación SFRA');
+  });
+
   test('ADR-028: la MISMA sub-prueba (mismo título) SÍ se superpone entre años', () => {
     const rel = (y, v) => ({ prueba: 'relacion', titulo: 'Relación de transformación AT/MT (T1=66 kV, T2=34.5 kV)', unidad: '', grafica: 'linea',
       series: [{ nombre: 'Fase A', puntos: [{ x: 9, y: v }] }] });
