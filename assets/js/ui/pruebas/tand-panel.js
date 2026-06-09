@@ -54,6 +54,36 @@ export function devanadoDe(sec) {
   return 'Otras';
 }
 
+// Localización del aislamiento que mide una sección (H=AT, L=MT/BT, T=Terciario):
+// CH=AT↔tierra, CHL=AT↔MT (entre devanados), CH+CHL+CHT=AT total a tierra (GST)…
+// Permite traducir "qué sección está alta" en "DÓNDE está el problema" (skill 04).
+const NOM_FOCO = { H: 'AT', L: 'MT/BT', T: 'Terciario' };
+export function localizacionDe(sec) {
+  const s = String(sec || '').toUpperCase().replace(/\s/g, '');
+  if (s.includes('+')) {
+    const focos = [...new Set(s.replace(/C/g, '').split('+').map((x) => x[0]).filter((c) => NOM_FOCO[c]))];
+    return focos.length === 1 ? `${NOM_FOCO[focos[0]]} total a tierra (GST)` : 'conjunto de aislamientos (GST)';
+  }
+  const letras = s.replace(/^C/, '').split('').filter((c) => NOM_FOCO[c]);
+  if (letras.length >= 2) return `${NOM_FOCO[letras[0]]} ↔ ${NOM_FOCO[letras[1]]} (entre devanados)`;
+  if (letras.length === 1) return `${NOM_FOCO[letras[0]]} ↔ tierra`;
+  return 'aislamiento';
+}
+
+// Causa probable + corroboración cuando una sección sale elevada (skill 04-diagnostico).
+export function causaProbableDe(sec) {
+  const s = String(sec || '').toUpperCase().replace(/\s/g, '');
+  if (s.includes('+')) return 'aislar por modo UST para localizar el foco dentro del conjunto';
+  const letras = s.replace(/^C/, '').split('').filter((c) => NOM_FOCO[c]);
+  if (letras.length >= 2) return 'humedad / defecto ENTRE devanados — corroborar con IR del par y reactancia de dispersión';
+  if (letras.length === 1) {
+    if (letras[0] === 'H') return 'contaminación/defecto en AT a tierra o sus bujes — corroborar con FP de buje y hot-collar';
+    if (letras[0] === 'L') return 'defecto localizado en MT/BT a tierra o sus bujes — corroborar con FP de buje e IR del lazo';
+    return 'defecto localizado en Terciario a tierra — corroborar con IR del lazo';
+  }
+  return 'verificar la configuración de medida (GST/UST/GSTg)';
+}
+
 const chip = (txt, on, onClick, color) => {
   const b = document.createElement('button'); b.type = 'button';
   b.className = 'pe-fase-chip' + (on ? ' is-on' : ''); b.textContent = txt;
@@ -113,14 +143,21 @@ export function analizarTand(repsVis, secs, tens) {
     tipdown: tipups.filter((x) => x.estado === 'tipdown').length,
     peor: tipups.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a)),
   } : null;
-  return { M, peor, porNorma, tendencia, tipups, tipResumen };
+  // Localización del hallazgo: secciones cuyo PEOR valor supera la guía estricta (NETA
+  // 0.5%) → dónde está el aislamiento elevado + causa probable (skill 04-diagnostico).
+  const GUIA = NORMAS_TAND[0].umbral;
+  const peorPorSec = {};
+  M.forEach((m) => { if (!peorPorSec[m.sec] || m.y > peorPorSec[m.sec].y) peorPorSec[m.sec] = m; });
+  const localizadas = Object.values(peorPorSec).filter((m) => m.y > GUIA).sort((a, b) => b.y - a.y)
+    .map((m) => ({ sec: m.sec, y: m.y, rep: m.rep, donde: localizacionDe(m.sec), causa: causaProbableDe(m.sec) }));
+  return { M, peor, porNorma, tendencia, tipups, tipResumen, localizadas, guia: GUIA };
 }
 
 // Pinta el bloque "Análisis conforme a norma" (sellos + veredicto por norma + conclusión).
 function renderAnalisis(box, datos) {
   box.innerHTML = '';
   if (!datos) { box.innerHTML = '<p class="muted small">Sin mediciones para analizar con los filtros activos.</p>'; return; }
-  const { M, peor, porNorma, tendencia, tipResumen } = datos;
+  const { M, peor, porNorma, tendencia, tipResumen, localizadas, guia } = datos;
   const card = document.createElement('div'); card.className = 'pe-analisis';
   const head = document.createElement('div'); head.className = 'pe-analisis-head';
   head.innerHTML = `<span>Análisis conforme a norma</span><span class="pe-analisis-n">${M.length} mediciones evaluadas</span>`;
@@ -151,6 +188,16 @@ function renderAnalisis(box, datos) {
   l2.textContent = `Peor medición: ${peor.y}% · ${peor.sec} · ${peor.rep.label}${peor.rep.config ? ' (' + peor.rep.config + ')' : ''} · ${peor.tension}.` +
     (tendencia ? ` Tendencia del peor caso: ${tendencia.ini.max}% (${tendencia.ini.rep.label}) → ${tendencia.fin.max}% (${tendencia.fin.rep.label}) · ${tendencia.dir}.` : '');
   concl.append(l1, l2); card.appendChild(concl);
+  // Localización del hallazgo: traduce "qué sección está alta" en "DÓNDE" + causa probable.
+  const loc = document.createElement('div'); loc.className = 'pe-analisis-loc';
+  if (localizadas && localizadas.length) {
+    const items = localizadas.slice(0, 5).map((x) =>
+      `<li><b>${esc(x.sec)}</b> — ${esc(x.donde)} · ${x.y}% (sobre guía ${guia}%): ${esc(x.causa)}</li>`).join('');
+    loc.innerHTML = `<div class="pe-loc-h">Localización del hallazgo — secciones sobre la guía ${guia}% (NETA)</div><ul>${items}</ul>`;
+  } else {
+    loc.innerHTML = `<div class="pe-loc-h">Localización</div><p>Ninguna sección supera la guía ${guia}% (NETA): aislamiento homogéneo entre modos, sin defecto localizado.</p>`;
+  }
+  card.appendChild(loc);
   // Tip-up (ΔFP): dependencia del FP con la tensión → ionización/PD (↑) o humedad/tierra (↓).
   if (tipResumen) {
     const tip = document.createElement('div'); tip.className = 'pe-analisis-extra';

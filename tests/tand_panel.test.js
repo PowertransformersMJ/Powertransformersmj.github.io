@@ -2,7 +2,7 @@
 // sección de aislamiento → devanado, para agrupar el filtro "por devanado".
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { devanadoDe, analizarTand } from '../assets/js/ui/pruebas/tand-panel.js';
+import { devanadoDe, analizarTand, localizacionDe, causaProbableDe } from '../assets/js/ui/pruebas/tand-panel.js';
 
 // Mini-informe para el análisis: un rep con un bloque de series (tensiones) y puntos.
 const rep = (id, label, secs) => ({ id, label, config: '', bloque: { series: [{ nombre: 'Tan δ @ 10 kV', puntos: secs.map(([x, y]) => ({ x, y })) }] } });
@@ -100,5 +100,41 @@ describe('analizarTand · tip-up (ΔFP = FP@alta − FP@baja)', () => {
     const r = analizarTand([rep2('a', '2021', [['CH', 0.55, 0.40], ['CL', 0.20, 0.45]])], ['CH', 'CL'], tens2);
     assert.equal(r.tipResumen.total, 2);
     assert.equal(r.tipResumen.peor.sec, 'CL'); // |−0.25| > |+0.15|
+  });
+});
+
+describe('localizacionDe / causaProbableDe · dónde está el defecto', () => {
+  test('sección a tierra simple (CH/CL/CT)', () => {
+    assert.equal(localizacionDe('CH'), 'AT ↔ tierra');
+    assert.equal(localizacionDe('CL'), 'MT/BT ↔ tierra');
+    assert.equal(localizacionDe('CT'), 'Terciario ↔ tierra');
+  });
+  test('entre devanados (2 focos)', () => {
+    assert.equal(localizacionDe('CHL'), 'AT ↔ MT/BT (entre devanados)');
+    assert.equal(localizacionDe('CHT'), 'AT ↔ Terciario (entre devanados)');
+    assert.equal(localizacionDe('CLT'), 'MT/BT ↔ Terciario (entre devanados)');
+  });
+  test('combinadas con + = total a tierra (GST)', () => {
+    assert.equal(localizacionDe('CH+CHL+CHT'), 'AT total a tierra (GST)');
+    assert.equal(localizacionDe('CL+CLT+CLH'), 'MT/BT total a tierra (GST)');
+  });
+  test('causa probable según el modo (skill 04)', () => {
+    assert.match(causaProbableDe('CHL'), /ENTRE devanados/);
+    assert.match(causaProbableDe('CH'), /AT a tierra o sus bujes/);
+    assert.match(causaProbableDe('CL'), /MT\/BT a tierra/);
+  });
+});
+
+describe('analizarTand · localización (secciones sobre guía 0.5%)', () => {
+  test('todo ≤0.5% → sin secciones localizadas', () => {
+    const r = analizarTand([rep('a', '2021', [['CH', 0.3], ['CL', 0.4]])], ['CH', 'CL'], ['Tan δ @ 10 kV']);
+    assert.equal(r.localizadas.length, 0);
+  });
+  test('CHL > 0.5% → localizada con donde + causa', () => {
+    const r = analizarTand([rep('a', '2021', [['CH', 0.3], ['CHL', 0.62]])], ['CH', 'CHL'], ['Tan δ @ 10 kV']);
+    assert.equal(r.localizadas.length, 1);
+    assert.equal(r.localizadas[0].sec, 'CHL');
+    assert.equal(r.localizadas[0].donde, 'AT ↔ MT/BT (entre devanados)');
+    assert.match(r.localizadas[0].causa, /ENTRE devanados/);
   });
 });

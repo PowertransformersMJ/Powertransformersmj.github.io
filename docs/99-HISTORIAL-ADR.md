@@ -768,3 +768,19 @@
 **38.4 Pendientes de la auditoría (no implementados, decisión del director)** — #2 localización del defecto por modo (CH/CL/CHL→dónde), #3 tendencia de capacitancia (pF), #5 pendiente/tasa con bandera predictiva, #6 baseline de fábrica. Ver `49 §Auditoría`.
 
 **38.5 Doctrina** — "Una auditoría de dominio (Trigger 🔵) se hace CON la skill (criterios/cálculos/diagnóstico) y aterrizada al DATO REAL disponible: el tip-up era computable porque el informe ya traía 2 tensiones — valor nuevo sin pedir más datos. Lo que falta (corrección de T) se DECLARA como caveat, no se inventa. Registrar los hallazgos en el lóbulo para que la próxima ronda continúe sin re-auditar."
+
+---
+
+## 39. ADR-039 — FP/tan δ: localización del defecto por modo (CH/CL/CHL…) + causa probable (gap #2 de la auditoría)
+
+> Continuación de la auditoría 🔵 (ADR-038): el director pidió "continuar" con los gaps. Se implementa #2: traducir "qué sección está alta" en "DÓNDE está el problema" + causa probable (skill `factor-potencia-aislamiento` 04-diagnostico). **Frontend; en prod tras push.**
+
+**39.1 Helpers puros (exportados/testeados)** — `localizacionDe(sec)`: mapea el código de sección al aislamiento que mide (H=AT, L=MT/BT, T=Terciario): `CH`=AT↔tierra, `CHL`=AT↔MT (entre devanados), `CH+CHL+CHT`=AT total a tierra (GST). `causaProbableDe(sec)`: causa + corroboración de la skill 04 (entre-devanados→humedad/defecto + IR del par/reactancia; a-tierra H→AT/bujes + FP buje/hot-collar; L→MT/BT + FP buje/IR lazo; combo→aislar por UST).
+
+**39.2 Integración** — `analizarTand` añade `localizadas`: secciones cuyo PEOR valor supera la guía estricta (NETA 0.5%), ordenadas desc, con `{sec, y, rep, donde, causa}`. `renderAnalisis` añade un bloque "Localización del hallazgo" (lista las secciones sobre guía con dónde+causa; si ninguna: "aislamiento homogéneo entre modos, sin defecto localizado"). Orden del análisis: norma → conclusión → **localización** → tip-up → caveat 20 °C.
+
+**39.3 Verificación (workflow)** — `_dev/preview-tand.html` con datos REALES (450108): localiza **CL — MT/BT ↔ tierra · 0.5135% (sobre guía 0.5%): defecto localizado en MT/BT a tierra o sus bujes — corroborar con FP de buje e IR del lazo** (la única sección sobre la guía estricta NETA, aunque cumple IEEE 1%). 6 tests nuevos (localizacionDe a-tierra/entre-devanados/GST; causaProbableDe; localizadas con y sin sección sobre guía). `npm test` **1157/1157**. Lint 0. Sin errores de consola.
+
+**39.4 Pendientes de la auditoría** — #3 tendencia de capacitancia (pF), #5 pendiente/tasa con bandera predictiva, #6 baseline de fábrica (ver `49 §Auditoría`).
+
+**39.5 Doctrina** — "El veredicto (pasa/no pasa) cobra valor de DECISIÓN cuando además dice DÓNDE y QUÉ corroborar. El código de sección de aislamiento ya codifica la localización (focos H/L/T); traducirlo es una capa pura y testeable sobre el dato existente, sin pedir más datos." Cierra el gap #2.
