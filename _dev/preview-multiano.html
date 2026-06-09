@@ -19,7 +19,7 @@
 
 <script type="module">
 import { svgBloque } from '../assets/js/ui/pruebas/grafico-generico.js';
-import { bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha } from '../assets/js/domain/pruebas_electricas_bloques.js';
+import { bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
 import { montarPanelTand } from '../assets/js/ui/pruebas/tand-panel.js';
 
 // Fixtures REALES (datos verídicos entregados por el director). Para ver el
@@ -48,14 +48,15 @@ const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#08
   }
 
   // ── replica de montarMultiAno (shell): panel tan δ condensado + genérico sin tand ──
-  const tandItems = informes.map((inf) => { const t = (inf.bloques || []).find((b) => b && /^tan/i.test(b.prueba || ''));
+  const esTand = (b) => { const f = familiaMA(b); return !!f && f.key === 'tand'; };
+  const tandItems = informes.map((inf) => { const t = (inf.bloques || []).find(esTand);
     return t ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), bloque: t } : null; }).filter(Boolean);
   cont.innerHTML = '';
   if (tandItems.length) { const sec = document.createElement('section'); sec.style.margin = '0 0 18px';
     sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Factor de Potencia / Tan δ — devanados', style: 'margin:0 0 8px' }));
     const host = document.createElement('div'); sec.appendChild(host); cont.appendChild(sec); montarPanelTand(host, tandItems);
     cont.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Demás pruebas · todos los años', style: 'margin:6px 0 8px' })); }
-  const bloques = bloquesMultiAno(informes).filter((b) => !/^tan/i.test(b.prueba || ''));
+  const bloques = bloquesMultiAno(informes).filter((b) => b.prueba !== 'tand');
   const repInfo = new Map();
   for (const b of bloques) for (const s of b.series) if (!repInfo.has(s._rep)) repInfo.set(s._rep, { label: s._repLabel, ano: s._ano });
   const repsAll = [...repInfo.keys()].sort((a, c) => ordenInforme(repInfo.get(a).label, repInfo.get(a).ano) - ordenInforme(repInfo.get(c).label, repInfo.get(c).ano));
