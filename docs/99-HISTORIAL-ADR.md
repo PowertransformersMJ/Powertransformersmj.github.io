@@ -638,3 +638,15 @@
 **29.4 No-regresión / verificación** — Validado con DATOS REALES (4 informes con tan δ de la 450108) en `_dev/preview-tand.html` (usa el módulo directo) y `_dev/preview-multiano.html` (integración: panel arriba + genérico SIN tand, verificado `tandEnGenerico = []`). Test del helper puro `devanadoDe`. `npm test` **1141/1141**. INTACTO: scorecard, multinorma, gráficas de desviación, selector por-informe.
 
 **29.5 Doctrina** — "Cuando una prueba tiene varias dimensiones (año · devanado · tensión · config), condénsala en UNA vista con panel de filtros de alto nivel en vez de multiplicar gráficas; el filtro es la herramienta de enfoque. 'Tendencia' = eje temporal con la métrica por categoría (cada valor vs su norma), distinto de 'apilar/acumular' (suma sin sentido físico para tan δ). Reusar un módulo entre tablero y harness garantiza que el preview valida EXACTAMENTE el código de producción." Refuerza L-49 (preview con datos reales).
+
+---
+
+## 30. ADR-030 — Modal de colisión por fecha: abrir AMBOS PDFs (guardado + nuevo) para comparar antes de decidir
+
+> Director (2026-06-09): al cargar un informe cuya fecha ya existe, el modal de previsualización (ADR-021) solo abría el PDF YA GUARDADO. "Debes permitirme abrir AMBOS informes, el ya guardado y el que se pretende guardar; solo así puedo validar si son iguales o distintos." Caso real: trafo móvil, mismo día, ensayos/configs distintos (eléctrico vs SFRA, estrella vs delta). **Frontend; en prod tras push.**
+
+**30.1 Cambio** — La columna "NUEVO (a cargar)" del modal ahora tiene un botón **"↗ Abrir PDF a cargar"**. El PDF nuevo es un **File LOCAL** (`item.file`) aún sin subir a Storage → se abre con un **blob URL** (`URL.createObjectURL(item.file)`) en otra pestaña; si no hay File pero ya tiene `downloadURL`, se usa ese. El click se maneja en el listener del overlay (`[data-abrir-nuevo]`) y **NO cierra el modal** (igual que "Abrir PDF guardado") → se comparan los dos PDFs lado a lado y luego se decide "distintos · crear nuevo" o "mismo · reemplazar". El blob URL se libera (`revokeObjectURL`) al cerrar.
+
+**30.2 Refactor (testabilidad)** — El modal se **extrajo del shell a `assets/js/ui/pruebas/modal-upsert.js`** (`confirmarUpsert`, + su `esc` local). Motivo: el shell auto-ejecuta `arrancar()` al cargar (Firebase + DOM) → no es importable en un harness; un módulo aislado SÍ. Mismo patrón que `tand-panel.js` (ADR-029). Validado en `_dev/preview-upsert.html`: ambos botones presentes, el "nuevo" abre un blob, el modal NO se cierra al abrirlo, y la decisión resuelve `nuevo`/`reemplazar`. `npm test` 1141/1141.
+
+**30.3 Doctrina** — "Para decidir entre dos opciones (reemplazar vs crear), dale al usuario la EVIDENCIA de ambas (abrir los dos PDFs), no solo una. Un PDF aún sin subir se previsualiza con un blob URL del File local — no hace falta subirlo primero. Extraer una pieza de UI del shell a su propio módulo cuando el shell no es importable en harness = poder validarla con preview (L-49)."

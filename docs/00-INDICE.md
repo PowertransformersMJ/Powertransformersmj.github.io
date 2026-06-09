@@ -88,6 +88,7 @@
 | §27 | ADR-027 — Multi-año muestra TODAS las pruebas ELÉCTRICAS (SFRA/reactancia/IR-núcleo/LTC/DFR con familia genérica, no solo las 7); el ACEITE (DGA) queda EXCLUIDO; criterios/datos se surfacean, no se fabrican | 578 |
 | §28 | ADR-028 — Multi-año TENDENCIA año a año: 1 gráfica por SUB-PRUEBA (par de devanados, no fusiona escalas), TODOS los años por defecto, orden cronológico + etiquetas uniformes; validado con 5 informes REALES 450108 (+ tan δ por sección) | 600 |
 | §29 | ADR-029 — Tan δ de devanados CONDENSADO en panel único filtrable (`ui/pruebas/tand-panel.js`): tendencia año tras año en BARRAS + filtros año/grupo/tensión/devanado + "Todos los años"; excluye tand del genérico | 628 |
+| §30 | ADR-030 — Modal de colisión por fecha abre AMBOS PDFs (guardado + nuevo vía blob URL) para comparar antes de decidir; modal extraído a `ui/pruebas/modal-upsert.js` | 644 |
 
 ---
 
