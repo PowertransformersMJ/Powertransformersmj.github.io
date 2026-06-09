@@ -710,3 +710,19 @@
 **34.4 Verificación** — `_dev/preview-multiano.html` con 9 fixtures REALES: `headers=[]`, `graficasGenericas=[]`, sección "Demás pruebas" AUSENTE, intro/chips de año ausentes; panel tan δ + "Análisis conforme a norma" intactos. Sin errores de consola. `npm test` **1146/1146**. INTACTO: scorecard, selector, multinorma, KPIs.
 
 **34.5 Doctrina** — "Cuando una vista entera deja de aportar, retírala con el MISMO mecanismo declarativo de exclusión (no un parche aparte) y replica la guarda de 'sección vacía' en TODOS los renderers (shell + harness) para que no quede un encabezado huérfano. Retirar la vista ≠ destruir la capacidad: el dato y la evaluación siguen vivos en scorecard/selector." Cierra el arco ADR-029→034 (condensar + depurar el multi-año).
+
+---
+
+## 35. ADR-035 — Retiro de la sección "Resultados del informe" (detalle por informe) — reversible, sin destruir el motor
+
+> Director (2026-06-09, vía pantallazos): "también elimina esto" — la sección "Resultados del informe" (selector de informe + detalle completo del informe vigente: análisis IA, evaluación multi-norma, recomendación, gráfica "Valores vs Sección" y la tabla de 24 filas de tan δ). **Frontend; en prod tras push.**
+
+**35.1 Contexto / riesgo** — Esa sección la arma `montarBloques()`, que ADEMÁS (a) carga `state.bloquesCache` (del que depende el panel tan δ) y (b) llama a `montarMultiAno()` + renderiza el **scorecard**. Borrar la función habría roto el panel tan δ y el scorecard. Por eso NO se borra.
+
+**35.2 Solución (reversible)** — Flag `MOSTRAR_RESULTADOS_INFORME = false` en el shell: envuelve SOLO el render del detalle por informe (selector + `pintarDetalle`); la carga de datos, `montarMultiAno()` y el scorecard quedan FUERA del guard → siguen ejecutándose. La `<section id="bloques">` se marca `hidden` en `pages/pruebas-electricas.html` (oculta encabezado + intro + placeholder). Revertir = `true` + quitar `hidden`.
+
+**35.3 No destructivo** — Intactos: extracción IA, `mountBloques`, motor multinorma, scorecard (la **evaluación multi-norma sigue visible ahí**), KPIs, timeline, panel tan δ. Sólo se oculta la vista de detalle/tablas por informe.
+
+**35.4 Verificación** — `node --check` OK (guard con llaves balanceadas; `montarMultiAno()`/scorecard alcanzables con flag en false). `npx html-validate pages/pruebas-electricas.html` 0. `npm test` **1146/1146**. ⚠️ La PÁGINA autenticada NO se pudo ejercitar en el preview (Firebase redirige a login `index.html`); validación por syntax+lint+tests+lectura de flujo, no por UI en vivo.
+
+**35.5 Doctrina** — "Cuando una sección comparte su función de montaje con dependencias vivas (carga de cache, otras vistas, scorecard), NO borres la función: aísla el render con un flag y oculta el contenedor. Distinguir 'lo que se ve' de 'lo que se ejecuta' permite retirar la vista sin desintegrar el motor. Si la vista vive tras auth y el preview no puede entrar, decláralo explícito (validación parcial)." Refuerza memoria 'no destruir lo logrado'.
