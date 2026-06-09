@@ -206,6 +206,35 @@ gitignorado → estas 24 son **local-only**; al re-clonar, re-correr el copy (la
 
 ---
 
+## 🏭 Transformadores de Potencia · EQUIPO (project-specific — construidas in-house)
+
+> Familia hermana de `pruebas-electricas`, pero sobre el **EQUIPO** (qué es, de qué tipo, qué
+> cálculos nominales/de placa le aplican), no los ensayos. Viven en `skills/transformadores-potencia/`.
+> Lóbulo madre con las decisiones: **`docs/50-TRANSFORMADORES-POTENCIA.md`**. Mismo patrón:
+> `SKILL.md` + 4 neuronas `references/` + `_conocimiento/` compartido. Disp. 🏠 = repo-only del proyecto.
+> Índice maestro de la familia: `skills/transformadores-potencia/README.md`. Arquitectura de 11 skills
+> **validada por el director (2026-06-08) y COMPLETA (11/11, 2026-06-09)** — cada una `SKILL.md` + 4 neuronas.
+
+| Skill (carpeta) | Para qué | Disp. |
+|---|---|---|
+| `identificacion-tipo-transformador` | Tipificar: bidevanado / bi+compensación (delta estabilización) / tridevanado / auto; deriva qué relación, qué impedancia y qué secuencia cero aplican | 🏠 ✅ ejemplar |
+| `grupo-vectorial-conexiones` | Grupo Dyn/YNd/YNyn0d, desfase horario, ANSI↔IEC, polaridad, paralelo, compensación 87T | 🏠 ✅ |
+| `calculos-nominales` | I nominal, S/I por etapa de enfriamiento, relación con √3 por conexión, V/espira | 🏠 ✅ |
+| `impedancia-cortocircuito` | %Z, base común, estrella equivalente (3 ramas), secuencia cero, I_cc, reparto de carga | 🏠 ✅ |
+| `placa-caracteristica` | Auditar nameplate, coherencias cruzadas, identidad por informe (móviles/multiconfig) | 🏠 ✅ |
+| `regulacion-tomas` | OLTC vs DETC (seguridad), V_toma(n), efecto en %Z, modos, prueba DRM | 🏠 ✅ |
+| `sistema-refrigeracion` | Notación IEEE 4 letras, etapas=potencia, "etapa ≠ MVA gratis", I por etapa, termografía | 🏠 ✅ |
+| `construccion-nucleo-devanados` | Shell/core form, 3/5 columnas (Z0), tipos de devanado, fuerzas ∝I² (telescopeo/pandeo), FRA | 🏠 ✅ |
+| `bujes-y-accesorios` | Bujes condensador OIP/RIP/RBP, C1/C2, FP de buje, tap capacitivo; conservador, Buchholz, sobrepresión, imagen térmica | 🏠 ✅ |
+| `gestion-vida-activo` | Papel/DP (1000-1200→150-250), hot-spot IEEE C57.91, Montsinger, cargabilidad, MTMP/condición | 🏠 ✅ |
+| `modos-falla-diagnostico` | Esfuerzos (E/T/M/Q) → deterioro → modos de falla; mapa síntoma→ensayo→lóbulo (integrador) | 🏠 ✅ |
+
+> **3 marcos compartidos** en `_conocimiento/`: `00-fundamentos-transformador.md`,
+> `marco-normativo-tx.md`, `convenciones-calculo.md`. ✅ **EG + ABB ingeridos** (2026-06-08, vía
+> subagentes). Valores `⚠️ verificar` y tablas [ILEGIBLES] pendientes → `docs/50-TRANSFORMADORES-POTENCIA.md`.
+
+---
+
 ## ✅ Cómo usar este catálogo
 
 1. **Trigger 🔵 (`CLAUDE.md §G.2`)** dispara: el cliente pide análisis especializado.

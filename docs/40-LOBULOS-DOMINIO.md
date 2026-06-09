@@ -17,7 +17,7 @@
 
 ## 🗂️ Categorías esperadas
 
-> Numeración reservada 41–49 para lóbulos de dominio. **No reutilizar** estos números para otras neuronas.
+> Numeración reservada 41–50 para lóbulos de dominio (49=pruebas eléctricas, 50=transformadores/equipo). **No reutilizar** estos números para otras neuronas.
 
 | ID | Lóbulo | Disparador (cliente dice…) | Estado | Cubre |
 |---|---|---|---|---|
@@ -30,10 +30,11 @@
 | **47** | Copywriting | "audita copy", "voz", "tono", "headlines", "CTAs", "mensajes" | 🟢 vacío | Tono de marca, microcopy, headlines, CTAs, mensajes de error. |
 | **48** | Accesibilidad (a11y) | "audita a11y", "WCAG", "lectores de pantalla", "teclado", "contraste" | 🟢 vacío | ARIA, contraste, navegación teclado, alt texts, foco visible, prefers-reduced-motion. |
 | **49** | Pruebas Eléctricas / Diagnóstico | "pruebas eléctricas", "megóhmetro", "IR/PI/DAR", "FP/tan δ", "DGA", "SFRA", "criterios/cálculos/diagnóstico de transformadores" | 🟠 **activo** → `docs/49-PRUEBAS-ELECTRICAS.md` | Cálculos, criterios NETA/IEEE y diagnóstico de la batería de ensayos a tx de potencia. Hogar de las skills `skills/pruebas-electricas/*`. |
+| **50** | Transformadores de Potencia (equipo) | "tipo de transformador", "bidevanado/tridevanado/auto", "devanado de compensación/estabilización/terciario", "buried delta", "grupo vectorial", "cálculos nominales/relación/impedancia del equipo" | 🟠 **activo** → `docs/50-TRANSFORMADORES-POTENCIA.md` | Tipificación, configuración, grupo vectorial y cálculos nominales/de placa del EQUIPO (distinto de los ENSAYOS, lóbulo 49). Hogar de las skills `skills/transformadores-potencia/*`. |
 
 **Categorías futuras**: cualquier dominio nuevo que el cliente pida análisis
-(ej. analytics/49, marketing/50, devops/51) se agrega aquí + se crea el
-archivo hijo cuando hay contenido real.
+(ej. analytics/51, devops/52) se agrega aquí + se crea el
+archivo hijo cuando hay contenido real. (50 ya está activo, ver fila arriba.)
 
 ---
 
