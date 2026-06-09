@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Calificación global por prueba — + SFRA + DFR</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+<h1>DEV · "Calificación global por prueba" — SFRA + DFR añadidas (criterio normativo, "No realizada" si no se hizo)</h1>
+<p style="color:#64748b;font-size:13px;max-width:64ch">Réplica de las FILAS del scorecard (presencia por bloque). Verifica que SFRA y DFR SIEMPRE aparezcan con su criterio; "No realizada" en el libro eléctrico, "realizada · comparar vs huella" en el libro SFRA.</p>
+<div id="sel" class="pe-fase-chips" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 12px"></div>
+<div class="matrix" id="matrix"></div>
+
+<script type="module">
+import { ESTADOS } from '../assets/js/domain/pruebas_electricas_semaforo.js';
+
+// Copia de FAMILIAS_SCORE (solo para visualizar; la fuente real está en el shell).
+const FAMILIAS_SCORE = [
+  { key:'tand', blockKeys:['tand','tan_delta'], label:'Tan δ / FP · aislamiento del transformador', criterio:'FP ≤ 1% (IEEE 62)' },
+  { key:'bushing', blockKeys:['bushing'], label:'Factor de potencia de bujes (C1)', criterio:'tan δ ≤ 1% (IEEE 62 / C57.19.100)' },
+  { key:'excitacion', blockKeys:['excitacion'], label:'Corriente de excitación', criterio:'Δ fases ≤ 10% (IEEE C57.152)' },
+  { key:'relacion', blockKeys:['relacion'], label:'Relación de transformación', criterio:'±0.5% vs placa (IEEE C57.152 §7.2.10 / NETA 7.2.2)' },
+  { key:'resistencia', blockKeys:['resistencia'], label:'Resistencia de devanados', criterio:'Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)' },
+  { key:'aislamiento', blockKeys:['aislamiento'], label:'Resistencia de aislamiento (CC)', criterio:'≥ mínimo NETA por clase' },
+  { key:'collar', blockKeys:['collar'], label:'Collar caliente / pérdidas en bujes', criterio:'< 100 mW' },
+  { key:'drm', blockKeys:['drm','oltc'], label:'DRM · conmutador (OLTC)', criterio:'40–70 ms' },
+  { key:'sfra', blockKeys:['sfra'], label:'SFRA · respuesta en frecuencia', criterio:'Comparación por bandas vs huella (DL/T 911 · IEEE C57.149 · IEC 60076-18)' },
+  { key:'dfr', blockKeys:['dfr'], label:'DFR · espectroscopía dieléctrica', criterio:'Humedad del papel < 2% (CIGRE TB 349/414 · IEEE C57.161)' }
+];
+
+const FIXTURES = [
+  { url:'./fixtures/450108-2024-01-19.json', label:'Libro eléctrico 2024' },
+  { url:'./fixtures/450108-2024-01-19-sfra-estrella.json', label:'Libro SFRA 2024' }
+];
+
+function render(bloques) {
+  const filas = FAMILIAS_SCORE.map((fam) => {
+    const presente = (fam.blockKeys||[fam.key]).some((bk)=>bloques.some((b)=>new RegExp('\\b'+bk,'i').test(String(b.prueba||''))));
+    let estado = ESTADOS.NEUTRAL, texto = 'No realizada';
+    if (presente && (fam.key==='sfra'||fam.key==='dfr')) { estado = ESTADOS.AMBAR; texto = 'realizada · comparar vs huella'; }
+    else if (presente) { estado = ESTADOS.VERDE; texto = '(verdicto canónico en la app)'; }
+    return { ...fam, estado, texto };
+  });
+  const body = filas.map((f)=>`<tr><td class="cfg">${f.label}</td><td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${f.texto==='No realizada'?f.texto:`${f.estado.etiqueta} · ${f.texto}`}</span></td><td class="muted small">${f.criterio}</td></tr>`).join('');
+  document.getElementById('matrix').innerHTML = `<table><thead><tr><th>Prueba</th><th>Calificación normativa</th><th>Criterio · norma</th></tr></thead><tbody>${body}</tbody></table>`;
+}
+
+(async () => {
+  const data = [];
+  for (const f of FIXTURES) { try { data.push({ ...f, j: await (await fetch(f.url+'?v='+Date.now())).json() }); } catch(e){ console.error(e); } }
+  const sel = document.getElementById('sel');
+  let cur = 0;
+  data.forEach((d, i) => { const b=document.createElement('button'); b.type='button'; b.className='pe-fase-chip'+(i===0?' is-on':''); b.textContent=d.label;
+    b.addEventListener('click',()=>{ cur=i; [...sel.children].forEach(x=>x.classList.remove('is-on')); b.classList.add('is-on'); render(d.j.bloques||[]); }); sel.appendChild(b); });
+  render(data[cur].j.bloques||[]);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

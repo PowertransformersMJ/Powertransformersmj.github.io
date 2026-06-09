@@ -958,7 +958,13 @@ const FAMILIAS_SCORE = [
   { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)' },
   { key: 'aislamiento', blockKeys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ mínimo NETA por clase' },
   { key: 'collar',      blockKeys: ['collar'],                          label: 'Collar caliente / pérdidas en bujes', criterio: '< 100 mW' },
-  { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' }
+  { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' },
+  // SFRA y DFR: pruebas que SIEMPRE se listan (aunque no se hayan hecho), a pedido
+  // del director. Su criterio es COMPARATIVO (no hay pasa/no-pasa numérico): SFRA
+  // compara huellas por banda; DFR mide % de humedad del papel. Sin motor canónico
+  // → si el informe trae el bloque, "realizada · comparar vs huella"; si no, "No realizada".
+  { key: 'sfra',        blockKeys: ['sfra'],                            label: 'SFRA · respuesta en frecuencia', criterio: 'Comparación por bandas vs huella (DL/T 911 · IEEE C57.149 · IEC 60076-18)' },
+  { key: 'dfr',         blockKeys: ['dfr'],                             label: 'DFR · espectroscopía dieléctrica', criterio: 'Humedad del papel < 2% (CIGRE TB 349/414 · IEEE C57.161)' }
 ];
 
 // Veredicto NORMATIVO del bloque de bujes: peor tan δ medido vs el límite (mismo
@@ -989,10 +995,19 @@ function renderScorecard(cont, data, inf) {
     const criterio = (fam.key === 'aislamiento' && minNeta != null)
       ? `≥ ${minNeta} GΩ · NETA 100.5 (clase ${kv} kV)`
       : fam.criterio;
-    if (!r || r.estado === ESTADOS.NEUTRAL) {
-      return { label: fam.label, criterio, estado: ESTADOS.NEUTRAL, texto: 'No realizada' };
+    if (r && r.estado && r.estado !== ESTADOS.NEUTRAL) {
+      return { label: fam.label, criterio, estado: r.estado, texto: r.texto };
     }
-    return { label: fam.label, criterio, estado: r.estado, texto: r.texto };
+    // Sin veredicto canónico. Pruebas COMPARATIVAS (SFRA/DFR: sin pasa/no-pasa
+    // numérico): si el informe TRAE el bloque, se marca "realizada · comparar vs
+    // huella" (ámbar = requiere interpretación vs baseline, conforme a la norma);
+    // si no, "No realizada" — la fila SIEMPRE aparece con su criterio (director).
+    const presente = (fam.blockKeys || [fam.key]).some((bk) =>
+      bloques.some((b) => new RegExp('\\b' + bk, 'i').test(String(b.prueba || ''))));
+    if (presente && (fam.key === 'sfra' || fam.key === 'dfr')) {
+      return { label: fam.label, criterio, estado: ESTADOS.AMBAR, texto: 'realizada · comparar vs huella' };
+    }
+    return { label: fam.label, criterio, estado: ESTADOS.NEUTRAL, texto: 'No realizada' };
   });
   const cap = inf
     ? `Informe ${inf.ano || 's/a'} · calificación DERIVADA de los valores medidos contra los criterios normativos — independiente de la calificación del laboratorio. Las pruebas no realizadas se listan igual.`
