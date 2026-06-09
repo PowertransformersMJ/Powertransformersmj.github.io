@@ -312,7 +312,7 @@ const FAMILIAS_MA = [
 // mixto, NO debe contaminar el tablero eléctrico → se excluye del multi-año.
 const ES_NO_ELECTRICA = /\bdga\b|gas(es)?\s*disuelt|cromatograf|aceite|fisicoqu[ií]mic|\bfisico\b|furan|humedad.*papel|tensi[oó]n\s*interfacial|\bift\b|acidez/i;
 
-function familiaMA(bloque) {
+export function familiaMA(bloque) {
   const p = String((bloque && (bloque.prueba || bloque.titulo)) || '').toLowerCase();
   // Coincidencia directa por clave canónica primero.
   const directa = FAMILIAS_MA.find((f) => f.key === p);

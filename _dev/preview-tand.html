@@ -17,7 +17,7 @@
 
 <script type="module">
 import { montarPanelTand } from '../assets/js/ui/pruebas/tand-panel.js';
-import { etiquetaFecha, configInforme, ordenInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+import { etiquetaFecha, configInforme, ordenInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 const FIXTURES = [
   './fixtures/450108-2021-11-03.json',
@@ -30,7 +30,7 @@ const FIXTURES = [
   const items = [];
   for (const url of FIXTURES) {
     try { const j = await (await fetch(url + '?v=' + Date.now())).json();
-      const t = (j.bloques || []).find((b) => b.prueba === 'tand');
+      const t = (j.bloques || []).find((b) => { const f = familiaMA(b); return !!f && f.key === 'tand'; });
       if (!t) continue;
       items.push({ id: j.id, label: etiquetaFecha(j.fecha, j.ano), ano: j.ano, config: configInforme(j), bloque: t });
     } catch (e) { console.error('fixture', url, e); }
