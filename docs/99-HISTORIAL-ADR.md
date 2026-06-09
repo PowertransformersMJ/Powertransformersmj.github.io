@@ -680,3 +680,17 @@
 **32.4 No-regresión / verificación** — `_dev/preview-tand.html` con datos reales: 2 sellos con medalla (44×54, cinta+anillos+acrónimo), border-left por norma, conclusión amber "warn". `analizarTand` con 5 tests nuevos (null sin datos, ≤0.5% cumple ambas, 0.5–1% cumple IEEE/supera NETA, >1% supera ambas, tendencia). `npm test` **1146/1146**. Lint HTML 0. Sin errores de consola. INTACTO: gráficas tendencia/por-devanado, filtros, scorecard.
 
 **32.5 Doctrina** — "Un análisis 'conforme a norma' debe ser MULTI-NORMA y conservador (cumple la estricta vs cumple el límite), anclado en el dato real (peor medición + tendencia), no en una etiqueta genérica. Para 'mostrar la norma' usa un emblema ESTILIZADO propio + la cita exacta del estándar, nunca el logotipo registrado de un tercero. El análisis se recalcula con los filtros para ser coherente con lo que se ve." Refuerza ADR-011/012 (veredicto multi-norma) + memoria 'no fabricar datos'.
+
+---
+
+## 33. ADR-033 — Retiro selectivo de familias del overlay genérico "Demás pruebas · todos los años" (lista de exclusión única)
+
+> Director (2026-06-09, mostrando capturas del overlay genérico): "necesito que vayamos eliminando estos segmentos, sin dañar lo que ya hemos logrado, sin depurar ni destruir o desintegrar." Elegió retirar 5 gráficas (corriente de excitación, relación TTR, resistencia de devanados AT y BT, resistencia de aislamiento por configuración). **Frontend; en prod tras push.**
+
+**33.1 Decisión** — El overlay genérico ya excluía `tand` con un filtro suelto (`...filter(b => b.prueba !== 'tand')`). Se generaliza a una **lista de exclusión ÚNICA y exportada** `FAMILIAS_EXCLUIDAS_OVERLAY` en `pruebas_electricas_bloques.js` = `{tand, excitacion, relacion, resistencia, aislamiento}`. Tanto el shell (`montarMultiAno`) como el harness (`_dev/preview-multiano.html`) importan ESA constante → una sola fuente de verdad (no se duplica el criterio). Retirar/restaurar una familia = editar el conjunto; los DATOS y el motor no se tocan.
+
+**33.2 No destructivo (clave del pedido)** — NO se borró código de extracción, ni el motor multinorma, ni `bloquesMultiAno`, ni datos. Sólo se filtra QUÉ se pinta en ese overlay. La evaluación de esas pruebas SIGUE viva en el **scorecard multi-norma** + **selector por informe** + KPIs/timeline. `tand` conserva su panel condensado (ADR-029/031/032). `resistencia` cubre AT y BT (misma clave) → se retiran ambas juntas, como pidió.
+
+**33.3 Verificación** — `_dev/preview-multiano.html` con datos REALES (9 fixtures): el overlay genérico pasó a mostrar SOLO `Factor de potencia de bujes AT (C1-UST)` (bushing) y `Coeficientes SFRA (DL/T911)` (otros:sfra) — ninguna de las 5 retiradas; panel tan δ + su "Análisis conforme a norma" intactos. Sin errores de consola. `npm test` **1146/1146**. INTACTO: scorecard, selector, multinorma, KPIs.
+
+**33.4 Doctrina** — "Para ocultar/retirar elementos de una vista, usa una LISTA DE EXCLUSIÓN declarativa y de fuente única (compartida shell↔harness), no borres el pipeline ni los datos: retirar de la vista ≠ destruir la capacidad. Así el cambio es reversible (editar un Set) y el preview valida exactamente lo que verá producción." Refuerza ADR-029 (condensar/enfocar) + memoria 'no destruir lo logrado'.
