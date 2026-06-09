@@ -1,0 +1,106 @@
+{
+  "_nota": "DATO REAL extraído del PDF de SFRA por subagente — verificar. Las trazas SFRA (magnitud dB vs frecuencia) están SOLO como gráficas-imagen en el informe; NO hay tabla numérica dB-Hz, por eso NO se crearon series de curva (sería inventar). SÍ hay tablas tabuladas de coeficientes de correlación DL/T911-2004 (RLF, RMF, RHF) + diagnóstico NCEPRI (factor E) por cada comparación de devanados/fases. Norma aplicable: DL/T911-2004 con equipo FRANEO 800 (S/N FN284B / 102312246).",
+  "ano": 2024,
+  "fecha": "19/01/2024",
+  "id": "450108-2024-01-19-sfra-estrella",
+  "nombre": "240119 SFRA TRAFO MOVIL conexion estrella NS 450108",
+  "serie": "450108",
+  "identidad": {
+    "fabricante": "SIEMENS",
+    "ano_fabricacion": 2020,
+    "potencia": "20 MVA",
+    "tensiones": "110000 / 34500 / 13800 V",
+    "grupo_conexion": "YNyn0yn0",
+    "refrigeracion": "OFAF",
+    "frecuencia": "60 Hz",
+    "fases": "3",
+    "posiciones_tap": 17,
+    "cliente": "Afinia",
+    "subestacion": "Membrillal",
+    "ubicacion": "Bolívar",
+    "norma": "DL/T911-2004",
+    "equipo_prueba": "FRANEO 800 (FN284B / 102312246)",
+    "temperatura_ambiente": "34°C",
+    "temperatura_aceite": "34°C",
+    "humedad_relativa": "81 %"
+  },
+  "bloques": [
+    {
+      "prueba": "sfra",
+      "titulo": "Coeficientes de correlación SFRA por comparación de devanados (DL/T911-2004)",
+      "unidad": "CC",
+      "eje_x": "Banda",
+      "grafica": "barra",
+      "_fuente": "Tablas DL/T911-2004 de cada slide de COMPARACION (no estimadas de gráfica). RLF=banda baja, RMF=banda media, RHF=banda alta; E=factor de evaluación NCEPRI. Veredicto DL/T911 y NCEPRI en extra del primer punto de cada serie.",
+      "series": [
+        { "nombre": "110 kV: (H1-H0) vs (H2-H0)", "puntos": [
+          { "x": "RLF", "y": 1.12, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 1.84 } },
+          { "x": "RMF", "y": 2.63 },
+          { "x": "RHF", "y": 2.8 }
+        ] },
+        { "nombre": "110 kV: (H1-H0) vs (H3-H0)", "puntos": [
+          { "x": "RLF", "y": 0.86, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Deformación leve", "E": 3.65 } },
+          { "x": "RMF", "y": 2.44 },
+          { "x": "RHF", "y": 2.42 }
+        ] },
+        { "nombre": "110 kV: (H2-H0) vs (H3-H0)", "puntos": [
+          { "x": "RLF", "y": 1.67, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 2.01 } },
+          { "x": "RMF", "y": 3.3 },
+          { "x": "RHF", "y": 2.64 }
+        ] },
+        { "nombre": "34.5 kV: (X0-X1) vs (X0-X2)", "puntos": [
+          { "x": "RLF", "y": 1.37, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 1.77 } },
+          { "x": "RMF", "y": 1.26 },
+          { "x": "RHF", "y": 0.66 }
+        ] },
+        { "nombre": "34.5 kV: (X0-X1) vs (X0-X3)", "puntos": [
+          { "x": "RLF", "y": 1.88, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 2.37 } },
+          { "x": "RMF", "y": 1.12 },
+          { "x": "RHF", "y": 0.61 }
+        ] },
+        { "nombre": "34.5 kV: (X0-X2) vs (X0-X3)", "puntos": [
+          { "x": "RLF", "y": 1.3, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 1.28 } },
+          { "x": "RMF", "y": 2 },
+          { "x": "RHF", "y": 0.91 }
+        ] },
+        { "nombre": "13.8 kV: (Y0-Y1) vs (Y0-Y2)", "puntos": [
+          { "x": "RLF", "y": 1.42, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 1.5 } },
+          { "x": "RMF", "y": 2.01 },
+          { "x": "RHF", "y": 2.07 }
+        ] },
+        { "nombre": "13.8 kV: (Y0-Y1) vs (Y0-Y3)", "puntos": [
+          { "x": "RLF", "y": 1.81, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 1.2 } },
+          { "x": "RMF", "y": 1.93 },
+          { "x": "RHF", "y": 1.36 }
+        ] },
+        { "nombre": "13.8 kV: (Y0-Y2) vs (Y0-Y3)", "puntos": [
+          { "x": "RLF", "y": 1.76, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal", "E": 0.97 } },
+          { "x": "RMF", "y": 2.6 },
+          { "x": "RHF", "y": 1.51 }
+        ] }
+      ]
+    },
+    {
+      "prueba": "sfra",
+      "titulo": "Resultados SFRA por devanado (admitancia de circuito abierto)",
+      "unidad": "",
+      "eje_x": "Devanado",
+      "grafica": "barra",
+      "_fuente": "Slide RESULTADOS (resumen final). Valores cualitativos, no numéricos.",
+      "series": [
+        { "nombre": "Diagnóstico SFRA", "puntos": [
+          { "x": "Primario (110 kV)", "y": null, "extra": { "DL/T911-2004": "Devanado leve", "NCEPRI": "Devanado normal" } },
+          { "x": "Secundario (34.5 kV)", "y": null, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal" } },
+          { "x": "Terciario (13.8 kV)", "y": null, "extra": { "DL/T911-2004": "Deformación leve", "NCEPRI": "Devanado normal" } }
+        ] }
+      ]
+    }
+  ],
+  "_trazas_solo_grafica": [
+    "110 kV magnitud+fase: H1-H0 (Open), H2-H0 (Open), H3-H0 (Open)",
+    "34.5 kV magnitud+fase: X1-X0 (Open), X2-X0 (Open), X3-X0 (Open)",
+    "13.8 kV magnitud+fase: Y1-Y0 (Open), Y2-Y0 (Open), Y3-Y0 (Open)",
+    "Eje X de las gráficas: 100 Hz a ~2 MHz (escala log). Eje Y magnitud: dB. Eje Y fase: grados.",
+    "NO transcritas como series: el informe no incluye los puntos numéricos, solo la imagen de la curva."
+  ]
+}
