@@ -96,6 +96,7 @@
 | §35 | ADR-035 — Retiro de la sección "Resultados del informe" (detalle por informe) vía flag `MOSTRAR_RESULTADOS_INFORME=false` + `<section hidden>`; NO se borra `montarBloques` (carga cache + montarMultiAno + scorecard siguen vivos). Reversible. ⚠️ CORREGIDO por §36 | 716 |
 | §36 | ADR-036 — CORRIGE §35: revertido el retiro de la sección; solo se filtra el BLOQUE tan δ del detalle por informe (ya vive en su panel). Lección anti sobre-retiro (L-51) | 732 |
 | §37 | ADR-037 — Reorden HTML: "Identidad de la unidad" reubicada justo debajo de "Resumen de la unidad" (render por ID, sin tocar JS) | 746 |
+| §38 | ADR-038 — FP/tan δ: vista **Tip-up** (ΔFP=FP@alta−FP@baja, detecta ionización/PD vs humedad; `svgTipUp`+`analizarTand`) + **caveat 20 °C** (sin T → se declara, no se inventa). Auditoría 🔵 skill factor-potencia-aislamiento (gaps #2/#3/#5/#6 en lóbulo 49) | 758 |
 
 ---
 

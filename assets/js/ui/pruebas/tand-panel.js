@@ -33,6 +33,13 @@ const NORMAS_TAND = [
   { id: 'neta', acron: 'NETA', nom: 'ANSI/NETA', sub: 'ATS · Tabla 100.3', umbral: 0.5, criterio: '≤ 0.5%', color: '#2c6e72' },
   { id: 'ieee', acron: 'IEEE', nom: 'IEEE', sub: 'Std 62 / C57.152', umbral: 1, criterio: '≤ 1%', color: '#1f3a5f' },
 ];
+// Tip-up: ΔFP = FP(tensión alta) − FP(tensión baja) por sección (skill factor-potencia-
+// aislamiento §D + 02§3). ΔFP>+umbral = ionización en vacíos / descargas parciales →
+// INVESTIGAR; ΔFP<−umbral = tip-down (humedad superficial / tierra de núcleo faltante).
+// No requiere corrección de T (es una diferencia a igual temperatura). ADR-038.
+// ⚠️ umbral a VERIFICAR contra la edición de norma del director (la práctica usa ~0.1%).
+const TIPUP_UMBRAL = 0.1;
+const kvDe = (t) => { const m = String(t).match(/([\d.]+)\s*kV/i); return m ? parseFloat(m[1]) : null; };
 const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
@@ -86,14 +93,34 @@ export function analizarTand(repsVis, secs, tens) {
   let tendencia = null;
   if (porRep.length >= 2) { const ini = porRep[0], fin = porRep[porRep.length - 1], d = fin.max - ini.max;
     tendencia = { ini, fin, delta: d, dir: Math.abs(d) < 0.03 ? 'estable' : d > 0 ? 'al alza' : 'a la baja' }; }
-  return { M, peor, porNorma, tendencia };
+  // Tip-up por (informe × sección): ΔFP = FP(kV máx visible) − FP(kV mín visible). Solo
+  // si la sección tiene ≥2 tensiones DISTINTAS con lectura. Clasifica plano/ioniza/tipdown.
+  const tipups = [];
+  (repsVis || []).forEach((r) => (secs || []).forEach((sec) => {
+    const lect = (tens || []).map((t) => { const s = r.bloque.series.find((x) => x.nombre === t); const p = s && s.puntos.find((pp) => String(pp.x) === sec); const kv = kvDe(t);
+      return (p && typeof p.y === 'number' && kv != null) ? { kv, y: p.y } : null; }).filter(Boolean);
+    if (lect.length < 2) return;
+    const hi = lect.reduce((a, b) => (b.kv > a.kv ? b : a)), lo = lect.reduce((a, b) => (b.kv < a.kv ? b : a));
+    if (hi.kv === lo.kv) return;
+    const delta = Math.round((hi.y - lo.y) * 1e4) / 1e4;
+    const estado = delta > TIPUP_UMBRAL ? 'ioniza' : delta < -TIPUP_UMBRAL ? 'tipdown' : 'plano';
+    tipups.push({ rep: r, sec, hi, lo, delta, estado });
+  }));
+  const tipResumen = tipups.length ? {
+    total: tipups.length,
+    planas: tipups.filter((x) => x.estado === 'plano').length,
+    ioniza: tipups.filter((x) => x.estado === 'ioniza').length,
+    tipdown: tipups.filter((x) => x.estado === 'tipdown').length,
+    peor: tipups.reduce((a, b) => (Math.abs(b.delta) > Math.abs(a.delta) ? b : a)),
+  } : null;
+  return { M, peor, porNorma, tendencia, tipups, tipResumen };
 }
 
 // Pinta el bloque "Análisis conforme a norma" (sellos + veredicto por norma + conclusión).
 function renderAnalisis(box, datos) {
   box.innerHTML = '';
   if (!datos) { box.innerHTML = '<p class="muted small">Sin mediciones para analizar con los filtros activos.</p>'; return; }
-  const { M, peor, porNorma, tendencia } = datos;
+  const { M, peor, porNorma, tendencia, tipResumen } = datos;
   const card = document.createElement('div'); card.className = 'pe-analisis';
   const head = document.createElement('div'); head.className = 'pe-analisis-head';
   head.innerHTML = `<span>Análisis conforme a norma</span><span class="pe-analisis-n">${M.length} mediciones evaluadas</span>`;
@@ -124,6 +151,23 @@ function renderAnalisis(box, datos) {
   l2.textContent = `Peor medición: ${peor.y}% · ${peor.sec} · ${peor.rep.label}${peor.rep.config ? ' (' + peor.rep.config + ')' : ''} · ${peor.tension}.` +
     (tendencia ? ` Tendencia del peor caso: ${tendencia.ini.max}% (${tendencia.ini.rep.label}) → ${tendencia.fin.max}% (${tendencia.fin.rep.label}) · ${tendencia.dir}.` : '');
   concl.append(l1, l2); card.appendChild(concl);
+  // Tip-up (ΔFP): dependencia del FP con la tensión → ionización/PD (↑) o humedad/tierra (↓).
+  if (tipResumen) {
+    const tip = document.createElement('div'); tip.className = 'pe-analisis-extra';
+    const pe = tipResumen.peor;
+    const partes = [`${tipResumen.planas} planas (sano)`];
+    if (tipResumen.ioniza) partes.push(`${tipResumen.ioniza} con ionización (ΔFP>+${TIPUP_UMBRAL}% → posible PD/vacíos, investigar)`);
+    if (tipResumen.tipdown) partes.push(`${tipResumen.tipdown} tip-down (humedad superficial / tierra de núcleo)`);
+    tip.innerHTML = `<b>Tip-up</b> (ΔFP = FP@alta − FP@baja · ${tipResumen.total} secciones): ${esc(partes.join(' · '))}. ` +
+      `Peor ΔFP=${pe.delta > 0 ? '+' : ''}${pe.delta}% en ${esc(pe.sec)} (${esc(pe.rep.label)}${pe.rep.config ? ' · ' + esc(pe.rep.config) : ''}). ` +
+      `<span class="muted">umbral ±${TIPUP_UMBRAL}% ⚠️ a verificar.</span>`;
+    card.appendChild(tip);
+  }
+  // Caveat de corrección de temperatura (skill 02§2/03): NO se inventa T → se declara.
+  const cav = document.createElement('div'); cav.className = 'pe-analisis-cav';
+  cav.innerHTML = '⚠️ Valores <b>como medidos</b>: el informe no registra temperatura, por lo que no se aplica corrección a 20 °C. ' +
+    'El criterio NETA/IEEE asume FP₂₀ — un FP alto a temperatura elevada puede mejorar al corregir. Capturar T del ensayo + factor del fabricante afinaría el veredicto.';
+  card.appendChild(cav);
   box.appendChild(card);
 }
 
@@ -267,13 +311,56 @@ export function montarPanelTand(cont, items) {
     return { svg, total, sobre, guia: enGuia };
   }
 
+  // Vista TIP-UP (barras con signo): eje X = sección, barra por informe = ΔFP (FP@alta −
+  // FP@baja). Color por ESTADO (el signo es la señal): rojo = ionización/PD (ΔFP>+umbral),
+  // verde-azulado = tip-down (ΔFP<−umbral), gris = plano. Línea cero + guías ±umbral.
+  function svgTipUp(tipups, secsAll, repsVis) {
+    const tps = (tipups || []).filter((x) => secsAll.includes(x.sec));
+    if (!tps.length) return null;
+    const secs = secsAll.filter((s) => tps.some((x) => x.sec === s));
+    const reps = repsVis.filter((r) => tps.some((x) => x.rep.id === r.id));
+    const W = 920, L = 54, R = 16, T = 30, B = 60, H = T + 250;
+    const ymax = Math.max(...tps.map((x) => Math.abs(x.delta)), TIPUP_UMBRAL * 2) * 1.15;
+    const Y = (v) => T + (1 - (v + ymax) / (2 * ymax)) * (H - T - B);
+    const n = secs.length, innerW = W - L - R, X = (i) => L + (i + 0.5) * (innerW / n);
+    const svg = el('svg', { viewBox: `0 0 ${W} ${H}` });
+    const COL = { ioniza: '#c0392b', tipdown: '#2c6e72', plano: '#94a3b8' };
+    // Leyenda por estado.
+    let lx = L; [['ioniza', `ionización (ΔFP>+${TIPUP_UMBRAL}%)`], ['tipdown', `tip-down (ΔFP<−${TIPUP_UMBRAL}%)`], ['plano', 'plano (sano)']]
+      .forEach(([k, t]) => { svg.appendChild(el('rect', { x: lx, y: 6, width: 11, height: 11, rx: 2, fill: COL[k] }));
+        const tx = el('text', { x: lx + 16, y: 15, fill: '#5b6876', 'font-size': 10 }); tx.textContent = t; svg.appendChild(tx); lx += 32 + t.length * 6; });
+    // Eje Y (−ymax · 0 · +ymax) con la línea cero marcada.
+    [-ymax, 0, ymax].forEach((v) => { const yy = Y(v); svg.appendChild(el('line', { x1: L, y1: yy, x2: W - R, y2: yy, stroke: v === 0 ? '#cbd5e1' : '#eef2f6', 'stroke-width': v === 0 ? 1.5 : 1 }));
+      const tx = el('text', { x: L - 8, y: yy + 4, fill: '#8a97a5', 'font-size': 10, 'text-anchor': 'end', 'font-family': 'IBM Plex Mono, monospace' }); tx.textContent = (v > 0 ? '+' : '') + v.toFixed(2); svg.appendChild(tx); });
+    // Guías ±umbral.
+    [TIPUP_UMBRAL, -TIPUP_UMBRAL].forEach((v) => svg.appendChild(el('line', { x1: L, y1: Y(v), x2: W - R, y2: Y(v), stroke: '#b07d12', 'stroke-width': 1, 'stroke-dasharray': '5 4' })));
+    svg.appendChild(Object.assign(el('text', { x: W - R, y: Y(TIPUP_UMBRAL) - 4, fill: '#b07d12', 'font-size': 9, 'text-anchor': 'end' }), { textContent: `±${TIPUP_UMBRAL}% umbral` }));
+    // Etiquetas X + título.
+    secs.forEach((sec, i) => { const tx = el('text', { x: X(i), y: H - B + 18, fill: '#5b6876', 'font-size': 10, 'text-anchor': 'middle', 'font-family': 'IBM Plex Mono, monospace' }); tx.textContent = sec; svg.appendChild(tx); });
+    svg.appendChild(Object.assign(el('text', { x: (L + W - R) / 2, y: H - 6, fill: '#5b6876', 'font-size': 10, 'text-anchor': 'middle' }), { textContent: 'Sección — ΔFP = FP@alta − FP@baja (signo = señal) →' }));
+    // Barras con signo (desde la línea cero).
+    const slotW = innerW / Math.max(n, 1), nb = Math.max(reps.length, 1), bw = Math.min(slotW * 0.8 / nb, 18), y0 = Y(0);
+    secs.forEach((sec, i) => { reps.forEach((r, k) => {
+      const tp = tps.find((x) => x.sec === sec && x.rep.id === r.id); if (!tp) return;
+      const cx = X(i) - (nb * bw) / 2 + (k + 0.5) * bw, yy = Y(tp.delta);
+      const rect = el('rect', { x: cx - bw / 2, y: Math.min(yy, y0), width: Math.max(bw - 1, 1), height: Math.max(Math.abs(yy - y0), 1), fill: COL[tp.estado], rx: 1 });
+      const dx = tp.estado === 'ioniza' ? 'posible ionización/PD' : tp.estado === 'tipdown' ? 'tip-down (humedad/tierra núcleo)' : 'plano (sano)';
+      rect.appendChild(el('title', {})).textContent = `${sec} · ${r.label}${r.config ? ' · ' + r.config : ''}: ΔFP=${tp.delta > 0 ? '+' : ''}${tp.delta}% (${tp.hi.y}%@${tp.hi.kv}kV − ${tp.lo.y}%@${tp.lo.kv}kV) — ${dx}`;
+      svg.appendChild(rect); }); });
+    return svg;
+  }
+
   const pintar = () => {
     chartBox.innerHTML = '';
     const repsVis = repsVisibles(), secs = seccionesVis(), tens = tensionesVis();
+    const datos = analizarTand(repsVis, secs, tens);
     let svg = null;
     if (modo === 'tendencia') {
       svg = svgTendencia(secs, tens, repsVis);
       cap.textContent = `Tendencia año tras año: eje X = informe (en el tiempo), BARRAS por sección (color por sección) — la misma sección queda alineada entre años para leer su evolución. ${tens.length > 1 ? 'Tensión: barra llena = ' + tens[0] + ', tenue = ' + tens[1] + '. ' : ''}Criterio ${CRIT.norma}: guía ${CRIT.guia}% / límite ${CRIT.limite}%.`;
+    } else if (modo === 'tipup') {
+      svg = datos && svgTipUp(datos.tipups, secs, repsVis);
+      cap.textContent = `Tip-up (ΔFP = FP@tensión alta − FP@baja por sección): mide la dependencia del FP con la tensión. ΔFP≈0 plano (sano); ΔFP>+${TIPUP_UMBRAL}% posible ionización en vacíos / descargas parciales (INVESTIGAR); ΔFP<−${TIPUP_UMBRAL}% tip-down (humedad superficial o tierra de núcleo faltante). No requiere corrección de temperatura (es diferencia a igual T). Umbral ±${TIPUP_UMBRAL}% ⚠️ a verificar. Requiere ≥2 tensiones por sección.`;
     } else {
       const r = svgPorDevanado(secs, tens, repsVis);
       svg = r && r.svg;
@@ -285,8 +372,9 @@ export function montarPanelTand(cont, items) {
         cap.textContent = `Por devanado: eje X = sección de aislamiento ROTULADA (precisión de qué devanado es y contra qué); barras por informe (color por informe, ver leyenda${tens.length > 1 ? ' · 2 tensiones: llena/tenue' : ''}). Criterio ${CRIT.norma} — guía ${CRIT.guia}% / límite ${CRIT.limite}%. Veredicto: ${partes.join(' · ')}.`;
       }
     }
-    if (svg) chartBox.appendChild(svg); else chartBox.innerHTML = '<p class="muted small">Sin datos para los filtros activos.</p>';
-    renderAnalisis(analisisBox, analizarTand(repsVis, secs, tens));
+    if (svg) chartBox.appendChild(svg);
+    else chartBox.innerHTML = `<p class="muted small">${modo === 'tipup' ? 'Sin tip-up para los filtros activos (se necesitan ≥2 tensiones de prueba por sección).' : 'Sin datos para los filtros activos.'}</p>`;
+    renderAnalisis(analisisBox, datos);
     contadores.forEach((fn) => fn());
   };
 
@@ -340,7 +428,7 @@ export function montarPanelTand(cont, items) {
   vistaBar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Vista:', style: 'font-size:12px;font-weight:600;color:#475569;margin-right:4px' }));
   const mkVista = (key, txt) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pe-fase-chip' + (modo === key ? ' is-on' : ''); b.textContent = txt;
     b.addEventListener('click', () => { modo = key; [...vistaBar.querySelectorAll('.pe-fase-chip')].forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); pintar(); }); return b; };
-  vistaBar.append(mkVista('seccion', 'Por devanado (secciones en X)'), mkVista('tendencia', 'Tendencia (años en X)'));
+  vistaBar.append(mkVista('seccion', 'Por devanado (secciones en X)'), mkVista('tendencia', 'Tendencia (años en X)'), mkVista('tipup', 'Tip-up (ΔFP 10−2 kV)'));
 
   cont.appendChild(card);
   cont.appendChild(vistaBar);

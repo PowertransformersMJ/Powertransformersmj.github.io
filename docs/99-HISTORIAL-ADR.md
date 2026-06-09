@@ -752,3 +752,19 @@
 **37.2 No-regresión** — Sólo se movió el bloque HTML; el JS puebla `#idgrid` por ID (orden-independiente), no se tocó. Verificado: un único `id="identidad"`, secuencia de secciones correcta, `html-validate` 0. ⚠️ La página vive tras Firebase Auth (el preview redirige a login), así que la verificación es estructural (grep de orden + lint), no UI en vivo.
 
 **37.3 Doctrina** — "Un reorden de presentación se hace moviendo el bloque en el HTML estático cuando el render se hace por ID (no por orden del DOM); no requiere tocar JS. Si la vista vive tras auth y el preview no entra, declara la validación como estructural." 
+
+---
+
+## 38. ADR-038 — FP/tan δ: vista Tip-up (ΔFP) + caveat de corrección a 20 °C (auditoría de dominio con skill)
+
+> Director (2026-06-09): "revisa el segmento de factor de potencia con todas tus skills… verifica si se nos escapa algo o podemos incluir algo que dé mayor valor en el diagnóstico." Auditoría 🔵 con `factor-potencia-aislamiento`; hallazgos en `49-PRUEBAS-ELECTRICAS §Auditoría`. Se implementan #1 (tip-up) y #4 (caveat 20 °C). **Frontend; en prod tras push.**
+
+**38.1 Tip-up (ΔFP)** — `analizarTand` ahora computa, por (informe × sección), `ΔFP = FP(kV máx) − FP(kV mín)` usando las DOS tensiones que ya trae el dato real (`Tan δ @10 kV`/`@2 kV`, kV parseado del nombre de serie). Clasifica: `ioniza` (ΔFP>+`TIPUP_UMBRAL`=0.1% → ionización en vacíos/PD, INVESTIGAR), `tipdown` (ΔFP<−0.1% → humedad superficial / tierra de núcleo faltante), `plano` (sano). NO requiere corrección de T (es diferencia a igual temperatura). Nueva **vista "Tip-up"** (`svgTipUp`): barras CON SIGNO desde la línea cero, color por estado, guías ±umbral; + resumen en "Análisis conforme a norma" (planas/ioniza/tipdown + peor ΔFP). Detecta un mecanismo (PD/ionización) INVISIBLE al FP absoluto. Skill §D + 02§3 + 04.
+
+**38.2 Caveat 20 °C** — Los informes NO registran temperatura → NO se inventa (memoria 'no fabricar datos'). El análisis muestra un aviso explícito: valores "como medidos", sin corrección a 20 °C; el criterio NETA/IEEE asume FP₂₀. Acción futura: capturar T del ensayo + factor del fabricante (IEEE C57.12.90 retiró el genérico en 2010) en la extracción IA. Correctitud normativa honesta (skill 02§2/03).
+
+**38.3 Verificación (workflow)** — `_dev/preview-tand.html` con datos REALES (450108): la vista Tip-up pinta 33 barras, leyenda por estado, tooltips con `ΔFP=hi%@kV − lo%@kV`; resumen real "30 secciones: 30 PLANAS (sano), peor +0.0567% en CLT" → confirma con métrica computada lo que la IA decía en texto ("sin variación significativa 2↔10 kV"). 5 tests nuevos de `analizarTand` (sin 2ª tensión→sin tip-up; +grande→ioniza; ≈0→plano; −grande→tipdown; peor=mayor |ΔFP|). `npm test` **1151/1151**. Lint 0. Sin errores de consola.
+
+**38.4 Pendientes de la auditoría (no implementados, decisión del director)** — #2 localización del defecto por modo (CH/CL/CHL→dónde), #3 tendencia de capacitancia (pF), #5 pendiente/tasa con bandera predictiva, #6 baseline de fábrica. Ver `49 §Auditoría`.
+
+**38.5 Doctrina** — "Una auditoría de dominio (Trigger 🔵) se hace CON la skill (criterios/cálculos/diagnóstico) y aterrizada al DATO REAL disponible: el tip-up era computable porque el informe ya traía 2 tensiones — valor nuevo sin pedir más datos. Lo que falta (corrección de T) se DECLARA como caveat, no se inventa. Registrar los hallazgos en el lóbulo para que la próxima ronda continúe sin re-auditar."
