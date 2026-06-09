@@ -364,9 +364,35 @@ export function etiquetaFecha(fecha, ano) {
 // Sin esto, ordenar por string pone "02/05/2022" ANTES que "18/01/2022" (mayo
 // antes que enero) — orden lexicográfico, no de fecha. Cae al año si no matchea.
 export function ordenInforme(repLabel, ano) {
-  const m = String(repLabel == null ? '' : repLabel).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  // Match del PREFIJO de fecha (sin anclar al final): la etiqueta puede llevar un
+  // sufijo de config (" · estrella") cuando dos informes coinciden en fecha.
+  const m = String(repLabel == null ? '' : repLabel).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if (m) return Number(m[3]) * 10000 + Number(m[2]) * 100 + Number(m[1]);
   return (Number(ano) || 0) * 10000;
+}
+
+// Etiqueta corta de CONFIGURACIÓN de un informe para desambiguar dos del MISMO día
+// (trafo móvil: misma prueba el mismo día en estrella vs delta, ADR-014/028).
+// Prioridad: (1) `config` explícito; (2) un rótulo "estrella/delta" hallado en los
+// textos del informe (nombre de archivo, título…) — la config de DESPLIEGUE vive ahí,
+// NO en el grupo de placa (nameplate), que es del DISEÑO y puede no coincidir; (3) como
+// último recurso, el grupo de conexión (HV: D→delta, Y→estrella). '' si no hay nada.
+const _id = (it) => (it && it.identidad) || {};
+export function configInforme(it) {
+  const c = (it && it.config != null) ? String(it.config).trim() : '';
+  if (c) return c;
+  const id = _id(it);
+  const textos = [it && it.nombre, it && it.archivo, it && it.pdf, it && it.titulo, it && it.tipo_prueba,
+    id.configuracion, id.conexion, id.montaje].map((t) => String(t == null ? '' : t).toLowerCase())
+    .join(' ').normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  if (/\bdelta\b/.test(textos)) return 'delta';
+  if (/\bestrella\b|\bwye\b|\bstar\b/.test(textos)) return 'estrella';
+  const gc = String((it && it.grupo_conexion) || id.grupo_conexion || '').trim();
+  if (!gc) return '';
+  const h = gc[0].toUpperCase();
+  if (h === 'D') return 'delta';
+  if (h === 'Y') return 'estrella';
+  return gc.split(/[^A-Za-z0-9]/)[0] || '';
 }
 
 const DEVANADOS = ['at', 'mt', 'bt'];
@@ -399,6 +425,7 @@ function discriminadorBloque(b) {
  */
 export function bloquesMultiAno(items) {
   const fam = new Map();
+  const repMeta = new Map(); // rep → {label, config, ano} para desambiguar colisiones de fecha
   for (const it of (Array.isArray(items) ? items : [])) {
     const ano = it && it.ano;
     const repLabel = etiquetaFecha(it && it.fecha, ano); // etiqueta UNIFORME DD/MM/YYYY
@@ -406,6 +433,7 @@ export function bloquesMultiAno(items) {
     // informes del mismo año compartirían clave y se solaparían. (La identidad usa
     // la fecha CRUDA, no la normalizada, para no fundir estrella+delta del mismo día.)
     const rep = (it && it.id != null && String(it.id)) || (it && it.fecha) || repLabel;
+    if (!repMeta.has(rep)) repMeta.set(rep, { label: repLabel, config: configInforme(it), ano });
     for (const b of ((it && it.bloques) || [])) {
       const f = familiaMA(b);
       if (!f) continue;
@@ -438,19 +466,36 @@ export function bloquesMultiAno(items) {
       for (const s of (b.series || [])) {
         const puntos = (s.puntos || []).filter((p) => p && p.x != null && typeof p.y === 'number');
         if (!puntos.length) continue;
-        g._series.push({ rep, repLabel, ano, fase: String(s.nombre || ''), puntos });
+        g._series.push({ rep, ano, fase: String(s.nombre || ''), puntos });
       }
     }
   }
+  // Etiqueta FINAL por informe: si dos+ informes comparten la misma fecha (trafo
+  // móvil: estrella y delta el MISMO día), se les añade la config para distinguir
+  // los chips ("19/01/2024 · estrella" vs "· delta"). Si la fecha es única, queda
+  // limpia. Sin config disponible para desempatar, se deja la fecha tal cual.
+  const porFecha = new Map();
+  for (const [rep, m] of repMeta) {
+    if (!porFecha.has(m.label)) porFecha.set(m.label, []);
+    porFecha.get(m.label).push(rep);
+  }
+  const etiqFinal = (rep) => {
+    const m = repMeta.get(rep) || {};
+    const colisiona = (porFecha.get(m.label) || []).length > 1;
+    return (colisiona && m.config) ? `${m.label} · ${m.config}` : (m.label || rep);
+  };
   return [...fam.values()]
     .map((g) => {
       const series = g._series
-        .slice().sort((a, b) => ordenInforme(a.repLabel, a.ano) - ordenInforme(b.repLabel, b.ano))
-        .map((s) => ({
-          nombre: s.fase ? `${s.repLabel} · ${s.fase}` : s.repLabel,
-          _rep: s.rep, _repLabel: s.repLabel, _ano: s.ano != null ? String(s.ano) : 's/a',
-          _fase: s.fase, puntos: s.puntos
-        }));
+        .slice().sort((a, b) => ordenInforme(etiqFinal(a.rep), a.ano) - ordenInforme(etiqFinal(b.rep), b.ano))
+        .map((s) => {
+          const lbl = etiqFinal(s.rep);
+          return {
+            nombre: s.fase ? `${lbl} · ${s.fase}` : lbl,
+            _rep: s.rep, _repLabel: lbl, _ano: s.ano != null ? String(s.ano) : 's/a',
+            _fase: s.fase, puntos: s.puntos
+          };
+        });
       const { _series, _ord, _tAno, ...resto } = g;
       void _ord; void _tAno;
       return { ...resto, series };

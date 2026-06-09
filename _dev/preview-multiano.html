@@ -19,7 +19,7 @@
 
 <script type="module">
 import { svgBloque } from '../assets/js/ui/pruebas/grafico-generico.js';
-import { bloquesMultiAno, ordenInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+import { bloquesMultiAno, ordenInforme, configInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
 
 // Fixtures REALES (datos verídicos entregados por el director). Para ver el
 // overlay multi-año, añadir aquí más informes reales de la misma serie.
@@ -28,7 +28,8 @@ const FIXTURES = [
   './fixtures/450108-2022-01-18.json',
   './fixtures/450108-2022-05-02.json',
   './fixtures/450108-2023-11-09.json',
-  './fixtures/450108-2024-01-19.json'
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
 ];
 
 const cont = document.getElementById('pe-consolidado');
@@ -38,7 +39,7 @@ const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#08
   const informes = [];
   for (const url of FIXTURES) {
     try { const j = await (await fetch(url + '?v=' + Date.now())).json();
-      informes.push({ ano: j.ano, fecha: j.fecha, id: j.id || j.fecha, bloques: j.bloques || [] });
+      informes.push({ ano: j.ano, fecha: j.fecha, id: j.id || j.fecha, config: configInforme(j), bloques: j.bloques || [] });
     } catch (e) { console.error('fixture', url, e); }
   }
 
