@@ -417,6 +417,11 @@ describe('configInforme · estrella/delta para desambiguar mismo día', () => {
     assert.equal(configInforme({}), '');
     assert.equal(configInforme(null), '');
   });
+  test('tipo de ensayo SFRA se combina con la config (libro SFRA aparte el mismo día)', () => {
+    assert.equal(configInforme({ nombre: '240119 SFRA TRAFO MOVIL conexion estrella NS 450108' }), 'SFRA estrella');
+    assert.equal(configInforme({ nombre: 'SFRA conexion delta' }), 'SFRA delta');
+    assert.equal(configInforme({ nombre: 'TRAFO conexion estrella' }), 'estrella'); // sin SFRA
+  });
 });
 
 describe('ADR-028: desambiguación de informes del MISMO día (trafo móvil estrella/delta)', () => {
