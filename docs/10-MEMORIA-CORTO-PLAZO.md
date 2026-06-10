@@ -18,9 +18,10 @@
 > **Arco tablero base (ADR-003→014) + arco panel tan δ (ADR-029→040) EN PRODUCCIÓN** (mergeado a `main`
 > vía **PR #172**). **Arco panel CORRIENTE DE EXCITACIÓN (ADR-041): panel (`3ce25ae`) EN PRODUCCIÓN (PR #173);
 > CABLEADO al shell (`7bb8b38`); **+ ADR-042** (vista "Resumen (todo)" = valores+desviación+tablas apiladas + **gating
-> de tablas** por año/nivel + fix `reset` huérfano L-54) RECIÉN COMMITEADO en `DESARROLLO`, **FALTA PUSH+PR** (lo dispara
-> el director; `git fetch` antes de afirmar despliegue).**
-> Detalle: `00`→`99 §29..§42`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108;
+> de tablas** por año/nivel + fix `reset` huérfano L-54) **+ ADR-043** (**tabla-RESUMEN por nivel FUSIÓN 1+4**: banda+KPI
+> tiles+franja de norma+tabla por años con criterio; detalle por TAP gateado debajo) COMMITEADOS en `DESARROLLO`,
+> **FALTA PUSH+PR** (lo dispara el director; `git fetch` antes de afirmar despliegue).**
+> Detalle: `00`→`99 §29..§43`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108;
 > **pendiente validar en la APP** (la página vive tras Firebase Auth → el preview no entra; sólo harness).
 >
 > **ARCO EXCITACIÓN (ADR-041 → `99 §41` + lobe 49) — `ui/pruebas/excitacion-panel.js` + cableado en shell:**
@@ -99,17 +100,18 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-10** — **Panel CORRIENTE DE EXCITACIÓN (ADR-041 → `99 §41`; ADR-042 → `99 §42`):** panel `3ce25ae` + cableado
-  `7bb8b38` EN PRODUCCIÓN. **ADR-042**: el director no veía la gráfica de VALORES (vistas eran mutuamente excluyentes) →
-  nueva vista **"Resumen (todo)"** por defecto (valores mA + desviación + tablas apiladas) + **gating de tablas** (solo al
-  acotar a 1 año o 1 nivel → no satura) + chip "Patrón"→"Valores (mA)"; **fix bug `reset`** (Sets reasignados dejaban
-  closures huérfanos → mutar en sitio, **L-54**). **+ §42.8**: separación **por NIVEL DE TENSIÓN** (cada nivel = su gráfica
-  de valores + su desviación + su criterio; quita "solo el 1.er nivel"). 1179/1179, lint 0; **FALTA PUSH+PR** (§42.8 en
-  commit aparte). Hallazgo previo **L-53** (patrón 2+1 = FORMA, central B menor por geometría). **Falta validar en la APP**.
+- **2026-06-10** — **Tabla-RESUMEN por nivel FUSIÓN 1+4 (ADR-043 → `99 §43`):** el director pidió 4 propuestas de tablas
+  vía preview (por nivel · valores totales · criterio por norma) → módulo DEV `_dev/excitacion-tablas-opciones.js` +
+  harness → eligió **fusionar opción 1 + 4**. Integrado en `excitacion-panel.js`: `agruparNiveles`/`tablaFusion` (banda +
+  KPI tiles + franja NETA/IEEE + tabla por años con criterio), `pintarTablas` = fusión SIEMPRE + detalle por TAP gateado
+  debajo (conservado); CSS `pe-fus-*`. Overflow de la col. criterio cerrado a 0 (chips de norma apilados + ancho/fuente).
+  1179/1179, lint 0, sin errores de consola; **FALTA PUSH+PR**. **Falta validar en la APP**.
+- **2026-06-10** — **Panel CORRIENTE DE EXCITACIÓN (ADR-041 §41; ADR-042 §42):** panel `3ce25ae` + cableado `7bb8b38` EN
+  PRODUCCIÓN. **ADR-042**: vista **"Resumen (todo)"** por defecto (valores+desviación+tablas apiladas) + **gating de tablas**
+  (1 año/1 nivel) + **fix `reset`** (Sets huérfanos → mutar en sitio, **L-54**) + **§42.8** separación por NIVEL DE TENSIÓN.
+  **L-53** (patrón 2+1 = FORMA, central B menor por geometría). **FALTA PUSH+PR · falta validar en la APP**.
 - **2026-06-09** — **Panel tan δ + auditoría FP (ADR-029→040) — MERGEADO a `main` (PR #172).** Detalle en `99`; lecciones
   **L-51** (sobre-retiro) / **L-52** (capacitancia −91% = artefacto). Tests 1160/1160.
 - **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
   [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
   + validación de arquitectura (TODO-10).
-- **2026-06-08** — Arco tablero pruebas-eléctricas **consolidado en `99` (ADR-010→027) + lecciones L-35..L-50** (TODO en prod
-  salvo el multi-año). 🚫 **NO romper la calificación global por prueba** (`feedback_calificacion_global_por_prueba`); preview UI L-49.

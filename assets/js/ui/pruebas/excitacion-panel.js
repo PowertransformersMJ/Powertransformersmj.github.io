@@ -621,23 +621,113 @@ export function montarPanelExcitacion(cont, items) {
     wrap.appendChild(vd); return wrap;
   };
 
+  // ── Tabla-RESUMEN por nivel (FUSIÓN 1+4, pedido del director): por NIVEL DE
+  // TENSIÓN — banda con veredicto + mosaicos KPI (I máx · Δ ext máx · Σ pérdidas ·
+  // # informes) + franja con la norma citada (NETA + IEEE) + tabla por informe/año
+  // con valores totales (I prom A/B/C, Δ ext, Σ pérd) y criterio por norma. Es la
+  // forma EJECUTIVA de "los valores totales + el criterio", complementa el detalle
+  // por TAP (abajo). Reutiliza el MISMO ev del patrón — no duplica criterio. ──
+  const avgN = (arr) => { const a = arr.filter((v) => v != null); return a.length ? a.reduce((x, y) => x + y, 0) / a.length : null; };
+  const r2 = (v) => (v == null ? null : round(v, 2));
+  const fmtN = (v) => (v == null ? '—' : round(v, 2));
+  const dClsExt = (d) => (d == null ? '' : d > CRIT.limite ? 'd-bad' : d > CRIT.guia ? 'd-warn' : 'd-ok');
+  const EST_TXT = { ok: 'Cumple', warn: 'Vigilar', bad: 'No cumple', na: 's/d' };
+  const badgeEstado = (e) => { const b = document.createElement('span'); b.className = 'pe-tabla-badge is-' + (e === 'na' ? 'warn' : e); b.textContent = EST_TXT[e] || e; return b; };
+  const chipNorma = (acron, cumple, sub) => {
+    const c = document.createElement('span'); c.className = 'pe-fus-chip is-' + (cumple ? 'ok' : 'bad');
+    c.textContent = (cumple ? '✓ ' : '✕ ') + acron; c.title = `${acron} · ${sub} — ${cumple ? 'cumple' : 'no cumple'}`;
+    return c;
+  };
+  const badgeNorma = (inf) => {
+    const w = document.createElement('div'); w.className = 'pe-fus-chips';
+    const netaOk = inf.ok && inf.patron !== 'plano';
+    const ieeeOk = inf.deltaMax != null && inf.deltaMax <= inf.admisible;
+    w.append(chipNorma('NETA', netaOk, 'patrón 2+1'), chipNorma('IEEE', ieeeOk, `Δ≤${inf.admisible}%`));
+    return w;
+  };
+  const agruparNiveles = (vis) => {
+    const byNivel = new Map();
+    vis.forEach((m) => {
+      if (!byNivel.has(m.nivel)) byNivel.set(m.nivel, new Map());
+      const inf = byNivel.get(m.nivel);
+      if (!inf.has(m.rep.id)) inf.set(m.rep.id, { rep: m.rep, rows: [] });
+      inf.get(m.rep.id).rows.push(m);
+    });
+    return [...byNivel.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([nivel, infMap]) => {
+      const informes = [...infMap.values()].sort((a, b) => (a.rep.ano || 0) - (b.rep.ano || 0)).map((g) => {
+        const Iprom = {}; ORDEN_FASE.forEach((f) => { Iprom[f] = r2(avgN(g.rows.map((m) => m.fases[f]))); });
+        const Wprom = {}; ORDEN_FASE.forEach((f) => { Wprom[f] = r2(avgN(g.rows.map((m) => (m.wfases ? m.wfases[f] : null)))); });
+        const tieneW = ORDEN_FASE.some((f) => Wprom[f] != null);
+        const sumW = tieneW ? r2(ORDEN_FASE.reduce((a, f) => a + (Wprom[f] || 0), 0)) : null;
+        const evs = g.rows.map((m) => m.ev).filter(Boolean);
+        const peor = evs.reduce((a, b) => (b.deltaExt > (a ? a.deltaExt : -1) ? b : a), null);
+        const deltaMax = peor ? peor.deltaExt : null;
+        const ok = evs.length ? evs.every((e) => e.ok) : true;
+        const estado = !evs.length ? 'na' : ok ? 'ok' : (deltaMax > peor.admisible * 2 ? 'bad' : 'warn');
+        const Imax = evs.length ? r2(Math.max(...g.rows.map((m) => (m.ev ? m.ev.corrMax : 0)))) : null;
+        return { rep: g.rep, Iprom, sumW, tieneW, deltaMax, ok, estado, Imax, patron: peor ? peor.patron : '—', admisible: peor ? peor.admisible : CRIT.limite };
+      });
+      return {
+        nivel, informes,
+        deltaMaxNivel: r2(Math.max(...informes.map((x) => x.deltaMax || 0))),
+        sumWNivel: informes.some((x) => x.sumW != null) ? r2(informes.reduce((a, x) => a + (x.sumW || 0), 0)) : null,
+        ImaxNivel: r2(Math.max(...informes.map((x) => x.Imax || 0))),
+        estadoNivel: informes.some((x) => x.estado === 'bad') ? 'bad' : informes.some((x) => x.estado === 'warn') ? 'warn' : 'ok',
+      };
+    });
+  };
+  const tablaFusion = (vis) => {
+    const niveles = agruparNiveles(vis);
+    if (!niveles.length) return null;
+    const root = document.createElement('div'); root.className = 'pe-fus';
+    niveles.forEach((N) => {
+      const card = document.createElement('div'); card.className = 'pe-fus-card';
+      const band = document.createElement('div'); band.className = 'pe-fus-band';
+      band.innerHTML = `<span class="pe-fus-niv">${esc(N.nivel)}</span>`; band.appendChild(badgeEstado(N.estadoNivel)); card.appendChild(band);
+      const tiles = document.createElement('div'); tiles.className = 'pe-fus-tiles';
+      const tile = (v, u, l, cls) => `<div class="pe-fus-tile ${cls || ''}"><div class="pe-fus-v">${v}<small>${u}</small></div><div class="pe-fus-l">${l}</div></div>`;
+      const dc = N.deltaMaxNivel == null ? '' : N.deltaMaxNivel > CRIT.limite ? 'is-bad' : N.deltaMaxNivel > CRIT.guia ? 'is-warn' : 'is-ok';
+      tiles.innerHTML = tile(fmtN(N.ImaxNivel), ' mA', 'Corriente máx') + tile(fmtN(N.deltaMaxNivel), ' %', 'Δ ext máx', dc) + tile(fmtN(N.sumWNivel), ' W', 'Σ pérdidas') + tile(N.informes.length, '', 'Informes');
+      card.appendChild(tiles);
+      const vr = document.createElement('div'); vr.className = 'pe-fus-verdict';
+      vr.innerHTML = `<span class="pe-fus-norma"><b>NETA</b> ${esc(NORMAS_EXC[0].sub)} · patrón 2+1</span><span class="pe-fus-norma"><b>IEEE</b> ${esc(NORMAS_EXC[1].sub)} · Δ ext ≤ ${CRIT.guia}–${CRIT.limite}%</span>`;
+      const vb = document.createElement('span'); vb.className = 'pe-fus-vb'; vb.appendChild(badgeEstado(N.estadoNivel)); vr.appendChild(vb); card.appendChild(vr);
+      const scroll = document.createElement('div'); scroll.className = 'pe-tabla-scroll';
+      const tbl = document.createElement('table'); tbl.className = 'pe-tabla';
+      tbl.innerHTML = '<thead><tr><th>Informe</th><th>I A (mA)</th><th>I B (mA)</th><th>I C (mA)</th><th>Δ ext (%)</th><th>Σ pérd. (W)</th><th>Criterio</th></tr></thead>';
+      const tb = document.createElement('tbody');
+      N.informes.forEach((inf) => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${esc(inf.rep.label)}${inf.rep.config ? ' · ' + esc(inf.rep.config) : ''}</td><td>${fmtN(inf.Iprom.A)}</td><td class="col-b">${fmtN(inf.Iprom.B)}</td><td>${fmtN(inf.Iprom.C)}</td><td class="${dClsExt(inf.deltaMax)}">${fmtN(inf.deltaMax)}</td><td>${fmtN(inf.sumW)}</td>`;
+        const td = document.createElement('td'); td.appendChild(badgeNorma(inf)); tr.appendChild(td); tb.appendChild(tr);
+      });
+      tbl.appendChild(tb); scroll.appendChild(tbl); card.appendChild(scroll); root.appendChild(card);
+    });
+    return root;
+  };
+
   // ── Gating de tablas (evita sobrecarga visual): las tablas de valores solo se
   // despliegan cuando el usuario acota a UN año o UN nivel — o cuando de por sí
   // hay pocas (≤2). Si no, se muestra una pista para filtrar (pedido del director). ──
   const totalTablas = () => new Set(medsVis().filter((m) => m.tap != null).map((m) => m.rep.id + '|' + m.nivel)).size;
   const tablasVisibles = () => sel.rep.size === 1 || sel.nivel.size === 1 || totalTablas() <= 2;
+  const subTtl = (txt) => Object.assign(document.createElement('div'), { textContent: txt, style: 'font-size:12px;font-weight:700;color:#334155;margin:16px 0 6px' });
   const pintarTablas = (target) => {
     const fasesList = fasesAll.filter((f) => sel.fase.has(f));
+    // 1) Resumen EJECUTIVO por nivel (valores totales + criterio por norma) — SIEMPRE.
+    const fus = tablaFusion(medsVis());
+    if (fus) target.appendChild(fus);
+    else { target.appendChild(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin valores de excitación para los filtros activos.' })); return; }
+    // 2) Detalle por posición de TAP (los valores CRUDOS del informe) — con gating.
     if (!tablasVisibles()) {
       const n = totalTablas();
       const hint = document.createElement('p'); hint.className = 'muted small';
-      hint.innerHTML = `Hay <b>${n}</b> tablas de valores (una por informe × nivel). Elige <b>un año</b> o <b>un nivel de tensión</b> en los filtros de arriba para desplegarlas — así no se sobrecarga la vista.`;
-      target.appendChild(hint);
+      hint.innerHTML = `El detalle por TAP son <b>${n}</b> tablas (una por informe × nivel). Elige <b>un año</b> o <b>un nivel de tensión</b> arriba para desplegarlas — el resumen ya muestra los valores totales y el criterio por nivel.`;
+      target.appendChild(subTtl('Detalle por posición de TAP')); target.appendChild(hint);
       return;
     }
     const t = tablaValores(medsVis(), fasesList, tablaMag);
-    if (t) target.appendChild(t);
-    else target.appendChild(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin valores de excitación para los filtros activos.' }));
+    if (t) { target.appendChild(subTtl('Detalle por posición de TAP')); target.appendChild(t); }
   };
 
   const pintar = () => {
