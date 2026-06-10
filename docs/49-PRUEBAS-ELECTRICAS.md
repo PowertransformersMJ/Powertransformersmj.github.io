@@ -59,6 +59,38 @@ Replicar es mecánico una vez validada la ejemplar.
 > ROTATIVAS y excluye tx** → en tx es apoyo por analogía, el criterio duro es NETA (PI≥1.0) +
 > IEEE C57.152 (PI≥1.5).
 
+## 📇 Fichas JSON por prueba (`docs/pruebas/*.json`) — mapa de comunicación
+
+Una **ficha por prueba** (10, en el orden del scorecard) para hablar el mismo idioma al corregir:
+cada una trae `datos_que_extrae_la_IA` (estructura real del schema) + `criterio_y_umbrales`
+(umbral vigente + normas multi-norma + `⚠️ verificar`) + `_fuente` (ruta/función del código).
+**El CÓDIGO manda** (`schema.js` + `multinorma.js` + `FAMILIAS_SCORE` en `pruebas-electricas-shell.js`);
+las fichas son el mapa — refrescarlas si cambia el código (Reflejo de Frescura). Creadas 2026-06-10.
+
+| # | Ficha | Motor |
+|---|---|---|
+| 01 | `factor-potencia-aislamiento` (tan δ) | canónico |
+| 02 | `factor-potencia-bujes` (C1) | canónico |
+| 03 | `corriente-excitacion` | canónico |
+| 04 | `relacion-transformacion` | canónico |
+| 05 | `resistencia-devanados` | canónico |
+| 06 | `resistencia-aislamiento` | canónico (NETA por clase) |
+| 07 | `collar-caliente` | canónico |
+| 08 | `drm-conmutador` | canónico (no multi-norma) |
+| 09 | `sfra-respuesta-frecuencia` | **comparativo** (sin pasa/no-pasa) |
+| 10 | `dfr-espectroscopia-dielectrica` | **comparativo** (humedad papel) |
+
+**Panel "Valores por prueba" EN PRODUCCIÓN (ADR-044)** — `assets/js/ui/pruebas/tablas-pruebas-panel.js`
+(`montarPanelPrueba(cont, familia, informes)`): nombre de prueba + filtro de año; resumen = **rango REAL
+mín–máx por fase** (nunca promedio) + **Σ pérdidas (W)**; un año = **tabla completa** (todos los TAP);
+discrimina por **NIVEL real** (`nivelDe`, NO la tensión de ensayo "10 kV"); **Diagnóstico conforme a norma**
+(sellos NETA/IEEE estilizados + `evaluarMultiNorma`) + **Análisis y recomendación** (peor caso + tendencia +
+acción CBM vía `accionPrueba`). Cableado ADITIVO en `montarMultiAno` para relación/resistencia/aislamiento/
+bujes/collar (tan δ/excitación conservan su panel). Reusa dominio (L-55); CSS `pe-vp-*`. Tests
+`tests/tablas_pruebas_panel.test.js` (6, guard del bug de nivel). Suite 1185/1185. **Falta validar en la APP**.
+Origen: workflow iterado (fichas `docs/pruebas/*.json` + harnesses `_dev/preview-panel-prueba*.html`). Lección
+→ `30 §L-55` (reusar dominio no reinventar · criterio por tipo · dedup · preview en raíz).
+
 ## Estado de las 13 skills (1 por prueba de la batería 7.2.2)
 
 | # | Skill | Estado |

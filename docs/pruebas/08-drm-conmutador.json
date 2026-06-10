@@ -1,0 +1,57 @@
+{
+  "prueba": "drm",
+  "nombre": "DRM · Resistencia dinámica del conmutador (OLTC)",
+  "orden_scorecard": 8,
+  "diagnostico_motor": "canónico (ventana de tiempos de transición)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarDrm() · DRM_TIEMPO_MS",
+    "motor_multinorma": "n/a — DRM NO está en CRITERIOS_MULTINORMA (veredicto por calificarDrm)",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[7]",
+    "skill": "skills/pruebas-electricas/ (conmutador/OLTC)",
+    "_nota": "El CÓDIGO manda. Refrescar esta ficha si cambia el código."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Identidad del conmutador + ventana de tiempos + detalle opcional por transición.",
+    "conmutador": {
+      "fabricante": "ej. 'MR'",
+      "tipo": "ej. 'V III 200 Y-76'",
+      "serial": "ej. '145981'",
+      "posiciones": "entero (ej. 21)",
+      "operaciones": "entero (ej. 383208)",
+      "pos_nominal": "entero (ej. 11)",
+      "tension_ui_v": "número (V)",
+      "corriente_iu_a": "número (A)",
+      "r_conmutacion_ohm": "número (Ω)"
+    },
+    "tiempo_min_ms": "número (extremo inferior de la ventana)",
+    "tiempo_max_ms": "número (extremo superior; se derivan de transiciones si faltan)",
+    "transiciones": [
+      { "posicion": "ej. '10→11'", "fase": "A|B|C", "tiempo_ms": "número", "sentido": "subir|bajar", "calif": "OK|fuera" }
+    ],
+    "calif": "OK | fuera | n/d (derivada)"
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "cualquier extremo fuera de [40, 70] ms → 'fuera'",
+    "criterio_scorecard": "40–70 ms",
+    "formula": "Tiempo de transición del conmutador por paso (ms) · sin discontinuidades",
+    "umbral_vigente": {
+      "40–70 ms": "OK",
+      "fuera de [40,70]": "fuera (riesgo de contacto)",
+      "_codigo": "DRM_TIEMPO_MS {min:40, max:70} · calificarDrm()"
+    },
+    "normas_multinorma": [
+      { "norma": "IEEE C57.152-2013", "umbral": "40–70 ms · sin discontinuidades", "tipo": "cuantitativo" }
+    ],
+    "pendiente_de_validar": {
+      "_estado": "ventana estable; sin ⚠️ abierto"
+    }
+  },
+
+  "notas": [
+    "Cuando solo se conoce el rango (resumen), transiciones[] queda vacío — no se inventan tiempos por paso.",
+    "Prueba INDEPENDIENTE — no fusionar."
+  ]
+}

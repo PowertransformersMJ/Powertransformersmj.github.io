@@ -1,0 +1,57 @@
+{
+  "prueba": "resistencia",
+  "nombre": "Resistencia óhmica de devanados",
+  "orden_scorecard": 5,
+  "diagnostico_motor": "canónico (desbalance entre fases)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarResistencia()",
+    "motor_multinorma": "assets/js/domain/pruebas_electricas_multinorma.js → CRITERIOS_MULTINORMA.resistencia",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[4]",
+    "skill": "skills/pruebas-electricas/ (resistencia)",
+    "_nota": "El CÓDIGO manda. Refrescar esta ficha si cambia el código."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Filas AT/MT/BT con fases en mΩ. Conserva marcas 'verificar' y 'no_medido'.",
+    "filas": [
+      {
+        "ano_tap": "ej. '2012 (7) mΩ', '2014 (8) corr.'",
+        "devanado": "AT | MT | BT",
+        "conexion": "ej. 'fase–N', 'fase–fase (Δ)'",
+        "unidad": "mΩ",
+        "fases": [{ "fase": "A", "valor": "número (mΩ)", "term": "string", "verificar": "bool" }],
+        "delta_max_pct": "número (desbalance máx entre fases %)",
+        "verificar": "bool (dato a confirmar)",
+        "no_medido": "bool (no se midió ese devanado)",
+        "calif": "OK | verificar | no medido | n/d (derivada)"
+      }
+    ]
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "máx(delta_max_pct) excluyendo filas no_medido",
+    "criterio_scorecard": "Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)",
+    "formula": "Δ% entre fases = (R_máx − R_mín) / R_prom × 100 (corregida a temperatura Ts)",
+    "umbral_vigente": {
+      "≤ 2% entre fases": "OK (NETA ATS)",
+      "≤ 3%": "sanity-check industria (Doble/Megger)",
+      "_nota_codigo": "El scorecard usa el consolidado multi-norma (≤2% NETA es el que manda)."
+    },
+    "normas_multinorma": [
+      { "norma": "ANSI/NETA ATS §7.2.2.D.8", "umbral": "≤2% entre fases / vs fábrica", "tipo": "cuantitativo (manda)" },
+      { "norma": "Práctica industria (Doble/Megger)", "umbral": "≤3%", "tipo": "sanity-check" },
+      { "norma": "IEEE C57.152 / C57.12.90", "umbral": "método (I≤10% In) + tendencia", "tipo": "sin % duro" },
+      { "norma": "MO.00418 por clase", "umbral": "⚠️ verificar (edición del director)", "tipo": "verificar" }
+    ],
+    "pendiente_de_validar": {
+      "⚠️_MO00418": "Umbral por clase MO.00418 sigue 'verificar' (TODO-08).",
+      "⚠️_correccion_temperatura": "La corrección a Ts depende de tener T del ensayo; sin T → declarar, no inventar."
+    }
+  },
+
+  "notas": [
+    "Filas con no_medido NO entran a la métrica peor-caso (no falsear como 0%).",
+    "Prueba INDEPENDIENTE — no fusionar."
+  ]
+}

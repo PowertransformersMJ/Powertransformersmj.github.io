@@ -1,0 +1,46 @@
+{
+  "prueba": "sfra",
+  "nombre": "SFRA · Respuesta en frecuencia (Sweep Frequency Response Analysis)",
+  "orden_scorecard": 9,
+  "diagnostico_motor": "COMPARATIVO — sin pasa/no-pasa numérico (no tiene motor canónico)",
+
+  "_fuente": {
+    "datos": "Bloque genérico (sin sanitizer dedicado) — detectado por blockKeys ['sfra'] sobre el bloque de la IA",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[8]",
+    "skill": "skills/pruebas-electricas/sfra/",
+    "fixtures": "_dev/fixtures/450108-*-sfra*.json",
+    "_nota": "El CÓDIGO manda. SFRA NO pasa por sanitizarInforme() de las 8 canónicas; vive como bloque genérico."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Bloque genérico (cuerpo + tabla). Las trazas dB–Hz del PDF son IMAGEN — no se inventan; se capturan los coeficientes de correlación por banda si el informe los da.",
+    "bloque": {
+      "prueba": "string que contiene 'sfra'",
+      "cuerpo": "texto/observaciones del laboratorio",
+      "tabla": "coeficientes de correlación por banda (LF / MF / HF) si están en el informe",
+      "tipo_ensayo": "ej. 'estrella' / 'delta' (chip propio por tipo)"
+    }
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "n/a — NO hay umbral pasa/no-pasa. Es comparación de HUELLA vs baseline.",
+    "criterio_scorecard": "Comparación por bandas vs huella (DL/T 911 · IEEE C57.149 · IEC 60076-18)",
+    "estado_en_tablero": {
+      "informe TRAE bloque sfra": "ámbar · 'realizada · comparar vs huella' (requiere interpretación experta vs baseline)",
+      "informe NO trae bloque": "neutral · 'No realizada' (la fila SIEMPRE aparece)"
+    },
+    "normas_referencia": [
+      { "norma": "DL/T 911", "uso": "coeficientes de correlación por banda (RLF/RMF/RHF)" },
+      { "norma": "IEEE C57.149", "uso": "guía de interpretación SFRA" },
+      { "norma": "IEC 60076-18", "uso": "medición de respuesta en frecuencia" }
+    ],
+    "pendiente_de_validar": {
+      "⚠️_sin_motor": "Por ser comparativa, hoy NO se califica automáticamente. Si quieres un veredicto auto (ej. bandas DL/T 911), habría que construir el motor — decisión del director."
+    }
+  },
+
+  "notas": [
+    "Diagnóstico = desviación de la huella (deformación de devanado, desplazamiento de núcleo), NO un número absoluto.",
+    "Prueba INDEPENDIENTE — no fusionar."
+  ]
+}

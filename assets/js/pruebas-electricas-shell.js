@@ -41,6 +41,7 @@ import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques, svgBloque } from './ui/pruebas/grafico-generico.js';
 import { montarPanelTand } from './ui/pruebas/tand-panel.js';
 import { montarPanelExcitacion } from './ui/pruebas/excitacion-panel.js';
+import { montarPanelPrueba } from './ui/pruebas/tablas-pruebas-panel.js';
 import { confirmarUpsert } from './ui/pruebas/modal-upsert.js';
 import { bloquesTendencia, resumenTendenciaParaIA, analisisTendencia } from './domain/pruebas_electricas_tendencia.js';
 
@@ -615,7 +616,15 @@ function montarMultiAno() {
     return excs.length ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), excs } : null;
   }).filter(Boolean);
   const bloques = bloquesMultiAno(items).filter((b) => !excluidaDelOverlay(b.prueba));
-  if (!bloques.length && !tandItems.length && !excItems.length) {
+  // Panel "Valores por prueba" (ADR-044): tabla completa + diagnóstico/análisis
+  // conforme a norma, para las pruebas SIN panel dedicado (relación/resistencia/
+  // aislamiento/bujes/collar). ADITIVO: NO toca tan δ/excitación ni el scorecard;
+  // reusa dominio. Identidad por INFORME (label = fecha; dos del mismo año no colapsan).
+  const panelInformes = items.map((it) => ({ ...it, label: etiquetaFecha(it.fecha, it.ano) }));
+  const PRUEBAS_VP = ['relacion', 'resistencia', 'aislamiento', 'bushing', 'collar'];
+  const famsVP = PRUEBAS_VP.filter((fam) => panelInformes.some((inf) =>
+    (inf.bloques || []).some((b) => { const f = familiaMA(b); return f && f.key === fam; })));
+  if (!bloques.length && !tandItems.length && !excItems.length && !famsVP.length) {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;
   }
@@ -636,7 +645,17 @@ function montarMultiAno() {
     cont.appendChild(sec);
     montarPanelExcitacion(host, excItems);
   }
-  if (!bloques.length) return; // solo paneles condensados (tan δ / excitación) → listo
+  // Panel "Valores por prueba" — una tarjeta por prueba sin panel dedicado (ADR-044).
+  if (famsVP.length) {
+    const sec = document.createElement('section'); sec.className = 'pe-vp-seccion'; sec.style.margin = '0 0 18px';
+    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Valores por prueba — tabla + diagnóstico conforme a norma', style: 'margin:0 0 8px' }));
+    cont.appendChild(sec);
+    famsVP.forEach((fam) => {
+      const host = document.createElement('div'); host.style.margin = '0 0 14px'; sec.appendChild(host);
+      montarPanelPrueba(host, fam, panelInformes);
+    });
+  }
+  if (!bloques.length) return; // solo paneles condensados (tan δ / excitación / valores por prueba) → listo
   // TODOS los informes presentes en el libro (filtro GLOBAL). Identidad = _rep
   // (no el año → no colapsa dos del mismo año); etiqueta = fecha/año; color fijo por informe.
   const repInfo = new Map();
