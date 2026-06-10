@@ -1,0 +1,50 @@
+{
+  "prueba": "dfr",
+  "nombre": "DFR · Espectroscopía dieléctrica en frecuencia (humedad del papel)",
+  "orden_scorecard": 10,
+  "diagnostico_motor": "COMPARATIVO — sin pasa/no-pasa canónico (interpretación de % humedad)",
+
+  "_fuente": {
+    "datos": "Bloque genérico (sin sanitizer dedicado) — detectado por blockKeys ['dfr'] sobre el bloque de la IA",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[9]",
+    "skill": "skills/pruebas-electricas/dfr-respuesta-dielectrica/",
+    "_nota": "El CÓDIGO manda. DFR NO pasa por sanitizarInforme() de las 8 canónicas; vive como bloque genérico."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Bloque genérico (cuerpo + tabla). Captura el % de humedad del papel y la conductividad del aceite si el informe los reporta.",
+    "bloque": {
+      "prueba": "string que contiene 'dfr'",
+      "cuerpo": "texto/observaciones del laboratorio",
+      "tabla": "% humedad del papel · conductividad del aceite · temperatura del ensayo (si vienen)"
+    }
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "% de humedad del papel (referencia; hoy sin motor auto)",
+    "criterio_scorecard": "Humedad del papel < 2% (CIGRE TB 349/414 · IEEE C57.161)",
+    "umbral_referencia_humedad": {
+      "< 2%": "seco / aceptable",
+      "2–3%": "húmedo (vigilar)",
+      "> 3%": "muy húmedo / riesgo",
+      "_nota": "Banda orientativa CIGRE; depende de T del ensayo."
+    },
+    "estado_en_tablero": {
+      "informe TRAE bloque dfr": "ámbar · 'realizada · comparar vs huella' (interpretación experta)",
+      "informe NO trae bloque": "neutral · 'No realizada' (la fila SIEMPRE aparece)"
+    },
+    "normas_referencia": [
+      { "norma": "CIGRE TB 349 / 414", "uso": "bandas de humedad del papel vs % y T" },
+      { "norma": "IEEE C57.161", "uso": "guía DFR (FDS) para aislamiento líquido-papel" }
+    ],
+    "pendiente_de_validar": {
+      "⚠️_sin_motor": "Por ser comparativa/dependiente de T, hoy NO se califica automáticamente. Construir motor de humedad = decisión del director.",
+      "⚠️_banda_humedad": "Los cortes 2% / 3% son orientativos CIGRE — confirmar con tu edición de norma."
+    }
+  },
+
+  "notas": [
+    "La humedad del papel es indicador de ENVEJECIMIENTO del aislamiento sólido — clave para cargabilidad/vida del activo.",
+    "Prueba INDEPENDIENTE — no fusionar."
+  ]
+}

@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Tablas de valores POR PRUEBA (alto nivel) — discriminación nivel/devanado/config</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; color: #0f172a; }
+  .pe-sec { margin: 28px 0 10px; font-size: 15px; font-weight: 800; color: #0f172a; }
+  .pe-sec small { font-weight: 500; color: #64748b; }
+  .intro { color: #475569; font-size: 13px; max-width: 86ch; line-height: 1.5; }
+  .intro code { background: #e2e8f0; padding: 1px 5px; border-radius: 4px; }
+</style>
+</head>
+<body>
+<h1>DEV · Tablas de valores POR PRUEBA — alto nivel</h1>
+<p class="intro">
+  Réplica del estilo de la tabla-RESUMEN de <b>corriente de excitación</b> extendida a TODAS las pruebas
+  presentes en los informes: cada prueba muestra <b>banda por grupo</b> (nivel de tensión de prueba /
+  devanado / configuración) + <b>KPI tiles</b> + <b>franja de norma</b> + <b>tabla por informe</b>. La
+  calificación es <b>DERIVADA del valor vs norma</b> (NUNCA del texto del laboratorio). Lógica en
+  <code>_dev/tablas-pruebas-preview.js</code> — reusa <code>derivarTablaTAP</code> y el CSS en SOLO LECTURA;
+  no toca producción. Datos REALES (serie 450108).
+</p>
+<div id="panel"></div>
+
+<script type="module">
+import { montarTablasPruebas } from './tablas-pruebas-preview.js';
+import { configInforme as configInformeProd } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+
+function etiquetaFecha(fecha, ano) { return (fecha && String(fecha).trim()) || (ano != null ? String(ano) : '—'); }
+// REUSA la config real de producción (nombre delta/estrella → grupo vectorial),
+// para que `nivelDe` derive el nivel del devanado correctamente (no la tensión de ensayo).
+function configInforme(j) {
+  return configInformeProd({ nombre: j.nombre, grupo_conexion: j.identidad && j.identidad.grupo_conexion });
+}
+
+(async () => {
+  const informes = [];
+  for (const url of FIXTURES) {
+    try {
+      const j = await (await fetch(url + '?v=' + Date.now())).json();
+      informes.push({
+        id: j.id, ano: j.ano,
+        label: etiquetaFecha(j.fecha, j.ano),
+        config: configInforme(j),
+        bloques: j.bloques || []
+      });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  informes.sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const n = montarTablasPruebas(document.getElementById('panel'), informes);
+  console.log('[preview-tablas-pruebas] informes:', informes.length, '· secciones pintadas:', n);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

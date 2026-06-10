@@ -1,0 +1,53 @@
+{
+  "prueba": "collar",
+  "nombre": "Collar caliente / pérdidas en bujes",
+  "orden_scorecard": 7,
+  "diagnostico_motor": "canónico (pérdida máxima vs límite)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarCollar()",
+    "motor_multinorma": "assets/js/domain/pruebas_electricas_multinorma.js → CRITERIOS_MULTINORMA.collar",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[6]",
+    "skill": "skills/pruebas-electricas/factor-potencia-aislamiento/ (collar caliente)",
+    "_nota": "El CÓDIGO manda. Refrescar esta ficha si cambia el código."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Pérdida máxima del año + detalle por buje (hot-collar test).",
+    "max_mw": "número (pérdida máxima del año, mW; null si ningún buje trae mw real)",
+    "calif": "OK | alto (derivada)",
+    "bujes": [
+      {
+        "buje": "ej. 'H0', 'X1', 'Y3'",
+        "fase": "A | B | C | N",
+        "fase_label": "ej. 'Fase A', 'Neutro'",
+        "devanado": "AT | MT | BT",
+        "i_ua": "número (corriente de salida µA)",
+        "mw": "número (pérdida mW)",
+        "calif": "OK | alto (derivada)"
+      }
+    ]
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "max_mw",
+    "criterio_scorecard": "< 100 mW",
+    "formula": "Pérdida del collar caliente por buje (mW)",
+    "umbral_vigente": {
+      "< 100 mW": "OK",
+      "≥ 100 mW": "alto",
+      "_codigo": "calificarCollar() · maxBanda(100, null) (no llega a rojo por esta óptica)"
+    },
+    "normas_multinorma": [
+      { "norma": "ANSI/NETA §7.2.2.D.5", "umbral": "<100 mW por sección", "tipo": "cuantitativo" }
+    ],
+    "pendiente_de_validar": {
+      "_estado": "umbral estable; sin ⚠️ abierto"
+    }
+  },
+
+  "notas": [
+    "Si NINGÚN buje trae mw real → max_mw = null → 'n/d' (no falsear como 0 = 'OK').",
+    "Prueba INDEPENDIENTE del FP de bujes C1 (#2) — miden cosas distintas, no fusionar."
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "prueba": "tand",
+  "nombre": "Tan δ / Factor de potencia · aislamiento del transformador",
+  "orden_scorecard": 1,
+  "diagnostico_motor": "canónico (veredicto numérico desde el valor medido)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarTand() · CONFIGS_TAND",
+    "motor_multinorma": "assets/js/domain/pruebas_electricas_multinorma.js → CRITERIOS_MULTINORMA.tand",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[0]",
+    "skill": "skills/pruebas-electricas/factor-potencia-aislamiento/",
+    "_nota": "El CÓDIGO manda. Esta ficha es el mapa de comunicación; si cambia el código, refrescar esta ficha (Reflejo de Frescura)."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Se mide por SECCIÓN de aislamiento (no por fase). Array de secciones.",
+    "secciones": [
+      {
+        "code": "CH | CHL | CL | CLT | CT | CHT",
+        "entre": "ej. 'AT ↔ tierra' (CH), 'AT ↔ MT' (CHL)…",
+        "valor_pct": "número (tan δ %)",
+        "calif": "bueno | normal | investigar | excesivo (derivada, no de la IA)"
+      }
+    ],
+    "_codigos_seccion": {
+      "CH": "AT ↔ tierra", "CHL": "AT ↔ MT", "CL": "MT ↔ tierra",
+      "CLT": "MT ↔ BT", "CT": "BT ↔ tierra", "CHT": "AT ↔ BT"
+    }
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "máx(valor_pct) entre todas las secciones",
+    "criterio_scorecard": "FP ≤ 1% (IEEE 62)",
+    "formula": "tan δ % = pérdidas / (V·I) × 100, por sección de aislamiento",
+    "veredicto_scorecard": "= consolidado multi-norma (el MÁS conservador). Por eso 0.51% sale 'investigar' (supera el 0.5% de NETA aunque pase el 1% de IEEE).",
+    "umbral_vigente": {
+      "≤0.5%": "bueno",
+      "0.5–0.7%": "normal",
+      "0.7–1%": "investigar",
+      ">1%": "excesivo",
+      "_codigo": "calificarTand()"
+    },
+    "normas_multinorma": [
+      { "norma": "ANSI/NETA ATS Tabla 100.3", "umbral": "≤0.5% (aceite mineral)", "tipo": "cuantitativo" },
+      { "norma": "IEEE 62 / C57.152", "umbral": "≤1% (0.5–1 investigar)", "tipo": "guía + tendencia" }
+    ],
+    "pendiente_de_validar": {
+      "_estado": "umbrales estables; sin ⚠️ abierto para esta prueba"
+    }
+  },
+
+  "notas": [
+    "El veredicto SIEMPRE sale del valor medido vs norma, NUNCA del texto de la IA (L-36).",
+    "Prueba INDEPENDIENTE del FP de bujes (C1) — no fusionar."
+  ]
+}

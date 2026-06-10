@@ -1,0 +1,53 @@
+{
+  "prueba": "excitacion",
+  "nombre": "Corriente de excitación",
+  "orden_scorecard": 3,
+  "diagnostico_motor": "canónico (desbalance + patrón 2+1 + tendencia)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarExcitacion()",
+    "motor_multinorma": "assets/js/domain/pruebas_electricas_multinorma.js → CRITERIOS_MULTINORMA.excitacion",
+    "panel": "assets/js/ui/pruebas/excitacion-panel.js (nivelDe / perdidasDe)",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[2]",
+    "skill": "skills/pruebas-electricas/corriente-excitacion/",
+    "_nota": "El CÓDIGO manda. Refrescar esta ficha si cambia el código."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Por fase A/B/C del devanado AT, referida al neutro, con TAP.",
+    "devanado": "AT",
+    "ref": "ej. 'N (H0)'",
+    "tap": "string (ej. '1', '11', '21')",
+    "fases": [
+      { "fase": "A", "valor": "número (mA)", "term": "ej. 'H1–H0'", "verificar": "bool" },
+      { "fase": "B", "valor": "número (mA)", "term": "ej. 'H2–H0'", "verificar": false },
+      { "fase": "C", "valor": "número (mA)", "term": "ej. 'H3–H0'", "verificar": false }
+    ],
+    "delta_ext_pct": "número (desbalance entre las 2 fases EXTERNAS)",
+    "calif": "normal | revisar | n/d (derivada)",
+    "_niveles_panel": "El panel separa por nivel: AT=66/110 kV · MT=34.5 kV · BT=13.8 kV ('10 kV' = tensión de ENSAYO, no nivel)."
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "delta_ext_pct",
+    "criterio_scorecard": "Δ fases ≤ 10% (IEEE C57.152)",
+    "formula": "Δ% = (I_lateral_mayor − I_lateral_menor) / I_lateral_menor × 100",
+    "umbral_vigente": {
+      "I < 50 mA": "Δ < 10% → normal",
+      "I ≥ 50 mA": "Δ < 5% → normal",
+      "_codigo": "calificarExcitacion(): limite = I>50mA ? 5 : 10"
+    },
+    "normas_multinorma": [
+      { "norma": "ANSI/NETA §7.2.2.D.6", "umbral": "patrón 2+1 (2 laterales ~iguales + central menor)", "tipo": "cualitativo · sin % duro" },
+      { "norma": "IEEE C57.152", "umbral": "vs fábrica/previos/fases (tendencia)", "tipo": "cambio de decenas de % = alarma" }
+    ],
+    "pendiente_de_validar": {
+      "⚠️_umbrales_delta": "Cortes 5% / 10% por CONFIRMAR contigo (WIP arco excitación). Editar aquí si tu edición de norma manda otro valor."
+    }
+  },
+
+  "notas": [
+    "Patrón 2+1 = FORMA: la central B es la MENOR en estrella Y delta por GEOMETRÍA del núcleo (L-53), no por defecto.",
+    "Prueba INDEPENDIENTE — no fusionar con tan δ."
+  ]
+}

@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Opción B por AÑO — pestaña por informe (todas las pruebas tabuladas)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; color: #0f172a; }
+  .pe-sec { margin: 18px 0 10px; font-size: 15px; font-weight: 800; color: #0f172a; }
+  .pe-sec small { font-weight: 500; color: #64748b; }
+  .intro { color: #475569; font-size: 13px; max-width: 86ch; line-height: 1.5; }
+  .intro code { background: #e2e8f0; padding: 1px 5px; border-radius: 4px; }
+  .pe-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0 12px; }
+  .pe-tab { padding: 7px 12px; border: 1px solid #cbd5e1; background: #fff; border-radius: 8px;
+            cursor: pointer; font-size: 12px; font-weight: 600; color: #475569; }
+  .pe-tab:hover { border-color: #94a3b8; }
+  .pe-tab.is-active { background: #0f3d5e; color: #fff; border-color: #0f3d5e; }
+</style>
+</head>
+<body>
+<h1>DEV · Opción B por AÑO — pestaña por informe</h1>
+<p class="intro">
+  Las pestañas son <b>los años / informes</b> (fecha + config). Al elegir uno, se ven <b>todas las pruebas
+  tabuladas de ESE informe</b>, discriminadas por nivel / devanado / configuración, con calificación
+  <b>DERIVADA del valor vs norma</b>. Dos informes del mismo año NO se colapsan (identidad por informe).
+  Misma lógica que A/B (<code>_dev/tablas-pruebas-preview.js</code>). Datos REALES (450108). No toca producción.
+</p>
+<div id="panel"></div>
+
+<script type="module">
+import { montarTablasPorInforme } from './tablas-pruebas-preview.js';
+import { configInforme as configInformeProd } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+
+function etiquetaFecha(fecha, ano) { return (fecha && String(fecha).trim()) || (ano != null ? String(ano) : '—'); }
+function configInforme(j) {
+  return configInformeProd({ nombre: j.nombre, grupo_conexion: j.identidad && j.identidad.grupo_conexion });
+}
+
+(async () => {
+  const informes = [];
+  for (const url of FIXTURES) {
+    try {
+      const j = await (await fetch(url + '?v=' + Date.now())).json();
+      informes.push({ id: j.id, ano: j.ano, label: etiquetaFecha(j.fecha, j.ano), config: configInforme(j), bloques: j.bloques || [] });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  const n = montarTablasPorInforme(document.getElementById('panel'), informes);
+  console.log('[preview-tablas-por-anio] informes/pestañas:', n);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

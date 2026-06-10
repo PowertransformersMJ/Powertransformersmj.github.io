@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Panel por prueba — MÓDULO DE PRODUCCIÓN (tablas-pruebas-panel.js)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } h2 { margin:6px 0 2px; font-size:18px; } </style>
+</head>
+<body>
+<h1>DEV · Panel por prueba — módulo de PRODUCCIÓN</h1>
+<p style="color:#475569;font-size:13px;max-width:86ch">Valida <code>assets/js/ui/pruebas/tablas-pruebas-panel.js</code> (el que usará el shell) con el CSS de producción <code>pruebas-electricas.css</code>, dentro de <code>.pe-scope</code>. Datos REALES (450108). Enlaces: <a href="?prueba=tand">tan δ</a> · <a href="?prueba=bushing">bujes</a> · <a href="?prueba=excitacion">excitación</a> · <a href="?prueba=relacion">relación</a> · <a href="?prueba=resistencia">resistencia</a> · <a href="?prueba=aislamiento">aislamiento</a></p>
+<div class="pe-scope"><div id="panel"></div></div>
+
+<script type="module">
+import { montarPanelPrueba } from '../assets/js/ui/pruebas/tablas-pruebas-panel.js';
+import { configInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+function etiquetaFecha(fecha, ano) { return (fecha && String(fecha).trim()) || (ano != null ? String(ano) : '—'); }
+
+(async () => {
+  const prueba = new URLSearchParams(location.search).get('prueba') || 'excitacion';
+  const informes = [];
+  for (const url of FIXTURES) {
+    try {
+      const j = await (await fetch(url + '?v=' + Date.now())).json();
+      const config = configInforme({ nombre: j.nombre, grupo_conexion: j.identidad && j.identidad.grupo_conexion });
+      informes.push({ id: j.id, ano: j.ano, label: etiquetaFecha(j.fecha, j.ano), config, bloques: j.bloques || [] });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  informes.sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const n = montarPanelPrueba(document.getElementById('panel'), prueba, informes);
+  console.log('[preview-prod]', prueba, '· años:', n);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
