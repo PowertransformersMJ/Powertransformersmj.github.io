@@ -12,14 +12,23 @@
 
 ---
 
-## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-09)
+## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-10)
 
-> **TEMA: Tablero de Pruebas Eléctricas con IA — panel tan δ + auditoría FP/tan δ.**
-> **Arco tablero base (ADR-003→014) EN PRODUCCIÓN.** **Esta sesión (ADR-029→040, 16 commits
-> `d5d974e`→`e696af6` en rama dev) FALTA PUSH** (Claude commitea, el director pushea; refs locales
-> STALE → `git fetch` antes de afirmar estado). Detalle: `00`→`99 §29..§40`. ✅ Validado todo con
-> workflow (`_dev/preview-*.html`) + datos REALES 450108; **pendiente validar en la APP tras push**
-> (la página vive tras Firebase Auth → el preview no entra; sólo harness).
+> **TEMA: Tablero de Pruebas Eléctricas con IA — paneles condensados por prueba (tan δ → excitación).**
+> **Arco tablero base (ADR-003→014) + arco panel tan δ (ADR-029→040) EN PRODUCCIÓN** (mergeado a `main`
+> vía **PR #172**). **Arco panel CORRIENTE DE EXCITACIÓN (ADR-041) COMMITEADO en `DESARROLLO`, FALTA PUSH.**
+> Detalle: `00`→`99 §29..§41`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108;
+> **pendiente validar en la APP** (la página vive tras Firebase Auth → el preview no entra; sólo harness).
+>
+> **ARCO EXCITACIÓN (ADR-041, FALTA PUSH) — `ui/pruebas/excitacion-panel.js` (espejo del tan δ):**
+> 5 vistas (Δ por TAP / patrón 2+1 / tendencia / por nivel / **tabla mA·W·ambos**) + filtros (año/grupo/**nivel**/fase).
+> **Discrimina por NIVEL DE TENSIÓN** (`nivelDe`: AT delta→66·estrella→110·MT 34.5·BT 13.8; el "10 kV" = tensión de
+> ENSAYO, no el nivel). **W de pérdidas** incluidos (`perdidasDe` lee `extra["P (W)"]`; tabla con sub-toggle mA/W/ambos
+> + Σ pérd. por TAP; informes sin W → "—"+badge, NO inventa; tendencia de pérdidas NO compara contra 0). Criterio
+> COMPARATIVO conforme a norma (NETA 2+1 / IEEE 62; sin umbral % duro; pérdidas = componente resistiva sin umbral propio).
+> **Patrón 2+1 = FORMA** (externas A–C simétricas + central distinta); dirección HLH/LHL **informativa** — la central B es la
+> MENOR en estrella Y delta por GEOMETRÍA del núcleo (verificado 7 tríos 450108; **L-53**). 19 tests; suite **1179/1179**.
+> ⚠️ Umbrales Δ 5–10% a verificar con el director. ⛔ NO dañar scorecard/calificación global/`grafico-generico.js`.
 >
 > **Qué hace el tablero HOY (todo en prod):** la IA (Opus 4.7/Sonnet 4.6) extrae el PDF →
 > tablero **IA-primaria** (bloques = cuerpo; tablas = DATOS). **El VEREDICTO es 100% NORMATIVO**
@@ -35,28 +44,15 @@
 > fecha** (re-cargar no duplica, L-39); **reproceso SERVER-SIDE** con contador (L-40) + **backfill INSTANTÁNEO**
 > de campos canónicos desde el diagnóstico guardado, sin IA (L-43).
 >
-> **🎯 "Reprocesar" RETIRADO (ADR-020, 2026-06-08).** El director concluyó que reprocesar **sale más costoso que
-> eliminar + re-subir el informe** (misma extracción IA, pero llamada larga y frágil a cortes de red). Se eliminó el botón
-> + handler + el modo-reproceso de la CF. ⛔ **NO re-introducir "Reprocesar"** sin pedido explícito del director. Para
-> re-extraer: **volver a subir el PDF** (upsert por fecha, L-39); para refrescar campos canónicos: **backfill sin IA** (L-43).
-> La **máxima calidad** (`effort:high`) y toda la robustez de transporte (reintento/timeout/dispatcher undici) **se conservan
-> para la CARGA** (que extrae los mismos informes densos, 12–22 min).
+> **🎯 "Reprocesar" RETIRADO (ADR-020, en prod):** ⛔ NO re-introducir sin pedido explícito (cuesta más que re-subir el PDF).
+> Re-extraer = volver a subir el PDF (upsert por fecha, L-39); refrescar canónicos = backfill sin IA (L-43). Robustez de
+> transporte + `effort:high` se conservan para la CARGA (informes densos, 12–22 min). Detalle → `99 §20`.
 >
-> **ARCO DE ESTA SESIÓN (ADR-029→040, FALTA PUSH) — panel tan δ `ui/pruebas/tand-panel.js` + análisis:**
-> - **Panel tan δ condensado** (ADR-029/031/032): vistas **Por devanado** (secciones en X, leyenda limpia por
->   informe, criterio NETA0.5%/IEEE1% visible) · **Tendencia** (años en X) · **Tip-up (ΔFP)**. Bloque **"Análisis
->   conforme a norma"** (`analizarTand`, puro/testeado): sellos/emblemas ESTILIZADOS propios (NETA+IEEE, NO logos
->   oficiales) + veredicto multi-norma + peor medición + localización + tip-up + pendiente + caveats.
-> - **Overlay genérico "Demás pruebas" RETIRADO** (ADR-033/034) vía `excluidaDelOverlay` (familias + regla `^otros:`);
->   panel tan δ = única vista multi-año. Reversible; datos/motor intactos (scorecard evalúa todo).
-> - **"Resultados del informe" CONSERVADA**; sólo se filtra el bloque tan δ del detalle por informe (ADR-036 corrige
->   el sobre-retiro de ADR-035 → **L-51**). **"Identidad de la unidad" reubicada** bajo "Resumen de la unidad" (ADR-037).
-> - **Auditoría FP/tan δ 🔵 (skill `factor-potencia-aislamiento`) CERRADA** (ADR-038/039/040, lobe 49 §Auditoría):
->   #1 tip-up, #2 localización por modo (`localizacionDe`/`causaProbableDe`), #4 caveat 20 °C (sin T → se declara),
->   #5 pendiente predictiva por sección, #6 baseline-proxy. **#3 capacitancia DESCARTADA** (el workflow cazó −91% =
->   artefacto: pF no comparable entre esquemas/modos de medida → **L-52**; habilitarlo exige extracción POR MODO).
-> - ⚠️ Umbrales `TIPUP_UMBRAL 0.1` / `PEND_UMBRAL 0.05` **a verificar** con el director. ⛔ NO dañar calificación
->   global / scorecard / `grafico-generico.js`. Trafo MÓVIL cambia config/tensión por despliegue (ADR-014).
+> **ARCO PANEL tan δ (ADR-029→040, EN PROD vía PR #172) — `ui/pruebas/tand-panel.js`** (detalle → `99 §29..§40` + lobe 49):
+> panel condensado (Por devanado / Tendencia / Tip-up ΔFP) + "Análisis conforme a norma" (`analizarTand`, sellos NETA+IEEE) +
+> overlay genérico "Demás pruebas" RETIRADO (`excluidaDelOverlay`, reversible) + auditoría FP CERRADA (tip-up/localización/
+> pendiente/baseline + caveat 20 °C; #3 capacitancia descartada por artefacto, L-52). ⚠️ Umbrales `TIPUP 0.1`/`PEND 0.05` a
+> verificar. **El panel excitación (ADR-041) sigue el MISMO molde** — al iterar uno, revisar el otro. ⛔ NO dañar scorecard/`grafico-generico.js`.
 >
 > **OTROS pendientes:** TODO-08 (⚠️ verificar umbrales MO.00418/C1 bujes/PI-DAR) · TODO-01/02 (refrigeración/contratos)
 > · TODO-10 (skills `transformadores-potencia` esperan validación + commit). #3 capacitancia → extracción por modo.
@@ -105,12 +101,17 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-09** — **Sesión panel tan δ + auditoría FP (ADR-029→040, 16 commits en dev, FALTA PUSH).** Construido el
-  panel tan δ condensado (3 vistas + análisis multi-norma con sellos), retirado el overlay genérico "Demás pruebas"
-  (reversible), corregido un **sobre-retiro** (oculté toda "Resultados del informe" cuando el director solo pedía el
-  bloque tan δ → ADR-036, **L-51 + memoria `feedback_no_sobre_retiro`**), reubicada "Identidad", y CERRADA la
-  auditoría FP/tan δ con la skill (tip-up/localización/pendiente/baseline + caveat 20 °C; **#3 capacitancia descartada
-  por artefacto −91%, L-52**). Todo validado con workflow + datos reales; falta validar en la APP tras push. Tests 1160/1160.
+- **2026-06-10** — **Sesión panel CORRIENTE DE EXCITACIÓN (ADR-041) — COMMITEADA en `DESARROLLO`, FALTA PUSH.**
+  Panel propio espejo del tan δ: discriminación por nivel de tensión (`nivelDe`), 5 vistas (Δ por TAP / patrón 2+1 /
+  tendencia / por nivel / tabla mA·W·ambos), **W de pérdidas** incluidos (`perdidasDe`), criterio comparativo conforme a
+  norma (skill `corriente-excitacion`). Hallazgo **L-53**: patrón 2+1 = FORMA, dirección HLH/LHL informativa (central B
+  menor en estrella Y delta por geometría del núcleo; la regla rígida daba 4/7 falsas alarmas). 19 tests; **1179/1179**.
+  Validado con workflow; **falta validar en la APP** + wiring al shell.
+- **2026-06-09** — **Sesión panel tan δ + auditoría FP (ADR-029→040) — PUSHEADA + MERGEADA a `main` (PR #172).** Panel
+  tan δ condensado (3 vistas + análisis multi-norma con sellos), overlay genérico "Demás pruebas" retirado (reversible),
+  corregido **sobre-retiro** (ADR-036, **L-51** + memoria `feedback_no_sobre_retiro`), reubicada "Identidad", y CERRADA la
+  auditoría FP/tan δ (tip-up/localización/pendiente/baseline + caveat 20 °C; **#3 capacitancia descartada por artefacto
+  −91%, L-52**). Validado con workflow + datos reales; **falta validar en la APP**. Tests 1160/1160.
 - **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
   [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
   + validación de arquitectura (TODO-10).

@@ -561,3 +561,27 @@
 .pe-analisis-extra{padding:10px 16px;border-top:1px solid #eef2f7;font-size:12.5px;color:#334155;line-height:1.5;}
 .pe-analisis-extra .muted{color:#94a3b8;}
 .pe-analisis-cav{padding:9px 16px;border-top:1px solid #eef2f7;background:#fcfbf4;font-size:12px;color:#7c6f3a;line-height:1.5;}
+
+/* ── Vista "Tabla de valores" (excitación): valores crudos por TAP/fase ─────── */
+.pe-tabla-wrap{display:flex;flex-direction:column;gap:14px;}
+.pe-tabla-card{border:1px solid #e2e8f0;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.pe-tabla-cab{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:9px 14px;background:#f8fafc;border-bottom:1px solid #eef2f7;}
+.pe-tabla-ttl{font-size:12.5px;font-weight:700;color:#1e293b;display:flex;align-items:center;gap:8px;}
+.pe-tabla-ttl .niv{font-family:var(--pe-mono,monospace);color:#2563eb;font-weight:700;}
+.pe-tabla-meta{font-size:11.5px;color:#64748b;font-variant-numeric:tabular-nums;display:flex;align-items:center;gap:8px;}
+.pe-tabla-scroll{overflow-x:auto;}
+table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:420px;}
+.pe-tabla th,.pe-tabla td{padding:6px 12px;border-bottom:1px solid #f1f5f9;text-align:right;font-variant-numeric:tabular-nums;font-family:var(--pe-mono,monospace);white-space:nowrap;}
+.pe-tabla th:first-child,.pe-tabla td:first-child{text-align:left;}
+.pe-tabla thead th{background:#fbfdfe;font-size:10.5px;letter-spacing:.04em;text-transform:uppercase;color:#475569;font-weight:600;border-bottom:1px solid #e2e8f0;}
+.pe-tabla tbody tr:last-child td{border-bottom:none;}
+.pe-tabla tbody tr:hover{background:#f8fafc;}
+.pe-tabla tfoot td{background:#fbfdfe;font-weight:700;color:#334155;border-top:1px solid #e2e8f0;}
+.pe-tabla .col-b{color:#a4694f;}
+.pe-tabla .d-ok{color:#15803d;}
+.pe-tabla .d-warn{color:#b45309;}
+.pe-tabla .d-bad{color:#b91c1c;font-weight:700;}
+.pe-tabla-badge{font-size:10.5px;padding:2px 8px;border-radius:6px;font-weight:600;font-family:var(--pe-mono,monospace);}
+.pe-tabla-badge.is-ok{background:#f0fdf4;color:#15803d;}
+.pe-tabla-badge.is-warn{background:#fffbeb;color:#b45309;}
+.pe-tabla-badge.is-bad{background:#fef2f2;color:#b91c1c;}
