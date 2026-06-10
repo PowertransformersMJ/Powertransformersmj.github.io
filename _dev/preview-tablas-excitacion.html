@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Excitación — 4 propuestas de ilustración de TABLAS (por nivel · valores · norma)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; color: #0f172a; }
+  h1 { font-size: 20px; }
+  .intro { color:#475569; font-size:13px; max-width:90ch; line-height:1.5; }
+  .prop { background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px 20px 22px; margin:22px 0; box-shadow:0 1px 3px rgba(15,23,42,.06); }
+  .prop-tag { display:inline-block; font-size:11px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:#fff; background:#1f3a5f; padding:3px 10px; border-radius:999px; }
+  .prop-titulo { font-size:16px; font-weight:800; margin:8px 0 2px; }
+  .prop-desc { color:#64748b; font-size:12.5px; max-width:88ch; line-height:1.5; margin:0 0 14px; }
+
+  table.pe-tabla { border-collapse:collapse; width:100%; font-size:12.5px; }
+  table.pe-tabla th, table.pe-tabla td { border:1px solid #e2e8f0; padding:6px 9px; text-align:right; white-space:nowrap; }
+  table.pe-tabla th:first-child, table.pe-tabla td:first-child { text-align:left; }
+  table.pe-tabla thead th { background:#f8fafc; font-weight:700; color:#334155; }
+  table.pe-tabla .col-b { background:#fbf3ee; }
+  .pe-tabla-scroll { overflow-x:auto; border-radius:8px; }
+  .d-ok { color:#15803d; } .d-warn { color:#b45309; font-weight:700; } .d-bad { color:#b91c1c; font-weight:800; }
+
+  /* OPCIÓN 1 — tarjeta + banda KPI */
+  .opt1-card { border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:16px; }
+  .opt1-band { display:flex; align-items:center; gap:16px; flex-wrap:wrap; padding:10px 14px; background:linear-gradient(90deg,#1f3a5f,#2c6e72); color:#fff; }
+  .opt1-niv { font-weight:800; font-size:14px; }
+  .opt1-kpis { display:flex; gap:18px; flex-wrap:wrap; font-size:12px; opacity:.95; }
+  .opt1-kpis b { font-size:14px; }
+  .opt1-band > span:last-child { margin-left:auto; }
+
+  /* FUSIÓN 1+4 */
+  .optF-card { border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; margin-bottom:18px; }
+  .optF-band { display:flex; align-items:center; gap:12px; padding:11px 16px; background:linear-gradient(90deg,#1f3a5f,#2c6e72); color:#fff; }
+  .optF-niv { font-weight:800; font-size:15px; }
+  .optF-band > span:last-child { margin-left:auto; }
+  .optF-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:12px 14px 4px; }
+  .optF-tile { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; text-align:center; }
+  .optF-tile.is-ok { border-color:#bbf7d0; background:#f0fdf4; }
+  .optF-tile.is-warn { border-color:#fde68a; background:#fffbeb; }
+  .optF-tile.is-bad { border-color:#fecaca; background:#fef2f2; }
+  .optF-v { font-size:22px; font-weight:800; color:#1f3a5f; line-height:1; }
+  .optF-v small { font-size:12px; font-weight:600; color:#64748b; }
+  .optF-l { font-size:11px; color:#64748b; margin-top:4px; }
+  .optF-verdict { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin:8px 14px 12px; padding:8px 12px; background:#f8fafc; border-radius:8px; }
+  .optF-norma { font-size:11.5px; color:#475569; }
+  .optF-norma b { color:#1f3a5f; }
+  .optF-vb { margin-left:auto; }
+  .optF .pe-tabla-scroll { margin:0 14px 16px; }
+
+  /* OPCIÓN 2 — matriz transpuesta */
+  .opt2-card { border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px; margin-bottom:16px; }
+  .opt2-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+  .opt2-niv { font-weight:800; font-size:14px; color:#1f3a5f; }
+  .opt2-matriz td.opt2-mlbl, .opt2-matriz th:first-child { text-align:left; font-weight:700; background:#f8fafc; color:#334155; }
+
+  /* OPCIÓN 3 — detalle por TAP + semáforo */
+  .opt3-nivel { margin-bottom:20px; }
+  .opt3-nivhead { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding-bottom:8px; border-bottom:2px solid #1f3a5f; margin-bottom:12px; }
+  .opt3-niv { font-weight:800; font-size:15px; color:#1f3a5f; }
+  .opt3-sub { color:#64748b; font-size:12px; }
+  .opt3-nivhead > span:last-child { margin-left:auto; }
+  .opt3-card { border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; margin-bottom:12px; }
+  .opt3-ribbon { display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:8px; font-size:13px; }
+  .opt3-ribbon > div:last-child { margin-left:auto; }
+  .opt3-dot { display:inline-block; width:11px; height:11px; border-radius:50%; }
+  .opt3 table.pe-tabla tfoot td { background:#f1f5f9; font-weight:700; }
+
+  /* OPCIÓN 4 — scorecard / KPI tiles */
+  .opt4-card { border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+  .opt4-head { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .opt4-niv { font-weight:800; font-size:15px; color:#1f3a5f; }
+  .opt4-head > span:last-child { margin-left:auto; }
+  .opt4-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+  .opt4-tile { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px 12px; text-align:center; }
+  .opt4-tile.is-ok { border-color:#bbf7d0; background:#f0fdf4; }
+  .opt4-tile.is-warn { border-color:#fde68a; background:#fffbeb; }
+  .opt4-tile.is-bad { border-color:#fecaca; background:#fef2f2; }
+  .opt4-v { font-size:22px; font-weight:800; color:#1f3a5f; line-height:1; }
+  .opt4-v small { font-size:12px; font-weight:600; color:#64748b; }
+  .opt4-l { font-size:11px; color:#64748b; margin-top:4px; }
+  .opt4-verdict { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:8px 12px; background:#f8fafc; border-radius:8px; margin-bottom:12px; }
+  .opt4-norma { font-size:11.5px; color:#475569; }
+  .opt4-norma b { color:#1f3a5f; }
+  .opt4-vb { margin-left:auto; }
+</style>
+</head>
+<body>
+<h1>DEV · Corriente de excitación — 4 propuestas de TABLAS (datos REALES 450108)</h1>
+<p class="intro">Cada propuesta ilustra las tablas <b>por nivel de tensión</b> con <b>valores totales</b> (I promedio por fase, Δ ext máx, Σ pérdidas) y <b>criterio según norma</b> (NETA patrón 2+1 + IEEE Std 62/C57.152 Δ ext). Reutilizan los mismos helpers de dominio del panel real — no se duplica criterio. Elige una para integrarla.</p>
+<div id="root"></div>
+
+<script type="module">
+import { etiquetaFecha, configInforme, ordenInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+import { construirMeds, agregar, OPCIONES } from './excitacion-tablas-opciones.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-01-18-sfra.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json',
+  './fixtures/450108-2024-01-19-sfra-estrella.json',
+  './fixtures/450108-2024-01-19-sfra-delta.json'
+];
+
+(async () => {
+  const items = [];
+  for (const url of FIXTURES) {
+    try { const j = await (await fetch(url + '?v=' + Date.now())).json();
+      const excs = (j.bloques || [])
+        .filter((b) => { const f = familiaMA(b); return !!f && f.key === 'excitacion'; })
+        .map((b) => ({ titulo: b.titulo, bloque: b }));
+      if (!excs.length) continue;
+      items.push({ id: j.id, label: etiquetaFecha(j.fecha, j.ano), ano: j.ano, config: configInforme(j), excs });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  items.sort((a, b) => ordenInforme(a.label, a.ano) - ordenInforme(b.label, b.ano));
+  const niveles = agregar(construirMeds(items));
+  console.log('[preview-tablas] informes:', items.length, '· niveles:', niveles.map((n) => n.nivel));
+
+  const root = document.getElementById('root');
+  OPCIONES.forEach((o) => {
+    const card = document.createElement('section'); card.className = 'prop'; card.id = 'opcion-' + o.n;
+    card.innerHTML = `<span class="prop-tag">Opción ${o.n}</span><div class="prop-titulo">${o.titulo}</div><p class="prop-desc">${o.desc}</p>`;
+    card.appendChild(o.render(niveles));
+    root.appendChild(card);
+  });
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

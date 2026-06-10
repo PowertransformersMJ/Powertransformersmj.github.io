@@ -585,3 +585,29 @@ table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:42
 .pe-tabla-badge.is-ok{background:#f0fdf4;color:#15803d;}
 .pe-tabla-badge.is-warn{background:#fffbeb;color:#b45309;}
 .pe-tabla-badge.is-bad{background:#fef2f2;color:#b91c1c;}
+/* Tabla-RESUMEN por nivel (FUSIÓN 1+4): banda + KPI tiles + franja de norma + tabla por años. */
+.pe-fus{display:flex;flex-direction:column;gap:16px;}
+.pe-fus-card{border:1px solid #e2e8f0;border-radius:12px;background:#fff;overflow:hidden;box-shadow:0 1px 2px rgba(15,23,42,.04);}
+.pe-fus-band{display:flex;align-items:center;gap:12px;padding:11px 16px;background:linear-gradient(90deg,#1f3a5f,#2c6e72);color:#fff;}
+.pe-fus-niv{font-weight:800;font-size:14px;font-family:var(--pe-mono,monospace);}
+.pe-fus-band .pe-tabla-badge{margin-left:auto;}
+.pe-fus-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:12px 14px 4px;}
+.pe-fus-tile{background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;text-align:center;}
+.pe-fus-tile.is-ok{border-color:#bbf7d0;background:#f0fdf4;}
+.pe-fus-tile.is-warn{border-color:#fde68a;background:#fffbeb;}
+.pe-fus-tile.is-bad{border-color:#fecaca;background:#fef2f2;}
+.pe-fus-v{font-size:21px;font-weight:800;color:#1f3a5f;line-height:1;font-variant-numeric:tabular-nums;font-family:var(--pe-mono,monospace);}
+.pe-fus-v small{font-size:12px;font-weight:600;color:#64748b;}
+.pe-fus-l{font-size:11px;color:#64748b;margin-top:4px;}
+.pe-fus-verdict{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin:8px 14px 12px;padding:8px 12px;background:#f8fafc;border-radius:8px;}
+.pe-fus-norma{font-size:11.5px;color:#475569;}
+.pe-fus-norma b{color:#1f3a5f;}
+.pe-fus-verdict .pe-fus-vb{margin-left:auto;}
+.pe-fus-chips{display:flex;flex-direction:column;gap:3px;align-items:flex-end;}
+.pe-fus-chip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid transparent;font-family:var(--pe-mono,monospace);white-space:nowrap;}
+.pe-fus-chip.is-ok{border-color:#bbf7d0;color:#15803d;background:#f0fdf4;}
+.pe-fus-chip.is-bad{border-color:#fecaca;color:#b91c1c;background:#fef2f2;}
+.pe-fus .pe-tabla-scroll{margin:0 14px 14px;}
+.pe-fus .pe-tabla{min-width:440px;font-size:11.5px;}
+.pe-fus .pe-tabla th,.pe-fus .pe-tabla td{padding:6px 8px;}
+@media(max-width:640px){.pe-fus-tiles{grid-template-columns:repeat(2,1fr);}}
