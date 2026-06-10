@@ -332,7 +332,7 @@ export function montarPanelExcitacion(cont, items) {
   const fasesAll = ORDEN_FASE.filter((f) => meds.some((m) => m.fases[f] != null));
 
   const sel = { rep: new Set(reps.map((r) => r.id)), grupo: new Set(grupos), nivel: new Set(niveles), fase: new Set(fasesAll) };
-  let modo = 'desviacion';
+  let modo = 'resumen';
   let tablaMag = 'ambos'; // 'mA' | 'W' | 'ambos' — magnitud de la Tabla de valores
 
   cont.innerHTML = '';
@@ -593,17 +593,58 @@ export function montarPanelExcitacion(cont, items) {
     return wrap;
   }
 
+  // ── Gating de tablas (evita sobrecarga visual): las tablas de valores solo se
+  // despliegan cuando el usuario acota a UN año o UN nivel — o cuando de por sí
+  // hay pocas (≤2). Si no, se muestra una pista para filtrar (pedido del director). ──
+  const totalTablas = () => new Set(medsVis().filter((m) => m.tap != null).map((m) => m.rep.id + '|' + m.nivel)).size;
+  const tablasVisibles = () => sel.rep.size === 1 || sel.nivel.size === 1 || totalTablas() <= 2;
+  const pintarTablas = (target) => {
+    const fasesList = fasesAll.filter((f) => sel.fase.has(f));
+    if (!tablasVisibles()) {
+      const n = totalTablas();
+      const hint = document.createElement('p'); hint.className = 'muted small';
+      hint.innerHTML = `Hay <b>${n}</b> tablas de valores (una por informe × nivel). Elige <b>un año</b> o <b>un nivel de tensión</b> en los filtros de arriba para desplegarlas — así no se sobrecarga la vista.`;
+      target.appendChild(hint);
+      return;
+    }
+    const t = tablaValores(medsVis(), fasesList, tablaMag);
+    if (t) target.appendChild(t);
+    else target.appendChild(Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin valores de excitación para los filtros activos.' }));
+  };
+
   const pintar = () => {
     chartBox.innerHTML = '';
     const agg = medsAgg(), fasesList = fasesAll.filter((f) => sel.fase.has(f));
-    magBar.style.display = modo === 'tabla' ? 'flex' : 'none';
+    magBar.style.display = (modo === 'tabla' || modo === 'resumen') ? 'flex' : 'none';
+    if (modo === 'resumen') {
+      const mkSec = (titulo, sub) => {
+        const d = document.createElement('div'); d.style.cssText = 'margin:0 0 16px';
+        const h = document.createElement('div'); h.style.cssText = 'font-size:12px;font-weight:700;color:#334155;margin:0 0 4px'; h.textContent = titulo; d.appendChild(h);
+        if (sub) { const s = Object.assign(document.createElement('p'), { className: 'muted small', textContent: sub }); s.style.margin = '0 0 6px'; d.appendChild(s); }
+        return d;
+      };
+      const s1 = mkSec('Valores de corriente de excitación (mA) por fase', 'Barras por informe×nivel; ROJO = patrón 2+1 fuera de criterio (2 externas similares + 1 central distinta).');
+      const gPat = svgPatron(agg, fasesList);
+      s1.appendChild(gPat || Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin valores para los filtros activos.' }));
+      chartBox.appendChild(s1);
+      const s2 = mkSec('Desviación entre fases laterales (A–C, %) por posición de TAP', `Una línea por informe; criterio IEEE Std 62 / C57.12.90 (≤ ${CRIT.limite}%).`);
+      const rDev = svgDesviacionTAP(medsVis());
+      s2.appendChild((rDev && rDev.svg) || Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin desviaciones para los filtros activos.' }));
+      chartBox.appendChild(s2);
+      const s3 = mkSec('Tablas de valores (mA / W) por informe × nivel', null);
+      pintarTablas(s3);
+      chartBox.appendChild(s3);
+      cap.textContent = 'Resumen: valores (mA), desviaciones y tablas en una sola vista. Las tablas se despliegan al elegir un año o un nivel (evita sobrecarga). Usa las pestañas de Vista para enfocar una sola gráfica.';
+      renderAnalisis(analisisBox, analizarExcitacion(agg));
+      contadores.forEach((fn) => fn());
+      return;
+    }
     if (modo === 'tabla') {
-      const t = tablaValores(medsVis(), fasesList, tablaMag);
       const queMide = tablaMag === 'mA' ? 'corriente de excitación (mA)' : tablaMag === 'W' ? 'pérdidas (W)' : 'corriente (mA) Y pérdidas (W)';
       cap.textContent = `Tabla de valores: ${queMide} CRUDA del informe por fase y por posición de TAP, una tabla por informe × nivel. ` +
         `Δ ext = desviación entre fases laterales (A–C) por posición; Σ pérd. = pérdidas totales del trío en ese TAP. ` +
         `Las pérdidas (W) son la componente resistiva del ensayo (I_exc = magnetizante + pérdidas) — se juzgan por COMPARACIÓN (vs fábrica / ensayos previos / fases hermanas), sin umbral duro propio. Filtra por nivel, año o fase para acotar.`;
-      if (t) chartBox.appendChild(t); else chartBox.innerHTML = '<p class="muted small">Sin valores de excitación para los filtros activos.</p>';
+      pintarTablas(chartBox);
       renderAnalisis(analisisBox, analizarExcitacion(agg));
       contadores.forEach((fn) => fn());
       return;
@@ -661,7 +702,10 @@ export function montarPanelExcitacion(cont, items) {
   const bFase = grupoFiltro('Fase', fasesAll.map((f) => ({ key: f, label: 'Fase ' + f, color: COL_FASE[f] })), sel.fase, { keys: fasesAll });
 
   reset.addEventListener('click', () => {
-    sel.rep = new Set(reps.map((r) => r.id)); sel.grupo = new Set(grupos); sel.nivel = new Set(niveles); sel.fase = new Set(fasesAll);
+    // Mutar los Sets EN SITIO (no reasignar): los closures de los chips/contadores
+    // capturaron estas referencias; reasignar las dejaría huérfanas (desync de filtros).
+    const restore = (set, keys) => { set.clear(); keys.forEach((k) => set.add(k)); };
+    restore(sel.rep, reps.map((r) => r.id)); restore(sel.grupo, grupos); restore(sel.nivel, niveles); restore(sel.fase, fasesAll);
     bRep.forEach((b, k) => b.classList.toggle('is-on', sel.rep.has(k)));
     bGr.forEach((b, k) => b.classList.toggle('is-on', sel.grupo.has(k)));
     bNiv.forEach((b, k) => b.classList.toggle('is-on', sel.nivel.has(k)));
@@ -673,7 +717,7 @@ export function montarPanelExcitacion(cont, items) {
   vistaBar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Vista:', style: 'font-size:12px;font-weight:600;color:#475569;margin-right:4px' }));
   const mkVista = (key, txt) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pe-fase-chip' + (modo === key ? ' is-on' : ''); b.textContent = txt;
     b.addEventListener('click', () => { modo = key; [...vistaBar.querySelectorAll('.pe-fase-chip')].forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); pintar(); }); return b; };
-  vistaBar.append(mkVista('desviacion', 'Δ por posición (TAP)'), mkVista('patron', 'Patrón de fases'), mkVista('tendencia', 'Tendencia (años en X)'), mkVista('nivel', 'Por nivel de tensión'), mkVista('tabla', 'Tabla de valores'));
+  vistaBar.append(mkVista('resumen', 'Resumen (todo)'), mkVista('desviacion', 'Δ por posición (TAP)'), mkVista('patron', 'Valores (mA) por fase'), mkVista('tendencia', 'Tendencia (años en X)'), mkVista('nivel', 'Por nivel de tensión'), mkVista('tabla', 'Tabla de valores'));
 
   // Sub-toggle de magnitud, SOLO visible en la Tabla de valores: corriente / pérdidas / ambos.
   const magBar = document.createElement('div'); magBar.className = 'pe-fase-chips'; magBar.style.cssText = 'display:none;gap:6px;align-items:center;margin:0 0 6px';
