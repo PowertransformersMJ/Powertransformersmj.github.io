@@ -17,8 +17,10 @@
 > **TEMA: Tablero de Pruebas Eléctricas con IA — paneles condensados por prueba (tan δ → excitación).**
 > **Arco tablero base (ADR-003→014) + arco panel tan δ (ADR-029→040) EN PRODUCCIÓN** (mergeado a `main`
 > vía **PR #172**). **Arco panel CORRIENTE DE EXCITACIÓN (ADR-041): panel (`3ce25ae`) EN PRODUCCIÓN (PR #173);
-> CABLEADO al shell (`7bb8b38`) COMMITEADO en `DESARROLLO`, FALTA PUSH+PR.**
-> Detalle: `00`→`99 §29..§41`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108;
+> CABLEADO al shell (`7bb8b38`); **+ ADR-042** (vista "Resumen (todo)" = valores+desviación+tablas apiladas + **gating
+> de tablas** por año/nivel + fix `reset` huérfano L-54) RECIÉN COMMITEADO en `DESARROLLO`, **FALTA PUSH+PR** (lo dispara
+> el director; `git fetch` antes de afirmar despliegue).**
+> Detalle: `00`→`99 §29..§42`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108;
 > **pendiente validar en la APP** (la página vive tras Firebase Auth → el preview no entra; sólo harness).
 >
 > **ARCO EXCITACIÓN (ADR-041 → `99 §41` + lobe 49) — `ui/pruebas/excitacion-panel.js` + cableado en shell:**
@@ -97,14 +99,14 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-10** — **Panel CORRIENTE DE EXCITACIÓN (ADR-041, → `99 §41`):** panel `3ce25ae` EN PRODUCCIÓN (PR #173);
-  cableado al shell `7bb8b38` en `DESARROLLO`, **FALTA PUSH+PR**. 19 tests; **1179/1179**. Hallazgo **L-53** (patrón 2+1 =
-  FORMA, central B menor por geometría). Validado con workflow; **falta validar en la APP** (tras Auth, el preview no entra).
-- **2026-06-09** — **Sesión panel tan δ + auditoría FP (ADR-029→040) — PUSHEADA + MERGEADA a `main` (PR #172).** Panel
-  tan δ condensado (3 vistas + análisis multi-norma con sellos), overlay genérico "Demás pruebas" retirado (reversible),
-  corregido **sobre-retiro** (ADR-036, **L-51** + memoria `feedback_no_sobre_retiro`), reubicada "Identidad", y CERRADA la
-  auditoría FP/tan δ (tip-up/localización/pendiente/baseline + caveat 20 °C; **#3 capacitancia descartada por artefacto
-  −91%, L-52**). Validado con workflow + datos reales; **falta validar en la APP**. Tests 1160/1160.
+- **2026-06-10** — **Panel CORRIENTE DE EXCITACIÓN (ADR-041 → `99 §41`; ADR-042 → `99 §42`):** panel `3ce25ae` + cableado
+  `7bb8b38` EN PRODUCCIÓN. **ADR-042**: el director no veía la gráfica de VALORES (vistas eran mutuamente excluyentes) →
+  nueva vista **"Resumen (todo)"** por defecto (valores mA + desviación + tablas apiladas) + **gating de tablas** (solo al
+  acotar a 1 año o 1 nivel → no satura) + chip "Patrón"→"Valores (mA)"; **fix bug `reset`** (Sets reasignados dejaban
+  closures huérfanos → mutar en sitio, **L-54**). 1179/1179, lint 0; commit en `DESARROLLO`, **FALTA PUSH+PR**. Hallazgo
+  previo **L-53** (patrón 2+1 = FORMA, central B menor por geometría). **Falta validar en la APP** (tras Auth).
+- **2026-06-09** — **Panel tan δ + auditoría FP (ADR-029→040) — MERGEADO a `main` (PR #172).** Detalle en `99`; lecciones
+  **L-51** (sobre-retiro) / **L-52** (capacitancia −91% = artefacto). Tests 1160/1160.
 - **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
   [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
   + validación de arquitectura (TODO-10).
