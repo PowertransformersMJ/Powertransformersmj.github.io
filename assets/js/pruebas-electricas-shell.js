@@ -40,6 +40,7 @@ import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo
 import { renderInformes } from './ui/pruebas/tabla-pruebas.js';
 import { mountBloques, svgBloque } from './ui/pruebas/grafico-generico.js';
 import { montarPanelTand } from './ui/pruebas/tand-panel.js';
+import { montarPanelExcitacion } from './ui/pruebas/excitacion-panel.js';
 import { confirmarUpsert } from './ui/pruebas/modal-upsert.js';
 import { bloquesTendencia, resumenTendenciaParaIA, analisisTendencia } from './domain/pruebas_electricas_tendencia.js';
 
@@ -603,8 +604,18 @@ function montarMultiAno() {
     const t = ((d && d.bloques) || []).find(esTand);
     return t ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), bloque: t } : null;
   }).filter(Boolean);
+  // La CORRIENTE DE EXCITACIÓN se condensa en su propio panel (espejo del tan δ;
+  // discrimina por NIVEL DE TENSIÓN + patrón 2+1 + W de pérdidas — ADR-041). Ya
+  // está EXCLUIDA del overlay genérico vía `excluidaDelOverlay`; aquí cada informe
+  // aporta TODOS sus bloques de excitación (puede traer varios niveles).
+  const esExc = (b) => { const f = familiaMA(b); return !!f && f.key === 'excitacion'; };
+  const excItems = docs.map((inf) => {
+    const d = state.bloquesCache.get(inf.id);
+    const excs = ((d && d.bloques) || []).filter(esExc).map((b) => ({ titulo: b.titulo, bloque: b }));
+    return excs.length ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), excs } : null;
+  }).filter(Boolean);
   const bloques = bloquesMultiAno(items).filter((b) => !excluidaDelOverlay(b.prueba));
-  if (!bloques.length && !tandItems.length) {
+  if (!bloques.length && !tandItems.length && !excItems.length) {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;
   }
@@ -617,7 +628,15 @@ function montarMultiAno() {
     cont.appendChild(sec);
     montarPanelTand(host, tandItems);
   }
-  if (!bloques.length) return; // solo tan δ → listo
+  // Panel de corriente de excitación condensado (espejo del tan δ; ADR-041).
+  if (excItems.length) {
+    const sec = document.createElement('section'); sec.className = 'pe-exc-seccion'; sec.style.margin = '0 0 18px';
+    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Corriente de excitación — por nivel de tensión', style: 'margin:0 0 8px' }));
+    const host = document.createElement('div'); sec.appendChild(host);
+    cont.appendChild(sec);
+    montarPanelExcitacion(host, excItems);
+  }
+  if (!bloques.length) return; // solo paneles condensados (tan δ / excitación) → listo
   // TODOS los informes presentes en el libro (filtro GLOBAL). Identidad = _rep
   // (no el año → no colapsa dos del mismo año); etiqueta = fecha/año; color fijo por informe.
   const repInfo = new Map();
@@ -640,7 +659,7 @@ function montarMultiAno() {
 
   // (cont ya fue limpiado arriba y puede contener el panel tan δ; aquí se APILA el
   // resto de pruebas, sin borrar lo anterior.)
-  if (tandItems.length) cont.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Demás pruebas · todos los años', style: 'margin:6px 0 8px' }));
+  if (tandItems.length || excItems.length) cont.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Demás pruebas · todos los años', style: 'margin:6px 0 8px' }));
   const intro = document.createElement('p');
   intro.className = 'muted small'; intro.style.margin = '0 0 6px';
   intro.innerHTML = `Cada gráfica es una prueba con <b>todos los años superpuestos</b> (la tendencia año a año; color por año). `
