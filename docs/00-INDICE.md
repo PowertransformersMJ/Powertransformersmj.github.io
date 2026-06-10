@@ -99,6 +99,7 @@
 | §38 | ADR-038 — FP/tan δ: vista **Tip-up** (ΔFP=FP@alta−FP@baja, detecta ionización/PD vs humedad; `svgTipUp`+`analizarTand`) + **caveat 20 °C** (sin T → se declara, no se inventa). Auditoría 🔵 skill factor-potencia-aislamiento (gaps #2/#3/#5/#6 en lóbulo 49) | 758 |
 | §39 | ADR-039 — FP/tan δ: **localización del defecto por modo** (`localizacionDe`/`causaProbableDe`: CH→AT↔tierra, CHL→entre devanados…) + bloque "Localización del hallazgo" para secciones sobre guía 0.5% (gap #2) | 774 |
 | §40 | ADR-040 — FP/tan δ: **pendiente predictiva por sección** (#5, `subiendo`) + **baseline-proxy** (#6) + capacitancia (#3) **DESCARTADA** (artefacto: pF no comparable entre esquemas/modos de medida → caveat, no falsa alarma). Cierra auditoría FP | 790 |
+| §41 | ADR-041 — **Corriente de excitación**: panel condensado propio `ui/pruebas/excitacion-panel.js` (espejo del tan δ) + **discriminación por nivel de tensión** (`nivelDe`: AT 66/110·MT 34.5·BT 13.8; el kV≤20 = tensión de ensayo) + 5 vistas (Δ por TAP / patrón 2+1 / tendencia / por nivel / **tabla mA·W·ambos**) + **W de pérdidas** (`perdidasDe`, `extra["P (W)"]`) + criterio COMPARATIVO conforme a norma (NETA 2+1 / IEEE 62). Patrón = FORMA; dir HLH/LHL informativa (geometría manda, L-53). 19 tests | 804 |
 
 ---
 

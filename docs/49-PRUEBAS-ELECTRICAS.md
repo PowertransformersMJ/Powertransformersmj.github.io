@@ -120,6 +120,24 @@ del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no
 
 Estado: **AUDITORÍA CERRADA** (ADR-038→040). #1 tip-up + #4 caveat 20 °C (ADR-038); #2 localización por modo (ADR-039); #5 pendiente predictiva por sección + #6 baseline-proxy (ADR-040). **#3 capacitancia DESCARTADA con causa**: comparar pF entre informes da artefactos (CHL −91%) porque los esquemas/modos de medida difieren (combos 2 vs 3 devanados, GST/UST) → la misma etiqueta de sección no mide lo mismo; el tan δ (ratio) sí es comparable, la capacitancia (absoluta) no. Para habilitar #3 haría falta **extracción POR MODO** (capturar GST/UST/GSTg por sección). Validado todo con workflow + datos REALES 450108.
 
+## 🔌 Panel de corriente de excitación (2026-06-10, ADR-041) — criterio + hallazgo de patrón
+
+Skill consultada: `corriente-excitacion` (`01-teoria`, `03-criterios-evaluacion`, `04-diagnostico`).
+Módulo: `assets/js/ui/pruebas/excitacion-panel.js` (espejo del panel tan δ; helpers puros testeados).
+
+**Criterio normativo (NO hay umbral % universal duro, ≠ TTR 0.5%) — es COMPARATIVO**, con precedencia:
+**fábrica/commissioning → ensayos previos/tendencia → NETA ATS §7.2.2.D.6 (patrón 2+1) → IEEE Std 62 / C57.152**.
+- Simetría de externas A–C (mismo `UMBRALES.excitacion` del scorecard): Δ **<10% si I<50 mA, <5% si I≥50 mA**.
+- Tendencia "decenas de %" vs baseline = alarma aunque el patrón parezca correcto.
+- **Pérdidas (W)** = componente resistiva (I_exc = I_magnetizante + I_pérdidas: histéresis+Foucault); **sin umbral propio** → comparativo (vs fábrica/previos/fases hermanas). Faithful a la tabla del informe (`extra["P (W)"]`).
+- Convergencia: excitación anómala SOLA = INVESTIGAR; "espira en corto" solo si converge con TTR desviada y/o R de devanados anómala.
+
+**Nivel de tensión** = devanado + nominal según grupo vectorial (trafo móvil): AT delta→**66 kV** / estrella→**110 kV**, MT→**34.5**, BT/Terciario→**13.8**. El "10 kV" de los títulos es la **tensión de ENSAYO**, no el nivel (`nivelDe` los separa). Comparar SOLO a igual nivel.
+
+**HALLAZGO (verificado, 7 tríos reales 450108) — L-53**: la columna **central (B) es la MENOR en estrella Y en delta** (patrón HLH en ambos). Lo gobierna la GEOMETRÍA del núcleo (columna central = camino magnético más corto → menor reluctancia → menor corriente), NO la conexión. Por eso el criterio de aprobación es la **FORMA 2+1** (externas simétricas + central como extremo distinto); la dirección HLH/LHL esperada por conexión es **informativa**, no veredicto. La regla rígida de libro (delta⇒LHL) daba 4/7 falsas "irregular" en una unidad sana.
+
+**Estado**: implementado + validado con workflow (`_dev/preview-excitacion.html` + 9 fixtures reales). 19 tests. ⚠️ Umbrales Δ 5–10% a verificar contra fábrica/edición de norma del director. Falta: validar en la APP + wiring al shell.
+
 ## Pendientes / próxima ronda
 
 - Validación del director sobre la skill ejemplar (¿el patrón de 4 neuronas le sirve?) antes

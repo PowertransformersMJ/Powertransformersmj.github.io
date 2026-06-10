@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Corriente de excitación — panel condensado (módulo excitacion-panel.js)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; } </style>
+</head>
+<body>
+<h1>DEV · Corriente de excitación — panel condensado (datos REALES 450108)</h1>
+<p style="color:#64748b;font-size:13px;max-width:78ch">Valida el módulo <code>ui/pruebas/excitacion-panel.js</code> (el MISMO que usará el tablero): mismo fundamento que el panel tan δ + <b>discriminación por NIVEL DE TENSIÓN</b> (devanado + tensión de prueba: AT·66 kV, AT·10 kV, MT·34.5 kV) manteniendo el mismo criterio (IEEE Std 62 + patrón 2+1). Filtros año/grupo/nivel/fase + 3 vistas (patrón / tendencia / por nivel).</p>
+<h2>Corriente de excitación</h2>
+<div id="panel"></div>
+
+<script type="module">
+import { montarPanelExcitacion } from '../assets/js/ui/pruebas/excitacion-panel.js';
+import { etiquetaFecha, configInforme, ordenInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+// TODOS los informes del libro (como en la app). El panel filtra y muestra solo
+// los que tienen excitación. El informe 2022-05-02 trae DOS niveles (AT·66 kV +
+// MT·34.5 kV) — valida la discriminación por nivel de tensión.
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-01-18-sfra.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json',
+  './fixtures/450108-2024-01-19-sfra-estrella.json',
+  './fixtures/450108-2024-01-19-sfra-delta.json'
+];
+
+(async () => {
+  const items = [];
+  for (const url of FIXTURES) {
+    try { const j = await (await fetch(url + '?v=' + Date.now())).json();
+      const excs = (j.bloques || [])
+        .filter((b) => { const f = familiaMA(b); return !!f && f.key === 'excitacion'; })
+        .map((b) => ({ titulo: b.titulo, bloque: b }));
+      if (!excs.length) continue;
+      items.push({ id: j.id, label: etiquetaFecha(j.fecha, j.ano), ano: j.ano, config: configInforme(j), excs });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  items.sort((a, b) => ordenInforme(a.label, a.ano) - ordenInforme(b.label, b.ano));
+  console.log('[preview-excitacion] informes con excitación:', items.length,
+    '· niveles:', items.flatMap((it) => it.excs.map((e) => e.titulo)));
+  montarPanelExcitacion(document.getElementById('panel'), items);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
