@@ -593,6 +593,34 @@ export function montarPanelExcitacion(cont, items) {
     return wrap;
   }
 
+  // ── Helpers de render por NIVEL DE TENSIÓN: cada nivel lleva su gráfica de
+  // valores (mA) + su desviación A–C + su criterio (pedido del director). ──
+  const sinDatos = (txt) => Object.assign(document.createElement('p'), { className: 'muted small', textContent: txt });
+  const mkSec = (titulo, sub) => {
+    const d = document.createElement('div'); d.style.cssText = 'margin:0 0 14px';
+    const h = document.createElement('div'); h.style.cssText = 'font-size:12px;font-weight:700;color:#334155;margin:0 0 4px'; h.textContent = titulo; d.appendChild(h);
+    if (sub) { const s = sinDatos(sub); s.style.margin = '0 0 6px'; d.appendChild(s); }
+    return d;
+  };
+  const mkNivelHeader = (nivel) => {
+    const h = document.createElement('div');
+    h.style.cssText = 'font-size:13px;font-weight:800;color:#1e293b;margin:0 0 10px;display:flex;align-items:center;gap:8px';
+    h.innerHTML = `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:#2563eb"></span>Nivel ${esc(nivel)}`;
+    return h;
+  };
+  const nivelesVisOrden = () => [...new Set(medsVis().map((m) => m.nivel))].sort();
+  const bloqueValores = (aggN, fasesList) => svgPatron(aggN, fasesList) || sinDatos('Sin valores para los filtros activos.');
+  const bloqueDesviacion = (medsN) => {
+    const wrap = document.createElement('div');
+    const r = svgDesviacionTAP(medsN);
+    if (!r || !r.svg) { wrap.appendChild(sinDatos('Sin desviaciones para los filtros activos.')); return wrap; }
+    wrap.appendChild(r.svg);
+    const ok = r.total - r.sobre - r.guia; const partes = [`${ok}/${r.total} posiciones dentro de norma`];
+    if (r.guia) partes.push(`${r.guia} sobre guía`); if (r.sobre) partes.push(`${r.sobre} SUPERA límite`);
+    const vd = sinDatos(`Criterio IEEE Std 62 / C57.12.90 (≤ ${CRIT.limite}%): ${partes.join(' · ')}.`); vd.style.margin = '4px 0 0';
+    wrap.appendChild(vd); return wrap;
+  };
+
   // ── Gating de tablas (evita sobrecarga visual): las tablas de valores solo se
   // despliegan cuando el usuario acota a UN año o UN nivel — o cuando de por sí
   // hay pocas (≤2). Si no, se muestra una pista para filtrar (pedido del director). ──
@@ -617,24 +645,23 @@ export function montarPanelExcitacion(cont, items) {
     const agg = medsAgg(), fasesList = fasesAll.filter((f) => sel.fase.has(f));
     magBar.style.display = (modo === 'tabla' || modo === 'resumen') ? 'flex' : 'none';
     if (modo === 'resumen') {
-      const mkSec = (titulo, sub) => {
-        const d = document.createElement('div'); d.style.cssText = 'margin:0 0 16px';
-        const h = document.createElement('div'); h.style.cssText = 'font-size:12px;font-weight:700;color:#334155;margin:0 0 4px'; h.textContent = titulo; d.appendChild(h);
-        if (sub) { const s = Object.assign(document.createElement('p'), { className: 'muted small', textContent: sub }); s.style.margin = '0 0 6px'; d.appendChild(s); }
-        return d;
-      };
-      const s1 = mkSec('Valores de corriente de excitación (mA) por fase', 'Barras por informe×nivel; ROJO = patrón 2+1 fuera de criterio (2 externas similares + 1 central distinta).');
-      const gPat = svgPatron(agg, fasesList);
-      s1.appendChild(gPat || Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin valores para los filtros activos.' }));
-      chartBox.appendChild(s1);
-      const s2 = mkSec('Desviación entre fases laterales (A–C, %) por posición de TAP', `Una línea por informe; criterio IEEE Std 62 / C57.12.90 (≤ ${CRIT.limite}%).`);
-      const rDev = svgDesviacionTAP(medsVis());
-      s2.appendChild((rDev && rDev.svg) || Object.assign(document.createElement('p'), { className: 'muted small', textContent: 'Sin desviaciones para los filtros activos.' }));
-      chartBox.appendChild(s2);
+      const nivs = nivelesVisOrden();
+      if (!nivs.length) chartBox.appendChild(sinDatos('Sin datos de excitación para los filtros activos.'));
+      else nivs.forEach((nivel) => {
+        const aggN = agg.filter((g) => g.nivel === nivel);
+        const medsN = medsVis().filter((m) => m.nivel === nivel);
+        const block = document.createElement('div'); block.style.cssText = 'margin:0 0 22px;padding:0 0 14px;border-bottom:1px solid #eef2f6';
+        block.appendChild(mkNivelHeader(nivel));
+        const s1 = mkSec('Valores de corriente de excitación (mA) por fase', 'Barras por informe; ROJO = patrón 2+1 fuera de criterio (2 externas similares + 1 central distinta).');
+        s1.appendChild(bloqueValores(aggN, fasesList)); block.appendChild(s1);
+        const s2 = mkSec('Desviación entre fases laterales (A–C, %) por posición de TAP', 'Una línea por informe (color por año).');
+        s2.appendChild(bloqueDesviacion(medsN)); block.appendChild(s2);
+        chartBox.appendChild(block);
+      });
       const s3 = mkSec('Tablas de valores (mA / W) por informe × nivel', null);
       pintarTablas(s3);
       chartBox.appendChild(s3);
-      cap.textContent = 'Resumen: valores (mA), desviaciones y tablas en una sola vista. Las tablas se despliegan al elegir un año o un nivel (evita sobrecarga). Usa las pestañas de Vista para enfocar una sola gráfica.';
+      cap.textContent = 'Resumen SEPARADO por nivel de tensión: cada nivel con su gráfica de valores (mA), su desviación A–C y su criterio normativo. Las tablas se despliegan al elegir un año o un nivel (evita sobrecarga). Usa las pestañas de Vista para enfocar una sola gráfica.';
       renderAnalisis(analisisBox, analizarExcitacion(agg));
       contadores.forEach((fn) => fn());
       return;
@@ -650,13 +677,25 @@ export function montarPanelExcitacion(cont, items) {
       return;
     }
     const datos = analizarExcitacion(agg);
+    if (modo === 'desviacion' || modo === 'patron') {
+      const nivs = nivelesVisOrden();
+      if (!nivs.length) chartBox.appendChild(sinDatos('Sin datos de excitación para los filtros activos.'));
+      else nivs.forEach((nivel) => {
+        const block = document.createElement('div'); block.style.cssText = 'margin:0 0 20px;padding:0 0 12px;border-bottom:1px solid #eef2f6';
+        block.appendChild(mkNivelHeader(nivel));
+        if (modo === 'desviacion') block.appendChild(bloqueDesviacion(medsVis().filter((m) => m.nivel === nivel)));
+        else block.appendChild(bloqueValores(agg.filter((g) => g.nivel === nivel), fasesList));
+        chartBox.appendChild(block);
+      });
+      cap.textContent = modo === 'desviacion'
+        ? `Δ por posición de TAP, SEPARADO por nivel de tensión: eje X = TAP, eje Y = Δ entre fases laterales (A–C); una línea por informe (color por año) — mismo criterio por nivel y posición (IEEE Std 62 / C57.12.90: ≤ ${CRIT.limite}%). El veredicto de cada nivel va bajo su gráfica.`
+        : 'Valores (mA) por fase, SEPARADO por nivel de tensión: eje X = fase (A/B/C), barras por informe (color por informe; ROJO = patrón fuera de criterio). El patrón sano es 2 externas similares + 1 central distinta. Pasa el cursor por cada barra para Δ y patrón.';
+      renderAnalisis(analisisBox, datos);
+      contadores.forEach((fn) => fn());
+      return;
+    }
     let svg = null;
-    if (modo === 'desviacion') {
-      const r = svgDesviacionTAP(medsVis()); svg = r && r.svg;
-      if (r) { const ok = r.total - r.sobre - r.guia; const partes = [`${ok}/${r.total} posiciones dentro de norma`];
-        if (r.guia) partes.push(`${r.guia} sobre guía`); if (r.sobre) partes.push(`${r.sobre} SUPERA límite`);
-        cap.textContent = `Δ por posición de TAP (${r.nivel}): eje X = TAP, eje Y = Δ entre fases laterales (A–C); una línea por informe (color por año) — mismo criterio por nivel y por posición (IEEE Std 62 / C57.12.90: ≤ ${CRIT.limite}%). La forma de la curva y su deriva entre años condensan la tendencia. Veredicto: ${partes.join(' · ')}.${r.varios ? ' (Varios niveles seleccionados: se grafica el primero — filtra a un nivel para ver otro.)' : ''}`; }
-    } else if (modo === 'tendencia') {
+    if (modo === 'tendencia') {
       const r = svgTendencia(agg, fasesList); svg = r && r.svg;
       cap.textContent = `Tendencia año tras año (${r ? r.nivel : '—'}): eje X = informe, BARRAS por fase (color por fase) — la misma fase alineada entre años. Una sola fase que se aparta sugiere espira/defecto local; las 3 subiendo a la vez, magnetismo residual.${r && r.varios ? ' (Varios niveles seleccionados: se grafica el primero — filtra a un nivel para ver otro.)' : ''}`;
     } else if (modo === 'nivel') {
@@ -664,9 +703,6 @@ export function montarPanelExcitacion(cont, items) {
       if (r) { const ok = r.total - r.sobre - r.guia; const partes = [`${ok}/${r.total} dentro de norma`];
         if (r.guia) partes.push(`${r.guia} sobre guía`); if (r.sobre) partes.push(`${r.sobre} SUPERA límite (rojo)`);
         cap.textContent = `Por nivel de tensión: eje X = nivel (devanado + tensión de prueba); barras por informe = Δ entre externas. Mismo criterio en cada nivel (IEEE Std 62: Δ<${CRIT.guia}% si I≥50 mA, <${CRIT.limite}% si I<50 mA). Veredicto: ${partes.join(' · ')}.`; }
-    } else {
-      svg = svgPatron(agg, fasesList);
-      cap.textContent = `Patrón de fases: eje X = fase (A/B/C), barras por informe×nivel (color por informe; ROJO = patrón fuera de criterio). El patrón sano es 2 externas similares + 1 central distinta (HLH en estrella, LHL en delta). Pasa el cursor por cada barra para Δ y patrón.`;
     }
     if (svg) chartBox.appendChild(svg);
     else chartBox.innerHTML = '<p class="muted small">Sin datos de excitación para los filtros activos.</p>';

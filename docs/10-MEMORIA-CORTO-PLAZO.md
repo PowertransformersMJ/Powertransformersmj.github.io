@@ -103,8 +103,9 @@
   `7bb8b38` EN PRODUCCIÓN. **ADR-042**: el director no veía la gráfica de VALORES (vistas eran mutuamente excluyentes) →
   nueva vista **"Resumen (todo)"** por defecto (valores mA + desviación + tablas apiladas) + **gating de tablas** (solo al
   acotar a 1 año o 1 nivel → no satura) + chip "Patrón"→"Valores (mA)"; **fix bug `reset`** (Sets reasignados dejaban
-  closures huérfanos → mutar en sitio, **L-54**). 1179/1179, lint 0; commit en `DESARROLLO`, **FALTA PUSH+PR**. Hallazgo
-  previo **L-53** (patrón 2+1 = FORMA, central B menor por geometría). **Falta validar en la APP** (tras Auth).
+  closures huérfanos → mutar en sitio, **L-54**). **+ §42.8**: separación **por NIVEL DE TENSIÓN** (cada nivel = su gráfica
+  de valores + su desviación + su criterio; quita "solo el 1.er nivel"). 1179/1179, lint 0; **FALTA PUSH+PR** (§42.8 en
+  commit aparte). Hallazgo previo **L-53** (patrón 2+1 = FORMA, central B menor por geometría). **Falta validar en la APP**.
 - **2026-06-09** — **Panel tan δ + auditoría FP (ADR-029→040) — MERGEADO a `main` (PR #172).** Detalle en `99`; lecciones
   **L-51** (sobre-retiro) / **L-52** (capacitancia −91% = artefacto). Tests 1160/1160.
 - **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
