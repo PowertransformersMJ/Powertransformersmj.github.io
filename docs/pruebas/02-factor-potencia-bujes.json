@@ -1,0 +1,43 @@
+{
+  "prueba": "bushing",
+  "nombre": "Factor de potencia de bujes (C1)",
+  "orden_scorecard": 2,
+  "diagnostico_motor": "canónico (FP de bujes DISCRIMINADO del FP del transformador, ADR-013)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarBushing()",
+    "motor_multinorma": "assets/js/domain/pruebas_electricas_multinorma.js → CRITERIOS_MULTINORMA.bushing",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[1]",
+    "skill": "skills/pruebas-electricas/factor-potencia-aislamiento/ (cubre bujes C1)",
+    "_nota": "El CÓDIGO manda. Refrescar esta ficha si cambia el código."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "La IA emite el bloque 'bushing'; el shell deriva el PEOR tan δ y la PEOR ΔC1 vs placa al guardar. null si el informe no trae bujes.",
+    "fp_max_pct": "número (peor tan δ de buje %, derivado)",
+    "dc1_max_pct": "número (peor variación de capacitancia C1 vs placa %)"
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "fp_max_pct (peor tan δ de buje)",
+    "criterio_scorecard": "tan δ ≤ 1% (IEEE 62 / C57.19.100)",
+    "formula": "tan δ del buje % · Capacitancia C1 medida vs valor de placa",
+    "umbral_vigente": {
+      "tan δ < 1%": "aceptable",
+      "Cap C1": "dentro de ±5–10% de placa",
+      "_codigo": "maxBanda(0.5, 1) en la óptica NETA"
+    },
+    "normas_multinorma": [
+      { "norma": "ANSI/NETA §7.2.2.D.5", "umbral": "tan δ ≤1% · vs placa: FP>50% / C1>5%", "tipo": "cuantitativo" },
+      { "norma": "IEEE C57.19.01 / Doble", "umbral": "≤0.5% bueno · 0.5–1 investigar · >1 crítico", "tipo": "orientativa; ΔC1 vs placa manda en seguridad" }
+    ],
+    "pendiente_de_validar": {
+      "⚠️_banda_C1": "La banda C1 vs placa (±5–10%) sigue 'verificar' (TODO-08, lobe 49)."
+    }
+  },
+
+  "notas": [
+    "Prueba INDEPENDIENTE del collar caliente (#7) y del FP del transformador (#1) — no fusionar.",
+    "ΔC1 vs placa es el criterio de SEGURIDAD (señal de daño), por encima del tan δ."
+  ]
+}

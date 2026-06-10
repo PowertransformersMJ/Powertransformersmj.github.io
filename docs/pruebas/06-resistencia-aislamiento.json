@@ -1,0 +1,54 @@
+{
+  "prueba": "aislamiento",
+  "nombre": "Resistencia de aislamiento (CC · Megger)",
+  "orden_scorecard": 6,
+  "diagnostico_motor": "canónico (mínimo NETA POR CLASE de tensión)",
+
+  "_fuente": {
+    "datos": "assets/js/domain/pruebas_electricas_schema.js → sanitizarAislamiento() · NETA_IR_MIN_GOHM · minNetaGohm()",
+    "motor_multinorma": "assets/js/domain/pruebas_electricas_multinorma.js → CRITERIOS_MULTINORMA.aislamiento",
+    "scorecard": "assets/js/pruebas-electricas-shell.js → FAMILIAS_SCORE[5]",
+    "skill": "skills/pruebas-electricas/resistencia-aislamiento/",
+    "_nota": "El CÓDIGO manda. Refrescar esta ficha si cambia el código."
+  },
+
+  "datos_que_extrae_la_IA": {
+    "_descripcion": "Por par de devanados / a tierra, en GΩ.",
+    "filas": [
+      {
+        "devanado": "AT | MT | BT",
+        "asociado": "ej. 'Tierra', 'MT', 'BT'",
+        "gohm": "número (resistencia de aislamiento GΩ)",
+        "calif": "OK | bajo | n/d (derivada)"
+      }
+    ]
+  },
+
+  "criterio_y_umbrales": {
+    "metrica_peor_caso": "mín(gohm) entre todas las filas",
+    "criterio_scorecard": "≥ mínimo NETA por clase (ej. clase 110 kV → ≥ 30 GΩ)",
+    "formula": "R_aisl a 1 min ≥ mínimo NETA por clase de tensión · DAR = R(1 min)/R(30 s) · PI = R(10 min)/R(1 min)",
+    "umbral_vigente_por_clase_GOhm": {
+      "13.8 kV (clase 15)": 5,
+      "34.5 kV (clase 34.5)": 15,
+      "110 kV (clase 115)": 30,
+      "_tabla": "NETA_IR_MIN_GOHM: 1kV→0.1 · 5→1 · 15→5 · 25→10 · 34.5→15 · 46→20 · 69→25 · 115→30",
+      "_codigo": "minNetaGohm(kv) redondea hacia ARRIBA al escalón de clase"
+    },
+    "normas_multinorma": [
+      { "norma": "ANSI/NETA Tabla 100.5", "umbral": "≥5 GΩ (>5 kV, líquido) · piso absoluto", "tipo": "piso" },
+      { "norma": "Por clase (MO.00418 / C57.152)", "umbral": "≥ mínimo por clase de tensión", "tipo": "criterio primario · ⚠️ verificar" },
+      { "norma": "IEEE C57.152 (PI/DAR)", "umbral": "PI≥1.5 · DAR>1.6 · tendencia", "tipo": "requiere PI/DAR del informe" }
+    ],
+    "pendiente_de_validar": {
+      "⚠️_clase": "Mínimo por clase (MO.00418) sigue 'verificar' (TODO-08).",
+      "⚠️_PI_DAR": "PI/DAR requieren que el informe traiga R a 30s/1min/10min."
+    }
+  },
+
+  "notas": [
+    "El mínimo ESCALA con la tensión: un 110 kV con 5–6 GΩ es POBRE, no 'aceptable' (caso testigo divergencia NETA piso vs clase).",
+    "La clase sale de la IDENTIDAD del informe (config móvil 63.5/110 kV, ADR-014).",
+    "Prueba INDEPENDIENTE — no fusionar."
+  ]
+}
