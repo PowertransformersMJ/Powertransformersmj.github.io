@@ -106,7 +106,8 @@
   tendencia / por nivel / tabla mA·W·ambos), **W de pérdidas** incluidos (`perdidasDe`), criterio comparativo conforme a
   norma (skill `corriente-excitacion`). Hallazgo **L-53**: patrón 2+1 = FORMA, dirección HLH/LHL informativa (central B
   menor en estrella Y delta por geometría del núcleo; la regla rígida daba 4/7 falsas alarmas). 19 tests; **1179/1179**.
-  Validado con workflow; **falta validar en la APP** + wiring al shell.
+  **CABLEADO al shell HECHO** (`pruebas-electricas-shell.js`: `esExc`/`excItems` espejo de tan δ + montaje tras el panel
+  tan δ; `node --check` OK). Validado con workflow; **falta validar en la APP** (tras Auth, el preview no entra).
 - **2026-06-09** — **Sesión panel tan δ + auditoría FP (ADR-029→040) — PUSHEADA + MERGEADA a `main` (PR #172).** Panel
   tan δ condensado (3 vistas + análisis multi-norma con sellos), overlay genérico "Demás pruebas" retirado (reversible),
   corregido **sobre-retiro** (ADR-036, **L-51** + memoria `feedback_no_sobre_retiro`), reubicada "Identidad", y CERRADA la
