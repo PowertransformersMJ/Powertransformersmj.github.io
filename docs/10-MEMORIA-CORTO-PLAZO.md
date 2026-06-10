@@ -16,19 +16,15 @@
 
 > **TEMA: Tablero de Pruebas Eléctricas con IA — paneles condensados por prueba (tan δ → excitación).**
 > **Arco tablero base (ADR-003→014) + arco panel tan δ (ADR-029→040) EN PRODUCCIÓN** (mergeado a `main`
-> vía **PR #172**). **Arco panel CORRIENTE DE EXCITACIÓN (ADR-041) COMMITEADO en `DESARROLLO`, FALTA PUSH.**
+> vía **PR #172**). **Arco panel CORRIENTE DE EXCITACIÓN (ADR-041): panel (`3ce25ae`) EN PRODUCCIÓN (PR #173);
+> CABLEADO al shell (`7bb8b38`) COMMITEADO en `DESARROLLO`, FALTA PUSH+PR.**
 > Detalle: `00`→`99 §29..§41`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108;
 > **pendiente validar en la APP** (la página vive tras Firebase Auth → el preview no entra; sólo harness).
 >
-> **ARCO EXCITACIÓN (ADR-041, FALTA PUSH) — `ui/pruebas/excitacion-panel.js` (espejo del tan δ):**
-> 5 vistas (Δ por TAP / patrón 2+1 / tendencia / por nivel / **tabla mA·W·ambos**) + filtros (año/grupo/**nivel**/fase).
-> **Discrimina por NIVEL DE TENSIÓN** (`nivelDe`: AT delta→66·estrella→110·MT 34.5·BT 13.8; el "10 kV" = tensión de
-> ENSAYO, no el nivel). **W de pérdidas** incluidos (`perdidasDe` lee `extra["P (W)"]`; tabla con sub-toggle mA/W/ambos
-> + Σ pérd. por TAP; informes sin W → "—"+badge, NO inventa; tendencia de pérdidas NO compara contra 0). Criterio
-> COMPARATIVO conforme a norma (NETA 2+1 / IEEE 62; sin umbral % duro; pérdidas = componente resistiva sin umbral propio).
-> **Patrón 2+1 = FORMA** (externas A–C simétricas + central distinta); dirección HLH/LHL **informativa** — la central B es la
-> MENOR en estrella Y delta por GEOMETRÍA del núcleo (verificado 7 tríos 450108; **L-53**). 19 tests; suite **1179/1179**.
-> ⚠️ Umbrales Δ 5–10% a verificar con el director. ⛔ NO dañar scorecard/calificación global/`grafico-generico.js`.
+> **ARCO EXCITACIÓN (ADR-041 → `99 §41` + lobe 49) — `ui/pruebas/excitacion-panel.js` + cableado en shell:**
+> espejo del tan δ; discrimina por NIVEL DE TENSIÓN (`nivelDe`), 5 vistas + W de pérdidas (`perdidasDe`), criterio
+> COMPARATIVO conforme a norma, patrón 2+1 = FORMA (central B menor por geometría, **L-53**). ⚠️ Umbrales Δ 5–10% a
+> verificar con el director. ⛔ NO dañar scorecard/calificación global/`grafico-generico.js`. El panel sigue el MISMO molde del tan δ.
 >
 > **Qué hace el tablero HOY (todo en prod):** la IA (Opus 4.7/Sonnet 4.6) extrae el PDF →
 > tablero **IA-primaria** (bloques = cuerpo; tablas = DATOS). **El VEREDICTO es 100% NORMATIVO**
@@ -101,12 +97,9 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-10** — **Sesión panel CORRIENTE DE EXCITACIÓN (ADR-041) — COMMITEADA en `DESARROLLO`, FALTA PUSH.**
-  Panel propio espejo del tan δ: discriminación por nivel de tensión (`nivelDe`), 5 vistas (Δ por TAP / patrón 2+1 /
-  tendencia / por nivel / tabla mA·W·ambos), **W de pérdidas** incluidos (`perdidasDe`), criterio comparativo conforme a
-  norma (skill `corriente-excitacion`). Hallazgo **L-53**: patrón 2+1 = FORMA, dirección HLH/LHL informativa (central B
-  menor en estrella Y delta por geometría del núcleo; la regla rígida daba 4/7 falsas alarmas). 19 tests; **1179/1179**.
-  Validado con workflow; **falta validar en la APP** + wiring al shell.
+- **2026-06-10** — **Panel CORRIENTE DE EXCITACIÓN (ADR-041, → `99 §41`):** panel `3ce25ae` EN PRODUCCIÓN (PR #173);
+  cableado al shell `7bb8b38` en `DESARROLLO`, **FALTA PUSH+PR**. 19 tests; **1179/1179**. Hallazgo **L-53** (patrón 2+1 =
+  FORMA, central B menor por geometría). Validado con workflow; **falta validar en la APP** (tras Auth, el preview no entra).
 - **2026-06-09** — **Sesión panel tan δ + auditoría FP (ADR-029→040) — PUSHEADA + MERGEADA a `main` (PR #172).** Panel
   tan δ condensado (3 vistas + análisis multi-norma con sellos), overlay genérico "Demás pruebas" retirado (reversible),
   corregido **sobre-retiro** (ADR-036, **L-51** + memoria `feedback_no_sobre_retiro`), reubicada "Identidad", y CERRADA la
