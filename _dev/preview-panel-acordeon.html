@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Panel por prueba — AÑOS DESPLEGABLES (acordeón)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  :root { --vp-navy:#0f2a44; --vp-teal:#2c6e72; --vp-ink:#0f172a; --vp-mut:#64748b; --vp-line:#e7ecf2; }
+  * { -webkit-font-smoothing:antialiased; }
+  body { padding:32px 24px; background:linear-gradient(180deg,#f6f8fb,#eef2f7 60%); font-family:system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--vp-ink); }
+  h1 { letter-spacing:-.02em; }
+  h2 { margin:6px 0 12px; font-size:19px; font-weight:800; letter-spacing:-.01em; }
+  .intro { color:var(--vp-mut); font-size:13px; max-width:86ch; line-height:1.55; }
+  .intro code { background:#e7ecf2; padding:1px 6px; border-radius:5px; font-size:.92em; }
+
+  /* ── Acordeón PREMIUM (transform/opacity solamente, §3.1) ── */
+  .pe-acc { border:1px solid var(--vp-line); border-radius:16px; background:#fff; margin:0 0 14px; overflow:hidden;
+            box-shadow:0 1px 2px rgba(15,42,68,.04); transition:box-shadow .2s ease; }
+  .pe-acc:hover { box-shadow:0 6px 20px -8px rgba(15,42,68,.14); }
+  .pe-acc[open] { box-shadow:0 12px 34px -14px rgba(15,42,68,.20); }
+  .pe-acc-sum { display:flex; align-items:center; gap:12px; cursor:pointer; padding:15px 20px; list-style:none; user-select:none;
+                background:linear-gradient(135deg,var(--vp-navy),var(--vp-teal)); color:#fff; }
+  .pe-acc-sum::-webkit-details-marker { display:none; }
+  .pe-acc-sum::before { content:''; width:7px; height:7px; flex:none; margin:0 2px; transform:rotate(-45deg); transition:transform .2s ease;
+                        border-right:2px solid rgba(255,255,255,.9); border-bottom:2px solid rgba(255,255,255,.9); }
+  .pe-acc[open] > .pe-acc-sum::before { transform:rotate(45deg); }
+  .pe-acc-sum .pe-fus-niv { flex:1; font-family:var(--pe-mono,ui-monospace,monospace); font-weight:800; font-size:14px; letter-spacing:.05em; color:#fff; }
+  .pe-acc-body { padding:16px 18px 12px; }
+
+  /* Filtro de año premium */
+  .pe-toolbar-lbl { font-size:10px; font-weight:800; letter-spacing:.09em; text-transform:uppercase; color:var(--vp-mut); margin:2px 0 7px; }
+  .pe-tabs { display:flex; gap:7px; flex-wrap:wrap; margin:0 0 14px; }
+  .pe-tab { padding:6px 14px; border:1px solid #d6deea; background:#fff; border-radius:999px; cursor:pointer; font-size:12px; font-weight:700; color:#475569;
+            transition:transform .12s ease, border-color .12s ease; }
+  .pe-tab:hover { border-color:#94a3b8; transform:translateY(-1px); }
+  .pe-tab.is-active { background:linear-gradient(135deg,var(--vp-navy),var(--vp-teal)); color:#fff; border-color:transparent; box-shadow:0 5px 14px -5px rgba(44,110,114,.55); }
+
+  /* Tarjeta interna — override SOLO dentro del acordeón (no toca producción) */
+  .pe-acc .pe-fus { padding:0; }
+  .pe-acc .pe-fus-card { border:none; box-shadow:none; margin:0; background:transparent; }
+  .pe-acc .pe-fus-tiles { display:grid; grid-template-columns:repeat(4,1fr); gap:11px; margin:0 0 14px; }
+  .pe-acc .pe-fus-tile { background:linear-gradient(180deg,#fff,#f7fafc); border:1px solid #eef2f6; border-radius:13px; padding:13px 15px; box-shadow:0 1px 2px rgba(15,42,68,.04); }
+  .pe-acc .pe-fus-tile.is-ok { border-color:#bbf7d0; background:linear-gradient(180deg,#fff,#f0fdf4); }
+  .pe-acc .pe-fus-tile.is-warn { border-color:#fde68a; background:linear-gradient(180deg,#fff,#fffbeb); }
+  .pe-acc .pe-fus-tile.is-bad { border-color:#fecaca; background:linear-gradient(180deg,#fff,#fef2f2); }
+  .pe-acc .pe-fus-v { font-size:24px; font-weight:800; letter-spacing:-.02em; font-variant-numeric:tabular-nums; color:var(--vp-ink); }
+  .pe-acc .pe-fus-v small { font-size:12px; font-weight:700; color:var(--vp-mut); }
+  .pe-acc .pe-fus-l { font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase; color:var(--vp-mut); margin-top:4px; }
+  .pe-acc .pe-fus-verdict { background:#f8fafc; border:1px solid #eef2f6; border-radius:11px; padding:9px 13px; }
+  .pe-acc .pe-tabla { font-variant-numeric:tabular-nums; }
+  .pe-acc .pe-tabla thead th { text-transform:uppercase; letter-spacing:.04em; font-size:10px; color:var(--vp-mut); }
+  .pe-acc .pe-tabla tbody tr:hover { background:#f8fafc; }
+
+  /* Diagnóstico premium */
+  .pe-diag { border-top:1px solid var(--vp-line); margin-top:16px; padding-top:13px; }
+  .pe-diag-h { font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; color:var(--vp-teal); margin-bottom:8px; }
+  .pe-diag-metric { font-size:12.5px; color:#475569; margin-bottom:10px; }
+  .pe-diag-tbl { width:100%; border-collapse:collapse; font-size:12px; }
+  .pe-diag-tbl th { text-align:left; color:var(--vp-mut); font-weight:800; padding:5px 8px; border-bottom:1px solid var(--vp-line); font-size:10px; text-transform:uppercase; letter-spacing:.05em; }
+  .pe-diag-tbl td { padding:7px 8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+  .pe-diag-nota { color:#94a3b8; }
+  .pe-diag-badge { display:inline-block; padding:3px 11px; border-radius:999px; font-size:11px; font-weight:700; background:#eef2f6; color:#475569; }
+  .pe-diag-badge.is-ok { background:#dcfce7; color:#166534; }
+  .pe-diag-badge.is-warn { background:#fef3c7; color:#92400e; }
+  .pe-diag-badge.is-bad { background:#fee2e2; color:#991b1b; }
+  .pe-diag-cons { font-size:12.5px; margin-top:10px; color:#334155; }
+  .pe-diag-concl { font-size:12.5px; margin-top:6px; color:var(--vp-ink); font-weight:600; }
+
+  @media (max-width:640px){ .pe-acc .pe-fus-tiles{ grid-template-columns:repeat(2,1fr); } }
+  @media (prefers-reduced-motion: reduce){ * { transition:none !important; } }
+</style>
+</head>
+<body>
+<h1>DEV · Panel por prueba — NIVELES desplegables (acordeón)</h1>
+<p class="intro">Cada <b>nivel de tensión se despliega</b> (clic en su fila: AT·110, AT·66, MT·34.5) y al abrirlo se ven
+  su KPI + criterio + <b>tabla</b> + diagnóstico/análisis. <b>Dentro de cada nivel hay un filtro de Año propio</b>
+  (solo los años en que ESE nivel se ensayó): "Todos los años" = rango real mín–máx; un año = tabla completa con
+  todos los TAP. El primer nivel abre por defecto. Datos REALES (450108). Prueba:
+  <a href="?prueba=excitacion">excitación</a> · <a href="?prueba=relacion">relación</a> ·
+  <a href="?prueba=resistencia">resistencia</a> · <a href="?prueba=aislamiento">aislamiento</a> · <a href="?prueba=bushing">bujes</a></p>
+<div id="panel"></div>
+
+<script type="module">
+const { montarPanelPruebaNivelAcordeon } = await import('./tablas-pruebas-preview.js?v=' + Date.now());
+import { configInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+function etiquetaFecha(fecha, ano) { return (fecha && String(fecha).trim()) || (ano != null ? String(ano) : '—'); }
+
+(async () => {
+  const prueba = new URLSearchParams(location.search).get('prueba') || 'excitacion';
+  const informes = [];
+  for (const url of FIXTURES) {
+    try {
+      const j = await (await fetch(url + '?v=' + Date.now())).json();
+      const config = configInforme({ nombre: j.nombre, grupo_conexion: j.identidad && j.identidad.grupo_conexion });
+      informes.push({ id: j.id, ano: j.ano, label: etiquetaFecha(j.fecha, j.ano), config, bloques: j.bloques || [] });
+    } catch (e) { console.error('fixture', url, e); }
+  }
+  informes.sort((a, b) => (a.ano || 0) - (b.ano || 0));
+  const n = montarPanelPruebaNivelAcordeon(document.getElementById('panel'), prueba, informes);
+  console.log('[preview-acordeon-niveles]', prueba, '· años:', n);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
