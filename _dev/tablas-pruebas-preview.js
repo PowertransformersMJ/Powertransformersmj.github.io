@@ -14,7 +14,7 @@
 // aquí, en _dev. Datos: fixtures REALES (450108), nada inventado.
 // ══════════════════════════════════════════════════════════════
 
-import { familiaMA, derivarTablaTAP } from '../assets/js/domain/pruebas_electricas_bloques.js';
+import { familiaMA, derivarTablaTAP, quitarColumnasVeredicto } from '../assets/js/domain/pruebas_electricas_bloques.js';
 import { evaluarMultiNorma } from '../assets/js/domain/pruebas_electricas_multinorma.js';
 // Capa de ANÁLISIS / recomendación por prueba (ADR-012): clasifica la acción
 // (preventiva/predictiva/correctiva/diagnóstica) y entrega el texto conforme a las
@@ -716,16 +716,20 @@ function tablaDetalleFases(bloque) {
 function tablaDetalleItems(bloque, a) {
   const extraKeys = [];
   a.items.forEach((it) => it.extra && Object.keys(it.extra).forEach((k) => { if (!extraKeys.includes(k)) extraKeys.push(k); }));
-  const cols = [bloque.eje_x || 'Punto', `Valor${bloque.unidad ? ' (' + bloque.unidad + ')' : ''}`, ...extraKeys];
+  const columnas = [bloque.eje_x || 'Punto', `Valor${bloque.unidad ? ' (' + bloque.unidad + ')' : ''}`, ...extraKeys];
+  const filas = a.items.map((it) => [it.label, it.value, ...extraKeys.map((k) => (it.extra ? it.extra[k] : null))]);
+  // Quita columnas de VEREDICTO que la IA pudo filtrar al `extra` (p.ej. "Evaluación"
+  // en bujes 2021): el veredicto vive en el diagnóstico, NO en la tabla (L-42). Reusa
+  // la detección de dominio (encabezado o celdas = palabras de veredicto).
+  const limpia = quitarColumnasVeredicto({ columnas, filas });
   const scroll = document.createElement('div'); scroll.className = 'pe-tabla-scroll';
   const tbl = document.createElement('table'); tbl.className = 'pe-tabla';
-  tbl.innerHTML = '<thead><tr>' + cols.map((c) => `<th>${esc(c)}</th>`).join('') + '</tr></thead>';
+  tbl.innerHTML = '<thead><tr>' + limpia.columnas.map((c) => `<th>${esc(c)}</th>`).join('') + '</tr></thead>';
   const tb = document.createElement('tbody');
-  a.items.forEach((it) => {
+  limpia.filas.forEach((f) => {
     const tr = document.createElement('tr');
-    let cells = `<td>${esc(it.label)}</td><td>${fmt(it.value)}</td>`;
-    extraKeys.forEach((k) => { const v = it.extra ? it.extra[k] : null; cells += `<td>${v == null || v === '' ? '—' : (typeof v === 'number' ? round(v, 3) : esc(v))}</td>`; });
-    tr.innerHTML = cells; tb.appendChild(tr);
+    tr.innerHTML = f.map((v) => `<td>${v == null || v === '' ? '—' : (typeof v === 'number' ? round(v, 3) : esc(v))}</td>`).join('');
+    tb.appendChild(tr);
   });
   tbl.appendChild(tb); scroll.appendChild(tbl); return scroll;
 }
@@ -796,4 +800,81 @@ export function montarPanelPrueba(cont, familia, informes) {
   cont.appendChild(lblY); cont.appendChild(yearbar); cont.appendChild(body);
   render();
   return anios.length;
+}
+
+// Convierte una tarjeta `.pe-fus-card` en un <details> desplegable: su BANDA
+// (nivel + estado) pasa a ser el encabezado (summary); el resto (KPI + franja +
+// tabla + diagnóstico) queda en el cuerpo que se despliega.
+function aAcordeon(card, abierto) {
+  const det = document.createElement('details'); det.className = 'pe-acc'; det.open = !!abierto;
+  const band = card.querySelector('.pe-fus-band');
+  const sum = document.createElement('summary'); sum.className = 'pe-acc-sum';
+  if (band) { sum.innerHTML = band.innerHTML; band.remove(); }
+  det.appendChild(sum);
+  const body = document.createElement('div'); body.className = 'pe-acc-body';
+  while (card.firstChild) body.appendChild(card.firstChild);
+  det.appendChild(body);
+  return det;
+}
+
+// ── VARIANTE: NIVELES DE TENSIÓN desplegables (cada nivel un <details>), y DENTRO
+// de cada nivel su PROPIO filtro de AÑO (solo los años en que ESE nivel se ensayó).
+// "Todos los años" = resumen rango mín–máx; un año = tabla completa (todos los TAP).
+// El primer nivel abre por defecto. No toca gráficas ni nada más. ──
+export function montarPanelPruebaNivelAcordeon(cont, familia, informes) {
+  cont.innerHTML = '';
+  const h = document.createElement('h2');
+  h.textContent = NOMBRE[familia];
+  h.style.cssText = 'margin:6px 0 8px;font-size:18px;color:#0f172a';
+  cont.appendChild(h);
+
+  const grupos = gruposDe(familia, informes); // Map(nivel → [{inf,bloque,a}])
+  if (!grupos.size) {
+    cont.appendChild(Object.assign(document.createElement('p'), { className: 'muted', textContent: `Sin datos de ${NOMBRE[familia]}.` }));
+    return 0;
+  }
+
+  [...grupos.entries()].sort((a, b) => a[0].localeCompare(b[0])).forEach(([nivel, entradas], idx) => {
+    entradas.sort((a, b) => (a.inf.ano || 0) - (b.inf.ano || 0));
+    const estadoNivel = entradas
+      .map((e) => filaDe(familia, e.inf, e.a, e.bloque).estado)
+      .reduce((acc, s) => peorEstado(acc, s), 'na');
+
+    const det = document.createElement('details'); det.className = 'pe-acc'; det.open = idx === 0;
+    const sum = document.createElement('summary'); sum.className = 'pe-acc-sum';
+    const niv = document.createElement('span'); niv.className = 'pe-fus-niv'; niv.textContent = nivel;
+    sum.appendChild(niv); sum.appendChild(badgeEstado(estadoNivel));
+    det.appendChild(sum);
+
+    const body = document.createElement('div'); body.className = 'pe-acc-body';
+    // Filtro de AÑO POR NIVEL: solo los años en que ESTE nivel tuvo prueba.
+    const anios = [...new Set(entradas.map((e) => e.inf.ano).filter((a) => a != null))].sort((a, b) => a - b);
+    const lblY = Object.assign(document.createElement('div'), { className: 'pe-toolbar-lbl', textContent: 'Año (de este nivel)' });
+    const yearbar = document.createElement('div'); yearbar.className = 'pe-tabs';
+    const content = document.createElement('div');
+    const st = { year: 'all' };
+    const render = () => {
+      content.innerHTML = '';
+      const sel = st.year === 'all' ? entradas : entradas.filter((e) => e.inf.ano === st.year);
+      const card = st.year === 'all' ? cardResumen(familia, nivel, sel) : cardDetalle(familia, nivel, sel);
+      const band = card.querySelector('.pe-fus-band'); if (band) band.remove(); // la banda ya es el encabezado del acordeón
+      const wrap = document.createElement('div'); wrap.className = 'pe-fus'; wrap.appendChild(card);
+      content.appendChild(wrap);
+      [...yearbar.children].forEach((b) => b.classList.toggle('is-active', b.dataset.year === String(st.year)));
+    };
+    const mkY = (val, label) => {
+      const b = document.createElement('button');
+      b.className = 'pe-tab pe-tab-year'; b.dataset.year = String(val); b.textContent = label;
+      b.onclick = () => { st.year = val; render(); };
+      return b;
+    };
+    yearbar.appendChild(mkY('all', 'Todos los años'));
+    anios.forEach((y) => yearbar.appendChild(mkY(y, String(y))));
+    body.appendChild(lblY); body.appendChild(yearbar); body.appendChild(content);
+    det.appendChild(body);
+    render();
+    cont.appendChild(det);
+  });
+
+  return grupos.size;
 }

@@ -619,9 +619,11 @@ table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:42
 .pe-scope .pe-vp-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 6px;}
 .pe-scope .pe-vp-tab{padding:6px 12px;border:1px solid #cbd5e1;background:#fff;border-radius:999px;cursor:pointer;font-size:12px;font-weight:600;color:#475569;}
 .pe-scope .pe-vp-tab:hover{border-color:#94a3b8;}
-.pe-scope .pe-vp-tab.is-active{background:#2c6e72;color:#fff;border-color:#2c6e72;}
+.pe-scope .pe-vp-tab{transition:transform .12s ease,border-color .12s ease;}
+.pe-scope .pe-vp-tab:hover{transform:translateY(-1px);}
+.pe-scope .pe-vp-tab.is-active{background:linear-gradient(135deg,#0f2a44,#2c6e72);color:#fff;border-color:transparent;box-shadow:0 5px 14px -5px rgba(44,110,114,.55);}
 .pe-scope .pe-vp-diag{border-top:1px solid #e2e8f0;margin-top:14px;padding-top:10px;}
-.pe-scope .pe-vp-diag-h{font-size:12px;font-weight:800;color:#0f172a;margin-bottom:6px;}
+.pe-scope .pe-vp-diag-h{font-size:11px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#2c6e72;margin-bottom:8px;}
 .pe-scope .pe-vp-diag-metric{font-size:12px;color:#475569;margin-bottom:8px;}
 .pe-scope .pe-vp-diag-tbl{width:100%;border-collapse:collapse;font-size:12px;}
 .pe-scope .pe-vp-diag-tbl th{text-align:left;color:#64748b;font-weight:700;padding:4px 8px;border-bottom:1px solid #e2e8f0;}
@@ -633,3 +635,33 @@ table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:42
 .pe-scope .pe-vp-diag-badge.is-bad{background:#fee2e2;color:#991b1b;}
 .pe-scope .pe-vp-diag-cons{font-size:12px;margin-top:8px;color:#334155;}
 .pe-scope .pe-vp-diag-concl{font-size:12px;margin-top:6px;color:#0f172a;font-weight:600;}
+
+/* ── Acordeón PREMIUM por NIVEL (ADR-045). Solo transform/opacity (§3.1).
+   Los overrides van scoped bajo .pe-vp-acc → NO afectan la tabla-fusión de
+   excitación ni los demás pe-fus-*. ── */
+.pe-scope .pe-vp-acc{border:1px solid #e7ecf2;border-radius:16px;background:#fff;margin:0 0 14px;overflow:hidden;box-shadow:0 1px 2px rgba(15,42,68,.04);transition:box-shadow .2s ease;}
+.pe-scope .pe-vp-acc:hover{box-shadow:0 6px 20px -8px rgba(15,42,68,.14);}
+.pe-scope .pe-vp-acc[open]{box-shadow:0 12px 34px -14px rgba(15,42,68,.20);}
+.pe-scope .pe-vp-acc-sum{display:flex;align-items:center;gap:12px;cursor:pointer;padding:15px 20px;list-style:none;user-select:none;background:linear-gradient(135deg,#0f2a44,#2c6e72);color:#fff;}
+.pe-scope .pe-vp-acc-sum::-webkit-details-marker{display:none;}
+.pe-scope .pe-vp-acc-sum::before{content:'';width:7px;height:7px;flex:none;margin:0 2px;transform:rotate(-45deg);transition:transform .2s ease;border-right:2px solid rgba(255,255,255,.9);border-bottom:2px solid rgba(255,255,255,.9);}
+.pe-scope .pe-vp-acc[open]>.pe-vp-acc-sum::before{transform:rotate(45deg);}
+.pe-scope .pe-vp-acc-sum .pe-fus-niv{flex:1;font-family:var(--pe-mono,ui-monospace,monospace);font-weight:800;font-size:14px;letter-spacing:.05em;color:#fff;}
+.pe-scope .pe-vp-acc-body{padding:16px 18px 12px;}
+/* tarjeta interna premium (solo dentro del acordeón) */
+.pe-scope .pe-vp-acc .pe-fus{padding:0;}
+.pe-scope .pe-vp-acc .pe-fus-card{border:none;box-shadow:none;margin:0;background:transparent;}
+.pe-scope .pe-vp-acc .pe-fus-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;margin:0 0 14px;}
+.pe-scope .pe-vp-acc .pe-fus-tile{background:linear-gradient(180deg,#fff,#f7fafc);border:1px solid #eef2f6;border-radius:13px;padding:13px 15px;box-shadow:0 1px 2px rgba(15,42,68,.04);}
+.pe-scope .pe-vp-acc .pe-fus-tile.is-ok{border-color:#bbf7d0;background:linear-gradient(180deg,#fff,#f0fdf4);}
+.pe-scope .pe-vp-acc .pe-fus-tile.is-warn{border-color:#fde68a;background:linear-gradient(180deg,#fff,#fffbeb);}
+.pe-scope .pe-vp-acc .pe-fus-tile.is-bad{border-color:#fecaca;background:linear-gradient(180deg,#fff,#fef2f2);}
+.pe-scope .pe-vp-acc .pe-fus-v{font-size:24px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;color:#0f172a;}
+.pe-scope .pe-vp-acc .pe-fus-v small{font-size:12px;font-weight:700;color:#64748b;}
+.pe-scope .pe-vp-acc .pe-fus-l{font-size:10px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#64748b;margin-top:4px;}
+.pe-scope .pe-vp-acc .pe-fus-verdict{background:#f8fafc;border:1px solid #eef2f6;border-radius:11px;padding:9px 13px;}
+.pe-scope .pe-vp-acc .pe-tabla{font-variant-numeric:tabular-nums;}
+.pe-scope .pe-vp-acc .pe-tabla thead th{text-transform:uppercase;letter-spacing:.04em;font-size:10px;color:#64748b;}
+.pe-scope .pe-vp-acc .pe-tabla tbody tr:hover{background:#f8fafc;}
+@media(max-width:640px){.pe-scope .pe-vp-acc .pe-fus-tiles{grid-template-columns:repeat(2,1fr);}}
+@media(prefers-reduced-motion:reduce){.pe-scope .pe-vp-acc,.pe-scope .pe-vp-acc-sum::before,.pe-scope .pe-vp-tab{transition:none;}}
