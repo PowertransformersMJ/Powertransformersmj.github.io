@@ -93,6 +93,10 @@
   `evaluarMultiNorma`) + **análisis/acción CBM** (`accionPrueba`). Cableado ADITIVO en `montarMultiAno` (relación/resistencia/
   aislamiento/bujes/collar; tan δ/excitación intactos); CSS `pe-vp-*`; reusa dominio. Tests `tablas_pruebas_panel.test.js` (6).
   **1185/1185, lint 0.** Validado con harness del módulo de PRODUCCIÓN. 🔲 Falta validar en la APP + **commit (Claude) + push (director)**.
+  **ADR-045**: ese panel pasó a **acordeón por NIVEL** (cada nivel desplegable) + **filtro de año POR NIVEL** (solo años de ese nivel) +
+  **toque premium "prime"** (`pe-vp-acc-*`: gradiente header, KPI tiles, micro-interacciones transform/opacity) + **fix conformidad**
+  (`tablaDetalleItems`→`quitarColumnasVeredicto`: bujes 2021 traía "Evaluación", L-42). Auditoría de extracción de los 6 informes: conforme,
+  diferencias reales por placa/visita (2021 delta 2-dev sin MT; tan δ ausente 2024; exc 2024 sin W; DAR/C1-C2 variables). Shell sin cambio.
   Lección **L-55** (reusar dominio no reinventar · criterio por tipo · dedup · edité función equivocada entre duplicados · preview en raíz).
 - **2026-06-10** — **Tabla-RESUMEN por nivel FUSIÓN 1+4 (ADR-043 → `99 §43`):** el director pidió 4 propuestas de tablas
   vía preview (por nivel · valores totales · criterio por norma) → módulo DEV `_dev/excitacion-tablas-opciones.js` +

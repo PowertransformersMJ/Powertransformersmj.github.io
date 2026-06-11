@@ -616,12 +616,13 @@ function montarMultiAno() {
     return excs.length ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), excs } : null;
   }).filter(Boolean);
   const bloques = bloquesMultiAno(items).filter((b) => !excluidaDelOverlay(b.prueba));
-  // Panel "Valores por prueba" (ADR-044): tabla completa + diagnóstico/análisis
-  // conforme a norma, para las pruebas SIN panel dedicado (relación/resistencia/
-  // aislamiento/bujes/collar). ADITIVO: NO toca tan δ/excitación ni el scorecard;
-  // reusa dominio. Identidad por INFORME (label = fecha; dos del mismo año no colapsan).
+  // Panel "Valores por prueba" (ADR-044/045): acordeón por nivel + diagnóstico/
+  // análisis conforme a norma. ADITIVO: NO toca el scorecard ni el motor; reusa
+  // dominio. Identidad por INFORME (label = fecha; dos del mismo año no colapsan).
+  // Incluye EXCITACIÓN (ADR-045, a pedido del director): COEXISTE con su panel de
+  // gráficas de arriba — la vista tabular es COMPLEMENTARIA, no lo reemplaza.
   const panelInformes = items.map((it) => ({ ...it, label: etiquetaFecha(it.fecha, it.ano) }));
-  const PRUEBAS_VP = ['relacion', 'resistencia', 'aislamiento', 'bushing', 'collar'];
+  const PRUEBAS_VP = ['excitacion', 'relacion', 'resistencia', 'aislamiento', 'bushing', 'collar'];
   const famsVP = PRUEBAS_VP.filter((fam) => panelInformes.some((inf) =>
     (inf.bloques || []).some((b) => { const f = familiaMA(b); return f && f.key === fam; })));
   if (!bloques.length && !tandItems.length && !excItems.length && !famsVP.length) {
