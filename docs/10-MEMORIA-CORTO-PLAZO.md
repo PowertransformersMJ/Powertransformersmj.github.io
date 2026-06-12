@@ -12,7 +12,13 @@
 
 ---
 
-## 🎯 Foco actual — HANDOFF (sesión cerrada 2026-06-10)
+## 🎯 Foco actual — HANDOFF (sesión 2026-06-11/12)
+
+> **ÚLTIMO (ADR-046, commit `6148710`, FALTA PUSH+PR):** excitación — cada NIVEL se ve **barras (valores) → curvas (desviación)**; la **tabla desplegable única** (con veredicto) vive en el acordeón "Valores por prueba" (panel B `pe-vp-acc`). Se retiraron del panel de gráficas la pestaña "Tabla de valores" (FUSIÓN ADR-043) + toggle "Magnitud" = info REPETIDA. **L-56** (preview debe ejecutar módulo REAL + `.pe-scope` + composición del shell, si no es engañoso — origen de varios días perdidos). Nuevo `_dev/preview-excitacion-fiel.html`. ⚠️ **Código muerto pendiente de poda** (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`). 1185/1185. 🔲 Falta validar en la APP real.
+
+---
+
+## 🎯 Foco anterior — HANDOFF (sesión cerrada 2026-06-10)
 
 > **TEMA: Tablero de Pruebas Eléctricas con IA — paneles condensados por prueba (tan δ → excitación).**
 > **Arco tablero base (ADR-003→014) + arco panel tan δ (ADR-029→040) EN PRODUCCIÓN** (PR #172).
