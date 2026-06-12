@@ -742,16 +742,15 @@ export function montarPanelExcitacion(cont, items) {
         const medsN = medsVis().filter((m) => m.nivel === nivel);
         const block = document.createElement('div'); block.style.cssText = 'margin:0 0 22px;padding:0 0 14px;border-bottom:1px solid #eef2f6';
         block.appendChild(mkNivelHeader(nivel));
+        // (1) Gráfica de VALORES (barras) por fase.
         const s1 = mkSec('Valores de corriente de excitación (mA) por fase', 'Barras por informe; ROJO = patrón 2+1 fuera de criterio (2 externas similares + 1 central distinta).');
         s1.appendChild(bloqueValores(aggN, fasesList)); block.appendChild(s1);
+        // (2) Gráfica de DESVIACIONES (curvas) por posición de TAP.
         const s2 = mkSec('Desviación entre fases laterales (A–C, %) por posición de TAP', 'Una línea por informe (color por año).');
         s2.appendChild(bloqueDesviacion(medsN)); block.appendChild(s2);
         chartBox.appendChild(block);
       });
-      const s3 = mkSec('Tablas de valores (mA / W) por informe × nivel', null);
-      pintarTablas(s3);
-      chartBox.appendChild(s3);
-      cap.textContent = 'Resumen SEPARADO por nivel de tensión: cada nivel con su gráfica de valores (mA), su desviación A–C y su criterio normativo. Las tablas se despliegan al elegir un año o un nivel (evita sobrecarga). Usa las pestañas de Vista para enfocar una sola gráfica.';
+      cap.textContent = 'Cada NIVEL de tensión: (1) gráfica de valores (barras) · (2) gráfica de desviaciones (curvas). La (3) TABLA desplegable por nivel (con su veredicto) va en la sección de abajo. Mismo criterio normativo por nivel (IEEE Std 62 / C57.12.90).';
       renderAnalisis(analisisBox, analizarExcitacion(agg));
       contadores.forEach((fn) => fn());
       return;
@@ -843,7 +842,9 @@ export function montarPanelExcitacion(cont, items) {
   vistaBar.appendChild(Object.assign(document.createElement('span'), { textContent: 'Vista:', style: 'font-size:12px;font-weight:600;color:#475569;margin-right:4px' }));
   const mkVista = (key, txt) => { const b = document.createElement('button'); b.type = 'button'; b.className = 'pe-fase-chip' + (modo === key ? ' is-on' : ''); b.textContent = txt;
     b.addEventListener('click', () => { modo = key; [...vistaBar.querySelectorAll('.pe-fase-chip')].forEach((x) => x.classList.remove('is-on')); b.classList.add('is-on'); pintar(); }); return b; };
-  vistaBar.append(mkVista('resumen', 'Resumen (todo)'), mkVista('desviacion', 'Δ por posición (TAP)'), mkVista('patron', 'Valores (mA) por fase'), mkVista('tendencia', 'Tendencia (años en X)'), mkVista('nivel', 'Por nivel de tensión'), mkVista('tabla', 'Tabla de valores'));
+  // Vistas de GRÁFICAS solamente. La tabla de valores vive (desplegable por nivel,
+  // con su veredicto) en la sección de abajo "Valores por prueba" — NO se repite aquí.
+  vistaBar.append(mkVista('resumen', 'Resumen (todo)'), mkVista('desviacion', 'Δ por posición (TAP)'), mkVista('patron', 'Valores (mA) por fase'), mkVista('tendencia', 'Tendencia (años en X)'), mkVista('nivel', 'Por nivel de tensión'));
 
   // Sub-toggle de magnitud, SOLO visible en la Tabla de valores: corriente / pérdidas / ambos.
   const magBar = document.createElement('div'); magBar.className = 'pe-fase-chips'; magBar.style.cssText = 'display:none;gap:6px;align-items:center;margin:0 0 6px';
@@ -854,7 +855,6 @@ export function montarPanelExcitacion(cont, items) {
 
   cont.appendChild(card);
   cont.appendChild(vistaBar);
-  cont.appendChild(magBar);
   cont.appendChild(cap);
   cont.appendChild(chartBox);
   cont.appendChild(analisisBox);
