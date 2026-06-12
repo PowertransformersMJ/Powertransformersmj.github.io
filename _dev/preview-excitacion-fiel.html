@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Excitación FIEL A PRODUCCIÓN — módulos reales dentro de .pe-scope</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; color:#0f172a; }
+  .nota { max-width: 92ch; font-size: 13px; color:#475569; line-height:1.55; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:18px; }
+  .nota b { color:#0f172a; }
+  .nota code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>DEV · Corriente de excitación — FIEL A PRODUCCIÓN</h1>
+<div class="nota">
+  Esto <b>NO es una maqueta</b>. Ejecuta los <b>mismos módulos de producción</b> que monta el shell
+  (<code>excitacion-panel.js</code> y <code>tablas-pruebas-panel.js</code>), envueltos en
+  <code>&lt;div class="pe-scope"&gt;</code> y compuestos en el <b>mismo orden</b> que la página real
+  (<code>pruebas-electricas-shell.js</code>, líneas 642-657), con los fixtures reales 450108.
+  Lo que ves aquí es <b>lo que se mergea</b>.<br><br>
+  Hoy el shell apila DOS secciones de excitación:
+  <b>(A)</b> el panel dedicado de gráficas/FUSIÓN, y <b>(B)</b> el panel genérico "Valores por prueba"
+  (porque <code>'excitacion'</code> está en la lista <code>PRUEBAS_VP</code>). Ambas aparecen abajo, igual que en producción.
+</div>
+
+<div class="pe-scope">
+  <div id="overlay-cont"></div>
+</div>
+
+<script type="module">
+import { montarPanelExcitacion } from '../assets/js/ui/pruebas/excitacion-panel.js';
+import { montarPanelPrueba } from '../assets/js/ui/pruebas/tablas-pruebas-panel.js';
+import { etiquetaFecha, configInforme, ordenInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-01-18-sfra.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json',
+  './fixtures/450108-2024-01-19-sfra-estrella.json',
+  './fixtures/450108-2024-01-19-sfra-delta.json'
+];
+
+const esExc = (b) => { const f = familiaMA(b); return !!f && f.key === 'excitacion'; };
+
+(async () => {
+  // Carga de informes (equivalente a docs + bloquesCache del shell).
+  const docs = [];
+  for (const url of FIXTURES) {
+    try {
+      const j = await (await fetch(url + '?v=' + Date.now())).json();
+      docs.push(j);
+    } catch (e) { console.error('fixture', url, e); }
+  }
+
+  // ── Prep de datos IGUAL que el shell ──
+  // (A) excItems → montarPanelExcitacion  (shell 613-617)
+  const excItems = docs.map((inf) => {
+    const excs = (inf.bloques || []).filter(esExc).map((b) => ({ titulo: b.titulo, bloque: b }));
+    return excs.length ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), excs } : null;
+  }).filter(Boolean);
+
+  // (B) panelInformes → montarPanelPrueba('excitacion', …)  (shell 624)
+  const panelInformes = docs.map((inf) => ({
+    id: inf.id, ano: inf.ano, label: etiquetaFecha(inf.fecha, inf.ano),
+    config: configInforme(inf), bloques: inf.bloques || []
+  }));
+
+  const cont = document.getElementById('overlay-cont');
+  cont.innerHTML = '';
+
+  // ── Composición IGUAL que el shell ──
+  // (A) Panel dedicado de corriente de excitación (shell 641-648)
+  if (excItems.length) {
+    const sec = document.createElement('section'); sec.className = 'pe-exc-seccion'; sec.style.margin = '0 0 18px';
+    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Corriente de excitación — por nivel de tensión', style: 'margin:0 0 8px' }));
+    const host = document.createElement('div'); sec.appendChild(host);
+    cont.appendChild(sec);
+    montarPanelExcitacion(host, excItems);
+  }
+
+  // (B) Panel genérico "Valores por prueba" para excitación (shell 649-657)
+  const tieneExc = panelInformes.some((inf) => (inf.bloques || []).some(esExc));
+  if (tieneExc) {
+    const sec = document.createElement('section'); sec.className = 'pe-vp-seccion'; sec.style.margin = '0 0 18px';
+    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Valores por prueba — tabla + diagnóstico conforme a norma', style: 'margin:0 0 8px' }));
+    cont.appendChild(sec);
+    const host = document.createElement('div'); host.style.margin = '0 0 14px'; sec.appendChild(host);
+    montarPanelPrueba(host, 'excitacion', panelInformes);
+  }
+
+  console.log('[preview-fiel] informes:', docs.length, '· excItems:', excItems.length, '· tieneExc(B):', tieneExc);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
