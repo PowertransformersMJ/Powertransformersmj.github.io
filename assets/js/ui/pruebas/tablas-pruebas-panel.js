@@ -358,32 +358,45 @@ function cardResumen(familia, grupo, entradas) {
   const filas = entradas.map((e) => filaDe(familia, e.inf, e.a, e.bloque));
   const crit = CRIT[familia];
   const card = cabeceraCard(familia, grupo, filas);
-  const esFases = filas[0].mode === 'fases';
+  // Un mismo NIVEL puede mezclar informes 'fases' (las 3 fases comparten TAPs) e
+  // 'items' (alguna fase con un TAP faltante en la extracción real → no comparten X).
+  // El layout se decide por SI HAY alguna fila 'fases' (no por `filas[0]`), y cada
+  // fila se pinta por SU PROPIO modo, rellenando '—' donde no aplica. Antes esto
+  // reventaba (`filas[0].mode` aplicado a todas → `faseNames.forEach` sobre null →
+  // corta el render del panel tras el 1.er nivel). L-55 / L-56.
+  const filaFases = filas.find((f) => f.mode === 'fases');
+  const esFases = !!filaFases;
+  const nFase = (filaFases && filaFases.faseNames) ? filaFases.faseNames.length : 0;
   const mostrarDesv = esFases && crit.kind === 'desb';
   const scroll = document.createElement('div'); scroll.className = 'pe-tabla-scroll';
   const tbl = document.createElement('table'); tbl.className = 'pe-tabla';
   const conPerd = familia === 'excitacion' && filas.some((f) => f.sumW != null);
   let headCols;
-  if (esFases) headCols = [...filas[0].faseNames.map((nm) => nm + ' (mín–máx)'), ...(mostrarDesv ? ['Desv. máx %'] : []), ...(conPerd ? ['Σ pérd. (W)'] : [])];
-  else { headCols = []; filas.forEach((f) => f.colLabels.forEach((l) => { if (!headCols.includes(l)) headCols.push(l); })); }
+  if (esFases) headCols = [...(filaFases.faseNames || []).map((nm) => nm + ' (mín–máx)'), ...(mostrarDesv ? ['Desv. máx %'] : []), ...(conPerd ? ['Σ pérd. (W)'] : [])];
+  else { headCols = []; filas.forEach((f) => (f.colLabels || []).forEach((l) => { if (!headCols.includes(l)) headCols.push(l); })); }
   tbl.innerHTML = '<thead><tr><th>Informe</th>' + headCols.map((c) => `<th>${esc(c)}</th>`).join('') + '<th>Criterio</th></tr></thead>';
   const tb = document.createElement('tbody');
   filas.forEach((f) => {
     const tr = document.createElement('tr');
     let cells = `<td>${esc(f.label)}${f.config ? ' · ' + esc(f.config) : ''}</td>`;
     if (esFases) {
-      f.faseNames.forEach((_, i) => {
-        const mn = f.faseMin[i], mx = f.faseMax[i];
-        const txt = mn == null ? '—' : (mn === mx ? fmt(mn) : `${fmt(mn)} – ${fmt(mx)}`);
-        cells += `<td${i === 1 ? ' class="col-b"' : ''}>${txt}</td>`;
-      });
+      if (f.mode === 'fases' && f.faseNames) {
+        f.faseNames.forEach((_, i) => {
+          const mn = (f.faseMin || [])[i], mx = (f.faseMax || [])[i];
+          const txt = mn == null ? '—' : (mn === mx ? fmt(mn) : `${fmt(mn)} – ${fmt(mx)}`);
+          cells += `<td${i === 1 ? ' class="col-b"' : ''}>${txt}</td>`;
+        });
+      } else {
+        // Fila 'items' dentro de un nivel con layout de fases → '—' en esas columnas.
+        for (let i = 0; i < nFase; i++) cells += `<td${i === 1 ? ' class="col-b"' : ''}>—</td>`;
+      }
       if (mostrarDesv) {
         const dcls = f.desvMax == null ? '' : Math.abs(f.desvMax) > crit.limite ? 'd-bad' : Math.abs(f.desvMax) > crit.limite * 0.7 ? 'd-warn' : 'd-ok';
         cells += `<td class="${dcls}">${fmt(f.desvMax)}</td>`;
       }
       if (conPerd) cells += `<td>${fmt(f.sumW)}</td>`;
     } else {
-      const byLabel = new Map(f.valoresRaw.map((it) => [it.label, it.value]));
+      const byLabel = new Map((f.valoresRaw || []).map((it) => [it.label, it.value]));
       headCols.forEach((l) => { cells += `<td>${fmt(byLabel.has(l) ? byLabel.get(l) : null)}</td>`; });
     }
     tr.innerHTML = cells;
@@ -515,11 +528,19 @@ export function montarPanelPrueba(cont, familia, informes) {
     const st = { year: 'all' };
     const render = () => {
       content.innerHTML = '';
-      const sel = st.year === 'all' ? entradas : entradas.filter((e) => e.inf.ano === st.year);
-      const card = st.year === 'all' ? cardResumen(familia, nivel, sel) : cardDetalle(familia, nivel, sel);
-      const band = card.querySelector('.pe-fus-band'); if (band) band.remove(); // la banda ya es el encabezado del acordeón
-      const wrap = document.createElement('div'); wrap.className = 'pe-fus'; wrap.appendChild(card);
-      content.appendChild(wrap);
+      // Defensa en profundidad: si un nivel no se puede construir con los datos
+      // actuales, muestra un aviso EN ESE nivel — NUNCA tumba el resto del panel
+      // (antes una excepción en un nivel cortaba el bucle y ocultaba los demás).
+      try {
+        const sel = st.year === 'all' ? entradas : entradas.filter((e) => e.inf.ano === st.year);
+        const card = st.year === 'all' ? cardResumen(familia, nivel, sel) : cardDetalle(familia, nivel, sel);
+        const band = card.querySelector('.pe-fus-band'); if (band) band.remove(); // la banda ya es el encabezado del acordeón
+        const wrap = document.createElement('div'); wrap.className = 'pe-fus'; wrap.appendChild(card);
+        content.appendChild(wrap);
+      } catch (e) {
+        console.error('[Valores por prueba] no se pudo construir el nivel', nivel, e);
+        content.innerHTML = '<p class="muted small">No se pudo construir la tabla de este nivel con los datos actuales.</p>';
+      }
       [...yearbar.children].forEach((b) => b.classList.toggle('is-active', b.dataset.year === String(st.year)));
     };
     const mkY = (val, label) => {
