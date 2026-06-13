@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Excitación — PRUEBA DE ESTRÉS modo-mixto (ADR-047)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #f1f5f9; font-family: system-ui, sans-serif; color:#0f172a; }
+  .nota { max-width: 94ch; font-size: 13px; color:#475569; line-height:1.55; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:18px; }
+  .nota b { color:#0f172a; } .nota code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .estado { font-size:13px; font-weight:700; padding:10px 14px; border-radius:10px; margin-bottom:16px; }
+  .estado.ok { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; }
+  .estado.bad { background:#fef2f2; border:1px solid #fecaca; color:#b91c1c; }
+</style>
+</head>
+<body>
+<h1>DEV · Corriente de excitación — PRUEBA DE ESTRÉS (ADR-047)</h1>
+<div class="nota">
+  Este preview ejecuta el <b>módulo real</b> (<code>tablas-pruebas-panel.js</code>) dentro de <code>.pe-scope</code>,
+  pero <b>inyecta a propósito la imperfección que rompía producción</b>: a un informe del nivel AT·110 le quito
+  <b>un TAP en la fase B</b> → ese informe queda en <b>modo 'items'</b> (las fases ya no comparten TAPs) =
+  <b>nivel de modo MIXTO</b>. Antes de ADR-047 esto reventaba <code>cardResumen</code> y el acordeón mostraba
+  <b>solo AT·110</b> (igual que viste en la app). Abajo verifica que ahora se construyen <b>los 3 niveles</b>.
+</div>
+<div id="estado" class="estado">Cargando…</div>
+
+<div class="pe-scope">
+  <section class="pe-exc-seccion" style="margin:0 0 18px">
+    <h3 style="margin:0 0 8px">Corriente de excitación — por nivel de tensión (GRÁFICAS)</h3>
+    <div id="graficas"></div>
+  </section>
+  <section class="pe-vp-seccion" style="margin:0 0 18px">
+    <h3 style="margin:0 0 8px">Valores por prueba — tabla + diagnóstico conforme a norma (ACORDEÓN)</h3>
+    <div id="panel"></div>
+  </section>
+</div>
+
+<script type="module">
+import { montarPanelPrueba } from '../assets/js/ui/pruebas/tablas-pruebas-panel.js';
+import { montarPanelExcitacion } from '../assets/js/ui/pruebas/excitacion-panel.js';
+import { etiquetaFecha, configInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+const esExc = (b) => { const f = familiaMA(b); return !!f && f.key === 'excitacion'; };
+
+(async () => {
+  const docs = [];
+  for (const url of FIXTURES) {
+    try { docs.push(await (await fetch(url + '?v=' + Date.now())).json()); }
+    catch (e) { console.error('fixture', url, e); }
+  }
+  // panelInformes como el shell (config por informe + bloques).
+  const panelInformes = docs.map((inf) => ({
+    id: inf.id, ano: inf.ano, label: etiquetaFecha(inf.fecha, inf.ano),
+    config: configInforme(inf), bloques: inf.bloques || []
+  }));
+
+  // ── INYECCIÓN DE LA IMPERFECCIÓN REAL ──────────────────────────────
+  // A un informe ESTRELLA (nivel AT·110) le quitamos un punto (TAP) de la
+  // fase B en su bloque de excitación → ese informe deja de "compartir X"
+  // entre fases → analizarBloque lo marca modo 'items' → el nivel AT·110
+  // queda MIXTO ('fases' + 'items'). Esto es lo que rompía producción.
+  let inyectado = null;
+  for (const inf of panelInformes) {
+    if (!/estrella/i.test(inf.config)) continue;
+    const blk = (inf.bloques || []).find(esExc);
+    const faseB = blk && (blk.series || []).find((s) => /\bB\b/.test(String(s.nombre)));
+    if (faseB && (faseB.puntos || []).length > 1) {
+      faseB.puntos = faseB.puntos.slice(0, -1); // quita el último TAP de la fase B
+      inyectado = inf.label;
+      break;
+    }
+  }
+
+  // Panel A (GRÁFICAS) — mismas mediciones (ya con la imperfección inyectada).
+  const excItems = panelInformes.map((inf) => {
+    const excs = (inf.bloques || []).filter(esExc).map((b) => ({ titulo: b.titulo, bloque: b }));
+    return excs.length ? { id: inf.id, label: inf.label, ano: inf.ano, config: inf.config, excs } : null;
+  }).filter(Boolean);
+  let errG = null;
+  try { montarPanelExcitacion(document.getElementById('graficas'), excItems); }
+  catch (e) { errG = String(e && e.message || e); }
+
+  const cont = document.getElementById('panel');
+  const est = document.getElementById('estado');
+  let err = errG;
+  try { montarPanelPrueba(cont, 'excitacion', panelInformes); }
+  catch (e) { err = err || String(e && e.message || e); }
+
+  const niveles = [...cont.querySelectorAll('.pe-vp-acc-sum .pe-fus-niv')].map((x) => x.textContent.trim());
+  const ok = !err && niveles.length >= 3;
+  est.className = 'estado ' + (ok ? 'ok' : 'bad');
+  est.textContent = ok
+    ? `✓ FIX OK — niveles renderizados: ${niveles.join(' · ')}` +
+      (inyectado ? `  (imperfección inyectada en el informe ${inyectado}, fase B con un TAP menos)` : '')
+    : `✗ FALLA — niveles: ${niveles.join(' · ') || '(ninguno)'}${err ? ' · error: ' + err : ''}`;
+  console.log('[modo-mixto] niveles:', niveles, '· error:', err, '· inyectado en:', inyectado);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
