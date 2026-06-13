@@ -164,6 +164,7 @@ gitignorado → estas 24 son **local-only**; al re-clonar, re-correr el copy (la
 | `firecrawl-download` | Descargar contenido | ✅ |
 | `firecrawl-interact` | Interacción con páginas | ✅ |
 | `llm-council` | Panel de varios LLMs para deliberar | ✅ |
+| `comite-expertos` | Comité de expertos inferidos por tema → critican/debaten → mejora ×3 la última respuesta. 4º experto = consejo externo **ChatGPT/GPT-5** (`docs/15-CONSEJO-EXTERNO.md`, no ve el código) solo en Decisión Fuerte. | 🟩 ✅ (staged `.claude/skills/`) |
 
 ---
 
