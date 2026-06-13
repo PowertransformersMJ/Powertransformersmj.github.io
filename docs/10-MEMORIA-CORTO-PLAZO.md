@@ -14,39 +14,31 @@
 
 ## 🎯 Foco actual — HANDOFF (sesión 2026-06-11/12)
 
-> **ÚLTIMO (ADR-046, commit `6148710`, FALTA PUSH+PR):** excitación — cada NIVEL se ve **barras (valores) → curvas (desviación)**; la **tabla desplegable única** (con veredicto) vive en el acordeón "Valores por prueba" (panel B `pe-vp-acc`). Se retiraron del panel de gráficas la pestaña "Tabla de valores" (FUSIÓN ADR-043) + toggle "Magnitud" = info REPETIDA. **L-56** (preview debe ejecutar módulo REAL + `.pe-scope` + composición del shell, si no es engañoso — origen de varios días perdidos). Nuevo `_dev/preview-excitacion-fiel.html`. ⚠️ **Código muerto pendiente de poda** (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`). 1185/1185. 🔲 Falta validar en la APP real.
+> **MÁS RECIENTE (ADR-047, commit `f472c8e`, FALTA PUSH+PR):** BUG de producción — el acordeón "Valores por prueba"
+> de excitación mostraba **solo AT·110** (faltaban AT·66/MT·34.5) aunque las gráficas sí los mostraban. Causa (L-55 p2):
+> `cardResumen` (`tablas-pruebas-panel.js`) aplicaba `filas[0].mode` a todas las filas → un nivel con informe modo 'items'
+> (fase con TAP faltante) hacía `faseNames.forEach` sobre null → TypeError corta el render tras el 1.er acordeón. **REPRODUCIDO
+> en navegador** antes de tocar (§3.3). Fix: layout **por-fila** + guards de null + **try/catch por nivel**. ⚠️ El preview con
+> fixtures LIMPIOS NO reproducía el bug — los datos reales imperfectos sí (L-56). 1185/1185.
+>
+> **ANTES (ADR-046, commit `6148710`, FALTA PUSH+PR):** excitación — cada NIVEL se ve **barras (valores) → curvas (desviación)**; la **tabla desplegable única** (con veredicto) vive en el acordeón "Valores por prueba" (panel B `pe-vp-acc`). Se retiraron del panel de gráficas la pestaña "Tabla de valores" (FUSIÓN ADR-043) + toggle "Magnitud" = info REPETIDA. **L-56** (preview debe ejecutar módulo REAL + `.pe-scope` + composición del shell, si no es engañoso — origen de varios días perdidos). Nuevo `_dev/preview-excitacion-fiel.html`. ⚠️ **Código muerto pendiente de poda** (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`). 1185/1185. 🔲 Falta validar en la APP real.
 
 ---
 
-## 🎯 Foco anterior — HANDOFF (sesión cerrada 2026-06-10)
+## 🎯 Contexto del tablero (consolidado — detalle en `99 §3..§47` + lobe 49)
 
-> **TEMA: Tablero de Pruebas Eléctricas con IA — paneles condensados por prueba (tan δ → excitación).**
-> **Arco tablero base (ADR-003→014) + arco panel tan δ (ADR-029→040) EN PRODUCCIÓN** (PR #172).
-> **Arco completo CORRIENTE DE EXCITACIÓN EN PRODUCCIÓN** (verificado `git fetch` 2026-06-10, `main`=`45ad218`):
-> ADR-041 (panel `3ce25ae` + cableado `7bb8b38`, PR #173) · ADR-042 (vista "Resumen (todo)" + gating de tablas por
-> año/nivel + fix `reset` L-54 + §42.8 separación por NIVEL) · ADR-043 (tabla-RESUMEN FUSIÓN 1+4: banda+KPI tiles+
-> franja de norma+tabla por años con criterio; detalle por TAP gateado) → mergeados vía PR #176/**#177**.
-> Detalle: `00`→`99 §29..§43`. ✅ Validado con workflow (`_dev/preview-*.html`) + datos REALES 450108.
-> **🔲 ÚNICO PENDIENTE DEL ARCO: validar en la APP REAL** (la página vive tras Firebase Auth → el preview no entra; sólo harness).
+> **TODO el tablero de Pruebas Eléctricas con IA está EN PRODUCCIÓN** salvo ADR-046/047 (commiteados, FALTA PUSH+PR).
+> Arcos: base ADR-003→014 · panel tan δ ADR-029→040 (PR #172) · corriente de excitación ADR-041→043 (PR #173/#176/#177) ·
+> panel "Valores por prueba" ADR-044/045 · ADR-046 (orden por nivel + retira tablas repetidas) · ADR-047 (fix modo-mixto).
+> **🔲 PENDIENTE TRANSVERSAL: validar en la APP REAL** (vive tras Firebase Auth → el preview fiel es lo más cercano).
 >
-> **ARCO EXCITACIÓN (ADR-041 → `99 §41` + lobe 49) — `ui/pruebas/excitacion-panel.js` + cableado en shell:**
-> espejo del tan δ; discrimina por NIVEL DE TENSIÓN (`nivelDe`), 5 vistas + W de pérdidas (`perdidasDe`), criterio
-> COMPARATIVO conforme a norma, patrón 2+1 = FORMA (central B menor por geometría, **L-53**). ⚠️ Umbrales Δ 5–10% a
-> verificar con el director. ⛔ NO dañar scorecard/calificación global/`grafico-generico.js`. El panel sigue el MISMO molde del tan δ.
->
-> **Qué hace el tablero HOY (todo en prod, detalle → `99 §3..§43` + lobe 49):** IA extrae el PDF → tablero **IA-primaria**;
-> **VEREDICTO 100% NORMATIVO** (VALOR vs norma, nunca texto IA, L-36) vía motor **MULTI-NORMA** `pruebas_electricas_multinorma.js`
-> (por norma + consolidado conservador + divergencias) + capa de **recomendaciones** (ADR-012). Fuente única `calificarPrueba` →
-> scorecard/KPI/matriz/timeline. **FP bujes CANÓNICO** (ADR-013) · **identidad/placa CONGELADA por informe** → aislamiento NETA por
-> clase del ensayo (ADR-014) · tablas SIN col. "Evaluación/OK" (L-42) · upsert por fecha (L-39) · reproceso+backfill server-side (L-40/43).
-> **"Reprocesar" RETIRADO (ADR-020):** ⛔ NO re-introducir (re-extraer = re-subir el PDF).
->
-> **ARCO PANEL tan δ (ADR-029→040, PR #172) — `ui/pruebas/tand-panel.js`** (detalle → `99 §29..§40` + lobe 49): panel condensado
-> (Por devanado / Tendencia / Tip-up ΔFP) + análisis conforme a norma + auditoría FP CERRADA (L-52). ⚠️ Umbrales `TIPUP 0.1`/`PEND 0.05`
-> a verificar. **Excitación sigue el MISMO molde** — al iterar uno, revisar el otro. ⛔ NO dañar scorecard/`grafico-generico.js`.
->
-> **OTROS pendientes:** TODO-08 (⚠️ verificar umbrales MO.00418/C1 bujes/PI-DAR) · TODO-01/02 (refrigeración/contratos)
-> · TODO-10 (skills `transformadores-potencia` esperan validación + commit). #3 capacitancia → extracción por modo.
+> **Qué hace HOY:** IA extrae el PDF → tablero **IA-primaria**; **VEREDICTO 100% NORMATIVO** (VALOR vs norma, nunca texto IA,
+> L-36) vía motor **MULTI-NORMA** `pruebas_electricas_multinorma.js` (por norma + consolidado conservador + divergencias) +
+> capa **recomendaciones** (ADR-012). Fuente única `calificarPrueba` → scorecard/KPI/matriz/timeline. FP bujes CANÓNICO (ADR-013) ·
+> identidad/placa CONGELADA por informe → aislamiento NETA por clase del ensayo (ADR-014) · tablas SIN col."OK" (L-42) ·
+> upsert por fecha (L-39) · backfill server-side (L-40/43). **"Reprocesar" RETIRADO (ADR-020)** ⛔ NO re-introducir.
+> Excitación y tan δ siguen el MISMO molde — al iterar uno, revisar el otro. ⛔ NO dañar scorecard/`grafico-generico.js`.
+> ⚠️ Umbrales a verificar con el director: Δ excitación 5–10%, `TIPUP 0.1`/`PEND 0.05`, MO.00418/C1 bujes/PI-DAR (TODO-08).
 >
 > **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
 > Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`
@@ -92,29 +84,13 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-10** — **Panel "Valores por prueba" PROMOVIDO A PRODUCCIÓN (ADR-044 → `99 §44`).** Origen: fichas `docs/pruebas/*.json`
-  (10) + workflow iterado en `_dev/preview-panel-prueba*.html`. Módulo `ui/pruebas/tablas-pruebas-panel.js` (`montarPanelPrueba`):
-  nombre de prueba + filtro de año; resumen = **rango REAL mín–máx + Σ pérdidas (W)**; un año = **tabla completa** (todos los TAP);
-  **NIVEL real** (`nivelDe`, no la tensión de ensayo — bug 10kV→110kV corregido, **L-55.4**); **diagnóstico** (sellos NETA/IEEE +
-  `evaluarMultiNorma`) + **análisis/acción CBM** (`accionPrueba`). Cableado ADITIVO en `montarMultiAno` (relación/resistencia/
-  aislamiento/bujes/collar; tan δ/excitación intactos); CSS `pe-vp-*`; reusa dominio. Tests `tablas_pruebas_panel.test.js` (6).
-  **1185/1185, lint 0.** Validado con harness del módulo de PRODUCCIÓN. 🔲 Falta validar en la APP + **commit (Claude) + push (director)**.
-  **ADR-045**: ese panel pasó a **acordeón por NIVEL** (cada nivel desplegable) + **filtro de año POR NIVEL** (solo años de ese nivel) +
-  **toque premium "prime"** (`pe-vp-acc-*`: gradiente header, KPI tiles, micro-interacciones transform/opacity) + **fix conformidad**
-  (`tablaDetalleItems`→`quitarColumnasVeredicto`: bujes 2021 traía "Evaluación", L-42). Auditoría de extracción de los 6 informes: conforme,
-  diferencias reales por placa/visita (2021 delta 2-dev sin MT; tan δ ausente 2024; exc 2024 sin W; DAR/C1-C2 variables). Shell sin cambio.
-  Lección **L-55** (reusar dominio no reinventar · criterio por tipo · dedup · edité función equivocada entre duplicados · preview en raíz).
-- **2026-06-10** — **Tabla-RESUMEN por nivel FUSIÓN 1+4 (ADR-043 → `99 §43`):** el director pidió 4 propuestas de tablas
-  vía preview (por nivel · valores totales · criterio por norma) → módulo DEV `_dev/excitacion-tablas-opciones.js` +
-  harness → eligió **fusionar opción 1 + 4**. Integrado en `excitacion-panel.js`: `agruparNiveles`/`tablaFusion` (banda +
-  KPI tiles + franja NETA/IEEE + tabla por años con criterio), `pintarTablas` = fusión SIEMPRE + detalle por TAP gateado
-  debajo (conservado); CSS `pe-fus-*`. Overflow de la col. criterio cerrado a 0 (chips de norma apilados + ancho/fuente).
-  1179/1179, lint 0. **EN PRODUCCIÓN (PR #177)**. 🔲 Falta validar en la APP real.
-- **2026-06-10** — **Arco CORRIENTE DE EXCITACIÓN MERGEADO a `main`** (ADR-041/042/043, PR #173/#176/#177). ADR-042:
-  vista "Resumen (todo)" + gating de tablas (1 año/1 nivel) + fix `reset` (**L-54**) + §42.8 por NIVEL. **L-53** (patrón
-  2+1 = FORMA, central B menor por geometría). 🔲 Único pendiente del arco: validar en la APP real.
-- **2026-06-09** — **Panel tan δ + auditoría FP (ADR-029→040) — MERGEADO a `main` (PR #172).** Detalle en `99`; lecciones
-  **L-51** (sobre-retiro) / **L-52** (capacitancia −91% = artefacto). Tests 1160/1160.
+- **2026-06-12** — **ADR-046 + ADR-047 (excitación) commiteados, FALTA PUSH+PR.** ADR-046: orden por nivel (barras→curvas) +
+  retira tablas repetidas del panel de gráficas (FUSIÓN + Magnitud) → tabla única en el acordeón. ADR-047: **fix de bug de
+  producción** — el acordeón mostraba solo AT·110 por un nivel modo-mixto que reventaba `cardResumen` (L-55 p2); **reproducido
+  en navegador** + fix layout por-fila + try/catch por nivel. Lecciones **L-56** (preview fiel) y refuerzo **L-55**.
+  Commits `6148710` (ADR-046), `cfe7958`+ (cerebro), `f472c8e` (ADR-047). 1185/1185. 🔲 Validar en la APP real.
+- **2026-06-10** — Panel "Valores por prueba" (ADR-044/045 → `99 §44-45`) + arco excitación (ADR-041→043) y tan δ (ADR-029→040)
+  **EN PRODUCCIÓN**. Lecciones clave: **L-55** (reusar dominio · criterio por tipo · 10kV≠110kV) · L-53/L-54 · L-51/L-52.
 - **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
   [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
   + validación de arquitectura (TODO-10).
