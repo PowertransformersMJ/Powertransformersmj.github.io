@@ -584,6 +584,22 @@ async function onGenerarNarrativa() {
  * calificación global ni el motor (reusa `svgBloque` + `bloquesMultiAno`). */
 const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#0891b2', '#65a30d', '#db2777', '#0f766e', '#9333ea'];
 
+// Descarga la ficha de referencia JSON de UNA prueba (docs/pruebas/NN-*.json) para
+// que el director la edite y la devuelva pidiendo modificaciones/mejoras (ADR-048).
+// La ruta es relativa a la PÁGINA (pages/…) → sube a la raíz y entra a docs/.
+// `docs/` se publica en GitHub Pages (pages.yml sube `path: .` + .nojekyll).
+function descargarFichaPrueba(fichaId, nombre) {
+  fetch('../docs/pruebas/' + fichaId + '.json')
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then((j) => {
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = (nombre || fichaId) + '.json'; document.body.appendChild(a); a.click();
+      a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 0);
+    })
+    .catch((e) => { console.warn('[ficha JSON]', e); alert('No se pudo descargar el JSON de la prueba: ' + e.message); });
+}
+
 function montarMultiAno() {
   const cont = $('pe-consolidado');
   if (!cont) return;
@@ -622,7 +638,9 @@ function montarMultiAno() {
   // Incluye EXCITACIÓN (ADR-045, a pedido del director): COEXISTE con su panel de
   // gráficas de arriba — la vista tabular es COMPLEMENTARIA, no lo reemplaza.
   const panelInformes = items.map((it) => ({ ...it, label: etiquetaFecha(it.fecha, it.ano) }));
-  const PRUEBAS_VP = ['excitacion', 'relacion', 'resistencia', 'aislamiento', 'bushing', 'collar'];
+  // Excitación NO va aquí: tiene su propio SEGMENTO unificado (gráficas + tablas)
+  // arriba (ADR-048). Las demás pruebas siguen en "Valores por prueba".
+  const PRUEBAS_VP = ['relacion', 'resistencia', 'aislamiento', 'bushing', 'collar'];
   const famsVP = PRUEBAS_VP.filter((fam) => panelInformes.some((inf) =>
     (inf.bloques || []).some((b) => { const f = familiaMA(b); return f && f.key === fam; })));
   if (!bloques.length && !tandItems.length && !excItems.length && !famsVP.length) {
@@ -638,13 +656,35 @@ function montarMultiAno() {
     cont.appendChild(sec);
     montarPanelTand(host, tandItems);
   }
-  // Panel de corriente de excitación condensado (espejo del tan δ; ADR-041).
+  // SEGMENTO "Corriente de excitación" (ADR-048): unifica EN UNA tarjeta su
+  // conjunto completo en el orden actual → (1) gráficas (barras+curvas por nivel,
+  // `montarPanelExcitacion`) + (2) tablas (acordeón por nivel con veredicto,
+  // `montarPanelPrueba`), + botón de descarga del JSON de referencia de la prueba
+  // (`docs/pruebas/03-corriente-excitacion.json`, para edición/feedback). Excitación
+  // queda FUERA de "Valores por prueba" (no se duplica). NO toca scorecard/motor.
   if (excItems.length) {
-    const sec = document.createElement('section'); sec.className = 'pe-exc-seccion'; sec.style.margin = '0 0 18px';
-    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Corriente de excitación — por nivel de tensión', style: 'margin:0 0 8px' }));
-    const host = document.createElement('div'); sec.appendChild(host);
-    cont.appendChild(sec);
-    montarPanelExcitacion(host, excItems);
+    const seg = document.createElement('section'); seg.className = 'pe-seg'; seg.id = 'seg-excitacion';
+    const head = document.createElement('div'); head.className = 'pe-seg-head';
+    head.innerHTML = '<span class="pe-seg-ico">Iexc</span><div><div class="pe-seg-tl">Corriente de excitación</div>'
+      + '<div class="pe-seg-sub">patrón 2+1 · NETA §7.2.2.D.6 / IEEE Std 62 · por nivel de tensión</div></div>';
+    const acts = document.createElement('div'); acts.className = 'pe-seg-actions';
+    const btnJson = document.createElement('button'); btnJson.type = 'button'; btnJson.className = 'pe-seg-json';
+    btnJson.textContent = '⬇ JSON de esta prueba';
+    btnJson.addEventListener('click', () => descargarFichaPrueba('03-corriente-excitacion', 'corriente-excitacion'));
+    acts.appendChild(btnJson); head.appendChild(acts); seg.appendChild(head);
+    const body = document.createElement('div'); body.className = 'pe-seg-body';
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'pe-seg-subh', textContent: 'Gráficas — por nivel de tensión' }));
+    const hostG = document.createElement('div'); body.appendChild(hostG);
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'pe-seg-divider' }));
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'pe-seg-subh', textContent: 'Tablas + diagnóstico conforme a norma' }));
+    const hostT = document.createElement('div'); body.appendChild(hostT);
+    seg.appendChild(body); cont.appendChild(seg);
+    montarPanelExcitacion(hostG, excItems);
+    montarPanelPrueba(hostT, 'excitacion', panelInformes);
+    // `montarPanelPrueba` rotula con su propio <h2> (nombre de la prueba); dentro
+    // del segmento eso DUPLICA el título → se retira (el encabezado del segmento + el
+    // subtítulo "Tablas…" ya lo nombran). No se toca el módulo (lo usan otras pruebas).
+    const h2t = hostT.querySelector('h2'); if (h2t) h2t.remove();
   }
   // Panel "Valores por prueba" — una tarjeta por prueba sin panel dedicado (ADR-044).
   if (famsVP.length) {
