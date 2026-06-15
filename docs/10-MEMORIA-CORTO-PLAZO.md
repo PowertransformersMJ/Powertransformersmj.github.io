@@ -14,7 +14,9 @@
 
 ## 🎯 Foco actual — HANDOFF (sesión 2026-06-11/12)
 
-> **MÁS RECIENTE (ADR-047, commit `f472c8e`, FALTA PUSH+PR):** BUG de producción — el acordeón "Valores por prueba"
+> **MÁS RECIENTE (ADR-048, commit `804e7fd`, FALTA PUSH+PR):** **Reorg del módulo POR PRUEBA — paso 1 de N** (director: "cada prueba = segmento independiente, **vamos paso a paso, no generalices**, integra TODO en el orden actual, habilítame el JSON individual de cada prueba"). Hecho SOLO excitación: tarjeta-segmento `.pe-seg` "Corriente de excitación" en `montarMultiAno` = gráficas (`montarPanelExcitacion`) + tablas (`montarPanelPrueba`) + botón "⬇ JSON de esta prueba" (`descargarFichaPrueba`→`docs/pruebas/03-corriente-excitacion.json`). Excitación SALE de `PRUEBAS_VP`. CSS `.pe-seg-*`. **⛔ NO anticipar las demás pruebas — solo cuando el director lo pida, una por una.** Cada prueba: su ficha `docs/pruebas/NN-*.json` = JSON editable. 1185/1185. 🔲 Validar en APP.
+>
+> **ANTES (ADR-047, commit `f472c8e`):** BUG de producción — el acordeón "Valores por prueba"
 > de excitación mostraba **solo AT·110** (faltaban AT·66/MT·34.5) aunque las gráficas sí los mostraban. Causa (L-55 p2):
 > `cardResumen` (`tablas-pruebas-panel.js`) aplicaba `filas[0].mode` a todas las filas → un nivel con informe modo 'items'
 > (fase con TAP faltante) hacía `faseNames.forEach` sobre null → TypeError corta el render tras el 1.er acordeón. **REPRODUCIDO
