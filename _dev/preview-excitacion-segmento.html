@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Corriente de excitación — SEGMENTO unificado (gráficas + tablas + JSON)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #eef2f6; font-family: system-ui, sans-serif; color:#0f172a; }
+  .nota { max-width: 96ch; font-size: 13px; color:#475569; line-height:1.55; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:22px; }
+  .nota b { color:#0f172a; } .nota code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:12px; }
+  /* Las clases .pe-seg-* viven en pruebas-electricas.css (producción) — el preview
+     las usa tal cual para ser FIEL; aquí NO se redefinen. */
+</style>
+</head>
+<body>
+<h1>DEV · Corriente de excitación — SEGMENTO unificado</h1>
+<div class="nota">
+  <b>Esto es exactamente lo que integraré en la página</b> (módulos reales en <code>.pe-scope</code>): UN segmento
+  "Corriente de excitación" que contiene <b>todo el conjunto en el orden actual</b> → (1) gráficas (barras + curvas
+  por nivel) y (2) tablas (acordeón por nivel con veredicto). Arriba a la derecha, el botón <b>⬇ JSON</b> descarga el
+  JSON de referencia de esta prueba (<code>docs/pruebas/03-corriente-excitacion.json</code>) para que lo edites y me
+  lo devuelvas si quieres una modificación. <b>No toca</b> scorecard, motor, ni las demás pruebas.
+</div>
+
+<div class="pe-scope">
+  <section class="pe-seg" id="seg-exc">
+    <div class="pe-seg-head">
+      <span class="pe-seg-ico">Iexc</span>
+      <div><div class="pe-seg-tl">Corriente de excitación</div><div class="pe-seg-sub">patrón 2+1 · NETA §7.2.2.D.6 / IEEE Std 62 · por nivel de tensión</div></div>
+      <div class="pe-seg-actions"><button type="button" class="pe-seg-json" id="btn-json">⬇ JSON de esta prueba</button></div>
+    </div>
+    <div class="pe-seg-body">
+      <div class="pe-seg-subh">Gráficas — por nivel de tensión</div>
+      <div id="exc-graf"></div>
+      <div class="pe-seg-divider"></div>
+      <div class="pe-seg-subh">Tablas + diagnóstico conforme a norma</div>
+      <div id="exc-tablas"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { montarPanelExcitacion } from '../assets/js/ui/pruebas/excitacion-panel.js';
+import { montarPanelPrueba } from '../assets/js/ui/pruebas/tablas-pruebas-panel.js';
+import { etiquetaFecha, configInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json','./fixtures/450108-2022-01-18.json','./fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json','./fixtures/450108-2024-01-19.json','./fixtures/450108-2024-01-19-delta.json'
+];
+const esExc = (b) => { const f = familiaMA(b); return !!f && f.key === 'excitacion'; };
+
+(async () => {
+  const docs = [];
+  for (const url of FIXTURES) { try { docs.push(await (await fetch(url + '?v=' + Date.now())).json()); } catch (e) { console.error(e); } }
+  const panelInformes = docs.map((inf) => ({ id: inf.id, ano: inf.ano, label: etiquetaFecha(inf.fecha, inf.ano), config: configInforme(inf), bloques: inf.bloques || [] }));
+  const excItems = panelInformes.map((inf) => {
+    const excs = (inf.bloques || []).filter(esExc).map((b) => ({ titulo: b.titulo, bloque: b }));
+    return excs.length ? { id: inf.id, label: inf.label, ano: inf.ano, config: inf.config, excs } : null;
+  }).filter(Boolean);
+
+  // (1) Gráficas y (2) Tablas — MISMO orden y MISMO trato que el shell.
+  montarPanelExcitacion(document.getElementById('exc-graf'), excItems);
+  const hostT = document.getElementById('exc-tablas');
+  montarPanelPrueba(hostT, 'excitacion', panelInformes);
+  const h2t = hostT.querySelector('h2'); if (h2t) h2t.remove(); // igual que el shell
+
+  // Botón JSON: descarga la ficha de referencia de la prueba.
+  document.getElementById('btn-json').addEventListener('click', async () => {
+    try {
+      const j = await (await fetch('../docs/pruebas/03-corriente-excitacion.json')).json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'corriente-excitacion.json'; a.click(); URL.revokeObjectURL(a.href);
+    } catch (e) { alert('No se pudo leer el JSON: ' + e.message); }
+  });
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>

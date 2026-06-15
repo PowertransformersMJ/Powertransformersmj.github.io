@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · PROPUESTA paso 1 — cada prueba en SEGMENTO independiente</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #eef2f6; font-family: system-ui, sans-serif; color:#0f172a; }
+  .nota { max-width: 96ch; font-size: 13px; color:#475569; line-height:1.55; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:22px; }
+  .nota b { color:#0f172a; }
+  /* ── Propuesta de SEGMENTO independiente por prueba ── */
+  .pe-seg { background:#fff; border:1px solid #e2e8f0; border-radius:16px; box-shadow:0 1px 3px rgba(15,23,42,.06); padding:0; margin:0 0 22px; overflow:hidden; }
+  .pe-seg-head { display:flex; align-items:center; gap:12px; padding:14px 20px; border-bottom:1px solid #eef2f6; background:linear-gradient(180deg,#fbfdff,#f3f7fb); }
+  .pe-seg-ico { width:34px; height:34px; border-radius:9px; display:grid; place-items:center; background:#1f3a5f; color:#fff; font-weight:800; font-size:13px; flex:none; font-family:var(--pe-mono,monospace); }
+  .pe-seg-tl { font-size:17px; font-weight:800; color:#0f172a; }
+  .pe-seg-sub { font-size:12px; color:#64748b; margin-top:1px; }
+  .pe-seg-body { padding:16px 20px 20px; }
+  /* el <h2> que pinta montarPanelPrueba dentro lo ocultamos: el título ya es el del segmento */
+  .pe-seg-body > h2 { display:none; }
+</style>
+</head>
+<body>
+<h1>DEV · Propuesta — cada prueba en su SEGMENTO independiente</h1>
+<div class="nota">
+  <b>Paso 1 (propuesta, sin tocar producción).</b> Hoy todas las tablas viven bajo UNA sección paraguas
+  "Valores por prueba". Aquí cada prueba se vuelve un <b>segmento delimitado propio</b> (tarjeta con su
+  encabezado), claramente separado del resto. Usa el <b>módulo real</b> (<code>tablas-pruebas-panel.js</code>)
+  dentro de <code>.pe-scope</code> — solo cambia el ENVOLTORIO, no el contenido ni el criterio.
+  <br><br>Dime si la dirección es correcta y con qué prueba arrancamos a integrar en la página.
+</div>
+
+<div class="pe-scope"><div id="root"></div></div>
+
+<script type="module">
+import { montarPanelPrueba } from '../assets/js/ui/pruebas/tablas-pruebas-panel.js';
+import { etiquetaFecha, configInforme } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json',
+  './fixtures/450108-2022-01-18.json',
+  './fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json',
+  './fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json'
+];
+// Orden y rótulos de las pruebas (mismas familias que el shell `PRUEBAS_VP`).
+const PRUEBAS = [
+  { fam: 'excitacion', ico: 'Iexc', nom: 'Corriente de excitación', sub: 'patrón 2+1 · NETA / IEEE Std 62' },
+  { fam: 'relacion',   ico: 'TTR',  nom: 'Relación de transformación', sub: '±0.5% vs placa · IEEE C57.152' },
+  { fam: 'resistencia',ico: 'Rdev', nom: 'Resistencia de devanados', sub: 'desbalance ≤ 2% · NETA' },
+  { fam: 'aislamiento',ico: 'IR',   nom: 'Resistencia de aislamiento', sub: '≥ mínimo por clase · NETA Tabla 100.5' },
+  { fam: 'bushing',    ico: 'C1',   nom: 'Factor de potencia de bujes', sub: 'tan δ ≤ 1% · IEEE C57.19.100' },
+  { fam: 'collar',     ico: 'HC',   nom: 'Collar caliente', sub: '< 100 mW · NETA' }
+];
+
+(async () => {
+  const docs = [];
+  for (const url of FIXTURES) {
+    try { docs.push(await (await fetch(url + '?v=' + Date.now())).json()); }
+    catch (e) { console.error('fixture', url, e); }
+  }
+  const panelInformes = docs.map((inf) => ({
+    id: inf.id, ano: inf.ano, label: etiquetaFecha(inf.fecha, inf.ano),
+    config: configInforme(inf), bloques: inf.bloques || []
+  }));
+
+  const root = document.getElementById('root');
+  const pintados = [];
+  PRUEBAS.forEach((p) => {
+    const seg = document.createElement('section'); seg.className = 'pe-seg';
+    const head = document.createElement('div'); head.className = 'pe-seg-head';
+    head.innerHTML = `<span class="pe-seg-ico">${p.ico}</span><div><div class="pe-seg-tl">${p.nom}</div><div class="pe-seg-sub">${p.sub}</div></div>`;
+    const body = document.createElement('div'); body.className = 'pe-seg-body';
+    const n = montarPanelPrueba(body, p.fam, panelInformes);
+    if (!n) return; // sin datos para esta prueba → no se pinta el segmento
+    seg.appendChild(head); seg.appendChild(body); root.appendChild(seg);
+    pintados.push(p.fam);
+  });
+  console.log('[segmentadas] pruebas con segmento:', pintados);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
