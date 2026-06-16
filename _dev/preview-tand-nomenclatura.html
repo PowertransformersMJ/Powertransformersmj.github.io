@@ -88,7 +88,11 @@ const NOM = [
   const host = document.createElement('div'); sec.appendChild(host);
   cont.appendChild(sec);
   montarPanelTand(host, tandItems);
-  if (nomNode) sec.appendChild(nomNode); // ← nomenclatura DENTRO de tan δ
+  // nomenclatura DEBAJO de las gráficas, ANTES de "Análisis conforme a norma" (igual que el shell)
+  if (nomNode) {
+    const analisis = host.querySelector('.pe-analisis-box');
+    if (analisis) host.insertBefore(nomNode, analisis); else sec.appendChild(nomNode);
+  }
 
   window.__ready = true;
 })();
