@@ -12,20 +12,16 @@
 
 ---
 
-## 🎯 Foco actual — HANDOFF (sesión 2026-06-11/12)
+## 🎯 Foco actual — HANDOFF (cierre 2026-06-16 · ctx 506k → relevo a sesión nueva)
 
-> **MÁS RECIENTE (ADR-049, commits `99bfa74`+`5b8077e`, FALTA PUSH+PR):** "Nomenclatura y secciones de aislamiento" pasa **DENTRO del panel Tan δ / FP — devanados** (era sección suelta), en posición **gráficas → nomenclatura → "Análisis conforme a norma"** (`insertBefore` antes de `.pe-analisis-box`). `montarMultiAno` reubica el nodo vivo `#nomencl`; **rescate a `#tablero-scope` antes del `innerHTML=''`** (no destruir el nodo). `renderNomenclatura` intacto. 1185/1185. 🔲 Validar en APP.
+> **🎯 FOCO DE TRABAJO ACTUAL (pedido explícito del director): EXCLUSIVAMENTE el segmento "Factor de Potencia / Tan δ — devanados".**
+> ⛔ NO tocar otras pruebas. ⛔ NO anticipar la reorg de las demás (relación/resistencia/aislamiento/bujes/collar) — SOLO cuando el director lo pida, **una por una**, modo **paso a paso, no generalizar** (puede afectar el desempeño). Workflow obligado: **preview FIEL** (módulo real + `.pe-scope` + composición del shell, L-56) **ANTES de tocar producción**; Claude commitea, el director pushea/mergea.
 >
-> **ANTES (ADR-048, commit `804e7fd`):** **Reorg del módulo POR PRUEBA — paso 1 de N** (director: "cada prueba = segmento independiente, **vamos paso a paso, no generalices**, integra TODO en el orden actual, habilítame el JSON individual de cada prueba"). Hecho SOLO excitación: tarjeta-segmento `.pe-seg` "Corriente de excitación" en `montarMultiAno` = gráficas (`montarPanelExcitacion`) + tablas (`montarPanelPrueba`) + botón "⬇ JSON de esta prueba" (`descargarFichaPrueba`→`docs/pruebas/03-corriente-excitacion.json`). Excitación SALE de `PRUEBAS_VP`. CSS `.pe-seg-*`. **⛔ NO anticipar las demás pruebas — solo cuando el director lo pida, una por una.** Cada prueba: su ficha `docs/pruebas/NN-*.json` = JSON editable. 1185/1185. 🔲 Validar en APP.
+> **Próximos pasos sugeridos para FP/tan δ (el director elige, NO adelantarse):** (1) convertirlo en **segmento `.pe-seg` propio** como excitación (encabezado + botón "⬇ JSON de esta prueba" → `docs/pruebas/01-factor-potencia-aislamiento.json` ó la ficha tan δ; ver patrón ADR-048); (2) ajustar contenido/orden interno; (3) confirmar **umbrales** `TIPUP 0.1`/`PEND 0.05` (⚠️ por validar). Detalle del panel tan δ → `99 §29..§40` + lobe 49.
 >
-> **ANTES (ADR-047, commit `f472c8e`):** BUG de producción — el acordeón "Valores por prueba"
-> de excitación mostraba **solo AT·110** (faltaban AT·66/MT·34.5) aunque las gráficas sí los mostraban. Causa (L-55 p2):
-> `cardResumen` (`tablas-pruebas-panel.js`) aplicaba `filas[0].mode` a todas las filas → un nivel con informe modo 'items'
-> (fase con TAP faltante) hacía `faseNames.forEach` sobre null → TypeError corta el render tras el 1.er acordeón. **REPRODUCIDO
-> en navegador** antes de tocar (§3.3). Fix: layout **por-fila** + guards de null + **try/catch por nivel**. ⚠️ El preview con
-> fixtures LIMPIOS NO reproducía el bug — los datos reales imperfectos sí (L-56). 1185/1185.
->
-> **ANTES (ADR-046, commit `6148710`, FALTA PUSH+PR):** excitación — cada NIVEL se ve **barras (valores) → curvas (desviación)**; la **tabla desplegable única** (con veredicto) vive en el acordeón "Valores por prueba" (panel B `pe-vp-acc`). Se retiraron del panel de gráficas la pestaña "Tabla de valores" (FUSIÓN ADR-043) + toggle "Magnitud" = info REPETIDA. **L-56** (preview debe ejecutar módulo REAL + `.pe-scope` + composición del shell, si no es engañoso — origen de varios días perdidos). Nuevo `_dev/preview-excitacion-fiel.html`. ⚠️ **Código muerto pendiente de poda** (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`). 1185/1185. 🔲 Falta validar en la APP real.
+> **Arco excitación + reorg por prueba — TODO EN PRODUCCIÓN (ADR-046→049, mergeado; `git fetch` 2026-06-16 `99bfa74`∈`origin/main`):**
+> ADR-046 (excitación: por nivel barras→curvas, retira tablas repetidas) · ADR-047 (fix bug acordeón modo-mixto 'fases/items' → solo se veía AT·110; L-55 p2; **REPRODUCIR el caso sucio, los fixtures limpios engañan** L-56) · ADR-048 (**"Corriente de excitación" = SEGMENTO `.pe-seg`** unificado gráficas+tablas+botón JSON; fuera de `PRUEBAS_VP`; patrón replicable a las demás pruebas) · ADR-049 (nomenclatura+secciones de aislamiento DENTRO del panel tan δ, entre gráficas y "Análisis conforme a norma"; `insertBefore`+rescate del nodo antes del `innerHTML=''`).
+> ⚠️ **Código muerto pendiente de poda** en `excitacion-panel.js` (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`) → hay chip de tarea spawneado. 🔲 Validar ADR-046→049 en la APP real. 🔲 Falta validar en la APP real.
 
 ---
 
