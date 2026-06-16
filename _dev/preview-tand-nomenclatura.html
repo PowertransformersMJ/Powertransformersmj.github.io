@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Nomenclatura DENTRO de Factor de Potencia / Tan δ — devanados (ADR-049)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style> body { padding: 24px; background: #eef2f6; font-family: system-ui, sans-serif; color:#0f172a; }
+  .nota { max-width: 96ch; font-size: 13px; color:#475569; line-height:1.55; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:22px; }
+  .nota b { color:#0f172a; } .nota code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>DEV · "Nomenclatura y secciones de aislamiento" DENTRO de Tan δ</h1>
+<div class="nota">
+  Replica el shell (ADR-049): el panel real <code>montarPanelTand</code> dentro de
+  <code>.pe-scope</code>, y el apartado <code>#nomencl</code> (nomenclatura de devanados +
+  tabla de secciones de aislamiento CH/CL/CT…) <b>reubicado DENTRO del segmento
+  "Factor de Potencia / Tan δ — devanados"</b>, igual que en producción. Antes vivía suelto
+  como sección aparte; ahora es contexto de ESTA prueba.
+</div>
+
+<div class="pe-scope" id="tablero-scope">
+  <div id="pe-consolidado"></div>
+
+  <!-- Mismo markup que la página (la sección que se reubicará dentro de tan δ). -->
+  <section id="nomencl">
+    <h2>Nomenclatura y secciones de aislamiento</h2>
+    <div class="tblwrap"><table class="dt">
+      <thead><tr><th scope="col">Devanado</th><th scope="col">Tensión</th><th scope="col">Conexión</th><th scope="col">Fase A</th><th scope="col">Fase B (central)</th><th scope="col">Fase C</th><th scope="col">Neutro</th></tr></thead>
+      <tbody id="nomencl-body"></tbody>
+    </table></div>
+    <h4>Tangente δ — secciones de aislamiento</h4>
+    <div class="tblwrap"><table class="dt">
+      <thead><tr><th scope="col">Config.</th><th scope="col">Aislamiento entre</th><th scope="col">Detalle</th></tr></thead>
+      <tbody>
+        <tr><td class="cfg">CH</td><td class="assoc">AT ↔ tierra</td><td class="muted small">Alta tensión contra masa</td></tr>
+        <tr><td class="cfg">CL</td><td class="assoc">MT ↔ tierra</td><td class="muted small">Media tensión contra masa</td></tr>
+        <tr><td class="cfg">CT</td><td class="assoc">BT ↔ tierra</td><td class="muted small">Baja tensión contra masa</td></tr>
+        <tr><td class="cfg">CHL</td><td class="assoc">AT ↔ MT</td><td class="muted small">Entre alta y media</td></tr>
+        <tr><td class="cfg">CLT</td><td class="assoc">MT ↔ BT</td><td class="muted small">Entre media y baja</td></tr>
+        <tr><td class="cfg">CHT</td><td class="assoc">AT ↔ BT</td><td class="muted small">Entre alta y baja</td></tr>
+      </tbody>
+    </table></div>
+  </section>
+</div>
+
+<script type="module">
+import { montarPanelTand } from '../assets/js/ui/pruebas/tand-panel.js';
+import { etiquetaFecha, configInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json','./fixtures/450108-2022-01-18.json','./fixtures/450108-2022-05-02.json',
+  './fixtures/450108-2023-11-09.json','./fixtures/450108-2024-01-19.json','./fixtures/450108-2024-01-19-delta.json'
+];
+const esTand = (b) => { const f = familiaMA(b); return !!f && f.key === 'tand'; };
+
+// Devanados de muestra (como los derivaría renderNomenclatura de la unidad).
+const NOM = [
+  { dev:'AT', t:'H', tension:'63.5 kV', conx:'D',   n:false },
+  { dev:'MT', t:'X', tension:'13.8 kV', conx:'yn1', n:true  },
+  { dev:'BT', t:'Y', tension:'—',       conx:'yn1', n:true  }
+];
+
+(async () => {
+  const docs = [];
+  for (const url of FIXTURES) { try { docs.push(await (await fetch(url + '?v=' + Date.now())).json()); } catch (e) { console.error(e); } }
+  const tandItems = docs.map((inf) => {
+    const t = (inf.bloques || []).find(esTand);
+    return t ? { id: inf.id, label: etiquetaFecha(inf.fecha, inf.ano), ano: inf.ano, config: configInforme(inf), bloque: t } : null;
+  }).filter(Boolean);
+
+  // Llenar la tabla de devanados (como renderNomenclatura).
+  document.getElementById('nomencl-body').innerHTML = NOM.map((r) => {
+    const ph = (k, cls) => `<span class="ph ${cls}">${r.t}${k}</span>`;
+    return `<tr><td>${r.dev}</td><td>${r.tension}</td><td>${r.conx}</td>`
+      + `<td>${ph(1,'pa')}</td><td>${ph(2,'pb')}</td><td>${ph(3,'pc')}</td>`
+      + `<td>${r.n ? ph(0,'pn') : '<span class="muted2">—</span>'}</td></tr>`;
+  }).join('');
+
+  // === Igual que el shell (ADR-049) ===
+  const cont = document.getElementById('pe-consolidado');
+  const nomNode = document.getElementById('nomencl');
+  const sec = document.createElement('section'); sec.className = 'pe-tand-seccion'; sec.style.margin = '0 0 18px';
+  sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Factor de Potencia / Tan δ — devanados', style: 'margin:0 0 8px' }));
+  const host = document.createElement('div'); sec.appendChild(host);
+  cont.appendChild(sec);
+  montarPanelTand(host, tandItems);
+  if (nomNode) sec.appendChild(nomNode); // ← nomenclatura DENTRO de tan δ
+
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
