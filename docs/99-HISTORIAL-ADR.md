@@ -944,3 +944,21 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 **48.6 Archivos** — MODIFICADOS: `assets/js/pruebas-electricas-shell.js` (helper `descargarFichaPrueba`; segmento excitación en `montarMultiAno`; `PRUEBAS_VP` sin 'excitacion'), `assets/css/pruebas-electricas.css` (`.pe-seg-*` scoped). NUEVOS (DEV): `_dev/preview-excitacion-segmento.html` (fiel), `_dev/preview-pruebas-segmentadas.html` (propuesta de las N pruebas). INTACTOS: todos los módulos de dominio/UI y demás pruebas.
 
 **48.7 Doctrina / pendiente** — Patrón replicable para las demás pruebas (relación, resistencia, aislamiento, bujes, collar) — **cada una en su turno, cuando el director lo pida** (no anticipar). Cada prueba tiene su ficha `docs/pruebas/NN-*.json` como JSON individual editable. L-56 (preview fiel con CSS real). Flujo ADR-005: Claude commitea, el director pushea.
+
+## 49. ADR-049 — "Nomenclatura y secciones de aislamiento" pasa DENTRO del segmento Tan δ / Factor de Potencia — devanados
+
+> Cliente (director): *"necesito que este apartado [Nomenclatura y secciones de aislamiento] esté en factor de potencia a los devanados"* (estaba como sección suelta aparte).
+
+**49.1 Causa raíz / motivación** — La `<section id="nomencl">` (tabla de nomenclatura de devanados H/X/Y + tabla de secciones de aislamiento CH/CL/CT/CHL/CLT/CHT) vivía como sección INDEPENDIENTE en la página, separada del panel de tan δ. Pero esas secciones de aislamiento SON el contexto de la prueba de FP/tan δ → deben ir CON ella (coherente con la reorg por prueba, ADR-048).
+
+**49.2 Solución estructural** — En `montarMultiAno`, el nodo vivo `#nomencl` se reubica DENTRO del panel tan δ (`pe-tand-seccion`, "Factor de Potencia / Tan δ — devanados"), **DEBAJO de las gráficas y ANTES del bloque "Análisis conforme a norma"** (`host.insertBefore(nomNode, host.querySelector('.pe-analisis-box'))`; fallback `appendChild`). Orden: gráficas → nomenclatura+secciones → análisis (posición a pedido del director, commit `5b8077e`). **Robustez clave**: `#pe-consolidado` se limpia con `innerHTML=''` en cada render → si `#nomencl` quedó dentro en un render previo, se RESCATA a su contenedor estable `#tablero-scope` ANTES del clear (`if (cont.contains(nomNode)) scopeHome.appendChild(nomNode)`) y se re-inserta después. Así el nodo NUNCA se destruye. `renderNomenclatura(u)` sigue llenando su `<tbody id="nomencl-body">` igual (getElementById funciona con cualquier padre). Sin tan δ → `#nomencl` queda en su posición original (sin regresión).
+
+**49.3 No-regresión** — Se mueve un nodo existente, no se re-renderiza ni se duplica. Motor, scorecard, calificación, otras pruebas, `renderNomenclatura`: INTACTOS. La tabla de secciones tan δ sigue siendo el mismo HTML estático.
+
+**49.4 Tests / verificación** — `node --check` OK; suite **1185/1185**, lint 0. Validado en `_dev/preview-tand-nomenclatura.html` (panel `montarPanelTand` REAL + `#nomencl` reubicado dentro vía el mismo código del shell, en `.pe-scope`): `#nomencl` DENTRO de `.pe-tand-seccion` (no suelto), 3 devanados + 6 secciones, cero errores de consola. **Falta validar en la APP** tras merge.
+
+**49.5 Anti-patterns evitados** — Destruir el nodo al limpiar el contenedor (se rescata antes del `innerHTML=''`). Duplicar la nomenclatura (se mueve el nodo, no se clona ni re-renderiza). Refactor innecesario (no hizo falta reconstruir; mover el nodo vivo bastó, ~6 líneas).
+
+**49.6 Archivos** — MODIFICADO: `assets/js/pruebas-electricas-shell.js` (`montarMultiAno`: rescate de `#nomencl` antes del clear + `sec.appendChild(nomNode)` en el bloque tan δ). NUEVO (DEV): `_dev/preview-tand-nomenclatura.html`. INTACTO: `pages/pruebas-electricas.html` (la sección `#nomencl` sigue en el HTML; solo se reubica su nodo en runtime), `renderNomenclatura`, el resto.
+
+**49.7 Doctrina** — Reorg por prueba (cada apartado con SU prueba) · cuidado con nodos vivos dentro de contenedores que se limpian con `innerHTML=''` (rescatar antes). Flujo ADR-005: Claude commitea, el director pushea.

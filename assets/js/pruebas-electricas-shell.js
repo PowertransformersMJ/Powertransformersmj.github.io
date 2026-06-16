@@ -647,14 +647,29 @@ function montarMultiAno() {
     cont.innerHTML = '<p class="muted small">Aún no hay gráficas extraídas para superponer. Abre/sube informes con análisis IA.</p>';
     return;
   }
+  // El apartado "Nomenclatura y secciones de aislamiento" (#nomencl) se reubica
+  // DENTRO del segmento tan δ ("Factor de potencia a los devanados", ADR-049). Si en
+  // un render previo quedó dentro de `cont`, rescátalo a su contenedor estable ANTES
+  // de limpiar (innerHTML='') para no destruirlo; luego se re-inserta en el panel tan δ.
+  const nomNode = document.getElementById('nomencl');
+  const scopeHome = document.getElementById('tablero-scope');
+  if (nomNode && scopeHome && cont.contains(nomNode)) scopeHome.appendChild(nomNode);
   cont.innerHTML = '';
-  // Panel tan δ condensado (primero, prominente).
+  // Panel tan δ condensado (primero, prominente). Incluye, AL FINAL, la nomenclatura
+  // y las secciones de aislamiento (CH/CL/CT…) — son contexto de ESTA prueba (ADR-049).
   if (tandItems.length) {
     const sec = document.createElement('section'); sec.className = 'pe-tand-seccion'; sec.style.margin = '0 0 18px';
     sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Factor de Potencia / Tan δ — devanados', style: 'margin:0 0 8px' }));
     const host = document.createElement('div'); sec.appendChild(host);
     cont.appendChild(sec);
     montarPanelTand(host, tandItems);
+    // Nomenclatura + secciones de aislamiento DEBAJO de las gráficas pero ANTES del
+    // bloque "Análisis conforme a norma" (`.pe-analisis-box`), dentro del panel tan δ
+    // (ADR-049, posición a pedido del director).
+    if (nomNode) {
+      const analisis = host.querySelector('.pe-analisis-box');
+      if (analisis) host.insertBefore(nomNode, analisis); else sec.appendChild(nomNode);
+    }
   }
   // SEGMENTO "Corriente de excitación" (ADR-048): unifica EN UNA tarjeta su
   // conjunto completo en el orden actual → (1) gráficas (barras+curvas por nivel,
