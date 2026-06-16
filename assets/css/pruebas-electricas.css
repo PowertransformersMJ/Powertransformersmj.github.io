@@ -636,6 +636,21 @@ table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:42
 .pe-scope .pe-vp-diag-cons{font-size:12px;margin-top:8px;color:#334155;}
 .pe-scope .pe-vp-diag-concl{font-size:12px;margin-top:6px;color:#0f172a;font-weight:600;}
 
+/* ── SEGMENTO independiente por prueba (ADR-048): cada prueba en su tarjeta
+   delimitada (encabezado + cuerpo), unificando sus gráficas + tablas. ── */
+.pe-scope .pe-seg{background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 1px 3px rgba(15,23,42,.06);margin:0 0 18px;overflow:hidden;}
+.pe-scope .pe-seg-head{display:flex;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid #eef2f6;background:linear-gradient(180deg,#fbfdff,#f3f7fb);}
+.pe-scope .pe-seg-ico{width:34px;height:34px;border-radius:9px;display:grid;place-items:center;background:#1f3a5f;color:#fff;font-weight:800;font-size:12px;flex:none;font-family:var(--pe-mono,ui-monospace,monospace);}
+.pe-scope .pe-seg-tl{font-size:17px;font-weight:800;color:#0f172a;}
+.pe-scope .pe-seg-sub{font-size:12px;color:#64748b;margin-top:1px;}
+.pe-scope .pe-seg-actions{margin-left:auto;}
+.pe-scope .pe-seg-json{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:#1f3a5f;background:#fff;border:1px solid #cdd9e5;border-radius:8px;padding:7px 12px;cursor:pointer;transition:background .15s ease;}
+.pe-scope .pe-seg-json:hover{background:#f3f7fb;}
+.pe-scope .pe-seg-body{padding:16px 20px 20px;}
+.pe-scope .pe-seg-subh{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#64748b;margin:6px 0 8px;}
+.pe-scope .pe-seg-divider{height:1px;background:#eef2f6;margin:20px 0 16px;}
+@media(max-width:640px){.pe-scope .pe-seg-head{flex-wrap:wrap;}.pe-scope .pe-seg-actions{margin-left:0;width:100%;}}
+
 /* ── Acordeón PREMIUM por NIVEL (ADR-045). Solo transform/opacity (§3.1).
    Los overrides van scoped bajo .pe-vp-acc → NO afectan la tabla-fusión de
    excitación ni los demás pe-fus-*. ── */
