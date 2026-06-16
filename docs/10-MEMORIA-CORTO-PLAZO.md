@@ -14,7 +14,7 @@
 
 ## 🎯 Foco actual — HANDOFF (sesión 2026-06-11/12)
 
-> **MÁS RECIENTE (ADR-049, commit `99bfa74`, FALTA PUSH+PR):** "Nomenclatura y secciones de aislamiento" (devanados + secciones CH/CL/CT…) pasa **DENTRO del segmento Tan δ / FP — devanados** (era sección suelta). `montarMultiAno` reubica el nodo vivo `#nomencl` en `.pe-tand-seccion`; **rescate a `#tablero-scope` antes del `innerHTML=''`** (no destruir el nodo). `renderNomenclatura` intacto. 1185/1185. 🔲 Validar en APP.
+> **MÁS RECIENTE (ADR-049, commits `99bfa74`+`5b8077e`, FALTA PUSH+PR):** "Nomenclatura y secciones de aislamiento" pasa **DENTRO del panel Tan δ / FP — devanados** (era sección suelta), en posición **gráficas → nomenclatura → "Análisis conforme a norma"** (`insertBefore` antes de `.pe-analisis-box`). `montarMultiAno` reubica el nodo vivo `#nomencl`; **rescate a `#tablero-scope` antes del `innerHTML=''`** (no destruir el nodo). `renderNomenclatura` intacto. 1185/1185. 🔲 Validar en APP.
 >
 > **ANTES (ADR-048, commit `804e7fd`):** **Reorg del módulo POR PRUEBA — paso 1 de N** (director: "cada prueba = segmento independiente, **vamos paso a paso, no generalices**, integra TODO en el orden actual, habilítame el JSON individual de cada prueba"). Hecho SOLO excitación: tarjeta-segmento `.pe-seg` "Corriente de excitación" en `montarMultiAno` = gráficas (`montarPanelExcitacion`) + tablas (`montarPanelPrueba`) + botón "⬇ JSON de esta prueba" (`descargarFichaPrueba`→`docs/pruebas/03-corriente-excitacion.json`). Excitación SALE de `PRUEBAS_VP`. CSS `.pe-seg-*`. **⛔ NO anticipar las demás pruebas — solo cuando el director lo pida, una por una.** Cada prueba: su ficha `docs/pruebas/NN-*.json` = JSON editable. 1185/1185. 🔲 Validar en APP.
 >
