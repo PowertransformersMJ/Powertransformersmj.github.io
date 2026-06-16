@@ -663,7 +663,13 @@ function montarMultiAno() {
     const host = document.createElement('div'); sec.appendChild(host);
     cont.appendChild(sec);
     montarPanelTand(host, tandItems);
-    if (nomNode) sec.appendChild(nomNode); // nomenclatura + secciones de aislamiento DENTRO de FP/tan δ
+    // Nomenclatura + secciones de aislamiento DEBAJO de las gráficas pero ANTES del
+    // bloque "Análisis conforme a norma" (`.pe-analisis-box`), dentro del panel tan δ
+    // (ADR-049, posición a pedido del director).
+    if (nomNode) {
+      const analisis = host.querySelector('.pe-analisis-box');
+      if (analisis) host.insertBefore(nomNode, analisis); else sec.appendChild(nomNode);
+    }
   }
   // SEGMENTO "Corriente de excitación" (ADR-048): unifica EN UNA tarjeta su
   // conjunto completo en el orden actual → (1) gráficas (barras+curvas por nivel,
