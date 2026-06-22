@@ -84,6 +84,15 @@
 
 ## 📝 Bitácora (efímera)
 
+- **2026-06-17** — **ADR-050 COMMITEADO (FALTA PUSH del director)** → `99 §50` + `00 §50` + **L-57** (hazlo-como-X:
+  reusa el componente, no recrees) + **L-58** (chips multi-norma por norma, no estado único). Tan δ / FP = SEGMENTO
+  unificado espejo de excitación: el shell monta `montarPanelTand` + **`montarPanelPrueba('tand')`** + botón JSON.
+  "Todos los años" añade **detalle + evaluación POR INFORME** (todas las secciones, 0 huecos = tablas self-consistent) +
+  **valores fuera de criterio en ROJO** (`claseCeldaTand`: `d-bad` >1% IEEE / `d-inv` >0.5% NETA) + **fix chips
+  multi-norma** (`chipsCriterio` evalúa por norma — antes ✕ IEEE en 0.51% que cumple). Preview FIEL
+  `_dev/preview-tand-tablas.html`; 1185/1185; 0 errores. 🔲 **Pendiente: push del director + validar en la APP real.**
+  🔲 Decisión abierta (no bloqueante): ¿1 acordeón único (actual) o split por devanado AT/MT/Terciario?
+  ⚠️ Sin tests unitarios nuevos para el branch tand (helpers reusados sí cubiertos); umbrales `TIPUP/PEND`/guía NETA 0.5% siguen `⚠️ verificar` (TODO-08).
 - **2026-06-12** — **ADR-046 + ADR-047 (excitación) commiteados, FALTA PUSH+PR.** ADR-046: orden por nivel (barras→curvas) +
   retira tablas repetidas del panel de gráficas (FUSIÓN + Magnitud) → tabla única en el acordeón. ADR-047: **fix de bug de
   producción** — el acordeón mostraba solo AT·110 por un nivel modo-mixto que reventaba `cardResumen` (L-55 p2); **reproducido

@@ -655,21 +655,41 @@ function montarMultiAno() {
   const scopeHome = document.getElementById('tablero-scope');
   if (nomNode && scopeHome && cont.contains(nomNode)) scopeHome.appendChild(nomNode);
   cont.innerHTML = '';
-  // Panel tan δ condensado (primero, prominente). Incluye, AL FINAL, la nomenclatura
-  // y las secciones de aislamiento (CH/CL/CT…) — son contexto de ESTA prueba (ADR-049).
+  // SEGMENTO "Factor de Potencia / Tan δ — devanados" (espejo del de excitación,
+  // ADR-048): unifica en UNA tarjeta el conjunto completo en el orden actual →
+  // (1) gráficas (tan δ por sección / tendencia / tip-up + nomenclatura ADR-049,
+  // `montarPanelTand`) + (2) tablas (acordeón con detalle y evaluación por informe,
+  // valores fuera de criterio en rojo, `montarPanelPrueba('tand')`) + botón JSON de
+  // referencia (`docs/pruebas/01-factor-potencia-aislamiento.json`). Tan δ NO va en
+  // "Valores por prueba" (no se duplica). NO toca scorecard/motor.
   if (tandItems.length) {
-    const sec = document.createElement('section'); sec.className = 'pe-tand-seccion'; sec.style.margin = '0 0 18px';
-    sec.appendChild(Object.assign(document.createElement('h3'), { textContent: 'Factor de Potencia / Tan δ — devanados', style: 'margin:0 0 8px' }));
-    const host = document.createElement('div'); sec.appendChild(host);
-    cont.appendChild(sec);
-    montarPanelTand(host, tandItems);
+    const seg = document.createElement('section'); seg.className = 'pe-seg'; seg.id = 'seg-tand';
+    const head = document.createElement('div'); head.className = 'pe-seg-head';
+    head.innerHTML = '<span class="pe-seg-ico">tanδ</span><div><div class="pe-seg-tl">Factor de Potencia / Tan δ — devanados</div>'
+      + '<div class="pe-seg-sub">aislamiento por sección · NETA 100.3 ≤ 0.5% / IEEE 62 ≤ 1%</div></div>';
+    const acts = document.createElement('div'); acts.className = 'pe-seg-actions';
+    const btnJson = document.createElement('button'); btnJson.type = 'button'; btnJson.className = 'pe-seg-json';
+    btnJson.textContent = '⬇ JSON de esta prueba';
+    btnJson.addEventListener('click', () => descargarFichaPrueba('01-factor-potencia-aislamiento', 'factor-potencia-aislamiento'));
+    acts.appendChild(btnJson); head.appendChild(acts); seg.appendChild(head);
+    const body = document.createElement('div'); body.className = 'pe-seg-body';
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'pe-seg-subh', textContent: 'Gráficas — tan δ por sección / tendencia / tip-up' }));
+    const hostG = document.createElement('div'); body.appendChild(hostG);
+    montarPanelTand(hostG, tandItems);
     // Nomenclatura + secciones de aislamiento DEBAJO de las gráficas pero ANTES del
-    // bloque "Análisis conforme a norma" (`.pe-analisis-box`), dentro del panel tan δ
-    // (ADR-049, posición a pedido del director).
+    // bloque "Análisis conforme a norma" (`.pe-analisis-box`) del panel tan δ (ADR-049).
     if (nomNode) {
-      const analisis = host.querySelector('.pe-analisis-box');
-      if (analisis) host.insertBefore(nomNode, analisis); else sec.appendChild(nomNode);
+      const analisis = hostG.querySelector('.pe-analisis-box');
+      if (analisis) hostG.insertBefore(nomNode, analisis); else hostG.appendChild(nomNode);
     }
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'pe-seg-divider' }));
+    body.appendChild(Object.assign(document.createElement('div'), { className: 'pe-seg-subh', textContent: 'Tablas + diagnóstico conforme a norma' }));
+    const hostT = document.createElement('div'); body.appendChild(hostT);
+    seg.appendChild(body); cont.appendChild(seg);
+    montarPanelPrueba(hostT, 'tand', panelInformes);
+    // `montarPanelPrueba` rotula con su propio <h2>; dentro del segmento eso duplica el
+    // título → se retira (el encabezado + el subtítulo "Tablas…" ya lo nombran).
+    const h2t = hostT.querySelector('h2'); if (h2t) h2t.remove();
   }
   // SEGMENTO "Corriente de excitación" (ADR-048): unifica EN UNA tarjeta su
   // conjunto completo en el orden actual → (1) gráficas (barras+curvas por nivel,
