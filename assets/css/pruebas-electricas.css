@@ -581,6 +581,8 @@ table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:42
 .pe-tabla .d-ok{color:#15803d;}
 .pe-tabla .d-warn{color:#b45309;}
 .pe-tabla .d-bad{color:#b91c1c;font-weight:700;}
+/* Investigar (tan δ > guía NETA 0.5%, dentro del límite IEEE 1%): rojo sin negrita. */
+.pe-tabla .d-inv{color:#dc2626;font-weight:600;}
 .pe-tabla-badge{font-size:10.5px;padding:2px 8px;border-radius:6px;font-weight:600;font-family:var(--pe-mono,monospace);}
 .pe-tabla-badge.is-ok{background:#f0fdf4;color:#15803d;}
 .pe-tabla-badge.is-warn{background:#fffbeb;color:#b45309;}
@@ -607,6 +609,10 @@ table.pe-tabla{width:100%;border-collapse:collapse;font-size:12.5px;min-width:42
 .pe-fus-chip{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;border:1px solid transparent;font-family:var(--pe-mono,monospace);white-space:nowrap;}
 .pe-fus-chip.is-ok{border-color:#bbf7d0;color:#15803d;background:#f0fdf4;}
 .pe-fus-chip.is-bad{border-color:#fecaca;color:#b91c1c;background:#fef2f2;}
+/* Investigar / vigilar (la norma no rechaza pero pide revisión) — ámbar, NO rojo. */
+.pe-fus-chip.is-warn{border-color:#fed7aa;color:#b45309;background:#fff7ed;}
+/* Óptica informativa (cualitativa / sin dato tabulado) — gris neutro. */
+.pe-fus-chip.is-na{border-color:#e2e8f0;color:#64748b;background:#f8fafc;}
 .pe-fus .pe-tabla-scroll{margin:0 14px 14px;}
 .pe-fus .pe-tabla{min-width:440px;font-size:11.5px;}
 .pe-fus .pe-tabla th,.pe-fus .pe-tabla td{padding:6px 8px;}

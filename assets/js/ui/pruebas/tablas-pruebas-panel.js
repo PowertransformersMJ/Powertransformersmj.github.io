@@ -71,6 +71,20 @@ const estadoDesb = (d, lim) => (d == null ? 'na' : Math.abs(d) <= lim ? 'ok' : M
 const estadoMax = (v, guia, lim) => (v == null ? 'na' : v <= guia ? 'ok' : v <= lim ? 'warn' : 'bad');
 const estadoMin = (v, mn) => (v == null ? 'na' : v >= mn ? 'ok' : v >= mn * 0.5 ? 'warn' : 'bad');
 
+// Color de celda en las tablas de DETALLE: cataloga en ROJO el VALOR de tan δ que,
+// según la norma, NO cumple (d-bad, > límite IEEE 1% — rojo negrita) o que recomienda
+// INVESTIGAR (d-inv, > guía NETA 0.5% — rojo). Pedido del director. Acotado a 'tand'
+// (módulo FP) y SOLO a la columna del propio tan δ (no Cap/Tensión/Desv). Devuelve el
+// atributo `class` listo para interpolar (o '' si el valor está dentro de norma).
+function claseCeldaTand(familia, header, v) {
+  if (familia !== 'tand' || typeof v !== 'number') return '';
+  if (!/^(tan\s*δ|valor)/i.test(String(header))) return '';
+  const crit = CRIT[familia];
+  if (crit.limite != null && v > crit.limite) return ' class="d-bad" title="No cumple — supera el límite IEEE 62/C57.152 (≤1%)"';
+  if (crit.guia != null && v > crit.guia) return ' class="d-inv" title="Investigar — supera la guía NETA 100.3 (≤0.5%)"';
+  return '';
+}
+
 // Etiqueta de discriminación (nivel de tensión / devanado / configuración) a
 // partir del título del bloque. Cae al título limpio si no reconoce el patrón.
 export function grupoDe(familia, titulo, config) {
@@ -129,16 +143,32 @@ const badgeEstado = (e) => {
   b.textContent = EST_TXT[e] || e;
   return b;
 };
-const chipNorma = (acron, ok) => {
+// Chip de veredicto POR NORMA según el nivel del semáforo (ESTADOS):
+//   0 VERDE → ✓ cumple (is-ok) · 1-2 ÁMBAR/NARANJA → ⚠ investigar/vigilar (is-warn,
+//   NO "no cumple") · ≥3 ROJO → ✕ fuera de norma (is-bad) · <0 informativa (is-na).
+const chipNorma = (acron, nivel) => {
   const c = document.createElement('span');
-  c.className = 'pe-fus-chip is-' + (ok ? 'ok' : 'bad');
-  c.textContent = (ok ? '✓ ' : '✕ ') + acron;
+  const cls = nivel === 0 ? 'is-ok' : nivel >= 3 ? 'is-bad' : nivel < 0 ? 'is-na' : 'is-warn';
+  const sym = nivel === 0 ? '✓' : nivel >= 3 ? '✕' : nivel < 0 ? '·' : '⚠';
+  const txt = nivel === 0 ? 'cumple' : nivel >= 3 ? 'no cumple (fuera de norma)' : nivel < 0 ? 'sin dato / cualitativa' : 'investigar / vigilar';
+  c.className = 'pe-fus-chip ' + cls;
+  c.textContent = sym + ' ' + acron;
+  c.title = acron + ' — ' + txt;
   return c;
 };
-const chipsCriterio = (familia, estado) => {
+const nivelDeEstadoStr = (e) => (e === 'ok' ? 0 : e === 'bad' ? 3 : e === 'na' ? -1 : 2);
+// Veredicto por norma del MISMO motor multi-norma que el diagnóstico de abajo
+// (L-36/L-37: cada prueba se evalúa contra CADA norma; NUNCA un estado único para
+// todas). Antes los chips usaban el consolidado para ambas → marcaban ✕ IEEE en un
+// tan δ de 0.51% que SÍ cumple IEEE (≤1%). Si una óptica es informativa (sin
+// veredicto numérico), cae al estado consolidado de la fila.
+const chipsCriterio = (familia, fila) => {
   const w = document.createElement('div'); w.className = 'pe-fus-chips';
-  const ok = estado === 'ok';
-  (NORMA[familia].chips || ['NETA']).forEach((a) => w.appendChild(chipNorma(a, ok)));
+  const ev = evaluarMultiNorma(familia, metricaFila(familia, fila));
+  (NORMA[familia].chips || ['NETA']).forEach((acron) => {
+    const op = ev && ev.opticas && ev.opticas.find((o) => selloDe(o.norma).acron === acron && o.estado && o.estado.nivel >= 0);
+    w.appendChild(chipNorma(acron, op ? op.estado.nivel : nivelDeEstadoStr(fila.estado)));
+  });
   return w;
 };
 const tile = (v, u, l, cls) =>
@@ -400,7 +430,7 @@ function cardResumen(familia, grupo, entradas) {
       headCols.forEach((l) => { cells += `<td>${fmt(byLabel.has(l) ? byLabel.get(l) : null)}</td>`; });
     }
     tr.innerHTML = cells;
-    const td = document.createElement('td'); td.appendChild(chipsCriterio(familia, f.estado)); tr.appendChild(td);
+    const td = document.createElement('td'); td.appendChild(chipsCriterio(familia, f)); tr.appendChild(td);
     tb.appendChild(tr);
   });
   tbl.appendChild(tb); scroll.appendChild(tbl); card.appendChild(scroll);
@@ -440,7 +470,7 @@ function cabeceraCard(familia, grupo, filas) {
 }
 
 // Tabla COMPLETA por fases (todas las posiciones de TAP) vía `derivarTablaTAP`.
-function tablaDetalleFases(bloque) {
+function tablaDetalleFases(bloque, familia) {
   const t = derivarTablaTAP(bloque);
   const scroll = document.createElement('div'); scroll.className = 'pe-tabla-scroll';
   const tbl = document.createElement('table'); tbl.className = 'pe-tabla';
@@ -448,14 +478,14 @@ function tablaDetalleFases(bloque) {
   const tb = document.createElement('tbody');
   t.filas.forEach((f) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = f.map((v) => `<td>${v === '' || v == null ? '—' : (typeof v === 'number' ? round(v, 3) : esc(v))}</td>`).join('');
+    tr.innerHTML = f.map((v, i) => `<td${claseCeldaTand(familia, t.columnas[i], v)}>${v === '' || v == null ? '—' : (typeof v === 'number' ? round(v, 3) : esc(v))}</td>`).join('');
     tb.appendChild(tr);
   });
   tbl.appendChild(tb); scroll.appendChild(tbl); return scroll;
 }
 
 // Tabla COMPLETA por ítems (todas las mediciones: config/buje + valor + extras).
-function tablaDetalleItems(bloque, a) {
+function tablaDetalleItems(bloque, a, familia) {
   const extraKeys = [];
   a.items.forEach((it) => it.extra && Object.keys(it.extra).forEach((k) => { if (!extraKeys.includes(k)) extraKeys.push(k); }));
   const columnas = [bloque.eje_x || 'Punto', `Valor${bloque.unidad ? ' (' + bloque.unidad + ')' : ''}`, ...extraKeys];
@@ -469,7 +499,7 @@ function tablaDetalleItems(bloque, a) {
   const tb = document.createElement('tbody');
   limpia.filas.forEach((f) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = f.map((v) => `<td>${v == null || v === '' ? '—' : (typeof v === 'number' ? round(v, 3) : esc(v))}</td>`).join('');
+    tr.innerHTML = f.map((v, i) => `<td${claseCeldaTand(familia, limpia.columnas[i], v)}>${v == null || v === '' ? '—' : (typeof v === 'number' ? round(v, 3) : esc(v))}</td>`).join('');
     tb.appendChild(tr);
   });
   tbl.appendChild(tb); scroll.appendChild(tbl); return scroll;
@@ -485,7 +515,7 @@ function cardDetalle(familia, grupo, entradas) {
       cap.textContent = e.inf.label + (e.inf.config ? ' · ' + e.inf.config : '');
       card.appendChild(cap);
     }
-    card.appendChild(e.a.mode === 'fases' ? tablaDetalleFases(e.bloque) : tablaDetalleItems(e.bloque, e.a));
+    card.appendChild(e.a.mode === 'fases' ? tablaDetalleFases(e.bloque, familia) : tablaDetalleItems(e.bloque, e.a, familia));
   });
   card.appendChild(bloqueDiagnostico(familia, filas));
   return card;
@@ -534,6 +564,27 @@ export function montarPanelPrueba(cont, familia, informes) {
       try {
         const sel = st.year === 'all' ? entradas : entradas.filter((e) => e.inf.ano === st.year);
         const card = st.year === 'all' ? cardResumen(familia, nivel, sel) : cardDetalle(familia, nivel, sel);
+        // Tan δ — "Todos los años": además del resumen rango mín–máx, el DETALLE
+        // COMPLETO de cada medición (toda sección, toda columna del informe, sin
+        // comprimir ni dejar huecos) — pedido del director. Cada informe trae su
+        // propia tabla self-consistente (no se fusionan secciones/unidades entre
+        // informes → así no aparecen '—'). Se inserta ANTES del diagnóstico.
+        if (familia === 'tand' && st.year === 'all') {
+          const det = document.createElement('div');
+          det.appendChild(Object.assign(document.createElement('div'), { className: 'pe-vp-toolbar-lbl', textContent: 'Detalle y evaluación por informe (todas las secciones)', style: 'margin:14px 0 2px' }));
+          sel.forEach((e) => {
+            const capn = document.createElement('div');
+            capn.style.cssText = 'font-size:12px;font-weight:700;color:#334155;margin:12px 0 4px';
+            capn.textContent = e.inf.label + (e.inf.config ? ' · ' + e.inf.config : '');
+            det.appendChild(capn);
+            det.appendChild(e.a.mode === 'fases' ? tablaDetalleFases(e.bloque, familia) : tablaDetalleItems(e.bloque, e.a, familia));
+            // Evaluación conforme a norma de ESE informe/año (veredicto multi-norma
+            // del propio ensayo) — pedido del director: una evaluación por cada año.
+            det.appendChild(bloqueDiagnostico(familia, [filaDe(familia, e.inf, e.a, e.bloque)]));
+          });
+          const diag = card.querySelector('.pe-vp-diag');
+          if (diag) card.insertBefore(det, diag); else card.appendChild(det);
+        }
         const band = card.querySelector('.pe-fus-band'); if (band) band.remove(); // la banda ya es el encabezado del acordeón
         const wrap = document.createElement('div'); wrap.className = 'pe-fus'; wrap.appendChild(card);
         content.appendChild(wrap);

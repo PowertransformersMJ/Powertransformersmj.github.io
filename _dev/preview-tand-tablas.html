@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Tan δ / FP — SEGMENTO unificado (gráficas + TABLAS como excitación)</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/pruebas-electricas.css">
+<style>
+  body { padding: 24px; background: #eef2f6; font-family: system-ui, sans-serif; color:#0f172a; }
+  .nota { max-width: 96ch; font-size: 13px; color:#475569; line-height:1.55; background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; margin-bottom:22px; }
+  .nota b { color:#0f172a; } .nota code { background:#f1f5f9; padding:1px 5px; border-radius:4px; font-size:12px; }
+</style>
+</head>
+<body>
+<h1>DEV · Factor de Potencia / Tan δ — SEGMENTO unificado</h1>
+<div class="nota">
+  <b>Tablas idénticas a corriente de excitación.</b> Las tablas las renderiza el MISMO componente de
+  producción que usa excitación: <code>montarPanelPrueba(host, 'tand', informes)</code>
+  (<code>tablas-pruebas-panel.js</code>) — acordeón por nivel + tabs de año ("Todos los años" = resumen
+  rango mín–máx; un año = tabla completa) + <b>Diagnóstico conforme a norma</b> (sellos NETA/IEEE +
+  veredicto multi-norma) + análisis/recomendación. Arriba, las gráficas del panel tan δ
+  (<code>tand-panel.js</code>), <b>intactas</b>. El botón <b>⬇ JSON</b> descarga la ficha de la prueba.
+</div>
+
+<div class="pe-scope">
+  <section class="pe-seg" id="seg-tand">
+    <div class="pe-seg-head">
+      <span class="pe-seg-ico">tanδ</span>
+      <div><div class="pe-seg-tl">Factor de Potencia / Tan δ — devanados</div><div class="pe-seg-sub">aislamiento por sección · NETA 100.3 ≤0.5% / IEEE 62 ≤1% · por devanado</div></div>
+      <div class="pe-seg-actions"><button type="button" class="pe-seg-json" id="btn-json">⬇ JSON de esta prueba</button></div>
+    </div>
+    <div class="pe-seg-body">
+      <div class="pe-seg-subh">Gráficas — tan δ por sección / tendencia / tip-up</div>
+      <div id="tand-graf"></div>
+      <div class="pe-seg-divider"></div>
+      <div class="pe-seg-subh">Tablas + diagnóstico conforme a norma</div>
+      <div id="tand-tablas"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+import { montarPanelTand } from '../assets/js/ui/pruebas/tand-panel.js';
+import { montarPanelPrueba } from '../assets/js/ui/pruebas/tablas-pruebas-panel.js';
+import { etiquetaFecha, configInforme, ordenInforme, familiaMA } from '../assets/js/domain/pruebas_electricas_bloques.js';
+
+const FIXTURES = [
+  './fixtures/450108-2021-11-03.json','./fixtures/450108-2022-01-18.json','./fixtures/450108-2022-01-18-sfra.json',
+  './fixtures/450108-2022-05-02.json','./fixtures/450108-2023-11-09.json','./fixtures/450108-2024-01-19.json',
+  './fixtures/450108-2024-01-19-delta.json','./fixtures/450108-2024-01-19-sfra-estrella.json','./fixtures/450108-2024-01-19-sfra-delta.json'
+];
+const esTand = (b) => { const f = familiaMA(b); return !!f && f.key === 'tand'; };
+
+(async () => {
+  const docs = [];
+  for (const url of FIXTURES) { try { docs.push(await (await fetch(url + '?v=' + Date.now())).json()); } catch (e) { console.error(e); } }
+  const panelInformes = docs.map((inf) => ({ id: inf.id, ano: inf.ano, label: etiquetaFecha(inf.fecha, inf.ano), config: configInforme(inf), bloques: inf.bloques || [] }));
+
+  // (1) GRÁFICAS — panel tan δ existente (un item por informe con bloque tand).
+  const items = panelInformes.map((inf) => {
+    const t = (inf.bloques || []).find(esTand);
+    return t ? { id: inf.id, label: inf.label, ano: inf.ano, config: inf.config, bloque: t } : null;
+  }).filter(Boolean);
+  items.sort((a, b) => ordenInforme(a.label, a.ano) - ordenInforme(b.label, b.ano));
+  montarPanelTand(document.getElementById('tand-graf'), items);
+
+  // (2) TABLAS — MISMO componente y MISMO trato que excitación (shell): se le quita el h2.
+  const hostT = document.getElementById('tand-tablas');
+  montarPanelPrueba(hostT, 'tand', panelInformes);
+  const h2t = hostT.querySelector('h2'); if (h2t) h2t.remove();
+
+  document.getElementById('btn-json').addEventListener('click', async () => {
+    try {
+      const j = await (await fetch('../docs/pruebas/01-factor-potencia-aislamiento.json')).json();
+      const blob = new Blob([JSON.stringify(j, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+      a.download = 'factor-potencia-aislamiento.json'; a.click(); URL.revokeObjectURL(a.href);
+    } catch (e) { alert('No se pudo leer el JSON: ' + e.message); }
+  });
+  console.log('[preview-tand-tablas] informes:', docs.length, '· con tan δ:', items.length);
+  window.__ready = true;
+})();
+</script>
+</body>
+</html>
