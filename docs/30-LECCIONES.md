@@ -30,6 +30,7 @@
 
 ### L-01 · El push lo hace el director (el runtime da 403)
 Los canales de push del runtime (`git push` vía proxy, `mcp__github__*`) dan **403** en este repo. **Flujo vigente (ADR-005)**: Claude commitea + deploya; **el director hace los `git push`** (GitHub Desktop o su terminal con sus credenciales). Claude NUNCA force-push a `main`. Si alguna vez se necesitara push desde el runtime, el único canal que funcionaría es `git push https://USER:TOKEN@github.com/USER/REPO.git BRANCH:BRANCH` con PAT clásico del dueño inline (el `local_proxy` resetea el remote → pasar la URL con token en CADA push). **Jamás** escribir el token a archivo/commit/PR/log; redactar con `sed 's|ghp_[A-Za-z0-9]*|ghp_****|g'`. (Full: `_legacy §0.1`.)
+> ⚠️ **OBSERVACIÓN 2026-06-23 (ADR-050)**: el `git push origin DESARROLLO-/-PROYECTO-MJ` del runtime **funcionó** (exit 0, SHA en origin, sin 403). El remoto reportó *"This repository moved"* (de `Powertransformersmj` a `powertransformersmj`) → la redirección/refresh de auth probablemente habilitó el push. **NO se reescribe la doctrina** (ADR-005 es gobernanza; un solo dato + causa probable transitoria). Si se confirma que es ESTABLE → decisión del director → ADR + actualizar esta lección. Hasta entonces: el director sigue siendo el dueño del push; Claude solo pushea con pedido explícito.
 
 ### L-02 · `main` solo con pedido explícito
 No tocar `main` salvo orden directa del director.
