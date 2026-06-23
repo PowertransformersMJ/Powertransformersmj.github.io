@@ -12,16 +12,24 @@
 
 ---
 
-## 🎯 Foco actual — HANDOFF (cierre 2026-06-16 · ctx 506k → relevo a sesión nueva)
+## 🎯 Foco actual — HANDOFF (cierre 2026-06-23 · relevo a sesión nueva)
 
 > **🎯 FOCO DE TRABAJO ACTUAL (pedido explícito del director): EXCLUSIVAMENTE el segmento "Factor de Potencia / Tan δ — devanados".**
-> ⛔ NO tocar otras pruebas. ⛔ NO anticipar la reorg de las demás (relación/resistencia/aislamiento/bujes/collar) — SOLO cuando el director lo pida, **una por una**, modo **paso a paso, no generalizar** (puede afectar el desempeño). Workflow obligado: **preview FIEL** (módulo real + `.pe-scope` + composición del shell, L-56) **ANTES de tocar producción**; Claude commitea, el director pushea/mergea.
+> ⛔ NO tocar otras pruebas. ⛔ NO anticipar la reorg de las demás (relación/resistencia/aislamiento/bujes/collar) — SOLO cuando el director lo pida, **una por una**, modo **paso a paso, no generalizar** (puede afectar el desempeño). Workflow obligado: **preview FIEL** (módulo real + `.pe-scope` + composición del shell, L-56) **ANTES de tocar producción**; Claude commitea (push: ver nota ⬇).
 >
-> **Próximos pasos sugeridos para FP/tan δ (el director elige, NO adelantarse):** (1) convertirlo en **segmento `.pe-seg` propio** como excitación (encabezado + botón "⬇ JSON de esta prueba" → `docs/pruebas/01-factor-potencia-aislamiento.json` ó la ficha tan δ; ver patrón ADR-048); (2) ajustar contenido/orden interno; (3) confirmar **umbrales** `TIPUP 0.1`/`PEND 0.05` (⚠️ por validar). Detalle del panel tan δ → `99 §29..§40` + lobe 49.
+> **✅ ÚLTIMO HECHO (ADR-050, `99 §50`): el segmento FP/tan δ YA ES `.pe-seg` unificado** (gráficas `montarPanelTand` + tablas `montarPanelPrueba('tand')` + botón JSON), espejo de excitación. + detalle/evaluación POR INFORME (0 huecos) + valores fuera de criterio en ROJO (`d-bad`/`d-inv`) + fix chips multi-norma (`chipsCriterio` por norma). Commit `9cac027` **PUSHEADO a `origin/DESARROLLO-/-PROYECTO-MJ`** (verificado `git fetch` 2026-06-23: SHA local == origin).
 >
-> **Arco excitación + reorg por prueba — TODO EN PRODUCCIÓN (ADR-046→049, mergeado; `git fetch` 2026-06-16 `99bfa74`∈`origin/main`):**
-> ADR-046 (excitación: por nivel barras→curvas, retira tablas repetidas) · ADR-047 (fix bug acordeón modo-mixto 'fases/items' → solo se veía AT·110; L-55 p2; **REPRODUCIR el caso sucio, los fixtures limpios engañan** L-56) · ADR-048 (**"Corriente de excitación" = SEGMENTO `.pe-seg`** unificado gráficas+tablas+botón JSON; fuera de `PRUEBAS_VP`; patrón replicable a las demás pruebas) · ADR-049 (nomenclatura+secciones de aislamiento DENTRO del panel tan δ, entre gráficas y "Análisis conforme a norma"; `insertBefore`+rescate del nodo antes del `innerHTML=''`).
-> ⚠️ **Código muerto pendiente de poda** en `excitacion-panel.js` (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`) → hay chip de tarea spawneado. 🔲 Validar ADR-046→049 en la APP real. 🔲 Falta validar en la APP real.
+> **🔲 PENDIENTES de FP/tan δ (próxima sesión):**
+> 1. **Abrir el PR** → `https://github.com/PowertransformersMJ/powertransformersmj.github.io/compare/main...DESARROLLO-%2F-PROYECTO-MJ?expand=1` (gh NO instalado en la Mac → no se puede `gh pr create`; el director lo abre con la URL, o `brew install gh` y lo crea Claude). Luego **merge a `main`** + **validar en la APP real** (tras Firebase Auth; el preview fiel `_dev/preview-tand-tablas.html` es lo más cercano).
+> 2. **Decisión abierta (no bloqueante)**: ¿1 acordeón único (actual) o **split por devanado** AT/MT/Terciario (como excitación splittea por nivel)? Si split → tocar `grupoDe('tand',…)` en `tablas-pruebas-panel.js` (hoy devuelve el título limpio → 1 grupo).
+> 3. Confirmar umbrales `TIPUP 0.1`/`PEND 0.05` + guía NETA 0.5% (⚠️ por validar con el director, TODO-08).
+>
+> **🚫 Callejones sin salida (NO reintentar):** recrear un panel tabular dentro de `tand-panel.js` para imitar excitación → el director lo rechazó ("no se aprecia como excitación"); las tablas las da `montarPanelPrueba`, NO el panel de gráficas (L-57). · Pintar "no cumple" con un estado consolidado para todas las normas (L-58: chip POR norma).
+>
+> **⚙️ Nota PUSH (contradice L-01):** 2026-06-23 el `git push` del runtime **funcionó** (exit 0, SHA en origin); el remoto reportó *"repository moved"* → posible refresh de auth. NO se reescribió ADR-005/L-01 (gobernanza, requiere decisión del director). Si el director confirma que ahora Claude puede pushear → ADR + actualizar L-01.
+>
+> **Arco excitación + reorg por prueba — EN PRODUCCIÓN (ADR-046→049, `git fetch` 2026-06-16 `99bfa74`∈`origin/main`):** ADR-046 (excitación por nivel barras→curvas) · ADR-047 (fix modo-mixto; **REPRODUCIR el caso sucio** L-56) · ADR-048 (excitación = SEGMENTO `.pe-seg`; patrón replicado a tan δ en ADR-050) · ADR-049 (nomenclatura dentro del panel tan δ).
+> ⚠️ **Código muerto pendiente de poda** en `excitacion-panel.js` (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`) → hay chip de tarea spawneado. 🔲 Validar ADR-046→050 en la APP real.
 
 ---
 
@@ -84,22 +92,10 @@
 
 ## 📝 Bitácora (efímera)
 
-- **2026-06-17** — **ADR-050 COMMITEADO (FALTA PUSH del director)** → `99 §50` + `00 §50` + **L-57** (hazlo-como-X:
-  reusa el componente, no recrees) + **L-58** (chips multi-norma por norma, no estado único). Tan δ / FP = SEGMENTO
-  unificado espejo de excitación: el shell monta `montarPanelTand` + **`montarPanelPrueba('tand')`** + botón JSON.
-  "Todos los años" añade **detalle + evaluación POR INFORME** (todas las secciones, 0 huecos = tablas self-consistent) +
-  **valores fuera de criterio en ROJO** (`claseCeldaTand`: `d-bad` >1% IEEE / `d-inv` >0.5% NETA) + **fix chips
-  multi-norma** (`chipsCriterio` evalúa por norma — antes ✕ IEEE en 0.51% que cumple). Preview FIEL
-  `_dev/preview-tand-tablas.html`; 1185/1185; 0 errores. 🔲 **Pendiente: push del director + validar en la APP real.**
-  🔲 Decisión abierta (no bloqueante): ¿1 acordeón único (actual) o split por devanado AT/MT/Terciario?
-  ⚠️ Sin tests unitarios nuevos para el branch tand (helpers reusados sí cubiertos); umbrales `TIPUP/PEND`/guía NETA 0.5% siguen `⚠️ verificar` (TODO-08).
-- **2026-06-12** — **ADR-046 + ADR-047 (excitación) commiteados, FALTA PUSH+PR.** ADR-046: orden por nivel (barras→curvas) +
-  retira tablas repetidas del panel de gráficas (FUSIÓN + Magnitud) → tabla única en el acordeón. ADR-047: **fix de bug de
-  producción** — el acordeón mostraba solo AT·110 por un nivel modo-mixto que reventaba `cardResumen` (L-55 p2); **reproducido
-  en navegador** + fix layout por-fila + try/catch por nivel. Lecciones **L-56** (preview fiel) y refuerzo **L-55**.
-  Commits `6148710` (ADR-046), `cfe7958`+ (cerebro), `f472c8e` (ADR-047). 1185/1185. 🔲 Validar en la APP real.
-- **2026-06-10** — Panel "Valores por prueba" (ADR-044/045 → `99 §44-45`) + arco excitación (ADR-041→043) y tan δ (ADR-029→040)
-  **EN PRODUCCIÓN**. Lecciones clave: **L-55** (reusar dominio · criterio por tipo · 10kV≠110kV) · L-53/L-54 · L-51/L-52.
+- **2026-06-23** — **ADR-050 PUSHEADO** (`9cac027` en `origin/DESARROLLO`; `git fetch` SHA local==origin). 🔲 PR pendiente de abrir (gh no instalado → URL compare en el Foco) + merge a `main` + validar APP. ⚙️ El push del runtime funcionó (contradice L-01 → ver L-01 nota + Foco).
+- **2026-06-17** — **ADR-050 COMMITEADO** (`9cac027`) → `99 §50` + `00 §50` + **L-57** (hazlo-como-X: reusa el componente) + **L-58** (chips por norma). Detalle completo en `99 §50` y en el Foco arriba. 1185/1185; preview FIEL `_dev/preview-tand-tablas.html`.
+- **2026-06-12** — ADR-046/047 (excitación: orden por nivel + fix modo-mixto acordeón) → `99 §46-47`. Lecciones **L-56** (preview fiel) + L-55. 1185/1185.
+- **2026-06-10** — Panel "Valores por prueba" (ADR-044/045) + arcos excitación (ADR-041→043) y tan δ (ADR-029→040) **EN PRODUCCIÓN** → `99 §29..§45`. Lecciones L-51..L-55.
 - **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
   [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
   + validación de arquitectura (TODO-10).
