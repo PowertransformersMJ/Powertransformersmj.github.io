@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/brain-check.mjs",
+            "timeout": 30,
+            "statusMessage": "Auto-auditoria del cerebro (brain:check)…"
+          }
+        ]
+      }
+    ]
+  }
+}

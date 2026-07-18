@@ -1,0 +1,39 @@
+{
+  "brainTemplateVersion": "1.1.0",
+  "repo": "sgm-transpower",
+  "_comment": "Config INSTANCE del cerebro (topes/budgets). El linter scripts/brain-check.mjs es KERNEL (no editarlo); estos budgets son por-repo. chars = unidad real de contexto. NO auto-cargado: solo lo lee el linter.",
+  "bootCharsTarget": 31500,
+  "alwaysOn": [
+    "CLAUDE.md",
+    "docs/05-ESTADO-GLOBAL.md",
+    "docs/10-MEMORIA-CORTO-PLAZO.md"
+  ],
+  "caps": {
+    "CLAUDE.md": { "lines": 320, "chars": 25000 },
+    "docs/05-ESTADO-GLOBAL.md": { "lines": 25, "chars": 4000 },
+    "docs/10-MEMORIA-CORTO-PLAZO.md": { "lines": 110, "chars": 16000 },
+    "docs/20-MEMORIA-ESPACIAL.md": { "lines": 280, "chars": 16000 },
+    "docs/30-LECCIONES.md": { "lines": 350, "chars": 40000 },
+    "docs/00-INDICE.md": { "lines": 450, "chars": 16000 }
+  },
+  "archiveDir": "../brain-private/sgm-transpower/research-archive",
+  "specsDir": "specs",
+  "staleDays": 10,
+  "kernelFiles": [
+    "scripts/brain-check.mjs",
+    "scripts/brain-diff.mjs",
+    "scripts/brain-index.mjs"
+  ],
+  "orphanAllowlist": [".handoff-auto.md"],
+  "_orphanAllowlistRazon": "handoff-auto: foto de sesion escrita por HOOK (session-handoff.mjs), gitignored, efimera; su ruta de lectura es el hook SessionStart --boot-echo, no el grafo de neuronas",
+  "peers": [],
+  "ssotFacts": [],
+  "_ssotFactsEjemplo": "Cuando tengas un hecho critico que vive en UN solo nodo (ej. version de cache), declaralo: [{\"regex\": \"mi-cache-v\\\\d+\", \"owner\": \"docs/05-ESTADO-GLOBAL.md\", \"scan\": [\"docs/10-MEMORIA-CORTO-PLAZO.md\"]}]",
+  "deepAudit": {
+    "last": "2026-07-18",
+    "coveredHeaderCount": 0,
+    "maxAdrGap": 12,
+    "maxDays": 30,
+    "_que": "Auditoria Nivel-2 del cerebro (skill auditoria-cerebro): correrla cuando el linter lo pida (gate #14). La primera cobertura real de headers la fija la Fase 9."
+  }
+}

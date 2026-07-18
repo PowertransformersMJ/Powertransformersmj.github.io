@@ -1,247 +1,69 @@
-# 🛠️ Inventario de Skills (catálogo del repo `skills/`)
+# 🛠️ skills-inventory — Catálogo de skills y agents
 
-> **Hoja de detalle** (no neurona) enlazada desde `40-LOBULOS-DOMINIO.md §Recursos
-> Externos`. Catálogo completo de las skills que viven en `skills/` del repo, para
-> consultar al disparar **Trigger 🔵 §G.2** ("¿qué skill tengo para X?"). On-demand:
-> NO se auto-carga. Mantener al añadir/quitar/renombrar una skill (Reflejo de Frescura `CLAUDE.md §G.4`).
+> Hoja de detalle referenciada desde `CLAUDE.md §0`. Regenerable: `node <scratchpad>/gen-skills-inventory.mjs`
+> (generado 2026-07-18, instalación brain-kit v1.0 — ADR-051). El linter #6 exige que TODA carpeta
+> de `skills/` del repo aparezca aquí. Skill nueva instalada → fila aquí en el MISMO cambio (§G.4).
 
----
+## 1 · Skills de MÉTODO del brain-kit (viven en `~/.claude/skills/` — nivel usuario, portables)
 
-## ⚠️ Verdad del wiring (leer primero — corrige un supuesto común)
+| Skill | Qué hace |
+|---|---|
+| `accessibility-audit` | >- |
+| `ad-creative` | When the user wants to generate, iterate, or scale ad creative — headlines, descriptions, primary text, or full ad variations — for any paid advertis… |
+| `anti-codigo-muerto` | Usar SIEMPRE al estrenar/fix/mejorar código que REEMPLAZA algo viejo — antes de cerrar el cambio. Evita el síndrome Knight Capital (el "8º servidor":… |
+| `arquitecto-software` | Piensa como ARQUITECTO DE SOFTWARE ANTES de escribir o corregir código en webs y apps. Aplica en CUALQUIER trabajo de código no trivial: implementar… |
+| `asesor-critico-honesto` | Activar cuando el usuario pide feedback, evalúa una idea, comparte un plan/estrategia/contenido/diseño, o pregunta "¿qué te parece?", "¿está bien?",… |
+| `auditoria-cerebro` | Auditoría profunda Nivel-2 del cerebro documental del proyecto activo — lo que el linter estructural NO puede medir (fidelidad, frescura, función). S… |
+| `auditoria-financiera` | Usar cuando haya que AUDITAR flujos de dinero de un sistema (POS/caja, pagos online, stock con valor, arqueos, saldos, reembolsos) buscando fugas, du… |
+| `caza-bugs` | Usar al TOCAR o ROZAR un subsistema con estado observable (render, listener/onSnapshot, CRUD, flujo de pasos) — editarlo, refactorizarlo con cambio d… |
+| `claude-automation-recommender` | Analyze a codebase and recommend Claude Code automations (hooks, subagents, skills, plugins, MCP servers). Use when user asks for automation recommen… |
+| `claude-md-improver` | Audit and improve CLAUDE.md files in repositories. Use when user asks to check, audit, update, improve, or fix CLAUDE.md files. Scans for all CLAUDE.… |
+| `cms-dinamico` | Usar al construir o EXTENDER un CMS donde el contenido de la web pública se administra desde un panel — migrar contenido HARDCODED a una base de dato… |
+| `comite-expertos` | Monta un comité de expertos que MEJORA ×3 la última respuesta de Claude. Infiere SOLO qué expertos convienen según el tema (no son fijos), los hace c… |
+| `crm-architect` | >- |
+| `ga4-lead-tracking` | Medir lo que importa en un negocio offline/bajo-consulta (joya, carro, inmueble) con GA4 — el LEAD, no `purchase` — con Consent Mode v2 (Ley 1581 Col… |
+| `image` | When the user wants to create, generate, edit, or optimize images for marketing — blog heroes, social graphics, product mockups, profile banners, lis… |
+| `image-pipeline` | Optimizar imágenes en el BUILD para velocidad (Core Web Vitals) + SEO de imagen + señal local — porque en joyería/autos/inmuebles la imagen ES el pro… |
+| `legal-colombia` | Guardrail + método para CUALQUIER tarea legal de un negocio COLOMBIANO (e-commerce, joyería, datos personales). Garantiza que todo lo legal se haga e… |
+| `maps-gbp-local` | Rankear #1 en el local pack de Google Maps / Google Business Profile (GBP) para un negocio con ubicación (joyería, concesionario, inmobiliaria) — don… |
+| `marketing-loops` | When the user wants to set up a recurring, self-running marketing workflow — a repeatable loop an AI agent runs on a cadence (weekly, daily, on a tri… |
+| `marketing-psicologico-conversion` | Activar cuando el usuario quiera crear guiones de video, piezas gráficas, copywriting para anuncios o estrategia de contenido — en especial piezas de… |
+| `meta-ads-diagnostico` | When the user wants to diagnose, analyze, or optimize a Meta Ads campaign. Use when the user shares metrics or asks 'why is my campaign not working,'… |
+| `offers` | When the user wants to design, construct, or improve an offer — the thing they actually sell — including value framing, bonus stacking, guarantee des… |
+| `optimizacion-rendimiento-web` | Usar para MEJORAR EL RENDIMIENTO de una página/sitio web end-to-end (velocidad de carga, Core Web Vitals, PageSpeed/Lighthouse) — no como parches sue… |
+| `opus-interino-protocolo` | Cargar SIEMPRE al inicio de sesión cuando el modelo activo NO es el titular del proyecto (p.ej. Opus 4.8 operando como interino mientras Fable 5 no t… |
+| `paid-ads` | When the user wants help with paid advertising campaigns on Google Ads, Meta (Facebook/Instagram), LinkedIn, Twitter/X, or other ad platforms. Also u… |
+| `pos-facturacion-retail` | Usar al DISEÑAR, auditar o explicar un sistema POS / facturación / caja de retail (joyería, tienda, concesionario, restaurante) — para que el sistema… |
+| `proceso-decision-fuerte` | Pipeline de validación multi-capa para DECISIONES FUERTES (arquitectura, modelo de datos, seguridad/legal, operaciones irreversibles, cambios multi-s… |
+| `product-feeds` | Generar feeds de producto/inventario en el BUILD para EMPUJAR tu catálogo a Google y portales en vez de esperar el rastreo — la palanca de visibilida… |
+| `publicar-web-produccion` | > |
+| `search-console-setup-y-diagnostico` | Dar de alta Google Search Console (GSC) y diagnosticar por qué un sitio "no sale en Google" — la herramienta gratis que dice qué indexó Google, con q… |
+| `semantic-schema-aeo` | El cerebro semántico de la visibilidad — qué structured data (JSON-LD) inyectar por tipo de página + cómo ser CITADO/RECOMENDADO #1 por buscadores e… |
+| `session-report` | Generate an explorable HTML report of Claude Code session usage (tokens, cache, subagents, skills, expensive prompts) from ~/.claude/projects transcr… |
+| `spec-kit` | Spec-Driven Development (SDD) — el método de GitHub spec-kit para construir software CON IA con rigor. Úsalo ANTES de codear una funcionalidad o proy… |
+| `validacion-live-chrome` | Usar DESPUÉS de un merge/deploy cuando los cambios YA están EN VIVO y hace falta EVIDENCIA REAL del comportamiento (no localhost, no opinión). Modo D… |
+| `video` | When the user wants to create, generate, or produce video content using AI tools or programmatic frameworks. Also use when the user mentions 'video p… |
+| `wompi-api-core` | Activar cuando el usuario quiera crear, leer, o gestionar transacciones, fuentes de pago o tokens de tarjetas en Wompi Colombia. |
+| `wompi-colombia-api-v1` | Skill maestro para la integración completa de la API v1 de Wompi Colombia. Úsalo cuando necesites implementar pagos en Colombia, Wompi, Bancolombia,… |
+| `wompi-webhooks-validator` | Activar cuando el usuario pida ayuda recibiendo, procesando o validando webhooks asíncronos de Wompi Colombia (ej. pagos PSE, Nequi). |
 
-`skills/` del repo **NO es la fuente** de las skills que Claude tiene cargadas en sesión.
+## 2 · Agents del brain-kit (`~/.claude/agents/`)
 
-- `~/.claude/settings.json` (config del usuario) → habilita plugins instalados (típicamente `superpowers@claude-plugins-official`).
-- `~/.claude/skills/` (user-level) → skills extra instaladas localmente (ej. `crm-architect`).
-- El namespace `anthropic-skills:*` que Claude ve es **bundle del entorno/build** (set oficial de Anthropic), independiente del repo.
+- `plan-auditor` · - `seo-auditor` · - `spec-analyze` · - `wompi_qa_agent` · - `wompi_support_agent`
 
-**Conclusión**: el solape de nombres entre `skills/` (repo) y las skills cargadas es **curaduría** (el repo se compone a partir de esos mismos sets). El repo es un **recurso de referencia paralelo** (como dice `40-LOBULOS §Recursos Externos`), NO el origen de las capacidades. Implicaciones:
+## 3 · Skills de DOMINIO del repo (`skills/` — conocimiento del PROYECTO, se commitean)
 
-- La mayoría de skills del repo **SÍ tienen contraparte usable** vía tool `Skill` (✅ abajo).
-- Algunas son **"repo-only"** (⚠️): NO hay contraparte instalada → invocarlas vía `Skill` fallaría; sirven como documentación/fuente.
-- **Anomalías estructurales** (🔧) NO romperían la config (el repo no es la fuente), pero ensucian el repo y romperían la carga **si algún día** se cablea `skills/` como plugin.
+| Pack | Qué es |
+|---|---|
+| `pruebas-electricas` | Pack de dominio: criterios/diagnóstico por prueba eléctrica (FP/tan δ, bujes, excitación, relación, resistencias, SFRA, DFR, DGA/aceite, LTC…). Fuente del lóbulo `49`. |
+| `transformadores-potencia` | Pack de dominio del EQUIPO: identificación de tipo, grupo vectorial, cálculos nominales. Fuente del lóbulo `50`. 11 skills (TODO-05: validación del Ingeniero). |
 
-**Leyenda Disp.**: ✅ contraparte instalada usable vía `Skill` · 🟩 staged local en `.claude/skills/` (activa tras reinicio, ver §Estado real) · ⚠️ repo-only (no instalada) · 🔧 anomalía estructural (no carga tal cual).
+Sub-skills `pruebas-electricas`: `_conocimiento`, `analisis-aceite`, `cambiador-tomas-ltc`, `corriente-excitacion`, `dfr-respuesta-dielectrica`, `dga`, `factor-potencia-aislamiento`, `factor-potencia-bujes`, `reactancia-dispersion`, `relacion-transformacion`, `resistencia-aislamiento`, `resistencia-aislamiento-nucleo`, `resistencia-devanados`, `sfra`.
+Sub-skills `transformadores-potencia`: `_conocimiento`, `bujes-y-accesorios`, `calculos-nominales`, `construccion-nucleo-devanados`, `gestion-vida-activo`, `grupo-vectorial-conexiones`, `identificacion-tipo-transformador`, `impedancia-cortocircuito`, `modos-falla-diagnostico`, `placa-caracteristica`, `regulacion-tomas`, `sistema-refrigeracion`.
 
----
+## 4 · Skills de MÉTODO instaladas en el repo (`skills/` — activación repo-only vía L-19)
 
-## 📍 Estado real de activación (auditado 2026-06-04 · ADR-002)
+`ab-test-setup` · `accessibility-audit` · `ad-creative` · `ai-seo` · `analytics-tracking` · `animate-skill-main` · `asesor-critico-honesto` · `brainstorming` · `canvas-design-creative` · `churn-prevention` · `claude-automation-recommender` · `claude-md-improver` · `claude-skills-llm-council-main` · `code-modernization` · `code-simplifier` · `cold-email` · `community-marketing` · `competitor-alternatives` · `content-strategy` · `copy-editing` · `copywriting` · `crm-architect` · `customer-research` · `dispatching-parallel-agents` · `ecommerce` · `email-sequence` · `emil-design-eng` · `executing-plans` · `finishing-a-development-branch` · `firecrawl-agent` · `firecrawl-cli` · `firecrawl-crawl` · `firecrawl-download` · `firecrawl-interact` · `firecrawl-map` · `firecrawl-scrape` · `firecrawl-search` · `form-cro` · `free-tool-strategy` · `frontend-design` · `impeccable` · `launch-strategy` · `lead-magnets` · `marketing-ideas` · `marketing-psychology` · `onboarding-cro` · `page-cro` · `paid-ads` · `paywall-upgrade-cro` · `popup-cro` · `pricing-strategy` · `product-marketing-context` · `programmatic-seo` · `receiving-code-review` · `referral-program` · `requesting-code-review` · `revops` · `sales-enablement` · `schema-markup` · `seo-audit` · `session-report` · `signup-flow-cro` · `site-architecture` · `skill-creator` · `social-content` · `subagent-driven-development` · `systematic-debugging` · `taste-skill-main` · `test-driven-development` · `using-git-worktrees` · `using-superpowers` · `verification-before-completion` · `writing-plans` · `writing-skills`
 
-> **Corrección importante**: las tablas de abajo marcaban con ✅ varias skills de
-> **diseño/UX** (`frontend-design`, `impeccable`, `emil-design-eng`, el bundle taste, etc.)
-> que en realidad NO estaban en la interfaz — eran **repo-only**. Auditoría de solape real:
-> **56** skills del repo SÍ tenían contraparte en el bundle `anthropic-skills:*`; **24** eran
-> repo-only. Esas 24 se **staged a `.claude/skills/`** (`name` del frontmatter como nombre de
-> carpeta) y cargan **tras reiniciar Claude Code**. Receta → `30-LECCIONES L-19`.
-
-**🟩 Las 24 ahora staged localmente** (verificadas activas tras reinicio):
-`accessibility-audit`, `animate`, `frontend-design`, `impeccable`, `emil-design-eng`,
-`design-taste-frontend` (+`-v1`), `redesign-existing-projects`, `minimalist-ui`,
-`industrial-brutalist-ui`, `high-end-visual-design`, `brandkit`, `stitch-design-taste`,
-`gpt-taste`, `image-to-code`, `imagegen-frontend-web`, `imagegen-frontend-mobile`,
-`full-output-enforcement`, `ecommerce`, `crm-architect`, `claude-automation-recommender`,
-`claude-md-improver`, `session-report`, `llm-council`.
-
-**Notas**: `canvas-design-creative` SÍ está en el bundle (✅, no fue necesario stagearla).
-`code-modernization` (plugin) y `code-simplifier` (subagente) NO se pueden activar como skill
-— sin `SKILL.md`; el built-in `simplify` cubre el segundo. **Persistencia**: `.claude/` está
-gitignorado → estas 24 son **local-only**; al re-clonar, re-correr el copy (la fuente vive en `skills/`).
-
----
-
-## 🧬 Proceso / Desarrollo (superpowers + dev)
-
-> Las skills de `superpowers` están **doble-disponibles** (`superpowers:` y `anthropic-skills:`).
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `brainstorming` | Explorar intención/requisitos ANTES de construir | ✅ |
-| `writing-plans` | Escribir plan de implementación multi-paso | ✅ |
-| `executing-plans` | Ejecutar un plan con checkpoints de revisión | ✅ |
-| `subagent-driven-development` | Ejecutar plan con subagentes en la sesión | ✅ |
-| `dispatching-parallel-agents` | Despachar 2+ tareas independientes en paralelo | ✅ |
-| `test-driven-development` | TDD: test antes que implementación | ✅ |
-| `systematic-debugging` | Debug metódico ante bug/fallo/comportamiento raro | ✅ |
-| `verification-before-completion` | Verificar antes de declarar "hecho" | ✅ |
-| `requesting-code-review` | Pedir revisión de código | ✅ |
-| `receiving-code-review` | Recibir/aplicar feedback de revisión | ✅ |
-| `finishing-a-development-branch` | Cerrar una rama de desarrollo | ✅ |
-| `using-git-worktrees` | Trabajar con git worktrees aislados | ✅ |
-| `using-superpowers` | Cómo descubrir/usar skills (boot) | ✅ |
-| `writing-skills` | Escribir/editar skills | ✅ |
-| `skill-creator` | Crear/optimizar/evaluar skills | ✅ |
-| `code-simplifier` | (definición de SUBAGENTE en el repo, NO `SKILL.md`) | ⚠️🔧 |
-| `code-modernization` | (PLUGIN de comandos/agentes en el repo, NO skill) | ⚠️🔧 |
-
----
-
-## 🎨 Diseño / UX / Frontend
-
-> El "taste bundle" vive **anidado** en `taste-skill-main/<sub>/SKILL.md` (varias skills en una carpeta).
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `frontend-design` | UI front-end production-grade, anti-genérico | ✅ |
-| `impeccable` | Diseñar/auditar/pulir interfaces (UX, jerarquía, motion) | ✅ |
-| `emil-design-eng` | Filosofía Emil Kowalski: pulido fino de UI | ✅ |
-| `animate` | Animaciones/transiciones web (React/Next) | ✅ |
-| `design-taste-frontend` | Anti-slop: landing/portfolio/redesign con gusto | ✅ |
-| `redesign-existing-projects` | Elevar a premium sin romper funcionalidad | ✅ |
-| `minimalist-ui` | Estética minimalista | ✅ |
-| `industrial-brutalist-ui` | Estética brutalista industrial | ✅ |
-| `high-end-visual-design` | Diseño visual high-end | ✅ |
-| `brandkit` | Brand boards / sistemas de identidad | ✅ |
-| `stitch-design-taste` | Gusto de diseño con Stitch | ✅ |
-| `gpt-taste` | Criterio de diseño estilo GPT | ✅ |
-| `image-to-code` | Convertir imagen → código UI | ✅ |
-| `imagegen-frontend-web` | Generación de imágenes para front web | ✅ |
-| `imagegen-frontend-mobile` | Idem mobile | ✅ |
-| `full-output-enforcement` | Forzar salida completa (anti-truncado) | ✅ |
-| `canvas-design-creative` | Arte/posters/PDF/PNG por filosofía de diseño | ✅ |
-| `accessibility-audit` | Framework WCAG 2.2 AA portable (auditoría a11y) | ✅ |
-
----
-
-## 🔍 SEO / Contenido / Arquitectura de sitio
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `seo-audit` | Auditoría SEO técnica/on-page | ✅ |
-| `ai-seo` | Optimizar para motores de IA (AEO/GEO) | ✅ |
-| `schema-markup` | Datos estructurados / rich snippets | ✅ |
-| `programmatic-seo` | SEO programático a escala | ✅ |
-| `site-architecture` | Arquitectura de información del sitio | ✅ |
-| `content-strategy` | Estrategia de contenido / topic clusters | ✅ |
-| `competitor-alternatives` | Páginas "vs"/alternativas (SEO+ventas) | ✅ |
-
----
-
-## 📣 Marketing / Growth / Conversión (CRO)
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `copywriting` | Copy de páginas (hero, pricing, CTAs) | ✅ |
-| `copy-editing` | Editar/pulir copy existente | ✅ |
-| `ad-creative` | Creatividades/variaciones de anuncios | ✅ |
-| `cold-email` | Cold email B2B + secuencias | ✅ |
-| `email-sequence` | Secuencias de email lifecycle/warm | ✅ |
-| `social-content` | Contenido para redes | ✅ |
-| `marketing-ideas` | Ideación de marketing | ✅ |
-| `marketing-psychology` | Palancas psicológicas de marketing | ✅ |
-| `community-marketing` | Construir/crecer comunidad | ✅ |
-| `launch-strategy` | Estrategia de lanzamiento | ✅ |
-| `lead-magnets` | Imanes de leads | ✅ |
-| `free-tool-strategy` | Herramientas gratis como growth | ✅ |
-| `referral-program` | Programas de referidos | ✅ |
-| `paid-ads` | Estrategia/targeting de paid ads | ✅ |
-| `pricing-strategy` | Estrategia de precios | ✅ |
-| `product-marketing-context` | Contexto de product marketing | ✅ |
-| `revops` | Revenue operations | ✅ |
-| `customer-research` | Investigación de clientes / VOC / ICP | ✅ |
-| `churn-prevention` | Reducir churn / flujos de cancelación | ✅ |
-| `ab-test-setup` | Diseñar A/B tests y experimentación | ✅ |
-| `analytics-tracking` | Tracking/medición (GA4, eventos) | ✅ |
-| `page-cro` | CRO a nivel página | ✅ |
-| `form-cro` | CRO de formularios | ✅ |
-| `popup-cro` | CRO de popups | ✅ |
-| `onboarding-cro` | CRO de onboarding | ✅ |
-| `signup-flow-cro` | CRO del flujo de registro | ✅ |
-| `paywall-upgrade-cro` | CRO de paywall/upgrade in-app | ✅ |
-| `ecommerce` | Patrones de e-commerce | ✅ |
-
----
-
-## 🌐 Investigación web / Firecrawl / Council
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `firecrawl` | Firecrawl CLI | ✅ |
-| `firecrawl-agent` | Agente Firecrawl | ✅ |
-| `firecrawl-crawl` | Crawl de sitios | ✅ |
-| `firecrawl-scrape` | Scrape de páginas | ✅ |
-| `firecrawl-search` | Búsqueda web | ✅ |
-| `firecrawl-map` | Mapear URLs de un sitio | ✅ |
-| `firecrawl-download` | Descargar contenido | ✅ |
-| `firecrawl-interact` | Interacción con páginas | ✅ |
-| `llm-council` | Panel de varios LLMs para deliberar | ✅ |
-| `comite-expertos` | Comité de expertos inferidos por tema → critican/debaten → mejora ×3 la última respuesta. 4º experto = consejo externo **ChatGPT/GPT-5** (`docs/15-CONSEJO-EXTERNO.md`, no ve el código) solo en Decisión Fuerte. | 🟩 ✅ (staged `.claude/skills/`) |
-
----
-
-## 🏗️ Construcción de productos verticales
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `crm-architect` | Framework para CONSTRUIR CRMs sobre Firebase + Firestore + Cloud Functions (vertical automotive-dealership incluido, RBAC + GDPR/Ley 1581). | ✅ user+bundle (si está instalada) |
-| `asesor-critico-honesto` | Feedback crítico honesto sobre ideas/planes (es) | ✅ |
-
----
-
-## 🧰 Meta Claude Code (repo-only — NO instaladas)
-
-| Skill (name) | Para qué | Disp. |
-|---|---|---|
-| `claude-automation-recommender` | Analiza el repo y recomienda automatizaciones de Claude Code (hooks/subagentes/skills/plugins/MCP). Read-only. | ⚠️ repo-only |
-| `claude-md-improver` | Audita y mejora archivos CLAUDE.md contra plantillas. | ⚠️ repo-only |
-| `session-report` | Genera reporte HTML de uso de sesiones Claude Code (tokens/cache/subagentes). | ⚠️ repo-only |
-
----
-
-## ⚡ Pruebas Eléctricas (project-specific — construidas in-house)
-
-> A diferencia del resto del catálogo (terceros, portables), estas son **del proyecto**:
-> criterios AFINIA/NETA aterrizados al schema del tablero. Viven SOLO en `skills/pruebas-electricas/`
-> (no hay contraparte de bundle). Lóbulo madre con las decisiones: **`docs/49-PRUEBAS-ELECTRICAS.md`**.
-> Patrón: `SKILL.md` + 4 neuronas `references/` (teoría/cálculos/criterios/diagnóstico) + `_conocimiento/`
-> compartido (tablas NETA). Disp. 🏠 = repo-only del proyecto.
-
-| Skill (carpeta) | Para qué | Disp. |
-|---|---|---|
-| `resistencia-aislamiento` | IR · DAR · PI: corrección de temp a 20 °C + criterio NETA por clase + diagnóstico de humedad | 🏠 ✅ ejemplar completa |
-| `relacion-transformacion`, `corriente-excitacion`, `resistencia-devanados`, `factor-potencia-aislamiento`, `factor-potencia-bujes`, `resistencia-aislamiento-nucleo`, `reactancia-dispersion`, `sfra`, `cambiador-tomas-ltc`, `analisis-aceite`, `dga`, `dfr-respuesta-dielectrica` | resto de la batería 7.2.2 | 🏠 ✅ completas (4 neuronas c/u) |
-
-> **3 marcos compartidos** en `_conocimiento/` que toda skill referencia: `marco-normativo-multinorma.md`
-> (evaluar con varias normas a la vez), `diagnostico-integrado-bateria.md` (convergencia cross-test),
-> `gestion-mantenimiento-predictivo.md` (veredicto → acción + intervalo). Valores `⚠️ verificar` pendientes
-> de confirmar contra la edición de norma del director → `docs/49-PRUEBAS-ELECTRICAS.md`.
-
----
-
-## 🏭 Transformadores de Potencia · EQUIPO (project-specific — construidas in-house)
-
-> Familia hermana de `pruebas-electricas`, pero sobre el **EQUIPO** (qué es, de qué tipo, qué
-> cálculos nominales/de placa le aplican), no los ensayos. Viven en `skills/transformadores-potencia/`.
-> Lóbulo madre con las decisiones: **`docs/50-TRANSFORMADORES-POTENCIA.md`**. Mismo patrón:
-> `SKILL.md` + 4 neuronas `references/` + `_conocimiento/` compartido. Disp. 🏠 = repo-only del proyecto.
-> Índice maestro de la familia: `skills/transformadores-potencia/README.md`. Arquitectura de 11 skills
-> **validada por el director (2026-06-08) y COMPLETA (11/11, 2026-06-09)** — cada una `SKILL.md` + 4 neuronas.
-
-| Skill (carpeta) | Para qué | Disp. |
-|---|---|---|
-| `identificacion-tipo-transformador` | Tipificar: bidevanado / bi+compensación (delta estabilización) / tridevanado / auto; deriva qué relación, qué impedancia y qué secuencia cero aplican | 🏠 ✅ ejemplar |
-| `grupo-vectorial-conexiones` | Grupo Dyn/YNd/YNyn0d, desfase horario, ANSI↔IEC, polaridad, paralelo, compensación 87T | 🏠 ✅ |
-| `calculos-nominales` | I nominal, S/I por etapa de enfriamiento, relación con √3 por conexión, V/espira | 🏠 ✅ |
-| `impedancia-cortocircuito` | %Z, base común, estrella equivalente (3 ramas), secuencia cero, I_cc, reparto de carga | 🏠 ✅ |
-| `placa-caracteristica` | Auditar nameplate, coherencias cruzadas, identidad por informe (móviles/multiconfig) | 🏠 ✅ |
-| `regulacion-tomas` | OLTC vs DETC (seguridad), V_toma(n), efecto en %Z, modos, prueba DRM | 🏠 ✅ |
-| `sistema-refrigeracion` | Notación IEEE 4 letras, etapas=potencia, "etapa ≠ MVA gratis", I por etapa, termografía | 🏠 ✅ |
-| `construccion-nucleo-devanados` | Shell/core form, 3/5 columnas (Z0), tipos de devanado, fuerzas ∝I² (telescopeo/pandeo), FRA | 🏠 ✅ |
-| `bujes-y-accesorios` | Bujes condensador OIP/RIP/RBP, C1/C2, FP de buje, tap capacitivo; conservador, Buchholz, sobrepresión, imagen térmica | 🏠 ✅ |
-| `gestion-vida-activo` | Papel/DP (1000-1200→150-250), hot-spot IEEE C57.91, Montsinger, cargabilidad, MTMP/condición | 🏠 ✅ |
-| `modos-falla-diagnostico` | Esfuerzos (E/T/M/Q) → deterioro → modos de falla; mapa síntoma→ensayo→lóbulo (integrador) | 🏠 ✅ |
-
-> **3 marcos compartidos** en `_conocimiento/`: `00-fundamentos-transformador.md`,
-> `marco-normativo-tx.md`, `convenciones-calculo.md`. ✅ **EG + ABB ingeridos** (2026-06-08, vía
-> subagentes). Valores `⚠️ verificar` y tablas [ILEGIBLES] pendientes → `docs/50-TRANSFORMADORES-POTENCIA.md`.
-
----
-
-## ✅ Cómo usar este catálogo
-
-1. **Trigger 🔵 (`CLAUDE.md §G.2`)** dispara: el cliente pide análisis especializado.
-2. Vienes a este archivo y al `40-LOBULOS-DOMINIO §Recursos Externos`.
-3. Identificas la skill del dominio. Verifica que esté ✅ (instalada). Si solo aparece en `skills/` del repo (⚠️ repo-only), NO la invoques vía `Skill` — léela como referencia.
-4. Invocas la skill vía tool `Skill` con el nombre exacto.
-5. La aplicas al código del proyecto y capturas findings en el lóbulo hijo (`41-*..49-*`), registrando QUÉ skill usaste.
-
-**Mantenimiento (Reflejo de Frescura)**: si agregas/quitas una carpeta en `skills/` o instalas una skill nueva, actualiza este catálogo en el mismo cambio. El cliente puede ampliar la carpeta `skills/` libremente (curaduría); este catálogo refleja lo que hay.
+> ⚠️ El repo NO es la fuente de las skills CARGADAS en la sesión (esas vienen de plugins + `~/.claude/skills`).
+> Para activar una skill repo-only: copiar su `SKILL.md` a `.claude/skills/<name>/` + reiniciar (L-19).

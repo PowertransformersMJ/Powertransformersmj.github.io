@@ -19,7 +19,10 @@ npm-debug.log*
 Thumbs.db
 
 # Claude Code (worktrees, sesiones, memoria local — nunca al repo)
-.claude/
+# EXCEPCIÓN (decisión F3a 2026-07-18): settings.json SÍ se commitea — son los
+# hooks del cerebro (brain-check --boot + session-handoff) y deben viajar con el repo.
+.claude/*
+!.claude/settings.json
 
 # Artefactos de depuración / QA (PDFs reales de cliente, capturas) — NUNCA al repo público
 Debug/
@@ -49,3 +52,6 @@ ui-debug.log*
 # Carpetas de referencia por serial (450108, etc.). Quedan en disco para que Claude
 # las consulte, pero NO se commitean (el user-page es público).
 450108/
+
+# 🧠 Cerebro — handoff automático de sesión (efímero, nunca al repo)
+docs/.handoff-auto.md
