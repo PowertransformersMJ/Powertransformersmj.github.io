@@ -91,9 +91,8 @@ Distinto de crear un lóbulo: aquí proponemos crear una **skill** nueva.
 - **`skills/pruebas-electricas/*`** (2026-06-07, vía `skill-creator`) — familia de skills
   **project-specific** (NO portables: criterios AFINIA/NETA aterrizados al schema del tablero).
   Ejemplar completa: `resistencia-aislamiento` (IR·DAR·PI). Documentadas en el lóbulo
-  **`49-PRUEBAS-ELECTRICAS`** + catálogo en `skills-inventory.md`. ✅ Patrón de 4 neuronas ya
-  replicado a las 13 pruebas (carpetas verificadas 2026-07-18, ADR-051); queda la validación de
-  valores `⚠️ verificar` por el Ingeniero (TODO-04).
+  **`49-PRUEBAS-ELECTRICAS`** + catálogo en `skills-inventory.md`. Pendiente: replicar el patrón
+  de 4 neuronas a las 12 pruebas restantes tras validación del director.
 
 ---
 

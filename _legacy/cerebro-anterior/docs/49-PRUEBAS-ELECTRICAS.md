@@ -1,0 +1,187 @@
+# ⚡ 49 — PRUEBAS ELÉCTRICAS / Ingeniería de Diagnóstico (lóbulo de dominio)
+
+> Lóbulo registrado en `40-LOBULOS-DOMINIO`. Disparador: Trigger 🔵 §G.2 cuando el
+> cliente pide mejorar **cálculos / criterios / diagnóstico** de pruebas eléctricas a
+> transformadores de potencia (megóhmetro, FP/tan δ, relación, excitación, DGA, SFRA…).
+> Mantenido por Claude bajo demanda del director; **el cliente irá entregando más normas
+> y documentos** para alimentar las neuronas de cada skill.
+
+## Qué es esta iniciativa
+
+Carpeta de **skills project-specific** en `skills/pruebas-electricas/` que convierten el
+conocimiento normativo de ensayos eléctricos en una capacidad de **veredicto trazable**
+(corrección de temperatura → criterio normativo que aplica → diagnóstico de causa). El fin
+declarado por el director: mejorar los **cálculos matemáticos, criterios de evaluación y
+diagnóstico** en TODAS las funcionalidades de la página (en especial el Tablero de Pruebas
+Eléctricas con IA — ver ADR-003→ADR-010).
+
+> ⚠️ Estas skills son **del proyecto** (criterios AFINIA/NETA + decisiones del schema), NO
+> capacidades portables genéricas → por eso viven en el cerebro (lobe) y no son candidatas a
+> "skill genérica" del `40 §Sugerencia`. La frontera: el *framework* de cómo escribir skills
+> es portable (skill-creator); el *contenido normativo aterrizado al proyecto* es del cerebro.
+
+## Skills consultadas
+
+- **`skill-creator`** — dio el método: `SKILL.md` (frontmatter `name`+`description` "pushy"
+  ≤1024 chars para disparar bien) + progressive disclosure (`references/` on-demand) + formato
+  de salida. Se aplicó para estructurar la skill ejemplar y el patrón replicable.
+
+## Arquitectura (patrón validado en la ejemplar)
+
+```
+skills/pruebas-electricas/
+  README.md                         ← índice maestro: 13 skills ↔ batería NETA 7.2.2
+  _conocimiento/                    ← neuronas COMPARTIDAS (no duplicar por skill)
+    00-BATERIA-NETA-7.2.2.md        ← backbone: bloques B (ensayos) + D (criterios)
+    tablas-neta-referencia.md       ← Tablas 100.1 / 100.3 / 100.4 / 100.5 / 100.14
+    marco-normativo-multinorma.md   ← ⭐ varias normas + precedencia + reconciliación + salida
+    diagnostico-integrado-bateria.md← ⭐ convergencia cross-test (no condenar con 1 prueba)
+    gestion-mantenimiento-predictivo.md ← ⭐ veredicto → acción preventiva/correctiva + intervalo
+  <una-carpeta-por-prueba>/
+    SKILL.md                        ← trigger + workflow 6 pasos + salida MULTI-NORMA
+    references/
+      01-teoria.md    02-calculos.md    03-criterios-evaluacion.md    04-diagnostico.md
+```
+
+**Patrón = 4 neuronas por skill + 3 marcos compartidos.** Las 4 (teoría → cálculos →
+criterios → diagnóstico) más: **(a) multi-norma** — evaluar desde varias ópticas (NETA +
+IEEE C57.152 + IEC + interno + fábrica), consolidar en el más conservador y mostrar
+divergencias; **(b) diagnóstico integrado** — confirmar causa por convergencia de pruebas,
+nunca con una sola; **(c) gestión predictiva** — traducir el veredicto en acción
+preventiva/correctiva, urgencia (criticidad×severidad) e intervalo de re-ensayo (CBM/PdM).
+Replicar es mecánico una vez validada la ejemplar.
+
+> **Decisión de diseño (2026-06-07, a pedido del director)**: el patrón de 4 neuronas NO era
+> suficiente para un criterio robusto → se añadió la **capa multi-norma** (evaluar con varios
+> estándares a la vez) + el **diagnóstico integrado cross-test**. Hallazgos de accuracy que
+> quedan grabados: **IEC 60076-3 NO da umbrales de IR/PI** (gobierna withstand/PD, no
+> resistencia); la escala fina de PI (2–4 "bueno") viene de **IEEE 43, que es de máquinas
+> ROTATIVAS y excluye tx** → en tx es apoyo por analogía, el criterio duro es NETA (PI≥1.0) +
+> IEEE C57.152 (PI≥1.5).
+
+## 📇 Fichas JSON por prueba (`docs/pruebas/*.json`) — mapa de comunicación
+
+Una **ficha por prueba** (10, en el orden del scorecard) para hablar el mismo idioma al corregir:
+cada una trae `datos_que_extrae_la_IA` (estructura real del schema) + `criterio_y_umbrales`
+(umbral vigente + normas multi-norma + `⚠️ verificar`) + `_fuente` (ruta/función del código).
+**El CÓDIGO manda** (`schema.js` + `multinorma.js` + `FAMILIAS_SCORE` en `pruebas-electricas-shell.js`);
+las fichas son el mapa — refrescarlas si cambia el código (Reflejo de Frescura). Creadas 2026-06-10.
+
+| # | Ficha | Motor |
+|---|---|---|
+| 01 | `factor-potencia-aislamiento` (tan δ) | canónico |
+| 02 | `factor-potencia-bujes` (C1) | canónico |
+| 03 | `corriente-excitacion` | canónico |
+| 04 | `relacion-transformacion` | canónico |
+| 05 | `resistencia-devanados` | canónico |
+| 06 | `resistencia-aislamiento` | canónico (NETA por clase) |
+| 07 | `collar-caliente` | canónico |
+| 08 | `drm-conmutador` | canónico (no multi-norma) |
+| 09 | `sfra-respuesta-frecuencia` | **comparativo** (sin pasa/no-pasa) |
+| 10 | `dfr-espectroscopia-dielectrica` | **comparativo** (humedad papel) |
+
+**Panel "Valores por prueba" EN PRODUCCIÓN (ADR-044)** — `assets/js/ui/pruebas/tablas-pruebas-panel.js`
+(`montarPanelPrueba(cont, familia, informes)`): nombre de prueba + filtro de año; resumen = **rango REAL
+mín–máx por fase** (nunca promedio) + **Σ pérdidas (W)**; un año = **tabla completa** (todos los TAP);
+discrimina por **NIVEL real** (`nivelDe`, NO la tensión de ensayo "10 kV"); **Diagnóstico conforme a norma**
+(sellos NETA/IEEE estilizados + `evaluarMultiNorma`) + **Análisis y recomendación** (peor caso + tendencia +
+acción CBM vía `accionPrueba`). Cableado ADITIVO en `montarMultiAno` para relación/resistencia/aislamiento/
+bujes/collar (tan δ/excitación conservan su panel). Reusa dominio (L-55); CSS `pe-vp-*`. Tests
+`tests/tablas_pruebas_panel.test.js` (6, guard del bug de nivel). Suite 1185/1185. **Falta validar en la APP**.
+Origen: workflow iterado (fichas `docs/pruebas/*.json` + harnesses `_dev/preview-panel-prueba*.html`). Lección
+→ `30 §L-55` (reusar dominio no reinventar · criterio por tipo · dedup · preview en raíz).
+
+## Estado de las 13 skills (1 por prueba de la batería 7.2.2)
+
+| # | Skill | Estado |
+|---|---|---|
+| 1 | `resistencia-aislamiento` (IR · DAR · PI) | ✅ ejemplar + multi-norma |
+| 2–13 | relacion-transformacion · corriente-excitacion · resistencia-devanados · factor-potencia-aislamiento · factor-potencia-bujes · resistencia-aislamiento-nucleo · reactancia-dispersion · sfra · cambiador-tomas-ltc · analisis-aceite · dga · dfr-respuesta-dielectrica | ✅ **LAS 13 COMPLETAS** (2026-06-07, 4 neuronas c/u + 3 marcos compartidos) |
+
+> **Replicación hecha (2026-06-07)** vía 4 agentes en paralelo (grupos: electromagnético /
+> dieléctrico FP / mecánico-impedancia / química-aceite). 65 archivos `.md` (13×5). Cada skill:
+> SKILL.md (trigger pushy ≤1024) + 4 neuronas, con salida multi-norma + convergencia cross-test
+> + acción predictiva. Verificado: nombres = carpeta, 0 links rotos, wiring de los 3 marcos en cada
+> skill, sin `.DS_Store`. **Pendiente del director**: validar y, sobre todo, confirmar los valores
+> marcados `⚠️ verificar` (ver §Decisiones) contra la edición de norma vigente.
+
+## Decisiones / criterios project-specific (verificar contra el tablero)
+
+- **Jerarquía de criterio IR** (NETA explícita): dato de fábrica/placa > mínimo por **clase de
+  tensión** > Tabla 100.5 genérica. El tablero usa `NETA_IR_MIN_GOHM` en `…_schema.js`.
+- **110 kV → 30 GΩ** (mínimo por clase): el enfoque **multi-norma ya lo resuelve sin tener que
+  elegir** — se presentan AMBOS veredictos (pasa el piso NETA 100.5 de 5 GΩ **pero** falla el
+  criterio por clase de 30 GΩ → "pobre/INVESTIGAR"). Aun así queda **PENDIENTE confirmar la
+  fuente exacta** del 30 GΩ contra la edición de norma del director (¿IEEE C57.152 por clase o
+  interno MO.00418.DE-GAC-AX.01 Ed. 02?) para citarlo con precisión en `03` y el schema.
+- Corrección de temperatura **a 20 °C** (Tabla 100.14.1 col. aceite) — consistente con el tablero.
+- PI/DAR **no se leen aislados**: con IR muy alta (>~5 GΩ) un PI bajo puede ser no concluyente.
+
+## ⚠️ Valores `verificar` que las skills dejaron marcados (consolidado para el director)
+
+Números no confirmables contra norma pública → cada skill los marca `⚠️ verificar` y usa
+mientras tanto el piso normativo más conservador. **Confirmar contra la edición vigente** del
+director (MO.00418 Ed. 02 / IEEE / NETA) y luego fijar en `03-…` + el schema del tablero:
+- **Todos los criterios por CLASE de tensión** (MO.00418) en las 13 skills — incl. `110 kV→30 GΩ` de IR.
+- **Excitación**: no hay umbral % duro normativo (se compara vs fábrica/fases); el "~5% externas / ~30% central" es práctica de industria, no norma.
+- **R. devanados**: desbalance ≤2 % (NETA, piso) vs 2–3 % industria.
+- **FP/tan δ**: IEEE C57.12.90 retiró factores genéricos de corrección de T en 2010 → usar el del fabricante; umbral de tip-up ΔFP.
+- **Bujes**: banda de capacitancia 5–10 %/>10 % (NETA solo fija >5 %); límite de FP de C2.
+- **IR núcleo**: piso 500 MΩ @500 Vdc (NETA) vs "cientos de MΩ"; límite de corriente circulante.
+- **Reactancia de dispersión**: umbral 3 % (batería interna; prueba opcional en NETA).
+- **SFRA**: sin umbral numérico de consenso IEEE/IEC — interpretación por bandas + métricas CC/ASLE (práctica).
+- **LTC**: transición 40–60 ms y tolerancia de resistores; umbral de nº de operaciones (del fabricante).
+- **Aceite**: límites en servicio por clase (IEEE C57.106 / NETA 100.4); cortes del índice IFT/acidez.
+- **DGA**: ppm exactos del percentil 90/95 por gas (IEEE C57.104-2019 Tablas 1/2, no públicos); cortes de Rogers/Doernenburg/Duval.
+- **DFR**: escala de % humedad del papel (2/3/4.5 %, CIGRE TB 349/414).
+
+## 🔎 Auditoría del panel FP/tan δ (2026-06-09) — gaps de diagnóstico vs la skill
+
+Skill consultada: `factor-potencia-aislamiento` (02-calculos, 03-criterios, 04-diagnostico).
+Datos REALES verificados (fixtures 450108): cada punto trae `Tan δ @10 kV` **y** `@2 kV` por
+sección + `Cap (pF)` en `punto.extra`; **NO** hay temperatura registrada en el informe.
+
+Lo que el panel YA cubre: veredicto multi-norma (NETA 0.5% / IEEE 1%), peor medición, tendencia
+del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no implementados)**:
+1. **Tip-up `ΔFP = FP@10kV − FP@2kV` por sección** (skill §D + 02§3): detecta ionización en voids/PD (ΔFP↑) o humedad superficial / tierra de núcleo faltante (ΔFP↓) — mecanismo INVISIBLE al FP absoluto. **Computable YA con dato real, sin corrección de T** (es diferencia a igual T). MÁXIMO valor/factibilidad.
+2. **Localización del defecto por modo** (04-diagnostico): CH alto=AT↔tierra/bujes · CL=MT↔tierra · CHL=entre AT-MT · CHT=AT-BT… → traduce "qué sección alta" en "dónde está el defecto". Decisión accionable.
+3. **Tendencia de capacitancia `Cap (pF)` por sección** (02§4): cambio de C = alteración geométrica (desplazamiento/humedad), complementa SFRA. Dato real disponible.
+4. **Corrección a 20 °C — caveat + captura de T** (02§2, 03): hoy se compara FP CRUDO vs 0.5/1% SIN corregir a 20 °C (la skill exige corregir SIEMPRE). No hay T → NO fabricar; mostrar caveat "valores como medidos" + capturar T+factor del fabricante en extracción futura. Correctitud normativa.
+5. **Pendiente/tasa de cambio con bandera predictiva** (03§E): la pendiente condena aunque FP≤0.5%; hoy solo hay tendencia del peor caso.
+6. **Baseline de fábrica/commissioning** (03 precedencia 1): no existe en data → usar el informe más antiguo como proxy + marcar "sin baseline de fábrica".
+
+Estado: **AUDITORÍA CERRADA** (ADR-038→040). #1 tip-up + #4 caveat 20 °C (ADR-038); #2 localización por modo (ADR-039); #5 pendiente predictiva por sección + #6 baseline-proxy (ADR-040). **#3 capacitancia DESCARTADA con causa**: comparar pF entre informes da artefactos (CHL −91%) porque los esquemas/modos de medida difieren (combos 2 vs 3 devanados, GST/UST) → la misma etiqueta de sección no mide lo mismo; el tan δ (ratio) sí es comparable, la capacitancia (absoluta) no. Para habilitar #3 haría falta **extracción POR MODO** (capturar GST/UST/GSTg por sección). Validado todo con workflow + datos REALES 450108.
+
+## 🔌 Panel de corriente de excitación (2026-06-10, ADR-041) — criterio + hallazgo de patrón
+
+Skill consultada: `corriente-excitacion` (`01-teoria`, `03-criterios-evaluacion`, `04-diagnostico`).
+Módulo: `assets/js/ui/pruebas/excitacion-panel.js` (espejo del panel tan δ; helpers puros testeados).
+
+**Criterio normativo (NO hay umbral % universal duro, ≠ TTR 0.5%) — es COMPARATIVO**, con precedencia:
+**fábrica/commissioning → ensayos previos/tendencia → NETA ATS §7.2.2.D.6 (patrón 2+1) → IEEE Std 62 / C57.152**.
+- Simetría de externas A–C (mismo `UMBRALES.excitacion` del scorecard): Δ **<10% si I<50 mA, <5% si I≥50 mA**.
+- Tendencia "decenas de %" vs baseline = alarma aunque el patrón parezca correcto.
+- **Pérdidas (W)** = componente resistiva (I_exc = I_magnetizante + I_pérdidas: histéresis+Foucault); **sin umbral propio** → comparativo (vs fábrica/previos/fases hermanas). Faithful a la tabla del informe (`extra["P (W)"]`).
+- Convergencia: excitación anómala SOLA = INVESTIGAR; "espira en corto" solo si converge con TTR desviada y/o R de devanados anómala.
+
+**Nivel de tensión** = devanado + nominal según grupo vectorial (trafo móvil): AT delta→**66 kV** / estrella→**110 kV**, MT→**34.5**, BT/Terciario→**13.8**. El "10 kV" de los títulos es la **tensión de ENSAYO**, no el nivel (`nivelDe` los separa). Comparar SOLO a igual nivel.
+
+**HALLAZGO (verificado, 7 tríos reales 450108) — L-53**: la columna **central (B) es la MENOR en estrella Y en delta** (patrón HLH en ambos). Lo gobierna la GEOMETRÍA del núcleo (columna central = camino magnético más corto → menor reluctancia → menor corriente), NO la conexión. Por eso el criterio de aprobación es la **FORMA 2+1** (externas simétricas + central como extremo distinto); la dirección HLH/LHL esperada por conexión es **informativa**, no veredicto. La regla rígida de libro (delta⇒LHL) daba 4/7 falsas "irregular" en una unidad sana.
+
+**Estado**: implementado + validado con workflow (`_dev/preview-excitacion.html` + 9 fixtures reales). 19 tests. ⚠️ Umbrales Δ 5–10% a verificar contra fábrica/edición de norma del director. Falta: validar en la APP + wiring al shell.
+
+## Pendientes / próxima ronda
+
+- Validación del director sobre la skill ejemplar (¿el patrón de 4 neuronas le sirve?) antes
+  de replicar a las 12 restantes.
+- Ingerir las normas/documentos adicionales que el director vaya entregando (alimentar neuronas).
+- Investigación web continua por prueba (IEEE C57.152/C57.104/C57.149 SFRA, etc.).
+- Confirmar el set de mínimos por clase de tensión vs la edición de norma vigente.
+
+## Cómo se conecta con el resto del cerebro
+
+- El **Tablero de Pruebas Eléctricas con IA** (ADR-003→ADR-010, ver `99 §3..§10`) es el
+  consumidor: la IA extrae lecturas crudas; estas skills aportan el **diagnóstico determinista**
+  (corregir, criteriar por jerarquía, emitir veredicto + causa probable).
+- Mapa de archivos del tablero → `10-MEMORIA-CORTO-PLAZO §MAPA DE ARCHIVOS CLAVE`.
+- Catálogo de skills del repo → `skills-inventory.md` (sección Pruebas Eléctricas).

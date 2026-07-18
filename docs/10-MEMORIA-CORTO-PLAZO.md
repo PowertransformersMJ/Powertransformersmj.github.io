@@ -1,101 +1,49 @@
 # ⚡ 10 — MEMORIA A CORTO PLAZO (WIP / Sprint activo)
 
-> **Nodo neuronal: Memoria a Corto Plazo.** Junto con `CLAUDE.md` + `05-ESTADO-GLOBAL`,
-> es de las primeras lecturas de cada sesión (Ignorancia Selectiva, `CLAUDE.md §G`).
-> SOLO lo vivo: foco actual, pendientes abiertos, bitácora. Estado técnico → `05`.
->
-> **Es la pizarra, no el archivo.** Al cerrar una tarea: consolidar a ADR (`99`) +
-> fila en `00-INDICE`, extraer lecciones a `30`, y PODAR esto al foco vivo (GC §G.4).
->
-> **Convención de handoff (relevo a ventana nueva)**: el "Foco actual" debe incluir
-> **🚫 Callejones sin salida** — qué se probó que FALLÓ y NO reintentar, con el porqué.
+> **Nodo de Memoria a Corto Plazo.** Junto con `CLAUDE.md` + `05-ESTADO-GLOBAL`, es de las primeras
+> lecturas de cada sesión (Ignorancia Selectiva, §G.1). SOLO lo vivo: foco actual, pendientes abiertos,
+> bitácora. Estado técnico → `05`. Es la **pizarra, no el archivo**: al cerrar una tarea, consolidar a
+> ADR (`99`) + fila en `00`, extraer lecciones a `30`, y PODAR esto al foco vivo (GC §G.4).
 
 ---
 
-## 🎯 Foco actual — HANDOFF (cierre 2026-06-23 · relevo a sesión nueva)
+## 🎯 Foco actual (2026-07-18)
 
-> **🎯 FOCO DE TRABAJO ACTUAL (pedido explícito del director): EXCLUSIVAMENTE el segmento "Factor de Potencia / Tan δ — devanados".**
-> ⛔ NO tocar otras pruebas. ⛔ NO anticipar la reorg de las demás (relación/resistencia/aislamiento/bujes/collar) — SOLO cuando el director lo pida, **una por una**, modo **paso a paso, no generalizar** (puede afectar el desempeño). Workflow obligado: **preview FIEL** (módulo real + `.pe-scope` + composición del shell, L-56) **ANTES de tocar producción**; Claude commitea (push: ver nota ⬇).
+> **✅ HOY: cerebro MIGRADO a brain-kit v1.0** (ADR-051, `99 §51`): kernel v1.2 + gates + hooks +
+> handoff + rescate exhaustivo (`_legacy/TRIAJE.md`). Política git NUEVA del Ingeniero (F3a):
+> Claude commitea + pushea + mergea + deploya, validando cada commit.
 >
-> **✅ ÚLTIMO HECHO (ADR-050, `99 §50`): el segmento FP/tan δ YA ES `.pe-seg` unificado** (gráficas `montarPanelTand` + tablas `montarPanelPrueba('tand')` + botón JSON), espejo de excitación. + detalle/evaluación POR INFORME (0 huecos) + valores fuera de criterio en ROJO (`d-bad`/`d-inv`) + fix chips multi-norma (`chipsCriterio` por norma). Commit `9cac027` **PUSHEADO a `origin/DESARROLLO-/-PROYECTO-MJ`** (verificado `git fetch` 2026-06-23: SHA local == origin).
+> **➡️ SIGUIENTE MISIÓN: Fase 9 (TODO-01)** — sesión nueva dedicada. Luego retomar el producto:
+> el foco de producto sigue siendo el segmento **"Factor de Potencia / Tan δ — devanados"**
+> (⛔ NO tocar otras pruebas; reorg de las demás SOLO cuando el Ingeniero lo pida, una por una).
+> Decisión abierta FP/tan δ (no bloqueante): ¿acordeón único (actual) o split por devanado
+> AT/MT/Terciario como excitación? (si split → `grupoDe('tand',…)` en `tablas-pruebas-panel.js`).
 >
-> **🔲 PENDIENTES de FP/tan δ (próxima sesión):**
-> 1. **Abrir el PR** → `https://github.com/PowertransformersMJ/powertransformersmj.github.io/compare/main...DESARROLLO-%2F-PROYECTO-MJ?expand=1` (gh NO instalado en la Mac → no se puede `gh pr create`; el director lo abre con la URL, o `brew install gh` y lo crea Claude). Luego **merge a `main`** + **validar en la APP real** (tras Firebase Auth; el preview fiel `_dev/preview-tand-tablas.html` es lo más cercano).
-> 2. **Decisión abierta (no bloqueante)**: ¿1 acordeón único (actual) o **split por devanado** AT/MT/Terciario (como excitación splittea por nivel)? Si split → tocar `grupoDe('tand',…)` en `tablas-pruebas-panel.js` (hoy devuelve el título limpio → 1 grupo).
-> 3. Confirmar umbrales `TIPUP 0.1`/`PEND 0.05` + guía NETA 0.5% (⚠️ por validar con el director, TODO-08).
->
-> **🚫 Callejones sin salida (NO reintentar):** recrear un panel tabular dentro de `tand-panel.js` para imitar excitación → el director lo rechazó ("no se aprecia como excitación"); las tablas las da `montarPanelPrueba`, NO el panel de gráficas (L-57). · Pintar "no cumple" con un estado consolidado para todas las normas (L-58: chip POR norma).
->
-> **⚙️ Nota PUSH (regla dura — Claude se extralimitó 2026-06-23):** el `git push` del runtime funcionó, PERO el director reafirmó: **el push SIEMPRE lo hace ÉL.** Que sea técnicamente posible ≠ permitido. **Claude NUNCA pushea**, solo commitea + entrega la URL del PR (L-01). Los 3 commits de la sesión ADR-050 ya quedaron en origin (hecho consumado, sin romper nada); de aquí en adelante Claude NO pushea.
->
-> **Arco excitación + reorg por prueba — EN PRODUCCIÓN (ADR-046→049, `git fetch` 2026-06-16 `99bfa74`∈`origin/main`):** ADR-046 (excitación por nivel barras→curvas) · ADR-047 (fix modo-mixto; **REPRODUCIR el caso sucio** L-56) · ADR-048 (excitación = SEGMENTO `.pe-seg`; patrón replicado a tan δ en ADR-050) · ADR-049 (nomenclatura dentro del panel tan δ).
-> ⚠️ **Código muerto pendiente de poda** en `excitacion-panel.js` (FUSIÓN inalcanzable: `modo==='tabla'`/`pintarTablas`/`tablaFusion`/`tablaValores`/`agruparNiveles`/`magBar`) → hay chip de tarea spawneado. 🔲 Validar ADR-046→050 en la APP real.
-
----
-
-## 🎯 Contexto del tablero (consolidado — detalle en `99 §3..§47` + lobe 49)
-
-> **TODO el tablero de Pruebas Eléctricas con IA está EN PRODUCCIÓN** salvo ADR-046/047 (commiteados, FALTA PUSH+PR).
-> Arcos: base ADR-003→014 · panel tan δ ADR-029→040 (PR #172) · corriente de excitación ADR-041→043 (PR #173/#176/#177) ·
-> panel "Valores por prueba" ADR-044/045 · ADR-046 (orden por nivel + retira tablas repetidas) · ADR-047 (fix modo-mixto).
-> **🔲 PENDIENTE TRANSVERSAL: validar en la APP REAL** (vive tras Firebase Auth → el preview fiel es lo más cercano).
->
-> **Qué hace HOY:** IA extrae el PDF → tablero **IA-primaria**; **VEREDICTO 100% NORMATIVO** (VALOR vs norma, nunca texto IA,
-> L-36) vía motor **MULTI-NORMA** `pruebas_electricas_multinorma.js` (por norma + consolidado conservador + divergencias) +
-> capa **recomendaciones** (ADR-012). Fuente única `calificarPrueba` → scorecard/KPI/matriz/timeline. FP bujes CANÓNICO (ADR-013) ·
-> identidad/placa CONGELADA por informe → aislamiento NETA por clase del ensayo (ADR-014) · tablas SIN col."OK" (L-42) ·
-> upsert por fecha (L-39) · backfill server-side (L-40/43). **"Reprocesar" RETIRADO (ADR-020)** ⛔ NO re-introducir.
-> Excitación y tan δ siguen el MISMO molde — al iterar uno, revisar el otro. ⛔ NO dañar scorecard/`grafico-generico.js`.
-> ⚠️ Umbrales a verificar con el director: Δ excitación 5–10%, `TIPUP 0.1`/`PEND 0.05`, MO.00418/C1 bujes/PI-DAR (TODO-08).
->
-> **MAPA DE ARCHIVOS CLAVE**: Funciones IA `functions/index.js` (`extraerPruebasElectricasIA` — prompt SIN col.
-> Evaluación; `narrativaTendenciaIA` F3) · Motor **multi-norma** `domain/pruebas_electricas_multinorma.js`
-> (`evaluarMultiNorma`/`metricaPrueba`) · **recomendaciones** `domain/pruebas_electricas_recomendaciones.js` ·
-> Tendencia `domain/pruebas_electricas_tendencia.js` (`analisisTendencia`/`bloquesTendencia`) · Bloques
-> `domain/pruebas_electricas_bloques.js` (`derivarTablaTAP`/`quitarColumnasVeredicto`) · Schema `…_schema.js`
-> (`sanitizarBushing`/`sanitizarIdentidad`/`NETA_IR_MIN_GOHM`/`minNetaGohm`/`kvAT`) · Semáforo `ui/pruebas/semaforo.js`
-> (`calificarPrueba` delega + `minNetaDe`) · Render `ui/pruebas/grafico-generico.js` (`panelMultiNorma`/`badgeBloque`) ·
-> Tabla `ui/pruebas/tabla-pruebas.js` (`esPendienteExtraccion`) · Shell `pruebas-electricas-shell.js`
-> (`renderScorecard`/`diagnosticoUnidadHtml`/`storeReport` upsert/`backfillCanonicos`/`kvDeInforme`/reproceso) ·
-> Capa datos `data/pruebas_electricas.js` (`narrarTendencia`/`eliminarPDF`/`listarInformes`) · `firebase-init.js`
-> (Firestore `experimentalAutoDetectLongPolling`). Lóbulo dominio **`49-PRUEBAS-ELECTRICAS`** + skills `skills/pruebas-electricas/*` (13).
->
-> **Flujo git (ADR-005)**: Claude commitea + deploya; el director pushea/mergea. Claude NUNCA force-push a `main`.
->
-> **🚫 Callejones sin salida (curados, detalle en `30`)**: push runtime 403→solo director pushea (L-01) · Storage no se lee del
-> browser sin CORS→CF server-side (L-29/L-40) · Firestore sin arrays anidados (L-30) + auto-long-polling (L-38) · clave IA no estable→aliasear
-> (L-31), LLM omite tabla ancha→derivar+`extra` (L-32/L-33) · veredicto SIEMPRE valor vs norma, nunca texto IA, sin col."OK" (L-36/L-37/L-42) ·
-> backfill derivable sin re-correr IA (L-43) · aislamiento por CLASE del propio informe (ADR-014) · allowlists frágiles→detectar por prefijo/contenido
-> (L-41) · **borrar de menos > borrar de más** (L-51) · valor implausible=artefacto, no hallazgo (L-52).
+> **🚫 Callejones (NO reintentar)**: tablas dentro de `tand-panel.js` imitando excitación → rechazado;
+> las tablas las da `montarPanelPrueba` (L-57) · estado consolidado multi-norma en un solo chip →
+> chip POR norma (L-58) · reactivar "Reprocesar" (ADR-020) · overlay genérico multi-año (ADR-033/034).
 
 ---
 
 ## 📋 Pendientes abiertos (TODO-NN)
 
-| ID | Item | Estado | Bloqueo |
+| ID | Item | Estado | Nota |
 |---|---|---|---|
-| **TODO-01** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) | 🔮 abierto | director corre el script |
-| **TODO-02** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | brief del director |
-| **TODO-08** | Skills `pruebas-electricas` (13/13). Falta: director **valida** + confirma los valores `⚠️ verificar` (lobe 49) contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR) → fijarlos en el motor multi-norma. | 🔄 en validación | director entrega edición de norma |
-| **TODO-10** | Skills `transformadores-potencia` (EQUIPO, lobe 50). Hoy: 1 ejemplar completa (`identificacion-tipo-transformador`, 4 neuronas) + scaffold (README + 3 marcos). **EG + ABB leídos completos** (subagentes); tipificación ABB (excitación/5-limb/6-cap) integrada en la ejemplar (`01 §B`, `03 §E`); resto EG destilado en lobe 50 (papel/cargabilidad → `gestion-vida-activo`; aceite/DGA → lobe 49). Falta: director **valida** arquitectura de 11 skills antes de replicar a las 10 restantes; luego commit (Claude commitea, director pushea). ⚠️ tablas EG [ILEGIBLES] (Transequipos + C57.104) `⚠️ verificar`. | 🔄 ejemplar reforzada, esperando validación | director valida arquitectura |
-> Cerrados y consolidados: **TODO-03/04** → ADR-003/004 · **TODO-05/06** → ADR-008 · **TODO-07** → ADR-009 · **TODO-09** → ADR-015 (reintento IA en "Reprocesar").
+| **TODO-01** | **Fase 9 — ESCANEO TOTAL + propuestas**: recorrer TODO el repo (código/config/seguridad/CI/dependencias) con skill `arquitecto-software` → someter el diagnóstico a `comite-expertos` ×3 (arquitectura·seguridad·costo) → consejo externo si hay acceso (`15`) → **informe priorizado al Ingeniero + plan por olas en `specs/`** (skill `spec-kit`). ⛔ NO refactorizar en la sesión del diagnóstico: el Ingeniero decide, luego se ejecuta ola por ola. Incluye: PDFs OLTC ~60MB en raíz de `main` (peso/copyright) + código muerto FUSIÓN (`excitacion-panel.js`). Crudos → bóveda. | 🔲 | siguiente sesión |
+| **TODO-02** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) — script verificado presente | 🔮 abierto | ex TODO-01 viejo |
+| **TODO-03** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | espera brief del Ingeniero (ex TODO-02) |
+| **TODO-04** | El Ingeniero valida los valores `⚠️ verificar` del lóbulo `49` contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR, guía NETA 0.5%, `TIPUP 0.1`/`PEND 0.05`) → fijarlos en el motor multi-norma | 🔄 en validación | ex TODO-08 viejo |
+| **TODO-05** | El Ingeniero valida la arquitectura de las 11 skills `transformadores-potencia` (ya commiteadas — 59 archivos tracked, verificado 2026-07-18) antes de replicar el patrón | 🔄 esperando validación | ex TODO-10 viejo |
+| **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth); el preview fiel `_dev/preview-tand-tablas.html` / `preview-excitacion-fiel.html` es lo más cercano | 🔲 | transversal |
+| **TODO-07** | Convertir `~/Desktop/brain-private/` en repo git PRIVADO (respaldo de la bóveda `sgm-transpower/research-archive`) | 🔲 | recomendación F4 |
+| **TODO-08** | 🔐 El Ingeniero revoca los PAT clásicos viejos de GitHub (hay uno de mayo 2026 anotado "pendiente revocar" en `_legacy/CLAUDE-previo.md §9.3.2`; el flujo PAT-inline quedó obsoleto — el push del runtime ya funciona) | 🔲 | seguridad — solo el Ingeniero puede (github.com → Settings → Developer settings → Tokens) |
 
 ---
 
-## 🔮 Contexto estratégico
-
-- Plan v2.2 (F16–F37) **cerrado** en `v2.0.0`; ahora "features puntuales + bugfixes de campo".
-- `_legacy/CLAUDE-previo.md` = referencia histórica (14 reglas condensadas en `30-LECCIONES`).
-- Skills en `skills/` (catálogo paralelo); auditoría especializada se activa con **Trigger 🔵**.
-- **Nota config (no código)**: aviso "domain not authorized for OAuth" → agregar `powertransformersmj.github.io` en
-  Firebase console → Auth → Settings → Authorized domains (solo afecta login Google/popup; email/password OK).
-
 ## 📝 Bitácora (efímera)
 
-- **2026-06-23** — **ADR-050 PUSHEADO** (`9cac027` en `origin/DESARROLLO`; `git fetch` SHA local==origin). 🔲 PR pendiente de abrir (gh no instalado → URL compare en el Foco) + merge a `main` + validar APP. ⚙️ El push del runtime funcionó (contradice L-01 → ver L-01 nota + Foco).
-- **2026-06-17** — **ADR-050 COMMITEADO** (`9cac027`) → `99 §50` + `00 §50` + **L-57** (hazlo-como-X: reusa el componente) + **L-58** (chips por norma). Detalle completo en `99 §50` y en el Foco arriba. 1185/1185; preview FIEL `_dev/preview-tand-tablas.html`.
-- **2026-06-12** — ADR-046/047 (excitación: orden por nivel + fix modo-mixto acordeón) → `99 §46-47`. Lecciones **L-56** (preview fiel) + L-55. 1185/1185.
-- **2026-06-10** — Panel "Valores por prueba" (ADR-044/045) + arcos excitación (ADR-041→043) y tan δ (ADR-029→040) **EN PRODUCCIÓN** → `99 §29..§45`. Lecciones L-51..L-55.
-- **2026-06-07/09** — Skills `transformadores-potencia` (EQUIPO) **11/11 + lóbulo 50** (detalle → `50`). ⚠️ Tablas EG
-  [ILEGIBLES] + valores `⚠️ verificar` pendientes del director. 🔲 **PENDIENTE: commit de `skills/transformadores-potencia/`**
-  + validación de arquitectura (TODO-10).
+> **2026-07-18 (Fable 5)**: Cerebro instalado con brain-kit v1.0 (ADR-051). Rescate F7: 99 (51 ADRs) +
+> 15/40/49/50 íntegros; 30 condensado 77.5k→<40k (59 lecciones intactas, L-01 ACTUALIZADA con la
+> política git nueva); 20 verificado contra el repo; TRIAJE completo en `_legacy/TRIAJE.md`.
+> Hallazgo `git fetch`: PRs #181–#187 ya mergeadas (el "PR pendiente" del 2026-06-23 no existía ya)
+> + 10 PDFs OLTC en la raíz de `main` (→ Fase 9). Brain-kit se borra SOLO al completar la Fase 9.
