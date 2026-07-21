@@ -7,7 +7,7 @@
 
 import {
   collection, doc,
-  setDoc, updateDoc, deleteDoc,
+  setDoc, addDoc, updateDoc, deleteDoc,
   getDoc, getDocs, query, where, orderBy, limit,
   onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
@@ -42,7 +42,10 @@ function prepararDoc(input, uid) {
 
 function auditarSeguro(entry) {
   return persistirAuditoria(
-    { db: getDbSafe(), addDoc: setDoc, collection, serverTimestamp },
+    // G015 (ADR-052 Ola 4): antes se pasaba setDoc bajo el nombre addDoc →
+    // setDoc(CollectionRef,...) lanzaba SIEMPRE y el catch lo tragaba → la
+    // auditoría de suministros nunca se escribía. Ahora el addDoc real.
+    { db: getDbSafe(), addDoc, collection, serverTimestamp },
     entry
   );
 }
