@@ -48,7 +48,9 @@ function bindBotones() {
   if (liveBtn) liveBtn.addEventListener('click', () => {
     const ahora = toggleLive();
     liveBtn.classList.toggle('live', ahora);
-    liveBtn.innerHTML = ahora ? '⏸ Tiempo real activo' : '▶ Activar tiempo real';
+    // G020 (ADR-052 Ola 2): no hay telemetría real conectada; la variación es
+    // una SIMULACIÓN. Se etiqueta como tal para no presentar datos fabricados como reales.
+    liveBtn.innerHTML = ahora ? '⏸ Simulación activa (datos NO reales)' : '▶ Simular variación';
     const dot = $('#liveDot');
     if (dot) dot.style.background = ahora ? 'var(--ok)' : 'var(--ink3)';
   });
@@ -67,7 +69,7 @@ function tickClock() {
   const ago = $('#ago');
   if (ago) {
     const sec = Math.round((Date.now() - store.state.lastTs) / 1000);
-    ago.textContent = store.state.live ? `actualizado hace ${sec} s` : 'datos estáticos (snapshot)';
+    ago.textContent = store.state.live ? `SIMULACIÓN · +${sec} s (datos no reales)` : 'datos estáticos (snapshot)';
   }
 }
 

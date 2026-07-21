@@ -20,7 +20,8 @@ export function renderKPIs(rows) {
     ['Máxima carga',        mx.toFixed(0),           '%',       mxloc, 'var(--cri)'],
     ['Usuarios expuestos',  (us / 1000).toFixed(us > 9999 ? 0 : 1), 'mil', 'bajo equipos críticos', 'var(--aqua2)'],
     ['Equipos visibles',    rows.length,             'TX',      subs + ' subestaciones', 'var(--aqua)'],
-    ['Tiempo medio mitig.', '4.2',                   'h',       'SLA objetivo &lt; 6 h', 'var(--ok)'],
+    // G020 (ADR-052 Ola 2): retirado 'Tiempo medio mitig. 4.2h' — era un valor
+    // FABRICADO (hard-coded, sin origen en datos). Doctrina: no fabricar datos.
   ];
 
   host.innerHTML = K.map(k =>
