@@ -23,8 +23,11 @@ service firebase.storage {
     }
 
     // ── Documentos técnicos ──
+    // Lectura solo para usuarios autenticados (ADR-052 Ola 0): antes era
+    // pública anónima. Los download-token URLs (getDownloadURL) siguen
+    // funcionando; se cierra el acceso por-path sin sesión.
     match /documentos/{docId}/{filename=**} {
-      allow read:   if true;
+      allow read:   if isSignedIn();
       allow create: if isAdmin()
                     && request.resource.size <= 20 * 1024 * 1024;
       allow update: if isAdmin()
@@ -34,10 +37,10 @@ service firebase.storage {
 
     // ── Información Contractual (Fase 3 · 2026-04-27) ──
     // PDFs por contrato: contratos/{contrato_id}/{filename}.pdf
-    // Lectura abierta (los PDFs son del director, no contienen
-    // datos sensibles externos). Escritura solo admin con tope 50 MB.
+    // Lectura solo autenticados (ADR-052 Ola 0): son documentos
+    // contractuales reales de AFINIA — NO deben ser anónimos.
     match /contratos/{contratoId}/{filename=**} {
-      allow read:   if true;
+      allow read:   if isSignedIn();
       allow create: if isAdmin()
                     && request.resource.size <= 50 * 1024 * 1024;
       allow update: if isAdmin()
@@ -48,10 +51,10 @@ service firebase.storage {
     // ── Pruebas Eléctricas (Mantenimiento Predictivo) ──
     // PDFs originales de cada informe:
     //   pruebas_electricas/{unidadId}/{filename}.pdf
-    // Lectura abierta (informes técnicos internos, sin datos
-    // sensibles externos). Escritura solo admin con tope 50 MB.
+    // Lectura solo autenticados (ADR-052 Ola 0): informes técnicos
+    // reales de cliente (misma clase que 450108/, excluido del repo).
     match /pruebas_electricas/{unidadId}/{filename=**} {
-      allow read:   if true;
+      allow read:   if isSignedIn();
       allow create: if isAdmin()
                     && request.resource.size <= 50 * 1024 * 1024;
       allow update: if isAdmin()

@@ -55,3 +55,23 @@ ui-debug.log*
 
 # 🧠 Cerebro — handoff automático de sesión (efímero, nunca al repo)
 docs/.handoff-auto.md
+
+# ⚠️ CONFIDENCIAL / COPYRIGHT — NUNCA al repo público (ADR-052 Ola 0)
+# El repo es user-page público (publica todo el root). Estas clases de archivo
+# son datos reales de AFINIA o material de fabricante con copyright: van a
+# Storage privado o a la bóveda local, NUNCA al repo.
+# Manuales OEM / normas / material de estudio (raíz):
+/OLTC*.pdf
+/Rele*.pdf
+/Valvula*.pdf
+/bal_*.pdf
+/5785291*.pdf
+/D1816*.pdf
+# Dashboards standalone con datos operativos reales (raíz):
+/Seguimiento Limites SCADA.html
+/SAIDI_SAIFI*.html
+/Tablero Dinamico de Pruebas Electricas.html
+/Cargabilidad Transformadores*.html
+# Hojas de negocio con datos reales (raíz):
+/Salud de Activos*.xlsx
+/Gestion_Suministros_Transformadores*.xlsm
