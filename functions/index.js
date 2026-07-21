@@ -505,6 +505,25 @@ const HERRAMIENTA_PRUEBAS = {
   }
 };
 
+// G007 (ADR-052 Ola 1): las callables de IA cuestan dinero real (API Anthropic).
+// Exigir que el llamador sea un miembro ACTIVO (perfil activo, o bootstrap /admins
+// sin perfil desactivado) — no solo autenticado. Así una cuenta desactivada o
+// cualquier sesión sin rol no puede invocar la IA en bucle y quemar el saldo.
+async function exigirMiembroActivo(request) {
+  const uid = request.auth && request.auth.uid;
+  if (!uid) throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
+  const db = getFirestore();
+  const [perfilSnap, adminSnap] = await Promise.all([
+    db.doc(`usuarios/${uid}`).get(),
+    db.doc(`admins/${uid}`).get(),
+  ]);
+  const perfilActivo = perfilSnap.exists && perfilSnap.data() && perfilSnap.data().activo === true;
+  const bootstrap = adminSnap.exists && (!perfilSnap.exists || (perfilSnap.data() && perfilSnap.data().activo === true));
+  if (!perfilActivo && !bootstrap) {
+    throw new HttpsError('permission-denied', 'Requiere un perfil de equipo activo.');
+  }
+}
+
 export const extraerPruebasElectricasIA = onCall(
   {
     region: 'southamerica-east1',
@@ -524,9 +543,15 @@ export const extraerPruebasElectricasIA = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
     }
+    await exigirMiembroActivo(request);
     const { storagePath, filename, modelId } = request.data || {};
     if (!storagePath || typeof storagePath !== 'string') {
       throw new HttpsError('invalid-argument', 'Falta storagePath del PDF.');
+    }
+    // G008 (ADR-052 Ola 1): confinar el túnel admin-SDK a PDFs de pruebas.
+    // Sin esto la función podía leer CUALQUIER objeto del bucket (bypass de rules).
+    if (!storagePath.startsWith('pruebas_electricas/') || !/\.pdf$/i.test(storagePath)) {
+      throw new HttpsError('invalid-argument', 'storagePath inválido: debe ser un PDF bajo pruebas_electricas/.');
     }
     const model = MODELOS_IA.has(modelId) ? modelId : MODELO_IA_DEFAULT;
 
@@ -737,6 +762,7 @@ export const narrativaTendenciaIA = onCall(
     if (!request.auth) {
       throw new HttpsError('unauthenticated', 'Requiere sesión iniciada.');
     }
+    await exigirMiembroActivo(request);
     const { serie, metricas, modelId } = request.data || {};
     if (!Array.isArray(metricas) || !metricas.length) {
       throw new HttpsError('invalid-argument', 'Falta el resumen de tendencia (metricas).');

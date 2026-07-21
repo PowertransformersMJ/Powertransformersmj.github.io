@@ -15,11 +15,18 @@ service firebase.storage {
     function isSignedIn() {
       return request.auth != null;
     }
+    // G005 (ADR-052 Ola 1): reconoce a los admins v2 (/usuarios rol='admin'
+    // activo) además del bootstrap legacy /admins. Antes solo /admins, lo que
+    // bloqueaba subidas de admins dados de alta por el flujo nuevo.
     function isAdmin() {
-      return isSignedIn()
-        && firestore.exists(
-             /databases/(default)/documents/admins/$(request.auth.uid)
-           );
+      return isSignedIn() && (
+        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
+        || (
+          firestore.exists(/databases/(default)/documents/usuarios/$(request.auth.uid))
+          && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin'
+          && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.activo == true
+        )
+      );
     }
 
     // ── Documentos técnicos ──

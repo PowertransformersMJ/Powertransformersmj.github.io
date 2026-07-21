@@ -35,17 +35,26 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
     }
 
+    // ADR-052 Ola 0/1 (G004): el fallback legacy /admins ya NO ignora la
+    // desactivación. Si el usuario tiene perfil y está activo:false, se le
+    // niega aunque figure en /admins (desactivar SÍ revoca). El bootstrap
+    // puro (uid en /admins SIN perfil en /usuarios) se conserva → sin lockout.
+    function adminsBootstrapValido() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        && (!hasProfile() || profile().activo == true);
+    }
+
     function isTeamMember() {
       return isSignedIn() && (
         (hasProfile() && profile().activo == true) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        adminsBootstrapValido()
       );
     }
 
     function isAdmin() {
       return isSignedIn() && (
         (hasProfile() && profile().rol == 'admin' && profile().activo == true) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+        adminsBootstrapValido()
       );
     }
 
@@ -390,7 +399,9 @@ service cloud.firestore {
     // ── /auditoria/{id} (F35) ──
     match /auditoria/{id} {
       allow read:   if isAdmin() || (hasProfile() && profile().rol == 'auditor_campo');
-      allow create: if isSignedIn()
+      // G002 (ADR-052 Ola 1): antes cualquier autenticado (incl. desactivado)
+      // podía escribir el log. Ahora exige miembro ACTIVO. append-only intacto.
+      allow create: if isTeamMember()
                     && request.resource.data.accion is string;
       allow update: if false;
       allow delete: if false;

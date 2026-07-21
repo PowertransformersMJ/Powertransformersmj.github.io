@@ -38,6 +38,11 @@ build/
 *.key
 *.pem
 serviceAccount*.json
+service-account*.json
+*-service-account*.json
+*.serviceaccount.json
+gcp-*.json
+firebase-adminsdk*.json
 
 # Firebase (locales)
 .firebase/
