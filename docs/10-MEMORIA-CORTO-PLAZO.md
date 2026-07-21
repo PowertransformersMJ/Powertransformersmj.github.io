@@ -28,7 +28,7 @@
 
 | ID | Item | Estado | Nota |
 |---|---|---|---|
-| **TODO-09** | 🔴 **Ola 0 — Confidencialidad/copyright (EMERGENCIA)**: filtrar `pages.yml` (no `path:'.'`), retirar contratos/manuales/xlsx/HTML-datos-reales del repo (→ Storage privado o local), cerrar `storage.rules` a autenticados, guard a 2 páginas + sacar datasets embebidos, **reescribir historial git** (BFG/filter-repo — Decisión Fuerte irreversible, respaldar antes). Detalle: bóveda G108/G099/G021/G101/G100/G117/G001/G106. | 🔲 | espera OK del Ingeniero |
+| **TODO-09** | 🔴 **Ola 0 — Confidencialidad/copyright**. ✅ HECHO (2026-07-21): retirados TODOS los binarios-doc confidenciales del repo (15 root + 13 contratos + 3 xlsm + 3 PDFs pruebas seed → bóveda `confidencial-retirado-2026-07-21/`); `storage.rules` read→`isSignedIn()` DESPLEGADO; `.gitignore` blindado; `main`+dev en historia REESCRITA (git-filter-repo por extensión, `.git` 220M→23M, 0 confidenciales en historial; respaldo bundle 110M en bóveda); build verde 1171/0/12. ⏳ **FALTA (Ola 0 parte app-coupled)**: (a) **G021 CRÍTICO**: `pages/parque-transformadores.html` aún embebe `SGM_EMBEDDED_DATA` (261 registros reales) — quitar y cargar de Firestore; (b) **G006**: poner guard a `parque-transformadores.html` + `seguimiento-cargabilidad.html`; (c) **G101**: baselines `assets/data/seguimiento-*-baseline.json` con datos reales (usados como fallback) — sanear; (d) **PR-refs residual**: GitHub retiene `refs/pull/*/head` viejos (commits confidenciales por SHA/PR) — el Ingeniero debe pedir purga a GitHub Support o aceptar GC gradual; (e) follow-ups: template xlsm SANITIZADO (roto el export) + fixture de test sanitizado. | 🟡 parcial | binarios+historia listos; falta app-coupled |
 | **TODO-10** | 🔐 **Ola 1 — Backend**: `/admins` puerta trasera (revocación no funciona, G004); callables IA sin rol/App Check/rate-limit (G007); + rules hardening (G002/G005/G008/G009). | 🔲 | espera OK |
 | **TODO-11** | 🧮 **Ola 2 — Dominio**: umbrales HI editables que nada consume (G010); excitación ignora corriente I≥50mA (G011); datos fabricados en cargabilidad (G020); calificadores contradictorios (G012); módulos huérfanos F24/F29/F37 (G013/G014). | 🔲 | espera OK |
 | **TODO-12** | 🛡️ **Ola 3 — CI/red de seguridad**: `firestore.rules` sin test (G025); 1185 tests fuera de CI (G026/G109/G110); `lucide@latest` sin SRI (G022/G094); deps vulnerables (G111); XSS/CSP (G024/G019); enlaces rotos muestras.html (G023). | 🔲 | espera OK |
@@ -51,6 +51,15 @@
 > política git nueva); 20 verificado contra el repo; TRIAJE completo en `_legacy/TRIAJE.md`.
 > Hallazgo `git fetch`: PRs #181–#187 ya mergeadas (el "PR pendiente" del 2026-06-23 no existía ya)
 > + 10 PDFs OLTC en la raíz de `main` (→ Fase 9). Brain-kit se borra SOLO al completar la Fase 9.
+>
+> **2026-07-21 tarde (Opus 4.8)**: El Ingeniero autorizó las 6 olas. **Ola 0 ejecutada (binarios+historia)**:
+> contención publicada a `main` + `storage.rules` desplegado + historia reescrita con `git-filter-repo`
+> (force-push a main autorizado con respaldo). 🚫 Callejón git-rewrite: clonar `--branch X` reescribe SOLO
+> esa rama → tags/otras ramas del remoto quedan sucias; usar `--mirror` si hay tags remotos (aquí no había).
+> filter-repo aborta si el `.git` tiene `tmp_pack_*` basura → `rm` + `git gc` antes. `--paths-from-file` con
+> `glob:*.pdf` (matchea todo dir) es más robusto que listar nombres. `.git` LOCAL sigue en 105M por refs
+> locales viejas (tags v*, ramas `claude/*`, stash) — NO son públicas (Mac); no borrar sin pedir. FALTA la
+> parte app-coupled de Ola 0 (G021 dataset embebido, G006 guards) + Olas 1-5.
 >
 > **2026-07-21 (Fable 5)**: **Fase 9 COMPLETADA** (ADR-052). Escaneo total 14 auditores (10 Fable + 4 Opus
 > tras topes de uso, recuperados vía `resumeFromRunId`) → 123 hallazgos → 11 verificadores adversariales
