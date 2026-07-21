@@ -7,21 +7,20 @@
 
 ---
 
-## 🎯 Foco actual (2026-07-18)
+## 🎯 Foco actual (2026-07-21)
 
-> **✅ HOY: cerebro MIGRADO a brain-kit v1.0** (ADR-051, `99 §51`): kernel v1.2 + gates + hooks +
-> handoff + rescate exhaustivo (`_legacy/TRIAJE.md`). Política git NUEVA del Ingeniero (F3a):
-> Claude commitea + pushea + mergea + deploya, validando cada commit.
+> **✅ HOY: Fase 9 diagnóstico COMPLETADA (ADR-052, `99 §52`)** — escaneo total (14 auditores) +
+> 11 verificadores adversariales en Fable (**0 refutados de 41 crítica/alta**). 123 hallazgos en
+> **6 olas**. Informe detallado + crudos en la **bóveda privada** `~/Desktop/brain-private/sgm-transpower/
+> research-archive/2026-07-21-fase9/` (NO al repo público: cataloga qué confidencial está expuesto).
 >
-> **➡️ SIGUIENTE MISIÓN: Fase 9 (TODO-01)** — sesión nueva dedicada. Luego retomar el producto:
-> el foco de producto sigue siendo el segmento **"Factor de Potencia / Tan δ — devanados"**
-> (⛔ NO tocar otras pruebas; reorg de las demás SOLO cuando el Ingeniero lo pida, una por una).
-> Decisión abierta FP/tan δ (no bloqueante): ¿acordeón único (actual) o split por devanado
-> AT/MT/Terciario como excitación? (si split → `grupoDe('tand',…)` en `tablas-pruebas-panel.js`).
+> **➡️ SIGUIENTE: el Ingeniero autoriza qué olas ejecutar** (⛔ NO refactorizar sin su OK — se ejecuta
+> ola por ola con verificación). **Ola 0 = EMERGENCIA** (confidencialidad/copyright en repo público).
+> El producto (FP/Tan δ devanados) queda en pausa hasta que decida el orden.
 >
-> **🚫 Callejones (NO reintentar)**: tablas dentro de `tand-panel.js` imitando excitación → rechazado;
-> las tablas las da `montarPanelPrueba` (L-57) · estado consolidado multi-norma en un solo chip →
-> chip POR norma (L-58) · reactivar "Reprocesar" (ADR-020) · overlay genérico multi-año (ADR-033/034).
+> **🚫 Callejones (NO reintentar)**: pasar `args` grandes a un Workflow como string → llega serializado
+> (`args.batches` undefined, 0 agentes); EMBEBER los datos en el script · tablas dentro de `tand-panel.js`
+> → las da `montarPanelPrueba` (L-57) · chip POR norma no consolidado (L-58) · "Reprocesar" (ADR-020).
 
 ---
 
@@ -29,7 +28,12 @@
 
 | ID | Item | Estado | Nota |
 |---|---|---|---|
-| **TODO-01** | **Fase 9 — ESCANEO TOTAL + propuestas**: recorrer TODO el repo (código/config/seguridad/CI/dependencias) con skill `arquitecto-software` → someter el diagnóstico a `comite-expertos` ×3 (arquitectura·seguridad·costo) → consejo externo si hay acceso (`15`) → **informe priorizado al Ingeniero + plan por olas en `specs/`** (skill `spec-kit`). ⛔ NO refactorizar en la sesión del diagnóstico: el Ingeniero decide, luego se ejecuta ola por ola. Incluye: PDFs OLTC ~60MB en raíz de `main` (peso/copyright) + código muerto FUSIÓN (`excitacion-panel.js`). Crudos → bóveda. | 🔲 | siguiente sesión |
+| **TODO-09** | 🔴 **Ola 0 — Confidencialidad/copyright (EMERGENCIA)**: filtrar `pages.yml` (no `path:'.'`), retirar contratos/manuales/xlsx/HTML-datos-reales del repo (→ Storage privado o local), cerrar `storage.rules` a autenticados, guard a 2 páginas + sacar datasets embebidos, **reescribir historial git** (BFG/filter-repo — Decisión Fuerte irreversible, respaldar antes). Detalle: bóveda G108/G099/G021/G101/G100/G117/G001/G106. | 🔲 | espera OK del Ingeniero |
+| **TODO-10** | 🔐 **Ola 1 — Backend**: `/admins` puerta trasera (revocación no funciona, G004); callables IA sin rol/App Check/rate-limit (G007); + rules hardening (G002/G005/G008/G009). | 🔲 | espera OK |
+| **TODO-11** | 🧮 **Ola 2 — Dominio**: umbrales HI editables que nada consume (G010); excitación ignora corriente I≥50mA (G011); datos fabricados en cargabilidad (G020); calificadores contradictorios (G012); módulos huérfanos F24/F29/F37 (G013/G014). | 🔲 | espera OK |
+| **TODO-12** | 🛡️ **Ola 3 — CI/red de seguridad**: `firestore.rules` sin test (G025); 1185 tests fuera de CI (G026/G109/G110); `lucide@latest` sin SRI (G022/G094); deps vulnerables (G111); XSS/CSP (G024/G019); enlaces rotos muestras.html (G023). | 🔲 | espera OK |
+| **TODO-13** | 💸 **Ola 4 — Costo/robustez datos**: auditoría suministros rota `setDoc`/`addDoc` (G015, quick-win S); lecturas duplicadas dashboard (G016); tx no atómica stock (G017); `/scada_eventos` sin limit (G018); borrado sin cascada (G095). | 🔲 | espera OK |
+| **TODO-14** | 🏗️ **Ola 5 — Arquitectura**: separar los 5 dominios del repo (app/cerebro/skills/estudio-OLTC/contratos); `functions/domain` copia commiteada (G119); monolitos (shell 2398L, parque 275KB); código muerto (`ui/nav.js`, FUSIÓN excitacion ADR-046). | 🔲 | espera OK |
 | **TODO-02** | Tipificar S03/S04/S05/S06 del contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, `dryRun` primero) — script verificado presente | 🔮 abierto | ex TODO-01 viejo |
 | **TODO-03** | Flujo de selección runtime FN-063 vs FN-050 (contrato 4123000081) | 🔮 abierto | espera brief del Ingeniero (ex TODO-02) |
 | **TODO-04** | El Ingeniero valida los valores `⚠️ verificar` del lóbulo `49` contra su edición de norma (MO.00418 por clase, C1 bujes, PI/DAR, guía NETA 0.5%, `TIPUP 0.1`/`PEND 0.05`) → fijarlos en el motor multi-norma | 🔄 en validación | ex TODO-08 viejo |
@@ -47,3 +51,10 @@
 > política git nueva); 20 verificado contra el repo; TRIAJE completo en `_legacy/TRIAJE.md`.
 > Hallazgo `git fetch`: PRs #181–#187 ya mergeadas (el "PR pendiente" del 2026-06-23 no existía ya)
 > + 10 PDFs OLTC en la raíz de `main` (→ Fase 9). Brain-kit se borra SOLO al completar la Fase 9.
+>
+> **2026-07-21 (Fable 5)**: **Fase 9 COMPLETADA** (ADR-052). Escaneo total 14 auditores (10 Fable + 4 Opus
+> tras topes de uso, recuperados vía `resumeFromRunId`) → 123 hallazgos → 11 verificadores adversariales
+> Fable por lotes: **0 refutados de 41 crítica/alta** (18 bajados a media con razón). Informe + crudos en
+> bóveda `2026-07-21-fase9/`. Olas → TODO-09..14. **Brain-kit YA se puede borrar** (Fase 9 cerrada) — pero
+> eso es un cambio al repo; ofrecerlo al Ingeniero. Gotcha capturado: `args` grande a Workflow llega como
+> string → embeber en el script (nuevo callejón en Foco).
