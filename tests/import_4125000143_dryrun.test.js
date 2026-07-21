@@ -11,7 +11,7 @@
 
 import { test, describe, before } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
@@ -25,8 +25,16 @@ import {
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const XLSM_PATH = resolve(__dirname, '..', 'Gestion_Suministros_Transformadores_4125000143.xlsm');
 
+// El .xlsm fuente contiene datos reales del contrato (confidencial AFINIA) y
+// fue retirado del repo público en la Ola 0 (ADR-052) → preservado en la bóveda
+// privada. Si el dev lo tiene local en la raíz, estas pruebas corren; si no,
+// se OMITEN (no fallan). Reconstruir un fixture SANITIZADO es follow-up.
+const FIXTURE_OK = existsSync(XLSM_PATH);
+const skipCfg = FIXTURE_OK ? {} : { skip: 'fixture .xlsm confidencial no versionado (bóveda; Ola 0 ADR-052)' };
+
 let wb, rowsCat, rowsMar;
 before(() => {
+  if (!FIXTURE_OK) return;
   const buf = readFileSync(XLSM_PATH);
   wb = XLSX.read(buf, { type: 'buffer', cellDates: true });
   // Header real está en fila 3 del .xlsm (filas 1-2 son título mergeado).
@@ -34,7 +42,7 @@ before(() => {
   rowsMar = XLSX.utils.sheet_to_json(wb.Sheets['Marcas'],               { range: 2, raw: false, defval: '' });
 });
 
-describe('contrato 4125000143 · estructura del .xlsm', () => {
+describe('contrato 4125000143 · estructura del .xlsm', skipCfg, () => {
   test('tiene las 8 hojas esperadas', () => {
     assert.deepEqual(wb.SheetNames, [
       'README', 'Catalogo_Suministros', 'Marcas', 'ListasMarcas',
@@ -61,7 +69,7 @@ describe('contrato 4125000143 · estructura del .xlsm', () => {
   });
 });
 
-describe('contrato 4125000143 · parser de catálogo', () => {
+describe('contrato 4125000143 · parser de catálogo', skipCfg, () => {
   test('parsea 25 suministros sin errores de validación', () => {
     const { suministros, errores } = parsearCatalogoRows(rowsCat);
     assert.equal(errores.length, 0, JSON.stringify(errores));
@@ -100,7 +108,7 @@ describe('contrato 4125000143 · parser de catálogo', () => {
   });
 });
 
-describe('contrato 4125000143 · parser de marcas', () => {
+describe('contrato 4125000143 · parser de marcas', skipCfg, () => {
   test('descarta entries con marca placeholder "(edite)"', () => {
     const { marcas, errores } = parsearMarcasRows(rowsMar);
     assert.equal(errores.length, 0);
@@ -127,7 +135,7 @@ describe('contrato 4125000143 · parser de marcas', () => {
   });
 });
 
-describe('contrato 4125000143 · plan de importación contra Firestore vacío', () => {
+describe('contrato 4125000143 · plan de importación contra Firestore vacío', skipCfg, () => {
   test('25 suministros van a "crear", 0 a "actualizar"', () => {
     const { suministros } = parsearCatalogoRows(rowsCat);
     const { marcas }      = parsearMarcasRows(rowsMar);
