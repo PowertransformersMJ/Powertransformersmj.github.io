@@ -38,7 +38,7 @@
 |---|---|---|
 | **TODO-09** | Ola 0: (d) GitHub Support purga `refs/pull/*`; (e) follow-ups: `SGM_DATA_SOURCE` real (Firestore) + template xlsm SANITIZADO (roto el export) + fixture test sanitizado. | ✅ core / follow-ups |
 | **TODO-10** | Ola 1: **G007/G008 código listo, DEPLOY BLOQUEADO por billing** — desplegar `functions` cuando el Ingeniero reactive Blaze. | 🟡 pend-billing |
-| **TODO-11** | Ola 2 (re-verificado §52.9). **✅ G011** (excitación por corriente) · **✅ G020** (modal "2/4") · **✅ G012** (Familia B muerta retirada + JSDoc; `.calif` de `schema.js` quedó **write-only** — reconciliar/retirar = hygiene diferida sin efecto visible). **DECISIÓN Ingeniero = CONECTAR** (fase siguiente, features nuevas): G013 (cablear respaldo TPT + sobrecarga IEEE + autogeneración órdenes a la UI) · G014 (enforcement RBAC F28 en `firestore.rules`). **BLOQUEADO**: G010 dirección = TODO-04. | 🔜 fase CONECTAR |
+| **TODO-11** | Ola 2 (re-verificado §52.9). **✅ G011** (excitación por corriente) · **✅ G020** (modal "2/4") · **✅ G012** (Familia B muerta retirada + JSDoc; `.calif` de `schema.js` quedó **write-only** — reconciliar/retirar = hygiene diferida sin efecto visible). **CONECTAR EN MARCHA (§52.11, plan mapeado, crudo en bóveda)**: ✅ **FASE A** sobrecarga IEEE en modal (commit `d28e0c4`, **RETENIDO en DESARROLLO — requiere tu validación del modelo normativo antes de desplegar a main**). Pendiente: B (botón proponer orden), C (feedback RBAC en select), D (enforcement RBAC en rules — seguridad, decisión), E (tpt_respaldo). **BLOQUEADO**: G010 dirección = TODO-04. | 🔵 FASE A pend-validación |
 | **TODO-12** | Ola 3 (re-verificado §52.9): **G022/G094 ✅** (auto-hospedado lucide v1.25.0 en `assets/vendor/lucide/`) · **G024 bump ✅** (escHtml). Pendiente: G025 (tests `firestore.rules` vía emulador — REAL, aditivo, L) · G024-CSP (falta CSP en 95 HTML; GitHub Pages estático → vía `<meta>`, trade-offs con CDN/inline) · G111 = **decisión** (websocket-driver: `npm audit fix` mecánico; **xlsx: sin fix npm** → migrar a cdn.sheetjs.com off-registry vs aceptar riesgo). | 🟡 G022/G024 ✅ |
 | **TODO-13** | Ola 4 (re-verificado §52.9): **✅ G095** (join-guard KPIs) · **✅ G016** (doble suscripción eliminada; render visual end-to-end pendiente de auth — dashboard gated, lógica revisada). **DECISIÓN Ingeniero pendiente**: G017 (movimientos no atómicos; fix obvio INVIABLE en SDK Web → contadores agregados vs Cloud Function vs aceptar riesgo). | 🟡 pend G017 (decisión) |
 | **TODO-14** | Ola 5 (re-verificado §52.9): **G119 ✅** (`.gitignore`+`git rm --cached functions/domain`; predeploy regenera). **DECISIÓN Ingeniero**: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L; +`calculo-refrigeracion.js` 4913L que el diagnóstico omitió). Dato corregido: parque.html YA 275→88KB (Ola 0). (nav ✅). | 🟡 G119/nav ✅ |
@@ -74,3 +74,9 @@
 > retirada, `tabla-pruebas.js` 469→141L, `.calif` write-only). Suite 1181 pass. Los 5 del batch desplegados a
 > `main` (§52.10). **Siguiente: fase CONECTAR (G013/G014)** — features nuevas, sesión dedicada. Otras
 > pendientes: G025/CSP · decisiones G017/G111-xlsx/STRUCT · bloqueadas G010(TODO-04)/billing/GitHub-Support.
+>
+> **2026-07-22 (Opus 4.8) — Fase CONECTAR arrancada**: mapeo de integración (4 agentes, crudo en bóveda) →
+> plan A-E (§52.11). **FASE A** ejecutada: sobrecarga IEEE C57.91 cableada al modal de cargabilidad
+> (`modal-detalle.js` + nuevo preview `_dev/preview-cargabilidad-modal.html`), verificada visual (Factor
+> 1.2×/45min/4.1×). **NO desplegada a main** — retenida en DESARROLLO (`d28e0c4`), es estimación normativa del
+> dominio del Ingeniero; espera su validación del modelo. B-E requieren decisiones de producto.
