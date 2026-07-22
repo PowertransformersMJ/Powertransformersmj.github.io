@@ -222,18 +222,23 @@ if (!BOOT && existsSync(histPath) && indexPaths.length) {
 const leccionesPath = join(DOCS, '30-LECCIONES.md');
 if (!BOOT && existsSync(leccionesPath)) {
   const leccionesText = read(leccionesPath);
+  // Nodos HIJOS de lecciones (shards §G.5, ej. 31-LECCIONES-IA): sus defs L-/M-
+  // cuentan igual que las de 30 (la madre deja un puntero, la def vive en la hija).
+  const shardPath = join(DOCS, '31-LECCIONES-IA.md');
+  const shardText = existsSync(shardPath) ? read(shardPath) : '';
+  const leccionesAll = leccionesText + '\n' + shardText;
   const cortoPath = join(DOCS, '10-MEMORIA-CORTO-PLAZO.md');
   const espacialPath = join(DOCS, '20-MEMORIA-ESPACIAL.md');
   const estadoPath = join(DOCS, '05-ESTADO-GLOBAL.md');
   const histText = existsSync(histPath) ? read(histPath) : '';
   const indiceText = indexPaths.length ? readIndex() : '';
-  const defined = new Set([...leccionesText.matchAll(/^###\s+([LM]-\d{2})\b/gm)].map((m) => m[1]));
-  const allBrain = [claude, indiceText, existsSync(estadoPath) ? read(estadoPath) : '', leccionesText, histText,
+  const defined = new Set([...leccionesAll.matchAll(/^###\s+([LM]-\d{2})\b/gm)].map((m) => m[1]));
+  const allBrain = [claude, indiceText, existsSync(estadoPath) ? read(estadoPath) : '', leccionesAll, histText,
     existsSync(cortoPath) ? read(cortoPath) : '', existsSync(espacialPath) ? read(espacialPath) : ''].join('\n');
   const referenced = new Set([...allBrain.matchAll(/\b([LM]-\d{2})\b/g)].map((m) => m[1]));
   const dangling = [...referenced].filter((r) => !defined.has(r)).sort();
   if (!referenced.size) info('sin refs L-NN/M-NN aún');
-  else if (!dangling.length) ok(`refs L-/M- (${referenced.size} usadas / ${defined.size} def) resuelven en 30`);
+  else if (!dangling.length) ok(`refs L-/M- (${referenced.size} usadas / ${defined.size} def) resuelven en 30/31`);
   else warn(`refs L-/M- COLGANTES: ${dangling.join(', ')}`);
 }
 if (BOOT) head('  ⏭️  5a/5b omitidas en --boot');

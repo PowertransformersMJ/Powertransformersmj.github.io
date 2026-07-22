@@ -60,6 +60,6 @@
 > batch REAL (G020/G011/G095/G016/G012, con tests+preview) + infra (G024/G022/G119), todo desplegado a `main`.
 > Fase CONECTAR arrancada: mapeo (4 agentes) → plan A-E; A/B/C desplegadas. **Brain-kit se borra solo al 100% de
 > Fase 9 (aún no).** Detalle → `99 §52.8-52.11`. **Poda de cerebro 2026-07-22** (boot al tope) — este `10`
-> recortado al foco vivo (8447→4735c; boot margen 169→3757c). **Pendiente GC**: `30-LECCIONES` sigue ~1.8k sobre
-> tope (soft, on-demand, no bloquea boot) → **shard** (§G.5: extraer el cluster IA/Cloud-Functions L-43..L-48+L-35
-> a `31-LECCIONES-IA.md`) con cuidado, NO destilar a la ligera (las lecciones son gotchas comprimidos).
+> recortado al foco vivo (8447→4735c; boot margen 169→3757c). **GC COMPLETO**: `30-LECCIONES` shardeado (§G.5) —
+> el cluster IA/Cloud-Functions (L-35, L-43–L-48) movido a `31-LECCIONES-IA.md` (30: 41804→34281c, bajo tope);
+> `brain-check.mjs` reconoce el nodo hijo; registrado en `CLAUDE.md §0`+`00`+manifest. Cerebro SANO.
