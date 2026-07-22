@@ -39,7 +39,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **CONECTAR D** | **A/B/C/E desplegadas** (los 4 módulos huérfanos ya cableados). Solo **D** enforcement RBAC en rules — **emulador G025 listo**; falta la **decisión de rollout** (ampliar escritura de órdenes de solo-admin a los 5 roles operativos + una UI donde operen; seguridad cara de revertir → decisión fuerte). | 🔵 decisión D |
+| **CONECTAR D** | **A/B/C/E desplegadas**. **D → DECIDIDO (comité ×4 unánime, §52.14): NO activar ahora.** Mantener `/ordenes` admin-only + feedback FASE C (defensa-en-profundidad genuina). Activar F28 solo cuando el negocio lo exija Y con UI no-admin + test de paridad/denegaciones verde + create/delete admin-only + rollout reversible. Pendiente del Ingeniero: (a) contrastar con Gemini (prompt entregado); (b) ¿hay necesidad operativa real de multi-rol? → si sí, es un épico (UI+tests+reglas juntos). | 🔵 esperar (decidido) |
 | **TODO-04** | Ingeniero valida los `⚠️ verificar` del lóbulo `49` (MO.00418 por clase, C1 bujes, PI/DAR, NETA 0.5%, TIPUP 0.1/PEND 0.05) → **bloquea motor normativo G010-12**. | 🔄 |
 | **TODO-10** | G007/G008 código listo, **deploy bloqueado por billing** Blaze. | 🟡 billing |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
