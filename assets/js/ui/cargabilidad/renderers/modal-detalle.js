@@ -1,7 +1,8 @@
 // ══════════════════════════════════════════════════════════════
 // Renderer · Modal de detalle (drill-down)
 // Reúne: gauge SVG por devanado · trend SVG con perfil sintético ·
-// diagnóstico 7 variables · workflow 4 pasos · ficha técnica.
+// diagnóstico 7 variables · workflow de REFERENCIA (4 pasos, no estado real) ·
+// ficha técnica.
 // ══════════════════════════════════════════════════════════════
 
 import { $, fmt, cap } from './_helpers.js';
@@ -140,8 +141,12 @@ export function renderModal() {
   const condCri = (d.cond || '').toUpperCase().includes('OBSOLET');
 
   const steps = [
-    ['1', 'Reconocer alerta',           'Operador confirma evento y registra causa raíz', 'done'],
-    ['2', 'Redistribución de carga',    'Transferir carga a TX adyacente vía maniobra de red', 'active'],
+    // Estados NEUTROS a propósito (G020): es un flujo de REFERENCIA, no un
+    // estado operativo real. No afirmar "paso 1 hecho / paso 2 en curso" —
+    // eso fabricaría datos (mismo estado para todo TX). Pendiente cablearlo al
+    // sistema real de órdenes de trabajo.
+    ['1', 'Reconocer alerta',           'Operador confirma evento y registra causa raíz', 'pend'],
+    ['2', 'Redistribución de carga',    'Transferir carga a TX adyacente vía maniobra de red', 'pend'],
     ['3', 'Programar intervención',     'Orden de trabajo a mantenimiento · ventana nocturna', 'pend'],
     ['4', condCri ? 'Evaluar repotenciación' : 'Seguimiento',
       'Equipo ' + (condCri ? 'OBSOLETO: evaluar reposición' : 'en observación'), 'pend'],
@@ -236,9 +241,12 @@ export function renderModal() {
         <div class="glass panel" style="flex:1">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
             <h3 style="margin:0;font-size:15px">Workflow de mitigación</h3>
-            <span class="pill bg-avi" style="font-size:11px">En curso · 2/4</span>
+            <span class="pill" style="background:rgba(255,255,255,.08);color:var(--ink2);font-size:11px">Flujo de referencia</span>
           </div>
           ${wf}
+          <div class="muted" style="font-size:11.5px;margin-top:4px">
+            <i style="color:var(--ink3)">Flujo de referencia — pendiente conexión al sistema de órdenes de trabajo.</i>
+          </div>
         </div>
       </div>
     </div>`;
