@@ -162,9 +162,21 @@ const nivelDeEstadoStr = (e) => (e === 'ok' ? 0 : e === 'bad' ? 3 : e === 'na' ?
 // todas). Antes los chips usaban el consolidado para ambas → marcaban ✕ IEEE en un
 // tan δ de 0.51% que SÍ cumple IEEE (≤1%). Si una óptica es informativa (sin
 // veredicto numérico), cae al estado consolidado de la fila.
+// Corriente de excitación de referencia (máx mA entre fases) de una o varias
+// filas → la óptica IEEE elige el margen (Δ<10% si I<50 · Δ<5% si I≥50). Sin
+// mA → null (calificador cae al 10%, sin regresión). `faseMax` sólo existe en
+// filas modo 'fases' (excitación se mide por fase).
+const corrienteExcMax = (...filas) => {
+  const vals = filas.flatMap((f) => (f && Array.isArray(f.faseMax)) ? f.faseMax : [])
+    .filter((v) => typeof v === 'number' && Number.isFinite(v));
+  return vals.length ? Math.max(...vals) : null;
+};
+const ctxExcitacion = (familia, ...filas) =>
+  familia === 'excitacion' ? { corrienteMA: corrienteExcMax(...filas) } : undefined;
+
 const chipsCriterio = (familia, fila) => {
   const w = document.createElement('div'); w.className = 'pe-fus-chips';
-  const ev = evaluarMultiNorma(familia, metricaFila(familia, fila));
+  const ev = evaluarMultiNorma(familia, metricaFila(familia, fila), ctxExcitacion(familia, fila));
   (NORMA[familia].chips || ['NETA']).forEach((acron) => {
     const op = ev && ev.opticas && ev.opticas.find((o) => selloDe(o.norma).acron === acron && o.estado && o.estado.nivel >= 0);
     w.appendChild(chipNorma(acron, op ? op.estado.nivel : nivelDeEstadoStr(fila.estado)));
@@ -296,7 +308,7 @@ export function selloDe(norma) {
 
 function bloqueDiagnostico(familia, filas) {
   const metrica = metricaGrupo(familia, filas);
-  const ev = evaluarMultiNorma(familia, metrica);
+  const ev = evaluarMultiNorma(familia, metrica, ctxExcitacion(familia, ...(filas || [])));
   const wrap = document.createElement('div'); wrap.className = 'pe-vp-diag';
   let html = '<div class="pe-vp-diag-h">Diagnóstico conforme a norma</div>';
   html += `<div class="pe-vp-diag-metric">Métrica peor caso: <b>${fmt(metrica)} ${esc(unidadMetrica(familia, filas))}</b> · ${esc(DESC_METRICA[familia] || 'métrica peor caso')}</div>`;

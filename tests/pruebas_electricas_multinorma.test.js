@@ -6,7 +6,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { evaluarMultiNorma, metricaPrueba, CRITERIOS_MULTINORMA } from '../assets/js/domain/pruebas_electricas_multinorma.js';
+import { evaluarMultiNorma, metricaPrueba, corrienteExcitacionMax, CRITERIOS_MULTINORMA } from '../assets/js/domain/pruebas_electricas_multinorma.js';
 
 describe('evaluarMultiNorma — resistencia (NETA 2% vs industria 3%)', () => {
   test('0.58% → todas aprueban, sin divergencia, consolidado verde', () => {
@@ -96,5 +96,45 @@ describe('CRITERIOS_MULTINORMA cubre las familias del tablero', () => {
   test('tand, bushing, excitacion, relacion, resistencia, aislamiento, collar', () => {
     ['tand', 'bushing', 'excitacion', 'relacion', 'resistencia', 'aislamiento', 'collar']
       .forEach((k) => assert.ok(Array.isArray(CRITERIOS_MULTINORMA[k]) && CRITERIOS_MULTINORMA[k].length, k));
+  });
+});
+
+// G011 — la óptica IEEE de excitación debe usar la MAGNITUD de corriente para
+// elegir el margen: Δ<10% si I<50 mA · Δ<5% si I≥50 mA (IEEE Std 62). Antes se
+// ignoraba la corriente (siempre 10%) → sub-calificaba.
+describe('evaluarMultiNorma — excitación depende de la corriente (G011)', () => {
+  test('I≥50 mA y 5%<Δ≤10% → ROJO (antes quedaba ÁMBAR)', () => {
+    const r = evaluarMultiNorma('excitacion', 6, { corrienteMA: 55 });
+    assert.equal(r.consolidado.clase, 'b-r'); // fuera de norma
+  });
+  test('frontera exacta I=50 mA aplica el margen estricto (5%)', () => {
+    assert.equal(evaluarMultiNorma('excitacion', 6, { corrienteMA: 50 }).consolidado.clase, 'b-r');
+  });
+  test('I<50 mA con mismo Δ=6% → NO rojo (margen amplio 10%)', () => {
+    const r = evaluarMultiNorma('excitacion', 6, { corrienteMA: 30 });
+    assert.notEqual(r.consolidado.clase, 'b-r');
+    assert.equal(r.consolidado.clase, 'b-a'); // vigilar (>mitad de 10%)
+  });
+  test('sin corriente (ctx vacío) conserva el comportamiento previo = margen 10%', () => {
+    assert.equal(evaluarMultiNorma('excitacion', 6).consolidado.clase, 'b-a');
+    assert.equal(evaluarMultiNorma('excitacion', 6, {}).consolidado.clase, 'b-a');
+  });
+  test('I≥50 y Δ dentro de 5% → VERDE; el consolidado sale de la óptica IEEE (NETA es cualitativa)', () => {
+    assert.equal(evaluarMultiNorma('excitacion', 2, { corrienteMA: 55 }).consolidado.clase, 'b-g');
+  });
+});
+
+describe('corrienteExcitacionMax — corriente de referencia (máx mA entre fases)', () => {
+  test('toma el máximo de las fases', () => {
+    assert.equal(corrienteExcitacionMax({ excitacion: { fases: [{ valor: 12 }, { valor: 55 }, { valor: 8 }] } }), 55);
+  });
+  test('sin fases / sin excitación / entrada nula → null (calificador cae al 10%)', () => {
+    assert.equal(corrienteExcitacionMax({ excitacion: { fases: [] } }), null);
+    assert.equal(corrienteExcitacionMax({ excitacion: {} }), null);
+    assert.equal(corrienteExcitacionMax({}), null);
+    assert.equal(corrienteExcitacionMax(null), null);
+  });
+  test('ignora fases sin valor numérico', () => {
+    assert.equal(corrienteExcitacionMax({ excitacion: { fases: [{ valor: null }, { valor: 33 }, {}] } }), 33);
   });
 });

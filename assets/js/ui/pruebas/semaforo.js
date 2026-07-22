@@ -17,7 +17,7 @@ import {
   calificarDrm,
   estadoGlobal
 } from '../../domain/pruebas_electricas_semaforo.js';
-import { evaluarMultiNorma, metricaPrueba } from '../../domain/pruebas_electricas_multinorma.js';
+import { evaluarMultiNorma, metricaPrueba, corrienteExcitacionMax } from '../../domain/pruebas_electricas_multinorma.js';
 import { minNetaGohm, kvAT } from '../../domain/pruebas_electricas_schema.js';
 
 // Mínimo NETA de aislamiento por CLASE para un informe: prioriza la placa
@@ -79,7 +79,11 @@ function calificarPrueba(key, inf, opts = {}) {
   if (m == null) return { estado: ESTADOS.NEUTRAL, texto: 'n/d' };
   // Aislamiento: clase de tensión del PROPIO informe (placa congelada) → cada
   // ensayo de un trafo móvil se evalúa contra SU clase (63.5 kV vs 110 kV).
-  const mn = evaluarMultiNorma(key, m, { minClase: minNetaDe(inf, opts) });
+  // Excitación: la óptica IEEE necesita la corriente (mA) para elegir el margen
+  // (Δ<10% si I<50 mA · Δ<5% si I≥50 mA). Sin corriente cae al 10% (sin regresión).
+  const ctx = { minClase: minNetaDe(inf, opts) };
+  if (key === 'excitacion') ctx.corrienteMA = corrienteExcitacionMax(inf);
+  const mn = evaluarMultiNorma(key, m, ctx);
   const estado = (mn && mn.consolidado) ? mn.consolidado : ESTADOS.NEUTRAL;
   return { estado, texto: textoMetrica(key, m, estado) };
 }

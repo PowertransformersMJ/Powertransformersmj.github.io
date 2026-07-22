@@ -56,7 +56,7 @@ export const CRITERIOS_MULTINORMA = Object.freeze({
   ],
   excitacion: [
     { norma: 'ANSI/NETA §7.2.2.D.6', umbral: 'patrón 2+1 (2 laterales ~iguales + central menor)', nota: 'criterio cualitativo — sin % normativo duro' },
-    { norma: 'IEEE C57.152', umbral: 'vs fábrica/previos/fases (tendencia)', evaluar: (v) => calificarExcitacion(num(v)), nota: 'cambio de decenas de % vs baseline = alarma' }
+    { norma: 'IEEE C57.152', umbral: 'vs fábrica/previos/fases (tendencia)', evaluar: (v, ctx) => calificarExcitacion(num(v), ctx && num(ctx.corrienteMA)), nota: 'Δ<10% si I<50 mA · Δ<5% si I≥50 mA (IEEE Std 62)' }
   ],
   relacion: [
     { norma: 'ANSI/NETA §7.2.2.D.3', umbral: '≤0.5% vs teórica/placa', evaluar: calificarRelacion },
@@ -139,4 +139,19 @@ export function metricaPrueba(key, inf) {
     default:
       return null;
   }
+}
+
+/**
+ * Corriente de excitación de referencia (máx mA entre fases) de un informe.
+ * La usa la óptica IEEE de excitación para elegir el margen normativo:
+ * Δ<10% si I<50 mA · Δ<5% si I≥50 mA (IEEE Std 62). Sin fases/mA → null
+ * (el calificador cae al margen amplio 10%, sin regresión). Mismo dato que
+ * `sanitizarExcitacion` usa para el `.calif` persistido (schema.js).
+ * @param {object} inf  informe con `excitacion.fases[].valor` (mA)
+ * @returns {number|null}
+ */
+export function corrienteExcitacionMax(inf) {
+  const fases = (inf && inf.excitacion && Array.isArray(inf.excitacion.fases)) ? inf.excitacion.fases : [];
+  const vals = fases.map((f) => num(f && f.valor)).filter((v) => v != null);
+  return vals.length ? Math.max(...vals) : null;
 }
