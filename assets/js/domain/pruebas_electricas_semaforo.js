@@ -150,7 +150,8 @@ export function calificarRelacion(desviacionPct) {
 
 /**
  * Resistencia de devanados: desbalance entre fases (%).
- * REGLA DE NEGOCIO: desbalance ≤ 5% dentro de norma. Si el dato está
+ * REGLA DE NEGOCIO: desbalance ≤ 2% dentro de norma (NETA §7.2.2.D.8; el
+ * umbral real es UMBRALES.resistencia.limite). Si el dato está
  * marcado como dudoso (flag de digitación), se devuelve ÁMBAR
  * ("verificar") aunque el número caiga en rango — esto replica el
  * caso AT 2020 = 847.22 mΩ del tablero (probable error de digitación).
