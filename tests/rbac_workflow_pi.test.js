@@ -5,8 +5,9 @@ import {
 } from '../assets/js/domain/rbac.js';
 import {
   puedeTransicionar, puedeAbrirOrden, aplicarTransicion,
-  ESTADOS_ESPECIALES_ACTIVO
+  ESTADOS_ESPECIALES_ACTIVO, PERMISOS_TRANSICION
 } from '../assets/js/domain/workflow.js';
+import { transicionValida } from '../assets/js/domain/orden_schema.js';
 import {
   scorePI, rankearPlanInversion, clasificarPropuestas, PESOS_PI_BASELINE
 } from '../assets/js/domain/plan_inversion.js';
@@ -195,5 +196,29 @@ describe('Plan de Inversión F30', () => {
 describe('Estados especiales catálogo', () => {
   test('contiene los 6 estados A9.3', () => {
     assert.equal(ESTADOS_ESPECIALES_ACTIVO.length, 6);
+  });
+});
+
+// FASE C (G014) — invariantes que hacen SEGURO el feedback de rol cableado en
+// data/ordenes.actualizar(): (1) ninguna política apunta a una transición
+// imposible; (2) admin nunca se bloquea (está en todas); (3) el gate discrimina
+// por rol. El wiring solo aplica puedeTransicionar cuando existe política, así
+// que estos invariantes garantizan que no rompe transiciones válidas.
+describe('PERMISOS_TRANSICION — invariantes de paridad (FASE C · G014)', () => {
+  test('toda política corresponde a una transición válida de la máquina', () => {
+    for (const clave of Object.keys(PERMISOS_TRANSICION)) {
+      const [from, to] = clave.split(':');
+      assert.ok(transicionValida(from, to), `política sin transición válida en la máquina: ${clave}`);
+    }
+  });
+  test('admin está autorizado en TODAS las transiciones (nunca se bloquea)', () => {
+    for (const [clave, roles] of Object.entries(PERMISOS_TRANSICION)) {
+      assert.ok(roles.includes('admin'), `admin falta en la política ${clave}`);
+    }
+  });
+  test('el gate discrimina por rol (revisada→autorizada solo director/admin)', () => {
+    assert.equal(puedeTransicionar('revisada', 'autorizada', 'analista_tx').ok, false);
+    assert.equal(puedeTransicionar('revisada', 'autorizada', 'director_proyectos').ok, true);
+    assert.equal(puedeTransicionar('revisada', 'autorizada', 'admin').ok, true);
   });
 });

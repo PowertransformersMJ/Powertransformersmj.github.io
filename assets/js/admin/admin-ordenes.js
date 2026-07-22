@@ -322,8 +322,11 @@ form.addEventListener('submit', async (e) => {
   try {
     const data = readForm();
     const uid = (window.__sgmAdmin && window.__sgmAdmin.uid) || null;
+    // FASE C (G014): pasa el rol de la sesión para el feedback de rol-por-transición
+    // en el data layer (hoy admin → pasa todas; scaffolding para roles operativos).
+    const rol = (window.__sgmSession && window.__sgmSession.role) || null;
     if (fId.value) {
-      await actualizar(fId.value, data, uid);
+      await actualizar(fId.value, data, uid, rol);
       showInfo(`✓ Orden ${data.codigo} actualizada.`, 'ok');
     } else {
       await crear(data, uid);

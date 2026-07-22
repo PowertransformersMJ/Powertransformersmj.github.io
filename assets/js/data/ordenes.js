@@ -22,6 +22,7 @@ import {
   sanitizarOrden, validarOrden, transicionValida,
   ESTADOS_ORDEN_V2, TIPOS_ORDEN as TIPOS_ORDEN_V2, PRIORIDADES as PRIORIDADES_V2
 } from '../domain/orden_schema.js';
+import { puedeTransicionar, PERMISOS_TRANSICION } from '../domain/workflow.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
 
 const COL_NAME = 'ordenes';
@@ -182,7 +183,7 @@ export async function crear(data, uid) {
   return ref.id;
 }
 
-export async function actualizar(id, data, uid) {
+export async function actualizar(id, data, uid, rol) {
   const prev = await obtener(id);
   const payload = preparar(data);
   // Validar transición de estado si hubo cambio
@@ -192,6 +193,16 @@ export async function actualizar(id, data, uid) {
         `Transición no válida: ${prev.estado_v2} → ${payload.estado_v2}. ` +
         `Permitidas desde '${prev.estado_v2}': ver orden_schema.TRANSICIONES_VALIDAS.`
       );
+    }
+    // FASE C (G014) — feedback temprano de rol-por-transición. Aditivo y
+    // backward-compatible: solo aplica si se pasó `rol` Y la transición tiene
+    // política de rol (una transición válida en la máquina sin política NO se
+    // bloquea aquí). El enforcement REAL es server-side en firestore.rules
+    // (FASE D pendiente); esto es solo feedback en cliente, nunca la única
+    // barrera. `admin` está en todas las políticas → nunca se bloquea.
+    if (rol && PERMISOS_TRANSICION[`${prev.estado_v2}:${payload.estado_v2}`]) {
+      const permiso = puedeTransicionar(prev.estado_v2, payload.estado_v2, rol);
+      if (!permiso.ok) throw new Error(permiso.razon);
     }
   }
   payload.updatedAt = serverTimestamp();
