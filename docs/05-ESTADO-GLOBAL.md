@@ -4,12 +4,12 @@
 
 | Señal | Valor (al **2026-07-21**) |
 |---|---|
-| **Misión ahora** | Tablero de Pruebas Eléctricas IA-primaria EN PRODUCCIÓN (arcos ADR-003→050). **Fase 9 diagnóstico COMPLETADA (ADR-052)**: 123 hallazgos verificados (4 críticos·21 altos), 6 olas propuestas → el Ingeniero autoriza cuáles ejecutar (NO se refactorizó nada). |
-| **Build** | 🟢 `npm test` (html-validate + `node --test`) **1185/1185** · verificado-vivo: 2026-07-18 |
-| **Branch / Deploy** | Trabajo en `DESARROLLO-/-PROYECTO-MJ` → merge a `main` → GitHub Pages (`pages.yml`). `git fetch` 2026-07-18: **PRs #181–#187 MERGEADAS** (ADR-046→050 en producción, `main`=`44fd75a`); `main` trae además **10 PDFs OLTC (~60MB) en la RAÍZ** subidos vía web (revisar en Fase 9: peso+copyright en repo público). |
+| **Misión ahora** | Fase 9 (ADR-052) EN EJECUCIÓN por olas (autorizadas todas). ✅ **Ola 0 confidencialidad COMPLETA** (repo limpio + historia reescrita + Storage cerrado, desplegado). ✅ **Ola 1 reglas desplegadas** (functions bloqueadas por billing). 🟡 Olas 2-4 parciales (CI, audit, scada, links, datos-fabricados). PENDIENTE: motor normativo (G010-12), G016/G017, infra (SRI/deps/CSP/rules-tests), + 2 acciones del Ingeniero (billing Firebase + GitHub Support PR-refs). Detalle → `10` TODO-09..14. |
+| **Build** | 🟢 `node --test` **1171 pass / 0 fail / 12 skip** (fixtures xlsm confidenciales retirados). CI ahora corre los tests (`ci.yml`). · verificado-vivo: 2026-07-21 |
+| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` (Fase 9 se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (git-filter-repo purgó confidenciales; `.git` 220M→23M; respaldo bundle en bóveda) → cualquier otra copia debe re-clonar. Árbol tracked 17M. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth email/password + Firestore + Storage). CF desplegadas: `extraerPruebasElectricasIA` (southamerica-east1, solo-CARGA, ADR-020) + `narrativaTendenciaIA`; secret `LLM_API_KEY` ok · verificado-vivo: 2026-06-23 |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA desactivada a propósito; CLAUDE §4 dormida). |
-| **Deuda crítica** | 🔴 **(0) CONFIDENCIALIDAD/LEGAL (Ola 0, ADR-052)**: el repo PÚBLICO auto-publica contratos reales AFINIA + datos del parque + manuales con copyright (`pages.yml path:'.'`, `storage.rules` abierto, historial 141MB). Emergencia — esperando autorización del Ingeniero. (2) `/admins` puerta trasera + callables IA sin rol/cuota (Ola 1). (3) 1185 tests + `firestore.rules` fuera de CI (Ola 3). (4) Umbrales HI editables que nada consume + `⚠️ verificar` sin validar (Ola 2 / TODO-04). |
+| **Deuda crítica** | 🔴 **ACCIÓN INGENIERO**: (a) **billing Firebase** (Blaze lapsó → deploy de functions bloqueado Y las CF de IA quizá no corren hoy); (b) **GitHub Support** "remove sensitive data" (purga `refs/pull/*` con commits confidenciales viejos). Pendiente técnico: motor normativo HI/excitación (G010-12, umbrales `⚠️ verificar` TODO-04) requiere trabajo cuidadoso con tests; `firestore.rules` sin tests (G025). |
 
 ## ⚠️ Flags de riesgo activos
 - **Política git NUEVA (F3a 2026-07-18, ADR-051)**: Claude hace commit+push+merge+deploys, validando cada commit con el Ingeniero. NUNCA force-push a `main`. (Reemplaza la regla "el push lo hace el director" — L-01 actualizada.)
