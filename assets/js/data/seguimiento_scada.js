@@ -16,10 +16,15 @@
 import { isFirebaseConfigured } from '../firebase-config.js';
 import { getDbSafe } from '../firebase-init.js';
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, query, orderBy, limit, onSnapshot,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 
 const BASELINE_URL = new URL('../../data/seguimiento-scada-baseline.json', import.meta.url).href;
+
+// G018 (ADR-052 Ola 4): tope de eventos por suscripción. El SOE puede escribir
+// ~11k eventos/día; sin límite, UNA visita leería toda la colección y podría
+// agotar la cuota Spark (50k lecturas/día). Cap a los N más recientes.
+const MAX_EVENTOS_SCADA = 5000;
 
 let _baselineCache = null;
 
@@ -98,7 +103,7 @@ export function suscribirEventosSCADA(onData, onError) {
     try {
       const db = getDbSafe();
       const ref = collection(db, 'scada_eventos');
-      const q = query(ref, orderBy('ts'));
+      const q = query(ref, orderBy('ts', 'desc'), limit(MAX_EVENTOS_SCADA));
       unsubFirestore = onSnapshot(
         q,
         (snap) => {
