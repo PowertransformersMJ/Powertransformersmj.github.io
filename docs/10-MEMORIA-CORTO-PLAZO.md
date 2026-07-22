@@ -39,10 +39,10 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **CONECTAR D/E** | **D** enforcement RBAC en rules (decisión rollout + emulador G025) · **E** respaldo TPT (superficie + mini-form). A/B/C desplegadas. | 🔵 decisión |
+| **CONECTAR D/E** | **D** enforcement RBAC en rules — **emulador G025 ya listo** (§52.12); solo falta la **decisión de rollout** (ampliar escritura de órdenes a 5 roles, seguridad cara de revertir → decisión fuerte). **E** respaldo TPT (superficie + mini-form). A/B/C desplegadas. | 🔵 decisión |
 | **TODO-04** | Ingeniero valida los `⚠️ verificar` del lóbulo `49` (MO.00418 por clase, C1 bujes, PI/DAR, NETA 0.5%, TIPUP 0.1/PEND 0.05) → **bloquea motor normativo G010-12**. | 🔄 |
 | **TODO-10** | G007/G008 código listo, **deploy bloqueado por billing** Blaze. | 🟡 billing |
-| **TODO-12** | Ola 3: G025 (tests `firestore.rules` vía emulador — aditivo, prerequisito de CONECTAR D) · CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 |
+| **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | Ola 0 follow-ups: `SGM_DATA_SOURCE` real (Firestore) + template xlsm sanitizado + fixture test. Core desplegado. | 🟢 follow-up |
