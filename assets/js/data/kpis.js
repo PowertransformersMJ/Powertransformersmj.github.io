@@ -51,27 +51,36 @@ export async function computeDashboard() {
 export function computeFromDatasets(trafos, ords) {
   const trafoById = new Map(trafos.map((t) => [t.id, t]));
 
+  // G095: al borrar un transformador sus órdenes se CONSERVAN en Firestore
+  // (trazabilidad MO.00418), pero un equipo eliminado NO debe inflar los KPIs.
+  // Se agregan solo las órdenes de un transformador vigente (join-guard, como ya
+  // hacía `porDepartamento`). Las huérfanas sobreviven en la base pero no cuentan
+  // en totales / distribuciones / serie mensual / RAM. `ordenes_huerfanas` deja
+  // visible cuántas se excluyeron (trazabilidad, no se ocultan).
+  const ordsVigentes = ords.filter((o) => trafoById.has(o.transformadorId));
+
   // ── Totales simples ──
   const totales = {
     transformadores: trafos.length,
     operativos:      trafos.filter((t) => t.estado === 'operativo').length,
     mantenimiento:   trafos.filter((t) => t.estado === 'mantenimiento').length,
     fuera_servicio:  trafos.filter((t) => t.estado === 'fuera_servicio').length,
-    ordenes:         ords.length,
-    ordenes_cerradas:    ords.filter((o) => o.estado === 'cerrada').length,
-    ordenes_planificadas: ords.filter((o) => o.estado === 'planificada').length,
-    ordenes_en_curso:    ords.filter((o) => o.estado === 'en_curso').length
+    ordenes:         ordsVigentes.length,
+    ordenes_cerradas:    ordsVigentes.filter((o) => o.estado === 'cerrada').length,
+    ordenes_planificadas: ordsVigentes.filter((o) => o.estado === 'planificada').length,
+    ordenes_en_curso:    ordsVigentes.filter((o) => o.estado === 'en_curso').length,
+    ordenes_huerfanas:   ords.length - ordsVigentes.length
   };
 
   // ── Distribuciones ──
-  const porEstado = distribuir(ords, 'estado', ESTADOS_ORDEN);
-  const porTipo   = distribuir(ords, 'tipo',   TIPOS_ORDEN);
-  const porPrioridad = distribuir(ords, 'prioridad', PRIORIDADES);
+  const porEstado = distribuir(ordsVigentes, 'estado', ESTADOS_ORDEN);
+  const porTipo   = distribuir(ordsVigentes, 'tipo',   TIPOS_ORDEN);
+  const porPrioridad = distribuir(ordsVigentes, 'prioridad', PRIORIDADES);
 
   // Por departamento (join con transformador)
   const porDepartamento = {};
   for (const d of DEPARTAMENTOS) porDepartamento[d.value] = 0;
-  for (const o of ords) {
+  for (const o of ordsVigentes) {
     const t = trafoById.get(o.transformadorId);
     if (t && porDepartamento[t.departamento] != null) porDepartamento[t.departamento] += 1;
   }
@@ -79,7 +88,7 @@ export function computeFromDatasets(trafos, ords) {
   // ── Serie mensual (últimos 12 meses, usa fecha_programada) ──
   const meses = lastNMonths(12);
   const porMes = Object.fromEntries(meses.map((m) => [m, 0]));
-  for (const o of ords) {
+  for (const o of ordsVigentes) {
     const d = parseDate(o.fecha_programada);
     if (!d) continue;
     const k = monthKey(d);
@@ -88,7 +97,7 @@ export function computeFromDatasets(trafos, ords) {
 
   // ── Top transformadores con más órdenes ──
   const countByTrafo = new Map();
-  for (const o of ords) {
+  for (const o of ordsVigentes) {
     if (!o.transformadorId) continue;
     countByTrafo.set(o.transformadorId, (countByTrafo.get(o.transformadorId) || 0) + 1);
   }
@@ -107,7 +116,7 @@ export function computeFromDatasets(trafos, ords) {
     .slice(0, 10);
 
   // ── RAM: MTBF / MTTR / Disponibilidad ──
-  const correctivasCerradas = ords.filter(
+  const correctivasCerradas = ordsVigentes.filter(
     (o) => o.tipo === 'correctivo' && o.estado === 'cerrada'
   );
 

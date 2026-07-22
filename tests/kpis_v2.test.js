@@ -66,3 +66,42 @@ describe('KPIs v2 — bloque saludV2', () => {
     assert.equal(r.saludV2.por_bucket.sin_dato, 2);
   });
 });
+
+// G095 — un transformador borrado conserva sus órdenes en Firestore (historial),
+// pero éstas NO deben inflar los KPIs: se agregan solo las de un trafo vigente.
+describe('KPIs — join-guard de órdenes huérfanas (G095)', () => {
+  test('las órdenes de un transformador eliminado no cuentan en totales/RAM', async () => {
+    let computeFromDatasets;
+    try {
+      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
+    } catch (_) { return; }
+    const trafos = [{ id: 'A', estado: 'operativo', fecha_instalacion: '2020-01-01' }];
+    const ords = [
+      { transformadorId: 'A', tipo: 'correctivo', estado: 'cerrada' },
+      { transformadorId: 'A', tipo: 'preventivo', estado: 'planificada' },
+      // huérfana: 'GHOST' fue borrado; su orden sobrevive pero no debe contar
+      { transformadorId: 'GHOST', tipo: 'correctivo', estado: 'cerrada' },
+      { transformadorId: 'GHOST', tipo: 'preventivo', estado: 'planificada' }
+    ];
+    const r = computeFromDatasets(trafos, ords);
+    assert.equal(r.totales.ordenes, 2);              // solo las de A
+    assert.equal(r.totales.ordenes_huerfanas, 2);    // las 2 de GHOST, visibles
+    assert.equal(r.totales.ordenes_cerradas, 1);
+    assert.equal(r.totales.ordenes_planificadas, 1);
+    assert.equal(r.ram.muestra_fallos, 1);           // solo el correctivo cerrado de A
+    assert.equal(r.topTransformadores.some((t) => t.id === 'GHOST'), false);
+    assert.equal(r.porEstado.cerrada, 1);            // distribución sin huérfanas
+  });
+
+  test('sin huérfanas, ordenes_huerfanas = 0', async () => {
+    let computeFromDatasets;
+    try {
+      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
+    } catch (_) { return; }
+    const r = computeFromDatasets(
+      [{ id: 'A', estado: 'operativo' }],
+      [{ transformadorId: 'A', tipo: 'preventivo', estado: 'cerrada' }]);
+    assert.equal(r.totales.ordenes, 1);
+    assert.equal(r.totales.ordenes_huerfanas, 0);
+  });
+});
