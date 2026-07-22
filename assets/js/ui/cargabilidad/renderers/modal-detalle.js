@@ -10,6 +10,7 @@ import { sev } from '../../../domain/cargabilidad_severidad.js';
 import {
   SEVCOL, SEVLBL, DIAG_MAP, PROFILE_24H, DIAG_LABEL,
 } from '../../../domain/cargabilidad_config.js';
+import { tiempoAdmisible } from '../../../domain/sobrecarga_admisible.js';
 import { store } from '../state.js';
 
 // ── Generación de series sintéticas (24h / 7d / 30d) ─────────
@@ -118,6 +119,40 @@ function diagRow(k, score) {
   return `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
     <span class="muted" style="font-size:13px">${k}</span>
     <span style="font-weight:700;color:${col}">${m[0]}</span>
+  </div>`;
+}
+
+// ── Sobrecarga admisible (IEEE C57.91) ──────────────────────
+// Cuando el devanado opera POR ENCIMA de su ampacidad (factor > 1), estima el
+// tiempo admisible de sobrecarga y la aceleración de envejecimiento del
+// aislamiento con la curva simplificada IEEE C57.91 (§4.1.3 MO.00418). El
+// veredicto sale del VALOR (factor = corriente/ampacidad) contra la tabla
+// normativa, no de datos fabricados. Se rotula ESTIMACIÓN — la tabla es
+// indicativa y asume carga previa 75% y 30 °C (no sustituye la curva térmica
+// del fabricante). Sin sobrecarga (factor ≤ 1) no se muestra: no hay nada que
+// estimar. Datos ya presentes en el modal → cero lecturas Firestore.
+function sobrecargaAdmisibleCard(o) {
+  const car = (o && typeof o.car === 'number') ? o.car : null;
+  const amp = (o && typeof o.amp === 'number') ? o.amp : null;
+  if (car == null || !amp || amp <= 0) return '';
+  const factor = car / amp;
+  if (factor <= 1) return ''; // dentro de ampacidad: sin sobrecarga que evaluar
+  // Modelo self-consistente: la sobrecarga MEDIDA (factor = corriente/ampacidad)
+  // se trata como sostenida desde carga nominal (cargaInicial=100), de modo que
+  // el pico térmico = la carga medida y el envejecimiento crece con la sobrecarga
+  // (usar 75% daría un pico < nominal → envejecimiento < 1×, engañoso bajo
+  // sobrecarga). Temperatura ambiente 30 °C (trópico, supuesto del módulo).
+  const sob = tiempoAdmisible(factor, 100, 30);
+  const min = sob.minutos;
+  const tFmt = (min == null || !isFinite(min))
+    ? '—'
+    : (min >= 60 ? `${(min / 60).toFixed(1)} h (${min} min)` : `${min} min`);
+  const faa = sob.aceleracion_envejecimiento;
+  const faaFmt = (faa == null) ? '—' : `${faa.toFixed(1)}×`;
+  return `<div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);font-size:12px;color:#FCD9A6">
+    <div style="font-weight:700;margin-bottom:3px">⚠ Sobrecarga admisible (estimación)</div>
+    Factor <b>${sob.factor_usado}×</b> · tiempo admisible <b>${tFmt}</b> · envejecimiento del aislamiento <b>${faaFmt}</b>.
+    <div style="color:var(--ink3);margin-top:5px;font-size:11px"><i>IEEE C57.91 §7 · MO.00418 §4.1.3 — curva simplificada; trata la sobrecarga medida como sostenida a 30 °C. Orientativo, no sustituye la curva térmica del fabricante.</i></div>
   </div>`;
 }
 
@@ -237,6 +272,7 @@ export function renderModal() {
           <div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:${margin != null && margin < 0 ? 'rgba(251,80,112,.12)' : 'rgba(52,211,153,.1)'};border:1px solid ${margin != null && margin < 0 ? 'rgba(251,80,112,.3)' : 'rgba(52,211,153,.25)'};font-size:12px;color:${margin != null && margin < 0 ? '#FFB0BF' : '#9BF3D3'}">
             Cargabilidad restante: <b>${margin == null ? '—' : fmt(margin, 1) + ' A (' + fmt(marginPct, 0) + '%)'}</b> en primario.${margin != null && margin < 0 ? ' Equipo operando por encima de su capacidad nominal.' : ''}
           </div>
+          ${sobrecargaAdmisibleCard(o)}
         </div>
         <div class="glass panel" style="flex:1">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">

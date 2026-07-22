@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>DEV · Modal de cargabilidad — módulo de PRODUCCIÓN (modal-detalle.js)</title>
+<style>
+  :root {
+    --aqua:#5EEAD4; --aqua2:#2DD4BF; --avi:#60A5FA; --ale:#FBBF24; --cri:#FB5070;
+    --ok:#34D399; --ink2:#9FC9C8; --ink3:#6E9A9C; --slate-400:#94A3B8;
+  }
+  body { margin:0; background:#06222A; color:#DCEFEE; font-family:'Inter',system-ui,sans-serif; padding:24px; }
+  .dev-note { color:#9FC9C8; font-size:13px; margin-bottom:16px; max-width:900px; }
+  .dev-note b { color:#5EEAD4; }
+  .modal-overlay { display:none; }
+  .modal-overlay.show { display:block; }
+  .glass.panel { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:16px; }
+  .disp { color:#DCEFEE; } .muted { color:#9FC9C8; } .tag { color:#6E9A9C; font-size:12px; }
+  .pill { display:inline-flex; align-items:center; gap:6px; padding:3px 10px; border-radius:999px; font-weight:700; font-size:12px; }
+  .pill .dot { width:8px; height:8px; border-radius:50%; }
+  .spec .k { color:#6E9A9C; font-size:11px; } .spec .v { color:#DCEFEE; font-weight:700; } .mono { font-family:'JetBrains Mono',monospace; }
+  .btn { background:rgba(255,255,255,.06); color:#9FC9C8; border:1px solid rgba(255,255,255,.1); border-radius:8px; cursor:pointer; }
+  .btn.on { background:var(--aqua2); color:#06222A; }
+  h3 { color:#DCEFEE; }
+</style>
+</head>
+<body>
+<div class="dev-note">
+  <b>Preview fiel</b> del modal de cargabilidad — importa el módulo de PRODUCCIÓN
+  <code>modal-detalle.js</code> con un transformador MOCK en <b>sobrecarga (factor 1.18)</b>
+  para verificar la card <b>"Sobrecarga admisible (IEEE C57.91)"</b> (G013b · FASE A).
+  Datos ficticios, sin Firestore.
+</div>
+<div id="overlay" class="modal-overlay"><div id="modalBody"></div></div>
+
+<script type="module">
+  import { renderModal } from '../assets/js/ui/cargabilidad/renderers/modal-detalle.js';
+  import { store } from '../assets/js/ui/cargabilidad/state.js';
+
+  // Transformador MOCK en sobrecarga: primario a 118 A sobre 100 A de ampacidad
+  // (factor 1.18 → dispara la card de sobrecarga admisible).
+  const mockD = {
+    _i: 0, sub: 'DEMO NORTE', id: 'TD-DEMO-01', zona: 'norte', dep: 'atlantico',
+    grupo: 'Dyn5', us: 1450, cond: 'REGULAR', cmax: 118,
+    P: { car: 118, amp: 100, pct: 118, l1: 105, l2: 120 },
+    S: { car: 70, amp: 100, pct: 70, l1: 105, l2: 120 },
+    T: { car: null, amp: null, pct: null },
+    diag: { carg: 3, edad: 2, dga: 1, fur: 1, herm: 1 },
+    pot: 10000, vp: '110', vs: '13.8', vt: 'N/A', refrig: 'ONAN', reg: 'OLTC', uucc: '6.2%'
+  };
+
+  store.setRows([mockD], 'baseline');
+  store.state.detailIndex = 0;
+  store.state.detailWin = '24h';
+  renderModal();
+</script>
+</body>
+</html>
