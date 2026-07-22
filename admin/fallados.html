@@ -120,6 +120,25 @@
       <tr><td colspan="8" style="font-family:var(--font-mono); font-size:.72rem; color:var(--text-soft); padding:1rem;">⋯ Cargando...</td></tr>
     </tbody>
   </table>
+
+  <!-- CONECTAR E (F24): evaluador de activación de respaldo (tpt_respaldo.js) -->
+  <section id="secRespaldo" style="margin-top:1.5rem;padding:1rem;border:1px solid var(--border,rgba(0,0,0,.12));border-radius:12px">
+    <h2 style="margin:0 0 .35rem;font-size:1rem">🔀 Evaluador de activación de respaldo (F24)</h2>
+    <p style="font-size:.75rem;color:var(--text-soft);margin:0 0 .75rem">Ante una unidad de POTENCIA fallada o en OTC: elige el mejor RESPALDO disponible (misma zona · mejor salud · mayor capacidad) y estima si puede absorber la carga (IEEE C57.91 §7 · MO.00418 §4.1.3). Estimación orientativa.</p>
+    <div class="grid" style="gap:.5rem">
+      <label>Unidad a respaldar (POTENCIA)
+        <select id="rPotencia"><option value="">— Cargando —</option></select>
+      </label>
+      <label>Carga a redistribuir (A)
+        <input type="number" id="rCarga" min="0" step="1" placeholder="p.ej. 120">
+      </label>
+      <label>Duración prevista (min)
+        <input type="number" id="rDuracion" min="0" step="1" placeholder="p.ej. 240">
+      </label>
+    </div>
+    <button type="button" class="btn-add" id="btnEvalRespaldo" style="margin-top:.5rem">Evaluar respaldo óptimo</button>
+    <div id="rResultado" style="margin-top:.75rem"></div>
+  </section>
 </main>
 
 <!-- MODAL -->
@@ -217,6 +236,8 @@
 <script type="module">
 import { listar, crear } from '../assets/js/data/fallados.js';
 import { calcularRPN, nivelRiesgoRPN, TIPOS_FALLA } from '../assets/js/domain/fallados_schema.js';
+import { evaluarActivacionRespaldo, seleccionarRespaldoOptimo } from '../assets/js/domain/tpt_respaldo.js';
+import { listarV2 } from '../assets/js/data/transformadores.js';
 
 const $ = (id) => document.getElementById(id);
 const setMsg = (t, cls) => { $('msg').textContent = t; $('msg').className = cls || ''; };
@@ -361,8 +382,56 @@ $('formF').addEventListener('submit', async (ev) => {
   } catch (err) { alert('Error: ' + err.message); }
 });
 
-document.addEventListener('sgm:session-ready', cargar);
-if (window.__sgmSession) cargar();
+// ── CONECTAR E (F24): evaluador de activación de respaldo ─────
+// Datos: una lectura de transformadores (orderBy codigo → índice automático,
+// SIN where para no depender de un índice compuesto inexistente) filtrada en
+// cliente por tipo_activo. La lógica (selección óptima + viabilidad) es pura y
+// ya testeada (tpt_respaldo.js). El veredicto sale del VALOR (factor de carga)
+// vs la norma IEEE C57.91, rotulado ESTIMACIÓN.
+const escR = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+let respaldoCandidatos = [], potenciaUnidades = [];
+async function cargarRespaldoData() {
+  const sel = $('rPotencia');
+  try {
+    const todos = await listarV2({ limite: 300 });
+    potenciaUnidades   = todos.filter((t) => t.identificacion && t.identificacion.tipo_activo === 'POTENCIA');
+    respaldoCandidatos = todos.filter((t) => t.identificacion && t.identificacion.tipo_activo === 'RESPALDO');
+    sel.innerHTML = potenciaUnidades.length
+      ? '<option value="">— Seleccione —</option>' + potenciaUnidades.map((t) => {
+          const cod = (t.identificacion && t.identificacion.codigo) || t.codigo || t.id;
+          const zona = (t.ubicacion && t.ubicacion.zona) || '—';
+          return `<option value="${escR(t.id)}">${escR(cod)} · ${escR(zona)}</option>`;
+        }).join('')
+      : '<option value="">Sin unidades POTENCIA</option>';
+  } catch (err) {
+    sel.innerHTML = '<option value="">Error al cargar</option>';
+    $('rResultado').innerHTML = `<span class="err">No se pudieron cargar unidades: ${escR(err.message)}</span>`;
+  }
+}
+function evaluarRespaldo() {
+  const box = $('rResultado');
+  const unidad = potenciaUnidades.find((t) => t.id === $('rPotencia').value);
+  if (!unidad) { box.innerHTML = '<span class="err">Selecciona una unidad de POTENCIA a respaldar.</span>'; return; }
+  const cargaA = +$('rCarga').value, durMin = +$('rDuracion').value;
+  if (!(cargaA > 0) || !(durMin > 0)) { box.innerHTML = '<span class="err">Ingresa carga (A) y duración (min) positivas.</span>'; return; }
+  const optimo = seleccionarRespaldoOptimo(unidad, respaldoCandidatos);
+  if (!optimo) { box.innerHTML = '<span class="err">No hay unidades RESPALDO operativas disponibles.</span>'; return; }
+  const ev = evaluarActivacionRespaldo(optimo, cargaA, durMin);
+  const cod = (optimo.identificacion && optimo.identificacion.codigo) || optimo.id;
+  const zona = (optimo.ubicacion && optimo.ubicacion.zona) || '—';
+  const col = ev.viable ? 'var(--ok,#16A34A)' : 'var(--cri,#DC2626)';
+  const f = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
+  const tAdm = isFinite(ev.tiempo_admisible_min) ? (ev.tiempo_admisible_min + ' min') : 'sin límite práctico';
+  box.innerHTML = `<div style="padding:.75rem;border-radius:10px;border:1px solid ${col}">
+    <div style="font-weight:700;color:${col}">${ev.viable ? '✓ Activación viable' : '⚠ RIESGO — no absorber sin más análisis'} · Respaldo óptimo: ${escR(cod)} (zona ${escR(zona)})</div>
+    <div style="font-size:.78rem;margin-top:.4rem">Factor de carga resultante <b>${f(ev.factor_resultante, 2)}</b> (límite 1.30) · tiempo admisible <b>${tAdm}</b> · envejecimiento del aislamiento <b>${ev.aceleracion_envejecimiento != null ? f(ev.aceleracion_envejecimiento, 1) + '×' : '—'}</b>.</div>
+    <div style="font-size:.72rem;color:var(--text-soft);margin-top:.35rem"><i>${escR(ev.referencia || '')} — estimación IEEE C57.91, orientativa.</i></div>
+  </div>`;
+}
+$('btnEvalRespaldo').addEventListener('click', evaluarRespaldo);
+
+document.addEventListener('sgm:session-ready', () => { cargar(); cargarRespaldoData(); });
+if (window.__sgmSession) { cargar(); cargarRespaldoData(); }
 </script>
 <script src="../assets/vendor/lucide/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>

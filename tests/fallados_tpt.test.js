@@ -122,3 +122,31 @@ describe('Catálogos F25', () => {
     assert.ok(vs.includes('fmea'));
   });
 });
+
+// CONECTAR E (F24) — el panel de admin/fallados.html replica EXACTAMENTE este flujo:
+// filtra los RESPALDO por tipo_activo (en cliente), elige el óptimo y evalúa la
+// activación. Invariante de integración del cableado.
+describe('CONECTAR E — flujo del evaluador de respaldo (F24)', () => {
+  const zona = 'BOLIVAR';
+  const unidadFallada = { id: 'P1', identificacion: { tipo_activo: 'POTENCIA' }, ubicacion: { zona } };
+  const parque = [
+    unidadFallada,
+    { id: 'R-BOL', identificacion: { tipo_activo: 'RESPALDO' }, estado_servicio: 'operativo',
+      electrico: { corriente_nominal_primaria_a: 1000 }, salud_actual: { crg_pct_medido: 30, hi_final: 1.5 },
+      ubicacion: { zona }, placa: { potencia_kva: 100000 } },
+    { id: 'R-ORI', identificacion: { tipo_activo: 'RESPALDO' }, estado_servicio: 'operativo',
+      electrico: { corriente_nominal_primaria_a: 1000 }, salud_actual: { crg_pct_medido: 30, hi_final: 1.2 },
+      ubicacion: { zona: 'ORIENTE' }, placa: { potencia_kva: 100000 } }
+  ];
+  test('elige el respaldo de la misma zona y evalúa una activación viable', () => {
+    const respaldos = parque.filter((t) => t.identificacion.tipo_activo === 'RESPALDO'); // filtro cliente del panel
+    const optimo = seleccionarRespaldoOptimo(unidadFallada, respaldos);
+    assert.equal(optimo.id, 'R-BOL'); // misma zona gana pese a HI peor
+    const ev = evaluarActivacionRespaldo(optimo, 400, 120);
+    assert.equal(ev.viable, true);
+    assert.ok(ev.referencia.includes('IEEE C57.91'));
+  });
+  test('sin RESPALDO operativos → null (el panel muestra el aviso)', () => {
+    assert.equal(seleccionarRespaldoOptimo(unidadFallada, []), null);
+  });
+});

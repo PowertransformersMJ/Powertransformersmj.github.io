@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>DEV · Panel evaluador de respaldo (F24) — módulos de PRODUCCIÓN</title>
+<style>
+  :root { --ok:#16A34A; --cri:#DC2626; --text-soft:#64748b; --border:rgba(0,0,0,.12); --font-mono:'JetBrains Mono',monospace; }
+  body { margin:0; background:#f1f5f9; color:#0f172a; font-family:'Inter',system-ui,sans-serif; padding:24px; }
+  .dev-note { color:#475569; font-size:13px; margin-bottom:16px; max-width:760px; }
+  .dev-note b { color:#0f766e; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:.5rem; }
+  label { display:flex; flex-direction:column; font-size:.8rem; gap:.25rem; }
+  select, input { padding:.4rem; border:1px solid var(--border); border-radius:6px; font-size:.85rem; }
+  .btn-add { background:#0f766e; color:#fff; border:none; border-radius:8px; padding:.5rem .9rem; cursor:pointer; font-size:.85rem; }
+  .err { color:var(--cri); font-size:.8rem; }
+  h2 { color:#0f172a; }
+</style>
+</head>
+<body>
+<div class="dev-note">
+  <b>Preview fiel</b> del panel <b>"Evaluador de activación de respaldo (F24)"</b> (CONECTAR E) que vive en
+  <code>admin/fallados.html</code>. Importa los módulos de PRODUCCIÓN <code>tpt_respaldo.js</code> con un parque
+  MOCK (sin Firestore) y ejecuta la evaluación automáticamente al cargar.
+</div>
+
+<section id="secRespaldo" style="margin-top:1rem;padding:1rem;border:1px solid var(--border);border-radius:12px;background:#fff">
+  <h2 style="margin:0 0 .35rem;font-size:1rem">🔀 Evaluador de activación de respaldo (F24)</h2>
+  <p style="font-size:.75rem;color:var(--text-soft);margin:0 0 .75rem">Ante una unidad de POTENCIA fallada o en OTC: elige el mejor RESPALDO disponible (misma zona · mejor salud · mayor capacidad) y estima si puede absorber la carga (IEEE C57.91 §7 · MO.00418 §4.1.3). Estimación orientativa.</p>
+  <div class="grid" style="gap:.5rem">
+    <label>Unidad a respaldar (POTENCIA)
+      <select id="rPotencia"><option value="">— Cargando —</option></select>
+    </label>
+    <label>Carga a redistribuir (A)
+      <input type="number" id="rCarga" min="0" step="1" placeholder="p.ej. 120" value="400">
+    </label>
+    <label>Duración prevista (min)
+      <input type="number" id="rDuracion" min="0" step="1" placeholder="p.ej. 240" value="120">
+    </label>
+  </div>
+  <button type="button" class="btn-add" id="btnEvalRespaldo" style="margin-top:.5rem">Evaluar respaldo óptimo</button>
+  <div id="rResultado" style="margin-top:.75rem"></div>
+</section>
+
+<script type="module">
+  import { evaluarActivacionRespaldo, seleccionarRespaldoOptimo } from '../assets/js/domain/tpt_respaldo.js';
+  const $ = (id) => document.getElementById(id);
+  const escR = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+
+  // Parque MOCK (lo que en producción llega de listarV2 filtrado en cliente).
+  const parque = [
+    { id: 'P1', identificacion: { tipo_activo: 'POTENCIA', codigo: 'TX-CARTAGENA-01' }, ubicacion: { zona: 'BOLIVAR' } },
+    { id: 'R-BOL', identificacion: { tipo_activo: 'RESPALDO', codigo: 'TR-RESP-BOL' }, estado_servicio: 'operativo',
+      electrico: { corriente_nominal_primaria_a: 1000 }, salud_actual: { crg_pct_medido: 30, hi_final: 1.6 },
+      ubicacion: { zona: 'BOLIVAR' }, placa: { potencia_kva: 100000 } },
+    { id: 'R-ORI', identificacion: { tipo_activo: 'RESPALDO', codigo: 'TR-RESP-ORI' }, estado_servicio: 'operativo',
+      electrico: { corriente_nominal_primaria_a: 1000 }, salud_actual: { crg_pct_medido: 30, hi_final: 1.2 },
+      ubicacion: { zona: 'ORIENTE' }, placa: { potencia_kva: 100000 } }
+  ];
+  const potenciaUnidades   = parque.filter((t) => t.identificacion.tipo_activo === 'POTENCIA');
+  const respaldoCandidatos = parque.filter((t) => t.identificacion.tipo_activo === 'RESPALDO');
+
+  $('rPotencia').innerHTML = potenciaUnidades.map((t) =>
+    `<option value="${escR(t.id)}">${escR(t.identificacion.codigo)} · ${escR(t.ubicacion.zona)}</option>`).join('');
+
+  function evaluarRespaldo() {
+    const box = $('rResultado');
+    const unidad = potenciaUnidades.find((t) => t.id === $('rPotencia').value);
+    if (!unidad) { box.innerHTML = '<span class="err">Selecciona una unidad.</span>'; return; }
+    const cargaA = +$('rCarga').value, durMin = +$('rDuracion').value;
+    if (!(cargaA > 0) || !(durMin > 0)) { box.innerHTML = '<span class="err">Ingresa carga y duración positivas.</span>'; return; }
+    const optimo = seleccionarRespaldoOptimo(unidad, respaldoCandidatos);
+    if (!optimo) { box.innerHTML = '<span class="err">No hay RESPALDO operativos.</span>'; return; }
+    const ev = evaluarActivacionRespaldo(optimo, cargaA, durMin);
+    const cod = (optimo.identificacion && optimo.identificacion.codigo) || optimo.id;
+    const zona = (optimo.ubicacion && optimo.ubicacion.zona) || '—';
+    const col = ev.viable ? 'var(--ok)' : 'var(--cri)';
+    const f = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
+    const tAdm = isFinite(ev.tiempo_admisible_min) ? (ev.tiempo_admisible_min + ' min') : 'sin límite práctico';
+    box.innerHTML = `<div style="padding:.75rem;border-radius:10px;border:1px solid ${col}">
+      <div style="font-weight:700;color:${col}">${ev.viable ? '✓ Activación viable' : '⚠ RIESGO — no absorber sin más análisis'} · Respaldo óptimo: ${escR(cod)} (zona ${escR(zona)})</div>
+      <div style="font-size:.78rem;margin-top:.4rem">Factor de carga resultante <b>${f(ev.factor_resultante, 2)}</b> (límite 1.30) · tiempo admisible <b>${tAdm}</b> · envejecimiento del aislamiento <b>${ev.aceleracion_envejecimiento != null ? f(ev.aceleracion_envejecimiento, 1) + '×' : '—'}</b>.</div>
+      <div style="font-size:.72rem;color:var(--text-soft);margin-top:.35rem"><i>${escR(ev.referencia || '')} — estimación IEEE C57.91, orientativa.</i></div>
+    </div>`;
+  }
+  $('btnEvalRespaldo').addEventListener('click', evaluarRespaldo);
+  evaluarRespaldo(); // auto-run para el screenshot
+</script>
+</body>
+</html>
