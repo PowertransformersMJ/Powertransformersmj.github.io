@@ -28,7 +28,7 @@
 > `args` grande a Workflow como string → llega serializado (embeber en el script) · git-filter-repo: clonar
 > `--branch X` reescribe SOLO esa rama (usar `--mirror` si hay tags remotos), aborta con `tmp_pack_*` basura
 > (`rm`+`gc` antes), `glob:*.pdf` matchea todo dir · "FUSIÓN muerta" del diagnóstico = FALSA (está viva) ·
-> tablas en `tand-panel.js` → las da `montarPanelPrueba` (L-57) · chip POR norma (L-58) · "Reprocesar" (ADR-020).
+> tablas en `tand-panel.js` → las da `montarPanelPrueba` (L-57) · chip POR norma (L-58) · "Reprocesar" (ADR-020) · **ref LOCAL `main` quedó stale en la historia vieja pre-filter-repo (`2f0e67f`)** → comparar SIEMPRE contra `origin/main`, no el local (parecía 786-commits divergida y era FF limpio) · hallazgo G024 "XSS en dashboards" = **casi todo FALSO** (escape ya universal; solo `bump.js` tenía fuga real).
 
 ---
 
@@ -38,10 +38,10 @@
 |---|---|---|
 | **TODO-09** | Ola 0: (d) GitHub Support purga `refs/pull/*`; (e) follow-ups: `SGM_DATA_SOURCE` real (Firestore) + template xlsm SANITIZADO (roto el export) + fixture test sanitizado. | ✅ core / follow-ups |
 | **TODO-10** | Ola 1: **G007/G008 código listo, DEPLOY BLOQUEADO por billing** — desplegar `functions` cuando el Ingeniero reactive Blaze. | 🟡 pend-billing |
-| **TODO-11** | Ola 2 (motor normativo — CUIDADO + tests + validar umbrales TODO-04): G010 (umbrales HI que nada consume → hilar `/umbrales_salud/global` por `snapshotSaludCompleto`), G011 (excitación no pasa `corrienteMA` al calificador — 4 callers de `evaluarMultiNorma`), G012 (calificadores contradictorios 5%/2%), G013/G014 (huérfanos F24/F29/F37: **decisión** conectar o retirar). G020: falta `modal-detalle.js` (workflow '2/4' + tendencia seno+random). | 🟡 motor pend |
-| **TODO-12** | Ola 3: G025 (tests de `firestore.rules` vía emulador), G022/G094 (`lucide@latest` sin SRI 67 pág — pin+SRI/self-host), G111 (deps `websocket-driver`), G024/G019 (CSP + escapar innerHTML dashboards). | 🟡 CI+links ✅ |
-| **TODO-13** | Ola 4: G016 (dashboard suscribe 2× — refactor `suscribirStockGlobal` para exponer lo que ya lee), G017 (stock no atómico en `runTransaction`), G095 (borrado transformador sin cascada). | 🟡 2/5 ✅ |
-| **TODO-14** | Ola 5: separar 5 dominios del repo (app/cerebro/skills/OLTC/contratos), G119 (`functions/domain` copia commiteada → gitignore+rm), monolitos (shell 2398L, parque 275KB). (nav.js/css muertos ✅ retirados). | 🟡 nav ✅ |
+| **TODO-11** | Ola 2 (re-verificado §52.9). **REAL, hacer**: G011 (excitación no pasa `corrienteMA` a la óptica IEEE de `evaluarMultiNorma:59` → sub-califica; fix aditivo `evaluar:(v,ctx)=>` + derivar corriente en callers + tests) · G020-resto (modal cargabilidad `modal-detalle.js:142-164,239` "Workflow 2/4" hard-coded; los otros 2 sub-hallazgos ya ✅) · G012-resto (retirar render muerto Familia B en `tabla-pruebas.js` + reconciliar `.calif` 5%/1GΩ de `schema.js:170-181` al canon 2%/por-clase + espejo `functions/domain`; superficie visible YA consolidada). **DECISIÓN Ingeniero**: G013 (4 módulos huérfanos: conectar/retirar) · G014 (RBAC F28 no enforced; sin hueco hoy). **BLOQUEADO**: G010 REAL pero dirección = TODO-04. | 🟡 3 REAL + 3 decisión |
+| **TODO-12** | Ola 3 (re-verificado §52.9): **G022/G094 ✅** (auto-hospedado lucide v1.25.0 en `assets/vendor/lucide/`) · **G024 bump ✅** (escHtml). Pendiente: G025 (tests `firestore.rules` vía emulador — REAL, aditivo, L) · G024-CSP (falta CSP en 95 HTML; GitHub Pages estático → vía `<meta>`, trade-offs con CDN/inline) · G111 = **decisión** (websocket-driver: `npm audit fix` mecánico; **xlsx: sin fix npm** → migrar a cdn.sheetjs.com off-registry vs aceptar riesgo). | 🟡 G022/G024 ✅ |
+| **TODO-13** | Ola 4 (re-verificado §52.9): **REAL, hacer**: G016 (dashboard suministros suscribe 2× — quick-win: `nombreSum`→`cacheStockGlobal` + fix mayor: exponer `movimientos` en emit de `suscribirStockGlobal`). **DECISIÓN Ingeniero**: G017 (movimientos no atómicos; `getDocs` en `runTransaction`; fix obvio INVIABLE en SDK Web → contadores agregados vs Cloud Function vs aceptar) · G095 (borrado sin cascada → órdenes huérfanas inflan KPIs; preservar historial MO.00418 vs cascada vs soft-delete). | 🟡 G015/G018 ✅ |
+| **TODO-14** | Ola 5 (re-verificado §52.9): **G119 ✅** (`.gitignore`+`git rm --cached functions/domain`; predeploy regenera). **DECISIÓN Ingeniero**: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L; +`calculo-refrigeracion.js` 4913L que el diagnóstico omitió). Dato corregido: parque.html YA 275→88KB (Ola 0). (nav ✅). | 🟡 G119/nav ✅ |
 | **TODO-04** | El Ingeniero valida los `⚠️ verificar` del lóbulo `49` (MO.00418 por clase, C1 bujes, PI/DAR, NETA 0.5%, `TIPUP 0.1`/`PEND 0.05`) → **bloquea Ola 2 (G010-12)**. | 🔄 validación |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 espera |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
@@ -60,3 +60,9 @@
 > bloqueadas por billing. Olas 2-5 parciales (ver §52.8). Cerré por: findings media sin verificar (una FALSA),
 > motor normativo necesita validación de umbrales, entorno con fatiga (clasificador, boot al tope). Detalle
 > completo commit-por-commit → `99 §52.8`. **Brain-kit se borra solo al 100% de Fase 9 (aún no).**
+>
+> **2026-07-22 (Opus 4.8) — Re-verificación + Olas 3/5**: workflow 21 agentes re-verificó los 15 hallazgos
+> media/baja pendientes (crudo en bóveda). Ejecutados+desplegados a `main` (FF): G024 (escHtml bump.js),
+> G119 (untrack functions/domain), G022 (auto-hospeda lucide v1.25.0, verificado en preview). Triaje completo
+> → `99 §52.9`. Corregí ref local `main` stale. Siguiente: batch REAL (G011/G016/G020/G012) + presenté al
+> Ingeniero las 6 decisiones de producto/arquitectura (G013/G014/G017/G095/G111-xlsx/STRUCT).
