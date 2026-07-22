@@ -304,7 +304,10 @@ export function suscribirStockGlobal(onDataOrFiltros, onDataMaybe, onErrorMaybe)
         ...s,
         stock: computarStockDesdeMovimientos(s.stock_inicial, movsBySum.get(s.codigo) || [])
       }));
-      onData({ suministros: out, generatedAt: new Date(), config: state.config || { ...DEFAULT_SUMINISTROS_CONFIG } });
+      // G016: expone también los movimientos crudos (ya suscritos aquí) para que
+      // el dashboard NO re-suscriba la colección 'movimientos' aparte. Aditivo:
+      // los consumidores previos ignoran el campo nuevo.
+      onData({ suministros: out, movimientos: state.movimientos, generatedAt: new Date(), config: state.config || { ...DEFAULT_SUMINISTROS_CONFIG } });
     } catch (err) { fail(err); }
   };
 

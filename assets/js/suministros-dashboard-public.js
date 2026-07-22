@@ -9,8 +9,7 @@
 //   4. Vista cruzada filtrable por zona/depto
 // ══════════════════════════════════════════════════════════════
 
-import { suscribirStockGlobal, suscribir as suscribirMovimientos, isReady } from '../js/data/movimientos.js';
-import { suscribir as suscribirSuministros } from '../js/data/suministros.js';
+import { suscribirStockGlobal, isReady } from '../js/data/movimientos.js';
 import { suscribir as suscribirAccionesRefrig } from '../js/data/acciones_refrigeracion.js';
 import { estadoStock, ESTADOS_STOCK } from '../js/domain/schema.js';
 import { computarKpisBrigada } from '../js/domain/dashboard_brigada_kpis.js';
@@ -47,11 +46,10 @@ const cruzadoCount = $('cruzadoCount');
 
 // Estado
 let cacheStockGlobal = [];   // [{...sumDoc, stock: {inicial, ingresado, egresado, actual}}]
-let cacheMovs = [];
-let cacheSums = [];
+let cacheMovs = [];          // G016: llega en el mismo emit de suscribirStockGlobal (sin re-suscribir)
 let cacheAccionesBrig = [];  // Microfase 6 · acciones de refrigeración del contrato
 let configCache = null;
-let unsubStock = null, unsubMovs = null, unsubSums = null;
+let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
 
@@ -82,8 +80,10 @@ function estadoMeta(key) {
   return ESTADOS_STOCK.find((e) => e.value === key) || { value: key, label: key, prefix: '·' };
 }
 function nombreSum(codigo) {
-  const s = cacheSums.find((x) => x.codigo === codigo);
-  return s ? `· ${s.nombre.slice(0, 32)}` : '';
+  // G016: el nombre ya viene en cacheStockGlobal (mismo doc de suministro con
+  // codigo+nombre); antes esto forzaba una 2ª suscripción a 'suministros'.
+  const s = cacheStockGlobal.find((x) => x.codigo === codigo);
+  return (s && s.nombre) ? `· ${s.nombre.slice(0, 32)}` : '';
 }
 
 // Paleta del skill (Tailwind)
@@ -368,27 +368,22 @@ function arrancar() {
     return;
   }
   if (unsubStock)         try { unsubStock(); }         catch (_) {}
-  if (unsubMovs)          try { unsubMovs(); }          catch (_) {}
-  if (unsubSums)          try { unsubSums(); }          catch (_) {}
   if (unsubAccionesBrig)  try { unsubAccionesBrig(); }  catch (_) {}
 
   const filtros = withContratoFiltro();
-  unsubStock = suscribirStockGlobal(filtros, ({ suministros, config }) => {
+  // G016: una sola suscripción. suscribirStockGlobal ya lee 'suministros' y
+  // 'movimientos' internamente y ahora expone ambos en el emit → tomamos
+  // cacheMovs de aquí en vez de re-suscribir esas colecciones (antes se leían
+  // 2× cada una por visita). nombreSum saca el nombre de cacheStockGlobal.
+  unsubStock = suscribirStockGlobal(filtros, ({ suministros, movimientos, config }) => {
     cacheStockGlobal = suministros;
+    cacheMovs = movimientos || [];
     configCache = config || null;
     recomputarTodo();
   }, (err) => {
     console.error(err);
     showInfo('Error realtime stock: ' + (err.message || err), 'err');
   });
-  unsubMovs = suscribirMovimientos(filtros, (rows) => {
-    cacheMovs = rows;
-    recomputarTodo();
-  }, (err) => console.warn('[movs]', err));
-  unsubSums = suscribirSuministros(filtros, (rows) => {
-    cacheSums = rows;
-    recomputarTodo();
-  }, (err) => console.warn('[sums]', err));
 
   // Microfase 6 · acciones de refrigeración del contrato para los
   // KPIs del widget "Consumo por Brigada".
@@ -405,8 +400,6 @@ function arrancar() {
 
 window.addEventListener('beforeunload', () => {
   if (unsubStock)        try { unsubStock(); }        catch (_) {}
-  if (unsubMovs)         try { unsubMovs(); }         catch (_) {}
-  if (unsubSums)         try { unsubSums(); }         catch (_) {}
   if (unsubAccionesBrig) try { unsubAccionesBrig(); } catch (_) {}
   for (const k of Object.keys(charts)) destroyChart(k);
 });
