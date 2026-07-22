@@ -20,9 +20,12 @@
     "start": "npm run serve",
     "build": "npm run lint && npm run test:unit",
     "test:unit": "node --test tests/*.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-sgm-rules \"node --test tests-rules/*.test.js\"",
     "test": "npm run lint && npm run test:unit"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.1",
+    "firebase": "^12.16.0",
     "firebase-admin": "^13.8.0",
     "html-validate": "^8.24.0",
     "jszip": "^3.10.1",

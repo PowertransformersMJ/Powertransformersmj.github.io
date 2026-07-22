@@ -44,3 +44,17 @@ jobs:
       # Antes solo se validaba HTML y el deploy salía sin ejecutar la suite.
       - name: Tests unitarios (node --test)
         run: npm run test:unit
+
+      # G025 (ADR-052 Ola 3): firestore.rules —el único firewall del backend—
+      # ahora se testea con el emulador de Firestore (requiere Java + firebase-tools).
+      - name: Setup Java (emulador Firestore)
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Instalar firebase-tools
+        run: npm install -g firebase-tools
+
+      - name: Tests de reglas Firestore (emulador)
+        run: npm run test:rules
