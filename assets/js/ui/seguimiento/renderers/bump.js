@@ -13,6 +13,7 @@ import {
   buildDailyRanking, deltaPosicion,
 } from '../../../domain/scada_ranking.js';
 import { store } from '../state.js';
+import { escHtml } from '../../../ui-helpers.js';
 
 // ── historialClamped(rankInfo, topN) ─────────────────────────
 // Como `calcularHistorial` del dominio, pero descarta los días
@@ -120,8 +121,8 @@ function renderTablaResumen(rankInfo, sidsTop, paleta) {
     return `<tr data-sid="${r.sid}" class="rank-row${isSelected ? ' is-selected' : ''}" style="cursor:pointer">
       <td><span class="${rb}">${r.rank}</span></td>
       <td><span class="rank-delta ${cls}">${delta}</span></td>
-      <td>${dot}<strong>${r.name}</strong></td>
-      <td><span class="zona-pill">${r.zona || '—'}</span></td>
+      <td>${dot}<strong>${escHtml(r.name)}</strong></td>
+      <td><span class="zona-pill">${escHtml(r.zona || '—')}</span></td>
       <td class="num">${r.count.toLocaleString()}</td>
       <td class="num">#${h.rankMax}</td>
       <td class="num">#${h.rankMin}</td>
@@ -408,8 +409,8 @@ function renderVariantC(rankInfo) {
           <div class="rank-card-pos" style="color:${color}">#${r.rank}</div>
           <div class="rank-card-delta ${cls}">${delta}</div>
         </div>
-        <div class="rank-card-name">${r.name}</div>
-        <div class="rank-card-zona"><span class="zona-pill">${r.zona || '—'}</span></div>
+        <div class="rank-card-name">${escHtml(r.name)}</div>
+        <div class="rank-card-zona"><span class="zona-pill">${escHtml(r.zona || '—')}</span></div>
         <div class="rank-card-spark" style="color:${color};font-family:'JetBrains Mono',monospace;font-size:18px;letter-spacing:-2px;line-height:1">${gradientSparkline(h.series)}</div>
         <div class="rank-card-meta">
           <span><b>${r.count.toLocaleString()}</b> viol.</span>
@@ -474,7 +475,7 @@ function renderDetalle(rankInfo) {
   if (!validas.length) {
     panel.innerHTML = `<div style="text-align:center;padding:20px;color:var(--slate-400)">Sin presencia en el Top ${rankTopN} para este equipo.</div>`;
     const closeBtn0 = `<button type="button" class="btn btn-ghost" id="rank-detail-close">✕ Quitar selección</button>`;
-    panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:20px"><span style="color:var(--slate-500)">${meta.name} sin presencia en el Top ${rankTopN}.</span>${closeBtn0}</div>`;
+    panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;padding:20px"><span style="color:var(--slate-500)">${escHtml(meta.name)} sin presencia en el Top ${rankTopN}.</span>${closeBtn0}</div>`;
     const c0 = $('#rank-detail-close');
     if (c0) c0.addEventListener('click', () => store.setSelectedSid(null));
     return;
@@ -538,9 +539,9 @@ function renderDetalle(rankInfo) {
     <div class="rank-detail-head">
       <div>
         <div class="rank-detail-tag">Trayectoria del equipo · acotada al Top ${rankTopN}</div>
-        <h4>${meta.name}</h4>
+        <h4>${escHtml(meta.name)}</h4>
         <div class="rank-detail-meta">
-          <span class="zona-pill">${meta.zona || '—'}</span>
+          <span class="zona-pill">${escHtml(meta.zona || '—')}</span>
           <span>${tendenciaTxt}</span>
         </div>
       </div>
