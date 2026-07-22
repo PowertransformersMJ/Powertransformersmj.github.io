@@ -34,6 +34,12 @@ Debug/
 dist/
 build/
 
+# Cloud Functions: copia AUTO-GENERADA del dominio (functions/prepare-deploy.mjs
+# la regenera desde assets/js/domain/ en cada `firebase deploy --only functions`
+# vía el hook predeploy). NUNCA se edita a mano ni se commitea (ADR-052 Ola 5,
+# G119): commiteada solo duplicaba el dominio y ya había divergido stale.
+functions/domain/
+
 # Secretos / claves
 *.key
 *.pem
