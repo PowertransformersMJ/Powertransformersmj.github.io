@@ -8,6 +8,7 @@ import {
   estrategiaPorCondicion, generarPropuestaOrden,
   detectarCausantePrincipal, periodicidadSugerida
 } from '../assets/js/domain/estrategias.js';
+import { sanitizarOrden, validarOrden } from '../assets/js/domain/orden_schema.js';
 
 describe('Matriz Criticidad — F36', () => {
   test('rangos con max=48312 min=1 producen pasos de ~9662', () => {
@@ -136,5 +137,24 @@ describe('Estrategias — F37', () => {
       condicion_nueva: 4, causante_principal: 'CAU-05'
     });
     assert.deepEqual(prop.causantes, ['CAU-05']);
+  });
+});
+
+// FASE B (G013) — el botón "Sugerir desde salud" pre-llena el formulario con este
+// payload; debe ser una ORDEN VÁLIDA para el pipeline (sanitizarOrden + validarOrden),
+// si no, al guardar fallaría. Invariante de integración del cableado.
+describe('FASE B — la propuesta de orden es válida para el pipeline (integración)', () => {
+  test('generarPropuestaOrden pasa sanitizarOrden + validarOrden sin errores', () => {
+    const tx = { id: 'tx1', identificacion: { codigo: 'TX-001' }, salud_actual: { hi_final: 4.2, calif_fur: 4 } };
+    const prop = generarPropuestaOrden(tx, {
+      condicion_nueva: Math.round(tx.salud_actual.hi_final),
+      causante_principal: detectarCausantePrincipal(tx.salud_actual)
+    });
+    assert.ok(prop, 'debe generar una propuesta');
+    assert.equal(prop.estado, 'borrador');
+    assert.equal(prop.transformadorId, 'tx1');
+    assert.equal(prop.condicion_objetivo, 4);
+    const errores = validarOrden(sanitizarOrden(prop));
+    assert.deepEqual(errores, [], 'la propuesta debe ser orden válida: ' + JSON.stringify(errores));
   });
 });

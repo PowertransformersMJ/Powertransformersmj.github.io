@@ -18,6 +18,7 @@ import {
 
 import { listarMacroactividades, listarCausantes } from '../data/catalogos.js';
 import { listar as listarContratos } from '../data/contratos.js';
+import { generarPropuestaOrden, detectarCausantePrincipal } from '../domain/estrategias.js';
 
 import { logoutAdmin, ADMIN_ROUTES } from './admin-auth.js';
 
@@ -169,6 +170,32 @@ function fillForm(o) {
   const set = new Set(o.causantes || []);
   for (const opt of fCausantes.options) opt.selected = set.has(opt.value);
 }
+// FASE B (G013) — pre-llena el formulario con la propuesta de orden que dicta la
+// salud del transformador seleccionado (estrategias.generarPropuestaOrden,
+// MO.00418 §4.3). NO crea nada: el admin revisa y guarda por el flujo normal, así
+// el humano evita duplicados. Aditivo, admin-only. El veredicto (tipo/prioridad/
+// macroactividad) sale del VALOR (condición derivada del HI) vs el catálogo, no
+// de datos fabricados.
+function sugerirDesdeSalud() {
+  const id = fTransformador.value;
+  if (!id) { showInfo('Selecciona un transformador primero.', 'err'); return; }
+  const tr = transformadoresCache.find((t) => t.id === id);
+  if (!tr) { showInfo('Transformador no encontrado en la lista.', 'err'); return; }
+  const salud = tr.salud_actual || {};
+  if (salud.hi_final == null) {
+    showInfo('Este transformador aún no tiene salud calculada; no se puede sugerir.', 'err');
+    return;
+  }
+  const propuesta = generarPropuestaOrden(tr, {
+    condicion_nueva: Math.round(salud.hi_final),
+    causante_principal: detectarCausantePrincipal(salud)
+  });
+  if (!propuesta) { showInfo('No hay estrategia definida para esa condición.', 'err'); return; }
+  // Nueva orden borrador: se pre-llena y el admin la revisa/guarda.
+  fillForm({ ...propuesta, id: '', estado: 'planificada', estado_v2: 'borrador' });
+  showInfo('Propuesta sugerida desde la salud del activo. Revisa los campos y guarda.', 'ok');
+}
+
 function readForm() {
   const sel = fTransformador.selectedOptions[0];
   const trCodigo = sel ? (sel.dataset.codigo || '') : '';
@@ -344,6 +371,7 @@ form.addEventListener('submit', async (e) => {
 });
 
 // ── Eventos UI ──
+$('btnSugerir')?.addEventListener('click', sugerirDesdeSalud);
 $('btnNuevo').addEventListener('click', () => {
   form.reset(); fId.value = '';
   histWrap.style.display = 'none'; histList.innerHTML = '';
