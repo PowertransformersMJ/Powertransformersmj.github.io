@@ -135,6 +135,33 @@ director (MO.00418 Ed. 02 / IEEE / NETA) y luego fijar en `03-…` + el schema d
 - **DGA**: ppm exactos del percentil 90/95 por gas (IEEE C57.104-2019 Tablas 1/2, no públicos); cortes de Rogers/Doernenburg/Duval.
 - **DFR**: escala de % humedad del papel (2/3/4.5 %, CIGRE TB 349/414).
 
+## ✅ Validación TODO-04 contra fuentes públicas (2026-07-23, ADR-053) — parcial
+
+Workflow Opus (4 clusters + refutación adversarial por ajuste; crudo → bóveda `2026-07-23-todo04-umbrales/`).
+Delegación "HAS TODO TU" del Ingeniero; **ratificación formal del director pendiente**.
+
+**CONFIRMADOS (fuente pública citada en el crudo)**: piso IR **5 GΩ** (NETA Tabla 100.5 >5 kV líquido, exacto) ·
+**PI ≥1.0** duro NETA + **≥1.5** IEEE C57.152 (escala fina 2–4 = IEEE 43 rotativas, por analogía — ya bien atribuido) ·
+**DAR >1.6** (práctica publicada) · **tan δ techo 1.0%** (NETA 100.3 + C57.152 servicio) · **TTR ±0.5%** ·
+**NO aplicar corrección de T genérica al FP** (IEEE C57.12.90-2010 la retiró; el tablero remite al factor del fabricante — correcto).
+
+**AJUSTES aplicados (c7683d7)**: (1) atribución tan δ INVERTIDA → corregida: NETA 100.3 aceite mineral = **1.0%**
+(el 0.5% era de silicona); el piso 0.5% "investigar" es **IEEE C57.12.90-2015/C57.152 (unidad nueva <230 kV)**.
+Etiquetas intercambiadas SIN tocar bandas (investigar >0.5, rechazar >1.0 intactas). (2) descriptor per-clase de
+`schema.js` ya no cita NETA 100.5 (esa tabla NO tiene desglose por clase) → "criterio interno ⚠️ verificar MO.00418".
+
+**REFUTADOS (NO tocar)**: fallback scorecard 1 GΩ (rol correcto: clase 601–5000 V; el shell recalifica por clase) ·
+óptica FP-vs-placa en bujes (requiere FP de placa por buje — dato que el schema NO captura; mejora futura de datos).
+
+**GAPS confirmados → TODO-15**: (a) **ΔC1 bujes sin semáforo** — `dc1_max_pct` se calcula pero no pinta color;
+criterio primario NETA/IEEE ±5% investigar (CONFIRMADO) y >10% retiro (práctica Megger/Doble). Diseño requerido:
+umbral >10% DIRECCIONAL (solo aumento de C) o gatillado por tendencia — NO condena automática con Δ absoluto.
+(b) **corrección IR a 20 °C (Tabla 100.14) no implementada** — el veredicto asume el GΩ ya corregido; informe a
+T>20 °C se SOBRE-califica. Implementar corrección o capturar IR₂₀ + caveat visible.
+**Sin validar aún** (agente falló/parcial): excitación Δ5/10% + R devanados 2% (cluster 3b) · IR núcleo 500 MΩ ·
+reactancia 3% · LTC 40–60 ms · collar (cluster 4). Tabla per-clase (30 GΩ@110 kV): **no confirmable públicamente**
+— solo el MO.00418 del director puede fijarla.
+
 ## 🔎 Auditoría del panel FP/tan δ (2026-06-09) — gaps de diagnóstico vs la skill
 
 Skill consultada: `factor-potencia-aislamiento` (02-calculos, 03-criterios, 04-diagnostico).

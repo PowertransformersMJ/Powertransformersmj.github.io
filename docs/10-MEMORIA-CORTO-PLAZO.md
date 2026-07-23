@@ -6,26 +6,26 @@
 
 ---
 
-## 🎯 Foco (2026-07-23) — Fase 9 COMPLETA · CONECTAR COMPLETA · sin trabajo autónomo pendiente
+## 🎯 Foco (2026-07-23) — Fase 9 + CONECTAR completas · "HAS TODO TU" ejecutado (ADR-053)
 
-> **Fase 9 (ADR-052)**: Olas 0-5 ejecutadas y desplegadas. **Fase CONECTAR (§52.11-14) COMPLETA** — los 4 módulos
-> huérfanos cableados: ✅ **A** sobrecarga IEEE en modal · **B** botón "sugerir orden desde salud" · **C** feedback
-> de rol en órdenes · **E** evaluador de respaldo TPT en `admin/fallados`; **D** (enforcement RBAC) **DECIDIDO: NO
-> activar** (comité ×4 + red-team ×3 convergen — mantener admin-only; §52.14). Detalle → `99 §52.8-52.14`.
-> **No queda trabajo autónomo seguro**: lo pendiente necesita acciones/decisiones del Ingeniero (abajo).
+> Fase 9 (ADR-052) Olas 0-5 + CONECTAR A/B/C/E desplegadas; D decidido NO activar (§52.14). **ADR-053 (hoy)**:
+> **G010 cableado** (umbrales F18 → Health Index, aditivo, revisión adversarial 0 defectos) + **TODO-04 validado
+> parcial** (re-atribución tan δ + per-clase aplicadas; ver `49 §Validación`) + **fixes FASE E** (tarjeta causa
+> real + XSS tabla RCA). **Billing CONFIRMADO caído → las 2 CF de IA están CAÍDAS en prod (HTTP 500)**.
 
 ### ▶️ RETOMAR (próxima sesión)
-> Confirma git real (HEAD, M-01) + lee `05`+`10`. **Los siguientes movimientos son del Ingeniero** (recomendación
-> por impacto): **(1) revisar billing Blaze** — si lapsó, las CF de IA (extracción/narrativa) podrían estar caídas
-> en prod Y bloquea el deploy de G007/G008 (si está activo → Claude despliega G007/G008). **(2) validar umbrales
-> (TODO-04)** → Claude cablea el motor normativo G010-12 (veredicto más correcto). **(3) probar en vivo FASE B**
-> (botón en `admin/ordenes.html`) **y FASE E** (panel respaldo en `admin/fallados.html`) — gated, no verificables
-> sin auth. Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D (si surge necesidad multi-rol real).
+> Confirma git real (M-01) + lee `05`+`10`. **(1) Ingeniero reactiva billing** (URL en Acciones) → Claude corre
+> `firebase deploy --only functions:extraerPruebasElectricasIA,functions:narrativaTendenciaIA,functions:onMuestraCreate`
+> (G007/G008 + G010-CF; NUNCA el cron — Etapa 2 intencional). **⚠️ NO editar umbrales en F18 hasta ese deploy**
+> (divergencia cliente/servidor). **(2) TODO-15** (ΔC1 semáforo + corrección IR 20 °C + clusters 3b/4) — diseño
+> especificado en `49`. **(3) probar B/E en vivo** (gated; verificación headless ya hecha: FUNCIONALES, ADR-053).
+> Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
-> **(A) Billing Blaze** → desbloquea deploy de functions (G007/G008) y quizá las CF de IA. **(B) GitHub Support**
-> "remove sensitive data" (purga `refs/pull/*` viejos). **(C) Valida umbrales (TODO-04)** → desbloquea motor
-> normativo G010-12.
+> **(A) Reactivar billing Blaze**: console.developers.google.com/billing/enable?project=lordpowertransformersmj —
+> SIN esto la extracción IA y la narrativa están CAÍDAS para los usuarios. **(B) GitHub Support** "remove sensitive
+> data" (purga `refs/pull/*`). **(C) Revocar PATs viejos** (TODO-08). **(D) Ratificar TODO-04** (`49 §Validación`)
+> y entregar MO.00418 Ed.02 para la tabla per-clase (30 GΩ@110 kV no confirmable en fuentes públicas).
 
 ### 🚫 Callejones (NO reintentar)
 > `args` grande a Workflow como string → llega serializado (embeber en el script) · git-filter-repo `--branch X`
@@ -41,9 +41,10 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **CONECTAR D** | **A/B/C/E desplegadas**. **D → DECIDIDO (comité ×4 + red-team ×3 independiente, §52.14): NO activar ahora** (2 capas convergen; sin Gemini se usó red-team interno). Mantener `/ordenes` admin-only + feedback FASE C. **Hoy SOLO admin está enforced** (los otros 6 roles ni escriben — el feedback cliente es cosmético). Prerrequisitos del día D (cuando el negocio lo exija): UI no-admin real · rol en **custom claims** (evita get() facturado) · **constraints a nivel de CAMPO** (la matriz solo gobierna `estado`; el doc entero queda abierto — falsa completitud) · test paridad+denegaciones verde · create/delete admin-only · rollout por-rol reversible. Pendiente del Ingeniero: ¿hay necesidad operativa real de multi-rol? → si sí, es un épico. | 🔵 esperar (decidido) |
-| **TODO-04** | Ingeniero valida los `⚠️ verificar` del lóbulo `49` (MO.00418 por clase, C1 bujes, PI/DAR, NETA 0.5%, TIPUP 0.1/PEND 0.05) → **bloquea motor normativo G010-12**. | 🔄 |
-| **TODO-10** | G007/G008 código listo, **deploy bloqueado por billing** Blaze. | 🟡 billing |
+| **CONECTAR D** | D decidido: **NO activar** (§52.14 — prerrequisitos del día D allá: UI no-admin, custom claims, constraints por CAMPO). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
+| **TODO-04** | **✅ PARCIAL (ADR-053)**: clusters IR/PI/DAR + FP/tan δ/bujes + TTR validados con fuente y refutación; 2 re-atribuciones aplicadas (`c7683d7`). RESTA: ratificación del director + MO.00418 (per-clase) + clusters 3b/4 (→ TODO-15). | 🟢 parcial |
+| **TODO-15** | Del TODO-04 (spec en `49 §Validación`): (a) evaluador ΔC1 bujes (>5% investigar NETA; >10% DIRECCIONAL/tendencia, práctica) con preview fiel; (b) corrección IR a 20 °C (Tabla 100.14) o caveat visible; (c) re-correr clusters 3b (excitación/R-dev) y 4 (núcleo/reactancia/LTC/collar) en Opus. | 🔴 nuevo |
+| **TODO-10** | G007/G008 + **G010-CF** código listo; **deploy bloqueado por billing** (CF de IA CAÍDAS en prod, verificado HTTP 500). Comando exacto en RETOMAR. | 🟡 billing |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
@@ -58,21 +59,8 @@
 
 ## 📝 Bitácora (efímera)
 
-> **2026-07-22 (Opus 4.8)** — Fase 9 re-verificada adversarialmente (21 agentes; una hipótesis salió FALSA) +
-> batch REAL (G020/G011/G095/G016/G012, con tests+preview) + infra (G024/G022/G119), todo desplegado a `main`.
-> Fase CONECTAR arrancada: mapeo (4 agentes) → plan A-E; A/B/C desplegadas. **Brain-kit se borra solo al 100% de
-> Fase 9 (aún no).** Detalle → `99 §52.8-52.11`. **Poda de cerebro 2026-07-22** (boot al tope) — este `10`
-> recortado al foco vivo (8447→4735c; boot margen 169→3757c). **GC COMPLETO**: `30-LECCIONES` shardeado (§G.5) —
-> el cluster IA/Cloud-Functions (L-35, L-43–L-48) movido a `31-LECCIONES-IA.md` (30: 41804→34281c, bajo tope);
-> `brain-check.mjs` reconoce el nodo hijo; registrado en `CLAUDE.md §0`+`00`+manifest. Cerebro SANO.
->
-> **2026-07-23 (Opus 4.8) — cierre de sesión para relevo fresco**: CONECTAR completa (A/B/C/E desplegadas) + **D
-> decidido: NO activar** (proceso-decision-fuerte: comité ×4 + red-team ×3 sin Gemini, ambas capas convergen; los
-> 3 hallazgos nuevos —agnóstico-de-campo, custom-claims, brecha percibida-vs-real— en `99 §52.14`) + **G025**
-> (tests de `firestore.rules` + emulador + CI) + **GC del cerebro** completo (boot recuperado + shard 30→31). Todo
-> a `main` (HEAD `2adcccf`). **Recomendación al Ingeniero**: revisar billing Blaze (posible CF-IA caída) → validar
-> umbrales (TODO-04) → probar FASE B/E en vivo. **GC menor pendiente**: `20-ESPACIAL` ≥90% de su tope (pre-shard,
-> no bloquea el boot).
+> **2026-07-22/23 (Opus 4.8)** — Fase 9 re-verificada + batch REAL + CONECTAR A-E + D decidido NO + G025 + GC del
+> cerebro (shard 30→31). Todo consolidado en `99 §52.8-52.14` (bitácora vieja podada — GC 2026-07-23).
 >
 > **2026-07-23 (Fable 5) — ESCANEO DE CIERRE ✅ + interinato Opus 4.8 listo**: brain:check SANO · tests vivos
 > 1189/1187 · git real sync (HEAD==origin/main==`ae593da`). Workflow adversarial ACOTADO en **Opus** (regla
@@ -86,3 +74,11 @@
 > interinato en `05`** (cargar `opus-interino-protocolo` al boot). **Falsos positivos (NO reabrir)**: "38 data
 > layers" es CORRECTO (`_firestore_clean.js` es helper) · hash del `05` 1 commit atrás = artefacto por diseño.
 > CRUDO+síntesis → bóveda `2026-07-23-escaneo-cierre-fable/`.
+>
+> **2026-07-23 (Fable 5) — "HAS TODO TU" (ADR-053)**: billing sondeado con exit-code REAL (la 1ª lectura "494
+> bytes OK" era el TEXTO del error — §3.3): **deshabilitado, CF de IA CAÍDAS en prod (500)**; deploy en cola.
+> **G010 EJECUTADO**: umbrales F18 → motor HI (aditivo, 6 consumidores + CF fail-safe, `umbrales_version`),
+> +7 tests → **1194 pass/0 fail**, revisión adversarial del diff (Opus): 0 defectos. **TODO-04**: workflow Opus
+> 4 clusters + refutación → 2 re-atribuciones aplicadas, 2 ajustes refutados, gaps→TODO-15 (detalle `49`).
+> **B/E verificadas headless** (Opus): FUNCIONALES; fix tarjeta E + XSS tabla RCA (`18f4632`). Commits
+> `52f06b7→c7683d7` a `main`. Crudos → bóveda `2026-07-23-todo04-umbrales/` + `2026-07-23-hastodotu/`.
