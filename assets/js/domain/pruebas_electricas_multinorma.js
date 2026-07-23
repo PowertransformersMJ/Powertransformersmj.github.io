@@ -47,8 +47,12 @@ const minBanda = (getMin) => (v, ctx) => {
  * donde la óptica coincide con el umbral ya probado. */
 export const CRITERIOS_MULTINORMA = Object.freeze({
   tand: [
-    { norma: 'ANSI/NETA ATS Tabla 100.3', umbral: '≤0.5% (aceite mineral)', evaluar: maxBanda(0.5, 1) },
-    { norma: 'IEEE 62 / C57.152', umbral: '≤1% (0.5–1 investigar)', evaluar: calificarTanDelta, nota: 'guía + tendencia' }
+    // ⚠️ Atribución corregida (TODO-04, 2026-07-23): NETA Tabla 100.3 aceite
+    // mineral = 1.0% (el 0.5% es de SILICONA); el piso 0.5% "investigar" es
+    // IEEE C57.12.90-2015/C57.152 (unidad nueva <230 kV; 0.5–1% investigar).
+    // Las BANDAS operativas no cambian: investigar >0.5, rechazar >1.
+    { norma: 'IEEE C57.12.90 / C57.152 (nuevo <230 kV)', umbral: '≤0.5% · 0.5–1 investigar', evaluar: maxBanda(0.5, 1) },
+    { norma: 'ANSI/NETA ATS Tabla 100.3', umbral: '≤1% (aceite mineral)', evaluar: calificarTanDelta, nota: 'guía 0.7 interna + tendencia' }
   ],
   bushing: [
     { norma: 'ANSI/NETA §7.2.2.D.5', umbral: 'tan δ ≤1% · vs placa: FP>50% / C1>5%', evaluar: maxBanda(0.5, 1) },
