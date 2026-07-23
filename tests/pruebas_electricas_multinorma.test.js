@@ -138,3 +138,39 @@ describe('corrienteExcitacionMax — corriente de referencia (máx mA entre fase
     assert.equal(corrienteExcitacionMax({ excitacion: { fases: [{ valor: null }, { valor: 33 }, {}] } }), 33);
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// TODO-15a — óptica ΔC1 de bujes (capacitancia vs placa)
+// ══════════════════════════════════════════════════════════════
+describe('bushing · óptica ΔC1 vs placa (NETA ±5% · sin rojo automático)', () => {
+  const optDc1 = (r) => r.opticas.find((o) => o.norma.includes('ΔC1'));
+
+  test('ΔC1 ≤5% → verde; sin afectar el consolidado si FP verde', () => {
+    const r = evaluarMultiNorma('bushing', 0.3, { dc1MaxPct: 4.9 });
+    assert.equal(optDc1(r).estado.nivel, 0);
+    assert.equal(r.consolidado.nivel, 0);
+  });
+
+  test('ΔC1 >5% → investigar y ARRASTRA el consolidado aunque FP esté verde', () => {
+    const r = evaluarMultiNorma('bushing', 0.3, { dc1MaxPct: 6.2 });
+    assert.equal(optDc1(r).estado.etiqueta, 'investigar');
+    assert.equal(r.consolidado.etiqueta, 'investigar');   // el gap que cerró 15a
+  });
+
+  test('ΔC1 >10% → SIGUE en investigar (|Δ| absoluto: nunca rojo automático)', () => {
+    const r = evaluarMultiNorma('bushing', 0.3, { dc1MaxPct: 14 });
+    assert.equal(optDc1(r).estado.etiqueta, 'investigar');
+    assert.notEqual(r.consolidado.etiqueta, 'crítico');
+  });
+
+  test('sin dc1MaxPct en ctx → óptica NEUTRAL (no participa del consolidado)', () => {
+    const r = evaluarMultiNorma('bushing', 0.3, {});
+    assert.ok(optDc1(r).estado.nivel < 0);
+    assert.equal(r.consolidado.nivel, 0);   // FP verde manda, sin regresión
+  });
+
+  test('FP rojo + ΔC1 verde → consolidado sigue rojo (peor óptica manda)', () => {
+    const r = evaluarMultiNorma('bushing', 1.4, { dc1MaxPct: 2 });
+    assert.ok(r.consolidado.nivel >= 3 || r.consolidado.etiqueta.includes('crít') || r.consolidado.clase === 'b-r');
+  });
+});

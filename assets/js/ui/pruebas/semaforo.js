@@ -83,6 +83,8 @@ function calificarPrueba(key, inf, opts = {}) {
   // (Δ<10% si I<50 mA · Δ<5% si I≥50 mA). Sin corriente cae al 10% (sin regresión).
   const ctx = { minClase: minNetaDe(inf, opts) };
   if (key === 'excitacion') ctx.corrienteMA = corrienteExcitacionMax(inf);
+  // TODO-15a: la óptica ΔC1 del buje lee la capacitancia vs placa del canónico.
+  if (key === 'bushing') ctx.dc1MaxPct = inf.bushing && inf.bushing.dc1_max_pct;
   const mn = evaluarMultiNorma(key, m, ctx);
   const estado = (mn && mn.consolidado) ? mn.consolidado : ESTADOS.NEUTRAL;
   return { estado, texto: textoMetrica(key, m, estado) };

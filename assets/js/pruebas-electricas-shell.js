@@ -1125,7 +1125,18 @@ function estadoBushing(bloques) {
     .filter((v) => typeof v === 'number');
   if (!ys.length) return null;
   const max = Math.max(...ys);
-  return { estado: calificarTanDelta(max), texto: `${max.toFixed(2)}%` };
+  // TODO-15a: ΔC1 vs placa (criterio PRIMARIO NETA ±5%) entra al veredicto
+  // del scorecard — >5% investiga aunque el FP esté verde. |Δ| absoluto →
+  // nunca rojo automático (la condena exige dirección/tendencia).
+  const d = derivarBushing(bloques);
+  const dc1 = d && d.dc1_max_pct;
+  let estado = calificarTanDelta(max);
+  let texto = `${max.toFixed(2)}%`;
+  if (dc1 != null && dc1 > 5) {
+    if (estado.nivel < ESTADOS.NARANJA.nivel) estado = ESTADOS.NARANJA;
+    texto += ` · ΔC1 ${dc1.toFixed(1)}%`;
+  }
+  return { estado, texto };
 }
 
 function renderScorecard(cont, data, inf) {
@@ -1143,7 +1154,10 @@ function renderScorecard(cont, data, inf) {
       ? estadoBushing(bloques)
       : calificarPrueba(fam.key, inf, { minNeta });
     const criterio = (fam.key === 'aislamiento' && minNeta != null)
-      ? `≥ ${minNeta} GΩ · NETA 100.5 (clase ${kv} kV)`
+      // TODO-04/ADR-053: el mínimo POR CLASE no está en NETA Tabla 100.5
+      // (esa tabla solo da el piso 5 GΩ >5 kV) — es criterio interno ⚠️
+      // pendiente de confirmar contra MO.00418 Ed.02.
+      ? `≥ ${minNeta} GΩ · por clase ${kv} kV (interno ⚠️ · piso NETA 100.5: 5 GΩ)`
       : fam.criterio;
     if (r && r.estado && r.estado !== ESTADOS.NEUTRAL) {
       return { label: fam.label, criterio, estado: r.estado, texto: r.texto };

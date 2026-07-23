@@ -56,7 +56,13 @@ export const CRITERIOS_MULTINORMA = Object.freeze({
   ],
   bushing: [
     { norma: 'ANSI/NETA §7.2.2.D.5', umbral: 'tan δ ≤1% · vs placa: FP>50% / C1>5%', evaluar: maxBanda(0.5, 1) },
-    { norma: 'IEEE C57.19.01 / Doble', umbral: '≤0.5% bueno · 0.5–1 investigar · >1 crítico', evaluar: calificarTanDelta, nota: 'orientativa; ΔC1 vs placa manda en seguridad' }
+    { norma: 'IEEE C57.19.01 / Doble', umbral: '≤0.5% bueno · 0.5–1 investigar · >1 crítico', evaluar: calificarTanDelta, nota: 'orientativa; ΔC1 vs placa manda en seguridad' },
+    // TODO-15a (ADR-053/49): ΔC1 vs placa — criterio PRIMARIO de seguridad
+    // (aumento de C = capas en corto). ±5% NETA/C57.152 CONFIRMADO público.
+    // `dc1_max_pct` es |Δ| ABSOLUTO (sin signo) → NUNCA rojo automático
+    // (la condena exige dirección/tendencia — refutación TODO-04): >5%
+    // investiga SIEMPRE, y el texto escala en >10% (práctica Megger/Doble).
+    { norma: 'NETA §7.2.2.D.5 / C57.152 · ΔC1', umbral: 'ΔC1 vs placa ≤5% · >5% investigar · >10% crítico (confirmar dirección)', evaluar: (v, ctx) => maxBanda(5, null)(num(ctx && ctx.dc1MaxPct)), nota: 'capacitancia C1 — Δ absoluto: sin dirección no hay condena automática' }
   ],
   excitacion: [
     { norma: 'ANSI/NETA §7.2.2.D.6', umbral: 'patrón 2+1 (2 laterales ~iguales + central menor)', nota: 'criterio cualitativo — sin % normativo duro' },
@@ -73,7 +79,11 @@ export const CRITERIOS_MULTINORMA = Object.freeze({
     { norma: 'MO.00418 por clase', umbral: '⚠️ verificar (edición del director)', nota: 'verificar' }
   ],
   aislamiento: [
-    { norma: 'ANSI/NETA Tabla 100.5', umbral: '≥5 GΩ (>5 kV, líquido) · piso absoluto', evaluar: minBanda(() => 5) },
+    // TODO-15b: el informe no registra T del ensayo → no se aplica la
+    // corrección Rc=Ra×K a 20 °C (NETA Tabla 100.14); el veredicto asume
+    // el GΩ como medido. A T>20 °C la IR real a 20 °C sería MENOR (riesgo
+    // de sobre-calificar) — caveat visible vía `nota`, como tan δ (ADR-038).
+    { norma: 'ANSI/NETA Tabla 100.5', umbral: '≥5 GΩ (>5 kV, líquido) · piso absoluto', evaluar: minBanda(() => 5), nota: 'valores como medidos — sin corrección a 20 °C (Tabla 100.14): el informe no registra T' },
     { norma: 'Por clase (MO.00418 / C57.152)', umbral: (ctx) => (ctx && ctx.minClase != null) ? `≥${ctx.minClase} GΩ (clase de tensión)` : '≥ por clase', evaluar: minBanda((ctx) => ctx.minClase != null ? ctx.minClase : null), nota: '⚠️ verificar · criterio primario' },
     { norma: 'IEEE C57.152 (PI/DAR/tendencia)', umbral: 'PI≥1.5 · DAR>1.6 · tendencia', nota: 'requiere PI/DAR del informe' }
   ],
