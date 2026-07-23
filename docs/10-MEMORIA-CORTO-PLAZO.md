@@ -41,7 +41,7 @@
 |---|---|---|
 | **CONECTAR D** | D decidido: **NO activar** (§52.14 — prerrequisitos del día D allá: UI no-admin, custom claims, constraints por CAMPO). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
 | **TODO-04** | **✅ PARCIAL (ADR-053)**: clusters IR/PI/DAR + FP/tan δ/bujes + TTR validados con fuente y refutación; 2 re-atribuciones aplicadas (`c7683d7`). RESTA: ratificación del director + MO.00418 (per-clase) + clusters 3b/4 (→ TODO-15). | 🟢 parcial |
-| **TODO-15** | Del TODO-04 (spec en `49 §Validación`): (a) evaluador ΔC1 bujes (>5% investigar NETA; >10% DIRECCIONAL/tendencia, práctica) con preview fiel; (b) corrección IR a 20 °C (Tabla 100.14) o caveat visible; (c) re-correr clusters 3b (excitación/R-dev) y 4 (núcleo/reactancia/LTC/collar) en Opus. | 🔴 nuevo |
+| **TODO-15** | Del TODO-04 (spec en `49 §Validación`): (a) evaluador ΔC1 bujes (>5% investigar NETA; >10% DIRECCIONAL/tendencia, práctica) con preview fiel; (b) corrección IR a 20 °C (Tabla 100.14) o caveat visible; (c) re-correr clusters 3b (excitación/R-dev) y 4 (núcleo/reactancia/LTC/collar) en Opus; (d) 3ª copia de la etiqueta "30 GΩ NETA 100.5" en la fila IR del scorecard (FAMILIAS_SCORE del shell) — misma re-atribución que `c7683d7`, vista en vivo 2026-07-23. | 🔴 nuevo |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
@@ -59,18 +59,11 @@
 > **2026-07-22/23 (Opus 4.8)** — Fase 9 re-verificada + batch REAL + CONECTAR A-E + D decidido NO + G025 + GC del
 > cerebro (shard 30→31). Todo consolidado en `99 §52.8-52.14` (bitácora vieja podada — GC 2026-07-23).
 >
-> **2026-07-23 (Fable 5) — ESCANEO DE CIERRE ✅ + interinato Opus 4.8 listo**: brain:check SANO · tests vivos
-> 1189/1187 · git real sync (HEAD==origin/main==`ae593da`). Workflow adversarial ACOTADO en **Opus** (regla
-> NUEVA del Ingeniero: workflows acotados y con Opus; Fable solo analiza): **cierre Fase 9+CONECTAR 100%
-> respaldado** (§52.8-14, commits y código B/E verificados) · **skills 100% consistentes** (las 6 refs
-> "¿fantasma?" existen: 5 globales + `resistencia-aislamiento` anidada en `skills/pruebas-electricas/`).
-> **Fixes**: (1) `20` L126 tenía la política git VIEJA ("el director pushea") → ADR-051 (riesgo para el
-> interino); (2) GC pre-shard de `20` (dup fusionado, 14921→14347c) sin shard; (3) `20`: 55→54 domain +
-> `nav.js` fantasma → `contrato-context.js`; (4) rótulo CI "1185 tests" → sin número; (5) **`brain-kit/`
-> retirado** (Fase 9 100%; respaldo con diff OK en bóveda `brain-kit-v1.0-respaldo-2026-07-23/`); (6) **flag
-> interinato en `05`** (cargar `opus-interino-protocolo` al boot). **Falsos positivos (NO reabrir)**: "38 data
-> layers" es CORRECTO (`_firestore_clean.js` es helper) · hash del `05` 1 commit atrás = artefacto por diseño.
-> CRUDO+síntesis → bóveda `2026-07-23-escaneo-cierre-fable/`.
+> **2026-07-23 (Fable 5) — ESCANEO DE CIERRE ✅**: auditoría Fase 9+CONECTAR 100% respaldada (workflow Opus) ·
+> skills consistentes (las 6 refs "¿fantasma?" existen) · 6 fixes: política git VIEJA en `20` L126 → ADR-051,
+> GC pre-shard, conteos/`nav.js`, rótulo CI, `brain-kit/` retirado (respaldo en bóveda), flag interinato en
+> `05`. Falsos positivos NO reabrir: "38 data layers" correcto (`_firestore_clean.js` es helper) · hash `05`
+> 1 atrás = por diseño. Detalle → commits `6d2b7b5`/`5fcbffd` + bóveda `2026-07-23-escaneo-cierre-fable/`.
 >
 > **2026-07-23 (Fable 5) — "HAS TODO TU" (ADR-053)**: billing sondeado con exit-code REAL (la 1ª lectura "494
 > bytes OK" era el TEXTO del error — §3.3): **deshabilitado, CF de IA CAÍDAS en prod (500)**; deploy en cola.
@@ -85,3 +78,12 @@
 > (cuenta completa; créditos restantes conservados). Secret Manager OK al 1er reintento → deploy de las 3 CF
 > exitoso → verificación viva: extracción/narrativa responden **401 JSON limpio** (antes 500 HTML = contenedor
 > muerto). TODO-10 ✅. Umbrales F18 editables desde ya (cliente+servidor coherentes con G010).
+>
+> **2026-07-23 (Fable 5 + Ingeniero) — EXTRACCIÓN IA VALIDADA EN VIVO 🏆 (TODO-06 parcial)**: informe REAL
+> 2020 de SE Montería cargado por Chrome guiado (serie nueva **LEL27007**, TRAFO UNION 1986, 40/15/35 MVA,
+> 110 kV) → IA extrajo identidad+mediciones correctas → veredicto multi-norma en vivo: **INVESTIGAR** (FP buje
+> C1 0.84% banda 0.5–1; relación 0.43% vigilar; tan δ 18/18 verde; excitación/collar verde; no-realizadas
+> listadas). Calificación POR PRUEBA respetada. Parque: 3 TX / 3 SE. Password de Chrome estaba stale → reset
+> por email + huella operativa. Gotchas de carga: file_upload de la extensión solo acepta archivos de la
+> sesión; fetch a localhost bloqueado por Local-Network-Access de Chrome (ni con header PNA) → la vía es
+> drag&drop del usuario (Finder `open -R` ayuda). Falta en vivo: FASE B/E (2 clics, gated). Hallazgo → TODO-15(d).
