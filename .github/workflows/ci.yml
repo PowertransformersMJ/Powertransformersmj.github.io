@@ -22,7 +22,7 @@ concurrency:
 
 jobs:
   verificar:
-    name: Lint HTML + 1185 tests
+    name: Lint HTML + suite de dominio
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -40,7 +40,7 @@ jobs:
       - name: Validar HTML
         run: npm run lint:html
 
-      # G026/G109 (ADR-052 Ola 3): los 1185 tests de dominio ahora corren en CI.
+      # G026/G109 (ADR-052 Ola 3): la suite de dominio completa ahora corre en CI.
       # Antes solo se validaba HTML y el deploy salía sin ejecutar la suite.
       - name: Tests unitarios (node --test)
         run: npm run test:unit
