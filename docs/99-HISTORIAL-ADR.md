@@ -1068,3 +1068,21 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 **54.6 Archivos**: `assets/js/auth/session-guard.js` · `assets/css/aqua-components.css`. INTACTAS las 10 páginas (sus listeners quedan válidos tal cual). Commit `b27b8f1` a `main`.
 
 **54.7 Doctrina**: validación EN VIVO como gate (el preview aislado era estructuralmente ciego a esto — L-56 confirmada dos veces hoy) · caza-bugs end-to-end · §3.3. **Pendiente del Ingeniero**: clasificar unidades RESPALDO en el parque (`identificacion.tipo_activo`) para que el evaluador dé salida útil. Cache: n/a.
+
+## 55. ADR-055 — TODO-15 completo: ΔC1 al veredicto + caveat 20 °C + validación clusters 3b/4 + re-atribuciones · TODO-07 bóveda versionada
+
+> Pedido del director (2026-07-23): *"dejar todos los pendientes cerrados… que el cerebro comience a aprender nuevas cosas"*.
+
+**55.1 Causa raíz**: restos del TODO-04/15 — (a) ΔC1 de bujes (criterio PRIMARIO de seguridad NETA ±5%) se calculaba pero no pintaba semáforo; (b) veredicto de IR asumía el GΩ corregido a 20 °C sin decirlo; (c) clusters excitación/R-dev y núcleo/reactancia/LTC/collar sin validar contra fuentes; (d) 3ª/4ª copias de etiquetas mal atribuidas; TODO-07 bóveda sin versionar.
+
+**55.2 Solución**: (a) óptica ΔC1 en multinorma vía `ctx.dc1MaxPct` (>5% INVESTIGAR; NUNCA rojo automático — |Δ| sin dirección, refutación TODO-04), cableada en matriz (`semaforo.js`) y scorecard del shell (`estadoBushing` peor-de FP/ΔC1 + texto "· ΔC1 x%"); degradación elegante (sin ctx → neutral). (b) nota visible "valores como medidos — sin corrección a 20 °C (Tabla 100.14)" en la óptica NETA de IR (patrón ADR-038). (c) workflow Opus acotado (2 investigadores + 3 refutadores, 0 refutados): patrón 2+1 y R-dev 2%/±5% CONFIRMADOS; re-atribuciones aplicadas — corte 50 mA→5% = práctica de campo (no "IEEE Std 62"), DRM 40–70 ms = banda de cordura fabricante (C57.152 no fija ventana), collar 100 mW = Doble TDRB (no NETA §7.2.2.D.5); franja tan δ del panel corregida (4ª copia). (d) scorecard "30 GΩ NETA 100.5" → criterio interno ⚠️. TODO-07: `~/Desktop/brain-private` = repo git local (respaldo con historial; remoto privado = decisión del Ingeniero).
+
+**55.3 No-regresión**: todo ADITIVO; bandas numéricas INTACTAS (solo citas); sin ctx la óptica ΔC1 no participa; chips degradan al estado de fila.
+
+**55.4 Tests/verificación**: +5 tests ΔC1 (verde/investigar/anti-rojo/neutral/peor-óptica) → **1201 tests · 1199 pass · 0 fail**; lint OK; preview fiel del panel de producción con datos reales 450108 (0 errores consola, sin regresión); scorecard ΔC1 verificable en vivo en los libros (450108/LEL27007).
+
+**55.5 Anti-patterns**: no rojo automático sin dirección/tendencia · valores conservadores se conservan aunque su cita caiga · lo no-confirmable NO se disfraza de norma (queda ⚠️ fabricante/MO.00418).
+
+**55.6 Archivos**: `pruebas_electricas_multinorma.js` · `pruebas_electricas_schema.js` · `semaforo.js` · `tablas-pruebas-panel.js` · `excitacion-panel.js` · `pruebas-electricas-shell.js` · tests. Commits `ed70c0b`+`52de77e` a `main`. Crudo → bóveda `2026-07-23-todo15c-clusters/`.
+
+**55.7 Doctrina + pendientes derivados**: multi-norma honesta (la cita ES parte del veredicto, §3.2) · workflows acotados en Opus (regla del Ingeniero). **TODO-17** (hygiene): `calificarResistencia` OK≤5% vs 2% del semáforo — unificar o documentar (ligado a `.calif` write-only G012). Ratificación del director del paquete normativo completo sigue pendiente (con MO.00418). Cache: n/a.

@@ -158,9 +158,17 @@ criterio primario NETA/IEEE ±5% investigar (CONFIRMADO) y >10% retiro (práctic
 umbral >10% DIRECCIONAL (solo aumento de C) o gatillado por tendencia — NO condena automática con Δ absoluto.
 (b) **corrección IR a 20 °C (Tabla 100.14) no implementada** — el veredicto asume el GΩ ya corregido; informe a
 T>20 °C se SOBRE-califica. Implementar corrección o capturar IR₂₀ + caveat visible.
-**Sin validar aún** (agente falló/parcial): excitación Δ5/10% + R devanados 2% (cluster 3b) · IR núcleo 500 MΩ ·
-reactancia 3% · LTC 40–60 ms · collar (cluster 4). Tabla per-clase (30 GΩ@110 kV): **no confirmable públicamente**
-— solo el MO.00418 del director puede fijarla.
+**Clusters 3b/4 validados (2026-07-23, ADR-055; crudo → bóveda `2026-07-23-todo15c-clusters/`)**:
+CONFIRMADOS — patrón 2+1 (NETA cualitativo; central-mayor aceptada = relajación de ingeniería marcada) · R
+devanados ≤2% NETA / 2–3% industria / ±5% admisible IEEE · reactancia ±3% vs placa + 2% entre fases (solo en
+skill, no implementada). RE-ATRIBUIDOS (valores intactos, aplicado `52de77e`): corte excitación 50 mA→5% =
+práctica de campo (NO "IEEE Std 62") · DRM 40–70 ms = banda de cordura del fabricante (Reinhausen ~40–60; C57.152
+es método comparativo SIN ventana) · collar 100 mW = Doble TDRB set 10 kV (NO NETA §7.2.2.D.5, que es de bujes).
+NO_CONFIRMABLE_PUBLICO (fabricante / MO.00418): IR núcleo 500 MΩ (cláusula §7.2.2.D.11 no verificable; basar en
+fábrica+tendencia) · resistores LTC ±10% y nº operaciones (VACUTAP VM 300k; representar OILTAP Y VACUTAP en
+paridad). HALLAZGO nuevo → TODO-17: `calificarResistencia` (schema) da OK ≤5% mientras semáforo/scorecard usan
+2% (el 5% es el "admisible" IEEE pero rompe consistencia interna; ligado al `.calif` write-only de G012).
+Tabla per-clase (30 GΩ@110 kV): **no confirmable públicamente** — solo el MO.00418 del director puede fijarla.
 
 ## 🔎 Auditoría del panel FP/tan δ (2026-06-09) — gaps de diagnóstico vs la skill
 

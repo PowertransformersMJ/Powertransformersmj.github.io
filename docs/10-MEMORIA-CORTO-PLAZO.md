@@ -14,10 +14,10 @@
 > real + XSS tabla RCA). Billing RESUELTO en vivo (CF vivas) · extracción IA validada con informe real.
 
 ### ▶️ RETOMAR (próxima sesión)
-> Confirma git real (M-01) + lee `05`+`10`. ✅ Billing/deploy RESUELTOS (TODO-10; CF vivas, umbrales F18 editables).
-> **(1) TODO-15** (ΔC1 semáforo + corrección IR 20 °C + clusters 3b/4) — diseño especificado en `49`; trabajo
-> autónomo disponible. **(2) probar B/E + extracción IA en vivo** (gated; verificación headless hecha: FUNCIONALES,
-> ADR-053). Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D.
+> Confirma git real (M-01) + lee `05`+`10`. ✅ TODO-04/07/10/15/16 CERRADOS (ADR-053/054/055). Trabajo autónomo
+> disponible: **TODO-09** (conectar dashboard Salud de Activos a Firestore real — hoy corre en DEMO, visto en
+> vivo) · TODO-17 (hygiene menor). Del Ingeniero: ratificar umbrales + MO.00418 · clasificar unidades RESPALDO ·
+> GitHub Support · PATs (TODO-08) · TODO-05. Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
 > **(A) GitHub Support** "remove sensitive data" (purga `refs/pull/*`). **(B) Revocar PATs viejos** (TODO-08).
@@ -38,14 +38,13 @@
 |---|---|---|
 | **CONECTAR D** | D decidido: **NO activar** (§52.14 — prerrequisitos del día D allá: UI no-admin, custom claims, constraints por CAMPO). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
 | **TODO-04** | **✅ PARCIAL (ADR-053)**: clusters IR/PI/DAR + FP/tan δ/bujes + TTR validados con fuente y refutación; 2 re-atribuciones aplicadas (`c7683d7`). RESTA: ratificación del director + MO.00418 (per-clase) + clusters 3b/4 (→ TODO-15). | 🟢 parcial |
-| **TODO-15** | Del TODO-04 (spec en `49 §Validación`): (a) evaluador ΔC1 bujes (>5% investigar NETA; >10% DIRECCIONAL/tendencia, práctica) con preview fiel; (b) corrección IR a 20 °C (Tabla 100.14) o caveat visible; (c) re-correr clusters 3b (excitación/R-dev) y 4 (núcleo/reactancia/LTC/collar) en Opus; (d) 3ª copia de la etiqueta "30 GΩ NETA 100.5" en la fila IR del scorecard (FAMILIAS_SCORE del shell) — misma re-atribución que `c7683d7`, vista en vivo 2026-07-23. | 🔴 nuevo |
+| **TODO-17** | Hygiene (hallazgo ADR-055): `calificarResistencia` (schema) da OK ≤5% mientras semáforo/scorecard usan 2% — unificar o documentar; ligado al `.calif` write-only (G012). | 🟢 menor |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | Ola 0 follow-ups: `SGM_DATA_SOURCE` real (Firestore) + template xlsm sanitizado + fixture test. Core desplegado. | 🟢 follow-up |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
-| **TODO-07** | Convertir `~/Desktop/brain-private/` en repo git PRIVADO (respaldo bóveda). | 🔲 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |
 | **TODO-02/03** | Tipificar S03-S06 contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, dryRun) · flujo runtime FN-063 vs FN-050 (contrato 4123000081). | 🔮 |
 
@@ -67,12 +66,17 @@
 > billing diagnosticado caído (§3.3: el "OK" inicial era texto de error). Detalle → ADR-053 + bóveda
 > `2026-07-23-todo04-umbrales/` + `2026-07-23-hastodotu/`.
 >
-> **2026-07-23 (Fable 5 + Ingeniero) — VALIDACIÓN VIVA B/E + TODO-16 RESUELTO (ADR-054)**: B guard OK ("sin
-> salud calculada no se puede sugerir"); pre-llenado espera unidad con `salud_actual` (parque sin muestras;
-> dashboard Salud en DEMO = TODO-09). E: tab Fallados estaba ROTO en prod → forense en vivo halló DOS bugs
-> sistémicos del shell (evento sesión window≠document en 10 páginas · modales legacy pegados en 6) → fix
-> `b27b8f1` desplegado y RE-VERIFICADO vivo: modal oculto, 213 unidades cargan solas, evaluación E corre
-> (estado-cero "sin RESPALDO" correcto — falta clasificar respaldos en el parque, dato del Ingeniero).
+> **2026-07-23 (Fable 5 + Ingeniero) — VALIDACIÓN VIVA B/E + TODO-16 RESUELTO (ADR-054)**: B guard OK; E: tab
+> Fallados estaba ROTO en prod → 2 bugs sistémicos del shell (evento sesión window≠document ×10 páginas ·
+> modales pegados ×6) → fix `b27b8f1` re-verificado vivo (213 unidades cargan solas). Falta clasificar
+> RESPALDO en el parque (Ingeniero) para salida útil del evaluador.
+>
+> **2026-07-23 (Fable 5) — TODO-15 COMPLETO + TODO-07 (ADR-055)**: (a) **ΔC1 de bujes AL VEREDICTO** (>5%
+> investigar; nunca rojo sin dirección) en matriz + scorecard, +5 tests → **1199 pass**; (b) caveat 20 °C en IR;
+> (c) clusters 3b/4 validados (workflow Opus, 0 refutados): 2+1 y R-dev CONFIRMADOS; re-atribuciones aplicadas
+> `52de77e` (50 mA→práctica de campo · DRM→fabricante · collar→Doble TDRB · 4ª copia tan δ); (d) scorecard
+> reetiquetado. IR núcleo y resistores LTC = fabricante/MO.00418 (⚠️ en skills). Bóveda ahora repo git local
+> (`f709509`) + crudos archivados. Nuevo: TODO-17 (calificarResistencia 5% vs 2%, hygiene menor).
 >
 > **2026-07-23 (Fable 5, con el Ingeniero en vivo) — BILLING RESUELTO + DEPLOY**: causa raíz = prueba gratuita
 > GCP expirada (no tarjeta vencida). Claude navegó con Chrome a billing/enable, el Ingeniero clickeó "Activar"
