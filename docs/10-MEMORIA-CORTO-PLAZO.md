@@ -22,7 +22,8 @@
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
 > **(A) GitHub Support** "remove sensitive data" (purga `refs/pull/*`). **(B) Revocar PATs viejos** (TODO-08).
 > **(C) Ratificar TODO-04** (`49 §Validación`) y entregar MO.00418 Ed.02 (tabla per-clase no confirmable en
-> fuentes públicas). **(D) Alerta de presupuesto GCP** (recomendada tras reactivar billing — Claude lo guía).
+> fuentes públicas). ✅ Alerta de presupuesto GCP: ajustada a **$5 USD/mes** (avisos reales $3/$5 al email del
+> Ingeniero; antes $25 — guardián free-tier, 2026-07-23 vía Chrome).
 
 ### 🚫 Callejones (NO reintentar)
 > `args` grande a Workflow como string → llega serializado (embeber en el script) · git-filter-repo `--branch X`
