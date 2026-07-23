@@ -73,3 +73,16 @@
 > a `main` (HEAD `2adcccf`). **Recomendación al Ingeniero**: revisar billing Blaze (posible CF-IA caída) → validar
 > umbrales (TODO-04) → probar FASE B/E en vivo. **GC menor pendiente**: `20-ESPACIAL` ≥90% de su tope (pre-shard,
 > no bloquea el boot).
+>
+> **2026-07-23 (Fable 5) — ESCANEO DE CIERRE ✅ + interinato Opus 4.8 listo**: brain:check SANO · tests vivos
+> 1189/1187 · git real sync (HEAD==origin/main==`ae593da`). Workflow adversarial ACOTADO en **Opus** (regla
+> NUEVA del Ingeniero: workflows acotados y con Opus; Fable solo analiza): **cierre Fase 9+CONECTAR 100%
+> respaldado** (§52.8-14, commits y código B/E verificados) · **skills 100% consistentes** (las 6 refs
+> "¿fantasma?" existen: 5 globales + `resistencia-aislamiento` anidada en `skills/pruebas-electricas/`).
+> **Fixes**: (1) `20` L126 tenía la política git VIEJA ("el director pushea") → ADR-051 (riesgo para el
+> interino); (2) GC pre-shard de `20` (dup fusionado, 14921→14347c) sin shard; (3) `20`: 55→54 domain +
+> `nav.js` fantasma → `contrato-context.js`; (4) rótulo CI "1185 tests" → sin número; (5) **`brain-kit/`
+> retirado** (Fase 9 100%; respaldo con diff OK en bóveda `brain-kit-v1.0-respaldo-2026-07-23/`); (6) **flag
+> interinato en `05`** (cargar `opus-interino-protocolo` al boot). **Falsos positivos (NO reabrir)**: "38 data
+> layers" es CORRECTO (`_firestore_clean.js` es helper) · hash del `05` 1 commit atrás = artefacto por diseño.
+> CRUDO+síntesis → bóveda `2026-07-23-escaneo-cierre-fable/`.

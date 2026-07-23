@@ -6,16 +6,16 @@
 |---|---|
 | **Misión ahora** | **Fase 9 (ADR-052) COMPLETA** (Olas 0-5 desplegadas) + **fase CONECTAR COMPLETA** (§52.11-14): A/B/C/E cableadas y desplegadas; **D (enforcement RBAC) decidido: NO activar** (comité ×4 + red-team ×3 convergen — mantener admin-only). **Sin trabajo autónomo pendiente**: lo que queda son acciones/decisiones del Ingeniero — revisar billing Blaze (→ deploy G007/G008), validar umbrales (TODO-04 → motor normativo G010-12), decisiones G017/G111-xlsx/STRUCT/CSP. Detalle → `10` + `99 §52.8-52.14`. |
 | **Build** | 🟢 `node --test` **1187 pass / 0 fail / 2 skip** + **8 tests de reglas** (`test:rules` vía emulador, G025). CI ahora corre los tests (`ci.yml`). · verificado-vivo: 2026-07-22 |
-| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `2adcccf` (se commitea+pushea+mergea en el mismo turno; ⚠️ comparar contra `origin/main`, NO el ref local que puede quedar stale tras el filter-repo). **Historia reescrita 2026-07-21** (git-filter-repo purgó confidenciales; `.git` 220M→23M; respaldo bundle en bóveda) → cualquier otra copia debe re-clonar. Árbol tracked 17M. |
+| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` (sin hash fijo — el SHA vivo lo da el handoff hook o `git fetch`, M-01; se commitea+pushea+mergea en el mismo turno; ⚠️ NO fiarse del ref local, puede quedar stale tras el filter-repo). **Historia reescrita 2026-07-21** (git-filter-repo purgó confidenciales; `.git` 220M→23M; respaldo bundle en bóveda) → cualquier otra copia debe re-clonar. Árbol tracked 17M. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth email/password + Firestore + Storage). CF desplegadas: `extraerPruebasElectricasIA` (southamerica-east1, solo-CARGA, ADR-020) + `narrativaTendenciaIA`; secret `LLM_API_KEY` ok · verificado-vivo: 2026-06-23 |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA desactivada a propósito; CLAUDE §4 dormida). |
 | **Deuda crítica** | 🔴 **ACCIÓN INGENIERO**: (a) **billing Firebase** (Blaze lapsó → deploy de functions bloqueado Y las CF de IA quizá no corren hoy — REVISAR PRIMERO); (b) **GitHub Support** "remove sensitive data" (purga `refs/pull/*` viejos); (c) **validar umbrales** (TODO-04) → desbloquea motor normativo G010-12. (`firestore.rules` ya con tests de emulador ✅ G025.) |
 
 ## ⚠️ Flags de riesgo activos
+- **🤖 Interinato Opus 4.8 (activo 2026-07-23)**: si el modelo del turno principal NO es Fable 5 → cargar la skill `opus-interino-protocolo` al boot (R1-R7: marcar commits, TDD en dinero/datos, verificación en vivo, escalada honesta). Workflows/subagentes SIEMPRE acotados y con `model: 'opus'` (cuota Fable reservada para análisis/decisiones — orden del Ingeniero 2026-07-23).
 - **Política git NUEVA (F3a 2026-07-18, ADR-051)**: Claude hace commit+push+merge+deploys, validando cada commit con el Ingeniero. NUNCA force-push a `main`. (Reemplaza la regla "el push lo hace el director" — L-01 actualizada.)
 - **Free-tier sagrado** (Firebase/Vercel/Pages): nada que facture sin aprobación del Ingeniero.
-- **Foco de producto**: reorg POR PRUEBA va paso a paso a pedido del director — NO generalizar a las demás pruebas sin su pedido (ADR-048/050).
-- 🔲 Validación en la APP real (tras Firebase Auth) de ADR-046→050 sigue pendiente (TODO-06); el preview fiel `_dev/` es lo más cercano.
+- **Foco de producto**: reorg POR PRUEBA paso a paso a pedido del director — NO generalizar sin su pedido (ADR-048/050) · 🔲 validación en APP real (tras Auth) de ADR-046→050 pendiente (TODO-06; preview fiel `_dev/` es lo más cercano).
 
 ## 🧩 Sub-sistemas
 Frontend estático ✅ · Firebase (Auth+Firestore+Storage) ✅ · Cloud Functions ✅ · Vercel `/api` ✅ · PWA/SW ⛔ (kill-switch) · Cerebro v1.1.0 ✅ (kernel v1.2 + hooks + handoff)

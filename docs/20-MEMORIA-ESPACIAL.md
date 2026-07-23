@@ -10,7 +10,8 @@
 >
 > ⚠️ corregido 2026-07-18: verificado archivo por archivo contra el repo real
 > (branch `DESARROLLO-/-PROYECTO-MJ`). El cerebro anterior completo vive hoy en
-> `_legacy/cerebro-anterior/docs/`; hay un kit nuevo en `brain-kit/` (untracked).
+> `_legacy/cerebro-anterior/docs/`. El instalador `brain-kit/` se retiró
+> el 2026-07-23 (Fase 9 al 100%; respaldo íntegro en la bóveda privada).
 
 ---
 
@@ -18,7 +19,7 @@
 
 | Si buscas… | Ve a |
 |---|---|
-| Lógica de negocio pura (HI, DGA, sobrecarga, refrigeración, RBAC, plan inversión, SAIDI, SCADA, multi-norma pruebas) | `assets/js/domain/*.js` (55 módulos sin Firebase, testables con `node --test`) |
+| Lógica de negocio pura (HI, DGA, sobrecarga, refrigeración, RBAC, plan inversión, SAIDI, SCADA, multi-norma pruebas) | `assets/js/domain/*.js` (54 módulos sin Firebase, testables con `node --test`) |
 | Acceso a Firestore/Storage (CRUD, suscripciones realtime) | `assets/js/data/*.js` (38 data layers thin I/O que delegan a `domain/`) |
 | UI de administración (CRUD con sesión admin) | `admin/*.html` (30 páginas) + `assets/js/admin/*.js` |
 | Páginas públicas/operativas (detrás de session-guard) | `pages/*.html` (31 páginas) + `assets/js/*-public.js` |
@@ -51,7 +52,7 @@
 | `assets/js/domain/` | Funciones puras de dominio (sin I/O) | Importadas por `data/` y por tests Node |
 | `assets/js/data/` | Data layers Firebase (one-shot + realtime `onSnapshot`) | Importadas por las UIs |
 | `assets/js/admin/` | Controladores de las páginas `admin/*.html` | `<script type="module">` por página |
-| `assets/js/ui/` | Componentes de render por módulo (`pruebas/`, `calidad/`, `cargabilidad/`, `seguimiento/`, `module-shell.js`, `nav.js`, `tabs.js`) ⚠️ corregido 2026-07-18: fila añadida — carpeta ya existente y central | Importados por los shells de página |
+| `assets/js/ui/` | Componentes de render por módulo (`pruebas/`, `calidad/`, `cargabilidad/`, `seguimiento/`, `module-shell.js`, `tabs.js`, `contrato-context.js`) ⚠️ corregido 2026-07-18: fila añadida — carpeta ya existente y central | Importados por los shells de página |
 | `assets/css/` | Estilos + sistema AQUA LIGHT | `<link>` por página |
 | `admin/` | UIs de administración (CRUD) | Protegidas por `admin-guard.js` |
 | `pages/` | Páginas públicas/operativas | Protegidas por `page-guard.js` |
@@ -63,17 +64,11 @@
 
 ---
 
-## 📚 Hojas de detalle técnicas (docs/ pre-existentes · COEXISTEN con el cerebro)
+## 📚 Subsistema Pruebas Eléctricas — extracción IA / tendencia (detalle único)
 
-> ⚠️ corregido 2026-07-18: son **16** documentos técnicos en `docs/` (no 15) +
-> la carpeta `docs/pruebas/` (10 JSON). Inventario línea a línea → sección final.
+> ⚠️ GC 2026-07-23: el listado de hojas del dueño duplicaba el inventario de la
+> sección final — fusionado allá; aquí queda solo el detalle técnico único.
 
-- `ARQUITECTURA.md` — arquitectura de código (dónde vive cada cosa, detalle fino).
-- `MODELO-DATOS-v2.md` — diccionario completo del schema Firestore v2 (ER, por sección, referencia normativa MO.00418 por campo).
-- `OPERACIONES.md` — runbook operativo / troubleshooting.
-- `DEPLOY-FUNCTIONS.md` — despliegue de Cloud Functions.
-- `MANTENIMIENTO-BRIGADA.md` — módulo Selección ONAF (dominio refrigeración, catálogos AFINIA + ZIEHL-ABEGG, informe imprimible).
-- `MANTENIMIENTO-PREDICTIVO.md` · `INDICADORES-CALIDAD.md` · `PLAN-SUMINISTROS.md` · `REPOSITORIO-PRUEBAS-ELECTRICAS.md` — módulos/dominios específicos.
 - **Extracción IA de PDFs (Pruebas Eléctricas)** — Cloud Function `functions/index.js#extraerPruebasElectricasIA` (PDF desde Storage → `sanitizarInforme` en `domain/pruebas_electricas_schema.js`); cliente `data/pruebas_electricas.js#extraerConIA` (+ `eliminarUnidad`); render detallado `ui/pruebas/tabla-pruebas.js` + gráficas `ui/pruebas/grafico-svg.js` (eje Y dinámico). Tablero IA-primaria (bloques): render genérico `ui/pruebas/grafico-generico.js` + dominio `domain/pruebas_electricas_bloques.js` (`derivarTablaTAP` + canal `extra`). ⚠️ corregido 2026-07-18: `bloquesDeExtra` es función LOCAL de `ui/pruebas/grafico-generico.js`, no export del dominio; y el módulo creció — shell `assets/js/pruebas-electricas-shell.js` (~2.4k líneas, scorecard/fichas), motor multi-norma `domain/pruebas_electricas_multinorma.js` + `_recomendaciones.js` + `_semaforo.js`, paneles `ui/pruebas/tand-panel.js`/`excitacion-panel.js`/`tablas-pruebas-panel.js`/`semaforo.js`/`modal-upsert.js`. Detalle → `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` + ADRs (arco 003→020+ en `99`).
   - **Workflow de auditoría/completitud por sección** (detectar→clasificar→corregir→verificar; auditor `scripts/audit-bloques-pruebas.mjs`) → hoja `workflow-auditoria-secciones-pruebas.md`.
   - **Tendencia temporal** (multi-informe): pestaña "Tendencia" + `domain/pruebas_electricas_tendencia.js` (`bloquesTendencia` — escalar peor-caso por prueba vs umbral; determinista, reusa el render genérico). ⚠️ corregido 2026-07-18: ya NO es "Fase 1 con F2-F3 pendientes" — F1-F3 consolidadas: timeline + narrativa IA vía Cloud Function `narrativaTendenciaIA` (desplegada) y cliente `data/pruebas_electricas.js` (httpsCallable, 120s).
@@ -123,7 +118,7 @@ Detalle completo → `docs/MODELO-DATOS-v2.md`.
 - **`/suministros/{X}` usa docId compuesto** `{contrato_id}_{codigo}` desde la migración N5 — usar `composeDocId(cid, codigo)` (definido en `domain/contratos.js`, re-exportado por `data/suministros.js`), nunca el código plano (ver `30-LECCIONES`).
 - **No hay bundler**: los `.js` son ES modules directos; rutas relativas importan (`../domain/x.js`). Nada pasa por transpilación.
 - **Lint local con `npm run lint:html`** (NO `npx html-validate` — descarga versión transitoria distinta a la de CI).
-- **Git**: ⚠️ corregido 2026-07-18 — ya NO aplica el "push solo con PAT inline". Flujo ADR-005: **Claude crea los commits; el director hace los `git push`** (GitHub Desktop/terminal; el push del runtime da 403, L-01). NUNCA force-push a `main`; NUNCA escribir tokens a archivo/commit/log.
+- **Git**: ⚠️ corregido 2026-07-23 — política vigente F3a/ADR-051 (reemplaza ADR-005): **Claude ejecuta commit + push + merge + deploys**, validando cada commit con el Ingeniero (L-01 actualizada). NUNCA force-push a `main`; NUNCA escribir tokens a archivo/commit/log.
 
 ---
 
