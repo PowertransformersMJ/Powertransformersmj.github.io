@@ -14,18 +14,15 @@
 > real + XSS tabla RCA). **Billing CONFIRMADO caído → las 2 CF de IA están CAÍDAS en prod (HTTP 500)**.
 
 ### ▶️ RETOMAR (próxima sesión)
-> Confirma git real (M-01) + lee `05`+`10`. **(1) Ingeniero reactiva billing** (URL en Acciones) → Claude corre
-> `firebase deploy --only functions:extraerPruebasElectricasIA,functions:narrativaTendenciaIA,functions:onMuestraCreate`
-> (G007/G008 + G010-CF; NUNCA el cron — Etapa 2 intencional). **⚠️ NO editar umbrales en F18 hasta ese deploy**
-> (divergencia cliente/servidor). **(2) TODO-15** (ΔC1 semáforo + corrección IR 20 °C + clusters 3b/4) — diseño
-> especificado en `49`. **(3) probar B/E en vivo** (gated; verificación headless ya hecha: FUNCIONALES, ADR-053).
-> Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D.
+> Confirma git real (M-01) + lee `05`+`10`. ✅ Billing/deploy RESUELTOS (TODO-10; CF vivas, umbrales F18 editables).
+> **(1) TODO-15** (ΔC1 semáforo + corrección IR 20 °C + clusters 3b/4) — diseño especificado en `49`; trabajo
+> autónomo disponible. **(2) probar B/E + extracción IA en vivo** (gated; verificación headless hecha: FUNCIONALES,
+> ADR-053). Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
-> **(A) Reactivar billing Blaze**: console.developers.google.com/billing/enable?project=lordpowertransformersmj —
-> SIN esto la extracción IA y la narrativa están CAÍDAS para los usuarios. **(B) GitHub Support** "remove sensitive
-> data" (purga `refs/pull/*`). **(C) Revocar PATs viejos** (TODO-08). **(D) Ratificar TODO-04** (`49 §Validación`)
-> y entregar MO.00418 Ed.02 para la tabla per-clase (30 GΩ@110 kV no confirmable en fuentes públicas).
+> **(A) GitHub Support** "remove sensitive data" (purga `refs/pull/*`). **(B) Revocar PATs viejos** (TODO-08).
+> **(C) Ratificar TODO-04** (`49 §Validación`) y entregar MO.00418 Ed.02 (tabla per-clase no confirmable en
+> fuentes públicas). **(D) Alerta de presupuesto GCP** (recomendada tras reactivar billing — Claude lo guía).
 
 ### 🚫 Callejones (NO reintentar)
 > `args` grande a Workflow como string → llega serializado (embeber en el script) · git-filter-repo `--branch X`
@@ -44,7 +41,6 @@
 | **CONECTAR D** | D decidido: **NO activar** (§52.14 — prerrequisitos del día D allá: UI no-admin, custom claims, constraints por CAMPO). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
 | **TODO-04** | **✅ PARCIAL (ADR-053)**: clusters IR/PI/DAR + FP/tan δ/bujes + TTR validados con fuente y refutación; 2 re-atribuciones aplicadas (`c7683d7`). RESTA: ratificación del director + MO.00418 (per-clase) + clusters 3b/4 (→ TODO-15). | 🟢 parcial |
 | **TODO-15** | Del TODO-04 (spec en `49 §Validación`): (a) evaluador ΔC1 bujes (>5% investigar NETA; >10% DIRECCIONAL/tendencia, práctica) con preview fiel; (b) corrección IR a 20 °C (Tabla 100.14) o caveat visible; (c) re-correr clusters 3b (excitación/R-dev) y 4 (núcleo/reactancia/LTC/collar) en Opus. | 🔴 nuevo |
-| **TODO-10** | G007/G008 + **G010-CF** código listo; **deploy bloqueado por billing** (CF de IA CAÍDAS en prod, verificado HTTP 500). Comando exacto en RETOMAR. | 🟡 billing |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
@@ -82,3 +78,9 @@
 > 4 clusters + refutación → 2 re-atribuciones aplicadas, 2 ajustes refutados, gaps→TODO-15 (detalle `49`).
 > **B/E verificadas headless** (Opus): FUNCIONALES; fix tarjeta E + XSS tabla RCA (`18f4632`). Commits
 > `52f06b7→c7683d7` a `main`. Crudos → bóveda `2026-07-23-todo04-umbrales/` + `2026-07-23-hastodotu/`.
+>
+> **2026-07-23 (Fable 5, con el Ingeniero en vivo) — BILLING RESUELTO + DEPLOY**: causa raíz = prueba gratuita
+> GCP expirada (no tarjeta vencida). Claude navegó con Chrome a billing/enable, el Ingeniero clickeó "Activar"
+> (cuenta completa; créditos restantes conservados). Secret Manager OK al 1er reintento → deploy de las 3 CF
+> exitoso → verificación viva: extracción/narrativa responden **401 JSON limpio** (antes 500 HTML = contenedor
+> muerto). TODO-10 ✅. Umbrales F18 editables desde ya (cliente+servidor coherentes con G010).
