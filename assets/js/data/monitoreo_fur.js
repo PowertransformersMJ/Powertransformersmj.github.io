@@ -92,6 +92,11 @@ export async function cerrarMonitoreoIntensivo(id, { razon, uid }) {
 
 // ── Propuestas FUR (A9.2) ──
 export async function abrirPropuestaFUR(params) {
+  if (params && params.umbrales === undefined) {
+    // G010: umbrales editados F18 (fallback interno a baseline)
+    const { obtenerUmbralesActivos } = await import('./umbrales_salud.js');
+    params = { ...params, umbrales: await obtenerUmbralesActivos() };
+  }
   const payload = crearPropuestaReclasificacionFUR(params);
   if (!payload) return null;
   payload.createdAt = serverTimestamp();

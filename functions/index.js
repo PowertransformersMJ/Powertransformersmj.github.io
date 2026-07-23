@@ -47,6 +47,20 @@ const IA_DISPATCHER = new Agent({ bodyTimeout: 0, headersTimeout: 0, keepAliveTi
 // La carpeta ./domain/ se sincroniza automáticamente desde
 // ../assets/js/domain/ por functions/prepare-deploy.mjs (predeploy hook).
 import { snapshotSaludCompleto } from './domain/salud_activos.js';
+import { mergeConBaseline } from './domain/umbrales_salud_baseline.js';
+
+// G010: lee la config de umbrales editada por el admin (F18) con
+// fallback al baseline si el doc no existe o la lectura falla —
+// el flujo de la muestra NUNCA se cae por la config.
+async function leerUmbralesActivos(db) {
+  try {
+    const s = await db.doc('umbrales_salud/global').get();
+    return s.exists ? mergeConBaseline(s.data()) : null;
+  } catch (e) {
+    console.warn('[umbrales_salud] fallback a baseline:', e.message || e);
+    return null;
+  }
+}
 
 // Compute mínimo de alertas críticas para el cron (subconjunto v2).
 // Las reglas v1 ricas viven en assets/js/data/alertas.js (browser).
@@ -108,7 +122,8 @@ export const onMuestraCreate = onDocumentCreated(
       transformador: tx,
       muestraDGA: dga, muestraADFQ: adfq, muestraFUR: fur,
       her: tx.salud_actual && tx.salud_actual.ubicacion_fuga_dominante,
-      pyt: tx.salud_actual && tx.salud_actual.calif_pyt
+      pyt: tx.salud_actual && tx.salud_actual.calif_pyt,
+      umbrales: await leerUmbralesActivos(db)   // G010: config F18
     });
 
     await txRef.update({ salud_actual: snap });

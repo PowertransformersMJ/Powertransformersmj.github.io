@@ -16,6 +16,7 @@ import {
   calcularCalifFUR, calcularDP, calcularVidaUtilizada
 } from '../domain/salud_activos.js';
 import { diagnosticoDGA } from '../domain/dga_diagnostico.js';
+import { obtenerUmbralesActivos } from './umbrales_salud.js';
 
 const COL = 'muestras';
 function colRef() { return collection(getDbSafe(), COL); }
@@ -28,23 +29,23 @@ export function isReady() { return isFirebaseConfigured && !!getDbSafe(); }
  * el cliente antes de persistir, para que la muestra se almacene
  * con sus valores de referencia pre-computados.
  */
-function derivarCampos(muestra) {
+function derivarCampos(muestra, cfgU) {
   const g = muestra.gases || {};
   const calif_tdgc = [g.H2, g.CH4, g.C2H4, g.C2H6].every((x) => x != null)
-    ? calcularCalifTDGC(g) : null;
-  const calif_c2h2 = g.C2H2 != null ? calcularCalifC2H2(g.C2H2) : null;
-  const calif_co   = g.CO   != null ? calcularCalifCO(g.CO)    : null;
-  const calif_co2  = g.CO2  != null ? calcularCalifCO2(g.CO2)  : null;
+    ? calcularCalifTDGC(g, cfgU) : null;
+  const calif_c2h2 = g.C2H2 != null ? calcularCalifC2H2(g.C2H2, cfgU) : null;
+  const calif_co   = g.CO   != null ? calcularCalifCO(g.CO, cfgU)    : null;
+  const calif_co2  = g.CO2  != null ? calcularCalifCO2(g.CO2, cfgU)  : null;
   const eval_dga   = (calif_tdgc != null || calif_c2h2 != null)
     ? Math.max(calif_tdgc ?? 0, calif_c2h2 ?? 0) || null : null;
 
   const adfq = muestra.adfq || {};
-  const calif_rd = adfq.rigidez_kv != null ? calcularCalifRD(adfq.rigidez_kv) : null;
+  const calif_rd = adfq.rigidez_kv != null ? calcularCalifRD(adfq.rigidez_kv, cfgU) : null;
   const calif_ic = (adfq.ti != null && adfq.nn != null)
-    ? calcularCalifIC({ ti: adfq.ti, nn: adfq.nn }) : null;
-  const eval_adfq = evaluarADFQ(adfq);
+    ? calcularCalifIC({ ti: adfq.ti, nn: adfq.nn }, cfgU) : null;
+  const eval_adfq = evaluarADFQ(adfq, cfgU);
 
-  const calif_fur = muestra.furanos_ppb != null ? calcularCalifFUR(muestra.furanos_ppb) : null;
+  const calif_fur = muestra.furanos_ppb != null ? calcularCalifFUR(muestra.furanos_ppb, cfgU) : null;
   const dp_est = muestra.furanos_ppb != null ? calcularDP(muestra.furanos_ppb) : null;
   const vida_utilizada_pct = dp_est != null ? calcularVidaUtilizada(dp_est) : null;
 
@@ -65,7 +66,8 @@ export async function crear(data, uid) {
   const payload = sanitizarMuestra(data);
   const errs = validarMuestra(payload);
   if (errs.length) throw new Error('Validación muestra:\n  · ' + errs.join('\n  · '));
-  const derivados = derivarCampos(payload);
+  const cfgU = await obtenerUmbralesActivos();   // G010: umbrales editados F18
+  const derivados = derivarCampos(payload, cfgU);
   const docCompleto = {
     ...payload, ...derivados,
     createdAt: serverTimestamp(),
@@ -79,7 +81,8 @@ export async function actualizar(id, data, uid) {
   const payload = sanitizarMuestra(data);
   const errs = validarMuestra(payload);
   if (errs.length) throw new Error('Validación muestra:\n  · ' + errs.join('\n  · '));
-  const derivados = derivarCampos(payload);
+  const cfgU = await obtenerUmbralesActivos();   // G010: umbrales editados F18
+  const derivados = derivarCampos(payload, cfgU);
   await updateDoc(docRef(id), {
     ...payload, ...derivados,
     updatedAt: serverTimestamp(),

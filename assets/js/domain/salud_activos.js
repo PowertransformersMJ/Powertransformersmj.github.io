@@ -17,6 +17,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { PESOS_HI, UBICACIONES_FUGA, bucketDesdeHI } from './schema.js';
+import { BASELINE_UMBRALES_SALUD } from './umbrales_salud_baseline.js';
 
 // ── Utilidades internas ────────────────────────────────────────
 const toNum = (v) => {
@@ -29,6 +30,20 @@ const calif15 = (v) => {
   const n = toNum(v);
   if (n == null) return null;
   return clamp(Math.round(n), 1, 5);
+};
+
+// ── Umbrales activos (G010 · cableado F18) ─────────────────────
+// Resuelve la sección de umbrales a usar: la config editada por
+// el admin (`/umbrales_salud/global`, ya mergeada por el data
+// layer / CF) o, en su ausencia, el BASELINE oficial MO.00418.
+// Sin `cfg` el resultado es idéntico a los literales históricos.
+const _u = (cfg, seccion, sub) => {
+  const base = sub
+    ? BASELINE_UMBRALES_SALUD[seccion][sub]
+    : BASELINE_UMBRALES_SALUD[seccion];
+  const c = cfg && cfg[seccion];
+  const over = sub ? (c && c[sub]) : c;
+  return over ? { ...base, ...over } : base;
 };
 
 // ══════════════════════════════════════════════════════════════
@@ -48,8 +63,9 @@ export const UMBRALES_TDGC = Object.freeze([401, 301, 201, 95]);
 
 /**
  * @param {{H2, CH4, C2H4, C2H6}} gases — ppm
+ * @param {object} [cfg] — umbrales activos (default: baseline MO.00418)
  */
-export function calcularCalifTDGC(gases) {
+export function calcularCalifTDGC(gases, cfg) {
   if (!gases) return null;
   const { H2, CH4, C2H4, C2H6 } = gases;
   const h2   = toNum(H2);
@@ -58,12 +74,13 @@ export function calcularCalifTDGC(gases) {
   const c2h6 = toNum(C2H6);
   if ([h2, ch4, c2h4, c2h6].some((x) => x == null)) return null;
   const tdgc = h2 + ch4 + c2h4 + c2h6;
+  const T = _u(cfg, 'dga', 'tdgc');
   // Convención estricta: la banda superior abre siempre con ">".
   // 401 → 4 (entra en 301 < v ≤ 401); > 401 → 5.
-  if (tdgc >  401) return 5;
-  if (tdgc >  301) return 4;
-  if (tdgc >  201) return 3;
-  if (tdgc >=  95) return 2;
+  if (tdgc >  T.c5_min) return 5;
+  if (tdgc >  T.c4_min) return 4;
+  if (tdgc >  T.c3_min) return 3;
+  if (tdgc >= T.c2_min) return 2;
   return 1;
 }
 
@@ -77,37 +94,40 @@ export const UMBRALES_CO = Object.freeze([
   { calif: 1, min: -Infinity, max: 100 }   // CO < 99 → usa ≤100 como frontera
 ]);
 
-export function calcularCalifCO(co) {
+export function calcularCalifCO(co, cfg) {
   const v = toNum(co);
   if (v == null) return null;
-  if (v >= 750) return 5;
-  if (v >  550) return 4;
-  if (v >  300) return 3;
-  if (v >  100) return 2;
+  const T = _u(cfg, 'dga', 'co');
+  if (v >= T.c5_min)      return 5;
+  if (v >  T.c4_min_excl) return 4;
+  if (v >  T.c3_min_excl) return 3;
+  if (v >  T.c2_min_excl) return 2;
   return 1;
 }
 
 // ── CO2 — Gas asociado a papel ─────────────────────────────────
-export function calcularCalifCO2(co2) {
+export function calcularCalifCO2(co2, cfg) {
   const v = toNum(co2);
   if (v == null) return null;
-  if (v >= 7001) return 5;
-  if (v >  5000) return 4;
-  if (v >  3000) return 3;
-  if (v >  1500) return 2;
+  const T = _u(cfg, 'dga', 'co2');
+  if (v >= T.c5_min)      return 5;
+  if (v >  T.c4_min_excl) return 4;
+  if (v >  T.c3_min_excl) return 3;
+  if (v >  T.c2_min_excl) return 2;
   return 1;
 }
 
 // ── C2H2 — Acetileno ───────────────────────────────────────────
 // MO.00418 §A3.1 (c) — umbrales OFICIALES (5× más estrictos que
 // el Excel legacy, ver §D2).
-export function calcularCalifC2H2(c2h2) {
+export function calcularCalifC2H2(c2h2, cfg) {
   const v = toNum(c2h2);
   if (v == null) return null;
-  if (v >= 7) return 5;
-  if (v >= 6) return 4;
-  if (v >= 5) return 3;
-  if (v >= 3) return 2;
+  const T = _u(cfg, 'dga', 'c2h2');
+  if (v >= T.c5_min) return 5;
+  if (v >= T.c4_min) return 4;
+  if (v >= T.c3_min) return 3;
+  if (v >= T.c2_min) return 2;
   return 1;
 }
 
@@ -115,10 +135,10 @@ export function calcularCalifC2H2(c2h2) {
 // MO.00418 §A3.1 (d): EVAL_DGA = MAX(CalifTDGC, CalifC2H2).
 // CO/CO2 quedan como indicadores complementarios (no entran al
 // HI principal; disparan alertas propias).
-export function evaluarDGA(muestra) {
+export function evaluarDGA(muestra, cfg) {
   if (!muestra) return null;
-  const tdgc = calcularCalifTDGC(muestra.gases || muestra);
-  const c2h2 = calcularCalifC2H2((muestra.gases || muestra).C2H2);
+  const tdgc = calcularCalifTDGC(muestra.gases || muestra, cfg);
+  const c2h2 = calcularCalifC2H2((muestra.gases || muestra).C2H2, cfg);
   if (tdgc == null && c2h2 == null) return null;
   return Math.max(tdgc ?? 0, c2h2 ?? 0) || null;
 }
@@ -128,13 +148,14 @@ export function evaluarDGA(muestra) {
 // Refs: NTC 3284, ASTM D1816, D974, D664, D924-23, etc.
 // ══════════════════════════════════════════════════════════════
 
-export function calcularCalifRD(rdKv) {
+export function calcularCalifRD(rdKv, cfg) {
   const v = toNum(rdKv);
   if (v == null) return null;
-  if (v < 19) return 5;
-  if (v < 20) return 4;
-  if (v < 25) return 3;
-  if (v < 33) return 2;
+  const T = _u(cfg, 'adfq', 'rd_kv');
+  if (v < T.c5_max_excl) return 5;
+  if (v < T.c4_max_excl) return 4;
+  if (v < T.c3_max_excl) return 3;
+  if (v < T.c2_max_excl) return 2;
   return 1;
 }
 
@@ -143,15 +164,16 @@ export function calcularCalifRD(rdKv) {
  * de neutralización).
  * @param {{ti, nn}} src
  */
-export function calcularCalifIC({ ti, nn } = {}) {
+export function calcularCalifIC({ ti, nn } = {}, cfg) {
   const iTi = toNum(ti);
   const iNn = toNum(nn);
   if (iTi == null || iNn == null || iNn === 0) return null;
   const ic = iTi / iNn;
-  if (ic <= 713)  return 5;
-  if (ic <= 999)  return 4;
-  if (ic <= 1130) return 3;
-  if (ic <= 1499) return 2;
+  const T = _u(cfg, 'adfq', 'ic');
+  if (ic <= T.c5_max) return 5;
+  if (ic <= T.c4_max) return 4;
+  if (ic <= T.c3_max) return 3;
+  if (ic <= T.c2_max) return 2;
   return 1;
 }
 
@@ -159,13 +181,13 @@ export function calcularCalifIC({ ti, nn } = {}) {
  * EVALUACION_ADFQ = promedio simple (CalifRD + CalifIC) / 2.
  * Si falta alguna, devuelve la otra; si faltan ambas, null.
  */
-export function evaluarADFQ(muestra) {
+export function evaluarADFQ(muestra, cfg) {
   if (!muestra) return null;
-  const rd = calcularCalifRD(muestra.rigidez_kv ?? muestra.rd);
+  const rd = calcularCalifRD(muestra.rigidez_kv ?? muestra.rd, cfg);
   const ic = calcularCalifIC({
     ti: muestra.ti ?? muestra.tension_interfacial,
     nn: muestra.nn ?? muestra.numero_neutralizacion
-  });
+  }, cfg);
   if (rd == null && ic == null) return null;
   if (rd == null) return ic;
   if (ic == null) return rd;
@@ -177,13 +199,14 @@ export function evaluarADFQ(muestra) {
 // Ref: ASTM D5837-15, IEC 61198, CIGRÉ 445.
 // ══════════════════════════════════════════════════════════════
 
-export function calcularCalifFUR(ppb) {
+export function calcularCalifFUR(ppb, cfg) {
   const v = toNum(ppb);
   if (v == null) return null;
-  if (v >= 5500) return 5;
-  if (v >= 4800) return 4;
-  if (v >= 3600) return 3;
-  if (v >= 2400) return 2;
+  const T = _u(cfg, 'fur');
+  if (v >= T.c5_min) return 5;
+  if (v >= T.c4_min) return 4;
+  if (v >= T.c3_min) return 3;
+  if (v >= T.c2_min) return 2;
   return 1;
 }
 
@@ -225,10 +248,10 @@ export function calcularVidaRemanente(dp) {
  *   primario/secundario/terciario. Puede faltar terciario.
  * @returns {{calif, crg_pct}} calificación 1–5 + % medido.
  */
-export function calcularCalifCRG({ cp, ap, cs, as: asec, ct, at } = {}) {
+export function calcularCalifCRG({ cp, ap, cs, as: asec, ct, at } = {}, cfg) {
   const pct = _cargaMaxPct({ cp, ap, cs, as: asec, ct, at });
   if (pct == null) return { calif: null, crg_pct: null };
-  return { calif: _califCRGDesdePct(pct), crg_pct: pct };
+  return { calif: _califCRGDesdePct(pct, cfg), crg_pct: pct };
 }
 
 function _cargaMaxPct({ cp, ap, cs, as: asec, ct, at }) {
@@ -246,11 +269,12 @@ function _ratioPct(carga, ampacidad) {
   return (c / a) * 100;
 }
 
-function _califCRGDesdePct(pct) {
-  if (pct > 90) return 5;
-  if (pct > 75) return 4;
-  if (pct > 65) return 3;
-  if (pct > 60) return 2;
+function _califCRGDesdePct(pct, cfg) {
+  const T = _u(cfg, 'crg');
+  if (pct > T.c5_min_excl) return 5;
+  if (pct > T.c4_min_excl) return 4;
+  if (pct > T.c3_min_excl) return 3;
+  if (pct > T.c2_min_excl) return 2;
   return 1;
 }
 
@@ -266,13 +290,14 @@ export function calcularEdadAnos(anoFabricacion, hoy = new Date()) {
   return y - a;
 }
 
-export function calcularCalifEDAD(anoFabricacion, hoy = new Date()) {
+export function calcularCalifEDAD(anoFabricacion, hoy = new Date(), cfg) {
   const edad = calcularEdadAnos(anoFabricacion, hoy);
   if (edad == null) return null;
-  if (edad >= 30) return 5;
-  if (edad >= 26) return 4;
-  if (edad >= 19) return 3;
-  if (edad >= 7)  return 2;
+  const T = _u(cfg, 'edad');
+  if (edad >= T.c5_min) return 5;
+  if (edad >= T.c4_min) return 4;
+  if (edad >= T.c3_min) return 3;
+  if (edad >= T.c2_min) return 2;
   return 1;
 }
 
@@ -355,12 +380,13 @@ export function calcularHIBruto(califs, pesos = PESOS_HI) {
 // Cada override deja registro en `overrides_aplicados[]`.
 // ══════════════════════════════════════════════════════════════
 
-export function aplicarOverrides(hiBruto, califs, contexto = {}) {
+export function aplicarOverrides(hiBruto, califs, contexto = {}, cfg) {
   if (hiBruto == null) {
     return { hi_final: null, overrides_aplicados: [] };
   }
   let hi = hiBruto;
   const marks = [];
+  const OV = _u(cfg, 'overrides');
 
   const fur  = calif15(califs.calif_fur ?? califs.fur ?? califs.FUR);
   const crg  = calif15(califs.calif_crg ?? califs.crg ?? califs.CRG);
@@ -371,14 +397,17 @@ export function aplicarOverrides(hiBruto, califs, contexto = {}) {
   //    (§A9.2 "juicio experto"). Se aplica automáticamente sólo
   //    cuando la bandera `fin_vida_util_papel` está en true; de
   //    lo contrario, queda como propuesta pendiente.
-  if (fur != null && fur >= 4 && finVida) {
+  const furMin = (OV.fur_aprobado && OV.fur_aprobado.min_calif) ?? 4;
+  if (fur != null && fur >= furMin && finVida) {
     if (fur > hi) { hi = fur; }
     marks.push(`FUR>=${fur} aprobado (fin_vida_util_papel) — MO.00418 §4.1.2`);
   }
 
   // 2. CRG = 5 — override duro automático (§A5 + §4.1.3).
-  if (crg === 5) {
-    if (hi < 4) hi = 4;
+  const crgMin   = (OV.crg_max && OV.crg_max.min_calif) ?? 5;
+  const crgHiMin = (OV.crg_max && OV.crg_max.hi_min)    ?? 4;
+  if (crg != null && crg >= crgMin) {
+    if (hi < crgHiMin) hi = crgHiMin;
     marks.push('CRG=5 automático — MO.00418 §4.1.3');
   }
 
@@ -389,8 +418,9 @@ export function aplicarOverrides(hiBruto, califs, contexto = {}) {
       contexto.umbral_velocidad_c2h2 != null &&
       contexto.velocidad_c2h2_ppm_dia >= contexto.umbral_velocidad_c2h2
   );
+  const c2h2HiMin = (OV.c2h2_accel && OV.c2h2_accel.hi_min) ?? 4;
   if (c2h2 === 5 && c2h2Accel) {
-    if (hi < 4) hi = 4;
+    if (hi < c2h2HiMin) hi = c2h2HiMin;
     marks.push('C2H2=5 + aceleración detectada — MO.00418 §A9.1');
   } else if (c2h2 === 5) {
     // Sólo marcador informativo: el override dispara monitoreo
@@ -427,37 +457,39 @@ export function snapshotSaludCompleto(ctx = {}) {
     pyt,
     her,
     hoy = new Date(),
-    contextoOverrides = {}
+    contextoOverrides = {},
+    umbrales = null   // G010: config activa `/umbrales_salud/global` (mergeada)
   } = ctx;
 
   // Variables por separado
   const dga = muestraDGA || {};
-  const califTDGC = calcularCalifTDGC(dga.gases || dga);
-  const califC2H2 = calcularCalifC2H2((dga.gases || dga).C2H2);
-  const califCO   = calcularCalifCO((dga.gases || dga).CO);
-  const califCO2  = calcularCalifCO2((dga.gases || dga).CO2);
+  const califTDGC = calcularCalifTDGC(dga.gases || dga, umbrales);
+  const califC2H2 = calcularCalifC2H2((dga.gases || dga).C2H2, umbrales);
+  const califCO   = calcularCalifCO((dga.gases || dga).CO, umbrales);
+  const califCO2  = calcularCalifCO2((dga.gases || dga).CO2, umbrales);
   const evalDGA   = Math.max(califTDGC ?? 0, califC2H2 ?? 0) || null;
 
   const adfq = muestraADFQ || {};
-  const califRD = calcularCalifRD(adfq.rigidez_kv ?? adfq.rd);
+  const califRD = calcularCalifRD(adfq.rigidez_kv ?? adfq.rd, umbrales);
   const califIC = calcularCalifIC({
     ti: adfq.ti ?? adfq.tension_interfacial,
     nn: adfq.nn ?? adfq.numero_neutralizacion
-  });
-  const evalADFQ = evaluarADFQ(adfq);
+  }, umbrales);
+  const evalADFQ = evaluarADFQ(adfq, umbrales);
 
   const fur = muestraFUR || {};
   const ppb = toNum(fur.ppb ?? fur.furanos_ppb ?? fur['2fal'] ?? fur.fal2);
-  const califFUR = calcularCalifFUR(ppb);
+  const califFUR = calcularCalifFUR(ppb, umbrales);
   const dpEst    = calcularDP(ppb);
   const vidaUtil = calcularVidaUtilizada(dpEst);
   const vidaRem  = vidaUtil != null ? clamp(100 - vidaUtil, 0, 100) : null;
 
-  const crgRes = calcularCalifCRG(cargaActual || {});
+  const crgRes = calcularCalifCRG(cargaActual || {}, umbrales);
   const califEDAD = calcularCalifEDAD(
     (transformador.fabricacion && transformador.fabricacion.ano_fabricacion)
     ?? transformador.ano_fabricacion,
-    hoy
+    hoy,
+    umbrales
   );
   const edadAnos = calcularEdadAnos(
     (transformador.fabricacion && transformador.fabricacion.ano_fabricacion)
@@ -483,7 +515,7 @@ export function snapshotSaludCompleto(ctx = {}) {
     calif_c2h2: califC2H2,
     fin_vida_util_papel:
       transformador?.salud_actual?.fin_vida_util_papel === true
-  }, contextoOverrides);
+  }, contextoOverrides, umbrales);
 
   return {
     ts_calculo: hoy.toISOString(),
@@ -513,6 +545,7 @@ export function snapshotSaludCompleto(ctx = {}) {
     hi_final:   ov.hi_final,
     bucket:     bucketDesdeHI(ov.hi_final),
     overrides_aplicados: ov.overrides_aplicados,
+    umbrales_version: (umbrales && umbrales.version) || BASELINE_UMBRALES_SALUD.version,
     fin_vida_util_papel:
       transformador?.salud_actual?.fin_vida_util_papel === true
   };

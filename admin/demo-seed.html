@@ -84,6 +84,7 @@ import { crear as crearMuestra } from '../assets/js/data/muestras.js';
 import { crear as crearOrden, eliminar as eliminarOrden, listar as listarOrdenes }
   from '../assets/js/data/ordenes.js';
 import { snapshotSaludCompleto } from '../assets/js/domain/salud_activos.js';
+import { obtenerUmbralesActivos } from '../assets/js/data/umbrales_salud.js';
 
 const $ = (id) => document.getElementById(id);
 const log = (t, cls = '') => {
@@ -137,11 +138,12 @@ const FIXTURES = [
     estadosEspeciales: ['fin_vida_util_papel', 'pendiente_reemplazo'] }
 ];
 
-function buildDoc(fx) {
+function buildDoc(fx, cfgU = null) {
   const tempTx = {
     fabricacion: { ano_fabricacion: fx.anoFab }
   };
   const snap = snapshotSaludCompleto({
+    umbrales: cfgU,
     transformador: { ...tempTx, salud_actual: { fin_vida_util_papel: !!fx.finVidaPapel } },
     muestraDGA: { gases: fx.gases },
     muestraADFQ: { rigidez_kv: fx.rd, ti: fx.ti, nn: fx.nn },
@@ -191,6 +193,7 @@ $('btnRun').addEventListener('click', async () => {
     const uid = session.user && session.user.uid;
 
     log('Creando 6 transformadores demo...');
+    const cfgU = await obtenerUmbralesActivos();   // G010: umbrales editados F18
     const idsPorCodigo = {};
     for (const fx of FIXTURES) {
       // Si existe, lo elimino primero (idempotencia)
@@ -198,7 +201,7 @@ $('btnRun').addEventListener('click', async () => {
         .filter((t) => t.codigo === fx.codigo);
       for (const e of existing) await eliminarTrafo(e.id, { uid });
 
-      const doc = buildDoc(fx);
+      const doc = buildDoc(fx, cfgU);
       const id = await crearTrafo(doc, uid);
       idsPorCodigo[fx.codigo] = id;
       log(`   · ${fx.codigo} → HI ${doc.salud_actual.hi_final.toFixed(2)} (${doc.salud_actual.bucket})`, 'ok');

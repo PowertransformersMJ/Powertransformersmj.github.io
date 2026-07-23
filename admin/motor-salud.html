@@ -235,6 +235,7 @@
 <script type="module">
 import { snapshotSaludCompleto, calcularHIBruto, aplicarOverrides }
   from '../assets/js/domain/salud_activos.js';
+import { obtenerUmbralesActivos } from '../assets/js/data/umbrales_salud.js';
 import { diagnosticoDGA, alertaArcoD2 }
   from '../assets/js/domain/dga_diagnostico.js';
 import { CONDICIONES } from '../assets/js/domain/schema.js';
@@ -295,9 +296,10 @@ function render(snap, diag, arcoD2) {
   `;
 }
 
-$('formMotor').addEventListener('submit', (ev) => {
+$('formMotor').addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const ctx = readForm();
+  ctx.umbrales = await obtenerUmbralesActivos();   // G010: umbrales editados F18
   const snap = snapshotSaludCompleto(ctx);
   const diag = diagnosticoDGA(ctx.muestraDGA.gases);
   const arcoD2 = alertaArcoD2(ctx.muestraDGA.gases);

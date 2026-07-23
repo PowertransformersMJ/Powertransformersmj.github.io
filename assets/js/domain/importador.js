@@ -123,7 +123,7 @@ function normEstado(v) {
  *   diagnóstico con HI calculado oficialmente y comparación contra
  *   la CONDICION del Excel (si viene).
  */
-export function parsearFilaTransformador(fila, hoja = '', hoy = new Date()) {
+export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU = null) {
   if (!fila || typeof fila !== 'object') {
     throw new Error('parsearFilaTransformador: fila inválida.');
   }
@@ -235,26 +235,26 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date()) {
   let califTDGC = null, califC2H2 = null, califCO = null, califCO2 = null;
   let evalDGA = null;
   if ([H2, CH4, C2H4, C2H6].every((x) => x != null)) {
-    califTDGC = calcularCalifTDGC({ H2, CH4, C2H4, C2H6 });
+    califTDGC = calcularCalifTDGC({ H2, CH4, C2H4, C2H6 }, cfgU);
   }
-  if (C2H2 != null) califC2H2 = calcularCalifC2H2(C2H2);
-  if (CO   != null) califCO   = calcularCalifCO(CO);
-  if (CO2  != null) califCO2  = calcularCalifCO2(CO2);
+  if (C2H2 != null) califC2H2 = calcularCalifC2H2(C2H2, cfgU);
+  if (CO   != null) califCO   = calcularCalifCO(CO, cfgU);
+  if (CO2  != null) califCO2  = calcularCalifCO2(CO2, cfgU);
   if (califTDGC != null || califC2H2 != null) {
     evalDGA = Math.max(califTDGC ?? 0, califC2H2 ?? 0) || null;
   }
 
-  const califRD = calcularCalifRD(rdKv);
-  const califIC = calcularCalifIC({ ti, nn });
-  const evalADFQ = evaluarADFQ({ rigidez_kv: rdKv, ti, nn });
+  const califRD = calcularCalifRD(rdKv, cfgU);
+  const califIC = calcularCalifIC({ ti, nn }, cfgU);
+  const evalADFQ = evaluarADFQ({ rigidez_kv: rdKv, ti, nn }, cfgU);
 
-  const califFUR = calcularCalifFUR(ppbFur);
+  const califFUR = calcularCalifFUR(ppbFur, cfgU);
   const dp       = calcularDP(ppbFur);
   const vidaU    = calcularVidaUtilizada(dp);
 
-  const crg = calcularCalifCRG({ cp, ap, cs, as: asec, ct, at });
+  const crg = calcularCalifCRG({ cp, ap, cs, as: asec, ct, at }, cfgU);
 
-  const califEDAD = calcularCalifEDAD(anoFab, hoy);
+  const califEDAD = calcularCalifEDAD(anoFab, hoy, cfgU);
   const califHER  = calcularCalifHER(herUbic);
   const califPYT  = calcularCalifPYT(pytRaw);
 
@@ -266,7 +266,7 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date()) {
   const ov = aplicarOverrides(hiBruto, {
     calif_fur: califFUR, calif_crg: crg.calif, calif_c2h2: califC2H2,
     fin_vida_util_papel: false
-  }, {});
+  }, {}, cfgU);
 
   entradaV2.salud_actual = {
     ts_calculo: hoy.toISOString(),
@@ -321,7 +321,7 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date()) {
  * @param {Array<{hoja, filas}>} hojas
  * @param {Date} [hoy]
  */
-export function procesarLibro(hojas, hoy = new Date()) {
+export function procesarLibro(hojas, hoy = new Date(), cfgU = null) {
   const resultados = [];
   const reporte = {
     total_filas: 0,
@@ -339,7 +339,7 @@ export function procesarLibro(hojas, hoy = new Date()) {
 
     for (const fila of arr) {
       try {
-        const { docV2, diagnostico } = parsearFilaTransformador(fila, hoja, hoy);
+        const { docV2, diagnostico } = parsearFilaTransformador(fila, hoja, hoy, cfgU);
         resultados.push({ hoja, docV2, diagnostico });
         reporte.exitosos += 1;
 

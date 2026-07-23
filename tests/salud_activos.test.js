@@ -385,3 +385,64 @@ describe('bucketizarHI', () => {
     assert.equal(bucketizarHI(4.8),  'muy_pobre');
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// G010 — umbrales configurables (cableado F18 → cálculo)
+// ══════════════════════════════════════════════════════════════
+describe('G010 — umbrales configurables', () => {
+  const mk = (t) => ({ H2: t, CH4: 0, C2H4: 0, C2H6: 0 });
+
+  test('calcularCalifTDGC respeta umbrales custom y el default queda intacto', () => {
+    const cfg = { dga: { tdgc: { c5_min: 500, c4_min: 400, c3_min: 300, c2_min: 200 } } };
+    assert.equal(calcularCalifTDGC(mk(450), cfg), 4);  // con default sería 5
+    assert.equal(calcularCalifTDGC(mk(450)), 5);       // default intacto
+  });
+
+  test('config PARCIAL hereda el resto del baseline (merge defensivo)', () => {
+    const cfg = { dga: { tdgc: { c5_min: 500 } } };     // solo c5 editado
+    assert.equal(calcularCalifTDGC(mk(450), cfg), 4);   // >301 heredado → 4
+    assert.equal(calcularCalifTDGC(mk(96), cfg), 2);    // c2_min heredado (95)
+  });
+
+  test('CO / CO2 / C2H2 con bandas custom', () => {
+    assert.equal(calcularCalifCO(700,  { dga: { co:   { c5_min: 600 } } }), 5);   // default 4
+    assert.equal(calcularCalifCO2(6000,{ dga: { co2:  { c5_min: 5500 } } }), 5);  // default 4
+    assert.equal(calcularCalifC2H2(4,  { dga: { c2h2: { c3_min: 4 } } }), 3);     // default 2
+  });
+
+  test('RD / IC con bandas custom', () => {
+    assert.equal(calcularCalifRD(21, { adfq: { rd_kv: { c4_max_excl: 22 } } }), 4);        // default 3
+    assert.equal(calcularCalifIC({ ti: 800, nn: 1 }, { adfq: { ic: { c5_max: 800 } } }), 5); // default 4
+  });
+
+  test('FUR / CRG / EDAD con bandas custom', () => {
+    assert.equal(calcularCalifFUR(3000, { fur: { c2_min: 3200 } }), 1);                        // default 2
+    assert.equal(calcularCalifCRG({ cp: 80, ap: 100 }, { crg: { c5_min_excl: 78 } }).calif, 5); // default 4
+    const hoy = new Date(Date.UTC(2026, 6, 1));
+    assert.equal(calcularCalifEDAD(2000, hoy, { edad: { c5_min: 25 } }), 5);                   // 26 años, default 4
+  });
+
+  test('snapshotSaludCompleto threadea ctx.umbrales hasta el HI', () => {
+    const gases = { H2: 200, CH4: 100, C2H4: 80, C2H6: 40, C2H2: 0 };  // TDGC 420
+    const hoy = new Date(Date.UTC(2026, 6, 1));
+    const base = snapshotSaludCompleto({
+      transformador: { ano_fabricacion: 2000 }, muestraDGA: { gases }, hoy
+    });
+    const cfg = { dga: { tdgc: { c2_min: 9e5, c3_min: 9e6, c4_min: 9e7, c5_min: 9e8 } } };
+    const conCfg = snapshotSaludCompleto({
+      transformador: { ano_fabricacion: 2000 }, muestraDGA: { gases }, hoy, umbrales: cfg
+    });
+    assert.equal(base.eval_dga, 5);        // 420 > 401 (baseline)
+    assert.equal(conCfg.eval_dga, 1);      // bandas corridas → 1
+    assert.ok(conCfg.hi_final < base.hi_final);
+    assert.equal(base.umbrales_version, '1.0.0');  // trazabilidad de la config usada
+  });
+
+  test('aplicarOverrides respeta hi_min custom de CRG', () => {
+    const { hi_final } = aplicarOverrides(
+      2.0, { calif_crg: 5 }, {},
+      { overrides: { crg_max: { min_calif: 5, hi_min: 4.5 } } }
+    );
+    assert.equal(hi_final, 4.5);
+  });
+});

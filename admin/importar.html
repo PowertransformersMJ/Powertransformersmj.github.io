@@ -133,6 +133,7 @@
 <script type="module">
 import { procesarLibro } from '../assets/js/domain/importador.js';
 import { persistirImportacion, isReady } from '../assets/js/data/importar.js';
+import { obtenerUmbralesActivos } from '../assets/js/data/umbrales_salud.js';
 
 // SheetJS vía CDN (UMD build funciona también como ESM con dynamic import).
 async function loadSheetJS() {
@@ -177,7 +178,8 @@ async function procesarArchivo(file) {
 
     $('progress').textContent = `⋯ Analizando ${hojas.reduce((s, h) => s + h.filas.length, 0)} filas con motor F18...`;
 
-    const { resultados, reporte } = procesarLibro(hojas);
+    const cfgU = await obtenerUmbralesActivos();   // G010: umbrales editados F18
+    const { resultados, reporte } = procesarLibro(hojas, new Date(), cfgU);
     procesadoActual = { resultados, reporte, nombre: file.name };
 
     $('reportWrap').hidden = false;

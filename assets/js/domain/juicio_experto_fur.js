@@ -35,10 +35,11 @@ export function crearPropuestaReclasificacionFUR({
   muestra_id,
   ppb_2fal,
   hi_bruto_actual,
-  hoy = new Date()
+  hoy = new Date(),
+  umbrales = null   // G010: config activa de umbrales (F18)
 } = {}) {
   const ppb = toNum(ppb_2fal);
-  const califFUR = calcularCalifFUR(ppb);
+  const califFUR = calcularCalifFUR(ppb, umbrales);
   if (califFUR == null || califFUR < 4) return null;
 
   const dp = calcularDP(ppb);
