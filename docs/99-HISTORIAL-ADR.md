@@ -1050,3 +1050,21 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 **53.6 Archivos**: `salud_activos.js` · `importador.js` · `juicio_experto_fur.js` · `muestras.js` · `monitoreo_fur.js` · `importar/motor-salud/demo-seed/fallados.html` · `functions/index.js` · `pruebas_electricas_multinorma.js` · `pruebas_electricas_schema.js` · `tests/salud_activos.test.js`. INTACTOS: `schema.js` (PESOS_HI), `firestore.rules`, calificadores/bandas de pruebas. Commits `52f06b7`→`c7683d7`, mergeados a `main`.
 
 **53.7 Doctrina + operativo**: §3.3 en acción — la 1ª sonda del Secret Manager "494 bytes" era el TEXTO del error, no el secreto (el exit-code real dijo FAIL): **billing sigue deshabilitado** y las **CF de IA están CAÍDAS en producción** (HTTP 500 del frontend de Google = contenedor no arranca sin el secreto; `onMuestraCreate` vivo con su 403 esperado). Deploy de functions (G007/G008 + G010-CF) en cola: `firebase deploy --only functions:extraerPruebasElectricasIA,functions:narrativaTendenciaIA,functions:onMuestraCreate` (NUNCA el cron — Etapa 2 intencional). **⚠️ NO editar umbrales en F18 hasta ese deploy** (evita divergencia cliente/servidor). Decisiones de este ADR: delegadas por "HAS TODO TU", NO revisadas externamente; **ratificación del director pendiente** (TODO-04 parcial: clusters 3b/4 sin validar — TODO-15). Cache: n/a.
+
+## 54. ADR-054 — Fix sistémico del shell: evento de sesión window→document + modales legacy pegados (TODO-16)
+
+> Continuación de "HAS TODO TU": el Ingeniero eligió atacar el bug cazado en la validación en vivo.
+
+**54.1 Causa raíz (verificada EN VIVO con sondas JS en producción)**: (a) `session-guard.js:248` despachaba `sgm:session-ready` SOLO en `window`, pero **10 páginas admin** (fallados, muestras, subestaciones, catalogos, umbrales-salud, propuestas-fur, contramuestras, auditoria, plan-inversion, desempeno-aliados) lo escuchan en `document` — un evento disparado en window JAMÁS alcanza listeners de document → sus cargas dependían de ganar la carrera del check inmediato `if (window.__sgmSession)` en el eval del módulo (la sesión tarda ~2 s en resolver el perfil: en frío la pierden) → "Cargando" eterno + botones sin listeners. (b) El override AQUA `body.aqua .modal-bg` (aqua-components.css:1075) es `display:grid` SIN estado oculto por defecto → aplasta por especificidad el `.modal-bg{display:none}` local de **6 páginas** → modal pegado abierto (invisible hasta hoy: la ruta directa está redirigida por aqua-shell:75 y el tab iframe casi no se había visitado).
+
+**54.2 Solución estructural**: doble dispatch `window`+`document` en session-guard (cubre ambos estilos de listener) + selector `body.aqua .modal-bg:not(.open):not(.on){display:none}` — el `:not(.on)` respeta la clase de apertura distinta de `parque-transformadores`, verificada ANTES de escribir el selector.
+
+**54.3 No-regresión**: aditivo puro (+10 líneas, 0 borradas); aqua-shell (listener en window) intacto; `.modal-overlay` NO tocado (funciona hoy — sin evidencia, sin fix).
+
+**54.4 Verificación**: forense en vivo — modal `display:grid` sin clase 'open' · dispatch manual sobre `document` cargó 213 unidades (módulo VIVO, evento jamás recibido). Tras deploy (`b27b8f1`): modal `none`, evaluador carga **213 unidades POTENCIA solo**, tabla "Sin fallas registradas", evaluación E ejecutada end-to-end con estado-cero correcto ("sin RESPALDO operativas" — el parque aún no clasifica respaldos). Suite 1194 pass · lint OK.
+
+**54.5 Anti-patterns evitados**: no adiviné — 2 hipótesis intermedias se DESCARTARON con sondas (§3.3), incl. retractar el falso "panel inalcanzable" (era iframe); fix mínimo en ruta de auth (alto blast radius).
+
+**54.6 Archivos**: `assets/js/auth/session-guard.js` · `assets/css/aqua-components.css`. INTACTAS las 10 páginas (sus listeners quedan válidos tal cual). Commit `b27b8f1` a `main`.
+
+**54.7 Doctrina**: validación EN VIVO como gate (el preview aislado era estructuralmente ciego a esto — L-56 confirmada dos veces hoy) · caza-bugs end-to-end · §3.3. **Pendiente del Ingeniero**: clasificar unidades RESPALDO en el parque (`identificacion.tipo_activo`) para que el evaluador dé salida útil. Cache: n/a.

@@ -39,7 +39,6 @@
 | **CONECTAR D** | D decidido: **NO activar** (§52.14 — prerrequisitos del día D allá: UI no-admin, custom claims, constraints por CAMPO). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
 | **TODO-04** | **✅ PARCIAL (ADR-053)**: clusters IR/PI/DAR + FP/tan δ/bujes + TTR validados con fuente y refutación; 2 re-atribuciones aplicadas (`c7683d7`). RESTA: ratificación del director + MO.00418 (per-clase) + clusters 3b/4 (→ TODO-15). | 🟢 parcial |
 | **TODO-15** | Del TODO-04 (spec en `49 §Validación`): (a) evaluador ΔC1 bujes (>5% investigar NETA; >10% DIRECCIONAL/tendencia, práctica) con preview fiel; (b) corrección IR a 20 °C (Tabla 100.14) o caveat visible; (c) re-correr clusters 3b (excitación/R-dev) y 4 (núcleo/reactancia/LTC/collar) en Opus; (d) 3ª copia de la etiqueta "30 GΩ NETA 100.5" en la fila IR del scorecard (FAMILIAS_SCORE del shell) — misma re-atribución que `c7683d7`, vista en vivo 2026-07-23. | 🔴 nuevo |
-| **TODO-16** | 🐛 **Tab Fallados+RCA ROTO en prod** (validación VIVA 2026-07-23): `admin/fallados.html` solo vive como IFRAME en `salud.html#tab=fallados` (aqua-shell:75) y ahí (a) colisión `.modal-bg` con AQUA (display:grid pisa el none local) → modal "Registrar falla" pegado abierto; (b) módulo sin init: tabla + evaluador E en "Cargando" eternos, `btnCancel` muerto (¿excepción temprana? leer consola con tracking+reload). FIX: renombrar clase local + cazar error init + preview fiel CON shell/iframe. | 🔴 bug prod |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
@@ -68,9 +67,12 @@
 > billing diagnosticado caído (§3.3: el "OK" inicial era texto de error). Detalle → ADR-053 + bóveda
 > `2026-07-23-todo04-umbrales/` + `2026-07-23-hastodotu/`.
 >
-> **2026-07-23 (Fable 5 + Ingeniero) — VALIDACIÓN VIVA B/E**: B guard OK ("sin salud calculada no se puede
-> sugerir"); pre-llenado espera unidad con `salud_actual` (parque sin muestras aún; dashboard Salud en DEMO =
-> TODO-09). E: panel presente pero tab ROTO → **TODO-16**. El preview aislado no podía verlo (L-56).
+> **2026-07-23 (Fable 5 + Ingeniero) — VALIDACIÓN VIVA B/E + TODO-16 RESUELTO (ADR-054)**: B guard OK ("sin
+> salud calculada no se puede sugerir"); pre-llenado espera unidad con `salud_actual` (parque sin muestras;
+> dashboard Salud en DEMO = TODO-09). E: tab Fallados estaba ROTO en prod → forense en vivo halló DOS bugs
+> sistémicos del shell (evento sesión window≠document en 10 páginas · modales legacy pegados en 6) → fix
+> `b27b8f1` desplegado y RE-VERIFICADO vivo: modal oculto, 213 unidades cargan solas, evaluación E corre
+> (estado-cero "sin RESPALDO" correcto — falta clasificar respaldos en el parque, dato del Ingeniero).
 >
 > **2026-07-23 (Fable 5, con el Ingeniero en vivo) — BILLING RESUELTO + DEPLOY**: causa raíz = prueba gratuita
 > GCP expirada (no tarjeta vencida). Claude navegó con Chrome a billing/enable, el Ingeniero clickeó "Activar"
