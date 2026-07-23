@@ -265,13 +265,13 @@ async function cargar() {
       const rpnMax = (f.rca_fmea || []).reduce((m, l) => l.rpn > m ? l.rpn : m, 0);
       const nivel = nivelRiesgoRPN(rpnMax);
       return `<tr>
-        <td>${f.fecha_falla || '—'}</td>
-        <td>${f.transformadorCodigo || f.transformadorId}</td>
-        <td><span class="tipo-pill tipo-${f.tipo_falla}">${tipoLabel(f.tipo_falla)}</span></td>
-        <td style="max-width:280px;">${f.causa_raiz || '—'}</td>
-        <td>${f.metodo_rca || '—'}</td>
+        <td>${escR(f.fecha_falla || '—')}</td>
+        <td>${escR(f.transformadorCodigo || f.transformadorId)}</td>
+        <td><span class="tipo-pill tipo-${escR(f.tipo_falla)}">${escR(tipoLabel(f.tipo_falla))}</span></td>
+        <td style="max-width:280px;">${escR(f.causa_raiz || '—')}</td>
+        <td>${escR(f.metodo_rca || '—')}</td>
         <td class="${nivelClase(nivel)}">${rpnMax > 0 ? rpnMax : '—'}</td>
-        <td>${f.horas_fuera_servicio ?? '—'}</td>
+        <td>${escR(f.horas_fuera_servicio ?? '—')}</td>
         <td>${f.costo_reposicion ? new Intl.NumberFormat('es-CO').format(f.costo_reposicion) : '—'}</td>
       </tr>`;
     }).join('');
@@ -421,9 +421,12 @@ function evaluarRespaldo() {
   const zona = (optimo.ubicacion && optimo.ubicacion.zona) || '—';
   const col = ev.viable ? 'var(--ok,#16A34A)' : 'var(--cri,#DC2626)';
   const f = (v, d) => (typeof v === 'number' && isFinite(v)) ? v.toFixed(d) : '—';
-  const tAdm = isFinite(ev.tiempo_admisible_min) ? (ev.tiempo_admisible_min + ' min') : 'sin límite práctico';
+  const tAdm = (typeof ev.tiempo_admisible_min === 'number')
+    ? (isFinite(ev.tiempo_admisible_min) ? (ev.tiempo_admisible_min + ' min') : 'sin límite práctico')
+    : '—';
   box.innerHTML = `<div style="padding:.75rem;border-radius:10px;border:1px solid ${col}">
     <div style="font-weight:700;color:${col}">${ev.viable ? '✓ Activación viable' : '⚠ RIESGO — no absorber sin más análisis'} · Respaldo óptimo: ${escR(cod)} (zona ${escR(zona)})</div>
+    ${ev.recomendacion ? `<div style="font-size:.78rem;margin-top:.35rem;color:${col}"><b>${escR(ev.recomendacion)}</b></div>` : ''}
     <div style="font-size:.78rem;margin-top:.4rem">Factor de carga resultante <b>${f(ev.factor_resultante, 2)}</b> (límite 1.30) · tiempo admisible <b>${tAdm}</b> · envejecimiento del aislamiento <b>${ev.aceleracion_envejecimiento != null ? f(ev.aceleracion_envejecimiento, 1) + '×' : '—'}</b>.</div>
     <div style="font-size:.72rem;color:var(--text-soft);margin-top:.35rem"><i>${escR(ev.referencia || '')} — estimación IEEE C57.91, orientativa.</i></div>
   </div>`;
