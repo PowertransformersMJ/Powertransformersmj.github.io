@@ -48,8 +48,8 @@ const NORMA = {
   resistencia: { franja: '<b>NETA</b> ATS §7.2.2.D.8 · Δ entre fases ≤ 2%', chips: ['NETA'] },
   aislamiento: { franja: '<b>NETA</b> Tabla 100.5 · ≥ mínimo por CLASE de tensión (⚠️ verificar) · piso 5 GΩ', chips: ['NETA'] },
   bushing: { franja: '<b>NETA</b> §7.2.2.D.5 &nbsp;·&nbsp; <b>IEEE</b> C57.19.100 · tan δ ≤ 1%', chips: ['NETA', 'IEEE'] },
-  tand: { franja: '<b>NETA</b> 100.3 · ≤0.5% &nbsp;·&nbsp; <b>IEEE</b> 62 · ≤1%', chips: ['NETA', 'IEEE'] },
-  collar: { franja: '<b>NETA</b> §7.2.2.D.5 · &lt; 100 mW', chips: ['NETA'] }
+  tand: { franja: '<b>NETA</b> 100.3 · ≤1% (aceite mineral) &nbsp;·&nbsp; <b>IEEE</b> C57.12.90 · ≤0.5% nuevo', chips: ['NETA', 'IEEE'] },
+  collar: { franja: '<b>Doble</b> TDRB · &lt; 100 mW (práctica, set 10 kV)', chips: ['DOBLE'] }
 };
 
 // kind: 'desb' (desbalance entre fases) | 'max' (valor ≤ umbral) | 'min' (valor ≥ umbral)

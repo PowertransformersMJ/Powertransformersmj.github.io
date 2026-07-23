@@ -88,7 +88,9 @@ export const CRITERIOS_MULTINORMA = Object.freeze({
     { norma: 'IEEE C57.152 (PI/DAR/tendencia)', umbral: 'PI≥1.5 · DAR>1.6 · tendencia', nota: 'requiere PI/DAR del informe' }
   ],
   collar: [
-    { norma: 'ANSI/NETA §7.2.2.D.5', umbral: '<100 mW por sección', evaluar: maxBanda(100, null) }
+    // TODO-15c: el 100 mW es del Doble Test Data Reference Book (set 10 kV),
+    // NO de NETA §7.2.2.D.5 (esa cláusula es de bujes: FP vs placa / ΔC1).
+    { norma: 'Doble TDRB / práctica (set 10 kV)', umbral: '<100 mW por sección', evaluar: maxBanda(100, null) }
   ]
 });
 

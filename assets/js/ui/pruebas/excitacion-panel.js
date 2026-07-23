@@ -4,8 +4,9 @@
 // Vista ÚNICA y CONDENSADA de la corriente de excitación (espejo del panel
 // tan δ, ADR-029). Un informe puede traer VARIOS bloques de excitación medidos
 // a distinto NIVEL DE TENSIÓN (devanado + tensión de prueba: AT·66 kV, AT·10 kV,
-// MT·34.5 kV) — cada nivel se evalúa con el MISMO criterio (IEEE Std 62: Δ entre
-// fases externas < 10% si I<50 mA / < 5% si I≥50 mA) y el patrón 2+1 del núcleo.
+// MT·34.5 kV) — cada nivel se evalúa con el MISMO criterio (Δ entre fases
+// externas < 10% — IEEE C57.152 comparativo; el corte 50 mA→5% es práctica de
+// campo/test-set, NO norma — TODO-15c) y el patrón 2+1 del núcleo.
 //
 // Panel de filtros (año/informe · grupo de conexión · NIVEL DE TENSIÓN · fase) y
 // tres vistas:
@@ -34,9 +35,9 @@ const COL_FASE = { A: '#1f3a5f', B: '#a4694f', C: '#2c6e72' };
 // oficiales). NETA fija el criterio CUALITATIVO de patrón; IEEE el comparativo.
 const NORMAS_EXC = [
   { id: 'neta', acron: 'NETA', nom: 'ANSI/NETA', sub: 'ATS §7.2.2.D.6', criterio: 'patrón 2+1', color: '#2c6e72' },
-  { id: 'ieee', acron: 'IEEE', nom: 'IEEE', sub: 'Std 62 / C57.152', criterio: `Δ ext ≤ ${U.guia}–${U.limite}%`, color: '#1f3a5f' },
+  { id: 'ieee', acron: 'IEEE', nom: 'IEEE', sub: 'C57.152 (comparativo)', criterio: `Δ ext ≤ ${U.guia}–${U.limite}%`, color: '#1f3a5f' },
 ];
-const CRIT = { guia: U.guia, limite: U.limite, norma: 'IEEE Std 62 / C57.152' };
+const CRIT = { guia: U.guia, limite: U.limite, norma: 'IEEE C57.152 · práctica de campo' };
 
 const ORDEN_FASE = ['A', 'B', 'C'];
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : (v != null && v !== '' && isFinite(Number(v)) ? Number(v) : null));

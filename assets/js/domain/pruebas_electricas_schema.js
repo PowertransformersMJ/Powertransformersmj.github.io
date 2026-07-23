@@ -88,13 +88,13 @@ export const CRITERIOS = Object.freeze({
  * coincide a propósito con el que evalúa el scorecard (consistencia). */
 export const CRITERIOS_NORMA = Object.freeze({
   tand:        { formula: 'tan δ % = pérdidas / (V·I) × 100, por sección de aislamiento', umbral: '≤1% (≤0.5 bueno · 0.5–0.7 normal · 0.7–1 investigar)', norma: 'IEEE 62 · ANSI/IEEE C57.12.90' },
-  excitacion:  { formula: 'Δ% = (I_lateral_mayor − I_lateral_menor) / I_lateral_menor × 100', umbral: 'Δ<10% (I<50 mA) · Δ<5% (I≥50 mA)', norma: 'IEEE Std 62 · ANSI/IEEE C57.12.90' },
+  excitacion:  { formula: 'Δ% = (I_lateral_mayor − I_lateral_menor) / I_lateral_menor × 100', umbral: 'Δ<10% (I<50 mA) · Δ<5% (I≥50 mA)', norma: 'IEEE C57.152 (comparativo, Δ ext <10%) · corte 50 mA→5%: práctica de campo (TODO-15c)' },
   relacion:    { formula: '%DIF = (relación medida − relación teórica) / relación teórica × 100', umbral: '±0.5% respecto a placa', norma: 'IEEE C57.152-2013 §7.2.10' },
   resistencia: { formula: 'Δ% entre fases = (R_máx − R_mín) / R_prom × 100 (corregida a Ts)', umbral: '≤2% entre fases (o vs fábrica)', norma: 'ANSI/NETA ATS §7.2.2.D.8 · IEEE C57.152 (método)' },
   aislamiento: { formula: 'R_aisl a 1 min ≥ mínimo por clase de tensión · DAR = R(1 min)/R(30 s)', umbral: 'mín. por clase: 13.8 kV → 5 GΩ · 34.5 kV → 15 GΩ · 110 kV → 30 GΩ', norma: 'Criterio por clase ⚠️ verificar vs MO.00418 (piso público NETA Tabla 100.5: ≥5 GΩ >5 kV líquido)' },
   bushing:     { formula: 'tan δ del buje % · Capacitancia medida vs valor de placa', umbral: 'tan δ <1% · Cap dentro de ±5–10% de placa', norma: 'IEEE C57.19.100' },
   collar:      { formula: 'Pérdida del collar caliente por buje (mW)', umbral: '<100 mW', norma: 'Test Data Reference Book' },
-  drm:         { formula: 'Tiempo de transición del conmutador por paso (ms)', umbral: '40–70 ms · sin discontinuidades', norma: 'IEEE C57.152-2013' }
+  drm:         { formula: 'Tiempo de transición del conmutador por paso (ms)', umbral: '40–70 ms (banda de cordura) · sin discontinuidades', norma: 'Fabricante (Reinhausen ~40–60 ms) · IEEE C57.152: método comparativo, sin ventana fija (TODO-15c)' }
 });
 
 /* ─── Umbral de desbalance entre fases por familia (% MÁXIMO) ───────
