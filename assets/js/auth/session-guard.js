@@ -246,6 +246,10 @@ export function ensureSession({ requireAdmin = false } = {}) {
         window.__sgmAdmin = { uid: user.uid, email: user.email };
         try {
           window.dispatchEvent(new CustomEvent('sgm:session-ready', { detail: sess }));
+          // TODO-16: 10 páginas admin escuchan este evento en `document`
+          // (no en window) — un evento disparado en window NUNCA llega a
+          // un listener de document. Doble dispatch para cubrir ambos.
+          document.dispatchEvent(new CustomEvent('sgm:session-ready', { detail: sess }));
         } catch (_) {}
         clearTimeout(FAILSAFE_TIMER);
         revealBody();

@@ -1081,6 +1081,12 @@ body.aqua .modal-bg {
   animation: aquaModalFade var(--dur-med) var(--ease-out);
 }
 body.aqua .modal-bg.open { display: grid; }
+/* TODO-16: el override de arriba dejaba los .modal-bg legacy en
+   display:grid SIEMPRE (sin estado oculto) → modal pegado abierto en
+   las 6 páginas que los ocultan con `.modal-bg{display:none}` local
+   (especificidad menor). Ocultos por defecto; visibles solo con su
+   clase de apertura ('open' · 'on' en parque-transformadores). */
+body.aqua .modal-bg:not(.open):not(.on) { display: none; }
 @keyframes aquaModalFade { from { opacity: 0; } to { opacity: 1; } }
 
 body.aqua .modal-overlay .modal-card,
