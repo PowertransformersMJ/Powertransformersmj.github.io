@@ -1,24 +1,26 @@
 # ⚡ 10 — MEMORIA A CORTO PLAZO (WIP / Sprint activo)
 
 > **Pizarra, no archivo.** Auto-carga con `CLAUDE.md` + `05` (§G.1). SOLO lo vivo/pendiente.
-> Todo lo EJECUTADO (Fase 9 + fase CONECTAR) → `99 §52.8-52.11`. Crudos → bóveda
-> `~/Desktop/brain-private/sgm-transpower/research-archive/2026-07-21-fase9/`.
+> Todo lo EJECUTADO (Fase 9 + fase CONECTAR) → `99 §52.8-52.14`. Crudos → bóveda
+> `~/Desktop/brain-private/sgm-transpower/research-archive/` (`2026-07-21-fase9/` + `2026-07-22-decision-rbac-f28/`).
 
 ---
 
-## 🎯 Foco (2026-07-22) — Fase 9 ejecutada · fase CONECTAR en marcha
+## 🎯 Foco (2026-07-23) — Fase 9 COMPLETA · CONECTAR COMPLETA · sin trabajo autónomo pendiente
 
-> **Fase 9 (ADR-052)**: Olas 0-5 ejecutadas y desplegadas (confidencialidad, backend, batch REAL
-> G020/G011/G095/G016/G012, infra G022/G024/G119). **Fase CONECTAR** (conectar los 4 módulos de dominio
-> huérfanos, §52.11): ✅ **A** sobrecarga IEEE en modal · ✅ **B** botón "sugerir orden desde salud" · ✅ **C**
-> feedback de rol en órdenes. Detalle commit-por-commit → `99 §52.8-52.11`.
+> **Fase 9 (ADR-052)**: Olas 0-5 ejecutadas y desplegadas. **Fase CONECTAR (§52.11-14) COMPLETA** — los 4 módulos
+> huérfanos cableados: ✅ **A** sobrecarga IEEE en modal · **B** botón "sugerir orden desde salud" · **C** feedback
+> de rol en órdenes · **E** evaluador de respaldo TPT en `admin/fallados`; **D** (enforcement RBAC) **DECIDIDO: NO
+> activar** (comité ×4 + red-team ×3 convergen — mantener admin-only; §52.14). Detalle → `99 §52.8-52.14`.
+> **No queda trabajo autónomo seguro**: lo pendiente necesita acciones/decisiones del Ingeniero (abajo).
 
-### ▶️ RETOMAR
-> Confirma git real (HEAD, M-01) + lee `05`+`10`. **Siguiente = CONECTAR D/E** (ambas necesitan decisión del
-> Ingeniero): **D** enforcement RBAC en `firestore.rules` (seguridad, decisión de rollout + montar emulador =
-> G025; decisión fuerte) · **E** respaldo TPT (`tpt_respaldo.js`; cruce a colección v2 + mini-form + elegir
-> superficie modal-cargabilidad vs fallados). **Prueba en vivo pendiente**: FASE B (botón en `admin/ordenes.html`,
-> gated — no verificable sin auth).
+### ▶️ RETOMAR (próxima sesión)
+> Confirma git real (HEAD, M-01) + lee `05`+`10`. **Los siguientes movimientos son del Ingeniero** (recomendación
+> por impacto): **(1) revisar billing Blaze** — si lapsó, las CF de IA (extracción/narrativa) podrían estar caídas
+> en prod Y bloquea el deploy de G007/G008 (si está activo → Claude despliega G007/G008). **(2) validar umbrales
+> (TODO-04)** → Claude cablea el motor normativo G010-12 (veredicto más correcto). **(3) probar en vivo FASE B**
+> (botón en `admin/ordenes.html`) **y FASE E** (panel respaldo en `admin/fallados.html`) — gated, no verificables
+> sin auth. Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D (si surge necesidad multi-rol real).
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
 > **(A) Billing Blaze** → desbloquea deploy de functions (G007/G008) y quizá las CF de IA. **(B) GitHub Support**
@@ -35,7 +37,7 @@
 
 ---
 
-## 📋 Pendientes (TODO-NN) — lo ejecutado → `99 §52.8-52.11`
+## 📋 Pendientes (TODO-NN) — lo ejecutado → `99 §52.8-52.14`
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
@@ -63,3 +65,11 @@
 > recortado al foco vivo (8447→4735c; boot margen 169→3757c). **GC COMPLETO**: `30-LECCIONES` shardeado (§G.5) —
 > el cluster IA/Cloud-Functions (L-35, L-43–L-48) movido a `31-LECCIONES-IA.md` (30: 41804→34281c, bajo tope);
 > `brain-check.mjs` reconoce el nodo hijo; registrado en `CLAUDE.md §0`+`00`+manifest. Cerebro SANO.
+>
+> **2026-07-23 (Opus 4.8) — cierre de sesión para relevo fresco**: CONECTAR completa (A/B/C/E desplegadas) + **D
+> decidido: NO activar** (proceso-decision-fuerte: comité ×4 + red-team ×3 sin Gemini, ambas capas convergen; los
+> 3 hallazgos nuevos —agnóstico-de-campo, custom-claims, brecha percibida-vs-real— en `99 §52.14`) + **G025**
+> (tests de `firestore.rules` + emulador + CI) + **GC del cerebro** completo (boot recuperado + shard 30→31). Todo
+> a `main` (HEAD `2adcccf`). **Recomendación al Ingeniero**: revisar billing Blaze (posible CF-IA caída) → validar
+> umbrales (TODO-04) → probar FASE B/E en vivo. **GC menor pendiente**: `20-ESPACIAL` ≥90% de su tope (pre-shard,
+> no bloquea el boot).
