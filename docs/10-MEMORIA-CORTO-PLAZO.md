@@ -73,8 +73,8 @@
 >
 > **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard Salud de Activos conectado al parque REAL (`f14eddc`) y
 > **verificado vivo con sesión**: banner demo fuera, **212 activos** (6 evaluados · 206 sin dato — honesto),
-> KPIs sin NaN. Mapper puro `domain/parque_salud.js` +6 tests → **1205 pass**. ⚠️ HALLAZGO DE NEGOCIO para el
-> Ingeniero: **2 activos reales en Condición 5 (acción inmediata), dominante DGA** — revisar en el tablero.
+> KPIs sin NaN. Mapper puro `domain/parque_salud.js` +6 tests → **1205 pass**. ⚠️ CORREGIDO mismo día (§3.3): los 6
+> "evaluados" eran **TX-DEMO del demo-seed** (no reales) — el parque real aún sin salud; retirar los TX-DEMO.
 >
 > **2026-07-23 (Fable 5, con el Ingeniero en vivo) — BILLING RESUELTO + DEPLOY**: causa raíz = prueba gratuita
 > GCP expirada (no tarjeta vencida). Claude navegó con Chrome a billing/enable, el Ingeniero clickeó "Activar"

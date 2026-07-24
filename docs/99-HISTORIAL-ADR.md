@@ -1095,7 +1095,7 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 
 **56.3 No-regresión**: aditivo (respeta `SGM_DATA_SOURCE` externo si existiera); fallback DEMO/Excel/json intactos.
 
-**56.4 Verificación**: +6 tests de fixture → **1207 tests · 1205 pass · 0 fail**; VERIFICADO EN VIVO con sesión real tras deploy `f14eddc`: banner demo DESAPARECIDO, **212 activos reales** (6 evaluados · 206 sin dato — split honesto), KPIs sin NaN. Hallazgo de NEGOCIO para el Ingeniero: **2 activos reales en Condición 5 (acción inmediata), variable dominante DGA**.
+**56.4 Verificación**: +6 tests de fixture → **1207 tests · 1205 pass · 0 fail**; VERIFICADO EN VIVO con sesión real tras deploy `f14eddc`: banner demo DESAPARECIDO, **212 activos reales** (6 evaluados · 206 sin dato — split honesto), KPIs sin NaN. CORRECCIÓN (mismo día, §3.3): los 6 "evaluados" resultaron ser los **TX-DEMO-01..06 del demo-seed** (docs de prueba sembrados en el Firestore real) — los "2 críticos" NO son unidades reales. El parque real (206) aún tiene CERO salud calculada; los TX-DEMO contaminan los KPIs → retirarlos (botón de limpieza del propio demo-seed).
 
 **56.5-56.6**: sin onSnapshot (una lectura por visita) · archivos: `domain/parque_salud.js` (nuevo) · `data/transformadores.js` · `pages/parque-transformadores.html` · `tests/parque_salud.test.js` (nuevo). Resta del TODO-09 SOLO el template xlsm sanitizado (insumo del Ingeniero).
 
