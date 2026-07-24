@@ -13,17 +13,22 @@
 > parcial** (re-atribución tan δ + per-clase aplicadas; ver `49 §Validación`) + **fixes FASE E** (tarjeta causa
 > real + XSS tabla RCA). Billing RESUELTO en vivo (CF vivas) · extracción IA validada con informe real.
 
-### ▶️ RETOMAR (próxima sesión) — **TAREA VIVA: importar el Excel real "Salud de Activos"**
-> Confirma git real (M-01). **El Ingeniero ADJUNTARÁ su Excel "Salud de Activos" (.xlsx, hoja TX_Potencia; quizá
-> TPT_Servicio/TX_Respaldo) en su 1er mensaje** — plan ACORDADO (2026-07-24): (1) leerlo LOCAL de su Mac (NUNCA
-> al repo público — confidencial); (2) **DRY-RUN** con `domain/importador.js#procesarLibro` (dominio PURO — corre
-> en Node: sheet_to_json con header:1 como en `admin/importar.html`) → reporte al Ingeniero: filas válidas,
-> incompletas y **discrepancias condición-Excel vs HI-MO.00418 recalculado**; (3) con su OK → **persistir** vía
-> `admin/importar.html` en su Chrome (drag&drop, L-62) o vía data layer con su sesión (patrón del borrado
-> TX-DEMO, bitácora 07-24); (4) verificar dashboard vivo (parque encendido; hoy: 206 reales, 0 evaluados);
-> (5) derivar del archivo el **template sanitizado** (headers sin datos) → cierra TODO-09; (6) si trae hoja
-> TX_Respaldo → también resuelve la clasificación RESPALDO (evaluador FASE E). Después: TODO-17 · ratificación
-> umbrales+MO.00418 · TODO-05/08 · GitHub Support · decisiones G017/G111/STRUCT/D.
+### ▶️ TAREA VIVA: importar Excel "Salud de Activos" — DRY-RUN ✅ HECHO (2026-07-24) · espera 3 DECISIONES + OK
+> Archivo: `~/Downloads/Salud_de_Activos_2026_UUCC_corregida-2.xlsx` (16-jul; existe una `corregida` anterior).
+> **Hecho** (`49e21fb`): importador entiende cabeceras reales (alias aditivos + colapso de espacios) + guard
+> `omitidos` (sin él, 5 filas vacías crearían docs basura UNK-*). Dry-run Node (script en scratchpad,
+> `dryrun-v2.mjs`): TX_Potencia 213 filas → **208 completas** · factores TDGC/CO/CO₂/C₂H₂/IC/FUR/EDAD
+> coinciden ≥93-100% con el Excel · persistencia idempotente por `codigo`=MATRICULA (actualiza, no duplica).
+> **DECISIONES del Ingeniero (bloquean persistir):** (1) **DGA**: Excel = promedio(TDGC,CO,CO₂,C₂H₂) redondeado
+> [201/206 filas lo prueban] vs motor = max(TDGC,C₂H₂) — ¿qué dice MO.00418 Ed.02?; (2) **CRG**: 61 filas donde
+> la col. CARGABILIDAD contradice a CARGA/AMPACIDAD del mismo Excel (ej. AST 250% vs 40%) — ¿cuál es la fuente
+> de verdad?; (3) **HER**: UBICACIÓN FUGAS es texto libre → ¿aceptar su EVALUACION HERMETICIDAD numérica, o
+> clasificar las ~35 fugas al catálogo (sin_fugas/laterales/junction_block/accesorios/superiores)?
+> **Con su OK** → persistir vía `admin/importar.html` en su Chrome (drag&drop L-62; primero botón Simulación =
+> dryRun con su sesión → creados/actualizados exactos vs los 206) → verificar dashboard vivo → template
+> sanitizado (headers sin datos) cierra TODO-09 → hojas TPT_Servicio (31) y TX_Respaldo (26) tienen filas de
+> título encima (cabeceras __EMPTY): necesitan detección de fila-cabecera ANTES de importarse (pendiente).
+> Después: TODO-17 · ratificación umbrales+MO.00418 · TODO-05/08 · GitHub Support · G017/G111/STRUCT/D.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
 > **(A) GitHub Support** "remove sensitive data" (purga `refs/pull/*`). **(B) Revocar PATs viejos** (TODO-08).
@@ -58,35 +63,18 @@
 
 ## 📝 Bitácora (efímera)
 
-> **2026-07-22/23 (Opus 4.8)** — Fase 9 re-verificada + batch REAL + CONECTAR A-E + D decidido NO + G025 + GC del
-> cerebro (shard 30→31). Todo consolidado en `99 §52.8-52.14` (bitácora vieja podada — GC 2026-07-23).
+> **2026-07-22/23** — Fase 9 + CONECTAR A-E → `99 §52.8-52.14` · ADR-053 (escaneo+G010) · ADR-054 (2 bugs shell,
+> falta clasificar RESPALDO) · ADR-055 (ΔC1 al veredicto + clusters 3b/4; nuevo TODO-17) · billing resuelto +
+> extracción IA validada (LEL27007, L-62, TODO-10 ✅) — detalle en sus ADRs/`05`/`30-31`.
 >
-> **2026-07-23 (Fable 5) — ESCANEO DE CIERRE + "HAS TODO TU" (ADR-053)**: auditoría respaldada · 6 fixes de
-> frescura (brain-kit retirado, flag interinato) · G010 ejecutado · TODO-04 validado. Falsos positivos NO
-> reabrir: "38 data layers" correcto · hash `05` -1 = por diseño. Detalle → ADR-053 + bóvedas 2026-07-23.
+> **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard conectado al parque REAL, verificado vivo; TX-DEMO
+> eliminados con aprobación del Ingeniero → **206 reales · 0 demos**. Detalle → ADR-056.
 >
-> **2026-07-23 (Fable 5 + Ingeniero) — VALIDACIÓN VIVA B/E + TODO-16 RESUELTO (ADR-054)**: B guard OK; E: tab
-> Fallados estaba ROTO en prod → 2 bugs sistémicos del shell (evento sesión window≠document ×10 páginas ·
-> modales pegados ×6) → fix `b27b8f1` re-verificado vivo (213 unidades cargan solas). Falta clasificar
-> RESPALDO en el parque (Ingeniero) para salida útil del evaluador.
->
-> **2026-07-23 (Fable 5) — TODO-15 COMPLETO + TODO-07 (ADR-055)**: (a) **ΔC1 de bujes AL VEREDICTO** (>5%
-> investigar; nunca rojo sin dirección) en matriz + scorecard, +5 tests → **1199 pass**; (b) caveat 20 °C en IR;
-> (c) clusters 3b/4 validados (workflow Opus, 0 refutados): 2+1 y R-dev CONFIRMADOS; re-atribuciones aplicadas
-> `52de77e` (50 mA→práctica de campo · DRM→fabricante · collar→Doble TDRB · 4ª copia tan δ); (d) scorecard
-> reetiquetado. IR núcleo y resistores LTC = fabricante/MO.00418 (⚠️ en skills). Bóveda ahora repo git local
-> (`f709509`) + crudos archivados. Nuevo: TODO-17 (calificarResistencia 5% vs 2%, hygiene menor).
->
-> **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard Salud de Activos conectado al parque REAL (`f14eddc`) y
-> **verificado vivo con sesión**: banner demo fuera, **212 activos** (6 evaluados · 206 sin dato — honesto),
-> KPIs sin NaN. Mapper puro `domain/parque_salud.js` +6 tests → **1205 pass**. ⚠️ CORREGIDO mismo día (§3.3): los 6
-> "evaluados" eran **TX-DEMO del demo-seed** (no reales). ✅ **TX-DEMO ELIMINADOS** (aprobación explícita del
-> Ingeniero, vía data layer con su sesión; verificado: 206 reales · 0 demos · 0 órdenes demo). SIGUE: importar
-> el Excel REAL "Salud de Activos" (hoja TX_Potencia) que comparte el Ingeniero — dry-run + reporte de
-> discrepancias ANTES de persistir; el Excel NO toca el repo público (confidencial).
->
-> **2026-07-23 (Fable 5 + Ingeniero) — BILLING RESUELTO + EXTRACCIÓN IA VALIDADA 🏆**: prueba gratuita GCP
-> expirada era la causa → cuenta activada + 3 CF re-desplegadas VIVAS (401 JSON limpio). Informe REAL de SE
-> Montería (serie nueva **LEL27007**, 110 kV, 1986) extraído por la IA con identidad correcta → veredicto
-> multi-norma vivo: **INVESTIGAR** (FP buje 0.84%). Calificación POR PRUEBA respetada. Gotchas de carga por
-> Chrome → **L-62**. TODO-10 ✅ · umbrales F18 editables.
+> **2026-07-24 (Fable 5) — DRY-RUN Excel Salud de Activos (`49e21fb`)**: Excel hallado en Downloads (no
+> adjuntado); importador NO entendía las cabeceras reales (POTENCIA (KVA), AÑO DE FABRICACION, dobles
+> espacios…) → HI se calculaba solo con DGA+FUR (EDAD pesa 30%!) e inflaba discrepancias. Alias aditivos +
+> test cabeceras reales → 1206 pass. Sondas: DGA-Excel=promedio-de-4 (201/206) · CRG-Excel auto-inconsistente
+> (61 filas) · ADFQ ambos usan promedio(RD,IC) · motor validado factor a factor (≥93-100% coincidencia).
+> Guard `omitidos` en persistir (5 filas vacías → antes docs UNK-* basura). NO persistido — esperan 3
+> decisiones normativas del Ingeniero (ver TAREA VIVA). Nota: plan decía "header:1" pero el código real usa
+> sheet_to_json con cabeceras-objeto (§3.3: el código manda).
