@@ -118,6 +118,18 @@ export async function listarV2(filtros = {}) {
 }
 
 /**
+ * TODO-09: fuente REAL del dashboard de Salud de Activos
+ * (`pages/parque-transformadores.html` vía `window.SGM_DATA_SOURCE`).
+ * Una sola lectura one-shot con límite (free-tier); el mapeo a filas
+ * del dashboard es dominio puro (`domain/parque_salud.js`, testeado).
+ */
+export async function listarTransformadoresSalud() {
+  const { filasParque } = await import('../domain/parque_salud.js');
+  const txs = await listarV2({ limite: 500 });
+  return filasParque(txs);
+}
+
+/**
  * Suscripción realtime (v1-compat). Mantiene la firma de F15.
  */
 export function suscribir(filtros = {}, onData, onError) {

@@ -697,6 +697,23 @@ const TIPOS=['TX_Potencia','TPT_Servicio','TX_Respaldo'];
 let ZONA_DEPTO={};   // se construye dinámicamente desde los datos reales
 
 async function loadData(){
+  // TODO-09: fuente REAL por defecto — el parque vivo de Firestore vía el
+  // data layer. Espera la sesión del guard ANTES de leer (evento en WINDOW,
+  // lección ADR-054); si no llega (sin login / error), el catch de abajo
+  // cae al DEMO rotulado. Sin fabricación: los docs sin salud viajan null.
+  if(typeof window.SGM_DATA_SOURCE!=='function'){
+    window.SGM_DATA_SOURCE=async function(){
+      if(!window.__sgmSession){
+        await new Promise((res)=>{
+          const t=setTimeout(res,12000);
+          window.addEventListener('sgm:session-ready',()=>{clearTimeout(t);res();},{once:true});
+          if(window.__sgmSession){clearTimeout(t);res();}
+        });
+      }
+      const m=await import('../assets/js/data/transformadores.js');
+      return m.listarTransformadoresSalud();
+    };
+  }
   // 1) Fuente en vivo (Firestore) si está definida
   if(typeof window.SGM_DATA_SOURCE==='function'){
     try{
