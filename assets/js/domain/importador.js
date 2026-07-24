@@ -130,11 +130,15 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
 
   const tipoActivo = HOJAS_TIPO_ACTIVO[toStr(hoja)] || 'POTENCIA';
 
-  // Headers aceptados (case-insensitive, alias varios).
+  // Headers aceptados (case-insensitive, alias varios). Los espacios
+  // internos se colapsan: el Excel real trae dobles espacios
+  // ("AMPACIDAD PRIMARIO  (A)").
+  const norm = (s) => String(s).toLowerCase().replace(/\s+/g, ' ').trim();
   const g = (candidates) => {
     for (const c of candidates) {
+      const cN = norm(c);
       for (const k of Object.keys(fila)) {
-        if (k.toLowerCase().trim() === c.toLowerCase()) return fila[k];
+        if (norm(k) === cN) return fila[k];
       }
     }
     return undefined;
@@ -152,25 +156,38 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   const uucc    = toStr(g(['uucc']) || '').toUpperCase();
   const grupo   = toStr(g(['grupo', 'group']) || '').toUpperCase();
 
-  const potKva  = toNum(g(['potencia_kva', 'potencia', 'kva', 'pot kva']));
-  const tPri    = toNum(g(['tension_primaria_kv', 'tension primaria', 'tp', 'kv_pri']));
-  const tSec    = toNum(g(['tension_secundaria_kv', 'tension secundaria', 'ts', 'kv_sec']));
-  const tTer    = toNum(g(['tension_terciaria_kv', 'kv_ter']));
-  const cp      = toNum(g(['carga_primaria', 'cp', 'corriente_primaria']));
-  const ap      = toNum(g(['ampacidad_primaria', 'ap', 'i_nominal_primaria']));
-  const cs      = toNum(g(['carga_secundaria', 'cs', 'corriente_secundaria']));
-  const asec    = toNum(g(['ampacidad_secundaria', 'as', 'i_nominal_secundaria']));
-  const ct      = toNum(g(['carga_terciaria', 'ct']));
-  const at      = toNum(g(['ampacidad_terciaria', 'at']));
+  // Alias "reales": cabeceras del Excel del parque "Salud de Activos"
+  // (hoja TX_Potencia) — se aceptan tal cual vienen, sin renombrar nada.
+  const potKva  = toNum(g(['potencia_kva', 'potencia', 'kva', 'pot kva',
+                           'potencia (kva)']));
+  const tPri    = toNum(g(['tension_primaria_kv', 'tension primaria', 'tp', 'kv_pri',
+                           'nivel de tension primario (kv)']));
+  const tSec    = toNum(g(['tension_secundaria_kv', 'tension secundaria', 'ts', 'kv_sec',
+                           'nivel de tension secundario (kv)']));
+  const tTer    = toNum(g(['tension_terciaria_kv', 'kv_ter',
+                           'nivel de tension terceario (kv)', 'nivel de tension terciario (kv)']));
+  const cp      = toNum(g(['carga_primaria', 'cp', 'corriente_primaria',
+                           'carga primario (a)']));
+  const ap      = toNum(g(['ampacidad_primaria', 'ap', 'i_nominal_primaria',
+                           'ampacidad primario (a)']));
+  const cs      = toNum(g(['carga_secundaria', 'cs', 'corriente_secundaria',
+                           'carga secundario (a)']));
+  const asec    = toNum(g(['ampacidad_secundaria', 'as', 'i_nominal_secundaria',
+                           'ampacidad secundario (a)']));
+  const ct      = toNum(g(['carga_terciaria', 'ct',
+                           'carga terceario (a)', 'carga terciario (a)']));
+  const at      = toNum(g(['ampacidad_terciaria', 'at',
+                           'ampacidad terceario (a)', 'ampacidad terciario (a)']));
 
   const fabFecha = toISODate(g(['fecha_fabricacion', 'fab_fecha', 'fecha fabricacion']));
   const anoFab   = anoDesdeISOorNumero(fabFecha) ??
-                   anoDesdeISOorNumero(g(['ano_fabricacion', 'año_fabricacion', 'año fabricacion', 'year']));
+                   anoDesdeISOorNumero(g(['ano_fabricacion', 'año_fabricacion', 'año fabricacion', 'year',
+                                          'año de fabricacion', 'ano de fabricacion']));
   const instFecha= toISODate(g(['fecha_instalacion', 'inst_fecha', 'fecha instalacion']));
 
   const latitud  = toNum(g(['latitud', 'lat']));
   const longitud = toNum(g(['longitud', 'lng', 'lon']));
-  const observaciones = toStr(g(['observaciones', 'obs', 'notas']));
+  const observaciones = toStr(g(['observaciones', 'obs', 'notas', 'observacion']));
 
   const estadoServicio = normEstado(g(['estado', 'estado_servicio']));
 
@@ -183,16 +200,19 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   const CO   = toNum(g(['co', 'monoxido']));
   const CO2  = toNum(g(['co2', 'dioxido']));
 
-  const rdKv   = toNum(g(['rd', 'rigidez_dielectrica', 'rigidez', 'rigidez_kv']));
-  const ti     = toNum(g(['ti', 'tension_interfacial']));
-  const nn     = toNum(g(['nn', 'numero_neutralizacion', 'acidez']));
+  const rdKv   = toNum(g(['rd', 'rigidez_dielectrica', 'rigidez', 'rigidez_kv',
+                          'rigidez dielectrica']));
+  const ti     = toNum(g(['ti', 'tension_interfacial', 'tension interfacial']));
+  const nn     = toNum(g(['nn', 'numero_neutralizacion', 'acidez',
+                          'numero de neutralizacion']));
   const ppbFur = toNum(g(['ppb', 'furanos', '2fal', 'fal2', 'furanos_ppb']));
 
   const herUbic = toStr(g(['her', 'hermeticidad', 'ubicacion_fuga_dominante', 'fuga']))
                     .toLowerCase().replace(/\s+/g, '_');
-  const pytRaw  = g(['pyt', 'protecciones', 'scada']);
+  const pytRaw  = g(['pyt', 'protecciones', 'scada', 'estudios pyt']);
 
-  const condicionExcel = toNum(g(['condicion', 'condición', 'condicion_excel', 'hi_excel']));
+  const condicionExcel = toNum(g(['condicion', 'condición', 'condicion_excel', 'hi_excel',
+                                  'condicion (entero)']));
 
   // ── Construir documento v2 ──
   const entradaV2 = {

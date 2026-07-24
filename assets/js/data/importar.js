@@ -56,13 +56,19 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
   const db = getDbSafe();
   if (!db) throw new Error('Firebase no inicializado.');
 
-  let creados = 0, actualizados = 0, fallidos = 0;
+  let creados = 0, actualizados = 0, fallidos = 0, omitidos = 0;
   let batch = writeBatch(db);
   let count = 0;
 
   for (let i = 0; i < resultados.length; i++) {
     const r = resultados[i];
     if (r.error) { fallidos += 1; continue; }
+    // Filas incompletas (p.ej. filas vacías al final de la hoja) NO se
+    // persisten: sin este guard se crearían docs basura "UNK-*".
+    if (r.diagnostico && Array.isArray(r.diagnostico.errores_validacion)
+        && r.diagnostico.errores_validacion.length > 0) {
+      omitidos += 1; continue;
+    }
     const codigo = r.docV2 && r.docV2.codigo;
     try {
       const existingId = codigo ? await buscarPorCodigo(codigo) : null;
@@ -107,6 +113,7 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
     creados,
     actualizados,
     fallidos,
+    omitidos,
     reporte_reducido: {
       total_filas: reporte.total_filas,
       por_hoja:    reporte.por_hoja,
@@ -128,11 +135,11 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
         { ...auditar({
             accion: 'importar_excel', coleccion: 'importaciones',
             docId: jobId, uid,
-            nota: `${nombre_archivo} — creados=${creados}, actualizados=${actualizados}, fallidos=${fallidos}`
+            nota: `${nombre_archivo} — creados=${creados}, actualizados=${actualizados}, fallidos=${fallidos}, omitidos=${omitidos}`
           }),
           at: serverTimestamp() });
     } catch (_) { /* ignore */ }
   }
 
-  return { jobId, creados, actualizados, fallidos, dryRun };
+  return { jobId, creados, actualizados, fallidos, omitidos, dryRun };
 }
