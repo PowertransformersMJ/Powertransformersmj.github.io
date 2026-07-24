@@ -210,3 +210,6 @@
 
 ### L-61 · Glosario del Ingeniero + invariante visual AQUA
 **Regla**: "tal cual" = SIN overlays/velos/scrims sobre la foto (retirar cualquier veil existente); `.aqua-power-scene` (aqua-components.css) cubre SIEMPRE el viewport completo (`position:fixed; inset:0`). Ante ambigüedad visual → preview fiel (L-56) + preguntar. (Origen: `_legacy/CLAUDE-previo.md §9.5/§9.7/§0.1.2`.)
+
+### L-62 · Automatizar el Chrome del Ingeniero: subir archivos = gesto humano; localhost bloqueado
+**Disparador**: inyectar un archivo local a un file-input de la app vía la extensión de Chrome. · **Cicatriz** (2026-07-23, carga del informe LEL27007): `file_upload` de la extensión solo acepta archivos compartidos a la sesión (ni scratchpad); `fetch` a `http://127.0.0.1` desde página https queda COLGADO por Local Network Access de Chrome (ni con headers PNA/CORS — el prompt de permiso no aparece en fetch programático); los inputs de wizards nacen ocultos en su paso (`display:none`). · **Regla**: la vía robusta es el **drag&drop del usuario** — prepararle todo: `open -R "<archivo>"` revela el PDF seleccionado en Finder y el arrastre son 5 s; si el input está oculto, hacerlo visible con JS es legítimo para diagnóstico. NO pelear contra los candados (son de seguridad, no bugs); presupuestar el gesto humano en el flujo.

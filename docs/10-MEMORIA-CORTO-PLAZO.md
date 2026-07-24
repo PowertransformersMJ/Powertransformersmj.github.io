@@ -74,19 +74,13 @@
 > **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard Salud de Activos conectado al parque REAL (`f14eddc`) y
 > **verificado vivo con sesión**: banner demo fuera, **212 activos** (6 evaluados · 206 sin dato — honesto),
 > KPIs sin NaN. Mapper puro `domain/parque_salud.js` +6 tests → **1205 pass**. ⚠️ CORREGIDO mismo día (§3.3): los 6
-> "evaluados" eran **TX-DEMO del demo-seed** (no reales) — el parque real aún sin salud; retirar los TX-DEMO.
+> "evaluados" eran **TX-DEMO del demo-seed** (no reales). ✅ **TX-DEMO ELIMINADOS** (aprobación explícita del
+> Ingeniero, vía data layer con su sesión; verificado: 206 reales · 0 demos · 0 órdenes demo). SIGUE: importar
+> el Excel REAL "Salud de Activos" (hoja TX_Potencia) que comparte el Ingeniero — dry-run + reporte de
+> discrepancias ANTES de persistir; el Excel NO toca el repo público (confidencial).
 >
-> **2026-07-23 (Fable 5, con el Ingeniero en vivo) — BILLING RESUELTO + DEPLOY**: causa raíz = prueba gratuita
-> GCP expirada (no tarjeta vencida). Claude navegó con Chrome a billing/enable, el Ingeniero clickeó "Activar"
-> (cuenta completa; créditos restantes conservados). Secret Manager OK al 1er reintento → deploy de las 3 CF
-> exitoso → verificación viva: extracción/narrativa responden **401 JSON limpio** (antes 500 HTML = contenedor
-> muerto). TODO-10 ✅. Umbrales F18 editables desde ya (cliente+servidor coherentes con G010).
->
-> **2026-07-23 (Fable 5 + Ingeniero) — EXTRACCIÓN IA VALIDADA EN VIVO 🏆 (TODO-06 parcial)**: informe REAL
-> 2020 de SE Montería cargado por Chrome guiado (serie nueva **LEL27007**, TRAFO UNION 1986, 40/15/35 MVA,
-> 110 kV) → IA extrajo identidad+mediciones correctas → veredicto multi-norma en vivo: **INVESTIGAR** (FP buje
-> C1 0.84% banda 0.5–1; relación 0.43% vigilar; tan δ 18/18 verde; excitación/collar verde; no-realizadas
-> listadas). Calificación POR PRUEBA respetada. Parque: 3 TX / 3 SE. Password de Chrome estaba stale → reset
-> por email + huella operativa. Gotchas de carga: file_upload de la extensión solo acepta archivos de la
-> sesión; fetch a localhost bloqueado por Local-Network-Access de Chrome (ni con header PNA) → la vía es
-> drag&drop del usuario (Finder `open -R` ayuda). Falta en vivo: FASE B/E (2 clics, gated). Hallazgo → TODO-15(d).
+> **2026-07-23 (Fable 5 + Ingeniero) — BILLING RESUELTO + EXTRACCIÓN IA VALIDADA 🏆**: prueba gratuita GCP
+> expirada era la causa → cuenta activada + 3 CF re-desplegadas VIVAS (401 JSON limpio). Informe REAL de SE
+> Montería (serie nueva **LEL27007**, 110 kV, 1986) extraído por la IA con identidad correcta → veredicto
+> multi-norma vivo: **INVESTIGAR** (FP buje 0.84%). Calificación POR PRUEBA respetada. Gotchas de carga por
+> Chrome → **L-62**. TODO-10 ✅ · umbrales F18 editables.
