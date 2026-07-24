@@ -6,18 +6,24 @@
 
 ---
 
-## 🎯 Foco (2026-07-23) — Fase 9 + CONECTAR completas · "HAS TODO TU" ejecutado (ADR-053)
+## 🎯 Foco (2026-07-24) — Parque real limpio (206, 0 demos) · SIGUE: importar Excel real de Salud
 
 > Fase 9 (ADR-052) Olas 0-5 + CONECTAR A/B/C/E desplegadas; D decidido NO activar (§52.14). **ADR-053 (hoy)**:
 > **G010 cableado** (umbrales F18 → Health Index, aditivo, revisión adversarial 0 defectos) + **TODO-04 validado
 > parcial** (re-atribución tan δ + per-clase aplicadas; ver `49 §Validación`) + **fixes FASE E** (tarjeta causa
 > real + XSS tabla RCA). Billing RESUELTO en vivo (CF vivas) · extracción IA validada con informe real.
 
-### ▶️ RETOMAR (próxima sesión)
-> Confirma git real (M-01) + lee `05`+`10`. ✅ TODO-04/07/10/15/16 CERRADOS (ADR-053/054/055). Trabajo autónomo
-> disponible: **TODO-09** (conectar dashboard Salud de Activos a Firestore real — hoy corre en DEMO, visto en
-> vivo) · TODO-17 (hygiene menor). Del Ingeniero: ratificar umbrales + MO.00418 · clasificar unidades RESPALDO ·
-> GitHub Support · PATs (TODO-08) · TODO-05. Decisiones abiertas sin urgencia: G017 · G111-xlsx · STRUCT · D.
+### ▶️ RETOMAR (próxima sesión) — **TAREA VIVA: importar el Excel real "Salud de Activos"**
+> Confirma git real (M-01). **El Ingeniero ADJUNTARÁ su Excel "Salud de Activos" (.xlsx, hoja TX_Potencia; quizá
+> TPT_Servicio/TX_Respaldo) en su 1er mensaje** — plan ACORDADO (2026-07-24): (1) leerlo LOCAL de su Mac (NUNCA
+> al repo público — confidencial); (2) **DRY-RUN** con `domain/importador.js#procesarLibro` (dominio PURO — corre
+> en Node: sheet_to_json con header:1 como en `admin/importar.html`) → reporte al Ingeniero: filas válidas,
+> incompletas y **discrepancias condición-Excel vs HI-MO.00418 recalculado**; (3) con su OK → **persistir** vía
+> `admin/importar.html` en su Chrome (drag&drop, L-62) o vía data layer con su sesión (patrón del borrado
+> TX-DEMO, bitácora 07-24); (4) verificar dashboard vivo (parque encendido; hoy: 206 reales, 0 evaluados);
+> (5) derivar del archivo el **template sanitizado** (headers sin datos) → cierra TODO-09; (6) si trae hoja
+> TX_Respaldo → también resuelve la clasificación RESPALDO (evaluador FASE E). Después: TODO-17 · ratificación
+> umbrales+MO.00418 · TODO-05/08 · GitHub Support · decisiones G017/G111/STRUCT/D.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
 > **(A) GitHub Support** "remove sensitive data" (purga `refs/pull/*`). **(B) Revocar PATs viejos** (TODO-08).
