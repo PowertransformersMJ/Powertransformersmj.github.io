@@ -54,6 +54,45 @@ describe('parsearFilaTransformador', () => {
       `diferencia = ${diagnostico.diferencia}`);
   });
 
+  test('cabeceras REALES del Excel del parque (espacios dobles, alias largos)', () => {
+    const { docV2, diagnostico } = parsearFilaTransformador({
+      'MATRICULA': 'T9-M/M-ZZZ',
+      'SERIE': '12345678',
+      'SUBESTACION': 'PRUEBA',
+      'DEPARTAMENTO': 'CESAR',
+      'ZONA': 'ORIENTE',
+      'GRUPO': 'G1',
+      'UUCC': 'N3T1',
+      'POTENCIA (KVA)': '2000',
+      'NIVEL DE TENSION PRIMARIO (KV)': '34.5 ',
+      'NIVEL DE TENSION SECUNDARIO (KV)': '13.8',
+      'NIVEL DE TENSION TERCEARIO (KV)': 'N/A',
+      'AMPACIDAD PRIMARIO  (A)': '100',
+      'CARGA PRIMARIO  (A)': '50',
+      'AMPACIDAD SECUNDARIO  (A)': '250',
+      'CARGA SECUNDARIO  (A)': '100',
+      'AÑO DE FABRICACION': '1998',
+      'RIGIDEZ DIELECTRICA': '55',
+      'TENSION INTERFACIAL': '32',
+      'NUMERO DE NEUTRALIZACION': '0.05',
+      'ESTUDIOS PYT': '1',
+      'CONDICION (ENTERO)': '3'
+    }, 'TX_Potencia', new Date('2026-07-24T00:00:00Z'));
+
+    assert.equal(docV2.identificacion.codigo, 'T9-M/M-ZZZ');
+    assert.equal(docV2.placa.potencia_kva, 2000);
+    assert.equal(docV2.electrico.tension_primaria_kv, 34.5);
+    assert.equal(docV2.electrico.tension_secundaria_kv, 13.8);
+    assert.equal(docV2.electrico.tension_terciaria_kv, null); // "N/A" → null
+    assert.equal(docV2.electrico.corriente_nominal_primaria_a, 100);
+    assert.equal(docV2.fabricacion.ano_fabricacion, 1998);
+    assert.equal(docV2.salud_actual.calif_edad, 4);           // 28 años ≥ c4_min:26
+    assert.ok(docV2.salud_actual.eval_adfq != null, 'ADFQ debe calcularse (RD/TI/NN mapeados)');
+    assert.equal(docV2.salud_actual.calif_pyt, 1);
+    assert.ok(docV2.salud_actual.calif_crg != null, 'CRG debe calcularse (cargas mapeadas)');
+    assert.equal(diagnostico.condicion_excel, 3);
+  });
+
   test('override CRG=5 automático se aplica durante import', () => {
     const { docV2 } = parsearFilaTransformador({
       codigo: 'TX-03', nombre: 'Sobrecargado', departamento: 'bolivar',

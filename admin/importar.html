@@ -238,7 +238,8 @@ async function persistir(dryRun) {
     );
     setMsg(
       `✓ ${dryRun ? 'Simulación' : 'Importación'} OK. Creados: ${out.creados} · ` +
-      `Actualizados: ${out.actualizados} · Fallidos: ${out.fallidos}` +
+      `Actualizados: ${out.actualizados} · Fallidos: ${out.fallidos} · ` +
+      `Omitidos (incompletos): ${out.omitidos}` +
       (out.jobId ? ` · Job: ${out.jobId}` : ''),
       'msg-ok'
     );
