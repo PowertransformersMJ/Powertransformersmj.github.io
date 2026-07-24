@@ -1086,3 +1086,17 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 **55.6 Archivos**: `pruebas_electricas_multinorma.js` · `pruebas_electricas_schema.js` · `semaforo.js` · `tablas-pruebas-panel.js` · `excitacion-panel.js` · `pruebas-electricas-shell.js` · tests. Commits `ed70c0b`+`52de77e` a `main`. Crudo → bóveda `2026-07-23-todo15c-clusters/`.
 
 **55.7 Doctrina + pendientes derivados**: multi-norma honesta (la cita ES parte del veredicto, §3.2) · workflows acotados en Opus (regla del Ingeniero). **TODO-17** (hygiene): `calificarResistencia` OK≤5% vs 2% del semáforo — unificar o documentar (ligado a `.calif` write-only G012). Ratificación del director del paquete normativo completo sigue pendiente (con MO.00418). Cache: n/a.
+
+## 56. ADR-056 — TODO-09: el dashboard de Salud de Activos se conecta al parque REAL de Firestore
+
+**56.1 Causa raíz**: la Ola 0 (ADR-052) retiró el dato real embebido por confidencialidad y dejó el dashboard (`pages/parque-transformadores.html`) corriendo con 6 activos DEMO sintéticos rotulados; el contrato `window.SGM_DATA_SOURCE` quedó documentado pero sin implementar.
+
+**56.2 Solución**: fuente real por defecto definida dentro de `loadData()` — espera la sesión del guard (evento en WINDOW, lección ADR-054) → `listarTransformadoresSalud()` en el data layer (one-shot `listarV2` límite 500, free-tier) → mapper de dominio PURO nuevo `domain/parque_salud.js` (`filaParqueDesdeTx`/`filasParque`): identidad/ubicación, tipos POTENCIA→TX_Potencia · TPT→TPT_Servicio · RESPALDO→TX_Respaldo, kVA→MVA, las 7 calificaciones desde `salud_actual` y `condicion = hi_final` del motor oficial (G010) — el dashboard NO re-inventa el HI. SIN fabricar: lo ausente viaja null (`fmtAvg`/`avgHI` defensivos verificados). Sin sesión/error → DEMO rotulado (sin regresión).
+
+**56.3 No-regresión**: aditivo (respeta `SGM_DATA_SOURCE` externo si existiera); fallback DEMO/Excel/json intactos.
+
+**56.4 Verificación**: +6 tests de fixture → **1207 tests · 1205 pass · 0 fail**; VERIFICADO EN VIVO con sesión real tras deploy `f14eddc`: banner demo DESAPARECIDO, **212 activos reales** (6 evaluados · 206 sin dato — split honesto), KPIs sin NaN. Hallazgo de NEGOCIO para el Ingeniero: **2 activos reales en Condición 5 (acción inmediata), variable dominante DGA**.
+
+**56.5-56.6**: sin onSnapshot (una lectura por visita) · archivos: `domain/parque_salud.js` (nuevo) · `data/transformadores.js` · `pages/parque-transformadores.html` · `tests/parque_salud.test.js` (nuevo). Resta del TODO-09 SOLO el template xlsm sanitizado (insumo del Ingeniero).
+
+**56.7 Doctrina**: no-fabricar (§3.2) · free-tier · lección ADR-054 aplicada en el wiring de sesión. Cache: n/a.

@@ -42,7 +42,7 @@
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
-| **TODO-09** | Ola 0 follow-ups: `SGM_DATA_SOURCE` real (Firestore) + template xlsm sanitizado + fixture test. Core desplegado. | 🟢 follow-up |
+| **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |
@@ -55,16 +55,9 @@
 > **2026-07-22/23 (Opus 4.8)** — Fase 9 re-verificada + batch REAL + CONECTAR A-E + D decidido NO + G025 + GC del
 > cerebro (shard 30→31). Todo consolidado en `99 §52.8-52.14` (bitácora vieja podada — GC 2026-07-23).
 >
-> **2026-07-23 (Fable 5) — ESCANEO DE CIERRE ✅**: auditoría Fase 9+CONECTAR 100% respaldada (workflow Opus) ·
-> skills consistentes (las 6 refs "¿fantasma?" existen) · 6 fixes: política git VIEJA en `20` L126 → ADR-051,
-> GC pre-shard, conteos/`nav.js`, rótulo CI, `brain-kit/` retirado (respaldo en bóveda), flag interinato en
-> `05`. Falsos positivos NO reabrir: "38 data layers" correcto (`_firestore_clean.js` es helper) · hash `05`
-> 1 atrás = por diseño. Detalle → commits `6d2b7b5`/`5fcbffd` + bóveda `2026-07-23-escaneo-cierre-fable/`.
->
-> **2026-07-23 (Fable 5) — "HAS TODO TU" (ADR-053)**: G010 ejecutado (revisión adversarial 0 defectos, 1194
-> pass) · TODO-04 validado con refutación (2 re-atribuciones aplicadas) · B/E headless FUNCIONALES + fixes ·
-> billing diagnosticado caído (§3.3: el "OK" inicial era texto de error). Detalle → ADR-053 + bóveda
-> `2026-07-23-todo04-umbrales/` + `2026-07-23-hastodotu/`.
+> **2026-07-23 (Fable 5) — ESCANEO DE CIERRE + "HAS TODO TU" (ADR-053)**: auditoría respaldada · 6 fixes de
+> frescura (brain-kit retirado, flag interinato) · G010 ejecutado · TODO-04 validado. Falsos positivos NO
+> reabrir: "38 data layers" correcto · hash `05` -1 = por diseño. Detalle → ADR-053 + bóvedas 2026-07-23.
 >
 > **2026-07-23 (Fable 5 + Ingeniero) — VALIDACIÓN VIVA B/E + TODO-16 RESUELTO (ADR-054)**: B guard OK; E: tab
 > Fallados estaba ROTO en prod → 2 bugs sistémicos del shell (evento sesión window≠document ×10 páginas ·
@@ -77,6 +70,11 @@
 > `52de77e` (50 mA→práctica de campo · DRM→fabricante · collar→Doble TDRB · 4ª copia tan δ); (d) scorecard
 > reetiquetado. IR núcleo y resistores LTC = fabricante/MO.00418 (⚠️ en skills). Bóveda ahora repo git local
 > (`f709509`) + crudos archivados. Nuevo: TODO-17 (calificarResistencia 5% vs 2%, hygiene menor).
+>
+> **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard Salud de Activos conectado al parque REAL (`f14eddc`) y
+> **verificado vivo con sesión**: banner demo fuera, **212 activos** (6 evaluados · 206 sin dato — honesto),
+> KPIs sin NaN. Mapper puro `domain/parque_salud.js` +6 tests → **1205 pass**. ⚠️ HALLAZGO DE NEGOCIO para el
+> Ingeniero: **2 activos reales en Condición 5 (acción inmediata), dominante DGA** — revisar en el tablero.
 >
 > **2026-07-23 (Fable 5, con el Ingeniero en vivo) — BILLING RESUELTO + DEPLOY**: causa raíz = prueba gratuita
 > GCP expirada (no tarjeta vencida). Claude navegó con Chrome a billing/enable, el Ingeniero clickeó "Activar"
