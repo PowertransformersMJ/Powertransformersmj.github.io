@@ -178,6 +178,9 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
                            'carga terceario (a)', 'carga terciario (a)']));
   const at      = toNum(g(['ampacidad_terciaria', 'at',
                            'ampacidad terceario (a)', 'ampacidad terciario (a)']));
+  // % de cargabilidad OFICIAL (Planificación Alta Tensión). Si viene,
+  // manda sobre el cociente carga/ampacidad (decisión Ingeniero 2026-07-27).
+  const crgPct  = toNum(g(['cargabilidad', 'crg_pct', 'cargabilidad_pct']));
 
   const fabFecha = toISODate(g(['fecha_fabricacion', 'fab_fecha', 'fecha fabricacion']));
   const anoFab   = anoDesdeISOorNumero(fabFecha) ??
@@ -272,7 +275,7 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   const dp       = calcularDP(ppbFur);
   const vidaU    = calcularVidaUtilizada(dp);
 
-  const crg = calcularCalifCRG({ cp, ap, cs, as: asec, ct, at }, cfgU);
+  const crg = calcularCalifCRG({ cp, ap, cs, as: asec, ct, at, crg_pct: crgPct }, cfgU);
 
   const califEDAD = calcularCalifEDAD(anoFab, hoy, cfgU);
   const califHER  = calcularCalifHER(herUbic);

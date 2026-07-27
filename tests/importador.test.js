@@ -93,6 +93,27 @@ describe('parsearFilaTransformador', () => {
     assert.equal(diagnostico.condicion_excel, 3);
   });
 
+  test('CARGABILIDAD directa (Planificación AT) manda sobre carga/ampacidad', () => {
+    const { docV2 } = parsearFilaTransformador({
+      'MATRICULA': 'T9-M/M-YYY', 'DEPARTAMENTO': 'CESAR',
+      'AMPACIDAD PRIMARIO  (A)': '100',
+      'CARGA PRIMARIO  (A)': '95',      // cociente diría 95 %
+      'CARGABILIDAD': '40'              // dato oficial: 40 %
+    }, 'TX_Potencia');
+    assert.equal(docV2.salud_actual.crg_pct_medido, 40);
+    assert.equal(docV2.salud_actual.calif_crg, 1);
+  });
+
+  test('sin CARGABILIDAD directa, el cociente carga/ampacidad sigue vigente', () => {
+    const { docV2 } = parsearFilaTransformador({
+      'MATRICULA': 'T9-M/M-XXX', 'DEPARTAMENTO': 'CESAR',
+      'AMPACIDAD PRIMARIO  (A)': '100',
+      'CARGA PRIMARIO  (A)': '95'
+    }, 'TX_Potencia');
+    assert.equal(docV2.salud_actual.crg_pct_medido, 95);
+    assert.equal(docV2.salud_actual.calif_crg, 5);
+  });
+
   test('override CRG=5 automático se aplica durante import', () => {
     const { docV2 } = parsearFilaTransformador({
       codigo: 'TX-03', nombre: 'Sobrecargado', departamento: 'bolivar',

@@ -244,12 +244,17 @@ export function calcularVidaRemanente(dp) {
 // ══════════════════════════════════════════════════════════════
 
 /**
- * @param {{cp, ap, cs, as, ct, at}} datos — carga y ampacidad en
- *   primario/secundario/terciario. Puede faltar terciario.
+ * @param {{cp, ap, cs, as, ct, at, crg_pct}} datos — carga y ampacidad en
+ *   primario/secundario/terciario (puede faltar terciario), o `crg_pct`
+ *   directo. Si viene `crg_pct` (dato oficial de Planificación Alta
+ *   Tensión — decisión del Ingeniero 2026-07-27), tiene PRIORIDAD sobre
+ *   el cociente carga/ampacidad.
  * @returns {{calif, crg_pct}} calificación 1–5 + % medido.
  */
-export function calcularCalifCRG({ cp, ap, cs, as: asec, ct, at } = {}, cfg) {
-  const pct = _cargaMaxPct({ cp, ap, cs, as: asec, ct, at });
+export function calcularCalifCRG({ cp, ap, cs, as: asec, ct, at, crg_pct } = {}, cfg) {
+  const directo = toNum(crg_pct);
+  const pct = (directo != null) ? directo
+    : _cargaMaxPct({ cp, ap, cs, as: asec, ct, at });
   if (pct == null) return { calif: null, crg_pct: null };
   return { calif: _califCRGDesdePct(pct, cfg), crg_pct: pct };
 }
