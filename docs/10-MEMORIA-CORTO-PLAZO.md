@@ -19,11 +19,13 @@
 > `omitidos` (sin él, 5 filas vacías crearían docs basura UNK-*). Dry-run Node (script en scratchpad,
 > `dryrun-v2.mjs`): TX_Potencia 213 filas → **208 completas** · factores TDGC/CO/CO₂/C₂H₂/IC/FUR/EDAD
 > coinciden ≥93-100% con el Excel · persistencia idempotente por `codigo`=MATRICULA (actualiza, no duplica).
-> **DECISIONES del Ingeniero (bloquean persistir):** (1) **DGA**: Excel = promedio(TDGC,CO,CO₂,C₂H₂) redondeado
-> [201/206 filas lo prueban] vs motor = max(TDGC,C₂H₂) — ¿qué dice MO.00418 Ed.02?; (2) **CRG**: 61 filas donde
-> la col. CARGABILIDAD contradice a CARGA/AMPACIDAD del mismo Excel (ej. AST 250% vs 40%) — ¿cuál es la fuente
-> de verdad?; (3) **HER**: UBICACIÓN FUGAS es texto libre → ¿aceptar su EVALUACION HERMETICIDAD numérica, o
-> clasificar las ~35 fugas al catálogo (sin_fugas/laterales/junction_block/accesorios/superiores)?
+> **DECISIONES:** (1) **DGA** ⏳: Excel = promedio(TDGC,CO,CO₂,C₂H₂) redondeado [201/206] vs motor =
+> max(TDGC,C₂H₂) — la resuelve el MO.00418 Ed.02 que el Ingeniero entregará; (2) **CRG** ✅ (2026-07-27,
+> `af5a31d`): columna CARGABILIDAD = dato OFICIAL de Planificación Alta Tensión → `crg_pct` directo con
+> prioridad en `calcularCalifCRG` (cociente de respaldo); coincidencia subió 148→192/206, las 14 restantes
+> son fronteras de umbral → van con la ratificación MO.00418; (3) **HER** ⏳: el Ingeniero indica que el
+> MO.00418 también define hermeticidad — se resuelve al recibir el documento.
+> **BLOQUEA persistir:** solo el MO.00418 Ed.02 (resuelve DGA + HER + ratifica umbrales) + OK del Ingeniero.
 > **Con su OK** → persistir vía `admin/importar.html` en su Chrome (drag&drop L-62; primero botón Simulación =
 > dryRun con su sesión → creados/actualizados exactos vs los 206) → verificar dashboard vivo → template
 > sanitizado (headers sin datos) cierra TODO-09 → hojas TPT_Servicio (31) y TX_Respaldo (26) tienen filas de
@@ -78,3 +80,8 @@
 > Guard `omitidos` en persistir (5 filas vacías → antes docs UNK-* basura). NO persistido — esperan 3
 > decisiones normativas del Ingeniero (ver TAREA VIVA). Nota: plan decía "header:1" pero el código real usa
 > sheet_to_json con cabeceras-objeto (§3.3: el código manda).
+>
+> **2026-07-27 (Fable 5) — DECISIÓN CRG (`af5a31d`)**: el Ingeniero confirma que CARGABILIDAD viene de
+> Planificación Alta Tensión (fuente de verdad) y que HER lo define el MO.00418 que entregará. `crg_pct`
+> directo cableado (aditivo) → 1208 pass. Pendiente único para persistir: MO.00418 + su OK. El Ingeniero pidió
+> **resumen de pendientes actualizado en cada turno** a medida que respondemos decisiones.
