@@ -40,7 +40,10 @@ export const BASELINE_UMBRALES_SALUD = Object.freeze({
     }),
     // §A9.1
     c2h2_monitoreo: BASELINES_C2H2,
-    aggregacion: 'MAX(TDGC, C2H2)'
+    // Ratificado con MO.00418 Ed.02 en mano (2026-07-27): la norma
+    // califica los 4 grupos y acumula el riesgo; agregación oficial
+    // del área = promedio redondeado de los disponibles.
+    aggregacion: 'PROMEDIO_REDONDEADO(TDGC, CO, CO2, C2H2)'
   }),
 
   // §A3.2 — ADFQ
