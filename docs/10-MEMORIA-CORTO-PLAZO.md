@@ -19,13 +19,15 @@
 > `omitidos` (sin él, 5 filas vacías crearían docs basura UNK-*). Dry-run Node (script en scratchpad,
 > `dryrun-v2.mjs`): TX_Potencia 213 filas → **208 completas** · factores TDGC/CO/CO₂/C₂H₂/IC/FUR/EDAD
 > coinciden ≥93-100% con el Excel · persistencia idempotente por `codigo`=MATRICULA (actualiza, no duplica).
-> **DECISIONES:** (1) **DGA** ⏳: Excel = promedio(TDGC,CO,CO₂,C₂H₂) redondeado [201/206] vs motor =
-> max(TDGC,C₂H₂) — la resuelve el MO.00418 Ed.02 que el Ingeniero entregará; (2) **CRG** ✅ (2026-07-27,
-> `af5a31d`): columna CARGABILIDAD = dato OFICIAL de Planificación Alta Tensión → `crg_pct` directo con
-> prioridad en `calcularCalifCRG` (cociente de respaldo); coincidencia subió 148→192/206, las 14 restantes
-> son fronteras de umbral → van con la ratificación MO.00418; (3) **HER** ⏳: el Ingeniero indica que el
-> MO.00418 también define hermeticidad — se resuelve al recibir el documento.
-> **BLOQUEA persistir:** solo el MO.00418 Ed.02 (resuelve DGA + HER + ratifica umbrales) + OK del Ingeniero.
+> **DECISIONES: LAS 3 RESUELTAS** ✅ (2026-07-27, `af5a31d` + `f17af07`) — MO.00418 Ed.02 entregado y
+> ratificado TABLA POR TABLA contra el baseline (todas idénticas ✓): (1) **DGA** = promedio redondeado de
+> TDGC/CO/CO₂/C₂H₂ (`calcularEvalDGA`, coincide 201/206; antes max→25/206); (2) **CRG** = columna oficial
+> de Planificación AT (`crg_pct` directo, 192/206); (3) **HER** = calif 1-5 de inspección (Tabla 9;
+> `EVALUACION HERMETICIDAD` numérica, texto de fugas queda informativo). CONDICION del Excel caracterizada:
+> HI truncado (150/206) + **juicio experto en ~38 filas** (capa del Profesional, norma la autoriza — el motor
+> NO la imita; los diagnósticos de import la mostrarán como discrepancia esperada). ⚠️ El anexo NO trae las
+> tablas per-clase de PRUEBAS ELÉCTRICAS → el resto de TODO-04 sigue pendiente (otro capítulo del MO).
+> **BLOQUEA persistir:** solo el OK del Ingeniero (drag&drop en su Chrome: Simulación → Importar).
 > **Con su OK** → persistir vía `admin/importar.html` en su Chrome (drag&drop L-62; primero botón Simulación =
 > dryRun con su sesión → creados/actualizados exactos vs los 206) → verificar dashboard vivo → template
 > sanitizado (headers sin datos) cierra TODO-09 → hojas TPT_Servicio (31) y TX_Respaldo (26) tienen filas de
@@ -72,16 +74,16 @@
 > **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard conectado al parque REAL, verificado vivo; TX-DEMO
 > eliminados con aprobación del Ingeniero → **206 reales · 0 demos**. Detalle → ADR-056.
 >
-> **2026-07-24 (Fable 5) — DRY-RUN Excel Salud de Activos (`49e21fb`)**: Excel hallado en Downloads (no
-> adjuntado); importador NO entendía las cabeceras reales (POTENCIA (KVA), AÑO DE FABRICACION, dobles
-> espacios…) → HI se calculaba solo con DGA+FUR (EDAD pesa 30%!) e inflaba discrepancias. Alias aditivos +
-> test cabeceras reales → 1206 pass. Sondas: DGA-Excel=promedio-de-4 (201/206) · CRG-Excel auto-inconsistente
-> (61 filas) · ADFQ ambos usan promedio(RD,IC) · motor validado factor a factor (≥93-100% coincidencia).
-> Guard `omitidos` en persistir (5 filas vacías → antes docs UNK-* basura). NO persistido — esperan 3
-> decisiones normativas del Ingeniero (ver TAREA VIVA). Nota: plan decía "header:1" pero el código real usa
-> sheet_to_json con cabeceras-objeto (§3.3: el código manda).
+> **2026-07-24 (Fable 5) — DRY-RUN Excel (`49e21fb`)**: Excel hallado en Downloads; alias de cabeceras
+> reales cableados (EDAD pesa 30% y no entraba) + guard `omitidos` (5 filas vacías → antes docs UNK-*).
+> Motor validado factor a factor. Nota §3.3: el plan decía "header:1"; el código real usa cabeceras-objeto.
 >
-> **2026-07-27 (Fable 5) — DECISIÓN CRG (`af5a31d`)**: el Ingeniero confirma que CARGABILIDAD viene de
-> Planificación Alta Tensión (fuente de verdad) y que HER lo define el MO.00418 que entregará. `crg_pct`
-> directo cableado (aditivo) → 1208 pass. Pendiente único para persistir: MO.00418 + su OK. El Ingeniero pidió
-> **resumen de pendientes actualizado en cada turno** a medida que respondemos decisiones.
+> **2026-07-27 (Fable 5) — DECISIÓN CRG (`af5a31d`)**: CARGABILIDAD = Planificación AT (fuente de verdad) →
+> `crg_pct` directo. El Ingeniero pidió **resumen de pendientes actualizado en cada turno**.
+>
+> **2026-07-27 (Fable 5) — MO.00418 Ed.02 ENTREGADO Y RATIFICADO (`f17af07`)**: PDF leído completo (19 pp,
+> NO tocó el repo). Baseline = norma en las 9 tablas + Tabla 10 + 3 overrides ✓. Cambios: eval_dga =
+> promedio redondeado (nueva `calcularEvalDGA`, 3 callsites) · HER numérica de inspección. 1209 pass.
+> Sondas: CONDICION Excel = trunc(HI) 150/206 + juicio experto ~38 (norma lo permite; el motor no lo
+> imita). EDAD ±1 en 15 filas = fecha de corte del Excel vs hoy (motor correcto). RD 18 diffs = bordes.
+> El anexo es SALUD DE ACTIVOS: las tablas per-clase de pruebas eléctricas (TODO-04) NO vienen aquí.
