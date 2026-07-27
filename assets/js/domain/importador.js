@@ -16,6 +16,7 @@ import {
 import { DEPARTAMENTOS } from './schema.js';
 import {
   calcularCalifTDGC, calcularCalifCO, calcularCalifCO2, calcularCalifC2H2,
+  calcularEvalDGA,
   calcularCalifRD, calcularCalifIC, evaluarADFQ,
   calcularCalifFUR, calcularDP, calcularVidaUtilizada,
   calcularCalifCRG, calcularCalifEDAD,
@@ -212,6 +213,9 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
 
   const herUbic = toStr(g(['her', 'hermeticidad', 'ubicacion_fuga_dominante', 'fuga']))
                     .toLowerCase().replace(/\s+/g, '_');
+  // Calificación HER 1–5 de la inspección (Tabla 9 MO.00418 Ed.02):
+  // dato de campo directo; el texto de UBICACIÓN FUGAS queda informativo.
+  const herEval = toNum(g(['evaluacion hermeticidad', 'her_calif', 'calif_her']));
   const pytRaw  = g(['pyt', 'protecciones', 'scada', 'estudios pyt']);
 
   const condicionExcel = toNum(g(['condicion', 'condición', 'condicion_excel', 'hi_excel',
@@ -263,9 +267,10 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   if (C2H2 != null) califC2H2 = calcularCalifC2H2(C2H2, cfgU);
   if (CO   != null) califCO   = calcularCalifCO(CO, cfgU);
   if (CO2  != null) califCO2  = calcularCalifCO2(CO2, cfgU);
-  if (califTDGC != null || califC2H2 != null) {
-    evalDGA = Math.max(califTDGC ?? 0, califC2H2 ?? 0) || null;
-  }
+  evalDGA = calcularEvalDGA({
+    calif_tdgc: califTDGC, calif_co: califCO,
+    calif_co2: califCO2, calif_c2h2: califC2H2
+  });
 
   const califRD = calcularCalifRD(rdKv, cfgU);
   const califIC = calcularCalifIC({ ti, nn }, cfgU);
@@ -278,7 +283,7 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   const crg = calcularCalifCRG({ cp, ap, cs, as: asec, ct, at, crg_pct: crgPct }, cfgU);
 
   const califEDAD = calcularCalifEDAD(anoFab, hoy, cfgU);
-  const califHER  = calcularCalifHER(herUbic);
+  const califHER  = calcularCalifHER(herEval ?? herUbic);
   const califPYT  = calcularCalifPYT(pytRaw);
 
   const hiBruto = calcularHIBruto({

@@ -92,14 +92,18 @@ describe('calcularCalifC2H2 — MO.00418 §A3.1 (c)', () => {
   });
 });
 
-describe('evaluarDGA = MAX(TDGC, C2H2)', () => {
-  test('TDGC alto domina', () => {
-    const m = { gases: { H2: 500, CH4: 0, C2H4: 0, C2H6: 0, C2H2: 0 } };
-    assert.equal(evaluarDGA(m), 5);
+describe('evaluarDGA = promedio redondeado (TDGC, CO, CO2, C2H2) — MO.00418 Ed.02 ratificado 2026-07-27', () => {
+  test('promedia los 4 grupos: TDGC 2 + CO 4 + CO2 2 + C2H2 1 → 2.25 → 2', () => {
+    const m = { gases: { H2: 20, CH4: 30, C2H4: 30, C2H6: 15, CO: 600, CO2: 1600, C2H2: 0 } };
+    assert.equal(evaluarDGA(m), 2);
   });
-  test('C2H2 alto domina sobre TDGC bajo', () => {
+  test('sin CO/CO2 promedia los disponibles: TDGC 5 + C2H2 1 → 3', () => {
+    const m = { gases: { H2: 500, CH4: 0, C2H4: 0, C2H6: 0, C2H2: 0 } };
+    assert.equal(evaluarDGA(m), 3);
+  });
+  test('C2H2 crítico pesa pero ya no domina solo: TDGC 1 + C2H2 5 → 3', () => {
     const m = { gases: { H2: 10, CH4: 10, C2H4: 10, C2H6: 10, C2H2: 8 } };
-    assert.equal(evaluarDGA(m), 5);
+    assert.equal(evaluarDGA(m), 3);
   });
 });
 
@@ -432,7 +436,7 @@ describe('G010 — umbrales configurables', () => {
     const conCfg = snapshotSaludCompleto({
       transformador: { ano_fabricacion: 2000 }, muestraDGA: { gases }, hoy, umbrales: cfg
     });
-    assert.equal(base.eval_dga, 5);        // 420 > 401 (baseline)
+    assert.equal(base.eval_dga, 3);        // promedio(TDGC 5, C2H2 1) = 3 (Ed.02)
     assert.equal(conCfg.eval_dga, 1);      // bandas corridas → 1
     assert.ok(conCfg.hi_final < base.hi_final);
     assert.equal(base.umbrales_version, '1.0.0');  // trazabilidad de la config usada

@@ -132,15 +132,28 @@ export function calcularCalifC2H2(c2h2, cfg) {
 }
 
 // ── Evaluación DGA agregada ────────────────────────────────────
-// MO.00418 §A3.1 (d): EVAL_DGA = MAX(CalifTDGC, CalifC2H2).
-// CO/CO2 quedan como indicadores complementarios (no entran al
-// HI principal; disparan alertas propias).
+// MO.00418 Ed.02 §4.1 califica los 4 grupos (TDGC, CO, CO2, C2H2)
+// para "establecer un umbral de riesgo acumulado". La agregación
+// oficial del área (Excel Salud de Activos de Planificación,
+// ratificada contra el documento el 2026-07-27) es el PROMEDIO
+// REDONDEADO de las calificaciones disponibles. (Antes: MAX(TDGC,
+// C2H2), que dejaba CO/CO2 fuera de la variable DGA.)
+export function calcularEvalDGA({ calif_tdgc, calif_co, calif_co2, calif_c2h2 } = {}) {
+  const vs = [calif_tdgc, calif_co, calif_co2, calif_c2h2]
+    .map(toNum).filter((x) => x != null);
+  if (!vs.length) return null;
+  return Math.round(vs.reduce((a, b) => a + b, 0) / vs.length);
+}
+
 export function evaluarDGA(muestra, cfg) {
   if (!muestra) return null;
-  const tdgc = calcularCalifTDGC(muestra.gases || muestra, cfg);
-  const c2h2 = calcularCalifC2H2((muestra.gases || muestra).C2H2, cfg);
-  if (tdgc == null && c2h2 == null) return null;
-  return Math.max(tdgc ?? 0, c2h2 ?? 0) || null;
+  const g = muestra.gases || muestra;
+  return calcularEvalDGA({
+    calif_tdgc: calcularCalifTDGC(g, cfg),
+    calif_co:   calcularCalifCO(g.CO, cfg),
+    calif_co2:  calcularCalifCO2(g.CO2, cfg),
+    calif_c2h2: calcularCalifC2H2(g.C2H2, cfg)
+  });
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -314,6 +327,11 @@ export function calcularCalifEDAD(anoFabricacion, hoy = new Date(), cfg) {
 
 export function calcularCalifHER(ubicacion) {
   if (ubicacion == null || ubicacion === '') return null;
+  // Tabla 9 MO.00418 Ed.02 es una escala 1–5 por inspección: se acepta
+  // la calificación numérica directa (dato de campo) además del
+  // descriptor canónico de ubicación.
+  const n = toNum(ubicacion);
+  if (n != null) return calif15(n);
   const hit = UBICACIONES_FUGA.find((u) => u.value === ubicacion);
   return hit ? hit.calif : null;
 }
@@ -472,7 +490,10 @@ export function snapshotSaludCompleto(ctx = {}) {
   const califC2H2 = calcularCalifC2H2((dga.gases || dga).C2H2, umbrales);
   const califCO   = calcularCalifCO((dga.gases || dga).CO, umbrales);
   const califCO2  = calcularCalifCO2((dga.gases || dga).CO2, umbrales);
-  const evalDGA   = Math.max(califTDGC ?? 0, califC2H2 ?? 0) || null;
+  const evalDGA   = calcularEvalDGA({
+    calif_tdgc: califTDGC, calif_co: califCO,
+    calif_co2: califCO2, calif_c2h2: califC2H2
+  });
 
   const adfq = muestraADFQ || {};
   const califRD = calcularCalifRD(adfq.rigidez_kv ?? adfq.rd, umbrales);
