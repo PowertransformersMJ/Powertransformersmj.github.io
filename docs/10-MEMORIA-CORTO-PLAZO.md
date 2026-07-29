@@ -6,38 +6,25 @@
 
 ---
 
-## 🎯 Foco (2026-07-24) — Parque real limpio (206, 0 demos) · SIGUE: importar Excel real de Salud
+## 🎯 Foco (2026-07-28) — Importador LISTO y ratificado (ADR-057) · falta SOLO el drag&drop del Ingeniero
 
-> Fase 9 (ADR-052) Olas 0-5 + CONECTAR A/B/C/E desplegadas; D decidido NO activar (§52.14). **ADR-053 (hoy)**:
-> **G010 cableado** (umbrales F18 → Health Index, aditivo, revisión adversarial 0 defectos) + **TODO-04 validado
-> parcial** (re-atribución tan δ + per-clase aplicadas; ver `49 §Validación`) + **fixes FASE E** (tarjeta causa
-> real + XSS tabla RCA). Billing RESUELTO en vivo (CF vivas) · extracción IA validada con informe real.
+> El Ingeniero anunció **nuevas instrucciones** para la próxima sesión (cierre 2026-07-28) — la tarea de abajo
+> queda lista para ejecutarse cuando él dé el paso; no bloquear lo nuevo por ella.
 
-### ▶️ TAREA VIVA: importar Excel "Salud de Activos" — DRY-RUN ✅ HECHO (2026-07-24) · espera 3 DECISIONES + OK
-> Archivo: `~/Downloads/Salud_de_Activos_2026_UUCC_corregida-2.xlsx` (16-jul; existe una `corregida` anterior).
-> **Hecho** (`49e21fb`): importador entiende cabeceras reales (alias aditivos + colapso de espacios) + guard
-> `omitidos` (sin él, 5 filas vacías crearían docs basura UNK-*). Dry-run Node (script en scratchpad,
-> `dryrun-v2.mjs`): TX_Potencia 213 filas → **208 completas** · factores TDGC/CO/CO₂/C₂H₂/IC/FUR/EDAD
-> coinciden ≥93-100% con el Excel · persistencia idempotente por `codigo`=MATRICULA (actualiza, no duplica).
-> **DECISIONES: LAS 3 RESUELTAS** ✅ (2026-07-27, `af5a31d` + `f17af07`) — MO.00418 Ed.02 entregado y
-> ratificado TABLA POR TABLA contra el baseline (todas idénticas ✓): (1) **DGA** = promedio redondeado de
-> TDGC/CO/CO₂/C₂H₂ (`calcularEvalDGA`, coincide 201/206; antes max→25/206); (2) **CRG** = columna oficial
-> de Planificación AT (`crg_pct` directo, 192/206); (3) **HER** = calif 1-5 de inspección (Tabla 9;
-> `EVALUACION HERMETICIDAD` numérica, texto de fugas queda informativo). CONDICION del Excel caracterizada:
-> HI truncado (150/206) + **juicio experto en ~38 filas** (capa del Profesional, norma la autoriza — el motor
-> NO la imita; los diagnósticos de import la mostrarán como discrepancia esperada). ⚠️ El anexo NO trae las
-> tablas per-clase de PRUEBAS ELÉCTRICAS → el resto de TODO-04 sigue pendiente (otro capítulo del MO).
-> **BLOQUEA persistir:** solo el OK del Ingeniero (drag&drop en su Chrome: Simulación → Importar).
-> **Con su OK** → persistir vía `admin/importar.html` en su Chrome (drag&drop L-62; primero botón Simulación =
-> dryRun con su sesión → creados/actualizados exactos vs los 206) → verificar dashboard vivo → template
-> sanitizado (headers sin datos) cierra TODO-09 → hojas TPT_Servicio (31) y TX_Respaldo (26) tienen filas de
-> título encima (cabeceras __EMPTY): necesitan detección de fila-cabecera ANTES de importarse (pendiente).
-> Después: TODO-17 · ratificación umbrales+MO.00418 · TODO-05/08 · GitHub Support · G017/G111/STRUCT/D.
+### ▶️ TAREA VIVA: encender el parque real — TODO listo salvo el PASO DEL INGENIERO (detalle → `99 §57`)
+> Metodología MO.00418 Ed.02 ratificada + importador en PRODUCCIÓN (`main` `c3c1c9b`, 1209 pass). Excel:
+> `~/Downloads/Salud_de_Activos_2026_UUCC_corregida-2.xlsx`. **PASO ÚNICO**: Ingeniero abre
+> `admin/importar.html` en su Chrome → drag&drop (L-62) → **Simulación** (dryRun: creados/actualizados
+> exactos vs los 206) → **Importar** → Claude verifica el tablero vivo con su sesión. TRAS el import:
+> (a) template sanitizado headers-only → cierra TODO-09; (b) TPT_Servicio (31) y TX_Respaldo (26) traen
+> títulos encima (cabeceras __EMPTY) → detección de fila-cabecera antes de importarlas (resuelve también
+> clasificación RESPALDO); (c) discrepancias del job = esperadas (juicio experto ~38 filas, `99 §57`).
+> 📌 El Ingeniero pidió **resumen de pendientes actualizado en CADA turno**.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
 > **(A) GitHub Support** "remove sensitive data" (purga `refs/pull/*`). **(B) Revocar PATs viejos** (TODO-08).
-> **(C) Ratificar TODO-04** (`49 §Validación`) y entregar MO.00418 Ed.02 (tabla per-clase no confirmable en
-> fuentes públicas). (✅ Alerta de presupuesto GCP $5/mes hecha — detalle en `05`.)
+> **(C) Entregar capítulo PRUEBAS ELÉCTRICAS del MO** (tablas per-clase — el anexo Salud de Activos ya
+> entregado NO las trae) y ratificar TODO-04 (`49 §Validación`). **(D) Drag&drop del import** (arriba).
 
 ### 🚫 Callejones (NO reintentar)
 > Workflow `args` grande como string → serializado (embeber en script) · git-filter-repo: `--branch` reescribe
@@ -52,7 +39,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **CONECTAR D** | D decidido: **NO activar** (§52.14 — prerrequisitos del día D allá: UI no-admin, custom claims, constraints por CAMPO). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
-| **TODO-04** | **✅ PARCIAL (ADR-053)**: clusters IR/PI/DAR + FP/tan δ/bujes + TTR validados con fuente y refutación; 2 re-atribuciones aplicadas (`c7683d7`). RESTA: ratificación del director + MO.00418 (per-clase) + clusters 3b/4 (→ TODO-15). | 🟢 parcial |
+| **TODO-04** | **✅ PARCIAL (ADR-053/057)**: clusters validados + paquete SALUD ratificado con MO.00418 Ed.02 en mano. RESTA: capítulo PRUEBAS ELÉCTRICAS del MO (tablas per-clase — el anexo Salud NO las trae) + ratificación del director. | 🟢 parcial |
 | **TODO-17** | Hygiene (hallazgo ADR-055): `calificarResistencia` (schema) da OK ≤5% mientras semáforo/scorecard usan 2% — unificar o documentar; ligado al `.calif` write-only (G012). | 🟢 menor |
 | **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, §52.12 — desbloquea CONECTAR D). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 G025 ✅ |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
@@ -74,16 +61,10 @@
 > **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard conectado al parque REAL, verificado vivo; TX-DEMO
 > eliminados con aprobación del Ingeniero → **206 reales · 0 demos**. Detalle → ADR-056.
 >
-> **2026-07-24 (Fable 5) — DRY-RUN Excel (`49e21fb`)**: Excel hallado en Downloads; alias de cabeceras
-> reales cableados (EDAD pesa 30% y no entraba) + guard `omitidos` (5 filas vacías → antes docs UNK-*).
-> Motor validado factor a factor. Nota §3.3: el plan decía "header:1"; el código real usa cabeceras-objeto.
+> **2026-07-24→28 (Fable 5) — IMPORTADOR + MO.00418 Ed.02 → CONSOLIDADO EN ADR-057**: dry-run del Excel real,
+> alias de cabeceras, guard `omitidos`, decisión CRG (Planificación AT), ratificación tabla por tabla,
+> eval_dga=promedio, HER numérica, sondas CONDICION (trunc+juicio experto). Detalle → `99 §57`.
 >
-> **2026-07-27 (Fable 5) — DECISIÓN CRG (`af5a31d`)**: CARGABILIDAD = Planificación AT (fuente de verdad) →
-> `crg_pct` directo. El Ingeniero pidió **resumen de pendientes actualizado en cada turno**.
->
-> **2026-07-27 (Fable 5) — MO.00418 Ed.02 ENTREGADO Y RATIFICADO (`f17af07`)**: PDF leído completo (19 pp,
-> NO tocó el repo). Baseline = norma en las 9 tablas + Tabla 10 + 3 overrides ✓. Cambios: eval_dga =
-> promedio redondeado (nueva `calcularEvalDGA`, 3 callsites) · HER numérica de inspección. 1209 pass.
-> Sondas: CONDICION Excel = trunc(HI) 150/206 + juicio experto ~38 (norma lo permite; el motor no lo
-> imita). EDAD ±1 en 15 filas = fecha de corte del Excel vs hoy (motor correcto). RD 18 diffs = bordes.
-> El anexo es SALUD DE ACTIVOS: las tablas per-clase de pruebas eléctricas (TODO-04) NO vienen aquí.
+> **2026-07-28 (Fable 5) — CIERRE por pedido del Ingeniero**: anuncia NUEVAS INSTRUCCIONES para la próxima
+> sesión. Cerebro consolidado (ADR-057 + poda GC) y `05` refrescado (deuda (c) vieja corregida — B/E y
+> extracción IA ya estaban validadas desde ADR-054).
