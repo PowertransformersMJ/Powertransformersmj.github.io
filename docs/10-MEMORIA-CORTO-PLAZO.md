@@ -74,3 +74,8 @@
 > Bóvedas NO se fusionan con el ecosistema de origen (datos de cliente). Detalle → `99 §58`.
 > ⚠️ El heartbeat marca **costo-cerebro 30d = 53% 🔴** (bandera 30%): la próxima sesión debería ser
 > de PRODUCTO, no de cerebro.
+>
+> **2026-07-29 (Opus 5) — ToS del hosting: CERRADO → `99 §60`**: Pages NO nos prohíbe nada (ni
+> e-commerce ni SaaS) → **no se migra**; runbook a Cloudflare listo por si acaso. ⚠️ Decisión viva
+> del Ingeniero: **Vercel Hobby SÍ veta el uso comercial** y no lo consume nadie → retirarlo o
+> dejarlo a sabiendas. NO re-analizar por calendario: solo por los disparadores de §60.7.

@@ -71,6 +71,7 @@
 | §57 | ADR-057 — Importador del Excel real Salud de Activos + MO.00418 Ed.02 ratificado tabla por tabla: eval_dga = promedio(TDGC,CO,CO₂,C₂H₂), CRG = % oficial Planificación AT, HER = calif 1-5 de inspección, guard omitidos; dry-run 208/213, coincidencias ≥93-100%; CONDICION Excel = trunc(HI)+juicio experto ~38 | 1104 |
 | §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`, Antigravity oficial; bóvedas NO se fusionan (datos de cliente) ⟦OPUS-5⟧ | 1122 |
 | §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y L-63 (no re-pedir autorización ya concedida) ⟦OPUS-5⟧ | 1140 |
+| §60 | ADR-060 — Hosting: ¿viola SGM los ToS de GitHub Pages? NO se migra (e-commerce/SaaS descartados; gris solo en "run your online business"). Trae runbook Cloudflare Pages costeado (medio día, gotcha `/x.html`→`/x`) + hallazgo: **Vercel Hobby SÍ prohíbe uso comercial** y no entrega nada. NO re-analizar por calendario: solo por los 4 disparadores de §60.7 ⟦OPUS-5⟧ | 1158 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -89,6 +90,7 @@
 | 🔵 Criterios / diagnóstico de PRUEBAS ELÉCTRICAS (IR/PI/DAR, FP/tan δ, SFRA, excitación…) | 🎯 `49-PRUEBAS-ELECTRICAS` + skills `skills/pruebas-electricas/*` |
 | 🔵 TIPO de transformador, grupo vectorial, cálculos del EQUIPO | 🎯 `50-TRANSFORMADORES-POTENCIA` + skills `skills/transformadores-potencia/*` |
 | 🛠️ ¿Qué skill tengo para X? | `docs/skills-inventory.md` + `40-LOBULOS §Recursos` |
+| ¿Podemos seguir en GitHub Pages? ¿migramos el hosting? ¿los ToS nos prohíben algo? | `99 §60` (veredicto + runbook Cloudflare + disparadores) — **no re-analizar por calendario** |
 | 🛰️ Decisión fuerte / cara de revertir → ¿2ª opinión externa? | `60-WORKFLOWS §W-11` (checklist cerrado) → `15-CONSEJO-EXTERNO` + skills `proceso-decision-fuerte`/`comite-expertos` |
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
