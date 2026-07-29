@@ -15,7 +15,8 @@
     "docs/20-MEMORIA-ESPACIAL.md": { "lines": 280, "chars": 16000 },
     "docs/30-LECCIONES.md": { "lines": 350, "chars": 40000 },
     "docs/31-LECCIONES-IA.md": { "lines": 200, "chars": 20000 },
-    "docs/00-INDICE.md": { "lines": 450, "chars": 16000 }
+    "docs/00-INDICE.md": { "lines": 450, "chars": 16000 },
+    "docs/60-WORKFLOWS.md": { "lines": 160, "chars": 14000 }
   },
   "archiveDir": "../brain-private/sgm-transpower/research-archive",
   "specsDir": "specs",
