@@ -6,10 +6,18 @@
 
 ---
 
-## 🎯 Foco (2026-07-28) — Importador LISTO y ratificado (ADR-057) · falta SOLO el drag&drop del Ingeniero
+## 🎯 Foco (2026-07-28, cierre) — Ecosistema montado (ADR-058/059) · el PRODUCTO espera el drag&drop
 
-> El Ingeniero anunció **nuevas instrucciones** para la próxima sesión (cierre 2026-07-28) — la tarea de abajo
-> queda lista para ejecutarse cuando él dé el paso; no bloquear lo nuevo por ella.
+> **ARRANQUE DE LA PRÓXIMA SESIÓN**: el Ingeniero cerró esta anunciando **instrucciones nuevas**.
+> Escúchalas primero; NO bloquees lo nuevo por lo de abajo. Contexto mínimo que necesitas saber:
+> el cerebro ahora vive en el ecosistema `~/Desktop/GitHub-MJ` con **kernel canónico repartido**
+> (`npm run brain:pull`; se edita SOLO en `../brain-private/kernel/`), catálogo de procesos en
+> **`60-WORKFLOWS`** (lee **W-11** antes de cualquier decisión fuerte) y consejo externo =
+> **Gemini vía Antigravity** (`15`). Proyecto nuevo → `../brain-private/NUEVO-PROYECTO.md`.
+>
+> ⚠️ **Deuda de equilibrio**: costo-cerebro 30d en ~54% contra bandera del 30%, dos sesiones
+> seguidas de infraestructura. Salvo que lo nuevo pida lo contrario, **esta sesión debería ser
+> de PRODUCTO**. Y aplica **L-63**: lo que `§2`/`§G` ya autoriza se ejecuta y se reporta, no se pregunta.
 
 ### ▶️ TAREA VIVA: encender el parque real — TODO listo salvo el PASO DEL INGENIERO (detalle → `99 §57`)
 > Metodología MO.00418 Ed.02 ratificada + importador en PRODUCCIÓN (`main` `c3c1c9b`, 1209 pass). Excel:
