@@ -1,9 +1,9 @@
 {
-  "version": "1.7.0",
+  "version": "1.7.1",
   "date": "2026-07-29",
   "files": {
-    "brain-check.mjs": "a2ffcf4cf0d52647ab0f109e68c0dc3a6c3fc72105a9023f21e83f24a554b4b3",
-    "brain-diff.mjs": "3b99d025e23109019d68898ba9c020ef6d98ffccd01bb9aba5357f57ab191e08",
+    "brain-check.mjs": "b03453b4c7e69dbcf8b242f662fb43ef45058706903bfd2529a4334a7d355109",
+    "brain-diff.mjs": "1d9fefd496a4fb27f4e0d5cca06f127b1e5136d759522cad81f13cbc0f34d043",
     "brain-index.mjs": "cafcab9e57fd5659ac845917e4ad77449a3303ded65a1adb23ae3c909b518b8d",
     "session-handoff.mjs": "f3a80e7536a75144b2082c0d0b9f504cda7a0db734018244f7c0e49fe19b62db",
     "boot-gate.mjs": "7a1a45eb0f09a0957468ecd4784ce7eb3753b928b28ead8dcac9fb1dfda82ea8",

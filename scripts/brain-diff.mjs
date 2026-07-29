@@ -55,9 +55,9 @@ for (const d of dirs) {
   console.log(`  ${d.name}${d.name === me ? ' (este)' : ''}${ignored}`);
   console.log(`     CLAUDE.md: ${hasClaude ? '✅' : '❌ SIN CEREBRO'} · template: ${version} · manifest: ${hasManifest} · kernel: ${kernel}`);
 
-  if (!hasClaude) todos.push(`| TODO-XX | 🧠 Repo \`${d.name}\` SIN cerebro → instalar con la receta \`INSTALACION-CEREBRO.md\` del canon (bersaglio) | 🔲 | decisión cliente |`);
+  if (!hasClaude) todos.push(`| TODO-XX | 🧠 Repo \`${d.name}\` SIN cerebro → instalar con la receta \`../brain-private/NUEVO-PROYECTO.md\` | 🔲 | decisión del dueño |`);
   else if (version === 'SIN marcador') todos.push(`| TODO-XX | 🧠 \`${d.name}\`: CLAUDE.md sin marcador de versión del template → añadir línea 1 | 🔲 | — |`);
-  if (kernel === '⚠️ DIVERGE') todos.push(`| TODO-XX | 🧠 \`${d.name}\`: kernel brain-check.mjs DIVERGE del de ${me} → re-propagar desde el canon | 🔲 | — |`);
+  if (kernel === '⚠️ DIVERGE') todos.push(`| TODO-XX | 🧠 \`${d.name}\`: kernel DIVERGE del canónico → \`npm run brain:pull\` en ese repo | 🔲 | — |`);
 }
 
 if (todos.length) {
