@@ -4,7 +4,7 @@
 
 | Señal | Valor (al **2026-07-28**) |
 |---|---|
-| **Misión ahora** | **ADR-058 (07-28): ecosistema y kernel canónico montados.** Antes: ADR-057, importador LISTO y MO.00418 Ed.02 RATIFICADO — **el parque enciende con UN paso del Ingeniero** (drag&drop Simulación→Importar en su Chrome). Pendientes y detalle → `10` (TODO-NN) + `99 §57`/`§58`. |
+| **Misión ahora** | **ADR-058/059 (07-28): ecosistema `~/Desktop/GitHub-MJ` + kernel canónico repartido + `60-WORKFLOWS` + Antigravity.** Antes: ADR-057, importador LISTO y MO.00418 Ed.02 RATIFICADO — **el parque enciende con UN paso del Ingeniero** (drag&drop Simulación→Importar en su Chrome). ⏭️ El Ingeniero cerró anunciando INSTRUCCIONES NUEVAS. Pendientes y detalle → `10` + `99 §57`/`§58`/`§59`. |
 | **Build** | 🟢 `node --test` **1209 pass / 0 fail / 2 skip** + **8 tests de reglas** (`test:rules` vía emulador, G025). CI corre los tests (`ci.yml`). · verificado-vivo: 2026-07-28 |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` (sin hash fijo — el SHA vivo lo da el handoff hook o `git fetch`, M-01; se commitea+pushea+mergea en el mismo turno; ⚠️ NO fiarse del ref local, puede quedar stale tras el filter-repo). **Historia reescrita 2026-07-21** (git-filter-repo purgó confidenciales; `.git` 220M→23M; respaldo bundle en bóveda) → cualquier otra copia debe re-clonar. Árbol tracked 17M. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO por el Ingeniero (2026-07-23)** y CF re-desplegadas VIVAS (401 JSON limpio): `extraerPruebasElectricasIA` + `narrativaTendenciaIA` + `onMuestraCreate`, ya con G007/G008 + G010-CF; secret ok · verificado-vivo: 2026-07-23 |
