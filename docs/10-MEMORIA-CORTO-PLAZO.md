@@ -2,7 +2,7 @@
 
 > **Pizarra, no archivo.** Auto-carga con `CLAUDE.md` + `05` (§G.1). SOLO lo vivo/pendiente.
 > Todo lo EJECUTADO (Fase 9 + fase CONECTAR) → `99 §52.8-52.14`. Crudos → bóveda
-> `~/Desktop/brain-private/sgm-transpower/research-archive/` (`2026-07-21-fase9/` + `2026-07-22-decision-rbac-f28/`).
+> `~/Desktop/GitHub-MJ/brain-private/sgm-transpower/research-archive/` (`2026-07-21-fase9/` + `2026-07-22-decision-rbac-f28/`).
 
 ---
 
@@ -54,17 +54,15 @@
 
 ## 📝 Bitácora (efímera)
 
-> **2026-07-22/23** — Fase 9 + CONECTAR A-E → `99 §52.8-52.14` · ADR-053 (escaneo+G010) · ADR-054 (2 bugs shell,
-> falta clasificar RESPALDO) · ADR-055 (ΔC1 al veredicto + clusters 3b/4; nuevo TODO-17) · billing resuelto +
-> extracción IA validada (LEL27007, L-62, TODO-10 ✅) — detalle en sus ADRs/`05`/`30-31`.
+> **2026-07-22→28 (Fable 5) — YA CONSOLIDADO, no re-leer aquí**: Fase 9 + CONECTAR A-E (`99 §52`) ·
+> ADR-053/054/055 (G010, 2 bugs del shell, ΔC1 + clusters) · ADR-056 (dashboard al parque REAL,
+> 206 reales · 0 demos) · **ADR-057** (importador del Excel real + MO.00418 Ed.02 ratificado tabla
+> por tabla). Detalle en sus ADRs vía `00`.
 >
-> **2026-07-24 (Fable 5) — TODO-09 ADR-056**: dashboard conectado al parque REAL, verificado vivo; TX-DEMO
-> eliminados con aprobación del Ingeniero → **206 reales · 0 demos**. Detalle → ADR-056.
->
-> **2026-07-24→28 (Fable 5) — IMPORTADOR + MO.00418 Ed.02 → CONSOLIDADO EN ADR-057**: dry-run del Excel real,
-> alias de cabeceras, guard `omitidos`, decisión CRG (Planificación AT), ratificación tabla por tabla,
-> eval_dga=promedio, HER numérica, sondas CONDICION (trunc+juicio experto). Detalle → `99 §57`.
->
-> **2026-07-28 (Fable 5) — CIERRE por pedido del Ingeniero**: anuncia NUEVAS INSTRUCCIONES para la próxima
-> sesión. Cerebro consolidado (ADR-057 + poda GC) y `05` refrescado (deuda (c) vieja corregida — B/E y
-> extracción IA ya estaban validadas desde ADR-054).
+> **2026-07-28 (Opus 5) — LAS NUEVAS INSTRUCCIONES eran el ECOSISTEMA → ADR-058**: paraguas
+> `~/Desktop/GitHub-MJ` (repo ⇄ bóveda hermanos + carpetas OLTC + `_archivo`), kernel canónico PROPIO
+> con reparto sellado (`brain:pull`, gate #0), `60-WORKFLOWS` (W-01..W-13), Antigravity oficial como
+> consejo externo, y `brain-private/NUEVO-PROYECTO.md` para que todo proyecto futuro nazca conectado.
+> Bóvedas NO se fusionan con el ecosistema de origen (datos de cliente). Detalle → `99 §58`.
+> ⚠️ El heartbeat marca **costo-cerebro 30d = 53% 🔴** (bandera 30%): la próxima sesión debería ser
+> de PRODUCTO, no de cerebro.

@@ -36,6 +36,32 @@
 
 ---
 
+## 🌐 Ecosistema — el paraguas `~/Desktop/GitHub-MJ/` (ADR-058, 2026-07-28)
+
+El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico único**.
+
+```
+~/Desktop/GitHub-MJ/
+├── brain-private/   bóveda privada (repo git aparte, NUNCA pública)
+│   ├── kernel/          🔑 KERNEL CANÓNICO (VERSION + .mjs) — escritor único
+│   ├── NUEVO-PROYECTO.md  receta: un proyecto nuevo nace conectado
+│   └── sgm-transpower/research-archive/  = `archiveDir` (crudos de deliberación)
+├── powertransformersmj.github.io/   ESTE repo (público)
+├── oltc-capacitacion/ · oltc-metodologia/   trabajo (work/ + entregables/)
+└── _archivo/   linajes viejos y capturas — no se toca, no se borra
+```
+
+- **Hermandad `repo ↔ brain-private` = ESTRUCTURAL**: de ella cuelgan `archiveDir` y el reparto
+  del kernel (`npm run brain:pull` → `../brain-private/kernel/pull.mjs`). Romperla **NO da error**
+  (gate #7 degrada a `info` → diría "SANO" con la bóveda desconectada). Tras cualquier mudanza
+  exigir literalmente `✅ archiveDir íntegro` **y** `kernel vX.Y.Z íntegro == canónico`.
+- **`brain-private` NO se renombra jamás**: `brain-diff.mjs` la ignora por nombre literal.
+- Ecosistema **gemelo, NO compartido**, del de un tercero (`~/Desktop/GitHub/`): su bóveda sube a
+  una cuenta GitHub ajena y esta guarda material real de cliente AFINIA → **jamás fusionar bóvedas
+  ni apuntar `archiveDir` allí**. El kernel se porta por copia + diff, nunca por dependencia.
+
+---
+
 ## 🏗️ Estructura del repo (vista aérea)
 
 - **Frontend / cliente**: HTML5 + CSS (sistema AQUA LIGHT) + JS ES6+ vanilla modular. **Sin framework ni bundler** — los `.js` se cargan como ES modules vía `<script type="module">` o CDN. Hosting GitHub Pages.

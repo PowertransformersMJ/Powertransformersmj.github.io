@@ -1,30 +1,33 @@
 #!/usr/bin/env node
 // ===========================================================
-// 🧠 brain-check v1.2 — Linter de integridad del cerebro neuronal (CANÓNICO · portable)
+// 🧠 brain-check v1.7 — Linter de integridad del cerebro neuronal (CANÓNICO · portable)
 // ===========================================================
-// KERNEL del cerebro — linter canónico, portable entre proyectos (distribuido vía brain-kit v1.0).
-// Los DATOS (topes/budgets/rutas/peers) son INSTANCE: viven en docs/.brain-manifest.json.
+// KERNEL del cerebro multi-proyecto. Linaje: brain-kit v1.0 → canónico v1.6.0 (ecosistema
+// de origen, otro dueño) → v1.7.0 = ESTE canónico, ecosistema ~/Desktop/GitHub-MJ (ADR-058).
+// Este archivo es IDÉNTICO en todos los repos del ecosistema — escritor único = este canónico.
+// v1.7 (delta propio vs 1.6.0): gate #5 acepta LECCIONES SHARDEADAS (30 + 3X-LECCIONES-*.md).
+// Los DATOS (topes/budgets/rutas) son INSTANCE: viven en docs/.brain-manifest.json.
 // ⚠️ La SEVERIDAD de cada gate está HARDCODEADA aquí (anti green-tuning, ADR §173):
 // el manifest NUNCA puede degradar un warn; solo aporta datos. Campo `downgrades`
 // (con ADR citado) se IMPRIME en cada corrida — visible, no silencioso.
-// READ-ONLY: reporta, no modifica. Sin child_process (portabilidad + byte-identidad ×3).
+// READ-ONLY: reporta, no modifica. Sin child_process (portabilidad + byte-identidad ×repos).
 //
 //   node scripts/brain-check.mjs           → --full (default): TODO (pre-commit / manual)
 //   node scripts/brain-check.mjs --boot    → arranque LIVIANO + SILENCIOSO (presupuesto de stdout;
 //                                            NO lee 99-HISTORIAL; el hook re-inyecta cada línea)
 //
-// Checks (severidad fija):
-//   (1) Neuronas huérfanas registradas [warn]            (7) Integridad archiveDir: archivos↔README↔refs [warn, --full]
+// Checks (fija) · v1.3 F0-§50: #1→#10 · #6b/#11 QUITADOS · #13 endurecida · +5c/+7b/+tableFile:
 //   (2) Caps chars+líneas [warn] · pre-shard ≥90% [info] (8) SSoT: hecho duplicado fuera del nodo dueño [warn, --full]
 //       · boot-budget [info: condición ×3 no cumplida]   (9) Consolidado-aún-en-10: fila ✅+§NN indexado [warn, --full]
-//   (3) Desync 00→99 [warn, --full]                     (10) BFS huérfanas 2º orden sobre grafo de ruteo [warn, --full]
-//   (4) Frescura cache SW↔05 [warn, opcional]           (11) Peer-hash kernelFiles ×3 [warn; peer ausente=info, --full]
-//   (5) Refs cruzadas ADR/L-M/hojas [warn]              (12) Fechas stale en 05/10 [info, --boot]
-//   (6) Skills↔inventario [warn, --full]                (13) Specs: checklist sin evidencia [warn] / sin checklist [info, --full]
-//                                                       (14) deepAudit Nivel-2 vencida [info nudge]
-//                                                       (15) Schema del manifest: clave desconocida [warn]
-//                                                       (16) Fiabilidad M-22: `verificado-vivo` stale [info, --full] (§257/TODO-44)
+//   (3) Desync 00→99 [warn, --full]                     (10) Huérfanas: BFS 2º orden + neurona NN- sin registro directo [warn, --full]
+//   (4) Frescura cache SW↔05 [warn, opcional]           (12) Fechas stale en 05/10 [info, --boot]
+//   (5) Refs cruzadas ADR/L-M/hojas [warn]              (13) Specs: checklist con evidencia RESOLUBLE [warn, --full]
+//       + 5c) cita viva a lección ⚰️ cuarentenada [warn] (14) deepAudit Nivel-2 vencida [info] + tableFile existe [warn]
+//   (6) Skills↔inventario [warn, --full]                (15) Schema del manifest: clave desconocida [warn]
+//   (7) archiveDir íntegro [warn, --full]               (16) Fiabilidad M-22: `verificado-vivo` stale [info, --full]
+//       + 7b) bóveda: commits ≠ origin vía fs [warn]
 // ===========================================================
+const KERNEL_VERSION = '1.8.0';
 import { readFileSync, readdirSync, existsSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
@@ -42,10 +45,8 @@ const ok = (m) => { if (!BOOT) say('  ✅ ' + m); };
 const info = (m) => say('  ℹ️  ' + m);
 const head = (m) => { if (!BOOT) say(m); };
 const read = (p) => readFileSync(p, 'utf-8');
-const norm = (s) => s.replace(/\r\n/g, '\n'); // CRLF-normalizado (autocrlf ×3)
-const sha = (s) => createHash('sha256').update(norm(s)).digest('hex');
 
-say(`\n🧠 BRAIN-CHECK v1.2${BOOT ? ' --boot (liviano+silencioso)' : ' --full'} — integridad del cerebro\n`);
+say(`\n🧠 BRAIN-CHECK v${KERNEL_VERSION}${BOOT ? ' --boot (liviano+silencioso)' : ' --full'} — integridad del cerebro\n`);
 
 // Pre-flight
 const CLAUDE_PATH = join(ROOT, 'CLAUDE.md');
@@ -64,13 +65,50 @@ if (existsSync(MANIFEST_PATH)) {
 const KNOWN_KEYS = new Set([
   'brainTemplateVersion', 'repo', 'bootCharsTarget', 'alwaysOn', 'caps', 'archiveDir',
   'deepAudit', 'peers', 'kernelFiles', 'ssotFacts', 'specsDir', 'staleDays', 'ignoreDirs',
-  'downgrades', 'orphanAllowlist', 'verifiedLiveStaleDays', 'verifiedLiveScan',
+  'downgrades', 'orphanAllowlist', 'verifiedLiveStaleDays', 'verifiedLiveScan', 'lastOffsiteBackup',
 ]);
 for (const k of Object.keys(manifest)) {
   if (!k.startsWith('_') && !KNOWN_KEYS.has(k)) warn(`manifest: clave desconocida "${k}" (¿typo? un typo apaga gates en silencio) — schema v1.2`);
 }
 if (Array.isArray(manifest.downgrades) && manifest.downgrades.length) {
   for (const d of manifest.downgrades) info(`DOWNGRADE activo: ${typeof d === 'string' ? d : JSON.stringify(d)} (visible por diseño — exige ADR)`);
+}
+// Compat kernel↔manifest (v1.4 §51): degradación RUIDOSA, jamás silencio.
+const REQUIRED_MANIFEST_MAJOR = 1;
+const mMajor = parseInt(String(manifest.brainTemplateVersion || '1').split('.')[0], 10) || 1;
+if (mMajor !== REQUIRED_MANIFEST_MAJOR) warn(`manifest brainTemplateVersion "${manifest.brainTemplateVersion}" ≠ major ${REQUIRED_MANIFEST_MAJOR} que exige este kernel → migrar el manifest (el kernel corre degradado)`);
+
+// 0) Identidad del kernel vs canónico (v1.4 §51 — reemplaza al viejo #11; corre también en --boot):
+//    el kernel canónico vive UNA vez en <bóveda>/kernel/; cada repo lo trae con `npm run brain:pull`
+//    que escribe scripts/.kernel-version.json (stamp commiteado). Editar scripts/*.mjs a mano = fork.
+{
+  const stampP = join(ROOT, 'scripts', '.kernel-version.json');
+  if (!existsSync(stampP)) { if (!BOOT) info('sin scripts/.kernel-version.json — repo pre-F1 (migrar: npm run brain:pull)'); }
+  else {
+    let stamp = null; try { stamp = JSON.parse(read(stampP)); } catch { warn('scripts/.kernel-version.json ilegible (JSON inválido)'); }
+    const shaHex = (p) => createHash('sha256').update(read(p).replace(/\r\n/g, '\n')).digest('hex');
+    let bad = 0;
+    for (const [name, h] of Object.entries((stamp && stamp.files) || {})) {
+      const p = join(ROOT, 'scripts', name);
+      if (!existsSync(p)) { warn(`kernel: ${name} está en el stamp pero AUSENTE en scripts/`); bad++; }
+      else if (shaHex(p) !== h) { warn(`kernel EDITADO LOCALMENTE: ${name} ≠ stamp (fork prohibido §51) → editar el CANÓNICO y npm run brain:pull`); bad++; }
+    }
+    let vault = manifest.archiveDir ? join(ROOT, manifest.archiveDir) : null;
+    if (vault) for (let i = 0; i < 4 && !existsSync(join(vault, '.git')); i++) vault = join(vault, '..');
+    const canonVerP = vault ? join(vault, 'kernel', 'VERSION') : null;
+    const canonVer = canonVerP && existsSync(canonVerP) ? read(canonVerP).trim() : null;
+    if (stamp && canonVer && canonVer !== stamp.version) { warn(`kernel v${stamp.version} STALE vs canónico v${canonVer} → npm run brain:pull`); bad++; }
+    // v1.5.1 §52 (punto ciego cazado EN VIVO): una edición del canónico SIN bump de VERSION era
+    // invisible (el gate solo miraba stamp+versión). Con el canónico presente, comparar CONTENIDO.
+    if (stamp && vault && existsSync(join(vault, 'kernel'))) for (const name of Object.keys(stamp.files || {})) {
+      const c = join(vault, 'kernel', name), l = join(ROOT, 'scripts', name);
+      if (existsSync(c) && existsSync(l) && shaHex(c) !== shaHex(l)) { warn(`kernel: ${name} difiere del CANÓNICO aun con versión igual (edición canónica sin bump / pull a medias) → npm run brain:pull`); bad++; break; }
+    }
+    if (stamp && !bad) {
+      if (BOOT) say(`  ✅ kernel v${stamp.version} íntegro${canonVer ? ' == canónico' : ''}`);
+      else ok(`kernel v${stamp.version} íntegro (${Object.keys(stamp.files || {}).length} archivos)${canonVer ? ' == canónico v' + canonVer : ' (canónico no clonado en esta máquina)'}`);
+    }
+  }
 }
 
 const DEFAULT_CAPS = {
@@ -96,19 +134,6 @@ const lobeRegistry = existsSync(lobeRegistryPath) ? read(lobeRegistryPath) : '';
 const indexNames = readdirSync(DOCS).filter((f) => /^00[a-z]?-INDICE.*\.md$/.test(f)).sort();
 const indexPaths = indexNames.map((f) => join(DOCS, f));
 const readIndex = () => indexPaths.map((p) => read(p)).join('\n');
-
-// 1) Neuronas huérfanas (registro directo)
-head('1) Neuronas huérfanas (registradas en CLAUDE.md / 40-LOBULOS):');
-const neurons = readdirSync(DOCS).filter((f) => /^\d{2}-.*\.md$/.test(f));
-let okNeurons = 0;
-for (const n of neurons) {
-  const isChildLobe = /^4[1-9]-/.test(n);
-  if (claude.includes(n)) { ok(`${n}`); okNeurons++; }
-  else if (isChildLobe && lobeRegistry.includes(n)) { ok(`${n} (lóbulo hijo → 40-LOBULOS)`); okNeurons++; }
-  else if (isChildLobe) warn(`${n} lóbulo hijo NO registrado en 40-LOBULOS-DOMINIO`);
-  else warn(`${n} NO referenciada en CLAUDE.md → HUÉRFANA (conectar en §0)`);
-}
-if (BOOT && okNeurons === neurons.length) say(`  ✅ ${okNeurons} neuronas registradas`);
 
 // 2) Capacidad (§G.5) + pre-shard 90% + boot-budget
 head('\n2) Capacidad de neuronas (§G.5 · chars = unidad real de contexto):');
@@ -201,7 +226,7 @@ if (hasSwSection && swFile) {
         const nv = (s) => String(s).replace(/^v/, '');
         if (nv(vig) === nv(swVer)) ok(`05 cache vigente == SW ("${swVer}")`);
         else warn(`05 STALE: declara "${vig}" pero SW="${swVer}" → actualizar 05`);
-      } else info('05 sin "Cache version vigente" parseable');
+      } else if (!existsSync(join(DOCS, '.estado-auto.md'))) info('05 sin "Cache version vigente" parseable (y sin heartbeat §52 — en era-heartbeat el campo vive en el sidecar)');
     }
   }
 } else head('  ℹ️  sin service-worker o sin §4 — omitido');
@@ -221,25 +246,34 @@ if (!BOOT && existsSync(histPath) && indexPaths.length) {
 }
 const leccionesPath = join(DOCS, '30-LECCIONES.md');
 if (!BOOT && existsSync(leccionesPath)) {
-  const leccionesText = read(leccionesPath);
-  // Nodos HIJOS de lecciones (shards §G.5, ej. 31-LECCIONES-IA): sus defs L-/M-
-  // cuentan igual que las de 30 (la madre deja un puntero, la def vive en la hija).
-  const shardPath = join(DOCS, '31-LECCIONES-IA.md');
-  const shardText = existsSync(shardPath) ? read(shardPath) : '';
-  const leccionesAll = leccionesText + '\n' + shardText;
+  // v1.7: nodos HIJOS de lecciones (shards §G.5: 31-LECCIONES-IA, 32-LECCIONES-GIT, …).
+  // Sus defs `### L-NN` cuentan igual que las de la madre — 30 deja el puntero, la def vive
+  // en la hija. Mismo idioma que el índice shardeado (00[a-z]?-INDICE, línea ~132).
+  // Sin esto, shardear lecciones convierte cada def de la hija en ref COLGANTE (warn bloqueante).
+  const leccionesShards = readdirSync(DOCS).filter((f) => /^3[1-9]-LECCIONES.*\.md$/.test(f)).sort();
+  const leccionesText = [leccionesPath, ...leccionesShards.map((f) => join(DOCS, f))].map(read).join('\n');
   const cortoPath = join(DOCS, '10-MEMORIA-CORTO-PLAZO.md');
   const espacialPath = join(DOCS, '20-MEMORIA-ESPACIAL.md');
   const estadoPath = join(DOCS, '05-ESTADO-GLOBAL.md');
   const histText = existsSync(histPath) ? read(histPath) : '';
   const indiceText = indexPaths.length ? readIndex() : '';
-  const defined = new Set([...leccionesAll.matchAll(/^###\s+([LM]-\d{2})\b/gm)].map((m) => m[1]));
-  const allBrain = [claude, indiceText, existsSync(estadoPath) ? read(estadoPath) : '', leccionesAll, histText,
+  const defined = new Set([...leccionesText.matchAll(/^###\s+([LM]-\d{2})\b/gm)].map((m) => m[1]));
+  const allBrain = [claude, indiceText, existsSync(estadoPath) ? read(estadoPath) : '', leccionesText, histText,
     existsSync(cortoPath) ? read(cortoPath) : '', existsSync(espacialPath) ? read(espacialPath) : ''].join('\n');
   const referenced = new Set([...allBrain.matchAll(/\b([LM]-\d{2})\b/g)].map((m) => m[1]));
   const dangling = [...referenced].filter((r) => !defined.has(r)).sort();
   if (!referenced.size) info('sin refs L-NN/M-NN aún');
-  else if (!dangling.length) ok(`refs L-/M- (${referenced.size} usadas / ${defined.size} def) resuelven en 30/31`);
+  else if (!dangling.length) ok(`refs L-/M- (${referenced.size} usadas / ${defined.size} def) resuelven en 30${leccionesShards.length ? `+${leccionesShards.length} shard(s)` : ''}`);
   else warn(`refs L-/M- COLGANTES: ${dangling.join(', ')}`);
+  // 5c) Tombstones-lite (v1.3 §50): lección ⚰️ citada desde nodos VIVOS (99 puede: es historia).
+  const quarantined = new Set([...leccionesText.matchAll(/^###\s+([LM]-\d{2})\b[^\n]*⚰️/gm)].map((m) => m[1]));
+  if (quarantined.size) {
+    const liveText = [claude, existsSync(estadoPath) ? read(estadoPath) : '',
+      existsSync(cortoPath) ? read(cortoPath) : '', existsSync(espacialPath) ? read(espacialPath) : ''].join('\n');
+    const cited = [...quarantined].filter((id) => new RegExp(`\\b${id}\\b`).test(liveText)).sort();
+    if (cited.length) warn(`nodo VIVO cita lección ⚰️ cuarentenada: ${cited.join(', ')} → apuntar al reemplazo o retirar la cita`);
+    else ok(`${quarantined.size} lección(es) ⚰️ sin citas desde nodos vivos`);
+  }
 }
 if (BOOT) head('  ⏭️  5a/5b omitidas en --boot');
 const refDocs = new Set([...claude.matchAll(/docs\/([\w-]+\.md)/g)].map((m) => m[1]));
@@ -276,12 +310,7 @@ else if (existsSync(SKILLS_DIR) && existsSync(invPath)) {
     if (!catalogued) { warn(`skill '${d.name}' NO está en skills-inventory.md → catalogar (§G.4)`); uncat++; }
   }
   if (!uncat) ok(`${dirs.length} carpetas de skills/ catalogadas`);
-  // 6b) bidireccional: refs a skills inexistentes en el registry de lóbulos
-  const skillSet = new Set(dirs.map((d) => d.name));
-  const lobeSkillRefs = [...lobeRegistry.matchAll(/`([a-z][a-z0-9-]{3,})`/g)].map((m) => m[1])
-    .filter((s) => /-/.test(s) && !s.includes('.') && !s.includes('/'));
-  const ghost = [...new Set(lobeSkillRefs)].filter((s) => !skillSet.has(s) && !lobeRegistry.includes(`\`${s}\` (la skill`) && !lobeRegistry.includes(`(\`${s}\` retirada`));
-  if (ghost.length) info(`refs de skills en 40-LOBULOS que NO están en skills/ (verificar si son globales o fantasma): ${ghost.slice(0, 6).join(', ')}${ghost.length > 6 ? '…' : ''}`);
+  // (6b QUITADO en v1.3 — sentencia G-11: 0 señal en 3 auditorías, puro ruido.)
 } else if (existsSync(SKILLS_DIR)) {
   warn('skills/ existe pero docs/skills-inventory.md NO → crear el catálogo (§G.4)');
 } else head('  ℹ️  skills/ no existe — omitido');
@@ -319,6 +348,24 @@ else {
     }
   }
   if (!bad) ok(`archiveDir íntegro (${files.length} crudos indexados; anclas resuelven)`);
+  // 7b) Bóveda vía fs (M-03 §50): commits ≠ origin. Lo no-commiteado lo cubre session-handoff.
+  let vaultGit = archiveDir;
+  for (let i = 0; i < 4 && !existsSync(join(vaultGit, '.git')); i++) vaultGit = join(vaultGit, '..');
+  if (existsSync(join(vaultGit, '.git'))) {
+    const refSha = (name) => {
+      const direct = join(vaultGit, '.git', name);
+      if (existsSync(direct)) return read(direct).trim().slice(0, 40);
+      const packed = join(vaultGit, '.git', 'packed-refs');
+      if (existsSync(packed)) { const l = read(packed).split('\n').find((x) => x.endsWith(' ' + name)); if (l) return l.slice(0, 40); }
+      return null;
+    };
+    const headRef = (read(join(vaultGit, '.git', 'HEAD')).match(/ref:\s*(\S+)/) || [])[1];
+    const local = headRef ? refSha(headRef) : null;
+    const remote = headRef ? refSha(headRef.replace('refs/heads/', 'refs/remotes/origin/')) : null;
+    if (local && remote && local !== remote)
+      warn(`bóveda: HEAD local (${local.slice(0, 7)}) ≠ origin (${remote.slice(0, 7)}) → push pendiente (o pull si origin avanzó) — M-03`);
+    else if (local && remote) ok('bóveda: HEAD local == origin (respaldo remoto al día)');
+  }
 }
 
 // 8) SSoT — hecho duplicado fuera del nodo dueño [--full]
@@ -360,8 +407,8 @@ else if (existsSync(cortoP) && indexPaths.length) {
   if (!flagged) ok('tabla TODO del 10 sin filas ✅ ya consolidadas');
 }
 
-// 10) BFS huérfanas de 2º orden (grafo de ruteo) [--full]
-head('\n10) Huérfanas de 2º orden (alcanzables desde los nodos de ruteo):');
+// 10) Huérfanas (v1.3: fusiona el viejo #1): BFS 2º orden + registro DIRECTO de neuronas NN- [--full]
+head('\n10) Huérfanas (BFS de ruteo + registro directo de neuronas):');
 if (BOOT) head('  ⏭️  omitido en --boot');
 else {
   const allow = new Set(manifest.orphanAllowlist || []);
@@ -379,29 +426,19 @@ else {
     for (const m of fileText(cur).matchAll(edgeRe)) if (universe.includes(m[1]) && !reachable.has(m[1])) { reachable.add(m[1]); queue.push(m[1]); }
   }
   const orphans = universe.filter((f) => !reachable.has(f) && !allow.has(f));
-  if (!orphans.length) ok(`${universe.length} docs de docs/ alcanzables desde el grafo de ruteo`);
-  else warn(`huérfanas de 2º ORDEN (existen pero ningún nodo de ruteo llega a ellas): ${orphans.join(', ')} → conectar o allowlist con razón`);
+  if (orphans.length) warn(`huérfanas de 2º ORDEN (existen pero ningún nodo de ruteo llega a ellas): ${orphans.join(', ')} → conectar o allowlist con razón`);
+  // registro DIRECTO (regla §G.5 "si CLAUDE.md no la conoce, el cerebro está roto" — ex-#1):
+  let unregistered = 0;
+  for (const n of universe.filter((f) => /^\d{2}-/.test(f))) {
+    const isChildLobe = /^4[1-9]-/.test(n);
+    if (claude.includes(n)) continue;
+    if (isChildLobe && lobeRegistry.includes(n)) continue;
+    warn(`neurona ${n} sin registro DIRECTO en ${isChildLobe ? '40-LOBULOS' : 'CLAUDE.md §0'} (§G.5)`); unregistered++;
+  }
+  if (!orphans.length && !unregistered) ok(`${universe.length} docs alcanzables y neuronas registradas`);
 }
 
-// 11) Peer-hash del kernel ×N repos [--full]
-head('\n11) Peer-hash del kernel (byte-identidad ×repos):');
-if (BOOT) head('  ⏭️  omitido en --boot');
-else if (!Array.isArray(manifest.peers) || !manifest.peers.length) info('manifest sin peers — gate omitido');
-else {
-  const kernelFiles = manifest.kernelFiles || ['scripts/brain-check.mjs'];
-  let divergent = 0, absent = 0;
-  for (const peer of manifest.peers) {
-    const peerRoot = join(ROOT, peer);
-    if (!existsSync(peerRoot)) { absent++; continue; }
-    for (const kf of kernelFiles) {
-      const a = join(ROOT, kf), b = join(peerRoot, kf);
-      if (!existsSync(a) || !existsSync(b)) { info(`peer ${peer}: ${kf} ausente en un lado`); continue; }
-      if (sha(read(a)) !== sha(read(b))) { warn(`KERNEL DIVERGENTE: ${kf} difiere vs ${peer} → re-propagar desde el canon (cp + shasum -a 256)`); divergent++; }
-    }
-  }
-  if (absent) info(`${absent} peer(s) no clonado(s) en esta máquina — omitidos`);
-  if (!divergent) ok(`kernel byte-idéntico con los peers presentes (${(manifest.kernelFiles || []).join(', ') || 'brain-check.mjs'})`);
-}
+// (11 QUITADO v1.3: peer-hash warn no cazó 3 kernels divergentes; F1 = hash-gate BLOQUEANTE vs canónico.)
 
 // 12) Fechas stale en 05/10 [info · corre también en --boot]
 {
@@ -430,14 +467,19 @@ else {
   else {
     const specs = readdirSync(sd).filter((f) => f.endsWith('.md'));
     let noCk = 0, badTicks = 0;
-    const EVIDENCE = /§\d+|TODO-\d+|commit|`[^`]+`|docs\/|research-archive\/|https?:\/\/|SHA|hash|\d{4}-\d{2}-\d{2}/i;
+    // v1.3 §50: solo evidencia RESOLUBLE (ancla seguible); la vieja aceptaba backtick/fecha = tautológica.
+    const EVIDENCE = /§\d+|TODO-\d+|research-archive\/|docs\/[\w-]+\.md|specs\/[\w-]+\.md|https?:\/\/|\b[0-9a-f]{7,40}\b/;
     for (const s of specs) {
       const t = read(join(sd, s));
       if (!/^##+\s*.*Checklist/im.test(t)) { noCk++; continue; }
+      // v1.4.1 §51: agregar POR SPEC (no por tick) — 33 warns idénticos en un repo hermano eran
+      // ruido inaccionable; 1 warn con conteo + 1er ejemplo empuja igual y se LEE.
+      let n = 0, first = '';
       for (const l of t.split('\n')) {
         if (!/^\s*-\s*\[x\]/i.test(l)) continue;
-        if (!EVIDENCE.test(l)) { warn(`${s}: ítem tickeado SIN evidencia resoluble: "${l.trim().slice(0, 70)}…"`); badTicks++; }
+        if (!EVIDENCE.test(l)) { n++; if (!first) first = l.trim().slice(0, 60); }
       }
+      if (n) { warn(`${s}: ${n} ítem(s) tickeado(s) SIN evidencia resoluble (1º: "${first}…") → anclar §/TODO/ruta/URL/sha`); badTicks += n; }
     }
     if (!badTicks) ok(`ticks de checklist con evidencia en ${specs.length - noCk} spec(s) con checklist`);
     if (noCk) info(`${noCk} spec(s) sin sección "## Checklist" (los previos a la convención §173 — info)`);
@@ -450,12 +492,20 @@ else {
   if (da && da.last) {
     const days = Math.floor((new Date() - new Date(da.last)) / 86400000);
     let due = da.maxDays && days > da.maxDays ? `hace ${days} días (> ${da.maxDays})` : null;
+    let gap = 0;
     if (!BOOT && da.maxAdrGap && existsSync(histPath)) {
       const headers = (read(histPath).match(/^##\s+/gm) || []).length;
-      if (da.coveredHeaderCount && headers - da.coveredHeaderCount >= da.maxAdrGap)
-        due = (due ? due + ' y ' : '') + `${headers - da.coveredHeaderCount} ADRs nuevos (≥ ${da.maxAdrGap})`;
+      gap = da.coveredHeaderCount ? headers - da.coveredHeaderCount : 0;
+      if (gap >= da.maxAdrGap) due = (due ? due + ' y ' : '') + `${gap} ADRs nuevos (≥ ${da.maxAdrGap})`;
     }
-    if (due) info(`🔬 auditoría Nivel-2 VENCIDA: última ${da.last}, ${due} → correr skill auditoria-cerebro (§173)`);
+    // v1.6 F3 §53 (escalación con GRACIA — el nudge info se ignoró semanas; el warn BLOQUEA commits
+    // del cerebro vía pre-commit): vencida dentro de gracia (maxDays+7 / gap+6) = info; pasada = WARN.
+    const pastGrace = (da.maxDays && days > da.maxDays + 7) || (da.maxAdrGap && gap >= da.maxAdrGap + 6);
+    if (due && pastGrace) warn(`🔬 auditoría Nivel-2 MUY vencida (${due}; gracia agotada) → correr skill auditoria-cerebro / mantenimiento-general AHORA`);
+    else if (due) info(`🔬 auditoría Nivel-2 VENCIDA: última ${da.last}, ${due} → correr skill auditoria-cerebro (§173)`);
+    // v1.3 §50: la tabla de la auditoría debe EXISTIR (sin ella la Sonda 0 no puede diffear).
+    if (!BOOT && da.tableFile && archiveDir && existsSync(archiveDir) && !existsSync(join(archiveDir, da.tableFile)))
+      warn(`deepAudit.tableFile "${da.tableFile}" NO existe en archiveDir → la Sonda 0 de la próxima auditoría no tiene input`);
   } else info('manifest sin deepAudit — la auditoría Nivel-2 no tiene disparador (declararlo, §173)');
 }
 

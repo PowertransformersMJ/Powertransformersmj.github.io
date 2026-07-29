@@ -42,14 +42,14 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | 🗺️ **Espacial** | `docs/20-MEMORIA-ESPACIAL.md` | ❌ on-demand | Trigger de Desorientación: dónde vive un componente, flujos, schema de datos, hojas del dueño. |
 | 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` (+ hija `docs/31-LECCIONES-IA.md`) | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas (L-01..L-58 + M-01); el cluster IA/Claude-API/Cloud-Functions (L-35, L-43–L-48) vive en la hija `31` (shard §G.5). |
 | 🗂️ **Índice sináptico** | `docs/00-INDICE.md` | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |
-| 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un § (51 ADRs). NUNCA completo — usa offset/limit. |
+| 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un § (57 ADRs). NUNCA completo — usa offset/limit. |
+| 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-13 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
 | 🛰️ **Consejo Externo** | `docs/15-CONSEJO-EXTERNO.md` | ❌ on-demand | Trigger de Decisión Fuerte: crítica adversarial de un provider de OTRA familia (config + tiers ahí). |
 | 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` | ❌ on-demand | Trigger 🔵: registry de dominios; lóbulos hijos (`41-SEGURIDAD`, …, `49-PRUEBAS-ELECTRICAS.md`) nacen on-demand con contenido real. |
-| ⚡🔌 **Transformadores (equipo)** | `docs/50-TRANSFORMADORES-POTENCIA.md` | ❌ on-demand | Lóbulo de dominio del EQUIPO: tipo de transformador, grupo vectorial, cálculos nominales. (Nombre heredado del cerebro v1; NO es el `50-CONFIG-INFRA` de la convención del template.) |
+| ⚡🔌 **Transformadores (equipo)** | `docs/50-TRANSFORMADORES-POTENCIA.md` | ❌ on-demand | Lóbulo de dominio del EQUIPO: tipo de transformador, grupo vectorial, cálculos nominales. |
 | 🛠️ **Skills externas** | `~/.claude/skills/` + `skills/` + tool Skill | ❌ on-demand | Expertise portable de método. NO es neurona — recurso paralelo. **Catálogo → `docs/skills-inventory.md`**. |
 
-**Nodos opcionales** (nacen por neurogénesis §G.4 cuando haya contenido REAL, nunca vacíos):
-lóbulos hijos `41`–`48` (seguridad/legal/UX/SEO/perf/escalabilidad/copy/a11y) · `60-WORKFLOWS.md` (catálogo W-NN).
+**Nodos opcionales** (nacen por neurogénesis §G.4 cuando haya contenido REAL, nunca vacíos): lóbulos hijos `41`–`48` (seguridad/legal/UX/SEO/perf/escalabilidad/copy/a11y).
 
 **Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `20-ESPACIAL`.
 
@@ -73,7 +73,7 @@ NUNCA leas `docs/99-HISTORIAL-ADR.md` completo (muerte por contexto). En su luga
 - **Hosting / Deploy**: **GitHub Pages** user-page (`powertransformersmj.github.io`) auto-deploy de `main` vía `.github/workflows/pages.yml` · **Vercel** Hobby para `/api/*` · **Firebase** proyecto **`lordpowertransformersmj`** (Auth email/password + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Claude ejecuta los `firebase deploy` (targets: rules/indexes/storage/functions según lo tocado) anunciándolo en el MISMO turno (L-09). Detalle → hoja `DEPLOY-FUNCTIONS.md` vía `20-ESPACIAL`.
 - **Áreas del repo**: portal login `index.html` (login-first) · sitio interno `home.html` + `pages/*` (protegido por `session-guard`) · panel `admin/*` (rol `admin`) · `api/*` (Vercel) · `functions/` (CF). Roles: `admin` + `tecnico` (+ roles v2); fuente de verdad `/usuarios/{uid}` en Firestore. Detalle → `20-ESPACIAL`.
 - **Reglas del dueño (entrevista F3a, 2026-07-18)**: valida en cada commit (Claude presenta resumen claro de qué/por qué/riesgo); *"toma la mejor decisión enfocándote siempre en el objetivo"*; repo PÚBLICO con `docs/` público OK (cero secretos en el cerebro, siempre).
-- **Entorno**: macOS + zsh · raíz del repo `/Users/migueljimenez/Desktop/powertransformersmj.github.io`.
+- **Entorno**: macOS + zsh · **paraguas `~/Desktop/GitHub-MJ/`** (ecosistema: este repo + `brain-private/` hermana + carpetas de trabajo) · raíz del repo `~/Desktop/GitHub-MJ/powertransformersmj.github.io`. La hermandad `../brain-private` es ESTRUCTURAL: de ella cuelgan el `archiveDir` y el kernel canónico (ADR-058).
 
 Detalle profundo de cualquier subsistema → `docs/20-MEMORIA-ESPACIAL.md` + ADRs vía `docs/00-INDICE.md`.
 
@@ -92,7 +92,7 @@ Encabezado `## NN. ADR-NNN — <título>` + cita del cliente si reportó, y 7 pu
 
 ### Reglas git
 - **Política del dueño (F3a 2026-07-18, ADR-051 — reemplaza la regla anterior "el push lo hace el director")**: **Claude ejecuta commit + push + merge + TODOS los deploys.** Validación por commit: antes/al commitear, Claude presenta al Ingeniero un resumen claro (qué cambia, por qué, riesgo, rollback) — el Ingeniero no programa, así que sin jerga. Rama de trabajo `DESARROLLO-/-PROYECTO-MJ` → merge a `main` (producción). **NUNCA force-push a `main`.**
-- `git add` ESPECÍFICO (NUNCA `-A`/`.`), footer `Co-Authored-By: Claude Fable 5 <noreply@anthropic.com>`, commits separados por tipo (código vs cerebro), estilo `feat(area): desc`.
+- `git add` ESPECÍFICO (NUNCA `-A`/`.`), footer `Co-Authored-By: Claude <MODELO REAL que trabajó> <noreply@anthropic.com>` (Fable 5 / Opus 5 / … — firmar con otro es falsear la autoría, §3.3), commits separados por tipo (código vs cerebro), estilo `feat(area): desc`.
 - NUNCA `--amend`/`--no-verify`/`--no-gpg-sign` sin pedido explícito. NUNCA commitear secrets (`.env`, credenciales, service accounts, tokens) ni `.claude/settings.local.json` ni `Debug/` ni `450108/` (PDFs reales de cliente — repo público).
 - Al cerrar un pendiente, marcar su `TODO-NN` como ✅ + link al §X. Mantén este CLAUDE.md liviano.
 
@@ -147,10 +147,10 @@ Al iniciar una conversación nueva estás **estrictamente obligado** a leer SOLO
 ### G.2 — Triggers de Recuperación (Escalation Path)
 - **🔴 Error / Saturación**: si fallas **2 veces** con el mismo bug, DETENTE y lee el Largo Plazo (`00-INDICE` → tramo de `99`) buscando el § o un bug análogo ANTES de la 3ª solución (prohibido adivinar, §3.3). Loops/contexto saturado: consolida `10` (con 🚫 callejones) y ofrece relevo curado.
 - **🟡 Desorientación**: dudas de DÓNDE vive un componente/ruta/flujo → **Memoria Espacial** (`20`) antes de tocar.
-- **🧪 Experiencia**: ANTES de op riesgosa/repetitiva (deploy, mover archivos, tocar reglas/estructura) → **Memoria Procedimental** (`30`). Si un síntoma "te suena", ahí está la receta.
+- **🧪 Experiencia**: ANTES de op riesgosa/repetitiva (deploy, mover archivos, tocar reglas/estructura) → **Memoria Procedimental** (`30`) para el gotcha concreto, y **`60-WORKFLOWS`** para el PROCESO repetible (W-01..W-13). Si un síntoma "te suena", ahí está la receta.
 - **🟢 Historia**: "por qué" de una decisión o detalle de un § → Índice → Largo Plazo.
 - **🔵 Auditoría/Dominio**: análisis especializado (seguridad/legal/UX/SEO/perf/pruebas eléctricas/equipo) → (1) skill relevante (catálogo `docs/skills-inventory.md`); (2) `40-LOBULOS` / `49` / `50`; (3) neurogénesis del lóbulo con contenido REAL (§G.4); (4) capturar findings + qué skill usé.
-- **🛰️ Decisión Fuerte**: ANTES de algo caro de revertir (arquitectura/datos/seguridad/legal), usa las skills `proceso-decision-fuerte` + `comite-expertos` y considera el provider externo de `docs/15-CONSEJO-EXTERNO.md`. Documenta la decisión como ADR (si no hubo revisor externo, márcala como NO revisada externamente).
+- **🛰️ Decisión Fuerte**: ANTES de algo caro de revertir (arquitectura/datos/seguridad/legal) → **`60-WORKFLOWS` W-11** es el checklist CERRADO (cuando dispara: COMPLETO o no se aplicó); skills `proceso-decision-fuerte` + `comite-expertos` + provider externo de `docs/15`. Documenta la decisión como ADR (si no hubo revisor externo, márcala como NO revisada externamente).
 
 **Enrutamiento semántico**: ante una duda, NO escanees el cerebro. Ve al `docs/00-INDICE.md` (capa "síntoma → neurona").
 
@@ -161,15 +161,16 @@ La memoria fluye en una dirección: Corto Plazo → Largo Plazo. **Por cada tare
 
 ### G.4 — Sistema Autónomo de Auto-construcción (neuroplasticidad, bajo TU guía)
 Reflejos VINCULANTES que disparas con juicio durante el trabajo normal, **sin que el usuario los pida**:
-- **Captura**: TODO conocimiento reutilizable → su neurona ANTES de cerrar (bug/lección → `30`; arquitectura → `20`; WIP → `10`; decisión cerrada → `99` + `00`). **Deliberación cara de reproducir** (comité / workflow multi-agente) → CRUDO al `archiveDir` del manifest (bóveda privada) + SÍNTESIS con *callejones probados* ANTES de cerrar. **La bóveda se alimenta en el mismo cierre.**
-- **Reflejo de Caza-bugs (verificar el camino vivo, no solo el diff)**: al TOCAR o ROZAR un subsistema con estado observable por el usuario (render / listener / CRUD / flujo), recorre su comportamiento END-TO-END antes de cerrar, en especial las dos fronteras del estado-cero (crear el 1er ítem y verlo aparecer en vivo Y al recargar; borrar el último y ver colapsar limpio). 'Rozar' = mi diff cambia una entrada/salida/contrato O el estado compartido que otro subsistema lee, aunque no edite su archivo. Capacidad portátil: skill `caza-bugs`. [HONOR]
+- **Captura**: TODO conocimiento reutilizable → su neurona ANTES de cerrar (bug/lección → `30`; arquitectura → `20`; WIP → `10`; decisión cerrada → `99` + `00`). **Deliberación cara de reproducir** (comité / workflow multi-agente) → CRUDO al `archiveDir` del manifest (bóveda privada) + SÍNTESIS con *callejones probados* ANTES de cerrar. **La bóveda se alimenta Y SE COMMITEA en el mismo cierre** (y se pushea en cuanto tenga remoto): hoy vive en un solo disco, y el gate #7 es ciego a git.
+- **Reflejo de Caza-bugs (verificar el camino vivo, no solo el diff)**: al TOCAR o ROZAR un subsistema con estado observable por el usuario (render / listener / CRUD / flujo), recorre su comportamiento END-TO-END antes de cerrar, en especial las dos fronteras del estado-cero (crear el 1er ítem y verlo aparecer en vivo Y al recargar; borrar el último y ver colapsar limpio). 'Rozar' = mi diff cambia una entrada/salida/contrato O el estado compartido que otro subsistema lee, aunque no edite su archivo. Capacidad portátil: skill `caza-bugs`. **Escala a maquinaria pesada (comité/workflow/consejo) SOLO si es no-trivial o caro de revertir; NUNCA en lo trivial** — y siempre acotada y con Opus (orden del Ingeniero). [HONOR]
 - **Neurogénesis**: conocimiento reutilizable que no encaja y crecerá → crea `docs/NN-NOMBRE.md` + (1) fila en §0, (2) registro en `00`, (3) bitácora. Anti-fragmentación: si dudas, apéndalo.
 - **Frescura**: si mueves/creas/renombras/eliminas un componente/ruta/flujo → actualiza `20` en el MISMO cambio.
 - **Higiene = GC**: `10` es pizarra (caps en el manifest). Al cerrar tarea, si supera el cap → poda: consolida a `99`/`30`, recorta `10` al foco vivo. ⛔ Nunca volcar a `99` sin convertir en ADR.
 - **Auto-auditoría (arranque Y pre-cierre)**: corre **`npm run brain:check`**. Al arrancar: si reporta problemas o `05`/`10` viejos → arréglalos ANTES. Antes de cerrar/idle — PROACTIVO: barrido holístico (brain:check + frescura vs git real) → cerebro impecable para el próximo "tú".
 - **Auto-mejora / Autocrítica / Desafío Crítico**: llena vacíos; si el cerebro contribuyó a un error nombra el DEFECTO y corrígelo (`30 §Meta`); cuestiona reglas con EVIDENCIA verificable.
 - **Cierre (anti "lo documento después")**: una tarea NO está cerrada hasta verificar: ¿`10` refleja el progreso? ¿`05` si cambió la salud? ¿decisión → ADR en `99` + `00`? ¿lección → `30`? ¿cache bump §4 si aplica? ¿`brain:check` SANO? **¿hubo deliberación (comité/workflow)? → CRUDO + SÍNTESIS enlazados, o la tarea está INCOMPLETA.** Si falta algo, vuelve y hazlo.
-- **Catalogación de Skills**: skill nueva instalada → documéntala en `docs/skills-inventory.md` en el mismo cambio.
+- **Catalogación de Skills**: skill nueva instalada → documéntala en `docs/skills-inventory.md` en el mismo cambio. *Backstop: `brain:check` gate #6.*
+- **El KERNEL no se edita aquí** (`scripts/*.mjs` de `kernelFiles`): se edita en `../brain-private/kernel/`, se bumpea su `VERSION` y se reparte con **`npm run brain:pull`**. Tocarlo dentro del repo = gate #0 *"fork prohibido"* y pre-commit bloqueado. *Backstop: gate #0 (SHA-256 vs canónico).*
 
 **🛡️ Límite de guardián**: los reflejos ENRIQUECEN, nunca borran a la ligera. Eliminar/reescribir conocimiento histórico exige certeza verificada (§3.3). Ante la duda: **apendar, no sobrescribir; cuarentenar en `_legacy/`, no borrar.**
 
@@ -182,4 +183,4 @@ Cada neurona tiene un TOPE BLANDO (señal, no muro). Los caps reales (en **chars
 
 1. **Boot** (§G.1): `CLAUDE.md` + `05` + `10` + `brain:check` (hook); imprime signos vitales; pendientes = TODO-NN.
 2. **Antes de tocar código**: IAP §3.4 · triggers §G.2. **Antes de commit**: §2 (política git F3a: Claude commitea/pushea/mergea, validando con el Ingeniero). **Tras CADA tarea**: §G.4 + cache bump §4 (si aplica).
-3. **Entorno**: macOS + zsh · raíz `/Users/migueljimenez/Desktop/powertransformersmj.github.io` · dueño: el Ingeniero (Miguel Jimenez).
+3. **Entorno y dueño** → §1 (no se repiten aquí: SSoT §G.3).

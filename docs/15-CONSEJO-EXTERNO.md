@@ -12,26 +12,47 @@
 
 ## §0 — MODELO EXTERNO ACTIVO
 
-**Provider activo**: **ChatGPT — familia GPT-5** (el director tiene acceso a
-`GPT-5.5`, `GPT-5.4`, `GPT-5.3`, `GPT-5.2` y `GPT-5-mini`). Otra familia que
-Claude → red team legítimo (sesgos distintos).
+**Provider activo**: **Gemini (Google) vía Antigravity** — familia distinta a Claude
+(Google DeepMind vs Anthropic: otro corpus, otro entrenamiento, otros puntos ciegos)
+→ red team legítimo.
 
 **Cómo llega la respuesta**:
-- [x] Manual: el director pega el prompt en ChatGPT y me trae la respuesta.
-- [ ] Vía MCP / tool: n/a (sin cableado de tool).
+- [x] Manual: el Ingeniero pega el prompt en Antigravity y me trae la respuesta.
+- [ ] Vía CLI / MCP: **n/a — verificado 2026-07-28**: no existe binario `antigravity`
+  ni `gemini` en el PATH, y `~/.gemini/config/mcp_config.json` está vacío (0 bytes).
+  Cualquier plan que asuma `antigravity --prompt …` es ficción.
 
-**Última verificación de disponibilidad**: `2026-06-04`.
+**Última verificación de disponibilidad**: `2026-07-28` (app instalada, onboarding
+completo, en ejecución). ⚠️ **Paso operativo previo al primer consejo**: abrir la carpeta
+del repo como **workspace en Antigravity** — hoy no hay ninguno registrado, y sin eso el
+prompt "apunta a rutas reales" no resuelve nada.
 
-**Mapeo de tiers a la familia GPT-5 disponible** (detalle en §3):
-- **TOP (High)** → `GPT-5.5` (el más capaz para arquitectura / seguridad / legal).
-- **TOP (Medium)** → `GPT-5.4` / `GPT-5.3` / `GPT-5.2` (2ª opinión sólida acotada).
-- **Fast** → `GPT-5-mini` (sanity-check rápido, generar alternativas).
+> **Historia (§G.4, apendar no reescribir)**: este nodo declaró ChatGPT/GPT-5 desde
+> 2026-06-04, y el ADR §52.14 (2026-07-22) registró *"el Ingeniero no tiene Gemini"*.
+> Ambos quedan **superados por hecho** el 2026-07-28 (ADR-058). El propio §6 de este nodo
+> previó este escenario por nombre: *"si el usuario consigue Antigravity, actualizar §0"*.
 
-> Si en una sesión futura el director pierde acceso a ChatGPT: el Trigger 🛰️ degrada a
-> "marcar la decisión como NO revisada externamente" + considerar la skill
-> **`llm-council`** como sustituto parcial. El protocolo de §4 sigue siendo útil para
-> estructurar mi propio análisis adversarial interno. Actualizar esta §0 en el mismo
-> cambio (Reflejo de Frescura §G.4).
+**Si algún día no hay provider externo**: el Trigger 🛰️ degrada a *"marcar la decisión como
+NO revisada externamente"* en el ADR + skill **`asesor-critico-honesto`** como sustituto
+parcial (la skill `proceso-decision-fuerte §128` declara ESE fallback; antes aquí decía
+`llm-council` — reconciliado el 2026-07-28 para no tener dos fallbacks divergentes).
+
+## §0b — Qué modelo pedir dentro de Antigravity
+
+> ✅ **CONFIRMADO por el Ingeniero (2026-07-28)**: su menú de Antigravity es **el mismo** del
+> ecosistema de origen, así que la tabla aplica con nombres reales. Sigue siendo un **HECHO
+> CADUCABLE tipo L-30** (los menús de modelos cambian solos): re-mirarlo al usarlo y corregir
+> aquí en el mismo cambio.
+>
+> **Regla madre**: el valor está en la OTRA FAMILIA. Cada prompt al Ingeniero **nombra el modelo**.
+
+| Modelo del menú | Cuándo pedirlo |
+|---|---|
+| **Gemini 3.1 Pro (High)** | ⭐ **DEFAULT de Decisión Fuerte**: crítica adversarial PROFUNDA (arquitectura, schema, `firestore.rules`, criterio normativo, op irreversible). Es el que más razona; que sea lento da igual, se corre una vez. |
+| **Gemini 3.6 Flash (High)** | Barridos AMPLIOS donde pesa el volumen más que la profundidad (revisar muchos archivos, checklist largo, 2ª pasada sobre algo ya criticado). Fallback si el 3.1 Pro no está disponible. |
+| Gemini 3.6/3.5 Flash (Medium/Low) · 3.1 Pro (Low) | 🚫 NO para el consejo: la crítica barata ya la da el comité interno ×3; una 2ª opinión débil **ancla sin aportar**. |
+| Claude Sonnet / Opus (Thinking) del menú | ⛔ **MISMA familia que yo** → no cuenta como consejo externo: comparte sesgos de entrenamiento, sería espejo y no adversario. |
+| **GPT-OSS 120B (Medium)** | **3ª familia** (OpenAI open-weights): solo para **DESEMPATE** cuando el comité interno y Gemini divergen de frente. Modelo pequeño → su voto pesa MENOS y se verifica doble (§3.3). Jamás árbitro único de arquitectura. |
 
 ---
 
@@ -56,7 +77,7 @@ Acceso a un modelo de otra familia (no-Claude) como **segunda opinión adversari
 
 **NO (no malgastar tokens):**
 - Trabajo rutinario, mecánico o **reversible** (fixes con RCA claro, edits triviales).
-- **Hechos/código de NUESTRO repo** → el modelo externo no ve el código ni el cerebro; alucina. Eso lo verifico YO leyendo código (`CLAUDE.md §3.3`). Sirve solo para **juicio/estrategia/tradeoffs**.
+- **Lo rutinario en general** → el comité interno ×3 basta. ⚠️ **CORREGIDO 2026-07-28**: antes esta línea decía que el modelo externo "no ve el código ni el cerebro; alucina". **Es falso con Antigravity**: SÍ ve el repo y el cerebro locales (solo-lectura), así que PUEDE revisar código y reglas reales. El motivo de no usarlo en lo rutinario es que el ida y vuelta manual no se amortiza — **no** que invente. Aun así verifico YO cada afirmación (`CLAUDE.md §3.3`): el mayor salto de valor del ecosistema hermano se desbloqueó justo al corregir este error.
 - Cuando los **tokens estén bajos** → guardarlos para lo grande (§5).
 
 ### §2.2 — Decisiones de ESTE proyecto que disparan 🛰️
@@ -123,27 +144,43 @@ Acceso a un modelo de otra familia (no-Claude) como **segunda opinión adversari
 
 **Principio rector**: el costo del modelo escala con el costo de equivocarse (reversibilidad).
 
-| Tier | Cuándo lo elijo | Modelo a usar (provider activo §0 = familia GPT-5) |
+| Tier | Cuándo lo elijo | Modelo a usar (provider activo §0 = Gemini vía Antigravity) |
 |---|---|---|
-| **TOP (High)** | Decisión TOP: arquitectura/modelo de datos caro de revertir, seguridad/legal, op irreversible, fork duro | **`GPT-5.5`** (el más capaz disponible) |
-| **TOP (Medium)** | Decisión importante pero acotada; 2ª opinión sólida sin gastar al máximo | **`GPT-5.4`** · `GPT-5.3` · `GPT-5.2` |
-| **Fast** | Sanity-check rápido, "¿se me escapó algo obvio?", generar alternativas, crítica ligera | **`GPT-5-mini`** |
+| **TOP** | Decisión TOP: arquitectura/modelo de datos caro de revertir, seguridad, normativa, op irreversible, fork duro | **Gemini Pro, tier alto** (§0b) |
+| **Amplio** | Barrido de volumen: muchos archivos, checklist largo, 2ª pasada sobre algo ya criticado | **Gemini Flash, tier alto** (§0b) |
+| **Desempate** | Comité interno y Gemini divergen de frente | 3ª familia (§0b), voto de menor peso |
 
-Regla simple: **irreversible/caro → `GPT-5.5`** · **importante/acotado → `GPT-5.4/5.3/5.2`** · **rápido/barato → `GPT-5-mini`**.
+Regla simple: **irreversible/caro → Gemini Pro alto** · **volumen → Flash alto** · **tiers bajos → 🚫 no se usan**.
 
 > 💡 Para arquitectura/seguridad de este proyecto (cambios en `firestore.rules`, schema,
-> motor de HI), elegir siempre `GPT-5.5`. El costo de equivocarse (backend abierto,
-> desalineación normativa, migración irreversible) justifica el tier máximo.
+> motor de HI), elegir siempre el tier máximo. El costo de equivocarse (backend abierto,
+> desalineación normativa, migración irreversible) lo justifica.
 >
-> 💡 Como el contexto del repo NO viaja al modelo externo (§6), el prompt debe ser
-> autocontenido y citar la norma relevante (MO.00418, CREG 085/2018, IEEE C57.91) cuando
-> la decisión dependa de ella — el modelo no la conoce a nivel de detalle del proyecto.
+> 💡 El repo local **sí** es visible para Antigravity (§0), así que el prompt **apunta a rutas
+> y archivos reales** en vez de pegar código a mano. Lo que NO ve es lo que no está en disco:
+> el **MO.00418 es interno y no público** → cuando la decisión dependa de él, el criterio
+> concreto va TRANSCRITO en el prompt. Nunca dejar que lo "recuerde": lo inventaría.
 
 ---
 
 ## §4 — Mecánica del consejo
 
-1. **Marco la decisión** como 🛰️ "vale consejo externo" + elijo el tier (§3) + te entrego un **prompt autocontenido** (el modelo externo no tiene memoria de nuestro trabajo → todo el contexto va en el prompt).
+**§4.0 — ENTREGA: el prompt va SIEMPRE en el CHAT, en bloque copiable.** Archivarlo en la
+bóveda es para el cerebro; **dárselo es para ti**. Jamás mandarte a abrir una carpeta a buscar
+un archivo: el archivo es el respaldo, NO el canal de entrega. *(Práctica adoptada del
+ecosistema hermano, donde nació como regla de su dueño; aquí se adopta por criterio propio.)*
+
+**§4.0b — Son 3 RONDAS, no una consulta.** Una sola pasada es la forma barata de que el
+consejo suene seguro y esté mal:
+- **R1 — ojos frescos**: le doy el problema CRUDO, sin mi postura (anti-anclaje).
+- **R2 — debate**: le muestro qué le refuto y por qué. Aquí es donde razona de verdad.
+- **R3 — caza de regresiones**: sobre el texto/diseño final, con el registro de cambios.
+- **Cierre**: cuando una ronda no produzca ningún hallazgo CRÍTICO ni MAYOR confirmado.
+
+> Costo real: 3 rondas = ~6 viajes manuales tuyos. Por eso el disparador se mantiene
+> ESTRECHO (§2.2/§2.3) — el consejo externo no es para lo rutinario.
+
+1. **Marco la decisión** como 🛰️ "vale consejo externo" + elijo el tier (§3) + te entrego un **prompt autocontenido** (el modelo externo no tiene memoria de nuestro trabajo → el contexto va en el prompt, y las rutas del repo se citan porque sí las puede leer).
 2. **Anti-anclaje**: en las decisiones TOP, **fijo MI postura primero** y la omito del prompt; así el modelo externo no me ancla y comparo después. En las ligeras, el orden no importa.
 3. Me pegas la respuesta → la trato como **peer review**: adopto lo correcto, **refuto con razones** lo erróneo, **sintetizo** una postura más fuerte, y te digo explícito **qué cambié y qué descarté**.
 4. **El resultado** (decisión final + qué aportó/cambió el modelo externo) queda en el **ADR/lección** correspondiente → el cerebro recuerda el porqué.
@@ -175,8 +212,30 @@ Sé concreto y breve.
 
 ## §6 — Límites duros
 
-- El modelo externo **no ve** nuestro código/cerebro → todo contexto va en el prompt; **jamás** usarlo para verificar hechos del repo.
+- 🚫 **ANTIGRAVITY NUNCA EDITA ESTE REPO.** Es un IDE agéntico: *puede* editar. Aquí es
+  consejero de **SOLO-LECTURA** — recibe únicamente prompts de **CRÍTICA** (preguntas,
+  hallazgos), JAMÁS tareas de implementación. **Ellos asesoran; quien delibera, decide,
+  implementa, commitea y pushea soy yo.** Anti-patrón concreto: no entregarte mensajes de
+  implementación sueltos (ni mensajes de commit) que, pegados ahí, le abran la puerta a
+  editar en paralelo → dos agentes colisionando sobre el mismo árbol de trabajo.
+- ⚠️ **Ve el repo, pero puede equivocarse igual.** Evidencia propia, no doctrina prestada:
+  los model IDs que propuso Antigravity (`claude-4-8-opus`, `claude-4-6-sonnet`,
+  `claude-3-5-sonnet-20241022`) eran **inválidos** y habrían dado 404/400 (`99 §77`).
+  Verifico cada afirmación contra el código real (§3.3). **Insumo, NUNCA oráculo.**
 - Es **insumo de juicio**, no autoridad: una crítica que esté mal **se refuta**, no se acata.
-- **Misma familia ≠ red team**: pedir 2ª opinión a otro Claude (mismo provider) NO cuenta — mismos sesgos. Solo cuenta otra familia (Gemini/GPT/Mistral/Llama/etc.) o la skill `llm-council` que ya combina varios.
+- **Misma familia ≠ red team**: pedir 2ª opinión a otro Claude (mismo provider) NO cuenta — mismos sesgos, sería espejo. Solo cuenta otra familia (Gemini/GPT/Mistral/Llama/etc.).
 - Si el protocolo lleva tiempo sin usarse y no aporta, **revisarlo** (Reflejo de Desafío Crítico `CLAUDE.md §G.4`) — un protocolo muerto es deuda.
-- Si el provider activo cambia (el usuario consigue Antigravity, pierde acceso a ChatGPT Pro, etc.), **actualizar §0** en el mismo cambio (Reflejo de Frescura).
+- Si el provider activo cambia (se pierde Antigravity, aparece un CLI/MCP que permita automatizarlo, cambia el menú de modelos), **actualizar §0 y §0b** en el mismo cambio (Reflejo de Frescura). Esta regla ya se cumplió una vez: predijo por nombre la llegada de Antigravity y disparó la actualización del 2026-07-28.
+
+---
+
+## §7 — Qué NO se puede automatizar (dicho sin rodeos)
+
+- **No hay forma de invocar Antigravity desde Claude Code.** Sin binario en el PATH, sin MCP
+  cableado, sin API local. El humano en el medio **no es una elección de diseño: es la única
+  opción**. Verificado 2026-07-28.
+- El flujo real es: yo redacto el prompt → lo imprimo en el chat en bloque copiable → tú lo
+  pegas en Antigravity → me traes la respuesta → yo la verifico afirmación por afirmación.
+- **Lo único que sí automatizo es el archivado**: el crudo de cada ronda va al `archiveDir`
+  (`../brain-private/sgm-transpower/research-archive/`) + la síntesis enlazada, antes de cerrar
+  (§G.4). Eso no depende de ti.
