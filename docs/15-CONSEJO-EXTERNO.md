@@ -39,20 +39,20 @@ parcial (la skill `proceso-decision-fuerte §128` declara ESE fallback; antes aq
 
 ## §0b — Qué modelo pedir dentro de Antigravity
 
-> ⚠️ **HECHO CADUCABLE — NO VERIFICADO EN ESTA MAC.** Tabla portada del ecosistema hermano
-> (menú visto allí el 2026-07-23; sus propios repos ya no coinciden entre sí). Desde disco el
-> modelo activo es opaco (`MODEL_PLACEHOLDER_M16`). **Confirmar el menú real al primer uso y
-> corregir esta tabla en el mismo cambio** (Reflejo de Frescura) — si no, es una mentira de boot.
+> ✅ **CONFIRMADO por el Ingeniero (2026-07-28)**: su menú de Antigravity es **el mismo** del
+> ecosistema de origen, así que la tabla aplica con nombres reales. Sigue siendo un **HECHO
+> CADUCABLE tipo L-30** (los menús de modelos cambian solos): re-mirarlo al usarlo y corregir
+> aquí en el mismo cambio.
 >
 > **Regla madre**: el valor está en la OTRA FAMILIA. Cada prompt al Ingeniero **nombra el modelo**.
 
 | Modelo del menú | Cuándo pedirlo |
 |---|---|
-| **Gemini Pro (tier alto)** | ⭐ **DEFAULT de Decisión Fuerte**: crítica adversarial PROFUNDA (arquitectura/datos/seguridad/normativa). Que sea lento no importa: se corre una vez. |
-| **Gemini Flash (tier alto)** | Barridos AMPLIOS donde el volumen pesa más que la profundidad (muchos archivos, checklist largo, 2ª pasada). Fallback si el Pro no está. |
-| Cualquier Flash/Pro en tier bajo o medio | 🚫 NO para el consejo: la crítica barata ya la da el comité interno ×3; una 2ª opinión débil **ancla sin aportar**. |
-| Claude (Sonnet/Opus) del menú | ⛔ **MISMA familia que yo** → no cuenta como consejo externo: sería espejo, no adversario. |
-| Un modelo de una **3ª familia** (p. ej. GPT-OSS) | Solo para **DESEMPATE** cuando el comité interno y Gemini divergen de frente. Modelo pequeño → su voto pesa menos y se verifica doble (§3.3). Jamás árbitro único. |
+| **Gemini 3.1 Pro (High)** | ⭐ **DEFAULT de Decisión Fuerte**: crítica adversarial PROFUNDA (arquitectura, schema, `firestore.rules`, criterio normativo, op irreversible). Es el que más razona; que sea lento da igual, se corre una vez. |
+| **Gemini 3.6 Flash (High)** | Barridos AMPLIOS donde pesa el volumen más que la profundidad (revisar muchos archivos, checklist largo, 2ª pasada sobre algo ya criticado). Fallback si el 3.1 Pro no está disponible. |
+| Gemini 3.6/3.5 Flash (Medium/Low) · 3.1 Pro (Low) | 🚫 NO para el consejo: la crítica barata ya la da el comité interno ×3; una 2ª opinión débil **ancla sin aportar**. |
+| Claude Sonnet / Opus (Thinking) del menú | ⛔ **MISMA familia que yo** → no cuenta como consejo externo: comparte sesgos de entrenamiento, sería espejo y no adversario. |
+| **GPT-OSS 120B (Medium)** | **3ª familia** (OpenAI open-weights): solo para **DESEMPATE** cuando el comité interno y Gemini divergen de frente. Modelo pequeño → su voto pesa MENOS y se verifica doble (§3.3). Jamás árbitro único de arquitectura. |
 
 ---
 

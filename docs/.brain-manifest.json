@@ -34,8 +34,8 @@
   "_orphanAllowlistRazon": "Sidecars escritos por HOOK (session-handoff.mjs --boot-echo), gitignored, efimeros: handoff-auto (foto de sesion), estado-auto (heartbeat) y boot-marker (canario que valida boot-gate). Su ruta de lectura es el hook SessionStart, no el grafo de neuronas; ademas el gate #10 no puede alcanzarlos por diseno (su regex exige empezar por \\w, y estos empiezan por punto).",
   "peers": [],
   "_peersRazon": "Vacio A PROPOSITO: no hay repos hermanos con cerebro todavia. Ademas el gate #11 (peer-hash) fue retirado en el kernel v1.3 y sustituido por el gate #0 (identidad contra el canonico), que es bloqueante y no necesita peers.",
-  "lastOffsiteBackup": "",
-  "_lastOffsiteBackupRazon": "La boveda ../brain-private NO tiene remoto: existe en un solo disco. Mientras este vacio, el banner 'EN CRISTIANO' del handoff avisara 'Copia de seguridad externa: NUNCA hecha'. Es verdad y debe doler hasta que se cree el repo privado.",
+  "lastOffsiteBackup": "NINGUNA",
+  "_lastOffsiteBackupRazon": "DECISION DEL INGENIERO 2026-07-28 (ADR-059): la boveda es de uso LOCAL, sin repo remoto. El sentinel 'NINGUNA' (kernel v1.8.0) le dice al banner que esto es una decision tomada, no una tarea pendiente — asi no queda una alarma permanente que nadie atendera y que taparia a las que si importan. El banner sigue diciendo el HECHO: la boveda vive en UNA sola copia. Verificado el mismo dia: Time Machine SIN destinos configurados, o sea que no hay ninguna otra copia en la maquina. Si algun dia se hace una copia real (disco externo), poner aqui su fecha ISO y el banner vuelve a vigilar la frescura.",
   "ssotFacts": [
     {
       "regex": "kernel v1\\.\\d+\\.\\d+",

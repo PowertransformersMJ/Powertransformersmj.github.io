@@ -49,8 +49,6 @@
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |
 | **TODO-02/03** | Tipificar S03-S06 contrato 4125000143 (`scripts/migrate/tipificar-suministros-fan-db.js`, dryRun) · flujo runtime FN-063 vs FN-050 (contrato 4123000081). | 🔮 |
-| **TODO-29** | 🔴 **La bóveda `../brain-private` no tiene remoto**: existe en UN disco, con material real de cliente (contratos, xlsm de suministros) y el kernel canónico. Crear repo **PRIVADO** en GitHub (decisión + cuenta del Ingeniero: es publicar en una cuenta, aunque sea privada) → luego llenar `lastOffsiteBackup` en el manifest y el banner deja de avisar. | 🔲 del Ingeniero |
-| **TODO-30** | Confirmar el **menú real de modelos de Antigravity** al primer consejo externo y corregir `15 §0b` en el mismo cambio (hoy es tabla portada, NO verificada en esta Mac). | 🔲 |
 
 ---
 

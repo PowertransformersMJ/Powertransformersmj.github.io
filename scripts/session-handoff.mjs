@@ -65,13 +65,18 @@ const heartbeat = () => {
   // 🧭 Banner EN CRISTIANO (F3 §53 — primer entregable visible para el dueño; el calendario vive
   // en el tool, no en el humano: cuando algo dice TOCA, un mensaje suyo dispara el mantenimiento).
   const dias = (iso) => Math.floor((Date.now() - new Date(iso)) / 86400000);
-  const backup = manifest.lastOffsiteBackup ? dias(manifest.lastOffsiteBackup) : null;
+  // v1.8: `lastOffsiteBackup` admite 3 estados, no 2. Antes, "sin fecha" = "NUNCA hecha ⚠️" para
+  // siempre — y un aviso que el dueño YA decidió no atender deja de ser aviso y pasa a ser ruido
+  // que tapa a los que sí importan. El sentinel "NINGUNA" distingue DECIDIDO de PENDIENTE, sin
+  // mentir: sigue diciendo que hay una sola copia (que es el hecho), pero no pide una acción muerta.
+  const backupOptOut = String(manifest.lastOffsiteBackup || '').toUpperCase() === 'NINGUNA';
+  const backup = !backupOptOut && manifest.lastOffsiteBackup ? dias(manifest.lastOffsiteBackup) : null;
   const da = manifest.deepAudit || {};
   const audDias = da.last ? dias(da.last) : null;
   const audToca = audDias != null && da.maxDays && audDias > da.maxDays;
   lines.push('', '🧭 EN CRISTIANO (para el dueño):',
     `   · Mantenimiento del cerebro: ${costoPct != null ? costoPct + '% del trabajo del mes (meta: menos del 30%)' : 'sin medir aún'}${costoPct > 30 ? ' 🔴' : ''}`,
-    `   · Copia de seguridad externa: ${backup != null ? `hace ${backup} día(s)${backup > 35 ? ' ⚠️ TOCA renovarla' : ' ✅'}` : '⚠️ NUNCA hecha'}`,
+    `   · Copia de seguridad externa: ${backupOptOut ? 'ninguna, por decisión del dueño — la bóveda vive en UNA sola copia' : backup != null ? `hace ${backup} día(s)${backup > 35 ? ' ⚠️ TOCA renovarla' : ' ✅'}` : '⚠️ NUNCA hecha'}`,
     `   · Revisión profunda del cerebro: ${audDias != null ? (audToca ? `⚠️ TOCA (última hace ${audDias} días)` : `al día (hace ${audDias} días)`) : '⚠️ nunca'}${audToca || (backup != null && backup > 35) ? ' → di: "haz el mantenimiento mensual"' : ''}`);
   return lines.join('\n');
 };
