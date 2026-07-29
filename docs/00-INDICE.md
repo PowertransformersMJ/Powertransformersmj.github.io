@@ -68,6 +68,7 @@
 | §54 | ADR-054 — Fix sistémico del shell (TODO-16, cazado en validación VIVA): evento `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin (doble dispatch) + override AQUA dejaba 6 modales legacy pegados abiertos (`:not(.open):not(.on)`) | 1054 |
 | §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación (re-atribuciones: 50 mA→práctica, DRM→fabricante, collar→Doble TDRB) · TODO-07 bóveda git | 1072 |
 | §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado vivo: 212 activos, 6 evaluados/206 sin dato; corrección §3.3: los 6 evaluados eran TX-DEMO del seed, no reales — limpiar | 1090 |
+| §57 | ADR-057 — Importador del Excel real Salud de Activos + MO.00418 Ed.02 ratificado tabla por tabla: eval_dga = promedio(TDGC,CO,CO₂,C₂H₂), CRG = % oficial Planificación AT, HER = calif 1-5 de inspección, guard omitidos; dry-run 208/213, coincidencias ≥93-100%; CONDICION Excel = trunc(HI)+juicio experto ~38 | 1104 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
