@@ -73,7 +73,7 @@ NUNCA leas `docs/99-HISTORIAL-ADR.md` completo (muerte por contexto). En su luga
 - **Hosting / Deploy**: **GitHub Pages** user-page (`powertransformersmj.github.io`) auto-deploy de `main` vía `.github/workflows/pages.yml` · **Vercel** Hobby para `/api/*` · **Firebase** proyecto **`lordpowertransformersmj`** (Auth email/password + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Claude ejecuta los `firebase deploy` (targets: rules/indexes/storage/functions según lo tocado) anunciándolo en el MISMO turno (L-09). Detalle → hoja `DEPLOY-FUNCTIONS.md` vía `20-ESPACIAL`.
 - **Áreas del repo**: portal login `index.html` (login-first) · sitio interno `home.html` + `pages/*` (protegido por `session-guard`) · panel `admin/*` (rol `admin`) · `api/*` (Vercel) · `functions/` (CF). Roles: `admin` + `tecnico` (+ roles v2); fuente de verdad `/usuarios/{uid}` en Firestore. Detalle → `20-ESPACIAL`.
 - **Reglas del dueño (entrevista F3a, 2026-07-18)**: valida en cada commit (Claude presenta resumen claro de qué/por qué/riesgo); *"toma la mejor decisión enfocándote siempre en el objetivo"*; repo PÚBLICO con `docs/` público OK (cero secretos en el cerebro, siempre).
-- **Entorno**: macOS + zsh · raíz del repo `/Users/migueljimenez/Desktop/powertransformersmj.github.io`.
+- **Entorno**: macOS + zsh · **paraguas `~/Desktop/GitHub-MJ/`** (ecosistema: este repo + `brain-private/` hermana + carpetas de trabajo) · raíz del repo `~/Desktop/GitHub-MJ/powertransformersmj.github.io`. La hermandad `../brain-private` es ESTRUCTURAL: de ella cuelgan el `archiveDir` y el kernel canónico (ADR-058).
 
 Detalle profundo de cualquier subsistema → `docs/20-MEMORIA-ESPACIAL.md` + ADRs vía `docs/00-INDICE.md`.
 
@@ -182,4 +182,4 @@ Cada neurona tiene un TOPE BLANDO (señal, no muro). Los caps reales (en **chars
 
 1. **Boot** (§G.1): `CLAUDE.md` + `05` + `10` + `brain:check` (hook); imprime signos vitales; pendientes = TODO-NN.
 2. **Antes de tocar código**: IAP §3.4 · triggers §G.2. **Antes de commit**: §2 (política git F3a: Claude commitea/pushea/mergea, validando con el Ingeniero). **Tras CADA tarea**: §G.4 + cache bump §4 (si aplica).
-3. **Entorno**: macOS + zsh · raíz `/Users/migueljimenez/Desktop/powertransformersmj.github.io` · dueño: el Ingeniero (Miguel Jimenez).
+3. **Entorno**: macOS + zsh · raíz `~/Desktop/GitHub-MJ/powertransformersmj.github.io` (hermana `../brain-private`) · dueño: el Ingeniero (Miguel Jimenez).
