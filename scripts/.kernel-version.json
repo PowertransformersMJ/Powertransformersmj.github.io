@@ -1,0 +1,12 @@
+{
+  "version": "1.7.0",
+  "date": "2026-07-29",
+  "files": {
+    "brain-check.mjs": "a2ffcf4cf0d52647ab0f109e68c0dc3a6c3fc72105a9023f21e83f24a554b4b3",
+    "brain-diff.mjs": "3b99d025e23109019d68898ba9c020ef6d98ffccd01bb9aba5357f57ab191e08",
+    "brain-index.mjs": "cafcab9e57fd5659ac845917e4ad77449a3303ded65a1adb23ae3c909b518b8d",
+    "session-handoff.mjs": "f3a80e7536a75144b2082c0d0b9f504cda7a0db734018244f7c0e49fe19b62db",
+    "boot-gate.mjs": "7a1a45eb0f09a0957468ecd4784ce7eb3753b928b28ead8dcac9fb1dfda82ea8",
+    "brain-archive.mjs": "2490c1d354881b6d2e33e78fb80f36c7c26b39f4e01a8ac9f64a5f9e33f2e9f8"
+  }
+}

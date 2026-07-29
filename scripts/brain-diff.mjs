@@ -55,7 +55,7 @@ for (const d of dirs) {
   console.log(`  ${d.name}${d.name === me ? ' (este)' : ''}${ignored}`);
   console.log(`     CLAUDE.md: ${hasClaude ? '✅' : '❌ SIN CEREBRO'} · template: ${version} · manifest: ${hasManifest} · kernel: ${kernel}`);
 
-  if (!hasClaude) todos.push(`| TODO-XX | 🧠 Repo \`${d.name}\` SIN cerebro → instalar con la receta INSTALACION-FABLE.md del brain-kit | 🔲 | decisión cliente |`);
+  if (!hasClaude) todos.push(`| TODO-XX | 🧠 Repo \`${d.name}\` SIN cerebro → instalar con la receta \`INSTALACION-CEREBRO.md\` del canon (bersaglio) | 🔲 | decisión cliente |`);
   else if (version === 'SIN marcador') todos.push(`| TODO-XX | 🧠 \`${d.name}\`: CLAUDE.md sin marcador de versión del template → añadir línea 1 | 🔲 | — |`);
   if (kernel === '⚠️ DIVERGE') todos.push(`| TODO-XX | 🧠 \`${d.name}\`: kernel brain-check.mjs DIVERGE del de ${me} → re-propagar desde el canon | 🔲 | — |`);
 }

@@ -64,8 +64,12 @@ ui-debug.log*
 # las consulte, pero NO se commitean (el user-page es público).
 450108/
 
-# 🧠 Cerebro — handoff automático de sesión (efímero, nunca al repo)
+# 🧠 Cerebro — sidecars efímeros escritos por los hooks de sesión (nunca al repo)
 docs/.handoff-auto.md
+docs/.estado-auto.md
+docs/.boot-marker
+.claude/settings.local.json.BAK-*
+# ⚠️ scripts/.kernel-version.json SÍ se commitea: es el sello de integridad del kernel (gate #0).
 
 # ⚠️ CONFIDENCIAL / COPYRIGHT — NUNCA al repo público (ADR-052 Ola 0)
 # El repo es user-page público (publica todo el root). Estas clases de archivo

@@ -1,7 +1,7 @@
 {
   "brainTemplateVersion": "1.1.0",
   "repo": "sgm-transpower",
-  "_comment": "Config INSTANCE del cerebro (topes/budgets). El linter scripts/brain-check.mjs es KERNEL (no editarlo); estos budgets son por-repo. chars = unidad real de contexto. NO auto-cargado: solo lo lee el linter.",
+  "_comment": "Config INSTANCE del cerebro (topes/budgets). Los scripts/*.mjs de kernelFiles son KERNEL: NO se editan aqui, se editan en ../brain-private/kernel/ y se reparten con 'npm run brain:pull' (editarlos en el repo = gate #0 'fork prohibido' y pre-commit bloqueado). Estos budgets si son por-repo. chars = unidad real de contexto. NO auto-cargado: solo lo lee el linter.",
   "bootCharsTarget": 31500,
   "alwaysOn": [
     "CLAUDE.md",
@@ -23,13 +23,27 @@
   "kernelFiles": [
     "scripts/brain-check.mjs",
     "scripts/brain-diff.mjs",
-    "scripts/brain-index.mjs"
+    "scripts/brain-index.mjs",
+    "scripts/session-handoff.mjs",
+    "scripts/boot-gate.mjs",
+    "scripts/brain-archive.mjs"
   ],
-  "orphanAllowlist": [".handoff-auto.md"],
-  "_orphanAllowlistRazon": "handoff-auto: foto de sesion escrita por HOOK (session-handoff.mjs), gitignored, efimera; su ruta de lectura es el hook SessionStart --boot-echo, no el grafo de neuronas",
+  "_kernelFilesRazon": "Los 6 que este repo consume (ADR-058). Declarar de MENOS es la forma silenciosa de quedarse con medio kernel viejo: pull.mjs copia SOLO lo declarado y el gate #0 solo hashea lo declarado.",
+  "orphanAllowlist": [".handoff-auto.md", ".estado-auto.md", ".boot-marker"],
+  "_orphanAllowlistRazon": "Sidecars escritos por HOOK (session-handoff.mjs --boot-echo), gitignored, efimeros: handoff-auto (foto de sesion), estado-auto (heartbeat) y boot-marker (canario que valida boot-gate). Su ruta de lectura es el hook SessionStart, no el grafo de neuronas; ademas el gate #10 no puede alcanzarlos por diseno (su regex exige empezar por \\w, y estos empiezan por punto).",
   "peers": [],
-  "ssotFacts": [],
-  "_ssotFactsEjemplo": "Cuando tengas un hecho critico que vive en UN solo nodo (ej. version de cache), declaralo: [{\"regex\": \"mi-cache-v\\\\d+\", \"owner\": \"docs/05-ESTADO-GLOBAL.md\", \"scan\": [\"docs/10-MEMORIA-CORTO-PLAZO.md\"]}]",
+  "_peersRazon": "Vacio A PROPOSITO: no hay repos hermanos con cerebro todavia. Ademas el gate #11 (peer-hash) fue retirado en el kernel v1.3 y sustituido por el gate #0 (identidad contra el canonico), que es bloqueante y no necesita peers.",
+  "lastOffsiteBackup": "",
+  "_lastOffsiteBackupRazon": "La boveda ../brain-private NO tiene remoto: existe en un solo disco. Mientras este vacio, el banner 'EN CRISTIANO' del handoff avisara 'Copia de seguridad externa: NUNCA hecha'. Es verdad y debe doler hasta que se cree el repo privado.",
+  "ssotFacts": [
+    {
+      "regex": "kernel v1\\.\\d+\\.\\d+",
+      "owner": "scripts/.kernel-version.json",
+      "scan": ["CLAUDE.md", "docs/05-ESTADO-GLOBAL.md", "docs/10-MEMORIA-CORTO-PLAZO.md", "docs/20-MEMORIA-ESPACIAL.md"],
+      "_que": "La version del kernel vive en el stamp que escribe brain:pull, y el gate #0 la compara contra ../brain-private/kernel/VERSION. Escribirla a mano en una neurona la convierte en mentira al primer pull. 99 (historia) queda fuera del scan a proposito."
+    }
+  ],
+  "_ssotFactsDescartados": "EVALUADOS Y NO DECLARADOS (2026-07-28, ADR-058): (a) 'MO.00418' y (b) 'lordpowertransformersmj'. Ambos aparecen 20+ y 12+ veces en docs/ como REFERENCIA legitima (citar la norma o el proyecto no es duplicar un hecho). Declararlos disparia warns bloqueantes sin corregir ningun riesgo real = green-tuning al reves. Re-evaluar SOLO si algun dia se versiona el valor (p.ej. 'Ed. 03'), que es cuando el gate #8 sirve.",
   "deepAudit": {
     "last": "2026-07-18",
     "coveredHeaderCount": 0,
