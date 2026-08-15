@@ -278,6 +278,10 @@
         <div class="sb-group-title">Salud del activo</div>
         <a href="${u('pages/salud.html')}" class="sb-item" data-key="salud"><span class="i"><i data-lucide="heart-pulse"></i></span>Salud del Activo</a>
       </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Planificación</div>
+        <a href="${u('pages/fichas-tecnicas.html')}" class="sb-item" data-key="fichas-tecnicas"><span class="i"><i data-lucide="file-spreadsheet"></i></span>Fichas Técnicas</a>
+      </div>
       <div class="sb-group sb-admin-group" hidden>
         <div class="sb-group-title">Administración</div>
         <a href="${u('admin/administracion.html')}" class="sb-item sb-admin" data-key="administracion"><span class="i"><i data-lucide="settings"></i></span>Administración</a>

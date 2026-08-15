@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
+<meta name="color-scheme" content="light"/>
+<title>PREVIEW · MODELO 2 — Fichas Técnicas embebidas en iframe</title>
+
+<!-- CSS REAL del sistema de diseño AQUA LIGHT (rutas relativas desde _dev/) -->
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/tabs.css"/>
+
+<style>
+/* ─────────────────────────────────────────────────────────────
+   SOLO-PREVIEW. Nada de esto se copia a producción.
+   El preview corre SIN sesión: no cargamos page-guard.js ni
+   aqua-shell.js. En su lugar reproducimos el marco visual del
+   shell (header.tb + aside.sb) con markup estático y las clases
+   reales de aqua-components.css.
+   ───────────────────────────────────────────────────────────── */
+body { font-family: var(--font-sans, -apple-system, "SF Pro Text", system-ui, sans-serif); background: var(--bg-1, #f4f6fb); margin: 0; }
+
+/* Banda fija de identificación del modelo */
+.pv-band{
+  position:fixed; top:0; left:0; right:0; z-index:9999;
+  background:linear-gradient(90deg,#0d2b4a,#134a6b);
+  color:#eaf3fa; padding:8px 20px;
+  font:600 12.5px/1.35 var(--font-sans, system-ui, sans-serif);
+  display:flex; gap:16px; align-items:center; flex-wrap:wrap;
+  box-shadow:0 2px 10px rgba(0,30,60,.25);
+}
+.pv-band .pv-tag{
+  background:#ffd166; color:#402c00; font-weight:800; letter-spacing:.02em;
+  padding:3px 10px; border-radius:999px; font-size:11.5px; white-space:nowrap;
+}
+.pv-band .pv-txt{ opacity:.94; font-weight:500 }
+.pv-band .pv-txt b{ color:#ffd9a8; font-weight:700 }
+
+/* Empujamos el shell simulado por debajo de la banda (altura medida en JS) */
+:root{ --pv-band-h: 56px; }
+.tb { top: calc(var(--pv-band-h) + 6px) !important; }
+.sb { padding-top: calc(var(--pv-band-h) + 82px) !important; }
+.app-main { padding-top: calc(var(--pv-band-h) + 96px) !important; }
+@media (max-width:1024px){ .app-main{ padding-top: calc(var(--pv-band-h) + 82px) !important; } }
+
+/* Aviso de simulación en el shell falso */
+.pv-fake-note{
+  position:fixed; left:12px; bottom:12px; z-index:200; max-width:240px;
+  font:600 10.5px/1.45 var(--font-sans, system-ui, sans-serif);
+  color:#4a5b6b; background:rgba(255,255,255,.72);
+  border:1px dashed rgba(0,40,90,.22); border-radius:10px; padding:8px 10px;
+}
+
+/* Callout del preview (explicación del modelo) */
+.pv-call{
+  border-left:4px solid var(--brand, #007aff);
+  background:rgba(0,122,255,.06);
+  border-radius:12px; padding:14px 16px; margin:0 0 18px;
+  font-size:13.5px; line-height:1.55; color:var(--ink-2,#3c4858);
+}
+.pv-call b{ color:var(--ink-1,#0f1a26) }
+.pv-call code{ font:600 12px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace; background:rgba(0,40,90,.07); padding:1px 6px; border-radius:5px; }
+.pv-code{
+  background:#0e1c2b; color:#d7e6f5; border-radius:12px; padding:14px 16px;
+  font:500 12px/1.65 ui-monospace,SFMono-Regular,Menlo,monospace;
+  overflow-x:auto; white-space:pre;
+}
+.pv-code .c{ color:#7fa6c4 } .pv-code .k{ color:#8fd0ff } .pv-code .s{ color:#ffd6a0 }
+.pv-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:16px }
+@media (max-width:900px){ .pv-grid2{ grid-template-columns:1fr } }
+.pv-list{ margin:8px 0 0; padding-left:18px; font-size:13px; line-height:1.7; color:var(--ink-2,#3c4858) }
+.pv-list b{ color:var(--ink-1,#0f1a26) }
+
+/* Panel de pestañas de este preview */
+.tab-panels > [role="tabpanel"]{ display:none }
+.tab-panels > [role="tabpanel"].is-active{ display:block }
+
+/* Marco del iframe: se ve dónde empieza la "otra piel" */
+.pv-frame-wrap{ position:relative; border-radius:16px; padding:6px; background:rgba(11,79,108,.10); border:1px solid rgba(11,79,108,.22) }
+.pv-frame-wrap::after{
+  content:"límite del <iframe> · a partir de aquí manda la piel del módulo";
+  position:absolute; top:-11px; left:16px; background:#0B4F6C; color:#dff1f8;
+  font:700 10px/1 var(--font-sans, system-ui, sans-serif); letter-spacing:.03em;
+  padding:5px 10px; border-radius:999px;
+}
+.tab-iframe{ background:#f4f6f8; border-radius:12px; height:calc(100vh - 300px); min-height:600px }
+</style>
+</head>
+<body class="aqua">
+
+<div class="pv-band">
+  <span class="pv-tag">MODELO 2 · Módulo embebido en iframe</span>
+  <span class="pv-txt">Propone: la página AQUA es solo el marco (cabecera + una pestaña) y el módulo de 1,8 MB entra <b>tal cual</b>, con su propia piel. <b>Concesión principal: conviven dos lenguajes visuales</b> — petróleo/Quicksand del módulo dentro del vidrio AQUA — y los datos deben cruzar la frontera del iframe por <b>postMessage</b>.</span>
+</div>
+
+<!-- ═══ ESCENA + SHELL SIMULADOS (sin auth, sin aqua-shell.js) ═══ -->
+<div class="aqua-scene" aria-hidden="true"></div>
+
+<header class="tb" aria-hidden="true">
+  <a href="#" class="tb-brand" onclick="return false">
+    <span class="logo">⚡</span> SGM · <span class="b">TRANSPOWER</span>
+  </a>
+  <div class="tb-search">
+    <input type="search" placeholder="Buscar transformador, OT, subestación…" aria-label="Buscar" disabled/>
+    <kbd>⌘K</kbd>
+  </div>
+  <div class="tb-right">
+    <span class="tb-role">preview</span>
+    <div class="tb-avatar">MJ</div>
+  </div>
+</header>
+
+<aside class="sb" aria-hidden="true">
+  <a href="#" class="sb-brand-head" onclick="return false" style="text-decoration:none">
+    <span class="logo">⚡</span>
+    <div><div class="title">SGM · <em>TRANSPOWER</em></div><div class="sub">Liquid Glass</div></div>
+  </a>
+  <div class="sb-group">
+    <div class="sb-group-title">Operación</div>
+    <a href="#" class="sb-item" onclick="return false"><span class="i">▦</span>Inicio</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i">▤</span>Salud de Activos</a>
+    <a href="#" class="sb-item is-active" onclick="return false"><span class="i">▣</span>Fichas Técnicas</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i">▥</span>Seguimiento Operativo</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i">▧</span>Órdenes</a>
+  </div>
+  <div class="sb-group">
+    <div class="sb-group-title">Análisis</div>
+    <a href="#" class="sb-item" onclick="return false"><span class="i">◈</span>Pruebas Eléctricas</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i">◉</span>Parque de Transformadores</a>
+  </div>
+</aside>
+
+<div class="pv-fake-note">Shell simulado: en producción lo inyecta <code>aqua-shell.js</code>. Aquí es markup estático porque el preview corre sin sesión.</div>
+
+<!-- ═══ LA PÁGINA CONTENEDORA (esto sí sería pages/fichas-tecnicas.html) ═══ -->
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Operación / Fichas Técnicas</div>
+    <h1 class="page-title">Fichas <em>Técnicas</em></h1>
+    <p class="page-subtitle">
+      Clasificación de unidades constructivas CREG 015/2018 de la flota de transformadores
+      de potencia, ficha técnica por equipo y generación de la Ficha de Planificación
+      institucional PE.02081.PE-FO.03. El módulo se sirve embebido dentro de la pestaña.
+    </p>
+  </div>
+
+  <div class="pv-call">
+    <b>Cómo funciona el embebido (ya existe, no hay que inventarlo).</b>
+    <code>aqua-shell.js</code> detecta <code>window.self !== window.top</code> y marca
+    <code>body.is-embedded</code>; entonces <b>NO inyecta topbar ni sidebar</b> y
+    <code>tabs.css</code> los oculta y pone <code>margin-left:0</code> en
+    <code>.app-main</code>. Es decir: el soporte de páginas dentro de <code>&lt;iframe class="tab-iframe"&gt;</code>
+    ya está en producción. En este modelo el módulo <b>ni siquiera necesita ese soporte</b>:
+    entra como HTML autónomo, con su propio <code>&lt;head&gt;</code>, su propia hoja de estilos
+    y su propio JS — el shell del padre queda intacto por construcción.
+  </div>
+
+  <!-- Pestañas AQUA reales (clases de tabs.css) -->
+  <div class="sgm-tabs" id="fichasTabs">
+    <div role="tablist" class="tab-bar" aria-label="Secciones del módulo Fichas Técnicas">
+      <button type="button" role="tab" data-tab="modulo" aria-selected="true" class="is-active">
+        <span class="i">▣</span>Módulo de fichas
+      </button>
+      <button type="button" role="tab" data-tab="datos" aria-selected="false">
+        <span class="i">◈</span>De dónde vendrían los datos
+      </button>
+    </div>
+
+    <div class="tab-panels">
+
+      <!-- ── Pestaña 1: el módulo embebido ── -->
+      <div role="tabpanel" data-panel="modulo" class="is-active">
+        <div class="pv-frame-wrap">
+          <iframe class="tab-iframe" id="fichasFrame"
+                  title="Módulo Fichas Técnicas (réplica reducida para el preview)"
+                  sandbox="allow-scripts"></iframe>
+        </div>
+        <p style="margin:14px 2px 0;font-size:12.5px;color:var(--ink-3,#6a7684);line-height:1.6">
+          <b>Aviso honesto del preview:</b> dentro del iframe NO va el módulo real de 1,8 MB
+          (208 registros, catálogo CREG y plantilla .xlsx en base64), sino una <b>réplica reducida</b>
+          de su aspecto — mismos colores (petróleo <code>#0B4F6C</code>, verde <code>#1B998B</code>),
+          misma tipografía redondeada, mismo tablero y las <b>seis pestañas</b> de la ficha.
+          Sirve para juzgar el <b>contraste de las dos pieles conviviendo</b>, que es la decisión
+          real de este modelo. Los 8 equipos son <b>inventados</b> (SUBESTACIÓN A…H).
+        </p>
+      </div>
+
+      <!-- ── Pestaña 2: origen de los datos ── -->
+      <div role="tabpanel" data-panel="datos">
+        <div class="panel" style="margin-bottom:18px">
+          <div class="panel-head">
+            <div>
+              <div class="panel-title">Los datos reales salen de la capa de datos del repo, no del HTML</div>
+              <div class="panel-sub">assets/js/data/transformadores.js</div>
+            </div>
+            <span class="chip chip--warn">hoy el módulo lleva los 208 registros incrustados</span>
+          </div>
+          <div class="pv-code"><span class="c">// Convención ya usada en pages/parque-transformadores.html</span>
+<span class="k">window</span>.SGM_DATA_SOURCE = <span class="k">async function</span> () {
+  <span class="k">return await</span> <span class="k">import</span>(<span class="s">'../assets/js/data/transformadores.js'</span>)
+    .then(m =&gt; m.<span class="k">listarTransformadoresSalud</span>());
+};
+<span class="c">// Si SGM_DATA_SOURCE no existe → datos de demostración ROTULADOS.</span>
+<span class="c">// Otras puertas disponibles: listarV2(filtros) · suscribir(filtros,onData,onError) · obtener(id)</span></div>
+          <p class="pv-list" style="list-style:none;padding-left:0;margin-top:14px">
+            En este preview esa llamada está <b>comentada</b> (no hay sesión Firebase). La muestra de
+            8 equipos es inventada y está rotulada como tal dentro del iframe.
+          </p>
+        </div>
+
+        <div class="pv-grid2">
+          <div class="panel">
+            <div class="panel-head"><div><div class="panel-title">La frontera del iframe: el precio real</div><div class="panel-sub">consecuencia técnica del Modelo 2</div></div></div>
+            <div class="pv-code"><span class="c">// PADRE (pages/fichas-tecnicas.html)</span>
+<span class="k">const</span> datos = <span class="k">await</span> listarTransformadoresSalud();
+frame.contentWindow.<span class="k">postMessage</span>(
+  { tipo: <span class="s">'SGM_FLOTA'</span>, datos }, origen);
+
+<span class="c">// MÓDULO (dentro del iframe)</span>
+<span class="k">window</span>.addEventListener(<span class="s">'message'</span>, e =&gt; {
+  <span class="k">if</span> (e.origin !== origenEsperado) <span class="k">return</span>;
+  <span class="k">if</span> (e.data?.tipo === <span class="s">'SGM_FLOTA'</span>) cargarFlota(e.data.datos);
+});</div>
+            <p style="font-size:12.5px;color:var(--ink-3,#6a7684);margin-top:12px;line-height:1.6">
+              El iframe no comparte el módulo ES6 del padre: los datos cruzan por mensajes, y la
+              sesión/rol tendría que cruzar igual. Es un contrato extra que hay que escribir y mantener.
+            </p>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head"><div><div class="panel-title">Balance del Modelo 2</div><div class="panel-sub">a favor / en contra</div></div></div>
+            <ul class="pv-list">
+              <li><b>A favor:</b> riesgo de regresión prácticamente nulo — el CSS del módulo vive aislado y no puede pisar AQUA, ni AQUA al módulo.</li>
+              <li><b>A favor:</b> integración inmediata; el módulo se actualiza reemplazando un archivo.</li>
+              <li><b>A favor:</b> sus CDN (<code>xlsx</code>, <code>jszip</code>) y su fuente Quicksand quedan confinados al iframe.</li>
+              <li><b>En contra:</b> la integración visual es <b>parcial</b> — se ve un producto dentro de otro.</li>
+              <li><b>En contra:</b> doble scroll, altura fija por CSS, y modales del módulo que no pueden cubrir la ventana completa.</li>
+              <li><b>En contra:</b> auth, roles y datos exigen puente por <code>postMessage</code>; buscar en el padre no busca dentro del módulo.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+/* ═══ La banda fija reserva su propia altura (varía con el ancho) ═══ */
+(function () {
+  var band = document.querySelector('.pv-band');
+  function medir() {
+    document.documentElement.style.setProperty('--pv-band-h', band.offsetHeight + 'px');
+  }
+  medir(); window.addEventListener('resize', medir);
+})();
+
+/* ═══ Pestañas AQUA del contenedor ═══ */
+(function () {
+  var bar = document.querySelector('#fichasTabs .tab-bar');
+  var panels = document.querySelectorAll('#fichasTabs [role="tabpanel"]');
+  bar.addEventListener('click', function (e) {
+    var b = e.target.closest('[role="tab"]'); if (!b) return;
+    bar.querySelectorAll('[role="tab"]').forEach(function (t) {
+      var on = t === b;
+      t.classList.toggle('is-active', on);
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    panels.forEach(function (p) {
+      p.classList.toggle('is-active', p.dataset.panel === b.dataset.tab);
+    });
+  });
+})();
+
+/* ═══ MUESTRA INVENTADA (8 equipos) ═══════════════════════════
+   PROHIBIDO traer los 208 registros reales ni nombres de
+   subestaciones reales: este repo es PÚBLICO.
+   En producción esta constante desaparece y se reemplaza por:
+     window.SGM_DATA_SOURCE = async () =>
+       (await import('../assets/js/data/transformadores.js'))
+         .listarTransformadoresSalud();
+   ─────────────────────────────────────────────────────────── */
+var MUESTRA_DEMO = [
+  { sub:'SUBESTACIÓN A', mat:'TP-0001', kva:20000, mva:20,  vp:110, niv:'N4', reg:'N4T3', cal:'N4T3', est:'Conforme',    cond:1 },
+  { sub:'SUBESTACIÓN B', mat:'TP-0002', kva:10000, mva:10,  vp:66,  niv:'N3', reg:'N3T2', cal:'N3T2', est:'Conforme',    cond:2 },
+  { sub:'SUBESTACIÓN C', mat:'TP-0003', kva:40000, mva:40,  vp:110, niv:'N4', reg:'N4T4', cal:'N4T5', est:'Discrepa',    cond:3 },
+  { sub:'SUBESTACIÓN D', mat:'TP-0004', kva:5000,  mva:5,   vp:34.5,niv:'N2', reg:'N2T1', cal:'N2T1', est:'Conforme',    cond:2 },
+  { sub:'SUBESTACIÓN E', mat:'TP-0005', kva:30000, mva:30,  vp:110, niv:'N4', reg:'—',    cal:'N4T4', est:'Sin registro',cond:4 },
+  { sub:'SUBESTACIÓN F', mat:'TP-0006', kva:15000, mva:15,  vp:66,  niv:'N3', reg:'N3T3', cal:'N3T3', est:'Conforme',    cond:3 },
+  { sub:'SUBESTACIÓN G', mat:'TP-0007', kva:60000, mva:60,  vp:220, niv:'N4', reg:'N4T6', cal:'N4T6', est:'Conforme',    cond:5 },
+  { sub:'SUBESTACIÓN H', mat:'TP-0008', kva:12500, mva:12.5,vp:34.5,niv:'N2', reg:'N2T2', cal:'N2T3', est:'Discrepa',    cond:4 }
+];
+
+/* ═══ RÉPLICA REDUCIDA DEL MÓDULO (dentro del iframe, vía srcdoc) ═══
+   Reproduce su piel: petróleo #0B4F6C, verde #1B998B, tipografía
+   redondeada, chips, tablero y las SEIS pestañas de la ficha.
+   Autocontenido: cero CDN, cero red.                                */
+var MODULO_REPLICA = `<!DOCTYPE html>
+<html lang="es"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+:root{--petrol:#0B4F6C;--petrol-d:#062f42;--petrol-l:#12678a;--green:#1B998B;--green-d:#137a6e;
+--ink:#0e1a20;--muted:#6b7f8a;--muted2:#4a5f6b;--line:#dbe4e9;--line-l:#e8eef1;--panel:#fff;--graybg:#f1f5f7;--bg:#f4f6f8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:"Quicksand","Avenir Next Rounded","Trebuchet MS",system-ui,sans-serif;font-size:13px}
+h1,h2,h3,h4,.q{font-family:"Quicksand","Avenir Next Rounded","Trebuchet MS",system-ui,sans-serif;margin:0}
+header{background:linear-gradient(135deg,var(--petrol),var(--petrol-d));color:#eaf1f3;padding:14px 18px}
+.hin{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.brand{display:flex;gap:12px;align-items:center;margin-right:auto}
+.logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--green),var(--green-d));
+  display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;color:#fff;
+  box-shadow:0 6px 18px rgba(27,153,139,.35)}
+header h1{font-size:16px;font-weight:700;letter-spacing:.2px}
+.sub{font-size:11.5px;color:#b9d3de;margin-top:2px}
+.hmeta{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chip{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.16);color:#dbeaf0;border-radius:999px;
+  padding:5px 11px;font-size:11px;display:flex;gap:6px;align-items:center}
+.chip b{color:#fff}
+.gauge{display:flex;gap:9px;align-items:center;margin-left:6px}
+.gauge .ring{width:50px;height:50px;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px;color:#fff;
+  background:conic-gradient(var(--green) 0 78%,rgba(255,255,255,.14) 78% 100%)}
+.gauge .ring i{width:38px;height:38px;border-radius:50%;background:var(--petrol-d);display:grid;place-items:center;font-style:normal}
+.gauge small{display:block;font-size:10px;color:#b9d3de}
+.gauge .big{font-weight:700;font-size:15px;color:#fff}
+.wrap{padding:14px 18px 26px}
+.tabs{display:flex;gap:5px;border-bottom:1px solid var(--line);margin-bottom:14px;flex-wrap:wrap}
+.tab{background:var(--panel);border:1px solid var(--line);color:var(--muted2);border-radius:11px 11px 0 0;
+  padding:9px 15px;cursor:pointer;font-weight:600;font-size:12.5px;border-bottom:none}
+.tab.on{background:var(--petrol);color:#fff;border-color:var(--petrol)}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+@media(max-width:820px){.kpis{grid-template-columns:repeat(2,1fr)}}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:11px 13px}
+.kpi .lb{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700}
+.kpi .num{font-weight:700;font-size:27px;line-height:1.1;color:var(--petrol)}
+.kpi .fo{font-size:10.5px;color:var(--muted)}
+.hchips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.hchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line-l);background:#fff;border-radius:999px;
+  padding:5px 11px;font-size:11.5px;color:var(--ink);cursor:pointer}
+.hchip.on{border-color:var(--green);background:#effaf7;box-shadow:0 0 0 2px rgba(27,153,139,.15)}
+.hchip .cdotb{width:9px;height:9px;border-radius:50%}
+.hchip small{color:var(--muted)}
+.demo{background:#fff6e0;border:1px dashed #e0b352;color:#7a5a10;border-radius:10px;padding:8px 12px;
+  font-size:11.5px;font-weight:600;margin-bottom:12px}
+.twrap{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.tbar{display:flex;gap:8px;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line-l);flex-wrap:wrap}
+.tbar h3{font-size:13.5px;color:var(--petrol);margin-right:auto}
+.inp,.sel{border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:11.5px;font-family:inherit;color:var(--muted2);background:#fff}
+.btn{border:1px solid var(--line);background:#fff;color:var(--muted2);border-radius:9px;padding:6px 11px;
+  font-size:11.5px;font-weight:600;font-family:inherit;cursor:pointer}
+.btn.p{background:var(--petrol);border-color:var(--petrol);color:#fff}
+.btn.g{background:var(--green);border-color:var(--green);color:#fff}
+table.fleet{width:100%;border-collapse:collapse;font-size:11.8px}
+table.fleet th{background:var(--graybg);color:var(--muted2);text-align:left;padding:8px 10px;font-weight:700;
+  border-bottom:1px solid var(--line);white-space:nowrap;font-size:11px}
+table.fleet td{padding:8px 10px;border-bottom:1px solid var(--line-l);white-space:nowrap}
+table.fleet tr:hover td{background:#f7fbfc}
+.uc{font-weight:700;color:var(--petrol)}
+.st{border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:700;display:inline-block}
+.st.ok{background:#e4f7f1;color:#0f7361}.st.dis{background:#fdeceb;color:#b3261e}.st.na{background:#f0f2f4;color:#6b7f8a}
+.cdot{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:-1px}
+.tfoot{padding:8px 12px;font-size:11px;color:var(--muted);border-top:1px solid var(--line-l);background:#fbfdfe}
+/* ── Modal Ficha (6 pestañas) ── */
+.ovl{position:fixed;inset:0;background:rgba(6,26,36,.55);display:none;align-items:flex-start;justify-content:center;
+  padding:18px;overflow:auto;z-index:50}
+.ovl.on{display:flex}
+.modal{background:#fff;border-radius:16px;width:min(980px,100%);box-shadow:0 24px 60px rgba(0,0,0,.35);overflow:hidden}
+.mhead{background:linear-gradient(135deg,var(--petrol),var(--petrol-l));color:#fff;padding:13px 16px;display:flex;
+  align-items:center;gap:12px;flex-wrap:wrap}
+.mhead h2{font-size:15px;font-weight:700}
+.mhead .mx{margin-left:auto;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);color:#fff;
+  border-radius:9px;padding:5px 11px;cursor:pointer;font-family:inherit;font-weight:600;font-size:12px}
+.ftchip{display:inline-block;padding:2px 10px;border-radius:999px;color:#fff;font-weight:800;font-size:11px}
+.ptabs{display:flex;gap:4px;padding:9px 12px 0;background:var(--graybg);flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.ptab{background:#fff;border:1px solid var(--line);border-bottom:none;border-radius:10px 10px 0 0;padding:8px 13px;
+  font-size:12px;font-weight:600;color:var(--muted2);cursor:pointer;font-family:inherit}
+.ptab.on{background:var(--petrol);border-color:var(--petrol);color:#fff}
+.pbody{padding:16px;max-height:52vh;overflow:auto}
+.pbody h3{font-size:13.5px;color:var(--petrol);margin:0 0 8px}
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin-bottom:14px}
+@media(max-width:700px){.kv{grid-template-columns:1fr}}
+.r{display:flex;justify-content:space-between;gap:12px;border-bottom:1px dashed var(--line-l);padding:5px 0;font-size:12px}
+.r .k{color:var(--muted)}.r .v{font-weight:700;color:var(--ink)}
+.plan{list-style:none;padding:0;margin:0}
+.plan li{display:flex;gap:9px;align-items:center;padding:6px 0;border-bottom:1px dashed var(--line-l);font-size:12px}
+.cat{color:#fff;border-radius:6px;padding:2px 8px;font-size:10px;font-weight:800;min-width:52px;text-align:center}
+.note{background:var(--graybg);border-radius:10px;padding:10px 12px;font-size:11.5px;color:var(--muted2);margin-top:12px}
+.dgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}
+@media(max-width:700px){.dgrid{grid-template-columns:1fr}}
+.tile{border:1px solid var(--line);border-radius:11px;padding:9px 11px;background:#fbfdfe}
+.tile .tl{font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+.tile .tv{font-weight:700;font-size:20px;color:var(--petrol)}
+table.mini{width:100%;border-collapse:collapse;font-size:11.5px;margin-top:8px}
+table.mini th{background:var(--graybg);color:var(--muted2);text-align:left;padding:6px 9px;font-size:10.5px;font-weight:700;border-bottom:1px solid var(--line)}
+table.mini td{padding:6px 9px;border-bottom:1px solid var(--line-l)}
+.mfoot{padding:11px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;background:#fbfdfe}
+</style></head>
+<body>
+<header>
+  <div class="hin">
+    <div class="brand"><div class="logo">A</div>
+      <div><h1>Tablero Gerencial · Clasificación UUCC de la Flota</h1>
+        <div class="sub">Transformadores de Potencia · Afinia — Grupo EPM</div></div></div>
+    <div class="hmeta">
+      <div class="chip">Versión&nbsp;<b>v22 · diagnóstico</b></div>
+      <div class="chip">Regla&nbsp;<b>CREG 015/2018</b></div>
+      <div class="chip">Fuente&nbsp;<b>TX_Potencia</b></div>
+      <div class="gauge"><div class="ring"><i>78%</i></div>
+        <div><small>Conformidad de flota</small><span class="big">6 / 8</span></div></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab on">Tablero</div>
+    <div class="tab">📊 Analítica gerencial</div>
+    <div class="tab">Norma CREG · Tablas 51 y 52</div>
+    <div class="tab">➕ Agregar transformador</div>
+  </div>
+
+  <div class="demo">DATOS DE DEMOSTRACIÓN — 8 equipos inventados (SUBESTACIÓN A…H). En producción entrarían por <code>listarTransformadoresSalud()</code> cruzando el iframe vía postMessage.</div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="lb">Equipos en flota</div><div class="num">8</div><div class="fo">muestra del preview</div></div>
+    <div class="kpi"><div class="lb">Conformidad UUCC</div><div class="num">78%</div><div class="fo">6 conformes · 2 discrepan</div></div>
+    <div class="kpi"><div class="lb">Capacidad total</div><div class="num">192,5</div><div class="fo">MVA instalados</div></div>
+    <div class="kpi"><div class="lb">Condición ≥ 4</div><div class="num">3</div><div class="fo">requieren priorización</div></div>
+  </div>
+
+  <div class="hchips" id="legend"></div>
+
+  <div class="twrap">
+    <div class="tbar">
+      <h3>Flota completa</h3>
+      <input class="inp" placeholder="Buscar subestación, serie, matrícula…"/>
+      <select class="sel"><option>Nivel: todos</option></select>
+      <select class="sel"><option>Zona: todas</option></select>
+      <button class="btn">Limpiar</button>
+      <button class="btn">CSV</button>
+      <button class="btn p">Excel</button>
+    </div>
+    <div style="overflow:auto;max-height:330px">
+      <table class="fleet"><thead><tr>
+        <th>Subestación</th><th>Matrícula</th><th>kVA</th><th>MVA</th><th>Vp</th><th>Nivel</th>
+        <th>Registrada</th><th>Calculada</th><th>Estado</th><th>Condición</th><th>Gestión</th>
+      </tr></thead><tbody id="tb"></tbody></table>
+    </div>
+    <div class="tfoot" id="foot"></div>
+  </div>
+</div>
+
+<div class="ovl" id="ovl">
+  <div class="modal">
+    <div class="mhead">
+      <h2 id="mtit">Ficha técnica</h2>
+      <span class="ftchip" id="mchip">3</span>
+      <button class="mx" onclick="cerrar()">Cerrar ✕</button>
+    </div>
+    <div class="ptabs" id="ptabs"></div>
+    <div class="pbody" id="pbody"></div>
+    <div class="mfoot">
+      <button class="btn">Imprimir ficha (HTML)</button>
+      <button class="btn g">Descargar .xlsx · PE.02081.PE-FO.03</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var DATA = __DATOS__;
+var COL={1:'#1f9d55',2:'#7cb342',3:'#f2a600',4:'#ef6c00',5:'#c62828'};
+var LBL={1:'Muy bueno',2:'Bueno',3:'Regular',4:'Malo',5:'Muy malo'};
+
+function pintarTabla(){
+  document.getElementById('tb').innerHTML = DATA.map(function(d,i){
+    var cls = d.est==='Conforme'?'ok':(d.est==='Discrepa'?'dis':'na');
+    return '<tr>'
+      +'<td><b>'+d.sub+'</b></td><td>'+d.mat+'</td><td>'+d.kva.toLocaleString('es-CO')+'</td>'
+      +'<td>'+String(d.mva).replace('.',',')+'</td><td>'+String(d.vp).replace('.',',')+' kV</td><td>'+d.niv+'</td>'
+      +'<td class="uc">'+d.reg+'</td><td class="uc">'+d.cal+'</td>'
+      +'<td><span class="st '+cls+'">'+d.est+'</span></td>'
+      +'<td><span class="cdot" style="background:'+COL[d.cond]+'"></span>'+d.cond+' · '+LBL[d.cond]+'</td>'
+      +'<td><button class="btn p" onclick="abrir('+i+')">Ficha</button></td>'
+      +'</tr>';
+  }).join('');
+  var cnt={1:0,2:0,3:0,4:0,5:0}; DATA.forEach(function(d){cnt[d.cond]++;});
+  document.getElementById('legend').innerHTML=[1,2,3,4,5].map(function(k){
+    return '<div class="hchip'+(k===3?' on':'')+'"><span class="cdotb" style="background:'+COL[k]+'"></span>'
+      +'<b>'+k+'</b> '+LBL[k]+' <small>'+cnt[k]+'</small></div>';
+  }).join('');
+  document.getElementById('foot').innerHTML='<b>8</b> de 8 en la selección · 8 en la flota · Condición 1:'+cnt[1]+' 2:'+cnt[2]+' 3:'+cnt[3]+' 4:'+cnt[4]+' 5:'+cnt[5]+' · muestra de demostración.';
+}
+
+var HOJAS=[['ficha','Ficha Técnica'],['benef','Beneficios'],['diagA','Diagrama Actual'],
+           ['diagF','Diagrama Futuro'],['anexoAT','Anexo AT'],['plan','Plan de acciones']];
+var CUR=0, HOJA='ficha';
+
+function contenido(d,h){
+  if(h==='ficha') return '<h3>1 · Identificación</h3><div class="kv">'
+    +fila('Subestación',d.sub)+fila('Matrícula',d.mat)+fila('Nivel de tensión',d.niv+' · '+d.vp+' kV')
+    +fila('Potencia',d.kva.toLocaleString('es-CO')+' kVA')+fila('UUCC registrada',d.reg)+fila('UUCC calculada',d.cal)
+    +'</div><h3>2 · Estado de salud</h3><div class="dgrid">'
+    +'<div class="tile"><div class="tl">Condición</div><div class="tv">'+d.cond+'</div><div class="tl">'+LBL[d.cond]+'</div></div>'
+    +'<div class="tile"><div class="tl">Conformidad UUCC</div><div class="tv">'+(d.est==='Conforme'?'OK':'REV')+'</div><div class="tl">'+d.est+'</div></div>'
+    +'<div class="tile"><div class="tl">Capacidad</div><div class="tv">'+String(d.mva).replace('.',',')+'</div><div class="tl">MVA</div></div>'
+    +'</div><div class="note">La ficha completa del módulo real añade placa, aceite, protecciones, histórico de eventos y la trazabilidad de la clasificación CREG.</div>';
+  if(h==='benef') return '<h3>Beneficios esperados de la intervención</h3>'
+    +'<ul class="plan"><li><span class="cat" style="background:#1B998B">CONF</span>Restituye la conformidad de la UUCC frente a CREG 015/2018.</li>'
+    +'<li><span class="cat" style="background:#0B4F6C">RIESGO</span>Reduce la probabilidad de falla del activo (condición '+d.cond+').</li>'
+    +'<li><span class="cat" style="background:#f2a600">CALIDAD</span>Sostiene los indicadores SAIDI/SAIFI del área de influencia.</li></ul>'
+    +'<div class="note">Texto editable en el módulo real: alimenta la celda B23 de la Ficha de Planificación.</div>';
+  if(h==='diagA') return '<h3>Diagrama Actual · configuración instalada</h3>'
+    +'<table class="mini"><tr><th>Transformador</th><th>ONAN</th><th>ONAF</th><th>Relación</th><th>Grupo</th><th>Z%</th></tr>'
+    +'<tr><td>'+d.sub+' · T1</td><td>'+String(d.mva).replace('.',',')+' MVA</td><td>—</td><td>'+d.vp+'/13,8 kV</td><td>YNd11</td><td>10,5</td></tr></table>'
+    +'<div class="note">Semilla del Anexo AT: el módulo autocompleta desde estos valores.</div>';
+  if(h==='diagF') return '<h3>Diagrama Futuro · configuración propuesta</h3>'
+    +'<table class="mini"><tr><th>Transformador</th><th>ONAN</th><th>ONAF</th><th>Relación</th><th>Grupo</th><th>Z%</th></tr>'
+    +'<tr><td>'+d.sub+' · T1 (nuevo)</td><td>'+String(d.mva).replace('.',',')+' MVA</td><td>'+String(d.mva*1.25).toFixed(1).replace('.',',')+' MVA</td><td>'+d.vp+'/13,8 kV</td><td>YNd11</td><td>10,5</td></tr></table>'
+    +'<div class="note">Los cambios aquí NO afectan al Diagrama Actual: son dos hojas independientes del Excel.</div>';
+  if(h==='anexoAT') return '<h3>Anexo AT · datos de placa</h3>'
+    +'<table class="mini"><tr><th>Cambiador de tomas</th><th>Extensión</th><th>Paso %</th><th>Paralelo</th><th>Refrigeración</th></tr>'
+    +'<tr><td>OLTC</td><td>±10 pasos</td><td>1,25</td><td>No</td><td>ONAN/ONAF</td></tr></table>'
+    +'<div class="note">Datos del transformador seleccionado (<b>'+d.sub+'</b>). Se escriben en la hoja «Anexo AT» del Excel exportado.</div>';
+  return '<h3>Plan de acciones · condición '+d.cond+' ('+LBL[d.cond]+')</h3>'
+    +'<ul class="plan">'
+    +'<li><span class="cat" style="background:#0B4F6C">DIAG</span>Inspección termográfica y ocular detallada</li>'
+    +'<li><span class="cat" style="background:#1B998B">CORR</span>Corrección de fugas por accesorios</li>'
+    +(d.cond>=4?'<li><span class="cat" style="background:#c62828">INV</span>Propuesta a Plan de Inversión (PI)</li>':'')
+    +'</ul><div class="note">Prioridad '+(d.cond>=4?'Alta':'Media')+' · horizonte '+(d.cond>=4?'≤ 6 meses':'ciclo vigente ≤ 12 meses')+'.</div>';
+}
+function fila(k,v){return '<div class="r"><span class="k">'+k+'</span><span class="v">'+v+'</span></div>';}
+
+function render(){
+  var d=DATA[CUR];
+  document.getElementById('mtit').textContent='Ficha técnica · '+d.sub;
+  var ch=document.getElementById('mchip'); ch.textContent=d.cond; ch.style.background=COL[d.cond];
+  document.getElementById('ptabs').innerHTML=HOJAS.map(function(h){
+    return '<button class="ptab'+(h[0]===HOJA?' on':'')+'" onclick="hoja(\\''+h[0]+'\\')">'+h[1]+'</button>';
+  }).join('');
+  document.getElementById('pbody').innerHTML=contenido(d,HOJA);
+}
+function abrir(i){CUR=i;HOJA='ficha';render();document.getElementById('ovl').classList.add('on');}
+function hoja(h){HOJA=h;render();}
+function cerrar(){document.getElementById('ovl').classList.remove('on');}
+pintarTabla();
+<\/script>
+</body></html>`;
+
+document.getElementById('fichasFrame').srcdoc =
+  MODULO_REPLICA.replace('__DATOS__', JSON.stringify(MUESTRA_DEMO));
+</script>
+</body>
+</html>

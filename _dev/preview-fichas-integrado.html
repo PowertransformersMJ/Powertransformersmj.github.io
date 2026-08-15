@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<!-- `data-aqua-base` es solo del preview: el shell deduce la base por el
+     pathname y solo conoce /pages/*; sin esto, desde /_dev/* buscaría la foto
+     de fondo en /_dev/assets/… y devolvería 404. -->
+<html lang="es" data-aqua data-aqua-base="../">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>PREVIEW · Fichas Técnicas integradas en AQUA</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/tabs.css"/>
+  <link rel="stylesheet" href="../assets/css/fichas-tecnicas.css"/>
+  <style>
+    /* Solo del preview: la banda que avisa que esto NO son datos reales.
+       Nada de esto viaja a producción. */
+    .prev-banda {
+      background: #fff4d6;
+      border: 1px solid #e0a800;
+      border-left: 5px solid #e0a800;
+      border-radius: 10px;
+      padding: 12px 16px;
+      margin: 0 0 18px;
+      color: #6b4a00;
+      font-size: 13px;
+      line-height: 1.5;
+    }
+    .prev-banda b { color: #4a3300; }
+    .prev-banda code { font-size: 12px; }
+  </style>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="prev-banda">
+    <b>PREVIEW · DATOS DE DEMOSTRACIÓN.</b>
+    Los siete transformadores de esta pantalla son <b>ficticios</b> (SUBESTACIÓN A…G) y
+    existen solo para revisar la interfaz sin sesión: ninguno corresponde a un activo real.
+    El módulo que se monta abajo <b>es el de producción</b>
+    (<code>assets/js/ui/fichas/panel.js</code>), no una réplica: lo único distinto es de
+    dónde salen los datos. En la página real llegan de Firestore por
+    <code>window.SGM_DATA_SOURCE</code>.
+  </div>
+
+  <div class="page-header">
+    <div class="breadcrumb">Planificación / Fichas Técnicas</div>
+    <h1 class="page-title">Fichas <em>Técnicas</em></h1>
+    <p class="page-subtitle">
+      Tablero de la flota contrastada contra el catálogo de Unidades
+      Constructivas del CREG 015/2018 y emisión de la Ficha Técnica de
+      Planificación (formato PE.02081): alcance, beneficios, diagramas
+      unifilares, Anexo AT y plan de acciones, con exportación al Excel oficial.
+    </p>
+  </div>
+
+  <div id="fichasPanel"></div>
+
+</main>
+
+<script type="module">
+  // ══════════════════════════════════════════════════════════════════════════
+  // FIXTURE DE DEMOSTRACIÓN — siete equipos INVENTADOS.
+  // Cubre los seis indicadores del tablero: concordante, discrepancia, falta
+  // registro, sin cálculo y con advertencia; con y sin ensayos de laboratorio.
+  // ══════════════════════════════════════════════════════════════════════════
+  const DEMO = [
+    {
+      codigo: 'TX-A-01', serie: 'DEMO-A-0001', matricula: 'TA-01',
+      subestacion: 'SUBESTACIÓN A', municipio: 'MUNICIPIO A', zona: 'ZONA NORTE',
+      departamento: 'DEPARTAMENTO 1',
+      potencia_kva: 20000, kv_prim: 66, kv_sec: 13.8, regulacion: 'OLTC',
+      refrigeracion: 'ONAN/ONAF', uucc_registrada: 'N4T4',
+      condicion: 2, calif_fur: 2, calif_adfq: 2, calif_crg: 2, calif_her: 1, calif_edad: 2,
+      edad: 12, anio_fab: 2014, usuarios: 9800,
+      macroactividad: 'MANTENIMIENTO PREVENTIVO',
+      det: { fur2fal: 180, h2: 12, ch4: 4, c2h4: 2, c2h6: 1.1, c2h2: 0.1, co: 210, co2: 2100,
+             rigidez: 58, humedad: 9, nn: 0.03, ti: 34, ic: 1500, carga: 62 }
+    },
+    {
+      codigo: 'TX-B-01', serie: 'DEMO-B-0001', matricula: 'TB-01',
+      subestacion: 'SUBESTACIÓN B', municipio: 'MUNICIPIO B', zona: 'ZONA NORTE',
+      departamento: 'DEPARTAMENTO 1',
+      potencia_kva: 40000, kv_prim: 110, kv_sec: 34.5, regulacion: 'OLTC',
+      refrigeracion: 'ONAN/ONAF/OFAF', uucc_registrada: 'N4T5',   // ≠ calculada ⇒ discrepancia
+      condicion: 4, calif_fur: 5, calif_adfq: 4, calif_crg: 4, calif_her: 3, calif_edad: 5,
+      edad: 34, anio_fab: 1992, usuarios: 41000,
+      causante: 'ENVEJECIMIENTO DEL PAPEL AISLANTE',
+      macroactividad: 'REPOSICIÓN',
+      det: { fur2fal: 4200, h2: 95, ch4: 62, c2h4: 140, c2h6: 33, c2h2: 2.4, co: 980, co2: 8600,
+             rigidez: 33, humedad: 22, nn: 0.19, ti: 18, ic: 340, carga: 96 }
+    },
+    {
+      codigo: 'TX-C-01', serie: 'DEMO-C-0001', matricula: 'TC-01',
+      subestacion: 'SUBESTACIÓN C', municipio: 'MUNICIPIO C', zona: 'ZONA CENTRO',
+      departamento: 'DEPARTAMENTO 2',
+      potencia_kva: 10000, kv_prim: 34.5, kv_sec: 13.8, regulacion: 'NLTC',
+      refrigeracion: 'ONAN', uucc_registrada: '',                  // ⇒ falta registro
+      condicion: 3, calif_fur: 3, calif_adfq: 3, calif_crg: 3, calif_her: 2, calif_edad: 3,
+      edad: 21, anio_fab: 2005, usuarios: 5400,
+      macroactividad: 'MANTENIMIENTO CORRECTIVO',
+      det: { fur2fal: 950, h2: 40, ch4: 18, c2h4: 12, c2h6: 6, c2h2: 0.4, co: 520, co2: 4200,
+             rigidez: 44, humedad: 14, nn: 0.08, ti: 26, ic: 900, carga: 78 }
+    },
+    {
+      codigo: 'TX-D-01', serie: 'DEMO-D-0001', matricula: 'TD-01',
+      subestacion: 'SUBESTACIÓN D', municipio: 'MUNICIPIO D', zona: 'ZONA CENTRO',
+      departamento: 'DEPARTAMENTO 2',
+      potencia_kva: 31500, kv_prim: 110, kv_sec: 13.8, kv_terc: 13.8, regulacion: 'OLTC',
+      refrigeracion: 'ONAN/ONAF', uucc_registrada: 'N4T16',
+      condicion: 1, calif_fur: 1, calif_adfq: 1, calif_crg: 1, calif_her: 1, calif_edad: 1,
+      edad: 4, anio_fab: 2022, usuarios: 26000,
+      macroactividad: 'MANTENIMIENTO PREVENTIVO',
+      det: { fur2fal: 45, h2: 5, ch4: 1.4, c2h4: 0.6, c2h6: 0.3, c2h2: 0.05, co: 90, co2: 1100,
+             rigidez: 72, humedad: 5, nn: 0.01, ti: 42, ic: 2600, carga: 48 }
+    },
+    {
+      codigo: 'TX-E-01', serie: 'DEMO-E-0001', matricula: 'TE-01',
+      subestacion: 'SUBESTACIÓN E', municipio: 'MUNICIPIO E', zona: 'ZONA SUR',
+      departamento: 'DEPARTAMENTO 3',
+      potencia_kva: 2000, kv_prim: 34.5, kv_sec: 13.8, regulacion: 'NLTC',
+      refrigeracion: 'ONAN', uucc_registrada: 'N3T2',              // ≠ calculada ⇒ discrepancia
+      condicion: 5, calif_fur: 5, calif_adfq: 5, calif_crg: 5, calif_her: 4, calif_edad: 5,
+      edad: 41, anio_fab: 1985, usuarios: 1800,
+      causante: 'SOBRECARGA SOSTENIDA',
+      macroactividad: 'REPOSICIÓN',
+      det: { fur2fal: 7800, h2: 160, ch4: 120, c2h4: 260, c2h6: 58, c2h2: 6.5, co: 1400, co2: 12000,
+             rigidez: 27, humedad: 31, nn: 0.28, ti: 14, ic: 120, carga: 108 }
+    },
+    {
+      codigo: 'TX-F-01', serie: 'DEMO-F-0001', matricula: 'TF-01',
+      subestacion: 'SUBESTACIÓN F', municipio: 'MUNICIPIO F', zona: 'ZONA SUR',
+      departamento: 'DEPARTAMENTO 3',
+      potencia_kva: 60000, kv_prim: 220, kv_sec: 66, regulacion: 'OLTC',
+      refrigeracion: 'ONAN/ONAF/OFAF', uucc_registrada: 'N5T5',    // concordante + advertencia STN
+      condicion: 3, calif_fur: 2, calif_adfq: 3, calif_crg: 3, calif_her: 2, calif_edad: 3,
+      edad: 18, anio_fab: 2008, usuarios: 73000,
+      macroactividad: 'MANTENIMIENTO PREVENTIVO',
+      det: { fur2fal: 610, h2: 28, ch4: 11, c2h4: 8, c2h6: 4, c2h2: 0.2, co: 380, co2: 3300,
+             rigidez: 51, humedad: 11, nn: 0.05, ti: 31, ic: 1300, carga: 71 }
+    },
+    {
+      codigo: 'TX-G-01', serie: 'DEMO-G-0001', matricula: 'TG-01',
+      subestacion: 'SUBESTACIÓN G', municipio: 'MUNICIPIO G', zona: 'ZONA NORTE',
+      departamento: 'DEPARTAMENTO 4',
+      potencia_kva: 15000, kv_prim: null, kv_sec: 13.8, regulacion: 'NLTC',
+      refrigeracion: 'ONAN', uucc_registrada: 'N4T3',              // sin Vp ⇒ sin cálculo
+      condicion: null,
+      edad: 15, anio_fab: 2011, usuarios: 3100,
+      macroactividad: 'INVENTARIO'
+      // sin `det`: equipo sin ensayos ⇒ la ficha NO trae el bloque 2b
+    }
+  ];
+
+  const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');
+  window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
+    datos: DEMO,
+    demostracion: true,
+    origen: 'DATOS DE DEMOSTRACIÓN — equipos ficticios'
+  });
+</script>
+
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>

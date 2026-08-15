@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
+<meta name="theme-color" content="#f4f6fb"/>
+<meta name="color-scheme" content="light"/>
+<title>PREVIEW · MODELO 1 — Fichas Técnicas nativo AQUA</title>
+
+<!-- ═══ Sistema de diseño REAL del sitio (rutas relativas desde _dev/) ═══ -->
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/tabs.css"/>
+
+<style>
+/* ══════════════════════════════════════════════════════════════
+   SOLO-PREVIEW · nada de esto viaja a producción.
+   (1) banda de rotulado del modelo  (2) desplazamiento del shell
+   ══════════════════════════════════════════════════════════════ */
+:root { --pv-band: 56px; }
+
+.pv-band{
+  position:fixed; top:0; left:0; right:0; height:var(--pv-band); z-index:9999;
+  display:flex; align-items:center; gap:16px; padding:0 20px;
+  background:linear-gradient(90deg,#0d1f38 0%, #123a6b 60%, #0051d5 100%);
+  color:#fff; box-shadow:0 2px 12px rgba(0,40,90,.28);
+  font-family:var(--font-sans); font-size:12.5px; letter-spacing:-.005em;
+}
+.pv-band b{ font-size:13px; font-weight:800; letter-spacing:.02em; white-space:nowrap; }
+.pv-band .pv-sep{ width:1px; height:26px; background:rgba(255,255,255,.28); flex:0 0 auto; }
+.pv-band .pv-txt{ line-height:1.35; opacity:.94; }
+.pv-band .pv-txt em{ font-style:normal; color:#ffd479; font-weight:700; }
+@media (max-width:820px){ :root{ --pv-band:74px; } .pv-band{ font-size:11.5px; } }
+
+/* El shell real es fixed en top:0 — lo bajamos bajo la banda */
+.tb        { top: var(--pv-band); }
+.sb        { padding-top: calc(78px + var(--pv-band)); }
+.app-main  { padding-top: calc(90px + var(--pv-band)); }
+.tab-bar   { top: calc(78px + var(--pv-band)); }
+@media (max-width:1024px){ .app-main{ padding-top: calc(76px + var(--pv-band)); } }
+
+/* Sello de datos de demostración */
+.pv-demo{
+  display:flex; align-items:flex-start; gap:12px; margin-bottom:20px;
+  padding:12px 16px; border-radius:var(--r-md);
+  background:rgba(255,149,0,.10); border:1px solid rgba(255,149,0,.30);
+}
+.pv-demo .i{ color:#b85f00; flex:0 0 auto; margin-top:1px; }
+.pv-demo p{ margin:0; font-size:12.5px; color:var(--ink-2); }
+.pv-demo b{ color:#8a4700; }
+
+/* ── Bloque "de dónde vienen los datos reales" ───────────────── */
+.pv-src{ margin-top:26px; }
+.pv-src pre{
+  margin:12px 0 0; padding:14px 16px; overflow-x:auto;
+  background:rgba(13,31,56,.94); color:#cfe3ff; border-radius:var(--r-md);
+  font-family:var(--font-mono); font-size:11.5px; line-height:1.65;
+}
+.pv-src pre .c{ color:#7fa8d8; }
+.pv-src pre .k{ color:#7fd4ff; }
+.pv-src pre .s{ color:#ffd479; }
+
+/* ══════════════════════════════════════════════════════════════
+   MÓDULO — todo construido con tokens AQUA. Cero paleta ajena.
+   ══════════════════════════════════════════════════════════════ */
+
+/* Barra de filtros */
+.m1-filters{
+  display:grid; grid-template-columns:minmax(220px,2fr) repeat(3, minmax(130px,1fr)) auto;
+  gap:10px; align-items:center; margin-bottom:16px;
+}
+@media (max-width:900px){ .m1-filters{ grid-template-columns:1fr 1fr; } }
+
+/* Tabla de flota — usa .dt del sistema, sólo afinamos densidad */
+.m1-tablewrap{ overflow-x:auto; border-radius:var(--r-md); }
+.m1-tablewrap .dt{ min-width:960px; }
+.m1-tablewrap .dt thead th{ white-space:nowrap; }
+.m1-tablewrap .dt tbody td{ vertical-align:middle; }
+.m1-sub{ font-weight:600; color:var(--ink-1); }
+.m1-sub small{ display:block; font-weight:400; color:var(--ink-4); font-size:11px; font-family:var(--font-mono); }
+.m1-code{ font-family:var(--font-mono); font-size:11.5px; color:var(--ink-2); }
+.m1-code.is-bad{ color:#c91a14; text-decoration:line-through; text-decoration-thickness:1px; }
+.m1-code.is-none{ color:var(--ink-4); font-style:italic; text-decoration:none; }
+
+/* Semáforo de condición 1–5 (mismo lenguaje que los chips AQUA) */
+.m1-cond{
+  display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px;
+  font-size:12.5px; font-weight:700; font-family:var(--font-mono);
+}
+.m1-c1{ background:rgba(28,200,112,.16); color:#008f4a; }
+.m1-c2{ background:rgba(48,209,176,.18); color:var(--teal-deep); }
+.m1-c3{ background:rgba(255,184,0,.20);  color:#8a6100; }
+.m1-c4{ background:rgba(255,149,0,.20);  color:#b85f00; }
+.m1-c5{ background:rgba(255,59,48,.16);  color:#c91a14; }
+.m1-cna{ background:rgba(0,40,90,.08);   color:var(--ink-4); }
+
+/* Ficha: rejilla clave–valor (equivalente AQUA del .kv del módulo) */
+.m1-kv{ display:grid; grid-template-columns:1fr 1fr; gap:0 24px; }
+.m1-kv.one{ grid-template-columns:1fr; }
+@media (max-width:760px){ .m1-kv{ grid-template-columns:1fr; } }
+.m1-kv div{
+  display:flex; justify-content:space-between; gap:14px; padding:7px 0;
+  border-bottom:1px solid rgba(0,40,90,.07); font-size:13px;
+}
+.m1-kv span{ color:var(--ink-3); }
+.m1-kv b{ color:var(--ink-1); font-weight:600; text-align:right; }
+
+.m1-h{
+  display:flex; align-items:center; gap:9px; margin:22px 0 12px;
+  font-size:11px; font-weight:700; text-transform:uppercase;
+  letter-spacing:var(--tracking-caps); color:var(--ink-3);
+}
+.m1-h:first-child{ margin-top:0; }
+.m1-h::after{ content:''; flex:1; height:1px; background:rgba(0,40,90,.10); }
+.m1-h .n{
+  display:inline-grid; place-items:center; width:20px; height:20px; border-radius:6px;
+  background:rgba(0,122,255,.14); color:var(--brand-deep); font-size:11px;
+}
+
+.m1-note{
+  margin-top:12px; padding:10px 14px; border-radius:var(--r-sm);
+  background:rgba(0,122,255,.06); border-left:3px solid var(--brand);
+  font-size:12px; color:var(--ink-2); line-height:1.55;
+}
+.m1-note.warn{ background:rgba(255,149,0,.08); border-left-color:var(--warn); }
+
+/* Plan de acciones */
+.m1-plan{ list-style:none; margin:0; padding:0; }
+.m1-plan li{
+  display:flex; align-items:flex-start; gap:12px; padding:11px 0;
+  border-bottom:1px solid rgba(0,40,90,.07); font-size:13.5px; color:var(--ink-2);
+}
+.m1-plan li:last-child{ border-bottom:0; }
+.m1-plan .chip{ flex:0 0 auto; min-width:150px; justify-content:center; }
+
+/* Diagrama unifilar — redibujado con la paleta AQUA */
+.m1-diag{ display:grid; grid-template-columns:280px 1fr; gap:20px; align-items:start; }
+@media (max-width:860px){ .m1-diag{ grid-template-columns:1fr; } }
+.m1-diagbox{
+  background:rgba(255,255,255,.62); border:1px solid rgba(0,40,90,.10);
+  border-radius:var(--r-md); padding:10px;
+}
+.m1-diagbox svg{ width:100%; height:auto; display:block; }
+.uni-hv   { stroke:var(--brand-deep); stroke-width:2.4; fill:none; }
+.uni-lv   { stroke:var(--cyan-deep);  stroke-width:2.4; fill:none; }
+.uni-core { stroke:var(--steel-dark); stroke-width:2.2; fill:none; }
+.uni-bus  { fill:var(--brand-deep); }
+.uni-oltc { stroke:var(--warn); stroke-width:2; fill:var(--warn); }
+.uni-t    { fill:var(--ink-1); font-family:var(--font-sans); font-size:13px; font-weight:600; }
+.uni-t.lbl{ fill:var(--ink-3); font-size:11px; font-weight:500; font-family:var(--font-mono); }
+.uni-t.big{ fill:var(--ink-1); font-size:15px; font-weight:700; }
+
+.m1-formgrid{ display:grid; gap:12px; }
+.m1-formgrid .field label{ font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:var(--tracking-caps); color:var(--ink-3); }
+
+/* Selector de redacciones (Beneficios) */
+.m1-picks{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:12px; }
+.m1-pick{
+  border:1px solid rgba(0,40,90,.14); background:rgba(255,255,255,.7);
+  color:var(--ink-2); font:inherit; font-size:12.5px; padding:7px 13px;
+  border-radius:var(--r-pill); cursor:pointer; transition:all var(--dur-fast);
+}
+.m1-pick:hover{ border-color:rgba(0,122,255,.36); color:var(--brand-deep); }
+.m1-pick.is-on{ background:rgba(0,122,255,.14); border-color:rgba(0,122,255,.34); color:var(--brand-deep); font-weight:600; }
+
+/* Modal a ancho de documento (el sistema lo limita a 600px) */
+#m1Modal .modal{ max-width:1080px; padding:26px 30px; }
+#m1Modal .tab-bar{ position:static; top:auto; }
+.m1-modal-meta{ display:flex; flex-wrap:wrap; gap:8px; margin-top:8px; }
+
+/* Cabecera institucional dentro de la ficha (marca de documento) */
+.m1-doc-head{
+  display:flex; justify-content:space-between; align-items:flex-start; gap:20px;
+  padding-bottom:14px; margin-bottom:18px; border-bottom:2px solid rgba(0,122,255,.24);
+}
+.m1-doc-head h3{ margin:0; font-size:15px; color:var(--ink-1); }
+.m1-doc-head .sub{ font-size:11.5px; color:var(--ink-3); margin-top:3px; }
+.m1-doc-head .cod{ font-family:var(--font-mono); font-size:11px; color:var(--ink-4); text-align:right; }
+</style>
+</head>
+
+<body class="aqua">
+
+<!-- ══════════ BANDA DE ROTULADO DEL MODELO ══════════ -->
+<div class="pv-band">
+  <b>MODELO 1 · Página nativa AQUA</b>
+  <span class="pv-sep"></span>
+  <span class="pv-txt">
+    Propone: <strong>reescribir el módulo con los componentes del sitio</strong> (page-header, sgm-tabs, .dt, .stat, .chip, modal AQUA) — cero rastro de Quicksand ni del verde #1B998B.
+    Concesión principal: <em>es reescritura total — el HTML original se descarta y cada mejora futura del módulo hay que re-implementarla aquí a mano.</em>
+  </span>
+</div>
+
+<!-- ══════════ ESCENA DE FONDO (la inyecta aqua-shell.js en producción) ══════════ -->
+<div class="aqua-scene" aria-hidden="true"></div>
+<div class="aqua-orb aqua-orb--blue" aria-hidden="true"></div>
+<div class="aqua-orb aqua-orb--cyan" aria-hidden="true"></div>
+<div class="aqua-orb aqua-orb--teal" aria-hidden="true"></div>
+<div class="aqua-power-scene" aria-hidden="true" style="background-image:url(../assets/img/aqua/substation-photo.webp)"></div>
+
+<!-- ══════════ SHELL ESTÁTICO (réplica visual de aqua-shell.js · sin auth) ══════════ -->
+<header class="tb">
+  <a href="#" class="tb-brand" onclick="return false">
+    <span class="logo"><i data-lucide="zap"></i></span>
+    SGM · <span class="b">TRANSPOWER</span>
+  </a>
+  <div class="tb-search">
+    <i data-lucide="search"></i>
+    <input type="search" placeholder="Buscar transformador, OT, subestación…" aria-label="Buscar"/>
+    <kbd>⌘K</kbd>
+  </div>
+  <div class="tb-right">
+    <span class="tb-role">preview</span>
+    <button class="btn btn--ghost btn--icon" type="button" aria-label="Notificaciones"><i data-lucide="bell"></i></button>
+    <div class="tb-avatar">MJ</div>
+  </div>
+</header>
+
+<aside class="sb">
+  <a href="#" class="sb-brand-head" onclick="return false" style="text-decoration:none">
+    <span class="logo"><i data-lucide="zap"></i></span>
+    <div>
+      <div class="title">SGM · <em>TRANSPOWER</em></div>
+      <div class="sub">Liquid Glass</div>
+    </div>
+  </a>
+  <div class="sb-group">
+    <div class="sb-group-title">Operación</div>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="layout-dashboard"></i></span>Inicio</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="database"></i></span>Salud de Activos</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="activity"></i></span>Seguimiento Operativo</a>
+    <a href="#" class="sb-item is-active" onclick="return false"><span class="i"><i data-lucide="file-badge"></i></span>Fichas Técnicas</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="clipboard-list"></i></span>Órdenes</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="file-text"></i></span>Contratos</a>
+  </div>
+  <div class="sb-group">
+    <div class="sb-group-title">Análisis</div>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="flask-conical"></i></span>Pruebas Eléctricas</a>
+    <a href="#" class="sb-item" onclick="return false"><span class="i"><i data-lucide="map"></i></span>Mapa del Parque</a>
+  </div>
+</aside>
+
+<!-- ══════════ PÁGINA ══════════ -->
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div>
+      <div class="breadcrumb">Operación / Fichas Técnicas</div>
+      <h1 class="page-title">Fichas <em>Técnicas</em></h1>
+      <p class="page-subtitle">
+        Clasificación de unidades constructivas CREG 015/2018 sobre el parque de transformadores
+        de potencia, y generación de la Ficha Técnica de Planificación institucional.
+      </p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn--glass" type="button"><i data-lucide="book-open"></i>Norma CREG · Tablas 51 y 52</button>
+      <button class="btn btn--primary" type="button"><i data-lucide="plus"></i>Agregar transformador</button>
+    </div>
+  </div>
+
+  <div class="pv-demo">
+    <span class="i"><i data-lucide="triangle-alert"></i></span>
+    <p>
+      <b>DATOS DE DEMOSTRACIÓN.</b> Las 7 unidades de abajo son inventadas (SUBESTACIÓN A…G) y los
+      códigos UUCC son ilustrativos, no normativos. El repositorio es público: aquí nunca se
+      pegan los 208 registros reales ni nombres de subestaciones de cliente. La conexión a los
+      datos verdaderos está declarada al pie de la página.
+    </p>
+  </div>
+
+  <!-- ── Indicadores de flota ─────────────────────────────── -->
+  <div class="grid-4" style="margin-bottom:22px">
+    <div class="stat stat--brand">
+      <div class="stat-top">
+        <span class="stat-label">Unidades</span>
+        <span class="stat-icon"><i data-lucide="layers"></i></span>
+      </div>
+      <div class="stat-value" id="kUnid">0</div>
+      <div class="stat-foot">Parque cargado en el módulo</div>
+    </div>
+    <div class="stat stat--success">
+      <div class="stat-top">
+        <span class="stat-label">Concordantes</span>
+        <span class="stat-icon"><i data-lucide="check"></i></span>
+      </div>
+      <div class="stat-value" id="kConc">0</div>
+      <div class="stat-foot"><span id="kConfPct">—</span> de conformidad de flota</div>
+    </div>
+    <div class="stat stat--danger">
+      <div class="stat-top">
+        <span class="stat-label">Discrepancias</span>
+        <span class="stat-icon"><i data-lucide="alert-octagon"></i></span>
+      </div>
+      <div class="stat-value" id="kDisc">0</div>
+      <div class="stat-foot">Registrada ≠ calculada · corregir maestro</div>
+    </div>
+    <div class="stat stat--warn">
+      <div class="stat-top">
+        <span class="stat-label">Falta registro</span>
+        <span class="stat-icon"><i data-lucide="circle-dashed"></i></span>
+      </div>
+      <div class="stat-value" id="kFalta">0</div>
+      <div class="stat-foot">Sin UUCC en la fuente · se propone la calculada</div>
+    </div>
+  </div>
+
+  <!-- ── Tablero de flota ─────────────────────────────────── -->
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Flota completa</div>
+        <div class="panel-sub">Clasificación UUCC · CREG 015/2018</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn--glass btn--sm" type="button"><i data-lucide="upload"></i>Importar</button>
+        <button class="btn btn--glass btn--sm" type="button"><i data-lucide="sheet"></i>Excel</button>
+      </div>
+    </div>
+
+    <div class="m1-filters">
+      <div class="input-icon">
+        <i data-lucide="search"></i>
+        <input class="input" id="fQ" type="search" placeholder="Buscar subestación, serie, matrícula, departamento…"/>
+      </div>
+      <select class="select" id="fNivel"><option value="">Nivel: todos</option></select>
+      <select class="select" id="fZona"><option value="">Zona: todas</option></select>
+      <select class="select" id="fEstado"><option value="">Estado: todos</option></select>
+      <button class="btn btn--ghost" type="button" id="fClr"><i data-lucide="eraser"></i>Limpiar</button>
+    </div>
+
+    <div class="m1-tablewrap">
+      <table class="dt">
+        <thead>
+          <tr>
+            <th>Subestación</th><th>Matrícula</th><th>kVA</th><th>MVA</th><th>Vp</th>
+            <th>Nivel</th><th>Registrada</th><th>Calculada</th><th>Estado</th>
+            <th>Condición</th><th>Gestión</th>
+          </tr>
+        </thead>
+        <tbody id="fleetBody"></tbody>
+      </table>
+    </div>
+    <div class="stat-foot" id="fleetFoot" style="margin-top:14px"></div>
+  </section>
+
+  <!-- ── Origen real de los datos ─────────────────────────── -->
+  <section class="panel pv-src">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">De dónde vendrán los datos reales</div>
+        <div class="panel-sub">Misma convención que pages/parque-transformadores.html</div>
+      </div>
+      <span class="chip chip--cyan"><i data-lucide="plug"></i>Punto de conexión</span>
+    </div>
+    <p style="font-size:13px;margin:0">
+      La página no lleva datos dentro. En producción declara <code class="mono">window.SGM_DATA_SOURCE</code>
+      y la capa de datos del sitio le entrega la flota; si esa función no existe (como en este preview),
+      el módulo cae a la muestra de demostración <strong>rotulada</strong>. Ese es el único punto de sutura.
+    </p>
+    <pre><span class="c">// pages/fichas-tecnicas.html — al final del &lt;body&gt;</span>
+window.<span class="k">SGM_DATA_SOURCE</span> = <span class="k">async function</span> () {
+  <span class="k">const</span> m = <span class="k">await import</span>(<span class="s">'../assets/js/data/transformadores.js'</span>);
+  <span class="k">return await</span> m.<span class="k">listarTransformadoresSalud</span>();
+  <span class="c">// → listarV2({limite:500})  →  domain/parque_salud.js :: filasParque()</span>
+  <span class="c">// Firestore one-shot con limit() — free-tier sagrado, sin onSnapshot.</span>
+};</pre>
+    <div class="m1-note">
+      El mapeo de campos de Firestore a las columnas del módulo (UUCC registrada/calculada,
+      nivel, banda de capacidad, condición 1–5) se implementaría como dominio puro y testeable
+      en <code class="mono">assets/js/domain/</code>, igual que el resto del proyecto — la página
+      sólo pinta.
+    </div>
+  </section>
+
+</main>
+
+<!-- ══════════ FICHA · MODAL CON LAS SEIS PESTAÑAS ══════════ -->
+<div class="modal-bg" id="m1Modal" role="dialog" aria-modal="true" aria-labelledby="m1ModalTitle">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h2 class="modal-title" id="m1ModalTitle">Ficha técnica</h2>
+        <div class="m1-modal-meta" id="m1ModalMeta"></div>
+      </div>
+      <button class="modal-close" type="button" id="m1Close" aria-label="Cerrar"><i data-lucide="x"></i></button>
+    </div>
+
+    <div class="sgm-tabs" id="fichaTabs">
+      <div role="tablist" class="tab-bar" aria-label="Hojas de la ficha de planificación">
+        <button type="button" role="tab" data-tab="ficha"  aria-selected="true"><span class="i"><i data-lucide="file-badge"></i></span>Ficha Técnica</button>
+        <button type="button" role="tab" data-tab="benef"><span class="i"><i data-lucide="sparkles"></i></span>Beneficios</button>
+        <button type="button" role="tab" data-tab="diagA"><span class="i"><i data-lucide="git-branch"></i></span>Diagrama Actual</button>
+        <button type="button" role="tab" data-tab="diagF"><span class="i"><i data-lucide="git-fork"></i></span>Diagrama Futuro</button>
+        <button type="button" role="tab" data-tab="anexo"><span class="i"><i data-lucide="table-2"></i></span>Anexo AT</button>
+        <button type="button" role="tab" data-tab="plan"><span class="i"><i data-lucide="list-checks"></i></span>Plan de acciones</button>
+      </div>
+
+      <div class="tab-panels">
+        <div role="tabpanel" data-tab-panel="ficha" id="pnFicha"></div>
+        <div role="tabpanel" data-tab-panel="benef" id="pnBenef" hidden></div>
+        <div role="tabpanel" data-tab-panel="diagA" id="pnDiagA" hidden></div>
+        <div role="tabpanel" data-tab-panel="diagF" id="pnDiagF" hidden></div>
+        <div role="tabpanel" data-tab-panel="anexo" id="pnAnexo" hidden></div>
+        <div role="tabpanel" data-tab-panel="plan"  id="pnPlan"  hidden></div>
+      </div>
+    </div>
+
+    <div class="modal-foot">
+      <span class="stat-foot" style="margin:0;margin-right:auto">
+        PE.02081.PE-FO.03 · la exportación conserva maquetación, logos y firmas de la plantilla
+      </span>
+      <button class="btn btn--glass" type="button"><i data-lucide="printer"></i>Ficha en HTML</button>
+      <button class="btn btn--primary" type="button"><i data-lucide="download"></i>Exportar .xlsx</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════
+   MODELO 1 — lógica del preview. Vanilla ES6, sin dependencias.
+   ══════════════════════════════════════════════════════════════ */
+(function () {
+  'use strict';
+
+  /* ── Muestra de demostración (7 unidades INVENTADAS) ──────── */
+  const DEMO = [
+    { fila:1, subestacion:'SUBESTACIÓN A', cod:'90000101', serie:'DEMO-0001', matricula:'T1-A/A-101',
+      grupo:'G1', zona:'ORIENTE',   depto:'DEPARTAMENTO NORTE', kva:40000, kv_prim:110, kv_sec:34.5, kv_terc:'N/A',
+      refrig:'ONAN-ONAF', reg:'OLTC', anio:1998, uucc_reg:'N4T-40-OLTC', cond:4, imped:'11.8', grupo_conex:'YNyn0(d1)',
+      macro:'MITIGACIÓN DE SOBRECARGA · MANTENIMIENTO OLTC · TERMOGRAFÍA', usuarios:38400, fugas:'Tapa de tanque principal', repot:'Sí' },
+    { fila:2, subestacion:'SUBESTACIÓN B', cod:'90000102', serie:'DEMO-0002', matricula:'T2-B/B-207',
+      grupo:'G1', zona:'OCCIDENTE', depto:'DEPARTAMENTO CENTRO', kva:20000, kv_prim:110, kv_sec:13.8, kv_terc:'N/A',
+      refrig:'ONAN', reg:'NLTC', anio:2011, uucc_reg:'N4T-20-NLTC', cond:2, imped:'9.4', grupo_conex:'YNd1',
+      macro:'INSPECCIÓN PREDICTIVA · ANÁLISIS DE ACEITE', usuarios:14200, fugas:'—', repot:'No' },
+    { fila:3, subestacion:'SUBESTACIÓN C', cod:'90000103', serie:'DEMO-0003', matricula:'T1-C/C-330',
+      grupo:'G2', zona:'ORIENTE',   depto:'DEPARTAMENTO SUR', kva:30000, kv_prim:34.5, kv_sec:13.8, kv_terc:'N/A',
+      refrig:'ONAN-ONAF', reg:'OLTC', anio:1985, uucc_reg:'N3T-20-OLTC', cond:5, imped:'10.6', grupo_conex:'Dyn5',
+      macro:'PLAN DE INVERSIÓN · REPOSICIÓN DE UNIDAD · AUMENTO DE CAPACIDAD', usuarios:22750, fugas:'Bujes AT y radiadores', repot:'Sí' },
+    { fila:4, subestacion:'SUBESTACIÓN D', cod:'90000104', serie:'DEMO-0004', matricula:'T3-D/D-412',
+      grupo:'G2', zona:'BOLÍVAR',   depto:'DEPARTAMENTO COSTA', kva:60000, kv_prim:110, kv_sec:34.5, kv_terc:13.8,
+      refrig:'ONAN-ONAF-OFAF', reg:'OLTC', anio:2004, uucc_reg:'', cond:3, imped:'12.5', grupo_conex:'YNyn0d1',
+      macro:'ACTUALIZACIÓN DEL SISTEMA DE REFRIGERACIÓN · CORRECCIÓN DE FUGAS', usuarios:51100, fugas:'Válvula inferior', repot:'Sí' },
+    { fila:5, subestacion:'SUBESTACIÓN E', cod:'90000105', serie:'DEMO-0005', matricula:'T1-E/E-508',
+      grupo:'G3', zona:'OCCIDENTE', depto:'DEPARTAMENTO CENTRO', kva:10000, kv_prim:34.5, kv_sec:13.8, kv_terc:'N/A',
+      refrig:'ONAN', reg:'NLTC', anio:2016, uucc_reg:'N3T-10-NLTC', cond:1, imped:'8.2', grupo_conex:'Dyn5',
+      macro:'MONITOREO DE CONDICIÓN · TERMOGRAFÍA ANUAL', usuarios:6800, fugas:'—', repot:'No' },
+    { fila:6, subestacion:'SUBESTACIÓN F', cod:'90000106', serie:'DEMO-0006', matricula:'T2-F/F-615',
+      grupo:'G3', zona:'BOLÍVAR',   depto:'DEPARTAMENTO COSTA', kva:15000, kv_prim:null, kv_sec:13.8, kv_terc:'N/A',
+      refrig:'ONAN', reg:'', anio:1992, uucc_reg:'N3T-15-NLTC', cond:null, imped:'', grupo_conex:'',
+      macro:'', usuarios:9300, fugas:'—', repot:'—' },
+    { fila:7, subestacion:'SUBESTACIÓN G', cod:'90000107', serie:'DEMO-0007', matricula:'T1-G/G-720',
+      grupo:'G1', zona:'ORIENTE',   depto:'DEPARTAMENTO NORTE', kva:40000, kv_prim:110, kv_sec:13.8, kv_terc:'N/A',
+      refrig:'ONAN-ONAF', reg:'NLTC', anio:1979, uucc_reg:'', cond:4, imped:'11.1', grupo_conex:'YNd1',
+      macro:'RECUPERACIÓN DE AISLAMIENTO · SECADO · REGENERACIÓN DE ACEITE', usuarios:33400, fugas:'Conservador', repot:'No' }
+  ];
+
+  /* ── Reglas de clasificación (ilustrativas en el preview) ─── */
+  const NIVEL_LBL = { 4:'Nivel 4 · ≥ 57,5 kV', 3:'Nivel 3 · 30–57,5 kV', 2:'Nivel 2 · 1–30 kV' };
+  function nivelDe(kv) {
+    if (kv == null || kv === '') return null;
+    if (kv >= 57.5) return 4;
+    if (kv >= 30)   return 3;
+    return 2;
+  }
+  function bandaDe(mva) {
+    if (mva == null) return '—';
+    if (mva <= 10) return 'hasta 10 MVA';
+    if (mva <= 20) return '> 10 y ≤ 20 MVA';
+    if (mva <= 40) return '> 20 y ≤ 40 MVA';
+    return '> 40 MVA';
+  }
+  function uuccCalc(f) {
+    const n = nivelDe(f.kv_prim);
+    if (n == null) return '';
+    const mva = f.kva / 1000;
+    const cap = mva <= 10 ? 10 : mva <= 20 ? 20 : mva <= 40 ? 40 : 60;
+    return 'N' + n + 'T-' + cap + '-' + (f.reg || 'NLTC');
+  }
+  function enriquecer(f) {
+    const mva = f.kva != null ? f.kva / 1000 : null;
+    const nivel = nivelDe(f.kv_prim);
+    const calc = uuccCalc(f);
+    let estado;
+    if (!calc)                       estado = 'SIN CALCULO';
+    else if (!f.uucc_reg)            estado = 'FALTA REGISTRO';
+    else if (f.uucc_reg !== calc)    estado = 'DISCREPANCIA';
+    else                             estado = 'CONCORDANTE';
+    return Object.assign({}, f, {
+      mva, nivel, banda: bandaDe(mva), uucc_calc: calc, estado,
+      devanado: (f.kv_terc && String(f.kv_terc).toUpperCase() !== 'N/A') ? 'tri' : 'bi',
+      edad: f.anio ? (new Date().getFullYear() - f.anio) : null
+    });
+  }
+
+  const ESTADO_CHIP = {
+    'CONCORDANTE':   ['chip--success', 'check',          'Concordante'],
+    'DISCREPANCIA':  ['chip--danger',  'alert-octagon',  'Discrepancia'],
+    'FALTA REGISTRO':['chip--warn',    'circle-dashed',  'Falta registro'],
+    'SIN CALCULO':   ['',              'minus',          'Sin cálculo']
+  };
+  const COND_LBL = { 1:'Muy bueno', 2:'Bueno', 3:'Medio', 4:'Pobre', 5:'Muy pobre' };
+  const CAT_ACC = {
+    INV:  ['Inversión / Reposición',   'chip--danger'],
+    MIT:  ['Mitigación operativa',     'chip--warn'],
+    MEJ:  ['Recuperación / Mejora',    'chip--success'],
+    CORR: ['Mantenimiento correctivo', 'chip--cyan'],
+    DIAG: ['Monitoreo / Diagnóstico',  'chip--brand']
+  };
+  function catOf(s) {
+    const u = (s || '').toUpperCase();
+    if (/(PLAN DE INVERSI|REPOSICI|AUMENTO DE CAPACIDAD|REEMPLAZO)/.test(u)) return 'INV';
+    if (/(MITIGACI|SOBRECARGA)/.test(u)) return 'MIT';
+    if (/(RECUPERACI|REFRIGERACI|REPOTENCIACI|REGENERACI|SECADO)/.test(u)) return 'MEJ';
+    if (/(FUGAS|OLTC|ACCESORIOS|PINTURA|MANTENIMIENTO)/.test(u)) return 'CORR';
+    return 'DIAG';
+  }
+  const ESTRATEGIA = {
+    1: { obj:'Sostener condición',      prio:'Baja',    horiz:'Plan anual',        foco:['DIAG'] },
+    2: { obj:'Sostener condición',      prio:'Baja',    horiz:'Plan anual',        foco:['DIAG','CORR'] },
+    3: { obj:'Frenar el deterioro',     prio:'Media',   horiz:'12–24 meses',       foco:['CORR','MEJ'] },
+    4: { obj:'Recuperar condición',     prio:'Alta',    horiz:'6–12 meses',        foco:['MEJ','MIT','CORR'] },
+    5: { obj:'Reponer / mitigar riesgo','prio':'Crítica','horiz':'Inmediato',      foco:['INV','MIT'] }
+  };
+  const BASE_COND = {
+    1:['Termografía anual','Inspección visual programada'],
+    2:['Análisis fisicoquímico de aceite','Termografía anual'],
+    3:['Corrección de fugas','Mantenimiento OLTC','Análisis de gases disueltos'],
+    4:['Recuperación de aislamiento · secado','Actualización del sistema de refrigeración','Mitigación de sobrecarga'],
+    5:['Plan de inversión · reposición de unidad','Mitigación de sobrecarga','Monitoreo permanente']
+  };
+
+  const esc = s => (s == null ? '' : String(s))
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const nf = n => (n == null || n === '' ? '—' : Number(n).toLocaleString('es-CO'));
+  const $  = s => document.querySelector(s);
+
+  let DATA = [];
+  let SEL  = null;                 // transformador abierto en la ficha
+  const DIAG = {};                 // estado independiente diagA / diagF por fila
+  const BENEF = {};                // texto de beneficios por fila
+
+  /* ── Tablero ───────────────────────────────────────────── */
+  function kpis() {
+    const n = DATA.length;
+    const c = DATA.filter(f => f.estado === 'CONCORDANTE').length;
+    $('#kUnid').textContent  = n;
+    $('#kConc').textContent  = c;
+    $('#kDisc').textContent  = DATA.filter(f => f.estado === 'DISCREPANCIA').length;
+    $('#kFalta').textContent = DATA.filter(f => f.estado === 'FALTA REGISTRO').length;
+    $('#kConfPct').textContent = n ? (c / n * 100).toFixed(0) + '%' : '—';
+  }
+
+  function poblarFiltros() {
+    const set = (sel, vals, pre) => {
+      const el = $(sel);
+      vals.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = pre + v; el.appendChild(o);
+      });
+    };
+    set('#fNivel',  [...new Set(DATA.map(f => f.nivel).filter(Boolean))].sort(), 'Nivel ');
+    set('#fZona',   [...new Set(DATA.map(f => f.zona).filter(Boolean))].sort(),  '');
+    set('#fEstado', Object.keys(ESTADO_CHIP), '');
+  }
+
+  function filtrar() {
+    const q  = ($('#fQ').value || '').trim().toLowerCase();
+    const nv = $('#fNivel').value, zo = $('#fZona').value, es = $('#fEstado').value;
+    return DATA.filter(f => {
+      if (nv && String(f.nivel) !== nv) return false;
+      if (zo && f.zona !== zo)          return false;
+      if (es && f.estado !== es)        return false;
+      if (!q) return true;
+      return [f.subestacion, f.serie, f.matricula, f.depto, f.zona, f.uucc_reg, f.uucc_calc]
+        .join(' ').toLowerCase().includes(q);
+    });
+  }
+
+  function condChip(v) {
+    const cls = v == null ? 'm1-cna' : 'm1-c' + v;
+    return '<span class="m1-cond ' + cls + '" title="' + (v == null ? 'Sin dato' : v + '/5 · ' + COND_LBL[v]) + '">'
+         + (v == null ? '·' : v) + '</span>';
+  }
+
+  function pintarTabla() {
+    const rows = filtrar();
+    $('#fleetBody').innerHTML = rows.map(f => {
+      const e = ESTADO_CHIP[f.estado];
+      const regCls = f.estado === 'DISCREPANCIA' ? 'm1-code is-bad'
+                   : (!f.uucc_reg ? 'm1-code is-none' : 'm1-code');
+      return '<tr>'
+        + '<td><span class="m1-sub">' + esc(f.subestacion) + '<small>' + esc(f.zona) + ' · ' + esc(f.depto) + '</small></span></td>'
+        + '<td class="mono" style="font-size:11.5px">' + esc(f.matricula) + '</td>'
+        + '<td class="num">' + nf(f.kva) + '</td>'
+        + '<td class="num">' + (f.mva != null ? f.mva : '—') + '</td>'
+        + '<td class="num">' + (f.kv_prim != null ? f.kv_prim : '—') + '</td>'
+        + '<td>' + (f.nivel ? '<span class="chip">N' + f.nivel + '</span>' : '<span class="muted">—</span>') + '</td>'
+        + '<td><span class="' + regCls + '">' + esc(f.uucc_reg || 'sin registro') + '</span></td>'
+        + '<td><span class="m1-code">' + esc(f.uucc_calc || '—') + '</span></td>'
+        + '<td><span class="chip ' + e[0] + '"><i data-lucide="' + e[1] + '"></i>' + e[2] + '</span></td>'
+        + '<td>' + condChip(f.cond) + '</td>'
+        + '<td><button class="btn btn--glass btn--sm" type="button" data-ficha="' + f.fila + '">'
+        + '<i data-lucide="file-badge"></i>Ver ficha</button></td>'
+        + '</tr>';
+    }).join('');
+
+    $('#fleetFoot').textContent = rows.length + ' de ' + DATA.length
+      + ' unidades · conformidad de la selección: '
+      + (rows.length ? (rows.filter(f => f.estado === 'CONCORDANTE').length / rows.length * 100).toFixed(0) + '%' : '—');
+    icons();
+  }
+
+  /* ── Ficha: hoja 1 ─────────────────────────────────────── */
+  function kv(label, val) {
+    return '<div><span>' + esc(label) + '</span><b>' + (val == null || val === '' ? '—' : esc(val)) + '</b></div>';
+  }
+
+  function planFilas(f) {
+    const src = (f.macro || '').split('·').map(s => s.trim()).filter(Boolean);
+    const base = !src.length;
+    const list = base ? (BASE_COND[f.cond] || []) : src;
+    return { base, rows: list.map(s => ({ s, cat: catOf(s) })) };
+  }
+
+  function hojaFicha(f) {
+    const st = f.cond ? ESTRATEGIA[f.cond] : null;
+    const p  = planFilas(f);
+    return ''
+    + '<div class="m1-doc-head">'
+      + '<div><h3>Ficha técnica del transformador</h3>'
+      + '<div class="sub">Plan de acciones según estado de salud · CREG 015/2018 · Metodología de Salud de Activos</div></div>'
+      + '<div class="cod">PE.02081.PE-FO.03<br>hoja 1 de 6</div>'
+    + '</div>'
+
+    + '<div class="m1-h"><span class="n">1</span>Identificación</div>'
+    + '<div class="m1-kv">'
+      + kv('Subestación', f.subestacion) + kv('Código S/E', f.cod)
+      + kv('Serie', f.serie)             + kv('Matrícula', f.matricula)
+      + kv('Grupo', f.grupo)             + kv('Zona', f.zona)
+      + kv('Departamento', f.depto)      + kv('Fila (fuente)', f.fila)
+    + '</div>'
+
+    + '<div class="m1-h"><span class="n">2</span>Datos técnicos / placa</div>'
+    + '<div class="m1-kv">'
+      + kv('Potencia (kVA)', nf(f.kva))  + kv('Capacidad (MVA)', f.mva)
+      + kv('Tensión primaria (kV)', f.kv_prim) + kv('Tensión secundaria (kV)', f.kv_sec)
+      + kv('Tensión terciaria (kV)', f.kv_terc) + kv('Configuración', f.devanado === 'tri' ? 'Tridevanado' : 'Bidevanado')
+      + kv('Refrigeración', f.refrig)    + kv('Regulación', f.reg || '—')
+      + kv('Año de fabricación', f.anio) + kv('Edad (años)', f.edad)
+    + '</div>'
+
+    + '<div class="m1-h"><span class="n">3</span>Clasificación UUCC (CREG 015/2018)</div>'
+    + '<div class="m1-kv">'
+      + kv('UUCC registrada', f.uucc_reg || 'N/D') + kv('UUCC calculada', f.uucc_calc || 'N/D')
+      + kv('Nivel de tensión', f.nivel ? (NIVEL_LBL[f.nivel]) : '—') + kv('Banda de capacidad', f.banda)
+      + kv('Estado de clasificación', ESTADO_CHIP[f.estado][2]) + kv('Origen de la regla', 'Tablas 51 y 52')
+    + '</div>'
+    + (f.estado === 'DISCREPANCIA'
+        ? '<div class="m1-note warn">La UUCC registrada difiere de la calculada por capacidad, nivel y configuración. Requiere corrección del maestro de activos o validación del tipo constructivo.</div>' : '')
+
+    + '<div class="m1-h"><span class="n">4</span>Estado de salud</div>'
+    + '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:8px">'
+      + condChip(f.cond)
+      + '<b style="font-size:15px;color:var(--ink-1)">' + (f.cond ? COND_LBL[f.cond] : 'Sin dato') + '</b>'
+      + '<span class="muted" style="font-size:12px">escala 1 muy bueno → 5 muy pobre</span>'
+    + '</div>'
+    + (st
+      ? '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+        + '<span class="chip"><b>Objetivo:</b>&nbsp;' + st.obj + '</span>'
+        + '<span class="chip"><b>Prioridad:</b>&nbsp;' + st.prio + '</span>'
+        + '<span class="chip"><b>Horizonte:</b>&nbsp;' + st.horiz + '</span>'
+        + st.foco.map(k => '<span class="chip ' + CAT_ACC[k][1] + '">' + CAT_ACC[k][0] + '</span>').join('')
+        + '</div>'
+      : '<div class="m1-note">Sin clasificación de salud en la fuente; el enfoque se definirá tras la evaluación de condición.</div>')
+
+    + '<div class="m1-h"><span class="n">5</span>Insumo del Salud de Activos</div>'
+    + '<div class="m1-note" style="border-left-color:var(--steel);background:rgba(0,40,90,.04);font-family:var(--font-mono);font-size:11.5px">'
+      + esc(f.macro || '(Sin macroactividad registrada para este equipo en la fuente.)') + '</div>'
+    + '<div class="m1-kv" style="margin-top:10px">'
+      + kv('Repotenciación de refrigeración', f.repot) + kv('Ubicación de fugas', f.fugas)
+      + kv('Usuarios asociados', nf(f.usuarios))       + kv('Impedancia (%)', f.imped)
+    + '</div>'
+
+    + '<div class="m1-h"><span class="n">6</span>Plan de acción propuesto</div>'
+    + (p.base ? '<div class="m1-note warn">Este equipo no tiene macroactividad registrada; se propone una <b>línea base por condición ' + (f.cond || 's/d') + '</b>, referencial y sujeta a validación en campo.</div>' : '')
+    + '<ul class="m1-plan">' + (p.rows.length
+        ? p.rows.map(r => '<li><span class="chip ' + CAT_ACC[r.cat][1] + '">' + CAT_ACC[r.cat][0] + '</span><span>' + esc(r.s) + '</span></li>').join('')
+        : '<li><span>Sin acciones registradas ni línea base aplicable.</span></li>') + '</ul>';
+  }
+
+  /* ── Ficha: hoja 2 · Beneficios ────────────────────────── */
+  const REDACCIONES = [
+    ['Confiabilidad', 'Se reduce la probabilidad de indisponibilidad no programada del transformador, mejorando los indicadores SAIDI/SAIFI del área de influencia y la continuidad del servicio a los usuarios asociados.'],
+    ['Capacidad',     'Se recupera margen de capacidad frente a la demanda proyectada, eliminando la condición de sobrecarga y habilitando la conexión de nueva demanda en el nivel de tensión asociado.'],
+    ['Riesgo',        'Se mitiga el riesgo de falla catastrófica del activo (pérdida total del equipo, incendio y afectación ambiental por derrame de aceite), con la consiguiente reducción de la exposición del operador de red.'],
+    ['Costo de ciclo','Se extiende la vida útil remanente del activo y se difiere la inversión de reposición, optimizando el costo de ciclo de vida frente al escenario de operación hasta falla.']
+  ];
+
+  function hojaBenef(f) {
+    const txt = BENEF[f.fila] || '';
+    return ''
+    + '<div class="m1-doc-head"><div><h3>Beneficios del proyecto</h3>'
+      + '<div class="sub">Celda B23 de la plantilla institucional · texto libre con redacciones sugeridas</div></div>'
+      + '<div class="cod">PE.02081.PE-FO.03<br>hoja 2 de 6</div></div>'
+    + '<div class="m1-picks">'
+      + REDACCIONES.map((r, i) => '<button type="button" class="m1-pick" data-red="' + i + '">+ ' + r[0] + '</button>').join('')
+      + '<button type="button" class="m1-pick" data-red="clear">Limpiar</button>'
+    + '</div>'
+    + '<div class="field"><label class="field-label">Texto que se escribirá en la ficha</label>'
+      + '<textarea class="textarea" id="benefTA" placeholder="Elija una o varias redacciones arriba, o escriba la suya.">' + esc(txt) + '</textarea></div>'
+    + '<div class="m1-note">El texto viaja tal cual a la celda B23 del <b>.xlsx</b> institucional. Si queda vacío, la exportación marca el campo como <b>[PENDIENTE]</b> en vez de inventar contenido.</div>';
+  }
+
+  /* ── Ficha: hojas 3 y 4 · Diagramas ────────────────────── */
+  function diagParams(f, which) {
+    const cont = DIAG[f.fila] = DIAG[f.fila] || {};
+    const d = cont[which] = cont[which] || {};
+    if (d.matricula === undefined) d.matricula = f.matricula || '';
+    if (d.mva       === undefined) d.mva       = f.mva != null ? String(f.mva) : '';
+    if (d.kvPrim    === undefined) d.kvPrim    = f.kv_prim != null ? String(f.kv_prim) : '';
+    if (d.kvSec     === undefined) d.kvSec     = f.kv_sec  != null ? String(f.kv_sec)  : '';
+    if (d.reg       === undefined) d.reg       = f.reg || '';
+    if (d.imped     === undefined) d.imped     = f.imped || '';
+    return d;
+  }
+
+  function unifilar(p) {
+    const oltc = /OLTC/i.test(p.reg || '');
+    const cx = 330;
+    const feed = [-63, -21, 21, 63].map(dx =>
+      '<line class="uni-lv" x1="' + (cx + dx) + '" y1="330" x2="' + (cx + dx) + '" y2="362"/>'
+      + '<path class="uni-lv" d="M ' + (cx + dx - 6) + ' 362 l 12 0 l -6 11 z"/>').join('');
+    return '<svg viewBox="0 0 520 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Diagrama unifilar">'
+      + '<line class="uni-hv" x1="' + cx + '" y1="26" x2="' + cx + '" y2="120"/>'
+      + '<rect class="uni-bus" x="' + (cx - 74) + '" y="20" width="148" height="6" rx="3"/>'
+      + (p.kvPrim ? '<text class="uni-t lbl" x="' + (cx + 12) + '" y="72">' + esc(p.kvPrim) + ' kV</text>' : '')
+      + '<circle class="uni-core" cx="' + cx + '" cy="152" r="30"/>'
+      + '<circle class="uni-core" cx="' + cx + '" cy="186" r="30"/>'
+      + (oltc
+          ? '<line class="uni-oltc" x1="' + (cx - 44) + '" y1="212" x2="' + (cx + 44) + '" y2="126" style="fill:none"/>'
+            + '<path class="uni-oltc" d="M ' + (cx + 36) + ' 126 l 11 1 l -4 9 z" style="stroke:none"/>'
+            + '<text class="uni-t lbl" x="' + (cx + 52) + '" y="122" style="fill:var(--warn)">OLTC</text>'
+          : '')
+      + '<line class="uni-lv" x1="' + cx + '" y1="218" x2="' + cx + '" y2="322"/>'
+      + '<rect class="uni-bus" x="' + (cx - 92) + '" y="322" width="184" height="6" rx="3" style="fill:var(--cyan-deep)"/>'
+      + (p.kvSec ? '<text class="uni-t lbl" x="' + (cx - 48) + '" y="316">' + esc(p.kvSec) + ' kV</text>' : '')
+      + feed
+      + '<text class="uni-t big" x="26" y="140">' + esc(p.matricula || '—') + '</text>'
+      + '<text class="uni-t big" x="26" y="168">' + esc(p.mva ? p.mva + ' MVA' : '—') + '</text>'
+      + '<text class="uni-t lbl" x="26" y="192">' + esc(p.reg || 'sin regulación') + '</text>'
+      + (p.imped ? '<text class="uni-t lbl" x="26" y="214">Z = ' + esc(p.imped) + ' %</text>' : '')
+      + '</svg>';
+  }
+
+  function hojaDiag(f, which) {
+    const d = diagParams(f, which);
+    const esF = which === 'diagF';
+    return ''
+    + '<div class="m1-doc-head"><div><h3>' + (esF ? 'Diagrama futuro' : 'Diagrama actual') + '</h3>'
+      + '<div class="sub">' + (esF ? 'Situación propuesta tras la intervención — independiente del actual'
+                                   : 'Situación instalada, semilla de los datos de placa') + '</div></div>'
+      + '<div class="cod">PE.02081.PE-FO.03<br>hoja ' + (esF ? '4' : '3') + ' de 6</div></div>'
+    + '<div class="m1-diag">'
+      + '<div class="m1-formgrid">'
+        + fld(which, 'matricula', 'Matrícula', d.matricula)
+        + fld(which, 'mva',       'Potencia (MVA)', d.mva)
+        + fld(which, 'kvPrim',    'Tensión primaria (kV)', d.kvPrim)
+        + fld(which, 'kvSec',     'Tensión secundaria (kV)', d.kvSec)
+        + '<div class="field"><label class="field-label">Regulación</label>'
+          + '<select class="select" data-diag="' + which + '" data-k="reg">'
+          + ['', 'NLTC', 'OLTC'].map(v => '<option value="' + v + '"' + (d.reg === v ? ' selected' : '') + '>' + (v || '—') + '</option>').join('')
+          + '</select></div>'
+        + fld(which, 'imped', 'Impedancia (%)', d.imped)
+        + (esF ? '<button class="btn btn--glass btn--sm" type="button" id="copyAF"><i data-lucide="copy"></i>Copiar datos del actual</button>' : '')
+      + '</div>'
+      + '<div class="m1-diagbox" id="svg-' + which + '">' + unifilar(d) + '</div>'
+    + '</div>'
+    + '<div class="m1-note">Los dos diagramas son <b>independientes</b>: editar aquí no afecta al '
+      + (esF ? 'diagrama actual' : 'diagrama futuro') + ', ni altera el maestro de la flota. El unifilar se redibuja en vivo con los tokens AQUA.</div>';
+  }
+  function fld(which, k, label, v) {
+    return '<div class="field"><label class="field-label">' + label + '</label>'
+      + '<input class="input" data-diag="' + which + '" data-k="' + k + '" value="' + esc(v) + '"/></div>';
+  }
+
+  /* ── Ficha: hoja 5 · Anexo AT ──────────────────────────── */
+  function hojaAnexo(f) {
+    const onan = f.mva != null ? (Math.round(f.mva * 0.8 * 10) / 10) : '';
+    return ''
+    + '<div class="m1-doc-head"><div><h3>Anexo AT</h3>'
+      + '<div class="sub">Datos de placa del equipo instalado · se escriben en la hoja «Anexo AT» del Excel</div></div>'
+      + '<div class="cod">PE.02081.PE-FO.03<br>hoja 5 de 6</div></div>'
+    + '<div class="m1-tablewrap"><table class="dt" style="min-width:720px"><thead><tr>'
+      + '<th>Transformador</th><th>Pot. ONAN (MVA)</th><th>Pot. ONAF (MVA)</th>'
+      + '<th>Relación de transformación</th><th>Grupo de conexión</th><th>Impedancia %</th><th>Tipo de refrigeración</th>'
+      + '</tr></thead><tbody><tr>'
+      + '<td class="tag">' + esc(f.matricula) + '</td>'
+      + '<td class="num">' + (onan || '—') + '</td>'
+      + '<td class="num">' + (f.mva != null ? f.mva : '—') + '</td>'
+      + '<td class="num">' + (f.kv_prim != null ? f.kv_prim + ' / ' + f.kv_sec : '—') + ' kV</td>'
+      + '<td class="num">' + esc(f.grupo_conex || '—') + '</td>'
+      + '<td class="num">' + esc(f.imped || '—') + '</td>'
+      + '<td>' + esc(f.refrig || '—') + '</td>'
+      + '</tr></tbody></table></div>'
+    + '<div class="m1-tablewrap" style="margin-top:16px"><table class="dt" style="min-width:720px"><thead><tr>'
+      + '<th>Cambiador de tomas (OLTC / OCTC)</th><th>Extensión cambiador</th><th>Porcentaje de paso %</th>'
+      + '<th>Operación en paralelo</th><th>Observación</th>'
+      + '</tr></thead><tbody><tr>'
+      + '<td>' + esc(f.reg || '—') + '</td>'
+      + '<td class="num">' + (/OLTC/i.test(f.reg || '') ? '±10 · 17 pasos' : 'N/A') + '</td>'
+      + '<td class="num">' + (/OLTC/i.test(f.reg || '') ? '1,25' : 'N/A') + '</td>'
+      + '<td>' + (f.grupo === 'G1' ? 'Sí' : 'No') + '</td>'
+      + '<td><span class="muted">completar en campo</span></td>'
+      + '</tr></tbody></table></div>'
+    + '<div class="m1-note">Se autocompleta desde el equipo y los diagramas; lo que falte se completa a mano. '
+      + 'Nada se fabrica: los campos sin dato viajan al Excel marcados como <b>[PENDIENTE]</b>.</div>';
+  }
+
+  /* ── Ficha: hoja 6 · Plan de acciones ──────────────────── */
+  function hojaPlan(f) {
+    const st = f.cond ? ESTRATEGIA[f.cond] : null;
+    const p = planFilas(f);
+    return ''
+    + '<div class="m1-doc-head"><div><h3>Plan de acciones</h3>'
+      + '<div class="sub">Anexo que se imprime aparte · prioridad derivada del estado de salud</div></div>'
+      + '<div class="cod">PE.02081.PE-FO.03<br>hoja 6 de 6</div></div>'
+    + (st ? '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">'
+        + '<span class="chip chip--brand"><i data-lucide="target"></i>' + st.obj + '</span>'
+        + '<span class="chip"><i data-lucide="flag"></i>Prioridad ' + st.prio + '</span>'
+        + '<span class="chip"><i data-lucide="calendar"></i>' + st.horiz + '</span>'
+        + '</div>' : '')
+    + '<div class="m1-tablewrap"><table class="dt" style="min-width:640px"><thead><tr>'
+      + '<th style="width:34%">Categoría</th><th>Acción</th><th style="width:16%">Origen</th>'
+      + '</tr></thead><tbody>'
+      + (p.rows.length
+          ? p.rows.map(r => '<tr><td><span class="chip ' + CAT_ACC[r.cat][1] + '">' + CAT_ACC[r.cat][0] + '</span></td>'
+              + '<td>' + esc(r.s) + '</td>'
+              + '<td class="muted" style="font-size:11.5px">' + (p.base ? 'Línea base · condición ' + f.cond : 'Salud de Activos') + '</td></tr>').join('')
+          : '<tr><td colspan="3" class="muted">Sin acciones registradas ni línea base aplicable.</td></tr>')
+      + '</tbody></table></div>'
+    + '<div class="m1-note">La categoría es una clasificación funcional automática de la macroactividad. '
+      + 'El orden refleja la prioridad asociada al estado de salud; no se incorporan acciones de aceite/DGA: '
+      + 'este módulo trabaja el activo y su clasificación, no el ensayo.</div>';
+  }
+
+  /* ── Modal ─────────────────────────────────────────────── */
+  function renderFicha() {
+    const f = SEL;
+    if (!f) return;
+    $('#m1ModalTitle').textContent = 'Ficha técnica · ' + f.subestacion;
+    const e = ESTADO_CHIP[f.estado];
+    $('#m1ModalMeta').innerHTML =
+        '<span class="chip"><i data-lucide="hash"></i>' + esc(f.matricula) + '</span>'
+      + '<span class="chip chip--cyan">' + nf(f.kva) + ' kVA · ' + (f.kv_prim || '—') + '/' + (f.kv_sec || '—') + ' kV</span>'
+      + '<span class="chip ' + e[0] + '"><i data-lucide="' + e[1] + '"></i>' + e[2] + '</span>'
+      + '<span class="chip">' + (f.cond ? 'Condición ' + f.cond + '/5 · ' + COND_LBL[f.cond] : 'Condición s/d') + '</span>';
+
+    $('#pnFicha').innerHTML = hojaFicha(f);
+    $('#pnBenef').innerHTML = hojaBenef(f);
+    $('#pnDiagA').innerHTML = hojaDiag(f, 'diagA');
+    $('#pnDiagF').innerHTML = hojaDiag(f, 'diagF');
+    $('#pnAnexo').innerHTML = hojaAnexo(f);
+    $('#pnPlan').innerHTML  = hojaPlan(f);
+    icons();
+  }
+
+  function abrirFicha(fila) {
+    SEL = DATA.find(f => f.fila === fila);
+    renderFicha();
+    activarTab('ficha');
+    $('#m1Modal').classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+  function cerrarFicha() {
+    $('#m1Modal').classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  function activarTab(key) {
+    document.querySelectorAll('#fichaTabs .tab-bar [role="tab"]').forEach(b => {
+      const on = b.dataset.tab === key;
+      b.classList.toggle('is-active', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    document.querySelectorAll('#fichaTabs [role="tabpanel"]').forEach(p => {
+      const on = p.dataset.tabPanel === key;
+      p.hidden = !on;
+      p.classList.toggle('is-active', on);
+    });
+  }
+
+  /* ── Eventos ───────────────────────────────────────────── */
+  function wire() {
+    ['#fQ', '#fNivel', '#fZona', '#fEstado'].forEach(s =>
+      $(s).addEventListener('input', pintarTabla));
+    $('#fClr').addEventListener('click', () => {
+      $('#fQ').value = ''; $('#fNivel').value = ''; $('#fZona').value = ''; $('#fEstado').value = '';
+      pintarTabla();
+    });
+
+    $('#fleetBody').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-ficha]');
+      if (b) abrirFicha(Number(b.dataset.ficha));
+    });
+
+    $('#m1Close').addEventListener('click', cerrarFicha);
+    $('#m1Modal').addEventListener('click', ev => { if (ev.target.id === 'm1Modal') cerrarFicha(); });
+    document.addEventListener('keydown', ev => { if (ev.key === 'Escape') cerrarFicha(); });
+
+    $('#fichaTabs').addEventListener('click', ev => {
+      const t = ev.target.closest('[role="tab"]');
+      if (t) activarTab(t.dataset.tab);
+    });
+
+    // Beneficios: redacciones + textarea
+    $('#pnBenef').addEventListener('click', ev => {
+      const b = ev.target.closest('[data-red]');
+      if (!b || !SEL) return;
+      const ta = $('#benefTA');
+      if (b.dataset.red === 'clear') { BENEF[SEL.fila] = ''; ta.value = ''; }
+      else {
+        const t = REDACCIONES[Number(b.dataset.red)][1];
+        BENEF[SEL.fila] = (BENEF[SEL.fila] ? BENEF[SEL.fila] + '\n\n' : '') + t;
+        ta.value = BENEF[SEL.fila];
+        b.classList.add('is-on');
+      }
+    });
+    $('#pnBenef').addEventListener('input', ev => {
+      if (ev.target.id === 'benefTA' && SEL) BENEF[SEL.fila] = ev.target.value;
+    });
+
+    // Diagramas: edición en vivo
+    ['#pnDiagA', '#pnDiagF'].forEach(sel => {
+      $(sel).addEventListener('input', ev => {
+        const el = ev.target.closest('[data-diag]');
+        if (!el || !SEL) return;
+        const which = el.dataset.diag;
+        diagParams(SEL, which)[el.dataset.k] = el.value;
+        $('#svg-' + which).innerHTML = unifilar(diagParams(SEL, which));
+      });
+      $(sel).addEventListener('change', ev => {
+        const el = ev.target.closest('[data-diag]');
+        if (!el || !SEL) return;
+        const which = el.dataset.diag;
+        diagParams(SEL, which)[el.dataset.k] = el.value;
+        $('#svg-' + which).innerHTML = unifilar(diagParams(SEL, which));
+      });
+    });
+    $('#pnDiagF').addEventListener('click', ev => {
+      if (!ev.target.closest('#copyAF') || !SEL) return;
+      const A = diagParams(SEL, 'diagA'), F = diagParams(SEL, 'diagF');
+      Object.keys(A).forEach(k => { F[k] = A[k]; });
+      $('#pnDiagF').innerHTML = hojaDiag(SEL, 'diagF');
+      icons();
+    });
+  }
+
+  function icons() {
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  }
+
+  /* ── Boot: misma convención que parque-transformadores.html ── */
+  async function boot() {
+    let filas = null;
+    if (typeof window.SGM_DATA_SOURCE === 'function') {
+      try { filas = await window.SGM_DATA_SOURCE(); } catch (e) { filas = null; }
+    }
+    // Sin fuente real (preview sin sesión) → muestra de demostración ROTULADA.
+    DATA = (filas && filas.length ? filas : DEMO).map(enriquecer);
+    poblarFiltros();
+    kpis();
+    pintarTabla();
+    wire();
+    icons();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
+</script>
+
+<!-- Iconos: asset LOCAL del repo (no es CDN) -->
+<script src="../assets/vendor/lucide/lucide.min.js"></script>
+<script>if (window.lucide) window.lucide.createIcons();</script>
+</body>
+</html>
