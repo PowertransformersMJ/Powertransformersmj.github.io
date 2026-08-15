@@ -280,3 +280,131 @@ export function filasParaExportar(filas) {
   ]);
   return [cab, ...cuerpo];
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LISTADO → EQUIPOS DEL TABLERO
+   ───────────────────────────────────────────────────────────────────────────
+   Adjuntar un archivo no debe producir solo un informe aparte: debe ALIMENTAR
+   toda la página. Para eso el listado se traduce al contrato plano que entiende
+   `ui/fichas/panel.js` (`normalizarEquipo`), incluidos los ensayos que nutren el
+   bloque de diagnóstico. Lo que el archivo no traiga se queda en null — nunca
+   se rellena con ceros, porque un cero medido y un dato ausente no son lo mismo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/** Columnas de ensayo y condición que se aprovechan si vienen en el archivo. */
+const SINONIMOS_ENSAYO = Object.freeze({
+  fur:   ['FURANOS', 'FURANOS PPB', '2FAL', '2 FAL'],
+  efur:  ['EVALUACION FURANOS', 'CALIF FURANOS'],
+  h2:    ['H2'],   ch4: ['CH4'],  c2h4: ['C2H4'], c2h6: ['C2H6'],
+  c2h2:  ['C2H2'], co:  ['CO'],   co2:  ['CO2'],
+  rig:   ['RIGIDEZ DIELECTRICA', 'RIGIDEZ'],
+  hum:   ['CONTENIDO HUMEDAD', 'HUMEDAD'],
+  nn:    ['NUMERO DE NEUTRALIZACION', 'ACIDEZ', 'INDICE DE NEUTRALIZACION'],
+  tif:   ['TENSION INTERFACIAL', 'TIF'],
+  ic:    ['IC', 'INDICE DE CALIDAD'],
+  crg:   ['CARGABILIDAD'],
+  eadfq: ['EVALUACION ADFQ'],
+  ecrg:  ['EVALUACION CARGABILIDAD'],
+  eherm: ['EVALUACION HERMETICIDAD'],
+  eedad: ['EVALUACION EDAD'],
+  cond:  ['CONDICION ENTERO', 'CONDICION'],
+  edad:  ['EDAD'],
+  anio:  ['ANO DE FABRICACION', 'ANIO DE FABRICACION', 'AÑO DE FABRICACION', 'ANO FABRICACION'],
+  usuarios: ['CANTIDAD DE USUARIOS', 'USUARIOS', 'USUARIOS ASOCIADOS'],
+  causa: ['CAUSANTE', 'CAUSA'],
+  refrigeracion: ['REFRIGERACION'],
+  municipio: ['MUNICIPIO'],
+  codigo: ['CODIGO SUBESTACION', 'CODIGO']
+});
+
+/** Igual que `mapearColumnas`, pero para las columnas de ensayo (todas opcionales). */
+export function mapearEnsayos(encabezados) {
+  const cols = (Array.isArray(encabezados) ? encabezados : []).map(normalizarEncabezado);
+  const mapa = {};
+  for (const [campo, alias] of Object.entries(SINONIMOS_ENSAYO)) {
+    for (const a of alias) {
+      const i = cols.indexOf(a);
+      // `indexOf` toma la PRIMERA aparición: en las exportaciones del parque la
+      // columna «REFRIGERACION» aparece dos veces (tipo y estado) y la buena
+      // para la ficha es la primera.
+      if (i !== -1) { mapa[campo] = i; break; }
+    }
+  }
+  return mapa;
+}
+
+function numero(v) {
+  if (v == null || v === '') return null;
+  const n = parseFloat(String(v).replace(/\s/g, '').replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+/**
+ * Traduce el listado a equipos listos para el tablero.
+ * @param {Array<Array>} matriz filas del archivo (la primera, encabezados)
+ * @returns {{equipos:Array<object>, evaluacion:object}} los equipos y, de paso,
+ *   la evaluación de UUCC ya calculada (para no recorrer el archivo dos veces).
+ */
+export function equiposDesdeListado(matriz) {
+  const evaluacion = evaluarListado(matriz);
+  const encabezados = evaluacion.encabezados || [];
+  const mapa = evaluacion.mapa || {};
+  const ens = mapearEnsayos(encabezados);
+  const datos = Array.isArray(matriz) ? matriz : [];
+
+  const equipos = evaluacion.filas.map((ev) => {
+    const cruda = datos[ev.fila - 1] || [];
+    const g = (campo) => celda(cruda, ens[campo]);
+    const n = (campo) => numero(g(campo));
+
+    return {
+      // Identidad y ubicación
+      fila: ev.fila,
+      codigo: g('codigo') || '',
+      serie: ev.serie || '',
+      matricula: ev.matricula || '',
+      subestacion: ev.subestacion || '',
+      municipio: g('municipio') || '',
+      zona: ev.zona || '',
+      departamento: ev.departamento || '',
+      // Placa
+      potencia_kva: numero(ev.potenciaKva),
+      kv_prim: numero(ev.kvPrim),
+      kv_sec: numero(ev.kvSec),
+      kv_terc: numero(ev.kvTerc),
+      regulacion: ev.regulacion || '',
+      refrigeracion: g('refrigeracion') || '',
+      // Veredicto de UUCC: se pasa ya resuelto para que el tablero no lo
+      // recalcule y las dos vistas no puedan discrepar.
+      uucc_registrada: ev.uuccRegistrada || '',
+      uucc_calculada: ev.uuccCalculada || '',
+      estado_uucc: ev.estado,
+      // Condición y contexto
+      cond_int: n('cond'),
+      edad: n('edad'),
+      anio_fab: n('anio'),
+      usuarios: n('usuarios'),
+      causante: g('causa') || '',
+      calif_fur: n('efur'),
+      calif_adfq: n('eadfq'),
+      calif_crg: n('ecrg'),
+      calif_her: n('eherm'),
+      calif_edad: n('eedad'),
+      // Ensayos (alimentan el bloque «Diagnóstico medido» de la ficha)
+      det: {
+        fur2fal: n('fur'),
+        h2: n('h2'), ch4: n('ch4'), c2h4: n('c2h4'), c2h6: n('c2h6'),
+        c2h2: n('c2h2'), co: n('co'), co2: n('co2'),
+        rigidez: n('rig'), humedad: n('hum'), nn: n('nn'),
+        ti: n('tif'), ic: n('ic'), carga: n('crg')
+      }
+    };
+  });
+
+  return { equipos, evaluacion };
+}
+
+/** Qué columnas de ensayo se reconocieron: sirve para decirle al usuario qué se aprovechó. */
+export function ensayosReconocidos(encabezados) {
+  return Object.keys(mapearEnsayos(encabezados));
+}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Adjuntar listado actualiza toda la página</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/fichas-tecnicas.css">
+<style>body{padding:20px;background:#f4f6fb;font-family:system-ui,sans-serif}
+.dev{max-width:1200px;margin:0 auto;background:#fff;padding:18px;border-radius:14px}
+.devh{font:600 13px/1.45 system-ui;color:#b26a00;background:#fff4e5;padding:10px 12px;border-radius:10px;margin-bottom:14px}</style>
+</head>
+<body class="aqua">
+<div class="dev">
+  <div class="devh">DEV · Panel REAL + segmento REAL conectados. Arranca con un «parque vivo»
+    simulado de 3 equipos; el botón adjunta un listado de 7 y debe actualizarse TODO.</div>
+  <button id="demo" class="ftm-btn ftm-btn--primary">Adjuntar listado de prueba</button>
+  <div id="fichasPanel"></div>
+  <div id="evaluacionUucc"></div>
+</div>
+<script type="module">
+import { montarPanelFichas } from '../assets/js/ui/fichas/panel.js';
+import { montarEvaluacionMasiva } from '../assets/js/ui/fichas/evaluacion-masiva.js';
+
+// «Parque vivo» simulado: 3 equipos ficticios.
+const VIVO = [
+  { fila:1, subestacion:'PARQUE VIVO 1', matricula:'TX-V-01', potencia_kva:20000, kv_prim:66, kv_sec:13.8, regulacion:'OLTC', uucc_registrada:'N4T4' },
+  { fila:2, subestacion:'PARQUE VIVO 2', matricula:'TX-V-02', potencia_kva:10000, kv_prim:34.5, kv_sec:13.8, regulacion:'NLTC', uucc_registrada:'N3T3' },
+  { fila:3, subestacion:'PARQUE VIVO 3', matricula:'TX-V-03', potencia_kva:30000, kv_prim:110, kv_sec:13.8, regulacion:'OLTC', uucc_registrada:'N4T6' }
+];
+const panel = montarPanelFichas(document.getElementById('fichasPanel'), {
+  fuente: async () => VIVO, origen: 'Parque vivo (simulado)'
+});
+window.__panel = panel;
+
+const seg = montarEvaluacionMasiva(document.getElementById('evaluacionUucc'), {
+  onListado({ equipos, archivo }) {
+    panel.fijarDatos(equipos, { origen: 'Listado adjunto · ' + archivo });
+  },
+  onRestaurar() { panel.recargar(); }
+});
+window.__seg = seg;
+
+const CAB=['SUBESTACION','MATRICULA','SERIE','POTENCIA (KVA)','NIVEL DE TENSION PRIMARIO (KV)',
+'NIVEL DE TENSION SECUNDARIO (KV)','NIVEL DE TENSION TERCEARIO (KV)','REGULACION','UUCC','ZONA','DEPARTAMENTO',
+'FURANOS','EVALUACION FURANOS','H2','CH4','C2H4','C2H2','CO','CO2','RIGIDEZ DIELECTRICA','CONTENIDO HUMEDAD',
+'CARGABILIDAD','EDAD','AÑO DE FABRICACION','CANTIDAD DE USUARIOS','CONDICION'];
+const F=[
+ ['SUBESTACIÓN A','TX-A-01','S-1001',20000,66,13.8,'N/A','OLTC','N4T4','ZONA 1','DPTO 1',5779,5,378,2580,3882,57,1872,10818,27,19,98,43,1982,3816,5],
+ ['SUBESTACIÓN B','TX-B-01','S-1002',20000,66,13.8,'N/A','OLTC','N4T2','ZONA 1','DPTO 1',120,1,20,10,5,0,300,2000,55,8,60,12,2013,900,2],
+ ['SUBESTACIÓN C','TX-C-01','S-1003',10000,34.5,13.8,'N/A','NLTC','','ZONA 2','DPTO 2',80,1,15,8,4,0,250,1800,58,7,45,9,2016,500,1],
+ ['SUBESTACIÓN D','TX-D-01','S-1004',12500,'',13.8,'N/A','OLTC','N3T4','ZONA 2','DPTO 2',87,1,105,38,80,0,1239,14740,52,10,98,26,1999,9942,4],
+ ['SUBESTACIÓN E','TX-E-01','S-1005',30000,110,34.5,13.8,'OLTC','N4T6','ZONA 3','DPTO 3',8744,5,10,4,25,2.9,483,4130,25,26,62,27,1998,21525,5],
+ ['SUBESTACIÓN F','TX-F-01','S-1006',40000,110,13.8,'N/A','OLTC','n4-t6','ZONA 3','DPTO 3',300,2,12,6,9,0,400,2500,50,9,70,15,2010,1200,2],
+ ['SUBESTACIÓN G','TX-G-01','S-1007',2000,34.5,13.8,'N/A','NLTC','N3T1','ZONA 1','DPTO 1',14392,5,30,20,15,1,900,6000,30,22,55,41,1984,82,5],
+];
+function archivoCSV(){
+  const csv=[CAB,...F].map(f=>f.map(c=>{const s=String(c==null?'':c);
+    return /[";\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(';')).join('\r\n');
+  return new File(['﻿'+csv],'parque_actualizado.csv',{type:'text/csv'});
+}
+document.getElementById('demo').addEventListener('click',()=>{
+  const dt=new DataTransfer(); dt.items.add(archivoCSV());
+  document.querySelector('#evaluacionUucc [data-ftm="zona"]')
+    .dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+});
+</script>
+</body></html>

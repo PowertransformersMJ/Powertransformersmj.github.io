@@ -66,11 +66,23 @@
   });
 
   // ── Segmento de evaluación masiva ─────────────────────────────────────────
-  // Se monta aparte del panel: si el parque vivo fallara, este segmento sigue
-  // sirviendo, porque trabaja sobre el archivo que adjunte el usuario. El
-  // archivo se lee en el navegador y no se envía a ningún servidor.
+  // El archivo se lee en el navegador y no se envía a ningún servidor.
+  // Al adjuntarlo, el listado ALIMENTA toda la página: el tablero, los
+  // contadores y las fichas pasan a mostrar lo que trae el archivo, rotulado
+  // como tal. «Volver al parque vivo» rehace la lectura de Firestore.
+  // Nada de esto escribe en la base: persistir un listado tiene su propia ruta
+  // en admin/importar.html, con simulación previa.
   const { montarEvaluacionMasiva } = await import('../assets/js/ui/fichas/evaluacion-masiva.js');
-  window.__sgmEvalUucc = montarEvaluacionMasiva(document.getElementById('evaluacionUucc'));
+  window.__sgmEvalUucc = montarEvaluacionMasiva(document.getElementById('evaluacionUucc'), {
+    onListado({ equipos, archivo }) {
+      window.__sgmFichas.fijarDatos(equipos, { origen: 'Listado adjunto · ' + archivo });
+      document.getElementById('fichasPanel')
+        .scrollIntoView({ behavior: 'smooth', block: 'start' });
+    },
+    onRestaurar() {
+      window.__sgmFichas.recargar();
+    }
+  });
 </script>
 
 <script src="../assets/vendor/lucide/lucide.min.js" defer></script>

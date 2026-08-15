@@ -14,7 +14,7 @@
  */
 
 import {
-  ESTADOS, evaluarListado, ordenarPorGravedad, filasParaExportar
+  ESTADOS, equiposDesdeListado, ordenarPorGravedad, filasParaExportar, ensayosReconocidos
 } from '../../domain/fichas_evaluacion_uucc.js';
 
 /** Mismo CDN de SheetJS que ya usan `ui/calidad/upload.js` y `data/seguimiento_scada_excel.js`. */
@@ -92,6 +92,10 @@ function tarjeta(valor, etiqueta, sufijo, mod) {
  * @param {HTMLElement|string} contenedor elemento o id
  * @param {object} [opts]
  * @param {number} [opts.maxFilasTabla=400] tope de filas pintadas (la exportación las lleva todas)
+ * @param {Function} [opts.onListado] se llama con ({equipos, evaluacion, archivo}) cada vez
+ *   que se adjunta un listado válido. Es el enganche que hace que el archivo
+ *   actualice TODA la página, no solo este segmento.
+ * @param {Function} [opts.onRestaurar] se llama al pedir volver a la fuente viva.
  * @returns {{destruir:Function, resultado:Function}}
  */
 export function montarEvaluacionMasiva(contenedor, opts = {}) {
@@ -171,7 +175,10 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
       }
       if (!usada) { decir('El archivo no tiene ninguna hoja con datos.', 'warn'); return; }
 
-      ultimo = evaluarListado(matriz);
+      const { equipos, evaluacion } = equiposDesdeListado(matriz);
+      ultimo = evaluacion;
+      ultimo.equipos = equipos;
+      ultimo.ensayos = ensayosReconocidos(evaluacion.encabezados);
       ultimo.archivo = nombre;
       ultimo.hoja = usada;
       ultimo.hojas = hojas;
@@ -181,7 +188,11 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
       if (ultimo.faltantes.length) {
         decir('Faltan columnas imprescindibles: ' + ultimo.faltantes.join(', ')
           + '. Sin ellas no se puede calcular la Unidad Constructiva.', 'warn');
+        // Aunque falten columnas, si algo se pudo leer se propaga igual: es
+        // preferible un tablero parcial y rotulado que una pantalla vacía.
+        propagar();
       } else {
+        propagar();
         decir(nombre + ' · hoja «' + usada + '» · ' + ultimo.filas.length + ' equipos evaluados'
           + (hojas.length > 1 ? ' (el archivo tiene ' + hojas.length + ' hojas; se evaluó la primera con datos)' : ''),
           'ok');
@@ -191,13 +202,59 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
     }
   }
 
+
+  /**
+   * Propaga el listado al resto de la página. Es lo que convierte este segmento
+   * en una fuente de datos y no en un informe aislado: el tablero, los
+   * contadores y las fichas pasan a mostrar lo que trae el archivo.
+   */
+  function propagar() {
+    if (typeof opts.onListado !== 'function' || !ultimo) return;
+    try {
+      opts.onListado({
+        equipos: ultimo.equipos || [],
+        evaluacion: ultimo,
+        archivo: ultimo.archivo || 'listado adjunto'
+      });
+    } catch (err) {
+      console.warn('[fichas/evaluacion-masiva] el consumidor del listado falló:', err);
+      decir('El listado se evaluó, pero el tablero no pudo actualizarse: ' + (err.message || err), 'warn');
+    }
+  }
+
+  /** Devuelve la página a su fuente viva y limpia el resultado del archivo. */
+  function restaurar() {
+    ultimo = null; filtro = null;
+    salida.innerHTML = '';
+    decir('', null);
+    if (typeof opts.onRestaurar === 'function') {
+      try { opts.onRestaurar(); } catch (err) {
+        console.warn('[fichas/evaluacion-masiva] no se pudo restaurar la fuente viva:', err);
+      }
+    }
+  }
+
   /* ── Pintado del resultado ───────────────────────────────── */
 
   function pintar() {
     if (!ultimo) { salida.innerHTML = ''; return; }
     const r = ultimo.resumen;
 
-    let h = '<div class="ftm-kpis">'
+    // Rótulo permanente: mientras haya un archivo cargado, TODA la página está
+    // mostrando ese archivo y no el parque vivo. Decirlo evita decisiones
+    // tomadas sobre datos que se creían de Firestore.
+    let h = '<div class="ftm-eval-origen">'
+      + '<span class="ftm-eval-origen-txt">La página está mostrando <b>'
+      + esc(ultimo.archivo || 'el listado adjunto') + '</b>'
+      + (ultimo.equipos ? ' · ' + ultimo.equipos.length + ' equipos' : '')
+      + (ultimo.ensayos && ultimo.ensayos.length
+          ? ' · ' + ultimo.ensayos.length + ' columnas de ensayo aprovechadas'
+          : ' · sin columnas de ensayo reconocidas')
+      + '</span>'
+      + '<button type="button" class="ftm-btn" data-ftm="restaurar">Volver al parque vivo</button>'
+      + '</div>';
+
+    h += '<div class="ftm-kpis">'
       + tarjeta(r.total, 'Equipos evaluados', ultimo.descartadas ? ultimo.descartadas + ' filas vacías omitidas' : '', 'total')
       + tarjeta(r.concordantes, 'Concordantes', r.pctConcordantes + ' %', 'ok')
       + tarjeta(r.discrepancias, 'Discrepancias', 'requieren decisión', 'err')
@@ -337,7 +394,8 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
       const v = b.getAttribute('data-valor');
       filtro = v === '' ? null : v;
       pintar();
-    } else if (q === 'csv') { exportarCSV(); }
+    } else if (q === 'restaurar') { restaurar(); }
+    else if (q === 'csv') { exportarCSV(); }
     else if (q === 'xlsx') { exportarXLSX(); }
   };
 
@@ -351,6 +409,7 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
 
   return {
     resultado: () => ultimo,
+    restaurar,
     destruir() {
       zona.removeEventListener('click', onClickZona);
       zona.removeEventListener('keydown', onTeclaZona);

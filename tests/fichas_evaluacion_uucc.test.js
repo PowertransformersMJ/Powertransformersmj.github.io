@@ -143,3 +143,59 @@ test('la exportación lleva la traza del cálculo, no solo el veredicto', () => 
   assert.equal(cab.length, primera.length);
   assert.match(String(primera[primera.length - 2]), /MVA/);
 });
+
+/* ── El listado como fuente de datos de toda la página ──────────────────── */
+
+import { equiposDesdeListado, mapearEnsayos, ensayosReconocidos }
+  from '../assets/js/domain/fichas_evaluacion_uucc.js';
+
+const CAB_FULL = [...CAB, 'FURANOS', 'EVALUACION FURANOS', 'H2', 'CH4', 'C2H4', 'C2H2',
+  'CO', 'CO2', 'RIGIDEZ DIELECTRICA', 'CONTENIDO HUMEDAD', 'CARGABILIDAD',
+  'EDAD', 'AÑO DE FABRICACION', 'CANTIDAD DE USUARIOS', 'CONDICION', 'MUNICIPIO'];
+
+const filaFull = (sub, uucc, extra) =>
+  [...fila(sub, 'TX-01', 20000, 66, 'N/A', 'OLTC', uucc), ...extra];
+
+test('mapearEnsayos reconoce las columnas de ensayo del parque', () => {
+  const m = mapearEnsayos(CAB_FULL);
+  assert.equal(m.fur, CAB.length);
+  assert.ok(m.h2 !== undefined && m.co2 !== undefined && m.crg !== undefined);
+  assert.ok(ensayosReconocidos(CAB_FULL).length >= 12);
+});
+
+test('equiposDesdeListado entrega equipos con placa, veredicto y ensayos', () => {
+  const m = [CAB_FULL,
+    filaFull('SUBESTACIÓN A', 'N4T4', [5779, 5, 378, 2580, 3882, 57, 1872, 10818, 27, 19, 98, 43, 1982, 3816, 5, 'MUNICIPIO A'])];
+  const { equipos, evaluacion } = equiposDesdeListado(m);
+  assert.equal(equipos.length, 1);
+  const e = equipos[0];
+  assert.equal(e.subestacion, 'SUBESTACIÓN A');
+  assert.equal(e.potencia_kva, 20000);
+  assert.equal(e.kv_prim, 66);
+  assert.equal(e.uucc_registrada, 'N4T4');
+  assert.equal(e.estado_uucc, ESTADOS.CONCORDANTE);
+  assert.equal(e.det.fur2fal, 5779, 'los furanos deben viajar al bloque de diagnóstico');
+  assert.equal(e.det.c2h2, 57);
+  assert.equal(e.cond_int, 5);
+  assert.equal(e.usuarios, 3816);
+  assert.equal(e.municipio, 'MUNICIPIO A');
+  // La evaluación viene de un solo recorrido, no de dos.
+  assert.equal(evaluacion.filas.length, 1);
+});
+
+test('lo que el archivo no trae se queda en null, no en cero', () => {
+  const { equipos } = equiposDesdeListado([CAB,
+    fila('SUBESTACIÓN B', 'TX-02', 10000, 34.5, 'N/A', 'NLTC', 'N3T3')]);
+  const e = equipos[0];
+  assert.equal(e.det.fur2fal, null, 'sin columna de furanos NO se asume 0');
+  assert.equal(e.cond_int, null);
+  assert.equal(e.usuarios, null);
+  assert.equal(e.estado_uucc, ESTADOS.CONCORDANTE, 'la UUCC sí se evalúa igual');
+});
+
+test('el veredicto viaja resuelto para que tablero e informe no discrepen', () => {
+  const { equipos, evaluacion } = equiposDesdeListado([CAB,
+    fila('SUBESTACIÓN C', 'TX-03', 20000, 66, 'N/A', 'OLTC', 'N4T2')]);
+  assert.equal(equipos[0].estado_uucc, evaluacion.filas[0].estado);
+  assert.equal(equipos[0].uucc_calculada, evaluacion.filas[0].uuccCalculada);
+});
