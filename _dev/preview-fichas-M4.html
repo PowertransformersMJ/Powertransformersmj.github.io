@@ -1,0 +1,1155 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MODELO 4 · Adopción por capas — Fichas Técnicas · SGM · TRANSPOWER</title>
+<meta name="robots" content="noindex,nofollow">
+
+<!--
+  ══════════════════════════════════════════════════════════════════════════════
+  PREVIEW · NO ES PRODUCCIÓN · MODELO 4 — "ADOPCIÓN POR CAPAS"
+  ══════════════════════════════════════════════════════════════════════════════
+  Archivo de trabajo (_dev/). No modifica NINGÚN archivo del repo.
+  Sí carga de verdad el sistema de diseño AQUA LIGHT (tokens + componentes + tabs)
+  para que lo que se ve aquí sea lo que se vería en pages/fichas-tecnicas.html.
+
+  NO se cargan page-guard.js ni aqua-shell.js: el preview corre SIN sesión.
+  El marco (topbar + sidebar) está SIMULADO con clases .pv-* propias de este
+  archivo, únicamente para juzgar la composición.
+
+  DATOS: MUESTRA INVENTADA de 7 equipos (SUBESTACION A..G). PROHIBIDO traer aquí
+  los 208 registros reales ni nombres de subestaciones reales — este repo es
+  PÚBLICO. En producción los datos entran por:
+
+      window.SGM_DATA_SOURCE = async function () {
+        return await import('../data/transformadores.js')
+                 .then(m => m.listarTransformadoresSalud());
+      };
+
+  (misma convención ya usada en pages/parque-transformadores.html)
+
+  PESOS CITADOS EN LA PÁGINA — medidos hoy sobre el archivo fuente
+  ~/Desktop/GitHub-MJ/Fichas Tecnicas/Modulo_Fichas_Tecnicas_v22.html
+  (1.869.384 bytes) con: awk '{print NR, length($0)}' | sort -k2 -rn
+      L615  const DATA          280.299 ch ≈ 274 kB  (208 registros reales)
+      L1040 SRC_XLSX_B64        323.054 ch ≈ 315 kB
+      L1041 FT_TPL_B64          657.684 ch ≈ 642 kB  (plantilla PE.02081)
+      L1561 FT_SHEET_IMG        341.462 ch ≈ 333 kB  (imágenes de las hojas)
+      L1579 DIAG                 52.282 ch ≈  51 kB  (datos de diagramas)
+  Las dos librerías CDN (xlsx.full.min.js, jszip.min.js) NO fueron medidas:
+  aparecen rotuladas como aproximadas.
+  ══════════════════════════════════════════════════════════════════════════════
+-->
+
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/tabs.css">
+
+<style>
+/* ───────────────────────────────────────────────────────────────
+   ESTILOS EXCLUSIVOS DEL PREVIEW (prefijo .pv-)
+   Nada de esto viaja a producción: es el andamio para juzgar.
+   ─────────────────────────────────────────────────────────────── */
+
+/* Banda fija de identificación del modelo */
+.pv-band{
+  position:fixed; top:0; left:0; right:0; z-index:9000;
+  background:linear-gradient(100deg,#0a2540 0%,#0d3a5c 55%,#0b4f6c 100%);
+  color:#fff; padding:9px 22px;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  box-shadow:0 2px 14px rgba(0,30,60,.28);
+  font-family:var(--font-sans);
+}
+.pv-band-tag{
+  font-family:var(--font-mono); font-size:11px; font-weight:700;
+  letter-spacing:.10em; text-transform:uppercase;
+  background:rgba(255,255,255,.16); border:1px solid rgba(255,255,255,.28);
+  padding:4px 11px; border-radius:999px; white-space:nowrap;
+}
+.pv-band-txt{ font-size:12.5px; line-height:1.45; color:rgba(255,255,255,.94); }
+.pv-band-txt b{ color:#7fd4ff; font-weight:700; }
+.pv-band-txt .pv-conc{ color:#ffcf7a; font-weight:700; }
+.pv-band-note{
+  margin-left:auto; font-family:var(--font-mono); font-size:10px;
+  letter-spacing:.08em; text-transform:uppercase; color:rgba(255,255,255,.55);
+  white-space:nowrap;
+}
+
+/* Marco simulado — topbar + rail lateral. Solo composición. */
+.pv-topbar{
+  position:fixed; top:var(--pv-band-h,58px); left:0; right:0; height:56px; z-index:8000;
+  display:flex; align-items:center; gap:14px; padding:0 22px;
+  background:rgba(255,255,255,.62);
+  backdrop-filter:blur(28px) saturate(180%);
+  -webkit-backdrop-filter:blur(28px) saturate(180%);
+  border-bottom:1px solid rgba(0,40,90,.08);
+}
+.pv-topbar .pv-logo{
+  font-family:var(--font-sans); font-weight:800; font-size:14.5px;
+  color:var(--ink-1); letter-spacing:-.02em;
+}
+.pv-topbar .pv-logo span{ color:var(--brand); font-weight:600; }
+.pv-fake{
+  font-family:var(--font-mono); font-size:9.5px; letter-spacing:.10em;
+  text-transform:uppercase; color:var(--ink-4);
+  border:1px dashed rgba(0,40,90,.22); border-radius:6px; padding:3px 8px;
+}
+.pv-topbar .pv-right{ margin-left:auto; display:flex; align-items:center; gap:10px; }
+
+.pv-rail{
+  position:fixed; top:calc(var(--pv-band-h,58px) + 56px); bottom:0; left:0; width:224px; z-index:7000;
+  padding:18px 12px; overflow:auto;
+  background:rgba(255,255,255,.46);
+  backdrop-filter:blur(24px) saturate(170%);
+  -webkit-backdrop-filter:blur(24px) saturate(170%);
+  border-right:1px solid rgba(0,40,90,.08);
+}
+.pv-rail-t{
+  font-family:var(--font-mono); font-size:9.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-4); margin:14px 10px 7px;
+}
+.pv-rail a{
+  display:block; padding:8px 12px; border-radius:9px;
+  font-size:13px; color:var(--ink-2); font-weight:500; text-decoration:none;
+}
+.pv-rail a.on{ background:rgba(0,122,255,.13); color:var(--brand-deep); font-weight:650; }
+
+/* Neutraliza el offset del shell real (aqua-shell.js no corre aquí) */
+body.aqua .app-main.pv-main{
+  margin-left:224px;
+  padding:calc(var(--pv-band-h,58px) + 56px + 26px) 34px 90px;
+  max-width:1500px;
+}
+@media (max-width:1100px){
+  .pv-rail{ display:none; }
+  body.aqua .app-main.pv-main{ margin-left:0; padding-left:20px; padding-right:20px; }
+  .pv-band-note{ display:none; }
+}
+
+/* ── Panel de CAPAS (el corazón del modelo) ── */
+.pv-layers{ margin-bottom:26px; }
+.pv-layer-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:14px; }
+@media (max-width:900px){ .pv-layer-grid{ grid-template-columns:1fr; } }
+
+.pv-layer{
+  border-radius:14px; padding:16px 17px;
+  background:rgba(255,255,255,.55);
+  border:1px solid rgba(0,40,90,.09);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+  position:relative; overflow:hidden;
+  transition:border-color .2s ease, box-shadow .2s ease, background .2s ease;
+}
+.pv-layer[data-state="activa"]{
+  border-color:rgba(28,200,112,.42);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 1px rgba(28,200,112,.18);
+}
+.pv-layer[data-state="cargando"]{
+  border-color:rgba(255,149,0,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.7), 0 0 0 1px rgba(255,149,0,.22);
+}
+.pv-layer[data-state="diferida"]{ background:rgba(255,255,255,.34); }
+.pv-layer[data-state="diferida"] .pv-layer-body{ opacity:.72; }
+
+.pv-layer-head{ display:flex; align-items:center; gap:9px; margin-bottom:9px; flex-wrap:wrap; }
+.pv-layer-n{
+  width:23px; height:23px; border-radius:7px; flex:none;
+  display:grid; place-items:center;
+  font-family:var(--font-mono); font-size:11.5px; font-weight:700;
+  background:rgba(0,40,90,.09); color:var(--ink-2);
+}
+.pv-layer[data-state="activa"] .pv-layer-n{ background:rgba(28,200,112,.18); color:#00753d; }
+.pv-layer[data-state="cargando"] .pv-layer-n{ background:rgba(255,149,0,.20); color:#a35400; }
+.pv-layer-name{ font-size:13.5px; font-weight:700; color:var(--ink-1); letter-spacing:-.01em; }
+.pv-layer-body{ font-size:12.5px; color:var(--ink-3); line-height:1.5; }
+.pv-layer-kb{
+  font-family:var(--font-mono); font-size:19px; font-weight:600;
+  color:var(--ink-1); letter-spacing:-.02em; margin:9px 0 3px;
+}
+.pv-layer-kb small{ font-size:11px; color:var(--ink-4); font-weight:500; letter-spacing:0; }
+
+/* Barra de progreso de una capa diferida */
+.pv-prog{ height:5px; border-radius:3px; background:rgba(0,40,90,.10); overflow:hidden; margin-top:11px; }
+.pv-prog i{ display:block; height:100%; width:0; border-radius:3px; background:linear-gradient(90deg,#ffb800,#ff9500); transition:width .18s linear; }
+.pv-prog-txt{ font-family:var(--font-mono); font-size:10.5px; color:var(--ink-4); margin-top:6px; min-height:14px; letter-spacing:.02em; }
+
+/* Medidor global de peso descargado */
+.pv-meter{ margin-top:18px; padding-top:16px; border-top:1px solid rgba(0,40,90,.08); }
+.pv-meter-head{ display:flex; justify-content:space-between; align-items:baseline; gap:12px; flex-wrap:wrap; margin-bottom:9px; }
+.pv-meter-lbl{ font-family:var(--font-mono); font-size:10.5px; letter-spacing:.10em; text-transform:uppercase; color:var(--ink-4); }
+.pv-meter-val{ font-family:var(--font-mono); font-size:14px; font-weight:650; color:var(--ink-1); }
+.pv-meter-val b{ color:var(--brand-deep); }
+.pv-meter-bar{ height:24px; border-radius:8px; background:rgba(0,40,90,.07); display:flex; overflow:hidden; border:1px solid rgba(0,40,90,.08); }
+.pv-seg{
+  height:100%; display:grid; place-items:center;
+  font-family:var(--font-mono); font-size:10px; font-weight:700; color:#fff;
+  white-space:nowrap; overflow:hidden;
+  transition:width .3s var(--ease-out,cubic-bezier(.2,.8,.2,1));
+}
+.pv-seg--c1{ background:linear-gradient(180deg,#22b573,#12994f); }
+.pv-seg--c2{ background:linear-gradient(180deg,#ffb31f,#f08a00); }
+.pv-seg--c3{ background:linear-gradient(180deg,#8f74ff,#6a4de0); }
+.pv-seg--rest{ background:transparent; color:var(--ink-4); }
+.pv-meter-foot{ font-size:11.5px; color:var(--ink-4); margin-top:8px; line-height:1.5; }
+
+/* Selector de estado del preview (a/b/c) */
+.pv-states{ display:flex; gap:7px; align-items:center; flex-wrap:wrap; }
+.pv-state-btn{
+  border:1px solid rgba(0,40,90,.14); background:rgba(255,255,255,.6);
+  color:var(--ink-2); font:600 11.5px var(--font-sans);
+  padding:6px 12px; border-radius:999px; cursor:pointer;
+  transition:background .15s ease, color .15s ease, border-color .15s ease;
+}
+.pv-state-btn:hover{ background:rgba(0,122,255,.08); }
+.pv-state-btn.on{ background:rgba(0,122,255,.15); border-color:rgba(0,122,255,.34); color:var(--brand-deep); }
+
+/* ── Tablero de flota ── */
+.pv-stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:24px; }
+@media (max-width:900px){ .pv-stats{ grid-template-columns:repeat(2,1fr); } }
+@media (max-width:520px){ .pv-stats{ grid-template-columns:1fr; } }
+
+.pv-filters{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:16px; }
+.pv-inp{
+  border:1px solid rgba(0,40,90,.14); background:rgba(255,255,255,.72);
+  border-radius:10px; padding:8px 12px; font:500 13px var(--font-sans);
+  color:var(--ink-1); min-width:160px;
+}
+.pv-inp:focus{ outline:none; border-color:var(--brand); box-shadow:0 0 0 3px rgba(0,122,255,.15); }
+
+.pv-tblwrap{ overflow-x:auto; border-radius:12px; }
+.pv-cond{
+  display:inline-grid; place-items:center; width:24px; height:24px; border-radius:7px;
+  font:700 12px var(--font-mono); color:#fff;
+}
+.pv-c1{ background:#1cc870; } .pv-c2{ background:#7fbf12; } .pv-c3{ background:#ffb800; color:#3a2b00; }
+.pv-c4{ background:#ff9500; } .pv-c5{ background:#ff3b30; }
+.pv-num{ font-family:var(--font-mono); font-size:12.5px; color:var(--ink-2); }
+.pv-code{ font-family:var(--font-mono); font-size:12px; color:var(--ink-3); }
+.pv-sub{ font-weight:650; color:var(--ink-1); }
+
+/* ── Modal ficha (ensanchado respecto al .modal base de 560px) ── */
+.pv-modal-bg{ display:none; }
+.pv-modal-bg.on{ display:grid; }
+.pv-modal{ max-width:1080px; padding:0; max-height:92vh; display:flex; flex-direction:column; }
+.pv-modal-top{
+  padding:20px 26px 14px; border-bottom:1px solid rgba(0,40,90,.09);
+  display:flex; justify-content:space-between; align-items:flex-start; gap:16px; flex-wrap:wrap;
+}
+.pv-modal-scroll{ overflow-y:auto; padding:18px 26px 8px; flex:1; }
+.pv-modal-foot{
+  padding:14px 26px; border-top:1px solid rgba(0,40,90,.09);
+  display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;
+  background:rgba(255,255,255,.42);
+}
+.pv-modal .tab-bar{ position:sticky; top:0; }
+
+/* Réplica ligera de la hoja institucional (capa 1, solo lectura) */
+.pv-sheet{ font-size:13px; color:var(--ink-2); }
+.pv-sheet h4{
+  font:700 11px var(--font-mono); letter-spacing:.10em; text-transform:uppercase;
+  color:var(--brand-deep); margin:20px 0 9px; padding-bottom:6px;
+  border-bottom:1px solid rgba(0,122,255,.16);
+}
+.pv-sheet h4:first-child{ margin-top:4px; }
+.pv-kv{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:0 26px; }
+.pv-kv.one{ grid-template-columns:1fr; }
+@media (max-width:700px){ .pv-kv{ grid-template-columns:1fr; } }
+.pv-kv > div{
+  display:flex; justify-content:space-between; gap:14px;
+  padding:7px 0; border-bottom:1px dotted rgba(0,40,90,.13);
+}
+.pv-kv k{ color:var(--ink-3); font-size:12.5px; }
+.pv-kv v{ color:var(--ink-1); font-weight:600; font-family:var(--font-mono); font-size:12.5px; text-align:right; }
+.pv-para{ line-height:1.62; color:var(--ink-2); font-size:13px; margin:6px 0 4px; }
+.pv-note{
+  font-size:11.5px; color:var(--ink-4); line-height:1.55;
+  border-left:2px solid rgba(0,40,90,.14); padding-left:11px; margin-top:12px;
+}
+
+/* Estado "capa diferida" dentro de una pestaña */
+.pv-defer{
+  border:1px dashed rgba(0,40,90,.20); border-radius:14px;
+  padding:34px 26px; text-align:center; background:rgba(255,255,255,.34);
+}
+.pv-defer-ico{
+  width:46px; height:46px; margin:0 auto 14px; border-radius:13px;
+  display:grid; place-items:center; background:rgba(126,87,255,.14); color:#4f2bb7;
+}
+.pv-defer h5{ font:700 15px var(--font-sans); color:var(--ink-1); margin:0 0 7px; letter-spacing:-.01em; }
+.pv-defer p{ font-size:12.5px; color:var(--ink-3); max-width:520px; margin:0 auto 16px; line-height:1.55; }
+
+.pv-badge-layer{
+  display:inline-flex; align-items:center; gap:6px;
+  font:700 10px var(--font-mono); letter-spacing:.08em; text-transform:uppercase;
+  padding:3px 9px; border-radius:999px; white-space:nowrap;
+}
+.pv-bl1{ background:rgba(28,200,112,.15); color:#00753d; border:1px solid rgba(28,200,112,.3); }
+.pv-bl2{ background:rgba(255,149,0,.15); color:#a35400; border:1px solid rgba(255,149,0,.32); }
+.pv-bl3{ background:rgba(126,87,255,.14); color:#4f2bb7; border:1px solid rgba(126,87,255,.30); }
+
+/* Bloque "de dónde vendrían los datos reales" */
+.pv-src{
+  margin-top:34px; border-radius:14px; padding:18px 20px;
+  background:rgba(10,37,64,.045); border:1px solid rgba(0,40,90,.12);
+}
+.pv-src h5{
+  font:700 10.5px var(--font-mono); letter-spacing:.11em; text-transform:uppercase;
+  color:var(--ink-3); margin:0 0 10px;
+}
+.pv-src pre{
+  margin:0; padding:14px 16px; border-radius:10px; overflow-x:auto;
+  background:#0b1a2b; color:#cfe6ff;
+  font:500 12px var(--font-mono); line-height:1.65;
+}
+.pv-src pre .c{ color:#6f8fae; }
+.pv-src pre .k{ color:#7fd4ff; }
+.pv-src pre .s{ color:#a5e8a5; }
+.pv-src p{ font-size:12px; color:var(--ink-3); margin:11px 0 0; line-height:1.55; }
+
+.pv-warn{
+  margin-top:14px; border-radius:12px; padding:13px 16px;
+  background:rgba(255,149,0,.09); border:1px solid rgba(255,149,0,.26);
+  font-size:12.5px; color:#7a4300; line-height:1.55;
+}
+
+.pv-tablefoot{ font-size:11.5px; color:var(--ink-4); margin-top:12px; line-height:1.55; }
+
+/* Anti-parpadeo del spinner */
+.pv-spin{ display:inline-block; width:13px; height:13px; border-radius:50%;
+  border:2px solid rgba(255,149,0,.28); border-top-color:#f08a00;
+  animation:pvspin .7s linear infinite; vertical-align:-2px; margin-right:6px; }
+@keyframes pvspin{ to{ transform:rotate(360deg); } }
+@media (prefers-reduced-motion:reduce){ .pv-spin{ animation:none; } }
+</style>
+</head>
+
+<body class="aqua">
+
+<!-- Escena de fondo AQUA (normalmente la inyecta aqua-shell.js) -->
+<div class="aqua-scene" aria-hidden="true"></div>
+
+<!-- ══ BANDA FIJA DE IDENTIFICACIÓN DEL MODELO ══ -->
+<div class="pv-band" id="pvBand">
+  <span class="pv-band-tag">Modelo 4 · Adopción por capas</span>
+  <span class="pv-band-txt">
+    Arranca solo con lo barato —tablero y ficha de lectura desde Firestore— y difiere
+    el generador <b>PE.02081</b> y el editor de diagramas hasta que alguien los pida.
+    <span class="pv-conc">Concesión:</span> dos rutas de carga que mantener y probar.
+  </span>
+  <span class="pv-band-note">Preview · no es producción</span>
+</div>
+
+<!-- ══ MARCO SIMULADO (aqua-shell.js NO corre aquí) ══ -->
+<div class="pv-topbar">
+  <div class="pv-logo">SGM · <span>TRANSPOWER</span></div>
+  <span class="pv-fake">topbar simulada</span>
+  <div class="pv-right">
+    <span class="chip chip--brand">Ing. Miguel Jimenez</span>
+  </div>
+</div>
+
+<nav class="pv-rail" aria-label="Navegación simulada">
+  <div class="pv-rail-t">Operación</div>
+  <a href="#">Parque de transformadores</a>
+  <a href="#">Salud de activos</a>
+  <a href="#" class="on">Fichas técnicas</a>
+  <a href="#">Pruebas eléctricas</a>
+  <div class="pv-rail-t">Planeación</div>
+  <a href="#">Órdenes de trabajo</a>
+  <a href="#">Suministros</a>
+  <div class="pv-rail-t">Preview</div>
+  <span class="pv-fake" style="margin:6px 12px; display:inline-block">sidebar simulado</span>
+</nav>
+
+<!-- ══ CONTENIDO ══ -->
+<main class="app-main page-container pv-main">
+
+  <div class="page-header">
+    <div>
+      <div class="breadcrumb">Operación / Fichas técnicas</div>
+      <h1 class="page-title">Fichas técnicas <em>de reposición</em></h1>
+      <p class="page-subtitle">
+        Tablero de flota y ficha institucional del transformador. Clasificación de unidad
+        constructiva según CREG 015 de 2018 (Tablas 51 y 52).
+      </p>
+    </div>
+    <div class="pv-states" role="group" aria-label="Estados de carga del modelo">
+      <span class="pv-meter-lbl" style="margin-right:2px">Ver estado:</span>
+      <button type="button" class="pv-state-btn on" data-goto="reposo">a · Reposo</button>
+      <button type="button" class="pv-state-btn" data-goto="cargando">b · Cargando</button>
+      <button type="button" class="pv-state-btn" data-goto="activo">c · Activo</button>
+    </div>
+  </div>
+
+  <!-- ══════ PANEL DE CAPAS ══════ -->
+  <section class="panel pv-layers" aria-labelledby="pvLayersTitle">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title" id="pvLayersTitle">Carga por capas</div>
+        <div class="panel-sub">Qué se descarga al abrir · qué espera a que lo pidan</div>
+      </div>
+      <span class="chip" id="pvGlobalState">Estado: reposo</span>
+    </div>
+
+    <div class="pv-layer-grid">
+
+      <!-- CAPA 1 -->
+      <article class="pv-layer" data-state="activa" id="pvL1">
+        <div class="pv-layer-head">
+          <span class="pv-layer-n">1</span>
+          <span class="pv-layer-name">Tablero + ficha de lectura</span>
+          <span class="pv-badge-layer pv-bl1">Inmediata</span>
+        </div>
+        <div class="pv-layer-kb">~210 kB <small>· código propio del módulo</small></div>
+        <div class="pv-layer-body">
+          Markup, lógica de tablero y las seis hojas en modo <b>lectura</b>. Los equipos
+          entran paginados desde Firestore: no viaja ningún JSON embebido.
+        </div>
+      </article>
+
+      <!-- CAPA 2 -->
+      <article class="pv-layer" data-state="diferida" id="pvL2">
+        <div class="pv-layer-head">
+          <span class="pv-layer-n">2</span>
+          <span class="pv-layer-name">Generador PE.02081 (.xlsx)</span>
+          <span class="pv-badge-layer pv-bl2" id="pvL2Badge">Diferida</span>
+        </div>
+        <div class="pv-layer-kb">~1.815 kB <small>· plantilla + librerías</small></div>
+        <div class="pv-layer-body">
+          Plantilla institucional en base64 (642 kB), libro fuente (315 kB), imágenes de
+          las hojas oficiales (333 kB) y las librerías <span class="mono">xlsx</span> +
+          <span class="mono">jszip</span> (~525 kB aprox.).
+        </div>
+        <div class="pv-prog" aria-hidden="true"><i id="pvL2Bar"></i></div>
+        <div class="pv-prog-txt" id="pvL2Txt">Sin descargar. Se pide con el botón de la ficha.</div>
+      </article>
+
+      <!-- CAPA 3 -->
+      <article class="pv-layer" data-state="diferida" id="pvL3">
+        <div class="pv-layer-head">
+          <span class="pv-layer-n">3</span>
+          <span class="pv-layer-name">Editor de diagramas</span>
+          <span class="pv-badge-layer pv-bl3" id="pvL3Badge">Diferida</span>
+        </div>
+        <div class="pv-layer-kb">~51 kB <small>· datos de diagrama + editor</small></div>
+        <div class="pv-layer-body">
+          Diagrama unifilar actual y futuro. Solo lo abre quien va a dibujar; el 90 % de
+          las consultas nunca toca esta pestaña.
+        </div>
+        <div class="pv-prog" aria-hidden="true"><i id="pvL3Bar"></i></div>
+        <div class="pv-prog-txt" id="pvL3Txt">Sin descargar. Se pide desde las pestañas de diagrama.</div>
+      </article>
+
+    </div>
+
+    <!-- MEDIDOR DE PESO -->
+    <div class="pv-meter">
+      <div class="pv-meter-head">
+        <span class="pv-meter-lbl">Peso descargado · comparado con el HTML suelto de hoy (1.825 kB)</span>
+        <span class="pv-meter-val"><b id="pvKb">210</b> kB de 2.076 kB · ahorro en arranque <b id="pvSave">88 %</b></span>
+      </div>
+      <div class="pv-meter-bar" role="img" aria-label="Distribución del peso por capa">
+        <div class="pv-seg pv-seg--c1" id="pvSeg1" style="width:10%">C1</div>
+        <div class="pv-seg pv-seg--c2" id="pvSeg2" style="width:0%">C2</div>
+        <div class="pv-seg pv-seg--c3" id="pvSeg3" style="width:0%">C3</div>
+        <div class="pv-seg pv-seg--rest" id="pvSegR" style="width:90%">diferido</div>
+      </div>
+      <div class="pv-meter-foot">
+        Pesos de las capas 2 y 3 <b>medidos</b> sobre <span class="mono">Modulo_Fichas_Tecnicas_v22.html</span>
+        (1.869.384 bytes): plantilla 642 kB · libro fuente 315 kB · imágenes de hoja 333 kB · diagramas 51 kB.
+        Las dos librerías CDN no fueron medidas (~525 kB, <b>aproximado</b>).
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ TABLERO DE FLOTA ══════ -->
+  <div class="pv-stats">
+    <div class="stat stat--brand">
+      <div class="stat-top"><span class="stat-label">Equipos en muestra</span></div>
+      <div class="stat-value" id="kEq">7</div>
+      <div class="stat-foot">Datos de demostración</div>
+    </div>
+    <div class="stat stat--danger">
+      <div class="stat-top"><span class="stat-label">Condición 4 y 5</span></div>
+      <div class="stat-value" id="kCrit">2</div>
+      <div class="stat-foot">Candidatos a reposición</div>
+    </div>
+    <div class="stat stat--teal">
+      <div class="stat-top"><span class="stat-label">Capacidad instalada</span></div>
+      <div class="stat-value" id="kMva">—<span class="unit">MVA</span></div>
+      <div class="stat-foot">Suma de la muestra</div>
+    </div>
+    <div class="stat stat--warn">
+      <div class="stat-top"><span class="stat-label">Fichas PE.02081 emitidas</span></div>
+      <div class="stat-value" id="kFichas">0</div>
+      <div class="stat-foot">Cada emisión activa la capa 2</div>
+    </div>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head">
+      <div>
+        <div class="panel-title">Flota evaluada</div>
+        <div class="panel-sub">Clic en un equipo para abrir su ficha</div>
+      </div>
+      <span class="chip chip--brand">CREG 015/2018</span>
+    </div>
+
+    <div class="pv-filters">
+      <input class="pv-inp" type="search" id="fTxt" placeholder="Buscar subestación o matrícula…" aria-label="Buscar">
+      <select class="pv-inp" id="fCond" aria-label="Filtrar por condición">
+        <option value="">Todas las condiciones</option>
+        <option value="1">1 · Muy bueno</option>
+        <option value="2">2 · Bueno</option>
+        <option value="3">3 · Medio</option>
+        <option value="4">4 · Pobre</option>
+        <option value="5">5 · Muy pobre</option>
+      </select>
+      <select class="pv-inp" id="fNiv" aria-label="Filtrar por nivel de tensión">
+        <option value="">Todos los niveles</option>
+        <option value="N3">N3 · [30 – 57,5) kV</option>
+        <option value="N4">N4 · [57,5 – 220) kV</option>
+      </select>
+      <span class="chip" id="fCount">7 de 7</span>
+    </div>
+
+    <div class="pv-tblwrap">
+      <table class="dt" id="tbl">
+        <thead>
+          <tr>
+            <th>Subestación</th>
+            <th>Matrícula</th>
+            <th>MVA</th>
+            <th>Tensión</th>
+            <th>UUCC</th>
+            <th>Año</th>
+            <th>Cond.</th>
+            <th>Modo dominante</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+
+    <div class="pv-tablefoot">
+      <b>Muestra de demostración — 7 equipos inventados (SUBESTACION A…G).</b>
+      No son datos de cliente. En producción esta tabla la alimenta Firestore con
+      <span class="mono">limit()</span> y paginación; nunca un JSON embebido.
+    </div>
+  </section>
+
+  <!-- ══════ DE DÓNDE VIENEN LOS DATOS REALES ══════ -->
+  <section class="pv-src">
+    <h5>Origen de los datos reales — un solo punto de entrada</h5>
+<pre><span class="c">// pages/fichas-tecnicas.html — misma convención que parque-transformadores.html</span>
+<span class="k">window</span>.SGM_DATA_SOURCE = <span class="k">async function</span> () {
+  <span class="k">return await</span> <span class="k">import</span>(<span class="s">'../assets/js/data/transformadores.js'</span>)
+    .then(m =&gt; m.<span class="k">listarTransformadoresSalud</span>());
+};
+
+<span class="c">// Alternativas del mismo módulo de datos, según la vista:</span>
+<span class="c">//   listarV2(filtros)                  → listado paginado con filtros</span>
+<span class="c">//   obtener(id)                        → un equipo, al abrir su ficha</span>
+<span class="c">//   suscribir(filtros, onData, onError)→ vivo (usar con limit(); free-tier)</span>
+
+<span class="c">// Si SGM_DATA_SOURCE no existe, la página cae a datos de DEMOSTRACIÓN rotulados.</span></pre>
+    <p>
+      El tablero y la ficha (capa 1) no necesitan nada más que esto. La plantilla
+      <span class="mono">PE.02081</span> y las librerías de la capa 2 son <em>assets</em>,
+      no datos: se piden por <span class="mono">import()</span> dinámico cuando el usuario
+      pulsa «Generar ficha», y quedan en caché del navegador para el resto de la sesión.
+    </p>
+  </section>
+
+</main>
+
+<!-- ══════ MODAL: FICHA CON SEIS PESTAÑAS ══════ -->
+<div class="modal-bg pv-modal-bg" id="mBg" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="modal pv-modal">
+
+    <div class="pv-modal-top">
+      <div>
+        <div class="breadcrumb" style="margin-bottom:6px" id="mCrumb">Ficha de planificación · PE.02081.PE-FO.03</div>
+        <h2 class="modal-title" id="mTitle">SUBESTACION A</h2>
+        <div class="page-subtitle" id="mSub">—</div>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center">
+        <span class="chip" id="mCond">Condición —</span>
+        <button class="modal-close" type="button" id="mClose" aria-label="Cerrar ficha">✕</button>
+      </div>
+    </div>
+
+    <div class="pv-modal-scroll">
+      <div class="sgm-tabs" id="fichaTabs">
+        <div role="tablist" class="tab-bar" aria-label="Hojas de la ficha de planificación">
+          <button type="button" role="tab" data-tab="ficha"  aria-selected="true"  class="is-active">Ficha Técnica</button>
+          <button type="button" role="tab" data-tab="benef"  aria-selected="false">Beneficios</button>
+          <button type="button" role="tab" data-tab="diagA"  aria-selected="false">Diagrama Actual</button>
+          <button type="button" role="tab" data-tab="diagF"  aria-selected="false">Diagrama Futuro</button>
+          <button type="button" role="tab" data-tab="anexo"  aria-selected="false">Anexo AT</button>
+          <button type="button" role="tab" data-tab="plan"   aria-selected="false">Plan de acciones</button>
+        </div>
+
+        <div class="tab-panels">
+          <div role="tabpanel" data-panel="ficha" class="is-active"></div>
+          <div role="tabpanel" data-panel="benef" hidden></div>
+          <div role="tabpanel" data-panel="diagA" hidden></div>
+          <div role="tabpanel" data-panel="diagF" hidden></div>
+          <div role="tabpanel" data-panel="anexo" hidden></div>
+          <div role="tabpanel" data-panel="plan"  hidden></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pv-modal-foot">
+      <div style="font-size:11.5px; color:var(--ink-4); max-width:520px; line-height:1.5" id="mFootTxt">
+        Lectura de la ficha: <b>capa 1</b>, ya cargada. Generar el .xlsx institucional
+        descarga la <b>capa 2</b> una sola vez por sesión.
+      </div>
+      <div style="display:flex; gap:9px; flex-wrap:wrap">
+        <button class="btn btn--ghost" type="button" id="btnReset">Volver a reposo</button>
+        <button class="btn btn--primary" type="button" id="btnGen">Generar ficha PE.02081 (.xlsx)</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════════════
+   PREVIEW — MODELO 4 · ADOPCIÓN POR CAPAS
+   Todo lo de abajo es simulación de comportamiento para juzgar el modelo.
+   En producción: fetch real a Firestore + import() dinámico de la capa 2/3.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Altura de la banda fija → variable CSS (la banda envuelve en pantallas chicas) */
+function pvBandH(){
+  var h = document.getElementById('pvBand').offsetHeight;
+  document.documentElement.style.setProperty('--pv-band-h', h + 'px');
+}
+window.addEventListener('resize', pvBandH);
+
+/* ─────────────────────────────────────────────────────────────
+   MUESTRA DE DEMOSTRACIÓN — 7 equipos INVENTADOS.
+   Nombres genéricos SUBESTACION A..G. Cero datos de cliente.
+   En producción esto llega de window.SGM_DATA_SOURCE().
+   ───────────────────────────────────────────────────────────── */
+var DEMO = [
+  { id:'DEMO-01', sub:'SUBESTACION A', mat:'TD-A1', serie:'DEMO-0001', mva:20,   vp:110, vs:13.8, niv:'N3', uucc:'N3T5',  anio:1996, edad:29, cond:5,
+    modo:'Degradación del aislamiento sólido', fur:3120, dp:285, vida:96, carga:91, rig:34, hum:14, refrig:'ONAF', reg:'OLTC' },
+  { id:'DEMO-02', sub:'SUBESTACION B', mat:'TD-B1', serie:'DEMO-0002', mva:40,   vp:110, vs:34.5, niv:'N4', uucc:'N4T12', anio:2003, edad:22, cond:4,
+    modo:'Falla térmica en el aislamiento', fur:820, dp:490, vida:58, carga:88, rig:41, hum:9,  refrig:'ONAF', reg:'OLTC' },
+  { id:'DEMO-03', sub:'SUBESTACION C', mat:'TD-C1', serie:'DEMO-0003', mva:10,   vp:34.5, vs:13.8, niv:'N3', uucc:'N3T2',  anio:2011, edad:14, cond:3,
+    modo:'Degradación del aceite dieléctrico', fur:210, dp:680, vida:26, carga:74, rig:38, hum:11, refrig:'ONAN', reg:'NLTC' },
+  { id:'DEMO-04', sub:'SUBESTACION D', mat:'TD-D1', serie:'DEMO-0004', mva:60,   vp:110, vs:34.5, niv:'N4', uucc:'N4T15', anio:2016, edad:9,  cond:2,
+    modo:'Sin hallazgo dominante', fur:48, dp:840, vida:7, carga:63, rig:52, hum:6, refrig:'ONAF', reg:'OLTC' },
+  { id:'DEMO-05', sub:'SUBESTACION E', mat:'TD-E1', serie:'DEMO-0005', mva:15,   vp:34.5, vs:13.8, niv:'N3', uucc:'N3T4',  anio:2008, edad:17, cond:3,
+    modo:'Cargabilidad en el límite', fur:165, dp:715, vida:21, carga:96, rig:47, hum:8, refrig:'ONAN', reg:'NLTC' },
+  { id:'DEMO-06', sub:'SUBESTACION F', mat:'TD-F1', serie:'DEMO-0006', mva:30,   vp:110, vs:13.8, niv:'N4', uucc:'N4T9',  anio:2021, edad:4,  cond:1,
+    modo:'Sin hallazgo dominante', fur:12, dp:920, vida:2, carga:41, rig:58, hum:5, refrig:'ONAF', reg:'OLTC' },
+  { id:'DEMO-07', sub:'SUBESTACION G', mat:'TD-G1', serie:'DEMO-0007', mva:12.5, vp:34.5, vs:13.8, niv:'N3', uucc:'N3T3',  anio:1999, edad:26, cond:4,
+    modo:'Pérdida de hermeticidad', fur:940, dp:465, vida:61, carga:80, rig:36, hum:16, refrig:'ONAN', reg:'NLTC' }
+];
+var CONDLBL = {1:'Muy bueno',2:'Bueno',3:'Medio',4:'Pobre',5:'Muy pobre'};
+
+/* ─────────────────────────────────────────────────────────────
+   MODELO DE CAPAS — el estado que el modelo 4 tiene que exhibir
+   ───────────────────────────────────────────────────────────── */
+var KB = { c1:210, c2:1815, c3:51 };
+var TOTAL = KB.c1 + KB.c2 + KB.c3;      // 2.076 kB
+var HOY   = 1825;                        // HTML suelto de hoy, sin CDN
+var capa  = { c2:'diferida', c3:'diferida' };   // diferida | cargando | activa
+var fichasEmitidas = 0;
+
+function kbCargado(){
+  return KB.c1 + (capa.c2==='activa'?KB.c2:0) + (capa.c3==='activa'?KB.c3:0);
+}
+
+function pintarCapas(){
+  ['c2','c3'].forEach(function(k){
+    var n   = (k==='c2') ? 2 : 3;
+    var el  = document.getElementById('pvL'+n);
+    var bdg = document.getElementById('pvL'+n+'Badge');
+    el.setAttribute('data-state', capa[k]);
+    bdg.textContent = capa[k]==='activa' ? 'Activa' : (capa[k]==='cargando' ? 'Cargando' : 'Diferida');
+    bdg.className = 'pv-badge-layer ' + (capa[k]==='activa' ? 'pv-bl1' : (k==='c2'?'pv-bl2':'pv-bl3'));
+  });
+
+  var cargado = kbCargado();
+  document.getElementById('pvKb').textContent = cargado.toLocaleString('es-CO');
+  var ahorro = Math.round((1 - (KB.c1 / HOY)) * 100);
+  document.getElementById('pvSave').textContent = ahorro + ' %';
+
+  function pct(v){ return (v / TOTAL * 100); }
+  var w1 = pct(KB.c1);
+  var w2 = capa.c2==='activa' ? pct(KB.c2) : 0;
+  var w3 = capa.c3==='activa' ? pct(KB.c3) : 0;
+  document.getElementById('pvSeg1').style.width = w1 + '%';
+  document.getElementById('pvSeg2').style.width = w2 + '%';
+  document.getElementById('pvSeg3').style.width = w3 + '%';
+  document.getElementById('pvSegR').style.width = Math.max(0, 100 - w1 - w2 - w3) + '%';
+  document.getElementById('pvSeg2').textContent = w2 > 6 ? 'C2 · generador' : '';
+  document.getElementById('pvSeg3').textContent = w3 > 4 ? 'C3' : '';
+  document.getElementById('pvSegR').textContent = (100 - w1 - w2 - w3) > 8 ? 'diferido' : '';
+
+  var g = document.getElementById('pvGlobalState');
+  var estado = (capa.c2==='cargando' || capa.c3==='cargando') ? 'cargando una capa'
+             : (capa.c2==='activa' || capa.c3==='activa') ? 'capa diferida activa'
+             : 'reposo';
+  g.textContent = 'Estado: ' + estado;
+  g.className = 'chip ' + (estado==='reposo' ? 'chip--success' : (estado==='cargando una capa' ? 'chip--warn' : 'chip--brand'));
+
+  document.querySelectorAll('.pv-state-btn').forEach(function(b){
+    var target = estado==='reposo' ? 'reposo' : (estado==='cargando una capa' ? 'cargando' : 'activo');
+    b.classList.toggle('on', b.dataset.goto === target);
+  });
+
+  document.getElementById('kFichas').textContent = fichasEmitidas;
+  if (fichaAbierta) renderTab(tabActual);
+  pintarFoot();
+}
+
+function pintarFoot(){
+  var t = document.getElementById('mFootTxt');
+  var b = document.getElementById('btnGen');
+  if (capa.c2 === 'activa'){
+    t.innerHTML = 'Generador <b>ya en memoria</b> (capa 2, ~1.815 kB descargados una sola vez). ' +
+                  'Las siguientes fichas de esta sesión se emiten sin descargar nada.';
+    b.textContent = 'Generar ficha PE.02081 (.xlsx)';
+    b.disabled = false;
+  } else if (capa.c2 === 'cargando'){
+    t.innerHTML = 'Descargando el generador… la ficha de lectura <b>sigue navegable</b> mientras tanto.';
+    b.innerHTML = '<span class="pv-spin"></span>Cargando generador…';
+    b.disabled = true;
+  } else {
+    t.innerHTML = 'Lectura de la ficha: <b>capa 1</b>, ya cargada. Generar el .xlsx institucional ' +
+                  'descarga la <b>capa 2</b> una sola vez por sesión.';
+    b.textContent = 'Generar ficha PE.02081 (.xlsx)';
+    b.disabled = false;
+  }
+}
+
+/* Simulación de la descarga de una capa diferida */
+var PASOS = {
+  c2: [
+    ['Resolviendo import() dinámico…', 12],
+    ['Descargando jszip (~95 kB aprox.)…', 26],
+    ['Descargando xlsx (~430 kB aprox.)…', 48],
+    ['Descargando plantilla PE.02081 (642 kB)…', 74],
+    ['Descargando libro fuente e imágenes de hoja (648 kB)…', 92],
+    ['Montando el generador…', 100]
+  ],
+  c3: [
+    ['Resolviendo import() dinámico…', 25],
+    ['Descargando datos de diagrama (51 kB)…', 70],
+    ['Montando el editor…', 100]
+  ]
+};
+
+var timers = [];
+function limpiarTimers(){ timers.forEach(clearTimeout); timers = []; }
+
+function cargarCapa(k, alTerminar){
+  if (capa[k] !== 'diferida') { if (alTerminar) alTerminar(); return; }
+  capa[k] = 'cargando';
+  pintarCapas();
+
+  var n = (k==='c2') ? 2 : 3;
+  var bar = document.getElementById('pvL'+n+'Bar');
+  var txt = document.getElementById('pvL'+n+'Txt');
+  var pasos = PASOS[k];
+  var dt = 340;
+
+  pasos.forEach(function(p, i){
+    timers.push(setTimeout(function(){
+      bar.style.width = p[1] + '%';
+      txt.textContent = p[0];
+    }, dt * (i + 1)));
+  });
+
+  timers.push(setTimeout(function(){
+    capa[k] = 'activa';
+    bar.style.width = '100%';
+    bar.style.background = 'linear-gradient(90deg,#22b573,#12994f)';
+    txt.textContent = (k==='c2')
+      ? 'Generador listo · en caché para el resto de la sesión.'
+      : 'Editor listo · en caché para el resto de la sesión.';
+    pintarCapas();
+    if (alTerminar) alTerminar();
+  }, dt * (pasos.length + 1)));
+}
+
+function reposo(){
+  limpiarTimers();
+  capa = { c2:'diferida', c3:'diferida' };
+  fichasEmitidas = 0;
+  [2,3].forEach(function(n){
+    var bar = document.getElementById('pvL'+n+'Bar');
+    bar.style.width = '0%';
+    bar.style.background = 'linear-gradient(90deg,#ffb800,#ff9500)';
+  });
+  document.getElementById('pvL2Txt').textContent = 'Sin descargar. Se pide con el botón de la ficha.';
+  document.getElementById('pvL3Txt').textContent = 'Sin descargar. Se pide desde las pestañas de diagrama.';
+  pintarCapas();
+}
+
+/* ─────────────────────────────────────────────────────────────
+   TABLERO DE FLOTA
+   ───────────────────────────────────────────────────────────── */
+function filtrar(){
+  var q = document.getElementById('fTxt').value.trim().toLowerCase();
+  var c = document.getElementById('fCond').value;
+  var n = document.getElementById('fNiv').value;
+  return DEMO.filter(function(f){
+    if (q && (f.sub + ' ' + f.mat + ' ' + f.serie).toLowerCase().indexOf(q) < 0) return false;
+    if (c && String(f.cond) !== c) return false;
+    if (n && f.niv !== n) return false;
+    return true;
+  });
+}
+
+function pintarTabla(){
+  var rows = filtrar();
+  document.getElementById('tbody').innerHTML = rows.map(function(f){
+    return '<tr>' +
+      '<td><span class="pv-sub">' + f.sub + '</span><br><span class="pv-code">' + f.id + '</span></td>' +
+      '<td class="pv-num">' + f.mat + '</td>' +
+      '<td class="pv-num">' + f.mva.toLocaleString('es-CO') + '</td>' +
+      '<td class="pv-num">' + f.vp + ' / ' + f.vs + ' kV</td>' +
+      '<td><span class="chip chip--brand">' + f.uucc + '</span></td>' +
+      '<td class="pv-num">' + f.anio + '</td>' +
+      '<td><span class="pv-cond pv-c' + f.cond + '" title="' + CONDLBL[f.cond] + '">' + f.cond + '</span></td>' +
+      '<td style="font-size:12.5px">' + f.modo + '</td>' +
+      '<td style="text-align:right"><button class="btn btn--sm btn--glass" type="button" data-open="' + f.id + '">Ficha</button></td>' +
+    '</tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--ink-4);padding:26px">Sin equipos que coincidan con el filtro.</td></tr>';
+
+  document.getElementById('fCount').textContent = rows.length + ' de ' + DEMO.length;
+  document.getElementById('kEq').textContent = DEMO.length;
+  document.getElementById('kCrit').textContent = DEMO.filter(function(f){ return f.cond >= 4; }).length;
+  document.getElementById('kMva').innerHTML = DEMO.reduce(function(a,f){ return a + f.mva; }, 0)
+    .toLocaleString('es-CO') + '<span class="unit">MVA</span>';
+}
+
+/* ─────────────────────────────────────────────────────────────
+   MODAL — SEIS PESTAÑAS
+   ───────────────────────────────────────────────────────────── */
+var fichaAbierta = null;
+var tabActual = 'ficha';
+
+function num(v, d){
+  if (v == null) return '—';
+  return Number(v).toLocaleString('es-CO', { minimumFractionDigits:(d||0), maximumFractionDigits:(d==null?0:d) });
+}
+function kv(k, v){ return '<div><k>' + k + '</k><v>' + v + '</v></div>'; }
+
+function badge(n){
+  if (n === 1) return '<span class="pv-badge-layer pv-bl1">Capa 1 · ya cargada</span>';
+  if (n === 2) return '<span class="pv-badge-layer pv-bl2">Capa 2 · bajo demanda</span>';
+  return '<span class="pv-badge-layer pv-bl3">Capa 3 · bajo demanda</span>';
+}
+
+function panelDiferido(k, titulo, texto, kb){
+  var estado = capa[k];
+  if (estado === 'activa'){
+    return '<div class="pv-sheet">' +
+      '<h4>' + titulo + ' &nbsp;' + badge(k==='c2'?2:3) + '</h4>' +
+      '<div style="border:1px solid rgba(0,40,90,.12);border-radius:12px;padding:22px;background:rgba(255,255,255,.5)">' +
+        '<div style="display:flex;gap:10px;align-items:center;margin-bottom:14px">' +
+          '<span class="chip chip--success">Editor activo</span>' +
+          '<span class="pv-code">' + kb + ' kB en memoria · sin nueva descarga</span>' +
+        '</div>' +
+        '<svg viewBox="0 0 640 190" width="100%" height="190" role="img" aria-label="Diagrama unifilar esquemático">' +
+          '<line x1="40" y1="34" x2="600" y2="34" stroke="#0b4f6c" stroke-width="3"/>' +
+          '<text x="40" y="24" font-family="monospace" font-size="11" fill="#0b4f6c">BARRA ' + fichaAbierta.vp + ' kV</text>' +
+          '<line x1="320" y1="34" x2="320" y2="72" stroke="#0b4f6c" stroke-width="2"/>' +
+          '<circle cx="320" cy="92" r="21" fill="none" stroke="#0b4f6c" stroke-width="2"/>' +
+          '<circle cx="320" cy="112" r="21" fill="none" stroke="#0b4f6c" stroke-width="2"/>' +
+          '<text x="352" y="100" font-family="monospace" font-size="11" fill="#12994f">' + fichaAbierta.mva + ' MVA · ' + fichaAbierta.reg + '</text>' +
+          '<text x="352" y="116" font-family="monospace" font-size="10" fill="#5b6b73">' + fichaAbierta.refrig + '</text>' +
+          '<line x1="320" y1="133" x2="320" y2="164" stroke="#0b4f6c" stroke-width="2"/>' +
+          '<line x1="40" y1="164" x2="600" y2="164" stroke="#0b4f6c" stroke-width="3"/>' +
+          '<text x="40" y="182" font-family="monospace" font-size="11" fill="#0b4f6c">BARRA ' + fichaAbierta.vs + ' kV</text>' +
+        '</svg>' +
+        '<div class="pv-note">Esquema de muestra. El editor real permite mover celdas, ' +
+        'marcar el equipo a reponer y exportar la hoja al libro institucional.</div>' +
+      '</div></div>';
+  }
+  if (estado === 'cargando'){
+    return '<div class="pv-defer">' +
+      '<div class="pv-defer-ico"><span class="pv-spin" style="width:20px;height:20px;border-width:3px"></span></div>' +
+      '<h5>Cargando el editor de diagramas…</h5>' +
+      '<p>' + kb + ' kB en camino. Las otras cinco pestañas siguen navegables: la capa 1 nunca se bloquea.</p>' +
+    '</div>';
+  }
+  return '<div class="pv-defer">' +
+    '<div class="pv-defer-ico">' +
+      '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">' +
+      '<path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M4 20h16"/></svg>' +
+    '</div>' +
+    '<h5>' + titulo + ' — aún no descargado</h5>' +
+    '<p>' + texto + ' Son <b>' + kb + ' kB</b> que el arranque no pagó. ' + badge(3) + '</p>' +
+    '<button class="btn btn--primary" type="button" data-load="' + k + '">Cargar editor de diagramas (' + kb + ' kB)</button>' +
+  '</div>';
+}
+
+var TABS = {
+
+  ficha: function(f){
+    return '<div class="pv-sheet">' +
+      '<h4>1 · Identificación del activo &nbsp;' + badge(1) + '</h4>' +
+      '<div class="pv-kv">' +
+        kv('Subestación', f.sub) + kv('Código interno', f.id) +
+        kv('Matrícula', f.mat) + kv('Serie', f.serie) +
+        kv('Año de fabricación', f.anio) + kv('Edad de servicio', f.edad + ' años') +
+      '</div>' +
+
+      '<h4>2 · Datos nominales</h4>' +
+      '<div class="pv-kv">' +
+        kv('Potencia nominal', num(f.mva,1) + ' MVA') + kv('Relación de tensión', f.vp + ' / ' + f.vs + ' kV') +
+        kv('Nivel de tensión', f.niv + (f.niv==='N3' ? ' · [30 – 57,5) kV' : ' · [57,5 – 220) kV')) +
+        kv('Regulación', f.reg) +
+        kv('Refrigeración', f.refrig) + kv('UUCC asignada (CREG 015/2018)', f.uucc) +
+      '</div>' +
+
+      '<h4>2b · Diagnóstico medido</h4>' +
+      '<div class="pv-kv">' +
+        kv('Furanos 2-FAL', num(f.fur) + ' ppb') + kv('DP estimado', num(f.dp)) +
+        kv('Vida del aislamiento consumida', num(f.vida) + ' %') + kv('Vida remanente', num(100 - f.vida) + ' %') +
+        kv('Rigidez dieléctrica', num(f.rig) + ' kV') + kv('Humedad', num(f.hum) + ' %') +
+        kv('Cargabilidad', num(f.carga) + ' %') + kv('Condición de salud', f.cond + ' de 5 — ' + CONDLBL[f.cond]) +
+      '</div>' +
+      '<div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">' +
+        '<span class="chip chip--warn"><b>Modo dominante:</b>&nbsp;' + f.modo + '</span>' +
+        '<span class="chip">ASTM D5837 · IEC 61198 · CIGRÉ 445</span>' +
+      '</div>' +
+
+      '<h4>3 · Alcance del proyecto</h4>' +
+      '<p class="pv-para">El alcance comprende la adquisición y reposición del transformador de potencia de ' +
+      num(f.mva,1) + ' MVA (matrícula ' + f.mat + ', serie ' + f.serie + ') que opera en la subestación ' + f.sub +
+      '. Bajo la metodología de salud de activos el equipo se encuentra en condición ' + f.cond + ' de 5 — ' +
+      CONDLBL[f.cond] + ', con ' + f.edad + ' años de servicio (fabricación ' + f.anio + '). El diagnóstico dominante es ' +
+      f.modo.toLowerCase() + ', con furanos 2-FAL de ' + num(f.fur) + ' ppb, DP estimado de ' + num(f.dp) +
+      ' y un ' + num(f.vida) + ' % de la vida del aislamiento ya consumida.</p>' +
+
+      '<div class="pv-note">Texto redactado automáticamente a partir de los <b>valores medidos</b>, no del ' +
+      'campo de texto de la fuente. El veredicto sale del valor contra la norma. Editable antes de emitir.</div>' +
+
+      '<div class="pv-warn">La <b>lectura</b> de esta hoja es capa 1. Volcarla a la plantilla oficial ' +
+      '<span class="mono">PE.02081.PE-FO.03</span> exige la capa 2 — el botón del pie la pide.</div>' +
+    '</div>';
+  },
+
+  benef: function(f){
+    var img = (capa.c2 === 'activa')
+      ? '<div style="border:1px solid rgba(28,200,112,.3);border-radius:12px;padding:16px;background:rgba(28,200,112,.06);margin-top:14px">' +
+        '<span class="chip chip--success">Imágenes de la hoja oficial disponibles</span>' +
+        '<div class="pv-note" style="border-color:rgba(28,200,112,.4)">Los 333 kB de imágenes de las seis hojas ' +
+        'llegaron con la capa 2 y ya están en caché.</div></div>'
+      : '<div style="border:1px dashed rgba(0,40,90,.2);border-radius:12px;padding:16px;background:rgba(255,255,255,.34);margin-top:14px">' +
+        badge(2) + '<div class="pv-note">La <b>imagen escaneada</b> de la hoja oficial de Beneficios (333 kB, ' +
+        'junto con las otras cinco) viaja en la capa 2. El texto que estás leyendo no la necesita.</div></div>';
+
+    return '<div class="pv-sheet">' +
+      '<h4>Beneficios del proyecto &nbsp;' + badge(1) + '</h4>' +
+      '<p class="pv-para"><b>Confiabilidad.</b> La reposición retira de servicio un activo en condición ' + f.cond +
+      ' de 5 cuyo modo dominante es ' + f.modo.toLowerCase() + '. Se elimina el riesgo de falla catastrófica con ' +
+      'indisponibilidad no programada de la subestación ' + f.sub + '.</p>' +
+      '<p class="pv-para"><b>Capacidad.</b> El equipo opera al ' + num(f.carga) + ' % de su capacidad nominal de ' +
+      num(f.mva,1) + ' MVA, sin margen para maniobra ni contingencia. La unidad nueva recupera el margen de reserva.</p>' +
+      '<p class="pv-para"><b>Vida útil.</b> Con ' + num(f.vida) + ' % de la vida del aislamiento consumida y un DP ' +
+      'estimado de ' + num(f.dp) + ', el activo está fuera de la franja donde el mantenimiento devuelve vida: cada ' +
+      'intervención adicional es costo hundido.</p>' +
+      '<p class="pv-para"><b>Calidad del servicio.</b> Menor exposición a eventos que impactan los indicadores ' +
+      'de continuidad del mercado atendido aguas abajo.</p>' +
+      img +
+    '</div>';
+  },
+
+  diagA: function(){
+    return panelDiferido('c3', 'Diagrama unifilar actual',
+      'Muestra la configuración de barras y celdas tal como opera hoy.', KB.c3);
+  },
+
+  diagF: function(){
+    return panelDiferido('c3', 'Diagrama unifilar futuro',
+      'Muestra la configuración propuesta una vez repuesto el equipo.', KB.c3);
+  },
+
+  anexo: function(f){
+    var t51 = (f.niv === 'N3');
+    return '<div class="pv-sheet">' +
+      '<h4>Anexo AT · Unidad constructiva CREG 015 de 2018 &nbsp;' + badge(1) + '</h4>' +
+      '<p class="pv-para">El módulo clasifica el equipo contra el catálogo de unidades constructivas por ' +
+      '<b>nivel de tensión</b> y <b>capacidad</b>. Umbrales tomados del capítulo de definiciones de la resolución: ' +
+      'N3 [30 – 57,5) kV · N4 [57,5 – 220) kV · N5 conexión al STN ≥ 220 kV.</p>' +
+
+      '<div class="pv-kv">' +
+        kv('Tensión primaria', f.vp + ' kV') + kv('Nivel resultante', f.niv) +
+        kv('Capacidad', num(f.mva,1) + ' MVA') + kv('Regulación', f.reg) +
+        kv('Tabla aplicable', t51 ? 'Tabla 51' : 'Tabla 52') + kv('UUCC asignada', f.uucc) +
+      '</div>' +
+
+      '<h4>Banda del catálogo</h4>' +
+      '<div class="pv-tblwrap"><table class="dt" style="font-size:12.5px">' +
+        '<thead><tr><th>Código</th><th>Nivel</th><th>Banda de capacidad</th><th>Regulación</th><th></th></tr></thead>' +
+        '<tbody>' +
+          '<tr><td class="pv-code">' + f.uucc + '</td><td>' + f.niv + '</td><td>banda que contiene ' + num(f.mva,1) +
+          ' MVA</td><td>' + f.reg + '</td><td><span class="chip chip--success">Asignada</span></td></tr>' +
+          '<tr><td class="pv-code">' + f.niv + 'T' + (parseInt(f.uucc.replace(/\D/g,''),10) + 1) + '</td><td>' + f.niv +
+          '</td><td>banda inmediatamente superior</td><td>' + f.reg + '</td><td><span class="chip">Referencia</span></td></tr>' +
+        '</tbody>' +
+      '</table></div>' +
+
+      '<div class="pv-note">El catálogo completo (Tablas 51 y 52 con sus columnas de costo en $ de dic-2017) ' +
+      'es un JSON pequeño: se queda en la <b>capa 1</b>. Lo que pesa del módulo original no es la norma, ' +
+      'son la plantilla binaria y las imágenes.</div>' +
+    '</div>';
+  },
+
+  plan: function(f){
+    var acc = f.cond >= 4
+      ? [
+          ['Inmediata', 'Muestreo dirigido de DGA y furanos para confirmar el modo dominante', 'Analítica'],
+          ['30 días',   'Restricción operativa de carga por debajo del ' + Math.max(60, f.carga - 15) + ' %', 'Operación'],
+          ['90 días',   'Radicar la ficha PE.02081 y abrir el proyecto de reposición', 'Planeación'],
+          ['12 meses',  'Adquisición y montaje de la unidad de reposición', 'Proyectos']
+        ]
+      : [
+          ['Anual',     'Mantener el plan de DGA y fisicoquímicas del aceite', 'Analítica'],
+          ['Bienal',    'Termografía y verificación de hermeticidad', 'Mantenimiento'],
+          ['Según hallazgo', 'Reevaluar condición si algún indicador cruza su umbral', 'Analítica']
+        ];
+
+    return '<div class="pv-sheet">' +
+      '<div class="pv-warn" style="background:rgba(0,122,255,.07);border-color:rgba(0,122,255,.24);color:var(--ink-2)">' +
+      '<b>Anexo interno de trabajo.</b> Se deriva del estado de salud y de la macroactividad registrada. ' +
+      'No forma parte de las seis hojas oficiales: se descarga o se imprime aparte.</div>' +
+
+      '<h4>Plan de acciones &nbsp;' + badge(1) + '</h4>' +
+      '<div class="pv-tblwrap"><table class="dt" style="font-size:12.5px">' +
+        '<thead><tr><th>Horizonte</th><th>Acción</th><th>Responsable</th></tr></thead><tbody>' +
+        acc.map(function(a){
+          return '<tr><td><span class="chip chip--warn">' + a[0] + '</span></td><td>' + a[1] +
+                 '</td><td class="pv-code">' + a[2] + '</td></tr>';
+        }).join('') +
+      '</tbody></table></div>' +
+
+      '<div class="pv-note">Las acciones se arman con la condición medida (' + f.cond + ' de 5) y la cargabilidad (' +
+      num(f.carga) + ' %) del equipo; no son una plantilla fija.</div>' +
+    '</div>';
+  }
+};
+
+function renderTab(k){
+  tabActual = k;
+  var panel = document.querySelector('[data-panel="' + k + '"]');
+  if (!panel || !fichaAbierta) return;
+  panel.innerHTML = TABS[k](fichaAbierta);
+}
+
+function abrirFicha(id){
+  var f = DEMO.find(function(x){ return x.id === id; });
+  if (!f) return;
+  fichaAbierta = f;
+  document.getElementById('mTitle').textContent = f.sub;
+  document.getElementById('mSub').textContent = f.mat + ' · ' + num(f.mva,1) + ' MVA · ' + f.vp + '/' + f.vs +
+    ' kV · UUCC ' + f.uucc;
+  var c = document.getElementById('mCond');
+  c.textContent = 'Condición ' + f.cond + ' — ' + CONDLBL[f.cond];
+  c.className = 'chip ' + (f.cond >= 4 ? 'chip--danger' : (f.cond === 3 ? 'chip--warn' : 'chip--success'));
+  seleccionarTab('ficha');
+  document.getElementById('mBg').classList.add('on');
+  pintarFoot();
+}
+
+function seleccionarTab(k){
+  document.querySelectorAll('#fichaTabs [role="tab"]').forEach(function(b){
+    var on = b.dataset.tab === k;
+    b.classList.toggle('is-active', on);
+    b.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  document.querySelectorAll('#fichaTabs [role="tabpanel"]').forEach(function(p){
+    var on = p.dataset.panel === k;
+    p.hidden = !on;
+    p.classList.toggle('is-active', on);
+  });
+  renderTab(k);
+}
+
+/* ─────────────────────────────────────────────────────────────
+   EVENTOS
+   ───────────────────────────────────────────────────────────── */
+document.getElementById('tbody').addEventListener('click', function(e){
+  var b = e.target.closest('[data-open]');
+  if (b) abrirFicha(b.dataset.open);
+});
+
+document.getElementById('fichaTabs').addEventListener('click', function(e){
+  var t = e.target.closest('[role="tab"]');
+  if (t) seleccionarTab(t.dataset.tab);
+  var l = e.target.closest('[data-load]');
+  if (l) cargarCapa(l.dataset.load);
+});
+
+document.getElementById('mClose').addEventListener('click', function(){
+  document.getElementById('mBg').classList.remove('on');
+});
+document.getElementById('mBg').addEventListener('click', function(e){
+  if (e.target === this) this.classList.remove('on');
+});
+document.addEventListener('keydown', function(e){
+  if (e.key === 'Escape') document.getElementById('mBg').classList.remove('on');
+});
+
+document.getElementById('btnGen').addEventListener('click', function(){
+  cargarCapa('c2', function(){
+    fichasEmitidas++;
+    pintarCapas();
+  });
+});
+document.getElementById('btnReset').addEventListener('click', reposo);
+
+['fTxt','fCond','fNiv'].forEach(function(id){
+  document.getElementById(id).addEventListener('input', pintarTabla);
+});
+
+/* Saltos directos a los tres estados que el modelo debe exhibir */
+document.querySelectorAll('.pv-state-btn').forEach(function(b){
+  b.addEventListener('click', function(){
+    var to = b.dataset.goto;
+    if (to === 'reposo') { reposo(); return; }
+    reposo();
+    if (to === 'cargando'){
+      // Se detiene a mitad de la descarga para poder mirar el estado (b).
+      capa.c2 = 'cargando';
+      pintarCapas();
+      var bar = document.getElementById('pvL2Bar');
+      bar.style.width = '48%';
+      document.getElementById('pvL2Txt').textContent = 'Descargando xlsx (~430 kB aprox.)…';
+      if (!document.getElementById('mBg').classList.contains('on')) abrirFicha(DEMO[0].id);
+      pintarFoot();
+      return;
+    }
+    if (to === 'activo'){
+      capa.c2 = 'activa';
+      var b2 = document.getElementById('pvL2Bar');
+      b2.style.width = '100%';
+      b2.style.background = 'linear-gradient(90deg,#22b573,#12994f)';
+      document.getElementById('pvL2Txt').textContent = 'Generador listo · en caché para el resto de la sesión.';
+      fichasEmitidas = 1;
+      if (!document.getElementById('mBg').classList.contains('on')) abrirFicha(DEMO[0].id);
+      pintarCapas();
+    }
+  });
+});
+
+/* ── Arranque ── */
+pvBandH();
+pintarTabla();
+pintarCapas();
+</script>
+
+</body>
+</html>

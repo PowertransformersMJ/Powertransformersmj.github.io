@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>SGM · TRANSPOWER — Fichas Técnicas de Planificación</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/tabs.css"/>
+  <link rel="stylesheet" href="../assets/css/fichas-tecnicas.css"/>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Planificación / Fichas Técnicas</div>
+    <h1 class="page-title">Fichas <em>Técnicas</em></h1>
+    <p class="page-subtitle">
+      Tablero de la flota contrastada contra el catálogo de Unidades
+      Constructivas del CREG 015/2018 y emisión de la Ficha Técnica de
+      Planificación (formato PE.02081): alcance, beneficios, diagramas
+      unifilares, Anexo AT y plan de acciones, con exportación al Excel oficial.
+    </p>
+  </div>
+
+  <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ftm- -->
+  <div id="fichasPanel"></div>
+
+</main>
+
+<script type="module">
+  // ── Fuente de datos ────────────────────────────────────────────────────────
+  // Convención del repo (`pages/parque-transformadores.html`): el parque vivo
+  // llega por `window.SGM_DATA_SOURCE`. Se espera a que el guard confirme la
+  // sesión ANTES de leer Firestore (evento en WINDOW, lección ADR-054).
+  // Si la fuente no existe o falla, el panel muestra un estado vacío honesto:
+  // esta página NO lleva datos incrustados ni fabrica ejemplos.
+  if (typeof window.SGM_DATA_SOURCE !== 'function') {
+    window.SGM_DATA_SOURCE = async function () {
+      if (!window.__sgmSession) {
+        await new Promise((res) => {
+          const t = setTimeout(res, 12000);
+          window.addEventListener('sgm:session-ready', () => { clearTimeout(t); res(); }, { once: true });
+          if (window.__sgmSession) { clearTimeout(t); res(); }
+        });
+      }
+      const m = await import('../assets/js/data/transformadores.js');
+      return m.listarTransformadoresSalud();
+    };
+  }
+
+  const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');
+  window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
+    origen: 'Parque vivo · Firestore'
+  });
+</script>
+
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
