@@ -233,14 +233,18 @@ export function normalizarEquipo(bruto, i) {
     : (num(leer(b, 'mva')) != null ? num(leer(b, 'mva')) * 1000 : null);
   const mva = num(leer(b, 'mva')) != null ? num(leer(b, 'mva')) : (kva != null ? kva / 1000 : null);
 
-  const kvPrim = num(leer(b, 'kv_prim', 'placa.tension_primaria_kv'));
-  const kvSec  = num(leer(b, 'kv_sec',  'placa.tension_secundaria_kv'));
-  const kvTerc = num(leer(b, 'kv_terc', 'placa.tension_terciaria_kv'));
-  const regulacion = txt(leer(b, 'regulacion', 'placa.regulacion'));
+  // Rutas verificadas contra Firestore en producción (2026-08-15): en el documento v2
+  // la placa va PLANA en la raíz (`tension_primaria_kv`), no anidada bajo `placa.*`.
+  // Se conservan las rutas antiguas por compatibilidad con fixtures y listados adjuntos.
+  const kvPrim = num(leer(b, 'kv_prim', 'tension_primaria_kv', 'placa.tension_primaria_kv'));
+  const kvSec  = num(leer(b, 'kv_sec',  'tension_secundaria_kv', 'placa.tension_secundaria_kv'));
+  const kvTerc = num(leer(b, 'kv_terc', 'tension_terciaria_kv', 'placa.tension_terciaria_kv'));
+  const regulacion = txt(leer(b, 'regulacion', 'tipo_regulacion', 'placa.regulacion'));
 
   const cls = clasificarUC(kva, kvPrim, kvTerc, regulacion || null);
 
-  const registrada = txt(leer(b, 'uucc_registrada', 'uucc.registrada')).toUpperCase();
+  const registrada = txt(leer(b, 'uucc_registrada', 'uucc.registrada',
+    'identificacion.uucc', 'uucc')).toUpperCase();
   const calculada = txt(leer(b, 'uucc_calculada') || cls.uucc_calc || '').toUpperCase();
 
   let estado = leer(b, 'estado_uucc');
@@ -264,6 +268,8 @@ export function normalizarEquipo(bruto, i) {
     zona: txt(leer(b, 'zona', 'ubicacion.zona')),
     departamento: txt(leer(b, 'departamento', 'ubicacion.departamento')),
     potencia_kva: kva,
+    marca: txt(leer(b, 'marca', 'identificacion.marca')),
+    modelo: txt(leer(b, 'modelo', 'identificacion.modelo')),
     mva,
     kv_prim: kvPrim,
     kv_sec: kvSec,
@@ -282,7 +288,7 @@ export function normalizarEquipo(bruto, i) {
     cond_int: ci,
     cond_lbl: txt(leer(b, 'cond_lbl')) || (ci != null ? nombreCondicion(ci) : ''),
     edad: num(leer(b, 'edad', 'det.edad_anos', 'edad_anos')),
-    anio_fab: num(leer(b, 'anio_fab', 'det.anio', 'anio')),
+    anio_fab: num(leer(b, 'anio_fab', 'det.anio', 'anio', 'fabricacion.ano_fabricacion')),
     usuarios: num(leer(b, 'usuarios', 'usuarios_aguas_abajo', 'criticidad.usuarios_aguas_abajo'))
   };
   e.diag = diagnosticoDeEquipo(e);

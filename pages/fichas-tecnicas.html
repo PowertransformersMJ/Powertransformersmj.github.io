@@ -55,8 +55,29 @@
           if (window.__sgmSession) { clearTimeout(t); res(); }
         });
       }
+      // Se necesitan DOS fuentes y hay que fusionarlas:
+      //  · listarV2()                 → documento completo: placa (potencia, tensiones),
+      //                                 UUCC registrada, marca, año. Sin esto NO se puede
+      //                                 clasificar la Unidad Constructiva.
+      //  · listarTransformadoresSalud() → proyección de salud: calificaciones, condición,
+      //                                 usuarios, causante. Alimenta el diagnóstico.
+      // Verificado en producción (2026-08-15): la proyección de salud NO trae tensión
+      // primaria, y sin ella los 206 equipos salían «Sin UC calculada».
       const m = await import('../assets/js/data/transformadores.js');
-      return m.listarTransformadoresSalud();
+      const [v2, salud] = await Promise.all([
+        m.listarV2({ limite: 500 }),
+        m.listarTransformadoresSalud().catch(() => [])
+      ]);
+      const porCodigo = new Map();
+      for (const s of (salud || [])) {
+        const k = s.codigo || s.id;
+        if (k) porCodigo.set(String(k), s);
+      }
+      return (v2 || []).map((t) => {
+        const s = porCodigo.get(String(t.codigo || t.id)) || {};
+        // La placa manda; la salud rellena lo que la placa no tiene.
+        return { ...s, ...t };
+      });
     };
   }
 
