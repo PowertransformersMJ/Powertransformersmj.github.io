@@ -29,6 +29,26 @@ jobs:
       - name: Configurar Pages
         uses: actions/configure-pages@v5
 
+      # El sitio publicaba el repositorio ENTERO (`path: .`), así que carpetas de
+      # trabajo quedaban servidas en internet sin sesión. Entre ellas `_dev/`, con
+      # nueve informes de ensayos REALES del transformador serie 450108.
+      # Aquí se retiran del artefacto ANTES de publicar. No se borran del repo:
+      # solo dejan de servirse. Ninguna de estas rutas la necesita el sitio en
+      # ejecución — verificado: ninguna página ni módulo de `assets/js/` las carga.
+      - name: Retirar del artefacto lo que NO debe publicarse
+        run: |
+          set -eux
+          # `scripts/` NO se retira entero: `assets/js/calculo-refrigeracion.js`
+          # importa en caliente `scripts/migrate/tipificar-suministros-fan-db.js`
+          # (líneas 244 y 313). Se retira solo lo que nadie carga en ejecución.
+          rm -rf _dev _legacy tests functions .github
+          find scripts -maxdepth 1 -type f -name '*.mjs' -delete
+          rm -f  package.json package-lock.json firebase.json .firebaserc \
+                 firestore.rules firestore.indexes.json storage.rules \
+                 vercel.json eslint.config.js .html-validate.json
+          echo "--- lo que queda publicado ---"
+          ls -a
+
       - name: Subir artefacto
         uses: actions/upload-pages-artifact@v3
         with:
