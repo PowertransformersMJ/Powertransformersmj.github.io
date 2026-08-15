@@ -6,12 +6,12 @@
 
 ---
 
-## 🎯 Foco (2026-08-15, cierre) — Fichas Técnicas YA VIVEN EN LA PÁGINA (ADR-060)
+## 🎯 Foco (2026-08-15, cierre) — Fichas Técnicas YA VIVEN EN LA PÁGINA (ADR-061)
 
 > El módulo suelto de Fichas Técnicas es ahora `pages/fichas-tecnicas.html`, con datos desde
 > Firestore. Commit `ec20f47`, mergeado a `main` y desplegado. 1254 pruebas verdes.
 > Modelo elegido por el Ingeniero: **híbrido `.ftm-`** (cascarón AQUA + módulo como componente).
-> Detalle → `99 §60`. Hallazgo de seguridad → `30 §L-64`.
+> Detalle → `99 §61`. Hallazgo de seguridad → `30 §L-64`.
 
 ### ▶️ TAREA VIVA: validar la página nueva con sesión real
 > Todo se verificó SIN sesión (preview con datos de demostración). Falta abrirla autenticado y
@@ -55,7 +55,7 @@
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
-| **TODO-30** | Validar `pages/fichas-tecnicas.html` con sesión real: datos de Firestore, ficha completa y exportación PE.02081 con un equipo de verdad (ADR-060). | 🔴 |
+| **TODO-30** | Validar `pages/fichas-tecnicas.html` con sesión real: datos de Firestore, ficha completa y exportación PE.02081 con un equipo de verdad (ADR-061). | 🔴 |
 | **TODO-31** | Decisión de sitio: contraste 2,37:1 de `.page-subtitle`/`.breadcrumb` sobre la foto (29 páginas afectadas, `aqua-components.css`). | 🟡 decisión |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
@@ -78,3 +78,8 @@
 > Bóvedas NO se fusionan con el ecosistema de origen (datos de cliente). Detalle → `99 §58`.
 > ⚠️ El heartbeat marca **costo-cerebro 30d = 53% 🔴** (bandera 30%): la próxima sesión debería ser
 > de PRODUCTO, no de cerebro.
+>
+> **2026-07-29 (Opus 5) — ToS del hosting: CERRADO → `99 §61`**: Pages NO nos prohíbe nada (ni
+> e-commerce ni SaaS) → **no se migra**; runbook a Cloudflare listo por si acaso. ⚠️ Decisión viva
+> del Ingeniero: **Vercel Hobby SÍ veta el uso comercial** y no lo consume nadie → retirarlo o
+> dejarlo a sabiendas. NO re-analizar por calendario: solo por los disparadores de §60.7.

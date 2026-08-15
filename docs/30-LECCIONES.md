@@ -230,4 +230,4 @@ manuscritas escaneadas** de tres personas, el autor del archivo, GUIDs de la org
 rutas locales con usuario de dominio y el estudio económico del proyecto real. **Un formato
 institucional recibido por correo es material de cliente hasta que se demuestre lo contrario**:
 descomprimirlo y auditar TODAS sus partes (XML, `.rels`, `docProps`, `media/`) antes de versionarlo.
-**Gate.** [HONOR] — ningún linter lo cubre. Ver `99 §60`.
+**Gate.** [HONOR] — ningún linter lo cubre. Ver `99 §61`.
