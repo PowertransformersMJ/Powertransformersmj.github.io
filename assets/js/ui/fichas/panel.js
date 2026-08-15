@@ -499,6 +499,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const modalTit = $('[data-ftm="modal-titulo"]');
   const modalTabs = $('[data-ftm="modal-tabs"]');
   const modalCuerpo = $('[data-ftm="modal-cuerpo"]');
+  const modalDiag = $('[data-ftm="modal-diag"]');
   const avisoBox = $('[data-ftm="aviso"]');
 
   /* ── armazón estático ───────────────────────────────────────────────── */
@@ -551,6 +552,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +     '</div>'
       +     '<div class="ftm-modal-tipos" data-ftm="modal-tabs" role="tablist" '
       +       'aria-label="Hojas de la ficha"></div>'
+      // Resumen del diagnóstico SIEMPRE visible, sea cual sea la hoja abierta.
+      // El bloque completo vive en el anexo «Plan de acciones» porque no forma
+      // parte del formato oficial PE.02081; pero enterrarlo allí sin señal hacía
+      // que nadie lo encontrara. Esta tira es el aviso, no un duplicado.
+      +     '<div class="ftm-modal-diag" data-ftm="modal-diag" hidden></div>'
       +     '<div class="ftm-modal-scroll" data-ftm="modal-cuerpo"></div>'
       +   '</div>'
       + '</div>';
@@ -719,11 +725,61 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     actual = null;
   }
 
+
+  /**
+   * Tira-resumen del diagnóstico, visible en cualquier hoja de la ficha.
+   * Solo aparece si el equipo TIENE ensayos: sin datos no se pinta una tira
+   * vacía que sugiera que se midió algo.
+   */
+  function pintarTiraDiagnostico(e) {
+    if (!modalDiag) return false;
+    const d = diagnosticoDeEquipo(e);
+    if (!d) { modalDiag.hidden = true; modalDiag.innerHTML = ''; return false; }
+
+    const info = dpInfo(d);
+    const md = modoDegradacion(e, d);
+    const chips = [];
+
+    if (e.cond_int != null) {
+      chips.push('<span class="ftm-modal-diag-chip" style="border-color:' + colorCondicion(e.cond_int)
+        + ';color:' + colorCondicion(e.cond_int) + '"><b>Condición ' + esc(e.cond_int) + '</b> · '
+        + esc(nombreCondicion(e.cond_int)) + '</span>');
+    }
+    if (info) {
+      chips.push('<span class="ftm-modal-diag-chip">2-FAL <b>' + esc(numES(info.ppb)) + '</b> ppb</span>');
+      chips.push('<span class="ftm-modal-diag-chip">DP ≈ <b>' + esc(info.dp) + '</b></span>');
+      chips.push('<span class="ftm-modal-diag-chip">Vida consumida <b>' + esc(info.vidaTxt) + ' %</b></span>');
+    }
+    if (d.crg != null) {
+      chips.push('<span class="ftm-modal-diag-chip">Cargabilidad <b>' + esc(numES(d.crg)) + ' %</b></span>');
+    }
+    if (md && md.dominante) {
+      chips.push('<span class="ftm-modal-diag-chip is-modo">' + esc(md.dominante.t) + '</span>');
+    }
+    if (!chips.length) { modalDiag.hidden = true; modalDiag.innerHTML = ''; return false; }
+
+    modalDiag.innerHTML = '<span class="ftm-modal-diag-lbl">Diagnóstico medido</span>'
+      + chips.join('')
+      + '<button type="button" class="ftm-modal-diag-ver" data-ftm="ver-diag">Ver detalle</button>'
+      + (md && md.alerta
+          ? '<span class="ftm-modal-diag-alerta">▸ ' + esc(md.alerta) + '</span>'
+          : '');
+    modalDiag.hidden = false;
+    return true;
+  }
+
   function pintarModal() {
     if (!actual) return;
     modalTabs.innerHTML = HOJAS_FICHA.map((h) =>
       '<button type="button" role="tab" class="ftm-modal-tipo-btn' + (hoja === h.id ? ' is-on' : '')
       + '" data-hoja="' + h.id + '" aria-selected="' + (hoja === h.id) + '">' + esc(h.t) + '</button>').join('');
+    const hayDiag = pintarTiraDiagnostico(actual);
+    if (hayDiag) {
+      // Punto en la pestaña que contiene el bloque completo, para que se vea
+      // dónde está el detalle sin tener que recorrer las seis hojas.
+      const bp = modalTabs.querySelector('[data-hoja="plan"]');
+      if (bp) bp.classList.add('has-diag');
+    }
     modalCuerpo.innerHTML = cuerpoHoja(actual, hoja);
     modalCuerpo.scrollTop = 0;
     const btnPlan = $('[data-ftm="descargar-plan"]');
@@ -1154,6 +1210,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         pintarFiltros(); aplicar();
         break;
       case 'cerrar': cerrarFicha(); break;
+      case 'ver-diag':
+        // Lleva al anexo, que es donde vive el bloque completo.
+        hoja = 'plan'; pintarModal();
+        break;
       case 'exportar': exportarExcel(); break;
       case 'descargar-plan': descargarPlan(); break;
       case 'copiar-diag':

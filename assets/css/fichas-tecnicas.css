@@ -1645,3 +1645,37 @@
 .ftm-root .ftm-eval-origen-txt {
   font-size: 12.5px; color: var(--ftm-warn-ink, #8a4b00); flex: 1 1 auto;
 }
+
+/* Tira-resumen del diagnóstico en la ficha (visible en cualquier hoja) */
+.ftm-root .ftm-modal-diag {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  padding: 8px 14px; border-bottom: 1px solid var(--ftm-line);
+  background: var(--ftm-surface-soft);
+}
+.ftm-root .ftm-modal-diag-lbl {
+  font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase;
+  font-weight: 700; color: var(--ftm-muted); margin-right: 2px;
+}
+.ftm-root .ftm-modal-diag-chip {
+  font-size: 11.5px; padding: 3px 9px; border-radius: 999px;
+  border: 1px solid var(--ftm-line-strong); color: var(--ftm-ink);
+  background: var(--ftm-surface);
+}
+.ftm-root .ftm-modal-diag-chip.is-modo {
+  border-color: var(--ftm-accent); color: var(--ftm-accent); font-weight: 600;
+}
+.ftm-root .ftm-modal-diag-ver {
+  font-size: 11.5px; padding: 3px 10px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--ftm-brand); color: var(--ftm-brand); background: transparent;
+}
+.ftm-root .ftm-modal-diag-ver:hover { background: var(--ftm-brand); color: #fff; }
+.ftm-root .ftm-modal-diag-alerta {
+  flex: 1 1 100%; font-size: 11px; color: var(--ftm-err-ink, #b04a2c); margin-top: 2px;
+}
+/* Punto en la pestaña que contiene el bloque completo */
+.ftm-root .ftm-modal-tipo-btn.has-diag::after {
+  content: ''; display: inline-block; width: 6px; height: 6px; margin-left: 6px;
+  border-radius: 50%; background: var(--ftm-accent); vertical-align: middle;
+}
+/* `hidden` debe ganarle a `display:flex`, o queda una banda vacía */
+.ftm-root .ftm-modal-diag[hidden] { display: none; }
