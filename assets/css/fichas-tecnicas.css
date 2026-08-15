@@ -1556,3 +1556,79 @@
     transition-duration: .01ms !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   19 · EVALUACIÓN MASIVA DE UUCC (segmento de adjuntar listado)
+   Prefijo propio .ftm-eval- para NO chocar con .ftm-import, que en este
+   mismo archivo es la zona de carga del módulo original. Reusa .ftm-kpi*, .ftm-tabla*, .ftm-pill--* y .ftm-row--* ya definidos arriba;
+   aquí solo va lo propio de la zona de adjuntar y sus filtros.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ftm-root .ftm-eval { margin-top: 28px; }
+
+.ftm-root .ftm-eval-head { margin-bottom: 12px; }
+.ftm-root .ftm-eval-titulo {
+  font-family: var(--ftm-font, inherit);
+  font-size: 17px; font-weight: 700; color: var(--ftm-ink-1); margin: 0 0 4px;
+}
+.ftm-root .ftm-eval-sub {
+  font-size: 13px; color: var(--ftm-ink-3); margin: 0; max-width: 78ch; line-height: 1.5;
+}
+
+/* Zona de adjuntar */
+.ftm-root .ftm-eval-zona {
+  border: 2px dashed var(--ftm-line); border-radius: var(--ftm-radio, 12px);
+  background: var(--ftm-surface-2, rgba(255,255,255,.85));
+  padding: 26px 18px; text-align: center; cursor: pointer;
+  transition: border-color .15s ease, background-color .15s ease;
+}
+.ftm-root .ftm-eval-zona:hover,
+.ftm-root .ftm-eval-zona:focus-visible {
+  border-color: var(--ftm-brand); background: var(--ftm-surface-1, #fff); outline: none;
+}
+.ftm-root .ftm-eval-zona.is-drag {
+  border-color: var(--ftm-brand); background: var(--ftm-brand-soft, rgba(0,122,255,.06));
+}
+.ftm-root .ftm-eval-icono { font-size: 26px; line-height: 1; margin-bottom: 6px; }
+.ftm-root .ftm-eval-txt { font-size: 14px; color: var(--ftm-ink-1); }
+.ftm-root .ftm-eval-hint { font-size: 11.5px; color: var(--ftm-ink-3); margin-top: 4px; }
+
+/* Mensajes de estado */
+.ftm-root .ftm-eval-estado { font-size: 12.5px; margin: 10px 0 0; min-height: 18px; }
+.ftm-root .ftm-eval-estado.is-info { color: var(--ftm-ink-3); }
+.ftm-root .ftm-eval-estado.is-ok   { color: var(--ftm-ok, #2e7d32); }
+.ftm-root .ftm-eval-estado.is-warn { color: var(--ftm-err, #c62828); font-weight: 600; }
+
+/* Conformidad y notas */
+.ftm-root .ftm-eval-conf {
+  font-size: 13px; color: var(--ftm-ink-2); margin: 12px 0 8px;
+  padding: 10px 12px; border-radius: var(--ftm-radio, 12px);
+  background: var(--ftm-surface-2, rgba(255,255,255,.85));
+  border-left: 4px solid var(--ftm-brand);
+}
+.ftm-root .ftm-eval-nota {
+  font-size: 11.5px; color: var(--ftm-ink-3); margin-top: 6px; line-height: 1.45;
+}
+
+/* Filtros */
+.ftm-root .ftm-eval-filtros {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 12px 0 10px;
+}
+.ftm-root .ftm-eval-filtro { font-size: 12px; }
+.ftm-root .ftm-eval-filtro.is-on {
+  background: var(--ftm-brand); color: #fff; border-color: var(--ftm-brand);
+}
+.ftm-root .ftm-eval-n { opacity: .7; font-variant-numeric: tabular-nums; }
+.ftm-root .ftm-eval-acciones { margin-left: auto; display: flex; gap: 6px; }
+
+/* Celdas de la tabla del segmento */
+.ftm-root .ftm-eval-motivo {
+  font-size: 11.5px; color: var(--ftm-ink-2); max-width: 34ch;
+}
+.ftm-root .ftm-eval-vacio {
+  text-align: center; color: var(--ftm-ink-3); font-size: 12.5px; padding: 18px;
+}
+
+@media (max-width: 720px) {
+  .ftm-root .ftm-eval-acciones { margin-left: 0; width: 100%; }
+}

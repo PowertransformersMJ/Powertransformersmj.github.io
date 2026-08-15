@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Evaluación masiva de UUCC</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/fichas-tecnicas.css">
+<style>body{padding:24px;background:#f4f6fb;font-family:system-ui,sans-serif}
+.dev{max-width:1180px;margin:0 auto;background:#fff;padding:20px;border-radius:14px}
+.devh{font:600 13px/1.4 system-ui;color:#b26a00;background:#fff4e5;padding:10px 12px;border-radius:10px;margin-bottom:16px}</style>
+</head>
+<body class="aqua">
+<div class="dev">
+  <div class="devh">DEV · Segmento de evaluación masiva montado suelto, con el módulo REAL
+    (assets/js/ui/fichas/evaluacion-masiva.js). Botón de abajo: carga un listado de prueba
+    generado en memoria (equipos ficticios), sin adjuntar archivo.</div>
+  <button id="demo" class="ftm-btn ftm-btn--primary">Cargar listado de prueba</button>
+  <div id="seg"></div>
+</div>
+<script type="module">
+import { montarEvaluacionMasiva } from '../assets/js/ui/fichas/evaluacion-masiva.js';
+const api = montarEvaluacionMasiva('seg');
+window.__api = api;
+
+// Listado de prueba con equipos FICTICIOS que ejercitan los cuatro veredictos.
+// Se entrega como ARCHIVO real por el mismo camino que un adjunto del usuario:
+// así se prueba la lectura con SheetJS, no solo la lógica de dominio.
+const CAB=['SUBESTACION','MATRICULA','SERIE','POTENCIA (KVA)','NIVEL DE TENSION PRIMARIO (KV)',
+'NIVEL DE TENSION SECUNDARIO (KV)','NIVEL DE TENSION TERCEARIO (KV)','REGULACION','UUCC','ZONA','DEPARTAMENTO'];
+const FILAS=[
+ ['SUBESTACIÓN A','TX-A-01','S-1001',20000,66,13.8,'N/A','OLTC','N4T4','ZONA 1','DEPARTAMENTO 1'],
+ ['SUBESTACIÓN B','TX-B-01','S-1002',20000,66,13.8,'N/A','OLTC','N4T2','ZONA 1','DEPARTAMENTO 1'],
+ ['SUBESTACIÓN C','TX-C-01','S-1003',10000,34.5,13.8,'N/A','NLTC','','ZONA 2','DEPARTAMENTO 2'],
+ ['SUBESTACIÓN D','TX-D-01','S-1004',12500,'',13.8,'N/A','OLTC','N3T4','ZONA 2','DEPARTAMENTO 2'],
+ ['SUBESTACIÓN E','TX-E-01','S-1005',30000,110,34.5,13.8,'OLTC','N4T6','ZONA 3','DEPARTAMENTO 3'],
+ ['SUBESTACIÓN F','TX-F-01','S-1006',40000,110,13.8,'N/A','OLTC','n4-t6','ZONA 3','DEPARTAMENTO 3'],
+ ['SUBESTACIÓN G','TX-G-01','S-1007',2000,34.5,13.8,'N/A','NLTC','N3T1','ZONA 1','DEPARTAMENTO 1'],
+];
+
+function archivoCSV(){
+  const csv=[CAB,...FILAS].map(f=>f.map(c=>{
+    const s=String(c==null?'':c);
+    return /[";\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s;
+  }).join(';')).join('\r\n');
+  return new File(['\ufeff'+csv], 'listado_de_prueba.csv', {type:'text/csv'});
+}
+
+document.getElementById('demo').addEventListener('click', () => {
+  const dt=new DataTransfer();
+  dt.items.add(archivoCSV());
+  const zona=document.querySelector('[data-ftm="zona"]');
+  zona.dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));
+});
+</script>
+</body></html>

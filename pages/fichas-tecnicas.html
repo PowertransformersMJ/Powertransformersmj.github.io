@@ -33,6 +33,10 @@
   <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ftm- -->
   <div id="fichasPanel"></div>
 
+  <!-- Segmento independiente: adjuntar un listado y evaluar su UUCC contra la
+       CREG 015/2018. No depende del panel ni comparte estado con él. -->
+  <div id="evaluacionUucc"></div>
+
 </main>
 
 <script type="module">
@@ -60,6 +64,13 @@
   window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
     origen: 'Parque vivo · Firestore'
   });
+
+  // ── Segmento de evaluación masiva ─────────────────────────────────────────
+  // Se monta aparte del panel: si el parque vivo fallara, este segmento sigue
+  // sirviendo, porque trabaja sobre el archivo que adjunte el usuario. El
+  // archivo se lee en el navegador y no se envía a ningún servidor.
+  const { montarEvaluacionMasiva } = await import('../assets/js/ui/fichas/evaluacion-masiva.js');
+  window.__sgmEvalUucc = montarEvaluacionMasiva(document.getElementById('evaluacionUucc'));
 </script>
 
 <script src="../assets/vendor/lucide/lucide.min.js" defer></script>
