@@ -71,6 +71,7 @@
 | §57 | ADR-057 — Importador del Excel real Salud de Activos + MO.00418 Ed.02 ratificado tabla por tabla: eval_dga = promedio(TDGC,CO,CO₂,C₂H₂), CRG = % oficial Planificación AT, HER = calif 1-5 de inspección, guard omitidos; dry-run 208/213, coincidencias ≥93-100%; CONDICION Excel = trunc(HI)+juicio experto ~38 | 1104 |
 | §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`, Antigravity oficial; bóvedas NO se fusionan (datos de cliente) ⟦OPUS-5⟧ | 1122 |
 | §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y L-63 (no re-pedir autorización ya concedida) ⟦OPUS-5⟧ | 1140 |
+| §60 | ADR-060 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483 selectores, 0 globales); plantilla PE.02081 saneada (traía firmas manuscritas y datos de cliente); 1254 pruebas ⟦OPUS-5⟧ | 1160 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

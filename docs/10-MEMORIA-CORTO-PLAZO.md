@@ -6,27 +6,29 @@
 
 ---
 
-## 🎯 Foco (2026-07-28, cierre) — Ecosistema montado (ADR-058/059) · el PRODUCTO espera el drag&drop
+## 🎯 Foco (2026-08-15, cierre) — Fichas Técnicas YA VIVEN EN LA PÁGINA (ADR-060)
 
-> **ARRANQUE DE LA PRÓXIMA SESIÓN**: el Ingeniero cerró esta anunciando **instrucciones nuevas**.
-> Escúchalas primero; NO bloquees lo nuevo por lo de abajo. Contexto mínimo que necesitas saber:
-> el cerebro ahora vive en el ecosistema `~/Desktop/GitHub-MJ` con **kernel canónico repartido**
-> (`npm run brain:pull`; se edita SOLO en `../brain-private/kernel/`), catálogo de procesos en
-> **`60-WORKFLOWS`** (lee **W-11** antes de cualquier decisión fuerte) y consejo externo =
-> **Gemini vía Antigravity** (`15`). Proyecto nuevo → `../brain-private/NUEVO-PROYECTO.md`.
->
-> ⚠️ **Deuda de equilibrio**: costo-cerebro 30d en ~54% contra bandera del 30%, dos sesiones
-> seguidas de infraestructura. Salvo que lo nuevo pida lo contrario, **esta sesión debería ser
-> de PRODUCTO**. Y aplica **L-63**: lo que `§2`/`§G` ya autoriza se ejecuta y se reporta, no se pregunta.
+> El módulo suelto de Fichas Técnicas es ahora `pages/fichas-tecnicas.html`, con datos desde
+> Firestore. Commit `ec20f47`, mergeado a `main` y desplegado. 1254 pruebas verdes.
+> Modelo elegido por el Ingeniero: **híbrido `.ftm-`** (cascarón AQUA + módulo como componente).
+> Detalle → `99 §60`. Hallazgo de seguridad → `30 §L-64`.
 
-### ▶️ TAREA VIVA: encender el parque real — TODO listo salvo el PASO DEL INGENIERO (detalle → `99 §57`)
-> Metodología MO.00418 Ed.02 ratificada + importador en PRODUCCIÓN (`main` `c3c1c9b`, 1209 pass). Excel:
-> `~/Downloads/Salud_de_Activos_2026_UUCC_corregida-2.xlsx`. **PASO ÚNICO**: Ingeniero abre
-> `admin/importar.html` en su Chrome → drag&drop (L-62) → **Simulación** (dryRun: creados/actualizados
-> exactos vs los 206) → **Importar** → Claude verifica el tablero vivo con su sesión. TRAS el import:
-> (a) template sanitizado headers-only → cierra TODO-09; (b) TPT_Servicio (31) y TX_Respaldo (26) traen
-> títulos encima (cabeceras __EMPTY) → detección de fila-cabecera antes de importarlas (resuelve también
-> clasificación RESPALDO); (c) discrepancias del job = esperadas (juicio experto ~38 filas, `99 §57`).
+### ▶️ TAREA VIVA: validar la página nueva con sesión real
+> Todo se verificó SIN sesión (preview con datos de demostración). Falta abrirla autenticado y
+> comprobar que `SGM_DATA_SOURCE` trae el parque real, que la ficha se llena y que el Excel
+> PE.02081 sale bien con un equipo de verdad. **Hasta entonces la integración NO está cerrada.**
+
+### 🎨 Decisión de sitio pendiente (NO es de este módulo)
+> El subtítulo y la miga de pan quedan en **2,37:1** sobre la foto de fondo — ilegibles.
+> Causa: `.page-subtitle` y `.breadcrumb` no tienen halo en `aqua-components.css`; `.page-title`
+> sí lo tiene (línea 987). **Afecta a 29 páginas del repo.** Arreglarlo toca un archivo compartido:
+> es decisión del Ingeniero, no se hace de oficio.
+
+### ▶️ TAREA VIVA: encender el parque real — falta el PASO DEL INGENIERO (detalle → `99 §57`)
+> Importador en PRODUCCIÓN y MO.00418 Ed.02 ratificado. **PASO ÚNICO**: abrir `admin/importar.html`
+> en su Chrome → drag&drop (L-62) → **Simulación** → **Importar**. Excel:
+> `~/Downloads/Salud_de_Activos_2026_UUCC_corregida-2.xlsx`. TRAS el import: template headers-only
+> (cierra TODO-09) y detección de fila-cabecera para TPT_Servicio/TX_Respaldo.
 > 📌 El Ingeniero pidió **resumen de pendientes actualizado en CADA turno**.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
@@ -53,6 +55,8 @@
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
+| **TODO-30** | Validar `pages/fichas-tecnicas.html` con sesión real: datos de Firestore, ficha completa y exportación PE.02081 con un equipo de verdad (ADR-060). | 🔴 |
+| **TODO-31** | Decisión de sitio: contraste 2,37:1 de `.page-subtitle`/`.breadcrumb` sobre la foto (29 páginas afectadas, `aqua-components.css`). | 🟡 decisión |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |

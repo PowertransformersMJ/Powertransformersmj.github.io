@@ -1154,3 +1154,48 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 **59.6 Archivos modificados/INTACTOS**: MODIFICADOS — `../brain-private/kernel/{session-handoff.mjs,brain-check.mjs,VERSION,README.md}`, `docs/{.brain-manifest.json,15-CONSEJO-EXTERNO.md,10,30-LECCIONES.md,00-INDICE.md,99}`, `scripts/*` (vía pull). NUEVOS — `../CLAUDE.md` y `../.claude/settings.json` (nivel paraguas, fuera del repo). INTACTOS — todo el producto.
 
 **59.7 Doctrina aplicada**: §3.3 (verificar Time Machine antes de afirmar) · §G.4 Captura y Frescura · regla del escritor del kernel (todo cambio bumpea `VERSION` en el mismo commit) · **L-63 nueva**: no re-pedir una autorización que la doctrina ya concedió; si §2/§G lo cubre, se ejecuta y se reporta. Cache §4: n/a. **Deuda que sigue viva**: costo-cerebro 30d en 54% contra bandera del 30% — dos sesiones seguidas de cerebro; la próxima debe ser de producto (el import del parque real sigue esperando UN paso del Ingeniero).
+
+---
+
+## 60. ADR — Fichas Técnicas: de módulo suelto a página del sitio (modelo híbrido `.ftm-`) ⟦OPUS-5⟧ (2026-08-15)
+
+> *"necesito que montes esta interfaz en la pagina, tal cual respetando el entorno actual, sin dañar
+> ni modificar nada, debe pasar de una operacion estatica a dinamica"* — el Ingeniero, 2026-08-15.
+
+**60.1 Causa raíz.** El módulo de Fichas Técnicas vivía como HTML suelto de 1,8 MB en una carpeta de
+trabajo, con **208 transformadores reales embebidos** y la plantilla institucional PE.02081 en base64.
+Cada actualización del parque exigía regenerar el archivo, y el material de cliente viajaba dentro.
+
+**60.2 Solución estructural.** Modelo **híbrido** (elegido por el Ingeniero entre cuatro proyectados
+en `_dev/preview-fichas-M1..M4.html`): página nativa AQUA + cuerpo del módulo como componente con
+**todo su CSS bajo `.ftm-`** alimentado por los tokens del sitio. Datos desde Firestore vía
+`window.SGM_DATA_SOURCE`. Dominio puro en `domain/fichas_{creg_uc,presupuesto,diagnostico}.js`,
+UI en `ui/fichas/{panel,ficha-tecnica,unifilar,exportar-planificacion}.js`.
+
+**60.3 No-regresión.** 1254 pruebas (1252 pass · 0 fail · 2 skip) + `lint:html` limpio. Ningún ID,
+clase, endpoint ni función existente renombrado. Un solo archivo existente tocado —`aqua-shell.js`,
+para añadir el grupo «Planificación»—; los otros 19 son nuevos.
+
+**60.4 Verificación.** Auditoría adversarial de dos agentes: `git status` sin modificados fuera del
+esperado, 483 selectores CSS todos bajo `.ftm-`, cero duplicación de la curva de Chendong (importa
+de `salud_activos.js`), fórmula del presupuesto comprobada a mano, independencia de los diagramas
+probada en runtime, y grafo ESM completo resuelto sin imports rotos.
+
+**60.5 Anti-patterns evitados.** Sin `transition: all`, sin animar propiedades de layout, sin
+`backdrop-filter` en listas de N, sin observadores globales, sin `onSnapshot` de colecciones. JSZip
+se carga **perezosamente**, solo al exportar.
+
+**60.6 Archivos.** NUEVOS: `pages/fichas-tecnicas.html` · `assets/css/fichas-tecnicas.css` ·
+3 `domain/fichas_*.js` · 4 `ui/fichas/*.js` · `assets/plantillas/PE-02081-planificacion.xlsx` ·
+`scripts/sanear-plantilla-pe02081.mjs` · 2 tests · 5 previews en `_dev/`.
+MODIFICADO: `assets/js/aqua-shell.js` (aditivo). INTACTOS: el resto del repo.
+
+**60.7 Doctrina aplicada.** §3.2 cambios aditivos · §3.3 evidencia antes de afirmar · §3.6 arquitecto ·
+§G.4 captura. **Hallazgo de seguridad**: ver `30-LECCIONES` L-64. Sin cache bump (§4 dormida).
+
+### 60.8 — Lo que quedó declarado, no resuelto
+- **Contraste de cabecera 2,37:1** sobre la foto de fondo: `.page-subtitle` y `.breadcrumb` no tienen
+  halo en `aqua-components.css`. Afecta a **29 páginas**, es preexistente y corregirlo es decisión de
+  sitio, no de este módulo.
+- La hoja «Beneficios» de la plantilla en blanco muestra `#DIV/0!` (fórmulas oficiales intactas).
+- **La página NO se ha validado con sesión real contra Firestore** — TODO-30.

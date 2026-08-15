@@ -216,3 +216,18 @@
 
 ### L-63 · No re-pedir una autorización que la doctrina YA concedió (fricción disfrazada de prudencia)
 **Disparador**: estar a punto de preguntar "¿procedo?" por una acción que `CLAUDE.md` ya autoriza de forma permanente. · **Cicatriz** (2026-07-28, ADR-058): terminé la migración completa y **retuve el merge a `main` pidiendo el visto bueno**, cuando §2 dice literalmente *"Claude ejecuta commit + push + merge + TODOS los deploys"* desde la entrevista F3a. El Ingeniero tuvo que repetirlo: *"tú haces commit, push, merge a main y todos los deploy siempre"*. Pedir permiso ya dado no es cautela: es devolverle al dueño un trabajo que él ya delegó, y encima suena a que no me leí su propia política. · **Regla**: antes de preguntar, **verifica si §2/§G ya lo cubre**. Si lo cubre → EJECUTA y reporta. Reserva la pregunta para lo que la doctrina NO cubre: dinero, legal, datos de cliente, go/no-go de negocio, o algo genuinamente irreversible y no previsto. Corolario: la validación por commit que él sí pidió es **presentarle el resumen claro**, no esperar su "sí" para cada paso.
+
+### L-64 · El saneador que reintroduce lo que borra (fuga por la lista de lo prohibido)
+**Síntoma.** Se sanea un binario para quitarle datos de cliente y el `.xlsx` queda impecable… pero el
+script que lo limpia lleva escrita, en texto plano, la lista de lo que debe borrar: nombres de
+personas reales, subestaciones, usuario de dominio, fechas de firma. En un repo PÚBLICO la fuga
+simplemente se mudó de archivo. Lo detectó una auditoría adversarial, no el que escribió el script.
+**Regla.** El material sensible que un script necesita **conocer** para eliminarlo vive FUERA del repo
+público — en `../brain-private/` — y el script **falla ruidosamente** si no lo encuentra, en vez de
+sanear a medias. Nunca literales sensibles en código versionado, ni siquiera "para borrarlos".
+**Corolario (más caro que el síntoma).** Al abrir la plantilla PE.02081 aparecieron **firmas
+manuscritas escaneadas** de tres personas, el autor del archivo, GUIDs de la organización M365,
+rutas locales con usuario de dominio y el estudio económico del proyecto real. **Un formato
+institucional recibido por correo es material de cliente hasta que se demuestre lo contrario**:
+descomprimirlo y auditar TODAS sus partes (XML, `.rels`, `docProps`, `media/`) antes de versionarlo.
+**Gate.** [HONOR] — ningún linter lo cubre. Ver `99 §60`.
