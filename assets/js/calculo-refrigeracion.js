@@ -110,10 +110,16 @@ function getMotorConn() {
 
 /* ─── Carga lazy de datos pesados ───────────────────────────── */
 
+// El catálogo de transformadores YA NO viaja incrustado en el
+// repositorio (es público): ahora se lee de Firestore detrás de Auth.
+// Se conserva el camino viejo como respaldo por si algún despliegue
+// quedara con la versión anterior del módulo en caché del navegador.
 async function ensureTransformers() {
   if (state.transformers) return state.transformers;
   const mod = await import('./data/refrigeracion-transformadores-afinia.js');
-  state.transformers = mod.TRANSFORMADORES_AFINIA;
+  state.transformers = (typeof mod.cargarTransformadoresAfinia === 'function')
+    ? await mod.cargarTransformadoresAfinia()
+    : mod.TRANSFORMADORES_AFINIA;
   return state.transformers;
 }
 
@@ -574,7 +580,11 @@ async function initMatSelect() {
       }
     });
 
-    if (hint) hint.textContent = `${catalogo.length} matrículas cargadas · escribí parte de la matrícula, subestación o departamento`;
+    if (hint) {
+      hint.textContent = catalogo.length
+        ? `${catalogo.length} matrículas cargadas · escribí parte de la matrícula, subestación o departamento`
+        : 'No se recibió ningún transformador. Verificá que tu sesión esté activa y que el inventario tenga transformadores cargados.';
+    }
     console.info('[calculo-refrigeracion] initMatSelect OK · ' + catalogo.length + ' matrículas · combobox custom');
   } catch (err) {
     if (hint) hint.textContent = 'ERROR cargando matrículas: ' + (err && err.message || err);

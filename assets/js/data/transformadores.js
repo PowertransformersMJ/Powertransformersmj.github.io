@@ -21,11 +21,13 @@ import {
   collection, doc,
   addDoc, setDoc, updateDoc, deleteDoc,
   getDoc, getDocs, query, where, orderBy, limit,
+  getCountFromServer,
   onSnapshot,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { conLimite, LIMITE_TRANSFORMADORES } from '../domain/limites_lectura.js';
 import {
   sanitizarTransformador, validarTransformador, proyeccionV1
 } from '../domain/transformador_schema.js';
@@ -36,6 +38,10 @@ import {
 import { auditar, diffSimple, persistirAuditoria } from '../domain/audit.js';
 
 const COL_NAME = 'transformadores';
+
+// Re-export del tope para que las vistas puedan pedirlo explícito y
+// compararlo (SSoT del número: domain/limites_lectura.js).
+export { LIMITE_TRANSFORMADORES };
 
 // ── Re-exports para compat con llamadores v1 ───────────────────
 // Mapeo v1.ESTADOS → v2.ESTADOS_SERVICIO (mismas `value`,
@@ -88,12 +94,15 @@ export function isReady() {
  * idéntica a v1 (usa campos aplanados en el nivel raíz por la
  * proyección v1). Las vistas nuevas deben migrar a `listarV2`.
  */
-export async function listar(filtros = {}) {
+export async function listar(filtrosIn = {}) {
+  // Tope por defecto: en Firestore se paga por documento leído, así que
+  // ninguna consulta sale sin `limit()` (ver domain/limites_lectura.js).
+  const filtros = conLimite(filtrosIn, LIMITE_TRANSFORMADORES);
   const constraints = [];
   if (filtros.departamento) constraints.push(where('departamento', '==', filtros.departamento));
   if (filtros.estado)       constraints.push(where('estado',       '==', filtros.estado));
   constraints.push(orderBy('codigo'));
-  if (filtros.limite)       constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
 
   const snap = await getDocs(query(collRef(), ...constraints));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -103,7 +112,8 @@ export async function listar(filtros = {}) {
  * Variante v2 para vistas nuevas. Filtros por sección.
  *   { zona, tipo_activo, grupo, bucket } — subset de filtros v2.
  */
-export async function listarV2(filtros = {}) {
+export async function listarV2(filtrosIn = {}) {
+  const filtros = conLimite(filtrosIn, LIMITE_TRANSFORMADORES);
   const constraints = [];
   if (filtros.zona)        constraints.push(where('ubicacion.zona',        '==', filtros.zona));
   if (filtros.tipo_activo) constraints.push(where('identificacion.tipo_activo', '==', filtros.tipo_activo));
@@ -111,7 +121,7 @@ export async function listarV2(filtros = {}) {
   if (filtros.bucket)      constraints.push(where('salud_actual.bucket',   '==', filtros.bucket));
   if (filtros.subestacionId) constraints.push(where('ubicacion.subestacionId', '==', filtros.subestacionId));
   constraints.push(orderBy('codigo'));
-  if (filtros.limite)      constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
 
   const snap = await getDocs(query(collRef(), ...constraints));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -132,12 +142,16 @@ export async function listarTransformadoresSalud() {
 /**
  * Suscripción realtime (v1-compat). Mantiene la firma de F15.
  */
-export function suscribir(filtros = {}, onData, onError) {
+export function suscribir(filtrosIn = {}, onData, onError) {
+  // Un onSnapshot SIN tope es el peor caso de costo: cada escritura de un
+  // solo documento reenvía la colección entera a TODAS las pestañas
+  // abiertas. El tope por defecto acota ese reenvío.
+  const filtros = conLimite(filtrosIn, LIMITE_TRANSFORMADORES);
   const constraints = [];
   if (filtros.departamento) constraints.push(where('departamento', '==', filtros.departamento));
   if (filtros.estado)       constraints.push(where('estado',       '==', filtros.estado));
   constraints.push(orderBy('codigo'));
-  if (filtros.limite)       constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
   return onSnapshot(
     query(collRef(), ...constraints),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
@@ -210,6 +224,19 @@ export async function eliminar(id, opts = {}) {
 }
 
 // ── Stats para KPIs (compat v1) ────────────────────────────────
+/**
+ * Total REAL de transformadores sin traerse los documentos.
+ * `getCountFromServer` es una consulta de agregación: cobra ~1 lectura
+ * por cada 1000 documentos contados en vez de 1 por documento. Es la
+ * alternativa correcta cuando una vista necesita el total y no la lista.
+ *
+ * @returns {Promise<number>}
+ */
+export async function contarTotal() {
+  const snap = await getCountFromServer(query(collRef()));
+  return snap.data().count;
+}
+
 export async function contarPorEstado() {
   const items = await listar({});
   const acc = { operativo: 0, mantenimiento: 0, fuera_servicio: 0, retirado: 0, fallado: 0 };

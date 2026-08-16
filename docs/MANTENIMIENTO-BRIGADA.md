@@ -91,7 +91,7 @@ hijas que viven en su propio iframe lazy-load. Separación estricta
 | `assets/js/mantenimiento-brigada-shell.js` | 3 | One-liner `initModuleShell('brigadaTabs', { defaultTab: 'refrigeracion' })` |
 | `assets/js/calculo-refrigeracion.js` | ~1750 | UI binding + Chart.js + generador de informe AFINIA |
 | `assets/js/domain/refrigeracion.js` | 552 | Dominio puro · funciones testables sin DOM |
-| `assets/js/data/refrigeracion-transformadores-afinia.js` | 29 | Catálogo congelado de 206 transformadores AFINIA |
+| `assets/js/data/refrigeracion-transformadores-afinia.js` | ~185 | **Lector de Firestore** del parque (ya no lleva datos incrustados) |
 | `assets/js/data/refrigeracion-fan-db.js` | 240 | Base de 13 fichas técnicas de motoventiladores |
 | `assets/css/calculo-refrigeracion.css` | ~720 | Capa de estilo module-specific (100% tokens AQUA) |
 | `assets/img/afinia/header.png` | binario | Logo Afinia · Grupo·epm (1273×282) |
@@ -520,11 +520,15 @@ Cero cambios en el sidebar.
 
 ### Añadir un transformador AFINIA al catálogo
 
-Editar `assets/js/data/refrigeracion-transformadores-afinia.js` y
-agregar la entrada al array `TRANSFORMADORES_AFINIA` con la misma
-forma que las existentes (campos en mayúsculas: `SERIE`,
-`POTENCIA (KVA)`, `GRUPO`, `SUBESTACION`, `MATRICULA`, `ZONA`,
-`DEPARTAMENTO`, `REFRIGERACION`).
+**Ya NO se edita este repositorio.** El parque se administra en
+Firestore (colección `transformadores`): dalo de alta desde el panel
+de inventario o por el importador de Excel. El módulo lo lee en vivo
+con `cargarTransformadoresAfinia()`.
+
+⛔ PROHIBIDO volver a incrustar el listado en
+`assets/js/data/refrigeracion-transformadores-afinia.js`: `assets/`
+se publica en GitHub Pages y el repositorio es PÚBLICO. Lo vigila
+`tests/refrigeracion_catalogo_sin_datos.test.js`.
 
 ### Añadir una ficha técnica de motoventilador
 
@@ -565,15 +569,14 @@ regla permanente §0.1.2.12 del CLAUDE.md.
 - JS: `initMatSelect()` en
   `assets/js/calculo-refrigeracion.js` (~ línea 125)
 - Catálogo: `assets/js/data/refrigeracion-transformadores-afinia.js`
-  (206 entradas, sincronizadas con `Salud de Activos 2026.xlsx` hoja
-  `TX_Potencia`)
+  (lector de Firestore · `listarV2({limite:500})` → `mapearDocV2ACatalogo`)
 
 **Búsqueda multi-campo** — filtra por substring case-insensitive en:
-- `MATRICULA` (ej. `T1-M/M-CHG` o solo `CHG`)
-- `SUBESTACION` (ej. `chiriguana` o `chiriguán`, normalize NFD ignora acentos)
+- `MATRICULA` (ej. `TX-A-01` o solo `A-01`)
+- `SUBESTACION` (ej. `subestacion a` o `subestación a`, normalize NFD ignora acentos)
 - `DEPARTAMENTO` (ej. `cesar`, `bolívar`, `magdalena`)
 - `ZONA` (ej. `oriente`, `bolivar`, `occidente`)
-- `SERIE` (ej. `N339380`)
+- `SERIE` (ej. `SN-DEMO-1`)
 
 **Eventos wireados:**
 
@@ -608,34 +611,18 @@ inline en `pages/calculo-refrigeracion.html` línea 55:
 <!-- [html-validate-disable-next prefer-native-element: combobox custom...] -->
 ```
 
-**Para añadir/modificar matrículas:** editar
-`Salud de Activos 2026.xlsx` hoja `TX_Potencia` y luego regenerar
-`assets/js/data/refrigeracion-transformadores-afinia.js` con un
-script Node (referencia rápida abajo). El catálogo congelado existe
-para que el módulo cargue sin depender de Firestore — los 206 trafos
-son catálogo cerrado de AFINIA.
+**Para añadir/modificar matrículas:** hacelo en Firestore
+(panel de inventario o importador de Excel). El módulo lee el parque
+en vivo con `cargarTransformadoresAfinia()`; no hay nada que
+regenerar ni que commitear en este repositorio.
 
-```bash
-# Regenerar catálogo desde Excel
-node -e "
-const XLSX = require('xlsx');
-const wb = XLSX.readFile('Salud de Activos 2026.xlsx');
-const ws = wb.Sheets['TX_Potencia'];
-const rows = XLSX.utils.sheet_to_json(ws, { defval: null });
-const out = rows.filter(r => r.MATRICULA && String(r.MATRICULA).trim())
-  .map(r => ({
-    SERIE: r.SERIE != null ? String(r.SERIE) : '',
-    'POTENCIA (KVA)': r['POTENCIA (KVA)'] != null ? String(r['POTENCIA (KVA)']) : '',
-    GRUPO: String(r.GRUPO || '').trim(),
-    SUBESTACION: String(r.SUBESTACION || '').trim(),
-    MATRICULA: String(r.MATRICULA).trim(),
-    ZONA: String(r.ZONA || '').trim(),
-    DEPARTAMENTO: String(r.DEPARTAMENTO || '').trim(),
-    REFRIGERACION: String(r.REFRIGERACION || '').trim()
-  }));
-console.log('export const TRANSFORMADORES_AFINIA = Object.freeze(' + JSON.stringify(out) + ');');
-"
-```
+⚠️ **Deuda de datos abierta:** el documento v2 todavía no puebla
+`identificacion.grupo` en los registros migrados ni
+`refrigeracion.tipo_refrigeracion` en ninguno (la migración v1→v2 y
+el importador escriben `refrigeracion: {}`). Mientras tanto el
+combobox muestra esos dos campos vacíos / "No especificado". NO se
+rellenan con valores por defecto: un dato fabricado corrompería el
+dimensionamiento ONAF.
 
 ### 7.5 Integración con catálogo de Suministros (2026-05-18 · M1–M7)
 

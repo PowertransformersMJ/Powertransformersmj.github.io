@@ -37,14 +37,81 @@ export const HOJAS_TIPO_ACTIVO = Object.freeze({
 
 // ── Helpers de coerción ────────────────────────────────────────
 const toStr = (v) => (v == null) ? '' : String(v).trim();
-const toNum = (v) => {
+
+// ══════════════════════════════════════════════════════════════
+// Normalización numérica: separador DECIMAL vs. separador de MILES
+// ──────────────────────────────────────────────────────────────
+// POR QUÉ ESTA REGLA (no tocar sin leer esto):
+//
+// Aquí entran dos formatos de texto distintos y hay que distinguirlos,
+// porque confundirlos corrompe el dato EN SILENCIO (el reporte de
+// importación sigue diciendo "exitoso"):
+//   · Formato colombiano  → coma = decimal, punto = miles ("1.234,5" = 1234,5)
+//   · Formato inglés que entrega SheetJS con `raw:false` cuando la celda
+//     tiene formato de miles → "60,000" es SESENTA MIL, no sesenta.
+//     (mismo hallazgo ya documentado en `importador_suministros.js`).
+//
+// Se decide por POSICIÓN y CANTIDAD de dígitos, nunca por adivinación:
+//  1) Si aparecen AMBOS separadores → el ÚLTIMO es el decimal y el otro
+//     es de miles. Criterio reutilizado de `parseNum()` en
+//     `pruebas_electricas_extraccion.js` (misma familia de problema).
+//  2) Solo COMAS: si la cadena calza el patrón de agrupación de miles
+//     —1 a 3 dígitos y luego grupos EXACTOS de 3— ("60,000",
+//     "1,234,567") la coma es de miles. En cualquier otro caso
+//     ("0,05", "1,5", "1234,5") la coma es DECIMAL (formato colombiano).
+//  3) Solo PUNTOS: se quitan como miles SOLO cuando hay 2+ grupos de 3
+//     ("1.000.000"), caso inequívoco. Un punto ÚNICO se respeta como
+//     decimal: "13.800" es ambiguo (13,8 kV vs 13800) y ahí la lectura
+//     conservadora es la histórica — mejor no cambiar lo que ya servía.
+//  4) Lo que no se puede leer como número ("N/A", "") → null, jamás 0.
+//
+// `comaSiempreDecimal` desactiva la regla (2) para campos donde el
+// formato de miles es imposible por dominio: latitud/longitud nunca
+// llegan a 1000, así que en "10,391" la coma SIEMPRE es decimal.
+//
+// @param {*} v — valor crudo de la celda (string, número, vacío…).
+// @param {{comaSiempreDecimal?: boolean}} [opciones]
+// @returns {number|null}
+// ══════════════════════════════════════════════════════════════
+const RE_MILES_COMA  = /^[+-]?\d{1,3}(?:,\d{3})+$/;        // 60,000 · 1,234,567
+const RE_MILES_PUNTO = /^[+-]?\d{1,3}(?:\.\d{3}){2,}$/;    // 1.000.000 (2+ grupos)
+
+export function normalizarNumeroExcel(v, { comaSiempreDecimal = false } = {}) {
   if (v === '' || v == null) return null;
-  if (typeof v === 'string') {
-    v = v.replace(/,/g, '.').replace(/\s/g, '');
+  if (typeof v !== 'string') {
+    const nDirecto = +v;                       // SheetJS con `raw:true` ya da número
+    return Number.isFinite(nDirecto) ? nDirecto : null;
   }
-  const n = +v;
-  return Number.isFinite(n) ? n : null;
-};
+
+  let s = v.replace(/\u00a0/g, ' ').replace(/\s/g, '');
+  if (!s) return null;
+
+  const hayComa  = s.includes(',');
+  const hayPunto = s.includes('.');
+
+  if (hayComa && hayPunto) {
+    // (1) el último separador manda: es el decimal.
+    if (s.lastIndexOf(',') > s.lastIndexOf('.')) {
+      s = s.replace(/\./g, '').replace(/,/g, '.');   // 1.234,5 → 1234.5
+    } else {
+      s = s.replace(/,/g, '');                       // 1,234.5 → 1234.5
+    }
+  } else if (hayComa) {
+    // (2) coma sola: ¿agrupación de miles a la inglesa o decimal colombiano?
+    if (!comaSiempreDecimal && RE_MILES_COMA.test(s)) s = s.replace(/,/g, '');
+    else s = s.replace(/,/g, '.');
+  } else if (hayPunto) {
+    // (3) punto solo: solo se trata como miles si es inequívoco.
+    if (RE_MILES_PUNTO.test(s)) s = s.replace(/\./g, '');
+  }
+
+  const n = Number(s);
+  return Number.isFinite(n) ? n : null;         // (4) "N/A" → null, nunca 0
+}
+
+const toNum = (v) => normalizarNumeroExcel(v);
+// Coordenadas: la coma nunca puede ser de miles (|lat| ≤ 90, |lon| ≤ 180).
+const toNumCoord = (v) => normalizarNumeroExcel(v, { comaSiempreDecimal: true });
 const toBool = (v) => (v === true || v === 'SI' || v === 'si' || v === 'Sí' ||
                         v === 'TRUE' || v === 1 || v === '1');
 
@@ -189,8 +256,8 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
                                           'año de fabricacion', 'ano de fabricacion']));
   const instFecha= toISODate(g(['fecha_instalacion', 'inst_fecha', 'fecha instalacion']));
 
-  const latitud  = toNum(g(['latitud', 'lat']));
-  const longitud = toNum(g(['longitud', 'lng', 'lon']));
+  const latitud  = toNumCoord(g(['latitud', 'lat']));
+  const longitud = toNumCoord(g(['longitud', 'lng', 'lon']));
   const observaciones = toStr(g(['observaciones', 'obs', 'notas', 'observacion']));
 
   const estadoServicio = normEstado(g(['estado', 'estado_servicio']));
