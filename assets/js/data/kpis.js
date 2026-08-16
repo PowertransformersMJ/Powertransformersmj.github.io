@@ -9,6 +9,9 @@ import { listar as listarTransformadores, departamentoLabel, DEPARTAMENTOS }
 import { listar as listarOrdenes, TIPOS_ORDEN, ESTADOS_ORDEN, PRIORIDADES }
   from './ordenes.js';
 import { isFirebaseConfigured } from '../firebase-init.js';
+import {
+  LIMITE_TRANSFORMADORES, LIMITE_ORDENES, LIMITE_EXPORT, diagnosticoLectura
+} from '../domain/limites_lectura.js';
 
 export function isReady() { return isFirebaseConfigured; }
 
@@ -36,11 +39,21 @@ function lastNMonths(n) {
 // ── Agregación principal ──
 // Devuelve un snapshot listo para renderizar en el dashboard.
 export async function computeDashboard() {
+  // Topes EXPLÍCITOS: el tablero agrega el parque y las órdenes, y sin
+  // `limit()` cada apertura costaba N lecturas facturables. El porqué de
+  // los números está en domain/limites_lectura.js.
   const [trafos, ords] = await Promise.all([
-    listarTransformadores({}),
-    listarOrdenes({})
+    listarTransformadores({ limite: LIMITE_TRANSFORMADORES }),
+    listarOrdenes({ limite: LIMITE_ORDENES })
   ]);
-  return computeFromDatasets(trafos, ords);
+  const snap = computeFromDatasets(trafos, ords);
+  // Trazabilidad: si alguna lectura se pegó al tope, el tablero está
+  // mostrando una foto parcial y debe poder decirlo (no se oculta).
+  snap.lecturas = [
+    diagnosticoLectura('transformadores', trafos.length, LIMITE_TRANSFORMADORES),
+    diagnosticoLectura('ordenes', ords.length, LIMITE_ORDENES)
+  ];
+  return snap;
 }
 
 /**
@@ -211,9 +224,11 @@ function distribuir(items, campo, enumDef) {
 
 // ── Export CSV (plano de órdenes con nombre legible de transformador) ──
 export async function exportarOrdenesCSV() {
+  // Un export SÍ quiere el universo, pero tampoco puede ser infinito:
+  // techo duro de descarga puntual (domain/limites_lectura.js).
   const [trafos, ords] = await Promise.all([
-    listarTransformadores({}),
-    listarOrdenes({})
+    listarTransformadores({ limite: LIMITE_EXPORT }),
+    listarOrdenes({ limite: LIMITE_EXPORT })
   ]);
   const trafoById = new Map(trafos.map((t) => [t.id, t]));
   const headers = [

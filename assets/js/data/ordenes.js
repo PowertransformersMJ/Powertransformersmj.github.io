@@ -13,11 +13,13 @@ import {
   collection, doc,
   addDoc, updateDoc, deleteDoc,
   getDoc, getDocs, query, where, orderBy, limit,
+  getCountFromServer,
   onSnapshot,
   serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { conLimite, LIMITE_ORDENES } from '../domain/limites_lectura.js';
 import {
   sanitizarOrden, validarOrden, transicionValida,
   ESTADOS_ORDEN_V2, TIPOS_ORDEN as TIPOS_ORDEN_V2, PRIORIDADES as PRIORIDADES_V2
@@ -26,6 +28,10 @@ import { puedeTransicionar, PERMISOS_TRANSICION } from '../domain/workflow.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
 
 const COL_NAME = 'ordenes';
+
+// Re-export del tope para que las vistas puedan pedirlo explícito y
+// compararlo (SSoT del número: domain/limites_lectura.js).
+export { LIMITE_ORDENES };
 
 // ── Enumeraciones v1-compat ──
 // Para vistas legacy que esperan los 4 estados. La proyección
@@ -122,7 +128,10 @@ export function isReady() {
   return isFirebaseConfigured && !!getDbSafe();
 }
 
-export async function listar(filtros = {}) {
+export async function listar(filtrosIn = {}) {
+  // Tope por defecto: las órdenes crecen sin techo con el histórico y en
+  // Firestore se paga por documento leído (ver domain/limites_lectura.js).
+  const filtros = conLimite(filtrosIn, LIMITE_ORDENES);
   const constraints = [];
   if (filtros.estado)          constraints.push(where('estado',          '==', filtros.estado));
   if (filtros.estado_v2)       constraints.push(where('estado_v2',       '==', filtros.estado_v2));
@@ -132,19 +141,23 @@ export async function listar(filtros = {}) {
   if (filtros.contratoId)      constraints.push(where('contratoId',      '==', filtros.contratoId));
   if (filtros.macroactividadId) constraints.push(where('macroactividadId','==', filtros.macroactividadId));
   constraints.push(orderBy('codigo', 'desc'));
-  if (filtros.limite)          constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
   const snap = await getDocs(query(collRef(), ...constraints));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export function suscribir(filtros = {}, onData, onError) {
+export function suscribir(filtrosIn = {}, onData, onError) {
+  // Un onSnapshot SIN tope reenvía la colección entera a cada pestaña
+  // abierta en CADA escritura. El tope por defecto acota ese reenvío;
+  // el orden es `codigo` descendente, o sea las órdenes más recientes.
+  const filtros = conLimite(filtrosIn, LIMITE_ORDENES);
   const constraints = [];
   if (filtros.estado)          constraints.push(where('estado',          '==', filtros.estado));
   if (filtros.tipo)            constraints.push(where('tipo',            '==', filtros.tipo));
   if (filtros.prioridad)       constraints.push(where('prioridad',       '==', filtros.prioridad));
   if (filtros.transformadorId) constraints.push(where('transformadorId', '==', filtros.transformadorId));
   constraints.push(orderBy('codigo', 'desc'));
-  if (filtros.limite)          constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
   return onSnapshot(
     query(collRef(), ...constraints),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
@@ -155,6 +168,23 @@ export function suscribir(filtros = {}, onData, onError) {
 export async function obtener(id) {
   const s = await getDoc(docRef(id));
   return s.exists() ? { id: s.id, ...s.data() } : null;
+}
+
+/**
+ * Total REAL de órdenes sin traerse los documentos.
+ * `getCountFromServer` es una consulta de agregación: cobra ~1 lectura
+ * por cada 1000 documentos contados. Úsala cuando una vista necesite el
+ * total; NUNCA levantes el tope de `listar`/`suscribir` para contar.
+ *
+ * @param {{estado?: string, tipo?: string}} [filtros]
+ * @returns {Promise<number>}
+ */
+export async function contarTotal(filtros = {}) {
+  const constraints = [];
+  if (filtros.estado) constraints.push(where('estado', '==', filtros.estado));
+  if (filtros.tipo)   constraints.push(where('tipo',   '==', filtros.tipo));
+  const snap = await getCountFromServer(query(collRef(), ...constraints));
+  return snap.data().count;
 }
 
 function auditarSeguro(entry) {

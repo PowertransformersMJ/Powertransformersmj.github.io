@@ -231,7 +231,13 @@
 <div class="pe-toast" id="toast"></div>
 <div class="pe-tip" id="tip"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" defer></script>
+<!-- pdf.js 4.10.38 (parcheado contra CVE-2024-4367). Desde 4.x solo se
+     publica como módulo ES, así que se carga por su módulo cargador, que
+     además fija el worker y sigue publicando window.pdfjsLib. -->
+<script type="module">
+  import { cargarPdfJs } from '../assets/js/pdfjs-loader.js';
+  cargarPdfJs().catch((e) => console.warn('[pdf.js] no se pudo cargar:', e));
+</script>
 <script src="../assets/vendor/lucide/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>
 <script src="../assets/js/aqua-shell.js" defer></script>

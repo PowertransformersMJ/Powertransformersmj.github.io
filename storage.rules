@@ -2,10 +2,12 @@ rules_version = '2';
 
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Reglas Firebase Storage (Fase 9)
-// Gestión documental:
-//   documentos/{docId}/{filename=**}  → lectura pública
-//   (filtrada por gate estático), escritura restringida a admins
-//   registrados en /admins/{uid} con tope de 20 MB por archivo.
+// Gestión documental. Criterio ÚNICO alineado con `firestore.rules`:
+//   · LECTURA  → miembro ACTIVO del equipo (`isTeamMember`), no
+//     "cualquier cuenta autenticada". Un usuario desactivado pierde
+//     los PDFs igual que pierde los datos en Firestore.
+//   · ESCRITURA → solo admin (`isAdmin`), con tope de tamaño por ruta.
+//   · Todo lo no declarado queda cerrado.
 // ══════════════════════════════════════════════════════════════
 
 service firebase.storage {
@@ -15,26 +17,56 @@ service firebase.storage {
     function isSignedIn() {
       return request.auth != null;
     }
+
+    // Espejo EXACTO de los helpers de `firestore.rules` (§ "Helpers de
+    // sesión / rol"). Storage y Firestore deben responder lo mismo a la
+    // pregunta "¿quién es este usuario?": si divergen, los PDFs quedan
+    // más abiertos que los datos que describen.
+    function hasProfile() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/usuarios/$(request.auth.uid));
+    }
+
+    function profile() {
+      return firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data;
+    }
+
+    // Bootstrap legacy /admins: se conserva para NO dejar al proyecto sin
+    // admin, pero ya no ignora la desactivación (mismo criterio que G004 en
+    // Firestore). uid en /admins SIN perfil en /usuarios = bootstrap puro.
+    function adminsBootstrapValido() {
+      return firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
+        && (!hasProfile() || profile().activo == true);
+    }
+
+    // Miembro ACTIVO del equipo: perfil en /usuarios con activo == true, o
+    // bootstrap válido. Es el criterio de lectura de todo el bucket.
+    function isTeamMember() {
+      return isSignedIn() && (
+        (hasProfile() && profile().activo == true) ||
+        adminsBootstrapValido()
+      );
+    }
+
     // G005 (ADR-052 Ola 1): reconoce a los admins v2 (/usuarios rol='admin'
     // activo) además del bootstrap legacy /admins. Antes solo /admins, lo que
     // bloqueaba subidas de admins dados de alta por el flujo nuevo.
     function isAdmin() {
       return isSignedIn() && (
-        firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
-        || (
-          firestore.exists(/databases/(default)/documents/usuarios/$(request.auth.uid))
-          && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.rol == 'admin'
-          && firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data.activo == true
-        )
+        (hasProfile() && profile().rol == 'admin' && profile().activo == true) ||
+        adminsBootstrapValido()
       );
     }
 
     // ── Documentos técnicos ──
-    // Lectura solo para usuarios autenticados (ADR-052 Ola 0): antes era
-    // pública anónima. Los download-token URLs (getDownloadURL) siguen
-    // funcionando; se cierra el acceso por-path sin sesión.
+    // Lectura solo para MIEMBRO ACTIVO del equipo: antes bastaba con estar
+    // autenticado (ADR-052 Ola 0), lo que entregaba los documentos a
+    // cualquier cuenta de Firebase Auth del proyecto — incluida una ya
+    // desactivada. Ahora se exige el mismo criterio que Firestore
+    // (`isTeamMember`). Los download-token URLs (getDownloadURL) siguen
+    // funcionando; se cierra el acceso por-path.
     match /documentos/{docId}/{filename=**} {
-      allow read:   if isSignedIn();
+      allow read:   if isTeamMember();
       allow create: if isAdmin()
                     && request.resource.size <= 20 * 1024 * 1024;
       allow update: if isAdmin()
@@ -44,10 +76,10 @@ service firebase.storage {
 
     // ── Información Contractual (Fase 3 · 2026-04-27) ──
     // PDFs por contrato: contratos/{contrato_id}/{filename}.pdf
-    // Lectura solo autenticados (ADR-052 Ola 0): son documentos
-    // contractuales reales de AFINIA — NO deben ser anónimos.
+    // Lectura solo para MIEMBRO ACTIVO del equipo: son documentos
+    // contractuales reales — ni anónimos, ni "cualquier cuenta con sesión".
     match /contratos/{contratoId}/{filename=**} {
-      allow read:   if isSignedIn();
+      allow read:   if isTeamMember();
       allow create: if isAdmin()
                     && request.resource.size <= 50 * 1024 * 1024;
       allow update: if isAdmin()
@@ -58,10 +90,10 @@ service firebase.storage {
     // ── Pruebas Eléctricas (Mantenimiento Predictivo) ──
     // PDFs originales de cada informe:
     //   pruebas_electricas/{unidadId}/{filename}.pdf
-    // Lectura solo autenticados (ADR-052 Ola 0): informes técnicos
+    // Lectura solo para MIEMBRO ACTIVO del equipo: informes técnicos
     // reales de cliente (misma clase que 450108/, excluido del repo).
     match /pruebas_electricas/{unidadId}/{filename=**} {
-      allow read:   if isSignedIn();
+      allow read:   if isTeamMember();
       allow create: if isAdmin()
                     && request.resource.size <= 50 * 1024 * 1024;
       allow update: if isAdmin()

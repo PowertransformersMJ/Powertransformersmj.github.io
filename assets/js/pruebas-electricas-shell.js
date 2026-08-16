@@ -34,6 +34,9 @@ import {
   minNetaGohm, kvAT, normalizarSerie
 } from './domain/pruebas_electricas_schema.js';
 import { extraerMediciones } from './domain/pruebas_electricas_extraccion.js';
+import {
+  cargarPdfJs, PDFJS_CMAP_URL, PDFJS_FONTS_URL, PDFJS_OPCIONES_SEGURAS
+} from './pdfjs-loader.js';
 import { derivarBushing, bloquesMultiAno, ordenInforme, configInforme, etiquetaFecha, familiaMA, excluidaDelOverlay } from './domain/pruebas_electricas_bloques.js';
 import { renderMatriz, estadoVigente, lineaTiempoInformes, calificarPrueba } from './ui/pruebas/semaforo.js';
 import { ESTADOS, calificarTanDelta } from './domain/pruebas_electricas_semaforo.js';
@@ -1842,20 +1845,24 @@ async function leerTextoArchivo(file, setEstado) {
   const aviso = setEstado || (() => {});
   let texto = '';
   let ocr = false;
-  const pdfjs = window.pdfjsLib;
   const tipo = (file && file.type) || '';
+  // pdf.js se carga bajo demanda (módulo ES desde 4.x). `cargarPdfJs` es
+  // idempotente: si la página ya lo cargó al abrir, devuelve lo mismo.
+  const pdfjs = tipo === 'application/pdf'
+    ? (window.pdfjsLib || await cargarPdfJs())
+    : null;
   if (tipo === 'application/pdf' && pdfjs) {
     aviso('Leyendo PDF…');
     const buf = await file.arrayBuffer();
-    // cMaps + standard fonts del MISMO CDN/versión del worker (3.11.174): sin
-    // esto pdf.js emite "fetchStandardFontData failed (FoxitSymbol.pfb)" y puede
-    // perder glifos de fuentes embebidas al extraer texto.
-    const PDFJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174';
+    // cMaps + standard fonts del MISMO origen y versión que el build: sin
+    // esto pdf.js emite "fetchStandardFontData failed (FoxitSymbol.pfb)" y
+    // puede perder glifos de fuentes embebidas al extraer texto.
     const pdf = await pdfjs.getDocument({
       data: buf,
-      cMapUrl: `${PDFJS_CDN}/cmaps/`,
+      cMapUrl: PDFJS_CMAP_URL,
       cMapPacked: true,
-      standardFontDataUrl: `${PDFJS_CDN}/standard_fonts/`
+      standardFontDataUrl: PDFJS_FONTS_URL,
+      ...PDFJS_OPCIONES_SEGURAS
     }).promise;
     // Las mediciones (tan δ, excitación, etc.) viven en páginas
     // intermedias (4–8 típicamente); leer todo el informe acotado.
@@ -2399,11 +2406,9 @@ async function saveEditor() {
 window.openUpload = openUpload;
 window.closeUpload = closeUpload;
 
-// Configura pdf.js worker si la librería cargó
-if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions) {
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-}
+// pdf.js: se precarga al arrancar para que el primer PDF no espere a la
+// descarga. El worker y la versión los fija el cargador (SSoT), no aquí.
+cargarPdfJs().catch(() => { /* se reintenta al abrir el primer PDF */ });
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', arrancar);

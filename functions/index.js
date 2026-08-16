@@ -98,7 +98,14 @@ const db = getFirestore();
 // recalcula salud_actual del transformador y añade snapshot al
 // historial_hi.
 export const onMuestraCreate = onDocumentCreated(
-  { document: 'muestras/{id}', region: 'southamerica-east1' },
+  {
+    document: 'muestras/{id}',
+    region: 'southamerica-east1',
+    // Techo de gasto: no usa IA, pero es un trigger de escritura — una
+    // carga masiva de muestras la dispararía N veces en paralelo. 10
+    // instancias absorben una importación normal y acotan el peor caso.
+    maxInstances: 10
+  },
   async (event) => {
     const data = event.data && event.data.data();
     if (!data || !data.transformadorId) return;
@@ -148,7 +155,15 @@ export const onMuestraCreate = onDocumentCreated(
 // el estado del envío (success/error). Nuestro código nunca toca
 // credenciales SMTP.
 export const cronAlertasDiarias = onSchedule(
-  { schedule: '0 7 * * *', timeZone: 'America/Bogota', region: 'southamerica-east1' },
+  {
+    schedule: '0 7 * * *',
+    timeZone: 'America/Bogota',
+    region: 'southamerica-east1',
+    // Techo de gasto: corre una vez al día y escribe en /mail. Nunca
+    // debería haber dos ejecuciones simultáneas (duplicaría correos),
+    // así que 1 es a la vez el tope de costo y una guarda funcional.
+    maxInstances: 1
+  },
   async () => {
     const cfgSnap = await db.doc('alertas_config/global').get();
     const cfg = cfgSnap.exists ? cfgSnap.data() : {};
@@ -552,7 +567,19 @@ export const extraerPruebasElectricasIA = onCall(
     // el PDF base64 (~5 MB) + el stream de la respuesta.
     // 2 GiB (gen2 acopla más CPU → base64 + visión + thinking más rápidos y con
     // margen anti-OOM; un OOM-kill tampoco corre catch → dejaría el estado colgado).
-    memory: '2GiB'
+    memory: '2GiB',
+    // TECHO DE GASTO. Ésta es la única función que factura de verdad:
+    // 2 GiB durante hasta 25 min por invocación, más el consumo del
+    // proveedor de IA. Sin `maxInstances` Cloud Run puede escalar a
+    // cientos de instancias en paralelo (un bucle de reintentos, varios
+    // PDFs soltados a la vez o un abuso bastan) y el costo es
+    // instancias × 25 min × 2 GiB, sin freno.
+    // 3 es deliberadamente conservador: el flujo real es un ingeniero
+    // subiendo informes de uno en uno, así que 3 extracciones simultáneas
+    // ya son holgura; la cuarta ESPERA en cola, no falla. Si algún día el
+    // equipo carga en lote y la espera molesta, se sube con criterio —
+    // pero se sube a un número, nunca a "sin límite".
+    maxInstances: 3
   },
   async (request) => {
     if (!request.auth) {
@@ -771,7 +798,11 @@ export const narrativaTendenciaIA = onCall(
     // Entrada chica (números, sin PDF) → respuesta corta. 120 s sobra; el
     // cliente espera lo mismo (ver narrarTendencia en la capa de datos).
     timeoutSeconds: 120,
-    memory: '512MiB'
+    memory: '512MiB',
+    // Techo de gasto: también llama al proveedor de IA, pero es barata
+    // (512 MiB, 120 s). 5 en paralelo cubren a todo el equipo mirando
+    // tendencias a la vez sin dejar la puerta abierta.
+    maxInstances: 5
   },
   async (request) => {
     if (!request.auth) {

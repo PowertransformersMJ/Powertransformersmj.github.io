@@ -1,5 +1,11 @@
 name: Deploy · GitHub Pages
 
+# PENDIENTE (no se puede hacer desde el repositorio, es configuración de GitHub):
+# activar la protección de la rama `main` — Settings → Branches → Add rule →
+# «Require status checks to pass before merging» marcando el check
+# «Lint HTML + suite de dominio». Este archivo bloquea la PUBLICACIÓN si la
+# verificación falla, pero NO impide que un commit roto llegue a `main`.
+
 on:
   push:
     branches:
@@ -17,7 +23,16 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  # Antes «Deploy» salía verde aunque «CI» estuviera rojo: producción se publicaba
+  # sin que nadie hubiera pasado el lint, la suite de dominio ni las reglas de
+  # Firestore. Ahora la publicación DEPENDE (`needs:`) de esta verificación, que
+  # es el MISMO flujo de CI reutilizado — no una copia que se desincronice.
+  verificar:
+    name: Verificación previa (CI)
+    uses: ./.github/workflows/ci.yml
+
   build-deploy:
+    needs: verificar          # si la verificación falla, NO se publica nada
     runs-on: ubuntu-latest
     environment:
       name: github-pages

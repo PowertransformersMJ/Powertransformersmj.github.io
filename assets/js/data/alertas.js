@@ -12,6 +12,9 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import {
+  LIMITE_TRANSFORMADORES, LIMITE_ORDENES, estaTruncado
+} from '../domain/limites_lectura.js';
 
 import {
   listar as listarTransformadores,
@@ -500,14 +503,37 @@ export function suscribirComputo(onData, onError) {
     timer = setTimeout(emit, 250);
   };
 
+  // Topes EXPLÍCITOS (aunque la capa de datos ya aplica el suyo por
+  // defecto): estas dos son suscripciones en vivo a colecciones enteras
+  // y son el punto más caro del sistema — cada escritura reenvía el
+  // resultado a todas las pestañas abiertas. El porqué de los números
+  // está en domain/limites_lectura.js. Si el motor de alertas llegara a
+  // tocar el tope se avisa por consola en vez de subirlo en silencio:
+  // significa que el parque o el histórico creció y hay que revisarlo.
   const unsubT = suscribirTransformadores(
-    {},
-    (items) => { state.transformadores = items; schedule(); },
+    { limite: LIMITE_TRANSFORMADORES },
+    (items) => {
+      if (estaTruncado(items.length, LIMITE_TRANSFORMADORES)) {
+        console.warn(
+          `[alertas] transformadores leídos al tope (${LIMITE_TRANSFORMADORES}): ` +
+          'las alertas pueden estar viendo un parque parcial.'
+        );
+      }
+      state.transformadores = items; schedule();
+    },
     fail
   );
   const unsubO = suscribirOrdenes(
-    {},
-    (items) => { state.ordenes = items; schedule(); },
+    { limite: LIMITE_ORDENES },
+    (items) => {
+      if (estaTruncado(items.length, LIMITE_ORDENES)) {
+        console.warn(
+          `[alertas] órdenes leídas al tope (${LIMITE_ORDENES}): ` +
+          'se están evaluando solo las más recientes.'
+        );
+      }
+      state.ordenes = items; schedule();
+    },
     fail
   );
   const unsubC = onSnapshot(

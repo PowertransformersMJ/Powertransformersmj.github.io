@@ -275,7 +275,9 @@ server-side (firebase-admin, seeds, migraciones). Copiar a `.env`
 Toda la lógica de extracción vive en
 `domain/pruebas_electricas_extraccion.js` (puro · sin pdf.js ni
 Firebase · testeable con `node --test`). El shell extrae el texto
-del PDF con **pdf.js v3.11.174** (CDN) y lo pasa a
+del PDF con **pdf.js v4.10.38** (CDN jsDelivr, cargado por
+`assets/js/pdfjs-loader.js` — SSoT de la versión; 4.2.0+ corrige
+CVE-2024-4367 y el cargador añade `isEvalSupported:false`) y lo pasa a
 `extraerMediciones(textoPdf)`, que devuelve las 6 mediciones más
 un bloque `_diagnostico`:
 
