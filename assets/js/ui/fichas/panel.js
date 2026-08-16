@@ -33,6 +33,7 @@ import { desgloseCreg, variacionReal, formatearCOP } from '../../domain/fichas_p
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES
 } from '../../domain/fichas_diagnostico.js';
+import { atraparFoco } from '../foco-modal.js';
 import { construirFichaTecnica, colorCondicion, nombreCondicion } from './ficha-tecnica.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
@@ -490,6 +491,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const filtros = { q: '', nivel: '', zona: '', uucc: '' };
   const ESTADOS = new Map();   // clave de equipo → estado editable
   let actual = null;           // equipo abierto en el modal
+  let trampaFoco = null;       // trampa de foco del modal (ui/foco-modal.js)
   let hoja = 'ficha';
   let aviso = '';
 
@@ -720,12 +722,21 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     modal.classList.add('is-on');
     modal.setAttribute('aria-hidden', 'false');
     pintarModal();
-    const primera = modalTabs.querySelector('button');
-    if (primera && typeof primera.focus === 'function') primera.focus();
+    // El diálogo ya declaraba `aria-modal="true"` pero el foco se escapaba con
+    // el tabulador a la página de detrás — la promesa de «el resto está
+    // inerte» quedaba incumplida. La trampa se arma DESPUÉS de pintar (si no,
+    // aún no hay controles a los que saltar) y enfoca la primera pestaña.
+    // Caso piloto de la utilidad compartida `ui/foco-modal.js`.
+    trampaFoco = atraparFoco(modal, {
+      alCerrar: cerrarFicha,
+      autoFoco: '[data-ftm="modal-tabs"] button'
+    });
     return true;
   }
 
   function cerrarFicha() {
+    // Primero soltar: devuelve el foco a la fila/botón que abrió la ficha.
+    if (trampaFoco) { trampaFoco.soltar(); trampaFoco = null; }
     modal.classList.remove('is-on');
     modal.setAttribute('aria-hidden', 'true');
     actual = null;
@@ -1290,7 +1301,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
   }
 
+  // Escape: mientras el modal está abierto lo gestiona la trampa de foco
+  // (`ui/foco-modal.js`, en fase de captura). Esto queda como red de
+  // seguridad para el caso raro de que la trampa no se haya podido armar;
+  // `cerrarFicha` es idempotente, así que un cierre doble no rompe nada.
   function alTeclear(ev) {
+    if (trampaFoco) return;
     if (ev.key === 'Escape' && modal.classList.contains('is-on')) cerrarFicha();
   }
 

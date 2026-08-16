@@ -18,13 +18,12 @@
   <link rel="stylesheet" href="assets/css/aqua-components.css"/>
 
   <style>
-    .skip-link {
-      position: absolute; top: -48px; left: 1rem; z-index: 1000;
-      background: var(--brand); color: #fff; font-family: var(--font-mono);
-      font-weight: 700; letter-spacing: .08em; padding: .6rem 1rem;
-      border-radius: var(--r-sm); text-decoration: none; transition: top .2s ease;
-    }
-    .skip-link:focus { top: 1rem; outline: 2px solid var(--cyan); outline-offset: 2px; }
+    /* `.skip-link` ya NO se estiliza aquí: la regla compartida vive en
+       assets/css/aqua-components.css, la misma que ahora sirve a las 62
+       páginas donde el enlace lo inyecta aqua-shell.js. La copia local
+       animaba `top` (propiedad de maquetación, prohibido por §3.1) y además
+       pisaba a la compartida solo en esta página. La clase y el marcado no
+       cambian: es una deduplicación, no un renombrado. */
     .sr-only { position: absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
 
     /* Hero compacto perla */

@@ -102,7 +102,7 @@ dominio puro.
 | `parametros_criticidad.js` | `/parametros_sistema/criticidad` (F36 tope dinámico). |
 | `auditoria.js` | `/auditoria` — read-only con filtros. |
 | `importar.js` | `persistirImportacion` idempotente por código + log en `/importaciones`. Audit cableado. |
-| `refrigeracion-transformadores-afinia.js` | **v2.9** · catálogo congelado de 206 transformadores AFINIA (matrícula, serie, potencia, grupo, subestación, zona, departamento, refrigeración). Helper `buscarPorMatricula(matricula)`. NO va a Firestore — vive en repo. |
+| `refrigeracion-transformadores-afinia.js` | **LECTOR de Firestore** (ya NO es catálogo incrustado). Lee `transformadores` vía `listarV2({limite:500})` y mapea el documento v2 a la forma canónica en mayúsculas (`mapearDocV2ACatalogo`, puro y testeado). Exporta `cargarTransformadoresAfinia()`, `buscarPorMatricula()` (ahora async), `catalogoEnCache()` y `TRANSFORMADORES_AFINIA` (array VACÍO, solo compat). ⛔ `assets/` se publica: PROHIBIDO volver a incrustar datos reales — lo vigila `tests/refrigeracion_catalogo_sin_datos.test.js`. ⚠️ Deuda: `GRUPO` y `REFRIGERACION` aún no se pueblan en el documento v2 y llegan vacíos. |
 | `refrigeracion-fan-db.js` | **v2.9** · catálogo congelado de 13 fichas técnicas de motoventiladores (ZIEHL-ABEGG ZN045/FN050/FN063/ZN063 + KRENZ F20). Helpers `buscarFan(key)` y `listarFans()`. NO va a Firestore. |
 
 ### 2.3 UIs

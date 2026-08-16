@@ -334,18 +334,38 @@ body.aqua .sb-item.is-active {
 .sb-tree .sb-caret:hover { background: rgba(0, 40, 90, .08); color: var(--ink-1); }
 .sb-tree .sb-caret svg,
 .sb-tree .sb-caret i { width: 14px; height: 14px; transition: transform .18s ease; }
-.sb-tree:not(.is-expanded) .sb-caret svg,
-.sb-tree:not(.is-expanded) .sb-caret i { transform: rotate(-90deg); }
+/* La flecha solo gira para SU propio nodo (scope directo). Antes el
+   selector era descendente y un nodo cerrado giraba también las flechas
+   de sus nietos, que ya ni se ven. */
+.sb-tree:not(.is-expanded) > .sb-item .sb-caret svg,
+.sb-tree:not(.is-expanded) > .sb-item .sb-caret i { transform: rotate(-90deg); }
 
-.sb-tree .sb-children {
-  display: grid;
-  grid-template-rows: 1fr;
-  transition: grid-template-rows .22s ease;
+/* ── Colapso del subárbol (corregido) ────────────────────────
+   ANTES: el contenedor era una rejilla con `grid-template-rows: 1fr` y al
+   cerrar se ponía a `0fr`. Como solo hay UNA fila declarada, únicamente la
+   PRIMERA fila (el primer hijo) se contraía; los hijos 2..N caían en filas
+   implícitas de tamaño automático y seguían visibles — un nodo con 3 hijos
+   medía lo mismo abierto que cerrado.
+   AHORA: se oculta el contenedor completo, así colapsa TODO el subárbol sin
+   importar cuántos hijos tenga. No se anima ninguna propiedad de layout
+   (doctrina de rendimiento); el aviso visual lo dan la flecha (transform) y
+   un fundido de entrada al abrir. */
+.sb-tree > .sb-children {
+  display: block;
   margin-top: 2px;
 }
-.sb-tree:not(.is-expanded) .sb-children {
-  grid-template-rows: 0fr;
-  overflow: hidden;
+.sb-tree.is-expanded > .sb-children {
+  animation: sbChildrenIn .18s var(--ease-out) both;
+}
+.sb-tree:not(.is-expanded) > .sb-children {
+  display: none;
+}
+@keyframes sbChildrenIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sb-tree.is-expanded > .sb-children { animation: none; }
 }
 .sb-tree .sb-children > * { min-height: 0; }
 
@@ -631,9 +651,60 @@ body.aqua .sb-item.is-active {
   padding: 90px 40px 80px;
   min-height: 100vh;
 }
+/* ─── Menú lateral en tablet/móvil (cajón deslizante) ──────────
+   ANTES: por debajo de 1024 px el sidebar se ocultaba (`display:none`) y no
+   había ningún botón que lo reemplazara: la app se quedaba SIN navegación
+   justo en la tablet que usa el técnico en subestación.
+   AHORA: el sidebar se convierte en un cajón que entra desde la izquierda,
+   con velo de fondo, y se abre desde el botón ☰ de la barra superior.
+   Se anima solo `transform` y `opacity` (nunca ancho/alto/márgenes). */
+
+/* Botón ☰ — solo existe por debajo de 1024 px.
+   Se escribe como `.tb .tb-menu-btn` para ganarle al `display:inline-flex`
+   que trae la clase `.btn`. */
+.tb .tb-menu-btn { display: none; }
+/* Velo detrás del cajón */
+.sb-backdrop {
+  position: fixed; inset: 0;
+  display: none;
+  z-index: 190;
+  background: rgba(0, 30, 70, .30);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity .2s var(--ease-out);
+}
+
 @media (max-width: 1024px) {
-  .sb { display: none; }
+  .tb .tb-menu-btn { display: inline-flex; }
+
+  .sb {
+    /* Sigue siendo `position:fixed`; solo lo sacamos de pantalla.
+       `visibility:hidden` lo saca además del orden de tabulación, para que
+       el teclado no navegue por un menú que no se ve. */
+    display: block;
+    width: min(300px, 86vw);
+    z-index: 210;
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition: transform .24s var(--ease-out), visibility 0s linear .24s;
+  }
+  body.sb-open .sb {
+    transform: translateX(0);
+    visibility: visible;
+    transition: transform .24s var(--ease-out), visibility 0s;
+    box-shadow: 24px 0 60px -12px rgba(0, 40, 90, .28);
+  }
+
+  .sb-backdrop { display: block; }
+  body.sb-open .sb-backdrop { opacity: 1; pointer-events: auto; }
+  /* Bloquear el scroll del fondo mientras el cajón está abierto */
+  body.sb-open { overflow: hidden; }
+
   .app-main { margin-left: 0; padding: 76px 24px 48px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sb, body.sb-open .sb, .sb-backdrop { transition: none; }
 }
 
 /* ─── BOTONES 3D ──────────────────────────────────────────── */
@@ -1642,6 +1713,98 @@ body.aqua .breadcrumb {
   margin-bottom: 8px;
   text-transform: uppercase;
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ACCESIBILIDAD · LEGIBILIDAD DE LA CABECERA SOBRE LA FOTO
+   ═══════════════════════════════════════════════════════════════
+   PROBLEMA. El fondo del sitio es una fotografía a pantalla completa
+   (.aqua-power-scene) y el bloque de cabecera (.page-header con su
+   .breadcrumb + .page-title + .page-subtitle) se apoya directamente sobre
+   ella, sin superficie propia. `.page-title` / `.page-sub` sí llevan halo
+   protector (ver arriba, sección PAGE HEADER), pero las clases que las 49
+   páginas usan de verdad — `.page-subtitle` y `.breadcrumb` — no lo tenían.
+
+   MEDICIÓN (WCAG 2.1 relación de contraste, muestreo real de la foto en la
+   franja donde cae la cabecera: 1440×900, background-size:cover, 19 500
+   muestras; luminancia relativa sRGB). ANTES, sin velo:
+     · .page-subtitle / .breadcrumb (--ink-3 #4d6485) → mediana 1,61:1
+       (peor píxel 1,00:1). Mínimo exigido para texto normal: 4,5:1.  ❌
+     · .page-title (--ink-1 #0d1f38, 28px bold) → mediana 4,22:1
+       (peor píxel 1,00:1). Mínimo para texto grande: 3:1.             ❌
+
+   SOLUCIÓN (la más conservadora que alcanza el umbral):
+     (a) velo blanco suave BAJO el bloque de cabecera — no cambia la
+         maquetación (background y box-shadow no ocupan espacio) ni los
+         colores de marca; el `box-shadow` sólido de 14px extiende el velo
+         más allá del texto sin añadir padding, y la capa difuminada lo
+         funde con la foto para que se lea como un halo de luz, no como una
+         tarjeta (sin borde, sin sombra proyectada);
+     (b) los dos textos pequeños bajan un escalón de tinta, de --ink-3 a
+         --ink-2 (#1f3656) — la MISMA tinta del cuerpo del sitio
+         (`body.aqua p`), no un color de marca;
+     (c) halo de texto igual al que ya usan .page-title / .page-sub.
+
+   DESPUÉS, con velo .72 (peor píxel de la foto, no la mediana):
+     · .page-subtitle / .breadcrumb (--ink-2) →  6,13:1   ✅ (≥ 4,5)
+     · .page-title (--ink-1)                  →  8,30:1   ✅ (≥ 3)
+   El halo de (c) NO se cuenta en esas cifras: el margen sale del velo solo.
+   (Con --ink-3 y este mismo velo el peor caso quedaría en 3,03:1 — por eso
+   hace falta también (b).)
+
+   Los tokens de aqua-tokens.css quedan INTACTOS a propósito: tocarlos
+   afectaría a todo el sitio. Aquí solo se acota al bloque de cabecera.
+   Nota rendimiento (§3.1): sin `transition: all`, sin animar propiedades de
+   layout y sin `backdrop-filter` — hay UN bloque de cabecera por página, no
+   una lista de N elementos.                                                */
+body.aqua .page-header,
+body.aqua .page-head {
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .72);
+  box-shadow:
+    0 0 0 14px rgba(255, 255, 255, .72),      /* extiende el velo sin tocar la maquetación */
+    0 0 26px 20px rgba(255, 255, 255, .34);   /* funde el borde con la foto */
+}
+body.aqua .page-subtitle,
+body.aqua .breadcrumb {
+  color: var(--ink-2);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, .55);
+}
+
+/* ── Enlace «saltar al contenido» ──────────────────────────────
+   Lo inyecta assets/js/aqua-shell.js como PRIMER elemento del <body>, así
+   que es también el primer tabulable de la página. Oculto fuera de pantalla
+   hasta que recibe el foco. Se mueve con `transform` (no con `top`) para no
+   animar una propiedad de maquetación (§3.1). */
+.skip-link {
+  position: fixed;
+  top: 10px;
+  left: 12px;
+  z-index: var(--z-toast, 1000);
+  display: inline-block;
+  background: var(--brand, #007aff);
+  color: #fff;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: .6rem 1rem;
+  border-radius: var(--r-sm, 10px);
+  text-decoration: none;
+  box-shadow: 0 6px 20px rgba(0, 40, 90, .28);
+  transform: translateY(-200%);
+  transition: transform var(--dur-fast, 180ms) var(--ease-out, ease);
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid var(--cyan, #00b8d4);
+  outline-offset: 2px;
+  opacity: 1;
+}
+/* El destino del salto recibe foco programático: sin contorno propio, que
+   el usuario ya sabe dónde está por el desplazamiento. */
+.app-main[tabindex="-1"]:focus,
+main[tabindex="-1"]:focus { outline: none; }
 
 /* Empty/loading states */
 body.aqua .empty-state,

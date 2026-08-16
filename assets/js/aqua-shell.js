@@ -123,16 +123,53 @@
     document.body.insertBefore(frag, document.body.firstChild);
   }
 
+  /* ─── Enlace «saltar al contenido» (accesibilidad) ───────
+   * Solo `index.html` y `home.html` lo traían escrito a mano; las otras 62
+   * páginas obligaban a tabular por toda la barra lateral antes de llegar al
+   * contenido. Se inyecta aquí — el mismo sitio que ya pone barra y menú en
+   * todas — para arreglarlo de una vez sin editar 62 archivos.
+   *
+   * Debe ser el PRIMER tabulable: se inserta al principio del <body> DESPUÉS
+   * de la escena/topbar/sidebar (que también insertan al principio), de modo
+   * que acabe delante de todos ellos.
+   * Estilos: `.skip-link` en assets/css/aqua-components.css (oculto salvo
+   * cuando tiene el foco). Si la página ya trae uno propio, no se duplica. */
+  function injectSkipLink() {
+    if (document.querySelector('.skip-link')) return;
+    const main = document.querySelector('main.app-main') || document.querySelector('main');
+    if (!main) return;
+    // El destino necesita id y ser enfocable para que el salto mueva el foco
+    // de verdad (no solo el scroll) en Safari/Chrome.
+    if (!main.id) main.id = 'main';
+    if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1');
+    const a = document.createElement('a');
+    a.className = 'skip-link';
+    a.href = '#' + main.id;
+    a.textContent = 'Saltar al contenido principal';
+    a.addEventListener('click', () => {
+      // Algunos navegadores no enfocan el destino de un ancla interna.
+      if (typeof main.focus === 'function') main.focus();
+    });
+    document.body.insertBefore(a, document.body.firstChild);
+  }
+
   /* ─── Topbar ────────────────────────────────────────────── */
   function injectTopbar() {
     if (document.querySelector('header.tb')) return;
     const tb = document.createElement('header');
     tb.className = 'tb';
     tb.innerHTML = `
-      <a href="${u('home.html')}" class="tb-brand">
-        <span class="logo"><i data-lucide="zap"></i></span>
-        SGM · <span class="b">TRANSPOWER</span>
-      </a>
+      <div class="tb-lead">
+        <button class="btn btn--ghost btn--icon tb-menu-btn" type="button" id="tbMenu"
+                aria-controls="aquaSidebar" aria-expanded="false"
+                title="Menú de navegación" aria-label="Abrir menú de navegación">
+          <i data-lucide="menu"></i>
+        </button>
+        <a href="${u('home.html')}" class="tb-brand">
+          <span class="logo"><i data-lucide="zap"></i></span>
+          SGM · <span class="b">TRANSPOWER</span>
+        </a>
+      </div>
       <div class="tb-search">
         <i data-lucide="search"></i>
         <input type="search" id="tbSearch" placeholder="Buscar transformador, OT, subestación…" aria-label="Buscar"/>
@@ -152,6 +189,11 @@
     if (document.querySelector('aside.sb')) return;
     const sb = document.createElement('aside');
     sb.className = 'sb';
+    sb.id = 'aquaSidebar';
+    // Enfocable por programa (no por tabulación) para poder mover el foco
+    // dentro del cajón al abrirlo en tablet.
+    sb.setAttribute('tabindex', '-1');
+    sb.setAttribute('aria-label', 'Navegación principal');
     sb.innerHTML = `
       <a href="${u('home.html')}" class="sb-brand-head" aria-label="Inicio · SGM TRANSPOWER" style="text-decoration:none">
         <span class="logo"><i data-lucide="zap"></i></span>
@@ -161,23 +203,50 @@
         </div>
       </a>
       <div class="sb-group">
-        <div class="sb-group-title">Operación</div>
+        <div class="sb-group-title">Parque</div>
         <a href="${u('home.html')}" class="sb-item" data-key="home"><span class="i"><i data-lucide="layout-dashboard"></i></span>Inicio</a>
-        <a href="${u('pages/activos.html')}" class="sb-item" data-key="activos"><span class="i"><i data-lucide="database"></i></span>Salud de Activos</a>
-        <a href="${u('pages/seguimiento-operativo.html')}" class="sb-item" data-key="seguimiento"><span class="i"><i data-lucide="activity"></i></span>Seguimiento Operativo</a>
-        <a href="${u('pages/indicadores-calidad.html')}" class="sb-item" data-key="calidad"><span class="i"><i data-lucide="trending-up"></i></span>Indicadores de Calidad</a>
+        <a href="${u('pages/activos.html')}#tab=inventario" class="sb-item" data-key="activos" data-default-tab><span class="i"><i data-lucide="database"></i></span>Transformadores</a>
+        <a href="${u('pages/activos.html')}#tab=mapa" class="sb-item" data-key="mapa"><span class="i"><i data-lucide="map"></i></span>Mapa</a>
+        <a href="${u('pages/activos.html')}#tab=subestaciones" class="sb-item" data-key="subestaciones"><span class="i"><i data-lucide="factory"></i></span>Subestaciones</a>
+        <a href="${u('pages/fichas-tecnicas.html')}" class="sb-item" data-key="fichas-tecnicas"><span class="i"><i data-lucide="file-spreadsheet"></i></span>Fichas Técnicas</a>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Diagnóstico</div>
+        <a href="${u('pages/pruebas-electricas.html')}" class="sb-item" data-key="pruebas-electricas"><span class="i"><i data-lucide="gauge"></i></span>Pruebas Eléctricas</a>
+        <a href="${u('pages/salud.html')}" class="sb-item" data-key="salud"><span class="i"><i data-lucide="heart-pulse"></i></span>Salud del Activo</a>
+        <a href="${u('pages/salud.html')}#tab=muestras" class="sb-item" data-key="muestras"><span class="i"><i data-lucide="flask-conical"></i></span>Muestras</a>
+        <a href="${u('pages/salud.html')}#tab=contramuestras" class="sb-item" data-key="contramuestras"><span class="i"><i data-lucide="test-tubes"></i></span>Contramuestras</a>
+        <a href="${u('pages/salud.html')}#tab=fallados" class="sb-item" data-key="fallados"><span class="i"><i data-lucide="alert-triangle"></i></span>Fallados y RCA</a>
+        <a href="${u('pages/salud.html')}#tab=matriz" class="sb-item" data-key="matriz-riesgo"><span class="i"><i data-lucide="grid-3x3"></i></span>Matriz de Riesgo</a>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Ejecución</div>
         <a href="${u('pages/ordenes.html')}" class="sb-item" data-key="ordenes"><span class="i"><i data-lucide="clipboard-list"></i></span>Órdenes</a>
         <a href="${u('pages/mantenimiento-brigada.html')}" class="sb-item" data-key="mantenimiento-brigada"><span class="i"><i data-lucide="hard-hat"></i></span>Mantenimiento Brigada</a>
+        <a href="${u('pages/seguimiento-operativo.html')}" class="sb-item" data-key="seguimiento"><span class="i"><i data-lucide="activity"></i></span>Seguimiento Operativo</a>
+        <a href="${u('pages/seguimiento-cargabilidad.html')}" class="sb-item" data-key="cargabilidad"><span class="i"><i data-lucide="battery-charging"></i></span>Cargabilidad</a>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Análisis</div>
+        <a href="${u('pages/analisis.html')}#tab=dashboard" class="sb-item" data-key="analisis" data-default-tab><span class="i"><i data-lucide="bar-chart-3"></i></span>Dashboard</a>
+        <a href="${u('pages/analisis.html')}#tab=kpis" class="sb-item" data-key="kpis"><span class="i"><i data-lucide="target"></i></span>KPIs</a>
+        <a href="${u('pages/analisis.html')}#tab=alertas" class="sb-item" data-key="alertas"><span class="i"><i data-lucide="bell-ring"></i></span>Alertas</a>
+        <a href="${u('pages/indicadores-calidad.html')}" class="sb-item" data-key="calidad"><span class="i"><i data-lucide="trending-up"></i></span>Indicadores de Calidad</a>
+        <a href="${u('pages/analisis.html')}#tab=desempeno" class="sb-item" data-key="desempeno-aliados"><span class="i"><i data-lucide="users"></i></span>Desempeño de Aliados</a>
+        <a href="${u('pages/analisis.html')}#tab=plan-inversion" class="sb-item" data-key="plan-inversion"><span class="i"><i data-lucide="wallet"></i></span>Plan de Inversión</a>
+      </div>
+      <div class="sb-group">
+        <div class="sb-group-title">Contratos</div>
         <div class="sb-tree" data-tree-key="contratos">
           <a href="${u('pages/contratos.html')}" class="sb-item sb-item-parent" data-key="contratos">
             <span class="i"><i data-lucide="file-text"></i></span>Contratos
-            <button type="button" class="sb-caret" aria-label="Expandir Contratos" aria-expanded="true" data-tree-toggle-btn="contratos">
+            <button type="button" class="sb-caret" aria-label="Expandir Contratos" aria-expanded="true" data-tree-toggle-btn="contratos" data-tree-label="Contratos">
               <i data-lucide="chevron-down"></i>
             </button>
           </a>
           <div class="sb-children" data-tree-children="contratos">
             <div class="sb-tree sb-tree-nested" data-tree-key="cat-sum-tx">
-              <button type="button" class="sb-item sb-item-child sb-item-category sb-item-toggle" data-key="cat-sum-tx" data-tree-toggle-btn="cat-sum-tx" aria-expanded="true" title="Suministro de Elementos y Accesorios para Transformadores de Potencia">
+              <button type="button" class="sb-item sb-item-child sb-item-category sb-item-toggle" data-key="cat-sum-tx" data-tree-toggle-btn="cat-sum-tx" data-tree-label="Suministro de Elementos y Accesorios para Transformadores de Potencia" aria-expanded="true" title="Suministro de Elementos y Accesorios para Transformadores de Potencia">
                 <span class="sb-child-bullet" aria-hidden="true"></span>
                 <span class="sb-cat-text">Suministro de Elementos y Accesorios para Transformadores de Potencia</span>
                 <span class="sb-caret sb-caret-sm" aria-hidden="true">
@@ -186,7 +255,7 @@
               </button>
               <div class="sb-children" data-tree-children="cat-sum-tx">
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4123000081">
-                  <button type="button" class="sb-item sb-item-grandchild sb-item-toggle" data-key="contrato-4123000081" data-tree-toggle-btn="contrato-4123000081" aria-expanded="false">
+                  <button type="button" class="sb-item sb-item-grandchild sb-item-toggle" data-key="contrato-4123000081" data-tree-toggle-btn="contrato-4123000081" data-tree-label="Contrato 4123000081" aria-expanded="false">
                     <span class="sb-child-bullet" aria-hidden="true"></span>
                     <code class="sb-contrato-num">4123000081</code>
                     <span class="sb-caret sb-caret-sm" aria-hidden="true">
@@ -203,7 +272,7 @@
                       <span class="sb-section-text">Información Contractual</span>
                     </a>
                     <div class="sb-tree sb-tree-nested" data-tree-key="seguimiento-4123000081">
-                      <button type="button" class="sb-item sb-item-greatgrandchild sb-item-toggle" data-key="seguimiento-4123000081" data-tree-toggle-btn="seguimiento-4123000081" aria-expanded="false">
+                      <button type="button" class="sb-item sb-item-greatgrandchild sb-item-toggle" data-key="seguimiento-4123000081" data-tree-toggle-btn="seguimiento-4123000081" data-tree-label="Seguimiento contractual del contrato 4123000081" aria-expanded="false">
                         <span class="sb-child-bullet" aria-hidden="true"></span>
                         <span class="sb-section-text">Seguimiento Contractual</span>
                         <span class="sb-caret sb-caret-sm" aria-hidden="true">
@@ -224,7 +293,7 @@
                   </div>
                 </div>
                 <div class="sb-tree sb-tree-nested" data-tree-key="contrato-4125000143">
-                  <button type="button" class="sb-item sb-item-grandchild sb-item-toggle" data-key="contrato-4125000143" data-tree-toggle-btn="contrato-4125000143" aria-expanded="false">
+                  <button type="button" class="sb-item sb-item-grandchild sb-item-toggle" data-key="contrato-4125000143" data-tree-toggle-btn="contrato-4125000143" data-tree-label="Contrato 4125000143" aria-expanded="false">
                     <span class="sb-child-bullet" aria-hidden="true"></span>
                     <code class="sb-contrato-num">4125000143</code>
                     <span class="sb-caret sb-caret-sm" aria-hidden="true">
@@ -241,7 +310,7 @@
                       <span class="sb-section-text">Información Contractual</span>
                     </a>
                     <div class="sb-tree sb-tree-nested" data-tree-key="seguimiento-4125000143">
-                      <button type="button" class="sb-item sb-item-greatgrandchild sb-item-toggle" data-key="seguimiento-4125000143" data-tree-toggle-btn="seguimiento-4125000143" aria-expanded="false">
+                      <button type="button" class="sb-item sb-item-greatgrandchild sb-item-toggle" data-key="seguimiento-4125000143" data-tree-toggle-btn="seguimiento-4125000143" data-tree-label="Seguimiento contractual del contrato 4125000143" aria-expanded="false">
                         <span class="sb-child-bullet" aria-hidden="true"></span>
                         <span class="sb-section-text">Seguimiento Contractual</span>
                         <span class="sb-caret sb-caret-sm" aria-hidden="true">
@@ -267,29 +336,22 @@
         </div>
       </div>
       <div class="sb-group">
-        <div class="sb-group-title">Mantenimiento Predictivo</div>
-        <a href="${u('pages/pruebas-electricas.html')}" class="sb-item" data-key="pruebas-electricas"><span class="i"><i data-lucide="gauge"></i></span>Pruebas Eléctricas</a>
-      </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Análisis</div>
-        <a href="${u('pages/analisis.html')}" class="sb-item" data-key="analisis"><span class="i"><i data-lucide="bar-chart-3"></i></span>Análisis e Indicadores</a>
-      </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Salud del activo</div>
-        <a href="${u('pages/salud.html')}" class="sb-item" data-key="salud"><span class="i"><i data-lucide="heart-pulse"></i></span>Salud del Activo</a>
-      </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Planificación</div>
-        <a href="${u('pages/fichas-tecnicas.html')}" class="sb-item" data-key="fichas-tecnicas"><span class="i"><i data-lucide="file-spreadsheet"></i></span>Fichas Técnicas</a>
+        <div class="sb-group-title">Recursos</div>
+        <a href="${u('pages/recursos.html')}#tab=documentos" class="sb-item" data-key="recursos" data-default-tab><span class="i"><i data-lucide="folder-open"></i></span>Documentos</a>
+        <a href="${u('pages/recursos.html')}#tab=normativa" class="sb-item" data-key="normativa"><span class="i"><i data-lucide="book-open"></i></span>Normativa</a>
+        <a href="${u('pages/recursos.html')}#tab=cobertura" class="sb-item" data-key="cobertura"><span class="i"><i data-lucide="map-pinned"></i></span>Cobertura</a>
+        <a href="${u('pages/contacto.html')}" class="sb-item" data-key="contacto"><span class="i"><i data-lucide="mail"></i></span>Contacto</a>
+        <a href="${u('pages/recursos.html')}#tab=about" class="sb-item" data-key="about"><span class="i"><i data-lucide="info"></i></span>Acerca de</a>
       </div>
       <div class="sb-group sb-admin-group" hidden>
         <div class="sb-group-title">Administración</div>
-        <a href="${u('admin/administracion.html')}" class="sb-item sb-admin" data-key="administracion"><span class="i"><i data-lucide="settings"></i></span>Administración</a>
+        <a href="${u('admin/administracion.html')}#tab=panel" class="sb-item sb-admin" data-key="administracion" data-default-tab><span class="i"><i data-lucide="settings"></i></span>Panel</a>
+        <a href="${u('admin/administracion.html')}#tab=usuarios" class="sb-item sb-admin" data-key="usuarios"><span class="i"><i data-lucide="users-round"></i></span>Usuarios</a>
+        <a href="${u('admin/administracion.html')}#tab=catalogos" class="sb-item sb-admin" data-key="catalogos"><span class="i"><i data-lucide="list"></i></span>Catálogos</a>
+        <a href="${u('admin/administracion.html')}#tab=importar" class="sb-item sb-admin" data-key="importar"><span class="i"><i data-lucide="upload"></i></span>Importar</a>
+        <a href="${u('admin/administracion.html')}#tab=auditoria" class="sb-item sb-admin" data-key="auditoria"><span class="i"><i data-lucide="scroll-text"></i></span>Auditoría</a>
+        <a href="${u('admin/umbrales-salud.html')}" class="sb-item sb-admin" data-key="umbrales-salud"><span class="i"><i data-lucide="sliders-horizontal"></i></span>Umbrales de Salud</a>
         <a href="${u('admin/migrate-contrato-id.html')}" class="sb-item sb-admin" data-key="migrate-contrato-id" title="Acceso temporal · retirar después de ejecutar la migración"><span class="i"><i data-lucide="database-zap"></i></span>Migrar contrato_id</a>
-      </div>
-      <div class="sb-group">
-        <div class="sb-group-title">Recursos</div>
-        <a href="${u('pages/recursos.html')}" class="sb-item" data-key="recursos"><span class="i"><i data-lucide="folder-open"></i></span>Recursos</a>
       </div>`;
 
     const main = document.querySelector('main.app-main') || document.querySelector('main');
@@ -448,6 +510,7 @@
     injectScene();
     injectTopbar();
     injectSidebar();
+    injectSkipLink();   // el ÚLTIMO que inserta al principio del <body> → queda primero
     markActive();
     bindTreeToggle();
     bindLogout();
