@@ -231,3 +231,18 @@ rutas locales con usuario de dominio y el estudio económico del proyecto real. 
 institucional recibido por correo es material de cliente hasta que se demuestre lo contrario**:
 descomprimirlo y auditar TODAS sus partes (XML, `.rels`, `docProps`, `media/`) antes de versionarlo.
 **Gate.** [HONOR] — ningún linter lo cubre. Ver `99 §61`.
+
+### L-65 · Un arreglo desplegado no es un arreglo verificado (GitHub Pages en modo `legacy`)
+**Síntoma.** Se corrige una fuga filtrando el artefacto en `pages.yml`, el commit entra, el workflow
+«Deploy» sale VERDE… y los archivos siguen sirviéndose en producción. Se reportó como resuelto y no
+lo estaba.
+**Causa.** GitHub Pages tenía `build_type: legacy`: publica la rama directamente e **ignora por
+completo** el artefacto que sube el workflow. El flujo corría y su salida no se usaba.
+**Regla.** Tras CUALQUIER arreglo de despliegue, comprobar el EFECTO contra la URL pública con
+anti-caché (`curl -o /dev/null -w '%{http_code}' "$URL?cb=$(date +%s)"`), nunca el estado del
+workflow. Verde en Actions ≠ cambio en producción. Y antes de tocar `pages.yml`, mirar
+`gh api repos/OWNER/REPO/pages` y confirmar que `build_type` es `workflow`.
+**Corolario.** Un sitio ESTÁTICO no puede guardar datos privados: todo lo que lee el navegador es
+público. Si un dato no debe verse, no se arregla con `.gitignore` ni con filtros de publicación —
+se mueve detrás de la autenticación. El catálogo de 206 equipos se resolvió leyendo de Firestore.
+**Gate.** [HONOR]. Ver `99 §62`.

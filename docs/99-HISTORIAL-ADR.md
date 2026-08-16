@@ -1220,3 +1220,61 @@ MODIFICADO: `assets/js/aqua-shell.js` (aditivo). INTACTOS: el resto del repo.
   sitio, no de este módulo.
 - La hoja «Beneficios» de la plantilla en blanco muestra `#DIV/0!` (fórmulas oficiales intactas).
 - **La página NO se ha validado con sesión real contra Firestore** — TODO-30.
+
+---
+
+## 62. ADR — Auditoría holística y remediación: la fuga que el sitio estático no podía evitar ⟦OPUS-5⟧ (2026-08-16)
+
+> *"se requiere una evaluacion holistica: Backend, fronted, framework, diseño... Te autorizo que hagas todo lo que sugieres"* — el Ingeniero, 2026-08-15/16.
+
+**62.1 Causa raíz.** Once auditores especializados + verificación adversarial sobre todo el sistema.
+De 44 hallazgos graves sobrevivieron 4 CRÍTICOS y 22 ALTOS (3 falsos, 5 degradados). El patrón de
+fondo: **el motor estaba sano y lo que rodeaba al motor estaba roto**. 1.274 pruebas verdes mientras
+había datos reales de AFINIA servidos en internet sin contraseña.
+
+**62.2 Solución estructural.**
+· **Exposición**: `_dev/fixtures/` con 9 informes REALES del TX 450108 y el catálogo de 206
+  transformadores estaban públicos. Pages publicaba `path: .`. Se filtra el artefacto Y —el hallazgo
+  que costó una segunda pasada— **se cambió `build_type` de `legacy` a `workflow`**: en modo legacy
+  Pages sirve la rama directamente e IGNORA el artefacto, así que el primer arreglo no hizo NADA.
+· **Catálogo**: `refrigeracion-transformadores-afinia.js` pasa de 37.898 B con el parque incrustado
+  a 8.764 B leyendo de Firestore. Prueba que falla si alguien vuelve a incrustar datos.
+· **Importador**: `importador.js` dividía entre 1.000 cualquier número con separador de miles
+  ("60,000"→60). Se adopta el criterio que ya usaba bien el importador de suministros.
+· **CI**: 76 corridas en rojo desde el 22-jul por Java 17 vs 21 exigido. Reparado, y `pages.yml`
+  ahora `needs:` el flujo de CI reutilizado: si la verificación falla, no se publica.
+· **Registro abierto**: en la consola de Firebase «Habilitar la creación (registro)» estaba ACTIVA
+  — cualquiera en internet podía crearse cuenta. Desactivado (verificado que ninguna página crea
+  cuentas). Storage pasa de `isSignedIn()` a miembro ACTIVO, espejo de `firestore.rules`.
+· **Gasto** (plan Blaze, no free-tier): topes en suscripciones (`domain/limites_lectura.js`) y
+  `maxInstances` en todas las funciones. · **pdf.js** 3.11.174 → 4.10.38 (CVE-2024-4367).
+· **Navegación**: el colapso del menú no colapsaba (nodo de 3 hijos: 159,8 px abierto y cerrado);
+  sin menú bajo 1.024 px; 11 páginas huérfanas. Árbol nuevo de 7 grupos con anclas `#tab=`.
+· **Legibilidad**: `.page-subtitle`/`.breadcrumb` en 1,61:1 sobre la foto (44 páginas) → 6,13:1.
+
+**62.3 No-regresión.** 1.334 pruebas (1.332 pass · 0 fail · +60 nuevas), `lint:html` limpio,
+**CI en VERDE por primera vez desde el 22 de julio**, despliegue encadenado exitoso.
+
+**62.4 Verificación.** Producción comprobada tras desplegar: catálogo 8.764 B con 0 registros;
+`_dev/`, `tests/` y reglas en 404; sitio y assets nuevos en 200. Importador probado caso por caso.
+Menú: 0 enlaces rotos, 21 anclas `#tab=` resueltas contra pestañas reales. Reglas de Storage
+desplegadas y compiladas OK.
+
+**62.5 Anti-patterns evitados.** Cambios aditivos; ningún export renombrado sin alias; cero datos de
+cliente en lo escrito; sin `transition: all` nuevos. El informe de auditoría se guardó en la BÓVEDA,
+no en el repo público: cita 15 veces series y subestaciones reales.
+
+**62.6 Archivos.** 21 modificados + 7 nuevos en tres commits (`7444564` datos · `5830d9c` seguridad
+· `dd9b5f6` interfaz). Configuración externa: Pages `build_type` y Firebase Auth.
+
+**62.7 Doctrina.** §3.2 free-tier/aditivo · §3.3 evidencia (el arreglo de Pages se creyó hecho y NO
+lo estaba) · §3.6 arquitecto · §G.4. Lección → `30 §L-65`.
+
+### 62.8 — Lo que queda abierto
+- **Funciones sin desplegar**: `maxInstances` está en el código pero el despliegue lo bloqueó el
+  clasificador de permisos. Comando: `npx firebase deploy --only functions`.
+- **Protección de rama `main`**: configuración de GitHub, fuera del alcance de Claude.
+- **Historial de git**: los datos siguen en los commits antiguos. Reescribirlo es irreversible y la
+  doctrina prohíbe force-push a `main`. NO se hizo: requiere decisión explícita del Ingeniero.
+- Índices Firestore faltantes, escapado HTML duplicado en 34 archivos, foto de fondo de 1,1 MB,
+  5 pruebas que pasan sin comprobar nada. Todo en el informe de la bóveda.

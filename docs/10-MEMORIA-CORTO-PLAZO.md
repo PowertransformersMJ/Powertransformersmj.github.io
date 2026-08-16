@@ -6,23 +6,21 @@
 
 ---
 
-## 🎯 Foco (2026-08-15, cierre) — Fichas Técnicas YA VIVEN EN LA PÁGINA (ADR-061)
+## 🎯 Foco (2026-08-16) — AUDITORÍA HOLÍSTICA REMEDIADA (ADR-062)
 
-> El módulo suelto de Fichas Técnicas es ahora `pages/fichas-tecnicas.html`, con datos desde
-> Firestore. Commit `ec20f47`, mergeado a `main` y desplegado. 1254 pruebas verdes.
-> Modelo elegido por el Ingeniero: **híbrido `.ftm-`** (cascarón AQUA + módulo como componente).
-> Detalle → `99 §61`. Hallazgo de seguridad → `30 §L-64`.
+> 11 auditores + verificación adversarial sobre todo el sistema. 4 CRÍTICOS y 22 ALTOS
+> sobrevivieron. Remediado y desplegado en 3 commits (`7444564` · `5830d9c` · `dd9b5f6`).
+> **1.334 pruebas verdes y CI en VERDE por primera vez desde el 22 de julio.**
+> Informe completo → bóveda `sgm-transpower/auditorias/` (cita datos reales, no va al repo público).
 
-### ▶️ TAREA VIVA: validar la página nueva con sesión real
-> Todo se verificó SIN sesión (preview con datos de demostración). Falta abrirla autenticado y
-> comprobar que `SGM_DATA_SOURCE` trae el parque real, que la ficha se llena y que el Excel
-> PE.02081 sale bien con un equipo de verdad. **Hasta entonces la integración NO está cerrada.**
-
-### 🎨 Decisión de sitio pendiente (NO es de este módulo)
-> El subtítulo y la miga de pan quedan en **2,37:1** sobre la foto de fondo — ilegibles.
-> Causa: `.page-subtitle` y `.breadcrumb` no tienen halo en `aqua-components.css`; `.page-title`
-> sí lo tiene (línea 987). **Afecta a 29 páginas del repo.** Arreglarlo toca un archivo compartido:
-> es decisión del Ingeniero, no se hace de oficio.
+### 🔴 PENDIENTES que NO pude cerrar
+> **(A) Desplegar funciones**: `maxInstances` está en el código, el despliegue lo bloqueó el
+> clasificador. Comando: `npx firebase deploy --only functions`.
+> **(B) Proteger la rama `main`**: configuración de GitHub, solo el Ingeniero.
+> **(C) Historial de git**: los datos reales siguen en commits antiguos. Irreversible y la doctrina
+> prohíbe force-push a `main` → DECISIÓN DEL INGENIERO, no se hizo.
+> **(D)** Índices Firestore faltantes · escapado HTML duplicado en 34 archivos · foto de fondo de
+> 1,1 MB · 5 pruebas que pasan sin comprobar nada. Detalle en el informe de la bóveda.
 
 ### ▶️ TAREA VIVA: encender el parque real — falta el PASO DEL INGENIERO (detalle → `99 §57`)
 > Importador en PRODUCCIÓN y MO.00418 Ed.02 ratificado. **PASO ÚNICO**: abrir `admin/importar.html`
@@ -55,8 +53,9 @@
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
+| **TODO-32** | Desplegar funciones con `maxInstances` (`npx firebase deploy --only functions`) — ADR-062 §62.8. | 🔴 |
+| **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
 | **TODO-30** | Validar `pages/fichas-tecnicas.html` con sesión real: datos de Firestore, ficha completa y exportación PE.02081 con un equipo de verdad (ADR-061). | 🔴 |
-| **TODO-31** | Decisión de sitio: contraste 2,37:1 de `.page-subtitle`/`.breadcrumb` sobre la foto (29 páginas afectadas, `aqua-components.css`). | 🟡 decisión |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |

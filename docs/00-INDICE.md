@@ -73,6 +73,7 @@
 | §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y L-63 (no re-pedir autorización ya concedida) ⟦OPUS-5⟧ | 1140 |
 | §60 | ADR-060 — Hosting: ¿viola SGM los ToS de GitHub Pages? NO se migra (e-commerce/SaaS descartados; gris solo en "run your online business"). Trae runbook Cloudflare Pages costeado (medio día, gotcha `/x.html`→`/x`) + hallazgo: **Vercel Hobby SÍ prohíbe uso comercial** y no entrega nada. NO re-analizar por calendario: solo por los 4 disparadores de §60.7 ⟦OPUS-5⟧ | 1158 |
 | §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483 selectores, 0 globales); plantilla PE.02081 saneada (traía firmas manuscritas y datos de cliente); 1254 pruebas ⟦OPUS-5⟧ | 1181 |
+| §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto), importador que dividía entre 1.000, CI en rojo 76 corridas, registro abierto en Firebase, menú que no colapsaba. 1.334 pruebas · CI en verde ⟦OPUS-5⟧ | 1226 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

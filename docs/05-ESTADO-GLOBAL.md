@@ -5,7 +5,7 @@
 | Señal | Valor (al **2026-08-15**) |
 |---|---|
 | **Misión ahora** | **ADR-061 (08-15): Fichas Técnicas ya viven en la página** (`pages/fichas-tecnicas.html`, modelo híbrido `.ftm-`, datos desde Firestore) — desplegado en `main`. Antes: ADR-058/059 ecosistema + kernel canónico. ⏭️ FALTA validarla con **sesión real** (TODO-30). Pendientes → `10`. |
-| **Build** | 🟢 `node --test` **1254 pass / 0 fail / 2 skip** (258 suites) + `lint:html` limpio + 8 tests de reglas (emulador, G025). CI corre los tests. · verificado-vivo: 2026-08-15 |
+| **Build** | 🟢 `node --test` **1332 pass / 0 fail / 2 skip** (258 suites) + `lint:html` limpio + 8 tests de reglas (emulador, G025). CI corre los tests. · verificado-vivo: 2026-08-16 · CI en VERDE tras 76 corridas en rojo |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` (sin hash fijo — el SHA vivo lo da el handoff hook o `git fetch`, M-01; se commitea+pushea+mergea en el mismo turno; ⚠️ NO fiarse del ref local, puede quedar stale tras el filter-repo). **Historia reescrita 2026-07-21** (git-filter-repo purgó confidenciales; `.git` 220M→23M; respaldo bundle en bóveda) → cualquier otra copia debe re-clonar. Árbol tracked 17M. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO por el Ingeniero (2026-07-23)** y CF re-desplegadas VIVAS (401 JSON limpio): `extraerPruebasElectricasIA` + `narrativaTendenciaIA` + `onMuestraCreate`, ya con G007/G008 + G010-CF; secret ok · verificado-vivo: 2026-07-23 |
 | **Cache / SW** | n/a — `sw.js` es kill-switch (PWA desactivada a propósito; CLAUDE §4 dormida). |
