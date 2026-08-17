@@ -4,37 +4,21 @@
 // No persiste nada: recalcula bajo demanda desde Firestore.
 // ══════════════════════════════════════════════════════════════
 
-import { listar as listarTransformadores, departamentoLabel, DEPARTAMENTOS }
+import { listar as listarTransformadores, departamentoLabel }
   from './transformadores.js';
-import { listar as listarOrdenes, TIPOS_ORDEN, ESTADOS_ORDEN, PRIORIDADES }
-  from './ordenes.js';
+import { listar as listarOrdenes } from './ordenes.js';
 import { isFirebaseConfigured } from '../firebase-init.js';
 import {
   LIMITE_TRANSFORMADORES, LIMITE_ORDENES, LIMITE_EXPORT, diagnosticoLectura
 } from '../domain/limites_lectura.js';
+import { computeFromDatasets } from '../domain/kpis_compute.js';
+
+// `computeFromDatasets` es cálculo puro y ya vive en el dominio, donde los
+// tests pueden importarlo sin arrastrar Firebase. Se re-exporta aquí con el
+// mismo nombre para no tocar ningún llamador (ADR-063).
+export { computeFromDatasets };
 
 export function isReady() { return isFirebaseConfigured; }
-
-// ── Helpers ──
-function parseDate(s) {
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-function monthKey(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-}
-function lastNMonths(n) {
-  const out = [];
-  const now = new Date();
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    out.push(monthKey(d));
-  }
-  return out;
-}
 
 // ── Agregación principal ──
 // Devuelve un snapshot listo para renderizar en el dashboard.
@@ -54,172 +38,6 @@ export async function computeDashboard() {
     diagnosticoLectura('ordenes', ords.length, LIMITE_ORDENES)
   ];
   return snap;
-}
-
-/**
- * Variante pura del dashboard: recibe los datasets ya cargados en
- * lugar de leerlos de Firestore. Útil para recomputar desde snapshots
- * en vivo (onSnapshot) sin disparar nuevas lecturas.
- */
-export function computeFromDatasets(trafos, ords) {
-  const trafoById = new Map(trafos.map((t) => [t.id, t]));
-
-  // G095: al borrar un transformador sus órdenes se CONSERVAN en Firestore
-  // (trazabilidad MO.00418), pero un equipo eliminado NO debe inflar los KPIs.
-  // Se agregan solo las órdenes de un transformador vigente (join-guard, como ya
-  // hacía `porDepartamento`). Las huérfanas sobreviven en la base pero no cuentan
-  // en totales / distribuciones / serie mensual / RAM. `ordenes_huerfanas` deja
-  // visible cuántas se excluyeron (trazabilidad, no se ocultan).
-  const ordsVigentes = ords.filter((o) => trafoById.has(o.transformadorId));
-
-  // ── Totales simples ──
-  const totales = {
-    transformadores: trafos.length,
-    operativos:      trafos.filter((t) => t.estado === 'operativo').length,
-    mantenimiento:   trafos.filter((t) => t.estado === 'mantenimiento').length,
-    fuera_servicio:  trafos.filter((t) => t.estado === 'fuera_servicio').length,
-    ordenes:         ordsVigentes.length,
-    ordenes_cerradas:    ordsVigentes.filter((o) => o.estado === 'cerrada').length,
-    ordenes_planificadas: ordsVigentes.filter((o) => o.estado === 'planificada').length,
-    ordenes_en_curso:    ordsVigentes.filter((o) => o.estado === 'en_curso').length,
-    ordenes_huerfanas:   ords.length - ordsVigentes.length
-  };
-
-  // ── Distribuciones ──
-  const porEstado = distribuir(ordsVigentes, 'estado', ESTADOS_ORDEN);
-  const porTipo   = distribuir(ordsVigentes, 'tipo',   TIPOS_ORDEN);
-  const porPrioridad = distribuir(ordsVigentes, 'prioridad', PRIORIDADES);
-
-  // Por departamento (join con transformador)
-  const porDepartamento = {};
-  for (const d of DEPARTAMENTOS) porDepartamento[d.value] = 0;
-  for (const o of ordsVigentes) {
-    const t = trafoById.get(o.transformadorId);
-    if (t && porDepartamento[t.departamento] != null) porDepartamento[t.departamento] += 1;
-  }
-
-  // ── Serie mensual (últimos 12 meses, usa fecha_programada) ──
-  const meses = lastNMonths(12);
-  const porMes = Object.fromEntries(meses.map((m) => [m, 0]));
-  for (const o of ordsVigentes) {
-    const d = parseDate(o.fecha_programada);
-    if (!d) continue;
-    const k = monthKey(d);
-    if (porMes[k] != null) porMes[k] += 1;
-  }
-
-  // ── Top transformadores con más órdenes ──
-  const countByTrafo = new Map();
-  for (const o of ordsVigentes) {
-    if (!o.transformadorId) continue;
-    countByTrafo.set(o.transformadorId, (countByTrafo.get(o.transformadorId) || 0) + 1);
-  }
-  const topTransformadores = [...countByTrafo.entries()]
-    .map(([id, count]) => {
-      const t = trafoById.get(id);
-      return {
-        id,
-        codigo: t ? t.codigo : '—',
-        nombre: t ? t.nombre : '(transformador eliminado)',
-        departamento: t ? departamentoLabel(t.departamento) : '—',
-        count
-      };
-    })
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 10);
-
-  // ── RAM: MTBF / MTTR / Disponibilidad ──
-  const correctivasCerradas = ordsVigentes.filter(
-    (o) => o.tipo === 'correctivo' && o.estado === 'cerrada'
-  );
-
-  // MTTR: media de duracion_horas declarada; si no, fecha_cierre − fecha_inicio.
-  const duraciones = correctivasCerradas
-    .map((o) => {
-      if (o.duracion_horas != null && !isNaN(+o.duracion_horas)) return +o.duracion_horas;
-      const ini = parseDate(o.fecha_inicio);
-      const fin = parseDate(o.fecha_cierre);
-      if (ini && fin && fin >= ini) return (fin - ini) / 36e5;
-      return null;
-    })
-    .filter((x) => x != null && x >= 0);
-  const mttr_horas = duraciones.length
-    ? duraciones.reduce((a, b) => a + b, 0) / duraciones.length
-    : 0;
-
-  // MTBF: tiempo de servicio del parque / número de fallos (correctivo cerrado).
-  // Servicio = suma (fecha_actual − fecha_instalacion) por transformador, en días.
-  const hoy = new Date();
-  let totalDiasServicio = 0;
-  for (const t of trafos) {
-    const fi = parseDate(t.fecha_instalacion);
-    if (!fi) continue;
-    const d = (hoy - fi) / (36e5 * 24);
-    if (d > 0) totalDiasServicio += d;
-  }
-  const mtbf_dias = correctivasCerradas.length
-    ? totalDiasServicio / correctivasCerradas.length
-    : 0;
-
-  // Disponibilidad = MTBF / (MTBF + MTTR)  (ambos a las mismas unidades).
-  const mtbf_horas = mtbf_dias * 24;
-  const denom = mtbf_horas + mttr_horas;
-  const disponibilidad_pct = denom > 0 ? (mtbf_horas / denom) * 100 : null;
-
-  // ── KPIs v2 (MO.00418) — distribución por bucket HI ──
-  const porBucket = {
-    muy_bueno: 0, bueno: 0, medio: 0, pobre: 0, muy_pobre: 0, sin_dato: 0
-  };
-  let hiSum = 0; let hiCount = 0;
-  let vidaSum = 0; let vidaCount = 0;
-  let propFurPendientes = 0;
-  let monitoreoC2H2Activos = 0;
-  let finVidaPapel = 0;
-  for (const t of trafos) {
-    const s = t.salud_actual || {};
-    const especiales = t.estados_especiales || [];
-    if (s.bucket && porBucket[s.bucket] != null) porBucket[s.bucket] += 1;
-    else porBucket.sin_dato += 1;
-    if (typeof s.hi_final === 'number') { hiSum += s.hi_final; hiCount += 1; }
-    if (typeof s.vida_remanente_pct === 'number') { vidaSum += s.vida_remanente_pct; vidaCount += 1; }
-    if (especiales.includes('propuesta_fur_pendiente')) propFurPendientes += 1;
-    if (especiales.includes('monitoreo_intensivo_c2h2')) monitoreoC2H2Activos += 1;
-    if (s.fin_vida_util_papel) finVidaPapel += 1;
-  }
-  const hi_promedio = hiCount > 0 ? hiSum / hiCount : null;
-  const vida_remanente_promedio = vidaCount > 0 ? vidaSum / vidaCount : null;
-
-  return {
-    totales,
-    porEstado, porTipo, porPrioridad, porDepartamento,
-    porMes, topTransformadores,
-    ram: {
-      mtbf_dias,
-      mttr_horas,
-      disponibilidad_pct,
-      muestra_fallos: correctivasCerradas.length,
-      parque_dias_servicio: Math.round(totalDiasServicio)
-    },
-    saludV2: {
-      hi_promedio,
-      vida_remanente_promedio,
-      por_bucket: porBucket,
-      propuestas_fur_pendientes: propFurPendientes,
-      monitoreos_c2h2_activos:   monitoreoC2H2Activos,
-      fin_vida_util_papel:       finVidaPapel
-    },
-    ts: Date.now()
-  };
-}
-
-// ── Utilidad ──
-function distribuir(items, campo, enumDef) {
-  const out = Object.fromEntries(enumDef.map((e) => [e.value, 0]));
-  for (const it of items) {
-    const v = it[campo];
-    if (v != null && out[v] != null) out[v] += 1;
-  }
-  return out;
 }
 
 // ── Export CSV (plano de órdenes con nombre legible de transformador) ──

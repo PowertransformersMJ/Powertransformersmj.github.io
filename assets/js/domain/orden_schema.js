@@ -29,6 +29,18 @@ export const ESTADOS_ORDEN_V2 = Object.freeze([
   { value: 'cancelada',     label: 'Cancelada' }
 ]);
 
+// Los 4 estados del modelo v1, que varias vistas legacy siguen usando.
+// Vivían dentro de `data/ordenes.js`, o sea que para leer esta lista había
+// que cargar Firebase entero. Al ser una enumeración de dominio puro su
+// sitio es aquí; `data/ordenes.js` la re-exporta como `ESTADOS_ORDEN`, así
+// que ningún llamador cambia (ADR-063).
+export const ESTADOS_ORDEN_V1 = Object.freeze([
+  { value: 'planificada', label: 'Planificada' },
+  { value: 'en_curso',    label: 'En curso' },
+  { value: 'cerrada',     label: 'Cerrada' },
+  { value: 'cancelada',   label: 'Cancelada' }
+]);
+
 // Mapeo legacy v1 → v2 (el v1 usaba 4 estados).
 const MAP_V1_V2 = Object.freeze({
   planificada: 'programada',

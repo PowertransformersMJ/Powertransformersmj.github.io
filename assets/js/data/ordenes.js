@@ -22,7 +22,8 @@ import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
 import { conLimite, LIMITE_ORDENES } from '../domain/limites_lectura.js';
 import {
   sanitizarOrden, validarOrden, transicionValida,
-  ESTADOS_ORDEN_V2, TIPOS_ORDEN as TIPOS_ORDEN_V2, PRIORIDADES as PRIORIDADES_V2
+  ESTADOS_ORDEN_V2, ESTADOS_ORDEN_V1,
+  TIPOS_ORDEN as TIPOS_ORDEN_V2, PRIORIDADES as PRIORIDADES_V2
 } from '../domain/orden_schema.js';
 import { puedeTransicionar, PERMISOS_TRANSICION } from '../domain/workflow.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
@@ -36,12 +37,10 @@ export { LIMITE_ORDENES };
 // ── Enumeraciones v1-compat ──
 // Para vistas legacy que esperan los 4 estados. La proyección
 // v1 se calcula a partir del estado v2 en `proyectarV1`.
-export const ESTADOS_ORDEN = [
-  { value: 'planificada', label: 'Planificada' },
-  { value: 'en_curso',    label: 'En curso' },
-  { value: 'cerrada',     label: 'Cerrada' },
-  { value: 'cancelada',   label: 'Cancelada' }
-];
+// La lista vive ahora en `domain/orden_schema.js` (enumeración de dominio
+// puro, legible sin cargar Firebase). Se re-exporta con el mismo nombre para
+// no tocar ningún llamador.
+export const ESTADOS_ORDEN = ESTADOS_ORDEN_V1;
 export const TIPOS_ORDEN  = TIPOS_ORDEN_V2;
 export const PRIORIDADES  = PRIORIDADES_V2;
 

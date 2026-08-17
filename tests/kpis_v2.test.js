@@ -1,26 +1,21 @@
 // Tests del bloque saludV2 en computeFromDatasets (KPIs F8 + v2).
+//
+// ANTES (ADR-063): estos tests importaban `../assets/js/data/kpis.js`, que
+// importa Firebase por URL https. En Node ese import SIEMPRE falla, y el
+// `catch { return }` hacía que el test se reportara ✔ sin ejecutar un solo
+// assert. Los cinco pasaban en verde sin comprobar nada.
+//
+// AHORA se importa `domain/kpis_compute.js`, que es dominio puro. El import
+// es estático y sin red: si algún día se rompe, el test FALLA — que es
+// justamente lo que se le pide a un test.
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-// Para evitar el import directo del data layer (que tira de Firebase),
-// reimplementamos la firma esperando el mismo shape de salida.
-// El test verifica el contrato del shape.
+import { computeFromDatasets } from '../assets/js/domain/kpis_compute.js';
 
 describe('KPIs v2 — bloque saludV2', () => {
-  test('agrega bucket por transformador y promedios', async () => {
-    // Importar dinámicamente solo si el SDK no se invoca al cargar
-    // la función. Como kpis.js importa Firestore por arriba,
-    // saltamos el test si el bind falla en Node.
-    let computeFromDatasets;
-    try {
-      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
-    } catch (err) {
-      // Si Node no puede importar (URL ESM Firebase), skip.
-      console.warn('skip: kpis.js no importable en Node:', err.message);
-      return;
-    }
-
+  test('agrega bucket por transformador y promedios', () => {
     const trafos = [
       { id: 'A', estado: 'operativo',
         salud_actual: { bucket: 'muy_bueno', hi_final: 1.2, vida_remanente_pct: 95 } },
@@ -46,21 +41,13 @@ describe('KPIs v2 — bloque saludV2', () => {
     assert.equal(r.saludV2.vida_remanente_promedio, 87.5);
   });
 
-  test('parque vacío → null en promedios', async () => {
-    let computeFromDatasets;
-    try {
-      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
-    } catch (_) { return; }
+  test('parque vacío → null en promedios', () => {
     const r = computeFromDatasets([], []);
     assert.equal(r.saludV2.hi_promedio, null);
     assert.equal(r.saludV2.vida_remanente_promedio, null);
   });
 
-  test('transformadores sin salud_actual van a sin_dato', async () => {
-    let computeFromDatasets;
-    try {
-      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
-    } catch (_) { return; }
+  test('transformadores sin salud_actual van a sin_dato', () => {
     const r = computeFromDatasets(
       [{ id: 'X', estado: 'operativo' }, { id: 'Y', estado: 'operativo' }], []);
     assert.equal(r.saludV2.por_bucket.sin_dato, 2);
@@ -70,11 +57,7 @@ describe('KPIs v2 — bloque saludV2', () => {
 // G095 — un transformador borrado conserva sus órdenes en Firestore (historial),
 // pero éstas NO deben inflar los KPIs: se agregan solo las de un trafo vigente.
 describe('KPIs — join-guard de órdenes huérfanas (G095)', () => {
-  test('las órdenes de un transformador eliminado no cuentan en totales/RAM', async () => {
-    let computeFromDatasets;
-    try {
-      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
-    } catch (_) { return; }
+  test('las órdenes de un transformador eliminado no cuentan en totales/RAM', () => {
     const trafos = [{ id: 'A', estado: 'operativo', fecha_instalacion: '2020-01-01' }];
     const ords = [
       { transformadorId: 'A', tipo: 'correctivo', estado: 'cerrada' },
@@ -93,11 +76,7 @@ describe('KPIs — join-guard de órdenes huérfanas (G095)', () => {
     assert.equal(r.porEstado.cerrada, 1);            // distribución sin huérfanas
   });
 
-  test('sin huérfanas, ordenes_huerfanas = 0', async () => {
-    let computeFromDatasets;
-    try {
-      ({ computeFromDatasets } = await import('../assets/js/data/kpis.js'));
-    } catch (_) { return; }
+  test('sin huérfanas, ordenes_huerfanas = 0', () => {
     const r = computeFromDatasets(
       [{ id: 'A', estado: 'operativo' }],
       [{ transformadorId: 'A', tipo: 'preventivo', estado: 'cerrada' }]);
