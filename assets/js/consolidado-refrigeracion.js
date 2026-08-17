@@ -31,7 +31,7 @@ function escaparHtml(s) {
   if (s == null) return '';
   return String(s)
     .replace(/&/g, '&amp;').replace(/"/g, '&quot;')
-    .replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    .replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/'/g, '&#39;');
 }
 
 function esAdmin() {

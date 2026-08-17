@@ -42,7 +42,7 @@ const CRIT = { guia: U.guia, limite: U.limite, norma: 'IEEE C57.152 · práctica
 const ORDEN_FASE = ['A', 'B', 'C'];
 const num = (v) => (typeof v === 'number' && isFinite(v) ? v : (v != null && v !== '' && isFinite(Number(v)) ? Number(v) : null));
 const round = (v, d = 2) => { const f = 10 ** d; return Math.round(v * f) / f; };
-const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
 

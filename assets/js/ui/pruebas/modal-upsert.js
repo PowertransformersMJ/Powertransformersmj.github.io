@@ -12,7 +12,7 @@
 // ══════════════════════════════════════════════════════════════
 
 const esc = (s) => String(s == null ? '' : s)
-  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 /**
  * @param {object} prev  informe ya guardado (con prev.pdf.downloadURL para abrirlo)

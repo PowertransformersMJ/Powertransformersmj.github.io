@@ -46,7 +46,7 @@ const TIPUP_UMBRAL = 0.1;
 //  mismo y comparar pF daría falsas alarmas. Requiere extracción POR MODO. Ver lóbulo 49.)
 const PEND_UMBRAL = 0.05; // % de subida de tan δ (baseline→último) que cuenta como "al alza"
 const kvDe = (t) => { const m = String(t).match(/([\d.]+)\s*kV/i); return m ? parseFloat(m[1]) : null; };
-const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 const NS = 'http://www.w3.org/2000/svg';
 const el = (t, a) => { const n = document.createElementNS(NS, t); for (const k in a) n.setAttribute(k, a[k]); return n; };
 

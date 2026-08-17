@@ -32,7 +32,7 @@ function tx(svg, x, y, s, o = {}) {
   t.textContent = s; svg.appendChild(t); return t;
 }
 function esc(s) {
-  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /* ─── Tooltip compartido (mismo nodo que grafico-svg) ────────── */

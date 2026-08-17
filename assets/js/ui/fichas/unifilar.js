@@ -66,7 +66,7 @@ export const TITULO_DIAGRAMA = Object.freeze({
 function esc(x) {
   return (x == null ? '' : String(x))
     .replace(/&/g, '&amp;').replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 /** Lee la primera ruta con valor útil ('a.b.c' admitido). */

@@ -28,7 +28,7 @@ const num = (v) => (typeof v === 'number' && isFinite(v)) ? v
 const round = (v, d = 2) => (v == null ? null : Math.round(v * 10 ** d) / 10 ** d);
 const fmt = (v) => (v == null ? '—' : round(v, 2));
 const avg = (a) => { const x = a.filter((v) => v != null); return x.length ? x.reduce((p, c) => p + c, 0) / x.length : null; };
-const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 const ORDEN = ['tand', 'bushing', 'excitacion', 'relacion', 'resistencia', 'aislamiento', 'collar'];
 
