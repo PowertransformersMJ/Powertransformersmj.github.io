@@ -91,7 +91,8 @@
   font-size: var(--text-sm);
   cursor: pointer;
   border-radius: var(--radius-md);
-  transition: all var(--dur-fast);
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--dur-fast);
 }
 .btn-cancel:hover { color: var(--ink-primary); border-color: var(--edge-strong); background: rgba(255,255,255,.03); }
 

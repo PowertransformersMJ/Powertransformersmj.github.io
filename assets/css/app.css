@@ -25,7 +25,8 @@
   padding: .4rem .7rem;
   border-radius: 3px;
   border: 1px solid transparent;
-  transition: all .2s; white-space: nowrap;
+  transition-property: background-color, border-color, color;
+  transition-duration: .2s; white-space: nowrap;
 }
 .nav-link:hover {
   color: var(--accent);
@@ -46,7 +47,8 @@
   font-family: var(--font-mono);
   font-size: .68rem; letter-spacing: .12em;
   cursor: pointer; border-radius: 3px;
-  transition: all .2s; white-space: nowrap;
+  transition-property: border-color, color;
+  transition-duration: .2s; white-space: nowrap;
 }
 .btn-logout:hover { border-color: rgba(255,80,80,.4); color: #ff7070; }
 

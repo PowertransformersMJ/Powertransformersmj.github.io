@@ -64,7 +64,9 @@
   background: transparent;
   color: var(--text);
   cursor: pointer;
-  transition: all .15s ease;
+  transition-property: background-color, border-color, color;
+  transition-duration: .15s;
+  transition-timing-function: ease;
   margin-right: .35rem;
 }
 .btn-mini:hover:not(:disabled) {

@@ -223,7 +223,8 @@
   border: 1px solid var(--edge-muted);
   color: var(--ink-secondary);
   border-radius: var(--radius-md); cursor: pointer;
-  transition: all var(--dur-fast);
+  transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-duration: var(--dur-fast);
   margin-left: 4px;
 }
 .row-btn:hover { border-color: var(--brand-500); color: var(--brand-400); background: rgba(79,140,255,.08); }
@@ -278,7 +279,8 @@
   color: var(--ink-muted);
   border-radius: var(--radius-md);
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--dur-fast);
 }
 .modal-x:hover { color: var(--danger-500); border-color: rgba(255,90,110,.45); background: rgba(255,90,110,.08); }
 .modal-x [data-lucide] { width: 16px; height: 16px; }

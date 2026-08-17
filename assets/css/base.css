@@ -21,7 +21,12 @@ html { scroll-behavior: smooth; }
 /* ── Accesibilidad ─────────────────────────────────────────── */
 .skip-link {
   position: absolute;
-  top: -48px;
+  /* Se oculta con `transform`, no moviendo `top`: animar `top` dispara un
+     reflow en cada fotograma y la doctrina de rendimiento solo permite
+     `transform`/`opacity` (CLAUDE.md §3.1). El enlace sigue existiendo y
+     siendo enfocable con el teclado, que es lo que importa para accesibilidad;
+     solo cambia CÓMO entra en pantalla. */
+  top: 1rem;
   left: 1rem;
   z-index: 1000;
   background: var(--brand-500);
@@ -32,10 +37,11 @@ html { scroll-behavior: smooth; }
   padding: .6rem 1rem;
   border-radius: var(--radius-md);
   text-decoration: none;
-  transition: top .2s ease;
+  transform: translateY(-200%);
+  transition: transform .2s ease;
 }
 .skip-link:focus {
-  top: 1rem;
+  transform: translateY(0);
   outline: 2px solid var(--teal-400);
   outline-offset: 2px;
 }

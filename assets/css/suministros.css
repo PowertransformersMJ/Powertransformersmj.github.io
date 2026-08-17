@@ -157,7 +157,8 @@
   letter-spacing: .04em;
   background: rgba(0, 40, 90, .03);
   color: var(--ink-2);
-  transition: all .15s;
+  transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-duration: .15s;
 }
 .tipo-radio input:checked + .tipo-label.tipo-ingreso {
   background: rgba(22, 163, 74, .15);

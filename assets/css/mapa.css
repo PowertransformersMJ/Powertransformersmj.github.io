@@ -105,7 +105,8 @@
   border: 1px solid rgba(240,165,0,.3);
   padding: .3rem .6rem;
   border-radius: 2px;
-  transition: all .15s;
+  transition-property: background-color, border-color, color;
+  transition-duration: .15s;
 }
 .sgm-pop-edit:hover {
   background: rgba(240,165,0,.08);

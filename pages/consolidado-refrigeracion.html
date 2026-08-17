@@ -93,7 +93,9 @@
       font: 600 11px var(--font-mono); letter-spacing: .04em;
       border: 1px solid rgba(13, 71, 161, .25);
       background: #fff; color: var(--brand-deep);
-      transition: all var(--dur-fast);
+      /* Lista explícita, nunca `all` (CLAUDE.md §3.1). */
+      transition-property: background-color, border-color, opacity;
+      transition-duration: var(--dur-fast);
     }
     .consol-filters button:hover { background: rgba(0, 122, 255, .08); border-color: var(--brand); }
     .consol-filters button.primary {

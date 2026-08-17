@@ -538,7 +538,9 @@ body.is-admin .cloud-doc-wrap:hover .cloud-doc-delete { display: inline-flex; }
   color: var(--brand-deep);
   border: 1px solid rgba(0,122,255,.18);
   text-decoration: none;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition-property: background-color, box-shadow, transform;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
 }
 .viewer-actions .btn--icon:hover {
   background: rgba(0,122,255,.16);

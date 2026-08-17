@@ -59,6 +59,16 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
 @media (prefers-reduced-motion: reduce) {
   .aqua-power-scene { opacity: 1; }
 }
+/* La foto de fondo la cargan las 88 páginas del sistema y pesaba 1,1 MB por
+   puro adorno: al ser fondo CSS no admite `loading="lazy"` ni `fetchpriority`
+   y se descubre tarde, tras parsear el CSS. En móvil 4G eran varios segundos
+   en CADA página. Recomprimida a 1920×1080 (236 KB) y, en pantallas chicas,
+   una variante de 1200×675 (118 KB) que ahí no se distingue. */
+@media (max-width: 900px) {
+  .aqua-power-scene {
+    background-image: url("../img/aqua/substation-photo-mobile.webp");
+  }
+}
 
 /* Versión legacy retro-compat (si algunas páginas aún usan
    .aqua-transformer-bg, lo redirigimos a la escena nueva) */
@@ -192,7 +202,9 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
   padding: 8px 14px; border-radius: var(--r-sm);
   color: var(--ink-2); font-size: 13.5px; font-weight: 500;
   display: inline-flex; align-items: center; gap: 6px;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition-property: background-color, color, opacity;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
 }
 .tb-nav a:hover { background: rgba(0,40,90,.05); color: var(--ink-1); opacity: 1; }
 .tb-nav a.is-active { background: rgba(0,122,255,.14); color: var(--brand-deep); }
@@ -286,7 +298,9 @@ body.aqua .sb-item {
   padding: 10px 14px; border-radius: var(--r-sm);
   color: var(--ink-2); font-size: 13.5px; font-weight: 500;
   letter-spacing: -.005em;
-  transition: all var(--dur-fast) var(--ease-out);
+  transition-property: background-color, box-shadow, color, opacity;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
   cursor: pointer;
   text-decoration: none;
   position: relative;
@@ -598,7 +612,8 @@ body.aqua .sb-item.is-active {
   display: grid; place-items: center;
   border-radius: 6px;
   background: rgba(0,40,90,.05);
-  transition: all var(--dur-fast);
+  transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-duration: var(--dur-fast);
 }
 .sb-item:hover .i, .sb-item.is-active .i {
   background: rgba(0,122,255,.18);
@@ -712,7 +727,9 @@ body.aqua .sb-item.is-active {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 10px 18px; border-radius: var(--r-pill);
   font: 600 14px var(--font-sans); letter-spacing: -.005em;
-  border: 0; cursor: pointer; transition: all var(--dur-fast) var(--ease-out);
+  border: 0; cursor: pointer; transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
   color: #fff; white-space: nowrap;
   text-decoration: none;
 }
@@ -794,7 +811,9 @@ body.aqua .sb-item.is-active {
   border: 1px solid rgba(0,40,90,.12);
   border-radius: var(--r-sm);
   color: var(--ink-1); font: 500 14px var(--font-sans);
-  transition: all var(--dur-fast) var(--ease-out);
+  transition-property: background-color, border-color, box-shadow, outline;
+  transition-duration: var(--dur-fast);
+  transition-timing-function: var(--ease-out);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
 .input::placeholder, .textarea::placeholder { color: var(--ink-4); }
@@ -823,7 +842,8 @@ body.aqua .sb-item.is-active {
   appearance: none; width: 18px; height: 18px; border-radius: 5px;
   background: rgba(255,255,255,.85); border: 1.5px solid rgba(0,40,90,.20);
   cursor: pointer; display: grid; place-items: center;
-  transition: all var(--dur-fast);
+  transition-property: background-color, border-color, color;
+  transition-duration: var(--dur-fast);
 }
 .check input:checked { background: var(--brand); border-color: var(--brand); }
 .check input:checked::after { content:'✓'; color: #fff; font-size: 12px; font-weight: 700; }
@@ -990,7 +1010,9 @@ body.aqua .sb-item.is-active {
   backdrop-filter: var(--glass-blur-thin);
   -webkit-backdrop-filter: var(--glass-blur-thin);
   box-shadow: var(--glass-ring), var(--sh-sm);
-  transition: all var(--dur-med) var(--ease-ios);
+  transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-duration: var(--dur-med);
+  transition-timing-function: var(--ease-ios);
   border: 1px solid rgba(0,40,90,.08);
   text-decoration: none; position: relative; overflow: hidden;
 }
@@ -1039,7 +1061,8 @@ body.aqua .sb-item.is-active {
   border-radius: var(--r-pill);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
-.tab { padding: 8px 16px; border-radius: var(--r-pill); color: var(--ink-3); font-size: 13px; font-weight: 600; cursor: pointer; transition: all var(--dur-fast); border: 0; background: transparent; }
+.tab { padding: 8px 16px; border-radius: var(--r-pill); color: var(--ink-3); font-size: 13px; font-weight: 600; cursor: pointer; transition-property: background-color, border-color, box-shadow, color, opacity, transform;
+  transition-duration: var(--dur-fast); border: 0; background: transparent; }
 .tab.is-active { background: rgba(0,122,255,.14); color: var(--brand-deep); box-shadow: inset 0 1px 0 rgba(255,255,255,.6); }
 
 /* ─── BREADCRUMB ──────────────────────────────────────────── */
@@ -1208,7 +1231,8 @@ body.aqua .modal-x {
   border: 1px solid rgba(0,40,90,.10);
   color: var(--ink-3);
   padding: 6px 10px; border-radius: var(--r-sm);
-  cursor: pointer; transition: all var(--dur-fast);
+  cursor: pointer; transition-property: background-color, border-color, color;
+  transition-duration: var(--dur-fast);
 }
 body.aqua .modal-x:hover {
   background: rgba(255,59,48,.12); color: var(--danger);
@@ -1244,7 +1268,8 @@ body.aqua .modal-overlay textarea {
   border-radius: var(--r-sm) !important;
   color: var(--ink-1) !important;
   font: 500 14px var(--font-sans);
-  transition: all var(--dur-fast);
+  transition-property: background-color, border-color, box-shadow, outline;
+  transition-duration: var(--dur-fast);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.6);
 }
 body.aqua .modal-bg .modal input:focus,
@@ -1316,7 +1341,8 @@ body.aqua .btn-primary-v3 {
     inset 0 1px 0 rgba(255,255,255,.45),
     0 4px 12px rgba(0,122,255,.30);
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition-property: box-shadow, transform;
+  transition-duration: var(--dur-fast);
 }
 body.aqua button.btn-primary:hover,
 body.aqua .btn-primary-v3:hover {
@@ -1332,7 +1358,8 @@ body.aqua .btn-ghost {
   padding: 10px 18px;
   font: 600 14px var(--font-sans);
   cursor: pointer;
-  transition: all var(--dur-fast);
+  transition-property: background-color;
+  transition-duration: var(--dur-fast);
 }
 body.aqua button.btn-secondary:hover,
 body.aqua .btn-ghost:hover { background: rgba(0,40,90,.10); }
@@ -1907,8 +1934,12 @@ body.aqua .leaflet-popup-close-button:hover { color: var(--danger) !important; }
 body.aqua .marker-cluster-small,
 body.aqua .marker-cluster-medium,
 body.aqua .marker-cluster-large {
+  /* SIN `backdrop-filter`: los clústeres son decenas de elementos que se
+     recalculan en cada paneo y zoom, y es justo el caso que prohíbe la regla
+     «cero backdrop-filter en listas de N elementos» (CLAUDE.md §3.1). Se
+     sentía pegajoso al arrastrar el mapa en equipos modestos. Un color sólido
+     con alpha se ve casi igual y cuesta cero. */
   background-color: rgba(0,122,255,.20) !important;
-  backdrop-filter: blur(4px);
 }
 body.aqua .marker-cluster-small div,
 body.aqua .marker-cluster-medium div,

@@ -40,7 +40,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<!-- SheetJS (xlsx) ya NO se carga aquí: son 315 KB comprimidos que detenían la
+     pintura de la página más pesada del sistema en CADA visita, cuando solo se
+     usa al pulsar «Exportar» o al cargar un Excel. Ahora se descarga bajo
+     demanda desde `asegurarXLSX()` (ADR-063). -->
 
 <style>
 :root{
@@ -806,10 +809,27 @@ function parseWorkbook(wb){
   });
   return {rows:out, found};
 }
+/* Carga SheetJS solo cuando de verdad hace falta (leer o exportar un Excel).
+   Antes venía en el <head> y bloqueaba la pintura de la página en cada visita.
+   Si ya está cargado no hace nada; si el CDN falla, quien llama sigue viendo
+   su mensaje de error de siempre porque el `typeof XLSX` se conserva. */
+function asegurarXLSX(){
+  if(window.XLSX) return Promise.resolve(window.XLSX);
+  if(!window.__xlsxCargando){
+    window.__xlsxCargando=new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+      s.onload=()=>res(window.XLSX); s.onerror=rej;
+      document.head.appendChild(s);
+    }).catch(()=>{ window.__xlsxCargando=null; return null; });
+  }
+  return window.__xlsxCargando;
+}
 async function handleExcel(file){
   const status=$('#upStatus'); status.className='up-status';
   try{
     status.textContent='Leyendo '+file.name+'…';
+    await asegurarXLSX();
     if(typeof XLSX==='undefined'){ status.className='up-status err'; status.textContent='No se pudo cargar el lector de Excel (sin conexión a internet para SheetJS).'; return; }
     const buf=await file.arrayBuffer();
     const wb=XLSX.read(buf,{type:'array',cellDates:true});
@@ -1205,9 +1225,10 @@ function exportRows(){
     };
   });
 }
-function exportXlsx(){
-  if(typeof XLSX==='undefined'){ alert('No se pudo cargar el generador de Excel (SheetJS). Verifica la conexión a internet.'); return; }
+async function exportXlsx(){
   if(!ALL.length){ alert('No hay datos cargados para exportar.'); return; }
+  await asegurarXLSX();
+  if(typeof XLSX==='undefined'){ alert('No se pudo cargar el generador de Excel (SheetJS). Verifica la conexión a internet.'); return; }
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(exportRows()), 'Activos');
   const z={}; ALL.forEach(a=>{const k=a.zona;(z[k]=z[k]||{1:0,2:0,3:0,4:0,5:0,sin:0})[a.hi==null?'sin':a.bucket.cls]++;});

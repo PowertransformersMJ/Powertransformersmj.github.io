@@ -129,7 +129,10 @@
       background: rgba(0,122,255,.06);
       color: var(--ink-3);
       border: 1px solid rgba(0,122,255,.14);
-      transition: all var(--dur-fast);
+      /* Lista explícita, nunca `all` (CLAUDE.md §3.1): son las tres
+         propiedades que de verdad cambian entre .err/.ok/.info. */
+      transition-property: background-color, border-color, color;
+      transition-duration: var(--dur-fast);
     }
     .auth-msg:empty { display: none; }
     .auth-msg.err {
