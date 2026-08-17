@@ -23,6 +23,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { conLimite, LIMITE_ACCIONES } from '../domain/limites_lectura.js';
 import { deepClean } from './_firestore_clean.js';
 
 const COL_NAME = 'acciones_refrigeracion';
@@ -268,14 +269,18 @@ export async function listar(filtros = {}) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export function suscribir(filtros = {}, onData, onError) {
+export function suscribir(filtrosIn = {}, onData, onError) {
+  // El `limite` era opcional y ningún llamador lo pasaba: en la práctica
+  // esto era un onSnapshot sin tope sobre un histórico que crece solo.
+  // Ahora hay valor por defecto; el límite explícito del llamador manda.
+  const filtros = conLimite(filtrosIn, LIMITE_ACCIONES);
   const constraints = [];
   if (filtros.transformador_id) constraints.push(where('transformador_id', '==', filtros.transformador_id));
   if (filtros.subestacion)      constraints.push(where('subestacion',      '==', filtros.subestacion));
   if (filtros.estado_accion)    constraints.push(where('estado_accion',    '==', filtros.estado_accion));
   if (filtros.responsable_uid)  constraints.push(where('responsable_uid',  '==', filtros.responsable_uid));
   constraints.push(orderBy('fecha_accion', 'desc'));
-  if (filtros.limite)           constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
   return onSnapshot(
     query(collRef(), ...constraints),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),

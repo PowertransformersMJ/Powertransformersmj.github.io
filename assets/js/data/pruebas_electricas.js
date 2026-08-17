@@ -23,9 +23,10 @@
 import {
   collection, doc,
   addDoc, setDoc, updateDoc, deleteDoc,
-  getDoc, getDocs, query, orderBy,
+  getDoc, getDocs, query, orderBy, limit,
   onSnapshot, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+import { LIMITE_UNIDADES_PRUEBAS } from '../domain/limites_lectura.js';
 
 import { getDbSafe, getStorageSafe, getFunctionsSafe, isFirebaseConfigured } from '../firebase-init.js';
 import { deepClean } from './_firestore_clean.js';
@@ -75,8 +76,13 @@ export function suscribirUnidades(onData, onError) {
     Promise.resolve().then(() => onData([]));
     return () => {};
   }
+  // El tope NO recorta lo que ve el usuario (hay una unidad por
+  // transformador y el parque cabe de sobra en 500): acota el peor caso
+  // de una suscripción que antes salía sin filtro ni límite sobre la
+  // colección entera, y que por tanto reenviaba TODAS las unidades a
+  // cada pestaña abierta con cada escritura de un solo informe.
   return onSnapshot(
-    query(collUnidades(), orderBy('serie', 'asc')),
+    query(collUnidades(), orderBy('serie', 'asc'), limit(LIMITE_UNIDADES_PRUEBAS)),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (err)  => { if (onError) onError(err); else console.warn('[pruebas_electricas.suscribirUnidades]', err); }
   );

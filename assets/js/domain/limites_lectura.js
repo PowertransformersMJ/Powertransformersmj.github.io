@@ -41,6 +41,30 @@ export const LIMITE_TRANSFORMADORES = 500;
 export const LIMITE_ORDENES = 1000;
 export const LIMITE_EXPORT = 5000;
 
+// ── Topes añadidos en ADR-063 ────────────────────────────────────
+// Mismos criterios que los de arriba: se dimensionan al universo REAL
+// de cada colección, no a un número redondo cualquiera. Todos cubren
+// hoy el total con holgura, así que ninguna vista cambia lo que
+// muestra; lo que cambia es que el peor caso deja de ser ilimitado.
+//
+//  · LIMITE_UNIDADES_PRUEBAS = 500 — una unidad por transformador con
+//    pruebas eléctricas registradas; es un subconjunto del parque, que
+//    ya está acotado a 500. Era la peor de las suscripciones: sin
+//    filtro NI tope sobre la colección entera.
+//  · LIMITE_CARGABILIDAD = 500 — un registro por transformador (mismo
+//    universo que el parque).
+//  · LIMITE_ACCIONES = 1000 — las acciones de refrigeración SÍ crecen
+//    sin techo (histórico). Se leen por `fecha_accion` descendente, o
+//    sea las más recientes primero; mismo criterio que LIMITE_ORDENES.
+//  · LIMITE_CORRECCIONES = 500 — catálogo de correcciones, decenas hoy.
+//  · LIMITE_CONTRATOS = 200 — los contratos se cuentan por decenas y
+//    crecen por adjudicación (unos pocos al año).
+export const LIMITE_UNIDADES_PRUEBAS = 500;
+export const LIMITE_CARGABILIDAD = 500;
+export const LIMITE_ACCIONES = 1000;
+export const LIMITE_CORRECCIONES = 500;
+export const LIMITE_CONTRATOS = 200;
+
 /**
  * Devuelve una copia de `filtros` con `limite` garantizado.
  *

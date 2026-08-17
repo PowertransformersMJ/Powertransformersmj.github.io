@@ -15,6 +15,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { conLimite, LIMITE_CORRECCIONES } from '../domain/limites_lectura.js';
 import {
   sanitizarCorreccion, validarCorreccion
 } from '../domain/correccion_schema.js';
@@ -61,12 +62,15 @@ export async function listar(filtros = {}) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export function suscribir(filtros = {}, onData, onError) {
+export function suscribir(filtrosIn = {}, onData, onError) {
+  // Ver acciones_refrigeracion.suscribir: el `limite` opcional que nadie
+  // pasaba dejaba la suscripción sin tope. Default sensato, el explícito manda.
+  const filtros = conLimite(filtrosIn, LIMITE_CORRECCIONES);
   const constraints = [];
   if (filtros.tipo) constraints.push(where('tipo', '==', filtros.tipo));
   constraints.push(orderBy('tipo'));
   constraints.push(orderBy('numero'));
-  if (filtros.limite) constraints.push(limit(filtros.limite));
+  constraints.push(limit(filtros.limite));
   return onSnapshot(
     query(collRef(), ...constraints),
     (snap) => onData(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),

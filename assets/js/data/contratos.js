@@ -9,6 +9,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { conLimite, LIMITE_CONTRATOS } from '../domain/limites_lectura.js';
 import { sanitizarContrato, validarContrato } from '../domain/contrato_schema.js';
 
 const COL = 'contratos';
@@ -27,10 +28,14 @@ export async function listar({ estado, aliado, limite = 100 } = {}) {
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
-export function suscribir(filtros, onData, onError) {
+export function suscribir(filtrosIn, onData, onError) {
+  // No tenía tope de ningún tipo. Los contratos se cuentan por decenas,
+  // así que 200 no recorta nada hoy y acota el reenvío en cada escritura.
+  const filtros = conLimite(filtrosIn, LIMITE_CONTRATOS);
   const cs = [];
-  if (filtros && filtros.estado) cs.push(where('estado', '==', filtros.estado));
+  if (filtros.estado) cs.push(where('estado', '==', filtros.estado));
   cs.push(orderBy('codigo'));
+  cs.push(limit(filtros.limite));
   return onSnapshot(query(colRef(), ...cs),
     (s) => onData(s.docs.map((d) => ({ id: d.id, ...d.data() }))),
     (err) => { if (onError) onError(err); });

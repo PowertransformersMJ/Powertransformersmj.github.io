@@ -17,8 +17,9 @@
 import { isFirebaseConfigured } from '../firebase-config.js';
 import { getDbSafe } from '../firebase-init.js';
 import {
-  collection, query, orderBy, onSnapshot,
+  collection, query, orderBy, onSnapshot, limit,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+import { LIMITE_CARGABILIDAD } from '../domain/limites_lectura.js';
 
 function candidatasBaselineURL() {
   const out = [];
@@ -103,7 +104,10 @@ export function suscribirCargabilidad(onData, onError) {
     try {
       const db = getDbSafe();
       const ref = collection(db, 'cargabilidad_transformadores');
-      const q = query(ref, orderBy('id'));
+      // Tope de lectura: hay un registro por transformador, así que 500
+      // cubre el parque entero; lo que evita es que una suscripción sin
+      // límite reenvíe la colección completa en cada escritura.
+      const q = query(ref, orderBy('id'), limit(LIMITE_CARGABILIDAD));
       unsubFirestore = onSnapshot(
         q,
         (snap) => {
