@@ -246,3 +246,17 @@ workflow. Verde en Actions ≠ cambio en producción. Y antes de tocar `pages.ym
 público. Si un dato no debe verse, no se arregla con `.gitignore` ni con filtros de publicación —
 se mueve detrás de la autenticación. El catálogo de 206 equipos se resolvió leyendo de Firestore.
 **Gate.** [HONOR]. Ver `99 §62`.
+
+### L-66 · Lo DECLARADO en el repo no es lo que hay en producción (índices de Firestore)
+**Síntoma.** El archivo declaraba 37 índices y producción tenía 33: los 4 de
+`acciones_refrigeracion` llevaban meses declarados sin desplegar. Y 5 colecciones publicadas
+(`auditoria`, `fallados`, `contramuestras`, `monitoreo_intensivo`, `propuestas_reclasificacion_fur`)
+no tenían ninguno: sus pantallas fallaban con `FAILED_PRECONDITION` al filtrar.
+**Causa.** Un índice se declara en el repo pero solo existe si alguien corre el deploy. Son dos
+estados independientes y nada los concilia: sin gate, sin aviso, y el error solo se ve en la consola
+del usuario que filtra. Igual con las CF: `maxInstances` no acota nada hasta desplegar.
+**Regla.** Antes de afirmar que un índice o una función existe, PREGUNTARLE AL SERVIDOR
+(`firestore:indexes`, `functions:list`) y comparar contra lo declarado. Misma raíz que L-65 aplicada
+al backend: **el repo describe una intención; producción es un hecho aparte**.
+**Corolario.** Un `where` + `orderBy` nuevo lleva su índice en el MISMO turno: declarado y desplegado.
+**Gate.** [HONOR]. Ver `99 §63`.

@@ -6,21 +6,19 @@
 
 ---
 
-## 🎯 Foco (2026-08-16) — AUDITORÍA HOLÍSTICA REMEDIADA (ADR-062)
+## 🎯 Foco (2026-08-17) — COLA DE LA AUDITORÍA REMEDIADA (ADR-063)
 
-> 11 auditores + verificación adversarial sobre todo el sistema. 4 CRÍTICOS y 22 ALTOS
-> sobrevivieron. Remediado y desplegado en 3 commits (`7444564` · `5830d9c` · `dd9b5f6`).
-> **1.334 pruebas verdes y CI en VERDE por primera vez desde el 22 de julio.**
-> Informe completo → bóveda `sgm-transpower/auditorias/` (cita datos reales, no va al repo público).
+> *"realiza todo lo que dependa de ti"*. Cerrado lo que no exigía su mano ni decisión suya.
+> **1.332 pruebas verdes**. Antes: ADR-062 (11 auditores). Informe original → bóveda
+> `sgm-transpower/auditorias/` (cita datos reales, no va al repo público).
 
-### 🔴 PENDIENTES que NO pude cerrar
-> **(A) Desplegar funciones**: `maxInstances` está en el código, el despliegue lo bloqueó el
-> clasificador. Comando: `npx firebase deploy --only functions`.
-> **(B) Proteger la rama `main`**: configuración de GitHub, solo el Ingeniero.
-> **(C) Historial de git**: los datos reales siguen en commits antiguos. Irreversible y la doctrina
+### 🔴 PENDIENTES que siguen sin poder cerrarse (detalle → `99 §63`)
+> **(A) Proteger `main`**: configuración de GitHub, solo el Ingeniero.
+> **(B) Historial de git**: los datos reales siguen en commits antiguos. Irreversible y la doctrina
 > prohíbe force-push a `main` → DECISIÓN DEL INGENIERO, no se hizo.
-> **(D)** Índices Firestore faltantes · escapado HTML duplicado en 34 archivos · foto de fondo de
-> 1,1 MB · 5 pruebas que pasan sin comprobar nada. Detalle en el informe de la bóveda.
+> **(C) Tres decisiones que no tomo yo**: tope en `/alertas_reconocidas` (haría reaparecer alertas ya
+> reconocidas) · `defer` en Chart.js de `parque-transformadores` (no verificable sin sesión) · barras
+> de progreso con `transition: width` (obliga a tocar el JS de subida).
 
 ### ▶️ TAREA VIVA: encender el parque real — falta el PASO DEL INGENIERO (detalle → `99 §57`)
 > Importador en PRODUCCIÓN y MO.00418 Ed.02 ratificado. **PASO ÚNICO**: abrir `admin/importar.html`
@@ -53,7 +51,6 @@
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar; fix "obvio" INVIABLE en SDK Web). | 🟡 decisión |
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
-| **TODO-32** | Desplegar funciones con `maxInstances` (`npx firebase deploy --only functions`) — ADR-062 §62.8. | 🔴 |
 | **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
 | **TODO-30** | Validar `pages/fichas-tecnicas.html` con sesión real: datos de Firestore, ficha completa y exportación PE.02081 con un equipo de verdad (ADR-061). | 🔴 |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |

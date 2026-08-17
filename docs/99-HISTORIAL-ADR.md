@@ -1278,3 +1278,62 @@ lo estaba) · §3.6 arquitecto · §G.4. Lección → `30 §L-65`.
   doctrina prohíbe force-push a `main`. NO se hizo: requiere decisión explícita del Ingeniero.
 - Índices Firestore faltantes, escapado HTML duplicado en 34 archivos, foto de fondo de 1,1 MB,
   5 pruebas que pasan sin comprobar nada. Todo en el informe de la bóveda.
+
+---
+
+## 63. ADR — Remediación de la deuda que dejó la auditoría: lo que sí dependía de Claude ⟦OPUS-5⟧ (2026-08-17)
+
+> *"realiza todo lo que dependa de ti"* — el Ingeniero, 2026-08-17, tras leer el resumen de pendientes.
+
+**63.1 Causa raíz.** ADR-062 cerró los 4 CRÍTICOS pero dejó una cola de ALTOS "sin urgencia" y un
+`TODO-32` bloqueado. La causa de fondo de casi todos es la misma: **el repositorio DECLARA una cosa y
+producción tiene otra**, y nadie lo comprobaba contra el servidor. Verificado este turno con sesión
+de Firebase: `firestore.indexes.json` declaraba 37 índices y producción tenía 33 — los 4 de
+`acciones_refrigeracion` nunca se desplegaron. Y cinco colecciones publicadas no tenían NINGUNO.
+
+**63.2 Solución estructural.**
+· **Funciones desplegadas** (cierra `TODO-32`): las 4 con sus `maxInstances` (10/1/3/5). El despliegue
+  creó además `cronAlertasDiarias`, que estaba en el código y nunca había subido.
+· **Índices**: 16 nuevos → 53 declarados y **53 desplegados y verificados**. Cubren `auditoria` (las 7
+  combinaciones de sus 3 filtros; es la bitácora append-only de la que depende la trazabilidad),
+  `fallados`, `contramuestras`, `monitoreo_intensivo`, `propuestas_reclasificacion_fur` y el de 3
+  campos de `marcas`. Campos en el orden que exige Firestore: igualdades primero, `orderBy` al final.
+· **`ts_calculo` con dos tipos**: la Cloud Function lo escribía como TEXTO (del dominio, que es puro y
+  no conoce Firestore) y el navegador como Timestamp. Firestore ordena primero por TIPO, así que el
+  historial de salud salía en dos bloques en vez de en orden cronológico. La función ahora escribe
+  fecha; el texto ISO se conserva dentro de `salud_actual`, donde el esquema sí lo declara `str`.
+· **Cinco suscripciones sin tope** (§3.2 free-tier): pruebas eléctricas —sin filtro NI límite—,
+  cargabilidad, acciones de refrigeración, correcciones y contratos. Se reutiliza `conLimite` de
+  `domain/limites_lectura.js` con topes dimensionados al universo real de cada colección: ninguna
+  vista muestra hoy menos, pero el peor caso deja de ser ilimitado.
+· **Pruebas falsas**: `computeFromDatasets` se extrae a `domain/kpis_compute.js` (idéntica carácter a
+  carácter, verificado con diff). Los 5 tests de KPIs pasaban en verde por un `catch { return }` sin
+  ejecutar un solo assert; ahora corren de verdad. `data/kpis.js` pasa de 256 a 74 líneas.
+· **13 escapadores de HTML** ampliados a `& < > " '`: se usaban dentro de atributos, donde una comilla
+  cierra el atributo e inyecta un manejador de eventos (XSS almacenado admin→equipo).
+· **Rendimiento**: foto de fondo de 1,1 MB → 236 KB + variante móvil de 118 KB; SheetJS (315 KB) sale
+  del `<head>` de la página más pesada y carga bajo demanda; 33 `transition: all`, el `backdrop-filter`
+  de los clústeres del mapa y la animación de `top` del skip-link, corregidos.
+
+**63.3 No-regresión.** Ningún renombrado: `computeFromDatasets`, `ESTADOS_ORDEN` y los 13 escapadores
+conservan nombre y firma, y se re-exportan desde donde vivían. 1.332 pruebas verdes antes y después.
+
+**63.4 Verificación.** Suite 1.334 (1.332 pass · 0 fail) tras cada bloque · `firestore:indexes` contra
+producción: 53/53 · los 14 escapadores devuelven `&quot; onmouseover=&quot;alert(1)` ante el payload de
+atributo · en el navegador: 0 `transition: all` vivos sobre 451 reglas, 0 `backdrop-filter` en
+clústeres, sin errores de consola, página idéntica en escritorio y móvil · foto comparada al 100% de
+zoom antes de aplicar.
+
+**63.5 Anti-patterns evitados.** No se declararon las 127 combinaciones teóricas de filtros de
+`ordenes`: se leyó qué ofrece cada pantalla. No se puso `defer` a Chart.js —el arranque de esa página
+es una función async que podría usarlo antes— porque no es verificable sin sesión. No se acotó
+`/alertas_reconocidas`: un tope ahí haría reaparecer alertas ya reconocidas. No se tocaron las barras
+de progreso (`transition: width`): exigen tocar el JS de subida de archivos para un solo elemento.
+
+**63.6 Archivos.** `firestore.indexes.json` · `functions/index.js` · `domain/{kpis_compute,
+limites_lectura,orden_schema}.js` · `data/{kpis,ordenes,contratos,correcciones,acciones_refrigeracion,
+pruebas_electricas,seguimiento_cargabilidad}.js` · 13 módulos con escapador · `assets/css/*` ·
+`tests/kpis_v2.test.js` · foto + variante móvil. INTACTOS: reglas, esquemas de dominio, `session-guard`.
+
+**63.7 Doctrina.** §3.2 free-tier y cambios aditivos · §3.1 rendimiento · §3.3 verificar contra
+producción, no contra el repositorio → **L-66**. Sin cache bump (§4 dormida).
