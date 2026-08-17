@@ -192,7 +192,6 @@
         { "fieldPath": "codigo",          "order": "DESCENDING" }
       ]
     },
-
     {
       "collectionGroup": "marcas",
       "queryScope": "COLLECTION",
@@ -300,6 +299,142 @@
       "fields": [
         { "fieldPath": "responsable_uid", "order": "ASCENDING"  },
         { "fieldPath": "fecha_accion",    "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "monitoreo_intensivo",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado",      "order": "ASCENDING"  },
+        { "fieldPath": "iniciado_ts", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "propuestas_reclasificacion_fur",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado",     "order": "ASCENDING"  },
+        { "fieldPath": "creada_ts",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contramuestras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "estado",            "order": "ASCENDING" },
+        { "fieldPath": "fecha_programada",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contramuestras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transformadorId",   "order": "ASCENDING" },
+        { "fieldPath": "fecha_programada",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contramuestras",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transformadorId",   "order": "ASCENDING" },
+        { "fieldPath": "estado",            "order": "ASCENDING" },
+        { "fieldPath": "fecha_programada",  "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "fallados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "tipo_falla",   "order": "ASCENDING"  },
+        { "fieldPath": "fecha_falla",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "fallados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transformadorId", "order": "ASCENDING"  },
+        { "fieldPath": "fecha_falla",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "fallados",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "transformadorId", "order": "ASCENDING"  },
+        { "fieldPath": "tipo_falla",      "order": "ASCENDING"  },
+        { "fieldPath": "fecha_falla",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "accion", "order": "ASCENDING"  },
+        { "fieldPath": "at",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "coleccion", "order": "ASCENDING"  },
+        { "fieldPath": "at",        "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "uid", "order": "ASCENDING"  },
+        { "fieldPath": "at",  "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "accion",    "order": "ASCENDING"  },
+        { "fieldPath": "coleccion", "order": "ASCENDING"  },
+        { "fieldPath": "at",        "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "accion", "order": "ASCENDING"  },
+        { "fieldPath": "uid",    "order": "ASCENDING"  },
+        { "fieldPath": "at",     "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "coleccion", "order": "ASCENDING"  },
+        { "fieldPath": "uid",       "order": "ASCENDING"  },
+        { "fieldPath": "at",        "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "auditoria",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "accion",    "order": "ASCENDING"  },
+        { "fieldPath": "coleccion", "order": "ASCENDING"  },
+        { "fieldPath": "uid",       "order": "ASCENDING"  },
+        { "fieldPath": "at",        "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "marcas",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "contrato_id",   "order": "ASCENDING" },
+        { "fieldPath": "suministro_id", "order": "ASCENDING" },
+        { "fieldPath": "marca",         "order": "ASCENDING" }
       ]
     }
   ],

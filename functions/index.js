@@ -137,7 +137,18 @@ export const onMuestraCreate = onDocumentCreated(
     await txRef.collection('historial_hi').add({
       trigger: 'muestra_nueva',
       muestra_origen_ref: event.params.id,
-      ...snap, createdAt: new Date()
+      ...snap,
+      // `snap.ts_calculo` viene del dominio como texto ISO (contrato correcto:
+      // el dominio es puro y no conoce Firestore). Pero el cliente escribe ese
+      // MISMO campo como Timestamp (transformadores_subcolecciones.js:142) y
+      // `listarHistorialHI` ordena por él. Firestore ordena PRIMERO por tipo:
+      // mezclar texto y Timestamp deja el historial de salud desordenado, con
+      // los dos orígenes en bloques separados en vez de en orden cronológico.
+      // Se escribe como Date (el Admin SDK lo guarda como Timestamp) para que
+      // ambos productores coincidan en tipo. El texto ISO se conserva íntegro
+      // dentro de `salud_actual`, donde el esquema sí lo declara `str`.
+      ts_calculo: new Date(),
+      createdAt: new Date()
     });
   }
 );
