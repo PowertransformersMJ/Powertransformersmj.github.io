@@ -75,6 +75,7 @@
 | §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483 selectores, 0 globales); plantilla PE.02081 saneada (traía firmas manuscritas y datos de cliente); 1254 pruebas ⟦OPUS-5⟧ | 1181 |
 | §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto), importador que dividía entre 1.000, CI en rojo 76 corridas, registro abierto en Firebase, menú que no colapsaba. 1.334 pruebas · CI en verde ⟦OPUS-5⟧ | 1226 |
 | §63 | ADR-063 — Remediación de la cola de la auditoría: funciones desplegadas con topes (TODO-32), 16 índices Firestore nuevos (producción tenía 33 de 37 declarados; 5 colecciones sin ninguno), `ts_calculo` con dos tipos desordenaba el historial de salud, 5 suscripciones sin límite, 5 pruebas que pasaban sin assert, 13 escapadores sin comillas, foto de 1,1 MB → 236 KB ⟦OPUS-5⟧ | 1284 |
+| §64 | ADR-064 — Fichas Técnicas: el port de ADR-061 trajo el CSS completo pero solo el 44% del marcado (189 de 339 clases `.ftm-` sin JS). Se portan las tres vistas que faltaban —Analítica gerencial (matriz de riesgo 5×5, top-20, novedades), Norma CREG y Agregar transformador— más la cabecera de procedencia, el anillo de conformidad y la banda de salud del tablero, con piel AQUA y pestañas del sitio ⟦OPUS-5⟧ | 1343 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

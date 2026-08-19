@@ -1337,3 +1337,54 @@ pruebas_electricas,seguimiento_cargabilidad}.js` · 13 módulos con escapador ·
 
 **63.7 Doctrina.** §3.2 free-tier y cambios aditivos · §3.1 rendimiento · §3.3 verificar contra
 producción, no contra el repositorio → **L-66**. Sin cache bump (§4 dormida).
+
+---
+
+## 64. ADR — Fichas Técnicas: el port se quedó a medias y el CSS lo delataba ⟦OPUS-5⟧ (2026-08-19)
+
+> *"noto que el modulo de fichas tecnicas aun no esta como lo diseñe en el archivo html por favor valida"* ·
+> *"necesito que la interfaz sea igual, el entorno respetemos el de la pagina"* — el Ingeniero, 2026-08-19.
+
+**64.1 Causa raíz.** El Ingeniero tenía razón y el propio repositorio lo probaba: de las **339 clases
+`.ftm-` de `assets/css/fichas-tecnicas.css`, 189 (56%) no las usaba ningún JS**. El port de ADR-061
+trajo la hoja de estilos ÍNTEGRA del módulo v22 —incluido su mapa de renombrado clase por clase— pero
+el JS solo implementó el tablero y la ficha. Faltaban **tres de las cuatro vistas**: Analítica
+gerencial, Norma CREG y Agregar transformador; y al tablero le faltaban la cabecera de procedencia, el
+anillo de conformidad y la banda de estado de salud. El CSS sin JS detrás era la huella del trabajo a
+medio hacer, y nadie la miró: no hay gate que compare hoja de estilos contra marcado.
+
+**64.2 Solución estructural.** Módulo nuevo `ui/fichas/vistas-gerenciales.js` con las tres vistas, y
+`panel.js` gana el sistema de pestañas. Decisión de encuadre del Ingeniero: **la interfaz igual, el
+entorno el de la página** — se porta la MAQUETACIÓN del v22 con la piel AQUA LIGHT, y las pestañas son
+las del sitio (`tabs.css`, `role=tab` + `aria-selected`), no una copia de las del archivo suelto.
+· Tablero: cabecera de procedencia + anillo de conformidad + banda «Estado de salud · Condición» con
+  filtro por tramo, que convive con los KPIs ya existentes.
+· Analítica: 5 indicadores gerenciales, matriz de riesgo 5×5, top-20 de priorización, centro de
+  novedades y cruces por zona / nivel de tensión.
+· Norma CREG: catálogo de UC (Tablas 51 y 52) servido por el MISMO módulo que usa el clasificador —
+  catálogo y veredicto no pueden divergir.
+· Agregar: clasifica contra el catálogo y suma a la pantalla; NO persiste (esa ruta es
+  `admin/importar.html`, con simulación previa).
+
+**64.3 No-regresión.** Cero dominio nuevo: todo el cálculo sale de `domain/fichas_creg_uc.js` y
+`domain/matriz_riesgo.js`, ya probados. El tablero y la ficha PE.02081 quedan intactos; las vistas
+nuevas se pintan solo al abrirlas. 1.332 pruebas verdes antes y después.
+
+**64.4 Verificación (en el navegador, no por lectura).** Matriz contra la tabla oficial MO.00418:
+condición 3 × criticidad máxima → rojo, 5 × mínima → amarillo, 1 × menor → verde. Alta: 20 MVA a
+110 kV → **N4T4**, con DISCREPANCIA frente a una N4T5 registrada, y la flota pasa de 7 a 8 equipos.
+Filtros de salud: alternan y conviven con los KPIs. Norma: 7 tablas del catálogo. Clases del CSS con
+JS detrás: **150 → 223 de 340**.
+
+**64.5 Anti-patterns evitados.** No se copió el tema oscuro del archivo suelto (el entorno manda). No
+se duplicó el clasificador ni la matriz. No se hizo que «Agregar» escriba en Firestore por comodidad.
+No se juzgó la página por el preview de `_dev/`: **estaba desactualizado** —no montaba el segmento de
+evaluación masiva que la página real sí monta—, así que primero se hizo fiel y luego se comparó.
+
+**64.6 Archivos.** NUEVO `assets/js/ui/fichas/vistas-gerenciales.js` · `assets/js/ui/fichas/panel.js` ·
+`assets/css/fichas-tecnicas.css` (barra de vistas + variante de párrafo del hint) ·
+`_dev/preview-fichas-integrado.html` (ahora fiel). INTACTOS: dominio, ficha PE.02081, exportador.
+
+**64.7 Doctrina.** §3.2 aditivo (ningún renombrado; el tablero y la ficha no cambian) · §3.1 (la barra
+de vistas sustituye el vidrio por superficie sólida: el fondo es una foto) · §3.3 verificado en vivo.
+Lección → **L-67**. Sin cache bump (§4 dormida).

@@ -260,3 +260,16 @@ del usuario que filtra. Igual con las CF: `maxInstances` no acota nada hasta des
 al backend: **el repo describe una intención; producción es un hecho aparte**.
 **Corolario.** Un `where` + `orderBy` nuevo lleva su índice en el MISMO turno: declarado y desplegado.
 **Gate.** [HONOR]. Ver `99 §63`.
+
+### L-67 · Una hoja de estilos sin marcado detrás es un port a medias
+**Síntoma.** El dueño dice que un módulo portado «no está como lo diseñó». Difícil de confirmar
+leyendo código: lo que hay funciona; el defecto es lo que FALTA, y las ausencias no se ven.
+**Medida objetiva.** Cruzar las clases que DEFINE el CSS contra las que USA el JS. En Fichas Técnicas:
+189 de 339 (56%) sin usar — la hoja traía las cuatro vistas y el JS pintaba una. Convierte una
+impresión en un hecho, y además dice QUÉ falta: cada familia huérfana (`ftm-rmx`, `ftm-gkpi`,
+`ftm-norma`, `ftm-form`) nombraba una vista.
+**Regla.** Al portar un módulo cuyo CSS se trae entero, medir esa cobertura ANTES de darlo por cerrado.
+Un CSS que define el doble de lo que el marcado usa no es «CSS de más»: es la lista de lo que falta.
+**Corolario.** No juzgar una página por su preview de `_dev/` sin comprobar que monta lo MISMO que la
+real: el de fichas no montaba la evaluación masiva. Primero se hace fiel el preview, luego se compara.
+**Gate.** [HONOR]. Ver `99 §64`.
