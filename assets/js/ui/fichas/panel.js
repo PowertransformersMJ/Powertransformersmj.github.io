@@ -39,10 +39,27 @@ import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
   claveEquipo, TITULO_DIAGRAMA
 } from './unifilar.js';
+import {
+  vistaAnalitica, vistaNorma, vistaAgregar, resumenGerencial
+} from './vistas-gerenciales.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    1 · CONSTANTES
    ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Las cuatro vistas del módulo. El original v22 las tenía todas; el port
+ * inicial (ADR-061) solo trajo el tablero, pese a que la hoja de estilos ya
+ * traía el marcado de las cuatro: 189 de sus 339 clases no las usaba nadie
+ * (ADR-064). La barra usa el sistema de pestañas del SITIO (`tabs.css`,
+ * role=tab + aria-selected), no el del archivo suelto: el entorno manda.
+ */
+export const VISTAS = Object.freeze([
+  { id: 'tablero',   lbl: 'Tablero' },
+  { id: 'analitica', lbl: 'Analítica gerencial' },
+  { id: 'norma',     lbl: 'Norma CREG · Tablas 51 y 52' },
+  { id: 'agregar',   lbl: 'Agregar transformador' }
+]);
 
 /** Las seis hojas del modal, en el orden del formato oficial. */
 export const HOJAS_FICHA = Object.freeze([
@@ -487,6 +504,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   let EQUIPOS = [];
   let VISIBLES = [];
   let SEL = 'ALL';
+  let condSel = '';           // filtro por condición (banda de salud)
   let orden = { k: 'subestacion', asc: true };
   const filtros = { q: '', nivel: '', zona: '', uucc: '' };
   const ESTADOS = new Map();   // clave de equipo → estado editable
@@ -517,8 +535,26 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const dk = c.k ? ' data-k="' + c.k + '"' : '';
       return '<th' + cls + dk + '>' + c.t + '</th>';
     }).join('');
+    const pestanas = VISTAS.map((v, i) => ''
+      + '<button type="button" role="tab" data-vista-btn="' + v.id + '"'
+      +   ' id="ftm-tab-' + v.id + '" aria-controls="ftm-panel-' + v.id + '"'
+      +   ' aria-selected="' + (i === 0 ? 'true' : 'false') + '"'
+      +   (i === 0 ? ' class="is-active"' : '') + '>'
+      +   esc(v.lbl)
+      + '</button>').join('');
+
     return ''
+      // Cabecera con la procedencia del veredicto: qué regla se aplicó y sobre
+      // qué datos. Sin esto el tablero afirma «concordante» sin decir contra qué.
+      + '<div class="ftm-meta" data-ftm="meta"></div>'
+      // Barra de vistas — sistema de pestañas del sitio (tabs.css), accesible.
+      + '<div class="tab-bar" role="tablist" aria-label="Vistas del módulo de fichas técnicas">'
+      +   pestanas
+      + '</div>'
+      + '<div class="ftm-view is-on" data-vista="tablero" role="tabpanel"'
+      +   ' id="ftm-panel-tablero" aria-labelledby="ftm-tab-tablero">'
       + '<div class="ftm-kpis" data-ftm="kpis"></div>'
+      + '<div data-ftm="salud"></div>'
       // El aviso y la ayuda van sobre una superficie SÓLIDA: el fondo del sitio
       // es una fotografía y el texto suelto encima queda ilegible.
       + '<div class="ftm-panel"><div class="ftm-panel-body">'
@@ -542,6 +578,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   '</div>'
       +   '<div class="ftm-tabla-foot" data-ftm="pie"></div>'
       + '</div>'
+      + '</div>'   /* ← cierra la vista «tablero» */
+      // Las tres vistas restantes se pintan PEREZOSAMENTE: su HTML solo se
+      // genera la primera vez que se abren (la de norma son 61 filas de
+      // catálogo y la analítica recorre la flota entera).
+      + VISTAS.slice(1).map((v) => ''
+        + '<div class="ftm-view" data-vista="' + v.id + '" role="tabpanel"'
+        +   ' id="ftm-panel-' + v.id + '" aria-labelledby="ftm-tab-' + v.id + '"></div>'
+        ).join('')
       // z-index en línea a propósito: la hoja del módulo declara 80 y en el
       // sitio la barra superior de AQUA vive en 200 y la barra lateral en 100.
       // Sin esto, el encabezado del modal (con «Exportar» y «Cerrar») queda
@@ -568,6 +612,208 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +     '<div class="ftm-modal-scroll" data-ftm="modal-cuerpo"></div>'
       +   '</div>'
       + '</div>';
+  }
+
+  /* ── vistas (pestañas) ──────────────────────────────────────────────── */
+  let vistaActual = 'tablero';
+  const vistasPintadas = new Set(['tablero']);
+
+  function cambiarVista(id) {
+    if (!VISTAS.some((v) => v.id === id)) return;
+    vistaActual = id;
+    contenedor.querySelectorAll('[data-vista]').forEach((el) => {
+      el.classList.toggle('is-on', el.getAttribute('data-vista') === id);
+    });
+    contenedor.querySelectorAll('[data-vista-btn]').forEach((b) => {
+      const on = b.getAttribute('data-vista-btn') === id;
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+      b.classList.toggle('is-active', on);
+    });
+    pintarVista(id);
+  }
+
+  /** Pinta una vista bajo demanda. El tablero se refresca siempre; las demás
+   *  solo la primera vez o cuando cambian los datos (ver `invalidarVistas`). */
+  function pintarVista(id) {
+    if (id === 'tablero' || vistasPintadas.has(id)) return;
+    const caja = contenedor.querySelector('[data-vista="' + id + '"]');
+    if (!caja) return;
+    if (id === 'analitica') caja.innerHTML = vistaAnalitica(EQUIPOS);
+    else if (id === 'norma') caja.innerHTML = vistaNorma();
+    else if (id === 'agregar') caja.innerHTML = vistaAgregar();
+    vistasPintadas.add(id);
+  }
+
+  /** Al cambiar el conjunto de equipos, lo ya pintado queda obsoleto.
+   *  Se conservan las vistas que NO dependen de la flota: «norma» es el
+   *  catálogo normativo, y «agregar» es un formulario — repintarlo borraría
+   *  lo que el usuario acaba de escribir y el veredicto que está leyendo. */
+  function invalidarVistas() {
+    const conservar = ['norma', 'agregar'].filter((id) => {
+      const c = contenedor.querySelector('[data-vista="' + id + '"]');
+      return c && c.innerHTML;
+    });
+    vistasPintadas.clear();
+    vistasPintadas.add('tablero');
+    conservar.forEach((id) => vistasPintadas.add(id));
+    if (vistaActual !== 'tablero') pintarVista(vistaActual);
+  }
+
+  /* ── cabecera de procedencia ────────────────────────────────────────── */
+  // Qué regla se aplicó, sobre qué datos y con qué conformidad global. El
+  // anillo repite la cifra clave para que se lea de un vistazo.
+  function pintarMeta() {
+    const caja = $('[data-ftm="meta"]');
+    if (!caja) return;
+    const r = resumenGerencial(EQUIPOS);
+    const conf = Math.round(r.conformidad * 10) / 10;
+    const chip = (k, v) => '<span class="ftm-chip"><small>' + esc(k) + '</small> <b>' + esc(v) + '</b></span>';
+    const grados = Math.round((conf / 100) * 360);
+    caja.innerHTML = ''
+      + chip('Regla', 'CREG 015/2018')
+      + chip('Fuente', cfg.origen || 'Parque vivo')
+      + chip('Evaluados', r.total + ' equipos')
+      + chip('Capacidad', (Math.round(r.mvaTotal * 10) / 10).toString().replace('.', ',') + ' MVA')
+      // El anillo se dibuja con dos gradientes: el cónico marca el avance y el
+      // radial abre el hueco central. Así es un ARO, no un disco macizo, y el
+      // número se lee en tinta normal sobre el hueco blanco.
+      + '<span class="ftm-gauge" style="margin-left:auto">'
+      +   '<span class="ftm-gauge-ring" style="color:var(--ftm-ink);'
+      +     'background:radial-gradient(closest-side,var(--ftm-surface-solid) 66%,transparent 68%),'
+      +     'conic-gradient(var(--ftm-ok) ' + grados + 'deg, rgba(0,40,90,.10) 0)">'
+      +     r.concordantes + '</span>'
+      +   '<span><span class="ftm-gauge-lbl">Conformidad de flota</span>'
+      +     '<span class="ftm-gauge-val">' + conf.toString().replace('.', ',') + '%</span></span>'
+      + '</span>';
+  }
+
+  /* ── banda de estado de salud ───────────────────────────────────────── */
+  // Distribución por condición (1 Muy bueno … 5 Muy pobre). Cada tramo filtra
+  // la tabla, igual que los KPIs de arriba.
+  const COND_COLOR = { 1: '#1B8E3F', 2: '#7CB342', 3: '#F5C518', 4: '#EF7820', 5: '#E53935' };
+  const COND_NOM = { 1: '1 Muy bueno', 2: '2 Bueno', 3: '3 Medio', 4: '4 Pobre', 5: '5 Muy pobre' };
+
+  function pintarSalud() {
+    const caja = $('[data-ftm="salud"]');
+    if (!caja) return;
+    const total = EQUIPOS.length;
+    if (!total) { caja.innerHTML = ''; return; }
+    const cuenta = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, sd: 0 };
+    EQUIPOS.forEach((e) => {
+      const c = e.cond_int;
+      if (c >= 1 && c <= 5) cuenta[c] += 1; else cuenta.sd += 1;
+    });
+    const segs = [1, 2, 3, 4, 5].filter((c) => cuenta[c] > 0).map((c) => {
+      const w = (cuenta[c] / total) * 100;
+      const on = condSel === String(c) ? ' is-on' : (condSel ? ' is-dim' : '');
+      return '<span class="ftm-salud-seg' + on + '" data-cond="' + c + '" role="button" tabindex="0"'
+        + ' title="' + esc(COND_NOM[c]) + ': ' + cuenta[c] + '"'
+        + ' style="width:' + w + '%;background:' + COND_COLOR[c] + '">'
+        + (w > 6 ? cuenta[c] : '') + '</span>';
+    }).join('');
+    const chips = [1, 2, 3, 4, 5].map((c) => {
+      const on = condSel === String(c) ? ' is-on' : '';
+      return '<button type="button" class="ftm-salud-chip' + on + '" data-cond="' + c + '">'
+        + '<span class="ftm-salud-chip-cq" style="background:' + COND_COLOR[c] + '"></span>'
+        + '<span class="ftm-salud-chip-lb"><b>' + esc(COND_NOM[c]) + '</b> '
+        + cuenta[c] + ' <small>(' + (Math.round(cuenta[c] / total * 1000) / 10)
+            .toString().replace('.', ',') + '%)</small></span></button>';
+    }).join('') + (cuenta.sd
+      ? '<span class="ftm-salud-chip"><span class="ftm-salud-chip-cq" style="background:#9aa7b2"></span>'
+        + '<span class="ftm-salud-chip-lb"><b>Sin dato</b> ' + cuenta.sd + '</span></span>'
+      : '');
+
+    caja.innerHTML = ''
+      + '<div class="ftm-salud">'
+      +   '<div class="ftm-salud-head"><h4>Estado de salud · Condición</h4>'
+      +     '<small>Escala 1 Muy bueno — 5 Muy pobre. Pulse un tramo o una etiqueta para acotar '
+      +     'la flota; vuelva a pulsarlo para quitar el filtro.</small></div>'
+      +   '<div class="ftm-salud-bar">' + segs + '</div>'
+      +   '<div class="ftm-salud-legend">' + chips + '</div>'
+      + '</div>';
+  }
+
+  /* ── vista «Agregar transformador» ──────────────────────────────────── */
+  // Clasifica un equipo contra el catálogo CREG y lo añade SOLO a esta
+  // pantalla. No escribe en Firestore a propósito: incorporar un activo al
+  // parque es otra operación, con simulación previa (admin/importar.html).
+  function altaLeer() {
+    const val = (id) => {
+      const el = contenedor.querySelector('#' + id);
+      return el ? el.value.trim() : '';
+    };
+    const numero = (id) => {
+      const v = val(id);
+      if (!v) return null;
+      const n = Number(v.replace(',', '.'));
+      return isFinite(n) ? n : null;
+    };
+    return {
+      subestacion: val('aSub'), matricula: val('aMat'), serie: val('aSerie'),
+      codigo: val('aCod'), zona: val('aZona'), departamento: val('aDepto'),
+      marca: val('aMarca'), anio_fab: numero('aAnio'),
+      potencia_kva: numero('aPot'),
+      kv_prim: numero('aVp'), kv_sec: numero('aVs'), kv_terc: numero('aVt'),
+      refrigeracion: val('aRef'), uucc_registrada: val('aUucc').toUpperCase()
+    };
+  }
+
+  function altaMensaje(html, clase) {
+    const caja = contenedor.querySelector('[data-ftm="alta-prev"]');
+    if (caja) caja.innerHTML = '<div class="ftm-form-prev ' + (clase || '') + '">' + html + '</div>';
+  }
+
+  /** Faltantes obligatorios para poder clasificar. */
+  function altaFaltantes(d) {
+    const falta = [];
+    if (!d.subestacion) falta.push('Subestación');
+    if (d.potencia_kva == null) falta.push('Potencia (kVA)');
+    if (d.kv_prim == null) falta.push('Tensión primaria (kV)');
+    return falta;
+  }
+
+  function altaPrevia() {
+    const d = altaLeer();
+    const falta = altaFaltantes(d);
+    if (falta.length) {
+      altaMensaje('<b>Faltan datos para clasificar:</b> ' + esc(falta.join(', ')) + '.', 'is-warn');
+      return null;
+    }
+    const e = normalizarEquipo(d, EQUIPOS.length);
+    const notas = (e.notas_uucc || []).length
+      ? '<div class="ftm-nota">' + e.notas_uucc.map(esc).join(' · ') + '</div>' : '';
+    altaMensaje(''
+      + '<div class="ftm-veredicto">'
+      +   '<span class="ftm-vbox ftm-vbox--calc"><small>UUCC calculada</small>'
+      +     '<span class="ftm-vbox-val">' + esc(e.uucc_calculada || '—') + '</span></span>'
+      +   (d.uucc_registrada
+          ? '<span class="ftm-vbox ftm-vbox--reg' + (e.estado === 'DISCREPANCIA' ? ' is-bad' : '')
+            + '"><small>UUCC registrada</small><span class="ftm-vbox-val">'
+            + esc(d.uucc_registrada) + '</span></span>'
+          : '')
+      +   '<span class="ftm-pill ' + (CLASE_PILL[e.estado] || '') + '">' + esc(e.estado) + '</span>'
+      + '</div>'
+      + '<div class="ftm-kv ftm-kv--una"><span class="ftm-kv-k">Nivel</span>'
+      +   '<span class="ftm-kv-v">' + esc(e.nivel || '—') + '</span></div>'
+      + notas, 'is-ok');
+    return e;
+  }
+
+  function altaAgregar() {
+    const e = altaPrevia();
+    if (!e) return;
+    e.alta_manual = true;
+    EQUIPOS = EQUIPOS.concat([e]);
+    pintarMeta(); pintarKpis(); pintarSalud(); pintarFiltros(); aplicar(); invalidarVistas();
+    altaMensaje('<b>' + esc(e.subestacion) + '</b> se añadió a la flota de esta pantalla como '
+      + '<b>' + esc(e.uucc_calculada || '—') + '</b>. Está en el tablero, con su ficha. '
+      + 'No se guardó en la base de datos.', 'is-ok');
+  }
+
+  function altaLimpiar() {
+    contenedor.querySelectorAll('.ftm-form-grid input').forEach((el) => { el.value = ''; });
+    const caja = contenedor.querySelector('[data-ftm="alta-prev"]');
+    if (caja) caja.innerHTML = '';
   }
 
   /* ── KPIs ───────────────────────────────────────────────────────────── */
@@ -617,6 +863,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (filtros.nivel && e.nivel !== filtros.nivel) return false;
       if (filtros.zona && e.zona !== filtros.zona) return false;
       if (filtros.uucc && e.uucc_calculada !== filtros.uucc) return false;
+      if (condSel && String(e.cond_int) !== condSel) return false;
       if (q) {
         const s = [e.subestacion, e.serie, e.matricula, e.codigo,
           e.uucc_registrada, e.uucc_calculada, e.departamento, e.municipio]
@@ -1200,6 +1447,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      ═════════════════════════════════════════════════════════════════════ */
 
   function alHacerClic(ev) {
+    // Pestañas de vista (Tablero / Analítica / Norma / Agregar)
+    const tabBtn = ev.target.closest('[data-vista-btn]');
+    if (tabBtn && contenedor.contains(tabBtn)) {
+      cambiarVista(tabBtn.getAttribute('data-vista-btn'));
+      return;
+    }
+    // Banda de salud: tramo o etiqueta acotan la flota por condición
+    const cond = ev.target.closest('[data-cond]');
+    if (cond && contenedor.contains(cond)) {
+      const v = cond.getAttribute('data-cond');
+      condSel = (condSel === v) ? '' : v;
+      pintarSalud(); aplicar(); return;
+    }
     const kpi = ev.target.closest('[data-cat]');
     if (kpi && contenedor.contains(kpi)) {
       const id = kpi.getAttribute('data-cat');
@@ -1221,6 +1481,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const accion = ev.target.closest('[data-ftm]');
     if (!accion) return;
     switch (accion.getAttribute('data-ftm')) {
+      case 'alta-previa':   altaPrevia();   return;
+      case 'alta-agregar':  altaAgregar();  return;
+      case 'alta-limpiar':  altaLimpiar();  return;
       case 'limpiar':
         filtros.q = ''; filtros.nivel = ''; filtros.zona = ''; filtros.uucc = '';
         $('[data-ftm="q"]').value = '';
@@ -1323,9 +1586,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     EQUIPOS = (Array.isArray(lista) ? lista : []).map((b, i) => normalizarEquipo(b, i));
     ESTADOS.clear();
     if (meta.origen != null) cfg.origen = meta.origen;
+    pintarMeta();
     pintarKpis();
+    pintarSalud();
     pintarFiltros();
     aplicar();
+    invalidarVistas();
     return EQUIPOS;
   }
 

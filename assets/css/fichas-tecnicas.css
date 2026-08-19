@@ -1679,3 +1679,42 @@
 }
 /* `hidden` debe ganarle a `display:flex`, o queda una banda vacía */
 .ftm-root .ftm-modal-diag[hidden] { display: none; }
+
+/* ═══════════════════════════════════════════════════════════════
+   14 · BARRA DE VISTAS DEL MÓDULO (ADR-064)
+   Las pestañas son las del SITIO (`tabs.css`, role=tab + aria-selected):
+   el entorno manda. Lo único que se corrige aquí es el contraste: la
+   barra nativa usa `background: transparent` + `backdrop-filter`, y el
+   fondo de esta página es una FOTOGRAFÍA — sobre ella las etiquetas
+   quedan ilegibles. Mismo criterio que el resto del módulo: superficie
+   casi opaca en lugar de vidrio (doctrina §3.1).
+   Al descender de `.ftm-root` no puede alterar las pestañas del sitio.
+═══════════════════════════════════════════════════════════════ */
+
+.ftm-root .tab-bar {
+  background: var(--ftm-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: 1px solid var(--ftm-line);
+  box-shadow: var(--ftm-sh-sm);
+}
+.ftm-root .tab-bar [role="tab"] {
+  color: var(--ftm-muted);
+  font-weight: 600;
+}
+.ftm-root .tab-bar [role="tab"][aria-selected="true"] {
+  color: var(--ftm-petrol);
+}
+
+/* La cabecera de procedencia respira antes de las pestañas. */
+.ftm-root > .ftm-meta { margin-bottom: 14px; }
+
+/* `.ftm-hint` es flex: sirve para una línea corta con su flecha. Las vistas
+   gerenciales explican en prosa y llevan <b> dentro, y en flex cada <b> se
+   convertiría en una columna — el texto salía partido en bloques. Variante de
+   párrafo para esos casos (ADR-064). */
+.ftm-root .ftm-hint--p {
+  display: block;
+  line-height: 1.55;
+  margin-bottom: 12px;
+}
