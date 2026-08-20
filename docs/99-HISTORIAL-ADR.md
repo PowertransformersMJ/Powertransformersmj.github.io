@@ -1430,3 +1430,60 @@ INTACTOS: dominio CREG, ficha PE.02081, exportador de planificación.
 **65.7 Doctrina.** §3.2 aditivo · §3.3 verificado en vivo, no por lectura · TDD en dinero/datos
 (R2 del interinato Opus). Clases del CSS con JS detrás: **242 de 341** (150 al empezar la serie).
 Sin cache bump (§4 dormida).
+
+---
+
+## 66. ADR — Evaluación holística de Fichas Técnicas: seis auditores y su remediación ⟦OPUS-5⟧ (2026-08-20)
+
+> *"has una evaluacion holistica con fable del modulo de fichas tecnias, si puedes mejorar dale el maximo nivel"* ·
+> *"corrije y procede por favor, dejemos todo conforme"* — el Ingeniero, 2026-08-20.
+
+**66.1 Causa raíz.** Seis auditores Fable en paralelo (dominio normativo · arquitectura · experiencia de
+uso · robustez ante datos sucios · seguridad y rendimiento · calidad de las pruebas) sobre las 6.284
+líneas del módulo. El patrón de fondo: **el módulo era honesto pero se contradecía a sí mismo y
+confiaba en datos limpios**. Varios de los defectos los introduje yo en ADR-064/065 — dos auditores
+independientes reprodujeron el mismo `NaN` en Node antes de que yo lo mirara.
+
+**66.2 Solución estructural — dinero y veredictos.**
+· **Terciario «0» fabricaba tridevanados**: 20 MVA/110 kV con terciario 0 daba N4T14 en vez de N4T4,
+  **+23% de presupuesto**. Un 0 es el relleno de «no tiene», no un devanado.
+· **Formato es-CO**: nace `numeroES`. «20.000» kVA se leía como 20 kVA y el equipo caía en la banda
+  mínima SIN nota → discrepancia falsa en un acta firmable. El dinero ya se trataba así (`montoCOP`);
+  la potencia no.
+· **Potencia ilegible/cero**: dejaban NaN viajando hasta el Excel, o clasificaban como dato bueno.
+· **Papel sano + `efur` alto**: el argumento de fin de vida del papel podía entrar en una ficha cuyo
+  furano medido lo desmiente — el escenario exacto que el módulo existe para evitar. Ahora no se elige
+  ese modo y la incoherencia se declara.
+
+**66.3 Cifras que se contradecían.** Conformidad calculada sobre el total en la vista gerencial y sobre
+los evaluables en el informe (dos porcentajes de la misma flota en la misma reunión) · «Avance de
+gestión» contaba un campo que nadie asignaba (0% eterno) · el valor de reposición reimplementaba la
+fórmula del presupuesto y sin MVA devolvía una cifra parcial · la leyenda de la matriz imprimía `NaN`
+y se tragaba el aviso de exclusión · el equipo MÁS crítico desaparecía del conteo si su HI venía fuera
+de escala.
+
+**66.4 Datos que se perdían.** El alta manual se esfumaba al guardar cualquier gestión (entraba en la
+lista pintada, no en la de origen) · un HI fuera de escala se redondeaba a «Muy bueno» · **el acta se
+reimportaba por número de FILA**: si el parque cambió de orden, la decisión de un equipo aterrizaba en
+otro, dentro de un documento que se firma. Ahora se cruza serie/matrícula · las fechas de Excel
+llegaban como objeto o serial y se guardaban «Wed Aug 19» / «46254».
+
+**66.5 Costo y silencios.** La página hacía **~412 lecturas facturables por apertura** (la proyección
+de salud relee la misma colección): ahora 206. Y un `.catch(() => [])` convertía un fallo de lectura en
+«0 equipos en riesgo» — que se lee como buena noticia. Cuando nadie tiene condición, la banda ahora lo
+dice en palabras y pide no confundir «no hay riesgo» con «no está evaluado».
+
+**66.6 Verificación.** 23 pruebas nuevas: los bordes del clasificador (que llevaba el rótulo «no
+cambiar sin decisión documentada» y no tenía ninguna), las vistas gerenciales (que tenían cero) y el
+canal sucio del acta. Suite **1.376 pass / 0 fail**. En el navegador: 0 `NaN`, aviso de exclusión
+visible, «3 de 6 evaluables», avance 0%→25% al gestionar, orden con flecha y `aria-sort`, Enter filtra
+desde la banda, foco atrapado en el cajón.
+
+**66.7 Lo que NO se hizo y por qué.** SheetJS 0.18.5 arrastra CVE-2023-30533 y hay que vendorizarla
+(≥0.20.2 no está en npm) — trabajo aparte, ligado a TODO-12 · partir `panel.js` (1.917 líneas) y mover
+`normalizarEquipo` al dominio son refactorizaciones mayores que merecen su propio turno · la colisión
+de identidad cuando dos transformadores de la misma subestación llegan por Excel · el aviso de trabajo
+sin guardar al cerrar la ficha. Todo queda en `10` como TODO-35.
+
+**66.8 Doctrina.** §3.2 aditivo (ningún renombrado; nombres exportados intactos) · §3.3 verificado en
+vivo · §3.7 comité por iniciativa propia, aquí a petición explícita. Lección → **L-68**.

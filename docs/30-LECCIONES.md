@@ -273,3 +273,12 @@ Un CSS que define el doble de lo que el marcado usa no es «CSS de más»: es la
 **Corolario.** No juzgar una página por su preview de `_dev/` sin comprobar que monta lo MISMO que la
 real: el de fichas no montaba la evaluación masiva. Primero se hace fiel el preview, luego se compara.
 **Gate.** [HONOR]. Ver `99 §64`.
+
+### L-68 · Auditar en paralelo por dimensiones: lo que dos auditores ven a la vez, es real
+**Receta.** Un auditor por DIMENSIÓN en paralelo (dominio · arquitectura · uso · robustez · seguridad ·
+pruebas), cada uno con su lista de archivos, las reglas de la casa para no proponer lo prohibido, y la
+orden de descartar en voz alta sus falsos positivos.
+**Por qué funciona.** La CONVERGENCIA filtra: el `NaN` de la matriz lo hallaron tres auditores por
+separado y dos lo reprodujeron en Node antes de que yo lo mirara. Lo que ve uno se verifica; lo que ven
+tres, se arregla. Pedirles también qué está BIEN evita el refactor por gusto.
+**Gate.** [HONOR]. Ver `99 §66`.

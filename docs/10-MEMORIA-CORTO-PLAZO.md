@@ -6,13 +6,13 @@
 
 ---
 
-## 🎯 Foco (2026-08-20) — FICHAS TÉCNICAS: PORT COMPLETADO (ADR-064/065)
+## 🎯 Foco (2026-08-20) — FICHAS TÉCNICAS: PORT COMPLETO + AUDITADO (ADR-064/065/066)
 
 > El Ingeniero avisó de que el módulo «no está como lo diseñé». Lo estaba: el port de ADR-061 trajo
 > el CSS entero y solo el 44% del marcado. Portadas las 3 vistas que faltaban (ADR-064) y el flujo de
 > gestión de novedades con acta (ADR-065). Clases del CSS con JS detrás: 150 → 242 de 341.
-> **1.349 pruebas.** ✅ **Validado EN VIVO** con sesión real (2026-08-20): 206 equipos, 167
-> concordantes (81,1%), ficha PE.02081 real OK, 0 errores → TODO-30 cerrado. ⚠️ Ver TODO-34.
+> ✅ Validado en vivo con sesión real (TODO-30 cerrado). **ADR-066**: 6 auditores Fable + remediación.
+> **1.376 pruebas.** ⚠️ TODO-34 (falta el índice de salud) · TODO-35 (cola de la auditoría).
 
 ### 🔴 PENDIENTES que siguen sin poder cerrarse (de ADR-063; detalle → `99 §63`)
 > **(A) Proteger `main`**: configuración de GitHub, solo el Ingeniero.
@@ -35,10 +35,9 @@
 > entregado NO las trae) y ratificar TODO-04 (`49 §Validación`). **(D) Drag&drop del import** (arriba).
 
 ### 🚫 Callejones (NO reintentar)
-> Workflow `args` grande como string → serializado (embeber en script) · git-filter-repo: `--branch` reescribe
-> SOLO esa rama, aborta con `tmp_pack_*` (rm+gc antes), `glob:*.pdf` matchea todo dir · ref local `main` stale
-> post-filter → usar `origin/main` · "FUSIÓN muerta"=FALSA · G024 "XSS dashboards" casi todo FALSO · tablas
-> tand-panel→L-57 · chip por norma→L-58 · "Reprocesar"→ADR-020 · `.calif` de schema write-only (G012).
+> Workflow `args` grande como string → serializado · git-filter-repo: `--branch` reescribe SOLO esa rama
+> (rm+gc antes) · ref local `main` stale post-filter → usar `origin/main` · "FUSIÓN muerta"=FALSA ·
+> G024 "XSS dashboards" casi todo FALSO · tand-panel→L-57 · chip por norma→L-58 · "Reprocesar"→ADR-020.
 
 ---
 
@@ -54,6 +53,7 @@
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
 | **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
+| **TODO-35** | Cola de ADR-066 (detalle → `99 §66.7`): vendorizar SheetJS ≥0.20.2 (CVE, cierra G111) · partir `panel.js` + `normalizarEquipo` al dominio · identidad de 2 TX en la misma subestación vía Excel · aviso de trabajo sin guardar. | 🟡 |
 | **TODO-34** | 🔴 **El parque real NO tiene Health Index**: los 206 traen `salud_actual` con TODOS sus campos en `null`/`""` (sin `hi_final`, `bucket`, `edad_anos`) y sin `usuarios` de criticidad. Por eso la banda de salud sale «Sin dato 206», la matriz de riesgo vacía y 0 equipos en riesgo — el módulo degrada limpio, no inventa. Se llena al correr el import de Salud de Activos (paso del Ingeniero, arriba) o al disparar el recálculo. | 🔴 |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
