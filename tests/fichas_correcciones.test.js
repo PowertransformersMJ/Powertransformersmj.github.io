@@ -156,3 +156,58 @@ describe('Correcciones de datos', () => {
     assert.equal(textoEdiciones({}, 1), '');
   });
 });
+
+// ── Canal sucio del acta (ADR-066) ───────────────────────────────────────────
+// Un acta se exporta, se edita a mano en Excel y se reimporta. Excel devuelve
+// las fechas de tres formas distintas según cómo se guardó y con qué lector se
+// lea. Antes se hacía `String(v).slice(0,10)`: un Date quedaba "Wed Aug 19" y
+// un serial quedaba "46254", dentro de un documento que se firma.
+describe('decisionesDesdeActa — fechas tal como las devuelve Excel', () => {
+  const actaCon = (fecha) => {
+    const row = new Array(COLUMNAS_ACTA.length).fill('');
+    row[COLUMNAS_ACTA.indexOf('Fila')] = 1;
+    row[COLUMNAS_ACTA.indexOf('Decisión')] = 'Mantener UUCC registrada';
+    row[COLUMNAS_ACTA.indexOf('Fecha')] = fecha;
+    return [[...COLUMNAS_ACTA], row];
+  };
+
+  test('texto ISO se conserva', () => {
+    assert.equal(decisionesDesdeActa(actaCon('2026-08-20')).dec[1].fecha, '2026-08-20');
+  });
+
+  test('celda convertida a Date por Excel', () => {
+    const r = decisionesDesdeActa(actaCon(new Date('2026-08-20T00:00:00Z')));
+    assert.equal(r.dec[1].fecha, '2026-08-20');
+  });
+
+  test('celda como número de serie de Excel', () => {
+    const serial = Math.round((Date.UTC(2026, 7, 20) - Date.UTC(1899, 11, 30)) / 86400000);
+    assert.equal(decisionesDesdeActa(actaCon(serial)).dec[1].fecha, '2026-08-20');
+  });
+
+  test('fecha vacía no inventa una', () => {
+    assert.equal(decisionesDesdeActa(actaCon('')).dec[1].fecha, '');
+  });
+});
+
+describe('decisionesDesdeActa — identidad y normalización', () => {
+  const acta = (campos) => {
+    const row = new Array(COLUMNAS_ACTA.length).fill('');
+    row[COLUMNAS_ACTA.indexOf('Fila')] = 1;
+    row[COLUMNAS_ACTA.indexOf('Decisión')] = 'Corregir a otra UUCC';
+    for (const [k, v] of Object.entries(campos)) row[COLUMNAS_ACTA.indexOf(k)] = v;
+    return [[...COLUMNAS_ACTA], row];
+  };
+
+  test('una UC escrita en minúsculas vale igual que en mayúsculas', () => {
+    // Si no se normaliza, al aplicarla el equipo seguiría en discrepancia
+    // contra su propia UC calculada.
+    assert.equal(decisionesDesdeActa(acta({ 'UUCC final': 'n4t4' })).dec[1].final, 'N4T4');
+  });
+
+  test('el acta arrastra la identidad del equipo, para no aplicarla a otro', () => {
+    const d = decisionesDesdeActa(acta({ 'Serie': 'S-123', 'Matrícula': 'T1-M/M-ABA' })).dec[1];
+    assert.equal(d._serie, 'S-123');
+    assert.equal(d._matricula, 'T1-M/M-ABA');
+  });
+});

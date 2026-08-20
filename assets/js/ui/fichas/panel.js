@@ -228,6 +228,11 @@ function mvaTxt(mva) {
 function condEntera(hi) {
   const n = num(hi);
   if (n == null) return null;
+  // Fuera de la escala 1..5 NO se clampea: un 0 (el relleno típico de «no
+  // evaluado») se convertía en «1 · Muy bueno» y el equipo entraba a la banda
+  // de salud y a la matriz de riesgo como flota sana. Un veredicto fabricado
+  // es peor que un hueco declarado (ADR-066).
+  if (n < 0.5 || n > 5.49) return null;
   return Math.min(5, Math.max(1, Math.round(n)));
 }
 
@@ -515,6 +520,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const DEC = {};              // fila → { decision, final, resp, fecha, obs }
   let APLICADO = false;        // ¿las decisiones están volcadas al tablero?
   let filaEnCajon = null;      // equipo abierto en el cajón de gestión
+  let trampaCajon = null;      // trampa de foco del cajón (ui/foco-modal.js)
   let orden = { k: 'subestacion', asc: true };
   const filtros = { q: '', nivel: '', zona: '', uucc: '' };
   const ESTADOS = new Map();   // clave de equipo → estado editable
@@ -817,11 +823,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   function altaAgregar() {
-    const e = altaPrevia();
-    if (!e) return;
-    e.alta_manual = true;
-    EQUIPOS = EQUIPOS.concat([e]);
-    pintarMeta(); pintarKpis(); pintarSalud(); pintarFiltros(); aplicar(); invalidarVistas();
+    const d = altaLeer();
+    if (altaFaltantes(d).length) { altaPrevia(); return; }
+    // El equipo entra por BRUTOS, no por EQUIPOS: `recomputarEquipos()`
+    // reconstruye SIEMPRE desde BRUTOS, así que si se añadiera solo a EQUIPOS
+    // desaparecería en silencio en cuanto se guardara una gestión, se aplicaran
+    // correcciones o se importara un acta (ADR-066).
+    d.fila = BRUTOS.reduce((m, b, i) => Math.max(m, (b && b.fila != null) ? b.fila : i + 1), 0) + 1;
+    d.alta_manual = true;
+    BRUTOS = BRUTOS.concat([d]);
+    refrescarTodo();
+    const e = EQUIPOS.find((x) => x.fila === d.fila) || altaPrevia();
     altaMensaje('<b>' + esc(e.subestacion) + '</b> se añadió a la flota de esta pantalla como '
       + '<b>' + esc(e.uucc_calculada || '—') + '</b>. Está en el tablero, con su ficha. '
       + 'No se guardó en la base de datos.', 'is-ok');
@@ -838,13 +850,23 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   // descartar una corrección devuelve exactamente el estado original, sin
   // arrastrar restos. `normalizarEquipo` vuelve a pasar por la regla CREG, de
   // modo que corregir la potencia o una tensión reclasifica el equipo solo.
+  let conteoDecisiones = { subsanadas: 0, aceptadas: 0, enGestion: 0 };
+
   function recomputarEquipos() {
     const lista = BRUTOS.map((b, i) => {
       const fila = (b && b.fila != null) ? b.fila : (i + 1);
       const ed = EDITS[fila];
-      return normalizarEquipo(ed ? { ...b, ...ed } : b, i);
+      const e = normalizarEquipo(ed ? { ...b, ...ed } : b, i);
+      // Marca de gestión para las vistas gerenciales: sin ella la tarjeta
+      // «Avance de gestión de novedades» contaba un campo que nadie asignaba
+      // y decía 0% mientras el tablero contaba las gestiones bien.
+      if (DEC[fila] || ed) e.novedad_gestionada = true;
+      return e;
     });
-    if (APLICADO) aplicarDecisiones(lista, DEC);
+    // El conteo lo devuelve `aplicarDecisiones`: no se reimplementa aquí.
+    conteoDecisiones = APLICADO
+      ? aplicarDecisiones(lista, DEC)
+      : { subsanadas: 0, aceptadas: 0, enGestion: 0 };
     return lista;
   }
 
@@ -876,10 +898,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     cajon.classList.add('is-on');
     scrim.classList.add('is-on');
     cajon.setAttribute('aria-hidden', 'false');
+    cajon.setAttribute('role', 'dialog');
+    cajon.setAttribute('aria-modal', 'true');
+    // Mismo trato que el modal de la ficha: gestionar 39 novedades se hace
+    // mucho más rápido por teclado, y sin esto el foco se quedaba detrás del
+    // velo y Escape no cerraba (ADR-066).
+    trampaCajon = atraparFoco(cajon, {
+      alCerrar: cerrarCajon,
+      autoFoco: '[data-edit]'
+    });
   }
 
   function cerrarCajon() {
     filaEnCajon = null;
+    if (trampaCajon) { try { trampaCajon.soltar(); } catch (_) { /* noop */ } trampaCajon = null; }
     const cajon = $('[data-ftm="cajon"]');
     const scrim = $('[data-ftm="scrim"]');
     if (cajon) { cajon.classList.remove('is-on'); cajon.setAttribute('aria-hidden', 'true'); }
@@ -953,18 +985,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + 'solo la registrada y el estado. Puede revertir cuando quiera.</div>');
   }
 
-  /** Cuenta el efecto de las decisiones sobre los equipos ya recomputados. */
-  function contarDecisiones() {
-    let subsanadas = 0; let aceptadas = 0; let enGestion = 0;
-    for (const e of EQUIPOS) {
-      const d = DEC[e.fila];
-      if (!d || !d.decision) continue;
-      if (d.decision === 'Mantener UUCC registrada') aceptadas += 1;
-      else if (e.estado === 'CONCORDANTE') subsanadas += 1;
-      else enGestion += 1;
-    }
-    return { subsanadas, aceptadas, enGestion };
-  }
+  /** El efecto de las decisiones lo calcula `aplicarDecisiones` al recomputar. */
+  function contarDecisiones() { return conteoDecisiones; }
 
   function revertirCorrecciones() {
     APLICADO = false;
@@ -1001,17 +1023,34 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const { leerPrimeraHoja } = await import('../../exports/xlsx.js');
       const matriz = await leerPrimeraHoja(archivo);
       const r = decisionesDesdeActa(matriz);
-      const filasVivas = new Set(EQUIPOS.map((e) => String(e.fila)));
-      let aplicadas = 0; let huerfanas = 0;
+      // Se cruza la IDENTIDAD, no solo el número de fila: un acta se exporta
+      // hoy y se retoma la semana que viene, y si entre tanto el parque cambió
+      // de orden, aplicar por posición pegaría la decisión de un equipo en
+      // otro — dentro de un documento que se firma (ADR-066).
+      const porFila = new Map(EQUIPOS.map((e) => [String(e.fila), e]));
+      const mismo = (e, d) => {
+        const s = (d._serie || '').toUpperCase();
+        const m = (d._matricula || '').toUpperCase();
+        if (!s && !m) return true;                    // acta antigua, sin identidad
+        return (s && String(e.serie || '').toUpperCase() === s)
+            || (m && String(e.matricula || '').toUpperCase() === m);
+      };
+      let aplicadas = 0; let huerfanas = 0; let ajenas = 0;
       for (const [fila, d] of Object.entries(r.dec)) {
-        if (filasVivas.has(String(fila))) { DEC[fila] = d; aplicadas += 1; }
-        else huerfanas += 1;
+        const e = porFila.get(String(fila));
+        if (!e) { huerfanas += 1; continue; }
+        if (!mismo(e, d)) { ajenas += 1; continue; }
+        delete d._serie; delete d._matricula;
+        DEC[fila] = d; aplicadas += 1;
       }
       refrescarTodo();
       fijarAviso('<div class="ftm-aviso"><b>Acta leída.</b> ' + aplicadas + ' decisión(es) recuperada(s)'
+        + (ajenas ? ' · <b>' + ajenas + ' NO se aplicaron</b>: la serie o matrícula del acta no '
+                  + 'coincide con el equipo que hoy ocupa esa fila (el parque cambió desde que se '
+                  + 'exportó el acta). Revíselas a mano' : '')
         + (huerfanas ? ' · ' + huerfanas + ' no corresponden a ningún equipo de esta pantalla' : '')
         + (r.ignoradas ? ' · ' + r.ignoradas + ' con una decisión no reconocida, ignorada(s)' : '')
-        + '. Revise y pulse «Aplicar correcciones al módulo».</div>');
+        + '. Revise y pulse «Aplicar decisiones al tablero».</div>');
     } catch (err) {
       fijarAviso('<div class="ftm-aviso"><b>No se pudo leer el acta.</b> '
         + esc(err && err.message ? err.message : String(err)) + '</div>');
@@ -1706,9 +1745,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       case 'alta-agregar':  altaAgregar();  return;
       case 'alta-limpiar':  altaLimpiar();  return;
       case 'limpiar':
+        // Limpia TODO lo que acota la tabla, no solo los selectores: el
+        // indicador seleccionado y el tramo de salud también son filtros, y
+        // dejarlos puestos hacía que «Limpiar» siguiera mostrando 39 de 206.
         filtros.q = ''; filtros.nivel = ''; filtros.zona = ''; filtros.uucc = '';
+        SEL = 'ALL'; condSel = '';
         $('[data-ftm="q"]').value = '';
-        pintarFiltros(); aplicar();
+        pintarKpis(); pintarSalud(); pintarFiltros(); aplicar();
         break;
       case 'cerrar': cerrarFicha(); break;
       case 'ver-diag':

@@ -140,7 +140,12 @@ export function modoDegradacion(equipo, diag) {
   const carga = g('ecrg') != null && g('ecrg') >= 4;
   const edadA = g('eedad') != null && g('eedad') >= 4;
 
-  if (papel && di) {
+  // El argumento de fin de vida del papel NO puede sostenerse si la propia
+  // medición de furanos dice que el papel está sano: es el escenario exacto
+  // que este módulo existe para evitar (un `efur` copiado de otra fila metía
+  // «degradación del aislamiento sólido» en una ficha que se firma, con la
+  // evidencia contradiciéndose dentro de la misma frase). ADR-066.
+  if (papel && di && !di.papelSano) {
     M.push({
       k: 'papel',
       t: 'Degradación del aislamiento sólido (celulosa)',
@@ -223,7 +228,15 @@ export function modoDegradacion(equipo, diag) {
   // Coherencia: ¿el CAUSANTE de la fuente habla de papel y los furanos lo desmienten?
   const causa = (d.causa || '');
   let alerta = null;
-  if (/PAPEL|CELULOSA|FURAN/i.test(causa) && g('efur') != null && g('efur') <= 2) {
+  // Incoherencia inversa: la CALIFICACIÓN dice papel degradado y la MEDICIÓN
+  // dice papel sano. No se elige ese modo (arriba), pero el dato de origen
+  // está mal y alguien tiene que mirarlo antes de firmar nada.
+  if (papel && di && di.papelSano) {
+    alerta = `La calificación de furanos (${d.efur}) indica degradación avanzada del papel, pero el `
+      + `furano medido (${numES(d.fur)} ppb) sitúa el consumo de vida del aislamiento por debajo de `
+      + 'cero. El dato de origen es incoherente: verifíquelo antes de sustentar una reposición con '
+      + 'el argumento de fin de vida del aislamiento.';
+  } else if (/PAPEL|CELULOSA|FURAN/i.test(causa) && g('efur') != null && g('efur') <= 2) {
     alerta = 'El campo CAUSANTE de la fuente atribuye la condición al envejecimiento del papel, pero los ' +
       `furanos medidos (${numES(d.fur)} ppb, calificación ${d.efur}) no lo respaldan. La evidencia apunta a ` +
       `${M[0].t.toLowerCase()}. Verificar antes de emitir la ficha.`;

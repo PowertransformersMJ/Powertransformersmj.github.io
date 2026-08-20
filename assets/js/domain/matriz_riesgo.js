@@ -66,16 +66,17 @@ export function calcularRangosCriticidad(maxUsuarios, minUsuarios = 1) {
  * Clasifica un número de usuarios en su nivel de criticidad.
  */
 export function nivelPorUsuarios(usuarios, rangos) {
-  if (usuarios == null || !Array.isArray(rangos) || rangos.length === 0) return null;
   const n = Number(usuarios);
-  if (!Number.isFinite(n)) return null;
+  if (!Number.isFinite(n) || !Array.isArray(rangos) || !rangos.length) return null;
+  // Se redondea antes de clasificar: los usuarios son personas, no decimales,
+  // y un 9662,5 caía en la grieta entera entre dos rangos y devolvía null —
+  // el equipo desaparecía de la matriz sin que nadie lo notara.
+  const v = Math.round(n);
+  if (v <= rangos[0].min) return rangos[0].nivel;
   for (const r of rangos) {
-    if (n >= r.min && n <= r.max) return r.nivel;
+    if (v >= r.min && v <= r.max) return r.nivel;
   }
-  // Por encima del máximo: asume el último nivel (maxima)
-  if (n > rangos[rangos.length - 1].max) return rangos[rangos.length - 1].nivel;
-  if (n < rangos[0].min) return rangos[0].nivel;
-  return null;
+  return rangos[rangos.length - 1].nivel;
 }
 
 /**
@@ -135,7 +136,10 @@ export function agregarConteos(transformadores, rangos) {
   for (const tx of transformadores) {
     const res = evaluarTransformador(tx, rangos);
     if (!res) continue;
-    const filaHi = Math.round(res.hi);
+    // Mismo clamp que `colorCelda`: sin él, un HI fuera de escala (5,6 por un
+    // redondeo o un dato sucio) se evaluaba como ROJO pero luego desaparecía
+    // del conteo — el equipo MÁS crítico de la flota se perdía de la matriz.
+    const filaHi = Math.min(5, Math.max(1, Math.round(res.hi)));
     if (!out[filaHi] || !out[filaHi][res.nivel]) continue;
     out[filaHi][res.nivel].count += 1;
     out[filaHi][res.nivel].ids.push(tx.id || tx.codigo);

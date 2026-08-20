@@ -15,7 +15,8 @@
 //   · domain/matriz_riesgo.js   → matriz 5×5 (MO.00418 Tabla 11)
 // ══════════════════════════════════════════════════════════════
 
-import { GRUPOS_UC, costoUC } from '../../domain/fichas_creg_uc.js';
+import { GRUPOS_UC } from '../../domain/fichas_creg_uc.js';
+import { valorCregTotal } from '../../domain/fichas_presupuesto.js';
 import {
   NIVELES_ORDEN, LABELS_NIVEL, COLORES_CELDA,
   calcularRangosCriticidad, nivelPorUsuarios, colorCelda
@@ -58,10 +59,12 @@ function copCorto(n) {
 export function valorReposicion(equipo) {
   const uc = equipo && equipo.uucc_calculada;
   if (!uc) return null;
-  const c = costoUC(uc);
-  if (!c) return null;
-  const mva = Number(equipo.mva);
-  return c.inst + (isFinite(mva) && mva > 0 ? mva * c.porMVA : 0);
+  // Delega en el dominio del presupuesto en vez de repetir la fórmula: es la
+  // MISMA cifra que sale en la ficha PE.02081. Cuando estaba duplicada aquí,
+  // el KPI gerencial podía no cuadrar con la suma de las fichas (esta copia
+  // no redondeaba y, sin MVA, devolvía solo el costo de instalación en vez
+  // de declararlo pendiente).
+  return valorCregTotal({ uc, mva: equipo.mva });
 }
 
 /**
@@ -73,7 +76,12 @@ export function resumenGerencial(equipos) {
   const total = eq.length;
   const concordantes = eq.filter((e) => e.estado === 'CONCORDANTE').length;
   const novedades = eq.filter((e) => e.estado !== 'CONCORDANTE').length;
-  const gestionadas = eq.filter((e) => e.estado !== 'CONCORDANTE' && e.novedad_gestionada).length;
+  // Se cuenta la gestión REAL: `gestion` la estampa `aplicarDecisiones` y
+  // `novedad_gestionada` la marca el panel al guardar una corrección. Antes
+  // solo se miraba el segundo campo, que ningún código asignaba: la tarjeta
+  // «Avance de gestión» decía 0% para siempre mientras el tablero contaba
+  // las gestiones bien — dos cifras contradictorias en la misma pantalla.
+  const gestionadas = eq.filter((e) => e.novedad_gestionada || e.gestion).length;
 
   let mvaTotal = 0;
   for (const e of eq) if (isFinite(Number(e.mva))) mvaTotal += Number(e.mva);
@@ -90,9 +98,17 @@ export function resumenGerencial(equipos) {
     if (v) valorRiesgo += v;
   }
 
+  // Conformidad con el MISMO criterio del dominio (`fichas_evaluacion_uucc.js`
+  // → `resumir`): sobre los equipos que SÍ se pudieron evaluar. Contar como
+  // incumplimiento a uno al que le falta la placa sería culparlo de un vacío
+  // de datos. Antes se dividía entre el total y el KPI gerencial daba un
+  // porcentaje distinto al del informe sobre la misma flota.
+  const sinCalculo = eq.filter((e) => e.estado === 'SIN CALCULO').length;
+  const evaluables = total - sinCalculo;
+
   return {
-    total, concordantes, novedades, gestionadas,
-    conformidad: total ? (concordantes / total) * 100 : 0,
+    total, concordantes, novedades, gestionadas, evaluables, sinCalculo,
+    conformidad: evaluables ? (concordantes / evaluables) * 100 : 0,
     mvaTotal, enRiesgo: enRiesgo.length, mvaRiesgo, valorRiesgo,
     avanceNovedades: novedades ? (gestionadas / novedades) * 100 : 0
   };
@@ -119,7 +135,9 @@ function panoramaHTML(r) {
     +     'cruzados con el estado de salud (Health Index).</div>'
     +     '<div class="ftm-gkpis">'
     +       tarjeta('ok', pct(r.concordantes, r.total),
-              r.concordantes + ' de ' + r.total + ' equipos', 'Conformidad UUCC de la flota')
+              r.concordantes + ' de ' + r.evaluables + ' evaluables'
+              + (r.sinCalculo ? ' · ' + r.sinCalculo + ' sin placa completa' : ''),
+              'Conformidad UUCC de la flota')
     +       tarjeta('cap', mva1(r.mvaTotal) + ' <small>MVA</small>',
               r.total + ' transformadores', 'Capacidad instalada evaluada')
     +       tarjeta('risk', String(r.enRiesgo),
@@ -192,7 +210,7 @@ function matrizRiesgoHTML(equipos) {
     +     '<div class="ftm-rmx-wrap"><table class="ftm-rmx">'
     +       '<thead>' + cabecera + '</thead><tbody>' + filas + '</tbody></table></div>'
     +     '<div class="ftm-rmx-scale">' + escala
-    +       + (sinDato ? '<span class="ftm-rmx-sc">' + sinDato + ' equipo(s) sin condición o sin usuarios: fuera de la matriz</span>' : '')
+            + (sinDato ? '<span class="ftm-rmx-sc">' + sinDato + ' equipo(s) sin condición o sin usuarios: fuera de la matriz</span>' : '')
     +     '</div>'
     +   '</div>'
     + '</div>';

@@ -23,6 +23,29 @@
 // ══════════════════════════════════════════════════════════════
 
 import { GRUPOS_UC } from '../../domain/fichas_creg_uc.js';
+import { normalizarCodigoUC } from '../../domain/fichas_evaluacion_uucc.js';
+
+/**
+ * Normaliza a `yyyy-mm-dd` una fecha venida de una hoja de cálculo.
+ * Excel la entrega de tres formas según cómo se guardó y con qué lector se
+ * leyó: texto, objeto Date, o número de serie (días desde 1899-12-30). Antes
+ * se hacía `String(v).slice(0,10)`, que convertía un Date en "Wed Aug 19" y
+ * un serial en "46254" — dentro de un acta que se firma (ADR-066).
+ */
+export function fechaDeCelda(v) {
+  if (v == null || v === '') return '';
+  if (v instanceof Date && !isNaN(v)) return v.toISOString().slice(0, 10);
+  if (typeof v === 'number' && isFinite(v) && v > 0 && v < 100000) {
+    const ms = Math.round((v - 25569) * 86400000);   // serial → epoch
+    const d = new Date(ms);
+    return isNaN(d) ? '' : d.toISOString().slice(0, 10);
+  }
+  const s = String(v).trim();
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const d = new Date(s);
+  return isNaN(d) ? s.slice(0, 10) : d.toISOString().slice(0, 10);
+}
 
 /* ─── Modelo de la decisión ────────────────────────────────────── */
 
@@ -242,6 +265,7 @@ export function decisionesDesdeActa(matriz) {
   if (iFila < 0 || iDec < 0) return out;
   const iFinal = col('UUCC final'); const iResp = col('Responsable');
   const iFecha = col('Fecha'); const iObs = col('Observación');
+  const iSerie = col('Serie'); const iMat = col('Matrícula');
   const valida = new Set(DECISIONES.map((d) => d.id));
 
   for (const fila of matriz.slice(1)) {
@@ -253,10 +277,16 @@ export function decisionesDesdeActa(matriz) {
     const txt = (i) => (i >= 0 && fila[i] != null ? String(fila[i]).trim() : '');
     out.dec[nf] = {
       decision,
-      final: txt(iFinal),
+      // La UC se normaliza: un "n4t4" escrito a mano en el acta debe valer
+      // igual que "N4T4", o al aplicarlo el equipo seguiría en discrepancia.
+      final: normalizarCodigoUC(txt(iFinal)) || '',
       resp: txt(iResp),
-      fecha: txt(iFecha).slice(0, 10),
-      obs: txt(iObs)
+      fecha: fechaDeCelda(iFecha >= 0 ? fila[iFecha] : ''),
+      obs: txt(iObs),
+      // Identidad del equipo al que se le tomó la decisión. Sirve para no
+      // aplicarla al equipo equivocado si el parque cambió de orden.
+      _serie: txt(iSerie),
+      _matricula: txt(iMat)
     };
     out.leidas += 1;
   }

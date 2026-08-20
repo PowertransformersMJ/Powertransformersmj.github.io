@@ -266,13 +266,43 @@ export function costoUC(codigo) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /** Normaliza una tensión a número en kV. "N/A", "", "-" y similares ⇒ null. */
+/**
+ * Convierte a número un valor que puede venir con formato colombiano.
+ *
+ * POR QUÉ EXISTE: el Excel del parque entrega muchas celdas como TEXTO, y en
+ * es-CO el punto separa los MILES: "12.500" son doce mil quinientos, no doce
+ * con cinco. `parseFloat` lo leía al revés y una potencia de 12.500 kVA se
+ * convertía en 12,5 kVA — el clasificador la mandaba a la banda más pequeña
+ * SIN ninguna nota y el equipo salía como discrepancia falsa en un acta que
+ * se firma. Mismo criterio que ya usaba `montoCOP` para el dinero.
+ *
+ * Reglas: si hay coma, ella es el decimal y los puntos son miles. Si solo hay
+ * puntos y el patrón es de grupos de tres, son miles. Un punto suelto con uno
+ * o dos decimales ("34.5") se respeta como decimal.
+ *
+ * @param {*} v
+ * @returns {number|null} null si no es un número legible
+ */
+export function numeroES(v) {
+  if (v == null) return null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  let s = String(v).trim();
+  if (s === '') return null;
+  if (s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');          // 1.234,5 → 1234.5
+  } else if (/^[+-]?\d{1,3}(\.\d{3})+$/.test(s)) {
+    s = s.replace(/\./g, '');                            // 12.500 → 12500
+  }
+  const n = parseFloat(s);
+  return Number.isNaN(n) ? null : n;
+}
+
 export function normalizarKv(v) {
   if (v == null) return null;
   if (typeof v === 'number') return v;
   const s = String(v).trim().toUpperCase();
-  if (['N/A', 'NA', '', 'NONE', '-'].includes(s)) return null;
-  const n = parseFloat(s.replace(',', '.'));
-  return Number.isNaN(n) ? null : n;
+  if (['N/A', 'NA', '', 'NONE', '-', 'S/D', 'SD'].includes(s)) return null;
+  return numeroES(s);
 }
 
 /**
@@ -317,8 +347,19 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion) {
   let mva = null;
 
   if (potKva != null && potKva !== '') {
-    mva = Math.round((parseFloat(String(potKva).replace(',', '.')) / 1000) * 10000) / 10000;
-    pasos.push(`Potencia ${potKva} kVA / 1000 = ${mva} MVA`);
+    const kva = numeroES(potKva);
+    if (kva == null) {
+      // Vino un dato, pero no se puede leer. Antes quedaba NaN y se filtraba
+      // al veredicto y al Excel sin que nadie lo advirtiera.
+      notas.push(`Potencia ilegible: "${potKva}". Verificar la placa.`);
+    } else if (kva <= 0) {
+      // Un 0 es el relleno habitual de "no lo sé", no una potencia real: si se
+      // aceptara, caería en la banda mínima como si fuera un dato bueno.
+      notas.push(`Potencia ${potKva} kVA no válida (cero o negativa). Verificar la placa.`);
+    } else {
+      mva = Math.round((kva / 1000) * 10000) / 10000;
+      pasos.push(`Potencia ${potKva} kVA / 1000 = ${mva} MVA`);
+    }
   }
 
   const kvp = normalizarKv(kvPrim);
@@ -326,7 +367,13 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion) {
   const [niv, nivLbl] = nivelPorTension(kvp);
   pasos.push(`Tension primaria = ${kvp} kV -> ${niv} (${nivLbl})`);
 
-  const tri = kvt != null;
+  // Un terciario en 0 (o negativo) es el relleno de «no tiene», no un
+  // devanado: aceptarlo convertía un bidevanado en tridevanado, que es otra
+  // familia de unidades constructivas y ~23% más de presupuesto.
+  const tri = kvt != null && kvt > 0;
+  if (kvt != null && kvt <= 0) {
+    notas.push('Tensión terciaria reportada como 0: se trata como equipo BIDEVANADO.');
+  }
   const dev = tri ? 'tri' : 'bi';
   pasos.push(`Tension terciaria = ${kvt} kV -> ${tri ? 'TRIDEVANADO' : 'BIDEVANADO'}`);
 

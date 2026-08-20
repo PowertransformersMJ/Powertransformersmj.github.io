@@ -138,6 +138,10 @@
 
 .ftm-root {
   /* ── Familia institucional (antes petróleo #0B4F6C) ── */
+  /* Se usa en 6 reglas y NUNCA se había definido: el botón «Ver detalle» del
+     diagnóstico y el chip de filtro activo quedaban con texto blanco sobre
+     fondo transparente — invisibles al pasar el ratón (ADR-066). */
+  --ftm-brand:        var(--brand, #007aff);
   --ftm-petrol:       var(--brand-deep, #0051d5);
   --ftm-petrol-deep:  var(--brand-700, #003ea0);
   --ftm-petrol-soft:  rgba(0, 122, 255, .12);
