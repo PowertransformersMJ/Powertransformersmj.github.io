@@ -726,6 +726,25 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const c = e.cond_int;
       if (c >= 1 && c <= 5) cuenta[c] += 1; else cuenta.sd += 1;
     });
+
+    // Si NADIE tiene condición, una barra vacía y cinco ceros se leen como
+    // «no hay equipos en mal estado» — que es justo lo contrario de la
+    // verdad: no se sabe. Se dice en palabras, y se dice por qué (ADR-066).
+    if (cuenta.sd === total) {
+      const fallo = globalThis.__sgmSaludFallo;
+      caja.innerHTML = ''
+        + '<div class="ftm-salud"><div class="ftm-salud-head">'
+        +   '<h4>Estado de salud · Condición</h4></div>'
+        + '<div class="ftm-aviso"><b>Ningún equipo tiene condición registrada.</b> '
+        + 'Los ' + total + ' transformadores llegaron sin índice de salud, así que esta banda, '
+        + 'la matriz de riesgo y la priorización no reflejan el estado real de la flota: '
+        + '<b>no diga que no hay equipos en riesgo</b>, diga que no está evaluado. '
+        + (fallo
+            ? 'La lectura de salud falló (' + esc(fallo) + ').'
+            : 'Se llena al cargar el archivo de Salud de Activos desde el panel de administración.')
+        + '</div></div>';
+      return;
+    }
     const segs = [1, 2, 3, 4, 5].filter((c) => cuenta[c] > 0).map((c) => {
       const w = (cuenta[c] / total) * 100;
       const on = condSel === String(c) ? ' is-on' : (condSel ? ' is-dim' : '');
@@ -1871,6 +1890,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     EQUIPOS = recomputarEquipos();
     ESTADOS.clear();
     if (meta.origen != null) cfg.origen = meta.origen;
+    // La lectura sale con tope (free-tier). Si se pegó a él, lo que se ve es
+    // una FOTO PARCIAL del parque y los porcentajes se calculan sobre ella.
+    if (EQUIPOS.length >= 500) {
+      fijarAviso('<div class="ftm-aviso"><b>Posible parque incompleto.</b> Se leyeron '
+        + EQUIPOS.length + ' equipos, que es el tope de la consulta: puede haber más. '
+        + 'Los porcentajes de esta pantalla se refieren solo a los mostrados.</div>');
+    }
     pintarMeta();
     pintarKpis();
     pintarSalud();

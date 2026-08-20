@@ -63,11 +63,25 @@
       //                                 usuarios, causante. Alimenta el diagnóstico.
       // Verificado en producción (2026-08-15): la proyección de salud NO trae tensión
       // primaria, y sin ella los 206 equipos salían «Sin UC calculada».
+      // UNA sola consulta. Antes se pedían las dos en paralelo, pero
+      // `listarTransformadoresSalud()` vuelve a leer la MISMA colección por
+      // dentro: eran ~412 lecturas facturables por apertura cuando bastan 206.
+      // La proyección de salud se deriva aquí del mismo resultado, con la
+      // misma función de dominio que usaba esa consulta (ADR-066).
       const m = await import('../assets/js/data/transformadores.js');
-      const [v2, salud] = await Promise.all([
-        m.listarV2({ limite: 500 }),
-        m.listarTransformadoresSalud().catch(() => [])
-      ]);
+      const v2 = await m.listarV2({ limite: 500 });
+      const { filasParque } = await import('../assets/js/domain/parque_salud.js');
+
+      // El `.catch(() => [])` de antes se tragaba el fallo en silencio: si la
+      // salud no cargaba, la pantalla mostraba «0 equipos en riesgo» — que se
+      // lee como buena noticia. Ahora, si falla, se avisa.
+      let salud = [];
+      try {
+        salud = filasParque(v2 || []);
+      } catch (err) {
+        window.__sgmSaludFallo = (err && err.message) || String(err);
+      }
+
       const porCodigo = new Map();
       for (const s of (salud || [])) {
         const k = s.codigo || s.id;
