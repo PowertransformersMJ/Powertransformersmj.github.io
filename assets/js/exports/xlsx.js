@@ -17,6 +17,25 @@ async function loadXLSX() {
 }
 
 /**
+ * Lee un libro Excel del disco y devuelve la PRIMERA hoja como matriz de
+ * filas (array de arrays), con la fila 0 como cabecera. Se usa para releer
+ * un acta de correcciones exportada por el propio sistema (ADR-065).
+ *
+ * El archivo se procesa en el navegador: no se sube a ningún servidor.
+ *
+ * @param {File} archivo
+ * @returns {Promise<Array<Array>>}
+ */
+export async function leerPrimeraHoja(archivo) {
+  const XLSX = await loadXLSX();
+  const buffer = await archivo.arrayBuffer();
+  const wb = XLSX.read(buffer, { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  if (!ws) return [];
+  return XLSX.utils.sheet_to_json(ws, { header: 1, defval: null, blankrows: false });
+}
+
+/**
  * Descarga un libro Excel con N hojas.
  * @param {string} filename
  * @param {Array<{nombre, filas, columnas}>} hojas

@@ -1718,3 +1718,14 @@
   line-height: 1.55;
   margin-bottom: 12px;
 }
+
+/* Celda de acciones de la tabla: «Ficha» y «Gestionar» se apilan en vez de
+   desbordar la columna, que es estrecha (ADR-065). El envoltorio va DENTRO
+   del <td> para no romper el layout de tabla. */
+.ftm-root .ftm-acts-fila {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: stretch;
+}
+.ftm-root .ftm-acts-fila .ftm-btn { white-space: nowrap; }

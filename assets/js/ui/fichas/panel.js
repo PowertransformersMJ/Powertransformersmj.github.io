@@ -42,6 +42,10 @@ import {
 import {
   vistaAnalitica, vistaNorma, vistaAgregar, resumenGerencial
 } from './vistas-gerenciales.js';
+import {
+  CAMPOS_EDITABLES, esNovedad, resumenNovedades, barraCorreccionesHTML,
+  cajonHTML, filasActa, decisionesDesdeActa, aplicarDecisiones, COLUMNAS_ACTA
+} from './correcciones.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    1 · CONSTANTES
@@ -505,6 +509,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   let VISIBLES = [];
   let SEL = 'ALL';
   let condSel = '';           // filtro por condición (banda de salud)
+  // ── gestión de novedades (ADR-065) ──
+  let BRUTOS = [];             // lista tal como llegó: base para recomputar
+  const EDITS = {};            // fila → { campo: valor } correcciones de datos
+  const DEC = {};              // fila → { decision, final, resp, fecha, obs }
+  let APLICADO = false;        // ¿las decisiones están volcadas al tablero?
+  let filaEnCajon = null;      // equipo abierto en el cajón de gestión
   let orden = { k: 'subestacion', asc: true };
   const filtros = { q: '', nivel: '', zona: '', uucc: '' };
   const ESTADOS = new Map();   // clave de equipo → estado editable
@@ -555,6 +565,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   ' id="ftm-panel-tablero" aria-labelledby="ftm-tab-tablero">'
       + '<div class="ftm-kpis" data-ftm="kpis"></div>'
       + '<div data-ftm="salud"></div>'
+      + '<div data-ftm="corr"></div>'
       // El aviso y la ayuda van sobre una superficie SÓLIDA: el fondo del sitio
       // es una fotografía y el texto suelto encima queda ilegible.
       + '<div class="ftm-panel"><div class="ftm-panel-body">'
@@ -586,6 +597,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + '<div class="ftm-view" data-vista="' + v.id + '" role="tabpanel"'
         +   ' id="ftm-panel-' + v.id + '" aria-labelledby="ftm-tab-' + v.id + '"></div>'
         ).join('')
+      // Cajón de gestión de una novedad. Vive fuera de las vistas porque se
+      // abre desde la tabla y se superpone; z-index en línea por el mismo
+      // motivo que el modal de la ficha (el shell de AQUA vive en 200).
+      + '<div class="ftm-scrim" data-ftm="scrim" style="z-index:290"></div>'
+      + '<aside class="ftm-drawer" data-ftm="cajon" style="z-index:300" '
+      +   'aria-hidden="true" aria-label="Gestión de la novedad"></aside>'
       // z-index en línea a propósito: la hoja del módulo declara 80 y en el
       // sitio la barra superior de AQUA vive en 200 y la barra lateral en 100.
       // Sin esto, el encabezado del modal (con «Exportar» y «Cerrar») queda
@@ -816,6 +833,191 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (caja) caja.innerHTML = '';
   }
 
+  /* ── gestión de novedades: recálculo ────────────────────────────────── */
+  // Se reconstruye SIEMPRE desde `BRUTOS`, nunca mutando lo ya calculado: así
+  // descartar una corrección devuelve exactamente el estado original, sin
+  // arrastrar restos. `normalizarEquipo` vuelve a pasar por la regla CREG, de
+  // modo que corregir la potencia o una tensión reclasifica el equipo solo.
+  function recomputarEquipos() {
+    const lista = BRUTOS.map((b, i) => {
+      const fila = (b && b.fila != null) ? b.fila : (i + 1);
+      const ed = EDITS[fila];
+      return normalizarEquipo(ed ? { ...b, ...ed } : b, i);
+    });
+    if (APLICADO) aplicarDecisiones(lista, DEC);
+    return lista;
+  }
+
+  /** Vuelve a calcular y repinta todo lo que depende de los equipos. */
+  function refrescarTodo() {
+    EQUIPOS = recomputarEquipos();
+    pintarMeta(); pintarKpis(); pintarSalud(); pintarCorrecciones();
+    pintarFiltros(); aplicar(); invalidarVistas();
+  }
+
+  function pintarCorrecciones() {
+    const caja = $('[data-ftm="corr"]');
+    if (!caja) return;
+    if (!EQUIPOS.length) { caja.innerHTML = ''; return; }
+    const res = resumenNovedades(EQUIPOS, EDITS, DEC);
+    caja.innerHTML = res.novedades || Object.keys(DEC).length
+      ? barraCorreccionesHTML(res, APLICADO)
+      : '';
+  }
+
+  /* ── cajón de gestión ───────────────────────────────────────────────── */
+  function abrirCajon(fila) {
+    const e = EQUIPOS.find((x) => String(x.fila) === String(fila));
+    if (!e) return;
+    filaEnCajon = e.fila;
+    const cajon = $('[data-ftm="cajon"]');
+    const scrim = $('[data-ftm="scrim"]');
+    cajon.innerHTML = cajonHTML(e, EDITS, DEC);
+    cajon.classList.add('is-on');
+    scrim.classList.add('is-on');
+    cajon.setAttribute('aria-hidden', 'false');
+  }
+
+  function cerrarCajon() {
+    filaEnCajon = null;
+    const cajon = $('[data-ftm="cajon"]');
+    const scrim = $('[data-ftm="scrim"]');
+    if (cajon) { cajon.classList.remove('is-on'); cajon.setAttribute('aria-hidden', 'true'); }
+    if (scrim) scrim.classList.remove('is-on');
+  }
+
+  /** Lee el cajón y guarda correcciones + decisión de ese equipo. */
+  function guardarCajon() {
+    if (filaEnCajon == null) return;
+    const fila = filaEnCajon;
+    const base = BRUTOS.find((b, i) => ((b && b.fila != null) ? b.fila : i + 1) === fila) || {};
+    const original = normalizarEquipo(base, 0);
+
+    // Correcciones de datos: solo se guarda lo que DIFIERE del original.
+    const ed = {};
+    contenedor.querySelectorAll('[data-edit]').forEach((el) => {
+      const k = el.getAttribute('data-edit');
+      const campo = CAMPOS_EDITABLES.find((c) => c.k === k);
+      let v = el.value.trim();
+      if (v === '') v = null;
+      else if (campo && campo.tipo === 'number') {
+        const n = Number(v.replace(',', '.'));
+        v = isFinite(n) ? n : v;
+      }
+      const ov = original[k] == null ? null : original[k];
+      if (String(v) !== String(ov)) ed[k] = v;
+    });
+    if (Object.keys(ed).length) EDITS[fila] = ed; else delete EDITS[fila];
+
+    // Decisión
+    const leer = (n) => {
+      const el = contenedor.querySelector('[data-dec="' + n + '"]');
+      return el ? el.value.trim() : '';
+    };
+    const decision = leer('decision');
+    if (decision) {
+      DEC[fila] = { decision, final: leer('final'), resp: leer('resp'),
+        fecha: leer('fecha'), obs: leer('obs') };
+    } else {
+      delete DEC[fila];
+    }
+
+    refrescarTodo();
+    cerrarCajon();
+    fijarAviso('<div class="ftm-aviso">Gestión guardada para <b>' + esc(original.subestacion || fila)
+      + '</b>. Queda en esta pantalla; use <b>Exportar acta</b> para entregarla.</div>');
+  }
+
+  function descartarCajon() {
+    if (filaEnCajon == null) return;
+    delete EDITS[filaEnCajon];
+    delete DEC[filaEnCajon];
+    refrescarTodo();
+    cerrarCajon();
+  }
+
+  /* ── aplicar / revertir / acta ──────────────────────────────────────── */
+  function aplicarCorrecciones() {
+    if (!Object.keys(DEC).length) {
+      fijarAviso('<div class="ftm-aviso"><b>No hay decisiones registradas.</b> Abra un equipo con '
+        + 'novedad, guarde su decisión y vuelva a intentarlo.</div>');
+      return;
+    }
+    APLICADO = true;
+    refrescarTodo();
+    const res = contarDecisiones();
+    fijarAviso('<div class="ftm-aviso"><b>Correcciones aplicadas.</b> '
+      + res.subsanadas + ' subsanada(s) → concordante · '
+      + res.aceptadas + ' aceptada(s) como estaban · '
+      + res.enGestion + ' aún en gestión. La UUCC calculada por la regla CREG no se tocó: '
+      + 'solo la registrada y el estado. Puede revertir cuando quiera.</div>');
+  }
+
+  /** Cuenta el efecto de las decisiones sobre los equipos ya recomputados. */
+  function contarDecisiones() {
+    let subsanadas = 0; let aceptadas = 0; let enGestion = 0;
+    for (const e of EQUIPOS) {
+      const d = DEC[e.fila];
+      if (!d || !d.decision) continue;
+      if (d.decision === 'Mantener UUCC registrada') aceptadas += 1;
+      else if (e.estado === 'CONCORDANTE') subsanadas += 1;
+      else enGestion += 1;
+    }
+    return { subsanadas, aceptadas, enGestion };
+  }
+
+  function revertirCorrecciones() {
+    APLICADO = false;
+    refrescarTodo();
+    fijarAviso('<div class="ftm-aviso">Se volvió al estado inicial. Las decisiones siguen '
+      + 'guardadas: puede volver a aplicarlas.</div>');
+  }
+
+  async function exportarActa() {
+    const filas = filasActa(EQUIPOS, EDITS, DEC);
+    if (!filas.length) {
+      fijarAviso('<div class="ftm-aviso">No hay novedades ni gestiones que llevar al acta.</div>');
+      return;
+    }
+    const res = resumenNovedades(EQUIPOS, EDITS, DEC);
+    const meta = [
+      { Campo: 'Documento', Valor: 'Acta de correcciones UUCC' },
+      { Campo: 'Regla', Valor: 'CREG 015/2018 · Tablas 51 y 52' },
+      { Campo: 'Origen de los datos', Valor: cfg.origen || '—' },
+      { Campo: 'Novedades', Valor: res.novedades },
+      { Campo: 'Gestionadas', Valor: res.gestionadas },
+      { Campo: 'Pendientes', Valor: res.pendientes }
+    ];
+    const { descargarHojas } = await import('../../exports/xlsx.js');
+    await descargarHojas('Acta_correcciones_UUCC', [
+      { nombre: 'Correcciones', filas, columnas: COLUMNAS_ACTA },
+      { nombre: 'Metadatos', filas: meta, columnas: ['Campo', 'Valor'] }
+    ]);
+  }
+
+  async function importarActa(archivo) {
+    if (!archivo) return;
+    try {
+      const { leerPrimeraHoja } = await import('../../exports/xlsx.js');
+      const matriz = await leerPrimeraHoja(archivo);
+      const r = decisionesDesdeActa(matriz);
+      const filasVivas = new Set(EQUIPOS.map((e) => String(e.fila)));
+      let aplicadas = 0; let huerfanas = 0;
+      for (const [fila, d] of Object.entries(r.dec)) {
+        if (filasVivas.has(String(fila))) { DEC[fila] = d; aplicadas += 1; }
+        else huerfanas += 1;
+      }
+      refrescarTodo();
+      fijarAviso('<div class="ftm-aviso"><b>Acta leída.</b> ' + aplicadas + ' decisión(es) recuperada(s)'
+        + (huerfanas ? ' · ' + huerfanas + ' no corresponden a ningún equipo de esta pantalla' : '')
+        + (r.ignoradas ? ' · ' + r.ignoradas + ' con una decisión no reconocida, ignorada(s)' : '')
+        + '. Revise y pulse «Aplicar correcciones al módulo».</div>');
+    } catch (err) {
+      fijarAviso('<div class="ftm-aviso"><b>No se pudo leer el acta.</b> '
+        + esc(err && err.message ? err.message : String(err)) + '</div>');
+    }
+  }
+
   /* ── KPIs ───────────────────────────────────────────────────────────── */
   function pintarKpis() {
     const total = EQUIPOS.length || 1;
@@ -919,7 +1121,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           + (e.advertencia ? '<span class="ftm-warnflag" title="Con advertencia de consistencia">⚠</span>' : '')
           + '</td>'
           + '<td>' + celdaCondicion(e) + '</td>'
-          + '<td><button type="button" class="ftm-btn" data-ficha="' + esc(claveEquipo(e)) + '">Ficha</button></td>'
+          + '<td><div class="ftm-acts-fila">'
+          + '<button type="button" class="ftm-btn" data-ficha="' + esc(claveEquipo(e)) + '">Ficha</button>'
+          // Gestionar solo aparece donde hay algo que gestionar: una novedad,
+          // o un equipo que ya se tocó (para poder revisarlo o descartarlo).
+          + (esNovedad(e) || EDITS[e.fila] || DEC[e.fila]
+              ? ' <button type="button" class="ftm-btn ftm-btn--accent" data-gestionar="' + esc(e.fila) + '">'
+                + (DEC[e.fila] ? 'Gestionada ✓' : 'Gestionar') + '</button>'
+              : '')
+          + '</div></td>'
           + '</tr>';
       }).join('');
     }
@@ -1447,6 +1657,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      ═════════════════════════════════════════════════════════════════════ */
 
   function alHacerClic(ev) {
+    // Gestión de novedades
+    const gest = ev.target.closest('[data-gestionar]');
+    if (gest && contenedor.contains(gest)) { abrirCajon(gest.getAttribute('data-gestionar')); return; }
+    if (ev.target.closest('[data-ftm="scrim"]')) { cerrarCajon(); return; }
+
     // Pestañas de vista (Tablero / Analítica / Norma / Agregar)
     const tabBtn = ev.target.closest('[data-vista-btn]');
     if (tabBtn && contenedor.contains(tabBtn)) {
@@ -1481,6 +1696,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const accion = ev.target.closest('[data-ftm]');
     if (!accion) return;
     switch (accion.getAttribute('data-ftm')) {
+      case 'corr-aplicar':  aplicarCorrecciones(); return;
+      case 'corr-revertir': revertirCorrecciones(); return;
+      case 'corr-exportar': exportarActa();         return;
+      case 'corr-cerrar':   cerrarCajon();          return;
+      case 'corr-guardar':  guardarCajon();         return;
+      case 'corr-descartar': descartarCajon();      return;
       case 'alta-previa':   altaPrevia();   return;
       case 'alta-agregar':  altaAgregar();  return;
       case 'alta-limpiar':  altaLimpiar();  return;
@@ -1543,6 +1764,21 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   function alCambiar(ev) {
     const t = ev.target;
+
+    // Acta: recuperar decisiones de un archivo
+    if (t.matches && t.matches('[data-ftm="corr-importar"]')) {
+      const f = t.files && t.files[0];
+      t.value = '';                       // permite reimportar el mismo archivo
+      importarActa(f);
+      return;
+    }
+    // «UUCC final» solo tiene sentido si se decide corregir a otra unidad
+    if (t.matches && t.matches('[data-dec="decision"]')) {
+      const wrap = contenedor.querySelector('[data-dec-final]');
+      if (wrap) wrap.hidden = (t.value !== 'Corregir a otra UUCC');
+      return;
+    }
+
     ['nivel', 'zona', 'uucc'].forEach((k) => {
       if (t.matches('[data-ftm="' + k + '"]')) { filtros[k] = t.value; aplicar(); }
     });
@@ -1583,12 +1819,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      ═════════════════════════════════════════════════════════════════════ */
 
   function fijarDatos(lista, meta = {}) {
-    EQUIPOS = (Array.isArray(lista) ? lista : []).map((b, i) => normalizarEquipo(b, i));
+    BRUTOS = Array.isArray(lista) ? lista : [];
+    // Un conjunto de datos nuevo invalida las correcciones del anterior: las
+    // filas ya no son las mismas y aplicar decisiones viejas sería inventar.
+    Object.keys(EDITS).forEach((k) => delete EDITS[k]);
+    Object.keys(DEC).forEach((k) => delete DEC[k]);
+    APLICADO = false;
+    EQUIPOS = recomputarEquipos();
     ESTADOS.clear();
     if (meta.origen != null) cfg.origen = meta.origen;
     pintarMeta();
     pintarKpis();
     pintarSalud();
+    pintarCorrecciones();
     pintarFiltros();
     aplicar();
     invalidarVistas();
