@@ -23,6 +23,17 @@
 // ══════════════════════════════════════════════════════════════
 
 import { GRUPOS_UC } from '../../domain/fichas_creg_uc.js';
+
+/** Mismas etiquetas y colores que la tabla: el cajón no puede llamarle
+ *  distinto al mismo estado. */
+const ETIQUETA_ESTADO = Object.freeze({
+  CONCORDANTE: 'Concordante', DISCREPANCIA: 'Discrepancia',
+  'FALTA REGISTRO': 'Falta registro', 'SIN CALCULO': 'Sin UC calculada'
+});
+const CLASE_PILL = Object.freeze({
+  CONCORDANTE: 'ftm-pill--ok', DISCREPANCIA: 'ftm-pill--err',
+  'FALTA REGISTRO': 'ftm-pill--falta', 'SIN CALCULO': 'ftm-pill--sin'
+});
 import { normalizarCodigoUC } from '../../domain/fichas_evaluacion_uucc.js';
 
 /**
@@ -130,7 +141,7 @@ export function barraCorreccionesHTML(res, aplicado) {
     +   '<span class="ftm-corr-acts">'
     +     '<button type="button" class="ftm-btn ftm-btn--primary" data-ftm="corr-aplicar"'
     +       (res.gestionadas ? '' : ' disabled title="Primero gestione al menos una novedad"') + '>'
-    +       (aplicado ? 'Correcciones aplicadas ✓' : 'Aplicar correcciones al módulo') + '</button>'
+    +       (aplicado ? 'Decisiones aplicadas ✓' : 'Aplicar decisiones al tablero') + '</button>'
     +     (aplicado
         ? '<button type="button" class="ftm-btn" data-ftm="corr-revertir">Revertir a estado inicial</button>'
         : '')
@@ -150,7 +161,9 @@ export function cajonHTML(equipo, edits, dec) {
   if (!equipo) return '';
   const ed = edits[equipo.fila] || {};
   const d = dec[equipo.fila] || {};
-  const hoy = (d.fecha || '');
+  // Fecha de hoy por defecto: gestionar 39 novedades abriendo el calendario en
+  // cada una es fricción pura, y la fecha casi siempre es la de la sesión.
+  const hoy = d.fecha || new Date().toISOString().slice(0, 10);
 
   const campos = CAMPOS_EDITABLES.map((c) => {
     const actual = ed[c.k] != null ? ed[c.k] : (equipo[c.k] != null ? equipo[c.k] : '');
@@ -167,6 +180,10 @@ export function cajonHTML(equipo, edits, dec) {
   const opciones = DECISIONES.map((o) =>
     '<option value="' + esc(o.id) + '"' + (d.decision === o.id ? ' selected' : '') + '>'
     + esc(o.id) + '</option>').join('');
+  // Cada decisión tiene una explicación escrita que no se pintaba en ninguna
+  // parte. Se muestran todas: son tres líneas y evitan elegir a ciegas.
+  const ayudas = DECISIONES.map((o) =>
+    '<div class="ftm-nota"><b>' + esc(o.id) + ':</b> ' + esc(o.ayuda) + '</div>').join('');
 
   // Catálogo completo de UC para «Corregir a otra UUCC».
   const ucs = GRUPOS_UC.flatMap((g) => g.rows.map((r) => r.uc));
@@ -185,9 +202,14 @@ export function cajonHTML(equipo, edits, dec) {
     +       '<span class="ftm-vbox-val">' + esc(equipo.uucc_registrada || '—') + '</span></span>'
     +     '<span class="ftm-vbox ftm-vbox--calc"><small>UUCC calculada (regla CREG)</small>'
     +       '<span class="ftm-vbox-val">' + esc(equipo.uucc_calculada || '—') + '</span></span>'
-    +     '<span class="ftm-pill">' + esc(equipo.estado) + '</span>'
+    +     '<span class="ftm-pill ' + esc(CLASE_PILL[equipo.estado] || '') + '">'
+    +       esc(ETIQUETA_ESTADO[equipo.estado] || equipo.estado) + '</span>'
     +   '</div>'
 
+    +   ((equipo.notas_uucc && equipo.notas_uucc.length)
+          ? '<div class="ftm-aviso"><b>Advertencias del clasificador:</b> '
+            + equipo.notas_uucc.map(esc).join(' · ') + '</div>'
+          : '')
     +   '<div class="ftm-sect"><div class="ftm-sect-t">1 · Corregir datos</div>'
     +     '<div class="ftm-hint ftm-hint--p">Los marcados como <b>reclasifica</b> vuelven a pasar por la '
     +     'regla CREG al guardar; los demás solo corrigen la ficha.</div>'
@@ -195,6 +217,7 @@ export function cajonHTML(equipo, edits, dec) {
     +   '</div>'
 
     +   '<div class="ftm-sect"><div class="ftm-sect-t">2 · Decisión sobre la UUCC</div>'
+    +     ayudas
     +     '<div class="ftm-form-grid">'
     +       '<label class="ftm-campo"><span class="ftm-campo-lbl">Decisión</span>'
     +         '<select class="ftm-campo-input" data-dec="decision">'

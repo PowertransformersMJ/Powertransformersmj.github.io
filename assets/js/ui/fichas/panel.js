@@ -37,7 +37,7 @@ import { atraparFoco } from '../foco-modal.js';
 import { construirFichaTecnica, colorCondicion, nombreCondicion } from './ficha-tecnica.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
-  claveEquipo, TITULO_DIAGRAMA
+  claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas
 } from './unifilar.js';
 import {
   vistaAnalitica, vistaNorma, vistaAgregar, resumenGerencial
@@ -521,6 +521,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   let APLICADO = false;        // ¿las decisiones están volcadas al tablero?
   let filaEnCajon = null;      // equipo abierto en el cajón de gestión
   let trampaCajon = null;      // trampa de foco del cajón (ui/foco-modal.js)
+  let tempBusqueda = null;     // temporizador del buscador (antirrebote)
   let orden = { k: 'subestacion', asc: true };
   const filtros = { q: '', nivel: '', zona: '', uucc: '' };
   const ESTADOS = new Map();   // clave de equipo → estado editable
@@ -548,8 +549,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function armazon() {
     const cols = COLUMNAS.map((c) => {
       const cls = c.chica ? ' class="ftm-hide-sm"' : '';
-      const dk = c.k ? ' data-k="' + c.k + '"' : '';
-      return '<th' + cls + dk + '>' + c.t + '</th>';
+      const dk = c.k ? ' data-k="' + c.k + '" tabindex="0" role="button"' : '';
+      return '<th' + cls + dk + '>' + c.t + (c.k ? '<span data-orden></span>' : '') + '</th>';
     }).join('');
     const pestanas = VISTAS.map((v, i) => ''
       + '<button type="button" role="tab" data-vista-btn="' + v.id + '"'
@@ -748,9 +749,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const segs = [1, 2, 3, 4, 5].filter((c) => cuenta[c] > 0).map((c) => {
       const w = (cuenta[c] / total) * 100;
       const on = condSel === String(c) ? ' is-on' : (condSel ? ' is-dim' : '');
+      // Tinta oscura sobre los tramos claros: el blanco sobre el amarillo de
+      // «Medio» daba ~1,7:1 de contraste — ilegible. Mismo criterio que ya
+      // usa la matriz de riesgo con sus celdas.
+      const tinta = (c === 3 || c === 4 || c === 2) ? '#10202c' : '#fff';
       return '<span class="ftm-salud-seg' + on + '" data-cond="' + c + '" role="button" tabindex="0"'
         + ' title="' + esc(COND_NOM[c]) + ': ' + cuenta[c] + '"'
-        + ' style="width:' + w + '%;background:' + COND_COLOR[c] + '">'
+        + ' style="width:' + w + '%;background:' + COND_COLOR[c] + ';color:' + tinta + '">'
         + (w > 6 ? cuenta[c] : '') + '</span>';
     }).join('');
     const chips = [1, 2, 3, 4, 5].map((c) => {
@@ -976,7 +981,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     refrescarTodo();
     cerrarCajon();
     fijarAviso('<div class="ftm-aviso">Gestión guardada para <b>' + esc(original.subestacion || fila)
-      + '</b>. Queda en esta pantalla; use <b>Exportar acta</b> para entregarla.</div>');
+      + '</b> (solo en esta pantalla). El acta ya la incluye; para verla reflejada en la tabla '
+      + 'pulse <b>«Aplicar decisiones al tablero»</b>.</div>');
   }
 
   function descartarCajon() {
@@ -1029,11 +1035,18 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       { Campo: 'Gestionadas', Valor: res.gestionadas },
       { Campo: 'Pendientes', Valor: res.pendientes }
     ];
+    const hoy = new Date().toISOString().slice(0, 10);
+    meta.unshift({ Campo: 'Fecha de emisión', Valor: hoy });
     const { descargarHojas } = await import('../../exports/xlsx.js');
-    await descargarHojas('Acta_correcciones_UUCC', [
+    // Con fecha en el nombre: tras tres sesiones, «Acta (1).xlsx» y
+    // «Acta (2).xlsx» no dicen cuál es cuál, y es un documento que se firma.
+    await descargarHojas('Acta_correcciones_UUCC_' + hoy, [
       { nombre: 'Correcciones', filas, columnas: COLUMNAS_ACTA },
       { nombre: 'Metadatos', filas: meta, columnas: ['Campo', 'Valor'] }
     ]);
+    fijarAviso('<div class="ftm-aviso"><b>Acta exportada</b> — ' + res.novedades + ' novedad(es), '
+      + res.gestionadas + ' gestionada(s), ' + res.pendientes + ' pendiente(s). El tablero no '
+      + 'guarda nada: conserve el archivo y retómelo con <b>Importar acta</b>.</div>');
   }
 
   async function importarActa(archivo) {
@@ -1139,7 +1152,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (typeof x !== 'number' || typeof y !== 'number') { x = String(x).toLowerCase(); y = String(y).toLowerCase(); }
       return (x < y ? -1 : x > y ? 1 : 0) * (orden.asc ? 1 : -1);
     });
+    pintarOrden();
     pintarTabla();
+  }
+
+  /** Flecha e `aria-sort` en la columna por la que se está ordenando. Con 206
+   *  filas, saber si se ve «peor condición primero» cambia lo que se decide. */
+  function pintarOrden() {
+    contenedor.querySelectorAll('th[data-k]').forEach((th) => {
+      const activa = th.getAttribute('data-k') === orden.k;
+      const flecha = th.querySelector('[data-orden]');
+      if (flecha) flecha.textContent = activa ? (orden.asc ? ' ▲' : ' ▼') : '';
+      if (activa) th.setAttribute('aria-sort', orden.asc ? 'ascending' : 'descending');
+      else th.removeAttribute('aria-sort');
+    });
   }
 
   /* ── tabla ──────────────────────────────────────────────────────────── */
@@ -1233,7 +1259,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (!e) return false;
     actual = e;
     hoja = 'ficha';
-    modalTit.textContent = 'Ficha técnica · ' + (e.subestacion || e.matricula || e.codigo || '—');
+    modalTit.textContent = 'Ficha técnica · ' + (actual.subestacion || '—')
+      + (actual.matricula ? ' · ' + actual.matricula : '');
     modal.classList.add('is-on');
     modal.setAttribute('aria-hidden', 'false');
     pintarModal();
@@ -1844,7 +1871,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     ['nivel', 'zona', 'uucc'].forEach((k) => {
       if (t.matches('[data-ftm="' + k + '"]')) { filtros[k] = t.value; aplicar(); }
     });
-    if (t.matches('[data-ftm="q"]')) { filtros.q = t.value; aplicar(); }
+    if (t.matches('[data-ftm="q"]')) {
+      // Cada tecla filtraba, ordenaba y reconstruía la tabla entera. Con 206
+      // filas se nota poco; con el tope de 500 se siente. Se espera a que el
+      // usuario deje de escribir.
+      filtros.q = t.value;
+      clearTimeout(tempBusqueda);
+      tempBusqueda = setTimeout(aplicar, 150);
+    }
 
     const campo = t.getAttribute && t.getAttribute('data-redaccion');
     if (campo && actual) {
@@ -1867,6 +1901,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   // seguridad para el caso raro de que la trampa no se haya podido armar;
   // `cerrarFicha` es idempotente, así que un cierre doble no rompe nada.
   function alTeclear(ev) {
+    // Los tramos de la banda son <span role="button">: reciben foco pero el
+    // navegador no traduce Enter/Espacio en clic como haría con un <button>.
+    if ((ev.key === 'Enter' || ev.key === ' ') && ev.target
+        && ev.target.matches && ev.target.matches('[data-cond][role="button"]')) {
+      ev.preventDefault();
+      ev.target.click();
+      return;
+    }
     if (trampaFoco) return;
     if (ev.key === 'Escape' && modal.classList.contains('is-on')) cerrarFicha();
   }
@@ -1921,9 +1963,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
     if (!fuente) {
       fijarDatos([]);
-      fijarAviso('<div class="ftm-aviso"><b>Sin fuente de datos.</b> Esta página lee el parque desde '
-        + 'Firestore a través de <code>window.SGM_DATA_SOURCE</code>. Mientras no exista, no se muestra '
-        + 'ningún equipo: el módulo no fabrica datos.</div>');
+      fijarAviso('<div class="ftm-aviso"><b>No hay conexión con el parque de transformadores.</b> '
+        + 'Sin conexión no se muestra ningún equipo: este tablero nunca inventa datos. '
+        + 'Recargue la página; si el problema continúa, avise al administrador.</div>');
       return EQUIPOS;
     }
     fijarAviso('<div class="ftm-nota">Cargando el parque…</div>');
@@ -1941,6 +1983,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   function destruir() {
+    // Los diagramas guardan estado a nivel de módulo: sin esto sobrevivían al
+    // desmontaje y un equipo con la misma matrícula heredaba el unifilar del
+    // anterior (la función existía y no la llamaba nadie).
+    try { olvidarDiagramas(); } catch (_) { /* noop */ }
+    clearTimeout(tempBusqueda);
     contenedor.removeEventListener('click', alHacerClic);
     contenedor.removeEventListener('input', alEscribir);
     contenedor.removeEventListener('change', alCambiar);

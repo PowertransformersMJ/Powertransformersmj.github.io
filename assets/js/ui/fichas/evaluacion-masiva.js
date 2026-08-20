@@ -350,7 +350,11 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
     if (!ultimo) return;
     const filas = filasParaExportar(ordenarPorGravedad(ultimo.filas));
     const csv = filas.map((f) => f.map((c) => {
-      const s = String(c == null ? '' : c);
+      let s = String(c == null ? '' : c);
+      // El listado lo puede fabricar un tercero. Una celda que empiece por
+      // = + - @ la interpreta Excel como FÓRMULA al abrir el CSV: se
+      // neutraliza anteponiendo un apóstrofo, que Excel no muestra.
+      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
       return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
     }).join(';')).join('\r\n');
     // BOM para que Excel en español respete las tildes.
