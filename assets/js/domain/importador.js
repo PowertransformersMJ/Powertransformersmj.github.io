@@ -288,6 +288,13 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   const condicionExcel = toNum(g(['condicion', 'condición', 'condicion_excel', 'hi_excel',
                                   'condicion (entero)']));
 
+  // Usuarios aguas abajo: es la CONSECUENCIA de la matriz de riesgo (MO.00418
+  // Tabla 11). La hoja TX_Potencia la trae como «CANTIDAD DE USUARIOS» y no se
+  // estaba leyendo: sin ella la criticidad queda nula y la matriz de riesgo
+  // sale vacía por mucho que la salud esté calculada (ADR-066).
+  const usuarios = toNum(g(['cantidad de usuarios', 'usuarios', 'usuarios_aguas_abajo',
+                            'usuarios aguas abajo', 'no. usuarios', 'nro usuarios']));
+
   // ── Construir documento v2 ──
   const entradaV2 = {
     schema_version: 2,
@@ -322,7 +329,13 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
     },
     mecanico: {}, refrigeracion: {}, protecciones: {},
     fabricacion: { fecha_fabricacion: fabFecha, ano_fabricacion: anoFab },
-    servicio:    { fecha_instalacion: instFecha, observaciones }
+    servicio:    { fecha_instalacion: instFecha, observaciones,
+                   usuarios_aguas_abajo: usuarios },
+    // `criticidad.nivel` NO se fija aquí a propósito: depende del tope de la
+    // flota (el mayor número de usuarios), que no se conoce viendo una fila
+    // suelta. Lo calcula `domain/matriz_riesgo.js` al pintar, con el universo
+    // completo delante.
+    criticidad:  { usuarios_aguas_abajo: usuarios }
   };
 
   // ── Recalcular HI conforme MO.00418 (NO confiar en el Excel) ──

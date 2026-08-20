@@ -193,3 +193,43 @@ describe('HOJAS_TIPO_ACTIVO — mapeo case-insensitive', () => {
     assert.equal(HOJAS_TIPO_ACTIVO['TX_Respaldo'], 'RESPALDO');
   });
 });
+
+// ── Usuarios aguas abajo (ADR-066) ───────────────────────────────────────────
+// Es la CONSECUENCIA de la matriz de riesgo (MO.00418 Tabla 11). La hoja
+// TX_Potencia la trae como «CANTIDAD DE USUARIOS» y no se estaba leyendo: la
+// salud se importaba bien y aun así la matriz salía vacía, porque sin
+// criticidad no hay eje horizontal.
+describe('usuarios aguas abajo — eje de consecuencia de la matriz', () => {
+  test('lee la cabecera real del Excel «CANTIDAD DE USUARIOS»', () => {
+    const { docV2 } = parsearFilaTransformador({
+      'MATRICULA': 'TX-01',
+      'SUBESTACION': 'AGUAS BLANCAS',
+      'CANTIDAD DE USUARIOS': 12345
+    }, 'TX_Potencia');
+    assert.equal(docV2.criticidad.usuarios_aguas_abajo, 12345);
+    assert.equal(docV2.servicio.usuarios_aguas_abajo, 12345);
+  });
+
+  test('acepta los alias habituales', () => {
+    for (const cab of ['usuarios', 'Usuarios aguas abajo', 'USUARIOS_AGUAS_ABAJO']) {
+      const { docV2 } = parsearFilaTransformador(
+        { 'MATRICULA': 'TX-01', [cab]: 500 }, 'TX_Potencia');
+      assert.equal(docV2.criticidad.usuarios_aguas_abajo, 500, 'falló con «' + cab + '»');
+    }
+  });
+
+  test('sin la columna, queda nulo — no se inventa un número', () => {
+    const { docV2 } = parsearFilaTransformador({ 'MATRICULA': 'TX-01' }, 'TX_Potencia');
+    assert.equal(docV2.criticidad.usuarios_aguas_abajo, null);
+  });
+
+  // El nivel de criticidad depende del TOPE de la flota, que no se conoce
+  // mirando una fila suelta: lo calcula matriz_riesgo.js con el universo entero.
+  test('no se fija el nivel de criticidad al importar una fila', () => {
+    const { docV2 } = parsearFilaTransformador(
+      { 'MATRICULA': 'TX-01', 'CANTIDAD DE USUARIOS': 48312 }, 'TX_Potencia');
+    // El esquema lo normaliza a cadena vacía: lo que importa es que NO trae
+    // un nivel decidido en la importación.
+    assert.equal(docV2.criticidad.nivel, '');
+  });
+});
