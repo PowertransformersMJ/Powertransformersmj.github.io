@@ -1388,3 +1388,45 @@ evaluación masiva que la página real sí monta—, así que primero se hizo fi
 **64.7 Doctrina.** §3.2 aditivo (ningún renombrado; el tablero y la ficha no cambian) · §3.1 (la barra
 de vistas sustituye el vidrio por superficie sólida: el fondo es una foto) · §3.3 verificado en vivo.
 Lección → **L-67**. Sin cache bump (§4 dormida).
+
+---
+
+## 65. ADR — Gestión de novedades: detectar no es gestionar ⟦OPUS-5⟧ (2026-08-20)
+
+> *"procede por favor"* — el Ingeniero, 2026-08-20, sobre el flujo de correcciones que quedó fuera de ADR-064.
+
+**65.1 Causa raíz.** El tablero señalaba las discrepancias con el catálogo CREG pero moría ahí: no
+había forma de decidir qué hacer con cada novedad, ni de dejar constancia de quién decidió y cuándo,
+ni de entregar esa constancia. Era el último bloque del v22 sin portar y el de más valor de negocio:
+una auditoría que no se puede cerrar no sirve de nada.
+
+**65.2 Solución estructural.** `ui/fichas/correcciones.js` (dominio del flujo, sin DOM) +
+integración en `panel.js`. Barra de gestión en el tablero (contadores, aplicar, revertir, exportar e
+importar acta), cajón por equipo (corregir datos + decisión con responsable/fecha/observación) y acta
+en Excel con las 18 columnas del original más metadatos. `exports/xlsx.js` gana `leerPrimeraHoja`
+para poder releer un acta.
+
+**65.3 Invariantes (una prueba dedicada cada una).**
+· **Ninguna decisión toca la UUCC CALCULADA.** Se ajusta la REGISTRADA y el estado. Si el veredicto de
+  la norma fuera editable, el tablero dejaría de ser una auditoría. Test recorre las 3 decisiones.
+· **El acta va y vuelve sin deformarse.** Es un documento que se firma: exportar → releer devuelve
+  cada campo idéntico. Una decisión que no está en el catálogo se ignora, no se cuela.
+
+**65.4 Decisiones de diseño.** Corregir PLACA reclasifica por la regla; corregir IDENTIFICACIÓN no
+(criterio del original). El recálculo se rehace SIEMPRE desde `BRUTOS` en vez de mutar lo calculado:
+descartar una corrección devuelve el estado exacto de partida sin restos. Nada se persiste en
+Firestore — el acta firmada entra al parque por `admin/importar.html`, que simula antes de escribir.
+
+**65.5 Verificación (navegador + pruebas).** Aceptar la calculada sobre un equipo en discrepancia →
+concordante, indicadores 3→4, calculada intacta · revertir → estado inicial conservando decisiones ·
+corregir 40.000→8.000 kVA reclasifica N4T6→N4T2 sola · acta generada como `.xlsx` REAL (17 KB) releída
+por la ruta del botón devuelve la decisión idéntica · 0 botones desbordando su celda. 17 pruebas
+nuevas; suite **1.349 pass / 0 fail**.
+
+**65.6 Archivos.** NUEVOS `assets/js/ui/fichas/correcciones.js`, `tests/fichas_correcciones.test.js` ·
+`assets/js/ui/fichas/panel.js` · `assets/js/exports/xlsx.js` · `assets/css/fichas-tecnicas.css`.
+INTACTOS: dominio CREG, ficha PE.02081, exportador de planificación.
+
+**65.7 Doctrina.** §3.2 aditivo · §3.3 verificado en vivo, no por lectura · TDD en dinero/datos
+(R2 del interinato Opus). Clases del CSS con JS detrás: **242 de 341** (150 al empezar la serie).
+Sin cache bump (§4 dormida).

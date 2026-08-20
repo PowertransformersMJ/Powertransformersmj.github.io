@@ -6,13 +6,14 @@
 
 ---
 
-## 🎯 Foco (2026-08-17) — COLA DE LA AUDITORÍA REMEDIADA (ADR-063)
+## 🎯 Foco (2026-08-20) — FICHAS TÉCNICAS: PORT COMPLETADO (ADR-064/065)
 
-> *"realiza todo lo que dependa de ti"*. Cerrado lo que no exigía su mano ni decisión suya.
-> **1.332 pruebas verdes**. Antes: ADR-062 (11 auditores). Informe original → bóveda
-> `sgm-transpower/auditorias/` (cita datos reales, no va al repo público).
+> El Ingeniero avisó de que el módulo «no está como lo diseñé». Lo estaba: el port de ADR-061 trajo
+> el CSS entero y solo el 44% del marcado. Portadas las 3 vistas que faltaban (ADR-064) y el flujo de
+> gestión de novedades con acta (ADR-065). Clases del CSS con JS detrás: 150 → 242 de 341.
+> **1.349 pruebas.** ⏭️ Queda: validar con SESIÓN REAL (TODO-30) — necesita su login.
 
-### 🔴 PENDIENTES que siguen sin poder cerrarse (detalle → `99 §63`)
+### 🔴 PENDIENTES que siguen sin poder cerrarse (de ADR-063; detalle → `99 §63`)
 > **(A) Proteger `main`**: configuración de GitHub, solo el Ingeniero.
 > **(B) Historial de git**: los datos reales siguen en commits antiguos. Irreversible y la doctrina
 > prohíbe force-push a `main` → DECISIÓN DEL INGENIERO, no se hizo.
@@ -62,18 +63,9 @@
 
 ## 📝 Bitácora (efímera)
 
-> **2026-07-22→28 (Fable 5) — YA CONSOLIDADO, no re-leer aquí**: Fase 9 + CONECTAR A-E (`99 §52`) ·
-> ADR-053/054/055 (G010, 2 bugs del shell, ΔC1 + clusters) · ADR-056 (dashboard al parque REAL,
-> 206 reales · 0 demos) · **ADR-057** (importador del Excel real + MO.00418 Ed.02 ratificado tabla
-> por tabla). Detalle en sus ADRs vía `00`.
->
-> **2026-07-28 (Opus 5) — LAS NUEVAS INSTRUCCIONES eran el ECOSISTEMA → ADR-058**: paraguas
-> `~/Desktop/GitHub-MJ` (repo ⇄ bóveda hermanos + carpetas OLTC + `_archivo`), kernel canónico PROPIO
-> con reparto sellado (`brain:pull`, gate #0), `60-WORKFLOWS` (W-01..W-13), Antigravity oficial como
-> consejo externo, y `brain-private/NUEVO-PROYECTO.md` para que todo proyecto futuro nazca conectado.
-> Bóvedas NO se fusionan con el ecosistema de origen (datos de cliente). Detalle → `99 §58`.
-> ⚠️ El heartbeat marca **costo-cerebro 30d = 53% 🔴** (bandera 30%): la próxima sesión debería ser
-> de PRODUCTO, no de cerebro.
+> **Julio — TODO CONSOLIDADO, no re-leer aquí**: Fase 9 + CONECTAR A-E (`99 §52`) · ADR-053/054/055 ·
+> ADR-056 (dashboard al parque REAL) · ADR-057 (importador + MO.00418 Ed.02 ratificado) · **ADR-058**
+> (ecosistema paraguas + kernel canónico + `60-WORKFLOWS`). Detalle en sus ADRs vía `00`.
 >
 > **2026-07-29 (Opus 5) — ToS del hosting: CERRADO → `99 §61`**: Pages NO nos prohíbe nada (ni
 > e-commerce ni SaaS) → **no se migra**; runbook a Cloudflare listo por si acaso. ⚠️ Decisión viva

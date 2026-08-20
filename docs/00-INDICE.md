@@ -76,6 +76,7 @@
 | §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto), importador que dividía entre 1.000, CI en rojo 76 corridas, registro abierto en Firebase, menú que no colapsaba. 1.334 pruebas · CI en verde ⟦OPUS-5⟧ | 1226 |
 | §63 | ADR-063 — Remediación de la cola de la auditoría: funciones desplegadas con topes (TODO-32), 16 índices Firestore nuevos (producción tenía 33 de 37 declarados; 5 colecciones sin ninguno), `ts_calculo` con dos tipos desordenaba el historial de salud, 5 suscripciones sin límite, 5 pruebas que pasaban sin assert, 13 escapadores sin comillas, foto de 1,1 MB → 236 KB ⟦OPUS-5⟧ | 1284 |
 | §64 | ADR-064 — Fichas Técnicas: el port de ADR-061 trajo el CSS completo pero solo el 44% del marcado (189 de 339 clases `.ftm-` sin JS). Se portan las tres vistas que faltaban —Analítica gerencial (matriz de riesgo 5×5, top-20, novedades), Norma CREG y Agregar transformador— más la cabecera de procedencia, el anillo de conformidad y la banda de salud del tablero, con piel AQUA y pestañas del sitio ⟦OPUS-5⟧ | 1343 |
+| §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y acta en Excel que se puede reimportar. Dos invariantes con prueba: una decisión NUNCA toca la UUCC calculada, y el acta va y vuelve sin deformarse. 1.349 pruebas ⟦OPUS-5⟧ | 1394 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
