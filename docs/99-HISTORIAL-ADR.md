@@ -1487,3 +1487,56 @@ sin guardar al cerrar la ficha. Todo queda en `10` como TODO-35.
 
 **66.8 Doctrina.** §3.2 aditivo (ningún renombrado; nombres exportados intactos) · §3.3 verificado en
 vivo · §3.7 comité por iniciativa propia, aquí a petición explícita. Lección → **L-68**.
+
+---
+
+## 67. ADR — «Veo información basura»: el sitio mostraba datos inventados y escondía los reales ⟦OPUS-5⟧ (2026-08-21)
+
+> *"necesito que hagas una evaluacion integral de la pagina, veo informacion basura, y solo necesito que se ilustre o poder apreciar informacion que yo te he entregado inclusive, esta se encuentra en el repositorio"* — el Ingeniero, 2026-08-21.
+
+**67.1 Causa raíz.** Dos patrones opuestos y simétricos. (a) Pantallas que caían a un baseline de
+DEMOSTRACIÓN —puesto cuando la Ola 0 retiró los datos confidenciales— y lo pintaban **sin rotularlo**,
+porque la colección de Firestore que debía sustituirlo nunca se pobló. (b) Información real del
+Ingeniero, ya en el repositorio, **sin ninguna ruta para verla**. El Ingeniero abrió Cargabilidad y vio
+`SUB-DEMO-NORTE`, `TD-01`, `DEMO-0001` presentados como su flota.
+
+**67.2 El dato real existía y se estaba tirando.** El Excel de Salud de Activos trae, por devanado,
+ampacidad y **carga medida**, más el % de cargabilidad oficial. El importador leía las tres columnas de
+carga y **las descartaba**: solo guardaba ampacidad y porcentaje. Sin la corriente medida, la pantalla
+no podía mostrar los amperios reales de ningún equipo. Ahora se persisten (202 de 208) y la
+cargabilidad se deriva del PARQUE, con `domain/cargabilidad_parque.js` (puro, 11 tests).
+
+**67.3 Hallazgo en la fuente, declarado y no corregido.** En **64 de 208** equipos el % de
+cargabilidad de la hoja no coincide con sus propias columnas de amperios (AGUAS BLANCAS: 88% vs 17,5%
+del cociente) y en **5** la carga supera la ampacidad (ASTREA: 418 A sobre 167 A). Manda el % oficial
+—decisión del Ingeniero, 2026-07-27— pero cada equipo queda MARCADO para revisar la captura.
+
+**67.4 Lo demás del barrido (32 páginas).** SCADA: 3 eventos sintéticos bajo un badge rojo
+«CRITICAL ALERT» **cableado en el HTML que ningún código actualizaba** — alarma permanente sobre datos
+que no existen; ahora la alarma se calcula. Inicio: *«el parque opera dentro de parámetros»* con el
+Índice de Salud sin calcular — la ausencia de alertas no es una declaración de buena salud. Contacto:
+prometía que los mensajes «quedan registrados en la bitácora interna» y su envío era un `alert()`.
+Matriz de riesgo: cuadrícula entera en ceros, muda; ahora explica con cifras que faltan sus dos ejes.
+Dashboard: mostraba al usuario el nombre de una colección de la base.
+
+**67.5 Información suya que nadie podía ver.** El repo trae **10 fichas normativas curadas**
+(`docs/pruebas/*.json`) con qué mide cada ensayo, sus normas y sus umbrales: **solo 2 tenían botón**.
+Las 10 pruebas del scorecard llevan ahora un botón «criterio» que abre la ficha en un panel legible,
+junto al veredicto. Pendiente mayor: los **9 informes REALES del TX 450108** (2021→2024, con SFRA y
+doble configuración estrella/delta) solo viven en `_dev/fixtures/` y en previews de desarrollo; el
+motor del tablero se afinó con ellos y hoy no los muestra.
+
+**67.6 Verificado en vivo (sesión real del Ingeniero).** Parque: 206 transformadores, **CERO equipos
+ficticios en Firestore** (los TX-DEMO de ADR-056 ya se habían limpiado; el riesgo que quedaba
+documentado está cerrado). Producción comprobada con anti-caché tras esperar el despliegue — el
+primer `curl` dio 0 porque Pages aún no había terminado: L-65 otra vez.
+
+**67.7 Decisiones que quedan para el Ingeniero.** (a) Los 9 fixtures del 450108 **están commiteados en
+el repo PÚBLICO** y citan serie real, tres subestaciones y el cliente; NO se sirven en la web (404,
+el filtro de ADR-062 funciona), pero son visibles en GitHub. Sobrevivieron a la purga de la Ola 0.
+(b) `indicadores-calidad-baseline.json` sirve SAIDI/SAIFI reales de CARIBEMAR desde el repo público.
+(c) Sembrar los 9 informes en Firestore para que el tablero los muestre. (d) `_firebase-test.html` y
+`seguimiento-bump-previews.html` siguen desplegados. → TODO-36.
+
+**67.8 Doctrina.** §3.2 (nada se inventa; el demo se rotula o no se muestra) · §3.3 verificado contra
+producción, no contra el workflow. Lección → **L-69**.

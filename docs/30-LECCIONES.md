@@ -282,3 +282,20 @@ orden de descartar en voz alta sus falsos positivos.
 separado y dos lo reprodujeron en Node antes de que yo lo mirara. Lo que ve uno se verifica; lo que ven
 tres, se arregla. Pedirles también qué está BIEN evita el refactor por gusto.
 **Gate.** [HONOR]. Ver `99 §66`.
+
+### L-69 · Un dato de demostración sin rótulo es peor que una pantalla vacía
+**Cicatriz.** El dueño abrió Cargabilidad y vio «SUB-DEMO-NORTE», «TD-01», con KPIs calculados sobre
+tres equipos ficticios y presentados como su flota. Los baselines sintéticos se pusieron al retirar
+datos confidenciales, con la idea de que Firestore los sustituiría; la colección nunca se pobló y la
+pantalla se quedó en el demo para siempre, sin decirlo.
+**Regla.** Todo dato que no venga de la fuente real se ROTULA en pantalla, con la palabra
+«demostración» visible, o no se muestra. Si no hay dato: estado vacío que explique **por qué** está
+vacío y **qué hacer**. Y ningún indicador de alarma se cablea en el HTML: se calcula, o miente para
+siempre (el badge «CRITICAL ALERT» de SCADA llevaba meses encendido sobre eventos inventados).
+**Corolario — la falta de dato no es una buena noticia.** «El parque opera dentro de parámetros» sin
+Índice de Salud, una matriz de riesgo en ceros y un «0 equipos en riesgo» se leen como tranquilidad
+cuando significan ignorancia. Redactar los vacíos como lo que son.
+**Segundo corolario.** Antes de dar por ausente un dato, buscarlo en el repo: el Excel traía la carga
+medida por devanado y el importador la leía **para calcular y tirarla**; y 8 de 10 fichas normativas
+estaban publicadas sin un botón que las abriera.
+**Gate.** [HONOR]. Ver `99 §67`.

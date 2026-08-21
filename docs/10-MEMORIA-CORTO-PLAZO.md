@@ -8,25 +8,21 @@
 
 ## 🎯 Foco (2026-08-20) — FICHAS TÉCNICAS: PORT COMPLETO + AUDITADO (ADR-064/065/066)
 
-> El Ingeniero avisó de que el módulo «no está como lo diseñé». Lo estaba: el port de ADR-061 trajo
-> el CSS entero y solo el 44% del marcado. Portadas las 3 vistas que faltaban (ADR-064) y el flujo de
-> gestión de novedades con acta (ADR-065). Clases del CSS con JS detrás: 150 → 242 de 341.
-> ✅ Validado en vivo con sesión real (TODO-30 cerrado). **ADR-066**: 6 auditores Fable + remediación.
-> **1.376 pruebas.** ⚠️ TODO-34 (falta el índice de salud) · TODO-35 (cola de la auditoría).
+> Fichas Técnicas: port completado (ADR-064/065), validado en vivo (TODO-30) y auditado por 6
+> auditores con su remediación (ADR-066). **ADR-067**: barrido de las 32 páginas — el sitio mostraba
+> datos inventados sin rotularlos y escondía los reales del Ingeniero.
+> **1.387 pruebas.** ⚠️ TODO-34 (falta el índice de salud) · TODO-35 · TODO-36.
 
-### 🔴 PENDIENTES que siguen sin poder cerrarse (de ADR-063; detalle → `99 §63`)
-> **(A) Proteger `main`**: configuración de GitHub, solo el Ingeniero.
-> **(B) Historial de git**: los datos reales siguen en commits antiguos. Irreversible y la doctrina
-> prohíbe force-push a `main` → DECISIÓN DEL INGENIERO, no se hizo.
-> **(C) Tres decisiones que no tomo yo**: tope en `/alertas_reconocidas` (haría reaparecer alertas ya
-> reconocidas) · `defer` en Chart.js de `parque-transformadores` (no verificable sin sesión) · barras
-> de progreso con `transition: width` (obliga a tocar el JS de subida).
+### 🔴 SIN PODER CERRARSE (de ADR-063; detalle → `99 §63`)
+> **(A)** Proteger `main` (config de GitHub) · **(B)** ¿reescribir el historial de git? irreversible ·
+> **(C)** tres decisiones suyas: tope en `/alertas_reconocidas`, `defer` en Chart.js, barras de progreso.
 
-### ▶️ TAREA VIVA: encender el parque real — falta el PASO DEL INGENIERO (detalle → `99 §57`)
-> Importador en PRODUCCIÓN y MO.00418 Ed.02 ratificado. **PASO ÚNICO**: abrir `admin/importar.html`
-> en su Chrome → drag&drop (L-62) → **Simulación** → **Importar**. Excel:
-> `~/Downloads/Salud_de_Activos_2026_UUCC_corregida-2.xlsx`. TRAS el import: template headers-only
-> (cierra TODO-09) y detección de fila-cabecera para TPT_Servicio/TX_Respaldo.
+### ▶️ TAREA VIVA: el import de Salud de Activos — PASO DEL INGENIERO
+> Simulación ya corrida con SU archivo (`~/Documents/2026/PSM 2026/Salud de Activos 2026 Actualizado
+> 01 de junio.xlsx`): 270 filas · 0 errores · **9 nuevos, 199 actualizados, 62 omitidos** (las hojas
+> de servicio y respaldo no traen campos obligatorios). Falta pulsar **IMPORTAR EN FIRESTORE**: el
+> clasificador me bloquea esa escritura. Repetirlo es seguro (busca por matrícula y fusiona).
+> Cierra TODO-34 y llena salud, matriz de riesgo y priorización.
 > 📌 El Ingeniero pidió **resumen de pendientes actualizado en CADA turno**.
 
 ### 🔴 Acciones que SOLO el Ingeniero puede hacer
@@ -53,6 +49,7 @@
 | **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-09** | ✅ Dashboard conectado a Firestore real + fixture (ADR-056, verificado vivo 212 activos). RESTA solo: **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). | 🟢 casi |
 | **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
+| **TODO-36** | Decisiones de ADR-067 (detalle → `99 §67.7`): 9 informes REALES del TX 450108 commiteados en el repo PÚBLICO (no servidos en web) · SAIDI/SAIFI reales públicos · sembrarlos en Firestore · retirar 2 páginas de desarrollo desplegadas · indicadores congelados en mayo. | 🟡 |
 | **TODO-35** | Cola de ADR-066 (detalle → `99 §66.7`): vendorizar SheetJS ≥0.20.2 (CVE, cierra G111) · partir `panel.js` + `normalizarEquipo` al dominio · identidad de 2 TX en la misma subestación vía Excel · aviso de trabajo sin guardar. | 🟡 |
 | **TODO-34** | 🔴 **El parque real NO tiene Health Index**: los 206 traen `salud_actual` con TODOS sus campos en `null`/`""` (sin `hi_final`, `bucket`, `edad_anos`) y sin `usuarios` de criticidad. Por eso la banda de salud sale «Sin dato 206», la matriz de riesgo vacía y 0 equipos en riesgo — el módulo degrada limpio, no inventa. Se llena al correr el import de Salud de Activos (paso del Ingeniero, arriba) o al disparar el recálculo. | 🔴 |
 | **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
