@@ -129,6 +129,7 @@
   </div>
 
   <div class="matriz-card">
+  <div id="avisoMatriz"></div>
     <table class="matriz" id="matriz" aria-label="Matriz de riesgo">
       <thead>
         <tr>
@@ -176,6 +177,35 @@ async function init() {
       return `<tr><th scope="row">HI ${hi}</th>${cells}</tr>`;
     }).join('');
     $('mbody').innerHTML = rows;
+
+    // Una cuadrícula entera en ceros no significa «no hay riesgo»: casi
+    // siempre significa que falta el dato. Antes se pintaba muda y se leía
+    // como buena noticia (ADR-067).
+    const ubicados = [5, 4, 3, 2, 1]
+      .reduce((t, hi) => t + NIVELES_ORDEN.reduce((u, n) => u + agg[hi][n].count, 0), 0);
+    const cajaAviso = $('avisoMatriz');
+    if (cajaAviso) {
+      if (!txs.length) {
+        cajaAviso.innerHTML = '<div class="aviso"><b>No hay transformadores para evaluar.</b> '
+          + 'Esta matriz nunca inventa datos.</div>';
+      } else if (!ubicados) {
+        const sinHI = txs.filter((t) => !(t.salud_actual && t.salud_actual.hi_final != null)).length;
+        const sinUsuarios = txs.filter((t) => !(
+          (t.criticidad && t.criticidad.usuarios_aguas_abajo != null) ||
+          (t.servicio && t.servicio.usuarios_aguas_abajo != null))).length;
+        cajaAviso.innerHTML = '<div class="aviso aviso--warn"><b>La matriz está vacía porque falta '
+          + 'el dato, no porque no haya riesgo.</b> De ' + txs.length + ' transformadores, '
+          + sinHI + ' no tienen Índice de Salud calculado y ' + sinUsuarios + ' no tienen usuarios '
+          + 'aguas abajo registrados. Ambos ejes son necesarios: se llenan al importar el archivo '
+          + 'de Salud de Activos desde el panel de administración.</div>';
+      } else if (ubicados < txs.length) {
+        cajaAviso.innerHTML = '<div class="aviso">Se ubicaron <b>' + ubicados + '</b> de '
+          + txs.length + ' transformadores. Los ' + (txs.length - ubicados) + ' restantes no '
+          + 'tienen Índice de Salud o usuarios aguas abajo y quedan fuera de la matriz.</div>';
+      } else {
+        cajaAviso.innerHTML = '';
+      }
+    }
 
     document.querySelectorAll('.matriz .cell').forEach((c) => {
       if (c.classList.contains('count-0')) return;

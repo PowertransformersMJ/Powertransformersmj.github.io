@@ -271,7 +271,10 @@
     <div class="alerts-strip" id="alertsStrip">
       <div class="alert-empty">
         <i data-lucide="check-circle-2"></i>
-        <p>Sin alertas críticas. El parque opera dentro de parámetros.</p>
+        <p>Sin alertas críticas registradas.</p>
+        <!-- Antes decía «el parque opera dentro de parámetros». Con el Índice
+             de Salud sin calcular eso no se puede afirmar: la ausencia de
+             alertas no es una declaración de buena salud (ADR-067). -->
       </div>
     </div>
   </section>
@@ -506,7 +509,7 @@
         if (kpi) kpi.textContent = criticas.length ? (estado.resumen?.criticas ?? criticas.length) : 0;
         if (!strip) return;
         if (!criticas.length) {
-          strip.innerHTML = '<div class="alert-empty"><i data-lucide="check-circle-2"></i><p>Sin alertas críticas. El parque opera dentro de parámetros.</p></div>';
+          strip.innerHTML = '<div class="alert-empty"><i data-lucide="check-circle-2"></i><p>Sin alertas críticas registradas.</p></div>';
         } else {
           strip.innerHTML = criticas.map((a) => `
             <a class="alert-card" href="pages/alertas.html">

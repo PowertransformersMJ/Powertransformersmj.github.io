@@ -8,7 +8,6 @@
 <meta name="color-scheme" content="light">
 <title>SGM · TRANSPOWER — Seguimiento Operativo</title>
 <meta name="description" content="Dashboard de seguimiento operativo: violaciones SCADA U1/U2 sobre el parque de transformadores de potencia.">
-
 <!--
   SGM · TRANSPOWER — Seguimiento Operativo · SCADA U1/U2 Tracking
   Refactor F39: archivo standalone original (8.7 MB · libs + dataset
@@ -70,10 +69,14 @@
           <div class="subtitle" id="subtitle">Cargando metadatos…</div>
         </div>
         <div class="scada-status-meta">
-          <span class="badge badge-red" id="status-badge">CRITICAL ALERT</span>
+          <!-- El texto lo fija el shell según los datos reales: antes decía
+               «CRITICAL ALERT» siempre, sobre eventos ficticios (ADR-067). -->
+          <span class="badge" id="status-badge">—</span>
           <div id="meta-info">—</div>
         </div>
       </div>
+      <!-- Origen de los datos: qué se está mirando exactamente (ADR-067). -->
+      <div id="avisoOrigenScada"></div>
 
       <!-- ===== SECCIÓN DE CARGA ACUMULATIVA ===== -->
       <div class="upload-card" id="upload-card">

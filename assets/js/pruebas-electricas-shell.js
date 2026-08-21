@@ -591,6 +591,84 @@ const COLORES_ANO = ['#1d4ed8', '#0d9488', '#dc2626', '#7c3aed', '#ea580c', '#08
 // que el director la edite y la devuelva pidiendo modificaciones/mejoras (ADR-048).
 // La ruta es relativa a la PÁGINA (pages/…) → sube a la raíz y entra a docs/.
 // `docs/` se publica en GitHub Pages (pages.yml sube `path: .` + .nojekyll).
+/**
+ * Abre la ficha normativa de una prueba en un panel legible.
+ *
+ * El repositorio trae DIEZ fichas curadas (`docs/pruebas/*.json`) con qué mide
+ * cada ensayo, contra qué normas y con qué umbrales. Solo dos tenían botón; las
+ * otras ocho estaban publicadas y sin forma de abrirlas. Se MUESTRAN, no solo
+ * se descargan: el criterio se consulta al lado del veredicto (ADR-067).
+ */
+function verFichaPrueba(fichaId) {
+  const modal = document.getElementById('pe-ficha-modal');
+  const cuerpo = document.getElementById('pe-ficha-cuerpo');
+  const titulo = document.getElementById('pe-ficha-titulo');
+  if (!modal || !cuerpo) return;
+  cuerpo.innerHTML = '<p class="muted">Cargando el criterio…</p>';
+  modal.hidden = false;
+  modal.classList.add('is-on');
+
+  fetch('../docs/pruebas/' + fichaId + '.json')
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then((j) => {
+      if (titulo) titulo.textContent = j.nombre || fichaId;
+      const cu = j.criterio_y_umbrales || {};
+      const bloque = (t, html) => html
+        ? '<div class="pe-ficha-sec"><h4>' + esc(t) + '</h4>' + html + '</div>' : '';
+      const lista = (arr) => '<ul>' + (arr || []).map((x) => '<li>' + esc(x) + '</li>').join('') + '</ul>';
+
+      const normas = (cu.normas_multinorma || []).map((n) =>
+        '<tr><td>' + esc(n.norma) + '</td><td>' + esc(n.umbral) + '</td><td class="muted small">'
+        + esc(n.tipo || '') + '</td></tr>').join('');
+
+      const umbral = cu.umbral_vigente
+        ? '<table class="pe-ficha-tabla">' + Object.entries(cu.umbral_vigente)
+            .filter(([k]) => !k.startsWith('_'))
+            .map(([k, v]) => '<tr><td>' + esc(k) + '</td><td>' + esc(v) + '</td></tr>').join('')
+          + '</table>'
+        : '';
+
+      cuerpo.innerHTML = ''
+        + bloque('Criterio del tablero', cu.criterio_scorecard
+            ? '<p><b>' + esc(cu.criterio_scorecard) + '</b></p>' : '')
+        + bloque('Cómo se calcula', cu.formula ? '<p class="mono">' + esc(cu.formula) + '</p>' : '')
+        + bloque('Qué se mide', cu.metrica_peor_caso
+            ? '<p>' + esc(cu.metrica_peor_caso) + '</p>' : '')
+        + bloque('Umbral vigente', umbral)
+        + bloque('Normas aplicables', normas
+            ? '<table class="pe-ficha-tabla"><thead><tr><th>Norma</th><th>Umbral</th><th>Tipo</th>'
+              + '</tr></thead><tbody>' + normas + '</tbody></table>' : '')
+        + bloque('Notas', (j.notas && j.notas.length) ? lista(j.notas) : '')
+        + '<p class="muted small">Diagnóstico del motor: ' + esc(j.diagnostico_motor || '—')
+        + ' · <button type="button" class="pe-ficha-btn" data-descargar="' + esc(fichaId)
+        + '">descargar esta ficha (JSON)</button></p>';
+    })
+    .catch((e) => {
+      cuerpo.innerHTML = '<p>No se pudo abrir el criterio de esta prueba: ' + esc(e.message) + '</p>';
+    });
+}
+
+function cerrarFichaPrueba() {
+  const modal = document.getElementById('pe-ficha-modal');
+  if (!modal) return;
+  modal.classList.remove('is-on');
+  modal.hidden = true;
+}
+
+// Delegación: los botones «criterio» nacen con cada render del scorecard.
+if (typeof document !== 'undefined') {
+  document.addEventListener('click', (ev) => {
+    const ver = ev.target.closest('[data-ficha]');
+    if (ver) { verFichaPrueba(ver.getAttribute('data-ficha')); return; }
+    const bajar = ev.target.closest('[data-descargar]');
+    if (bajar) { descargarFichaPrueba(bajar.getAttribute('data-descargar'), bajar.getAttribute('data-descargar')); return; }
+    if (ev.target.closest('[data-cerrar-ficha]')) cerrarFichaPrueba();
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape') cerrarFichaPrueba();
+  });
+}
+
 function descargarFichaPrueba(fichaId, nombre) {
   fetch('../docs/pruebas/' + fichaId + '.json')
     .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
@@ -1104,20 +1182,20 @@ function encabezadoInforme(inf) {
 //     `calificarPrueba` sobre las mediciones (aislamiento = NETA por clase).
 //   · bujes (C1): derivado del peor tan δ medido del bloque vs el límite norma.
 const FAMILIAS_SCORE = [
-  { key: 'tand',        blockKeys: ['tand', 'tan_delta'],               label: 'Tan δ / FP · aislamiento del transformador', criterio: 'FP ≤ 1% (IEEE 62)' },
-  { key: 'bushing',     blockKeys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes (C1)',           criterio: 'tan δ ≤ 1% (IEEE 62 / C57.19.100)' },
-  { key: 'excitacion',  blockKeys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δ fases ≤ 10% (IEEE C57.152)' },
-  { key: 'relacion',    blockKeys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5% vs placa (IEEE C57.152 §7.2.10 / NETA 7.2.2)' },
-  { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)' },
-  { key: 'aislamiento', blockKeys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ mínimo NETA por clase' },
-  { key: 'collar',      blockKeys: ['collar'],                          label: 'Collar caliente / pérdidas en bujes', criterio: '< 100 mW' },
-  { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms' },
+  { key: 'tand',        blockKeys: ['tand', 'tan_delta'],               label: 'Tan δ / FP · aislamiento del transformador', criterio: 'FP ≤ 1% (IEEE 62)', ficha: '01-factor-potencia-aislamiento' },
+  { key: 'bushing',     blockKeys: ['bushing', 'bushing_capacitancia'], label: 'Factor de potencia de bujes (C1)',           criterio: 'tan δ ≤ 1% (IEEE 62 / C57.19.100)', ficha: '02-factor-potencia-bujes' },
+  { key: 'excitacion',  blockKeys: ['excitacion'],                      label: 'Corriente de excitación',        criterio: 'Δ fases ≤ 10% (IEEE C57.152)', ficha: '03-corriente-excitacion' },
+  { key: 'relacion',    blockKeys: ['relacion'],                        label: 'Relación de transformación',     criterio: '±0.5% vs placa (IEEE C57.152 §7.2.10 / NETA 7.2.2)', ficha: '04-relacion-transformacion' },
+  { key: 'resistencia', blockKeys: ['resistencia'],                     label: 'Resistencia de devanados',       criterio: 'Δ fases ≤ 2% (NETA ATS §7.2.2.D.8)', ficha: '05-resistencia-devanados' },
+  { key: 'aislamiento', blockKeys: ['aislamiento'],                     label: 'Resistencia de aislamiento (CC)', criterio: '≥ mínimo NETA por clase', ficha: '06-resistencia-aislamiento' },
+  { key: 'collar',      blockKeys: ['collar'],                          label: 'Collar caliente / pérdidas en bujes', criterio: '< 100 mW', ficha: '07-collar-caliente' },
+  { key: 'drm',         blockKeys: ['drm', 'oltc'],                     label: 'DRM · conmutador (OLTC)',        criterio: '40–70 ms', ficha: '08-drm-conmutador' },
   // SFRA y DFR: pruebas que SIEMPRE se listan (aunque no se hayan hecho), a pedido
   // del director. Su criterio es COMPARATIVO (no hay pasa/no-pasa numérico): SFRA
   // compara huellas por banda; DFR mide % de humedad del papel. Sin motor canónico
   // → si el informe trae el bloque, "realizada · comparar vs huella"; si no, "No realizada".
-  { key: 'sfra',        blockKeys: ['sfra'],                            label: 'SFRA · respuesta en frecuencia', criterio: 'Comparación por bandas vs huella (DL/T 911 · IEEE C57.149 · IEC 60076-18)' },
-  { key: 'dfr',         blockKeys: ['dfr'],                             label: 'DFR · espectroscopía dieléctrica', criterio: 'Humedad del papel < 2% (CIGRE TB 349/414 · IEEE C57.161)' }
+  { key: 'sfra',        blockKeys: ['sfra'],                            label: 'SFRA · respuesta en frecuencia', criterio: 'Comparación por bandas vs huella (DL/T 911 · IEEE C57.149 · IEC 60076-18)', ficha: '09-sfra-respuesta-frecuencia' },
+  { key: 'dfr',         blockKeys: ['dfr'],                             label: 'DFR · espectroscopía dieléctrica', criterio: 'Humedad del papel < 2% (CIGRE TB 349/414 · IEEE C57.161)', ficha: '10-dfr-espectroscopia-dielectrica' }
 ];
 
 // Veredicto NORMATIVO del bloque de bujes: peor tan δ medido vs el límite (mismo
@@ -1163,7 +1241,7 @@ function renderScorecard(cont, data, inf) {
       ? `≥ ${minNeta} GΩ · por clase ${kv} kV (interno ⚠️ · piso NETA 100.5: 5 GΩ)`
       : fam.criterio;
     if (r && r.estado && r.estado !== ESTADOS.NEUTRAL) {
-      return { label: fam.label, criterio, estado: r.estado, texto: r.texto };
+      return { label: fam.label, criterio, estado: r.estado, texto: r.texto, ficha: fam.ficha };
     }
     // Sin veredicto canónico. Pruebas COMPARATIVAS (SFRA/DFR: sin pasa/no-pasa
     // numérico): si el informe TRAE el bloque, se marca "realizada · comparar vs
@@ -1172,9 +1250,9 @@ function renderScorecard(cont, data, inf) {
     const presente = (fam.blockKeys || [fam.key]).some((bk) =>
       bloques.some((b) => new RegExp('\\b' + bk, 'i').test(String(b.prueba || ''))));
     if (presente && (fam.key === 'sfra' || fam.key === 'dfr')) {
-      return { label: fam.label, criterio, estado: ESTADOS.AMBAR, texto: 'realizada · comparar vs huella' };
+      return { label: fam.label, criterio, estado: ESTADOS.AMBAR, texto: 'realizada · comparar vs huella', ficha: fam.ficha };
     }
-    return { label: fam.label, criterio, estado: ESTADOS.NEUTRAL, texto: 'No realizada' };
+    return { label: fam.label, criterio, estado: ESTADOS.NEUTRAL, texto: 'No realizada', ficha: fam.ficha };
   });
   const cap = inf
     ? `Informe ${inf.ano || 's/a'} · calificación DERIVADA de los valores medidos contra los criterios normativos — independiente de la calificación del laboratorio. Las pruebas no realizadas se listan igual.`
@@ -1184,9 +1262,17 @@ function renderScorecard(cont, data, inf) {
     const contenido = esNd
       ? esc(f.texto)
       : `${esc(f.estado.etiqueta)}${(f.texto && f.texto !== 'OK') ? ` · ${esc(f.texto)}` : ''}`;
+    // Botón a la ficha normativa de la prueba. El repo trae DIEZ fichas
+    // curadas (`docs/pruebas/*.json`) con qué mide cada ensayo, sus normas y
+    // sus límites, y solo DOS estaban enlazadas: las ocho restantes estaban
+    // publicadas y no había forma de abrirlas desde ninguna pantalla (ADR-067).
+    const btnFicha = f.ficha
+      ? `<button type="button" class="pe-ficha-btn" data-ficha="${esc(f.ficha)}" `
+        + `title="Ver el criterio normativo de esta prueba">criterio</button>`
+      : '';
     return `<tr><td class="cfg">${esc(f.label)}</td>` +
       `<td><span class="cellbox ${f.estado.clase}"><span class="dot ${f.estado.dot}"></span>${contenido}</span></td>` +
-      `<td class="muted small">${esc(f.criterio)}</td></tr>`;
+      `<td class="muted small">${esc(f.criterio)} ${btnFicha}</td></tr>`;
   }).join('');
   cont.innerHTML = `<table><thead><tr><th>Prueba</th><th>Calificación normativa</th><th>Criterio · norma</th></tr></thead><tbody>${body}</tbody></table>` +
     `<p class="muted small" style="margin-top:8px">${esc(cap)}</p>`;

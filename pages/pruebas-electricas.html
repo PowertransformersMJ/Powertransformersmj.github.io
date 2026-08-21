@@ -246,5 +246,19 @@
   initModuleShell('pruebasTabs', { defaultTab: 'biblioteca' });
 </script>
 <script type="module" src="../assets/js/pruebas-electricas-shell.js"></script>
+<!-- Visor del criterio normativo de cada prueba. El repositorio trae diez
+     fichas curadas y solo dos tenían botón: ahora se pueden consultar todas
+     desde el scorecard, al lado del veredicto (ADR-067). -->
+<div class="pe-ficha-modal" id="pe-ficha-modal" role="dialog" aria-modal="true"
+     aria-labelledby="pe-ficha-titulo" hidden>
+  <div class="pe-ficha-win">
+    <div class="pe-ficha-bar">
+      <h3 id="pe-ficha-titulo">Criterio normativo</h3>
+      <button type="button" class="pe-ficha-x" data-cerrar-ficha aria-label="Cerrar">✕</button>
+    </div>
+    <div class="pe-ficha-cuerpo" id="pe-ficha-cuerpo"></div>
+  </div>
+</div>
+
 </body>
 </html>

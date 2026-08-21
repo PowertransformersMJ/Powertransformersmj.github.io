@@ -157,8 +157,52 @@ async function boot() {
   }
 
   // 4) Render inicial (después de SEED + extra)
-  store.on(() => renderAll());
+  store.on(() => { renderAll(); rotularOrigenScada(); });
   renderAll();
+  rotularOrigenScada();
+
+  /**
+   * Dice de dónde salen los eventos y desactiva la alarma cuando son de
+   * demostración. La pantalla mostraba 3 eventos sintéticos de subestaciones
+   * inventadas bajo un badge rojo «CRITICAL ALERT» cableado en el HTML que
+   * ningún código actualizaba jamás: una alarma permanente sobre datos que no
+   * existen (ADR-067).
+   */
+  function rotularOrigenScada() {
+    const st = store.get ? store.get() : {};
+    const fuente = st.source || 'empty';
+    const eventos = (st.events || []).length;
+    const esDemo = fuente === 'baseline';
+
+    const badge = document.getElementById('status-badge');
+    if (badge) {
+      if (esDemo) {
+        badge.textContent = 'DATOS DE DEMOSTRACIÓN';
+        badge.className = 'badge';
+      } else if (!eventos) {
+        badge.textContent = 'SIN EVENTOS';
+        badge.className = 'badge';
+      } else {
+        // La alarma se calcula, no se cablea: solo se enciende si hay
+        // violaciones de verdad.
+        const viol = (st.events || []).filter((e) => e && e.viol).length;
+        badge.textContent = viol ? viol + ' VIOLACIÓN(ES)' : 'SIN VIOLACIONES';
+        badge.className = viol ? 'badge badge-red' : 'badge';
+      }
+    }
+
+    const caja = document.getElementById('avisoOrigenScada');
+    if (!caja) return;
+    caja.innerHTML = esDemo
+      ? '<div class="aviso aviso--warn"><b>Estas NO son sus subestaciones.</b> La pantalla '
+        + 'muestra ' + eventos + ' evento(s) de demostración («SUB-DEMO-*») porque no hay datos '
+        + 'reales de SCADA cargados. No tome ninguna decisión con estas cifras: el dato real '
+        + 'llega por la colección <code>scada_eventos</code> o adjuntando un reporte.</div>'
+      : (fuente === 'empty' || !eventos
+          ? '<div class="aviso"><b>Sin eventos de SCADA.</b> No hay violaciones registradas para '
+            + 'el período consultado — esta pantalla nunca inventa datos.</div>'
+          : '');
+  }
 
   // 5) Suscripción Firestore (opcional)
   let _unsub = null;

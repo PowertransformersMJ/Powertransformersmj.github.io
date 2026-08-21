@@ -301,7 +301,9 @@ async function render() {
         </li>`).join('');
 
     // Próximas muestras (placeholder F26)
-    $('proximas').innerHTML = '<li class="empty">Integración pendiente con /muestras_programadas.</li>';
+    // Estado vacío en el idioma del ingeniero: antes se leía el nombre de una
+    // colección de la base de datos, que no le dice nada a quien la usa.
+    $('proximas').innerHTML = '<li class="empty">No hay muestras programadas.</li>';
 
     // Órdenes por estado (v2)
     const porEstado = {};
