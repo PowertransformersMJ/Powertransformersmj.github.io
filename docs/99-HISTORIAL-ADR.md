@@ -1485,7 +1485,11 @@ desde la banda, foco atrapado en el cajón.
 de identidad cuando dos transformadores de la misma subestación llegan por Excel · el aviso de trabajo
 sin guardar al cerrar la ficha. Todo queda en `10` como TODO-35.
 
-**66.8 Doctrina.** §3.2 aditivo (ningún renombrado; nombres exportados intactos) · §3.3 verificado en
+**66.8 Crudo de la deliberación.** Los 6 informes íntegros →
+`brain-private/sgm-transpower/research-archive/2026-08-20-adr066-auditoria-fichas/`
+(citan equipos reales: no van al repo público).
+
+**66.8b Doctrina.** §3.2 aditivo (ningún renombrado; nombres exportados intactos) · §3.3 verificado en
 vivo · §3.7 comité por iniciativa propia, aquí a petición explícita. Lección → **L-68**.
 
 ---
@@ -1538,5 +1542,8 @@ el filtro de ADR-062 funciona), pero son visibles en GitHub. Sobrevivieron a la 
 (c) Sembrar los 9 informes en Firestore para que el tablero los muestre. (d) `_firebase-test.html` y
 `seguimiento-bump-previews.html` siguen desplegados. → TODO-36.
 
-**67.8 Doctrina.** §3.2 (nada se inventa; el demo se rotula o no se muestra) · §3.3 verificado contra
+**67.8 Crudo de la deliberación.** Los 2 informes íntegros →
+`brain-private/sgm-transpower/research-archive/2026-08-21-adr067-barrido-sitio/`.
+
+**67.8b Doctrina.** §3.2 (nada se inventa; el demo se rotula o no se muestra) · §3.3 verificado contra
 producción, no contra el workflow. Lección → **L-69**.
