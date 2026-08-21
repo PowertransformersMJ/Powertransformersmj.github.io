@@ -115,6 +115,13 @@ function sanitizeElectrico(src) {
     corriente_nominal_primaria_a:   num(src.corriente_nominal_primaria_a),
     corriente_nominal_secundaria_a: num(src.corriente_nominal_secundaria_a),
     corriente_nominal_terciaria_a:  num(src.corriente_nominal_terciaria_a),
+    // Corriente MEDIDA por devanado. Es el otro término del cociente de
+    // cargabilidad: sin ella solo se conoce el porcentaje, y la pantalla de
+    // cargabilidad no puede mostrar cuántos amperios lleva de verdad cada
+    // equipo (ADR-067).
+    corriente_medida_primaria_a:   num(src.corriente_medida_primaria_a),
+    corriente_medida_secundaria_a: num(src.corriente_medida_secundaria_a),
+    corriente_medida_terciaria_a:  num(src.corriente_medida_terciaria_a),
     grupo_conexion:         str(src.grupo_conexion),
     impedancia_cc_pct:      num(src.impedancia_cc_pct),
     tap_cambiador:          str(src.tap_cambiador),

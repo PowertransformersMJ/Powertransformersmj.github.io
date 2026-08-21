@@ -2,11 +2,15 @@
 // SGM · TRANSPOWER — Seguimiento Operativo · Cargabilidad
 // DATA LAYER
 // ──────────────────────────────────────────────────────────────
-// Hidrata el dataset del dashboard combinando:
-//   1. Baseline JSON local (cargado con 3 URLs candidatas como
-//      fallback robusto, mismo patrón que indicadores-calidad).
-//   2. Realtime Firestore (colección /cargabilidad_transformadores)
-//      cuando esté configurada y poblada.
+// Hidrata el dataset del dashboard. ORDEN DE FUENTES (ADR-067):
+//   1. EL PARQUE REAL de Firestore (/transformadores): la ampacidad,
+//      la carga medida por devanado y el % de cargabilidad oficial
+//      llegan del Excel de Salud de Activos. Es el dato del Ingeniero.
+//   2. Realtime /cargabilidad_transformadores, si algún día se puebla.
+//   3. Baseline JSON local — DEMOSTRACIÓN SINTÉTICA. Antes era el
+//      primero de la lista y por eso la pantalla mostraba tres
+//      transformadores inventados como si fueran el parque. Ahora es
+//      el último recurso y va SIEMPRE rotulado como demo.
 //
 // API pública:
 //   - cargarBaselineLocal()                       → Promise<rows[]>
@@ -20,6 +24,7 @@ import {
   collection, query, orderBy, onSnapshot, limit,
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
 import { LIMITE_CARGABILIDAD } from '../domain/limites_lectura.js';
+import { cargabilidadDeParque } from '../domain/cargabilidad_parque.js';
 
 function candidatasBaselineURL() {
   const out = [];
@@ -77,6 +82,19 @@ export async function cargarBaselineLocal() {
   throw new Error('Baseline Cargabilidad no disponible · ' + (ultimo?.message || 'sin red'));
 }
 
+/**
+ * Deriva el tablero del PARQUE REAL. Una sola lectura, con tope, y todo el
+ * cálculo en dominio puro (`domain/cargabilidad_parque.js`).
+ * @returns {Promise<{filas:object[], resumen:object}|null>}
+ */
+async function cargarDesdeParque() {
+  if (!firestoreListo()) return null;
+  const m = await import('./transformadores.js');
+  const parque = await m.listarV2({ limite: LIMITE_CARGABILIDAD });
+  if (!Array.isArray(parque) || !parque.length) return null;
+  return cargabilidadDeParque(parque);
+}
+
 function firestoreListo() {
   return isFirebaseConfigured && !!getDbSafe();
 }
@@ -91,13 +109,25 @@ export function suscribirCargabilidad(onData, onError) {
   let unsubFirestore = null;
   let resuelto = false;
 
-  cargarBaselineLocal()
-    .then(rows => {
-      if (!resuelto) onData({ source: 'baseline', rows });
+  // 1º el parque REAL. Solo si no devuelve nada se recurre al baseline, y
+  // entonces la pantalla debe rotularlo: son datos de demostración.
+  cargarDesdeParque()
+    .then((res) => {
+      if (resuelto) return;
+      if (res && res.filas.length) {
+        resuelto = true;
+        onData({ source: 'parque', rows: res.filas, resumen: res.resumen });
+        return;
+      }
+      return cargarBaselineLocal().then((rows) => {
+        if (!resuelto) onData({ source: 'baseline-demo', rows, demo: true });
+      });
     })
-    .catch(err => {
-      console.warn('[cargabilidad] baseline no disponible:', err);
-      if (!resuelto) onData({ source: 'empty', rows: [] });
+    .catch((err) => {
+      console.warn('[cargabilidad] parque no disponible:', err);
+      cargarBaselineLocal()
+        .then((rows) => { if (!resuelto) onData({ source: 'baseline-demo', rows, demo: true }); })
+        .catch(() => { if (!resuelto) onData({ source: 'empty', rows: [] }); });
     });
 
   if (firestoreListo()) {

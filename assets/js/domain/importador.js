@@ -325,7 +325,16 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
       tension_terciaria_kv:  tTer,
       corriente_nominal_primaria_a:   ap,
       corriente_nominal_secundaria_a: asec,
-      corriente_nominal_terciaria_a:  at
+      corriente_nominal_terciaria_a:  at,
+      // CARGA MEDIDA por devanado. El Excel la trae (columnas «CARGA
+      // PRIMARIO/SECUNDARIO/TERCEARIO (A)») y se leía solo para calcular la
+      // calificación de cargabilidad: después se TIRABA. Sin ella, la pantalla
+      // de cargabilidad no puede mostrar la corriente real de ningún equipo y
+      // caía a un archivo de demostración con transformadores inventados
+      // (ADR-067). Guardarla es lo que permite ilustrar el parque de verdad.
+      corriente_medida_primaria_a:   cp,
+      corriente_medida_secundaria_a: cs,
+      corriente_medida_terciaria_a:  ct
     },
     mecanico: {}, refrigeracion: {}, protecciones: {},
     fabricacion: { fecha_fabricacion: fabFecha, ano_fabricacion: anoFab },

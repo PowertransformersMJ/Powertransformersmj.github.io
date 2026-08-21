@@ -2000,3 +2000,22 @@ body.aqua select:focus-visible,
 body.aqua textarea:focus-visible {
   box-shadow: 0 0 0 3px rgba(0,122,255,.22);
 }
+
+/* Aviso de origen de datos (ADR-067) — dice de dónde salen las cifras que se
+   están viendo. Nació porque una pantalla mostraba transformadores inventados
+   sin declararlo en ninguna parte. */
+.aviso {
+  background: rgba(255, 255, 255, .92);
+  border: 1px solid var(--edge-muted, rgba(0, 40, 90, .12));
+  border-left: 4px solid var(--brand, #007aff);
+  border-radius: var(--r-sm, 10px);
+  padding: 10px 14px;
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2, #1f3656);
+}
+.aviso--warn {
+  border-left-color: var(--warn, #ff9500);
+  background: rgba(255, 249, 240, .96);
+}

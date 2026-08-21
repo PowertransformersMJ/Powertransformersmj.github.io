@@ -15,7 +15,10 @@
   modular embebida como tab del card "Seguimiento Operativo".
 
   · CSS                  → assets/css/seguimiento-cargabilidad.css (scope .carga-shell)
-  · Dataset baseline     → assets/data/seguimiento-cargabilidad-baseline.json (102 KB · 206 trafos)
+  · Fuente PRINCIPAL     → el parque real de Firestore (ampacidad, carga medida y % de
+                            cargabilidad del Excel de Salud de Activos)
+  · Baseline local       → assets/data/seguimiento-cargabilidad-baseline.json — SOLO 3
+                            transformadores de DEMOSTRACIÓN, último recurso y rotulado
   · Dominio puro         → assets/js/domain/cargabilidad_{config,severidad,filtros}.js
   · Data layer           → assets/js/data/seguimiento_cargabilidad.js (Firestore realtime)
   · UI · store / filtros → assets/js/ui/cargabilidad/{state,filtros,live,modal,export}.js
@@ -52,6 +55,10 @@
       <button class="btn" id="exportBtn" type="button">⬇ Exportar CSV</button>
     </div>
   </div>
+
+  <!-- Origen de los datos: qué se está mirando exactamente. La pantalla
+       llegó a mostrar tres transformadores inventados sin decirlo (ADR-067). -->
+  <div id="avisoOrigen"></div>
 
   <!-- filtros -->
   <div class="glass filters">
