@@ -3,6 +3,8 @@
 > **Nodo neuronal: la EXPERIENCIA del cerebro** — gotchas, trampas y recetas que evitan reproceso y regresión.
 > **Cuándo leerlo** (Trigger de Experiencia, `CLAUDE.md §G.2`): ANTES de una op riesgosa/repetitiva (mover archivos, merges, cache, refactor) y cuando un síntoma "suena". No se auto-carga.
 > **Cómo crece** (Reflejo de Captura, `§G.4`): al fallar/sorprender/resolver algo no-obvio, apendar una lección (Síntoma → Causa → Receta → Cómo evitarlo) ANTES de cerrar la tarea; solo lo reutilizable.
+> **Cómo leerlo sin quemar contexto** (es la neurona on-demand más pesada): `grep -n "^## \|^### L-" docs/30-LECCIONES.md`
+> para ver secciones y títulos, y LUEGO `Read` con `offset`/`limit` solo del tramo que sirve. Nunca completo.
 > **IDs**: `L-NN` lecciones operativas; `M-NN` meta-aprendizajes. Cada lección = header `### L-NN · …`; el linter valida las refs.
 > Cosecha del CLAUDE.md previo (2026-06-04): las 14 reglas §0.1.2.* del monolito viven en `_legacy/CLAUDE-previo.md`; aquí condensadas, el detalle (bug, código, commits) en el legacy.
 
@@ -24,6 +26,8 @@
 
 ---
 
+### L-25 · Purgar archivos sensibles del historial git (filter-repo)
+**Disparador**: se commiteó algo sensible (PDFs de cliente, secretos) en repo público · **Cicatriz**: sacarlo del HEAD no basta — vive en commits viejos · **Regla**: (1) respaldo `git bundle create /tmp/backup-$(date +%s).bundle --all`; (2) anotar SHAs de ramas afectadas; (3) `pip3 install --user git-filter-repo`; (4) `git-filter-repo --invert-paths --path "Debug/" --force`; (5) re-agregar `origin` (filter-repo lo borra); (6) verificar `git rev-list --objects --all | grep -c "Debug/"` = 0; (7) force-push lo hace el DIRECTOR, nunca Claude. GitHub puede cachear commits viejos (pedir a Support si crítico); lo expuesto es ya-comprometido; clones deben re-clonar.
 ## 🌐 Frontend / runtime
 
 ### L-05 · NO usar `<datalist>` para búsqueda/autocompletar
@@ -40,6 +44,14 @@
 
 ---
 
+### L-22 · Contenido sobre el fondo "liquid glass" necesita superficie propia
+**Disparador**: crear módulos sobre el fondo foto `.aqua-power-scene` (`aqua-components.css`, `position:fixed; z-index:-1`) · **Cicatriz**: texto sin fondo propio queda ilegible ("los textos se ocultan con el fondo") · **Regla**: toda sección de contenido en panel sólido (`background:var(--pe-surface)` + borde/radio/sombra), acotado por `[data-tab-panel] > section`; sin sombra en internos (`.chartbox/.tblwrap/.matrix`) para evitar tarjeta-en-tarjeta; NUNCA texto suelto sobre el body.
+
+### L-23 · Gráficas SVG: eje Y dinámico para no desbordar el marco
+**Disparador**: gráficas en `assets/js/ui/pruebas/grafico-svg.js` · **Cicatriz**: `ymax` fijo (aislamiento 4, relación 0.6, resistencia 6) → un valor real (5.72 GΩ) se dibujaba FUERA del marco · **Regla**: techo dinámico `ejeMax(valores, limite, piso)` = `max(dataMax*1.15, limite*1.1, piso)` + `ticksY(ymax)` + `drawGridY()`; calcular `ymax` de los datos ANTES de definir `Y`; nunca asumir rango fijo para datos de campo (aislamiento 2–50 GΩ).
+
+### L-28 · UI gated por rol admin: re-render al `sgm:session-ready` (carrera intermitente)
+**Disparador**: UI condicionada a `esAdmin()` / `window.__sgmSession` · **Cicatriz**: la "X" de borrar aparecía a veces sí a veces no — `session-guard.js` resuelve el perfil ASÍNCRONO y setea `__sgmSession` + dispara `sgm:session-ready`; si el `onSnapshot` de datos llega antes, el gate queda en false · **Regla**: además del primer render, escuchar `window.addEventListener('sgm:session-ready', () => reRender())` (patrón de `contrato-info.js`, `aqua-shell.js`); nunca asumir sesión lista en el primer render.
 ## 🔥 Backend / infra / entorno
 
 ### L-09 · Deploys Firebase los ejecuta Claude (flujo ADR-005, desde 2026-06-06)
@@ -65,6 +77,14 @@
 
 ---
 
+### L-38 · Firestore "WebChannel RPC 'Listen' transport errored (400)" → activar auto-long-polling
+**Disparador**: error rojo `firestore.../Listen/channel... 400` + `WebChannelConnection RPC 'Listen' stream transport errored` en consola. · **Cicatriz**: `getFirestore(app)` usa WebChannel, que ciertas redes/proxies/antivirus bloquean (los datos igual cargan, pero puede cortar onSnapshot). · **Regla**: `firebase-init.js#getDbSafe` — `initializeFirestore(app, { experimentalAutoDetectLongPolling: true })` memoizado ANTES del primer `getFirestore` (con fallback). Es el fix oficial; no es bug del código de datos. Aparte: "domain not authorized for OAuth" solo afecta login Google/popup, no email/password ni Firestore.
+
+### L-29 · Firebase Storage NO se puede LEER desde el navegador sin CORS → datos que el browser lee van a Firestore
+**Disparador**: decidir dónde persistir datos · **Cicatriz**: lecturas (`getBytes`/`getBlob`/`getDownloadURL`+fetch, endpoint `?alt=media`) bloqueadas por CORS (`No 'Access-Control-Allow-Origin'`, `net::ERR_FAILED 200`); las ESCRITURAS sí pasan → engaña · **Regla**: ¿quién lee? Browser → Firestore (sin CORS); server/binario por URL directa → Storage. Configurar CORS del bucket (`gsutil cors set`) solo si es imprescindible. Caso: ADR-007 movió bloques a subcolección `informes/{id}/diagnostico/ia`.
+
+### L-30 · Firestore NO admite arrays anidados → serializar payloads complejos a string JSON
+**Disparador**: `setDoc` de tablas/matrices/JSON de LLM · **Cicatriz**: `tabla.filas=[[…],[…]]` → error `Nested arrays are not supported` (arrays DE OBJETOS sí valen; `[[...]]` no) · **Regla**: serializar el bloque complejo a string JSON en un campo (`{payload: JSON.stringify(obj), ts}`) y re-parsear al leer — inmune a arrays anidados, `undefined` y tipos raros. Caso: ADR-007 `guardarBloques`. Asumir arrays anidados por defecto en datos de LLM.
 ## 🔗 Integración cross-módulo (patrón canónico)
 
 ### L-16 · Integración cross-módulo = dominio puro + idempotencia + trazabilidad bidireccional
@@ -89,16 +109,37 @@
 
 ---
 
+### L-71 · Un array pasado a `args` de un Workflow llega SERIALIZADO como string
+**Disparador**: parametrizar un workflow con una lista (rutas, dimensiones, ítems). · **Cicatriz**: se pasó el array como string JSON y en el script `args` llegó siendo UN string; `args.filter`/`args.map` revientan. Estuvo años como callejón en `10` **sin fuente** — la auditoría §68 lo obligó a nacer con ancla (M-04). · **Regla**: `args` recibe el VALOR JSON real (`args: ["a.ts","b.ts"]`), nunca su serialización; si llega un string donde esperas lista, es esto. Ver `99 §68`.
+
+### L-70 · El `grep` de esta Mac es un envoltorio de **ugrep**, no GNU/BSD grep
+**Disparador**: barrido por `grep` para afirmar "no queda ninguna referencia a X". · **Cicatriz**: `grep --version` → `ugrep 7.8.4`; la shell define una función `grep` que ejecuta `ARGV0=ugrep claude -G --ignore-files --hidden -I --exclude-dir=.git …`. Semántica distinta a la esperada (`-I` salta binarios, excluye VCS, otras banderas largas). · **Regla**: para un barrido del que dependa una AFIRMACIÓN, correr `/usr/bin/grep` (o `git grep`) y comparar; `command grep` también salta la función. **Verificado 2026-08-21**: la afirmación heredada de que ugrep se salta lo gitignored (2 aciertos vs 38) **NO se reprodujo** en prueba controlada — el envoltorio sí encontró el archivo ignorado. Se conserva el hecho comprobado (no es GNU grep) y se marca lo no reproducido, para no perseguir un fantasma. Ver `99 §68`.
+
+### L-63 · No re-pedir una autorización que la doctrina YA concedió (fricción disfrazada de prudencia)
+**Disparador**: estar a punto de preguntar "¿procedo?" por una acción que `CLAUDE.md` ya autoriza de forma permanente. · **Cicatriz** (2026-07-28, ADR-058): terminé la migración completa y **retuve el merge a `main` pidiendo el visto bueno**, cuando §2 dice literalmente *"Claude ejecuta commit + push + merge + TODOS los deploys"* desde la entrevista F3a. El Ingeniero tuvo que repetirlo: *"tú haces commit, push, merge a main y todos los deploy siempre"*. Pedir permiso ya dado no es cautela: es devolverle al dueño un trabajo que él ya delegó, y encima suena a que no me leí su propia política. · **Regla**: antes de preguntar, **verifica si §2/§G ya lo cubre**. Si lo cubre → EJECUTA y reporta. Reserva la pregunta para lo que la doctrina NO cubre: dinero, legal, datos de cliente, go/no-go de negocio, o algo genuinamente irreversible y no previsto. Corolario: la validación por commit que él sí pidió es **presentarle el resumen claro**, no esperar su "sí" para cada paso.
+
 ## 🪞 Meta: fallos del propio cerebro (Reflejo de Autocrítica `CLAUDE.md §G.4`)
 
 ### M-01 · `brain-check.mjs` ensuciaba la raíz con un archivo `NUL` en cada corrida
 **Disparador**: archivo `NUL` 0-byte huérfano en la raíz. · **Cicatriz**: el linter traía `git rev-parse … 2>NUL` (Windows); en macOS/Linux crea un archivo literal `NUL` en cwd en cada corrida. · **Regla**: `scripts/brain-check.mjs:171` → `2>/dev/null` (2×); tooling POSIX-limpio; ante `NUL` huérfano, grep `2>NUL`.
 
+### M-02 · El mapa espacial se pudre en SILENCIO (el Reflejo de Frescura no tiene gate)
+**Disparador**: buscar dónde vive un módulo y que `20` diga "no está". · **Cicatriz** (auditoría 2026-08-21): `20-ESPACIAL` no nombraba el importador de Salud de Activos —la tarea VIVA del proyecto— ni Fichas Técnicas, ni Indicadores de Calidad, ni Seguimiento Operativo, pese a 4 ADRs seguidos sobre ellos. Un agente frío gastó 16 KB para recibir un "no documentado" FALSO. Ningún gate lo caza: el linter valida que las hojas existan, no que el mapa conozca el código. · **Regla**: al crear/mover una PÁGINA o un módulo `ui/`, la fila en `20` va en el MISMO commit; y al cerrar un ADR que estrena módulo, verificar `grep -c '<slug>' docs/20-MEMORIA-ESPACIAL.md` antes de dar la tarea por cerrada. Ver `99 §68`.
+
+### M-03 · Un ✅ que verifica una condición DISTINTA a la que anuncia
+**Disparador**: leer un verde del linter y creerle. · **Cicatriz** (auditoría 2026-08-21): (a) el arranque imprimía `✅ cache verificada (SW↔manager↔05)` con solo existir `sw.js`, mientras la comprobación real estaba saltada — una mentira inyectada en CADA sesión; (b) `✅ archiveDir íntegro (0 crudos indexados)` con 10 deliberaciones caras dentro, porque el gate solo miraba ficheros sueltos y la convención real son carpetas. · **Regla**: un gate cuyo mensaje no nombre EXACTAMENTE lo que evaluó es peor que no tenerlo (apaga la sospecha). Al leer un ✅ del que dependa una decisión, mirar su condición en el código; al escribir uno, que la condición del `if` sea la del texto. Ver `99 §68`.
+
+### M-04 · Un callejón sin cita es superstición
+**Disparador**: la lista `🚫 Callejones` de `10`. · **Cicatriz** (auditoría 2026-08-21): de 8 entradas, 3 llevaban cita y una ("Workflow `args` grande como string → serializado") **no tenía fuente en ninguna neurona**: se obedecía sin poder reevaluarse. En paralelo, los callejones probados de ADR-058/066/067 —lo más caro de producir— nunca llegaron a la lista. · **Regla**: todo "no reintentar" nace con su ancla (`L-NN`, `§NN` o ruta del crudo) o no se escribe; y al cerrar una deliberación, sus falsos positivos y su "verificado sano" bajan a `10 §🚫` ANTES de que la bóveda sea el único ejemplar. Ver `99 §68`.
+
+### M-05 · La bóveda es COMPARTIDA: un `git add` amplio se lleva el trabajo a medio hacer de otra sesión
+**Disparador**: dos sesiones de Claude abiertas a la vez en proyectos distintos del paraguas (aquí y `mantenimiento-lineas-at`). · **Cicatriz** (2026-08-21, durante la auditoría §68): mientras yo editaba `../brain-private/kernel/` para el bump a v1.9.0, la otra sesión commiteó en la MISMA bóveda con un `git add` amplio y se llevó mi `VERSION`, mi `brain-check.mjs` y mi `session-handoff.mjs` **a medio terminar**, bajo el mensaje `f10d142` («ADR-045 enlaza sus crudos»), que no habla de nada de eso. La historia quedó diciendo una cosa distinta de la que pasó, y no se reescribe porque la bóveda es compartida. · **Regla**: en `brain-private` **`git add` de rutas específicas SIEMPRE** (`CLAUDE.md §2` ya lo exige y aquí es doblemente crítico: el repo tiene dueños concurrentes); antes de commitear ahí, `git status --porcelain -uall` y commitear **solo lo tuyo**; si aparece trabajo ajeno a medias, se deja y se avisa, no se barre. Ver `99 §68`.
+
 > Pendiente universal: no confiar en `origin/*` sin `git fetch`. Lección→doctrina: promover a `CLAUDE.md §3`. Tope ~350 líneas: shard (ej. `31-LECCIONES-GIT.md`) registrada en §0/`00-INDICE`, puntero madre→hija.
 
 ---
 
-## 🤖 IA / Claude API (Anthropic)
+## ⚡ Pruebas Eléctricas: dominio, tablero y previews fieles
 
 ### L-49 · UI con requisito ambiguo o sensible → workflow de PREVIEW (dev-server + harness mock) ANTES de cablear
 **Disparador**: cambio de UI no trivial invisible en la app real (admin-gated + Firebase). · **Cicatriz**: (ADR-024) doble misinterpretación; la "leyenda 2019/2021/2023" NO eran chips de filtro (`.pe-fase-chip`=0). · **Regla**: `scripts/dev-server.mjs` (Node puro; `python -m http.server` da `PermissionError` en el sandbox) + harness `_dev/preview-multiano.html` con módulos reales + mocks; validar con Preview MCP y eval duro (líneas SVG 6→5 tras clic). Una LEYENDA no es un FILTRO hasta clicarla.
@@ -124,9 +165,10 @@
 ### L-51 · BORRAR de más es destruir valor ajeno al pedido → ante duda de alcance, retira lo MÍNIMO señalado (no el contenedor)
 **Disparador**: borrado por pantallazo o alcance ambiguo. · **Cicatriz**: (ADR-035→036) "elimina esto": el pantallazo arrancaba en el encabezado "Resultados del informe" pero señalaba el bloque tan δ; oculté TODA la sección y borré bujes/excitación/relación/resistencia/aislamiento. · **Regla**: defecto CONSERVADOR — retirar lo mínimo, nunca el contenedor; lo ya representado en otro lado (tan δ) es candidato, lo único es pérdida neta; implementar como filtro (`bloques.filter(b => familiaMA(b)?.key !== 'tand')`) y validar en `preview-bloques.html`.
 
-> **Lecciones de IA / Claude API / Cloud Functions (L-35, L-43–L-48)** → shard a
-> [`31-LECCIONES-IA.md`](31-LECCIONES-IA.md) (§G.5, 2026-07-22): streaming largo, reintentos,
-> timeouts, trabajo asíncrono observable. Léela antes de tocar `functions/` o el pipeline de IA.
+> **Todo lo de IA / Claude API / Cloud Functions vive en la hija** →
+> [`31-LECCIONES-IA.md`](31-LECCIONES-IA.md) (§G.5): streaming largo, reintentos, timeouts, trabajo
+> asíncrono observable y extracción con LLM (prompt, modelo, estructura). Léela ANTES de tocar
+> `functions/` o el pipeline de IA. La hija lleva su propio listado — aquí no se duplican sus IDs.
 
 ### L-42 · Ninguna columna "Evaluación/OK" en las tablas — el veredicto es del panel multi-norma
 **Disparador**: tablas de detalle (tan δ, bujes, aislamiento) con veredictos por fila. · **Cicatriz**: el prompt PEDÍA columna "Evaluación" (la IA ponía "OK") y `derivarTablaTAP` añadía "Eval." derivada — doble origen que violaba L-36. Cada laboratorio nombra distinto la columna (2021/Applus: "Resultado"/"Evaluación"; 2023/EMS: "Evaluación"). · **Regla** (3 capas): (1) quitar Evaluación/Calificación del prompt (IA emite solo datos crudos) + re-deploy de `extraerPruebasElectricasIA`; (2) `derivarTablaTAP` sin "Eval." (mantener "Desv. %", que es DATO); (3) `quitarColumnasVeredicto` (dominio) como strip defensivo en `tablaBloque` — detección por DOS vías: encabezado `/evaluaci|calificaci|veredicto|resultado|concepto|dictamen|diagnostic|^eval\.?$/i` O todas las celdas = palabras de veredicto. Tablas = DATOS; veredicto = panel multi-norma; sospechoso → `verificar`, nunca "OK".
@@ -140,59 +182,14 @@
 ### L-39 · Re-carga de informes = upsert por fecha exacta (con confirmación), no duplicar a ciegas
 **Disparador**: cargas que pueden repetirse. · **Cicatriz**: `crearInforme` siempre hacía `addDoc` → duplicados (dos puntos del mismo año en la tendencia, columnas dobles). · **Regla** (`storeReport`): `listarInformes(unidadId)` + `buscarInformeExistente` por FECHA EXACTA (dd/mm/aaaa; fallback a AÑO solo si el nuevo no trae fecha); si hay match, `window.confirm` → REEMPLAZAR (borra doc + diagnóstico + `eliminarPDF`, sin huérfanos) o crear nuevo. Lista local mutable para duplicados dentro del MISMO lote. Toda carga repetible: clave de identidad + política de colisión explícita, nunca "siempre insertar".
 
-### L-38 · Firestore "WebChannel RPC 'Listen' transport errored (400)" → activar auto-long-polling
-**Disparador**: error rojo `firestore.../Listen/channel... 400` + `WebChannelConnection RPC 'Listen' stream transport errored` en consola. · **Cicatriz**: `getFirestore(app)` usa WebChannel, que ciertas redes/proxies/antivirus bloquean (los datos igual cargan, pero puede cortar onSnapshot). · **Regla**: `firebase-init.js#getDbSafe` — `initializeFirestore(app, { experimentalAutoDetectLongPolling: true })` memoizado ANTES del primer `getFirestore` (con fallback). Es el fix oficial; no es bug del código de datos. Aparte: "domain not authorized for OAuth" solo afecta login Google/popup, no email/password ni Firestore.
-
 ### L-37 · Veredicto robusto = MULTI-NORMA (peor de todas + mostrar divergencias) — ninguna norma es "la definitiva"
 **Disparador**: calificar una prueba contra criterios normativos. · **Cicatriz**: colapsar a UN criterio (≤2% NETA) pierde diagnóstico — cada norma mira un ángulo (NETA pisos, IEEE C57.152 método+tendencia, MO.00418 por clase, industria, fábrica baseline); caso testigo: 5 GΩ a 110 kV pasa NETA 100.5 pero falla por clase 30 GΩ. · **Regla** (ADR-012, `pruebas_electricas_multinorma.js`): `evaluarMultiNorma` → `{opticas, consolidado=el más conservador, divergen}`; el consolidado conduce el semáforo, las divergencias se muestran; precedencia fábrica > clase > NETA > industria define qué número se CITA, no cuál se ignora. Gotcha: al reusar `calificarResistencia` como evaluador NO pasar `ctx` crudo como 2º arg (lo toma como `flagVerificar` → siempre ámbar); envolver `(v)=>calificar(v)`. Marco: `_conocimiento/marco-normativo-multinorma.md §4`.
 
 ### L-36 · El veredicto es del VALOR contra la NORMA — nunca del informe ni del texto de la IA
 **Disparador**: cualquier "estado/semáforo/OK" en la UI. · **Cicatriz** (ADR-011): `renderScorecard` mapeaba `b.calif` (texto del laboratorio/IA) al semáforo mientras el KPI derivaba de `calificarPrueba(valor)` → "Satisfactorio" junto a "fuera de norma". · **Regla**: toda calificación se computa en el dominio desde el valor medido vs el umbral (`calificarPrueba`, único punto de verdad); el texto del informe/IA es solo CONTEXTO. Parámetros físicos del criterio (clase de tensión, NETA 100.5) entran al calificador del DOMINIO (`opts.minNeta`), no a la capa de presentación — si no, las vistas divergen. Citar siempre norma + umbral junto al veredicto.
 
-### L-20 · IDs de modelo Claude: forma exacta y cascada por costo
-**Disparador**: codear cualquier llamada a la API de Claude. · **Cicatriz**: IDs inventados (`claude-4-8-opus`, `claude-3-5-sonnet-20241022`, "Opus 4.8") dan 404/400. · **Regla**: válidos `claude-opus-4-7`, `claude-sonnet-4-6`, `claude-haiku-4-5`; verificar SIEMPRE contra la skill `claude-api` (`shared/models.md`), no memoria. Cascada: Sonnet 4.6 por defecto (extracción/clasificación), Opus 4.7 solo escalación en PDFs ambiguos, Haiku 4.5 para lo simple. Allowlist server-side + default seguro en `extraerPruebasElectricasIA`.
-
-### L-21 · Extracción de PDFs variables con Claude (patrón de la plataforma)
-**Disparador**: llevar PDFs sin formato fijo a schema estructurado con IA · **Cicatriz**: exponer key o romper front · **Regla**: Cloud Function `onCall` con secret `LLM_API_KEY` (`defineSecret`, región `southamerica-east1` igual en `getFunctions` o da `not-found`); cliente pasa `storagePath` y la función descarga el PDF server-side → base64 como bloque `{type:'document'}` (Claude ve tablas/escaneos, evita límite de payload); tool use forzado con `input_schema` que espeja `sanitizarInforme` (sin `$ref/$defs`, sin calificaciones en la IA — el dominio deriva el color); prompt caching (`cache_control ephemeral` en system, ~80% menos costo); fallback IA → extractor local → editor manual; contrato fijado por test puro `tests/pruebas_electricas_ia.test.js`.
-
-### L-22 · Contenido sobre el fondo "liquid glass" necesita superficie propia
-**Disparador**: crear módulos sobre el fondo foto `.aqua-power-scene` (`aqua-components.css`, `position:fixed; z-index:-1`) · **Cicatriz**: texto sin fondo propio queda ilegible ("los textos se ocultan con el fondo") · **Regla**: toda sección de contenido en panel sólido (`background:var(--pe-surface)` + borde/radio/sombra), acotado por `[data-tab-panel] > section`; sin sombra en internos (`.chartbox/.tblwrap/.matrix`) para evitar tarjeta-en-tarjeta; NUNCA texto suelto sobre el body.
-
-### L-23 · Gráficas SVG: eje Y dinámico para no desbordar el marco
-**Disparador**: gráficas en `assets/js/ui/pruebas/grafico-svg.js` · **Cicatriz**: `ymax` fijo (aislamiento 4, relación 0.6, resistencia 6) → un valor real (5.72 GΩ) se dibujaba FUERA del marco · **Regla**: techo dinámico `ejeMax(valores, limite, piso)` = `max(dataMax*1.15, limite*1.1, piso)` + `ticksY(ymax)` + `drawGridY()`; calcular `ymax` de los datos ANTES de definir `Y`; nunca asumir rango fijo para datos de campo (aislamiento 2–50 GΩ).
-
-### L-24 · Extracción IA: completitud en informes densos / multi-TAP
-**Disparador**: informes densos (slides, 3 devanados, 17 TAPs) · **Cicatriz**: con Sonnet solo salió tan δ; el resto vacío — datos por TAP no encajan en schema de valor único y modelos menores rinden peor · **Regla**: system prompt explícito "recorre TODO, extrae TODAS las familias, para datos por TAP elige posición representativa/peor caso, nunca dejar vacío lo que aparece"; `max_tokens` 16k→32k; preferir Opus 4.7 para densos; pendiente: schema con series POR TAP (cambio de schema+render, no solo prompt).
-
-### L-25 · Purgar archivos sensibles del historial git (filter-repo)
-**Disparador**: se commiteó algo sensible (PDFs de cliente, secretos) en repo público · **Cicatriz**: sacarlo del HEAD no basta — vive en commits viejos · **Regla**: (1) respaldo `git bundle create /tmp/backup-$(date +%s).bundle --all`; (2) anotar SHAs de ramas afectadas; (3) `pip3 install --user git-filter-repo`; (4) `git-filter-repo --invert-paths --path "Debug/" --force`; (5) re-agregar `origin` (filter-repo lo borra); (6) verificar `git rev-list --objects --all | grep -c "Debug/"` = 0; (7) force-push lo hace el DIRECTOR, nunca Claude. GitHub puede cachear commits viejos (pedir a Support si crítico); lo expuesto es ya-comprometido; clones deben re-clonar.
-
-### L-26 · `tool_choice` forzado MATA el thinking → extracción incompleta en docs densos
-**Disparador**: extracción de documentos largos con tool use · **Cicatriz**: con `tool_choice:{type:'tool'}` el modelo NO puede emitir thinking → satisficing: solo la primera prueba salía, sin importar prompt ni `max_tokens` · **Regla**: extracción compleja = `tool_choice:{type:'auto'}` + `thinking:{type:'adaptive'}` + `output_config:{effort:'high'}` (Opus 4.7/Sonnet 4.6; en Haiku omitir) + streaming (`client.messages.stream(...).finalMessage()`) contra timeouts; pedir en el prompt recorrer el doc completo. Herramienta forzada SOLO para tareas triviales de 1 paso.
-
-### L-27 · `httpsCallable` default 70 s → IA "falla y cae al motor local" en PDFs lentos
-**Disparador**: callable que invoca IA/operación larga · **Cicatriz**: PDF escaneado 3.86 MB → el SDK aborta a los 70 s por defecto (`deadline-exceeded`) aunque el server siga (`timeoutSeconds` 300) → catch → fallback OCR local lento; el 404 de `…bloques.json` era benigno · **Regla**: fijar `timeout` explícito en cliente `httpsCallable(fns, name, {timeout:540000})` ≥ `timeoutSeconds` del server (540 s; gen2 hasta 3600) + memoria `1GiB`; nunca confiar en el default de 70 s.
-
-### L-28 · UI gated por rol admin: re-render al `sgm:session-ready` (carrera intermitente)
-**Disparador**: UI condicionada a `esAdmin()` / `window.__sgmSession` · **Cicatriz**: la "X" de borrar aparecía a veces sí a veces no — `session-guard.js` resuelve el perfil ASÍNCRONO y setea `__sgmSession` + dispara `sgm:session-ready`; si el `onSnapshot` de datos llega antes, el gate queda en false · **Regla**: además del primer render, escuchar `window.addEventListener('sgm:session-ready', () => reRender())` (patrón de `contrato-info.js`, `aqua-shell.js`); nunca asumir sesión lista en el primer render.
-
-### L-29 · Firebase Storage NO se puede LEER desde el navegador sin CORS → datos que el browser lee van a Firestore
-**Disparador**: decidir dónde persistir datos · **Cicatriz**: lecturas (`getBytes`/`getBlob`/`getDownloadURL`+fetch, endpoint `?alt=media`) bloqueadas por CORS (`No 'Access-Control-Allow-Origin'`, `net::ERR_FAILED 200`); las ESCRITURAS sí pasan → engaña · **Regla**: ¿quién lee? Browser → Firestore (sin CORS); server/binario por URL directa → Storage. Configurar CORS del bucket (`gsutil cors set`) solo si es imprescindible. Caso: ADR-007 movió bloques a subcolección `informes/{id}/diagnostico/ia`.
-
-### L-30 · Firestore NO admite arrays anidados → serializar payloads complejos a string JSON
-**Disparador**: `setDoc` de tablas/matrices/JSON de LLM · **Cicatriz**: `tabla.filas=[[…],[…]]` → error `Nested arrays are not supported` (arrays DE OBJETOS sí valen; `[[...]]` no) · **Regla**: serializar el bloque complejo a string JSON en un campo (`{payload: JSON.stringify(obj), ts}`) y re-parsear al leer — inmune a arrays anidados, `undefined` y tipos raros. Caso: ADR-007 `guardarBloques`. Asumir arrays anidados por defecto en datos de LLM.
-
-### L-32 · Cambiar el prompt ≠ que el LLM obedezca → VERIFICAR la salida cruda antes de declarar hecho
-**Disparador**: cerrar una tarea que depende de salida de LLM · **Cicatriz**: reforcé el prompt para emitir `tabla` completa, declaré hecho y desplegué; la IA puso los datos en `series` y omitió `tabla` — prosa imperativa es sugerencia DÉBIL (anti-patrón §3.3) · **Regla**: (1) tras tocar un prompt, verificar la salida real (`[IA-DIAG]` `mediciones_raw`/`bloques_raw` o panel de interpretación cruda; el `[IA-DIAG-RESUMEN]` no basta); (2) para forzar formato, few-shot concreto > prosa; (3) si sigue fallando, `required` en el tool schema o derivar en cliente. Caso: ADR-008, `functions/index.js` SYSTEM_PRUEBAS_IA.
-
-### L-33 · El LLM omite estructura REDUNDANTE → derivar en el cliente + adjuntar lo único-del-PDF inline
-**Disparador**: una salida del LLM falla 2 veces pese al prompt · **Cicatriz**: ni el few-shot logró la `tabla` ancha (logs: `tabla cols=0`, 2 corridas) — re-emitir datos ya presentes en `series` es redundante y el modelo lo evita sistemáticamente · **Regla (ADR-008 lote 6)**: derivar en cliente lo computable (`derivarTablaTAP()`, dominio puro); canal `extra` por punto para lo único-del-PDF (`{x,y,extra:{...}}` inline, mínima data nueva); umbrales/criterios normativos = DOMINIO (`UMBRAL_DESBALANCE`/`CRITERIOS_NORMA`), nunca la IA. El prompt es la última palanca, no la primera.
-
 ### L-34 · Auto-graficar TODA magnitud derivada produce ruido/duplicados → curar qué amerita gráfica
 **Disparador**: auto-render de claves `extra`/derivadas · **Cicatriz**: gráficas redundantes (R.Ref ≈ R.Medida, %DIF duplicada, tensión monótona sin valor) — "renderiza todo" trata datos de TABLA como de GRÁFICA · **Regla (ADR-009, `bloquesDeExtra`/`EXTRA_GRAFICABLE`)**: data secundaria a TABLA por defecto; solo graficar magnitud distinta y diagnóstica (ej. Potencia); curar con allowlist/regex/flag. Mostrar dato ≠ visualizar tendencia; más gráficas ≠ más claridad.
-
-### L-31 · Las claves categóricas que emite el LLM NO son estables → aliasear, no igualar
-**Disparador**: matching contra claves categóricas de LLM (`prueba`, `tipo_prueba`, secciones, unidades) · **Cicatriz**: la IA pasó de `"tand"` a `"tan_delta"` y el scorecard perdió la fila Tan δ (filtro con `keys.includes('tand')`) · **Regla**: comparar con conjunto de alias (`['tand','tan_delta']`) o normalizar (lowercase + sinónimos). Caso: ADR-008, `FAMILIAS_SCORE`; vigilar `bloqueDesviacion` keyado por `prueba==='excitacion'`.
 
 ### L-57 · "Hazlo como X" → encuentra QUÉ componente produce X antes de construir uno nuevo
 **Disparador**: pedido "hazlo como X" · **Cicatriz (ADR-050)**: asumí que las tablas de excitación salían de `excitacion-panel.js` y recreé un panel en `tand-panel.js`; en realidad las renderiza `montarPanelPrueba(host,'excitacion',…)` (`tablas-pruebas-panel.js`), compartido y que YA soportaba `'tand'` — rechazo del director y revert a HEAD · **Regla**: localizar el código que produce X (grep del render real, no el panel "obvio") y reusar; "parecerse a X" = usar el MISMO componente, no reimplementar (§3.3).
@@ -214,88 +211,10 @@
 ### L-62 · Automatizar el Chrome del Ingeniero: subir archivos = gesto humano; localhost bloqueado
 **Disparador**: inyectar un archivo local a un file-input de la app vía la extensión de Chrome. · **Cicatriz** (2026-07-23, carga del informe LEL27007): `file_upload` de la extensión solo acepta archivos compartidos a la sesión (ni scratchpad); `fetch` a `http://127.0.0.1` desde página https queda COLGADO por Local Network Access de Chrome (ni con headers PNA/CORS — el prompt de permiso no aparece en fetch programático); los inputs de wizards nacen ocultos en su paso (`display:none`). · **Regla**: la vía robusta es el **drag&drop del usuario** — prepararle todo: `open -R "<archivo>"` revela el PDF seleccionado en Finder y el arrastre son 5 s; si el input está oculto, hacerlo visible con JS es legítimo para diagnóstico. NO pelear contra los candados (son de seguridad, no bugs); presupuestar el gesto humano en el flujo.
 
-### L-63 · No re-pedir una autorización que la doctrina YA concedió (fricción disfrazada de prudencia)
-**Disparador**: estar a punto de preguntar "¿procedo?" por una acción que `CLAUDE.md` ya autoriza de forma permanente. · **Cicatriz** (2026-07-28, ADR-058): terminé la migración completa y **retuve el merge a `main` pidiendo el visto bueno**, cuando §2 dice literalmente *"Claude ejecuta commit + push + merge + TODOS los deploys"* desde la entrevista F3a. El Ingeniero tuvo que repetirlo: *"tú haces commit, push, merge a main y todos los deploy siempre"*. Pedir permiso ya dado no es cautela: es devolverle al dueño un trabajo que él ya delegó, y encima suena a que no me leí su propia política. · **Regla**: antes de preguntar, **verifica si §2/§G ya lo cubre**. Si lo cubre → EJECUTA y reporta. Reserva la pregunta para lo que la doctrina NO cubre: dinero, legal, datos de cliente, go/no-go de negocio, o algo genuinamente irreversible y no previsto. Corolario: la validación por commit que él sí pidió es **presentarle el resumen claro**, no esperar su "sí" para cada paso.
+## 🧭 Verificación, despliegue y honestidad del dato → hija `32`
 
-### L-64 · El saneador que reintroduce lo que borra (fuga por la lista de lo prohibido)
-**Síntoma.** Se sanea un binario para quitarle datos de cliente y el `.xlsx` queda impecable… pero el
-script que lo limpia lleva escrita, en texto plano, la lista de lo que debe borrar: nombres de
-personas reales, subestaciones, usuario de dominio, fechas de firma. En un repo PÚBLICO la fuga
-simplemente se mudó de archivo. Lo detectó una auditoría adversarial, no el que escribió el script.
-**Regla.** El material sensible que un script necesita **conocer** para eliminarlo vive FUERA del repo
-público — en `../brain-private/` — y el script **falla ruidosamente** si no lo encuentra, en vez de
-sanear a medias. Nunca literales sensibles en código versionado, ni siquiera "para borrarlos".
-**Corolario (más caro que el síntoma).** Al abrir la plantilla PE.02081 aparecieron **firmas
-manuscritas escaneadas** de tres personas, el autor del archivo, GUIDs de la organización M365,
-rutas locales con usuario de dominio y el estudio económico del proyecto real. **Un formato
-institucional recibido por correo es material de cliente hasta que se demuestre lo contrario**:
-descomprimirlo y auditar TODAS sus partes (XML, `.rels`, `docProps`, `media/`) antes de versionarlo.
-**Gate.** [HONOR] — ningún linter lo cubre. Ver `99 §61`.
-
-### L-65 · Un arreglo desplegado no es un arreglo verificado (GitHub Pages en modo `legacy`)
-**Síntoma.** Se corrige una fuga filtrando el artefacto en `pages.yml`, el commit entra, el workflow
-«Deploy» sale VERDE… y los archivos siguen sirviéndose en producción. Se reportó como resuelto y no
-lo estaba.
-**Causa.** GitHub Pages tenía `build_type: legacy`: publica la rama directamente e **ignora por
-completo** el artefacto que sube el workflow. El flujo corría y su salida no se usaba.
-**Regla.** Tras CUALQUIER arreglo de despliegue, comprobar el EFECTO contra la URL pública con
-anti-caché (`curl -o /dev/null -w '%{http_code}' "$URL?cb=$(date +%s)"`), nunca el estado del
-workflow. Verde en Actions ≠ cambio en producción. Y antes de tocar `pages.yml`, mirar
-`gh api repos/OWNER/REPO/pages` y confirmar que `build_type` es `workflow`.
-**Corolario.** Un sitio ESTÁTICO no puede guardar datos privados: todo lo que lee el navegador es
-público. Si un dato no debe verse, no se arregla con `.gitignore` ni con filtros de publicación —
-se mueve detrás de la autenticación. El catálogo de 206 equipos se resolvió leyendo de Firestore.
-**Gate.** [HONOR]. Ver `99 §62`.
-
-### L-66 · Lo DECLARADO en el repo no es lo que hay en producción (índices de Firestore)
-**Síntoma.** El archivo declaraba 37 índices y producción tenía 33: los 4 de
-`acciones_refrigeracion` llevaban meses declarados sin desplegar. Y 5 colecciones publicadas
-(`auditoria`, `fallados`, `contramuestras`, `monitoreo_intensivo`, `propuestas_reclasificacion_fur`)
-no tenían ninguno: sus pantallas fallaban con `FAILED_PRECONDITION` al filtrar.
-**Causa.** Un índice se declara en el repo pero solo existe si alguien corre el deploy. Son dos
-estados independientes y nada los concilia: sin gate, sin aviso, y el error solo se ve en la consola
-del usuario que filtra. Igual con las CF: `maxInstances` no acota nada hasta desplegar.
-**Regla.** Antes de afirmar que un índice o una función existe, PREGUNTARLE AL SERVIDOR
-(`firestore:indexes`, `functions:list`) y comparar contra lo declarado. Misma raíz que L-65 aplicada
-al backend: **el repo describe una intención; producción es un hecho aparte**.
-**Corolario.** Un `where` + `orderBy` nuevo lleva su índice en el MISMO turno: declarado y desplegado.
-**Gate.** [HONOR]. Ver `99 §63`.
-
-### L-67 · Una hoja de estilos sin marcado detrás es un port a medias
-**Síntoma.** El dueño dice que un módulo portado «no está como lo diseñó». Difícil de confirmar
-leyendo código: lo que hay funciona; el defecto es lo que FALTA, y las ausencias no se ven.
-**Medida objetiva.** Cruzar las clases que DEFINE el CSS contra las que USA el JS. En Fichas Técnicas:
-189 de 339 (56%) sin usar — la hoja traía las cuatro vistas y el JS pintaba una. Convierte una
-impresión en un hecho, y además dice QUÉ falta: cada familia huérfana (`ftm-rmx`, `ftm-gkpi`,
-`ftm-norma`, `ftm-form`) nombraba una vista.
-**Regla.** Al portar un módulo cuyo CSS se trae entero, medir esa cobertura ANTES de darlo por cerrado.
-Un CSS que define el doble de lo que el marcado usa no es «CSS de más»: es la lista de lo que falta.
-**Corolario.** No juzgar una página por su preview de `_dev/` sin comprobar que monta lo MISMO que la
-real: el de fichas no montaba la evaluación masiva. Primero se hace fiel el preview, luego se compara.
-**Gate.** [HONOR]. Ver `99 §64`.
-
-### L-68 · Auditar en paralelo por dimensiones: lo que dos auditores ven a la vez, es real
-**Receta.** Un auditor por DIMENSIÓN en paralelo (dominio · arquitectura · uso · robustez · seguridad ·
-pruebas), cada uno con su lista de archivos, las reglas de la casa para no proponer lo prohibido, y la
-orden de descartar en voz alta sus falsos positivos.
-**Por qué funciona.** La CONVERGENCIA filtra: el `NaN` de la matriz lo hallaron tres auditores por
-separado y dos lo reprodujeron en Node antes de que yo lo mirara. Lo que ve uno se verifica; lo que ven
-tres, se arregla. Pedirles también qué está BIEN evita el refactor por gusto.
-**Gate.** [HONOR]. Ver `99 §66`.
-
-### L-69 · Un dato de demostración sin rótulo es peor que una pantalla vacía
-**Cicatriz.** El dueño abrió Cargabilidad y vio «SUB-DEMO-NORTE», «TD-01», con KPIs calculados sobre
-tres equipos ficticios y presentados como su flota. Los baselines sintéticos se pusieron al retirar
-datos confidenciales, con la idea de que Firestore los sustituiría; la colección nunca se pobló y la
-pantalla se quedó en el demo para siempre, sin decirlo.
-**Regla.** Todo dato que no venga de la fuente real se ROTULA en pantalla, con la palabra
-«demostración» visible, o no se muestra. Si no hay dato: estado vacío que explique **por qué** está
-vacío y **qué hacer**. Y ningún indicador de alarma se cablea en el HTML: se calcula, o miente para
-siempre (el badge «CRITICAL ALERT» de SCADA llevaba meses encendido sobre eventos inventados).
-**Corolario — la falta de dato no es una buena noticia.** «El parque opera dentro de parámetros» sin
-Índice de Salud, una matriz de riesgo en ceros y un «0 equipos en riesgo» se leen como tranquilidad
-cuando significan ignorancia. Redactar los vacíos como lo que son.
-**Segundo corolario.** Antes de dar por ausente un dato, buscarlo en el repo: el Excel traía la carga
-medida por devanado y el importador la leía **para calcular y tirarla**; y 8 de 10 fichas normativas
-estaban publicadas sin un botón que las abriera.
-**Gate.** [HONOR]. Ver `99 §67`.
+> **Todo lo de "lo declarado ≠ lo que hay en producción" y "un dato sin rótulo miente" vive en**
+> [`32-LECCIONES-VERIFICACION.md`](32-LECCIONES-VERIFICACION.md) (§G.5): sanear sin filtrar la lista de
+> lo prohibido, verificar el EFECTO y no el workflow, preguntarle al servidor, medir un port por su CSS,
+> auditar en paralelo por dimensiones, rotular el dato de demostración. Léela ANTES de declarar algo
+> desplegado, portado o auditado. La hija lleva su propio listado — aquí no se duplican sus IDs.

@@ -79,6 +79,7 @@
 | §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y acta en Excel que se puede reimportar. Dos invariantes con prueba: una decisión NUNCA toca la UUCC calculada, y el acta va y vuelve sin deformarse. 1.349 pruebas ⟦OPUS-5⟧ | 1394 |
 | §66 | ADR-066 — Evaluación holística de Fichas Técnicas (6 auditores Fable) y remediación: terciario «0» inflaba el presupuesto 23%, «20.000» kVA se leía como 20, el papel sano podía sostener el argumento de fin de vida, conformidad contradictoria entre vistas, acta reimportada por posición, 412→206 lecturas. 23 pruebas nuevas ⟦OPUS-5⟧ | 1436 |
 | §67 | ADR-067 — «Veo información basura»: Cargabilidad y SCADA mostraban equipos inventados sin rotularlos (el importador tiraba la carga medida del Excel), la matriz y el inicio vestían la falta de datos de buena noticia, y 8 de las 10 fichas normativas no tenían botón. 64 de 208 equipos con la fuente en desacuerdo ⟦OPUS-5⟧ | 1497 |
+| §68 | ADR-068 — Mantenimiento integral del cerebro (auditoría Nivel-2, 8 sondas): el arranque afirmaba una verificación de caché que no corría y el gate de la bóveda decía «íntegro» con 8 deliberaciones sin indexar; el mapa espacial no conocía 4 módulos vivos; el formato ADR no tenía casilla para lo «verificado sano» y esa fuga se llevó los callejones de ADR-058/066/067. Kernel v1.9.0, neurona hija `32`, boot a la baja ⟦OPUS-5⟧ | 1551 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

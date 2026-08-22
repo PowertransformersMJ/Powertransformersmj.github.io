@@ -19,7 +19,6 @@
     "docs/60-WORKFLOWS.md": { "lines": 160, "chars": 14000 }
   },
   "archiveDir": "../brain-private/sgm-transpower/research-archive",
-  "specsDir": "specs",
   "staleDays": 10,
   "kernelFiles": [
     "scripts/brain-check.mjs",
@@ -45,11 +44,13 @@
     }
   ],
   "_ssotFactsDescartados": "EVALUADOS Y NO DECLARADOS (2026-07-28, ADR-058): (a) 'MO.00418' y (b) 'lordpowertransformersmj'. Ambos aparecen 20+ y 12+ veces en docs/ como REFERENCIA legitima (citar la norma o el proyecto no es duplicar un hecho). Declararlos disparia warns bloqueantes sin corregir ningun riesgo real = green-tuning al reves. Re-evaluar SOLO si algun dia se versiona el valor (p.ej. 'Ed. 03'), que es cuando el gate #8 sirve.",
+  "_specsDirRazon": "RETIRADO 2026-08-21 (auditoria Nivel-2, §68): 'specs' no existe y nunca existio; declararlo solo producia una linea de ruido informativo en cada corrida. Si algun dia se adopta spec-kit, se vuelve a declarar.",
   "deepAudit": {
-    "last": "2026-07-18",
-    "coveredHeaderCount": 0,
+    "last": "2026-08-21",
+    "tableFile": "2026-08-21-auditoria-nivel2/HALLAZGOS.md",
+    "coveredHeaderCount": 67,
     "maxAdrGap": 12,
     "maxDays": 30,
-    "_que": "Auditoria Nivel-2 del cerebro (skill auditoria-cerebro): correrla cuando el linter lo pida (gate #14). La primera cobertura real de headers la fija la Fase 9."
+    "_que": "Auditoria Nivel-2 del cerebro (skill auditoria-cerebro): correrla cuando el linter lo pida (gate #14). 'last' y 'coveredHeaderCount' se actualizan SOLO al cerrar una auditoria con su tabla de hallazgos escrita. OJO: con coveredHeaderCount en 0 el disparador por VOLUMEN de ADRs (maxAdrGap) quedaba muerto — gap se calculaba como 0 siempre; llevaba apagado desde el dia 1. 'tableFile' es el input de la Sonda 0 de la proxima auditoria: sin el no puede diffear, que es lo que paso en 2026-08-21, la primera con tabla real."
   }
 }

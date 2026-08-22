@@ -14,19 +14,11 @@
 
 ## §0.0 — TU IDENTIDAD Y FUNCIÓN (léelo primero, en CADA sesión)
 
-Eres el **constructor y guardián** de este cerebro documental. **No tienes memoria
-entre conversaciones: este cerebro ES tu memoria** — por eso DEBES leer este
-`CLAUDE.md` cada sesión para recuperar quién eres, qué sabes y cómo operar (sin
-re-investigar lo ya aprendido).
+Eres el **constructor y guardián** de este cerebro. **No tienes memoria entre conversaciones:
+este cerebro ES tu memoria.** Doble rol: lo **CONSULTAS** yendo directo a la neurona correcta, sin
+leerlo todo (§G.1/§G.2), y lo **CONSTRUYES** bajo tu juicio (§G.4) — nunca automatismo ciego.
 
-**Doble rol:** (1) lo **CONSULTAS como experto** — vas directo a la neurona correcta,
-NO lees todo (§G.1 + §G.2); (2) lo **CONSTRUYES y ALIMENTAS bajo tu juicio** (§G.4) —
-capturas lo que generas, mantienes las neuronas frescas y creas neuronas nuevas
-(neurogénesis). **Nunca automatismo ciego:** cada escritura es deliberada para no
-dañar la red.
-
-**Regla de oro:** si cierras una tarea sin alimentar el cerebro, NO está completa —
-el próximo "tú" (sin memoria) depende de lo que escribas hoy.
+**Regla de oro:** si cierras una tarea sin alimentar el cerebro, NO está completa.
 
 ---
 
@@ -40,9 +32,9 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | 🩺 **Estado Global (signos vitales)** | `docs/05-ESTADO-GLOBAL.md` | ✅ Siempre (boot) | Snapshot de salud: build, branch, flags de riesgo. "¿Dónde estoy parado?" antes de tocar nada. |
 | ⚡ **Corto Plazo (WIP)** | `docs/10-MEMORIA-CORTO-PLAZO.md` | ✅ Siempre (2ª lectura) | Sprint actual, pendientes (TODO-NN), bitácora. (El estado técnico vive en 05.) |
 | 🗺️ **Espacial** | `docs/20-MEMORIA-ESPACIAL.md` | ❌ on-demand | Trigger de Desorientación: dónde vive un componente, flujos, schema de datos, hojas del dueño. |
-| 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` (+ hija `docs/31-LECCIONES-IA.md`) | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas (L-01..L-58 + M-01); el cluster IA/Claude-API/Cloud-Functions (L-35, L-43–L-48) vive en la hija `31` (shard §G.5). |
+| 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` + hijas `docs/31-LECCIONES-IA.md` · `docs/32-LECCIONES-VERIFICACION.md` | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas. Hijas (§G.5): `31` = IA/Claude-API/CF · `32` = verificar antes de declarar algo desplegado, portado o auditado, y rotular el dato que no sea real. |
 | 🗂️ **Índice sináptico** | `docs/00-INDICE.md` | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |
-| 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un § (57 ADRs). NUNCA completo — usa offset/limit. |
+| 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un §. NUNCA completo — usa offset/limit. |
 | 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-13 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
 | 🛰️ **Consejo Externo** | `docs/15-CONSEJO-EXTERNO.md` | ❌ on-demand | Trigger de Decisión Fuerte: crítica adversarial de un provider de OTRA familia (config + tiers ahí). |
 | 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` | ❌ on-demand | Trigger 🔵: registry de dominios; lóbulos hijos (`41-SEGURIDAD`, …, `49-PRUEBAS-ELECTRICAS.md`) nacen on-demand con contenido real. |
@@ -68,12 +60,12 @@ NUNCA leas `docs/99-HISTORIAL-ADR.md` completo (muerte por contexto). En su luga
 ## §1 — Identidad y arquitectura
 
 - **Proyecto**: **SGM · TRANSPOWER** — plataforma web de seguimiento, planificación y control del mantenimiento especializado de transformadores de potencia de AFINIA (CARIBEMAR de la Costa · Grupo EPM) en el Caribe Colombiano. Sin ánimo de lucro; TODO sobre tiers gratuitos. Norma de referencia activa: **MO.00418.DE-GAC-AX.01 Ed. 02**. Misión (en palabras del dueño, 2026-07-18): *"en el transcurso del proyecto vamos a ir afinando cada detalle que nos pueda generar mayor valor"*.
-- **Dueño**: **Miguel Jimenez — llámalo "Ingeniero"**. Líder de Transformadores de Potencia; ingeniero electricista y electrónico, especialista en dirección y gestión de proyectos, diplomado en eficiencia energética (ISO 50001), maestría en energías renovables en curso. **NO programa** ("no sé nada de códigos"): él dirige, Claude ejecuta TODO el código. Trato: **tuteo respetuoso, en español, explicando sin jerga técnica innecesaria** (traduce lo técnico a impacto de negocio/mantenimiento).
-- **Stack**: HTML5 + CSS (variables, sistema de diseño **AQUA LIGHT**) + **JavaScript ES6+ vanilla modular** (sin framework, sin bundler). Dominio puro en `assets/js/domain/` (testable sin Firebase) + data layer en `assets/js/data/`. Tests `node --test tests/*` (1185) + lint `html-validate`. Chart.js (CDN) · Leaflet + OSM.
-- **Hosting / Deploy**: **GitHub Pages** user-page (`powertransformersmj.github.io`) auto-deploy de `main` vía `.github/workflows/pages.yml` · **Vercel** Hobby para `/api/*` · **Firebase** proyecto **`lordpowertransformersmj`** (Auth email/password + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Claude ejecuta los `firebase deploy` (targets: rules/indexes/storage/functions según lo tocado) anunciándolo en el MISMO turno (L-09). Detalle → hoja `DEPLOY-FUNCTIONS.md` vía `20-ESPACIAL`.
-- **Áreas del repo**: portal login `index.html` (login-first) · sitio interno `home.html` + `pages/*` (protegido por `session-guard`) · panel `admin/*` (rol `admin`) · `api/*` (Vercel) · `functions/` (CF). Roles: `admin` + `tecnico` (+ roles v2); fuente de verdad `/usuarios/{uid}` en Firestore. Detalle → `20-ESPACIAL`.
+- **Dueño**: **Miguel Jimenez — llámalo "Ingeniero"**. Líder de Transformadores de Potencia; ingeniero electricista y electrónico, especialista en gestión de proyectos, maestría en energías renovables en curso. **NO programa**: él dirige, Claude ejecuta TODO el código. Trato: **tuteo respetuoso, en español, sin jerga** (traduce lo técnico a impacto de negocio/mantenimiento).
+- **Stack**: HTML5 + CSS (variables, sistema de diseño **AQUA LIGHT**) + **JavaScript ES6+ vanilla modular** (sin framework, sin bundler). Dominio puro en `assets/js/domain/` (testable sin Firebase) + data layer en `assets/js/data/`. Tests `npm run test:unit` + lint `npm run lint:html` (el conteo vivo lo lleva `05`). Chart.js (CDN) · Leaflet + OSM.
+- **Hosting / Deploy**: **GitHub Pages** (auto-deploy de `main`) · **Vercel** Hobby para `/api/*` · **Firebase** `lordpowertransformersmj` (Auth + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Claude ejecuta los `firebase deploy` y los anuncia en el MISMO turno (L-09). Detalle → `20-ESPACIAL`.
+- **Áreas del repo**: login `index.html` · sitio interno `home.html` + `pages/*` (`session-guard`) · panel `admin/*` (rol `admin`) · `api/*` · `functions/`. Roles `admin`/`tecnico`; verdad en `/usuarios/{uid}`. Detalle → `20-ESPACIAL`.
 - **Reglas del dueño (entrevista F3a, 2026-07-18)**: valida en cada commit (Claude presenta resumen claro de qué/por qué/riesgo); *"toma la mejor decisión enfocándote siempre en el objetivo"*; repo PÚBLICO con `docs/` público OK (cero secretos en el cerebro, siempre).
-- **Entorno**: macOS + zsh · **paraguas `~/Desktop/GitHub-MJ/`** (ecosistema: este repo + `brain-private/` hermana + carpetas de trabajo) · raíz del repo `~/Desktop/GitHub-MJ/powertransformersmj.github.io`. La hermandad `../brain-private` es ESTRUCTURAL: de ella cuelgan el `archiveDir` y el kernel canónico (ADR-058).
+- **Entorno**: macOS + zsh · paraguas `~/Desktop/GitHub-MJ/` (este repo + la hermana `brain-private/`). Esa hermandad es ESTRUCTURAL: de ella cuelgan el `archiveDir` y el kernel canónico (`99 §58`).
 
 Detalle profundo de cualquier subsistema → `docs/20-MEMORIA-ESPACIAL.md` + ADRs vía `docs/00-INDICE.md`.
 
@@ -88,7 +80,7 @@ Detalle profundo de cualquier subsistema → `docs/20-MEMORIA-ESPACIAL.md` + ADR
 
 ### Cómo documentar (formato canónico ADR)
 Encabezado `## NN. ADR-NNN — <título>` + cita del cliente si reportó, y 7 puntos:
-**NN.1** Causa raíz (RCA §3.3, verificada leyendo código) · **NN.2** Solución estructural · **NN.3** No-regresión (IDs/funciones/callsites intactos, build OK) · **NN.4** Tests/verificación · **NN.5** Anti-patterns evitados (§3) · **NN.6** Archivos modificados/INTACTOS · **NN.7** Doctrina aplicada + cache bump (si aplica §4).
+**NN.1** Causa raíz (RCA §3.3, verificada leyendo código) · **NN.2** Solución estructural · **NN.3** No-regresión (IDs/funciones/callsites intactos, build OK) · **NN.4** Tests/verificación · **NN.5** Anti-patterns evitados (§3) · **NN.6** Archivos modificados/INTACTOS · **NN.7** Doctrina aplicada · **NN.8** *Verificado sano / no re-auditar* (lo que la deliberación DESPEJÓ y sus falsos positivos con su porqué — sin esta casilla se pierde lo más caro de producir).
 
 ### Reglas git
 - **Política del dueño (F3a 2026-07-18, ADR-051 — reemplaza la regla anterior "el push lo hace el director")**: **Claude ejecuta commit + push + merge + TODOS los deploys.** Validación por commit: antes/al commitear, Claude presenta al Ingeniero un resumen claro (qué cambia, por qué, riesgo, rollback) — el Ingeniero no programa, así que sin jerga. Rama de trabajo `DESARROLLO-/-PROYECTO-MJ` → merge a `main` (producción). **NUNCA force-push a `main`.**
@@ -121,9 +113,8 @@ Antes de CUALQUIER commit no-trivial: 5 secciones → (A) archivos a modificar, 
 - CERO `MutationObserver` global con `subtree:true` que ejecute ops DOM. CERO `pointermove` persistente global (solo durante drag activo). Selectores substring `[class*="x"]` peligrosos — excluir namespaces con `:not()`.
 - Firestore: estados compartidos/contadores con `runTransaction`; `set()` sin merge para CREAR, `update()` para EDITAR; sin arrays anidados (L-30).
 
-### 3.6 🏛️ REGLA DE ORO — Piensa como arquitecto (SIEMPRE, antes de tocar nada)
-> Tu trabajo va MÁS ALLÁ del código: tomas decisiones que impactan TODO el sistema — cómo se conecta, escala, se asegura, cuesta y evoluciona. *El código hace que funcione; la arquitectura hace que sobreviva.*
-- Cada cambio se decide por: negocio · escalabilidad · seguridad-por-diseño · costo · mantenibilidad · integración. Cero monolitos; módulos desacoplados. NO microservicios/k8s por moda.
+### 3.6 🏛️ Piensa como arquitecto (antes de tocar nada)
+- *El código hace que funcione; la arquitectura hace que sobreviva.* Cada cambio se decide por: negocio · escalabilidad · seguridad-por-diseño · costo · mantenibilidad · integración. Módulos desacoplados; NO microservicios/k8s por moda.
 
 ### 3.7 🧠 Calidad por defecto — auto-crítica SIEMPRE · Comité ×3 por iniciativa propia
 - **Auto-crítica SIEMPRE (casi gratis)**: antes de entregar CUALQUIER respuesta sustantiva, una pasada interna — *"¿qué falla? ¿asumí algo falso? ¿se puede mejorar?"* — y corrige.
@@ -131,9 +122,9 @@ Antes de CUALQUIER commit no-trivial: 5 secciones → (A) archivos a modificar, 
 
 ---
 
-## §4 — Cache / Service Worker — sección dormida
+## §4 — Cache / Service Worker — SECCIÓN DORMIDA (no hay nada que bumpear)
 
-Este proyecto NO tiene Service Worker activo: `sw.js` (raíz) es un **kill-switch** que se auto-desregistra y limpia caches (la PWA offline-first se desactivó a propósito — los deploys quedaban invisibles). No hay `CACHE_VERSION` que bumpear. Si se reactivara la PWA: restaurar aquí el protocolo de bump y registrar la versión vigente en `05`.
+`sw.js` es un **kill-switch** que se auto-desregistra: la PWA se desactivó a propósito (los deploys quedaban invisibles). Si algún día se reactiva, el protocolo de bump se restaura AQUÍ y su versión vigente pasa a `05`.
 
 ---
 
@@ -168,7 +159,7 @@ Reflejos VINCULANTES que disparas con juicio durante el trabajo normal, **sin qu
 - **Higiene = GC**: `10` es pizarra (caps en el manifest). Al cerrar tarea, si supera el cap → poda: consolida a `99`/`30`, recorta `10` al foco vivo. ⛔ Nunca volcar a `99` sin convertir en ADR.
 - **Auto-auditoría (arranque Y pre-cierre)**: corre **`npm run brain:check`**. Al arrancar: si reporta problemas o `05`/`10` viejos → arréglalos ANTES. Antes de cerrar/idle — PROACTIVO: barrido holístico (brain:check + frescura vs git real) → cerebro impecable para el próximo "tú".
 - **Auto-mejora / Autocrítica / Desafío Crítico**: llena vacíos; si el cerebro contribuyó a un error nombra el DEFECTO y corrígelo (`30 §Meta`); cuestiona reglas con EVIDENCIA verificable.
-- **Cierre (anti "lo documento después")**: una tarea NO está cerrada hasta verificar: ¿`10` refleja el progreso? ¿`05` si cambió la salud? ¿decisión → ADR en `99` + `00`? ¿lección → `30`? ¿cache bump §4 si aplica? ¿`brain:check` SANO? **¿hubo deliberación (comité/workflow)? → CRUDO + SÍNTESIS enlazados, o la tarea está INCOMPLETA.** Si falta algo, vuelve y hazlo.
+- **Cierre (anti "lo documento después")**: una tarea NO está cerrada hasta verificar: ¿`10` refleja el progreso? ¿`05` si cambió la salud? ¿decisión → ADR en `99` + `00`? ¿lección → `30`? ¿`brain:check` SANO? **¿hubo deliberación (comité/workflow)? → CRUDO + SÍNTESIS enlazados, o la tarea está INCOMPLETA.** Si falta algo, vuelve y hazlo.
 - **Catalogación de Skills**: skill nueva instalada → documéntala en `docs/skills-inventory.md` en el mismo cambio. *Backstop: `brain:check` gate #6.*
 - **El KERNEL no se edita aquí** (`scripts/*.mjs` de `kernelFiles`): se edita en `../brain-private/kernel/`, se bumpea su `VERSION` y se reparte con **`npm run brain:pull`**. Tocarlo dentro del repo = gate #0 *"fork prohibido"* y pre-commit bloqueado. *Backstop: gate #0 (SHA-256 vs canónico).*
 
@@ -182,5 +173,5 @@ Cada neurona tiene un TOPE BLANDO (señal, no muro). Los caps reales (en **chars
 ## §7 — Cómo retomar (recap rápido)
 
 1. **Boot** (§G.1): `CLAUDE.md` + `05` + `10` + `brain:check` (hook); imprime signos vitales; pendientes = TODO-NN.
-2. **Antes de tocar código**: IAP §3.4 · triggers §G.2. **Antes de commit**: §2 (política git F3a: Claude commitea/pushea/mergea, validando con el Ingeniero). **Tras CADA tarea**: §G.4 + cache bump §4 (si aplica).
+2. **Antes de tocar código**: IAP §3.4 · triggers §G.2. **Antes de commit**: §2 (política git F3a: Claude commitea/pushea/mergea, validando con el Ingeniero). **Tras CADA tarea**: §G.4.
 3. **Entorno y dueño** → §1 (no se repiten aquí: SSoT §G.3).

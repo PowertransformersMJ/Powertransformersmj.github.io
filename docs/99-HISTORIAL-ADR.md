@@ -1547,3 +1547,89 @@ el filtro de ADR-062 funciona), pero son visibles en GitHub. Sobrevivieron a la 
 
 **67.8b Doctrina.** §3.2 (nada se inventa; el demo se rotula o no se muestra) · §3.3 verificado contra
 producción, no contra el workflow. Lección → **L-69**.
+
+## 68. ADR — Mantenimiento integral del cerebro: dos gates decían verde sin medir lo que anunciaban ⟦OPUS-5⟧ (2026-08-21)
+
+> Pedido del Ingeniero: *"por favor realiza el mantenimiento integral del cerebro"*.
+> Auditoría Nivel-2 completa (skill `auditoria-cerebro`, 8 sondas; 3 con subagentes Opus fríos).
+> **Deliberación**: crudo íntegro + tabla de 18 hallazgos →
+> `brain-private/sgm-transpower/research-archive/2026-08-21-auditoria-nivel2/` (`HALLAZGOS.md`).
+
+**68.1 Causa raíz.** El linter estructural llevaba 34 días imprimiendo `✅ CEREBRO SANO` mientras dos de
+sus gates **reportaban verde por una condición distinta a la que anunciaban**: (a) el arranque decía
+`✅ cache verificada (SW↔manager↔05)` cuando el `if` solo comprobaba que existiera `sw.js` —la
+verificación real exige la sección §4, que este repo no tiene— así que era una **mentira inyectada en
+cada sesión**; (b) `✅ archiveDir íntegro (0 crudos indexados)` con la bóveda llena, porque el gate solo
+miraba ficheros sueltos `.json/.md` del nivel superior y la convención real de este proyecto es **una
+carpeta por deliberación**: 8 deliberaciones caras estaban sin fila en el índice y las anclas a carpeta
+—todas las reales— **nunca se verificaban**. Debajo de ese verde crecieron tres podredumbres que ningún
+gate vigila: cifras duplicadas que se pudrieron (el router decía 1185 tests contra los 1387 reales y
+"57 ADRs" contra 67; el mapa, 4 conteos viejos), el **Reflejo de Frescura incumplido** (`20-ESPACIAL` no
+nombraba el importador de Salud de Activos —la tarea VIVA— ni Fichas Técnicas, ni Indicadores de
+Calidad, ni Seguimiento Operativo, pese a cuatro ADRs seguidos sobre ellos), y **fuga de deliberación**:
+los cierres de ADR-058/066/067 guardaron el resultado ganador y tiraron lo más caro de producir —el
+ledger de *"verificado sano / no re-auditar"* y los callejones probados—, porque el formato ADR de siete
+puntos **no tenía casilla donde ponerlo**.
+
+**68.2 Solución estructural.** (1) **Kernel canónico v1.8.0 → v1.9.0** (editado en `../brain-private/kernel/`,
+repartido con `brain:pull`): el ✅ de caché exige ahora `hasSwSection`; el gate #7 acepta carpetas y
+`.jsonl` y sus anclas resuelven directorios; el aviso de bóveda cuenta con `-uall` (un directorio nuevo
+con 207 fotos se reportaba como "1 archivo") y **deja de ordenar un `push` imposible** cuando no hay
+remoto; y se retiran de sus mensajes los IDs de lección heredados del cerebro de origen (tres meta-lecciones
+y un §), que en este repo no resolvían o apuntaban a un ADR distinto. (2) **Casilla `NN.8 — Verificado sano / no re-auditar`** en el
+formato ADR (`CLAUDE.md §2`) y en la plantilla del kernel: cierra por diseño la fuga de 68.1.
+(3) **Frescura**: 5 filas nuevas en `20-ESPACIAL` con los módulos vivos, y fuera los conteos que se
+pudren solos. (4) **Economía**: nace la neurona hija **`32-LECCIONES-VERIFICACION.md`**, 8 lecciones de
+IA vuelven a su hija `31`, 7 quedan archivadas en su sección real y dos títulos que mentían se corrigen.
+(5) **Manifest**: `deepAudit` sellado con `coveredHeaderCount: 67` —estaba en 0, lo que dejaba **muerto**
+el disparador por volumen de ADRs desde el día uno— y `tableFile` declarado, que es lo que le faltaba a
+la Sonda 0 de esta auditoría para poder diffear.
+
+**68.3 No-regresión.** Ningún ID de lección cambió de significado: las 75 refs `L-`/`M-` resuelven
+(`30` + 2 shards). Las neuronas movidas conservan su texto íntegro; nada se destiló ni se borró — se
+reubicó. `CLAUDE.md` conserva todas sus doctrinas: lo que se recortó es prosa duplicada de nodos que ya
+la poseen (`§0.0` remite a `§G`, `§1` remite a `20`, `05` remite a `10`). El código de producción no se
+tocó: 1387 tests siguen pasando y el lint sigue limpio.
+
+**68.4 Tests/verificación.** `npm run test:unit` → **1387 pass / 0 fail / 2 skip**; `npm run lint:html`
+limpio; `gh run list` → CI y Deploy en VERDE. `npm run brain:check` → SANO con **11 crudos indexados**
+(antes 0) y `BOOT always-on = 31.324c ≤ 31.500` (**GC pareado cumplido**: el boot BAJÓ 69 chars pese a
+haber añadido 5 filas de pendientes). Cada hallazgo de la tabla lleva su comando reproducible.
+
+**68.5 Anti-patterns evitados.** No se dio por buena ni una conclusión de subagente sin verificarla
+(§3.3): el claim heredado *"ugrep se salta lo gitignored"* **no se reprodujo** y quedó marcado como tal
+en L-70 en vez de convertirse en doctrina; `functions/domain/` resultó **peor** de lo reportado (5
+divergencias, no 3). No se destiló contenido para hacer caber un tope (§G.4: enriquecer, no borrar):
+se shardeó. No se editó el kernel dentro del repo (gate #0).
+
+**68.6 Archivos modificados.** Kernel: `brain-check.mjs`, `session-handoff.mjs`, `brain-archive.mjs`,
+`VERSION`. Repo: `CLAUDE.md`, `docs/05`, `docs/10`, `docs/20`, `docs/30`, **`docs/32` (nueva)**,
+`docs/00`, `docs/99`, `docs/.brain-manifest.json`. Bóveda: README + carpeta de la auditoría.
+**INTACTOS**: todo `assets/`, `functions/`, `admin/`, `pages/`, `tests/`, `firestore.rules`.
+
+**68.7 Cola abierta.** **TODO-37** 🔴 (`functions/domain/`: 61 archivos gitignorados, 0 versionados, 5
+divergentes — el dominio de las Cloud Functions desplegadas vive SOLO en este disco) · **TODO-38**
+(cola de Fichas que se había evaporado) · **TODO-39** (badge cableado + PNG muerto) · **TODO-40** (el
+`pre-commit` sale en verde si el commit no toca `docs/` ⇒ cero escaneo de secretos/PII; `verificado-vivo`
+valida la fecha, no la verificación) · **TODO-41** (cerrar el ledger de adopción de ADR-058).
+
+**68.8 Verificado sano / no re-auditar.** `05` **no miente**: build, branch, CI/Deploy, las 4 CF con sus
+`maxInstances` (10/1/3/5) y los 53 índices declarados se comprobaron uno a uno. El cerebro **coincidió
+con el código al 100 %** donde se contrastó (guard `omitidos` del importador, de `data/importar.js:68-70`
+hasta la UI). La regla de oro anti-saturación **funciona en campo**: el agente frío respondió 4 de 6
+preguntas leyendo el 4,8 % de `99`. `MEMORY.md` del harness **apunta** al cerebro y no lo contradice.
+Y ADR-058 sigue siendo el ejemplo a imitar en captura: aparcó sus callejones dentro del manifest, con
+disparador de reevaluación. **NO verificable aquí** (se dice en voz alta): los 206 TX de Firestore y los
+53 índices DESPLEGADOS exigen sesión autenticada.
+
+**68.9 Doctrina.** §3.3 (evidencia antes de afirmar, aplicada también a los subagentes) · §G.3 SSoT (un
+hecho, un dueño: las cifras salieron del router) · §G.4 (captura + frescura + GC) · §G.5 (shard, no
+engorde). Lecciones → **L-70**, **L-71**, **M-02**, **M-03**, **M-04**, **M-05**.
+
+**68.10 Incidente durante la propia auditoría (dejado por escrito, no barrido).** Mientras se editaba
+el kernel, **otra sesión de Claude** (proyecto `mantenimiento-lineas-at`) commiteó en la bóveda
+COMPARTIDA con un `git add` amplio y se llevó el bump a medio terminar dentro de `f10d142`, un commit
+cuyo mensaje habla de otra cosa. No se reescribe la historia (bóveda con dueños concurrentes): queda
+el rastro aquí y la regla en **M-05**. Efecto colateral bueno: esa misma sesión versionó los 207
+archivos de fotos de campo que llevaban semanas sin commitear, así que el riesgo que TODO-29 señalaba
+como inmediato quedó cubierto — la bóveda sigue en un solo disco, pero ya no con trabajo sin registrar.
