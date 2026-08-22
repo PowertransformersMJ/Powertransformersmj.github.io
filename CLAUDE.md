@@ -118,7 +118,7 @@ Antes de CUALQUIER commit no-trivial: 5 secciones → (A) archivos a modificar, 
 
 ### 3.7 🧠 Calidad por defecto — auto-crítica SIEMPRE · Comité ×3 por iniciativa propia
 - **Auto-crítica SIEMPRE (casi gratis)**: antes de entregar CUALQUIER respuesta sustantiva, una pasada interna — *"¿qué falla? ¿asumí algo falso? ¿se puede mejorar?"* — y corrige.
-- **Comité ×3 por INICIATIVA PROPIA (caro)**: dispara la skill `comite-expertos` SIN que lo pidan cuando la respuesta sea una DECISIÓN con consecuencias, tenga incertidumbre genuina, sea cara de revertir o un entregable importante. Anúncialo. NO en lo trivial.
+- **Comité ×3 por INICIATIVA PROPIA (caro)**: dispara `comite-expertos` sin que lo pidan cuando la respuesta sea una DECISIÓN cara de revertir, con incertidumbre genuina o un entregable importante. Anúncialo. NO en lo trivial. [HONOR]
 
 ---
 
@@ -153,7 +153,7 @@ La memoria fluye en una dirección: Corto Plazo → Largo Plazo. **Por cada tare
 ### G.4 — Sistema Autónomo de Auto-construcción (neuroplasticidad, bajo TU guía)
 Reflejos VINCULANTES que disparas con juicio durante el trabajo normal, **sin que el usuario los pida**:
 - **Captura**: TODO conocimiento reutilizable → su neurona ANTES de cerrar (bug/lección → `30`; arquitectura → `20`; WIP → `10`; decisión cerrada → `99` + `00`). **Deliberación cara de reproducir** (comité / workflow multi-agente) → CRUDO al `archiveDir` del manifest (bóveda privada) + SÍNTESIS con *callejones probados* ANTES de cerrar. **La bóveda se alimenta Y SE COMMITEA en el mismo cierre** (y se pushea en cuanto tenga remoto): hoy vive en un solo disco, y el gate #7 es ciego a git.
-- **Reflejo de Caza-bugs (verificar el camino vivo, no solo el diff)**: al TOCAR o ROZAR un subsistema con estado observable por el usuario (render / listener / CRUD / flujo), recorre su comportamiento END-TO-END antes de cerrar, en especial las dos fronteras del estado-cero (crear el 1er ítem y verlo aparecer en vivo Y al recargar; borrar el último y ver colapsar limpio). 'Rozar' = mi diff cambia una entrada/salida/contrato O el estado compartido que otro subsistema lee, aunque no edite su archivo. Capacidad portátil: skill `caza-bugs`. **Escala a maquinaria pesada (comité/workflow/consejo) SOLO si es no-trivial o caro de revertir; NUNCA en lo trivial** — y siempre acotada y con Opus (orden del Ingeniero). [HONOR]
+- **Reflejo de Caza-bugs (el camino vivo, no solo el diff)**: al TOCAR o ROZAR un subsistema con estado observable (render/listener/CRUD/flujo), recórrelo END-TO-END antes de cerrar, sobre todo el estado-cero (crear el 1er ítem y verlo en vivo Y al recargar; borrar el último y ver colapsar limpio). *Rozar* = mi diff cambia una entrada/salida/contrato o el estado compartido que otro lee, aunque no edite su archivo. Skill `caza-bugs`. Escalar a comité/workflow SOLO si es no-trivial o caro de revertir, acotado y con Opus. [HONOR]
 - **Neurogénesis**: conocimiento reutilizable que no encaja y crecerá → crea `docs/NN-NOMBRE.md` + (1) fila en §0, (2) registro en `00`, (3) bitácora. Anti-fragmentación: si dudas, apéndalo.
 - **Frescura**: si mueves/creas/renombras/eliminas un componente/ruta/flujo → actualiza `20` en el MISMO cambio.
 - **Higiene = GC**: `10` es pizarra (caps en el manifest). Al cerrar tarea, si supera el cap → poda: consolida a `99`/`30`, recorta `10` al foco vivo. ⛔ Nunca volcar a `99` sin convertir en ADR.
@@ -172,6 +172,5 @@ Cada neurona tiene un TOPE BLANDO (señal, no muro). Los caps reales (en **chars
 
 ## §7 — Cómo retomar (recap rápido)
 
-1. **Boot** (§G.1): `CLAUDE.md` + `05` + `10` + `brain:check` (hook); imprime signos vitales; pendientes = TODO-NN.
-2. **Antes de tocar código**: IAP §3.4 · triggers §G.2. **Antes de commit**: §2 (política git F3a: Claude commitea/pushea/mergea, validando con el Ingeniero). **Tras CADA tarea**: §G.4.
-3. **Entorno y dueño** → §1 (no se repiten aquí: SSoT §G.3).
+1. **Boot** (§G.1): `CLAUDE.md` + `05` + `10` + `brain:check`; imprime signos vitales; pendientes = TODO-NN.
+2. **Antes de tocar código**: IAP §3.4 · triggers §G.2. **Antes de commit**: §2. **Tras CADA tarea**: §G.4.

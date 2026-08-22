@@ -1633,3 +1633,76 @@ cuyo mensaje habla de otra cosa. No se reescribe la historia (bóveda con dueño
 el rastro aquí y la regla en **M-05**. Efecto colateral bueno: esa misma sesión versionó los 207
 archivos de fotos de campo que llevaban semanas sin commitear, así que el riesgo que TODO-29 señalaba
 como inmediato quedó cubierto — la bóveda sigue en un solo disco, pero ya no con trabajo sin registrar.
+
+## 69. ADR — La hoja TX_Potencia leída de verdad: los "62 omitidos" eran 57 equipos reales ⟦OPUS-5⟧ (2026-08-21)
+
+> Petición del Ingeniero: *"fíjate solo en la hoja de TX_potencia"* (sobre su archivo real
+> `~/Documents/2026/PSM 2026/Salud de Activos 2026 Actualizado 01 de junio.xlsx`).
+> **Deliberación**: scripts reproducibles + salidas + tabla de sobrecargados →
+> `brain-private/sgm-transpower/research-archive/2026-08-21-tx-potencia-analisis/`.
+> ⚠️ El Excel NO se copia a la bóveda: es material de cliente y vive en su carpeta.
+
+**69.1 Causa raíz.** El simulacro del import reportaba **270 filas · 62 omitidas** y el cerebro lo
+había explicado como *"las hojas de servicio y respaldo no traen campos obligatorios"* (`10`, y de ahí
+a `05`). Era una hipótesis cómoda que nadie verificó abriendo el archivo. Al leerlo: de esas 62,
+**5 son filas vacías del final** (esas sí, basura) y **57 son equipos REALES** — 30 en `TPT_Servicio`
+(Magangué, Montería…) y 25 en `TX_Respaldo` (San Onofre, Calamar…), con serie, potencia, subestación
+y departamento. Caen porque **su fila de títulos está en la fila 2 y la 1 viene en blanco**: el
+importador lee la primera, obtiene claves vacías y toda fila falla la validación. No les faltaban
+datos: no se sabían leer. Es exactamente el hueco que ADR-057 §57.7 dejó anotado como *"falta
+detección de fila-cabecera"* y que llevaba desde julio sin morder a nadie porque su síntoma —un
+contador de omitidos— se leía como normal.
+
+**69.2 Qué contiene realmente la hoja (medido, no supuesto).** 213 filas → **208 equipos válidos,
+0 errores**. Los 208 salen con **Índice de Salud calculado** (muy bueno 39 · bueno 86 · medio 54 ·
+pobre 28 · muy pobre 1) y **205 con usuarios aguas abajo: 1.655.376 en total**. Es decir: el import
+acotado a esta hoja **cierra TODO-34** — llena salud, criticidad, matriz de riesgo y priorización.
+Los seis peores: COSPIQUE (44 años, único "muy pobre"), SANTA TERESA (43), ARIGUANI, AYAPEL,
+BARRANCO DE LOBA y BOSCONIA. Los números del simulacro cuadran: 213+31+26 = 270, y 9 nuevos + 199
+actualizados = 208 = las filas con matrícula de TX_Potencia.
+
+**69.3 La divergencia con la `CONDICION` del Excel, explicada.** La plataforma **no copia** esa
+columna: recalcula desde los valores medidos y aplica el override normativo (MO.00418 §4.1.3:
+cargabilidad al tope ⇒ condición ≥ 4). Redondeando a entero coinciden **96 de 208 (46 %)**. La causa
+dominante es la carga: **18 equipos van al 90 % o más de su ampacidad y 5 por encima del 100 %**, y a
+varios de ellos el Excel los califica como sanos (BOSCONIA 1,70 · CALAMAR 1,65 · TIERRALTA 1,6 con
+carga ≥92 %). Al revés, GUATAPURI y MAJAGUAL vienen en `CONDICION` 5 y salen ~3 con nosotros, porque
+la razón de ese 5 no está en ninguna columna medida. **Ninguna versión es automáticamente la buena**:
+la nuestra es trazable (dato + norma), la suya puede recoger un criterio experto que el archivo no
+explica. Se documenta la divergencia; NO se pisa ni se esconde (L-37).
+
+**69.4 La fuente se contradice a sí misma.** `T1-M/M-AST` (ASTREA) mide **250 % de carga** —
+físicamente implausible, artefacto de dato (**L-52**)— y su propia `EVALUACION CARGABILIDAD` dice
+**1** (óptimo). Esto **confirma con números la hipótesis que el barrido de ADR-067 dejó huérfana**
+(*"ASTREA: posibles columnas intercambiadas"*), rescatada por la auditoría §68. Mismo patrón en
+LORICA (98 % medido, evaluación 1). Lección: las columnas de EVALUACIÓN de la fuente son referencia,
+no veredicto (**L-73** = L-36 aplicada al Excel).
+
+**69.5 Tres equipos jóvenes en banda pobre, y no por deterioro.** BARRANCO DE LOBA (5 años, 125 %),
+CALAMAR (5 años) y BOSCONIA (6 años) caen a 4 por **sobrecarga**, no por edad ni aceite. Si el dato de
+carga es correcto, son un problema de OPERACIÓN, no de calificación — y la plataforma los está
+señalando bien. Queda para criterio del Ingeniero (TODO-42c).
+
+**69.6 Verificación.** Se corrió el importador REAL (`assets/js/domain/importador.js`) contra el
+archivo del Ingeniero, **sin escribir en Firestore**, con `procesarLibro` acotado a la hoja. Scripts y
+salidas literales en la bóveda. `npm run test:unit` sigue en 1387/0/2 — **no se tocó ni una línea de
+código de producción en este ADR**: es análisis, no cambio.
+
+**69.7 Decisiones ABIERTAS (ninguna se ejecuta sin el Ingeniero).** Consolidadas en **TODO-42**:
+(a) acotar el import a `TX_Potencia` y que la pantalla diga *"las hojas de servicio y respaldo no se
+incluyen"* en vez de un "62 omitidos" que parece un error — **propuesto por Claude, pendiente su
+visto bueno**; (b) qué hacer con los 57 equipos de servicio y respaldo: arreglar la detección de
+fila-cabecera para incorporarlos, o excluirlos por escrito; (c) revisar caso a caso las discrepancias
+`CONDICION` vs Índice de Salud, empezando por ASTREA (dato sospechoso) y por las tres máquinas
+jóvenes sobrecargadas.
+
+**69.8 Verificado sano / no re-auditar.** El importador **sí lee los usuarios**
+(`criticidad.usuarios_aguas_abajo`, 205 de 208): el arreglo de `9fee266` está en pie — una primera
+consulta dio 0 porque miró una ruta que no existe (`docV2.usuarios`), error del que consulta, no del
+código. El guard de filas incompletas funciona: las 5 vacías se omiten y se cuentan, sin colarse como
+documentos `UNK-*`. Los alias de cabecera toleran los dobles espacios del Excel real
+(`AMPACIDAD PRIMARIO  (A)`). Nada de eso necesita tocarse.
+
+**69.9 Doctrina.** §3.3 (se abrió el archivo en vez de repetir la explicación cómoda que ya estaba
+escrita en el cerebro) · §3.2 (el veredicto sale del valor contra la norma, también frente al Excel) ·
+§G.4 (captura: crudo + síntesis + lecciones antes de cerrar). Lecciones → **L-72**, **L-73**.

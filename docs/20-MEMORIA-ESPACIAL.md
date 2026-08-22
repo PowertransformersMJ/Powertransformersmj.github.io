@@ -30,7 +30,7 @@
 | Foto de fondo | `assets/img/aqua/substation-photo.webp` |
 | Migraciones / scripts de datos | `scripts/migrate/*.js` (`tipificar-suministros-fan-db.js`, `v1-to-v2-transformadores.js`) |
 | Tests | `tests/*.test.js` (el conteo vivo lo lleva `05`) |
-| **Importar el Excel real "Salud de Activos"** (la tarea viva del Ingeniero) | `assets/js/domain/importador.js` + `assets/js/data/importar.js` + `admin/importar.html` (proceso → `60-WORKFLOWS` W-13 · historia → `99 §57`) |
+| **Importar el Excel real "Salud de Activos"** (la tarea viva del Ingeniero) | `assets/js/domain/importador.js` + `assets/js/data/importar.js` + `admin/importar.html`. El libro trae **3 hojas** (`TX_Potencia` con la cabecera en la fila 1; `TPT_Servicio` y `TX_Respaldo` en la **fila 2**, por eso caen — L-72). Proceso → `60-WORKFLOWS` W-13 · historia → `99 §57` y `§69` |
 | **Fichas Técnicas de reposición** (familia CSS `.ftm-`) | `pages/fichas-tecnicas.html` + `assets/js/ui/fichas/*` (`panel.js`, `ficha-tecnica.js`, `vistas-gerenciales.js`, `evaluacion-masiva.js`, `correcciones.js`, `unifilar.js`, `exportar-planificacion.js`) · `99 §61/64/65/66` |
 | **Indicadores de calidad** (SAIDI/SAIFI) | `pages/indicadores-calidad.html` + `assets/js/ui/calidad/*` · hoja `INDICADORES-CALIDAD.md` |
 | **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` |
@@ -72,7 +72,7 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 - **Backend**: Firebase (Auth + Firestore + Storage, proyecto `lordpowertransformersmj`) + Cloud Functions (`functions/`) + Vercel para `/api/*` (hoy solo `api/health.js`).
 - **Scripts / herramientas**: `scripts/` — incluye `scripts/migrate/`, `scripts/brain-check.mjs` y `scripts/audit-bloques-pruebas.mjs`. Además `boot-gate.mjs`, `brain-diff.mjs`, `brain-index.mjs`, `brain-archive.mjs`, `dev-server.mjs`, `session-handoff.mjs`.
 - **Tests**: `tests/*.test.js` con el runner nativo `node --test` (`npm run test:unit`).
-- **Docs**: `docs/` = hojas técnicas del dueño (16 .md + `docs/pruebas/`, ver sección final). Las neuronas del cerebro anterior NO viven aquí: están en `_legacy/cerebro-anterior/docs/`.
+- **Docs**: `docs/` = neuronas del cerebro + hojas técnicas del dueño (ver sección final). Las del cerebro anterior están en `_legacy/cerebro-anterior/docs/`.
 - **CI / Deploy**: `.github/workflows/ci.yml` (lint HTML) · `pages.yml` (deploy main → GitHub Pages) · `vercel.json` (`/api`). `sw.js` en raíz es kill-switch (PWA desactivada).
 
 ### 📁 Estructura de carpetas principales
@@ -158,11 +158,9 @@ Detalle completo → `docs/MODELO-DATOS-v2.md`.
 - `PLAN-SUMINISTROS.md` — plan v2.2 de integración Suministros + Repuestos (F38–F50) a partir de los fuentes `.jsx`/`.xlsm`, con decisiones bloqueantes aprobadas.
 - `INDICADORES-CALIDAD.md` — dashboard SAIDI_E/SAIFI_E (refactor F40): impacto de causas controlables + proyección Jun–Dic con OLS y bandas IC95%.
 - `REPOSITORIO-PRUEBAS-ELECTRICAS.md` — arquitectura del repositorio digital de pruebas por número de serie (extiende `pages/pruebas-electricas.html`); su §13 documenta la extracción con IA (ADR-003).
-- `CONTRATO_4125000143_ANALISIS.md` — reporte Fase A: diff estructural del `.xlsm` del contrato 4125000143 vs el template canónico (inventario ZIP parte a parte).
-- `MICROCIRUGIA-CONTRATOS-2026-04-27.md` — Fase 1 (inventario y diagnóstico) de la microcirugía del módulo Suministros/Contratos: estado encontrado + PDFs del repo.
-- `SESION-2026-05-03-CONTINUACION.md` — handoff de sesión: Mantenimiento Brigada (mix multi-modelo, plan de microfases, hotfix).
-- `SESION-2026-05-05.md` — handoff de sesión: render integral del transformador, interactividad click-en-cuerpo y render lateral con foto real.
-- `UI-V3-DARKMODE.md` — decisiones de diseño del refactor visual UI v3 dark mode (cierre 2026-04-27, v2.5.0; histórico — el sistema activo es AQUA LIGHT).
+- `CONTRATO_4125000143_ANALISIS.md` · `MICROCIRUGIA-CONTRATOS-2026-04-27.md` — diagnóstico del módulo Suministros/Contratos (diff del `.xlsm` vs el template canónico + inventario).
+- `SESION-2026-05-03-CONTINUACION.md` · `SESION-2026-05-05.md` — handoffs de sesión (Mantenimiento Brigada · render integral del transformador con foto real).
+- `UI-V3-DARKMODE.md` — refactor visual UI v3 dark mode (histórico; el sistema activo es AQUA LIGHT).
 - `INSTALACION-CEREBRO.md` — manual del cerebro anterior; hoy en `_legacy/cerebro-anterior/docs/`.
 - `workflow-auditoria-secciones-pruebas.md` — hoja hija de ESTE nodo: proceso repetible de auditoría/completitud por sección del tablero de pruebas (columnas que la IA pierde).
 - `docs/pruebas/` — 10 fichas JSON de criterios normativos, una por prueba (01 FP aislamiento … 10 DFR): mapa código↔norma con `_fuente` apuntando a dominio/skill; las consume `assets/js/pruebas-electricas-shell.js` vía `fetch('../docs/pruebas/…')`.
