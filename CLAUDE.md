@@ -41,8 +41,6 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | ⚡🔌 **Transformadores (equipo)** | `docs/50-TRANSFORMADORES-POTENCIA.md` | ❌ on-demand | Lóbulo de dominio del EQUIPO: tipo de transformador, grupo vectorial, cálculos nominales. |
 | 🛠️ **Skills externas** | `~/.claude/skills/` + `skills/` + tool Skill | ❌ on-demand | Expertise portable de método. NO es neurona — recurso paralelo. **Catálogo → `docs/skills-inventory.md`**. |
 
-**Nodos opcionales** (nacen por neurogénesis §G.4 cuando haya contenido REAL, nunca vacíos): lóbulos hijos `41`–`48` (seguridad/legal/UX/SEO/perf/escalabilidad/copy/a11y).
-
 **Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `20-ESPACIAL`.
 
 ### 🏆 Regla de oro anti-saturación (CÓMO leer el Largo Plazo)
@@ -59,12 +57,12 @@ NUNCA leas `docs/99-HISTORIAL-ADR.md` completo (muerte por contexto). En su luga
 
 ## §1 — Identidad y arquitectura
 
-- **Proyecto**: **SGM · TRANSPOWER** — plataforma web de seguimiento, planificación y control del mantenimiento especializado de transformadores de potencia de AFINIA (CARIBEMAR de la Costa · Grupo EPM) en el Caribe Colombiano. Sin ánimo de lucro; TODO sobre tiers gratuitos. Norma de referencia activa: **MO.00418.DE-GAC-AX.01 Ed. 02**. Misión (en palabras del dueño, 2026-07-18): *"en el transcurso del proyecto vamos a ir afinando cada detalle que nos pueda generar mayor valor"*.
+- **Proyecto**: **SGM · TRANSPOWER** — plataforma de seguimiento, planificación y control del mantenimiento de transformadores de potencia de AFINIA (CARIBEMAR · Grupo EPM) en el Caribe colombiano. Sin ánimo de lucro; TODO sobre tiers gratuitos. Norma activa: **MO.00418.DE-GAC-AX.01 Ed. 02**. Misión, en sus palabras: *"vamos a ir afinando cada detalle que nos pueda generar mayor valor"*.
 - **Dueño**: **Miguel Jimenez — llámalo "Ingeniero"**. Líder de Transformadores de Potencia; ingeniero electricista y electrónico, especialista en gestión de proyectos, maestría en energías renovables en curso. **NO programa**: él dirige, Claude ejecuta TODO el código. Trato: **tuteo respetuoso, en español, sin jerga** (traduce lo técnico a impacto de negocio/mantenimiento).
 - **Stack**: HTML5 + CSS (variables, sistema de diseño **AQUA LIGHT**) + **JavaScript ES6+ vanilla modular** (sin framework, sin bundler). Dominio puro en `assets/js/domain/` (testable sin Firebase) + data layer en `assets/js/data/`. Tests `npm run test:unit` + lint `npm run lint:html` (el conteo vivo lo lleva `05`). Chart.js (CDN) · Leaflet + OSM.
 - **Hosting / Deploy**: **GitHub Pages** (auto-deploy de `main`) · **Vercel** Hobby para `/api/*` · **Firebase** `lordpowertransformersmj` (Auth + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Claude ejecuta los `firebase deploy` y los anuncia en el MISMO turno (L-09). Detalle → `20-ESPACIAL`.
 - **Áreas del repo**: login `index.html` · sitio interno `home.html` + `pages/*` (`session-guard`) · panel `admin/*` (rol `admin`) · `api/*` · `functions/`. Roles `admin`/`tecnico`; verdad en `/usuarios/{uid}`. Detalle → `20-ESPACIAL`.
-- **Reglas del dueño (entrevista F3a, 2026-07-18)**: valida en cada commit (Claude presenta resumen claro de qué/por qué/riesgo); *"toma la mejor decisión enfocándote siempre en el objetivo"*; repo PÚBLICO con `docs/` público OK (cero secretos en el cerebro, siempre).
+- **Reglas del dueño (F3a)**: valida por commit con un resumen claro (qué/por qué/riesgo); *"toma la mejor decisión enfocándote siempre en el objetivo"*; repo PÚBLICO — cero secretos en el cerebro, siempre.
 - **Entorno**: macOS + zsh · paraguas `~/Desktop/GitHub-MJ/` (este repo + la hermana `brain-private/`). Esa hermandad es ESTRUCTURAL: de ella cuelgan el `archiveDir` y el kernel canónico (`99 §58`).
 
 Detalle profundo de cualquier subsistema → `docs/20-MEMORIA-ESPACIAL.md` + ADRs vía `docs/00-INDICE.md`.
