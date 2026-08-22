@@ -48,7 +48,7 @@
 |---|---|---|
 | **TODO-34** | 🔴 **El parque real NO tiene Health Index**: los 206 traen `salud_actual` todo en `null` y sin `usuarios` de criticidad → banda «Sin dato 206», matriz de riesgo vacía, 0 en riesgo (degrada limpio, no inventa). Se llena con el import (arriba). | 🔴 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
-| **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos de campo YA quedaron versionados el 08-21, así que dentro del disco no hay trabajo sin registrar; lo que falta es una copia FUERA. Si algún día la hay → `lastOffsiteBackup` del manifest. | 🟡 decidido |
+| **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos ya quedaron versionados (08-21): dentro del disco no falta nada; falta una copia FUERA → `lastOffsiteBackup`. | 🟡 decidido |
 | **TODO-36** | Decisiones de ADR-067 (`99 §67.7`): 9 fixtures con datos REALES del TX 450108 en el repo PÚBLICO (`_dev/fixtures/450108-*.json` — el `.gitignore` protege la carpeta `450108/`, no esos archivos) · SAIDI/SAIFI públicos · sembrarlos en Firestore · 2 páginas de desarrollo desplegadas · indicadores congelados en mayo. | 🟡 decisión |
 | **TODO-38** | Fichas · cola de ADR-066 que se había evaporado: huecos literales de la norma absorbidos sin nota · `montoCOP` (signo y centavos) · criterio 5 MVA→N4T1 sin escribir ($629,5 M vs $533,7 M) · **carrera de 12 s** que borra EDITS/DEC · paleta duplicada · código muerto · test con fecha no fijada. Lista → `99 §68.7`. | 🟡 |
 | **TODO-39** | Sitio · cola de ADR-067: badge «TENDENCIA CRÍTICA» **cableado** en Indicadores de Calidad (viola L-69) · KPIs que solo muestran guiones sin decir por qué · `transformador_2048px-2.png` (334 KB, cero usos). | 🟡 |
@@ -73,7 +73,6 @@
 ## 📝 Bitácora (efímera)
 
 > **Julio consolidado — no re-leer aquí**: Fase 9 + CONECTAR A-E, ADR-053→058 y el cierre del ToS del
-> hosting (ADR-060: Pages **no** nos prohíbe nada → no se migra; runbook a Cloudflare listo por si acaso).
-> Todo en `99` vía `00`. ⚠️ Decisión viva heredada de ahí: **Vercel Hobby SÍ veta el uso comercial** y hoy
+> hosting (`99 §60`: Pages no nos prohíbe nada → no se migra; runbook a Cloudflare listo por si acaso). ⚠️ Decisión viva heredada de ahí: **Vercel Hobby SÍ veta el uso comercial** y hoy
 > no lo consume nadie → retirarlo o dejarlo a sabiendas. NO re-analizar por calendario: solo por los
 > disparadores de `60 §60.7`.

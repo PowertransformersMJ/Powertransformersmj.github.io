@@ -1593,7 +1593,7 @@ tocó: 1387 tests siguen pasando y el lint sigue limpio.
 
 **68.4 Tests/verificación.** `npm run test:unit` → **1387 pass / 0 fail / 2 skip**; `npm run lint:html`
 limpio; `gh run list` → CI y Deploy en VERDE. `npm run brain:check` → SANO con **11 crudos indexados**
-(antes 0) y `BOOT always-on = 31.324c ≤ 31.500` (**GC pareado cumplido**: el boot BAJÓ 69 chars pese a
+(antes 0) y `BOOT always-on = 31.295c ≤ 31.500` (**GC pareado cumplido**: el boot BAJÓ 98 chars pese a
 haber añadido 5 filas de pendientes). Cada hallazgo de la tabla lleva su comando reproducible.
 
 **68.5 Anti-patterns evitados.** No se dio por buena ni una conclusión de subagente sin verificarla
