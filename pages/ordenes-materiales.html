@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>SGM · TRANSPOWER — Órdenes de Materiales SSEE</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/ordenes-materiales.css"/>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Ejecución / Órdenes de Materiales</div>
+    <h1 class="page-title">Órdenes de <em>Materiales</em></h1>
+    <p class="page-subtitle">
+      Diligenciar, guardar y emitir la orden de entrada y/o salida de materiales
+      de subestaciones sobre el formato institucional IT.05801.MA-MNP-FO.01 Ed:01,
+      con su vista previa fiel, exportación a PDF vectorial y a Excel, e
+      indicadores del histórico. Las líneas de firma salen en blanco: se firman
+      a mano, igual que en el formato en papel.
+    </p>
+  </div>
+
+  <!-- Todo el marcado del módulo vive bajo `.oms-scope`: sus clases son
+       genéricas (.btn, .campo, .modal, .tabla) y sin acotar chocarían con las
+       del sitio. Misma técnica que `.pe-scope` en Pruebas Eléctricas. -->
+  <div class="oms-scope">
+  <!-- =====================================================================
+       ENCABEZADO DE LA APLICACIÓN
+       ===================================================================== -->
+  <header class="app-header">
+    <div class="oms-logo"><img id="logoApp" alt="afinia — Grupo EPM"></div>
+    <div class="titulos">
+      <h1>Órdenes de Entrada y Salida de Materiales SSEE</h1>
+      <p class="oms-sub">
+        <span>Formato <code id="codDoc"></code> · <span id="edDoc"></span></span>
+        <span class="estado-libs" id="estadoLibs"></span>
+      </p>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       BARRA DE ACCIONES (MENÚ PRINCIPAL)
+       ===================================================================== -->
+  <nav class="barra" aria-label="Acciones de la orden">
+    <button type="button" class="oms-btn primario" id="btnNueva">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      Nueva orden
+    </button>
+    <button type="button" class="oms-btn exito" id="btnGuardar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      Guardar orden
+    </button>
+    <button type="button" class="oms-btn" id="btnVista">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      Vista previa
+    </button>
+    <button type="button" class="oms-btn" id="btnIndicadores">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M6 21V11M11 21V4M16 21v-7M21 21v-4"/></svg>
+      Indicadores
+    </button>
+    <div class="sep" aria-hidden="true"></div>
+    <button type="button" class="oms-btn excel" id="btnExcel">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13l6 6M15 13l-6 6"/></svg>
+      Exportar a Excel
+    </button>
+    <button type="button" class="oms-btn pdf" id="btnPdf">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 15h2.2a1.4 1.4 0 0 0 0-2.8H8V18M14 18v-5.8h1.6a1.4 1.4 0 0 1 1.4 1.4v3a1.4 1.4 0 0 1-1.4 1.4z"/></svg>
+      Exportar a PDF
+    </button>
+    <div class="sep" aria-hidden="true"></div>
+    <button type="button" class="oms-btn peligro" id="btnLimpiar">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      Limpiar formulario
+    </button>
+    <span class="crece"></span>
+  </nav>
+
+  <div class="oms-main">
+    <form id="formOrden" novalidate autocomplete="off">
+
+      <!-- ============ 1. DATOS DE LA ORDEN ============ -->
+      <section class="tarjeta">
+        <header>
+          <h2><span class="oms-num">1</span> Datos de la orden</h2>
+          <span class="nota-h">Los campos marcados con <span class="req">*</span> son obligatorios.</span>
+        </header>
+        <div class="cuerpo">
+          <div class="rejilla">
+
+            <div class="campo c6" id="w-tipo">
+              <label>Tipo de orden <span class="req">*</span></label>
+              <div class="tipo-orden" role="radiogroup" aria-label="Tipo de orden">
+                <label class="tipo-op">
+                  <input type="radio" name="tipo" value="ENTRADA" id="tipoEntrada">
+                  <span class="caja" aria-hidden="true"></span> Orden de entrada
+                </label>
+                <label class="tipo-op">
+                  <input type="radio" name="tipo" value="SALIDA" id="tipoSalida">
+                  <span class="caja" aria-hidden="true"></span> Orden de salida
+                </label>
+              </div>
+              <span class="msg-error" id="e-tipo">Seleccione el tipo de orden (entrada o salida).</span>
+            </div>
+
+            <div class="campo c3" id="w-numero">
+              <label for="numero">N.º de orden <span class="req">*</span></label>
+              <input type="text" id="numero" name="numero" maxlength="30" placeholder="26082026-01">
+              <span class="msg-error" id="e-numero">Ingrese el número de la orden.</span>
+            </div>
+
+            <div class="campo c3" id="w-zona">
+              <label for="zona">Zona <span class="req">*</span></label>
+              <input type="text" id="zona" name="zona" list="dlZonas" maxlength="40" placeholder="BOLIVAR">
+              <datalist id="dlZonas"></datalist>
+              <span class="msg-error" id="e-zona">Ingrese la zona correspondiente.</span>
+            </div>
+
+            <div class="campo c3" id="w-fecha">
+              <label for="fecha">Fecha <span class="req">*</span></label>
+              <input type="date" id="fecha" name="fecha">
+              <span class="ayuda">Se exporta como DD/MM/AAAA</span>
+              <span class="msg-error" id="e-fecha">Seleccione una fecha válida.</span>
+            </div>
+
+            <div class="campo c3" id="w-hora">
+              <label for="hora">Hora <span class="req">*</span></label>
+              <input type="time" id="hora" name="hora">
+              <span class="ayuda">Formato HH:MM (24 h)</span>
+              <span class="msg-error" id="e-hora">Seleccione una hora válida.</span>
+            </div>
+
+            <div class="campo c6" id="w-origen">
+              <label for="origen">Origen <span class="req">*</span></label>
+              <select id="origen" name="origen"><option value="">— Seleccione —</option></select>
+              <span class="msg-error" id="e-origen">Seleccione el origen.</span>
+            </div>
+
+            <div class="campo c6" id="w-destino">
+              <label for="destino">Destino <span class="req">*</span></label>
+              <select id="destino" name="destino"><option value="">— Seleccione —</option></select>
+              <span class="msg-error" id="e-destino">Seleccione el destino.</span>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 2. MATERIALES ============ -->
+      <section class="tarjeta">
+        <header>
+          <h2><span class="oms-num">2</span> Materiales</h2>
+          <span class="nota-h">La unidad se completa automáticamente según el material seleccionado.</span>
+        </header>
+        <div class="cuerpo">
+          <div class="fila-agregar">
+            <div class="campo" id="w-descripcion">
+              <label for="descripcion">Descripción del material <span class="req">*</span></label>
+              <select id="descripcion" name="descripcion"><option value="">— Seleccione —</option></select>
+              <span class="msg-error" id="e-descripcion">Seleccione la descripción del material.</span>
+            </div>
+            <div class="campo">
+              <label for="unidad">Unidad</label>
+              <input type="text" id="unidad" name="unidad" readonly placeholder="—">
+            </div>
+            <div class="campo" id="w-cantidad">
+              <label for="cantidad">Cantidad <span class="req">*</span></label>
+              <input type="number" id="cantidad" name="cantidad" min="0" step="any" placeholder="0">
+              <span class="msg-error" id="e-cantidad">La cantidad debe ser un número mayor que cero.</span>
+            </div>
+            <button type="button" class="oms-btn primario" id="btnAgregarItem">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+              Agregar ítem
+            </button>
+          </div>
+
+          <div id="w-items">
+            <table class="tabla-items">
+              <thead>
+                <tr>
+                  <th class="n" scope="col">Ítem</th>
+                  <th scope="col">Descripción del(os) material(es)</th>
+                  <th class="u" scope="col">Unidad</th>
+                  <th class="q" scope="col">Cantidad</th>
+                  <th class="acc" scope="col"><span class="sr">Quitar</span></th>
+                </tr>
+              </thead>
+              <tbody id="cuerpoItems"></tbody>
+            </table>
+            <div class="resumen-items">
+              <span>Ítems registrados: <b id="numItems">0</b></span>
+              <span>Capacidad por página del formato: <b id="capPagina">18</b></span>
+              <span id="avisoPaginas"></span>
+            </div>
+            <span class="msg-error" id="e-items" style="margin-top:8px">Agregue al menos un material a la orden.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 3. MOTIVO ============ -->
+      <section class="tarjeta">
+        <header>
+          <h2><span class="oms-num">3</span> Motivo de entrada y/o salida de materiales</h2>
+        </header>
+        <div class="cuerpo">
+          <div class="rejilla">
+            <div class="campo c12" id="w-motivo">
+              <label for="motivo">Motivo <span class="req">*</span></label>
+              <select id="motivo" name="motivo"><option value="">— Seleccione —</option></select>
+              <span class="msg-error" id="e-motivo">Seleccione el motivo de la entrada y/o salida.</span>
+            </div>
+
+            <div class="campo c12" id="w-motivoOtro" hidden>
+              <label for="motivoOtro">Describa el motivo <span class="req">*</span></label>
+              <textarea id="motivoOtro" name="motivoOtro" maxlength="300" rows="2"
+                        placeholder="Escriba el motivo tal como debe aparecer en el documento…"></textarea>
+              <span class="ayuda">Este texto es el que se imprime; la palabra «Otro» no aparece en el documento.</span>
+              <span class="msg-error" id="e-motivoOtro">Describa el motivo: es obligatorio al elegir «Otro».</span>
+            </div>
+
+            <div class="campo c12">
+              <label for="nota">Nota <span class="ayuda">(opcional — corresponde a la línea «Nota:» del formato)</span></label>
+              <textarea id="nota" name="nota" maxlength="300" rows="2" placeholder="Ej.: Materiales trasladados por el Sr. …, c.c.: …"></textarea>
+            </div>
+
+            <div class="campo c12">
+              <div class="oms-aviso" id="avisoRenglones" role="status"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 4. RESPONSABLES Y VIGILANCIA ============ -->
+      <section class="tarjeta">
+        <header>
+          <h2><span class="oms-num">4</span> Responsables y control de vigilancia</h2>
+        </header>
+        <div class="cuerpo">
+          <div class="rejilla">
+
+            <div class="campo c4">
+              <label for="autorizado">Autorizado por</label>
+              <input type="text" id="autorizado" readonly>
+              <span class="ayuda">Valor fijo. Se modifica en <code>CONFIG.autorizadoPor</code>.</span>
+            </div>
+
+            <div class="campo c4" id="w-entregado">
+              <label for="entregado">Entregado por <span class="req">*</span></label>
+              <select id="entregado" name="entregado"><option value="">— Seleccione —</option></select>
+              <span class="msg-error" id="e-entregado">Seleccione quién entrega los materiales.</span>
+            </div>
+
+            <div class="campo c4" id="w-recibido">
+              <label for="recibido">Recibido por <span class="req">*</span></label>
+              <select id="recibido" name="recibido"><option value="">— Seleccione —</option></select>
+              <span class="msg-error" id="e-recibido">Seleccione quién recibe los materiales.</span>
+            </div>
+
+            <div class="campo c6">
+              <label for="empresaVig">Empresa de vigilancia (portería)</label>
+              <input type="text" id="empresaVig" maxlength="60" placeholder="Ej.: AGUILA DE ORO">
+              <span class="ayuda">Opcional. Nombre y cédula del vigilante se firman físicamente en portería.</span>
+            </div>
+
+            <div class="campo c6">
+              <label>Firmas digitalizadas</label>
+              <label class="interruptor">
+                <input type="checkbox" id="conFirmas" checked disabled>
+                <span class="palanca" aria-hidden="true"></span>
+                <span>Firmas digitalizadas — no disponibles en la web</span>
+              </label>
+              <!-- El interruptor se conserva (el JS lo lee en 4 sitios y el histórico
+                   guarda su valor), pero deshabilitado y con el texto veraz: en esta
+                   versión el documento SIEMPRE sale con la línea de firma en blanco.
+                   Publicar firmas escaneadas en un sitio abierto permitiría falsificar
+                   documentos a nombre de esas personas. Ver `99 §70`. -->
+              <span class="ayuda" id="estadoFirmas">El documento sale con la línea de firma en blanco, para firmar a mano sobre el impreso — igual que el formato en papel.</span>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 5. LISTAS Y ARCHIVOS EXTERNOS ============ -->
+      <section class="tarjeta">
+        <header>
+          <h2><span class="oms-num">5</span> Listas desplegables y carga de archivos</h2>
+          <span class="nota-h">Excel (.xlsx / .xls) o CSV</span>
+        </header>
+        <div class="cuerpo">
+          <label class="zona-drop" id="zonaDrop">
+            <span class="icono" aria-hidden="true">📄</span>
+            <span class="oms-linea">Haga clic aquí o arrastre el archivo con las listas</span>
+            <small>Se leen las hojas <b>Origen_Destino</b> (origen y destino), <b>Accesorios</b> (ítem y unidad)
+            y <b>Transformadores</b> (UC y descripción CREG 015-2018).<br>
+            También se detectan automáticamente columnas llamadas Origen, Destino, Descripción, Ítem, UC, Código, Referencia o Unidad.</small>
+            <input type="file" id="archivoListas" accept=".xlsx,.xls,.csv,.txt" class="oms-archivo-oculto">
+          </label>
+
+          <div class="rejilla" style="margin-top:14px" id="selHojaWrap" hidden>
+            <div class="campo c6">
+              <label for="selHoja">Hoja del libro</label>
+              <select id="selHoja"></select>
+            </div>
+            <div class="campo c6" style="justify-content:flex-end">
+              <button type="button" class="oms-btn primario" id="btnCargarHoja">Cargar hoja seleccionada</button>
+            </div>
+          </div>
+
+          <div class="oms-aviso" id="avisoImport" role="status"></div>
+
+          <div class="estado-listas">
+            <div class="pastilla"><div class="k">Origen / Destino</div><div class="v" id="cntOD">0</div><div class="f" id="fteOD">precargado</div></div>
+            <div class="pastilla"><div class="k">Materiales</div><div class="v" id="cntMat">0</div><div class="f" id="fteMat">precargado</div><div class="f" id="detMat"></div></div>
+            <div class="pastilla"><div class="k">Órdenes guardadas</div><div class="v" id="cntOrd">0</div><div class="f">en este navegador</div></div>
+          </div>
+
+          <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap">
+            <button type="button" class="oms-btn mini" id="btnRestaurarListas">Restaurar listas precargadas</button>
+            <button type="button" class="oms-btn mini" id="btnPlantilla">Descargar plantilla de listas (.xlsx)</button>
+            <button type="button" class="oms-btn mini peligro" id="btnBorrarLocal">Borrar todos los datos guardados localmente</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 6. ÓRDENES GUARDADAS ============ -->
+      <section class="tarjeta">
+        <header>
+          <h2><span class="oms-num">6</span> Órdenes guardadas</h2>
+          <span class="nota-h">Se acumulan al pulsar «Guardar orden» y se recuperan al reabrir el módulo</span>
+        </header>
+        <div class="cuerpo">
+          <div style="margin-bottom:12px">
+            <input type="search" id="buscarOrden" placeholder="Buscar por número, origen, destino o material…"
+                   aria-label="Buscar entre las órdenes guardadas">
+          </div>
+          <div class="lista-ordenes" id="listaOrdenes"></div>
+        </div>
+      </section>
+
+      <!-- ============ 7. ALMACENAMIENTO Y RESPALDO ============ -->
+      <section class="tarjeta" id="panelDatos">
+        <header>
+          <h2><span class="oms-num">7</span> Almacenamiento y respaldo</h2>
+          <span class="nota-h">Dónde viven sus datos y cómo protegerlos</span>
+        </header>
+        <div class="cuerpo">
+
+          <div class="estado-listas">
+            <div class="pastilla"><div class="k">Órdenes acumuladas</div><div class="v" id="dEstadoOrdenes">0</div><div class="f">en este equipo</div></div>
+            <div class="pastilla"><div class="k">Líneas de material</div><div class="v" id="dEstadoItems">0</div><div class="f">en total</div></div>
+            <div class="pastilla"><div class="k">Espacio usado</div><div class="v" id="dEstadoEspacio">0 KB</div><div class="f">del navegador</div></div>
+          </div>
+
+          <div class="oms-aviso" id="dEstadoArchivo" role="status"></div>
+
+          <h3 class="sub-titulo">Archivo de datos vinculado <span class="etiqueta">recomendado</span></h3>
+          <p class="parrafo">
+            Elija una vez un archivo <code>.json</code> —en su disco o en una carpeta de red— y a partir de
+            ahí <b>cada orden que guarde se escribe también allí</b>. Los datos dejan de depender del navegador:
+            puede respaldarlos, copiarlos a otro equipo o compartirlos. Antes de escribir, el módulo relee el
+            archivo y fusiona, de modo que si varias personas usan el mismo archivo ninguna borra lo de la otra.
+          </p>
+          <div class="fila-botones">
+            <button type="button" class="oms-btn primario" id="btnVincular">Vincular archivo de datos…</button>
+            <button type="button" class="oms-btn" id="btnSincronizar" hidden>Sincronizar ahora</button>
+            <button type="button" class="oms-btn mini" id="btnDesvincular" hidden>Desvincular</button>
+          </div>
+
+          <h3 class="sub-titulo">Copia de seguridad manual</h3>
+          <p class="parrafo">
+            Funciona en cualquier navegador. Exporta un <code>.json</code> con todas las órdenes y las listas.
+            Al restaurar, <b>fusiona</b> con lo que ya haya en lugar de sobrescribirlo.
+          </p>
+          <div class="fila-botones">
+            <button type="button" class="oms-btn" id="btnExportarCopia">Exportar copia de seguridad (.json)</button>
+            <button type="button" class="oms-btn" id="btnRestaurarCopia">Restaurar desde copia…</button>
+            <input type="file" id="archivoCopia" accept=".json,application/json" hidden>
+          </div>
+
+          <h3 class="sub-titulo">Consolidado del histórico</h3>
+          <p class="parrafo">
+            Exporta <b>todas</b> las órdenes guardadas a un Excel de una fila por material, más una hoja de
+            resumen con entradas, salidas y neto por ítem.
+          </p>
+          <div class="fila-botones">
+            <button type="button" class="oms-btn excel" id="btnHistoricoExcel">Exportar histórico a Excel</button>
+          </div>
+
+        </div>
+      </section>
+
+    </form>
+  </div>
+
+  <!-- =====================================================================
+       MODAL DE VISTA PREVIA (RÉPLICA A4 DEL FORMATO MODELO)
+       ===================================================================== -->
+  <div class="oms-modal" id="modalVista" role="dialog" aria-modal="true" aria-labelledby="tituloVista">
+    <div class="modal-caja">
+      <div class="modal-cab">
+        <h3 id="tituloVista">Vista previa del documento</h3>
+        <span class="crece"></span>
+        <button type="button" class="oms-btn mini" id="btnZoomMenos" title="Reducir">−</button>
+        <span id="nivelZoom" style="font-size:.82rem;min-width:44px;text-align:center">100 %</span>
+        <button type="button" class="oms-btn mini" id="btnZoomMas" title="Ampliar">+</button>
+        <button type="button" class="oms-btn mini" id="btnImprimir">Imprimir</button>
+        <button type="button" class="oms-btn mini excel" id="btnExcel2">Excel</button>
+        <button type="button" class="oms-btn mini pdf" id="btnPdf2">PDF</button>
+        <button type="button" class="oms-btn mini" id="btnCerrarVista">Cerrar</button>
+      </div>
+      <div class="modal-cuerpo" id="cuerpoVista"></div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL DE INDICADORES
+       ===================================================================== -->
+  <div class="oms-modal" id="modalViz" role="dialog" aria-modal="true" aria-labelledby="tituloViz">
+    <div class="modal-caja ancha">
+      <div class="modal-cab">
+        <h3 id="tituloViz">Indicadores</h3>
+        <span class="crece"></span>
+        <button type="button" class="oms-btn mini excel" id="btnVizExcel">Exportar a Excel</button>
+        <button type="button" class="oms-btn mini" id="btnCerrarViz">Cerrar</button>
+      </div>
+
+      <div class="modal-cuerpo viz-cuerpo" id="cuerpoViz">
+        <div class="viz-tip" id="vizTip"></div>
+
+        <!-- Filtros: una sola fila, encima de todo -->
+        <div class="viz-filtros">
+          <div class="campo"><label for="fDesde">Desde</label><input type="date" id="fDesde"></div>
+          <div class="campo"><label for="fHasta">Hasta</label><input type="date" id="fHasta"></div>
+          <div class="campo"><label for="fZona">Zona</label><select id="fZona"></select></div>
+          <div class="campo"><label for="fTipo">Tipo</label>
+            <select id="fTipo">
+              <option value="">Entradas y salidas</option>
+              <option value="ENTRADA">Solo entradas</option>
+              <option value="SALIDA">Solo salidas</option>
+            </select>
+          </div>
+          <button type="button" class="oms-btn mini" id="btnLimpiarFiltros">Limpiar filtros</button>
+        </div>
+
+        <div class="oms-aviso" id="vizAlcance" role="status"></div>
+
+        <!-- Cifras de cabecera -->
+        <div class="kpis">
+          <div class="kpi"><div class="k">Órdenes</div><div class="v" id="kOrdenes">0</div><div class="s" id="kOrdenesSub">—</div></div>
+          <div class="kpi"><div class="k">Líneas de material</div><div class="v" id="kLineas">0</div><div class="s" id="kLineasSub">—</div></div>
+          <div class="kpi"><div class="k">Sedes involucradas</div><div class="v" id="kSedes">0</div><div class="s">origen o destino</div></div>
+          <div class="kpi"><div class="k">Zonas</div><div class="v" id="kZonas">0</div><div class="s">con movimientos</div></div>
+        </div>
+
+        <!-- Leyenda única: un color significa lo mismo en todo el panel -->
+        <div class="viz-leyenda">
+          <span><span class="pt pt-e"></span> Entrada</span>
+          <span><span class="pt pt-s"></span> Salida</span>
+        </div>
+
+        <div class="viz-grid">
+          <figure class="viz-fig"><figcaption>Órdenes por zona</figcaption><div id="vizZona"></div></figure>
+          <figure class="viz-fig"><figcaption>Órdenes por mes</figcaption><div id="vizMes"></div>
+            <p class="viz-nota" id="vizMesNota"></p></figure>
+          <figure class="viz-fig ancha"><figcaption>Órdenes por motivo <span class="viz-nota">(10 primeros)</span></figcaption><div id="vizMotivo"></div></figure>
+          <figure class="viz-fig"><figcaption>Sedes de origen <span class="viz-nota">(10 primeras)</span></figcaption><div id="vizOrigen"></div></figure>
+          <figure class="viz-fig"><figcaption>Sedes de destino <span class="viz-nota">(10 primeras)</span></figcaption><div id="vizDestino"></div></figure>
+        </div>
+
+        <h3 class="viz-titulo">Material movido</h3>
+        <p class="viz-nota">
+          Agrupado <b>por unidad</b>: no se suman cantidades de unidades distintas.
+          El <b>neto (E − S)</b> es la diferencia entre lo registrado como entrada y como salida,
+          <b>no un inventario</b>.
+        </p>
+        <div id="vizMaterial"></div>
+
+        <h3 class="viz-titulo">Responsables</h3>
+        <div class="viz-grid">
+          <div id="vizEntrega"></div>
+          <div id="vizRecibe"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="tostadas" id="tostadas" aria-live="polite"></div>
+  <div class="cargando" id="cargando"><div class="spin"></div><p id="txtCargando">Procesando…</p></div>
+  </div>
+
+</main>
+
+<!-- Librerías del módulo. Se mantienen las MISMAS versiones y el mismo CDN que
+     ya usa el resto del sitio, para no divergir: la subida de SheetJS a ≥0.20.2
+     es una decisión abierta que afecta a todas las páginas (TODO-12 / TODO-35),
+     no de este port. Sin ellas el módulo sigue permitiendo diligenciar, guardar
+     y ver la vista previa; solo se deshabilitan exportar y leer archivos, y lo
+     avisa en pantalla. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="module" src="../assets/js/ordenes-materiales.js"></script>
+
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>

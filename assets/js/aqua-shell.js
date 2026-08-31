@@ -222,6 +222,7 @@
       <div class="sb-group">
         <div class="sb-group-title">Ejecución</div>
         <a href="${u('pages/ordenes.html')}" class="sb-item" data-key="ordenes"><span class="i"><i data-lucide="clipboard-list"></i></span>Órdenes</a>
+        <a href="${u('pages/ordenes-materiales.html')}" class="sb-item" data-key="ordenes-materiales"><span class="i"><i data-lucide="package"></i></span>Órdenes de Materiales</a>
         <a href="${u('pages/mantenimiento-brigada.html')}" class="sb-item" data-key="mantenimiento-brigada"><span class="i"><i data-lucide="hard-hat"></i></span>Mantenimiento Brigada</a>
         <a href="${u('pages/seguimiento-operativo.html')}" class="sb-item" data-key="seguimiento"><span class="i"><i data-lucide="activity"></i></span>Seguimiento Operativo</a>
         <a href="${u('pages/seguimiento-cargabilidad.html')}" class="sb-item" data-key="cargabilidad"><span class="i"><i data-lucide="battery-charging"></i></span>Cargabilidad</a>

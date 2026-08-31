@@ -1,0 +1,556 @@
+/* ==========================================================================
+   SGM · TRANSPOWER — Órdenes de Materiales SSEE (IT.05801.MA-MNP-FO.01 Ed:01)
+   --------------------------------------------------------------------------
+   Port de la hoja del módulo suelto (Modulo_Ordenes_SSEE/modular/styles.css).
+   TODA regla vive bajo `.oms-scope`: sus nombres son genéricos (.oms-btn, .campo,
+   .oms-modal, .tabla, .panel) y chocarían con los del sitio. Misma técnica que
+   `.pe-scope` en Pruebas Eléctricas. Las variables de color quedan en el
+   contenedor y no en :root, por el mismo motivo. Animaciones con prefijo oms-.
+   ========================================================================== */
+
+/* ==========================================================================
+   MÓDULO ÓRDENES DE ENTRADA Y SALIDA DE MATERIALES SSEE
+   Hoja de estilos — Identidad afinia / Grupo EPM
+   --------------------------------------------------------------------------
+   PARA PERSONALIZAR COLORES: modifique únicamente las variables del bloque
+   :root. Todo el resto del archivo deriva de ellas.
+   ========================================================================== */
+.oms-scope{
+  /* --- Paleta corporativa (muestreada del logotipo del formato modelo) --- */
+  --azul:        #006FB7;   /* Azul afinia — color principal            */
+  --azul-osc:    #005089;
+  --azul-claro:  #E8F2FA;
+  --cian:        #37BEE0;
+  --verde:       #8DC63F;
+  --naranja:     #F5901F;
+  --gris:        #6D6E71;
+
+  /* --- Neutros de interfaz --- */
+  --tinta:       #16222B;
+  --tinta-2:     #4A5A66;
+  --linea:       #D8E0E6;
+  --linea-2:     #EDF1F4;
+  --fondo:       #F4F7F9;
+  --panel:       #FFFFFF;
+
+  /* --- Semánticos --- */
+  /* --- Series de datos (paleta validada con el verificador de daltonismo).
+         El verde/naranja de marca fallaba: ΔE 2,5 en deuteranopía. --- */
+  --serie-e:     #2a78d6;   /* ENTRADA */
+  --serie-s:     #eb6834;   /* SALIDA  */
+  --serie-e-bg:  #E8F1FC;   --serie-e-ink: #14508F;
+  --serie-s-bg:  #FDEEE7;   --serie-s-ink: #8A3410;
+
+  --error:       #C62828;
+  --error-bg:    #FDECEC;
+  --ok:          #2E7D32;
+  --ok-bg:       #EAF5EA;
+  --aviso:       #B26A00;
+  --aviso-bg:    #FFF6E6;
+
+  --radio:       10px;
+  --radio-s:     7px;
+  --sombra:      0 1px 2px rgba(16,34,45,.06), 0 6px 18px rgba(16,34,45,.06);
+  --sombra-alta: 0 18px 50px rgba(16,34,45,.22);
+  --fuente:      "Segoe UI", Roboto, -apple-system, BlinkMacSystemFont, Helvetica, Arial, sans-serif;
+}
+.oms-scope *, .oms-scope *::before, .oms-scope *::after{ box-sizing:border-box; }
+/* El atributo `hidden` debe ganar siempre: reglas como `.campo{display:flex}`
+   lo anularían y el elemento seguiría visible. */
+.oms-scope [hidden]{ display:none !important; }
+/* el reset html,body no se importa: lo gobierna el sitio */
+.oms-scope{
+  font-family:var(--fuente);
+  background:var(--fondo);
+  color:var(--tinta);
+  font-size:15px;
+  line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+/* ===================== ENCABEZADO DE LA APLICACIÓN ===================== */
+.oms-scope .app-header{
+  background:linear-gradient(100deg,var(--azul) 0%,var(--azul-osc) 100%);
+  color:#fff;
+  padding:14px 22px;
+  display:flex; align-items:center; gap:18px; flex-wrap:wrap;
+  box-shadow:0 2px 10px rgba(0,80,137,.25);
+  position:relative; z-index:20;
+}
+.oms-scope .app-header .oms-logo{
+  background:#fff; border-radius:8px; padding:7px 11px;
+  display:flex; align-items:center; flex:0 0 auto;
+}
+.oms-scope .app-header .oms-logo img{ height:34px; width:auto; display:block; }
+.oms-scope .app-header .titulos{ flex:1 1 260px; min-width:0; }
+.oms-scope .app-header h1{
+  margin:0; font-size:1.16rem; font-weight:700; letter-spacing:.2px;
+  text-transform:uppercase;
+}
+.oms-scope .app-header .oms-sub{
+  margin:2px 0 0; font-size:.8rem; opacity:.85; font-weight:400;
+  display:flex; gap:10px; flex-wrap:wrap;
+}
+.oms-scope .app-header .oms-sub code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  background:rgba(255,255,255,.16); padding:1px 6px; border-radius:4px; font-size:.95em;
+}
+.oms-scope .estado-libs{ display:flex; gap:6px; align-items:center; font-size:.75rem; }
+.oms-scope .chip-lib{
+  background:rgba(255,255,255,.16); border-radius:20px; padding:2px 9px;
+  display:inline-flex; align-items:center; gap:5px; white-space:nowrap;
+}
+.oms-scope .chip-lib::before{ content:""; width:7px; height:7px; border-radius:50%; background:var(--verde); }
+.oms-scope .chip-lib.off::before{ background:var(--naranja); }
+.oms-scope .chip-lib.off{ background:rgba(245,144,31,.25); }
+/* ===================== BARRA DE ACCIONES (MENÚ) ===================== */
+.oms-scope .barra{
+  position:sticky; top:0; z-index:15;
+  background:var(--panel);
+  border-bottom:1px solid var(--linea);
+  padding:10px 22px;
+  display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+  box-shadow:0 1px 6px rgba(16,34,45,.05);
+}
+.oms-scope .barra .sep{ width:1px; height:26px; background:var(--linea); margin:0 4px; }
+.oms-scope .barra .crece{ flex:1 1 auto; }
+.oms-scope .oms-btn{
+  font:inherit; font-size:.87rem; font-weight:600;
+  border:1px solid var(--linea); background:var(--panel); color:var(--tinta);
+  padding:8px 14px; border-radius:var(--radio-s); cursor:pointer;
+  display:inline-flex; align-items:center; gap:7px; white-space:nowrap;
+  transition:background .15s,border-color .15s,box-shadow .15s,transform .05s;
+}
+.oms-scope .oms-btn:hover{ background:var(--linea-2); border-color:#C4D0D8; }
+.oms-scope .oms-btn:active{ transform:translateY(1px); }
+.oms-scope .oms-btn:focus-visible{ outline:3px solid rgba(0,111,183,.35); outline-offset:1px; }
+.oms-scope .oms-btn svg{ width:16px; height:16px; flex:0 0 16px; }
+.oms-scope .oms-btn.primario{ background:var(--azul); border-color:var(--azul); color:#fff; }
+.oms-scope .oms-btn.primario:hover{ background:var(--azul-osc); border-color:var(--azul-osc); }
+.oms-scope .oms-btn.exito{ background:var(--ok); border-color:var(--ok); color:#fff; }
+.oms-scope .oms-btn.exito:hover{ filter:brightness(.92); }
+.oms-scope .oms-btn.excel{ background:#1D6F42; border-color:#1D6F42; color:#fff; }
+.oms-scope .oms-btn.excel:hover{ filter:brightness(.92); }
+.oms-scope .oms-btn.pdf{ background:#B3261E; border-color:#B3261E; color:#fff; }
+.oms-scope .oms-btn.pdf:hover{ filter:brightness(.92); }
+.oms-scope .oms-btn.peligro{ color:var(--error); border-color:#F0C4C4; background:var(--error-bg); }
+.oms-scope .oms-btn.peligro:hover{ background:#FBDCDC; }
+.oms-scope .oms-btn.mini{ padding:5px 10px; font-size:.8rem; }
+.oms-scope .oms-btn:disabled{ opacity:.45; cursor:not-allowed; }
+/* ===================== DISPOSICIÓN ===================== */
+.oms-scope .oms-main{ max-width:1180px; margin:0 auto; padding:20px 22px 80px; }
+.oms-scope .tarjeta{
+  background:var(--panel); border:1px solid var(--linea);
+  border-radius:var(--radio); box-shadow:var(--sombra);
+  margin-bottom:18px; overflow:hidden;
+}
+.oms-scope .tarjeta > header{
+  padding:12px 18px; border-bottom:1px solid var(--linea);
+  background:linear-gradient(0deg,#FBFCFD,#fff);
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.oms-scope .tarjeta > header h2{
+  margin:0; font-size:.95rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.5px; color:var(--azul-osc);
+  display:flex; align-items:center; gap:9px;
+}
+.oms-scope .tarjeta > header h2 .oms-num{
+  background:var(--azul); color:#fff; width:22px; height:22px; border-radius:50%;
+  display:inline-flex; align-items:center; justify-content:center;
+  font-size:.75rem; font-weight:700; flex:0 0 22px;
+}
+.oms-scope .tarjeta > header .nota-h{ font-size:.78rem; color:var(--tinta-2); font-weight:400; text-transform:none; letter-spacing:0; }
+.oms-scope .tarjeta > .cuerpo{ padding:18px; }
+.oms-scope .rejilla{ display:grid; gap:14px 16px; grid-template-columns:repeat(12,1fr); }
+.oms-scope .c3{ grid-column:span 3; }
+.oms-scope .c4{ grid-column:span 4; }
+.oms-scope .c5{ grid-column:span 5; }
+.oms-scope .c6{ grid-column:span 6; }
+.oms-scope .c8{ grid-column:span 8; }
+.oms-scope .c12{ grid-column:span 12; }
+/* ===================== CAMPOS ===================== */
+.oms-scope .campo{ display:flex; flex-direction:column; gap:5px; min-width:0; }
+.oms-scope .campo > label{
+  font-size:.78rem; font-weight:700; color:var(--tinta-2);
+  text-transform:uppercase; letter-spacing:.4px;
+  display:flex; align-items:center; gap:5px;
+}
+.oms-scope .req{ color:var(--error); font-weight:700; }
+.oms-scope .campo .ayuda{ font-size:.74rem; color:var(--tinta-2); font-weight:400; text-transform:none; letter-spacing:0; }
+.oms-scope input[type=text], .oms-scope input[type=number], .oms-scope input[type=date], .oms-scope input[type=time], .oms-scope select, .oms-scope textarea{
+  font:inherit; font-size:.9rem; color:var(--tinta);
+  background:#fff; border:1px solid var(--linea); border-radius:var(--radio-s);
+  padding:9px 11px; width:100%; min-width:0;
+  transition:border-color .15s, box-shadow .15s, background .15s;
+}
+.oms-scope select{ cursor:pointer; appearance:none;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234A5A66' stroke-width='2.4' stroke-linecap='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat; background-position:right 9px center; background-size:15px;
+  padding-right:32px;
+}
+.oms-scope textarea{ resize:vertical; min-height:64px; }
+.oms-scope input:focus, .oms-scope select:focus, .oms-scope textarea:focus{
+  outline:none; border-color:var(--azul); box-shadow:0 0 0 3px rgba(0,111,183,.16);
+}
+.oms-scope input[readonly]{ background:var(--linea-2); color:var(--tinta-2); cursor:default; }
+.oms-scope input[readonly]:focus{ border-color:var(--linea); box-shadow:none; }
+.oms-scope .campo.error input, .oms-scope .campo.error select, .oms-scope .campo.error textarea{
+  border-color:var(--error); background:var(--error-bg);
+}
+.oms-scope .msg-error{
+  font-size:.76rem; color:var(--error); font-weight:600;
+  display:none; align-items:center; gap:5px;
+}
+.oms-scope .campo.error .msg-error{ display:flex; }
+.oms-scope .msg-error::before{ content:"⚠"; }
+/* Selector de tipo de orden — réplica de las casillas del formato */
+.oms-scope .tipo-orden{ display:flex; gap:12px; flex-wrap:wrap; }
+.oms-scope .tipo-op{
+  position:relative;
+  flex:1 1 170px; display:flex; align-items:center; gap:11px;
+  border:1.5px solid var(--linea); border-radius:var(--radio-s);
+  padding:11px 14px; cursor:pointer; background:#fff; font-weight:600; font-size:.9rem;
+  transition:border-color .15s, background .15s, box-shadow .15s;
+}
+.oms-scope .tipo-op:hover{ border-color:#B9CBD8; }
+.oms-scope .tipo-op input{ position:absolute; opacity:0; width:0; height:0; }
+.oms-scope .tipo-op .caja{
+  width:20px; height:17px; border:1.5px solid var(--tinta); border-radius:2px;
+  display:flex; align-items:center; justify-content:center; flex:0 0 20px; background:#fff;
+}
+.oms-scope .tipo-op .caja::after{
+  content:""; width:9px; height:9px; border:1px solid var(--tinta); background:#fff;
+  display:block; position:relative;
+}
+.oms-scope .tipo-op input:checked ~ .caja::after{
+  background:var(--azul); border-color:var(--azul);
+  box-shadow:inset 0 0 0 1.5px #fff;
+}
+.oms-scope .tipo-op:has(input:checked){
+  border-color:var(--azul); background:var(--azul-claro);
+  box-shadow:0 0 0 3px rgba(0,111,183,.13);
+}
+.oms-scope .campo.error .tipo-op{ border-color:var(--error); }
+/* Interruptor (checkbox con aspecto de switch) */
+.oms-scope .interruptor{
+  position:relative;
+  display:flex; align-items:center; gap:10px; cursor:pointer;
+  font-size:.87rem; font-weight:500; color:var(--tinta);
+  border:1px solid var(--linea); border-radius:var(--radio-s);
+  padding:9px 12px; background:#fff; text-transform:none; letter-spacing:0;
+  transition:border-color .15s, background .15s;
+}
+.oms-scope .interruptor:hover{ border-color:#B9CBD8; }
+.oms-scope .interruptor input{ position:absolute; opacity:0; width:0; height:0; }
+.oms-scope .interruptor .palanca{
+  width:38px; height:21px; border-radius:20px; background:#C7D2DA;
+  flex:0 0 38px; position:relative; transition:background .18s;
+}
+.oms-scope .interruptor .palanca::after{
+  content:""; position:absolute; top:3px; left:3px; width:15px; height:15px;
+  border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.28);
+  transition:transform .18s;
+}
+.oms-scope .interruptor input:checked ~ .palanca{ background:var(--azul); }
+.oms-scope .interruptor input:checked ~ .palanca::after{ transform:translateX(17px); }
+.oms-scope .interruptor input:focus-visible ~ .palanca{ box-shadow:0 0 0 3px rgba(0,111,183,.3); }
+/* ===================== TABLA DE MATERIALES ===================== */
+.oms-scope .fila-agregar{ display:grid; grid-template-columns:1fr 110px 130px auto; gap:12px; align-items:end; }
+.oms-scope .tabla-items{ width:100%; border-collapse:collapse; margin-top:16px; font-size:.87rem; }
+.oms-scope .tabla-items th{
+  background:var(--azul); color:#fff; font-size:.74rem; text-transform:uppercase;
+  letter-spacing:.6px; padding:9px 10px; text-align:left; font-weight:700;
+  border:1px solid var(--azul);
+}
+.oms-scope .tabla-items td{ padding:8px 10px; border:1px solid var(--linea); vertical-align:middle; }
+.oms-scope .tabla-items tbody tr:nth-child(even) td{ background:#FAFCFD; }
+.oms-scope .tabla-items .n{ text-align:center; width:52px; }
+.oms-scope .tabla-items .u{ text-align:center; width:88px; }
+.oms-scope .tabla-items .q{ text-align:right; width:104px; font-variant-numeric:tabular-nums; }
+.oms-scope .tabla-items .acc{ width:56px; text-align:center; }
+.oms-scope .tabla-items .vacia td{
+  text-align:center; color:var(--tinta-2); font-style:italic; padding:22px 10px; background:#fff;
+}
+.oms-scope .btn-quitar{
+  border:1px solid #F0C4C4; background:var(--error-bg); color:var(--error);
+  width:28px; height:28px; border-radius:6px; cursor:pointer; font-size:1rem; line-height:1;
+  display:inline-flex; align-items:center; justify-content:center;
+}
+.oms-scope .btn-quitar:hover{ background:#FBDCDC; }
+.oms-scope .resumen-items{
+  margin-top:10px; font-size:.82rem; color:var(--tinta-2);
+  display:flex; gap:16px; flex-wrap:wrap; align-items:center;
+}
+.oms-scope .resumen-items b{ color:var(--tinta); }
+/* ===================== IMPORTACIÓN DE LISTAS ===================== */
+.oms-scope .zona-drop{
+  border:2px dashed var(--linea); border-radius:var(--radio);
+  padding:22px; text-align:center; background:#FBFDFE; cursor:pointer;
+  transition:border-color .15s, background .15s;
+}
+.oms-scope .zona-drop:hover, .oms-scope .zona-drop.sobre{ border-color:var(--azul); background:var(--azul-claro); }
+.oms-scope .zona-drop .icono{ font-size:1.6rem; }
+.oms-scope .zona-drop p{ margin:6px 0 2px; font-weight:600; font-size:.9rem; }
+.oms-scope .zona-drop small{ color:var(--tinta-2); }
+.oms-scope .estado-listas{ display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:10px; margin-top:14px; }
+.oms-scope .pastilla{
+  border:1px solid var(--linea); border-radius:var(--radio-s); padding:10px 12px; background:#fff;
+}
+.oms-scope .pastilla .k{ font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:var(--tinta-2); font-weight:700; }
+.oms-scope .pastilla .v{ font-size:1.25rem; font-weight:700; color:var(--azul-osc); line-height:1.2; }
+.oms-scope .pastilla .f{ font-size:.72rem; color:var(--tinta-2); }
+.oms-scope .oms-aviso{
+  border-radius:var(--radio-s); padding:10px 13px; font-size:.84rem;
+  margin-top:12px; display:none; border:1px solid transparent;
+}
+.oms-scope .oms-aviso.ver{ display:block; }
+.oms-scope .oms-aviso.ok{ background:var(--ok-bg); border-color:#BFDFC0; color:var(--ok); }
+.oms-scope .oms-aviso.err{ background:var(--error-bg); border-color:#F0C4C4; color:var(--error); }
+.oms-scope .oms-aviso.warn{ background:var(--aviso-bg); border-color:#F2DDB4; color:var(--aviso); }
+.oms-scope .oms-aviso ul{ margin:6px 0 0; padding-left:20px; }
+/* ===================== ALMACENAMIENTO Y RESPALDO ===================== */
+.oms-scope .sub-titulo{
+  margin:22px 0 6px; font-size:.82rem; font-weight:700; text-transform:uppercase;
+  letter-spacing:.5px; color:var(--azul-osc);
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+}
+.oms-scope .sub-titulo:first-of-type{ margin-top:18px; }
+.oms-scope .etiqueta{
+  background:var(--verde); color:#fff; font-size:.62rem; font-weight:800;
+  padding:2px 8px; border-radius:20px; letter-spacing:.6px;
+}
+.oms-scope .parrafo{ margin:0 0 10px; font-size:.85rem; color:var(--tinta-2); line-height:1.55; }
+.oms-scope .parrafo code{
+  background:var(--linea-2); padding:1px 5px; border-radius:4px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.9em; color:var(--tinta);
+}
+.oms-scope .fila-botones{ display:flex; gap:8px; flex-wrap:wrap; }
+.oms-scope input[type=search]{
+  font:inherit; font-size:.9rem; width:100%; padding:9px 11px;
+  border:1px solid var(--linea); border-radius:var(--radio-s); background:#fff;
+}
+.oms-scope input[type=search]:focus{ outline:none; border-color:var(--azul); box-shadow:0 0 0 3px rgba(0,111,183,.16); }
+/* ===================== ÓRDENES GUARDADAS ===================== */
+.oms-scope .lista-ordenes{ display:flex; flex-direction:column; gap:8px; }
+.oms-scope .item-orden{
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+  border:1px solid var(--linea); border-radius:var(--radio-s); padding:10px 13px; background:#fff;
+}
+.oms-scope .item-orden .badge{
+  font-size:.68rem; font-weight:800; letter-spacing:.6px; padding:3px 9px 3px 7px; border-radius:20px;
+  text-transform:uppercase; flex:0 0 auto;
+  display:inline-flex; align-items:center; gap:6px;
+}
+/* Chip de color (identidad, igual que en los gráficos) + tinta oscura (legibilidad
+   7,2:1). El texto blanco sobre naranja se quedaba en 3,20:1, por debajo de AA. */
+.oms-scope .badge::before{ content:""; width:8px; height:8px; border-radius:50%; background:currentColor; opacity:.85; }
+.oms-scope .badge.entrada{ background:var(--serie-e-bg); color:var(--serie-e-ink); }
+.oms-scope .badge.salida{  background:var(--serie-s-bg); color:var(--serie-s-ink); }
+.oms-scope .item-orden .no{ font-weight:700; font-size:.92rem; }
+.oms-scope .item-orden .meta{ font-size:.79rem; color:var(--tinta-2); flex:1 1 200px; min-width:0; }
+.oms-scope .item-orden .acciones{ display:flex; gap:6px; }
+.oms-scope .sin-datos{ color:var(--tinta-2); font-style:italic; font-size:.87rem; padding:6px 0; }
+/* ===================== MODAL DE VISTA PREVIA ===================== */
+.oms-scope .oms-modal{
+  position:fixed; inset:0; background:rgba(16,34,45,.62);
+  display:none; align-items:flex-start; justify-content:center;
+  padding:0; z-index:100; overflow:auto;
+  backdrop-filter:blur(2px);
+}
+.oms-scope .oms-modal.ver{ display:flex; }
+.oms-scope .modal-caja{
+  background:var(--fondo); width:100%; max-width:1100px; min-height:100%;
+  box-shadow:var(--sombra-alta); display:flex; flex-direction:column;
+}
+.oms-scope .modal-cab{
+  position:sticky; top:0; z-index:5; background:var(--panel);
+  border-bottom:1px solid var(--linea); padding:12px 18px;
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+}
+.oms-scope .modal-cab h3{ margin:0; font-size:.95rem; text-transform:uppercase; letter-spacing:.5px; color:var(--azul-osc); }
+.oms-scope .modal-cab .crece{ flex:1 1 auto; }
+.oms-scope .modal-cuerpo{ padding:22px; display:flex; flex-direction:column; align-items:center; gap:22px; }
+/* --- Lienzo A4: 1 pt = 1 unidad, escalado con transform --- */
+.oms-scope .envoltura-hoja{ transform-origin:top center; }
+.oms-scope .hoja{
+  position:relative; width:595.32pt; height:841.92pt;
+  background:#fff; box-shadow:0 3px 16px rgba(16,34,45,.28);
+  font-family:Calibri,Carlito,"Segoe UI",Arial,Helvetica,sans-serif;
+  color:#000; overflow:hidden;
+}
+.oms-scope .hoja *{ box-sizing:border-box; }
+.oms-scope .hoja .t{ position:absolute; white-space:pre; line-height:1; }
+.oms-scope .hoja .l{ position:absolute; background:#000; }
+.oms-scope .hoja .bx{ position:absolute; border:1px solid #000; }
+.oms-scope .hoja .im{ position:absolute; }
+.oms-scope .hoja .ct{ text-align:center; }
+.oms-scope .hoja .rt{ text-align:right; }
+.oms-scope .hoja b{ font-weight:700; }
+/* ===================== INDICADORES ===================== */
+.oms-scope .modal-caja.ancha{ max-width:1240px; }
+.oms-scope .viz-cuerpo{ display:block; padding:20px 24px 60px; position:relative; align-items:stretch; }
+.oms-scope .viz-filtros{
+  display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap;
+  background:var(--panel); border:1px solid var(--linea); border-radius:var(--radio);
+  padding:12px 14px; margin-bottom:14px;
+}
+.oms-scope .viz-filtros .campo{ min-width:150px; flex:0 1 auto; }
+.oms-scope .viz-filtros .campo > label{ font-size:.7rem; }
+/* Puntos de serie: la identidad viaja en el color, el texto en tinta legible */
+.oms-scope .pt{ width:9px; height:9px; border-radius:50%; display:inline-block; margin-right:5px; vertical-align:baseline; }
+.oms-scope .pt-e{ background:var(--serie-e); }
+.oms-scope .pt-s{ background:var(--serie-s); }
+.oms-scope .kpis{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; margin:14px 0; }
+.oms-scope .kpi{
+  background:var(--panel); border:1px solid var(--linea); border-radius:var(--radio);
+  padding:14px 16px; box-shadow:var(--sombra);
+}
+.oms-scope .kpi .k{ font-size:.72rem; text-transform:uppercase; letter-spacing:.5px; color:var(--tinta-2); font-weight:700; }
+.oms-scope .kpi .v{ font-size:2.1rem; font-weight:700; color:var(--azul-osc); line-height:1.15; font-variant-numeric:tabular-nums; }
+.oms-scope .kpi .s{ font-size:.76rem; color:var(--tinta-2); }
+.oms-scope .viz-leyenda{
+  display:flex; gap:18px; align-items:center; font-size:.82rem; color:var(--tinta-2);
+  margin:6px 0 14px; font-weight:600;
+}
+.oms-scope .viz-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(430px,1fr)); gap:16px; align-items:start; }
+.oms-scope .viz-fig{
+  margin:0; background:var(--panel); border:1px solid var(--linea);
+  border-radius:var(--radio); padding:14px 16px 10px; box-shadow:var(--sombra); min-width:0;
+}
+.oms-scope .viz-fig.ancha{ grid-column:1 / -1; }
+.oms-scope .viz-fig figcaption{
+  font-size:.85rem; font-weight:700; color:var(--azul-osc); margin-bottom:10px;
+  text-transform:uppercase; letter-spacing:.4px;
+}
+.oms-scope .viz-titulo{
+  font-size:.9rem; font-weight:700; color:var(--azul-osc); text-transform:uppercase;
+  letter-spacing:.5px; margin:26px 0 4px;
+}
+.oms-scope .viz-sub{ font-size:.82rem; font-weight:600; color:var(--tinta); margin:16px 0 6px; }
+.oms-scope .viz-nota{ font-size:.78rem; color:var(--tinta-2); margin:4px 0 10px; font-weight:400; text-transform:none; letter-spacing:0; }
+/* `max-width` en línea (= ancho del viewBox) evita que el SVG se amplíe por
+   encima de su tamaño de diseño y agrande texto y barras de forma desmedida. */
+.oms-scope svg.viz{ width:100%; height:auto; display:block; overflow:visible; margin:0 auto; }
+.oms-scope svg.viz .viz-etq{ font-size:11px; fill:var(--tinta); font-family:inherit; }
+.oms-scope svg.viz .viz-eje{ font-size:10px; fill:var(--tinta-2); font-family:inherit; }
+.oms-scope svg.viz .viz-valor{ font-size:11px; font-weight:700; fill:var(--tinta); font-family:inherit; font-variant-numeric:tabular-nums; }
+.oms-scope svg.viz .viz-marca{ cursor:default; transition:opacity .12s; }
+.oms-scope svg.viz .viz-marca:hover{ opacity:.78; }
+.oms-scope .viz-tip{
+  position:absolute; z-index:20; pointer-events:none; display:none;
+  background:var(--tinta); color:#fff; font-size:.78rem; line-height:1.4;
+  padding:7px 10px; border-radius:6px; box-shadow:var(--sombra-alta); max-width:260px;
+}
+.oms-scope .viz-tip.ver{ display:block; }
+.oms-scope .tabla-viz{ font-size:.82rem; margin-top:0; }
+.oms-scope .tabla-viz .cod{ font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:.9em; color:var(--azul-osc); font-weight:700; }
+.oms-scope .tabla-viz .q{ text-align:right; font-variant-numeric:tabular-nums; width:auto; }
+.oms-scope .tabla-viz .q.pos{ color:var(--serie-e-ink); font-weight:700; }
+.oms-scope .tabla-viz .q.neg{ color:var(--serie-s-ink); font-weight:700; }
+@media (max-width:720px){
+  .oms-scope .viz-cuerpo{ padding:12px 10px 50px; }
+  .oms-scope .viz-grid{ grid-template-columns:1fr; }
+  .oms-scope .viz-filtros .campo{ min-width:calc(50% - 6px); }
+  .oms-scope .kpi .v{ font-size:1.7rem; }
+}
+/* ===================== NOTIFICACIONES ===================== */
+.oms-scope .tostadas{ position:fixed; right:18px; bottom:18px; z-index:200; display:flex; flex-direction:column; gap:9px; max-width:min(380px,88vw); }
+.oms-scope .tostada{
+  background:var(--tinta); color:#fff; padding:11px 15px; border-radius:var(--radio-s);
+  font-size:.86rem; box-shadow:var(--sombra-alta); display:flex; gap:9px; align-items:flex-start;
+  animation:oms-entra .22s ease-out;
+}
+.oms-scope .tostada.ok{ background:#1F6B2A; }
+.oms-scope .tostada.err{ background:#A31D1D; }
+.oms-scope .tostada.warn{ background:#8A5200; }
+.oms-scope .tostada .x{ margin-left:auto; cursor:pointer; opacity:.7; }
+.oms-scope .tostada .x:hover{ opacity:1; }
+@keyframes oms-entra{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+.oms-scope .cargando{
+  position:fixed; inset:0; background:rgba(255,255,255,.78); z-index:300;
+  display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+}
+.oms-scope .cargando.ver{ display:flex; }
+.oms-scope .spin{
+  width:42px; height:42px; border:4px solid var(--linea); border-top-color:var(--azul);
+  border-radius:50%; animation:oms-gira .8s linear infinite;
+}
+@keyframes oms-gira{ to{ transform:rotate(360deg); } }
+.oms-scope .cargando p{ font-weight:600; color:var(--azul-osc); margin:0; }
+@media (max-width:980px){
+  .oms-scope .c3, .oms-scope .c4, .oms-scope .c5{ grid-column:span 6; }
+  .oms-scope .c8{ grid-column:span 12; }
+  .oms-scope .fila-agregar{ grid-template-columns:1fr 100px 110px auto; }
+}
+@media (max-width:720px){
+  .oms-scope{ font-size:14.5px; }
+  .oms-scope .oms-main{ padding:14px 12px 70px; }
+  .oms-scope .app-header{ padding:12px 14px; gap:12px; }
+  .oms-scope .app-header h1{ font-size:1rem; }
+  .oms-scope .barra{ padding:9px 12px; }
+  .oms-scope .barra .oms-btn{ flex:1 1 calc(50% - 8px); justify-content:center; }
+  .oms-scope .barra .sep, .oms-scope .barra .crece{ display:none; }
+  .oms-scope .c3, .oms-scope .c4, .oms-scope .c5, .oms-scope .c6, .oms-scope .c8{ grid-column:span 12; }
+  .oms-scope .fila-agregar{ grid-template-columns:1fr 1fr; }
+  .oms-scope .fila-agregar .campo:first-child{ grid-column:span 2; }
+  .oms-scope .fila-agregar .oms-btn{ grid-column:span 2; justify-content:center; }
+  .oms-scope .tarjeta > .cuerpo{ padding:14px; }
+  .oms-scope .modal-cuerpo{ padding:12px 6px; }
+  .oms-scope .tabla-items{ font-size:.8rem; }
+  .oms-scope .tabla-items th, .oms-scope .tabla-items td{ padding:6px; }
+}
+@page{ size:A4 portrait; margin:0; }
+@media print{
+  /* El acotado no puede resolver esto solo: al vivir dentro del sitio, lo que
+     hay que esconder al imprimir ya no es «main» del módulo sino el ARMAZÓN
+     del sitio (barra superior `header.tb` y menú lateral `aside.sb`) más la
+     cabecera de la página. Sin esto la orden sale con el menú encima. */
+  header.tb, aside.sb, #aquaSidebar, .skip-link, .page-header{ display:none !important; }
+  body{ background:#fff; }
+  .app-main, .page-container{ margin:0 !important; padding:0 !important; max-width:none !important; }
+
+  .oms-scope .app-header,
+  .oms-scope .barra,
+  .oms-scope .tostadas,
+  .oms-scope .modal-cab,
+  .oms-scope .cargando{ display:none !important; }
+  .oms-scope .oms-modal{ position:static; display:block !important; background:#fff; padding:0; backdrop-filter:none; }
+  .oms-scope .modal-caja{ box-shadow:none; max-width:none; min-height:0; background:#fff; }
+  .oms-scope .modal-cuerpo{ padding:0; gap:0; display:block; }
+  .oms-scope .envoltura-hoja{ transform:none !important; }
+  .oms-scope .hoja{ box-shadow:none; page-break-after:always; break-after:page; margin:0; }
+  .oms-scope .hoja:last-child{ page-break-after:auto; break-after:auto; }
+}
+/* ── Ajustes del port ──────────────────────────────────────────────────────
+   La página ya tiene su cabecera (breadcrumb + título) como todas las del
+   sitio, así que la cabecera propia del módulo se reduce a una tira: conserva
+   el código del formato y los indicadores de librerías (que el JS actualiza)
+   y suelta el título grande, que estaría duplicado. */
+.oms-scope .app-header{ padding:10px 14px; margin-bottom:14px; border-radius:10px; }
+.oms-scope .app-header .titulos h1{ display:none; }
+.oms-scope .app-header .oms-logo img{ max-height:26px; }
+.oms-scope .app-header .oms-sub{ margin:0; }
+
+/* La zona de arrastre es un <label>: clic y teclado los da el navegador, sin
+   JavaScript. El input no puede llevar `hidden` —eso lo saca del tabulador y
+   deja la zona inalcanzable con el teclado—, así que se oculta a la vista pero
+   sigue enfocable, y el foco se dibuja sobre la zona entera. */
+.oms-scope .oms-archivo-oculto{
+  position:absolute; width:1px; height:1px; padding:0; margin:-1px;
+  overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+}
+.oms-scope .zona-drop{ display:block; }
+.oms-scope .zona-drop:focus-within{ border-color:var(--azul); box-shadow:0 0 0 3px rgba(0,111,183,.25); }
+/* Dentro de un <label> solo cabe contenido de línea; estos dos se comportan
+   como bloque por CSS y el marcado queda válido. */
+.oms-scope .zona-drop .icono,
+.oms-scope .zona-drop .oms-linea{ display:block; }
+
+/* ── Capas: el módulo suelto no competía con nadie ─────────────────────────
+   Sus modales venían en z-index 100 y sus avisos en 200. Dentro del sitio eso
+   los deja POR DEBAJO de la barra superior (200) y empatados con el menú
+   lateral (100): la vista previa del documento salía tapada por el armazón.
+   Se adoptan las capas del sistema de diseño (aqua-tokens) en vez de inventar
+   números: así el módulo respeta el mismo orden que el resto del sitio. */
+.oms-scope .oms-modal{ z-index: var(--z-modal, 500); }
+.oms-scope .tostadas{ z-index: var(--z-toast, 1000); }
+.oms-scope .cargando{ z-index: var(--z-toast, 1000); }
