@@ -35,6 +35,39 @@ import {
   consolidarMateriales
 } from './data/materiales-afinia.js';
 
+// ── Firma personal (ADR-071) ──────────────────────────────────────────────
+// El informe traía la firma escaneada como archivo del repositorio: pública y
+// descargable por cualquiera, sin sesión. Ahora se lee de la cuenta de quien
+// tiene la sesión y SOLO se estampa si esa persona es la que figura en la
+// línea. Para cualquier otro, el informe sale con el espacio en blanco para
+// firmar a mano. Nadie puede emitir un documento con la firma de otro.
+import { miFirma, firmasDisponibles } from './data/firmas.js';
+import { firmaAplicaA } from './domain/firmas.js';
+import { getSession } from './auth/session-guard.js';
+
+// Se precarga: `generateReport()` arma el informe de una sola pasada en otra
+// ventana y no puede esperar a una promesa a mitad de la plantilla.
+const FIRMA_INFORME = { dataUrl: null, nombre: '' };
+function cargarFirmaInforme() {
+  if (!firmasDisponibles()) return;
+  const s = getSession();
+  FIRMA_INFORME.nombre = (s && s.profile && s.profile.nombre) || '';
+  miFirma().then((d) => { FIRMA_INFORME.dataUrl = d || null; })
+           .catch(() => { FIRMA_INFORME.dataUrl = null; });
+}
+if (getSession()) cargarFirmaInforme();
+else {
+  window.addEventListener('sgm:session-ready', cargarFirmaInforme, { once: true });
+  document.addEventListener('sgm:session-ready', cargarFirmaInforme, { once: true });
+}
+
+/** HTML de la firma para la línea de una persona: la suya, o nada. */
+function firmaHTMLDe(nombreDeLaLinea) {
+  if (!FIRMA_INFORME.dataUrl) return '';
+  if (!firmaAplicaA(nombreDeLaLinea, FIRMA_INFORME.nombre)) return '';
+  return `<img src="${FIRMA_INFORME.dataUrl}" alt="Firma de ${escaparHtml(nombreDeLaLinea)}" class="firma-img">`;
+}
+
 const $ = (id) => document.getElementById(id);
 
 /* ─── Estado UI mutable (mínimo) ────────────────────────────── */
@@ -4576,7 +4609,7 @@ function generateReport() {
           <div class="firma-pair"><div class="firma-key">Unidad</div><div class="firma-val">Mantenimiento Red Alta Tensión</div></div>
         </div>
         <div class="firma-block-img">
-          <img src="../assets/img/afinia/firma-miguel-jimenez.png" alt="Firma Ing. Miguel Jimenez" class="firma-img">
+          ${firmaHTMLDe('Miguel Jimenez')}
           <div class="firma-line-under"></div>
           <div class="firma-cap">Firma</div>
         </div>

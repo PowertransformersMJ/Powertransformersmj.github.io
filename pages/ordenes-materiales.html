@@ -13,6 +13,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
   <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/firma-personal.css"/>
   <link rel="stylesheet" href="../assets/css/ordenes-materiales.css"/>
 </head>
 <body class="aqua">
@@ -274,17 +275,20 @@
             <div class="campo c6">
               <label>Firmas digitalizadas</label>
               <label class="interruptor">
-                <input type="checkbox" id="conFirmas" checked disabled>
+                <input type="checkbox" id="conFirmas" checked>
                 <span class="palanca" aria-hidden="true"></span>
-                <span>Firmas digitalizadas — no disponibles en la web</span>
+                <span>Estampar mi firma en la línea que lleva mi nombre</span>
               </label>
-              <!-- El interruptor se conserva (el JS lo lee en 4 sitios y el histórico
-                   guarda su valor), pero deshabilitado y con el texto veraz: en esta
-                   versión el documento SIEMPRE sale con la línea de firma en blanco.
-                   Publicar firmas escaneadas en un sitio abierto permitiría falsificar
-                   documentos a nombre de esas personas. Ver `99 §70`. -->
-              <span class="ayuda" id="estadoFirmas">El documento sale con la línea de firma en blanco, para firmar a mano sobre el impreso — igual que el formato en papel.</span>
+              <!-- Vuelve a estar activo desde ADR-071, pero con una diferencia de
+                   fondo: la firma ya NO viaja dentro de la página. Se lee de la
+                   cuenta de quien tiene la sesión y solo se estampa en SU línea.
+                   Las demás salen en blanco para firmar a mano. -->
+              <span class="ayuda" id="estadoFirmas">Solo se estampa la suya, y solo donde figura su nombre. Las demás líneas salen en blanco para firmar a mano.</span>
             </div>
+
+            <!-- Alta autoservicio de la firma propia: se monta desde
+                 `assets/js/ui/firma-personal.js`. -->
+            <div class="campo c6" id="panelMiFirma"></div>
 
           </div>
         </div>
@@ -511,6 +515,29 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script type="module" src="../assets/js/ordenes-materiales.js"></script>
+
+<script type="module">
+  // Panel «Mi firma». Se monta cuando el guard confirma la sesión: antes no hay
+  // uid y no se podría leer nada. Al cambiar la firma se avisa al módulo para
+  // que repinte la marca ✒ de los desplegables y la vista previa abierta.
+  import { montarFirmaPersonal } from '../assets/js/ui/firma-personal.js';
+  import { getSession } from '../assets/js/auth/session-guard.js';
+
+  function montar() {
+    const caja = document.getElementById('panelMiFirma');
+    if (!caja) return null;
+    return montarFirmaPersonal(caja, {
+      onCambio() { window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); }
+    });
+  }
+  // Se monta SIEMPRE: el propio panel resuelve el caso «sin sesión» con su
+  // estado vacío. Esperar al evento dejaba la caja sin pintar si la sesión ya
+  // estaba resuelta antes de que este script corriera.
+  const panel = montar();
+  const refrescar = () => { try { panel && panel.refrescar(); } catch (_) {} };
+  window.addEventListener('sgm:session-ready', refrescar, { once: true });
+  document.addEventListener('sgm:session-ready', refrescar, { once: true });
+</script>
 
 <script src="../assets/vendor/lucide/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>

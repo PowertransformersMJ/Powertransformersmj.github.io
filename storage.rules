@@ -101,6 +101,35 @@ service firebase.storage {
       allow delete: if isAdmin();
     }
 
+    // ── Firmas personales (ADR-071) ──
+    // `firmas/{uid}` — una por persona, y SOLO la suya. Es la única ruta del
+    // bucket donde la lectura no basta con ser del equipo: se exige además
+    // que el uid de la sesión sea el del archivo. Si un miembro activo
+    // pudiera leer la firma de otro, el sitio serviría para estampar la
+    // firma ajena en un documento, que es exactamente lo que se retiró del
+    // repositorio público en ADR-070.
+    //
+    // Escritura: el propio dueño (no el admin). Una firma manuscrita es un
+    // dato personalísimo; que un administrador pueda subirla por otro
+    // rompería la única garantía que da este mecanismo.
+    //   · solo PNG — es el formato que conserva el fondo transparente; un
+    //     JPG llega con fondo blanco y tapa la línea de firma del formato.
+    //   · 1 MB — un trazo recortado pesa decenas de KB; el tope corta las
+    //     fotos de cámara sin recortar.
+    match /firmas/{uid} {
+      allow read:   if isTeamMember() && request.auth.uid == uid;
+      // create/update por separado y NO `write`: en Storage `write` incluye el
+      // borrado, y al borrar `request.resource` es nulo — una condición sobre
+      // su tamaño no se puede evaluar. Mismo estilo que el resto del archivo.
+      allow create: if isTeamMember() && request.auth.uid == uid
+                    && request.resource.size <= 1 * 1024 * 1024
+                    && request.resource.contentType == 'image/png';
+      allow update: if isTeamMember() && request.auth.uid == uid
+                    && request.resource.size <= 1 * 1024 * 1024
+                    && request.resource.contentType == 'image/png';
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{allPaths=**} {
       allow read, write: if false;

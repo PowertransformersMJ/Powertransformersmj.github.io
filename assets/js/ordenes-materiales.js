@@ -29,6 +29,13 @@
    ========================================================================== */
 'use strict';
 
+// ── Firmas personales (ADR-071) ───────────────────────────────────────────
+// El módulo ya NO lleva firmas dentro. La única firma que puede estamparse es
+// la de quien tiene la sesión abierta, y solo en SU propia línea del documento.
+import { miFirma, firmasDisponibles } from './data/firmas.js';
+import { firmaAplicaA } from './domain/firmas.js';
+import { getSession } from './auth/session-guard.js';
+
 const CONFIG = {
 
   /* --- Textos fijos del formato -------------------------------------- */
@@ -350,15 +357,50 @@ function norm(txt) {
     .replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/** Deja solo los dígitos de una cédula: '12.345.678' → '12345678'. */
-function claveCedula(ced) {
-  return String(ced == null ? '' : ced).replace(/\D+/g, '');
+/** Firma de la sesión, cargada una vez. `rel` = ancho/alto real del PNG:
+ *  sin él la firma sale deformada dentro de su caja. */
+const FIRMA_SESION = { dataUrl: null, rel: 1, nombre: '', cargada: false };
+
+/**
+ * ¿Qué firma va en la línea de ESTA persona?
+ *
+ * Solo hay una respuesta posible: la de quien tiene la sesión abierta, y solo
+ * si la línea es la suya. No existe forma de obtener la firma de otro — ni
+ * aquí ni en el servidor, donde las reglas de Storage lo impiden. Para el
+ * resto de líneas devuelve null y el documento sale con el espacio en blanco
+ * para firmar a mano, igual que el formato en papel.
+ */
+function firmaDe(persona) {
+  if (!FIRMA_SESION.dataUrl) return null;
+  const nombre = persona && persona.nombre;
+  if (!firmaAplicaA(nombre, FIRMA_SESION.nombre)) return null;
+  return { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel };
 }
 
-/** Devuelve la firma digitalizada registrada para una cédula, o null. */
-function firmaDe(cedula) {
-  const k = claveCedula(cedula);
-  return (k && CONFIG.firmas && CONFIG.firmas[k]) ? CONFIG.firmas[k] : null;
+/** Mide el ancho/alto real de un dataURL para no deformar la firma. */
+function medirRel(dataUrl) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img.naturalHeight ? img.naturalWidth / img.naturalHeight : 1);
+    img.onerror = () => resolve(1);
+    img.src = dataUrl;
+  });
+}
+
+/** Carga la firma propia (si la hay) y repinta lo que dependa de ella. */
+async function cargarFirmaDeLaSesion() {
+  FIRMA_SESION.cargada = true;
+  try {
+    if (!firmasDisponibles()) return;
+    const s = getSession();
+    FIRMA_SESION.nombre = (s && s.profile && s.profile.nombre) || '';
+    const dataUrl = await miFirma();
+    if (!dataUrl) return;
+    FIRMA_SESION.dataUrl = dataUrl;
+    FIRMA_SESION.rel = await medirRel(dataUrl);
+  } catch (e) {
+    console.warn('[órdenes] no se pudo cargar la firma de la sesión:', e);
+  }
 }
 
 /** Convierte 'AAAA-MM-DD' (valor nativo de <input type=date>) a 'DD/MM/AAAA'. */
@@ -596,13 +638,13 @@ function llenarFijos() {
   $('#edDoc').textContent  = CONFIG.documento.edicion;
   $('#capPagina').textContent = CONFIG.filasTablaPagina;
 
-  $('#autorizado').value = `${CONFIG.autorizadoPor.nombre} — Cédula: ${CONFIG.autorizadoPor.cedula}`;
+  $('#autorizado').value = CONFIG.autorizadoPor.nombre;
   if ($('#conFirmas')) $('#conFirmas').checked = true;
 
   $('#dlZonas').innerHTML = CONFIG.zonas.map(z => `<option value="${esc(z)}">`).join('');
 
   opciones($('#motivo'), CONFIG.motivos.concat([CONFIG.motivoOtro]));
-  const marca = p => firmaDe(p.cedula) ? '  ✒' : '';
+  const marca = p => firmaDe(p) ? '  ✒' : '';
   opciones($('#entregado'), CONFIG.entregadoPor.map((p, i) => ({
     valor: String(i), texto: `${p.nombre}${marca(p)}`
   })));
@@ -617,17 +659,28 @@ function llenarFijos() {
 function pintarEstadoFirmas() {
   const cont = $('#estadoFirmas');
   if (!cont) return;
+  // Antes esto listaba quién de los 8 responsables tenía firma cargada. Ese
+  // modelo ya no existe (ADR-071): la única firma que el navegador puede leer
+  // es la de quien tiene la sesión, así que el resumen habla de USTED.
+  const s = getSession();
+  const yo = (s && s.profile && s.profile.nombre) || '';
   const todos = [CONFIG.autorizadoPor].concat(CONFIG.entregadoPor, CONFIG.recibidoPor);
-  const con = todos.filter(p => firmaDe(p.cedula));
-  const sin = todos.filter(p => !firmaDe(p.cedula));
-  cont.innerHTML =
-    (con.length
-      ? `<b>Con firma cargada (${con.length}):</b> ` + con.map(p => esc(p.nombre)).join(', ') + '. '
-      : '<b>Todavía no hay firmas cargadas.</b> ') +
-    (sin.length
-      ? `<span style="color:#4A5A66">Sin firma (${sin.length}): ` + sin.map(p => esc(p.nombre)).join(', ') +
-        ' — se deja el espacio en blanco para firmar a mano.</span>'
-      : '');
+  const misLineas = todos.filter(p => firmaAplicaA(p.nombre, yo));
+
+  if (!yo) {
+    cont.innerHTML = 'Sin sesión: el documento sale con las líneas de firma en blanco.';
+    return;
+  }
+  if (!FIRMA_SESION.dataUrl) {
+    cont.innerHTML = 'Aún no ha cargado su firma — cárguela en <b>«Mi firma»</b>, aquí abajo. '
+                   + 'Mientras tanto el documento sale con las líneas en blanco.';
+    return;
+  }
+  cont.innerHTML = misLineas.length
+    ? `Se estampará su firma en <b>${misLineas.length}</b> línea(s) de este documento. `
+      + 'Las demás salen en blanco para firmar a mano.'
+    : 'Su firma está cargada, pero <b>su nombre no figura</b> en ninguna línea de este '
+      + 'documento, así que no se estampará. Solo puede firmar donde aparece usted.';
 }
 
 /* --------------------- Motivo abierto y renglones ---------------------- */
@@ -946,7 +999,7 @@ function limpiarFormulario(pedirConfirmacion, mensaje) {
   ['tipo', 'numero', 'zona', 'fecha', 'hora', 'origen', 'destino', 'motivo', 'motivoOtro', 'entregado', 'recibido', 'items', 'descripcion', 'cantidad'].forEach(marcarOK);
   $('#w-motivoOtro').hidden = true;
   if (typeof medirRenglones === 'function') medirRenglones();
-  $('#autorizado').value = `${CONFIG.autorizadoPor.nombre} — Cédula: ${CONFIG.autorizadoPor.cedula}`;
+  $('#autorizado').value = CONFIG.autorizadoPor.nombre;
   if ($('#conFirmas')) $('#conFirmas').checked = true;
   $('#unidad').value = '';
   pintarItems();
@@ -1172,7 +1225,7 @@ function construirPaginas(o) {
       /* Firma digitalizada, si la persona tiene una registrada en CONFIG.firmas.
          Se escala conservando su proporción y se centra sobre la línea de firma. */
       if (o.conFirmas !== false) {
-        const fir = firmaDe(pe.p && pe.p.cedula);
+        const fir = firmaDe(pe.p);
         if (fir) {
           const c = cajaFirma(fir, i);
           d.push(P.img(c.x, c.y, c.w, c.h, fir.src));
@@ -1730,7 +1783,7 @@ function hojaOrden(wb, o, p, nPag, idLogo) {
   if (o.conFirmas !== false) {
     const M = GEO.firmas.imagen;
     pers.forEach((pe, i) => {
-      const fir = firmaDe(pe[1] && pe[1].cedula);
+      const fir = firmaDe(pe[1]);
       if (!fir) return;
       let id;
       try { id = wb.addImage({ base64: fir.src.split(',')[1], extension: 'png' }); }
@@ -3484,3 +3537,26 @@ function iniciar() {
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', iniciar);
 else iniciar();
+
+// La firma llega DESPUÉS que la sesión, así que no se puede pedir en `iniciar()`:
+// se pide cuando el guard avisa, y si la sesión ya estaba lista, de inmediato.
+// Al llegar se repinta la vista previa abierta, para que la firma aparezca sin
+// que el usuario tenga que cerrarla y volver a abrirla.
+function trasCargarFirma() {
+  cargarFirmaDeLaSesion().then(() => {
+    try { if (document.getElementById('modalVista').classList.contains('ver')) abrirVistaPrevia(); } catch (_) {}
+    try { llenarFijos(); } catch (_) {}   // repinta la marca ✒ de quien ya tiene firma
+  });
+}
+if (getSession()) trasCargarFirma();
+else {
+  window.addEventListener('sgm:session-ready', trasCargarFirma, { once: true });
+  document.addEventListener('sgm:session-ready', trasCargarFirma, { once: true });
+}
+
+// El panel «Mi firma» avisa al subir o quitar: se vuelve a leer y se repinta,
+// para que el usuario vea el efecto sin recargar la página.
+window.addEventListener('sgm:firma-cambiada', () => {
+  FIRMA_SESION.dataUrl = null;
+  trasCargarFirma();
+});
