@@ -5,14 +5,15 @@
 
 ---
 
-## 🎯 Foco (2026-08-30) — ÓRDENES DE MATERIALES YA ESTÁ EN PRODUCCIÓN (ADR-070)
+## 🎯 Foco (2026-08-31) — FIRMAS DETRÁS DE LA SESIÓN (ADR-071), TRAS EL PORT (ADR-070)
 
 > **ADR-070**: el módulo de órdenes de materiales SSEE es una página más del sitio, **sin las 3 firmas
 > escaneadas ni las 8 cédulas** (el guard esconde la página, no el archivo). Verificado vivo en la URL
 > pública. Antes: **ADR-069** (TX_Potencia da 208 válidos con salud y usuarios) y **ADR-068**
 > (auditoría Nivel-2: 18 hallazgos y una neurona hija nueva).
-> ⚠️ Abiertos: **TODO-44** (🔴 su firma YA publicada en otro módulo) · TODO-37 (🔴) · TODO-42 · 36/38/39/40/45.
-> ✅ Cerrado de paso: **TODO-43** — el arranque reventó y se partió la cola fría a la hija `11`.
+> ⚠️ Abiertos: **TODO-37** (🔴) · TODO-42 · TODO-45 · 29/33/36/38/39/40/41.
+> ✅ **TODO-44 cerrado (ADR-071)**: la firma del Ingeniero salió de la web (404 en producción) y pasó
+> a su cuenta; cada quien sube la suya en «Mi firma» y solo se estampa en SU línea. Antes, TODO-43.
 
 ### ▶️ TAREA VIVA: el import de Salud de Activos — PASO DEL INGENIERO
 > Archivo: `~/Documents/2026/PSM 2026/Salud de Activos 2026 Actualizado 01 de junio.xlsx` (ojo: se
@@ -50,7 +51,6 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-34** | 🔴 **El parque real NO tiene Índice de Salud**: `salud_actual` todo en `null` y sin usuarios → banda «Sin dato 206», matriz vacía, 0 en riesgo (degrada limpio, no inventa). **El dato ya existe y está verificado** (ADR-069): el import trae 208 con salud (muy bueno 39 · bueno 86 · medio 54 · pobre 28 · muy pobre 1) y 1.655.376 usuarios. Solo falta pulsarlo. | 🔴 |
-| **TODO-44** | 🔴 **La firma escaneada del Ingeniero YA está publicada** en `assets/img/afinia/firma-miguel-jimenez.png` (PNG con transparencia, listo para recortar y pegar); la usa `calculo-refrigeracion.js:4579` y se descarga sin sesión. El argumento con el que ADR-070 retiró 3 firmas se le aplica igual. Decidir: a Storage tras sesión, o línea en blanco. `99 §70`. | 🔴 |
 | **TODO-45** | `robots.txt` está al revés para este caso: `Disallow: /pages/` + `Allow: /assets/` ⇒ la página (sin datos) está bloqueada y el `.js` (con los 8 nombres) es rastreable; el `<meta robots>` no cubre a un `.js`. Valorar `Disallow: /assets/js/` o mover la lista de responsables a Firestore. `99 §70`. | 🟡 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
 | **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos ya quedaron versionados (08-21): dentro del disco no falta nada; falta una copia FUERA → `lastOffsiteBackup`. | 🟡 decidido |

@@ -1777,3 +1777,60 @@ por el límite MENSUAL de gasto de la cuenta**; solo cerró la dimensión de seg
 acotado a 3 revisores sobre el port hecho, cerró completo y fue el que cazó el bloqueante. Lección de
 dimensionamiento: contra un techo de gasto, **un workflow pequeño sobre trabajo terminado rinde más
 que uno grande sobre trabajo por hacer**. Lecciones → **L-74**, **L-75**.
+
+## 71. ADR — Las firmas salen de la web y pasan a la cuenta de cada quien ⟦OPUS-5⟧ (2026-08-31)
+
+> Decisión del Ingeniero ante las tres salidas que se le plantearon (`99 §70.7`, TODO-44):
+> **«detrás de la sesión»**. Se descartaron «retirarla y firmar a mano» y «dejarlo como está».
+
+**71.1 Causa raíz.** ADR-070 retiró 3 firmas escaneadas del módulo de Órdenes de Materiales porque el
+sitio es estático y público. La revisión encontró que **el mismo problema seguía vivo en otro módulo**:
+`assets/img/afinia/firma-miguel-jimenez.png` (65 KB, PNG con transparencia) estaba versionado y
+`calculo-refrigeracion.js:4579` lo estampaba en el informe. Comprobado en el remoto con
+`git cat-file -e origin/main:…`. El argumento era idéntico; la aplicación, a medias.
+
+**71.2 Solución.** Ruta `firmas/{uid}` en Storage, **una por persona y solo la suya**. Reglas nuevas en
+`storage.rules` (desplegadas): `read` exige `isTeamMember() && request.auth.uid == uid`; `create`/
+`update` lo mismo más ≤1 MB y `contentType == 'image/png'`; `delete` solo el dueño. Se usan create/
+update por separado y no `write` porque en Storage `write` incluye el borrado y allí `request.resource`
+es nulo. **La escritura es del dueño, no del admin**: que un administrador pueda subir la firma de otro
+rompería la única garantía del mecanismo.
+
+**71.3 El detalle que decide si esto sirve de algo.** Se lee con **`getBytes()`**, no con
+`getDownloadURL()`. La URL de descarga lleva token y **funciona sin sesión**: usarla habría trasladado
+el problema de un PNG público a una URL pública. `getBytes` exige la sesión en cada lectura y no deja
+enlace detrás; la imagen se convierte a dataURL en memoria (por trozos de 32 KB: `String.fromCharCode(...bytes)`
+con 1 MB revienta la pila). → **L-76**.
+
+**71.4 Regla de negocio.** La firma solo se estampa en la línea **que lleva el nombre de quien tiene la
+sesión** (`firmaAplicaA`, dominio puro). Las demás salen en blanco para firmar a mano, como el formato
+en papel. No existe forma de estampar la de otro: ni en el cliente (no hay ruta que lo permita) ni en
+el servidor (las reglas lo niegan). La comparación de nombres **preserva la Ñ**: al quitar tildes por
+NFD, `MUÑOZ` se convertía en `MUNOZ` y dos personas distintas pasaban por la misma — en una firma,
+equivocarse hacia el lado permisivo es justo lo que no se puede.
+
+**71.5 Piezas.** `domain/firmas.js` (validación + regla de nombre, sin I/O) · `data/firmas.js` (Storage,
+caché en memoria de sesión) · `ui/firma-personal.js` + `css/firma-personal.css` (panel «Mi firma»:
+subir, ver, reemplazar, quitar — autoservicio) · integración en Órdenes de Materiales (interruptor
+reactivado, resumen que habla de USTED y no de los 8) y en el informe de refrigeración (precarga,
+porque construye el documento de una pasada en otra ventana y no puede esperar una promesa).
+
+**71.6 Verificación.** `node --test` **1407 pass / 0 fail** (20 nuevas, que blindan que nadie firme por
+otro) · `lint:html` limpio · reglas de Storage **desplegadas** (`firebase deploy --only storage`) ·
+panel montado y con su estado vacío correcto sin sesión · documento y PDF siguen saliendo · y en la
+URL pública (L-65) **`firma-miguel-jimenez.png` responde 404**: ya no se descarga.
+
+**71.7 Cola abierta.** El PNG **sigue en el historial de git**: esto corta la exposición hacia adelante,
+no borra el pasado — es TODO-33, irreversible y del Ingeniero. No hay suite de reglas de Storage
+(`tests-rules/` solo cubre Firestore y `test:rules` solo levanta el emulador de Firestore): las reglas
+nuevas se validaron por compilación en el deploy, no por prueba. **TODO-45** (robots.txt) sigue abierto.
+
+**71.8 Verificado sano / no re-auditar.** El dominio no toca I/O y se prueba con `node --test`, como
+manda la casa. El panel no lleva `hidden` en su input de archivo (eso lo sacaría del tabulador): se
+oculta a la vista conservando el foco, con el foco dibujado sobre el botón. La caché de la firma vive
+**solo en memoria de la sesión**, no en `localStorage`: un dato personal no tiene por qué sobrevivir al
+cierre de la pestaña. `claveCedula()` quedó sin uso al cambiar la búsqueda y se retiró.
+
+**71.9 Doctrina.** §3.2 (aditivo: ningún ID ni export renombrado) · §3.3 (se comprobó en el remoto que
+la firma estaba publicada, y en la URL pública que dejó de estarlo) · L-69 (los vacíos se explican: el
+panel y el resumen dicen POR QUÉ no hay firma y qué hacer). Lección → **L-76**.
