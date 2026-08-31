@@ -5,13 +5,14 @@
 
 ---
 
-## 🎯 Foco (2026-08-21) — CEREBRO AUDITADO (ADR-068) + LA HOJA TX_POTENCIA LEÍDA (ADR-069)
+## 🎯 Foco (2026-08-30) — ÓRDENES DE MATERIALES YA ESTÁ EN PRODUCCIÓN (ADR-070)
 
-> **ADR-068**: auditoría Nivel-2 (8 sondas, 3 con subagentes fríos) — 18 hallazgos, 12 cerrados;
-> dos gates decían verde sin medir lo que anunciaban. Kernel **v1.9.0**, neurona hija `32`.
-> **ADR-069**: se abrió el Excel real. Los «62 omitidos» del simulacro **no eran basura**: 57 son
-> equipos reales cuya cabecera está en la fila 2. TX_Potencia da **208 válidos con salud y usuarios**.
-> ⚠️ Abiertos: **TODO-37** (🔴) · TODO-42 (decisiones del import) · TODO-38/39/40/41.
+> **ADR-070**: el módulo de órdenes de materiales SSEE es una página más del sitio, **sin las 3 firmas
+> escaneadas ni las 8 cédulas** (el guard esconde la página, no el archivo). Verificado vivo en la URL
+> pública. Antes: **ADR-069** (TX_Potencia da 208 válidos con salud y usuarios) y **ADR-068**
+> (auditoría Nivel-2: 18 hallazgos y una neurona hija nueva).
+> ⚠️ Abiertos: **TODO-44** (🔴 su firma YA publicada en otro módulo) · TODO-37 (🔴) · TODO-42 · 36/38/39/40/45.
+> ✅ Cerrado de paso: **TODO-43** — el arranque reventó y se partió la cola fría a la hija `11`.
 
 ### ▶️ TAREA VIVA: el import de Salud de Activos — PASO DEL INGENIERO
 > Archivo: `~/Documents/2026/PSM 2026/Salud de Activos 2026 Actualizado 01 de junio.xlsx` (ojo: se
@@ -28,10 +29,10 @@
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
 
 ### 🚫 Callejones probados (NO reintentar — cada uno con su ancla)
-> De `99 §52.8-52.9`: el ref local `main` queda stale tras un filter-repo (usar `origin/main`) · el
-> "código muerto FUSIÓN" de `excitacion-panel.js` es **FALSO** (`tablaFusion` sí se llama) · G024 "XSS
-> en dashboards" casi todo FALSO salvo la fuga de `bump.js`, ya corregida · el fix "obvio"
-> `getDocs→tx.get` para movimientos atómicos es INVIABLE en el SDK Web. · `git-filter-repo --branch`
+> De `99 §52.8-52.9`: `main` local queda stale tras un filter-repo (usar `origin/main`) · el "código
+> muerto FUSIÓN" de `excitacion-panel.js` es **FALSO** · G024 "XSS en dashboards" casi todo FALSO salvo
+> `bump.js`, ya corregida · `getDocs→tx.get` para movimientos atómicos es INVIABLE en el SDK Web ·
+> `git-filter-repo --branch`
 > reescribe SOLO esa rama, rm+gc antes (**L-25**) · reimplementar un panel "parecido a X" en vez de
 > reusar el que produce X (**L-57**) · un estado consolidado para todos los chips normativos
 > (**L-58**) · reintroducir "Reprocesar" (`99 §20`) · meter DGA/aceite o fabricar el dato que falta
@@ -49,26 +50,21 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-34** | 🔴 **El parque real NO tiene Índice de Salud**: `salud_actual` todo en `null` y sin usuarios → banda «Sin dato 206», matriz vacía, 0 en riesgo (degrada limpio, no inventa). **El dato ya existe y está verificado** (ADR-069): el import trae 208 con salud (muy bueno 39 · bueno 86 · medio 54 · pobre 28 · muy pobre 1) y 1.655.376 usuarios. Solo falta pulsarlo. | 🔴 |
+| **TODO-44** | 🔴 **La firma escaneada del Ingeniero YA está publicada** en `assets/img/afinia/firma-miguel-jimenez.png` (PNG con transparencia, listo para recortar y pegar); la usa `calculo-refrigeracion.js:4579` y se descarga sin sesión. El argumento con el que ADR-070 retiró 3 firmas se le aplica igual. Decidir: a Storage tras sesión, o línea en blanco. `99 §70`. | 🔴 |
+| **TODO-45** | `robots.txt` está al revés para este caso: `Disallow: /pages/` + `Allow: /assets/` ⇒ la página (sin datos) está bloqueada y el `.js` (con los 8 nombres) es rastreable; el `<meta robots>` no cubre a un `.js`. Valorar `Disallow: /assets/js/` o mover la lista de responsables a Firestore. `99 §70`. | 🟡 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
 | **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos ya quedaron versionados (08-21): dentro del disco no falta nada; falta una copia FUERA → `lastOffsiteBackup`. | 🟡 decidido |
-| **TODO-36** | Decisiones de ADR-067 (`99 §67.7`): 9 fixtures con datos REALES del TX 450108 en el repo PÚBLICO (`_dev/fixtures/450108-*.json` — el `.gitignore` protege la carpeta `450108/`, no esos archivos) · SAIDI/SAIFI públicos · sembrarlos en Firestore · 2 páginas de desarrollo desplegadas · indicadores congelados en mayo. | 🟡 decisión |
+| **TODO-36** | Decisiones de ADR-067 (`99 §67.7`): 9 fixtures con datos REALES del TX 450108 en el repo PÚBLICO · SAIDI/SAIFI públicos · sembrarlos en Firestore · 2 páginas de desarrollo desplegadas · indicadores congelados en mayo. | 🟡 decisión |
 | **TODO-42** | 🟡 **Tres decisiones del import, esperando al Ingeniero** (detalle → `99 §69.7`): **(a)** acotar el import a `TX_Potencia` y rotular las hojas excluidas — *propuesto, falta su visto bueno*; **(b)** los **57 equipos reales** de `TPT_Servicio` y `TX_Respaldo` que caen por la cabecera en fila 2 (**L-72**): incorporarlos o excluirlos por escrito; **(c)** las discrepancias `CONDICION` vs Índice de Salud (46% de acuerdo), empezando por **ASTREA** (250%, dato sospechoso — **L-73**) y las tres jóvenes sobrecargadas. | 🟡 |
 | **TODO-39** | Sitio · cola de ADR-067: badge «TENDENCIA CRÍTICA» **cableado** en Indicadores de Calidad (viola L-69) · KPIs que solo muestran guiones sin decir por qué · `transformador_2048px-2.png` (334 KB, cero usos). | 🟡 |
 | **TODO-40** | Gates del cerebro (`99 §68`): el `pre-commit` sale en verde si el commit no toca `docs/` ⇒ **cero escaneo de secretos/PII** · `verificado-vivo` valida la fecha, no la verificación · gate #6 por substring · gate 5c sin uso posible. | 🟡 |
-| **TODO-43** | 🟡 **El arranque está al límite** y `20`/`30`/`00` pasan del 90% de su tope: lo próximo que se escriba ahí obliga a shardear (candidatos: el mapa `js/` de `20` a una hija `21`, o partir `00`). El linter lo avisa en cada corrida. | 🟡 |
-| **TODO-41** | Cerrar por escrito el ledger de adopción de ADR-058 (adoptar o descartar): nodo `55-CONFIG-INFRA` · lecciones ajenas de verificación de UI · patrón `LD-NN` · índice shardeado · caveat anti-burla del auto-mode. `99 §68`. | 🟢 |
-| **TODO-12** | Ola 3: **✅ G025** (suite de reglas vía emulador + CI, `99 §52.12`). Pendiente: CSP en 95 HTML (vía `<meta>`, trade-offs CDN/inline) · G111 xlsx = **decisión** (sin fix npm → migrar a cdn.sheetjs.com vs aceptar). | 🟡 |
+| **TODO-12** | Ola 3: falta CSP en 95 HTML · **G111**: todo el sitio usa SheetJS 0.18.5 (con CVE) desde 2 CDN — decisión suya: migrar a cdn.sheetjs.com ≥0.20.2 o aceptarlo. `99 §52.12`. | 🟡 |
 | **TODO-35** | **Cola completa de Fichas Técnicas** (ADR-066): lo priorizado en `99 §66.7` —vendorizar SheetJS ≥0.20.2 (CVE, cierra G111) · partir `panel.js` + `normalizarEquipo` al dominio · identidad de 2 TX en la misma subestación · aviso de trabajo sin guardar— **más lo que se había evaporado** y rescató la auditoría (`99 §68.7`): huecos literales de la norma sin nota · `montoCOP` (signo y centavos) · criterio 5 MVA→N4T1 sin escribir · carrera de 12 s que borra EDITS/DEC · paleta duplicada · código muerto · test con fecha no fijada. | 🟡 |
-| **TODO-04** | **✅ PARCIAL**: clusters validados + paquete SALUD ratificado con MO.00418 Ed.02. RESTA: capítulo PRUEBAS ELÉCTRICAS del MO + ratificación del director. | 🟢 parcial |
-| **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar). | 🟡 decisión |
-| **TODO-14** | Ola 5: separar 5 dominios (app/cerebro/skills/OLTC) + monolitos (shell 2398L, `calculo-refrigeracion.js` 4913L) = **decisión de arquitectura**. | 🟡 decisión |
-| **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
-| **TODO-09** | Falta el **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). El dashboard ya quedó conectado al parque real en `99 §56`. | 🟢 casi |
-| **TODO-17** | Hygiene: `calificarResistencia` (schema) da OK ≤5% mientras semáforo/scorecard usan 2% — unificar o documentar. | 🟢 menor |
-| **TODO-05** | Valida arquitectura de las 11 skills `transformadores-potencia` antes de replicar. | 🔄 |
-| **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |
-| **TODO-02/03** | Tipificar S03-S06 del contrato 4125000143 (`scripts/migrate/…-fan-db.js`, dryRun) · flujo FN-063 vs FN-050. | 🔮 |
+
+> **Los pendientes FRÍOS** (decisiones de arquitectura, validaciones diferidas, colas viejas) viven
+> en la hija [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md): no cambian de semana en semana y no
+> tienen por qué pesar en el arranque de cada sesión. Aquí solo lo que está VIVO.
 
 ---
 

@@ -30,7 +30,7 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 |---|---|---|---|
 | 🧠 **Tronco Encefálico** | `CLAUDE.md` (este) | ✅ Siempre | Router + identidad + doctrinas + gobernanza. |
 | 🩺 **Estado Global (signos vitales)** | `docs/05-ESTADO-GLOBAL.md` | ✅ Siempre (boot) | Snapshot de salud: build, branch, flags de riesgo. "¿Dónde estoy parado?" antes de tocar nada. |
-| ⚡ **Corto Plazo (WIP)** | `docs/10-MEMORIA-CORTO-PLAZO.md` | ✅ Siempre (2ª lectura) | Sprint actual, pendientes (TODO-NN), bitácora. (El estado técnico vive en 05.) |
+| ⚡ **Corto Plazo (WIP)** | `docs/10-MEMORIA-CORTO-PLAZO.md` + hija `docs/11-PENDIENTES-FRIOS.md` | ✅ Siempre (la hija ❌ on-demand) | Sprint actual y pendientes VIVOS. Los fríos (decisiones de arquitectura, validaciones diferidas) → la hija `11`. |
 | 🗺️ **Espacial** | `docs/20-MEMORIA-ESPACIAL.md` | ❌ on-demand | Trigger de Desorientación: dónde vive un componente, flujos, schema de datos, hojas del dueño. |
 | 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` + hijas `docs/31-LECCIONES-IA.md` · `docs/32-LECCIONES-VERIFICACION.md` | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas. Hijas (§G.5): `31` = IA/Claude-API/CF · `32` = verificar antes de declarar algo desplegado, portado o auditado, y rotular el dato que no sea real. |
 | 🗂️ **Índice sináptico** | `docs/00-INDICE.md` | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |

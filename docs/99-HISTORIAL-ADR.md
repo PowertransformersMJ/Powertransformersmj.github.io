@@ -1706,3 +1706,74 @@ documentos `UNK-*`. Los alias de cabecera toleran los dobles espacios del Excel 
 **69.9 Doctrina.** §3.3 (se abrió el archivo en vez de repetir la explicación cómoda que ya estaba
 escrita en el cerebro) · §3.2 (el veredicto sale del valor contra la norma, también frente al Excel) ·
 §G.4 (captura: crudo + síntesis + lecciones antes de cerrar). Lecciones → **L-72**, **L-73**.
+
+## 70. ADR — Órdenes de Materiales SSEE entra al sitio: acotar no basta, y sanear por la forma tampoco ⟦OPUS-5⟧ (2026-08-30)
+
+> Petición del Ingeniero: *"evalúalo de forma holística, necesito que sea cargado en producción,
+> dame preview, vamos con workflow"* sobre `~/Desktop/GitHub-MJ/Modulo_Ordenes_SSEE`.
+> **Deliberación**: los dos workflows →
+> `brain-private/sgm-transpower/research-archive/2026-08-30-port-ordenes-materiales/`.
+
+**70.1 Causa raíz.** El módulo suelto (formato AFINIA IT.05801.MA-MNP-FO.01 Ed:01, PDF vectorial +
+Excel + histórico) estaba **bien hecho** —geometría medida sobre el PDF real a 300 ppp, vista previa y
+PDF salidos de la misma lista de primitivas— pero era inpublicable tal cual por tres razones que
+comparten una sola raíz: **el sitio es estático y público, y el guard de sesión esconde la página, no
+el contenido del archivo**. Llevaba dentro (a) 3 firmas manuscritas escaneadas en base64 —134 KB, el
+45 % del JS—, (b) 8 cédulas reales con su nombre al lado, y (c) los archivos de ejemplo incluían una
+orden REAL ya firmada. Publicar eso permite falsificar documentos a nombre de tres personas y expone
+el par nombre+documento de ocho, siete de las cuales no son el dueño del proyecto.
+
+**70.2 Solución.** Página nueva `pages/ordenes-materiales.html` con **nombre propio** —el sitio ya
+tenía «Órdenes» (las de TRABAJO: macroactividad, contrato, causante, colección `ordenes`), un dominio
+distinto que no se podía pisar (§3.2 aditivo)—, estilos en `assets/css/ordenes-materiales.css` bajo
+`.oms-scope`, JS en `assets/js/ordenes-materiales.js` como módulo ES, y una línea en el menú. **Sin
+firmas y sin cédulas**: `CONFIG.firmas = {}` y `cedula: ''`; el documento sale con la línea de firma en
+blanco, que es lo que hace el formato en papel. El código de dibujo **no se tocó**.
+
+**70.3 Los tres defectos que solo aparecen dentro del armazón** (el preview fiel de L-56 en acción;
+ninguno se ve en una maqueta): (1) **el sitio también define `.modal`** con `max-width: 560px`, y
+acotar no protege las propiedades que el módulo no declara → la vista previa del documento salía a
+560 px en 1280; se calculó la intersección real (6 clases: `.aviso .btn .logo .modal .num .sub`) y se
+renombraron solo esas (**L-74**); (2) **capas**: modales del módulo en 100 contra la barra del sitio en
+200 → documento tapado; se adoptaron `--z-modal`/`--z-toast` del propio sistema de diseño; (3)
+**impresión**: el `@media print` escondía `main`, que dentro del sitio ya no es el suyo → reescrito
+para ocultar `header.tb` y `aside.sb`.
+
+**70.4 El bloqueante que casi se publica.** El saneado sustituyó el patrón `cedula: '…'` y se dio por
+hecho. La revisión adversarial encontró que **la cédula de RAMON ROMERO sobrevivía en dos comentarios**,
+en sus dos grafías, a 20 líneas de su nombre. Misma raíz que el `.gitignore` de `450108/` en `§68`
+(A-05): **la regla se escribió contra la FORMA, no contra el DATO** (**L-75**). Se retiró entero el
+instructivo de firmas —que además enseñaba a hacer lo que se acababa de prohibir— y el ejemplo de la
+función viva pasó a un número inventado.
+
+**70.5 Verificación.** Preview fiel sobre el armazón real (banco en `_dev/`, **borrado antes de
+commitear**: en este repo los `_dev/preview-*.html` sí se suben y habría quedado una puerta lateral sin
+guard). Comprobado: hoja en **794×1123 px = A4 exacto** con sus 44 textos · **PDF generado**
+(`Orden_Entrada_…pdf`) · **Excel generado** (24 KB, MIME correcto) · orden incompleta bloqueada · menú
+intacto (7 grupos, 48 enlaces, «Órdenes» sin desplazar) · `lint:html` limpio · **1387 tests, 0 fallos**.
+Y contra la **URL pública** tras el deploy (L-65): los 3 archivos vivos y byte-idénticos, **0 cédulas,
+1 sola imagen base64 (el logo), `firmas: {}`** y el guard presente.
+
+**70.6 Anti-patterns evitados.** No se tocó el código de dibujo ni la geometría (§3.2). No se subió
+SheetJS a ≥0.20.2 en solitario: el sitio entero usa 0.18.5 desde dos CDN y esa es una decisión abierta
+suya (TODO-12/35), no de este port — divergir aquí habría dejado el sitio incoherente. No se cambió
+`robots.txt` por iniciativa propia (→ TODO-45). No se renombraron las clases que NO chocaban.
+
+**70.7 Cola abierta.** **TODO-44** 🔴 (la firma escaneada del Ingeniero YA está publicada en
+`assets/img/afinia/firma-miguel-jimenez.png`, la usa `calculo-refrigeracion.js:4579` — el argumento de
+este ADR se le aplica igual) · **TODO-45** (`robots.txt` bloquea `/pages/` y permite `/assets/`: el JS
+con los 8 nombres es rastreable y la página, que no lleva datos, no lo es) · y si algún día se quieren
+firmas y cédulas automáticas: Storage/Firestore tras sesión, cada quien solo la suya.
+
+**70.8 Verificado sano / no re-auditar.** El CSS portado está **completamente limpio** (cero base64,
+cero nombres, cero cédulas, cero comentarios con rastro; su único `url()` es una flechita SVG en
+línea). La única imagen que queda es el logotipo institucional (PNG 480×279, cuadra con
+`logoRelAspecto`). Cero restos del `LEEME.md` y de los tres archivos de ejemplo. Los 136 IDs del módulo
+**no chocan** con los 6 del armazón (comprobado por intersección). El marcado no usa manejadores en
+línea, por eso el JS pudo pasar a módulo ES sin romper nada.
+
+**70.9 Nota de proceso.** El primer workflow (13 agentes, 6 dimensiones × escéptico) **murió a medias
+por el límite MENSUAL de gasto de la cuenta**; solo cerró la dimensión de seguridad. El segundo, ya
+acotado a 3 revisores sobre el port hecho, cerró completo y fue el que cazó el bloqueante. Lección de
+dimensionamiento: contra un techo de gasto, **un workflow pequeño sobre trabajo terminado rinde más
+que uno grande sobre trabajo por hacer**. Lecciones → **L-74**, **L-75**.
