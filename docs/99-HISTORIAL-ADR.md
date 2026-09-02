@@ -1834,3 +1834,68 @@ cierre de la pestaña. `claveCedula()` quedó sin uso al cambiar la búsqueda y 
 **71.9 Doctrina.** §3.2 (aditivo: ningún ID ni export renombrado) · §3.3 (se comprobó en el remoto que
 la firma estaba publicada, y en la URL pública que dejó de estarlo) · L-69 (los vacíos se explican: el
 panel y el resumen dicen POR QUÉ no hay firma y qué hacer). Lección → **L-76**.
+
+## 72. ADR — «Documenta absolutamente todo»: lo que el cerebro no se había enterado ⟦OPUS-5⟧ (2026-09-01)
+
+> Petición del Ingeniero, literal, tras cerrar ADR-070 y ADR-071. No era una tarea de relleno: al
+> barrer apareció que **el cerebro no sabía nada de lo construido en las dos tareas anteriores**.
+
+**72.1 Causa raíz — y es incómoda.** En la auditoría §68 diagnostiqué que el mapa espacial se pudre en
+silencio y escribí **M-02**: *«al crear una página o un módulo, la fila en `20` va en el MISMO commit»*.
+**Dos tareas después, en esta misma sesión, creé cinco cosas y no anoté ninguna**: la página de Órdenes
+de Materiales, los tres módulos de firmas (`domain/`, `data/`, `ui/` + su CSS) y la neurona hija `11`.
+`grep` en `20` daba **0 menciones de las cinco**. No lo cazó ningún gate —el linter valida que las
+hojas existan, no que el mapa conozca el código— sino el dueño al pedir esto. De ahí **M-06**: *escribir
+la lección no la instala*; mientras no haya gate, el cierre exige comprobación explícita, no memoria.
+
+**72.2 Frescura restituida.** `20-ESPACIAL` recupera las dos entradas que faltaban (Órdenes de
+Materiales con su familia `.oms-` y el aviso de NO confundirla con «Órdenes» de trabajo; y las firmas
+personales con sus cuatro archivos y su ruta de Storage). `05` re-sellado con datos verificados hoy:
+**1407 pruebas**, CI y Deploy en verde, reglas de Storage desplegadas, y el aviso de que **no hay suite
+para las reglas de Storage**. La skill externa `ordenes-materiales-ssee` —que el Ingeniero instaló y
+que trae el módulo, su geometría medida y su catálogo de trampas— queda catalogada en
+`skills-inventory` bajo una sección nueva: **el gate #6 solo recorre `skills/` del repo y no la
+alcanzaba**, así que sin anotarla a mano el cerebro no sabría que existe.
+
+**72.3 Dos shards, porque dos neuronas reventaron.** `20` llegó a **3 caracteres** de su tope y `30`
+volvió a pasarlo. Se extrajeron: **`21-ESPACIAL-HOJAS`** (el inventario de las hojas del dueño, 3,2 KB
+que se consultan a demanda) y **`33-LECCIONES-HARNESS`** (lo que muerde por el ENTORNO y no por el
+código: activar skills, automatizar el navegador, el `grep` que no es GNU grep, los `args` de un
+workflow y por qué un workflow de horas no sobrevive). Con la `11` de §68, el cerebro tiene ahora
+**cinco neuronas hijas**. `20` bajó de 15.997 a 13.461 chars; `30`, de 41.035 a 36.949.
+
+**72.4 Los workflows: dos de tres muertos.** El de ADR-070 cayó con 7 de 9 agentes por el **límite
+MENSUAL de gasto**; el de diseño de ADR-071 corrió **3 h 27 min** y murió entero porque **la Mac se
+durmió**, con 0 resultados de ~800 k tokens. Total: **~1,3 M tokens sin retorno**. El único que cerró
+fue el pequeño —3 revisores sobre trabajo YA HECHO— y fue justo el que encontró el bloqueante de §70.
+→ **L-77**: dimensionar por DURACIÓN, no solo por número de agentes; varios pequeños sobre trabajo
+terminado rinden más que uno grande sobre trabajo por hacer.
+
+**72.5 W-11 se aplicó A MEDIAS, y hay que decirlo.** El flujo fuerte (`60 §W-11`) es explícito:
+*«cuando dispara: COMPLETO o NO se aplicó»*. En ADR-070/071 se cumplieron las capas de EVIDENCIA
+(ground-truth leído, skills invocadas, preview FIEL sobre el armazón real que destapó tres defectos
+invisibles en maqueta) y las de cierre (implementar, validar, documentar). **NO se cumplieron la 5
+(comité ×3), la 6 (consejo externo) ni la 7 (veredicto escrito ANTES de codear)**: los workflows que
+las cubrían murieron y no se sustituyeron por otra cosa. De los tres artefactos que W-11 exige
+entregar sin que los pidan, se entregó el preview fiel y el reporte de validación; **faltó el prompt
+de consejo externo**. Queda escrito como incumplimiento, no como detalle: la alternativa —callarlo—
+convertiría el checklist en decoración.
+
+**72.6 Archivos.** Neuronas: `05`, `20`, `30`, `00`, `10`, `CLAUDE.md`, `skills-inventory`, y las
+nuevas `21` y `33`. Bóveda: `2026-08-31-firmas-tras-sesion/` con el script del workflow caído (que es
+**reutilizable**: relanzarlo es un comando) y su bitácora. **INTACTOS**: todo el código de producción
+—esta pasada no toca ni una línea de `assets/`, `pages/` o `functions/`.
+
+**72.7 Cola abierta.** **TODO-46** (montar la suite de reglas de Storage con su emulador: las de
+`firmas/{uid}` se validaron al COMPILAR, no probando que un tercero no pueda leer la firma ajena) ·
+TODO-45 (`robots.txt`) · y el flujo completo de firma **con sesión real** sigue sin probarse: el banco
+local corre sin sesión, así que se verificó el estado vacío, que es el que se ve sin entrar.
+
+**72.8 Verificado sano / no re-auditar.** Las 83 refs `L-`/`M-` resuelven en `30` + 3 shards. Los 72
+ADRs están indexados. El `archiveDir` tiene 14 crudos indexados y sus anclas resuelven. El boot quedó
+en **30.767c** con 733 de margen, por debajo de los 31.418 con que empezó la sesión pese a haber
+añadido dos pendientes y tres hijas. `brain:check` **SANO** y `node --test` en **1407/0**.
+
+**72.9 Doctrina.** §G.4 (captura, frescura, catalogación de skills, cierre) · §G.5 (shard cuando la
+neurona revienta, no engordarla) · §3.3 (se comprobó con `grep` que el mapa NO conocía lo creado, en
+vez de suponer que sí). Lecciones → **L-77**, **M-06**.

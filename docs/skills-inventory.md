@@ -67,3 +67,12 @@ Sub-skills `transformadores-potencia`: `_conocimiento`, `bujes-y-accesorios`, `c
 
 > ⚠️ El repo NO es la fuente de las skills CARGADAS en la sesión (esas vienen de plugins + `~/.claude/skills`).
 > Para activar una skill repo-only: copiar su `SKILL.md` a `.claude/skills/<name>/` + reiniciar (L-19).
+
+## 5 · Skills de DOMINIO instaladas FUERA del repo (plugin, no se commitean)
+
+> No las alcanza el gate #6 del linter, que solo recorre `skills/` de este repositorio: si no se
+> anotan aquí a mano, el cerebro no sabe que existen y se reinventa lo que ya está resuelto.
+
+| Skill | Qué trae y cuándo dispara |
+|---|---|
+| `anthropic-skills:ordenes-materiales-ssee` | **El módulo de Órdenes de Materiales SSEE completo** (formato IT.05801.MA-MNP-FO.01 Ed:01): su código fuente en `assets/fuente/` con `build.py`, la **geometría del documento medida sobre el PDF real a 300 ppp**, los datos fijos verificados, seis suites Playwright y un catálogo de trampas ya resueltas (`addImage` que devuelve 0, `hidden` que no funciona con flex, `measureText` en píxeles y no en puntos, Helvetica en vez de Calibri…). Dispara con cualquier trabajo sobre ese módulo o ese formato. Usada en `99 §70`. ⚠️ **Antes de modificar, pedirle al Ingeniero SU `index.html` actual**: el de la skill es la línea base del día en que se empaquetó. |

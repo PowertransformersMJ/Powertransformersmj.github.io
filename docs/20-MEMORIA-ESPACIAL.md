@@ -35,6 +35,8 @@
 | **Indicadores de calidad** (SAIDI/SAIFI) | `pages/indicadores-calidad.html` + `assets/js/ui/calidad/*` · hoja `INDICADORES-CALIDAD.md` |
 | **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` |
 | **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` |
+| **Órdenes de Materiales SSEE** (formato IT.05801, familia `.oms-`) | `pages/ordenes-materiales.html` + `assets/js/ordenes-materiales.js` + `assets/css/ordenes-materiales.css`. **NO confundir con «Órdenes»** (`pages/ordenes.html`), que son las órdenes de TRABAJO y usan la colección `ordenes`. Historia → `99 §70` |
+| **Firmas personales** (subir/ver/quitar la propia) | `assets/js/domain/firmas.js` (regla pura) + `assets/js/data/firmas.js` (Storage, ruta `firmas/{uid}`) + `assets/js/ui/firma-personal.js` + `assets/css/firma-personal.css`. Reglas en `storage.rules`. Historia → `99 §71` |
 | Historia/decisión de un subsistema (§NN) | `00-INDICE.md` → `99-HISTORIAL-ADR.md` |
 | Reglas permanentes históricas (informes, deep-clean, anti-datalist, etc.) | `30-LECCIONES.md` (condensado) · `_legacy/CLAUDE-previo.md §0.1.2.*` (full) |
 
@@ -96,7 +98,7 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 
 ## 📚 Subsistema Pruebas Eléctricas — extracción IA / tendencia (detalle único)
 
-- **Extracción IA de PDFs (Pruebas Eléctricas)** — Cloud Function `functions/index.js#extraerPruebasElectricasIA` (PDF desde Storage → `sanitizarInforme` en `domain/pruebas_electricas_schema.js`); cliente `data/pruebas_electricas.js#extraerConIA` (+ `eliminarUnidad`); render detallado `ui/pruebas/tabla-pruebas.js` + gráficas `ui/pruebas/grafico-svg.js` (eje Y dinámico). Tablero IA-primaria (bloques): render genérico `ui/pruebas/grafico-generico.js` + dominio `domain/pruebas_electricas_bloques.js` (`derivarTablaTAP` + canal `extra`). `bloquesDeExtra` es función LOCAL de `ui/pruebas/grafico-generico.js`, no export del dominio. El módulo creció: shell `assets/js/pruebas-electricas-shell.js` (~2.4k líneas, scorecard/fichas), motor multi-norma `domain/pruebas_electricas_multinorma.js` + `_recomendaciones.js` + `_semaforo.js`, paneles `ui/pruebas/tand-panel.js`/`excitacion-panel.js`/`tablas-pruebas-panel.js`/`semaforo.js`/`modal-upsert.js`. Detalle → `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` + ADRs (arco 003→020+ en `99`).
+- **Extracción IA de PDFs (Pruebas Eléctricas)** — CF `functions/index.js#extraerPruebasElectricasIA` (PDF desde Storage → `sanitizarInforme` en `domain/pruebas_electricas_schema.js`); cliente `data/pruebas_electricas.js#extraerConIA`; render `ui/pruebas/*` (tabla, gráficas SVG con eje Y dinámico, panel genérico por bloques con `derivarTablaTAP`). Shell `assets/js/pruebas-electricas-shell.js` (~2,4k líneas) + motor multi-norma `domain/pruebas_electricas_multinorma.js` (+ `_recomendaciones`, `_semaforo`). Ojo: `bloquesDeExtra` es función LOCAL de `ui/pruebas/grafico-generico.js`, no export del dominio. Detalle completo → `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` + el arco de ADRs 003→020 en `99`.
   - **Workflow de auditoría/completitud por sección** (detectar→clasificar→corregir→verificar; auditor `scripts/audit-bloques-pruebas.mjs`) → hoja `workflow-auditoria-secciones-pruebas.md`.
   - **Tendencia temporal** (multi-informe): pestaña "Tendencia" + `domain/pruebas_electricas_tendencia.js` (`bloquesTendencia` — escalar peor-caso por prueba vs umbral; determinista, reusa el render genérico). F1-F3 consolidadas: timeline + narrativa IA vía Cloud Function `narrativaTendenciaIA` (desplegada) y cliente `data/pruebas_electricas.js` (httpsCallable, 120s).
 
@@ -144,28 +146,11 @@ Detalle completo → `docs/MODELO-DATOS-v2.md`.
 
 ---
 
-## 🗂️ Hojas de detalle del proyecto (docs/ del dueño)
+## 🗂️ Hojas de detalle del proyecto → hija `21`
 
-> Inventario verificado leyendo la cabecera de cada archivo.
-
-- `ARQUITECTURA.md` — mapa de navegación del repositorio (v2.0.8): dónde vive cada cosa, para sesiones nuevas sin explorar a ciegas.
-- `MODELO-DATOS-v2.md` — documento maestro del schema Firestore v2 (Fase 16): Health Index ponderado por secciones, referencia MO.00418.DE-GAC-AX.01 Ed. 02.
-- `DEPLOY-FUNCTIONS.md` — guía de activación por etapas de `onMuestraCreate` y `cronAlertasDiarias` (F32); email opcional vía Firebase Extension "Trigger Email" + Gmail SMTP.
-- `OPERACIONES.md` — runbook operativo v2.0.8: bootstrap, uso diario y emergencia (audiencia: Ingeniero Director). **Aquí viven los comandos `firebase deploy --only …`**; para COMPARAR declarado vs desplegado se pregunta al servidor: `firebase firestore:indexes` / `firebase functions:list` (L-66).
-- `MANTENIMIENTO-BRIGADA.md` — módulo Selección ONAF: calculadora de refrigeración ONAN→ONAF conforme IEEE C57.12.00 / C57.91-2011 / ANSI C57.12.91 + Westinghouse.
-- `MANTENIMIENTO-PREDICTIVO.md` — refactor del tablero estático de Pruebas Eléctricas (TransformerOps) a módulo modular sobre Firestore realtime + sistema Aqua.
-- `PLAN-SERVICIOS-EXTERNOS.md` — guía paso a paso (legacy, para no-programadores) de conexión con Firebase, Node.js, GitHub Pages y Vercel.
-- `PLAN-SUMINISTROS.md` — plan v2.2 de integración Suministros + Repuestos (F38–F50) a partir de los fuentes `.jsx`/`.xlsm`, con decisiones bloqueantes aprobadas.
-- `INDICADORES-CALIDAD.md` — dashboard SAIDI_E/SAIFI_E (refactor F40): impacto de causas controlables + proyección Jun–Dic con OLS y bandas IC95%.
-- `REPOSITORIO-PRUEBAS-ELECTRICAS.md` — arquitectura del repositorio digital de pruebas por número de serie (extiende `pages/pruebas-electricas.html`); su §13 documenta la extracción con IA (ADR-003).
-- `CONTRATO_4125000143_ANALISIS.md` · `MICROCIRUGIA-CONTRATOS-2026-04-27.md` — diagnóstico del módulo Suministros/Contratos (diff del `.xlsm` vs el template canónico + inventario).
-- `SESION-2026-05-03-CONTINUACION.md` · `SESION-2026-05-05.md` — handoffs de sesión (Mantenimiento Brigada · render integral del transformador con foto real).
-- `UI-V3-DARKMODE.md` — refactor visual UI v3 dark mode (histórico; el sistema activo es AQUA LIGHT).
-- `INSTALACION-CEREBRO.md` — manual del cerebro anterior; hoy en `_legacy/cerebro-anterior/docs/`.
-- `workflow-auditoria-secciones-pruebas.md` — hoja hija de ESTE nodo: proceso repetible de auditoría/completitud por sección del tablero de pruebas (columnas que la IA pierde).
-- `docs/pruebas/` — 10 fichas JSON de criterios normativos, una por prueba (01 FP aislamiento … 10 DFR): mapa código↔norma con `_fuente` apuntando a dominio/skill; las consume `assets/js/pruebas-electricas-shell.js` vía `fetch('../docs/pruebas/…')`.
-
----
+> El inventario de las hojas técnicas del dueño (qué contiene cada `docs/*.md` y para qué sirve)
+> vive en [`21-ESPACIAL-HOJAS.md`](21-ESPACIAL-HOJAS.md). Se consulta a demanda: aquí solo se
+> nombran desde el mapa de arriba cuando hacen falta.
 
 > Si tras leer este nodo sigues sin ubicar algo, NO adivines: lee la hoja de
 > detalle enlazada arriba, o el ADR § correspondiente vía `docs/00-INDICE.md`.

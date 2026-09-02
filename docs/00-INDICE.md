@@ -68,7 +68,7 @@
 | §54 | ADR-054 — Fix sistémico del shell (TODO-16, cazado en validación VIVA): evento `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin (doble dispatch) + override AQUA dejaba 6 modales legacy pegados abiertos (`:not(.open):not(.on)`) | 1054 |
 | §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación (re-atribuciones: 50 mA→práctica, DRM→fabricante, collar→Doble TDRB) · TODO-07 bóveda git | 1072 |
 | §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado vivo: 212 activos, 6 evaluados/206 sin dato; corrección §3.3: los 6 evaluados eran TX-DEMO del seed, no reales — limpiar | 1090 |
-| §57 | ADR-057 — Importador del Excel real Salud de Activos + MO.00418 Ed.02 ratificado tabla por tabla: eval_dga = promedio(TDGC,CO,CO₂,C₂H₂), CRG = % oficial Planificación AT, HER = calif 1-5 de inspección, guard omitidos; dry-run 208/213, coincidencias ≥93-100%; CONDICION Excel = trunc(HI)+juicio experto ~38 | 1104 |
+| §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
 | §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`, Antigravity oficial; bóvedas NO se fusionan (datos de cliente) ⟦OPUS-5⟧ | 1122 |
 | §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y L-63 (no re-pedir autorización ya concedida) ⟦OPUS-5⟧ | 1140 |
 | §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso ⟦OPUS-5⟧ | 1158 |
@@ -83,6 +83,7 @@
 | §69 | ADR-069 — La hoja TX_Potencia leída de verdad: los «62 omitidos» eran **57 equipos reales** con la cabecera en la fila 2. Da 208 válidos con Índice de Salud y 1.655.376 usuarios (cierra TODO-34). Su `CONDICION` y el índice recalculado solo coinciden en el 46%: manda la cargabilidad (18 al ≥90%), y ASTREA marca un 250% imposible ⟦OPUS-5⟧ | 1637 |
 | §70 | ADR-070 — Órdenes de Materiales SSEE entra al sitio con página propia (ya existían las «Órdenes» de TRABAJO), sin las 3 firmas escaneadas ni las 8 cédulas: el guard esconde la página, no el archivo. Acotar estilos no basta (el sitio también define `.modal`) y sanear por la forma del campo dejó una cédula viva en comentarios ⟦OPUS-5⟧ | 1710 |
 | §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la línea que lleva su nombre. Se lee con `getBytes` y NO con `getDownloadURL`, cuya URL con token funciona sin sesión ⟦OPUS-5⟧ | 1781 |
+| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después la incumplí yo mismo (M-06). Frescura restituida, `05` re-sellado, skill externa catalogada, dos shards nuevos (`21`, `33`), y la admisión de que W-11 se aplicó A MEDIAS ⟦OPUS-5⟧ | 1838 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -92,6 +93,8 @@
 | Voy a mover/renombrar archivos, refactor, merge, deploy | 🧪 `30-LECCIONES` (gotchas) + 🗺️ `20` |
 | Voy a tocar `functions/` o el pipeline de IA (streaming/reintentos/timeouts) | 🤖 `31-LECCIONES-IA` (hija de `30`, L-35/L-43–L-48) |
 | Busco un pendiente que no está en `10` (decisión de arquitectura, validación diferida, cola vieja) | 🧊 `11-PENDIENTES-FRIOS` (hija de `10`) |
+| Necesito saber qué contiene una hoja `docs/*.md` del dueño | 🗂️ `21-ESPACIAL-HOJAS` (hija de `20`) |
+| Voy a lanzar agentes/workflow, automatizar el navegador o fiarme de un barrido por consola | 🛠️ `33-LECCIONES-HARNESS` (hija de `30`) |
 | Validar si algo es código muerto antes de borrar | 🧪 `30-LECCIONES` + `_legacy/README.md` |
 | Bug recurrente / 2 fallos en el mismo síntoma | Capa 1 → tramo de `99-HISTORIAL-ADR` |
 | ¿Qué hay pendiente? estado del sprint | ⚡ `10-CORTO-PLAZO` (TODO-NN) |

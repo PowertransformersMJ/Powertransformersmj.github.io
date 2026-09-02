@@ -105,18 +105,14 @@
 
 ---
 
-## 🛠️ Claude Code / harness (skills, config)
+## 🛠️ Claude Code, entorno y herramientas → hija `33`
 
-### L-19 · Activar una skill repo-only = copiar su `SKILL.md` a `.claude/skills/<name>/` + reiniciar
-**Disparador**: skill que solo existe en `skills/` del repo (NO es la fuente de lo cargado; el bundle `anthropic-skills:*` viene del entorno). · **Cicatriz**: `<name>` = el `name` del frontmatter, NO la carpeta fuente (ej. `brutalist-skill` → `industrial-brutalist-ui`; `grep -m1 '^name:' SKILL.md`); escaneo solo en boot → el director debe reiniciar; bundles multi-skill anidados se copian por subcarpeta; plugins (`code-modernization`) y subagentes (`code-simplifier`) sin `SKILL.md` no cargan; re-stagear skills del bundle = colisión de `name`. · **Regla**: copiar la carpeta a `.claude/skills/<name>/`, validar con `find .claude/skills -name SKILL.md` + chequear `name`+`description`. `.claude/` está gitignorado (`.gitignore:22`) → copia local-only; al re-clonar, re-correr el copy (la fuente tracked vive en `skills/`). (Ref: ADR-002, `99`.)
-
+> **Lo que muerde por el ENTORNO y no por el código** vive en
+> [`33-LECCIONES-HARNESS.md`](33-LECCIONES-HARNESS.md) (§G.5): activar skills, automatizar el Chrome
+> del Ingeniero, el `grep` que no es GNU grep, cómo se le pasan datos a un workflow y por qué un
+> workflow de horas no sobrevive. Léela ANTES de lanzar trabajo largo con agentes o de fiarte de un
+> barrido por consola. La hija lleva su propio listado — aquí no se duplican sus IDs.
 ---
-
-### L-71 · Un array pasado a `args` de un Workflow llega SERIALIZADO como string
-**Disparador**: parametrizar un workflow con una lista (rutas, dimensiones, ítems). · **Cicatriz**: se pasó el array como string JSON y en el script `args` llegó siendo UN string; `args.filter`/`args.map` revientan. Estuvo años como callejón en `10` **sin fuente** — la auditoría §68 lo obligó a nacer con ancla (M-04). · **Regla**: `args` recibe el VALOR JSON real (`args: ["a.ts","b.ts"]`), nunca su serialización; si llega un string donde esperas lista, es esto. Ver `99 §68`.
-
-### L-70 · El `grep` de esta Mac es un envoltorio de **ugrep**, no GNU/BSD grep
-**Disparador**: barrido por `grep` para afirmar "no queda ninguna referencia a X". · **Cicatriz**: `grep --version` → `ugrep 7.8.4`; la shell define una función `grep` que ejecuta `ARGV0=ugrep claude -G --ignore-files --hidden -I --exclude-dir=.git …`. Semántica distinta a la esperada (`-I` salta binarios, excluye VCS, otras banderas largas). · **Regla**: para un barrido del que dependa una AFIRMACIÓN, correr `/usr/bin/grep` (o `git grep`) y comparar; `command grep` también salta la función. **Verificado 2026-08-21**: la afirmación heredada de que ugrep se salta lo gitignored (2 aciertos vs 38) **NO se reprodujo** en prueba controlada — el envoltorio sí encontró el archivo ignorado. Se conserva el hecho comprobado (no es GNU grep) y se marca lo no reproducido, para no perseguir un fantasma. Ver `99 §68`.
 
 ### L-63 · No re-pedir una autorización que la doctrina YA concedió (fricción disfrazada de prudencia)
 **Disparador**: estar a punto de preguntar "¿procedo?" por una acción que `CLAUDE.md` ya autoriza de forma permanente. · **Cicatriz** (2026-07-28, ADR-058): terminé la migración completa y **retuve el merge a `main` pidiendo el visto bueno**, cuando §2 dice literalmente *"Claude ejecuta commit + push + merge + TODOS los deploys"* desde la entrevista F3a. El Ingeniero tuvo que repetirlo: *"tú haces commit, push, merge a main y todos los deploy siempre"*. Pedir permiso ya dado no es cautela: es devolverle al dueño un trabajo que él ya delegó, y encima suena a que no me leí su propia política. · **Regla**: antes de preguntar, **verifica si §2/§G ya lo cubre**. Si lo cubre → EJECUTA y reporta. Reserva la pregunta para lo que la doctrina NO cubre: dinero, legal, datos de cliente, go/no-go de negocio, o algo genuinamente irreversible y no previsto. Corolario: la validación por commit que él sí pidió es **presentarle el resumen claro**, no esperar su "sí" para cada paso.
@@ -137,6 +133,9 @@
 
 ### M-05 · La bóveda es COMPARTIDA: un `git add` amplio se lleva el trabajo a medio hacer de otra sesión
 **Disparador**: dos sesiones de Claude abiertas a la vez en proyectos distintos del paraguas (aquí y `mantenimiento-lineas-at`). · **Cicatriz** (2026-08-21, durante la auditoría §68): mientras yo editaba `../brain-private/kernel/` para el bump a v1.9.0, la otra sesión commiteó en la MISMA bóveda con un `git add` amplio y se llevó mi `VERSION`, mi `brain-check.mjs` y mi `session-handoff.mjs` **a medio terminar**, bajo el mensaje `f10d142` («ADR-045 enlaza sus crudos»), que no habla de nada de eso. La historia quedó diciendo una cosa distinta de la que pasó, y no se reescribe porque la bóveda es compartida. · **Regla**: en `brain-private` **`git add` de rutas específicas SIEMPRE** (`CLAUDE.md §2` ya lo exige y aquí es doblemente crítico: el repo tiene dueños concurrentes); antes de commitear ahí, `git status --porcelain -uall` y commitear **solo lo tuyo**; si aparece trabajo ajeno a medias, se deja y se avisa, no se barre. Ver `99 §68`.
+
+### M-06 · Escribir la lección no la INSTALA: la misma sesión la volvió a romper
+**Disparador**: dar por corregido un fallo porque ya está escrito en el cerebro. · **Cicatriz** (2026-09-01): en la auditoría §68 diagnostiqué que el mapa espacial se pudre en silencio y escribí **M-02** — «al crear una página o un módulo, la fila en `20` va en el MISMO commit». **Dos tareas después, en esta misma sesión, creé cinco cosas** (la página de Órdenes de Materiales, tres módulos de firmas, una neurona hija) **y no anoté ninguna**. El fallo lo destapó el propio dueño al pedir «documenta absolutamente todo», no un gate. · **Regla**: una lección recién escrita no es un reflejo adquirido; es un texto. Mientras no exista un gate que la vigile, el cierre de tarea debe incluir la comprobación EXPLÍCITA — `git status` de lo creado contra `grep` en `20` — y no la confianza en acordarse. Corolario general: **la lección que solo vive en prosa se incumple primero por quien la escribió**; si la regla importa, o se mecaniza o se verifica a mano en cada cierre. Ver `99 §71`.
 
 > Pendiente universal: no confiar en `origin/*` sin `git fetch`. Lección→doctrina: promover a `CLAUDE.md §3`. Tope ~350 líneas: shard (ej. `31-LECCIONES-GIT.md`) registrada en §0/`00-INDICE`, puntero madre→hija.
 
@@ -213,9 +212,6 @@
 
 ### L-61 · Glosario del Ingeniero + invariante visual AQUA
 **Regla**: "tal cual" = SIN overlays/velos/scrims sobre la foto (retirar cualquier veil existente); `.aqua-power-scene` (aqua-components.css) cubre SIEMPRE el viewport completo (`position:fixed; inset:0`). Ante ambigüedad visual → preview fiel (L-56) + preguntar. (Origen: `_legacy/CLAUDE-previo.md §9.5/§9.7/§0.1.2`.)
-
-### L-62 · Automatizar el Chrome del Ingeniero: subir archivos = gesto humano; localhost bloqueado
-**Disparador**: inyectar un archivo local a un file-input de la app vía la extensión de Chrome. · **Cicatriz** (2026-07-23, carga del informe LEL27007): `file_upload` de la extensión solo acepta archivos compartidos a la sesión (ni scratchpad); `fetch` a `http://127.0.0.1` desde página https queda COLGADO por Local Network Access de Chrome (ni con headers PNA/CORS — el prompt de permiso no aparece en fetch programático); los inputs de wizards nacen ocultos en su paso (`display:none`). · **Regla**: la vía robusta es el **drag&drop del usuario** — prepararle todo: `open -R "<archivo>"` revela el PDF seleccionado en Finder y el arrastre son 5 s; si el input está oculto, hacerlo visible con JS es legítimo para diagnóstico. NO pelear contra los candados (son de seguridad, no bugs); presupuestar el gesto humano en el flujo.
 
 ## 🧭 Verificación, despliegue y honestidad del dato → hija `32`
 
