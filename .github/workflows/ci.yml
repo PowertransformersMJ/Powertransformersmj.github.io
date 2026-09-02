@@ -60,7 +60,7 @@ jobs:
       #   "firebase-tools no longer supports Java version before 21."
       # (verificado en el log de la corrida 31907520435, paso «Tests de reglas»).
       # En la Mac del Ingeniero pasaba porque allí hay un JDK 25 instalado.
-      - name: Setup Java (emulador Firestore)
+      - name: Setup Java (emuladores Firestore + Storage)
         uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
@@ -69,5 +69,11 @@ jobs:
       - name: Instalar firebase-tools
         run: npm install -g firebase-tools --no-audit --no-fund
 
-      - name: Tests de reglas Firestore (emulador)
+      # TODO-46 (cola de ADR-071): storage.rules se desplegó sin una sola
+      # prueba —el deploy solo COMPILA las reglas—, así que la promesa
+      # «nadie puede descargar la firma de otro» nunca se había demostrado.
+      # Desde ahora el mismo paso levanta AMBOS emuladores: las reglas de
+      # Storage consultan Firestore (`firestore.exists` sobre /usuarios), y
+      # sin el segundo emulador `isTeamMember()` no se puede evaluar.
+      - name: Tests de reglas Firestore + Storage (emuladores)
         run: npm run test:rules
