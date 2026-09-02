@@ -22,6 +22,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { readFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
 import { test, before, after, describe } from 'node:test';
 import {
   initializeTestEnvironment, assertFails, assertSucceeds
@@ -91,6 +92,10 @@ before(async () => {
     // Bootstrap puro: en /admins y SIN perfil en /usuarios. Se conserva
     // para no dejar el proyecto sin ningún admin posible.
     await setDoc(doc(db, 'admins/s_bootstrap'), { legacy: true });
+    // EX-ADMIN DEGRADADO: sigue en el equipo (activo) pero ya NO es admin en
+    // /usuarios… y quedó en /admins. Ver el bloque «límites conocidos».
+    await setDoc(doc(db, 'usuarios/s_degradado'), { email: 'd@x.co', rol: 'tecnico', activo: true });
+    await setDoc(doc(db, 'admins/s_degradado'),  { legacy: true });
   });
 
   // ── Semilla de objetos en el bucket ──
@@ -100,6 +105,8 @@ before(async () => {
   await sembrarObjeto('contratos/c1/contrato.pdf', PDF, { contentType: 'application/pdf' });
   await sembrarObjeto('pruebas_electricas/u1/informe.pdf', PDF, { contentType: 'application/pdf' });
   await sembrarObjeto('otros/suelto.png');
+  // Segunda unidad, para que el listado de la raíz tenga algo que revelar.
+  await sembrarObjeto('pruebas_electricas/u2/informe.pdf', PDF, { contentType: 'application/pdf' });
 });
 
 after(async () => { if (testEnv) await testEnv.cleanup(); });
@@ -192,6 +199,23 @@ describe('storage.rules · firmas/{uid} — la firma es SOLO de su dueño (ADR-0
     await assertFails(listAll(ref(como('s_admin'), 'firmas')));
     await assertFails(listAll(ref(como('s_tech'), 'firmas')));
   });
+
+  test('sin sesión NO puede borrar una firma', async () => {
+    await assertFails(deleteObject(ref(anonimo(), 'firmas/s_otro')));
+  });
+
+  test('un ADMIN no puede borrar la firma de otro (sabotaje sobre un dato personal)', async () => {
+    await assertFails(deleteObject(ref(como('s_admin'), 'firmas/s_otro')));
+  });
+
+  // El bootstrap legacy es la puerta que más fácil se cuela como superusuario.
+  // Sobre firmas NO se cuela: es dueño de la suya y de ninguna otra.
+  test('el bootstrap legacy es dueño de SU firma y de ninguna otra', async () => {
+    await assertSucceeds(
+      uploadBytes(ref(como('s_bootstrap'), 'firmas/s_bootstrap'), PNG, PNG_META)
+    );
+    await assertFails(getBytes(ref(como('s_bootstrap'), 'firmas/s_tech')));
+  });
 });
 
 // ══════════════════════════════════════════════════════════════
@@ -252,5 +276,89 @@ describe('storage.rules · todo lo no declarado está cerrado', () => {
 
   test('la raíz del bucket no se puede listar', async () => {
     await assertFails(listAll(ref(como('s_admin'), '')));
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// LÍMITES CONOCIDOS — lo que las reglas HOY permiten y no debería
+// darse por bueno sin decidirlo
+// ──────────────────────────────────────────────────────────────
+// Estas pruebas NO celebran el comportamiento: lo FIJAN. Salieron de la
+// auditoría adversarial de ADR-073 (5 lentes, 26 hallazgos, 3 sobrevivieron
+// al refutador y los tres se reprodujeron con el emulador antes de creerlos).
+// Si alguien corrige la regla, la prueba se cae y obliga a cambiarla a mano
+// — que es exactamente lo que se quiere: que la corrección sea CONSCIENTE y
+// no un efecto colateral. Cada una dice qué decisión está esperando.
+// ══════════════════════════════════════════════════════════════
+describe('storage.rules · límites conocidos (decisión pendiente del Ingeniero)', () => {
+
+  // 🔴 EL GRAVE. `adminsBootstrapValido()` comprueba dos cosas —estar en
+  // /admins y no estar desactivado— pero NUNCA mira el ROL, y en `isAdmin()`
+  // va en la rama OR, así que gana. Consecuencia: degradar a alguien de
+  // 'admin' a 'tecnico' desde el panel —la acción natural cuando sigue en el
+  // equipo pero ya no administra— NO le quita la escritura sobre contratos ni
+  // sobre los informes reales de cliente. El comentario de las reglas dice
+  // otra cosa ("uid en /admins SIN perfil en /usuarios = bootstrap puro") y
+  // el cliente hace otra cosa (session-guard.js solo mira /admins cuando NO
+  // hay perfil): son las reglas las que se apartan de su propia intención.
+  // El mismo defecto está en `firestore.rules` (líneas 42-58), así que
+  // alcanza a TODO el backend, no solo al bucket.
+  // Arreglo de una línea: `&& !hasProfile()` en vez de
+  // `&& (!hasProfile() || profile().activo == true)`.
+  // Riesgo del arreglo: si alguien depende de /admins TENIENDO perfil no-admin,
+  // pierde el acceso. Por eso se decide, no se ejecuta a ciegas.
+  test('🔴 HOY PERMITE: un ex-admin degradado a técnico, aún en /admins, sigue escribiendo en contratos', async () => {
+    await assertSucceeds(
+      uploadBytes(ref(como('s_degradado'), 'contratos/c1/colado.pdf'), PDF, { contentType: 'application/pdf' })
+    );
+  });
+
+  test('control: un técnico normal (fuera de /admins) SÍ queda bloqueado', async () => {
+    await assertFails(
+      uploadBytes(ref(como('s_tech'), 'contratos/c1/bloqueado.pdf'), PDF, { contentType: 'application/pdf' })
+    );
+  });
+
+  // 🟡 `request.resource.contentType` es la cabecera que DECLARA el cliente,
+  // no el resultado de mirar el archivo. La regla no garantiza que el objeto
+  // sea una imagen: garantiza que quien lo subió dijo que lo era. No es
+  // corregible desde las reglas (haría falta una Cloud Function que inspeccione
+  // los bytes). Se fija aquí para que nadie cite esa línea como una garantía
+  // de formato que no da. Impacto acotado: la ruta es la propia, el tope de
+  // 1 MB sigue vigente y el visor arma el dataURL con 'image/png' fijo.
+  test('🟡 HOY PERMITE: un archivo que NO es PNG entra si se declara image/png', async () => {
+    await assertSucceeds(
+      uploadBytes(ref(como('s_tech'), 'firmas/s_tech'), PDF, PNG_META)
+    );
+  });
+
+  // 🟡 En Storage, `read` incluye `list`. Al evaluar un listado sobre un
+  // prefijo ancestro, los comodines sin ligar se ligan a null y el match
+  // aplica igual: como `isTeamMember()` no menciona ni {unidadId} ni
+  // {filename}, la condición da true y el listado se concede. Resultado: un
+  // técnico puede enumerar TODAS las unidades y contratos del bucket. No
+  // añade acceso a contenido (ya podía descargar cada objeto), pero es una
+  // capacidad que ninguna línea declara y que nadie eligió.
+  // ⚠️ No se puede cerrar el list "en todas partes" sin romper
+  // `eliminarUnidad()` (assets/js/data/pruebas_electricas.js), que necesita
+  // listAll de admin para borrar los PDFs de una unidad.
+  test('🟡 HOY PERMITE: un técnico enumera todas las unidades de pruebas eléctricas', async () => {
+    const r = await listAll(ref(como('s_tech'), 'pruebas_electricas'));
+    assert.deepEqual(r.prefixes.map((p) => p.name).sort(), ['u1', 'u2']);
+  });
+
+  test('🟡 HOY PERMITE: y también el inventario de documentos y contratos', async () => {
+    await assertSucceeds(listAll(ref(como('s_tech'), 'documentos')));
+    await assertSucceeds(listAll(ref(como('s_tech'), 'contratos')));
+  });
+
+  // 🟡 Asimetría menor: `allow delete` de firmas/{uid} es la ÚNICA línea del
+  // bloque que exige `isSignedIn()` en vez de `isTeamMember()`. Un usuario
+  // dado de baja no puede leer ni subir su firma, pero sí borrarla. Se puede
+  // defender (borrar un dato personal propio no es un privilegio) — se fija
+  // para que sea una decisión y no un descuido.
+  test('🟡 HOY PERMITE: un usuario dado de baja todavía puede borrar su propia firma', async () => {
+    await sembrarObjeto('firmas/s_revocado');
+    await assertSucceeds(deleteObject(ref(como('s_revocado'), 'firmas/s_revocado')));
   });
 });
