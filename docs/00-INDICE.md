@@ -84,6 +84,7 @@
 | §70 | ADR-070 — Órdenes de Materiales SSEE entra al sitio con página propia (ya existían las «Órdenes» de TRABAJO), sin las 3 firmas escaneadas ni las 8 cédulas: el guard esconde la página, no el archivo. Acotar estilos no basta (el sitio también define `.modal`) y sanear por la forma del campo dejó una cédula viva en comentarios ⟦OPUS-5⟧ | 1710 |
 | §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la línea que lleva su nombre. Se lee con `getBytes` y NO con `getDownloadURL`, cuya URL con token funciona sin sesión ⟦OPUS-5⟧ | 1781 |
 | §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después la incumplí yo mismo (M-06). Frescura restituida, `05` re-sellado, skill externa catalogada, dos shards nuevos (`21`, `33`), y la admisión de que W-11 se aplicó A MEDIAS ⟦OPUS-5⟧ | 1838 |
+| §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría adversarial: 26 hallazgos, **23 refutados** (§73.8), 3 confirmados con sonda propia — el grave alcanza también a `firestore.rules` ⟦OPUS-5⟧ | 1905 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

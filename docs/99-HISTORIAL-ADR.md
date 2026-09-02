@@ -1899,3 +1899,81 @@ añadido dos pendientes y tres hijas. `brain:check` **SANO** y `node --test` en 
 **72.9 Doctrina.** §G.4 (captura, frescura, catalogación de skills, cierre) · §G.5 (shard cuando la
 neurona revienta, no engordarla) · §3.3 (se comprobó con `grep` que el mapa NO conocía lo creado, en
 vez de suponer que sí). Lecciones → **L-77**, **M-06**.
+
+---
+
+## 73. ADR — Las reglas que nadie había probado: el deploy solo compila ⟦OPUS-5⟧ (2026-09-01)
+
+> Cola de ADR-071 (**TODO-46**). Sin cita del cliente: nace de la propia casilla que ADR-071 dejó
+> abierta —"las reglas nuevas se validaron al COMPILAR en el deploy, no probando que un tercero no
+> pueda leer la firma ajena, que es justo lo que garantizan"—. Modo **interinato** (Opus 5): R2
+> (prueba en el mismo commit) y R4 (verificación en vivo) aplicados; los hallazgos de seguridad
+> quedan **fijados con prueba y en cola de decisión** (R6), no corregidos por iniciativa propia.
+
+**73.1 Causa raíz.** `firebase deploy --only storage` valida la SINTAXIS de las reglas y no ejecuta
+ni una petición. Como salió en verde, la ruta `firmas/{uid}` se dio por protegida. La suite
+`tests-rules/` existía desde ADR-052 Ola 3 pero cubría **solo Firestore**, y `npm run test:rules`
+arrancaba `emulators:exec --only firestore`: aunque alguien hubiera escrito una prueba de Storage,
+habría pasado en verde por la razón equivocada, porque las reglas de Storage consultan Firestore
+(`firestore.exists` sobre `/usuarios/{uid}`) y sin ese emulador `isTeamMember()` no se evalúa.
+
+**73.2 Solución estructural.** (a) `tests-rules/storage.rules.test.js` — **43 casos** que ejercen las
+cuatro rutas del bucket en las dos direcciones (el dueño SÍ, el ajeno NO). (b) `test:rules` pasa a
+`--only firestore,storage`, en la Mac y en CI. (c) Auditoría adversarial de `storage.rules` (5 lentes
++ 1 refutador por hallazgo, 31 agentes): **82 invariantes · 26 hallazgos · 23 refutados · 3
+confirmados**, y los 3 reproducidos con sonda propia antes de creerlos. (d) Los 3 quedan **fijados
+con prueba** en el bloque «límites conocidos», que documenta qué decisión espera cada uno.
+
+**73.3 No-regresión.** No se modificó **ninguna regla** ni una línea de la aplicación: el cambio es
+puramente aditivo (un archivo de pruebas nuevo, una bandera más en un script, dos comentarios en CI).
+`storage.rules` y `firestore.rules` quedan byte a byte como estaban. Sin renombres, sin endpoints,
+sin exports tocados.
+
+**73.4 Tests/verificación.** `npm run test:rules` → **51 pass / 0 fail** (8 Firestore + 43 Storage).
+`npm run build` → 1407 pass / 0 fail / 2 skip + lint limpio. Verificado **en CI, no solo en la Mac**:
+corrida `33583062377` descargó `cloud-storage-rules-runtime-v1.1.3.jar` y ejecutó las 42 de la
+primera tanda en verde; el despliegue a Pages también. Los 3 hallazgos se reprodujeron con una sonda
+propia (`emulators:exec --only firestore,storage`, proyecto `demo-sgm-probe`) con su control negativo
+al lado, y la sonda se borró después.
+
+**73.5 Anti-patterns evitados.** No se "arreglaron" las reglas sobre la marcha: cambiar quién es
+administrador es caro de revertir y puede dejar sin acceso a quien dependa de `/admins` — decisión
+del Ingeniero (§3.6, R6). No se aceptó ningún hallazgo sin refutador ni sin sonda propia (§3.3): de
+26, sobrevivieron 3. No se declaró nada desplegado sin `git fetch` ni sin leer el log de CI (§3.3).
+No se engordó `30-LECCIONES` (a 37,9k de 40k): las tres lecciones fueron a su hija `32` (§G.5).
+
+**73.6 Archivos.** MODIFICADOS: `tests-rules/storage.rules.test.js` (nuevo, 364 líneas) ·
+`package.json` (script `test:rules`) · `.github/workflows/ci.yml` (nombres de dos pasos + comentario) ·
+`docs/32-LECCIONES-VERIFICACION.md` (L-78/79/80) · `docs/05`, `docs/10`, `docs/00` · bóveda.
+**INTACTOS verificados**: `storage.rules` · `firestore.rules` · `assets/js/data/firmas.js` ·
+`assets/js/domain/firmas.js` · `assets/js/ordenes-materiales.js` · `tests-rules/firestore.rules.test.js`
+(los uid de la suite nueva llevan prefijo `s_` justo para no pisarla: el runner corre los archivos en
+procesos paralelos contra el mismo emulador, y por eso aquí NUNCA se llama a `clearFirestore()`).
+
+**73.7 Doctrina aplicada.** §3.3 verifica-no-asumas (sonda propia antes de creer a un subagente) ·
+§3.4 IAP · §3.6 arquitecto (seguridad por diseño; el arreglo de una línea no se ejecuta sin decidir a
+quién deja fuera) · §3.7 comité por iniciativa propia · §G.4 captura + bóveda + cierre · R2/R4/R6 del
+interinato. **W-11 NO aplicado**: no hubo revisor externo de otra familia (`docs/15`) — esta decisión
+queda marcada como **NO revisada externamente**, igual que se marcó en `§72`.
+
+**73.8 Verificado sano / no re-auditar.** Los **23 hallazgos refutados** están en la bóveda
+(`2026-09-01-adr073-auditoria-storage-rules/README.md`, agrupados por familia con su porqué). Casi
+todos comparten forma: **el mecanismo técnico es cierto, la consecuencia que lo haría agujero es
+falsa** —no hay atacante, o no hay cruce de frontera de privilegio, o el único actor capaz ya es el
+dueño del dato—. En concreto, NO volver a levantar: el `allow delete` de firmas que solo exige
+`isSignedIn()` (4 hallazgos distintos, sin ataque posible) · el comodín final `if false` como "código
+muerto" (las reglas se ORean; cierto e irrelevante) · las URLs con token que sobreviven a la
+revocación (cierto de Firebase, ya evitado con `getBytes` en ADR-071, **L-76**) · `(default)` como
+"divergencia" con `firestore.rules` (invertido: en Storage no existe `$(database)`) · el tope de
+tamaño y las subidas resumables (el oráculo propuesto no puede decidir la pregunta) · la falta de cota
+inferior o de validación de tipo en `documentos/`+`contratos/` (solo escribe `isAdmin()`) ·
+`{filename=**}` casando cero segmentos (no cambia quién puede qué). **Sano y probado**: el criterio de
+revocación de las tres rutas de documentos, el bootstrap legacy sobre firmas (es dueño de la suya y de
+ninguna otra), el cierre de la subruta `firmas/{uid}/…` y el del prefijo `firmas/` al listado.
+
+**73.9 Lo que queda en cola de decisión (los 3 confirmados).**
+| # | Qué permite hoy | Gravedad | Qué hay que decidir |
+|---|---|---|---|
+| 1 | **Un ex-admin degradado a `tecnico` que siga en `/admins` conserva admin total** — en Storage **y en Firestore** (`adminsBootstrapValido()` no mira el rol y va en la rama OR de `isAdmin()`). `/admins` es `allow write: if false`: solo se edita desde la consola de Firebase, así que la aplicación no ofrece forma de quitarlo | 🔴 alta | Arreglo de una línea (`&& !hasProfile()`), pero deja fuera a quien dependa de `/admins` teniendo perfil no-admin. **Quién está hoy en `/admins` solo lo ve el Ingeniero en la consola** |
+| 2 | Un archivo que **no es PNG** entra en `firmas/{uid}` si se declara `image/png` (la regla mira la etiqueta del cliente, no los bytes) | 🟡 baja | No corregible en reglas (haría falta una Cloud Function que inspeccione bytes). Aceptar y documentar, o gastar una función |
+| 3 | Cualquier miembro obtiene el **inventario** de unidades, contratos y documentos vía `listAll` sobre los prefijos raíz | 🟡 baja | Aceptar (no da acceso a contenido nuevo) o restringir el `list` sin romper `eliminarUnidad()`, que necesita `listAll` de admin |

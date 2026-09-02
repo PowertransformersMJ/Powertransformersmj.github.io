@@ -19,3 +19,4 @@
 | **TODO-06** | Validar ADR-046→050 en la APP real (tras Firebase Auth). | 🔲 |
 | **TODO-02/03** | Tipificar S03-S06 del contrato 4125000143 (`scripts/migrate/…-fan-db.js`, dryRun) · flujo FN-063 vs FN-050. | 🔮 |
 | **CONECTAR D** | D decidido: **NO activar** (`99 §52.14`). Esperar necesidad multi-rol real del negocio. | 🔵 decidido |
+| **TODO-48** | **Vercel Hobby veta el uso comercial** y hoy no lo consume nadie: retirarlo o dejarlo a sabiendas. Heredado de la bitácora de julio de `10` (`99 §60`: GitHub Pages, en cambio, no nos prohíbe nada → no se migra). NO re-analizar por calendario: solo por los disparadores de `60 §60.7`. | 🟡 decisión |

@@ -5,15 +5,19 @@
 
 ---
 
-## 🎯 Foco (2026-08-31) — FIRMAS DETRÁS DE LA SESIÓN (ADR-071), TRAS EL PORT (ADR-070)
+## 🎯 Foco (2026-09-01) — LAS REGLAS YA NO SE CREEN BAJO PALABRA (ADR-073)
 
-> **ADR-070**: el módulo de órdenes de materiales SSEE es una página más del sitio, **sin las 3 firmas
-> escaneadas ni las 8 cédulas** (el guard esconde la página, no el archivo). Verificado vivo en la URL
-> pública. Antes: **ADR-069** (TX_Potencia da 208 válidos con salud y usuarios) y **ADR-068**
-> (auditoría Nivel-2: 18 hallazgos y una neurona hija nueva).
-> ⚠️ Abiertos: **TODO-37** (🔴) · TODO-42 · TODO-45 · 29/33/36/38/39/40/41.
+> **ADR-073**: `firebase deploy` solo COMPILA — las reglas de `firmas/{uid}` llevaban 24 h dadas por
+> buenas sin una prueba. Ahora hay 43, con los dos emuladores y también en CI. La auditoría
+> adversarial que siguió dejó 3 hallazgos vivos de 26. Antes: **ADR-071** (firmas a la cuenta de cada
+> quien), **ADR-070** (port de Órdenes de Materiales), **ADR-069** (TX_Potencia da 208 válidos).
+> ⚠️ Abiertos: **TODO-47** (🔴) · **TODO-37** (🔴) · TODO-42 · TODO-45 · 29/33/36/38/39/40/41.
 > ✅ **TODO-44 cerrado (ADR-071)**: la firma del Ingeniero salió de la web (404 en producción) y pasó
 > a su cuenta; cada quien sube la suya en «Mi firma» y solo se estampa en SU línea. Antes, TODO-43.
+> ✅ **TODO-46 cerrado (ADR-073)**: `storage.rules` pasa de 0 a **43 pruebas** y `test:rules` levanta
+> los dos emuladores (Storage pregunta en Firestore quién es el usuario). Verificado también en CI.
+> La auditoría adversarial que vino detrás (26 hallazgos, 23 refutados) dejó **3 confirmados** →
+> **TODO-47**, con el grave esperando tu decisión.
 
 ### ▶️ TAREA VIVA: el import de Salud de Activos — PASO DEL INGENIERO
 > Archivo: `~/Documents/2026/PSM 2026/Salud de Activos 2026 Actualizado 01 de junio.xlsx` (ojo: se
@@ -28,6 +32,9 @@
 > viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
 > **(D)** Tres decisiones de ADR-063: tope en `/alertas_reconocidas`, `defer` en Chart.js, barras de
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
+> **(G)** Ver en la consola de Firebase **quién figura hoy en `/admins`** — la colección es
+> `allow write: if false`, así que ni la app ni yo podemos leerla ni tocarla, y de esa lista
+> depende decidir el hueco 🔴 de **TODO-47a**.
 
 ### 🚫 Callejones probados (NO reintentar — cada uno con su ancla)
 > De `99 §52.8-52.9`: `main` local queda stale tras un filter-repo (usar `origin/main`) · el "código
@@ -41,8 +48,11 @@
 > por basura un contador de "omitidos" sin abrir el archivo (**L-72**) · reabrir CONECTAR D (roles v2):
 > decidido NO activar hasta que el negocio pida multi-rol real (`99 §52.14`).
 > **Ya verificado SANO — no re-auditar sin motivo**: lo que las auditorías DESPEJARON vive en la
-> casilla `NN.8` de su ADR (`99 §66.8`, `§68.8`) y en el crudo de la bóveda. Consúltalo ANTES de
-> volver a auditar Fichas, el escapado de HTML o la doctrina CSS.
+> casilla `NN.8` de su ADR (`99 §66.8`, `§68.8`, **`§73.8`**) y en el crudo de la bóveda. Consúltalo
+> ANTES de volver a auditar Fichas, el escapado de HTML, la doctrina CSS o **las reglas de Storage**
+> (ahí están los 23 hallazgos refutados: el `delete` que solo pide sesión, el comodín `if false`, las
+> URLs con token, `(default)`, el tope y las subidas resumables — todos mecanismo cierto, consecuencia
+> falsa).
 
 ---
 
@@ -51,7 +61,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-34** | 🔴 **El parque real NO tiene Índice de Salud**: `salud_actual` todo en `null` y sin usuarios → banda «Sin dato 206», matriz vacía, 0 en riesgo (degrada limpio, no inventa). **El dato ya existe y está verificado** (ADR-069): el import trae 208 con salud (muy bueno 39 · bueno 86 · medio 54 · pobre 28 · muy pobre 1) y 1.655.376 usuarios. Solo falta pulsarlo. | 🔴 |
-| **TODO-46** | 🟡 **Las reglas de Storage no tienen pruebas**: `tests-rules/` solo cubre Firestore y `npm run test:rules` solo levanta ese emulador. Las reglas nuevas de `firmas/{uid}` (ADR-071) se validaron al COMPILAR en el deploy, no probando que un tercero no pueda leer la firma ajena — que es justo lo que garantizan. Montar la suite con el emulador de Storage. | 🟡 |
+| **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
 | **TODO-45** | `robots.txt` está al revés para este caso: `Disallow: /pages/` + `Allow: /assets/` ⇒ la página (sin datos) está bloqueada y el `.js` (con los 8 nombres) es rastreable; el `<meta robots>` no cubre a un `.js`. Valorar `Disallow: /assets/js/` o mover la lista de responsables a Firestore. `99 §70`. | 🟡 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
 | **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos ya quedaron versionados (08-21): dentro del disco no falta nada; falta una copia FUERA → `lastOffsiteBackup`. | 🟡 decidido |
@@ -66,12 +76,3 @@
 > **Los pendientes FRÍOS** (decisiones de arquitectura, validaciones diferidas, colas viejas) viven
 > en la hija [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md): no cambian de semana en semana y no
 > tienen por qué pesar en el arranque de cada sesión. Aquí solo lo que está VIVO.
-
----
-
-## 📝 Bitácora (efímera)
-
-> **Julio consolidado — no re-leer aquí**: Fase 9 + CONECTAR A-E, ADR-053→058 y el ToS del hosting
-> (`99 §60`: Pages no nos prohíbe nada → no se migra). ⚠️ Decisión viva heredada de ahí: **Vercel Hobby SÍ veta el uso comercial** y hoy
-> no lo consume nadie → retirarlo o dejarlo a sabiendas. NO re-analizar por calendario: solo por los
-> disparadores de `60 §60.7`.
