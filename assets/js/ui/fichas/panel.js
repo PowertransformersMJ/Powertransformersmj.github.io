@@ -263,9 +263,23 @@ export function normalizarEquipo(bruto, i) {
   // Rutas verificadas contra Firestore en producción (2026-08-15): en el documento v2
   // la placa va PLANA en la raíz (`tension_primaria_kv`), no anidada bajo `placa.*`.
   // Se conservan las rutas antiguas por compatibilidad con fixtures y listados adjuntos.
-  const kvPrim = num(leer(b, 'kv_prim', 'tension_primaria_kv', 'placa.tension_primaria_kv'));
-  const kvSec  = num(leer(b, 'kv_sec',  'tension_secundaria_kv', 'placa.tension_secundaria_kv'));
-  const kvTerc = num(leer(b, 'kv_terc', 'tension_terciaria_kv', 'placa.tension_terciaria_kv'));
+  //
+  // ⚠️ La TERCIARIA es la excepción y costó 39 discrepancias falsas: la proyección v1
+  // sube al nivel raíz la primaria y la secundaria, pero NO la terciaria
+  // (`transformador_schema.js`, `proyeccionV1`). La terciaria vive SOLO en
+  // `electrico.tension_terciaria_kv`. Como aquí no se miraba ahí, `kvTerc` era
+  // null para los 206 equipos y `clasificarUC` clasificaba TODO como bidevanado
+  // (`fichas_creg_uc.js`: `const tri = kvt != null && kvt > 0`). Resultado: 30 de los
+  // 39 «discrepancias» del tablero no eran del registro —era esta línea—, y aceptarlas
+  // habría degradado 30 tridevanados reales a bidevanado en el parque, bajándolos a
+  // una familia de UC de menor valor de reposición. Se lee también `electrico.*` para
+  // la primaria y la secundaria: si mañana la proyección deja de subirlas, esto aguanta.
+  const kvPrim = num(leer(b, 'kv_prim', 'tension_primaria_kv',
+    'electrico.tension_primaria_kv', 'placa.tension_primaria_kv'));
+  const kvSec  = num(leer(b, 'kv_sec',  'tension_secundaria_kv',
+    'electrico.tension_secundaria_kv', 'placa.tension_secundaria_kv'));
+  const kvTerc = num(leer(b, 'kv_terc', 'tension_terciaria_kv',
+    'electrico.tension_terciaria_kv', 'placa.tension_terciaria_kv'));
   const regulacion = txt(leer(b, 'regulacion', 'tipo_regulacion', 'placa.regulacion'));
 
   const cls = clasificarUC(kva, kvPrim, kvTerc, regulacion || null);
