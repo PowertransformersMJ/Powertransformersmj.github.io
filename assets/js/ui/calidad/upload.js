@@ -184,7 +184,10 @@ async function parsearJSON(file) {
 // Detecta cuál según las hojas presentes.
 async function parsearExcel(file) {
   const XLSX = await loadSheetJS();
-  const buf = await file.arrayBuffer();
+  // `type:'array'` de SheetJS espera un Uint8Array, no el ArrayBuffer crudo:
+  // con el crudo parsea MAL y en silencio (el libro sale como una sola
+  // «Sheet1» de basura). Se convierte UNA vez y se reusa en las 4 lecturas.
+  const buf = new Uint8Array(await file.arrayBuffer());
 
   // Primera lectura ligera para inspeccionar nombres de hojas.
   const wbProbe = XLSX.read(buf, { type: 'array', cellDates: false, sheetRows: 1, bookSheets: true });

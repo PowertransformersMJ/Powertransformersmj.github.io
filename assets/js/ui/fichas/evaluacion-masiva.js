@@ -164,7 +164,10 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
 
     try {
       const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: 'array' });
+      // `type:'array'` espera Uint8Array, no el ArrayBuffer crudo: con el crudo
+      // parsea MAL y en silencio — el libro entero sale como una «Sheet1» de
+      // basura y el listado adjunto no se lee. Ver `admin/importar.html`.
+      const wb = XLSX.read(new Uint8Array(buf), { type: 'array' });
       // Se evalúa la primera hoja con contenido; si hay varias, se avisa.
       const hojas = wb.SheetNames || [];
       let usada = null;

@@ -168,8 +168,17 @@ async function procesarArchivo(file) {
   try {
     $('progress').textContent = `⋯ Parseando ${file.name}`;
     const XLSX = await loadSheetJS();
+    // `type:'array'` de SheetJS espera un Uint8Array, NO un ArrayBuffer crudo.
+    // Pasarle el ArrayBuffer no falla: parsea MAL y en silencio. Un .xlsx de tres
+    // hojas salía como UNA sola llamada «Sheet1» con cientos de filas de basura,
+    // y el reporte decía «Exitosos: 685 · Errores de parseo: 0» tan tranquilo.
+    // Comprobado en el navegador con el Excel real del parque (2026-09-08):
+    //   XLSX.read(buf,               {type:'array'}) → ['Sheet1']
+    //   XLSX.read(new Uint8Array(buf),{type:'array'}) → ['TX_Potencia','TPT_Servicio','TX_Respaldo']
+    // Esta es la razón por la que la importación del parque nunca llegó a
+    // funcionar: no era el archivo, era esta línea.
     const buf = await file.arrayBuffer();
-    const wb = XLSX.read(buf, { type: 'array', cellDates: true });
+    const wb = XLSX.read(new Uint8Array(buf), { type: 'array', cellDates: true });
 
     const hojas = wb.SheetNames.map((name) => ({
       hoja: name,
