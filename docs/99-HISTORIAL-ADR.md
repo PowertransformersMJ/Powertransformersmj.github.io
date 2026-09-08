@@ -2080,3 +2080,26 @@ que el desajuste de regulación fue una decisión y no un descuido.
 autotransformadores rotulados como **no evaluables** (que es la verdad, no un veredicto inventado) y
 capacidad **3.831,3 MVA**. Siete documentos corregidos en total, cada uno con su auditoría.
 
+**74.10 El import, revisado antes de pulsarlo (mismo día).** El Ingeniero preguntó si podía subir
+el Excel de Salud de Activos. Se leyó de su disco y **no se importó**: comparado equipo por equipo
+contra la base, habría creado **9 duplicados** (matrículas que no coinciden: `T4-A/A-BQE` vs
+`T4-A/M-BQE`, CERETE, COVEÑAS, CHINÚ, NUEVA MONTERÍA, PLANETA RICA) y la fila de CASA DE ZINC
+—que lleva la matrícula de CASACARA— habría **sobrescrito a CASACARA**. Además traía las UUCC
+viejas de 6 equipos y habría deshecho las correcciones de `§74.9`. Se generó una **copia corregida**
+(18 cambios, con hoja `_CAMBIOS` justificando cada uno; el original intacto) y se verificó sobre el
+archivo generado: 0 huérfanas, 0 duplicadas, 0 UUCC desactualizadas.
+
+Un red-team de 24 agentes sobre el import (2 confirmados · 18 refutados) encontró el bloqueador
+real: **123 de 208 equipos iban a quedar con vida remanente del papel > 100 %**, hasta 135,28 %.
+`importador.js` usaba `Math.max(0, 100 - vidaU)` —solo piso, sin techo— y 88 filas del Excel traen
+FURANOS = 14 ppb (el piso de detección del laboratorio), donde la curva de Chedong da vida
+utilizada NEGATIVA. El motor y la Cloud Function ya hacían `clamp(0,100)`: el importador era el
+único de los tres escritores que rompía la invariante, desde 2026-04-19, y nadie lo vio porque el
+parque nunca había tenido salud cargada. Corregido en `74bedcb`: el KPI «vida remanente promedio»
+del tablero pasa de **88,6 % a 80,3 %**.
+
+⚠️ **Corrección al red-team, verificada**: su segundo hallazgo («el import borra marca, municipio,
+coordenadas y deja el mapa vacío») describe un mecanismo REAL —el payload no es ralo y `merge:true`
+escribe las claves vacías— pero **su consecuencia es falsa hoy**: esos campos ya están vacíos en la
+base (0 de 206). El mapa ya estaba vacío por falta de datos. No bloquea; queda como TODO-51.
+
