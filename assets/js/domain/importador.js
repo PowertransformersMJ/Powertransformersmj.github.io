@@ -424,6 +424,22 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
     errores_validacion: errs
   };
 
+  // ── La UUCC no se pisa con un vacío ─────────────────────────────────────
+  // El Excel del parque («Salud de Activos», hoja TX_Potencia) NO trae columna
+  // de Unidad Constructiva: `uucc` sale '' de la línea de arriba. El
+  // sanitizador lo emite igual —siempre devuelve la clave, con '' por
+  // defecto— y `data/importar.js` escribe el documento con `merge: true`.
+  // Resultado: cada importación BORRABA la UUCC de los 206 equipos, y el
+  // reporte decía «actualizados: 206» sin una sola queja.
+  //
+  // Con `merge: true`, una clave AUSENTE deja intacto lo que ya está guardado.
+  // Así que cuando la fila no trae UUCC, la clave se retira: importar el
+  // parque deja de ser una forma silenciosa de perder ese dato. Si algún día
+  // el Excel trae la columna, el valor viaja y manda, como cualquier otro
+  // campo. Borrar una UUCC a propósito se hace desde el módulo, no colando
+  // una celda vacía en una importación masiva.
+  if (!uucc && final.identificacion) delete final.identificacion.uucc;
+
   return { docV2: final, diagnostico };
 }
 
