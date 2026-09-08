@@ -221,6 +221,23 @@ export function buscarUC(codigo) {
   return null;
 }
 
+/**
+ * Familia constructiva de una UC del catálogo: `'bi'` bidevanado ·
+ * `'tri'` tridevanado · `'auto'` autotransformador. `null` si el código
+ * no está catalogado.
+ *
+ * Existe porque el catálogo tiene TRES familias y `clasificarUC` solo sabe
+ * decidir entre dos: mira la tensión del tercer devanado y responde `bi` o
+ * `tri`. Nunca puede responder `auto`, porque el documento del equipo no
+ * dice si es un autotransformador. Quien compare lo registrado con lo
+ * calculado necesita saberlo para no acusar de discrepancia a un equipo
+ * que en realidad no se puede evaluar.
+ */
+export function familiaDeUC(codigo) {
+  const r = buscarUC(codigo);
+  return r && r.fila && r.fila.dev ? r.fila.dev : null;
+}
+
 /** Códigos de UC catalogados para un nivel de tensión ("N3".."N6"). */
 export function codigosPorNivel(nivel) {
   const out = [];

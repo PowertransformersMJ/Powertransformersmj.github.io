@@ -28,7 +28,7 @@
 // Sin `onclick=` en el HTML: todo por delegación de eventos sobre la raíz.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { clasificarUC, buscarUC, hayAdvertencia, montoCOP } from '../../domain/fichas_creg_uc.js';
+import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia, montoCOP } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg, variacionReal, formatearCOP } from '../../domain/fichas_presupuesto.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES
@@ -289,10 +289,32 @@ export function normalizarEquipo(bruto, i) {
   const calculada = txt(leer(b, 'uucc_calculada') || cls.uucc_calc || '').toUpperCase();
 
   let estado = leer(b, 'estado_uucc');
+  const notasUC = (cls.notas || []).slice();
   if (!estado) {
     if (!calculada) estado = 'SIN CALCULO';
     else if (!registrada) estado = 'FALTA REGISTRO';
     else estado = (registrada === calculada) ? 'CONCORDANTE' : 'DISCREPANCIA';
+  }
+
+  // El catálogo tiene TRES familias —bidevanado, tridevanado y
+  // AUTOTRANSFORMADOR— y `clasificarUC` solo sabe decidir entre las dos
+  // primeras: mira la tensión del tercer devanado, y el documento no dice si
+  // el equipo es un autotransformador. Así que a un autotransformador
+  // registrado siempre le calculaba una UC bidevanada y lo acusaba de
+  // «discrepancia» — un veredicto que no puede sostener.
+  // Es el caso de CANDELARIA T-KDR04/T-KDR05 y BOSQUE T4 (verificado contra
+  // el parque real, 2026-09-08). No es que el registro esté mal: es que ESTO
+  // no se puede evaluar sin el tipo constructivo. Se dice, en vez de acusar
+  // (misma doctrina que la banda de salud: no digas que no hay, di que no se
+  // sabe — L-69).
+  if (estado === 'DISCREPANCIA'
+      && familiaDeUC(registrada) === 'auto'
+      && familiaDeUC(calculada) !== 'auto') {
+    estado = 'SIN CALCULO';
+    notasUC.push('La UUCC registrada (' + registrada + ') es de la familia '
+      + 'AUTOTRANSFORMADOR, y la regla CREG solo puede calcular bidevanado o '
+      + 'tridevanado: el documento del equipo no registra el tipo constructivo. '
+      + 'No se compara — habría que verificar el tipo en placa.');
   }
 
   const ci = condEntera(leer(b, 'cond_int', 'condicion', 'salud_actual.hi_final'));
@@ -324,7 +346,7 @@ export function normalizarEquipo(bruto, i) {
     uucc_registrada: registrada,
     uucc_calculada: calculada,
     estado,
-    notas_uucc: cls.notas,
+    notas_uucc: notasUC,
     advertencia: hayAdvertencia(cls.notas),
     cond_int: ci,
     cond_lbl: txt(leer(b, 'cond_lbl')) || (ci != null ? nombreCondicion(ci) : ''),

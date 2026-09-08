@@ -105,3 +105,77 @@ describe('normalizarEquipo — la tensión terciaria llega al clasificador', () 
     assert.equal(e.uucc_calculada, 'N4T18');
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// El catálogo tiene TRES familias, el clasificador sabe DOS
+// ──────────────────────────────────────────────────────────────
+// `clasificarUC` decide bidevanado o tridevanado mirando la tensión del
+// tercer devanado. Nunca puede responder «autotransformador», porque el
+// documento del equipo no registra el tipo constructivo. El resultado
+// era que a un autotransformador registrado se le calculaba siempre una
+// UC bidevanada y el tablero lo acusaba de «discrepancia» — un veredicto
+// que no puede sostener. Caso real: CANDELARIA T-KDR04 y T-KDR05, y
+// BOSQUE T4 (verificado contra el parque, 2026-09-08).
+// ══════════════════════════════════════════════════════════════
+
+import { familiaDeUC } from '../assets/js/domain/fichas_creg_uc.js';
+
+describe('familiaDeUC — las tres familias del catálogo CREG', () => {
+  test('distingue bidevanado, tridevanado y autotransformador', () => {
+    assert.equal(familiaDeUC('N4T8'),  'bi',   'N4T1-N4T11 son trifásicos de dos devanados');
+    assert.equal(familiaDeUC('N4T18'), 'tri',  'N4T12-N4T19 son tridevanados');
+    assert.equal(familiaDeUC('N5T16'), 'auto', 'N5T11-N5T18 son autotransformadores monofásicos');
+  });
+
+  test('un código que no está en el catálogo devuelve null', () => {
+    assert.equal(familiaDeUC('N9T99'), null);
+    assert.equal(familiaDeUC(''), null);
+    assert.equal(familiaDeUC(null), null);
+  });
+});
+
+describe('normalizarEquipo — un autotransformador no se acusa de discrepancia', () => {
+  /** CANDELARIA T-KDR04: 100 MVA, 220/110 kV, registrado N5T16 (autotransformador). */
+  const autotrafo = {
+    potencia_kva: 100000,
+    tension_primaria_kv: 220,
+    identificacion: { uucc: 'N5T16' },
+    electrico: { tension_primaria_kv: 220, tension_secundaria_kv: 110, tension_terciaria_kv: null }
+  };
+
+  test('el veredicto es «no se puede calcular», NO «discrepancia»', () => {
+    const e = normalizarEquipo(autotrafo, 0);
+    assert.equal(e.uucc_registrada, 'N5T16');
+    assert.equal(e.uucc_calculada, 'N5T7', 'la regla solo sabe llegar a la familia bidevanado');
+    assert.equal(e.estado, 'SIN CALCULO',
+      'acusar de discrepancia a un equipo que no se puede evaluar es un veredicto falso');
+  });
+
+  test('y lo dice con todas las letras en las notas', () => {
+    const e = normalizarEquipo(autotrafo, 0);
+    const nota = (e.notas_uucc || []).find((n) => /AUTOTRANSFORMADOR/.test(n));
+    assert.ok(nota, 'debe explicar POR QUÉ no se compara');
+    assert.match(nota, /tipo constructivo/);
+  });
+
+  // Contra-prueba: la regla solo se aplica a la familia auto. Un
+  // bidevanado que discrepa de verdad tiene que seguir discrepando.
+  test('una discrepancia REAL entre bidevanados sigue siendo discrepancia', () => {
+    const e = normalizarEquipo({
+      potencia_kva: 6500, tension_primaria_kv: 34.5,
+      identificacion: { uucc: 'N3T2' }          // BERRUGAS: registrada N3T2, calcula N3T3
+    }, 0);
+    assert.equal(e.uucc_calculada, 'N3T3');
+    assert.equal(e.estado, 'DISCREPANCIA');
+  });
+
+  // Y un autotransformador cuya UC registrada SÍ coincide con la calculada
+  // no debe degradarse a «sin cálculo»: sigue siendo concordante.
+  test('si por casualidad coinciden, se queda en concordante', () => {
+    const e = normalizarEquipo({
+      potencia_kva: 100000, tension_primaria_kv: 220,
+      identificacion: { uucc: 'N5T7' }
+    }, 0);
+    assert.equal(e.estado, 'CONCORDANTE');
+  });
+});
