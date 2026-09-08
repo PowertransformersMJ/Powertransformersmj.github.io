@@ -2052,3 +2052,24 @@ ABIERTO y NO resuelto**: el acta no guarda el valor anterior si las decisiones e
 (`aplicarDecisiones` muta `e.uucc_registrada` y `filasActa` lee el objeto ya mutado) — reproducido,
 en cola. Y **Chrome bloquea la segunda descarga automática** de la misma página: la primera acta
 salió inservible y la buena llegó como «(1)», que casi se da por perdida.
+
+**74.9 Correcciones aplicadas en producción (2026-09-08, con el Ingeniero confirmando cada dato).**
+Cuatro documentos, cada uno con su registro en `/auditoria` (`await`, no best-effort) y verificado
+releyendo el documento después de escribir. En los cuatro: `identificacion` conserva sus 6 claves y
+`estado`/`estado_servicio` siguen en `operativo`.
+
+| Equipo | Qué estaba mal | Corrección |
+|---|---|---|
+| PLANETA RICA `T1-A/M-PRC` | 110/34,5/13,8 kV son **tres** niveles; registrado como bidevanado | `identificacion.uucc` `N4T7` → **`N4T17`** |
+| CASACARA `T1-M/M-CAC` | **La potencia**, no la UC: es de **2 MVA**, no de 5. Con 2 MVA, `N3T1` (0,5-2,5) ya era correcta | `potencia_kva` y `placa.potencia_kva` `5000` → **`2000`** (los DOS campos: escribir uno solo deja el documento incoherente) |
+| GAMBOTE `T3-A/M-GBT` | 30 MVA registrado en la banda 11-20 | `identificacion.uucc` `N4T14` → **`N4T15`** |
+| BOSQUE `T1-A/M-BQE` | 33 MVA registrado en la banda 16-20 | `identificacion.uucc` `N4T4` → **`N4T6`** |
+
+⚠️ La capacidad del parque baja de **3.834,3 a 3.831,3 MVA** por la corrección de CASACARA: no es
+una pérdida de activo, es que el dato estaba inflado en 3 MVA.
+
+**Quedan 3, y son el MISMO hueco de la norma** (→ TODO-50): BERRUGAS y PUEBLO NUEVO (6,5 MVA) y
+GUATAPURÍ `T3` (7,875 MVA), los tres **NLTC**. En nivel 3 el catálogo CREG **no cataloga ninguna
+banda NLTC por encima de 6 MVA** — de 6,1 en adelante todo es OLTC. No es un error de registro: la
+norma no contempla estos equipos. Decisión pendiente del Ingeniero.
+
