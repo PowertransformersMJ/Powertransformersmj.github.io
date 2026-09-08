@@ -18,7 +18,7 @@ import {
   calcularCalifTDGC, calcularCalifCO, calcularCalifCO2, calcularCalifC2H2,
   calcularEvalDGA,
   calcularCalifRD, calcularCalifIC, evaluarADFQ,
-  calcularCalifFUR, calcularDP, calcularVidaUtilizada,
+  calcularCalifFUR, calcularDP, calcularVidaUtilizada, calcularVidaRemanente,
   calcularCalifCRG, calcularCalifEDAD,
   calcularCalifHER, calcularCalifPYT,
   calcularHIBruto, aplicarOverrides, bucketizarHI
@@ -393,7 +393,18 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
     calif_fur: califFUR,
     dp_estimado: dp,
     vida_utilizada_pct: vidaU,
-    vida_remanente_pct: vidaU != null ? Math.max(0, 100 - vidaU) : null,
+    // El tope lo pone el motor, no esta linea. `Math.max(0, 100 - vidaU)` solo
+    // ponia PISO en 0: sin techo, un 2FAL bajo daba vida utilizada NEGATIVA y
+    // salia una vida remanente del 114 % — o del 135 %. Papel mejor que nuevo.
+    // No es teorico: 88 filas del Excel del parque traen FURANOS = 14 ppb (el
+    // mismo valor repetido, que es el piso de deteccion del laboratorio) y 5
+    // traen 1 ppb; por debajo de ~58 ppb la curva de Chedong devuelve DP > 800,
+    // fuera de su rango de validez. Con el archivo real eran 123 de 208 equipos.
+    // `calcularVidaRemanente` (salud_activos.js) hace clamp(100-u, 0, 100), que
+    // es la invariante que el propio proyecto ya prueba (tests/salud_activos)
+    // y la que usa la Cloud Function. Este importador era el unico de los tres
+    // escritores que la rompia.
+    vida_remanente_pct: calcularVidaRemanente(dp),
     calif_crg: crg.calif, crg_pct_medido: crg.crg_pct,
     calif_edad: califEDAD,
     edad_anos: (hoy.getUTCFullYear() - (anoFab || hoy.getUTCFullYear())),
