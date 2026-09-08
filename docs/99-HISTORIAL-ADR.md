@@ -2068,8 +2068,15 @@ releyendo el documento después de escribir. En los cuatro: `identificacion` con
 ⚠️ La capacidad del parque baja de **3.834,3 a 3.831,3 MVA** por la corrección de CASACARA: no es
 una pérdida de activo, es que el dato estaba inflado en 3 MVA.
 
-**Quedan 3, y son el MISMO hueco de la norma** (→ TODO-50): BERRUGAS y PUEBLO NUEVO (6,5 MVA) y
-GUATAPURÍ `T3` (7,875 MVA), los tres **NLTC**. En nivel 3 el catálogo CREG **no cataloga ninguna
-banda NLTC por encima de 6 MVA** — de 6,1 en adelante todo es OLTC. No es un error de registro: la
-norma no contempla estos equipos. Decisión pendiente del Ingeniero.
+**Las 3 restantes, resueltas por decisión del Ingeniero (mismo día).** BERRUGAS y PUEBLO NUEVO
+(6,5 MVA) y GUATAPURÍ `T3` (7,875 MVA) son los tres **NLTC**, y en nivel 3 el catálogo CREG **no
+cataloga ninguna banda NLTC por encima de 6 MVA** — de 6,1 en adelante todo es OLTC, así que no
+existe código exacto para ellos. El Ingeniero decidió **asignar por CAPACIDAD**: los tres a `N3T3`
+(6,1-10 MVA), aceptando que el descriptor diga OLTC. La **excepción normativa queda escrita en el
+registro de auditoría de cada uno**, no solo aquí: quien mire ese equipo dentro de dos años sabrá
+que el desajuste de regulación fue una decisión y no un descuido.
+
+**Resultado final: 39 discrepancias → 0.** 206 equipos, todos con UUCC registrada, 3
+autotransformadores rotulados como **no evaluables** (que es la verdad, no un veredicto inventado) y
+capacidad **3.831,3 MVA**. Siete documentos corregidos en total, cada uno con su auditoría.
 
