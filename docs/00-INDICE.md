@@ -85,6 +85,7 @@
 | §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la línea que lleva su nombre. Se lee con `getBytes` y NO con `getDownloadURL`, cuya URL con token funciona sin sesión ⟦OPUS-5⟧ | 1781 |
 | §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después la incumplí yo mismo (M-06). Frescura restituida, `05` re-sellado, skill externa catalogada, dos shards nuevos (`21`, `33`), y la admisión de que W-11 se aplicó A MEDIAS ⟦OPUS-5⟧ | 1838 |
 | §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría adversarial: 26 hallazgos, **23 refutados** (§73.8), 3 confirmados con sonda propia — el grave alcanza también a `firestore.rules` ⟦OPUS-5⟧ | 1905 |
+| §74 | ADR-074 — Las 39 discrepancias que no lo eran: la tensión del tercer devanado vivía en una ruta que `panel.js` no miraba y el parque entero salía bidevanado — aceptar el cálculo habría degradado **30 tridevanados reales**. Además el catálogo tiene 3 familias y el clasificador sabía 2, y cada importación borraba la UUCC en silencio. 39 → 6 ⟦OPUS-5⟧ | 1983 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

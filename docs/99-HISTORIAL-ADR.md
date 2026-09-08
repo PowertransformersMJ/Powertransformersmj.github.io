@@ -1977,3 +1977,78 @@ ninguna otra), el cierre de la subruta `firmas/{uid}/…` y el del prefijo `firm
 | 1 | **Un ex-admin degradado a `tecnico` que siga en `/admins` conserva admin total** — en Storage **y en Firestore** (`adminsBootstrapValido()` no mira el rol y va en la rama OR de `isAdmin()`). `/admins` es `allow write: if false`: solo se edita desde la consola de Firebase, así que la aplicación no ofrece forma de quitarlo | 🔴 alta | Arreglo de una línea (`&& !hasProfile()`), pero deja fuera a quien dependa de `/admins` teniendo perfil no-admin. **Quién está hoy en `/admins` solo lo ve el Ingeniero en la consola** |
 | 2 | Un archivo que **no es PNG** entra en `firmas/{uid}` si se declara `image/png` (la regla mira la etiqueta del cliente, no los bytes) | 🟡 baja | No corregible en reglas (haría falta una Cloud Function que inspeccione bytes). Aceptar y documentar, o gastar una función |
 | 3 | Cualquier miembro obtiene el **inventario** de unidades, contratos y documentos vía `listAll` sobre los prefijos raíz | 🟡 baja | Aceptar (no da acceso a contenido nuevo) o restringir el `list` sin romper `eliminarUnidad()`, que necesita `listAll` de admin |
+
+---
+
+## 74. ADR — Las 39 discrepancias que no lo eran: un renglón, tres familias y un dato que se borraba solo ⟦OPUS-5⟧ (2026-09-08)
+
+> Nace de un pedido del Ingeniero: *«gestiona todas las discrepancias con Aceptar UUCC
+> calculada»* y después *«necesito que los cambios prevalezcan en producción»*. Se
+> gestionaron las 39 en pantalla y, al preparar la escritura, el plan se cayó entero.
+> Su corrección de dominio —*«los tridevanados son los que tienen tres niveles de
+> tensión»*— fue la llave que destapó el tercer hallazgo. Modo **interinato** (R2/R4/R6).
+
+**74.1 Causa raíz (tres, encadenadas).** (a) `panel.js:268` buscaba la tensión terciaria en
+`kv_terc`, la raíz y `placa.*`; en el documento v2 vive **solo** en `electrico.tension_terciaria_kv`
+—la proyección plana sube la primaria y la secundaria, pero no la terciaria—. Como `clasificarUC`
+decide tri/bi únicamente por ella, **el parque entero salía bidevanado**. (b) El catálogo CREG tiene
+**tres** familias (28 `bi` · 15 `tri` · **11 `auto`**) y el clasificador solo sabe elegir entre dos:
+a los 3 autotransformadores les calculaba una UC bidevanada y los acusaba de discrepancia. (c) El
+Excel del parque no trae columna UUCC → el importador la leía `''`, el sanitizador la emitía igual y
+el escritor la guardaba con `merge` — **cada importación borraba la UUCC de los 206**, con el reporte
+diciendo «actualizados: 206».
+
+**74.2 Solución estructural.** Tres commits, todos aditivos: `359c3fe` (leer la terciaria desde
+`electrico.*`, y también la primaria/secundaria por si la proyección deja de subirlas) · `cdddfe3`
+(nuevo `familiaDeUC()` en el dominio; un autotransformador ya no se acusa de discrepancia sino que
+se declara **no evaluable**, con la nota de verificar placa — misma doctrina que la banda de salud,
+**L-69**) · `1acf058` (si la fila no trae UUCC, la clave **no viaja**: con `merge` una clave ausente
+deja intacto lo guardado). Más **una corrección de dato en producción**: PLANETA RICA `T1-A/M-PRC`.
+
+**74.3 No-regresión.** Ningún renombre, ningún borrado, ninguna regla tocada. La única escritura en
+producción fue **un campo de un documento**, con ruta de punto y clave única. Verificado tras
+escribir: `identificacion` conserva `codigo`, `grupo`, `matricula`, `nombre` y `tipo_activo`; `estado`
+y `estado_servicio` siguen en `operativo`; `electrico` intacto. Las dos trampas que la revisión
+adversarial había señalado —escribir `identificacion` como objeto, y el `estado` de pantalla que es
+el veredicto UUCC— se esquivaron a propósito.
+
+**74.4 Tests/verificación.** 1427 pass / 0 fail (20 nuevas: 8 de la terciaria, 6 de las familias y
+el veredicto honesto, 6 del importador), lint limpio, CI y Deploy en verde y **comprobados en el
+sitio servido** (`curl` del `.js` desplegado, no del repo). El efecto se midió ejecutando el
+clasificador REAL contra el parque vivo, antes y después: **39 → 6**.
+
+| | |
+|---|---|
+| Falsas por la terciaria | **30** |
+| Autotransformadores no evaluables | **3** |
+| Error de registro real, corregido | **1** (PLANETA RICA) |
+| Diferencias de banda de capacidad, abiertas | **6** → TODO-50 |
+
+**74.5 Anti-patterns evitados.** No se ejecutó la orden literal: aceptar la UUCC calculada habría
+**degradado 30 tridevanados reales a bidevanado** en el registro oficial, bajándolos a una familia de
+menor valor de reposición encima de un dato correcto. Se paró, se midió y se presentó (§3.3, R6). No
+se persistió nada antes de tapar el agujero del importador: habría sido trabajo que se perdía en la
+siguiente carga. No se escribió sin registro de reversión ni sin auditoría explícita (`await`, no
+best-effort).
+
+**74.6 Archivos.** MODIFICADOS: `assets/js/ui/fichas/panel.js` · `assets/js/domain/fichas_creg_uc.js`
+(+`familiaDeUC`) · `assets/js/domain/importador.js` · `tests/fichas_tension_terciaria.test.js` (nuevo)
+· `tests/importador_no_pisa_uucc.test.js` (nuevo) · cerebro y bóveda. **INTACTOS verificados**:
+`firestore.rules` · `storage.rules` · `assets/js/data/transformadores.js` · `assets/js/data/importar.js`
+· `correcciones.js` · `vistas-gerenciales.js`.
+
+**74.7 Doctrina aplicada.** §3.3 (sonda propia antes de creer a nadie, incluido yo: corregí en el
+mismo turno haber dicho que el campo no existía y que la segunda acta no se había descargado) · §3.4
+IAP · §3.6 arquitecto · §3.7 comité por iniciativa propia (red-team de 30 agentes: 6 altos
+confirmados, 19 refutados) · §G.4 captura + bóveda + cierre · R2/R4/R6. **W-11 NO aplicado**: sin
+revisor externo de otra familia → decisión **NO revisada externamente**.
+
+**74.8 Verificado sano / no re-auditar.** Los **19 riesgos refutados** del red-team están en la bóveda
+(`2026-09-08-uucc-terciaria-y-persistencia/`). Confirmado sano y probado: las 174 unidades de dos
+niveles clasifican bien (el sistema acierta cuando tiene el dato); el criterio tri/bi por tensión
+terciaria es correcto y coincide con la definición del Ingeniero (174 con dos niveles / 32 con tres,
+y solo 4 desajustes contra la familia registrada, de los cuales 3 son autotransformadores). **Sigue
+ABIERTO y NO resuelto**: el acta no guarda el valor anterior si las decisiones están aplicadas
+(`aplicarDecisiones` muta `e.uucc_registrada` y `filasActa` lee el objeto ya mutado) — reproducido,
+en cola. Y **Chrome bloquea la segunda descarga automática** de la misma página: la primera acta
+salió inservible y la buena llegó como «(1)», que casi se da por perdida.
