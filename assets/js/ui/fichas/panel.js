@@ -518,6 +518,42 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   let BRUTOS = [];             // lista tal como llegó: base para recomputar
   const EDITS = {};            // fila → { campo: valor } correcciones de datos
   const DEC = {};              // fila → { decision, final, resp, fecha, obs }
+  // Ninguna de las dos se guarda en Firestore ni en el navegador a propósito
+  // (ver la cabecera de `correcciones.js`): la gestión es trabajo de escritorio
+  // y sale de aquí como ACTA. El precio de esa decisión es que un cierre de
+  // pestaña, una recarga o una carga de datos nueva se lo llevan todo, y hasta
+  // ahora eso pasaba EN SILENCIO — alguien gestionaba 39 novedades y las perdía
+  // sin enterarse. `SIN_EXPORTAR` es lo que permite avisar (TODO-35).
+  let SIN_EXPORTAR = false;    // hay gestión que aún no ha salido en un acta
+
+  /** ¿Hay gestión en pantalla que se perdería? */
+  function hayGestionViva() {
+    return Object.keys(DEC).length > 0 || Object.keys(EDITS).length > 0;
+  }
+  /** Cuenta lo que se perdería, para decirlo con números y no con un «¿seguro?». */
+  function cuentaGestion() {
+    const d = Object.keys(DEC).length;
+    const e = Object.keys(EDITS).filter((k) => !DEC[k]).length;
+    return { dec: d, edit: e, total: d + e };
+  }
+  function marcarSucio() { SIN_EXPORTAR = hayGestionViva(); }
+
+  /**
+   * Pide permiso ANTES de pisar la gestión en pantalla. Devuelve `true` si se
+   * puede continuar. No pregunta si no hay nada que perder, ni si ya se exportó
+   * el acta: molestar por costumbre enseña a decir que sí sin leer.
+   */
+  function permisoParaPisar(motivo) {
+    if (!SIN_EXPORTAR || !hayGestionViva()) return true;
+    const c = cuentaGestion();
+    const detalle = c.dec + ' decisión(es)'
+      + (c.edit ? ' y ' + c.edit + ' corrección(es) de datos' : '');
+    return globalThis.confirm(
+      'Tiene ' + detalle + ' sin exportar.\n\n'
+      + motivo + ' las borrará: esta pantalla no las guarda en ningún lado.\n\n'
+      + 'Pulse Cancelar para volver y usar «Exportar acta» primero.'
+    );
+  }
   let APLICADO = false;        // ¿las decisiones están volcadas al tablero?
   let filaEnCajon = null;      // equipo abierto en el cajón de gestión
   let trampaCajon = null;      // trampa de foco del cajón (ui/foco-modal.js)
@@ -906,8 +942,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (!caja) return;
     if (!EQUIPOS.length) { caja.innerHTML = ''; return; }
     const res = resumenNovedades(EQUIPOS, EDITS, DEC);
+    // El aviso de salida solo aparece cuando ya es tarde para pensarlo. Este
+    // rótulo está a la vista todo el rato, con el número delante: «tiene 12
+    // decisiones que solo existen en esta pantalla» pesa más que un «¿seguro?».
+    const c = cuentaGestion();
+    const sinGuardar = (SIN_EXPORTAR && c.total)
+      ? '<div class="ftm-aviso"><b>' + c.total + ' gestión(es) sin exportar.</b> '
+        + 'Esta pantalla no las guarda en ningún lado: si cierra o recarga, se pierden. '
+        + 'Use <b>«Exportar acta»</b> — y con <b>«Importar acta»</b> las recupera otro día.</div>'
+      : '';
     caja.innerHTML = res.novedades || Object.keys(DEC).length
-      ? barraCorreccionesHTML(res, APLICADO)
+      ? sinGuardar + barraCorreccionesHTML(res, APLICADO)
       : '';
   }
 
@@ -978,6 +1023,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       delete DEC[fila];
     }
 
+    marcarSucio();
     refrescarTodo();
     cerrarCajon();
     fijarAviso('<div class="ftm-aviso">Gestión guardada para <b>' + esc(original.subestacion || fila)
@@ -989,6 +1035,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (filaEnCajon == null) return;
     delete EDITS[filaEnCajon];
     delete DEC[filaEnCajon];
+    marcarSucio();
     refrescarTodo();
     cerrarCajon();
   }
@@ -1044,6 +1091,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       { nombre: 'Correcciones', filas, columnas: COLUMNAS_ACTA },
       { nombre: 'Metadatos', filas: meta, columnas: ['Campo', 'Valor'] }
     ]);
+    // El archivo ya está en el disco del usuario: a partir de aquí no hay nada
+    // que perder, y el aviso de salida deja de aparecer hasta la próxima gestión.
+    SIN_EXPORTAR = false;
+    pintarCorrecciones();
     fijarAviso('<div class="ftm-aviso"><b>Acta exportada</b> — ' + res.novedades + ' novedad(es), '
       + res.gestionadas + ' gestionada(s), ' + res.pendientes + ' pendiente(s). El tablero no '
       + 'guarda nada: conserve el archivo y retómelo con <b>Importar acta</b>.</div>');
@@ -1075,6 +1126,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         delete d._serie; delete d._matricula;
         DEC[fila] = d; aplicadas += 1;
       }
+      // Lo que acaba de entrar ya vive en el acta que se leyó: no está «sin
+      // exportar». Avisar aquí enseñaría a ignorar el aviso.
+      SIN_EXPORTAR = false;
       refrescarTodo();
       fijarAviso('<div class="ftm-aviso"><b>Acta leída.</b> ' + aplicadas + ' decisión(es) recuperada(s)'
         + (ajenas ? ' · <b>' + ajenas + ' NO se aplicaron</b>: la serie o matrícula del acta no '
@@ -1918,16 +1972,40 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   contenedor.addEventListener('change', alCambiar);
   document.addEventListener('keydown', alTeclear);
 
+  /* ── aviso de salida con trabajo sin guardar (TODO-35) ──────────────────
+     Cerrar la pestaña o recargar con F5 se llevaba la gestión sin decir nada:
+     no hay copia en Firestore ni en el navegador, a propósito. El navegador
+     solo deja mostrar su texto genérico, pero el freno es lo que importa.
+     Se registra siempre y decide en el momento, porque `SIN_EXPORTAR` cambia
+     mientras la página vive; añadir y quitar el listener sería más frágil. */
+  function alSalir(ev) {
+    if (!SIN_EXPORTAR || !hayGestionViva()) return undefined;
+    ev.preventDefault();
+    ev.returnValue = '';            // exigido por navegadores antiguos
+    return '';
+  }
+  globalThis.addEventListener('beforeunload', alSalir);
+
   /* ═════════════════════════════════════════════════════════════════════
      10 · CARGA DE DATOS
      ═════════════════════════════════════════════════════════════════════ */
 
   function fijarDatos(lista, meta = {}) {
+    // Este es el ÚNICO sitio donde la gestión se borra, así que es el único
+    // sitio donde hace falta preguntar: cargar la página, adjuntar un listado
+    // y «volver al parque vivo» pasan todos por aquí. `forzar` lo usa quien ya
+    // preguntó (`recargar`), para no preguntar dos veces por lo mismo.
+    if (!meta.forzar && !permisoParaPisar('Cargar otros datos en la pantalla')) {
+      fijarAviso('<div class="ftm-aviso">Carga cancelada: su gestión sigue en pantalla. '
+        + 'Use <b>«Exportar acta»</b> para conservarla.</div>');
+      return EQUIPOS;
+    }
     BRUTOS = Array.isArray(lista) ? lista : [];
     // Un conjunto de datos nuevo invalida las correcciones del anterior: las
     // filas ya no son las mismas y aplicar decisiones viejas sería inventar.
     Object.keys(EDITS).forEach((k) => delete EDITS[k]);
     Object.keys(DEC).forEach((k) => delete DEC[k]);
+    SIN_EXPORTAR = false;
     APLICADO = false;
     EQUIPOS = recomputarEquipos();
     ESTADOS.clear();
@@ -1950,11 +2028,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   async function recargar() {
+    // Se pregunta ANTES de leer, no después: la consulta al parque son ~206
+    // lecturas facturables y no tiene sentido pagarlas para luego cancelar
+    // (free-tier). Lo que venga después ya no vuelve a preguntar (`forzar`).
+    if (!permisoParaPisar('Recargar el parque')) {
+      fijarAviso('<div class="ftm-aviso">Recarga cancelada: su gestión sigue en pantalla. '
+        + 'Use <b>«Exportar acta»</b> para conservarla.</div>');
+      return EQUIPOS;
+    }
     const fuente = opciones.fuente
       || (typeof globalThis.SGM_DATA_SOURCE === 'function' ? globalThis.SGM_DATA_SOURCE : null);
 
     if (Array.isArray(opciones.datos) && opciones.datos.length) {
-      fijarDatos(opciones.datos);
+      fijarDatos(opciones.datos, { forzar: true });
       if (cfg.demostracion) {
         fijarAviso('<div class="ftm-aviso"><b>DATOS DE DEMOSTRACIÓN</b> — equipos ficticios para revisar '
           + 'la interfaz. Ningún dato de esta pantalla corresponde a un activo real.</div>');
@@ -1962,7 +2048,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       return EQUIPOS;
     }
     if (!fuente) {
-      fijarDatos([]);
+      fijarDatos([], { forzar: true });
       fijarAviso('<div class="ftm-aviso"><b>No hay conexión con el parque de transformadores.</b> '
         + 'Sin conexión no se muestra ningún equipo: este tablero nunca inventa datos. '
         + 'Recargue la página; si el problema continúa, avise al administrador.</div>');
@@ -1971,11 +2057,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     fijarAviso('<div class="ftm-nota">Cargando el parque…</div>');
     try {
       const filas = await fuente();
-      fijarDatos(filas || []);
+      fijarDatos(filas || [], { forzar: true });
       fijarAviso(EQUIPOS.length ? '' : '<div class="ftm-aviso">La fuente respondió sin equipos.</div>');
     } catch (err) {
       console.warn('[fichas/panel] la fuente de datos falló:', err);
-      fijarDatos([]);
+      fijarDatos([], { forzar: true });
       fijarAviso('<div class="ftm-aviso"><b>No se pudo leer el parque.</b> ' + esc(err && err.message ? err.message : err)
         + '</div>');
     }
@@ -1992,6 +2078,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     contenedor.removeEventListener('input', alEscribir);
     contenedor.removeEventListener('change', alCambiar);
     document.removeEventListener('keydown', alTeclear);
+    globalThis.removeEventListener('beforeunload', alSalir);
     contenedor.innerHTML = '';
     contenedor.classList.remove('ftm-root');
   }
