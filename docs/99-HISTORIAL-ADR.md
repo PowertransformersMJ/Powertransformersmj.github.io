@@ -2252,3 +2252,63 @@ el PI por defecto. El selector vive FUERA del modal a propósito — meterlo ent
 sugerido que Salud de Activos es una hoja más del mismo papel. Verificado pulsando ambos caminos en
 producción. Construir el documento de Salud → **TODO-53**.
 
+**74.17 El documento de Mantenimiento Especializado deja de ser un cartel (2026-09-08, TODO-53).**
+Encargo del Ingeniero: *«adopta lo mismo que PI; en lo que nos vamos a trabajar es en el segmento de
+alcance (las 5 propuestas en redacción) y en beneficios (las 5 propuestas). Añadiremos una hoja donde
+se pueda apreciar de forma clara el estado de salud del activo y en dónde se sitúa en la matriz de
+riesgo, que se puedan ver la cantidad de usuarios y los MVA comprometidos.»*
+
+**Causa raíz de que hiciera falta**: §74.16 dejó el selector con dos documentos y el segundo sin
+contenido. Un documento que se abre y no se emite es deuda visible.
+
+**Solución.** `HOJAS_SALUD`: las seis del PI **más** «Salud y riesgo», que va **tercera** —después de
+qué se hace y para qué, antes de los diagramas—. De última habría sido un anexo que nadie abre. La
+hoja trae cuatro cifras (condición · usuarios aguas abajo · MVA comprometidos · veredicto) y la
+matriz 5×5 con **una sola casilla encendida**: la de este equipo. El reparto de la flota ya está en
+Analítica; aquí la pregunta es dónde cae ESTE activo.
+
+**Lo que NO se reimplementó.** Rangos de criticidad, nivel por usuarios y color salen de
+`domain/matriz_riesgo.js` — el mismo dominio que pinta la matriz gerencial, con los rangos calculados
+sobre **todo el parque**. Si se hubieran recalculado aquí, un equipo podría caer en dos casillas
+distintas según dónde se le mirara, y el documento no valdría nada.
+
+**Alcance y beneficios: catálogo aparte, clave aparte.** Cinco redacciones cada uno (4 escritas por
+un workflow de 10 agentes + 1 automática del dominio). Se guardan en `alcance_mtto` /
+`beneficios_mtto`: un mismo índice significa cosas distintas en cada documento, así que compartir la
+clave habría hecho que elegir aquí **pisara** lo que el PI ya tuviera escrito. **El PI quedó intacto**
+—mismas hojas, mismas redacciones, misma exportación al PE.02081— y así lo fija una prueba.
+
+**La regla que sostiene el documento**: lo que el mantenimiento NO revierte, se dice. Si el hallazgo
+dominante es la celulosa, el alcance advierte que la intervención contiene el avance pero *«no
+devuelve al activo la vida de aislamiento ya consumida»*, y los beneficios cambian «recuperación
+efectiva» por «contención del deterioro y tiempo de decisión». Prometer que un mantenimiento
+restituye el papel es indefendible ante el regulador — es la misma doctrina de ADR-066 aplicada al
+documento nuevo.
+
+**Un hueco que ya se estaba emitiendo en el PI.** `modoDegradacion` dispara por **calificación**
+(`eadfq`, `ecrg`…) pero redactaba la evidencia con los **valores medidos** (`rig`, `hum`, `crg`), que
+viven en `det`/`ensayos` y **en producción no se cargan**. El resultado salía así: *«rigidez
+dieléctrica de  kV, humedad de  %»* — en un papel que se firma. Ahora se enumera solo lo medido y, si
+no hay nada, se declara de dónde sale la calificación. Arreglado en el dominio compartido: el PI
+hereda el arreglo.
+
+**No exporta, y lo dice.** La exportación llena el Excel oficial PE.02081, que es el formato del PI.
+El de mantenimiento no tiene formato propio todavía, así que su botón de exportar no aparece y su
+descripción en el selector lo advierte. Prometer ese papel habría sido peor que no tenerlo.
+
+**Verificación**: 1501 pruebas verdes (26 nuevas en `tests/fichas_mantenimiento.test.js`), lint
+limpio, y preview fiel con el módulo real —no una maqueta— recorriendo las siete hojas, las cinco
+redacciones de cada segmento y los dos extremos de la matriz (riesgo crítico y riesgo tolerable) más
+el equipo sin usuarios, que muestra el estado vacío honesto en lugar de una casilla al azar.
+
+**Verificado sano / no re-auditar**: `abrirFicha(clave, doc)` conserva su firma con el PI por
+defecto · el exportador sigue leyendo `st.plan.alcance` / `.beneficios`, que el documento nuevo no
+toca · `estadoVacio()` no necesitó campos nuevos (el `plan` es libre) · el cartel
+`hojaEnConstruccion` se retiró por quedar sin llamantes.
+
+**Dos cosas quedan a decisión del Ingeniero**, señaladas y no decididas por mí: (a) el bloque de
+**PRESUPUESTO** se adoptó igual que el del PI —dice «INVERSIÓN» y valora la UC de **reposición**—,
+que es lo que se pidió («adopta lo mismo que PI») pero probablemente no es lo que un documento de
+mantenimiento debe costear; (b) el documento aún no tiene formato oficial al cual exportar.
+
+Crudo del workflow y los recortes de los editores → bóveda, `2026-09-08-redacciones-mantenimiento/`.
