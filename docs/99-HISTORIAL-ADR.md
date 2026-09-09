@@ -2236,3 +2236,19 @@ constructiva no los saca de ningún informe de salud.
 **Estado final: 208 · 203 concordantes · 0 discrepancias · 4 fuera del catálogo · 0 advertencias ·
 salud 85/83/16/15/9.**
 
+**74.16 «Ficha» deja de ser un documento y pasa a ser una elección (2026-09-08).** El Ingeniero
+precisó algo que el módulo daba por supuesto: lo que ahí se propone **no es «la ficha», es una
+propuesta a Plan de Inversión (PI)**. Y hará falta otro documento: *Mantenimiento Especializado ·
+Salud de Activos*.
+
+No es cosmética. Uno propone **inversión** (reponer el activo) y el otro programará **mantenimiento**
+sobre el equipo que ya está en servicio, a partir de su condición: dos presupuestos distintos.
+
+`5416d77`: el botón «Ficha» abre un selector con los dos. El de Salud se puede abrir —para verlo y
+opinar— y declara que está en construcción, con lo que llevará y en qué se diferencia del PI; sin
+hojas y sin botón de exportar, para que nadie lo tome por emitible. **El PI no se tocó**: mismas
+seis hojas, mismo orden, mismo PE.02081, misma exportación, y `abrirFicha` conserva su firma con
+el PI por defecto. El selector vive FUERA del modal a propósito — meterlo entre las hojas habría
+sugerido que Salud de Activos es una hoja más del mismo papel. Verificado pulsando ambos caminos en
+producción. Construir el documento de Salud → **TODO-53**.
+
