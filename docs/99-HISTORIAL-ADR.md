@@ -2458,3 +2458,48 @@ PE.02081 · el aviso dinámico de contradicción `INV × banda` se retiró por q
 
 Queda una sola cosa esperando decisión suya: el documento de mantenimiento **no tiene formato oficial
 al cual exportar**, y por eso no lleva botón de exportar.
+
+**74.21 Una sola dirección de lectura, y una definición para cada banda (2026-09-09).** Dos encargos:
+*«los estados de salud organízalos en orden de 1 a 5, y dame otra definición a cada estado de salud
+teniendo en cuenta el riesgo y la continuidad del servicio.»*
+
+**El orden.** Las matrices se pintaban de 5 arriba a 1 abajo —la convención de una matriz de
+riesgo— y el resto del módulo de 1 a 5. Dentro de la misma pantalla eso obliga a releer el
+encabezado cada vez, y ahí es donde alguien confunde la banda buena con la mala. Ahora van de 1 a 5
+en las tres: hoja «Salud y riesgo», matriz de Analítica gerencial y la agregación del dominio.
+También el desplegable de redacciones, que sacaba de sitio la banda del equipo para ponerla primera:
+se distingue por su rótulo, no rompiendo la escala.
+
+**Las definiciones.** «Pobre» no le dice a nadie qué pasa con el suministro. `DEFINICION_CONDICION`
+acompaña a la etiqueta oficial del MO.00418 —que **no** se toca— en los chips del tablero, en las
+filas de las dos matrices y, en prosa, en la hoja de salud del documento. El hilo de las cinco es
+**quién gobierna la salida del transformador**: primero el plan con libertad, luego el plan
+condicionado, después el activo, más tarde una reposición que se vuelve forzada, y al final la
+propia falla.
+
+**La trampa que fija la prueba.** La condición es UN SOLO EJE —la probabilidad de falla—; la
+consecuencia la aporta la criticidad por usuarios aguas abajo. Una definición que dijera «riesgo
+alto» a secas sería **falsa**: un activo en condición 5 que alimenta a poca gente cae en una celda de
+menor prioridad que uno en condición 4 que alimenta a una ciudad. Ninguna lo dice, todas nombran la
+criticidad, y cada una le da una **función distinta** —impone la vigilancia · estrecha la holgura ·
+separa seguimiento de intervención prioritaria · fija el turno · determina el alcance—, porque
+repetir la misma coletilla cinco veces es un sello, no una idea. Las tres cosas con prueba.
+
+**Tres afirmaciones que el motor no sostiene**, cazadas por el juez de rigor leyendo el código:
+(a) «sin deterioro detectable» en la banda 1 es falso para un índice ponderado donde EDAD pesa 0,30
+—un activo entra a la banda superior con deterioro perfectamente detectable en una variable—;
+(b) «el diagnóstico ya no recupera margen» en la banda 4 contradice su propia estrategia, cuyo foco
+incluye `MEJ` y cuya línea base trae «Recuperación de aislamientos»; (c) ninguna puede hablar de
+transferencias, holgura ante contingencias ni despacho, porque **el índice no modela la red** —no hay
+topología y la cargabilidad pesa 0,05—. Era el juego más vívido en pantalla y el más falso en el
+fondo. Las tres quedan fijadas con prueba. → **L-83**.
+
+**Verificación**: 1549 pruebas verdes (18 nuevas), lint limpio, preview con las dos matrices de 1 a 5
+y la definición visible en la hoja y en los tooltips.
+
+**Verificado sano / no re-auditar**: `NOMBRE_CONDICION` y `BUCKETS_HI` intactos —las etiquetas
+oficiales no se tocan, la definición las acompaña— · `agregarConteos` se indexa por HI, así que
+cambiar el orden de construcción no altera ningún conteo · el marcador «— este equipo» sigue en el
+desplegable.
+
+Crudo del panel de jueces → bóveda, `2026-09-09-definiciones-condicion/`.

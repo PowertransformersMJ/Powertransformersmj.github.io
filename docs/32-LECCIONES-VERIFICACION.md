@@ -129,3 +129,19 @@ ADVERSO —el elemento solo, el género contrario, la lista vacía—, no el que
 **Cómo se cazó**: cinco críticos adversariales independientes, y varios no lo razonaron: **ejecutaron
 la función que rellena el hueco** (`prosaAcciones()`) contra el catálogo real y leyeron el resultado.
 Es la diferencia entre revisar el texto y revisar lo que el texto produce. → `99 §74.19`.
+
+### L-83 · Un panel de jueces sirve tanto para elegir como para señalar dónde no vale ninguna
+
+Tres juegos de definiciones, tres jueces con un criterio cada uno. Los tres coincidieron en que la
+**banda 2 era la más floja de las quince** y **ninguno la dio por buena**: hubo que reescribirla en
+la síntesis. Un revisor solo no dice eso — elige la menos mala y sigue.
+
+El juez de rigor aportó lo que ningún lector atento habría visto sin abrir el código: tres
+afirmaciones que suenan impecables y que **el motor no sostiene** —«sin deterioro detectable» en la
+banda superior de un índice donde EDAD pesa 0,30; «ya no recupera margen» en una banda cuya
+estrategia todavía incluye mejora; y promesas de comportamiento de red en un índice que no modela
+topología—. Las tres venían del juego que mejor se leía en pantalla.
+
+**La regla**: cuando lo que se juzga es texto de dominio, al menos un juez tiene que tener por
+criterio **verificar el fondo contra el código**, y hay que dejarle decir «ninguna sirve». Sin eso,
+el panel premia la redacción más vívida, que es justo la que más afirma. → `99 §74.21`.
