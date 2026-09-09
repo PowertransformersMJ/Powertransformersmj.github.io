@@ -253,8 +253,15 @@ function sanitizeSaludActual(src) {
     calif_pyt:              califInt(src.calif_pyt),
     // HI final y trazabilidad
     hi_bruto:               califFloat(src.hi_bruto),
+    // `hi_final` es la condición OFICIAL del activo. Desde 2026-09-08 la
+    // fija el archivo de Salud de Activos —decisión del Ingeniero, que es el
+    // especialista— y no el recálculo del motor (`99 §74.14`).
     hi_final:               califFloat(src.hi_final),
     bucket:                 normEnum(src.bucket, BUCKETS_HI, ''),
+    // El recálculo del MO.00418 se conserva al lado, no se tira: permite
+    // comparar en cualquier momento y hace la decisión reversible.
+    hi_recalculado:         califFloat(src.hi_recalculado),
+    bucket_recalculado:     normEnum(src.bucket_recalculado, BUCKETS_HI, ''),
     overrides_aplicados:    arrStr(src.overrides_aplicados),
     // Flag permanente (MO.00418 §4.1.2 Nota Técnica FUR)
     fin_vida_util_papel:    bool(src.fin_vida_util_papel)

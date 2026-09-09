@@ -37,7 +37,13 @@ describe('parsearFilaTransformador', () => {
     assert.equal(docV2.identificacion.tipo_activo, 'RESPALDO');
   });
 
-  test('recalcula HI con gases DGA (no confía en condicion_excel)', () => {
+  // CAMBIO DE CRITERIO (2026-09-08, `99 §74.14`). Este test afirmaba que el HI
+  // recalculado MANDABA sobre la columna del Excel. El Ingeniero —especialista
+  // en transformadores— decidió lo contrario: la condición oficial es la del
+  // archivo de Salud de Activos. Lo que se conserva, y es lo que este test
+  // protege ahora, es que el recálculo NO se pierde: sigue entero al lado y el
+  // diagnóstico sigue midiendo la diferencia entre ambos.
+  test('el HI del Excel manda, pero el recálculo se conserva y se compara', () => {
     const { docV2, diagnostico } = parsearFilaTransformador({
       codigo: 'TX-02', nombre: 'T', departamento: 'cordoba',
       h2: 50, ch4: 50, c2h4: 50, c2h6: 50, c2h2: 8, co: 200, co2: 2000,
@@ -47,11 +53,13 @@ describe('parsearFilaTransformador', () => {
       condicion: 2                // Excel dice 2
     }, 'TX_Potencia');
 
-    assert.ok(docV2.salud_actual.hi_final > 3,
-      `HI debería ser alto por CRG=5 y DGA/ADFQ degradados: ${docV2.salud_actual.hi_final}`);
+    assert.equal(docV2.salud_actual.hi_final, 2,
+      'la condición oficial es la del Excel');
+    assert.ok(docV2.salud_actual.hi_recalculado > 3,
+      `el motor sigue calculando lo suyo: ${docV2.salud_actual.hi_recalculado}`);
     assert.ok(diagnostico.diferencia != null, 'debe calcular diferencia');
     assert.ok(diagnostico.diferencia > 0.5,
-      `diferencia = ${diagnostico.diferencia}`);
+      `la discrepancia se sigue reportando: ${diagnostico.diferencia}`);
   });
 
   test('cabeceras REALES del Excel del parque (espacios dobles, alias largos)', () => {

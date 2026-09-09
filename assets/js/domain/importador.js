@@ -449,8 +449,28 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
     calif_her: califHER,
     ubicacion_fuga_dominante: herUbic || '',
     calif_pyt: califPYT,
-    hi_bruto: hiBruto, hi_final: ov.hi_final,
-    bucket: bucketizarHI(ov.hi_final),
+    hi_bruto: hiBruto,
+
+    // ── LA CONDICIÓN OFICIAL ES LA DEL EXCEL ─────────────────────────────
+    // Decisión del Ingeniero (2026-09-08), que es el especialista en
+    // transformadores de potencia: la condición del parque se toma TAL CUAL
+    // viene del archivo de Salud de Activos.
+    //
+    // Hasta hoy este importador la RECALCULABA con el motor del MO.00418 y
+    // descartaba la columna del Excel. Discrepaban en 98 de 208 equipos: el
+    // Excel marcaba 9 en «muy pobre» y el motor dejaba 1, porque el DGA pesa
+    // el 35 % de la ponderación y un aceite sano tira del índice hacia arriba
+    // aunque el equipo esté viejo y sobrecargado (`99 §74.14`).
+    //
+    // El cálculo NO se tira: sigue entero en `hi_bruto`, en `hi_recalculado`
+    // y en cada `calif_*`, y el reporte de discrepancias del job lo compara.
+    // Así la decisión es reversible y no se pierde el trabajo del motor —
+    // solo deja de ser quien tiene la última palabra.
+    hi_final: condicionExcel != null ? condicionExcel : ov.hi_final,
+    hi_recalculado: ov.hi_final,
+    bucket: bucketizarHI(condicionExcel != null ? condicionExcel : ov.hi_final),
+    bucket_recalculado: bucketizarHI(ov.hi_final),
+
     overrides_aplicados: ['_importacion_v2', ...ov.overrides_aplicados],
     fin_vida_util_papel: false
   };
