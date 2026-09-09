@@ -143,40 +143,48 @@ describe('Catálogos de redacción — uno por documento', () => {
 
   // 🔒 EL INVARIANTE MÁS CARO: un documento de mantenimiento que proponga
   // reponer el activo es el documento equivocado, y se firma igual.
-  // 🔒 EL INVARIANTE MÁS CARO, ahora acotado: proponer reponer es correcto en la
-  // condición 5 —es su decisión— y es el documento equivocado en las otras
-  // cuatro, donde el activo sigue en servicio y se interviene.
-  test('solo la condición 5 propone la salida del activo', () => {
-    // Lo prohibido es PROPONER que el transformador salga de servicio. No lo es
-    // nombrar el reemplazo de un buje o de un componente (condición 4 lo hace, y
-    // es correcto), ni usar «valor de reposición» como referencia de costo para
-    // comparar contra la intervención — que es exactamente la comparación que
-    // esa banda tiene que dejar documentada.
-    const SALIDA = 'salida (ordenada|del activo|programada|anticipad)|retiro programado'
-      + '|desincorporaci|reposici[óo]n por una unidad|reemplazo por otro activo';
-    const proponeSalida = new RegExp(SALIDA, 'i');
-    // El alcance PROPONE la salida; los beneficios describen sus efectos, con
-    // otro vocabulario. Se acepta cualquiera de las dos formas en la banda 5.
-    const hablaDeSalida = new RegExp(SALIDA + '|sustituci[óo]n|activo entrante|equipo retirado', 'i');
+  // 🔒 EL INVARIANTE, reescrito por orden del Ingeniero (2026-09-09): «todo lo
+  // referente a inversión queda en PI». Este documento programa mantenimiento;
+  // ninguna de sus cinco bandas propone reponer, reemplazar ni retirar el
+  // activo — ni siquiera la condición 5, que antes sí lo hacía. Lo que la
+  // condición 5 hace ahora es SOSTENER hasta la salida y remitir la decisión.
+  test('ninguna banda propone la inversión: eso es del PI', () => {
+    const propone = /(?:se ejecuta|comprende|se propone|el alcance)[^.]{0,90}\b(reposici[óo]n del|reemplazo del|retiro programado|salida ordenada de servicio)/i;
     for (const o of escritas) {
-      if (o.cond === 5) {
-        assert.match(o.v, hablaDeSalida, 'la condición 5 debe tratar la salida del activo');
-      } else {
-        assert.ok(!proponeSalida.test(o.v),
-          `«${o.t}» propone la salida del activo, y en esa banda sigue en servicio`);
-      }
+      assert.ok(!propone.test(o.v), `«${o.t}» propone inversión, y eso vive en el PI`);
     }
   });
 
-  test('la condición 4 sí puede hablar de valor de reposición', () => {
-    // El reemplazo de bujes ya no se enumera en la plantilla: es una de las
-    // acciones que el Ingeniero marca. Lo que sí queda en el texto es la
-    // comparación de costo, que es el insumo de la decisión siguiente.
-    const b4 = BENEF_MTTO_OPC.find((o) => o.cond === 4);
-    assert.match(b4.v, /valor de reposición/i);
+  test('la condición 5 remite la decisión al PI en lugar de tomarla', () => {
+    const a5 = ALCANCE_MTTO_OPC.filter((o) => o.cond === 5);
+    assert.equal(a5.length, 3);
+    assert.ok(a5.some((o) => /propuesta a Plan de Inversión/i.test(o.v)),
+      'alguna de las tres debe nombrar el documento al que se remite la decisión');
+    for (const o of escritas.filter((x) => x.cond === 5)) {
+      assert.match(o.v, /sosten|salida|expediente|Plan de Inversión/i,
+        `«${o.t}» debe tratar el sostenimiento del activo hasta su salida`);
+    }
   });
 
-  // El texto del PI arranca por «reposición»; el de mantenimiento, por el trabajo.
+  test('la condición 4 documenta su costo, pero no lo compara contra la reposición', () => {
+    // Comparar el costo de intervenir contra el valor de reposición es la
+    // pregunta del PI. Aquí se documenta lo ejecutado y se remite.
+    const b4 = BENEF_MTTO_OPC.find((o) => o.cond === 4);
+    assert.ok(!/valor de reposición/i.test(b4.v));
+    assert.match(b4.v, /propuesta a Plan de Inversión/i);
+  });
+
+  // La categoría INV tiene que seguir siendo reconocible: de ella depende que
+  // la hoja pueda dejar esas acciones fuera del selector.
+  test('las acciones de inversión siguen marcándose como tales', async () => {
+    const { accionesDeEquipo } = await import('../assets/js/ui/fichas/panel.js');
+    const disp = accionesDeEquipo({ potencia_kva: 20000, salud_actual: { hi_final: 5 } });
+    assert.ok(disp.some((a) => a.cat === 'INV'),
+      'si dejara de marcarse, el filtro de la hoja quedaría ciego');
+    assert.ok(disp.some((a) => a.cat !== 'INV'),
+      'y deben quedar acciones de sostenimiento que sí se pueden contratar aquí');
+  });
+
   test('ninguna arranca con el encabezado del PI', () => {
     for (const o of escritas) {
       assert.ok(!/^El alcance del proyecto (consiste|comprende) en la (adquisici|reposici)/i.test(o.v),

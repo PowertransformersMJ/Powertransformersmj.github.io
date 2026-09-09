@@ -121,6 +121,21 @@ export function accionesDisponibles(ci, registradas, esLineaBase, clasificar) {
   return salida;
 }
 
+/**
+ * ¿Esta acción es INVERSIÓN? Orden del Ingeniero (2026-09-09): «todo lo
+ * referente a inversión queda en PI», así que el documento de Mantenimiento
+ * Especializado no la ofrece.
+ *
+ * Se decide con una lista EXPLÍCITA y no con la categoría funcional, que es
+ * demasiado gruesa para esto: `clasificarAccion` mandaba a «INV» cualquier cosa
+ * que dijera «reemplazo», y reemplazar un buje es correctivo mayor, no
+ * inversión. Lo que sí lo es: crear o sustituir capacidad de transformación.
+ */
+export function esInversion(txt) {
+  return /PLAN DE INVERSION|\bPI\b|REPOSICION|REEMPLAZO (DEL? |DE LA )?(TRANSFORMADOR|UNIDAD|ACTIVO)|AUMENTO DE CAPACIDAD DE TRANSFORMACION|INSTALACION (DE )?UNIDAD|REPOTENCIACION/
+    .test(normalizarAccion(txt));
+}
+
 /** Los ids que van marcados de entrada: lo que el equipo ya tiene asignado. */
 export function seleccionPorDefecto(acciones) {
   return (Array.isArray(acciones) ? acciones : [])

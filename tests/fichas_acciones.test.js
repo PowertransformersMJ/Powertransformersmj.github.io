@@ -23,6 +23,7 @@ import {
   accionesDisponibles, seleccionPorDefecto, prosaAcciones,
   catalogoCondicion, idAccion, normalizarAccion
 } from '../assets/js/domain/fichas_acciones.js';
+import { esInversion } from '../assets/js/domain/fichas_acciones.js';
 import { clasificarAccion } from '../assets/js/ui/fichas/ficha-tecnica.js';
 import { accionesDeEquipo, seleccionAcciones } from '../assets/js/ui/fichas/panel.js';
 
@@ -217,5 +218,59 @@ describe('El equipo y su selección', () => {
 
   test('un equipo sin condición no ofrece acciones', () => {
     assert.deepEqual(accionesDeEquipo({ potencia_kva: 1000 }), []);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// Qué es inversión — y qué solo lo parece
+// ──────────────────────────────────────────────────────────────
+// Orden del Ingeniero (2026-09-09): «todo lo referente a inversión
+// queda en PI». El documento de Mantenimiento Especializado deja
+// esas acciones fuera del selector. La frontera NO puede apoyarse
+// en la categoría funcional: `clasificarAccion` mandaba a «INV»
+// cualquier cosa que dijera «reemplazo», y con eso el filtro se
+// llevaba por delante el reemplazo de bujes y de componentes
+// defectuosos — que son correctivo mayor, trabajo contratable en
+// este documento. Perder trabajo real del alcance es tan grave
+// como colar inversión donde no va.
+// ══════════════════════════════════════════════════════════════
+
+describe('esInversion — crear o sustituir capacidad de transformación', () => {
+
+  test('lo que sí es inversión', () => {
+    for (const t of ['Propuesta a Plan de Inversión (PI)', 'PROPUESTA A PLAN DE INVERSION (PI)',
+      'Aumento de capacidad de transformación', 'Instalación unidad de transformación adicional',
+      'INSTALACION DE UNIDAD DE TRANSFORMACION ADICIONAL', 'Repotenciación de unidad de transformación',
+      'Reposición del transformador']) {
+      assert.ok(esInversion(t), `«${t}» debería quedar fuera del documento de mantenimiento`);
+    }
+  });
+
+  // 🔒 LA CONTRA-PRUEBA, que es la que de verdad protege: reemplazar un buje no
+  // es reponer el activo, y sacarlo del selector le quitaría al alcance un
+  // frente de trabajo real del correctivo mayor.
+  test('lo que NO es inversión y se queda', () => {
+    for (const t of ['Reemplazo de bushings', 'Reemplazo o reparación componentes defectuosos',
+      'Movimiento estratégico de transformadores', 'Pintura total', 'Regeneración de aceite',
+      'Mantenimiento OLTC con despiece', 'Retrofit de protecciones mecánicas y tableros',
+      'Aumento de capacidad sistema refrigeración']) {
+      assert.ok(!esInversion(t), `«${t}» es mantenimiento y debe poder contratarse aquí`);
+    }
+  });
+
+  test('el clasificador ya no manda a inversión el reemplazo de un componente', () => {
+    assert.equal(clasificarAccion('Reemplazo de bushings'), 'CORR');
+    assert.equal(clasificarAccion('Reemplazo o reparación componentes defectuosos'), 'CORR');
+    assert.equal(clasificarAccion('REPOSICION DEL TRANSFORMADOR'), 'INV');
+    assert.equal(clasificarAccion('PROPUESTA A PLAN DE INVERSION (PI)'), 'INV');
+  });
+
+  test('en cada banda queda trabajo de mantenimiento contratable', () => {
+    for (const c of [1, 2, 3, 4, 5]) {
+      const quedan = accionesDisponibles(c, [], true, clasificarAccion)
+        .filter((a) => !esInversion(a.txt));
+      assert.ok(quedan.length >= 3,
+        `la condición ${c} se queda con ${quedan.length} acciones tras excluir la inversión`);
+    }
   });
 });
