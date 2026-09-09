@@ -145,3 +145,20 @@ topología—. Las tres venían del juego que mejor se leía en pantalla.
 **La regla**: cuando lo que se juzga es texto de dominio, al menos un juez tiene que tener por
 criterio **verificar el fondo contra el código**, y hay que dejarle decir «ninguna sirve». Sin eso,
 el panel premia la redacción más vívida, que es justo la que más afirma. → `99 §74.21`.
+
+### L-84 · Un valor por equipo pintado en cada parte fabrica dos mentiras, y la segunda acusa al dato
+
+El tablero de cargabilidad tomaba `crg_pct_medido` —uno por transformador— y lo mostraba como
+porcentaje de sus tres devanados. La primera mentira es visible: un devanado sin ampacidad ni
+corriente exhibía «96 %» junto a «— A / — A». La segunda es peor porque **parece diligencia**: como
+un valor único no puede coincidir con tres cocientes distintos, el sistema declaraba «fuente en
+desacuerdo» en 74 equipos y mandaba a *revisar la captura*. La captura estaba bien; el que no
+cuadraba era el modelo.
+
+**La regla**: cuando un dato de nivel N se muestra en el nivel N+1, cualquier comprobación de
+coherencia entre ambos denunciará al dato de abajo por construcción. Antes de creer un contador de
+discrepancias, hay que preguntar si el valor comparado describe de verdad la cosa comparada.
+
+**Cómo se comprobó**: abriendo el Excel y midiendo. Los porcentajes por devanado coinciden con sus
+propios amperios en el 100 % de las filas medidas — 196, 196 y 31. Un solo número mata la hipótesis
+de que el problema fuera la captura. → `99 §74.23`.
