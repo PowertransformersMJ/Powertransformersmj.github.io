@@ -35,6 +35,44 @@ export const HOJAS_TIPO_ACTIVO = Object.freeze({
   'TX_RESPALDO':   'RESPALDO'
 });
 
+/**
+ * Quita del documento las claves cuyo valor está VACÍO (`''`, `null` o
+ * `undefined`), en profundidad.
+ *
+ * POR QUÉ (TODO-51, y dos sustos el mismo día): `sanitizarTransformador`
+ * devuelve SIEMPRE todas las claves de todas las secciones, rellenando con
+ * cadena vacía o `null` lo que el Excel no traiga. Y aquí se escribe con
+ * `merge: true`, donde una clave presente con valor vacío **NO se ignora:
+ * sobrescribe**. Resultado: cada importación borraba en silencio todo lo que
+ * el Excel no conoce. Le pasó a la UUCC (se parcheó a mano en el parser) y
+ * habría vuelto a pasar con cualquier dato que se cargue por otra vía —
+ * coordenadas, marca, fechas, el tipo constructivo.
+ *
+ * Con `merge: true` una clave AUSENTE deja intacto lo guardado. Así que el
+ * Excel manda sobre lo que TRAE, y calla sobre lo que no.
+ *
+ * ⚠️ El precio, consciente: ya no se puede vaciar un campo colando una celda
+ * en blanco en una importación masiva. Borrar un dato pasa a ser un acto
+ * explícito desde su módulo, que es donde queda registrado quién lo hizo.
+ *
+ * `0` y `false` NO son vacíos: son datos. Un tap en 0 o un booleano en falso
+ * se escriben.
+ */
+export function ralo(v) {
+  if (Array.isArray(v)) return v;                    // los arrays viajan enteros
+  if (v === null || v === undefined || v === '') return undefined;
+  if (typeof v !== 'object') return v;               // 0 y false pasan
+  if (v instanceof Date) return v;
+  const out = {};
+  for (const [k, val] of Object.entries(v)) {
+    const limpio = ralo(val);
+    if (limpio !== undefined) out[k] = limpio;
+  }
+  // Una sección que se queda sin nada no se escribe: dejarla como {} borraría
+  // sus hermanos guardados en algunas rutas y no aporta nada en ninguna.
+  return Object.keys(out).length ? out : undefined;
+}
+
 // ── Helpers de coerción ────────────────────────────────────────
 const toStr = (v) => (v == null) ? '' : String(v).trim();
 

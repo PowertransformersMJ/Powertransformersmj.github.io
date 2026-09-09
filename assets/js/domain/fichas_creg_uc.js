@@ -358,7 +358,7 @@ function textoBanda(cap) {
  *   (banda por debajo del mínimo, regulación que no concuerda con el
  *   descriptor, conexión al STN sin tipo constructivo…).
  */
-export function clasificarUC(potKva, kvPrim, kvTerc, regulacion) {
+export function clasificarUC(potKva, kvPrim, kvTerc, regulacion, fases) {
   const pasos = [];
   const notas = [];
   let mva = null;
@@ -391,8 +391,24 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion) {
   if (kvt != null && kvt <= 0) {
     notas.push('Tensión terciaria reportada como 0: se trata como equipo BIDEVANADO.');
   }
-  const dev = tri ? 'tri' : 'bi';
+
+  // FASES (opcional). El catálogo CREG solo tiene UNA familia monofásica —los
+  // autotransformadores de conexión al STN, niveles 5 y 6—; en los niveles 3 y
+  // 4 todas sus unidades son trifásicas. Así que con saber el número de fases
+  // basta para elegir familia, y no hace falta un campo aparte de «es
+  // autotransformador»: el catálogo no ofrece esa combinación.
+  //
+  // Sin este dato el clasificador ASUME trifásico y lo dice en sus notas. Esa
+  // suposición ya salió cara (`99 §74.12`): el parque tiene monofásicos reales
+  // en nivel 3 a los que se les asignaba una banda trifásica.
+  const nf = (fases === 1 || fases === 3 || fases === '1' || fases === '3')
+    ? Number(fases) : null;
+  const monofasico = nf === 1;
+  const dev = monofasico ? 'auto' : (tri ? 'tri' : 'bi');
   pasos.push(`Tension terciaria = ${kvt} kV -> ${tri ? 'TRIDEVANADO' : 'BIDEVANADO'}`);
+  if (nf != null) {
+    pasos.push(`Fases = ${nf} -> ${monofasico ? 'MONOFASICO (familia autotransformador)' : 'TRIFASICO'}`);
+  }
 
   let uucc = null;
   let banda = null;
@@ -401,7 +417,7 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion) {
 
   if (niv === 'N1' || niv === 'N2') {
     notas.push(`Nivel ${niv}: la Tabla 16 no cataloga UC de transformador de potencia para este nivel (revisar; posible activo Nivel 1/2).`);
-  } else if (niv === 'N6') {
+  } else if (niv === 'N6' && nf == null) {
     notas.push('Primario 500 kV: aplica catalogo N6 (Tabla 15); requiere dato de tipo constructivo.');
   } else if (niv && GRUPO_POR_LLAVE[key]) {
     const rows = GRUPO_POR_LLAVE[key].rows;
@@ -423,11 +439,21 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion) {
         }
       }
     }
-    if (niv === 'N5') {
+    // Esta advertencia es sobre una SUPOSICIÓN. Si el equipo ya tiene sus
+    // fases registradas no hay suposición que advertir, y repetirla enseñaría
+    // a ignorar el aviso justo donde sí importa.
+    if (niv === 'N5' && nf == null) {
       notas.push(`Conexion STN: catalogo distingue trifasico (N5T1-10), autotransf. monofasico (N5T11-18) y tridevanado (N5T19-25). Sin columna de fases/tipo, se asume trifasico${tri ? '/tridevanado' : ''}; verificar tipo constructivo.`);
     }
   } else if (niv) {
-    notas.push(`Combinacion ${key} sin catalogo aplicable.`);
+    if (monofasico) {
+      // El caso real de TRES PALMAS: monofásicos de 250 kVA en nivel 3.
+      // Decir «no hay UC» es la verdad; asignarles una banda trifásica era
+      // una interpretación disfrazada de dato.
+      notas.push(`Equipo MONOFASICO en nivel ${niv}: la CREG 015/2018 solo cataloga unidades monofasicas en los niveles 5 y 6 (autotransformadores de conexion al STN). NO existe Unidad Constructiva aplicable a este equipo; asignarle una banda trifasica seria una interpretacion, no un dato.`);
+    } else {
+      notas.push(`Combinacion ${key} sin catalogo aplicable.`);
+    }
   }
 
   const rr = regulacion != null ? String(regulacion).trim().toUpperCase() : null;

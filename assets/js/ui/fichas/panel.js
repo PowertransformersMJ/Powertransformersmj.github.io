@@ -292,8 +292,12 @@ export function normalizarEquipo(bruto, i) {
   const kvTerc = num(leer(b, 'kv_terc', 'tension_terciaria_kv',
     'electrico.tension_terciaria_kv', 'placa.tension_terciaria_kv'));
   const regulacion = txt(leer(b, 'regulacion', 'tipo_regulacion', 'placa.regulacion'));
+  // Fases: 1 monofásico · 3 trifásico · null no registrado. Decide la FAMILIA
+  // de Unidad Constructiva, así que sin dato el clasificador asume trifásico y
+  // lo advierte. Ver `99 §74.12`.
+  const fases = num(leer(b, 'fases', 'electrico.fases'));
 
-  const cls = clasificarUC(kva, kvPrim, kvTerc, regulacion || null);
+  const cls = clasificarUC(kva, kvPrim, kvTerc, regulacion || null, fases);
 
   const registrada = txt(leer(b, 'uucc_registrada', 'uucc.registrada',
     'identificacion.uucc', 'uucc')).toUpperCase();
@@ -359,6 +363,7 @@ export function normalizarEquipo(bruto, i) {
     banda: txt(leer(b, 'banda') || cls.banda || ''),
     reg_catalogo: txt(leer(b, 'reg_catalogo') || cls.reg_catalogo || ''),
     devanado: cls.devanado,
+    fases,
     uucc_registrada: registrada,
     uucc_calculada: calculada,
     // Texto literal del catálogo CREG 015/2018 para la UUCC REGISTRADA (la
@@ -501,7 +506,7 @@ function ucDeLaFicha(equipo, st) {
   const plan = st.plan || {};
   if (lleno(plan.presu_ucc)) return String(plan.presu_ucc).trim().toUpperCase();
   const mva = potenciaProyecto(equipo, st);
-  const r = clasificarUC(mva != null ? mva * 1000 : null, equipo.kv_prim, equipo.kv_terc, equipo.regulacion);
+  const r = clasificarUC(mva != null ? mva * 1000 : null, equipo.kv_prim, equipo.kv_terc, equipo.regulacion, equipo.fases);
   return r.uucc_calc || equipo.uucc_calculada || equipo.uucc_registrada || '';
 }
 

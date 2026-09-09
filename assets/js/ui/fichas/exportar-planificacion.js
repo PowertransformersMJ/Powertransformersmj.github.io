@@ -192,7 +192,7 @@ export function uccDeLaFicha(equipo = {}, estado = {}) {
   if (lleno(plan.presu_ucc)) return String(plan.presu_ucc).trim().toUpperCase();
   const mva = potenciaProyecto(equipo, estado);
   const kva = mva != null ? mva * 1000 : null;
-  const r = clasificarUC(kva, equipo.kv_prim, equipo.kv_terc, equipo.regulacion);
+  const r = clasificarUC(kva, equipo.kv_prim, equipo.kv_terc, equipo.regulacion, equipo.fases);
   return r.uucc_calc || estado.uuccDecidida || equipo.uucc_calculada || equipo.uucc_registrada || '';
 }
 

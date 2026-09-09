@@ -276,7 +276,8 @@ function clasificacionUC(f) {
     const kvt = leer(f, 'kv_terc', 'tension_terciaria_kv', 'electrico.tension_terciaria_kv');
     const reg = leer(f, 'regulacion', 'tipo_tap', 'electrico.tipo_tap');
     if (kva != null || kvp != null) {
-      const c = clasificarUC(kva, kvp, kvt, reg);
+      const fs = leer(f, 'fases', 'electrico.fases');
+      const c = clasificarUC(kva, kvp, kvt, reg, fs);
       calculada = c.uucc_calc; nivel = nivel ?? c.nivel;
       nivelLbl = nivelLbl ?? c.nivel_lbl; banda = banda ?? c.banda;
       catalogo = catalogo ?? c.reg_catalogo;

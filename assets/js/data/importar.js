@@ -12,6 +12,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
 import { auditar } from '../domain/audit.js';
+import { ralo } from '../domain/importador.js';
 
 const COL_TX    = 'transformadores';
 const COL_JOBS  = 'importaciones';
@@ -75,7 +76,7 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
       if (existingId) {
         if (!dryRun) {
           batch.set(doc(db, COL_TX, existingId), {
-            ...r.docV2,
+            ...(ralo(r.docV2) || {}),
             updatedAt: serverTimestamp()
           }, { merge: true });
         }
@@ -84,7 +85,7 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
         if (!dryRun) {
           const newRef = doc(colTxRef());
           batch.set(newRef, {
-            ...r.docV2,
+            ...(ralo(r.docV2) || {}),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: uid || null

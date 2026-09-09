@@ -122,6 +122,23 @@ function sanitizeElectrico(src) {
     corriente_medida_primaria_a:   num(src.corriente_medida_primaria_a),
     corriente_medida_secundaria_a: num(src.corriente_medida_secundaria_a),
     corriente_medida_terciaria_a:  num(src.corriente_medida_terciaria_a),
+    // FASES del equipo: 1 (monofásico) o 3 (trifásico). `null` = no registrado.
+    //
+    // Existe porque el catálogo de la CREG 015/2018 SOLO cataloga unidades
+    // monofásicas en los niveles 5 y 6 (autotransformadores de conexión al
+    // STN); en niveles 3 y 4 todas sus unidades son trifásicas. Sin este dato
+    // el clasificador tiene que ASUMIR trifásico —lo dice en sus notas— y esa
+    // suposición ya salió cara: el parque tiene equipos monofásicos reales
+    // (TRES PALMAS T1/T2/T3, 250 kVA en nivel 3) a los que se les venía
+    // asignando una banda trifásica que no les corresponde.
+    //
+    // Cualquier otro valor se descarta a `null`: media fase no existe, y un
+    // dato inventado aquí cambia la familia de Unidad Constructiva y con ella
+    // el valor de reposición del activo.
+    fases: (() => {
+      const n = num(src.fases);
+      return (n === 1 || n === 3) ? n : null;
+    })(),
     grupo_conexion:         str(src.grupo_conexion),
     impedancia_cc_pct:      num(src.impedancia_cc_pct),
     tap_cambiador:          str(src.tap_cambiador),
