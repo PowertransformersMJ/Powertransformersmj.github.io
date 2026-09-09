@@ -65,14 +65,38 @@ describe('Las hojas de cada documento', () => {
 
 describe('Catálogos de redacción — uno por documento', () => {
 
-  test('cada segmento ofrece cinco propuestas, como en el PI', () => {
-    assert.equal(ALCANCE_MTTO_OPC.length, 5);
-    assert.equal(BENEF_MTTO_OPC.length, 5);
+  // 🔒 El eje del documento de mantenimiento NO es el ángulo del argumento
+  // —ese es el del PI— sino la CONDICIÓN del activo, que es lo que decide qué
+  // se hace con él. Una propuesta por banda, en orden de deterioro.
+  test('hay una propuesta por condición de salud, en orden', () => {
+    for (const cat of [ALCANCE_MTTO_OPC, BENEF_MTTO_OPC]) {
+      const conds = cat.filter((o) => o.cond != null).map((o) => o.cond);
+      assert.deepEqual(conds, [1, 2, 3, 4, 5], 'faltan bandas o están desordenadas');
+    }
   });
 
-  test('la quinta es automática y se ancla en los datos medidos', () => {
-    assert.equal(ALCANCE_MTTO_OPC[4].auto, 'alcance_mtto');
-    assert.equal(BENEF_MTTO_OPC[4].auto, 'beneficios_mtto');
+  test('la última es automática y se ancla en los datos medidos', () => {
+    assert.equal(ALCANCE_MTTO_OPC[ALCANCE_MTTO_OPC.length - 1].auto, 'alcance_mtto');
+    assert.equal(BENEF_MTTO_OPC[BENEF_MTTO_OPC.length - 1].auto, 'beneficios_mtto');
+    assert.ok(ALCANCE_MTTO_OPC.every((o) => o.cond != null || o.auto),
+      'toda opción es de una condición o es la automática');
+  });
+
+  // La lista es plegable: si la etiqueta no cabe de un vistazo, no sirve.
+  test('las etiquetas son cortas y dicen la decisión, no el argumento', () => {
+    for (const o of [...ALCANCE_MTTO_OPC, ...BENEF_MTTO_OPC]) {
+      assert.ok(o.t.length <= 42, `etiqueta demasiado larga para un desplegable: «${o.t}»`);
+    }
+    assert.match(ALCANCE_MTTO_OPC[0].t, /^C1 · /);
+    assert.match(ALCANCE_MTTO_OPC[4].t, /^C5 · /);
+  });
+
+  // Cada banda propone una decisión DISTINTA, no la misma con más intensidad.
+  test('la progresión de decisión va de conservar a reemplazar', () => {
+    const verbos = [/vigilar/i, /controlar|seguir/i, /recuperar/i, /intervenir/i, /reemplazar|retirar/i];
+    ALCANCE_MTTO_OPC.filter((o) => o.cond != null).forEach((o, i) => {
+      assert.match(o.t, verbos[i], `la condición ${o.cond} no anuncia su decisión`);
+    });
   });
 
   // 🔒 Si los dos documentos compartieran la clave del estado, elegir una
@@ -93,10 +117,41 @@ describe('Catálogos de redacción — uno por documento', () => {
 
   // 🔒 EL INVARIANTE MÁS CARO: un documento de mantenimiento que proponga
   // reponer el activo es el documento equivocado, y se firma igual.
-  test('ninguna redacción de mantenimiento propone reponer ni comprar', () => {
+  // 🔒 EL INVARIANTE MÁS CARO, ahora acotado: proponer reponer es correcto en la
+  // condición 5 —es su decisión— y es el documento equivocado en las otras
+  // cuatro, donde el activo sigue en servicio y se interviene.
+  test('solo la condición 5 propone la salida del activo', () => {
+    // Lo prohibido es PROPONER que el transformador salga de servicio. No lo es
+    // nombrar el reemplazo de un buje o de un componente (condición 4 lo hace, y
+    // es correcto), ni usar «valor de reposición» como referencia de costo para
+    // comparar contra la intervención — que es exactamente la comparación que
+    // esa banda tiene que dejar documentada.
+    const proponeSalida = /salida ordenada|retiro programado|reposici[óo]n por una unidad|reemplazo por otro activo/i;
+    // El alcance PROPONE la salida; los beneficios describen sus efectos, con
+    // otro vocabulario. Se acepta cualquiera de las dos formas en la banda 5.
+    const hablaDeSalida = /salida ordenada|retiro programado|sustituci[óo]n|activo entrante|equipo retirado/i;
     for (const o of escritas) {
-      assert.ok(!/reposici[óo]n|reponer|adquisici[óo]n|nueva unidad|transformador nuevo/i.test(o.v),
-        `«${o.t}» usa lenguaje de reposición, que es del PI`);
+      if (o.cond === 5) {
+        assert.match(o.v, hablaDeSalida, 'la condición 5 debe tratar la salida del activo');
+      } else {
+        assert.ok(!proponeSalida.test(o.v),
+          `«${o.t}» propone la salida del activo, y en esa banda sigue en servicio`);
+      }
+    }
+  });
+
+  test('la condición 4 sí puede nombrar reemplazo de componentes y valor de reposición', () => {
+    const a4 = ALCANCE_MTTO_OPC.find((o) => o.cond === 4);
+    const b4 = BENEF_MTTO_OPC.find((o) => o.cond === 4);
+    assert.match(a4.v, /reemplazo de bujes/i, 'es una actividad del correctivo mayor, no una reposición');
+    assert.match(b4.v, /valor de reposición/i, 'la comparación de costo es el insumo de la decisión siguiente');
+  });
+
+  // El texto del PI arranca por «reposición»; el de mantenimiento, por el trabajo.
+  test('ninguna arranca con el encabezado del PI', () => {
+    for (const o of escritas) {
+      assert.ok(!/^El alcance del proyecto (consiste|comprende) en la (adquisici|reposici)/i.test(o.v),
+        `«${o.t}» abre como abre el PI`);
     }
   });
 
