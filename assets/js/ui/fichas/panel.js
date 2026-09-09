@@ -85,6 +85,13 @@ export const CATEGORIAS = Object.freeze([
   { id: 'ADVERTENCIA',    cls: 'ftm-kpi--warn',  lbl: 'Con advertencia', f: (e) => !!e.advertencia }
 ]);
 
+/** Cómo se llama cada familia del catálogo CREG, para decirlo en castellano. */
+const NOMBRE_FAMILIA = Object.freeze({
+  bi:   'transformador trifásico de dos devanados',
+  tri:  'transformador tridevanado trifásico',
+  auto: 'autotransformador monofásico'
+});
+
 const ETIQUETA_ESTADO = Object.freeze({
   'CONCORDANTE': 'Concordante',
   'DISCREPANCIA': 'Discrepancia',
@@ -302,23 +309,28 @@ export function normalizarEquipo(bruto, i) {
 
   // El catálogo tiene TRES familias —bidevanado, tridevanado y
   // AUTOTRANSFORMADOR— y `clasificarUC` solo sabe decidir entre las dos
-  // primeras: mira la tensión del tercer devanado, y el documento no dice si
-  // el equipo es un autotransformador. Así que a un autotransformador
-  // registrado siempre le calculaba una UC bidevanada y lo acusaba de
-  // «discrepancia» — un veredicto que no puede sostener.
-  // Es el caso de CANDELARIA T-KDR04/T-KDR05 y BOSQUE T4 (verificado contra
-  // el parque real, 2026-09-08). No es que el registro esté mal: es que ESTO
-  // no se puede evaluar sin el tipo constructivo. Se dice, en vez de acusar
-  // (misma doctrina que la banda de salud: no digas que no hay, di que no se
-  // sabe — L-69).
-  if (estado === 'DISCREPANCIA'
-      && familiaDeUC(registrada) === 'auto'
-      && familiaDeUC(calculada) !== 'auto') {
-    estado = 'SIN CALCULO';
-    notasUC.push('La UUCC registrada (' + registrada + ') es de la familia '
-      + 'AUTOTRANSFORMADOR, y la regla CREG solo puede calcular bidevanado o '
-      + 'tridevanado: el documento del equipo no registra el tipo constructivo. '
-      + 'No se compara — habría que verificar el tipo en placa.');
+  // primeras: mira la tensión del tercer devanado, y el documento no registra
+  // el tipo constructivo, así que asume trifásico (lo dice en sus notas).
+  //
+  // ⚠️ AQUÍ ME EQUIVOQUÉ EL 2026-09-08 y queda escrito para que no se repita.
+  // Al ver que a CANDELARIA T-KDR04/T-KDR05 y BOSQUE T4 —registrados en la
+  // familia autotransformador— se les calculaba una UC trifásica, di por
+  // supuesto que el registro estaba bien y el clasificador ciego, y degradé el
+  // veredicto a «no evaluable». El Ingeniero corrigió: **los tres son
+  // transformadores TRIFÁSICOS**. O sea que el registro estaba mal, el cálculo
+  // tenía razón, y mi regla TAPÓ TRES DISCREPANCIAS REALES.
+  //
+  // La lección: ante dos fuentes que discrepan, silenciar la comparación no es
+  // prudencia — es perder la señal. Lo correcto es mantener la discrepancia y
+  // EXPLICARLA, para que quien la mire sepa qué verificar. Eso hace esto ahora.
+  const famReg = familiaDeUC(registrada);
+  const famCalc = familiaDeUC(calculada);
+  if (estado === 'DISCREPANCIA' && famReg && famCalc && famReg !== famCalc) {
+    notasUC.push('La UUCC registrada (' + registrada + ') y la calculada ('
+      + calculada + ') son de FAMILIAS distintas: ' + NOMBRE_FAMILIA[famReg]
+      + ' frente a ' + NOMBRE_FAMILIA[famCalc] + '. La regla CREG no puede leer '
+      + 'el tipo constructivo del documento y asume trifásico. Verifique la placa: '
+      + 'si el equipo es trifásico, lo que hay que corregir es el registro.');
   }
 
   const ci = condEntera(leer(b, 'cond_int', 'condicion', 'salud_actual.hi_final'));

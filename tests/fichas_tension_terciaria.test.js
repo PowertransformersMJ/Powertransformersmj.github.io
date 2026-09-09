@@ -134,49 +134,54 @@ describe('familiaDeUC — las tres familias del catálogo CREG', () => {
   });
 });
 
-describe('normalizarEquipo — un autotransformador no se acusa de discrepancia', () => {
-  /** CANDELARIA T-KDR04: 100 MVA, 220/110 kV, registrado N5T16 (autotransformador). */
-  const autotrafo = {
+describe('normalizarEquipo — una discrepancia de FAMILIA se explica, no se tapa', () => {
+  /** CANDELARIA T-KDR04: 100 MVA, 220/110 kV, registrado N5T16 (familia auto). */
+  const caso = {
     potencia_kva: 100000,
     tension_primaria_kv: 220,
     identificacion: { uucc: 'N5T16' },
     electrico: { tension_primaria_kv: 220, tension_secundaria_kv: 110, tension_terciaria_kv: null }
   };
 
-  test('el veredicto es «no se puede calcular», NO «discrepancia»', () => {
-    const e = normalizarEquipo(autotrafo, 0);
+  // 🔒 EL INVARIANTE, y la cicatriz. El 2026-09-08 degradé este caso a
+  // «SIN CALCULO» creyendo que el registro estaba bien y el clasificador
+  // ciego. El Ingeniero corrigió: los tres equipos así son TRIFÁSICOS, o
+  // sea que el registro estaba mal y mi regla tapó tres discrepancias
+  // reales. Silenciar una comparación no es prudencia: es perder la señal.
+  test('sigue siendo DISCREPANCIA — no se degrada a «sin cálculo»', () => {
+    const e = normalizarEquipo(caso, 0);
     assert.equal(e.uucc_registrada, 'N5T16');
-    assert.equal(e.uucc_calculada, 'N5T7', 'la regla solo sabe llegar a la familia bidevanado');
-    assert.equal(e.estado, 'SIN CALCULO',
-      'acusar de discrepancia a un equipo que no se puede evaluar es un veredicto falso');
+    assert.equal(e.uucc_calculada, 'N5T7');
+    assert.equal(e.estado, 'DISCREPANCIA',
+      'tapar la discrepancia hizo perder tres errores de registro reales');
   });
 
-  test('y lo dice con todas las letras en las notas', () => {
-    const e = normalizarEquipo(autotrafo, 0);
-    const nota = (e.notas_uucc || []).find((n) => /AUTOTRANSFORMADOR/.test(n));
-    assert.ok(nota, 'debe explicar POR QUÉ no se compara');
-    assert.match(nota, /tipo constructivo/);
+  test('y la nota explica QUÉ verificar', () => {
+    const e = normalizarEquipo(caso, 0);
+    const nota = (e.notas_uucc || []).find((n) => /FAMILIAS distintas/.test(n));
+    assert.ok(nota, 'debe explicar que la diferencia es de familia, no de capacidad');
+    assert.match(nota, /autotransformador monofásico/);
+    assert.match(nota, /trifásico/);
+    assert.match(nota, /Verifique la placa/);
   });
 
-  // Contra-prueba: la regla solo se aplica a la familia auto. Un
-  // bidevanado que discrepa de verdad tiene que seguir discrepando.
-  test('una discrepancia REAL entre bidevanados sigue siendo discrepancia', () => {
+  test('una discrepancia de BANDA (misma familia) no lleva esa nota', () => {
     const e = normalizarEquipo({
       potencia_kva: 6500, tension_primaria_kv: 34.5,
-      identificacion: { uucc: 'N3T2' }          // BERRUGAS: registrada N3T2, calcula N3T3
+      identificacion: { uucc: 'N3T2' }          // BERRUGAS: N3T2 vs N3T3, ambas bi
     }, 0);
-    assert.equal(e.uucc_calculada, 'N3T3');
     assert.equal(e.estado, 'DISCREPANCIA');
+    assert.ok(!(e.notas_uucc || []).some((n) => /FAMILIAS distintas/.test(n)),
+      'ahí la familia coincide: la nota sería ruido');
   });
 
-  // Y un autotransformador cuya UC registrada SÍ coincide con la calculada
-  // no debe degradarse a «sin cálculo»: sigue siendo concordante.
-  test('si por casualidad coinciden, se queda en concordante', () => {
+  test('cuando registrada y calculada coinciden, no hay nota ni discrepancia', () => {
     const e = normalizarEquipo({
       potencia_kva: 100000, tension_primaria_kv: 220,
       identificacion: { uucc: 'N5T7' }
     }, 0);
     assert.equal(e.estado, 'CONCORDANTE');
+    assert.ok(!(e.notas_uucc || []).some((n) => /FAMILIAS distintas/.test(n)));
   });
 });
 
