@@ -32,6 +32,8 @@ const num = (v) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+import { DEPARTAMENTOS } from './schema.js';
+
 const txt = (v) => (v == null ? '' : String(v).trim());
 
 /** Lee una ruta anidada sin reventar si falta un tramo. */
@@ -54,6 +56,13 @@ function leer(obj, ...rutas) {
  * @returns {{amp:number|null, car:number|null, pct:number|null,
  *            cociente:number|null, desacuerdo:boolean}}
  */
+/** Zona operativa que corresponde a un departamento (MO.00418 · `schema.js`). */
+export function zonaDeDepartamento(depto) {
+  const d = txt(depto).toLowerCase();
+  const hit = DEPARTAMENTOS.find((x) => x.value === d);
+  return hit ? hit.zona : '';
+}
+
 export function devanado(amp, car, pctOficial) {
   const a = num(amp);
   const c = num(car);
@@ -106,7 +115,13 @@ export function filaCargabilidad(tx) {
     id:     txt(leer(tx, 'identificacion.matricula', 'matricula', 'identificacion.codigo', 'codigo', 'id')),
     serie:  txt(leer(tx, 'identificacion.numero_serie', 'placa.serial', 'serie')),
     sub:    txt(leer(tx, 'ubicacion.subestacion_nombre', 'subestacion')),
-    zona:   txt(leer(tx, 'ubicacion.zona', 'zona')),
+    // Si el registro no trae zona, se DEDUCE del departamento en vez de dejarla
+    // vacía. Con el filtro de zona múltiple eso importa: `listarUnicos` no pinta
+    // chip para una zona vacía, así que en cuanto se marca cualquier zona esos
+    // equipos desaparecen del tablero y no hay control que los devuelva. Es el
+    // mismo respaldo que ya usa `refrigeracion-transformadores-afinia.js`.
+    zona:   txt(leer(tx, 'ubicacion.zona', 'zona'))
+              || zonaDeDepartamento(leer(tx, 'ubicacion.departamento', 'departamento')),
     dep:    txt(leer(tx, 'ubicacion.departamento', 'departamento')),
     grupo:  txt(leer(tx, 'identificacion.grupo', 'grupo')),
     pot:    kva,

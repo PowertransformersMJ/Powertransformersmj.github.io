@@ -64,7 +64,10 @@
   <div class="glass filters">
     <span class="tag" style="align-self:center;margin-right:2px">Filtros</span>
     <div class="fgroup"><label for="search">Buscar</label><input type="text" id="search" placeholder="Subestación, matrícula, depto…"></div>
-    <div class="fgroup"><label for="fZona">Zona</label><select id="fZona"></select></div>
+    <div class="fgroup">
+      <label id="lblZona">Zona</label>
+      <div class="chips-zona" id="fZonaChips" role="group" aria-labelledby="lblZona"></div>
+    </div>
     <div class="fgroup"><label for="fDep">Departamento</label><select id="fDep"></select></div>
     <div class="fgroup"><label for="fGrupo">Grupo</label><select id="fGrupo"></select></div>
     <div class="fgroup">

@@ -6,9 +6,27 @@
 import { sev } from './cargabilidad_severidad.js';
 
 /**
+ * Normaliza el filtro de zonas a un Set.
+ *
+ * Acepta Set, array, cadena o vacío: el filtro pasó de una zona a VARIAS
+ * (encargo del Ingeniero, 2026-09-09) y esta función es lo que permite que
+ * cualquier llamada antigua con `zona: 'BOLIVAR'` siga funcionando en vez de
+ * filtrar de más en silencio, que es como se pierde media flota sin que nadie
+ * lo note.
+ *
+ * @returns {Set<string>} vacío = TODAS las zonas, no ninguna.
+ */
+export function normalizarZonas(v) {
+  if (v instanceof Set) return v;
+  if (Array.isArray(v)) return new Set(v.filter(Boolean));
+  if (typeof v === 'string' && v) return new Set([v]);
+  return new Set();
+}
+
+/**
  * @typedef {Object} CargaFiltros
  * @property {string} q       Texto libre (busca en sub / id / dep)
- * @property {string} zona    Zona operativa exacta
+ * @property {Set<string>} zona  Zonas operativas activas · vacío = todas
  * @property {string} dep     Departamento exacto
  * @property {string} grupo   G1 / G2 / G3
  * @property {string} dev     'all' | 'P' | 'S' | 'T'
@@ -22,12 +40,16 @@ import { sev } from './cargabilidad_severidad.js';
 export function aplicarFiltros(rows, filtros) {
   if (!Array.isArray(rows)) return [];
   const { q = '', zona = '', dep = '', grupo = '', dev = 'all', sev: sevActivas } = filtros || {};
-  const setSev = sevActivas instanceof Set ? sevActivas : new Set(sevActivas || []);
+  const setSev  = sevActivas instanceof Set ? sevActivas : new Set(sevActivas || []);
+  const setZona = normalizarZonas(zona);
   const qLow = String(q || '').toLowerCase().trim();
 
   return rows.filter(d => {
     if (!d) return false;
-    if (zona  && d.zona  !== zona)  return false;
+    // Sin zonas marcadas se ven TODAS. Es lo contrario del criterio de las
+    // severidades, donde el estado inicial las trae las cuatro activas: aquí un
+    // Set vacío significa «no acotado», no «nada».
+    if (setZona.size && !setZona.has(d.zona)) return false;
     if (dep   && d.dep   !== dep)   return false;
     if (grupo && d.grupo !== grupo) return false;
     if (qLow) {
@@ -71,7 +93,7 @@ export function listarUnicos(rows, campo) {
  */
 export function filtrosVacios() {
   return {
-    q: '', zona: '', dep: '', grupo: '', dev: 'all',
+    q: '', zona: new Set(), dep: '', grupo: '', dev: 'all',
     sev: new Set(['cri', 'ale', 'avi', 'ok']),
   };
 }

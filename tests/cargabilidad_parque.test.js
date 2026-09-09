@@ -106,3 +106,65 @@ describe('cargabilidadDeParque — resumen honesto de la flota', () => {
     }
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// La zona se deduce del departamento cuando no viene registrada
+// ──────────────────────────────────────────────────────────────
+// Con el filtro de zona en modo múltiple esto dejó de ser cosmético.
+// `listarUnicos` no pinta chip para una zona vacía, así que un equipo
+// sin zona no tiene control que lo alcance: en cuanto se marca
+// CUALQUIER zona desaparece del tablero, y los KPI caen sin causa
+// visible. Deducirla del departamento cierra el hueco para todo
+// registro con departamento válido — que es lo que las reglas de
+// Firestore ya garantizan. Mismo respaldo que usa el módulo de
+// refrigeración.
+// ══════════════════════════════════════════════════════════════
+
+import { zonaDeDepartamento } from '../assets/js/domain/cargabilidad_parque.js';
+
+describe('zonaDeDepartamento', () => {
+
+  test('los cinco departamentos del parque tienen zona', () => {
+    assert.equal(zonaDeDepartamento('BOLIVAR'), 'BOLIVAR');
+    assert.equal(zonaDeDepartamento('CORDOBA'), 'OCCIDENTE');
+    assert.equal(zonaDeDepartamento('SUCRE'), 'OCCIDENTE');
+    assert.equal(zonaDeDepartamento('CESAR'), 'ORIENTE');
+    assert.equal(zonaDeDepartamento('MAGDALENA'), 'ORIENTE');
+  });
+
+  test('no distingue mayúsculas ni espacios sobrantes', () => {
+    assert.equal(zonaDeDepartamento(' magdalena '), 'ORIENTE');
+    assert.equal(zonaDeDepartamento('Córdoba'), '', 'el catálogo va sin tildes: no se inventa');
+  });
+
+  test('lo que no está en el catálogo no recibe zona inventada', () => {
+    assert.equal(zonaDeDepartamento('ATLANTICO'), '');
+    assert.equal(zonaDeDepartamento(''), '');
+    assert.equal(zonaDeDepartamento(null), '');
+  });
+});
+
+describe('filaCargabilidad — la zona registrada manda sobre la deducida', () => {
+
+  const base = {
+    identificacion: { matricula: 'T-DEP' },
+    ubicacion: { subestacion_nombre: 'PRUEBA', departamento: 'SUCRE' },
+    salud_actual: { crg_pct_medido: 55 }
+  };
+
+  test('sin zona registrada se deduce del departamento', () => {
+    assert.equal(filaCargabilidad(base).zona, 'OCCIDENTE');
+  });
+
+  // 🔒 El respaldo NO puede pisar el dato del registro: si alguien movió una
+  // unidad de zona sin cambiarle el departamento, manda lo registrado.
+  test('con zona registrada se respeta esa, aunque discrepe del departamento', () => {
+    const tx = { ...base, ubicacion: { ...base.ubicacion, zona: 'BOLIVAR' } };
+    assert.equal(filaCargabilidad(tx).zona, 'BOLIVAR');
+  });
+
+  test('sin zona y sin departamento reconocible se queda vacía, no se inventa', () => {
+    const tx = { ...base, ubicacion: { subestacion_nombre: 'PRUEBA' } };
+    assert.equal(filaCargabilidad(tx).zona, '');
+  });
+});

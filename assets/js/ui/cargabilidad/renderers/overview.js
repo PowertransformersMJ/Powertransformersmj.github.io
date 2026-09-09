@@ -74,11 +74,13 @@ function renderZoneBars(rows) {
     }).join('');
   host.innerHTML = bars;
 
-  // Click en barra de zona → fija filtro
+  // Click en barra de zona → ALTERNA esa zona en el filtro. Antes fijaba una
+  // sola y descartaba lo demás; con el filtro múltiple, reemplazar sería perder
+  // la selección que el Ingeniero acaba de armar con dos clics.
   host.querySelectorAll('.zonebar-row').forEach(el => {
     el.addEventListener('click', () => {
       const z = el.dataset.zona;
-      store.setFiltro({ zona: z });
+      if (z) store.toggleZona(z);
     });
   });
 }
