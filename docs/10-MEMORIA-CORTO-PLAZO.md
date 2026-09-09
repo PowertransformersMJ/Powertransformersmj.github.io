@@ -11,7 +11,7 @@
 > buenas sin una prueba. Ahora hay 43, con los dos emuladores y también en CI. La auditoría
 > adversarial que siguió dejó 3 hallazgos vivos de 26. Antes: **ADR-071** (firmas a la cuenta de cada
 > quien), **ADR-070** (port de Órdenes de Materiales), **ADR-069** (TX_Potencia da 208 válidos).
-> ⚠️ Abiertos: **TODO-47** (🔴) · **TODO-37** (🔴) · TODO-51 · 29/33/41. Fríos → `11`.
+> ⚠️ Abiertos: **TODO-47** (🔴) · **TODO-37** (🔴) · 29/33/41. Fríos → `11`.
 > ✅ **TODO-44 cerrado (ADR-071)**: la firma del Ingeniero salió de la web (404 en producción) y pasó
 > a su cuenta; cada quien sube la suya en «Mi firma» y solo se estampa en SU línea. Antes, TODO-43.
 > ✅ **TODO-46 cerrado (ADR-073)**: `storage.rules` pasa de 0 a **43 pruebas** y `test:rules` levanta
@@ -63,7 +63,6 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-51** | 🟡 **El import pisa con vacío lo que el Excel no trae**: el sanitizador emite SIEMPRE todas las claves y se guarda con `merge:true`. Hoy no se pierde nada (esos campos ya están vacíos, 0/206), pero el día que se carguen coordenadas o marca, el siguiente import se las lleva. Arreglo: payload ralo. `99 §74.10`. | 🟡 |
 | **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
 | **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos ya quedaron versionados (08-21): dentro del disco no falta nada; falta una copia FUERA → `lastOffsiteBackup`. | 🟡 decidido |

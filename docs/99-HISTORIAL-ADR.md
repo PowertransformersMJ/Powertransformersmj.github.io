@@ -2147,3 +2147,32 @@ autotransformadores. Los tres registros corregidos en producción con auditoría
 **Resultado final del día: 208 equipos · 207 concordantes (99,5 %) · 0 discrepancias · 0 «sin UC
 calculada» · 208 con Índice de Salud.** Lección → **L-81**.
 
+**74.13 El sistema deja de adivinar el tipo constructivo (2026-09-08).** Mirando las 7 filas «con
+advertencia», el Ingeniero aportó el dato que faltaba: **las tres de TRES PALMAS son MONOFÁSICAS**
+(y CUIVA, del mismo tamaño, trifásica). El parque es MIXTO — lo que invalidaba la opción «marcar
+todo como trifásico» que yo había ofrecido una respuesta antes.
+
+**Hallazgo normativo**: el catálogo CREG solo cataloga unidades monofásicas en los **niveles 5 y 6**
+(autotransformadores de conexión al STN); N3 tiene 7 unidades y **las 7 son trifásicas**. Así que
+TRES PALMAS estaba fuera del catálogo **por partida doble**: monofásico en un nivel que no los
+contempla, y 0,25 MVA cuando la banda mínima empieza en 0,5. El `N3T1` que tenían era una
+interpretación sobre otra.
+
+**Implementado** (`532df37`), en el orden que impuso la dependencia:
+1. **TODO-51 cerrado**: el payload del import va **ralo** — `ralo()` en el dominio quita las claves
+   vacías antes de escribir, porque con `merge:true` una clave vacía SOBRESCRIBE. Sin esto, el campo
+   nuevo se habría borrado en la siguiente importación, igual que le pasó a la UUCC. `0` y `false`
+   NO son vacíos. Precio consciente: ya no se vacía un campo con una celda en blanco.
+2. **`electrico.fases`** (1 · 3 · null) + quinto parámetro **opcional** de `clasificarUC`. Sin el
+   dato todo se comporta igual —hay prueba—; con él, un monofásico de N5 va a la familia
+   autotransformador y uno de N3 se queda **sin UC**, diciendo por qué. La advertencia «se asume
+   trifásico» desaparece donde ya no hay suposición.
+
+No hizo falta un campo «es autotransformador»: el catálogo no ofrece «trifásico autotransformador»
+ni «monofásico no-auto», así que con las fases basta.
+
+**Escrito en producción**: 7 documentos, un campo, con auditoría (3 monofásicos, 4 trifásicos).
+**Resultado**: 208 equipos · 204 concordantes · 0 discrepancias · **3 sin UC calculada** (los tres
+monofásicos, que es la verdad) · **advertencias de 7 a 1** — la que queda es CUIVA por capacidad
+inferior al mínimo del catálogo, que es real y debe seguir viéndose.
+
