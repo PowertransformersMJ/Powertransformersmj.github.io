@@ -6,6 +6,14 @@ import { sev, metricPct } from '../../../domain/cargabilidad_severidad.js';
 import { SEVCOL, SEVLBL, DEV_LABEL } from '../../../domain/cargabilidad_config.js';
 import { store } from '../state.js';
 
+/** Corriente medida del devanado que la tabla está mostrando. */
+function corrienteDe(d, devSel) {
+  const k = devSel === 'all'
+    ? ({ Primario: 'P', Secundario: 'S', Terciario: 'T' }[d.dev] || 'P')
+    : devSel;
+  return d[k] ? d[k].car : null;
+}
+
 /**
  * Los TRES devanados de un equipo en una celda: «P 145 · S 145 · T —».
  *
@@ -40,6 +48,11 @@ export function renderTabla(rows) {
     // colarse entre los equipos medidos y ensuciar el ranking.
     const sinDato = -Infinity;
     if (sort === 'cmax') { A = metricPct(a, devSel) ?? sinDato; B = metricPct(b, devSel) ?? sinDato; }
+    // «I medida» ordena por AMPERIOS, no por porcentaje. Antes compartía clave
+    // con «% Ampacidad» y la flecha del orden salía en las dos columnas a la
+    // vez, como si hubiera dos criterios activos. Además ordenar por corriente
+    // absoluta es otra pregunta —qué equipo mueve más carga— y ahora se puede.
+    else if (sort === 'icar') { A = corrienteDe(a, devSel) ?? sinDato; B = corrienteDe(b, devSel) ?? sinDato; }
     else if (sort === 'us')  { A = a.us ?? sinDato; B = b.us ?? sinDato; }
     else if (sort === 'pot') { A = a.pot ?? sinDato; B = b.pot ?? sinDato; }
     else { A = ('' + a[sort]).toLowerCase(); B = ('' + b[sort]).toLowerCase(); }
