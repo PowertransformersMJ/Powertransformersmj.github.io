@@ -26,24 +26,21 @@
 > suya, con la excepción escrita en cada registro. **TODO-49 y TODO-50 cerrados.**
 
 ### ✅ CERRADO: el import de Salud de Activos (2026-09-08, `99 §74.11`)
-> El parque tiene salud por primera vez: **208 equipos, 208 con condición** (39·86·54·28·1).
-> No funcionaba por una línea: las 4 subidas de Excel del sitio pasaban un `ArrayBuffer` donde
-> SheetJS espera `Uint8Array` — parseaba mal **en silencio**. No era el archivo del Ingeniero.
+> **208 equipos con condición.** Fallaba por una línea: `ArrayBuffer` donde SheetJS espera
+> `Uint8Array`, y parseaba mal en silencio. No era el archivo del Ingeniero.
 
-### ✅ CERRADO: el documento de Mantenimiento Especializado (2026-09-08, `99 §74.17`)
+### ✅ CERRADO: el documento de Mantenimiento Especializado (2026-09-08, `99 §74.17-19`)
 
-**TODO-53.** Ya se emite: siete hojas —las seis del PI más «Salud y riesgo», que sitúa al equipo en
-la matriz 5×5 con sus usuarios y sus MVA— y la regla dura de **no prometer lo que el mantenimiento no
-revierte**. Las 5+5 redacciones van **por condición de salud** (`99 §74.18`), no por ángulo del
-argumento: la lista señala la que corresponde al equipo y sus frentes de trabajo salen del catálogo
-`MO.00418 §4.3` del repo. El PI quedó intacto, con prueba que lo fija. De paso se tapó un hueco que el PI ya emitía: la evidencia
-salía con el número en blanco («rigidez dieléctrica de  kV») cuando el hallazgo venía de la
-calificación y no de un valor medido.
+**TODO-53.** Siete hojas —las seis del PI más «Salud y riesgo», que sitúa al equipo en la matriz 5×5
+con sus usuarios y MVA—. El **alcance es plantilla + selección**: quince textos técnicos (tres por
+condición) con un hueco que se rellena con las acciones que el Ingeniero marque —las registradas del
+equipo, su línea base, o el catálogo `MO.00418 §4.3`—. Regla dura: no se promete lo que el
+mantenimiento no revierte. El PI quedó intacto, con prueba que lo fija. Lecciones: L-82.
 
-> 🟡 **Esperando decisión suya** (señalado, no decidido por mí): (a) el bloque de **PRESUPUESTO** se
-> adoptó igual al del PI —dice «INVERSIÓN» y valora la UC de **reposición**—, que es lo que se pidió
-> pero probablemente no es lo que un documento de mantenimiento debe costear; (b) el documento no
-> tiene formato oficial al cual exportar, así que no lleva botón de exportar.
+> 🟡 **Esperando decisión suya**: (a) el bloque de **PRESUPUESTO** se adoptó igual al del PI —dice
+> «INVERSIÓN» y valora la UC de **reposición**—, que es lo que se pidió pero probablemente no es lo
+> que un documento de mantenimiento debe costear; (b) no hay formato oficial al cual exportar, así
+> que no lleva botón de exportar.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(A)** ~~Pulsar IMPORTAR~~ ✅ hecho 09-08. **(B)** GitHub Support "remove sensitive data" + revocar los PAT
