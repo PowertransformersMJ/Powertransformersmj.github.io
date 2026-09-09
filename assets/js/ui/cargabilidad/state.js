@@ -8,7 +8,7 @@ import { filtrosVacios } from '../../domain/cargabilidad_filtros.js';
 const _state = {
   rows: [],                  // dataset normalizado (con _i, _base, recompute aplicado)
   source: 'empty',           // 'baseline' | 'firestore' | 'empty'
-  filtros: filtrosVacios(),  // { q, zona, dep, grupo, dev, sev: Set }
+  filtros: filtrosVacios(),  // { q, zona: Set, dep, grupo, dev, sev: Set }
   sort: 'cmax',              // columna activa para ordenar tabla
   dir: -1,                   // 1 asc · -1 desc
   live: false,               // simulación tiempo real activa
@@ -37,6 +37,14 @@ export const store = {
 
   setFiltro(parche) {
     Object.assign(_state.filtros, parche);
+    notify();
+  },
+
+  /** Marca o desmarca una zona. Ninguna marcada = todas visibles. */
+  toggleZona(z) {
+    const set = _state.filtros.zona;
+    if (set.has(z)) set.delete(z);
+    else set.add(z);
     notify();
   },
 

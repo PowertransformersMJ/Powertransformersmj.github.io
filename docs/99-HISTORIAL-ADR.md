@@ -2503,3 +2503,48 @@ cambiar el orden de construcción no altera ningún conteo · el marcador «— 
 desplegable.
 
 Crudo del panel de jueces → bóveda, `2026-09-09-definiciones-condicion/`.
+
+**74.22 El filtro de zona de Cargabilidad admite varias a la vez (2026-09-09).** Encargo:
+*«permíteme seleccionar varias zonas mediante filtro»*.
+
+**La decisión de control.** `filtros.zona` pasa de cadena a `Set`. En pantalla son **chips**, no un
+`<select multiple>`: hay tres zonas, el filtro de severidad de al lado ya usa chips, y con un
+desplegable múltiple hay que abrirlo para saber qué está filtrado. En un tablero que se mira de
+lejos, el estado tiene que verse sin tocar nada. La barra de «Concentración por zona» pasa de
+**fijar** una zona a **alternarla**: reemplazar habría borrado la selección recién armada.
+
+**La asimetría que hay que recordar.** Un `Set` vacío de zonas significa **TODAS**; uno vacío de
+severidades significa **NINGUNA**. Son criterios opuestos conviviendo en la misma función, y están
+escritos en el código y fijados con prueba: invertir el de zonas dejaría el tablero en cero al
+abrirlo y parecería que el parque está vacío. `normalizarZonas` acepta Set, array, cadena o vacío
+para que ninguna llamada antigua filtre de más en silencio.
+
+**Dos defectos que salieron de verificar, no de suponer.** (a) El **foco se perdía en cada clic**:
+los chips se pintan desde el dataset y `renderAll` corre con cada cambio del store, así que el botón
+recién pulsado se reemplazaba por uno nuevo — con teclado no se podía marcar la segunda zona sin
+volver a tabular. Ahora solo se reconstruyen si cambia la LISTA de zonas. (b) Un equipo **sin zona
+registrada** no tiene chip que lo alcance: al marcar cualquier zona desaparecía y los KPI caían sin
+causa visible. `filaCargabilidad` deduce ahora la zona del departamento —el mismo respaldo que ya
+usaba el módulo de refrigeración— **sin pisar nunca la zona registrada**.
+
+**La revisión adversarial, y su proporción.** 4 lentes → 24 hallazgos → 1 escéptico por hallazgo con
+la carga de la prueba invertida: **21 refutados**, casi todos por «mecanismo cierto, consecuencia
+falsa». La inyección por `data-zona` sin escapar es imposible porque el schema coacciona la zona a un
+enum de tres; el caso de la zona que desaparece del dataset no dispara porque esa colección de
+Firestore cae en el catch-all de las reglas; y el `<div>` de la barra sin teclado es **preexistente**
+—el diff no toca esa plantilla—. Varios escépticos no razonaron: **corrieron el módulo**.
+
+De los tres confirmados salió el respaldo de zona (con un arreglo **mejor** que el del hallazgo: el
+escéptico descartó el centinela `SIN_ZONA` porque habría que coordinarlo con `overview.js`) y dos
+pruebas que no probaban nada — entre ellas la **frescura de `filtrosVacios()`**, de la que depende
+que «Limpiar» limpie: hoistear ese `Set` a constante de módulo dejaba las 1554 pruebas en verde.
+
+**Verificación**: 1561 pruebas verdes (14 nuevas), lint limpio, y preview fiel de la página real
+—sin el guard de sesión, todo lo demás intacto— comprobando unión, alternado desde la barra, foco
+conservado y «Limpiar».
+
+**Verificado sano / no re-auditar**: el store de cargabilidad solo lo importan los cinco archivos de
+su carpeta · `dep` y `grupo` siguen siendo de selección única a propósito, el encargo era la zona ·
+el CSV exporta filas, no el filtro, así que no le afecta el cambio de tipo.
+
+Crudo de la revisión → bóveda, `2026-09-09-filtro-zona-multiple/`.
