@@ -1838,3 +1838,12 @@
   margin: 0; padding: 9px 12px; font-size: 12.5px; line-height: 1.45;
   background: #fff6e5; color: #6b4a00; border-top: 1px solid #f0d9a8;
 }
+
+/* Definición de la banda de salud: lo que significa esa condición para el
+   riesgo y para el suministro. Va debajo de las cifras, en prosa, porque es
+   lo que le da sentido al número que está arriba. */
+.ftm-sr-def {
+  margin: -6px 0 18px; padding: 11px 14px; font-size: 13.5px; line-height: 1.5;
+  background: var(--ftm-bg-soft, #f3f6f9); border-left: 3px solid var(--ftm-line, #c9d5e2);
+  border-radius: 0 6px 6px 0; color: var(--ftm-ink, #10202c);
+}

@@ -21,6 +21,7 @@ import {
   NIVELES_ORDEN, LABELS_NIVEL, COLORES_CELDA,
   calcularRangosCriticidad, nivelPorUsuarios, colorCelda
 } from '../../domain/matriz_riesgo.js';
+import { definicionCondicion } from './ficha-tecnica.js';
 
 /* ─── helpers locales ─────────────────────────────────────────── */
 
@@ -165,7 +166,7 @@ function matrizRiesgoHTML(equipos) {
   // Agregación 5×5 propia: los equipos del panel son planos
   // (cond_int / usuarios), no documentos de Firestore.
   const celdas = {};
-  for (const hi of [5, 4, 3, 2, 1]) {
+  for (const hi of [1, 2, 3, 4, 5]) {
     celdas[hi] = {};
     for (const n of NIVELES_ORDEN) celdas[hi][n] = { n: 0, mva: 0 };
   }
@@ -184,7 +185,9 @@ function matrizRiesgoHTML(equipos) {
     + '</tr>';
 
   const NOMBRE_HI = { 5: '5 · Muy pobre', 4: '4 · Pobre', 3: '3 · Medio', 2: '2 · Bueno', 1: '1 · Muy bueno' };
-  const filas = [5, 4, 3, 2, 1].map((hi) => {
+  // De 1 a 5, igual que la banda de condición del tablero y que la hoja de
+  // «Salud y riesgo»: una sola dirección de lectura en todo el módulo.
+  const filas = [1, 2, 3, 4, 5].map((hi) => {
     const tds = NIVELES_ORDEN.map((n) => {
       const c = celdas[hi][n];
       const cod = colorCelda(hi, n);
@@ -197,7 +200,8 @@ function matrizRiesgoHTML(equipos) {
         + (c.mva > 0 ? '<div class="ftm-rmx-cm">' + mva1(c.mva) + ' MVA</div>' : '')
         + '</td>';
     }).join('');
-    return '<tr><th class="ftm-rmx-rylbl">' + NOMBRE_HI[hi] + '</th>' + tds + '</tr>';
+    return '<tr><th class="ftm-rmx-rylbl" title="' + esc(definicionCondicion(hi)) + '">'
+      + NOMBRE_HI[hi] + '</th>' + tds + '</tr>';
   }).join('');
 
   const escala = Object.entries(COLORES_CELDA).map(([, v]) =>
