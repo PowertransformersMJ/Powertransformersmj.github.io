@@ -2548,3 +2548,53 @@ su carpeta · `dep` y `grupo` siguen siendo de selección única a propósito, e
 el CSV exporta filas, no el filtro, así que no le afecta el cambio de tipo.
 
 Crudo de la revisión → bóveda, `2026-09-09-filtro-zona-multiple/`.
+
+**74.23 «Cargabilidad sin medida»: un valor de equipo pintado en tres devanados (2026-09-09).**
+El Ingeniero reportó equipos *«con cargabilidad pero sin medida»* y adjuntó
+`Cargabilidad_TX_completado_v2.xlsx`.
+
+**Causa raíz.** `devanado(amp, car, pctOficial)` recibía `salud_actual.crg_pct_medido` —UN valor por
+equipo— y lo usaba como porcentaje de LOS TRES devanados. Dos falsedades de un solo defecto:
+(a) un devanado sin ninguna medida mostraba un porcentaje («96 %» junto a «— A / — A»); y (b) como
+un valor único no puede coincidir con tres cocientes distintos, los otros dos se contaban como
+«fuente en desacuerdo» — los **74** del banner, que además mandaban a *revisar la captura*.
+
+**La captura estaba bien.** En la hoja `Cargabilidad_2025` los porcentajes coinciden con sus propios
+amperios en el **100 % de las filas medidas** (196 primarios · 196 secundarios · 31 terciarios, cero
+discrepancias). El error era del modelo, no del dato.
+
+**Esto NO revierte la decisión del 2026-07-27** («manda el % oficial», `99 §67.3`). Aquella se tomó
+porque los amperios de la hoja de entonces estaban sucios: ASTREA con 418 A sobre una ampacidad de
+167 (250 %), AGUAS BLANCAS con 88 % frente a un cociente de 17,5 %. La hoja 2025 **disuelve ese
+conflicto**: ASTREA baja a 53,2 %, AGUAS BLANCAS a 53,9 % coherente con sus amperios, y no queda
+ninguna fila con carga por encima del doble de la ampacidad. La cifra de equipo se conserva en
+`pct_oficial` y su desacuerdo se juzga contra el devanado **más cargado**, que es lo que pretende
+describir.
+
+**Datos actualizados en producción.** 195 equipos con ampacidad y corriente medida de los tres
+devanados, desde la hoja 2025, con `actualizarParcial` (dot-notation, seis claves) y un registro de
+auditoría de lote. Cero errores.
+
+**Lo que NO se importó, y por qué.** Tres filas traen una **errata de digitación de ×10** —GUATAPURÍ
+T2 (ampacidad 5.022 A cuando su gemelo tiene 502), LORICA T1 (secundaria 8.366 frente a 836 de su
+gemelo) y SANTA TERESA T1—. En las tres, ampacidad y carga están escaladas **juntas**, así que el
+porcentaje sale correcto y solo los amperios absolutos están mal; se detectaron comparando la
+relación de ampacidades contra la relación de tensiones (`Iprim/Isec ≈ Vsec/Vprim`), que aísla las
+desviaciones de ×10 del ruido normal de un tridevanado. Quedan a decisión del Ingeniero: dividir
+entre 10 es una corrección plausible, pero es dato de cliente y no se inventa.
+
+**Diez matrículas no cruzaron**, y parecen diferencias de escritura más que equipos faltantes
+(`T1-M/M-COV` vs `T1-A/M-COV`, `T1A-A/M-NMON` vs `T1A-A/M-NMO`, `T2-A/M-CPA` vs `T2-M/M-CPA`).
+Reportadas, no forzadas: cruzar por aproximación habría escrito la medida de un equipo en otro.
+
+**La magnitud del error que se estaba mostrando.** La hoja 2025 sitúa **31 equipos por encima del
+100 %**, 52 por encima del 90 % y 79 por encima del 80 %. El tablero venía anunciando **1 en
+sobrecarga**.
+
+**Verificación**: 1566 pruebas verdes, lint limpio, y delta leído contra producción ANTES de escribir
+(195 cambian, 0 idénticos, 13 sin pareja).
+
+**Verificado sano / no re-auditar**: no se tocó `crg_pct_medido` ni ningún campo de
+`salud_actual` —la condición del parque es la del Excel por decisión suya (`99 §74.15`) y la
+cargabilidad no debía arrastrarla— · el import fue por clave puntual, no por payload completo, así
+que ningún otro campo pudo borrarse.
