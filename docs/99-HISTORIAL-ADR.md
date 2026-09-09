@@ -2312,3 +2312,53 @@ que es lo que se pidió («adopta lo mismo que PI») pero probablemente no es lo
 mantenimiento debe costear; (b) el documento aún no tiene formato oficial al cual exportar.
 
 Crudo del workflow y los recortes de los editores → bóveda, `2026-09-08-redacciones-mantenimiento/`.
+
+**74.18 Las propuestas dejan de variar por argumento y pasan a variar por condición (2026-09-08).**
+El Ingeniero precisó el eje: *«compáctalo más, la idea es que cada uno se pueda seleccionar en la
+lista plegable de la ficha técnica»*, sobre cinco propuestas ordenadas por **estado de salud**.
+
+**Lo que estaba mal.** En §74.17 leí «las 5 propuestas» como cinco versiones del mismo argumento
+—que es como está armado el PI— y entregué cuatro ángulos redaccionales más la automática. El eje
+correcto era otro: la condición del activo, que es lo que decide **qué se hace con él**. Conservar ·
+controlar · recuperar · intervenir · reemplazar. Cinco decisiones distintas, no cinco formas de
+decir lo mismo.
+
+**Por qué el eje nuevo es mejor y no solo distinto.** El módulo ya conoce la condición de cada
+equipo (`e.cond_int`, del Excel de Salud de Activos). Con el eje del argumento, elegir era un gusto
+del redactor; con el eje de la condición, la lista **señala cuál corresponde** («← este equipo») y
+lo explica en la pista. No la autoselecciona: elegir por él pisaría lo que hubiera escrito, y la
+condición es una recomendación, no una orden.
+
+**De dónde salen los frentes de trabajo.** No de una invención: del catálogo `MO.00418 §4.3` que ya
+vivía en `assets/js/domain/catalogos_baseline.js` —seguimiento, seguimiento trimestral, correctivo
+menor, correctivo mayor, reemplazo, más las dos macroactividades de mitigación—. Se omiten sus
+periodicidades y costos de referencia porque el encargo pedía texto conceptual, no frecuencias ni
+cantidades.
+
+**La regla dura cambió de forma.** Antes: «ninguna redacción de mantenimiento propone reponer».
+Ahora: **proponer la salida del activo es correcto en la condición 5 y es el documento equivocado en
+las otras cuatro.** La prueba tuvo que aprender tres distinciones que una regex burda confundía:
+*reemplazar un buje* en la condición 4 no es reponer el transformador; el *valor de reposición* es la
+referencia de costo que esa banda debe dejar documentada; y el alcance **propone** la salida mientras
+los beneficios **describen sus efectos**, con vocabulario distinto.
+
+**Lo que aportó la deliberación adversarial.** El workflow (21 agentes) topó el límite de sesión con
+los 5 borradores y 8 de las 10 críticas hechas; recuperé todo del `journal.jsonl` y apliqué yo las
+correcciones. Tres hallazgos cambiaron el texto de raíz: (1) retirar las designaciones de norma del
+alcance —elegir un método de ensayo concreto es prescribir un procedimiento, que era justo lo
+prohibido—; (2) **no prometer mejora del índice de salud**, porque EDAD pesa 0,30 y solo empeora; y
+(3) el más caro: **tratar el aceite reinicia la línea base** de gases y furanos, de modo que poner la
+variación del índice como indicador principal lo vuelve falsificable por la propia intervención. El
+tercero es ahora doctrina escrita en las condiciones 3 y 4.
+
+**Verificación**: 1505 pruebas verdes, lint limpio, y preview con el módulo real comprobando que la
+marca sigue a la condición del equipo en los dos segmentos (condición 5 → C5; condición 2 → C2) y
+que `{MVA}` y `{SUB}` resuelven.
+
+**Verificado sano / no re-auditar**: el PI conserva su catálogo por ángulo, intacto y con prueba que
+lo fija · las claves `alcance_mtto` / `beneficios_mtto` siguen separadas de las del PI · la
+automática (V5) no cambió y sigue siendo la última de la lista.
+
+Crudo y recortes de los editores → bóveda, `2026-09-08-redacciones-mantenimiento/`. El estudio
+conceptual largo del que salieron estos textos —diez campos por propuesta y matriz comparativa—
+quedó publicado como artefacto para el Ingeniero.

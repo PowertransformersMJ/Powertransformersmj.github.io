@@ -33,9 +33,10 @@
 ### ✅ CERRADO: el documento de Mantenimiento Especializado (2026-09-08, `99 §74.17`)
 
 **TODO-53.** Ya se emite: siete hojas —las seis del PI más «Salud y riesgo», que sitúa al equipo en
-la matriz 5×5 con sus usuarios y sus MVA—, 5+5 redacciones propias (4 de un workflow de 10 agentes +
-1 automática del dominio) y la regla dura de **no prometer lo que el mantenimiento no revierte**. El
-PI quedó intacto, con prueba que lo fija. De paso se tapó un hueco que el PI ya emitía: la evidencia
+la matriz 5×5 con sus usuarios y sus MVA— y la regla dura de **no prometer lo que el mantenimiento no
+revierte**. Las 5+5 redacciones van **por condición de salud** (`99 §74.18`), no por ángulo del
+argumento: la lista señala la que corresponde al equipo y sus frentes de trabajo salen del catálogo
+`MO.00418 §4.3` del repo. El PI quedó intacto, con prueba que lo fija. De paso se tapó un hueco que el PI ya emitía: la evidencia
 salía con el número en blanco («rigidez dieléctrica de  kV») cuando el hallazgo venía de la
 calificación y no de un valor medido.
 
