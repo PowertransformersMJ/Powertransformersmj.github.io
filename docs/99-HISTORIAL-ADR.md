@@ -2207,3 +2207,32 @@ cuál es la fuente de verdad cuando ambas discrepan (→ **TODO-52**), porque si
 recogen un juicio experto que las variables medidas no capturan, se está perdiendo esa señal; y si
 no, el Excel sobre-marca. Es exactamente la raíz de **L-73**, ahora cuantificada: 98 de 208.
 
+**74.15 La condición del Excel, en producción — y dos cosas que el Ingeniero cazó mirando (2026-09-08).**
+Reimportado (job `JwYM1NzDQzqOG5DPWHxn`): la banda de salud es ya la del archivo — **85 · 83 · 16 ·
+15 · 9**, con los nueve «muy pobre» que él señaló. El recálculo del motor queda al lado en los 208
+(`hi_recalculado`), sin estorbar.
+
+**El primer intento no aplicó nada**, y la causa merece quedar escrita: el navegador recargó el HTML
+pero sirvió **el módulo del importador desde caché**, así que la importación corrió con el código
+anterior. El archivo del servidor sí tenía el arreglo —lo comprobé con `curl`— y aun así el
+resultado fue el viejo. **Verificar el servidor no es verificar lo que ejecuta el navegador**: hay
+que comprobar el módulo YA CARGADO en la página (`Cmd+Shift+R` y ejecutar la función) antes de dar
+por buena una corrida. Costó un clic de más al Ingeniero.
+
+**Y la reimportación revirtió 3 UUCC**: CANDELARIA `T-KDR04`/`T-KDR05` y BOSQUE `T4` volvieron a la
+familia autotransformador. No fue el sistema: **el Excel corregido se generó ANTES** de que el
+Ingeniero confirmara que son trifásicos, así que el archivo llevaba los códigos viejos y el import
+escribió lo que decía. Corregido en los dos sitios —base y archivo— para que no se repita. Lo que sí
+resistió, y era la prueba del payload ralo: las 7 fases, las 7 UUCC y la potencia de CASACARA.
+
+**Dos correcciones más, suyas** (`c0488e0`): CUIVA aparecía a la vez «Sin UC calculada» **y** con
+triángulo de advertencia — el mismo hecho contado dos veces, porque esa nota es el MOTIVO del
+estado; sale de la lista de avisos. Y el panorama llamaba a estos equipos «sin placa completa»,
+que es falso: su placa está entera, es el catálogo el que no los cubre. Ahora dice **«fuera del
+catálogo CREG»**. Verificado además lo que pidió: **los 208 reportan condición** (0 sin dato),
+ninguno queda fuera de la matriz, y los cuatro sin UC aparecen en la priorización — no tener unidad
+constructiva no los saca de ningún informe de salud.
+
+**Estado final: 208 · 203 concordantes · 0 discrepancias · 4 fuera del catálogo · 0 advertencias ·
+salud 85/83/16/15/9.**
+
