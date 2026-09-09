@@ -126,9 +126,16 @@ async function boot() {
         partes.push(resumen.sinDatos + ' equipo(s) del parque no traen datos de carga y no aparecen aquí');
       }
       if (resumen.desacuerdosFuente) {
-        partes.push('<b>' + resumen.desacuerdosFuente + ' equipo(s) con la fuente en desacuerdo</b>: '
-          + 'el % de cargabilidad de la hoja no coincide con sus propias columnas de amperios '
-          + '(manda el % oficial; conviene revisar la captura)');
+        // El aviso decía «no coincide con sus propias columnas de amperios ·
+        // conviene revisar la captura», y eso ya no es cierto: la cargabilidad
+        // que se muestra AHORA sale de los amperios de cada devanado, y la hoja
+        // 2025 los trae coherentes al 100 %. Lo que discrepa es el porcentaje
+        // guardado a nivel de EQUIPO en Salud de Activos, que quedó viejo. Decir
+        // «revise la captura» mandaba a auditar un archivo que estaba bien.
+        partes.push('<b>' + resumen.desacuerdosFuente + ' equipo(s) con el % de Salud de Activos '
+          + 'desactualizado</b>: la cargabilidad medida por devanado no coincide con el porcentaje '
+          + 'guardado a nivel de equipo. Manda lo medido; el porcentaje guardado se actualiza en la '
+          + 'próxima importación de Salud de Activos');
       }
       if (resumen.sobrecargasMedidas) {
         partes.push(resumen.sobrecargasMedidas + ' con la corriente medida por encima de su ampacidad');
