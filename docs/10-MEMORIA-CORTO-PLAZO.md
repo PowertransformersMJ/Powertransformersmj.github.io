@@ -11,7 +11,7 @@
 > buenas sin una prueba. Ahora hay 43, con los dos emuladores y también en CI. La auditoría
 > adversarial que siguió dejó 3 hallazgos vivos de 26. Antes: **ADR-071** (firmas a la cuenta de cada
 > quien), **ADR-070** (port de Órdenes de Materiales), **ADR-069** (TX_Potencia da 208 válidos).
-> ⚠️ Abiertos: **TODO-53** (siguiente) · **TODO-52** (🔴) · **TODO-47** (🔴) · **TODO-37** (🔴) · 29/33/41.
+> ⚠️ Abiertos: **TODO-52** (🔴 siguiente) · **TODO-47** (🔴) · **TODO-37** (🔴) · 29/33/41. **TODO-53 cerrado.**
 > ✅ **TODO-44 cerrado (ADR-071)**: la firma del Ingeniero salió de la web (404 en producción) y pasó
 > a su cuenta; cada quien sube la suya en «Mi firma» y solo se estampa en SU línea. Antes, TODO-43.
 > ✅ **TODO-46 cerrado (ADR-073)**: `storage.rules` pasa de 0 a **43 pruebas** y `test:rules` levanta
@@ -29,6 +29,20 @@
 > El parque tiene salud por primera vez: **208 equipos, 208 con condición** (39·86·54·28·1).
 > No funcionaba por una línea: las 4 subidas de Excel del sitio pasaban un `ArrayBuffer` donde
 > SheetJS espera `Uint8Array` — parseaba mal **en silencio**. No era el archivo del Ingeniero.
+
+### ✅ CERRADO: el documento de Mantenimiento Especializado (2026-09-08, `99 §74.17`)
+
+**TODO-53.** Ya se emite: siete hojas —las seis del PI más «Salud y riesgo», que sitúa al equipo en
+la matriz 5×5 con sus usuarios y sus MVA—, 5+5 redacciones propias (4 de un workflow de 10 agentes +
+1 automática del dominio) y la regla dura de **no prometer lo que el mantenimiento no revierte**. El
+PI quedó intacto, con prueba que lo fija. De paso se tapó un hueco que el PI ya emitía: la evidencia
+salía con el número en blanco («rigidez dieléctrica de  kV») cuando el hallazgo venía de la
+calificación y no de un valor medido.
+
+> 🟡 **Esperando decisión suya** (señalado, no decidido por mí): (a) el bloque de **PRESUPUESTO** se
+> adoptó igual al del PI —dice «INVERSIÓN» y valora la UC de **reposición**—, que es lo que se pidió
+> pero probablemente no es lo que un documento de mantenimiento debe costear; (b) el documento no
+> tiene formato oficial al cual exportar, así que no lleva botón de exportar.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(A)** ~~Pulsar IMPORTAR~~ ✅ hecho 09-08. **(B)** GitHub Support "remove sensitive data" + revocar los PAT
@@ -63,7 +77,6 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-53** | 🟢 **Construir el documento «Mantenimiento Especializado · Salud de Activos»**, el segundo que se emite desde un equipo. Hoy el selector ya lo ofrece y declara que está en construcción (`99 §74.16`). A diferencia del PI —que propone INVERSIÓN, reponer el activo— este programará MANTENIMIENTO sobre el equipo en servicio a partir de su condición. Falta definirlo con el Ingeniero: qué hojas, qué datos y si tiene formato oficial. | 🟢 |
 | **TODO-52** | 🔴 **¿Quién manda cuando el Excel y el motor discrepan?** El sistema recalcula la condición con el MO.00418 y **no copia** la columna CONDICION del Excel: discrepan en **98 de 208**. El Excel marca **9 «muy pobre»** y el motor solo **1** (los otros 8 caen a pobre/medio; 5 de ellos en HI 4,000 exacto, que es el piso del override de cargabilidad, no un tope). La causa es la ponderación: **DGA pesa 35 %**. Si los 5 del Excel recogen un juicio experto que las variables medidas no capturan, se está perdiendo esa señal. Raíz de L-73, ahora cuantificada. `99 §74.14`. | 🔴 |
 | **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |

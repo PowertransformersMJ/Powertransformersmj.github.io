@@ -263,6 +263,28 @@
    el nivel 4 capacidad final de 41 a 50 MVA") en una tabla que ya tiene once
    columnas: se acota el ancho y se deja respirar en dos líneas en vez de
    estirar la fila. El texto completo queda en el `title` de la celda. */
+/* ── Hoja «Salud y riesgo» del documento de Mantenimiento Especializado ──
+   Cuatro cifras arriba y la matriz debajo con UNA casilla marcada. Las demás
+   quedan apagadas a propósito: aquí no interesa el reparto de la flota —eso
+   está en Analítica— sino dónde cae ESTE activo. */
+.ftm-sr-kpis {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px; margin: 4px 0 18px;
+}
+.ftm-sr-kpi {
+  background: var(--ftm-card, #fff); border: 1px solid var(--ftm-line, #e3e9f0);
+  border-radius: 12px; padding: 14px 16px;
+}
+.ftm-sr-kpi b { display: block; font-size: 26px; line-height: 1.1; letter-spacing: -.02em; }
+.ftm-sr-kpi-s { display: block; font-size: 12px; color: var(--ftm-muted, #61748a); margin-top: 2px; }
+.ftm-sr-kpi-l {
+  display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ftm-muted, #61748a); margin-top: 8px; font-weight: 700;
+}
+.ftm-sr-cell { text-align: center; font-size: 12px; padding: 12px 8px; }
+.ftm-sr-cell.is-aqui { font-weight: 800; }
+.ftm-sr-aqui { font-size: 10.5px; letter-spacing: .04em; white-space: nowrap; }
+
 /* ── Selector de documento ──────────────────────────────────────────────
    Paso previo a la ficha: elegir qué documento se emite para el equipo.
    Ventana pequeña, dos opciones grandes y legibles — se pulsa una vez por

@@ -123,6 +123,23 @@ export function dpInfo(diag) {
  *   cifras reales y norma de referencia. `dominante` es el primero de la lista
  *   (el orden de evaluación es el orden de prioridad).
  */
+/**
+ * Enumera SOLO los valores que existen. Las calificaciones (1–5) llegan
+ * siempre; los valores medidos (`det`/`ensayos`) no. Cuando faltaban, la
+ * evidencia salía con el hueco a la vista —«rigidez dieléctrica de  kV»— en un
+ * documento que se firma. Ahora se dice lo que hay, y si no hay nada se dice
+ * de dónde sale la calificación en vez de fingir una medida.
+ *
+ * @param {Array<[string, *]>} pares — [texto con la cifra ya formateada, valor]
+ * @returns {string} lista en castellano, o '' si no se midió nada.
+ */
+function soloMedido(pares) {
+  const hay = pares.filter(([, v]) => v != null && v !== '').map(([t]) => t);
+  if (!hay.length) return '';
+  if (hay.length === 1) return hay[0];
+  return hay.slice(0, -1).join(', ') + ' y ' + hay[hay.length - 1];
+}
+
 export function modoDegradacion(equipo, diag) {
   const d = diag;
   if (!d) return null;
@@ -178,8 +195,8 @@ export function modoDegradacion(equipo, diag) {
       t: 'Descargas parciales / falla de baja energía',
       e: `hidrógeno (H₂) en ${numES(d.h2)} ppm` +
          (d.ch4 != null ? ` y metano (CH₄) en ${numES(d.ch4)} ppm` : '') +
-         `, con etileno prácticamente ausente (${numES(d.c2h4, 1)} ppm) — firma compatible con descargas ` +
-         'parciales, no con envejecimiento térmico del papel',
+         (g('c2h4') != null ? `, con etileno prácticamente ausente (${numES(d.c2h4, 1)} ppm)` : ', sin etileno relevante') +
+         ' — firma compatible con descargas parciales, no con envejecimiento térmico del papel',
       n: 'IEEE C57.104 · IEC 60599 · triángulo de Duval (confirmar con muestreo dirigido)'
     });
   }
@@ -187,8 +204,13 @@ export function modoDegradacion(equipo, diag) {
     M.push({
       k: 'aceite',
       t: 'Degradación del aceite dieléctrico',
-      e: `rigidez dieléctrica de ${numES(d.rig)} kV, humedad de ${numES(d.hum)} %, tensión interfacial de ` +
-         `${numES(d.tif, 1)} mN/m e índice de neutralización de ${numES(d.nn, 2)} mgKOH/g`,
+      e: soloMedido([
+        [`rigidez dieléctrica de ${numES(d.rig)} kV`, g('rig')],
+        [`humedad de ${numES(d.hum)} %`, g('hum')],
+        [`tensión interfacial de ${numES(d.tif, 1)} mN/m`, g('tif')],
+        [`índice de neutralización de ${numES(d.nn, 2)} mgKOH/g`, g('nn')]
+      ]) || `calificación ${[g('eadfq'), g('erig'), g('eic')].filter((x) => x != null && x >= 4)[0]} ` +
+        'de 5 en el ensayo físico-químico del aceite (valores de laboratorio no cargados en el activo)',
       n: 'IEC 60422 · ASTM D1816/D971/D974'
     });
   }
@@ -207,7 +229,10 @@ export function modoDegradacion(equipo, diag) {
     M.push({
       k: 'carga',
       t: 'Cargabilidad en el límite',
-      e: `cargabilidad del ${numES(d.crg)} % de la capacidad nominal, sin margen para maniobra ni contingencia`,
+      e: (g('crg') != null
+        ? `cargabilidad del ${numES(d.crg)} % de la capacidad nominal`
+        : `calificación ${g('ecrg')} de 5 en cargabilidad`) +
+        ', sin margen para maniobra ni contingencia',
       n: 'IEEE C57.91 · IEC 60076-7'
     });
   }
@@ -339,5 +364,204 @@ export function redaccionBeneficios(equipo, diag) {
   L.push('· Eficiencia energética y calidad: una unidad diseñada bajo la normativa de eficiencia vigente opera ' +
     'con menores pérdidas y mejor comportamiento térmico (ISO 50001), con mayor estabilidad de tensión para ' +
     'cargas sensibles.');
+  return L.join('\n');
+}
+
+// ── Redacción automática del documento de MANTENIMIENTO ESPECIALIZADO ────────
+// Mismo diagnóstico, otra decisión. El PI concluye «reponer el activo»; este
+// documento concluye «intervenir el activo que sigue en servicio». Por eso la
+// evidencia se comparte (`modoDegradacion` es el dueño único) pero la acción
+// no: cada modo de degradación tiene su trabajo, y hay uno —la celulosa— que
+// NINGÚN mantenimiento revierte. Decirlo es lo que separa un documento que se
+// puede firmar de uno que promete lo que no puede cumplir.
+
+/**
+ * Trabajo que corresponde a cada modo de degradación.
+ * `rev: true` marca los modos que el mantenimiento NO revierte: se vigilan y se
+ * frena su avance, pero el activo no vuelve atrás.
+ */
+const TRABAJO_POR_MODO = Object.freeze({
+  papel: {
+    rev: false,
+    a: 'seguimiento dirigido del envejecimiento del aislamiento sólido (furanos y CO/CO₂ con '
+     + 'periodicidad acortada) y reducción del esfuerzo térmico sobre el devanado',
+    n: 'ASTM D5837 · CIGRÉ 445'
+  },
+  termico: {
+    rev: true,
+    a: 'intervención del sistema de refrigeración y de las conexiones: termografía bajo carga, '
+     + 'verificación de ventiladores, bombas, radiadores e indicadores de temperatura, y revisión '
+     + 'del apriete y del estado de bornes y conexiones de alta y baja',
+    n: 'IEEE C57.104 · IEC 60599 · IEC 60076-7'
+  },
+  arco: {
+    rev: true,
+    a: 'inspección interna dirigida al origen del arco —con revisión del conmutador bajo carga '
+     + '(OLTC) y de sus contactos— y muestreo de gases con periodicidad acortada hasta descartar '
+     + 'la evolución del defecto',
+    n: 'IEEE C57.104 · IEC 60599 · triángulo de Duval'
+  },
+  descargas: {
+    rev: true,
+    a: 'medición de descargas parciales (eléctrica y acústica/UHF) para localizar el defecto, '
+     + 'con muestreo de gases dirigido antes y después de la intervención',
+    n: 'IEC 60270 · IEEE C57.127'
+  },
+  aceite: {
+    rev: true,
+    a: 'tratamiento del aceite dieléctrico —termovacío o regeneración según el nivel de acidez y '
+     + 'tensión interfacial—, cambio del deshidratante del respirador y verificación del sistema '
+     + 'de preservación',
+    n: 'IEC 60422 · ASTM D1816/D971/D974'
+  },
+  hermeticidad: {
+    rev: true,
+    a: 'reparación de fugas y restitución de la hermeticidad: empaquetaduras, bridas, válvulas y '
+     + 'sistema de preservación, con prueba de estanqueidad posterior',
+    n: 'IEC 60076-1'
+  },
+  carga: {
+    rev: false,
+    a: 'seguimiento de la cargabilidad y del perfil térmico en operación, con gestión de la carga '
+     + 'y de las maniobras de contingencia mientras se recupera margen por otra vía',
+    n: 'IEEE C57.91 · IEC 60076-7'
+  },
+  edad: {
+    rev: false,
+    a: 'mantenimiento mayor sobre los subsistemas que sí se renuevan (conmutador, bujes, '
+     + 'refrigeración, protecciones e instrumentación) y vigilancia reforzada del núcleo activo',
+    n: 'IEC 60076-7'
+  }
+});
+
+/**
+ * Texto del ALCANCE del documento de Mantenimiento Especializado.
+ *
+ * Se apoya en los mismos valores medidos que el PI, pero concluye intervención
+ * y no reposición. Si el modo dominante es irreversible, lo dice: el alcance
+ * pasa a ser contener y vigilar, no «recuperar» el activo.
+ *
+ * @param {object} equipo
+ * @param {object} diag
+ * @returns {string}
+ */
+export function redaccionAlcanceMtto(equipo, diag) {
+  const f = equipo || {};
+  const d = diag || null;
+  const md = modoDegradacion(f, d);
+  const mva = mvaDe(f);
+  const sub = f.subestacion || '';
+  const ci = f.cond_int != null ? f.cond_int : null;
+  const cl = f.cond_lbl || '';
+
+  let t = 'El presente documento tiene por alcance la ejecución de mantenimiento especializado sobre el '
+    + `transformador de potencia de ${mvaTxt(mva)} MVA`
+    + (f.matricula ? ` (matrícula ${f.matricula}${f.serie ? `, serie ${f.serie}` : ''})` : '')
+    + ` que opera en la subestación ${sub}. `;
+
+  t += 'Bajo la metodología de salud de activos el equipo se encuentra en condición '
+    + (ci != null ? `${ci} de 5${cl ? ` — ${cl}` : ''}` : 'no clasificada')
+    + (f.edad != null ? `, con ${f.edad} años de servicio${f.anio_fab ? ` (fabricación ${f.anio_fab})` : ''}` : '')
+    + '. ';
+
+  if (md) {
+    const w = TRABAJO_POR_MODO[md.dominante.k];
+    t += `El hallazgo que gobierna la intervención es ${md.dominante.t.toLowerCase()}: ${md.dominante.e}, `
+      + `conforme a ${md.dominante.n}. `;
+    if (w) {
+      t += `En consecuencia, el trabajo comprende ${w.a} (${w.n}). `;
+      if (!w.rev) {
+        t += 'Se advierte que este modo de degradación NO se revierte con mantenimiento: la intervención '
+          + 'contiene su avance y sostiene la operación con riesgo controlado, pero no devuelve al activo '
+          + 'la vida de aislamiento ya consumida. ';
+      }
+    }
+    if (md.todos.length > 1) {
+      const otros = md.todos.slice(1)
+        .map((m) => TRABAJO_POR_MODO[m.k] ? `${m.t.toLowerCase()} — ${TRABAJO_POR_MODO[m.k].a}` : m.t.toLowerCase());
+      t += 'De forma concurrente se atiende ' + otros.join('; ') + '. ';
+    }
+  } else {
+    t += 'No se identifican modos de degradación activos en los ensayos disponibles, de modo que el '
+      + 'alcance corresponde al mantenimiento especializado programado del activo y a la actualización '
+      + 'de su línea base de ensayos. ';
+  }
+
+  if (d && num(d.crg) != null && num(d.crg) >= 90) {
+    t += `La unidad opera al ${numES(d.crg)} % de su capacidad nominal, por lo que la intervención debe `
+      + 'programarse con la indisponibilidad coordinada y el respaldo de carga previsto. ';
+  }
+  if (f.usuarios != null) {
+    t += `La afectación asociada a una falla del activo alcanza ${numES(f.usuarios)} usuarios. `;
+  }
+
+  t += 'El alcance incluye los ensayos eléctricos de verificación antes y después de la intervención, la '
+    + 'actualización del historial del activo y la reevaluación de su índice de salud con los resultados '
+    + 'obtenidos.';
+  return t;
+}
+
+/**
+ * Texto de los BENEFICIOS del documento de Mantenimiento Especializado.
+ *
+ * ⚠️ No promete «reinicio de la vida útil»: eso solo lo da un activo nuevo. El
+ * beneficio de mantener es frenar el deterioro, recuperar lo que sí se recupera
+ * y comprar tiempo de decisión con el riesgo bajo control.
+ *
+ * @param {object} equipo
+ * @param {object} diag
+ * @returns {string} viñetas separadas por salto de línea.
+ */
+export function redaccionBeneficiosMtto(equipo, diag) {
+  const f = equipo || {};
+  const d = diag || null;
+  const md = modoDegradacion(f, d);
+  const di = dpInfo(d);
+  const L = [];
+
+  L.push('· Atención dirigida al modo de falla identificado: la intervención actúa sobre '
+    + (md ? md.dominante.t.toLowerCase().replace(/\s*\([^)]*\)/g, '') : 'la condición registrada del activo')
+    + ', y no sobre una rutina genérica, con lo que el esfuerzo de mantenimiento se concentra donde está '
+    + 'el riesgo real.');
+
+  const w = md && TRABAJO_POR_MODO[md.dominante.k];
+  if (w && w.rev) {
+    L.push('· Recuperación efectiva de la condición: el hallazgo dominante es reversible mediante '
+      + 'mantenimiento, de modo que se espera una mejora medible del índice de salud tras la intervención, '
+      + 'verificable con los ensayos de comprobación.');
+  } else if (w) {
+    L.push('· Contención del deterioro y tiempo de decisión: el hallazgo dominante no se revierte con '
+      + 'mantenimiento, pero la intervención frena su avance y permite operar con riesgo controlado '
+      + 'mientras se estructura la reposición del activo, evitando una salida no programada.');
+  }
+
+  if (di && di.fueraRango) {
+    L.push(`· Vigilancia proporcional al riesgo: con 2-FAL de ${numES(di.ppb)} ppb y DP estimado ${di.dp}, `
+      + 'el aislamiento sólido exige seguimiento con periodicidad acortada; el documento deja programada esa '
+      + 'vigilancia en lugar de dejarla al criterio de cada visita.');
+  } else if (di && !di.papelSano && di.vidaUsada >= 50) {
+    L.push(`· Vigilancia proporcional al riesgo: con el ${di.vidaTxt} % de la vida del aislamiento consumida `
+      + `(DP estimado ${di.dp}), la intervención fija la periodicidad de seguimiento acorde a esa condición.`);
+  }
+
+  L.push('· Disponibilidad del suministro: reduce la probabilidad de una salida intempestiva y de la '
+    + 'energía no suministrada asociada, con efecto directo en los indicadores de continuidad (SAIDI/SAIFI)'
+    + (f.usuarios != null ? ` de los ${numES(f.usuarios)} usuarios atendidos` : ' de la zona de influencia') + '.');
+
+  if (d && num(d.crg) != null && num(d.crg) >= 90) {
+    L.push(`· Operación segura en el límite de carga: con una cargabilidad del ${numES(d.crg)} %, mantener el `
+      + 'activo en condición controlada es lo que evita que una contingencia se convierta en interrupción, '
+      + 'mientras no exista margen por otra vía.');
+  }
+
+  L.push('· Seguridad de personas e instalaciones: la intervención retira las condiciones que derivan en '
+    + 'fallas violentas —fugas, sobrecalentamiento y defectos internos en evolución—, protegiendo al '
+    + 'personal y a los equipos adyacentes de la subestación.');
+  L.push('· Costo evitado: el mantenimiento programado sobre un modo de falla conocido cuesta una fracción '
+    + 'de la atención correctiva de emergencia, del alquiler de respaldo y de las compensaciones por '
+    + 'indisponibilidad que acarrea una salida no prevista.');
+  L.push('· Decisión soportada: los ensayos de comprobación actualizan el índice de salud del activo con '
+    + 'medición propia, dejando trazabilidad para sustentar la próxima decisión —continuar en operación, '
+    + 'repotenciar o reponer— ante la Empresa y ante el regulador.');
   return L.join('\n');
 }
