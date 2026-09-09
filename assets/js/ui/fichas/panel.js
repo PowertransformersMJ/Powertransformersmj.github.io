@@ -65,6 +65,31 @@ export const VISTAS = Object.freeze([
   { id: 'agregar',   lbl: 'Agregar transformador' }
 ]);
 
+/**
+ * Los DOCUMENTOS que se pueden emitir desde un equipo. Al pulsar «Ficha» se
+ * elige uno: hasta hoy solo existía el de plan de inversión y se abría directo,
+ * pero el Ingeniero precisó que lo que ahí se propone es una **propuesta a Plan
+ * de Inversión (PI)** — un documento entre varios, no «la ficha».
+ *
+ * Nombrarlo bien no es cosmética: quien abra esto dentro de un año tiene que
+ * saber que está proponiendo inversión y no programando mantenimiento.
+ */
+export const DOCUMENTOS_FICHA = Object.freeze([
+  {
+    id: 'salud',
+    lbl: 'Mantenimiento Especializado · Salud de Activos',
+    desc: 'Programación de intervención a partir de la condición del equipo. En construcción.',
+    listo: false
+  },
+  {
+    id: 'pi',
+    lbl: 'Propuesta a Plan de Inversión · PI',
+    desc: 'Formato PE.02081: alcance, beneficios, diagramas unifilares, Anexo AT y plan de '
+        + 'acciones, con exportación al Excel oficial.',
+    listo: true
+  }
+]);
+
 /** Las seis hojas del modal, en el orden del formato oficial. */
 export const HOJAS_FICHA = Object.freeze([
   { id: 'ficha',   t: 'Ficha Técnica' },
@@ -647,6 +672,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const modalCuerpo = $('[data-ftm="modal-cuerpo"]');
   const modalDiag = $('[data-ftm="modal-diag"]');
   const avisoBox = $('[data-ftm="aviso"]');
+  const selDoc    = $('[data-ftm="selector-doc"]');
+  const selTit    = $('[data-ftm="selector-titulo"]');
+  const selOpc    = $('[data-ftm="selector-opciones"]');
+  let trampaSelector = null;
+  let documento = 'pi';          // qué documento está abierto en el modal
 
   /* ── armazón estático ───────────────────────────────────────────────── */
   function armazon() {
@@ -718,6 +748,22 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // Sin esto, el encabezado del modal (con «Exportar» y «Cerrar») queda
       // TAPADO por el shell. Se corrige aquí y no en el CSS del módulo para no
       // atar esa hoja a los z-index del sitio.
+      // Selector de documento. Vive fuera del modal de la ficha a propósito: es
+      // un paso ANTES, y mezclarlo con las hojas del PI habría dado a entender
+      // que Salud de Activos es una hoja más del mismo papel, cuando es otro
+      // documento con otro propósito.
+      + '<div class="ftm-modal" data-ftm="selector-doc" role="dialog" aria-modal="true" '
+      +   'style="z-index:300" aria-label="Elegir documento" aria-hidden="true">'
+      +   '<div class="ftm-modal-win ftm-selector-win">'
+      +     '<div class="ftm-modal-bar">'
+      +       '<span class="ftm-modal-title" data-ftm="selector-titulo"></span>'
+      +       '<span class="ftm-modal-acts">'
+      +         '<button type="button" class="ftm-btn" data-ftm="selector-cerrar">Cerrar</button>'
+      +       '</span>'
+      +     '</div>'
+      +     '<div class="ftm-selector-body" data-ftm="selector-opciones"></div>'
+      +   '</div>'
+      + '</div>'
       + '<div class="ftm-modal" data-ftm="modal" role="dialog" aria-modal="true" style="z-index:300" '
       +   'aria-label="Ficha técnica de planificación" aria-hidden="true">'
       +   '<div class="ftm-modal-win">'
@@ -1378,12 +1424,46 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     return ESTADOS.get(k);
   }
 
-  function abrirFicha(clave) {
+  /**
+   * Paso previo: elegir QUÉ documento se emite para este equipo. Antes se abría
+   * el de plan de inversión directamente; ahora se pregunta, porque hay más de
+   * uno y llamarlos a todos «la ficha» confundía dos cosas distintas.
+   */
+  function abrirSelectorDocumento(clave) {
+    const e = EQUIPOS.find((x) => claveEquipo(x) === clave);
+    if (!e) return false;
+    selTit.textContent = 'Documento para ' + (e.subestacion || '—')
+      + (e.matricula ? ' · ' + e.matricula : '');
+    selOpc.innerHTML = DOCUMENTOS_FICHA.map((d) =>
+      '<button type="button" class="ftm-selector-opt' + (d.listo ? '' : ' is-wip') + '"'
+      + ' data-doc="' + d.id + '" data-doc-clave="' + esc(clave) + '">'
+      +   '<span class="ftm-selector-opt-t">' + esc(d.lbl)
+      +     (d.listo ? '' : ' <span class="ftm-selector-wip">en construcción</span>') + '</span>'
+      +   '<span class="ftm-selector-opt-d">' + esc(d.desc) + '</span>'
+      + '</button>').join('');
+    selDoc.classList.add('is-on');
+    selDoc.setAttribute('aria-hidden', 'false');
+    trampaSelector = atraparFoco(selDoc, {
+      alCerrar: cerrarSelectorDocumento,
+      autoFoco: '[data-doc="pi"]'          // el que hoy se usa siempre
+    });
+    return true;
+  }
+
+  function cerrarSelectorDocumento() {
+    if (trampaSelector) { trampaSelector.soltar(); trampaSelector = null; }
+    selDoc.classList.remove('is-on');
+    selDoc.setAttribute('aria-hidden', 'true');
+  }
+
+  function abrirFicha(clave, doc = 'pi') {
     const e = EQUIPOS.find((x) => claveEquipo(x) === clave);
     if (!e) return false;
     actual = e;
+    documento = doc;
     hoja = 'ficha';
-    modalTit.textContent = 'Ficha técnica · ' + (actual.subestacion || '—')
+    const nombreDoc = (DOCUMENTOS_FICHA.find((d) => d.id === doc) || {}).lbl || 'Ficha técnica';
+    modalTit.textContent = nombreDoc + ' · ' + (actual.subestacion || '—')
       + (actual.matricula ? ' · ' + actual.matricula : '');
     modal.classList.add('is-on');
     modal.setAttribute('aria-hidden', 'false');
@@ -1453,6 +1533,21 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   function pintarModal() {
     if (!actual) return;
+
+    // El documento de Salud de Activos todavía no está construido. Se dice, con
+    // lo que va a llevar, en vez de enseñar una hoja vacía que parezca rota o —
+    // peor— un papel a medias que alguien pueda dar por bueno.
+    if (documento === 'salud') {
+      modalTabs.innerHTML = '';
+      modalDiag.hidden = true;
+      $('[data-ftm="descargar-plan"]').hidden = true;
+      $('[data-ftm="exportar"]').hidden = true;
+      modalCuerpo.innerHTML = hojaEnConstruccion(actual);
+      modalCuerpo.scrollTop = 0;
+      return;
+    }
+    $('[data-ftm="exportar"]').hidden = false;
+
     modalTabs.innerHTML = HOJAS_FICHA.map((h) =>
       '<button type="button" role="tab" class="ftm-modal-tipo-btn' + (hoja === h.id ? ' is-on' : '')
       + '" data-hoja="' + h.id + '" aria-selected="' + (hoja === h.id) + '">' + esc(h.t) + '</button>').join('');
@@ -1468,6 +1563,29 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const btnPlan = $('[data-ftm="descargar-plan"]');
     if (btnPlan) btnPlan.hidden = (hoja !== 'plan');
     if (hoja === 'diagA' || hoja === 'diagF') pintarUnifilar();
+  }
+
+  /** Lo que se ve al elegir el documento que aún no existe. */
+  function hojaEnConstruccion(e) {
+    const cond = e.cond_int;
+    return ''
+      + '<div class="ftm-hoja">'
+      +   cabeceraHoja('Mantenimiento Especializado · Salud de Activos')
+      +   '<div class="ftm-aviso"><b>Este documento está en construcción.</b> '
+      +   'Todavía no se emite: se está definiendo con el Ingeniero. Mientras tanto, '
+      +   'la propuesta a Plan de Inversión (PI) sigue disponible y no ha cambiado.</div>'
+      +   '<div class="ftm-kv">'
+      +     '<div class="ftm-kv-k">Equipo</div><div class="ftm-kv-v">'
+      +       esc(e.subestacion || '—') + (e.matricula ? ' · ' + esc(e.matricula) : '') + '</div>'
+      +     '<div class="ftm-kv-k">Condición actual</div><div class="ftm-kv-v">'
+      +       (cond != null ? esc(cond + ' · ' + nombreCondicion(cond)) : 'sin dato') + '</div>'
+      +     '<div class="ftm-kv-k">Capacidad</div><div class="ftm-kv-v">'
+      +       (e.mva != null ? esc(mvaTxt(e.mva)) + ' MVA' : '—') + '</div>'
+      +   '</div>'
+      +   '<p class="ftm-mini-src">La diferencia con el PI: aquel propone <b>inversión</b> '
+      +   '(reponer el activo) y este programará <b>mantenimiento especializado</b> sobre el '
+      +   'equipo que ya está en servicio, a partir de su condición.</p>'
+      + '</div>';
   }
 
   function cuerpoHoja(e, cual) {
@@ -1897,7 +2015,16 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       aplicar(); return;
     }
     const btnFicha = ev.target.closest('[data-ficha]');
-    if (btnFicha) { abrirFicha(btnFicha.getAttribute('data-ficha')); return; }
+    if (btnFicha) { abrirSelectorDocumento(btnFicha.getAttribute('data-ficha')); return; }
+
+    const btnDoc = ev.target.closest('[data-doc]');
+    if (btnDoc) {
+      const clave = btnDoc.getAttribute('data-doc-clave');
+      cerrarSelectorDocumento();
+      abrirFicha(clave, btnDoc.getAttribute('data-doc'));
+      return;
+    }
+    if (ev.target.closest('[data-ftm="selector-cerrar"]')) { cerrarSelectorDocumento(); return; }
 
     const hojaBtn = ev.target.closest('[data-hoja]');
     if (hojaBtn) { hoja = hojaBtn.getAttribute('data-hoja'); pintarModal(); return; }
