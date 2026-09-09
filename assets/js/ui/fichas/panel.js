@@ -31,8 +31,13 @@
 import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia, montoCOP } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg, variacionReal, formatearCOP } from '../../domain/fichas_presupuesto.js';
 import {
-  dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES
+  dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
+  redaccionAlcanceMtto, redaccionBeneficiosMtto
 } from '../../domain/fichas_diagnostico.js';
+import {
+  NIVELES_ORDEN, LABELS_NIVEL, COLORES_CELDA,
+  calcularRangosCriticidad, nivelPorUsuarios, colorCelda
+} from '../../domain/matriz_riesgo.js';
 import { atraparFoco } from '../foco-modal.js';
 import { construirFichaTecnica, colorCondicion, nombreCondicion } from './ficha-tecnica.js';
 import {
@@ -78,8 +83,9 @@ export const DOCUMENTOS_FICHA = Object.freeze([
   {
     id: 'salud',
     lbl: 'Mantenimiento Especializado · Salud de Activos',
-    desc: 'Programación de intervención a partir de la condición del equipo. En construcción.',
-    listo: false
+    desc: 'Alcance y beneficios de INTERVENIR el equipo que sigue en servicio, con su salud '
+        + 'y su posición en la matriz de riesgo. Sin exportación al Excel oficial todavía.',
+    listo: true
   },
   {
     id: 'pi',
@@ -99,6 +105,29 @@ export const HOJAS_FICHA = Object.freeze([
   { id: 'anexoAT', t: 'Anexo AT' },
   { id: 'plan',    t: 'Plan de acciones', anexo: true }
 ]);
+
+/**
+ * Las hojas del documento de Mantenimiento Especializado. Son las mismas del PI
+ * —encargo del Ingeniero: «adopta lo mismo que PI»— con una añadida: «Salud y
+ * riesgo», que es lo que justifica intervenir ESTE equipo y no otro.
+ *
+ * Va tercera, no al final: primero qué se hace y para qué, y enseguida la
+ * evidencia. De última habría quedado como un anexo que nadie abre.
+ */
+export const HOJAS_SALUD = Object.freeze([
+  { id: 'ficha',   t: 'Ficha Técnica' },
+  { id: 'benef',   t: 'Beneficios' },
+  { id: 'salud',   t: 'Salud y riesgo' },
+  { id: 'diagA',   t: 'Diagrama Actual' },
+  { id: 'diagF',   t: 'Diagrama Futuro' },
+  { id: 'anexoAT', t: 'Anexo AT' },
+  { id: 'plan',    t: 'Plan de acciones', anexo: true }
+]);
+
+/** Hojas del documento que está abierto. */
+export function hojasDe(doc) {
+  return doc === 'salud' ? HOJAS_SALUD : HOJAS_FICHA;
+}
 
 /** Categorías del tablero. `f` decide si un equipo entra en la categoría. */
 export const CATEGORIAS = Object.freeze([
@@ -177,6 +206,43 @@ export const BENEF_OPC = Object.freeze([
   { t: 'V4 · Compacta y contundente', v: '· Confiabilidad: menor probabilidad de fallas imprevistas y salidas de servicio.\n· Disponibilidad: mayor continuidad del suministro en la zona de influencia.\n· Seguridad: elimina el riesgo de eventos catastróficos asociados al activo en fin de vida.\n· Economía: reduce el costo total de propiedad del activo.\n· Calidad y sostenibilidad: mejor calidad de energía y suministro sostenible a largo plazo.' },
   { t: 'V5 · Automática · anclada en datos medidos', auto: 'beneficios' }
 ]);
+
+/* ── Redacciones del documento de MANTENIMIENTO ESPECIALIZADO ──────────────
+   Catálogo aparte, no una variante del de arriba. Un mismo índice significa
+   cosas distintas en cada documento, así que también se guardan en claves
+   distintas del estado (`alcance_mtto`, `beneficios_mtto`): elegir una
+   redacción aquí no puede pisar la que el PI ya tenga escrita. */
+
+/** Las cinco redacciones del ALCANCE del mantenimiento especializado. */
+export const ALCANCE_MTTO_OPC = Object.freeze([
+  { t: 'V1 · Gestión de activos (integral)', v: 'El alcance del proyecto comprende un programa de mantenimiento especializado sobre el transformador de potencia de {MVA} MVA que continúa en servicio en la subestación {SUB}, definido a partir de su índice de salud y dirigido a las variables de condición que admiten corrección. La edad del activo y el consumo de vida del aislamiento sólido no se revierten con mantenimiento; sí se corrigen el estado del aceite dieléctrico, la hermeticidad, las conexiones y el desempeño de los componentes sometidos a maniobra. Sobre esa distinción se estructura la intervención: tratamiento o regeneración del aceite aislante y cambio de la sílica gel del deshidratador; corrección de fugas y restablecimiento de la hermeticidad; limpieza de aisladores, ajuste de conexiones y termografía; mantenimiento del cambiador de tomas bajo carga en unidades provistas de él; y pruebas eléctricas de diagnóstico. En el marco de la gestión de activos (ISO 55001), el programa contiene el deterioro medido y administra la vida útil remanente del equipo.' },
+  { t: 'V2 · Evidencia de laboratorio', v: 'El alcance del proyecto comprende el mantenimiento especializado del transformador de potencia de {MVA} MVA que permanece en servicio en la subestación {SUB}, definido a partir de la evidencia de laboratorio de su campaña de ensayos más reciente, de modo que cada actividad quede soportada en el resultado que la motiva. El análisis de gases disueltos delimita el mecanismo de degradación activo y ordena la termografía infrarroja, el ajuste de conexiones y el mantenimiento del cambiador de tomas bajo carga, cuyo aceite se muestrea aparte. La rigidez dieléctrica y el contenido de humedad sustentan el tratamiento del aceite por termovacío y el cambio de la sílica gel; la tensión interfacial y el número de neutralización, que componen el índice de calidad, sustentan su regeneración. La ubicación dominante de las fugas delimita la corrección de la hermeticidad y el nivel de compuestos furánicos fija la frecuencia del seguimiento del aislamiento sólido. Cierran el alcance las pruebas eléctricas de diagnóstico.' },
+  { t: 'V3 · Riesgo y continuidad del servicio', v: 'El presente proyecto tiene por alcance la ejecución de mantenimiento especializado sobre el transformador de potencia de {MVA} MVA que continúa en servicio en la subestación {SUB}, activo crítico cuya valoración bajo la metodología de salud de activos identifica variables de condición cuya evolución eleva la probabilidad de falla; una salida intempestiva se traduciría en energía no suministrada, afectación de los indicadores de continuidad (SAIDI/SAIFI) y desatención de los usuarios servidos aguas abajo. La intervención comprende pruebas eléctricas de diagnóstico, termovisión y ajuste de conexiones; tratamiento del aceite dieléctrico y cambio del material desecante; corrección de fugas y restablecimiento de la hermeticidad; limpieza de aisladores; mantenimiento del cambiador de tomas bajo carga, único componente sometido a desgaste por maniobra; y verificación de las protecciones y el telecontrol, de los que depende que una falla incipiente se despeje sin escalar. Su propósito es contener la degradación y preservar la continuidad del suministro en la zona de influencia.' },
+  { t: 'V4 · Compacta y contundente', v: 'El alcance del proyecto comprende el mantenimiento especializado del transformador de potencia de {MVA} MVA de la subestación {SUB}, unidad que continúa en servicio y cuya condición, evaluada bajo la metodología de salud de activos, admite intervención dirigida sobre el equipo instalado. El análisis de gases disueltos, los ensayos físico-químicos del aceite —rigidez dieléctrica, acidez, tensión interfacial y humedad—, el nivel de compuestos furánicos y el régimen de carga definen los frentes de trabajo: tratamiento del aceite aislante y, según su índice de calidad, regeneración; cambio del material desecante; corrección de fugas; termovisión, limpieza de aisladores y ajuste de conexiones; mantenimiento del cambiador de tomas bajo carga cuando la unidad lo incorpora; y pruebas eléctricas de diagnóstico como verificación de cierre. El propósito es detener el avance del deterioro, recuperar margen de operación del aislamiento y sostener la disponibilidad del equipo.' },
+  { t: 'V5 · Automática · anclada en datos medidos', auto: 'alcance_mtto' }
+]);
+
+/** Las cinco redacciones de BENEFICIOS del mantenimiento especializado. */
+export const BENEF_MTTO_OPC = Object.freeze([
+  { t: 'V1 · Gestión de activos (integral)', v: '· Contención de la degradación: la intervención actúa sobre las variables que deprimen el índice de salud —condición del aceite, humedad y hermeticidad— y detiene el deterioro antes de que el riesgo deje de ser tolerable.\n· Recuperación del margen operativo: el tratamiento del aceite, el cambio de sílica gel y la corrección de fugas restituyen rigidez dieléctrica y capacidad de disipación térmica a la unidad de {MVA} MVA.\n· Extensión de la vida útil remanente: controlar humedad, oxidación y temperatura reduce la velocidad de despolimerización del papel aislante y prolonga el horizonte de servicio.\n· Riesgo en nivel controlado: el mantenimiento del cambiador de tomas, el ajuste de conexiones verificado por termografía y la limpieza de aisladores retiran modos de falla identificados, conforme a la política de gestión de activos (ISO 55001).\n· Continuidad del plan de mantenimiento: las pruebas eléctricas de diagnóstico posteriores actualizan la condición del transformador de la subestación {SUB} y sustentan el alcance y la periodicidad de las próximas intervenciones.' },
+  { t: 'V2 · Evidencia de laboratorio', v: '· Recuperación medible del aceite: el tratamiento termovacío y la regeneración restablecen la rigidez dieléctrica y la tensión interfacial, y el ensayo físico-químico de cierre lo verifica.\n· Control de la humedad: el cambio de sílica gel, el sellado y la corrección de fugas reducen el agua medida en el aceite, principal acelerador de la despolimerización de la celulosa.\n· Preservación del aislamiento sólido: el seguimiento de compuestos furánicos (2-FAL) permite verificar que la tasa de envejecimiento se estabiliza y que se conserva el grado de polimerización remanente.\n· Origen térmico corregido: la termografía, el ajuste de conexiones y el mantenimiento del cambiador de tomas atacan la fuente de calentamiento, y el análisis de gases disueltos (DGA) posterior confirma si cede la generación de gases combustibles.\n· Cierre soportado en ensayo: los resultados posteriores a la intervención actualizan la condición medida de la unidad de {MVA} MVA de {SUB} y documentan su permanencia en servicio.' },
+  { t: 'V3 · Riesgo y continuidad del servicio', v: '· Menor probabilidad de falla: la intervención corrige los mecanismos que deprimen el índice de salud del transformador de {MVA} MVA de la subestación {SUB} —deterioro del aceite, humedad y puntos calientes en conexiones— antes de que deriven en una salida forzada.\n· Continuidad del servicio protegida: evitar salidas intempestivas de un activo crítico preserva la disponibilidad del suministro y contiene la energía no suministrada (ENS) asociada a una falla.\n· Indicadores de calidad resguardados: menos interrupciones, y de menor duración, sostienen el desempeño de SAIDI y SAIFI en la zona de influencia y reducen la exposición a compensaciones regulatorias.\n· Desviación detectada a tiempo: las pruebas eléctricas de diagnóstico, y la verificación de protecciones y telecontrol permiten intervenir en ventana programada y no en atención de emergencia.\n· Seguridad de personas e instalaciones: corregir fugas, ajustar conexiones y sanear el aislamiento elimina derrames, puntos calientes y contactos deteriorados que hoy ponen en riesgo al personal de la subestación.' },
+  { t: 'V4 · Compacta y contundente', v: '· Confiabilidad: corregir los modos de falla que hoy señalan el DGA y los ensayos físico-químicos reduce la probabilidad de falla imprevista de la unidad de {MVA} MVA de la subestación {SUB}.\n· Vida útil: el tratamiento del aceite restituye la rigidez dieléctrica y la tensión interfacial, abate la acidez y frena la despolimerización del papel aislante.\n· Salud medible: la intervención actúa sobre el DGA —la variable de mayor peso del índice de salud—, el análisis físico-químico, la hermeticidad y las protecciones; la edad, en cambio, no se corrige con mantenimiento.\n· Disponibilidad y seguridad: mantenimiento del cambiador de tomas, ajuste de conexiones, termografía y corrección de fugas evitan salidas intempestivas, puntos calientes y derrames de aceite.\n· Costo: la intervención programada evita el correctivo de emergencia, la energía no suministrada y las compensaciones por indisponibilidad.' },
+  { t: 'V5 · Automática · anclada en datos medidos', auto: 'beneficios_mtto' }
+]);
+
+/** Qué catálogo de redacciones corresponde a cada campo del estado. */
+const CATALOGO_REDACCION = Object.freeze({
+  alcance: ALCANCE_OPC,
+  beneficios: BENEF_OPC,
+  alcance_mtto: ALCANCE_MTTO_OPC,
+  beneficios_mtto: BENEF_MTTO_OPC
+});
+
+/** Opciones de redacción de un campo. Campo desconocido ⇒ lista vacía, no crash. */
+export function opcionesRedaccion(campo) {
+  return CATALOGO_REDACCION[campo] || [];
+}
 
 /**
  * Cuadro de firmas del formato oficial. Solo el ROL (que es parte del formato);
@@ -560,13 +626,19 @@ function resolverPlantilla(tpl, equipo, st) {
  * `mvaProyecto` (el dominio ya sabe darle prioridad).
  */
 function textoVersion(campo, indice, equipo, st) {
-  const opts = campo === 'alcance' ? ALCANCE_OPC : BENEF_OPC;
-  const o = opts[indice];
+  const o = opcionesRedaccion(campo)[indice];
   if (!o) return '';
   if (o.auto) {
     const eq = { ...equipo, mvaProyecto: potenciaProyecto(equipo, st) };
     const d = diagnosticoDeEquipo(equipo);
-    return o.auto === 'alcance' ? redaccionAlcance(eq, d) : redaccionBeneficios(eq, d);
+    const AUTO = {
+      alcance: redaccionAlcance,
+      beneficios: redaccionBeneficios,
+      alcance_mtto: redaccionAlcanceMtto,
+      beneficios_mtto: redaccionBeneficiosMtto
+    };
+    const fn = AUTO[o.auto];
+    return fn ? fn(eq, d) : '';
   }
   return resolverPlantilla(o.v, equipo, st);
 }
@@ -1534,21 +1606,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function pintarModal() {
     if (!actual) return;
 
-    // El documento de Salud de Activos todavía no está construido. Se dice, con
-    // lo que va a llevar, en vez de enseñar una hoja vacía que parezca rota o —
-    // peor— un papel a medias que alguien pueda dar por bueno.
-    if (documento === 'salud') {
-      modalTabs.innerHTML = '';
-      modalDiag.hidden = true;
-      $('[data-ftm="descargar-plan"]').hidden = true;
-      $('[data-ftm="exportar"]').hidden = true;
-      modalCuerpo.innerHTML = hojaEnConstruccion(actual);
-      modalCuerpo.scrollTop = 0;
-      return;
-    }
-    $('[data-ftm="exportar"]').hidden = false;
+    // La exportación llena el Excel oficial PE.02081, que es el formato del PI.
+    // El documento de mantenimiento todavía no tiene formato propio: enseñar ese
+    // botón aquí prometería un papel que no existe.
+    $('[data-ftm="exportar"]').hidden = (documento === 'salud');
 
-    modalTabs.innerHTML = HOJAS_FICHA.map((h) =>
+    modalTabs.innerHTML = hojasDe(documento).map((h) =>
       '<button type="button" role="tab" class="ftm-modal-tipo-btn' + (hoja === h.id ? ' is-on' : '')
       + '" data-hoja="' + h.id + '" aria-selected="' + (hoja === h.id) + '">' + esc(h.t) + '</button>').join('');
     const hayDiag = pintarTiraDiagnostico(actual);
@@ -1565,30 +1628,105 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (hoja === 'diagA' || hoja === 'diagF') pintarUnifilar();
   }
 
-  /** Lo que se ve al elegir el documento que aún no existe. */
-  function hojaEnConstruccion(e) {
-    const cond = e.cond_int;
+  /**
+   * Hoja «Salud y riesgo» del documento de Mantenimiento Especializado.
+   *
+   * Responde de un vistazo a las cuatro preguntas que el Ingeniero pidió ver
+   * juntas: en qué condición está el activo, dónde cae en la matriz de riesgo,
+   * a cuántos usuarios afecta y cuántos MVA hay comprometidos.
+   *
+   * La matriz NO se reimplementa: los rangos de criticidad, el nivel por
+   * usuarios y el color de la celda salen del mismo dominio que alimenta la
+   * matriz gerencial (`domain/matriz_riesgo.js`, MO.00418 Tabla 11). Si las dos
+   * pintaran cosas distintas para el mismo equipo, el documento no valdría nada.
+   */
+  function hojaSaludRiesgo(e) {
+    const hi = e.cond_int;
+    const usuarios = e.usuarios;
+    const mva = e.mva;
+
+    // Los rangos de criticidad son RELATIVOS a la flota: se calculan sobre el
+    // parque completo, no sobre este equipo. Es la misma base que la matriz
+    // gerencial, así que un equipo cae en la misma celda en los dos sitios.
+    let maxU = 1;
+    for (const x of EQUIPOS) {
+      const u = Number(x.usuarios);
+      if (isFinite(u) && u > maxU) maxU = u;
+    }
+    const rangos = calcularRangosCriticidad(maxU);
+    const nivel = nivelPorUsuarios(usuarios, rangos);
+    const color = (hi != null && nivel) ? colorCelda(hi, nivel) : null;
+
+    const NOMBRE_HI = { 5: '5 · Muy pobre', 4: '4 · Pobre', 3: '3 · Medio', 2: '2 · Bueno', 1: '1 · Muy bueno' };
+    // Los códigos son los del dominio (MO.00418 Tabla 11). Aquí solo se les
+    // pone el veredicto en palabras; el color y su nombre siguen saliendo de
+    // `COLORES_CELDA`, que es su dueño único.
+    const VEREDICTO = { VRD: 'Riesgo tolerable', AMRL: 'Atención', NAR: 'Riesgo alto', ROJ: 'Riesgo crítico' };
+    const hexDe = (c) => (COLORES_CELDA[c] && COLORES_CELDA[c].hex) || null;
+
+    const tarjeta = (v, sub, lbl, tinta) => ''
+      + '<div class="ftm-sr-kpi">'
+      +   '<b' + (tinta ? ' style="color:' + tinta + '"' : '') + '>' + v + '</b>'
+      +   '<span class="ftm-sr-kpi-s">' + sub + '</span>'
+      +   '<span class="ftm-sr-kpi-l">' + lbl + '</span>'
+      + '</div>';
+
+    // Matriz 5×5 con la casilla del equipo marcada. Las demás quedan en gris:
+    // aquí no interesa el reparto de la flota —eso ya está en Analítica— sino
+    // DÓNDE cae ESTE activo.
+    const cabecera = '<tr><th class="ftm-rmx-corner">Probabilidad de falla (condición) ↓ '
+      + '/ Consecuencia (usuarios) →</th>'
+      + NIVELES_ORDEN.map((n, i) => '<th>' + (i + 1) + ' · ' + esc(LABELS_NIVEL[n]) + '</th>').join('')
+      + '</tr>';
+    const filas = [5, 4, 3, 2, 1].map((f) => {
+      const tds = NIVELES_ORDEN.map((n) => {
+        const aqui = (f === hi && n === nivel);
+        const c = colorCelda(f, n);
+        const bg = aqui ? (hexDe(c) || '#e9eef4') : '#f3f6f9';
+        const tinta = aqui ? (c === 'AMRL' ? '#10202c' : '#fff') : '#c3ced9';
+        return '<td class="ftm-sr-cell' + (aqui ? ' is-aqui' : '') + '"'
+          + ' style="background:' + bg + ';color:' + tinta + '">'
+          + (aqui ? '<span class="ftm-sr-aqui">ESTE EQUIPO</span>' : '·')
+          + '</td>';
+      }).join('');
+      return '<tr><th class="ftm-rmx-ry">' + esc(NOMBRE_HI[f]) + '</th>' + tds + '</tr>';
+    }).join('');
+
+    const sinDato = (hi == null || !nivel);
+
     return ''
       + '<div class="ftm-hoja">'
-      +   cabeceraHoja('Mantenimiento Especializado · Salud de Activos')
-      +   '<div class="ftm-aviso"><b>Este documento está en construcción.</b> '
-      +   'Todavía no se emite: se está definiendo con el Ingeniero. Mientras tanto, '
-      +   'la propuesta a Plan de Inversión (PI) sigue disponible y no ha cambiado.</div>'
-      +   '<div class="ftm-kv">'
-      +     '<div class="ftm-kv-k">Equipo</div><div class="ftm-kv-v">'
-      +       esc(e.subestacion || '—') + (e.matricula ? ' · ' + esc(e.matricula) : '') + '</div>'
-      +     '<div class="ftm-kv-k">Condición actual</div><div class="ftm-kv-v">'
-      +       (cond != null ? esc(cond + ' · ' + nombreCondicion(cond)) : 'sin dato') + '</div>'
-      +     '<div class="ftm-kv-k">Capacidad</div><div class="ftm-kv-v">'
-      +       (e.mva != null ? esc(mvaTxt(e.mva)) + ' MVA' : '—') + '</div>'
+      +   cabeceraHoja('Salud del activo y posición en la matriz de riesgo')
+      +   '<div class="ftm-sr-kpis">'
+      +     tarjeta(hi != null ? esc(String(hi)) : '—',
+                    hi != null ? esc(nombreCondicion(hi)) : 'sin dato',
+                    'Condición del activo', hi != null ? colorCondicion(hi) : null)
+      +     tarjeta(usuarios != null ? esc(numES(usuarios, 0)) : '—',
+                    nivel ? 'criticidad ' + esc(LABELS_NIVEL[nivel]) : 'sin clasificar',
+                    'Usuarios aguas abajo')
+      +     tarjeta(mva != null ? esc(mvaTxt(mva)) : '—', 'MVA', 'Capacidad comprometida')
+      +     tarjeta(color ? esc(VEREDICTO[color] || color) : '—',
+                    color ? esc((COLORES_CELDA[color] || {}).label || '') + ' · MO.00418 Tabla 11'
+                          : 'falta condición o usuarios',
+                    'Veredicto de riesgo', color ? hexDe(color) : null)
       +   '</div>'
-      +   '<p class="ftm-mini-src">La diferencia con el PI: aquel propone <b>inversión</b> '
-      +   '(reponer el activo) y este programará <b>mantenimiento especializado</b> sobre el '
-      +   'equipo que ya está en servicio, a partir de su condición.</p>'
+      +   (sinDato
+          ? '<div class="ftm-aviso"><b>Este equipo no se puede situar en la matriz.</b> '
+            + 'Falta ' + (hi == null ? 'la condición' : 'el número de usuarios aguas abajo')
+            + ': sin ese dato no hay posición que mostrar, y una casilla marcada al azar '
+            + 'sería peor que ninguna.</div>'
+          : '')
+      +   '<div class="ftm-rmx-wrap"><table class="ftm-rmx">'
+      +     '<thead>' + cabecera + '</thead><tbody>' + filas + '</tbody>'
+      +   '</table></div>'
+      +   '<p class="ftm-mini-src">La consecuencia se mide por usuarios aguas abajo, en cinco '
+      +   'rangos calculados sobre TODO el parque: por eso este equipo cae en la misma casilla '
+      +   'aquí y en la matriz de Analítica gerencial.</p>'
       + '</div>';
   }
 
   function cuerpoHoja(e, cual) {
+    if (cual === 'salud') return hojaSaludRiesgo(e);
     if (cual === 'ficha') return hojaFicha(e);
     if (cual === 'benef') return hojaBeneficios(e);
     if (cual === 'diagA') return hojaDiagrama(e, 'actual');
@@ -1619,10 +1757,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     + 'placeholder="' + esc(ph || '') + '" aria-label="' + esc(lbl) + '"'
     + (extra || '') + '></div>';
 
+  /**
+   * Clave del estado donde vive un segmento redactado. El PI y el documento de
+   * mantenimiento comparten la hoja, no el texto: cada uno guarda el suyo, de
+   * modo que elegir una redacción aquí no pisa la que el otro ya tuviera.
+   */
+  const campoRed = (base) => (documento === 'salud' ? base + '_mtto' : base);
+
   /** Selector de redacción + área de texto (alcance / beneficios). */
   function selectorRedaccion(e, campo) {
     const st = estadoDe(e);
-    const opts = campo === 'alcance' ? ALCANCE_OPC : BENEF_OPC;
+    const opts = opcionesRedaccion(campo);
     const cur = st.plan[campo + '_ver'];
     const options = '<option value="">— Personalizado / en blanco —</option>'
       + opts.map((o, i) =>
@@ -1702,7 +1847,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const r = buscarUC(U);
     const potVal = lleno(P.potenciaMVA) ? P.potenciaMVA : (e.mva != null ? e.mva : '');
     return '<div class="ftm-hoja">'
-      + cabeceraHoja('FICHA TÉCNICA PLANIFICACIÓN SISTEMA DISTRIBUCIÓN')
+      + cabeceraHoja(documento === 'salud'
+        ? 'FICHA TÉCNICA · MANTENIMIENTO ESPECIALIZADO · SALUD DE ACTIVOS'
+        : 'FICHA TÉCNICA PLANIFICACIÓN SISTEMA DISTRIBUCIÓN')
       + '<div class="ftm-hoja-grid2">'
       +   campoInput('Proyecto', 'proyecto', P.proyecto || '', '(nombre del proyecto)')
       +   campoInput('Consecutivo', 'consecutivo', P.consecutivo || '', '')
@@ -1723,7 +1870,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +     '<span class="ftm-campo-val" data-calc="uucc">' + esc(textoUC(U, r)) + '</span></div>'
       + '</div>'
       + banda('Alcance')
-      + selectorRedaccion(e, 'alcance')
+      + selectorRedaccion(e, campoRed('alcance'))
       + banda('Presupuesto')
       + bloquePresupuesto(e)
       + banda('Histórico de revisiones')
@@ -1735,7 +1882,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   campoInput('Año de entrada', 'anioentrada', P.anioentrada || '', 'aaaa')
       + '</div>'
       + bloqueFirmas(e)
-      + pieHoja('Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
+      + pieHoja(documento === 'salud' ? 'Pág. 1 de 7' : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
   }
 
@@ -1746,19 +1893,26 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   // ── HOJA 2 · Beneficios ──
   function hojaBeneficios(e) {
-    return '<div class="ftm-nota-anexo">Texto de los <b>beneficios</b> del proyecto. Se escribe en la '
-      + 'hoja 1 del formato oficial (celda B23) al exportar. La hoja «Beneficios» del libro conserva '
-      + 'su estudio económico y sus fórmulas: este módulo no la reescribe.</div>'
-      + selectorRedaccion(e, 'beneficios')
+    const campo = campoRed('beneficios');
+    const nota = documento === 'salud'
+      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. No se prometen los de un '
+        + 'equipo nuevo: la redacción automática distingue lo que el mantenimiento recupera de lo que '
+        + 'no revierte.'
+      : 'Texto de los <b>beneficios</b> del proyecto. Se escribe en la hoja 1 del formato oficial '
+        + '(celda B23) al exportar. La hoja «Beneficios» del libro conserva su estudio económico y sus '
+        + 'fórmulas: este módulo no la reescribe.';
+    return '<div class="ftm-nota-anexo">' + nota + '</div>'
+      + selectorRedaccion(e, campo)
       + '<div class="ftm-hoja">'
-      + cabeceraHoja('BENEFICIOS DEL PROYECTO')
+      + cabeceraHoja(documento === 'salud'
+        ? 'BENEFICIOS DEL MANTENIMIENTO ESPECIALIZADO' : 'BENEFICIOS DEL PROYECTO')
       + banda('Vista previa del texto')
-      + '<div class="ftm-campo-val" data-vista="beneficios">'
-      + (lleno(estadoDe(e).plan.beneficios)
-        ? esc(estadoDe(e).plan.beneficios).replace(/\n/g, '<br>')
+      + '<div class="ftm-campo-val" data-vista="' + campo + '">'
+      + (lleno(estadoDe(e).plan[campo])
+        ? esc(estadoDe(e).plan[campo]).replace(/\n/g, '<br>')
         : '<i>Sin texto todavía.</i>')
       + '</div>'
-      + pieHoja('Pág. 2 de 5', 'PE.02081.PE-FO.03 Ed.01')
+      + pieHoja(documento === 'salud' ? 'Pág. 2 de 7' : 'Pág. 2 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
   }
 
@@ -1901,7 +2055,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function reescribirRedacciones() {
     if (!actual) return;
     const st = estadoDe(actual);
-    ['alcance', 'beneficios'].forEach((campo) => {
+    [campoRed('alcance'), campoRed('beneficios')].forEach((campo) => {
       const ver = st.plan[campo + '_ver'];
       if (ver == null || ver === 'custom') return;
       st.plan[campo] = textoVersion(campo, +ver, actual, st);
