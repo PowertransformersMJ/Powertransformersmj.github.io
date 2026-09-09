@@ -2362,3 +2362,61 @@ automática (V5) no cambió y sigue siendo la última de la lista.
 Crudo y recortes de los editores → bóveda, `2026-09-08-redacciones-mantenimiento/`. El estudio
 conceptual largo del que salieron estos textos —diez campos por propuesta y matriz comparativa—
 quedó publicado como artefacto para el Ingeniero.
+
+**74.19 El alcance deja de ser un texto y pasa a ser una composición (2026-09-08).** Encargo:
+*«necesito que la redacción en el alcance sea más técnica, y se complemente con las acciones de
+mantenimiento, estas me gustaría que me permitas escogerlas y con base a eso das un alcance
+específico y compacto. Dame 3 propuestas por condición.»*
+
+**Lo que cambia de fondo.** Hasta aquí el alcance era un texto cerrado que se elegía. Ahora es una
+**plantilla más una selección**: quince plantillas (tres por banda) con un hueco `{ACCIONES}` que se
+rellena con lo que el Ingeniero marque en la hoja. La plantilla *enmarca*; no enumera. Por eso el
+texto puede ser a la vez compacto y específico de ESTE equipo.
+
+**De dónde salen las acciones — y por qué el orden importa.** `nucleoFicha` ya entregaba las
+subactividades registradas del equipo, o la línea base de su condición cuando no tiene ninguna. A eso
+se suma el catálogo `MO.00418 §4.3` de su banda, sin marcar, para añadir. Los tres orígenes se
+distinguen en pantalla porque **no valen lo mismo**: presentar una línea base como plan de récord es
+fabricar un plan que nadie aprobó (la doctrina de ADR-066 aplicada a otra superficie).
+
+**Las tres variantes por banda** abren por sitios distintos para que no sean intercambiables: `·A` el
+trabajo y los subsistemas sobre los que recae · `·B` la evidencia medida que lo sustenta y cómo se
+verifica al cierre · `·C` la operación y el riesgo (ventana, respaldo, consecuencia). Con dieciséis
+entradas la lista plana dejaba de leerse: va agrupada por condición, con la del equipo primero.
+
+**La trampa que cazó la crítica adversarial, y que yo no había previsto.** Los cinco críticos, de
+forma independiente, señalaron el mismo defecto de clase: los borradores escribían *«comprende
+{ACCIONES}, ejecutadas sobre los subsistemas…»*. Se lee perfecto con la lista de ejemplo —femenina
+plural por casualidad— y **se rompe con la real**: «comprende muestreo de aceite, *ejecutadas*
+sobre…». Un participio concordado detrás del hueco depende del género y del número de una lista que
+cambia con cada equipo. Varios lo verificaron **ejecutando `prosaAcciones()` contra el catálogo**, no
+razonándolo. Ninguna plantilla lleva ya concordancia detrás del hueco, y una prueba lo fija.
+→ **L-82**.
+
+**Tres defectos que solo salieron al usar el catálogo de verdad.** (a) `clasificarAccion` comparaba
+sin normalizar tildes: «Regeneración aceite» no casaba con `/REGENERACION/` y caía a «diagnóstico»;
+además «aumento de capacidad» a secas contaba como inversión aunque fuera del sistema de
+refrigeración. (b) El registro y el catálogo nombran la misma acción de dos formas —«PLAN DE
+MITIGACION POR SOBRECARGA» / «Plan de mitigación sobrecarga 90-110 %»— y se ofrecían las dos: en un
+documento que se firma, eso **invita a contratar dos veces el mismo trabajo**. Se deduplica por
+huella de contenido, no por cadena literal, con contra-prueba de que no colapsa acciones distintas.
+(c) La línea base se imprimía sin tildes; esas cadenas son nuestras, no dato de cliente, y ahora van
+bien escritas.
+
+**Una contradicción que ahora se avisa.** La línea base de la condición 4 incluye «Propuesta a Plan
+de Inversión (PI)». Componerla dentro de un alcance de condición 4 —que declara que *«el activo se
+conserva en operación»*— produce un documento que se contradice a sí mismo. No se bloquea: se avisa
+con las acciones nombradas, y el Ingeniero decide si sobra la acción o si al equipo le corresponde la
+condición 5.
+
+**Verificación**: 1531 pruebas verdes (26 nuevas), lint limpio, y preview de punta a punta —
+composición del texto, aviso que aparece y desaparece al marcar y desmarcar, agrupación del
+desplegable con la banda del equipo primero.
+
+**Verificado sano / no re-auditar**: las cadenas del registro de Salud de Activos NO se tocan (son
+dato de cliente) · `clasificarAccion` sigue devolviendo lo mismo para todas las cadenas heredadas, con
+prueba de no-regresión · el PI no usa `{ACCIONES}` y su catálogo queda intacto · una selección vacía
+guardada se respeta y no se repuebla sola.
+
+Crudo del workflow y la lección de la concordancia → bóveda,
+`2026-09-08-redacciones-mantenimiento/` (segunda vuelta).

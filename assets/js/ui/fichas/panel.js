@@ -39,7 +39,13 @@ import {
   calcularRangosCriticidad, nivelPorUsuarios, colorCelda
 } from '../../domain/matriz_riesgo.js';
 import { atraparFoco } from '../foco-modal.js';
-import { construirFichaTecnica, colorCondicion, nombreCondicion } from './ficha-tecnica.js';
+import {
+  construirFichaTecnica, colorCondicion, nombreCondicion, nucleoFicha,
+  clasificarAccion, CATEGORIAS_ACCION
+} from './ficha-tecnica.js';
+import {
+  accionesDisponibles, seleccionPorDefecto, prosaAcciones
+} from '../../domain/fichas_acciones.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
   claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas
@@ -214,17 +220,36 @@ export const BENEF_OPC = Object.freeze([
    redacción aquí no puede pisar la que el PI ya tenga escrita. */
 
 /**
- * Las cinco propuestas del ALCANCE, una por CONDICIÓN DE SALUD. El eje no es el
- * ángulo del argumento sino el estado del activo, que es lo que decide qué se
- * hace con él: conservar · controlar · recuperar · intervenir · reemplazar.
- * `cond` permite señalar en la lista la que corresponde a este equipo.
+ * El ALCANCE: TRES propuestas por CONDICIÓN DE SALUD (quince en total) más la
+ * automática. El eje no es el ángulo del argumento sino el estado del activo,
+ * que es lo que decide qué se hace con él.
+ *
+ * Cada banda ofrece tres entradas técnicas que abren por sitios distintos:
+ *   ·A  el trabajo y los subsistemas sobre los que recae;
+ *   ·B  la evidencia medida que lo sustenta y cómo se verifica al cierre;
+ *   ·C  la operación y el riesgo: ventana, respaldo y consecuencia.
+ *
+ * `{ACCIONES}` es el hueco donde entran las acciones que el Ingeniero marque:
+ * la plantilla ENMARCA, no enumera. Por eso ninguna cierra con un participio
+ * concordado detrás del hueco —«comprende {ACCIONES}, ejecutadas sobre…» se
+ * rompe en cuanto la lista mezcla géneros o trae una sola acción—.
  */
 export const ALCANCE_MTTO_OPC = Object.freeze([
-  { t: 'C1 · Conservar y vigilar', cond: 1, v: 'El alcance del proyecto comprende el programa de conservación predictiva del transformador de potencia de {MVA} MVA en servicio en la subestación {SUB}, cuya evaluación bajo la metodología de salud de activos lo ubica en la mejor banda de la escala. El trabajo no actúa sobre la parte activa: sostiene el régimen de seguimiento asignado a esta condición —muestreo y caracterización del aceite, pruebas eléctricas de diagnóstico, inspección ocular detallada, inspección termográfica y diagnóstico del sistema de puesta a tierra— y constituye la línea base por variable contra la cual se medirá toda desviación futura, junto con la recuperación documental del historial de mantenimiento. Se verifican sin apertura el cambiador de tomas y los accesorios principales, el régimen de carga y temperatura, la hermeticidad y las protecciones e instrumentación. La componente de edad del índice progresa por sí sola y ninguna acción la detiene: lo que el programa conserva es el estado físico de los subsistemas y la capacidad de detectar la primera desviación mientras aún admite corrección de bajo costo.' },
-  { t: 'C2 · Controlar y seguir', cond: 2, v: 'El alcance del proyecto comprende el programa de vigilancia reforzada y control de tendencias del transformador de potencia de {MVA} MVA de la subestación {SUB}, unidad que permanece en buena condición pero ya exhibe desviaciones menores en una o más variables del índice de salud. La intervención es no invasiva: adopta el régimen de seguimiento reforzado asignado a esta condición —inspección termográfica, verificación de los sistemas de enfriamiento y de los indicadores de temperatura, inspección ocular detallada, pruebas eléctricas de diagnóstico y evaluación de descargadores de sobretensión— y añade muestreo dirigido sobre la variable que presenta la señal, con cadencia acortada, para separar fluctuación de tendencia. Comprende además la verificación de causas incipientes de origen externo —conexiones, aisladores, sistema de refrigeración y hermeticidad— y la aplicación de los disparadores de escalamiento que la metodología ya define. No contempla tratamiento del aceite ni apertura del equipo: hacerlo en esta banda reiniciaría la línea base de gases y compuestos furánicos y destruiría la evidencia que se está tratando de leer.' },
-  { t: 'C3 · Recuperar y mitigar', cond: 3, v: 'El alcance del proyecto comprende la intervención correctiva programada del transformador de potencia de {MVA} MVA de la subestación {SUB}, con deterioro moderado conforme a la metodología de salud de activos, y las medidas de mitigación operativa que la acompañan. El trabajo separa de forma explícita lo que se recupera de lo que no: comprende corrección de fugas por accesorios y restitución de la hermeticidad, actualización de accesorios y de tablero, tratamiento del aceite dieléctrico —secado y, según su condición físico-química, regeneración—, mantenimiento preventivo del cambiador de tomas y recuperación de aislamientos en los alcances que la admiten; y, cuando la causa es el régimen de operación, aumento del caudal o de la capacidad del sistema de refrigeración. Incluye ensayos eléctricos de verificación antes y después de la intervención y la actualización del historial del activo. La edad y el consumo de vida del aislamiento sólido no se revierten: se declara formalmente el límite de la recuperación obtenida.' },
-  { t: 'C4 · Intervenir y reducir exposición', cond: 4, v: 'El alcance del proyecto comprende la intervención correctiva mayor del transformador de potencia de {MVA} MVA de la subestación {SUB} y, de forma inseparable, la reducción de la exposición del nodo que alimenta. Sobre el equipo contempla regeneración del aceite dieléctrico, secado de la parte activa, mantenimiento del cambiador de tomas con despiece, inspección de la parte activa, reemplazo de bujes, reemplazo o reparación de componentes defectuosos y protección superficial parcial, con el frente de localización del defecto seleccionado según el patrón de gases hallado y ensayos eléctricos de verificación antes y después. Sobre el sistema comprende el plan de mitigación por cargabilidad, la redistribución de carga y el aseguramiento de respaldo, y evalúa la repotenciación de la unidad o su movimiento estratégico hacia un emplazamiento de menor criticidad. En esta banda contener la probabilidad de falla no basta: se actúa también sobre la consecuencia de su ocurrencia.' },
-  { t: 'C5 · Reemplazar o retirar', cond: 5, v: 'El alcance del proyecto comprende la salida ordenada de servicio del transformador de potencia de {MVA} MVA de la subestación {SUB}, activo en condición crítica cuya permanencia en operación no se sostiene frente al costo de recuperarlo. Comprende la evaluación de las alternativas de salida —reposición por una unidad de capacidad equivalente o superior, reemplazo por otro activo del parque, modernización transitoria o retiro programado—, la formulación de la propuesta a plan de inversión y, cuando la demanda proyectada lo justifique, el aumento de capacidad de transformación del nodo. Incluye el plan de continuidad del suministro durante la transición, las medidas de sostenimiento que controlan el riesgo hasta la salida —retrofit de protecciones mecánicas y tableros, regeneración de aislamientos y protección superficial— y el cierre ambiental, documental y patrimonial del ciclo de vida, con la disposición final del aceite y el destino definido del equipo retirado.' },
+  { t: 'C1·A · Trabajo y subsistemas', cond: 1, v: 'El alcance contratado comprende {ACCIONES} sobre el transformador de {MVA} MVA de la subestación {SUB}. La intervención se ejecuta sobre cuba y sistema de preservación, bujes, sistema de refrigeración, tablero de control, protecciones e instrumentación, accionamiento del conmutador bajo carga o sin carga y sistema de puesta a tierra; la evaluación de descargadores no pertenece a este alcance. No se abre la parte activa ni se interviene el aislamiento sólido: ese criterio de exclusión delimita el trabajo. Lo compatible con el activo en servicio se atiende sin indisponibilidad; lo que exija desenergización se coordina como tal. Al cierre, cada subsistema intervenido queda verificado en su función y el resultado se incorpora a la ficha del activo.' },
+  { t: 'C1·B · Evidencia y línea base', cond: 1, v: 'Las variables que gobiernan la condición del transformador de {MVA} MVA de la subestación {SUB} muestran este comportamiento registrado: gases disueltos, edad del activo, rigidez dieléctrica, tensión interfacial y número de neutralización —que componen el índice de calidad del aceite—, compuestos furánicos y el grado de polimerización, cargabilidad, protecciones y telecontrol, y hermeticidad; humedad y temperatura del punto más caliente se vigilan fuera del índice. Se mantiene dentro de las bandas de referencia, salvo donde el diagnóstico señale lo contrario. Sobre él se sustentan las acciones contratadas: {ACCIONES}, cuyo propósito es sostener esa condición y documentar su tendencia. La verificación posterior contrasta cada resultado contra la línea base, variable por variable; un tratamiento del aceite la reiniciaría en gases y furanos, y la comparación arrancaría en la muestra posterior.' },
+  { t: 'C1·C · Servicio y riesgo', cond: 1, v: 'La exigencia no la fija el transformador de {MVA} MVA, sino el sistema: su condición de salud lo ubica en la fila de menor probabilidad de falla y la criticidad por usuarios aguas abajo aporta la consecuencia; con criticidad máxima, la celda resultante deja de ser favorable. Por ello la ejecución de las acciones contratadas —{ACCIONES}— se organiza para preservar el servicio: cuba, preservación, refrigeración y tablero se atienden con el activo en servicio; bujes, devanados y puesta a tierra exigen indisponibilidad, agrupada en una ventana única y coordinada con el centro de control según la configuración de red disponible; sin respaldo, se programa como indisponibilidad de la carga. La duración queda por determinar mediante evaluación especializada y la maniobra se planifica para acotar la afectación aguas abajo de {SUB}.' },
+  { t: 'C2·A · Trabajo y subsistemas', cond: 2, v: 'El trabajo contratado sobre el transformador de {MVA} MVA de la subestación {SUB} comprende {ACCIONES}. La intervención recae sobre los subsistemas accesibles desde el exterior de la cuba: hermeticidad, sistema de preservación, sistema de refrigeración, tablero de control e instrumentación de temperatura con su señalización a las protecciones. No contempla apertura de la cuba, acceso a la parte activa, intervención del conmutador bajo carga o sin carga ni tratamiento del aceite aislante: cualquiera de ellos reiniciaría la línea base de gases disueltos y de compuestos furánicos, y toda evaluación posterior se haría contra un nuevo cero. Al cierre, los accesorios quedan verificados, la hermeticidad comprobada y la instrumentación contrastada, sin intervención del aislamiento sólido; la reposición de aceite se limita a la del muestreo y las juntas intervenidas.' },
+  { t: 'C2·B · Evidencia y verificación', cond: 2, v: 'La evidencia que sustenta la intervención en el transformador de {MVA} MVA de la subestación {SUB} es una señal incipiente no atribuida: tendencia de los gases disueltos, rigidez dieléctrica, tensión interfacial y número de neutralización, edad cronológica y cargabilidad. Sobre ella se define el alcance: {ACCIONES}. Su objeto es confirmar la señal, caracterizarla y atribuirla a un subsistema. Se excluyen la apertura de la cuba, el acceso a la parte activa, la intervención del conmutador y el tratamiento del aceite, que reiniciaría la línea base de gases disueltos y de compuestos furánicos y obligaría a evaluar contra un nuevo cero. Ninguna de estas acciones modifica por sí sola la condición: su producto es diagnóstico. El consumo de vida del aislamiento sólido, leído por compuestos furánicos, es irreversible.' },
+  { t: 'C2·C · Operación y continuidad', cond: 2, v: 'En la subestación {SUB} el transformador de {MVA} MVA permanece en servicio, y el trabajo se programa sin comprometer la demanda. El alcance comprende {ACCIONES}. Se separa lo ejecutable con equipo energizado de lo que exige ventana operativa; esto último se coordina con el centro de control, acotado a la mínima indisponibilidad y condicionado a que este confirme respaldo por transferencia de carga, sin el cual se reprograma. Quedan fuera abrir la cuba, acceder a la parte activa y tratar el aceite: exigen indisponibilidad prolongada y reiniciarían la línea base de gases disueltos y de compuestos furánicos, con evaluación posterior contra un nuevo cero. La criticidad, fijada por los usuarios aguas abajo, es ajena a este alcance, que actúa sobre la condición; la celda resulta del cruce.' },
+  { t: 'C3·A · Trabajo y estado final', cond: 3, v: 'La intervención se ejecuta sobre el transformador de potencia de {MVA} MVA instalado en {SUB} y comprende {ACCIONES}. El trabajo es un correctivo menor y alcanza solo los subsistemas que admiten restitución. Cada acción devuelve a valores de servicio únicamente la variable sobre la que actúa: la hermeticidad si se corrige una fuga, la capacidad de disipación si se interviene el sistema de refrigeración, la rigidez dieléctrica y el número de neutralización si se trata el aceite; lo no incluido permanece en su condición actual. Del aislamiento sólido se retiran humedad y contaminación; el grado de polimerización consumido no se recupera. El tratamiento del aceite, si está en el alcance, reinicia la línea base de gases disueltos y de compuestos furánicos: la evaluación posterior se refiere a ese nuevo cero.' },
+  { t: 'C3·B · Evidencia y verificación', cond: 3, v: 'La condición del transformador de potencia de {MVA} MVA en {SUB} se sustenta en la evidencia acumulada: gases disueltos y su tendencia, evaluación dieléctrica y físico-química del aceite —rigidez dieléctrica, tensión interfacial, número de neutralización—, compuestos furánicos, hermeticidad, cargabilidad, perfil térmico en operación, edad cronológica y estado de protecciones y telecontrol; la humedad se sigue como parámetro de control. Esa lectura sitúa al activo en el correctivo menor, separa lo recuperable de lo irrecuperable y sustenta el alcance definido: {ACCIONES}. Concluidos los trabajos se repite la verificación que motivó cada acción y se actualiza el historial. Tratar el aceite reinicia la línea base de gases disueltos y de compuestos furánicos: el grado de polimerización estimado a partir de ellos, que no revierte, deja de contrastarse con la serie anterior.' },
+  { t: 'C3·C · Operación y riesgo', cond: 3, v: 'El transformador de potencia de {MVA} MVA alimenta la carga de {SUB}; su probabilidad de falla domina el riesgo y la consecuencia la fija su criticidad por usuarios aguas abajo. Del cruce de ambos ejes resulta la celda que fija prioridad y ventana de la intervención, que se atiende como correctivo menor mediante {ACCIONES}. Los trabajos que exigen retiro de servicio se coordinan con la operación —indisponibilidad, transferencia de carga y respaldo definidos según el diagnóstico—; los que se ejecutan energizados no consumen indisponibilidad. Entretanto, actuar sobre el régimen de operación acota cargabilidad y temperatura de punto más caliente. Si el alcance incluye tratamiento del aceite, el seguimiento posterior se mide contra una línea base reiniciada de gases disueltos y de compuestos furánicos; el aislamiento sólido sigue envejeciendo bajo vigilancia.' },
+  { t: 'C4·A · Intervención y entrega', cond: 4, v: 'La intervención correctiva mayor sobre el transformador de {MVA} MVA de la subestación {SUB} comprende {ACCIONES}. Recae sobre los subsistemas que el diagnóstico señale como origen de la condición —parte activa y aislamiento sólido, cuba y sistema de preservación, conmutador, bujes, refrigeración, tablero de control con sus protecciones e instrumentación—. El activo se conserva en operación: la intervención no contempla su reposición. Se entrega con lo intervenido verificado por ensayo y sin alterar lo ajeno al alcance; se exceptúa el aislamiento sólido, cuyo envejecimiento la intervención contiene pero no deshace. Cuando hay tratamiento del aceite, este reinicia la línea base de gases disueltos y de compuestos furánicos: la evaluación posterior se hace contra el nuevo cero. Los niveles de entrega se fijan según los resultados del diagnóstico del activo.' },
+  { t: 'C4·B · Evidencia y verificación', cond: 4, v: 'Las variables evaluadas sustentan la intervención: contenido y tendencia de gases disueltos, rigidez dieléctrica, tensión interfacial, índice de neutralización y humedad del aislamiento líquido, compuestos furánicos y grado de polimerización estimado del aislamiento sólido, cargabilidad, temperatura estimada del punto más caliente, hermeticidad, edad de servicio y estado de protecciones e instrumentación. Sobre esa evidencia se define el trabajo del transformador de {MVA} MVA de {SUB}: abarca {ACCIONES}; cada actividad se escoge contra la variable que la motiva, provenga del plan registrado o de la línea base. Concluida la ejecución se comprueban por ensayo las variables recuperables —el envejecimiento del aislamiento sólido no revierte— y se actualiza el historial. Todo tratamiento del aceite deja en cero la referencia de gases disueltos y compuestos furánicos: la comparación siguiente parte de ahí.' },
+  { t: 'C4·C · Ventana, respaldo y riesgo', cond: 4, v: 'La celda de riesgo cruza dos ejes: la condición del activo, que expresa la probabilidad de falla de la unidad, y la criticidad por usuarios aguas abajo, que fija la consecuencia. Esa condición puede originarse por deterioro ponderado o por un piso automático —cargabilidad en su calificación máxima, acetileno con aceleración detectada o furanos con fin de vida útil del papel aprobado—; cuando la origina la cargabilidad, el alcance incorpora decisiones sobre el sistema, concretadas en las acciones escogidas. El trabajo sobre el transformador de {MVA} MVA de la subestación {SUB} comprende {ACCIONES}, en ventana coordinada con la operación, con maniobras, respaldo e indisponibilidad por determinar mediante evaluación especializada. Si el alcance toca el aceite, gases disueltos y compuestos furánicos vuelven a cero y el seguimiento se replantea desde ahí.' },
+  { t: 'C5·A · Ejecución de la salida', cond: 5, v: 'Sobre el transformador de {MVA} MVA de la subestación {SUB}, en condición muy pobre, se ejecuta un alcance que comprende {ACCIONES}, dirigido a sostener la operabilidad hasta la salida del activo y no a extender su vida técnica. Cada subsistema intervenido queda en condición de operación acotada y verificable. Todo tratamiento de aceite o de aislamientos que ese alcance incluya reinicia la línea base de gases disueltos y de compuestos furánicos, contra la cual se contrasta la verificación posterior. En paralelo se evalúan las alternativas de salida ajenas al alcance ejecutado —reposición, reemplazo por otro activo del parque o retiro programado—, cuyo dimensionamiento queda por determinar mediante evaluación especializada. El activo se entrega con inventario de componentes recuperables, expediente técnico consolidado y ruta de desincorporación ambiental, documental y patrimonial.' },
+  { t: 'C5·B · Evidencia de fin de vida', cond: 5, v: 'La calificación muy pobre se sustenta en la evidencia ponderada del índice de salud: tendencia de gases disueltos, rigidez dieléctrica, tensión interfacial y número de neutralización, compuestos furánicos y grado de polimerización estimado a partir de ellos, edad, cargabilidad, protecciones y telecontrol, y hermeticidad. Sobre esa base, el alcance definido para el transformador de {MVA} MVA de la subestación {SUB} comprende {ACCIONES}. La despolimerización de la celulosa es irreversible y la edad solo acumula: se informa la recuperación de variables tratables, no del agregado. Todo tratamiento del aceite reinicia la línea base de gases disueltos y compuestos furánicos, y la verificación posterior se contrasta contra ese nuevo cero. El resultado se incorpora al expediente que sustenta la salida del activo: la evidencia no habilita recuperación, sino retiro programado o reposición.' },
+  { t: 'C5·C · Riesgo y continuidad', cond: 5, v: 'Los usuarios aguas abajo de esta unidad de la subestación {SUB} definen la consecuencia de una falla; su condición muy pobre, la probabilidad; su cruce ubica la celda de riesgo y la prioridad. Con esa prioridad se programa sobre la unidad de {MVA} MVA la ejecución de {ACCIONES}, en ventana coordinada con la operación y la indisponibilidad tramitada. Antes de intervenir se prueba el respaldo del nodo y se fijan los criterios de reingreso transitorio o de retiro anticipado, subordinados a su salida programada. Todo tratamiento de aceite o de aislamientos reinicia la línea base de gases disueltos y compuestos furánicos: la verificación posterior se contrasta contra ese nuevo cero. Se contiene así la falla no programada de un activo en fin de vida técnica y la interrupción prolongada del suministro.' },
   { t: 'Automática · anclada en datos medidos', auto: 'alcance_mtto' }
 ]);
 
@@ -621,10 +646,35 @@ function descripcionUC(equipo, codigo) {
 }
 
 /** Resuelve `{MVA}` y `{SUB}` de una plantilla del dueño. */
+/**
+ * Acciones de mantenimiento que se le pueden marcar a un equipo: las suyas
+ * (registradas, o la línea base de su condición) más las que el catálogo
+ * oficial contempla para esa banda y todavía no tiene.
+ */
+export function accionesDeEquipo(equipo) {
+  const n = nucleoFicha(equipo || {});
+  return accionesDisponibles(n.ci, n.acciones, n.baseUsada, clasificarAccion);
+}
+
+/** Ids marcados: los guardados, o los del plan del equipo la primera vez. */
+export function seleccionAcciones(equipo, st) {
+  const disp = accionesDeEquipo(equipo);
+  const guardado = (st && st.plan) ? st.plan.acc_sel : null;
+  const ids = Array.isArray(guardado) ? guardado : seleccionPorDefecto(disp);
+  const set = new Set(ids);
+  return disp.filter((a) => set.has(a.id));
+}
+
 function resolverPlantilla(tpl, equipo, st) {
+  // `{ACCIONES}` lo compone el Ingeniero marcando en la ficha. Si no ha marcado
+  // ninguna NO se deja el hueco ni se inventa un plan: se dice que están por
+  // definir, que es lo único cierto en ese momento.
+  const escogidas = prosaAcciones(seleccionAcciones(equipo, st));
   return String(tpl || '')
     .replace(/\{MVA\}/g, mvaTxt(potenciaProyecto(equipo, st)))
-    .replace(/\{SUB\}/g, equipo.subestacion || '');
+    .replace(/\{SUB\}/g, equipo.subestacion || '')
+    .replace(/\{ACCIONES\}/g, escogidas
+      || 'las acciones de mantenimiento que se definan según los resultados del diagnóstico del activo');
 }
 
 /**
@@ -1630,6 +1680,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
     modalCuerpo.innerHTML = cuerpoHoja(actual, hoja);
     modalCuerpo.scrollTop = 0;
+    pintarAvisoAcciones();
     const btnPlan = $('[data-ftm="descargar-plan"]');
     if (btnPlan) btnPlan.hidden = (hoja !== 'plan');
     if (hoja === 'diagA' || hoja === 'diagF') pintarUnifilar();
@@ -1771,6 +1822,61 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    */
   const campoRed = (base) => (documento === 'salud' ? base + '_mtto' : base);
 
+  /**
+   * Selector de ACCIONES de mantenimiento. Es lo que hace específico el alcance:
+   * el Ingeniero marca qué se ejecuta y la redacción se compone con eso.
+   *
+   * Se distingue de dónde sale cada renglón, porque no valen lo mismo: lo que el
+   * equipo tiene REGISTRADO en Salud de Activos, la LÍNEA BASE de su condición
+   * cuando no tiene nada registrado (y entonces se rotula como referencial), y
+   * el CATÁLOGO oficial de la banda, que se ofrece sin marcar para añadir.
+   */
+  function selectorAcciones(e) {
+    const st = estadoDe(e);
+    const disp = accionesDeEquipo(e);
+    if (!disp.length) {
+      return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
+        + 'registrada, así que no hay acciones de su banda que ofrecer. El alcance se redacta a '
+        + 'mano o se toma la versión automática.</div>';
+    }
+    const marcados = new Set(seleccionAcciones(e, st).map((a) => a.id));
+    const hayRegistro = disp.some((a) => a.origen === 'registro');
+    const esBase = disp.some((a) => a.origen === 'base');
+
+    const fila = (a) => {
+      const C = CATEGORIAS_ACCION[a.cat] || CATEGORIAS_ACCION.DIAG;
+      return '<label class="ftm-acc-item' + (a.origen === 'catalogo' ? ' es-extra' : '') + '">'
+        + '<input type="checkbox" data-accion="' + esc(a.id) + '"' + (marcados.has(a.id) ? ' checked' : '') + '>'
+        + '<span class="ftm-acc-cat" style="background:' + C.c + '" title="' + esc(C.lbl) + '"></span>'
+        + '<span class="ftm-acc-txt">' + esc(a.txt) + '</span>'
+        + '</label>';
+    };
+
+    const propias = disp.filter((a) => a.origen !== 'catalogo');
+    const extra = disp.filter((a) => a.origen === 'catalogo');
+
+    return '<div class="ftm-acc">'
+      + '<div class="ftm-acc-head">Acciones de mantenimiento del alcance'
+      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar todas</button>'
+      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="0">Ninguna</button>'
+      + '</div>'
+      + (propias.length
+        ? '<div class="ftm-acc-grupo"><span class="ftm-acc-rot">'
+          + (hayRegistro ? 'Plan registrado del equipo' : 'Línea base de la condición · referencial')
+          + '</span>' + propias.map(fila).join('') + '</div>'
+        : '')
+      + (extra.length
+        ? '<div class="ftm-acc-grupo"><span class="ftm-acc-rot">Catálogo de la condición · añadir</span>'
+          + extra.map(fila).join('') + '</div>'
+        : '')
+      + '<p class="ftm-acc-pie">' + (esBase
+        ? 'El equipo no trae macroactividad registrada: lo marcado arriba es la línea base de su '
+          + 'condición y se rotula como referencial, no como plan aprobado. '
+        : '') + 'Lo que marque entra en el texto del alcance.</p>'
+      + '<p class="ftm-acc-aviso" data-acc-aviso hidden></p>'
+      + '</div>';
+  }
+
   /** Selector de redacción + área de texto (alcance / beneficios). */
   function selectorRedaccion(e, campo) {
     const st = estadoDe(e);
@@ -1781,13 +1887,30 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // autoselecciona — elegir por él pisaría lo que hubiera escrito, y la
     // condición es una recomendación, no una orden.
     const rec = opts.some((o) => o.cond != null) ? e.cond_int : null;
+
+    // Con tres propuestas por banda la lista plana pasa de dieciséis entradas y
+    // deja de leerse. Se agrupa por condición y la del equipo va PRIMERA, que es
+    // la única que casi siempre se va a usar.
+    const opt = (o, i) => '<option value="' + i + '"'
+      + (String(cur) === String(i) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
+    const conIndice = opts.map((o, i) => ({ o, i }));
+    const bandas = [...new Set(conIndice.filter((x) => x.o.cond != null).map((x) => x.o.cond))]
+      .sort((a, b) => (a === rec ? -1 : b === rec ? 1 : a - b));
+    const grupo = (c) => '<optgroup label="Condición ' + c + ' · ' + esc(nombreCondicion(c))
+      + (c === rec ? ' — este equipo' : '') + '">'
+      + conIndice.filter((x) => x.o.cond === c).map((x) => opt(x.o, x.i)).join('')
+      + '</optgroup>';
+    const sueltas = conIndice.filter((x) => x.o.cond == null);
     const options = '<option value="">— Personalizado / en blanco —</option>'
-      + opts.map((o, i) =>
-        '<option value="' + i + '"' + (String(cur) === String(i) ? ' selected' : '') + '>'
-        + esc(o.t) + (o.cond != null && o.cond === rec ? '  ← este equipo' : '') + '</option>').join('');
+      + bandas.map(grupo).join('')
+      + (sueltas.length
+        ? '<optgroup label="Sin condición">' + sueltas.map((x) => opt(x.o, x.i)).join('') + '</optgroup>'
+        : '');
+    const nProp = conIndice.filter((x) => x.o.cond === rec).length;
     const pista = rec != null
       ? 'Este equipo está en condición ' + esc(String(rec)) + ' · ' + esc(nombreCondicion(rec))
-        + ': la propuesta señalada es la que le corresponde. Puede elegir otra y editarla libremente.'
+        + ': sus ' + nProp + (nProp === 1 ? ' propuesta va' : ' propuestas van') + ' primero en la lista. '
+        + 'El texto se compone con las acciones que haya marcado arriba; puede editarlo libremente.'
       : 'Elija una versión y edítela libremente; la cifra de potencia se toma de «Potencia del proyecto».';
     return '<div class="ftm-alcance">'
       + '<label for="ftm-sel-' + campo + '">Redacción</label>'
@@ -1885,6 +2008,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +     '<span class="ftm-campo-val" data-calc="uucc">' + esc(textoUC(U, r)) + '</span></div>'
       + '</div>'
       + banda('Alcance')
+      + (documento === 'salud' ? selectorAcciones(e) : '')
       + selectorRedaccion(e, campoRed('alcance'))
       + banda('Presupuesto')
       + bloquePresupuesto(e)
@@ -2066,6 +2190,55 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
   }
 
+  /**
+   * Contradicción que sí se puede firmar sin darse cuenta: marcar una acción de
+   * INVERSIÓN (propuesta a plan de inversión, aumento de capacidad, instalación
+   * de unidad) bajo un alcance de condición 1 a 4, que declara que el activo se
+   * conserva en operación. Es real: la línea base de la condición 4 ya incluye
+   * la propuesta a PI. No se bloquea nada — se dice, y el Ingeniero decide.
+   */
+  function pintarAvisoAcciones() {
+    const el = modalCuerpo.querySelector('[data-acc-aviso]');
+    if (!el || !actual) return;
+    const st = estadoDe(actual);
+    const ver = st.plan[campoRed('alcance') + '_ver'];
+    const opc = (ver == null || ver === 'custom') ? null : opcionesRedaccion(campoRed('alcance'))[+ver];
+    const banda = opc && opc.cond != null ? opc.cond : null;
+    const inv = seleccionAcciones(actual, st).filter((a) => a.cat === 'INV');
+
+    if (banda == null || banda === 5 || !inv.length) { el.hidden = true; el.textContent = ''; return; }
+    el.hidden = false;
+    el.innerHTML = '⚠ Ha marcado ' + (inv.length === 1 ? 'una acción de inversión ('
+      : inv.length + ' acciones de inversión (')
+      + inv.map((a) => esc(a.txt)).join(', ') + ') dentro de un alcance de condición ' + banda
+      + ', que declara que el activo <b>se conserva en operación</b>. O la acción sobra en este '
+      + 'documento, o al equipo le corresponde la condición 5.';
+  }
+
+  /**
+   * Rehace el texto del alcance con la selección de acciones vigente. Solo si
+   * hay una redacción elegida: si el Ingeniero escribió la suya, no se pisa.
+   */
+  function rehacerAlcance() {
+    if (!actual || documento !== 'salud') return;
+    const st = estadoDe(actual);
+    const campo = campoRed('alcance');
+    const ver = st.plan[campo + '_ver'];
+    if (ver == null || ver === 'custom') return;
+    st.plan[campo] = textoVersion(campo, +ver, actual, st);
+    const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
+    if (ta) ta.value = st.plan[campo];
+  }
+
+  /** Guarda la selección de acciones y rehace el alcance. */
+  function fijarAcciones(ids) {
+    const st = estadoDe(actual);
+    st.plan.acc_sel = ids;
+    marcarSucio();
+    rehacerAlcance();
+    pintarAvisoAcciones();
+  }
+
   /** Al cambiar la potencia, las redacciones NO personalizadas se rehacen. */
   function reescribirRedacciones() {
     if (!actual) return;
@@ -2153,6 +2326,16 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      ═════════════════════════════════════════════════════════════════════ */
 
   function alHacerClic(ev) {
+    // Marcar todas / ninguna las acciones del alcance
+    const acct = ev.target.closest('[data-acc-todo]');
+    if (acct && contenedor.contains(acct) && actual) {
+      const todas = acct.getAttribute('data-acc-todo') === '1';
+      const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
+      cajas.forEach((c) => { c.checked = todas; });
+      fijarAcciones(todas ? cajas.map((c) => c.getAttribute('data-accion')) : []);
+      return;
+    }
+
     // Gestión de novedades
     const gest = ev.target.closest('[data-gestionar]');
     if (gest && contenedor.contains(gest)) { abrirCajon(gest.getAttribute('data-gestionar')); return; }
@@ -2310,6 +2493,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (ta) ta.value = st.plan[campo];
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
       if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+      pintarAvisoAcciones();
+    }
+    const accId = t.getAttribute && t.getAttribute('data-accion');
+    if (accId && actual) {
+      const marcados = [...modalCuerpo.querySelectorAll('[data-accion]')]
+        .filter((c) => c.checked).map((c) => c.getAttribute('data-accion'));
+      fijarAcciones(marcados);
     }
     if (t.getAttribute && t.getAttribute('data-anexo') && actual) {
       estadoDe(actual).anexo[t.getAttribute('data-anexo')] = t.value;

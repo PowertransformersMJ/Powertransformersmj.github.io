@@ -73,11 +73,19 @@ export const CATEGORIAS_ACCION = Object.freeze({
  * @returns {'INV'|'MIT'|'MEJ'|'CORR'|'DIAG'}
  */
 export function clasificarAccion(s) {
-  const u = (s || '').toUpperCase();
-  if (/(PLAN DE INVERSION|\bPI\b|AUMENTO DE CAPACIDAD|INSTALACION DE UNIDAD|REPOSICION|REEMPLAZO)/.test(u)) return 'INV';
-  if (/(MITIGACION|SOBRECARGA)/.test(u)) return 'MIT';
-  if (/(RECUPERACION DE AISLAM|ACTUALIZACION DEL SISTEMA DE REFRIG|REPOTENCIACION|REGENERACION|SECADO)/.test(u)) return 'MEJ';
-  if (/(CORRECCION DE FUGAS|MANTENIMIENTO OLTC|ACTUALIZACION DE ACCESORIOS|PINTURA|\bMANTENIMIENTO\b)/.test(u)) return 'CORR';
+  // Se compara SIN TILDES: las acciones registradas en Salud de Activos vienen
+  // en mayúscula sin acentuar («CORRECCION DE FUGAS»), pero las del catálogo
+  // MO.00418 §4.3 vienen bien escritas («Corrección de fugas»). Sin este
+  // normalizado, media docena de actividades del catálogo caían a «DIAG» —
+  // la regeneración de aceite se clasificaba como diagnóstico.
+  const u = (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+  // «AUMENTO DE CAPACIDAD» a secas no es inversión: el catálogo tiene
+  // «aumento de capacidad SISTEMA REFRIGERACION», que es mitigación. Solo la
+  // de TRANSFORMACION mueve capital de reposición.
+  if (/(PLAN DE INVERSION|\bPI\b|AUMENTO DE CAPACIDAD DE TRANSFORMACION|INSTALACION (DE )?UNIDAD|REPOSICION|REEMPLAZO)/.test(u)) return 'INV';
+  if (/(MITIGACION|SOBRECARGA|MOVIMIENTO ESTRATEGICO)/.test(u)) return 'MIT';
+  if (/(RECUPERACION (DE )?AISLAM|ACTUALIZACION DEL SISTEMA DE REFRIG|AUMENTO DE (CAUDAL|CAPACIDAD)|REPOTENCIACION|REGENERACION|SECADO)/.test(u)) return 'MEJ';
+  if (/(CORRECCION DE FUGAS|MANTENIMIENTO (PREVENTIVO )?OLTC|ACTUALIZACION DE (ACCESORIOS|TABLERO)|RETROFIT|PINTURA|\bMANTENIMIENTO\b)/.test(u)) return 'CORR';
   return 'DIAG';
 }
 
@@ -94,12 +102,16 @@ export const ESTRATEGIA_POR_CONDICION = Object.freeze({
  * Línea base por condición: qué se propone cuando la fuente NO trae
  * macroactividad para el equipo. Siempre se rotula como referencial.
  */
+// Redactadas con ortografía correcta: estas cadenas se IMPRIMEN en un documento
+// que se firma y se componen dentro del texto del alcance. Las que llegan del
+// registro de Salud de Activos vienen en mayúscula sin acentuar y no se tocan
+// —son dato de cliente—, pero estas son nuestras.
 export const LINEA_BASE_POR_CONDICION = Object.freeze({
-  1: ['INSPECCION TERMOGRAFICA', 'INSPECCION OCULAR DETALLADA', 'MUESTREO DE ACEITE'],
-  2: ['INSPECCION TERMOGRAFICA', 'MUESTREO DE ACEITE', 'VERIFICACION DE SISTEMAS DE REFRIGERACION', 'CORRECCION DE FUGAS POR ACCESORIOS'],
-  3: ['MUESTREO DE ACEITE', 'RECUPERACION DE AISLAMIENTOS', 'ACTUALIZACION DEL SISTEMA DE REFRIGERACION', 'CORRECCION DE FUGAS POR ACCESORIOS'],
-  4: ['PLAN DE MITIGACION POR SOBRECARGA', 'RECUPERACION DE AISLAMIENTOS', 'PROPUESTA A PLAN DE INVERSION (PI)'],
-  5: ['PROPUESTA A PLAN DE INVERSION (PI)', 'INSTALACION DE UNIDAD DE TRANSFORMACION ADICIONAL']
+  1: ['Inspección termográfica', 'Inspección ocular detallada', 'Muestreo de aceite'],
+  2: ['Inspección termográfica', 'Muestreo de aceite', 'Verificación de sistemas de refrigeración', 'Corrección de fugas por accesorios'],
+  3: ['Muestreo de aceite', 'Recuperación de aislamientos', 'Actualización del sistema de refrigeración', 'Corrección de fugas por accesorios'],
+  4: ['Plan de mitigación por sobrecarga', 'Recuperación de aislamientos', 'Propuesta a Plan de Inversión (PI)'],
+  5: ['Propuesta a Plan de Inversión (PI)', 'Instalación de unidad de transformación adicional']
 });
 
 // ── utilidades internas ───────────────────────────────────────

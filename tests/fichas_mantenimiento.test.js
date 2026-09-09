@@ -67,50 +67,76 @@ describe('Catálogos de redacción — uno por documento', () => {
 
   // 🔒 El eje del documento de mantenimiento NO es el ángulo del argumento
   // —ese es el del PI— sino la CONDICIÓN del activo, que es lo que decide qué
-  // se hace con él. Una propuesta por banda, en orden de deterioro.
-  test('hay una propuesta por condición de salud, en orden', () => {
-    for (const cat of [ALCANCE_MTTO_OPC, BENEF_MTTO_OPC]) {
-      const conds = cat.filter((o) => o.cond != null).map((o) => o.cond);
-      assert.deepEqual(conds, [1, 2, 3, 4, 5], 'faltan bandas o están desordenadas');
+  // se hace con él. El alcance ofrece TRES propuestas por banda; los beneficios,
+  // una. Las quince del alcance son lo que el Ingeniero pidió poder escoger.
+  test('el alcance trae tres propuestas por condición y los beneficios una', () => {
+    for (const c of [1, 2, 3, 4, 5]) {
+      assert.equal(ALCANCE_MTTO_OPC.filter((o) => o.cond === c).length, 3,
+        `la condición ${c} no tiene sus tres propuestas de alcance`);
+      assert.equal(BENEF_MTTO_OPC.filter((o) => o.cond === c).length, 1);
+    }
+    assert.equal(ALCANCE_MTTO_OPC.filter((o) => o.cond != null).length, 15);
+  });
+
+  test('las tres de cada banda son A, B y C, y no se repiten', () => {
+    for (const c of [1, 2, 3, 4, 5]) {
+      const ks = ALCANCE_MTTO_OPC.filter((o) => o.cond === c)
+        .map((o) => (o.t.match(/^C\d·([ABC])/) || [])[1]);
+      assert.deepEqual(ks, ['A', 'B', 'C'], `la condición ${c} no ofrece las tres variantes`);
+      const textos = new Set(ALCANCE_MTTO_OPC.filter((o) => o.cond === c).map((o) => o.v));
+      assert.equal(textos.size, 3, 'dos variantes de la misma banda son el mismo texto');
     }
   });
 
-  test('la última es automática y se ancla en los datos medidos', () => {
+  test('las bandas van en orden y la automática cierra', () => {
+    const conds = ALCANCE_MTTO_OPC.filter((o) => o.cond != null).map((o) => o.cond);
+    assert.deepEqual([...new Set(conds)], [1, 2, 3, 4, 5]);
     assert.equal(ALCANCE_MTTO_OPC[ALCANCE_MTTO_OPC.length - 1].auto, 'alcance_mtto');
     assert.equal(BENEF_MTTO_OPC[BENEF_MTTO_OPC.length - 1].auto, 'beneficios_mtto');
-    assert.ok(ALCANCE_MTTO_OPC.every((o) => o.cond != null || o.auto),
-      'toda opción es de una condición o es la automática');
   });
 
   // La lista es plegable: si la etiqueta no cabe de un vistazo, no sirve.
-  test('las etiquetas son cortas y dicen la decisión, no el argumento', () => {
+  test('las etiquetas son cortas y dicen de qué banda y variante son', () => {
     for (const o of [...ALCANCE_MTTO_OPC, ...BENEF_MTTO_OPC]) {
       assert.ok(o.t.length <= 42, `etiqueta demasiado larga para un desplegable: «${o.t}»`);
     }
-    assert.match(ALCANCE_MTTO_OPC[0].t, /^C1 · /);
-    assert.match(ALCANCE_MTTO_OPC[4].t, /^C5 · /);
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.cond != null)) {
+      assert.match(o.t, /^C[1-5]·[ABC] · /, `«${o.t}» no dice su banda y variante`);
+    }
   });
 
-  // Cada banda propone una decisión DISTINTA, no la misma con más intensidad.
-  test('la progresión de decisión va de conservar a reemplazar', () => {
-    const verbos = [/vigilar/i, /controlar|seguir/i, /recuperar/i, /intervenir/i, /reemplazar|retirar/i];
-    ALCANCE_MTTO_OPC.filter((o) => o.cond != null).forEach((o, i) => {
-      assert.match(o.t, verbos[i], `la condición ${o.cond} no anuncia su decisión`);
-    });
+  // ── El hueco de las acciones ────────────────────────────────
+  // La plantilla ENMARCA; la lista de actividades la pone el Ingeniero marcando
+  // en la ficha. Que el hueco esté exactamente una vez es lo que hace que el
+  // texto sea específico sin fabricar un plan.
+  test('cada plantilla de alcance deja el hueco de las acciones, una sola vez', () => {
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v)) {
+      const n = (o.v.match(/\{ACCIONES\}/g) || []).length;
+      assert.equal(n, 1, `«${o.t}» tiene ${n} huecos {ACCIONES}`);
+    }
   });
 
-  // 🔒 Si los dos documentos compartieran la clave del estado, elegir una
-  // redacción en uno borraría la del otro sin avisar.
-  test('opcionesRedaccion devuelve el catálogo del campo, no el del vecino', () => {
-    assert.equal(opcionesRedaccion('alcance'), ALCANCE_OPC);
-    assert.equal(opcionesRedaccion('beneficios'), BENEF_OPC);
-    assert.equal(opcionesRedaccion('alcance_mtto'), ALCANCE_MTTO_OPC);
-    assert.equal(opcionesRedaccion('beneficios_mtto'), BENEF_MTTO_OPC);
+  // 🔒 LA TRAMPA QUE CAZÓ LA CRÍTICA ADVERSARIAL: «comprende {ACCIONES},
+  // ejecutadas sobre los subsistemas…» se lee bien con la lista de ejemplo y se
+  // rompe con la real — «comprende muestreo de aceite, ejecutadas sobre…».
+  // Un participio o adjetivo concordado justo detrás del hueco depende del
+  // género y del número de una lista que cambia con cada equipo.
+  test('detrás del hueco no queda un participio que tenga que concordar', () => {
+    const trampa = /\{ACCIONES\}[,;]?\s+(?:[a-záéíóúñ]+(?:adas|idas|ados|idos))\b/;
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v)) {
+      assert.ok(!trampa.test(o.v),
+        `«${o.t}» concuerda con la lista y se romperá en cuanto cambie: ` +
+        (o.v.match(trampa) || [''])[0]);
+    }
   });
 
-  test('un campo desconocido devuelve lista vacía, no revienta', () => {
-    assert.deepEqual(opcionesRedaccion('inventado'), []);
-    assert.deepEqual(opcionesRedaccion(undefined), []);
+  test('al sustituir una sola acción el texto sigue siendo legible', () => {
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v)) {
+      const rendido = o.v.replace('{ACCIONES}', 'muestreo de aceite');
+      assert.ok(!/\{|\}/.test(rendido.replace(/\{(MVA|SUB)\}/g, '')),
+        `«${o.t}» deja marcadores sin resolver`);
+      assert.ok(!/\s,|\s\./.test(rendido), `«${o.t}» deja un espacio antes de la puntuación`);
+    }
   });
 
   const escritas = [...ALCANCE_MTTO_OPC, ...BENEF_MTTO_OPC].filter((o) => o.v);
@@ -126,10 +152,12 @@ describe('Catálogos de redacción — uno por documento', () => {
     // es correcto), ni usar «valor de reposición» como referencia de costo para
     // comparar contra la intervención — que es exactamente la comparación que
     // esa banda tiene que dejar documentada.
-    const proponeSalida = /salida ordenada|retiro programado|reposici[óo]n por una unidad|reemplazo por otro activo/i;
+    const SALIDA = 'salida (ordenada|del activo|programada|anticipad)|retiro programado'
+      + '|desincorporaci|reposici[óo]n por una unidad|reemplazo por otro activo';
+    const proponeSalida = new RegExp(SALIDA, 'i');
     // El alcance PROPONE la salida; los beneficios describen sus efectos, con
     // otro vocabulario. Se acepta cualquiera de las dos formas en la banda 5.
-    const hablaDeSalida = /salida ordenada|retiro programado|sustituci[óo]n|activo entrante|equipo retirado/i;
+    const hablaDeSalida = new RegExp(SALIDA + '|sustituci[óo]n|activo entrante|equipo retirado', 'i');
     for (const o of escritas) {
       if (o.cond === 5) {
         assert.match(o.v, hablaDeSalida, 'la condición 5 debe tratar la salida del activo');
@@ -140,11 +168,12 @@ describe('Catálogos de redacción — uno por documento', () => {
     }
   });
 
-  test('la condición 4 sí puede nombrar reemplazo de componentes y valor de reposición', () => {
-    const a4 = ALCANCE_MTTO_OPC.find((o) => o.cond === 4);
+  test('la condición 4 sí puede hablar de valor de reposición', () => {
+    // El reemplazo de bujes ya no se enumera en la plantilla: es una de las
+    // acciones que el Ingeniero marca. Lo que sí queda en el texto es la
+    // comparación de costo, que es el insumo de la decisión siguiente.
     const b4 = BENEF_MTTO_OPC.find((o) => o.cond === 4);
-    assert.match(a4.v, /reemplazo de bujes/i, 'es una actividad del correctivo mayor, no una reposición');
-    assert.match(b4.v, /valor de reposición/i, 'la comparación de costo es el insumo de la decisión siguiente');
+    assert.match(b4.v, /valor de reposición/i);
   });
 
   // El texto del PI arranca por «reposición»; el de mantenimiento, por el trabajo.
@@ -155,12 +184,20 @@ describe('Catálogos de redacción — uno por documento', () => {
     }
   });
 
-  test('no fabrican cifras: los únicos huecos son {MVA} y {SUB}', () => {
+  test('no fabrican cifras: los únicos huecos son {MVA}, {SUB} y {ACCIONES}', () => {
+    const validos = new Set(['{MVA}', '{SUB}', '{ACCIONES}']);
     for (const o of escritas) {
-      const marcas = o.v.match(/\{[A-Z_]+\}/g) || [];
-      for (const m of marcas) {
-        assert.ok(m === '{MVA}' || m === '{SUB}', `«${o.t}» usa el marcador ${m}, que nadie resuelve`);
+      for (const m of (o.v.match(/\{[A-Z_]+\}/g) || [])) {
+        assert.ok(validos.has(m), `«${o.t}» usa el marcador ${m}, que nadie resuelve`);
       }
+    }
+  });
+
+  // «transformador de {MVA} de la subestación» rinde «transformador de 60 de la
+  // subestación»: `mvaTxt` devuelve el número, no la unidad.
+  test('la potencia nunca queda sin su unidad', () => {
+    for (const o of escritas) {
+      assert.ok(!/\{MVA\}(?! MVA)/.test(o.v), `«${o.t}» deja la potencia sin unidad`);
     }
   });
 

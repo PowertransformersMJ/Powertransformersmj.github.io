@@ -112,3 +112,20 @@ estaban publicadas sin un botón que las abriera.
 
 ### L-81 · Ante dos fuentes que discrepan, silenciar la comparación no es prudencia: es perder la señal
 **Disparador**: un sistema compara un dato REGISTRADO contra uno CALCULADO y salta una discrepancia que el cálculo "no puede sostener" porque le falta una entrada. La tentación es degradar el veredicto a «no evaluable» para no acusar en falso. · **Cicatriz** (ADR-074 §74.12): el catálogo CREG tiene tres familias y el clasificador solo distingue dos —no lee el tipo constructivo—, así que a tres equipos registrados como *autotransformador monofásico* les calculaba una UC *trifásica*. Razoné que el registro estaría bien y el clasificador ciego, y marqué los tres «Sin cálculo». El Ingeniero miró la tabla y dijo la frase que lo tumbó: **«todos son transformadores trifásicos»**. Era al revés — el registro estaba mal, el cálculo tenía razón, y mi regla había **tapado tres errores reales** en el registro oficial de activos. · **Regla**: cuando dos fuentes discrepan y no puedes decidir cuál manda, **mantén la discrepancia visible y EXPLÍCALA**: qué dice cada una, por qué el cálculo puede estar limitado, y qué hay que verificar (aquí: la placa). Nunca la conviertas en silencio. Un «no evaluable» se lee como «aquí no hay nada que mirar», y es exactamente lo contrario. Corolario del mismo día: la asimetría también engaña al revés — di por supuesto que el dato humano vencía al calculado *porque el calculado tenía una limitación conocida*, sin comprobar el hecho físico. El hecho físico lo sabe el dueño: **pregúntale, en vez de elegir por él**. **Gate** [HONOR]. Ver `99 §74.12`.
+
+### L-82 · El ejemplo que le das a una plantilla se convierte en el único caso que se prueba
+
+Quince plantillas de alcance llevaban un hueco `{ACCIONES}` y varias lo remataban con un participio
+concordado: *«comprende {ACCIONES}, **ejecutadas** sobre los subsistemas…»*. Con la lista de ejemplo
+del prompt —«inspección termográfica, muestreo de aceite y corrección de fugas», femenina plural por
+casualidad— se lee perfecto. Con la lista real se rompe: *«comprende muestreo de aceite, ejecutadas
+sobre…»*, y basta una sola acción o un género mixto para que la frase quede agramatical en un
+documento que se firma.
+
+**Lo que falló** no fue la redacción sino el ejemplo: al darle un caso cómodo, ese fue el único que
+se verificó. **La regla**: cuando algo tiene un hueco, el ejemplo de referencia debe ser el caso
+ADVERSO —el elemento solo, el género contrario, la lista vacía—, no el que luce bien.
+
+**Cómo se cazó**: cinco críticos adversariales independientes, y varios no lo razonaron: **ejecutaron
+la función que rellena el hueco** (`prosaAcciones()`) contra el catálogo real y leyeron el resultado.
+Es la diferencia entre revisar el texto y revisar lo que el texto produce. → `99 §74.19`.
