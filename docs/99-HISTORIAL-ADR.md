@@ -2127,3 +2127,23 @@ Verificado en la base tras importar: **208 equipos · 208 con condición** (39 m
 real; intenté anularlo para automatizar y el clasificador lo bloqueó — con razón, y queda escrito:
 una confirmación puesta para que la pulse una persona no se rodea.
 
+**74.12 Mi propio error, corregido el mismo día (2026-09-08).** En `§74.2` marqué como «no
+evaluables» los tres equipos con UUCC registrada de familia AUTOTRANSFORMADOR (CANDELARIA
+`T-KDR04`/`T-KDR05`, BOSQUE `T4`), razonando que el clasificador no lee el tipo constructivo y por
+tanto no podía acusarlos. **Di por supuesto que el registro estaba bien y el cálculo ciego.**
+
+El Ingeniero miró la columna «Descripción CREG» recién añadida —que fue la que hizo visible el
+problema, al escribir *«AutoTransformador monofásico»* en letra— y corrigió: **los tres son
+transformadores TRIFÁSICOS**. Verificado que el desajuste era solo de familia: misma banda de
+capacidad y misma regulación (`N5T16`→`N5T7` en 91-100 MVA; `N5T18`→`N5T9` en 121-150, dos veces).
+O sea que el registro estaba mal, el cálculo tenía razón, y **mi regla tapó tres discrepancias
+reales** en el registro oficial de activos.
+
+Revertido en `53287eb`: el estado vuelve a ser DISCREPANCIA y se añade una nota que nombra las dos
+familias en castellano, dice que la regla asume trifásico porque el documento no registra el tipo
+constructivo, y pide verificar la placa. Aplica a las tres familias, no solo a los
+autotransformadores. Los tres registros corregidos en producción con auditoría.
+
+**Resultado final del día: 208 equipos · 207 concordantes (99,5 %) · 0 discrepancias · 0 «sin UC
+calculada» · 208 con Índice de Salud.** Lección → **L-81**.
+
