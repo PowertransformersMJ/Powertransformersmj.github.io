@@ -136,7 +136,12 @@ function panoramaHTML(r) {
     +     '<div class="ftm-gkpis">'
     +       tarjeta('ok', pct(r.concordantes, r.total),
               r.concordantes + ' de ' + r.evaluables + ' evaluables'
-              + (r.sinCalculo ? ' · ' + r.sinCalculo + ' sin placa completa' : ''),
+              // NO es «sin placa completa»: estos equipos tienen su placa entera.
+              // Es el catálogo de la CREG el que no los cubre — por capacidad
+              // por debajo de su mínimo, o por ser monofásicos en un nivel donde
+              // la norma solo cataloga trifásicos. Decir «placa incompleta»
+              // culpaba al dato de una laguna de la norma.
+              + (r.sinCalculo ? ' · ' + r.sinCalculo + ' fuera del catálogo CREG' : ''),
               'Conformidad UUCC de la flota')
     +       tarjeta('cap', mva1(r.mvaTotal) + ' <small>MVA</small>',
               r.total + ' transformadores', 'Capacidad instalada evaluada')

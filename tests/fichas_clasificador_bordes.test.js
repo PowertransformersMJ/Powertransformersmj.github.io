@@ -48,6 +48,25 @@ describe('clasificarUC — bordes de banda (criterio congelado)', () => {
     assert.match(nota, /NO tiene UC aplicable/);
   });
 
+  // El Ingeniero lo señaló en CUIVA: aparecía a la vez «Sin UC calculada» y con
+  // el triángulo de advertencia. Es el mismo hecho contado dos veces — la nota
+  // es el MOTIVO del estado, no un aviso aparte.
+  test('bajo el mínimo NO lleva además el triángulo de advertencia', () => {
+    const r = clasificarUC(300, 34.5, null, 'NLTC');
+    assert.equal(r.uucc_calc, null);
+    assert.ok(r.notas.length > 0, 'el motivo se sigue explicando');
+    assert.equal(hayAdvertencia(r.notas), false,
+      'el estado «sin UC» ya lo dice: marcarlo otra vez es ruido');
+  });
+
+  test('una regulación que no cuadra con su banda SÍ sigue avisando', () => {
+    // Contraprueba: al quitar un patrón de la lista, hay que verificar que los
+    // demás siguen vivos. Este equipo SÍ se clasifica, y su aviso es real.
+    const r = clasificarUC(33000, 66, null, 'NLTC');   // banda OLTC, equipo NLTC
+    assert.ok(r.uucc_calc, 'este sí clasifica');
+    assert.equal(hayAdvertencia(r.notas), true);
+  });
+
   test('justo EN el mínimo sí clasifica — el corte es estricto', () => {
     // Contraprueba: sin ella, un bug que devolviera siempre null pasaría el
     // test de arriba y dejaría al parque entero sin unidad constructiva.

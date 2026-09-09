@@ -484,7 +484,17 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion, fases) {
  * Mismo criterio que `advFromNotas` en el módulo original.
  */
 export function hayAdvertencia(notas) {
+  // `inferior al minimo` salió de esta lista el 2026-09-08. Cuando la capacidad
+  // está por debajo del mínimo del catálogo ya NO se propone banda: el equipo
+  // queda «Sin UC calculada», y esa nota es el MOTIVO de ese estado, no un aviso
+  // aparte. Marcarlo además con ⚠ contaba el mismo hecho dos veces —el Ingeniero
+  // lo señaló en CUIVA— y un tablero que repite se lee peor que uno que dice
+  // cada cosa una vez.
+  //
+  // Lo que queda son avisos sobre equipos que SÍ se clasificaron: la regulación
+  // que no cuadra con el descriptor de su banda, y la conexión al STN cuando no
+  // se conoce el tipo constructivo.
   return (notas || []).some(
-    (n) => /difiere del descriptor|inferior al minimo|Conexion STN/.test(n)
+    (n) => /difiere del descriptor|Conexion STN/.test(n)
   );
 }
