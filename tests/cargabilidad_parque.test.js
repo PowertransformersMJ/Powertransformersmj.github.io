@@ -25,35 +25,105 @@ const tx = (extra = {}) => ({
   ...extra
 });
 
-describe('devanado — el porcentaje oficial manda, el desacuerdo se marca', () => {
-  test('sin oficial, se usa el cociente carga/ampacidad', () => {
-    const d = devanado(100, 59, null);
-    assert.equal(d.pct, 59);
-    assert.equal(d.desacuerdo, false);
+// ══════════════════════════════════════════════════════════════
+// El porcentaje de un devanado sale de SUS amperios
+// ──────────────────────────────────────────────────────────────
+// HISTORIA, porque sin ella este cambio parece revertir una orden.
+// El 2026-07-27 el Ingeniero decidió que mandara el % oficial de la
+// hoja: en aquel Excel las columnas de amperios estaban sucias
+// —ASTREA con 418 A sobre una ampacidad de 167 (250 %), AGUAS
+// BLANCAS con 88 % frente a un cociente de 17,5 %— y el cociente no
+// era de fiar (`99 §67.3`).
+//
+// Esa decisión se aplicaba a UN valor por equipo, pero el código lo
+// usaba como porcentaje de LOS TRES devanados. De ahí las dos cosas
+// que el Ingeniero reportó el 2026-09-09: devanados con «96 %» junto
+// a «— A / — A», y 74 equipos acusados de «fuente en desacuerdo»
+// cuando la captura estaba bien — un valor único no puede coincidir
+// con tres cocientes distintos.
+//
+// La hoja «Cargabilidad_2025» disuelve el conflicto que motivó
+// aquella decisión: trae un porcentaje POR DEVANADO, los tres
+// coinciden con sus propios amperios en el 100 % de las filas
+// medidas, ASTREA baja a 53,2 % y no queda ninguna fila imposible.
+// Así que el porcentaje vuelve a salir del cociente, y la cifra de
+// equipo se conserva aparte, en `pct_oficial`, comparada contra el
+// devanado más cargado — que es lo que pretende describir.
+// ══════════════════════════════════════════════════════════════
+
+describe('devanado — cada devanado con sus propios amperios', () => {
+
+  test('el porcentaje es el cociente carga/ampacidad', () => {
+    assert.equal(devanado(100, 59).pct, 59);
+    assert.equal(devanado(167.3, 88.97).pct, 53.2, 'ASTREA con el dato de 2025');
   });
 
-  test('con oficial que concuerda, no hay desacuerdo', () => {
-    const d = devanado(41.84, 24.6856, 59);
-    assert.equal(d.pct, 59);
-    assert.equal(d.desacuerdo, false);
-  });
-
-  // Caso real del parque: la hoja dice 88% y sus columnas dan 17,5%.
-  test('con oficial que NO concuerda, manda el oficial y se marca', () => {
-    const d = devanado(502, 88, 88);
-    assert.equal(d.pct, 88, 'el oficial es el que manda (decisión del Ingeniero)');
-    assert.equal(d.cociente, 17.5);
-    assert.equal(d.desacuerdo, true, 'la contradicción tiene que quedar visible');
-  });
-
-  test('una diferencia dentro de la tolerancia no se marca', () => {
-    assert.equal(devanado(100, 60, 60 + TOLERANCIA_PCT).desacuerdo, false);
-    assert.equal(devanado(100, 60, 60 + TOLERANCIA_PCT + 0.1).desacuerdo, true);
+  // 🔒 EL INVARIANTE que motivó el cambio: sin medida no hay porcentaje.
+  test('sin medida NO se inventa un porcentaje', () => {
+    assert.equal(devanado(null, null).pct, null, 'es el «96 % junto a — A» que se reportó');
+    assert.equal(devanado(100, null).pct, null);
+    assert.equal(devanado(null, 50).pct, null);
   });
 
   test('ampacidad cero o ausente no produce división', () => {
-    assert.equal(devanado(0, 50, null).pct, null);
-    assert.equal(devanado(null, 50, null).cociente, null);
+    assert.equal(devanado(0, 50).pct, null);
+    assert.equal(devanado(null, 50).cociente, null);
+  });
+
+  test('la sobrecarga se lee del cociente, no de una cifra heredada', () => {
+    assert.equal(devanado(100.4, 133.7).pct, 133.2, 'BARRANCO DE LOBA, hoja 2025');
+  });
+});
+
+describe('filaCargabilidad — la cifra de equipo no se pinta en los devanados', () => {
+
+  const base = {
+    identificacion: { matricula: 'T-PCT' },
+    ubicacion: { subestacion_nombre: 'PRUEBA', departamento: 'CESAR' },
+    electrico: {
+      corriente_nominal_primaria_a: 100, corriente_medida_primaria_a: 60,
+      corriente_nominal_secundaria_a: 200, corriente_medida_secundaria_a: 40
+    },
+    salud_actual: { crg_pct_medido: 96 }
+  };
+
+  // 🔒 Lo que el Ingeniero vio en pantalla: un terciario sin ninguna medida
+  // mostrando el porcentaje del equipo.
+  test('un devanado sin medida queda en null aunque el equipo traiga porcentaje', () => {
+    const f = filaCargabilidad(base);
+    assert.equal(f.T.pct, null, 'el terciario no tiene amperios: no puede tener porcentaje');
+    assert.equal(f.T.amp, null);
+    assert.equal(f.T.car, null);
+  });
+
+  test('cada devanado medido muestra SU propio porcentaje', () => {
+    const f = filaCargabilidad(base);
+    assert.equal(f.P.pct, 60);
+    assert.equal(f.S.pct, 20, 'no los 96 de la cifra de equipo');
+  });
+
+  test('la cifra de equipo se conserva aparte, no se pierde', () => {
+    assert.equal(filaCargabilidad(base).pct_oficial, 96);
+  });
+
+  // El desacuerdo se juzga contra el devanado MÁS cargado. Compararlo contra
+  // cada devanado acusaba a los otros dos por construcción: así se llegó a 74.
+  test('el desacuerdo se mide contra el devanado más cargado', () => {
+    assert.equal(filaCargabilidad(base).desacuerdo_fuente, true, '96 frente a un máximo de 60');
+    const coherente = { ...base, salud_actual: { crg_pct_medido: 60 } };
+    assert.equal(filaCargabilidad(coherente).desacuerdo_fuente, false,
+      'la cifra de equipo describe al devanado más cargado: no hay contradicción');
+  });
+
+  test('sin cifra de equipo no hay desacuerdo que declarar', () => {
+    const sinOficial = { ...base, salud_actual: {} };
+    assert.equal(filaCargabilidad(sinOficial).desacuerdo_fuente, false);
+  });
+
+  test('la sobrecarga se declara desde los amperios medidos', () => {
+    const sobre = { ...base, electrico: { ...base.electrico, corriente_medida_primaria_a: 133 } };
+    assert.equal(filaCargabilidad(sobre).sobrecarga_medida, true);
+    assert.equal(filaCargabilidad(base).sobrecarga_medida, false);
   });
 });
 
@@ -67,11 +137,16 @@ describe('filaCargabilidad — datos del parque, sin inventar', () => {
   });
 
   test('conserva ampacidad y carga medida por devanado', () => {
+    // El fixture es AGUAS BLANCAS con el dato VIEJO (88 A sobre 502 de
+    // ampacidad, y la hoja declarando 88 %). Antes el porcentaje mostrado era
+    // el oficial; ahora es el cociente de sus propios amperios, y la
+    // contradicción sigue declarada en `desacuerdo_fuente`.
     const f = filaCargabilidad(tx());
     assert.equal(f.P.amp, 502);
     assert.equal(f.P.car, 88);
-    assert.equal(f.P.pct, 88);
-    assert.equal(f.desacuerdo_fuente, true);
+    assert.equal(f.P.pct, 17.5, 'lo que de verdad dicen sus amperios');
+    assert.equal(f.pct_oficial, 88, 'la cifra de la hoja no se pierde');
+    assert.equal(f.desacuerdo_fuente, true, 'y la contradicción se sigue señalando');
   });
 
   test('un equipo sin ningún dato de carga NO produce fila hueca', () => {

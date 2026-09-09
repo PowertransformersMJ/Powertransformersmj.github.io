@@ -63,17 +63,35 @@ export function zonaDeDepartamento(depto) {
   return hit ? hit.zona : '';
 }
 
-export function devanado(amp, car, pctOficial) {
+/**
+ * Cargabilidad de UN devanado, a partir de SU ampacidad y SU corriente medida.
+ *
+ * ⚠️ El porcentaje de un devanado sale de sus propios amperios y de nada más.
+ * Antes esta función recibía el `crg_pct_medido` del equipo —UNO solo, a nivel
+ * de transformador— y lo usaba como porcentaje de LOS TRES devanados. Eso
+ * producía dos falsedades a la vez, ambas visibles en pantalla:
+ *
+ *   · un devanado sin ninguna medida mostraba un porcentaje («96 %» junto a
+ *     «— A / — A»), que es exactamente lo que el Ingeniero reportó;
+ *   · y como ese único valor solo puede describir a un devanado, se contaba
+ *     como «fuente en desacuerdo» en los otros dos. El aviso del tablero
+ *     mandaba a revisar la captura, y la captura estaba bien.
+ *
+ * La hoja de cargabilidad 2025 lo confirma: trae un porcentaje POR DEVANADO y
+ * los tres coinciden con sus propios amperios en el 100 % de las filas medidas
+ * (196 primarios, 196 secundarios, 31 terciarios). Sin medida no hay
+ * porcentaje: se devuelve null y la pantalla muestra un guion.
+ *
+ * @param {*} amp ampacidad del devanado (A)
+ * @param {*} car corriente medida del devanado (A)
+ */
+export function devanado(amp, car) {
   const a = num(amp);
   const c = num(car);
-  const of = num(pctOficial);
-  const cociente = (a != null && c != null && a > 0)
+  const pct = (a != null && c != null && a > 0)
     ? Math.round((c / a) * 1000) / 10
     : null;
-  const pct = of != null ? of : cociente;
-  const desacuerdo = (of != null && cociente != null)
-    && Math.abs(of - cociente) > TOLERANCIA_PCT;
-  return { amp: a, car: c, pct, cociente, desacuerdo };
+  return { amp: a, car: c, pct, cociente: pct };
 }
 
 /**
@@ -91,18 +109,15 @@ export function filaCargabilidad(tx) {
 
   const P = devanado(
     leer(tx, 'electrico.corriente_nominal_primaria_a', 'ampacidad_primaria'),
-    leer(tx, 'electrico.corriente_medida_primaria_a', 'carga_primaria'),
-    pctOficial
+    leer(tx, 'electrico.corriente_medida_primaria_a', 'carga_primaria')
   );
   const S = devanado(
     leer(tx, 'electrico.corriente_nominal_secundaria_a', 'ampacidad_secundaria'),
-    leer(tx, 'electrico.corriente_medida_secundaria_a', 'carga_secundaria'),
-    pctOficial
+    leer(tx, 'electrico.corriente_medida_secundaria_a', 'carga_secundaria')
   );
   const T = devanado(
     leer(tx, 'electrico.corriente_nominal_terciaria_a', 'ampacidad_terciaria'),
-    leer(tx, 'electrico.corriente_medida_terciaria_a', 'carga_terciaria'),
-    pctOficial
+    leer(tx, 'electrico.corriente_medida_terciaria_a', 'carga_terciaria')
   );
 
   // Sin ampacidad, sin carga y sin porcentaje no hay nada que ilustrar.
@@ -139,8 +154,15 @@ export function filaCargabilidad(tx) {
     // Trazabilidad de la fuente: no se corrige el dato, se señala.
     pct_oficial: pctOficial,
     cociente_primario: P.cociente,
-    desacuerdo_fuente: P.desacuerdo || S.desacuerdo || T.desacuerdo,
-    sobrecarga_medida: [P, S, T].some((d) => d.cociente != null && d.cociente > 100)
+    // El desacuerdo se juzga contra el devanado MÁS CARGADO, que es lo que la
+    // cifra de equipo pretende describir. Compararla contra cada devanado por
+    // separado acusaba de discrepancia a los otros dos por construcción.
+    desacuerdo_fuente: (() => {
+      const medidos = [P, S, T].map((d) => d.pct).filter((v) => v != null);
+      if (pctOficial == null || !medidos.length) return false;
+      return Math.abs(pctOficial - Math.max(...medidos)) > TOLERANCIA_PCT;
+    })(),
+    sobrecarga_medida: [P, S, T].some((d) => d.pct != null && d.pct > 100)
   };
 }
 
