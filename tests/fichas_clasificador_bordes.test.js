@@ -35,10 +35,24 @@ describe('clasificarUC — bordes de banda (criterio congelado)', () => {
     assert.equal(nivelPorTension(500)[0],   'N6');
   });
 
-  test('bajo el mínimo del nivel: se clasifica PERO con advertencia visible', () => {
+  // CAMBIO DE CRITERIO (2026-09-08, decisión del Ingeniero). Antes se proponía
+  // la banda mínima «como interpretación, con advertencia». Ahora no se propone
+  // nada: si la CREG no define banda por debajo de ese mínimo, el equipo NO
+  // CUMPLE con el catálogo. Una interpretación abanderada sigue siendo un dato
+  // fabricado en un documento que se firma. Caso real: CUIVA, 225 kVA.
+  test('bajo el mínimo del nivel: NO se fabrica banda, y se dice por qué', () => {
     const r = clasificarUC(300, 34.5, null, 'NLTC');   // 0,3 MVA
-    assert.ok(r.uucc_calc, 'debe proponer una banda');
-    assert.ok(hayAdvertencia(r.notas), 'una interpretación debe abanderarse, no pasar por hecho');
+    assert.equal(r.uucc_calc, null, 'proponer la banda mínima es fabricar un dato');
+    const nota = r.notas.find((n) => /no define ninguna Unidad Constructiva/.test(n));
+    assert.ok(nota, 'debe explicar que la norma no cubre este equipo');
+    assert.match(nota, /NO tiene UC aplicable/);
+  });
+
+  test('justo EN el mínimo sí clasifica — el corte es estricto', () => {
+    // Contraprueba: sin ella, un bug que devolviera siempre null pasaría el
+    // test de arriba y dejaría al parque entero sin unidad constructiva.
+    const r = clasificarUC(500, 34.5, null, 'NLTC');   // 0,5 MVA = mínimo N3
+    assert.equal(r.uucc_calc, 'N3T1');
   });
 
   test('niveles fuera del catálogo no fabrican código', () => {

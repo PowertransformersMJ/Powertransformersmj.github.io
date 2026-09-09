@@ -425,10 +425,15 @@ export function clasificarUC(potKva, kvPrim, kvTerc, regulacion, fases) {
     if (mva == null) {
       notas.push('Sin potencia: no se puede asignar banda.');
     } else if (mva < mmin) {
-      const r = rows[0];
-      uucc = r.uc; banda = textoBanda(r.cap); regCat = r.reg;
-      pasos.push(`${mva} MVA < minimo catalogo ${mmin} MVA -> se asigna banda minima ${r.uc} (${banda})`);
-      notas.push(`Capacidad ${mva} MVA inferior al minimo del catalogo ${niv}/${dev} (${mmin} MVA); el CREG no define banda por debajo de ${mmin} MVA. Se asigna la banda minima ${r.uc} (interpretacion; requiere validacion).`);
+      // NO se asigna banda. Hasta el 2026-09-08 se proponía la mínima del
+      // catálogo «como interpretación, marcada con advertencia»; el Ingeniero
+      // decidió lo contrario, y tiene razón: si la CREG no define banda por
+      // debajo de ese mínimo, el equipo NO CUMPLE con el catálogo, y proponer
+      // una es fabricar un dato que luego viaja a un documento que se firma.
+      // Misma doctrina que con los monofásicos de nivel 3 y que con la banda
+      // de salud: mejor decir «no hay» que inventar (L-69).
+      pasos.push(`${mva} MVA < minimo catalogo ${mmin} MVA -> SIN banda aplicable`);
+      notas.push(`Capacidad ${mva} MVA inferior al minimo del catalogo ${niv}/${dev} (${mmin} MVA): la CREG 015/2018 no define ninguna Unidad Constructiva por debajo de ${mmin} MVA, asi que este equipo NO tiene UC aplicable. Proponer la banda minima seria una interpretacion, no un dato.`);
     } else {
       for (const r of rows) {
         const hi = r.max == null ? Infinity : r.max;

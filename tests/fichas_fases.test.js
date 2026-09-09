@@ -106,14 +106,31 @@ describe('normalizarEquipo — lee las fases del documento', () => {
       'sin UC que calcular, el veredicto es «no se puede», no «concordante»');
   });
 
+  // El equipo va POR ENCIMA del mínimo del catálogo a propósito: así esta
+  // prueba mide solo la dimensión de las fases. Con 250 kVA medía dos cosas a
+  // la vez y se rompió al cambiar el criterio del mínimo — un ejemplo mal
+  // elegido convierte una prueba en una alarma falsa.
   test('sin el dato sigue clasificando como siempre', () => {
     const e = normalizarEquipo({
-      potencia_kva: 250, tension_primaria_kv: 34.5,
-      identificacion: { uucc: 'N3T1' },
+      potencia_kva: 6500, tension_primaria_kv: 34.5,
+      identificacion: { uucc: 'N3T3' },
       electrico: { tension_primaria_kv: 34.5 }
     }, 0);
     assert.equal(e.fases, null);
-    assert.equal(e.uucc_calculada, 'N3T1');
+    assert.equal(e.uucc_calculada, 'N3T3');
     assert.equal(e.estado, 'CONCORDANTE');
+  });
+
+  // El caso de CUIVA: trifásico, pero 225 kVA — por debajo del mínimo del
+  // catálogo. Tampoco tiene UC, y por un motivo distinto al de TRES PALMAS.
+  test('un trifásico por debajo del mínimo del catálogo tampoco tiene UC', () => {
+    const e = normalizarEquipo({
+      potencia_kva: 225, tension_primaria_kv: 34.5,
+      identificacion: { uucc: 'N3T1' },
+      electrico: { tension_primaria_kv: 34.5, fases: 3 }
+    }, 0);
+    assert.equal(e.fases, 3);
+    assert.equal(e.uucc_calculada, '');
+    assert.equal(e.estado, 'SIN CALCULO');
   });
 });
