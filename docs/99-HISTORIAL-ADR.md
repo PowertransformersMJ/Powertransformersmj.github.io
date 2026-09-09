@@ -2176,3 +2176,34 @@ ni «monofásico no-auto», así que con las fases basta.
 monofásicos, que es la verdad) · **advertencias de 7 a 1** — la que queda es CUIVA por capacidad
 inferior al mínimo del catálogo, que es real y debe seguir viéndose.
 
+**74.14 Dos criterios más del Ingeniero, y una pregunta que había que responder (2026-09-08).**
+
+**(a) Por debajo del mínimo del catálogo no se propone banda.** Hasta hoy, un equipo con capacidad
+inferior al mínimo recibía la banda más baja «como interpretación, con advertencia». El Ingeniero:
+*«CUIVA no cumple conforme a lo que indica la CREG, también queda sin UC calculada»*. Tiene razón —
+una advertencia no convierte una interpretación en un hecho, y ese dato viaja a un documento que se
+firma. Corregido en `ad3079c`. Ahora los dos casos que la norma no cubre —por tipo constructivo y
+por capacidad— responden igual. Estado: **208 · 203 concordantes · 0 discrepancias · 4 sin UC**.
+
+**(b) «¿Seguro que cruzaste todos los estados de salud? El 5 muy pobre no está completo.»** Tenía
+razón en la observación, y la respuesta importa: **se cruzaron los 208, ninguno quedó sin condición**
+— pero el sistema **NO copia la columna CONDICION del Excel: la recalcula** con el motor del
+MO.00418, y discrepa en **98 equipos** (el propio import lo reporta y lo guarda en
+`/importaciones/{jobId}`).
+
+| | 1 | 2 | 3 | 4 | 5 muy pobre |
+|---|---|---|---|---|---|
+| CONDICION del Excel | 85 | 83 | 16 | 15 | **9** |
+| HI recalculado (MO.00418) | 39 | 86 | 54 | 28 | **1** |
+
+De los 9 que el Excel marca «muy pobre», el motor deja 1 en muy_pobre (COSPIQUE, HI 4,575), **5 en
+pobre con HI exactamente 4,000** y 3 en medio. El 4,000 clavado **no es un tope**: es el piso del
+override de cargabilidad (`CRG=5 ⇒ HI ≥ 4`, §4.1.3), que sube pero nunca baja. Lo que los deja bajo
+4 es la ponderación de la Tabla 10: **DGA pesa el 35 %**. ARIGUANI, con DGA=2 y casi todo lo demás
+en 5, da `0,35×2 + 0,30×5 + 0,15×5 + 0,05×(5+5+1+5)` = **3,75** → el override lo sube a 4,00.
+
+O sea: el motor no falla ni le faltan datos — aplica la norma. **Queda abierto para el Ingeniero**
+cuál es la fuente de verdad cuando ambas discrepan (→ **TODO-52**), porque si los 5 del Excel
+recogen un juicio experto que las variables medidas no capturan, se está perdiendo esa señal; y si
+no, el Excel sobre-marca. Es exactamente la raíz de **L-73**, ahora cuantificada: 98 de 208.
+
