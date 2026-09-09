@@ -115,6 +115,10 @@ const COLUMNAS = Object.freeze([
   { k: 'nivel',            t: 'Nivel' },
   { k: 'uucc_registrada',  t: 'Registrada' },
   { k: 'uucc_calculada',   t: 'Calculada' },
+  // El código («N4T17») no le dice nada a quien lee el tablero. Esta columna
+  // pone el texto LITERAL del catálogo de la CREG para la UUCC registrada, que
+  // es la oficial del activo. Se oculta en pantallas pequeñas: es larga.
+  { k: 'uucc_desc',        t: 'Descripción CREG', chica: true },
   { k: 'estado',           t: 'Estado' },
   { k: 'cond_int',         t: 'Condición',  num: true },
   { k: null,               t: 'Ficha' }
@@ -345,6 +349,16 @@ export function normalizarEquipo(bruto, i) {
     devanado: cls.devanado,
     uucc_registrada: registrada,
     uucc_calculada: calculada,
+    // Texto literal del catálogo CREG 015/2018 para la UUCC REGISTRADA (la
+    // oficial del activo). Si no hay registrada, se describe la calculada y se
+    // dice que es la calculada — nunca se presenta un texto sin decir de dónde
+    // sale. Si el código no está catalogado, queda vacío: no se inventa.
+    uucc_desc: (() => {
+      const r = buscarUC(registrada);
+      if (r && r.fila && r.fila.desc) return r.fila.desc;
+      const c = buscarUC(calculada);
+      return (c && c.fila && c.fila.desc) ? 'Según el cálculo: ' + c.fila.desc : '';
+    })(),
     estado,
     notas_uucc: notasUC,
     advertencia: hayAdvertencia(cls.notas),
@@ -1290,6 +1304,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           + '<td>' + esc(e.nivel || '—') + '</td>'
           + '<td><span class="' + regCls + '">' + esc(e.uucc_registrada || '—') + '</span></td>'
           + '<td><span class="ftm-code ftm-code--calc">' + esc(e.uucc_calculada || '—') + '</span></td>'
+          + '<td class="ftm-hide-sm ftm-uc-desc" title="' + esc(e.uucc_desc || '') + '">'
+          +   (e.uucc_desc ? esc(e.uucc_desc) : '<span class="ftm-mini-src">sin UC catalogada</span>')
+          + '</td>'
           + '<td><span class="ftm-pill ' + (CLASE_PILL[e.estado] || 'ftm-pill--sin') + '">'
           + esc(ETIQUETA_ESTADO[e.estado] || e.estado) + '</span>'
           + (e.advertencia ? '<span class="ftm-warnflag" title="Con advertencia de consistencia">⚠</span>' : '')

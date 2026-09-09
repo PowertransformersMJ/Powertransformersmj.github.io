@@ -179,3 +179,53 @@ describe('normalizarEquipo — un autotransformador no se acusa de discrepancia'
     assert.equal(e.estado, 'CONCORDANTE');
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// La descripción literal del catálogo CREG acompaña al código
+// ──────────────────────────────────────────────────────────────
+// «N4T17» no le dice nada a quien lee el tablero. La columna nueva
+// pone el texto tal y como lo redacta la CREG 015/2018. Se describe la
+// UUCC REGISTRADA (la oficial del activo); si no hay registrada se
+// describe la calculada Y SE DICE que es la calculada — no se presenta
+// un texto sin decir de dónde sale.
+// ══════════════════════════════════════════════════════════════
+
+describe('normalizarEquipo — descripción CREG de la Unidad Constructiva', () => {
+
+  test('describe la UUCC registrada con el texto literal de la norma', () => {
+    const e = normalizarEquipo({
+      potencia_kva: 50000, tension_primaria_kv: 110,
+      identificacion: { uucc: 'N4T17' },
+      electrico: { tension_primaria_kv: 110, tension_terciaria_kv: 13.8 }
+    }, 0);
+    assert.equal(e.uucc_registrada, 'N4T17');
+    assert.match(e.uucc_desc, /tridevanado trifásico/);
+    assert.match(e.uucc_desc, /41 a 50 MVA/);
+    assert.ok(!/Según el cálculo/.test(e.uucc_desc),
+      'hay UUCC registrada: se describe esa, sin prefijo');
+  });
+
+  test('sin UUCC registrada describe la calculada, y lo dice', () => {
+    const e = normalizarEquipo({
+      potencia_kva: 50000, tension_primaria_kv: 110,
+      electrico: { tension_primaria_kv: 110, tension_terciaria_kv: 13.8 }
+    }, 0);
+    assert.equal(e.uucc_registrada, '');
+    assert.match(e.uucc_desc, /^Según el cálculo: /,
+      'si el texto no viene del registro oficial, hay que decirlo');
+  });
+
+  test('un código fuera del catálogo no inventa descripción', () => {
+    const e = normalizarEquipo({ identificacion: { uucc: 'N9T99' } }, 0);
+    assert.equal(e.uucc_desc, '');
+  });
+
+  test('un autotransformador se describe como lo que es', () => {
+    const e = normalizarEquipo({
+      potencia_kva: 100000, tension_primaria_kv: 220,
+      identificacion: { uucc: 'N5T16' }
+    }, 0);
+    assert.match(e.uucc_desc, /AutoTransformador monofásico/);
+    assert.match(e.uucc_desc, /conexión al STN/);
+  });
+});

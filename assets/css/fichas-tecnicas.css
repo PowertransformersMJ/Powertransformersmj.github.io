@@ -257,6 +257,20 @@
   display: flex; align-items: center; gap: 7px;
 }
 .ftm-mini-src { font-size: 11px; color: var(--ftm-muted); margin: 2px 0 8px; }
+
+/* Descripción literal de la Unidad Constructiva según el catálogo de la CREG.
+   Es texto largo ("Transformador tridevanado trifásico (OLTC) lado de alta en
+   el nivel 4 capacidad final de 41 a 50 MVA") en una tabla que ya tiene once
+   columnas: se acota el ancho y se deja respirar en dos líneas en vez de
+   estirar la fila. El texto completo queda en el `title` de la celda. */
+.ftm-uc-desc {
+  max-width: 320px;
+  min-width: 200px;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--ftm-muted);
+}
 .ftm-count    { color: var(--ftm-muted); font-size: 12px; font-weight: 600; }
 .ftm-saved    { font-size: 12px; color: var(--ftm-ok-ink); font-weight: 700; margin-left: 8px; }
 .ftm-arrow    { color: var(--ftm-muted); }
