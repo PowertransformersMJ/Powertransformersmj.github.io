@@ -25,16 +25,13 @@
 > 3 sin banda en la norma (NLTC > 6 MVA en nivel 3) asignadas por capacidad a `N3T3` por decisión
 > suya, con la excepción escrita en cada registro. **TODO-49 y TODO-50 cerrados.**
 
-### ▶️ TAREA VIVA: el import de Salud de Activos — PASO DEL INGENIERO
-> Archivo: `~/Documents/2026/PSM 2026/Salud de Activos 2026 Actualizado 01 de junio.xlsx` (ojo: se
-> llama «01 de junio» pero se modificó el **2026-08-17**). Verificado abriéndolo (ADR-069): la hoja
-> **TX_Potencia da 208 equipos válidos de 213 filas, 0 errores**, todos con Índice de Salud y 205 con
-> usuarios (1.655.376). Falta pulsar **IMPORTAR EN FIRESTORE** en `admin/importar.html` — el
-> clasificador me bloquea esa escritura. Repetirlo es seguro (busca por matrícula y fusiona).
-> Cierra **TODO-34**. 📌 Pidió **resumen de pendientes en CADA turno**.
+### ✅ CERRADO: el import de Salud de Activos (2026-09-08, `99 §74.11`)
+> El parque tiene salud por primera vez: **208 equipos, 208 con condición** (39·86·54·28·1).
+> No funcionaba por una línea: las 4 subidas de Excel del sitio pasaban un `ArrayBuffer` donde
+> SheetJS espera `Uint8Array` — parseaba mal **en silencio**. No era el archivo del Ingeniero.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
-> **(A)** Pulsar IMPORTAR (arriba). **(B)** GitHub Support "remove sensitive data" + revocar los PAT
+> **(A)** ~~Pulsar IMPORTAR~~ ✅ hecho 09-08. **(B)** GitHub Support "remove sensitive data" + revocar los PAT
 > viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
 > **(D)** Tres decisiones de ADR-063: tope en `/alertas_reconocidas`, `defer` en Chart.js, barras de
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
@@ -66,7 +63,6 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-34** | 🔴 **El parque real NO tiene Índice de Salud**: `salud_actual` todo en `null` y sin usuarios → banda «Sin dato 206», matriz vacía, 0 en riesgo (degrada limpio, no inventa). **El dato ya existe y está verificado** (ADR-069): el import trae 208 con salud (muy bueno 39 · bueno 86 · medio 54 · pobre 28 · muy pobre 1) y 1.655.376 usuarios. Solo falta pulsarlo. | 🔴 |
 | **TODO-51** | 🟡 **El import pisa con vacío lo que el Excel no trae**: el sanitizador emite SIEMPRE todas las claves y se guarda con `merge:true`. Hoy no se pierde nada (esos campos ya están vacíos, 0/206), pero el día que se carguen coordenadas o marca, el siguiente import se las lleva. Arreglo: payload ralo. `99 §74.10`. | 🟡 |
 | **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
