@@ -41,7 +41,7 @@ import {
 import { atraparFoco } from '../foco-modal.js';
 import {
   construirFichaTecnica, colorCondicion, nombreCondicion, nucleoFicha,
-  clasificarAccion, CATEGORIAS_ACCION
+  clasificarAccion, CATEGORIAS_ACCION, definicionCondicion
 } from './ficha-tecnica.js';
 import {
   accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion
@@ -1523,7 +1523,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const cc = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, na: 0 };
     VISIBLES.forEach((e) => { const v = e.cond_int; if (v == null) cc.na++; else cc[v]++; });
     const chips = [1, 2, 3, 4, 5].map((k) =>
-      '<span class="ftm-cond-dist-chip" title="Condición ' + k + ' · ' + esc(nombreCondicion(k)) + '">'
+      '<span class="ftm-cond-dist-chip" title="Condición ' + k + ' · ' + esc(nombreCondicion(k))
+        + ' — ' + esc(definicionCondicion(k)) + '">'
       + '<span class="ftm-cond-dot" style="background:' + colorCondicion(k) + '"></span>'
       + k + ': <b>' + cc[k] + '</b></span>').join('')
       + (cc.na ? '<span class="ftm-cond-dist-chip" title="Sin dato">'
@@ -1735,7 +1736,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '/ Consecuencia (usuarios) →</th>'
       + NIVELES_ORDEN.map((n, i) => '<th>' + (i + 1) + ' · ' + esc(LABELS_NIVEL[n]) + '</th>').join('')
       + '</tr>';
-    const filas = [5, 4, 3, 2, 1].map((f) => {
+    // Filas de 1 a 5, como el resto del módulo: el Ingeniero lee la escala en
+    // ese orden y tenerla invertida aquí obligaba a releer el encabezado.
+    const filas = [1, 2, 3, 4, 5].map((f) => {
       const tds = NIVELES_ORDEN.map((n) => {
         const aqui = (f === hi && n === nivel);
         const c = colorCelda(f, n);
@@ -1746,7 +1749,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           + (aqui ? '<span class="ftm-sr-aqui">ESTE EQUIPO</span>' : '·')
           + '</td>';
       }).join('');
-      return '<tr><th class="ftm-rmx-ry">' + esc(NOMBRE_HI[f]) + '</th>' + tds + '</tr>';
+      return '<tr><th class="ftm-rmx-ry" title="' + esc(definicionCondicion(f)) + '">'
+        + esc(NOMBRE_HI[f]) + '</th>' + tds + '</tr>';
     }).join('');
 
     const sinDato = (hi == null || !nivel);
@@ -1767,6 +1771,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
                           : 'falta condición o usuarios',
                     'Veredicto de riesgo', color ? hexDe(color) : null)
       +   '</div>'
+      +   (hi != null
+          ? '<p class="ftm-sr-def"><b>Condición ' + esc(String(hi)) + ' · '
+            + esc(nombreCondicion(hi)) + '.</b> ' + esc(definicionCondicion(hi)) + '</p>'
+          : '')
       +   (sinDato
           ? '<div class="ftm-aviso"><b>Este equipo no se puede situar en la matriz.</b> '
             + 'Falta ' + (hi == null ? 'la condición' : 'el número de usuarios aguas abajo')
@@ -1904,8 +1912,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const opt = (o, i) => '<option value="' + i + '"'
       + (String(cur) === String(i) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
     const conIndice = opts.map((o, i) => ({ o, i }));
+    // Las bandas van SIEMPRE de 1 a 5 —una sola dirección de lectura en todo el
+    // módulo—; la del equipo se distingue por su rótulo, no sacándola de sitio.
     const bandas = [...new Set(conIndice.filter((x) => x.o.cond != null).map((x) => x.o.cond))]
-      .sort((a, b) => (a === rec ? -1 : b === rec ? 1 : a - b));
+      .sort((a, b) => a - b);
     const grupo = (c) => '<optgroup label="Condición ' + c + ' · ' + esc(nombreCondicion(c))
       + (c === rec ? ' — este equipo' : '') + '">'
       + conIndice.filter((x) => x.o.cond === c).map((x) => opt(x.o, x.i)).join('')
@@ -1919,8 +1929,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const nProp = conIndice.filter((x) => x.o.cond === rec).length;
     const pista = rec != null
       ? 'Este equipo está en condición ' + esc(String(rec)) + ' · ' + esc(nombreCondicion(rec))
-        + ': sus ' + nProp + (nProp === 1 ? ' propuesta va' : ' propuestas van') + ' primero en la lista. '
-        + 'El texto se compone con las acciones que haya marcado arriba; puede editarlo libremente.'
+        + ': ' + (nProp === 1 ? 'su propuesta está marcada' : 'sus ' + nProp + ' propuestas están marcadas')
+        + ' en la lista. El texto se compone con las acciones que haya marcado arriba; '
+        + 'puede editarlo libremente.'
       : 'Elija una versión y edítela libremente; la cifra de potencia se toma de «Potencia del proyecto».';
     return '<div class="ftm-alcance">'
       + '<label for="ftm-sel-' + campo + '">Redacción</label>'

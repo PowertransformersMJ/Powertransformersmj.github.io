@@ -45,6 +45,45 @@ export const NOMBRE_CONDICION = Object.freeze({
   1: 'Muy bueno', 2: 'Bueno', 3: 'Medio', 4: 'Pobre', 5: 'Muy pobre'
 });
 
+/**
+ * Qué significa cada banda en términos de RIESGO y de CONTINUIDAD DEL SERVICIO.
+ *
+ * No sustituye a `NOMBRE_CONDICION` —esas son las etiquetas oficiales del
+ * MO.00418 y no se tocan—: la acompaña, para quien lee el tablero y no sabe qué
+ * implica «Pobre» para el suministro.
+ *
+ * ⚠️ La condición es UN SOLO EJE: la probabilidad de falla. La consecuencia la
+ * aporta la criticidad por usuarios aguas abajo, y la celda sale del cruce. Por
+ * eso ninguna definición dice «riesgo alto» a secas —sería falsa: un activo en
+ * condición 5 que alimenta a poca gente cae en una celda de menor prioridad que
+ * uno en condición 4 que alimenta a una ciudad— y cada una nombra qué determina
+ * la criticidad en esa banda, con una función distinta.
+ *
+ * Tampoco prometen lo que el motor no calcula: el índice no modela la red, así
+ * que ninguna habla de transferencias ni de holgura ante contingencias; y la
+ * banda 1 no afirma «sin deterioro», porque con EDAD pesando 0,30 un activo
+ * puede quedar en la banda superior con deterioro perfectamente detectable.
+ */
+export const DEFINICION_CONDICION = Object.freeze({
+  1: 'Sin hallazgos que comprometan el servicio: la salida se programa con libertad. '
+   + 'La exigencia de vigilancia no la impone el equipo, sino la criticidad aguas abajo.',
+  2: 'Deterioro incipiente, ya distinguible de la variación normal de los ensayos y reversible '
+   + 'con mantenimiento rutinario. La salida sigue programándose sin urgencia; la criticidad '
+   + 'estrecha esa holgura.',
+  3: 'El activo, no el plan, fija la ventana de salida; el deterioro todavía se frena dentro del '
+   + 'ciclo vigente. La criticidad separa el seguimiento de la intervención prioritaria.',
+  4: 'Deterioro parcialmente irreversible, o exigencia de carga en su tope aun con el equipo sano. '
+   + 'Postergar convierte la reposición programada en salida forzada; la criticidad fija el turno.',
+  5: 'Fin de vida técnica, irrecuperable con mantenimiento: puede fallar entre diagnósticos, sin '
+   + 'aviso utilizable; el momento de la salida deja de elegirse. Su alcance lo determina la '
+   + 'criticidad.'
+});
+
+/** Definición de la condición en términos de riesgo y continuidad ('' si no hay). */
+export function definicionCondicion(ci) {
+  return (ci == null ? '' : DEFINICION_CONDICION[ci]) || '';
+}
+
 /** Nombre de la condición 1–5 ('Sin dato' si no hay). */
 export function nombreCondicion(ci) {
   return ci == null ? 'Sin dato' : (NOMBRE_CONDICION[ci] || ('Condición ' + ci));

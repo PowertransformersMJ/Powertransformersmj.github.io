@@ -364,3 +364,143 @@ describe('Matriz de riesgo — el contrato que consume la hoja', () => {
     }
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// Una sola dirección de lectura: siempre de 1 a 5
+// ──────────────────────────────────────────────────────────────
+// La escala de salud aparece en cuatro sitios del módulo —la banda
+// del tablero, la matriz de Analítica gerencial, la hoja «Salud y
+// riesgo» y el desplegable de redacciones—. Las matrices se
+// pintaban de 5 arriba a 1 abajo, que es la convención de una
+// matriz de riesgo, y el resto de 1 a 5. Leerlas en direcciones
+// opuestas dentro del mismo módulo obliga a releer el encabezado
+// cada vez, y ahí es donde alguien confunde la banda buena con la
+// mala. Orden del Ingeniero (2026-09-09): de 1 a 5 en todas.
+// ══════════════════════════════════════════════════════════════
+
+import { readFileSync } from 'node:fs';
+
+describe('El orden de la escala de salud', () => {
+
+  const FUENTES = [
+    'assets/js/ui/fichas/panel.js',
+    'assets/js/ui/fichas/vistas-gerenciales.js',
+    'assets/js/domain/matriz_riesgo.js'
+  ];
+
+  // 🔒 EL INVARIANTE: ninguna enumeración de la escala va al revés.
+  test('ninguna fuente recorre las condiciones de 5 a 1', () => {
+    for (const f of FUENTES) {
+      const src = readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+      assert.ok(!/\[\s*5\s*,\s*4\s*,\s*3\s*,\s*2\s*,\s*1\s*\]/.test(src),
+        `${f} todavía enumera la escala de 5 a 1`);
+    }
+  });
+
+  test('y sí la recorren de 1 a 5', () => {
+    for (const f of FUENTES) {
+      const src = readFileSync(new URL('../' + f, import.meta.url), 'utf8');
+      assert.match(src, /\[\s*1\s*,\s*2\s*,\s*3\s*,\s*4\s*,\s*5\s*\]/,
+        `${f} debería recorrer la escala de 1 a 5`);
+    }
+  });
+
+  // El desplegable agrupa por banda: esas bandas también van en orden, y la
+  // del equipo se distingue por su rótulo en vez de saltarse la fila.
+  test('las bandas del desplegable salen en orden, no la del equipo primero', () => {
+    const src = readFileSync(new URL('../assets/js/ui/fichas/panel.js', import.meta.url), 'utf8');
+    assert.ok(!/\(a === rec \? -1 : b === rec \? 1 : a - b\)/.test(src),
+      'el orden del desplegable seguía sacando de sitio la banda del equipo');
+    assert.match(src, /\.sort\(\(a, b\) => a - b\)/);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════
+// Qué significa cada banda para el riesgo y el suministro
+// ──────────────────────────────────────────────────────────────
+// «Pobre» no le dice a nadie qué pasa con el servicio. Cada banda
+// lleva ahora una definición que sí lo dice — y que tiene una
+// trampa evidente: la condición es UN SOLO EJE, la probabilidad
+// de falla. La consecuencia la aporta la criticidad por usuarios
+// aguas abajo. Una definición que dijera «riesgo alto» a secas
+// sería FALSA: un activo en condición 5 que alimenta a poca gente
+// cae en una celda de menor prioridad que uno en condición 4 que
+// alimenta a una ciudad. Estas pruebas fijan eso, y que ninguna
+// prometa lo que el índice no calcula.
+// ══════════════════════════════════════════════════════════════
+
+import {
+  DEFINICION_CONDICION, definicionCondicion, NOMBRE_CONDICION
+} from '../assets/js/ui/fichas/ficha-tecnica.js';
+
+describe('Definición de cada estado de salud', () => {
+
+  const TODAS = [1, 2, 3, 4, 5].map((c) => ({ c, d: DEFINICION_CONDICION[c] }));
+
+  test('hay una por banda y ninguna vacía', () => {
+    for (const { c, d } of TODAS) {
+      assert.ok(d && d.length > 40, `la condición ${c} no tiene definición`);
+    }
+    assert.equal(definicionCondicion(null), '', 'sin dato no se inventa una');
+    assert.equal(definicionCondicion(9), '');
+  });
+
+  // Van en una fila de tabla y en un tooltip: si no se leen de un vistazo,
+  // no sirven para lo que se hicieron.
+  test('se leen de un vistazo', () => {
+    for (const { c, d } of TODAS) {
+      const n = d.split(/\s+/).length;
+      assert.ok(n <= 30, `la condición ${c} tiene ${n} palabras`);
+    }
+  });
+
+  // 🔒 LA TRAMPA PRINCIPAL: la condición no es el riesgo, es un eje de dos.
+  test('ninguna llama «riesgo» a la condición por sí sola', () => {
+    for (const { c, d } of TODAS) {
+      assert.ok(!/riesgo (alto|bajo|medio|crítico|muy alto|elevado)/i.test(d),
+        `la condición ${c} presenta la banda como si fuera el riesgo completo`);
+    }
+  });
+
+  test('todas atribuyen la consecuencia a la criticidad', () => {
+    for (const { c, d } of TODAS) {
+      assert.match(d, /criticidad/i, `la condición ${c} olvida el segundo eje`);
+    }
+  });
+
+  // …pero no con la misma muletilla cinco veces: eso es un sello, no una idea.
+  test('y cada una le da a la criticidad una función distinta', () => {
+    const frases = TODAS.map(({ d }) => (d.match(/[^.;]*criticidad[^.;]*/i) || [''])[0].trim());
+    assert.equal(new Set(frases).size, 5, 'la cláusula de criticidad se repite entre bandas');
+  });
+
+  test('no prometen lo que el índice no calcula', () => {
+    // El HI no modela la red: no hay topología, ni N-1, ni transferencias, y la
+    // cargabilidad pesa 0,05 en el ponderado. Una banda que viene de DGA (0,35)
+    // y EDAD (0,30) no dice nada sobre si se puede transferir carga.
+    for (const { c, d } of TODAS) {
+      assert.ok(!/transferencia|contingencia|N-1|despacho|topolog/i.test(d),
+        `la condición ${c} promete comportamiento de red que el índice no modela`);
+    }
+  });
+
+  // Con EDAD pesando 0,30 un activo puede caer en la banda superior con
+  // deterioro perfectamente detectable en una variable.
+  test('la banda 1 no afirma que no haya deterioro', () => {
+    assert.ok(!/sin deterioro/i.test(DEFINICION_CONDICION[1]),
+      'el índice es ponderado: «sin deterioro» es una afirmación que no sostiene');
+  });
+
+  // La 4 mantiene el foco de mejora en su estrategia (recuperación de
+  // aislamientos está en su línea base): no puede declarar cerrada la recuperación.
+  test('la banda 4 no declara agotada la recuperación', () => {
+    assert.ok(!/ya no recupera|no recupera margen|irrecuperable/i.test(DEFINICION_CONDICION[4]),
+      'su estrategia todavía incluye mejora, y su línea base recuperación de aislamientos');
+    assert.match(DEFINICION_CONDICION[4], /irreversible/i, 'pero sí dice qué se perdió');
+  });
+
+  test('las etiquetas oficiales del MO.00418 no se tocaron', () => {
+    assert.deepEqual(NOMBRE_CONDICION,
+      { 1: 'Muy bueno', 2: 'Bueno', 3: 'Medio', 4: 'Pobre', 5: 'Muy pobre' });
+  });
+});

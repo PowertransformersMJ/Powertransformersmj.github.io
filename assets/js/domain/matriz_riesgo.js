@@ -129,7 +129,7 @@ export function evaluarTransformador(tx, rangos) {
  */
 export function agregarConteos(transformadores, rangos) {
   const out = {};
-  for (const hi of [5, 4, 3, 2, 1]) {
+  for (const hi of [1, 2, 3, 4, 5]) {
     out[hi] = {};
     for (const n of NIVELES_ORDEN) out[hi][n] = { count: 0, color: colorCelda(hi, n), ids: [] };
   }
