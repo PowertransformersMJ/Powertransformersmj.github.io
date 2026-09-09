@@ -37,10 +37,9 @@ condición) con un hueco que se rellena con las acciones que el Ingeniero marque
 equipo, su línea base, o el catálogo `MO.00418 §4.3`—. Regla dura: no se promete lo que el
 mantenimiento no revierte. El PI quedó intacto, con prueba que lo fija. Lecciones: L-82.
 
-> 🟡 **Esperando decisión suya**: (a) el bloque de **PRESUPUESTO** se adoptó igual al del PI —dice
-> «INVERSIÓN» y valora la UC de **reposición**—, que es lo que se pidió pero probablemente no es lo
-> que un documento de mantenimiento debe costear; (b) no hay formato oficial al cual exportar, así
-> que no lleva botón de exportar.
+> **Frontera cerrada** (`99 §74.20`): la inversión es del PI. Fuera de este documento el bloque de
+> presupuesto, las acciones de inversión —nombradas, no ocultas— y el lenguaje que proponía reponer.
+> 🟡 Queda una decisión suya: no hay formato oficial al cual exportar, así que no lleva ese botón.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(A)** ~~Pulsar IMPORTAR~~ ✅ hecho 09-08. **(B)** GitHub Support "remove sensitive data" + revocar los PAT

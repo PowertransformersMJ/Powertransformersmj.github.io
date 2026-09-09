@@ -2420,3 +2420,41 @@ guardada se respeta y no se repuebla sola.
 
 Crudo del workflow y la lección de la concordancia → bóveda,
 `2026-09-08-redacciones-mantenimiento/` (segunda vuelta).
+
+**74.20 La frontera entre los dos documentos queda cerrada: la inversión es del PI (2026-09-09).**
+Decisión del Ingeniero, que zanja lo que yo venía señalando desde `§74.17`: *«todo lo referente a
+inversión queda en PI»*.
+
+**Qué sale del documento de mantenimiento.** (a) El bloque de **PRESUPUESTO**, que rotulaba
+«INVERSIÓN» y valoraba la Unidad Constructiva de **reposición** — se había adoptado del PI porque el
+encargo fue «adopta lo mismo que PI», y era la primera de las dos cosas que quedaron esperando
+decisión. (b) Las **acciones de inversión** del selector. (c) El lenguaje que **proponía** reponer:
+la condición 5 pasa de «ejecutar la salida» a **sostener hasta la salida** y aportar el expediente de
+condición al PI; la 4 documenta su costo en vez de compararlo contra el valor de reposición.
+
+**Lo que NO se hace: ocultar.** Si el plan registrado del equipo trae una acción de inversión, se
+nombra y se dice dónde se sustenta. Borrarla de la vista sería perder de la pantalla un renglón del
+plan de récord — es la misma trampa de L-81, en otra superficie.
+
+**La frontera se hace explícita, no heredada.** El filtro NO usa la categoría funcional: `INV` era
+demasiado gruesa y marcaba como inversión cualquier acción que dijera «reemplazo». Con eso el filtro
+se llevaba por delante el **reemplazo de bujes** y el de **componentes defectuosos**, que son
+subactividades del correctivo mayor y trabajo contratable en este documento. `esInversion()` enumera
+lo que de verdad lo es —crear o sustituir capacidad de transformación: propuesta a PI, aumento de
+capacidad de transformación, instalación de unidad adicional, repotenciación, reposición del
+activo— y hay **contra-prueba** de que lo demás se queda. Perder trabajo real del alcance es tan
+grave como colar inversión donde no va.
+
+**De paso**, `clasificarAccion` deja de mandar a `INV` el reemplazo de un componente. Eso también
+corrige la señal de *brecha* de `nucleoFicha`, que avisa cuando una condición severa no tiene acción
+de inversión en su plan: antes un reemplazo de bujes la silenciaba.
+
+**Verificación**: 1537 pruebas verdes (12 nuevas), lint limpio, preview sin bloque de presupuesto,
+con el aviso de lo excluido y con las nueve acciones de mantenimiento contratables de la banda 4.
+
+**Verificado sano / no re-auditar**: el PI conserva su bloque de presupuesto y su exportación al
+PE.02081 · el aviso dinámico de contradicción `INV × banda` se retiró por quedar sin poder dispararse
+(ya no hay acciones de inversión que marcar), no por dejarlo de vigilar.
+
+Queda una sola cosa esperando decisión suya: el documento de mantenimiento **no tiene formato oficial
+al cual exportar**, y por eso no lleva botón de exportar.
