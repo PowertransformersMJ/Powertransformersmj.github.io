@@ -741,7 +741,9 @@ function textoVersion(campo, indice, equipo, st) {
       beneficios_mtto: redaccionBeneficiosMtto
     };
     const fn = AUTO[o.auto];
-    return fn ? fn(eq, d) : '';
+    // La automática del alcance de mantenimiento ARGUMENTA lo escogido, así que
+    // necesita la selección; a las demás el tercer argumento les da igual.
+    return fn ? fn(eq, d, seleccionAcciones(equipo, st, campo)) : '';
   }
   return resolverPlantilla(o.v, equipo, st, campo);
 }
