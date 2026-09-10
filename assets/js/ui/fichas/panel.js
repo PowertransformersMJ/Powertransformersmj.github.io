@@ -29,6 +29,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia, montoCOP } from '../../domain/fichas_creg_uc.js';
+import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP } from '../../domain/fichas_presupuesto.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
@@ -472,6 +473,9 @@ export function normalizarEquipo(bruto, i) {
     matricula: txt(leer(b, 'matricula', 'identificacion.matricula')),
     subestacion: txt(leer(b, 'subestacion', 'ubicacion.subestacion_nombre')),
     municipio: txt(leer(b, 'municipio', 'ubicacion.municipio')),
+    // `municipio` se completa más abajo desde la tabla de subestaciones cuando
+    // el registro no lo trae: es geografía, no un dato que se invente.
+
     zona: txt(leer(b, 'zona', 'ubicacion.zona')),
     departamento: txt(leer(b, 'departamento', 'ubicacion.departamento')),
     potencia_kva: kva,
@@ -509,6 +513,12 @@ export function normalizarEquipo(bruto, i) {
     anio_fab: num(leer(b, 'anio_fab', 'det.anio', 'anio', 'fabricacion.ano_fabricacion')),
     usuarios: num(leer(b, 'usuarios', 'usuarios_aguas_abajo', 'criticidad.usuarios_aguas_abajo'))
   };
+  // El municipio se deduce de la SUBESTACIÓN cuando el registro no lo trae —y
+  // solo entonces: lo que venga del parque manda—. Es la tabla oficial del
+  // Ingeniero, así que no es un dato inventado sino uno que faltaba copiar; y
+  // si la subestación no está o resulta ambigua, el campo se queda vacío para
+  // que lo llene él. `99 §75.11`.
+  if (!e.municipio) e.municipio = municipioDeSubestacion(e) || '';
   e.diag = diagnosticoDeEquipo(e);
   return e;
 }
