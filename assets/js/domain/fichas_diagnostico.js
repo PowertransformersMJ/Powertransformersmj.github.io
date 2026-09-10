@@ -35,6 +35,7 @@
 
 import { calcularDP, calcularVidaUtilizada } from './salud_activos.js';
 import { sustentoDeAccion } from './acciones_tecnicas.js';
+import { condicionesPresentes, CIERRE_CONDICIONES } from './condiciones_deterioro.js';
 
 // ── Utilidades internas ──────────────────────────────────────────────────────
 
@@ -459,6 +460,32 @@ const TRABAJO_POR_MODO = Object.freeze({
  * @param {object} diag
  * @returns {string}
  */
+/**
+ * Las condiciones de deterioro que el activo PRESENTA, definidas.
+ *
+ * Encargo del Ingeniero (2026-09-10) con su propia redacción: el alcance
+ * nombraba el hallazgo pero no lo DEFINÍA, ni decía qué riesgo supone para el
+ * equipo, ni cómo puede afectar al cliente.
+ *
+ * Solo las que el motor declaró a partir de valores MEDIDOS —decisión suya—:
+ * escribir las cinco por defecto sería afirmar condiciones que el equipo no
+ * tiene, en un papel que se firma. Si no hay ninguna, no se escribe el bloque
+ * ni el cierre.
+ *
+ * @param {object|null} md salida de `modoDegradacion`
+ * @returns {string} '' si el activo no presenta ninguna
+ */
+function bloqueCondiciones(md) {
+  const cs = condicionesPresentes(md);
+  if (!cs.length) return '';
+  const renglones = cs.map((c) => `• ${c.condicion}. ${c.definicion}\n`
+    + `  Riesgo para el equipo: ${c.riesgoEquipo}\n`
+    + `  Posible afectación a clientes: ${c.afectacionClientes}`);
+  return 'CONDICIONES QUE PRESENTA EL ACTIVO\n'
+    + renglones.join('\n')
+    + '\n' + CIERRE_CONDICIONES;
+}
+
 /** Primera letra en mayúscula, sin tocar el resto (siglas incluidas). */
 function may(t) {
   const x = String(t || '').trim();
@@ -592,6 +619,12 @@ export function redaccionAlcanceMtto(equipo, diag, escogidas) {
   // porqué del activo (condición y hallazgo dominante), aquí el porqué de cada
   // trabajo. Si no hay nada marcado no se escribe nada — no se rellena con un
   // catálogo que el Ingeniero no escogió.
+  // Orden del documento: primero QUÉ le pasa al activo (condición definida,
+  // riesgo y afectación), después QUÉ se le va a hacer y por qué. Es el orden
+  // en que lo lee quien firma.
+  const cond = bloqueCondiciones(md);
+  if (cond) t += '\n\n' + cond;
+
   const arg = argumentoDeAcciones(escogidas);
   if (arg) t += '\n\n' + arg;
   return t;
