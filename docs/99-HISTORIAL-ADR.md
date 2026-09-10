@@ -2825,3 +2825,47 @@ contiene medidas, ni datos de cliente, ni nada facturable: son nombres de subest
 con su municipio —geografía de infraestructura, no medidas ni datos de cliente, y el sitio ya publica
 un mapa de la flota—, pero si el Ingeniero prefiere que no esté en el repo, la alternativa es
 Firestore con su costo de lectura.
+
+**75.12 El alcance ARGUMENTA cada actividad, ya no las enumera (2026-09-10).** Encargo, sobre el
+párrafo generado: *«la descripción en el alcance la necesito en un contexto técnico, donde se
+argumentan las actividades que se van a desarrollar al activo»*.
+
+**Causa raíz.** El módulo sabía argumentar por **modo de degradación** (`TRABAJO_POR_MODO`) pero no
+sabía nada de cada **actividad**: el catálogo `MO.00418 §4.3` solo trae el nombre. Por eso el texto
+decía «el alcance comprende regeneración de aceite, pintura parcial y reemplazo de componentes
+defectuosos» y seguía hablando de ventanas operativas — logística, no argumento.
+
+**Solución.** `assets/js/domain/acciones_tecnicas.js`: el sustento de las **36** subactividades —sobre
+qué SUBSISTEMA actúa, qué VARIABLE la motiva, qué deja al cierre, qué NO devuelve, si reinicia la
+línea base y su referencia—. `redaccionAlcanceMtto` acepta un **tercer argumento opcional** con lo
+escogido y compone el argumento renglón por renglón; sin él se comporta como antes. Las acciones
+llevan ahora su `codigo` de catálogo (aditivo) para resolver el sustento por código y no por texto.
+La advertencia de línea base va **una vez** al final: repetirla en cada renglón es un sello.
+
+**Cómo se produjo, y por qué se puede firmar.** 14 agentes (7 redactores por macroactividad + 7
+revisores de rigor), con una **lista cerrada de normas permitidas** y la orden de dejar la referencia
+VACÍA ante la duda. El revisor devolvió **48 correcciones sobre 36 actividades**: 35 imprecisiones
+técnicas · 6 rellenos · 3 afirmaciones de dato · **2 normas que no aplicaban** · **1 norma INVENTADA**
+· **1 promesa de revertir lo irreversible**. Todas aplicadas. Las tres más instructivas: un absoluto
+falso en el primer renglón («el único indicador que declara un defecto interno» — las pruebas
+eléctricas y la termografía también lo declaran), una obligación incumplible («deja localizado TODO
+punto caliente», cuando la termografía solo ve superficies accesibles) y una **verificación** de
+enfriamiento que prometía «capacidad de disipación restituida a su condición de diseño», que es
+trabajo de reparación con otro costo. → **L-88**.
+
+**Las cuatro reglas, con prueba.** (1) Ninguna norma fuera del cuerpo que el proyecto ya usa. (2) Lo
+que toca la celulosa **contiene** el avance, no devuelve el grado de polimerización consumido. (3)
+Ningún texto afirma un valor de ensayo: nombra la variable. (4) Una actividad **sin ficha** —viene del
+plan registrado, que es texto libre de Salud de Activos— se enumera, pero **no se le inventa** un
+argumento.
+
+**Verificación**: 1632 pass / 0 fail / 2 skip (12 nuevas), lint limpio, preview FIEL sobre MAMONAL con
+6 viñetas compuestas; la hoja convierte los saltos en `<br>` (`panel.js:2206`), así que salen en
+líneas propias.
+
+**Verificado sano / no re-auditar**: el `%` NO se filtra como «dato afirmado» — la norma define bandas
+en porcentaje (`SUB-C4-08` se llama literalmente «Plan de mitigación sobrecarga 90-110 %») y filtrarlo
+daba falso positivo · llamar a `redaccionAlcanceMtto` con dos argumentos sigue funcionando · las otras
+tres redacciones automáticas ignoran el tercero.
+
+Crudo del workflow y el fusionado tras correcciones → bóveda, `2026-09-10-sustento-tecnico-actividades/`.
