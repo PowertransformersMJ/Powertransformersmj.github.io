@@ -228,3 +228,25 @@ un «arreglo» que rompe algo sano. Comprobar el estado vacío ANTES de prometer
 (regresión · fidelidad a la norma · lo que el usuario ve). Dos dijeron «roto». La lente normativa
 —la que fue a mirar precios y alternativas del catálogo— es la que vio el fondo; las de código
 encontraron los ocho defectos de superficie. → `99 §75.10`.
+
+### L-88 · El texto que redacta un modelo para un papel firmado necesita un revisor de DOMINIO, no de estilo
+
+Se redactó el sustento técnico de 36 actividades de mantenimiento con una lista cerrada de normas
+permitidas y la orden explícita de no inventar ninguna. Aun así, el revisor de rigor encontró **una
+norma inventada, dos que no aplicaban y una promesa de revertir lo irreversible** — más 35
+imprecisiones técnicas. La restricción en el prompt **no bastó**; lo que las cazó fue un segundo
+agente leyendo como ingeniero que va a firmar.
+
+Los tres patrones que se repiten y que hay que buscar siempre:
+1. **El absoluto falso**: «el único indicador que declara un defecto interno». Suena autoritario y es
+   refutable con el propio catálogo. Es lo primero que ataca un revisor externo.
+2. **La obligación incumplible**: «deja localizado TODO punto caliente» — la termografía solo ve
+   superficies accesibles. Firmado, crea una obligación imposible ante un hallazgo interno posterior.
+3. **El verbo que sube de categoría el trabajo**: una *verificación* de enfriamiento que prometía
+   «capacidad de disipación restituida a su condición de diseño» — eso es una reparación, con otro
+   repuesto, otras horas y otro costo.
+
+**La regla**: cuando un texto generado vaya a un documento que se firma, el segundo par de ojos revisa
+**el dominio** (¿es cierto? ¿es exigible? ¿esa norma aplica?), no la redacción. Y conviene un tercer
+paso mecánico: las correcciones llegan **sin tildes** —hay que reponerlas antes de publicar—.
+→ `99 §75.12`.
