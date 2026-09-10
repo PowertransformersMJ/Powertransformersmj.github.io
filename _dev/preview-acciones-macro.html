@@ -16,7 +16,7 @@
   <div class="devh">DEV · Panel REAL. Encargo 2026-09-10: en el selector de acciones del documento de
     Mantenimiento Especializado deben verse TODAS las macroactividades por condición, con la banda
     del equipo abierta y señalada. TX-1 = condición 2 (el caso del pantallazo); TX-2 = condición 3
-    con mitigación; TX-3 = condición 5, donde casi todo es inversión.</div>
+    con mitigación; TX-3 = condición 5. TX-4 = MAMONAL, subestación real SIN municipio en el registro: el campo debe salir con CARTAGENA solo.</div>
   <div id="fichasPanel"></div>
 </div>
 <script type="module">
@@ -27,7 +27,10 @@ const VIVO = [
   { fila:2, subestacion:'DEMO C3', matricula:'TX-DEMO-03', potencia_kva:10000, kv_prim:34.5, kv_sec:13.8,
     regulacion:'NLTC', uucc_registrada:'N3T3', cond_int:3, usuarios:8100, mva:10 },
   { fila:3, subestacion:'DEMO C5', matricula:'TX-DEMO-05', potencia_kva:30000, kv_prim:110, kv_sec:13.8,
-    regulacion:'OLTC', uucc_registrada:'N4T6', cond_int:5, usuarios:15000, mva:30 }
+    regulacion:'OLTC', uucc_registrada:'N4T6', cond_int:5, usuarios:15000, mva:30 },
+  // Caso del encargo 2026-09-10: subestación REAL y SIN municipio en el registro.
+  { fila:4, subestacion:'MAMONAL', matricula:'T1-M/M-MAM', potencia_kva:20000, kv_prim:66, kv_sec:13.8,
+    regulacion:'OLTC', uucc_registrada:'N4T4', cond_int:2, usuarios:9500, mva:20, zona:'bolivar' }
 ];
 window.__panel = montarPanelFichas(document.getElementById('fichasPanel'), {
   fuente: async () => VIVO, origen: 'DEV (simulado)'
