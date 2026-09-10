@@ -2638,3 +2638,65 @@ sola flecha activa.
 en sobrecarga, 145 % Curumaní, 205 mil usuarios) — lo que faltaba era la vista, no el dato · el
 `% Ampacidad` renderizado siempre fue correcto; el «1» de la columna de usuarios es dato de origen,
 comprobado contra el Excel.
+
+## 75. ADR — Cinco afirmaciones falsas en el papel que se firma, y una decisión suya que solo se había aplicado a medias ⟦OPUS-5⟧ (2026-09-10)
+
+> Encargo del Ingeniero al retomar: *«el segmento de fichas técnicas»*. Antes de tocar nada, cuatro
+> lentes independientes sobre el módulo (cola declarada · caza-bugs del camino real · verdad del
+> documento · deuda de arquitectura), cada hallazgo refutado por un escéptico que abría el código él
+> mismo. 36 hallazgos, los 36 confirmados; se remedian los cinco que hacen **mentir al documento**.
+
+**75.1 Causa raíz (cinco, independientes).** (a) `montoCOP` borraba *todo* lo que no fuera dígito
+(`replace(/[^0-9]/g,'')`), pensada para el catálogo CREG —que no trae decimales—, pero es la misma
+función que lee lo que el Ingeniero **teclea a mano**: con centavos multiplicaba por cien y se comía
+el signo menos. (b) `descripcionUC` pegaba «TRANSFORMADOR TRIFASICO» delante de la regulación y la
+banda, tirando a la basura el campo `fila.desc` del catálogo, que trae el texto **literal de la
+resolución**; el catálogo tiene tres familias y el texto afirmaba una sola. (c) `soloMedido` filtraba
+`null` y `''` pero **no el 0**, que es el relleno de «no lo sé» de la hoja de Salud de Activos — el
+módulo ya se defiende del 0 en potencia, terciario y condición; en los ensayos de aceite no.
+(d) `f.usuarios != null` deja pasar el 0. (e) `selectorAcciones` filtra la inversión (orden del
+2026-09-09, `§74.20`) pero `resolverPlantilla` compone la prosa con `seleccionAcciones`, que **no**:
+la decisión se había aplicado a un solo camino de escritura.
+
+**75.2 Solución estructural.** `montoCOP` lee con la convención colombiana (punto = miles,
+coma = decimales, dos centavos, signo respetado) — arregla de un golpe el Valor Real y el override
+del unitario CREG, que es la base de la comparación. `descripcionUC` (en sus **dos** copias) devuelve
+`fila.desc` en mayúsculas; sin catálogo no afirma la familia. `soloMedido` descarta el 0 y el módulo
+cae solo en su texto honesto, que ya estaba escrito y probado. Las cuatro afirmaciones de usuarios
+pasan a `> 0`. `seleccionAcciones(equipo, st, campo)` gana un tercer parámetro **opcional**: con un
+campo `*_mtto` aplica el mismo filtro que el selector.
+
+**75.3 No-regresión.** Cero renombres. `seleccionAcciones` conserva su firma de dos argumentos (el
+tercero es opcional y sin él se comporta como el PI, que es donde la inversión SÍ va) — hay
+contraprueba de que el PI mantiene las suyas. `formatearCOP` ya redondeaba, así que el paso de entero
+a decimal no altera ninguna cifra impresa del catálogo. Build OK.
+
+**75.4 Tests/verificación.** 1583 pass / 0 fail / 2 skip (eran 1566) — **17 nuevas** en
+`tests/fichas_verdad_documento.test.js`, una por defecto más las contrapruebas. `lint:html` limpio.
+CI y Deploy en verde, esperados a que terminaran (L-65). **NO verificado en vivo**: la página exige
+sesión; el recorrido en producción queda pendiente de confirmación del Ingeniero (L-85).
+
+**75.5 Anti-patterns evitados.** No se tocó el caso `usuarios == 1`, que es dato de origen y decisión
+suya abierta (**TODO-55**): arreglar el 0 es corregir una contradicción interna de la ficha; tratar
+el 1 sería decidir por él. No se «arregló» la banda CREG de los huecos entre rangos: la banda
+asignada es probablemente la correcta y lo que falta es **declarar** que se interpretó.
+
+**75.6 Archivos.** MODIFICADOS: `assets/js/domain/fichas_creg_uc.js` · `…/fichas_diagnostico.js` ·
+`assets/js/ui/fichas/panel.js` · `…/exportar-planificacion.js`. NUEVO:
+`tests/fichas_verdad_documento.test.js`. INTACTOS: el exportador al PE.02081, `HOJAS_FICHA`,
+`HOJAS_SALUD`, `estadoVacio`, las reglas y el importador.
+
+**75.7 Doctrina aplicada.** §3.2 (aditivo) · §3.3 (comprobé yo mismo con `node` las cinco causas
+antes de escribir una línea; el escéptico corrigió al primer agente en cifras y alcance) · R2 del
+interinato (TDD en código de dinero) · §G.4 caza-bugs del camino vivo, no del diff.
+
+**75.8 Verificado sano / no re-auditar.** El PI conserva su presupuesto, su exportación y sus
+acciones de inversión, con prueba · `selectorAcciones` solo se pinta cuando `documento === 'salud'`
+(`panel.js:2032`), así que el filtro de casillas nunca afectó al PI · el catálogo trae `desc` en las
+**54** filas, comprobado · `montoCOP` sobre el catálogo devuelve exactamente los mismos enteros que
+antes · `soloMedido` tiene un único llamante, así que descartar el 0 no alcanza a ningún otro texto.
+
+**Los 31 hallazgos restantes NO se tocaron** y viven en `10` como cola del segmento: los dos graves
+son la **colisión de identidad** (dos transformadores de la misma subestación comparten documento
+entero, porque la clave sale de «CODIGO SUBESTACION») y la **carrera de la carga tardía**, que pisa
+lo adjuntado sin preguntar porque `fijarDatos(..., {forzar:true})` salta el permiso.
