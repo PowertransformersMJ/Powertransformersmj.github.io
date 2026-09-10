@@ -253,8 +253,22 @@ export function codigosPorNivel(nivel) {
  */
 export function montoCOP(texto) {
   if (texto == null) return null;
-  const n = parseInt(String(texto).replace(/[^0-9]/g, ''), 10);
-  return Number.isNaN(n) ? null : n;
+  const s = String(texto).trim();
+  // Convención colombiana: el PUNTO agrupa miles y la COMA separa decimales.
+  // El catálogo CREG viene sin decimales ("152.592.000"), pero el Valor Real y
+  // el override del unitario los teclea el Ingeniero a mano: borrar todo lo que
+  // no fuera dígito convertía "1.000.000,50" en 100.000.050 —cien veces la
+  // cifra— y se tragaba el signo menos, en un número que se firma y se exporta
+  // al PE.02081. Los centavos se truncan a dos, no se inventan más.
+  const negativo = /^-/.test(s.replace(/[^\d,.-]/g, ''));
+  const limpio = s.replace(/[^0-9,]/g, '');
+  const partes = limpio.split(',');
+  const ent = partes[0];
+  const dec = partes.length > 1 ? partes[1] : '';
+  if (!ent && !dec) return null;
+  const n = Number((ent || '0') + '.' + (dec || '0').slice(0, 2));
+  if (Number.isNaN(n)) return null;
+  return negativo ? -n : n;
 }
 
 /**

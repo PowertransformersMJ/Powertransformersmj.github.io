@@ -134,7 +134,16 @@ export function dpInfo(diag) {
  * @returns {string} lista en castellano, o '' si no se midió nada.
  */
 function soloMedido(pares) {
-  const hay = pares.filter(([, v]) => v != null && v !== '').map(([t]) => t);
+  // La hoja de Salud de Activos usa el 0 como relleno de «no lo sé». En estas
+  // variables el cero NO es una medida posible en un equipo en servicio: una
+  // rigidez dieléctrica de 0 kV sería un cortocircuito y una tensión
+  // interfacial de 0,0 mN/m no existe. Colarlo imprimía un ensayo inventado en
+  // un documento que se firma —y empujaba «degradación del aceite» como
+  // hallazgo dominante, que en el documento de mantenimiento se traduce en
+  // comprar tratamiento de aceite por un dato que nunca se midió. Es la misma
+  // defensa que el módulo ya aplica a la potencia, al terciario y a la
+  // condición. Sin nada medido, cae solo en su texto honesto.
+  const hay = pares.filter(([, v]) => v != null && v !== '' && Number(v) !== 0).map(([t]) => t);
   if (!hay.length) return '';
   if (hay.length === 1) return hay[0];
   return hay.slice(0, -1).join(', ') + ' y ' + hay[hay.length - 1];
@@ -306,7 +315,11 @@ export function redaccionAlcance(equipo, diag) {
     t += `La unidad opera al ${numES(d.crg)} % de su capacidad nominal, de modo que no existe margen para ` +
       'atender la carga por otra vía ante una salida del equipo. ';
   }
-  if (f.usuarios != null) {
+  // `> 0` y no `!= null`: con 0 usuarios la frase se autodestruye —«si no
+  // afecta a nadie, nadie firma»— y contradice a la propia ficha, que dos
+  // párrafos más abajo imprime «—» para ese mismo campo. Con el dato ausente
+  // no se escribe, que es lo único cierto.
+  if (f.usuarios > 0) {
     t += `La afectación asociada a una falla del activo alcanza ${numES(f.usuarios)} usuarios. `;
   }
   t += 'En consecuencia, y en el marco de la gestión de activos (ISO 55001), la reposición por una unidad de ' +
@@ -350,7 +363,7 @@ export function redaccionBeneficios(equipo, diag) {
 
   L.push('· Aumento de la disponibilidad del suministro: menor frecuencia y duración de interrupciones, con ' +
     'impacto directo en la continuidad del servicio y en los indicadores de calidad (SAIDI/SAIFI) de la zona ' +
-    'de influencia' + (f.usuarios != null ? `, que atiende ${numES(f.usuarios)} usuarios` : '') + '.');
+    'de influencia' + (f.usuarios > 0 ? `, que atiende ${numES(f.usuarios)} usuarios` : '') + '.');
 
   if (d && num(d.crg) != null && num(d.crg) >= 90) {
     L.push(`· Recuperación del margen de capacidad: hoy la unidad opera al ${numES(d.crg)} % de su capacidad ` +
@@ -491,7 +504,11 @@ export function redaccionAlcanceMtto(equipo, diag) {
     t += `La unidad opera al ${numES(d.crg)} % de su capacidad nominal, por lo que la intervención debe `
       + 'programarse con la indisponibilidad coordinada y el respaldo de carga previsto. ';
   }
-  if (f.usuarios != null) {
+  // `> 0` y no `!= null`: con 0 usuarios la frase se autodestruye —«si no
+  // afecta a nadie, nadie firma»— y contradice a la propia ficha, que dos
+  // párrafos más abajo imprime «—» para ese mismo campo. Con el dato ausente
+  // no se escribe, que es lo único cierto.
+  if (f.usuarios > 0) {
     t += `La afectación asociada a una falla del activo alcanza ${numES(f.usuarios)} usuarios. `;
   }
 
@@ -546,7 +563,7 @@ export function redaccionBeneficiosMtto(equipo, diag) {
 
   L.push('· Disponibilidad del suministro: reduce la probabilidad de una salida intempestiva y de la '
     + 'energía no suministrada asociada, con efecto directo en los indicadores de continuidad (SAIDI/SAIFI)'
-    + (f.usuarios != null ? ` de los ${numES(f.usuarios)} usuarios atendidos` : ' de la zona de influencia') + '.');
+    + (f.usuarios > 0 ? ` de los ${numES(f.usuarios)} usuarios atendidos` : ' de la zona de influencia') + '.');
 
   if (d && num(d.crg) != null && num(d.crg) >= 90) {
     L.push(`· Operación segura en el límite de carga: con una cargabilidad del ${numES(d.crg)} %, mantener el `

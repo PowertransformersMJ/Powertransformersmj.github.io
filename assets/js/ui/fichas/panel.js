@@ -635,13 +635,21 @@ function ucDeLaFicha(equipo, st) {
 
 /** Descripción normalizada de la UC, tal como la imprime la ficha. */
 function descripcionUC(equipo, codigo) {
+  // El catálogo CREG trae la descripción LITERAL de la resolución en `fila.desc`
+  // —«AutoTransformador monofásico (OLTC)…», «Transformador tridevanado
+  // trifásico (OLTC)…»—. Armarla a mano pegando «TRANSFORMADOR TRIFASICO»
+  // delante describía un autotransformador monofásico como trifásico y un
+  // tridevanado como bidevanado: familias distintas, con precios distintos, en
+  // la celda D36 del PE.02081. Sin catálogo no se sabe la familia, así que no
+  // se afirma.
   const r = buscarUC(codigo);
   if (r) {
-    return 'TRANSFORMADOR TRIFASICO (' + (r.fila.reg || '') + ') - LADO DE ALTA NIVEL '
+    if (r.fila.desc) return String(r.fila.desc).toUpperCase();
+    return 'TRANSFORMADOR (' + (r.fila.reg || '') + ') - LADO DE ALTA NIVEL '
       + String(r.fila.nivel || equipo.nivel || '').replace('N', '')
       + ' - DE ' + String(r.fila.cap || '').toUpperCase();
   }
-  return 'TRANSFORMADOR TRIFASICO (' + txt(equipo.reg_catalogo) + ') - LADO DE ALTA NIVEL '
+  return 'TRANSFORMADOR (' + txt(equipo.reg_catalogo) + ') - LADO DE ALTA NIVEL '
     + txt(equipo.nivel).replace('N', '') + ' - DE ' + txt(equipo.banda).toUpperCase();
 }
 
@@ -656,20 +664,35 @@ export function accionesDeEquipo(equipo) {
   return accionesDisponibles(n.ci, n.acciones, n.baseUsada, clasificarAccion);
 }
 
-/** Ids marcados: los guardados, o los del plan del equipo la primera vez. */
-export function seleccionAcciones(equipo, st) {
-  const disp = accionesDeEquipo(equipo);
+/** ¿El campo pertenece al documento de Mantenimiento Especializado? */
+function esCampoMtto(campo) {
+  return /_mtto$/.test(String(campo || ''));
+}
+
+/**
+ * Ids marcados: los guardados, o los del plan del equipo la primera vez.
+ *
+ * `campo` es opcional y ADITIVO: sin él se comporta como siempre (el PI, donde
+ * la inversión SÍ va). Con un campo del documento de mantenimiento aplica el
+ * mismo filtro que el selector de casillas —orden del Ingeniero del 2026-09-09,
+ * «todo lo referente a inversión queda en PI» (`99 §74.20`)—. Sin este filtro
+ * la prosa del alcance abría proponiendo reposición del activo mientras el
+ * selector, que sí filtra, no ofrecía casilla con la que quitarla.
+ */
+export function seleccionAcciones(equipo, st, campo) {
+  const todas = accionesDeEquipo(equipo);
+  const disp = esCampoMtto(campo) ? todas.filter((a) => !esInversion(a.txt)) : todas;
   const guardado = (st && st.plan) ? st.plan.acc_sel : null;
   const ids = Array.isArray(guardado) ? guardado : seleccionPorDefecto(disp);
   const set = new Set(ids);
   return disp.filter((a) => set.has(a.id));
 }
 
-function resolverPlantilla(tpl, equipo, st) {
+function resolverPlantilla(tpl, equipo, st, campo) {
   // `{ACCIONES}` lo compone el Ingeniero marcando en la ficha. Si no ha marcado
   // ninguna NO se deja el hueco ni se inventa un plan: se dice que están por
   // definir, que es lo único cierto en ese momento.
-  const escogidas = prosaAcciones(seleccionAcciones(equipo, st));
+  const escogidas = prosaAcciones(seleccionAcciones(equipo, st, campo));
   return String(tpl || '')
     .replace(/\{MVA\}/g, mvaTxt(potenciaProyecto(equipo, st)))
     .replace(/\{SUB\}/g, equipo.subestacion || '')
@@ -697,7 +720,7 @@ function textoVersion(campo, indice, equipo, st) {
     const fn = AUTO[o.auto];
     return fn ? fn(eq, d) : '';
   }
-  return resolverPlantilla(o.v, equipo, st);
+  return resolverPlantilla(o.v, equipo, st, campo);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -1852,7 +1875,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + 'registrada, así que no hay acciones de su banda que ofrecer. El alcance se redacta a '
         + 'mano o se toma la versión automática.</div>';
     }
-    const marcados = new Set(seleccionAcciones(e, st).map((a) => a.id));
+    const marcados = new Set(seleccionAcciones(e, st, 'alcance_mtto').map((a) => a.id));
     const hayRegistro = disp.some((a) => a.origen === 'registro');
     const esBase = disp.some((a) => a.origen === 'base');
 

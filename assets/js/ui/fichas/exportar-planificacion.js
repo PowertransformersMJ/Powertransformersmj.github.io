@@ -198,13 +198,21 @@ export function uccDeLaFicha(equipo = {}, estado = {}) {
 
 /** Descripción normalizada de la UC, tal como la imprime la ficha. */
 export function descripcionUC(equipo = {}, codigo) {
+  // El catálogo CREG trae la descripción LITERAL de la resolución en `fila.desc`
+  // —«AutoTransformador monofásico (OLTC)…», «Transformador tridevanado
+  // trifásico (OLTC)…»—. Armarla a mano pegando «TRANSFORMADOR TRIFASICO»
+  // delante describía un autotransformador monofásico como trifásico y un
+  // tridevanado como bidevanado: familias distintas, con precios distintos, en
+  // la celda D36 del PE.02081. Sin catálogo no se sabe la familia, así que no
+  // se afirma.
   const r = buscarUC(codigo);
   if (r) {
-    return 'TRANSFORMADOR TRIFASICO (' + (r.fila.reg || '') + ') - LADO DE ALTA NIVEL ' +
+    if (r.fila.desc) return String(r.fila.desc).toUpperCase();
+    return 'TRANSFORMADOR (' + (r.fila.reg || '') + ') - LADO DE ALTA NIVEL ' +
       String(r.fila.nivel || equipo.nivel || '').replace('N', '') +
       ' - DE ' + String(r.fila.cap || '').toUpperCase();
   }
-  return 'TRANSFORMADOR TRIFASICO (' + txt(equipo.reg_catalogo) + ') - LADO DE ALTA NIVEL ' +
+  return 'TRANSFORMADOR (' + txt(equipo.reg_catalogo) + ') - LADO DE ALTA NIVEL ' +
     txt(equipo.nivel).replace('N', '') + ' - DE ' + txt(equipo.banda).toUpperCase();
 }
 
