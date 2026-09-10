@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DEV · Todas las macroactividades por condición</title>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css">
+<link rel="stylesheet" href="../assets/css/aqua-components.css">
+<link rel="stylesheet" href="../assets/css/fichas-tecnicas.css">
+<style>body{padding:20px;background:#f4f6fb;font-family:system-ui,sans-serif}
+.dev{max-width:1200px;margin:0 auto;background:#fff;padding:18px;border-radius:14px}
+.devh{font:600 13px/1.45 system-ui;color:#b26a00;background:#fff4e5;padding:10px 12px;border-radius:10px;margin-bottom:14px}</style>
+</head>
+<body class="aqua">
+<div class="dev">
+  <div class="devh">DEV · Panel REAL. Encargo 2026-09-10: en el selector de acciones del documento de
+    Mantenimiento Especializado deben verse TODAS las macroactividades por condición, con la banda
+    del equipo abierta y señalada. TX-1 = condición 2 (el caso del pantallazo); TX-2 = condición 3
+    con mitigación; TX-3 = condición 5, donde casi todo es inversión.</div>
+  <div id="fichasPanel"></div>
+</div>
+<script type="module">
+import { montarPanelFichas } from '../assets/js/ui/fichas/panel.js';
+const VIVO = [
+  { fila:1, subestacion:'DEMO C2', matricula:'TX-DEMO-02', potencia_kva:20000, kv_prim:66, kv_sec:13.8,
+    regulacion:'OLTC', uucc_registrada:'N4T4', cond_int:2, usuarios:4200, mva:20 },
+  { fila:2, subestacion:'DEMO C3', matricula:'TX-DEMO-03', potencia_kva:10000, kv_prim:34.5, kv_sec:13.8,
+    regulacion:'NLTC', uucc_registrada:'N3T3', cond_int:3, usuarios:8100, mva:10 },
+  { fila:3, subestacion:'DEMO C5', matricula:'TX-DEMO-05', potencia_kva:30000, kv_prim:110, kv_sec:13.8,
+    regulacion:'OLTC', uucc_registrada:'N4T6', cond_int:5, usuarios:15000, mva:30 }
+];
+window.__panel = montarPanelFichas(document.getElementById('fichasPanel'), {
+  fuente: async () => VIVO, origen: 'DEV (simulado)'
+});
+</script>
+</body>
+</html>

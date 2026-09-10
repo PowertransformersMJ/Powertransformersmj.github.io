@@ -20,7 +20,7 @@
 // Funciones PURAS: cero DOM, cero Firebase, cero I/O.
 // ═════════════════════════════════════════════════════════════════════════════
 
-import { SUBACTIVIDADES_BASELINE } from './catalogos_baseline.js';
+import { MACROACTIVIDADES_BASELINE, SUBACTIVIDADES_BASELINE } from './catalogos_baseline.js';
 
 /** Normaliza para comparar: sin tildes, sin dobles espacios, en mayúsculas. */
 export function normalizarAccion(s) {
@@ -75,6 +75,43 @@ export function catalogoCondicion(ci) {
 }
 
 /**
+ * El catálogo `MO.00418 §4.3` ENTERO, agrupado por macroactividad.
+ *
+ * Encargo del Ingeniero (2026-09-10): *«aquí me gustaría que aparezcan todas
+ * las macroactividades por condición»*. Hasta ahora el selector solo ofrecía la
+ * banda del equipo, así que un correctivo menor que conviniera adelantar —o una
+ * mitigación de otra banda— no estaba a la vista siquiera para descartarla.
+ *
+ * El orden es el de la norma leída de arriba abajo: cada condición con su
+ * macroactividad y, pegada a ella, su mitigación cuando la tiene (C3 y C4).
+ *
+ * @returns {Array<{codigo:string, nombre:string, condicion:number,
+ *                  referencia:string, esMitigacion:boolean,
+ *                  subs:Array<{codigo:string, nombre:string, mitigacion:boolean}>}>}
+ */
+export function macroactividadesCatalogo() {
+  const de = (cod) => MACROACTIVIDADES_BASELINE.find((m) => m.codigo === cod);
+  const orden = ['MACRO-PSM', 'MACRO-ST', 'MACRO-CM', 'MACRO-MIT-C3',
+                 'MACRO-CMA', 'MACRO-MIT-C4', 'MACRO-REP'];
+  return orden.map(de).filter(Boolean).map((m) => ({
+    codigo: m.codigo,
+    nombre: m.nombre,
+    condicion: m.condicion_objetivo,
+    referencia: m.referencia || '',
+    esMitigacion: /^MACRO-MIT/.test(m.codigo),
+    subs: (m.subactividades || []).map((cod) => {
+      const x = SUBACTIVIDADES_BASELINE.find((y) => y.codigo === cod);
+      if (!x) return null;
+      // El nombre del catálogo lleva la periodicidad entre paréntesis; el
+      // encargo prohíbe desarrollar frecuencias, así que se ofrece la
+      // actividad y no su ciclo (mismo criterio que `catalogoCondicion`).
+      return { codigo: x.codigo, mitigacion: !!x.mitigacion,
+               nombre: String(x.nombre).replace(/\s*\([^)]*\)\s*$/, '').trim() };
+    }).filter(Boolean)
+  }));
+}
+
+/**
  * Lista completa de acciones escogibles para un equipo.
  *
  * @param {number|null} ci  condición de salud 1–5.
@@ -87,7 +124,7 @@ export function catalogoCondicion(ci) {
  *   `origen`: 'registro' · 'base' · 'catalogo'. Las dos primeras van marcadas
  *   por defecto; la tercera se ofrece para añadir.
  */
-export function accionesDisponibles(ci, registradas, esLineaBase, clasificar) {
+export function accionesDisponibles(ci, registradas, esLineaBase, clasificar, opts) {
   const cls = typeof clasificar === 'function' ? clasificar : () => 'DIAG';
   const huellas = [];
   const salida = [];
@@ -105,6 +142,28 @@ export function accionesDisponibles(ci, registradas, esLineaBase, clasificar) {
       id: idAccion(txt), txt, cat: r && r.cat ? r.cat : cls(txt),
       origen: esLineaBase ? 'base' : 'registro', mitigacion: false
     });
+  }
+
+  // MODO COMPLETO (`opts.todasLasCondiciones`): se ofrece el catálogo ENTERO
+  // agrupado por macroactividad, no solo la banda del equipo. Aquí NO se
+  // deduplica contra lo registrado: un grupo con huecos se leería como un error
+  // del sistema, no como que ese renglón ya está marcado más arriba. La norma
+  // repite dos subactividades en C1 y C2 («Pruebas eléctricas», «Inspección
+  // ocular detallada»); comparten `id` a propósito, porque son la MISMA acción,
+  // y quien las pinte debe mantenerlas sincronizadas.
+  if (opts && opts.todasLasCondiciones) {
+    for (const m of macroactividadesCatalogo()) {
+      for (const sub of m.subs) {
+        salida.push({
+          id: idAccion(sub.nombre), txt: sub.nombre,
+          cat: sub.mitigacion ? 'MIT' : cls(sub.nombre),
+          origen: 'catalogo', mitigacion: sub.mitigacion,
+          macro: m.codigo, macroNombre: m.nombre, cond: m.condicion,
+          referencia: m.referencia, esMitigacion: m.esMitigacion
+        });
+      }
+    }
+    return salida;
   }
 
   for (const c of catalogoCondicion(ci)) {
