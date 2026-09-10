@@ -2740,3 +2740,54 @@ lo mismo**: la línea base escrita a mano en `ficha-tecnica.js` (`LINEA_BASE_POR
 que mezclan bandas) y el catálogo oficial. Por eso un equipo de condición 2 aparece con marcas en C1
 y C3 y **cero en su propia banda**. Unificarlos cambiaría el texto por defecto del alcance, así que
 no se toca sin su visto bueno. → cola del segmento.
+
+**75.10 Un solo catálogo — y lo REFERENCIAL deja de contratarse entero (2026-09-10).** El Ingeniero
+autorizó unificar los dos catálogos que `§75.9` destapó. Se hizo, **y salió mal a la primera**: tres
+escépticos independientes revisaron el cambio ANTES de subirlo y dos dijeron *roto*. Tenían razón.
+
+**Mi error de juicio, para que no se repita.** Le presenté el alcance vacío de la condición 5 como
+*«el agujero más serio»*. No lo era: sin nada marcado la plantilla cae sola en su texto honesto
+—«las acciones de mantenimiento que se definan según los resultados del diagnóstico del activo»—.
+Lo que yo hice fue peor que el hueco: marcar por defecto la macroactividad **completa**. El
+`MO.00418 §4.3` lista por banda lo que **puede** aplicar, no lo que todo equipo necesita; marcarlo
+entero convierte un menú en un contrato. En condición 3 contrataba a la vez secado de aceite,
+regeneración de aceite y recuperación de aislamientos —tratamientos **alternativos** del mismo aceite
+y del mismo papel—; en condición 5 prometía recuperar el aislamiento de un activo que el propio
+documento declara irrecuperable. → **L-87**.
+
+**La regla que queda.** Plan **REGISTRADO** = plan de récord, se marca entero. **LÍNEA BASE** =
+referencial, se marca solo lo de **diagnóstico y verificación**. C1 y C2 son programas de seguimiento
+(todo diagnóstico) ⇒ enteras, como antes; C3 y C5 no marcan nada ⇒ texto de reserva; C4 marca la
+inspección de parte activa. Lo intrusivo se **ofrece** sin marcar y se escoge contra el hallazgo, que
+es exactamente lo que la plantilla del alcance afirma («cada actividad se escoge contra la variable
+que la motiva»).
+
+**Los ocho defectos que cazó la revisión, todos arreglados.** (1) La nota nueva **mentía**: se
+disparaba con cualquier marca en banda ajena y afirmaba «la norma repite esta actividad» — solo 2 de
+34 se repiten; ahora se calcula sobre lo repetido de verdad y lo añadido a mano tiene su propia
+frase. (2) El rótulo **«línea base · referencial» había desaparecido** (el bloque de arriba quedaba
+vacío siempre) y el pie seguía diciendo «lo marcado arriba»: un bloque marcado y abierto sin ese
+rótulo se lee como plan aprobado, que es la confusión que ADR-066 prohíbe; el rótulo pasa a la
+cabecera de su banda. (3) «Marcar las suyas» barría la **mitigación**, contra su propio docblock.
+(4) `SUB-C4-08` lleva `mitigacion:true` pero cuelga de la macro principal: se marcaba sola y afirmaba
+un dato de carga que nadie midió. (5) El aviso del equipo **sin condición** era código muerto —colgaba
+de una lista que en modo catálogo nunca está vacía—. (6) El gris de «opcional» pintaba renglones
+MARCADOS. (7) La condición 4 **perdía la remisión al PI**: la lista vieja la traía y tapaba el hueco
+por accidente, y la señal de brecha solo disparaba con plan registrado, así que la hoja imprimía la
+píldora «Inversión» sobre un plan sin inversión; ahora la brecha se evalúa también con línea base.
+(8) «Regeneración aceite **(frío)**» perdía el calificativo, indistinguible en la prosa firmada de la
+regeneración completa de C4 —otro trabajo, otro precio—: el recorte del paréntesis se acota a
+periodicidades.
+
+**Y dos pruebas MÍAS daban por buena la premisa equivocada**; una tercera era tautológica (comparaba
+la función consigo misma). Reescritas y ancladas a la norma.
+
+**Verificación**: 1608 pass / 0 fail / 2 skip (eran 1595), lint limpio, preview FIEL recorriendo C2 y
+C5 — rótulo referencial en su sitio, nota veraz, mitigación fuera del botón, cero renglones marcados
+en gris. CI y Deploy en verde, esperados.
+
+**Verificado sano / no re-auditar**: el texto del PI **no usa** `{ACCIONES}` (0 coincidencias en sus
+cinco redacciones) y su exportador lee `plan.alcance`, así que el PI solo cambia por su hoja anexa
+«Plan de acciones», que es la unificación autorizada · el export `LINEA_BASE_POR_CONDICION` se
+conserva marcado `@deprecated` (§3.2) · las dos subactividades que la norma repite comparten `id` a
+propósito y sus casillas van sincronizadas.
