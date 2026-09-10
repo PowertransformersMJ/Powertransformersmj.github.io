@@ -2791,3 +2791,37 @@ cinco redacciones) y su exportador lee `plan.alcance`, así que el PI solo cambi
 «Plan de acciones», que es la unificación autorizada · el export `LINEA_BASE_POR_CONDICION` se
 conserva marcado `@deprecated` (§3.2) · las dos subactividades que la norma repite comparten `id` a
 propósito y sus casillas van sincronizadas.
+
+**75.11 El municipio sale solo de la subestación (2026-09-10).** Encargo, con su `Municipios.xlsx`:
+*«procesa el documento excel para que al momento de elaborar la ficha técnica aparezca de forma
+automática el municipio correspondiente a la subestación»*. El campo salía vacío —«(municipio)»— y
+había que teclearlo en cada ficha; en el Excel oficial PE.02081 salía «[PENDIENTE: MUNICIPIO]».
+
+**La fuente, verificada al importarla.** 153 subestaciones · 83 municipios · **cero** códigos
+repetidos · **cero** municipios vacíos · todas las claves con el formato `SE_XXX NOMBRE`. Se guarda
+como **tabla literal** en `assets/js/domain/municipios_subestacion.js`: son datos de geografía que no
+cambian, y meterlos en Firestore costaría una lectura por ficha (free-tier, §3.2).
+
+**Cómo resuelve, y por qué en ese orden.** Primero el **nombre** normalizado (sin tildes, sin
+puntuación); si no hay nombre, el **código** de la matrícula. No al revés: no siempre coinciden —
+Candelaria es `CDR` en el catálogo y aparece como `KDR` en alguna matrícula, así que un código suelto
+no puede mandar. `normalizarEquipo` solo lo aplica cuando el registro **no** trae municipio.
+
+**Las tres reglas, porque el dato se firma.** (1) Lo que traiga el parque **manda**: nunca se pisa.
+(2) Si la búsqueda no deja **una única** respuesta, no se elige ninguna — «COSPIQUE» y «NUEVA
+COSPIQUE» son subestaciones distintas, así que nada de coincidencias parciales; el campo se queda
+vacío, como hoy. (3) Una subestación que no esté en la tabla **no se inventa**. Es rellenar un hueco
+con el dato oficial del dueño, no fabricarlo (`§27`, L-50/L-69).
+
+**Verificación**: 1620 pass / 0 fail / 2 skip (12 nuevas), lint limpio, preview FIEL con el módulo
+real sobre **MAMONAL** —el caso del pantallazo—: el bloque «Emplazamiento físico» sale con
+`MUNICIPIO CARTAGENA`. Comprobado además **servido desde producción** (153 filas, HTTP 200).
+
+**Verificado sano / no re-auditar**: el exportador ya leía `estado.municipio` para la celda **D14**
+del PE.02081, así que el Excel oficial hereda el arreglo sin tocar el exportador · la tabla no
+contiene medidas, ni datos de cliente, ni nada facturable: son nombres de subestación y municipio.
+
+**Queda dicho, no decidido**: la tabla vive en un repo **PÚBLICO**. Son 153 subestaciones de AFINIA
+con su municipio —geografía de infraestructura, no medidas ni datos de cliente, y el sitio ya publica
+un mapa de la flota—, pero si el Ingeniero prefiere que no esté en el repo, la alternativa es
+Firestore con su costo de lectura.

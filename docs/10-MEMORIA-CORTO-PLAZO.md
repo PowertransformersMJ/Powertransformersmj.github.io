@@ -7,7 +7,7 @@
 
 ## 🎯 Foco (2026-09-10) — FICHAS TÉCNICAS
 
-> Qué pasó → `05` y `99 §75` (**§75.9-75.10**: el alcance ofrece las 7 macroactividades y lo referencial dejó de contratarse entero — **L-87**) (**no se repite aquí**, §G.3 propiedad). Lección: **L-86** — *una
+> Qué pasó → `05` y `99 §75` (**§75.9-75.11**: las 7 macroactividades en el alcance · lo referencial deja de contratarse entero (**L-87**) · el municipio sale solo de la subestación) (**no se repite aquí**, §G.3 propiedad). Lección: **L-86** — *una
 > decisión aplicada a UN camino de escritura no está aplicada* (mismo patrón que TODO-52/59).
 > ⚠️ **Abiertos**: **TODO-35/58** (31 hallazgos del segmento) · **TODO-59** 🔴 · **TODO-60** 🔴 ·
 > **TODO-55** 🔴 · **TODO-52** 🔴 · **TODO-47** 🔴 · 54 · 56 · 57 · 12 · 33 · 41.
