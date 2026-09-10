@@ -195,7 +195,7 @@ export function accionesDisponibles(ci, registradas, esLineaBase, clasificar, op
     for (const m of macroactividadesCatalogo()) {
       for (const sub of m.subs) {
         salida.push({
-          id: idAccion(sub.nombre), txt: sub.nombre,
+          id: idAccion(sub.nombre), txt: sub.nombre, codigo: sub.codigo,
           cat: sub.mitigacion ? 'MIT' : cls(sub.nombre),
           origen: 'catalogo', mitigacion: sub.mitigacion,
           macro: m.codigo, macroNombre: m.nombre, cond: m.condicion,
@@ -211,7 +211,7 @@ export function accionesDisponibles(ci, registradas, esLineaBase, clasificar, op
     // Que una subactividad sea de mitigación lo dice el CATÁLOGO, no una
     // heurística sobre su nombre: se respeta esa marca antes de clasificar.
     salida.push({
-      id: idAccion(c.nombre), txt: c.nombre,
+      id: idAccion(c.nombre), txt: c.nombre, codigo: c.codigo,
       cat: c.mitigacion ? 'MIT' : cls(c.nombre),
       origen: 'catalogo', mitigacion: c.mitigacion
     });

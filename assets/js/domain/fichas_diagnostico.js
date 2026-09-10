@@ -34,6 +34,7 @@
 // ═════════════════════════════════════════════════════════════════════════════
 
 import { calcularDP, calcularVidaUtilizada } from './salud_activos.js';
+import { sustentoDeAccion } from './acciones_tecnicas.js';
 
 // ── Utilidades internas ──────────────────────────────────────────────────────
 
@@ -458,7 +459,78 @@ const TRABAJO_POR_MODO = Object.freeze({
  * @param {object} diag
  * @returns {string}
  */
-export function redaccionAlcanceMtto(equipo, diag) {
+/** Primera letra en mayúscula, sin tocar el resto (siglas incluidas). */
+function may(t) {
+  const x = String(t || '').trim();
+  return x ? x.charAt(0).toUpperCase() + x.slice(1) : '';
+}
+
+/** Cierra una frase con punto si no lo trae ya. */
+function pto(t) {
+  const x = String(t || '').trim();
+  if (!x) return '';
+  return /[.;:!?]$/.test(x) ? x + ' ' : x + '. ';
+}
+
+/**
+ * Las actividades escogidas, ARGUMENTADAS una por una.
+ *
+ * Encargo del Ingeniero (2026-09-10): *«la descripción en el alcance la
+ * necesito en un contexto técnico, donde se argumentan las actividades que se
+ * van a desarrollar al activo»*. Hasta aquí el alcance las ENUMERABA —«el
+ * alcance comprende regeneración de aceite, pintura parcial y…»— sin decir de
+ * ninguna por qué se le hace al activo.
+ *
+ * Cada renglón dice sobre qué SUBSISTEMA actúa, qué VARIABLE la motiva, qué
+ * deja al cierre y qué NO devuelve. Lo que reinicia la línea base se advierte
+ * UNA vez al final, no en cada renglón: repetirlo cinco veces es un sello.
+ *
+ * Una actividad sin ficha (viene del plan registrado, que es texto libre de
+ * Salud de Activos) se enumera igual, pero NO se le inventa un argumento.
+ *
+ * @param {Array<{txt:string, codigo?:string}>} escogidas
+ * @returns {string} '' si no hay ninguna — quien llame decide qué poner
+ */
+function argumentoDeAcciones(escogidas) {
+  const lista = Array.isArray(escogidas) ? escogidas : [];
+  if (!lista.length) return '';
+
+  const reinician = [];
+  const renglones = lista.map((a) => {
+    const nom = String(a && a.txt ? a.txt : '').trim();
+    if (!nom) return '';
+    const f = sustentoDeAccion(a);
+    if (!f) {
+      return `• ${may(nom)}. Actividad tomada del plan registrado del activo; su sustento técnico se `
+        + 'incorpora con el resultado del diagnóstico.';
+    }
+    if (f.reiniciaLineaBase) reinician.push(nom.toLowerCase());
+    // `motiva` es una frase completa en minúscula, no un complemento: encajarla
+    // tras «la motiva» daba «La motiva el ensayo físico-químico ubica…», que no
+    // concuerda. Va como oración propia, que además se lee mejor.
+    let t = `• ${may(nom)} — actúa sobre ${f.subsistema}. `;
+    t += pto(may(f.motiva));
+    t += 'Al cierre, ' + pto(f.resultado);
+    if (f.noRevierte) t += may(f.noRevierte).replace(/^No /, 'No ') + (/[.]$/.test(f.noRevierte) ? ' ' : '. ');
+    if (f.referencia) t += `Referencia: ${f.referencia}.`;
+    return t.trim();
+  }).filter(Boolean);
+
+  if (!renglones.length) return '';
+
+  let t = 'Las actividades contratadas y su sustento técnico son las siguientes.\n'
+    + renglones.join('\n');
+  if (reinician.length) {
+    t += '\nAdvertencia de línea base: '
+      + (reinician.length === 1 ? `la ${reinician[0]} reinicia` : 'las siguientes actividades reinician')
+      + (reinician.length === 1 ? '' : ` —${reinician.join(', ')}— `)
+      + ' la línea base de gases disueltos y de compuestos furánicos: toda evaluación posterior se '
+      + 'contrasta contra ese nuevo cero, no contra la serie anterior.';
+  }
+  return t;
+}
+
+export function redaccionAlcanceMtto(equipo, diag, escogidas) {
   const f = equipo || {};
   const d = diag || null;
   const md = modoDegradacion(f, d);
@@ -515,6 +587,13 @@ export function redaccionAlcanceMtto(equipo, diag) {
   t += 'El alcance incluye los ensayos eléctricos de verificación antes y después de la intervención, la '
     + 'actualización del historial del activo y la reevaluación de su índice de salud con los resultados '
     + 'obtenidos.';
+
+  // El argumento por ACTIVIDAD va al final y en bloque aparte: arriba queda el
+  // porqué del activo (condición y hallazgo dominante), aquí el porqué de cada
+  // trabajo. Si no hay nada marcado no se escribe nada — no se rellena con un
+  // catálogo que el Ingeniero no escogió.
+  const arg = argumentoDeAcciones(escogidas);
+  if (arg) t += '\n\n' + arg;
   return t;
 }
 
