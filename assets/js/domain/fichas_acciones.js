@@ -62,15 +62,27 @@ function mismaAccion(a, b) {
   return true;
 }
 
+/**
+ * Quita del nombre del catálogo el paréntesis de PERIODICIDAD, y solo ese.
+ *
+ * El encargo prohíbe desarrollar frecuencias, así que se ofrece la actividad y
+ * no su ciclo. Pero antes se recortaba TODO paréntesis final, y eso se comía
+ * calificativos de proceso: «Regeneración aceite (frío)» salía como
+ * «Regeneración aceite», indistinguible en la prosa firmada de la regeneración
+ * completa de la banda 4 — que es otro trabajo y otro precio.
+ */
+function sinPeriodicidad(nombre) {
+  return String(nombre || '')
+    .replace(/\s*\((?:diaria|semanal|quincenal|mensual|bimestral|trimestral|cuatrimestral|semestral|anual|bienal)\)\s*$/i, '')
+    .trim();
+}
+
 /** Subactividades que el catálogo oficial asigna a una condición. */
 export function catalogoCondicion(ci) {
   if (ci == null) return [];
   return SUBACTIVIDADES_BASELINE
     .filter((x) => x.condicion_objetivo === ci)
-    // El nombre del catálogo lleva la periodicidad entre paréntesis
-    // («Muestreo de aceite (semestral)»). El encargo prohíbe desarrollar
-    // frecuencias, así que se ofrece la actividad y no su ciclo.
-    .map((x) => ({ codigo: x.codigo, nombre: String(x.nombre).replace(/\s*\([^)]*\)\s*$/, '').trim(),
+    .map((x) => ({ codigo: x.codigo, nombre: sinPeriodicidad(x.nombre),
                    mitigacion: !!x.mitigacion }));
 }
 
@@ -109,6 +121,34 @@ export function macroactividadesCatalogo() {
                nombre: String(x.nombre).replace(/\s*\([^)]*\)\s*$/, '').trim() };
     }).filter(Boolean)
   }));
+}
+
+/**
+ * Línea base de una condición: qué propone la norma cuando el equipo NO trae
+ * macroactividad registrada en Salud de Activos. Siempre referencial.
+ *
+ * Son las subactividades de la macroactividad PRINCIPAL de esa banda —no las
+ * de su mitigación—. La mitigación se ofrece en el selector pero NO se marca
+ * sola: depende de la causa, no de la banda, y marcarla por defecto metería
+ * «aumento de caudal de refrigeración» en el alcance de todo equipo en
+ * condición 3 sin que nadie lo haya decidido.
+ *
+ * Sustituye a la lista escrita a mano que vivía en `ficha-tecnica.js`
+ * (`LINEA_BASE_POR_CONDICION`): eran DOS catálogos para lo mismo, y el de a
+ * mano mezclaba bandas —por eso un equipo de condición 2 aparecía con marcas
+ * en C1 y C3 y ninguna en la suya—. El agujero peor lo tenía la condición 5:
+ * sus dos únicas actividades eran inversión, así que un activo en fin de vida
+ * sin plan registrado se quedaba con el alcance VACÍO. Decisión del Ingeniero,
+ * 2026-09-10, con el antes/después a la vista.
+ *
+ * @param {number|null} ci condición 1-5
+ * @returns {string[]} nombres de las subactividades, en el orden de la norma
+ */
+export function lineaBaseCondicion(ci) {
+  if (ci == null) return [];
+  const m = macroactividadesCatalogo()
+    .find((x) => x.condicion === ci && !x.esMitigacion);
+  return m ? m.subs.map((s) => s.nombre) : [];
 }
 
 /**
@@ -195,11 +235,36 @@ export function esInversion(txt) {
     .test(normalizarAccion(txt));
 }
 
-/** Los ids que van marcados de entrada: lo que el equipo ya tiene asignado. */
+/**
+ * Los ids que van marcados de entrada.
+ *
+ * DOS reglas, porque las dos fuentes NO valen lo mismo:
+ *
+ *  · **Plan REGISTRADO** (`origen:'registro'`): es el plan de récord del
+ *    equipo, aprobado por alguien. Se marca entero.
+ *  · **LÍNEA BASE** (`origen:'base'`): es REFERENCIAL. El `MO.00418 §4.3`
+ *    lista por banda lo que PUEDE aplicar, no lo que todo equipo de esa banda
+ *    necesita. Marcarla entera convierte un menú en un contrato: en condición
+ *    3 contrataría a la vez secado de aceite, regeneración de aceite y
+ *    recuperación de aislamientos —tratamientos ALTERNATIVOS del mismo aceite
+ *    y del mismo papel—, y en condición 5 prometería recuperar el aislamiento
+ *    de un activo que el propio documento declara irrecuperable. Así que se
+ *    marca solo lo de DIAGNÓSTICO y verificación: lo que se hace siempre y no
+ *    compromete plata de intervención. Lo intrusivo se ofrece SIN marcar y se
+ *    escoge contra el hallazgo — que es justo lo que la plantilla del alcance
+ *    afirma («cada actividad se escoge contra la variable que la motiva»).
+ *    En C1 y C2, que son programas de seguimiento, todo es diagnóstico: se
+ *    marcan enteras, como antes.
+ *
+ * Si no queda nada marcado, la plantilla cae sola en su texto de reserva
+ * («las acciones que se definan según los resultados del diagnóstico»), que es
+ * lo único cierto en ese momento. Un alcance vacío NO es un agujero.
+ */
 export function seleccionPorDefecto(acciones) {
-  return (Array.isArray(acciones) ? acciones : [])
-    .filter((a) => a.origen !== 'catalogo')
-    .map((a) => a.id);
+  const propias = (Array.isArray(acciones) ? acciones : [])
+    .filter((a) => a.origen !== 'catalogo');
+  if (propias.some((a) => a.origen === 'registro')) return propias.map((a) => a.id);
+  return propias.filter((a) => a.cat === 'DIAG').map((a) => a.id);
 }
 
 /**
