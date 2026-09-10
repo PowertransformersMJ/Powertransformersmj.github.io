@@ -32,6 +32,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { clasificarUC } from '../../domain/fichas_creg_uc.js';
+import { lineaBaseCondicion } from '../../domain/fichas_acciones.js';
 
 // ── Escala de condición (estado de salud) ─────────────────────
 // Los colores coinciden con los tokens --ftm-c1..c5 de la hoja de estilos;
@@ -145,6 +146,13 @@ export const ESTRATEGIA_POR_CONDICION = Object.freeze({
 // que se firma y se componen dentro del texto del alcance. Las que llegan del
 // registro de Salud de Activos vienen en mayúscula sin acentuar y no se tocan
 // —son dato de cliente—, pero estas son nuestras.
+/**
+ * @deprecated 2026-09-10 — sustituida por `lineaBaseCondicion()` del dominio,
+ * que lee el catálogo oficial `MO.00418 §4.3`. Ya no la usa nadie: se conserva
+ * porque es un export público y §3.2 prohíbe retirarlos sin migración. Su
+ * defecto era mezclar bandas y dejar la condición 5 sin acciones de
+ * mantenimiento. NO reintroducirla.
+ */
 export const LINEA_BASE_POR_CONDICION = Object.freeze({
   1: ['Inspección termográfica', 'Inspección ocular detallada', 'Muestreo de aceite'],
   2: ['Inspección termográfica', 'Muestreo de aceite', 'Verificación de sistemas de refrigeración', 'Corrección de fugas por accesorios'],
@@ -287,8 +295,12 @@ export function nucleoFicha(equipo) {
   let items = subacts.map(limpiarTexto).filter(Boolean);
 
   const baseUsada = items.length === 0;
-  if (baseUsada && ci != null && LINEA_BASE_POR_CONDICION[ci]) {
-    items = LINEA_BASE_POR_CONDICION[ci].slice();
+  if (baseUsada && ci != null) {
+    // La línea base sale del catálogo OFICIAL `MO.00418 §4.3`, no de una lista
+    // paralela. Tener dos era la causa de que un equipo apareciera con marcas
+    // en bandas ajenas y ninguna en la suya. Ver `lineaBaseCondicion`.
+    const base = lineaBaseCondicion(ci);
+    if (base.length) items = base.slice();
   }
 
   const acciones = items.map((s) => {
@@ -297,12 +309,23 @@ export function nucleoFicha(equipo) {
   });
   acciones.sort((a, b) => b.tier - a.tier);
 
-  // Brecha: condición severa cuyo plan REGISTRADO no contempla inversión.
+  // Brecha: condición severa cuyo plan no contempla inversión. Se evalúa en los
+  // DOS casos, con redacción distinta, porque la hoja imprime la píldora de
+  // enfoque «Inversión» y el horizonte de reposición: dejarla sin una línea que
+  // diga dónde se sustenta hace que el documento se contradiga a sí mismo.
+  // Antes solo disparaba con plan registrado; la línea base vieja de C4 traía
+  // «Propuesta a Plan de Inversión (PI)» y tapaba el hueco por accidente. Al
+  // pasar la línea base al catálogo oficial —que no la trae— el hueco quedó al
+  // descubierto. → `99 §75.10`.
   let brecha = '';
-  if (estrategia && !baseUsada && estrategia.foco.indexOf('INV') >= 0
+  if (estrategia && estrategia.foco.indexOf('INV') >= 0
       && !acciones.some((r) => r.cat === 'INV')) {
-    brecha = 'El plan registrado no incluye una acción de inversión/reposición pese a la condición '
-      + ci + ' (' + cn + '); se recomienda evaluar su incorporación.';
+    brecha = baseUsada
+      ? 'La línea base de la condición ' + ci + ' (' + cn + ') no contempla inversión: es trabajo '
+        + 'de mantenimiento. La reposición del activo no pertenece a este plan y se sustenta en la '
+        + 'Propuesta a Plan de Inversión, que es el otro documento que se emite desde este equipo.'
+      : 'El plan registrado no incluye una acción de inversión/reposición pese a la condición '
+        + ci + ' (' + cn + '); se recomienda evaluar su incorporación.';
   }
 
   return { ci, cn, estrategia, acciones, baseUsada, brecha };

@@ -1884,9 +1884,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // más sería perder de la pantalla un renglón del plan de récord (L-81).
     const disp = todas.filter((a) => !esInversion(a.txt));
     const fueraPorInversion = todas.filter((a) => esInversion(a.txt));
-    if (!disp.length && !fueraPorInversion.length) {
+    // El aviso es por NO TENER CONDICIÓN, no por lista vacía: en modo catálogo
+    // la lista nunca está vacía (siempre trae las 7 macroactividades), así que
+    // colgarlo de `disp.length` lo dejaba muerto y le enseñaba a un equipo sin
+    // condición un catálogo entero sin decirle que ninguna banda es la suya.
+    if (ci == null || (!disp.length && !fueraPorInversion.length)) {
       return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
-        + 'registrada, así que no hay acciones de su banda que ofrecer. El alcance se redacta a '
+        + 'registrada, así que no hay una banda suya que proponer. El alcance se redacta a '
         + 'mano o se toma la versión automática.</div>';
     }
     const marcados = new Set(seleccionAcciones(e, st, 'alcance_mtto').map((a) => a.id));
@@ -1896,8 +1900,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
     const fila = (a) => {
       const C = CATEGORIAS_ACCION[a.cat] || CATEGORIAS_ACCION.DIAG;
-      return '<label class="ftm-acc-item' + (a.origen === 'catalogo' ? ' es-extra' : '') + '">'
-        + '<input type="checkbox" data-accion="' + esc(a.id) + '"' + (marcados.has(a.id) ? ' checked' : '') + '>'
+      // El gris es de «se ofrece, no está en el alcance». Un renglón MARCADO
+      // no es opcional aunque venga del catálogo: no puede salir en gris.
+      const marcada = marcados.has(a.id);
+      return '<label class="ftm-acc-item' + (a.origen === 'catalogo' && !marcada ? ' es-extra' : '') + '">'
+        + '<input type="checkbox" data-accion="' + esc(a.id) + '"' + (marcada ? ' checked' : '') + '>'
         + '<span class="ftm-acc-cat" style="background:' + C.c + '" title="' + esc(C.lbl) + '"></span>'
         + '<span class="ftm-acc-txt">' + esc(a.txt) + '</span>'
         + '</label>';
@@ -1908,23 +1915,53 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // agrupa la norma; la banda del equipo va abierta y señalada, el resto
     // plegado para que no tape la pantalla. Se pliega con <details>, que es
     // nativo: sin JS, sin listener global y accesible por teclado (§3.5).
+    // Ids de la banda del equipo: sirven para saber si una marca en un grupo
+    // ajeno es una REPETICIÓN real de la norma (solo pasa con 2 de las 34
+    // subactividades, entre C1 y C2) o algo que el Ingeniero marcó a mano.
+    const idsSuBanda = new Set(
+      disp.filter((a) => a.cond === ci && !a.esMitigacion).map((a) => a.id));
+
     const grupoMacro = (m) => {
       const suyas = disp.filter((a) => a.macro === m.codigo);
       const fuera = fueraPorInversion.filter((a) => a.macro === m.codigo);
       if (!suyas.length && !fuera.length) return '';
       const esSuya = ci != null && m.condicion === ci;
-      const nMarcadas = suyas.filter((a) => marcados.has(a.id)).length;
+      const esSuBanda = esSuya && !m.esMitigacion;
+      const marcadasAqui = suyas.filter((a) => marcados.has(a.id));
+      const nMarcadas = marcadasAqui.length;
+      const nRepetidas = marcadasAqui.filter((a) => idsSuBanda.has(a.id)).length;
+      const nAjenas = nMarcadas - nRepetidas;
       return '<details class="ftm-acc-macro' + (esSuya ? ' es-suya' : '') + '"'
-        + (esSuya ? ' open' : '') + (esSuya ? ' data-acc-ambito="propio"' : '') + '>'
+        + (esSuya ? ' open' : '')
+        // «Marcar las suyas» NO debe barrer la mitigación: depende de la causa,
+        // no de la banda. El grupo se abre y se señala, pero queda fuera del
+        // ámbito del botón.
+        + (esSuBanda ? ' data-acc-ambito="propio"' : '') + '>'
         + '<summary class="ftm-acc-macro-cab">'
         +   '<span class="ftm-acc-macro-nom">' + esc(m.nombre) + '</span>'
         +   '<span class="ftm-acc-macro-cond">Condición ' + m.condicion + '</span>'
         +   (esSuya ? '<span class="ftm-acc-macro-yo">este equipo</span>' : '')
+        // El rótulo «referencial» tiene que vivir DONDE está la marca: si no,
+        // un bloque marcado y abierto se lee como plan aprobado, que es
+        // exactamente la confusión que ADR-066 prohíbe.
+        +   (esSuBanda && esBase
+          ? '<span class="ftm-acc-macro-ref-lbl">línea base · referencial</span>' : '')
         +   '<span class="ftm-acc-macro-n">' + (nMarcadas ? nMarcadas + ' de ' : '')
         +     suyas.length + '</span>'
         +   '<span class="ftm-acc-macro-ref">' + esc(m.referencia) + '</span>'
         + '</summary>'
         + suyas.map(fila).join('')
+        + (!esSuya && nRepetidas
+          ? '<p class="ftm-acc-macro-nota">' + (nRepetidas === 1 ? 'Una actividad' : nRepetidas + ' actividades')
+            + ' de este grupo aparece' + (nRepetidas === 1 ? '' : 'n')
+            + ' marcada' + (nRepetidas === 1 ? '' : 's') + ' porque la norma '
+            + (nRepetidas === 1 ? 'la' : 'las') + ' repite en la banda del equipo: es la misma '
+            + 'acción, no una segunda.</p>'
+          : '')
+        + (!esSuya && nAjenas
+          ? '<p class="ftm-acc-macro-nota">' + (nAjenas === 1 ? 'Una actividad' : nAjenas + ' actividades')
+            + ' de otra banda que usted añadió al alcance.</p>'
+          : '')
         + (fuera.length
           ? '<p class="ftm-acc-macro-inv">Fuera de este documento por ser inversión: '
             + fuera.map((a) => esc(a.txt)).join(', ') + '.</p>'
@@ -1936,15 +1973,25 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // sería presentar como aprobado algo que nadie aprobó (ADR-066).
     const fueraDelPlan = fueraPorInversion.filter((a) => a.origen !== 'catalogo');
 
+    // Desde que la línea base sale del catálogo oficial (2026-09-10) ya no hace
+    // falta un grupo «línea base» aparte: es LITERALMENTE la banda del equipo,
+    // que abajo aparece abierta, rotulada «este equipo» y marcada. Repetirla
+    // arriba sería enseñar dos veces lo mismo. Solo se pinta arriba lo que NO
+    // está en ningún grupo del catálogo —el plan registrado, y por defensa
+    // cualquier renglón base sin pareja—, para que nada quede seleccionado y
+    // fuera de la vista.
+    const enCatalogo = new Set(disp.filter((a) => a.origen === 'catalogo').map((a) => a.id));
+    const arriba = propias.filter((a) => a.origen === 'registro' || !enCatalogo.has(a.id));
+
     return '<div class="ftm-acc">'
       + '<div class="ftm-acc-head">Acciones de mantenimiento del alcance'
       +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar las suyas</button>'
       +   '<button type="button" class="ftm-acc-todo" data-acc-todo="0">Ninguna</button>'
       + '</div>'
-      + (propias.length
+      + (arriba.length
         ? '<div class="ftm-acc-grupo" data-acc-ambito="propio"><span class="ftm-acc-rot">'
           + (hayRegistro ? 'Plan registrado del equipo' : 'Línea base de la condición · referencial')
-          + '</span>' + propias.map(fila).join('') + '</div>'
+          + '</span>' + arriba.map(fila).join('') + '</div>'
         : '')
       + '<div class="ftm-acc-catalogo">'
       +   '<span class="ftm-acc-rot">Catálogo MO.00418 §4.3 · todas las macroactividades</span>'
@@ -1957,9 +2004,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           + 'otro documento que se emite desde este equipo.</p>'
         : '')
       + '<p class="ftm-acc-pie">' + (esBase
-        ? 'El equipo no trae macroactividad registrada: lo marcado arriba es la línea base de su '
-          + 'condición y se rotula como referencial, no como plan aprobado. '
-        : '') + 'Lo que marque entra en el texto del alcance, venga de la banda que venga.</p>'
+        ? 'El equipo no trae macroactividad registrada. Su banda queda abierta y rotulada '
+          + '<b>referencial</b>: de ella se marca solo lo de diagnóstico y verificación, porque la '
+          + 'norma lista por banda lo que PUEDE aplicar, no lo que este equipo necesita. Lo '
+          + 'intrusivo se ofrece sin marcar y se escoge contra el hallazgo. '
+        : '') + 'Lo que marque entra en el texto del alcance, venga de la banda que venga; si no '
+      + 'marca nada, el alcance dice que las acciones se definirán según el diagnóstico.</p>'
       + '</div>';
   }
 

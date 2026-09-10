@@ -210,10 +210,33 @@ describe('El equipo y su selección', () => {
       'si el Ingeniero desmarcó todo, no se le vuelve a marcar');
   });
 
-  test('sin nada guardado se parte del plan del equipo', () => {
-    const sel = seleccionAcciones(EQUIPO, { plan: {} });
-    assert.ok(sel.length > 0);
-    assert.ok(sel.every((a) => a.origen !== 'catalogo'));
+  // Regla del 2026-09-10: el plan REGISTRADO es plan de récord y se marca
+  // entero; la LÍNEA BASE es referencial y solo se marca lo de diagnóstico,
+  // porque la norma lista por banda lo que PUEDE aplicar, no lo que este
+  // equipo necesita. Marcar la banda 3 entera contrataría a la vez tres
+  // tratamientos alternativos del mismo aceite. → `99 §75.10`.
+  test('un plan REGISTRADO se marca entero: es plan de récord', () => {
+    const conRegistro = { ...EQUIPO, subacts: ['CORRECCION DE FUGAS POR ACCESORIOS', 'SECADO DE ACEITE'] };
+    const sel = seleccionAcciones(conRegistro, { plan: {} });
+    assert.equal(sel.length, 2);
+    assert.ok(sel.every((a) => a.origen === 'registro'));
+  });
+
+  test('la LÍNEA BASE solo marca lo de diagnóstico: es referencial, no un contrato', () => {
+    const sel = seleccionAcciones(EQUIPO, { plan: {} });           // condición 3
+    assert.ok(sel.every((a) => a.cat === 'DIAG'),
+      'nada intrusivo puede entrar solo en un alcance que se firma');
+    // Y lo intrusivo NO desaparece: se sigue ofreciendo sin marcar.
+    const ofrecidas = accionesDeEquipo(EQUIPO);
+    assert.ok(ofrecidas.some((a) => a.cat !== 'DIAG'));
+  });
+
+  test('en una banda de seguimiento (todo diagnóstico) se marca entera, como antes', () => {
+    const c1 = { potencia_kva: 60000, tension_primaria_kv: 110, salud_actual: { hi_final: 1 } };
+    const sel = seleccionAcciones(c1, { plan: {} });
+    const base = accionesDeEquipo(c1).filter((a) => a.origen === 'base');
+    assert.ok(base.length > 0);
+    assert.equal(sel.length, base.length);
   });
 
   test('un equipo sin condición no ofrece acciones', () => {

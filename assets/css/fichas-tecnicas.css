@@ -1865,9 +1865,21 @@
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em;
   background: var(--ftm-acc, #1b7f9e); color: #fff; border-radius: 999px; padding: 1px 7px;
 }
+/* «referencial» tiene que vivir DONDE está la marca: un bloque marcado y
+   abierto sin ese rótulo se lee como plan aprobado, que es justo la confusión
+   que ADR-066 prohíbe. */
+.ftm-acc-macro-ref-lbl {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
+  border: 1px solid var(--ftm-line, #d7e0ea); border-radius: 999px; padding: 1px 7px;
+  color: var(--ftm-muted, #61748a); background: var(--ftm-bg-soft, #f8fafc);
+}
 .ftm-acc-macro-n { margin-left: auto; font-variant-numeric: tabular-nums; }
 .ftm-acc-macro-ref { font-size: 10.5px; color: var(--ftm-muted, #9fb0c2); width: 100%; }
 .ftm-acc-macro > .ftm-acc-item { padding: 4px 10px; }
+.ftm-acc-macro-nota {
+  margin: 0; padding: 6px 10px 2px; font-size: 11.5px; line-height: 1.4;
+  color: var(--ftm-muted, #61748a);
+}
 .ftm-acc-macro-inv {
   margin: 0; padding: 6px 10px 8px; font-size: 11.5px; line-height: 1.4;
   color: var(--ftm-muted, #61748a); border-top: 1px dashed var(--ftm-line, #eef2f6);

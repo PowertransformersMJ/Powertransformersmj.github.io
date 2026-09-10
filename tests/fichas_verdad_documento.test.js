@@ -104,10 +104,16 @@ describe('El documento de Mantenimiento NO propone inversión (99 §74.20)', () 
       'sin casilla para quitarla, entraba al alcance por defecto y no se podía sacar');
   });
 
-  test('el PI conserva sus acciones de inversión: el filtro es SOLO del otro documento', () => {
-    const sel = seleccionAcciones(EQUIPO, { plan: {} });
-    assert.ok(sel.some((a) => esInversion(a.txt)),
+  test('el PI sigue viendo la inversión: el filtro es SOLO del otro documento', () => {
+    // Desde el 2026-09-10 la línea base referencial solo MARCA lo de
+    // diagnóstico, así que aquí se comprueba lo que de verdad importa: que al
+    // PI se le siga OFRECIENDO la inversión, que es su razón de ser.
+    const ofrecidas = accionesDeEquipo(EQUIPO);
+    assert.ok(ofrecidas.some((a) => esInversion(a.txt)),
       'la propuesta a Plan de Inversión es justo donde la inversión SÍ va');
+    // Y que al documento de mantenimiento no se le cuele.
+    const mtto = seleccionAcciones(EQUIPO, { plan: { acc_sel: ofrecidas.map((a) => a.id) } }, 'alcance_mtto');
+    assert.deepEqual(mtto.filter((a) => esInversion(a.txt)), []);
   });
 });
 
