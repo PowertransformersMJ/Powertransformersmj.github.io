@@ -2869,3 +2869,37 @@ daba falso positivo · llamar a `redaccionAlcanceMtto` con dos argumentos sigue 
 tres redacciones automáticas ignoran el tercero.
 
 Crudo del workflow y el fusionado tras correcciones → bóveda, `2026-09-10-sustento-tecnico-actividades/`.
+
+**75.13 El alcance DEFINE la condición, no solo la nombra (2026-09-10).** Encargo, con su propia
+redacción de cinco condiciones: *«necesito que incluyas esta definición»*. El alcance nombraba el
+hallazgo —«degradación del aceite dieléctrico: …»— pero no lo **definía**, ni decía qué **riesgo**
+supone para el equipo, ni cómo puede **afectar al cliente**.
+
+**Solución.** `assets/js/domain/condiciones_deterioro.js`: las cinco condiciones con definición
+técnica, riesgo para el equipo y posible afectación a clientes, más su párrafo de cierre. **El texto
+es del Ingeniero y va LITERAL** —es la definición que él sostiene ante el regulador, no se parafrasea
+ni se «mejora»— y hay prueba que cae si alguien lo toca. El bloque entra **antes** de las actividades:
+primero qué le pasa al activo, después qué se le va a hacer y por qué; es el orden en que lo lee quien
+firma.
+
+**La regla que él fijó**: aparecen **solo** las condiciones que el activo PRESENTA según valores
+medidos. Escribir las cinco por defecto sería afirmar hallazgos que el equipo no tiene. Sin ninguna,
+no se escribe ni el bloque ni el cierre.
+
+**Dos detalles que importan.** Tres modos distintos del motor (acetileno, hidrógeno, etileno) son
+**una sola** condición —«presencia de gases combustibles»—, no tres renglones repetidos. Y
+cargabilidad y edad, que el motor sí declara como modos, **no pertenecen** a esta tabla y no se
+escriben aquí.
+
+**⚠️ «Sistema de refrigeración deficiente» se queda SIN DETECTOR**, declarado en el propio código: el
+registro guarda el **tipo** de refrigeración y las cantidades (ONAN/ONAF, radiadores, ventiladores,
+bombas), **no su estado**. NO se colgó del modo `termico`, que el motor dispara por etileno —falla
+térmica **interna**— y es otra cosa: colgarla ahí habría hecho que el documento afirmara una
+deficiencia de refrigeración que nadie midió. Queda en el catálogo esperando su señal.
+
+**Verificación**: 1643 pass / 0 fail / 2 skip (11 nuevas), lint limpio, y comprobado servido desde
+producción. CI y Deploy en verde.
+
+**Verificado sano / no re-auditar**: si el activo no presenta ninguna condición el texto queda
+exactamente como estaba (prueba con diagnóstico sano) · el cierre se escribe UNA vez · el orden
+condiciones→actividades está fijado con prueba.
