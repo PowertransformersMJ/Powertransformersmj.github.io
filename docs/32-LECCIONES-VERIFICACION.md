@@ -183,3 +183,23 @@ location.replace(rutaDelHTML);
 **La regla**: cuando el usuario reporta que no ve un cambio, la evidencia válida es el DOM de su
 pestaña, no la respuesta del servidor. Y si el módulo tiene sesión, se valida con la extensión de
 Chrome, que es la única que la tiene. → `99 §74.24`.
+
+### L-86 · Una decisión aplicada a UN camino de escritura no está aplicada
+
+El 2026-09-09 el Ingeniero ordenó que *«todo lo referente a inversión queda en PI»*. Se aplicó al
+selector de casillas del documento de mantenimiento y quedó fijado con prueba. Pero la **prosa** del
+alcance se compone por otra vía (`resolverPlantilla` → `seleccionAcciones`), y esa no filtraba: el
+documento abría proponiendo reposición del activo **sin casilla con la que quitarla**, porque el
+selector ya la había escondido. La prueba existente pasaba: probaba el camino arreglado.
+
+Es la misma forma del defecto que `TODO-52` tiene en el backend —la decisión «manda el Excel» se
+aplicó al importador y no a la función de la nube, que sigue pisándola—. Dos superficies distintas,
+un solo patrón.
+
+**La regla**: al aplicar una decisión del dueño, primero **enumera los caminos de escritura** de ese
+dato (pantalla, prosa, exportación, backend, importador) y cierra todos o declara por escrito cuál
+queda fuera y por qué. Una prueba que solo cubre el camino que acabas de tocar confirma tu trabajo,
+no la decisión.
+
+**Cómo se cazó**: recorriendo el flujo end-to-end en vez del diff — el reflejo de caza-bugs de §G.4.
+El diff de `§74.20` era impecable. → `99 §75`.

@@ -5,28 +5,22 @@
 
 ---
 
-## 🎯 Foco (2026-09-10) — CARGABILIDAD: EL DATO 2025 EN PRODUCCIÓN
+## 🎯 Foco (2026-09-10) — FICHAS TÉCNICAS
 
-> **`99 §74.23-74.24`.** El tablero mostraba **1 equipo en sobrecarga**; la realidad medida son **30**
-> (58 devanados · 235,8 MVA · 205.413 usuarios). Dos causas, las dos cerradas:
-> **(1)** `devanado()` recibía el `crg_pct_medido` del EQUIPO y lo pintaba en sus tres devanados —de
-> ahí los «96 % junto a — A» y los 74 falsos «desacuerdos» que mandaban a revisar una captura que
-> estaba bien—; **(2)** producción tenía el dato viejo. Importados **205 de 208** equipos desde
-> `Cargabilidad_TX_completado_v2.xlsx` (hoja `Cargabilidad_2025`) con auditoría de lote.
-> La tabla ganó `MVA`, `P · S · T` y `Usuarios`, todo ordenable. Lecciones: **L-84**, **L-85**.
-> ⚠️ Abiertos: **TODO-55** (🔴) · **TODO-54** · **TODO-56** · **TODO-57** · **TODO-52** (🔴) ·
-> **TODO-47** (🔴) · **TODO-37** (🔴) · 29/33/41. **TODO-53 y TODO-34 cerrados.**
+> Qué pasó → `05` y `99 §75` (**no se repite aquí**, §G.3 propiedad). Lección: **L-86** — *una
+> decisión aplicada a UN camino de escritura no está aplicada* (mismo patrón que TODO-52/59).
+> ⚠️ **Abiertos**: **TODO-35/58** (31 hallazgos del segmento) · **TODO-59** 🔴 · **TODO-60** 🔴 ·
+> **TODO-55** 🔴 · **TODO-52** 🔴 · **TODO-47** 🔴 · 54 · 56 · 57 · 12 · 33 · 41.
+> **TODO-37 resultó FALSA ALARMA** → pasó a la hija `11`.
 
-### ✅ CERRADOS en esta tanda (detalle en `99`, no repetir aquí)
-> **Fichas Técnicas** `§74.16-74.22`: «Ficha» es una elección de documento · el de Mantenimiento
-> Especializado se emite (7 hojas, alcance = plantilla + acciones escogidas, 15 textos por condición)
-> · la inversión queda en el PI · escala 1→5 con definición de cada banda. Lecciones L-82, L-83.
-> **Cargabilidad** `§74.22-74.24`: filtro de zona múltiple (chips) · cargabilidad por devanado ·
-> tabla con potencia y usuarios.
+### ✅ CERRADOS (detalle en `99`, no repetir aquí)
+> **Fichas** `§74.16-74.22` + **`§75`**: la ficha es una elección de documento · Mantenimiento
+> Especializado se emite (7 hojas) · la inversión queda en el PI · escala 1→5 definida · y las cinco
+> afirmaciones falsas del papel firmado. **Cargabilidad** `§74.22-74.24`: zona múltiple · por
+> devanado · potencia y usuarios. Lecciones L-82..L-86.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
-> **(A)** ~~Pulsar IMPORTAR~~ ✅ hecho 09-08. **(B)** GitHub Support "remove sensitive data" + revocar los PAT
-> viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
+> **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
 > **(D)** Tres decisiones de ADR-063: tope en `/alertas_reconocidas`, `defer` en Chart.js, barras de
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
 > **(H)** Decir qué se hace con los **3 equipos que su hoja de cargabilidad no trae**: `T1-M/M-CAZ`
@@ -35,23 +29,19 @@
 > `allow write: if false`, así que ni la app ni yo podemos leerla ni tocarla, y de esa lista
 > depende decidir el hueco 🔴 de **TODO-47a**.
 
-### 🚫 Callejones probados (NO reintentar — cada uno con su ancla)
-> De `99 §52.8-52.9`: `main` local queda stale tras un filter-repo (usar `origin/main`) · el "código
-> muerto FUSIÓN" de `excitacion-panel.js` es **FALSO** · G024 "XSS en dashboards" casi todo FALSO salvo
-> `bump.js`, ya corregida · `getDocs→tx.get` para movimientos atómicos es INVIABLE en el SDK Web ·
-> `git-filter-repo --branch`
-> reescribe SOLO esa rama, rm+gc antes (**L-25**) · reimplementar un panel "parecido a X" en vez de
-> reusar el que produce X (**L-57**) · un estado consolidado para todos los chips normativos
-> (**L-58**) · reintroducir "Reprocesar" (`99 §20`) · meter DGA/aceite o fabricar el dato que falta
-> (`99 §27`, **L-50/L-69**) · pasar un array a `args` de Workflow como string JSON (**L-71**) · dar
-> por basura un contador de "omitidos" sin abrir el archivo (**L-72**) · reabrir CONECTAR D (roles v2):
-> decidido NO activar hasta que el negocio pida multi-rol real (`99 §52.14`).
+### 🚫 Callejones probados (NO reintentar)
+> **Los de la Fase 9 viven en `99 §52.8-52.9`** — `main` local stale tras filter-repo · el "código
+> muerto FUSIÓN" de `excitacion-panel.js` (FALSO) · G024 XSS (FALSO salvo `bump.js`, ya corregida) ·
+> `getDocs→tx.get` INVIABLE en el SDK Web · `git-filter-repo --branch` (**L-25**).
+> **Vivos aquí**: reimplementar un panel "parecido a X" en vez de reusar el que produce X (**L-57**) ·
+> un estado consolidado para todos los chips normativos (**L-58**) · reintroducir "Reprocesar"
+> (`99 §20`) · meter DGA/aceite o fabricar el dato que falta (`99 §27`, **L-50/L-69**) · pasar un
+> array a `args` de Workflow como string JSON (**L-71**) · dar por basura un contador de "omitidos"
+> sin abrir el archivo (**L-72**) · reabrir CONECTAR D (`99 §52.14`).
 > **Ya verificado SANO — no re-auditar sin motivo**: lo que las auditorías DESPEJARON vive en la
-> casilla `NN.8` de su ADR (`99 §66.8`, `§68.8`, **`§73.8`**) y en el crudo de la bóveda. Consúltalo
-> ANTES de volver a auditar Fichas, el escapado de HTML, la doctrina CSS o **las reglas de Storage**
-> (ahí están los 23 hallazgos refutados: el `delete` que solo pide sesión, el comodín `if false`, las
-> URLs con token, `(default)`, el tope y las subidas resumables — todos mecanismo cierto, consecuencia
-> falsa).
+> casilla `NN.8` de su ADR (`§66.8`, `§68.8`, `§73.8`, **`§75.8`**) y en el crudo de la bóveda.
+> Consúltalo ANTES de volver a auditar Fichas, el escapado de HTML, la doctrina CSS o las reglas de
+> Storage (ahí están los 23 refutados: mecanismo cierto, consecuencia falsa).
 
 ---
 
@@ -59,16 +49,16 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-55** | 🔴 **Nueve transformadores de 628 MVA con 1 o 0 usuarios registrados** — Bosque T4 (150), Candelaria T-KDR05 (150) y T-KDR04 (100), Chinú Planta T3 (60) y T1 (20), Coveñas T1 y T3 (60 c/u), Nueva Cospique T3 (20), Guatapurí T3 (7,9 con 0). No es campo vacío (Bayunca tiene 31.628): el «1» parece marcador de *no aplica* en unidades de transmisión. **La criticidad de la matriz MO.00418 se calcula POR USUARIOS**, así que los nueve equipos más grandes del parque caen en criticidad mínima. Decisión suya: contar usuarios aguas abajo de forma transitiva, o marcarlos «transmisión — no aplica» con criterio propio. `99 §74.24`. | 🔴 |
-| **TODO-54** | **Tres erratas ×10 en la ampacidad**, PREEXISTENTES (no las trajo el import 2025): `T2-M/M-GUP`, `T1-M/M-LOR`, `T1-M/M-STR`. Ampacidad y carga escaladas JUNTAS ⇒ el **porcentaje es correcto**, solo fallan los amperios absolutos. Falta su OK para dividir entre 10. `99 §74.23`. | 🟡 |
-| **TODO-56** | **¿Se recalcula `calif_crg`?** Se calculó con los amperios VIEJOS y no se tocó al importar. Con 30 equipos >100 % debería subir en varios — y con ella la condición, que es la del Excel por decisión suya (`99 §74.15`). Exige comparación antes/después. | 🟡 |
+| **TODO-35/58** | **Cola de Fichas Técnicas — 31 hallazgos confirmados (`99 §75`) + lo priorizado en `§66.7` y rescatado en `§68.7`.** Los dos graves: **(a)** dos TX de la misma subestación comparten **el documento entero** (la clave sale de «CODIGO SUBESTACION»); **(b)** la carga tardía pisa lo adjuntado sin preguntar (`fijarDatos(…,{forzar:true})` salta el permiso). Luego: notas del clasificador CREG que no llegan al papel · dos vigencias de pesos sumadas (2007+2017) · el aviso de «sin guardar» no cubre la ficha · el unifilar puede pintarse sobre otro equipo · vendorizar SheetJS ≥0.20.2 (cierra G111) · partir `panel.js` y bajar `normalizarEquipo` al dominio · 11,4 KB de CSS sin emisor · el 61 % de `panel.js` sin prueba posible · `montoCOP` ✅ y las 5 verdades del documento ✅ (`§75`). | 🟡 |
+| **TODO-59** | 🔴 **La nube borra la condición del Excel al registrar una muestra** (`functions/index.js:136` reescribe `salud_actual` entero). Contradice tu decisión del 09-08; el código es anterior a ella. **No es decisión, es defecto.** Solo lo dispara `admin/muestras.html`: basta con no subir muestras hasta taparlo. `99 §75`, **L-86**. | 🔴 |
+| **TODO-60** | 🔴 **El Plan de Inversión ignora la criticidad**: `criticidad.nivel` no lo escribe ningún módulo de producción ⇒ `plan_inversion.js:50-51` deja `critN = 0` en los 208 y **el 25 % del ranking vale cero**. Arreglar TODO-55 no moverá el ranking hasta cerrar esto. | 🔴 |
+| **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada** — cifras rehechas sobre el corte que calza con `05` (208 TX / 3.838,5 MVA): **14 equipos ≥20 MVA con ≤10 usuarios = 870 MVA (22,7 %)** + 3 con celda vacía (`M-BEC`, `M-GUP`, `M-SML`). El defecto de fondo: la banda «mínima» va **de 1 a 9.662 usuarios** y se traga **144 equipos (69 % del parque)**. Daño PRESENTE: la ficha firma «alcanza 1 usuarios» para 150 MVA. Latente: matriz y ranking. Opciones: (A) pedir el dato · (C) excepción «transmisión» solo a `T-KDR04/05` · **(F) revisar los cortes de la Tabla 9**. La regla iría en **3 sitios**. `99 §74.24`. | 🔴 |
+| **TODO-54** | **Erratas ×10 en la ampacidad** (`T2-M/M-GUP`, `T1-M/M-STR`; `T1-M/M-LOR` ya viene corregida en la hoja 2025 y su primario va al **102,5 %**). ⚠️ La receta vieja rompía los datos: en GUP y STR la **carga también** está escalada ⇒ hay que dividir el **PAR**, no la ampacidad sola. **Antes de tocar**: leer producción — el ADR y su propia aritmética se contradicen y el script del lote no quedó versionado. `99 §74.23`. | 🟡 |
+| **TODO-56** | **¿Se recalcula `calif_crg`?** ⚠️ Baja de urgencia: **no subiría el índice de salud de nadie** (la condición es la del Excel; el override CRG=5 solo mueve `hi_recalculado`, que nadie lee). Sí mueve el causante principal y la macroactividad. El cruce: **119 cambios sobre 193 — 84 suben, 35 BAJAN, 8 pierden el CRG=5**. Exige antes/después guardado. | 🟡 |
 | **TODO-57** | **Versionar los assets contra la caché.** Cada despliegue le sirve una MEZCLA de viejo y nuevo (HTML nuevo + módulos ES viejos = tabla descuadrada); hoy se arregla a mano desde la extensión. `99 §74.24`, **L-85**. | 🟡 |
-| **TODO-52** | 🔴 **¿Quién manda cuando el Excel y el motor discrepan?** El sistema recalcula la condición con el MO.00418 y **no copia** la columna CONDICION del Excel: discrepan en **98 de 208**. El Excel marca **9 «muy pobre»** y el motor solo **1** (los otros 8 caen a pobre/medio; 5 de ellos en HI 4,000 exacto, que es el piso del override de cargabilidad, no un tope). La causa es la ponderación: **DGA pesa 35 %**. Si los 5 del Excel recogen un juicio experto que las variables medidas no capturan, se está perdiendo esa señal. Raíz de L-73, ahora cuantificada. `99 §74.14`. | 🔴 |
+| **TODO-52** | 🔴 **¿Se RATIFICA que manda el Excel, para TODOS los caminos?** ⚠️ El texto viejo era falso: desde el 09-08 el importador **sí copia** la condición del Excel (`importador.js:469`) y guarda el cálculo aparte; está en producción con prueba. Falta cerrar el otro camino (**TODO-59**) y ratificarlo por escrito. El dato sigue vivo: **98 de 208** divergen, el Excel marca 9 «muy pobre» y el motor 1 (DGA pesa 35 %). ⚠️ ASTREA 250 % **ya no sostiene** la tesis de «archivo sucio» (`§74.23` lo baja a 53,2 %; L-73 quedó sin actualizar) y las cifras del motor son PROVISIONALES. `99 §74.14`. | 🔴 |
 | **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
-| **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |
-| **TODO-29** | 🔴 **Bóveda sin remoto** (decisión suya, ADR-059): UN disco con material real de cliente. Los 127 MB de fotos ya quedaron versionados (08-21): dentro del disco no falta nada; falta una copia FUERA → `lastOffsiteBackup`. | 🟡 decidido |
-| **TODO-12** | Ola 3: falta CSP en 95 HTML · **G111**: todo el sitio usa SheetJS 0.18.5 (con CVE) desde 2 CDN — decisión suya: migrar a cdn.sheetjs.com ≥0.20.2 o aceptarlo. `99 §52.12`. | 🟡 |
-| **TODO-35** | **Cola completa de Fichas Técnicas** (ADR-066): lo priorizado en `99 §66.7` —vendorizar SheetJS ≥0.20.2 (CVE, cierra G111) · partir `panel.js` + `normalizarEquipo` al dominio · identidad de 2 TX en la misma subestación · aviso de trabajo sin guardar— **más lo que se había evaporado** y rescató la auditoría (`99 §68.7`): huecos literales de la norma sin nota · `montoCOP` (signo y centavos) · criterio 5 MVA→N4T1 sin escribir · carrera de 12 s que borra EDITS/DEC · paleta duplicada · código muerto · test con fecha no fijada. | 🟡 |
+| **TODO-12** | Ola 3: falta CSP en 95 HTML · **G111**: SheetJS 0.18.5 (CVE) en **8** pantallas desde 2 CDN, sin sello de integridad — 5 las abre cualquier técnico con sesión. Decisión: vendorizar ≥0.20.2 o aceptarlo por escrito. `99 §52.12`. | 🟡 |
 | **TODO-08** | 🔐 Ingeniero revoca PAT clásicos viejos de GitHub (uno de mayo 2026). | 🔲 |
 
 > **Los pendientes FRÍOS** (decisiones de arquitectura, validaciones diferidas, colas viejas) viven
