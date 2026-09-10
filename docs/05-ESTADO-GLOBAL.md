@@ -2,10 +2,10 @@
 
 > Nodo de signos vitales. Se **AUTO-CARGA** (con `CLAUDE.md` + `10`). "¿En qué estado está el sistema AHORA?". Tope ~25 líneas / 4k chars (§G.5) — tablero, no bitácora. Detalle histórico → `99` vía `00`.
 
-| Señal | Valor (al **2026-09-01**) |
+| Señal | Valor (al **2026-09-10**) |
 |---|---|
-| **Misión ahora** | **ADR-074 (09-08)**: las 39 discrepancias de UUCC eran 3 — la terciaria vivía donde nadie la leía, el catálogo tiene 3 familias y el clasificador sabía 2, y cada import borraba la UUCC. 4 correcciones en producción con auditoría. Antes: ADR-073. Pendientes → `10`. |
-| **Build** | 🟢 **1475 pass / 0 fail / 2 skip** + `lint:html` limpio + **51 tests de reglas** (8 Firestore + 43 Storage; Storage necesita el emulador de Firestore al lado — L-78). · verificado-vivo: 2026-09-01 · CI y Deploy en VERDE, comprobado en el log (esperar SIEMPRE a que el Deploy termine — L-65) |
+| **Misión ahora** | **`99 §74.23-24` (09-09/10)**: la cargabilidad del parque estaba mal contada — el tablero decía **1 equipo en sobrecarga** y son **30** (58 devanados · 235,8 MVA · 205.413 usuarios). Un valor por EQUIPO se pintaba en sus tres devanados, y producción tenía el dato viejo: importados 205/208 desde la hoja 2025 con auditoría. Antes: ADR-074, ADR-073. Pendientes → `10`. |
+| **Build** | 🟢 **1566 pass / 0 fail / 2 skip** + `lint:html` limpio + **51 tests de reglas** (8 Firestore + 43 Storage; Storage necesita el emulador de Firestore al lado — L-78). · verificado-vivo: 2026-09-10 · CI y Deploy en VERDE, comprobado en el log (esperar SIEMPRE a que el Deploy termine — L-65) |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` (SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (filter-repo purgó confidenciales) → otra copia debe re-clonar. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`** (10/1/3/5): `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias` (esta se creó el 08-17: estaba en el código sin subir). **53 índices Firestore declarados == desplegados** (comprobar con `firestore:indexes`, NO con el archivo — L-66) · verificado-vivo: 2026-08-17. **Storage**: reglas con `firmas/{uid}` desplegadas 2026-08-31 (`99 §71`) y **probadas desde 2026-09-01** (`99 §73`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |

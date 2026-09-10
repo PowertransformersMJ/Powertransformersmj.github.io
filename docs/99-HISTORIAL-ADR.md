@@ -2598,3 +2598,43 @@ sobrecarga**.
 `salud_actual` —la condición del parque es la del Excel por decisión suya (`99 §74.15`) y la
 cargabilidad no debía arrastrarla— · el import fue por clave puntual, no por payload completo, así
 que ningún otro campo pudo borrarse.
+
+**74.24 «No veo lo que te pedí en producción»: la respuesta estaba en el chat, no en la herramienta
+(2026-09-09/10).** El Ingeniero pidió un ranking de equipos que superan su ampacidad **en cada
+devanado** y luego **ordenado por potencia**. Se lo respondí con tablas en la conversación y le dije
+que ya estaba en producción. Su respuesta: *«aquí no veo el orden que te pedí»*. Tenía razón.
+
+**Lo que faltaba de verdad.** La tabla mostraba **un solo devanado por fila** —el más cargado, o el
+del filtro—, así que era imposible ver que un equipo excede en primario Y secundario; **no había
+columna de potencia**; y la ordenación por potencia y por usuarios **existía en el código pero
+ninguna cabecera la disparaba** — capacidad muerta desde el port. Añadidas: `MVA` ordenable, celda
+`P · S · T` con los tres devanados (rojo el que excede, guion si no hay medida — que no es 0 %),
+`Usuarios` ordenable, e indicador `▲▼` + `aria-sort` en la cabecera activa: sin él, pulsar «MVA»
+reordenaba la tabla y nada decía que hubiera pasado. De paso, un valor ausente dejó de contar como
+cero al ordenar (se hunde al final en vez de colarse entre los medidos), y `I medida` pasó a ordenar
+por **amperios** porque compartía clave con `% Ampacidad` y la flecha salía en dos columnas a la vez.
+
+**La trampa de caché, y por qué importa.** Al validar con la extensión sobre SU pestaña apareció
+algo que el servidor no podía mostrar: **HTML nuevo con JavaScript viejo** — 11 cabeceras y 8 celdas
+por fila, la tabla descuadrada. Un `?query` refresca el HTML pero **no** los módulos ES, que se
+piden por su propia URL; y revalidar solo los módulos deja el caso inverso. Hubo que forzar
+`fetch(..., {cache:'reload'})` sobre los 27 módulos **y** el HTML antes de recargar. → **L-85**.
+
+**Un hallazgo del dato que vale más que el cambio.** Al comprobar la columna nueva, nueve equipos
+—**628 MVA**— aparecen con **1 o 0 usuarios**: Bosque T4 (150), Candelaria T-KDR05 (150) y T-KDR04
+(100), Chinú Planta T3 (60) y T1 (20), Coveñas T1 y T3 (60 c/u), Nueva Cospique T3 (20), Guatapurí
+T3 (7,9 con **0**). No es un fallo de render ni un campo vacío —Bayunca tiene 31.628 y Boston
+33.748—: el «1» parece un marcador de *no aplica* en unidades de transmisión que no alimentan
+usuarios directamente. **Consecuencia**: la criticidad de la matriz MO.00418 se calcula POR USUARIOS
+aguas abajo, así que los nueve transformadores más grandes del parque caen en criticidad mínima y en
+la celda de menor prioridad. Bosque T4, de 150 MVA, hoy pesa menos que una unidad rural de 3 MVA con
+4.000 usuarios. → **TODO-55**.
+
+**Verificación**: 1566 pruebas verdes, lint limpio, y comprobación en la pestaña real del Ingeniero
+—no en el servidor— de las 11 columnas, las 11 celdas, el orden por MVA (150 · 150 · 100 · 60) y una
+sola flecha activa.
+
+**Verificado sano / no re-auditar**: la página YA mostraba el dato correcto antes de este cambio (30
+en sobrecarga, 145 % Curumaní, 205 mil usuarios) — lo que faltaba era la vista, no el dato · el
+`% Ampacidad` renderizado siempre fue correcto; el «1» de la columna de usuarios es dato de origen,
+comprobado contra el Excel.
