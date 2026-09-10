@@ -2700,3 +2700,43 @@ antes · `soloMedido` tiene un único llamante, así que descartar el 0 no alcan
 son la **colisión de identidad** (dos transformadores de la misma subestación comparten documento
 entero, porque la clave sale de «CODIGO SUBESTACION») y la **carrera de la carga tardía**, que pisa
 lo adjuntado sin preguntar porque `fijarDatos(..., {forzar:true})` salta el permiso.
+
+**75.9 El alcance deja de ofrecer solo la banda del equipo (2026-09-10).** Encargo, sobre el
+pantallazo del selector: *«aquí me gustaría que aparezcan todas las macroactividades por condición»*.
+
+**Por qué hacía falta.** El selector ofrecía la banda del equipo y nada más, así que un correctivo
+que conviniera adelantar —o una mitigación de otra banda— no estaba a la vista **ni para
+descartarlo**. Decidir sin ver el menú completo no es decidir.
+
+**Solución.** `macroactividadesCatalogo()` (dominio) devuelve el `MO.00418 §4.3` entero agrupado como
+lo agrupa la norma y en su orden de lectura: cada condición con su macroactividad y, pegada a ella,
+su mitigación (C3 y C4). `accionesDisponibles` gana un **quinto argumento opcional**
+(`{todasLasCondiciones:true}`) — sin él se comporta igual que antes, con prueba de que el contrato
+viejo no se movió: **el PI sigue viendo solo su banda**. El selector pinta los 7 grupos con
+`<details>` nativo (sin JS, sin listener global, accesible por teclado — §3.5); la banda del equipo va
+ABIERTA y rotulada «este equipo», las demás plegadas y con contador de cuántas de ese grupo ya están
+en el alcance. La frontera de inversión (`§74.20`) se aplica **por grupo**: cada uno declara lo suyo
+que queda fuera en vez de esconderlo (L-81). «Marcar todas» pasa a **«Marcar las suyas»** y se acota
+al plan del equipo más su banda: marcar las 36 de la norma metería en el alcance trabajos de bandas
+que no le corresponden.
+
+**Un bug propio, cazado en el preview y no en el diff.** La norma REPITE dos subactividades en C1 y
+C2 («Pruebas eléctricas», «Inspección ocular detallada»). Al abrir el catálogo entero, el alcance
+salía diciendo *«pruebas eléctricas, pruebas eléctricas y regeneración de aceite»* — en un documento
+que se firma. `seleccionAcciones` deduplica por id y las dos casillas se mueven juntas, porque son la
+MISMA acción. Es justo lo que el reflejo de caza-bugs existe para encontrar: el diff estaba limpio.
+
+**Verificación**: 1595 pass / 0 fail / 2 skip (12 nuevas), lint limpio, y **preview FIEL** con el
+módulo real (L-56, `_dev/preview-acciones-macro.html`) recorriendo condición 2, 3 y 5 — el plegado,
+el contador, el filtro de inversión por grupo, las casillas gemelas y que una acción de otra banda SÍ
+llega al texto del alcance.
+
+**Verificado sano / no re-auditar**: el PI conserva su lista y su prosa (prueba de contrato) · lo
+marcado POR DEFECTO no cambia (`seleccionPorDefecto` sigue tomando solo lo que no es catálogo) · no
+se perdió ninguna subactividad al reagrupar (prueba que cruza los grupos contra `catalogoCondicion`).
+
+**Lo que este cambio DESTAPÓ y queda a decisión del Ingeniero.** El módulo tiene **dos catálogos para
+lo mismo**: la línea base escrita a mano en `ficha-tecnica.js` (`LINEA_BASE_POR_CONDICION`, 3-4 ítems
+que mezclan bandas) y el catálogo oficial. Por eso un equipo de condición 2 aparece con marcas en C1
+y C3 y **cero en su propia banda**. Unificarlos cambiaría el texto por defecto del alcance, así que
+no se toca sin su visto bueno. → cola del segmento.
