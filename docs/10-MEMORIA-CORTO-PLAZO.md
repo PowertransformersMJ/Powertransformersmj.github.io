@@ -5,47 +5,32 @@
 
 ---
 
-## 🎯 Foco (2026-09-01) — LAS REGLAS YA NO SE CREEN BAJO PALABRA (ADR-073)
+## 🎯 Foco (2026-09-10) — CARGABILIDAD: EL DATO 2025 EN PRODUCCIÓN
 
-> **ADR-073**: `firebase deploy` solo COMPILA — las reglas de `firmas/{uid}` llevaban 24 h dadas por
-> buenas sin una prueba. Ahora hay 43, con los dos emuladores y también en CI. La auditoría
-> adversarial que siguió dejó 3 hallazgos vivos de 26. Antes: **ADR-071** (firmas a la cuenta de cada
-> quien), **ADR-070** (port de Órdenes de Materiales), **ADR-069** (TX_Potencia da 208 válidos).
-> ⚠️ Abiertos: **TODO-52** (🔴 siguiente) · **TODO-47** (🔴) · **TODO-37** (🔴) · 29/33/41. **TODO-53 cerrado.**
-> ✅ **TODO-44 cerrado (ADR-071)**: la firma del Ingeniero salió de la web (404 en producción) y pasó
-> a su cuenta; cada quien sube la suya en «Mi firma» y solo se estampa en SU línea. Antes, TODO-43.
-> ✅ **TODO-46 cerrado (ADR-073)**: `storage.rules` pasa de 0 a **43 pruebas** y `test:rules` levanta
-> los dos emuladores (Storage pregunta en Firestore quién es el usuario). Verificado también en CI.
-> La auditoría adversarial que vino detrás (26 hallazgos, 23 refutados) dejó **3 confirmados** →
-> **TODO-47**, con el grave esperando tu decisión.
-> ✅ **ADR-074 (09-08)**: las 39 discrepancias de UUCC eran 6. La terciaria vivía en una ruta que
-> nadie miraba (30 falsas), el catálogo tiene 3 familias y el clasificador sabía 2 (3
-> autotransformadores acusados en falso), y cada importación borraba la UUCC en silencio — los tres
-> arreglados. **39 discrepancias → 0**: 7 documentos corregidos en producción con auditoría, y las
-> 3 sin banda en la norma (NLTC > 6 MVA en nivel 3) asignadas por capacidad a `N3T3` por decisión
-> suya, con la excepción escrita en cada registro. **TODO-49 y TODO-50 cerrados.**
+> **`99 §74.23-74.24`.** El tablero mostraba **1 equipo en sobrecarga**; la realidad medida son **30**
+> (58 devanados · 235,8 MVA · 205.413 usuarios). Dos causas, las dos cerradas:
+> **(1)** `devanado()` recibía el `crg_pct_medido` del EQUIPO y lo pintaba en sus tres devanados —de
+> ahí los «96 % junto a — A» y los 74 falsos «desacuerdos» que mandaban a revisar una captura que
+> estaba bien—; **(2)** producción tenía el dato viejo. Importados **205 de 208** equipos desde
+> `Cargabilidad_TX_completado_v2.xlsx` (hoja `Cargabilidad_2025`) con auditoría de lote.
+> La tabla ganó `MVA`, `P · S · T` y `Usuarios`, todo ordenable. Lecciones: **L-84**, **L-85**.
+> ⚠️ Abiertos: **TODO-55** (🔴) · **TODO-54** · **TODO-56** · **TODO-57** · **TODO-52** (🔴) ·
+> **TODO-47** (🔴) · **TODO-37** (🔴) · 29/33/41. **TODO-53 y TODO-34 cerrados.**
 
-### ✅ CERRADO: el import de Salud de Activos (2026-09-08, `99 §74.11`)
-> **208 equipos con condición.** Fallaba por una línea: `ArrayBuffer` donde SheetJS espera
-> `Uint8Array`, y parseaba mal en silencio. No era el archivo del Ingeniero.
-
-### ✅ CERRADO: el documento de Mantenimiento Especializado (2026-09-08, `99 §74.17-19`)
-
-**TODO-53.** Siete hojas —las seis del PI más «Salud y riesgo», que sitúa al equipo en la matriz 5×5
-con sus usuarios y MVA—. El **alcance es plantilla + selección**: quince textos técnicos (tres por
-condición) con un hueco que se rellena con las acciones que el Ingeniero marque —las registradas del
-equipo, su línea base, o el catálogo `MO.00418 §4.3`—. Regla dura: no se promete lo que el
-mantenimiento no revierte. El PI quedó intacto, con prueba que lo fija. Lecciones: L-82.
-
-> **Frontera cerrada** (`99 §74.20`): la inversión es del PI. Fuera de este documento el bloque de
-> presupuesto, las acciones de inversión —nombradas, no ocultas— y el lenguaje que proponía reponer.
-> 🟡 Queda una decisión suya: no hay formato oficial al cual exportar, así que no lleva ese botón.
+### ✅ CERRADOS en esta tanda (detalle en `99`, no repetir aquí)
+> **Fichas Técnicas** `§74.16-74.22`: «Ficha» es una elección de documento · el de Mantenimiento
+> Especializado se emite (7 hojas, alcance = plantilla + acciones escogidas, 15 textos por condición)
+> · la inversión queda en el PI · escala 1→5 con definición de cada banda. Lecciones L-82, L-83.
+> **Cargabilidad** `§74.22-74.24`: filtro de zona múltiple (chips) · cargabilidad por devanado ·
+> tabla con potencia y usuarios.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(A)** ~~Pulsar IMPORTAR~~ ✅ hecho 09-08. **(B)** GitHub Support "remove sensitive data" + revocar los PAT
 > viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
 > **(D)** Tres decisiones de ADR-063: tope en `/alertas_reconocidas`, `defer` en Chart.js, barras de
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
+> **(H)** Decir qué se hace con los **3 equipos que su hoja de cargabilidad no trae**: `T1-M/M-CAZ`
+> (Casa de Zinc), `T2-M/M-BEC` (Becerril) y `T2-M/M-SML` (San Martín de Loba) — sin medida 2025.
 > **(G)** Ver en la consola de Firebase **quién figura hoy en `/admins`** — la colección es
 > `allow write: if false`, así que ni la app ni yo podemos leerla ni tocarla, y de esa lista
 > depende decidir el hueco 🔴 de **TODO-47a**.
@@ -74,6 +59,10 @@ mantenimiento no revierte. El PI quedó intacto, con prueba que lo fija. Leccion
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
+| **TODO-55** | 🔴 **Nueve transformadores de 628 MVA con 1 o 0 usuarios registrados** — Bosque T4 (150), Candelaria T-KDR05 (150) y T-KDR04 (100), Chinú Planta T3 (60) y T1 (20), Coveñas T1 y T3 (60 c/u), Nueva Cospique T3 (20), Guatapurí T3 (7,9 con 0). No es campo vacío (Bayunca tiene 31.628): el «1» parece marcador de *no aplica* en unidades de transmisión. **La criticidad de la matriz MO.00418 se calcula POR USUARIOS**, así que los nueve equipos más grandes del parque caen en criticidad mínima. Decisión suya: contar usuarios aguas abajo de forma transitiva, o marcarlos «transmisión — no aplica» con criterio propio. `99 §74.24`. | 🔴 |
+| **TODO-54** | **Tres erratas ×10 en la ampacidad**, PREEXISTENTES (no las trajo el import 2025): `T2-M/M-GUP`, `T1-M/M-LOR`, `T1-M/M-STR`. Ampacidad y carga escaladas JUNTAS ⇒ el **porcentaje es correcto**, solo fallan los amperios absolutos. Falta su OK para dividir entre 10. `99 §74.23`. | 🟡 |
+| **TODO-56** | **¿Se recalcula `calif_crg`?** Se calculó con los amperios VIEJOS y no se tocó al importar. Con 30 equipos >100 % debería subir en varios — y con ella la condición, que es la del Excel por decisión suya (`99 §74.15`). Exige comparación antes/después. | 🟡 |
+| **TODO-57** | **Versionar los assets contra la caché.** Cada despliegue le sirve una MEZCLA de viejo y nuevo (HTML nuevo + módulos ES viejos = tabla descuadrada); hoy se arregla a mano desde la extensión. `99 §74.24`, **L-85**. | 🟡 |
 | **TODO-52** | 🔴 **¿Quién manda cuando el Excel y el motor discrepan?** El sistema recalcula la condición con el MO.00418 y **no copia** la columna CONDICION del Excel: discrepan en **98 de 208**. El Excel marca **9 «muy pobre»** y el motor solo **1** (los otros 8 caen a pobre/medio; 5 de ellos en HI 4,000 exacto, que es el piso del override de cargabilidad, no un tope). La causa es la ponderación: **DGA pesa 35 %**. Si los 5 del Excel recogen un juicio experto que las variables medidas no capturan, se está perdiendo esa señal. Raíz de L-73, ahora cuantificada. `99 §74.14`. | 🔴 |
 | **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
 | **TODO-37** | 🔴 **`functions/domain/` vive SOLO en este disco**: 61 archivos gitignorados, **0 versionados**, **5 divergen** de `assets/js/domain/` → un re-clono pierde el dominio de las Cloud Functions desplegadas. Decidir espejo vs versionar vs veto. Detalle → `99 §68`. | 🔴 |

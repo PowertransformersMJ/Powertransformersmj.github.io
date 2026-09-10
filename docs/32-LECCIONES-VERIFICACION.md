@@ -162,3 +162,24 @@ discrepancias, hay que preguntar si el valor comparado describe de verdad la cos
 **Cómo se comprobó**: abriendo el Excel y midiendo. Los porcentajes por devanado coinciden con sus
 propios amperios en el 100 % de las filas medidas — 196, 196 y 31. Un solo número mata la hipótesis
 de que el problema fuera la captura. → `99 §74.23`.
+
+### L-85 · «Está en producción» no es «lo está viendo»: valida en SU pestaña, no en el servidor
+
+Confirmé un despliegue con `curl` contra el sitio —CI verde, deploy verde, el archivo servido con el
+cambio— y le dije al Ingeniero que ya estaba. Él respondió que no lo veía. Lo estaba mirando con el
+navegador sirviendo **una mezcla**: HTML nuevo y módulos ES viejos, con la tabla en 11 cabeceras y
+8 celdas por fila. Ninguna comprobación del lado del servidor podía detectar eso.
+
+**Lo que hay que saber de la caché**: un `?query` en la URL refresca el HTML pero **no** los módulos
+ES —se piden por su propia URL, sin el parámetro—; y revalidar solo los módulos produce el caso
+inverso, filas nuevas bajo cabeceras viejas. La receta que funcionó desde la extensión:
+
+```js
+for (const u of urlsDeModulos) await fetch(u, { cache: 'reload' });
+await fetch(rutaDelHTML, { cache: 'reload' });
+location.replace(rutaDelHTML);
+```
+
+**La regla**: cuando el usuario reporta que no ve un cambio, la evidencia válida es el DOM de su
+pestaña, no la respuesta del servidor. Y si el módulo tiene sesión, se valida con la extensión de
+Chrome, que es la única que la tiene. → `99 §74.24`.
