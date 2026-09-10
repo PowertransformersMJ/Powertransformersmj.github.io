@@ -203,3 +203,28 @@ no la decisión.
 
 **Cómo se cazó**: recorriendo el flujo end-to-end en vez del diff — el reflejo de caza-bugs de §G.4.
 El diff de `§74.20` era impecable. → `99 §75`.
+
+### L-87 · Un catálogo normativo lista lo que PUEDE aplicar, no lo que hay que contratar
+
+Al unificar la línea base de Fichas Técnicas con el `MO.00418 §4.3` marqué por defecto la
+macroactividad **completa** de cada banda. Parecía lo más fiel a la norma y era lo contrario: el §4.3
+es un **menú por condición**, no una lista de trabajos obligatorios. Marcarlo entero contrataba, en
+condición 3, secado de aceite + regeneración de aceite + recuperación de aislamientos a la vez
+—tratamientos **alternativos** del mismo aceite y del mismo papel— y, en condición 5, prometía
+recuperar el aislamiento de un activo que el mismo documento declara irrecuperable. El papel se
+contradecía a sí mismo, y lo firma el Ingeniero.
+
+**La regla**: antes de marcar por defecto un catálogo normativo, pregunta si sus renglones son
+**acumulativos o alternativos**. Si son alternativos, el defecto correcto es *ninguno* y que el
+sistema lo diga («las acciones que se definan según el diagnóstico»). Lo que se ofrece no es lo que
+se contrata.
+
+**El corolario que casi me cuesta más caro**: le presenté al Ingeniero un alcance vacío como «un
+agujero» sin comprobar qué hacía el sistema con él. Hacía lo correcto — caer en su texto de reserva.
+**Un estado vacío que el código ya maneja con honestidad no es un defecto**; llamarlo así justifica
+un «arreglo» que rompe algo sano. Comprobar el estado vacío ANTES de prometer cerrarlo.
+
+**Cómo se cazó**: tres escépticos independientes sobre el diff sin commitear, con lentes distintas
+(regresión · fidelidad a la norma · lo que el usuario ve). Dos dijeron «roto». La lente normativa
+—la que fue a mirar precios y alternativas del catálogo— es la que vio el fondo; las de código
+encontraron los ocho defectos de superficie. → `99 §75.10`.
