@@ -44,7 +44,8 @@ import {
   clasificarAccion, CATEGORIAS_ACCION, definicionCondicion
 } from './ficha-tecnica.js';
 import {
-  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion
+  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion,
+  macroactividadesCatalogo
 } from '../../domain/fichas_acciones.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
@@ -659,9 +660,9 @@ function descripcionUC(equipo, codigo) {
  * (registradas, o la línea base de su condición) más las que el catálogo
  * oficial contempla para esa banda y todavía no tiene.
  */
-export function accionesDeEquipo(equipo) {
+export function accionesDeEquipo(equipo, opts) {
   const n = nucleoFicha(equipo || {});
-  return accionesDisponibles(n.ci, n.acciones, n.baseUsada, clasificarAccion);
+  return accionesDisponibles(n.ci, n.acciones, n.baseUsada, clasificarAccion, opts);
 }
 
 /** ¿El campo pertenece al documento de Mantenimiento Especializado? */
@@ -680,12 +681,24 @@ function esCampoMtto(campo) {
  * selector, que sí filtra, no ofrecía casilla con la que quitarla.
  */
 export function seleccionAcciones(equipo, st, campo) {
-  const todas = accionesDeEquipo(equipo);
+  // En el documento de mantenimiento el selector ofrece el catálogo ENTERO
+  // (encargo del 2026-09-10), así que la prosa tiene que conocer las mismas
+  // acciones: si no, marcar una de otra banda no llegaría al alcance.
+  const todas = accionesDeEquipo(equipo, esCampoMtto(campo) ? { todasLasCondiciones: true } : undefined);
   const disp = esCampoMtto(campo) ? todas.filter((a) => !esInversion(a.txt)) : todas;
   const guardado = (st && st.plan) ? st.plan.acc_sel : null;
   const ids = Array.isArray(guardado) ? guardado : seleccionPorDefecto(disp);
   const set = new Set(ids);
-  return disp.filter((a) => set.has(a.id));
+  // Una acción, un renglón. En modo completo la lista trae el catálogo entero y
+  // la norma repite dos subactividades en C1 y C2, así que sin este filtro el
+  // alcance salía diciendo «pruebas eléctricas, pruebas eléctricas y …» en un
+  // documento que se firma.
+  const yaSalio = new Set();
+  return disp.filter((a) => {
+    if (!set.has(a.id) || yaSalio.has(a.id)) return false;
+    yaSalio.add(a.id);
+    return true;
+  });
 }
 
 function resolverPlantilla(tpl, equipo, st, campo) {
@@ -1863,7 +1876,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    */
   function selectorAcciones(e) {
     const st = estadoDe(e);
-    const todas = accionesDeEquipo(e);
+    const ci = nucleoFicha(e || {}).ci;
+    const todas = accionesDeEquipo(e, { todasLasCondiciones: true });
     // Orden del Ingeniero (2026-09-09): «todo lo referente a inversión queda en
     // PI». Aquí no se ofrecen, pero tampoco se borran de la vista: si el plan
     // del equipo trae una, se dice cuál es y dónde se sustenta. Ocultarla sin
@@ -1876,8 +1890,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + 'mano o se toma la versión automática.</div>';
     }
     const marcados = new Set(seleccionAcciones(e, st, 'alcance_mtto').map((a) => a.id));
-    const hayRegistro = disp.some((a) => a.origen === 'registro');
-    const esBase = disp.some((a) => a.origen === 'base');
+    const propias = disp.filter((a) => a.origen !== 'catalogo');
+    const hayRegistro = propias.some((a) => a.origen === 'registro');
+    const esBase = propias.some((a) => a.origen === 'base');
 
     const fila = (a) => {
       const C = CATEGORIAS_ACCION[a.cat] || CATEGORIAS_ACCION.DIAG;
@@ -1888,33 +1903,63 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + '</label>';
     };
 
-    const propias = disp.filter((a) => a.origen !== 'catalogo');
-    const extra = disp.filter((a) => a.origen === 'catalogo');
+    // Encargo del Ingeniero (2026-09-10): «que aparezcan TODAS las
+    // macroactividades por condición». El catálogo entero, agrupado como lo
+    // agrupa la norma; la banda del equipo va abierta y señalada, el resto
+    // plegado para que no tape la pantalla. Se pliega con <details>, que es
+    // nativo: sin JS, sin listener global y accesible por teclado (§3.5).
+    const grupoMacro = (m) => {
+      const suyas = disp.filter((a) => a.macro === m.codigo);
+      const fuera = fueraPorInversion.filter((a) => a.macro === m.codigo);
+      if (!suyas.length && !fuera.length) return '';
+      const esSuya = ci != null && m.condicion === ci;
+      const nMarcadas = suyas.filter((a) => marcados.has(a.id)).length;
+      return '<details class="ftm-acc-macro' + (esSuya ? ' es-suya' : '') + '"'
+        + (esSuya ? ' open' : '') + (esSuya ? ' data-acc-ambito="propio"' : '') + '>'
+        + '<summary class="ftm-acc-macro-cab">'
+        +   '<span class="ftm-acc-macro-nom">' + esc(m.nombre) + '</span>'
+        +   '<span class="ftm-acc-macro-cond">Condición ' + m.condicion + '</span>'
+        +   (esSuya ? '<span class="ftm-acc-macro-yo">este equipo</span>' : '')
+        +   '<span class="ftm-acc-macro-n">' + (nMarcadas ? nMarcadas + ' de ' : '')
+        +     suyas.length + '</span>'
+        +   '<span class="ftm-acc-macro-ref">' + esc(m.referencia) + '</span>'
+        + '</summary>'
+        + suyas.map(fila).join('')
+        + (fuera.length
+          ? '<p class="ftm-acc-macro-inv">Fuera de este documento por ser inversión: '
+            + fuera.map((a) => esc(a.txt)).join(', ') + '.</p>'
+          : '')
+        + '</details>';
+    };
+
+    // El plan de récord del equipo NO es catálogo y va aparte: confundirlos
+    // sería presentar como aprobado algo que nadie aprobó (ADR-066).
+    const fueraDelPlan = fueraPorInversion.filter((a) => a.origen !== 'catalogo');
 
     return '<div class="ftm-acc">'
       + '<div class="ftm-acc-head">Acciones de mantenimiento del alcance'
-      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar todas</button>'
+      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar las suyas</button>'
       +   '<button type="button" class="ftm-acc-todo" data-acc-todo="0">Ninguna</button>'
       + '</div>'
       + (propias.length
-        ? '<div class="ftm-acc-grupo"><span class="ftm-acc-rot">'
+        ? '<div class="ftm-acc-grupo" data-acc-ambito="propio"><span class="ftm-acc-rot">'
           + (hayRegistro ? 'Plan registrado del equipo' : 'Línea base de la condición · referencial')
           + '</span>' + propias.map(fila).join('') + '</div>'
         : '')
-      + (extra.length
-        ? '<div class="ftm-acc-grupo"><span class="ftm-acc-rot">Catálogo de la condición · añadir</span>'
-          + extra.map(fila).join('') + '</div>'
-        : '')
-      + (fueraPorInversion.length
+      + '<div class="ftm-acc-catalogo">'
+      +   '<span class="ftm-acc-rot">Catálogo MO.00418 §4.3 · todas las macroactividades</span>'
+      +   macroactividadesCatalogo().map(grupoMacro).join('')
+      + '</div>'
+      + (fueraDelPlan.length
         ? '<p class="ftm-acc-aviso">Fuera de este documento por ser <b>inversión</b>: '
-          + fueraPorInversion.map((a) => esc(a.txt)).join(', ')
+          + fueraDelPlan.map((a) => esc(a.txt)).join(', ')
           + '. La inversión se sustenta en la <b>Propuesta a Plan de Inversión (PI)</b>, que es el '
           + 'otro documento que se emite desde este equipo.</p>'
         : '')
       + '<p class="ftm-acc-pie">' + (esBase
         ? 'El equipo no trae macroactividad registrada: lo marcado arriba es la línea base de su '
           + 'condición y se rotula como referencial, no como plan aprobado. '
-        : '') + 'Lo que marque entra en el texto del alcance.</p>'
+        : '') + 'Lo que marque entra en el texto del alcance, venga de la banda que venga.</p>'
       + '</div>';
   }
 
@@ -2352,9 +2397,18 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const acct = ev.target.closest('[data-acc-todo]');
     if (acct && contenedor.contains(acct) && actual) {
       const todas = acct.getAttribute('data-acc-todo') === '1';
+      // «Marcar todas» = las de SU condición y su plan, no las 41 de la norma:
+      // el selector ahora muestra el catálogo entero y marcarlo completo
+      // metería en el alcance trabajos de bandas que no le corresponden.
       const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
-      cajas.forEach((c) => { c.checked = todas; });
-      fijarAcciones(todas ? cajas.map((c) => c.getAttribute('data-accion')) : []);
+      const propias = [...modalCuerpo.querySelectorAll('[data-acc-ambito="propio"] [data-accion]')];
+      if (todas) {
+        propias.forEach((c) => { c.checked = true; });
+        fijarAcciones([...new Set(propias.map((c) => c.getAttribute('data-accion')))]);
+      } else {
+        cajas.forEach((c) => { c.checked = false; });
+        fijarAcciones([]);
+      }
       return;
     }
 
@@ -2518,8 +2572,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       }
     const accId = t.getAttribute && t.getAttribute('data-accion');
     if (accId && actual) {
-      const marcados = [...modalCuerpo.querySelectorAll('[data-accion]')]
-        .filter((c) => c.checked).map((c) => c.getAttribute('data-accion'));
+      // La norma repite dos subactividades en C1 y C2 («Pruebas eléctricas»,
+      // «Inspección ocular detallada»): son la MISMA acción, así que sus dos
+      // casillas se mueven juntas. Si no, la pantalla mostraría una marcada y
+      // otra no para algo que en el alcance sale una sola vez.
+      modalCuerpo.querySelectorAll('[data-accion="' + accId + '"]')
+        .forEach((c) => { c.checked = t.checked; });
+      const marcados = [...new Set([...modalCuerpo.querySelectorAll('[data-accion]')]
+        .filter((c) => c.checked).map((c) => c.getAttribute('data-accion')))];
       fijarAcciones(marcados);
     }
     if (t.getAttribute && t.getAttribute('data-anexo') && actual) {
