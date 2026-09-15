@@ -204,8 +204,11 @@ function matrizRiesgoHTML(equipos) {
       + NOMBRE_HI[hi] + '</th>' + tds + '</tr>';
   }).join('');
 
+  // La muestra lleva `ftm-sw2`: sin tamaño propio, un <i> vacío mide 0×0 y la
+  // leyenda enseñaba «Verde (OK)» sin ningún verde (cazado 2026-09-15 al pintar
+  // la matriz de la hoja «Salud y riesgo» con este mismo patrón).
   const escala = Object.entries(COLORES_CELDA).map(([, v]) =>
-    '<span class="ftm-rmx-sc"><i style="background:' + v.hex + '"></i>' + esc(v.label) + '</span>'
+    '<span class="ftm-rmx-sc"><i class="ftm-sw2" style="background:' + v.hex + '"></i>' + esc(v.label) + '</span>'
   ).join('');
 
   return ''
