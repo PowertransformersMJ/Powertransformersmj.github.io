@@ -250,3 +250,18 @@ Los tres patrones que se repiten y que hay que buscar siempre:
 **el dominio** (¿es cierto? ¿es exigible? ¿esa norma aplica?), no la redacción. Y conviene un tercer
 paso mecánico: las correcciones llegan **sin tildes** —hay que reponerlas antes de publicar—.
 → `99 §75.12`.
+
+### L-89 · El color que se ve en pantalla no es el que se imprime: fondos y `<i>` vacíos
+
+Dos defectos del mismo tipo, cazados el mismo día sobre la misma matriz de riesgo:
+
+1. **Los fondos no se imprimen.** Chrome omite `background` al imprimir salvo que el elemento lleve
+   `print-color-adjust: exact`. Una matriz de riesgo pintada con `style="background:…"` se ve perfecta
+   en pantalla y sale **en blanco** en el PDF. En un documento que se firma, lo que cuenta es el papel.
+2. **Un `<i>` vacío mide 0×0.** La leyenda gerencial pintaba cada muestra con
+   `<i style="background:#1B8E3F">` sin tamaño: el color estaba en el DOM y no se veía. La leyenda decía
+   «Verde (OK)» sin verde, y nadie lo notó porque el texto se lee igual.
+
+**La regla**: un color que *significa* algo (semáforo, veredicto) se verifica **midiendo**
+(`getBoundingClientRect`, `getComputedStyle(...).backgroundColor`), no mirando el código; y si el
+documento se imprime, se declara `print-color-adjust: exact` en el mismo cambio. → `99 §75.15`.
