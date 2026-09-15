@@ -67,24 +67,64 @@ describe('Catálogos de redacción — uno por documento', () => {
 
   // 🔒 El eje del documento de mantenimiento NO es el ángulo del argumento
   // —ese es el del PI— sino la CONDICIÓN del activo, que es lo que decide qué
-  // se hace con él. El alcance ofrece TRES propuestas por banda; los beneficios,
-  // una. Las quince del alcance son lo que el Ingeniero pidió poder escoger.
-  test('el alcance trae tres propuestas por condición y los beneficios una', () => {
+  // se hace con él. Desde el 2026-09-10 el alcance ofrece CINCO propuestas por
+  // banda (encargo del Ingeniero: cuatro escritas + la automática dentro de la
+  // banda); los beneficios siguen con una.
+  test('el alcance trae cinco propuestas por condición y los beneficios una', () => {
     for (const c of [1, 2, 3, 4, 5]) {
-      assert.equal(ALCANCE_MTTO_OPC.filter((o) => o.cond === c).length, 3,
-        `la condición ${c} no tiene sus tres propuestas de alcance`);
+      assert.equal(ALCANCE_MTTO_OPC.filter((o) => o.cond === c).length, 5,
+        `la condición ${c} no tiene sus cinco propuestas de alcance`);
       assert.equal(BENEF_MTTO_OPC.filter((o) => o.cond === c).length, 1);
     }
-    assert.equal(ALCANCE_MTTO_OPC.filter((o) => o.cond != null).length, 15);
+    assert.equal(ALCANCE_MTTO_OPC.filter((o) => o.cond != null).length, 25);
   });
 
-  test('las tres de cada banda son A, B y C, y no se repiten', () => {
+  test('las cinco de cada banda son A a E, las cuatro escritas no se repiten y la E es la automática', () => {
     for (const c of [1, 2, 3, 4, 5]) {
-      const ks = ALCANCE_MTTO_OPC.filter((o) => o.cond === c)
-        .map((o) => (o.t.match(/^C\d·([ABC])/) || [])[1]);
-      assert.deepEqual(ks, ['A', 'B', 'C'], `la condición ${c} no ofrece las tres variantes`);
-      const textos = new Set(ALCANCE_MTTO_OPC.filter((o) => o.cond === c).map((o) => o.v));
-      assert.equal(textos.size, 3, 'dos variantes de la misma banda son el mismo texto');
+      const banda = ALCANCE_MTTO_OPC.filter((o) => o.cond === c);
+      const ks = banda.map((o) => (o.t.match(/^C\d·([A-E])/) || [])[1]);
+      assert.deepEqual(ks, ['A', 'B', 'C', 'D', 'E'], `la condición ${c} no ofrece las cinco variantes`);
+      const escritas = banda.filter((o) => o.v);
+      assert.equal(escritas.length, 4, `la condición ${c} debe tener cuatro redacciones escritas`);
+      assert.equal(new Set(escritas.map((o) => o.v)).size, 4, 'dos variantes de la misma banda son el mismo texto');
+      const e = banda[4];
+      assert.equal(e.auto, 'alcance_mtto', `C${c}·E debe ser la automática anclada en datos medidos`);
+      assert.ok(!e.v, 'la automática no lleva plantilla: la compone el dominio');
+    }
+  });
+
+  // 🔒 La D del encargo del 2026-09-10: CONSERVACIÓN DEL ACTIVO. Lleva la cadena
+  // que pidió el Ingeniero en las cinco, y la afirmación de riesgo solo donde
+  // es cierta: decir que una banda FAVORABLE «coloca en riesgo de falla» sería
+  // falso en un documento que se firma.
+  test('la D de cada banda argumenta la conservación con la cadena del Ingeniero', () => {
+    for (const c of [1, 2, 3, 4, 5]) {
+      const d = ALCANCE_MTTO_OPC.find((o) => o.cond === c && /^C\d·D/.test(o.t));
+      assert.ok(d && d.v, `falta C${c}·D`);
+      assert.match(d.v, /conserva/i);
+      assert.match(d.v, /usuarios asociados a la instalación/);
+      assert.match(d.v, /SAIDI y SAIFI/);
+      assert.match(d.v, /reputación|imagen corporativa/);
+      assert.match(d.v, /indisponib|disponibilidad/);
+      assert.match(d.v, /CREG 015 de 2018/);
+    }
+  });
+
+  test('la D solo AFIRMA riesgo de falla en las bandas donde es cierto', () => {
+    const d = (c) => ALCANCE_MTTO_OPC.find((o) => o.cond === c && /^C\d·D/.test(o.t)).v;
+    for (const c of [3, 4, 5]) {
+      assert.match(d(c), /coloca en riesgo de falla|mayor probabilidad de falla/, `C${c}·D debe declarar el riesgo`);
+    }
+    for (const c of [1, 2]) {
+      assert.doesNotMatch(d(c), /(?:^|[.;]\s*)(?:La condición[^.]{0,60})?(?:ya )?lo coloca en riesgo de falla/,
+        `C${c}·D afirma riesgo en una banda favorable`);
+      assert.match(d(c), /preserv|sostener la condición favorable/, `C${c}·D debe argumentar PRESERVAR`);
+    }
+  });
+
+  test('la D no inventa cifras regulatorias: ni montos, ni porcentajes, ni artículos', () => {
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => /^C\d·D/.test(x.t))) {
+      assert.doesNotMatch(o.v, /\$|\d+\s?%|art[íi]culo|SMMLV|compensaci[óo]n de/i, `«${o.t}» afirma una cifra regulatoria`);
     }
   });
 
@@ -101,7 +141,7 @@ describe('Catálogos de redacción — uno por documento', () => {
       assert.ok(o.t.length <= 42, `etiqueta demasiado larga para un desplegable: «${o.t}»`);
     }
     for (const o of ALCANCE_MTTO_OPC.filter((x) => x.cond != null)) {
-      assert.match(o.t, /^C[1-5]·[ABC] · /, `«${o.t}» no dice su banda y variante`);
+      assert.match(o.t, /^C[1-5]·[A-E] · /, `«${o.t}» no dice su banda y variante`);
     }
   });
 
@@ -157,7 +197,7 @@ describe('Catálogos de redacción — uno por documento', () => {
 
   test('la condición 5 remite la decisión al PI en lugar de tomarla', () => {
     const a5 = ALCANCE_MTTO_OPC.filter((o) => o.cond === 5);
-    assert.equal(a5.length, 3);
+    assert.equal(a5.length, 5);
     assert.ok(a5.some((o) => /propuesta a Plan de Inversión/i.test(o.v)),
       'alguna de las tres debe nombrar el documento al que se remite la decisión');
     for (const o of escritas.filter((x) => x.cond === 5)) {
