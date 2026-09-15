@@ -2938,3 +2938,25 @@ producción** (5 D, 5 E). CI y Deploy en verde.
 insertar opciones se corre; pero ese estado vive en un `Map` en memoria que no se persiste en ninguna
 parte (grep en todo `assets/js`), así que ninguna ficha ya elaborada cambia de redacción. Crudo →
 bóveda `2026-09-15-conservacion-del-activo/`.
+
+**75.15 La matriz de riesgo muestra todos sus colores y ENCIERRA al activo (2026-09-15).** Encargo
+sobre la hoja «Salud y riesgo»: *«aquí me gustaría que se aprecien todos los colores y encierres el
+activo conforme a su estado de salud en la matriz de riesgo»*. **Revierte por decisión suya** lo que
+`§74.17` había fijado —«una sola casilla encendida: la de este equipo»—: la posición de un activo se
+lee mejor contra el mapa completo. Siguen sin conteos de flota, que son de Analítica.
+
+**Solución.** Las 25 casillas en el color de la MO.00418 Tabla 11, desde `colorCelda` +
+`COLORES_CELDA` —los mismos que la matriz gerencial: no hay tercera paleta—. El equipo **encerrado**
+(marco oscuro por fuera, anillo blanco por dentro: se distingue sobre cualquiera de los cuatro colores)
+y una leyenda con las palabras del KPI «Veredicto de riesgo».
+
+**La trampa de impresión.** La hoja se imprime y Chrome **no imprime fondos** por defecto: sin
+`print-color-adjust: exact` la matriz salía **en blanco en el PDF** del documento que se firma. → L-89.
+
+**Defecto previo cazado de paso.** La leyenda de la matriz **gerencial** usaba `<i>` sin tamaño: sus
+cuatro muestras medían **0×0** —«Verde (OK)» sin ningún verde—. Medido en vivo y arreglado con la clase
+`ftm-sw2` que ya existía.
+
+**Verificación**: 1646 pass, lint limpio, preview FIEL (25 casillas iguales a la Tabla 11, cero grises,
+equipo encerrado en su fila, impresión exacta, ambas leyendas con color) y **servido en producción**.
+Sin prueba unitaria: la hoja es un render dentro de `montarPanelFichas`.
