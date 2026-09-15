@@ -2903,3 +2903,38 @@ producción. CI y Deploy en verde.
 **Verificado sano / no re-auditar**: si el activo no presenta ninguna condición el texto queda
 exactamente como estaba (prueba con diagnóstico sano) · el cierre se escribe UNA vez · el orden
 condiciones→actividades está fijado con prueba.
+
+**75.14 Cinco redacciones por condición, con CONSERVACIÓN DEL ACTIVO (2026-09-15).** Encargo, sobre
+el desplegable del alcance: *«me gustaría que aquí aparezcan 5 opciones y una de ellas sea pensando en
+conservar el activo teniendo en cuenta que la condición actual coloca en riesgo de falla el activo y
+afectación a los usuarios asociados a la instalación e impacto negativo a la imagen corporativa de la
+compañía, afectación de indicadores de calidad e indisponibilidad o regulatorios»*. Para la quinta
+eligió **la automática, dentro de cada banda**.
+
+**Solución.** Cada banda pasa de 3 a 5 en `ALCANCE_MTTO_OPC`: A · trabajo · B · evidencia · C ·
+operación y riesgo · **D · Conservación del activo** (nueva) · **E · la automática** (antes suelta al
+final). La D la escribieron 5 escritores → 5 revisores de dominio (30 correcciones) → 1 juez de
+coherencia. Lleva la cadena del Ingeniero en las cinco: riesgo de falla → usuarios asociados a la
+instalación → reputación de la empresa → SAIDI/SAIFI e indisponibilidad → esquema de calidad de la
+Resolución CREG 015 de 2018.
+
+**La trampa del encargo literal.** «La condición actual coloca en riesgo de falla» es **falso en C1 y
+C2**, que son bandas favorables. Ahí la D argumenta **preservar** la condición para que el activo no
+entre en riesgo; la afirmación de riesgo queda solo en C3-C5, con prueba. Además: ni montos, ni
+porcentajes, ni artículos regulatorios (prueba); nada de inversión, y en C5 conservar es sostener hasta
+la salida con la decisión remitida al PI. El juez retiró los «sellos» —la coletilla de irreversibilidad
+idéntica en las cinco— y matizó C3/C4 («según el respaldo disponible», «de materializarse») para no
+afirmar un corte seguro que el índice no puede sostener.
+
+**Dos cuidados de UI.** La automática suelta **no se borró** (§3.2): la necesita el equipo sin
+condición; solo se oculta cuando la banda del equipo ya trae su E. Y **beneficios** usa el mismo
+selector sin automática en sus bandas: ahí la suelta sigue visible — verificado en vivo.
+
+**Verificación**: 1646 pass / 0 fail / 2 skip, lint limpio, preview FIEL (cinco por banda; D y E generan
+texto; beneficios y el equipo sin condición conservan su automática) y comprobado **servido en
+producción** (5 D, 5 E). CI y Deploy en verde.
+
+**Verificado sano / no re-auditar**: el documento guarda la **posición** de la redacción (`_ver`) y al
+insertar opciones se corre; pero ese estado vive en un `Map` en memoria que no se persiste en ninguna
+parte (grep en todo `assets/js`), así que ninguna ficha ya elaborada cambia de redacción. Crudo →
+bóveda `2026-09-15-conservacion-del-activo/`.
