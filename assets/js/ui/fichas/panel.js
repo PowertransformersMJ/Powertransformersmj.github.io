@@ -1794,9 +1794,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   '<span class="ftm-sr-kpi-l">' + lbl + '</span>'
       + '</div>';
 
-    // Matriz 5×5 con la casilla del equipo marcada. Las demás quedan en gris:
-    // aquí no interesa el reparto de la flota —eso ya está en Analítica— sino
-    // DÓNDE cae ESTE activo.
+    // Matriz 5×5 con TODAS sus casillas en el color de la MO.00418 Tabla 11 y la
+    // del equipo ENCERRADA. Antes las demás iban en gris («aquí la pregunta es
+    // dónde cae ESTE activo», `99 §74.17`); el Ingeniero pidió verlas todas
+    // (2026-09-15): la posición de un activo solo se lee bien contra el mapa
+    // completo —qué tan lejos está del naranja, qué tan cerca del rojo—. Siguen
+    // sin conteos de flota: eso sigue siendo de Analítica. Los colores salen de
+    // `colorCelda` + `COLORES_CELDA`, los mismos que pintan la matriz gerencial:
+    // no hay una tercera paleta.
     const cabecera = '<tr><th class="ftm-rmx-corner">Probabilidad de falla (condición) ↓ '
       + '/ Consecuencia (usuarios) →</th>'
       + NIVELES_ORDEN.map((n, i) => '<th>' + (i + 1) + ' · ' + esc(LABELS_NIVEL[n]) + '</th>').join('')
@@ -1807,11 +1812,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const tds = NIVELES_ORDEN.map((n) => {
         const aqui = (f === hi && n === nivel);
         const c = colorCelda(f, n);
-        const bg = aqui ? (hexDe(c) || '#e9eef4') : '#f3f6f9';
-        const tinta = aqui ? (c === 'AMRL' ? '#10202c' : '#fff') : '#c3ced9';
+        const bg = hexDe(c) || '#e9eef4';
+        // El amarillo es claro: la tinta oscura es la que se lee encima.
+        const tinta = c === 'AMRL' ? '#10202c' : '#fff';
         return '<td class="ftm-sr-cell' + (aqui ? ' is-aqui' : '') + '"'
-          + ' style="background:' + bg + ';color:' + tinta + '">'
-          + (aqui ? '<span class="ftm-sr-aqui">ESTE EQUIPO</span>' : '·')
+          + ' style="background:' + bg + ';color:' + tinta + '"'
+          + ' title="Condición ' + f + ' × consecuencia ' + esc(LABELS_NIVEL[n]) + ': '
+          + esc(VEREDICTO[c] || c) + '"'
+          + (aqui ? ' aria-current="true"' : '') + '>'
+          + (aqui ? '<span class="ftm-sr-aqui">ESTE EQUIPO</span>' : '')
           + '</td>';
       }).join('');
       return '<tr><th class="ftm-rmx-ry" title="' + esc(definicionCondicion(f)) + '">'
@@ -1846,9 +1855,18 @@ export function montarPanelFichas(contenedor, opciones = {}) {
             + ': sin ese dato no hay posición que mostrar, y una casilla marcada al azar '
             + 'sería peor que ninguna.</div>'
           : '')
-      +   '<div class="ftm-rmx-wrap"><table class="ftm-rmx">'
+      +   '<div class="ftm-rmx-wrap"><table class="ftm-rmx ftm-sr-rmx">'
       +     '<thead>' + cabecera + '</thead><tbody>' + filas + '</tbody>'
       +   '</table></div>'
+      // Leyenda: el color sin su significado obliga a adivinar. Mismas palabras
+      // que el KPI «Veredicto de riesgo», y el recuadro explicado.
+      +   '<div class="ftm-rmx-scale ftm-sr-leyenda">'
+      +     Object.keys(COLORES_CELDA).map((k) => '<span class="ftm-rmx-sc">'
+            + '<i class="ftm-sw2" style="background:' + hexDe(k) + '"></i>'
+            + esc(VEREDICTO[k] || k) + '</span>').join('')
+      +     (sinDato ? '' : '<span class="ftm-rmx-sc"><i class="ftm-sw2 ftm-sr-marco-muestra"></i>'
+            + 'Recuadro: posición de este equipo</span>')
+      +   '</div>'
       +   '<p class="ftm-mini-src">La consecuencia se mide por usuarios aguas abajo, en cinco '
       +   'rangos calculados sobre TODO el parque: por eso este equipo cae en la misma casilla '
       +   'aquí y en la matriz de Analítica gerencial.</p>'
