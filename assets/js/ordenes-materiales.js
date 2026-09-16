@@ -45,6 +45,14 @@ import {
   claveDe, normalizarNumero, problemaNumero, candidatasDeSubida, situacionDeSubida,
   seleccionadaPorDefecto, siguienteNumeroLibre, huella, esDelRegistro, llaveDeMarca
 } from './domain/ordenes_registro.js';
+// Cédulas de los responsables (99 §78): viven en Firestore, NUNCA en este
+// archivo (repositorio público). La capa de datos se carga con import()
+// dinámico: si falla, solo se apagan las cédulas.
+import {
+  nombresDeOrden, aplicarCedulas, faltantes, sinCedulas, traeCedulas,
+  paresDeArchivo, idDeResponsable, normalizarCedula, problemaCedula, enmascarar,
+  pareceDatoPersonal, esHojaDeOrdenExportada
+} from './domain/responsables_ordenes.js';
 
 const CONFIG = {
 
@@ -1366,7 +1374,7 @@ const LOCAL = {
       const k = this.claveDeLocal(o) + '|' + huella(o);
       if (conocidas.has(k)) return;
       conocidas.add(k);
-      this.pendientes.push(o);
+      this.pendientes.push(sinCedulas(o));     // una copia vieja puede traer cédulas (99 §78)
       nuevas++;
     });
     if (nuevas) LS.escribir(LS.PENDIENTES, this.pendientes);
@@ -1376,7 +1384,7 @@ const LOCAL = {
   agregarPendiente(o) {
     const clave = this.claveDeLocal(o);
     this.pendientes = this.pendientes.filter(p => !clave || this.claveDeLocal(p) !== clave);
-    this.pendientes.unshift(o);
+    this.pendientes.unshift(sinCedulas(o));
     LS.escribir(LS.PENDIENTES, this.pendientes);
   },
 
@@ -2002,6 +2010,361 @@ function cerrarSubida() {
   pintarSubida(); pintarPendientes();
 }
 
+/* ==========================================================================
+   CÉDULAS DE LOS RESPONSABLES (99 §78)
+   --------------------------------------------------------------------------
+   · Se leen del directorio privado (`responsables_ordenes`) JUSTO al generar
+     la vista previa, el PDF o el Excel, y solo las de las personas de ESA
+     orden. No se guardan en ningún lado: la orden (borrador, pendientes,
+     registro, copias) nunca lleva cédula.
+   · Si falta alguna, el PDF y el Excel lo preguntan nombrando a la persona;
+     nunca sale un documento en blanco sin que nadie lo sepa.
+   · El editor es solo para el administrador y nunca muestra la cédula
+     completa: la pista «•••123». Los números se escriben o se importan desde
+     un archivo local que el navegador lee sin subirlo.
+   ========================================================================== */
+
+/** Tope para descargar el módulo de cédulas Y leerlas: la capa nunca se queda pegada. */
+const ESPERA_CEDULAS_MS = 8000;
+
+let _modResponsables = null;
+/** Capa de datos de cédulas, cargada bajo demanda. Si falla, lanza. */
+async function modResponsables() {
+  if (!_modResponsables) {
+    _modResponsables = import('./data/responsables_ordenes.js').catch(e => { _modResponsables = null; throw e; });
+  }
+  return _modResponsables;
+}
+
+function motivoSinCedulas(e) {
+  const cod = e && e.codigo;
+  if (cod === 'permiso') return 'su usuario no tiene acceso al directorio';
+  if (cod === 'sin-sesion') return 'no hay sesión activa';
+  if (cod === 'red' || cod === 'tiempo') return 'no hubo conexión para consultarlas';
+  return 'no se pudo consultar el directorio';
+}
+
+/**
+ * Copia de la orden con las cédulas del directorio, para imprimir. Con
+ * `preguntar`, si falta alguna pide confirmación nombrando a la persona y
+ * devuelve null si el usuario prefiere no generar.
+ */
+async function ordenParaImprimir(orden, { preguntar }) {
+  const nombres = nombresDeOrden(orden);
+  let mapa = new Map();
+  let motivo = '';
+  if (nombres.length) {
+    if (!getSession()) {
+      motivo = 'no hay sesión activa';
+    } else {
+      // Solo se cierra la capa de carga si la abrió esta consulta: otra operación
+      // (guardar, exportar el histórico) puede tenerla abierta.
+      const yaAbierta = !!($('#cargando') && $('#cargando').classList.contains('ver'));
+      if (!yaAbierta) cargando(true, 'Consultando las cédulas…');
+      let reloj;
+      try {
+        const limite = new Promise((_, rej) => {
+          reloj = setTimeout(() => rej({ codigo: 'tiempo' }), ESPERA_CEDULAS_MS);
+        });
+        mapa = await Promise.race([modResponsables().then(m => m.cedulasPara(nombres)), limite]);
+      } catch (e) {
+        console.warn('[ordenes-materiales] cédulas no disponibles:', (e && e.codigo) || e);
+        motivo = motivoSinCedulas(e);
+      } finally {
+        clearTimeout(reloj);
+        if (!yaAbierta) cargando(false);
+      }
+    }
+  }
+  const falta = faltantes(orden, mapa);
+  pintarEstadoCedulas(falta, motivo);
+  if (falta.length) {
+    const texto = `Este documento saldrá sin la cédula de: ${falta.join(', ')} ` +
+      `(${motivo || 'no está registrada en el directorio'}).`;
+    if (preguntar) {
+      if (!confirm(texto + '\n\n¿Generarlo así, con la cédula en blanco?')) return null;
+    } else {
+      aviso(texto, 'warn', 8000);
+    }
+  }
+  return aplicarCedulas(orden, mapa);
+}
+
+function pintarEstadoCedulas(falta, motivo) {
+  const el = $('#estadoCedulas');
+  if (!el) return;
+  if (!falta || !falta.length) {
+    el.textContent = 'La cédula de cada responsable se toma del directorio privado del equipo al generar ' +
+      'el documento (nunca se guarda con la orden).';
+    return;
+  }
+  el.textContent = `En el último documento faltó la cédula de: ${falta.join(', ')} ` +
+    `(${motivo || 'no está registrada en el directorio'}).`;
+}
+
+/**
+ * Limpieza única al abrir: si algo guardado en el navegador trae cédulas (una
+ * copia importada de la versión suelta del módulo), se vacían. La huella de
+ * las órdenes no cambia (`aDocumento` ya las ignoraba).
+ */
+function limpiarCedulasLocales() {
+  try {
+    const b = LS.leer(LS.BORRADOR, null);
+    if (b && traeCedulas(b)) LS.escribir(LS.BORRADOR, sinCedulas(b));
+    [LS.PENDIENTES, LS.ORDENES].forEach(k => {
+      const lista = LS.leer(k, null);
+      if (Array.isArray(lista) && lista.some(traeCedulas)) LS.escribir(k, lista.map(sinCedulas));
+    });
+    const l = LS.leer(LS.LISTAS, null);
+    if (l && typeof l === 'object') {
+      const mat = Array.isArray(l.materiales) ? l.materiales : [];
+      const od = Array.isArray(l.origenDestino) ? l.origenDestino : [];
+      const matL = mat.filter(m => !pareceDatoPersonal(m && m.descripcion));
+      const odL = od.filter(v => !pareceDatoPersonal(v));
+      if (matL.length !== mat.length || odL.length !== od.length) {
+        LS.escribir(LS.LISTAS, Object.assign({}, l, { materiales: matL, origenDestino: odL }));
+      }
+    }
+  } catch (e) { console.warn('[ordenes-materiales] no se pudo revisar el almacenamiento local:', e); }
+}
+
+/* ------------------------ Editor del administrador ---------------------- */
+
+const EDITOR_CED = { directorio: null, estado: 'cerrado', importadas: null, guardando: false };
+
+function personasDelFormato() {
+  const vistos = new Set();
+  return [CONFIG.autorizadoPor].concat(CONFIG.entregadoPor, CONFIG.recibidoPor)
+    .map(p => String((p && p.nombre) || '').trim())
+    .filter(n => n && !vistos.has(n) && vistos.add(n));
+}
+
+function hoyISO() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** Muestra el editor solo a un administrador (el HTML lo trae oculto). */
+function prepararEditorCedulas() {
+  const panel = $('#panelCedulas');
+  if (!panel) return;
+  panel.hidden = !esAdminDeSesion();
+}
+
+async function cargarEditorCedulas() {
+  if (!esAdminDeSesion()) return;
+  EDITOR_CED.estado = 'cargando';
+  pintarEditorCedulas();
+  try {
+    const m = await modResponsables();
+    const lista = await m.listarParaEditor();
+    EDITOR_CED.directorio = new Map(lista.map(x => [x.nombre, x]));
+    EDITOR_CED.estado = 'ok';
+  } catch (e) {
+    EDITOR_CED.estado = 'error';
+    EDITOR_CED.error = motivoSinCedulas(e);
+  }
+  pintarEditorCedulas();
+}
+
+function autorizacionDelEditor() {
+  const ok = $('#cedAutorizo') && $('#cedAutorizo').checked;
+  const medio = (($('#cedMedio') || {}).value || '').trim();
+  const fecha = ($('#cedFecha') || {}).value || '';
+  if (!ok || medio.length < 3 || !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) return null;
+  return { fecha, medio };
+}
+
+function pintarEditorCedulas(progreso) {
+  const cont = $('#editorCedulas');
+  if (!cont) return;
+  if (EDITOR_CED.estado === 'cargando') { cont.innerHTML = '<p class="sin-datos">Cargando el directorio…</p>'; return; }
+  if (EDITOR_CED.estado === 'error') {
+    cont.innerHTML = `<div class="oms-aviso ver err">No se pudo leer el directorio: ${esc(EDITOR_CED.error)}. ` +
+      '<button type="button" class="oms-btn mini" data-ced="recargar">Reintentar</button></div>';
+    return;
+  }
+  if (EDITOR_CED.estado !== 'ok') { cont.replaceChildren(); return; }
+
+  const dir = EDITOR_CED.directorio;
+  const formato = personasDelFormato();
+  const huerfanas = Array.from(dir.keys()).filter(n => !formato.includes(n));
+  const bloqueo = EDITOR_CED.guardando ? ' disabled' : '';
+  // Conserva lo que el admin ya había escrito en la declaración al repintar.
+  const medio = (($('#cedMedio') || {}).value) || '';
+  const fecha = (($('#cedFecha') || {}).value) || hoyISO();
+  const autorizo = !!($('#cedAutorizo') && $('#cedAutorizo').checked);
+  const conCedula = formato.filter(n => dir.has(n)).length;
+
+  const fila = (nombre, enFormato) => {
+    const x = dir.get(nombre);
+    const id = idDeResponsable(nombre);
+    return `<tr>
+      <td>${esc(nombre)}${enFormato ? '' : ' <span class="pend">ya no está en el formato</span>'}</td>
+      <td>${x ? esc(x.pista) : '<span class="sin-datos">sin cédula</span>'}</td>
+      <td>${enFormato && id
+        ? `<input type="text" inputmode="numeric" autocomplete="off" spellcheck="false" maxlength="16"
+             class="ced-nueva" data-ced-input="${esc(nombre)}" aria-label="Nueva cédula de ${esc(nombre)}"${bloqueo}>`
+        : ''}</td>
+      <td class="acciones">
+        ${enFormato && id ? `<button type="button" class="oms-btn mini" data-ced="guardar" data-nombre="${esc(nombre)}"${bloqueo}>Guardar</button>` : ''}
+        ${x ? `<button type="button" class="oms-btn mini peligro" data-ced="quitar" data-nombre="${esc(nombre)}"${bloqueo}>Quitar</button>` : ''}
+      </td></tr>`;
+  };
+
+  const imp = EDITOR_CED.importadas;
+  cont.innerHTML = `
+    <p class="parrafo">Las cédulas se imprimen en el formato, pero <b>no viven en esta página</b>: están en el
+      directorio privado del equipo. Aquí solo se ve la terminación. <b>${conCedula} de ${formato.length}</b>
+      responsables tienen cédula.</p>
+    <div class="ced-autorizacion">
+      <label class="interruptor"><input type="checkbox" id="cedAutorizo"${autorizo ? ' checked' : ''}>
+        <span class="palanca" aria-hidden="true"></span>
+        <span>Confirmo que cada persona sabe y autorizó que su cédula se use para imprimir la orden IT.05801 (Ley 1581 de 2012).</span></label>
+      <div class="fila-ced">
+        <label>¿Cómo lo autorizó? <input type="text" id="cedMedio" maxlength="120" value="${esc(medio)}" placeholder="Ej.: correo del 16-09-2026"></label>
+        <label>Fecha <input type="date" id="cedFecha" value="${esc(fecha)}"></label>
+      </div>
+    </div>
+    <div class="desliza"><table class="tabla-ced">
+      <thead><tr><th>Responsable</th><th>Cédula actual</th><th>Nueva cédula</th><th></th></tr></thead>
+      <tbody>${formato.map(n => fila(n, true)).join('')}${huerfanas.map(n => fila(n, false)).join('')}</tbody>
+    </table></div>
+    <div class="fila-botones">
+      <label class="oms-btn" for="archivoCedulas">Importar desde un archivo…</label>
+      <input type="file" id="archivoCedulas" accept=".html,.htm,.json,.csv,.txt" hidden>
+      <span class="ayuda">El archivo se lee en este navegador y no se sube a ningún lado.</span>
+    </div>
+    ${progreso ? `<p class="progreso">${esc(progreso)}</p>` : ''}
+    ${imp ? pintarImportacionCedulas(imp, dir, bloqueo) : ''}`;
+}
+
+function pintarImportacionCedulas(imp, dir, bloqueo) {
+  if (!imp.length) {
+    return '<div class="oms-aviso ver warn">El archivo no trae pares de nombre y cédula reconocibles.</div>';
+  }
+  const marcadas = imp.filter(p => p.sel).length;
+  return `<h3 class="sub-titulo">Revise antes de guardar</h3>
+    <p class="parrafo">Compare cada nombre y la terminación con su archivo. Solo se guardan las marcadas.</p>
+    <div class="desliza"><table class="tabla-ced">
+      <thead><tr><th></th><th>Nombre en el archivo</th><th>Termina en</th><th>Situación</th></tr></thead>
+      <tbody>${imp.map((p, i) => {
+        const x = dir.get(p.nombre);
+        const situacion = p.hecha ? p.hecha
+          : p.problema ? p.problema
+          : !p.enLista ? 'No está entre los responsables del formato: no se guarda.'
+          : x ? (x.pista === enmascarar(p.cedula) ? `Ya tiene una cédula que termina igual (${x.pista}).` : `Reemplaza la actual (${x.pista}).`)
+          : 'Nueva.';
+        const marcable = p.enLista && !p.problema && !p.hecha;
+        return `<tr><td>${marcable ? `<input type="checkbox" data-ced-sel="${i}"${p.sel ? ' checked' : ''}${bloqueo} aria-label="Guardar ${esc(p.nombre)}">` : ''}</td>
+          <td>${esc(p.nombre)}</td><td>${esc(enmascarar(p.cedula))}</td><td>${esc(situacion)}</td></tr>`;
+      }).join('')}</tbody></table></div>
+    <div class="fila-botones">
+      <button type="button" class="oms-btn primario" data-ced="guardar-importadas"${bloqueo}>Guardar marcadas (${marcadas})</button>
+      <button type="button" class="oms-btn" data-ced="descartar-importadas"${bloqueo}>Descartar el archivo</button>
+    </div>`;
+}
+
+/** «•123»: suficiente para `enmascarar` y ya no es una cédula. */
+function enmascararEnMemoria(c) {
+  const d = normalizarCedula(c);
+  return d ? '•' + d.slice(-3) : '';
+}
+
+/** Olvida los números del archivo importado (quedan las pistas y lo informado). */
+function olvidarImportadas() {
+  (EDITOR_CED.importadas || []).forEach(p => {
+    if (!p.hecha && p.enLista && !p.problema) p.hecha = 'No se guardó: vuelva a importar el archivo si la necesita.';
+    p.cedula = enmascararEnMemoria(p.cedula);
+    p.sel = false;
+  });
+}
+
+function leerArchivoCedulas(file) {
+  if (!file || EDITOR_CED.guardando) return;
+  const lector = new FileReader();
+  lector.onerror = () => aviso('No se pudo leer el archivo.', 'err');
+  lector.onload = ev => {
+    const pares = paresDeArchivo(String(ev.target.result || ''), personasDelFormato());
+    // Solo se retiene el número de quien SÍ se puede guardar; del resto, la pista.
+    EDITOR_CED.importadas = pares.map(p => {
+      const guardable = p.enLista && !p.problema;
+      return Object.assign(p, { sel: guardable, cedula: guardable ? p.cedula : enmascararEnMemoria(p.cedula) });
+    });
+    pintarEditorCedulas();
+  };
+  lector.readAsText(file);
+}
+
+async function guardarUnaCedula(nombre) {
+  const input = $$('#editorCedulas [data-ced-input]').find(el => el.dataset.cedInput === nombre);
+  const cedula = normalizarCedula(input ? input.value : '');
+  const problema = problemaCedula(cedula);
+  if (problema) { aviso(`${nombre}: ${problema}`, 'err', 7000); return; }
+  const autorizacion = autorizacionDelEditor();
+  if (!autorizacion) { aviso('Marque la confirmación de autorización y diga cómo y cuándo se dio.', 'err', 8000); return; }
+  const x = EDITOR_CED.directorio.get(nombre);
+  EDITOR_CED.guardando = true; pintarEditorCedulas('Guardando…');
+  try {
+    const m = await modResponsables();
+    const r = await m.guardarCedula({ nombre, cedula, autorizacion, pistaAnterior: x && x.pista });
+    EDITOR_CED.directorio.set(nombre, { nombre, pista: r.pista, autorizacion });
+    aviso(`Cédula de ${nombre} guardada (${r.pista}).`, 'ok');
+  } catch (e) {
+    aviso(`No se guardó la cédula de ${nombre}: ${e.message}`, 'err', 9000);
+  } finally {
+    EDITOR_CED.guardando = false;
+    pintarEditorCedulas();          // repinta con los campos vacíos: el número no queda en la página
+  }
+}
+
+async function quitarUnaCedula(nombre) {
+  const x = EDITOR_CED.directorio.get(nombre);
+  if (!x) return;
+  if (!confirm(`¿Quitar la cédula de ${nombre} (${x.pista})?\n\nDesde ya, sus documentos saldrán con la cédula en blanco.`)) return;
+  EDITOR_CED.guardando = true; pintarEditorCedulas('Quitando…');
+  try {
+    const m = await modResponsables();
+    await m.quitarCedula(nombre, x.pista);
+    EDITOR_CED.directorio.delete(nombre);
+    aviso(`Cédula de ${nombre} retirada.`, 'ok');
+  } catch (e) {
+    aviso(`No se pudo quitar la cédula de ${nombre}: ${e.message}`, 'err', 9000);
+  } finally {
+    EDITOR_CED.guardando = false;
+    pintarEditorCedulas();
+  }
+}
+
+async function guardarImportadas() {
+  const marcadas = (EDITOR_CED.importadas || []).filter(p => p.sel && p.enLista && !p.problema && !p.hecha);
+  if (!marcadas.length) { aviso('No hay cédulas marcadas para guardar.', 'warn'); return; }
+  const autorizacion = autorizacionDelEditor();
+  if (!autorizacion) { aviso('Marque la confirmación de autorización y diga cómo y cuándo se dio.', 'err', 8000); return; }
+  if (EDITOR_CED.guardando) return;
+  EDITOR_CED.guardando = true;
+  let ok = 0, fallas = 0;
+  const m = await modResponsables().catch(() => null);
+  for (let i = 0; i < marcadas.length; i++) {
+    const p = marcadas[i];
+    pintarEditorCedulas(`Guardando ${i + 1} de ${marcadas.length}…`);
+    try {
+      if (!m) throw new Error('no se pudo cargar el directorio');
+      const x = EDITOR_CED.directorio.get(p.nombre);
+      const r = await m.guardarCedula({ nombre: p.nombre, cedula: p.cedula, autorizacion, pistaAnterior: x && x.pista });
+      EDITOR_CED.directorio.set(p.nombre, { nombre: p.nombre, pista: r.pista, autorizacion });
+      p.hecha = `Guardada (${r.pista}).`; ok++;
+    } catch (e) {
+      p.hecha = `No se guardó: ${e.message}`; fallas++;
+    }
+  }
+  // Los números del archivo no se quedan en la página: solo lo que se informó.
+  olvidarImportadas();
+  EDITOR_CED.guardando = false;
+  pintarEditorCedulas();
+  aviso(`Cédulas guardadas: ${ok}` + (fallas ? ` · sin guardar: ${fallas}` : '') + '.', fallas ? 'warn' : 'ok', 8000);
+}
+
 /* ------------------------ Nueva orden / limpiar ------------------------ */
 
 function formularioTieneDatos() {
@@ -2372,11 +2735,19 @@ function paginaASVG(prims) {
 
 /* ---------------------------- Modal ------------------------------------ */
 
-function abrirVistaPrevia(ordenOpcional) {
-  const o = ordenOpcional || leerOrden();
+/** Orden que muestra la vista previa: la del formulario (null) o una del registro.
+ *  `turno` descarta un pintado que llega tarde (se cerró o se pidió otra). */
+const VISTA = { orden: null, turno: 0 };
+
+async function abrirVistaPrevia(ordenOpcional) {
+  const base = ordenOpcional || leerOrden();
   const v = ordenOpcional ? { ok: true, errores: [] } : validar();
   if (!v.ok) { mostrarErrores(v.errores); return; }
+  const turno = ++VISTA.turno;
 
+  const o = await ordenParaImprimir(base, { preguntar: false });
+  if (turno !== VISTA.turno) return;
+  VISTA.orden = ordenOpcional || null;
   const paginas = construirPaginas(o);
   $('#cuerpoVista').innerHTML = paginas
     .map(p => `<div class="envoltura-hoja">${paginaASVG(p)}</div>`).join('');
@@ -2391,6 +2762,11 @@ function abrirVistaPrevia(ordenOpcional) {
 }
 
 function cerrarVistaPrevia() {
+  VISTA.orden = null;
+  VISTA.turno++;
+  // El documento pintado lleva cédulas: no se deja en la página (la hoja de
+  // impresión muestra los modales aunque estén cerrados).
+  $('#cuerpoVista').replaceChildren();
   $('#modalVista').classList.remove('ver');
   document.body.style.overflow = '';
 }
@@ -2421,10 +2797,10 @@ function ajustarZoom(delta) {
    vectoriales, por lo que la calidad de impresión es independiente del zoom.
    ========================================================================== */
 
-function exportarPDF(ordenOpcional, soloDevolver) {
+async function exportarPDF(ordenOpcional, soloDevolver) {
   // 1) Primero se valida el formulario (aunque falte la librería, el usuario
   //    debe ver qué campos obligatorios tiene pendientes).
-  const o = ordenOpcional || leerOrden();
+  let o = ordenOpcional || leerOrden();
   if (!ordenOpcional) {
     const v = validar();
     if (!v.ok) { mostrarErrores(v.errores); return null; }
@@ -2436,6 +2812,10 @@ function exportarPDF(ordenOpcional, soloDevolver) {
     aviso('La librería de PDF (jsPDF) no está disponible. Verifique su conexión a internet y recargue la página.', 'err', 8000);
     return null;
   }
+
+  // 3) Cédulas del directorio privado, solo las de esta orden (99 §78).
+  o = await ordenParaImprimir(o, { preguntar: true });
+  if (!o) return null;
 
   try {
     cargando(true, 'Generando el PDF…');
@@ -2610,9 +2990,9 @@ function marcoFila(ws, r) {
 
 /* ------------------------------ Exportación ---------------------------- */
 
-function exportarExcel(ordenOpcional) {
+async function exportarExcel(ordenOpcional) {
   // 1) Validación previa del formulario.
-  const o = ordenOpcional || leerOrden();
+  let o = ordenOpcional || leerOrden();
   if (!ordenOpcional) {
     const v = validar();
     if (!v.ok) { mostrarErrores(v.errores); return; }
@@ -2624,6 +3004,10 @@ function exportarExcel(ordenOpcional) {
     aviso('La librería de Excel (ExcelJS) no está disponible. Verifique su conexión a internet y recargue la página.', 'err', 8000);
     return;
   }
+
+  // 3) Cédulas del directorio privado, solo las de esta orden (99 §78).
+  o = await ordenParaImprimir(o, { preguntar: true });
+  if (!o) return;
 
   cargando(true, 'Generando el archivo de Excel…');
 
@@ -2933,9 +3317,11 @@ function hojaDatos(wb, o) {
       o.tipo, o.numero, o.zona, o.fecha, o.hora, o.origen, o.destino,
       i + 1, it.descripcion, it.unidad || '', Number(it.cantidad),
       o.transformador || '', o.motivo, o.nota || '',
-      o.autorizado.nombre, o.autorizado.cedula,
-      o.entregado.nombre, o.entregado.cedula,
-      o.recibido.nombre, o.recibido.cedula, o.empresaVig || ''
+      // Las cédulas van SOLO en la hoja del formato (99 §78): esta tabla es la
+      // que se filtra y se copia a otras planillas. Columnas vacías a propósito.
+      o.autorizado.nombre, '',
+      o.entregado.nombre, '',
+      o.recibido.nombre, '', o.empresaVig || ''
     ]);
     fila.eachCell(c => {
       c.font = { name: FUENTE_XLS, size: 10 };
@@ -3081,10 +3467,12 @@ function extraerDeHoja(an) {
 /** Quita duplicados conservando el primer registro. */
 function deduplicar(res) {
   const vistosOD = new Set(), od = [];
-  res.origenDestino.forEach(v => { const k = norm(v); if (k && !vistosOD.has(k)) { vistosOD.add(k); od.push(v); } });
+  // Rótulos del bloque de firmas y cédulas no son listas (99 §78), vengan de la
+  // hoja que vengan: sin este filtro quedarían en localStorage y en las copias.
+  res.origenDestino.forEach(v => { const k = norm(v); if (k && !pareceDatoPersonal(v) && !vistosOD.has(k)) { vistosOD.add(k); od.push(v); } });
 
   const vistosM = new Set(), mat = [];
-  res.materiales.forEach(m => {
+  res.materiales.filter(m => !pareceDatoPersonal(m && m.descripcion)).forEach(m => {
     const k = norm(m.grupo) + '|' + norm(m.descripcion) + '|' + norm(m.unidad);
     if (norm(m.descripcion) && !vistosM.has(k)) { vistosM.add(k); mat.push(m); }
   });
@@ -3127,6 +3515,9 @@ function procesarArchivo(file) {
       // 1) Intento automático sobre todas las hojas
       let acum = { origenDestino: [], materiales: [], detalle: [] };
       libro.SheetNames.forEach(n => {
+        // La hoja «Orden» del Excel que exporta este módulo trae el bloque de
+        // firmas con cédulas (99 §78): no es una lista.
+        if (esHojaDeOrdenExportada(n)) return;
         const r = extraerDeHoja(analizarHoja(libro, n));
         acum.origenDestino.push(...r.origenDestino);
         acum.materiales.push(...r.materiales);
@@ -4377,8 +4768,10 @@ function conectarEventos() {
 
   /* --- Modal de vista previa --- */
   $('#btnCerrarVista').onclick = cerrarVistaPrevia;
-  $('#btnExcel2').onclick = () => exportarExcel();
-  $('#btnPdf2').onclick   = () => exportarPDF();
+  // Dentro de la vista previa se exporta LO QUE SE VE: si es una orden del
+  // registro abierta con «Ver…», esa; si no, la del formulario.
+  $('#btnExcel2').onclick = () => exportarExcel(VISTA.orden || undefined);
+  $('#btnPdf2').onclick   = () => exportarPDF(VISTA.orden || undefined);
   $('#btnImprimir').onclick = () => window.print();
   $('#btnZoomMas').onclick  = () => ajustarZoom(+0.1);
   $('#btnZoomMenos').onclick = () => ajustarZoom(-0.1);
@@ -4437,6 +4830,32 @@ function conectarEventos() {
     if (!c) return;
     const f = SUBIDA.filas[Number(c.dataset.subidaSel)];
     if (f) { f.sel = c.checked; pintarSubida(); }
+  });
+  // Editor de cédulas (solo admin; el HTML lo trae oculto) — 99 §78
+  en('panelCedulas', 'toggle', () => {
+    if ($('#panelCedulas').open && EDITOR_CED.estado !== 'ok') cargarEditorCedulas();
+  });
+  en('editorCedulas', 'click', ev => {
+    const b = ev.target.closest('button[data-ced]');
+    if (!b || EDITOR_CED.guardando) return;
+    const acc = b.dataset.ced;
+    if (acc === 'guardar') guardarUnaCedula(b.dataset.nombre);
+    else if (acc === 'quitar') quitarUnaCedula(b.dataset.nombre);
+    else if (acc === 'recargar') cargarEditorCedulas();
+    else if (acc === 'guardar-importadas') guardarImportadas();
+    else if (acc === 'descartar-importadas') { EDITOR_CED.importadas = null; pintarEditorCedulas(); }
+  });
+  en('editorCedulas', 'change', ev => {
+    if (ev.target.id === 'archivoCedulas') {
+      leerArchivoCedulas(ev.target.files && ev.target.files[0]);
+      ev.target.value = '';
+      return;
+    }
+    const c = ev.target.closest('[data-ced-sel]');
+    if (c && EDITOR_CED.importadas) {
+      const pp = EDITOR_CED.importadas[Number(c.dataset.cedSel)];
+      if (pp) { pp.sel = c.checked; pintarEditorCedulas(); }
+    }
   });
   en('barraEdicion', 'click', ev => {
     if (ev.target.closest('[data-edicion="nueva"]')) convertirEnNueva();
@@ -4517,12 +4936,14 @@ function conectarEventos() {
   });
 
   /* --- Atajos de teclado --- */
+  // Con la vista previa abierta, los atajos exportan LO QUE SE VE (igual que sus botones).
+  const enVista = () => $('#modalVista').classList.contains('ver');
   document.addEventListener('keydown', ev => {
     if (!(ev.ctrlKey || ev.metaKey)) return;
     const k = ev.key.toLowerCase();
     if (k === 's')      { ev.preventDefault(); guardarOrden(); }
-    else if (k === 'p') { ev.preventDefault(); exportarPDF(); }
-    else if (k === 'e') { ev.preventDefault(); exportarExcel(); }
+    else if (k === 'p') { ev.preventDefault(); exportarPDF(enVista() ? (VISTA.orden || undefined) : undefined); }
+    else if (k === 'e') { ev.preventDefault(); exportarExcel(enVista() ? (VISTA.orden || undefined) : undefined); }
     else if (k === 'q') { ev.preventDefault(); abrirVistaPrevia(); }
     else if (k === 'i') { ev.preventDefault(); abrirIndicadores(); }
   });
@@ -4546,6 +4967,7 @@ function iniciar() {
     // Registro del equipo: llega tras la sesión (`trasSesionRegistro`). Aquí
     // solo lo propio del navegador (pendientes e histórico anterior).
     FILTROS.leer();
+    limpiarCedulasLocales();           // 99 §78: nada con cédula se queda en el navegador
     LOCAL.leer();
     estado.ordenes = [];
     pintarOrdenes();
@@ -4602,7 +5024,7 @@ else iniciar();
 // que el usuario tenga que cerrarla y volver a abrirla.
 function trasCargarFirma() {
   cargarFirmaDeLaSesion().then(() => {
-    try { if (document.getElementById('modalVista').classList.contains('ver')) abrirVistaPrevia(); } catch (_) {}
+    try { if (document.getElementById('modalVista').classList.contains('ver')) abrirVistaPrevia(VISTA.orden || undefined); } catch (_) {}
     try { llenarResponsables(); } catch (_) {}   // repinta SOLO la marca ✒ (no «con firmas»)
   });
 }
@@ -4642,6 +5064,7 @@ let registroEnCamino = false;
 function trasSesionRegistro() {
   if (registroEnCamino) return;
   registroEnCamino = true;
+  try { prepararEditorCedulas(); } catch (_) {}
   cargarRegistro(false);
 }
 if (getSession()) trasSesionRegistro();

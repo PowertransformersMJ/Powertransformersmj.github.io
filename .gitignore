@@ -93,3 +93,9 @@ docs/.boot-marker
 
 # Bancos de prueba TEMPORALES sin guard (99 §70.5, §76): nunca se suben
 _dev/zz-*
+
+# Documentos generados por Órdenes de Materiales: llevan cédulas (99 §78)
+Orden_*.pdf
+Orden_*.xlsx
+Respaldo_Ordenes_SSEE_*.json
+Ordenes_SSEE_datos.json

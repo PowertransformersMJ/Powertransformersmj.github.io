@@ -789,6 +789,42 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // ── Cédulas de los responsables de las Órdenes de Materiales (99 §78) ──
+    // El repositorio es público: las cédulas no pueden ir en el código. Aquí
+    // las lee el equipo activo UNA a UNA (get por nombre, al generar el
+    // documento); listar el directorio completo y escribir, solo el admin.
+    // El id sale del nombre (todos los espacios → «_», Ñ incluida) y la
+    // escritura exige declarar la autorización de la persona (Ley 1581).
+    // Espejo de `assets/js/domain/responsables_ordenes.js`.
+    match /responsables_ordenes/{id} {
+      allow get:  if isTeamMember();
+      allow list: if isTeamMember() && isAdmin() && request.query.limit <= 50;
+      allow create, update: if isTeamMember() && isAdmin() && hasProfile()
+                    && request.resource.data.keys().hasOnly(['nombre', 'cedula', 'autorizacion',
+                                                             'actualizadoPor', 'actualizadoEn'])
+                    && request.resource.data.keys().hasAll(['nombre', 'cedula', 'autorizacion',
+                                                            'actualizadoPor', 'actualizadoEn'])
+                    && request.resource.data.nombre is string
+                    && request.resource.data.nombre.size() <= 80
+                    && request.resource.data.nombre.matches('^[A-ZÑ]+( [A-ZÑ]+)*$')
+                    && id == request.resource.data.nombre.replace(' ', '_')
+                    && request.resource.data.cedula is string
+                    && request.resource.data.cedula.matches('^[0-9]{5,12}$')
+                    && request.resource.data.autorizacion is map
+                    && request.resource.data.autorizacion.keys().hasOnly(['fecha', 'medio'])
+                    && request.resource.data.autorizacion.fecha is string
+                    && request.resource.data.autorizacion.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+                    && request.resource.data.autorizacion.medio is string
+                    && request.resource.data.autorizacion.medio.size() >= 3
+                    && request.resource.data.autorizacion.medio.size() <= 120
+                    && request.resource.data.actualizadoPor is map
+                    && request.resource.data.actualizadoPor.keys().hasOnly(['uid', 'nombre'])
+                    && request.resource.data.actualizadoPor.uid == request.auth.uid
+                    && request.resource.data.actualizadoPor.nombre == profile().get('nombre', '')
+                    && request.resource.data.actualizadoEn == request.time;
+      allow delete: if isTeamMember() && isAdmin();
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

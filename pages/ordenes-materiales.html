@@ -300,6 +300,18 @@
                  `assets/js/ui/firma-personal.js`. -->
             <div class="campo c6" id="panelMiFirma"></div>
 
+            <!-- Cédulas (99 §78): NO viven en esta página ni en su JS (repositorio
+                 público). Se leen del directorio privado al generar el documento.
+                 El editor llega oculto y solo el JS lo muestra a un administrador. -->
+            <div class="campo c12">
+              <label>Cédulas de los responsables</label>
+              <span class="ayuda" id="estadoCedulas">La cédula de cada responsable se toma del directorio privado del equipo al generar el documento (nunca se guarda con la orden).</span>
+            </div>
+            <details class="campo c12 panel-cedulas" id="panelCedulas" hidden>
+              <summary>Directorio de cédulas <span class="etiqueta">privado · solo administrador</span></summary>
+              <div id="editorCedulas"></div>
+            </details>
+
           </div>
         </div>
       </section>

@@ -14,6 +14,19 @@
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 for d in "$HOME"/.nvm/versions/node/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 
+# 🔒 Guardia de datos personales (99 §78): corre en TODO commit, no solo en los
+# del cerebro. Bloquea si lo preparado trae una cédula registrada (huellas con
+# sal en la bóveda privada; en el repo no hay ningún número).
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/guardia-cedulas.mjs; then
+    echo ""
+    echo "❌ COMMIT BLOQUEADO: el cambio puede llevar una cédula (ver arriba)."
+    exit 1
+  fi
+else
+  echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron cédulas (99 §78)."
+fi
+
 staged=$(git diff --cached --name-only)
 echo "$staged" | grep -qE '^(CLAUDE\.md|docs/)' || exit 0   # nada del cerebro staged → no aplica
 
