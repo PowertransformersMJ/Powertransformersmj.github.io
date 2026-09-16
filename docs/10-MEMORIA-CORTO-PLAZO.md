@@ -7,8 +7,8 @@
 
 ## 🎯 Foco (2026-09-16) — ÓRDENES DE MATERIALES · registro del equipo
 
-> Qué pasó → `05` y `99 §77` (**no se repite aquí**, §G.3). Lección **L-91**.
-> ⚠️ **Abiertos**: **TODO-62** (cierre en vivo del registro) · **TODO-35/58** · **TODO-59** 🔴 · **TODO-60** 🔴 ·
+> Qué pasó → `05` y `99 §77-§78` (**no se repite aquí**, §G.3). Lecciones **L-91**, **L-93**.
+> ⚠️ **Abiertos**: **TODO-62/63** (cierre en vivo) · **TODO-35/58** · **TODO-59** 🔴 · **TODO-60** 🔴 ·
 > **TODO-55** 🔴 · **TODO-52** 🔴 · **TODO-47** 🔴 · 54 · 56 · 57 · 61 · y los fríos de la hija `11`.
 
 ### ✅ CERRADOS → `99` (`§74.16-74.24`, `§75`) · lecciones L-82..L-86
@@ -43,7 +43,8 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-62** | **Cerrar en vivo el registro de OE/OS** (`99 §77.5`): (a) con permiso del Ingeniero, orden de PRUEBA en producción: crear, editar, eliminar, ver lápida y bitácora; (b) sesión real de TÉCNICO: sin «Eliminar» en ajenas; (c) verificar la respuesta de Gemini claim por claim; (d) ¿el consecutivo es por ZONA? (la clave no la incluye). | 🟡 |
+| **TODO-62** | **Registro OE/OS en vivo** (`99 §77.5`): con permiso, orden de PRUEBA (crear, editar, eliminar); sesión de TÉCNICO; Gemini; ¿consecutivo por ZONA? | 🟡 |
+| **TODO-63** | **Cédulas (`99 §78`), las carga el Ingeniero**: sección 4 → Directorio de cédulas → autorización → «Importar desde un archivo…» (`index_6`) → «Guardar marcadas»; verificar «9 de 9» sin dígitos. ¿Rastro de lectura (Function)? Gemini. Cédula nueva → `--registrar`. | 🟡 |
 | **TODO-35/58** | **Cola de Fichas Técnicas — 31 hallazgos confirmados (`99 §75`) + lo priorizado en `§66.7` y rescatado en `§68.7`.** Los dos graves: **(a)** dos TX de la misma subestación comparten **el documento entero** (la clave sale de «CODIGO SUBESTACION»); **(b)** la carga tardía pisa lo adjuntado sin preguntar (`fijarDatos(…,{forzar:true})` salta el permiso). Luego: notas del clasificador CREG que no llegan al papel · dos vigencias de pesos sumadas (2007+2017) · el aviso de «sin guardar» no cubre la ficha · el unifilar puede pintarse sobre otro equipo · vendorizar SheetJS ≥0.20.2 (cierra G111) · partir `panel.js` y bajar `normalizarEquipo` al dominio · 11,4 KB de CSS sin emisor · el 61 % de `panel.js` sin prueba posible · `montoCOP` ✅ y las 5 verdades del documento ✅ (`§75`). ✅ **los dos catálogos, unificados** (`§75.10`, L-87). Siguiente paso posible, a su criterio: que lo marcado por defecto se derive del **hallazgo** (`modoDegradacion` ya existe) en vez de la banda — hoy C3 y C5 arrancan con el texto de reserva. | 🟡 |
 | **TODO-61** | **«Sistema de refrigeración deficiente» no tiene señal** — es una de las 5 condiciones que el Ingeniero definió (`99 §75.13`), pero el registro guarda el TIPO de refrigeración y las cantidades (ONAN/ONAF, radiadores, ventiladores, bombas), no su ESTADO. No se colgó del modo `termico` a propósito: eso es falla térmica INTERNA por etileno, otra cosa. Falta decidir de qué dato saldría: ¿una calificación propia en Salud de Activos, la termografía, o el delta de temperatura contra la carga? | 🟡 |
 | **TODO-59** | 🔴 **La nube borra la condición del Excel al registrar una muestra** (`functions/index.js:136` reescribe `salud_actual` entero). Contradice tu decisión del 09-08; el código es anterior a ella. **No es decisión, es defecto.** Solo lo dispara `admin/muestras.html`: basta con no subir muestras hasta taparlo. `99 §75`, **L-86**. | 🔴 |

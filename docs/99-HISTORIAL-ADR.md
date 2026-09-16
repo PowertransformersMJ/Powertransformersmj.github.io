@@ -3098,3 +3098,72 @@ por meta (riesgo de romper los CDN; aparte). **Abierto al Ingeniero**: ¿el cons
 clave no la incluye; si lo fuera, el choque se muestra y no se pierde nada. `nota` es texto libre y su
 placeholder sugiere «c.c.»: queda en Firestore privado del equipo, no en el repo público.
 Crudo del comité y veredicto → bóveda `2026-09-16-registro-oe-os/`.
+
+## 78. ADR — Las cédulas de los responsables se imprimen desde un directorio privado; el repositorio público nunca las ve ⟦OPUS-5⟧ (2026-09-16)
+
+> El Ingeniero pasó por el chat la cédula de un responsable para el formato IT.05801. Decisiones suyas
+> (AskUserQuestion): **directorio privado en Firebase** y **cargar las 8 de su archivo local `index_6`
+> más esa** (coincide con la que ya traía el archivo). W-11 completo: evidencia → diseño → **comité de 3**
+> (seguridad/Ley 1581, operación, ejecutor; 37 hallazgos) → veredicto → construcción → **revisión
+> adversarial de 3 con verificación independiente por hallazgo** (23 hallazgos, 22 confirmados, todos
+> resueltos) → emulador → banco → despliegue → vivo. Prompt de Gemini entregado (**NO revisado externamente aún**).
+
+**78.1 Causa raíz.** Desde `§70` el documento sale con «CÉDULA:» vacío: el guard esconde la página, no el
+JS, y el repo es público. La cédula es un dato que el formato exige pero que no puede vivir en el código.
+Y dos veces (`§70.4`, `§76.3`) un saneado contra la FORMA dejó pasar el DATO (L-75, L-90): sin un candado
+determinista, «nunca en el repo» dependía de la memoria.
+
+**78.2 Solución.** `responsables_ordenes/{NOMBRE_CON_GUIONES}` {nombre, cedula (dígitos), autorizacion
+{fecha, medio}, actualizadoPor, actualizadoEn}. Dominio puro `domain/responsables_ordenes.js`; datos
+`data/responsables_ordenes.js` cargado con `import()` dinámico (si falla, solo se apagan las cédulas).
+**Se leen al generar** vista previa/PDF/Excel y **solo las 3 personas de esa orden** (`ordenParaImprimir`
+→ `aplicarCedulas` sobre una COPIA; la cédula que traiga la orden se ignora). Si falta alguna, PDF y Excel
+**preguntan nombrándola** (vista previa avisa). La orden, el borrador, los pendientes, el registro y las
+copias **nunca llevan cédula** (`sinCedulas` en lo que entra; limpieza de `ssee.orden.*` y de las listas al
+abrir). La hoja «Datos» del Excel va sin cédulas. **Editor solo admin** con pista «•••123», escribir o
+**importar un archivo local** que el navegador lee sin subirlo (tabla de confirmación; solo retiene el
+número de quien se puede guardar), declaración de autorización obligatoria; bitácora con pistas, sin dígitos.
+
+**78.3 Reglas.** `get` miembro activo · `list` solo admin activo y `limit ≤ 50` · create/update solo admin
+activo con perfil: `hasOnly`, `id == nombre.replace(' ', '_')` (todos los espacios, Ñ incluida),
+`^[A-ZÑ]+( [A-ZÑ]+)*$`, `^[0-9]{5,12}$`, autorización {fecha ISO, medio 3..120}, autor = auth.uid + nombre
+del perfil, `request.time` · delete solo admin. **Límite aceptado a propósito**: un miembro activo puede
+leer todas pidiendo nombre por nombre (los nombres son públicos); es lo que necesita para imprimir. Rastro
+de lectura por persona = Cloud Function (descartada hoy: costo, complejidad, sin conexión) → TODO-63.
+
+**78.4 Candado** `scripts/guardia-cedulas.mjs` + `githooks/{pre-commit, commit-msg, pre-merge-commit,
+pre-push}`: **DATO** — toda corrida de dígitos (puntos, comas, espacios, guiones, apóstrofos) en TODAS sus
+ventanas de 5-12, más base64 largo y cédula partida en dos líneas, contra **huellas SHA-256 con sal en la
+bóveda** (`brain-private/sgm-transpower/huellas-cedulas.json`, 9); **FORMA** — «cédula/C.C. + número»
+bloquea (en `tests/` solo avisa); **binarios** — PDF/Office agregados bloquean (`GUARDIA_BINARIOS_OK=1`);
+diff con `--no-ext-diff --no-textconv` y parser con estado; bóveda buscada desde el repo principal (worktrees);
+nunca imprime dígitos. `.gitignore`: `Orden_*.pdf|xlsx`, respaldos `.json`. **Historia completa: 1.649
+commits, 0 cédulas registradas**; 1 forma = ejemplo inventado obvio en `7285a87` (ya fuera de HEAD); 246
+binarios no legibles por texto.
+
+**78.5 Verificación.** Unitarias **1696 pass / 0 fail / 2 skip** (19 nuevas) · lint limpio · **`test:rules`
+91/91** (14 nuevas: nombre de 3 palabras con Ñ, lote exacto ficha+bitácora, desactivados, sin perfil, lista
+sin límite) · candado probado con evasiones (guion, coma, pegado, base64, partida, forma, mensaje, binario)
+usando huellas FALSAS · **banco** (importmap): limpieza de un borrador viejo con cédulas, editor oculto al
+técnico, vista previa/PDF/Excel con directorio vacío, parcial y sin red (pregunta nombrando), 0 rastro en
+localStorage, admin guarda/valida/quita, importación (repetida, ajena, nombre hostil) sin dígitos en el DOM,
+vista previa cerrada vacía y cerrada durante la carga sin reabrirse. **Producción**: reglas desplegadas,
+`main` byte-idéntico, CI+Deploy verde; con la sesión del Ingeniero (solo lectura, desde su pestaña): listar
+permitido (0), `get` por nombre permitido, lista sin límite **rechazada**. ⏳ Carga real: la hace él (TODO-63).
+
+**78.6 Archivos.** Nuevos: `assets/js/domain/responsables_ordenes.js`, `assets/js/data/responsables_ordenes.js`,
+`scripts/guardia-cedulas.mjs`, `githooks/{commit-msg,pre-merge-commit,pre-push}`, `tests/responsables_ordenes.test.js`,
+`tests-rules/responsables_ordenes.rules.test.js`. Modificados: `assets/js/ordenes-materiales.js`,
+`pages/ordenes-materiales.html` (sección 4), `assets/css/ordenes-materiales.css`, `firestore.rules`,
+`githooks/pre-commit`, `package.json` (`guardia:cedulas`), `.gitignore`. INTACTOS: `CONFIG` (sigue con
+`cedula: ''`), reglas del registro (`§77`), dibujo del documento.
+
+**78.7 Doctrina.** L-75/L-90 (el candado mira el DATO, no la forma) · L-78 (reglas en las dos direcciones) ·
+L-85 (import dinámico + editor `hidden` en el HTML) · free-tier (3 lecturas por documento).
+
+**78.8 Verificado sano / no re-auditar.** Firestore del sitio usa caché en **memoria** (`firebase-init.js`
+no activa persistencia): las cédulas no tocan IndexedDB · regla de `/auditoria` = `accion is string` · exportar
+no guarda en borrador ni pendientes · **refutado**: «listar solo admin no protege nada» (es el alcance
+diseñado, 78.3) · **descartado**: enmascarar en la vista previa (el botón Imprimir imprime esa vista),
+Claude tecleando cédulas (quedarían en transcripciones), reasignar huérfanas, doble tecleo · la ficha
+técnica y otros módulos no imprimen cédulas. Crudo → bóveda `2026-09-16-cedulas-responsables/`.
