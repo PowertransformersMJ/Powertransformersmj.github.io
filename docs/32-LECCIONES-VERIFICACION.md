@@ -282,3 +282,18 @@ campo y pregunta, en cada una, si lo usaba como **llave**. Si sí, cambia la lla
 ANTES de fusionar**, no después. En una fusión a tres vías, lo que no choca entra limpio — y así habría
 vuelto a entrar cualquier cédula nueva. Y el saneado por forma volvió a fallar: la cédula real seguía en
 un comentario (L-75). → `99 §76`.
+
+### L-91 · Pasar un dato de LOCAL a COMPARTIDO: todo lo que era seguro «porque era mío» deja de serlo
+
+Las Órdenes de Materiales vivían en el navegador de quien las hacía; el encargo era «que queden
+almacenadas». Parecía cambiar solo *dónde* se guardan. El comité y el código mostraron cuatro cosas que eran
+correctas **solo por ser locales** y que en compartido rompen: el número propuesto `DDMMAAAA-01` igual para
+todos (el choque pasa a ser el caso normal), el `confirm «¿reemplazar?»` (ahora pisa la orden de un
+compañero sin verla), el archivo que **reemplazaba** la lista al abrirse (resucita lo que otro borró) y el
+texto pintado en la página (ahora lo abre el admin: XSS almacenado).
+
+**La regla**: antes de mover estado de local a compartido, lista **cada supuesto que dependía de un solo
+dueño** —valores por defecto, confirmaciones de reemplazo, fusiones «gana el más reciente», caminos de
+importación, lo que se pinta— y dale a cada uno su versión compartida: crear ≠ editar, versión esperada,
+lápida al borrar, fuentes locales congeladas que solo *ofrecen* subir, escapado verificado. El diseño que
+solo cambia la capa de datos hereda todos esos supuestos sin que nadie lo note. → `99 §77`.

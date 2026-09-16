@@ -3013,3 +3013,88 @@ renombradas en `§70.3` siguen con prefijo `oms-` en el código nuevo (los dos u
 `sub`, ya estaban en el sitio) · `escala` de firma compatible (`fir.escala || 1`) · el parque se lee **una**
 vez aunque el guard avise por window y por document · 0 cédulas en el historial git (`git log --all -S`).
 Crudo de la validación → bóveda `2026-09-16-port-ordenes-materiales-v8sep/`.
+
+## 77. ADR — Las OE/OS quedan en el registro del equipo: de lo local a lo compartido sin que nadie pise a nadie ⟦OPUS-5⟧ (2026-09-16)
+
+> Encargo del Ingeniero: *«necesito que las OE/OS queden almacenadas en el módulo»*. Decisiones suyas
+> (AskUserQuestion): guardan y editan **todos los miembros activos**; borra **quien la creó o el
+> administrador**; las órdenes que ya están en navegadores se suben con **un botón**; todos ven todas.
+> Flujo fuerte W-11 completo: evidencia → diseño candidato → **comité de 4** (seguridad, integridad,
+> ejecutor, operación de campo; 57 hallazgos, 4 bloqueantes) → veredicto → prompt de Gemini entregado
+> (**NO revisado externamente aún**) → implementación → emulador → banco → despliegue → vivo.
+
+**77.1 Causa raíz.** Las órdenes vivían solo en `localStorage` (`ssee.orden.historico.v1`) del navegador
+que las hizo. Pasarlas a un almacén compartido **no es cambiar dónde se guardan**: todo lo que era
+seguro *porque era local* deja de serlo (→ **L-91**). Lo que el comité y la evidencia destaparon:
+**(a)** `nuevaOrden()` proponía `DDMMAAAA-01` **a todos** — con registro compartido, dos personas el mismo
+día chocan casi seguro: el choque es el caso normal; **(b)** el `confirm «¿reemplazar?»` que servía para
+tus propias órdenes, en compartido **borra la de un compañero** sin verla; **(c)** el archivo vinculado y
+la copia **reemplazaban** la lista al abrirse: una orden borrada **resucitaba** desde cualquier PC;
+**(d)** un texto que antes solo veía quien lo escribió ahora lo abre el admin (XSS almacenado).
+
+**77.2 Solución.** Colección `ordenes_materiales/{TIPO_NUMERO}` (`/`→`~` en la clave; número normalizado
+**a la vista** en el formulario: mayúsculas, sin tildes, espacios colapsados, alfabeto `A-Z 0-9 espacio . _ / -`,
+≤30; no se trunca ni se funden variantes). Dominio puro `assets/js/domain/ordenes_registro.js`; datos
+`assets/js/data/ordenes_materiales.js`. **Crear y editar son dos caminos**: crear falla si existe
+(«ya está · quién · cuándo · [Ver] [Usar el siguiente libre]»); editar exige la versión con la que se abrió
+(tipo y número fijos; «Convertir en orden nueva» suelta el vínculo); conflicto → [Ver la versión actual]
+[Guardar la mía encima], el formulario nunca se toca. **Ningún diálogo dentro de `runTransaction`**
+(se reintenta). **Borrar** = transacción con **lápida** `ordenes_materiales_borradas/{clave}` (copia exacta,
+exigida por la regla) + bitácora con `antes`. **Sin señal**: se ofrece «Dejarla pendiente» (bandeja
+`ssee.orden.pendientes.v1`; nunca cola offline automática). Si vence el tiempo se relee por clave: si llegó,
+«sí quedó guardada». **Legado congelado** (no se vuelve a escribir) y **subida orden por orden**: candidata =
+sin autoría y no marcada con la misma huella; existencia comprobada **por clave** y contra la lápida; lo
+idéntico se marca solo, lo distinto y lo borrado **desmarcados**, marca tras cada commit, resumen.
+Archivo vinculado y copia = **respaldo**: sus órdenes sin autoría van a pendientes; con autoría, se ignoran.
+Lectura: una `getDocs(orderBy fechaISO desc, limit 501)` al abrir + «Actualizar»; tras guardar/borrar se
+aplica en memoria (0 lecturas). Rótulo **«Registro del equipo»** (no «almacén»: aquí suena a bodega).
+
+**77.3 Reglas** (`firestore.rules`, primera colección donde escribe un técnico): `get` miembro activo ·
+`list` con `limit ≤ 501` · create/update con `hasOnly` de primer nivel, **clave == tipo + '_' +
+numero.replace('/','~')**, personas `keys().hasOnly(['nombre'])` (**sin cédulas**), autor
+`{uid == auth.uid, nombre == perfil.nombre}`, sellos `request.time`, `version == 1` / `+1`, inmutables
+(clave, tipo, número, creadoPor, creadoEn, migradaDe, elaboradaEn), ítems 1..200, textos acotados · delete:
+admin o creador **y** `getAfter(lápida).borradaEn == request.time` · lápida: solo en la misma escritura que
+borra, copia **==** `get(orden).data`, no se lista ni se borra. **Límite documentado**: el interior de cada
+ítem no lo validan las reglas (no recorren listas); lo limpia `aDocumento`.
+
+**77.4 No-regresión.** IDs intactos (`#listaOrdenes`, `#buscarOrden`, `#cntOrd`, `#btnGuardar`, `DATOS.*`,
+`LS.ORDENES`); vista previa, PDF, Excel e indicadores leen `estado.ordenes` como antes (ahora = registro).
+Página vieja en caché + JS nuevo (L-85): los elementos nuevos se enganchan con guarda y el diálogo cae a
+`confirm`. `CONFIG.maxOrdenesGuardadas` queda sin uso (comentado).
+
+**77.5 Verificación.** Unitarias **1677 pass / 0 fail / 2 skip** (23 nuevas del dominio) · lint limpio ·
+**`test:rules` 77/77** (26 nuevas, las dos direcciones — L-78: técnico crea/edita, no borra ajena; admin
+borra; sin lápida o con copia alterada no; cédula, firma, clave ajena, autor falso, versión saltada, lista
+sin límite → rechazo) · **banco local** con `importmap` que sustituye sesión, firmas, parque y registro
+(L-92): estado cero, 1.ª orden (queda en edición, no toca `historico.v1`), v1→2→3 sin falso conflicto,
+conflicto → «encima» v5, número repetido (propone -02), sin red → pendiente, «lento pero llegó», editar una
+borrada, admin borra ajena con lápida, borrar la última → vacío limpio, carga fallida («—», sin «Revisar y
+subir»), copia con órdenes del registro → 0 pendientes, subida mixta (nueva con cédula → quitada y avisada;
+repetida; igual; distinta; borrada; inválida; copia con autoría no ofrecida), payload `<img onerror>` /
+`"><svg onload>` / `=HYPERLINK` en 12 campos → lista, vista previa (11 textos SVG), indicadores y barra sin
+ejecutar nada. **Producción**: reglas desplegadas, `main` byte-idéntico, CI + Deploy en verde; con la
+sesión del Ingeniero (solo lectura): registro leído (0), `get` en las dos colecciones permitido, sin errores.
+⏳ **Pendiente**: escritura real en producción (necesita su permiso) y sesión de técnico en vivo.
+
+**77.6 Archivos.** Nuevos: `assets/js/domain/ordenes_registro.js`, `assets/js/data/ordenes_materiales.js`,
+`tests/ordenes_registro.test.js`, `tests-rules/ordenes_materiales.rules.test.js`. Modificados:
+`assets/js/ordenes-materiales.js` (bloque «REGISTRO DEL EQUIPO», DATOS, eventos, arranque),
+`pages/ordenes-materiales.html` (sección 6, barra de edición, diálogo, rótulos), `assets/css/ordenes-materiales.css`,
+`firestore.rules`. INTACTOS: `domain/audit.js`, `session-guard.js`, firmas, parque, las otras 27 colecciones.
+
+**77.7 Doctrina.** W-11 completo · `runTransaction` para estado compartido, `set` sin merge para crear,
+`update` para editar, sin arrays anidados (L-30) · free-tier: sin `onSnapshot`, `limit` en la regla ·
+L-78 (reglas probadas en las dos direcciones) · L-90 (lo quitado por seguridad no puede seguir siendo llave).
+
+**77.8 Verificado sano / no re-auditar.** **Refutado** «fórmula que se ejecuta al abrir el Excel»: el
+módulo escribe con ExcelJS `cell.value = 'texto'` (cadena; fórmula solo con `{formula}`) · `esc()` ya
+escapa `& < > " '` y todo `innerHTML` del módulo con datos de una orden pasa por `esc`/`esc_` (incluidos los nuevos); `<image href>` solo recibe la
+firma de la sesión · **descartado por sobre-ingeniería** para 3-10 usuarios: subcolección de versiones
+exigida por reglas, ítems como JSON string, caché offline con escrituras en cola, borrado lógico, caché en
+`sessionStorage` y paginación por año (disparador: >400 órdenes o >10 000 lecturas/día medidas) ·
+**no impuesto**: «el creador solo borra si nadie más editó» (cambia la decisión 2; la lápida cubre) · CSP
+por meta (riesgo de romper los CDN; aparte). **Abierto al Ingeniero**: ¿el consecutivo es por ZONA? Hoy la
+clave no la incluye; si lo fuera, el choque se muestra y no se pierde nada. `nota` es texto libre y su
+placeholder sugiere «c.c.»: queda en Firestore privado del equipo, no en el repo público.
+Crudo del comité y veredicto → bóveda `2026-09-16-registro-oe-os/`.
