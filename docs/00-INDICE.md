@@ -89,6 +89,7 @@
 | §75 | ADR-075 — **Fichas Técnicas**: 5 falsedades del papel firmado corregidas; 5 redacciones por banda; alcance argumentado con condiciones; matriz a color; municipio automático. **L-86..89** ⟦OPUS-5⟧ | 2642 |
 | §76 | ADR-076 — **Órdenes de Materiales** con la versión del 8-sep, sin firmas ni cédulas y con el parque vivo; recuperar una orden devolvía la primera persona. **L-90** ⟦OPUS-5⟧ | 2964 |
 | §77 | ADR-077 — **Registro del equipo de OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, subida orden por orden, sin cédulas; comité de 4 (57 hallazgos). **L-91/92** ⟦OPUS-5⟧ | 3017 |
+| §78 | ADR-078 — **Cédulas de los responsables** desde un directorio privado en Firestore; candado por huella/forma/binario en commit, mensaje, merge y push. **L-93/94** ⟦OPUS-5⟧ | 3102 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

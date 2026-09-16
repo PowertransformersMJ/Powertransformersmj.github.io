@@ -297,3 +297,18 @@ dueño** —valores por defecto, confirmaciones de reemplazo, fusiones «gana el
 importación, lo que se pinta— y dale a cada uno su versión compartida: crear ≠ editar, versión esperada,
 lápida al borrar, fuentes locales congeladas que solo *ofrecen* subir, escapado verificado. El diseño que
 solo cambia la capa de datos hereda todos esos supuestos sin que nadie lo note. → `99 §77`.
+
+### L-93 · Un candado de datos personales solo en pre-commit tiene seis puertas laterales
+
+Para las cédulas (`99 §78`) el primer candado revisaba lo preparado para commit, por huella de la cédula
+exacta. La revisión adversarial le encontró salidas reales: **merge, cherry-pick y push** no pasan por
+pre-commit; el **mensaje** del commit no se mira; un **PDF/Excel** (justo lo que ahora lleva cédulas) es
+binario y comprimido; un número con **guion, coma o pegado** a otros cae fuera de la expresión; en un
+**worktree** la bóveda no aparece y el candado falla abierto; y una cédula **nueva**, cargada desde la web,
+no tiene huella.
+
+**La regla**: un candado de dato sensible se prueba contra la lista de puertas —commit, mensaje, merge,
+push; texto, binario, nombre de archivo; separadores y ventanas; worktree; dato no registrado— y cada una
+tiene su caso con datos FALSOS (huellas falsas vía `SGM_HUELLAS`). Donde el texto no deja ver (binarios),
+se bloquea por tipo con un escape explícito. DATO (huellas con sal fuera del repo) y FORMA («cédula +
+número») se complementan: uno atrapa lo conocido, el otro lo nuevo.
