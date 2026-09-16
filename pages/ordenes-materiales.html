@@ -89,6 +89,10 @@
   <div class="oms-main">
     <form id="formOrden" novalidate autocomplete="off">
 
+      <!-- Aviso de edición: aparece cuando la orden del formulario se abrió
+           desde el registro del equipo (tipo y número quedan fijos). -->
+      <div class="oms-aviso barra-edicion" id="barraEdicion" role="status"></div>
+
       <!-- ============ 1. DATOS DE LA ORDEN ============ -->
       <section class="tarjeta">
         <header>
@@ -332,7 +336,7 @@
           <div class="estado-listas">
             <div class="pastilla"><div class="k">Origen / Destino</div><div class="v" id="cntOD">0</div><div class="f" id="fteOD">precargado</div></div>
             <div class="pastilla"><div class="k">Materiales</div><div class="v" id="cntMat">0</div><div class="f" id="fteMat">precargado</div><div class="f" id="detMat"></div></div>
-            <div class="pastilla"><div class="k">Órdenes guardadas</div><div class="v" id="cntOrd">0</div><div class="f">en este navegador</div></div>
+            <div class="pastilla"><div class="k">Órdenes guardadas</div><div class="v" id="cntOrd">0</div><div class="f">en el registro del equipo</div></div>
           </div>
 
           <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap">
@@ -343,16 +347,20 @@
         </div>
       </section>
 
-      <!-- ============ 6. ÓRDENES GUARDADAS ============ -->
-      <section class="tarjeta">
+      <!-- ============ 6. REGISTRO DEL EQUIPO ============ -->
+      <section class="tarjeta" id="panelRegistro">
         <header>
-          <h2><span class="oms-num">6</span> Órdenes guardadas</h2>
-          <span class="nota-h">Se acumulan al pulsar «Guardar orden» y se recuperan al reabrir el módulo</span>
+          <h2><span class="oms-num">6</span> Registro del equipo</h2>
+          <span class="nota-h">Las órdenes que guarda cualquier miembro del equipo, visibles para todos</span>
         </header>
         <div class="cuerpo">
-          <div style="margin-bottom:12px">
+          <div class="oms-aviso ver" id="estadoRegistro" role="status">Cargando el registro del equipo…</div>
+          <div class="oms-aviso" id="avisoPendientes" role="status"></div>
+          <div class="panel-subida" id="panelSubida" hidden></div>
+          <div class="fila-buscar">
             <input type="search" id="buscarOrden" placeholder="Buscar por número, origen, destino o material…"
-                   aria-label="Buscar entre las órdenes guardadas">
+                   aria-label="Buscar entre las órdenes del registro">
+            <button type="button" class="oms-btn mini" id="btnActualizarRegistro">Actualizar</button>
           </div>
           <div class="lista-ordenes" id="listaOrdenes"></div>
         </div>
@@ -367,7 +375,7 @@
         <div class="cuerpo">
 
           <div class="estado-listas">
-            <div class="pastilla"><div class="k">Órdenes acumuladas</div><div class="v" id="dEstadoOrdenes">0</div><div class="f">en este equipo</div></div>
+            <div class="pastilla"><div class="k">Órdenes en el registro</div><div class="v" id="dEstadoOrdenes">0</div><div class="f">del equipo</div></div>
             <div class="pastilla"><div class="k">Líneas de material</div><div class="v" id="dEstadoItems">0</div><div class="f">en total</div></div>
             <div class="pastilla"><div class="k">Espacio usado</div><div class="v" id="dEstadoEspacio">0 KB</div><div class="f">del navegador</div></div>
           </div>
@@ -376,10 +384,10 @@
 
           <h3 class="sub-titulo">Archivo de datos vinculado <span class="etiqueta">recomendado</span></h3>
           <p class="parrafo">
-            Elija una vez un archivo <code>.json</code> —en su disco o en una carpeta de red— y a partir de
-            ahí <b>cada orden que guarde se escribe también allí</b>. Los datos dejan de depender del navegador:
-            puede respaldarlos, copiarlos a otro equipo o compartirlos. Antes de escribir, el módulo relee el
-            archivo y fusiona, de modo que si varias personas usan el mismo archivo ninguna borra lo de la otra.
+            Las órdenes viven en el <b>registro del equipo</b>. El archivo vinculado es una <b>copia de respaldo</b>
+            en su disco: cada vez que guarda, se escribe allí una copia del registro (con las órdenes de todo el
+            equipo) y las que tenga pendientes en este equipo. Lo que se lea de un archivo nunca reemplaza el
+            registro: las órdenes que no estén en él se ofrecen para subir.
           </p>
           <div class="fila-botones">
             <button type="button" class="oms-btn primario" id="btnVincular">Vincular archivo de datos…</button>
@@ -389,8 +397,9 @@
 
           <h3 class="sub-titulo">Copia de seguridad manual</h3>
           <p class="parrafo">
-            Funciona en cualquier navegador. Exporta un <code>.json</code> con todas las órdenes y las listas.
-            Al restaurar, <b>fusiona</b> con lo que ya haya en lugar de sobrescribirlo.
+            Funciona en cualquier navegador. Exporta un <code>.json</code> con las órdenes del registro, las
+            pendientes de este equipo y las listas. Al restaurar, las listas se recuperan y las órdenes que no
+            estén en el registro se ofrecen para subir.
           </p>
           <div class="fila-botones">
             <button type="button" class="oms-btn" id="btnExportarCopia">Exportar copia de seguridad (.json)</button>
@@ -400,7 +409,7 @@
 
           <h3 class="sub-titulo">Consolidado del histórico</h3>
           <p class="parrafo">
-            Exporta <b>todas</b> las órdenes guardadas a un Excel de una fila por material, más una hoja de
+            Exporta las órdenes del registro del equipo a un Excel de una fila por material, más una hoja de
             resumen con entradas, salidas y neto por ítem.
           </p>
           <div class="fila-botones">
@@ -504,6 +513,14 @@
       </div>
     </div>
   </div>
+
+  <!-- Diálogo del registro: número repetido, cambios de otra persona, sin
+       conexión. Se arma con textContent (los datos los escribió otra persona). -->
+  <dialog class="oms-dlg" id="dlgRegistro" aria-labelledby="dlgRegistroTitulo">
+    <h3 id="dlgRegistroTitulo">Registro del equipo</h3>
+    <p class="dlg-texto" id="dlgRegistroTexto"></p>
+    <div class="dlg-botones" id="dlgRegistroBotones"></div>
+  </dialog>
 
   <div class="tostadas" id="tostadas" aria-live="polite"></div>
   <div class="cargando" id="cargando"><div class="spin"></div><p id="txtCargando">Procesando…</p></div>

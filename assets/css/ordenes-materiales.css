@@ -554,3 +554,41 @@
 .oms-scope .oms-modal{ z-index: var(--z-modal, 500); }
 .oms-scope .tostadas{ z-index: var(--z-toast, 1000); }
 .oms-scope .cargando{ z-index: var(--z-toast, 1000); }
+
+/* ===================== REGISTRO DEL EQUIPO (99 §77) =====================
+   Lista compartida, aviso de edición, panel de subida y diálogo de choques.
+   El diálogo va al top layer con showModal(): no necesita z-index. */
+.oms-scope .fila-buscar{ display:flex; gap:8px; align-items:center; margin:10px 0 12px; }
+.oms-scope .fila-buscar input[type=search]{ flex:1 1 auto; min-width:0; }
+.oms-scope .item-orden .quien{ display:block; margin-top:2px; }
+.oms-scope .item-orden .pend{
+  font-size:.68rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
+  color:var(--aviso); background:var(--aviso-bg); border-radius:20px; padding:2px 8px;
+}
+.oms-scope .barra-edicion{ margin-bottom:12px; }
+.oms-scope .barra-edicion .oms-btn{ margin:6px 6px 0 0; }
+.oms-scope .panel-subida{
+  border:1px solid var(--linea); border-radius:var(--radio-s); background:#fff;
+  padding:12px 14px; margin:10px 0;
+}
+.oms-scope .panel-subida h3{ margin:0 0 6px; font-size:.95rem; color:var(--azul-osc); }
+.oms-scope .panel-subida .desliza{ overflow-x:auto; margin:8px 0; }
+.oms-scope .panel-subida table{ width:100%; border-collapse:collapse; font-size:.8rem; }
+.oms-scope .panel-subida th,
+.oms-scope .panel-subida td{ text-align:left; padding:6px 8px; border-top:1px solid var(--linea-2); vertical-align:top; }
+.oms-scope .panel-subida th{ color:var(--tinta-2); font-weight:700; border-top:0; }
+.oms-scope .panel-subida .sit-nueva{ color:var(--ok); }
+.oms-scope .panel-subida .sit-igual{ color:var(--tinta-2); }
+.oms-scope .panel-subida .sit-distinta,
+.oms-scope .panel-subida .sit-borrada{ color:var(--aviso); }
+.oms-scope .panel-subida .sit-invalida{ color:var(--error); }
+.oms-scope .panel-subida .progreso{ font-size:.82rem; color:var(--tinta-2); margin:6px 0; }
+.oms-scope .oms-dlg{
+  border:1px solid var(--linea); border-radius:var(--radio); padding:18px 20px;
+  width:min(520px, calc(100vw - 32px)); color:var(--tinta); background:#fff;
+}
+.oms-scope .oms-dlg::backdrop{ background:rgba(10,30,45,.45); }
+.oms-scope .oms-dlg h3{ margin:0 0 8px; font-size:1.02rem; color:var(--azul-osc); }
+.oms-scope .oms-dlg .dlg-texto{ margin:0 0 14px; font-size:.88rem; line-height:1.5; white-space:pre-line; color:var(--tinta-2); }
+.oms-scope .oms-dlg .dlg-botones{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+.oms-scope #btnGuardar[aria-busy="true"]{ opacity:.65; cursor:progress; }

@@ -691,6 +691,104 @@ service cloud.firestore {
       }
     }
 
+    // ── Órdenes de Materiales: registro del equipo de OE/OS (99 §77) ──
+    // La PRIMERA colección donde escribe un técnico (decisión del Ingeniero:
+    // guardan y editan todos los miembros activos; borra quien la creó o un
+    // admin). Espejo de `assets/js/domain/ordenes_registro.js` (LIMITES,
+    // RE_NUMERO): si cambian allá, cambian aquí y en tests-rules/.
+    //  · la clave SALE del tipo y el número: nadie guarda dos veces la misma
+    //    orden ni esconde una orden bajo la clave de otra;
+    //  · personas SOLO con nombre (sin cédulas); autoría = quien escribe, con
+    //    el nombre de su perfil; sellos del servidor; versión +1 al editar;
+    //  · borrar exige dejar en la MISMA escritura la lápida con la copia
+    //    exacta de lo borrado (recuperación, y freno a que una copia vieja de
+    //    un navegador la resucite);
+    //  · límite: el INTERIOR de cada ítem no se valida aquí (las reglas no
+    //    recorren listas); lo limpia el cliente.
+    match /ordenes_materiales/{clave} {
+      function omTexto(d, k, max) {
+        return !(k in d) || (d[k] is string && d[k].size() <= max);
+      }
+      function omPersona(p) {
+        return p is map && p.keys().hasOnly(['nombre'])
+          && p.get('nombre', '') is string && p.get('nombre', '').size() <= 120;
+      }
+      function omAutor(a) {
+        return a is map && a.keys().hasOnly(['uid', 'nombre'])
+          && a.uid == request.auth.uid
+          && a.nombre == profile().get('nombre', '');
+      }
+      function omValida(d) {
+        return d.keys().hasOnly(['clave', 'tipo', 'numero', 'zona', 'fechaISO', 'fecha', 'hora',
+                                 'origen', 'destino', 'items', 'transformador', 'motivo', 'motivoSel',
+                                 'nota', 'autorizado', 'entregado', 'recibido', 'empresaVig',
+                                 'conFirmas', 'creadoPor', 'creadoEn', 'actualizadoPor',
+                                 'actualizadoEn', 'version', 'migradaDe', 'elaboradaEn'])
+          && d.keys().hasAll(['clave', 'tipo', 'numero', 'fechaISO', 'items', 'autorizado',
+                              'entregado', 'recibido', 'creadoPor', 'creadoEn', 'actualizadoPor',
+                              'actualizadoEn', 'version'])
+          && d.tipo in ['ENTRADA', 'SALIDA']
+          && d.numero is string && d.numero.matches('^[A-Z0-9][A-Z0-9 ._/-]{0,29}$')
+          && d.clave == clave
+          && clave == d.tipo + '_' + d.numero.replace('/', '~')
+          && d.fechaISO is string && d.fechaISO.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          && d.items is list && d.items.size() >= 1 && d.items.size() <= 200
+          && omPersona(d.autorizado) && omPersona(d.entregado) && omPersona(d.recibido)
+          && omTexto(d, 'zona', 60) && omTexto(d, 'fecha', 60) && omTexto(d, 'hora', 20)
+          && omTexto(d, 'origen', 160) && omTexto(d, 'destino', 160)
+          && omTexto(d, 'transformador', 200) && omTexto(d, 'motivo', 500)
+          && omTexto(d, 'motivoSel', 500) && omTexto(d, 'nota', 500)
+          && omTexto(d, 'empresaVig', 100) && omTexto(d, 'elaboradaEn', 40)
+          && (!('conFirmas' in d) || d.conFirmas is bool)
+          && (!('migradaDe' in d) || d.migradaDe in ['navegador', 'pendiente'])
+          && d.version is int
+          && omAutor(d.actualizadoPor) && d.actualizadoEn == request.time;
+      }
+      function omLapida() {
+        return /databases/$(database)/documents/ordenes_materiales_borradas/$(clave);
+      }
+
+      allow get:    if isTeamMember();
+      allow list:   if isTeamMember() && request.query.limit <= 501;
+      allow create: if isTeamMember() && hasProfile()
+                    && omValida(request.resource.data)
+                    && omAutor(request.resource.data.creadoPor)
+                    && request.resource.data.creadoEn == request.time
+                    && request.resource.data.version == 1;
+      allow update: if isTeamMember() && hasProfile()
+                    && omValida(request.resource.data)
+                    && !request.resource.data.diff(resource.data).affectedKeys()
+                         .hasAny(['clave', 'tipo', 'numero', 'creadoPor', 'creadoEn',
+                                  'migradaDe', 'elaboradaEn'])
+                    && request.resource.data.version == resource.data.version + 1;
+      allow delete: if isTeamMember() && hasProfile()
+                    && (isAdmin() || resource.data.creadoPor.uid == request.auth.uid)
+                    && existsAfter(omLapida())
+                    && getAfter(omLapida()).data.borradaEn == request.time;
+    }
+
+    // Lápida de una orden borrada: solo nace en la MISMA escritura que borra la
+    // orden, la escribe quien puede borrarla y guarda la copia EXACTA.
+    match /ordenes_materiales_borradas/{clave} {
+      function omOrden() {
+        return /databases/$(database)/documents/ordenes_materiales/$(clave);
+      }
+      allow get:    if isTeamMember();
+      allow list:   if false;
+      allow create, update: if isTeamMember() && hasProfile()
+                    && exists(omOrden()) && !existsAfter(omOrden())
+                    && (isAdmin() || get(omOrden()).data.creadoPor.uid == request.auth.uid)
+                    && request.resource.data.keys().hasOnly(['clave', 'borradaPor', 'borradaEn', 'orden'])
+                    && request.resource.data.clave == clave
+                    && request.resource.data.borradaPor is map
+                    && request.resource.data.borradaPor.keys().hasOnly(['uid', 'nombre'])
+                    && request.resource.data.borradaPor.uid == request.auth.uid
+                    && request.resource.data.borradaPor.nombre == profile().get('nombre', '')
+                    && request.resource.data.borradaEn == request.time
+                    && request.resource.data.orden == get(omOrden()).data;
+      allow delete: if false;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

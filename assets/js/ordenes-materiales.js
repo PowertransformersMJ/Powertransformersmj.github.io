@@ -34,9 +34,17 @@
 // la de quien tiene la sesión abierta, y solo en SU propia línea del documento.
 import { miFirma, firmasDisponibles } from './data/firmas.js';
 import { firmaAplicaA } from './domain/firmas.js';
-import { getSession } from './auth/session-guard.js';
+import { getSession, isAdmin as esAdminDeSesion } from './auth/session-guard.js';
 import { listarV2 as listarParque } from './data/transformadores.js';
 import { parqueParaOrdenes } from './domain/ordenes_parque.js';
+// Registro del equipo (99 §77): las órdenes se guardan en Firestore y las ve
+// todo el equipo. El navegador solo guarda el borrador, las listas y lo que
+// quedó pendiente de subir.
+import * as REG from './data/ordenes_materiales.js';
+import {
+  claveDe, normalizarNumero, problemaNumero, candidatasDeSubida, situacionDeSubida,
+  seleccionadaPorDefecto, siguienteNumeroLibre, huella, esDelRegistro, llaveDeMarca
+} from './domain/ordenes_registro.js';
 
 const CONFIG = {
 
@@ -449,7 +457,7 @@ const CONFIG = {
 
   /* --- Comportamiento -------------------------------------------------- */
   filasTablaPagina: 18,        // filas de la tabla de materiales por página
-  maxOrdenesGuardadas: 500,    // tope del histórico acumulado (≈ 600 KB)
+  maxOrdenesGuardadas: 500,    // sin uso desde el registro del equipo (99 §77): lo acota TOPE_LECTURA
   prefijoArchivo: 'Orden'      // Orden_Entrada_00125_2026-08-26.pdf
 };
 
@@ -700,7 +708,13 @@ function cargando(on, texto) {
 const LS = {
   BORRADOR: 'ssee.orden.borrador.v1',
   LISTAS:   'ssee.orden.listas.v1',
+  // Histórico de ANTES del registro del equipo (99 §77). Queda CONGELADO: se
+  // lee para ofrecer subirlo y no se vuelve a escribir, para que nunca se
+  // confunda una copia del registro con una orden que solo está aquí.
   ORDENES:  'ssee.orden.historico.v1',
+  PENDIENTES:  'ssee.orden.pendientes.v1',   // guardadas sin conexión o traídas de un archivo
+  SUBIDAS:     'ssee.orden.subidas.v1',      // { clave: huella } ya subidas desde aquí
+  DESCARTADAS: 'ssee.orden.descartadas.v1',  // { clave: huella } que el usuario pidió no ofrecer
 
   disponible() {
     try { const k = '__t'; localStorage.setItem(k, '1'); localStorage.removeItem(k); return true; }
@@ -793,7 +807,8 @@ const estado = {
     fuenteOD:  'precargado',
     fuenteMat: 'precargado'
   },
-  ordenes: [],                                 // histórico en localStorage
+  ordenes: [],                                 // registro del equipo (Firestore), en memoria
+  cargada: null,                               // { clave, version } de la orden abierta desde el registro
   libroImportado: null,                        // libro SheetJS pendiente de elegir hoja
   zoom: 1
 };
@@ -1285,63 +1300,706 @@ function escribirOrden(o) {
 let _tBorrador = null;
 function guardarBorrador() {
   clearTimeout(_tBorrador);
-  _tBorrador = setTimeout(() => LS.escribir(LS.BORRADOR, leerOrden()), 400);
+  _tBorrador = setTimeout(() => {
+    const b = leerOrden();
+    // La orden abierta del registro viaja con el borrador: al reabrir la
+    // página sigue siendo una EDICIÓN de esa versión, no una orden nueva que
+    // chocaría con su propio número.
+    if (estado.cargada) b._cargada = { clave: estado.cargada.clave, version: estado.cargada.version };
+    LS.escribir(LS.BORRADOR, b);
+  }, 400);
 }
 
-function guardarOrden() {
-  const v = validar();
-  if (!v.ok) { mostrarErrores(v.errores); return; }
-  const o = leerOrden();
-  const i = estado.ordenes.findIndex(x => x.numero === o.numero && x.tipo === o.tipo);
-  if (i >= 0) {
-    if (!confirm(`Ya existe una orden de ${o.tipo.toLowerCase()} con el número ${o.numero}.\n\n¿Desea reemplazarla?`)) return;
-    estado.ordenes[i] = o;
-  } else {
-    estado.ordenes.unshift(o);
-    if (estado.ordenes.length > CONFIG.maxOrdenesGuardadas) estado.ordenes.length = CONFIG.maxOrdenesGuardadas;
-  }
-  LS.escribir(LS.ORDENES, estado.ordenes);
-  pintarOrdenes();
-  aviso(`Orden ${o.numero} guardada. Total acumulado: ${estado.ordenes.length}.`, 'ok');
+/* ==========================================================================
+   REGISTRO DEL EQUIPO (99 §77)
+   --------------------------------------------------------------------------
+   Las órdenes viven en Firestore (`data/ordenes_materiales.js`) y todo el
+   equipo las ve. Reglas de este bloque:
+   · «Guardar orden» CREA si la orden es nueva y EDITA si se abrió del
+     registro (tipo y número quedan fijos). Nunca reemplaza desde una orden
+     nueva la de otra persona.
+   · Ante un choque, el formulario NO se toca: se explica quién, cuándo y qué
+     hacer. Los diálogos se arman con textContent: los datos los escribió
+     otra persona.
+   · Lo que está solo en este navegador (histórico anterior, pendientes sin
+     conexión, órdenes de un archivo) se ofrece para subir, orden por orden,
+     y SOLO después de que el registro cargó bien.
+   ========================================================================== */
 
-  // Si hay un archivo de datos vinculado, se escribe también allí
-  if (typeof DATOS !== 'undefined' && DATOS.handle) DATOS.escribir();
-  if (typeof pintarAlmacenamiento === 'function') pintarAlmacenamiento();
+const REGISTRO = {
+  estado: 'cargando',   // 'cargando' | 'ok' | 'error' | 'sin-acceso'
+  mensaje: '',
+  truncado: false,
+  cargadoEn: null,
+  leyendo: false,
+  guardando: false
+};
+
+/** Lo que vive solo en este navegador y podría subirse. */
+const LOCAL = {
+  legado: [], pendientes: [], subidas: {}, descartadas: {},
+
+  leer() {
+    const lista = (v) => (Array.isArray(v) ? v : []);
+    const mapa = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+    this.legado = lista(LS.leer(LS.ORDENES, []));
+    this.pendientes = lista(LS.leer(LS.PENDIENTES, []));
+    this.subidas = mapa(LS.leer(LS.SUBIDAS, {}));
+    this.descartadas = mapa(LS.leer(LS.DESCARTADAS, {}));
+  },
+
+  candidatas() {
+    return candidatasDeSubida(this.legado.concat(this.pendientes),
+      Object.assign({}, this.descartadas, this.subidas));
+  },
+
+  claveDeLocal(o) { return claveDe(o && o.tipo, normalizarNumero(o && o.numero)); },
+
+  esPendiente(clave) { return this.pendientes.some(p => this.claveDeLocal(p) === clave); },
+
+  /** Agrega órdenes (sin autoría) a pendientes, sin repetir lo que ya se conoce igual. */
+  incorporar(ordenes) {
+    const conocidas = new Set(this.legado.concat(this.pendientes).map(o => this.claveDeLocal(o) + '|' + huella(o)));
+    let nuevas = 0;
+    (ordenes || []).forEach(o => {
+      if (!o || esDelRegistro(o)) return;
+      const k = this.claveDeLocal(o) + '|' + huella(o);
+      if (conocidas.has(k)) return;
+      conocidas.add(k);
+      this.pendientes.push(o);
+      nuevas++;
+    });
+    if (nuevas) LS.escribir(LS.PENDIENTES, this.pendientes);
+    return { nuevas, actualizadas: 0 };
+  },
+
+  agregarPendiente(o) {
+    const clave = this.claveDeLocal(o);
+    this.pendientes = this.pendientes.filter(p => !clave || this.claveDeLocal(p) !== clave);
+    this.pendientes.unshift(o);
+    LS.escribir(LS.PENDIENTES, this.pendientes);
+  },
+
+  /** Subida confirmada (o ya estaba igual): no se vuelve a ofrecer y sale de pendientes. */
+  marcarSubida(clave, h) {
+    this.subidas[clave] = h;
+    LS.escribir(LS.SUBIDAS, this.subidas);
+    const antes = this.pendientes.length;
+    this.pendientes = this.pendientes.filter(p => !(this.claveDeLocal(p) === clave && huella(p) === h));
+    if (this.pendientes.length !== antes) LS.escribir(LS.PENDIENTES, this.pendientes);
+  },
+
+  descartar(llave, h) {
+    this.descartadas[llave] = h;
+    LS.escribir(LS.DESCARTADAS, this.descartadas);
+  }
+};
+
+const miUid = () => { const s = getSession(); return (s && s.user && s.user.uid) || ''; };
+
+function cuando(ms) {
+  if (!ms) return '';
+  const d = new Date(ms);
+  return d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' +
+         d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+}
+
+function hace(ms) {
+  if (!ms) return '';
+  const min = Math.round((Date.now() - ms) / 60000);
+  if (min < 1) return 'hace un momento';
+  if (min < 60) return `hace ${min} min`;
+  const h = Math.round(min / 60);
+  if (h < 24) return `hace ${h} h`;
+  return 'el ' + cuando(ms).split(' ')[0];
+}
+
+const nombreDe = (a) => (a && a.nombre) || 'otra persona';
+
+function resumenOrden(o) {
+  return `${o.tipo} N.º ${o.numero} · guardó ${nombreDe(o.actualizadoPor)} el ${cuando(o.actualizadoEn)} · ` +
+         `${o.items.length} ítem(s)` + (o.destino ? ` · destino ${o.destino}` : '');
+}
+
+function ordenarRegistro() {
+  estado.ordenes.sort((a, b) =>
+    (b.fechaISO || '').localeCompare(a.fechaISO || '') ||
+    (b.hora || '').localeCompare(a.hora || '') ||
+    (b.actualizadoEn || 0) - (a.actualizadoEn || 0));
+}
+
+function ponerEnRegistro(o) {
+  const i = estado.ordenes.findIndex(x => x.clave === o.clave);
+  if (i >= 0) estado.ordenes[i] = o; else estado.ordenes.unshift(o);
+  ordenarRegistro();
+}
+
+function quitarDelRegistro(clave) {
+  estado.ordenes = estado.ordenes.filter(x => x.clave !== clave);
+}
+
+function numerosOcupados() {
+  return estado.ordenes.map(o => o.numero).concat(LOCAL.pendientes.map(p => normalizarNumero(p.numero)));
+}
+
+/** Diálogo con botones. Resuelve con el `id` del botón (o 'cancelar' con Esc). */
+function dialogo({ titulo, texto, botones }) {
+  const dlg = $('#dlgRegistro');
+  if (!dlg) {
+    // Página vieja en caché: sin el diálogo, una pregunta de sí/no entre la
+    // opción que no cambia nada (la primera) y la principal (la última).
+    const ultimo = botones[botones.length - 1];
+    return Promise.resolve(confirm(`${titulo}\n\n${texto}\n\n¿${ultimo.texto}?`) ? ultimo.id : botones[0].id);
+  }
+  return new Promise(resolver => {
+    $('#dlgRegistroTitulo').textContent = titulo;
+    $('#dlgRegistroTexto').textContent = texto;
+    const cont = $('#dlgRegistroBotones');
+    cont.replaceChildren();
+    const alCancelar = ev => { ev.preventDefault(); cerrar('cancelar'); };
+    function cerrar(id) {
+      dlg.removeEventListener('cancel', alCancelar);
+      if (dlg.open) dlg.close();
+      resolver(id);
+    }
+    dlg.addEventListener('cancel', alCancelar);
+    botones.forEach(b => {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.className = 'oms-btn' + (b.clase ? ' ' + b.clase : '');
+      el.textContent = b.texto;
+      el.addEventListener('click', () => cerrar(b.id));
+      cont.appendChild(el);
+    });
+    if (typeof dlg.showModal === 'function') dlg.showModal(); else dlg.setAttribute('open', '');
+    // El foco arranca en la opción que no cambia nada (la primera).
+    if (cont.firstElementChild) cont.firstElementChild.focus();
+  });
+}
+
+/* ---------------------------- Carga y pintado --------------------------- */
+
+async function cargarRegistro(manual) {
+  if (REGISTRO.leyendo) return;
+  REGISTRO.leyendo = true;
+  const teniaDatos = REGISTRO.estado === 'ok';
+  if (!teniaDatos) REGISTRO.estado = 'cargando';
+  pintarOrdenes();
+  try {
+    const r = await REG.listar();
+    estado.ordenes = r.ordenes;
+    ordenarRegistro();
+    REGISTRO.truncado = r.truncado;
+    REGISTRO.estado = 'ok';
+    REGISTRO.mensaje = '';
+    REGISTRO.cargadoEn = Date.now();
+    if (manual) aviso(`Registro actualizado: ${estado.ordenes.length} orden(es).`, 'ok');
+    revisarOrdenAbierta();
+    if (DATOS.handle && DATOS.permisoActual === 'granted') DATOS.escribir(true);
+  } catch (e) {
+    console.error('No se pudo cargar el registro del equipo:', e.causa || e);
+    if (teniaDatos) {
+      aviso('No se pudo actualizar el registro: ' + e.message + ' Se sigue mostrando la última lectura.', 'err', 8000);
+    } else {
+      REGISTRO.estado = e.codigo === 'permiso' ? 'sin-acceso' : 'error';
+      REGISTRO.mensaje = e.message;
+    }
+  } finally {
+    REGISTRO.leyendo = false;
+    pintarOrdenes(); pintarPendientes(); pintarBarraEdicion(); pintarAlmacenamiento();
+  }
+}
+
+/** Tras cargar: ¿la orden abierta (del borrador) cambió o desapareció? */
+function revisarOrdenAbierta() {
+  if (!estado.cargada) return;
+  const o = estado.ordenes.find(x => x.clave === estado.cargada.clave);
+  if (!o) {
+    if (!REGISTRO.truncado) {
+      aviso('La orden que tenía abierta ya no está en el registro. Si la guarda, se le preguntará qué hacer.', 'warn', 9000);
+    }
+    return;
+  }
+  if (o.version !== estado.cargada.version) {
+    aviso(`${nombreDe(o.actualizadoPor)} guardó cambios en la orden que tenía abierta (ahora versión ${o.version}). ` +
+          'Al guardar se le preguntará qué hacer.', 'warn', 9000);
+  }
+}
+
+function pintarEstadoRegistro() {
+  const el = $('#estadoRegistro');
+  if (!el) return;
+  if (REGISTRO.estado === 'cargando') {
+    el.className = 'oms-aviso ver';
+    el.textContent = 'Cargando el registro del equipo…';
+    return;
+  }
+  if (REGISTRO.estado === 'sin-acceso') {
+    el.className = 'oms-aviso ver err';
+    el.innerHTML = '<b>Su usuario no tiene acceso al registro del equipo.</b> Puede estar desactivado o la sesión ' +
+      'haber vencido: recargue la página y, si sigue igual, consulte con el administrador.';
+    return;
+  }
+  if (REGISTRO.estado === 'error') {
+    el.className = 'oms-aviso ver err';
+    el.innerHTML = `<b>No se pudo cargar el registro del equipo.</b> ${esc(REGISTRO.mensaje)} ` +
+      'Revise la conexión y pulse «Actualizar». Mientras tanto puede diligenciar, imprimir y sacar el PDF; ' +
+      'si guarda sin conexión, podrá dejar la orden pendiente en este equipo.';
+    return;
+  }
+  el.className = 'oms-aviso ver ' + (REGISTRO.truncado ? 'warn' : 'ok');
+  el.innerHTML = `<b>Registro del equipo:</b> ${estado.ordenes.length} orden(es) · leído ${esc(hace(REGISTRO.cargadoEn))}.` +
+    (REGISTRO.truncado
+      ? ` <b>Hay más:</b> se muestran las ${estado.ordenes.length} de fecha más reciente; los indicadores y el Excel cubren solo esas.`
+      : '');
 }
 
 function pintarOrdenes() {
   const cont = $('#listaOrdenes');
-  $('#cntOrd').textContent = estado.ordenes.length;
+  $('#cntOrd').textContent = REGISTRO.estado === 'ok' ? estado.ordenes.length : '—';
+  pintarEstadoRegistro();
+  if (REGISTRO.estado !== 'ok') { cont.innerHTML = ''; return; }
+
   if (!estado.ordenes.length) {
-    cont.innerHTML = '<p class="sin-datos">Todavía no hay órdenes guardadas en este equipo.</p>';
+    cont.innerHTML = '<p class="sin-datos">El registro del equipo todavía no tiene órdenes. ' +
+      'La primera que guarde aparecerá aquí para todos.</p>';
     return;
   }
 
-  // Filtro del buscador (número, origen, destino o descripción de material)
+  // Filtro del buscador (número, origen, destino, zona, transformador o material)
   const q = norm(($('#buscarOrden') || {}).value || '');
-  const visibles = !q ? estado.ordenes.map((o, i) => [o, i])
-    : estado.ordenes.map((o, i) => [o, i]).filter(([o]) =>
+  const visibles = !q ? estado.ordenes
+    : estado.ordenes.filter(o =>
         norm(o.numero).includes(q) || norm(o.origen).includes(q) ||
         norm(o.destino).includes(q) || norm(o.zona).includes(q) ||
         norm(o.transformador).includes(q) ||
         (o.items || []).some(it => norm(it.descripcion).includes(q)));
 
   if (!visibles.length) {
-    cont.innerHTML = `<p class="sin-datos">Ninguna de las ${estado.ordenes.length} órdenes guardadas coincide con «${esc(q)}».</p>`;
+    cont.innerHTML = `<p class="sin-datos">Ninguna de las ${estado.ordenes.length} órdenes del registro coincide con «${esc(q)}».</p>`;
     return;
   }
 
-  cont.innerHTML = visibles.map(([o, i]) => `
+  const yo = miUid();
+  const admin = esAdminDeSesion();
+  cont.innerHTML = visibles.map(o => {
+    const autoria = (o.migradaDe ? 'subida por ' : 'guardó ') + esc(nombreDe(o.creadoPor)) +
+      (o.migradaDe ? '' : ' ' + esc(hace(o.creadoEn)));
+    const edicion = o.version > 1
+      ? ` · editó ${esc(nombreDe(o.actualizadoPor))} ${esc(hace(o.actualizadoEn))}` : '';
+    const abierta = estado.cargada && estado.cargada.clave === o.clave ? ' · <b>abierta en el formulario</b>' : '';
+    const puedeEliminar = admin || (yo && o.creadoPor.uid === yo);
+    return `
     <div class="item-orden">
       <span class="badge ${o.tipo === 'ENTRADA' ? 'entrada' : 'salida'}">${esc(o.tipo)}</span>
       <span class="no">N.º ${esc(o.numero)}</span>
-      <span class="meta">${esc(o.fecha)} ${esc(o.hora)} · ${esc(o.origen)} → ${esc(o.destino)} · ${o.items.length} ítem(s)</span>
+      <span class="meta">${esc(o.fecha)} ${esc(o.hora)} · ${esc(o.origen)} → ${esc(o.destino)} · ${o.items.length} ítem(s)
+        <span class="quien">${autoria}${edicion}${abierta}</span></span>
       <span class="acciones">
-        <button type="button" class="oms-btn mini" data-cargar="${i}">Cargar</button>
-        <button type="button" class="oms-btn mini peligro" data-eliminar="${i}">Eliminar</button>
+        <button type="button" class="oms-btn mini" data-abrir="${esc(o.clave)}">Abrir</button>
+        ${puedeEliminar ? `<button type="button" class="oms-btn mini peligro" data-eliminar="${esc(o.clave)}">Eliminar</button>` : ''}
       </span>
-    </div>`).join('') +
-    (q ? `<p class="sin-datos">Mostrando ${visibles.length} de ${estado.ordenes.length} órdenes guardadas.</p>` : '');
+    </div>`;
+  }).join('') +
+    (q ? `<p class="sin-datos">Mostrando ${visibles.length} de ${estado.ordenes.length} órdenes del registro.</p>` : '');
+}
+
+/** Aviso de edición + tipo y número fijos mientras la orden venga del registro. */
+function pintarBarraEdicion() {
+  const b = $('#barraEdicion');
+  if (!b) return;
+  const fija = !!estado.cargada;
+  $('#numero').readOnly = fija;
+  $$('input[name=tipo]').forEach(r => { r.disabled = fija && !r.checked; });
+  if (!fija) { b.className = 'oms-aviso barra-edicion'; b.replaceChildren(); return; }
+
+  const o = estado.ordenes.find(x => x.clave === estado.cargada.clave);
+  b.className = 'oms-aviso barra-edicion ver';
+  b.innerHTML = `<b>Está editando una orden del registro del equipo</b>` +
+    (o ? ` (${esc(o.tipo)} N.º ${esc(o.numero)} · versión ${estado.cargada.version} · creó ${esc(nombreDe(o.creadoPor))})` : '') +
+    '. El tipo y el número quedan fijos: «Guardar orden» actualiza ESTA orden para todo el equipo. ' +
+    'Para hacer otra a partir de ella, use:<br>' +
+    '<button type="button" class="oms-btn mini" data-edicion="nueva">Convertir en orden nueva</button>';
+}
+
+function abrirDelRegistro(clave) {
+  const o = estado.ordenes.find(x => x.clave === clave);
+  if (!o) return;
+  if (formularioTieneDatos() && !confirm('Se reemplazarán los datos del formulario actual. ¿Continuar?')) return;
+  estado.cargada = null;           // escribirOrden necesita los campos libres
+  pintarBarraEdicion();
+  escribirOrden(o);
+  estado.cargada = { clave: o.clave, version: o.version };
+  pintarBarraEdicion();
+  pintarOrdenes();
+  guardarBorrador();
+  aviso(`Orden ${o.numero} abierta desde el registro (versión ${o.version}).`, 'ok');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/** La orden abierta deja de ser una edición: se propone el siguiente número libre. */
+function convertirEnNueva() {
+  if (!estado.cargada) return;
+  estado.cargada = null;
+  const libre = siguienteNumeroLibre($('#numero').value, numerosOcupados());
+  if (libre) $('#numero').value = libre;
+  pintarBarraEdicion(); pintarOrdenes(); guardarBorrador();
+  aviso(`Ahora es una orden NUEVA con el número ${$('#numero').value}. Revise tipo y número y pulse «Guardar orden».`, 'ok', 8000);
+}
+
+/* ------------------------------- Guardar -------------------------------- */
+
+async function guardarOrden() {
+  if (REGISTRO.guardando) return;
+  // El número se normaliza A LA VISTA antes de validar: lo que se ve es lo que queda.
+  const num = normalizarNumero($('#numero').value);
+  if (num !== $('#numero').value) $('#numero').value = num;
+  const v = validar();
+  if (!v.ok) { mostrarErrores(v.errores); return; }
+  const pn = problemaNumero(num);
+  if (pn) { marcarError('numero'); aviso(pn, 'err', 8000); $('#numero').focus(); return; }
+
+  const o = leerOrden();
+  const clave = claveDe(o.tipo, o.numero);
+  const plan = estado.cargada && estado.cargada.clave === clave
+    ? { modo: 'editar', version: estado.cargada.version }
+    : { modo: 'crear' };
+  await ejecutarGuardado(o, plan);
+}
+
+async function ejecutarGuardado(o, plan) {
+  let fallo = null;
+  REGISTRO.guardando = true;
+  cargando(true, 'Guardando en el registro del equipo…');
+  try {
+    const r = plan.modo === 'editar' ? await REG.editar(o, plan.version) : await REG.crear(o);
+    trasGuardar(r.orden, r.ajustes, plan.modo);
+  } catch (e) {
+    fallo = e;
+  } finally {
+    REGISTRO.guardando = false;
+    cargando(false);
+  }
+  if (!fallo) return;
+  const otroPlan = await resolverFalloGuardado(fallo, o, plan);
+  if (otroPlan) await ejecutarGuardado(o, otroPlan);
+}
+
+function trasGuardar(orden, ajustes, modo) {
+  ponerEnRegistro(orden);
+  estado.cargada = { clave: orden.clave, version: orden.version };
+  // Si esta misma orden estaba pendiente o en el histórico del navegador con
+  // el mismo contenido, ya no hace falta ofrecerla.
+  if (LOCAL.legado.concat(LOCAL.pendientes).some(p => LOCAL.claveDeLocal(p) === orden.clave && huella(p) === huella(orden))) {
+    LOCAL.marcarSubida(orden.clave, huella(orden));
+  }
+  guardarBorrador();
+  pintarBarraEdicion(); pintarOrdenes(); pintarPendientes(); pintarAlmacenamiento();
+  aviso(modo === 'editar'
+    ? `Orden ${orden.numero} actualizada en el registro del equipo (versión ${orden.version}).`
+    : `Orden ${orden.numero} guardada en el registro del equipo.`, 'ok', 6000);
+  if (ajustes && ajustes.length) aviso('Al guardar: ' + ajustes.join('; ') + '.', 'warn', 9000);
+  if (DATOS.handle) DATOS.escribir(true);
+}
+
+/** Explica el fallo y devuelve otro plan de guardado si el usuario lo pide. */
+async function resolverFalloGuardado(e, o, plan) {
+  const cod = e && e.codigo;
+
+  if (cod === 'invalida' || cod === 'sin-sesion') { aviso(e.message, 'err', 9000); return null; }
+
+  if (cod === 'existe') {
+    const a = e.actual;
+    ponerEnRegistro(a); pintarOrdenes();
+    const libre = siguienteNumeroLibre(o.numero, numerosOcupados().concat([a.numero]));
+    const botones = [{ id: 'cerrar', texto: 'Cerrar' }, { id: 'ver', texto: 'Ver la que ya existe' }];
+    if (libre) botones.push({ id: 'libre', texto: `Usar ${libre} (siguiente libre)`, clase: 'primario' });
+    const r = await dialogo({
+      titulo: 'Ese número ya está en el registro',
+      texto: `${resumenOrden(a)}\n\nSu orden NO se guardó y el formulario sigue intacto.`,
+      botones
+    });
+    if (r === 'ver') abrirVistaPrevia(a);
+    if (r === 'libre') {
+      $('#numero').value = libre; guardarBorrador();
+      aviso(`Número cambiado a ${libre}. Revise la orden y pulse «Guardar orden».`, 'ok', 8000);
+    }
+    return null;
+  }
+
+  if (cod === 'version') {
+    const a = e.actual;
+    ponerEnRegistro(a); pintarOrdenes();
+    const r = await dialogo({
+      titulo: `${nombreDe(a.actualizadoPor)} guardó cambios en esta orden`,
+      texto: `Usted la abrió en la versión ${plan.version} y ahora va en la ${a.version} (guardada el ${cuando(a.actualizadoEn)}).\n\n` +
+             'Sus cambios siguen en el formulario. Puede ver la versión actual antes de decidir.',
+      botones: [
+        { id: 'cancelar', texto: 'No guardar' },
+        { id: 'ver', texto: 'Ver la versión actual' },
+        { id: 'encima', texto: 'Guardar la mía encima' }
+      ]
+    });
+    if (r === 'ver') abrirVistaPrevia(a);
+    if (r === 'encima') return { modo: 'editar', version: a.version };
+    return null;
+  }
+
+  if (cod === 'borrada' || cod === 'no-existe') {
+    quitarDelRegistro(o && estado.cargada ? estado.cargada.clave : '');
+    estado.cargada = null;
+    pintarBarraEdicion(); pintarOrdenes(); guardarBorrador();
+    const l = e.lapida;
+    const r = await dialogo({
+      titulo: 'Esta orden ya no está en el registro',
+      texto: (l ? `La eliminó ${nombreDe(l.borradaPor)} (${cuando(l.borradaEn)}).` : 'Otra persona la eliminó.') +
+             '\n\nSus datos siguen en el formulario. Si la guarda ahora, queda como una orden nueva a su nombre.',
+      botones: [{ id: 'cancelar', texto: 'No guardar' }, { id: 'crear', texto: 'Guardarla como nueva' }]
+    });
+    return r === 'crear' ? { modo: 'crear' } : null;
+  }
+
+  if (cod === 'permiso') {
+    aviso('El registro rechazó el guardado. Puede que la sesión haya vencido o que su usuario ya no esté ' +
+          'activo. Recargue la página e intente de nuevo: el borrador sigue en este equipo.', 'err', 12000);
+    return null;
+  }
+
+  // Red o tiempo: puede que SÍ haya llegado y solo se perdió la respuesta.
+  const clave = claveDe(o.tipo, normalizarNumero(o.numero));
+  try {
+    const r = await REG.obtener(clave);
+    const quedo = r.orden && r.orden.actualizadoPor.uid === miUid() && huella(r.orden) === huella(o) &&
+      (plan.modo === 'crear' ? r.orden.version === 1 : r.orden.version === plan.version + 1);
+    if (quedo) {
+      trasGuardar(r.orden, [], plan.modo);
+      aviso('La respuesta tardó, pero la orden sí quedó guardada.', 'ok', 7000);
+      return null;
+    }
+  } catch (_) { /* sigue sin conexión */ }
+
+  const r = await dialogo({
+    titulo: 'No hubo conexión con el registro',
+    texto: 'La orden NO llegó al registro del equipo. Puede imprimirla o sacar el PDF igual.\n\n' +
+           '¿La deja pendiente en este equipo para subirla cuando vuelva la señal?',
+    botones: [
+      { id: 'cerrar', texto: 'Cerrar' },
+      { id: 'reintentar', texto: 'Reintentar' },
+      { id: 'pendiente', texto: 'Dejarla pendiente', clase: 'primario' }
+    ]
+  });
+  if (r === 'reintentar') return plan;
+  if (r === 'pendiente') {
+    LOCAL.agregarPendiente(o);
+    pintarPendientes(); pintarAlmacenamiento();
+    if (DATOS.handle) DATOS.escribir(true);
+    aviso('Orden guardada como PENDIENTE en este equipo. Súbala desde «Registro del equipo» cuando haya conexión.', 'warn', 10000);
+  }
+  return null;
+}
+
+/* ------------------------------- Eliminar ------------------------------- */
+
+async function eliminarDelRegistro(clave) {
+  const o = estado.ordenes.find(x => x.clave === clave);
+  if (!o) return;
+  if (!confirm(`¿Eliminar del registro del equipo la orden de ${o.tipo.toLowerCase()} N.º ${o.numero}?\n\n` +
+               `${o.fecha} · ${o.items.length} ítem(s) · creó ${nombreDe(o.creadoPor)}.\n\n` +
+               'Deja de verse para todo el equipo. Queda una copia que el administrador puede recuperar.')) return;
+  cargando(true, 'Eliminando del registro…');
+  try {
+    await REG.eliminar(clave, o.version);
+    quitarDelRegistro(clave);
+    if (estado.cargada && estado.cargada.clave === clave) { estado.cargada = null; guardarBorrador(); }
+    aviso(`Orden ${o.numero} eliminada del registro del equipo.`, 'ok');
+    if (DATOS.handle) DATOS.escribir(true);
+  } catch (e) {
+    if (e.codigo === 'version') {
+      ponerEnRegistro(e.actual);
+      aviso(`${nombreDe(e.actual.actualizadoPor)} guardó cambios en esta orden (versión ${e.actual.version}). ` +
+            'Revísela antes de eliminarla.', 'warn', 9000);
+    } else if (e.codigo === 'no-existe') {
+      quitarDelRegistro(clave);
+      aviso('Esa orden ya no estaba en el registro.', 'warn');
+    } else if (e.codigo === 'permiso') {
+      aviso('Solo quien creó la orden o un administrador puede eliminarla.', 'err', 8000);
+    } else {
+      aviso('No se pudo eliminar: ' + e.message, 'err', 8000);
+    }
+  } finally {
+    cargando(false);
+    pintarBarraEdicion(); pintarOrdenes(); pintarAlmacenamiento();
+  }
+}
+
+/* ------------------- Subir lo que está solo en este equipo --------------- */
+
+const SUBIDA = { abierta: false, filas: [], enCurso: false, resumen: null };
+
+const SITUACION_TXT = {
+  nueva: 'Nueva: no está en el registro',
+  igual: 'Ya estaba igual en el registro',
+  distinta: 'Ya existe DISTINTA en el registro',
+  borrada: 'Fue eliminada del registro',
+  invalida: 'No se puede subir'
+};
+const esMarcable = (s) => s === 'nueva' || s === 'distinta' || s === 'borrada';
+
+function pintarPendientes() {
+  const el = $('#avisoPendientes');
+  if (!el) return;
+  const n = SUBIDA.abierta ? 0 : LOCAL.candidatas().length;
+  if (!n) { el.className = 'oms-aviso'; el.replaceChildren(); return; }
+  el.className = 'oms-aviso ver warn';
+  el.innerHTML = `<b>${n} orden(es) están solo en este navegador</b> (guardadas antes del registro del equipo, ` +
+    'sin conexión o traídas de un archivo). ' +
+    (REGISTRO.estado === 'ok'
+      ? '<button type="button" class="oms-btn mini" data-subida="revisar">Revisar y subir</button>'
+      : 'Podrá revisarlas y subirlas cuando el registro cargue.');
+}
+
+async function abrirSubida() {
+  if (REGISTRO.estado !== 'ok' || SUBIDA.enCurso) return;
+  const cands = LOCAL.candidatas();
+  Object.assign(SUBIDA, { abierta: true, filas: [], enCurso: true, resumen: null });
+  pintarPendientes();
+  pintarSubida('Comprobando cada orden contra el registro…');
+  const filas = [];
+  try {
+    for (let i = 0; i < cands.length; i += 10) {
+      const lote = await Promise.all(cands.slice(i, i + 10).map(async c => {
+        if (c.problema || !c.clave) return { c, situacion: 'invalida', servidor: null };
+        const r = await REG.obtener(c.clave);
+        const servidor = { existe: !!r.orden, huella: r.orden ? huella(r.orden) : '', orden: r.orden, lapida: r.lapida };
+        return { c, situacion: situacionDeSubida(c, servidor), servidor };
+      }));
+      filas.push(...lote);
+      pintarSubida(`Comprobando… ${filas.length} de ${cands.length}`);
+    }
+  } catch (e) {
+    Object.assign(SUBIDA, { abierta: false, filas: [], enCurso: false });
+    pintarSubida(); pintarPendientes();
+    aviso('No se pudo comprobar contra el registro: ' + e.message + ' Intente de nuevo con conexión.', 'err', 9000);
+    return;
+  }
+  // Lo que ya está igual arriba se marca solo: no hay nada que decidir.
+  filas.forEach(f => {
+    f.sel = seleccionadaPorDefecto(f.situacion);
+    if (f.situacion === 'igual') { LOCAL.marcarSubida(f.c.clave, f.c.huella); f.hecha = true; }
+  });
+  SUBIDA.filas = filas;
+  SUBIDA.enCurso = false;
+  pintarSubida();
+}
+
+function detalleSubida(f) {
+  if (f.resultado) return f.resultado;
+  const o = f.c.orden;
+  if (f.situacion === 'invalida') return f.c.problema || 'El tipo o el número no son válidos.';
+  if (f.situacion === 'distinta') {
+    const s = f.servidor.orden;
+    return `En el registro: guardó ${nombreDe(s.actualizadoPor)} el ${cuando(s.actualizadoEn)}, ${s.items.length} ítem(s) · ` +
+           `aquí: ${(o.items || []).length} ítem(s)` +
+           (o.guardadaEn ? `, guardada el ${cuando(Date.parse(o.guardadaEn))}` : '') +
+           ' · si la marca, REEMPLAZA la del registro.';
+  }
+  if (f.situacion === 'borrada') {
+    const l = f.servidor.lapida;
+    return `La eliminó ${nombreDe(l.borradaPor)} el ${cuando(l.borradaEn)} · si la marca, vuelve a crearse.`;
+  }
+  return '';
+}
+
+function pintarSubida(progreso) {
+  const p = $('#panelSubida');
+  if (!p) return;
+  if (!SUBIDA.abierta) { p.hidden = true; p.replaceChildren(); return; }
+  p.hidden = false;
+  const filas = SUBIDA.filas;
+  const nSel = filas.filter(f => f.sel && !f.hecha && esMarcable(f.situacion)).length;
+  const bloqueo = SUBIDA.enCurso ? ' disabled' : '';
+  const res = SUBIDA.resumen;
+
+  p.innerHTML = `
+    <h3>Órdenes que están solo en este navegador</h3>
+    <p class="parrafo">Marque las que quiere subir al registro del equipo. Lo nuevo va marcado; lo que choca con el
+      registro se decide orden por orden. <b>Nada se borra de este navegador.</b></p>
+    ${progreso ? `<p class="progreso">${esc(progreso)}</p>` : ''}
+    ${filas.length ? `<div class="desliza"><table>
+      <thead><tr><th></th><th>Tipo</th><th>N.º</th><th>Fecha</th><th>Ítems</th><th>Situación</th></tr></thead>
+      <tbody>${filas.map((f, i) => {
+        const o = f.c.orden;
+        const casilla = esMarcable(f.situacion) && !f.hecha
+          ? `<input type="checkbox" data-subida-sel="${i}"${f.sel ? ' checked' : ''}${bloqueo} aria-label="Subir la orden ${esc(normalizarNumero(o.numero))}">`
+          : '';
+        const clase = f.hecha ? 'nueva' : f.situacion;
+        const titulo = f.hecha ? (f.situacion === 'igual' ? SITUACION_TXT.igual : 'Subida') : SITUACION_TXT[f.situacion];
+        return `<tr><td>${casilla}</td><td>${esc(o.tipo)}</td><td>${esc(normalizarNumero(o.numero))}</td>` +
+               `<td>${esc(o.fecha || o.fechaISO)}</td><td>${(o.items || []).length}</td>` +
+               `<td class="sit-${clase}"><b>${esc(titulo)}</b><br>${esc(detalleSubida(f))}</td></tr>`;
+      }).join('')}</tbody></table></div>` : (progreso ? '' : '<p class="sin-datos">No quedan órdenes por revisar.</p>')}
+    ${res ? `<div class="oms-aviso ver ${res.fallidas || res.conflicto ? 'warn' : 'ok'}">Subidas: <b>${res.subidas}</b> · ` +
+            `con choque: <b>${res.conflicto}</b> · sin conexión o rechazadas: <b>${res.fallidas}</b>.` +
+            (res.cortada ? ' Se detuvo por falta de conexión: lo que falta se puede subir después.' : '') + '</div>' : ''}
+    <div class="fila-botones">
+      <button type="button" class="oms-btn primario" data-subida="subir"${bloqueo}>Subir marcadas (${nSel})</button>
+      <button type="button" class="oms-btn" data-subida="descartar"${bloqueo}>No volver a ofrecer las no marcadas</button>
+      <button type="button" class="oms-btn" data-subida="cerrar"${bloqueo}>Cerrar</button>
+    </div>`;
+}
+
+async function subirMarcadas() {
+  const marcadas = SUBIDA.filas.filter(f => f.sel && !f.hecha && esMarcable(f.situacion));
+  if (!marcadas.length) { aviso('No hay órdenes marcadas para subir.', 'warn'); return; }
+  const reemplazos = marcadas.filter(f => f.situacion === 'distinta').length;
+  if (reemplazos && !confirm(`${reemplazos} de las marcadas REEMPLAZARÁN órdenes que ya están en el registro con ` +
+                             'otro contenido.\n\n¿Continuar?')) return;
+
+  SUBIDA.enCurso = true;
+  const res = { subidas: 0, conflicto: 0, fallidas: 0, cortada: false };
+  for (let i = 0; i < marcadas.length; i++) {
+    const f = marcadas[i];
+    pintarSubida(`Subiendo ${i + 1} de ${marcadas.length}…`);
+    const o = f.c.orden;
+    try {
+      const r = f.situacion === 'distinta'
+        ? await REG.editar(o, f.servidor.orden.version)
+        : await REG.crear(o, { migradaDe: LOCAL.esPendiente(f.c.clave) ? 'pendiente' : 'navegador',
+                               elaboradaEn: o.guardadaEn || '' });
+      ponerEnRegistro(r.orden);
+      LOCAL.marcarSubida(f.c.clave, f.c.huella);   // orden por orden, justo después de confirmarse
+      f.hecha = true;
+      f.resultado = r.ajustes.length ? 'Ajustes: ' + r.ajustes.join('; ') + '.' : '';
+      res.subidas++;
+    } catch (e) {
+      if (e.codigo === 'existe' || e.codigo === 'version' || e.codigo === 'borrada' || e.codigo === 'no-existe') {
+        res.conflicto++;
+        f.resultado = 'Cambió en el registro mientras se subía: vuelva a revisar para ver su situación actual.';
+      } else {
+        res.fallidas++;
+        f.resultado = e.message;
+        if (e.codigo === 'red' || e.codigo === 'tiempo') { res.cortada = true; break; }
+      }
+    }
+  }
+  SUBIDA.enCurso = false;
+  SUBIDA.resumen = res;
+  pintarSubida(); pintarOrdenes(); pintarAlmacenamiento();
+  if (res.subidas && DATOS.handle) DATOS.escribir(true);
+}
+
+function descartarNoMarcadas() {
+  const resto = SUBIDA.filas.filter(f => !f.hecha && !(f.sel && esMarcable(f.situacion)));
+  if (!resto.length) { aviso('No hay órdenes sin marcar para dejar de ofrecer.', 'warn'); return; }
+  if (!confirm(`¿Dejar de ofrecer ${resto.length} orden(es)?\n\nNo se borran de este navegador: siguen en la copia ` +
+               'de seguridad y vuelven a ofrecerse si su contenido cambia.')) return;
+  resto.forEach(f => { LOCAL.descartar(llaveDeMarca(f.c.clave, f.c.huella), f.c.huella); f.hecha = true; f.resultado = 'No se volverá a ofrecer.'; });
+  pintarSubida();
+}
+
+function cerrarSubida() {
+  Object.assign(SUBIDA, { abierta: false, filas: [], resumen: null });
+  pintarSubida(); pintarPendientes();
 }
 
 /* ------------------------ Nueva orden / limpiar ------------------------ */
@@ -1366,6 +2024,8 @@ function limpiarFormulario(pedirConfirmacion, mensaje) {
   if ($('#conFirmas')) $('#conFirmas').checked = true;
   $('#unidad').value = '';
   pintarItems();
+  estado.cargada = null;           // lo que venga ahora es una orden nueva
+  pintarBarraEdicion();
   LS.borrar(LS.BORRADOR);
   return true;
 }
@@ -1378,7 +2038,9 @@ function nuevaOrden() {
   const aa = hoy.getFullYear();
   $('#fecha').value  = `${aa}-${mm}-${dd}`;
   $('#hora').value   = String(hoy.getHours()).padStart(2, '0') + ':' + String(hoy.getMinutes()).padStart(2, '0');
-  $('#numero').value = `${dd}${mm}${aa}-01`;   // mismo criterio del formato modelo
+  // Mismo criterio del formato modelo, pero sin repetir un número del
+  // registro: todos arrancan en -01 y dos personas el mismo día chocaban.
+  $('#numero').value = siguienteNumeroLibre(`${dd}${mm}${aa}-01`, numerosOcupados()) || `${dd}${mm}${aa}-01`;
   $('#numero').focus();
   $('#numero').select();
   aviso('Nueva orden iniciada. Se propuso número, fecha y hora actuales.', 'ok');
@@ -2628,26 +3290,19 @@ function descargarPlantilla() {
 /* ==========================================================================
    ▓▓▓ BLOQUE 11 — ALMACENAMIENTO Y RESPALDO ▓▓▓
    --------------------------------------------------------------------------
-   Tres capas de persistencia, de menor a mayor robustez:
+   Desde el registro del equipo (99 §77) las ÓRDENES viven en Firestore. Lo
+   que queda en este bloque es respaldo y lo propio del navegador:
 
-   1. localStorage (SIEMPRE ACTIVO, todos los navegadores)
-      Guarda automáticamente borrador, listas e histórico. Los datos viven
-      DENTRO DEL NAVEGADOR, no dentro del archivo HTML: si se borran los
-      datos de navegación, se cambia de navegador o de equipo, se pierden.
+   1. localStorage — borrador, listas importadas, órdenes PENDIENTES de subir
+      y el histórico de antes del registro (congelado, solo se lee).
 
-   2. ARCHIVO DE DATOS VINCULADO (Chrome y Edge)
-      El usuario elige una vez un archivo .json —en su disco o en una carpeta
-      de red— y a partir de ahí cada «Guardar orden» lo escribe también allí.
-      Los datos pasan a vivir en un archivo real que él controla, respalda y
-      puede compartir. Antes de escribir se RELEE y FUSIONA, de modo que si
-      dos personas usan el mismo archivo en una carpeta compartida ninguna
-      borra el trabajo de la otra.
+   2. ARCHIVO DE DATOS VINCULADO (Chrome y Edge) — copia de RESPALDO: se
+      escribe con el registro (ya leído bien) más lo pendiente. Lo que se lee
+      de un archivo NUNCA reemplaza el registro: las órdenes sin autoría
+      entran a «pendientes» y se ofrecen para subir; las copias del registro
+      se ignoran (así una orden borrada no resucita desde un archivo viejo).
 
-   3. COPIA DE SEGURIDAD MANUAL (.json) — todos los navegadores
-      Exportar / restaurar a voluntad. Al restaurar también fusiona.
-
-   La fusión usa como llave «TIPO|NÚMERO» y conserva la versión guardada más
-   recientemente (campo `guardadaEn`).
+   3. COPIA DE SEGURIDAD MANUAL (.json) — mismo paquete, a voluntad.
    ========================================================================== */
 
 const DATOS = {
@@ -2742,7 +3397,8 @@ const DATOS = {
       version: this.VERSION,
       actualizado: new Date().toISOString(),
       equipo: navigator.userAgent.slice(0, 120),
-      ordenes: estado.ordenes,
+      // Copia del registro (solo si se leyó bien) + lo pendiente de este equipo.
+      ordenes: (REGISTRO.estado === 'ok' ? estado.ordenes : []).concat(LOCAL.pendientes),
       listas: {
         origenDestino: estado.listas.origenDestino,
         materiales: estado.listas.materiales,
@@ -2752,40 +3408,15 @@ const DATOS = {
     };
   },
 
-  /** Llave de identidad de una orden: mismo tipo + mismo número = misma orden. */
-  _llave(o) { return (o.tipo || '') + '|' + norm(o.numero || ''); },
-
   /**
-   * Fusiona dos listas de órdenes conservando, para cada llave, la guardada
-   * más recientemente. Devuelve { lista, nuevas, actualizadas }.
+   * Aplica un paquete leído (de archivo o de copia). Las órdenes NO tocan el
+   * registro: las que nunca estuvieron en él pasan a pendientes de subir.
    */
-  fusionarOrdenes(base, entrantes) {
-    const mapa = new Map();
-    (base || []).forEach(o => mapa.set(this._llave(o), o));
-    let nuevas = 0, actualizadas = 0;
-
-    (entrantes || []).forEach(o => {
-      const k = this._llave(o);
-      const ya = mapa.get(k);
-      if (!ya) { mapa.set(k, o); nuevas++; return; }
-      const tA = Date.parse(ya.guardadaEn || 0) || 0;
-      const tB = Date.parse(o.guardadaEn || 0) || 0;
-      if (tB > tA) { mapa.set(k, o); actualizadas++; }
-    });
-
-    const lista = Array.from(mapa.values())
-      .sort((a, b) => (Date.parse(b.guardadaEn || 0) || 0) - (Date.parse(a.guardadaEn || 0) || 0));
-    return { lista, nuevas, actualizadas };
-  },
-
-  /** Aplica un paquete leído (de archivo o de copia) al estado, fusionando. */
   aplicar(paquete, fusionarListas) {
     if (!paquete || paquete.formato !== this.FORMATO) {
       throw new Error('El archivo no tiene el formato esperado (falta «' + this.FORMATO + '»).');
     }
-    const r = this.fusionarOrdenes(estado.ordenes, paquete.ordenes || []);
-    estado.ordenes = r.lista.slice(0, CONFIG.maxOrdenesGuardadas);
-    LS.escribir(LS.ORDENES, estado.ordenes);
+    const r = LOCAL.incorporar(paquete.ordenes || []);
 
     let listasCambiadas = false;
     if (fusionarListas && paquete.listas) {
@@ -2803,7 +3434,7 @@ const DATOS = {
       if (listasCambiadas) { LS.escribir(LS.LISTAS, estado.listas); refrescarListas(); }
     }
 
-    pintarOrdenes(); pintarAlmacenamiento();
+    pintarPendientes(); pintarAlmacenamiento();
     return Object.assign(r, { listasCambiadas });
   },
 
@@ -2832,15 +3463,15 @@ const DATOS = {
         const txt = await (await h.getFile()).text();
         if (txt.trim()) {
           const r = this.aplicar(JSON.parse(txt), true);
-          if (r.nuevas || r.actualizadas) {
-            aviso(`Se incorporaron ${r.nuevas} orden(es) nueva(s) y ${r.actualizadas} actualizada(s) del archivo.`, 'ok', 7000);
+          if (r.nuevas) {
+            aviso(`El archivo traía ${r.nuevas} orden(es) que no estaban en este equipo: quedaron para revisar y subir.`, 'warn', 8000);
           }
         }
       } catch (e) { /* archivo nuevo o vacío */ }
 
       await this.escribir(true);
       pintarAlmacenamiento();
-      aviso(`Archivo de datos vinculado: ${h.name}. A partir de ahora cada orden guardada se escribe allí.`, 'ok', 8000);
+      aviso(`Archivo de respaldo vinculado: ${h.name}. Cada vez que guarde se escribe allí una copia del registro.`, 'ok', 8000);
     } catch (e) {
       if (e && e.name === 'AbortError') return;          // el usuario canceló
       console.error(e);
@@ -2853,15 +3484,18 @@ const DATOS = {
     this.handle = null; this.nombreArchivo = ''; this.ultimaEscritura = null;
     await this._olvidarHandle();
     pintarAlmacenamiento();
-    aviso('Archivo desvinculado. Los datos siguen guardándose en este navegador.', 'ok');
+    aviso('Archivo desvinculado. Las órdenes siguen guardándose en el registro del equipo.', 'ok');
   },
 
   /**
-   * Escribe el paquete en el archivo vinculado, RELEYENDO Y FUSIONANDO antes
-   * para no pisar cambios que otra persona (u otro equipo) haya guardado.
+   * Escribe el paquete en el archivo vinculado. Antes RELEE el archivo: lo que
+   * traiga sin autoría pasa a pendientes, para no perder órdenes que otra
+   * persona dejó allí. Sin un registro leído bien no se escribe (el archivo
+   * quedaría con una lista incompleta).
    */
   async escribir(silencioso) {
     if (!this.handle) return false;
+    if (REGISTRO.estado !== 'ok') return false;
     const perm = await this.permiso(false);
     if (perm !== 'granted') {
       if (!silencioso) {
@@ -2877,12 +3511,10 @@ const DATOS = {
         if (txt.trim()) {
           const remoto = JSON.parse(txt);
           if (remoto.formato === this.FORMATO) {
-            const r = this.fusionarOrdenes(estado.ordenes, remoto.ordenes || []);
-            estado.ordenes = r.lista.slice(0, CONFIG.maxOrdenesGuardadas);
-            LS.escribir(LS.ORDENES, estado.ordenes);
-            if (r.nuevas && !silencioso) {
-              aviso(`Se incorporaron ${r.nuevas} orden(es) que había en el archivo.`, 'warn', 6000);
-              pintarOrdenes();
+            const r = LOCAL.incorporar(remoto.ordenes || []);
+            if (r.nuevas) {
+              pintarPendientes();
+              if (!silencioso) aviso(`El archivo traía ${r.nuevas} orden(es) que no estaban en este equipo: quedaron para revisar y subir.`, 'warn', 7000);
             }
           }
         }
@@ -2912,9 +3544,11 @@ const DATOS = {
       const txt = await (await this.handle.getFile()).text();
       if (txt.trim()) {
         const r = this.aplicar(JSON.parse(txt), true);
-        aviso(`Sincronizado: ${r.nuevas} nueva(s), ${r.actualizadas} actualizada(s). Total: ${estado.ordenes.length}.`, 'ok', 7000);
+        aviso(r.nuevas
+          ? `Sincronizado. El archivo traía ${r.nuevas} orden(es) que no estaban en este equipo: quedaron para revisar y subir.`
+          : 'Sincronizado con el archivo de respaldo.', r.nuevas ? 'warn' : 'ok', 7000);
       } else {
-        aviso('El archivo estaba vacío; se escribieron los datos de este equipo.', 'warn', 6000);
+        aviso('El archivo estaba vacío; se escribió allí la copia del registro.', 'warn', 6000);
       }
       await this.escribir(true);
     } catch (e) {
@@ -2932,8 +3566,8 @@ const DATOS = {
     const perm = await this.permiso(false);
     pintarAlmacenamiento();
     if (perm === 'granted') await this.sincronizarSilencioso();
-    else aviso('Hay un archivo de datos vinculado. Pulse «Sincronizar ahora» en la sección 7 para ' +
-               'autorizar el acceso y cargar sus órdenes.', 'warn', 10000);
+    else aviso('Hay un archivo de respaldo vinculado. Pulse «Sincronizar ahora» en la sección 7 para ' +
+               'autorizar el acceso.', 'warn', 10000);
   },
 
   async sincronizarSilencioso() {
@@ -2941,8 +3575,8 @@ const DATOS = {
       const txt = await (await this.handle.getFile()).text();
       if (!txt.trim()) return;
       const r = this.aplicar(JSON.parse(txt), true);
-      if (r.nuevas || r.actualizadas) {
-        aviso(`Datos cargados del archivo vinculado: ${estado.ordenes.length} orden(es).`, 'ok', 6000);
+      if (r.nuevas) {
+        aviso(`El archivo vinculado traía ${r.nuevas} orden(es) que no estaban en este equipo: quedaron para revisar y subir.`, 'warn', 8000);
       }
     } catch (e) { console.warn('No se pudo leer el archivo vinculado al iniciar:', e); }
   },
@@ -2953,7 +3587,8 @@ const DATOS = {
     const fecha = new Date().toISOString().slice(0, 10);
     const blob = new Blob([JSON.stringify(this.empaquetar(), null, 1)], { type: 'application/json' });
     LIBS.descargar(blob, `Respaldo_Ordenes_SSEE_${fecha}.json`);
-    aviso(`Copia de seguridad exportada con ${estado.ordenes.length} orden(es).`, 'ok', 6000);
+    aviso(`Copia de seguridad exportada: ${REGISTRO.estado === 'ok' ? estado.ordenes.length : 0} orden(es) del registro` +
+          ` y ${LOCAL.pendientes.length} pendiente(s) de este equipo.`, 'ok', 7000);
   },
 
   restaurarCopia(file) {
@@ -2963,7 +3598,9 @@ const DATOS = {
     lector.onload = ev => {
       try {
         const r = this.aplicar(JSON.parse(ev.target.result), true);
-        aviso(`Copia restaurada: ${r.nuevas} orden(es) nueva(s), ${r.actualizadas} actualizada(s). Total: ${estado.ordenes.length}.`, 'ok', 8000);
+        aviso(r.nuevas
+          ? `Copia leída: ${r.nuevas} orden(es) que no estaban en este equipo quedaron para revisar y subir.`
+          : 'Copia leída: no traía órdenes nuevas para este equipo' + (r.listasCambiadas ? ' (listas restauradas).' : '.'), 'ok', 8000);
         if (this.handle) this.escribir(true);
       } catch (e) {
         console.error(e);
@@ -2978,7 +3615,7 @@ const DATOS = {
   bytesUsados() {
     try {
       let n = 0;
-      [LS.BORRADOR, LS.LISTAS, LS.ORDENES].forEach(k => {
+      [LS.BORRADOR, LS.LISTAS, LS.ORDENES, LS.PENDIENTES, LS.SUBIDAS, LS.DESCARTADAS].forEach(k => {
         const v = localStorage.getItem(k); if (v) n += v.length;
       });
       return n;
@@ -3111,10 +3748,12 @@ function pintarAlmacenamiento() {
   const nOrd = estado.ordenes.length;
   const nItems = estado.ordenes.reduce((s, o) => s + ((o.items || []).length), 0);
 
-  $('#dEstadoOrdenes').textContent = nOrd;
-  $('#dEstadoItems').textContent = nItems;
+  // Sin un registro leído bien no hay cifra que dar: «0» se leería como «no hay órdenes».
+  const leido = REGISTRO.estado === 'ok';
+  $('#dEstadoOrdenes').textContent = leido ? nOrd : '—';
+  $('#dEstadoItems').textContent = leido ? nItems : '—';
   $('#dEstadoEspacio').textContent = kb + ' KB';
-  $('#cntOrd').textContent = nOrd;
+  $('#cntOrd').textContent = leido ? nOrd : '—';
 
   const est = $('#dEstadoArchivo');
   const btnSync = $('#btnSincronizar');
@@ -3123,18 +3762,18 @@ function pintarAlmacenamiento() {
 
   if (!DATOS.soportado) {
     est.className = 'oms-aviso ver warn';
-    est.innerHTML = '<b>Este navegador no admite vincular un archivo de datos.</b> ' +
-      'Funciona en Chrome y Edge. Aquí sus datos viven solo dentro del navegador: ' +
-      'use la <b>copia de seguridad</b> con regularidad.';
+    est.innerHTML = '<b>Este navegador no admite vincular un archivo de respaldo.</b> ' +
+      'Funciona en Chrome y Edge. Las órdenes igual quedan en el <b>registro del equipo</b>; si quiere una ' +
+      'copia en su disco, use la copia de seguridad.';
     btnVinc.disabled = true; btnSync.hidden = true; btnDesv.hidden = true;
     return;
   }
 
   if (!DATOS.handle) {
     est.className = 'oms-aviso ver warn';
-    est.innerHTML = '<b>Sin archivo de datos vinculado.</b> Los datos se guardan solo dentro de este ' +
-      'navegador y en este equipo: se perderían al borrar los datos de navegación, al cambiar de ' +
-      'navegador o al cambiar de computador. Vincule un archivo para que vivan en su disco.';
+    est.innerHTML = '<b>Sin archivo de respaldo vinculado.</b> Las órdenes viven en el registro del equipo; ' +
+      'en este navegador solo quedan el borrador, las listas y lo pendiente de subir. Vincule un archivo si ' +
+      'quiere además una copia en su disco.';
     btnVinc.disabled = false; btnSync.hidden = true; btnDesv.hidden = true;
     return;
   }
@@ -3153,8 +3792,8 @@ function pintarAlmacenamiento() {
     est.className = 'oms-aviso ver warn';
     est.innerHTML = `<b>Archivo vinculado pero pendiente de autorizar:</b> <code>${esc(DATOS.nombreArchivo)}</code>. ` +
       'Por seguridad, el navegador vuelve a pedir permiso en cada sesión. ' +
-      '<b>Pulse «Sincronizar ahora»</b> para autorizarlo y cargar sus órdenes. Mientras tanto, ' +
-      'los datos se siguen guardando dentro del navegador.';
+      '<b>Pulse «Sincronizar ahora»</b> para autorizarlo. Mientras tanto, las órdenes se siguen ' +
+      'guardando en el registro del equipo.';
     return;
   }
 
@@ -3163,7 +3802,7 @@ function pintarAlmacenamiento() {
     : 'aún no en esta sesión';
   est.className = 'oms-aviso ver ok';
   est.innerHTML = `<b>Archivo de datos vinculado y autorizado:</b> <code>${esc(DATOS.nombreArchivo)}</code>. ` +
-    `Cada orden que guarde se escribe también allí. Última escritura: ${ult}.` +
+    `Cada vez que guarda se escribe allí una copia del registro. Última escritura: ${ult}.` +
     (DATOS.recordado ? '' : '<br><b>Aviso:</b> este navegador no pudo memorizar el vínculo; tendrá que rehacerlo al reabrir.');
 }
 
@@ -3494,9 +4133,10 @@ function pintarIndicadores() {
   alc.className = 'oms-aviso ver' + (d.total ? 'ok' : 'warn');
   alc.innerHTML = d.total
     ? `Calculado sobre <b>${d.total}</b> ${d.total === 1 ? 'orden guardada' : 'órdenes guardadas'}` +
-      (FILTROS.activos() ? ` (de ${totalHist} en el histórico, tras aplicar los filtros)` : ' en este equipo') +
+      (FILTROS.activos() ? ` (de ${totalHist} en el registro, tras aplicar los filtros)` : ' del registro del equipo') +
       (d.desde ? ` · del <b>${fechaAtexto(d.desde)}</b> al <b>${fechaAtexto(d.hasta)}</b>` : '') +
-      `. <span style="color:var(--tinta-2)">Solo incluye lo que se pulsó «Guardar orden» en este equipo.</span>`
+      `. <span style="color:var(--tinta-2)">Solo incluye lo guardado en el registro del equipo.</span>` +
+      (REGISTRO.truncado ? ` <b>Parcial:</b> el registro tiene más órdenes y aquí entran solo las ${totalHist} de fecha más reciente.` : '')
     : (totalHist
         ? `Ninguna de las <b>${totalHist}</b> órdenes guardadas cumple los filtros aplicados.`
         : '<b>Todavía no hay órdenes guardadas.</b> Diligencie una orden y pulse «Guardar orden» para empezar a ver indicadores.');
@@ -3703,20 +4343,24 @@ function exportarIndicadoresExcel() {
    ========================================================================== */
 
 function borrarDatosLocales() {
+  const nPend = LOCAL.candidatas().length;
   const extra = (typeof DATOS !== 'undefined' && DATOS.handle)
-    ? '\n\nEl archivo de datos vinculado («' + DATOS.nombreArchivo + '») NO se borra: podrá recuperarlo desde él.'
-    : '\n\nNo hay archivo de datos vinculado, así que esta acción es IRREVERSIBLE. Exporte antes una copia de seguridad.';
-  if (!confirm('¿Desea borrar TODOS los datos guardados en este navegador?\n\n' +
-               'Se eliminarán: el borrador actual, las listas importadas y el histórico de órdenes.' + extra)) return;
-  LS.borrar(LS.BORRADOR); LS.borrar(LS.LISTAS); LS.borrar(LS.ORDENES);
-  estado.ordenes = [];
+    ? '\n\nEl archivo de respaldo vinculado («' + DATOS.nombreArchivo + '») NO se borra.'
+    : '';
+  if (!confirm('¿Desea borrar los datos guardados en ESTE navegador?\n\n' +
+               'Se eliminarán: el borrador actual, las listas importadas, el histórico de antes del registro ' +
+               'y las órdenes que no se han subido' + (nPend ? ` (${nPend} ahora mismo: exporte antes una copia de seguridad)` : '') +
+               '.\n\nEl registro del equipo NO se toca.' + extra)) return;
+  [LS.BORRADOR, LS.LISTAS, LS.ORDENES, LS.PENDIENTES, LS.SUBIDAS, LS.DESCARTADAS].forEach(k => LS.borrar(k));
+  LOCAL.leer();
   estado.listas = {
     origenDestino: CONFIG.origenDestino.slice(),
     materiales:    CONFIG.materiales.slice(),
     fuenteOD: 'precargado', fuenteMat: 'precargado'
   };
-  refrescarListas(); pintarOrdenes(); pintarAlmacenamiento(); limpiarFormulario(false);
-  aviso('Se borraron los datos de este navegador. El archivo de datos vinculado NO se tocó.', 'ok', 8000);
+  cerrarSubida();
+  refrescarListas(); limpiarFormulario(false); pintarOrdenes(); pintarPendientes(); pintarAlmacenamiento();
+  aviso('Se borraron los datos de este navegador. El registro del equipo no se tocó.', 'ok', 8000);
 }
 
 function conectarEventos() {
@@ -3766,28 +4410,41 @@ function conectarEventos() {
     }
   });
 
-  /* --- Órdenes guardadas --- */
+  /* --- Registro del equipo (99 §77) --- */
   $('#listaOrdenes').addEventListener('click', ev => {
-    const bc = ev.target.closest('[data-cargar]');
+    const ba = ev.target.closest('[data-abrir]');
     const be = ev.target.closest('[data-eliminar]');
-    if (bc) {
-      const o = estado.ordenes[Number(bc.dataset.cargar)];
-      if (!o) return;
-      if (formularioTieneDatos() && !confirm('Se reemplazarán los datos del formulario actual. ¿Continuar?')) return;
-      escribirOrden(o);
-      aviso(`Orden ${o.numero} cargada en el formulario.`, 'ok');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-    if (be) {
-      const i = Number(be.dataset.eliminar);
-      const o = estado.ordenes[i];
-      if (o && confirm(`¿Eliminar definitivamente la orden ${o.numero} del histórico local?`)) {
-        estado.ordenes.splice(i, 1);
-        LS.escribir(LS.ORDENES, estado.ordenes);
-        pintarOrdenes();
-        aviso('Orden eliminada del histórico.', 'ok');
-      }
-    }
+    if (ba) abrirDelRegistro(ba.dataset.abrir);
+    if (be) eliminarDelRegistro(be.dataset.eliminar);
+  });
+  // Tras un despliegue, un navegador puede traer la página vieja de caché con
+  // este código nuevo (`30 L-85`): sin estos elementos, el módulo sigue
+  // arrancando en vez de romperse entero.
+  const en = (id, evento, fn) => { const el = $('#' + id); if (el) el.addEventListener(evento, fn); };
+  en('btnActualizarRegistro', 'click', () => cargarRegistro(true));
+  en('avisoPendientes', 'click', ev => {
+    if (ev.target.closest('[data-subida="revisar"]')) abrirSubida();
+  });
+  en('panelSubida', 'click', ev => {
+    const b = ev.target.closest('button[data-subida]');
+    if (!b || SUBIDA.enCurso) return;
+    if (b.dataset.subida === 'subir') subirMarcadas();
+    else if (b.dataset.subida === 'descartar') descartarNoMarcadas();
+    else if (b.dataset.subida === 'cerrar') cerrarSubida();
+  });
+  en('panelSubida', 'change', ev => {
+    const c = ev.target.closest('[data-subida-sel]');
+    if (!c) return;
+    const f = SUBIDA.filas[Number(c.dataset.subidaSel)];
+    if (f) { f.sel = c.checked; pintarSubida(); }
+  });
+  en('barraEdicion', 'click', ev => {
+    if (ev.target.closest('[data-edicion="nueva"]')) convertirEnNueva();
+  });
+  // El número se ve normalizado al salir del campo: lo que se ve es lo que se guarda.
+  $('#numero').addEventListener('blur', () => {
+    const n = normalizarNumero($('#numero').value);
+    if (n !== $('#numero').value) { $('#numero').value = n; guardarBorrador(); }
   });
 
   /* --- Importación de listas --- */
@@ -3886,17 +4543,24 @@ function iniciar() {
     if (guardadas) estado.listas = Object.assign(estado.listas, listasDelUsuario(guardadas));
     refrescarListas();
 
-    // Histórico de órdenes
+    // Registro del equipo: llega tras la sesión (`trasSesionRegistro`). Aquí
+    // solo lo propio del navegador (pendientes e histórico anterior).
     FILTROS.leer();
-    estado.ordenes = LS.leer(LS.ORDENES, []) || [];
+    LOCAL.leer();
+    estado.ordenes = [];
     pintarOrdenes();
+    pintarPendientes();
     pintarAlmacenamiento();
     DATOS.restaurarVinculo();          // recupera el archivo vinculado, si lo hay
 
-    // Borrador
+    // Borrador (con la orden del registro que estaba abierta, si la había)
     const b = LS.leer(LS.BORRADOR, null);
     if (b && (b.numero || (b.items && b.items.length))) {
       escribirOrden(b);
+      if (b._cargada && b._cargada.clave) {
+        estado.cargada = { clave: String(b._cargada.clave), version: Number(b._cargada.version) || 0 };
+      }
+      pintarBarraEdicion();
       aviso('Se recuperó la última orden diligenciada en este navegador.', 'warn', 6000);
     } else {
       pintarItems();
@@ -3920,7 +4584,7 @@ function iniciar() {
     console.log('%cMódulo de Órdenes SSEE listo.', 'color:#006FB7;font-weight:bold',
       `\n· Origen/Destino: ${estado.listas.origenDestino.length}` +
       `\n· Materiales: ${estado.listas.materiales.length}` +
-      `\n· Órdenes guardadas: ${estado.ordenes.length}` +
+      `\n· Pendientes de subir en este navegador: ${LOCAL.candidatas().length}` +
       `\n· Archivo de datos: ${DATOS.soportado ? (DATOS.handle ? DATOS.nombreArchivo : 'sin vincular') : 'no admitido por este navegador'}`);
 
   } catch (err) {
@@ -3970,6 +4634,20 @@ if (getSession()) trasSesionParque();
 else {
   window.addEventListener('sgm:session-ready', trasSesionParque, { once: true });
   document.addEventListener('sgm:session-ready', trasSesionParque, { once: true });
+}
+
+// El registro del equipo exige sesión y perfil activo (reglas de Firestore).
+// Una sola lectura al abrir; después, el botón «Actualizar».
+let registroEnCamino = false;
+function trasSesionRegistro() {
+  if (registroEnCamino) return;
+  registroEnCamino = true;
+  cargarRegistro(false);
+}
+if (getSession()) trasSesionRegistro();
+else {
+  window.addEventListener('sgm:session-ready', trasSesionRegistro, { once: true });
+  document.addEventListener('sgm:session-ready', trasSesionRegistro, { once: true });
 }
 
 // El panel «Mi firma» avisa al subir o quitar: se vuelve a leer y se repinta,
