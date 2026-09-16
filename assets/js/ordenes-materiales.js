@@ -35,6 +35,8 @@
 import { miFirma, firmasDisponibles } from './data/firmas.js';
 import { firmaAplicaA } from './domain/firmas.js';
 import { getSession } from './auth/session-guard.js';
+import { listarV2 as listarParque } from './data/transformadores.js';
+import { parqueParaOrdenes } from './domain/ordenes_parque.js';
 
 const CONFIG = {
 
@@ -67,7 +69,8 @@ const CONFIG = {
 
   entregadoPor: [
     { nombre: 'CARLOS MARTELO', cedula: '' },
-    { nombre: 'JUAN CARDONA',   cedula: '' }
+    { nombre: 'JUAN CARDONA',   cedula: '' },
+    { nombre: 'JORGE RHENALS',  cedula: '' }
   ],
 
   recibidoPor: [
@@ -161,6 +164,8 @@ const CONFIG = {
     { descripcion: "Motoventiladores Tipo 2 FN-050", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Motoventiladores Tipo 3", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Motoventiladores Tipo 4", unidad: "UND", grupo: "Accesorios" },
+    { descripcion: "Motoventilador Trifasico F20 marca Krenz (URE)", unidad: "UND", grupo: "Accesorios" },
+    { descripcion: "Motoventilador Trifasico F26 marca Krenz (URE)", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Bombas de aceite", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Membrana tanque de expansión", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Cable protecciones mecánicas", unidad: "Mts", grupo: "Accesorios" },
@@ -180,6 +185,207 @@ const CONFIG = {
     { descripcion: "Buje 13,8 KV", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Buje 34,5 KV", unidad: "UND", grupo: "Accesorios" },
     { descripcion: "Buje 66/110 KV", unidad: "UND", grupo: "Accesorios" },
+    { descripcion: "Funda termo encogible · 36KV-180mm/125°c · WOER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Funda termo encogible · 36KV-150mm/125°c · WOER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Funda termo encogible · 36KV-40mm/125°c · WOER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Funda termo encogible · 36KV-25mm/125°c · WOER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Respirador deshidratante · Libre de mantenimiento · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Des humificador de aire · Sálico gel 2.2 KG · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Des humificador de aire · Sálico gel 3.6 KG · ARES", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Termómetro bimetálico · Con 2 contactos tipo interruptor · ARES", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Transformador · Multibalasto · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Termómetro · Temperatura del aceite · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Termómetro · Temperatura De los devanados · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Sensor o transmisor · Temperatura del transformador · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Pozo combinado (termómetro) · TP100 · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Pozo combinado (termómetro) · RTD 4-20 mA para indicación remota · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Indicador de nivel de líquidos · Con micro interruptores de control · ORTO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Relé buccholz · Relé EB 050 A (4 HUECOS) · CEDASPE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Relé buccholz · Relé EB 070 A (4 HUECOS) · CEDASPE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Relé buccholz · Relé EB0 80 A (8 HUECOS) · CEDASPE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Relé buccholz · Relé EB0 80 A (8 HUECOS) de segunda", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Válvula de alivio de presión · Tamaño 1/4” BSP / NPT · VIAT INSTRUMENTS", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Válvula de alivio de presión · Messko / 12 psi · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Válvula de alivio de presión · Tipo qualitrol 10 psi · HEARTLAND", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conectores · Borna 2 hcos #750 robusto Ref:3CC2TR2750 · CU", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Silica gel · Naranja por 25 kg · China", unidad: "Kg", grupo: "Bodega Membrillal" },
+    { descripcion: "Mini interruptor trifásico · Protección termomagnética de 3 x 10 A · STECK", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor trifásico · Protección termomagnética de 3 x 63 A · NOARK", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor trifásico · Protección termomagnética de 3 x 50 A · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor trifásico · Protección termomagnética de 3 x 32 A · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor trifásico · Proteccion termomagnetica de 3 x 4 A · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor bipolar · Protección termomagnética de 2 x 16 A · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor unipolar · Protección termomagnética de 1 x 16 A · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor trifásico · Protección termomagnética de 3 x 32 A · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor bipolar · Protección termomagnética de 2 x 16 A · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Interruptor unipolar · Protección termomagnética de 1 x 16 A · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guarda motor · Clase de disparo 2.5 A -4 A · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guarda motor · Clase de disparo 1.6 A – 2.5 A · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guarda motor · Clase de disparo 21A · SIEMENS", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guarda motor · Clase de disparo 1 A 1.6 A · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guarda motor · Clase de disparo 2.5 A -4 A · LS ELECTRIC", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guarda motor · Clase de disparo 2.5 A -4 A · CHNT", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactor · 3 polos 09 A 400 W 5 HP · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactor · 3 polos 09 A 400 W 7 HP · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactor · 3 polos 25A 400 W 7.5 HP · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conectores enlaces de cortos · Juego de conectores de pruebas · ONKA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares para interruptor termomagnetico · NS2-AU11 · CHNT", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares para interruptor termomagnetico · AL3111 1NO + 1NC · NOARK", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · GVAE11 Contacto inst NA- NC · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bloque Contactos auxiliares · LAND 11 aditivo instantáneo · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · A9N26924 contacto auxiliar of · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · A9N26929 contacto auxiliar of · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Higrostato · Para tablero · PLASTIM", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Panel calentador · PTC1000 · PLASTIM", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · GVAE11 Contacto inst NA- NC izq · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · LADN11 Contacto inst NA- NC frontal · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · LADN22 Contacto inst NA- NC frontal · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · LADN22 Contacto inst NA- NC frontal · TELEMACANIQUE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Contactos auxiliares · S2C-H6-11R · ABB", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Borneras · Bloque de terminales Tamaño 2.5 mm · ROHS", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Borneras · Bloque de terminales tamaño 2.5 mm · ONKA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Borneras de sujeccion · Bloque de terminales para sujetar · ONKA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Coraza · Liquid tigh ½ “x 100 mts", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Coraza · Liquid tigh 2 “x 50 mts", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conector · Curvo de 2” · UL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conector · Recto de 2” · UL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conector · Curvo de1/2” · UL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conector · Recto de 1/2” · UL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Varilla roscada · De 13mm x 1 m", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable verde #14 x100m · CENTELSA", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable verde #16 x100m · PROCABLES", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable amarillo #14 x100m · PROCABLES", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable blanco #14 x100m · ARGOS", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable rojo #14 x100m · CENTELSA", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable Azul #14 x100m · CENTELSA", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conectores · Borna 2 huecos #500 KCMIL · IED", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conectores · Borna 2 huecos #750 KCMIL · IED", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable 3x12 · CENTELSA", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable 4x16 · CENTELSA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conductor · Cable 4x16 · PROCABLES", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Auto laminado · Repuesto de la maquilladora · PANDUIT", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conector · Recto cable a cable 21,8x21,8mm bimetálico · CONECTORES", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Amarras plásticas · 50cm x 100 unid · DEXSON", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Amarras plásticas · 35cm x 100 unid · DEXSON", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Gabinetes · Tableros de control", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bomba sumergible · Verde · WDM", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Buje · 3 campanas 2000A", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Buje · 11 campanas 19mm · GAMA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Buje · 3 campanas 19mm · GAMA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Buje · 4 campanas 13mm · GAMA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Desengrasante · Industrial · LPS", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Alcohol etílico · Uso externo · KLEINE", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Wypall · 60 paños · Wypall", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bolsa de basura roja · Industrial 130 x 120 (10 uní) · Super", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Disco flap · Grano 40 · FLC", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Disco para corte de metal · 4” · TRUSWE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Soldadura de plata · 0.05 · SANHAAN", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Pegante instantáneo m 40 · Instant adhesuve m4 · ROHS M40", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Ventiladores grandes · ZIEHL ABGG FN050-DL.4I.A7P1 · ZIEHL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Ventilador monofásico · ZIEHL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Ventiladores pequeños · ZIEHL ABGG FN063-DL.4I.A7P1 · ZIEHL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Buje · Aislador porcelano 20nf1000 · CEDASPE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Buje de silicona · BUJE DE SILICONA NBR ESPECIAL · CEDASPE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Descargadores · DPS RF: YH10W-12S (TENSION 12 KV, 10 KA · PROTECK", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Premoldeados · 35 KV TFT-353E · ETE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Tubo cuadrado · Acero inoxidable (soporte) · Acero", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conmutador sin carga · CAPT 010 · MR", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminales de ojo · Modelo RV2-6 calibre 16-14 /27A · EBHQ", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal de orqueta · Modelo SV2-5 calibre 16-14 · SPK", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminales de pin · Modelo E15121 REF 34616 · EBHQ", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · 500mmX1200mm 1/8 · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · 500mmX1200mm 3/16 · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · 500mmX1200mm 1/4 · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · THO207 / 300X300X3mm · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · THO194 / 300X300X4mm · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · THO195 / 300X300X5mm · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · THO193 / 300X300X6mm · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · THO 521/ 510X510X4mm · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lamina de nitrilo · 600x600x6mm · NITRILO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO150 / 3mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO152 / 5mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO 153 / 6mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO155/ 8mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO160/ 13mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO161 / 14mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO163 / 16mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO166 / 19mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Cordon O-ring · THO/ 10mm · HERNOL", unidad: "Mts", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 565 / 80X7 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 0 048 / 96X55X5,5 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 009/ 45X22X3 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO OO1/ 32X14X3 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO O46/ 80X56X6 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 043/ 125x90x4 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 010/ 70X45X6 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 021/ 65X32X3 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 057/ 78X58X4 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 030/ 104X70X4 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO OO2/ 50X28X6 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO 029/ 80X45X2 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques satelite · THO 115/ 41x10,5 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques satelite · THO 126 / 50x11 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques satelite · THO127 / 4114X12 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques planos · THO O44/ 106X75X5 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 571 / 70X45X27 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 087/ 65X48X18 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 086/ 59X42X18 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 094 / 38X19X18 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 668 / 65X42X24 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO O93/ 44X29X16 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 089 / 22X12X10 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · LG – 0046/ 5X2,5 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Empaques de bolas · THO 088 / 31X19X12 · HERNOL", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Guantes de nitrilo · RINO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Agua de bateria · 500 c.c · Qool", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Embudo plástico · 14 cm · AUTO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Limpiador de contactos · 430 cm · CRC", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lubricante penetrante 3-36 · 430 cm · CRC", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Espuma expansiva · 300 ml · topex", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lubricante WD-40 · 382 ML · WD-40", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Cita aislante · Super 33 · SCOTCH", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Cita de tela de vidrio · Super 27 · SCOTCH", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Cita termo encogible · Super 23 · SCOTCH", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Cinta De Papel · ½ · CELLUX", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Grata de copa · 4\" · MASSO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Lima de caña · 6\" · REDLINE", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bombillas · 12 w · SYLVANIA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Traba roscas · 36 ml · GASTPO", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Disco de corte de · 7\" · BOSCH", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Selector Switch · ZBE-101 · SCHNEIDER", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Selector Switch · NP2 · CHNT", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Selector Switch · XB2-BD21 · THKC", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Manometro de glicerina · 2.5\" X 1/4 NPT  0 - 150 PSI · BOSTON", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Luz piloto · Rojo 110v C:10899 · CHINT", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Luz piloto · Verde 110v C:10898 · CHINT", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Belzona · 1161 X 1KG · BELZONA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Belzona · 1121 X 3 KG · BELZONA", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bolsa de basura negra · 61x61 cm 50=und · BASURIN", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bolsa de basura verde · 61x61 cm 50=und · CITYSALUD", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Bolsa de basura Blanca · 61x61 cm 50=und · BASURIN", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Esmalte Uretano · Serie 36 - Componente A - 4GAL · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Catalizador Esmalte Uretano · Serie 36 - Componente B - 1GAL · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Ajustador Epoxico · 1 Galon · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Barrera Epoxica · Componente A - 1 GAL · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Barrera Epoxica · Componente B - 1 GAL · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Imprimante Epoxico Rojo · Componente A - 1 GAL · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Sika Catalizador · Componente B - 0.25 GAL · SIKA", unidad: "GL", grupo: "Bodega Membrillal" },
+    { descripcion: "Ventiladores · FN063-6DL.41.A7PI · ZIEHL-ABEGG", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Ventiladores · FN050-6DL.41.A7PI · ZIEHL-ABEGG", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Ventiladores · ZN045-4DL.2FV7P2 · ZIEHL-ABEGG", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Tuercamordasa · FREC 3/8", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Tuercas · FREC 3/8", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Arandela Plana · FREC 3/8", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Arandela de presion · FREC 3/8", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Teminal tipo Pin · E2521 14AWG · EBCHQ", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal tipo Pin · PTV5.5-13 · SPK", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal tipo Pin · S1512 · EBCHQ", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal  tipo Ojo · RV2-6 14-16AWG · EBCHQ", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal tipo Ojo · 12AWG", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal Tipo U · SV2-4M 16-14AWG", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Terminal tipo U · SV5.5-5 12-10AWG · EBCHQ", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Conectores Tubulares · 12AWG", unidad: "UND", grupo: "Bodega Membrillal" },
+    { descripcion: "Varilla tipo U · FREC 4\" - 1/2", unidad: "UND", grupo: "Bodega Membrillal" },
     { descripcion: "Transformador trifásico (OLTC) de conexión al STN capacidad final de hasta 10 MVA", unidad: "UND", grupo: "Transformadores · UC CREG 015-2018", codigo: "N5T1", nivel: "Nivel 5 (conexión al STN)", tipo: "Dos devanados", cambiador: "OLTC" },
     { descripcion: "Transformador trifásico (OLTC) de conexión al STN capacidad final de 11 a 20 MVA", unidad: "UND", grupo: "Transformadores · UC CREG 015-2018", codigo: "N5T2", nivel: "Nivel 5 (conexión al STN)", tipo: "Dos devanados", cambiador: "OLTC" },
     { descripcion: "Transformador trifásico (OLTC) de conexión al STN capacidad final de 21 a 40 MVA", unidad: "UND", grupo: "Transformadores · UC CREG 015-2018", codigo: "N5T3", nivel: "Nivel 5 (conexión al STN)", tipo: "Dos devanados", cambiador: "OLTC" },
@@ -224,6 +430,22 @@ const CONFIG = {
     { descripcion: "Transformador trifásico (OLTC) lado de alta en el nivel 3 capacidad final de 21 a 30 MVA", unidad: "UND", grupo: "Transformadores · UC CREG 015-2018", codigo: "N3T6", nivel: "Nivel 3", tipo: "Dos devanados", cambiador: "OLTC" },
     { descripcion: "Transformador trifásico (OLTC) lado de alta en el nivel 3 capacidad final mayor a 31 MVA", unidad: "UND", grupo: "Transformadores · UC CREG 015-2018", codigo: "N3T7", nivel: "Nivel 3", tipo: "Dos devanados", cambiador: "OLTC" }
   ],
+
+  /* --- Parque de transformadores de potencia --------------------------- *
+     Relaciona cada orden con el activo al que corresponde: la matrícula y su
+     subestación se imprimen en el primer renglón del bloque «Motivo». La
+     matrícula NO es única por sí sola (hay una en dos subestaciones), por eso
+     la llave es matrícula + subestación.
+
+     EN EL SITIO ESTE LISTADO NO VIAJA DENTRO DEL ARCHIVO. El módulo suelto lo
+     trae copiado de la hoja TX_Potencia porque no tiene servidor; aquí se lee
+     del PARQUE VIVO en Firestore, detrás de la sesión (`cargarParque`). Dos
+     razones: el repositorio es público —el guard esconde la página, no el
+     contenido del archivo, `99 §70`— y una copia se queda vieja en cuanto el
+     parque cambia. Mismo criterio con el que las firmas pasaron a la cuenta
+     de cada quien (`99 §71`).
+     -------------------------------------------------------------------- */
+  transformadores: [],
 
   /* --- Comportamiento -------------------------------------------------- */
   filasTablaPagina: 18,        // filas de la tabla de materiales por página
@@ -351,6 +573,25 @@ function esc(txt) {
 }
 
 /** Normaliza cadenas para comparar (sin tildes, sin espacios, minúsculas). */
+/**
+ * De unas listas guardadas (navegador, archivo vinculado o copia de seguridad),
+ * lo que es DEL USUARIO. Lo marcado `precargado` es del código: el archivo lo
+ * guarda igual, así que una copia escrita por una versión anterior traía los 68
+ * materiales de antes y tapaba en silencio los 271 del catálogo nuevo. Lo
+ * importado o editado por el usuario se respeta siempre.
+ */
+function listasDelUsuario(l) {
+  const out = {};
+  if (!l) return out;
+  if (Array.isArray(l.origenDestino) && l.origenDestino.length && l.fuenteOD !== 'precargado') {
+    out.origenDestino = l.origenDestino; out.fuenteOD = l.fuenteOD;
+  }
+  if (Array.isArray(l.materiales) && l.materiales.length && l.fuenteMat !== 'precargado') {
+    out.materiales = l.materiales; out.fuenteMat = l.fuenteMat;
+  }
+  return out;
+}
+
 function norm(txt) {
   return String(txt == null ? '' : txt)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -644,6 +885,19 @@ function llenarFijos() {
   $('#dlZonas').innerHTML = CONFIG.zonas.map(z => `<option value="${esc(z)}">`).join('');
 
   opciones($('#motivo'), CONFIG.motivos.concat([CONFIG.motivoOtro]));
+
+  llenarTransformadores();
+  llenarResponsables();
+}
+
+/**
+ * Responsables con la marca ✒ de quien tiene firma. Separado de `llenarFijos`
+ * porque es lo ÚNICO que cambia al llegar la firma de la sesión: repintar el
+ * formulario entero volvía a marcar «con firmas» aunque el usuario la hubiera
+ * desmarcado (y el siguiente PDF estampaba la firma igual) y repintaba el
+ * desplegable del parque sin necesidad. `opciones` conserva la selección.
+ */
+function llenarResponsables() {
   const marca = p => firmaDe(p) ? '  ✒' : '';
   opciones($('#entregado'), CONFIG.entregadoPor.map((p, i) => ({
     valor: String(i), texto: `${p.nombre}${marca(p)}`
@@ -651,8 +905,58 @@ function llenarFijos() {
   opciones($('#recibido'), CONFIG.recibidoPor.map((p, i) => ({
     valor: String(i), texto: `${p.nombre}${marca(p)}`
   })));
-
   pintarEstadoFirmas();
+}
+
+/**
+ * Desplegable de transformadores, agrupado por zona. El valor es el texto que
+ * se imprime, porque la matrícula sola no basta: una aparece en dos
+ * subestaciones. Separado de `llenarFijos` para poder repintarlo cuando llega
+ * el parque SIN volver a marcar «con firmas» ni tocar el resto del formulario
+ * (`opciones` conserva la selección que el usuario ya hubiera hecho).
+ */
+let ESTADO_PARQUE = 'cargando';   // 'cargando' | 'listo' | 'error'
+
+function llenarTransformadores() {
+  const sel = $('#transformador');
+  if (!sel) return;
+  const prev = sel.value;
+  const vacio = ESTADO_PARQUE === 'error' ? '— No se pudo cargar el parque —'
+    : ESTADO_PARQUE === 'cargando' ? '— Cargando el parque… —'
+    : (CONFIG.transformadores.length ? '— Ninguno —' : '— Sin transformadores en el parque —');
+  opciones(sel, (CONFIG.transformadores || []).map(t => ({
+    valor: textoTransformador(t),
+    texto: t.matricula + '  ·  ' + t.subestacion + (t.potencia ? '  ·  ' + t.potencia + ' kVA' : ''),
+    grupo: t.zona || '',
+    datos: { zona: t.zona || '' }
+  })), vacio);
+  // Un borrador o una orden del histórico pueden traer un transformador que la
+  // lista todavía no tiene (el parque llega después de restaurarlos) o que ya
+  // no está en el parque. `opciones` solo conserva lo que existe en la lista
+  // nueva, así que sin esto la selección se perdía al repintar y el PDF salía
+  // sin la línea TRANSFORMADOR, sin avisar. Mismo criterio que `escribirOrden`.
+  if (prev && sel.value !== prev) {
+    const op = document.createElement('option'); op.value = prev; op.textContent = prev;
+    sel.appendChild(op);
+    sel.value = prev;
+  }
+  medirRenglones();
+}
+
+/**
+ * Lee el parque vivo (una sola lectura con tope, free-tier) y llena el
+ * desplegable. Si falla, el formulario sigue funcionando: el transformador es
+ * opcional y la orden se emite igual; solo se avisa en el propio desplegable.
+ */
+async function cargarParque() {
+  try {
+    CONFIG.transformadores = parqueParaOrdenes(await listarParque());
+    ESTADO_PARQUE = 'listo';
+  } catch (err) {
+    console.warn('[ordenes-materiales] no se pudo leer el parque:', err);
+    ESTADO_PARQUE = 'error';
+  }
+  llenarTransformadores();
 }
 
 /** Resume en la interfaz qué responsables tienen firma digitalizada cargada. */
@@ -693,6 +997,37 @@ function motivoFinal() {
   return motivoEsOtro() ? $('#motivoOtro').value.trim() : $('#motivo').value;
 }
 
+/** Cómo se nombra un transformador en el documento y en el desplegable. */
+function textoTransformador(t) {
+  return t.matricula + ' · S/E ' + t.subestacion;
+}
+
+/** Renglón del bloque «Motivo» que identifica el activo. Vacío si no se eligió. */
+function renglonTransformador() {
+  const v = $('#transformador') ? $('#transformador').value : '';
+  return v ? 'TRANSFORMADOR: ' + v : '';
+}
+
+/**
+ * Al elegir el transformador se completa la Zona, pero SOLO si está vacía:
+ * lo que el usuario haya escrito manda sobre lo que diga el listado.
+ */
+function alTransformador() {
+  const op = $('#transformador').selectedOptions[0];
+  const z = op && op.dataset ? op.dataset.zona : '';
+  const zona = $('#zona');
+  const actual = zona.value.trim();
+  // Se completa si está vacía o si sigue siendo la que puso el propio
+  // desplegable: así, al corregir el transformador, la zona lo acompaña. Lo que
+  // el usuario escribió a mano manda y no se pisa.
+  if (z && (!actual || actual === zona.dataset.auto)) {
+    zona.value = z;
+    zona.dataset.auto = z;
+    marcarOK('zona');
+  }
+  medirRenglones();
+}
+
 /** Muestra u oculta el campo de descripción según la opción elegida. */
 function alternarMotivoOtro() {
   const otro = motivoEsOtro();
@@ -714,13 +1049,16 @@ function medirRenglones() {
   const mot = motivoFinal();
   const nota = $('#nota').value.trim();
 
+  const trf = renglonTransformador();
+
+  const lTrf  = trf  ? partirTexto(trf, ancho, GEO.motivo.size, false).length : 0;
   const lMot  = mot  ? partirTexto(mot, ancho, GEO.motivo.size, false).length : 0;
   const lNota = nota ? partirTexto('Nota: ' + nota, ancho, GEO.motivo.size, false).length : 0;
-  const total = lMot + lNota;
+  const total = lTrf + lMot + lNota;
 
   if (!total) { el.className = 'oms-aviso'; el.innerHTML = ''; return; }
 
-  const detalle = `Motivo: ${lMot} · Nota: ${lNota}`;
+  const detalle = (lTrf ? `Transformador: ${lTrf} · ` : '') + `Motivo: ${lMot} · Nota: ${lNota}`;
   if (total <= 3) {
     el.className = 'oms-aviso ver ok';
     el.innerHTML = `Ocupa <b>${total} de los 3 renglones</b> del bloque «Motivo» del formato (${detalle}).`;
@@ -871,6 +1209,7 @@ function leerOrden() {
     origen:   $('#origen').value,
     destino:  $('#destino').value,
     items:    estado.items.map(i => ({ ...i })),
+    transformador: $('#transformador') ? $('#transformador').value : '',
     motivo:    motivoFinal(),                 // lo que se imprime
     motivoSel: $('#motivo').value,             // la opción elegida, para poder recargarla
     nota:      $('#nota').value.trim(),
@@ -888,6 +1227,7 @@ function escribirOrden(o) {
   $$('input[name=tipo]').forEach(r => { r.checked = (r.value === o.tipo); });
   $('#numero').value  = o.numero || '';
   $('#zona').value    = o.zona || '';
+  delete $('#zona').dataset.auto;   // la zona de la orden recuperada es del usuario, no del desplegable
   $('#fecha').value   = o.fechaISO || '';
   $('#hora').value    = o.hora || '';
   const sel = o.motivoSel || o.motivo || '';
@@ -897,6 +1237,17 @@ function escribirOrden(o) {
   $('#w-motivoOtro').hidden = !esOtro;
   $('#nota').value    = o.nota || '';
   $('#empresaVig').value = o.empresaVig || '';
+
+  // El transformador puede haber salido del listado tras una actualización:
+  // se agrega la opción para no perder lo que la orden registró en su día.
+  const trf = o.transformador || '';
+  if ($('#transformador')) {
+    if (trf && !Array.prototype.some.call($('#transformador').options, x => x.value === trf)) {
+      const op = document.createElement('option'); op.value = trf; op.textContent = trf;
+      $('#transformador').appendChild(op);
+    }
+    $('#transformador').value = trf;
+  }
   if ($('#conFirmas')) $('#conFirmas').checked = (o.conFirmas !== false);
 
   // Origen/destino pueden no estar en la lista actual: se agregan si faltan
@@ -909,8 +1260,19 @@ function escribirOrden(o) {
     $(sel).value = val;
   });
 
-  const iE = CONFIG.entregadoPor.findIndex(p => p.cedula === (o.entregado || {}).cedula);
-  const iR = CONFIG.recibidoPor.findIndex(p => p.cedula === (o.recibido || {}).cedula);
+  // Se identifica al responsable por NOMBRE. En el sitio las cédulas están
+  // vacías a propósito (`99 §70`), y buscar por cédula devolvía SIEMPRE la
+  // primera persona: una orden entregada por JORGE RHENALS volvía como CARLOS
+  // MARTELO, una sin responsables pasaba la validación con dos ya elegidos y,
+  // con la firma de la sesión activa, podía estamparse en un documento ajeno.
+  // Un responsable sin nombre, o que ya no está en la lista, deja el campo
+  // vacío para obligar a elegir: nunca el primero.
+  const idxPersona = (lista, per) => {
+    const n = norm((per || {}).nombre);
+    return n ? lista.findIndex(p => norm(p.nombre) === n) : -1;
+  };
+  const iE = idxPersona(CONFIG.entregadoPor, o.entregado);
+  const iR = idxPersona(CONFIG.recibidoPor, o.recibido);
   $('#entregado').value = iE >= 0 ? String(iE) : '';
   $('#recibido').value  = iR >= 0 ? String(iR) : '';
 
@@ -961,6 +1323,7 @@ function pintarOrdenes() {
     : estado.ordenes.map((o, i) => [o, i]).filter(([o]) =>
         norm(o.numero).includes(q) || norm(o.origen).includes(q) ||
         norm(o.destino).includes(q) || norm(o.zona).includes(q) ||
+        norm(o.transformador).includes(q) ||
         (o.items || []).some(it => norm(it.descripcion).includes(q)));
 
   if (!visibles.length) {
@@ -1203,6 +1566,10 @@ function construirPaginas(o) {
 
     const anchoMot = R - M.x - 4;
     const rMot = [];                                    // hasta 3 renglones disponibles
+    // El activo va primero: identifica la orden antes que la razón del movimiento
+    if (o.transformador) {
+      partirTexto('TRANSFORMADOR: ' + o.transformador, anchoMot, S, false).forEach(l => rMot.push(l));
+    }
     partirTexto(o.motivo || '', anchoMot, S, false).forEach(l => rMot.push(l));
     if (o.nota) partirTexto('Nota: ' + o.nota, anchoMot, S, false).forEach(l => rMot.push(l));
     const basesMot = [M.base1, M.base2, M.base3];
@@ -1222,7 +1589,7 @@ function construirPaginas(o) {
       const x = F.colX[i];
       const anchoCol = (F.segs[i][1] - F.segs[i][0]) - (x - F.segs[i][0]) - 4;
 
-      /* Firma digitalizada, si la persona tiene una registrada en CONFIG.firmas.
+      /* Firma de la sesión, solo si esta línea es la de quien tiene la sesión (firmaDe → firmaAplicaA, `99 §71`).
          Se escala conservando su proporción y se centra sobre la línea de firma. */
       if (o.conFirmas !== false) {
         const fir = firmaDe(pe.p);
@@ -1515,6 +1882,10 @@ const XLS_NCOL = 15;                                     // A … O
 const XLS_LIMITES = [36.5, 76.42, 96.2, 154.77, 175.16, 194.6, 273.3, 288.65,
                      312.18, 332.57, 371.7, 430.59, 469.59, 489.62, 537.73, 557.9];
 
+/* Ancho útil de la celda de descripción (B:K) en puntos, menos la sangría de un
+   carácter. Sale de los mismos límites que el PDF, no de un número aparte. */
+const ANCHO_DESC_XLS = XLS_LIMITES[11] - XLS_LIMITES[1] - 8;
+
 /** Convierte una coordenada X en puntos a { col, frac } para anclar imágenes. */
 function anclaX(xPt) {
   for (let c = 0; c < XLS_LIMITES.length - 1; c++) {
@@ -1730,7 +2101,13 @@ function hojaOrden(wb, o, p, nPag, idLogo) {
 
     celda(ws, `A${r}`, it ? (p * NF + i + 1) : null, { h: 'center', borde: b });
     ws.mergeCells(`B${r}:K${r}`);
-    celda(ws, `B${r}`, it ? (it.codigo ? it.codigo + ' · ' : '') + it.descripcion : null, { indent: 1, borde: b });
+    // Excel NO aplica shrinkToFit a una celda combinada: si el texto no cabe, lo recorta
+    // sin avisar. Por eso el tamaño se calcula aquí con la misma función que usa el PDF
+    // sobre la misma columna. La métrica es la de Helvetica y Excel pinta Calibri, que es
+    // más estrecha: el error va del lado seguro (encoge un pelo de más, nunca de menos).
+    const txtDesc = it ? (it.codigo ? it.codigo + ' · ' : '') + it.descripcion : null;
+    celda(ws, `B${r}`, txtDesc, { indent: 1, borde: b,
+      size: txtDesc ? ajustar(txtDesc, ANCHO_DESC_XLS, 11, false, 6) : 11 });
     ws.mergeCells(`L${r}:M${r}`);
     celda(ws, `L${r}`, it ? (it.unidad || '') : null, { h: 'center', borde: b });
     ws.mergeCells(`N${r}:O${r}`);
@@ -1753,6 +2130,9 @@ function hojaOrden(wb, o, p, nPag, idLogo) {
 
   const anchoMotPt = GEO.caja.r - GEO.motivo.x - 4;
   const renglones = [];
+  if (o.transformador) {
+    partirTexto('TRANSFORMADOR: ' + o.transformador, anchoMotPt, 10.6, false).forEach(l => renglones.push(l));
+  }
   partirTexto(o.motivo || '', anchoMotPt, 10.6, false).forEach(l => renglones.push(l));
   if (o.nota) partirTexto('Nota: ' + o.nota, anchoMotPt, 10.6, false).forEach(l => renglones.push(l));
 
@@ -1871,10 +2251,10 @@ function hojaDatos(wb, o) {
   });
 
   const cab = ['Tipo de orden', 'No. de orden', 'Zona', 'Fecha', 'Hora', 'Origen', 'Destino',
-    'Ítem', 'Descripción', 'Unidad', 'Cantidad', 'Motivo', 'Nota',
+    'Ítem', 'Descripción', 'Unidad', 'Cantidad', 'Transformador', 'Motivo', 'Nota',
     'Autorizado por', 'Cédula autoriza', 'Entregado por', 'Cédula entrega',
     'Recibido por', 'Cédula recibe', 'Empresa vigilancia'];
-  const anchos = [13, 14, 12, 11, 7, 22, 22, 6, 34, 8, 9, 38, 32, 18, 15, 18, 15, 18, 15, 18];
+  const anchos = [13, 14, 12, 11, 7, 22, 22, 6, 34, 8, 9, 30, 38, 32, 18, 15, 18, 15, 18, 15, 18];
 
   ws.columns = cab.map((t, i) => ({ header: t, key: 'k' + i, width: anchos[i] }));
 
@@ -1890,7 +2270,7 @@ function hojaDatos(wb, o) {
     const fila = ws.addRow([
       o.tipo, o.numero, o.zona, o.fecha, o.hora, o.origen, o.destino,
       i + 1, it.descripcion, it.unidad || '', Number(it.cantidad),
-      o.motivo, o.nota || '',
+      o.transformador || '', o.motivo, o.nota || '',
       o.autorizado.nombre, o.autorizado.cedula,
       o.entregado.nombre, o.entregado.cedula,
       o.recibido.nombre, o.recibido.cedula, o.empresaVig || ''
@@ -1921,8 +2301,13 @@ function hojaDatos(wb, o) {
      └────────────────────┘    └──────────────────────────────┴─────────┘
 
    También se aceptan encabezados llamados: Origen, Destino, Descripción,
-   Material, Código, Referencia y Unidad, en cualquier hoja y en cualquier
-   orden de columnas.
+   Material, Código, Referencia, Unidad y Grupo, en cualquier hoja y en
+   cualquier orden de columnas.
+
+   La columna «Grupo» es opcional y, cuando viene, manda sobre el nombre de la
+   hoja. Sirve para traer varios grupos del desplegable en una sola hoja
+   (Accesorios, Bodega Membrillal, …) y es lo que hace que la plantilla que se
+   descarga desde el módulo vuelva a entrar sin perder la clasificación.
    ========================================================================== */
 
 const ENCABEZADOS = {
@@ -1935,7 +2320,9 @@ const ENCABEZADOS = {
   // «DESCRIPCIÓN SEGÚN CREG 015-2018» y similares se reconocen por prefijo
   unidad:      ['unidad', 'und', 'un', 'u.m.', 'um', 'unidad de medida', 'unidad medida'],
   codigo:      ['codigo', 'código', 'cod', 'cod.', 'uc', 'u.c.'],
-  referencia:  ['referencia', 'ref', 'ref.']
+  referencia:  ['referencia', 'ref', 'ref.'],
+  // Permite traer más de un grupo en una sola hoja; si no viene, se deduce del nombre de la hoja
+  grupo:       ['grupo', 'grupos', 'categoria', 'categoría', 'clasificacion', 'clasificación']
 };
 
 function rolDeEncabezado(txt) {
@@ -1987,6 +2374,7 @@ function extraerDeHoja(an) {
     roles.forEach((rol, c) => { if (rol && idx[rol] === undefined) idx[rol] = c; });
     const cOD = idx.origenDestino, cOr = idx.origen, cDe = idx.destino;
     const cDesc = idx.descripcion, cUn = idx.unidad, cCod = idx.codigo, cRef = idx.referencia;
+    const cGr = idx.grupo;
 
     for (let i = iCab + 1; i < filas.length; i++) {
       const f = filas[i] || [];
@@ -1999,7 +2387,10 @@ function extraerDeHoja(an) {
           unidad:      cUn  !== undefined && f[cUn]  != null ? String(f[cUn]).trim()  : 'UND',
           codigo:      cCod !== undefined && f[cCod] != null ? String(f[cCod]).trim() : '',
           referencia:  cRef !== undefined && f[cRef] != null ? String(f[cRef]).trim() : '',
-          grupo:       grupoDeHoja(nombreHoja)
+          // La columna «Grupo», si viene, manda sobre el nombre de la hoja: así una sola
+          // hoja puede traer varios grupos y la plantilla descargada vuelve a entrar igual
+          grupo:       (cGr !== undefined && f[cGr] != null && String(f[cGr]).trim())
+                         ? String(f[cGr]).trim() : grupoDeHoja(nombreHoja)
         });
       }
     }
@@ -2192,10 +2583,13 @@ function descargarPlantilla() {
     h2.columns = [
       { header: 'Ítem',   key: 'd', width: 46 },
       { header: 'Unidad', key: 'u', width: 12 },
-      { header: 'Código', key: 'c', width: 16 }
+      { header: 'Código', key: 'c', width: 16 },
+      // Sin esta columna, al reimportar la plantilla todos los grupos que no son
+      // transformadores se fundirían en «Accesorios»
+      { header: 'Grupo',  key: 'g', width: 26 }
     ];
     estado.listas.materiales.filter(m => !esTrafo(m))
-      .forEach(m => h2.addRow([m.descripcion, m.unidad || '', m.codigo || '']));
+      .forEach(m => h2.addRow([m.descripcion, m.unidad || '', m.codigo || '', m.grupo || '']));
 
     const h3 = wb.addWorksheet('Transformadores');
     h3.columns = [
@@ -2395,14 +2789,15 @@ const DATOS = {
 
     let listasCambiadas = false;
     if (fusionarListas && paquete.listas) {
-      if ((paquete.listas.origenDestino || []).length) {
-        estado.listas.origenDestino = paquete.listas.origenDestino;
-        estado.listas.fuenteOD = paquete.listas.fuenteOD || 'copia de seguridad';
+      const delUsuario = listasDelUsuario(paquete.listas);
+      if (delUsuario.origenDestino) {
+        estado.listas.origenDestino = delUsuario.origenDestino;
+        estado.listas.fuenteOD = delUsuario.fuenteOD || 'copia de seguridad';
         listasCambiadas = true;
       }
-      if ((paquete.listas.materiales || []).length) {
-        estado.listas.materiales = paquete.listas.materiales;
-        estado.listas.fuenteMat = paquete.listas.fuenteMat || 'copia de seguridad';
+      if (delUsuario.materiales) {
+        estado.listas.materiales = delUsuario.materiales;
+        estado.listas.fuenteMat = delUsuario.fuenteMat || 'copia de seguridad';
         listasCambiadas = true;
       }
       if (listasCambiadas) { LS.escribir(LS.LISTAS, estado.listas); refrescarListas(); }
@@ -2614,9 +3009,9 @@ function exportarHistoricoExcel() {
     });
 
     const cab = ['Tipo', 'No. de orden', 'Fecha', 'Hora', 'Zona', 'Origen', 'Destino',
-      'Ítem', 'Código / UC', 'Descripción', 'Unidad', 'Cantidad', 'Motivo', 'Nota',
+      'Ítem', 'Código / UC', 'Descripción', 'Unidad', 'Cantidad', 'Transformador', 'Motivo', 'Nota',
       'Autorizado por', 'Entregado por', 'Recibido por', 'Empresa vigilancia', 'Guardada el'];
-    const anchos = [10, 15, 11, 7, 12, 22, 22, 6, 12, 36, 8, 10, 40, 30, 18, 18, 18, 18, 18];
+    const anchos = [10, 15, 11, 7, 12, 22, 22, 6, 12, 36, 8, 10, 30, 40, 30, 18, 18, 18, 18, 18];
     ws.columns = cab.map((t, i) => ({ header: t, key: 'k' + i, width: anchos[i] }));
 
     ws.getRow(1).height = 28;
@@ -2634,7 +3029,7 @@ function exportarHistoricoExcel() {
         const f = ws.addRow([
           o.tipo, o.numero, o.fecha, o.hora, o.zona, o.origen, o.destino,
           i + 1, it.codigo || '', it.descripcion, it.unidad || '', Number(it.cantidad),
-          o.motivo, o.nota || '',
+          o.transformador || '', o.motivo, o.nota || '',
           (o.autorizado || {}).nombre || '', (o.entregado || {}).nombre || '',
           (o.recibido || {}).nombre || '', o.empresaVig || '',
           o.guardadaEn ? o.guardadaEn.slice(0, 19).replace('T', ' ') : ''
@@ -3451,6 +3846,7 @@ function conectarEventos() {
     medirRenglones(); guardarBorrador();
   });
   $('#nota').addEventListener('input', medirRenglones);
+  $('#transformador').addEventListener('change', () => { alTransformador(); guardarBorrador(); });
   $('#conFirmas').addEventListener('change', guardarBorrador);
   $$('input[name=tipo]').forEach(r => r.addEventListener('change', () => { marcarOK('tipo'); guardarBorrador(); }));
   $('#cantidad').addEventListener('input', () => { if ($('#cantidad').value) marcarOK('cantidad'); });
@@ -3487,9 +3883,7 @@ function iniciar() {
 
     // Listas guardadas previamente
     const guardadas = LS.leer(LS.LISTAS, null);
-    if (guardadas && guardadas.origenDestino && guardadas.origenDestino.length) {
-      estado.listas = Object.assign(estado.listas, guardadas);
-    }
+    if (guardadas) estado.listas = Object.assign(estado.listas, listasDelUsuario(guardadas));
     refrescarListas();
 
     // Histórico de órdenes
@@ -3545,13 +3939,37 @@ else iniciar();
 function trasCargarFirma() {
   cargarFirmaDeLaSesion().then(() => {
     try { if (document.getElementById('modalVista').classList.contains('ver')) abrirVistaPrevia(); } catch (_) {}
-    try { llenarFijos(); } catch (_) {}   // repinta la marca ✒ de quien ya tiene firma
+    try { llenarResponsables(); } catch (_) {}   // repinta SOLO la marca ✒ (no «con firmas»)
   });
 }
-if (getSession()) trasCargarFirma();
+// El guard avisa por window Y por document: sin candado la firma se pedía dos
+// veces a Storage antes de que existiera la caché. `sgm:firma-cambiada` sigue
+// llamando a `trasCargarFirma` directamente, porque ahí sí hay que releerla.
+let firmaEnCamino = false;
+function trasSesionFirma() {
+  if (firmaEnCamino) return;
+  firmaEnCamino = true;
+  trasCargarFirma();
+}
+if (getSession()) trasSesionFirma();
 else {
-  window.addEventListener('sgm:session-ready', trasCargarFirma, { once: true });
-  document.addEventListener('sgm:session-ready', trasCargarFirma, { once: true });
+  window.addEventListener('sgm:session-ready', trasSesionFirma, { once: true });
+  document.addEventListener('sgm:session-ready', trasSesionFirma, { once: true });
+}
+
+// El parque también exige sesión (reglas de Firestore). Una sola lectura: el
+// `parqueEnCamino` evita pedirlo dos veces si el aviso llega por window y por
+// document.
+let parqueEnCamino = false;
+function trasSesionParque() {
+  if (parqueEnCamino) return;
+  parqueEnCamino = true;
+  cargarParque();
+}
+if (getSession()) trasSesionParque();
+else {
+  window.addEventListener('sgm:session-ready', trasSesionParque, { once: true });
+  document.addEventListener('sgm:session-ready', trasSesionParque, { once: true });
 }
 
 // El panel «Mi firma» avisa al subir o quitar: se vuelve a leer y se repinta,

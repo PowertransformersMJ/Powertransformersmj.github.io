@@ -90,3 +90,6 @@ docs/.boot-marker
 # Hojas de negocio con datos reales (raíz):
 /Salud de Activos*.xlsx
 /Gestion_Suministros_Transformadores*.xlsm
+
+# Bancos de prueba TEMPORALES sin guard (99 §70.5, §76): nunca se suben
+_dev/zz-*

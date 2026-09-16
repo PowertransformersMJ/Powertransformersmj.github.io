@@ -214,6 +214,12 @@
         </header>
         <div class="cuerpo">
           <div class="rejilla">
+            <div class="campo c12" id="w-transformador">
+              <label for="transformador">Transformador <span class="ayuda">(opcional — se imprime en el primer renglón del bloque «Motivo»)</span></label>
+              <select id="transformador" name="transformador"><option value="">— Cargando el parque… —</option></select>
+              <span class="ayuda">Matrícula y subestación del parque de potencia. Al elegirlo se completa la Zona si está vacía.</span>
+            </div>
+
             <div class="campo c12" id="w-motivo">
               <label for="motivo">Motivo <span class="req">*</span></label>
               <select id="motivo" name="motivo"><option value="">— Seleccione —</option></select>
@@ -306,7 +312,8 @@
             <span class="oms-linea">Haga clic aquí o arrastre el archivo con las listas</span>
             <small>Se leen las hojas <b>Origen_Destino</b> (origen y destino), <b>Accesorios</b> (ítem y unidad)
             y <b>Transformadores</b> (UC y descripción CREG 015-2018).<br>
-            También se detectan automáticamente columnas llamadas Origen, Destino, Descripción, Ítem, UC, Código, Referencia o Unidad.</small>
+            También se detectan automáticamente columnas llamadas Origen, Destino, Descripción, Ítem, UC, Código, Referencia, Unidad o <b>Grupo</b>.<br>
+          La columna <b>Grupo</b> es opcional: si viene, decide en qué grupo del desplegable queda cada material y permite traer varios grupos en una sola hoja.</small>
             <input type="file" id="archivoListas" accept=".xlsx,.xls,.csv,.txt" class="oms-archivo-oculto">
           </label>
 
