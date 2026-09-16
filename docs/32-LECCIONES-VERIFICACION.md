@@ -265,3 +265,20 @@ Dos defectos del mismo tipo, cazados el mismo día sobre la misma matriz de ries
 **La regla**: un color que *significa* algo (semáforo, veredicto) se verifica **midiendo**
 (`getBoundingClientRect`, `getComputedStyle(...).backgroundColor`), no mirando el código; y si el
 documento se imprime, se declara `print-color-adjust: exact` en el mismo cambio. → `99 §75.15`.
+
+### L-90 · Vaciar un dato que sirve de LLAVE rompe en silencio todo lo que buscaba por él
+
+`§70` vació las cédulas del módulo de Órdenes de Materiales porque el repositorio es público. Estaba
+bien. Pero `escribirOrden` seguía buscando al responsable con `findIndex(p => p.cedula === …)`: con todas
+las cédulas en `''`, **cualquier** orden recuperada devolvía la primera persona. Nadie lo vio en dos
+semanas porque el formulario se veía perfecto; solo fallaba al *recuperar* una orden, y fallaba hacia el
+lado peligroso: nombres cambiados en un documento que se firma y la firma de la sesión estampable en una
+línea ajena.
+
+**La regla**: al vaciar, anonimizar o quitar un campo por seguridad, `grep` de **todas las lecturas** de ese
+campo y pregunta, en cada una, si lo usaba como **llave**. Si sí, cambia la llave en el mismo commit.
+
+**El corolario de la fusión**: al traer una versión nueva de algo que ya se había saneado, **sanea la suya
+ANTES de fusionar**, no después. En una fusión a tres vías, lo que no choca entra limpio — y así habría
+vuelto a entrar cualquier cédula nueva. Y el saneado por forma volvió a fallar: la cédula real seguía en
+un comentario (L-75). → `99 §76`.
