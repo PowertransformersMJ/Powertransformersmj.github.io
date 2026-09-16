@@ -2960,3 +2960,56 @@ cuatro muestras medían **0×0** —«Verde (OK)» sin ningún verde—. Medido 
 **Verificación**: 1646 pass, lint limpio, preview FIEL (25 casillas iguales a la Tabla 11, cero grises,
 equipo encerrado en su fila, impresión exacta, ambas leyendas con color) y **servido en producción**.
 Sin prueba unitaria: la hoja es un render dentro de `montarPanelFichas`.
+
+## 76. ADR — Órdenes de Materiales al día con la versión del 8-sep: fusionar sin dejar entrar el dato ⟦OPUS-5⟧ (2026-09-16)
+
+> Encargo del Ingeniero, con `~/Downloads/index_6.html`: *«ubícate en el módulo de órdenes de
+> materiales, compara con el archivo html que te estoy adjuntando y completa todo en caso de que haga
+> falta algo, valídalo al terminar para evitar dejar huecos o pendientes»*.
+
+**76.1 Qué había que portar.** `index_6` es idéntico a `index_4` (8-sep). Contra la fuente del port
+original (`Modulo_Ordenes_SSEE/index.html`, 26-ago, `§70`): CSS **idéntico**, HTML con 2 cambios y JS con
+~500 líneas en 30 bloques. Funcionalmente: (1) catálogo de materiales **agrupado** (Accesorios 27 · Bodega
+Membrillal 201 · Transformadores UC CREG 015-2018 43 = 271) y columna «Grupo» en el Excel; (2) desplegable
+**Transformador** que se imprime en el primer renglón del bloque «Motivo» y completa la Zona; (3) JORGE
+RHENALS entre los responsables; (4) ajustes de lógica.
+
+**76.2 Lo que NO se portó, a propósito.** `index_6` traía **4 firmas escaneadas y 9 cédulas reales** —lo
+mismo que `§70` retiró— y el **parque completo** (208 TX) copiado dentro del JS. Firmas y cédulas se
+sanearon **antes** de fusionar; el parque se lee del **parque vivo en Firestore**, detrás de la sesión
+(`cargarParque` → `listarV2` → `parqueParaOrdenes`, `assets/js/domain/ordenes_parque.js`, con pruebas):
+público no, y una copia se queda vieja en cuanto el parque cambia. Mismo criterio que `§71`.
+
+**76.3 Cómo se fusionó.** Tres vías con `git merge-file`: base = módulo del 26-ago · nuestro = sitio ·
+suyo = `index_6` **saneado**. Sanear **el suyo antes** de fusionar es la clave: un bloque que no choca entra
+limpio, y así habría vuelto a entrar cualquier cédula. Salieron solo 4 conflictos, resueltos uno a uno. El
+saneado por forma (`cedula: '…'`) **no bastó otra vez**: la cédula real de RAMON ROMERO seguía en dos
+comentarios con sus dos grafías, exactamente el caso de `§70.4` (L-75). → **L-90**.
+
+**76.4 Los huecos que cazó la validación** (4 revisores adversariales, 12 hallazgos), todos arreglados:
+**(1) 🔴** al recuperar una orden, «Entregado/Recibido por» se buscaban **por cédula**, y en el sitio están
+todas vacías: volvía **siempre la primera persona** —una orden de JORGE RHENALS regresaba como CARLOS
+MARTELO—, una orden sin responsables pasaba la validación y la firma de la sesión podía estamparse en un
+documento ajeno. **Venía del port anterior**: `§70` vació la llave y no cambió las búsquedas que dependían
+de ella. Ahora se busca por nombre; sin nombre, vacío. **(2)** el transformador de un borrador u orden
+recuperada **se borraba** al repintarse el desplegable (lo introdujo este port). **(3)** el catálogo nuevo
+**no llegaba** a quien tuviera listas guardadas: la copia `precargado` tapaba los 271 con los 68 viejos —lo
+precargado es del código, lo importado del usuario—. **(4)** al llegar la firma se **volvía a marcar «con
+firmas»** aunque el usuario la hubiera desmarcado (preexistente). **(5)** el aviso de fallo del parque se
+tapaba con «Cargando…». **(6)** la Zona no acompañaba al cambiar de transformador. **(7)** doble lectura de
+la firma. **(8)** comentario viejo y una prueba que copiaba datos reales. Además `_dev/zz-*` queda en
+`.gitignore`: el banco sin guard nunca se sube.
+
+**76.5 Verificación.** 1654 pass / 0 fail / 2 skip (8 nuevas) · lint limpio · banco en vivo (borrado antes
+del commit): catálogo agrupado, campo en su sitio, zona que acompaña y respeta lo escrito, huérfano que
+sobrevive, «con firmas» respetada, **Guardar → Limpiar → Cargar devuelve JORGE RHENALS / RAMON ROMERO**,
+lista vieja precargada que ya no tapa el catálogo e importada que se respeta, documento con
+«TRANSFORMADOR: …» en el bloque Motivo. Producción **byte-idéntica** al repo, **0 cédulas, 1 base64 (el
+logo), 0 parque embebido**. Y **con la sesión del Ingeniero y el parque real**: 208 transformadores
+(BOLIVAR 57 · OCCIDENTE 89 · ORIENTE 62).
+
+**76.6 Verificado sano / no re-auditar.** CSS base e `index_6` idénticos: nada que portar · las 6 clases
+renombradas en `§70.3` siguen con prefijo `oms-` en el código nuevo (los dos usos sin prefijo, `btn` y
+`sub`, ya estaban en el sitio) · `escala` de firma compatible (`fir.escala || 1`) · el parque se lee **una**
+vez aunque el guard avise por window y por document · 0 cédulas en el historial git (`git log --all -S`).
+Crudo de la validación → bóveda `2026-09-16-port-ordenes-materiales-v8sep/`.
