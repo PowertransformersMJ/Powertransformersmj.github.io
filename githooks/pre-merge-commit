@@ -1,0 +1,10 @@
+#!/bin/sh
+# 🔒 Guardia de datos personales (99 §78): un merge no pasa por pre-commit.
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+for d in "$HOME"/.nvm/versions/node/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
+if ! command -v node >/dev/null 2>&1; then
+  echo "⚠️  pre-merge-commit: 'node' no está en PATH → NO se revisaron cédulas (99 §78)."
+  exit 0
+fi
+node scripts/guardia-cedulas.mjs || { echo "❌ MERGE BLOQUEADO: el resultado puede llevar una cédula."; exit 1; }
+exit 0

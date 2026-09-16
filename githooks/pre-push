@@ -1,0 +1,11 @@
+#!/bin/sh
+# 🔒 Guardia de datos personales (99 §78): última red antes de que el repo
+# PÚBLICO reciba los commits (cubre cherry-pick, revert, rebase y merges en avance rápido).
+PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+for d in "$HOME"/.nvm/versions/node/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
+if ! command -v node >/dev/null 2>&1; then
+  echo "❌ PUSH BLOQUEADO: 'node' no está en PATH y no se pueden revisar cédulas (99 §78). Use --no-verify solo si lo revisó a mano."
+  exit 1
+fi
+node scripts/guardia-cedulas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube puede llevar una cédula."; exit 1; }
+exit 0

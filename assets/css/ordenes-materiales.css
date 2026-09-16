@@ -592,3 +592,18 @@
 .oms-scope .oms-dlg .dlg-texto{ margin:0 0 14px; font-size:.88rem; line-height:1.5; white-space:pre-line; color:var(--tinta-2); }
 .oms-scope .oms-dlg .dlg-botones{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
 .oms-scope #btnGuardar[aria-busy="true"]{ opacity:.65; cursor:progress; }
+
+/* ===================== CÉDULAS DE LOS RESPONSABLES (99 §78) ===================== */
+.oms-scope .panel-cedulas{ border:1px solid var(--linea); border-radius:var(--radio-s); background:#fff; padding:10px 14px; }
+.oms-scope .panel-cedulas > summary{ cursor:pointer; font-weight:700; color:var(--azul-osc); font-size:.9rem; }
+.oms-scope .panel-cedulas[open] > summary{ margin-bottom:10px; }
+.oms-scope .ced-autorizacion{ border:1px solid var(--linea-2); border-radius:var(--radio-s); padding:10px 12px; margin:8px 0 12px; background:var(--fondo); }
+.oms-scope .ced-autorizacion .fila-ced{ display:flex; gap:12px; flex-wrap:wrap; margin-top:8px; font-size:.82rem; }
+.oms-scope .ced-autorizacion .fila-ced label{ display:flex; flex-direction:column; gap:4px; flex:1 1 220px; min-width:0; }
+.oms-scope .tabla-ced{ width:100%; border-collapse:collapse; font-size:.82rem; }
+.oms-scope .tabla-ced th,
+.oms-scope .tabla-ced td{ text-align:left; padding:6px 8px; border-top:1px solid var(--linea-2); vertical-align:middle; }
+.oms-scope .tabla-ced th{ color:var(--tinta-2); border-top:0; }
+.oms-scope .tabla-ced .ced-nueva{ width:100%; min-width:120px; max-width:180px; }
+.oms-scope .tabla-ced .acciones{ white-space:nowrap; }
+.oms-scope .panel-cedulas .progreso{ font-size:.82rem; color:var(--tinta-2); margin:6px 0; }
