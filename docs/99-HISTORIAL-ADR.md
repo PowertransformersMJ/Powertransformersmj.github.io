@@ -3075,7 +3075,15 @@ repetida; igual; distinta; borrada; inválida; copia con autoría no ofrecida), 
 `"><svg onload>` / `=HYPERLINK` en 12 campos → lista, vista previa (11 textos SVG), indicadores y barra sin
 ejecutar nada. **Producción**: reglas desplegadas, `main` byte-idéntico, CI + Deploy en verde; con la
 sesión del Ingeniero (solo lectura): registro leído (0), `get` en las dos colecciones permitido, sin errores.
-⏳ **Pendiente**: escritura real en producción (necesita su permiso) y sesión de técnico en vivo.
+✅ **Escritura real en producción** (20-09, con su permiso, desde su propia sesión y sin tocar su
+formulario —módulo cargado con `import()` en su pestaña—): crear v1 → aparece en la lista · editar → v2 con
+su nombre · editar con la versión vieja → rechazado nombrando quién la cambió · crear el mismo número →
+«ya existe», mostrando la v2 sin pisarla · eliminar con versión vieja → rechazado · eliminar con la buena →
+fuera de la lista, con **lápida que guarda la orden completa** (v2, su ítem, su nota, el creador original) ·
+la lápida **no se puede listar ni borrar ni siendo admin** (`permission-denied`) · bitácora con las **3**
+entradas (crear, actualizar, eliminar), las dos últimas con el `antes`. Quedan en la base, por diseño, la
+lápida y las 3 entradas de la prueba. Hallazgo de paso: el registro ya tenía **la primera orden real del
+Ingeniero** (ENTRADA 20260216, 11 ítems, 16-09) — el módulo está en uso. ⏳ Falta la sesión de TÉCNICO en vivo.
 
 **77.6 Archivos.** Nuevos: `assets/js/domain/ordenes_registro.js`, `assets/js/data/ordenes_materiales.js`,
 `tests/ordenes_registro.test.js`, `tests-rules/ordenes_materiales.rules.test.js`. Modificados:
