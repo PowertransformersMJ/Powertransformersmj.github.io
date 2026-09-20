@@ -3157,7 +3157,14 @@ técnico, vista previa/PDF/Excel con directorio vacío, parcial y sin red (pregu
 localStorage, admin guarda/valida/quita, importación (repetida, ajena, nombre hostil) sin dígitos en el DOM,
 vista previa cerrada vacía y cerrada durante la carga sin reabrirse. **Producción**: reglas desplegadas,
 `main` byte-idéntico, CI+Deploy verde; con la sesión del Ingeniero (solo lectura, desde su pestaña): listar
-permitido (0), `get` por nombre permitido, lista sin límite **rechazada**. ⏳ Carga real: la hace él (TODO-63).
+permitido (0), `get` por nombre permitido, lista sin límite **rechazada**. ✅ **Carga real (20-09)**: el Ingeniero eligió «formato de autorización firmado» y las **9 de 9** quedaron
+cargadas desde SU archivo local —leído por el navegador con `file_upload` sobre el `<input type=file>`, sin
+que el archivo suba a ningún lado y sin que Claude vea un solo dígito: en pantalla y en el informe solo
+«•••NNN»—. Verificado enseguida, en su sesión: las 9 con pista, **9 entradas de bitácora** todas
+enmascaradas (`«(sin cédula) → •••NNN»`, cero dígitos completos), `"cedula":"<dígito>"` **ausente** del
+almacenamiento del navegador, y **su primera orden real** (ENTRADA 20260216) resuelve las 3 cédulas de sus
+firmantes al imprimir (10, 10 y 8 dígitos). ⏳ Queda su decisión sobre el rastro de lectura y la respuesta
+de Gemini (TODO-63).
 
 **78.6 Archivos.** Nuevos: `assets/js/domain/responsables_ordenes.js`, `assets/js/data/responsables_ordenes.js`,
 `scripts/guardia-cedulas.mjs`, `githooks/{commit-msg,pre-merge-commit,pre-push}`, `tests/responsables_ordenes.test.js`,
