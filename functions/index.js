@@ -46,7 +46,7 @@ const IA_DISPATCHER = new Agent({ bodyTimeout: 0, headersTimeout: 0, keepAliveTi
 // Lógica pura del dominio (módulos sin imports de Firebase SDK).
 // La carpeta ./domain/ se sincroniza automáticamente desde
 // ../assets/js/domain/ por functions/prepare-deploy.mjs (predeploy hook).
-import { snapshotSaludCompleto } from './domain/salud_activos.js';
+import { snapshotSaludCompleto, fusionarConservandoCondicion } from './domain/salud_activos.js';
 import { mergeConBaseline } from './domain/umbrales_salud_baseline.js';
 
 // G010: lee la config de umbrales editada por el admin (F18) con
@@ -133,11 +133,18 @@ export const onMuestraCreate = onDocumentCreated(
       umbrales: await leerUmbralesActivos(db)   // G010: config F18
     });
 
-    await txRef.update({ salud_actual: snap });
+    // La condición oficial la fija el archivo de Salud de Activos y NINGÚN
+    // recálculo la pisa (decisión del Ingeniero `99 §74.14`, ratificada el
+    // 2026-09-20 «sí, y en pdf también» → `99 §80`). Antes, esta línea
+    // reemplazaba `salud_actual` entero y borraba en silencio la condición del
+    // Excel en cuanto alguien subía una muestra; el motor queda al lado, en
+    // `hi_recalculado`, que es lo que hace reversible la decisión.
+    const vigente = fusionarConservandoCondicion(tx.salud_actual, snap);
+    await txRef.update({ salud_actual: vigente });
     await txRef.collection('historial_hi').add({
       trigger: 'muestra_nueva',
       muestra_origen_ref: event.params.id,
-      ...snap,
+      ...vigente,
       // `snap.ts_calculo` viene del dominio como texto ISO (contrato correcto:
       // el dominio es puro y no conoce Firestore). Pero el cliente escribe ese
       // MISMO campo como Timestamp (transformadores_subcolecciones.js:142) y
