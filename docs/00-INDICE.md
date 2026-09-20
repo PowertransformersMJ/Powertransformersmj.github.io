@@ -52,7 +52,7 @@
 | §38 | ADR-038 — FP/tan δ: vista Tip-up (ΔFP alta−baja: PD vs humedad) + caveat 20 °C; auditoría 🔵 skill FP | 758 |
 | §39 | ADR-039 — FP/tan δ: localización del defecto por modo (`localizacionDe`/`causaProbableDe`) | 774 |
 | §40 | ADR-040 — FP/tan δ: pendiente predictiva por sección + baseline-proxy; capacitancia descartada (artefacto) | 790 |
-| §41 | ADR-041 — Corriente de excitación: panel propio `excitacion-panel.js` espejo del tan δ; nivel de tensión (`nivelDe`), 5 vistas, W de pérdidas, criterio NETA 2+1/IEEE 62 (patrón=FORMA, L-53) | 804 |
+| §41 | ADR-041 — Corriente de excitación: panel propio `excitacion-panel.js` espejo del tan δ; nivel de tensión (`nivelDe`), 5 vistas, W de pérdidas, criterio NETA 2+1/IEEE 62… | 804 |
 | §42 | ADR-042 — Excitación: vista "Resumen (todo)" + gating de tablas + fix `reset` (Sets en sitio, L-54) + separación por NIVEL (§42.8) | 822 |
 | §43 | ADR-043 — Excitación: tabla-RESUMEN por nivel (fusión 1+4: banda+KPI+norma+años); detalle por TAP gateado; elegida por el director entre 4 previews | 842 |
 | §44 | ADR-044 — Panel "Valores por prueba" (`tablas-pruebas-panel.js`): rango real, Σ pérdidas, nivel real, diagnóstico multi-norma + acción CBM; aditivo | 860 |
@@ -61,36 +61,37 @@
 | §47 | ADR-047 — Fix modo MIXTO que tumbaba el panel (solo AT·110 visible): layout por-fila + guards + try/catch por nivel; reproducido en navegador | 912 |
 | §48 | ADR-048 — Reorg POR PRUEBA paso 1: "Corriente de excitación" = SEGMENTO unificado `.pe-seg` (gráficas+tablas+JSON); demás pruebas intactas | 930 |
 | §49 | ADR-049 — "Nomenclatura y secciones de aislamiento" pasa DENTRO del segmento Tan δ (reubica `#nomencl` vivo) | 948 |
-| §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (tablas de `montarPanelPrueba`, L-57) + detalle por informe + fuera-de-criterio en rojo + fix chips multi-norma (L-58) | 968 |
-| §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (kernel v1.2): entrevista F3a (política git NUEVA: Claude commit+push+merge+deploy), rescate TRIAJE en `_legacy/`, 30 condensado, hooks de sesión | 986 |
-| §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores adversariales, 0 refutados) → 123 hallazgos en 6 olas; hallazgo dominante = confidencial/copyright en repo público; detalle en bóveda privada | 1004 |
-| §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase; refutados 2) + fixes FASE E (tarjeta+XSS) · billing confirmado caído (CF IA 500) | 1036 |
-| §54 | ADR-054 — Fix sistémico del shell (TODO-16, cazado en validación VIVA): evento `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin (doble dispatch) + override AQUA dejaba 6 modales legacy pegados abiertos (`:not(.open):not(.on)`) | 1054 |
-| §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación (re-atribuciones: 50 mA→práctica, DRM→fabricante, collar→Doble TDRB) · TODO-07 bóveda git | 1072 |
-| §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado vivo: 212 activos, 6 evaluados/206 sin dato; corrección §3.3: los 6 evaluados eran TX-DEMO del seed, no reales — limpiar | 1090 |
+| §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (tablas de `montarPanelPrueba`, L-57) + detalle por informe + fuera-de-criterio en rojo + fix chips… | 968 |
+| §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (kernel v1.2): entrevista F3a (política git NUEVA: Claude commit+push+merge+deploy), rescate TRIAJE en `_legacy/`, 30… | 986 |
+| §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores adversariales, 0 refutados) → 123 hallazgos en 6 olas; hallazgo dominante =… | 1004 |
+| §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase; refutados 2) + fixes… | 1036 |
+| §54 | ADR-054 — Fix sistémico del shell (TODO-16, cazado en validación VIVA): evento `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin (doble… | 1054 |
+| §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación… | 1072 |
+| §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado… | 1090 |
 | §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
-| §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`, Antigravity oficial; bóvedas NO se fusionan (datos de cliente) ⟦OPUS-5⟧ | 1122 |
-| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y L-63 (no re-pedir autorización ya concedida) ⟦OPUS-5⟧ | 1140 |
+| §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`, Antigravity oficial; bóvedas NO… | 1122 |
+| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y… | 1140 |
 | §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso ⟦OPUS-5⟧ | 1158 |
-| §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483 selectores, 0 globales); plantilla PE.02081 saneada (traía firmas manuscritas y datos de cliente); 1254 pruebas ⟦OPUS-5⟧ | 1181 |
-| §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto), importador que dividía entre 1.000, CI en rojo 76 corridas, registro abierto en Firebase, menú que no colapsaba. 1.334 pruebas · CI en verde ⟦OPUS-5⟧ | 1226 |
-| §63 | ADR-063 — Cola de la auditoría: funciones con topes, 16 índices Firestore nuevos (producción tenía 33 de 37), `ts_calculo` con dos tipos, 5 suscripciones sin límite, 5 pruebas sin assert, 13 escapadores sin comillas, foto de 1,1 MB → 236 KB ⟦OPUS-5⟧ | 1284 |
+| §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483… | 1181 |
+| §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto)… | 1226 |
+| §63 | ADR-063 — Cola de la auditoría: funciones con topes, 16 índices Firestore nuevos (producción tenía 33 de 37), `ts_calculo` con dos tipos, 5 suscripciones sin límite, 5… | 1284 |
 | §64 | ADR-064 — Fichas: el port de ADR-061 trajo el CSS entero pero solo el 44% del marcado; las clases huérfanas nombraban las vistas que faltaban ⟦OPUS-5⟧ | 1343 |
-| §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y acta en Excel que se puede reimportar. Dos invariantes con prueba: una decisión NUNCA toca la UUCC calculada, y el acta va y vuelve sin deformarse. 1.349 pruebas ⟦OPUS-5⟧ | 1394 |
-| §66 | ADR-066 — Evaluación holística de Fichas Técnicas (6 auditores) y remediación: terciario «0» inflaba el presupuesto 23%, «20.000» kVA se leía como 20, conformidad contradictoria entre vistas, acta reimportada por posición, 412→206 lecturas ⟦OPUS-5⟧ | 1436 |
-| §67 | ADR-067 — «Veo información basura»: Cargabilidad y SCADA mostraban equipos inventados sin rotularlos, la matriz vestía la falta de datos de buena noticia y 8 de 10 fichas normativas no tenían botón. 64 de 208 equipos con la fuente en desacuerdo ⟦OPUS-5⟧ | 1497 |
-| §68 | ADR-068 — Mantenimiento del cerebro (auditoría Nivel-2, 8 sondas): caché afirmada sin correr, gate de bóveda «íntegro» con 8 deliberaciones sin indexar, mapa sin 4 módulos vivos y el formato ADR no tenía casilla para lo «verificado sano». Neurona hija `32` ⟦OPUS-5⟧ | 1551 |
-| §69 | ADR-069 — TX_Potencia leída de verdad: los «62 omitidos» eran **57 equipos reales** (cabecera en la fila 2) → 208 válidos y 1.655.376 usuarios (cierra TODO-34). Su `CONDICION` y el índice recalculado solo coinciden en el 46%: manda la cargabilidad (18 al ≥90%), y ASTREA marca un 250% imposible ⟦OPUS-5⟧ | 1637 |
-| §70 | ADR-070 — Órdenes de Materiales SSEE entra al sitio con página propia (ya existían las «Órdenes» de TRABAJO), sin las 3 firmas escaneadas ni las 8 cédulas: el guard esconde la página, no el archivo. Acotar estilos no basta (el sitio también define `.modal`) y sanear por la forma del campo dejó una cédula viva en comentarios ⟦OPUS-5⟧ | 1710 |
-| §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la línea que lleva su nombre. Se lee con `getBytes` y NO con `getDownloadURL`, cuya URL con token funciona sin sesión ⟦OPUS-5⟧ | 1781 |
-| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después la incumplí yo mismo (M-06). Frescura restituida, `05` re-sellado, skill externa catalogada, dos shards nuevos (`21`, `33`), y la admisión de que W-11 se aplicó A MEDIAS ⟦OPUS-5⟧ | 1838 |
-| §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría adversarial: 26 hallazgos, **23 refutados** (§73.8), 3 confirmados con sonda propia — el grave alcanza también a `firestore.rules` ⟦OPUS-5⟧ | 1905 |
-| §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta y aceptar el cálculo degradaba 30 tridevanados reales; catálogo de 3 familias; la importación borraba la UUCC. 39 → 6 ⟦OPUS-5⟧ | 1983 |
-| §75 | ADR-075 — **Fichas Técnicas**: 5 falsedades del papel firmado corregidas; 5 redacciones por banda; alcance argumentado con condiciones; matriz a color; municipio automático. **L-86..89** ⟦OPUS-5⟧ | 2642 |
-| §76 | ADR-076 — **Órdenes de Materiales** con la versión del 8-sep, sin firmas ni cédulas y con el parque vivo; recuperar una orden devolvía la primera persona. **L-90** ⟦OPUS-5⟧ | 2964 |
-| §77 | ADR-077 — **Registro del equipo de OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, subida orden por orden, sin cédulas; comité de 4 (57 hallazgos). **L-91/92** ⟦OPUS-5⟧ | 3017 |
-| §78 | ADR-078 — **Cédulas de los responsables** desde un directorio privado en Firestore; candado por huella/forma/binario en commit, mensaje, merge y push. **L-93/94** ⟦OPUS-5⟧ | 3110 |
-| §79 | ADR-079 — **El rol sale del perfil**: el bootstrap `/admins` deja de dar admin a quien ya tiene perfil (degradar por fin revoca), en Firestore y Storage. Cierra TODO-47a. **L-95** ⟦OPUS-5⟧ | 3186 |
+| §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y acta en Excel que se… | 1394 |
+| §66 | ADR-066 — Evaluación holística de Fichas Técnicas (6 auditores) y remediación: terciario «0» inflaba el presupuesto 23%, «20.000» kVA se leía como 20, conformidad… | 1436 |
+| §67 | ADR-067 — «Veo información basura»: Cargabilidad y SCADA mostraban equipos inventados sin rotularlos, la matriz vestía la falta de datos de buena noticia y 8 de 10… | 1497 |
+| §68 | ADR-068 — Mantenimiento del cerebro (auditoría Nivel-2, 8 sondas): caché afirmada sin correr, gate de bóveda «íntegro» con 8 deliberaciones sin indexar, mapa sin 4… | 1551 |
+| §69 | ADR-069 — TX_Potencia leída de verdad: los «62 omitidos» eran **57 equipos reales** (cabecera en la fila 2) → 208 válidos y 1.655.376 usuarios (cierra TODO-34). Su… | 1637 |
+| §70 | ADR-070 — Órdenes de Materiales SSEE entra al sitio con página propia (ya existían las «Órdenes» de TRABAJO), sin las 3 firmas escaneadas ni las 8 cédulas: el guard… | 1710 |
+| §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la… | 1781 |
+| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después la incumplí yo mismo… | 1838 |
+| §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría… | 1905 |
+| §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta y aceptar el cálculo degradaba 30 tridevanados reales; catálogo de 3 familias; la… | 1983 |
+| §75 | ADR-075 — **Fichas Técnicas**: 5 falsedades del papel firmado corregidas; 5 redacciones por banda; alcance argumentado con condiciones; matriz a color; municipio… | 2642 |
+| §76 | ADR-076 — **Órdenes de Materiales** con la versión del 8-sep, sin firmas ni cédulas y con el parque vivo; recuperar una orden devolvía la primera persona. **L-90**… | 2964 |
+| §77 | ADR-077 — **Registro del equipo de OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, subida orden por orden, sin cédulas; comité de 4 (57 hallazgos).… | 3017 |
+| §78 | ADR-078 — **Cédulas de los responsables** desde un directorio privado en Firestore; candado por huella/forma/binario en commit, mensaje, merge y push. **L-93/94**… | 3110 |
+| §79 | ADR-079 — **El rol sale del perfil**: el bootstrap `/admins` deja de dar admin a quien ya tiene perfil (degradar por fin revoca), en Firestore y Storage. Cierra… | 3186 |
+| §80 | ADR-080 — **Manda el Excel en todos los caminos** (ratificado): el trigger de muestras reemplazaba `salud_actual` entero y borraba la condición del archivo; ahora se… | 3221 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

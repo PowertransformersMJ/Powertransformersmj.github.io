@@ -220,3 +220,15 @@
 > lo prohibido, verificar el EFECTO y no el workflow, preguntarle al servidor, medir un port por su CSS,
 > auditar en paralelo por dimensiones, rotular el dato de demostración. Léela ANTES de declarar algo
 > desplegado, portado o auditado. La hija lleva su propio listado — aquí no se duplican sus IDs.
+
+### L-96 · Un trigger que reemplaza un objeto entero borra lo que otro camino escribió
+
+`onMuestraCreate` hacía `update({ salud_actual: snapshotDelMotor })`. Correcto cuando el motor era el único
+que escribía ahí; destructivo desde que el importador del Excel pasó a fijar la condición oficial en ese
+MISMO objeto (`99 §80`). El dominio estaba bien, el importador estaba bien, y aun así el dato se perdía:
+el defecto solo existe en la COSTURA entre los dos caminos.
+
+**La regla**: cuando dos caminos escriben el mismo sub-objeto, ninguno lo reemplaza entero — se actualiza
+por campos o se fusiona con una función pura que declare quién manda sobre cada campo (y que la procedencia
+quede guardada, no deducida). Y eso se prueba donde vive el defecto: una prueba del dominio no lo ve; hace
+falta una de integración que ejecute el trigger de verdad (emulador de Functions, `npm run test:trigger`).

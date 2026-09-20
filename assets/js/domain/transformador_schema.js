@@ -262,6 +262,11 @@ function sanitizeSaludActual(src) {
     // comparar en cualquier momento y hace la decisión reversible.
     hi_recalculado:         califFloat(src.hi_recalculado),
     bucket_recalculado:     normEnum(src.bucket_recalculado, BUCKETS_HI, ''),
+    // De dónde salió la condición oficial: 'excel' (el archivo de Salud de
+    // Activos manda, decisión ratificada 2026-09-20) o 'motor'. Sin marca, se
+    // deduce del rastro `_importacion_v2` (`domain/salud_activos.js`).
+    condicion_fuente:       (src.condicion_fuente === 'excel' || src.condicion_fuente === 'motor')
+                              ? src.condicion_fuente : '',
     overrides_aplicados:    arrStr(src.overrides_aplicados),
     // Flag permanente (MO.00418 §4.1.2 Nota Técnica FUR)
     fin_vida_util_papel:    bool(src.fin_vida_util_papel)
@@ -279,6 +284,7 @@ function emptySaludActual() {
     calif_her: null, ubicacion_fuga_dominante: '',
     calif_pyt: null,
     hi_bruto: null, hi_final: null, bucket: '',
+    hi_recalculado: null, bucket_recalculado: '', condicion_fuente: '',
     overrides_aplicados: [], fin_vida_util_papel: false
   };
 }

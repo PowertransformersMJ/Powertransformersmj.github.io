@@ -467,6 +467,9 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
     // Así la decisión es reversible y no se pierde el trabajo del motor —
     // solo deja de ser quien tiene la última palabra.
     hi_final: condicionExcel != null ? condicionExcel : ov.hi_final,
+    // Marca explícita de quién fijó la condición: ningún otro camino la pisa
+    // (`99 §80`; antes solo se deducía del rastro `_importacion_v2`).
+    condicion_fuente: condicionExcel != null ? 'excel' : 'motor',
     hi_recalculado: ov.hi_final,
     bucket: bucketizarHI(condicionExcel != null ? condicionExcel : ov.hi_final),
     bucket_recalculado: bucketizarHI(ov.hi_final),

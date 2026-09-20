@@ -3217,3 +3217,46 @@ lo que la regla EJECUTA es lo que manda) · §3.2 (cambio aditivo, sin renombrar
 **79.6 Verificado sano / no re-auditar.** Los otros dos huecos de `§73.9` siguen abiertos y son decisión
 suya: **(b)** el «solo PNG» mira la etiqueta declarada, no los bytes; **(c)** cualquier miembro puede
 listar el inventario del bucket. El resto de `§73.8` no se re-audita.
+
+## 80. ADR — Manda el Excel, en todos los caminos y también en el PDF: la nube deja de borrar la condición ⟦OPUS-5⟧ (2026-09-20)
+
+> Ratificación del Ingeniero (TODO-52, abierto desde `§74.14`): *«sí, y en pdf también»*.
+
+**80.1 Causa raíz.** La condición oficial del activo la fija el archivo de Salud de Activos desde el
+2026-09-08 (`§74.14`): el importador escribe `salud_actual.hi_final = condición del Excel` y deja el
+recálculo del MO.00418 al lado, en `hi_recalculado`. Pero `functions/index.js` (`onMuestraCreate`) hacía
+`txRef.update({ salud_actual: snap })` con el snapshot **entero** del motor: en cuanto alguien subía una
+muestra, la condición del Excel desaparecía y el equipo pasaba a mostrar el número del motor —en el
+dashboard, en la matriz, en la ficha y en el **PDF**, que leen todos el mismo `salud_actual.hi_final`
+(`exports/pdf.js:75`, `ui/fichas/ficha-tecnica.js:285`, `ui/fichas/panel.js:482`)—. Sin aviso y sin
+rastro: el historial guardaba el snapshot del motor, no lo que el Excel decía. El código era **anterior** a
+la decisión; nadie lo había alineado (TODO-59).
+
+**80.2 Solución.** Función pura `fusionarConservandoCondicion(previo, nuevo)` en `domain/salud_activos.js`:
+si la condición vigente vino del Excel, se conservan `hi_final` y `bucket`, y el recálculo nuevo viaja a
+`hi_recalculado`/`bucket_recalculado`; lo demás del snapshot (calificaciones, sello de tiempo, referencias
+de muestra) sí entra. Sin condición del Excel, manda el motor y se marca como tal. La procedencia deja de
+deducirse: `salud_actual.condicion_fuente` ('excel' | 'motor') la escribe el importador y la conserva el
+esquema; para los equipos cargados antes, se sigue leyendo el rastro `_importacion_v2`
+(`condicionVieneDelExcel`). El trigger y el `historial_hi` guardan ya el snapshot fusionado.
+
+**80.3 No-regresión.** El motor no se tocó (`snapshotSaludCompleto` intacto) y su número sigue completo en
+`hi_recalculado` → la decisión es reversible. Ningún otro camino escribía la condición: `motor-salud.html`
+solo renderiza y el único `update` a `/transformadores` de las Functions es este.
+
+**80.4 Verificación.** 10 pruebas de dominio nuevas (conserva, no muta, dos muestras seguidas, equipo sin
+Excel, marca en el esquema) → **1706 pass / 0 fail / 2 skip** · y, sobre todo, **prueba de integración
+contra el emulador de Functions** (`npm run test:trigger`, nueva): se siembra un equipo con condición del
+Excel 4,6, se crean tres muestras reales (ADFQ, FURANOS, DGA) y el trigger corre de verdad → `hi_final`
+sigue en **4,6**, `condicion_fuente` sigue en `excel`, el motor deja su número **distinto** en
+`hi_recalculado`, las calificaciones se actualizan y el `historial_hi` también respeta la condición. El
+defecto vivía justo donde el dominio por separado daba bien: sin esta prueba no se ve (**L-96**).
+Función desplegada (`onMuestraCreate`, southamerica-east1).
+
+**80.5 Doctrina.** §3.2 (aditivo: campo nuevo, nada renombrado) · §3.5 (`update` por campos, no reemplazo
+de objetos compartidos) · L-96 · la decisión del especialista manda sobre el cálculo (`§74.14`).
+
+**80.6 Verificado sano / no re-auditar.** El PDF, la ficha y el panel ya leían `salud_actual.hi_final`: no
+había que tocarlos, el arreglo es aguas arriba. `historial_hi` conserva el recálculo del motor en cada
+snapshot, así que la serie del motor no se pierde. Queda vivo, aparte: el Plan de Inversión ignora la
+criticidad (TODO-60) y los cortes por usuarios (TODO-55).

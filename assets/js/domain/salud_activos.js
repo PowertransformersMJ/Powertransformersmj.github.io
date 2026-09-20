@@ -585,3 +585,45 @@ function _bandaUmbral(valor, tabla) {
   // Fallback: usar la última banda.
   return tabla[tabla.length - 1].calif;
 }
+
+/**
+ * ¿La condición vigente la fijó el archivo de Salud de Activos (el Excel)?
+ * Marca explícita `condicion_fuente`, o el rastro que dejó el importador
+ * antes de que existiera esa marca (`_importacion_v2` en overrides).
+ */
+export function condicionVieneDelExcel(salud) {
+  const s = salud || {};
+  if (s.condicion_fuente === 'excel') return true;
+  if (s.condicion_fuente === 'motor') return false;
+  return Array.isArray(s.overrides_aplicados) && s.overrides_aplicados.includes('_importacion_v2');
+}
+
+/**
+ * Fusiona el snapshot recién calculado con el que ya estaba, RESPETANDO la
+ * decisión del Ingeniero (`99 §74.14`, ratificada 2026-09-20): la condición
+ * oficial (`hi_final`/`bucket`) la fija el Excel y ningún recálculo la pisa —
+ * ni el de una muestra nueva, ni ningún otro camino. El cálculo del motor no
+ * se tira: viaja al lado, en `hi_recalculado`/`bucket_recalculado`, para poder
+ * comparar y para que la decisión siga siendo reversible.
+ *
+ * Sin condición del Excel (equipo que nunca pasó por el archivo), manda el
+ * motor y se marca como tal.
+ */
+export function fusionarConservandoCondicion(previo, nuevo) {
+  const snap = Object.assign({}, nuevo || {});
+  const prev = previo || {};
+  if (!condicionVieneDelExcel(prev) || prev.hi_final == null) {
+    snap.condicion_fuente = 'motor';
+    return snap;
+  }
+  snap.hi_recalculado = (nuevo && nuevo.hi_final != null) ? nuevo.hi_final
+    : (nuevo && nuevo.hi_recalculado != null ? nuevo.hi_recalculado : null);
+  snap.bucket_recalculado = (nuevo && nuevo.bucket) ? nuevo.bucket : (nuevo && nuevo.bucket_recalculado) || '';
+  snap.hi_final = prev.hi_final;
+  snap.bucket = prev.bucket || '';
+  snap.condicion_fuente = 'excel';
+  const marcas = Array.isArray(snap.overrides_aplicados) ? snap.overrides_aplicados.slice() : [];
+  if (!marcas.includes('_importacion_v2')) marcas.unshift('_importacion_v2');
+  snap.overrides_aplicados = marcas;
+  return snap;
+}
