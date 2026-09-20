@@ -312,3 +312,15 @@ push; texto, binario, nombre de archivo; separadores y ventanas; worktree; dato 
 tiene su caso con datos FALSOS (huellas falsas vía `SGM_HUELLAS`). Donde el texto no deja ver (binarios),
 se bloquea por tipo con un escape explícito. DATO (huellas con sal fuera del repo) y FORMA («cédula +
 número») se complementan: uno atrapa lo conocido, el otro lo nuevo.
+
+### L-95 · Un comentario no revoca: lo que la regla EJECUTA es lo que manda
+
+`adminsBootstrapValido()` llevaba meses con un comentario que decía «uid en /admins SIN perfil = bootstrap
+puro»… y un código que aceptaba a cualquiera de /admins mientras estuviera activo (`99 §79`). El cliente
+implementaba la intención del comentario; las reglas, otra cosa. Nadie lo vio leyendo: se vio cuando una
+prueba del emulador ESCRIBIÓ con el uid de un ex-admin degradado y pasó.
+
+**La regla**: cuando el comentario de una regla enuncia una condición, esa condición se prueba con un caso
+que la ejerza; si el caso pasa cuando debía fallar, el defecto es del código, no del comentario. Y el
+hallazgo se deja fijado como test que AFIRMA el comportamiento vigente («🔴 HOY PERMITE»), para que cerrar
+el hueco sea cambiarle el signo y no descubrirlo otra vez.

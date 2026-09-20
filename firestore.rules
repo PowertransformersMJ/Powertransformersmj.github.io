@@ -35,13 +35,17 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data;
     }
 
-    // ADR-052 Ola 0/1 (G004): el fallback legacy /admins ya NO ignora la
-    // desactivación. Si el usuario tiene perfil y está activo:false, se le
-    // niega aunque figure en /admins (desactivar SÍ revoca). El bootstrap
-    // puro (uid en /admins SIN perfil en /usuarios) se conserva → sin lockout.
+    // ADR-079 (TODO-47a, decisión del Ingeniero 2026-09-20: «el administrador
+    // soy yo»): el bootstrap legacy /admins es SOLO para el arranque, cuando
+    // todavía no hay perfil. Si el usuario YA tiene perfil en /usuarios, su rol
+    // sale de ahí y de ningún otro lado → degradar de admin a técnico revoca de
+    // verdad. Antes bastaba con estar en /admins y activo, así que un degradado
+    // seguía administrando TODO el backend (ADR-052 solo cerró el caso del
+    // desactivado). El bootstrap puro (uid en /admins SIN perfil) se conserva:
+    // sin él, borrar el perfil del único admin dejaría el proyecto sin nadie.
     function adminsBootstrapValido() {
-      return exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-        && (!hasProfile() || profile().activo == true);
+      return !hasProfile()
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
     function isTeamMember() {

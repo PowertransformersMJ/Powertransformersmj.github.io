@@ -31,12 +31,13 @@ service firebase.storage {
       return firestore.get(/databases/(default)/documents/usuarios/$(request.auth.uid)).data;
     }
 
-    // Bootstrap legacy /admins: se conserva para NO dejar al proyecto sin
-    // admin, pero ya no ignora la desactivación (mismo criterio que G004 en
-    // Firestore). uid en /admins SIN perfil en /usuarios = bootstrap puro.
+    // Bootstrap legacy /admins: SOLO para el arranque, cuando aún no hay
+    // perfil. Con perfil, el rol sale de /usuarios y de ningún otro lado
+    // (ADR-079, mismo criterio que firestore.rules): un ex-admin degradado a
+    // técnico deja de escribir aquí, aunque siga en /admins.
     function adminsBootstrapValido() {
-      return firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid))
-        && (!hasProfile() || profile().activo == true);
+      return !hasProfile()
+        && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
     }
 
     // Miembro ACTIVO del equipo: perfil en /usuarios con activo == true, o
