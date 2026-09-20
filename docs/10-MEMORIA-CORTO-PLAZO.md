@@ -9,7 +9,7 @@
 
 > Qué pasó → `05` y `99 §77-§78` (**no se repite aquí**, §G.3). Lecciones **L-91**, **L-93**.
 > ⚠️ **Abiertos**: **TODO-62/63** (cierre en vivo) · **TODO-35/58** · **TODO-59** 🔴 · **TODO-60** 🔴 ·
-> **TODO-55** 🔴 · **TODO-52** 🔴 · **TODO-47** 🔴 · 54 · 56 · 57 · 61 · y los fríos de la hija `11`.
+> **TODO-55** 🔴 · **TODO-52** 🔴 · **TODO-47** · 54 · 56 · 57 · 61 · y los fríos de la hija `11`.
 
 ### ✅ CERRADOS → `99` (`§74.16-74.24`, `§75`) · lecciones L-82..L-86
 
@@ -19,9 +19,6 @@
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
 > **(H)** Decir qué se hace con los **3 equipos que su hoja de cargabilidad no trae**: `T1-M/M-CAZ`
 > (Casa de Zinc), `T2-M/M-BEC` (Becerril) y `T2-M/M-SML` (San Martín de Loba) — sin medida 2025.
-> **(G)** Ver en la consola de Firebase **quién figura hoy en `/admins`** — la colección es
-> `allow write: if false`, así que ni la app ni yo podemos leerla ni tocarla, y de esa lista
-> depende decidir el hueco 🔴 de **TODO-47a**.
 
 ### 🚫 Callejones probados (NO reintentar)
 > **Los de la Fase 9 viven en `99 §52.8-52.9`** — `main` local stale tras filter-repo · el "código
@@ -54,7 +51,7 @@
 | **TODO-56** | **¿Se recalcula `calif_crg`?** ⚠️ Baja de urgencia: **no subiría el índice de salud de nadie** (la condición es la del Excel; el override CRG=5 solo mueve `hi_recalculado`, que nadie lee). Sí mueve el causante principal y la macroactividad. El cruce: **119 cambios sobre 193 — 84 suben, 35 BAJAN, 8 pierden el CRG=5**. Exige antes/después guardado. | 🟡 |
 | **TODO-57** | **Versionar los assets contra la caché.** Cada despliegue le sirve una MEZCLA de viejo y nuevo (HTML nuevo + módulos ES viejos = tabla descuadrada); hoy se arregla a mano desde la extensión. `99 §74.24`, **L-85**. | 🟡 |
 | **TODO-52** | 🔴 **¿Se RATIFICA que manda el Excel, para TODOS los caminos?** ⚠️ El texto viejo era falso: desde el 09-08 el importador **sí copia** la condición del Excel (`importador.js:469`) y guarda el cálculo aparte; está en producción con prueba. Falta cerrar el otro camino (**TODO-59**) y ratificarlo por escrito. El dato sigue vivo: **98 de 208** divergen, el Excel marca 9 «muy pobre» y el motor 1 (DGA pesa 35 %). ⚠️ ASTREA 250 % **ya no sostiene** la tesis de «archivo sucio» (`§74.23` lo baja a 53,2 %; L-73 quedó sin actualizar) y las cifras del motor son PROVISIONALES. `99 §74.14`. | 🔴 |
-| **TODO-47** | 🔴 **Tres huecos de las reglas, fijados con prueba y esperando decisión** — detalle y opciones en `99 §73.9`. **(a) EL GRAVE**: degradar a alguien de administrador a técnico NO le quita nada si su uid sigue en `/admins`, y el defecto está también en `firestore.rules` (todo el backend). Ver quién está en esa lista solo puedes tú, en la consola. **(b)** el «solo PNG» mira la etiqueta, no los bytes. **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. | 🔴 |
+| **TODO-47** | 🟡 **Quedan dos huecos de `99 §73.9`, decisión suya**: **(b)** el «solo PNG» mira la etiqueta que declara el cliente, no los bytes; **(c)** cualquier miembro obtiene el inventario del almacén con `listAll`. ✅ **(a) CERRADO** (`99 §79`): degradar a técnico ya revoca. | 🟡 |
 
 > **Los pendientes FRÍOS** (decisiones de arquitectura, validaciones diferidas, colas viejas) viven
 > en la hija [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md): no cambian de semana en semana y no

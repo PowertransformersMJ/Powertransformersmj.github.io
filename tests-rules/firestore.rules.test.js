@@ -48,6 +48,11 @@ before(async () => {
     await setDoc(doc(db, 'usuarios/tech1'),    { email: 't@x.co', rol: 'tecnico', activo: true });
     await setDoc(doc(db, 'usuarios/revoked1'), { email: 'r@x.co', rol: 'admin',   activo: false });
     await setDoc(doc(db, 'admins/revoked1'),   { legacy: true }); // en /admins pero desactivado
+    // ADR-079: ex-admin degradado a técnico que quedó en /admins, y bootstrap
+    // puro (en /admins, SIN perfil) que se conserva para no quedarse sin admin.
+    await setDoc(doc(db, 'usuarios/degradado1'), { email: 'd@x.co', rol: 'tecnico', activo: true });
+    await setDoc(doc(db, 'admins/degradado1'), { legacy: true });
+    await setDoc(doc(db, 'admins/boot1'),      { legacy: true });
     await setDoc(doc(db, 'transformadores/tx-seed'), trafoValido);
   });
 });
@@ -79,6 +84,18 @@ describe('firestore.rules — invariantes de seguridad (G025)', () => {
     const db = testEnv.authenticatedContext('revoked1').firestore();
     await assertFails(getDoc(doc(db, 'transformadores/tx-seed')));           // no team member
     await assertFails(setDoc(doc(db, 'transformadores/tx-rev'), trafoValido)); // no admin
+  });
+
+  test('un ex-admin degradado a técnico, aún en /admins, YA NO es admin pero sigue leyendo (ADR-079)', async () => {
+    const db = testEnv.authenticatedContext('degradado1').firestore();
+    await assertSucceeds(getDoc(doc(db, 'transformadores/tx-seed')));          // sigue en el equipo
+    await assertFails(setDoc(doc(db, 'transformadores/tx-degradado'), trafoValido));
+    await assertFails(getDoc(doc(db, 'usuarios/admin1')));                     // ni lee perfiles ajenos
+  });
+
+  test('el bootstrap puro (en /admins y SIN perfil) conserva el acceso de admin (sin lockout)', async () => {
+    const db = testEnv.authenticatedContext('boot1').firestore();
+    await assertSucceeds(setDoc(doc(db, 'transformadores/tx-boot'), trafoValido));
   });
 
   test('un usuario lee SU perfil pero NO el de otro (self-scoped)', async () => {

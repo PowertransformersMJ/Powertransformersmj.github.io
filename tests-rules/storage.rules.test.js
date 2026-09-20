@@ -292,23 +292,13 @@ describe('storage.rules · todo lo no declarado está cerrado', () => {
 // ══════════════════════════════════════════════════════════════
 describe('storage.rules · límites conocidos (decisión pendiente del Ingeniero)', () => {
 
-  // 🔴 EL GRAVE. `adminsBootstrapValido()` comprueba dos cosas —estar en
-  // /admins y no estar desactivado— pero NUNCA mira el ROL, y en `isAdmin()`
-  // va en la rama OR, así que gana. Consecuencia: degradar a alguien de
-  // 'admin' a 'tecnico' desde el panel —la acción natural cuando sigue en el
-  // equipo pero ya no administra— NO le quita la escritura sobre contratos ni
-  // sobre los informes reales de cliente. El comentario de las reglas dice
-  // otra cosa ("uid en /admins SIN perfil en /usuarios = bootstrap puro") y
-  // el cliente hace otra cosa (session-guard.js solo mira /admins cuando NO
-  // hay perfil): son las reglas las que se apartan de su propia intención.
-  // El mismo defecto está en `firestore.rules` (líneas 42-58), así que
-  // alcanza a TODO el backend, no solo al bucket.
-  // Arreglo de una línea: `&& !hasProfile()` en vez de
-  // `&& (!hasProfile() || profile().activo == true)`.
-  // Riesgo del arreglo: si alguien depende de /admins TENIENDO perfil no-admin,
-  // pierde el acceso. Por eso se decide, no se ejecuta a ciegas.
-  test('🔴 HOY PERMITE: un ex-admin degradado a técnico, aún en /admins, sigue escribiendo en contratos', async () => {
-    await assertSucceeds(
+  // ✅ CERRADO (ADR-079, decisión del Ingeniero 2026-09-20 «el administrador
+  // soy yo»): `adminsBootstrapValido()` ya no mira solo /admins + activo —que
+  // nunca miraba el ROL y ganaba en la rama OR de `isAdmin()`—, sino que exige
+  // NO tener perfil. Degradar de 'admin' a 'tecnico' vuelve a significar algo,
+  // aquí y en firestore.rules (era el mismo defecto en todo el backend).
+  test('un ex-admin degradado a técnico, aún en /admins, YA NO escribe en contratos (ADR-079)', async () => {
+    await assertFails(
       uploadBytes(ref(como('s_degradado'), 'contratos/c1/colado.pdf'), PDF, { contentType: 'application/pdf' })
     );
   });

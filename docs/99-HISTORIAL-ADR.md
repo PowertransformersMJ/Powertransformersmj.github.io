@@ -3167,3 +3167,38 @@ no guarda en borrador ni pendientes · **refutado**: «listar solo admin no prot
 diseñado, 78.3) · **descartado**: enmascarar en la vista previa (el botón Imprimir imprime esa vista),
 Claude tecleando cédulas (quedarían en transcripciones), reasignar huérfanas, doble tecleo · la ficha
 técnica y otros módulos no imprimen cédulas. Crudo → bóveda `2026-09-16-cedulas-responsables/`.
+
+## 79. ADR — El rol sale del perfil y de ningún otro lado: se cierra el hueco de `/admins` ⟦OPUS-5⟧ (2026-09-20)
+
+> Pregunta al Ingeniero (TODO-47a, abierta desde `§73.9`): *«¿quién figura hoy en `/admins`?»*.
+> Respuesta: **«el administrador soy yo»**. Con eso la decisión quedó tomada.
+
+**79.1 Causa raíz.** `adminsBootstrapValido()` exigía dos cosas —estar en `/admins` y no estar
+desactivado— y **nunca miraba el ROL**; en `isAdmin()` iba en la rama `OR`, así que ganaba. Degradar a
+alguien de `admin` a `tecnico` desde el panel (la acción natural cuando sigue en el equipo pero ya no
+administra) **no le quitaba nada** si su uid seguía en la lista legacy. `§52` (ADR-052) solo había cerrado
+el caso del **desactivado**. El comentario de las reglas decía otra cosa («uid en /admins SIN perfil =
+bootstrap puro») y el cliente hacía otra («session-guard` solo mira /admins cuando NO hay perfil): las
+reglas se habían apartado de su propia intención, en `firestore.rules` **y** en `storage.rules` → todo el
+backend, no solo el bucket. Estaba fijado con prueba desde `§73` (test «🔴 HOY PERMITE»).
+
+**79.2 Solución.** Una línea en cada capa: `!hasProfile() && exists(/admins/{uid})`. Con perfil, el rol
+sale de `/usuarios` y de ningún otro lado. El **bootstrap puro** (uid en `/admins` SIN perfil) se conserva:
+sin él, borrar el perfil del único admin dejaría el proyecto sin nadie que administre.
+
+**79.3 No-regresión.** `isTeamMember()` e `isAdmin()` intactos en su forma; ningún callsite cambia. Un
+bootstrap puro no escribe en `ordenes_materiales` ni en `responsables_ordenes` (ambas exigen `hasProfile()`
+para firmar el autor): es coherente, quien administra de verdad tiene perfil.
+
+**79.4 Verificación.** `test:rules` **93/93** (2 nuevas en Firestore: el degradado ya no crea y sigue
+leyendo; el bootstrap puro conserva admin) y la prueba de `§73` que documentaba el hueco **cambia de signo**
+(de `assertSucceeds` a `assertFails`, con su comentario reescrito). Reglas desplegadas (Firestore + Storage).
+**En vivo, con la sesión del Ingeniero**: sigue siendo admin (lista los 3 perfiles: 1 admin + 2 técnicos) y
+conserva el acceso a su firma en Storage → sin lockout.
+
+**79.5 Doctrina.** L-78 (las reglas se prueban en las dos direcciones) · **L-95** (un comentario no revoca:
+lo que la regla EJECUTA es lo que manda) · §3.2 (cambio aditivo, sin renombrar helpers).
+
+**79.6 Verificado sano / no re-auditar.** Los otros dos huecos de `§73.9` siguen abiertos y son decisión
+suya: **(b)** el «solo PNG» mira la etiqueta declarada, no los bytes; **(c)** cualquier miembro puede
+listar el inventario del bucket. El resto de `§73.8` no se re-audita.
