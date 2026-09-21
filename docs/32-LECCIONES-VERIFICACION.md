@@ -192,9 +192,9 @@ alcance se compone por otra vía (`resolverPlantilla` → `seleccionAcciones`), 
 documento abría proponiendo reposición del activo **sin casilla con la que quitarla**, porque el
 selector ya la había escondido. La prueba existente pasaba: probaba el camino arreglado.
 
-Es la misma forma del defecto que `TODO-52` tiene en el backend —la decisión «manda el Excel» se
-aplicó al importador y no a la función de la nube, que sigue pisándola—. Dos superficies distintas,
-un solo patrón.
+Es la misma forma del defecto que tenía el backend hasta `99 §80` (20-09): la decisión «manda el
+Excel» se aplicó al importador y NO a la función de la nube, que siguió pisándola tres semanas. Dos
+superficies distintas, un solo patrón; el backend ya se cerró, la prosa fue el otro camino.
 
 **La regla**: al aplicar una decisión del dueño, primero **enumera los caminos de escritura** de ese
 dato (pantalla, prosa, exportación, backend, importador) y cierra todos o declara por escrito cuál
