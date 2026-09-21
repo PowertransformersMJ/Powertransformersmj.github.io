@@ -3260,3 +3260,52 @@ de objetos compartidos) · L-96 · la decisión del especialista manda sobre el 
 había que tocarlos, el arreglo es aguas arriba. `historial_hi` conserva el recálculo del motor en cada
 snapshot, así que la serie del motor no se pierde. Queda vivo, aparte: el Plan de Inversión ignora la
 criticidad (TODO-60) y los cortes por usuarios (TODO-55).
+
+## 81. ADR — La potencia y los usuarios se leen EN la casilla; la casilla sigue siendo la de la norma ⟦OPUS-5⟧ (2026-09-20)
+
+> Encargo del Ingeniero: *«necesito que en la ficha tecnica aparezca el estado de salud y la matriz como se
+> situaria conforme a su probabilidad vs consecuencia, aqui se debe apreciar la potencia y cantidad de
+> usuarios»*, precisado después: *«en la posicion que se ubique en la matriz, se aprecie la potencia.
+> cantidad de usuarios»*. Antes rechazó re-bandear usuarios: *«no es la proyeccion que en este caso necesito»*.
+> Taller de diseño (workflow, 4 propuestas × 2 críticos = 12 agentes) + preview antes de publicar.
+
+**81.1 Causa raíz.** La hoja «Salud y riesgo» ya situaba el equipo, pero su casilla solo decía «ESTE
+EQUIPO»: las dos magnitudes que explican la consecuencia —potencia y usuarios— vivían lejos, en tarjetas
+sueltas del mismo tamaño que el resto. Con eso, Bosque T4 (150 MVA, 1 usuario registrado) se imprime en
+«consecuencia mínima» sin que nada en la hoja avise de que ahí hay 150 MVA en juego ni de que ese «1» es
+un marcador de «no aplica» de las unidades de transmisión (14 equipos, 870 MVA, 23 % de la potencia).
+
+**81.2 Solución.** En la casilla donde cae el equipo se imprimen **su potencia y sus usuarios** («150 MVA ·
+1 usuario») con un punto cuyo tamaño es la banda de potencia (5 bandas sobre la distribución real:
+<5 · 5-9,9 · 10-19,9 · 20-49,9 · ≥50 MVA). Cada columna imprime **su rango real de usuarios y cuántos
+equipos del parque caen ahí** (1–9.662 · 147 eq. …), calculados con `conteoPorNivel` y los mismos `rangos`
+que clasifican. Cada tarjeta declara su papel («fila 1 de la matriz», «columna Mínima», «se muestra: no
+mueve la casilla», «resultado de fila × columna»). Se añade el aviso `avisoDatoConsecuencia` cuando el
+registro de usuarios no representa el alcance, una **lectura por potencia informativa** («si la
+consecuencia se midiera por potencia, su columna sería Máxima en vez de Mínima») y un pie de trazabilidad
+(equipos considerados, máximo del parque, ancho de banda, fecha de corte).
+
+**81.3 Lo que NO cambia (y por qué).** La casilla sigue saliendo de condición × usuarios (MO.00418 §4.2/A6,
+Tabla 11): ficha y matriz gerencial siguen coincidiendo. Los dos auditores del taller marcaron **bloqueante**
+la alternativa de que la potencia moviera la casilla: con el mismo color y el mismo rótulo «veredicto», se
+estaría reemplazando la norma en silencio y sin acto de aprobación. La potencia se aprecia, no reclasifica.
+
+**81.4 Verificación.** 10 pruebas nuevas de dominio (bandas sin huecos ni solapes; `Number(null)` no se
+cuela como «0 usuarios»; el conteo ignora lo que no es dato; y una que falla si la potencia empieza a mover
+la columna) → **1716 pass / 0 fail / 2 skip** · lint limpio · **preview del módulo real** en banco local
+con tres equipos de muestra (hoja renderizada, capturas entregadas al Ingeniero antes de publicar) ·
+producción byte-idéntica y, con su sesión y el parque real (208 equipos), se comprobó que la hoja imprimirá
+`1–9.662 · 147 eq.` … `38.649–48.312 · 4 eq.` y, para Bosque T4: 150 MVA (banda ≥ 50, punto 5), columna
+Mínima, columna por potencia Máxima y el aviso del «1» como marcador.
+
+**81.5 Archivos.** `assets/js/domain/matriz_riesgo.js` (+`BANDAS_POTENCIA`, `bandaPotencia`,
+`nivelPorPotencia`, `avisoDatoConsecuencia`, `conteoPorNivel`), `assets/js/ui/fichas/panel.js`
+(`hojaSaludRiesgo`), `assets/css/fichas-tecnicas.css`, `tests/matriz_potencia.test.js`. INTACTOS: el cálculo
+normativo (`calcularRangosCriticidad`, `nivelPorUsuarios`, `colorCelda`) y la matriz gerencial.
+
+**81.6 Verificado sano / no re-auditar.** El resto de hojas de la ficha no se tocó · la hoja «Salud y
+riesgo» no se exporta al Excel de la ficha (sigue igual; si algún día se exporta, deben ir también rango,
+conteo y banda) · descartado del taller: índice compuesto usuarios×MVA (bloqueante), dos matrices lado a
+lado (duplica el objeto que se firma), burbuja en plano continuo (no sobrevive a A4 ni a blanco y negro) ·
+queda abierto, de antes: los cortes por usuarios (TODO-55) y el dato real de los 14 equipos de transmisión.
+Crudo del taller → bóveda `2026-09-20-ficha-probabilidad-consecuencia/`.
