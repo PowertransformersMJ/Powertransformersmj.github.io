@@ -360,7 +360,13 @@ export function equiposDesdeListado(matriz) {
     return {
       // Identidad y ubicación
       fila: ev.fila,
+      // OJO: la columna se llama «CODIGO SUBESTACION» y es de la SUBESTACIÓN,
+      // no del equipo: los dos transformadores de una misma subestación traen
+      // el mismo valor. Se conserva `codigo` (nada se borra: lo leen la tabla y
+      // el documento) y se publica además con su nombre real, para que nadie
+      // vuelva a confundirlo con la identidad del transformador (`99 §82`).
       codigo: g('codigo') || '',
+      codigo_subestacion: g('codigo') || '',
       serie: ev.serie || '',
       matricula: ev.matricula || '',
       subestacion: ev.subestacion || '',

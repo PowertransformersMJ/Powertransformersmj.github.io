@@ -485,7 +485,12 @@ export function normalizarEquipo(bruto, i) {
   const e = {
     ...b,
     fila: b.fila != null ? b.fila : (i + 1),
-    id: txt(leer(b, 'id', 'codigo', 'identificacion.codigo')),
+    // `codigo` NO entra en la identidad: por el camino del listado adjunto es
+    // el «CODIGO SUBESTACION», que los dos TX de una subestación comparten —y
+    // como `claveEquipo` lee `id` primero, fabricarlo aquí hacía que el segundo
+    // equipo no pudiera abrir su propia ficha (`99 §82`). Sin `id` propio, la
+    // identidad la resuelve `claveEquipo` (matrícula · serie · código+fila).
+    id: txt(leer(b, 'id', 'identificacion.codigo')),
     codigo: txt(leer(b, 'codigo', 'identificacion.codigo')),
     serie: txt(leer(b, 'serie', 'identificacion.numero_serie')),
     matricula: txt(leer(b, 'matricula', 'identificacion.matricula')),
