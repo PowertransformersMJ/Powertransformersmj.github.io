@@ -1,0 +1,99 @@
+# 📋 Cola del módulo de FICHAS TÉCNICAS (hoja de `10`)
+
+> **Hoja de detalle de `docs/10-MEMORIA-CORTO-PLAZO.md` (TODO-35/58).** No se auto-carga.
+> Levantada el **2026-09-21** con una auditoría de 9 agentes Opus sobre el módulo REAL —una superficie
+> por agente, cada hallazgo con su `archivo:línea`— que reemplaza la cola heredada de `§75` (los «31
+> hallazgos» sin lista viva). Crudo → bóveda `2026-09-21-estado-fichas-tecnicas/`.
+>
+> ⚠️ **Leído en el código, NO reproducido en el navegador** salvo donde se diga. El mecanismo está
+> verificado; la confirmación en vivo es parte del arreglo, no de este inventario.
+> Al cerrar un punto: marcarlo ✅ con su `§` y retirarlo cuando el ADR lo recoja (§G.3).
+
+## Lo que YA está cerrado (no re-auditar sin motivo)
+
+- **`§82`** cada TX abre SU ficha: la identidad sale de matrícula/serie, no del «CODIGO SUBESTACION»
+  (verificado en banco con dos TX de una subestación, y con prueba que lo vigila).
+- **`§81`** en la casilla de la matriz se leen potencia y usuarios, y es **informativo**: el color sale
+  solo de `colorCelda(hi, nivel)`; hay prueba que falla si la potencia mueve la columna.
+- **`§75`** las cinco afirmaciones falsas del papel · un solo catálogo de acciones (registrado vs línea
+  base) · el sustento técnico de las 36 actividades · «conservación del activo» · las 5 condiciones
+  literales del Ingeniero con prueba anti-paráfrasis · la inversión fuera del alcance de mantenimiento
+  en las **dos** vías de escritura.
+- **`§80`** manda el Excel de Salud de Activos en todos los caminos (de aquí en adelante; lo ya pisado
+  es TODO-64).
+- El Excel sale de la **plantilla oficial real** (se parchean celdas conservando estilo) y el «Valor CREG
+  Total» va como **fórmula viva** `F36+(MVA × $/MVA)`, auditable por el revisor.
+- El presupuesto **no inventa cifra**: sin UC en catálogo o sin potencia, imprime `[PENDIENTE]` con motivo.
+- El municipio se rellena solo desde `Municipios.xlsx` con las tres reglas del Ingeniero.
+- Por debajo del mínimo del catálogo CREG **no se propone banda** (decisión suya, escrita en el código).
+- **303 pruebas** del módulo en verde (17 archivos) y el lado del cálculo separado de la pantalla.
+
+---
+
+## 🔴 GRAVE · mío, sin preguntar nada
+
+| id | Qué pasa | Dónde | Arreglo |
+|---|---|---|---|
+| **CF-01** | **Se pierde el documento entero sin avisar.** Proyecto, consecutivo, alcance, beneficios, presupuesto, firmantes, los dos diagramas y el Anexo AT viven solo en memoria; el aviso de «sin guardar» cuenta únicamente decisiones y correcciones del tablero. Cerrar la pestaña, recargar o adjuntar un listado borra una tarde de redacción. | `panel.js:822-824` (`hayGestionViva`), `:2784`, `:2813` (`ESTADOS.clear()`), `:855`; cero `localStorage` en `ui/fichas/` | Que `hayGestionViva()` cuente las hojas con contenido; que el freno de salida y el permiso antes de pisar digan **cuántas fichas** se perderían |
+| **CF-02** | **La carga tardía del parque borra el listado que acabas de adjuntar** y no pregunta, porque entra con `forzar`. El peor camino: adjuntas el archivo *porque* el parque no cargaba, y la rama de fallo te deja la pantalla en blanco. | `panel.js:2856-2862` (`fijarDatos(filas, {forzar:true})` tras el `await`), `:2887` (`recargar()` sin `await`) | Sello de secuencia: la respuesta que vuelve tarde comprueba que sigue siendo la última; si no, se descarta |
+| **CF-03** | **El pie del papel puede declarar un origen falso.** `cfg.origen` solo se reescribe si llega `meta.origen`, y la carga de Firestore no lo manda: el documento sigue diciendo «Listado adjunto · archivo.xlsx» sobre datos de Firestore, o al revés. Es la única línea que dice de dónde salió el dato. | `panel.js:2814`, `:2862`, `:2413`, `:2547`; `fichas-tecnicas.html:113` | Que el origen viaje **siempre** junto con los datos, y que el segmento apague su banner cuando la fuente cambie |
+| **CF-04** | **Los diagramas sobreviven al cambio de datos** y pueden reaparecer dibujados sobre otro equipo: `olvidarDiagramas()` solo corre al desmontar el tablero. | `panel.js:2873-2877` vs `:2815` | Llamar `olvidarDiagramas()` dentro de `fijarDatos`, donde ya se limpia el resto. **Una línea** + prueba |
+| **CF-05** | **El «Valor Real Total» y el «Sistema» que tecleas no llegan al Excel firmado**: se quedan en pantalla. | `exportar-planificacion.js` (mapa de casillas sin `J36`/`K36`) | Añadir `J36` (leyendo el dinero con `montoCOP`, no `parseFloat`) y `K36` |
+| **CF-06** | **Cuando falta un dato de plata, la casilla del Excel sale en blanco** en vez de decir que falta, y nadie avisa antes de descargar. | mismo exportador; los avisos ya están calculados y nadie los lee | `[PENDIENTE]` también en las casillas de dinero + lista de lo que falta antes de descargar |
+| **CF-07** | **Al equipo sin usuarios registrados la hoja le asigna «criticidad Mínima» y firma un veredicto**, sin avisar. | `panel.js` (hoja salud/riesgo) + `matriz_riesgo.js` (`avisoDatoConsecuencia` no cubre el vacío) | Sin usuarios no hay columna: aviso de «no se puede situar» y sin veredicto |
+| **CF-08** | **Dos criterios para el equipo sin evaluar**: la matriz del sitio lo pinta de verde (clampa), la ficha lo descarta (`condEntera`). | `panel.js:389` vs `matriz_riesgo.js` (`evaluarTransformador`) | Subir la regla de `condEntera` al dominio: un solo criterio para matriz, analítica y ficha |
+| **CF-09** | **El papel llama «plan registrado» a actividades que salieron de la norma** (línea base referencial), no de un plan del equipo. | redactor del alcance (`ficha-tecnica.js`) — el origen no viaja hasta la frase | Dos frases distintas: lo registrado y lo «tomado de la línea base referencial» |
+| **CF-10** | **7 actividades pierden su sustento técnico en el papel** (el de las 48 correcciones): el renglón no lleva el código de la subactividad y el índice no encuentra el nombre sin periodicidad. | `acciones_tecnicas.js` / redactor | Que el código viaje con el renglón y aceptar el nombre sin periodicidad |
+
+## 🟠 MEDIO/MENOR · mío, en paquetes
+
+- **Paquete «papel honesto»**: la paginación del documento de Salud está mal (7 hojas rotuladas «de 5», la
+  hoja de Salud y riesgo sin folio) · «Código S/E» sale vacío (lee `cod_subestacion`, que nadie escribe:
+  conectarlo al `codigo_subestacion` de `§82`) · «Identificador (fuente)» lidera con el código de
+  subestación · el papel dice «DISCREPANCIA» sin decir por qué · el pie pone la fecha de hoy rotulada
+  «corte» · el anexo dice «cinco hojas oficiales» también en el de Salud · seis erratas y un espacio doble
+  en texto que se firma · «Regeneración aceite (frío)» pierde el «(frío)» · la fuga se imprime genérica
+  aunque la fuente traiga el sitio exacto (`ubicacion_fuga_dominante`) · dos fichas del mismo patio pueden
+  salir con el mismo nombre de archivo.
+- **Paquete «que no vuelva a pasar»** (pruebas): el camino de datos, la hoja salud/riesgo y el exportador
+  **no tienen ni una prueba**; la pantalla y el Excel calculan lo mismo con **dos copias** del código.
+  Sacar el estado (carga, sello de fuente, rangos, veredicto) a funciones puras y cubrirlo; unificar las
+  dos copias. El molde ya existe (`tests/xlsm_export_integracion.test.js`).
+- **Paquete «partir la pantalla»**: `panel.js` es el monolito; 638 líneas de constructores de hoja salen
+  primero a `ui/fichas/hojas.js`, en 4 commits de menos a más riesgo. **Después** de eso, retirar los
+  **8,0 KB** de CSS con todas sus clases muertas (el suelo seguro; no los 11,9 KB).
+- **Detalles**: en Analítica la tabla de priorización usa rangos distintos de la matriz de arriba · la
+  bandera de advertencia mira una lista y la pantalla pinta otra · si pides «Volver al parque vivo» y
+  cancelas, te quedas sin evaluación y sin botón · una clase de estilo que la lámina pide y el CSS no tiene.
+
+## 🤝 Mío, pero con UNA respuesta suya primero
+
+| id | Pregunta concreta | Mi propuesta por defecto |
+|---|---|---|
+| **CF-20** | **La casilla que se firma cambia según qué archivo esté cargado**, porque el máximo de usuarios se recalcula con lo que hay en pantalla y el papel dice «todo el parque». ¿Se **congela** en el parámetro oficial (hoy 48.312) o se sigue recalculando? | Congelarlo: así la casilla es reproducible y el papel no miente |
+| **CF-21** | **La hoja «Salud y riesgo» no puede salir en ningún archivo** (la plantilla oficial no la tiene). ¿Se agrega al libro PE.02081, va como hoja anexa, o se queda solo en pantalla? | Incluirla ya en el HTML que se descarga; hoja anexa en el libro, no dentro de las oficiales |
+| **CF-22** | **Las advertencias del clasificador CREG no llegan al papel**: el Excel sale con un precio basado en una interpretación, sin decirlo. ¿Dónde caben y con qué palabras? (`O11` «observación» del Anexo AT está libre) | `O11` del Anexo AT, con el mismo texto que ya muestra el tablero |
+| **CF-23** | **Vigencia de pesos.** El papel no dice de qué año son las cifras (son de dic-2007, Tablas 51/52) y la «Variación Valor Real − CREG» compara con pesos de hoy. Además **tres UC de nivel 6 están en pesos de 2017**. ¿Hay activos de 500 kV en el parque? ¿La comparación se hace contra la resolución tal cual o indexada? | Rotular la vigencia junto a cada cifra y declarar la variación como comparación entre vigencias; no sumar 2017 dentro de un total rotulado 2007 |
+| **CF-24** | **Las notas del diagrama no llegan a ningún papel.** ¿Se imprimen dentro del recuadro del diagrama, o son notas internas y hay que decirlo en pantalla? | Imprimirlas en el recuadro |
+| **CF-25** | **Los firmantes no llegan al Excel** (solo la fecha). ¿El formato admite el nombre impreso o exige escribirlo a mano sobre la línea? | Imprimirlos, como la fecha |
+| **CF-26** | **SheetJS 0.18.5 con CVE** en el camino de exportación. ¿Autorizas vendorizar ≥0.20.2 en `assets/vendor/` (como los iconos) verificando que los Excel salgan idénticos? | Sí, vendorizar |
+| **CF-27** | **Refrigeración deficiente** sigue sin señal, y ya existe el dato: `acciones_refrigeracion` guarda un veredicto por matrícula (`no_aprobado`, con déficit y cobertura) y el registro de OE/OS tiene el motivo «Reposición de unidad de refrigeración fallada». ¿Sirve como evidencia para firmar la condición? | Sí, con el veredicto de `acciones_refrigeracion` y rotulando de dónde sale |
+| **CF-28** | **Documento de Mantenimiento Especializado**: ¿qué código y edición de formato lleva (hoy usa el `PE.02081` del PI)? ¿Tiene consecutivo y firmantes propios? | Sin código mientras no exista el formato; consecutivo y firmantes propios |
+| **CF-29** | Casillas del formato: **«Zona»** imprime el departamento · **«Ámbito»** sale «Media Tensión / Alta Tensión» a la vez · en el Anexo AT la casilla **«Transformador»** se precarga con el nombre de la subestación · la sección dice **«Unidades MCOL $»** y escribimos pesos completos. ¿Qué va en cada una? | Zona operativa · ámbito derivado del nivel · «Transformador» vacío antes que con el dato de otro · pesos completos |
+| **CF-30** | **¿Un PE.02081 lleva alguna vez más de una línea de inversión?** (hoy solo cabe una; la función que suma varias está sin conectar, y el formato admite 33) | Si es sí, abro la tabla con su aviso de vigencia |
+| **CF-31** | Menores: el **$/MVA** no tiene casilla para corregir a mano (solo la instalación) · «Cantidad 2» con un total que no la multiplica · los **huecos entre bandas** del catálogo se resuelven hoy con la banda superior sin declararlo · en C3/C5 sin plan registrado el alcance sale sin actividades: ¿aviso o bloqueo? · ¿el acta debe recuperar la ficha completa (alcance, Anexo, diagramas) al importarla? · ¿una **sexta condición** para cargabilidad/edad, con tu texto? · la alerta de dato incoherente, ¿se imprime como nota de verificación? | Declarar siempre la interpretación; aviso y no bloqueo; acta que recupere todo; sin sexta condición salvo que la redactes |
+
+## 🧑‍💼 Tuyo · dato o decisión, sin código de por medio
+
+1. **El archivo de Salud de Activos vigente** para re-importar: hay equipos cuya ficha firma hoy la
+   condición del motor y no la tuya (TODO-64.a). Cuántos son solo se cuenta en Firestore con tu sesión.
+2. **Los usuarios aguas abajo** (TODO-55): el alcance real de los 14 equipos de transmisión y de los tres
+   con celda vacía (`M-BEC`, `M-GUP`, `M-SML`) — o la orden de imprimir «no aplica» en vez de «1 usuario».
+3. **Los 3 equipos sin medida 2025** (`M-CAZ`, `M-BEC`, `M-SML`): ¿se miden, se excluyen del análisis de
+   cargabilidad, o la ficha imprime «sin medida 2025»?
+4. **`calif_crg` del parque** (TODO-56): 119 cambios sobre 193, 35 bajan. ¿Todo, solo lo que tiene medida
+   2025, o nada por ahora? Exige antes/después guardado.
+5. **La discrepancia condición vs índice de salud** (46 % de acuerdo) y **ASTREA al 250 %**: qué número
+   manda y si la ficha declara la discrepancia.
+6. **La tabla de 153 subestaciones con su municipio** vive en el repo público: ¿se queda o se mueve a
+   Firestore (con su costo de lectura)?
