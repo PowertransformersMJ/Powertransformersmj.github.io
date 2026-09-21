@@ -299,6 +299,38 @@
 .ftm-sr-leyenda .ftm-sw2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .ftm-sr-marco-muestra { background: #fff; outline: 2px solid #10202c; outline-offset: 1px; }
 
+/* Potencia y usuarios DENTRO de la casilla donde cae el equipo (99 §81). El
+   punto dimensiona la potencia; las cifras van debajo. Todo con el mismo
+   `print-color-adjust` del resto de la matriz: lo que se ve es lo que se firma. */
+.ftm-sr-aqui { display: flex; flex-direction: column; align-items: center; gap: 1px; line-height: 1.15; }
+.ftm-sr-aqui b { font-size: 11px; font-weight: 800; letter-spacing: -.01em; }
+.ftm-sr-aqui > span { font-size: 9.5px; opacity: .92; }
+.ftm-sr-pt {
+  display: inline-block; border-radius: 50%; background: currentColor;
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, .85);
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.ftm-sr-pt-1 { width: 6px;  height: 6px;  }
+.ftm-sr-pt-2 { width: 8px;  height: 8px;  }
+.ftm-sr-pt-3 { width: 10px; height: 10px; }
+.ftm-sr-pt-4 { width: 13px; height: 13px; }
+.ftm-sr-pt-5 { width: 16px; height: 16px; }
+.ftm-sr-ley-pt { align-items: center; gap: 3px; }
+.ftm-sr-ley-pt .ftm-sr-pt { background: #10202c; box-shadow: none; margin-right: 2px; }
+/* Cabecera de columna: nivel arriba, rango real y conteo del parque debajo. */
+.ftm-sr-nv { display: block; }
+.ftm-sr-rng { display: block; font-size: 9.5px; font-weight: 400; opacity: .8; white-space: nowrap; }
+/* Badge de rol en las tarjetas: qué entra en la casilla y qué solo se muestra. */
+.ftm-sr-rol {
+  display: inline-block; margin-top: 5px; font-size: 9.5px; letter-spacing: .02em;
+  padding: 1px 6px; border-radius: 10px; background: #10202c; color: #fff;
+  -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.ftm-sr-rol.es-info { background: transparent; color: var(--ftm-muted, #61748a); border: 1px solid currentColor; }
+.ftm-sr-lectura { font-size: 11.5px; color: var(--ftm-muted, #61748a); margin: 8px 0 0; line-height: 1.45; }
+.ftm-sr-lectura b { color: var(--ftm-ink, #10202c); }
+.ftm-sr-aviso-dato { margin-top: 8px; }
+
 /* ── Selector de documento ──────────────────────────────────────────────
    Paso previo a la ficha: elegir qué documento se emite para el equipo.
    Ventana pequeña, dos opciones grandes y legibles — se pulsa una vez por
