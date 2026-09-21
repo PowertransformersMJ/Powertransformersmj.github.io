@@ -37,7 +37,8 @@ import {
 } from '../../domain/fichas_diagnostico.js';
 import {
   NIVELES_ORDEN, LABELS_NIVEL, COLORES_CELDA,
-  calcularRangosCriticidad, nivelPorUsuarios, colorCelda
+  calcularRangosCriticidad, nivelPorUsuarios, colorCelda,
+  BANDAS_POTENCIA, bandaPotencia, nivelPorPotencia, avisoDatoConsecuencia, conteoPorNivel
 } from '../../domain/matriz_riesgo.js';
 import { atraparFoco } from '../foco-modal.js';
 import {
@@ -1779,6 +1780,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const rangos = calcularRangosCriticidad(maxU);
     const nivel = nivelPorUsuarios(usuarios, rangos);
     const color = (hi != null && nivel) ? colorCelda(hi, nivel) : null;
+    const banda = bandaPotencia(mva);
+    const nivelPot = nivelPorPotencia(mva);
+    const avisoDato = avisoDatoConsecuencia(usuarios, mva);
 
     const NOMBRE_HI = { 5: '5 · Muy pobre', 4: '4 · Pobre', 3: '3 · Medio', 2: '2 · Bueno', 1: '1 · Muy bueno' };
     // Los códigos son los del dominio (MO.00418 Tabla 11). Aquí solo se les
@@ -1787,11 +1791,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const VEREDICTO = { VRD: 'Riesgo tolerable', AMRL: 'Atención', NAR: 'Riesgo alto', ROJ: 'Riesgo crítico' };
     const hexDe = (c) => (COLORES_CELDA[c] && COLORES_CELDA[c].hex) || null;
 
-    const tarjeta = (v, sub, lbl, tinta) => ''
+    // El badge dice QUÉ PAPEL juega cada cifra en la clasificación: cuál entra
+    // en la casilla y cuál solo se muestra. Sin eso, cuatro números del mismo
+    // tamaño invitan a creer que los cuatro clasifican (99 §81).
+    const tarjeta = (v, sub, lbl, tinta, badge, badgeGris) => ''
       + '<div class="ftm-sr-kpi">'
       +   '<b' + (tinta ? ' style="color:' + tinta + '"' : '') + '>' + v + '</b>'
       +   '<span class="ftm-sr-kpi-s">' + sub + '</span>'
       +   '<span class="ftm-sr-kpi-l">' + lbl + '</span>'
+      +   (badge ? '<span class="ftm-sr-rol' + (badgeGris ? ' es-info' : '') + '">' + badge + '</span>' : '')
       + '</div>';
 
     // Matriz 5×5 con TODAS sus casillas en el color de la MO.00418 Tabla 11 y la
@@ -1802,9 +1810,21 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // sin conteos de flota: eso sigue siendo de Analítica. Los colores salen de
     // `colorCelda` + `COLORES_CELDA`, los mismos que pintan la matriz gerencial:
     // no hay una tercera paleta.
+    // Cada columna imprime SU rango real de usuarios y cuántos equipos del parque
+    // caen ahí. Los dos salen de la misma función que clasifica: un rango tecleado
+    // a mano acabaría contradiciendo a la casilla marcada (99 §81).
+    const cuentaParque = conteoPorNivel(EQUIPOS.map((x) => x.usuarios), rangos);
+    const rangoTxt = (i) => {
+      const r = rangos[i];
+      if (!r) return '';
+      return numES(r.min, 0) + '–' + numES(r.max, 0);
+    };
     const cabecera = '<tr><th class="ftm-rmx-corner">Probabilidad de falla (condición) ↓ '
-      + '/ Consecuencia (usuarios) →</th>'
-      + NIVELES_ORDEN.map((n, i) => '<th>' + (i + 1) + ' · ' + esc(LABELS_NIVEL[n]) + '</th>').join('')
+      + '/ Consecuencia (usuarios aguas abajo) →</th>'
+      + NIVELES_ORDEN.map((n, i) => '<th>'
+          + '<span class="ftm-sr-nv">' + (i + 1) + ' · ' + esc(LABELS_NIVEL[n]) + '</span>'
+          + '<span class="ftm-sr-rng">' + esc(rangoTxt(i)) + ' · ' + cuentaParque[n] + ' eq.</span>'
+        + '</th>').join('')
       + '</tr>';
     // Filas de 1 a 5, como el resto del módulo: el Ingeniero lee la escala en
     // ese orden y tenerla invertida aquí obligaba a releer el encabezado.
@@ -1815,12 +1835,23 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         const bg = hexDe(c) || '#e9eef4';
         // El amarillo es claro: la tinta oscura es la que se lee encima.
         const tinta = c === 'AMRL' ? '#10202c' : '#fff';
+        // En la casilla donde cae el equipo se leen SUS dos magnitudes (orden del
+        // Ingeniero 2026-09-20): el punto dimensiona la potencia y debajo van las
+        // cifras. La posición sigue saliendo de condición × usuarios.
+        const marca = !aqui ? '' : ''
+          + '<span class="ftm-sr-aqui">'
+          +   (banda ? '<i class="ftm-sr-pt ftm-sr-pt-' + banda.punto + '"></i>' : '')
+          +   '<b>' + (mva != null ? esc(mvaTxt(mva)) + ' MVA' : 'sin MVA') + '</b>'
+          +   '<span>' + (usuarios != null
+                ? esc(numES(usuarios, 0)) + ' usuario' + (Math.round(usuarios) === 1 ? '' : 's')
+                : 'usuarios sin dato') + '</span>'
+          + '</span>';
         return '<td class="ftm-sr-cell' + (aqui ? ' is-aqui' : '') + '"'
           + ' style="background:' + bg + ';color:' + tinta + '"'
           + ' title="Condición ' + f + ' × consecuencia ' + esc(LABELS_NIVEL[n]) + ': '
           + esc(VEREDICTO[c] || c) + '"'
           + (aqui ? ' aria-current="true"' : '') + '>'
-          + (aqui ? '<span class="ftm-sr-aqui">ESTE EQUIPO</span>' : '')
+          + marca
           + '</td>';
       }).join('');
       return '<tr><th class="ftm-rmx-ry" title="' + esc(definicionCondicion(f)) + '">'
@@ -1835,15 +1866,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   '<div class="ftm-sr-kpis">'
       +     tarjeta(hi != null ? esc(String(hi)) : '—',
                     hi != null ? esc(nombreCondicion(hi)) : 'sin dato',
-                    'Condición del activo', hi != null ? colorCondicion(hi) : null)
+                    'Condición del activo', hi != null ? colorCondicion(hi) : null,
+                    hi != null ? 'fila ' + esc(String(hi)) + ' de la matriz' : '')
       +     tarjeta(usuarios != null ? esc(numES(usuarios, 0)) : '—',
                     nivel ? 'criticidad ' + esc(LABELS_NIVEL[nivel]) : 'sin clasificar',
-                    'Usuarios aguas abajo')
-      +     tarjeta(mva != null ? esc(mvaTxt(mva)) : '—', 'MVA', 'Capacidad comprometida')
+                    'Usuarios aguas abajo', null,
+                    nivel ? 'columna ' + esc(LABELS_NIVEL[nivel]) : '')
+      +     tarjeta(mva != null ? esc(mvaTxt(mva)) : '—',
+                    mva != null ? 'MVA' + (banda ? ' · banda ' + esc(banda.etiqueta) : '') : 'sin dato de placa',
+                    'Capacidad comprometida', null, 'se muestra: no mueve la casilla', true)
       +     tarjeta(color ? esc(VEREDICTO[color] || color) : '—',
                     color ? esc((COLORES_CELDA[color] || {}).label || '') + ' · MO.00418 Tabla 11'
                           : 'falta condición o usuarios',
-                    'Veredicto de riesgo', color ? hexDe(color) : null)
+                    'Veredicto de riesgo', color ? hexDe(color) : null,
+                    color ? 'resultado de fila × columna' : '')
       +   '</div>'
       +   (hi != null
           ? '<p class="ftm-sr-def"><b>Condición ' + esc(String(hi)) + ' · '
@@ -1866,10 +1902,29 @@ export function montarPanelFichas(contenedor, opciones = {}) {
             + esc(VEREDICTO[k] || k) + '</span>').join('')
       +     (sinDato ? '' : '<span class="ftm-rmx-sc"><i class="ftm-sw2 ftm-sr-marco-muestra"></i>'
             + 'Recuadro: posición de este equipo</span>')
+      +     '<span class="ftm-rmx-sc ftm-sr-ley-pt">'
+      +       BANDAS_POTENCIA.map((b) => '<i class="ftm-sr-pt ftm-sr-pt-' + b.punto + '"></i>').join('')
+      +       'Tamaño del punto: potencia (' + esc(BANDAS_POTENCIA[0].etiqueta) + ' … '
+      +       esc(BANDAS_POTENCIA[BANDAS_POTENCIA.length - 1].etiqueta) + ')</span>'
       +   '</div>'
-      +   '<p class="ftm-mini-src">La consecuencia se mide por usuarios aguas abajo, en cinco '
-      +   'rangos calculados sobre TODO el parque: por eso este equipo cae en la misma casilla '
-      +   'aquí y en la matriz de Analítica gerencial.</p>'
+      +   (avisoDato ? '<div class="ftm-aviso ftm-sr-aviso-dato"><b>Ojo con el dato de usuarios.</b> '
+            + esc(avisoDato) + '</div>' : '')
+      +   (nivelPot && nivel
+          ? '<p class="ftm-sr-lectura"><b>Lectura por potencia (informativa, no normativa).</b> '
+            + 'Este equipo pesa ' + esc(mvaTxt(mva)) + ' MVA (banda ' + esc(banda.etiqueta) + '). Si la consecuencia '
+            + 'se midiera por potencia en vez de por usuarios, su columna sería <b>'
+            + esc(LABELS_NIVEL[nivelPot]) + '</b>'
+            + (nivelPot === nivel
+                ? ' — la misma en la que ya está.'
+                : ', en vez de <b>' + esc(LABELS_NIVEL[nivel]) + '</b>. La casilla firmada sigue siendo la de la norma.')
+            + '</p>'
+          : '')
+      +   '<p class="ftm-mini-src">La casilla sale de la norma: condición (fila) × usuarios aguas abajo '
+      +   '(columna), en cinco rangos calculados sobre TODO el parque — por eso este equipo cae en la misma '
+      +   'casilla aquí y en la matriz de Analítica gerencial. La potencia se muestra junto a la posición y '
+      +   'no la mueve. Rangos sobre ' + EQUIPOS.length + ' equipos · máximo del parque '
+      +   esc(numES(maxU, 0)) + ' usuarios · ancho de banda ' + esc(numES(Math.floor((maxU - 1) / 5), 0))
+      +   ' · corte ' + esc(new Date().toLocaleDateString('es-CO')) + '.</p>'
       + '</div>';
   }
 

@@ -146,3 +146,79 @@ export function agregarConteos(transformadores, rangos) {
   }
   return out;
 }
+
+// ══════════════════════════════════════════════════════════════
+// Lectura por POTENCIA — informativa, NO normativa (99 §81)
+// ──────────────────────────────────────────────────────────────
+// La criticidad del MO.00418 se mide por usuarios aguas abajo y eso NO cambia:
+// la casilla de la matriz sigue saliendo de `nivelPorUsuarios`. Pero el parque
+// tiene 14 equipos de ≥20 MVA con ≤10 usuarios registrados (870 MVA, 23 % de la
+// potencia) porque el «1» se usa como marcador de «no aplica» en unidades de
+// transmisión: ahí la columna normativa dice «mínima» y el papel se firma sin
+// que nadie vea la capacidad que está en juego. Estas bandas existen para
+// MOSTRAR la potencia junto a la posición, nunca para reclasificar.
+// Cortes = los de la distribución real del parque (mediana 6,5 · p75 30 · máx 150).
+// ══════════════════════════════════════════════════════════════
+
+/** Número de verdad, o null. `Number(null)` da 0 y eso convierte un vacío en un dato. */
+function numeroOVacio(v) {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+export const BANDAS_POTENCIA = Object.freeze([
+  { nivel: 'minima',   min: 0,  max: 5,        etiqueta: '< 5 MVA',        punto: 1 },
+  { nivel: 'menor',    min: 5,  max: 10,       etiqueta: '5 – 9,9 MVA',    punto: 2 },
+  { nivel: 'moderada', min: 10, max: 20,       etiqueta: '10 – 19,9 MVA',  punto: 3 },
+  { nivel: 'mayor',    min: 20, max: 50,       etiqueta: '20 – 49,9 MVA',  punto: 4 },
+  { nivel: 'maxima',   min: 50, max: Infinity, etiqueta: '≥ 50 MVA',       punto: 5 }
+]);
+
+/** Banda de potencia de un equipo (o null si no hay dato). */
+export function bandaPotencia(mva) {
+  const v = numeroOVacio(mva);
+  if (v == null || v <= 0) return null;
+  return BANDAS_POTENCIA.find((b) => v >= b.min && v < b.max) || BANDAS_POTENCIA[BANDAS_POTENCIA.length - 1];
+}
+
+/** Nivel 1..5 que tendría la consecuencia si se midiera por potencia. INFORMATIVO. */
+export function nivelPorPotencia(mva) {
+  const b = bandaPotencia(mva);
+  return b ? b.nivel : null;
+}
+
+/**
+ * ¿El registro de usuarios de este equipo hay que mirarlo con lupa? Devuelve
+ * el motivo en palabras, o '' si no hay nada que advertir. No cambia ninguna
+ * clasificación: es lo que se imprime al lado de la casilla.
+ */
+export function avisoDatoConsecuencia(usuarios, mva) {
+  // `Number(null)` es 0: sin este filtro, un campo VACÍO se leería como «0
+  // usuarios registrados» y la hoja afirmaría algo que el archivo no dice.
+  const u = numeroOVacio(usuarios);
+  const m = numeroOVacio(mva);
+  const sinUsuarios = u != null && u <= 1;
+  const grande = m != null && m >= 20;
+  if (sinUsuarios && grande) {
+    return 'Dato de usuarios a confirmar: el «1» se usa como marcador de «no aplica» en unidades de ' +
+           'transmisión, y aquí hay capacidad comprometida de peso.';
+  }
+  if (sinUsuarios) return 'Sin usuarios registrados aguas abajo (0 o 1): la columna sale del valor registrado, no de un conteo.';
+  if (u != null && u >= 10000 && m != null && m < 10) {
+    return 'Muchos usuarios para poca potencia: la consecuencia por clientes es alta aunque el activo sea pequeño.';
+  }
+  return '';
+}
+
+/** Cuántos equipos del parque caen en cada columna (para imprimirlo en la cabecera). */
+export function conteoPorNivel(usuariosDelParque, rangos) {
+  const cuenta = { minima: 0, menor: 0, moderada: 0, mayor: 0, maxima: 0 };
+  (usuariosDelParque || []).forEach((u) => {
+    const v = numeroOVacio(u);
+    if (v == null) return;                       // sin dato no cuenta en ninguna columna
+    const n = nivelPorUsuarios(v, rangos);
+    if (n && cuenta[n] != null) cuenta[n] += 1;
+  });
+  return cuenta;
+}
