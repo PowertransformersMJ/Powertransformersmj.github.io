@@ -92,6 +92,7 @@
 | §78 | ADR-078 — **Cédulas de los responsables** desde un directorio privado en Firestore; candado por huella/forma/binario en commit, mensaje, merge y push. **L-93/94**… | 3110 |
 | §79 | ADR-079 — **El rol sale del perfil**: el bootstrap `/admins` deja de dar admin a quien ya tiene perfil (degradar por fin revoca), en Firestore y Storage. Cierra… | 3186 |
 | §80 | ADR-080 — **Manda el Excel en todos los caminos** (ratificado): el trigger de muestras reemplazaba `salud_actual` entero y borraba la condición del archivo; ahora se… | 3221 |
+| §81 | ADR-081 — **La potencia y los usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, rango y conteo por columna, aviso del «1» de transmisión); la casilla sigue siendo la de la norma ⟦OPUS-5⟧ | 3264 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
