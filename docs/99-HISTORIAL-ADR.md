@@ -3309,3 +3309,52 @@ conteo y banda) · descartado del taller: índice compuesto usuarios×MVA (bloqu
 lado (duplica el objeto que se firma), burbuja en plano continuo (no sobrevive a A4 ni a blanco y negro) ·
 queda abierto, de antes: los cortes por usuarios (TODO-55) y el dato real de los 14 equipos de transmisión.
 Crudo del taller → bóveda `2026-09-20-ficha-probabilidad-consecuencia/`.
+
+## 82. ADR — El código de la subestación dejó de ser la identidad del equipo ⟦OPUS-5⟧ (2026-09-20)
+
+> Hallazgo de la auditoría de pendientes del 20-09 (TODO-35a, de la cola de `§75`), verificado contra
+> el código y reproducido en banco. El Ingeniero acotó el trabajo: *«estamos trabajando en el modulo de
+> fichas tecnicas… vamos por partes, no borres nada»*.
+
+**82.1 Causa raíz.** Cuando los datos entran por **listado adjunto** —que es el camino de la exportación
+de Salud de Activos—, `equiposDesdeListado` llama `codigo` a la columna **«CODIGO SUBESTACION»**
+(`fichas_evaluacion_uucc.js:317` la declara como sinónimo). De ahí salía la identidad por dos vías:
+`normalizarEquipo` fabricaba `id` copiando `codigo` (`panel.js:488`) y `claveEquipo` leía `id` y luego
+`codigo` ANTES que matrícula o serie (`unifilar.js:123-125`). Resultado: **los dos transformadores de una
+misma subestación quedaban con la misma clave**. El botón «Ficha» de ambos llevaba el mismo valor,
+`EQUIPOS.find(...)` devolvía siempre el primero y `ESTADOS`/`ESTADO` (documento editable y diagramas)
+eran un solo cajón compartido: el segundo equipo **no podía abrir su propia ficha**. En el parque vivo no
+se ve —ahí cada equipo llega con su id de Firestore—, así que el defecto solo aparece justo cuando se
+trabaja con el archivo del especialista.
+
+**82.2 Solución.** La identidad sale de un identificador **propio** del equipo: `id` · `matricula` ·
+`identificacion.matricula` · `serie` · `identificacion.numero_serie` · `identificacion.codigo` (el del
+EQUIPO en el esquema v2). Si no hay ninguno, el `codigo` compartido se usa **con la fila del listado como
+desempate** (`M-BQE#7`), nunca la fila sola: una fila suelta cambia de equipo si el listado se reordena.
+`normalizarEquipo` deja de fabricar `id` desde `codigo`. Y `equiposDesdeListado` publica además
+`codigo_subestacion` con su nombre real.
+
+**82.3 No-regresión (nada se borra, pedido literal).** El campo `codigo` **se conserva** tal cual (lo leen
+la tabla y el documento); solo se le suma el alias explícito. El camino del parque vivo no cambia: con
+`id` de Firestore la clave es la misma de antes. `claveEquipo` sigue aceptando texto/número, la ruta
+anidada del esquema v2 y la clave anónima por `WeakMap` para el equipo sin ningún identificador.
+
+**82.4 Verificación.** 12 pruebas nuevas (`tests/fichas_identidad_equipo.test.js`): 4 fallaban antes del
+arreglo y las de no-regresión pasaban ya. **1726 pass / 0 fail / 2 skip**, `lint:html` limpio. **Gate
+empírico en banco con el módulo REAL** y dos TX de la misma subestación: claves distintas · botones
+distintos · T1 abre 40 MVA/N4T6 y T4 abre 150 MVA/N4T11 · una marca escrita en el documento de T1 **no**
+aparece en el de T4 y T1 conserva la suya · el diagrama de T4 muestra su matrícula y sus 150 MVA sin la
+nota de T1.
+
+**82.5 Archivos.** `assets/js/ui/fichas/unifilar.js` (`claveEquipo`), `assets/js/ui/fichas/panel.js`
+(`normalizarEquipo`), `assets/js/domain/fichas_evaluacion_uucc.js` (`equiposDesdeListado`),
+`tests/fichas_identidad_equipo.test.js`. INTACTOS: la lectura del parque (`listarV2`), el documento
+emitido, el exportador y el resto de la cola de `§75`.
+
+**82.6 Verificado sano / no re-auditar.** No existe documento de Firestore de la ficha: el módulo solo LEE
+`transformadores` y el estado editable vive en memoria (`ESTADOS` en `panel.js:850`, `ESTADO` en
+`unifilar.js:138`) — lo que se compartía era el cajón en memoria y, con él, el papel emitido; no hay dato
+guardado que migrar ni reparar. `claveEquipo` solo lo consumen el botón «Ficha», `estadoDe` y la búsqueda
+del equipo (3 sitios): cambiar la clave no toca persistencia. **Queda abierto, de la misma cola**: que el
+documento imprima `codigo` (el de la subestación) donde el lector espera el código del equipo — se revisa
+en su parte, con `codigo_subestacion` ya disponible para distinguirlos.
