@@ -5,10 +5,10 @@
 
 ---
 
-## 🎯 Foco (2026-09-16) — ÓRDENES DE MATERIALES · registro del equipo
+## 🎯 Foco (2026-09-20) — SALUD: reparar lo que el trigger viejo alcanzó a pisar
 
-> Qué pasó → `05` y `99 §77-§78` (**no se repite aquí**, §G.3). Lecciones **L-91**, **L-93**.
-> ⚠️ **Abiertos**: **TODO-62/63** (cierre en vivo) · **TODO-35/58** · **TODO-60** 🔴 ·
+> Qué pasó → `05` y `99 §77-§81` (**no se repite aquí**, §G.3). Lecciones **L-91**, **L-93**, **L-96**.
+> ⚠️ **Abiertos**: **TODO-64** 🔴 · **TODO-65** · **TODO-62/63** (cierre en vivo) · **TODO-35/58** · **TODO-60** 🔴 ·
 > **TODO-55** 🔴 · **TODO-47** · 54 · 56 · 57 · 61 · y los fríos de la hija `11`.
 
 ### ✅ CERRADOS → `99` (`§74.16-74.24`, `§75`) · lecciones L-82..L-86
@@ -42,6 +42,8 @@
 |---|---|---|
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (crear/editar/conflicto/eliminar/lápida/bitácora, `99 §77.5`). Falta: sesión de TÉCNICO en vivo; Gemini; ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (20-09, «formato de autorización firmado»; `99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula (Function) o basta como está? + respuesta de Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
+| **TODO-64** | 🔴 **Cola de `§80`, auditada 20-09**: **(a)** a los equipos que el trigger VIEJO alcanzó a pisar les borró la condición del Excel **y el rastro** (`condicion_fuente` quedó «motor», `salud_activos.js:594`) ⇒ su ficha firma hoy el número del motor; se reparan re-importando el archivo, pero cuántos son solo se sabe contando en Firestore. **(b)** cada muestra nueva **BORRA `calif_crg`/`crg_pct_medido`** (el trigger llama al motor sin `cargaActual`, `functions/index.js:128`) ⇒ ficha sin cargabilidad, causante sin CAU-02, respaldo leído como «descargado». **(c)** `npm run test:trigger` —la única red que ve esto— **no está en CI** (`ci.yml` corre lint+unit+rules). | 🔴 |
+| **TODO-65** | 🟡 **Puerta lateral a `§78`**: el `<textarea id="nota">` de órdenes sugiere «c.c.: …» (`pages/ordenes-materiales.html:243`) y `sinCedulas` no lo limpia ⇒ una cédula puede entrar a `ordenes_materiales` (lo lee cualquier miembro activo) y salir en la copia `.json` y en el PDF. Decisión: quitar la sugerencia del placeholder y/o limpiar dígitos al guardar. | 🟡 |
 | **TODO-35/58** | **Cola de Fichas Técnicas — 31 hallazgos confirmados (`99 §75`) + lo priorizado en `§66.7` y rescatado en `§68.7`.** Los dos graves: **(a)** dos TX de la misma subestación comparten **el documento entero** (la clave sale de «CODIGO SUBESTACION»); **(b)** la carga tardía pisa lo adjuntado sin preguntar (`fijarDatos(…,{forzar:true})` salta el permiso). Luego: notas del clasificador CREG que no llegan al papel · dos vigencias de pesos sumadas (2007+2017) · el aviso de «sin guardar» no cubre la ficha · el unifilar puede pintarse sobre otro equipo · vendorizar SheetJS ≥0.20.2 (cierra G111) · partir `panel.js` y bajar `normalizarEquipo` al dominio · 11,4 KB de CSS sin emisor · el 61 % de `panel.js` sin prueba posible · `montoCOP` ✅ y las 5 verdades del documento ✅ (`§75`). ✅ **los dos catálogos, unificados** (`§75.10`, L-87). Siguiente paso posible, a su criterio: que lo marcado por defecto se derive del **hallazgo** (`modoDegradacion` ya existe) en vez de la banda — hoy C3 y C5 arrancan con el texto de reserva. | 🟡 |
 | **TODO-61** | **«Sistema de refrigeración deficiente» no tiene señal** — es una de las 5 condiciones que el Ingeniero definió (`99 §75.13`), pero el registro guarda el TIPO de refrigeración y las cantidades (ONAN/ONAF, radiadores, ventiladores, bombas), no su ESTADO. No se colgó del modo `termico` a propósito: eso es falla térmica INTERNA por etileno, otra cosa. Falta decidir de qué dato saldría: ¿una calificación propia en Salud de Activos, la termografía, o el delta de temperatura contra la carga? | 🟡 |
 | **TODO-60** | 🔴 **El Plan de Inversión ignora la criticidad**: `criticidad.nivel` no lo escribe ningún módulo de producción ⇒ `plan_inversion.js:50-51` deja `critN = 0` en los 208 y **el 25 % del ranking vale cero**. Arreglar TODO-55 no moverá el ranking hasta cerrar esto. | 🔴 |
