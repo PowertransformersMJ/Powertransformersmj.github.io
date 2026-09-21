@@ -93,6 +93,7 @@
 | §79 | ADR-079 — **El rol sale del perfil**: el bootstrap `/admins` deja de dar admin a quien ya tiene perfil (degradar por fin revoca), en Firestore y Storage. Cierra… | 3186 |
 | §80 | ADR-080 — **Manda el Excel en todos los caminos** (ratificado): el trigger de muestras reemplazaba `salud_actual` entero y borraba la condición del archivo; ahora se… | 3221 |
 | §81 | ADR-081 — **La potencia y los usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, rango y conteo por columna, aviso del «1» de transmisión); la casilla sigue siendo la de la norma ⟦OPUS-5⟧ | 3264 |
+| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad del equipo (dos TX de una subestación compartían ficha, documento y diagrama por el camino del listado adjunto) ⟦OPUS-5⟧ | 3313 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
