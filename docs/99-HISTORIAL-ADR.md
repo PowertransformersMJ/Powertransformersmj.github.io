@@ -3458,3 +3458,49 @@ trabajo de la sesión. Producción byte-idéntica.
 está acotado porque el disco se relee en cada guardado) · dos filas con la MISMA matrícula en un mismo
 listado se pisan al guardar y luego salen como ambiguas al restaurar · si la sesión tarda más de 12 s el
 borrador podría escribirse sin dueño. Ninguno pierde trabajo en silencio; van a la cola del módulo.
+
+## 84. ADR — La carga tardía deja de borrar el listado, y el pie del papel deja de poder mentir ⟦OPUS-5⟧ (2026-09-22)
+
+> Tanda A de la cola del módulo, elegida por el Ingeniero: *«dame un estatus… quiero que dejemos esto
+> listo pronto»* → arranque por **el camino de los datos**. Cierra **CF-02** y **CF-03**.
+
+**84.1 Causa raíz (dos, del mismo camino).** **(a)** `recargar()` corre al montar la página **sin
+`await`** y, al volver del `await fuente()`, llamaba `fijarDatos(filas, {forzar:true})`. `forzar` existe
+para no preguntar dos veces, pero además saltaba el permiso: si el Ingeniero adjuntaba su listado
+mientras la consulta seguía en vuelo, la respuesta tardía se lo borraba sin preguntar. El peor camino era
+el de FALLO: se adjunta el archivo *porque* el parque no carga, y el `catch` hacía `fijarDatos([])` —la
+pantalla en blanco justo cuando más trabajo había encima—. **(b)** El rótulo de procedencia vivía en
+`cfg.origen` y solo se reescribía `if (meta.origen != null)`; la carga del parque no lo mandaba. Desde
+ese momento el chip, el pie del tablero y **el pie del documento que se firma** seguían declarando
+«Listado adjunto · archivo.xlsx» sobre datos de Firestore, o al revés. Es la única línea del papel que
+dice de dónde salió el dato.
+
+**84.2 Solución.** Un **número de secuencia** (`cargaSeq`) que sube con cada cambio de fuente: la lectura
+se queda con el suyo antes del `await` y, al volver, solo escribe si sigue siendo la última; si no, se
+descarta y se dice en cristiano («la lectura del parque llegó tarde y se descartó: en pantalla sigue lo
+que usted cargó después»). La rama de fallo, además, **no vacía nada** si hay ficha redactada o gestión
+viva. Y el **origen viaja siempre con los datos**: `fijarDatos` fija `cfg.origen` en cada llamada, sin
+declaración no se afirma procedencia —`sin declarar` en el chip, «Origen de los datos: no declarado» en
+el papel, en vez de heredar la frase anterior o la que trae por defecto el módulo suelto— y el panel
+avisa el cambio (`alCambiarFuente`) para que el segmento apague su banner (`limpiar()`, aditivo).
+
+**84.3 No-regresión.** `forzar` conserva su significado (no volver a preguntar); lo que se añade es la
+comprobación de vigencia. `restaurar()` del segmento sigue igual: `limpiar()` es un método NUEVO que no
+llama de vuelta a `onRestaurar` (si no, bucle). Ningún llamante existente cambió de firma.
+
+**84.4 Verificación.** 1753 pass / 0 fail / 2 skip, lint limpio. **Banco con una fuente controlable**
+(se suelta o se hace fallar a mano): respuesta tardía descartada con el listado intacto y su aviso ·
+fallo del parque con trabajo encima sin vaciar nada · chip, pie del tablero y **pie del PAPEL** siguiendo
+la fuente real en los dos sentidos (parque → listado → parque) · el segmento recibe el aviso del cambio.
+Producción byte-idéntica.
+
+**84.5 Archivos.** `assets/js/ui/fichas/panel.js`, `assets/js/ui/fichas/evaluacion-masiva.js` (+`limpiar`),
+`pages/fichas-tecnicas.html`. INTACTOS: el dominio, el exportador y el borrador de `§83`.
+
+**84.6 Verificado sano / no re-auditar.** El borrador (`§83`) sigue volcando ANTES de que `fijarDatos`
+limpie, así que descartar una respuesta tardía no pierde nada · `fichaConTrabajo` ya existía de `§83.7`
+y es lo que ahora protege la rama de fallo · **honesto**: este camino sigue **sin prueba automática** —la
+lógica vive en `panel.js`, que no es testeable— y entra en el paquete «que no vuelva a pasar» de la cola,
+junto con el exportador y la hoja de riesgo. **Autorización en bloque del Ingeniero (09-22)**: las doce
+preguntas CF-20…CF-31 se aplican con la propuesta por defecto de la cola, cada una en su tanda, y se le
+enseña en preview lo que toque el papel antes de publicar.
