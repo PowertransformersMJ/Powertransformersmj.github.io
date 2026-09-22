@@ -64,7 +64,7 @@
 | §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (tablas de `montarPanelPrueba`, L-57) + detalle por informe + fuera-de-criterio en rojo + fix chips… | 968 |
 | §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (kernel v1.2): entrevista F3a (política git NUEVA: Claude commit+push+merge+deploy), rescate TRIAJE en `_legacy/`, 30… | 986 |
 | §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores adversariales, 0 refutados) → 123 hallazgos en 6 olas; hallazgo dominante =… | 1004 |
-| §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase; refutados 2) + fixes… | 1036 |
+| §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase;… | 1036 |
 | §54 | ADR-054 — Fix sistémico del shell (TODO-16, cazado en validación VIVA): evento `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin (doble… | 1054 |
 | §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación… | 1072 |
 | §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado… | 1090 |
@@ -76,14 +76,14 @@
 | §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto)… | 1226 |
 | §63 | ADR-063 — Cola de la auditoría: funciones con topes, 16 índices Firestore nuevos (producción tenía 33 de 37), `ts_calculo` con dos tipos, 5 suscripciones sin límite, 5… | 1284 |
 | §64 | ADR-064 — Fichas: el port de ADR-061 trajo el CSS entero pero solo el 44% del marcado; las clases huérfanas nombraban las vistas que faltaban ⟦OPUS-5⟧ | 1343 |
-| §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y acta en Excel que se… | 1394 |
+| §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y… | 1394 |
 | §66 | ADR-066 — Evaluación holística de Fichas Técnicas (6 auditores) y remediación: terciario «0» inflaba el presupuesto 23%, «20.000» kVA se leía como 20, conformidad… | 1436 |
 | §67 | ADR-067 — «Veo información basura»: Cargabilidad y SCADA mostraban equipos inventados sin rotularlos, la matriz vestía la falta de datos de buena noticia y 8 de 10… | 1497 |
 | §68 | ADR-068 — Mantenimiento del cerebro (auditoría Nivel-2, 8 sondas): caché afirmada sin correr, gate de bóveda «íntegro» con 8 deliberaciones sin indexar, mapa sin 4… | 1551 |
 | §69 | ADR-069 — TX_Potencia leída de verdad: los «62 omitidos» eran **57 equipos reales** (cabecera en la fila 2) → 208 válidos y 1.655.376 usuarios (cierra TODO-34). Su… | 1637 |
 | §70 | ADR-070 — Órdenes de Materiales SSEE entra al sitio con página propia (ya existían las «Órdenes» de TRABAJO), sin las 3 firmas escaneadas ni las 8 cédulas: el guard… | 1710 |
 | §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la… | 1781 |
-| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después la incumplí yo mismo… | 1838 |
+| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después… | 1838 |
 | §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría… | 1905 |
 | §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta y aceptar el cálculo degradaba 30 tridevanados reales; catálogo de 3 familias; la… | 1983 |
 | §75 | ADR-075 — **Fichas Técnicas**: 5 falsedades del papel firmado corregidas; 5 redacciones por banda; alcance argumentado con condiciones; matriz a color; municipio… | 2642 |
