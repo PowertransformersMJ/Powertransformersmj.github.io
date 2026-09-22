@@ -417,6 +417,19 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
   return {
     resultado: () => ultimo,
     restaurar,
+    /**
+     * Borra el listado adjunto de ESTE segmento SIN pedir la fuente viva.
+     * La usa la página cuando el tablero cambió de fuente por su cuenta: el
+     * banner «Listado adjunto · archivo.xlsx» se quedaba encendido sobre datos
+     * que ya eran de Firestore (CF-03). `restaurar()` no sirve aquí porque
+     * llamaría de vuelta a `onRestaurar` y entraríamos en bucle.
+     */
+    limpiar() {
+      if (!ultimo && !filtro) return;
+      ultimo = null; filtro = null;
+      salida.innerHTML = '';
+      decir('', null);
+    },
     destruir() {
       zona.removeEventListener('click', onClickZona);
       zona.removeEventListener('keydown', onTeclaZona);

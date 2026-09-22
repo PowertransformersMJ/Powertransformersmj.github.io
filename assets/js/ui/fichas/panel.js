@@ -1292,7 +1292,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const grados = Math.round((conf / 100) * 360);
     caja.innerHTML = ''
       + chip('Regla', 'CREG 015/2018')
-      + chip('Fuente', cfg.origen || 'Parque vivo')
+      + chip('Fuente', cfg.origen || 'sin declarar')
       + chip('Evaluados', r.total + ' equipos')
       + chip('Capacidad', (Math.round(r.mvaTotal * 10) / 10).toString().replace('.', ',') + ' MVA')
       // El anillo se dibuja con dos gradientes: el cónico marca el avance y el
@@ -2659,7 +2659,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     return '<div class="ftm-nota-anexo">Anexo interno de trabajo — plan de acciones derivado del estado '
       + 'de salud y de la macroactividad registrada. No forma parte de las cinco hojas oficiales; puede '
       + 'descargarlo aparte con el botón «Descargar plan».</div>'
-      + construirFichaTecnica(e, { diagnostico: bloqueDiagnosticoHTML, origen: cfg.origen });
+      + construirFichaTecnica(e, { diagnostico: bloqueDiagnosticoHTML, origen: origenDeclarado() });
   }
 
   /* ── recálculos en vivo (sin re-render: no se pierde el foco) ───────── */
@@ -2795,7 +2795,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     } catch (err) {
       console.info('[fichas/panel] plan sin hoja de estilos incrustada:', err);
     }
-    const cuerpo = construirFichaTecnica(actual, { diagnostico: bloqueDiagnosticoHTML, origen: cfg.origen });
+    const cuerpo = construirFichaTecnica(actual, { diagnostico: bloqueDiagnosticoHTML, origen: origenDeclarado() });
     const html = '<!doctype html><html lang="es"><head><meta charset="utf-8">'
       + '<title>Plan de acciones · ' + esc(actual.subestacion || actual.matricula || '') + '</title>'
       + '<style>' + css + '</style></head><body class="ftm-root">' + cuerpo + '</body></html>';
@@ -3063,6 +3063,23 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      10 · CARGA DE DATOS
      ═════════════════════════════════════════════════════════════════════ */
 
+  /* ── de dónde salen los datos que están en pantalla (CF-02 · CF-03) ───────
+     `cargaSeq` sube con CADA cambio de fuente. La lectura del parque se queda
+     con su número antes del `await` y, al volver, comprueba que siga siendo la
+     última: si mientras tanto se adjuntó un listado, la respuesta tardía se
+     DESCARTA en vez de borrar el trabajo. Y el rótulo de origen viaja SIEMPRE
+     junto a los datos: antes se quedaba pegado en `cfg` y el pie del documento
+     acababa declarando una procedencia falsa. */
+  let cargaSeq = 0;
+  function origenParque() { return opciones.origen || 'Parque vivo · Firestore'; }
+  /** Lo que el PAPEL puede afirmar sobre la procedencia. Sin declaración no se
+      hereda la frase por defecto del módulo suelto: se dice que no consta. */
+  function origenDeclarado() { return cfg.origen || 'Origen de los datos: no declarado'; }
+  function avisarFuente(origen) {
+    if (typeof opciones.alCambiarFuente !== 'function') return;
+    try { opciones.alCambiarFuente(origen); } catch (_) { /* noop */ }
+  }
+
   function fijarDatos(lista, meta = {}) {
     // Lo primero, SIEMPRE: lo que se acaba de teclear baja a disco antes de que
     // nada se limpie. Con el antirrebote suelto, el guardado podía dispararse
@@ -3078,6 +3095,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + 'Use <b>«Exportar acta»</b> para conservarla.</div>');
       return EQUIPOS;
     }
+    cargaSeq++;                 // cualquier fuente nueva invalida la anterior
     BRUTOS = Array.isArray(lista) ? lista : [];
     // Un conjunto de datos nuevo invalida las correcciones del anterior: las
     // filas ya no son las mismas y aplicar decisiones viejas sería inventar.
@@ -3095,7 +3113,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     try { olvidarDiagramas(); } catch (_) { /* noop */ }
     clearTimeout(tempBorrador);
     tempBorrador = null;
-    if (meta.origen != null) cfg.origen = meta.origen;
+    // El rótulo es un HECHO sobre estos datos, no una preferencia del panel: si
+    // quien los trae no dice de dónde vienen, el papel no afirma ninguna
+    // procedencia en vez de repetir la anterior (CF-03).
+    cfg.origen = (meta.origen != null) ? meta.origen : '';
+    avisarFuente(cfg.origen);
     // La lectura sale con tope (free-tier). Si se pegó a él, lo que se ve es
     // una FOTO PARCIAL del parque y los porcentajes se calculan sobre ella.
     if (EQUIPOS.length >= 500) {
@@ -3127,7 +3149,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       || (typeof globalThis.SGM_DATA_SOURCE === 'function' ? globalThis.SGM_DATA_SOURCE : null);
 
     if (Array.isArray(opciones.datos) && opciones.datos.length) {
-      fijarDatos(opciones.datos, { forzar: true });
+      fijarDatos(opciones.datos, { forzar: true, origen: origenParque() });
       if (cfg.demostracion) {
         fijarAviso('<div class="ftm-aviso"><b>DATOS DE DEMOSTRACIÓN</b> — equipos ficticios para revisar '
           + 'la interfaz. Ningún dato de esta pantalla corresponde a un activo real.</div>');
@@ -3135,20 +3157,44 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       return EQUIPOS;
     }
     if (!fuente) {
-      fijarDatos([], { forzar: true });
+      fijarDatos([], { forzar: true, origen: '' });
       fijarAviso('<div class="ftm-aviso"><b>No hay conexión con el parque de transformadores.</b> '
         + 'Sin conexión no se muestra ningún equipo: este tablero nunca inventa datos. '
         + 'Recargue la página; si el problema continúa, avise al administrador.</div>');
       return EQUIPOS;
     }
     fijarAviso('<div class="ftm-nota">Cargando el parque…</div>');
+    const mia = ++cargaSeq;
+    // ¿Sigue siendo esta lectura la última? Si el Ingeniero adjuntó un listado
+    // mientras la consulta estaba en vuelo, la respuesta que llega tarde NO
+    // puede pisarle el trabajo: se descarta y se dice (CF-02).
+    const vigente = () => mia === cargaSeq;
     try {
       const filas = await fuente();
-      fijarDatos(filas || [], { forzar: true });
+      if (!vigente()) {
+        fijarAviso('<div class="ftm-nota">La lectura del parque llegó tarde y se descartó: '
+          + 'en pantalla sigue lo que usted cargó después.</div>');
+        return EQUIPOS;
+      }
+      fijarDatos(filas || [], { forzar: true, origen: origenParque() });
       fijarAviso(EQUIPOS.length ? '' : '<div class="ftm-aviso">La fuente respondió sin equipos.</div>');
     } catch (err) {
       console.warn('[fichas/panel] la fuente de datos falló:', err);
-      fijarDatos([], { forzar: true });
+      if (!vigente()) {
+        fijarAviso('<div class="ftm-nota">El parque falló, pero en pantalla sigue lo que usted cargó: '
+          + 'no se tocó nada.</div>');
+        return EQUIPOS;
+      }
+      // Vaciar la pantalla tras un fallo es correcto SOLO si no hay trabajo
+      // encima: el peor camino era adjuntar el listado justamente porque el
+      // parque no cargaba, y que la rama de fallo lo borrara (CF-02).
+      if (EQUIPOS.some(fichaConTrabajo) || hayGestionViva()) {
+        fijarAviso('<div class="ftm-aviso"><b>No se pudo leer el parque.</b> '
+          + esc(err && err.message ? err.message : err)
+          + ' — se conservó lo que hay en pantalla.</div>');
+        return EQUIPOS;
+      }
+      fijarDatos([], { forzar: true, origen: '' });
       fijarAviso('<div class="ftm-aviso"><b>No se pudo leer el parque.</b> ' + esc(err && err.message ? err.message : err)
         + '</div>');
     }
