@@ -3358,3 +3358,61 @@ guardado que migrar ni reparar. `claveEquipo` solo lo consumen el botón «Ficha
 del equipo (3 sitios): cambiar la clave no toca persistencia. **Queda abierto, de la misma cola**: que el
 documento imprima `codigo` (el de la subestación) donde el lector espera el código del equipo — se revisa
 en su parte, con `codigo_subestacion` ya disponible para distinguirlos.
+
+## 83. ADR — El documento que se firma deja de vivir solo en la memoria de la pantalla ⟦OPUS-5⟧ (2026-09-22)
+
+> Encargo del Ingeniero: *«vamos a trabajar sobre lo que esta grave de tu parte. superemos el 1 punto
+> que dices que se pierde el documento entero»* (CF-01 de la cola auditada el 09-21). Antes de escribir
+> una línea, **comité acotado de 4** (integridad de datos · seguridad y privacidad · el Ingeniero como
+> usuario · ejecutor) sobre el diseño candidato: **16 bloqueantes**, todos adoptados.
+
+**83.1 Causa raíz.** Todo lo que se redacta para el papel —proyecto, consecutivo, alcance, beneficios,
+presupuesto tecleado, **nombres y cargos de quienes firman**, Anexo AT y los dos diagramas— vivía en dos
+`Map` en memoria (`ESTADOS` en `panel.js`, el suyo en `unifilar.js`). Se perdía **sin una palabra** al
+cerrar la pestaña, al pulsar F5, al adjuntar un listado (`ESTADOS.clear()` dentro de `fijarDatos`) y al
+desmontar el tablero. El aviso de salida existía desde `§65` pero solo contaba decisiones y correcciones
+del tablero: `hayGestionViva()` no miraba la ficha, que es justamente lo que se firma.
+
+**83.2 Solución.** Borrador local en el navegador, con la política ENTERA en dominio puro
+(`domain/fichas_borrador.js`) y quince líneas de pasamanos en la pantalla. Cinco reglas, que son código
+y no intención: **(1)** guardar es **fusionar contra el disco** y solo los equipos que la sesión tocó —un
+mapa vacío jamás borra—; **(2)** la identidad es el **aparato** (matrícula o serie, `§82`), nunca el
+patio: sin ninguna de las dos no se guarda, y si calza con dos equipos o la serie contradice, no se
+restaura; **(3)** se guarda **lo tecleado tal cual** y nada del parque (ni caché de Firestore en el
+navegador); **(4)** lo que vuelve del disco es **entrada no confiable** (lista blanca, `__proto__`
+rechazado, mapa sin prototipo, y al pintar solo `.value`/`.textContent`); **(5)** el borrador tiene
+**dueño** (el `uid` opaco de la sesión, nunca el correo) y **caduca a los 30 días**, que es lo que
+justifica guardar nombres de terceros. El volcado es **síncrono** y ocurre ANTES de limpiar nada
+(primera línea de `fijarDatos` y `destruir`, más `pagehide` y la pestaña que se oculta). La restauración
+**nunca es silenciosa**: una banda dice cuántas fichas hay y de qué equipos —sin presupuesto ni nombres,
+porque esa pantalla se proyecta en comité—, y al restaurar no pisa lo tecleado hoy.
+
+**83.3 No-regresión (nada se borra, pedido literal del Ingeniero).** `hayGestionViva()` **no se tocó**:
+sigue significando lo mismo para el resto del módulo; el aviso de salida **suma** la ficha en riesgo, no
+resta nada. La doctrina de `correcciones.js` sigue en pie: decisiones y correcciones del tablero NO se
+guardan, salen como ACTA. `claveEquipo` se movió a `domain/fichas_identidad.js` y `unifilar.js` la
+**reexporta**: ningún llamante cambió. Si no hay almacén (incógnito, cookies bloqueadas, cuota llena) el
+módulo funciona **exactamente como antes** y lo dice en pantalla.
+
+**83.4 Verificación.** 23 pruebas puras nuevas —una por cada bloqueante del comité— y **1749 pass /
+0 fail / 2 skip**, `lint:html` limpio. **Gate empírico en banco con el módulo real y almacenamiento
+real**, los ocho caminos que el comité exigió: guarda y lo sella · F5 → banda → restaura en SU equipo ·
+escribir y cambiar de fuente **dentro** de los 800 ms no pierde nada y **no borra** lo de antes ·
+restaurar no pisa lo de hoy («1 restaurada · 1 omitida porque ya tenía texto») · la nota del diagrama
+vuelve · dos TX de la misma subestación no se confunden · «Descartar» pregunta con el número y borra de
+verdad · sin almacén no se rompe y avisa «Sin guardar en este navegador». Producción byte-idéntica.
+
+**83.5 Archivos.** NUEVOS: `assets/js/domain/fichas_borrador.js`, `assets/js/domain/fichas_identidad.js`,
+`tests/fichas_borrador.test.js`. MODIFICADOS: `assets/js/ui/fichas/panel.js`, `…/unifilar.js`,
+`assets/css/fichas-tecnicas.css`. INTACTOS: el exportador, las hojas del documento, `correcciones.js` y
+el camino de datos del parque.
+
+**83.6 Verificado sano / no re-auditar.** El borrador NO toca Firebase: cero escrituras, free-tier
+intacto · el almacén se comparte con el borrador de Órdenes de Materiales, por eso el fallo por cuota
+poda el más viejo y reintenta una vez · dos pestañas ya no se pisan porque el disco se relee en cada
+guardado (la sincronía fina por evento `storage` queda para después, y el daño ya está acotado a un
+equipo) · **queda abierto y es de él**: que el borrador muera en el cierre de sesión voluntario exige un
+gancho en `auth/session-guard.js` (fuera de este módulo) · hallazgo del comité que abre pendiente nuevo:
+un campo que empiece por `=`, `+`, `-` o `@` se convierte en fórmula viva al abrir el Excel — va a la
+cola como **CF-32**, no es parte de «no perder el documento». Crudo del comité → bóveda
+`2026-09-22-borrador-ficha/`.
