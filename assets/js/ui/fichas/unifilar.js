@@ -151,6 +151,16 @@ function semilla(equipo) {
   };
 }
 
+/**
+ * Semilla de los DOS diagramas, sin tocar ni crear estado (`99 §83.7`).
+ * La usa el borrador para guardar solo lo que el Ingeniero cambió: exportar el
+ * diagrama entero metía en el navegador la placa del equipo —datos del parque—
+ * y hacía que una ficha en blanco pareciera redactada.
+ */
+export function semillaDiagramas(equipo) {
+  return { actual: semilla(equipo), futuro: semilla(equipo) };
+}
+
 /** Contenedor {actual, futuro} del equipo, creándolo con su semilla. */
 function contenedor(equipo) {
   const k = claveEquipo(equipo);
