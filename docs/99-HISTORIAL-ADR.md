@@ -3416,3 +3416,45 @@ gancho en `auth/session-guard.js` (fuera de este módulo) · hallazgo del comit�
 un campo que empiece por `=`, `+`, `-` o `@` se convierte en fórmula viva al abrir el Excel — va a la
 cola como **CF-32**, no es parte de «no perder el documento». Crudo del comité → bóveda
 `2026-09-22-borrador-ficha/`.
+
+**83.7 La revisión adversarial del día siguiente encontró seis cabos (2026-09-22).** El Ingeniero
+preguntó *«quedó hecho o falta algo?»*. En vez de responder que sí, se pasaron **4 lentes** sobre el
+código ya publicado (escritores sin cubrir · dónde se sigue perdiendo · integridad y concurrencia · lo
+que ve quien lo usa). Veredicto: **quedan cabos**, tres graves. Todos arreglados y verificados en vivo:
+
+1. **El equipo sin matrícula ni serie se perdía callando.** No se puede guardar —no hay a qué equipo
+   devolverlo— pero el sello mostraba la hora de OTRA ficha y `fichaEnRiesgo()` devolvía `false`: se
+   redactaba una tarde entera y el navegador no preguntaba nada al cerrar. Y el camino es real: el alta
+   manual de un TX solo exige subestación, potencia y tensión. Ahora **el sello es de la ficha ABIERTA**
+   y dice *«no se puede guardar sola: al equipo le falta matrícula y serie»*, y el aviso de salida la cubre.
+2. **Restaurar pisaba el diagrama de hoy.** La guardia de «ya escrita» miraba plan y anexo con los
+   diagramas puestos a `{}` a mano: una ficha cuyo único trabajo del día era el unifilar contaba como en
+   blanco y se le escribía encima el de ayer, diciendo «1 ficha restaurada».
+3. **Se guardaba la placa del parque.** `exportarDiagramas` SIEMBRA el diagrama con los datos del equipo,
+   así que el borrador se llevaba al navegador potencias, grupo, impedancia y tensiones —contra la regla
+   3 del propio módulo— y hacía que «una ficha en blanco no se guarda» no se cumpliera nunca. Ahora solo
+   viaja el **delta contra la semilla** (`soloLoTocado`), y los campos `*_ver` no cuentan como contenido.
+4. **`fijarDatos` no olvidaba los diagramas**: el unifilar del listado anterior sobrevivía al cambio de
+   datos y podía acabar dibujado —y guardado— sobre otro equipo. **Cierra también CF-04.**
+5. **«Descartar» borraba de más**: quitaba el almacén entero, incluidas las fichas que esa misma sesión
+   acababa de guardar, y después el aviso de salida ya no las cubría. Ahora quita **solo lo que la banda
+   ofreció**, lo dice en la pregunta y confirma al terminar.
+6. **El sello era ilegible**: gris de texto sobre la barra azul del documento (contraste ≈1,1:1) y
+   recortado a una línea, justo con el mensaje que más importa. Ahora es blanco, y el de fallo va en
+   chip ámbar con texto oscuro y a dos líneas.
+
+Menores del mismo barrido: el selector de redacción vacío no marcaba la ficha · `ofrecerBorrador`
+apagaba la bandera de fallo sin repintar · el aviso y la banda no se anunciaban a un lector de pantalla ·
+el pie prometía que los borradores «se borran solos» (la caducidad se aplica al leer) · un round-trip
+había dejado **caracteres de control literales** dentro del fuente, repuestos como escapes.
+
+**Verificación de esta ronda.** 3 pruebas puras nuevas (29 del borrador) → **1753 pass / 0 fail / 2
+skip**, lint limpio; y en banco, con tres equipos —dos de la misma subestación y **uno sin matrícula ni
+serie**—: el sello rojo aparece y el `beforeunload` queda armado · tras cambiar de datos el diagrama sale
+vacío · restaurar respeta la nota escrita hoy y la reporta como omitida · descartar deja intacto el
+trabajo de la sesión. Producción byte-idéntica.
+
+**Lo que este barrido DEJA abierto, a sabiendas:** dos pestañas siguen sin avisarse entre sí (el daño ya
+está acotado porque el disco se relee en cada guardado) · dos filas con la MISMA matrícula en un mismo
+listado se pisan al guardar y luego salen como ambiguas al restaurar · si la sesión tarda más de 12 s el
+borrador podría escribirse sin dueño. Ninguno pierde trabajo en silencio; van a la cola del módulo.
