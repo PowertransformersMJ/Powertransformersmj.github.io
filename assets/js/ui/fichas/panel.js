@@ -51,8 +51,12 @@ import {
 } from '../../domain/fichas_acciones.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
-  claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas
+  claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas
 } from './unifilar.js';
+import {
+  CLAVE_ALMACEN, entradaDesdeFicha, leerDocumento, fusionar, serializar,
+  emparejar, resumenParaBanda, tieneContenido
+} from '../../domain/fichas_borrador.js';
 import {
   vistaAnalitica, vistaNorma, vistaAgregar, resumenGerencial
 } from './vistas-gerenciales.js';
@@ -854,6 +858,205 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const filtros = { q: '', nivel: '', zona: '', uucc: '' };
   const ESTADOS = new Map();   // clave de equipo → estado editable
   let actual = null;           // equipo abierto en el modal
+
+  /* ── borrador local de la ficha (99 §83) ──────────────────────────────────
+     Lo que se redacta para el documento que se FIRMA ya no vive solo aquí. El
+     dominio (`domain/fichas_borrador.js`) decide TODO —forma, fusión, poda,
+     caducidad, a qué equipo vuelve—; esto de abajo es solo el pasamanos con el
+     navegador. Dos reglas que no se pueden relajar sin repetir un fallo que el
+     comité marcó bloqueante:
+       · Se GUARDA FUSIONANDO contra lo que hay en disco, y solo los equipos que
+         ESTA sesión tocó (`TOCADOS`). Volcar el mapa de memoria borraría las
+         fichas que aún no se han restaurado.
+       · El volcado es SÍNCRONO y ocurre ANTES de limpiar nada: entre la última
+         tecla y el temporizador hay casi un segundo en el que, si no, se pierde
+         justo lo último que se escribió. */
+  const TOCADOS = new Set();   // claves tocadas en esta sesión
+  let tempBorrador = null;     // antirrebote del guardado
+  let borradorFallo = false;   // el último guardado no se pudo escribir
+  let borradorISO = '';        // sello del último guardado que SÍ quedó escrito
+
+  /** Acceso al almacén del navegador. En incógnito o con cookies bloqueadas el
+      simple hecho de TOCAR `localStorage` lanza, así que se envuelve el acceso
+      entero: si no hay almacén, el módulo sigue funcionando como siempre. */
+  function almacen() {
+    try {
+      const a = globalThis.localStorage;
+      if (!a) return null;
+      return {
+        leer: () => a.getItem(CLAVE_ALMACEN),
+        escribir: (txt) => { a.setItem(CLAVE_ALMACEN, txt); },
+        borrar: () => { a.removeItem(CLAVE_ALMACEN); }
+      };
+    } catch (_) { return null; }
+  }
+
+  /** El uid de la sesión (opaco, nunca el correo): el borrador es de su dueño. */
+  function uidActual() {
+    if (opciones.usuarioId) return String(opciones.usuarioId);
+    const s = globalThis.__sgmSession;
+    return (s && s.user && s.user.uid) ? String(s.user.uid) : '';
+  }
+
+  /** Marca el equipo como tocado y programa el guardado (antirrebote). */
+  function tocarFicha(equipo) {
+    const k = claveEquipo(equipo || actual);
+    if (!k) return;
+    TOCADOS.add(k);
+    clearTimeout(tempBorrador);
+    tempBorrador = setTimeout(volcarYa, 800);
+  }
+
+  /** Vuelca YA lo tocado. Síncrono a propósito: se llama en el último instante. */
+  function volcarYa() {
+    clearTimeout(tempBorrador);
+    tempBorrador = null;
+    if (!TOCADOS.size) return;
+    // El sello se repinta pase lo que pase: el caso en que MÁS hace falta verlo
+    // es justo aquel en el que no se pudo guardar.
+    try { volcado(); } finally { pintarEstadoBorrador(); }
+  }
+
+  function volcado() {
+    const alm = almacen();
+    if (!alm) { borradorFallo = true; return; }
+    const ahora = new Date().toISOString();
+    const uid = uidActual();
+    const entradas = [];
+    TOCADOS.forEach((k) => {
+      const eq = EQUIPOS.find((x) => claveEquipo(x) === k);
+      const st = ESTADOS.get(k);
+      if (!eq || !st) return;
+      const e = entradaDesdeFicha({
+        equipo: eq, plan: st.plan, anexo: st.anexo,
+        diagramas: exportarDiagramas(eq), ahoraISO: ahora
+      });
+      if (e) entradas.push(e);
+    });
+    if (!entradas.length) return;
+    let leido;
+    try { leido = leerDocumento(alm.leer(), { uid, ahoraISO: ahora }); } catch (_) { leido = null; }
+    if (leido && (leido.estado === 'futuro' || leido.estado === 'ajeno')) {
+      // Ni se lee ni se pisa: es de otra versión de la página o de otro usuario.
+      borradorFallo = true;
+      return;
+    }
+    const doc = fusionar(leido && leido.doc, entradas, { uid, ahoraISO: ahora });
+    try {
+      alm.escribir(serializar(doc));
+      borradorFallo = false;
+      borradorISO = ahora;
+    } catch (_) {
+      // Cuota llena (el almacén se comparte con otros módulos del sitio):
+      // se sacrifica el borrador más viejo y se reintenta UNA vez.
+      const claves = Object.keys(doc.equipos)
+        .sort((a, b) => (Date.parse(doc.equipos[a].tocadoISO) || 0) - (Date.parse(doc.equipos[b].tocadoISO) || 0));
+      if (claves.length > 1) delete doc.equipos[claves[0]];
+      try { alm.escribir(serializar(doc)); borradorFallo = false; borradorISO = ahora; }
+      catch (_e) { borradorFallo = true; }
+    }
+  }
+
+  /** ¿Hay ficha redactada que NO esté a salvo en el borrador? */
+  function fichaEnRiesgo() {
+    if (tempBorrador) return true;          // guardado pendiente: aún no está en disco
+    if (!borradorFallo) return false;
+    for (const st of ESTADOS.values()) {
+      if (tieneContenido({ plan: st.plan, anexo: st.anexo, diagramas: {} })) return true;
+    }
+    return false;
+  }
+
+  /** Hora corta en español, para que el sello se lea de un vistazo. */
+  function horaCorta(iso) {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return d.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  }
+
+  function pintarEstadoBorrador() {
+    const box = $('[data-ftm="borrador"]');
+    if (!box) return;
+    if (borradorFallo) {
+      box.className = 'ftm-borrador es-mal';
+      box.textContent = 'Sin guardar en este navegador — exporte antes de cerrar';
+      return;
+    }
+    box.className = 'ftm-borrador';
+    box.textContent = borradorISO ? 'Borrador guardado ' + horaCorta(borradorISO) : '';
+  }
+
+  /* ── restaurar lo que quedó a medias ──────────────────────────────────── */
+  let borradorOfrecido = null; // { doc, resumen, caducados } pendiente de decidir
+
+  /** Lee el disco y ofrece —nunca aplica sola— la ficha que quedó a medias. */
+  function ofrecerBorrador() {
+    const alm = almacen();
+    if (!alm) { borradorFallo = false; return; }   // sin almacén no hay nada que ofrecer
+    let leido;
+    try { leido = leerDocumento(alm.leer(), { uid: uidActual(), ahoraISO: new Date().toISOString() }); }
+    catch (_) { return; }
+    if (!leido || leido.estado !== 'ok' || !leido.doc) { borradorOfrecido = null; pintarBanda(); return; }
+    borradorOfrecido = { doc: leido.doc, resumen: resumenParaBanda(leido.doc), caducados: leido.caducados };
+    pintarBanda();
+  }
+
+  function pintarBanda() {
+    const box = $('[data-ftm="borrador-banda"]');
+    if (!box) return;
+    if (!borradorOfrecido) { box.innerHTML = ''; return; }
+    const r = borradorOfrecido.resumen;
+    const lista = r.equipos.map((e) => '<b>' + esc(e.matricula) + '</b>'
+      + (e.subestacion ? ' (' + esc(e.subestacion) + ')' : '')).join(' · ');
+    box.innerHTML = '<div class="ftm-aviso ftm-borrador-banda">'
+      + '<b>Tiene ' + r.total + (r.total === 1 ? ' ficha' : ' fichas') + ' a medio redactar</b> '
+      + 'del ' + esc(horaCorta(r.guardadoISO)) + ' — '
+      + lista + (r.resto ? ' y ' + r.resto + ' más' : '') + '. '
+      + '<button type="button" class="ftm-btn ftm-btn--primary" data-ftm="borr-restaurar">Restaurar</button> '
+      + '<button type="button" class="ftm-btn" data-ftm="borr-descartar">Descartar</button>'
+      + '<div class="ftm-borrador-pie">Los borradores se guardan en este navegador durante 30 días y luego '
+      + 'se borran solos. Nadie más los ve.'
+      + (borradorOfrecido.caducados ? ' Se descartaron ' + borradorOfrecido.caducados + ' por antigüedad.' : '')
+      + '</div></div>';
+  }
+
+  /** Devuelve a la pantalla lo guardado, equipo por equipo y diciendo qué hizo. */
+  function restaurarBorrador() {
+    if (!borradorOfrecido) return;
+    const yaEscrita = (eq) => {
+      const st = ESTADOS.get(claveEquipo(eq));
+      return !!st && tieneContenido({ plan: st.plan, anexo: st.anexo, diagramas: {} });
+    };
+    const r = emparejar(borradorOfrecido.doc, EQUIPOS, yaEscrita);
+    r.aplicables.forEach(({ entrada, equipo }) => {
+      const st = estadoDe(equipo);
+      Object.keys(entrada.plan).forEach((k) => { st.plan[k] = entrada.plan[k]; });
+      Object.keys(entrada.anexo).forEach((k) => { st.anexo[k] = entrada.anexo[k]; });
+      if (entrada.diagramas && Object.keys(entrada.diagramas).length) {
+        importarDiagramas(equipo, entrada.diagramas);
+      }
+    });
+    const partes = [r.aplicables.length + ' ficha(s) restaurada(s)'];
+    if (r.ocupados.length) partes.push(r.ocupados.length + ' omitida(s) porque ya tenía texto en pantalla');
+    if (r.ambiguos.length) partes.push(r.ambiguos.length + ' sin restaurar por identidad ambigua');
+    if (r.sinUbicar.length) partes.push(r.sinUbicar.length + ' guardada(s) cuyo equipo no está en esta lista');
+    borradorOfrecido = null;
+    pintarBanda();
+    fijarAviso('<div class="ftm-nota">' + esc(partes.join(' · ')) + '. Revise los datos del equipo antes de generar el documento.</div>');
+    if (actual) pintarModal();
+  }
+
+  function descartarBorrador() {
+    const n = borradorOfrecido ? borradorOfrecido.resumen.total : 0;
+    if (n && !globalThis.confirm('Esto borra ' + n + ' ficha(s) a medio redactar y no se puede deshacer.')) return;
+    const alm = almacen();
+    if (alm) { try { alm.borrar(); } catch (_) { /* noop */ } }
+    borradorOfrecido = null;
+    TOCADOS.clear();
+    borradorISO = '';
+    pintarBanda();
+    pintarEstadoBorrador();
+  }
   let trampaFoco = null;       // trampa de foco del modal (ui/foco-modal.js)
   let hoja = 'ficha';
   let aviso = '';
@@ -912,6 +1115,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   '<div class="ftm-hint">▸ Pulse un indicador para acotar la flota; el botón «Ficha» de cada '
       +   'fila abre el documento de planificación con sus seis hojas.</div>'
       +   '<div data-ftm="aviso"></div>'
+      // Banda del borrador: NUNCA se restaura en silencio (`99 §83`).
+      +   '<div data-ftm="borrador-banda"></div>'
       + '</div></div>'
       + '<div class="ftm-tabla-wrap">'
       +   '<div class="ftm-tabla-bar">'
@@ -969,6 +1174,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   '<div class="ftm-modal-win">'
       +     '<div class="ftm-modal-bar">'
       +       '<span class="ftm-modal-title" data-ftm="modal-titulo"></span>'
+      // Estado del borrador: que él VEA si lo suyo está a salvo, sin tener que
+      // confiar en que algo pasa por detrás (`99 §83`).
+      +       '<span class="ftm-borrador" data-ftm="borrador" aria-live="polite"></span>'
       +       '<span class="ftm-modal-acts">'
       +         '<button type="button" class="ftm-btn" data-ftm="descargar-plan" hidden>Descargar plan</button>'
       +         '<button type="button" class="ftm-btn ftm-btn--primary" data-ftm="exportar">Exportar Excel</button>'
@@ -2467,6 +2675,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function fijarAcciones(ids) {
     const st = estadoDe(actual);
     st.plan.acc_sel = ids;
+    tocarFicha(actual);
     marcarSucio();
     rehacerAlcance();
   }
@@ -2479,6 +2688,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const ver = st.plan[campo + '_ver'];
       if (ver == null || ver === 'custom') return;
       st.plan[campo] = textoVersion(campo, +ver, actual, st);
+      tocarFicha(actual);
       const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
       if (ta) ta.value = st.plan[campo];
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
@@ -2558,6 +2768,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      ═════════════════════════════════════════════════════════════════════ */
 
   function alHacerClic(ev) {
+    // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
+    if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
+    if (ev.target.closest('[data-ftm="borr-descartar"]')) { descartarBorrador(); return; }
+
     // Marcar todas / ninguna las acciones del alcance
     const acct = ev.target.closest('[data-acc-todo]');
     if (acct && contenedor.contains(acct) && actual) {
@@ -2651,7 +2865,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       case 'exportar': exportarExcel(); break;
       case 'descargar-plan': descargarPlan(); break;
       case 'copiar-diag':
-        if (actual) { copiarActualAFuturo(actual); pintarModal(); }
+        if (actual) { copiarActualAFuturo(actual); tocarFicha(actual); pintarModal(); }
         break;
       case 'modal':
         if (ev.target === modal) cerrarFicha();   // clic en el velo
@@ -2671,6 +2885,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const plan = t.getAttribute('data-plan');
     if (plan) {
       st.plan[plan] = t.value;
+      tocarFicha(actual);
       if (t.getAttribute('data-recalcula')) {
         if (plan === 'potenciaMVA') reescribirRedacciones();
         recalcular();
@@ -2678,11 +2893,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       return;
     }
     const anexo = t.getAttribute('data-anexo');
-    if (anexo) { st.anexo[anexo] = t.value; return; }
+    if (anexo) { st.anexo[anexo] = t.value; tocarFicha(actual); return; }
 
     const diag = t.getAttribute('data-diag');
     if (diag) {
       fijarParametro(actual, hoja === 'diagA' ? 'actual' : 'futuro', diag, t.value);
+      tocarFicha(actual);
       if (diag !== 'notas') pintarUnifilar();
       return;
     }
@@ -2690,6 +2906,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (campo) {
       st.plan[campo] = t.value;
       st.plan[campo + '_ver'] = 'custom';
+      tocarFicha(actual);
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
       if (vista) vista.innerHTML = esc(t.value).replace(/\n/g, '<br>');
     }
@@ -2734,6 +2951,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (ta) ta.value = st.plan[campo];
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
       if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+      tocarFicha(actual);
       }
     const accId = t.getAttribute && t.getAttribute('data-accion');
     if (accId && actual) {
@@ -2749,6 +2967,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
     if (t.getAttribute && t.getAttribute('data-anexo') && actual) {
       estadoDe(actual).anexo[t.getAttribute('data-anexo')] = t.value;
+      tocarFicha(actual);
     }
   }
 
@@ -2781,18 +3000,34 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      Se registra siempre y decide en el momento, porque `SIN_EXPORTAR` cambia
      mientras la página vive; añadir y quitar el listener sería más frágil. */
   function alSalir(ev) {
-    if (!SIN_EXPORTAR || !hayGestionViva()) return undefined;
+    // `hayGestionViva()` NO se toca: sigue significando lo mismo para el resto
+    // del módulo (§3.2). Lo que cambia es que aquí se suma la ficha cuando NO
+    // está a salvo en el borrador — antes se perdía sin una palabra (`99 §83`).
+    volcarYa();
+    const enRiesgo = (SIN_EXPORTAR && hayGestionViva()) || fichaEnRiesgo();
+    if (!enRiesgo) return undefined;
     ev.preventDefault();
     ev.returnValue = '';            // exigido por navegadores antiguos
     return '';
   }
   globalThis.addEventListener('beforeunload', alSalir);
+  // `beforeunload` no es de fiar para tareas pendientes (en móvil ni dispara).
+  // `pagehide` y la pestaña que se oculta SÍ lo son, y `localStorage` es
+  // síncrono: es el último instante bueno para bajar lo tecleado a disco.
+  function alOcultar() { if (document.visibilityState === 'hidden') volcarYa(); }
+  globalThis.addEventListener('pagehide', volcarYa);
+  document.addEventListener('visibilitychange', alOcultar);
 
   /* ═════════════════════════════════════════════════════════════════════
      10 · CARGA DE DATOS
      ═════════════════════════════════════════════════════════════════════ */
 
   function fijarDatos(lista, meta = {}) {
+    // Lo primero, SIEMPRE: lo que se acaba de teclear baja a disco antes de que
+    // nada se limpie. Con el antirrebote suelto, el guardado podía dispararse
+    // DESPUÉS del `ESTADOS.clear()` de más abajo y escribir el mapa ya vacío
+    // (fallo bloqueante que el comité cazó en el diseño, `99 §83`).
+    volcarYa();
     // Este es el ÚNICO sitio donde la gestión se borra, así que es el único
     // sitio donde hace falta preguntar: cargar la página, adjuntar un listado
     // y «volver al parque vivo» pasan todos por aquí. `forzar` lo usa quien ya
@@ -2811,6 +3046,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     APLICADO = false;
     EQUIPOS = recomputarEquipos();
     ESTADOS.clear();
+    TOCADOS.clear();
+    clearTimeout(tempBorrador);
+    tempBorrador = null;
     if (meta.origen != null) cfg.origen = meta.origen;
     // La lectura sale con tope (free-tier). Si se pegó a él, lo que se ve es
     // una FOTO PARCIAL del parque y los porcentajes se calculan sobre ella.
@@ -2819,6 +3057,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + EQUIPOS.length + ' equipos, que es el tope de la consulta: puede haber más. '
         + 'Los porcentajes de esta pantalla se refieren solo a los mostrados.</div>');
     }
+    ofrecerBorrador();
     pintarMeta();
     pintarKpis();
     pintarSalud();
@@ -2871,6 +3110,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   function destruir() {
+    volcarYa();                 // antes de olvidar nada (`99 §83`)
     // Los diagramas guardan estado a nivel de módulo: sin esto sobrevivían al
     // desmontaje y un equipo con la misma matrícula heredaba el unifilar del
     // anterior (la función existía y no la llamaba nadie).
@@ -2881,6 +3121,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     contenedor.removeEventListener('change', alCambiar);
     document.removeEventListener('keydown', alTeclear);
     globalThis.removeEventListener('beforeunload', alSalir);
+    globalThis.removeEventListener('pagehide', volcarYa);
+    document.removeEventListener('visibilitychange', alOcultar);
     contenedor.innerHTML = '';
     contenedor.classList.remove('ftm-root');
   }

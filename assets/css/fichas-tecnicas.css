@@ -1939,3 +1939,15 @@
   background: var(--ftm-bg-soft, #f3f6f9); border-left: 3px solid var(--ftm-line, #c9d5e2);
   border-radius: 0 6px 6px 0; color: var(--ftm-ink, #10202c);
 }
+
+/* ── Borrador local de la ficha (99 §83) ───────────────────────────────────
+   El sello vive en la barra del modal: dice si lo redactado está a salvo sin
+   que haya que confiar en que «algo pasa por detrás». */
+.ftm-borrador{
+  margin-left:auto;padding:0 10px;font-size:11px;color:var(--ftm-muted,#5b6b73);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44ch;
+}
+.ftm-borrador.es-mal{color:#9a3412;font-weight:600}
+.ftm-borrador-banda .ftm-btn{margin-left:6px;vertical-align:baseline}
+.ftm-borrador-pie{display:block;margin-top:6px;font-size:11px;color:var(--ftm-muted,#5b6b73)}
+@media (max-width:720px){ .ftm-borrador{max-width:100%;order:3;flex-basis:100%;margin-left:0} }
