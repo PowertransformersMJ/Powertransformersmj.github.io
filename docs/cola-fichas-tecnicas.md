@@ -72,6 +72,11 @@
 
 ## 🤝 Mío, pero con UNA respuesta suya primero
 
+> ✅ **AUTORIZADO EN BLOQUE (2026-09-22)**: *«adelante con todas tus propuestas»*. Las doce se aplican
+> con la propuesta por defecto de la última columna, cada una en su tanda, y se le reporta al cerrarla;
+> lo que toque el papel se le enseña en preview antes de publicar. Si al verlo quiere otra cosa, se
+> cambia: la autorización es para no frenar, no para decidir por él.
+
 | id | Pregunta concreta | Mi propuesta por defecto |
 |---|---|---|
 | **CF-20** | **La casilla que se firma cambia según qué archivo esté cargado**, porque el máximo de usuarios se recalcula con lo que hay en pantalla y el papel dice «todo el parque». ¿Se **congela** en el parámetro oficial (hoy 48.312) o se sigue recalculando? | Congelarlo: así la casilla es reproducible y el papel no miente |

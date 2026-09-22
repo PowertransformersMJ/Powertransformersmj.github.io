@@ -97,7 +97,15 @@
 
   const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');
   window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
-    origen: 'Parque vivo · Firestore'
+    origen: 'Parque vivo · Firestore',
+    // El rótulo de origen viaja con los datos (`99 §84`). Cuando el tablero
+    // deja de mostrar el listado adjunto, el segmento apaga su banner: si no,
+    // seguía anunciando el archivo sobre datos que ya eran del parque vivo.
+    alCambiarFuente(origen) {
+      if (!/Listado adjunto/.test(String(origen || '')) && window.__sgmEvalUucc) {
+        window.__sgmEvalUucc.limpiar();
+      }
+    }
   });
 
   // ── Segmento de evaluación masiva ─────────────────────────────────────────
