@@ -69,12 +69,12 @@
 | §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación… | 1072 |
 | §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado… | 1090 |
 | §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
-| §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`, Antigravity oficial; bóvedas NO… | 1122 |
+| §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`,… | 1122 |
 | §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y… | 1140 |
 | §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso ⟦OPUS-5⟧ | 1158 |
 | §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483… | 1181 |
 | §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto)… | 1226 |
-| §63 | ADR-063 — Cola de la auditoría: funciones con topes, 16 índices Firestore nuevos (producción tenía 33 de 37), `ts_calculo` con dos tipos, 5 suscripciones sin límite, 5… | 1284 |
+| §63 | ADR-063 — Cola de la auditoría: funciones con topes, 16 índices Firestore nuevos (producción tenía 33 de 37), `ts_calculo` con dos tipos, 5… | 1284 |
 | §64 | ADR-064 — Fichas: el port de ADR-061 trajo el CSS entero pero solo el 44% del marcado; las clases huérfanas nombraban las vistas que faltaban ⟦OPUS-5⟧ | 1343 |
 | §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y… | 1394 |
 | §66 | ADR-066 — Evaluación holística de Fichas Técnicas (6 auditores) y remediación: terciario «0» inflaba el presupuesto 23%, «20.000» kVA se leía como 20, conformidad… | 1436 |
