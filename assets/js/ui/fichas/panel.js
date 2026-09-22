@@ -51,11 +51,12 @@ import {
 } from '../../domain/fichas_acciones.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
-  claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas
+  claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas,
+  semillaDiagramas
 } from './unifilar.js';
 import {
   CLAVE_ALMACEN, entradaDesdeFicha, leerDocumento, fusionar, serializar,
-  emparejar, resumenParaBanda, tieneContenido
+  emparejar, resumenParaBanda, tieneContenido, soloLoTocado
 } from '../../domain/fichas_borrador.js';
 import {
   vistaAnalitica, vistaNorma, vistaAgregar, resumenGerencial
@@ -875,6 +876,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   let tempBorrador = null;     // antirrebote del guardado
   let borradorFallo = false;   // el último guardado no se pudo escribir
   let borradorISO = '';        // sello del último guardado que SÍ quedó escrito
+  const SIN_IDENTIDAD = new Set();  // tocadas que NO se pueden guardar (sin matrícula ni serie)
 
   /** Acceso al almacén del navegador. En incógnito o con cookies bloqueadas el
       simple hecho de TOCAR `localStorage` lanza, así que se envuelve el acceso
@@ -929,9 +931,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (!eq || !st) return;
       const e = entradaDesdeFicha({
         equipo: eq, plan: st.plan, anexo: st.anexo,
-        diagramas: exportarDiagramas(eq), ahoraISO: ahora
+        diagramas: diagramaTocado(eq), ahoraISO: ahora
       });
-      if (e) entradas.push(e);
+      // Sin matrícula ni serie no hay forma de devolverle la ficha a SU equipo,
+      // así que no se guarda. Eso NO puede pasar en silencio: se anota para que
+      // el sello lo diga y el aviso de salida lo cubra (`99 §83.7`).
+      if (e) { entradas.push(e); SIN_IDENTIDAD.delete(k); }
+      else if (tieneContenido({ plan: st.plan, anexo: st.anexo, diagramas: diagramaTocado(eq) })) SIN_IDENTIDAD.add(k);
+      else SIN_IDENTIDAD.delete(k);
     });
     if (!entradas.length) return;
     let leido;
@@ -957,14 +964,25 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
   }
 
+  /** Del diagrama, solo lo que se apartó de la placa del equipo. */
+  function diagramaTocado(equipo) {
+    try { return soloLoTocado(exportarDiagramas(equipo), semillaDiagramas(equipo)); }
+    catch (_) { return {}; }
+  }
+
+  /** ¿Esta ficha tiene trabajo encima? Cuenta también el diagrama. */
+  function fichaConTrabajo(equipo) {
+    const st = ESTADOS.get(claveEquipo(equipo));
+    if (!st) return false;
+    return tieneContenido({ plan: st.plan, anexo: st.anexo, diagramas: diagramaTocado(equipo) });
+  }
+
   /** ¿Hay ficha redactada que NO esté a salvo en el borrador? */
   function fichaEnRiesgo() {
     if (tempBorrador) return true;          // guardado pendiente: aún no está en disco
+    if (SIN_IDENTIDAD.size) return true;    // hay ficha que no se puede guardar
     if (!borradorFallo) return false;
-    for (const st of ESTADOS.values()) {
-      if (tieneContenido({ plan: st.plan, anexo: st.anexo, diagramas: {} })) return true;
-    }
-    return false;
+    return EQUIPOS.some(fichaConTrabajo);
   }
 
   /** Hora corta en español, para que el sello se lea de un vistazo. */
@@ -974,15 +992,21 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     return d.toLocaleString('es-CO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
   }
 
+  /** El sello habla de la ficha ABIERTA, no del módulo (`99 §83.7`). */
   function pintarEstadoBorrador() {
     const box = $('[data-ftm="borrador"]');
     if (!box) return;
+    const malo = (txt) => { box.className = 'ftm-borrador es-mal'; box.textContent = txt; box.title = txt; };
+    if (actual && SIN_IDENTIDAD.has(claveEquipo(actual))) {
+      malo('Esta ficha no se puede guardar sola: al equipo le falta matrícula y serie — expórtela antes de cerrar');
+      return;
+    }
     if (borradorFallo) {
-      box.className = 'ftm-borrador es-mal';
-      box.textContent = 'Sin guardar en este navegador — exporte antes de cerrar';
+      malo('Sin guardar en este navegador — exporte antes de cerrar');
       return;
     }
     box.className = 'ftm-borrador';
+    box.title = '';
     box.textContent = borradorISO ? 'Borrador guardado ' + horaCorta(borradorISO) : '';
   }
 
@@ -992,7 +1016,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Lee el disco y ofrece —nunca aplica sola— la ficha que quedó a medias. */
   function ofrecerBorrador() {
     const alm = almacen();
-    if (!alm) { borradorFallo = false; return; }   // sin almacén no hay nada que ofrecer
+    if (!alm) return;    // sin almacén no hay nada que ofrecer (la bandera la pone el volcado)
     let leido;
     try { leido = leerDocumento(alm.leer(), { uid: uidActual(), ahoraISO: new Date().toISOString() }); }
     catch (_) { return; }
@@ -1014,8 +1038,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + lista + (r.resto ? ' y ' + r.resto + ' más' : '') + '. '
       + '<button type="button" class="ftm-btn ftm-btn--primary" data-ftm="borr-restaurar">Restaurar</button> '
       + '<button type="button" class="ftm-btn" data-ftm="borr-descartar">Descartar</button>'
-      + '<div class="ftm-borrador-pie">Los borradores se guardan en este navegador durante 30 días y luego '
-      + 'se borran solos. Nadie más los ve.'
+      + '<div class="ftm-borrador-pie">Se guardan SOLO en este navegador —no viajan por la red ni los ve '
+      + 'otro usuario del sitio— y se descartan a los 30 días. En un computador compartido, use «Descartar» al terminar.'
       + (borradorOfrecido.caducados ? ' Se descartaron ' + borradorOfrecido.caducados + ' por antigüedad.' : '')
       + '</div></div>';
   }
@@ -1023,10 +1047,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Devuelve a la pantalla lo guardado, equipo por equipo y diciendo qué hizo. */
   function restaurarBorrador() {
     if (!borradorOfrecido) return;
-    const yaEscrita = (eq) => {
-      const st = ESTADOS.get(claveEquipo(eq));
-      return !!st && tieneContenido({ plan: st.plan, anexo: st.anexo, diagramas: {} });
-    };
+    // Incluye el DIAGRAMA: una ficha cuyo único trabajo de hoy es el unifilar
+    // no es una ficha «en blanco», y restaurar encima se lo borraba sin decirlo.
+    const yaEscrita = (eq) => fichaConTrabajo(eq);
     const r = emparejar(borradorOfrecido.doc, EQUIPOS, yaEscrita);
     r.aplicables.forEach(({ entrada, equipo }) => {
       const st = estadoDe(equipo);
@@ -1046,16 +1069,33 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (actual) pintarModal();
   }
 
+  /**
+   * Descarta SOLO las fichas que la banda ofreció. Borrar el almacén entero se
+   * llevaba por delante lo que esta misma sesión acababa de guardar, y después
+   * el aviso de salida ya no lo cubría (`99 §83.7`).
+   */
   function descartarBorrador() {
-    const n = borradorOfrecido ? borradorOfrecido.resumen.total : 0;
-    if (n && !globalThis.confirm('Esto borra ' + n + ' ficha(s) a medio redactar y no se puede deshacer.')) return;
+    if (!borradorOfrecido) return;
+    const claves = Object.keys(borradorOfrecido.doc.equipos);
+    const n = claves.length;
+    if (n && !globalThis.confirm('Se borrarán los borradores de ' + n + ' equipo(s) guardados en este '
+      + 'navegador, incluidos los de otras cargas. No se puede deshacer.')) return;
     const alm = almacen();
-    if (alm) { try { alm.borrar(); } catch (_) { /* noop */ } }
+    if (alm) {
+      try {
+        const ahora = new Date().toISOString();
+        const leido = leerDocumento(alm.leer(), { uid: uidActual(), ahoraISO: ahora });
+        if (leido && leido.doc) {
+          claves.forEach((k) => { delete leido.doc.equipos[k]; });
+          if (Object.keys(leido.doc.equipos).length) alm.escribir(serializar(leido.doc));
+          else alm.borrar();
+        } else { alm.borrar(); }
+      } catch (_) { /* noop */ }
+    }
     borradorOfrecido = null;
-    TOCADOS.clear();
-    borradorISO = '';
     pintarBanda();
     pintarEstadoBorrador();
+    fijarAviso('<div class="ftm-nota">Borradores descartados.</div>');
   }
   let trampaFoco = null;       // trampa de foco del modal (ui/foco-modal.js)
   let hoja = 'ficha';
@@ -1114,9 +1154,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<div class="ftm-panel"><div class="ftm-panel-body">'
       +   '<div class="ftm-hint">▸ Pulse un indicador para acotar la flota; el botón «Ficha» de cada '
       +   'fila abre el documento de planificación con sus seis hojas.</div>'
-      +   '<div data-ftm="aviso"></div>'
+      +   '<div data-ftm="aviso" role="status" aria-live="polite"></div>'
       // Banda del borrador: NUNCA se restaura en silencio (`99 §83`).
-      +   '<div data-ftm="borrador-banda"></div>'
+      +   '<div data-ftm="borrador-banda" role="status" aria-live="polite"></div>'
       + '</div></div>'
       + '<div class="ftm-tabla-wrap">'
       +   '<div class="ftm-tabla-bar">'
@@ -1877,6 +1917,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     modal.classList.add('is-on');
     modal.setAttribute('aria-hidden', 'false');
     pintarModal();
+    pintarEstadoBorrador();   // el sello es de ESTA ficha (`99 §83.7`)
     // El diálogo ya declaraba `aria-modal="true"` pero el foco se escapaba con
     // el tabulador a la página de detrás — la promesa de «el resto está
     // inerte» quedaba incumplida. La trampa se arma DESPUÉS de pintar (si no,
@@ -2944,7 +2985,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const campo = t.getAttribute && t.getAttribute('data-redaccion');
     if (campo && actual) {
       const st = estadoDe(actual);
-      if (t.value === '') { st.plan[campo + '_ver'] = 'custom'; return; }
+      if (t.value === '') { st.plan[campo + '_ver'] = 'custom'; tocarFicha(actual); return; }
       st.plan[campo + '_ver'] = +t.value;
       st.plan[campo] = textoVersion(campo, +t.value, actual, st);
       const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
@@ -3047,6 +3088,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     EQUIPOS = recomputarEquipos();
     ESTADOS.clear();
     TOCADOS.clear();
+    SIN_IDENTIDAD.clear();
+    // Los diagramas viven a nivel de módulo: sin esto, el unifilar del listado
+    // anterior sobrevivía al cambio de datos y podía acabar dibujado —y
+    // guardado— sobre otro equipo (CF-04, `99 §83.7`).
+    try { olvidarDiagramas(); } catch (_) { /* noop */ }
     clearTimeout(tempBorrador);
     tempBorrador = null;
     if (meta.origen != null) cfg.origen = meta.origen;

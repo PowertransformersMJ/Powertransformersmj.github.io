@@ -1944,10 +1944,16 @@
    El sello vive en la barra del modal: dice si lo redactado está a salvo sin
    que haya que confiar en que «algo pasa por detrás». */
 .ftm-borrador{
-  margin-left:auto;padding:0 10px;font-size:11px;color:var(--ftm-muted,#5b6b73);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:44ch;
+  /* Vive en la barra AZUL del documento: el gris de texto normal quedaba
+     ilegible sobre ese fondo (contraste 1,1:1) y el mensaje que más importa
+     salía recortado. Blanco, 12px y hasta dos líneas (`99 §83.7`). */
+  margin-left:auto;padding:0 10px;font-size:12px;color:#fff;line-height:1.3;
+  max-width:46ch;text-align:right;
 }
-.ftm-borrador.es-mal{color:#9a3412;font-weight:600}
+.ftm-borrador.es-mal{
+  background:#ffe8cc;color:#7c2d12;font-weight:600;border-radius:6px;
+  padding:3px 8px;white-space:normal;
+}
 .ftm-borrador-banda .ftm-btn{margin-left:6px;vertical-align:baseline}
 .ftm-borrador-pie{display:block;margin-top:6px;font-size:11px;color:var(--ftm-muted,#5b6b73)}
 @media (max-width:720px){ .ftm-borrador{max-width:100%;order:3;flex-basis:100%;margin-left:0} }
