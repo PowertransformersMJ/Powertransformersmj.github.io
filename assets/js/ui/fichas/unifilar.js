@@ -108,43 +108,15 @@ export function normalizarDiagrama(cual) {
 /**
  * Clave de estado del equipo. El módulo original usaba la fila del Excel;
  * aquí se prefiere el identificador real del documento.
- * @param {object|string|number} equipo
- * @returns {string} clave estable, '' si no hay nada identificable
+ *
+ * VIVE EN EL DOMINIO (`domain/fichas_identidad.js`) desde `99 §83`: el borrador
+ * de la ficha necesita la MISMA noción de identidad, y dos copias que se
+ * desincronizan el día que una cambie resucitan una ficha sobre el equipo
+ * equivocado —que es justo el defecto de `§82`—. Se reexporta aquí para que
+ * nadie tenga que cambiar sus importaciones (§3.2, cambios aditivos).
  */
-// Clave de respaldo por objeto: si un equipo no trae NINGÚN identificador, dos
-// equipos distintos compartirían la clave '' y editar el diagrama de uno pisaría
-// el del otro. Se le asigna entonces una clave propia, atada a esa instancia.
-const CLAVES_ANONIMAS = new WeakMap();
-let contadorAnonimo = 0;
-
-export function claveEquipo(equipo) {
-  if (equipo == null) return '';
-  if (typeof equipo === 'string' || typeof equipo === 'number') return String(equipo);
-  // Identificadores PROPIOS del equipo, de más a menos específico. La matrícula
-  // y la serie van ANTES que `codigo` porque, cuando los datos entran por
-  // listado adjunto, `codigo` es el «CODIGO SUBESTACION» y los dos
-  // transformadores de una misma subestación lo COMPARTEN: de ahí salía que el
-  // segundo equipo nunca pudiera abrir su propia ficha (`99 §82`).
-  const propio = leer(equipo,
-    'id', 'matricula', 'identificacion.matricula',
-    'serie', 'identificacion.numero_serie',
-    // `identificacion.codigo` es el código del EQUIPO en el esquema v2 (único);
-    // el `codigo` plano del listado es otra cosa y se trata más abajo.
-    'identificacion.codigo');
-  if (propio != null) return String(propio);
-  // Sin identificador propio queda `codigo`, que puede venir compartido: la
-  // fila del listado entra como DESEMPATE. Nunca al revés —una fila suelta
-  // cambia de equipo si el listado se reordena—, y nunca sola si hay código.
-  const compartido = leer(equipo, 'codigo');
-  const fila = leer(equipo, 'fila');
-  if (compartido != null) return fila != null ? `${compartido}#${fila}` : String(compartido);
-  if (fila != null) return String(fila);
-  if (typeof equipo !== 'object') return '';
-  if (!CLAVES_ANONIMAS.has(equipo)) {
-    CLAVES_ANONIMAS.set(equipo, `sin-id:${++contadorAnonimo}`);
-  }
-  return CLAVES_ANONIMAS.get(equipo);
-}
+import { claveEquipo } from '../../domain/fichas_identidad.js';
+export { claveEquipo };
 
 // ── estado por equipo y por diagrama ──────────────────────────
 // Map<claveEquipo, { actual:{…}, futuro:{…} }>. Vive en memoria: es el
