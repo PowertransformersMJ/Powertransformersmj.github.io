@@ -3628,3 +3628,84 @@ hoy · el archivo de la bóveda está íntegro y sus anclas resuelven · la revi
 cédulas dio **1691 commits, 0 hallazgos** · el predeploy de las Cloud Functions está versionado y los dos
 módulos que la CF importa son idénticos a su original. **Abierto y con dueño**: los 9 fixtures del 450108
 (decisión del Ingeniero, sube de la hija `11` a `10`) y el shard real de `00-INDICE`.
+
+## 87. ADR — Tanda B: el Excel que se firma lleva el Valor Real, dice [PENDIENTE] donde falta plata, y la «fórmula viva» resultó no existir ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Encargo: *«arranca por la Tanda B: CF-05, CF-06 y CF-32 — el Excel que se firma. Un punto a la vez,
+> nada se borra, y lo que toque el papel me lo enseñas en preview antes de publicar.»* Tres commits
+> separados en la rama; **publicación retenida hasta su visto bueno** sobre el preview.
+
+**87.1 Causa raíz (leída en el código y en la plantilla oficial).** (a) CF-05: `celdasFichaPlan` no tenía
+`J36`/`K36`, aunque la plantilla ya trae `J36` con formato de pesos (estilo 255, desbloqueada) y
+`J78 = SUM(J34:J66)`. Consecuencia que la cola no decía: el **TOTAL DEL PROYECTO real firmaba 0** en todas
+las fichas. (b) CF-06: F36/I36 llevaban `clear` cuando faltaba el dato y el exportador escribía `''` —la
+marca `pend` se calculaba y nadie la leía—; y como I78/J78 son SUM, **un equipo sin UC firmaba «0 y 0»**:
+un papel que afirma que el proyecto no cuesta nada. (c) CF-32: el exportador escribe TODO texto como
+`t="inlineStr"`; el riesgo de «fórmula viva» es del CSV.
+
+**87.2 Solución.** CF-05: `J36` numérico leído con `montoCOP` (la misma función que pinta el total en
+pantalla) y `K36` texto. CF-06: F36/I36/J36 sin dato ⇒ `[PENDIENTE]` como texto con el estilo de la
+plantilla; I78/J78 ⇒ `[PENDIENTE]` **solo mientras su línea esté pendiente** (con dato, entrada
+`plantilla:true` y manda la SUM oficial intacta); `pendientesFichaPlan()` agrupa por motivo y
+`exportarExcel` pide `confirm()` **solo si falta algo**. De paso, `lleno()` decide también el valor de
+D8/B17/B23 (un campo de puros espacios salía en blanco y a la vez contaba como pendiente). CF-32: sin
+cambio de código; prueba-candado. **Tras la revisión (87.4b)**: `leerMonto()` en el dominio —solo la forma
+colombiana; lo demás es ILEGIBLE— usado por el Excel, la pantalla (`textoTotalReal`, `variacionReal`) y el
+costo de instalación tecleado (`desgloseCreg`, motivos `instalacion_ilegible`/`por_mva_ilegible`; ya no cae
+en silencio al catálogo) · los totales van en su propia línea del aviso · todos los `String.replace` con
+texto dinámico del exportador usan FUNCIÓN · `celdaCSV()` cita también el `\r` suelto.
+
+**87.3 No-regresión.** Firmas públicas intactas (`celdasFichaPlan`, `exportarFichaPlanificacion`); solo se
+AÑADE `pendientesFichaPlan`. Contrato del mapa ampliado con `motivo`, `plantilla`, `derivada` (único
+consumidor: el propio exportador, verificado con grep). Con `cfg.exportador` inyectado (pruebas) no hay
+aviso. Prueba «fuera del mapa la hoja 1 sale idéntica celda por celda» y «no se crean celdas nuevas».
+
+**87.4 Verificación.** 14 pruebas nuevas contra la plantilla REAL (primeras del exportador) → **1773 pass /
+0 fail / 2 skip**, lint limpio. Banco local con el módulo real y dos equipos de EJEMPLO: aviso + Cancelar
+sin descarga y botón restaurado · ficha completa sin aviso · equipo sin UC con cinco `[PENDIENTE]` en el
+archivo y en el render de LibreOffice. CF-32: `=SUM`, `=HYPERLINK`, `@SUM`, `=CMD|…` en D8/B17/B23/O11 →
+LibreOffice y SheetJS los leen como texto; la salida `.xlsx` de la evaluación masiva (SheetJS `t="str"`
+sin `<f>`) tampoco evalúa; su CSV ya antepone apóstrofo. **Prueba de mutación**: con el apóstrofo metido
+a propósito el candado falla. Microsoft Excel NO se consultó (macOS pidió permiso de automatización y se
+dejó sin tocar).
+
+**87.4b Lo que la revisión adversarial paró antes del preview** (3 lentes + 1 escéptico por hallazgo, 13
+agentes Opus; crudo → bóveda `2026-09-23-tanda-b-excel/`). **Confirmados y corregidos**: (1) *media, lo trajo
+CF-05* — el Valor Real con texto libre se firmaba como OTRA cifra: «2.100 millones» → 2.100, «2,100,000,000»
+→ 2,1, «1850000000.50» → cien veces más, «=2.100.000.000*1,19» → otra; lo hallaron las TRES lentes · (2)
+*baja, CF-06* — el aviso contaba menos casillas que el papel · (3) *media, preexistente* — un «$» delante de
+`" < > & '` era orden de `String.replace` (`$&`, `` $` ``) y cambiaba el texto; «$`» dejaba la hoja ilegible;
+el candado no lo veía · (4) *media, preexistente* — el CSV de la evaluación masiva revivía la fórmula tras un
+`\r` suelto. **Refutado**: redondear centavos (el formato distinto de línea y total es el de la plantilla).
+**Confirmados, NO corregidos** (preexistentes → cola): Cantidad 0/texto se imprime 1; hoja «Beneficios» con
+`K11` enlazado a un libro EXTERNO inexistente. Tras los arreglos: **1798 pass / 0 fail / 2 skip** (39 pruebas
+nuevas en la tanda), lint limpio, mutación del «$» (falla con la forma vieja) y banco en vivo: «no legible»
+en pantalla, aviso que cita lo tecleado, cuenta del aviso = casillas del papel (4 y 7), el costo ilegible
+sigue visible tras cerrar y reabrir.
+
+**87.5 Anti-patrones evitados.** Aplicar el «arreglo de dos líneas» sin reproducir (L-100) · un total que
+firma 0 sobre datos que faltan · preguntar por costumbre (el aviso solo sale si falta algo) · leer dinero
+tecleado con un lector tolerante pensado para el catálogo · caer en silencio a un valor por defecto cuando
+lo tecleado no se entiende.
+
+**87.6 Archivos.** `assets/js/ui/fichas/exportar-planificacion.js` (`celdasFichaPlan`,
+`pendientesFichaPlan`, `escribirCelda`/`escribirFormula`/dibujo con reemplazo por función),
+`assets/js/ui/fichas/panel.js` (`avisoPendientes`, `exportarExcel`, `textoTotalReal`, `recalcular`),
+`assets/js/domain/fichas_presupuesto.js` (`leerMonto`, motivos nuevos, `desgloseCreg`, `variacionReal`),
+`assets/js/ui/fichas/evaluacion-masiva.js` (`celdaCSV`), `tests/fichas_exportar_planificacion.test.js`
+(nuevo), `tests/fichas_presupuesto.test.js`. Commits `6c702c5` · `b830c02` · `2fa7241` · `8b72751` ·
+`a6e4e3f`. INTACTOS: la plantilla, `montoCOP` (sigue leyendo el catálogo), el documento de Mantenimiento
+(botón oculto), el `.xlsx` de la evaluación masiva.
+
+**87.7 Doctrina.** «El presupuesto no inventa cifra» (`§74`) llevada del cálculo al PAPEL: ni blanco ni 0
+donde falta plata · verificar antes de afirmar (§3.3) aplicado a un hallazgo heredado.
+
+**87.8 Verificado sano / no re-auditar.** CF-32 en el PE.02081 y en la evaluación masiva (arriba) · la SUM
+de I78/J78 con dato queda byte-idéntica a la plantilla salvo el valor en caché · `montoCOP` con puntos de
+miles y coma decimal. **Pregunta abierta al Ingeniero**: ¿Valor Real vacío ⇒ `[PENDIENTE]` (así quedó) o en
+blanco y fuera del aviso? **Nuevo en cola**: CF-35 (la Descripción D36 sin UC sale «TRANSFORMADOR () - LADO
+DE ALTA NIVEL - DE», en pantalla y papel; texto que se firma ⇒ ejemplos antes) · CF-36 (Cantidad) · CF-37
+(`K11` de «Beneficios» con vínculo externo: ¿Costos = Valor Real o CREG?) · CF-38 (`resolverPlantilla` de
+las redacciones inserta subestación/matrícula con el mismo `String.replace` de texto: mismo «$», datos del
+parque). **Publicación retenida** hasta el visto bueno del Ingeniero sobre el preview (artifact privado
+«El Excel que se firma» + tres `.xlsx` de ejemplo).

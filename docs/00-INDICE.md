@@ -92,12 +92,13 @@
 | §78 | ADR-078 — **Cédulas de los responsables** desde un directorio privado en Firestore; candado por huella/forma/binario en commit, mensaje, merge y push. **L-93/94**… | 3110 |
 | §79 | ADR-079 — **El rol sale del perfil**: el bootstrap `/admins` deja de dar admin a quien ya tiene perfil (degradar por fin revoca), en Firestore y Storage. Cierra… | 3186 |
 | §80 | ADR-080 — **Manda el Excel en todos los caminos** (ratificado): el trigger de muestras reemplazaba `salud_actual` entero y borraba la condición del archivo; ahora se… | 3221 |
-| §81 | ADR-081 — **La potencia y los usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, rango y conteo por columna, aviso del «1» de transmisión); la casilla sigue siendo la de la norma ⟦OPUS-5⟧ | 3264 |
-| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad del equipo (dos TX de una subestación compartían ficha, documento y diagrama por el camino del listado adjunto) ⟦OPUS-5⟧ | 3313 |
-| §83 | ADR-083 — **El documento que se firma deja de vivir solo en memoria**: borrador local con dueño y caducidad, volcado síncrono antes de limpiar, restauración que nunca pisa ni se equivoca de equipo (comité de 4, 16 bloqueantes) ⟦OPUS-5⟧ | 3362 |
+| §81 | ADR-081 — **Potencia y usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, aviso del «1»); la casilla sigue siendo la de la norma ⟦OPUS-5⟧ | 3264 |
+| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad (dos TX de un patio compartían ficha) ⟦OPUS-5⟧ | 3313 |
+| §83 | ADR-083 — **El documento que se firma deja de vivir solo en memoria**: borrador local con dueño y caducidad que nunca pisa ni se equivoca de equipo ⟦OPUS-5⟧ | 3362 |
 | §84 | ADR-084 — **La carga tardía deja de borrar el listado** (número de secuencia) y **el pie del papel deja de poder mentir** sobre su fuente (el origen viaja con los datos) ⟦OPUS-5⟧ | 3468 |
-| §85 | ADR-085 — **El alcance del mantenimiento lo escribe la redacción del formato** (texto dictado por el Ingeniero, con matrícula y potencia del equipo); el texto que compone el módulo deja de contar como trabajo suyo ⟦OPUS-5⟧ | 3514 |
+| §85 | ADR-085 — **El alcance lo escribe la redacción del formato** dictada por el Ingeniero; lo que compone el módulo no cuenta como trabajo suyo ⟦OPUS-5⟧ | 3514 |
 | §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos ⟦OPUS-5⟧ | 3574 |
+| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` donde falta plata (nunca «0»), dinero tecleado leído sin adivinar; CF-32 refutado ⟦OPUS-5.5⟧ | 3632 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
