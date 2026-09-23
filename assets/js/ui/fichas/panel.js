@@ -275,7 +275,25 @@ export const ALCANCE_MTTO_OPC = Object.freeze([
   { t: 'C5·C · Riesgo y continuidad', cond: 5, v: 'Los usuarios aguas abajo de esta unidad de la subestación {SUB} definen la consecuencia de una falla; su condición muy pobre, la probabilidad; su cruce ubica la celda de riesgo y la prioridad. Con esa prioridad se programa sobre la unidad de {MVA} MVA la ejecución de {ACCIONES}, en ventana coordinada con la operación y la indisponibilidad tramitada. Antes de intervenir se prueba el respaldo del nodo y se fijan los criterios de reingreso transitorio o de retiro anticipado, subordinados a su salida programada. Todo tratamiento de aceite o de aislamientos reinicia la línea base de gases disueltos y compuestos furánicos: la verificación posterior se contrasta contra ese nuevo cero. Se contiene así la falla no programada de un activo en fin de vida técnica y la interrupción prolongada del suministro.' },
   { t: 'C5·D · Conservación del activo', cond: 5, v: 'La condición muy pobre del transformador de {MVA} MVA de la subestación {SUB} corresponde a la banda de mayor probabilidad de falla, y la criticidad por usuarios aguas abajo dimensiona lo que esa falla comprometería. Una falla en servicio dejaría la unidad indisponible y, donde la configuración de red no respalde su carga, interrumpiría el suministro a los usuarios asociados a la instalación, con deterioro de la percepción del servicio y de la reputación de la empresa, afectación de los indicadores de calidad del servicio SAIDI y SAIFI y exposición ante el esquema de calidad del servicio de la distribución (Resolución CREG 015 de 2018). En esta banda, conservar el activo no es preservarlo ni recuperarlo: es mantenerlo operable y acotar la probabilidad de que esa falla ocurra antes de su salida. A ese fin responde el alcance, que comprende {ACCIONES}. Los trabajos no devuelven la vida consumida del aislamiento sólido ni prolongan la vida técnica. La decisión sobre su destino se resuelve en la propuesta a Plan de Inversión, que recibe de este documento la condición medida al cierre.' },
   { t: 'C5·E · Automática · datos medidos', cond: 5, auto: 'alcance_mtto' },
-  { t: 'Automática · anclada en datos medidos', auto: 'alcance_mtto' }
+  { t: 'Automática · anclada en datos medidos', auto: 'alcance_mtto' },
+  // ── La redacción del ALCANCE que dictó el Ingeniero (2026-09-23, `99 §85`):
+  // «solo quiero que aparezca lo que te acabo de enviar en alcance».
+  // Va al FINAL del arreglo a propósito: el borrador de `§83` guarda la versión
+  // elegida por su ÍNDICE, y anteponerla habría corrido todos los índices y
+  // cambiado la redacción de las fichas ya guardadas. El desplegable la pinta
+  // primera por `principal`, no por su posición aquí.
+  {
+    t: 'Alcance del mantenimiento especializado',
+    principal: true,
+    v: 'Ejecutar el mantenimiento especializado y las acciones de recuperación requeridas al '
+      + 'transformador de potencia {MATRICULA} de {MVA} MVA, con condición de riesgo inminente, de '
+      + 'acuerdo con la metodología de salud de activos, con el fin de eliminar condiciones asociadas '
+      + 'a fugas, deterioro del sistema de refrigeración, obsolescencia o falla de accesorios y '
+      + 'degradación de los sistemas de aislamiento. Las actividades están orientadas a reducir la '
+      + 'probabilidad de falla catastrófica, garantizar la disponibilidad y confiabilidad del activo y '
+      + 'prevenir afectaciones a los clientes, los indicadores de calidad del servicio y la imagen '
+      + 'corporativa de CARIBEMAR DE LA COSTA.'
+  }
 ]);
 
 /** Las cinco propuestas de BENEFICIOS, una por condición de salud. */
@@ -744,9 +762,19 @@ function resolverPlantilla(tpl, equipo, st, campo) {
   // ninguna NO se deja el hueco ni se inventa un plan: se dice que están por
   // definir, que es lo único cierto en ese momento.
   const escogidas = prosaAcciones(seleccionAcciones(equipo, st, campo));
+  // Sin potencia, «de — MVA» se lee como un guion de redacción y no como un
+  // dato que falta. En una frase que se firma, el hueco se declara (`99 §85`).
+  const mvaP = potenciaProyecto(equipo, st);
   return String(tpl || '')
-    .replace(/\{MVA\}/g, mvaTxt(potenciaProyecto(equipo, st)))
+    .replace(/\{MVA\}/g, mvaP != null ? mvaTxt(mvaP) : '[PENDIENTE: POTENCIA]')
     .replace(/\{SUB\}/g, equipo.subestacion || '')
+    // La matrícula identifica al EQUIPO en el papel (`99 §85`): el Ingeniero la
+    // pidió junto a la potencia en la apertura del alcance. `codigo` NO entra
+    // como respaldo: por el camino del listado es el «CODIGO SUBESTACION», que
+    // los dos TX de un patio comparten (`§82`), y el papel acabaría nombrando
+    // al equipo equivocado. Sin matrícula ni serie se declara el hueco, como
+    // hace el resto del módulo, en vez de dejar la frase muda.
+    .replace(/\{MATRICULA\}/g, equipo.matricula || equipo.serie || '[PENDIENTE: MATRÍCULA]')
     .replace(/\{ACCIONES\}/g, escogidas
       || 'las acciones de mantenimiento que se definan según los resultados del diagnóstico del activo');
 }
@@ -1914,6 +1942,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const nombreDoc = (DOCUMENTOS_FICHA.find((d) => d.id === doc) || {}).lbl || 'Ficha técnica';
     modalTit.textContent = nombreDoc + ' · ' + (actual.subestacion || '—')
       + (actual.matricula ? ' · ' + actual.matricula : '');
+    sembrarRedaccionPrincipal(e);
     modal.classList.add('is-on');
     modal.setAttribute('aria-hidden', 'false');
     pintarModal();
@@ -1928,6 +1957,22 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       autoFoco: '[data-ftm="modal-tabs"] button'
     });
     return true;
+  }
+
+  /**
+   * Deja escrita la redacción del formato al abrir la ficha (`99 §85`).
+   * Solo cuando el campo está VACÍO y nadie eligió versión: ni pisa lo que el
+   * Ingeniero escribió, ni lo que devolvió el borrador de `§83`.
+   */
+  function sembrarRedaccionPrincipal(e) {
+    const campo = campoRed('alcance');
+    const opts = opcionesRedaccion(campo);
+    const i = opts.findIndex((o) => o.principal);
+    if (i < 0) return;
+    const st = estadoDe(e);
+    if (st.plan[campo + '_ver'] != null || lleno(st.plan[campo])) return;
+    st.plan[campo + '_ver'] = i;
+    st.plan[campo] = textoVersion(campo, i, e, st);
   }
 
   function cerrarFicha() {
@@ -2402,19 +2447,33 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // no se toca: sus bandas no traen automática y ahí la suelta es la única.
     const bandaTraeAuto = rec != null
       && conIndice.some((x) => x.o.cond === rec && x.o.auto);
-    const sueltas = bandaTraeAuto ? [] : conIndice.filter((x) => x.o.cond == null);
-    const options = '<option value="">— Personalizado / en blanco —</option>'
+    // La redacción del formato va PRIMERA y fuera de las bandas: es la que se
+    // usa siempre, no una opción más que haya que ir a buscar (`99 §85`).
+    const principales = conIndice.filter((x) => x.o.principal);
+    const sueltas = bandaTraeAuto ? [] : conIndice.filter((x) => x.o.cond == null && !x.o.principal);
+    // Escribir a mano pone la versión en «custom»: el desplegable tiene que
+    // decirlo. Antes bastaba con que «Personalizado» fuera la primera opción y
+    // el navegador la eligiera por descarte; con la redacción del formato
+    // delante, había que marcarla a propósito (`99 §85`).
+    const esCustom = cur === 'custom' || cur == null;
+    const options = principales.map((x) => opt(x.o, x.i)).join('')
+      + '<option value=""' + (esCustom ? ' selected' : '') + '>— Personalizado / en blanco —</option>'
       + bandas.map(grupo).join('')
       + (sueltas.length
         ? '<optgroup label="Sin condición">' + sueltas.map((x) => opt(x.o, x.i)).join('') + '</optgroup>'
         : '');
     const nProp = conIndice.filter((x) => x.o.cond === rec).length;
-    const pista = rec != null
-      ? 'Este equipo está en condición ' + esc(String(rec)) + ' · ' + esc(nombreCondicion(rec))
-        + ': ' + (nProp === 1 ? 'su propuesta está marcada' : 'sus ' + nProp + ' propuestas están marcadas')
-        + ' en la lista. El texto se compone con las acciones que haya marcado arriba; '
-        + 'puede editarlo libremente.'
-      : 'Elija una versión y edítela libremente; la cifra de potencia se toma de «Potencia del proyecto».';
+    const hayPrincipal = opts.some((o) => o.principal);
+    const pista = hayPrincipal
+      ? 'La primera es la redacción del formato: se escribe sola con la matrícula y la potencia del '
+        + 'equipo, y es la que aparece al abrir la ficha. Puede editarla libremente o elegir otra de '
+        + 'la lista.'
+      : (rec != null
+        ? 'Este equipo está en condición ' + esc(String(rec)) + ' · ' + esc(nombreCondicion(rec))
+          + ': ' + (nProp === 1 ? 'su propuesta está marcada' : 'sus ' + nProp + ' propuestas están marcadas')
+          + ' en la lista. El texto se compone con las acciones que haya marcado arriba; '
+          + 'puede editarlo libremente.'
+        : 'Elija una versión y edítela libremente; la cifra de potencia se toma de «Potencia del proyecto».');
     return '<div class="ftm-alcance">'
       + '<label for="ftm-sel-' + campo + '">Redacción</label>'
       + '<select id="ftm-sel-' + campo + '" class="ftm-alcance-sel" data-redaccion="' + campo + '">' + options + '</select>'

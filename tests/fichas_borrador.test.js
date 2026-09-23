@@ -41,9 +41,22 @@ describe('qué se guarda y qué no', () => {
 
   test('elegir una redacción y dejarla vacía NO es una ficha redactada', () => {
     assert.equal(entradaDesdeFicha({ equipo: TX1, plan: { alcance: '', alcance_ver: 'custom' }, ahoraISO: AHORA }), null);
-    // …pero si hay texto, la versión elegida sí se guarda con él
-    const e = entradaDesdeFicha({ equipo: TX1, plan: { alcance: 'TEXTO', alcance_ver: 2 }, ahoraISO: AHORA });
-    assert.equal(e.plan.alcance_ver, 2);
+  });
+
+  // 🔒 `99 §85`: abrir la ficha deja escrita la redacción del formato. Ese texto
+  // lo compuso el MÓDULO y se rehace solo con su `_ver`, así que no puede
+  // contar como trabajo: si contara, la ficha aparecería «ocupada» y el
+  // borrador guardado del Ingeniero se saltaría al restaurar.
+  test('el texto que compone el módulo no es trabajo del Ingeniero', () => {
+    assert.equal(entradaDesdeFicha({ equipo: TX1, plan: { alcance: 'TEXTO COMPUESTO', alcance_ver: 2 }, ahoraISO: AHORA }), null,
+      'solo el texto sembrado: no hay nada que guardar');
+    // Lo que él escribe a mano SÍ cuenta, y se guarda.
+    const suyo = entradaDesdeFicha({ equipo: TX1, plan: { alcance: 'LO QUE YO ESCRIBÍ', alcance_ver: 'custom' }, ahoraISO: AHORA });
+    assert.ok(suyo && suyo.plan.alcance === 'LO QUE YO ESCRIBÍ');
+    // Y marcar acciones también: ahí la versión elegida viaja con ellas.
+    const conAcciones = entradaDesdeFicha({ equipo: TX1, plan: { alcance: 'TEXTO COMPUESTO', alcance_ver: 2, acc_sel: ['SUB-C3-M1'] }, ahoraISO: AHORA });
+    assert.ok(conAcciones, 'marcar acciones es trabajo suyo');
+    assert.equal(conAcciones.plan.alcance_ver, 2, 'la versión elegida se guarda con ellas');
   });
 
   test('el diagrama solo también cuenta como trabajo', () => {
