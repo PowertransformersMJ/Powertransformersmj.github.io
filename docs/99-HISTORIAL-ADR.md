@@ -3709,3 +3709,33 @@ DE ALTA NIVEL - DE», en pantalla y papel; texto que se firma ⇒ ejemplos antes
 las redacciones inserta subestación/matrícula con el mismo `String.replace` de texto: mismo «$», datos del
 parque). **Publicación retenida** hasta el visto bueno del Ingeniero sobre el preview (artifact privado
 «El Excel que se firma» + tres `.xlsx` de ejemplo).
+
+## 88. ADR — Período de ejecución y firmas con la forma del Excel PE.02081 ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Pedido, con captura del documento de Mantenimiento: *«me gustaría que esta parte se pueda apreciar como
+> en el entregable en el Excel para darte los parámetros completos»*. En rama, **sin publicar** (preview
+> entregado: `PREVIEW_Firmas_como_el_Excel.png`), como la Tanda B de `§87`.
+
+**88.1 Causa.** La pantalla tenía 4 columnas con «(nombre)» y «(cargo)» y el Excel otra cosa: en
+`drawing1.xml` de la plantilla hay 4 cuadros con título sobre el borde, **Aprobación con DOS firmantes**
+(la pantalla solo tenía uno) y, por firmante, Nombre · Ocupación (ya impresa) · Firma · Fecha; el período
+son dos cuadros con título. Y la regla global `body.aqua input:not(...)` —especificidad (0,6,3)— le ganaba
+al estilo de papel del módulo: por eso la captura mostraba cajas de formulario redondeadas.
+
+**88.2 Solución.** `bloqueFirmas` y `bloquePeriodo` (nuevo) arman la forma del Excel; `FIRMAS` se exporta y
+lleva `ocupacion` literal de la plantilla (cargos, no personas) y el segundo aprobador `apr2`. Claves de
+antes intactas (`nom_*`, `occ_*`, `fechaentrega`, `anioentrada`); se AÑADEN `fec_*` y `*_apr2`. La ocupación
+de la plantilla se muestra pero no se guarda mientras no se cambie (`§85.4`). Nombre y Ocupación crecen con
+el texto (`field-sizing: content`) en vez de cortarlo. CSS `18b` gana a la regla global solo en el bloque
+(clase repetida, (0,7,1)); al imprimir, sin bordes de campo ni textos de ayuda.
+
+**88.3 Verificación.** Prueba nueva: `FIRMAS` (roles, dos aprobadores, cada ocupación) debe ser LITERAL a
+`drawing1.xml` —falló primero porque un renglón viene partido en varios `<a:t>`; se lee por párrafo—
+→ **1799 pass / 0 fail / 2 skip**, lint limpio. Banco con el módulo real: cinco firmantes, lo tecleado vuelve
+al cerrar y reabrir, el borrador guarda SOLO lo tecleado (`nom_apr2`, `fec_rev`) y no la ocupación de la
+plantilla; capturas a 2× con Chrome sin cabeza de los dos documentos. Commit `8e27a49`.
+
+**88.4 Abierto.** Lo tecleado en Nombre/Ocupación/Fecha de firma **aún no llega al Excel** (CF-25): se
+conecta cuando el Ingeniero entregue los parámetros. Los NOMBRES de personas no pueden vivir en el código
+(repo público): si son fijos, irán a su navegador o a un documento de configuración en Firestore. La
+plantilla escribe «Lider Planificacion» sin tildes: la pantalla lo copia tal cual hasta que él diga.

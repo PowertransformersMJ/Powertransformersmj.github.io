@@ -65,12 +65,12 @@
 | §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (kernel v1.2): entrevista F3a (política git NUEVA: Claude commit+push+merge+deploy), rescate TRIAJE en `_legacy/`, 30… | 986 |
 | §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores adversariales, 0 refutados) → 123 hallazgos en 6 olas; hallazgo dominante =… | 1004 |
 | §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase;… | 1036 |
-| §54 | ADR-054 — Fix sistémico del shell (TODO-16, cazado en validación VIVA): evento `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin (doble… | 1054 |
+| §54 | ADR-054 — Shell: `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin | 1054 |
 | §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación… | 1072 |
-| §56 | ADR-056 — TODO-09: dashboard Salud de Activos conectado al parque REAL de Firestore (mapper puro `parque_salud.js`, hi_final del motor G010, sin fabricar) — verificado… | 1090 |
+| §56 | ADR-056 — Dashboard Salud de Activos conectado al parque REAL (`parque_salud.js`, sin fabricar) | 1090 |
 | §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
 | §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`,… | 1122 |
-| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0: sentinel `NINGUNA` para no dejar alarma perpetua), menú de Antigravity confirmado con nombres reales, y… | 1140 |
+| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0, sentinel `NINGUNA`) | 1140 |
 | §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso ⟦OPUS-5⟧ | 1158 |
 | §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483… | 1181 |
 | §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto)… | 1226 |
@@ -99,6 +99,7 @@
 | §85 | ADR-085 — **El alcance lo escribe la redacción del formato** dictada por el Ingeniero; lo que compone el módulo no cuenta como trabajo suyo ⟦OPUS-5⟧ | 3514 |
 | §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos ⟦OPUS-5⟧ | 3574 |
 | §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` donde falta plata (nunca «0»), dinero tecleado leído sin adivinar; CF-32 refutado ⟦OPUS-5.5⟧ | 3632 |
+| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes, ocupación de la plantilla); aún no llegan al Excel (CF-25) ⟦OPUS-5.5⟧ | 3713 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
