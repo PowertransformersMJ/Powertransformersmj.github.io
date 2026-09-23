@@ -140,6 +140,14 @@ export function tieneContenido(entrada) {
   if (!entrada) return false;
   const conAlgo = (m) => !!m && Object.keys(m).some((k) => {
     if (k.endsWith('_ver')) return false;
+    // Texto que compuso el MÓDULO, no él: cuando el campo tiene una versión
+    // elegida por índice, su contenido se puede rehacer en cualquier momento a
+    // partir de `_ver`. No es trabajo del Ingeniero y no puede contar como tal:
+    // si contara, abrir una ficha bastaría para que el borrador guardado se
+    // saltara al restaurar —«omitida porque ya tenía texto en pantalla»— y su
+    // redacción de ayer se perdería (`99 §85`). Lo escrito a mano lleva
+    // `_ver: 'custom'` y sí cuenta.
+    if (typeof m[k + '_ver'] === 'number') return false;
     const v = m[k];
     if (Array.isArray(v)) return v.length > 0;
     if (typeof v === 'string') return v.trim() !== '';

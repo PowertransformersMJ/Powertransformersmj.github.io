@@ -131,7 +131,10 @@ describe('Catálogos de redacción — uno por documento', () => {
   test('las bandas van en orden y la automática cierra', () => {
     const conds = ALCANCE_MTTO_OPC.filter((o) => o.cond != null).map((o) => o.cond);
     assert.deepEqual([...new Set(conds)], [1, 2, 3, 4, 5]);
-    assert.equal(ALCANCE_MTTO_OPC[ALCANCE_MTTO_OPC.length - 1].auto, 'alcance_mtto');
+    // La automática cierra el bloque de BANDAS; detrás de ella solo puede ir la
+    // redacción del formato (`§85`), que se pinta primera por `principal`.
+    const porBanda = ALCANCE_MTTO_OPC.filter((o) => !o.principal);
+    assert.equal(porBanda[porBanda.length - 1].auto, 'alcance_mtto');
     assert.equal(BENEF_MTTO_OPC[BENEF_MTTO_OPC.length - 1].auto, 'beneficios_mtto');
   });
 
@@ -149,8 +152,8 @@ describe('Catálogos de redacción — uno por documento', () => {
   // La plantilla ENMARCA; la lista de actividades la pone el Ingeniero marcando
   // en la ficha. Que el hueco esté exactamente una vez es lo que hace que el
   // texto sea específico sin fabricar un plan.
-  test('cada plantilla de alcance deja el hueco de las acciones, una sola vez', () => {
-    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v)) {
+  test('cada plantilla de BANDA deja el hueco de las acciones, una sola vez', () => {
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v && x.cond != null)) {
       const n = (o.v.match(/\{ACCIONES\}/g) || []).length;
       assert.equal(n, 1, `«${o.t}» tiene ${n} huecos {ACCIONES}`);
     }
@@ -171,7 +174,7 @@ describe('Catálogos de redacción — uno por documento', () => {
   });
 
   test('al sustituir una sola acción el texto sigue siendo legible', () => {
-    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v)) {
+    for (const o of ALCANCE_MTTO_OPC.filter((x) => x.v && x.cond != null)) {
       const rendido = o.v.replace('{ACCIONES}', 'muestreo de aceite');
       assert.ok(!/\{|\}/.test(rendido.replace(/\{(MVA|SUB)\}/g, '')),
         `«${o.t}» deja marcadores sin resolver`);
@@ -232,8 +235,8 @@ describe('Catálogos de redacción — uno por documento', () => {
     }
   });
 
-  test('no fabrican cifras: los únicos huecos son {MVA}, {SUB} y {ACCIONES}', () => {
-    const validos = new Set(['{MVA}', '{SUB}', '{ACCIONES}']);
+  test('no fabrican cifras: los únicos huecos son {MVA}, {SUB}, {ACCIONES} y {MATRICULA}', () => {
+    const validos = new Set(['{MVA}', '{SUB}', '{ACCIONES}', '{MATRICULA}']);
     for (const o of escritas) {
       for (const m of (o.v.match(/\{[A-Z_]+\}/g) || [])) {
         assert.ok(validos.has(m), `«${o.t}» usa el marcador ${m}, que nadie resuelve`);
@@ -542,5 +545,45 @@ describe('Definición de cada estado de salud', () => {
   test('las etiquetas oficiales del MO.00418 no se tocaron', () => {
     assert.deepEqual(NOMBRE_CONDICION,
       { 1: 'Muy bueno', 2: 'Bueno', 3: 'Medio', 4: 'Pobre', 5: 'Muy pobre' });
+  });
+});
+
+/* ── La redacción del ALCANCE que dictó el Ingeniero (99 §85) ─────────────────
+   «solo quiero que aparezca lo que te acabo de enviar en alcance». Es SU texto:
+   estas pruebas existen para que nadie lo parafrasee ni lo desplace, igual que
+   las de las cinco condiciones de deterioro. */
+describe('99 §85 · el alcance del formato', () => {
+  const principales = ALCANCE_MTTO_OPC.filter((o) => o.principal);
+
+  test('existe una sola, y va al final del arreglo', () => {
+    assert.equal(principales.length, 1, 'debe haber exactamente una redacción del formato');
+    assert.equal(ALCANCE_MTTO_OPC[ALCANCE_MTTO_OPC.length - 1].principal, true,
+      'va al final: el borrador guarda la versión por su ÍNDICE y anteponerla movería los de las fichas ya guardadas');
+  });
+
+  test('el texto es el del Ingeniero, palabra por palabra', () => {
+    const v = principales[0].v;
+    assert.ok(v.startsWith('Ejecutar el mantenimiento especializado y las acciones de recuperación '
+      + 'requeridas al transformador de potencia {MATRICULA} de {MVA} MVA, con condición de riesgo '
+      + 'inminente, de acuerdo con la metodología de salud de activos'), 'la apertura cambió');
+    assert.match(v, /con el fin de eliminar condiciones asociadas a fugas, deterioro del sistema de refrigeración, obsolescencia o falla de accesorios y degradación de los sistemas de aislamiento\./);
+    assert.match(v, /reducir la probabilidad de falla catastrófica, garantizar la disponibilidad y confiabilidad del activo/);
+    assert.ok(v.endsWith('y la imagen corporativa de CARIBEMAR DE LA COSTA.'), 'el cierre cambió');
+  });
+
+  test('identifica el equipo con matrícula y potencia, y con nada más', () => {
+    const v = principales[0].v;
+    assert.match(v, /\{MATRICULA\}/);
+    assert.match(v, /\{MVA\} MVA/, 'la potencia lleva su unidad');
+    assert.ok(!v.includes('{SUB}'), 'el Ingeniero pidió matrícula y potencia, no la subestación');
+  });
+
+  test('NO lleva el hueco de las acciones: es el encuadre, no la lista', () => {
+    assert.ok(!principales[0].v.includes('{ACCIONES}'));
+  });
+
+  test('la etiqueta cabe en el desplegable y no se confunde con una banda', () => {
+    assert.ok(principales[0].t.length <= 42);
+    assert.doesNotMatch(principales[0].t, /^C[1-5]·/);
   });
 });
