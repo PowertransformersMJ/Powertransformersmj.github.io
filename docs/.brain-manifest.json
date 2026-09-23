@@ -9,14 +9,38 @@
     "docs/10-MEMORIA-CORTO-PLAZO.md"
   ],
   "caps": {
-    "CLAUDE.md": { "lines": 320, "chars": 25000 },
-    "docs/05-ESTADO-GLOBAL.md": { "lines": 25, "chars": 4000 },
-    "docs/10-MEMORIA-CORTO-PLAZO.md": { "lines": 110, "chars": 16000 },
-    "docs/20-MEMORIA-ESPACIAL.md": { "lines": 280, "chars": 16000 },
-    "docs/30-LECCIONES.md": { "lines": 350, "chars": 40000 },
-    "docs/31-LECCIONES-IA.md": { "lines": 200, "chars": 20000 },
-    "docs/00-INDICE.md": { "lines": 450, "chars": 16000 },
-    "docs/60-WORKFLOWS.md": { "lines": 160, "chars": 14000 }
+    "CLAUDE.md": {
+      "lines": 320,
+      "chars": 25000
+    },
+    "docs/05-ESTADO-GLOBAL.md": {
+      "lines": 25,
+      "chars": 4000
+    },
+    "docs/10-MEMORIA-CORTO-PLAZO.md": {
+      "lines": 110,
+      "chars": 16000
+    },
+    "docs/20-MEMORIA-ESPACIAL.md": {
+      "lines": 280,
+      "chars": 16000
+    },
+    "docs/30-LECCIONES.md": {
+      "lines": 350,
+      "chars": 40000
+    },
+    "docs/31-LECCIONES-IA.md": {
+      "lines": 200,
+      "chars": 20000
+    },
+    "docs/00-INDICE.md": {
+      "lines": 450,
+      "chars": 16000
+    },
+    "docs/60-WORKFLOWS.md": {
+      "lines": 160,
+      "chars": 14000
+    }
   },
   "archiveDir": "../brain-private/sgm-transpower/research-archive",
   "staleDays": 10,
@@ -29,7 +53,11 @@
     "scripts/brain-archive.mjs"
   ],
   "_kernelFilesRazon": "Los 6 que este repo consume (ADR-058). Declarar de MENOS es la forma silenciosa de quedarse con medio kernel viejo: pull.mjs copia SOLO lo declarado y el gate #0 solo hashea lo declarado.",
-  "orphanAllowlist": [".handoff-auto.md", ".estado-auto.md", ".boot-marker"],
+  "orphanAllowlist": [
+    ".handoff-auto.md",
+    ".estado-auto.md",
+    ".boot-marker"
+  ],
   "_orphanAllowlistRazon": "Sidecars escritos por HOOK (session-handoff.mjs --boot-echo), gitignored, efimeros: handoff-auto (foto de sesion), estado-auto (heartbeat) y boot-marker (canario que valida boot-gate). Su ruta de lectura es el hook SessionStart, no el grafo de neuronas; ademas el gate #10 no puede alcanzarlos por diseno (su regex exige empezar por \\w, y estos empiezan por punto).",
   "peers": [],
   "_peersRazon": "Vacio A PROPOSITO: no hay repos hermanos con cerebro todavia. Ademas el gate #11 (peer-hash) fue retirado en el kernel v1.3 y sustituido por el gate #0 (identidad contra el canonico), que es bloqueante y no necesita peers.",
@@ -39,16 +67,21 @@
     {
       "regex": "kernel v1\\.\\d+\\.\\d+",
       "owner": "scripts/.kernel-version.json",
-      "scan": ["CLAUDE.md", "docs/05-ESTADO-GLOBAL.md", "docs/10-MEMORIA-CORTO-PLAZO.md", "docs/20-MEMORIA-ESPACIAL.md"],
+      "scan": [
+        "CLAUDE.md",
+        "docs/05-ESTADO-GLOBAL.md",
+        "docs/10-MEMORIA-CORTO-PLAZO.md",
+        "docs/20-MEMORIA-ESPACIAL.md"
+      ],
       "_que": "La version del kernel vive en el stamp que escribe brain:pull, y el gate #0 la compara contra ../brain-private/kernel/VERSION. Escribirla a mano en una neurona la convierte en mentira al primer pull. 99 (historia) queda fuera del scan a proposito."
     }
   ],
   "_ssotFactsDescartados": "EVALUADOS Y NO DECLARADOS (2026-07-28, ADR-058): (a) 'MO.00418' y (b) 'lordpowertransformersmj'. Ambos aparecen 20+ y 12+ veces en docs/ como REFERENCIA legitima (citar la norma o el proyecto no es duplicar un hecho). Declararlos disparia warns bloqueantes sin corregir ningun riesgo real = green-tuning al reves. Re-evaluar SOLO si algun dia se versiona el valor (p.ej. 'Ed. 03'), que es cuando el gate #8 sirve.",
   "_specsDirRazon": "RETIRADO 2026-08-21 (auditoria Nivel-2, §68): 'specs' no existe y nunca existio; declararlo solo producia una linea de ruido informativo en cada corrida. Si algun dia se adopta spec-kit, se vuelve a declarar.",
   "deepAudit": {
-    "last": "2026-08-21",
-    "tableFile": "2026-08-21-auditoria-nivel2/HALLAZGOS.md",
-    "coveredHeaderCount": 67,
+    "last": "2026-09-23",
+    "tableFile": "2026-09-23-auditoria-nivel2/HALLAZGOS.md",
+    "coveredHeaderCount": 86,
     "maxAdrGap": 12,
     "maxDays": 30,
     "_que": "Auditoria Nivel-2 del cerebro (skill auditoria-cerebro): correrla cuando el linter lo pida (gate #14). 'last' y 'coveredHeaderCount' se actualizan SOLO al cerrar una auditoria con su tabla de hallazgos escrita. OJO: con coveredHeaderCount en 0 el disparador por VOLUMEN de ADRs (maxAdrGap) quedaba muerto — gap se calculaba como 0 siempre; llevaba apagado desde el dia 1. 'tableFile' es el input de la Sonda 0 de la proxima auditoria: sin el no puede diffear, que es lo que paso en 2026-08-21, la primera con tabla real."

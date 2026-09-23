@@ -47,6 +47,8 @@
 
 | **CF-32** | **Un campo que empiece por `=`, `+`, `-` o `@` se vuelve fórmula viva al abrir el Excel.** Lo destapó el comité de `§83`: pasa ya al teclear, y el borrador lo amplía (ahora el texto puede llegar del disco). | `exportar-planificacion.js` (escritura de celdas de texto) | Forzar formato texto y anteponer un apóstrofo. Dos líneas |
 
+| **CF-34** | **Dos cabos que destapó `§85`**: el exportador escribe `plan.alcance` en B17 y el documento de Mantenimiento usa `alcance_mtto` (hoy no muerde: su botón de Excel está oculto) · el cuadro del alcance **no crece al imprimir**, así que una redacción larga se corta en silencio (el corte empieza cerca de los 950 caracteres). | `exportar-planificacion.js:261` · `fichas-tecnicas.css:1266` | Pasar el campo del documento abierto · dejar que el cuadro crezca en la regla de impresión |
+
 ## 🟠 MEDIO/MENOR · mío, en paquetes
 
 - **Paquete «papel honesto»**: la paginación del documento de Salud está mal (7 hojas rotuladas «de 5», la

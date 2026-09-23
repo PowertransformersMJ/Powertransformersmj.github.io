@@ -3504,3 +3504,121 @@ lógica vive en `panel.js`, que no es testeable— y entra en el paquete «que n
 junto con el exportador y la hoja de riesgo. **Autorización en bloque del Ingeniero (09-22)**: las doce
 preguntas CF-20…CF-31 se aplican con la propuesta por defecto de la cola, cada una en su tanda, y se le
 enseña en preview lo que toque el papel antes de publicar.
+
+## 85. ADR — El alcance del mantenimiento lo escribe la redacción del formato, dictada por el Ingeniero ⟦OPUS-5⟧ (2026-09-23)
+
+> Encargo, tras dos vueltas de ejemplos: *«me gustaría que el alcance iniciara de la siguiente manera…»* y
+> luego, zanjando el diseño que yo proponía, *«solo quiero que aparezca lo que te acabo de enviar en
+> alcance»*. El texto es suyo; lo único que pone el módulo es la matrícula y la potencia del equipo.
+
+**85.1 De dónde viene.** El desplegable del alcance ofrecía **26 entradas** —«Personalizado» + 5 bandas ×
+5 versiones— con la banda del equipo enterrada en el medio y **nada preseleccionado**. Su queja literal:
+*«que se desplieguen 5 opciones donde a mí me permita escoger»* y *«como están hoy no me sirven»*. Al
+leerlas se veía por qué: las cuatro plantillas de cada banda **describen el diagnóstico** —gases, grado de
+polimerización, líneas base— y dejan el trabajo en tres nombres sueltos; además las cuatro terminan en la
+misma lista, así que no eran cuatro opciones sino cuatro preámbulos. Se le propusieron dos formas nuevas
+(riesgo + detalle por actividad, con ejemplos publicados); las descartó y dictó la redacción del formato.
+
+**85.2 Solución.** Entrada nueva en `ALCANCE_MTTO_OPC` marcada `principal`, con **su texto literal** y dos
+huecos: `{MATRICULA}` y `{MVA}`. El desplegable la pinta **primera y fuera de las bandas**; `abrirFicha`
+la deja **ya escrita** cuando el campo está vacío y nadie eligió versión, así que aparece sola. Escribir a
+mano la conmuta a «Personalizado» y no se vuelve a pisar.
+
+**85.3 Dos decisiones de ingeniería dentro del cambio.** (a) La entrada va al **FINAL del arreglo**, no al
+principio: el borrador de `§83` guarda la versión elegida **por su índice**, y anteponerla habría corrido
+todos los índices y cambiado la redacción de las fichas ya guardadas. (b) `{MATRICULA}` **no** cae a
+`codigo` como respaldo: por el camino del listado ese campo es el «CODIGO SUBESTACION» que los dos TX de
+un patio comparten (`§82`), y el papel habría nombrado al equipo equivocado; sin matrícula ni serie
+—y sin potencia— la frase **declara el hueco** (`[PENDIENTE: MATRÍCULA]`) en vez de mentir o callar.
+
+**85.4 Lo que la revisión adversarial paró antes de publicar.** Tres lentes sobre el cambio sin publicar;
+veredicto **«no publicar»**, y tenían razón: sembrar el texto al abrir hacía que la ficha contara como
+**«ya tenía texto en pantalla»**, de modo que el borrador guardado del Ingeniero **no se restauraba** —el
+aviso decía «omitida»— y al primer tecleo se reemplazaba en disco. Se perdía su redacción de ayer y se
+firmaba el párrafo genérico creyendo que era suyo. **Arreglo estructural**: el texto que compone el módulo
+deja de contar como trabajo, y se distingue por su `_ver` **numérico**, que lo hace reproducible; lo
+escrito a mano (`_ver: 'custom'`) y las acciones marcadas sí cuentan. La regla vive en el dominio
+(`tieneContenido`) y cubre también el caso anterior de elegir una versión sin marcar nada.
+
+**85.5 Verificación.** 11 pruebas nuevas —anti-paráfrasis del texto del Ingeniero, palabra por palabra, y
+el contrato nuevo del borrador— → **1759 pass / 0 fail / 2 skip**, lint limpio. En banco: aparece sola,
+primera y elegida, con la matrícula y la potencia del equipo · no pisa lo escrito a mano y el desplegable
+pasa a «Personalizado» · **abrir la ficha ya no impide restaurar el borrador de ayer** · el equipo sin
+matrícula ni potencia imprime los dos `[PENDIENTE: …]`. Producción byte-idéntica.
+
+**85.6 Riesgo asumido y documentado.** El texto afirma **«con condición de riesgo inminente»** de forma
+FIJA y enumera condiciones a eliminar también fijas, para cualquier equipo. Se le advirtió dos veces —con
+el mismo campo puesto sobre un equipo de condición 3— y resolvió que se ponga tal cual. Queda escrito
+aquí: en un equipo en condición 1 o 2 el papel afirmará un riesgo que su propio diagnóstico no sostiene, y
+podrá enumerar condiciones que el equipo no presenta. Es decisión del especialista que firma; el módulo no
+la contradice ni la disfraza. **Se revierte cambiando una sola plantilla.**
+
+**85.7 Archivos.** `assets/js/ui/fichas/panel.js` (`ALCANCE_MTTO_OPC`, `resolverPlantilla`,
+`selectorRedaccion`, `sembrarRedaccionPrincipal`, `abrirFicha`), `assets/js/domain/fichas_borrador.js`
+(`tieneContenido`), `tests/fichas_mantenimiento.test.js`, `tests/fichas_borrador.test.js`. INTACTOS: las 25
+redacciones por banda —nada se borró, siguen en el desplegable—, el PI y los dos campos de beneficios.
+
+**85.8 Verificado sano / no re-auditar.** `rehacerAlcance` no rompe nada: recompone al marcar acciones
+solo si la versión es un índice, y el texto del formato no lleva `{ACCIONES}`, así que se rehace idéntico ·
+los contratos del hueco `{ACCIONES}` se acotaron a las plantillas **por banda**, no se debilitaron ·
+**queda anotado en la cola**: el exportador lee `plan.alcance` y este documento usa `alcance_mtto` (hoy no
+muerde porque el botón de Excel está oculto en Mantenimiento) y el cuadro del alcance no crece al imprimir,
+así que una redacción larga se corta en silencio — ambos son defectos previos, ahora escritos.
+
+## 86. ADR — Auditoría Nivel-2 del cerebro: 53 hallazgos, 6 reincidentes, y el gate que por fin disparó solo ⟦OPUS-5⟧ (2026-09-23)
+
+> Deliberación: `brain-private/sgm-transpower/research-archive/2026-09-23-auditoria-nivel2/` (tabla
+> `HALLAZGOS.md` con los 53, crudo de las 6 sondas). **No la pidió el calendario**: la disparó el
+> `pre-commit`, que bloqueó el cierre de `§85` porque la auditoría llevaba 33 días y **18 ADRs nuevos**
+> sobre el tope de 12. Es el gate que `A-11` desbloqueó en agosto —llevaba apagado desde el día 1—
+> funcionando por primera vez.
+
+**86.1 Lo que la auditoría es.** El linter valida ESTRUCTURA; esto valida si el contenido es VERDAD, si
+está fresco y si el cerebro **entrega** lo que guarda. Seis sondas frías (Opus, sin este contexto): diff
+contra la tabla de agosto · fidelidad de estado · frescura · **retrieval-drill** (una sesión que solo lee
+el boot e intenta responder cinco preguntas reales) · fidelidad de la deliberación capturada · memoria del
+harness y economía · voz adversarial sobre los gates.
+
+**86.2 Los seis REINCIDENTES, que son el KPI del lazo.** **(a)** El mapa espacial se volvió a pudrir sobre
+la MISMA misión activa (`A-03`): los 7 módulos de dominio de Fichas —dos creados anteayer— no estaban en
+`20`, y la fila citaba `§61/64/65/66` con `§75`-`§85` cerrados encima. **La lección M-02 nació de eso y no
+lo evitó: escribir la lección no instala el reflejo.** **(b)** Los IDs de otro cerebro volvieron al kernel
+(`A-07`): una meta-lección del cerebro vecino citada tres veces y un pendiente suyo impreso en el banner de CADA arranque, ninguno
+existente aquí — y la causa estructural es que **el gate #5 solo recorre `docs/`**, así que el kernel es
+zona ciega del verificador de referencias. **(c)** `00-INDICE` volvió a pasarse del tope, con **dos
+commits de «destilar» en ocho días**: destilar es tapón, no arreglo. **(d)** Los sellos de `05` volvieron a
+no corresponder a su dato. **(e)** La memoria del harness sigue mandando a editar el HTML suelto v22.
+**(f)** Los 9 fixtures con datos reales del TX 450108 siguen en el repo PÚBLICO, 33 días después.
+
+**86.3 Lo que se arregló en esta sesión.** `20` nombra los 7 módulos de dominio y las ADRs vigentes ·
+W-05 deja de invitar al error que `TODO-37` ya había desmentido (`functions/domain/` es producto del
+predeploy, nunca se edita) · los sellos de `05` dicen la fecha de su dato y el claim de los 53 índices se
+**degrada** a lo que de verdad se sabe · el foco de `10` va al día, con los dos callejones nuevos de `§85`
+anclados · la fila de la cola de Fichas deja de ser inventario y pasa a puntero (**−900c de boot**) ·
+**kernel v1.11.0**: fuera los identificadores ajenos, y la sonda del SW deja de gritar un ❌ que el gate #4 del
+mismo arranque declara «no aplica» (tercer caso de la familia `A-01`: un rojo que nadie puede accionar
+enseña a ignorar el tablero) · se archivaron las **dos deliberaciones adversariales** de `§83.7` y `§85`,
+que se habían cerrado sin crudo.
+
+**86.4 Lo que la voz adversarial destapó y nadie vigilaba.** **(1)** Todos los candados viven en
+`githooks/` y solo corren si alguien ejecutó una vez `git config core.hooksPath`: en una máquina nueva el
+cerebro se cree protegido y no lo está. **(2)** El candado de cédulas puede fallar en silencio: construye
+las ventanas de dígitos por «corrida» acotada, así que una línea con muchos números separados por comas
+—una fila CSV— puede esconder una cédula. **(3)** El `pre-commit` hace `exit 0` antes de llamar al
+boot-gate cuando el commit no toca `docs/`. Los tres van al ledger; el sub-gate 5c (lección cuarentenada)
+es el candidato a retirarse a cambio, porque no ha cazado nada en dos auditorías.
+
+**86.5 Lo que el retrieval-drill probó.** Una sesión que solo lee el boot llega bien a lo que el router
+enruta y falla donde el mapa está viejo: el conocimiento existía y el cerebro **no lo entregaba**. Es el
+mismo defecto de `A-03`, medido desde la función y no desde el almacén.
+
+**86.6 GC pareado (masa-neta).** Boot antes **31.223c** → después **31.169c** (**−54c**), y eso pagando
+dos filas nuevas de ledger (`TODO-66`/`TODO-67`), los dos callejones de `§85` y el hueco del dato de
+cliente. Lo que salió: los TODO dejaron de llevar el razonamiento —que ya vive en su ADR y en la hoja de
+la cola— y se quedaron con el hecho y el puntero. Cumple la regla de que toda auditoría cierra con delta ≤ 0.
+
+**86.7 Verificado sano / no re-auditar.** 12 de los 18 hallazgos de agosto siguen cerrados y comprobados
+hoy · el archivo de la bóveda está íntegro y sus anclas resuelven · la revisión de toda la historia por
+cédulas dio **1691 commits, 0 hallazgos** · el predeploy de las Cloud Functions está versionado y los dos
+módulos que la CF importa son idénticos a su original. **Abierto y con dueño**: los 9 fixtures del 450108
+(decisión del Ingeniero, sube de la hija `11` a `10`) y el shard real de `00-INDICE`.
