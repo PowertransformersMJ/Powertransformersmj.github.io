@@ -22,6 +22,7 @@ import {
   exportarFichaPlanificacion
 } from '../assets/js/ui/fichas/exportar-planificacion.js';
 import { celdaCSV } from '../assets/js/ui/fichas/evaluacion-masiva.js';
+import { FIRMAS } from '../assets/js/ui/fichas/panel.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLANTILLA = resolve(__dirname, '..', 'assets', 'plantillas', 'PE-02081-planificacion.xlsx');
@@ -331,5 +332,23 @@ describe('CF-32 · lo que se teclea NUNCA se vuelve fórmula en el Excel (candad
     assert.equal(celdaCSV('di "x"'), '"di ""x"""');
     assert.equal(celdaCSV('normal'), 'normal');
     assert.equal(celdaCSV(null), '');
+  });
+});
+
+describe('§88 · el cuadro de firmas de la pantalla es el de la plantilla PE.02081', () => {
+  test('cuatro cuadros, Aprobación con dos firmantes, y cada ocupación LITERAL de la plantilla', async () => {
+    const zip = await JSZip.loadAsync(readFileSync(PLANTILLA));
+    const dibujo = await zip.file('xl/drawings/drawing1.xml').async('string');
+    // Un renglón del cuadro puede venir partido en varios <a:t>: se leen por párrafo.
+    const textos = [...dibujo.matchAll(/<a:p>([\s\S]*?)<\/a:p>/g)]
+      .map((p) => [...p[1].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join('').trim());
+    assert.deepEqual([...new Set(FIRMAS.map((f) => f.rol))], ['Elaboración', 'Revisión', 'Aprobación', 'Recibe']);
+    assert.equal(FIRMAS.filter((f) => f.rol === 'Aprobación').length, 2);
+    for (const rol of ['Elaboración', 'Revisión', 'Aprobación', 'Recibe']) assert.ok(textos.includes(rol), rol);
+    for (const f of FIRMAS) {
+      assert.ok(textos.includes(('Ocupación: ' + f.ocupacion).trim()), f.k + ': «' + f.ocupacion + '» no está en la plantilla');
+    }
+    // Cinco firmantes en la plantilla = cinco «Nombre:» en el dibujo.
+    assert.equal(textos.filter((t) => t === 'Nombre:').length, FIRMAS.length);
   });
 });

@@ -320,15 +320,20 @@ export function opcionesRedaccion(campo) {
 }
 
 /**
- * Cuadro de firmas del formato oficial. Solo el ROL (que es parte del formato);
- * el nombre y el cargo los escribe quien emite la ficha — este repo es público
- * y no lleva nombres de personas.
+ * Cuadro de firmas del formato oficial, tal como lo trae la plantilla PE.02081
+ * (`xl/drawings/drawing1.xml`): cuatro cuadros —Elaboración, Revisión,
+ * Aprobación y Recibe— y en Aprobación DOS firmantes. Cada uno con Nombre,
+ * Ocupación, Firma y Fecha. La `ocupacion` es la que la plantilla trae ya
+ * impresa (un cargo, no una persona, y ya es pública en la plantilla); el
+ * nombre lo escribe quien emite la ficha — este repo es público y no lleva
+ * nombres de personas.
  */
-const FIRMAS = Object.freeze([
-  { k: 'elab', rol: 'Elaboración' },
-  { k: 'rev',  rol: 'Revisión' },
-  { k: 'apr',  rol: 'Aprobación' },
-  { k: 'rec',  rol: 'Recibe' }
+export const FIRMAS = Object.freeze([
+  { k: 'elab', rol: 'Elaboración', ocupacion: 'Profesional Transformadores de Potencia' },
+  { k: 'rev',  rol: 'Revisión',    ocupacion: 'Lider Planificacion y Aseguramiento Mantenimiento AT' },
+  { k: 'apr',  rol: 'Aprobación',  ocupacion: 'Subgerente Mantenimiento AT' },
+  { k: 'apr2', rol: 'Aprobación',  ocupacion: 'Subgerente Mantenimiento AT', segundo: true },
+  { k: 'rec',  rol: 'Recibe',      ocupacion: '' }
 ]);
 
 /** Campos del formulario de un diagrama: [clave, etiqueta, placeholder, ancho px]. */
@@ -2538,16 +2543,60 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   /** Cuadro de firmas del formato (roles fijos; nombre y cargo los pone quien firma). */
+  /**
+   * Cuadro de firmas con la MISMA forma que el Excel PE.02081 (orden del
+   * Ingeniero, 2026-09-23: «que esta parte se pueda apreciar como en el
+   * entregable»): un cuadro por rol con el título sobre el borde, Aprobación con
+   * sus dos firmantes lado a lado, y en cada firmante Nombre, Ocupación (ya
+   * escrita, como la trae la plantilla), Firma (a mano, sobre la línea) y Fecha.
+   * Mismas claves de antes (`nom_*`, `occ_*`); se AÑADEN `fec_*` y el segundo
+   * aprobador (`*_apr2`). La ocupación de la plantilla se muestra mientras no
+   * se escriba otra, pero no se guarda: no es trabajo del usuario (`99 §85.4`).
+   */
   function bloqueFirmas(e) {
     const st = estadoDe(e);
-    return '<div class="ftm-firmas">' + FIRMAS.map((f) =>
-      '<div class="ftm-firma"><div class="ftm-firma-rol">' + esc(f.rol) + '</div>'
-      + '<div class="ftm-firma-sign"><div class="ftm-firma-linea"></div></div>'
-      + '<input class="ftm-firma-nombre" data-plan="nom_' + f.k + '" placeholder="(nombre)" '
-      + 'aria-label="Nombre de quien firma en ' + esc(f.rol) + '" value="' + esc(st.plan['nom_' + f.k] || '') + '">'
-      + '<input class="ftm-firma-nombre" data-plan="occ_' + f.k + '" placeholder="(cargo)" '
-      + 'aria-label="Cargo de quien firma en ' + esc(f.rol) + '" value="' + esc(st.plan['occ_' + f.k] || '') + '">'
-      + '</div>').join('') + '</div>';
+    const P = st.plan;
+    const renglon = (lbl, clave, valor, ph, aria, area) =>
+      '<label class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">' + esc(lbl) + '</span>'
+      // Nombre y Ocupación van en área de texto que CRECE con lo escrito: en un
+      // cuadro angosto un campo de una línea cortaba «…de Potencia» y el nombre.
+      + (area
+        ? '<textarea class="ftm-fmt-in ftm-fmt-in--area" rows="1" data-plan="' + clave + '" '
+          + 'placeholder="' + esc(ph) + '" aria-label="' + esc(aria) + '">' + esc(valor) + '</textarea>'
+        : '<input class="ftm-fmt-in" data-plan="' + clave + '" value="' + esc(valor) + '" '
+          + 'placeholder="' + esc(ph) + '" aria-label="' + esc(aria) + '">')
+      + '</label>';
+    const firmante = (f) => {
+      const quien = f.rol + (f.segundo ? ' (segundo firmante)' : '');
+      const occ = P['occ_' + f.k] != null ? P['occ_' + f.k] : f.ocupacion;
+      return '<div class="ftm-fmt-firmante">'
+        + renglon('Nombre:', 'nom_' + f.k, P['nom_' + f.k] || '', '', 'Nombre de quien firma en ' + quien, true)
+        + renglon('Ocupación:', 'occ_' + f.k, occ, '', 'Ocupación de quien firma en ' + quien, true)
+        + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
+        +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
+        + renglon('Fecha:', 'fec_' + f.k, P['fec_' + f.k] || '', 'dd/mm/aaaa', 'Fecha de la firma en ' + quien)
+        + '</div>';
+    };
+    const roles = [...new Set(FIRMAS.map((f) => f.rol))];
+    return '<div class="ftm-fmt ftm-fmt-firmas">' + roles.map((rol) => {
+      const suyos = FIRMAS.filter((f) => f.rol === rol);
+      return '<fieldset class="ftm-fmt-caja' + (suyos.length > 1 ? ' ftm-fmt-caja--doble' : '') + '">'
+        + '<legend>' + esc(rol) + '</legend>'
+        + '<div class="ftm-fmt-cols">' + suyos.map(firmante).join('') + '</div></fieldset>';
+    }).join('') + '</div>';
+  }
+
+  /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
+  function bloquePeriodo(e) {
+    const P = estadoDe(e).plan;
+    const caja = (titulo, clave, ph) =>
+      '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>' + esc(titulo) + '</legend>'
+      + '<input class="ftm-fmt-in ftm-fmt-in--centro" data-plan="' + clave + '" value="' + esc(P[clave] || '') + '" '
+      + 'placeholder="' + esc(ph) + '" aria-label="' + esc(titulo) + '"></fieldset>';
+    return '<div class="ftm-fmt ftm-fmt-periodo">'
+      + caja('Fecha de Entrega', 'fechaentrega', 'dd/mm/aaaa')
+      + caja('Año de entrada', 'anioentrada', 'aaaa')
+      + '</div>';
   }
 
   // ── HOJA 1 · Ficha Técnica ──
@@ -2593,10 +2642,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<table class="ftm-tabla"><tbody><tr><th>Fecha</th><th>Versión</th><th>Motivo del cambio</th></tr>'
       +   '<tr><td></td><td></td><td></td></tr></tbody></table>'
       + banda('Período de ejecución')
-      + '<div class="ftm-hoja-grid2">'
-      +   campoInput('Fecha de entrega', 'fechaentrega', P.fechaentrega || '', 'dd/mm/aaaa')
-      +   campoInput('Año de entrada', 'anioentrada', P.anioentrada || '', 'aaaa')
-      + '</div>'
+      + bloquePeriodo(e)
       + bloqueFirmas(e)
       + pieHoja(documento === 'salud' ? 'Pág. 1 de 7' : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
