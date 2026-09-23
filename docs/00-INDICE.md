@@ -96,6 +96,8 @@
 | §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad del equipo (dos TX de una subestación compartían ficha, documento y diagrama por el camino del listado adjunto) ⟦OPUS-5⟧ | 3313 |
 | §83 | ADR-083 — **El documento que se firma deja de vivir solo en memoria**: borrador local con dueño y caducidad, volcado síncrono antes de limpiar, restauración que nunca pisa ni se equivoca de equipo (comité de 4, 16 bloqueantes) ⟦OPUS-5⟧ | 3362 |
 | §84 | ADR-084 — **La carga tardía deja de borrar el listado** (número de secuencia) y **el pie del papel deja de poder mentir** sobre su fuente (el origen viaja con los datos) ⟦OPUS-5⟧ | 3462 |
+| §85 | ADR-085 — **El alcance del mantenimiento lo escribe la redacción del formato** (texto dictado por el Ingeniero, con matrícula y potencia del equipo); el texto que compone el módulo deja de contar como trabajo suyo ⟦OPUS-5⟧ | 3508 |
+| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos ⟦OPUS-5⟧ | 3568 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
