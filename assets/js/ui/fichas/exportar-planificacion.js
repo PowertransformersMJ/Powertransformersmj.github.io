@@ -9,8 +9,9 @@
 // `assets/js/exports/xlsm_suministros.js` con el libro de suministros.
 //
 // Qué se escribe (y nada más):
-//   · Hoja 1 «Ficha Técnica» → 15 celdas (proyecto, ubicación, alcance,
-//     beneficios y la línea de inversión con el presupuesto CREG).
+//   · Hoja 1 «Ficha Técnica» → 17 celdas (proyecto, ubicación, alcance,
+//     beneficios y la línea de inversión: presupuesto CREG, Valor Real y
+//     Sistema).
 //   · Hoja 5 «Anexo AT»       → la fila 11 con los datos de placa del equipo.
 //   · Hoja 3 «Diagrama Actual» y hoja 4 «Diagrama Futuro» → sus dos unifilares,
 //     que son INDEPENDIENTES: cada hoja recibe el suyo (image5 = Actual,
@@ -29,7 +30,7 @@
 // escribe llega por parámetro en tiempo de ejecución.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
+import { buscarUC, clasificarUC, montoCOP } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg } from '../../domain/fichas_presupuesto.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -249,6 +250,10 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
   const municipio = lleno(plan.municipio) ? plan.municipio : txt(estado.municipio);
   const desc = lleno(plan.presu_desc) ? plan.presu_desc : descripcionUC(equipo, U);
   const okTotal = !presu.pendiente;
+  // El Valor Real lo teclea el Ingeniero con puntos de miles y coma decimal:
+  // se lee con `montoCOP`, la MISMA función con que la pantalla pinta su total.
+  // Con `parseFloat` «2.100.000.000» se firmaría como 2,1 pesos.
+  const real = montoCOP(plan.presu_real);
 
   return [
     { cell: 'D8',  campo: 'Proyecto',   val: (plan.proyecto || '[PENDIENTE: NOMBRE DEL PROYECTO]'), pend: !lleno(plan.proyecto) },
@@ -274,7 +279,15 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
       formula: (okTotal ? ('F36+(' + presu.mva + '*' + presu.valorUnitarioMVA + ')') : null),
       clear: !okTotal, pend: !okTotal,
       val: presu.total,
-      vista: presu.formula }
+      vista: presu.formula },
+    // J36 y K36 los teclea el Ingeniero en la ficha. La plantilla ya trae J36
+    // con formato de pesos y J78 = SUM(J34:J66): al escribir J36 el «TOTAL DEL
+    // PROYECTO» real se llena solo. Vacíos ⇒ la casilla queda en blanco, como
+    // en la pantalla (CF-05).
+    { cell: 'J36', campo: 'Valor Real Total', numeric: true,
+      val: real, clear: real == null, pend: false, vista: real },
+    { cell: 'K36', campo: 'Sistema', val: txt(plan.presu_sistema).trim(),
+      clear: !lleno(plan.presu_sistema), pend: false }
   ];
 }
 
