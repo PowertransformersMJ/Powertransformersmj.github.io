@@ -185,3 +185,44 @@ describe('CF-06 · el dinero que falta dice [PENDIENTE] en el Excel, y se avisa 
     assert.equal(celda(mapa, 'D8').val, '[PENDIENTE: NOMBRE DEL PROYECTO]');
   });
 });
+
+describe('CF-32 · lo que se teclea NUNCA se vuelve fórmula en el Excel (candado)', () => {
+  // Verificado el 2026-09-23 (99 §87): el exportador escribe todo texto como
+  // celda de TEXTO (`t="inlineStr"`), y ni LibreOffice ni SheetJS lo evalúan
+  // aunque empiece por = + - @. El riesgo de «fórmula viva» es del CSV (y la
+  // evaluación masiva ya lo neutraliza allí). Anteponer un apóstrofo, como
+  // proponía la cola, NO protege nada en un .xlsx y SÍ imprime «'» en el papel
+  // firmado. Este candado falla si alguien convierte el texto en fórmula… o si
+  // le mete el apóstrofo.
+  const PELIGROSOS = Object.freeze({
+    proyecto: '=SUM(2,3)', municipio: '-4+10', alcance: '=HYPERLINK("http://ejemplo.invalid","clic")',
+    beneficios: '@SUM(1,1)', presu_sistema: '=10*10', presu_desc: '+7*6', presu_real: '100'
+  });
+  const ANEXO = Object.freeze({ observacion: "=CMD|' /C calc'!A0", grupo: '=2*2' });
+
+  test('las únicas fórmulas del libro son las del presupuesto; el texto sale literal, sin apóstrofo', async () => {
+    const plantillaBuffer = readFileSync(PLANTILLA);
+    const bytes = await exportarFichaPlanificacion(
+      { ...EQUIPO, subestacion: '=1+1', departamento: '+2+3' },
+      { plan: PELIGROSOS, anexo: ANEXO },
+      { plantillaBuffer, tipoSalida: 'uint8array' });
+    const zip = await JSZip.loadAsync(bytes);
+    const hoja1 = await zip.file(HOJA).async('string');
+    const anexo = await zip.file('xl/worksheets/sheet6.xml').async('string');
+    const formulas = (xml) => [...xml.matchAll(/<c r="([A-Z]+\d+)"[^>]*><f>/g)].map((m) => m[1]);
+    assert.deepEqual(formulas(hoja1).sort(), ['I36', 'I78', 'J78']);
+    assert.deepEqual(formulas(anexo), []);
+
+    const wb = XLSX.read(bytes, { type: 'array' });
+    const h = wb.Sheets[wb.SheetNames[0]];
+    const esperado = { D8: '=SUM(2,3)', D14: '-4+10', B17: PELIGROSOS.alcance, B23: '@SUM(1,1)',
+      D36: '+7*6', K36: '=10*10', H13: '=1+1', D13: '+2+3' };
+    for (const [ref, texto] of Object.entries(esperado)) {
+      assert.equal(h[ref].t, 's', ref);
+      assert.equal(h[ref].v, texto, ref + ' debe salir literal (sin apóstrofo)');
+    }
+    const a = wb.Sheets['Anexo AT'] || wb.Sheets[wb.SheetNames[wb.SheetNames.length - 1]];
+    assert.equal(a.O11.v, ANEXO.observacion);
+    assert.equal(a.F11.v, '=2*2');
+  });
+});
