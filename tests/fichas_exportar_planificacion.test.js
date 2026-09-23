@@ -21,6 +21,7 @@ import {
   pendientesFichaPlan,
   exportarFichaPlanificacion
 } from '../assets/js/ui/fichas/exportar-planificacion.js';
+import { celdaCSV } from '../assets/js/ui/fichas/evaluacion-masiva.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLANTILLA = resolve(__dirname, '..', 'assets', 'plantillas', 'PE-02081-planificacion.xlsx');
@@ -288,5 +289,47 @@ describe('CF-32 · lo que se teclea NUNCA se vuelve fórmula en el Excel (candad
     const a = wb.Sheets['Anexo AT'] || wb.Sheets[wb.SheetNames[wb.SheetNames.length - 1]];
     assert.equal(a.O11.v, ANEXO.observacion);
     assert.equal(a.F11.v, '=2*2');
+  });
+
+  // La revisión de §87 encontró el hueco del candado: un «$» delante de « " < > & ' `»
+  // era una ORDEN de String.replace ($&, $`, $') y cambiaba el texto o rompía el XML.
+  test('un «$» tecleado sale literal en todas las vías de texto, y el archivo sigue siendo válido', async () => {
+    const plan = {
+      proyecto: 'Proyecto $` fin', alcance: 'Tope $<5 millones', beneficios: "Ahorro $& fin y $' más",
+      presu_sistema: 'STR "$"', presu_desc: 'Cotizado en US$"', presu_real: '1',
+      fechaentrega: "01/10/2026 $'", anioentrada: '2027 $`'
+    };
+    const anexo = { observacion: 'Cotizado en US$" y $$' };
+    const bytes = await exportarFichaPlanificacion(EQUIPO, { plan, anexo },
+      { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array' });
+    const zip = await JSZip.loadAsync(bytes);
+    for (const parte of [HOJA, 'xl/worksheets/sheet6.xml', 'xl/drawings/drawing1.xml']) {
+      const xml = await zip.file(parte).async('string');
+      assert.equal((xml.match(/<\?xml/g) || []).length, 1, parte + ': una sola declaración XML');
+      assert.ok(!/<a:t>[^<]*<a:t>/.test(xml), parte + ': sin cuadros de texto anidados');
+    }
+    const h = XLSX.read(bytes, { type: 'array' });
+    const hoja = h.Sheets[h.SheetNames[0]];
+    assert.equal(hoja.D8.v, plan.proyecto);
+    assert.equal(hoja.B17.v, plan.alcance);
+    assert.equal(hoja.B23.v, plan.beneficios);
+    assert.equal(hoja.K36.v, plan.presu_sistema);
+    assert.equal(hoja.D36.v, plan.presu_desc);
+    assert.equal(h.Sheets['Anexo AT'].O11.v, anexo.observacion);
+    const dibujo = await zip.file('xl/drawings/drawing1.xml').async('string');
+    assert.ok(dibujo.includes('<a:t>01/10/2026 $&#39;</a:t>'), 'fecha literal');
+    assert.ok(dibujo.includes('<a:t>2027 $`</a:t>'), 'año literal');
+  });
+
+  test('CSV de la evaluación masiva: la fórmula no revive ni al inicio ni detrás de un salto de línea', () => {
+    assert.equal(celdaCSV('=1+1'), "'=1+1");
+    assert.equal(celdaCSV('@SUM(1,1)'), "'@SUM(1,1)");
+    // El \r suelto partía la fila y dejaba «=1+1» al inicio de una celda nueva.
+    assert.equal(celdaCSV('SE PRUEBA\r=1+1'), '"SE PRUEBA\r=1+1"');
+    assert.equal(celdaCSV('SE PRUEBA\n=1+1'), '"SE PRUEBA\n=1+1"');
+    assert.equal(celdaCSV('a;b'), '"a;b"');
+    assert.equal(celdaCSV('di "x"'), '"di ""x"""');
+    assert.equal(celdaCSV('normal'), 'normal');
+    assert.equal(celdaCSV(null), '');
   });
 });

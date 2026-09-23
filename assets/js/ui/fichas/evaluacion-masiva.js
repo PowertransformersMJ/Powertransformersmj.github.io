@@ -20,6 +20,21 @@ import {
 /** Mismo CDN de SheetJS que ya usan `ui/calidad/upload.js` y `data/seguimiento_scada_excel.js`. */
 const SHEETJS_CDN = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
 
+/**
+ * Una celda del CSV que se descarga (separador «;»).
+ * El listado lo puede fabricar un tercero. Una celda que empiece por
+ * = + - @ la interpreta Excel como FÓRMULA al abrir el CSV: se neutraliza
+ * anteponiendo un apóstrofo, que Excel no muestra.
+ * El \r SUELTO también va entre comillas: sin ellas partía la fila en dos al
+ * abrir el CSV, y lo que venía detrás («=1+1») empezaba celda nueva y quedaba
+ * como FÓRMULA viva, saltándose el apóstrofo (`99 §87`).
+ */
+export function celdaCSV(c) {
+  let s = String(c == null ? '' : c);
+  if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+  return /[";\r\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+}
+
 /** Extensiones aceptadas. El .csv se lee igual con SheetJS. */
 const EXTENSIONES = ['.xlsx', '.xlsm', '.xls', '.csv'];
 
@@ -352,14 +367,7 @@ export function montarEvaluacionMasiva(contenedor, opts = {}) {
   function exportarCSV() {
     if (!ultimo) return;
     const filas = filasParaExportar(ordenarPorGravedad(ultimo.filas));
-    const csv = filas.map((f) => f.map((c) => {
-      let s = String(c == null ? '' : c);
-      // El listado lo puede fabricar un tercero. Una celda que empiece por
-      // = + - @ la interpreta Excel como FÓRMULA al abrir el CSV: se
-      // neutraliza anteponiendo un apóstrofo, que Excel no muestra.
-      if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-      return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
-    }).join(';')).join('\r\n');
+    const csv = filas.map((f) => f.map(celdaCSV).join(';')).join('\r\n');
     // BOM para que Excel en español respete las tildes.
     descargar(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }), nombreSalida('csv'));
   }

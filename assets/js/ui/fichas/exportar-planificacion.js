@@ -117,18 +117,24 @@ export function escribirCelda(xml, ref, valor, numerico, estiloPlantilla) {
     : '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' +
       escXml(valor) + '</t></is></c>';
 
+  // OJO: TODOS los reemplazos van con FUNCIÓN, no con texto. En el texto de
+  // reemplazo de `String.replace`, «$&», «$`», «$'» y «$$» son órdenes: un «$»
+  // tecleado delante de « " < > & ' » (que escXml vuelve «&quot;», «&lt;»…) se
+  // convertía en «$&» y metía la celda de la plantilla dentro del texto, y
+  // «$`» metía todo el XML anterior y dejaba el archivo ilegible (`99 §87`).
   const celdaRe = new RegExp('<c r="' + ref + '"[^>]*?(?:/>|>[\\s\\S]*?</c>)');
   const m = xml.match(celdaRe);
   if (m) {
     const sM = m[0].match(/\ss="(\d+)"/);
-    return xml.replace(celdaRe, construir(sM ? (' s="' + sM[1] + '"') : ''));
+    const nueva = construir(sM ? (' s="' + sM[1] + '"') : '');
+    return xml.replace(celdaRe, () => nueva);
   }
 
   const celda = construir(estiloPlantilla ? (' s="' + estiloPlantilla + '"') : '');
   const filaRe = new RegExp('(<row r="' + row + '"[^>]*>)([\\s\\S]*?)(</row>)');
   const fm = xml.match(filaRe);
   if (!fm) {
-    return xml.replace('</sheetData>', '<row r="' + row + '">' + celda + '</row></sheetData>');
+    return xml.replace('</sheetData>', () => '<row r="' + row + '">' + celda + '</row></sheetData>');
   }
   const interior = fm[2];
   const objetivo = numeroDeColumna(col);
@@ -137,7 +143,7 @@ export function escribirCelda(xml, ref, valor, numerico, estiloPlantilla) {
   for (const cm of celdas) {
     if (numeroDeColumna(cm[1]) > objetivo) { pos = cm.index; break; }
   }
-  return xml.replace(filaRe, fm[1] + interior.slice(0, pos) + celda + interior.slice(pos) + fm[3]);
+  return xml.replace(filaRe, () => fm[1] + interior.slice(0, pos) + celda + interior.slice(pos) + fm[3]);
 }
 
 /**
@@ -151,7 +157,7 @@ export function escribirFormula(xml, ref, formula) {
   if (!m) return xml;
   const s = (m[0].match(/\ss="(\d+)"/) || [])[1];
   const celda = '<c r="' + ref + '"' + (s ? (' s="' + s + '"') : '') + '><f>' + escXml(formula) + '</f></c>';
-  return xml.replace(celdaRe, celda);
+  return xml.replace(celdaRe, () => celda);
 }
 
 /** Borra el valor en caché de una celda con fórmula, para forzar recálculo. */
@@ -588,8 +594,9 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
     const dr = zip.file(DIBUJO_HOJA1);
     if (dr) {
       let xml = await dr.async('string');
-      xml = xml.replace(ANCLA_FECHA, '<a:t>' + escXml(plan.fechaentrega || '') + '</a:t>');
-      xml = xml.replace(ANCLA_ANIO,  '<a:t>' + escXml(plan.anioentrada  || '') + '</a:t>');
+      // Reemplazo con función: un «$» tecleado no debe leerse como orden.
+      xml = xml.replace(ANCLA_FECHA, () => '<a:t>' + escXml(plan.fechaentrega || '') + '</a:t>');
+      xml = xml.replace(ANCLA_ANIO,  () => '<a:t>' + escXml(plan.anioentrada  || '') + '</a:t>');
       zip.file(DIBUJO_HOJA1, xml);
     }
   } catch (e) { /* el dibujo se conserva tal cual */ }
