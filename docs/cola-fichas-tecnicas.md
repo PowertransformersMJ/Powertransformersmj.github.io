@@ -44,9 +44,7 @@
 | **CF-08** | **Dos criterios para el equipo sin evaluar**: la matriz del sitio lo pinta de verde (clampa), la ficha lo descarta (`condEntera`). | `panel.js:389` vs `matriz_riesgo.js` (`evaluarTransformador`) | Subir la regla de `condEntera` al dominio: un solo criterio para matriz, analítica y ficha |
 | **CF-09** | **El papel llama «plan registrado» a actividades que salieron de la norma** (línea base referencial), no de un plan del equipo. | redactor del alcance (`ficha-tecnica.js`) — el origen no viaja hasta la frase | Dos frases distintas: lo registrado y lo «tomado de la línea base referencial» |
 | **CF-10** | **7 actividades pierden su sustento técnico en el papel** (el de las 48 correcciones): el renglón no lleva el código de la subactividad y el índice no encuentra el nombre sin periodicidad. | `acciones_tecnicas.js` / redactor | Que el código viaje con el renglón y aceptar el nombre sin periodicidad |
-
 | **CF-32** | **Un campo que empiece por `=`, `+`, `-` o `@` se vuelve fórmula viva al abrir el Excel.** Lo destapó el comité de `§83`: pasa ya al teclear, y el borrador lo amplía (ahora el texto puede llegar del disco). | `exportar-planificacion.js` (escritura de celdas de texto) | Forzar formato texto y anteponer un apóstrofo. Dos líneas |
-
 | **CF-34** | **Dos cabos que destapó `§85`**: el exportador escribe `plan.alcance` en B17 y el documento de Mantenimiento usa `alcance_mtto` (hoy no muerde: su botón de Excel está oculto) · el cuadro del alcance **no crece al imprimir**, así que una redacción larga se corta en silencio (el corte empieza cerca de los 950 caracteres). | `exportar-planificacion.js:261` · `fichas-tecnicas.css:1266` | Pasar el campo del documento abierto · dejar que el cuadro crezca en la regla de impresión |
 
 ## 🟠 MEDIO/MENOR · mío, en paquetes
@@ -70,7 +68,7 @@
   bandera de advertencia mira una lista y la pantalla pinta otra · si pides «Volver al parque vivo» y
   cancelas, te quedas sin evaluación y sin botón · una clase de estilo que la lámina pide y el CSS no tiene.
 
-| **CF-33** | **Cabos que el barrido de `§83.7` dejó a sabiendas** (ninguno pierde trabajo en silencio): dos pestañas del módulo no se avisan entre sí · dos filas con la MISMA matrícula en un listado se pisan al guardar y salen ambiguas al restaurar · si la sesión tarda más de 12 s el borrador podría escribirse sin dueño. | `99 §83.7` | Evento `storage` entre pestañas · guardia de matrícula duplicada al guardar · no escribir mientras el uid esté vacío |
+- **CF-33 · Cabos que el barrido de `§83.7` dejó a sabiendas (ninguno pierde trabajo en silencio): dos pestañas del módulo no se avisan entre sí · dos filas con la MISMA matrícula en un listado se pisan al guardar y salen ambiguas al restaurar · si la sesión tarda más de 12 s el borrador podría escribirse sin dueño. → Evento `storage` entre pestañas · guardia de matrícula duplicada al guardar · no escribir mientras el uid esté vacío
 
 ## 🤝 Mío, pero con UNA respuesta suya primero
 
@@ -110,3 +108,5 @@
    manda y si la ficha declara la discrepancia.
 6. **La tabla de 153 subestaciones con su municipio** vive en el repo público: ¿se queda o se mueve a
    Firestore (con su costo de lectura)?
+7. **¿A cuáles de los 9 equipos en condición 5 se les emite ficha?** (venía de la memoria del harness, 08-15; sin nodo dueño hasta hoy).
+8. **Dos huecos de dato que solo estaban en la memoria del harness**: el archivo `Furanos Trafos de Potencia.xlsx` está protegido con contraseña (se usó Salud de Activos como fuente) · **LA SALVACIÓN** no tiene tensión primaria en la fuente y por eso no calcula UC.

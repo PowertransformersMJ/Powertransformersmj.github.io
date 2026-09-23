@@ -3459,6 +3459,12 @@ está acotado porque el disco se relee en cada guardado) · dos filas con la MIS
 listado se pisan al guardar y luego salen como ambiguas al restaurar · si la sesión tarda más de 12 s el
 borrador podría escribirse sin dueño. Ninguno pierde trabajo en silencio; van a la cola del módulo.
 
+> ⚠️ **Enmienda (2026-09-23, `§85.4`)**: el criterio de «qué cuenta como contenido» de la regla 3 y de
+> «una ficha en blanco no se guarda» lo redefinió `§85.4` — el texto que compone el módulo (`_ver`
+> numérico) **no** es contenido; lo tecleado (`_ver: 'custom'`) y las acciones marcadas sí (`tieneContenido`).
+> Y el comité fue de **17** bloqueantes (16 tras fusionar los dos de «dos pestañas»); dos quedaron
+> declarados abiertos en `§83.6`: el cierre de sesión y la sincronía entre pestañas. Lecciones: **L-97**, **L-98**, **L-99**.
+
 ## 84. ADR — La carga tardía deja de borrar el listado, y el pie del papel deja de poder mentir ⟦OPUS-5⟧ (2026-09-22)
 
 > Tanda A de la cola del módulo, elegida por el Ingeniero: *«dame un estatus… quiero que dejemos esto
