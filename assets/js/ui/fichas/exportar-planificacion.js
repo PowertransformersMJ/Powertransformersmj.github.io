@@ -31,8 +31,8 @@
 // escribe llega por parámetro en tiempo de ejecución.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { buscarUC, clasificarUC, montoCOP } from '../../domain/fichas_creg_uc.js';
-import { desgloseCreg, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
+import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
+import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -261,10 +261,17 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
   const municipio = lleno(plan.municipio) ? plan.municipio : txt(estado.municipio);
   const desc = lleno(plan.presu_desc) ? plan.presu_desc : descripcionUC(equipo, U);
   const okTotal = !presu.pendiente;
-  // El Valor Real lo teclea el Ingeniero con puntos de miles y coma decimal:
-  // se lee con `montoCOP`, la MISMA función con que la pantalla pinta su total.
-  // Con `parseFloat` «2.100.000.000» se firmaría como 2,1 pesos.
-  const real = montoCOP(plan.presu_real);
+  // El Valor Real lo teclea el Ingeniero con puntos de miles y coma decimal.
+  // Se lee con `leerMonto`, la MISMA función con que la pantalla pinta su total:
+  // acepta solo la forma colombiana y NO adivina. Con `parseFloat`
+  // «2.100.000.000» se firmaría como 2,1 pesos; con la lectura tolerante,
+  // «2.100 millones» se firmaba como 2.100 (`99 §87`).
+  const leidoReal = leerMonto(plan.presu_real);
+  const real = leidoReal.valor;
+  const motivoReal = leidoReal.estado === 'ilegible'
+    ? 'El Valor Real Total tecleado («' + recortar(plan.presu_real) + '») no se puede leer como cifra: '
+      + 'escríbalo solo con números, p. ej. 2.100.000.000.'
+    : 'No se ha tecleado el Valor Real Total.';
 
   const sinInstalacion = presu.costoInstalacion == null;
 
@@ -306,32 +313,42 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
     // «Sistema» no es dinero: vacío ⇒ en blanco, como en la pantalla.
     { cell: 'J36', campo: 'Valor Real Total', numeric: real != null,
       val: (real != null ? real : TEXTO_PENDIENTE), pend: real == null,
-      motivo: (real == null ? 'No se ha tecleado el Valor Real Total.' : null), vista: real },
+      motivo: (real == null ? motivoReal : null), vista: real },
     { cell: 'K36', campo: 'Sistema', val: txt(plan.presu_sistema).trim(),
       clear: !lleno(plan.presu_sistema), pend: false },
     // TOTAL DEL PROYECTO: con dato manda la fórmula SUM de la plantilla; con la
     // línea pendiente, [PENDIENTE] — nunca el «0» que SUM daría sobre el texto.
-    { cell: 'I78', campo: 'Total del proyecto · CREG', derivada: true,
+    { cell: 'I78', campo: 'TOTAL DEL PROYECTO (CREG)', derivada: true,
       plantilla: okTotal, pend: !okTotal, val: TEXTO_PENDIENTE },
-    { cell: 'J78', campo: 'Total del proyecto · Real', derivada: true,
+    { cell: 'J78', campo: 'TOTAL DEL PROYECTO (real)', derivada: true,
       plantilla: real != null, pend: real == null, val: TEXTO_PENDIENTE }
   ];
 }
 
+/** Texto tecleado, acortado para citarlo en un aviso. */
+function recortar(v) {
+  const s = txt(v).trim();
+  return s.length > 40 ? s.slice(0, 39) + '…' : s;
+}
+
+/** Motivo común de los totales: heredan el pendiente de su línea. */
+const MOTIVO_TOTAL = 'Queda [PENDIENTE] mientras su línea no tenga cifra.';
+
 /**
  * Lo que el Excel va a llevar marcado [PENDIENTE], para decírselo al usuario
  * ANTES de descargar (CF-06). Una línea por motivo: si el Valor CREG Unitario
- * y el Total faltan por la misma causa, se dice una sola vez. Los totales no se
- * listan aparte: heredan el pendiente de su línea.
+ * y el Total faltan por la misma causa, se dice una sola vez. Los totales van
+ * al final, en su propia línea, para que la cuenta de casillas del aviso sea
+ * la MISMA que la del papel (lo destapó la revisión de `99 §87`).
  *
  * @returns {Array<{campos: string[], motivo: string}>}  vacío si no falta nada
  */
 export function pendientesFichaPlan(equipo = {}, estado = {}) {
   const porMotivo = new Map();
-  celdasFichaPlan(equipo, estado)
-    .filter((m) => m.pend && !m.derivada)
+  const celdas = celdasFichaPlan(equipo, estado).filter((m) => m.pend);
+  [...celdas.filter((m) => !m.derivada), ...celdas.filter((m) => m.derivada)]
     .forEach((m) => {
-      const motivo = m.motivo || ('Falta ' + m.campo + '.');
+      const motivo = m.derivada ? MOTIVO_TOTAL : (m.motivo || ('Falta ' + m.campo + '.'));
       if (!porMotivo.has(motivo)) porMotivo.set(motivo, []);
       porMotivo.get(motivo).push(m.campo);
     });

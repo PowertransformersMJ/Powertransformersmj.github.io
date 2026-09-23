@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 
 import {
   valorCregTotal, desgloseCreg, totalProyectoCreg, variacionReal,
-  formatearCOP, TEXTO_PENDIENTE, MOTIVOS_PENDIENTE
+  formatearCOP, TEXTO_PENDIENTE, MOTIVOS_PENDIENTE, leerMonto
 } from '../assets/js/domain/fichas_presupuesto.js';
 import { costoUC } from '../assets/js/domain/fichas_creg_uc.js';
 
@@ -163,5 +163,51 @@ describe('formatearCOP', () => {
     assert.equal(formatearCOP(999), '999');
     assert.equal(formatearCOP(-1500), '-1.500');
     assert.equal(formatearCOP(null), '');
+  });
+});
+
+describe('leerMonto — el dinero tecleado se lee sin adivinar (99 §87)', () => {
+  test('forma colombiana: miles con punto, coma decimal, «$» y signo opcionales', () => {
+    assert.deepEqual(leerMonto('2.100.000.000'), { valor: 2100000000, estado: 'ok' });
+    assert.deepEqual(leerMonto('2100000000'), { valor: 2100000000, estado: 'ok' });
+    assert.deepEqual(leerMonto('$ 2.100.000.000'), { valor: 2100000000, estado: 'ok' });
+    assert.deepEqual(leerMonto('1.000.000,50'), { valor: 1000000.5, estado: 'ok' });
+    assert.deepEqual(leerMonto('-1.000'), { valor: -1000, estado: 'ok' });
+    assert.deepEqual(leerMonto('12.500'), { valor: 12500, estado: 'ok' });
+    assert.deepEqual(leerMonto('0'), { valor: 0, estado: 'ok' });
+    assert.deepEqual(leerMonto(1234), { valor: 1234, estado: 'ok' });
+  });
+
+  test('vacío no es ilegible: es que no se ha tecleado', () => {
+    for (const v of [null, undefined, '', '   ']) assert.deepEqual(leerMonto(v), { valor: null, estado: 'vacio' });
+  });
+
+  test('lo que montoCOP convertía en OTRA cifra ahora es ilegible', () => {
+    for (const v of ['2.100 millones', '$2.100 MM', '2,1 mil millones', '2,100,000,000', '1850000000.50',
+      'aprox 2 mil millones', '1.5 millones', '=2.100.000.000*1,19', 'USD 500.000', '1.000.00', '12.5', '$', NaN]) {
+      assert.deepEqual(leerMonto(v), { valor: null, estado: 'ilegible' }, String(v));
+    }
+  });
+
+  test('un costo de instalación tecleado ilegible deja la línea pendiente y NO cae al catálogo', () => {
+    const d = desgloseCreg({ uc: UC, mva: 30, costoInstalacion: '192 millones' });
+    assert.equal(d.pendiente, true);
+    assert.equal(d.costoInstalacion, null);
+    assert.equal(d.total, null);
+    assert.equal(d.motivo, 'instalacion_ilegible');
+    assert.match(d.formula, /no se puede leer como cifra/);
+  });
+
+  test('un costo de instalación tecleado en forma colombiana sí manda', () => {
+    const d = desgloseCreg({ uc: UC, mva: 30, costoInstalacion: '200.000.000' });
+    assert.equal(d.pendiente, false);
+    assert.equal(d.costoInstalacion, 200000000);
+    assert.equal(d.total, 200000000 + 30 * POR_MVA);
+  });
+
+  test('la variación no se calcula sobre un Valor Real ilegible: lo dice', () => {
+    const v = variacionReal({ totalCreg: 1000, valorReal: '2.100 millones' });
+    assert.equal(v.abs, null);
+    assert.match(v.texto, /no se puede leer como cifra/);
   });
 });

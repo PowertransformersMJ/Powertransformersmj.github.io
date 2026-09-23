@@ -28,9 +28,9 @@
 // Sin `onclick=` en el HTML: todo por delegación de eventos sobre la raíz.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia, montoCOP } from '../../domain/fichas_creg_uc.js';
+import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domain/fichas_creg_uc.js';
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
-import { desgloseCreg, variacionReal, formatearCOP } from '../../domain/fichas_presupuesto.js';
+import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -2483,6 +2483,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + ' — elija una redacción arriba o escriba la suya)">' + esc(st.plan[campo] || '') + '</textarea>';
   }
 
+  /** Total real en pantalla: la cifra, «—» si no hay, «no legible» si no es cifra. */
+  function textoTotalReal(v) {
+    const r = leerMonto(v);
+    if (r.estado === 'ilegible') return 'no legible';
+    return r.valor != null ? formatearCOP(r.valor) : '—';
+  }
+
   /** Presupuesto: el desglose lo calcula el dominio; aquí solo se pinta. */
   function bloquePresupuesto(e) {
     const st = estadoDe(e);
@@ -2510,16 +2517,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<tr><td class="ftm-izq">' + esc(e.subestacion || '') + '</td>'
       +   '<td>' + tI('presu_ucc', lleno(P.presu_ucc) ? P.presu_ucc : U, 'UC') + '</td>'
       +   '<td class="ftm-izq">' + tI('presu_desc', desc, '') + '</td>'
-      +   '<td>' + nI('presu_unit', dg.costoInstalacion != null ? formatearCOP(dg.costoInstalacion) : '') + '</td>'
+      // Un costo tecleado que no es cifra se deja VISIBLE tal cual: si se
+      // repintara vacío, el aviso diría «ilegible» sobre un campo en blanco.
+      +   '<td>' + nI('presu_unit', dg.motivo === 'instalacion_ilegible' ? P.presu_unit
+        : (dg.costoInstalacion != null ? formatearCOP(dg.costoInstalacion) : '')) + '</td>'
       +   '<td>' + nI('presu_cant', dg.cantidad) + '</td>'
       +   '<td class="ftm-num" data-calc="total">' + (dg.total != null ? formatearCOP(dg.total) : '—') + '</td>'
       +   '<td>' + nI('presu_real', P.presu_real) + '</td>'
       +   '<td>' + tI('presu_sistema', P.presu_sistema, '') + '</td></tr>'
       + '<tr class="ftm-total"><td colspan="5" class="ftm-izq">TOTAL DEL PROYECTO</td>'
       +   '<td class="ftm-num" data-calc="proyecto">' + (dg.total != null ? formatearCOP(dg.total) : '—') + '</td>'
-      // OJO: el dinero se lee con `montoCOP` (los puntos son miles), NUNCA con
-      // `num` — "2.100.000.000" con parseFloat sería 2,1.
-      +   '<td class="ftm-num" data-calc="real">' + (montoCOP(P.presu_real) != null ? formatearCOP(montoCOP(P.presu_real)) : '—') + '</td>'
+      // OJO: el dinero se lee con `leerMonto` (los puntos son miles y no se
+      // adivina), NUNCA con `num` — "2.100.000.000" con parseFloat sería 2,1.
+      // Es la MISMA lectura que va al Excel (`99 §87`).
+      +   '<td class="ftm-num" data-calc="real">' + textoTotalReal(P.presu_real) + '</td>'
       +   '<td></td></tr>'
       + '</tbody></table>'
       + '<div class="ftm-nota" data-calc="formula"><b>Desglose:</b> ' + esc(dg.formula) + '</div>'
@@ -2743,10 +2754,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (el) el.textContent = totTxt;
     });
     const elReal = modalCuerpo.querySelector('[data-calc="real"]');
-    if (elReal) {
-      const r = montoCOP(st.plan.presu_real);
-      elReal.textContent = r != null ? formatearCOP(r) : '—';
-    }
+    if (elReal) elReal.textContent = textoTotalReal(st.plan.presu_real);
     const elF = modalCuerpo.querySelector('[data-calc="formula"]');
     if (elF) elF.innerHTML = '<b>Desglose:</b> ' + esc(dg.formula);
     const elV = modalCuerpo.querySelector('[data-calc="variacion"]');

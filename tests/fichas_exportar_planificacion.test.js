@@ -164,33 +164,97 @@ describe('CF-06 · el dinero que falta dice [PENDIENTE] en el Excel, y se avisa 
     assert.deepEqual(pendientesFichaPlan(EQUIPO, { plan: COMPLETO }), []);
   });
 
-  test('el aviso dice cada motivo una vez, con los campos que afecta; los totales no se repiten', () => {
+  test('el aviso dice cada motivo una vez, con los campos que afecta; los totales van al final, en su línea', () => {
     const p = pendientesFichaPlan(EQUIPO, { plan: { ...COMPLETO, presu_ucc: 'ZZ999', presu_real: '' } });
     assert.deepEqual(p, [
       { campos: ['Valor CREG Unitario', 'Valor CREG Total'],
         motivo: 'La UC no está en el catálogo CREG 015/2018 (Tablas 51 y 52).' },
-      { campos: ['Valor Real Total'], motivo: 'No se ha tecleado el Valor Real Total.' }
+      { campos: ['Valor Real Total'], motivo: 'No se ha tecleado el Valor Real Total.' },
+      { campos: ['TOTAL DEL PROYECTO (CREG)', 'TOTAL DEL PROYECTO (real)'],
+        motivo: 'Queda [PENDIENTE] mientras su línea no tenga cifra.' }
     ]);
   });
 
   test('sin potencia, el aviso lo dice con el motivo del dominio', () => {
     const p = pendientesFichaPlan(SIN_POTENCIA, { plan: { ...COMPLETO, presu_ucc: 'N4T5' } });
-    assert.deepEqual(p, [{ campos: ['Valor CREG Total'], motivo: 'Falta la potencia del proyecto en MVA.' }]);
+    assert.deepEqual(p, [
+      { campos: ['Valor CREG Total'], motivo: 'Falta la potencia del proyecto en MVA.' },
+      { campos: ['TOTAL DEL PROYECTO (CREG)'], motivo: 'Queda [PENDIENTE] mientras su línea no tenga cifra.' }
+    ]);
   });
 
+  test('la cuenta del aviso es la MISMA que las casillas [PENDIENTE] del papel (revisión §87)', async () => {
+    const escenarios = [
+      [EQUIPO, {}],
+      [EQUIPO, { ...COMPLETO }],
+      [EQUIPO, { ...COMPLETO, presu_real: '' }],
+      [EQUIPO, { ...COMPLETO, presu_ucc: 'ZZ999' }],
+      [EQUIPO, { ...COMPLETO, presu_real: '2.100 millones' }],
+      [EQUIPO, { ...COMPLETO, presu_unit: '192 millones' }],
+      [SIN_POTENCIA, { ...COMPLETO, presu_ucc: 'N4T5', proyecto: '' }]
+    ];
+    for (const [equipo, plan] of escenarios) {
+      const aviso = pendientesFichaPlan(equipo, { plan }).reduce((n, f) => n + f.campos.length, 0);
+      const { hoja } = await exportar(plan, equipo);
+      const enPapel = Object.keys(hoja).filter((ref) => ref[0] !== '!'
+        && typeof hoja[ref].v === 'string' && hoja[ref].v.startsWith('[PENDIENTE')).length;
+      assert.equal(aviso, enPapel, JSON.stringify(plan));
+    }
+  });
   test('los textos que faltan también entran al aviso; un campo de puros espacios cuenta como vacío', () => {
     const p = pendientesFichaPlan(EQUIPO, { plan: { ...COMPLETO, proyecto: '   ', alcance: '' } });
     assert.deepEqual(p.map((x) => x.campos[0]), ['Proyecto', 'Alcance']);
     const mapa = celdasFichaPlan(EQUIPO, { plan: { ...COMPLETO, proyecto: '   ' } });
     assert.equal(celda(mapa, 'D8').val, '[PENDIENTE: NOMBRE DEL PROYECTO]');
   });
+
+});
+
+describe('Revisión §87 · el dinero tecleado se lee sin adivinar (pantalla y papel)', () => {
+  const COMPLETO = Object.freeze({
+    proyecto: 'PROYECTO DE PRUEBA', municipio: 'MUNICIPIO DE PRUEBA',
+    alcance: 'Alcance de prueba.', beneficios: 'Beneficios de prueba.', presu_sistema: 'STR'
+  });
+
+  for (const texto of ['2.100 millones', '$2.100 MM', '2,1 mil millones', '2,100,000,000',
+    '1850000000.50', 'aprox 2 mil millones', '1.5 millones', '=2.100.000.000*1,19', 'USD 500.000']) {
+    test('«' + texto + '» no se firma como otra cifra: J36 y su total dicen [PENDIENTE] y el aviso lo cita', async () => {
+      const { hoja } = await exportar({ ...COMPLETO, presu_real: texto });
+      assert.equal(hoja.J36.v, '[PENDIENTE]');
+      assert.equal(hoja.J78.v, '[PENDIENTE]');
+      const p = pendientesFichaPlan(EQUIPO, { plan: { ...COMPLETO, presu_real: texto } });
+      const real = p.find((f) => f.campos.includes('Valor Real Total'));
+      assert.ok(real, 'el aviso debe listar el Valor Real');
+      assert.match(real.motivo, /no se puede leer como cifra/);
+      assert.ok(real.motivo.includes(texto.slice(0, 20)), 'el aviso cita lo tecleado');
+    });
+  }
+
+  for (const [texto, valor] of [['2.100.000.000', 2100000000], ['2100000000', 2100000000],
+    ['$ 2.100.000.000', 2100000000], ['1.000.000,50', 1000000.5], ['12.500', 12500], ['0', 0]]) {
+    test('«' + texto + '» sí es una cifra colombiana y se firma tal cual: ' + valor, async () => {
+      const { hoja } = await exportar({ ...COMPLETO, presu_real: texto });
+      assert.equal(hoja.J36.t, 'n');
+      assert.equal(hoja.J36.v, valor);
+    });
+  }
+
+  test('un Valor CREG Unitario tecleado que no es cifra NO cae en silencio al catálogo', async () => {
+    const plan = { ...COMPLETO, presu_real: '1', presu_unit: '192 millones' };
+    const { hoja } = await exportar(plan);
+    for (const ref of ['F36', 'I36', 'I78']) assert.equal(hoja[ref].v, '[PENDIENTE]', ref);
+    const p = pendientesFichaPlan(EQUIPO, { plan });
+    assert.match(p[0].motivo, /Valor CREG Unitario tecleado no se puede leer como cifra/);
+  });
 });
 
 describe('CF-32 · lo que se teclea NUNCA se vuelve fórmula en el Excel (candado)', () => {
   // Verificado el 2026-09-23 (99 §87): el exportador escribe todo texto como
   // celda de TEXTO (`t="inlineStr"`), y ni LibreOffice ni SheetJS lo evalúan
-  // aunque empiece por = + - @. El riesgo de «fórmula viva» es del CSV (y la
-  // evaluación masiva ya lo neutraliza allí). Anteponer un apóstrofo, como
+  // aunque empiece por = + - @. El riesgo de «fórmula viva» es del CSV: la
+  // evaluación masiva lo neutralizaba al inicio de la celda pero no detrás de un
+  // retorno de carro suelto (lo cerró la revisión de §87, prueba de abajo; y esa
+  // revisión destapó también el «$», otra prueba de abajo). Anteponer un apóstrofo, como
   // proponía la cola, NO protege nada en un .xlsx y SÍ imprime «'» en el papel
   // firmado. Este candado falla si alguien convierte el texto en fórmula… o si
   // le mete el apóstrofo.
