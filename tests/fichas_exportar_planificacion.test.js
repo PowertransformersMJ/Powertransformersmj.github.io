@@ -19,7 +19,9 @@ import * as XLSX from 'xlsx';
 import {
   celdasFichaPlan,
   pendientesFichaPlan,
-  exportarFichaPlanificacion
+  exportarFichaPlanificacion,
+  escribirFirmantes,
+  imagenesDeFirmaAlFondo
 } from '../assets/js/ui/fichas/exportar-planificacion.js';
 import { celdaCSV } from '../assets/js/ui/fichas/evaluacion-masiva.js';
 import { FIRMAS } from '../assets/js/ui/fichas/panel.js';
@@ -336,7 +338,7 @@ describe('CF-32 · lo que se teclea NUNCA se vuelve fórmula en el Excel (candad
 });
 
 describe('§88 · el cuadro de firmas de la pantalla es el de la plantilla PE.02081', () => {
-  test('cuatro cuadros, Aprobación con dos firmantes, y cada ocupación LITERAL de la plantilla', async () => {
+  test('cuatro cuadros como los de la plantilla, y Aprobación con dos firmantes', async () => {
     const zip = await JSZip.loadAsync(readFileSync(PLANTILLA));
     const dibujo = await zip.file('xl/drawings/drawing1.xml').async('string');
     // Un renglón del cuadro puede venir partido en varios <a:t>: se leen por párrafo.
@@ -345,10 +347,73 @@ describe('§88 · el cuadro de firmas de la pantalla es el de la plantilla PE.02
     assert.deepEqual([...new Set(FIRMAS.map((f) => f.rol))], ['Elaboración', 'Revisión', 'Aprobación', 'Recibe']);
     assert.equal(FIRMAS.filter((f) => f.rol === 'Aprobación').length, 2);
     for (const rol of ['Elaboración', 'Revisión', 'Aprobación', 'Recibe']) assert.ok(textos.includes(rol), rol);
-    for (const f of FIRMAS) {
-      assert.ok(textos.includes(('Ocupación: ' + f.ocupacion).trim()), f.k + ': «' + f.ocupacion + '» no está en la plantilla');
-    }
     // Cinco firmantes en la plantilla = cinco «Nombre:» en el dibujo.
     assert.equal(textos.filter((t) => t === 'Nombre:').length, FIRMAS.length);
+  });
+});
+
+describe('§89 · quién firma llega al Excel, cada uno en SU cuadro', () => {
+  const dibujoDe = async (plan) => {
+    const bytes = await exportarFichaPlanificacion(EQUIPO, { plan },
+      { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array' });
+    return (await JSZip.loadAsync(bytes)).file('xl/drawings/drawing1.xml').async('string');
+  };
+  const anclas = (xml) => xml.match(/<xdr:(twoCellAnchor|oneCellAnchor)\b[\s\S]*?<\/xdr:\1>/g);
+  const renglones = (ancla) => [...ancla.matchAll(/<a:p>([\s\S]*?)<\/a:p>/g)]
+    .map((p) => [...p[1].matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join('').trim()).filter(Boolean);
+  const cuadro = (xml, titulo) => renglones(anclas(xml).find((a) => renglones(a).includes(titulo)));
+
+  test('por defecto: la primera persona de cada casilla, con su cargo, en el cuadro de su título', async () => {
+    const xml = await dibujoDe({ fec_elab: '01/10/2026' });
+    assert.deepEqual(cuadro(xml, 'Elaboración'), ['Elaboración', 'Nombre: MIGUEL A. JIMENEZ',
+      'Ocupación: PROFESIONAL EN TRANSFORMADORES DE POTENCIA', 'Firma:', 'Fecha: 01/10/2026']);
+    assert.deepEqual(cuadro(xml, 'Revisión').slice(1, 3), ['Nombre: JORGE MIRANDA',
+      'Ocupación: LIDER DE PLANIFICACION Y ASEGURAMIENTO MANTENIMIENTO AT']);
+    assert.deepEqual(cuadro(xml, 'Aprobación').slice(1, 3), ['Nombre: JORGE MIRANDA',
+      'Ocupación: LIDER DE PLANIFICACION Y ASEGURAMIENTO MANTENIMIENTO AT']);
+    assert.deepEqual(cuadro(xml, 'Recibe').slice(1, 3), ['Nombre: ERICK VERGARA',
+      'Ocupación: SUBGERENTE MANTENIMIENTO RED ALTA TENSION']);
+    // El segundo aprobador es el único cuadro con «Nombre:» y sin título.
+    const segundo = anclas(xml).map(renglones).filter((r) => r.some((t) => t.startsWith('Nombre:'))
+      && !['Elaboración', 'Revisión', 'Aprobación', 'Recibe'].includes(r[0]));
+    assert.equal(segundo.length, 1);
+    assert.deepEqual(segundo[0].slice(0, 2), ['Nombre: ERICK VERGARA',
+      'Ocupación: JEFE OPERATIVA MANTENIMIENTO RED ALTA TENSION (E)']);
+  });
+
+  test('otra persona escrita a mano (con un «$») sale literal; la Firma queda en blanco', async () => {
+    const xml = await dibujoDe({ sel_rec: 'otro', nom_rec: 'PERSONA $` DE PRUEBA', occ_rec: 'CARGO "$" DE PRUEBA' });
+    assert.deepEqual(cuadro(xml, 'Recibe'), ['Recibe', 'Nombre: PERSONA $` DE PRUEBA',
+      'Ocupación: CARGO &quot;$&quot; DE PRUEBA', 'Firma:', 'Fecha:']);
+    assert.equal((xml.match(/<\?xml/g) || []).length, 1);
+  });
+
+  test('los renglones del firmante van a 9 pt; el título del cuadro conserva su tamaño', async () => {
+    const xml = await dibujoDe({});
+    const elab = anclas(xml).find((a) => renglones(a).includes('Elaboración'));
+    const nombre = elab.match(/<a:p>(?:(?!<\/a:p>)[\s\S])*Nombre:[\s\S]*?<\/a:p>/)[0];
+    assert.match(nombre, /sz="900"/);
+    assert.doesNotMatch(nombre, /sz="1100"/);
+    const titulo = elab.match(/<a:p>(?:(?!<\/a:p>)[\s\S])*Elaboración[\s\S]*?<\/a:p>/)[0];
+    assert.match(titulo, /sz="1000"/);
+  });
+
+  test('las imágenes en blanco de la zona de firma pasan al fondo; no se borra ninguna ancla', async () => {
+    const plantilla = await (await JSZip.loadAsync(readFileSync(PLANTILLA))).file('xl/drawings/drawing1.xml').async('string');
+    const xml = await dibujoDe({});
+    assert.equal(anclas(xml).length, anclas(plantilla).length);
+    const tipos = anclas(xml).map((a) => (/<xdr:pic>/.test(a) ? 'pic' : 'txt'));
+    assert.deepEqual(tipos.slice(0, 2), ['pic', 'pic']);
+    // El logo del encabezado (fila 2) NO se mueve: sigue siendo la última.
+    assert.equal(tipos[tipos.length - 1], 'pic');
+    assert.equal(imagenesDeFirmaAlFondo(imagenesDeFirmaAlFondo(plantilla)).length, plantilla.length, 'idempotente');
+  });
+
+  test('fuera de los cuadros de firma y de fecha/año, el dibujo sale igual que la plantilla', async () => {
+    const plantilla = await (await JSZip.loadAsync(readFileSync(PLANTILLA))).file('xl/drawings/drawing1.xml').async('string');
+    const xml = await dibujoDe({});
+    const sinFirma = (x) => anclas(x).filter((a) => !renglones(a).some((t) => /^(Nombre:|Fecha de Entrega|Año de entrada)/.test(t)));
+    assert.deepEqual(sinFirma(xml).sort(), sinFirma(plantilla).sort());
+    assert.equal(escribirFirmantes('<x/>', {}), '<x/>');
   });
 });

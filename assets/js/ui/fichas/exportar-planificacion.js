@@ -17,8 +17,9 @@
 //   · Hoja 3 «Diagrama Actual» y hoja 4 «Diagrama Futuro» → sus dos unifilares,
 //     que son INDEPENDIENTES: cada hoja recibe el suyo (image5 = Actual,
 //     image6 = Futuro; verificado en drawing3/drawing4 de la plantilla).
-//   · Cuadros de texto del dibujo de la hoja 1: fecha de entrega y año de
-//     entrada en operación.
+//   · Cuadros de texto del dibujo de la hoja 1: fecha de entrega, año de
+//     entrada en operación y, en el cuadro de firmas, Nombre · Ocupación ·
+//     Fecha de cada firmante (`99 §89`; la Firma queda a mano).
 //
 // Qué NO vive aquí (por diseño):
 //   · La FÓRMULA del presupuesto → `domain/fichas_presupuesto.js`.
@@ -33,6 +34,7 @@
 
 import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
+import { firmanteDe } from '../../domain/fichas_firmantes.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -434,6 +436,105 @@ export function celdasAnexoAT(equipo = {}, estado = {}) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   CUADRO DE FIRMAS (dibujo de la hoja 1)
+   ── Cada firmante es un cuadro de texto de `drawing1.xml`. Se reconoce por su
+      TÍTULO («Elaboración», «Revisión», «Aprobación», «Recibe»), no por su
+      posición ni por su nombre interno (hay dos «Grupo 41» en la plantilla).
+      El segundo aprobador es el único cuadro con «Nombre:» y SIN título: está
+      dentro del de Aprobación. Solo se reescriben los renglones Nombre,
+      Ocupación y Fecha; la Firma queda en blanco, para firmar a mano.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const TITULO_CASILLA = Object.freeze({ 'Elaboración': 'elab', 'Revisión': 'rev', 'Aprobación': 'apr', 'Recibe': 'rec' });
+const RENGLONES_FIRMA = Object.freeze(['Nombre:', 'Ocupación:', 'Fecha:']);
+/** Tamaño (centésimas de punto) de los renglones del firmante. La plantilla trae
+ *  11 pt pensando en «Nombre:» vacío; con los cargos dictados —largos y en
+ *  mayúscula— a 11 pt la «Firma» y la «Fecha» se salían del cuadro en Aprobación
+ *  (render de LibreOffice, `99 §89`). El título del cuadro no se toca. */
+const SZ_FIRMANTE = '900';
+
+/** Texto de un párrafo del dibujo, uniendo sus corridas (un renglón puede venir partido). */
+function textoParrafo(p) {
+  return [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join('');
+}
+
+/** Cambia el tamaño de letra de un `<a:rPr>`/`<a:endParaRPr>` (lo añade si falta). */
+function conTamano(etiqueta, sz) {
+  return /\ssz="\d+"/.test(etiqueta)
+    ? etiqueta.replace(/\ssz="\d+"/, ' sz="' + sz + '"')
+    : etiqueta.replace(/^<(a:rPr|a:endParaRPr)\b/, '<$1 sz="' + sz + '"');
+}
+
+/** Pone el tamaño del firmante a TODAS las corridas y al fin de párrafo. */
+function tamanoParrafo(p, sz) {
+  return p.replace(/<a:(?:rPr|endParaRPr)\b[^>]*?\/?>/g, (m) => conTamano(m, sz));
+}
+
+/** Reescribe un párrafo con UNA sola corrida, conservando el formato de la primera. */
+function reescribirParrafo(p, texto) {
+  const corridas = [...p.matchAll(/<a:r>[\s\S]*?<\/a:r>/g)];
+  if (!corridas.length) return p;
+  const primera = corridas[0];
+  const ultima = corridas[corridas.length - 1];
+  const rPr = (primera[0].match(/<a:rPr\b[^>]*?(?:\/>|>[\s\S]*?<\/a:rPr>)/) || ['<a:rPr/>'])[0];
+  return p.slice(0, primera.index)
+    + '<a:r>' + rPr + '<a:t>' + escXml(texto) + '</a:t></a:r>'
+    + p.slice(ultima.index + ultima[0].length);
+}
+
+/**
+ * Escribe en el cuadro de firmas del dibujo quién firma cada casilla.
+ * Función pura sobre el XML: devuelve el dibujo con los renglones reescritos.
+ *
+ * @param {string} xml   `xl/drawings/drawing1.xml`
+ * @param {object} plan  estado de la ficha (lo lee `firmanteDe`)
+ * @returns {string}
+ */
+export function escribirFirmantes(xml, plan = {}) {
+  return xml.replace(/<xdr:(twoCellAnchor|oneCellAnchor)\b[\s\S]*?<\/xdr:\1>/g, (ancla) => {
+    const parrafos = [...ancla.matchAll(/<a:p>[\s\S]*?<\/a:p>/g)].map((m) => m[0]);
+    const textos = parrafos.map((p) => textoParrafo(p).trim());
+    if (!textos.some((t) => t.startsWith('Nombre:'))) return ancla;
+    const titulo = textos.find((t) => TITULO_CASILLA[t]);
+    const k = titulo ? TITULO_CASILLA[titulo] : 'apr2';
+    const f = firmanteDe(k, plan);
+    const valor = { 'Nombre:': f.nombre, 'Ocupación:': f.ocupacion, 'Fecha:': f.fecha };
+    // Reemplazo con FUNCIÓN: un «$» del nombre no debe leerse como orden (`§87`).
+    return ancla.replace(/<a:p>[\s\S]*?<\/a:p>/g, (p) => {
+      const t = textoParrafo(p).trim();
+      if (TITULO_CASILLA[t]) return p;                    // el título se queda como está
+      const renglon = RENGLONES_FIRMA.find((r) => t.startsWith(r));
+      const nuevo = renglon
+        ? reescribirParrafo(p, (renglon + ' ' + (valor[renglon] || '')).trimEnd() + (valor[renglon] ? '' : ' '))
+        : p;
+      return tamanoParrafo(nuevo, SZ_FIRMANTE);           // Firma y separadores, al mismo tamaño
+    });
+  });
+}
+
+/**
+ * Las dos imágenes que la plantilla tiene en la zona de firma (filas ≥ 90 de la
+ * hoja 1) son RECTÁNGULOS BLANCOS: ahí iban las firmas escaneadas que se
+ * retiraron por privacidad (`§70`). Están dibujadas ENCIMA de los cuadros de
+ * texto y tapaban lo escrito (la fecha de Elaboración perdía su último dígito,
+ * `99 §89`). No se borran: se llevan al FONDO del dibujo, detrás de los cuadros.
+ *
+ * @param {string} xml  `xl/drawings/drawing1.xml`
+ * @returns {string}
+ */
+export function imagenesDeFirmaAlFondo(xml) {
+  const reAncla = /<xdr:(twoCellAnchor|oneCellAnchor)\b[\s\S]*?<\/xdr:\1>/g;
+  const alFondo = [];
+  const resto = xml.replace(reAncla, (ancla) => {
+    const fila = ancla.match(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/);
+    if (/<xdr:pic>/.test(ancla) && fila && +fila[1] >= 90) { alFondo.push(ancla); return ''; }
+    return ancla;
+  });
+  if (!alFondo.length) return xml;
+  return resto.replace(/(<xdr:wsDr\b[^>]*>)/, (m) => m + alFondo.join(''));
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
    UNIFILAR: SVG → PNG rotado 90°
    ── El recuadro de las hojas 3 y 4 es VERTICAL y el unifilar se dibuja
       horizontal: se rota al rasterizar. Solo funciona en el navegador
@@ -597,6 +698,9 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       // Reemplazo con función: un «$» tecleado no debe leerse como orden.
       xml = xml.replace(ANCLA_FECHA, () => '<a:t>' + escXml(plan.fechaentrega || '') + '</a:t>');
       xml = xml.replace(ANCLA_ANIO,  () => '<a:t>' + escXml(plan.anioentrada  || '') + '</a:t>');
+      // Quién firma: Nombre · Ocupación · Fecha de cada casilla (`99 §89`).
+      xml = escribirFirmantes(xml, plan);
+      xml = imagenesDeFirmaAlFondo(xml);
       zip.file(DIBUJO_HOJA1, xml);
     }
   } catch (e) { /* el dibujo se conserva tal cual */ }

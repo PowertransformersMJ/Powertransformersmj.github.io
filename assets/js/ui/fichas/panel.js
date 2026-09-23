@@ -31,6 +31,7 @@
 import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domain/fichas_creg_uc.js';
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
+import { FIRMANTES, OTRA_PERSONA, firmanteDe } from '../../domain/fichas_firmantes.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -323,17 +324,15 @@ export function opcionesRedaccion(campo) {
  * Cuadro de firmas del formato oficial, tal como lo trae la plantilla PE.02081
  * (`xl/drawings/drawing1.xml`): cuatro cuadros —Elaboración, Revisión,
  * Aprobación y Recibe— y en Aprobación DOS firmantes. Cada uno con Nombre,
- * Ocupación, Firma y Fecha. La `ocupacion` es la que la plantilla trae ya
- * impresa (un cargo, no una persona, y ya es pública en la plantilla); el
- * nombre lo escribe quien emite la ficha — este repo es público y no lleva
- * nombres de personas.
+ * Ocupación, Firma y Fecha. QUIÉN firma cada casilla lo dictó el Ingeniero y
+ * vive en `domain/fichas_firmantes.js` (`99 §89`), que usa también el Excel.
  */
 export const FIRMAS = Object.freeze([
-  { k: 'elab', rol: 'Elaboración', ocupacion: 'Profesional Transformadores de Potencia' },
-  { k: 'rev',  rol: 'Revisión',    ocupacion: 'Lider Planificacion y Aseguramiento Mantenimiento AT' },
-  { k: 'apr',  rol: 'Aprobación',  ocupacion: 'Subgerente Mantenimiento AT' },
-  { k: 'apr2', rol: 'Aprobación',  ocupacion: 'Subgerente Mantenimiento AT', segundo: true },
-  { k: 'rec',  rol: 'Recibe',      ocupacion: '' }
+  { k: 'elab', rol: 'Elaboración' },
+  { k: 'rev',  rol: 'Revisión' },
+  { k: 'apr',  rol: 'Aprobación' },
+  { k: 'apr2', rol: 'Aprobación', segundo: true },
+  { k: 'rec',  rol: 'Recibe' }
 ]);
 
 /** Campos del formulario de un diagrama: [clave, etiqueta, placeholder, ancho px]. */
@@ -2568,15 +2567,25 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '</label>';
     const firmante = (f) => {
       const quien = f.rol + (f.segundo ? ' (segundo firmante)' : '');
-      const occ = P['occ_' + f.k] != null ? P['occ_' + f.k] : f.ocupacion;
-      return '<div class="ftm-fmt-firmante">'
-        + renglon('Nombre:', 'nom_' + f.k, P['nom_' + f.k] || '', '', 'Nombre de quien firma en ' + quien, true)
-        + renglon('Ocupación:', 'occ_' + f.k, occ, '', 'Ocupación de quien firma en ' + quien, true)
+      // Quién firma sale del dominio, con la MISMA función que usa el Excel.
+      const q = firmanteDe(f.k, P);
+      const opciones = (FIRMANTES[f.k] || []).map((p, i) =>
+        '<option value="' + i + '"' + (q.indice === i ? ' selected' : '') + '>' + esc(p.nombre) + '</option>').join('')
+        + '<option value="' + OTRA_PERSONA + '"' + (q.otra ? ' selected' : '') + '>Otra persona (escribir)</option>';
+      return '<div class="ftm-fmt-firmante" data-firmante="' + f.k + '">'
+        + '<label class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">Nombre:</span>'
+        +   '<select class="ftm-fmt-in ftm-fmt-sel" data-firma-sel="' + f.k + '" '
+        +     'aria-label="Quién firma en ' + esc(quien) + '">' + opciones + '</select></label>'
+        + (q.otra
+          ? renglon('', 'nom_' + f.k, q.nombre, '(nombre)', 'Nombre de quien firma en ' + quien, true)
+          : '')
+        + renglon('Ocupación:', 'occ_' + f.k, q.ocupacion, '', 'Ocupación de quien firma en ' + quien, true)
         + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
         +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
         + renglon('Fecha:', 'fec_' + f.k, P['fec_' + f.k] || '', 'dd/mm/aaaa', 'Fecha de la firma en ' + quien)
         + '</div>';
     };
+    firmanteHTML = firmante;
     const roles = [...new Set(FIRMAS.map((f) => f.rol))];
     return '<div class="ftm-fmt ftm-fmt-firmas">' + roles.map((rol) => {
       const suyos = FIRMAS.filter((f) => f.rol === rol);
@@ -2584,6 +2593,40 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + '<legend>' + esc(rol) + '</legend>'
         + '<div class="ftm-fmt-cols">' + suyos.map(firmante).join('') + '</div></fieldset>';
     }).join('') + '</div>';
+  }
+
+  /** Pinta un firmante suelto (lo usa `elegirFirmante` para repintar solo esa casilla). */
+  let firmanteHTML = null;
+
+  /**
+   * Cambio en el desplegable «Nombre» de una casilla de firma. Elegir a una
+   * persona de la lista fija su nombre y deja que la ocupación vuelva a ser la
+   * suya; «Otra persona» abre el renglón para escribirla a mano.
+   */
+  function elegirFirmante(k, valor) {
+    if (!actual) return;
+    const P = estadoDe(actual).plan;
+    if (valor === OTRA_PERSONA) {
+      P['sel_' + k] = OTRA_PERSONA;
+      P['nom_' + k] = '';
+      P['occ_' + k] = '';
+    } else {
+      const p = (FIRMANTES[k] || [])[+valor];
+      if (!p) return;
+      delete P['sel_' + k];
+      delete P['occ_' + k];
+      P['nom_' + k] = p.nombre;
+    }
+    tocarFicha(actual);
+    const caja = modalCuerpo.querySelector('[data-firmante="' + k + '"]');
+    const f = FIRMAS.find((x) => x.k === k);
+    if (caja && f && firmanteHTML) {
+      caja.outerHTML = firmanteHTML(f);
+      if (valor === OTRA_PERSONA) {
+        const n = modalCuerpo.querySelector('[data-firmante="' + k + '"] [data-plan="nom_' + k + '"]');
+        if (n) n.focus();
+      }
+    }
   }
 
   /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
@@ -3083,6 +3126,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   function alCambiar(ev) {
     const t = ev.target;
+
+    // Casilla de firma: elegir quién firma (`99 §89`)
+    if (t.matches && t.matches('[data-firma-sel]')) {
+      elegirFirmante(t.getAttribute('data-firma-sel'), t.value);
+      return;
+    }
 
     // Acta: recuperar decisiones de un archivo
     if (t.matches && t.matches('[data-ftm="corr-importar"]')) {
