@@ -2572,14 +2572,23 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const opciones = (FIRMANTES[f.k] || []).map((p, i) =>
         '<option value="' + i + '"' + (q.indice === i ? ' selected' : '') + '>' + esc(p.nombre) + '</option>').join('')
         + '<option value="' + OTRA_PERSONA + '"' + (q.otra ? ' selected' : '') + '>Otra persona (escribir)</option>';
+      // El nombre elegido se ve como TEXTO corrido (baja de renglón como en el
+      // Excel, nunca se corta) y el desplegable va encima, transparente: al
+      // tocar el nombre se elige otra persona. Un <select> visible cortaba
+      // «MIGUEL A. JIME…» en el cuadro angosto de Elaboración.
+      const elige = '<span class="ftm-fmt-elige"><span class="ftm-fmt-valor">'
+        + esc(q.otra ? 'Otra persona' : q.nombre) + '</span>'
+        + '<select class="ftm-fmt-sel" data-firma-sel="' + f.k + '" '
+        + 'aria-label="Quién firma en ' + esc(quien) + '">' + opciones + '</select></span>';
+      const texto = (lbl, valor) => '<div class="ftm-fmt-renglon ftm-fmt-renglon--texto">'
+        + '<span class="ftm-fmt-lbl">' + esc(lbl) + '</span> ' + valor + '</div>';
       return '<div class="ftm-fmt-firmante" data-firmante="' + f.k + '">'
-        + '<label class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">Nombre:</span>'
-        +   '<select class="ftm-fmt-in ftm-fmt-sel" data-firma-sel="' + f.k + '" '
-        +     'aria-label="Quién firma en ' + esc(quien) + '">' + opciones + '</select></label>'
+        + texto('Nombre:', elige)
         + (q.otra
           ? renglon('', 'nom_' + f.k, q.nombre, '(nombre)', 'Nombre de quien firma en ' + quien, true)
-          : '')
-        + renglon('Ocupación:', 'occ_' + f.k, q.ocupacion, '', 'Ocupación de quien firma en ' + quien, true)
+            + renglon('Ocupación:', 'occ_' + f.k, q.ocupacion, '(cargo)', 'Ocupación de quien firma en ' + quien, true)
+          // De la lista: el cargo es el dictado y se lee como texto del formato.
+          : texto('Ocupación:', esc(q.ocupacion)))
         + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
         +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
         + renglon('Fecha:', 'fec_' + f.k, P['fec_' + f.k] || '', 'dd/mm/aaaa', 'Fecha de la firma en ' + quien)
