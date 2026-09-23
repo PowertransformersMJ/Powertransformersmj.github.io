@@ -11,7 +11,8 @@
 // Qué se escribe (y nada más):
 //   · Hoja 1 «Ficha Técnica» → 17 celdas (proyecto, ubicación, alcance,
 //     beneficios y la línea de inversión: presupuesto CREG, Valor Real y
-//     Sistema).
+//     Sistema) y, solo cuando su línea está pendiente, los dos totales del
+//     proyecto (I78/J78), que entonces dicen [PENDIENTE] en vez de «0».
 //   · Hoja 5 «Anexo AT»       → la fila 11 con los datos de placa del equipo.
 //   · Hoja 3 «Diagrama Actual» y hoja 4 «Diagrama Futuro» → sus dos unifilares,
 //     que son INDEPENDIENTES: cada hoja recibe el suyo (image5 = Actual,
@@ -31,7 +32,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { buscarUC, clasificarUC, montoCOP } from '../../domain/fichas_creg_uc.js';
-import { desgloseCreg } from '../../domain/fichas_presupuesto.js';
+import { desgloseCreg, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -226,10 +227,20 @@ export function descripcionUC(equipo = {}, codigo) {
  * Es una función PURA: el mismo mapa alimenta el exportador y la vista previa
  * que se le muestra al usuario antes de descargar.
  *
- * Cada entrada: { cell, campo, val, numeric?, formula?, clear?, pend?, vista? }
+ * Cada entrada: { cell, campo, val, numeric?, formula?, clear?, pend?, motivo?,
+ *                 plantilla?, derivada?, vista? }
  *   · `clear`   ⇒ la celda se deja en blanco (el dato no existe todavía).
- *   · `pend`    ⇒ falta un dato que nadie puede deducir; se marca [PENDIENTE].
+ *   · `pend`    ⇒ falta un dato que nadie puede deducir; se marca [PENDIENTE]
+ *                 y `motivo` dice qué falta (lo lee {@link pendientesFichaPlan}).
  *   · `formula` ⇒ se escribe una fórmula de Excel, no un valor.
+ *   · `plantilla` ⇒ la celda NO se toca: manda la fórmula del formato oficial.
+ *   · `derivada`  ⇒ total que hereda el pendiente de su línea (no se lista aparte).
+ *
+ * Dinero (CF-06): una casilla de plata sin dato NO sale en blanco ni en 0 —
+ * dice [PENDIENTE], como ya lo decía la pantalla. Y su total tampoco: la
+ * plantilla suma con SUM(), que trata el texto como cero y firmaría «0» en el
+ * TOTAL DEL PROYECTO; por eso, solo mientras la línea esté pendiente, el total
+ * se reemplaza por [PENDIENTE] (con dato, vuelve a mandar la fórmula oficial).
  *
  * @param {object} equipo  registro del transformador
  * @param {object} estado  { plan, municipio, uuccDecidida }
@@ -255,40 +266,76 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
   // Con `parseFloat` «2.100.000.000» se firmaría como 2,1 pesos.
   const real = montoCOP(plan.presu_real);
 
+  const sinInstalacion = presu.costoInstalacion == null;
+
   return [
-    { cell: 'D8',  campo: 'Proyecto',   val: (plan.proyecto || '[PENDIENTE: NOMBRE DEL PROYECTO]'), pend: !lleno(plan.proyecto) },
+    // `lleno` también decide el valor, no solo la marca: un campo con puros
+    // espacios se escribía en blanco y a la vez se contaba como pendiente.
+    { cell: 'D8',  campo: 'Proyecto',   val: (lleno(plan.proyecto) ? plan.proyecto : '[PENDIENTE: NOMBRE DEL PROYECTO]'), pend: !lleno(plan.proyecto),
+      motivo: 'Falta el nombre del proyecto.' },
     { cell: 'H8',  campo: 'Consecutivo', val: txt(plan.consecutivo), clear: !lleno(plan.consecutivo), pend: false },
     { cell: 'D9',  campo: 'Cód estudio/tarea', val: txt(plan.codestudio), clear: !lleno(plan.codestudio), pend: false },
     { cell: 'H9',  campo: 'Ámbito', val: 'Media Tensión / Alta Tensión', pend: false },
     { cell: 'D13', campo: 'Zona', val: txt(equipo.departamento), pend: false },
     { cell: 'H13', campo: 'Subestación', val: txt(equipo.subestacion), pend: false },
-    { cell: 'D14', campo: 'Municipio', val: (lleno(municipio) ? municipio : '[PENDIENTE: MUNICIPIO]'), pend: !lleno(municipio) },
-    { cell: 'B17', campo: 'Alcance', val: (plan.alcance || '[PENDIENTE: ALCANCE — texto del proyecto]'), pend: !lleno(plan.alcance) },
-    { cell: 'B23', campo: 'Beneficios', val: (plan.beneficios || '[PENDIENTE: BENEFICIOS — texto del proyecto]'), pend: !lleno(plan.beneficios) },
+    { cell: 'D14', campo: 'Municipio', val: (lleno(municipio) ? municipio : '[PENDIENTE: MUNICIPIO]'), pend: !lleno(municipio),
+      motivo: 'Falta el municipio.' },
+    { cell: 'B17', campo: 'Alcance', val: (lleno(plan.alcance) ? plan.alcance : '[PENDIENTE: ALCANCE — texto del proyecto]'), pend: !lleno(plan.alcance),
+      motivo: 'Falta el texto del alcance.' },
+    { cell: 'B23', campo: 'Beneficios', val: (lleno(plan.beneficios) ? plan.beneficios : '[PENDIENTE: BENEFICIOS — texto del proyecto]'), pend: !lleno(plan.beneficios),
+      motivo: 'Falta el texto de los beneficios.' },
     { cell: 'B36', campo: 'Inversión · Subestación', val: txt(equipo.subestacion), pend: false },
     { cell: 'C36', campo: 'Inversión · UUCC', val: txt(U), pend: false },
     { cell: 'D36', campo: 'Inversión · Descripción', val: desc, pend: false },
     // OJO: «Valor CREG Unitario» (F36) NO es el $/MVA — es el COSTO DE
     // INSTALACIÓN de la UC. El $/MVA es el que multiplica a la potencia.
-    { cell: 'F36', campo: 'Valor CREG Unitario', numeric: true,
-      val: presu.costoInstalacion, clear: presu.costoInstalacion == null, pend: false,
+    { cell: 'F36', campo: 'Valor CREG Unitario', numeric: !sinInstalacion,
+      val: (sinInstalacion ? TEXTO_PENDIENTE : presu.costoInstalacion), pend: sinInstalacion,
+      motivo: (sinInstalacion ? presu.motivoTexto : null),
       vista: presu.costoInstalacion },
     { cell: 'H36', campo: 'Cantidad', val: presu.cantidad, numeric: true, pend: false },
     // I36 se escribe como FÓRMULA viva para que el revisor vea de dónde sale.
     { cell: 'I36', campo: 'Valor CREG Total',
       formula: (okTotal ? ('F36+(' + presu.mva + '*' + presu.valorUnitarioMVA + ')') : null),
-      clear: !okTotal, pend: !okTotal,
-      val: presu.total,
+      pend: !okTotal, motivo: (okTotal ? null : presu.motivoTexto),
+      val: (okTotal ? presu.total : TEXTO_PENDIENTE),
       vista: presu.formula },
     // J36 y K36 los teclea el Ingeniero en la ficha. La plantilla ya trae J36
     // con formato de pesos y J78 = SUM(J34:J66): al escribir J36 el «TOTAL DEL
-    // PROYECTO» real se llena solo. Vacíos ⇒ la casilla queda en blanco, como
-    // en la pantalla (CF-05).
-    { cell: 'J36', campo: 'Valor Real Total', numeric: true,
-      val: real, clear: real == null, pend: false, vista: real },
+    // PROYECTO» real se llena solo (CF-05). Sin Valor Real, [PENDIENTE] (CF-06).
+    // «Sistema» no es dinero: vacío ⇒ en blanco, como en la pantalla.
+    { cell: 'J36', campo: 'Valor Real Total', numeric: real != null,
+      val: (real != null ? real : TEXTO_PENDIENTE), pend: real == null,
+      motivo: (real == null ? 'No se ha tecleado el Valor Real Total.' : null), vista: real },
     { cell: 'K36', campo: 'Sistema', val: txt(plan.presu_sistema).trim(),
-      clear: !lleno(plan.presu_sistema), pend: false }
+      clear: !lleno(plan.presu_sistema), pend: false },
+    // TOTAL DEL PROYECTO: con dato manda la fórmula SUM de la plantilla; con la
+    // línea pendiente, [PENDIENTE] — nunca el «0» que SUM daría sobre el texto.
+    { cell: 'I78', campo: 'Total del proyecto · CREG', derivada: true,
+      plantilla: okTotal, pend: !okTotal, val: TEXTO_PENDIENTE },
+    { cell: 'J78', campo: 'Total del proyecto · Real', derivada: true,
+      plantilla: real != null, pend: real == null, val: TEXTO_PENDIENTE }
   ];
+}
+
+/**
+ * Lo que el Excel va a llevar marcado [PENDIENTE], para decírselo al usuario
+ * ANTES de descargar (CF-06). Una línea por motivo: si el Valor CREG Unitario
+ * y el Total faltan por la misma causa, se dice una sola vez. Los totales no se
+ * listan aparte: heredan el pendiente de su línea.
+ *
+ * @returns {Array<{campos: string[], motivo: string}>}  vacío si no falta nada
+ */
+export function pendientesFichaPlan(equipo = {}, estado = {}) {
+  const porMotivo = new Map();
+  celdasFichaPlan(equipo, estado)
+    .filter((m) => m.pend && !m.derivada)
+    .forEach((m) => {
+      const motivo = m.motivo || ('Falta ' + m.campo + '.');
+      if (!porMotivo.has(motivo)) porMotivo.set(motivo, []);
+      porMotivo.get(motivo).push(m.campo);
+    });
+  return [...porMotivo].map(([motivo, campos]) => ({ campos, motivo }));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -500,6 +547,7 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
   // 3) Hoja 1 «Ficha Técnica» — solo las celdas del mapa.
   let s1 = await zip.file(HOJA_FICHA).async('string');
   celdasFichaPlan(equipo, estado).forEach((m) => {
+    if (m.plantilla) return;                      // manda la fórmula del formato
     if (m.formula) s1 = escribirFormula(s1, m.cell, m.formula);
     else s1 = escribirCelda(s1, m.cell, (m.clear ? '' : m.val), !!m.numeric, null);
   });

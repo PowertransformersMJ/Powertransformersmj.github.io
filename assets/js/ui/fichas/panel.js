@@ -2817,6 +2817,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     };
   }
 
+  /** Texto del aviso previo a la descarga: una línea por motivo (CF-06). */
+  function avisoPendientes(faltan) {
+    const n = faltan.reduce((s, f) => s + f.campos.length, 0);
+    return 'El Excel va a salir con ' + n + (n === 1 ? ' casilla marcada' : ' casillas marcadas')
+      + ' [PENDIENTE]:\n\n'
+      + faltan.map((f) => '• ' + f.campos.join(' y ') + ': ' + f.motivo).join('\n')
+      + '\n\nPulse Aceptar para descargarlo así, o Cancelar para volver y completarlo.';
+  }
+
   async function exportarExcel() {
     if (!actual) return;
     const btn = $('[data-ftm="exportar"]');
@@ -2827,7 +2836,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const mod = cfg.exportador
         ? { exportarFichaPlanificacion: cfg.exportador, nombreArchivoFicha: null }
         : await import('./exportar-planificacion.js');
-      const blob = await mod.exportarFichaPlanificacion(actual, estadoParaExportar(actual));
+      const estado = estadoParaExportar(actual);
+      // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo
+      // se pregunta si falta algo: preguntar por costumbre enseña a decir que sí
+      // sin leer.
+      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(actual, estado) : [];
+      if (faltan.length && !globalThis.confirm(avisoPendientes(faltan))) return;
+      const blob = await mod.exportarFichaPlanificacion(actual, estado);
       const nombre = mod.nombreArchivoFicha
         ? mod.nombreArchivoFicha(actual)
         : 'Ficha_Planificacion.xlsx';
