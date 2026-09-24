@@ -45,11 +45,13 @@ import {
 import { atraparFoco } from '../foco-modal.js';
 import {
   construirFichaTecnica, colorCondicion, nombreCondicion, nucleoFicha,
-  clasificarAccion, definicionCondicion
+  clasificarAccion, CATEGORIAS_ACCION, definicionCondicion
 } from './ficha-tecnica.js';
 import {
-  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion
+  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion,
+  macroactividadesCatalogo
 } from '../../domain/fichas_acciones.js';
+import { redaccionBeneficiosPracticas } from '../../domain/beneficios_practicas.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
   claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas,
@@ -304,7 +306,12 @@ export const BENEF_MTTO_OPC = Object.freeze([
   { t: 'C3 · Recuperar y mitigar', cond: 3, v: '· Recuperación medible: la condición del aceite, la hermeticidad, el cambiador de tomas, los accesorios y la capacidad de disipación mejoran de forma verificable con los ensayos de cierre.\n· Límite declarado: se informa por separado lo que la intervención restituye y lo que solo contiene, de modo que no se promete recuperar la vida del aislamiento ni la edad del activo.\n· Progresión frenada: actuar en esta banda evita el correctivo mayor de la siguiente, que exige apertura de la parte activa e indisponibilidad prolongada.\n· Riesgo ambiental cerrado: la corrección de fugas retira el escenario de derrame y el ingreso de humedad y oxígeno que acelera el envejecimiento del aislamiento.\n· Disponibilidad de la unidad de {MVA} MVA de {SUB}: menor probabilidad de salida intempestiva y de energía no suministrada.\n· Trazabilidad para decidir: los ensayos actualizan la condición medida del activo y sustentan la próxima decisión de conservar o reponer.' },
   { t: 'C4 · Intervenir y reducir exposición', cond: 4, v: '· Probabilidad contenida: la intervención actúa sobre el modo de degradación identificado, con ensayos eléctricos de verificación que comprueban el resultado antes y después.\n· Consecuencia reducida: el respaldo asegurado, la carga redistribuida y la eventual reubicación del activo bajan el impacto de una falla aunque el estado del equipo no cambie.\n· Margen de operación recuperado: la mitigación por cargabilidad devuelve capacidad para maniobra y contingencia en {SUB}.\n· Falla catastrófica evitada: se retiran las condiciones que derivan en falla violenta, con proyección de aceite, incendio y daño a equipos adyacentes y al personal.\n· Afectación acotada: menor exposición a energía no suministrada, a compensaciones regulatorias y a lucro cesante por indisponibilidad prolongada.\n· Decisión soportada: el costo y el resultado verificado de la intervención sobre la unidad de {MVA} MVA quedan documentados como insumo de la decisión siguiente, que se sustenta en la propuesta a Plan de Inversión.' },
   { t: 'C5 · Sostener hasta la salida', cond: 5, v: '· Riesgo contenido hasta la salida: las medidas de sostenimiento acotan la probabilidad de una falla violenta y de una indisponibilidad prolongada mientras el activo sigue en servicio.\n· Vida útil reiniciada: el activo entrante inicia la curva de vida de su aislamiento y devuelve al nodo margen de operación y de sobrecarga de emergencia.\n· Continuidad asegurada: la transición se ejecuta con respaldo y ventana coordinada, y no como atención de emergencia después de una falla.\n· Expediente listo para decidir: la condición medida de la unidad de {SUB} queda consolidada y trazable, que es lo que la propuesta a Plan de Inversión necesita para sustentarse.\n· Cierre ambiental cumplido: la disposición final del aceite y de los residuos del equipo retirado queda certificada y trazable.\n· Exposición económica y reputacional acotada: evita el lucro cesante, las compensaciones y el deterioro de imagen que acarrea una falla previsible no atendida.' },
-  { t: 'Automática · anclada en datos medidos', auto: 'beneficios_mtto' }
+  { t: 'Automática · anclada en datos medidos', auto: 'beneficios_mtto' },
+  // Pedido del Ingeniero (2026-09-23, `99 §92`): los beneficios se PROPONEN con
+  // las prácticas que escoja en esta hoja. Al FINAL del arreglo por la misma
+  // razón que la del alcance (`§85.3`): el borrador guarda la versión por su
+  // índice. El desplegable la pinta primera por `principal`.
+  { t: 'Beneficios de las prácticas escogidas', principal: true, auto: 'beneficios_practicas' }
 ]);
 
 /** Qué catálogo de redacciones corresponde a cada campo del estado. */
@@ -798,7 +805,8 @@ function textoVersion(campo, indice, equipo, st) {
       alcance: redaccionAlcance,
       beneficios: redaccionBeneficios,
       alcance_mtto: redaccionAlcanceMtto,
-      beneficios_mtto: redaccionBeneficiosMtto
+      beneficios_mtto: redaccionBeneficiosMtto,
+      beneficios_practicas: redaccionBeneficiosPracticas
     };
     const fn = AUTO[o.auto];
     // La automática del alcance de mantenimiento ARGUMENTA lo escogido, así que
@@ -1969,14 +1977,16 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    * Ingeniero escribió, ni lo que devolvió el borrador de `§83`.
    */
   function sembrarRedaccionPrincipal(e) {
-    const campo = campoRed('alcance');
-    const opts = opcionesRedaccion(campo);
-    const i = opts.findIndex((o) => o.principal);
-    if (i < 0) return;
-    const st = estadoDe(e);
-    if (st.plan[campo + '_ver'] != null || lleno(st.plan[campo])) return;
-    st.plan[campo + '_ver'] = i;
-    st.plan[campo] = textoVersion(campo, i, e, st);
+    // Alcance (`§85`) y, en Mantenimiento, Beneficios de las prácticas (`§92`).
+    [campoRed('alcance'), campoRed('beneficios')].forEach((campo) => {
+      const opts = opcionesRedaccion(campo);
+      const i = opts.findIndex((o) => o.principal);
+      if (i < 0) return;
+      const st = estadoDe(e);
+      if (st.plan[campo + '_ver'] != null || lleno(st.plan[campo])) return;
+      st.plan[campo + '_ver'] = i;
+      st.plan[campo] = textoVersion(campo, i, e, st);
+    });
   }
 
   function cerrarFicha() {
@@ -2298,6 +2308,156 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const campoRed = (base) => (documento === 'salud' ? base + '_mtto' : base);
 
 
+  /**
+   * Selector de MACROACTIVIDADES y ACCIONES de mantenimiento. Vive en la hoja de
+   * BENEFICIOS del documento de Mantenimiento (orden del Ingeniero, 2026-09-23,
+   * `99 §92`; antes estaba en el Alcance, `§90`): el Ingeniero marca qué
+   * prácticas se ejecutan y con eso se proponen los beneficios.
+   *
+   * Se distingue de dónde sale cada renglón, porque no valen lo mismo: lo que el
+   * equipo tiene REGISTRADO en Salud de Activos, la LÍNEA BASE de su condición
+   * cuando no tiene nada registrado (y entonces se rotula como referencial), y
+   * el CATÁLOGO oficial de la banda, que se ofrece sin marcar para añadir.
+   */
+  function selectorAcciones(e) {
+    const st = estadoDe(e);
+    const ci = nucleoFicha(e || {}).ci;
+    const todas = accionesDeEquipo(e, { todasLasCondiciones: true });
+    // Orden del Ingeniero (2026-09-09): «todo lo referente a inversión queda en
+    // PI». Aquí no se ofrecen, pero tampoco se borran de la vista: si el plan
+    // del equipo trae una, se dice cuál es y dónde se sustenta. Ocultarla sin
+    // más sería perder de la pantalla un renglón del plan de récord (L-81).
+    const disp = todas.filter((a) => !esInversion(a.txt));
+    const fueraPorInversion = todas.filter((a) => esInversion(a.txt));
+    // El aviso es por NO TENER CONDICIÓN, no por lista vacía: en modo catálogo
+    // la lista nunca está vacía (siempre trae las 7 macroactividades), así que
+    // colgarlo de `disp.length` lo dejaba muerto y le enseñaba a un equipo sin
+    // condición un catálogo entero sin decirle que ninguna banda es la suya.
+    if (ci == null || (!disp.length && !fueraPorInversion.length)) {
+      return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
+        + 'registrada, así que no hay una banda suya que proponer. Los beneficios se redactan a '
+        + 'mano o se toma otra de las redacciones.</div>';
+    }
+    const marcados = new Set(seleccionAcciones(e, st, campoRed('beneficios')).map((a) => a.id));
+    const propias = disp.filter((a) => a.origen !== 'catalogo');
+    const hayRegistro = propias.some((a) => a.origen === 'registro');
+    const esBase = propias.some((a) => a.origen === 'base');
+
+    const fila = (a) => {
+      const C = CATEGORIAS_ACCION[a.cat] || CATEGORIAS_ACCION.DIAG;
+      // El gris es de «se ofrece, no está en el alcance». Un renglón MARCADO
+      // no es opcional aunque venga del catálogo: no puede salir en gris.
+      const marcada = marcados.has(a.id);
+      return '<label class="ftm-acc-item' + (a.origen === 'catalogo' && !marcada ? ' es-extra' : '') + '">'
+        + '<input type="checkbox" data-accion="' + esc(a.id) + '"' + (marcada ? ' checked' : '') + '>'
+        + '<span class="ftm-acc-cat" style="background:' + C.c + '" title="' + esc(C.lbl) + '"></span>'
+        + '<span class="ftm-acc-txt">' + esc(a.txt) + '</span>'
+        + '</label>';
+    };
+
+    // Encargo del Ingeniero (2026-09-10): «que aparezcan TODAS las
+    // macroactividades por condición». El catálogo entero, agrupado como lo
+    // agrupa la norma; la banda del equipo va abierta y señalada, el resto
+    // plegado para que no tape la pantalla. Se pliega con <details>, que es
+    // nativo: sin JS, sin listener global y accesible por teclado (§3.5).
+    // Ids de la banda del equipo: sirven para saber si una marca en un grupo
+    // ajeno es una REPETICIÓN real de la norma (solo pasa con 2 de las 34
+    // subactividades, entre C1 y C2) o algo que el Ingeniero marcó a mano.
+    const idsSuBanda = new Set(
+      disp.filter((a) => a.cond === ci && !a.esMitigacion).map((a) => a.id));
+
+    const grupoMacro = (m) => {
+      const suyas = disp.filter((a) => a.macro === m.codigo);
+      const fuera = fueraPorInversion.filter((a) => a.macro === m.codigo);
+      if (!suyas.length && !fuera.length) return '';
+      const esSuya = ci != null && m.condicion === ci;
+      const esSuBanda = esSuya && !m.esMitigacion;
+      const marcadasAqui = suyas.filter((a) => marcados.has(a.id));
+      const nMarcadas = marcadasAqui.length;
+      const nRepetidas = marcadasAqui.filter((a) => idsSuBanda.has(a.id)).length;
+      const nAjenas = nMarcadas - nRepetidas;
+      return '<details class="ftm-acc-macro' + (esSuya ? ' es-suya' : '') + '"'
+        + (esSuya ? ' open' : '')
+        // «Marcar las suyas» NO debe barrer la mitigación: depende de la causa,
+        // no de la banda. El grupo se abre y se señala, pero queda fuera del
+        // ámbito del botón.
+        + (esSuBanda ? ' data-acc-ambito="propio"' : '') + '>'
+        + '<summary class="ftm-acc-macro-cab">'
+        +   '<span class="ftm-acc-macro-nom">' + esc(m.nombre) + '</span>'
+        +   '<span class="ftm-acc-macro-cond">Condición ' + m.condicion + '</span>'
+        +   (esSuya ? '<span class="ftm-acc-macro-yo">este equipo</span>' : '')
+        // El rótulo «referencial» tiene que vivir DONDE está la marca: si no,
+        // un bloque marcado y abierto se lee como plan aprobado, que es
+        // exactamente la confusión que ADR-066 prohíbe.
+        +   (esSuBanda && esBase
+          ? '<span class="ftm-acc-macro-ref-lbl">línea base · referencial</span>' : '')
+        +   '<span class="ftm-acc-macro-n">' + (nMarcadas ? nMarcadas + ' de ' : '')
+        +     suyas.length + '</span>'
+        +   '<span class="ftm-acc-macro-ref">' + esc(m.referencia) + '</span>'
+        + '</summary>'
+        + suyas.map(fila).join('')
+        + (!esSuya && nRepetidas
+          ? '<p class="ftm-acc-macro-nota">' + (nRepetidas === 1 ? 'Una actividad' : nRepetidas + ' actividades')
+            + ' de este grupo aparece' + (nRepetidas === 1 ? '' : 'n')
+            + ' marcada' + (nRepetidas === 1 ? '' : 's') + ' porque la norma '
+            + (nRepetidas === 1 ? 'la' : 'las') + ' repite en la banda del equipo: es la misma '
+            + 'acción, no una segunda.</p>'
+          : '')
+        + (!esSuya && nAjenas
+          ? '<p class="ftm-acc-macro-nota">' + (nAjenas === 1 ? 'Una actividad' : nAjenas + ' actividades')
+            + ' de otra banda que usted añadió.</p>'
+          : '')
+        + (fuera.length
+          ? '<p class="ftm-acc-macro-inv">Fuera de este documento por ser inversión: '
+            + fuera.map((a) => esc(a.txt)).join(', ') + '.</p>'
+          : '')
+        + '</details>';
+    };
+
+    // El plan de récord del equipo NO es catálogo y va aparte: confundirlos
+    // sería presentar como aprobado algo que nadie aprobó (ADR-066).
+    const fueraDelPlan = fueraPorInversion.filter((a) => a.origen !== 'catalogo');
+
+    // Desde que la línea base sale del catálogo oficial (2026-09-10) ya no hace
+    // falta un grupo «línea base» aparte: es LITERALMENTE la banda del equipo,
+    // que abajo aparece abierta, rotulada «este equipo» y marcada. Repetirla
+    // arriba sería enseñar dos veces lo mismo. Solo se pinta arriba lo que NO
+    // está en ningún grupo del catálogo —el plan registrado, y por defensa
+    // cualquier renglón base sin pareja—, para que nada quede seleccionado y
+    // fuera de la vista.
+    const enCatalogo = new Set(disp.filter((a) => a.origen === 'catalogo').map((a) => a.id));
+    const arriba = propias.filter((a) => a.origen === 'registro' || !enCatalogo.has(a.id));
+
+    return '<div class="ftm-acc">'
+      + '<div class="ftm-acc-head">Macroactividades y acciones de mantenimiento'
+      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar las suyas</button>'
+      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="0">Ninguna</button>'
+      + '</div>'
+      + (arriba.length
+        ? '<div class="ftm-acc-grupo" data-acc-ambito="propio"><span class="ftm-acc-rot">'
+          + (hayRegistro ? 'Plan registrado del equipo' : 'Línea base de la condición · referencial')
+          + '</span>' + arriba.map(fila).join('') + '</div>'
+        : '')
+      + '<div class="ftm-acc-catalogo">'
+      +   '<span class="ftm-acc-rot">Catálogo MO.00418 §4.3 · todas las macroactividades</span>'
+      +   macroactividadesCatalogo().map(grupoMacro).join('')
+      + '</div>'
+      + (fueraDelPlan.length
+        ? '<p class="ftm-acc-aviso">Fuera de este documento por ser <b>inversión</b>: '
+          + fueraDelPlan.map((a) => esc(a.txt)).join(', ')
+          + '. La inversión se sustenta en la <b>Propuesta a Plan de Inversión (PI)</b>, que es el '
+          + 'otro documento que se emite desde este equipo.</p>'
+        : '')
+      + '<p class="ftm-acc-pie">' + (esBase
+        ? 'El equipo no trae macroactividad registrada. Su banda queda abierta y rotulada '
+          + '<b>referencial</b>: de ella se marca solo lo de diagnóstico y verificación, porque la '
+          + 'norma lista por banda lo que PUEDE aplicar, no lo que este equipo necesita. Lo '
+          + 'intrusivo se ofrece sin marcar y se escoge contra el hallazgo. '
+        : '') + 'Con lo que marque se proponen los beneficios de abajo, venga de la banda que venga; '
+      + 'si no marca nada, el texto le pide escogerlas.</p>'
+      + '</div>';
+  }
+
   /** Selector de redacción + área de texto (alcance / beneficios). */
   function selectorRedaccion(e, campo) {
     const st = estadoDe(e);
@@ -2348,7 +2508,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         : '');
     const nProp = conIndice.filter((x) => x.o.cond === rec).length;
     const hayPrincipal = opts.some((o) => o.principal);
-    const pista = hayPrincipal
+    const principalPracticas = opts.some((o) => o.principal && o.auto === 'beneficios_practicas');
+    const pista = principalPracticas
+      ? 'La primera se compone con las prácticas que marque arriba y se rehace cada vez que cambie la '
+        + 'selección. Puede editarla libremente (desde ese momento ya no se rehace) o elegir otra de la lista.'
+      : hayPrincipal
       ? 'La primera es la redacción del formato: se escribe sola con la matrícula y la potencia del '
         + 'equipo, y es la que aparece al abrir la ficha. Puede editarla libremente o elegir otra de '
         + 'la lista.'
@@ -2606,13 +2770,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function hojaBeneficios(e) {
     const campo = campoRed('beneficios');
     const nota = documento === 'salud'
-      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. No se prometen los de un '
-        + 'equipo nuevo: la redacción automática distingue lo que el mantenimiento recupera de lo que '
-        + 'no revierte.'
+      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. Escoja las macroactividades y '
+        + 'acciones de mantenimiento: la primera redacción propone los beneficios que gana el activo con '
+        + 'esas prácticas, frente al riesgo de falla catastrófica. No se prometen los de un equipo nuevo.'
       : 'Texto de los <b>beneficios</b> del proyecto. Se escribe en la hoja 1 del formato oficial '
         + '(celda B23) al exportar. La hoja «Beneficios» del libro conserva su estudio económico y sus '
         + 'fórmulas: este módulo no la reescribe.';
     return '<div class="ftm-nota-anexo">' + nota + '</div>'
+      + (documento === 'salud' ? selectorAcciones(e) : '')
       + selectorRedaccion(e, campo)
       + '<div class="ftm-hoja">'
       + cabeceraHoja(documento === 'salud'
@@ -2759,6 +2924,29 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
   }
 
+  /**
+   * Guarda la selección de prácticas y rehace las redacciones que dependen de
+   * ella: los Beneficios de las prácticas (`§92`) y, si se eligió una redacción
+   * vieja del alcance con «{acciones}», también esa. Solo si la versión es un
+   * índice: lo escrito a mano («custom») no se pisa.
+   */
+  function fijarAcciones(ids) {
+    const st = estadoDe(actual);
+    st.plan.acc_sel = ids;
+    tocarFicha(actual);
+    marcarSucio();
+    if (documento !== 'salud') return;
+    [campoRed('beneficios'), campoRed('alcance')].forEach((campo) => {
+      const ver = st.plan[campo + '_ver'];
+      if (ver == null || ver === 'custom') return;
+      st.plan[campo] = textoVersion(campo, +ver, actual, st);
+      const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
+      if (ta) ta.value = st.plan[campo];
+      const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
+      if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+    });
+  }
+
   /** Al cambiar la potencia, las redacciones NO personalizadas se rehacen. */
   function reescribirRedacciones() {
     if (!actual) return;
@@ -2870,6 +3058,25 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
     if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
     if (ev.target.closest('[data-ftm="borr-descartar"]')) { descartarBorrador(); return; }
+
+    // Marcar las suyas / ninguna las prácticas de Beneficios (`§92`)
+    const acct = ev.target.closest('[data-acc-todo]');
+    if (acct && contenedor.contains(acct) && actual) {
+      const todas = acct.getAttribute('data-acc-todo') === '1';
+      // «Marcar las suyas» = las de SU condición y su plan, no las de toda la
+      // norma: marcar el catálogo completo metería prácticas de bandas que no
+      // le corresponden.
+      const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
+      const propias = [...modalCuerpo.querySelectorAll('[data-acc-ambito="propio"] [data-accion]')];
+      if (todas) {
+        propias.forEach((c) => { c.checked = true; });
+        fijarAcciones([...new Set(propias.map((c) => c.getAttribute('data-accion')))]);
+      } else {
+        cajas.forEach((c) => { c.checked = false; });
+        fijarAcciones([]);
+      }
+      return;
+    }
 
     // Gestión de novedades
     const gest = ev.target.closest('[data-gestionar]');
@@ -3061,6 +3268,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
       tocarFicha(actual);
       }
+    const accId = t.getAttribute && t.getAttribute('data-accion');
+    if (accId && actual) {
+      // La norma repite dos subactividades en C1 y C2 («Pruebas eléctricas»,
+      // «Inspección ocular detallada»): son la MISMA acción, así que sus dos
+      // casillas se mueven juntas.
+      modalCuerpo.querySelectorAll('[data-accion="' + accId + '"]')
+        .forEach((c) => { c.checked = t.checked; });
+      const marcados = [...new Set([...modalCuerpo.querySelectorAll('[data-accion]')]
+        .filter((c) => c.checked).map((c) => c.getAttribute('data-accion')))];
+      fijarAcciones(marcados);
+    }
     if (t.getAttribute && t.getAttribute('data-anexo') && actual) {
       estadoDe(actual).anexo[t.getAttribute('data-anexo')] = t.value;
       tocarFicha(actual);
