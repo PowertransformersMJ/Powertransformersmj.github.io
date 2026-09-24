@@ -3850,6 +3850,7 @@ imprime siempre «dd/mm/aaaa»; un texto viejo, tal cual). Al imprimir: sin icon
 queda «15/12/2026» y sobrevive a reabrir; el acta de novedades también lo abre; captura de pantalla e impresión.
 Commit `729e74e`, publicado en `845df6e` (CI y Deploy verdes, archivos idénticos en producción). «Año de
 entrada» es un año, no una fecha: **sigue escrito a mano por decisión del Ingeniero** (*«año está bien»*).
+**Enmienda 09-24 → `§94`**: el Ingeniero pidió también para el año un calendario, «solo años, desde 2020».
 
 ## 92. ADR — Beneficios propuestos con las prácticas de mantenimiento escogidas ⟦OPUS-5.5⟧ (2026-09-23)
 
@@ -3916,3 +3917,45 @@ INTACTOS: `panel.js` (su aviso solo sale si la lista trae algo), `fichas_presupu
 **93.8 Verificado sano / no re-auditar.** Una celda con texto vacío en J36 NO rompe el total: `COUNT` solo cuenta
 números. CF-37 (vínculo de «Costos» en la hoja Beneficios): si se conecta a J78, protegerlo también para el
 blanco, no solo para `[PENDIENTE]`.
+
+## 94. ADR — El «Año de entrada» se escoge en un calendario de años desde 2020 ⟦OPUS-5.5⟧ (2026-09-24)
+
+> Pedido (con captura de la casilla): *«me gustaría que aquí también aparezca un calendario pero solo años,
+> desde 2020»*. Revierte lo decidido en `§91` («año está bien»: quedaba a mano). En rama (`134c06e` +
+> `84213af`), preview entregado, esperando su «procede».
+
+**94.1 Causa.** El navegador no trae un calendario «solo años» (`type=month` pide mes; un `<select>` es una lista,
+no un calendario). La casilla de fecha de `§91` usa el calendario nativo; para el año hay que construirlo.
+
+**94.2 Solución.** `domain/fichas_fechas.js`: `ANIO_MIN = 2020`, `leerAnio` (4 cifras ≥ 2020; lo demás NO se
+convierte) y `aniosDelCalendario(añoActual, guardado)` (2020 → año en curso + 10, o el guardado si es posterior,
+completando filas de 4; hoy 2020-2039). `panel.js`: `campoAnio` se ve como la casilla de fecha (año + iconito) con
+un botón transparente encima; `abrirAnios` pinta la rejilla con «Borrar» y «Este año», foco en el elegido (o el
+año en curso); flechas/Inicio/Fin; Esc cierra SOLO el calendario (escucha en `window` en captura, que llega antes
+que la trampa del modal en `document`); toque fuera o Tab fuera lo cierra; sus escuchas globales viven solo
+mientras está abierto (§3.5) y `cerrarFicha`/`pintarModal`/`destruir` lo cierran. Se guarda «aaaa» en la misma
+clave: el exportador no cambia. Un texto viejo que no es año del calendario se ve marcado y no se borra.
+
+**94.3 No-regresión.** Nadie más leía `input[data-plan="anioentrada"]` (búsqueda en todo el repo; enfoque
+«contratos» sin hallazgos). La casilla de fecha de `§91` y los firmantes, intactos. Exportador sin cambio.
+
+**94.4 Verificación.** +5 pruebas de dominio → **1842 pass / 0 fail / 2 skip**; lint limpio. Banco en vivo: ratón,
+teclado, Esc (solo el calendario; con él cerrado, Esc cierra la ficha), toque fuera, «Borrar», cerrar/reabrir,
+recargar + restaurar, texto viejo, Excel exportado con el año (`drawing1.xml` y PDF), celular 375×812, pantalla
+baja 812×375, doble clic real, y PDF impreso con valores viejos. Revisión adversarial de 7 agentes Opus: 3
+confirmados y corregidos en `84213af` (doble clic que elegía un año fantasma, pantalla baja, subrayado rojo
+impreso). Crudo → bóveda `2026-09-24-calendario-anios/`.
+
+**94.5 Anti-patterns evitados.** Ninguna escucha global permanente; nada de `transition`; no se borra en silencio
+lo escrito antes; no se reemplazó la casilla de fecha que ya funcionaba.
+
+**94.6 Archivos.** `assets/js/domain/fichas_fechas.js`, `tests/fichas_fechas.test.js`,
+`assets/js/ui/fichas/panel.js`, `assets/css/fichas-tecnicas.css`. INTACTOS: `exportar-planificacion.js`,
+`fichas_borrador.js`.
+
+**94.7 Doctrina.** Lo dictado va literal (desde 2020); UI sensible con preview fiel (L-56); caza-bugs: el gesto real.
+
+**94.8 Verificado sano / no re-auditar.** «Borrar» deja el año viejo en el borrador en disco: es la regla 1 de
+`§83.2`; borrar del disco la ficha vaciada abriría una pérdida real (REFUTADO). El calendario abierto con el foco
+en el cuerpo no cambia datos. El corrimiento lateral de 20 px en el celular era de la hoja, no del calendario.
+Callejón: `scrollIntoView` para mostrar un desplegable mueve el contenido bajo el puntero (L-101).
