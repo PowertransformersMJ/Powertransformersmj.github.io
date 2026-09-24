@@ -3878,5 +3878,6 @@ Leído completo antes de montarlo. Crudo → bóveda `2026-09-23-beneficios-prac
 a la regla de `§85` → **1836 pass / 0 fail / 2 skip**, lint limpio. Banco: el selector sale en Beneficios y no en
 el Alcance; marcar tres prácticas arma el texto agrupado; sobrevive a reabrir. Commit `167f252`.
 
-**92.4 Abierto.** Su aprobación del texto (o cambios por práctica), la apertura, y que aplique solo al documento
-de Mantenimiento (el PI no cambia). Residuo de `§90.3` se invierte: `acc_sel` vuelve a tener pantalla.
+**92.4 Publicación.** Orden del Ingeniero: *«procede por favor cárgalo en producción»*. Merge `b91b36a`; CI y Deploy
+verdes; `beneficios_practicas.js` y `panel.js` servidos idénticos al repo con anti-caché (L-65). Aplica solo al
+documento de Mantenimiento (el PI no cambia). Residuo de `§90.3` se invierte: `acc_sel` vuelve a tener pantalla.
