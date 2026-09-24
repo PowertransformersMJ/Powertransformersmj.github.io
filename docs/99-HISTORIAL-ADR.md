@@ -3793,3 +3793,32 @@ presupuesto salen como cajas redondeadas y cortados («TRANSI», «192.85…») 
 `§88.1`— y el texto de ayuda del alcance se imprime.
 
 Commits `8e27a49` · `f639ab3` · `f5bd961` · `386adfd`. Publicación retenida hasta su visto bueno.
+
+## 90. ADR — El Alcance muestra solo el alcance: fuera el selector de «acciones de mantenimiento» ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Orden: *«quitemos lo de las acciones de mantenimiento en la parte de alcance y todo lo asociado,
+> simplemente debe aparecer el alcance y todo lo demás»*. En rama, **sin publicar**; preview entregado
+> (`PREVIEW_Alcance_sin_acciones.png`).
+
+**90.1 Qué había.** En el documento de Mantenimiento, la sección Alcance abría con el bloque «Acciones de
+mantenimiento del alcance» (`selectorAcciones`, `§74.x`/`§75`): «Marcar las suyas»/«Ninguna», plan registrado
+o línea base, y el catálogo MO.00418 §4.3 entero; lo marcado (`plan.acc_sel`) componía `{ACCIONES}` en las
+redacciones por banda y en la automática. Desde `§85` el alcance que se usa es la redacción del formato, que
+no lleva `{ACCIONES}`: el bloque ya no movía el texto por defecto.
+
+**90.2 Qué se retiró (lo mínimo señalado, L del Ingeniero «no borrar de más»).** La función del bloque y su
+llamada, sus dos manejadores y `fijarAcciones`/`rehacerAlcance` (solo lo servían), la frase de ayuda «el texto
+se compone con las acciones que haya marcado arriba» y dos importaciones sin uso. **Intacto**: la Redacción y
+el texto; la pestaña «Plan de acciones» y «Descargar plan» (salen de `nucleoFicha`: plan registrado + línea
+base, no de lo marcado); el dominio (`seleccionAcciones`, cubierto por pruebas en cinco archivos); el CSS
+`.ftm-acc*` (queda para el paquete de CSS muerto de la cola).
+
+**90.3 Residuo conocido.** Las redacciones viejas del desplegable que dicen «comprende {acciones}» siguen
+disponibles y toman las acciones por defecto de su banda; un borrador de ≤30 días con una selección hecha
+antes (`acc_sel`) las seguiría usando sin que se vea. Caduca con el borrador; si molesta, se ignora `acc_sel`
+en la pantalla. CF-09/CF-10 de la cola ahora solo tocan esas redacciones viejas y la automática, no la que
+sale por defecto.
+
+**90.4 Verificación.** 1816 pass / 0 fail / 2 skip, lint limpio. Banco: el Alcance muestra solo Redacción +
+texto, cero restos de acciones, «Plan de acciones» con sus 7 renglones, consola limpia; captura antes/después.
+Commit `10fb915`.

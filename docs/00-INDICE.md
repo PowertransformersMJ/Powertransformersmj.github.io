@@ -101,6 +101,7 @@
 | §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` donde falta plata (nunca «0»), dinero tecleado leído sin adivinar; CF-32 refutado ⟦OPUS-5.5⟧ | 3632 |
 | §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes, ocupación de la plantilla); aún no llegan al Excel (CF-25) ⟦OPUS-5.5⟧ | 3713 |
 | §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero en la ficha y en el Excel (CF-25); revisión de 12 agentes, 6 confirmados ⟦OPUS-5.5⟧ | 3743 |
+| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento ⟦OPUS-5.5⟧ | 3797 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
