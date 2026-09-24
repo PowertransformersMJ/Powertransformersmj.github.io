@@ -32,7 +32,9 @@ import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domai
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
 import { FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../../domain/fichas_firmantes.js';
-import { fechaAISO, isoAFecha } from '../../domain/fichas_fechas.js';
+import {
+  fechaAISO, isoAFecha, leerAnio, aniosDelCalendario, ANIO_MIN, COLUMNAS_ANIOS
+} from '../../domain/fichas_fechas.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -1138,6 +1140,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     fijarAviso('<div class="ftm-nota">Borradores descartados.</div>');
   }
   let trampaFoco = null;       // trampa de foco del modal (ui/foco-modal.js)
+  // Calendario de años abierto (uno a la vez, `99 §94`). Sus escuchas globales
+  // viven SOLO mientras está abierto y se retiran al cerrarlo (§3.5).
+  let aniosAbierto = null;     // { caja, boton, pop, clave, soltar }
   let hoja = 'ficha';
   let aviso = '';
 
@@ -1990,6 +1995,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   function cerrarFicha() {
+    cerrarAnios(false);
     // Primero soltar: devuelve el foco a la fila/botón que abrió la ficha.
     if (trampaFoco) { trampaFoco.soltar(); trampaFoco = null; }
     modal.classList.remove('is-on');
@@ -2058,6 +2064,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const bp = modalTabs.querySelector('[data-hoja="plan"]');
       if (bp) bp.classList.add('has-diag');
     }
+    cerrarAnios(false);
     modalCuerpo.innerHTML = cuerpoHoja(actual, hoja);
     modalCuerpo.scrollTop = 0;
     const btnPlan = $('[data-ftm="descargar-plan"]');
@@ -2298,6 +2305,169 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Abre el calendario de una casilla de fecha (si el navegador no sabe, al menos la enfoca). */
   function abrirCalendario(inp) {
     try { inp.showPicker(); } catch (err) { inp.focus(); }
+  }
+
+  /**
+   * Casilla de AÑO con calendario de años (orden del Ingeniero, 2026-09-24,
+   * `99 §94`: «un calendario, pero solo años, desde 2020»). Se ve igual que la
+   * de fecha —el año como sale en el papel y el iconito— y al tocarla se abre
+   * una rejilla de años ({@link abrirAnios}). Se guarda «aaaa» en la misma
+   * clave de siempre. Un texto escrito antes que no sea un año del calendario
+   * se sigue viendo (y marcado) hasta que se elija uno: no se borra en silencio.
+   */
+  const campoAnio = (clave, valor, titulo) => {
+    const n = leerAnio(valor);
+    const vieja = lleno(valor) && n == null;
+    const texto = n != null ? String(n) : (vieja ? String(valor).trim() : '');
+    return '<span class="ftm-fecha ftm-fecha--centro ftm-anio" data-anio-caja="' + esc(clave) + '">'
+      + '<span class="ftm-fecha-txt' + (texto ? '' : ' is-vacia') + (vieja ? ' is-vieja' : '') + '">'
+      +   esc(texto || 'aaaa') + '</span>'
+      + '<button type="button" class="ftm-anio-abrir" data-anio="' + esc(clave) + '" '
+      +   'data-anio-titulo="' + esc(titulo) + '" aria-haspopup="dialog" aria-expanded="false" '
+      +   'aria-label="' + esc(etiquetaAnio(titulo, texto)) + '"'
+      +   (vieja ? ' title="Escrito antes: ' + esc(String(valor).trim()) + '. Elija el año en el calendario."' : '')
+      + '></button></span>';
+  };
+  const etiquetaAnio = (titulo, texto) =>
+    titulo + ': ' + (texto || 'sin año') + '. Abrir el calendario de años';
+
+  /** Abre la rejilla de años de una casilla de año, con el foco en el año elegido. */
+  function abrirAnios(boton) {
+    cerrarAnios(false);
+    const caja = boton.closest('[data-anio-caja]');
+    if (!caja || !actual) return;
+    const clave = boton.getAttribute('data-anio');
+    const titulo = boton.getAttribute('data-anio-titulo') || 'Año';
+    const guardado = estadoDe(actual).plan[clave];
+    const elegido = leerAnio(guardado);
+    const hoy = new Date().getFullYear();
+    const anios = aniosDelCalendario(hoy, guardado);
+    const foco = elegido != null ? elegido : (anios.includes(hoy) ? hoy : anios[0]);
+
+    const pop = document.createElement('div');
+    pop.className = 'ftm-anios';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', titulo + ': elija el año');
+    pop.innerHTML = '<div class="ftm-anios-cab">' + esc(titulo) + '</div>'
+      + '<div class="ftm-anios-rejilla" role="group" aria-label="Años desde ' + ANIO_MIN + '">'
+      + anios.map((a) => '<button type="button" class="ftm-anio-op' + (a === elegido ? ' is-sel' : '')
+          + (a === hoy ? ' is-hoy' : '') + '" data-anio-op="' + a + '" aria-pressed="' + (a === elegido) + '" '
+          + 'tabindex="' + (a === foco ? '0' : '-1') + '"' + (a === hoy ? ' title="Año en curso"' : '') + '>'
+          + a + '</button>').join('')
+      + '</div>'
+      + '<div class="ftm-anios-pie">'
+      +   '<button type="button" class="ftm-anios-acc" data-anio-borrar="1">Borrar</button>'
+      +   '<button type="button" class="ftm-anios-acc" data-anio-op="' + hoy + '">Este año</button>'
+      + '</div>';
+    caja.appendChild(pop);
+    boton.setAttribute('aria-expanded', 'true');
+    ubicarAnios(caja, pop);
+
+    // Esc cierra SOLO el calendario: se escucha en `window` en fase de captura,
+    // que llega ANTES que la trampa de foco del modal (en `document`), porque
+    // si no, Esc cerraba la ficha entera.
+    const alTecla = (ev) => {
+      if (!pop.isConnected) { cerrarAnios(false); return; }
+      if (ev.key === 'Escape' || ev.key === 'Esc') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        cerrarAnios(true);
+        return;
+      }
+      const op = ev.target && ev.target.closest && ev.target.closest('.ftm-anio-op');
+      if (!op || !op.closest('.ftm-anios-rejilla') || !pop.contains(op)) return;
+      const ops = [...pop.querySelectorAll('.ftm-anios-rejilla .ftm-anio-op')];
+      const i = ops.indexOf(op);
+      const salto = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -COLUMNAS_ANIOS, ArrowDown: COLUMNAS_ANIOS }[ev.key];
+      let j = null;
+      if (salto != null) j = Math.min(ops.length - 1, Math.max(0, i + salto));
+      else if (ev.key === 'Home') j = 0;
+      else if (ev.key === 'End') j = ops.length - 1;
+      if (j == null) return;
+      ev.preventDefault();
+      ops[i].tabIndex = -1;
+      ops[j].tabIndex = 0;
+      ops[j].focus();
+    };
+    // Un toque FUERA de la casilla cierra el calendario sin elegir nada.
+    const alPresionar = (ev) => {
+      if (!pop.isConnected) { cerrarAnios(false); return; }
+      if (!caja.contains(ev.target)) cerrarAnios(false);
+    };
+    // Con el teclado (Tab) el foco se va a OTRO control: se cierra. Si no hay
+    // destino (Safari no enfoca un botón al hacerle clic) NO se cierra aquí: el
+    // clic lo decide, o se comería la elección.
+    const alSalirFoco = (ev) => {
+      if (ev.relatedTarget && !caja.contains(ev.relatedTarget)) cerrarAnios(false);
+    };
+    globalThis.addEventListener('keydown', alTecla, true);
+    document.addEventListener('pointerdown', alPresionar, true);
+    caja.addEventListener('focusout', alSalirFoco);
+    aniosAbierto = {
+      caja, boton, pop, clave,
+      soltar() {
+        globalThis.removeEventListener('keydown', alTecla, true);
+        document.removeEventListener('pointerdown', alPresionar, true);
+        caja.removeEventListener('focusout', alSalirFoco);
+      }
+    };
+    const inicial = pop.querySelector('.ftm-anios-rejilla [tabindex="0"]');
+    if (inicial) inicial.focus();
+  }
+
+  /**
+   * Abre la rejilla hacia ABAJO y desplaza la ficha lo justo para verla entera
+   * junto a su casilla. Solo si abajo no hay más hoja (la casilla está al final),
+   * hacia arriba. Nunca se sale por los lados.
+   */
+  function ubicarAnios(caja, pop) {
+    const marco = caja.closest('.ftm-modal-scroll') || caja.closest('[data-ftm="modal-cuerpo"]');
+    const limites = () => (marco ? marco.getBoundingClientRect()
+      : { top: 0, bottom: globalThis.innerHeight || 0, left: 0, right: globalThis.innerWidth || 0 });
+    const verEntera = () => { try { pop.scrollIntoView({ block: 'nearest' }); } catch (err) { /* navegador viejo */ } };
+    verEntera();
+    let r = pop.getBoundingClientRect();
+    let lim = limites();
+    if (r.bottom > lim.bottom + 1) {
+      pop.classList.add('ftm-anios--arriba');
+      verEntera();
+      r = pop.getBoundingClientRect();
+      lim = limites();
+    }
+    const margen = 8;
+    if (r.right > lim.right - margen) pop.style.marginLeft = -(r.right - (lim.right - margen)) + 'px';
+    else if (r.left < lim.left + margen) pop.style.marginLeft = ((lim.left + margen) - r.left) + 'px';
+  }
+
+  /** Cierra el calendario de años (idempotente). `devolverFoco` ⇒ vuelve a la casilla. */
+  function cerrarAnios(devolverFoco) {
+    const a = aniosAbierto;
+    if (!a) return;
+    aniosAbierto = null;
+    a.soltar();
+    if (a.pop.isConnected) a.pop.remove();
+    if (a.boton.isConnected) {
+      a.boton.setAttribute('aria-expanded', 'false');
+      if (devolverFoco) a.boton.focus();
+    }
+  }
+
+  /** Guarda el año escogido («aaaa», o '' con «Borrar») y lo pinta en la casilla. */
+  function elegirAnio(valor) {
+    const a = aniosAbierto;
+    if (!a || !actual) return;
+    const nuevo = valor == null ? '' : String(valor);
+    estadoDe(actual).plan[a.clave] = nuevo;
+    tocarFicha(actual);
+    const tx = a.caja.querySelector('.ftm-fecha-txt');
+    if (tx) {
+      tx.textContent = nuevo || 'aaaa';
+      tx.classList.toggle('is-vacia', !nuevo);
+      tx.classList.remove('is-vieja');
+    }
+    a.boton.removeAttribute('title');
+    a.boton.setAttribute('aria-label', etiquetaAnio(a.boton.getAttribute('data-anio-titulo') || 'Año', nuevo));
+    cerrarAnios(true);
   }
 
   /**
@@ -2699,15 +2869,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
   function bloquePeriodo(e) {
     const P = estadoDe(e).plan;
-    const caja = (titulo, clave, ph) =>
-      '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>' + esc(titulo) + '</legend>'
-      + '<input class="ftm-fmt-in ftm-fmt-in--centro" data-plan="' + clave + '" value="' + esc(P[clave] || '') + '" '
-      + 'placeholder="' + esc(ph) + '" aria-label="' + esc(titulo) + '"></fieldset>';
     return '<div class="ftm-fmt ftm-fmt-periodo">'
       // La Fecha de Entrega se escoge en el calendario (`99 §91`).
       + '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>Fecha de Entrega</legend>'
       +   campoFecha('fechaentrega', P.fechaentrega, 'Fecha de Entrega', true) + '</fieldset>'
-      + caja('Año de entrada', 'anioentrada', 'aaaa')
+      // El Año de entrada se escoge en un calendario de años (`99 §94`).
+      + '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>Año de entrada</legend>'
+      +   campoAnio('anioentrada', P.anioentrada, 'Año de entrada') + '</fieldset>'
       + '</div>';
   }
 
@@ -3054,6 +3222,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // (`99 §91`): Chrome solo lo abría si se atinaba al iconito.
     const inFecha = ev.target.closest && ev.target.closest('input[type="date"]');
     if (inFecha && contenedor.contains(inFecha)) { abrirCalendario(inFecha); return; }
+
+    // Calendario de años (`99 §94`): abrir/cerrar, elegir un año o borrarlo.
+    const opAnio = ev.target.closest('[data-anio-op]');
+    if (opAnio && aniosAbierto && aniosAbierto.pop.contains(opAnio)) { elegirAnio(opAnio.getAttribute('data-anio-op')); return; }
+    const borrarAnio = ev.target.closest('[data-anio-borrar]');
+    if (borrarAnio && aniosAbierto && aniosAbierto.pop.contains(borrarAnio)) { elegirAnio(''); return; }
+    if (ev.target.closest('.ftm-anios')) return;   // clic en el fondo del calendario: no hace nada
+    const btnAnio = ev.target.closest('[data-anio]');
+    if (btnAnio) {
+      if (aniosAbierto && aniosAbierto.boton === btnAnio) cerrarAnios(true);
+      else abrirAnios(btnAnio);
+      return;
+    }
 
     // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
     if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
@@ -3488,6 +3669,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // anterior (la función existía y no la llamaba nadie).
     try { olvidarDiagramas(); } catch (_) { /* noop */ }
     clearTimeout(tempBusqueda);
+    cerrarAnios(false);
     contenedor.removeEventListener('click', alHacerClic);
     contenedor.removeEventListener('input', alEscribir);
     contenedor.removeEventListener('change', alCambiar);

@@ -1443,6 +1443,41 @@ body.aqua .ftm-fecha .ftm-fecha-in.ftm-fecha-in.ftm-fecha-in.ftm-fecha-in.ftm-fe
   position: absolute; inset: 0; width: 100%; height: 100%;
   margin: 0; padding: 0; border: 0; box-shadow: none; opacity: 0; cursor: pointer;
 }
+/* Casilla de AÑO con calendario de años (`99 §94`): se ve como la de fecha
+   (el año y el iconito) y un botón transparente encima abre la rejilla. */
+.ftm-anio-abrir,
+body.aqua .ftm-anio .ftm-anio-abrir.ftm-anio-abrir.ftm-anio-abrir.ftm-anio-abrir.ftm-anio-abrir {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; border: 0; border-radius: 0; background: transparent;
+  box-shadow: none; opacity: 0; cursor: pointer;
+}
+.ftm-anios {
+  position: absolute; z-index: 40; top: calc(100% + 6px); left: 50%;
+  transform: translateX(-50%);
+  box-sizing: border-box; width: 236px; max-width: calc(100vw - 32px); padding: 10px;
+  background: #fff; border: 1px solid #c9d4d8; border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(16, 42, 52, .18);
+  font-size: 12px; line-height: 1.2; color: var(--ftm-paper-ink);
+  text-align: center; white-space: normal; cursor: default;
+}
+.ftm-anios--arriba { top: auto; bottom: calc(100% + 6px); }
+.ftm-anios-cab { font-weight: 600; margin-bottom: 8px; }
+.ftm-anios-rejilla { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
+.ftm-anio-op,
+.ftm-anios-acc {
+  margin: 0; padding: 7px 0; border: 1px solid transparent; border-radius: 8px;
+  background: transparent; font: inherit; color: inherit; cursor: pointer;
+}
+.ftm-anio-op:hover,
+.ftm-anios-acc:hover { background: var(--ftm-paper-input); }
+.ftm-anio-op.is-hoy { border-color: var(--ftm-petrol); }
+.ftm-anio-op.is-sel,
+.ftm-anio-op.is-sel:hover { background: var(--ftm-petrol); border-color: var(--ftm-petrol); color: #fff; font-weight: 600; }
+.ftm-anios-pie {
+  display: flex; justify-content: space-between; gap: 8px;
+  margin-top: 8px; padding-top: 6px; border-top: 1px solid #e3eaec;
+}
+.ftm-anios-acc { padding: 5px 8px; color: var(--ftm-petrol); font-weight: 600; }
 .ftm-fmt-in::placeholder { color: #a9b4b9; }
 .ftm-fmt-in:focus,
 body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus {
@@ -1773,6 +1808,8 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
   .ftm-fecha { background-image: none; padding-right: 0; border-bottom: none; }
   .ftm-fecha-txt.is-vacia { color: transparent; }
   .ftm-fecha-in { display: none !important; }
+  .ftm-anio-abrir,
+  .ftm-anios { display: none !important; }
   .ftm-fmt-sel { display: none !important; }
   .ftm-fmt-caja { break-inside: avoid; }
   .ftm-campo-area--alcance { border: none; white-space: pre-wrap; }
