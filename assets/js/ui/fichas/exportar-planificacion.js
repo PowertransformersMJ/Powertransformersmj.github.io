@@ -9,14 +9,17 @@
 // `assets/js/exports/xlsm_suministros.js` con el libro de suministros.
 //
 // Qué se escribe (y nada más):
-//   · Hoja 1 «Ficha Técnica» → 15 celdas (proyecto, ubicación, alcance,
-//     beneficios y la línea de inversión con el presupuesto CREG).
+//   · Hoja 1 «Ficha Técnica» → 17 celdas (proyecto, ubicación, alcance,
+//     beneficios y la línea de inversión: presupuesto CREG, Valor Real y
+//     Sistema) y, solo cuando su línea está pendiente, los dos totales del
+//     proyecto (I78/J78), que entonces dicen [PENDIENTE] en vez de «0».
 //   · Hoja 5 «Anexo AT»       → la fila 11 con los datos de placa del equipo.
 //   · Hoja 3 «Diagrama Actual» y hoja 4 «Diagrama Futuro» → sus dos unifilares,
 //     que son INDEPENDIENTES: cada hoja recibe el suyo (image5 = Actual,
 //     image6 = Futuro; verificado en drawing3/drawing4 de la plantilla).
-//   · Cuadros de texto del dibujo de la hoja 1: fecha de entrega y año de
-//     entrada en operación.
+//   · Cuadros de texto del dibujo de la hoja 1: fecha de entrega, año de
+//     entrada en operación y, en el cuadro de firmas, Nombre · Ocupación ·
+//     Fecha de cada firmante (`99 §89`; la Firma queda a mano).
 //
 // Qué NO vive aquí (por diseño):
 //   · La FÓRMULA del presupuesto → `domain/fichas_presupuesto.js`.
@@ -30,7 +33,8 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
-import { desgloseCreg } from '../../domain/fichas_presupuesto.js';
+import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
+import { firmanteDe } from '../../domain/fichas_firmantes.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -87,6 +91,11 @@ function numeroDeColumna(letras) {
 
 function escXml(s) {
   return String(s == null ? '' : s)
+    // Caracteres de control que XML 1.0 NO admite (llegan pegados de un PDF u
+    // otro sistema): uno solo dejaba el dibujo mal formado y LibreOffice perdía
+    // el cuadro Recibe y el logo (revisión §89). Se conservan \t, \n y \r.
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -115,18 +124,24 @@ export function escribirCelda(xml, ref, valor, numerico, estiloPlantilla) {
     : '<c r="' + ref + '"' + s + ' t="inlineStr"><is><t xml:space="preserve">' +
       escXml(valor) + '</t></is></c>';
 
+  // OJO: TODOS los reemplazos van con FUNCIÓN, no con texto. En el texto de
+  // reemplazo de `String.replace`, «$&», «$`», «$'» y «$$» son órdenes: un «$»
+  // tecleado delante de « " < > & ' » (que escXml vuelve «&quot;», «&lt;»…) se
+  // convertía en «$&» y metía la celda de la plantilla dentro del texto, y
+  // «$`» metía todo el XML anterior y dejaba el archivo ilegible (`99 §87`).
   const celdaRe = new RegExp('<c r="' + ref + '"[^>]*?(?:/>|>[\\s\\S]*?</c>)');
   const m = xml.match(celdaRe);
   if (m) {
     const sM = m[0].match(/\ss="(\d+)"/);
-    return xml.replace(celdaRe, construir(sM ? (' s="' + sM[1] + '"') : ''));
+    const nueva = construir(sM ? (' s="' + sM[1] + '"') : '');
+    return xml.replace(celdaRe, () => nueva);
   }
 
   const celda = construir(estiloPlantilla ? (' s="' + estiloPlantilla + '"') : '');
   const filaRe = new RegExp('(<row r="' + row + '"[^>]*>)([\\s\\S]*?)(</row>)');
   const fm = xml.match(filaRe);
   if (!fm) {
-    return xml.replace('</sheetData>', '<row r="' + row + '">' + celda + '</row></sheetData>');
+    return xml.replace('</sheetData>', () => '<row r="' + row + '">' + celda + '</row></sheetData>');
   }
   const interior = fm[2];
   const objetivo = numeroDeColumna(col);
@@ -135,7 +150,7 @@ export function escribirCelda(xml, ref, valor, numerico, estiloPlantilla) {
   for (const cm of celdas) {
     if (numeroDeColumna(cm[1]) > objetivo) { pos = cm.index; break; }
   }
-  return xml.replace(filaRe, fm[1] + interior.slice(0, pos) + celda + interior.slice(pos) + fm[3]);
+  return xml.replace(filaRe, () => fm[1] + interior.slice(0, pos) + celda + interior.slice(pos) + fm[3]);
 }
 
 /**
@@ -149,7 +164,7 @@ export function escribirFormula(xml, ref, formula) {
   if (!m) return xml;
   const s = (m[0].match(/\ss="(\d+)"/) || [])[1];
   const celda = '<c r="' + ref + '"' + (s ? (' s="' + s + '"') : '') + '><f>' + escXml(formula) + '</f></c>';
-  return xml.replace(celdaRe, celda);
+  return xml.replace(celdaRe, () => celda);
 }
 
 /** Borra el valor en caché de una celda con fórmula, para forzar recálculo. */
@@ -225,10 +240,20 @@ export function descripcionUC(equipo = {}, codigo) {
  * Es una función PURA: el mismo mapa alimenta el exportador y la vista previa
  * que se le muestra al usuario antes de descargar.
  *
- * Cada entrada: { cell, campo, val, numeric?, formula?, clear?, pend?, vista? }
+ * Cada entrada: { cell, campo, val, numeric?, formula?, clear?, pend?, motivo?,
+ *                 plantilla?, derivada?, vista? }
  *   · `clear`   ⇒ la celda se deja en blanco (el dato no existe todavía).
- *   · `pend`    ⇒ falta un dato que nadie puede deducir; se marca [PENDIENTE].
+ *   · `pend`    ⇒ falta un dato que nadie puede deducir; se marca [PENDIENTE]
+ *                 y `motivo` dice qué falta (lo lee {@link pendientesFichaPlan}).
  *   · `formula` ⇒ se escribe una fórmula de Excel, no un valor.
+ *   · `plantilla` ⇒ la celda NO se toca: manda la fórmula del formato oficial.
+ *   · `derivada`  ⇒ total que hereda el pendiente de su línea (no se lista aparte).
+ *
+ * Dinero (CF-06): una casilla de plata sin dato NO sale en blanco ni en 0 —
+ * dice [PENDIENTE], como ya lo decía la pantalla. Y su total tampoco: la
+ * plantilla suma con SUM(), que trata el texto como cero y firmaría «0» en el
+ * TOTAL DEL PROYECTO; por eso, solo mientras la línea esté pendiente, el total
+ * se reemplaza por [PENDIENTE] (con dato, vuelve a mandar la fórmula oficial).
  *
  * @param {object} equipo  registro del transformador
  * @param {object} estado  { plan, municipio, uuccDecidida }
@@ -249,33 +274,98 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
   const municipio = lleno(plan.municipio) ? plan.municipio : txt(estado.municipio);
   const desc = lleno(plan.presu_desc) ? plan.presu_desc : descripcionUC(equipo, U);
   const okTotal = !presu.pendiente;
+  // El Valor Real lo teclea el Ingeniero con puntos de miles y coma decimal.
+  // Se lee con `leerMonto`, la MISMA función con que la pantalla pinta su total:
+  // acepta solo la forma colombiana y NO adivina. Con `parseFloat`
+  // «2.100.000.000» se firmaría como 2,1 pesos; con la lectura tolerante,
+  // «2.100 millones» se firmaba como 2.100 (`99 §87`).
+  const leidoReal = leerMonto(plan.presu_real);
+  const real = leidoReal.valor;
+  const motivoReal = leidoReal.estado === 'ilegible'
+    ? 'El Valor Real Total tecleado («' + recortar(plan.presu_real) + '») no se puede leer como cifra: '
+      + 'escríbalo solo con números, p. ej. 2.100.000.000.'
+    : 'No se ha tecleado el Valor Real Total.';
+
+  const sinInstalacion = presu.costoInstalacion == null;
 
   return [
-    { cell: 'D8',  campo: 'Proyecto',   val: (plan.proyecto || '[PENDIENTE: NOMBRE DEL PROYECTO]'), pend: !lleno(plan.proyecto) },
+    // `lleno` también decide el valor, no solo la marca: un campo con puros
+    // espacios se escribía en blanco y a la vez se contaba como pendiente.
+    { cell: 'D8',  campo: 'Proyecto',   val: (lleno(plan.proyecto) ? plan.proyecto : '[PENDIENTE: NOMBRE DEL PROYECTO]'), pend: !lleno(plan.proyecto),
+      motivo: 'Falta el nombre del proyecto.' },
     { cell: 'H8',  campo: 'Consecutivo', val: txt(plan.consecutivo), clear: !lleno(plan.consecutivo), pend: false },
     { cell: 'D9',  campo: 'Cód estudio/tarea', val: txt(plan.codestudio), clear: !lleno(plan.codestudio), pend: false },
     { cell: 'H9',  campo: 'Ámbito', val: 'Media Tensión / Alta Tensión', pend: false },
     { cell: 'D13', campo: 'Zona', val: txt(equipo.departamento), pend: false },
     { cell: 'H13', campo: 'Subestación', val: txt(equipo.subestacion), pend: false },
-    { cell: 'D14', campo: 'Municipio', val: (lleno(municipio) ? municipio : '[PENDIENTE: MUNICIPIO]'), pend: !lleno(municipio) },
-    { cell: 'B17', campo: 'Alcance', val: (plan.alcance || '[PENDIENTE: ALCANCE — texto del proyecto]'), pend: !lleno(plan.alcance) },
-    { cell: 'B23', campo: 'Beneficios', val: (plan.beneficios || '[PENDIENTE: BENEFICIOS — texto del proyecto]'), pend: !lleno(plan.beneficios) },
+    { cell: 'D14', campo: 'Municipio', val: (lleno(municipio) ? municipio : '[PENDIENTE: MUNICIPIO]'), pend: !lleno(municipio),
+      motivo: 'Falta el municipio.' },
+    { cell: 'B17', campo: 'Alcance', val: (lleno(plan.alcance) ? plan.alcance : '[PENDIENTE: ALCANCE — texto del proyecto]'), pend: !lleno(plan.alcance),
+      motivo: 'Falta el texto del alcance.' },
+    { cell: 'B23', campo: 'Beneficios', val: (lleno(plan.beneficios) ? plan.beneficios : '[PENDIENTE: BENEFICIOS — texto del proyecto]'), pend: !lleno(plan.beneficios),
+      motivo: 'Falta el texto de los beneficios.' },
     { cell: 'B36', campo: 'Inversión · Subestación', val: txt(equipo.subestacion), pend: false },
     { cell: 'C36', campo: 'Inversión · UUCC', val: txt(U), pend: false },
     { cell: 'D36', campo: 'Inversión · Descripción', val: desc, pend: false },
     // OJO: «Valor CREG Unitario» (F36) NO es el $/MVA — es el COSTO DE
     // INSTALACIÓN de la UC. El $/MVA es el que multiplica a la potencia.
-    { cell: 'F36', campo: 'Valor CREG Unitario', numeric: true,
-      val: presu.costoInstalacion, clear: presu.costoInstalacion == null, pend: false,
+    { cell: 'F36', campo: 'Valor CREG Unitario', numeric: !sinInstalacion,
+      val: (sinInstalacion ? TEXTO_PENDIENTE : presu.costoInstalacion), pend: sinInstalacion,
+      motivo: (sinInstalacion ? presu.motivoTexto : null),
       vista: presu.costoInstalacion },
     { cell: 'H36', campo: 'Cantidad', val: presu.cantidad, numeric: true, pend: false },
     // I36 se escribe como FÓRMULA viva para que el revisor vea de dónde sale.
     { cell: 'I36', campo: 'Valor CREG Total',
       formula: (okTotal ? ('F36+(' + presu.mva + '*' + presu.valorUnitarioMVA + ')') : null),
-      clear: !okTotal, pend: !okTotal,
-      val: presu.total,
-      vista: presu.formula }
+      pend: !okTotal, motivo: (okTotal ? null : presu.motivoTexto),
+      val: (okTotal ? presu.total : TEXTO_PENDIENTE),
+      vista: presu.formula },
+    // J36 y K36 los teclea el Ingeniero en la ficha. La plantilla ya trae J36
+    // con formato de pesos y J78 = SUM(J34:J66): al escribir J36 el «TOTAL DEL
+    // PROYECTO» real se llena solo (CF-05). Sin Valor Real, [PENDIENTE] (CF-06).
+    // «Sistema» no es dinero: vacío ⇒ en blanco, como en la pantalla.
+    { cell: 'J36', campo: 'Valor Real Total', numeric: real != null,
+      val: (real != null ? real : TEXTO_PENDIENTE), pend: real == null,
+      motivo: (real == null ? motivoReal : null), vista: real },
+    { cell: 'K36', campo: 'Sistema', val: txt(plan.presu_sistema).trim(),
+      clear: !lleno(plan.presu_sistema), pend: false },
+    // TOTAL DEL PROYECTO: con dato manda la fórmula SUM de la plantilla; con la
+    // línea pendiente, [PENDIENTE] — nunca el «0» que SUM daría sobre el texto.
+    { cell: 'I78', campo: 'TOTAL DEL PROYECTO (CREG)', derivada: true,
+      plantilla: okTotal, pend: !okTotal, val: TEXTO_PENDIENTE },
+    { cell: 'J78', campo: 'TOTAL DEL PROYECTO (real)', derivada: true,
+      plantilla: real != null, pend: real == null, val: TEXTO_PENDIENTE }
   ];
+}
+
+/** Texto tecleado, acortado para citarlo en un aviso. */
+function recortar(v) {
+  const s = txt(v).trim();
+  return s.length > 40 ? s.slice(0, 39) + '…' : s;
+}
+
+/** Motivo común de los totales: heredan el pendiente de su línea. */
+const MOTIVO_TOTAL = 'Queda [PENDIENTE] mientras su línea no tenga cifra.';
+
+/**
+ * Lo que el Excel va a llevar marcado [PENDIENTE], para decírselo al usuario
+ * ANTES de descargar (CF-06). Una línea por motivo: si el Valor CREG Unitario
+ * y el Total faltan por la misma causa, se dice una sola vez. Los totales van
+ * al final, en su propia línea, para que la cuenta de casillas del aviso sea
+ * la MISMA que la del papel (lo destapó la revisión de `99 §87`).
+ *
+ * @returns {Array<{campos: string[], motivo: string}>}  vacío si no falta nada
+ */
+export function pendientesFichaPlan(equipo = {}, estado = {}) {
+  const porMotivo = new Map();
+  const celdas = celdasFichaPlan(equipo, estado).filter((m) => m.pend);
+  [...celdas.filter((m) => !m.derivada), ...celdas.filter((m) => m.derivada)]
+    .forEach((m) => {
+      const motivo = m.derivada ? MOTIVO_TOTAL : (m.motivo || ('Falta ' + m.campo + '.'));
+      if (!porMotivo.has(motivo)) porMotivo.set(motivo, []);
+      porMotivo.get(motivo).push(m.campo);
+    });
+  return [...porMotivo].map(([motivo, campos]) => ({ campos, motivo }));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -348,6 +438,105 @@ export function celdasAnexoAT(equipo = {}, estado = {}) {
     { cell: 'N11', val: (!par ? '*' : '') },
     { cell: 'O11', val: v.observacion }
   ];
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CUADRO DE FIRMAS (dibujo de la hoja 1)
+   ── Cada firmante es un cuadro de texto de `drawing1.xml`. Se reconoce por su
+      TÍTULO («Elaboración», «Revisión», «Aprobación», «Recibe»), no por su
+      posición ni por su nombre interno (hay dos «Grupo 41» en la plantilla).
+      El segundo aprobador es el único cuadro con «Nombre:» y SIN título: está
+      dentro del de Aprobación. Solo se reescriben los renglones Nombre,
+      Ocupación y Fecha; la Firma queda en blanco, para firmar a mano.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const TITULO_CASILLA = Object.freeze({ 'Elaboración': 'elab', 'Revisión': 'rev', 'Aprobación': 'apr', 'Recibe': 'rec' });
+const RENGLONES_FIRMA = Object.freeze(['Nombre:', 'Ocupación:', 'Fecha:']);
+/** Tamaño (centésimas de punto) de los renglones del firmante. La plantilla trae
+ *  11 pt pensando en «Nombre:» vacío; con los cargos dictados —largos y en
+ *  mayúscula— a 11 pt la «Firma» y la «Fecha» se salían del cuadro en Aprobación
+ *  (render de LibreOffice, `99 §89`). El título del cuadro no se toca. */
+const SZ_FIRMANTE = '900';
+
+/** Texto de un párrafo del dibujo, uniendo sus corridas (un renglón puede venir partido). */
+function textoParrafo(p) {
+  return [...p.matchAll(/<a:t>([^<]*)<\/a:t>/g)].map((m) => m[1]).join('');
+}
+
+/** Cambia el tamaño de letra de un `<a:rPr>`/`<a:endParaRPr>` (lo añade si falta). */
+function conTamano(etiqueta, sz) {
+  return /\ssz="\d+"/.test(etiqueta)
+    ? etiqueta.replace(/\ssz="\d+"/, ' sz="' + sz + '"')
+    : etiqueta.replace(/^<(a:rPr|a:endParaRPr)\b/, '<$1 sz="' + sz + '"');
+}
+
+/** Pone el tamaño del firmante a TODAS las corridas y al fin de párrafo. */
+function tamanoParrafo(p, sz) {
+  return p.replace(/<a:(?:rPr|endParaRPr)\b[^>]*?\/?>/g, (m) => conTamano(m, sz));
+}
+
+/** Reescribe un párrafo con UNA sola corrida, conservando el formato de la primera. */
+function reescribirParrafo(p, texto) {
+  const corridas = [...p.matchAll(/<a:r>[\s\S]*?<\/a:r>/g)];
+  if (!corridas.length) return p;
+  const primera = corridas[0];
+  const ultima = corridas[corridas.length - 1];
+  const rPr = (primera[0].match(/<a:rPr\b[^>]*?(?:\/>|>[\s\S]*?<\/a:rPr>)/) || ['<a:rPr/>'])[0];
+  return p.slice(0, primera.index)
+    + '<a:r>' + rPr + '<a:t>' + escXml(texto) + '</a:t></a:r>'
+    + p.slice(ultima.index + ultima[0].length);
+}
+
+/**
+ * Escribe en el cuadro de firmas del dibujo quién firma cada casilla.
+ * Función pura sobre el XML: devuelve el dibujo con los renglones reescritos.
+ *
+ * @param {string} xml   `xl/drawings/drawing1.xml`
+ * @param {object} plan  estado de la ficha (lo lee `firmanteDe`)
+ * @returns {string}
+ */
+export function escribirFirmantes(xml, plan = {}) {
+  return xml.replace(/<xdr:(twoCellAnchor|oneCellAnchor)\b[\s\S]*?<\/xdr:\1>/g, (ancla) => {
+    const parrafos = [...ancla.matchAll(/<a:p>[\s\S]*?<\/a:p>/g)].map((m) => m[0]);
+    const textos = parrafos.map((p) => textoParrafo(p).trim());
+    if (!textos.some((t) => t.startsWith('Nombre:'))) return ancla;
+    const titulo = textos.find((t) => TITULO_CASILLA[t]);
+    const k = titulo ? TITULO_CASILLA[titulo] : 'apr2';
+    const f = firmanteDe(k, plan);
+    const valor = { 'Nombre:': f.nombre, 'Ocupación:': f.ocupacion, 'Fecha:': f.fecha };
+    // Reemplazo con FUNCIÓN: un «$» del nombre no debe leerse como orden (`§87`).
+    return ancla.replace(/<a:p>[\s\S]*?<\/a:p>/g, (p) => {
+      const t = textoParrafo(p).trim();
+      if (TITULO_CASILLA[t]) return p;                    // el título se queda como está
+      const renglon = RENGLONES_FIRMA.find((r) => t.startsWith(r));
+      const nuevo = renglon
+        ? reescribirParrafo(p, (renglon + ' ' + (valor[renglon] || '')).trimEnd() + (valor[renglon] ? '' : ' '))
+        : p;
+      return tamanoParrafo(nuevo, SZ_FIRMANTE);           // Firma y separadores, al mismo tamaño
+    });
+  });
+}
+
+/**
+ * Las dos imágenes que la plantilla tiene en la zona de firma (filas ≥ 90 de la
+ * hoja 1) son RECTÁNGULOS BLANCOS: ahí iban las firmas escaneadas que se
+ * retiraron por privacidad (`§70`). Están dibujadas ENCIMA de los cuadros de
+ * texto y tapaban lo escrito (la fecha de Elaboración perdía su último dígito,
+ * `99 §89`). No se borran: se llevan al FONDO del dibujo, detrás de los cuadros.
+ *
+ * @param {string} xml  `xl/drawings/drawing1.xml`
+ * @returns {string}
+ */
+export function imagenesDeFirmaAlFondo(xml) {
+  const reAncla = /<xdr:(twoCellAnchor|oneCellAnchor)\b[\s\S]*?<\/xdr:\1>/g;
+  const alFondo = [];
+  const resto = xml.replace(reAncla, (ancla) => {
+    const fila = ancla.match(/<xdr:from>[\s\S]*?<xdr:row>(\d+)<\/xdr:row>/);
+    if (/<xdr:pic>/.test(ancla) && fila && +fila[1] >= 90) { alFondo.push(ancla); return ''; }
+    return ancla;
+  });
+  if (!alFondo.length) return xml;
+  return resto.replace(/(<xdr:wsDr\b[^>]*>)/, (m) => m + alFondo.join(''));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -487,6 +676,7 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
   // 3) Hoja 1 «Ficha Técnica» — solo las celdas del mapa.
   let s1 = await zip.file(HOJA_FICHA).async('string');
   celdasFichaPlan(equipo, estado).forEach((m) => {
+    if (m.plantilla) return;                      // manda la fórmula del formato
     if (m.formula) s1 = escribirFormula(s1, m.cell, m.formula);
     else s1 = escribirCelda(s1, m.cell, (m.clear ? '' : m.val), !!m.numeric, null);
   });
@@ -510,8 +700,12 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
     const dr = zip.file(DIBUJO_HOJA1);
     if (dr) {
       let xml = await dr.async('string');
-      xml = xml.replace(ANCLA_FECHA, '<a:t>' + escXml(plan.fechaentrega || '') + '</a:t>');
-      xml = xml.replace(ANCLA_ANIO,  '<a:t>' + escXml(plan.anioentrada  || '') + '</a:t>');
+      // Reemplazo con función: un «$» tecleado no debe leerse como orden.
+      xml = xml.replace(ANCLA_FECHA, () => '<a:t>' + escXml(plan.fechaentrega || '') + '</a:t>');
+      xml = xml.replace(ANCLA_ANIO,  () => '<a:t>' + escXml(plan.anioentrada  || '') + '</a:t>');
+      // Quién firma: Nombre · Ocupación · Fecha de cada casilla (`99 §89`).
+      xml = escribirFirmantes(xml, plan);
+      xml = imagenesDeFirmaAlFondo(xml);
       zip.file(DIBUJO_HOJA1, xml);
     }
   } catch (e) { /* el dibujo se conserva tal cual */ }

@@ -28,9 +28,10 @@
 // Sin `onclick=` en el HTML: todo por delegación de eventos sobre la raíz.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia, montoCOP } from '../../domain/fichas_creg_uc.js';
+import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domain/fichas_creg_uc.js';
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
-import { desgloseCreg, variacionReal, formatearCOP } from '../../domain/fichas_presupuesto.js';
+import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
+import { FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../../domain/fichas_firmantes.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -43,11 +44,10 @@ import {
 import { atraparFoco } from '../foco-modal.js';
 import {
   construirFichaTecnica, colorCondicion, nombreCondicion, nucleoFicha,
-  clasificarAccion, CATEGORIAS_ACCION, definicionCondicion
+  clasificarAccion, definicionCondicion
 } from './ficha-tecnica.js';
 import {
-  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion,
-  macroactividadesCatalogo
+  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion
 } from '../../domain/fichas_acciones.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
@@ -320,14 +320,17 @@ export function opcionesRedaccion(campo) {
 }
 
 /**
- * Cuadro de firmas del formato oficial. Solo el ROL (que es parte del formato);
- * el nombre y el cargo los escribe quien emite la ficha — este repo es público
- * y no lleva nombres de personas.
+ * Cuadro de firmas del formato oficial, tal como lo trae la plantilla PE.02081
+ * (`xl/drawings/drawing1.xml`): cuatro cuadros —Elaboración, Revisión,
+ * Aprobación y Recibe— y en Aprobación DOS firmantes. Cada uno con Nombre,
+ * Ocupación, Firma y Fecha. QUIÉN firma cada casilla lo dictó el Ingeniero y
+ * vive en `domain/fichas_firmantes.js` (`99 §89`), que usa también el Excel.
  */
-const FIRMAS = Object.freeze([
+export const FIRMAS = Object.freeze([
   { k: 'elab', rol: 'Elaboración' },
   { k: 'rev',  rol: 'Revisión' },
   { k: 'apr',  rol: 'Aprobación' },
+  { k: 'apr2', rol: 'Aprobación', segundo: true },
   { k: 'rec',  rol: 'Recibe' }
 ]);
 
@@ -2266,153 +2269,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    */
   const campoRed = (base) => (documento === 'salud' ? base + '_mtto' : base);
 
-  /**
-   * Selector de ACCIONES de mantenimiento. Es lo que hace específico el alcance:
-   * el Ingeniero marca qué se ejecuta y la redacción se compone con eso.
-   *
-   * Se distingue de dónde sale cada renglón, porque no valen lo mismo: lo que el
-   * equipo tiene REGISTRADO en Salud de Activos, la LÍNEA BASE de su condición
-   * cuando no tiene nada registrado (y entonces se rotula como referencial), y
-   * el CATÁLOGO oficial de la banda, que se ofrece sin marcar para añadir.
-   */
-  function selectorAcciones(e) {
-    const st = estadoDe(e);
-    const ci = nucleoFicha(e || {}).ci;
-    const todas = accionesDeEquipo(e, { todasLasCondiciones: true });
-    // Orden del Ingeniero (2026-09-09): «todo lo referente a inversión queda en
-    // PI». Aquí no se ofrecen, pero tampoco se borran de la vista: si el plan
-    // del equipo trae una, se dice cuál es y dónde se sustenta. Ocultarla sin
-    // más sería perder de la pantalla un renglón del plan de récord (L-81).
-    const disp = todas.filter((a) => !esInversion(a.txt));
-    const fueraPorInversion = todas.filter((a) => esInversion(a.txt));
-    // El aviso es por NO TENER CONDICIÓN, no por lista vacía: en modo catálogo
-    // la lista nunca está vacía (siempre trae las 7 macroactividades), así que
-    // colgarlo de `disp.length` lo dejaba muerto y le enseñaba a un equipo sin
-    // condición un catálogo entero sin decirle que ninguna banda es la suya.
-    if (ci == null || (!disp.length && !fueraPorInversion.length)) {
-      return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
-        + 'registrada, así que no hay una banda suya que proponer. El alcance se redacta a '
-        + 'mano o se toma la versión automática.</div>';
-    }
-    const marcados = new Set(seleccionAcciones(e, st, 'alcance_mtto').map((a) => a.id));
-    const propias = disp.filter((a) => a.origen !== 'catalogo');
-    const hayRegistro = propias.some((a) => a.origen === 'registro');
-    const esBase = propias.some((a) => a.origen === 'base');
-
-    const fila = (a) => {
-      const C = CATEGORIAS_ACCION[a.cat] || CATEGORIAS_ACCION.DIAG;
-      // El gris es de «se ofrece, no está en el alcance». Un renglón MARCADO
-      // no es opcional aunque venga del catálogo: no puede salir en gris.
-      const marcada = marcados.has(a.id);
-      return '<label class="ftm-acc-item' + (a.origen === 'catalogo' && !marcada ? ' es-extra' : '') + '">'
-        + '<input type="checkbox" data-accion="' + esc(a.id) + '"' + (marcada ? ' checked' : '') + '>'
-        + '<span class="ftm-acc-cat" style="background:' + C.c + '" title="' + esc(C.lbl) + '"></span>'
-        + '<span class="ftm-acc-txt">' + esc(a.txt) + '</span>'
-        + '</label>';
-    };
-
-    // Encargo del Ingeniero (2026-09-10): «que aparezcan TODAS las
-    // macroactividades por condición». El catálogo entero, agrupado como lo
-    // agrupa la norma; la banda del equipo va abierta y señalada, el resto
-    // plegado para que no tape la pantalla. Se pliega con <details>, que es
-    // nativo: sin JS, sin listener global y accesible por teclado (§3.5).
-    // Ids de la banda del equipo: sirven para saber si una marca en un grupo
-    // ajeno es una REPETICIÓN real de la norma (solo pasa con 2 de las 34
-    // subactividades, entre C1 y C2) o algo que el Ingeniero marcó a mano.
-    const idsSuBanda = new Set(
-      disp.filter((a) => a.cond === ci && !a.esMitigacion).map((a) => a.id));
-
-    const grupoMacro = (m) => {
-      const suyas = disp.filter((a) => a.macro === m.codigo);
-      const fuera = fueraPorInversion.filter((a) => a.macro === m.codigo);
-      if (!suyas.length && !fuera.length) return '';
-      const esSuya = ci != null && m.condicion === ci;
-      const esSuBanda = esSuya && !m.esMitigacion;
-      const marcadasAqui = suyas.filter((a) => marcados.has(a.id));
-      const nMarcadas = marcadasAqui.length;
-      const nRepetidas = marcadasAqui.filter((a) => idsSuBanda.has(a.id)).length;
-      const nAjenas = nMarcadas - nRepetidas;
-      return '<details class="ftm-acc-macro' + (esSuya ? ' es-suya' : '') + '"'
-        + (esSuya ? ' open' : '')
-        // «Marcar las suyas» NO debe barrer la mitigación: depende de la causa,
-        // no de la banda. El grupo se abre y se señala, pero queda fuera del
-        // ámbito del botón.
-        + (esSuBanda ? ' data-acc-ambito="propio"' : '') + '>'
-        + '<summary class="ftm-acc-macro-cab">'
-        +   '<span class="ftm-acc-macro-nom">' + esc(m.nombre) + '</span>'
-        +   '<span class="ftm-acc-macro-cond">Condición ' + m.condicion + '</span>'
-        +   (esSuya ? '<span class="ftm-acc-macro-yo">este equipo</span>' : '')
-        // El rótulo «referencial» tiene que vivir DONDE está la marca: si no,
-        // un bloque marcado y abierto se lee como plan aprobado, que es
-        // exactamente la confusión que ADR-066 prohíbe.
-        +   (esSuBanda && esBase
-          ? '<span class="ftm-acc-macro-ref-lbl">línea base · referencial</span>' : '')
-        +   '<span class="ftm-acc-macro-n">' + (nMarcadas ? nMarcadas + ' de ' : '')
-        +     suyas.length + '</span>'
-        +   '<span class="ftm-acc-macro-ref">' + esc(m.referencia) + '</span>'
-        + '</summary>'
-        + suyas.map(fila).join('')
-        + (!esSuya && nRepetidas
-          ? '<p class="ftm-acc-macro-nota">' + (nRepetidas === 1 ? 'Una actividad' : nRepetidas + ' actividades')
-            + ' de este grupo aparece' + (nRepetidas === 1 ? '' : 'n')
-            + ' marcada' + (nRepetidas === 1 ? '' : 's') + ' porque la norma '
-            + (nRepetidas === 1 ? 'la' : 'las') + ' repite en la banda del equipo: es la misma '
-            + 'acción, no una segunda.</p>'
-          : '')
-        + (!esSuya && nAjenas
-          ? '<p class="ftm-acc-macro-nota">' + (nAjenas === 1 ? 'Una actividad' : nAjenas + ' actividades')
-            + ' de otra banda que usted añadió al alcance.</p>'
-          : '')
-        + (fuera.length
-          ? '<p class="ftm-acc-macro-inv">Fuera de este documento por ser inversión: '
-            + fuera.map((a) => esc(a.txt)).join(', ') + '.</p>'
-          : '')
-        + '</details>';
-    };
-
-    // El plan de récord del equipo NO es catálogo y va aparte: confundirlos
-    // sería presentar como aprobado algo que nadie aprobó (ADR-066).
-    const fueraDelPlan = fueraPorInversion.filter((a) => a.origen !== 'catalogo');
-
-    // Desde que la línea base sale del catálogo oficial (2026-09-10) ya no hace
-    // falta un grupo «línea base» aparte: es LITERALMENTE la banda del equipo,
-    // que abajo aparece abierta, rotulada «este equipo» y marcada. Repetirla
-    // arriba sería enseñar dos veces lo mismo. Solo se pinta arriba lo que NO
-    // está en ningún grupo del catálogo —el plan registrado, y por defensa
-    // cualquier renglón base sin pareja—, para que nada quede seleccionado y
-    // fuera de la vista.
-    const enCatalogo = new Set(disp.filter((a) => a.origen === 'catalogo').map((a) => a.id));
-    const arriba = propias.filter((a) => a.origen === 'registro' || !enCatalogo.has(a.id));
-
-    return '<div class="ftm-acc">'
-      + '<div class="ftm-acc-head">Acciones de mantenimiento del alcance'
-      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar las suyas</button>'
-      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="0">Ninguna</button>'
-      + '</div>'
-      + (arriba.length
-        ? '<div class="ftm-acc-grupo" data-acc-ambito="propio"><span class="ftm-acc-rot">'
-          + (hayRegistro ? 'Plan registrado del equipo' : 'Línea base de la condición · referencial')
-          + '</span>' + arriba.map(fila).join('') + '</div>'
-        : '')
-      + '<div class="ftm-acc-catalogo">'
-      +   '<span class="ftm-acc-rot">Catálogo MO.00418 §4.3 · todas las macroactividades</span>'
-      +   macroactividadesCatalogo().map(grupoMacro).join('')
-      + '</div>'
-      + (fueraDelPlan.length
-        ? '<p class="ftm-acc-aviso">Fuera de este documento por ser <b>inversión</b>: '
-          + fueraDelPlan.map((a) => esc(a.txt)).join(', ')
-          + '. La inversión se sustenta en la <b>Propuesta a Plan de Inversión (PI)</b>, que es el '
-          + 'otro documento que se emite desde este equipo.</p>'
-        : '')
-      + '<p class="ftm-acc-pie">' + (esBase
-        ? 'El equipo no trae macroactividad registrada. Su banda queda abierta y rotulada '
-          + '<b>referencial</b>: de ella se marca solo lo de diagnóstico y verificación, porque la '
-          + 'norma lista por banda lo que PUEDE aplicar, no lo que este equipo necesita. Lo '
-          + 'intrusivo se ofrece sin marcar y se escoge contra el hallazgo. '
-        : '') + 'Lo que marque entra en el texto del alcance, venga de la banda que venga; si no '
-      + 'marca nada, el alcance dice que las acciones se definirán según el diagnóstico.</p>'
-      + '</div>';
-  }
 
   /** Selector de redacción + área de texto (alcance / beneficios). */
   function selectorRedaccion(e, campo) {
@@ -2471,8 +2327,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       : (rec != null
         ? 'Este equipo está en condición ' + esc(String(rec)) + ' · ' + esc(nombreCondicion(rec))
           + ': ' + (nProp === 1 ? 'su propuesta está marcada' : 'sus ' + nProp + ' propuestas están marcadas')
-          + ' en la lista. El texto se compone con las acciones que haya marcado arriba; '
-          + 'puede editarlo libremente.'
+          + ' en la lista. Puede editar el texto libremente.'
         : 'Elija una versión y edítela libremente; la cifra de potencia se toma de «Potencia del proyecto».');
     return '<div class="ftm-alcance">'
       + '<label for="ftm-sel-' + campo + '">Redacción</label>'
@@ -2481,6 +2336,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<textarea class="ftm-campo-area ftm-campo-area--alcance" data-texto="' + campo + '" '
       + 'aria-label="Texto de ' + campo + '" placeholder="(texto del ' + campo
       + ' — elija una redacción arriba o escriba la suya)">' + esc(st.plan[campo] || '') + '</textarea>';
+  }
+
+  /** Total real en pantalla: la cifra, «—» si no hay, «no legible» si no es cifra. */
+  function textoTotalReal(v) {
+    const r = leerMonto(v);
+    if (r.estado === 'ilegible') return 'no legible';
+    return r.valor != null ? formatearCOP(r.valor) : '—';
   }
 
   /** Presupuesto: el desglose lo calcula el dominio; aquí solo se pinta. */
@@ -2510,16 +2372,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<tr><td class="ftm-izq">' + esc(e.subestacion || '') + '</td>'
       +   '<td>' + tI('presu_ucc', lleno(P.presu_ucc) ? P.presu_ucc : U, 'UC') + '</td>'
       +   '<td class="ftm-izq">' + tI('presu_desc', desc, '') + '</td>'
-      +   '<td>' + nI('presu_unit', dg.costoInstalacion != null ? formatearCOP(dg.costoInstalacion) : '') + '</td>'
+      // Un costo tecleado que no es cifra se deja VISIBLE tal cual: si se
+      // repintara vacío, el aviso diría «ilegible» sobre un campo en blanco.
+      +   '<td>' + nI('presu_unit', dg.motivo === 'instalacion_ilegible' ? P.presu_unit
+        : (dg.costoInstalacion != null ? formatearCOP(dg.costoInstalacion) : '')) + '</td>'
       +   '<td>' + nI('presu_cant', dg.cantidad) + '</td>'
       +   '<td class="ftm-num" data-calc="total">' + (dg.total != null ? formatearCOP(dg.total) : '—') + '</td>'
       +   '<td>' + nI('presu_real', P.presu_real) + '</td>'
       +   '<td>' + tI('presu_sistema', P.presu_sistema, '') + '</td></tr>'
       + '<tr class="ftm-total"><td colspan="5" class="ftm-izq">TOTAL DEL PROYECTO</td>'
       +   '<td class="ftm-num" data-calc="proyecto">' + (dg.total != null ? formatearCOP(dg.total) : '—') + '</td>'
-      // OJO: el dinero se lee con `montoCOP` (los puntos son miles), NUNCA con
-      // `num` — "2.100.000.000" con parseFloat sería 2,1.
-      +   '<td class="ftm-num" data-calc="real">' + (montoCOP(P.presu_real) != null ? formatearCOP(montoCOP(P.presu_real)) : '—') + '</td>'
+      // OJO: el dinero se lee con `leerMonto` (los puntos son miles y no se
+      // adivina), NUNCA con `num` — "2.100.000.000" con parseFloat sería 2,1.
+      // Es la MISMA lectura que va al Excel (`99 §87`).
+      +   '<td class="ftm-num" data-calc="real">' + textoTotalReal(P.presu_real) + '</td>'
       +   '<td></td></tr>'
       + '</tbody></table>'
       + '<div class="ftm-nota" data-calc="formula"><b>Desglose:</b> ' + esc(dg.formula) + '</div>'
@@ -2527,16 +2393,127 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   /** Cuadro de firmas del formato (roles fijos; nombre y cargo los pone quien firma). */
+  /**
+   * Cuadro de firmas con la MISMA forma que el Excel PE.02081 (orden del
+   * Ingeniero, 2026-09-23: «que esta parte se pueda apreciar como en el
+   * entregable»): un cuadro por rol con el título sobre el borde, Aprobación con
+   * sus dos firmantes lado a lado, y en cada firmante Nombre, Ocupación (ya
+   * escrita, como la trae la plantilla), Firma (a mano, sobre la línea) y Fecha.
+   * Mismas claves de antes (`nom_*`, `occ_*`); se AÑADEN `fec_*` y el segundo
+   * aprobador (`*_apr2`). La ocupación de la plantilla se muestra mientras no
+   * se escriba otra, pero no se guarda: no es trabajo del usuario (`99 §85.4`).
+   */
   function bloqueFirmas(e) {
     const st = estadoDe(e);
-    return '<div class="ftm-firmas">' + FIRMAS.map((f) =>
-      '<div class="ftm-firma"><div class="ftm-firma-rol">' + esc(f.rol) + '</div>'
-      + '<div class="ftm-firma-sign"><div class="ftm-firma-linea"></div></div>'
-      + '<input class="ftm-firma-nombre" data-plan="nom_' + f.k + '" placeholder="(nombre)" '
-      + 'aria-label="Nombre de quien firma en ' + esc(f.rol) + '" value="' + esc(st.plan['nom_' + f.k] || '') + '">'
-      + '<input class="ftm-firma-nombre" data-plan="occ_' + f.k + '" placeholder="(cargo)" '
-      + 'aria-label="Cargo de quien firma en ' + esc(f.rol) + '" value="' + esc(st.plan['occ_' + f.k] || '') + '">'
-      + '</div>').join('') + '</div>';
+    const P = st.plan;
+    // `tope`: largo máximo. En «Otra persona» un nombre o un cargo muy largos
+    // empujaban la Firma y la Fecha fuera del cuadro del papel (revisión §89).
+    const renglon = (lbl, clave, valor, ph, aria, area, tope, extra) =>
+      '<label class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">' + esc(lbl) + '</span>'
+      // Nombre y Ocupación van en área de texto que CRECE con lo escrito: en un
+      // cuadro angosto un campo de una línea cortaba «…de Potencia» y el nombre.
+      + (area
+        ? '<textarea class="ftm-fmt-in ftm-fmt-in--area" rows="1" data-plan="' + clave + '" '
+          + (tope ? 'maxlength="' + tope + '" ' : '')
+          + 'placeholder="' + esc(ph) + '" aria-label="' + esc(aria) + '">' + esc(valor) + '</textarea>'
+        : '<input class="ftm-fmt-in" data-plan="' + clave + '" value="' + esc(valor) + '" '
+          + 'placeholder="' + esc(ph) + '" aria-label="' + esc(aria) + '">')
+      + (extra || '') + '</label>';
+    const firmante = (f) => {
+      const quien = f.rol + (f.segundo ? ' (segundo firmante)' : '');
+      // Quién firma sale del dominio, con la MISMA función que usa el Excel.
+      const q = firmanteDe(f.k, P);
+      const opciones = (FIRMANTES[f.k] || []).map((p, i) =>
+        '<option value="' + i + '"' + (q.indice === i ? ' selected' : '') + '>' + esc(p.nombre) + '</option>').join('')
+        + '<option value="' + OTRA_PERSONA + '"' + (q.otra ? ' selected' : '') + '>Otra persona (escribir)</option>';
+      // El nombre elegido se ve como TEXTO corrido (baja de renglón como en el
+      // Excel, nunca se corta) y el desplegable va encima, transparente: al
+      // tocar el nombre se elige otra persona. Un <select> visible cortaba
+      // «MIGUEL A. JIME…» en el cuadro angosto de Elaboración.
+      const sel = '<select class="ftm-fmt-sel" data-firma-sel="' + f.k + '" '
+        + 'aria-label="Quién firma en ' + esc(quien) + '">' + opciones + '</select>';
+      const texto = (lbl, valor) => '<div class="ftm-fmt-renglon ftm-fmt-renglon--texto">'
+        + '<span class="ftm-fmt-lbl">' + esc(lbl) + '</span> ' + valor + '</div>';
+      return '<div class="ftm-fmt-firmante" data-firmante="' + f.k + '">'
+        + (q.otra
+          // «Otra persona»: el nombre se escribe EN su renglón (al imprimir sale
+          // «Nombre: …», no el rótulo «Otra persona») y la flechita queda al lado
+          // para volver a la lista.
+          ? renglon('Nombre:', 'nom_' + f.k, q.nombre, '(nombre)', 'Nombre de quien firma en ' + quien, true, 45,
+              '<span class="ftm-fmt-elige ftm-fmt-elige--solo" title="Elegir de la lista">' + sel + '</span>')
+            + renglon('Ocupación:', 'occ_' + f.k, q.ocupacion, '(cargo)', 'Ocupación de quien firma en ' + quien, true, 60)
+          // De la lista: nombre y cargo dictados, como TEXTO del formato.
+          : texto('Nombre:', '<span class="ftm-fmt-elige"><span class="ftm-fmt-valor">' + esc(q.nombre) + '</span>' + sel + '</span>')
+            + texto('Ocupación:', esc(q.ocupacion)))
+        + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
+        +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
+        + renglon('Fecha:', 'fec_' + f.k, P['fec_' + f.k] || '', 'dd/mm/aaaa', 'Fecha de la firma en ' + quien)
+        + '</div>';
+    };
+    firmanteHTML = firmante;
+    const roles = [...new Set(FIRMAS.map((f) => f.rol))];
+    return '<div class="ftm-fmt ftm-fmt-firmas">' + roles.map((rol) => {
+      const suyos = FIRMAS.filter((f) => f.rol === rol);
+      return '<fieldset class="ftm-fmt-caja' + (suyos.length > 1 ? ' ftm-fmt-caja--doble' : '') + '">'
+        + '<legend>' + esc(rol) + '</legend>'
+        + '<div class="ftm-fmt-cols">' + suyos.map(firmante).join('') + '</div></fieldset>';
+    }).join('') + '</div>';
+  }
+
+  /** Pinta un firmante suelto (lo usa `elegirFirmante` para repintar solo esa casilla). */
+  let firmanteHTML = null;
+
+  /**
+   * Cambio en el desplegable «Nombre» de una casilla de firma. Elegir a una
+   * persona de la lista fija su nombre y deja que la ocupación vuelva a ser la
+   * suya; «Otra persona» abre el renglón para escribirla a mano.
+   */
+  function elegirFirmante(k, valor) {
+    if (!actual) return;
+    const P = estadoDe(actual).plan;
+    if (valor === OTRA_PERSONA) {
+      P['sel_' + k] = OTRA_PERSONA;
+      P['nom_' + k] = '';
+      P['occ_' + k] = '';
+    } else {
+      const p = (FIRMANTES[k] || [])[+valor];
+      if (!p) return;
+      delete P['sel_' + k];
+      delete P['occ_' + k];
+      delete P['nom_' + k];
+      // Elegir a la persona que ya iba por defecto no guarda nada: la ficha
+      // queda igual que sin tocar y no debe contar como trabajo del usuario
+      // (si contara, bloquearía restaurar el borrador de ayer, `§85.4`).
+      if (+valor !== indicePorDefecto(k, P)) P['nom_' + k] = p.nombre;
+    }
+    tocarFicha(actual);
+    // El segundo aprobador depende del primero (no repite persona): se repinta
+    // también cuando cambia el primero.
+    const repintar = k === 'apr' ? ['apr', 'apr2'] : [k];
+    repintar.forEach((c) => {
+      const caja = modalCuerpo.querySelector('[data-firmante="' + c + '"]');
+      const f = FIRMAS.find((x) => x.k === c);
+      if (caja && f && firmanteHTML) caja.outerHTML = firmanteHTML(f);
+    });
+    // El foco vuelve a donde estaba: al reemplazar la casilla se perdía y el
+    // siguiente Tab saltaba a «Exportar Excel» (revisión §89).
+    const destino = modalCuerpo.querySelector(valor === OTRA_PERSONA
+      ? '[data-firmante="' + k + '"] [data-plan="nom_' + k + '"]'
+      : '[data-firma-sel="' + k + '"]');
+    if (destino) destino.focus();
+  }
+
+  /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
+  function bloquePeriodo(e) {
+    const P = estadoDe(e).plan;
+    const caja = (titulo, clave, ph) =>
+      '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>' + esc(titulo) + '</legend>'
+      + '<input class="ftm-fmt-in ftm-fmt-in--centro" data-plan="' + clave + '" value="' + esc(P[clave] || '') + '" '
+      + 'placeholder="' + esc(ph) + '" aria-label="' + esc(titulo) + '"></fieldset>';
+    return '<div class="ftm-fmt ftm-fmt-periodo">'
+      + caja('Fecha de Entrega', 'fechaentrega', 'dd/mm/aaaa')
+      + caja('Año de entrada', 'anioentrada', 'aaaa')
+      + '</div>';
   }
 
   // ── HOJA 1 · Ficha Técnica ──
@@ -2570,7 +2547,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +     '<span class="ftm-campo-val" data-calc="uucc">' + esc(textoUC(U, r)) + '</span></div>'
       + '</div>'
       + banda('Alcance')
-      + (documento === 'salud' ? selectorAcciones(e) : '')
+      // Orden del Ingeniero (2026-09-23, `99 §90`): en el Alcance ya no va el
+      // selector de «acciones de mantenimiento»; aparece solo el alcance.
       + selectorRedaccion(e, campoRed('alcance'))
       // El presupuesto valora la Unidad Constructiva de REPOSICIÓN y rotula
       // «INVERSIÓN»: pertenece al PI. Orden del Ingeniero (2026-09-09): todo lo
@@ -2582,10 +2560,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<table class="ftm-tabla"><tbody><tr><th>Fecha</th><th>Versión</th><th>Motivo del cambio</th></tr>'
       +   '<tr><td></td><td></td><td></td></tr></tbody></table>'
       + banda('Período de ejecución')
-      + '<div class="ftm-hoja-grid2">'
-      +   campoInput('Fecha de entrega', 'fechaentrega', P.fechaentrega || '', 'dd/mm/aaaa')
-      +   campoInput('Año de entrada', 'anioentrada', P.anioentrada || '', 'aaaa')
-      + '</div>'
+      + bloquePeriodo(e)
       + bloqueFirmas(e)
       + pieHoja(documento === 'salud' ? 'Pág. 1 de 7' : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
@@ -2743,10 +2718,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (el) el.textContent = totTxt;
     });
     const elReal = modalCuerpo.querySelector('[data-calc="real"]');
-    if (elReal) {
-      const r = montoCOP(st.plan.presu_real);
-      elReal.textContent = r != null ? formatearCOP(r) : '—';
-    }
+    if (elReal) elReal.textContent = textoTotalReal(st.plan.presu_real);
     const elF = modalCuerpo.querySelector('[data-calc="formula"]');
     if (elF) elF.innerHTML = '<b>Desglose:</b> ' + esc(dg.formula);
     const elV = modalCuerpo.querySelector('[data-calc="variacion"]');
@@ -2754,30 +2726,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const varr = variacionReal({ totalCreg: dg.total, valorReal: st.plan.presu_real });
       elV.innerHTML = '<b>Variación Valor Real − CREG:</b> ' + esc(varr.texto);
     }
-  }
-
-  /**
-   * Rehace el texto del alcance con la selección de acciones vigente. Solo si
-   * hay una redacción elegida: si el Ingeniero escribió la suya, no se pisa.
-   */
-  function rehacerAlcance() {
-    if (!actual || documento !== 'salud') return;
-    const st = estadoDe(actual);
-    const campo = campoRed('alcance');
-    const ver = st.plan[campo + '_ver'];
-    if (ver == null || ver === 'custom') return;
-    st.plan[campo] = textoVersion(campo, +ver, actual, st);
-    const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
-    if (ta) ta.value = st.plan[campo];
-  }
-
-  /** Guarda la selección de acciones y rehace el alcance. */
-  function fijarAcciones(ids) {
-    const st = estadoDe(actual);
-    st.plan.acc_sel = ids;
-    tocarFicha(actual);
-    marcarSucio();
-    rehacerAlcance();
   }
 
   /** Al cambiar la potencia, las redacciones NO personalizadas se rehacen. */
@@ -2817,6 +2765,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     };
   }
 
+  /** Texto del aviso previo a la descarga: una línea por motivo (CF-06). */
+  function avisoPendientes(faltan) {
+    const n = faltan.reduce((s, f) => s + f.campos.length, 0);
+    return 'El Excel va a salir con ' + n + (n === 1 ? ' casilla marcada' : ' casillas marcadas')
+      + ' [PENDIENTE]:\n\n'
+      + faltan.map((f) => '• ' + f.campos.join(' y ') + ': ' + f.motivo).join('\n')
+      + '\n\nPulse Aceptar para descargarlo así, o Cancelar para volver y completarlo.';
+  }
+
   async function exportarExcel() {
     if (!actual) return;
     const btn = $('[data-ftm="exportar"]');
@@ -2827,7 +2784,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const mod = cfg.exportador
         ? { exportarFichaPlanificacion: cfg.exportador, nombreArchivoFicha: null }
         : await import('./exportar-planificacion.js');
-      const blob = await mod.exportarFichaPlanificacion(actual, estadoParaExportar(actual));
+      const estado = estadoParaExportar(actual);
+      // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo
+      // se pregunta si falta algo: preguntar por costumbre enseña a decir que sí
+      // sin leer.
+      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(actual, estado) : [];
+      if (faltan.length && !globalThis.confirm(avisoPendientes(faltan))) return;
+      const blob = await mod.exportarFichaPlanificacion(actual, estado);
       const nombre = mod.nombreArchivoFicha
         ? mod.nombreArchivoFicha(actual)
         : 'Ficha_Planificacion.xlsx';
@@ -2871,25 +2834,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
     if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
     if (ev.target.closest('[data-ftm="borr-descartar"]')) { descartarBorrador(); return; }
-
-    // Marcar todas / ninguna las acciones del alcance
-    const acct = ev.target.closest('[data-acc-todo]');
-    if (acct && contenedor.contains(acct) && actual) {
-      const todas = acct.getAttribute('data-acc-todo') === '1';
-      // «Marcar todas» = las de SU condición y su plan, no las 41 de la norma:
-      // el selector ahora muestra el catálogo entero y marcarlo completo
-      // metería en el alcance trabajos de bandas que no le corresponden.
-      const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
-      const propias = [...modalCuerpo.querySelectorAll('[data-acc-ambito="propio"] [data-accion]')];
-      if (todas) {
-        propias.forEach((c) => { c.checked = true; });
-        fijarAcciones([...new Set(propias.map((c) => c.getAttribute('data-accion')))]);
-      } else {
-        cajas.forEach((c) => { c.checked = false; });
-        fijarAcciones([]);
-      }
-      return;
-    }
 
     // Gestión de novedades
     const gest = ev.target.closest('[data-gestionar]');
@@ -2985,6 +2929,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const plan = t.getAttribute('data-plan');
     if (plan) {
       st.plan[plan] = t.value;
+      // Escribir el nombre de un firmante es «Otra persona» EXPLÍCITO: si luego
+      // se borra, la casilla no debe volver sola a la persona por defecto con el
+      // cargo que quedó escrito (revisión §89).
+      if (/^nom_/.test(plan) && t.closest('[data-firmante]')) st.plan['sel_' + plan.slice(4)] = OTRA_PERSONA;
       tocarFicha(actual);
       if (t.getAttribute('data-recalcula')) {
         if (plan === 'potenciaMVA') reescribirRedacciones();
@@ -3014,6 +2962,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   function alCambiar(ev) {
     const t = ev.target;
+
+    // Casilla de firma: elegir quién firma (`99 §89`)
+    if (t.matches && t.matches('[data-firma-sel]')) {
+      elegirFirmante(t.getAttribute('data-firma-sel'), t.value);
+      return;
+    }
 
     // Acta: recuperar decisiones de un archivo
     if (t.matches && t.matches('[data-ftm="corr-importar"]')) {
@@ -3053,18 +3007,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
       tocarFicha(actual);
       }
-    const accId = t.getAttribute && t.getAttribute('data-accion');
-    if (accId && actual) {
-      // La norma repite dos subactividades en C1 y C2 («Pruebas eléctricas»,
-      // «Inspección ocular detallada»): son la MISMA acción, así que sus dos
-      // casillas se mueven juntas. Si no, la pantalla mostraría una marcada y
-      // otra no para algo que en el alcance sale una sola vez.
-      modalCuerpo.querySelectorAll('[data-accion="' + accId + '"]')
-        .forEach((c) => { c.checked = t.checked; });
-      const marcados = [...new Set([...modalCuerpo.querySelectorAll('[data-accion]')]
-        .filter((c) => c.checked).map((c) => c.getAttribute('data-accion')))];
-      fijarAcciones(marcados);
-    }
     if (t.getAttribute && t.getAttribute('data-anexo') && actual) {
       estadoDe(actual).anexo[t.getAttribute('data-anexo')] = t.value;
       tocarFicha(actual);

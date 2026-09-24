@@ -38,15 +38,47 @@ export const MOTIVOS_PENDIENTE = Object.freeze({
   SIN_UC: 'sin_uc',                 // no se indicó ninguna UC
   UC_FUERA_CATALOGO: 'uc_fuera_catalogo', // la UC no existe en Tablas 51/52
   UC_SIN_COSTO: 'uc_sin_costo',     // la UC existe pero su fila no trae cifras
-  SIN_POTENCIA: 'sin_potencia'      // falta la potencia del proyecto en MVA
+  SIN_POTENCIA: 'sin_potencia',     // falta la potencia del proyecto en MVA
+  INSTALACION_ILEGIBLE: 'instalacion_ilegible', // el costo tecleado a mano no es una cifra
+  POR_MVA_ILEGIBLE: 'por_mva_ilegible'          // el $/MVA tecleado a mano no es una cifra
 });
 
 const MENSAJE_PENDIENTE = Object.freeze({
   sin_uc: 'No se indicó la Unidad Constructiva del proyecto.',
   uc_fuera_catalogo: 'La UC no está en el catálogo CREG 015/2018 (Tablas 51 y 52).',
   uc_sin_costo: 'La UC está en el catálogo pero su fila no trae costo de instalación y/o valor unitario.',
-  sin_potencia: 'Falta la potencia del proyecto en MVA.'
+  sin_potencia: 'Falta la potencia del proyecto en MVA.',
+  instalacion_ilegible: 'El Valor CREG Unitario tecleado no se puede leer como cifra: escríbalo solo con números, p. ej. 192.852.000.',
+  por_mva_ilegible: 'El valor por MVA tecleado no se puede leer como cifra: escríbalo solo con números, p. ej. 49.593.000.'
 });
+
+/** Forma colombiana de un monto: miles con punto en grupos de tres (o sin
+ *  separador), coma decimal opcional, «$» y signo menos opcionales. */
+const FORMA_MONTO = /^-?\s*\$?\s*-?\s*(?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d+)?$/;
+
+/**
+ * Lee un monto TECLEADO a mano para el papel que se firma, SIN adivinar.
+ *
+ * POR QUÉ EXISTE: `montoCOP` es tolerante a propósito (limpia el catálogo), y
+ * con texto libre inventaba cifras: «2.100 millones» → 2.100, «2,100,000,000»
+ * (miles al estilo inglés) → 2,1, «1850000000.50» (punto decimal) → cien veces
+ * más. Con CF-05 esa cifra llegaba al Excel firmado sin aviso (`99 §87`). Aquí
+ * solo se acepta la forma colombiana; lo demás es ILEGIBLE y se dice.
+ *
+ * @param {*} v  número o texto tecleado
+ * @returns {{valor: number|null, estado: 'vacio'|'ok'|'ilegible'}}
+ */
+export function leerMonto(v) {
+  if (v == null) return { valor: null, estado: 'vacio' };
+  if (typeof v === 'number') {
+    return Number.isFinite(v) ? { valor: v, estado: 'ok' } : { valor: null, estado: 'ilegible' };
+  }
+  const s = String(v).trim();
+  if (s === '') return { valor: null, estado: 'vacio' };
+  if (!FORMA_MONTO.test(s)) return { valor: null, estado: 'ilegible' };
+  const valor = montoCOP(s);
+  return valor == null ? { valor: null, estado: 'ilegible' } : { valor, estado: 'ok' };
+}
 
 // ── Utilidades internas ──────────────────────────────────────────────────────
 
@@ -112,17 +144,28 @@ export function desgloseCreg(entrada = {}) {
   const hallada = uc ? buscarUC(uc) : null;
   const catalogo = uc ? costoUC(uc) : null;
 
-  const instOverride = aMonto(entrada.costoInstalacion);
-  const porMvaOverride = aMonto(entrada.valorUnitarioMVA);
+  // Lo tecleado a mano se lee sin adivinar (`leerMonto`): si no es una cifra,
+  // NO se cae en silencio al catálogo —el usuario creería que manda su valor—
+  // ni se firma otra cifra; la línea queda pendiente y se dice por qué.
+  const inst = leerMonto(entrada.costoInstalacion);
+  const porMva = leerMonto(entrada.valorUnitarioMVA);
+  const instOverride = inst.valor;
+  const porMvaOverride = porMva.valor;
 
-  const costoInstalacion = instOverride != null ? instOverride : (catalogo ? catalogo.inst : null);
-  const valorUnitarioMVA = porMvaOverride != null ? porMvaOverride : (catalogo ? catalogo.porMVA : null);
+  const costoInstalacion = inst.estado === 'ilegible' ? null
+    : (instOverride != null ? instOverride : (catalogo ? catalogo.inst : null));
+  const valorUnitarioMVA = porMva.estado === 'ilegible' ? null
+    : (porMvaOverride != null ? porMvaOverride : (catalogo ? catalogo.porMVA : null));
   const vigencia = catalogo ? catalogo.vig : null;
 
   // ¿Por qué queda pendiente? Se reporta la PRIMERA causa, de la más de fondo
   // a la más superficial, para que el usuario sepa qué corregir.
   let motivo = null;
-  if (costoInstalacion == null || valorUnitarioMVA == null) {
+  if (inst.estado === 'ilegible') {
+    motivo = MOTIVOS_PENDIENTE.INSTALACION_ILEGIBLE;
+  } else if (porMva.estado === 'ilegible') {
+    motivo = MOTIVOS_PENDIENTE.POR_MVA_ILEGIBLE;
+  } else if (costoInstalacion == null || valorUnitarioMVA == null) {
     if (!uc) motivo = MOTIVOS_PENDIENTE.SIN_UC;
     else if (!hallada) motivo = MOTIVOS_PENDIENTE.UC_FUERA_CATALOGO;
     else motivo = MOTIVOS_PENDIENTE.UC_SIN_COSTO;
@@ -197,7 +240,12 @@ export function totalProyectoCreg(lineas = []) {
  */
 export function variacionReal({ totalCreg, valorReal } = {}) {
   const creg = aMonto(totalCreg);
-  const real = aMonto(valorReal);
+  const leido = leerMonto(valorReal);
+  if (leido.estado === 'ilegible') {
+    return { abs: null, pct: null, sentido: null,
+      texto: 'El Valor Real Total tecleado no se puede leer como cifra: escríbalo solo con números, p. ej. 2.100.000.000.' };
+  }
+  const real = leido.valor;
   if (real == null) {
     return { abs: null, pct: null, sentido: null, texto: 'Ingrese el Valor Real Total para ver la variación.' };
   }

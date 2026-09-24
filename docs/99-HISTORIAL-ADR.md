@@ -3628,3 +3628,197 @@ hoy · el archivo de la bóveda está íntegro y sus anclas resuelven · la revi
 cédulas dio **1691 commits, 0 hallazgos** · el predeploy de las Cloud Functions está versionado y los dos
 módulos que la CF importa son idénticos a su original. **Abierto y con dueño**: los 9 fixtures del 450108
 (decisión del Ingeniero, sube de la hija `11` a `10`) y el shard real de `00-INDICE`.
+
+## 87. ADR — Tanda B: el Excel que se firma lleva el Valor Real, dice [PENDIENTE] donde falta plata, y la «fórmula viva» resultó no existir ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Encargo: *«arranca por la Tanda B: CF-05, CF-06 y CF-32 — el Excel que se firma. Un punto a la vez,
+> nada se borra, y lo que toque el papel me lo enseñas en preview antes de publicar.»* Tres commits
+> separados en la rama; **publicación retenida hasta su visto bueno** sobre el preview.
+
+**87.1 Causa raíz (leída en el código y en la plantilla oficial).** (a) CF-05: `celdasFichaPlan` no tenía
+`J36`/`K36`, aunque la plantilla ya trae `J36` con formato de pesos (estilo 255, desbloqueada) y
+`J78 = SUM(J34:J66)`. Consecuencia que la cola no decía: el **TOTAL DEL PROYECTO real firmaba 0** en todas
+las fichas. (b) CF-06: F36/I36 llevaban `clear` cuando faltaba el dato y el exportador escribía `''` —la
+marca `pend` se calculaba y nadie la leía—; y como I78/J78 son SUM, **un equipo sin UC firmaba «0 y 0»**:
+un papel que afirma que el proyecto no cuesta nada. (c) CF-32: el exportador escribe TODO texto como
+`t="inlineStr"`; el riesgo de «fórmula viva» es del CSV.
+
+**87.2 Solución.** CF-05: `J36` numérico leído con `montoCOP` (la misma función que pinta el total en
+pantalla) y `K36` texto. CF-06: F36/I36/J36 sin dato ⇒ `[PENDIENTE]` como texto con el estilo de la
+plantilla; I78/J78 ⇒ `[PENDIENTE]` **solo mientras su línea esté pendiente** (con dato, entrada
+`plantilla:true` y manda la SUM oficial intacta); `pendientesFichaPlan()` agrupa por motivo y
+`exportarExcel` pide `confirm()` **solo si falta algo**. De paso, `lleno()` decide también el valor de
+D8/B17/B23 (un campo de puros espacios salía en blanco y a la vez contaba como pendiente). CF-32: sin
+cambio de código; prueba-candado. **Tras la revisión (87.4b)**: `leerMonto()` en el dominio —solo la forma
+colombiana; lo demás es ILEGIBLE— usado por el Excel, la pantalla (`textoTotalReal`, `variacionReal`) y el
+costo de instalación tecleado (`desgloseCreg`, motivos `instalacion_ilegible`/`por_mva_ilegible`; ya no cae
+en silencio al catálogo) · los totales van en su propia línea del aviso · todos los `String.replace` con
+texto dinámico del exportador usan FUNCIÓN · `celdaCSV()` cita también el `\r` suelto.
+
+**87.3 No-regresión.** Firmas públicas intactas (`celdasFichaPlan`, `exportarFichaPlanificacion`); solo se
+AÑADE `pendientesFichaPlan`. Contrato del mapa ampliado con `motivo`, `plantilla`, `derivada` (único
+consumidor: el propio exportador, verificado con grep). Con `cfg.exportador` inyectado (pruebas) no hay
+aviso. Prueba «fuera del mapa la hoja 1 sale idéntica celda por celda» y «no se crean celdas nuevas».
+
+**87.4 Verificación.** 14 pruebas nuevas contra la plantilla REAL (primeras del exportador) → **1773 pass /
+0 fail / 2 skip**, lint limpio. Banco local con el módulo real y dos equipos de EJEMPLO: aviso + Cancelar
+sin descarga y botón restaurado · ficha completa sin aviso · equipo sin UC con cinco `[PENDIENTE]` en el
+archivo y en el render de LibreOffice. CF-32: `=SUM`, `=HYPERLINK`, `@SUM`, `=CMD|…` en D8/B17/B23/O11 →
+LibreOffice y SheetJS los leen como texto; la salida `.xlsx` de la evaluación masiva (SheetJS `t="str"`
+sin `<f>`) tampoco evalúa; su CSV ya antepone apóstrofo. **Prueba de mutación**: con el apóstrofo metido
+a propósito el candado falla. Microsoft Excel NO se consultó (macOS pidió permiso de automatización y se
+dejó sin tocar).
+
+**87.4b Lo que la revisión adversarial paró antes del preview** (3 lentes + 1 escéptico por hallazgo, 13
+agentes Opus; crudo → bóveda `2026-09-23-tanda-b-excel/`). **Confirmados y corregidos**: (1) *media, lo trajo
+CF-05* — el Valor Real con texto libre se firmaba como OTRA cifra: «2.100 millones» → 2.100, «2,100,000,000»
+→ 2,1, «1850000000.50» → cien veces más, «=2.100.000.000*1,19» → otra; lo hallaron las TRES lentes · (2)
+*baja, CF-06* — el aviso contaba menos casillas que el papel · (3) *media, preexistente* — un «$» delante de
+`" < > & '` era orden de `String.replace` (`$&`, `` $` ``) y cambiaba el texto; «$`» dejaba la hoja ilegible;
+el candado no lo veía · (4) *media, preexistente* — el CSV de la evaluación masiva revivía la fórmula tras un
+`\r` suelto. **Refutado**: redondear centavos (el formato distinto de línea y total es el de la plantilla).
+**Confirmados, NO corregidos** (preexistentes → cola): Cantidad 0/texto se imprime 1; hoja «Beneficios» con
+`K11` enlazado a un libro EXTERNO inexistente. Tras los arreglos: **1798 pass / 0 fail / 2 skip** (39 pruebas
+nuevas en la tanda), lint limpio, mutación del «$» (falla con la forma vieja) y banco en vivo: «no legible»
+en pantalla, aviso que cita lo tecleado, cuenta del aviso = casillas del papel (4 y 7), el costo ilegible
+sigue visible tras cerrar y reabrir.
+
+**87.5 Anti-patrones evitados.** Aplicar el «arreglo de dos líneas» sin reproducir (L-100) · un total que
+firma 0 sobre datos que faltan · preguntar por costumbre (el aviso solo sale si falta algo) · leer dinero
+tecleado con un lector tolerante pensado para el catálogo · caer en silencio a un valor por defecto cuando
+lo tecleado no se entiende.
+
+**87.6 Archivos.** `assets/js/ui/fichas/exportar-planificacion.js` (`celdasFichaPlan`,
+`pendientesFichaPlan`, `escribirCelda`/`escribirFormula`/dibujo con reemplazo por función),
+`assets/js/ui/fichas/panel.js` (`avisoPendientes`, `exportarExcel`, `textoTotalReal`, `recalcular`),
+`assets/js/domain/fichas_presupuesto.js` (`leerMonto`, motivos nuevos, `desgloseCreg`, `variacionReal`),
+`assets/js/ui/fichas/evaluacion-masiva.js` (`celdaCSV`), `tests/fichas_exportar_planificacion.test.js`
+(nuevo), `tests/fichas_presupuesto.test.js`. Commits `6c702c5` · `b830c02` · `2fa7241` · `8b72751` ·
+`a6e4e3f`. INTACTOS: la plantilla, `montoCOP` (sigue leyendo el catálogo), el documento de Mantenimiento
+(botón oculto), el `.xlsx` de la evaluación masiva.
+
+**87.7 Doctrina.** «El presupuesto no inventa cifra» (`§74`) llevada del cálculo al PAPEL: ni blanco ni 0
+donde falta plata · verificar antes de afirmar (§3.3) aplicado a un hallazgo heredado.
+
+**87.8 Verificado sano / no re-auditar.** CF-32 en el PE.02081 y en la evaluación masiva (arriba) · la SUM
+de I78/J78 con dato queda byte-idéntica a la plantilla salvo el valor en caché · `montoCOP` con puntos de
+miles y coma decimal. **Pregunta abierta al Ingeniero**: ¿Valor Real vacío ⇒ `[PENDIENTE]` (así quedó) o en
+blanco y fuera del aviso? **Nuevo en cola**: CF-35 (la Descripción D36 sin UC sale «TRANSFORMADOR () - LADO
+DE ALTA NIVEL - DE», en pantalla y papel; texto que se firma ⇒ ejemplos antes) · CF-36 (Cantidad) · CF-37
+(`K11` de «Beneficios» con vínculo externo: ¿Costos = Valor Real o CREG?) · CF-38 (`resolverPlantilla` de
+las redacciones inserta subestación/matrícula con el mismo `String.replace` de texto: mismo «$», datos del
+parque). **Publicación retenida** hasta el visto bueno del Ingeniero sobre el preview (artifact privado
+«El Excel que se firma» + tres `.xlsx` de ejemplo).
+
+## 88. ADR — Período de ejecución y firmas con la forma del Excel PE.02081 ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Pedido, con captura del documento de Mantenimiento: *«me gustaría que esta parte se pueda apreciar como
+> en el entregable en el Excel para darte los parámetros completos»*. En rama, **sin publicar** (preview
+> entregado: `PREVIEW_Firmas_como_el_Excel.png`), como la Tanda B de `§87`.
+
+**88.1 Causa.** La pantalla tenía 4 columnas con «(nombre)» y «(cargo)» y el Excel otra cosa: en
+`drawing1.xml` de la plantilla hay 4 cuadros con título sobre el borde, **Aprobación con DOS firmantes**
+(la pantalla solo tenía uno) y, por firmante, Nombre · Ocupación (ya impresa) · Firma · Fecha; el período
+son dos cuadros con título. Y la regla global `body.aqua input:not(...)` —especificidad (0,6,3)— le ganaba
+al estilo de papel del módulo: por eso la captura mostraba cajas de formulario redondeadas.
+
+**88.2 Solución.** `bloqueFirmas` y `bloquePeriodo` (nuevo) arman la forma del Excel; `FIRMAS` se exporta y
+lleva `ocupacion` literal de la plantilla (cargos, no personas) y el segundo aprobador `apr2`. Claves de
+antes intactas (`nom_*`, `occ_*`, `fechaentrega`, `anioentrada`); se AÑADEN `fec_*` y `*_apr2`. La ocupación
+de la plantilla se muestra pero no se guarda mientras no se cambie (`§85.4`). Nombre y Ocupación crecen con
+el texto (`field-sizing: content`) en vez de cortarlo. CSS `18b` gana a la regla global solo en el bloque
+(clase repetida, (0,7,1)); al imprimir, sin bordes de campo ni textos de ayuda.
+
+**88.3 Verificación.** Prueba nueva: `FIRMAS` (roles, dos aprobadores, cada ocupación) debe ser LITERAL a
+`drawing1.xml` —falló primero porque un renglón viene partido en varios `<a:t>`; se lee por párrafo—
+→ **1799 pass / 0 fail / 2 skip**, lint limpio. Banco con el módulo real: cinco firmantes, lo tecleado vuelve
+al cerrar y reabrir, el borrador guarda SOLO lo tecleado (`nom_apr2`, `fec_rev`) y no la ocupación de la
+plantilla; capturas a 2× con Chrome sin cabeza de los dos documentos. Commit `8e27a49`.
+
+**88.4 Abierto.** Lo tecleado en Nombre/Ocupación/Fecha de firma **aún no llega al Excel** (CF-25): se
+conecta cuando el Ingeniero entregue los parámetros. Los NOMBRES de personas no pueden vivir en el código
+(repo público): si son fijos, irán a su navegador o a un documento de configuración en Firestore. La
+plantilla escribe «Lider Planificacion» sin tildes: la pantalla lo copia tal cual hasta que él diga.
+
+## 89. ADR — Quién firma el PE.02081: la lista dictada por el Ingeniero, en la ficha y en el Excel (CF-25) ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Dictado: *«en elaboración van los siguientes nombres: MIGUEL A. JIMENEZ — PROFESIONAL EN TRANSFORMADORES
+> DE POTENCIA · CARLOS MARTELO — ANALISTA DE TRANSFORMADORES AT · JORGE RHENALS — ANALISTA DE TRANSFORMADORES
+> AT · en Revision: JORGE MIRANDA — LIDER DE PLANIFICACION Y ASEGURAMIENTO MANTENIMIENTO AT · MIGUEL JIMENEZ —
+> PROFESIONAL EN TRANSFORMADORES DE POTENCIA · en Aprovacion: JORGE MIRANDA — (el mismo cargo) · ERICK VERGARA —
+> JEFE OPERATIVA MANTENIMIENTO RED ALTA TENSION (E) · RECIBE: ERICK VERGARA — SUBGERENTE MANTENIMIENTO RED ALTA
+> TENSION»*. En rama, **sin publicar**; preview entregado.
+
+**89.1 Lectura del dictado.** El formato tiene UNA casilla por rol salvo Aprobación, que tiene dos. Donde dio
+varias personas para una casilla (Elaboración 3, Revisión 2) es la lista de quienes PUEDEN firmarla: la primera
+va por defecto, las demás se eligen; siempre queda «Otra persona (escribir)». Aprobación: sus dos personas en sus
+dos casillas. Se le dijo la lectura; si quería los tres a la vez en Elaboración, se cambia. Texto LITERAL (mayúsculas,
+sin tildes, «MIGUEL A. JIMENEZ» en Elaboración y «MIGUEL JIMENEZ» en Revisión, como los escribió).
+
+**89.2 Nombres en el repo público.** Se revisó antes de escribirlos: `§78.3` ya aceptó que **los nombres son
+públicos** y Órdenes (`§76`) los lleva en el código; lo prohibido son cédulas y firmas escaneadas (`§70`, `§78`).
+La afirmación contraria que se le dio en el turno anterior («los nombres no pueden ir en el código») era más
+estricta que la decisión vigente y se le corrigió. Prueba: la lista no lleva cédulas.
+
+**89.3 Solución.** `domain/fichas_firmantes.js` (`FIRMANTES`, `firmanteDe`) — una sola función para pantalla y
+papel. Pantalla: nombre y cargo como TEXTO corrido que baja de renglón (un `<select>` visible cortaba «MIGUEL A.
+JIME…» y los `<textarea>` partían «TRANSFORMADO / RES»), desplegable transparente encima del nombre; Firma y Fecha
+alineadas abajo. Excel: `escribirFirmantes` reescribe Nombre · Ocupación · Fecha en el cuadro de `drawing1.xml`
+reconocido por su TÍTULO (hay dos «Grupo 41»; el segundo aprobador es el único sin título); la Firma queda a mano.
+
+**89.4 Dos cosas del papel que solo se vieron renderizando.** (a) A 11 pt, con los cargos en mayúscula, la Firma y
+la Fecha de Aprobación **se salían del cuadro** ⇒ los renglones del firmante van a 9 pt (el título no se toca).
+(b) Las dos imágenes de la zona de firma son **rectángulos blancos** —restos de las firmas retiradas en `§70`—
+dibujados ENCIMA del texto: se comían el último dígito de la fecha ⇒ `imagenesDeFirmaAlFondo` las pasa detrás de
+los cuadros, sin borrarlas (el logo del encabezado no se mueve).
+
+**89.5 Verificación.** 13 pruebas nuevas (anti-paráfrasis de la lista, reparto por título, «$» literal, 9 pt,
+imágenes al fondo, resto del dibujo idéntico) → **1811 pass / 0 fail / 2 skip**, lint limpio. Banco con el módulo
+real: elegir persona trae su cargo, «Otra persona» abre los renglones con el foco puesto, volver a la lista
+restaura, todo sobrevive a cerrar y reabrir (y en el documento de Mantenimiento, que comparte las claves); el
+Excel descargado dice lo mismo que la pantalla y cabe (render de LibreOffice a 220 ppp).
+
+**89.6 Lo que la revisión adversarial paró antes del preview** (2 lentes + 1 escéptico por hallazgo, 12
+agentes Opus; crudo → bóveda `2026-09-23-firmantes-pe02081/`). Confirmados y corregidos en `386adfd`:
+Aprobación con **ERICK VERGARA dos veces** (ficha vieja o elegir a Erick en el primero) ⇒ el segundo no repite
+(`indicePorDefecto`) · un **cargo viejo pegado** a la persona por defecto ⇒ la persona de la lista lleva siempre
+su cargo dictado · «Otra persona» con el nombre borrado **volvía sola** al defecto ⇒ escribir fija `sel_` ·
+**foco perdido** al elegir con teclado · un **carácter de control** pegado rompía `drawing1.xml` (preexistente en
+`escXml`) · «Otra persona» **sin tope** sacaba la Fecha del cuadro (45/60) · elegir el defecto contaba como
+trabajo del borrador. Tres verificadores se trabaron: revisaban lo que el banco ya había corregido
+(`f5bd961`), verificado con capturas 2× y PDF impreso. Final: **1816 pass / 0 fail / 2 skip**, lint limpio.
+
+**89.7 Visto al imprimir, preexistente y fuera de este punto** (→ CF-39): en la hoja impresa los campos del
+presupuesto salen como cajas redondeadas y cortados («TRANSI», «192.85…») —la misma regla global de
+`§88.1`— y el texto de ayuda del alcance se imprime.
+
+Commits `8e27a49` · `f639ab3` · `f5bd961` · `386adfd`. Publicación retenida hasta su visto bueno.
+
+## 90. ADR — El Alcance muestra solo el alcance: fuera el selector de «acciones de mantenimiento» ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Orden: *«quitemos lo de las acciones de mantenimiento en la parte de alcance y todo lo asociado,
+> simplemente debe aparecer el alcance y todo lo demás»*. En rama, **sin publicar**; preview entregado
+> (`PREVIEW_Alcance_sin_acciones.png`).
+
+**90.1 Qué había.** En el documento de Mantenimiento, la sección Alcance abría con el bloque «Acciones de
+mantenimiento del alcance» (`selectorAcciones`, `§74.x`/`§75`): «Marcar las suyas»/«Ninguna», plan registrado
+o línea base, y el catálogo MO.00418 §4.3 entero; lo marcado (`plan.acc_sel`) componía `{ACCIONES}` en las
+redacciones por banda y en la automática. Desde `§85` el alcance que se usa es la redacción del formato, que
+no lleva `{ACCIONES}`: el bloque ya no movía el texto por defecto.
+
+**90.2 Qué se retiró (lo mínimo señalado, L del Ingeniero «no borrar de más»).** La función del bloque y su
+llamada, sus dos manejadores y `fijarAcciones`/`rehacerAlcance` (solo lo servían), la frase de ayuda «el texto
+se compone con las acciones que haya marcado arriba» y dos importaciones sin uso. **Intacto**: la Redacción y
+el texto; la pestaña «Plan de acciones» y «Descargar plan» (salen de `nucleoFicha`: plan registrado + línea
+base, no de lo marcado); el dominio (`seleccionAcciones`, cubierto por pruebas en cinco archivos); el CSS
+`.ftm-acc*` (queda para el paquete de CSS muerto de la cola).
+
+**90.3 Residuo conocido.** Las redacciones viejas del desplegable que dicen «comprende {acciones}» siguen
+disponibles y toman las acciones por defecto de su banda; un borrador de ≤30 días con una selección hecha
+antes (`acc_sel`) las seguiría usando sin que se vea. Caduca con el borrador; si molesta, se ignora `acc_sel`
+en la pantalla. CF-09/CF-10 de la cola ahora solo tocan esas redacciones viejas y la automática, no la que
+sale por defecto.
+
+**90.4 Verificación.** 1816 pass / 0 fail / 2 skip, lint limpio. Banco: el Alcance muestra solo Redacción +
+texto, cero restos de acciones, «Plan de acciones» con sus 7 renglones, consola limpia; captura antes/después.
+Commit `10fb915`.

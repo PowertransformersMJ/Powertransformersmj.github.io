@@ -1346,6 +1346,92 @@
 }
 .ftm-firma-nombre:focus { outline: none; border-bottom-color: var(--ftm-petrol); }
 
+/* ── 18b · Período de ejecución y firmas CON LA FORMA DEL EXCEL (99 §88) ──
+   Orden del Ingeniero (2026-09-23): «que esta parte se pueda apreciar como en
+   el entregable en el Excel». Cuadros redondeados con el título sobre el borde,
+   Aprobación con dos firmantes y, en cada uno, Nombre · Ocupación · Firma ·
+   Fecha, como en `drawing1.xml` de la plantilla PE.02081.
+   OJO con los campos: la regla global `body.aqua input:not(...)` de
+   aqua-components pesa (0,6,3) y los volvía cajas de formulario redondeadas
+   (así se veía la captura del Ingeniero). Aquí se le gana A PROPÓSITO con la
+   clase repetida —(0,7,1)— y solo dentro de este bloque. */
+.ftm-fmt { padding: 6px 8px 8px; }
+.ftm-fmt-caja {
+  margin: 0; min-width: 0;
+  border: 1px solid #7d8a90; border-radius: 12px;
+  padding: 2px 8px 6px;
+}
+.ftm-fmt-caja > legend {
+  margin: 0 auto; padding: 0 8px;
+  font-size: 9px; font-weight: 400; color: #222; text-align: center;
+}
+.ftm-fmt-periodo {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+  border-bottom: 1px solid var(--ftm-paper-frame);
+}
+.ftm-fmt-caja--periodo { justify-self: center; width: min(190px, 90%); }
+.ftm-fmt-firmas {
+  display: grid; gap: 6px;
+  grid-template-columns: 1fr 1fr 2.1fr 1.45fr;
+}
+.ftm-fmt-firmas > .ftm-fmt-caja { display: flex; flex-direction: column; }
+.ftm-fmt-cols { display: grid; grid-template-columns: 1fr; gap: 10px; flex: 1; }
+.ftm-fmt-caja--doble .ftm-fmt-cols { grid-template-columns: 1fr 1fr; }
+/* Nombre y ocupación arriba; Firma y Fecha ABAJO y alineadas en todos los
+   cuadros (con grid, la columna con menos texto repartía el sobrante entre sus
+   renglones y quedaba desalineada de su vecina). */
+.ftm-fmt-firmante { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ftm-fmt-renglon {
+  display: flex; align-items: flex-start; gap: 4px;
+  font-size: 9.5px; line-height: 1.3; color: var(--ftm-paper-ink); min-width: 0;
+}
+.ftm-fmt-lbl { flex: 0 0 auto; }
+.ftm-fmt-renglon--firma { align-items: flex-end; min-height: 20px; margin-top: auto; padding-top: 6px; }
+.ftm-fmt-linea { flex: 1; border-bottom: 1px solid #6f7f86; margin-bottom: 2px; min-width: 20px; }
+.ftm-fmt-in,
+body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in {
+  flex: 1; min-width: 0; width: 100%;
+  border: 0; border-bottom: 1px dotted var(--ftm-paper-line); border-radius: 0;
+  background: transparent; box-shadow: none;
+  padding: 0 1px; margin: 0;
+  font: inherit; color: var(--ftm-paper-ink);
+}
+.ftm-fmt-in--area,
+body.aqua .ftm-fmt .ftm-fmt-in--area.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in {
+  /* Crece con el texto (como el cuadro del Excel), nunca lo corta. Donde el
+     navegador no sepa crecer, queda una línea con desplazamiento. */
+  resize: none; overflow: hidden; line-height: 1.3;
+  field-sizing: content; min-height: 1.3em; height: auto;
+  overflow-wrap: break-word;
+}
+.ftm-fmt-in--centro,
+body.aqua .ftm-fmt .ftm-fmt-in--centro.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in { text-align: center; }
+/* Nombre y Ocupación de la lista dictada (`99 §89`) se leen como TEXTO corrido
+   del formato —bajan de renglón debajo de la etiqueta, como en el Excel—. El
+   nombre lleva el desplegable ENCIMA, transparente: se toca el nombre y se
+   elige a otra persona. La flechita no sale al imprimir. */
+.ftm-fmt-renglon--texto { display: block; overflow-wrap: break-word; }
+.ftm-fmt-elige {
+  position: relative; display: inline; cursor: pointer;
+  padding-right: 11px; border-bottom: 1px dotted var(--ftm-paper-line);
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0h8L4 5z' fill='%236f7f86'/%3E%3C/svg%3E") no-repeat right 1px center;
+}
+.ftm-fmt-elige:focus-within { outline: 2px solid var(--ftm-petrol); outline-offset: 1px; }
+/* En «Otra persona» solo queda la flechita al lado del nombre escrito. */
+.ftm-fmt-elige--solo { flex: 0 0 12px; align-self: center; height: 12px; padding-right: 0; border-bottom: 0; background-position: center; }
+.ftm-fmt-sel,
+body.aqua .ftm-fmt .ftm-fmt-sel.ftm-fmt-sel.ftm-fmt-sel.ftm-fmt-sel.ftm-fmt-sel {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  opacity: 0; cursor: pointer; margin: 0; padding: 0; border: 0;
+  -webkit-appearance: none; appearance: none;
+}
+.ftm-fmt-in::placeholder { color: #a9b4b9; }
+.ftm-fmt-in:focus,
+body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus {
+  outline: none; box-shadow: none; background: var(--ftm-paper-input);
+  border-bottom-color: var(--ftm-petrol);
+}
+
 
 /* ═══════════════════════════════════════════════════════════════
    19 · FICHA TÉCNICA (documento resumen, formato carta)
@@ -1633,6 +1719,8 @@
   .ftm-form-row2 { grid-template-columns: 1fr; }
   .ftm-hoja-grid2 { grid-template-columns: 1fr; }
   .ftm-firmas    { grid-template-columns: repeat(2, 1fr); }
+  .ftm-fmt-firmas { grid-template-columns: 1fr; }
+  .ftm-fmt-caja--doble .ftm-fmt-cols { grid-template-columns: 1fr; }
   .ftm-hide-sm   { display: none; }
 }
 
@@ -1660,6 +1748,12 @@
   .ftm-ficha { box-shadow: none; max-width: 100%; padding: 0; }
   .ftm-tabla .ftm-campo-input { border: none; padding: 0; background: transparent; }
   .ftm-firma-nombre { border-bottom: none; }
+  body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in,
+  .ftm-fmt-in { border-bottom: none; background: transparent; }
+  .ftm-fmt-in::placeholder { color: transparent; }
+  .ftm-fmt-elige { background-image: none; padding-right: 0; border-bottom: none; }
+  .ftm-fmt-sel { display: none !important; }
+  .ftm-fmt-caja { break-inside: avoid; }
   .ftm-campo-area--alcance { border: none; white-space: pre-wrap; }
   .ftm-an-sec { break-inside: avoid; border-color: #ccc; }
 }
