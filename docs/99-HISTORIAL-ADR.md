@@ -3822,3 +3822,9 @@ sale por defecto.
 **90.4 Verificación.** 1816 pass / 0 fail / 2 skip, lint limpio. Banco: el Alcance muestra solo Redacción +
 texto, cero restos de acciones, «Plan de acciones» con sus 7 renglones, consola limpia; captura antes/después.
 Commit `10fb915`.
+
+**90.5 Publicación de `§87`-`§90` (orden del Ingeniero: «procede por favor»).** Merge `f3411fb` a `main`; CI
+«Lint + Tests» y «Deploy · GitHub Pages» en verde; y el EFECTO comprobado (L-65): los 7 archivos del sitio que
+cambiaron (`fichas_firmantes.js`, `fichas_presupuesto.js`, `fichas_borrador.js`, `exportar-planificacion.js`,
+`panel.js`, `evaluacion-masiva.js`, `fichas-tecnicas.css`) servidos **byte a byte idénticos** al repo, pedidos
+con anti-caché. El Valor Real vacío quedó en `[PENDIENTE]` (su pregunta sigue abierta).
