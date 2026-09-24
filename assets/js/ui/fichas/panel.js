@@ -316,6 +316,12 @@ export const BENEF_MTTO_OPC = Object.freeze([
   { t: 'Beneficios de las prácticas escogidas', principal: true, auto: 'beneficios_practicas' }
 ]);
 
+/**
+ * Campo de los Beneficios del documento de Mantenimiento: ya no ofrece lista;
+ * su texto sigue a las prácticas marcadas (`99 §95`).
+ */
+const CAMPO_BENEF_PRACTICAS = 'beneficios_mtto';
+
 /** Qué catálogo de redacciones corresponde a cada campo del estado. */
 const CATALOGO_REDACCION = Object.freeze({
   alcance: ALCANCE_OPC,
@@ -1108,7 +1114,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     borradorOfrecido = null;
     pintarBanda();
     fijarAviso('<div class="ftm-nota">' + esc(partes.join(' · ')) + '. Revise los datos del equipo antes de generar el documento.</div>');
-    if (actual) pintarModal();
+    // Lo restaurado pasa por la misma siembra que al abrir (`§85`, `§95`).
+    if (actual) { sembrarRedaccionPrincipal(actual); pintarModal(); }
   }
 
   /**
@@ -1988,7 +1995,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const i = opts.findIndex((o) => o.principal);
       if (i < 0) return;
       const st = estadoDe(e);
-      if (st.plan[campo + '_ver'] != null || lleno(st.plan[campo])) return;
+      // Beneficios de Mantenimiento ya no ofrece lista (`99 §95`): una ficha que
+      // traía otra redacción ESCOGIDA de la lista (índice, no escrita a mano)
+      // pasa a la de las prácticas, que es lo que ahora se ve. Lo escrito a mano
+      // («custom») se respeta y queda el botón para volver a componer.
+      const ver = st.plan[campo + '_ver'];
+      if (campo === CAMPO_BENEF_PRACTICAS && ver != null && ver !== 'custom' && +ver !== i) {
+        st.plan[campo + '_ver'] = i;
+        st.plan[campo] = textoVersion(campo, i, e, st);
+        return;
+      }
+      if (ver != null || lleno(st.plan[campo])) return;
       st.plan[campo + '_ver'] = i;
       st.plan[campo] = textoVersion(campo, i, e, st);
     });
@@ -2727,6 +2744,60 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + ' — elija una redacción arriba o escriba la suya)">' + esc(st.plan[campo] || '') + '</textarea>';
   }
 
+  /**
+   * Beneficios del documento de Mantenimiento SIN lista de redacciones (pedido
+   * del Ingeniero, 2026-09-24, `99 §95`: «que los beneficios vayan saliendo
+   * conforme a las acciones de mantenimiento que yo escoja»). El texto se compone
+   * con las prácticas marcadas arriba —un renglón breve por práctica— y se rehace
+   * al marcar o desmarcar. Se puede corregir a mano; desde ese momento ya no se
+   * rehace, y un botón lo vuelve a componer. Las propuestas por condición siguen
+   * en `BENEF_MTTO_OPC` (no se borran), pero esta hoja ya no las ofrece.
+   */
+  function redaccionPorPracticas(e, campo) {
+    const st = estadoDe(e);
+    const i = opcionesRedaccion(campo).findIndex((o) => o.principal);
+    const aMano = String(st.plan[campo + '_ver']) !== String(i);
+    return '<div class="ftm-alcance" data-benef-practicas="' + campo + '">'
+      + '<label for="ftm-txt-' + campo + '">Beneficios</label>'
+      + '<span class="ftm-alcance-hint" data-benef-pista="auto"' + (aMano ? ' hidden' : '') + '>'
+      +   'Salen de las prácticas que marque arriba: cada una suma su beneficio y se quita al desmarcarla. '
+      +   'Puede corregir el texto a mano.</span>'
+      + '<span class="ftm-alcance-hint" data-benef-pista="mano"' + (aMano ? '' : ' hidden') + '>'
+      +   'Texto corregido a mano: ya no sigue a las prácticas marcadas.</span>'
+      + '<button type="button" class="ftm-btn" data-ftm="benef-rehacer"' + (aMano ? '' : ' hidden') + '>'
+      +   'Volver a componer con las prácticas marcadas</button></div>'
+      + '<textarea id="ftm-txt-' + campo + '" class="ftm-campo-area ftm-campo-area--alcance" data-texto="' + campo + '" '
+      + 'aria-label="Texto de los beneficios" placeholder="(los beneficios salen de las prácticas que marque arriba)">'
+      + esc(st.plan[campo] || '') + '</textarea>';
+  }
+
+  /** Muestra u oculta el aviso «corregido a mano» y el botón de volver a componer. */
+  function pintarModoBeneficios(aMano) {
+    const caja = modalCuerpo.querySelector('[data-benef-practicas]');
+    if (!caja) return;
+    caja.querySelector('[data-benef-pista="auto"]').hidden = aMano;
+    caja.querySelector('[data-benef-pista="mano"]').hidden = !aMano;
+    caja.querySelector('[data-ftm="benef-rehacer"]').hidden = !aMano;
+  }
+
+  /** Vuelve a componer los beneficios con las prácticas marcadas (descarta lo corregido a mano, avisando). */
+  function recomponerBeneficios() {
+    if (!actual || documento !== 'salud') return;
+    const campo = CAMPO_BENEF_PRACTICAS;
+    const st = estadoDe(actual);
+    if (lleno(st.plan[campo]) && !globalThis.confirm('Se reemplazará el texto corregido a mano por los '
+      + 'beneficios de las prácticas marcadas. ¿Continuar?')) return;
+    const i = opcionesRedaccion(campo).findIndex((o) => o.principal);
+    st.plan[campo + '_ver'] = i;
+    st.plan[campo] = textoVersion(campo, i, actual, st);
+    tocarFicha(actual);
+    const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
+    if (ta) ta.value = st.plan[campo];
+    const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
+    if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+    pintarModoBeneficios(false);
+  }
+
   /** Total real en pantalla: la cifra, «—» si no hay, «no legible» si no es cifra. */
   function textoTotalReal(v) {
     const r = leerMonto(v);
@@ -2965,15 +3036,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function hojaBeneficios(e) {
     const campo = campoRed('beneficios');
     const nota = documento === 'salud'
-      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. Escoja las macroactividades y '
-        + 'acciones de mantenimiento: la primera redacción propone los beneficios que gana el activo con '
-        + 'esas prácticas, frente al riesgo de falla catastrófica. No se prometen los de un equipo nuevo.'
+      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. Marque las macroactividades y '
+        + 'acciones de mantenimiento: por cada una sale, en breve, el beneficio que gana el activo frente al '
+        + 'riesgo de falla catastrófica. No se prometen los de un equipo nuevo.'
       : 'Texto de los <b>beneficios</b> del proyecto. Se escribe en la hoja 1 del formato oficial '
         + '(celda B23) al exportar. La hoja «Beneficios» del libro conserva su estudio económico y sus '
         + 'fórmulas: este módulo no la reescribe.';
     return '<div class="ftm-nota-anexo">' + nota + '</div>'
-      + (documento === 'salud' ? selectorAcciones(e) : '')
-      + selectorRedaccion(e, campo)
+      + (documento === 'salud' ? selectorAcciones(e) + redaccionPorPracticas(e, campo) : selectorRedaccion(e, campo))
       + '<div class="ftm-hoja">'
       + cabeceraHoja(documento === 'salud'
         ? 'BENEFICIOS DEL MANTENIMIENTO ESPECIALIZADO' : 'BENEFICIOS DEL PROYECTO')
@@ -3364,6 +3434,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         break;
       case 'exportar': exportarExcel(); break;
       case 'descargar-plan': descargarPlan(); break;
+      case 'benef-rehacer': recomponerBeneficios(); break;
       case 'copiar-diag':
         if (actual) { copiarActualAFuturo(actual); tocarFicha(actual); pintarModal(); }
         break;
@@ -3429,6 +3500,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       st.plan[campo] = t.value;
       st.plan[campo + '_ver'] = 'custom';
       tocarFicha(actual);
+      if (campo === CAMPO_BENEF_PRACTICAS && documento === 'salud') pintarModoBeneficios(true);
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
       if (vista) vista.innerHTML = esc(t.value).replace(/\n/g, '<br>');
     }
