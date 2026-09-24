@@ -237,6 +237,12 @@ export function descripcionUC(equipo = {}, codigo) {
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /**
+ * TOTAL DEL PROYECTO real cuando no hay Valor Real: en blanco mientras la
+ * columna esté vacía (no «0»), y la suma del formato en cuanto haya una cifra.
+ */
+const FORMULA_TOTAL_REAL_EN_BLANCO = 'IF(COUNT(J34:J66)=0,"",SUM(J34:J66))';
+
+/**
  * Celdas de la primera hoja que se rellenan, con el valor y su explicación.
  * Es una función PURA: el mismo mapa alimenta el exportador y la vista previa
  * que se le muestra al usuario antes de descargar.
@@ -255,6 +261,8 @@ export function descripcionUC(equipo = {}, codigo) {
  * plantilla suma con SUM(), que trata el texto como cero y firmaría «0» en el
  * TOTAL DEL PROYECTO; por eso, solo mientras la línea esté pendiente, el total
  * se reemplaza por [PENDIENTE] (con dato, vuelve a mandar la fórmula oficial).
+ * EXCEPCIÓN (§93): el Valor Real vacío NO es pendiente — va en blanco, y su
+ * total también (nunca «0»); solo lo tecleado ilegible se marca [PENDIENTE].
  *
  * @param {object} equipo  registro del transformador
  * @param {object} estado  { plan, municipio, uuccDecidida }
@@ -280,12 +288,16 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
   // acepta solo la forma colombiana y NO adivina. Con `parseFloat`
   // «2.100.000.000» se firmaría como 2,1 pesos; con la lectura tolerante,
   // «2.100 millones» se firmaba como 2.100 (`99 §87`).
+  //
+  // Sin Valor Real, la casilla va EN BLANCO, sin [PENDIENTE] y sin aviso: es un
+  // dato que se llena cuando se conoce, no un faltante (orden del Ingeniero,
+  // 2026-09-24, `99 §93`). Lo que SÍ avisa es lo tecleado que no es cifra: eso
+  // ya es un error, no un valor que falta.
   const leidoReal = leerMonto(plan.presu_real);
   const real = leidoReal.valor;
-  const motivoReal = leidoReal.estado === 'ilegible'
-    ? 'El Valor Real Total tecleado («' + recortar(plan.presu_real) + '») no se puede leer como cifra: '
-      + 'escríbalo solo con números, p. ej. 2.100.000.000.'
-    : 'No se ha tecleado el Valor Real Total.';
+  const realIlegible = leidoReal.estado === 'ilegible';
+  const motivoReal = 'El Valor Real Total tecleado («' + recortar(plan.presu_real) + '») no se puede leer como cifra: '
+    + 'escríbalo solo con números, p. ej. 2.100.000.000.';
 
   const sinInstalacion = presu.costoInstalacion == null;
 
@@ -323,19 +335,26 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
       vista: presu.formula },
     // J36 y K36 los teclea el Ingeniero en la ficha. La plantilla ya trae J36
     // con formato de pesos y J78 = SUM(J34:J66): al escribir J36 el «TOTAL DEL
-    // PROYECTO» real se llena solo (CF-05). Sin Valor Real, [PENDIENTE] (CF-06).
+    // PROYECTO» real se llena solo (CF-05). Sin Valor Real ⇒ en blanco (§93);
+    // tecleado ilegible ⇒ [PENDIENTE] con su motivo (CF-06).
     // «Sistema» no es dinero: vacío ⇒ en blanco, como en la pantalla.
     { cell: 'J36', campo: 'Valor Real Total', numeric: real != null,
-      val: (real != null ? real : TEXTO_PENDIENTE), pend: real == null,
-      motivo: (real == null ? motivoReal : null), vista: real },
+      val: (real != null ? real : (realIlegible ? TEXTO_PENDIENTE : '')),
+      clear: (real == null && !realIlegible), pend: realIlegible,
+      motivo: (realIlegible ? motivoReal : null), vista: real },
     { cell: 'K36', campo: 'Sistema', val: txt(plan.presu_sistema).trim(),
       clear: !lleno(plan.presu_sistema), pend: false },
     // TOTAL DEL PROYECTO: con dato manda la fórmula SUM de la plantilla; con la
     // línea pendiente, [PENDIENTE] — nunca el «0» que SUM daría sobre el texto.
     { cell: 'I78', campo: 'TOTAL DEL PROYECTO (CREG)', derivada: true,
       plantilla: okTotal, pend: !okTotal, val: TEXTO_PENDIENTE },
+    // Sin Valor Real, el total real tampoco firma «0» (lo que SUM da sobre
+    // casillas vacías): se deja una suma que se ve EN BLANCO mientras la columna
+    // esté vacía y que suma sola si luego se teclea la cifra en el Excel (§93).
     { cell: 'J78', campo: 'TOTAL DEL PROYECTO (real)', derivada: true,
-      plantilla: real != null, pend: real == null, val: TEXTO_PENDIENTE }
+      plantilla: real != null, pend: realIlegible,
+      formula: ((real == null && !realIlegible) ? FORMULA_TOTAL_REAL_EN_BLANCO : null),
+      val: TEXTO_PENDIENTE }
   ];
 }
 
