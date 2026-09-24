@@ -3848,5 +3848,5 @@ imprime siempre «dd/mm/aaaa»; un texto viejo, tal cual). Al imprimir: sin icon
 **91.3 Verificación.** 8 pruebas nuevas → **1823 pass / 0 fail / 2 skip**, lint limpio. Banco: clic REAL →
 `showPicker` aceptado (la ventana nativa no sale en capturas; se verificó por la llamada), Enter igual, la fecha
 queda «15/12/2026» y sobrevive a reabrir; el acta de novedades también lo abre; captura de pantalla e impresión.
-Commit `729e74e`. **Abierto**: «Año de entrada» es un año, no una fecha: sigue escrito a mano (se le ofrece una
-lista de años).
+Commit `729e74e`, publicado en `845df6e` (CI y Deploy verdes, archivos idénticos en producción). «Año de
+entrada» es un año, no una fecha: **sigue escrito a mano por decisión del Ingeniero** (*«año está bien»*).
