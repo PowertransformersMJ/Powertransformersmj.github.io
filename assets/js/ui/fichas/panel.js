@@ -1995,20 +1995,45 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const i = opts.findIndex((o) => o.principal);
       if (i < 0) return;
       const st = estadoDe(e);
-      // Beneficios de Mantenimiento ya no ofrece lista (`99 §95`): una ficha que
-      // traía otra redacción ESCOGIDA de la lista (índice, no escrita a mano)
-      // pasa a la de las prácticas, que es lo que ahora se ve. Lo escrito a mano
-      // («custom») se respeta y queda el botón para volver a componer.
       const ver = st.plan[campo + '_ver'];
-      if (campo === CAMPO_BENEF_PRACTICAS && ver != null && ver !== 'custom' && +ver !== i) {
-        st.plan[campo + '_ver'] = i;
-        st.plan[campo] = textoVersion(campo, i, e, st);
-        return;
-      }
+      if (campo === CAMPO_BENEF_PRACTICAS) { sembrarBeneficiosPracticas(e, st, i, ver); return; }
       if (ver != null || lleno(st.plan[campo])) return;
       st.plan[campo + '_ver'] = i;
       st.plan[campo] = textoVersion(campo, i, e, st);
     });
+  }
+
+  /**
+   * Beneficios de Mantenimiento (`99 §95`). CON condición de salud el texto sale
+   * SIEMPRE de las prácticas marcadas: una redacción escogida de la lista vieja
+   * —y también el texto amplio de `§92`, que ya vive en borradores— se recompone
+   * al abrir, porque un índice es texto reproducible (`§85`) y no trabajo del
+   * Ingeniero. Lo escrito a mano («custom», o texto sin versión de antes de
+   * `§83`) se respeta y queda el botón para volver a componer. SIN condición no
+   * hay casillas que marcar (`selectorAcciones`): se conserva la lista de
+   * redacciones y la opción de prácticas —que solo daría un [PENDIENTE]— no se
+   * siembra ni se ofrece (revisión de §95). Nada de esto cuenta como tocar la
+   * ficha: no llama a `tocarFicha`.
+   */
+  function sembrarBeneficiosPracticas(e, st, i, ver) {
+    const campo = CAMPO_BENEF_PRACTICAS;
+    const esIndice = ver != null && ver !== 'custom';
+    if (conPracticas(e)) {
+      if (esIndice || (ver == null && !lleno(st.plan[campo]))) {
+        st.plan[campo + '_ver'] = i;
+        st.plan[campo] = textoVersion(campo, i, e, st);
+      }
+      return;
+    }
+    if (esIndice && +ver === i) {
+      delete st.plan[campo + '_ver'];
+      st.plan[campo] = '';
+    }
+  }
+
+  /** ¿El equipo tiene casillas de prácticas en Beneficios? Solo si tiene condición de salud. */
+  function conPracticas(e) {
+    return nucleoFicha(e || {}).ci != null;
   }
 
   function cerrarFicha() {
@@ -2549,8 +2574,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // condición un catálogo entero sin decirle que ninguna banda es la suya.
     if (ci == null || (!disp.length && !fueraPorInversion.length)) {
       return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
-        + 'registrada, así que no hay una banda suya que proponer. Los beneficios se redactan a '
-        + 'mano o se toma otra de las redacciones.</div>';
+        + 'registrada, así que no hay una banda suya que proponer ni prácticas que marcar. Los '
+        + 'beneficios se toman de la lista de redacciones de abajo o se escriben a mano.</div>';
     }
     const marcados = new Set(seleccionAcciones(e, st, campoRed('beneficios')).map((a) => a.id));
     const propias = disp.filter((a) => a.origen !== 'catalogo');
@@ -2688,7 +2713,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // la única que casi siempre se va a usar.
     const opt = (o, i) => '<option value="' + i + '"'
       + (String(cur) === String(i) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
-    const conIndice = opts.map((o, i) => ({ o, i }));
+    // Sin condición de salud no hay casillas de prácticas: la opción que se
+    // compone con ellas no se ofrece, solo daría un [PENDIENTE] (revisión de
+    // §95). Se filtra aquí y cada opción conserva su índice de siempre (`§85.3`).
+    const sinPracticas = !conPracticas(e);
+    const conIndice = opts.map((o, i) => ({ o, i }))
+      .filter((x) => !(sinPracticas && x.o.auto === 'beneficios_practicas'));
     // Las bandas van SIEMPRE de 1 a 5 —una sola dirección de lectura en todo el
     // módulo—; la del equipo se distingue por su rótulo, no sacándola de sitio.
     const bandas = [...new Set(conIndice.filter((x) => x.o.cond != null).map((x) => x.o.cond))]
@@ -2721,8 +2751,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         ? '<optgroup label="Sin condición">' + sueltas.map((x) => opt(x.o, x.i)).join('') + '</optgroup>'
         : '');
     const nProp = conIndice.filter((x) => x.o.cond === rec).length;
-    const hayPrincipal = opts.some((o) => o.principal);
-    const principalPracticas = opts.some((o) => o.principal && o.auto === 'beneficios_practicas');
+    const hayPrincipal = conIndice.some((x) => x.o.principal);
+    const principalPracticas = conIndice.some((x) => x.o.principal && x.o.auto === 'beneficios_practicas');
     const pista = principalPracticas
       ? 'La primera se compone con las prácticas que marque arriba y se rehace cada vez que cambie la '
         + 'selección. Puede editarla libremente (desde ese momento ya no se rehace) o elegir otra de la lista.'
@@ -2796,6 +2826,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
     if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
     pintarModoBeneficios(false);
+    // El botón se ocultó con el foco puesto: sin esto, el teclado volvía al
+    // principio de la ficha (revisión de §95).
+    if (ta) ta.focus();
   }
 
   /** Total real en pantalla: la cifra, «—» si no hay, «no legible» si no es cifra. */
@@ -3043,7 +3076,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + '(celda B23) al exportar. La hoja «Beneficios» del libro conserva su estudio económico y sus '
         + 'fórmulas: este módulo no la reescribe.';
     return '<div class="ftm-nota-anexo">' + nota + '</div>'
-      + (documento === 'salud' ? selectorAcciones(e) + redaccionPorPracticas(e, campo) : selectorRedaccion(e, campo))
+      + (documento === 'salud' ? selectorAcciones(e) : '')
+      // Con condición, el texto sigue a las prácticas (`§95`); sin ella no hay
+      // casillas y se conserva la lista de redacciones (revisión de §95).
+      + (documento === 'salud' && conPracticas(e) ? redaccionPorPracticas(e, campo) : selectorRedaccion(e, campo))
       + '<div class="ftm-hoja">'
       + cabeceraHoja(documento === 'salud'
         ? 'BENEFICIOS DEL MANTENIMIENTO ESPECIALIZADO' : 'BENEFICIOS DEL PROYECTO')
@@ -3352,8 +3388,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
       const propias = [...modalCuerpo.querySelectorAll('[data-acc-ambito="propio"] [data-accion]')];
       if (todas) {
-        propias.forEach((c) => { c.checked = true; });
-        fijarAcciones([...new Set(propias.map((c) => c.getAttribute('data-accion')))]);
+        // SUMA las suyas a lo ya marcado, y la selección se lee de la pantalla
+        // como en el cambio de casilla: antes una práctica de otra banda seguía
+        // marcada a la vista pero salía del texto (revisión de §95).
+        const ids = new Set(propias.map((c) => c.getAttribute('data-accion')));
+        cajas.forEach((c) => { if (ids.has(c.getAttribute('data-accion'))) c.checked = true; });
+        fijarAcciones([...new Set(cajas.filter((c) => c.checked).map((c) => c.getAttribute('data-accion')))]);
       } else {
         cajas.forEach((c) => { c.checked = false; });
         fijarAcciones([]);
