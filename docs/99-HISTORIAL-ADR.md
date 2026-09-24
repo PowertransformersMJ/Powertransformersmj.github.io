@@ -3881,3 +3881,38 @@ el Alcance; marcar tres prácticas arma el texto agrupado; sobrevive a reabrir. 
 **92.4 Publicación.** Orden del Ingeniero: *«procede por favor cárgalo en producción»*. Merge `b91b36a`; CI y Deploy
 verdes; `beneficios_practicas.js` y `panel.js` servidos idénticos al repo con anti-caché (L-65). Aplica solo al
 documento de Mantenimiento (el PI no cambia). Residuo de `§90.3` se invierte: `acc_sel` vuelve a tener pantalla.
+
+## 93. ADR — Sin Valor Real, la casilla y su total van en blanco (no `[PENDIENTE]`) ⟦OPUS-5.5⟧ (2026-09-24)
+
+> Pregunta abierta de `§87` (CF-06): ¿Valor Real vacío ⇒ `[PENDIENTE]` o en blanco? Respuesta del Ingeniero:
+> *«no coloquemos nada, continuemos como lo habíamos hecho anteriormente»*. En rama (`7716388`), preview entregado.
+
+**93.1 Causa.** `§87` trató el Valor Real (J36) como dinero faltante, igual que el Valor CREG: vacío ⇒ `[PENDIENTE]`,
+aviso antes de descargar y J78 también `[PENDIENTE]`. Pero el Valor Real no se deduce ni se calcula: se llena
+cuando se conoce (a veces después de firmar la planificación). Marcarlo pendiente ensuciaba el papel y el aviso.
+
+**93.2 Solución.** `celdasFichaPlan`: J36 vacío ⇒ `clear` (en blanco, conserva el estilo 255 de pesos), `pend:false`,
+sin motivo. J78 vacío ⇒ fórmula `IF(COUNT(J34:J66)=0,"",SUM(J34:J66))`: en blanco mientras la columna esté vacía
+(la SUM desnuda firmaba **«0»**, estilo 58 = `#,##0`) y suma sola si luego se teclea la cifra en el Excel. Con cifra
+⇒ la SUM de la plantilla, intacta. **Lo ilegible** («2.100 millones») sigue `[PENDIENTE]` y avisa: eso es un error,
+no un dato que falta.
+
+**93.3 No-regresión.** Valor CREG (F36/I36/I78) sin cambio: sigue `[PENDIENTE]` si falta. La cuenta aviso = papel
+(`§87`) se mantiene en los 7 escenarios. Pantalla sin cambio (ya mostraba «—»). Fuera del mapa, la hoja sale
+idéntica a la plantilla.
+
+**93.4 Verificación.** 3 pruebas actualizadas + 1 nueva (ficha completa sin Valor Real ⇒ nada que avisar) →
+**1837 pass / 0 fail / 2 skip**; lint limpio. LibreOffice recalculando el archivo real: vacío → J36 y J78 en blanco;
+cifra → J78 = J36; ilegible → `[PENDIENTE]`; cifra escrita a mano después en J36 → J78 suma.
+
+**93.5 Anti-patterns evitados.** Ni `0` ni `[PENDIENTE]` inventados en papel firmado; no se tocó la fórmula de la
+plantilla cuando hay dato.
+
+**93.6 Archivos.** `assets/js/ui/fichas/exportar-planificacion.js`, `tests/fichas_exportar_planificacion.test.js`.
+INTACTOS: `panel.js` (su aviso solo sale si la lista trae algo), `fichas_presupuesto.js`.
+
+**93.7 Doctrina.** Lo que se dicta va literal (`vamos por partes`); dinero: no fabricar cifras (`§3.2`).
+
+**93.8 Verificado sano / no re-auditar.** Una celda con texto vacío en J36 NO rompe el total: `COUNT` solo cuenta
+números. CF-37 (vínculo de «Costos» en la hoja Beneficios): si se conecta a J78, protegerlo también para el
+blanco, no solo para `[PENDIENTE]`.

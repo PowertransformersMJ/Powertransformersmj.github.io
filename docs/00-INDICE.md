@@ -104,6 +104,7 @@
 | §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento ⟦OPUS-5.5⟧ | 3797 |
 | §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas ⟦OPUS-5.5⟧ | 3832 |
 | §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido ⟦OPUS-5.5⟧ | 3854 |
+| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso ⟦OPUS-5.5⟧ | 3885 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
