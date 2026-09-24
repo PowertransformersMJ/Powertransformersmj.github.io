@@ -135,7 +135,13 @@ describe('Catálogos de redacción — uno por documento', () => {
     // redacción del formato (`§85`), que se pinta primera por `principal`.
     const porBanda = ALCANCE_MTTO_OPC.filter((o) => !o.principal);
     assert.equal(porBanda[porBanda.length - 1].auto, 'alcance_mtto');
-    assert.equal(BENEF_MTTO_OPC[BENEF_MTTO_OPC.length - 1].auto, 'beneficios_mtto');
+    // Igual en Beneficios desde `§92`: la automática cierra las BANDAS y detrás
+    // solo va «Beneficios de las prácticas escogidas», que se pinta primera. Va
+    // al FINAL del arreglo para no correr los índices que guarda el borrador.
+    const benefPorBanda = BENEF_MTTO_OPC.filter((o) => !o.principal);
+    assert.equal(benefPorBanda[benefPorBanda.length - 1].auto, 'beneficios_mtto');
+    assert.equal(BENEF_MTTO_OPC[BENEF_MTTO_OPC.length - 1].auto, 'beneficios_practicas');
+    assert.equal(BENEF_MTTO_OPC.filter((o) => o.principal).length, 1);
   });
 
   // La lista es plegable: si la etiqueta no cabe de un vistazo, no sirve.

@@ -3850,3 +3850,33 @@ imprime siempre «dd/mm/aaaa»; un texto viejo, tal cual). Al imprimir: sin icon
 queda «15/12/2026» y sobrevive a reabrir; el acta de novedades también lo abre; captura de pantalla e impresión.
 Commit `729e74e`, publicado en `845df6e` (CI y Deploy verdes, archivos idénticos en producción). «Año de
 entrada» es un año, no una fecha: **sigue escrito a mano por decisión del Ingeniero** (*«año está bien»*).
+
+## 92. ADR — Beneficios propuestos con las prácticas de mantenimiento escogidas ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Pedido: *«necesito que en los beneficios sí me coloques las macroactividades y acciones de mantenimiento, y
+> con base a eso construir y proponer los beneficios que gana el activo al realizarle las prácticas que escoja,
+> esto debe ser en un contexto técnico y enfocado en el riesgo operativo de falla catastrófica de los equipos que
+> no son fáciles de adquirir por su construcción especializada»*. En rama, **sin publicar**: ejemplos entregados
+> (artifact privado «Beneficios por práctica»), esperando su visto bueno.
+
+**92.1 Solución.** El selector de macroactividades y acciones (retirado del Alcance en `§90`) vuelve, a la hoja de
+BENEFICIOS del documento de Mantenimiento, con sus textos adaptados. `domain/beneficios_practicas.js`: apertura
+(equipo de construcción especializada, a la medida de su punto, de reposición no inmediata — sin plazos ni
+afirmar que falte respaldo), un beneficio por cada una de las 32 prácticas del MO.00418 que no son inversión con
+la falla catastrófica que ayuda a prevenir, y cierre (probabilidad y severidad vs consecuencia; lo del papel se
+contiene, no se recupera). Redacción «Beneficios de las prácticas escogidas» al FINAL del arreglo (`§85.3`),
+primera por `principal`, sembrada al abrir si Beneficios está vacío; se rehace al marcar/desmarcar mientras la
+versión sea un índice. Sin prácticas ⇒ `[PENDIENTE]`; acción sin beneficio catalogado ⇒ `[PENDIENTE]`.
+
+**92.2 Cómo se produjo el texto.** 3 redactores Opus sobre el SUSTENTO de `acciones_tecnicas.js` → 3 revisores
+técnicos adversariales (30 correcciones: diagnóstico inflado, sujeto equivocado, causalidad, coherencia con el
+sustento) → 1 editor (apertura, cierre y 20 ajustes de coherencia; OLTC con OILTAP, VACUTAP y NLTC por separado).
+Leído completo antes de montarlo. Crudo → bóveda `2026-09-23-beneficios-practicas/`.
+
+**92.3 Verificación.** 13 pruebas nuevas (sin cifras ni normas, sin promesas, lo irreversible siempre negado, las
+32 y ninguna de inversión, armado por macroactividad en orden) + la de orden de `fichas_mantenimiento` actualizada
+a la regla de `§85` → **1836 pass / 0 fail / 2 skip**, lint limpio. Banco: el selector sale en Beneficios y no en
+el Alcance; marcar tres prácticas arma el texto agrupado; sobrevive a reabrir. Commit `167f252`.
+
+**92.4 Abierto.** Su aprobación del texto (o cambios por práctica), la apertura, y que aplique solo al documento
+de Mantenimiento (el PI no cambia). Residuo de `§90.3` se invierte: `acc_sel` vuelve a tener pantalla.
