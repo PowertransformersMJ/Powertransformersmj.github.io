@@ -3882,6 +3882,7 @@ el Alcance; marcar tres prácticas arma el texto agrupado; sobrevive a reabrir. 
 **92.4 Publicación.** Orden del Ingeniero: *«procede por favor cárgalo en producción»*. Merge `b91b36a`; CI y Deploy
 verdes; `beneficios_practicas.js` y `panel.js` servidos idénticos al repo con anti-caché (L-65). Aplica solo al
 documento de Mantenimiento (el PI no cambia). Residuo de `§90.3` se invierte: `acc_sel` vuelve a tener pantalla.
+**Enmienda 09-24 → `§95`**: sin lista de redacciones (con condición) y beneficios BREVES por práctica.
 
 ## 93. ADR — Sin Valor Real, la casilla y su total van en blanco (no `[PENDIENTE]`) ⟦OPUS-5.5⟧ (2026-09-24)
 
@@ -3959,3 +3960,49 @@ lo escrito antes; no se reemplazó la casilla de fecha que ya funcionaba.
 `§83.2`; borrar del disco la ficha vaciada abriría una pérdida real (REFUTADO). El calendario abierto con el foco
 en el cuerpo no cambia datos. El corrimiento lateral de 20 px en el celular era de la hoja, no del calendario.
 Callejón: `scrollIntoView` para mostrar un desplegable mueve el contenido bajo el puntero (L-101).
+
+## 95. ADR — Beneficios de Mantenimiento: salen de las prácticas marcadas, en breve y sin lista de redacciones ⟦OPUS-5.5⟧ (2026-09-24)
+
+> Pedido (con captura del desplegable en «C1 · Conservar y vigilar»): *«en la redacción veo un listado
+> incorporado en una lista desplegable, me gustaría que los beneficios vayan saliendo conforme a las acciones
+> de mantenimiento que yo escoja; recuerda que la redacción debe ser breve en un contexto técnico enfocado en
+> el riesgo operativo»*. Enmienda a `§92`. En rama (`2f427cc` + `ce02d45`), preview entregado.
+
+**95.1 Causa.** `§92` dejó la redacción por prácticas como PRIMERA opción de la lista, pero la lista seguía: una
+ficha con otra redacción ya escogida (C1…C5, la Automática) no seguía a las casillas. Y los beneficios de `§92`
+medían 62-107 palabras (≈500 con tres prácticas): no eran breves.
+
+**95.2 Solución.** Hoja Beneficios del documento de Mantenimiento, equipo CON condición: sin desplegable
+(`redaccionPorPracticas`); el texto se compone con las prácticas marcadas, un renglón «· práctica — beneficio»
+por cada una, y se rehace al marcar/desmarcar. Corregido a mano (`_ver='custom'`) deja de rehacerse y aparece
+«Volver a componer con las prácticas marcadas» (con confirmación). Al abrir o restaurar, todo índice se
+recompone (`sembrarBeneficiosPracticas`): texto reproducible, no trabajo del Ingeniero (`§85`). SIN condición
+no hay casillas: conserva su lista de redacciones, sin la opción de prácticas. `BENEF_MTTO_OPC` intacto (no se
+borra nada; ya no se ofrece con condición). El PI no cambia. `beneficios_practicas.js`: `beneficio` = BREVE
+(25-28 palabras), `beneficioAmplio` = el de `§92`; apertura 33 y cierre 30 palabras (los amplios se conservan
+como `*_AMPLIA/_AMPLIO`). Con tres prácticas el texto baja de ≈500 a 165 palabras.
+
+**95.3 No-regresión.** PI con su lista; Alcance de Mantenimiento intacto; equipo sin condición sin callejón;
+borradores de `§92` recompuestos en breve; lo escrito a mano respetado.
+
+**95.4 Verificación.** Pruebas nuevas (breve 12-30 palabras y más corto que el amplio, OILTAP/VACUTAP en breve,
+diagnóstico no «reduce», apertura/cierre breves) → **1845 pass / 0 fail / 2 skip**; lint limpio. Banco en vivo:
+sin lista, marcar/desmarcar, editar → botón, recomponer con confirmación y foco al texto, migración de C1 y del
+amplio de `§92`, «custom» intacto, equipo sin condición con lista, «Marcar las suyas» sumando, PI intacto, PDF
+impreso sin la lista de casillas. Redacción: 3 redactores → 3 revisores técnicos (19 de 32 corregidos) →
+editor, 7 Opus; crudo → bóveda `2026-09-24-beneficios-breves/`. Revisión de pantalla: 2 enfoques, 5 confirmados
+y corregidos en `ce02d45` (sus verificadores no corrieron por el límite de gasto: verificados a mano).
+
+**95.5 Anti-patterns evitados.** No se borraron las propuestas por condición; no se inventó beneficio (una
+acción sin catálogo sale `[PENDIENTE]`); el breve no agrega afirmaciones a su fuente.
+
+**95.6 Archivos.** `assets/js/ui/fichas/panel.js`, `assets/js/domain/beneficios_practicas.js`,
+`assets/css/fichas-tecnicas.css`, `tests/beneficios_practicas.test.js`. INTACTOS: `fichas_borrador.js`,
+`exportar-planificacion.js`, `BENEF_MTTO_OPC`.
+
+**95.7 Doctrina.** Lo dictado va literal (breve, técnico, riesgo operativo); OLTC con ambas tecnologías;
+retirar lo mínimo señalado (la lista, solo donde hay casillas).
+
+**95.8 Verificado sano / no re-auditar.** Recomponer una ficha que se queda sin otro trabajo no borra del disco
+su texto a mano anterior: regla 1 de `§83.2` (mismo compromiso que el «Borrar» de `§94`). El texto de la casilla
+de edición también sale impreso encima de la hoja: es anterior (CF-39), no de este cambio.
