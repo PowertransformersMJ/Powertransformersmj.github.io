@@ -35,6 +35,7 @@
 import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
 import { firmanteDe } from '../../domain/fichas_firmantes.js';
+import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -503,7 +504,8 @@ export function escribirFirmantes(xml, plan = {}) {
     const titulo = textos.find((t) => TITULO_CASILLA[t]);
     const k = titulo ? TITULO_CASILLA[titulo] : 'apr2';
     const f = firmanteDe(k, plan);
-    const valor = { 'Nombre:': f.nombre, 'Ocupación:': f.ocupacion, 'Fecha:': f.fecha };
+    // La fecha sale siempre «dd/mm/aaaa», como la escribe el calendario (`99 §91`).
+    const valor = { 'Nombre:': f.nombre, 'Ocupación:': f.ocupacion, 'Fecha:': fechaParaPapel(f.fecha) };
     // Reemplazo con FUNCIÓN: un «$» del nombre no debe leerse como orden (`§87`).
     return ancla.replace(/<a:p>[\s\S]*?<\/a:p>/g, (p) => {
       const t = textoParrafo(p).trim();
@@ -701,7 +703,7 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
     if (dr) {
       let xml = await dr.async('string');
       // Reemplazo con función: un «$» tecleado no debe leerse como orden.
-      xml = xml.replace(ANCLA_FECHA, () => '<a:t>' + escXml(plan.fechaentrega || '') + '</a:t>');
+      xml = xml.replace(ANCLA_FECHA, () => '<a:t>' + escXml(fechaParaPapel(plan.fechaentrega)) + '</a:t>');
       xml = xml.replace(ANCLA_ANIO,  () => '<a:t>' + escXml(plan.anioentrada  || '') + '</a:t>');
       // Quién firma: Nombre · Ocupación · Fecha de cada casilla (`99 §89`).
       xml = escribirFirmantes(xml, plan);

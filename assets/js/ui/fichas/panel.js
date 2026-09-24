@@ -32,6 +32,7 @@ import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domai
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
 import { FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../../domain/fichas_firmantes.js';
+import { fechaAISO, isoAFecha } from '../../domain/fichas_fechas.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -2263,6 +2264,33 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     + (extra || '') + '></div>';
 
   /**
+   * Casilla de FECHA con calendario (orden del Ingeniero, 2026-09-23, `99 §91`:
+   * «que en las fechas siempre se despliegue un calendario»). Se VE la fecha
+   * en «dd/mm/aaaa» —como sale en el papel, sin depender del idioma del
+   * navegador— y encima va el calendario nativo, transparente: al tocarla se
+   * abre (`abrirCalendario`). Se guarda «dd/mm/aaaa» en la misma clave de
+   * siempre. Un texto escrito antes que no sea una fecha se sigue viendo (y
+   * marcado) hasta que se elija una en el calendario: no se borra en silencio.
+   */
+  const campoFecha = (clave, valor, aria, centro) => {
+    const iso = fechaAISO(valor);
+    const vieja = lleno(valor) && !iso;
+    const texto = iso ? isoAFecha(iso) : (vieja ? String(valor).trim() : '');
+    return '<span class="ftm-fecha' + (centro ? ' ftm-fecha--centro' : '') + '" data-fecha-caja="' + esc(clave) + '">'
+      + '<span class="ftm-fecha-txt' + (texto ? '' : ' is-vacia') + (vieja ? ' is-vieja' : '') + '">'
+      +   esc(texto || 'dd/mm/aaaa') + '</span>'
+      + '<input type="date" class="ftm-fecha-in" data-fecha="' + esc(clave) + '" value="' + iso + '" '
+      +   'aria-label="' + esc(aria) + '"'
+      +   (vieja ? ' title="Escrita antes: ' + esc(String(valor).trim()) + '. Elija la fecha en el calendario."' : '')
+      + '></span>';
+  };
+
+  /** Abre el calendario de una casilla de fecha (si el navegador no sabe, al menos la enfoca). */
+  function abrirCalendario(inp) {
+    try { inp.showPicker(); } catch (err) { inp.focus(); }
+  }
+
+  /**
    * Clave del estado donde vive un segmento redactado. El PI y el documento de
    * mantenimiento comparten la hoja, no el texto: cada uno guarda el suyo, de
    * modo que elegir una redacción aquí no pisa la que el otro ya tuviera.
@@ -2447,7 +2475,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
             + texto('Ocupación:', esc(q.ocupacion)))
         + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
         +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
-        + renglon('Fecha:', 'fec_' + f.k, P['fec_' + f.k] || '', 'dd/mm/aaaa', 'Fecha de la firma en ' + quien)
+        + '<div class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">Fecha:</span>'
+        +   campoFecha('fec_' + f.k, P['fec_' + f.k], 'Fecha de la firma en ' + quien) + '</div>'
         + '</div>';
     };
     firmanteHTML = firmante;
@@ -2511,7 +2540,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<input class="ftm-fmt-in ftm-fmt-in--centro" data-plan="' + clave + '" value="' + esc(P[clave] || '') + '" '
       + 'placeholder="' + esc(ph) + '" aria-label="' + esc(titulo) + '"></fieldset>';
     return '<div class="ftm-fmt ftm-fmt-periodo">'
-      + caja('Fecha de Entrega', 'fechaentrega', 'dd/mm/aaaa')
+      // La Fecha de Entrega se escoge en el calendario (`99 §91`).
+      + '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>Fecha de Entrega</legend>'
+      +   campoFecha('fechaentrega', P.fechaentrega, 'Fecha de Entrega', true) + '</fieldset>'
       + caja('Año de entrada', 'anioentrada', 'aaaa')
       + '</div>';
   }
@@ -2831,6 +2862,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      ═════════════════════════════════════════════════════════════════════ */
 
   function alHacerClic(ev) {
+    // Toda casilla de fecha del módulo abre SIEMPRE su calendario al tocarla
+    // (`99 §91`): Chrome solo lo abría si se atinaba al iconito.
+    const inFecha = ev.target.closest && ev.target.closest('input[type="date"]');
+    if (inFecha && contenedor.contains(inFecha)) { abrirCalendario(inFecha); return; }
+
     // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
     if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
     if (ev.target.closest('[data-ftm="borr-descartar"]')) { descartarBorrador(); return; }
@@ -2926,6 +2962,24 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (!actual) return;
     const st = estadoDe(actual);
 
+    // Fecha escogida en el calendario: se guarda «dd/mm/aaaa» (`99 §91`). Mientras
+    // se teclea a medias el navegador entrega '' con `badInput`: eso no borra
+    // la fecha que había.
+    const fecha = t.getAttribute('data-fecha');
+    if (fecha) {
+      if (t.value === '' && t.validity && t.validity.badInput) return;
+      const nueva = isoAFecha(t.value);
+      st.plan[fecha] = nueva;
+      tocarFicha(actual);
+      const tx = t.closest('[data-fecha-caja]') && t.closest('[data-fecha-caja]').querySelector('.ftm-fecha-txt');
+      if (tx) {
+        tx.textContent = nueva || 'dd/mm/aaaa';
+        tx.classList.toggle('is-vacia', !nueva);
+        tx.classList.remove('is-vieja');
+      }
+      return;
+    }
+
     const plan = t.getAttribute('data-plan');
     if (plan) {
       st.plan[plan] = t.value;
@@ -3018,6 +3072,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   // seguridad para el caso raro de que la trampa no se haya podido armar;
   // `cerrarFicha` es idempotente, así que un cierre doble no rompe nada.
   function alTeclear(ev) {
+    // Enter sobre una casilla de fecha abre el calendario (`99 §91`).
+    if (ev.key === 'Enter' && ev.target && ev.target.matches && ev.target.matches('input[type="date"]')
+        && contenedor.contains(ev.target)) {
+      ev.preventDefault();
+      abrirCalendario(ev.target);
+      return;
+    }
     // Los tramos de la banda son <span role="button">: reciben foco pero el
     // navegador no traduce Enter/Espacio en clic como haría con un <button>.
     if ((ev.key === 'Enter' || ev.key === ' ') && ev.target
