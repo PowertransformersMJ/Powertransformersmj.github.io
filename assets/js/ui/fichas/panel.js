@@ -31,7 +31,7 @@
 import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domain/fichas_creg_uc.js';
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
-import { FIRMANTES, OTRA_PERSONA, firmanteDe } from '../../domain/fichas_firmantes.js';
+import { FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../../domain/fichas_firmantes.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -2555,16 +2555,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function bloqueFirmas(e) {
     const st = estadoDe(e);
     const P = st.plan;
-    const renglon = (lbl, clave, valor, ph, aria, area) =>
+    // `tope`: largo máximo. En «Otra persona» un nombre o un cargo muy largos
+    // empujaban la Firma y la Fecha fuera del cuadro del papel (revisión §89).
+    const renglon = (lbl, clave, valor, ph, aria, area, tope, extra) =>
       '<label class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">' + esc(lbl) + '</span>'
       // Nombre y Ocupación van en área de texto que CRECE con lo escrito: en un
       // cuadro angosto un campo de una línea cortaba «…de Potencia» y el nombre.
       + (area
         ? '<textarea class="ftm-fmt-in ftm-fmt-in--area" rows="1" data-plan="' + clave + '" '
+          + (tope ? 'maxlength="' + tope + '" ' : '')
           + 'placeholder="' + esc(ph) + '" aria-label="' + esc(aria) + '">' + esc(valor) + '</textarea>'
         : '<input class="ftm-fmt-in" data-plan="' + clave + '" value="' + esc(valor) + '" '
           + 'placeholder="' + esc(ph) + '" aria-label="' + esc(aria) + '">')
-      + '</label>';
+      + (extra || '') + '</label>';
     const firmante = (f) => {
       const quien = f.rol + (f.segundo ? ' (segundo firmante)' : '');
       // Quién firma sale del dominio, con la MISMA función que usa el Excel.
@@ -2576,19 +2579,21 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // Excel, nunca se corta) y el desplegable va encima, transparente: al
       // tocar el nombre se elige otra persona. Un <select> visible cortaba
       // «MIGUEL A. JIME…» en el cuadro angosto de Elaboración.
-      const elige = '<span class="ftm-fmt-elige"><span class="ftm-fmt-valor">'
-        + esc(q.otra ? 'Otra persona' : q.nombre) + '</span>'
-        + '<select class="ftm-fmt-sel" data-firma-sel="' + f.k + '" '
-        + 'aria-label="Quién firma en ' + esc(quien) + '">' + opciones + '</select></span>';
+      const sel = '<select class="ftm-fmt-sel" data-firma-sel="' + f.k + '" '
+        + 'aria-label="Quién firma en ' + esc(quien) + '">' + opciones + '</select>';
       const texto = (lbl, valor) => '<div class="ftm-fmt-renglon ftm-fmt-renglon--texto">'
         + '<span class="ftm-fmt-lbl">' + esc(lbl) + '</span> ' + valor + '</div>';
       return '<div class="ftm-fmt-firmante" data-firmante="' + f.k + '">'
-        + texto('Nombre:', elige)
         + (q.otra
-          ? renglon('', 'nom_' + f.k, q.nombre, '(nombre)', 'Nombre de quien firma en ' + quien, true)
-            + renglon('Ocupación:', 'occ_' + f.k, q.ocupacion, '(cargo)', 'Ocupación de quien firma en ' + quien, true)
-          // De la lista: el cargo es el dictado y se lee como texto del formato.
-          : texto('Ocupación:', esc(q.ocupacion)))
+          // «Otra persona»: el nombre se escribe EN su renglón (al imprimir sale
+          // «Nombre: …», no el rótulo «Otra persona») y la flechita queda al lado
+          // para volver a la lista.
+          ? renglon('Nombre:', 'nom_' + f.k, q.nombre, '(nombre)', 'Nombre de quien firma en ' + quien, true, 45,
+              '<span class="ftm-fmt-elige ftm-fmt-elige--solo" title="Elegir de la lista">' + sel + '</span>')
+            + renglon('Ocupación:', 'occ_' + f.k, q.ocupacion, '(cargo)', 'Ocupación de quien firma en ' + quien, true, 60)
+          // De la lista: nombre y cargo dictados, como TEXTO del formato.
+          : texto('Nombre:', '<span class="ftm-fmt-elige"><span class="ftm-fmt-valor">' + esc(q.nombre) + '</span>' + sel + '</span>')
+            + texto('Ocupación:', esc(q.ocupacion)))
         + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
         +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
         + renglon('Fecha:', 'fec_' + f.k, P['fec_' + f.k] || '', 'dd/mm/aaaa', 'Fecha de la firma en ' + quien)
@@ -2624,18 +2629,27 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (!p) return;
       delete P['sel_' + k];
       delete P['occ_' + k];
-      P['nom_' + k] = p.nombre;
+      delete P['nom_' + k];
+      // Elegir a la persona que ya iba por defecto no guarda nada: la ficha
+      // queda igual que sin tocar y no debe contar como trabajo del usuario
+      // (si contara, bloquearía restaurar el borrador de ayer, `§85.4`).
+      if (+valor !== indicePorDefecto(k, P)) P['nom_' + k] = p.nombre;
     }
     tocarFicha(actual);
-    const caja = modalCuerpo.querySelector('[data-firmante="' + k + '"]');
-    const f = FIRMAS.find((x) => x.k === k);
-    if (caja && f && firmanteHTML) {
-      caja.outerHTML = firmanteHTML(f);
-      if (valor === OTRA_PERSONA) {
-        const n = modalCuerpo.querySelector('[data-firmante="' + k + '"] [data-plan="nom_' + k + '"]');
-        if (n) n.focus();
-      }
-    }
+    // El segundo aprobador depende del primero (no repite persona): se repinta
+    // también cuando cambia el primero.
+    const repintar = k === 'apr' ? ['apr', 'apr2'] : [k];
+    repintar.forEach((c) => {
+      const caja = modalCuerpo.querySelector('[data-firmante="' + c + '"]');
+      const f = FIRMAS.find((x) => x.k === c);
+      if (caja && f && firmanteHTML) caja.outerHTML = firmanteHTML(f);
+    });
+    // El foco vuelve a donde estaba: al reemplazar la casilla se perdía y el
+    // siguiente Tab saltaba a «Exportar Excel» (revisión §89).
+    const destino = modalCuerpo.querySelector(valor === OTRA_PERSONA
+      ? '[data-firmante="' + k + '"] [data-plan="nom_' + k + '"]'
+      : '[data-firma-sel="' + k + '"]');
+    if (destino) destino.focus();
   }
 
   /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
@@ -3106,6 +3120,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const plan = t.getAttribute('data-plan');
     if (plan) {
       st.plan[plan] = t.value;
+      // Escribir el nombre de un firmante es «Otra persona» EXPLÍCITO: si luego
+      // se borra, la casilla no debe volver sola a la persona por defecto con el
+      // cargo que quedó escrito (revisión §89).
+      if (/^nom_/.test(plan) && t.closest('[data-firmante]')) st.plan['sel_' + plan.slice(4)] = OTRA_PERSONA;
       tocarFicha(actual);
       if (t.getAttribute('data-recalcula')) {
         if (plan === 'potenciaMVA') reescribirRedacciones();

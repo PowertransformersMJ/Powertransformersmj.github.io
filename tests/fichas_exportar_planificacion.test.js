@@ -388,6 +388,25 @@ describe('§89 · quién firma llega al Excel, cada uno en SU cuadro', () => {
     assert.equal((xml.match(/<\?xml/g) || []).length, 1);
   });
 
+  test('ficha vieja con Erick en el único campo de Aprobación: el papel no lo repite y sale Jorge Miranda', async () => {
+    const xml = await dibujoDe({ nom_apr: 'Erick Vergara', occ_apr: 'Subgerente Mantenimiento AT' });
+    const nombres = anclas(xml).map(renglones).flat().filter((t) => t.startsWith('Nombre:'));
+    assert.equal(nombres.filter((t) => t === 'Nombre: ERICK VERGARA').length, 2, 'Aprobación 1 + Recibe');
+    assert.ok(nombres.includes('Nombre: JORGE MIRANDA'));
+    assert.ok(!anclas(xml).map(renglones).flat().includes('Ocupación: Subgerente Mantenimiento AT'),
+      'el cargo viejo no se pega a una persona de la lista');
+  });
+
+  test('un carácter de control pegado no rompe el dibujo (se descarta al escribir)', async () => {
+    const xml = await dibujoDe({ sel_rec: 'otro', nom_rec: 'PERSONA\u000BFICTICIA\u0002', occ_rec: 'CARGO' });
+    assert.ok(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(xml), 'sin controles en el XML');
+    assert.deepEqual(cuadro(xml, 'Recibe').slice(1, 2), ['Nombre: PERSONAFICTICIA']);
+    const bytes = await exportarFichaPlanificacion(EQUIPO, { plan: { proyecto: 'P\u0001ROYECTO' } },
+      { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array' });
+    const h = XLSX.read(bytes, { type: 'array' });
+    assert.equal(h.Sheets[h.SheetNames[0]].D8.v, 'PROYECTO');
+  });
+
   test('los renglones del firmante van a 9 pt; el título del cuadro conserva su tamaño', async () => {
     const xml = await dibujoDe({});
     const elab = anclas(xml).find((a) => renglones(a).includes('Elaboración'));

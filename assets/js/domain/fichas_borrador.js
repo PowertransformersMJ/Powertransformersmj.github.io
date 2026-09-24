@@ -140,6 +140,9 @@ export function tieneContenido(entrada) {
   if (!entrada) return false;
   const conAlgo = (m) => !!m && Object.keys(m).some((k) => {
     if (k.endsWith('_ver')) return false;
+    // `sel_<casilla>` solo dice que la casilla de firma está en «Otra persona»:
+    // sin un nombre escrito no hay trabajo que proteger (`99 §89`).
+    if (k.startsWith('sel_')) return false;
     // Texto que compuso el MÓDULO, no él: cuando el campo tiene una versión
     // elegida por índice, su contenido se puede rehacer en cualquier momento a
     // partir de `_ver`. No es trabajo del Ingeniero y no puede contar como tal:

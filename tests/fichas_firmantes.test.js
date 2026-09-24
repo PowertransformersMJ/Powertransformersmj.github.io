@@ -2,7 +2,8 @@
 // `99 §89`) y la función que usan por igual la pantalla y el Excel.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe } from '../assets/js/domain/fichas_firmantes.js';
+import { FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../assets/js/domain/fichas_firmantes.js';
+import { tieneContenido } from '../assets/js/domain/fichas_borrador.js';
 
 describe('La lista dictada, LITERAL (anti-paráfrasis)', () => {
   test('cada casilla con sus personas y cargos, letra por letra y en su orden', () => {
@@ -60,10 +61,36 @@ describe('firmanteDe — lo que se imprime en cada casilla', () => {
       { nombre: '', ocupacion: '', fecha: '', otra: true, indice: -1 });
   });
 
-  test('el cargo cambiado a mano manda sobre el de la lista; la fecha viaja', () => {
-    const f = firmanteDe('apr', { occ_apr: 'CARGO ENCARGADO', fec_apr: ' 03/10/2026 ' });
+  test('una persona de la lista lleva SIEMPRE su cargo dictado: un cargo viejo no se le pega; la fecha viaja', () => {
+    // Revisión §89: una ficha vieja con solo el cargo tecleado imprimía «JORGE MIRANDA / Subgerente…».
+    const f = firmanteDe('apr', { occ_apr: 'Subgerente Mantenimiento AT', fec_apr: ' 03/10/2026 ' });
     assert.equal(f.nombre, 'JORGE MIRANDA');
-    assert.equal(f.ocupacion, 'CARGO ENCARGADO');
+    assert.equal(f.ocupacion, 'LIDER DE PLANIFICACION Y ASEGURAMIENTO MANTENIMIENTO AT');
     assert.equal(f.fecha, '03/10/2026');
+  });
+
+  test('el segundo aprobador no repite a quien ya está en el primero', () => {
+    // Ficha vieja: Aprobación tenía un solo campo y se tecleó «Erick Vergara».
+    const vieja = { nom_apr: 'Erick Vergara', occ_apr: 'Subgerente Mantenimiento AT' };
+    assert.equal(firmanteDe('apr', vieja).nombre, 'ERICK VERGARA');
+    assert.equal(firmanteDe('apr2', vieja).nombre, 'JORGE MIRANDA');
+    assert.equal(indicePorDefecto('apr2', vieja), 1);
+    // Sin nada escrito, el orden dictado: Miranda y Vergara.
+    assert.equal(firmanteDe('apr2', {}).nombre, 'ERICK VERGARA');
+    // Si se elige explícitamente, manda la elección.
+    assert.equal(firmanteDe('apr2', { nom_apr: 'ERICK VERGARA', nom_apr2: 'ERICK VERGARA' }).nombre, 'ERICK VERGARA');
+  });
+
+  test('«Otra persona» explícita con el nombre borrado NO vuelve sola a la persona por defecto', () => {
+    // Revisión §89: se imprimía ERICK VERGARA con el cargo viejo de otra persona.
+    assert.deepEqual(firmanteDe('rec', { sel_rec: OTRA_PERSONA, nom_rec: '', occ_rec: 'CARGO VIEJO DE PRUEBA' }),
+      { nombre: '', ocupacion: 'CARGO VIEJO DE PRUEBA', fecha: '', otra: true, indice: -1 });
+  });
+});
+
+describe('El borrador no cuenta como trabajo lo que no lo es (revisión §89)', () => {
+  test('la marca «Otra persona» sin nombre escrito no es contenido; con nombre, sí', () => {
+    assert.equal(tieneContenido({ plan: { sel_elab: OTRA_PERSONA, nom_elab: '', occ_elab: '' } }), false);
+    assert.equal(tieneContenido({ plan: { sel_elab: OTRA_PERSONA, nom_elab: 'PERSONA DE PRUEBA' } }), true);
   });
 });

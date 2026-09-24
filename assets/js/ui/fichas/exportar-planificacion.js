@@ -91,6 +91,11 @@ function numeroDeColumna(letras) {
 
 function escXml(s) {
   return String(s == null ? '' : s)
+    // Caracteres de control que XML 1.0 NO admite (llegan pegados de un PDF u
+    // otro sistema): uno solo dejaba el dibujo mal formado y LibreOffice perdía
+    // el cuadro Recibe y el logo (revisión §89). Se conservan \t, \n y \r.
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g, '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
