@@ -3828,3 +3828,25 @@ Commit `10fb915`.
 cambiaron (`fichas_firmantes.js`, `fichas_presupuesto.js`, `fichas_borrador.js`, `exportar-planificacion.js`,
 `panel.js`, `evaluacion-masiva.js`, `fichas-tecnicas.css`) servidos **byte a byte idénticos** al repo, pedidos
 con anti-caché. El Valor Real vacío quedó en `[PENDIENTE]` (su pregunta sigue abierta).
+
+## 91. ADR — Las fechas de la ficha se escogen en un calendario que se abre al tocarlas ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Pedido: *«necesito que en las fechas siempre se despliegue un calendario donde me permita escoger la fecha
+> a mi voluntad»*.
+
+**91.1 Qué había.** Fecha de Entrega y la fecha de cada firmante eran texto libre «dd/mm/aaaa»; la del acta de
+novedades ya era `<input type="date">`, pero Chrome solo abre su calendario si se atina al iconito.
+
+**91.2 Solución.** `campoFecha` (panel): se VE la fecha en «dd/mm/aaaa» —formateada por el módulo, no por el
+navegador, porque un `type="date"` visible se pinta y se IMPRIME en el formato del idioma del navegador (en
+inglés, mes/día/año)— y encima va el calendario nativo transparente. Tocar cualquier `input[type="date"]` del
+módulo o pulsar Enter llama `showPicker()` (con clic real el navegador lo acepta; si no sabe, enfoca). Se guarda
+«dd/mm/aaaa» en las mismas claves; a medio teclear (`badInput`) no se borra; un texto viejo que no es fecha se ve
+marcado hasta que se elija una. `domain/fichas_fechas.js`: `fechaAISO`, `isoAFecha`, `fechaParaPapel` (el Excel
+imprime siempre «dd/mm/aaaa»; un texto viejo, tal cual). Al imprimir: sin icono ni texto de ayuda.
+
+**91.3 Verificación.** 8 pruebas nuevas → **1823 pass / 0 fail / 2 skip**, lint limpio. Banco: clic REAL →
+`showPicker` aceptado (la ventana nativa no sale en capturas; se verificó por la llamada), Enter igual, la fecha
+queda «15/12/2026» y sobrevive a reabrir; el acta de novedades también lo abre; captura de pantalla e impresión.
+Commit `729e74e`. **Abierto**: «Año de entrada» es un año, no una fecha: sigue escrito a mano (se le ofrece una
+lista de años).

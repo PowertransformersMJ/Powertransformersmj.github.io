@@ -407,6 +407,12 @@ describe('§89 · quién firma llega al Excel, cada uno en SU cuadro', () => {
     assert.equal(h.Sheets[h.SheetNames[0]].D8.v, 'PROYECTO');
   });
 
+  test('las fechas salen en «dd/mm/aaaa» aunque se hayan guardado de otra forma (§91)', async () => {
+    const xml = await dibujoDe({ fechaentrega: '2026-12-15', fec_elab: '1/10/2026' });
+    assert.ok(xml.includes('<a:t>15/12/2026</a:t>'), 'Fecha de Entrega');
+    assert.deepEqual(cuadro(xml, 'Elaboración').slice(-1), ['Fecha: 01/10/2026']);
+  });
+
   test('los renglones del firmante van a 9 pt; el título del cuadro conserva su tamaño', async () => {
     const xml = await dibujoDe({});
     const elab = anclas(xml).find((a) => renglones(a).includes('Elaboración'));

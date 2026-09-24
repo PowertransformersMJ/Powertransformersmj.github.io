@@ -1425,6 +1425,24 @@ body.aqua .ftm-fmt .ftm-fmt-sel.ftm-fmt-sel.ftm-fmt-sel.ftm-fmt-sel.ftm-fmt-sel 
   opacity: 0; cursor: pointer; margin: 0; padding: 0; border: 0;
   -webkit-appearance: none; appearance: none;
 }
+/* Casilla de FECHA con calendario (`99 §91`): se ve «dd/mm/aaaa» como en el
+   papel y el calendario nativo va encima, transparente; al tocarla se abre.
+   La regla global de inputs se neutraliza aquí con la clase repetida. */
+.ftm-fecha {
+  position: relative; display: inline-flex; align-items: center; flex: 1; min-width: 7em;
+  padding-right: 16px; cursor: pointer; border-bottom: 1px dotted var(--ftm-paper-line);
+  background: transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 11 11'%3E%3Crect x='.5' y='1.5' width='10' height='9' rx='1.5' fill='none' stroke='%236f7f86'/%3E%3Cpath d='M.5 4.5h10M3 .5v2M8 .5v2' stroke='%236f7f86'/%3E%3C/svg%3E") no-repeat right 2px center;
+}
+.ftm-fecha--centro { justify-content: center; width: 100%; padding-left: 16px; }
+.ftm-fecha:focus-within { outline: 2px solid var(--ftm-petrol); outline-offset: 1px; }
+.ftm-fecha-txt { white-space: nowrap; }
+.ftm-fecha-txt.is-vacia { color: #a9b4b9; }
+.ftm-fecha-txt.is-vieja { text-decoration: underline wavy #c4281f; text-underline-offset: 2px; }
+.ftm-fecha-in,
+body.aqua .ftm-fecha .ftm-fecha-in.ftm-fecha-in.ftm-fecha-in.ftm-fecha-in.ftm-fecha-in {
+  position: absolute; inset: 0; width: 100%; height: 100%;
+  margin: 0; padding: 0; border: 0; box-shadow: none; opacity: 0; cursor: pointer;
+}
 .ftm-fmt-in::placeholder { color: #a9b4b9; }
 .ftm-fmt-in:focus,
 body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus {
@@ -1752,6 +1770,9 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
   .ftm-fmt-in { border-bottom: none; background: transparent; }
   .ftm-fmt-in::placeholder { color: transparent; }
   .ftm-fmt-elige { background-image: none; padding-right: 0; border-bottom: none; }
+  .ftm-fecha { background-image: none; padding-right: 0; border-bottom: none; }
+  .ftm-fecha-txt.is-vacia { color: transparent; }
+  .ftm-fecha-in { display: none !important; }
   .ftm-fmt-sel { display: none !important; }
   .ftm-fmt-caja { break-inside: avoid; }
   .ftm-campo-area--alcance { border: none; white-space: pre-wrap; }
