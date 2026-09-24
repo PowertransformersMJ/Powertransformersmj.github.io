@@ -52,17 +52,17 @@
 | §38 | ADR-038 — FP/tan δ: vista Tip-up (ΔFP alta−baja: PD vs humedad) + caveat 20 °C; auditoría 🔵 skill FP | 758 |
 | §39 | ADR-039 — FP/tan δ: localización del defecto por modo (`localizacionDe`/`causaProbableDe`) | 774 |
 | §40 | ADR-040 — FP/tan δ: pendiente predictiva por sección + baseline-proxy; capacitancia descartada (artefacto) | 790 |
-| §41 | ADR-041 — Corriente de excitación: panel propio `excitacion-panel.js` espejo del tan δ; nivel de tensión (`nivelDe`), 5 vistas, W de pérdidas, criterio NETA 2+1/IEEE 62… | 804 |
+| §41 | ADR-041 — Corriente de excitación: panel propio `excitacion-panel.js`, espejo del tan δ | 804 |
 | §42 | ADR-042 — Excitación: vista "Resumen (todo)" + gating de tablas + fix `reset` (Sets en sitio, L-54) + separación por NIVEL (§42.8) | 822 |
 | §43 | ADR-043 — Excitación: tabla-RESUMEN por nivel (fusión 1+4: banda+KPI+norma+años); detalle por TAP gateado; elegida por el director entre 4 previews | 842 |
 | §44 | ADR-044 — Panel "Valores por prueba" (`tablas-pruebas-panel.js`): rango real, Σ pérdidas, nivel real, diagnóstico multi-norma + acción CBM; aditivo | 860 |
 | §45 | ADR-045 — "Valores por prueba": acordeón por NIVEL + filtro de año por nivel + fix conformidad (`quitarColumnasVeredicto`, L-42) | 878 |
-| §46 | ADR-046 — Excitación: orden por nivel + retira tablas repetidas; nace el preview FIEL `_dev/preview-excitacion-fiel.html` (L-56); código muerto FUSIÓN pendiente de poda | 894 |
+| §46 | ADR-046 — Excitación: orden por nivel; nace el preview FIEL `_dev/preview-excitacion-fiel.html` (L-56) | 894 |
 | §47 | ADR-047 — Fix modo MIXTO que tumbaba el panel (solo AT·110 visible): layout por-fila + guards + try/catch por nivel; reproducido en navegador | 912 |
 | §48 | ADR-048 — Reorg POR PRUEBA paso 1: "Corriente de excitación" = SEGMENTO unificado `.pe-seg` (gráficas+tablas+JSON); demás pruebas intactas | 930 |
 | §49 | ADR-049 — "Nomenclatura y secciones de aislamiento" pasa DENTRO del segmento Tan δ (reubica `#nomencl` vivo) | 948 |
 | §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (tablas de `montarPanelPrueba`, L-57) + detalle por informe + fuera-de-criterio en rojo + fix chips… | 968 |
-| §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (kernel v1.2): entrevista F3a (política git NUEVA: Claude commit+push+merge+deploy), rescate TRIAJE en `_legacy/`, 30… | 986 |
+| §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (política git: Claude commit+push+merge+deploy) | 986 |
 | §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores adversariales, 0 refutados) → 123 hallazgos en 6 olas; hallazgo dominante =… | 1004 |
 | §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase;… | 1036 |
 | §54 | ADR-054 — Shell: `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin | 1054 |
@@ -81,7 +81,7 @@
 | §67 | ADR-067 — «Veo información basura»: Cargabilidad y SCADA mostraban equipos inventados sin rotularlos, la matriz vestía la falta de datos de buena noticia y 8 de 10… | 1497 |
 | §68 | ADR-068 — Mantenimiento del cerebro (auditoría Nivel-2, 8 sondas): caché afirmada sin correr, gate de bóveda «íntegro» con 8 deliberaciones sin indexar, mapa sin 4… | 1551 |
 | §69 | ADR-069 — TX_Potencia leída de verdad: los «62 omitidos» eran **57 equipos reales** (cabecera en la fila 2) → 208 válidos y 1.655.376 usuarios (cierra TODO-34). Su… | 1637 |
-| §70 | ADR-070 — Órdenes de Materiales SSEE entra al sitio con página propia (ya existían las «Órdenes» de TRABAJO), sin las 3 firmas escaneadas ni las 8 cédulas: el guard… | 1710 |
+| §70 | ADR-070 — Órdenes de Materiales SSEE con página propia, sin firmas escaneadas ni cédulas | 1710 |
 | §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la… | 1781 |
 | §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después… | 1838 |
 | §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría… | 1905 |
@@ -100,6 +100,7 @@
 | §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos ⟦OPUS-5⟧ | 3574 |
 | §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` donde falta plata (nunca «0»), dinero tecleado leído sin adivinar; CF-32 refutado ⟦OPUS-5.5⟧ | 3632 |
 | §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes, ocupación de la plantilla); aún no llegan al Excel (CF-25) ⟦OPUS-5.5⟧ | 3713 |
+| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero en la ficha y en el Excel (CF-25); revisión de 12 agentes, 6 confirmados ⟦OPUS-5.5⟧ | 3743 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

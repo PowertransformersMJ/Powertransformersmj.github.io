@@ -3739,3 +3739,57 @@ plantilla; capturas a 2× con Chrome sin cabeza de los dos documentos. Commit `8
 conecta cuando el Ingeniero entregue los parámetros. Los NOMBRES de personas no pueden vivir en el código
 (repo público): si son fijos, irán a su navegador o a un documento de configuración en Firestore. La
 plantilla escribe «Lider Planificacion» sin tildes: la pantalla lo copia tal cual hasta que él diga.
+
+## 89. ADR — Quién firma el PE.02081: la lista dictada por el Ingeniero, en la ficha y en el Excel (CF-25) ⟦OPUS-5.5⟧ (2026-09-23)
+
+> Dictado: *«en elaboración van los siguientes nombres: MIGUEL A. JIMENEZ — PROFESIONAL EN TRANSFORMADORES
+> DE POTENCIA · CARLOS MARTELO — ANALISTA DE TRANSFORMADORES AT · JORGE RHENALS — ANALISTA DE TRANSFORMADORES
+> AT · en Revision: JORGE MIRANDA — LIDER DE PLANIFICACION Y ASEGURAMIENTO MANTENIMIENTO AT · MIGUEL JIMENEZ —
+> PROFESIONAL EN TRANSFORMADORES DE POTENCIA · en Aprovacion: JORGE MIRANDA — (el mismo cargo) · ERICK VERGARA —
+> JEFE OPERATIVA MANTENIMIENTO RED ALTA TENSION (E) · RECIBE: ERICK VERGARA — SUBGERENTE MANTENIMIENTO RED ALTA
+> TENSION»*. En rama, **sin publicar**; preview entregado.
+
+**89.1 Lectura del dictado.** El formato tiene UNA casilla por rol salvo Aprobación, que tiene dos. Donde dio
+varias personas para una casilla (Elaboración 3, Revisión 2) es la lista de quienes PUEDEN firmarla: la primera
+va por defecto, las demás se eligen; siempre queda «Otra persona (escribir)». Aprobación: sus dos personas en sus
+dos casillas. Se le dijo la lectura; si quería los tres a la vez en Elaboración, se cambia. Texto LITERAL (mayúsculas,
+sin tildes, «MIGUEL A. JIMENEZ» en Elaboración y «MIGUEL JIMENEZ» en Revisión, como los escribió).
+
+**89.2 Nombres en el repo público.** Se revisó antes de escribirlos: `§78.3` ya aceptó que **los nombres son
+públicos** y Órdenes (`§76`) los lleva en el código; lo prohibido son cédulas y firmas escaneadas (`§70`, `§78`).
+La afirmación contraria que se le dio en el turno anterior («los nombres no pueden ir en el código») era más
+estricta que la decisión vigente y se le corrigió. Prueba: la lista no lleva cédulas.
+
+**89.3 Solución.** `domain/fichas_firmantes.js` (`FIRMANTES`, `firmanteDe`) — una sola función para pantalla y
+papel. Pantalla: nombre y cargo como TEXTO corrido que baja de renglón (un `<select>` visible cortaba «MIGUEL A.
+JIME…» y los `<textarea>` partían «TRANSFORMADO / RES»), desplegable transparente encima del nombre; Firma y Fecha
+alineadas abajo. Excel: `escribirFirmantes` reescribe Nombre · Ocupación · Fecha en el cuadro de `drawing1.xml`
+reconocido por su TÍTULO (hay dos «Grupo 41»; el segundo aprobador es el único sin título); la Firma queda a mano.
+
+**89.4 Dos cosas del papel que solo se vieron renderizando.** (a) A 11 pt, con los cargos en mayúscula, la Firma y
+la Fecha de Aprobación **se salían del cuadro** ⇒ los renglones del firmante van a 9 pt (el título no se toca).
+(b) Las dos imágenes de la zona de firma son **rectángulos blancos** —restos de las firmas retiradas en `§70`—
+dibujados ENCIMA del texto: se comían el último dígito de la fecha ⇒ `imagenesDeFirmaAlFondo` las pasa detrás de
+los cuadros, sin borrarlas (el logo del encabezado no se mueve).
+
+**89.5 Verificación.** 13 pruebas nuevas (anti-paráfrasis de la lista, reparto por título, «$» literal, 9 pt,
+imágenes al fondo, resto del dibujo idéntico) → **1811 pass / 0 fail / 2 skip**, lint limpio. Banco con el módulo
+real: elegir persona trae su cargo, «Otra persona» abre los renglones con el foco puesto, volver a la lista
+restaura, todo sobrevive a cerrar y reabrir (y en el documento de Mantenimiento, que comparte las claves); el
+Excel descargado dice lo mismo que la pantalla y cabe (render de LibreOffice a 220 ppp).
+
+**89.6 Lo que la revisión adversarial paró antes del preview** (2 lentes + 1 escéptico por hallazgo, 12
+agentes Opus; crudo → bóveda `2026-09-23-firmantes-pe02081/`). Confirmados y corregidos en `386adfd`:
+Aprobación con **ERICK VERGARA dos veces** (ficha vieja o elegir a Erick en el primero) ⇒ el segundo no repite
+(`indicePorDefecto`) · un **cargo viejo pegado** a la persona por defecto ⇒ la persona de la lista lleva siempre
+su cargo dictado · «Otra persona» con el nombre borrado **volvía sola** al defecto ⇒ escribir fija `sel_` ·
+**foco perdido** al elegir con teclado · un **carácter de control** pegado rompía `drawing1.xml` (preexistente en
+`escXml`) · «Otra persona» **sin tope** sacaba la Fecha del cuadro (45/60) · elegir el defecto contaba como
+trabajo del borrador. Tres verificadores se trabaron: revisaban lo que el banco ya había corregido
+(`f5bd961`), verificado con capturas 2× y PDF impreso. Final: **1816 pass / 0 fail / 2 skip**, lint limpio.
+
+**89.7 Visto al imprimir, preexistente y fuera de este punto** (→ CF-39): en la hoja impresa los campos del
+presupuesto salen como cajas redondeadas y cortados («TRANSI», «192.85…») —la misma regla global de
+`§88.1`— y el texto de ayuda del alcance se imprime.
+
+Commits `8e27a49` · `f639ab3` · `f5bd961` · `386adfd`. Publicación retenida hasta su visto bueno.
