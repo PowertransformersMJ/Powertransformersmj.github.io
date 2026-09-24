@@ -44,11 +44,10 @@ import {
 import { atraparFoco } from '../foco-modal.js';
 import {
   construirFichaTecnica, colorCondicion, nombreCondicion, nucleoFicha,
-  clasificarAccion, CATEGORIAS_ACCION, definicionCondicion
+  clasificarAccion, definicionCondicion
 } from './ficha-tecnica.js';
 import {
-  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion,
-  macroactividadesCatalogo
+  accionesDisponibles, seleccionPorDefecto, prosaAcciones, esInversion
 } from '../../domain/fichas_acciones.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
@@ -2270,153 +2269,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    */
   const campoRed = (base) => (documento === 'salud' ? base + '_mtto' : base);
 
-  /**
-   * Selector de ACCIONES de mantenimiento. Es lo que hace específico el alcance:
-   * el Ingeniero marca qué se ejecuta y la redacción se compone con eso.
-   *
-   * Se distingue de dónde sale cada renglón, porque no valen lo mismo: lo que el
-   * equipo tiene REGISTRADO en Salud de Activos, la LÍNEA BASE de su condición
-   * cuando no tiene nada registrado (y entonces se rotula como referencial), y
-   * el CATÁLOGO oficial de la banda, que se ofrece sin marcar para añadir.
-   */
-  function selectorAcciones(e) {
-    const st = estadoDe(e);
-    const ci = nucleoFicha(e || {}).ci;
-    const todas = accionesDeEquipo(e, { todasLasCondiciones: true });
-    // Orden del Ingeniero (2026-09-09): «todo lo referente a inversión queda en
-    // PI». Aquí no se ofrecen, pero tampoco se borran de la vista: si el plan
-    // del equipo trae una, se dice cuál es y dónde se sustenta. Ocultarla sin
-    // más sería perder de la pantalla un renglón del plan de récord (L-81).
-    const disp = todas.filter((a) => !esInversion(a.txt));
-    const fueraPorInversion = todas.filter((a) => esInversion(a.txt));
-    // El aviso es por NO TENER CONDICIÓN, no por lista vacía: en modo catálogo
-    // la lista nunca está vacía (siempre trae las 7 macroactividades), así que
-    // colgarlo de `disp.length` lo dejaba muerto y le enseñaba a un equipo sin
-    // condición un catálogo entero sin decirle que ninguna banda es la suya.
-    if (ci == null || (!disp.length && !fueraPorInversion.length)) {
-      return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
-        + 'registrada, así que no hay una banda suya que proponer. El alcance se redacta a '
-        + 'mano o se toma la versión automática.</div>';
-    }
-    const marcados = new Set(seleccionAcciones(e, st, 'alcance_mtto').map((a) => a.id));
-    const propias = disp.filter((a) => a.origen !== 'catalogo');
-    const hayRegistro = propias.some((a) => a.origen === 'registro');
-    const esBase = propias.some((a) => a.origen === 'base');
-
-    const fila = (a) => {
-      const C = CATEGORIAS_ACCION[a.cat] || CATEGORIAS_ACCION.DIAG;
-      // El gris es de «se ofrece, no está en el alcance». Un renglón MARCADO
-      // no es opcional aunque venga del catálogo: no puede salir en gris.
-      const marcada = marcados.has(a.id);
-      return '<label class="ftm-acc-item' + (a.origen === 'catalogo' && !marcada ? ' es-extra' : '') + '">'
-        + '<input type="checkbox" data-accion="' + esc(a.id) + '"' + (marcada ? ' checked' : '') + '>'
-        + '<span class="ftm-acc-cat" style="background:' + C.c + '" title="' + esc(C.lbl) + '"></span>'
-        + '<span class="ftm-acc-txt">' + esc(a.txt) + '</span>'
-        + '</label>';
-    };
-
-    // Encargo del Ingeniero (2026-09-10): «que aparezcan TODAS las
-    // macroactividades por condición». El catálogo entero, agrupado como lo
-    // agrupa la norma; la banda del equipo va abierta y señalada, el resto
-    // plegado para que no tape la pantalla. Se pliega con <details>, que es
-    // nativo: sin JS, sin listener global y accesible por teclado (§3.5).
-    // Ids de la banda del equipo: sirven para saber si una marca en un grupo
-    // ajeno es una REPETICIÓN real de la norma (solo pasa con 2 de las 34
-    // subactividades, entre C1 y C2) o algo que el Ingeniero marcó a mano.
-    const idsSuBanda = new Set(
-      disp.filter((a) => a.cond === ci && !a.esMitigacion).map((a) => a.id));
-
-    const grupoMacro = (m) => {
-      const suyas = disp.filter((a) => a.macro === m.codigo);
-      const fuera = fueraPorInversion.filter((a) => a.macro === m.codigo);
-      if (!suyas.length && !fuera.length) return '';
-      const esSuya = ci != null && m.condicion === ci;
-      const esSuBanda = esSuya && !m.esMitigacion;
-      const marcadasAqui = suyas.filter((a) => marcados.has(a.id));
-      const nMarcadas = marcadasAqui.length;
-      const nRepetidas = marcadasAqui.filter((a) => idsSuBanda.has(a.id)).length;
-      const nAjenas = nMarcadas - nRepetidas;
-      return '<details class="ftm-acc-macro' + (esSuya ? ' es-suya' : '') + '"'
-        + (esSuya ? ' open' : '')
-        // «Marcar las suyas» NO debe barrer la mitigación: depende de la causa,
-        // no de la banda. El grupo se abre y se señala, pero queda fuera del
-        // ámbito del botón.
-        + (esSuBanda ? ' data-acc-ambito="propio"' : '') + '>'
-        + '<summary class="ftm-acc-macro-cab">'
-        +   '<span class="ftm-acc-macro-nom">' + esc(m.nombre) + '</span>'
-        +   '<span class="ftm-acc-macro-cond">Condición ' + m.condicion + '</span>'
-        +   (esSuya ? '<span class="ftm-acc-macro-yo">este equipo</span>' : '')
-        // El rótulo «referencial» tiene que vivir DONDE está la marca: si no,
-        // un bloque marcado y abierto se lee como plan aprobado, que es
-        // exactamente la confusión que ADR-066 prohíbe.
-        +   (esSuBanda && esBase
-          ? '<span class="ftm-acc-macro-ref-lbl">línea base · referencial</span>' : '')
-        +   '<span class="ftm-acc-macro-n">' + (nMarcadas ? nMarcadas + ' de ' : '')
-        +     suyas.length + '</span>'
-        +   '<span class="ftm-acc-macro-ref">' + esc(m.referencia) + '</span>'
-        + '</summary>'
-        + suyas.map(fila).join('')
-        + (!esSuya && nRepetidas
-          ? '<p class="ftm-acc-macro-nota">' + (nRepetidas === 1 ? 'Una actividad' : nRepetidas + ' actividades')
-            + ' de este grupo aparece' + (nRepetidas === 1 ? '' : 'n')
-            + ' marcada' + (nRepetidas === 1 ? '' : 's') + ' porque la norma '
-            + (nRepetidas === 1 ? 'la' : 'las') + ' repite en la banda del equipo: es la misma '
-            + 'acción, no una segunda.</p>'
-          : '')
-        + (!esSuya && nAjenas
-          ? '<p class="ftm-acc-macro-nota">' + (nAjenas === 1 ? 'Una actividad' : nAjenas + ' actividades')
-            + ' de otra banda que usted añadió al alcance.</p>'
-          : '')
-        + (fuera.length
-          ? '<p class="ftm-acc-macro-inv">Fuera de este documento por ser inversión: '
-            + fuera.map((a) => esc(a.txt)).join(', ') + '.</p>'
-          : '')
-        + '</details>';
-    };
-
-    // El plan de récord del equipo NO es catálogo y va aparte: confundirlos
-    // sería presentar como aprobado algo que nadie aprobó (ADR-066).
-    const fueraDelPlan = fueraPorInversion.filter((a) => a.origen !== 'catalogo');
-
-    // Desde que la línea base sale del catálogo oficial (2026-09-10) ya no hace
-    // falta un grupo «línea base» aparte: es LITERALMENTE la banda del equipo,
-    // que abajo aparece abierta, rotulada «este equipo» y marcada. Repetirla
-    // arriba sería enseñar dos veces lo mismo. Solo se pinta arriba lo que NO
-    // está en ningún grupo del catálogo —el plan registrado, y por defensa
-    // cualquier renglón base sin pareja—, para que nada quede seleccionado y
-    // fuera de la vista.
-    const enCatalogo = new Set(disp.filter((a) => a.origen === 'catalogo').map((a) => a.id));
-    const arriba = propias.filter((a) => a.origen === 'registro' || !enCatalogo.has(a.id));
-
-    return '<div class="ftm-acc">'
-      + '<div class="ftm-acc-head">Acciones de mantenimiento del alcance'
-      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="1">Marcar las suyas</button>'
-      +   '<button type="button" class="ftm-acc-todo" data-acc-todo="0">Ninguna</button>'
-      + '</div>'
-      + (arriba.length
-        ? '<div class="ftm-acc-grupo" data-acc-ambito="propio"><span class="ftm-acc-rot">'
-          + (hayRegistro ? 'Plan registrado del equipo' : 'Línea base de la condición · referencial')
-          + '</span>' + arriba.map(fila).join('') + '</div>'
-        : '')
-      + '<div class="ftm-acc-catalogo">'
-      +   '<span class="ftm-acc-rot">Catálogo MO.00418 §4.3 · todas las macroactividades</span>'
-      +   macroactividadesCatalogo().map(grupoMacro).join('')
-      + '</div>'
-      + (fueraDelPlan.length
-        ? '<p class="ftm-acc-aviso">Fuera de este documento por ser <b>inversión</b>: '
-          + fueraDelPlan.map((a) => esc(a.txt)).join(', ')
-          + '. La inversión se sustenta en la <b>Propuesta a Plan de Inversión (PI)</b>, que es el '
-          + 'otro documento que se emite desde este equipo.</p>'
-        : '')
-      + '<p class="ftm-acc-pie">' + (esBase
-        ? 'El equipo no trae macroactividad registrada. Su banda queda abierta y rotulada '
-          + '<b>referencial</b>: de ella se marca solo lo de diagnóstico y verificación, porque la '
-          + 'norma lista por banda lo que PUEDE aplicar, no lo que este equipo necesita. Lo '
-          + 'intrusivo se ofrece sin marcar y se escoge contra el hallazgo. '
-        : '') + 'Lo que marque entra en el texto del alcance, venga de la banda que venga; si no '
-      + 'marca nada, el alcance dice que las acciones se definirán según el diagnóstico.</p>'
-      + '</div>';
-  }
 
   /** Selector de redacción + área de texto (alcance / beneficios). */
   function selectorRedaccion(e, campo) {
@@ -2475,8 +2327,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       : (rec != null
         ? 'Este equipo está en condición ' + esc(String(rec)) + ' · ' + esc(nombreCondicion(rec))
           + ': ' + (nProp === 1 ? 'su propuesta está marcada' : 'sus ' + nProp + ' propuestas están marcadas')
-          + ' en la lista. El texto se compone con las acciones que haya marcado arriba; '
-          + 'puede editarlo libremente.'
+          + ' en la lista. Puede editar el texto libremente.'
         : 'Elija una versión y edítela libremente; la cifra de potencia se toma de «Potencia del proyecto».');
     return '<div class="ftm-alcance">'
       + '<label for="ftm-sel-' + campo + '">Redacción</label>'
@@ -2696,7 +2547,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +     '<span class="ftm-campo-val" data-calc="uucc">' + esc(textoUC(U, r)) + '</span></div>'
       + '</div>'
       + banda('Alcance')
-      + (documento === 'salud' ? selectorAcciones(e) : '')
+      // Orden del Ingeniero (2026-09-23, `99 §90`): en el Alcance ya no va el
+      // selector de «acciones de mantenimiento»; aparece solo el alcance.
       + selectorRedaccion(e, campoRed('alcance'))
       // El presupuesto valora la Unidad Constructiva de REPOSICIÓN y rotula
       // «INVERSIÓN»: pertenece al PI. Orden del Ingeniero (2026-09-09): todo lo
@@ -2876,30 +2728,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
   }
 
-  /**
-   * Rehace el texto del alcance con la selección de acciones vigente. Solo si
-   * hay una redacción elegida: si el Ingeniero escribió la suya, no se pisa.
-   */
-  function rehacerAlcance() {
-    if (!actual || documento !== 'salud') return;
-    const st = estadoDe(actual);
-    const campo = campoRed('alcance');
-    const ver = st.plan[campo + '_ver'];
-    if (ver == null || ver === 'custom') return;
-    st.plan[campo] = textoVersion(campo, +ver, actual, st);
-    const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
-    if (ta) ta.value = st.plan[campo];
-  }
-
-  /** Guarda la selección de acciones y rehace el alcance. */
-  function fijarAcciones(ids) {
-    const st = estadoDe(actual);
-    st.plan.acc_sel = ids;
-    tocarFicha(actual);
-    marcarSucio();
-    rehacerAlcance();
-  }
-
   /** Al cambiar la potencia, las redacciones NO personalizadas se rehacen. */
   function reescribirRedacciones() {
     if (!actual) return;
@@ -3006,25 +2834,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
     if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
     if (ev.target.closest('[data-ftm="borr-descartar"]')) { descartarBorrador(); return; }
-
-    // Marcar todas / ninguna las acciones del alcance
-    const acct = ev.target.closest('[data-acc-todo]');
-    if (acct && contenedor.contains(acct) && actual) {
-      const todas = acct.getAttribute('data-acc-todo') === '1';
-      // «Marcar todas» = las de SU condición y su plan, no las 41 de la norma:
-      // el selector ahora muestra el catálogo entero y marcarlo completo
-      // metería en el alcance trabajos de bandas que no le corresponden.
-      const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
-      const propias = [...modalCuerpo.querySelectorAll('[data-acc-ambito="propio"] [data-accion]')];
-      if (todas) {
-        propias.forEach((c) => { c.checked = true; });
-        fijarAcciones([...new Set(propias.map((c) => c.getAttribute('data-accion')))]);
-      } else {
-        cajas.forEach((c) => { c.checked = false; });
-        fijarAcciones([]);
-      }
-      return;
-    }
 
     // Gestión de novedades
     const gest = ev.target.closest('[data-gestionar]');
@@ -3198,18 +3007,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
       tocarFicha(actual);
       }
-    const accId = t.getAttribute && t.getAttribute('data-accion');
-    if (accId && actual) {
-      // La norma repite dos subactividades en C1 y C2 («Pruebas eléctricas»,
-      // «Inspección ocular detallada»): son la MISMA acción, así que sus dos
-      // casillas se mueven juntas. Si no, la pantalla mostraría una marcada y
-      // otra no para algo que en el alcance sale una sola vez.
-      modalCuerpo.querySelectorAll('[data-accion="' + accId + '"]')
-        .forEach((c) => { c.checked = t.checked; });
-      const marcados = [...new Set([...modalCuerpo.querySelectorAll('[data-accion]')]
-        .filter((c) => c.checked).map((c) => c.getAttribute('data-accion')))];
-      fijarAcciones(marcados);
-    }
     if (t.getAttribute && t.getAttribute('data-anexo') && actual) {
       estadoDe(actual).anexo[t.getAttribute('data-anexo')] = t.value;
       tocarFicha(actual);
