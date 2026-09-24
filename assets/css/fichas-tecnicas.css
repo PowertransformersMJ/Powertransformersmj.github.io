@@ -1810,6 +1810,12 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
   .ftm-fecha-in { display: none !important; }
   .ftm-anio-abrir,
   .ftm-anios { display: none !important; }
+  /* El recuadro de «casilla con el foco» no es parte del papel: tras elegir un
+     año el foco vuelve a su casilla, e imprimir en ese momento lo pintaba. */
+  .ftm-fecha:focus-within { outline: none; }
+  /* El subrayado rojo de «escrito antes, elija en el calendario» es un aviso de
+     pantalla: en el papel el texto sale limpio (revisión de §94). */
+  .ftm-fecha-txt.is-vieja { text-decoration: none; }
   .ftm-fmt-sel { display: none !important; }
   .ftm-fmt-caja { break-inside: avoid; }
   .ftm-campo-area--alcance { border: none; white-space: pre-wrap; }

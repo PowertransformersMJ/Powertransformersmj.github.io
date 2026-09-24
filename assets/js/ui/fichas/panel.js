@@ -1142,7 +1142,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   let trampaFoco = null;       // trampa de foco del modal (ui/foco-modal.js)
   // Calendario de años abierto (uno a la vez, `99 §94`). Sus escuchas globales
   // viven SOLO mientras está abierto y se retiran al cerrarlo (§3.5).
-  let aniosAbierto = null;     // { caja, boton, pop, clave, soltar }
+  let aniosAbierto = null;     // { caja, boton, pop, clave, abiertoEn, soltar }
   let hoja = 'ficha';
   let aviso = '';
 
@@ -2362,6 +2362,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     caja.appendChild(pop);
     boton.setAttribute('aria-expanded', 'true');
     ubicarAnios(caja, pop);
+    // Tocar el FONDO del calendario (título, márgenes, huecos) no le quita el
+    // foco al año: si no, el foco caía al cuerpo de la página y el teclado se
+    // perdía con el calendario todavía abierto (revisión de §94). La escucha
+    // vive en el propio calendario y se va con él.
+    pop.addEventListener('mousedown', (ev) => { if (!ev.target.closest('button')) ev.preventDefault(); });
 
     // Esc cierra SOLO el calendario: se escucha en `window` en fase de captura,
     // que llega ANTES que la trampa de foco del modal (en `document`), porque
@@ -2372,6 +2377,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         ev.preventDefault();
         ev.stopPropagation();
         cerrarAnios(true);
+        return;
+      }
+      // Enter sostenido: el que abrió el calendario no puede, repitiéndose,
+      // elegir el año que quedó con el foco.
+      if (ev.repeat && (ev.key === 'Enter' || ev.key === ' ') && pop.contains(ev.target)) {
+        ev.preventDefault();
         return;
       }
       const op = ev.target && ev.target.closest && ev.target.closest('.ftm-anio-op');
@@ -2404,7 +2415,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     document.addEventListener('pointerdown', alPresionar, true);
     caja.addEventListener('focusout', alSalirFoco);
     aniosAbierto = {
-      caja, boton, pop, clave,
+      caja, boton, pop, clave, abiertoEn: Date.now(),
       soltar() {
         globalThis.removeEventListener('keydown', alTecla, true);
         document.removeEventListener('pointerdown', alPresionar, true);
@@ -2416,23 +2427,39 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   /**
-   * Abre la rejilla hacia ABAJO y desplaza la ficha lo justo para verla entera
-   * junto a su casilla. Solo si abajo no hay más hoja (la casilla está al final),
-   * hacia arriba. Nunca se sale por los lados.
+   * Abre la rejilla hacia ABAJO y desplaza la ficha lo justo para verla entera,
+   * sin sacar su casilla por arriba. Solo si abajo no cabe y arriba SÍ cabe
+   * entera, se abre hacia arriba. En un área muy baja (celular acostado) queda
+   * abajo con la casilla arriba del área, y el resto se ve desplazando la ficha:
+   * nunca se esconde la casilla ni el título del calendario. Nunca se sale por
+   * los lados (revisión de `99 §94`).
    */
   function ubicarAnios(caja, pop) {
     const marco = caja.closest('.ftm-modal-scroll') || caja.closest('[data-ftm="modal-cuerpo"]');
     const limites = () => (marco ? marco.getBoundingClientRect()
       : { top: 0, bottom: globalThis.innerHeight || 0, left: 0, right: globalThis.innerWidth || 0 });
-    const verEntera = () => { try { pop.scrollIntoView({ block: 'nearest' }); } catch (err) { /* navegador viejo */ } };
-    verEntera();
-    let r = pop.getBoundingClientRect();
+    const HOLGURA = 6;
     let lim = limites();
-    if (r.bottom > lim.bottom + 1) {
+    let rc = caja.getBoundingClientRect();
+    let r = pop.getBoundingClientRect();
+    if (marco && r.bottom > lim.bottom) {
+      const subir = Math.min(r.bottom - lim.bottom + HOLGURA, Math.max(0, rc.top - lim.top - HOLGURA));
+      marco.scrollTop += subir;
+      lim = limites(); rc = caja.getBoundingClientRect(); r = pop.getBoundingClientRect();
+    }
+    if (r.bottom > lim.bottom + 1 && (r.height + HOLGURA) <= (rc.top - lim.top)) {
       pop.classList.add('ftm-anios--arriba');
-      verEntera();
       r = pop.getBoundingClientRect();
-      lim = limites();
+    } else if (r.bottom > lim.bottom + 1) {
+      // No cabe ni abajo ni arriba (área muy baja): la rejilla se acorta y se
+      // desplaza por dentro, y así título, años y «Borrar» quedan a la vista.
+      const rej = pop.querySelector('.ftm-anios-rejilla');
+      const alto = rej ? rej.getBoundingClientRect().height - (r.bottom - (lim.bottom - HOLGURA)) : 0;
+      if (rej && alto >= 60) {
+        rej.style.maxHeight = Math.floor(alto) + 'px';
+        rej.style.overflowY = 'auto';
+        r = pop.getBoundingClientRect();
+      }
     }
     const margen = 8;
     if (r.right > lim.right - margen) pop.style.marginLeft = -(r.right - (lim.right - margen)) + 'px';
@@ -3224,6 +3251,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (inFecha && contenedor.contains(inFecha)) { abrirCalendario(inFecha); return; }
 
     // Calendario de años (`99 §94`): abrir/cerrar, elegir un año o borrarlo.
+    // Un DOBLE clic sobre la casilla no elige nada: al abrirse, la ficha se
+    // desplaza y el segundo clic caía sobre un año que nadie escogió (revisión
+    // de §94). Tampoco cuenta un clic que llegue apenas abierto el calendario.
+    if ((ev.target.closest('.ftm-anios') || ev.target.closest('[data-anio]'))
+        && (ev.detail > 1 || (aniosAbierto && ev.detail === 1 && Date.now() - aniosAbierto.abiertoEn < 300))) return;
     const opAnio = ev.target.closest('[data-anio-op]');
     if (opAnio && aniosAbierto && aniosAbierto.pop.contains(opAnio)) { elegirAnio(opAnio.getAttribute('data-anio-op')); return; }
     const borrarAnio = ev.target.closest('[data-anio-borrar]');
