@@ -117,17 +117,12 @@ service firebase.storage {
     //     JPG llega con fondo blanco y tapa la línea de firma del formato.
     //   · 1 MB — un trazo recortado pesa decenas de KB; el tope corta las
     //     fotos de cámara sin recortar.
+    // RETIRADO para escribir (ADR-100): la firma propia vive ahora en Firestore
+    // `firmas/{uid}` porque Storage no entrega las descargas al navegador (503).
+    // Queda leer y BORRAR la copia vieja, para limpiarla; nadie sube aquí.
     match /firmas/{uid} {
       allow read:   if isTeamMember() && request.auth.uid == uid;
-      // create/update por separado y NO `write`: en Storage `write` incluye el
-      // borrado, y al borrar `request.resource` es nulo — una condición sobre
-      // su tamaño no se puede evaluar. Mismo estilo que el resto del archivo.
-      allow create: if isTeamMember() && request.auth.uid == uid
-                    && request.resource.size <= 1 * 1024 * 1024
-                    && request.resource.contentType == 'image/png';
-      allow update: if isTeamMember() && request.auth.uid == uid
-                    && request.resource.size <= 1 * 1024 * 1024
-                    && request.resource.contentType == 'image/png';
+      allow create, update: if false;
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
@@ -143,24 +138,13 @@ service firebase.storage {
     function personaDelEquipo(p) {
       return p in ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA', 'ERICK_VERGARA'];
     }
-    function firmaEquipoValida() {
-      return request.resource.size <= 512 * 1024
-        && request.resource.contentType == 'image/png'
-        && request.resource.metadata != null
-        && request.resource.metadata.keys().hasAll(['autorizacionFecha', 'autorizacionMedio', 'huella'])
-        && request.resource.metadata.autorizacionFecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && request.resource.metadata.autorizacionMedio.size() >= 3
-        && request.resource.metadata.autorizacionMedio.size() <= 200
-        && request.resource.metadata.huella.matches('^[0-9a-f]{64}$');
-    }
     // Custodio = admin CON PERFIL: el de arranque (/admins, sin perfil) no puede
     // dejar el registro, así que tampoco sube ni lee (revisión de §99.11).
+    // RETIRADO para escribir (ADR-100): ahora en Firestore
+    // `firmas_equipo/{custodio}/personas/{persona}`. Queda leer y borrar lo viejo.
     match /firmas-equipo/{custodio}/{persona} {
       allow get:    if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona);
-      allow create: if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
-                    && firmaEquipoValida();
-      allow update: if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
-                    && firmaEquipoValida();
+      allow create, update: if false;
       // Quitar la propia copia no exige seguir siendo admin: un custodio al que
       // le retiran el rol debe poder retirar lo que custodiaba.
       allow delete: if isSignedIn() && request.auth.uid == custodio;

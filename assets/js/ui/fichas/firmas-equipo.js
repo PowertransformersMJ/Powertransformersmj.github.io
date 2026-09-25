@@ -184,8 +184,11 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
     // Turno: si empieza un pintado más nuevo, este se descarta (dos refrescos
     // superpuestos dejaban la imagen duplicada, revisión de §99).
     const turno = ++x.turno;
-    const e = await datos.estadoFirma(p.id);
-    const leida = e.hay ? await datos.leerFirma(p.id) : null;
+    // UNA lectura: el documento trae la imagen y la autorización (ADR-100).
+    const leida = await datos.leerFirma(p.id);
+    const e = leida && !leida.error
+      ? { hay: true, autorizacion: leida.autorizacion }
+      : { hay: false, error: !!(leida && leida.error) };
     if (turno !== x.turno) return;
     x.aut = e.hay ? e.autorizacion : null;
     x.vista.textContent = '';
