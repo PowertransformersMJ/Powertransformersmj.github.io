@@ -4163,4 +4163,34 @@ la emisión con firmas del equipo NO sale (no puede leerlas) y la ficha avisa qu
 familia de `L-29` (el navegador no lee de Storage en este proyecto); `§71` usó `getBytes` y solo se probó en el
 emulador. Otros defectos vistos: «Mi firma» puede quedar en «Inicie sesión» si la sesión llega antes de montar el
 panel; una lectura fallida tarda ~2 min en rendirse (reintentos del SDK). **Queda para el Ingeniero**: la ruta.
+**99.14 Corrección (09-25).** «“Mi firma” puede quedar en “Inicie sesión” si la sesión llega antes de montar el
+panel» (99.13) fue un diagnóstico EQUIVOCADO: el panel esperaba los ~2 min de reintentos del 503 sin repintar. Ver `§100`.
+
+## 100. ADR — Las firmas pasan de Storage a Firestore: Storage no entrega las descargas al navegador ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Hallazgo en vivo (`§99.13`): toda descarga de imagen de Storage responde 503 en producción. Decisión del Ingeniero
+> (entre «a la base de datos» e «investigar el almacenamiento»): *«A la base de datos»*. Publicado `8f5d5da`.
+
+**100.1 Causa raíz.** `§71` (firma propia) y `§99` (equipo) leían con `getBytes`; en producción Storage responde 503
+a `?alt=media` (metadatos 200, subidas OK, Firebase sin incidentes). `§71` solo se probó en el emulador, que no
+reproduce la entrega real. Misma familia de **L-29**, que ya decía que el navegador no lee de Storage en este proyecto.
+Causa exacta en Google Cloud: NO investigada (el Ingeniero eligió no hacerlo).
+**100.2 Solución.** Firma propia en `firmas/{uid}` {imagen (bytes), huella, en}: solo su dueño; tope 900 KB (cabe en
+un documento de 1 MiB); se comprueban los BYTES del PNG. Firmas del equipo en `firmas_equipo/{custodio}/personas/
+{persona}` escritas en UN lote con su registro. Reglas: `firmaConSuRegistroNuevo` (registro nuevo, misma persona,
+huella y autorización; alta si no existía, reemplazo si existía) y `registroAtadoASuFirma` (sin registros sueltos;
+un retiro solo si la firma desaparece). Storage: rutas de firmas cerradas para escribir (leer y borrar lo viejo).
+**100.3 No-regresión.** API de `data/firmas.js` intacta: Órdenes de Materiales, refrigeración y fichas sin cambios;
+el Excel estampa igual. Custodio degradado: puede retirar sin dejar registro (como antes).
+**100.4 Verificación.** 1869 pass · reglas 119/119 (10 nuevas de Firestore; las de Storage ahora prueban el cierre).
+Revisión de 6 Opus: 7 confirmados y corregidos (registro suelto, alta que pisaba, retiro degradado, doble lectura,
+«Consultando…», mensajes), 2 refutados. Publicado: reglas ANTES de la página; CI y Deploy verdes; 5 archivos
+idénticos. **En vivo en su Chrome**: la firma propia se guarda y se ve en 4 s (antes 2 min y error); las cuatro del
+equipo guardadas con su registro, leídas y con la huella de los bytes igual a la registrada; su firma estampada en
+Elaboración en pantalla. No se emitió ningún Excel real (el primero lo emite él).
+**100.5 Anti-patterns evitados.** Declarar una función «publicada» sin leer el dato real en producción (L-102) ·
+URL pública de la firma · escritura en dos pasos con retirada.
+**100.8 Verificado sano / no re-auditar.** «Mi firma» muestra «no hay» si la lectura falla: ya era así (no es
+regresión). Pruebas de Storage que siguen: describen reglas vigentes (leer y borrar). **Pendiente del Ingeniero**:
+borrar a mano las 5 copias viejas en Storage (`firmas/` y `firmas-equipo/`); Claude no borra datos.
 

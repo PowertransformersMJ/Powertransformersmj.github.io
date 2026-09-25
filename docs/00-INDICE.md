@@ -111,6 +111,7 @@
 | §97 | ADR-097 — **Beneficios sin subtítulos y con términos técnicos** ⟦OPUS-5.5⟧ | 4032 |
 | §98 | ADR-098 — **Firma estampada** de la sesión en su casilla (ficha y Excel) ⟦OPUS-5.5⟧ | 4046 |
 | §99 | ADR-099 — **Firmas del equipo bajo custodia** en el PE.02081, con registro de cada emisión ⟦OPUS-5.5⟧ | 4078 |
+| §100 | ADR-100 — **Firmas en Firestore**: Storage no entrega las descargas al navegador (503) ⟦OPUS-5.5⟧ | 4169 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
