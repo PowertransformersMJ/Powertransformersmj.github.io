@@ -41,9 +41,12 @@ before(async () => {
     await setDoc(doc(d, 'usuarios/fe_tech'),    { email: 't@x.co', rol: 'tecnico', activo: true, nombre: 'Tecnico' });
     await setDoc(doc(d, 'usuarios/fe_revocado'), { email: 'r@x.co', rol: 'admin',  activo: false, nombre: 'Revocado' });
     await setDoc(doc(d, 'fichas_emisiones/fe_semilla'), { documento: 'PE.02081' });
+    // Admin de ARRANQUE: está en /admins pero no tiene perfil en /usuarios.
+    await setDoc(doc(d, 'admins/fe_arranque'), { email: 'x@x.co' });
   });
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     await uploadBytes(ref(ctx.storage(), 'firmas-equipo/fe_admin/JORGE_MIRANDA'), PNG, META());
+    await uploadBytes(ref(ctx.storage(), 'firmas-equipo/fe_arranque/JORGE_MIRANDA'), PNG, META());
     await uploadBytes(ref(ctx.storage(), 'firmas-equipo/fe_revocado/JORGE_MIRANDA'), PNG, META());
   });
 });
@@ -66,6 +69,10 @@ describe('Storage · firmas-equipo — solo su custodio', () => {
   test('sin sesión, nada; un admin desactivado no lee lo que custodiaba', async () => {
     await assertFails(getBytes(ref(testEnv.unauthenticatedContext().storage(), 'firmas-equipo/fe_admin/JORGE_MIRANDA')));
     await assertFails(getBytes(ref(st('fe_revocado'), 'firmas-equipo/fe_revocado/JORGE_MIRANDA')));
+  });
+  test('el admin de arranque (sin perfil) no custodia: no sube ni lee (no podría dejar el registro)', async () => {
+    await assertFails(uploadBytes(ref(st('fe_arranque'), 'firmas-equipo/fe_arranque/ERICK_VERGARA'), PNG, META()));
+    await assertFails(getBytes(ref(st('fe_arranque'), 'firmas-equipo/fe_arranque/JORGE_MIRANDA')));
   });
   test('…pero sí puede retirarla (quitar no exige seguir siendo admin)', async () => {
     await assertSucceeds(deleteObject(ref(st('fe_revocado'), 'firmas-equipo/fe_revocado/JORGE_MIRANDA')));

@@ -153,11 +153,13 @@ service firebase.storage {
         && request.resource.metadata.autorizacionMedio.size() <= 200
         && request.resource.metadata.huella.matches('^[0-9a-f]{64}$');
     }
+    // Custodio = admin CON PERFIL: el de arranque (/admins, sin perfil) no puede
+    // dejar el registro, así que tampoco sube ni lee (revisión de §99.11).
     match /firmas-equipo/{custodio}/{persona} {
-      allow get:    if isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona);
-      allow create: if isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
+      allow get:    if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona);
+      allow create: if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
                     && firmaEquipoValida();
-      allow update: if isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
+      allow update: if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
                     && firmaEquipoValida();
       // Quitar la propia copia no exige seguir siendo admin: un custodio al que
       // le retiran el rol debe poder retirar lo que custodiaba.

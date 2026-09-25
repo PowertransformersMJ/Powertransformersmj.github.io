@@ -8,13 +8,17 @@
 // Todo texto que viene del usuario se pinta con textContent.
 // ══════════════════════════════════════════════════════════════
 
-import { PERSONAS_EQUIPO, validarAutorizacion } from '../../domain/firmas_equipo.js';
+import { PERSONAS_EQUIPO, validarAutorizacion, hoyLocalISO } from '../../domain/firmas_equipo.js';
 import { firmaAplicaA } from '../../domain/firmas.js';
 
 const ANCHO_MAX = 1200;
 const ALTO_MAX = 400;
 const ANCHO_MIN_NITIDO = 300;
 const TOPE_BYTES = 512 * 1024;
+// Decisión del Ingeniero (§99.11): «yo autorizo verbalmente». En una firma NUEVA
+// la fecha y el medio vienen llenos por defecto; al REEMPLAZAR se conserva la
+// autorización que ya estaba declarada. Quedan en el registro y se pueden corregir.
+const MEDIO_POR_DEFECTO = 'Autorización verbal';
 
 /**
  * Imagen elegida → PNG normalizado (Uint8Array): fondo claro transparente,
@@ -90,7 +94,7 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
   const ayuda = document.createElement('p');
   ayuda.className = 'fe-ayuda';
   ayuda.textContent = 'Solo usted ve y usa estas firmas: quedan en su espacio privado, no en la página. '
-    + 'Al subir cada una declare la fecha y el medio de la autorización de su titular. '
+    + 'Cada subida queda registrada con su fecha (por defecto, como autorización verbal). '
     + 'Retirar una firma solo afecta a las descargas futuras: los Excel ya enviados la conservan.';
   caja.appendChild(ayuda);
   const lista = document.createElement('div');
@@ -126,7 +130,14 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
     const aviso = document.createElement('p'); aviso.className = 'fe-msg fe-aviso'; aviso.setAttribute('aria-live', 'polite');
     f.append(nom, vista, est, acc, form, aviso);
 
-    bSubir.addEventListener('click', () => { form.hidden = false; msg.textContent = ''; inA.focus(); });
+    bSubir.addEventListener('click', () => {
+      form.hidden = false; msg.textContent = '';
+      const previa = (filas.get(p.id) || {}).aut;
+      inF.max = hoyLocalISO();
+      if (!inF.value) inF.value = (previa && previa.fecha) || hoyLocalISO();
+      if (!inM.value) inM.value = (previa && previa.medio) || MEDIO_POR_DEFECTO;
+      inA.focus();
+    });
     bCancelar.addEventListener('click', () => { form.hidden = true; form.reset(); bSubir.focus(); });
     form.addEventListener('submit', async (ev) => {
       ev.preventDefault();
@@ -163,7 +174,7 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
       bSubir.focus();
       alCambiar();
     });
-    filas.set(p.id, { f, vista, est, bSubir, bQuitar, turno: 0 });
+    filas.set(p.id, { f, vista, est, bSubir, bQuitar, turno: 0, aut: null });
     return f;
   }
 
@@ -176,6 +187,7 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
     const e = await datos.estadoFirma(p.id);
     const leida = e.hay ? await datos.leerFirma(p.id) : null;
     if (turno !== x.turno) return;
+    x.aut = e.hay ? e.autorizacion : null;
     x.vista.textContent = '';
     if (e.hay) {
       if (leida && !leida.error) {

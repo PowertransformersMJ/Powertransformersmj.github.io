@@ -38,6 +38,9 @@ function custodio() {
   } catch (_) { /* sin Auth manda la sesión publicada */ }
   const p = (s && s.profile) || {};
   if (p.rol !== 'admin' || p.activo === false) return null;
+  // El admin de ARRANQUE (/admins, perfil sintético `legacy`) no custodia: las
+  // reglas exigen perfil real (hasProfile) y sin él no hay registro (§99.11).
+  if (p.legacy) return null;
   return { uid, nombre: p.nombre || '' };
 }
 

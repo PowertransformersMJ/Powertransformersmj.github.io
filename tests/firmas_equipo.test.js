@@ -5,7 +5,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PERSONAS_EQUIPO, IDS_EQUIPO, idDeNombreDeLista, personaDeCasilla, planDeEstampado,
-  personasALeer, validarAutorizacion, folioDeEmision, textoMarca, nombreDePersona
+  personasALeer, validarAutorizacion, folioDeEmision, nombreDePersona, hoyLocalISO
 } from '../assets/js/domain/firmas_equipo.js';
 import { FIRMANTES } from '../assets/js/domain/fichas_firmantes.js';
 
@@ -82,10 +82,18 @@ describe('La declaración de la autorización', () => {
   });
 });
 
-describe('Folio y marca', () => {
-  test('folio corto y legible; marca con el folio', () => {
+describe('Folio', () => {
+  test('folio corto y legible (va en el nombre del archivo; las firmas salen limpias)', () => {
     assert.equal(folioDeEmision('aB3dE5fG7hJ9kL1mN2pQ'), 'F-AB3DE5FG');
     assert.equal(folioDeEmision(''), 'F-');
-    assert.equal(textoMarca('F-AB3DE5FG'), 'SGM F-AB3DE5FG');
+  });
+});
+
+describe('«Hoy» en hora local', () => {
+  test('a las 8 p. m. en Colombia (ya es mañana en UTC) hoy sigue siendo hoy', () => {
+    const d = new Date(2026, 8, 25, 20, 0, 0);          // 25/09/2026 20:00 hora LOCAL
+    assert.equal(hoyLocalISO(d), '2026-09-25');
+    assert.equal(validarAutorizacion({ fecha: '2026-09-26', medio: 'Autorización verbal' }, hoyLocalISO(d)).ok, false);
+    assert.equal(validarAutorizacion({ fecha: '2026-09-25', medio: 'Autorización verbal' }, hoyLocalISO(d)).ok, true);
   });
 });

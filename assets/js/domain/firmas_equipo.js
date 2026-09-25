@@ -113,11 +113,19 @@ const esFechaReal = (s) => {
 };
 
 /**
+ * Fecha de hoy (AAAA-MM-DD) en la hora LOCAL del equipo, no en UTC: en Colombia
+ * (UTC-5), de 7 p. m. a medianoche la fecha UTC ya es la de mañana (revisión §99.11).
+ */
+export function hoyLocalISO(d = new Date()) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/**
  * Declaración de la autorización del titular (fecha ISO + medio), como en las
- * cédulas (`§78`). La fecha no puede ser futura.
+ * cédulas (`§78`). La fecha no puede ser futura (hoy LOCAL).
  * @returns {{ok: boolean, motivo: string}}
  */
-export function validarAutorizacion(aut = {}, hoyISO = new Date().toISOString().slice(0, 10)) {
+export function validarAutorizacion(aut = {}, hoyISO = hoyLocalISO()) {
   const fecha = String(aut.fecha || '').trim();
   const medio = String(aut.medio || '').trim();
   if (!esFechaReal(fecha)) return { ok: false, motivo: 'Escoja la fecha de la autorización.' };
@@ -130,9 +138,4 @@ export function validarAutorizacion(aut = {}, hoyISO = new Date().toISOString().
 /** Folio corto y legible de una emisión a partir del id del registro. */
 export function folioDeEmision(id) {
   return 'F-' + String(id || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 8).toUpperCase();
-}
-
-/** Texto de la marca tenue que lleva cada firma del equipo dentro del Excel. */
-export function textoMarca(folio) {
-  return 'SGM ' + String(folio || '');
 }
