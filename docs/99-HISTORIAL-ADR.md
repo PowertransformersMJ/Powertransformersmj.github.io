@@ -4026,3 +4026,5 @@ defecto. Borradores con selección propia se restauran con ella; los que solo tr
 **96.4 Verificación.** 1847 pass / 0 fail; lint limpio; banco: 0 marcadas y texto vacío al abrir, marcar → aparece,
 desmarcar la última → vacío con «Sin texto todavía.», Alcance intacto.
 **96.8 Verificado sano.** «Marcar las suyas» sigue marcando la banda entera del equipo: es explícito del Ingeniero.
+**96.9 Publicación (09-25).** Orden del Ingeniero: *«procede»*. Merge `0499e0d`; CI y Deploy verdes; `panel.js` y
+`beneficios_practicas.js` servidos idénticos al repo con anti-caché (L-65).
