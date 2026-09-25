@@ -32,9 +32,9 @@ import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domai
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
 import {
-  FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillaEsDeLaSesion, casillasDeLaSesion,
-  tamanoFirma, FIRMA_PAPEL
+  FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillaEsDeLaSesion, casillasDeLaSesion
 } from '../../domain/fichas_firmantes.js';
+import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import {
   planDeEstampado, personasALeer, folioDeEmision, IDS_EQUIPO
 } from '../../domain/firmas_equipo.js';
@@ -3775,8 +3775,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           + (conEquipo ? ' Con ellas no se puede descargar con firmas del equipo.' : ''));
       }
       const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array' });
-      const JSZip = await mod.cargarJSZip();
-      const { leerLibroParaVista, mostrarVistaPrevia } = await import('./vista-previa-excel.js');
+      const { leerLibroParaVista, mostrarVistaPrevia, cargarJSZip } = await import('./vista-previa-excel.js');
+      const JSZip = await cargarJSZip();
       const modelo = await leerLibroParaVista(await JSZip.loadAsync(bytes));
       if (actual !== eq) return;
       mostrarVistaPrevia(modelo, {

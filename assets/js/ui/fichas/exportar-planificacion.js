@@ -34,7 +34,8 @@
 
 import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
-import { firmanteDe, tamanoFirma, FIRMA_PAPEL } from '../../domain/fichas_firmantes.js';
+import { firmanteDe } from '../../domain/fichas_firmantes.js';
+import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -60,7 +61,7 @@ export function rutaPlantilla() {
  * se usa esa instancia y no se toca la red (mismo convenio que
  * `exports/xlsm_suministros.js`).
  */
-export async function cargarJSZip() {
+async function cargarJSZip() {
   if (typeof globalThis !== 'undefined' && globalThis.__sgmJSZip) {
     return globalThis.__sgmJSZip;
   }

@@ -3,8 +3,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillasDeLaSesion, casillaEsDeLaSesion, tamanoFirma, FIRMA_PAPEL
+  FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillasDeLaSesion, casillaEsDeLaSesion
 } from '../assets/js/domain/fichas_firmantes.js';
+import { tamanoFirma, FIRMA_PAPEL } from '../assets/js/domain/firmas_tamano.js';
 import { tieneContenido } from '../assets/js/domain/fichas_borrador.js';
 
 describe('La lista dictada, LITERAL (anti-paráfrasis)', () => {

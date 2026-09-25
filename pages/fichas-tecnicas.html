@@ -117,8 +117,17 @@
   // Se lee de la cuenta de quien tiene la sesión (Storage `firmas/{uid}`, solo el
   // dueño) y se le entrega al módulo, que la estampa ÚNICAMENTE en las casillas
   // que llevan su nombre. Sin sesión o sin firma, la ficha sale para firmar a mano.
-  const { montarFirmaPersonal } = await import('../assets/js/ui/firma-personal.js');
-  const { miFirma, firmasDisponibles } = await import('../assets/js/data/firmas.js');
+  // Si lo de las firmas no carga (p. ej. Chrome mezcla archivos nuevos con otros
+  // viejos que tenía guardados, justo después de publicar — L-102), la página
+  // SIGUE: las fichas se ven y se exportan igual, sin firma. Antes esto tumbaba
+  // todo el módulo (99 §102).
+  let montarFirmaPersonal = null;
+  let miFirma = async () => null;
+  let firmasDisponibles = () => false;
+  try { ({ montarFirmaPersonal } = await import('../assets/js/ui/firma-personal.js')); }
+  catch (err) { console.warn('[fichas] «Mi firma» no disponible:', err); }
+  try { ({ miFirma, firmasDisponibles } = await import('../assets/js/data/firmas.js')); }
+  catch (err) { console.warn('[fichas] firmas no disponibles:', err); }
   const { getSession } = await import('../assets/js/auth/session-guard.js');
   const esperarSesion = () => (window.__sgmSession ? Promise.resolve() : new Promise((res) => {
     const t = setTimeout(res, 12000);
@@ -130,9 +139,15 @@
     const s = getSession();
     return { nombre: (s && s.profile && s.profile.nombre) || '', dataUrl: await miFirma() };
   }
-  const panelFirma = montarFirmaPersonal(document.getElementById('panelMiFirma'), {
-    onCambio() { window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); }
-  });
+  const panelFirma = montarFirmaPersonal
+    ? montarFirmaPersonal(document.getElementById('panelMiFirma'), {
+      onCambio() { window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); }
+    })
+    : null;
+  if (!panelFirma) {
+    const caja = document.getElementById('panelMiFirma');
+    if (caja) caja.textContent = 'No se pudo cargar «Mi firma». Recargue la página con Cmd + Shift + R (Ctrl + Shift + R en Windows).';
+  }
   // El módulo de fichas ya espera la sesión por su cuenta (`firmaSesion`); aquí
   // solo se repinta el panel. Avisar también al módulo descargaba la firma de
   // más (revisión de §98).

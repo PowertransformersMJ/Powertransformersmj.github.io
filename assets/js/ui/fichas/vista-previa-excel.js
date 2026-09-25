@@ -17,6 +17,15 @@
 const EMU_PX = 9525;
 const PT_PX = 96 / 72;
 
+/** JSZip: la instancia ya cargada (pruebas o exportador) o la del CDN, igual que el exportador. */
+export async function cargarJSZip() {
+  if (globalThis.__sgmJSZip) return globalThis.__sgmJSZip;
+  const mod = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm');
+  const JSZip = mod.default || mod;
+  if (!JSZip || typeof JSZip.loadAsync !== 'function') throw new Error('No se pudo cargar la librería para leer el Excel.');
+  return JSZip;
+}
+
 /* ── utilidades XML ─────────────────────────────────────────────────────────── */
 
 const attr = (tag, nombre) => {
