@@ -4118,3 +4118,15 @@ silencio: con la plantilla fija halla las cinco · emisión «con equipo» sin n
 Crudos → bóveda `2026-09-25-firmas-equipo/` (comité, revisión, prompt de Gemini).
 **99.9 Pendiente.** Su «procede» → desplegar reglas (storage + firestore) + merge + validación en vivo; él sube las
 firmas en «Firmas del equipo» con fecha y medio; la de Erick es pequeña (187×41 px): pedir un escaneo mayor. La de Jorge Rhenals llegó por chat (418×121 px): preparada en `~/Downloads/JRhenals-firma-transparente.png`, sus huellas en la bóveda (la guardia bloquea una copia renombrada, probado) y probada en el banco por el formulario real (Elaboración).
+**99.10 Consejo externo (Gemini, 09-25) — verificado, no adoptado a ciegas.** Acierta en la dirección (una imagen
+estampada por otro no es la firma del titular: puede decir «no aprobé esa ficha») y sobre-afirma: «control
+exclusivo» es de la firma DIGITAL (Ley 527 art. 28; para la electrónica, Decreto 2364/2012 art. 4.1) · «falsedad
+ideológica (Hecho)» es PARCIAL (C-637/2009; si el trabajador de AFINIA es servidor público en lo penal quedó
+ABIERTO) · «la Contraloría invalidará» es falso · su regla de Storage no funciona aquí (sin custom claims) · sí hay
+cómo desmentir un Excel alterado (huella), no qué decía · el plan gratuito no es el límite. Cierto: la firma es
+dato personal y la autorización debe nombrar la FINALIDAD (Ley 1581). Hallazgos nuevos confirmados en código: emitir
+con [PENDIENTE] (firmas sobre contenido que se completa a mano), firmas ajenas sueltas en `xl/media/` ampliadas a
+≥600 px con marca de esquina, huella de metadatos (no de bytes), promesa vieja en «Mi firma», cualquier admin puede
+ser custodio. Descartados con razón: el híbrido «el titular sube y consiente» (el custodio crea las cuentas; abre el
+SGM a 4 personas) y la copia maestra en Firestore (nombres de terceros para siempre, contra ADR-083). **Queda para el
+Ingeniero** el alcance y la prueba de cada autorización. Crudos → bóveda `2026-09-25-firmas-equipo/`.
