@@ -30,10 +30,11 @@ import { CASILLAS_FIRMA, firmanteDe, casillaEsDeLaSesion } from './fichas_firman
  * Personas de la lista dictada (`§89`) con su CLAVE fija. La clave no se deriva
  * del nombre en tiempo de ejecución (las tildes darían claves distintas) y es la
  * misma que exigen las reglas de Storage. Un mismo titular con dos nombres
- * dictados («MIGUEL A. JIMENEZ» / «MIGUEL JIMENEZ») es UNA persona.
+ * dictados («MIGUEL A. JIMENEZ» / «MIGUEL JIMENEZ») es UNA persona; «ING. MIGUEL
+ * JIMENEZ» es el nombre de su perfil (`§99.12`), para reconocer su sesión.
  */
 export const PERSONAS_EQUIPO = Object.freeze([
-  Object.freeze({ id: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', nombres: Object.freeze(['MIGUEL A. JIMENEZ', 'MIGUEL JIMENEZ']) }),
+  Object.freeze({ id: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', nombres: Object.freeze(['MIGUEL A. JIMENEZ', 'MIGUEL JIMENEZ', 'ING. MIGUEL JIMENEZ']) }),
   Object.freeze({ id: 'CARLOS_MARTELO', nombre: 'CARLOS MARTELO', nombres: Object.freeze(['CARLOS MARTELO']) }),
   Object.freeze({ id: 'JORGE_RHENALS', nombre: 'JORGE RHENALS', nombres: Object.freeze(['JORGE RHENALS']) }),
   Object.freeze({ id: 'JORGE_MIRANDA', nombre: 'JORGE MIRANDA', nombres: Object.freeze(['JORGE MIRANDA']) }),

@@ -7,7 +7,7 @@ import {
   PERSONAS_EQUIPO, IDS_EQUIPO, idDeNombreDeLista, personaDeCasilla, planDeEstampado,
   personasALeer, validarAutorizacion, folioDeEmision, nombreDePersona, hoyLocalISO
 } from '../assets/js/domain/firmas_equipo.js';
-import { FIRMANTES } from '../assets/js/domain/fichas_firmantes.js';
+import { FIRMANTES, casillasDeLaSesion } from '../assets/js/domain/fichas_firmantes.js';
 
 describe('La lista del equipo', () => {
   test('cubre a TODAS las personas de la lista dictada, con clave fija', () => {
@@ -95,5 +95,21 @@ describe('«Hoy» en hora local', () => {
     assert.equal(hoyLocalISO(d), '2026-09-25');
     assert.equal(validarAutorizacion({ fecha: '2026-09-26', medio: 'Autorización verbal' }, hoyLocalISO(d)).ok, false);
     assert.equal(validarAutorizacion({ fecha: '2026-09-25', medio: 'Autorización verbal' }, hoyLocalISO(d)).ok, true);
+  });
+});
+
+describe('El nombre REAL del perfil del Ingeniero (`§99.12`)', () => {
+  const PERFIL = 'Ing. Miguel Jimenez';   // leído en producción el 2026-09-25
+  test('su casilla es suya: firma propia en Elaboración y en Revisión si lo eligen', () => {
+    assert.deepEqual(casillasDeLaSesion({}, PERFIL), ['elab']);
+    assert.deepEqual(casillasDeLaSesion({ nom_rev: 'MIGUEL JIMENEZ' }, PERFIL), ['elab', 'rev']);
+    const p = planDeEstampado({}, PERFIL, { equipo: IDS_EQUIPO, propia: true });
+    assert.equal(p.find((x) => x.k === 'elab').origen, 'propia');
+    assert.ok(!personasALeer({}, PERFIL).includes('MIGUEL_JIMENEZ'));
+  });
+  test('sigue siendo lista cerrada: otros títulos o nombres no pasan', () => {
+    for (const n of ['Ing. Miguel', 'Dr. Miguel Jimenez', 'Ing. Miguel Jimenez Perez', 'Ing Miguel Jimenez']) {
+      assert.deepEqual(casillasDeLaSesion({}, n), [], n);
+    }
   });
 });
