@@ -27,9 +27,9 @@ describe('El catálogo de beneficios', () => {
   test('cada entrada dice la falla catastrófica que ayuda a prevenir, su beneficio BREVE y el amplio que lo sustenta', () => {
     for (const [cod, b] of Object.entries(BENEFICIO_PRACTICA)) {
       assert.ok(b.falla && b.falla.trim().length > 5, cod + ' sin falla');
-      // Pedido del Ingeniero (`99 §95`): «la redacción debe ser breve».
+      // Pedido del Ingeniero: «breve» (`99 §95`) y «términos más técnicos» (`§97`).
       const n = palabras(b.beneficio);
-      assert.ok(n >= 12 && n <= 30, cod + ' breve: ' + n + ' palabras');
+      assert.ok(n >= 15 && n <= 32, cod + ' breve: ' + n + ' palabras');
       assert.ok(/[.]$/.test(b.beneficio.trim()), cod + ': el breve cierra con punto');
       // El amplio de `§92`: tope 110 porque el cambiador de tomas (SUB-C3-05)
       // nombra OILTAP, VACUTAP y NLTC por separado.
@@ -118,14 +118,20 @@ describe('Cómo se arma el texto', () => {
     if (APERTURA_BENEFICIOS.includes('{SUB}')) assert.ok(t.includes('SUBESTACION DE PRUEBA'));
   });
 
-  test('las prácticas salen agrupadas por macroactividad, en el orden del MO.00418, cada una con su beneficio', () => {
+  test('un renglón por práctica, en el orden del MO.00418 y SIN subtítulos de macroactividad (`99 §97`)', () => {
     const t = redaccionBeneficiosPracticas(EQ, null,
       [practica('SUB-C4-06'), practica('SUB-C3-05'), practica('SUB-C3-01'), practica('SUB-C2-01')]);
-    const iC2 = t.indexOf('Seguimiento Trimestral');
-    const iC3 = t.indexOf('Correctivo Menor');
-    const iC4 = t.indexOf('Correctivo Mayor');
-    assert.ok(iC2 > 0 && iC2 < iC3 && iC3 < iC4, 'orden de macroactividades');
-    assert.ok(t.indexOf('· Corrección de fugas por accesorios —') < t.indexOf('· Mantenimiento preventivo OLTC/NLTC —'));
+    for (const macro of new Set(SUBS.map((s) => s.macro))) {
+      assert.ok(!t.split('\n').includes(macro), 'subtítulo que no debe salir: ' + macro);
+    }
+    const partes = t.split('\n\n');
+    assert.equal(partes.length, 3, 'apertura, renglones y cierre');
+    const renglones = partes[1].split('\n');
+    assert.equal(renglones.length, 4);
+    assert.ok(renglones.every((r) => r.startsWith('· ')));
+    const i = (n) => t.indexOf('· ' + n + ' —');
+    assert.ok(i(SUBS.find((s) => s.codigo === 'SUB-C2-01').nombre) < i('Corrección de fugas por accesorios'));
+    assert.ok(i('Corrección de fugas por accesorios') < i('Mantenimiento preventivo OLTC/NLTC'));
     assert.ok(t.includes(BENEFICIO_PRACTICA['SUB-C4-06'].beneficio));
   });
 

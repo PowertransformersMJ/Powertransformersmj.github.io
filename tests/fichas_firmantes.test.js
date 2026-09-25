@@ -2,7 +2,9 @@
 // `99 §89`) y la función que usan por igual la pantalla y el Excel.
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
-import { FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../assets/js/domain/fichas_firmantes.js';
+import {
+  FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillasDeLaSesion, casillaEsDeLaSesion
+} from '../assets/js/domain/fichas_firmantes.js';
 import { tieneContenido } from '../assets/js/domain/fichas_borrador.js';
 
 describe('La lista dictada, LITERAL (anti-paráfrasis)', () => {
@@ -92,5 +94,42 @@ describe('El borrador no cuenta como trabajo lo que no lo es (revisión §89)', 
   test('la marca «Otra persona» sin nombre escrito no es contenido; con nombre, sí', () => {
     assert.equal(tieneContenido({ plan: { sel_elab: OTRA_PERSONA, nom_elab: '', occ_elab: '' } }), false);
     assert.equal(tieneContenido({ plan: { sel_elab: OTRA_PERSONA, nom_elab: 'PERSONA DE PRUEBA' } }), true);
+  });
+});
+
+describe('Firma estampada: solo en la casilla de quien tiene la sesión (`99 §98`)', () => {
+  test('el Ingeniero firma en SU casilla con cualquiera de sus dos nombres dictados', () => {
+    for (const perfil of ['Miguel Jiménez', 'MIGUEL JIMENEZ', 'Miguel A. Jiménez', ' miguel  a. jimenez ']) {
+      assert.deepEqual(casillasDeLaSesion({}, perfil), ['elab'], perfil);
+    }
+    // Revisión con su nombre: firma en las dos.
+    assert.deepEqual(casillasDeLaSesion({ nom_rev: 'MIGUEL JIMENEZ' }, 'Miguel Jimenez'), ['elab', 'rev']);
+  });
+
+  test('un nombre parecido NO firma: la regla no se afloja (iniciales, apellidos de más)', () => {
+    for (const perfil of ['Miguel Jimenez Perez', 'Miguel Angel Jimenez', 'M. Jimenez', 'Jimenez', '', null]) {
+      assert.deepEqual(casillasDeLaSesion({}, perfil), [], String(perfil));
+    }
+  });
+
+  test('cada quien solo en las suyas; nadie en la del otro', () => {
+    assert.deepEqual(casillasDeLaSesion({}, 'Jorge Miranda'), ['rev', 'apr']);
+    assert.deepEqual(casillasDeLaSesion({}, 'Erick Vergara'), ['apr2', 'rec']);
+    assert.deepEqual(casillasDeLaSesion({}, 'Carlos Martelo'), []);
+    assert.deepEqual(casillasDeLaSesion({ nom_elab: 'CARLOS MARTELO' }, 'Carlos Martelo'), ['elab']);
+    assert.equal(casillaEsDeLaSesion('elab', { nom_elab: 'CARLOS MARTELO' }, 'Miguel Jimenez'), false);
+  });
+
+  test('«Otra persona» firma solo con lo escrito TAL CUAL (sin los alias de la lista)', () => {
+    const plan = { sel_elab: 'otro', nom_elab: 'Ana Pérez', occ_elab: 'Cargo' };
+    assert.equal(casillaEsDeLaSesion('elab', plan, 'ANA PEREZ'), true);
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'MIGUEL JIMENEZ' }, 'Miguel A. Jimenez'), false);
+    // La Ñ no se confunde con la N (`§71.4`), tampoco pegada como «N» + tilde
+    // combinable (NFD), que es como llega desde algunos PDF (revisión de §98).
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'JUAN MUÑOZ' }, 'Juan Munoz'), false);
+    const nfd = 'JUAN MUN\u0303OZ';
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: nfd }, 'Juan Munoz'), false);
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: nfd }, 'Juan Muñoz'), true);
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'JUAN MUNOZ' }, 'Juan Mun\u0303oz'), false);
   });
 });

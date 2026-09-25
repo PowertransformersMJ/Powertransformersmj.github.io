@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
   <link rel="stylesheet" href="../assets/css/tabs.css"/>
   <link rel="stylesheet" href="../assets/css/fichas-tecnicas.css"/>
+  <link rel="stylesheet" href="../assets/css/firma-personal.css"/>
 </head>
 <body class="aqua">
 <main class="app-main page-container">
@@ -29,6 +30,15 @@
       unifilares, Anexo AT y plan de acciones, con exportación al Excel oficial.
     </p>
   </div>
+
+  <!-- «Mi firma» (99 §98, mecanismo de §71): la firma vive en la cuenta de cada
+       quien —nunca en la página ni en el repositorio— y se estampa en la ficha y
+       en el Excel SOLO en la casilla que lleva el nombre de quien tiene la sesión.
+       Se monta desde `assets/js/ui/firma-personal.js`. -->
+  <details class="ftm-mi-firma">
+    <summary>Mi firma · se estampa solo en la casilla que lleva su nombre</summary>
+    <div id="panelMiFirma"></div>
+  </details>
 
   <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ftm- -->
   <div id="fichasPanel"></div>
@@ -95,9 +105,37 @@
     };
   }
 
+  // ── Firma de la sesión (99 §98) ─────────────────────────────────────────────
+  // Se lee de la cuenta de quien tiene la sesión (Storage `firmas/{uid}`, solo el
+  // dueño) y se le entrega al módulo, que la estampa ÚNICAMENTE en las casillas
+  // que llevan su nombre. Sin sesión o sin firma, la ficha sale para firmar a mano.
+  const { montarFirmaPersonal } = await import('../assets/js/ui/firma-personal.js');
+  const { miFirma, firmasDisponibles } = await import('../assets/js/data/firmas.js');
+  const { getSession } = await import('../assets/js/auth/session-guard.js');
+  const esperarSesion = () => (window.__sgmSession ? Promise.resolve() : new Promise((res) => {
+    const t = setTimeout(res, 12000);
+    window.addEventListener('sgm:session-ready', () => { clearTimeout(t); res(); }, { once: true });
+  }));
+  async function firmaSesion() {
+    await esperarSesion();
+    if (!firmasDisponibles()) return null;
+    const s = getSession();
+    return { nombre: (s && s.profile && s.profile.nombre) || '', dataUrl: await miFirma() };
+  }
+  const panelFirma = montarFirmaPersonal(document.getElementById('panelMiFirma'), {
+    onCambio() { window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); }
+  });
+  // El módulo de fichas ya espera la sesión por su cuenta (`firmaSesion`); aquí
+  // solo se repinta el panel. Avisar también al módulo descargaba la firma de
+  // más (revisión de §98).
+  window.addEventListener('sgm:session-ready', () => {
+    try { panelFirma && panelFirma.refrescar(); } catch (_) { /* el panel explica su estado */ }
+  }, { once: true });
+
   const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');
   window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
     origen: 'Parque vivo · Firestore',
+    firmaSesion,
     // El rótulo de origen viaja con los datos (`99 §84`). Cuando el tablero
     // deja de mostrar el listado adjunto, el segmento apaga su banner: si no,
     // seguía anunciando el archivo sobre datos que ya eran del parque vivo.

@@ -4028,3 +4028,43 @@ desmarcar la última → vacío con «Sin texto todavía.», Alcance intacto.
 **96.8 Verificado sano.** «Marcar las suyas» sigue marcando la banda entera del equipo: es explícito del Ingeniero.
 **96.9 Publicación (09-25).** Orden del Ingeniero: *«procede»*. Merge `0499e0d`; CI y Deploy verdes; `panel.js` y
 `beneficios_practicas.js` servidos idénticos al repo con anti-caché (L-65).
+
+## 97. ADR — Beneficios sin subtítulos y con términos más técnicos, uno por acción ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Pedido (captura de la vista previa con subtítulos): *«no es necesario los subtítulos, simplemente me interesa
+> que se aprecien los beneficios teniendo en cuenta cada acción, utiliza términos más técnicos»*. En rama
+> (`90bb0fc`), preview entregado. Enmienda a `§95`.
+
+**97.1 Solución.** `redaccionBeneficiosPracticas`: apertura, UN renglón por acción en el orden del MO.00418 y
+cierre; sin subtítulos de macroactividad. Los 32 beneficios reescritos con terminología de ingeniería de
+transformadores (30-32 palabras): 3 redactores → 3 revisores técnicos → 1 editor (Opus); apertura y cierre
+técnicos. Los amplios de `§92` siguen como `beneficioAmplio`. Crudo → bóveda `2026-09-25-beneficios-tecnicos/`.
+**97.2 Verificación.** Pruebas: 15-32 palabras, sin cifras ni normas, diagnóstico no «reduce», lo irreversible
+negado, OILTAP/VACUTAP en breve, sin subtítulos → 1856 pass; banco con tres prácticas.
+**97.3 Límite.** La introducción y el cierre se conservan (no se pidió quitarlos); se le ofreció retirarlos.
+
+## 98. ADR — La firma de quien tiene la sesión se estampa en su casilla, en la ficha y en el Excel ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Pedido (con `FMJP.tif`): *«Firma de Miguel Jimenez para que aparezca en el entregable y mientras se gestiona la
+> ficha técnica»*. En rama (`796eab8` + `fa942c5`), preview entregado.
+
+**98.1 Decisión.** El repositorio es público: la firma NUNCA entra al repo ni a la página. Se usa el mecanismo de
+`§71` (Storage `firmas/{uid}`, solo el dueño, `getBytes`, `firmaAplicaA`). El TIF se convirtió a PNG
+transparente EN SU MAC (`~/Downloads/FMJP-firma-transparente.png`, 10 KB); **él la sube** en «Mi firma» (la
+escritura es solo del dueño: ni Claude ni un admin pueden cargarla).
+**98.2 Solución.** Dominio: `casillaEsDeLaSesion`/`casillasDeLaSesion` (comparación exacta; «MIGUEL A. JIMENEZ» y
+«MIGUEL JIMENEZ» son la misma persona por lista CERRADA `MISMA_PERSONA`). Pantalla: la firma sobre la línea
+«Firma:» de sus casillas + aviso de dónde va o por qué no. Excel: `estamparFirmas` (pura) añade imagen, relación
+y ancla; el texto de los cinco cuadros de firma pasa a alinearse ABAJO (`anchor="b"`) para que «Firma:»/«Fecha:»
+queden a la misma altura en cualquier programa (la plantilla usa DIN-Bold, que cada programa sustituye distinto).
+Página: panel «Mi firma» plegado sobre el módulo; `cfg.firmaSesion` entrega nombre de perfil + firma.
+**98.3 No-regresión.** Sin firmas el Excel solo cambia la alineación de los cuadros de firma (visto en render); la
+firma vive en memoria (nunca en el borrador); Órdenes de Materiales gana el arreglo del botón de subir.
+**98.4 Verificación.** 1856 pass (pruebas de casillas, Ñ en NFD, Excel con PNG de 1×1 de prueba, alineación);
+banco con proveedor local: elab por defecto, rev con MIGUEL JIMENEZ, cambio de firmante, perfil que no coincide,
+sin firma, sin sesión; Excel descargado con solo `firma-elab.png`; render de LibreOffice en los cinco cuadros.
+Revisión de 6 Opus (seguridad · Excel · pantalla): 9 corregidos en `fa942c5`. Crudo → bóveda
+`2026-09-25-firma-estampada/`.
+**98.8 Verificado sano / no re-auditar.** innerHTML con el dataURL: no explotable (endurecido igual). El perfil
+real del Ingeniero NO se conoce desde aquí: si su `nombre` de perfil no es «Miguel Jimenez» ni «Miguel A. Jimenez»
+(p. ej. con segundo apellido), el aviso lo dice y hay que añadir ese nombre a `MISMA_PERSONA`.

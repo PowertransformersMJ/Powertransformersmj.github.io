@@ -31,7 +31,9 @@
 import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domain/fichas_creg_uc.js';
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
-import { FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../../domain/fichas_firmantes.js';
+import {
+  FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillaEsDeLaSesion, casillasDeLaSesion
+} from '../../domain/fichas_firmantes.js';
 import {
   fechaAISO, isoAFecha, leerAnio, aniosDelCalendario, ANIO_MIN, COLUMNAS_ANIOS
 } from '../../domain/fichas_fechas.js';
@@ -857,7 +859,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     origen: opciones.origen || '',
     demostracion: !!opciones.demostracion,
     exportador: opciones.exportador || null,
-    descargar: opciones.descargar || descargaPorDefecto
+    descargar: opciones.descargar || descargaPorDefecto,
+    // La página entrega la firma de la sesión (`99 §98`): async () => ({ nombre, dataUrl }) | null.
+    firmaSesion: typeof opciones.firmaSesion === 'function' ? opciones.firmaSesion : null
   };
 
   // ── estado vivo del panel ──
@@ -2118,6 +2122,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const btnPlan = $('[data-ftm="descargar-plan"]');
     if (btnPlan) btnPlan.hidden = (hoja !== 'plan');
     if (hoja === 'diagA' || hoja === 'diagF') pintarUnifilar();
+    pintarFirmasEstampadas();
   }
 
   /**
@@ -2953,7 +2958,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           : texto('Nombre:', '<span class="ftm-fmt-elige"><span class="ftm-fmt-valor">' + esc(q.nombre) + '</span>' + sel + '</span>')
             + texto('Ocupación:', esc(q.ocupacion)))
         + '<div class="ftm-fmt-renglon ftm-fmt-renglon--firma"><span class="ftm-fmt-lbl">Firma:</span>'
-        +   '<span class="ftm-fmt-linea" aria-hidden="true"></span></div>'
+        +   '<span class="ftm-fmt-linea" aria-hidden="true"></span>'
+        // Hueco de la firma estampada (`99 §98`): lo llena `pintarFirmasEstampadas`.
+        +   '<span class="ftm-fmt-firma" data-firma-slot="' + f.k + '"></span></div>'
         + '<div class="ftm-fmt-renglon"><span class="ftm-fmt-lbl">Fecha:</span>'
         +   campoFecha('fec_' + f.k, P['fec_' + f.k], 'Fecha de la firma en ' + quien) + '</div>'
         + '</div>';
@@ -2965,11 +2972,95 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       return '<fieldset class="ftm-fmt-caja' + (suyos.length > 1 ? ' ftm-fmt-caja--doble' : '') + '">'
         + '<legend>' + esc(rol) + '</legend>'
         + '<div class="ftm-fmt-cols">' + suyos.map(firmante).join('') + '</div></fieldset>';
-    }).join('') + '</div>';
+    }).join('') + '</div>'
+      // Dónde va la firma de la sesión, o por qué no va (solo en pantalla).
+      + '<p class="ftm-fmt-firma-nota" data-firma-nota hidden></p>';
   }
 
   /** Pinta un firmante suelto (lo usa `elegirFirmante` para repintar solo esa casilla). */
   let firmanteHTML = null;
+
+  /**
+   * Firma de QUIEN TIENE LA SESIÓN (`99 §98`, mecanismo de `§71`). La entrega la
+   * página (`cfg.firmaSesion`), que es la que sabe de sesiones y de Storage;
+   * vive SOLO en memoria —ni en el borrador ni en la página— y se estampa
+   * únicamente en las casillas que llevan su nombre (`casillaEsDeLaSesion`).
+   */
+  const firmaSesion = { hay: false, nombre: '', dataUrl: null, rel: 2.5 };
+
+  /** Proporción ancho/alto de la firma, para no deformarla en el Excel. */
+  function medirFirma(dataUrl) {
+    return new Promise((resolve) => {
+      if (typeof Image === 'undefined') { resolve(2.5); return; }
+      const img = new Image();
+      img.onload = () => resolve(img.naturalHeight ? img.naturalWidth / img.naturalHeight : 2.5);
+      img.onerror = () => resolve(2.5);
+      img.src = dataUrl;
+    });
+  }
+
+  /** Pide a la página la firma de la sesión (al montar y cuando cambia en «Mi firma»). */
+  async function cargarFirmaSesion() {
+    if (typeof cfg.firmaSesion !== 'function') return;
+    try {
+      const r = await cfg.firmaSesion();
+      firmaSesion.hay = !!r;
+      firmaSesion.nombre = (r && r.nombre) || '';
+      firmaSesion.dataUrl = (r && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) ? r.dataUrl : null;
+      firmaSesion.rel = firmaSesion.dataUrl ? await medirFirma(firmaSesion.dataUrl) : 2.5;
+    } catch (err) {
+      console.warn('[fichas/panel] no se pudo cargar la firma de la sesión:', err);
+      firmaSesion.hay = false; firmaSesion.dataUrl = null;
+    }
+    pintarFirmasEstampadas();
+  }
+  const alCambiarFirma = () => { cargarFirmaSesion(); };
+
+  /** Las casillas de la ficha abierta donde va la firma de la sesión. */
+  function casillasConFirma(e) {
+    if (!firmaSesion.dataUrl || !e) return [];
+    return casillasDeLaSesion(estadoDe(e).plan, firmaSesion.nombre);
+  }
+
+  /** Estampa (o retira) la firma de la sesión en los huecos de la hoja abierta y explica dónde va. */
+  function pintarFirmasEstampadas() {
+    if (!actual || !modalCuerpo) return;
+    const P = estadoDe(actual).plan;
+    modalCuerpo.querySelectorAll('[data-firma-slot]').forEach((slot) => {
+      const k = slot.getAttribute('data-firma-slot');
+      const va = !!firmaSesion.dataUrl && casillaEsDeLaSesion(k, P, firmaSesion.nombre);
+      slot.textContent = '';
+      if (va) {
+        const img = document.createElement('img');
+        img.alt = 'Firma estampada';
+        img.src = firmaSesion.dataUrl;
+        slot.appendChild(img);
+      }
+    });
+    const nota = modalCuerpo.querySelector('[data-firma-nota]');
+    if (!nota) return;
+    const texto = textoNotaFirma(P);
+    nota.textContent = texto;
+    nota.hidden = !texto;
+  }
+
+  /** Por qué va o no va la firma (L-69: un vacío se explica). */
+  function textoNotaFirma(P) {
+    if (typeof cfg.firmaSesion !== 'function' || !firmaSesion.hay) return '';
+    if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
+      + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.';
+    const ks = casillasDeLaSesion(P, firmaSesion.nombre);
+    if (!ks.length) return 'Su firma no se estampa en esta ficha: su nombre de perfil («' + firmaSesion.nombre
+      + '») no es el de ninguna casilla. Las casillas salen en blanco para firmar a mano.';
+    const nombres = ks.map((k) => {
+      const f = FIRMAS.find((x) => x.k === k);
+      return f ? f.rol + (f.segundo ? ' (segundo firmante)' : '') : k;
+    });
+    // El documento de Mantenimiento no exporta Excel: no se le promete.
+    return 'Su firma va estampada en ' + nombres.join(' y ')
+      + (documento === 'salud' ? ', en pantalla. ' : ', en pantalla y en el Excel. ')
+      + 'Las demás casillas salen en blanco para firmar a mano.';
+  }
 
   /**
    * Cambio en el desplegable «Nombre» de una casilla de firma. Elegir a una
@@ -3009,6 +3100,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       ? '[data-firmante="' + k + '"] [data-plan="nom_' + k + '"]'
       : '[data-firma-sel="' + k + '"]');
     if (destino) destino.focus();
+    pintarFirmasEstampadas();
   }
 
   /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
@@ -3291,7 +3383,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         futuro: { ...dF, svg: unifilarDeEquipo(e, 'futuro') }
       },
       municipio: e.municipio || '',
-      uuccDecidida: e.uucc_calculada || ''
+      uuccDecidida: e.uucc_calculada || '',
+      // Solo las casillas de la sesión; nunca se guarda en el borrador (`§98`).
+      firmas: Object.fromEntries(casillasConFirma(e)
+        .map((k) => [k, { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel }]))
     };
   }
 
@@ -3314,6 +3409,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const mod = cfg.exportador
         ? { exportarFichaPlanificacion: cfg.exportador, nombreArchivoFicha: null }
         : await import('./exportar-planificacion.js');
+      // La firma se vuelve a pedir justo antes de armar el Excel: si la sesión
+      // se cerró en otra pestaña, ya no hay firma que estampar (revisión §98).
+      await cargarFirmaSesion();
       const estado = estadoParaExportar(actual);
       // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo
       // se pregunta si falta algo: preguntar por costumbre enseña a decir que sí
@@ -3527,7 +3625,18 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // Escribir el nombre de un firmante es «Otra persona» EXPLÍCITO: si luego
       // se borra, la casilla no debe volver sola a la persona por defecto con el
       // cargo que quedó escrito (revisión §89).
-      if (/^nom_/.test(plan) && t.closest('[data-firmante]')) st.plan['sel_' + plan.slice(4)] = OTRA_PERSONA;
+      if (/^nom_/.test(plan) && t.closest('[data-firmante]')) {
+        st.plan['sel_' + plan.slice(4)] = OTRA_PERSONA;
+        // El segundo aprobador depende del primero (no se repite): si cambia el
+        // nombre escrito del primero, la casilla del segundo se repinta, o la
+        // firma podía quedar bajo el nombre de otra persona (revisión de §98).
+        if (plan === 'nom_apr') {
+          const caja = modalCuerpo.querySelector('[data-firmante="apr2"]');
+          const f = FIRMAS.find((x) => x.k === 'apr2');
+          if (caja && f && firmanteHTML) caja.outerHTML = firmanteHTML(f);
+        }
+        pintarFirmasEstampadas();
+      }
       tocarFicha(actual);
       if (t.getAttribute('data-recalcula')) {
         if (plan === 'potenciaMVA') reescribirRedacciones();
@@ -3645,6 +3754,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   contenedor.addEventListener('click', alHacerClic);
+  // La firma de la sesión: al montar, y cuando cambia en «Mi firma» (`99 §98`).
+  globalThis.addEventListener('sgm:firma-cambiada', alCambiarFirma);
+  cargarFirmaSesion();
   contenedor.addEventListener('input', alEscribir);
   contenedor.addEventListener('change', alCambiar);
   document.addEventListener('keydown', alTeclear);
@@ -3828,6 +3940,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     contenedor.removeEventListener('input', alEscribir);
     contenedor.removeEventListener('change', alCambiar);
     document.removeEventListener('keydown', alTeclear);
+    globalThis.removeEventListener('sgm:firma-cambiada', alCambiarFirma);
     globalThis.removeEventListener('beforeunload', alSalir);
     globalThis.removeEventListener('pagehide', volcarYa);
     document.removeEventListener('visibilitychange', alOcultar);

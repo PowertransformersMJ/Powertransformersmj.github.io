@@ -19,6 +19,8 @@
 // con la MISMA función, para que no digan cosas distintas.
 // ══════════════════════════════════════════════════════════════════════════════
 
+import { firmaAplicaA } from './firmas.js';
+
 /** Casillas del formato, en el orden de la plantilla. */
 export const CASILLAS_FIRMA = Object.freeze(['elab', 'rev', 'apr', 'apr2', 'rec']);
 
@@ -108,4 +110,50 @@ export function firmanteDe(k, plan = {}) {
     : indicePorDefecto(k, plan);
   const persona = lista[indice];
   return { nombre: persona.nombre, ocupacion: persona.ocupacion, fecha, otra: false, indice };
+}
+
+// ── FIRMA ESTAMPADA · `99 §98` ──────────────────────────────────────────────
+// Pedido del Ingeniero (2026-09-25): su firma «para que aparezca en el
+// entregable y mientras se gestiona la ficha técnica». Se usa el mecanismo de
+// `§71`: la firma vive en la cuenta de cada quien (Storage `firmas/{uid}`),
+// solo se lee con la sesión, y SOLO se estampa en la casilla que lleva el
+// nombre de quien tiene la sesión (`firmaAplicaA`, comparación exacta). Nunca
+// se puede estampar la de otro.
+
+/**
+ * Nombres de la lista dictada que son LA MISMA persona: el Ingeniero se dictó
+ * «MIGUEL A. JIMENEZ» en Elaboración y «MIGUEL JIMENEZ» en Revisión (`§89`).
+ * Es una lista CERRADA y explícita, no una comparación aproximada: aflojar la
+ * regla para todos (quitar iniciales, etc.) sería equivocarse hacia el lado
+ * permisivo, que en una firma no se permite (`§71.4`).
+ */
+const MISMA_PERSONA = Object.freeze([
+  Object.freeze(['MIGUEL A. JIMENEZ', 'MIGUEL JIMENEZ'])
+]);
+
+/** Nombres con que puede figurar en su perfil la persona de la lista (ella misma incluida). */
+function nombresDePersona(nombre) {
+  const grupo = MISMA_PERSONA.find((g) => g.includes(nombre));
+  return grupo ? [...grupo] : [nombre];
+}
+
+/**
+ * ¿La casilla `k` es de quien tiene la sesión? Solo entonces se estampa su
+ * firma. Una persona de la lista se reconoce también por sus otros nombres
+ * dictados (`MISMA_PERSONA`); «Otra persona» solo por lo escrito, tal cual.
+ *
+ * @param {string} k             casilla ('elab' | 'rev' | 'apr' | 'apr2' | 'rec')
+ * @param {object} plan          estado editable de la ficha
+ * @param {string} nombreSesion  nombre del perfil de la sesión
+ */
+export function casillaEsDeLaSesion(k, plan, nombreSesion) {
+  const f = firmanteDe(k, plan || {});
+  if (!f.nombre) return false;
+  const nombres = f.otra ? [f.nombre] : nombresDePersona(f.nombre);
+  return nombres.some((n) => firmaAplicaA(n, nombreSesion));
+}
+
+/** Las casillas de la ficha que son de quien tiene la sesión, en el orden del formato. */
+export function casillasDeLaSesion(plan, nombreSesion) {
+  return CASILLAS_FIRMA.filter((k) => casillaEsDeLaSesion(k, plan, nombreSesion));
 }
