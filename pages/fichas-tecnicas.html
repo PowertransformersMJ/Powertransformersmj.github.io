@@ -40,6 +40,14 @@
     <div id="panelMiFirma"></div>
   </details>
 
+  <!-- «Firmas del equipo» (99 §99): solo un administrador, como CUSTODIO, sube y
+       estampa las firmas que le autorizaron; quedan en SU espacio privado (nunca
+       en la página ni en el repositorio). Oculto hasta confirmar el rol. -->
+  <details class="ftm-mi-firma" id="firmasEquipoCaja" hidden>
+    <summary>Firmas del equipo · solo usted, como custodio, las ve y las estampa</summary>
+    <div id="panelFirmasEquipo"></div>
+  </details>
+
   <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ftm- -->
   <div id="fichasPanel"></div>
 
@@ -132,10 +140,41 @@
     try { panelFirma && panelFirma.refrescar(); } catch (_) { /* el panel explica su estado */ }
   }, { once: true });
 
+  // ── Firmas del EQUIPO bajo custodia (99 §99): solo administradores ────────
+  // Los datos se cargan con import() dinámico y solo si la sesión es de admin;
+  // las reglas del servidor lo vuelven a exigir en cada lectura y escritura.
+  let datosEquipo = null;
+  const cargarDatosEquipo = async () => (datosEquipo = datosEquipo || await import('../assets/js/data/firmas_equipo.js'));
+  const firmasEquipo = {
+    disponible() { return !!(datosEquipo && datosEquipo.puedeCustodiar()); },
+    async leer(id) { return (await cargarDatosEquipo()).leerFirma(id); },
+    nuevaEmisionId() { return datosEquipo.nuevaEmisionId(); },
+    async registrarEmision(id, datos) { return (await cargarDatosEquipo()).registrarEmision(id, datos); }
+  };
+  esperarSesion().then(async () => {
+    const s = getSession();
+    if (!s || !s.profile || s.profile.rol !== 'admin') return;
+    try {
+      const datos = await cargarDatosEquipo();
+      if (!datos.puedeCustodiar()) return;
+      const { montarFirmasEquipo } = await import('../assets/js/ui/fichas/firmas-equipo.js');
+      const caja = document.getElementById('firmasEquipoCaja');
+      const panelEquipo = montarFirmasEquipo(document.getElementById('panelFirmasEquipo'), {
+        datos, nombreSesion: s.profile.nombre || ''
+      });
+      caja.hidden = false;
+      // Se consulta al ABRIRLO: no se leen firmas que nadie pidió ver.
+      caja.addEventListener('toggle', () => { if (caja.open && panelEquipo) panelEquipo.refrescar(); });
+    } catch (err) {
+      console.warn('[fichas] firmas del equipo no disponibles:', err);
+    }
+  });
+
   const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');
   window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
     origen: 'Parque vivo · Firestore',
     firmaSesion,
+    firmasEquipo,
     // El rótulo de origen viaja con los datos (`99 §84`). Cuando el tablero
     // deja de mostrar el listado adjunto, el segmento apaga su banner: si no,
     // seguía anunciando el archivo sobre datos que ya eran del parque vivo.

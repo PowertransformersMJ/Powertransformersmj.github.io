@@ -27,6 +27,17 @@ else
   echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron cédulas (99 §78)."
 fi
 
+# 🔒 Guardia de FIRMAS (99 §99): ninguna imagen de firma entra al repo público.
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/guardia-firmas.mjs; then
+    echo ""
+    echo "❌ COMMIT BLOQUEADO: el cambio trae una imagen de firma (ver arriba)."
+    exit 1
+  fi
+else
+  echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron firmas (99 §99)."
+fi
+
 staged=$(git diff --cached --name-only)
 echo "$staged" | grep -qE '^(CLAUDE\.md|docs/)' || exit 0   # nada del cerebro staged → no aplica
 

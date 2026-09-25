@@ -29,9 +29,10 @@ export function montarFirmaPersonal(contenedor, opts = {}) {
       <div class="fp-cab">
         <h3 class="fp-titulo">Mi firma</h3>
         <p class="fp-ayuda">
-          Se guarda en su cuenta, no en la página: <strong>solo usted puede verla y usarla</strong>.
-          Se estampa únicamente en la línea que lleva su nombre; las demás salen en blanco
-          para firmar a mano.
+          Se guarda en su cuenta, no en la página: <strong>esta copia solo la ve y la usa usted</strong>
+          (si autorizó a un administrador a usar su firma, él guarda una copia aparte).
+          En la descarga normal se estampa únicamente en la línea que lleva su nombre; las demás
+          salen en blanco para firmar a mano.
         </p>
       </div>
       <div class="fp-cuerpo">

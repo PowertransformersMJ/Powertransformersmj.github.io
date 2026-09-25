@@ -800,6 +800,63 @@ service cloud.firestore {
     // El id sale del nombre (todos los espacios → «_», Ñ incluida) y la
     // escritura exige declarar la autorización de la persona (Ley 1581).
     // Espejo de `assets/js/domain/responsables_ordenes.js`.
+    // ── Firmas del EQUIPO · registros que SOLO se agregan (ADR-099) ──
+    // Trazabilidad interna elegida por el Ingeniero: nadie edita ni borra.
+    //   · firmas_equipo_registro: alta / reemplazo / retiro de cada firma, con la
+    //     autorización declarada y la huella de la imagen.
+    //   · fichas_emisiones: cada Excel emitido con firmas del equipo: equipo,
+    //     casillas con su origen y huella, y la huella del archivo.
+    function personaDelEquipo(p) {
+      return p in ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA', 'ERICK_VERGARA'];
+    }
+    match /firmas_equipo_registro/{id} {
+      // get y list, ambos SOLO del custodio: otro admin no ve a quién custodia
+      // ni con qué autorización (revisión de ADR-099).
+      allow get:  if isAdmin() && resource.data.custodio == request.auth.uid;
+      allow list: if isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
+      allow create: if isAdmin() && hasProfile()
+                    && request.resource.data.keys().hasOnly(['tipo', 'persona', 'autorizacion', 'huella',
+                                                             'custodio', 'custodioNombre', 'en'])
+                    && request.resource.data.keys().hasAll(['tipo', 'persona', 'custodio', 'custodioNombre', 'en'])
+                    && request.resource.data.tipo in ['alta', 'reemplazo', 'retiro']
+                    && personaDelEquipo(request.resource.data.persona)
+                    && request.resource.data.custodio == request.auth.uid
+                    && request.resource.data.custodioNombre == profile().get('nombre', '')
+                    && request.resource.data.en == request.time
+                    && (request.resource.data.tipo == 'retiro'
+                        || (request.resource.data.autorizacion is map
+                            && request.resource.data.autorizacion.keys().hasOnly(['fecha', 'medio'])
+                            && request.resource.data.autorizacion.fecha is string
+                            && request.resource.data.autorizacion.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+                            && request.resource.data.autorizacion.medio is string
+                            && request.resource.data.autorizacion.medio.size() >= 3
+                            && request.resource.data.autorizacion.medio.size() <= 200
+                            && request.resource.data.huella is string
+                            && request.resource.data.huella.matches('^[0-9a-f]{64}$')));
+      allow update, delete: if false;
+    }
+    match /fichas_emisiones/{folio} {
+      allow get:  if isAdmin();
+      allow list: if isAdmin() && request.query.limit <= 50;
+      allow create: if isAdmin() && hasProfile()
+                    && request.resource.data.keys().hasOnly(['equipo', 'documento', 'casillas', 'huellaArchivo',
+                                                             'custodio', 'custodioNombre', 'en'])
+                    && request.resource.data.keys().hasAll(['equipo', 'documento', 'casillas', 'huellaArchivo',
+                                                            'custodio', 'custodioNombre', 'en'])
+                    && request.resource.data.equipo is map
+                    && request.resource.data.equipo.keys().hasOnly(['matricula', 'subestacion', 'serie'])
+                    && request.resource.data.documento == 'PE.02081'
+                    && request.resource.data.casillas is list
+                    && request.resource.data.casillas.size() >= 1
+                    && request.resource.data.casillas.size() <= 5
+                    && request.resource.data.huellaArchivo is string
+                    && request.resource.data.huellaArchivo.matches('^[0-9a-f]{64}$')
+                    && request.resource.data.custodio == request.auth.uid
+                    && request.resource.data.custodioNombre == profile().get('nombre', '')
+                    && request.resource.data.en == request.time;
+      allow update, delete: if false;
+    }
+
     match /responsables_ordenes/{id} {
       allow get:  if isTeamMember();
       allow list: if isTeamMember() && isAdmin() && request.query.limit <= 50;

@@ -4074,3 +4074,71 @@ archivos servidos idénticos al repo con anti-caché (L-65); ninguna firma en el
 estampó desde su cuenta: la regla de `§71` es que cada quien sube la SUYA con su sesión. Se le preparó
 `~/Downloads/EVergara-firma-transparente.png` (187×41 px de origen: pixelada; se pidió un escaneo mayor) para que
 Erick la suba en «Mi firma». Si su perfil no es «Erick Vergara», el aviso lo dirá y se añade a `MISMA_PERSONA`.
+
+## 99. ADR — Firmas del EQUIPO bajo custodia: el PE.02081 sale con la firma de todos, y cada emisión queda registrada ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Pedido: *«es un documento de trazabilidad, por eso te enviaré aquí la firma de todos para que aparezca»*; tras una
+> objeción: *«el entregable en excel, deben aparecer la firma de todos […] no compromete la integridad de nadie»*.
+> En rama (`53722db` + `e1d36de`), preview entregado. W-11: comité ×4 + revisión ×6 (Opus) + prompt de Gemini
+> entregado — **sin respuesta aún: NO revisada externamente**.
+
+**99.1 Contexto.** Con `§71`/`§98` cada quien estampa SOLO su firma, con su sesión. Objeción dada una vez (autorizar
+el uso de la imagen no prueba que la persona aprobó ESTA ficha, Ley 527/1999 art. 7). Él mantuvo el pedido y decidió:
+sin leyenda visible (solo registro interno) · Recibe también · basta la autorización general · ya la tiene de cada uno.
+**Enmienda `§98.10`**: la firma de un tercero ya no depende solo de que él la suba en «Mi firma».
+**99.2 Solución.** *Storage* `firmas-equipo/{custodio}/{persona}`: solo SU custodio (admin activo, su uid) lee y
+escribe; persona de lista cerrada (5 claves fijas); PNG ≤512 KB con fecha y medio de la autorización y huella SHA-256
+obligatorios; se lee con `getBytes` y SIN caché (retirar una firma la saca de la siguiente emisión). *Firestore*, solo
+se agrega: `firmas_equipo_registro` (alta/reemplazo/retiro; get y list solo del custodio) y `fichas_emisiones`
+(equipo, casilla → persona/origen/huella, huella del archivo, custodio). *Dominio* `firmas_equipo.js`:
+`planDeEstampado` — la casilla de la sesión usa SIEMPRE la firma propia; «Otra persona» escrita igual que alguien de
+la lista sale SIN FIRMA (cuenta la opción elegida, no el texto); folio `F-XXXXXXXX`. *Pantalla*: panel «Firmas del
+equipo» (solo admin; normaliza la imagen: fondo transparente, recorte al trazo) y botón APARTE «Descargar con firmas
+del equipo» → tabla de confirmación → al confirmar relee todo y, si algo cambió, repinta y no descarga; **sin
+registro no hay descarga**; marca «SGM F-…» bajo cada firma del equipo (**retirada en `§99.11`**: firmas limpias) y folio en el nombre del archivo. *Git*:
+`scripts/guardia-firmas.mjs` en el pre-commit (nombre, bytes sin extensión, huellas de la bóveda aunque se renombre,
+Excel emitidos) + `.gitignore` de `Ficha_Planificacion_*.xlsx`.
+**99.3 No-regresión.** «Descargar Excel» no cambia (solo la firma propia, `§98`); un técnico no ve nada nuevo; nada
+del equipo va al borrador local; `exportar-planificacion.js` INTACTO (reusa `estamparFirmas`).
+**99.4 Verificación.** 1865 pass / 2 skip · lint limpio · reglas 107/107 dos veces (`test:rules` pasa a correr en
+serie: los archivos limpiaban el emulador a la vez). Banco con almacén falso: cinco firmas + registro + folio; registro
+caído → sin descarga; «Otra persona» → SIN FIRMA; sin fecha → rechazada; no custodio → ni botón ni panel. Tras
+`e1d36de`: cambiar un firmante cierra la tabla; retirar una firma con la tabla abierta → aviso y sin descarga;
+cancelar el aviso de pendientes devuelve el botón; error de lectura → no se emite. Render de LibreOffice de las cinco
+casillas.
+**99.5 Anti-patterns evitados.** Firma en el repo o cargada por Claude · `getDownloadURL` · `docProps` como
+trazabilidad (Excel lo reescribe) · decidir «de la lista» comparando nombres · Cloud Function (free-tier).
+**99.6 Archivos.** Nuevos: `domain/`, `data/` y `ui/fichas/firmas_equipo`/`firmas-equipo.js`, sus pruebas y
+`guardia-firmas.mjs`. Tocados: `panel.js`, `fichas-tecnicas.html`/`.css`, `storage.rules`, `firestore.rules`,
+`githooks/pre-commit`, `package.json`, `.gitignore`.
+**99.7 Doctrina.** W-11 · §3.2 free-tier · el repo es público (cero firmas) · L-65 al publicar.
+**99.8 Verificado sano / no re-auditar.** Folio no reversible: el enlace es `folioDeEmision(doc.id)`, basta listar ·
+huella declarada en metadatos: el único escritor es el custodio vía `subirFirma` · exportador que descarte firmas en
+silencio: con la plantilla fija halla las cinco · emisión «con equipo» sin ninguna del equipo: registra lo que hubo.
+Crudos → bóveda `2026-09-25-firmas-equipo/` (comité, revisión, prompt de Gemini).
+**99.9 Pendiente.** Su «procede» → desplegar reglas (storage + firestore) + merge + validación en vivo; él sube las
+firmas en «Firmas del equipo» con fecha y medio; la de Erick es pequeña (187×41 px): pedir un escaneo mayor. La de Jorge Rhenals llegó por chat (418×121 px): preparada en `~/Downloads/JRhenals-firma-transparente.png`, sus huellas en la bóveda (la guardia bloquea una copia renombrada, probado) y probada en el banco por el formulario real (Elaboración). Igual la de Carlos Martelo (1218×349 px, la más nítida): `~/Downloads/CMartelo-firma-transparente.png`, huellas en la bóveda, guardia probada, banco con el permiso verbal prellenado.
+**99.10 Consejo externo (Gemini, 09-25) — verificado, no adoptado a ciegas.** Acierta en la dirección (una imagen
+estampada por otro no es la firma del titular: puede decir «no aprobé esa ficha») y sobre-afirma: «control
+exclusivo» es de la firma DIGITAL (Ley 527 art. 28; para la electrónica, Decreto 2364/2012 art. 4.1) · «falsedad
+ideológica (Hecho)» es PARCIAL (C-637/2009; si el trabajador de AFINIA es servidor público en lo penal quedó
+ABIERTO) · «la Contraloría invalidará» es falso · su regla de Storage no funciona aquí (sin custom claims) · sí hay
+cómo desmentir un Excel alterado (huella), no qué decía · el plan gratuito no es el límite. Cierto: la firma es
+dato personal y la autorización debe nombrar la FINALIDAD (Ley 1581). Hallazgos nuevos confirmados en código: emitir
+con [PENDIENTE] (firmas sobre contenido que se completa a mano), firmas ajenas sueltas en `xl/media/` ampliadas a
+≥600 px con marca de esquina, huella de metadatos (no de bytes), promesa vieja en «Mi firma», cualquier admin puede
+ser custodio. Descartados con razón: el híbrido «el titular sube y consiente» (el custodio crea las cuentas; abre el
+SGM a 4 personas) y la copia maestra en Firestore (nombres de terceros para siempre, contra ADR-083). **Queda para el
+Ingeniero** el alcance y la prueba de cada autorización. Crudos → bóveda `2026-09-25-firmas-equipo/`.
+**99.11 Decisiones del Ingeniero tras el consejo externo (09-25) y lo que se ajustó (`8cf879d`).** Preguntado
+por el alcance del permiso, el destino del Excel, la marca y Recibe: *«Es verbal y basta»* · *«Circula tal cual»* ·
+*«no es necesario que aparezca nada adicional, la firma debe ser limpia cada una de ellas»* · *«salen todas las
+firmas, no requieren autorización, yo autorizo verbalmente»*. Se ajustó: firmas del equipo LIMPIAS (sin marca ni
+ampliación; el folio queda en el nombre del archivo y en el registro) · **no se emite con [PENDIENTE]** (circula
+firmado: completarlo a mano dejaría las firmas sobre otro contenido; «Exportar Excel» no cambia) · huella de cada
+firma calculada de los bytes leídos (si no es la registrada, no se emite) · subida con hoy LOCAL y «Autorización
+verbal» por defecto (al reemplazar se conserva la declarada) · custodio con perfil real (`hasProfile` en la regla y
+`legacy` fuera en la pantalla) · textos de «Mi firma». Revisión de 6 Opus: 6 confirmados y corregidos, 1 refutado.
+Queda **a su criterio** (no bloquea): las fechas bajo cada firma salen vacías si no se llenan, y el Valor Real puede
+ir en blanco (`§93`). Riesgo asumido por él y documentado: la firma estampada no prueba que cada titular revisó esa
+ficha, y cada Excel lleva las imágenes de las firmas dentro. 1866 pass · reglas 108/108.
