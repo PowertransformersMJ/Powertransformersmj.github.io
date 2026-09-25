@@ -4006,3 +4006,7 @@ retirar lo mínimo señalado (la lista, solo donde hay casillas).
 **95.8 Verificado sano / no re-auditar.** Recomponer una ficha que se queda sin otro trabajo no borra del disco
 su texto a mano anterior: regla 1 de `§83.2` (mismo compromiso que el «Borrar» de `§94`). El texto de la casilla
 de edición también sale impreso encima de la hoja: es anterior (CF-39), no de este cambio.
+
+**95.9 / 94.9 / 93.9 Publicación (09-25).** Orden del Ingeniero: *«procede»*. Merge `098dbff`; CI y Deploy verdes;
+`exportar-planificacion.js`, `panel.js`, `fichas_fechas.js`, `beneficios_practicas.js` y `fichas-tecnicas.css`
+servidos idénticos al repo con anti-caché (L-65).
