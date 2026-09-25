@@ -762,7 +762,13 @@ export function seleccionAcciones(equipo, st, campo) {
   const todas = accionesDeEquipo(equipo, esCampoMtto(campo) ? { todasLasCondiciones: true } : undefined);
   const disp = esCampoMtto(campo) ? todas.filter((a) => !esInversion(a.txt)) : todas;
   const guardado = (st && st.plan) ? st.plan.acc_sel : null;
-  const ids = Array.isArray(guardado) ? guardado : seleccionPorDefecto(disp);
+  // En el documento de MANTENIMIENTO nada viene marcado de fábrica: los
+  // beneficios salen solo de lo que el Ingeniero escoja (orden del 2026-09-25,
+  // `99 §96`: «aquí no debe reposar nada hasta que yo seleccione las acciones
+  // de mantenimiento»). El PI conserva su selección por defecto. El alcance de
+  // mantenimiento sin marcas ya tiene su redacción honesta (`§75`).
+  const ids = Array.isArray(guardado) ? guardado
+    : (esCampoMtto(campo) ? [] : seleccionPorDefecto(disp));
   const set = new Set(ids);
   // Una acción, un renglón. En modo completo la lista trae el catálogo entero y
   // la norma repite dos subactividades en C1 y C2, así que sin este filtro el
@@ -2688,12 +2694,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           + 'otro documento que se emite desde este equipo.</p>'
         : '')
       + '<p class="ftm-acc-pie">' + (esBase
-        ? 'El equipo no trae macroactividad registrada. Su banda queda abierta y rotulada '
-          + '<b>referencial</b>: de ella se marca solo lo de diagnóstico y verificación, porque la '
-          + 'norma lista por banda lo que PUEDE aplicar, no lo que este equipo necesita. Lo '
-          + 'intrusivo se ofrece sin marcar y se escoge contra el hallazgo. '
-        : '') + 'Con lo que marque se proponen los beneficios de abajo, venga de la banda que venga; '
-      + 'si no marca nada, el texto le pide escogerlas.</p>'
+        ? 'El equipo no trae macroactividad registrada: su banda queda abierta y rotulada '
+          + '<b>referencial</b>, porque la norma lista por banda lo que PUEDE aplicar, no lo que este '
+          + 'equipo necesita. '
+        : '') + 'Nada viene marcado: los beneficios de abajo salen solo de lo que usted marque, venga '
+      + 'de la banda que venga, y sin marcas el texto queda vacío.</p>'
       + '</div>';
   }
 
@@ -2824,11 +2829,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
     if (ta) ta.value = st.plan[campo];
     const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
-    if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+    if (vista) vista.innerHTML = htmlVista(st.plan[campo]);
     pintarModoBeneficios(false);
     // El botón se ocultó con el foco puesto: sin esto, el teclado volvía al
     // principio de la ficha (revisión de §95).
     if (ta) ta.focus();
+  }
+
+  /**
+   * Vista previa de un texto redactado. Vacío ⇒ «Sin texto todavía.», igual al
+   * abrir la hoja que después de vaciarla (al desmarcar la última práctica
+   * quedaba en blanco, `99 §96`).
+   */
+  function htmlVista(texto) {
+    return lleno(texto) ? esc(texto).replace(/\n/g, '<br>') : '<i>Sin texto todavía.</i>';
   }
 
   /** Total real en pantalla: la cifra, «—» si no hay, «no legible» si no es cifra. */
@@ -3084,11 +3098,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + cabeceraHoja(documento === 'salud'
         ? 'BENEFICIOS DEL MANTENIMIENTO ESPECIALIZADO' : 'BENEFICIOS DEL PROYECTO')
       + banda('Vista previa del texto')
-      + '<div class="ftm-campo-val" data-vista="' + campo + '">'
-      + (lleno(estadoDe(e).plan[campo])
-        ? esc(estadoDe(e).plan[campo]).replace(/\n/g, '<br>')
-        : '<i>Sin texto todavía.</i>')
-      + '</div>'
+      + '<div class="ftm-campo-val" data-vista="' + campo + '">' + htmlVista(estadoDe(e).plan[campo]) + '</div>'
       + pieHoja(documento === 'salud' ? 'Pág. 2 de 7' : 'Pág. 2 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
   }
@@ -3244,7 +3254,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
       if (ta) ta.value = st.plan[campo];
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
-      if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+      if (vista) vista.innerHTML = htmlVista(st.plan[campo]);
     });
   }
 
@@ -3260,7 +3270,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
       if (ta) ta.value = st.plan[campo];
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
-      if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+      if (vista) vista.innerHTML = htmlVista(st.plan[campo]);
     });
   }
 
@@ -3542,7 +3552,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       tocarFicha(actual);
       if (campo === CAMPO_BENEF_PRACTICAS && documento === 'salud') pintarModoBeneficios(true);
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
-      if (vista) vista.innerHTML = esc(t.value).replace(/\n/g, '<br>');
+      if (vista) vista.innerHTML = htmlVista(t.value);
     }
   }
 
@@ -3590,7 +3600,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
       if (ta) ta.value = st.plan[campo];
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
-      if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+      if (vista) vista.innerHTML = htmlVista(st.plan[campo]);
       tocarFicha(actual);
       }
     const accId = t.getAttribute && t.getAttribute('data-accion');

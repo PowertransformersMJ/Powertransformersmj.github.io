@@ -268,13 +268,11 @@ export function redaccionBeneficiosPracticas(equipo, _diag, escogidas) {
     .replace(/\{MVA\}/g, () => mva || '[PENDIENTE: POTENCIA]')
     .replace(/\{SUB\}/g, () => f.subestacion || '[PENDIENTE: SUBESTACIÓN]');
 
+  // Sin prácticas escogidas NO sale nada —ni apertura, ni cierre, ni aviso—:
+  // «aquí no debe reposar nada hasta que yo seleccione las acciones de
+  // mantenimiento» (orden del Ingeniero, 2026-09-25, `99 §96`).
   const lista = Array.isArray(escogidas) ? escogidas : [];
-  if (!lista.length) {
-    return [apertura,
-      '[PENDIENTE: escoja arriba las macroactividades y acciones de mantenimiento; los beneficios se '
-        + 'proponen con base en ellas.]',
-      CIERRE_BENEFICIOS].join('\n\n');
-  }
+  if (!lista.length) return '';
 
   const grupos = new Map();          // macroactividad → { orden, renglones }
   const sinBeneficio = [];

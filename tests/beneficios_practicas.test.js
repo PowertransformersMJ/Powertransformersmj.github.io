@@ -99,10 +99,14 @@ describe('Cómo se arma el texto', () => {
     return { id: cod, txt: s.nombre };
   };
 
-  test('sin prácticas escogidas: la apertura, el aviso [PENDIENTE] y el cierre; nada inventado', () => {
-    const t = redaccionBeneficiosPracticas(EQ, null, []);
-    assert.match(t, /\[PENDIENTE: escoja arriba las macroactividades y acciones de mantenimiento/);
-    assert.ok(!t.includes('·'), 'sin prácticas no hay renglones de beneficio');
+  test('sin prácticas escogidas NO sale nada: ni apertura, ni cierre, ni aviso (`99 §96`)', () => {
+    for (const vacia of [[], null, undefined]) assert.equal(redaccionBeneficiosPracticas(EQ, null, vacia), '');
+  });
+
+  test('con una práctica, sale la apertura, su renglón y el cierre', () => {
+    const t = redaccionBeneficiosPracticas(EQ, null, [practica('SUB-C3-01')]);
+    assert.ok(t.startsWith('El transformador de potencia T1-PRUEBA'));
+    assert.ok(t.includes(BENEFICIO_PRACTICA['SUB-C3-01'].beneficio));
     assert.ok(t.endsWith(CIERRE_BENEFICIOS));
   });
 
@@ -138,7 +142,7 @@ describe('Cómo se arma el texto', () => {
   });
 
   test('sin potencia ni matrícula, el hueco se declara', () => {
-    const t = redaccionBeneficiosPracticas({ subestacion: 'X', cond_int: 3 }, null, []);
+    const t = redaccionBeneficiosPracticas({ subestacion: 'X', cond_int: 3 }, null, [practica('SUB-C3-01')]);
     if (APERTURA_BENEFICIOS.includes('{MVA}')) assert.match(t, /\[PENDIENTE: POTENCIA\]/);
     if (APERTURA_BENEFICIOS.includes('{MATRICULA}')) assert.match(t, /\[PENDIENTE: MATRÍCULA\]/);
   });

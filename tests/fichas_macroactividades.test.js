@@ -185,11 +185,27 @@ describe('Un solo catálogo: la línea base sale de la norma (decisión 2026-09-
     assert.ok(!sel.some((a) => /mitigaci/i.test(a.txt)), sel.map((a) => a.txt).join(' | '));
   });
 
-  test('solo se marca lo de su banda — y de las ajenas, únicamente lo que la norma repite', () => {
+  test('en el documento de mantenimiento NADA viene marcado de fábrica (`99 §96`)', () => {
+    // «Aquí no debe reposar nada hasta que yo seleccione las acciones de
+    // mantenimiento»: ni la línea base, ni lo registrado, en ninguna banda.
+    for (const ci of [1, 2, 3, 4, 5]) {
+      const EQ = { potencia_kva: 20000, cond_int: ci, subestacion: 'PRUEBA', nivel: 'N4' };
+      assert.deepEqual(seleccionAcciones(EQ, { plan: {} }, 'alcance_mtto'), [], 'C' + ci);
+      assert.deepEqual(seleccionAcciones(EQ, { plan: {} }, 'beneficios_mtto'), [], 'C' + ci);
+    }
+    const conRegistro = { potencia_kva: 20000, cond_int: 3, subestacion: 'PRUEBA',
+      subacts: ['CORRECCION DE FUGAS POR ACCESORIOS'] };
+    assert.deepEqual(seleccionAcciones(conRegistro, { plan: {} }, 'beneficios_mtto'), []);
+    // Lo que el Ingeniero marca, sí.
+    const una = accionesDeEquipo(conRegistro, { todasLasCondiciones: true })[0].id;
+    assert.equal(seleccionAcciones(conRegistro, { plan: { acc_sel: [una] } }, 'beneficios_mtto').length, 1);
+  });
+
+  test('el PI conserva su selección por defecto: solo marca lo de su banda y lo que la norma repite', () => {
     // C2 es el caso duro: comparte «Pruebas eléctricas» e «Inspección ocular
     // detallada» con C1, así que ahí SÍ aparecen marcas en un grupo ajeno.
     const EQ = { potencia_kva: 20000, cond_int: 2, subestacion: 'PRUEBA', nivel: 'N4' };
-    const marcados = new Set(seleccionAcciones(EQ, { plan: {} }, 'alcance_mtto').map((a) => a.id));
+    const marcados = new Set(seleccionAcciones(EQ, { plan: {} }).map((a) => a.id));
     const todas = accionesDeEquipo(EQ, { todasLasCondiciones: true });
     const idsSuBanda = new Set(todas.filter((a) => a.macro === 'MACRO-ST').map((a) => a.id));
     const ajenasMarcadas = todas.filter((a) => a.macro && a.macro !== 'MACRO-ST' && marcados.has(a.id));
