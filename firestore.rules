@@ -810,8 +810,10 @@ service cloud.firestore {
       return p in ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA', 'ERICK_VERGARA'];
     }
     match /firmas_equipo_registro/{id} {
+      // get y list, ambos SOLO del custodio: otro admin no ve a quién custodia
+      // ni con qué autorización (revisión de ADR-099).
       allow get:  if isAdmin() && resource.data.custodio == request.auth.uid;
-      allow list: if isAdmin() && request.query.limit <= 50;
+      allow list: if isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
       allow create: if isAdmin() && hasProfile()
                     && request.resource.data.keys().hasOnly(['tipo', 'persona', 'autorizacion', 'huella',
                                                              'custodio', 'custodioNombre', 'en'])

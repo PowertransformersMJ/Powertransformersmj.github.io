@@ -34,6 +34,8 @@ if command -v node >/dev/null 2>&1; then
     echo "❌ COMMIT BLOQUEADO: el cambio trae una imagen de firma (ver arriba)."
     exit 1
   fi
+else
+  echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron firmas (99 §99)."
 fi
 
 staged=$(git diff --cached --name-only)

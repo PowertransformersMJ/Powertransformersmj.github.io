@@ -12,9 +12,15 @@ import { PERSONAS_EQUIPO, validarAutorizacion } from '../../domain/firmas_equipo
 import { firmaAplicaA } from '../../domain/firmas.js';
 
 const ANCHO_MAX = 1200;
+const ALTO_MAX = 400;
 const ANCHO_MIN_NITIDO = 300;
+const TOPE_BYTES = 512 * 1024;
 
-/** Imagen elegida → PNG normalizado (Uint8Array) con fondo claro transparente. */
+/**
+ * Imagen elegida → PNG normalizado (Uint8Array): fondo claro transparente,
+ * RECORTADA al trazo (una foto o una hoja escaneada no se sube entera) y con
+ * ancho y alto acotados (revisión de `§99`).
+ */
 async function normalizarImagen(archivo) {
   const url = URL.createObjectURL(archivo);
   try {
@@ -24,23 +30,42 @@ async function normalizarImagen(archivo) {
       i.onerror = () => reject(new Error('No se pudo leer la imagen (use PNG o JPG).'));
       i.src = url;
     });
-    const esc = Math.min(1, ANCHO_MAX / img.naturalWidth);
-    const w = Math.max(1, Math.round(img.naturalWidth * esc));
-    const h = Math.max(1, Math.round(img.naturalHeight * esc));
-    const c = document.createElement('canvas');
-    c.width = w; c.height = h;
-    const ctx = c.getContext('2d');
-    ctx.drawImage(img, 0, 0, w, h);
-    const px = ctx.getImageData(0, 0, w, h);
+    // 1) A tamaño de trabajo, con el fondo claro vuelto transparente.
+    const esc0 = Math.min(1, 2400 / img.naturalWidth);
+    const W = Math.max(1, Math.round(img.naturalWidth * esc0));
+    const H = Math.max(1, Math.round(img.naturalHeight * esc0));
+    const c0 = document.createElement('canvas'); c0.width = W; c0.height = H;
+    const x0 = c0.getContext('2d');
+    x0.drawImage(img, 0, 0, W, H);
+    const px = x0.getImageData(0, 0, W, H);
     const d = px.data;
-    for (let i = 0; i < d.length; i += 4) {
-      const lum = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
-      const a = lum >= 235 ? 0 : (lum <= 120 ? 255 : Math.round(255 * (235 - lum) / 115));
-      d[i + 3] = Math.min(d[i + 3], a);
+    let minX = W; let minY = H; let maxX = -1; let maxY = -1;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = (y * W + x) * 4;
+        const lum = (d[i] * 299 + d[i + 1] * 587 + d[i + 2] * 114) / 1000;
+        const a = Math.min(d[i + 3], lum >= 235 ? 0 : (lum <= 120 ? 255 : Math.round(255 * (235 - lum) / 115)));
+        d[i + 3] = a;
+        if (a > 40) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+      }
     }
-    ctx.putImageData(px, 0, 0);
+    if (maxX < 0) throw new Error('No se encontró el trazo de la firma: use una imagen con la firma en tinta oscura sobre fondo claro.');
+    x0.putImageData(px, 0, 0);
+    // 2) Recortada al trazo (con un margen) y acotada en ancho y alto.
+    const m = Math.round(Math.max(maxX - minX, maxY - minY) * 0.03) + 2;
+    const cx = Math.max(0, minX - m); const cy = Math.max(0, minY - m);
+    const cw = Math.min(W, maxX + m + 1) - cx; const ch = Math.min(H, maxY + m + 1) - cy;
+    const esc = Math.min(1, ANCHO_MAX / cw, ALTO_MAX / ch);
+    const w = Math.max(1, Math.round(cw * esc)); const h = Math.max(1, Math.round(ch * esc));
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    c.getContext('2d').drawImage(c0, cx, cy, cw, ch, 0, 0, w, h);
     const blob = await new Promise((resolve) => c.toBlob(resolve, 'image/png'));
-    return { png: new Uint8Array(await blob.arrayBuffer()), ancho: img.naturalWidth };
+    const png = new Uint8Array(await blob.arrayBuffer());
+    if (png.length > TOPE_BYTES) {
+      throw new Error('La firma recortada pesa ' + Math.round(png.length / 1024) + ' KB (máximo 512): '
+        + 'escanéela sobre papel blanco, recortada a la firma.');
+    }
+    return { png, ancho: Math.round(cw / esc0) };
   } finally {
     URL.revokeObjectURL(url);
   }
@@ -96,7 +121,10 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
     const bCancelar = document.createElement('button'); bCancelar.type = 'button'; bCancelar.className = 'ftm-btn'; bCancelar.textContent = 'Cancelar';
     const msg = document.createElement('p'); msg.className = 'fe-msg'; msg.setAttribute('aria-live', 'polite');
     form.append(lblA, lblF, lblM, bGuardar, bCancelar, msg);
-    f.append(nom, vista, est, acc, form);
+    // Aviso de la fila fuera del formulario: `pintar` no lo toca, así un error de
+    // «Retirar» o de «Guardar» no se borra al instante (revisión de §99).
+    const aviso = document.createElement('p'); aviso.className = 'fe-msg fe-aviso'; aviso.setAttribute('aria-live', 'polite');
+    f.append(nom, vista, est, acc, form, aviso);
 
     bSubir.addEventListener('click', () => { form.hidden = false; msg.textContent = ''; inA.focus(); });
     bCancelar.addEventListener('click', () => { form.hidden = true; form.reset(); bSubir.focus(); });
@@ -107,20 +135,22 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
       const aut = { fecha: inF.value, medio: inM.value };
       const v = validarAutorizacion(aut);
       if (!v.ok) { msg.textContent = v.motivo; return; }
-      bGuardar.disabled = true; msg.textContent = 'Guardando…';
+      bGuardar.disabled = true; bCancelar.disabled = true; msg.textContent = 'Guardando…';
+      aviso.textContent = '';
       try {
         const { png, ancho } = await normalizarImagen(archivo);
         const r = await datos.subirFirma(p.id, png, aut);
+        await pintar(p);                       // SIEMPRE: la fila dice el estado real
         if (!r.ok) { msg.textContent = r.motivo; return; }
         form.hidden = true; form.reset();
         msg.textContent = '';
-        await pintar(p);
-        if (ancho < ANCHO_MIN_NITIDO) est.textContent += ' · Imagen pequeña: se verá pixelada al imprimir.';
+        aviso.textContent = ancho < ANCHO_MIN_NITIDO ? 'Guardada. Imagen pequeña: se verá pixelada al imprimir.' : 'Guardada.';
+        bSubir.focus();
         alCambiar();
       } catch (e) {
         msg.textContent = (e && e.message) || 'No se pudo guardar la firma.';
       } finally {
-        bGuardar.disabled = false;
+        bGuardar.disabled = false; bCancelar.disabled = false;
       }
     });
     bQuitar.addEventListener('click', async () => {
@@ -128,22 +158,27 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
       bQuitar.disabled = true;
       const r = await datos.quitarFirma(p.id);
       bQuitar.disabled = false;
-      if (r.motivo) est.textContent = r.motivo;
       await pintar(p);
+      aviso.textContent = r.motivo || (r.ok ? 'Retirada.' : 'No se pudo retirar la firma.');
+      bSubir.focus();
       alCambiar();
     });
-    filas.set(p.id, { f, vista, est, bSubir, bQuitar });
+    filas.set(p.id, { f, vista, est, bSubir, bQuitar, turno: 0 });
     return f;
   }
 
   async function pintar(p) {
     const x = filas.get(p.id);
     if (!x) return;
+    // Turno: si empieza un pintado más nuevo, este se descarta (dos refrescos
+    // superpuestos dejaban la imagen duplicada, revisión de §99).
+    const turno = ++x.turno;
     const e = await datos.estadoFirma(p.id);
+    const leida = e.hay ? await datos.leerFirma(p.id) : null;
+    if (turno !== x.turno) return;
     x.vista.textContent = '';
     if (e.hay) {
-      const leida = await datos.leerFirma(p.id);
-      if (leida) {
+      if (leida && !leida.error) {
         const img = document.createElement('img');
         img.alt = 'Firma de ' + p.nombre; img.src = leida.dataUrl; img.className = 'fe-img';
         x.vista.appendChild(img);

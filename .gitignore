@@ -99,3 +99,5 @@ Orden_*.pdf
 Orden_*.xlsx
 Respaldo_Ordenes_SSEE_*.json
 Ordenes_SSEE_datos.json
+# Excel emitidos desde Fichas (pueden llevar firmas estampadas, 99 §99)
+Ficha_Planificacion_*.xlsx

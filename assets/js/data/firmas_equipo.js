@@ -17,7 +17,7 @@ import {
   ref as storageRef, getBytes, uploadBytes, deleteObject, getMetadata
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
 import {
-  collection, doc, setDoc, serverTimestamp
+  collection, doc, setDoc, getDoc, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getStorageSafe, getDbSafe, getAuthSafe } from '../firebase-init.js';
@@ -80,10 +80,14 @@ export async function estadoFirma(id) {
   }
 }
 
-/** La firma de una persona, recién leída: {dataUrl, huella, autorizacion} o null. */
+/**
+ * La firma de una persona, recién leída: {dataUrl, huella, autorizacion}; null si
+ * NO HAY; {error: true} si no se pudo leer (red, permisos). No es lo mismo «no
+ * hay firma» que «no se pudo leer» (revisión de `§99`).
+ */
 export async function leerFirma(id) {
   const r = refDe(id);
-  if (!r) return null;
+  if (!r) return { error: true };
   try {
     const [m, buf] = await Promise.all([getMetadata(r), getBytes(r, TOPE)]);
     const cm = m.customMetadata || {};
@@ -93,23 +97,36 @@ export async function leerFirma(id) {
       autorizacion: { fecha: cm.autorizacionFecha || '', medio: cm.autorizacionMedio || '' }
     };
   } catch (e) {
-    if (!(e && e.code === 'storage/object-not-found')) console.warn('[firmas-equipo] lectura:', e && e.code || e);
-    return null;
+    if (e && e.code === 'storage/object-not-found') return null;
+    console.warn('[firmas-equipo] lectura:', e && e.code || e);
+    return { error: true };
   }
+}
+
+/**
+ * Nombre del custodio tal como está AHORA en su perfil: la regla lo compara con
+ * /usuarios/{uid}.nombre, y el de la sesión puede haber quedado viejo.
+ */
+async function nombreVigente(c) {
+  try {
+    const snap = await getDoc(doc(getDbSafe(), 'usuarios', c.uid));
+    return (snap.exists() && snap.data().nombre) || c.nombre || '';
+  } catch (_) { return c.nombre || ''; }
 }
 
 async function registrar(datos) {
   const c = custodio();
   const d = getDbSafe();
   await setDoc(doc(collection(d, 'firmas_equipo_registro')), {
-    ...datos, custodio: c.uid, custodioNombre: c.nombre, en: serverTimestamp()
+    ...datos, custodio: c.uid, custodioNombre: await nombreVigente(c), en: serverTimestamp()
   });
 }
 
 /**
  * Sube (o reemplaza) la firma de una persona con la autorización declarada.
- * Primero la imagen y después el registro; si el registro falla, la imagen se
- * retira: no queda una firma sin su rastro.
+ * Primero la imagen y después el registro. Si el registro falla, un alta se
+ * retira y un reemplazo RESTAURA la anterior: no queda una firma sin su rastro
+ * ni se pierde la que ya estaba registrada.
  * @param {string} id
  * @param {Uint8Array} png   PNG ya normalizado por la pantalla
  * @param {{fecha: string, medio: string}} autorizacion
@@ -121,20 +138,33 @@ export async function subirFirma(id, png, autorizacion) {
   if (!v.ok) return v;
   if (!(png instanceof Uint8Array) || png.length > TOPE) return { ok: false, motivo: 'La imagen pesa más de 512 KB.' };
   const previa = await estadoFirma(id);
+  if (previa.error) return { ok: false, motivo: 'No se pudo consultar la firma actual (revise la conexión).' };
+  // En un REEMPLAZO se guarda antes la firma anterior: si el registro falla, se
+  // restaura en vez de perder las dos (revisión de `§99`).
+  let anterior = null;
+  if (previa.hay) {
+    try { anterior = { bytes: new Uint8Array(await getBytes(r, TOPE)), meta: await getMetadata(r) }; }
+    catch (_) { return { ok: false, motivo: 'No se pudo leer la firma actual para reemplazarla con seguridad.' }; }
+  }
   const huella = await huellaDe(png);
   const aut = { fecha: String(autorizacion.fecha).trim(), medio: String(autorizacion.medio).trim() };
+  const meta = (m) => ({ contentType: 'image/png', cacheControl: 'private, no-store', customMetadata: m });
   try {
-    await uploadBytes(r, png, {
-      contentType: 'image/png',
-      cacheControl: 'private, no-store',
-      customMetadata: { autorizacionFecha: aut.fecha, autorizacionMedio: aut.medio, huella }
-    });
+    await uploadBytes(r, png, meta({ autorizacionFecha: aut.fecha, autorizacionMedio: aut.medio, huella }));
   } catch (e) {
     return { ok: false, motivo: 'No se pudo guardar la firma (' + ((e && e.code) || 'error') + ').' };
   }
   try {
     await registrar({ tipo: previa.hay ? 'reemplazo' : 'alta', persona: id, autorizacion: aut, huella });
   } catch (e) {
+    if (anterior) {
+      try {
+        await uploadBytes(r, anterior.bytes, meta(anterior.meta.customMetadata || {}));
+        return { ok: false, motivo: 'No se pudo dejar el registro; se conservó la firma ANTERIOR.' };
+      } catch (_) {
+        return { ok: false, motivo: 'No se pudo dejar el registro ni restaurar la firma anterior: vuelva a subirla.' };
+      }
+    }
     try { await deleteObject(r); } catch (_) { /* queda para retirarla a mano */ }
     return { ok: false, motivo: 'No se pudo dejar el registro; la firma no quedó guardada.' };
   }
@@ -177,7 +207,7 @@ export async function registrarEmision(id, { equipo, casillas, huellaArchivo }) 
     casillas,
     huellaArchivo,
     custodio: c.uid,
-    custodioNombre: c.nombre,
+    custodioNombre: await nombreVigente(c),
     en: serverTimestamp()
   });
 }

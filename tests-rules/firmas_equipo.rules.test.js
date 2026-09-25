@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { test, before, after, describe } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, updateDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, collection, query, where, limit } from 'firebase/firestore';
 import { ref, uploadBytes, getBytes, deleteObject, listAll } from 'firebase/storage';
 
 const PROJECT_ID = 'demo-sgm-rules';
@@ -110,6 +110,13 @@ describe('Firestore · registros de las firmas del equipo — solo se agrega', (
     await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x4'), alta('fe_admin', { tipo: 'borrado' })));
     await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x5'), alta('fe_admin', { custodioNombre: 'Otro Nombre' })));
     await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x6'), alta('fe_admin', { autorizacion: { fecha: '2026-09-20', medio: 'ok' } })));
+  });
+  test('otro admin NO ve el registro de un custodio: ni por documento ni listando', async () => {
+    await assertFails(getDoc(doc(db('fe_admin2'), 'firmas_equipo_registro/fe_r1')));
+    await assertFails(getDocs(query(collection(db('fe_admin2'), 'firmas_equipo_registro'), limit(50))));
+    // El custodio sí lista lo suyo, filtrando por su uid.
+    await assertSucceeds(getDocs(query(collection(db('fe_admin'), 'firmas_equipo_registro'),
+      where('custodio', '==', 'fe_admin'), limit(50))));
   });
   test('un técnico no registra', async () => {
     await assertFails(setDoc(doc(db('fe_tech'), 'firmas_equipo_registro/fe_t1'), alta('fe_tech')));

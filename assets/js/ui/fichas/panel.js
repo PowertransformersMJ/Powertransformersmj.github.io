@@ -3113,6 +3113,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       : '[data-firma-sel="' + k + '"]');
     if (destino) destino.focus();
     pintarFirmasEstampadas();
+    // La tabla de confirmación ya no dice la verdad: se cierra (revisión §99).
+    cerrarEmision(false);
   }
 
   /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
@@ -3452,23 +3454,42 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     });
   }
 
+  /**
+   * Lee las firmas del equipo que pide la ficha. Devuelve {lecturas, fallidas}:
+   * un error de red o permisos NO se confunde con «no hay firma» (revisión §99).
+   */
+  async function leerFirmasEquipo(P) {
+    const ids = personasALeer(P, firmaSesion.nombre);
+    const lecturas = new Map();
+    const fallidas = [];
+    await Promise.all(ids.map(async (id) => {
+      const r = await cfg.firmasEquipo.leer(id);
+      if (r && r.error) fallidas.push(id);
+      else if (r && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) lecturas.set(id, r);
+    }));
+    return { lecturas, fallidas };
+  }
+
   /** Lee las firmas del equipo que pide la ficha y muestra la tabla de confirmación. */
   async function prepararEmisionEquipo() {
     if (!actual || !custodiaDisponible()) return;
+    // La ficha se fija AL ENTRAR: si se cambia de equipo o se cierra mientras se
+    // leen las firmas, la tabla no se pinta sobre otra ficha (revisión §99).
+    const eq = actual;
     const btn = $('[data-ftm="exportar-equipo"]');
     const antes = btn ? btn.textContent : '';
     if (btn) { btn.disabled = true; btn.textContent = 'Leyendo firmas…'; }
     try {
       await cargarFirmaSesion();
-      const P = estadoDe(actual).plan;
-      const ids = personasALeer(P, firmaSesion.nombre);
-      const lecturas = new Map();
-      await Promise.all(ids.map(async (id) => {
-        const r = await cfg.firmasEquipo.leer(id);
-        if (r && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) lecturas.set(id, r);
-      }));
-      const plan = planDeEstampado(P, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
-      emision = { plan, lecturas, equipo: actual };
+      const { lecturas, fallidas } = await leerFirmasEquipo(estadoDe(eq).plan);
+      if (actual !== eq) return;
+      if (fallidas.length) {
+        alert('No se pudieron leer ' + fallidas.length + ' firma(s) del equipo (revise la conexión). '
+          + 'No se emite con firmas incompletas: intente de nuevo.');
+        return;
+      }
+      const plan = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
+      emision = { plan, lecturas, equipo: eq };
       pintarEmision();
     } catch (err) {
       console.warn('[fichas/panel] no se pudieron leer las firmas del equipo:', err);
@@ -3479,7 +3500,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   /** La tabla de confirmación, arriba de la hoja abierta (todo texto con textContent). */
-  function pintarEmision() {
+  function pintarEmision(avisoCambio) {
     const previa = modalCuerpo.querySelector('[data-ftm-emision]');
     if (previa) previa.remove();
     if (!emision) return;
@@ -3488,6 +3509,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     sec.setAttribute('data-ftm-emision', '');
     sec.setAttribute('aria-label', 'Confirmar las firmas de esta descarga');
     const h = document.createElement('h3'); h.textContent = 'Firmas que llevará esta descarga';
+    sec.appendChild(h);
+    if (avisoCambio) {
+      const a = document.createElement('p'); a.className = 'ftm-emision-cambio'; a.setAttribute('role', 'status');
+      a.textContent = avisoCambio;
+      sec.appendChild(a);
+    }
     const tabla = document.createElement('table'); tabla.className = 'ftm-emision-tabla';
     const cab = tabla.createTHead().insertRow();
     ['Casilla', 'Firmante', 'Firma', 'Origen'].forEach((t) => { const th = document.createElement('th'); th.textContent = t; cab.appendChild(th); });
@@ -3520,7 +3547,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const nota = document.createElement('p'); nota.className = 'ftm-emision-nota';
     nota.textContent = 'Cada firma del equipo lleva una marca tenue con el folio de esta emisión, y la emisión '
       + 'queda en el registro interno del SGM (quién, cuándo, qué firmas y la huella del archivo). '
-      + 'Sin registro no se descarga.';
+      + 'Sin registro no se descarga. Si cambia un firmante, esta tabla se cierra y hay que volver a confirmar.';
     const acc = document.createElement('div'); acc.className = 'ftm-emision-acc';
     const bOk = document.createElement('button'); bOk.type = 'button'; bOk.className = 'ftm-btn ftm-btn--primary';
     bOk.setAttribute('data-ftm', 'emision-confirmar'); bOk.textContent = 'Descargar con estas firmas';
@@ -3528,64 +3555,113 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const bNo = document.createElement('button'); bNo.type = 'button'; bNo.className = 'ftm-btn';
     bNo.setAttribute('data-ftm', 'emision-cancelar'); bNo.textContent = 'Cancelar';
     acc.append(bOk, bNo);
-    sec.append(h, tabla, nota, acc);
+    sec.append(tabla, nota, acc);
     modalCuerpo.prepend(sec);
     modalCuerpo.scrollTop = 0;
     bOk.focus();
   }
 
-  function cerrarEmision() {
+  /** Cierra la tabla de confirmación; el foco vuelve al botón que la abrió. */
+  function cerrarEmision(devolverFoco = true) {
+    const habia = !!emision;
     emision = null;
     const s = modalCuerpo && modalCuerpo.querySelector('[data-ftm-emision]');
     if (s) s.remove();
+    const b = habia && devolverFoco ? $('[data-ftm="exportar-equipo"]') : null;
+    if (b && !b.hidden) b.focus();
   }
 
-  /** Marca, arma el Excel, lo REGISTRA y solo entonces lo descarga. */
+  /** ¿El plan de la tabla sigue siendo el de la ficha? (nombre, persona y origen por casilla) */
+  function mismoPlan(a, b) {
+    return a.length === b.length && a.every((x, i) => x.k === b[i].k && x.nombre === b[i].nombre
+      && x.id === b[i].id && x.origen === b[i].origen);
+  }
+
+  /** Mensaje de la emisión DENTRO de la ficha (se ve y se anuncia con el modal abierto). */
+  function avisoEmision(texto) {
+    const previo = modalCuerpo.querySelector('[data-ftm-emision-ok]');
+    if (previo) previo.remove();
+    const p = document.createElement('p');
+    p.className = 'ftm-emision-ok'; p.setAttribute('data-ftm-emision-ok', ''); p.setAttribute('role', 'status');
+    p.textContent = texto;
+    modalCuerpo.prepend(p);
+  }
+
+  /** Vuelve a comprobar, marca, arma el Excel, lo REGISTRA y solo entonces lo descarga. */
   async function confirmarEmisionEquipo() {
     const e = emision;
-    if (!e || e.equipo !== actual || !custodiaDisponible()) { cerrarEmision(); return; }
+    if (!e || e.equipo !== actual || !custodiaDisponible()) { cerrarEmision(false); return; }
+    const eq = e.equipo;
+    const sec = modalCuerpo.querySelector('[data-ftm-emision]');
+    const botones = sec ? [...sec.querySelectorAll('button')] : [];
     const bOk = modalCuerpo.querySelector('[data-ftm="emision-confirmar"]');
-    if (bOk) { bOk.disabled = true; bOk.textContent = 'Generando…'; }
+    // Mientras se genera no se cancela a medias: se deshabilita todo (revisión §99).
+    botones.forEach((b) => { b.disabled = true; });
+    if (bOk) bOk.textContent = 'Generando…';
+    let emitido = false;
     try {
+      // 1) La ficha y las firmas, RELEÍDAS ahora: si cambió un firmante o una
+      //    firma se retiró o reemplazó desde que se mostró la tabla, no se emite.
+      await cargarFirmaSesion();
+      const releido = await leerFirmasEquipo(estadoDe(eq).plan);
+      if (emision !== e || actual !== eq) return;
+      const vivo = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...releido.lecturas.keys()] });
+      const firmasIguales = [...e.lecturas.keys()].every((id) => !releido.lecturas.has(id)
+        || (releido.lecturas.get(id).huella === e.lecturas.get(id).huella));
+      if (releido.fallidas.length || !mismoPlan(vivo, e.plan) || !firmasIguales) {
+        emision = { plan: vivo, lecturas: releido.lecturas, equipo: eq };
+        pintarEmision(releido.fallidas.length
+          ? 'No se pudieron releer algunas firmas: revise la conexión antes de confirmar.'
+          : 'La ficha o las firmas cambiaron desde que abrió esta tabla. Revise y vuelva a confirmar.');
+        if (releido.fallidas.length) { const b = modalCuerpo.querySelector('[data-ftm="emision-confirmar"]'); if (b) b.disabled = true; }
+        return;
+      }
       const mod = cfg.exportador
         ? { exportarFichaPlanificacion: cfg.exportador, nombreArchivoFicha: null }
         : await import('./exportar-planificacion.js');
-      const estado = estadoParaExportar(actual);
-      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(actual, estado) : [];
+      const estado = estadoParaExportar(eq);
+      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
       if (faltan.length && !globalThis.confirm(avisoPendientes(faltan))) return;
       const idEmision = cfg.firmasEquipo.nuevaEmisionId();
       const folio = folioDeEmision(idEmision);
       const firmas = {};
       const casillas = [];
-      for (const c of e.plan) {
+      for (const c of vivo) {
         if (c.origen === 'propia' && firmaSesion.dataUrl) {
           firmas[c.k] = { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel };
-          casillas.push({ k: c.k, persona: c.id || '', origen: 'propia', huella: await huellaDataUrl(firmaSesion.dataUrl) });
+          casillas.push({ k: c.k, persona: c.id || '', nombre: c.nombre, origen: 'propia', huella: await huellaDataUrl(firmaSesion.dataUrl) });
         } else if (c.origen === 'equipo') {
-          const l = e.lecturas.get(c.id);
+          const l = releido.lecturas.get(c.id);
           const marcada = l ? await marcarFirma(l.dataUrl, textoMarca(folio)) : null;
           if (!marcada) throw new Error('No se pudo marcar la firma de ' + c.nombre + '; no se emitió.');
           firmas[c.k] = { dataUrl: marcada, rel: await medirFirma(marcada) };
-          casillas.push({ k: c.k, persona: c.id, origen: 'equipo', huella: l.huella || '' });
+          casillas.push({ k: c.k, persona: c.id, nombre: c.nombre, origen: 'equipo', huella: l.huella || '' });
         }
       }
       if (!casillas.length) { cerrarEmision(); return; }
       estado.firmas = firmas;
-      const blob = await mod.exportarFichaPlanificacion(actual, estado);
+      const blob = await mod.exportarFichaPlanificacion(eq, estado);
       const huellaArchivo = await huellaBytes(new Uint8Array(await blob.arrayBuffer()));
+      const base = mod.nombreArchivoFicha ? mod.nombreArchivoFicha(eq) : 'Ficha_Planificacion.xlsx';
+      const nombre = base.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx';
       // Sin registro no hay descarga: la trazabilidad interna es la condición.
       await cfg.firmasEquipo.registrarEmision(idEmision, {
-        equipo: { matricula: actual.matricula || '', subestacion: actual.subestacion || '', serie: actual.serie || '' },
+        equipo: { matricula: eq.matricula || '', subestacion: eq.subestacion || '', serie: eq.serie || '' },
         casillas, huellaArchivo
       });
-      const base = mod.nombreArchivoFicha ? mod.nombreArchivoFicha(actual) : 'Ficha_Planificacion.xlsx';
-      cfg.descargar(blob, base.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx');
-      cerrarEmision();
-      fijarAviso('<div class="ftm-nota">Emisión ' + esc(folio) + ' registrada: el Excel salió con las firmas confirmadas.</div>');
+      cfg.descargar(blob, nombre);
+      emitido = true;
+      const texto = 'Emisión ' + folio + ' registrada: el Excel salió con las firmas confirmadas.';
+      if (actual === eq) { cerrarEmision(); avisoEmision(texto); }
+      fijarAviso('<div class="ftm-nota">' + esc(texto) + '</div>');
     } catch (err) {
       console.warn('[fichas/panel] la emisión con firmas del equipo falló:', err);
       alert('No se emitió el Excel con firmas del equipo.\n\n' + (err && err.message ? err.message : err));
-      if (bOk && bOk.isConnected) { bOk.disabled = false; bOk.textContent = 'Descargar con estas firmas'; }
+    } finally {
+      if (!emitido && bOk && bOk.isConnected) {
+        botones.forEach((b) => { if (b.isConnected) b.disabled = false; });
+        bOk.textContent = 'Descargar con estas firmas';
+      }
     }
   }
 
@@ -3827,6 +3903,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // Escribir el nombre de un firmante es «Otra persona» EXPLÍCITO: si luego
       // se borra, la casilla no debe volver sola a la persona por defecto con el
       // cargo que quedó escrito (revisión §89).
+      if (/^(nom|occ)_/.test(plan) && t.closest('[data-firmante]')) cerrarEmision(false);
       if (/^nom_/.test(plan) && t.closest('[data-firmante]')) {
         st.plan['sel_' + plan.slice(4)] = OTRA_PERSONA;
         // El segundo aprobador depende del primero (no se repite): si cambia el

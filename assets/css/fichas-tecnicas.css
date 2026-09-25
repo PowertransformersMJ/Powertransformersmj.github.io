@@ -2141,6 +2141,11 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 .fe-acciones { display: flex; gap: 6px; }
 .fe-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12px; }
 .fe-msg { flex-basis: 100%; margin: 0; font-size: 12px; color: #b3261e; }
+.fe-aviso { grid-column: 1 / -1; color: var(--ftm-ink-2, #33424d); }
+.fe-aviso:empty { display: none; }
+.ftm-emision-cambio { margin: 0 0 8px; padding: 6px 8px; border-radius: 8px; background: #fff4e5; color: #7a4a00; font-size: 12px; }
+.ftm-emision-ok { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: #e8f5ec; color: #1d5b33; font-size: 12.5px; }
+@media print { .ftm-emision-ok { display: none !important; } }
 @media (max-width: 720px) { .fe-fila { grid-template-columns: 1fr; } }
 
 /* Tabla de confirmación de la emisión con firmas del equipo (`99 §99`). */
