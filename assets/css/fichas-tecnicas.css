@@ -1390,7 +1390,9 @@
 /* Firma estampada de la sesión (`99 §98`): apoyada en la línea, tras «Firma:».
    No tapa los controles: no recibe clics. */
 .ftm-fmt-firma { position: absolute; left: 34px; bottom: -3px; pointer-events: none; line-height: 0; }
-.ftm-fmt-firma img { display: block; height: 30px; width: auto; max-width: 150px; }
+/* El tamaño lo pone el código (misma superficie para todas, `99 §101`); esto es
+   solo el tope de seguridad si el cálculo no corre. */
+.ftm-fmt-firma img { display: block; height: 30px; width: auto; max-width: 150px; object-fit: contain; }
 .ftm-fmt-firma-nota { margin: 6px 2px 0; font-size: 10.5px; color: var(--ftm-muted); }
 .ftm-fmt-linea { flex: 1; border-bottom: 1px solid #6f7f86; margin-bottom: 2px; min-width: 20px; }
 .ftm-fmt-in,
@@ -2157,3 +2159,53 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 .ftm-emision-nota { font-size: 11.5px; color: var(--ftm-muted, #61748a); margin: 8px 0; }
 .ftm-emision-acc { display: flex; gap: 8px; flex-wrap: wrap; }
 @media print { .ftm-emision { display: none !important; } }
+
+/* ── Vista previa del Excel (`99 §102`): el MISMO archivo que se descargaría ── */
+.vpx-fondo {
+  position: fixed; inset: 0; z-index: 120;
+  background: rgba(8, 20, 40, .55);
+  display: flex; align-items: flex-start; justify-content: center;
+  padding: 16px 12px; overflow: auto;
+}
+.vpx-ventana {
+  width: min(1180px, 100%); background: var(--ftm-surface-solid, #fff);
+  border-radius: 14px; box-shadow: 0 24px 60px rgba(0, 30, 70, .35);
+  display: flex; flex-direction: column; overflow: hidden;
+}
+.vpx-cab {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 16px; background: #1f5fd6; color: #fff;
+}
+.vpx-titulo { display: flex; flex-direction: column; gap: 2px; font-size: 13px; min-width: 0; }
+.vpx-titulo strong { font-size: 15px; }
+.vpx-avisos:empty { display: none; }
+.vpx-avisos { padding: 8px 16px 0; font-size: 12.5px; color: var(--ftm-ink-2, #243142); }
+.vpx-avisos p { margin: 4px 0; }
+.vpx-pestanas { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-bottom: 1px solid #e3e8ef; }
+.vpx-pestana {
+  border: 1px solid #cdd6e3; background: #f5f8fc; color: #1f3b63; border-radius: 999px;
+  padding: 5px 12px; font-size: 12.5px; cursor: pointer;
+}
+.vpx-pestana--activa { background: #1f5fd6; color: #fff; border-color: #1f5fd6; }
+.vpx-cuerpo { padding: 12px 16px 16px; }
+.vpx-marco { position: relative; overflow: hidden; background: #eef2f7; border-radius: 8px; padding: 4px; }
+.vpx-hoja {
+  position: relative; background: #fff; transform-origin: 0 0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, .18); font-family: Arial, Helvetica, sans-serif; color: #000;
+}
+.vpx-celda { position: absolute; display: flex; box-sizing: border-box; padding: 0 2px; overflow: hidden; line-height: 1.15; }
+.vpx-celda > span { max-width: 100%; }
+.vpx-externa { background: #fff1c2 !important; color: #8a5a00 !important; font-weight: 700; }
+.vpx-texto { position: absolute; display: flex; flex-direction: column; box-sizing: border-box; padding: 3px 6px; overflow: hidden; line-height: 1.2; }
+.vpx-texto--borde { border: 1px solid #555; }
+.vpx-texto--redondo { border-radius: 10px; }
+.vpx-parrafo { white-space: pre-wrap; }
+.vpx-img { position: absolute; object-fit: fill; }
+.vpx-img--nota { display: flex; align-items: center; justify-content: center; border: 1px dashed #9aa6b5; color: #6b7785; font-size: 10px; background: #fafbfc; }
+.vpx-linea { position: absolute; overflow: visible; }
+.vpx-pie { margin: 8px 2px 0; font-size: 11.5px; color: var(--ftm-muted, #5d6b7c); }
+.vpx-ocultos-intro { margin: 0 0 10px; font-size: 13px; }
+.vpx-oculto { border: 1px solid #e3e8ef; border-left: 4px solid #e0a100; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px; font-size: 13px; }
+.vpx-oculto-detalle { margin-top: 3px; word-break: break-word; font-family: ui-monospace, Menlo, monospace; font-size: 12px; }
+.vpx-oculto-nota { margin-top: 3px; color: var(--ftm-muted, #5d6b7c); font-size: 12px; }
+@media print { .vpx-fondo { display: none !important; } }

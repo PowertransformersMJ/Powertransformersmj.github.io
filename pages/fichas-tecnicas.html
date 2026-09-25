@@ -160,7 +160,9 @@
       const { montarFirmasEquipo } = await import('../assets/js/ui/fichas/firmas-equipo.js');
       const caja = document.getElementById('firmasEquipoCaja');
       const panelEquipo = montarFirmasEquipo(document.getElementById('panelFirmasEquipo'), {
-        datos, nombreSesion: s.profile.nombre || ''
+        datos, nombreSesion: s.profile.nombre || '',
+        // La ficha abierta repinta las firmas del equipo al cambiar alguna (99 §102).
+        alCambiar() { window.dispatchEvent(new CustomEvent('sgm:firmas-equipo-cambiadas')); }
       });
       caja.hidden = false;
       // Se consulta al ABRIRLO: no se leen firmas que nadie pidió ver.

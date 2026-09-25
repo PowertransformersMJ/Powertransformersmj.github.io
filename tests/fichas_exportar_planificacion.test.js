@@ -497,12 +497,18 @@ describe('Firma estampada en el PE.02081 (`99 §98`)', () => {
     const geo = geometriaHoja(hoja);
     const cajas = cajasDeFirma(dib, geo);
     assert.deepEqual(Object.keys(cajas).sort(), ['apr', 'apr2', 'elab', 'rec', 'rev']);
+    // Con firmas anchas, típicas y altas (`99 §101`): siempre dentro, con margen.
     for (const [k, c] of Object.entries(cajas)) {
-      const u = ubicacionFirma(c, 2.5);
-      assert.ok(u.x > c.x0 && u.x + u.cx <= c.x1, k + ': dentro a lo ancho');
-      assert.ok(u.y >= c.y0 && u.y + u.cy <= Math.max(c.y1, c.fondo || 0), k + ': dentro a lo alto');
-      assert.ok(u.cx > 0 && u.cy > 0);
+      for (const rel of [1.5, 1.74, 2.5, 3.44, 4.5, 12]) {
+        const u = ubicacionFirma(c, rel);
+        assert.ok(u.x > c.x0 && u.x + u.cx <= c.x1 - 4 * 12700 + 1, k + ' ' + rel + ': dentro a lo ancho');
+        assert.ok(u.y >= c.y0 && u.y + u.cy <= Math.max(c.y1, c.fondo || 0), k + ' ' + rel + ': dentro a lo alto');
+        assert.ok(u.cx > 0 && u.cy > 0 && u.cy <= 22 * 12700 + 1, k + ' ' + rel + ': no pasa del renglón');
+      }
     }
+    // Mismo peso visual: una ancha y una típica ocupan la misma superficie.
+    const s1 = ubicacionFirma(cajas.rev, 2.5); const s2 = ubicacionFirma(cajas.rev, 4.5);
+    assert.ok(Math.abs(s1.cx * s1.cy - s2.cx * s2.cy) / (s1.cx * s1.cy) < 0.01);
     // La primera de Aprobación no se monta sobre la segunda.
     const a = ubicacionFirma(cajas.apr, 2.5);
     assert.ok(a.x + a.cx <= cajas.apr2.x0);
