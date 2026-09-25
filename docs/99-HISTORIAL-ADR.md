@@ -4010,3 +4010,19 @@ de edición también sale impreso encima de la hoja: es anterior (CF-39), no de 
 **95.9 / 94.9 / 93.9 Publicación (09-25).** Orden del Ingeniero: *«procede»*. Merge `098dbff`; CI y Deploy verdes;
 `exportar-planificacion.js`, `panel.js`, `fichas_fechas.js`, `beneficios_practicas.js` y `fichas-tecnicas.css`
 servidos idénticos al repo con anti-caché (L-65).
+
+## 96. ADR — En Mantenimiento nada viene marcado: Beneficios vacío hasta que el Ingeniero escoja ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Pedido (captura del texto ya compuesto al abrir, equipo de ASTREA): *«aquí no debe reposar nada hasta que yo
+> seleccione las acciones de mantenimiento»*. En rama (`3a4758f`), preview entregado.
+
+**96.1 Causa.** `seleccionAcciones` pre-marcaba por defecto (`seleccionPorDefecto`: lo registrado, o la línea base
+de diagnóstico de su banda), y con `§95` el texto se compone de las marcas: al abrir ya salía escrito.
+**96.2 Solución.** En el documento de Mantenimiento (`esCampoMtto`) sin selección propia la selección es `[]`; el PI
+conserva su defecto. `redaccionBeneficiosPracticas` sin prácticas devuelve `''` (ni apertura, ni cierre, ni aviso).
+`htmlVista`: la vista previa dice «Sin texto todavía.» siempre que esté vacía. Pie del selector al día.
+**96.3 No-regresión.** Alcance de Mantenimiento sin marcas: su redacción honesta (`§75`), sin `[PENDIENTE]`. PI con su
+defecto. Borradores con selección propia se restauran con ella; los que solo traían texto automático no se ofrecen.
+**96.4 Verificación.** 1847 pass / 0 fail; lint limpio; banco: 0 marcadas y texto vacío al abrir, marcar → aparece,
+desmarcar la última → vacío con «Sin texto todavía.», Alcance intacto.
+**96.8 Verificado sano.** «Marcar las suyas» sigue marcando la banda entera del equipo: es explícito del Ingeniero.
