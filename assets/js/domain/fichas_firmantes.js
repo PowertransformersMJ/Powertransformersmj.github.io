@@ -126,9 +126,11 @@ export function firmanteDe(k, plan = {}) {
  * Es una lista CERRADA y explícita, no una comparación aproximada: aflojar la
  * regla para todos (quitar iniciales, etc.) sería equivocarse hacia el lado
  * permisivo, que en una firma no se permite (`§71.4`).
+ * «ING. MIGUEL JIMENEZ» es el nombre REAL de su perfil en producción (leído en
+ * vivo el 2026-09-25, `§99.12`): sin él, su casilla no se reconocía como suya.
  */
 const MISMA_PERSONA = Object.freeze([
-  Object.freeze(['MIGUEL A. JIMENEZ', 'MIGUEL JIMENEZ'])
+  Object.freeze(['MIGUEL A. JIMENEZ', 'MIGUEL JIMENEZ', 'ING. MIGUEL JIMENEZ'])
 ]);
 
 /** Nombres con que puede figurar en su perfil la persona de la lista (ella misma incluida). */
