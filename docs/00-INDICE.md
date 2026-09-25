@@ -107,6 +107,7 @@
 | §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso ⟦OPUS-5.5⟧ | 3887 |
 | §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 ⟦OPUS-5.5⟧ | 3922 |
 | §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve ⟦OPUS-5.5⟧ | 3964 |
+| §96 | ADR-096 — **Mantenimiento sin marcas de fábrica**: Beneficios vacío hasta escoger ⟦OPUS-5.5⟧ | 4014 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
