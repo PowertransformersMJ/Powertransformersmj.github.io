@@ -3850,6 +3850,7 @@ imprime siempre «dd/mm/aaaa»; un texto viejo, tal cual). Al imprimir: sin icon
 queda «15/12/2026» y sobrevive a reabrir; el acta de novedades también lo abre; captura de pantalla e impresión.
 Commit `729e74e`, publicado en `845df6e` (CI y Deploy verdes, archivos idénticos en producción). «Año de
 entrada» es un año, no una fecha: **sigue escrito a mano por decisión del Ingeniero** (*«año está bien»*).
+**Enmienda 09-24 → `§94`**: el Ingeniero pidió también para el año un calendario, «solo años, desde 2020».
 
 ## 92. ADR — Beneficios propuestos con las prácticas de mantenimiento escogidas ⟦OPUS-5.5⟧ (2026-09-23)
 
@@ -3881,3 +3882,127 @@ el Alcance; marcar tres prácticas arma el texto agrupado; sobrevive a reabrir. 
 **92.4 Publicación.** Orden del Ingeniero: *«procede por favor cárgalo en producción»*. Merge `b91b36a`; CI y Deploy
 verdes; `beneficios_practicas.js` y `panel.js` servidos idénticos al repo con anti-caché (L-65). Aplica solo al
 documento de Mantenimiento (el PI no cambia). Residuo de `§90.3` se invierte: `acc_sel` vuelve a tener pantalla.
+**Enmienda 09-24 → `§95`**: sin lista de redacciones (con condición) y beneficios BREVES por práctica.
+
+## 93. ADR — Sin Valor Real, la casilla y su total van en blanco (no `[PENDIENTE]`) ⟦OPUS-5.5⟧ (2026-09-24)
+
+> Pregunta abierta de `§87` (CF-06): ¿Valor Real vacío ⇒ `[PENDIENTE]` o en blanco? Respuesta del Ingeniero:
+> *«no coloquemos nada, continuemos como lo habíamos hecho anteriormente»*. En rama (`7716388`), preview entregado.
+
+**93.1 Causa.** `§87` trató el Valor Real (J36) como dinero faltante, igual que el Valor CREG: vacío ⇒ `[PENDIENTE]`,
+aviso antes de descargar y J78 también `[PENDIENTE]`. Pero el Valor Real no se deduce ni se calcula: se llena
+cuando se conoce (a veces después de firmar la planificación). Marcarlo pendiente ensuciaba el papel y el aviso.
+
+**93.2 Solución.** `celdasFichaPlan`: J36 vacío ⇒ `clear` (en blanco, conserva el estilo 255 de pesos), `pend:false`,
+sin motivo. J78 vacío ⇒ fórmula `IF(COUNT(J34:J66)=0,"",SUM(J34:J66))`: en blanco mientras la columna esté vacía
+(la SUM desnuda firmaba **«0»**, estilo 58 = `#,##0`) y suma sola si luego se teclea la cifra en el Excel. Con cifra
+⇒ la SUM de la plantilla, intacta. **Lo ilegible** («2.100 millones») sigue `[PENDIENTE]` y avisa: eso es un error,
+no un dato que falta.
+
+**93.3 No-regresión.** Valor CREG (F36/I36/I78) sin cambio: sigue `[PENDIENTE]` si falta. La cuenta aviso = papel
+(`§87`) se mantiene en los 7 escenarios. Pantalla sin cambio (ya mostraba «—»). Fuera del mapa, la hoja sale
+idéntica a la plantilla.
+
+**93.4 Verificación.** 3 pruebas actualizadas + 1 nueva (ficha completa sin Valor Real ⇒ nada que avisar) →
+**1837 pass / 0 fail / 2 skip**; lint limpio. LibreOffice recalculando el archivo real: vacío → J36 y J78 en blanco;
+cifra → J78 = J36; ilegible → `[PENDIENTE]`; cifra escrita a mano después en J36 → J78 suma.
+
+**93.5 Anti-patterns evitados.** Ni `0` ni `[PENDIENTE]` inventados en papel firmado; no se tocó la fórmula de la
+plantilla cuando hay dato.
+
+**93.6 Archivos.** `assets/js/ui/fichas/exportar-planificacion.js`, `tests/fichas_exportar_planificacion.test.js`.
+INTACTOS: `panel.js` (su aviso solo sale si la lista trae algo), `fichas_presupuesto.js`.
+
+**93.7 Doctrina.** Lo que se dicta va literal (`vamos por partes`); dinero: no fabricar cifras (`§3.2`).
+
+**93.8 Verificado sano / no re-auditar.** Una celda con texto vacío en J36 NO rompe el total: `COUNT` solo cuenta
+números. CF-37 (vínculo de «Costos» en la hoja Beneficios): si se conecta a J78, protegerlo también para el
+blanco, no solo para `[PENDIENTE]`.
+
+## 94. ADR — El «Año de entrada» se escoge en un calendario de años desde 2020 ⟦OPUS-5.5⟧ (2026-09-24)
+
+> Pedido (con captura de la casilla): *«me gustaría que aquí también aparezca un calendario pero solo años,
+> desde 2020»*. Revierte lo decidido en `§91` («año está bien»: quedaba a mano). En rama (`134c06e` +
+> `84213af`), preview entregado, esperando su «procede».
+
+**94.1 Causa.** El navegador no trae un calendario «solo años» (`type=month` pide mes; un `<select>` es una lista,
+no un calendario). La casilla de fecha de `§91` usa el calendario nativo; para el año hay que construirlo.
+
+**94.2 Solución.** `domain/fichas_fechas.js`: `ANIO_MIN = 2020`, `leerAnio` (4 cifras ≥ 2020; lo demás NO se
+convierte) y `aniosDelCalendario(añoActual, guardado)` (2020 → año en curso + 10, o el guardado si es posterior,
+completando filas de 4; hoy 2020-2039). `panel.js`: `campoAnio` se ve como la casilla de fecha (año + iconito) con
+un botón transparente encima; `abrirAnios` pinta la rejilla con «Borrar» y «Este año», foco en el elegido (o el
+año en curso); flechas/Inicio/Fin; Esc cierra SOLO el calendario (escucha en `window` en captura, que llega antes
+que la trampa del modal en `document`); toque fuera o Tab fuera lo cierra; sus escuchas globales viven solo
+mientras está abierto (§3.5) y `cerrarFicha`/`pintarModal`/`destruir` lo cierran. Se guarda «aaaa» en la misma
+clave: el exportador no cambia. Un texto viejo que no es año del calendario se ve marcado y no se borra.
+
+**94.3 No-regresión.** Nadie más leía `input[data-plan="anioentrada"]` (búsqueda en todo el repo; enfoque
+«contratos» sin hallazgos). La casilla de fecha de `§91` y los firmantes, intactos. Exportador sin cambio.
+
+**94.4 Verificación.** +5 pruebas de dominio → **1842 pass / 0 fail / 2 skip**; lint limpio. Banco en vivo: ratón,
+teclado, Esc (solo el calendario; con él cerrado, Esc cierra la ficha), toque fuera, «Borrar», cerrar/reabrir,
+recargar + restaurar, texto viejo, Excel exportado con el año (`drawing1.xml` y PDF), celular 375×812, pantalla
+baja 812×375, doble clic real, y PDF impreso con valores viejos. Revisión adversarial de 7 agentes Opus: 3
+confirmados y corregidos en `84213af` (doble clic que elegía un año fantasma, pantalla baja, subrayado rojo
+impreso). Crudo → bóveda `2026-09-24-calendario-anios/`.
+
+**94.5 Anti-patterns evitados.** Ninguna escucha global permanente; nada de `transition`; no se borra en silencio
+lo escrito antes; no se reemplazó la casilla de fecha que ya funcionaba.
+
+**94.6 Archivos.** `assets/js/domain/fichas_fechas.js`, `tests/fichas_fechas.test.js`,
+`assets/js/ui/fichas/panel.js`, `assets/css/fichas-tecnicas.css`. INTACTOS: `exportar-planificacion.js`,
+`fichas_borrador.js`.
+
+**94.7 Doctrina.** Lo dictado va literal (desde 2020); UI sensible con preview fiel (L-56); caza-bugs: el gesto real.
+
+**94.8 Verificado sano / no re-auditar.** «Borrar» deja el año viejo en el borrador en disco: es la regla 1 de
+`§83.2`; borrar del disco la ficha vaciada abriría una pérdida real (REFUTADO). El calendario abierto con el foco
+en el cuerpo no cambia datos. El corrimiento lateral de 20 px en el celular era de la hoja, no del calendario.
+Callejón: `scrollIntoView` para mostrar un desplegable mueve el contenido bajo el puntero (L-101).
+
+## 95. ADR — Beneficios de Mantenimiento: salen de las prácticas marcadas, en breve y sin lista de redacciones ⟦OPUS-5.5⟧ (2026-09-24)
+
+> Pedido (con captura del desplegable en «C1 · Conservar y vigilar»): *«en la redacción veo un listado
+> incorporado en una lista desplegable, me gustaría que los beneficios vayan saliendo conforme a las acciones
+> de mantenimiento que yo escoja; recuerda que la redacción debe ser breve en un contexto técnico enfocado en
+> el riesgo operativo»*. Enmienda a `§92`. En rama (`2f427cc` + `ce02d45`), preview entregado.
+
+**95.1 Causa.** `§92` dejó la redacción por prácticas como PRIMERA opción de la lista, pero la lista seguía: una
+ficha con otra redacción ya escogida (C1…C5, la Automática) no seguía a las casillas. Y los beneficios de `§92`
+medían 62-107 palabras (≈500 con tres prácticas): no eran breves.
+
+**95.2 Solución.** Hoja Beneficios del documento de Mantenimiento, equipo CON condición: sin desplegable
+(`redaccionPorPracticas`); el texto se compone con las prácticas marcadas, un renglón «· práctica — beneficio»
+por cada una, y se rehace al marcar/desmarcar. Corregido a mano (`_ver='custom'`) deja de rehacerse y aparece
+«Volver a componer con las prácticas marcadas» (con confirmación). Al abrir o restaurar, todo índice se
+recompone (`sembrarBeneficiosPracticas`): texto reproducible, no trabajo del Ingeniero (`§85`). SIN condición
+no hay casillas: conserva su lista de redacciones, sin la opción de prácticas. `BENEF_MTTO_OPC` intacto (no se
+borra nada; ya no se ofrece con condición). El PI no cambia. `beneficios_practicas.js`: `beneficio` = BREVE
+(25-28 palabras), `beneficioAmplio` = el de `§92`; apertura 33 y cierre 30 palabras (los amplios se conservan
+como `*_AMPLIA/_AMPLIO`). Con tres prácticas el texto baja de ≈500 a 165 palabras.
+
+**95.3 No-regresión.** PI con su lista; Alcance de Mantenimiento intacto; equipo sin condición sin callejón;
+borradores de `§92` recompuestos en breve; lo escrito a mano respetado.
+
+**95.4 Verificación.** Pruebas nuevas (breve 12-30 palabras y más corto que el amplio, OILTAP/VACUTAP en breve,
+diagnóstico no «reduce», apertura/cierre breves) → **1845 pass / 0 fail / 2 skip**; lint limpio. Banco en vivo:
+sin lista, marcar/desmarcar, editar → botón, recomponer con confirmación y foco al texto, migración de C1 y del
+amplio de `§92`, «custom» intacto, equipo sin condición con lista, «Marcar las suyas» sumando, PI intacto, PDF
+impreso sin la lista de casillas. Redacción: 3 redactores → 3 revisores técnicos (19 de 32 corregidos) →
+editor, 7 Opus; crudo → bóveda `2026-09-24-beneficios-breves/`. Revisión de pantalla: 2 enfoques, 5 confirmados
+y corregidos en `ce02d45` (sus verificadores no corrieron por el límite de gasto: verificados a mano).
+
+**95.5 Anti-patterns evitados.** No se borraron las propuestas por condición; no se inventó beneficio (una
+acción sin catálogo sale `[PENDIENTE]`); el breve no agrega afirmaciones a su fuente.
+
+**95.6 Archivos.** `assets/js/ui/fichas/panel.js`, `assets/js/domain/beneficios_practicas.js`,
+`assets/css/fichas-tecnicas.css`, `tests/beneficios_practicas.test.js`. INTACTOS: `fichas_borrador.js`,
+`exportar-planificacion.js`, `BENEF_MTTO_OPC`.
+
+**95.7 Doctrina.** Lo dictado va literal (breve, técnico, riesgo operativo); OLTC con ambas tecnologías;
+retirar lo mínimo señalado (la lista, solo donde hay casillas).
+
+**95.8 Verificado sano / no re-auditar.** Recomponer una ficha que se queda sin otro trabajo no borra del disco
+su texto a mano anterior: regla 1 de `§83.2` (mismo compromiso que el «Borrar» de `§94`). El texto de la casilla
+de edición también sale impreso encima de la hoja: es anterior (CF-39), no de este cambio.

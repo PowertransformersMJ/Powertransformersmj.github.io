@@ -103,7 +103,10 @@
 | §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero en la ficha y en el Excel (CF-25); revisión de 12 agentes, 6 confirmados ⟦OPUS-5.5⟧ | 3743 |
 | §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento ⟦OPUS-5.5⟧ | 3797 |
 | §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas ⟦OPUS-5.5⟧ | 3832 |
-| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido ⟦OPUS-5.5⟧ | 3854 |
+| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido ⟦OPUS-5.5⟧ | 3855 |
+| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso ⟦OPUS-5.5⟧ | 3887 |
+| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 ⟦OPUS-5.5⟧ | 3922 |
+| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve ⟦OPUS-5.5⟧ | 3964 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

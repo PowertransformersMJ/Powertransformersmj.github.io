@@ -32,7 +32,9 @@ import { clasificarUC, buscarUC, familiaDeUC, hayAdvertencia } from '../../domai
 import { municipioDeSubestacion } from '../../domain/municipios_subestacion.js';
 import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../domain/fichas_presupuesto.js';
 import { FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto } from '../../domain/fichas_firmantes.js';
-import { fechaAISO, isoAFecha } from '../../domain/fichas_fechas.js';
+import {
+  fechaAISO, isoAFecha, leerAnio, aniosDelCalendario, ANIO_MIN, COLUMNAS_ANIOS
+} from '../../domain/fichas_fechas.js';
 import {
   dpInfo, modoDegradacion, redaccionAlcance, redaccionBeneficios, numES,
   redaccionAlcanceMtto, redaccionBeneficiosMtto
@@ -313,6 +315,12 @@ export const BENEF_MTTO_OPC = Object.freeze([
   // índice. El desplegable la pinta primera por `principal`.
   { t: 'Beneficios de las prácticas escogidas', principal: true, auto: 'beneficios_practicas' }
 ]);
+
+/**
+ * Campo de los Beneficios del documento de Mantenimiento: ya no ofrece lista;
+ * su texto sigue a las prácticas marcadas (`99 §95`).
+ */
+const CAMPO_BENEF_PRACTICAS = 'beneficios_mtto';
 
 /** Qué catálogo de redacciones corresponde a cada campo del estado. */
 const CATALOGO_REDACCION = Object.freeze({
@@ -1106,7 +1114,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     borradorOfrecido = null;
     pintarBanda();
     fijarAviso('<div class="ftm-nota">' + esc(partes.join(' · ')) + '. Revise los datos del equipo antes de generar el documento.</div>');
-    if (actual) pintarModal();
+    // Lo restaurado pasa por la misma siembra que al abrir (`§85`, `§95`).
+    if (actual) { sembrarRedaccionPrincipal(actual); pintarModal(); }
   }
 
   /**
@@ -1138,6 +1147,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     fijarAviso('<div class="ftm-nota">Borradores descartados.</div>');
   }
   let trampaFoco = null;       // trampa de foco del modal (ui/foco-modal.js)
+  // Calendario de años abierto (uno a la vez, `99 §94`). Sus escuchas globales
+  // viven SOLO mientras está abierto y se retiran al cerrarlo (§3.5).
+  let aniosAbierto = null;     // { caja, boton, pop, clave, abiertoEn, soltar }
   let hoja = 'ficha';
   let aviso = '';
 
@@ -1983,13 +1995,49 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const i = opts.findIndex((o) => o.principal);
       if (i < 0) return;
       const st = estadoDe(e);
-      if (st.plan[campo + '_ver'] != null || lleno(st.plan[campo])) return;
+      const ver = st.plan[campo + '_ver'];
+      if (campo === CAMPO_BENEF_PRACTICAS) { sembrarBeneficiosPracticas(e, st, i, ver); return; }
+      if (ver != null || lleno(st.plan[campo])) return;
       st.plan[campo + '_ver'] = i;
       st.plan[campo] = textoVersion(campo, i, e, st);
     });
   }
 
+  /**
+   * Beneficios de Mantenimiento (`99 §95`). CON condición de salud el texto sale
+   * SIEMPRE de las prácticas marcadas: una redacción escogida de la lista vieja
+   * —y también el texto amplio de `§92`, que ya vive en borradores— se recompone
+   * al abrir, porque un índice es texto reproducible (`§85`) y no trabajo del
+   * Ingeniero. Lo escrito a mano («custom», o texto sin versión de antes de
+   * `§83`) se respeta y queda el botón para volver a componer. SIN condición no
+   * hay casillas que marcar (`selectorAcciones`): se conserva la lista de
+   * redacciones y la opción de prácticas —que solo daría un [PENDIENTE]— no se
+   * siembra ni se ofrece (revisión de §95). Nada de esto cuenta como tocar la
+   * ficha: no llama a `tocarFicha`.
+   */
+  function sembrarBeneficiosPracticas(e, st, i, ver) {
+    const campo = CAMPO_BENEF_PRACTICAS;
+    const esIndice = ver != null && ver !== 'custom';
+    if (conPracticas(e)) {
+      if (esIndice || (ver == null && !lleno(st.plan[campo]))) {
+        st.plan[campo + '_ver'] = i;
+        st.plan[campo] = textoVersion(campo, i, e, st);
+      }
+      return;
+    }
+    if (esIndice && +ver === i) {
+      delete st.plan[campo + '_ver'];
+      st.plan[campo] = '';
+    }
+  }
+
+  /** ¿El equipo tiene casillas de prácticas en Beneficios? Solo si tiene condición de salud. */
+  function conPracticas(e) {
+    return nucleoFicha(e || {}).ci != null;
+  }
+
   function cerrarFicha() {
+    cerrarAnios(false);
     // Primero soltar: devuelve el foco a la fila/botón que abrió la ficha.
     if (trampaFoco) { trampaFoco.soltar(); trampaFoco = null; }
     modal.classList.remove('is-on');
@@ -2058,6 +2106,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const bp = modalTabs.querySelector('[data-hoja="plan"]');
       if (bp) bp.classList.add('has-diag');
     }
+    cerrarAnios(false);
     modalCuerpo.innerHTML = cuerpoHoja(actual, hoja);
     modalCuerpo.scrollTop = 0;
     const btnPlan = $('[data-ftm="descargar-plan"]');
@@ -2301,6 +2350,196 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   /**
+   * Casilla de AÑO con calendario de años (orden del Ingeniero, 2026-09-24,
+   * `99 §94`: «un calendario, pero solo años, desde 2020»). Se ve igual que la
+   * de fecha —el año como sale en el papel y el iconito— y al tocarla se abre
+   * una rejilla de años ({@link abrirAnios}). Se guarda «aaaa» en la misma
+   * clave de siempre. Un texto escrito antes que no sea un año del calendario
+   * se sigue viendo (y marcado) hasta que se elija uno: no se borra en silencio.
+   */
+  const campoAnio = (clave, valor, titulo) => {
+    const n = leerAnio(valor);
+    const vieja = lleno(valor) && n == null;
+    const texto = n != null ? String(n) : (vieja ? String(valor).trim() : '');
+    return '<span class="ftm-fecha ftm-fecha--centro ftm-anio" data-anio-caja="' + esc(clave) + '">'
+      + '<span class="ftm-fecha-txt' + (texto ? '' : ' is-vacia') + (vieja ? ' is-vieja' : '') + '">'
+      +   esc(texto || 'aaaa') + '</span>'
+      + '<button type="button" class="ftm-anio-abrir" data-anio="' + esc(clave) + '" '
+      +   'data-anio-titulo="' + esc(titulo) + '" aria-haspopup="dialog" aria-expanded="false" '
+      +   'aria-label="' + esc(etiquetaAnio(titulo, texto)) + '"'
+      +   (vieja ? ' title="Escrito antes: ' + esc(String(valor).trim()) + '. Elija el año en el calendario."' : '')
+      + '></button></span>';
+  };
+  const etiquetaAnio = (titulo, texto) =>
+    titulo + ': ' + (texto || 'sin año') + '. Abrir el calendario de años';
+
+  /** Abre la rejilla de años de una casilla de año, con el foco en el año elegido. */
+  function abrirAnios(boton) {
+    cerrarAnios(false);
+    const caja = boton.closest('[data-anio-caja]');
+    if (!caja || !actual) return;
+    const clave = boton.getAttribute('data-anio');
+    const titulo = boton.getAttribute('data-anio-titulo') || 'Año';
+    const guardado = estadoDe(actual).plan[clave];
+    const elegido = leerAnio(guardado);
+    const hoy = new Date().getFullYear();
+    const anios = aniosDelCalendario(hoy, guardado);
+    const foco = elegido != null ? elegido : (anios.includes(hoy) ? hoy : anios[0]);
+
+    const pop = document.createElement('div');
+    pop.className = 'ftm-anios';
+    pop.setAttribute('role', 'dialog');
+    pop.setAttribute('aria-label', titulo + ': elija el año');
+    pop.innerHTML = '<div class="ftm-anios-cab">' + esc(titulo) + '</div>'
+      + '<div class="ftm-anios-rejilla" role="group" aria-label="Años desde ' + ANIO_MIN + '">'
+      + anios.map((a) => '<button type="button" class="ftm-anio-op' + (a === elegido ? ' is-sel' : '')
+          + (a === hoy ? ' is-hoy' : '') + '" data-anio-op="' + a + '" aria-pressed="' + (a === elegido) + '" '
+          + 'tabindex="' + (a === foco ? '0' : '-1') + '"' + (a === hoy ? ' title="Año en curso"' : '') + '>'
+          + a + '</button>').join('')
+      + '</div>'
+      + '<div class="ftm-anios-pie">'
+      +   '<button type="button" class="ftm-anios-acc" data-anio-borrar="1">Borrar</button>'
+      +   '<button type="button" class="ftm-anios-acc" data-anio-op="' + hoy + '">Este año</button>'
+      + '</div>';
+    caja.appendChild(pop);
+    boton.setAttribute('aria-expanded', 'true');
+    ubicarAnios(caja, pop);
+    // Tocar el FONDO del calendario (título, márgenes, huecos) no le quita el
+    // foco al año: si no, el foco caía al cuerpo de la página y el teclado se
+    // perdía con el calendario todavía abierto (revisión de §94). La escucha
+    // vive en el propio calendario y se va con él.
+    pop.addEventListener('mousedown', (ev) => { if (!ev.target.closest('button')) ev.preventDefault(); });
+
+    // Esc cierra SOLO el calendario: se escucha en `window` en fase de captura,
+    // que llega ANTES que la trampa de foco del modal (en `document`), porque
+    // si no, Esc cerraba la ficha entera.
+    const alTecla = (ev) => {
+      if (!pop.isConnected) { cerrarAnios(false); return; }
+      if (ev.key === 'Escape' || ev.key === 'Esc') {
+        ev.preventDefault();
+        ev.stopPropagation();
+        cerrarAnios(true);
+        return;
+      }
+      // Enter sostenido: el que abrió el calendario no puede, repitiéndose,
+      // elegir el año que quedó con el foco.
+      if (ev.repeat && (ev.key === 'Enter' || ev.key === ' ') && pop.contains(ev.target)) {
+        ev.preventDefault();
+        return;
+      }
+      const op = ev.target && ev.target.closest && ev.target.closest('.ftm-anio-op');
+      if (!op || !op.closest('.ftm-anios-rejilla') || !pop.contains(op)) return;
+      const ops = [...pop.querySelectorAll('.ftm-anios-rejilla .ftm-anio-op')];
+      const i = ops.indexOf(op);
+      const salto = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -COLUMNAS_ANIOS, ArrowDown: COLUMNAS_ANIOS }[ev.key];
+      let j = null;
+      if (salto != null) j = Math.min(ops.length - 1, Math.max(0, i + salto));
+      else if (ev.key === 'Home') j = 0;
+      else if (ev.key === 'End') j = ops.length - 1;
+      if (j == null) return;
+      ev.preventDefault();
+      ops[i].tabIndex = -1;
+      ops[j].tabIndex = 0;
+      ops[j].focus();
+    };
+    // Un toque FUERA de la casilla cierra el calendario sin elegir nada.
+    const alPresionar = (ev) => {
+      if (!pop.isConnected) { cerrarAnios(false); return; }
+      if (!caja.contains(ev.target)) cerrarAnios(false);
+    };
+    // Con el teclado (Tab) el foco se va a OTRO control: se cierra. Si no hay
+    // destino (Safari no enfoca un botón al hacerle clic) NO se cierra aquí: el
+    // clic lo decide, o se comería la elección.
+    const alSalirFoco = (ev) => {
+      if (ev.relatedTarget && !caja.contains(ev.relatedTarget)) cerrarAnios(false);
+    };
+    globalThis.addEventListener('keydown', alTecla, true);
+    document.addEventListener('pointerdown', alPresionar, true);
+    caja.addEventListener('focusout', alSalirFoco);
+    aniosAbierto = {
+      caja, boton, pop, clave, abiertoEn: Date.now(),
+      soltar() {
+        globalThis.removeEventListener('keydown', alTecla, true);
+        document.removeEventListener('pointerdown', alPresionar, true);
+        caja.removeEventListener('focusout', alSalirFoco);
+      }
+    };
+    const inicial = pop.querySelector('.ftm-anios-rejilla [tabindex="0"]');
+    if (inicial) inicial.focus();
+  }
+
+  /**
+   * Abre la rejilla hacia ABAJO y desplaza la ficha lo justo para verla entera,
+   * sin sacar su casilla por arriba. Solo si abajo no cabe y arriba SÍ cabe
+   * entera, se abre hacia arriba. En un área muy baja (celular acostado) queda
+   * abajo con la casilla arriba del área, y el resto se ve desplazando la ficha:
+   * nunca se esconde la casilla ni el título del calendario. Nunca se sale por
+   * los lados (revisión de `99 §94`).
+   */
+  function ubicarAnios(caja, pop) {
+    const marco = caja.closest('.ftm-modal-scroll') || caja.closest('[data-ftm="modal-cuerpo"]');
+    const limites = () => (marco ? marco.getBoundingClientRect()
+      : { top: 0, bottom: globalThis.innerHeight || 0, left: 0, right: globalThis.innerWidth || 0 });
+    const HOLGURA = 6;
+    let lim = limites();
+    let rc = caja.getBoundingClientRect();
+    let r = pop.getBoundingClientRect();
+    if (marco && r.bottom > lim.bottom) {
+      const subir = Math.min(r.bottom - lim.bottom + HOLGURA, Math.max(0, rc.top - lim.top - HOLGURA));
+      marco.scrollTop += subir;
+      lim = limites(); rc = caja.getBoundingClientRect(); r = pop.getBoundingClientRect();
+    }
+    if (r.bottom > lim.bottom + 1 && (r.height + HOLGURA) <= (rc.top - lim.top)) {
+      pop.classList.add('ftm-anios--arriba');
+      r = pop.getBoundingClientRect();
+    } else if (r.bottom > lim.bottom + 1) {
+      // No cabe ni abajo ni arriba (área muy baja): la rejilla se acorta y se
+      // desplaza por dentro, y así título, años y «Borrar» quedan a la vista.
+      const rej = pop.querySelector('.ftm-anios-rejilla');
+      const alto = rej ? rej.getBoundingClientRect().height - (r.bottom - (lim.bottom - HOLGURA)) : 0;
+      if (rej && alto >= 60) {
+        rej.style.maxHeight = Math.floor(alto) + 'px';
+        rej.style.overflowY = 'auto';
+        r = pop.getBoundingClientRect();
+      }
+    }
+    const margen = 8;
+    if (r.right > lim.right - margen) pop.style.marginLeft = -(r.right - (lim.right - margen)) + 'px';
+    else if (r.left < lim.left + margen) pop.style.marginLeft = ((lim.left + margen) - r.left) + 'px';
+  }
+
+  /** Cierra el calendario de años (idempotente). `devolverFoco` ⇒ vuelve a la casilla. */
+  function cerrarAnios(devolverFoco) {
+    const a = aniosAbierto;
+    if (!a) return;
+    aniosAbierto = null;
+    a.soltar();
+    if (a.pop.isConnected) a.pop.remove();
+    if (a.boton.isConnected) {
+      a.boton.setAttribute('aria-expanded', 'false');
+      if (devolverFoco) a.boton.focus();
+    }
+  }
+
+  /** Guarda el año escogido («aaaa», o '' con «Borrar») y lo pinta en la casilla. */
+  function elegirAnio(valor) {
+    const a = aniosAbierto;
+    if (!a || !actual) return;
+    const nuevo = valor == null ? '' : String(valor);
+    estadoDe(actual).plan[a.clave] = nuevo;
+    tocarFicha(actual);
+    const tx = a.caja.querySelector('.ftm-fecha-txt');
+    if (tx) {
+      tx.textContent = nuevo || 'aaaa';
+      tx.classList.toggle('is-vacia', !nuevo);
+      tx.classList.remove('is-vieja');
+    }
+    a.boton.removeAttribute('title');
+    a.boton.setAttribute('aria-label', etiquetaAnio(a.boton.getAttribute('data-anio-titulo') || 'Año', nuevo));
+    cerrarAnios(true);
+  }
+
+  /**
    * Clave del estado donde vive un segmento redactado. El PI y el documento de
    * mantenimiento comparten la hoja, no el texto: cada uno guarda el suyo, de
    * modo que elegir una redacción aquí no pisa la que el otro ya tuviera.
@@ -2335,8 +2574,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // condición un catálogo entero sin decirle que ninguna banda es la suya.
     if (ci == null || (!disp.length && !fueraPorInversion.length)) {
       return '<div class="ftm-acc ftm-acc--vacio">Este equipo no tiene condición de salud '
-        + 'registrada, así que no hay una banda suya que proponer. Los beneficios se redactan a '
-        + 'mano o se toma otra de las redacciones.</div>';
+        + 'registrada, así que no hay una banda suya que proponer ni prácticas que marcar. Los '
+        + 'beneficios se toman de la lista de redacciones de abajo o se escriben a mano.</div>';
     }
     const marcados = new Set(seleccionAcciones(e, st, campoRed('beneficios')).map((a) => a.id));
     const propias = disp.filter((a) => a.origen !== 'catalogo');
@@ -2474,7 +2713,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // la única que casi siempre se va a usar.
     const opt = (o, i) => '<option value="' + i + '"'
       + (String(cur) === String(i) ? ' selected' : '') + '>' + esc(o.t) + '</option>';
-    const conIndice = opts.map((o, i) => ({ o, i }));
+    // Sin condición de salud no hay casillas de prácticas: la opción que se
+    // compone con ellas no se ofrece, solo daría un [PENDIENTE] (revisión de
+    // §95). Se filtra aquí y cada opción conserva su índice de siempre (`§85.3`).
+    const sinPracticas = !conPracticas(e);
+    const conIndice = opts.map((o, i) => ({ o, i }))
+      .filter((x) => !(sinPracticas && x.o.auto === 'beneficios_practicas'));
     // Las bandas van SIEMPRE de 1 a 5 —una sola dirección de lectura en todo el
     // módulo—; la del equipo se distingue por su rótulo, no sacándola de sitio.
     const bandas = [...new Set(conIndice.filter((x) => x.o.cond != null).map((x) => x.o.cond))]
@@ -2507,8 +2751,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         ? '<optgroup label="Sin condición">' + sueltas.map((x) => opt(x.o, x.i)).join('') + '</optgroup>'
         : '');
     const nProp = conIndice.filter((x) => x.o.cond === rec).length;
-    const hayPrincipal = opts.some((o) => o.principal);
-    const principalPracticas = opts.some((o) => o.principal && o.auto === 'beneficios_practicas');
+    const hayPrincipal = conIndice.some((x) => x.o.principal);
+    const principalPracticas = conIndice.some((x) => x.o.principal && x.o.auto === 'beneficios_practicas');
     const pista = principalPracticas
       ? 'La primera se compone con las prácticas que marque arriba y se rehace cada vez que cambie la '
         + 'selección. Puede editarla libremente (desde ese momento ya no se rehace) o elegir otra de la lista.'
@@ -2528,6 +2772,63 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<textarea class="ftm-campo-area ftm-campo-area--alcance" data-texto="' + campo + '" '
       + 'aria-label="Texto de ' + campo + '" placeholder="(texto del ' + campo
       + ' — elija una redacción arriba o escriba la suya)">' + esc(st.plan[campo] || '') + '</textarea>';
+  }
+
+  /**
+   * Beneficios del documento de Mantenimiento SIN lista de redacciones (pedido
+   * del Ingeniero, 2026-09-24, `99 §95`: «que los beneficios vayan saliendo
+   * conforme a las acciones de mantenimiento que yo escoja»). El texto se compone
+   * con las prácticas marcadas arriba —un renglón breve por práctica— y se rehace
+   * al marcar o desmarcar. Se puede corregir a mano; desde ese momento ya no se
+   * rehace, y un botón lo vuelve a componer. Las propuestas por condición siguen
+   * en `BENEF_MTTO_OPC` (no se borran), pero esta hoja ya no las ofrece.
+   */
+  function redaccionPorPracticas(e, campo) {
+    const st = estadoDe(e);
+    const i = opcionesRedaccion(campo).findIndex((o) => o.principal);
+    const aMano = String(st.plan[campo + '_ver']) !== String(i);
+    return '<div class="ftm-alcance" data-benef-practicas="' + campo + '">'
+      + '<label for="ftm-txt-' + campo + '">Beneficios</label>'
+      + '<span class="ftm-alcance-hint" data-benef-pista="auto"' + (aMano ? ' hidden' : '') + '>'
+      +   'Salen de las prácticas que marque arriba: cada una suma su beneficio y se quita al desmarcarla. '
+      +   'Puede corregir el texto a mano.</span>'
+      + '<span class="ftm-alcance-hint" data-benef-pista="mano"' + (aMano ? '' : ' hidden') + '>'
+      +   'Texto corregido a mano: ya no sigue a las prácticas marcadas.</span>'
+      + '<button type="button" class="ftm-btn" data-ftm="benef-rehacer"' + (aMano ? '' : ' hidden') + '>'
+      +   'Volver a componer con las prácticas marcadas</button></div>'
+      + '<textarea id="ftm-txt-' + campo + '" class="ftm-campo-area ftm-campo-area--alcance" data-texto="' + campo + '" '
+      + 'aria-label="Texto de los beneficios" placeholder="(los beneficios salen de las prácticas que marque arriba)">'
+      + esc(st.plan[campo] || '') + '</textarea>';
+  }
+
+  /** Muestra u oculta el aviso «corregido a mano» y el botón de volver a componer. */
+  function pintarModoBeneficios(aMano) {
+    const caja = modalCuerpo.querySelector('[data-benef-practicas]');
+    if (!caja) return;
+    caja.querySelector('[data-benef-pista="auto"]').hidden = aMano;
+    caja.querySelector('[data-benef-pista="mano"]').hidden = !aMano;
+    caja.querySelector('[data-ftm="benef-rehacer"]').hidden = !aMano;
+  }
+
+  /** Vuelve a componer los beneficios con las prácticas marcadas (descarta lo corregido a mano, avisando). */
+  function recomponerBeneficios() {
+    if (!actual || documento !== 'salud') return;
+    const campo = CAMPO_BENEF_PRACTICAS;
+    const st = estadoDe(actual);
+    if (lleno(st.plan[campo]) && !globalThis.confirm('Se reemplazará el texto corregido a mano por los '
+      + 'beneficios de las prácticas marcadas. ¿Continuar?')) return;
+    const i = opcionesRedaccion(campo).findIndex((o) => o.principal);
+    st.plan[campo + '_ver'] = i;
+    st.plan[campo] = textoVersion(campo, i, actual, st);
+    tocarFicha(actual);
+    const ta = modalCuerpo.querySelector('[data-texto="' + campo + '"]');
+    if (ta) ta.value = st.plan[campo];
+    const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
+    if (vista) vista.innerHTML = esc(st.plan[campo]).replace(/\n/g, '<br>');
+    pintarModoBeneficios(false);
+    // El botón se ocultó con el foco puesto: sin esto, el teclado volvía al
+    // principio de la ficha (revisión de §95).
+    if (ta) ta.focus();
   }
 
   /** Total real en pantalla: la cifra, «—» si no hay, «no legible» si no es cifra. */
@@ -2699,15 +3000,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Período de ejecución como en el Excel: dos cuadros con su título encima. */
   function bloquePeriodo(e) {
     const P = estadoDe(e).plan;
-    const caja = (titulo, clave, ph) =>
-      '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>' + esc(titulo) + '</legend>'
-      + '<input class="ftm-fmt-in ftm-fmt-in--centro" data-plan="' + clave + '" value="' + esc(P[clave] || '') + '" '
-      + 'placeholder="' + esc(ph) + '" aria-label="' + esc(titulo) + '"></fieldset>';
     return '<div class="ftm-fmt ftm-fmt-periodo">'
       // La Fecha de Entrega se escoge en el calendario (`99 §91`).
       + '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>Fecha de Entrega</legend>'
       +   campoFecha('fechaentrega', P.fechaentrega, 'Fecha de Entrega', true) + '</fieldset>'
-      + caja('Año de entrada', 'anioentrada', 'aaaa')
+      // El Año de entrada se escoge en un calendario de años (`99 §94`).
+      + '<fieldset class="ftm-fmt-caja ftm-fmt-caja--periodo"><legend>Año de entrada</legend>'
+      +   campoAnio('anioentrada', P.anioentrada, 'Año de entrada') + '</fieldset>'
       + '</div>';
   }
 
@@ -2770,15 +3069,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function hojaBeneficios(e) {
     const campo = campoRed('beneficios');
     const nota = documento === 'salud'
-      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. Escoja las macroactividades y '
-        + 'acciones de mantenimiento: la primera redacción propone los beneficios que gana el activo con '
-        + 'esas prácticas, frente al riesgo de falla catastrófica. No se prometen los de un equipo nuevo.'
+      ? 'Beneficios de <b>intervenir</b> el activo que sigue en servicio. Marque las macroactividades y '
+        + 'acciones de mantenimiento: por cada una sale, en breve, el beneficio que gana el activo frente al '
+        + 'riesgo de falla catastrófica. No se prometen los de un equipo nuevo.'
       : 'Texto de los <b>beneficios</b> del proyecto. Se escribe en la hoja 1 del formato oficial '
         + '(celda B23) al exportar. La hoja «Beneficios» del libro conserva su estudio económico y sus '
         + 'fórmulas: este módulo no la reescribe.';
     return '<div class="ftm-nota-anexo">' + nota + '</div>'
       + (documento === 'salud' ? selectorAcciones(e) : '')
-      + selectorRedaccion(e, campo)
+      // Con condición, el texto sigue a las prácticas (`§95`); sin ella no hay
+      // casillas y se conserva la lista de redacciones (revisión de §95).
+      + (documento === 'salud' && conPracticas(e) ? redaccionPorPracticas(e, campo) : selectorRedaccion(e, campo))
       + '<div class="ftm-hoja">'
       + cabeceraHoja(documento === 'salud'
         ? 'BENEFICIOS DEL MANTENIMIENTO ESPECIALIZADO' : 'BENEFICIOS DEL PROYECTO')
@@ -3055,6 +3356,24 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const inFecha = ev.target.closest && ev.target.closest('input[type="date"]');
     if (inFecha && contenedor.contains(inFecha)) { abrirCalendario(inFecha); return; }
 
+    // Calendario de años (`99 §94`): abrir/cerrar, elegir un año o borrarlo.
+    // Un DOBLE clic sobre la casilla no elige nada: al abrirse, la ficha se
+    // desplaza y el segundo clic caía sobre un año que nadie escogió (revisión
+    // de §94). Tampoco cuenta un clic que llegue apenas abierto el calendario.
+    if ((ev.target.closest('.ftm-anios') || ev.target.closest('[data-anio]'))
+        && (ev.detail > 1 || (aniosAbierto && ev.detail === 1 && Date.now() - aniosAbierto.abiertoEn < 300))) return;
+    const opAnio = ev.target.closest('[data-anio-op]');
+    if (opAnio && aniosAbierto && aniosAbierto.pop.contains(opAnio)) { elegirAnio(opAnio.getAttribute('data-anio-op')); return; }
+    const borrarAnio = ev.target.closest('[data-anio-borrar]');
+    if (borrarAnio && aniosAbierto && aniosAbierto.pop.contains(borrarAnio)) { elegirAnio(''); return; }
+    if (ev.target.closest('.ftm-anios')) return;   // clic en el fondo del calendario: no hace nada
+    const btnAnio = ev.target.closest('[data-anio]');
+    if (btnAnio) {
+      if (aniosAbierto && aniosAbierto.boton === btnAnio) cerrarAnios(true);
+      else abrirAnios(btnAnio);
+      return;
+    }
+
     // Borrador: restaurar lo que quedó a medias, o descartarlo (`99 §83`)
     if (ev.target.closest('[data-ftm="borr-restaurar"]')) { restaurarBorrador(); return; }
     if (ev.target.closest('[data-ftm="borr-descartar"]')) { descartarBorrador(); return; }
@@ -3069,8 +3388,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const cajas = [...modalCuerpo.querySelectorAll('[data-accion]')];
       const propias = [...modalCuerpo.querySelectorAll('[data-acc-ambito="propio"] [data-accion]')];
       if (todas) {
-        propias.forEach((c) => { c.checked = true; });
-        fijarAcciones([...new Set(propias.map((c) => c.getAttribute('data-accion')))]);
+        // SUMA las suyas a lo ya marcado, y la selección se lee de la pantalla
+        // como en el cambio de casilla: antes una práctica de otra banda seguía
+        // marcada a la vista pero salía del texto (revisión de §95).
+        const ids = new Set(propias.map((c) => c.getAttribute('data-accion')));
+        cajas.forEach((c) => { if (ids.has(c.getAttribute('data-accion'))) c.checked = true; });
+        fijarAcciones([...new Set(cajas.filter((c) => c.checked).map((c) => c.getAttribute('data-accion')))]);
       } else {
         cajas.forEach((c) => { c.checked = false; });
         fijarAcciones([]);
@@ -3151,6 +3474,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         break;
       case 'exportar': exportarExcel(); break;
       case 'descargar-plan': descargarPlan(); break;
+      case 'benef-rehacer': recomponerBeneficios(); break;
       case 'copiar-diag':
         if (actual) { copiarActualAFuturo(actual); tocarFicha(actual); pintarModal(); }
         break;
@@ -3216,6 +3540,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       st.plan[campo] = t.value;
       st.plan[campo + '_ver'] = 'custom';
       tocarFicha(actual);
+      if (campo === CAMPO_BENEF_PRACTICAS && documento === 'salud') pintarModoBeneficios(true);
       const vista = modalCuerpo.querySelector('[data-vista="' + campo + '"]');
       if (vista) vista.innerHTML = esc(t.value).replace(/\n/g, '<br>');
     }
@@ -3488,6 +3813,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // anterior (la función existía y no la llamaba nadie).
     try { olvidarDiagramas(); } catch (_) { /* noop */ }
     clearTimeout(tempBusqueda);
+    cerrarAnios(false);
     contenedor.removeEventListener('click', alHacerClic);
     contenedor.removeEventListener('input', alEscribir);
     contenedor.removeEventListener('change', alCambiar);

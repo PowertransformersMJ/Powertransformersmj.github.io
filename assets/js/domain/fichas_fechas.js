@@ -63,3 +63,47 @@ export function fechaParaPapel(v) {
   const iso = fechaAISO(s);
   return iso ? isoAFecha(iso) : s;
 }
+
+// ── AÑO DE ENTRADA · calendario de años ─────────────────────────────────────
+// Orden del Ingeniero (2026-09-24, `99 §94`): «que aquí también aparezca un
+// calendario, pero solo años, desde 2020». Se guarda el año como texto
+// «aaaa», igual que antes; el papel lo imprime tal cual.
+
+/** Primer año que ofrece el calendario (orden del Ingeniero). */
+export const ANIO_MIN = 2020;
+/** Años hacia adelante que se ofrecen desde el año en curso. */
+const ANIOS_ADELANTE = 10;
+/** Columnas de la rejilla: la última fila se completa para que no quede coja. */
+export const COLUMNAS_ANIOS = 4;
+
+/**
+ * Lee un año guardado («2027», « 2027 »). Solo cuenta un año de cuatro
+ * cifras desde {@link ANIO_MIN}: lo demás (un año viejo, «2027-2028», «27»)
+ * NO se convierte en otro — se sigue viendo como se escribió.
+ * @returns {number|null}
+ */
+export function leerAnio(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!/^\d{4}$/.test(s)) return null;
+  const n = +s;
+  return n >= ANIO_MIN && n <= 2200 ? n : null;
+}
+
+/**
+ * Años del calendario: desde {@link ANIO_MIN} hasta el año en curso +
+ * {@link ANIOS_ADELANTE} (o hasta el año ya guardado, si es posterior: nunca se
+ * esconde lo elegido), completando la última fila de la rejilla.
+ * @param {number} anioActual  año en curso (la pantalla pasa el del reloj)
+ * @param {*} [guardado]       lo que ya tiene la ficha
+ * @returns {number[]}
+ */
+export function aniosDelCalendario(anioActual, guardado) {
+  const hoy = Number.isInteger(anioActual) ? anioActual : ANIO_MIN;
+  const elegido = leerAnio(guardado);
+  let fin = Math.max(hoy + ANIOS_ADELANTE, elegido || 0, ANIO_MIN);
+  const n = fin - ANIO_MIN + 1;
+  fin += (COLUMNAS_ANIOS - (n % COLUMNAS_ANIOS)) % COLUMNAS_ANIOS;
+  const out = [];
+  for (let a = ANIO_MIN; a <= fin; a++) out.push(a);
+  return out;
+}

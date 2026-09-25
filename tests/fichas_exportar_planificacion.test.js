@@ -79,11 +79,13 @@ describe('CF-05 · el Valor Real y el Sistema llegan al Excel que se firma', () 
     assert.equal(v('$ 500.000'), 500000);
   });
 
-  test('estado cero: sin Valor Real no se inventa cifra (CF-06: [PENDIENTE]); sin Sistema, en blanco', () => {
+  test('estado cero: sin Valor Real no se inventa cifra NI se marca pendiente — en blanco (§93); sin Sistema, en blanco', () => {
     for (const plan of [{}, { presu_real: '', presu_sistema: '' }, { presu_real: '   ', presu_sistema: '   ' }]) {
       const mapa = celdasFichaPlan(EQUIPO, { plan });
-      assert.equal(celda(mapa, 'J36').val, '[PENDIENTE]', JSON.stringify(plan));
+      assert.equal(celda(mapa, 'J36').clear, true, JSON.stringify(plan));
+      assert.equal(celda(mapa, 'J36').pend, false, JSON.stringify(plan));
       assert.equal(celda(mapa, 'J36').numeric, false, JSON.stringify(plan));
+      assert.equal(celda(mapa, 'J78').pend, false, JSON.stringify(plan));
       assert.equal(celda(mapa, 'K36').clear, true, JSON.stringify(plan));
     }
   });
@@ -102,11 +104,16 @@ describe('CF-05 · el Valor Real y el Sistema llegan al Excel que se firma', () 
     assert.equal(c.J78, '<c r="J78" s="58"><f>SUM(J34:J66)</f></c>');
   });
 
-  test('en el archivo, estado cero: J36 y su total dicen [PENDIENTE] (no «0»); K36 queda vacía', async () => {
-    const { hoja } = await exportar({});
-    assert.equal(hoja.J36.v, '[PENDIENTE]');
-    assert.equal(hoja.J78.v, '[PENDIENTE]');
-    assert.equal(hoja.J78.f, undefined, 'el total pendiente no puede seguir siendo SUM (daría 0)');
+  test('en el archivo, estado cero: J36 en blanco y su total en blanco (nunca «0» ni [PENDIENTE]); K36 vacía (§93)', async () => {
+    const { xml, hoja } = await exportar({});
+    const c = celdasXml(xml);
+    assert.ok(!hoja.J36 || hoja.J36.v === '' || hoja.J36.v == null, 'J36 debería quedar vacía');
+    assert.match(c.J36, /^<c r="J36" s="255"/, 'J36 conserva el formato de pesos para cuando se teclee');
+    // El total NO es la SUM desnuda (daría «0» sobre la columna vacía): es la
+    // suma que se ve en blanco mientras no haya cifra, sin valor en caché.
+    assert.equal(c.J78, '<c r="J78" s="58"><f>IF(COUNT(J34:J66)=0,&quot;&quot;,SUM(J34:J66))</f></c>');
+    assert.notEqual(hoja.J78 && hoja.J78.v, 0);
+    assert.notEqual(hoja.J78 && hoja.J78.v, '[PENDIENTE]');
     assert.ok(!hoja.K36 || hoja.K36.v === '' || hoja.K36.v == null, 'K36 debería quedar vacía');
   });
 
@@ -173,10 +180,15 @@ describe('CF-06 · el dinero que falta dice [PENDIENTE] en el Excel, y se avisa 
     assert.deepEqual(p, [
       { campos: ['Valor CREG Unitario', 'Valor CREG Total'],
         motivo: 'La UC no está en el catálogo CREG 015/2018 (Tablas 51 y 52).' },
-      { campos: ['Valor Real Total'], motivo: 'No se ha tecleado el Valor Real Total.' },
-      { campos: ['TOTAL DEL PROYECTO (CREG)', 'TOTAL DEL PROYECTO (real)'],
+      { campos: ['TOTAL DEL PROYECTO (CREG)'],
         motivo: 'Queda [PENDIENTE] mientras su línea no tenga cifra.' }
     ]);
+  });
+
+  test('sin Valor Real tecleado, la ficha completa NO avisa nada: es un dato que se llena cuando se conozca (§93)', () => {
+    for (const presu_real of ['', '   ', undefined]) {
+      assert.deepEqual(pendientesFichaPlan(EQUIPO, { plan: { ...COMPLETO, presu_real } }), [], String(presu_real));
+    }
   });
 
   test('sin potencia, el aviso lo dice con el motivo del dominio', () => {
