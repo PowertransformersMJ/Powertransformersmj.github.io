@@ -4117,4 +4117,4 @@ huella declarada en metadatos: el único escritor es el custodio vía `subirFirm
 silencio: con la plantilla fija halla las cinco · emisión «con equipo» sin ninguna del equipo: registra lo que hubo.
 Crudos → bóveda `2026-09-25-firmas-equipo/` (comité, revisión, prompt de Gemini).
 **99.9 Pendiente.** Su «procede» → desplegar reglas (storage + firestore) + merge + validación en vivo; él sube las
-firmas en «Firmas del equipo» con fecha y medio; la de Erick es pequeña (187×41 px): pedir un escaneo mayor.
+firmas en «Firmas del equipo» con fecha y medio; la de Erick es pequeña (187×41 px): pedir un escaneo mayor. La de Jorge Rhenals llegó por chat (418×121 px): preparada en `~/Downloads/JRhenals-firma-transparente.png`, sus huellas en la bóveda (la guardia bloquea una copia renombrada, probado) y probada en el banco por el formulario real (Elaboración).
