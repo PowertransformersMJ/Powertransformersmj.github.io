@@ -2127,3 +2127,28 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 .ftm-mi-firma { margin: 0 0 12px; }
 .ftm-mi-firma > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--ftm-petrol, #0051d5); padding: 6px 0; }
 @media print { .ftm-mi-firma { display: none !important; } }
+
+/* «Firmas del equipo» del custodio (`99 §99`). */
+.fe-caja { padding: 8px 0; }
+.fe-ayuda { font-size: 12px; color: var(--ftm-muted, #61748a); margin: 0 0 10px; max-width: 70ch; }
+.fe-lista { display: grid; gap: 10px; }
+.fe-fila { display: grid; grid-template-columns: minmax(140px, 1fr) 150px minmax(180px, 2fr) auto; gap: 8px 12px; align-items: center;
+  padding: 8px 10px; border: 1px solid var(--ftm-line, #e3e9f0); border-radius: 10px; }
+.fe-nombre { font-weight: 600; font-size: 13px; }
+.fe-vista { min-height: 34px; display: flex; align-items: center; }
+.fe-img { max-height: 34px; max-width: 150px; }
+.fe-estado { font-size: 12px; color: var(--ftm-muted, #61748a); }
+.fe-acciones { display: flex; gap: 6px; }
+.fe-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12px; }
+.fe-msg { flex-basis: 100%; margin: 0; font-size: 12px; color: #b3261e; }
+@media (max-width: 720px) { .fe-fila { grid-template-columns: 1fr; } }
+
+/* Tabla de confirmación de la emisión con firmas del equipo (`99 §99`). */
+.ftm-emision { margin: 0 0 12px; padding: 12px 14px; border: 2px solid var(--ftm-petrol, #0051d5); border-radius: 12px; background: #fff; }
+.ftm-emision h3 { margin: 0 0 8px; font-size: 14px; }
+.ftm-emision-tabla { width: 100%; border-collapse: collapse; font-size: 12px; }
+.ftm-emision-tabla th, .ftm-emision-tabla td { text-align: left; padding: 5px 8px; border-bottom: 1px solid var(--ftm-line, #e3e9f0); vertical-align: middle; }
+.ftm-emision-img { max-height: 30px; max-width: 140px; display: block; }
+.ftm-emision-nota { font-size: 11.5px; color: var(--ftm-muted, #61748a); margin: 8px 0; }
+.ftm-emision-acc { display: flex; gap: 8px; flex-wrap: wrap; }
+@media print { .ftm-emision { display: none !important; } }

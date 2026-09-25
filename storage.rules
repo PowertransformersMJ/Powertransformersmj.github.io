@@ -131,6 +131,39 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == uid;
     }
 
+    // ── Firmas del EQUIPO bajo custodia (ADR-099) ──
+    // Pedido del Ingeniero: el Excel de Fichas lleva la firma de todos. Cada
+    // CUSTODIO (admin) guarda SU copia de las firmas que le autorizaron, en
+    // firmas-equipo/{su uid}/{persona}: solo él la lee, la reemplaza o la quita.
+    // Otro admin NO la ve (la autorización se dio a una persona, no a un rol).
+    //   · persona: una de las 5 claves FIJAS de la lista (domain/firmas_equipo.js).
+    //   · solo PNG ≤ 512 KB, con la declaración de la autorización del titular
+    //     (fecha ISO + medio) y la huella SHA-256 de la imagen en sus metadatos.
+    //   · `get` y no `read`: nadie LISTA el directorio.
+    function personaDelEquipo(p) {
+      return p in ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA', 'ERICK_VERGARA'];
+    }
+    function firmaEquipoValida() {
+      return request.resource.size <= 512 * 1024
+        && request.resource.contentType == 'image/png'
+        && request.resource.metadata != null
+        && request.resource.metadata.keys().hasAll(['autorizacionFecha', 'autorizacionMedio', 'huella'])
+        && request.resource.metadata.autorizacionFecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.metadata.autorizacionMedio.size() >= 3
+        && request.resource.metadata.autorizacionMedio.size() <= 200
+        && request.resource.metadata.huella.matches('^[0-9a-f]{64}$');
+    }
+    match /firmas-equipo/{custodio}/{persona} {
+      allow get:    if isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona);
+      allow create: if isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
+                    && firmaEquipoValida();
+      allow update: if isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
+                    && firmaEquipoValida();
+      // Quitar la propia copia no exige seguir siendo admin: un custodio al que
+      // le retiran el rol debe poder retirar lo que custodiaba.
+      allow delete: if isSignedIn() && request.auth.uid == custodio;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{allPaths=**} {
       allow read, write: if false;
