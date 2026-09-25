@@ -809,12 +809,67 @@ service cloud.firestore {
     function personaDelEquipo(p) {
       return p in ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA', 'ERICK_VERGARA'];
     }
+
+    // ── Firmas: la IMAGEN vive en Firestore (ADR-100) ──
+    // Storage sube pero niega toda descarga desde el navegador (503 en
+    // producción, `99 §100`). La imagen PNG va dentro del documento (bytes).
+    //   · firmas/{uid}: la firma PROPIA (ADR-071): solo su dueño la lee y la
+    //     escribe; nadie lista. Tope 900 KB (cabe en un documento de 1 MiB).
+    match /firmas/{uid} {
+      allow get:    if isTeamMember() && request.auth.uid == uid;
+      allow create, update: if isTeamMember() && request.auth.uid == uid
+                    && request.resource.data.keys().hasOnly(['imagen', 'huella', 'en'])
+                    && request.resource.data.imagen is bytes
+                    && request.resource.data.imagen.size() <= 900 * 1024
+                    && request.resource.data.huella is string
+                    && request.resource.data.huella.matches('^[0-9a-f]{64}$')
+                    && request.resource.data.en == request.time;
+      allow delete: if isSignedIn() && request.auth.uid == uid;
+    }
+    //   · firmas_equipo/{custodio}/personas/{persona}: firmas del EQUIPO bajo
+    //     custodia (ADR-099): solo SU custodio (admin con perfil). Toda firma se
+    //     escribe JUNTO con un registro NUEVO de alta o reemplazo que coincide con
+    //     ella (persona, huella y autorización): sin registro no hay firma.
+    function firmaConSuRegistroNuevo(persona) {
+      let ruta = /databases/$(database)/documents/firmas_equipo_registro/$(request.resource.data.registro);
+      let reg = getAfter(ruta).data;
+      return !exists(ruta) && existsAfter(ruta)
+        && reg.tipo == (resource == null ? 'alta' : 'reemplazo')
+        && reg.persona == persona
+        && reg.custodio == request.auth.uid
+        && reg.huella == request.resource.data.huella
+        && reg.autorizacion == request.resource.data.autorizacion;
+    }
+    match /firmas_equipo/{custodio}/personas/{persona} {
+      allow get:    if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona);
+      allow create, update: if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
+                    && request.resource.data.keys().hasOnly(['imagen', 'huella', 'autorizacion', 'registro', 'en'])
+                    && request.resource.data.imagen is bytes
+                    && request.resource.data.imagen.size() <= 512 * 1024
+                    && request.resource.data.huella is string
+                    && request.resource.data.huella.matches('^[0-9a-f]{64}$')
+                    && request.resource.data.registro is string
+                    && request.resource.data.en == request.time
+                    && firmaConSuRegistroNuevo(persona);
+      // Quitar la propia copia no exige seguir siendo admin (como en Storage).
+      allow delete: if isSignedIn() && request.auth.uid == custodio;
+    }
+    // Revisión de ADR-100: un registro suelto mentiría. Un alta/reemplazo solo
+    // existe junto con la firma que lo nombra; un retiro solo si la firma deja
+    // de existir en la misma operación.
+    function registroAtadoASuFirma(id) {
+      let firma = /databases/$(database)/documents/firmas_equipo/$(request.auth.uid)/personas/$(request.resource.data.persona);
+      return request.resource.data.tipo == 'retiro'
+        ? !existsAfter(firma)
+        : (existsAfter(firma) && getAfter(firma).data.registro == id);
+    }
     match /firmas_equipo_registro/{id} {
       // get y list, ambos SOLO del custodio: otro admin no ve a quién custodia
       // ni con qué autorización (revisión de ADR-099).
       allow get:  if isAdmin() && resource.data.custodio == request.auth.uid;
       allow list: if isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
       allow create: if isAdmin() && hasProfile()
+                    && registroAtadoASuFirma(id)
                     && request.resource.data.keys().hasOnly(['tipo', 'persona', 'autorizacion', 'huella',
                                                              'custodio', 'custodioNombre', 'en'])
                     && request.resource.data.keys().hasAll(['tipo', 'persona', 'custodio', 'custodioNombre', 'en'])

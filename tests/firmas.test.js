@@ -4,7 +4,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_BYTES, TIPO_REQUERIDO,
+  MAX_BYTES, TIPO_REQUERIDO, esPngPorBytes,
   validarArchivoFirma, normalizarNombre, firmaAplicaA, motivoSinFirma
 } from '../assets/js/domain/firmas.js';
 
@@ -22,13 +22,15 @@ describe('validarArchivoFirma', () => {
     assert.match(r.motivo, /fondo blanco/i);
   });
 
-  test('rechaza por encima de 1 MB y dice qué hacer', () => {
+  test('rechaza por encima del tope (900 KB, cabe en un documento de Firestore) y dice qué hacer', () => {
     const r = validarArchivoFirma(archivo('image/png', MAX_BYTES + 1));
     assert.equal(r.ok, false);
     assert.match(r.motivo, /recórtela/i);
+    assert.match(r.motivo, /900 KB/);
   });
 
-  test('el tope es inclusivo: exactamente 1 MB entra', () => {
+  test('el tope es inclusivo: exactamente 900 KB entra', () => {
+    assert.equal(MAX_BYTES, 900 * 1024);
     assert.equal(validarArchivoFirma(archivo('image/png', MAX_BYTES)).ok, true);
   });
 
@@ -109,5 +111,15 @@ describe('motivoSinFirma — un hueco siempre se explica (L-69)', () => {
 
   test('cuando sí se puede firmar, no hay motivo que mostrar', () => {
     assert.equal(motivoSinFirma({ haySesion: true, esMiLinea: true, hayFirmaPropia: true }), '');
+  });
+});
+
+describe('PNG por su contenido (`99 §100`)', () => {
+  test('reconoce la firma de 8 bytes del PNG y rechaza lo demás', () => {
+    const png = new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]);
+    assert.equal(esPngPorBytes(png), true);
+    assert.equal(esPngPorBytes(new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0, 0, 0, 0, 0])), false);   // JPEG
+    assert.equal(esPngPorBytes(png.slice(0, 8)), false);                                           // solo cabecera
+    assert.equal(esPngPorBytes(null), false);
   });
 });

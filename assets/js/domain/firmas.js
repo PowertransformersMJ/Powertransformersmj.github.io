@@ -7,13 +7,15 @@
 // implementación: es lo que impide que el sitio se convierta en una
 // máquina de falsificar documentos (ADR-070, ADR-071).
 //
-// Sin I/O a propósito: se prueba con `node --test`. El acceso a Storage
-// vive en `assets/js/data/firmas.js`.
+// Sin I/O a propósito: se prueba con `node --test`. El acceso (Firestore
+// `firmas/{uid}` desde `99 §100`; antes Storage) vive en `assets/js/data/firmas.js`.
 // ══════════════════════════════════════════════════════════════
 
 /** Tope de una firma escaneada. Un PNG recortado a solo el trazo pesa
- *  decenas de KB; 1 MB deja margen de sobra y corta las fotos de cámara. */
-export const MAX_BYTES = 1024 * 1024;
+ *  decenas de KB. Era 1 MB; desde `99 §100` la firma vive DENTRO de un
+ *  documento de Firestore (tope 1 MiB por documento, con sus campos), así
+ *  que el tope baja a 900 KB: sigue sobrando y corta las fotos de cámara. */
+export const MAX_BYTES = 900 * 1024;
 
 /** Solo PNG: es el único formato de los tres habituales que garantiza
  *  fondo TRANSPARENTE. Un JPG (que no tiene canal alfa) llega con fondo
@@ -42,14 +44,23 @@ export function validarArchivoFirma(archivo) {
     return { ok: false, motivo: 'El archivo está vacío o no se pudo leer.' };
   }
   if (bytes > MAX_BYTES) {
-    const mb = (bytes / (1024 * 1024)).toFixed(1);
+    // Hacia ARRIBA: redondeando, 900,4 KB se leía «pesa 900 KB y el tope es 900 KB».
+    const peso = bytes >= 1024 * 1024 ? (Math.ceil(bytes / (1024 * 1024) * 10) / 10).toFixed(1) + ' MB' : Math.ceil(bytes / 1024) + ' KB';
     return {
       ok: false,
-      motivo: `La imagen pesa ${mb} MB y el tope es 1 MB. Recórtela dejando `
+      motivo: `La imagen pesa ${peso} y el tope es ${Math.round(MAX_BYTES / 1024)} KB. Recórtela dejando `
             + 'solo el trazo de la firma: así pesa mucho menos y se ve mejor.'
     };
   }
   return { ok: true, motivo: '' };
+}
+
+/** ¿Son estos bytes un PNG de verdad (firma de 8 bytes), diga lo que diga la
+ *  etiqueta del archivo? Se comprueba antes de guardar (`99 §100`). */
+export function esPngPorBytes(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  const FIRMA_PNG = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+  return b.length > FIRMA_PNG.length && FIRMA_PNG.every((v, i) => b[i] === v);
 }
 
 /** Normaliza un nombre para compararlo: sin tildes, sin dobles espacios,

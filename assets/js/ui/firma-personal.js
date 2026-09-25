@@ -46,7 +46,7 @@ export function montarFirmaPersonal(contenedor, opts = {}) {
         </div>
         <p class="fp-nota">
           Debe ser un <strong>PNG con fondo transparente</strong>, recortado dejando solo el trazo,
-          de menos de 1 MB. Un JPG llega con fondo blanco y taparía la línea del formato.
+          de menos de 900 KB. Un JPG llega con fondo blanco y taparía la línea del formato.
         </p>
         <p class="fp-estado" id="fpEstado" role="status" aria-live="polite"></p>
       </div>
@@ -75,6 +75,9 @@ export function montarFirmaPersonal(contenedor, opts = {}) {
     // llegue y la rama de arriba lo deshabilitó; sin esto quedaba bloqueado para
     // siempre (revisión de `99 §98`).
     input.disabled = false;
+    // Mientras se lee, lo dice (antes quedaba el texto anterior, p. ej. «Inicie
+    // sesión», durante toda la lectura; revisión de ADR-100).
+    if (!vista.querySelector('img')) vista.innerHTML = '<p class="fp-vacio">Consultando su firma…</p>';
     const dataUrl = await miFirma();
     if (dataUrl) {
       vista.innerHTML = `<img src="${esc(dataUrl)}" alt="Su firma registrada" class="fp-img">`;

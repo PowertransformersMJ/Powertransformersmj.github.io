@@ -12,7 +12,7 @@
 import { readFileSync } from 'node:fs';
 import { test, before, after, describe } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
-import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, collection, query, where, limit } from 'firebase/firestore';
+import { doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, serverTimestamp, collection, query, where, limit, writeBatch, Bytes } from 'firebase/firestore';
 import { ref, uploadBytes, getBytes, deleteObject, listAll } from 'firebase/storage';
 
 const PROJECT_ID = 'demo-sgm-rules';
@@ -52,9 +52,12 @@ before(async () => {
 });
 after(async () => { if (testEnv) await testEnv.cleanup(); });
 
-describe('Storage · firmas-equipo — solo su custodio', () => {
-  test('el custodio sube la firma de una persona de la lista con su autorización', async () => {
-    await assertSucceeds(uploadBytes(ref(st('fe_admin'), 'firmas-equipo/fe_admin/ERICK_VERGARA'), PNG, META()));
+// Desde ADR-100 las firmas del equipo viven en Firestore (Storage no entrega
+// las descargas al navegador): en Storage nadie sube; quedan leer y borrar lo
+// viejo. Lo vivo se prueba en tests-rules/firmas_firestore.rules.test.js.
+describe('Storage · firmas-equipo — solo su custodio (escritura retirada en ADR-100)', () => {
+  test('ADR-100: ni el custodio sube aquí (la firma vive en Firestore)', async () => {
+    await assertFails(uploadBytes(ref(st('fe_admin'), 'firmas-equipo/fe_admin/ERICK_VERGARA'), PNG, META()));
   });
   test('el custodio la lee; OTRO admin no la lee ni la pisa', async () => {
     await assertSucceeds(getBytes(ref(st('fe_admin'), 'firmas-equipo/fe_admin/JORGE_MIRANDA')));
@@ -96,27 +99,50 @@ describe('Storage · firmas-equipo — solo su custodio', () => {
   });
 });
 
-describe('Firestore · registros de las firmas del equipo — solo se agrega', () => {
+describe('Firestore · registros de las firmas del equipo — solo se agrega, y atado a su firma (ADR-100)', () => {
+  const AUT = { fecha: '2026-09-20', medio: 'correo del 20/09/2026' };
   const alta = (uid, extra = {}) => ({
-    tipo: 'alta', persona: 'ERICK_VERGARA', autorizacion: { fecha: '2026-09-20', medio: 'correo del 20/09/2026' },
+    tipo: 'alta', persona: 'ERICK_VERGARA', autorizacion: AUT,
     huella: HUELLA, custodio: uid, custodioNombre: uid === 'fe_admin' ? 'Custodio Uno' : 'Tecnico', en: serverTimestamp(), ...extra
   });
-  test('el custodio registra un alta y un retiro; no los edita ni los borra', async () => {
-    await assertSucceeds(setDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_r1'), alta('fe_admin')));
-    await assertSucceeds(setDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_r2'),
-      { tipo: 'retiro', persona: 'ERICK_VERGARA', custodio: 'fe_admin', custodioNombre: 'Custodio Uno', en: serverTimestamp() }));
+  /** Registro + su firma en UN lote, como lo hace la página (solo cambia lo que se prueba). */
+  const conFirma = (uid, regId, extra = {}) => {
+    const d = db(uid);
+    const reg = alta(uid, extra);
+    const b = writeBatch(d);
+    b.set(doc(d, 'firmas_equipo_registro', regId), reg);
+    b.set(doc(d, 'firmas_equipo', uid, 'personas', reg.persona), {
+      imagen: Bytes.fromUint8Array(PNG), huella: HUELLA, autorizacion: AUT, registro: regId, en: serverTimestamp() });
+    return b.commit();
+  };
+  test('el custodio registra un alta (con su firma) y un retiro (al quitarla); no los edita ni los borra', async () => {
+    await assertSucceeds(conFirma('fe_admin', 'fe_r1'));
+    const d = db('fe_admin');
+    const b = writeBatch(d);
+    b.delete(doc(d, 'firmas_equipo/fe_admin/personas/ERICK_VERGARA'));
+    b.set(doc(d, 'firmas_equipo_registro/fe_r2'),
+      { tipo: 'retiro', persona: 'ERICK_VERGARA', custodio: 'fe_admin', custodioNombre: 'Custodio Uno', en: serverTimestamp() });
+    await assertSucceeds(b.commit());
     await assertSucceeds(getDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_r1')));
     await assertFails(updateDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_r1'), { huella: 'b'.repeat(64) }));
     await assertFails(deleteDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_r1')));
   });
+  test('un registro SUELTO no se admite: ni alta sin su firma, ni retiro con la firma viva', async () => {
+    await assertFails(setDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_s1'), alta('fe_admin', { persona: 'JORGE_RHENALS' })));
+    await assertSucceeds(conFirma('fe_admin', 'fe_s2', { persona: 'JORGE_RHENALS' }));
+    await assertFails(setDoc(doc(db('fe_admin'), 'firmas_equipo_registro/fe_s3'),
+      { tipo: 'retiro', persona: 'JORGE_RHENALS', custodio: 'fe_admin', custodioNombre: 'Custodio Uno', en: serverTimestamp() }));
+    // Un segundo «alta» sobre una firma que ya existe tampoco: eso es un reemplazo.
+    await assertFails(conFirma('fe_admin', 'fe_s4', { persona: 'JORGE_RHENALS' }));
+    await assertSucceeds(conFirma('fe_admin', 'fe_s5', { persona: 'JORGE_RHENALS', tipo: 'reemplazo' }));
+  });
   test('no se registra a nombre de otro, ni con fecha del cliente, ni persona o tipo inválidos', async () => {
-    const d = db('fe_admin');
-    await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x1'), alta('fe_admin', { custodio: 'fe_admin2' })));
-    await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x2'), alta('fe_admin', { en: new Date() })));
-    await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x3'), alta('fe_admin', { persona: 'JUAN_PEREZ' })));
-    await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x4'), alta('fe_admin', { tipo: 'borrado' })));
-    await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x5'), alta('fe_admin', { custodioNombre: 'Otro Nombre' })));
-    await assertFails(setDoc(doc(d, 'firmas_equipo_registro/fe_x6'), alta('fe_admin', { autorizacion: { fecha: '2026-09-20', medio: 'ok' } })));
+    await assertFails(conFirma('fe_admin', 'fe_x1', { custodio: 'fe_admin2' }));
+    await assertFails(conFirma('fe_admin', 'fe_x2', { en: new Date() }));
+    await assertFails(conFirma('fe_admin', 'fe_x3', { persona: 'JUAN_PEREZ' }));
+    await assertFails(conFirma('fe_admin', 'fe_x4', { tipo: 'borrado' }));
+    await assertFails(conFirma('fe_admin', 'fe_x5', { custodioNombre: 'Otro Nombre' }));
+    await assertFails(conFirma('fe_admin', 'fe_x6', { autorizacion: { fecha: '2026-09-20', medio: 'ok' } }));
   });
   test('otro admin NO ve el registro de un custodio: ni por documento ni listando', async () => {
     await assertFails(getDoc(doc(db('fe_admin2'), 'firmas_equipo_registro/fe_r1')));
@@ -126,7 +152,7 @@ describe('Firestore · registros de las firmas del equipo — solo se agrega', (
       where('custodio', '==', 'fe_admin'), limit(50))));
   });
   test('un técnico no registra', async () => {
-    await assertFails(setDoc(doc(db('fe_tech'), 'firmas_equipo_registro/fe_t1'), alta('fe_tech')));
+    await assertFails(conFirma('fe_tech', 'fe_t1'));
   });
 
   const emision = (extra = {}) => ({

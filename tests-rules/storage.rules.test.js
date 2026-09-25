@@ -114,7 +114,11 @@ after(async () => { if (testEnv) await testEnv.cleanup(); });
 // ══════════════════════════════════════════════════════════════
 // FIRMAS — la promesa de ADR-071
 // ══════════════════════════════════════════════════════════════
-describe('storage.rules · firmas/{uid} — la firma es SOLO de su dueño (ADR-071)', () => {
+// Desde ADR-100 la firma propia vive en Firestore `firmas/{uid}` (Storage no
+// entrega las descargas al navegador): aquí nadie SUBE; queda leer y borrar la
+// copia vieja del dueño. Las promesas de ADR-071 se prueban ahora también en
+// tests-rules/firmas_firestore.rules.test.js.
+describe('storage.rules · firmas/{uid} — la firma es SOLO de su dueño (ADR-071; escritura retirada en ADR-100)', () => {
 
   test('sin sesión NO puede leer una firma', async () => {
     await assertFails(getBytes(ref(anonimo(), 'firmas/s_tech')));
@@ -128,8 +132,8 @@ describe('storage.rules · firmas/{uid} — la firma es SOLO de su dueño (ADR-0
     await assertSucceeds(getBytes(ref(como('s_tech'), 'firmas/s_tech')));
   });
 
-  test('el dueño SÍ sube su propia firma (PNG ≤ 1 MB)', async () => {
-    await assertSucceeds(uploadBytes(ref(como('s_tech'), 'firmas/s_tech'), PNG, PNG_META));
+  test('ADR-100: ni el dueño SUBE aquí (la firma vive en Firestore)', async () => {
+    await assertFails(uploadBytes(ref(como('s_tech'), 'firmas/s_tech'), PNG, PNG_META));
   });
 
   // 🔒 EL INVARIANTE CENTRAL: si esto se rompe, el sitio sirve para
@@ -210,8 +214,8 @@ describe('storage.rules · firmas/{uid} — la firma es SOLO de su dueño (ADR-0
 
   // El bootstrap legacy es la puerta que más fácil se cuela como superusuario.
   // Sobre firmas NO se cuela: es dueño de la suya y de ninguna otra.
-  test('el bootstrap legacy es dueño de SU firma y de ninguna otra', async () => {
-    await assertSucceeds(
+  test('el bootstrap legacy no lee la firma de otro (y aquí ya nadie sube, ADR-100)', async () => {
+    await assertFails(
       uploadBytes(ref(como('s_bootstrap'), 'firmas/s_bootstrap'), PNG, PNG_META)
     );
     await assertFails(getBytes(ref(como('s_bootstrap'), 'firmas/s_tech')));
@@ -316,8 +320,10 @@ describe('storage.rules · límites conocidos (decisión pendiente del Ingeniero
   // los bytes). Se fija aquí para que nadie cite esa línea como una garantía
   // de formato que no da. Impacto acotado: la ruta es la propia, el tope de
   // 1 MB sigue vigente y el visor arma el dataURL con 'image/png' fijo.
-  test('🟡 HOY PERMITE: un archivo que NO es PNG entra si se declara image/png', async () => {
-    await assertSucceeds(
+  // ✅ CERRADO en ADR-100: aquí ya nadie sube. En Firestore (`firmas/{uid}`) la
+  // página comprueba los BYTES (esPngPorBytes) antes de guardar.
+  test('✅ ADR-100: un archivo que NO es PNG ya no entra (nadie sube a firmas/)', async () => {
+    await assertFails(
       uploadBytes(ref(como('s_tech'), 'firmas/s_tech'), PDF, PNG_META)
     );
   });
