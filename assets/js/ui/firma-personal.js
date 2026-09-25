@@ -70,6 +70,10 @@ export function montarFirmaPersonal(contenedor, opts = {}) {
       input.disabled = true;
       return;
     }
+    // Con sesión se puede subir: el panel suele montarse ANTES de que la sesión
+    // llegue y la rama de arriba lo deshabilitó; sin esto quedaba bloqueado para
+    // siempre (revisión de `99 §98`).
+    input.disabled = false;
     const dataUrl = await miFirma();
     if (dataUrl) {
       vista.innerHTML = `<img src="${esc(dataUrl)}" alt="Su firma registrada" class="fp-img">`;

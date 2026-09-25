@@ -125,9 +125,11 @@
   const panelFirma = montarFirmaPersonal(document.getElementById('panelMiFirma'), {
     onCambio() { window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); }
   });
+  // El módulo de fichas ya espera la sesión por su cuenta (`firmaSesion`); aquí
+  // solo se repinta el panel. Avisar también al módulo descargaba la firma de
+  // más (revisión de §98).
   window.addEventListener('sgm:session-ready', () => {
     try { panelFirma && panelFirma.refrescar(); } catch (_) { /* el panel explica su estado */ }
-    window.dispatchEvent(new CustomEvent('sgm:firma-cambiada'));
   }, { once: true });
 
   const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');

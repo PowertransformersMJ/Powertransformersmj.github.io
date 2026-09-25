@@ -124,7 +124,12 @@ describe('Firma estampada: solo en la casilla de quien tiene la sesión (`99 §9
     const plan = { sel_elab: 'otro', nom_elab: 'Ana Pérez', occ_elab: 'Cargo' };
     assert.equal(casillaEsDeLaSesion('elab', plan, 'ANA PEREZ'), true);
     assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'MIGUEL JIMENEZ' }, 'Miguel A. Jimenez'), false);
-    // La Ñ no se confunde con la N (`§71.4`).
+    // La Ñ no se confunde con la N (`§71.4`), tampoco pegada como «N» + tilde
+    // combinable (NFD), que es como llega desde algunos PDF (revisión de §98).
     assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'JUAN MUÑOZ' }, 'Juan Munoz'), false);
+    const nfd = 'JUAN MUN\u0303OZ';
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: nfd }, 'Juan Munoz'), false);
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: nfd }, 'Juan Muñoz'), true);
+    assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'JUAN MUNOZ' }, 'Juan Mun\u0303oz'), false);
   });
 });

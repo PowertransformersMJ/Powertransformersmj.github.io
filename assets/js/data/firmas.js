@@ -18,7 +18,7 @@ import {
   ref as storageRef, getBytes, uploadBytes, deleteObject
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-storage.js';
 
-import { getStorageSafe, isFirebaseConfigured } from '../firebase-init.js';
+import { getStorageSafe, getAuthSafe, isFirebaseConfigured } from '../firebase-init.js';
 import { getSession } from '../auth/session-guard.js';
 import { validarArchivoFirma, TIPO_REQUERIDO } from '../domain/firmas.js';
 
@@ -34,7 +34,17 @@ let _cacheUid = null;
 
 function uidActual() {
   const s = getSession();
-  return (s && s.user && s.user.uid) || null;
+  const uid = (s && s.user && s.user.uid) || null;
+  if (!uid) return null;
+  // La sesión publicada por el guard no se entera de un cierre de sesión hecho
+  // en OTRA pestaña; Firebase Auth sí (sincroniza entre pestañas). Si el usuario
+  // vivo ya no es el de la sesión, no hay firma que leer ni estampar (revisión
+  // de `99 §98`).
+  try {
+    const auth = getAuthSafe();
+    if (auth && auth.currentUser !== undefined && (!auth.currentUser || auth.currentUser.uid !== uid)) return null;
+  } catch (_) { /* sin Auth no se puede comprobar: manda la sesión publicada */ }
+  return uid;
 }
 
 function refDeMiFirma() {
@@ -44,7 +54,12 @@ function refDeMiFirma() {
   return storageRef(st, `${PREFIJO}/${uid}`);
 }
 
-function invalidar() { _cache = undefined; _cacheUid = null; }
+// Lectura en curso: las llamadas que llegan mientras tanto la comparten, en vez
+// de descargar la misma firma dos o tres veces (revisión de `99 §98`).
+let _pendiente = null;
+let _pendienteUid = null;
+
+function invalidar() { _cache = undefined; _cacheUid = null; _pendiente = null; _pendienteUid = null; }
 
 /** ArrayBuffer → base64 POR TROZOS. `String.fromCharCode(...bytes)` con un
  *  PNG de 1 MB pasa un millón de argumentos y revienta la pila de llamadas:
@@ -78,22 +93,33 @@ export async function miFirma() {
   const uid = uidActual();
   if (!uid) return null;
   if (_cacheUid === uid && _cache !== undefined) return _cache;
+  if (_pendiente && _pendienteUid === uid) return _pendiente;
 
   const r = refDeMiFirma();
   if (!r) return null;
-  try {
-    const buf = await getBytes(r, 2 * 1024 * 1024);   // tope defensivo de lectura
-    _cache = `data:${TIPO_REQUERIDO};base64,${aBase64(buf)}`;
-  } catch (e) {
-    // 'storage/object-not-found' es el caso NORMAL de quien aún no subió su
-    // firma: no es un error que merezca ruido en consola.
-    if (!(e && e.code === 'storage/object-not-found')) {
-      console.warn('[firmas] no se pudo leer la firma propia:', e && e.code || e);
+  _pendienteUid = uid;
+  _pendiente = (async () => {
+    try {
+      const buf = await getBytes(r, 2 * 1024 * 1024);   // tope defensivo de lectura
+      _cache = `data:${TIPO_REQUERIDO};base64,${aBase64(buf)}`;
+      _cacheUid = uid;
+    } catch (e) {
+      // 'storage/object-not-found' es el caso NORMAL de quien aún no subió su
+      // firma: se recuerda como «no hay». Cualquier otro fallo (red, cuota) NO
+      // se guarda: la próxima lectura lo reintenta (revisión de `99 §98`).
+      if (e && e.code === 'storage/object-not-found') {
+        _cache = null;
+        _cacheUid = uid;
+      } else {
+        console.warn('[firmas] no se pudo leer la firma propia:', e && e.code || e);
+      }
+    } finally {
+      _pendiente = null;
+      _pendienteUid = null;
     }
-    _cache = null;
-  }
-  _cacheUid = uid;
-  return _cache;
+    return _cacheUid === uid ? _cache : null;
+  })();
+  return _pendiente;
 }
 
 /**

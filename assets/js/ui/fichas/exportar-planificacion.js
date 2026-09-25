@@ -525,6 +525,14 @@ export function escribirFirmantes(xml, plan = {}) {
     const f = firmanteDe(k, plan);
     // La fecha sale siempre «dd/mm/aaaa», como la escribe el calendario (`99 §91`).
     const valor = { 'Nombre:': f.nombre, 'Ocupación:': f.ocupacion, 'Fecha:': fechaParaPapel(f.fecha) };
+    // «Firma:» y «Fecha:» AL PIE de cada cuadro, alineadas en los cinco (como en
+    // la pantalla, `§89`): el cuadro de texto del firmante pasa a alinearse
+    // abajo. Así la línea de firma no se mueve con los renglones del nombre y
+    // del cargo, ni con la letra que cada programa use en lugar de la DIN de la
+    // plantilla (`99 §98`), y la firma estampada cae siempre en su línea.
+    ancla = ancla.replace(/<xdr:sp\b[\s\S]*?<\/xdr:sp>/g, (sp) => (/Nombre:/.test(sp)
+      ? sp.replace(/(<a:bodyPr\b[^>]*?)\sanchor="t"/, (m, a) => a + ' anchor="b"')
+      : sp));
     // Reemplazo con FUNCIÓN: un «$» del nombre no debe leerse como orden (`§87`).
     return ancla.replace(/<a:p>[\s\S]*?<\/a:p>/g, (p) => {
       const t = textoParrafo(p).trim();
@@ -636,40 +644,42 @@ export function cajasDeFirma(dibujoXml, geo) {
     const k = titulo ? TITULO_CASILLA[titulo] : 'apr2';
     const a = pos(ancla, 'from'); const b = pos(ancla, 'to');
     if (!a || !b || cajas[k]) continue;
-    const body = (ancla.match(/<xdr:sp\b[\s\S]*?<a:bodyPr\b[^>]*>(?=[\s\S]*?Nombre:)/) || [''])[0];
-    const lIns = attrNum((body.match(/<a:bodyPr\b[^>]*>$/) || [''])[0], 'lIns');
-    cajas[k] = { x0: a.x, y0: a.y, x1: b.x, y1: b.y, lIns: lIns != null ? lIns : 91440 };
+    // Cuadro de TEXTO del firmante: en un grupo, su lugar dentro del grupo se
+    // lleva al rectángulo del ancla (coordenadas hijas → ancla).
+    const sps = [...ancla.matchAll(/<xdr:sp\b[\s\S]*?<\/xdr:sp>/g)].map((x) => x[0]);
+    const spTexto = sps.find((x) => /Nombre:/.test(x)) || '';
+    const body = (spTexto.match(/<a:bodyPr\b[^>]*>/) || [''])[0];
+    const lIns = attrNum(body, 'lIns');
+    const ch = ancla.match(/<a:chOff x="(-?\d+)" y="(-?\d+)"\/><a:chExt cx="(\d+)" cy="(\d+)"\/>/);
+    const xf = spTexto.match(/<a:off x="(-?\d+)" y="(-?\d+)"\/><a:ext cx="(\d+)" cy="(\d+)"\/>/);
+    let pieTexto = b.y;
+    if (ch && xf && +ch[4] > 0) {
+      pieTexto = a.y + ((+xf[2] + +xf[4]) - +ch[2]) / +ch[4] * (b.y - a.y);
+    }
+    cajas[k] = { x0: a.x, y0: a.y, x1: b.x, y1: b.y, lIns: lIns != null ? lIns : 91440, pieTexto };
   }
   // El cuadro de Aprobación abarca también la segunda casilla: la primera firma
   // va en su mitad izquierda, sin montarse sobre la del segundo aprobador.
-  if (cajas.apr && cajas.apr2) {
-    cajas.apr.x1 = Math.min(cajas.apr.x1, cajas.apr2.x0);
-    // La segunda casilla de Aprobación es un cuadro de texto suelto DENTRO del
-    // marco de Aprobación, que empieza más abajo: su «Firma:» cae un renglón
-    // por debajo de la de las demás (render de LibreOffice, `§98`). Se mide
-    // desde el fondo del marco, como las demás, más ese renglón.
-    cajas.apr2.fondo = cajas.apr.y1 + Math.round(RENGLON_FIRMA * 1.35);
-  }
+  if (cajas.apr && cajas.apr2) cajas.apr.x1 = Math.min(cajas.apr.x1, cajas.apr2.x0);
   return cajas;
 }
 
-/** Un renglón del cuadro de firma (9 pt) en EMU. */
-const RENGLON_FIRMA = Math.round(9 * 1.15 * EMU_PT);
 /**
- * Del fondo del marco al pie de la firma. Calibrado con el render de la
- * plantilla oficial (LibreOffice): el renglón «Firma:» de Elaboración, Revisión,
- * Aprobación y Recibe queda a la misma altura, casi tres renglones sobre el
- * fondo del marco (debajo va «Fecha:», que la «J» de una firma no debe tapar). La plantilla es fija; una prueba la vigila.
+ * Del pie del cuadro de texto al pie de la firma. Con el texto alineado abajo,
+ * «Fecha:» es el último renglón y «Firma:» el de encima, a la misma altura en
+ * los cinco cuadros (render de LibreOffice de la plantilla oficial): la firma
+ * apoya su trazo en esa línea y no baja hasta tapar la fecha. Una prueba vigila
+ * que cada firma caiga dentro de su casilla.
  */
-const PIE_SOBRE_FONDO = Math.round(RENGLON_FIRMA * 2.75);
+const PIE_SOBRE_TEXTO = Math.round(11.5 * EMU_PT);
 /** Ancho del rótulo «Firma:» más un respiro: la firma empieza a su derecha. */
 const TRAS_ROTULO = Math.round(31 * EMU_PT);
-/** Alto de la firma estampada (≈ 0,36 pulgadas). */
-const ALTO_FIRMA = Math.round(26 * EMU_PT);
+/** Alto de la firma estampada (≈ 0,31 pulgadas). */
+const ALTO_FIRMA = Math.round(22 * EMU_PT);
 
 /**
- * Dónde va la firma dentro de su casilla: su pie apoyado en la línea «Firma:»,
- * a la derecha del rótulo y sin salirse del cuadro. `rel` = ancho / alto.
+ * Dónde va la firma dentro de su casilla: su trazo apoyado en la línea
+ * «Firma:», a la derecha del rótulo y sin salirse del cuadro. `rel` = ancho / alto.
  */
 export function ubicacionFirma(caja, rel) {
   const r = rel > 0 && Number.isFinite(rel) ? rel : 2.5;
@@ -678,7 +688,7 @@ export function ubicacionFirma(caja, rel) {
   let ancho = Math.round(alto * r);
   const anchoMax = Math.max(0, caja.x1 - x - Math.round(4 * EMU_PT));
   if (ancho > anchoMax) { ancho = anchoMax; alto = Math.round(ancho / r); }
-  const pie = (caja.fondo != null ? caja.fondo : caja.y1) - PIE_SOBRE_FONDO;
+  const pie = (caja.pieTexto != null ? caja.pieTexto : caja.y1) - PIE_SOBRE_TEXTO;
   return { x, y: Math.max(caja.y0, pie - alto), cx: ancho, cy: alto };
 }
 

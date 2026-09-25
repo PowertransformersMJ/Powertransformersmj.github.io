@@ -59,7 +59,10 @@ export function normalizarNombre(n) {
   // quitar los diacríticos se convertiría en N. Eso haría que MUÑOZ y MUNOZ
   // se tomaran por la misma persona — y en una firma, equivocarse hacia el
   // lado permisivo es exactamente lo que no se puede permitir.
-  return String(n == null ? '' : n)
+  // Primero se RECOMPONE (NFC): una «Ñ» pegada como «N» + tilde combinable
+  // (así llega desde algunos PDF y nombres de archivo de macOS) no es una Ñ
+  // precompuesta y se perdía al quitar diacríticos (revisión de `99 §98`).
+  return String(n == null ? '' : n).normalize('NFC')
     .replace(/ñ/g, '\u0001').replace(/Ñ/g, '\u0002')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/\u0001/g, 'ñ').replace(/\u0002/g, 'Ñ')

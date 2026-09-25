@@ -3006,7 +3006,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const r = await cfg.firmaSesion();
       firmaSesion.hay = !!r;
       firmaSesion.nombre = (r && r.nombre) || '';
-      firmaSesion.dataUrl = (r && /^data:image\/png;base64,/.test(r.dataUrl || '')) ? r.dataUrl : null;
+      firmaSesion.dataUrl = (r && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) ? r.dataUrl : null;
       firmaSesion.rel = firmaSesion.dataUrl ? await medirFirma(firmaSesion.dataUrl) : 2.5;
     } catch (err) {
       console.warn('[fichas/panel] no se pudo cargar la firma de la sesión:', err);
@@ -3029,7 +3029,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     modalCuerpo.querySelectorAll('[data-firma-slot]').forEach((slot) => {
       const k = slot.getAttribute('data-firma-slot');
       const va = !!firmaSesion.dataUrl && casillaEsDeLaSesion(k, P, firmaSesion.nombre);
-      slot.innerHTML = va ? '<img src="' + firmaSesion.dataUrl + '" alt="Firma estampada">' : '';
+      slot.textContent = '';
+      if (va) {
+        const img = document.createElement('img');
+        img.alt = 'Firma estampada';
+        img.src = firmaSesion.dataUrl;
+        slot.appendChild(img);
+      }
     });
     const nota = modalCuerpo.querySelector('[data-firma-nota]');
     if (!nota) return;
@@ -3041,8 +3047,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Por qué va o no va la firma (L-69: un vacío se explica). */
   function textoNotaFirma(P) {
     if (typeof cfg.firmaSesion !== 'function' || !firmaSesion.hay) return '';
-    if (!firmaSesion.dataUrl) return 'Aún no ha cargado su firma: puede subirla en «Mi firma», en esta página. '
-      + 'Mientras tanto la ficha sale para firmar a mano.';
+    if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
+      + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.';
     const ks = casillasDeLaSesion(P, firmaSesion.nombre);
     if (!ks.length) return 'Su firma no se estampa en esta ficha: su nombre de perfil («' + firmaSesion.nombre
       + '») no es el de ninguna casilla. Las casillas salen en blanco para firmar a mano.';
@@ -3050,7 +3056,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const f = FIRMAS.find((x) => x.k === k);
       return f ? f.rol + (f.segundo ? ' (segundo firmante)' : '') : k;
     });
-    return 'Su firma va estampada en ' + nombres.join(' y ') + ', en pantalla y en el Excel. '
+    // El documento de Mantenimiento no exporta Excel: no se le promete.
+    return 'Su firma va estampada en ' + nombres.join(' y ')
+      + (documento === 'salud' ? ', en pantalla. ' : ', en pantalla y en el Excel. ')
       + 'Las demás casillas salen en blanco para firmar a mano.';
   }
 
@@ -3401,6 +3409,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const mod = cfg.exportador
         ? { exportarFichaPlanificacion: cfg.exportador, nombreArchivoFicha: null }
         : await import('./exportar-planificacion.js');
+      // La firma se vuelve a pedir justo antes de armar el Excel: si la sesión
+      // se cerró en otra pestaña, ya no hay firma que estampar (revisión §98).
+      await cargarFirmaSesion();
       const estado = estadoParaExportar(actual);
       // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo
       // se pregunta si falta algo: preguntar por costumbre enseña a decir que sí
@@ -3616,6 +3627,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // cargo que quedó escrito (revisión §89).
       if (/^nom_/.test(plan) && t.closest('[data-firmante]')) {
         st.plan['sel_' + plan.slice(4)] = OTRA_PERSONA;
+        // El segundo aprobador depende del primero (no se repite): si cambia el
+        // nombre escrito del primero, la casilla del segundo se repinta, o la
+        // firma podía quedar bajo el nombre de otra persona (revisión de §98).
+        if (plan === 'nom_apr') {
+          const caja = modalCuerpo.querySelector('[data-firmante="apr2"]');
+          const f = FIRMAS.find((x) => x.k === 'apr2');
+          if (caja && f && firmanteHTML) caja.outerHTML = firmanteHTML(f);
+        }
         pintarFirmasEstampadas();
       }
       tocarFicha(actual);

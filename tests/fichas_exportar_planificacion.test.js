@@ -508,6 +508,13 @@ describe('Firma estampada en el PE.02081 (`99 §98`)', () => {
     assert.ok(a.x + a.cx <= cajas.apr2.x0);
   });
 
+  test('«Firma:» y «Fecha:» al pie: el texto de los cinco firmantes se alinea abajo (con o sin firma)', async () => {
+    const { dibujo } = await archivos({ plan: PLAN });
+    const textos = [...dibujo.matchAll(/<xdr:sp\b[\s\S]*?<\/xdr:sp>/g)].map((m) => m[0]).filter((sp) => /Nombre:/.test(sp));
+    assert.equal(textos.length, 5);
+    for (const sp of textos) assert.match(sp, /<a:bodyPr\b[^>]*anchor="b"/);
+  });
+
   test('solo PNG en dataURL; una casilla desconocida o una imagen inválida no estampan nada', () => {
     const r1 = estamparFirmas('<xdr:wsDr></xdr:wsDr>', '<Relationships></Relationships>', '<worksheet/>', { zzz: { dataUrl: PNG } });
     assert.equal(r1.medios.length, 0);
