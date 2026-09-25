@@ -21,7 +21,12 @@ import {
   pendientesFichaPlan,
   exportarFichaPlanificacion,
   escribirFirmantes,
-  imagenesDeFirmaAlFondo
+  imagenesDeFirmaAlFondo,
+  estamparFirmas,
+  cajasDeFirma,
+  geometriaHoja,
+  ubicacionFirma,
+  bytesDePng
 } from '../assets/js/ui/fichas/exportar-planificacion.js';
 import { celdaCSV } from '../assets/js/ui/fichas/evaluacion-masiva.js';
 import { FIRMAS } from '../assets/js/ui/fichas/panel.js';
@@ -452,5 +457,62 @@ describe('§89 · quién firma llega al Excel, cada uno en SU cuadro', () => {
     const sinFirma = (x) => anclas(x).filter((a) => !renglones(a).some((t) => /^(Nombre:|Fecha de Entrega|Año de entrada)/.test(t)));
     assert.deepEqual(sinFirma(xml).sort(), sinFirma(plantilla).sort());
     assert.equal(escribirFirmantes('<x/>', {}), '<x/>');
+  });
+});
+
+describe('Firma estampada en el PE.02081 (`99 §98`)', () => {
+  // PNG de PRUEBA de 1×1 px: el repo es público y jamás lleva una firma real.
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+  const PLAN = { proyecto: 'P', municipio: 'M', alcance: 'A', beneficios: 'B' };
+  const DIBUJO = 'xl/drawings/drawing1.xml';
+  const RELS = 'xl/drawings/_rels/drawing1.xml.rels';
+  async function archivos(estado) {
+    const bytes = await exportarFichaPlanificacion(EQUIPO, estado, { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array' });
+    const zip = await JSZip.loadAsync(bytes);
+    return { zip, dibujo: await zip.file(DIBUJO).async('string'), rels: await zip.file(RELS).async('string') };
+  }
+
+  test('sin firmas, el dibujo y sus relaciones salen igual que siempre', async () => {
+    const a = await archivos({ plan: PLAN });
+    const b = await archivos({ plan: PLAN, firmas: {} });
+    assert.equal(a.dibujo, b.dibujo);
+    assert.equal(a.rels, b.rels);
+    assert.ok(!/rIdFirma/.test(a.rels) && !a.zip.file(/firma-/).length);
+  });
+
+  test('con la firma de UNA casilla, entra esa sola: imagen, relación y ancla', async () => {
+    const { zip, dibujo, rels } = await archivos({ plan: PLAN, firmas: { elab: { dataUrl: PNG, rel: 2.5 } } });
+    assert.ok(zip.file('xl/media/firma-elab.png'), 'la imagen de la firma');
+    assert.equal(zip.file(/xl\/media\/firma-/).length, 1);
+    assert.match(rels, /Id="rIdFirmaelab"[^>]*Target="\.\.\/media\/firma-elab\.png"/);
+    assert.equal((dibujo.match(/r:embed="rIdFirma/g) || []).length, 1);
+    const ids = [...dibujo.matchAll(/<xdr:cNvPr id="(\d+)"/g)].map((m) => m[1]);
+    assert.equal(new Set(ids).size, ids.length, 'ids únicos en el dibujo');
+  });
+
+  test('cada firma cae DENTRO de su casilla, sobre la zona de firmas', async () => {
+    const plantilla = await JSZip.loadAsync(readFileSync(PLANTILLA));
+    const hoja = await plantilla.file(HOJA).async('string');
+    const dib = await plantilla.file(DIBUJO).async('string');
+    const geo = geometriaHoja(hoja);
+    const cajas = cajasDeFirma(dib, geo);
+    assert.deepEqual(Object.keys(cajas).sort(), ['apr', 'apr2', 'elab', 'rec', 'rev']);
+    for (const [k, c] of Object.entries(cajas)) {
+      const u = ubicacionFirma(c, 2.5);
+      assert.ok(u.x > c.x0 && u.x + u.cx <= c.x1, k + ': dentro a lo ancho');
+      assert.ok(u.y >= c.y0 && u.y + u.cy <= Math.max(c.y1, c.fondo || 0), k + ': dentro a lo alto');
+      assert.ok(u.cx > 0 && u.cy > 0);
+    }
+    // La primera de Aprobación no se monta sobre la segunda.
+    const a = ubicacionFirma(cajas.apr, 2.5);
+    assert.ok(a.x + a.cx <= cajas.apr2.x0);
+  });
+
+  test('solo PNG en dataURL; una casilla desconocida o una imagen inválida no estampan nada', () => {
+    const r1 = estamparFirmas('<xdr:wsDr></xdr:wsDr>', '<Relationships></Relationships>', '<worksheet/>', { zzz: { dataUrl: PNG } });
+    assert.equal(r1.medios.length, 0);
+    assert.equal(bytesDePng('data:image/jpeg;base64,AAAA'), null);
+    assert.equal(bytesDePng('https://ejemplo.invalid/firma.png'), null);
+    assert.ok(bytesDePng(PNG) instanceof Uint8Array);
   });
 });

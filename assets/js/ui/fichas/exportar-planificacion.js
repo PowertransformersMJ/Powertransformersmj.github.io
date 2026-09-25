@@ -561,6 +561,191 @@ export function imagenesDeFirmaAlFondo(xml) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+   FIRMA ESTAMPADA (`99 §98`)
+   ── La firma de QUIEN TIENE LA SESIÓN, solo en su casilla (`§71`). El módulo
+      de la ficha decide de quién es cada casilla (`casillaEsDeLaSesion`) y
+      entrega aquí únicamente esas; este exportador no sabe de sesiones ni
+      puede pedir la firma de nadie. Se dibuja sobre la línea «Firma:», a la
+      derecha del rótulo, como iban las firmas escaneadas que la plantilla
+      tuvo en su día (sus huecos blancos siguen al fondo, `§89`).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const EMU_PX = 9525;
+const EMU_PT = 12700;
+/** Ancho de columna de Excel (en caracteres) → píxeles, con dígito máximo de 7 px. */
+const anchoColumnaPx = (w) => Math.trunc(((256 * w + Math.trunc(128 / 7)) / 256) * 7);
+const attrNum = (tag, nombre) => {
+  const m = tag.match(new RegExp('\\s' + nombre + '="([\\d.]+)"'));
+  return m ? +m[1] : null;
+};
+
+/**
+ * Geometría de la hoja (en EMU): dónde empieza cada columna y cada fila, y la
+ * conversión inversa de un punto absoluto a celda + desplazamiento.
+ * @param {string} hojaXml  `xl/worksheets/sheet1.xml`
+ */
+export function geometriaHoja(hojaXml) {
+  const fmt = (hojaXml.match(/<sheetFormatPr\b[^>]*>/) || [''])[0];
+  const anchoDef = attrNum(fmt, 'defaultColWidth') || 8.43;
+  const altoDef = attrNum(fmt, 'defaultRowHeight') || 15;
+  const cols = [...hojaXml.matchAll(/<col\b[^>]*>/g)]
+    .map((m) => ({ min: attrNum(m[0], 'min'), max: attrNum(m[0], 'max'), w: attrNum(m[0], 'width') }));
+  const altos = {};
+  for (const m of hojaXml.matchAll(/<row r="(\d+)"([^>]*)>/g)) {
+    const ht = attrNum(m[2], 'ht');
+    if (ht != null) altos[+m[1] - 1] = ht;
+  }
+  const anchoCol = (c) => {
+    const k = cols.find((x) => c + 1 >= x.min && c + 1 <= x.max);
+    return anchoColumnaPx(k && k.w ? k.w : anchoDef) * EMU_PX;
+  };
+  const altoFila = (r) => Math.round((altos[r] != null ? altos[r] : altoDef) * EMU_PT);
+  const x = (col, off) => { let t = 0; for (let c = 0; c < col; c++) t += anchoCol(c); return t + off; };
+  const y = (row, off) => { let t = 0; for (let r = 0; r < row; r++) t += altoFila(r); return t + off; };
+  const aCelda = (valor, medida) => {
+    let i = 0; let resto = Math.max(0, Math.round(valor));
+    while (i < 20000 && resto >= medida(i)) { resto -= medida(i); i++; }
+    return { i, off: resto };
+  };
+  return {
+    x, y,
+    celda(X, Y) {
+      const c = aCelda(X, anchoCol); const r = aCelda(Y, altoFila);
+      return { col: c.i, colOff: c.off, row: r.i, rowOff: r.off };
+    }
+  };
+}
+
+/**
+ * Caja (en EMU absolutos) de cada casilla de firma del dibujo de la hoja 1,
+ * identificada igual que al escribir los firmantes (por su título; la segunda
+ * de Aprobación no lo lleva).
+ */
+export function cajasDeFirma(dibujoXml, geo) {
+  const cajas = {};
+  const pos = (ancla, t) => {
+    const m = ancla.match(new RegExp('<xdr:' + t + '><xdr:col>(\\d+)</xdr:col><xdr:colOff>(-?\\d+)</xdr:colOff>'
+      + '<xdr:row>(\\d+)</xdr:row><xdr:rowOff>(-?\\d+)</xdr:rowOff></xdr:' + t + '>'));
+    return m ? { x: geo.x(+m[1], +m[2]), y: geo.y(+m[3], +m[4]) } : null;
+  };
+  for (const m of dibujoXml.matchAll(/<xdr:twoCellAnchor\b[\s\S]*?<\/xdr:twoCellAnchor>/g)) {
+    const ancla = m[0];
+    const textos = [...ancla.matchAll(/<a:p>[\s\S]*?<\/a:p>/g)].map((p) => textoParrafo(p[0]).trim());
+    if (!textos.some((t) => t.startsWith('Nombre:'))) continue;
+    const titulo = textos.find((t) => TITULO_CASILLA[t]);
+    const k = titulo ? TITULO_CASILLA[titulo] : 'apr2';
+    const a = pos(ancla, 'from'); const b = pos(ancla, 'to');
+    if (!a || !b || cajas[k]) continue;
+    const body = (ancla.match(/<xdr:sp\b[\s\S]*?<a:bodyPr\b[^>]*>(?=[\s\S]*?Nombre:)/) || [''])[0];
+    const lIns = attrNum((body.match(/<a:bodyPr\b[^>]*>$/) || [''])[0], 'lIns');
+    cajas[k] = { x0: a.x, y0: a.y, x1: b.x, y1: b.y, lIns: lIns != null ? lIns : 91440 };
+  }
+  // El cuadro de Aprobación abarca también la segunda casilla: la primera firma
+  // va en su mitad izquierda, sin montarse sobre la del segundo aprobador.
+  if (cajas.apr && cajas.apr2) {
+    cajas.apr.x1 = Math.min(cajas.apr.x1, cajas.apr2.x0);
+    // La segunda casilla de Aprobación es un cuadro de texto suelto DENTRO del
+    // marco de Aprobación, que empieza más abajo: su «Firma:» cae un renglón
+    // por debajo de la de las demás (render de LibreOffice, `§98`). Se mide
+    // desde el fondo del marco, como las demás, más ese renglón.
+    cajas.apr2.fondo = cajas.apr.y1 + Math.round(RENGLON_FIRMA * 1.35);
+  }
+  return cajas;
+}
+
+/** Un renglón del cuadro de firma (9 pt) en EMU. */
+const RENGLON_FIRMA = Math.round(9 * 1.15 * EMU_PT);
+/**
+ * Del fondo del marco al pie de la firma. Calibrado con el render de la
+ * plantilla oficial (LibreOffice): el renglón «Firma:» de Elaboración, Revisión,
+ * Aprobación y Recibe queda a la misma altura, casi tres renglones sobre el
+ * fondo del marco (debajo va «Fecha:», que la «J» de una firma no debe tapar). La plantilla es fija; una prueba la vigila.
+ */
+const PIE_SOBRE_FONDO = Math.round(RENGLON_FIRMA * 2.75);
+/** Ancho del rótulo «Firma:» más un respiro: la firma empieza a su derecha. */
+const TRAS_ROTULO = Math.round(31 * EMU_PT);
+/** Alto de la firma estampada (≈ 0,36 pulgadas). */
+const ALTO_FIRMA = Math.round(26 * EMU_PT);
+
+/**
+ * Dónde va la firma dentro de su casilla: su pie apoyado en la línea «Firma:»,
+ * a la derecha del rótulo y sin salirse del cuadro. `rel` = ancho / alto.
+ */
+export function ubicacionFirma(caja, rel) {
+  const r = rel > 0 && Number.isFinite(rel) ? rel : 2.5;
+  const x = caja.x0 + (caja.lIns || 0) + TRAS_ROTULO;
+  let alto = ALTO_FIRMA;
+  let ancho = Math.round(alto * r);
+  const anchoMax = Math.max(0, caja.x1 - x - Math.round(4 * EMU_PT));
+  if (ancho > anchoMax) { ancho = anchoMax; alto = Math.round(ancho / r); }
+  const pie = (caja.fondo != null ? caja.fondo : caja.y1) - PIE_SOBRE_FONDO;
+  return { x, y: Math.max(caja.y0, pie - alto), cx: ancho, cy: alto };
+}
+
+/** dataURL PNG → bytes. */
+export function bytesDePng(dataUrl) {
+  const m = String(dataUrl || '').match(/^data:image\/png;base64,([A-Za-z0-9+/=]+)$/);
+  if (!m) return null;
+  const bin = atob(m[1]);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+
+/**
+ * Estampa las firmas entregadas en el dibujo de la hoja 1. PURA: devuelve el
+ * dibujo y sus relaciones nuevos, y los archivos de imagen que hay que añadir.
+ *
+ * @param {string} dibujoXml   `xl/drawings/drawing1.xml`
+ * @param {string} relsXml     `xl/drawings/_rels/drawing1.xml.rels`
+ * @param {string} hojaXml     `xl/worksheets/sheet1.xml` (geometría)
+ * @param {Object<string,{dataUrl:string, rel:number}>} firmas  solo las casillas de la sesión
+ * @returns {{dibujo:string, rels:string, medios:Array<{ruta:string, bytes:Uint8Array}>}}
+ */
+export function estamparFirmas(dibujoXml, relsXml, hojaXml, firmas) {
+  const medios = [];
+  const claves = Object.keys(firmas || {}).filter((k) => CASILLAS_ESTAMPABLES.includes(k));
+  if (!claves.length) return { dibujo: dibujoXml, rels: relsXml, medios };
+  const geo = geometriaHoja(hojaXml);
+  const cajas = cajasDeFirma(dibujoXml, geo);
+  let idMax = Math.max(0, ...[...dibujoXml.matchAll(/<xdr:cNvPr id="(\d+)"/g)].map((m) => +m[1]));
+  let dibujo = dibujoXml;
+  let rels = relsXml;
+  const anclas = [];
+  for (const k of claves) {
+    const caja = cajas[k];
+    const bytes = bytesDePng(firmas[k] && firmas[k].dataUrl);
+    if (!caja || !bytes) continue;
+    const u = ubicacionFirma(caja, firmas[k].rel);
+    const c = geo.celda(u.x, u.y);
+    const rid = 'rIdFirma' + k;
+    const ruta = 'xl/media/firma-' + k + '.png';
+    medios.push({ ruta, bytes });
+    rels = rels.replace('</Relationships>', () => '<Relationship Id="' + rid + '" '
+      + 'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" '
+      + 'Target="../media/firma-' + k + '.png"/></Relationships>');
+    idMax += 1;
+    anclas.push('<xdr:oneCellAnchor>'
+      + '<xdr:from><xdr:col>' + c.col + '</xdr:col><xdr:colOff>' + c.colOff + '</xdr:colOff>'
+      + '<xdr:row>' + c.row + '</xdr:row><xdr:rowOff>' + c.rowOff + '</xdr:rowOff></xdr:from>'
+      + '<xdr:ext cx="' + u.cx + '" cy="' + u.cy + '"/>'
+      + '<xdr:pic><xdr:nvPicPr><xdr:cNvPr id="' + idMax + '" name="Firma ' + k + '" descr="Firma"/>'
+      + '<xdr:cNvPicPr><a:picLocks noChangeAspect="1"/></xdr:cNvPicPr></xdr:nvPicPr>'
+      + '<xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" '
+      + 'r:embed="' + rid + '"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
+      + '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + u.cx + '" cy="' + u.cy + '"/></a:xfrm>'
+      + '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr></xdr:pic>'
+      + '<xdr:clientData/></xdr:oneCellAnchor>');
+  }
+  // Al FINAL del dibujo: encima de los cuadros de texto, como una firma real.
+  if (anclas.length) dibujo = dibujo.replace('</xdr:wsDr>', () => anclas.join('') + '</xdr:wsDr>');
+  return { dibujo, rels, medios };
+}
+
+/** Casillas donde se puede estampar una firma. */
+const CASILLAS_ESTAMPABLES = Object.freeze(['elab', 'rev', 'apr', 'apr2', 'rec']);
+
+/* ═══════════════════════════════════════════════════════════════════════════
    UNIFILAR: SVG → PNG rotado 90°
    ── El recuadro de las hojas 3 y 4 es VERTICAL y el unifilar se dibuja
       horizontal: se rota al rasterizar. Solo funciona en el navegador
@@ -613,6 +798,8 @@ export function svgAPngRotado(svg, anchoDestino, altoDestino, vbAncho, vbAlto) {
 const HOJA_FICHA  = 'xl/worksheets/sheet1.xml';   // «Ficha Técnica»
 const HOJA_ANEXO  = 'xl/worksheets/sheet6.xml';   // «Anexo AT»
 const DIBUJO_HOJA1 = 'xl/drawings/drawing1.xml';
+// Sus relaciones (imágenes): ahí se da de alta la firma estampada (`99 §98`).
+const RELS_DIBUJO_HOJA1 = 'xl/drawings/_rels/drawing1.xml.rels';
 // Verificado en drawing3/_rels y drawing4/_rels de la plantilla:
 const IMG_DIAG_ACTUAL = 'xl/media/image5.png';    // hoja 3 «Diagrama Actual»
 const IMG_DIAG_FUTURO = 'xl/media/image6.png';    // hoja 4 «Diagrama Futuro»
@@ -727,6 +914,22 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       // Quién firma: Nombre · Ocupación · Fecha de cada casilla (`99 §89`).
       xml = escribirFirmantes(xml, plan);
       xml = imagenesDeFirmaAlFondo(xml);
+      // La firma de la sesión, SOLO en sus casillas (`99 §98`). Si algo falla,
+      // la ficha sale igual, para firmar a mano: nunca se deja de emitir.
+      if (estado.firmas && Object.keys(estado.firmas).length) {
+        try {
+          const relsF = zip.file(RELS_DIBUJO_HOJA1);
+          const hojaF = zip.file(HOJA_FICHA);
+          if (relsF && hojaF) {
+            const r = estamparFirmas(xml, await relsF.async('string'), await hojaF.async('string'), estado.firmas);
+            if (r.medios.length) {
+              r.medios.forEach((m) => zip.file(m.ruta, m.bytes));
+              zip.file(RELS_DIBUJO_HOJA1, r.rels);
+              xml = r.dibujo;
+            }
+          }
+        } catch (e) { /* sin firma estampada: se firma a mano */ }
+      }
       zip.file(DIBUJO_HOJA1, xml);
     }
   } catch (e) { /* el dibujo se conserva tal cual */ }
