@@ -4095,7 +4095,7 @@ se agrega: `firmas_equipo_registro` (alta/reemplazo/retiro; get y list solo del 
 la lista sale SIN FIRMA (cuenta la opción elegida, no el texto); folio `F-XXXXXXXX`. *Pantalla*: panel «Firmas del
 equipo» (solo admin; normaliza la imagen: fondo transparente, recorte al trazo) y botón APARTE «Descargar con firmas
 del equipo» → tabla de confirmación → al confirmar relee todo y, si algo cambió, repinta y no descarga; **sin
-registro no hay descarga**; marca «SGM F-…» bajo cada firma del equipo y folio en el nombre del archivo. *Git*:
+registro no hay descarga**; marca «SGM F-…» bajo cada firma del equipo (**retirada en `§99.11`**: firmas limpias) y folio en el nombre del archivo. *Git*:
 `scripts/guardia-firmas.mjs` en el pre-commit (nombre, bytes sin extensión, huellas de la bóveda aunque se renombre,
 Excel emitidos) + `.gitignore` de `Ficha_Planificacion_*.xlsx`.
 **99.3 No-regresión.** «Descargar Excel» no cambia (solo la firma propia, `§98`); un técnico no ve nada nuevo; nada
@@ -4130,3 +4130,15 @@ con [PENDIENTE] (firmas sobre contenido que se completa a mano), firmas ajenas s
 ser custodio. Descartados con razón: el híbrido «el titular sube y consiente» (el custodio crea las cuentas; abre el
 SGM a 4 personas) y la copia maestra en Firestore (nombres de terceros para siempre, contra ADR-083). **Queda para el
 Ingeniero** el alcance y la prueba de cada autorización. Crudos → bóveda `2026-09-25-firmas-equipo/`.
+**99.11 Decisiones del Ingeniero tras el consejo externo (09-25) y lo que se ajustó (`8cf879d`).** Preguntado
+por el alcance del permiso, el destino del Excel, la marca y Recibe: *«Es verbal y basta»* · *«Circula tal cual»* ·
+*«no es necesario que aparezca nada adicional, la firma debe ser limpia cada una de ellas»* · *«salen todas las
+firmas, no requieren autorización, yo autorizo verbalmente»*. Se ajustó: firmas del equipo LIMPIAS (sin marca ni
+ampliación; el folio queda en el nombre del archivo y en el registro) · **no se emite con [PENDIENTE]** (circula
+firmado: completarlo a mano dejaría las firmas sobre otro contenido; «Exportar Excel» no cambia) · huella de cada
+firma calculada de los bytes leídos (si no es la registrada, no se emite) · subida con hoy LOCAL y «Autorización
+verbal» por defecto (al reemplazar se conserva la declarada) · custodio con perfil real (`hasProfile` en la regla y
+`legacy` fuera en la pantalla) · textos de «Mi firma». Revisión de 6 Opus: 6 confirmados y corregidos, 1 refutado.
+Queda **a su criterio** (no bloquea): las fechas bajo cada firma salen vacías si no se llenan, y el Valor Real puede
+ir en blanco (`§93`). Riesgo asumido por él y documentado: la firma estampada no prueba que cada titular revisó esa
+ficha, y cada Excel lleva las imágenes de las firmas dentro. 1866 pass · reglas 108/108.
