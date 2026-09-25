@@ -4142,3 +4142,12 @@ verbal» por defecto (al reemplazar se conserva la declarada) · custodio con pe
 Queda **a su criterio** (no bloquea): las fechas bajo cada firma salen vacías si no se llenan, y el Valor Real puede
 ir en blanco (`§93`). Riesgo asumido por él y documentado: la firma estampada no prueba que cada titular revisó esa
 ficha, y cada Excel lleva las imágenes de las firmas dentro. 1866 pass · reglas 108/108.
+**99.12 Publicación (09-25).** Orden del Ingeniero: *«publícalas mientras te envío la de Jorge Miranda»*. Reglas
+desplegadas (`storage` + `firestore:rules`, solo agregan); merge `42ba8bf`; CI (con reglas) y Deploy verdes; 7
+archivos servidos idénticos al repo; reglas, guardia y Excel emitidos: 404. **Validación en vivo en su Chrome** (su
+sesión, sin emitir ni subir nada): panel y botón visibles; las filas consultan sin error (la regla del custodio
+responde en producción); ficha incompleta → el bloqueo de [PENDIENTE]. **Hallazgo**: su perfil se llama «Ing.
+Miguel Jimenez» (el riesgo de `§98.8`): su casilla no era suya y el panel lo listaba como tercero → se añadió a la
+lista CERRADA (`86d16a9`, CI y Deploy verdes, servidos idénticos, revalidado en vivo: su fila desaparece y la ficha
+reconoce su casilla). «Mi firma» sigue vacía: aún no ha subido la suya. Lección → **L-102**.
+

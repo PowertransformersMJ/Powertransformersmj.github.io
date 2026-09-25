@@ -336,3 +336,14 @@ el hueco sea cambiarle el signo y no descubrirlo otra vez.
 
 ### L-101 · Un control nuevo se prueba con el GESTO real (doble clic, pantalla baja), no solo con clics limpios
 **Disparador**: un desplegable o ventanita propia dentro de un área con scroll (modal de la ficha). · **Cicatriz** (`99 §94`): el calendario de años pasó ratón, teclado, Esc, recarga y celular; la revisión adversarial lo rompió con un **doble clic** —al abrirse, `scrollIntoView` movía la rejilla BAJO el puntero y el segundo clic guardaba un año que nadie eligió— y con una **pantalla baja**, donde `block:'nearest'` alineaba mal y tapaba la casilla. · **Regla**: en todo control propio, probar doble clic, Enter sostenido, pantalla más baja que el control y toque en el fondo; y no usar `scrollIntoView` para mostrar un desplegable (calcular `scrollTop` con la casilla como tope). Un clic con `detail > 1` no elige.
+
+### L-102 · Lo que un dato REAL de producción decide se lee en vivo antes de declarar la función lista — y el módulo cargado se comprueba, no el HTML
+**Disparador**: una función depende de un dato que solo existe en producción (el `nombre` del perfil, un rol, una
+configuración) o la validación en vivo sigue a un segundo despliegue en minutos. · **Cicatriz** (`99 §99.12`): la
+firma propia del Ingeniero dependía de que su perfil se llamara como la lista cerrada; `§98.8` lo dejó escrito como
+riesgo y nadie lo leyó en vivo. Se llama «Ing. Miguel Jimenez»: su casilla nunca fue suya y el panel lo listaba como
+tercero. Al revalidar el arreglo, Chrome seguía con los módulos viejos (`max-age=600`) aunque el HTML era nuevo, y
+Cmd+Shift+R desde la extensión no los refrescó. · **Regla**: (1) un riesgo que depende de un dato de producción se
+cierra LEYÉNDOLO en la sesión real (`window.__sgmSession.profile`), no se deja en el ADR; (2) en la validación en vivo,
+comprobar la versión con `import()` del módulo cambiado; si es vieja, `fetch(u, {cache: 'reload'})` de cada módulo
+cambiado y recargar. **Gate** [HONOR] (TODO-57 es el arreglo de fondo).
