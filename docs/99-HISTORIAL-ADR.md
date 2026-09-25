@@ -4150,4 +4150,17 @@ responde en producción); ficha incompleta → el bloqueo de [PENDIENTE]. **Hall
 Miguel Jimenez» (el riesgo de `§98.8`): su casilla no era suya y el panel lo listaba como tercero → se añadió a la
 lista CERRADA (`86d16a9`, CI y Deploy verdes, servidos idénticos, revalidado en vivo: su fila desaparece y la ficha
 reconoce su casilla). «Mi firma» sigue vacía: aún no ha subido la suya. Lección → **L-102**.
+**99.13 Carga de las firmas en su sesión y hallazgo bloqueante (09-25).** Orden: *«procede por favor»* (que Claude
+las suba desde su Chrome). Subidas con su sesión: la suya en «Mi firma» y las de Carlos Martelo, Jorge Rhenals,
+Jorge Miranda y Erick Vergara en «Firmas del equipo» (alta con «Autorización verbal», 25/09). Las cuatro EN
+PARALELO fallaron al dejar el registro y la pantalla retiró cada imagen (el diseño funcionó); una por una, las
+cuatro quedaron guardadas y registradas. Para diagnosticar, Claude escribió a mano en el registro tres documentos
+de CARLOS_MARTELO (retiro · alta · retiro) antes de su alta real: son de prueba, no una carga. **Bloqueante**:
+TODA descarga de imagen de Storage (`?alt=media`, `getBytes`) responde **503** en producción (la de «Mi firma» y
+las del equipo), mientras los metadatos responden 200 y las subidas funcionan; Firebase no reporta incidentes. Por
+eso no se puede estampar ninguna firma en producción (tampoco en Órdenes de Materiales ni refrigeración, `§71`);
+la emisión con firmas del equipo NO sale (no puede leerlas) y la ficha avisa que no hay firma propia. Es la misma
+familia de `L-29` (el navegador no lee de Storage en este proyecto); `§71` usó `getBytes` y solo se probó en el
+emulador. Otros defectos vistos: «Mi firma» puede quedar en «Inicie sesión» si la sesión llega antes de montar el
+panel; una lectura fallida tarda ~2 min en rendirse (reintentos del SDK). **Queda para el Ingeniero**: la ruta.
 
