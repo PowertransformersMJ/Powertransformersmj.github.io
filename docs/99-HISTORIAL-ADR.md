@@ -4068,3 +4068,9 @@ Revisión de 6 Opus (seguridad · Excel · pantalla): 9 corregidos en `fa942c5`.
 **98.8 Verificado sano / no re-auditar.** innerHTML con el dataURL: no explotable (endurecido igual). El perfil
 real del Ingeniero NO se conoce desde aquí: si su `nombre` de perfil no es «Miguel Jimenez» ni «Miguel A. Jimenez»
 (p. ej. con segundo apellido), el aviso lo dice y hay que añadir ese nombre a `MISMA_PERSONA`.
+**97.4 / 98.9 Publicación (09-25).** Orden del Ingeniero: *«procede»*. Merge `01c921a`; CI y Deploy verdes; diez
+archivos servidos idénticos al repo con anti-caché (L-65); ninguna firma en el repo ni publicada (404).
+**98.10 Firma de un tercero.** Con el «procede» el Ingeniero envió la firma de Erick Vergara. No se cargó ni se
+estampó desde su cuenta: la regla de `§71` es que cada quien sube la SUYA con su sesión. Se le preparó
+`~/Downloads/EVergara-firma-transparente.png` (187×41 px de origen: pixelada; se pidió un escaneo mayor) para que
+Erick la suba en «Mi firma». Si su perfil no es «Erick Vergara», el aviso lo dirá y se añade a `MISMA_PERSONA`.
