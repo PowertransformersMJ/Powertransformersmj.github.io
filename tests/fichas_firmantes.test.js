@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import {
   FIRMANTES, CASILLAS_FIRMA, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillasDeLaSesion, casillaEsDeLaSesion
 } from '../assets/js/domain/fichas_firmantes.js';
+import { tamanoFirma, FIRMA_PAPEL } from '../assets/js/domain/firmas_tamano.js';
 import { tieneContenido } from '../assets/js/domain/fichas_borrador.js';
 
 describe('La lista dictada, LITERAL (anti-paráfrasis)', () => {
@@ -131,5 +132,39 @@ describe('Firma estampada: solo en la casilla de quien tiene la sesión (`99 §9
     assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: nfd }, 'Juan Munoz'), false);
     assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: nfd }, 'Juan Muñoz'), true);
     assert.equal(casillaEsDeLaSesion('elab', { sel_elab: 'otro', nom_elab: 'JUAN MUNOZ' }, 'Juan Mun\u0303oz'), false);
+  });
+});
+
+describe('Tamaño de la firma estampada: mismo peso visual para todas (`99 §101`)', () => {
+  const LIM = { area: FIRMA_PAPEL.areaPt2, altoMax: FIRMA_PAPEL.altoMaxPt, anchoMax: 148 };
+  // Proporciones REALES de las cinco firmas cargadas el 2026-09-25 (ancho / alto).
+  const REALES = [1.68, 2.5, 3.08, 3.44, 5.83];
+  test('las firmas reales: misma superficie las que caben; la alta, al tope del renglón', () => {
+    const umbral = LIM.area / (LIM.altoMax * LIM.altoMax);
+    for (const rel of REALES) {
+      const t = tamanoFirma(rel, LIM);
+      assert.ok(t.alto <= LIM.altoMax && t.ancho <= LIM.anchoMax, 'dentro con rel ' + rel);
+      if (rel >= umbral) assert.ok(Math.abs(t.ancho * t.alto - LIM.area) < 1, 'superficie con rel ' + rel);
+      else assert.equal(t.alto, LIM.altoMax, 'la alta llega al renglón con rel ' + rel);
+    }
+  });
+  test('una firma alta no pasa del renglón de «Firma:» (crece hasta él, no más)', () => {
+    const t = tamanoFirma(1.68, LIM);
+    assert.equal(t.alto, LIM.altoMax);
+    assert.ok(Math.abs(t.ancho - 1.68 * LIM.altoMax) < 1e-9);
+  });
+  test('una firma muy ancha no se sale de la casilla: se achica sin deformarse', () => {
+    const t = tamanoFirma(40, { ...LIM, anchoMax: 100 });
+    assert.equal(t.ancho, 100);
+    assert.ok(Math.abs(t.ancho / t.alto - 40) < 1e-9);
+  });
+  test('la ancha se ve más baja y la alta más angosta que antes (ya no gana la ancha)', () => {
+    const ancha = tamanoFirma(5.83, LIM); const alta = tamanoFirma(1.68, LIM);
+    assert.ok(ancha.ancho < 5.83 * 22, 'antes medía 128 pt de ancho');
+    const antes = (5.83 * 22) / (1.68 * 22);
+    assert.ok(ancha.ancho / alta.ancho < antes * 0.7, 'la diferencia de ancho entre las extremas baja al menos un 30 %');
+  });
+  test('proporción inválida: la de una firma típica', () => {
+    assert.deepEqual(tamanoFirma(NaN, LIM), tamanoFirma(2.5, LIM));
   });
 });

@@ -34,8 +34,9 @@ import { desgloseCreg, variacionReal, formatearCOP, leerMonto } from '../../doma
 import {
   FIRMANTES, OTRA_PERSONA, firmanteDe, indicePorDefecto, casillaEsDeLaSesion, casillasDeLaSesion
 } from '../../domain/fichas_firmantes.js';
+import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import {
-  planDeEstampado, personasALeer, folioDeEmision
+  planDeEstampado, personasALeer, folioDeEmision, IDS_EQUIPO, nombreDePersona
 } from '../../domain/firmas_equipo.js';
 import {
   fechaAISO, isoAFecha, leerAnio, aniosDelCalendario, ANIO_MIN, COLUMNAS_ANIOS
@@ -1289,6 +1290,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +       '<span class="ftm-borrador" data-ftm="borrador" aria-live="polite"></span>'
       +       '<span class="ftm-modal-acts">'
       +         '<button type="button" class="ftm-btn" data-ftm="descargar-plan" hidden>Descargar plan</button>'
+      +         '<button type="button" class="ftm-btn" data-ftm="vista-previa">Vista previa</button>'
       +         '<button type="button" class="ftm-btn" data-ftm="exportar-equipo" hidden>Descargar con firmas del equipo</button>'
       +         '<button type="button" class="ftm-btn ftm-btn--primary" data-ftm="exportar">Exportar Excel</button>'
       +         '<button type="button" class="ftm-btn" data-ftm="cerrar">Cerrar</button>'
@@ -2114,6 +2116,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     // El documento de mantenimiento todavía no tiene formato propio: enseñar ese
     // botón aquí prometería un papel que no existe.
     $('[data-ftm="exportar"]').hidden = (documento === 'salud');
+    // Vista previa del MISMO Excel que se descargaría (`99 §102`).
+    $('[data-ftm="vista-previa"]').hidden = (documento === 'salud');
     // Con firmas del equipo: solo el custodio y solo el documento con Excel (`§99`).
     emision = null;
     $('[data-ftm="exportar-equipo"]').hidden = !(documento !== 'salud' && custodiaDisponible());
@@ -2135,6 +2139,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (btnPlan) btnPlan.hidden = (hoja !== 'plan');
     if (hoja === 'diagA' || hoja === 'diagF') pintarUnifilar();
     pintarFirmasEstampadas();
+    asegurarFirmasEquipoPantalla();
   }
 
   /**
@@ -3035,17 +3040,79 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
 
   /** Estampa (o retira) la firma de la sesión en los huecos de la hoja abierta y explica dónde va. */
+  /** Alto máximo de la firma en la pantalla (el renglón de «Firma:»). */
+  const ALTO_FIRMA_PX = 30;
+
+  /* Firmas del EQUIPO en la ficha de la pantalla (`99 §102`, pedido del
+     Ingeniero: «deben aparecer la de todos»). Solo para el custodio y en el
+     documento con Excel. Se leen UNA vez por sesión (son las mismas en todas las
+     fichas) y se vuelven a leer si cambian en «Firmas del equipo». */
+  // `generacion` sube con cada cambio del directorio: una lectura que termina
+  // después de un cambio no se da por buena (revisión de §102). Un fallo de red
+  // NO se guarda como «no tiene firma»: se reintenta al repintar y se explica.
+  const firmasEquipoPantalla = { cargadas: false, cargando: null, generacion: 0, lecturas: new Map(), fallidas: [] };
+  function asegurarFirmasEquipoPantalla() {
+    if (documento === 'salud' || !custodiaDisponible()) return;
+    if (firmasEquipoPantalla.cargadas || firmasEquipoPantalla.cargando) return;
+    const gen = firmasEquipoPantalla.generacion;
+    firmasEquipoPantalla.cargando = (async () => {
+      const lecturas = new Map(); const fallidas = [];
+      await Promise.all(IDS_EQUIPO.map(async (id) => {
+        try {
+          const r = await cfg.firmasEquipo.leer(id);
+          if (r && r.error) fallidas.push(id);
+          else if (r && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) {
+            lecturas.set(id, { dataUrl: r.dataUrl, rel: await medirFirma(r.dataUrl) });
+          }
+        } catch (_) { fallidas.push(id); }
+      }));
+      if (gen !== firmasEquipoPantalla.generacion) return false;   // cambió mientras se leía
+      firmasEquipoPantalla.lecturas = lecturas;
+      firmasEquipoPantalla.fallidas = fallidas;
+      firmasEquipoPantalla.cargadas = !fallidas.length;
+      return true;
+    })().then((vigente) => {
+      firmasEquipoPantalla.cargando = null;
+      pintarFirmasEstampadas();
+      if (!vigente && actual) asegurarFirmasEquipoPantalla();
+    });
+  }
+  const alCambiarFirmasEquipo = () => {
+    firmasEquipoPantalla.generacion += 1;
+    firmasEquipoPantalla.cargadas = false;
+    if (actual) asegurarFirmasEquipoPantalla();
+  };
+
+  /** Qué firma lleva cada casilla EN PANTALLA: la propia y, para el custodio, las del equipo. */
+  function planPantalla(P) {
+    const equipo = documento !== 'salud' && custodiaDisponible() ? [...firmasEquipoPantalla.lecturas.keys()] : [];
+    return planDeEstampado(P, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo });
+  }
+
   function pintarFirmasEstampadas() {
     if (!actual || !modalCuerpo) return;
     const P = estadoDe(actual).plan;
+    const plan = planPantalla(P);
     modalCuerpo.querySelectorAll('[data-firma-slot]').forEach((slot) => {
       const k = slot.getAttribute('data-firma-slot');
-      const va = !!firmaSesion.dataUrl && casillaEsDeLaSesion(k, P, firmaSesion.nombre);
+      const c = plan.find((x) => x.k === k);
+      const f = !c ? null
+        : c.origen === 'propia' ? { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel }
+          : c.origen === 'equipo' ? firmasEquipoPantalla.lecturas.get(c.id) : null;
       slot.textContent = '';
-      if (va) {
+      if (f && f.dataUrl) {
         const img = document.createElement('img');
-        img.alt = 'Firma estampada';
-        img.src = firmaSesion.dataUrl;
+        img.alt = c.origen === 'propia' ? 'Firma estampada' : 'Firma de ' + (c.nombre || '');
+        img.src = f.dataUrl;
+        // La MISMA regla que en el Excel (`99 §101`), a la escala de la pantalla:
+        // 30 px de alto máximo y el ancho libre de la casilla tras «Firma:».
+        const k = ALTO_FIRMA_PX / FIRMA_PAPEL.altoMaxPt;
+        const libre = slot.parentElement ? slot.parentElement.clientWidth - slot.offsetLeft - 4 : 0;
+        const t = tamanoFirma(f.rel, {
+          area: FIRMA_PAPEL.areaPt2 * k * k, altoMax: ALTO_FIRMA_PX, anchoMax: libre > 0 ? libre : 150
+        });
+        img.style.width = Math.round(t.ancho) + 'px';
+        img.style.height = Math.round(t.alto) + 'px';
         slot.appendChild(img);
       }
     });
@@ -3056,11 +3123,28 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     nota.hidden = !texto;
   }
 
+  function rolDe(k) {
+    const f = FIRMAS.find((x) => x.k === k);
+    return f ? f.rol + (f.segundo ? ' (segundo firmante)' : '') : k;
+  }
+
   /** Por qué va o no va la firma (L-69: un vacío se explica). */
   function textoNotaFirma(P) {
     if (typeof cfg.firmaSesion !== 'function' || !firmaSesion.hay) return '';
+    const plan = planPantalla(P);
+    const delEquipo = plan.filter((c) => c.origen === 'equipo').map((c) => rolDe(c.k));
+    const noLeidas = documento !== 'salud' && custodiaDisponible() && firmasEquipoPantalla.fallidas.length
+      ? ' No se pudo leer la firma de ' + firmasEquipoPantalla.fallidas.map((id) => nombreDePersona(id)).join(', ')
+        + ' (revise la conexión): su casilla sale en blanco.' : '';
+    if (delEquipo.length) {
+      const propias = firmaSesion.dataUrl ? casillasDeLaSesion(P, firmaSesion.nombre).map(rolDe) : [];
+      return (propias.length ? 'Su firma va en ' + propias.join(' y ') + '; '
+        : (firmaSesion.dataUrl ? '' : 'Su firma propia no está cargada (súbala en «Mi firma»); '))
+        + 'las del equipo, en ' + [...new Set(delEquipo)].join(', ') + '. En el Excel, todas salen con '
+        + '«Descargar con firmas del equipo»; «Exportar Excel» sale solo con la suya.' + noLeidas;
+    }
     if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
-      + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.';
+      + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.' + noLeidas;
     const ks = casillasDeLaSesion(P, firmaSesion.nombre);
     if (!ks.length) return 'Su firma no se estampa en esta ficha: su nombre de perfil («' + firmaSesion.nombre
       + '») no es el de ninguna casilla. Las casillas salen en blanco para firmar a mano.';
@@ -3672,6 +3756,60 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '\n\nPulse Aceptar para descargarlo así, o Cancelar para volver y completarlo.';
   }
 
+  /**
+   * Vista previa del Excel (`99 §102`): se arma el MISMO archivo que se
+   * descargaría y se muestra hoja por hoja, con lo que viaja oculto. No descarga
+   * ni registra nada. Para el custodio lleva las firmas del equipo (lo que sale
+   * con «Descargar con firmas del equipo»); si no, la de la sesión.
+   */
+  async function abrirVistaPrevia() {
+    if (!actual || cfg.exportador) return;
+    const eq = actual;
+    const btn = $('[data-ftm="vista-previa"]');
+    const antes = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Armando…'; }
+    try {
+      const mod = await import('./exportar-planificacion.js');
+      await cargarFirmaSesion();
+      const estado = estadoParaExportar(eq);
+      const avisos = [];
+      let conEquipo = false;
+      if (custodiaDisponible()) {
+        const { lecturas, fallidas } = await leerFirmasEquipo(estadoDe(eq).plan);
+        const plan = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
+        for (const c of plan) {
+          const l = c.origen === 'equipo' ? lecturas.get(c.id) : null;
+          if (l) { estado.firmas[c.k] = { dataUrl: l.dataUrl, rel: await medirFirma(l.dataUrl) }; conEquipo = true; }
+        }
+        if (fallidas.length) avisos.push('No se pudieron leer ' + fallidas.length + ' firma(s) del equipo: en esta vista salen en blanco.');
+      }
+      if (actual !== eq) return;
+      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
+      avisos.unshift(conEquipo
+        ? 'Así sale con «Descargar con firmas del equipo». «Exportar Excel» sale igual, pero solo con su firma.'
+        : 'Así sale con «Exportar Excel».');
+      if (faltan.length) {
+        avisos.push('Casillas [PENDIENTE]: ' + faltan.map((f) => f.campos.join(' y ')).join(' · ') + '.'
+          + (conEquipo ? ' Con ellas no se puede descargar con firmas del equipo.' : ''));
+      }
+      const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array' });
+      const { leerLibroParaVista, mostrarVistaPrevia, cargarJSZip } = await import('./vista-previa-excel.js');
+      const JSZip = await cargarJSZip();
+      const modelo = await leerLibroParaVista(await JSZip.loadAsync(bytes));
+      if (actual !== eq) return;
+      mostrarVistaPrevia(modelo, {
+        titulo: [eq.subestacion, eq.matricula].filter(Boolean).join(' · '),
+        avisos, contenedor: modal,
+        alCerrar() { const b = $('[data-ftm="vista-previa"]'); if (b && !b.hidden) b.focus(); }
+      });
+    } catch (err) {
+      console.warn('[fichas/panel] la vista previa falló:', err);
+      alert('No se pudo armar la vista previa.\n\n' + (err && err.message ? err.message : err));
+    } finally {
+      if (btn) { btn.disabled = false; btn.textContent = antes; }
+    }
+  }
+
   async function exportarExcel() {
     if (!actual) return;
     const btn = $('[data-ftm="exportar"]');
@@ -3855,6 +3993,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         break;
       case 'exportar': exportarExcel(); break;
       case 'exportar-equipo': prepararEmisionEquipo(); break;
+      case 'vista-previa': abrirVistaPrevia(); break;
       case 'emision-confirmar': confirmarEmisionEquipo(); break;
       case 'emision-cancelar': cerrarEmision(); break;
       case 'descargar-plan': descargarPlan(); break;
@@ -4033,6 +4172,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   contenedor.addEventListener('click', alHacerClic);
   // La firma de la sesión: al montar, y cuando cambia en «Mi firma» (`99 §98`).
   globalThis.addEventListener('sgm:firma-cambiada', alCambiarFirma);
+  globalThis.addEventListener('sgm:firmas-equipo-cambiadas', alCambiarFirmasEquipo);
   cargarFirmaSesion();
   contenedor.addEventListener('input', alEscribir);
   contenedor.addEventListener('change', alCambiar);
@@ -4218,6 +4358,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     contenedor.removeEventListener('change', alCambiar);
     document.removeEventListener('keydown', alTeclear);
     globalThis.removeEventListener('sgm:firma-cambiada', alCambiarFirma);
+    globalThis.removeEventListener('sgm:firmas-equipo-cambiadas', alCambiarFirmasEquipo);
     globalThis.removeEventListener('beforeunload', alSalir);
     globalThis.removeEventListener('pagehide', volcarYa);
     document.removeEventListener('visibilitychange', alOcultar);

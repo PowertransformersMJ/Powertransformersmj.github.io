@@ -35,6 +35,7 @@
 import { buscarUC, clasificarUC } from '../../domain/fichas_creg_uc.js';
 import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_presupuesto.js';
 import { firmanteDe } from '../../domain/fichas_firmantes.js';
+import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -674,20 +675,24 @@ export function cajasDeFirma(dibujoXml, geo) {
 const PIE_SOBRE_TEXTO = Math.round(11.5 * EMU_PT);
 /** Ancho del rótulo «Firma:» más un respiro: la firma empieza a su derecha. */
 const TRAS_ROTULO = Math.round(31 * EMU_PT);
-/** Alto de la firma estampada (≈ 0,31 pulgadas). */
-const ALTO_FIRMA = Math.round(22 * EMU_PT);
+/** Alto MÁXIMO de la firma estampada (≈ 0,31 pulgadas): el renglón de «Firma:»
+ *  sin tapar el texto de encima. */
+const ALTO_FIRMA = Math.round(FIRMA_PAPEL.altoMaxPt * EMU_PT);
+/** Superficie de cada firma (`99 §101`): todas pesan lo mismo a la vista. */
+const AREA_FIRMA = FIRMA_PAPEL.areaPt2 * EMU_PT * EMU_PT;
+/** Margen derecho dentro de la casilla. */
+const MARGEN_DERECHO = Math.round(4 * EMU_PT);
 
 /**
  * Dónde va la firma dentro de su casilla: su trazo apoyado en la línea
  * «Firma:», a la derecha del rótulo y sin salirse del cuadro. `rel` = ancho / alto.
  */
 export function ubicacionFirma(caja, rel) {
-  const r = rel > 0 && Number.isFinite(rel) ? rel : 2.5;
   const x = caja.x0 + (caja.lIns || 0) + TRAS_ROTULO;
-  let alto = ALTO_FIRMA;
-  let ancho = Math.round(alto * r);
-  const anchoMax = Math.max(0, caja.x1 - x - Math.round(4 * EMU_PT));
-  if (ancho > anchoMax) { ancho = anchoMax; alto = Math.round(ancho / r); }
+  const anchoMax = Math.max(0, caja.x1 - x - MARGEN_DERECHO);
+  const t = tamanoFirma(rel, { area: AREA_FIRMA, altoMax: ALTO_FIRMA, anchoMax });
+  const ancho = Math.round(t.ancho);
+  const alto = Math.round(t.alto);
   const pie = (caja.pieTexto != null ? caja.pieTexto : caja.y1) - PIE_SOBRE_TEXTO;
   return { x, y: Math.max(caja.y0, pie - alto), cx: ancho, cy: alto };
 }
