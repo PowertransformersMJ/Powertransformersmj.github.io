@@ -145,9 +145,22 @@ export function formatearValor(v, codigo, idFormato) {
   const esFecha = FORMATOS_FECHA.has(idFormato) || (/(^|[^"])(d{1,4}|y{2,4})/i.test(cod.replace(/"[^"]*"/g, '')) && !/#|0\.0/.test(cod));
   if (esFecha) {
     const d = new Date(Date.UTC(1899, 11, 30) + Math.round(v * 86400000));
+    const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    const mes = MESES[d.getUTCMonth()]; const aa = String(d.getUTCFullYear()).slice(2);
+    // Formatos internos con el mes en letras (Excel en es-CO): 15 d-mmm-aa · 16 d-mmm · 17 mmm-aa.
+    if (idFormato === 17 || (/mmm/i.test(cod) && !/d/i.test(cod.replace(/"[^"]*"/g, '')))) return mes + '-' + aa;
+    if (idFormato === 15 || /d+[-/ ]mmm[-/ ]y/i.test(cod)) return d.getUTCDate() + '-' + mes + '-' + aa;
+    if (idFormato === 16 || /d+[-/ ]mmm/i.test(cod)) return d.getUTCDate() + '-' + mes;
     return String(d.getUTCDate()).padStart(2, '0') + '/' + String(d.getUTCMonth() + 1).padStart(2, '0') + '/' + d.getUTCFullYear();
   }
-  const seccion = cod.split(';')[0];
+  const secciones = cod.split(';');
+  // El cero tiene su propia sección en los formatos contables: «$ -», no «$ 0,00».
+  if (v === 0 && secciones.length >= 3) {
+    const cero = secciones[2].replace(/_./g, '').replace(/\*./g, '').replace(/\\/g, '');
+    const literal = (cero.match(/"([^"]*)"/g) || []).map((q) => q.slice(1, -1)).join(' ').trim();
+    if (literal && !/0/.test(cero.replace(/"[^"]*"/g, ''))) return literal.replace(/^\$\s*/, '$ ').replace(/\?+$/, '').trim();
+  }
+  const seccion = secciones[0];
   const dec = idFormato === 2 || idFormato === 4 ? 2 : ((seccion.match(/0\.(0+)/) || [null, ''])[1].length);
   if (/%/.test(seccion)) return (v * 100).toLocaleString('es-CO', { minimumFractionDigits: dec, maximumFractionDigits: dec }) + ' %';
   const miles = idFormato === 3 || idFormato === 4 || /#,##0/.test(seccion);
@@ -348,13 +361,18 @@ async function leerDibujo(zip, rutaDibujo, geo) {
       const r = id && rels.get(id);
       const ruta = r ? resolverRuta(rutaDibujo, r.target) : null;
       const ext = ruta ? ruta.split('.').pop().toLowerCase() : '';
-      let src = null;
-      if (ruta && ['png', 'jpg', 'jpeg', 'gif'].includes(ext) && zip.file(ruta)) {
-        const b64 = await zip.file(ruta).async('base64');
-        src = 'data:image/' + (ext === 'jpg' ? 'jpeg' : ext) + ';base64,' + b64;
+      let src = null; let bytes = 0;
+      if (ruta && zip.file(ruta)) {
+        if (['png', 'jpg', 'jpeg', 'gif'].includes(ext)) {
+          const b64 = await zip.file(ruta).async('base64');
+          src = 'data:image/' + (ext === 'jpg' ? 'jpeg' : ext) + ';base64,' + b64;
+          bytes = Math.round(b64.length * 3 / 4);
+        } else {
+          bytes = (await zip.file(ruta).async('uint8array')).length;
+        }
       }
       // EMF/WMF (el logo de la plantilla) no se dibuja en el navegador: se avisa, pero sí va en el Excel.
-      imagenes.push({ ...caja, capa: capa++, src, ruta: ruta || '', nota: src ? '' : ('Imagen ' + (ext || '?').toUpperCase() + ' (logo): sí va en el Excel; aquí no se puede dibujar') });
+      imagenes.push({ ...caja, capa: capa++, src, bytes, ruta: ruta || '', nota: src ? '' : ('Imagen ' + (ext || '?').toUpperCase() + ' (logo): sí va en el Excel; aquí no se puede dibujar') });
     } else if (tipo === 'sp') {
       const cuerpo = (x.match(/<xdr:txBody>([\s\S]*?)<\/xdr:txBody>/) || ['', ''])[1];
       const body = (cuerpo.match(/<a:bodyPr\b[^>]*>/) || [''])[0];
@@ -422,14 +440,19 @@ async function leerOcultos(zip, workbookXml, hojas) {
   for (const ruta of Object.keys(zip.files).filter((n) => /^xl\/externalLinks\/_rels\/externalLink\d+\.xml\.rels$/.test(n))) {
     for (const r of relaciones(await texto(zip, ruta)).values()) {
       const usos = hojas.flatMap((h) => h.formulasExternas.map((f) => h.nombre + '!' + f));
-      out.push({ titulo: 'Vínculo a otro archivo', detalle: decodeURIComponent(String(r.target || '').replace(/^file:\/\/\//, '')),
+      const libroXml = await texto(zip, ruta.replace(/_rels\/(externalLink\d+\.xml)\.rels$/, '$1')) || '';
+      const hojasExt = [...libroXml.matchAll(/<sheetName val="([^"]*)"/g)].map((m) => desXml(m[1]));
+      const guardados = [...libroXml.matchAll(/<cell r="([A-Z]+\d+)"[^>]*>\s*<v>([^<]*)<\/v>/g)].map((m) => m[1] + ' = ' + desXml(m[2]));
+      out.push({ titulo: 'Vínculo a otro archivo', detalle: decodeURIComponent(String(r.target || '').replace(/^file:\/\/\//, ''))
+          + (hojasExt.length ? ' · hojas de ese archivo: ' + hojasExt.join(', ') : '')
+          + (guardados.length ? ' · valores guardados: ' + guardados.slice(0, 10).join(', ') : ''),
         nota: 'Al abrir el Excel, Excel puede pedir «actualizar vínculos». ' + (usos.length ? 'Lo usan: ' + usos.join(', ') + '.' : 'Ninguna fórmula lo usa.') });
     }
   }
   // Propiedades del documento.
   const core = await texto(zip, 'docProps/core.xml');
   if (core) {
-    const campos = { 'dc:creator': 'Autor', 'cp:lastModifiedBy': 'Modificado por', 'dc:title': 'Título', 'dc:subject': 'Asunto', 'cp:keywords': 'Palabras clave', 'dc:description': 'Comentarios', 'cp:category': 'Categoría', 'dcterms:created': 'Creado', 'dcterms:modified': 'Modificado' };
+    const campos = { 'dc:creator': 'Autor', 'cp:lastModifiedBy': 'Modificado por', 'dc:title': 'Título', 'dc:subject': 'Asunto', 'cp:keywords': 'Palabras clave', 'dc:description': 'Comentarios', 'cp:category': 'Categoría', 'cp:contentStatus': 'Estado', 'dcterms:created': 'Creado', 'dcterms:modified': 'Modificado', 'cp:lastPrinted': 'Última impresión' };
     const vistos = [];
     for (const [tag, rot] of Object.entries(campos)) {
       const m = core.match(new RegExp('<' + tag + '\\b[^>]*>([^<]*)</' + tag + '>'));
@@ -470,6 +493,15 @@ async function leerOcultos(zip, workbookXml, hojas) {
     if (h.fueraDelArea.length) {
       out.push({ titulo: 'Contenido FUERA del área de impresión · ' + h.nombre, detalle: h.fueraDelArea.slice(0, 12).map((c) => c.ref + ': ' + c.texto).join(' · ') + (h.fueraDelArea.length > 12 ? ' · …' : ''),
         nota: h.fueraDelArea.length + ' celda(s) que viajan en el archivo pero no se imprimen.' });
+    }
+    for (const d of h.dibujosFuera) {
+      const que = d.parrafos ? 'Cuadro de texto' : (d.ruta !== undefined ? 'Imagen' : 'Línea');
+      const detalle = d.parrafos ? d.parrafos.map((p) => p.texto).join(' / ').slice(0, 160)
+        : (d.ruta ? d.ruta.split('/').pop() + ' · ' + Math.round(d.w) + ' × ' + Math.round(d.h) + ' px en la hoja'
+          + (d.bytes ? ' · ' + Math.round(d.bytes / 1024) + ' KB' : '') : 'línea dibujada');
+      out.push({ titulo: que + (d.parcial ? ' parcialmente' : '') + ' FUERA del área de impresión · ' + h.nombre, detalle,
+        nota: d.parcial ? 'Una parte no se imprime, pero viaja completa en el archivo.' : 'No se imprime ni se ve en la hoja, pero viaja en el archivo.',
+        miniatura: d.src || null });
     }
     if (h.ocultas.length) out.push({ titulo: 'Filas o columnas ocultas con contenido · ' + h.nombre, detalle: h.ocultas.slice(0, 12).join(' · '), nota: 'No se ven, pero viajan en el archivo.' });
   }
@@ -553,11 +585,25 @@ export async function leerLibroParaVista(zip) {
     let dibujo = { imagenes: [], textos: [], lineas: [] };
     for (const r of relsH.values()) if (/\/drawing$/.test(r.tipo)) dibujo = await leerDibujo(zip, resolverRuta(d.ruta, r.target), geo);
     const mover = (o) => ({ ...o, x: o.x - ox, y: o.y - oy });
+    const ancho = geo.X(area.c1 + 1) - ox; const alto = geo.Y(area.r1 + 1) - oy;
+    // Lo dibujado FUERA del área de impresión no se imprime ni se ve en la hoja,
+    // pero viaja en el archivo (revisión de §102: una captura de UPME en Beneficios
+    // y en Anexo AT). Se aparta y se reporta en «Datos ocultos».
+    const dibujosFuera = [];
+    const dentroDe = (o) => {
+      const iw = Math.min(o.x + o.w, ancho) - Math.max(o.x, 0); const ih = Math.min(o.y + o.h, alto) - Math.max(o.y, 0);
+      const inter = Math.max(0, iw) * Math.max(0, ih); const total = Math.max(1, o.w * o.h);
+      if (inter <= 0) { dibujosFuera.push({ ...o, parcial: false }); return false; }
+      if (inter / total < 0.9) dibujosFuera.push({ ...o, parcial: true });
+      return true;
+    };
+    const imagenes = dibujo.imagenes.map(mover).filter(dentroDe);
+    const textos = dibujo.textos.map(mover).filter(dentroDe);
+    const lineas = dibujo.lineas.map(mover).filter(dentroDe);
     hojas.push({
       nombre: d.nombre, oculta: d.oculta, area: colLetras(area.c0) + (area.r0 + 1) + ':' + colLetras(area.c1) + (area.r1 + 1), areaDefinida: area.definida,
-      ancho: geo.X(area.c1 + 1) - ox, alto: geo.Y(area.r1 + 1) - oy, celdas,
-      imagenes: dibujo.imagenes.map(mover), textos: dibujo.textos.map(mover), lineas: dibujo.lineas.map(mover),
-      fueraDelArea, ocultas, formulasExternas
+      ancho, alto, celdas, imagenes, textos, lineas,
+      fueraDelArea, dibujosFuera, ocultas, formulasExternas
     });
   }
   const ocultos = await leerOcultos(zip, wb, hojas);
@@ -655,6 +701,9 @@ export function mostrarVistaPrevia(modelo, opciones = {}) {
       for (const o of modelo.ocultos) {
         const it = el('div', 'vpx-oculto'); it.appendChild(el('strong', null, o.titulo)); it.appendChild(el('div', 'vpx-oculto-detalle', o.detalle));
         if (o.nota) it.appendChild(el('div', 'vpx-oculto-nota', o.nota));
+        if (o.miniatura && /^data:image\/(png|jpeg|gif);base64,/.test(o.miniatura)) {
+          const im = el('img', 'vpx-oculto-img'); im.src = o.miniatura; im.alt = o.titulo; it.appendChild(im);
+        }
         lista.appendChild(it);
       }
       cuerpo.appendChild(lista);

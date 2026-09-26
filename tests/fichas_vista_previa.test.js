@@ -54,6 +54,9 @@ describe('Formato de números como en Excel (es-CO)', () => {
     assert.equal(formatearValor(44927, '', 14), '01/01/2023');
     assert.equal(formatearValor(30, '', 0), '30');
     assert.equal(formatearValor(0.25, '0.00%', 10), '25,00 %');
+    // Revisión de §102: mes en letras (formato 17) y cero contable «$ -».
+    assert.equal(formatearValor(44927, '', 17), 'ene-23');
+    assert.equal(formatearValor(0, PESOS, 172), '$ -');
     assert.equal(colIndice('AB'), 27);
   });
 });
@@ -126,3 +129,26 @@ describe('Dibujos del Excel en su lugar', () => {
     assert.ok(hueco && caja && hueco.capa < caja.capa, 'el hueco blanco queda debajo del texto');
   });
 });
+
+describe('Lo que viaja fuera del área de impresión (revisión de §102)', () => {
+  test('la captura de UPME en Beneficios y Anexo AT se reporta en «Datos ocultos», con miniatura', async () => {
+    const m = await libro({ plan: {} });
+    const fuera = m.ocultos.filter((o) => /FUERA del área de impresión/.test(o.titulo) && /^Imagen/.test(o.titulo));
+    const hojas = fuera.map((o) => o.titulo.split(' · ').pop());
+    assert.ok(hojas.includes('Beneficios'), 'imagen fuera en Beneficios: ' + hojas.join(', '));
+    assert.ok(hojas.includes('Anexo AT'), 'imagen fuera en Anexo AT');
+    assert.ok(fuera.every((o) => /KB/.test(o.detalle)));
+    assert.ok(fuera.some((o) => o.miniatura && /^data:image\/png;base64,/.test(o.miniatura)));
+    // Y no se mezcla con la hoja: la que se dibuja no la lleva.
+    const ben = m.hojas.find((h) => h.nombre === 'Beneficios');
+    assert.ok(ben.imagenes.every((i) => i.x < ben.ancho && i.y < ben.alto));
+  });
+  test('el vínculo externo dice qué hojas y qué valores guardados trae', async () => {
+    const m = await libro({ plan: {} });
+    const v = m.ocultos.find((o) => /Vínculo/.test(o.titulo));
+    assert.match(v.detalle, /hojas de ese archivo: .*Anexos MT/);
+    assert.match(v.detalle, /valores guardados: J37 = 0/);
+    assert.match(m.ocultos.find((o) => /Propiedades del documento/.test(o.titulo)).detalle, /Última impresión/);
+  });
+});
+

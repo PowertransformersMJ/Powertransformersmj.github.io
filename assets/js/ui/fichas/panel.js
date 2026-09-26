@@ -36,7 +36,7 @@ import {
 } from '../../domain/fichas_firmantes.js';
 import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import {
-  planDeEstampado, personasALeer, folioDeEmision, IDS_EQUIPO
+  planDeEstampado, personasALeer, folioDeEmision, IDS_EQUIPO, nombreDePersona
 } from '../../domain/firmas_equipo.js';
 import {
   fechaAISO, isoAFecha, leerAnio, aniosDelCalendario, ANIO_MIN, COLUMNAS_ANIOS
@@ -3047,25 +3047,38 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      Ingeniero: «deben aparecer la de todos»). Solo para el custodio y en el
      documento con Excel. Se leen UNA vez por sesión (son las mismas en todas las
      fichas) y se vuelven a leer si cambian en «Firmas del equipo». */
-  const firmasEquipoPantalla = { cargadas: false, cargando: null, lecturas: new Map() };
+  // `generacion` sube con cada cambio del directorio: una lectura que termina
+  // después de un cambio no se da por buena (revisión de §102). Un fallo de red
+  // NO se guarda como «no tiene firma»: se reintenta al repintar y se explica.
+  const firmasEquipoPantalla = { cargadas: false, cargando: null, generacion: 0, lecturas: new Map(), fallidas: [] };
   function asegurarFirmasEquipoPantalla() {
     if (documento === 'salud' || !custodiaDisponible()) return;
     if (firmasEquipoPantalla.cargadas || firmasEquipoPantalla.cargando) return;
+    const gen = firmasEquipoPantalla.generacion;
     firmasEquipoPantalla.cargando = (async () => {
-      const lecturas = new Map();
+      const lecturas = new Map(); const fallidas = [];
       await Promise.all(IDS_EQUIPO.map(async (id) => {
         try {
           const r = await cfg.firmasEquipo.leer(id);
-          if (r && !r.error && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) {
+          if (r && r.error) fallidas.push(id);
+          else if (r && /^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(r.dataUrl || '')) {
             lecturas.set(id, { dataUrl: r.dataUrl, rel: await medirFirma(r.dataUrl) });
           }
-        } catch (_) { /* sin esa firma: su casilla queda en blanco */ }
+        } catch (_) { fallidas.push(id); }
       }));
+      if (gen !== firmasEquipoPantalla.generacion) return false;   // cambió mientras se leía
       firmasEquipoPantalla.lecturas = lecturas;
-      firmasEquipoPantalla.cargadas = true;
-    })().finally(() => { firmasEquipoPantalla.cargando = null; pintarFirmasEstampadas(); });
+      firmasEquipoPantalla.fallidas = fallidas;
+      firmasEquipoPantalla.cargadas = !fallidas.length;
+      return true;
+    })().then((vigente) => {
+      firmasEquipoPantalla.cargando = null;
+      pintarFirmasEstampadas();
+      if (!vigente && actual) asegurarFirmasEquipoPantalla();
+    });
   }
   const alCambiarFirmasEquipo = () => {
+    firmasEquipoPantalla.generacion += 1;
     firmasEquipoPantalla.cargadas = false;
     if (actual) asegurarFirmasEquipoPantalla();
   };
@@ -3118,15 +3131,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /** Por qué va o no va la firma (L-69: un vacío se explica). */
   function textoNotaFirma(P) {
     if (typeof cfg.firmaSesion !== 'function' || !firmaSesion.hay) return '';
-    if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
-      + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.';
-    const delEquipo = planPantalla(P).filter((c) => c.origen === 'equipo').map((c) => rolDe(c.k));
+    const plan = planPantalla(P);
+    const delEquipo = plan.filter((c) => c.origen === 'equipo').map((c) => rolDe(c.k));
+    const noLeidas = documento !== 'salud' && custodiaDisponible() && firmasEquipoPantalla.fallidas.length
+      ? ' No se pudo leer la firma de ' + firmasEquipoPantalla.fallidas.map((id) => nombreDePersona(id)).join(', ')
+        + ' (revise la conexión): su casilla sale en blanco.' : '';
     if (delEquipo.length) {
-      const propias = casillasDeLaSesion(P, firmaSesion.nombre).map(rolDe);
-      return (propias.length ? 'Su firma va en ' + propias.join(' y ') + '; ' : '')
+      const propias = firmaSesion.dataUrl ? casillasDeLaSesion(P, firmaSesion.nombre).map(rolDe) : [];
+      return (propias.length ? 'Su firma va en ' + propias.join(' y ') + '; '
+        : (firmaSesion.dataUrl ? '' : 'Su firma propia no está cargada (súbala en «Mi firma»); '))
         + 'las del equipo, en ' + [...new Set(delEquipo)].join(', ') + '. En el Excel, todas salen con '
-        + '«Descargar con firmas del equipo»; «Exportar Excel» sale solo con la suya.';
+        + '«Descargar con firmas del equipo»; «Exportar Excel» sale solo con la suya.' + noLeidas;
     }
+    if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
+      + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.' + noLeidas;
     const ks = casillasDeLaSesion(P, firmaSesion.nombre);
     if (!ks.length) return 'Su firma no se estampa en esta ficha: su nombre de perfil («' + firmaSesion.nombre
       + '») no es el de ninguna casilla. Las casillas salen en blanco para firmar a mano.';
