@@ -109,7 +109,7 @@ export const DOCUMENTOS_FICHA = Object.freeze([
     id: 'salud',
     lbl: 'Mantenimiento Especializado · Salud de Activos',
     desc: 'Alcance y beneficios de INTERVENIR el equipo que sigue en servicio, con su salud '
-        + 'y su posición en la matriz de riesgo. Sin exportación al Excel oficial todavía.',
+        + 'y su posición en la matriz de riesgo. Se exporta al Excel oficial PE.02081, igual que el PI.',
     listo: true
   },
   {
@@ -2112,15 +2112,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   function pintarModal() {
     if (!actual) return;
 
-    // La exportación llena el Excel oficial PE.02081, que es el formato del PI.
-    // El documento de mantenimiento todavía no tiene formato propio: enseñar ese
-    // botón aquí prometería un papel que no existe.
-    $('[data-ftm="exportar"]').hidden = (documento === 'salud');
-    // Vista previa del MISMO Excel que se descargaría (`99 §102`).
-    $('[data-ftm="vista-previa"]').hidden = (documento === 'salud');
-    // Con firmas del equipo: solo el custodio y solo el documento con Excel (`§99`).
+    // Los DOS documentos se exportan al Excel oficial PE.02081. Mantenimiento, desde
+    // `99 §103` (orden del Ingeniero: «PE.02081 igual al PI»), con SU alcance y SUS
+    // beneficios. Vista previa del mismo Excel (`§102`).
+    $('[data-ftm="exportar"]').hidden = false;
+    $('[data-ftm="vista-previa"]').hidden = false;
+    // Con firmas del equipo: solo el custodio (`§99`).
     emision = null;
-    $('[data-ftm="exportar-equipo"]').hidden = !(documento !== 'salud' && custodiaDisponible());
+    $('[data-ftm="exportar-equipo"]').hidden = !custodiaDisponible();
 
     modalTabs.innerHTML = hojasDe(documento).map((h) =>
       '<button type="button" role="tab" class="ftm-modal-tipo-btn' + (hoja === h.id ? ' is-on' : '')
@@ -3052,7 +3051,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   // NO se guarda como «no tiene firma»: se reintenta al repintar y se explica.
   const firmasEquipoPantalla = { cargadas: false, cargando: null, generacion: 0, lecturas: new Map(), fallidas: [] };
   function asegurarFirmasEquipoPantalla() {
-    if (documento === 'salud' || !custodiaDisponible()) return;
+    if (!custodiaDisponible()) return;
     if (firmasEquipoPantalla.cargadas || firmasEquipoPantalla.cargando) return;
     const gen = firmasEquipoPantalla.generacion;
     firmasEquipoPantalla.cargando = (async () => {
@@ -3085,7 +3084,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   /** Qué firma lleva cada casilla EN PANTALLA: la propia y, para el custodio, las del equipo. */
   function planPantalla(P) {
-    const equipo = documento !== 'salud' && custodiaDisponible() ? [...firmasEquipoPantalla.lecturas.keys()] : [];
+    const equipo = custodiaDisponible() ? [...firmasEquipoPantalla.lecturas.keys()] : [];
     return planDeEstampado(P, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo });
   }
 
@@ -3133,7 +3132,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (typeof cfg.firmaSesion !== 'function' || !firmaSesion.hay) return '';
     const plan = planPantalla(P);
     const delEquipo = plan.filter((c) => c.origen === 'equipo').map((c) => rolDe(c.k));
-    const noLeidas = documento !== 'salud' && custodiaDisponible() && firmasEquipoPantalla.fallidas.length
+    const noLeidas = custodiaDisponible() && firmasEquipoPantalla.fallidas.length
       ? ' No se pudo leer la firma de ' + firmasEquipoPantalla.fallidas.map((id) => nombreDePersona(id)).join(', ')
         + ' (revise la conexión): su casilla sale en blanco.' : '';
     if (delEquipo.length) {
@@ -3154,7 +3153,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     });
     // El documento de Mantenimiento no exporta Excel: no se le promete.
     return 'Su firma va estampada en ' + nombres.join(' y ')
-      + (documento === 'salud' ? ', en pantalla. ' : ', en pantalla y en el Excel. ')
+      + ', en pantalla y en el Excel. '
       + 'Las demás casillas salen en blanco para firmar a mano.';
   }
 
@@ -3474,7 +3473,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const dA = parametrosDiagrama(e, 'actual');
     const dF = parametrosDiagrama(e, 'futuro');
     return {
-      plan: { ...st.plan },
+      // Mantenimiento lleva SU alcance y SUS beneficios (`alcance_mtto`,
+      // `beneficios_mtto`) en las celdas del PE.02081 (`99 §103`).
+      plan: documento === 'salud'
+        ? { ...st.plan, alcance: st.plan.alcance_mtto || '', beneficios: st.plan.beneficios_mtto || '' }
+        : { ...st.plan },
       anexo: valoresAnexo(e),
       diagramas: {
         actual: { ...dA, svg: unifilarDeEquipo(e, 'actual') },
@@ -3724,7 +3727,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       estado.firmas = firmas;
       const blob = await mod.exportarFichaPlanificacion(eq, estado);
       const huellaArchivo = await huellaBytes(new Uint8Array(await blob.arrayBuffer()));
-      const base = mod.nombreArchivoFicha ? mod.nombreArchivoFicha(eq) : 'Ficha_Planificacion.xlsx';
+      const base = nombreDelArchivo(mod, eq);
       const nombre = base.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx';
       // Sin registro no hay descarga: la trazabilidad interna es la condición.
       await cfg.firmasEquipo.registrarEmision(idEmision, {
@@ -3754,6 +3757,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + ' [PENDIENTE]:\n\n'
       + faltan.map((f) => '• ' + f.campos.join(' y ') + ': ' + f.motivo).join('\n')
       + '\n\nPulse Aceptar para descargarlo así, o Cancelar para volver y completarlo.';
+  }
+
+  /** Nombre del Excel: el de Mantenimiento no pisa al del PI si se bajan los dos (`99 §103`). */
+  function nombreDelArchivo(mod, eq) {
+    const base = mod.nombreArchivoFicha ? mod.nombreArchivoFicha(eq) : 'Ficha_Planificacion.xlsx';
+    return documento === 'salud' ? base.replace(/^Ficha_Planificacion/, 'Ficha_Mantenimiento') : base;
   }
 
   /**
@@ -3831,7 +3840,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (faltan.length && !globalThis.confirm(avisoPendientes(faltan))) return;
       const blob = await mod.exportarFichaPlanificacion(actual, estado);
       const nombre = mod.nombreArchivoFicha
-        ? mod.nombreArchivoFicha(actual)
+        ? nombreDelArchivo(mod, actual)
         : 'Ficha_Planificacion.xlsx';
       cfg.descargar(blob, nombre);
     } catch (err) {
