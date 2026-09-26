@@ -2210,3 +2210,4 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 .vpx-oculto-nota { margin-top: 3px; color: var(--ftm-muted, #5d6b7c); font-size: 12px; }
 @media print { .vpx-fondo { display: none !important; } }
 .vpx-oculto-img { display: block; margin-top: 6px; max-width: min(360px, 100%); max-height: 240px; border: 1px solid #d5dde8; border-radius: 6px; background: #fff; }
+.vpx-acciones { display: flex; gap: 8px; flex-wrap: wrap; }

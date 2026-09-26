@@ -669,6 +669,70 @@ function pintarHoja(h) {
   return hoja;
 }
 
+/** Estilos mínimos para imprimir las hojas (los mismos de la vista, sin la ventana). */
+const CSS_IMPRESION = `
+@page { size: letter portrait; margin: 8mm; }
+@page horizontal { size: letter landscape; margin: 8mm; }
+html, body { margin: 0; background: #fff; }
+.vpx-pagina { position: relative; page-break-after: always; break-after: page; overflow: hidden; }
+.vpx-pagina > .vpx-hoja { position: absolute; left: 0; top: 0; }
+.vpx-pagina:last-child { page-break-after: auto; break-after: auto; }
+.vpx-pagina--h { page: horizontal; }
+.vpx-hoja { position: relative; background: #fff; transform-origin: 0 0; font-family: Arial, Helvetica, sans-serif; color: #000; }
+.vpx-celda { position: absolute; display: flex; box-sizing: border-box; padding: 0 2px; overflow: hidden; line-height: 1.15; }
+.vpx-celda > span { max-width: 100%; }
+.vpx-externa { background: #fff1c2 !important; color: #8a5a00 !important; font-weight: 700; }
+.vpx-texto { position: absolute; display: flex; flex-direction: column; box-sizing: border-box; padding: 3px 6px; overflow: hidden; line-height: 1.2; }
+.vpx-texto--borde { border: 1px solid #555; }
+.vpx-texto--redondo { border-radius: 10px; }
+.vpx-parrafo { white-space: pre-wrap; }
+.vpx-img { position: absolute; object-fit: fill; }
+.vpx-img--nota { display: flex; align-items: center; justify-content: center; border: 1px dashed #9aa6b5; color: #6b7785; font-size: 10px; }
+.vpx-linea { position: absolute; overflow: visible; }
+* { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+`;
+
+/**
+ * Imprime las hojas visibles (una por página, vertical u horizontal según su forma)
+ * en un marco aparte: el navegador ofrece «Guardar como PDF». No toca la página.
+ */
+export function imprimirHojas(modelo, titulo) {
+  const marco = document.createElement('iframe');
+  marco.setAttribute('aria-hidden', 'true');
+  Object.assign(marco.style, { position: 'fixed', right: '0', bottom: '0', width: '0', height: '0', border: '0' });
+  document.body.appendChild(marco);
+  const doc = marco.contentDocument;
+  doc.open(); doc.write('<!doctype html><html lang="es"><head><meta charset="utf-8"><title></title></head><body></body></html>'); doc.close();
+  doc.title = 'Ficha técnica PE.02081 · ' + String(titulo || '');
+  const st = doc.createElement('style'); st.textContent = CSS_IMPRESION; doc.head.appendChild(st);
+  // Ancho útil de la página en px (96 ppp): carta menos márgenes.
+  const ANCHO_V = (215.9 - 16) / 25.4 * 96; const ALTO_V = (279.4 - 16) / 25.4 * 96;
+  for (const h of modelo.hojas.filter((q) => !q.oculta)) {
+    const horizontal = h.ancho > h.alto;
+    const [W, H] = horizontal ? [ALTO_V, ANCHO_V] : [ANCHO_V, ALTO_V];
+    const k = Math.min(W / h.ancho, H / h.alto);
+    const pagina = doc.createElement('div');
+    pagina.className = 'vpx-pagina' + (horizontal ? ' vpx-pagina--h' : '');
+    // Tamaño EXACTO de la página: si la hoja sin escalar sobresale, Chrome encoge
+    // todo el documento para que quepa y cada página sale diminuta.
+    pagina.style.width = Math.floor(h.ancho * k) + 'px';
+    pagina.style.height = Math.floor(h.alto * k) + 'px';
+    const hoja = doc.importNode(pintarHoja(h), true);
+    // `zoom` (no `transform`): cambia también el tamaño que usa el diseño de la
+    // página; con `transform` la hoja seguía «midiendo» su ancho original y Chrome
+    // encogía el documento entero al imprimir.
+    hoja.style.zoom = String(k);
+    pagina.appendChild(hoja);
+    doc.body.appendChild(pagina);
+  }
+  const imprimir = () => {
+    try { marco.contentWindow.focus(); marco.contentWindow.print(); } finally { setTimeout(() => marco.remove(), 1500); }
+  };
+  // Espera a que carguen las imágenes (firmas, diagramas) antes de imprimir.
+  const imgs = [...doc.images];
+  Promise.all(imgs.map((i) => (i.complete ? null : new Promise((r) => { i.onload = r; i.onerror = r; })))).then(() => setTimeout(imprimir, 100));
+}
+
 /**
  * Muestra la vista previa en una ventana propia.
  * @param {{hojas: Array, ocultos: Array}} modelo  de leerLibroParaVista
@@ -684,7 +748,12 @@ export function mostrarVistaPrevia(modelo, opciones = {}) {
   const cab = el('div', 'vpx-cab');
   const tit = el('div', 'vpx-titulo'); tit.appendChild(el('strong', null, 'Vista previa del Excel')); tit.appendChild(el('span', null, opciones.titulo || ''));
   const cerrar = el('button', 'ftm-btn', 'Cerrar'); cerrar.type = 'button';
-  cab.append(tit, cerrar);
+  // PDF (pedido del Ingeniero, 2026-09-25): como el informe de refrigeración, por el
+  // cuadro de impresión del navegador («Guardar como PDF»): una hoja por página.
+  const pdf = el('button', 'ftm-btn', 'Imprimir / Guardar PDF'); pdf.type = 'button';
+  pdf.addEventListener('click', () => imprimirHojas(modelo, opciones.titulo || ''));
+  const acciones = el('div', 'vpx-acciones'); acciones.append(pdf, cerrar);
+  cab.append(tit, acciones);
   const avisos = el('div', 'vpx-avisos');
   for (const a of (opciones.avisos || [])) avisos.appendChild(el('p', null, a));
   const pestanas = el('div', 'vpx-pestanas'); pestanas.setAttribute('role', 'tablist');
