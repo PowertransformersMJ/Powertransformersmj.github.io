@@ -26,6 +26,11 @@ async function libro(estado) {
   const bytes = await exportarFichaPlanificacion(EQUIPO, estado, { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array' });
   return leerLibroParaVista(await JSZip.loadAsync(bytes));
 }
+// Los datos ocultos viven en la PLANTILLA: el exportador los quita (`99 §104`,
+// `tests/fichas_limpiar_ocultos.test.js`). Aquí se prueba que la vista previa los ve.
+async function libroPlantilla() {
+  return leerLibroParaVista(await JSZip.loadAsync(readFileSync(PLANTILLA)));
+}
 
 describe('Fórmulas del PE.02081', () => {
   const hoja = { F36: 192852000, I36: undefined, J34: undefined, E20: 2, F11: 1549 };
@@ -41,6 +46,10 @@ describe('Fórmulas del PE.02081', () => {
     const r = calcularFormula("'[1]Ficha Técnica'!J37/1000000", 'Beneficios', leer);
     assert.equal(r.externa, true);
     assert.equal(r.valor, null);
+  });
+  test('dividir entre cero da «#¡DIV/0!», como Excel, y el error se arrastra (§104)', () => {
+    assert.equal(calcularFormula('F36/I36', 'H', leer).valor, '#¡DIV/0!');
+    assert.equal(calcularFormula('1+F36/I36', 'H', leer).valor, '#¡DIV/0!');
   });
   test('lo que no entiende lo dice, no inventa un número', () => {
     assert.ok(calcularFormula('VLOOKUP(A1,B:C,2)', 'H', leer).error);
@@ -81,8 +90,8 @@ describe('La vista previa lee el archivo que se descargaría', () => {
     assert.equal(con.hojas[0].imagenes.length, sin.hojas[0].imagenes.length + 1);
     assert.ok(con.hojas[0].imagenes.some((i) => /firma-elab\.png$/.test(i.ruta) && i.src));
   });
-  test('muestra lo que viaja OCULTO: vínculo externo, hoja fantasma, etiqueta, SharePoint, nombres rotos', async () => {
-    const m = await libro({ plan: {} });
+  test('muestra lo que la plantilla trae OCULTO: vínculo externo, hoja fantasma, etiqueta, SharePoint, nombres rotos', async () => {
+    const m = await libroPlantilla();
     const titulos = m.ocultos.map((o) => o.titulo).join(' | ');
     assert.match(titulos, /Vínculo a otro archivo/);
     const vinculo = m.ocultos.find((o) => /Vínculo/.test(o.titulo));
@@ -131,8 +140,8 @@ describe('Dibujos del Excel en su lugar', () => {
 });
 
 describe('Lo que viaja fuera del área de impresión (revisión de §102)', () => {
-  test('la captura de UPME en Beneficios y Anexo AT se reporta en «Datos ocultos», con miniatura', async () => {
-    const m = await libro({ plan: {} });
+  test('la captura de UPME de la plantilla en Beneficios y Anexo AT se reporta en «Datos ocultos», con miniatura', async () => {
+    const m = await libroPlantilla();
     const fuera = m.ocultos.filter((o) => /FUERA del área de impresión/.test(o.titulo) && /^Imagen/.test(o.titulo));
     const hojas = fuera.map((o) => o.titulo.split(' · ').pop());
     assert.ok(hojas.includes('Beneficios'), 'imagen fuera en Beneficios: ' + hojas.join(', '));
@@ -143,8 +152,8 @@ describe('Lo que viaja fuera del área de impresión (revisión de §102)', () =
     const ben = m.hojas.find((h) => h.nombre === 'Beneficios');
     assert.ok(ben.imagenes.every((i) => i.x < ben.ancho && i.y < ben.alto));
   });
-  test('el vínculo externo dice qué hojas y qué valores guardados trae', async () => {
-    const m = await libro({ plan: {} });
+  test('el vínculo externo de la plantilla dice qué hojas y qué valores guardados trae', async () => {
+    const m = await libroPlantilla();
     const v = m.ocultos.find((o) => /Vínculo/.test(o.titulo));
     assert.match(v.detalle, /hojas de ese archivo: .*Anexos MT/);
     assert.match(v.detalle, /valores guardados: J37 = 0/);

@@ -11,8 +11,11 @@
 //     con celdas (valor, fórmula calculada, estilo), imágenes y cuadros de texto
 //     en su lugar; y los DATOS OCULTOS del archivo. Se prueba con node.
 //   · mostrarVistaPrevia(modelo, opciones) — la ventana, una pestaña por hoja.
-// Solo MUESTRA: no quita ni cambia nada del archivo.
+// Solo MUESTRA: no quita ni cambia nada del archivo. Quitar los datos ocultos lo
+// hace el exportador (`limpiar-ocultos.js`, `99 §104`); aquí se comprueba.
 // ══════════════════════════════════════════════════════════════════════════════
+
+import { partesSueltas, textosSobrantes } from './limpiar-ocultos.js';
 
 const EMU_PX = 9525;
 const PT_PX = 96 / 72;
@@ -200,7 +203,9 @@ export function calcularFormula(formula, hojaActual, leerCelda) {
     i += m[0].length;
     return { hoja: hoja || hojaActual, ref: m[0] };
   }
-  const aNum = (v) => (typeof v === 'number' ? v : (v === '' || v == null ? 0 : (Number.isFinite(+v) ? +v : NaN)));
+  // Un error de Excel («#¡DIV/0!», «#¡VALOR!»…) se propaga tal cual, como en Excel.
+  const ERROR_EXCEL = /^#(?:¡?(?:DIV\/0!|VALOR!|REF!|NOMBRE\?|NUM!|NULO!)|N\/A|VALUE!|NAME\?|NULL!)$/;
+  const aNum = (v) => (typeof v === 'number' ? v : (v === '' || v == null ? 0 : (Number.isFinite(+v) ? +v : (ERROR_EXCEL.test(String(v)) ? ERR(String(v)) : NaN))));
   function valores(r) {
     const [a, b] = r.ref.replace(/\$/g, '').split(':');
     const p = refPartes(a); const q = refPartes(b || a);
@@ -249,7 +254,7 @@ export function calcularFormula(formula, hojaActual, leerCelda) {
     ERR('símbolo');
   }
   function potencia() { let v = primario(); esp(); while (s[i] === '^') { i++; v = aNum(v) ** aNum(primario()); esp(); } return v; }
-  function producto() { let v = potencia(); esp(); while (s[i] === '*' || s[i] === '/') { const o = s[i++]; const w = aNum(potencia()); v = o === '*' ? aNum(v) * w : aNum(v) / w; esp(); } return v; }
+  function producto() { let v = potencia(); esp(); while (s[i] === '*' || s[i] === '/') { const o = s[i++]; const w = aNum(potencia()); if (o === '/' && w === 0) ERR('#¡DIV/0!'); v = o === '*' ? aNum(v) * w : aNum(v) / w; esp(); } return v; }
   function suma() { let v = producto(); esp(); while (s[i] === '+' || s[i] === '-') { const o = s[i++]; const w = aNum(producto()); v = o === '+' ? aNum(v) + w : aNum(v) - w; esp(); } return v; }
   function concat() { let v = suma(); esp(); while (s[i] === '&') { i++; v = String(v ?? '') + String(suma() ?? ''); esp(); } return v; }
   function comparacion() {
@@ -268,6 +273,7 @@ export function calcularFormula(formula, hojaActual, leerCelda) {
     if (externa) return { valor: null, externa: true };
     return { valor: typeof v === 'boolean' ? (v ? 'VERDADERO' : 'FALSO') : (Number.isNaN(v) ? '#¡VALOR!' : v) };
   } catch (e) {
+    if (!externa && ERROR_EXCEL.test(e.message)) return { valor: e.message };
     return { valor: null, externa, error: e.message };
   }
 }
@@ -433,7 +439,7 @@ async function leerDibujo(zip, rutaDibujo, geo) {
 
 /* ── datos ocultos del archivo ──────────────────────────────────────────────── */
 
-async function leerOcultos(zip, workbookXml, hojas) {
+async function leerOcultos(zip, workbookXml, hojas, hojasXml = []) {
   const out = [];
   const nombresHojas = hojas.map((h) => h.nombre);
   // Vínculos a otros archivos.
@@ -507,6 +513,28 @@ async function leerOcultos(zip, workbookXml, hojas) {
   }
   const comentarios = Object.keys(zip.files).filter((n) => /comments\d*\.xml$|threadedComment/.test(n));
   if (comentarios.length) out.push({ titulo: 'Comentarios', detalle: comentarios.length + ' archivo(s) de comentarios', nota: '' });
+  // Restos de hojas borradas (`99 §104`): piezas a las que ya nada llega y
+  // textos que ninguna celda usa.
+  const nombres = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
+  const rels = new Map();
+  for (const n of nombres.filter((q) => /\.rels$/.test(q))) rels.set(n, await texto(zip, n));
+  const sueltas = partesSueltas(nombres, (r) => (rels.has(r) ? rels.get(r) : null));
+  if (sueltas.length) {
+    const partes = []; let miniatura = null;
+    for (const n of sueltas) {
+      const b = await zip.file(n).async('uint8array');
+      partes.push(n.split('/').pop() + ' · ' + (b.length < 1024 ? b.length + ' B' : Math.round(b.length / 1024) + ' KB'));
+      if (!miniatura && /\.png$/i.test(n)) miniatura = 'data:image/png;base64,' + await zip.file(n).async('base64');
+    }
+    out.push({ titulo: 'Piezas del archivo que ninguna hoja usa', detalle: partes.join(' · '), nota: 'Restos de hojas borradas: no se ven, pero viajan en el archivo.', miniatura });
+  }
+  const sobrantes = textosSobrantes(await texto(zip, 'xl/sharedStrings.xml'), hojasXml);
+  if (sobrantes.length) {
+    out.push({ titulo: 'Textos guardados que ninguna celda usa', detalle: sobrantes.slice(0, 12).map((x) => desXml(x.texto)).join(' · ') + (sobrantes.length > 12 ? ' · …' : ''),
+      nota: sobrantes.length + ' texto(s) de hojas borradas que viajan en el archivo.' });
+  }
+  const carpeta = (String(workbookXml).match(/<x15ac:absPath\b[^>]*url="([^"]*)"/) || [])[1];
+  if (carpeta) out.push({ titulo: 'Carpeta de quien guardó el archivo', detalle: desXml(carpeta), nota: 'Ruta del computador donde se guardó la plantilla.' });
   return out;
 }
 
@@ -606,7 +634,7 @@ export async function leerLibroParaVista(zip) {
       fueraDelArea, dibujosFuera, ocultas, formulasExternas
     });
   }
-  const ocultos = await leerOcultos(zip, wb, hojas);
+  const ocultos = await leerOcultos(zip, wb, hojas, Object.values(xmls));
   for (const h of hojas.filter((q) => q.oculta)) ocultos.unshift({ titulo: 'Hoja oculta', detalle: h.nombre, nota: 'Viaja en el archivo aunque no se vea.' });
   return { hojas, ocultos };
 }
@@ -765,8 +793,8 @@ export function mostrarVistaPrevia(modelo, opciones = {}) {
     const v = vistas[i];
     if (v.ocultos) {
       const lista = el('div', 'vpx-ocultos');
-      lista.appendChild(el('p', 'vpx-ocultos-intro', 'Lo que viaja dentro del archivo y no se ve en las hojas. Aquí solo se muestra: no se quita nada.'));
-      if (!modelo.ocultos.length) lista.appendChild(el('p', null, 'No se encontraron datos ocultos.'));
+      lista.appendChild(el('p', 'vpx-ocultos-intro', 'Lo que viaja dentro del archivo y no se ve en las hojas. El sistema quita estos datos al generar el Excel: esta lista debe quedar vacía.'));
+      if (!modelo.ocultos.length) lista.appendChild(el('p', null, 'El archivo no lleva datos ocultos.'));
       for (const o of modelo.ocultos) {
         const it = el('div', 'vpx-oculto'); it.appendChild(el('strong', null, o.titulo)); it.appendChild(el('div', 'vpx-oculto-detalle', o.detalle));
         if (o.nota) it.appendChild(el('div', 'vpx-oculto-nota', o.nota));
