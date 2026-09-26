@@ -4235,3 +4235,20 @@ sin ventana: 5 páginas completas. En vivo (AGUAS BLANCAS, su sesión): cinco fi
 previa, 11 datos ocultos, botón de PDF. **102.8 No re-auditar.** El logo de AFINIA es EMF: el navegador no lo dibuja
 (la vista lo avisa; sí va en el Excel). Crudos → bóveda `2026-09-25-vista-previa-excel/`.
 
+## 103. ADR — «Mantenimiento Especializado» se exporta al PE.02081 igual que el PI ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Tras ver `§102` en producción, el Ingeniero no encontró la vista previa: estaba en el documento de Mantenimiento
+> (dentro de Fichas), que no exportaba. Preguntado por el formato: *«PE.02081 igual al PI»*. Publicado `2897195`.
+
+**103.1 Solución.** Mismos botones que el PI (vista previa + PDF, con firmas del equipo, Exportar Excel) y las cinco
+firmas en pantalla. `estadoParaExportar` pone en las celdas del PE.02081 el alcance y los beneficios de Mantenimiento
+(`alcance_mtto`, `beneficios_mtto`); lo demás igual que el PI, presupuesto incluido (decisión suya, aunque en pantalla
+Mantenimiento no lo muestra, orden 09-09). Archivo «Ficha_Mantenimiento_…xlsx» (no pisa al del PI). **103.4
+Verificación.** Banco: Mantenimiento lleva SUS textos y el PI los suyos; las tres descargas funcionan. En vivo (ANIMAS
+BAJAS, su sesión): tres botones, cinco firmas, vista previa con el alcance de Mantenimiento. **103.5 Tropiezo.** Una
+prueba vieja exigía «sin exportación»: se publicó con ella en rojo (la cadena de comandos no se detuvo) — CI y Deploy
+de `1f13f55` fallaron; se actualizó la prueba a la regla nueva y `2897195` salió verde. Regla: comprobar el resultado
+de las pruebas ANTES de encadenar el merge. **103.8 Pendiente suyo.** «[object Object]» en «Tipo de refrigeración»
+(Anexo AT, pantalla y Excel): el registro guarda la refrigeración como grupo de datos; corrección propuesta y NO hecha
+(él la descartó por ahora). Y qué retirar de los datos ocultos de la plantilla (`§102.2`).
+

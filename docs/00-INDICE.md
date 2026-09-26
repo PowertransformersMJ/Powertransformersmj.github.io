@@ -85,7 +85,7 @@
 | §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la… | 1781 |
 | §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después… | 1838 |
 | §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría… | 1905 |
-| §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta y aceptar el cálculo degradaba 30 tridevanados reales; catálogo de 3 familias; la… | 1983 |
+| §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta; catálogo de 3 familias | 1983 |
 | §75 | ADR-075 — **Fichas Técnicas**: 5 falsedades del papel firmado corregidas; 5 redacciones por banda; alcance argumentado con condiciones; matriz a color; municipio… | 2642 |
 | §76 | ADR-076 — **Órdenes de Materiales** con la versión del 8-sep, sin firmas ni cédulas y con el parque vivo; recuperar una orden devolvía la primera persona. **L-90**… | 2964 |
 | §77 | ADR-077 — **Registro del equipo de OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, subida orden por orden, sin cédulas; comité de 4 (57 hallazgos).… | 3017 |
@@ -114,6 +114,7 @@
 | §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) ⟦OPUS-5.5⟧ | 4169 |
 | §101 | ADR-101 — **Firmas de tamaño parejo** ⟦OPUS-5.5⟧ | 4197 |
 | §102 | ADR-102 — **Vista previa del Excel + PDF**; cinco firmas en pantalla ⟦OPUS-5.5⟧ | 4211 |
+| §103 | ADR-103 — **Mantenimiento al PE.02081** ⟦OPUS-5.5⟧ | 4238 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
