@@ -37,6 +37,7 @@ import { desgloseCreg, leerMonto, TEXTO_PENDIENTE } from '../../domain/fichas_pr
 import { firmanteDe } from '../../domain/fichas_firmantes.js';
 import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import { fechaParaPapel } from '../../domain/fichas_fechas.js';
+import { limpiarOcultos } from './limpiar-ocultos.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -978,8 +979,17 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
     }
   } catch (e) { /* los diagramas quedan como en la plantilla */ }
 
-  // 8) Recomprimir. Nada más del libro se tocó: estilos, sharedStrings, temas,
-  //    dibujos, encabezados, pies y cuadro de firmas salen idénticos.
+  // 8) Sin datos ocultos (`99 §104`): vínculo a otro archivo, propiedades y
+  //    etiquetas heredadas, impresora, nombres rotos y lo dibujado fuera del área
+  //    de impresión. Lo visible no cambia. Si la limpieza falla, sale como antes.
+  try {
+    await limpiarOcultos(zip);
+  } catch (e) {
+    if (typeof console !== 'undefined') console.warn('[fichas] no se pudieron quitar los datos ocultos:', e && e.message);
+  }
+
+  // 9) Recomprimir. Nada más del libro se tocó: estilos, temas, dibujos dentro
+  //    del área, encabezados, pies y cuadro de firmas salen idénticos.
   const tipo = opts.tipoSalida || (typeof Blob !== 'undefined' ? 'blob' : 'uint8array');
   return await zip.generateAsync({
     type: tipo,
