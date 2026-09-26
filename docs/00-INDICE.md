@@ -110,8 +110,10 @@
 | §96 | ADR-096 — **Mantenimiento sin marcas de fábrica**: Beneficios vacío hasta escoger ⟦OPUS-5.5⟧ | 4014 |
 | §97 | ADR-097 — **Beneficios sin subtítulos y con términos técnicos** ⟦OPUS-5.5⟧ | 4032 |
 | §98 | ADR-098 — **Firma estampada** de la sesión en su casilla (ficha y Excel) ⟦OPUS-5.5⟧ | 4046 |
-| §99 | ADR-099 — **Firmas del equipo bajo custodia** en el PE.02081, con registro de cada emisión ⟦OPUS-5.5⟧ | 4078 |
-| §100 | ADR-100 — **Firmas en Firestore**: Storage no entrega las descargas al navegador (503) ⟦OPUS-5.5⟧ | 4169 |
+| §99 | ADR-099 — **Firmas del equipo bajo custodia** ⟦OPUS-5.5⟧ | 4078 |
+| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) ⟦OPUS-5.5⟧ | 4169 |
+| §101 | ADR-101 — **Firmas de tamaño parejo** ⟦OPUS-5.5⟧ | 4197 |
+| §102 | ADR-102 — **Vista previa del Excel + PDF**; cinco firmas en pantalla ⟦OPUS-5.5⟧ | 4211 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

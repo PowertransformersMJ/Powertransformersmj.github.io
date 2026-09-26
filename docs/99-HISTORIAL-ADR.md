@@ -4194,3 +4194,44 @@ URL pública de la firma · escritura en dos pasos con retirada.
 regresión). Pruebas de Storage que siguen: describen reglas vigentes (leer y borrar). **Pendiente del Ingeniero**:
 borrar a mano las 5 copias viejas en Storage (`firmas/` y `firmas-equipo/`); Claude no borra datos.
 
+## 101. ADR — Firmas de tamaño parejo: misma superficie, sin pasar del renglón ni de la casilla ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Pedido: *«necesito que las firmas todas sean proporcionales con el espacio para firmar, que no se vean ni muy grandes,
+> ni muy pequeñas, respetando los márgenes»*. Publicado `8017e0a` (junto con `§102`).
+
+**101.1 Causa.** Todas iban a 22 pt de ALTO fijo: la ancha (Erick, 5,8 : 1) se estiraba a 128 pt y la alta (Jorge
+Miranda, 1,7 : 1) quedaba angosta. **101.2 Solución.** `tamanoFirma` en `domain/firmas_tamano.js` (archivo nuevo, ver
+`§102.4`): misma superficie (1200 pt² ≈ 55 × 22 pt) con tope de alto = renglón de «Firma:» (22 pt, no tapa el texto) y
+de ancho = casilla − 4 pt; la MISMA regla en el Excel (`ubicacionFirma`) y en la pantalla (30 px). La alta NO crece más
+allá del renglón (hacerlo taparía «Ocupación»): con proporción < 2,5 : 1 sale igual que antes. **101.4 Verificación.**
+Pruebas con las cinco proporciones reales; render de LibreOffice con 1000 y 1200 pt² (se eligió 1200). Revisión de 4
+Opus (crudo en la bóveda `2026-09-25-vista-previa-excel/`). **101.8 No re-auditar.** La base de la firma roza 1 pt el
+renglón de la fecha en LibreOffice: ya era así antes (no es de este cambio).
+
+## 102. ADR — Vista previa del Excel completo (+ PDF) y las cinco firmas en la ficha en pantalla ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Pedidos: *«en ficha técnica solo se aprecia la firma de miguel jimenez, deben aparecer la de todos y también la opción
+> de vista previa»* · *«la ficha técnica completa con todas las hojas, quiero validar que no se exporte información que
+> no necesito»* · *«vista previa descargar en excel y pdf»*. Publicado `8017e0a`; validado en vivo en su Chrome.
+
+**102.1 Solución.** (a) Ficha en pantalla: para el custodio, cada casilla muestra la firma de su firmante (propia y del
+equipo), leídas una vez por sesión, relectura al cambiar el directorio, un fallo se explica en la nota. (b) Botón
+**«Vista previa»**: arma el MISMO .xlsx que se descargaría (con las firmas del equipo si es custodio) y lo muestra con
+`ui/fichas/vista-previa-excel.js` (lee el zip: celdas con estilos y fórmulas calculadas, recuadros, imágenes y firmas
+en sus capas) + pestaña **«Datos ocultos del archivo»**. No descarga ni registra. (c) **«Imprimir / Guardar PDF»**:
+cuadro de impresión del navegador, una hoja por página (Ficha vertical, las otras horizontales), como el informe de
+refrigeración. **102.2 Lo que la vista previa destapó en la PLANTILLA oficial** (viaja en cada Excel; NO se quitó nada —
+decide él): vínculo a «PE.02081.PE-FO.03 Ficha tecnica.xlsx» usado por Beneficios!K11 (Excel pide actualizar
+vínculos); tabla de ejemplo en «Beneficios» (1549 $/kWh, 01/01/2023); **captura del tablero UPME del CRO (88 KB) fuera
+del área de impresión** (2 copias en Beneficios, 1 en Anexo AT); hoja fantasma «Anexos MT»; etiqueta de clasificación
+y datos de SharePoint; nombres definidos rotos. **102.3 No-regresión** (recorrido en el banco): técnico igual que antes;
+Mantenimiento sin botones de Excel; «Exportar Excel» y «Descargar con firmas del equipo» iguales; Esc cierra solo la
+vista previa. **102.4 Incidente y blindaje.** Tras publicar `§100` la página de Fichas no apareció en su Chrome (caché
+mezclada, se resolvió con Cmd+Shift+R — L-102): lo nuevo va en archivos NUEVOS (`firmas_tamano.js`,
+`vista-previa-excel.js` con su propio JSZip), `fichas_firmantes.js` quedó idéntico a producción y la página ya no se
+cae si «Mi firma» no carga. **102.5 Verificación.** 1885 pass (11 de la vista previa). Revisión de Opus: una se colgó
+(servicio) y se relanzó acotada — ALTA (la captura UPME no se mostraba) + 4 bajos, corregidos. PDF impreso con Chrome
+sin ventana: 5 páginas completas. En vivo (AGUAS BLANCAS, su sesión): cinco firmas reales en pantalla y en la vista
+previa, 11 datos ocultos, botón de PDF. **102.8 No re-auditar.** El logo de AFINIA es EMF: el navegador no lo dibuja
+(la vista lo avisa; sí va en el Excel). Crudos → bóveda `2026-09-25-vista-previa-excel/`.
+
