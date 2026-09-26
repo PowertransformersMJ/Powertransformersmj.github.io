@@ -29,13 +29,14 @@ describe('DOCUMENTOS_FICHA — los documentos que se emiten desde un equipo', ()
   // 🔒 El que aún no existe NO puede anunciarse como disponible: alguien
   // podría dar por emitido un documento que no se ha construido.
   // Antes estaba marcado «no listo» y el modal enseñaba un cartel de obra.
-  // Ya tiene sus dos segmentos redactados y su hoja de salud y riesgo; lo que
-  // le falta —y por eso lo dice su descripción— es formato de exportación.
-  test('Salud de Activos ya se emite, pero avisa que no exporta', () => {
+  // Ya tiene sus dos segmentos redactados y su hoja de salud y riesgo. Desde
+  // `99 §103` (orden del Ingeniero: «PE.02081 igual al PI») se exporta al Excel
+  // oficial PE.02081, y su descripción lo dice.
+  test('Salud de Activos se emite y se exporta al PE.02081, igual que el PI (§103)', () => {
     const s = DOCUMENTOS_FICHA.find((d) => d.id === 'salud');
     assert.equal(s.listo, true);
-    assert.match(s.desc, /sin exportación/i,
-      'prometer el Excel oficial sería prometer un papel que no existe');
+    assert.match(s.desc, /PE\.02081/);
+    assert.doesNotMatch(s.desc, /sin exportación/i);
   });
 
   test('los nombres dicen qué es cada uno, sin ambigüedad', () => {
