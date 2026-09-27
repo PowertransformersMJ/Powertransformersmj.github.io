@@ -2044,6 +2044,12 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 }
 .ftm-acc-item.es-extra .ftm-acc-txt { color: var(--ftm-muted, #61748a); }
 .ftm-acc-item input { flex: none; margin: 0; }
+/* Beneficios de Mantenimiento: las 13 acciones del Ingeniero y sus elementos (`99 §105`). */
+.ftm-bacc-lista { padding: 6px 12px; }
+.ftm-bacc-grupo { border-top: 1px dashed var(--ftm-line, #e3e9f0); }
+.ftm-bacc-grupo:first-child { border-top: 0; }
+.ftm-bacc-sub { padding: 0 0 6px 26px; }
+.ftm-bacc-sub .ftm-acc-item { padding-top: 3px; padding-bottom: 3px; font-size: .95em; }
 .ftm-acc-cat { width: 8px; height: 8px; border-radius: 2px; flex: none; }
 .ftm-acc-pie { margin: 0; padding: 8px 12px 10px; font-size: 11.5px; color: var(--ftm-muted, #61748a);
   border-top: 1px solid var(--ftm-line, #e3e9f0); background: var(--ftm-bg-soft, #f8fafc); }

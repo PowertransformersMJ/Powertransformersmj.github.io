@@ -38,6 +38,7 @@ import { firmanteDe } from '../../domain/fichas_firmantes.js';
 import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 import { limpiarOcultos } from './limpiar-ocultos.js';
+import { ajustarAltoCasilla } from './alto-casilla.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -899,12 +900,24 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
 
   // 3) Hoja 1 «Ficha Técnica» — solo las celdas del mapa.
   let s1 = await zip.file(HOJA_FICHA).async('string');
-  celdasFichaPlan(equipo, estado).forEach((m) => {
+  const celdas1 = celdasFichaPlan(equipo, estado);
+  celdas1.forEach((m) => {
     if (m.plantilla) return;                      // manda la fórmula del formato
     if (m.formula) s1 = escribirFormula(s1, m.cell, m.formula);
     else s1 = escribirCelda(s1, m.cell, (m.clear ? '' : m.val), !!m.numeric, null);
   });
   TOTALES_SUM.forEach((ref) => { s1 = limpiarCacheFormula(s1, ref); });
+  // La casilla BENEFICIOS (B23:L26) crece con su texto para que no se corte en
+  // el papel (`99 §105`, decisión del Ingeniero: «Agrandar la casilla»). Si el
+  // texto cabe, la hoja no cambia. Si algo falla, sale como antes.
+  try {
+    // Solo en el documento de Mantenimiento (lo marca el panel): el PI conserva
+    // su casilla tal cual, también con sus redacciones más largas.
+    const benef = celdas1.find((m) => m.cell === 'B23');
+    if (estado.crecerBeneficios && benef && benef.val) {
+      s1 = ajustarAltoCasilla(s1, { filas: [23, 24, 25, 26], texto: String(benef.val) });
+    }
+  } catch (e) { /* la casilla conserva su alto */ }
   zip.file(HOJA_FICHA, s1);
 
   // 4) Forzar recálculo de fórmulas al abrir en Excel/Calc.

@@ -143,10 +143,10 @@ describe('lo que vuelve del disco es entrada NO confiable', () => {
   });
 
   test('los caracteres de control se limpian y el campo tiene tope', () => {
-    const largo = 'A'.repeat(9000);
+    const largo = 'A'.repeat(25000);
     const e = entradaDesdeFicha({ equipo: TX1, plan: { a: 'ho\u0000la', b: largo }, ahoraISO: AHORA });
     assert.equal(e.plan.a, 'hola');
-    assert.equal(e.plan.b.length, 8000);
+    assert.equal(e.plan.b.length, 20000);
   });
 });
 

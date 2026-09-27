@@ -40,7 +40,10 @@ export const VERSION = 1;
 /** Topes: el almacén del navegador lo comparten otros módulos del sitio. */
 export const TOPE_EQUIPOS = 40;
 export const TOPE_BYTES = 400 * 1024;
-export const TOPE_CAMPO = 8000;
+// 20 000: los Beneficios de las 13 acciones del Ingeniero pasan de 10 000
+// caracteres (`99 §105`); con 8 000 el texto corregido a mano se cortaba al
+// recargar. Sigue muy por debajo de lo que admite una celda de Excel.
+export const TOPE_CAMPO = 20000;
 export const DIAS_VIDA = 30;
 
 const LLAVES_PROHIBIDAS = new Set(['__proto__', 'constructor', 'prototype']);
