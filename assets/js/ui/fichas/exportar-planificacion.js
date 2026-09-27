@@ -40,6 +40,7 @@ import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 import { limpiarOcultos } from './limpiar-ocultos.js';
 import { ajustarAltoCasilla } from './alto-casilla.js';
 import { zonaDelActivo } from '../../domain/fichas_zona.js';
+import { svgSaludRiesgo, cajaSaludRiesgo, svgAPng, montarHojaSaludRiesgo } from './salud-riesgo-excel.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -993,6 +994,20 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       if (png) zip.file(IMG_DIAG_FUTURO, png);
     }
   } catch (e) { /* los diagramas quedan como en la plantilla */ }
+
+  // 7b) Mantenimiento: la hoja «Salud y riesgo» (matriz de riesgo) en el lugar
+  //     del «Anexo AT» (`99 §107`). Si no se puede dibujar, el libro conserva el
+  //     Anexo AT: nunca se deja de emitir.
+  if (estado.saludRiesgo) {
+    try {
+      const caja = cajaSaludRiesgo(await zip.file('xl/worksheets/sheet3.xml').async('string'));
+      const d = svgSaludRiesgo(estado.saludRiesgo);
+      const png = estado.saludRiesgo.png || await svgAPng(d.svg, d.w, d.h, caja.w * 2, caja.h * 2);
+      if (png) await montarHojaSaludRiesgo(zip, png, caja);
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[fichas] no se pudo montar la hoja «Salud y riesgo»:', e && e.message);
+    }
+  }
 
   // 8) Sin datos ocultos (`99 §104`): vínculo a otro archivo, propiedades y
   //    etiquetas heredadas, impresora, nombres rotos y lo dibujado fuera del área
