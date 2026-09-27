@@ -4082,7 +4082,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // cada descarga con firmas del equipo queda registrada con su folio.
       const registro = await firmasDelEquipoEnEstado(eq, estado);
       if (registro === false || actual !== eq) return;
-      const blob = await mod.exportarFichaPlanificacion(eq, estado);
+      let blob = await mod.exportarFichaPlanificacion(eq, estado);
       let nombre = mod.nombreArchivoFicha
         ? nombreDelArchivo(mod, eq)
         : 'Ficha_Planificacion.xlsx';
@@ -4090,12 +4090,27 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         const folio = folioDeEmision(registro.idEmision);
         const huellaArchivo = await huellaBytes(new Uint8Array(await blob.arrayBuffer()));
         // Sin registro no hay descarga con firmas del equipo: la trazabilidad es la condición (§99).
-        await cfg.firmasEquipo.registrarEmision(registro.idEmision, {
-          equipo: { matricula: eq.matricula || '', subestacion: eq.subestacion || '', serie: eq.serie || '' },
-          casillas: registro.casillas, huellaArchivo
-        });
-        nombre = nombre.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx';
-        fijarAviso('<div class="ftm-nota">' + esc('Emisión ' + folio + ' registrada: el Excel salió con las firmas del equipo.') + '</div>');
+        let registrada = true;
+        try {
+          await cfg.firmasEquipo.registrarEmision(registro.idEmision, {
+            equipo: { matricula: eq.matricula || '', subestacion: eq.subestacion || '', serie: eq.serie || '' },
+            casillas: registro.casillas, huellaArchivo
+          });
+        } catch (errReg) {
+          console.warn('[fichas/panel] no se registró la emisión:', errReg);
+          registrada = false;
+        }
+        if (registrada) {
+          nombre = nombre.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx';
+          fijarAviso('<div class="ftm-nota">' + esc('Emisión ' + folio + ' registrada: el Excel salió con las firmas del equipo.') + '</div>');
+        } else {
+          // Lo que ya servía no se pierde (`99 §108`): antes «Exportar Excel» siempre
+          // entregaba el archivo con la firma de la sesión. Sin registro, esa es la salida.
+          if (!globalThis.confirm('No se pudo registrar la descarga con las firmas del equipo (revise la conexión). '
+            + 'Sin registro no sale con ellas.\n\nPulse Aceptar para descargarlo solo con su firma, '
+            + 'o Cancelar para intentar de nuevo.') || actual !== eq) return;
+          blob = await mod.exportarFichaPlanificacion(eq, estadoParaExportar(eq));
+        }
       }
       cfg.descargar(blob, nombre);
     } catch (err) {
