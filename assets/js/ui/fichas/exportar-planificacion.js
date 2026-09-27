@@ -996,16 +996,25 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
   } catch (e) { /* los diagramas quedan como en la plantilla */ }
 
   // 7b) Mantenimiento: la hoja «Salud y riesgo» (matriz de riesgo) en el lugar
-  //     del «Anexo AT» (`99 §107`). Si no se puede dibujar, el libro conserva el
-  //     Anexo AT: nunca se deja de emitir.
+  //     del «Anexo AT» (`99 §107`). Si la imagen no se puede dibujar, la hoja sale
+  //     igual con un aviso en el marco (el Anexo AT no vuelve); solo si el marco
+  //     mismo no se puede armar queda el Anexo AT. Nunca se deja de emitir, y en
+  //     los dos casos se le avisa a quien descarga (`opts.avisos`), no solo a la consola.
   if (estado.saludRiesgo) {
+    let conImagen = false; let montada = false;
     try {
       const caja = cajaSaludRiesgo(await zip.file('xl/worksheets/sheet3.xml').async('string'));
       const d = svgSaludRiesgo(estado.saludRiesgo);
       const png = estado.saludRiesgo.png || await svgAPng(d.svg, d.w, d.h, caja.w * 2, caja.h * 2);
-      if (png) await montarHojaSaludRiesgo(zip, png, caja);
+      conImagen = await montarHojaSaludRiesgo(zip, png || null, caja);
+      montada = true;
     } catch (e) {
       if (typeof console !== 'undefined') console.warn('[fichas] no se pudo montar la hoja «Salud y riesgo»:', e && e.message);
+    }
+    if (Array.isArray(opts.avisos) && !conImagen) {
+      opts.avisos.push(montada
+        ? 'La matriz de riesgo no se pudo dibujar: la hoja «Salud y riesgo» del Excel lleva un aviso en su lugar. Vuelva a exportar.'
+        : 'La hoja «Salud y riesgo» no se pudo armar: este Excel lleva el Anexo AT en su lugar. Vuelva a exportar.');
     }
   }
 

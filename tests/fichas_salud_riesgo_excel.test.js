@@ -8,7 +8,8 @@ import { dirname, resolve } from 'node:path';
 import JSZip from 'jszip';
 import { exportarFichaPlanificacion } from '../assets/js/ui/fichas/exportar-planificacion.js';
 import { leerLibroParaVista } from '../assets/js/ui/fichas/vista-previa-excel.js';
-import { svgSaludRiesgo, cajaSaludRiesgo } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
+import { svgSaludRiesgo, cajaSaludRiesgo, AVISO_SIN_IMAGEN } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
+import { calcularRangosCriticidad, nivelPorUsuarios } from '../assets/js/domain/matriz_riesgo.js';
 import { HOJAS_SALUD, HOJAS_FICHA } from '../assets/js/ui/fichas/panel.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -84,9 +85,52 @@ describe('En el Excel', () => {
     const m = await leerLibroParaVista(await libro({ plan: { proyecto: 'P' } }));
     assert.equal(m.hojas[4].nombre, 'Anexo AT');
   });
-  test('si no hay imagen (sin navegador), el libro sale igual que antes, con su Anexo AT', async () => {
-    const m = await leerLibroParaVista(await libro({ plan: { proyecto: 'P' }, saludRiesgo: MODELO }));
-    assert.equal(m.hojas[4].nombre, 'Anexo AT');
+  // Revisión §107: antes, sin imagen volvía el Anexo AT en silencio — lo contrario de lo pedido.
+  test('si no hay imagen (sin navegador), la hoja «Salud y riesgo» sale con su aviso, sin Anexo AT, y se le avisa a quien descarga', async () => {
+    const avisos = [];
+    const b = await exportarFichaPlanificacion(EQ, { plan: { proyecto: 'P' }, saludRiesgo: MODELO },
+      { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array', avisos });
+    const z = await JSZip.loadAsync(b);
+    const m = await leerLibroParaVista(z);
+    assert.equal(m.hojas[4].nombre, 'Salud y riesgo');
+    assert.ok(m.hojas[4].celdas.some((c) => c.texto === AVISO_SIN_IMAGEN));
+    assert.deepEqual(m.ocultos, []);
+    assert.doesNotMatch(await z.file('xl/workbook.xml').async('string'), /Anexo AT/);
+    assert.equal(z.file('xl/media/image8.png'), null);
+    assert.doesNotMatch(await z.file('xl/drawings/_rels/drawing6.xml.rels').async('string'), /image8/);
+    assert.equal(avisos.length, 1);
+    assert.match(avisos[0], /no se pudo dibujar/);
+  });
+  test('con imagen no hay aviso', async () => {
+    const avisos = [];
+    await exportarFichaPlanificacion(EQ, { plan: { proyecto: 'P' }, saludRiesgo: { ...MODELO, png: PNG } },
+      { plantillaBuffer: readFileSync(PLANTILLA), tipoSalida: 'uint8array', avisos });
+    assert.deepEqual(avisos, []);
+  });
+});
+
+describe('El dibujo no se rompe ni sugiere lo que no hay (revisión §107)', () => {
+  test('un carácter de control en la subestación no deja el dibujo mal formado', () => {
+    const { svg } = svgSaludRiesgo({ ...MODELO, titulo: 'Salud · S/E X\u000bY\u0001 · T1' });
+    // eslint-disable-next-line no-control-regex
+    assert.doesNotMatch(svg, /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/);
+    assert.match(svg, /S\/E XY · T1/);
+  });
+  test('sin MVA (punto null) no se dibuja punto en la casilla; la leyenda conserva sus cinco', () => {
+    const conPunto = svgSaludRiesgo(MODELO).svg.match(/<circle\b/g).length;
+    const sinPunto = svgSaludRiesgo({ ...MODELO, marca: { ...MODELO.marca, mva: 'sin MVA', punto: null } }).svg.match(/<circle\b/g).length;
+    assert.equal(conPunto, 6);
+    assert.equal(sinPunto, 5);
+  });
+  test('sin dato de usuarios el equipo no cae en ninguna columna (antes: «Mínima» con veredicto)', () => {
+    const r = calcularRangosCriticidad(48312);
+    assert.equal(nivelPorUsuarios(null, r), null);
+    assert.equal(nivelPorUsuarios(undefined, r), null);
+    assert.equal(nivelPorUsuarios('', r), null);
+    assert.equal(nivelPorUsuarios('  ', r), null);
+    assert.equal(nivelPorUsuarios(0, r), 'minima');
+    assert.equal(nivelPorUsuarios('0', r), 'minima');
+    assert.equal(nivelPorUsuarios(20000, r), 'moderada');
   });
 });
 

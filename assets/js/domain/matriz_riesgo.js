@@ -66,6 +66,11 @@ export function calcularRangosCriticidad(maxUsuarios, minUsuarios = 1) {
  * Clasifica un número de usuarios en su nivel de criticidad.
  */
 export function nivelPorUsuarios(usuarios, rangos) {
+  // Sin dato NO es «Mínima» (`99 §107`): Number(null) y Number('') dan 0 y el
+  // equipo caía en la primera columna con veredicto de riesgo, aunque nadie
+  // sepa cuántos usuarios cuelgan de él. Igual que conteoPorNivel: sin dato,
+  // ninguna columna. Cero usuarios registrados sí es un dato (Mínima).
+  if (usuarios == null || String(usuarios).trim() === '') return null;
   const n = Number(usuarios);
   if (!Number.isFinite(n) || !Array.isArray(rangos) || !rangos.length) return null;
   // Se redondea antes de clasificar: los usuarios son personas, no decimales,

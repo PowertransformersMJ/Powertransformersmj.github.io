@@ -2394,7 +2394,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       }) })),
       marca: sinDato ? null : { mva: mva != null ? mvaTxt(mva) + ' MVA' : 'sin MVA',
         usuarios: usuarios != null ? numES(usuarios, 0) + ' usuario' + (Math.round(usuarios) === 1 ? '' : 's') : 'usuarios sin dato',
-        punto: banda ? banda.punto : 1 },
+        punto: banda ? banda.punto : null },
       hayMarca: !sinDato,
       leyenda: Object.keys(COLORES_CELDA).map((k) => ({ hex: hexDe(k), texto: VEREDICTO[k] || k })),
       puntos: BANDAS_POTENCIA.map((b) => b.punto),
@@ -4001,7 +4001,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (faltan.length) {
         avisos.push('Casillas [PENDIENTE]: ' + faltan.map((f) => f.campos.join(' y ')).join(' · ') + '.');
       }
-      const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array' });
+      // Lo que el exportador no pudo dibujar se dice aquí también (`99 §107`).
+      const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array', avisos });
       const { leerLibroParaVista, mostrarVistaPrevia, cargarJSZip } = await import('./vista-previa-excel.js');
       const JSZip = await cargarJSZip();
       const modelo = await leerLibroParaVista(await JSZip.loadAsync(bytes));
@@ -4082,7 +4083,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // cada descarga con firmas del equipo queda registrada con su folio.
       const registro = await firmasDelEquipoEnEstado(eq, estado);
       if (registro === false || actual !== eq) return;
-      let blob = await mod.exportarFichaPlanificacion(eq, estado);
+      // Lo que el exportador no pudo dibujar (la matriz de «Salud y riesgo», `99 §107`).
+      const avisosExcel = [];
+      let blob = await mod.exportarFichaPlanificacion(eq, estado, { avisos: avisosExcel });
       let nombre = mod.nombreArchivoFicha
         ? nombreDelArchivo(mod, eq)
         : 'Ficha_Planificacion.xlsx';
@@ -4109,10 +4112,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
           if (!globalThis.confirm('No se pudo registrar la descarga con las firmas del equipo (revise la conexión). '
             + 'Sin registro no sale con ellas.\n\nPulse Aceptar para descargarlo solo con su firma, '
             + 'o Cancelar para intentar de nuevo.') || actual !== eq) return;
-          blob = await mod.exportarFichaPlanificacion(eq, estadoParaExportar(eq));
+          avisosExcel.length = 0;
+          blob = await mod.exportarFichaPlanificacion(eq, estadoParaExportar(eq), { avisos: avisosExcel });
         }
       }
       cfg.descargar(blob, nombre);
+      if (avisosExcel.length) alert(avisosExcel.join('\n\n'));
     } catch (err) {
       console.warn('[fichas/panel] la exportación falló:', err);
       alert('No se pudo generar la ficha en Excel.\n\n' + (err && err.message ? err.message : err));

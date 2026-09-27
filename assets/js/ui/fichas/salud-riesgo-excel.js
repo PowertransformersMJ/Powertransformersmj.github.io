@@ -34,7 +34,14 @@ const IMAGEN = 'xl/media/image8.png';
 export const NOMBRE_HOJA = 'Salud y riesgo';
 
 const esc = (s) => String(s == null ? '' : s)
+  // Caracteres de control que XML 1.0 no admite (llegan pegados de otro sistema):
+  // uno solo en la subestación dejaba el dibujo sin imagen (revisión §107, igual que §89).
+  // eslint-disable-next-line no-control-regex
+  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+/** Lo que dice la hoja cuando la matriz no se pudo dibujar: el Anexo AT no vuelve (`99 §107`). */
+export const AVISO_SIN_IMAGEN = 'No se pudo dibujar la matriz de riesgo de este equipo. Consulte la hoja «Salud y riesgo» de la ficha en pantalla y vuelva a exportar.';
 
 /** Parte un texto en renglones de a lo sumo `n` caracteres (por palabras). */
 function renglones(texto, n) {
@@ -85,7 +92,8 @@ export function svgSaludRiesgo(m) {
   y += 18;
 
   // Matriz 5×5.
-  const rotW = 250; const cw = (W - 2 * P - rotW) / 5; const hh = 70; const rh = 72;
+  // 280: «Consecuencia (usuarios aguas abajo) →» mide ~249 px y con 250 la columna 1 tapaba la flecha.
+  const rotW = 280; const cw = (W - 2 * P - rotW) / 5; const hh = 70; const rh = 72;
   const x0 = P; const y0 = y;
   partes.push('<rect x="' + x0 + '" y="' + y0 + '" width="' + rotW + '" height="' + hh + '" fill="#e9eef4" stroke="#ffffff" stroke-width="2"/>');
   texto(x0 + 10, y0 + 28, 'Probabilidad de falla (condición) ↓', { tam: 13, peso: 700, color: '#26394d' });
@@ -105,8 +113,11 @@ export function svgSaludRiesgo(m) {
       partes.push('<rect x="' + x + '" y="' + yy + '" width="' + cw + '" height="' + rh + '" fill="' + c.hex + '" stroke="#ffffff" stroke-width="2"/>');
       if (c.aqui && m.marca) {
         partes.push('<rect x="' + (x + 4) + '" y="' + (yy + 4) + '" width="' + (cw - 8) + '" height="' + (rh - 8) + '" fill="none" stroke="#10202c" stroke-width="6"/>');
-        const r = 3 + 2.4 * (m.marca.punto || 1);
-        partes.push('<circle cx="' + (x + 30) + '" cy="' + (yy + rh / 2) + '" r="' + r + '" fill="' + c.tinta + '"/>');
+        // Sin MVA no hay punto, como en la pantalla: el papel no sugiere una potencia que no está registrada.
+        if (m.marca.punto) {
+          const r = 3 + 2.4 * m.marca.punto;
+          partes.push('<circle cx="' + (x + 30) + '" cy="' + (yy + rh / 2) + '" r="' + r + '" fill="' + c.tinta + '"/>');
+        }
         texto(x + 52, yy + rh / 2 - 4, m.marca.mva, { tam: 19, peso: 800, color: c.tinta });
         texto(x + 52, yy + rh / 2 + 18, m.marca.usuarios, { tam: 15, color: c.tinta });
       }
@@ -199,7 +210,9 @@ function celdaTexto(xml, ref, texto) {
 /**
  * Reemplaza la hoja «Anexo AT» por «Salud y riesgo»: clona el marco de
  * «Diagrama Actual», le pone título y pie, y dibuja la imagen dentro del marco.
- * Lee y arma todo antes de escribir; si algo falla lanza y el zip queda igual.
+ * Sin imagen (`png` null) la hoja se monta igual, con AVISO_SIN_IMAGEN en el
+ * marco. Devuelve true si llevó la imagen. Lee y arma todo antes de escribir;
+ * si algo falla lanza y el zip queda igual.
  */
 export async function montarHojaSaludRiesgo(zip, png, caja) {
   const leer = async (r) => { const f = zip.file(r); if (!f) throw new Error('falta ' + r); return f.async('string'); };
@@ -207,6 +220,9 @@ export async function montarHojaSaludRiesgo(zip, png, caja) {
 
   let hoja = celdaTexto(hojaDiag, 'B3', 'SALUD Y RIESGO');
   hoja = celdaTexto(hoja, 'B56', 'Pág. 5 de 5');
+  // Sin imagen, la hoja igual reemplaza al Anexo AT y lo dice dentro del marco.
+  const conImagen = !!(png && png.length);
+  if (!conImagen) hoja = celdaTexto(hoja, 'B10', AVISO_SIN_IMAGEN);
   // La copia NO repite el identificador interno de «Diagrama Actual»: toma el que
   // tenía la hoja que reemplaza (o ninguno), para que Excel no la tome por duplicada.
   const original = zip.file(HOJA_DESTINO) ? await zip.file(HOJA_DESTINO).async('string') : '';
@@ -225,11 +241,11 @@ export async function montarHojaSaludRiesgo(zip, png, caja) {
     + '<xdr:blipFill><a:blip xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:embed="rId2"/><a:stretch><a:fillRect/></a:stretch></xdr:blipFill>'
     + '<xdr:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="' + caja.w * EMU_PX + '" cy="' + caja.h * EMU_PX + '"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></xdr:spPr>'
     + '</xdr:pic><xdr:clientData/></xdr:twoCellAnchor>';
-  const cuerpo = dibujoDiag.replace(/(<xdr:wsDr\b[^>]*>)[\s\S]*(<\/xdr:wsDr>)/, (_m, a, b) => a + logo + imagen + b);
+  const cuerpo = dibujoDiag.replace(/(<xdr:wsDr\b[^>]*>)[\s\S]*(<\/xdr:wsDr>)/, (_m, a, b) => a + logo + (conImagen ? imagen : '') + b);
   const rels = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
     + '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
     + '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image1.emf"/>'
-    + '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image8.png"/>'
+    + (conImagen ? '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/image8.png"/>' : '')
     + '</Relationships>';
 
   // Libro: el nombre de la hoja y su área de impresión (la del marco de diagramas).
@@ -242,6 +258,7 @@ export async function montarHojaSaludRiesgo(zip, png, caja) {
   zip.file(HOJA_DESTINO, hoja);
   zip.file(DIBUJO_DESTINO, cuerpo);
   zip.file(RELS_DIBUJO_DESTINO, rels);
-  zip.file(IMAGEN, png);
+  if (conImagen) zip.file(IMAGEN, png);
   zip.file('xl/workbook.xml', wb);
+  return conImagen;
 }
