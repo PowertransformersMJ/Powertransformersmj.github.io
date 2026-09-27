@@ -288,7 +288,7 @@ describe('CF-32 · lo que se teclea NUNCA se vuelve fórmula en el Excel (candad
   test('las únicas fórmulas del libro son las del presupuesto; el texto sale literal, sin apóstrofo', async () => {
     const plantillaBuffer = readFileSync(PLANTILLA);
     const bytes = await exportarFichaPlanificacion(
-      { ...EQUIPO, subestacion: '=1+1', departamento: '+2+3' },
+      { ...EQUIPO, subestacion: '=1+1', zona: '+2+3' },
       { plan: PELIGROSOS, anexo: ANEXO },
       { plantillaBuffer, tipoSalida: 'uint8array' });
     const zip = await JSZip.loadAsync(bytes);

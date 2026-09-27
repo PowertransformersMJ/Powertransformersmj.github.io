@@ -62,6 +62,8 @@ import {
 import { redaccionBeneficiosPracticas } from '../../domain/beneficios_practicas.js';
 // Las 13 acciones del Ingeniero para Beneficios de Mantenimiento (`99 §105`).
 import { redaccionBeneficiosAcciones, ACCIONES_BENEFICIO } from '../../domain/beneficios_acciones_mtto.js';
+// La zona del activo (BOLIVAR / ORIENTE / OCCIDENTE), no su departamento (`99 §106`).
+import { zonaDelActivo } from '../../domain/fichas_zona.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
   claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas,
@@ -3344,7 +3346,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '</div>'
       + banda('Emplazamiento físico del proyecto')
       + '<div class="ftm-hoja-grid2">'
-      +   campoTexto('Zona', e.departamento)
+      +   campoTexto('Zona', zonaDelActivo(e))
       +   campoTexto('Subestación', e.subestacion)
       +   campoInput('Municipio', 'municipio', lleno(P.municipio) ? P.municipio : (e.municipio || ''), '(municipio)')
       +   '<div class="ftm-campo"><span class="ftm-campo-lbl"></span><span class="ftm-campo-val"></span></div>'

@@ -39,6 +39,7 @@ import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 import { limpiarOcultos } from './limpiar-ocultos.js';
 import { ajustarAltoCasilla } from './alto-casilla.js';
+import { zonaDelActivo } from '../../domain/fichas_zona.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -312,7 +313,8 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
     { cell: 'H8',  campo: 'Consecutivo', val: txt(plan.consecutivo), clear: !lleno(plan.consecutivo), pend: false },
     { cell: 'D9',  campo: 'Cód estudio/tarea', val: txt(plan.codestudio), clear: !lleno(plan.codestudio), pend: false },
     { cell: 'H9',  campo: 'Ámbito', val: 'Media Tensión / Alta Tensión', pend: false },
-    { cell: 'D13', campo: 'Zona', val: txt(equipo.departamento), pend: false },
+    // La ZONA del activo, no su departamento (`99 §106`).
+    { cell: 'D13', campo: 'Zona', val: txt(zonaDelActivo(equipo)), pend: false },
     { cell: 'H13', campo: 'Subestación', val: txt(equipo.subestacion), pend: false },
     { cell: 'D14', campo: 'Municipio', val: (lleno(municipio) ? municipio : '[PENDIENTE: MUNICIPIO]'), pend: !lleno(municipio),
       motivo: 'Falta el municipio.' },
