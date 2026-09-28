@@ -2217,3 +2217,12 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 @media print { .vpx-fondo { display: none !important; } }
 .vpx-oculto-img { display: block; margin-top: 6px; max-width: min(360px, 100%); max-height: 240px; border: 1px solid #d5dde8; border-radius: 6px; background: #fff; }
 .vpx-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* ── «Diagrama Operativo» (`99 §112`): adjunto de la ficha de Mantenimiento ── */
+.ftm-op { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; min-height: 180px; }
+.ftm-op-marco { border: 1px solid var(--ftm-paper-line); background: #fff; padding: 8px; display: flex; justify-content: center; }
+.ftm-op-img { display: block; max-width: 100%; height: auto; image-rendering: auto; }
+.ftm-op-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.ftm-op-hoja { font-size: 13px; display: flex; gap: 6px; align-items: center; }
+.ftm-op-hoja select { font: inherit; padding: 4px 6px; border: 1px solid var(--ftm-paper-line); border-radius: 6px; background: #fff; }
+.ftm-btn--primario { background: var(--ftm-accent, #0b6bcb); border-color: var(--ftm-accent, #0b6bcb); color: #fff; }

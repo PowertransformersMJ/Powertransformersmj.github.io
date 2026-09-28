@@ -912,6 +912,100 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Fichas · «Diagrama Operativo» (ADR-112) ──
+    // Un adjunto por TRANSFORMADOR: la meta en fichas_adjuntos/{id} y la imagen
+    // aprobada en partes/{0..2} (bytes ≤ 900 KB, a lo sumo 3), atadas por `lote`
+    // para que un reemplazo nunca mezcle ni deje partes sueltas. El id sale de la
+    // identidad PERSISTENTE (M:matrícula / S:serie). Lo escriben SOLO
+    // administradores con perfil; lo leen los miembros del equipo (exportan con
+    // él). Nadie lista partes. Registro que SOLO se agrega y sin bytes.
+    function rutaAdjunto(id) { return /databases/$(database)/documents/fichas_adjuntos/$(id); }
+    // Revisión de ADR-112: todo cambio deja su registro con id FIJO (sin él no hay
+    // cambio), como las firmas del equipo (ADR-099).
+    function rutaRegistroAdjunto(rid) { return /databases/$(database)/documents/fichas_adjuntos_registro/$(rid); }
+    function autorAdjuntoValido(p) {
+      return p is map && p.keys().hasOnly(['uid', 'nombre']) && p.keys().hasAll(['uid', 'nombre'])
+        && p.uid == request.auth.uid && p.nombre == profile().get('nombre', '');
+    }
+    function metaAdjuntoValida(id) {
+      let d = request.resource.data;
+      return d.keys().hasOnly(['clave', 'matricula', 'serie', 'documento', 'tipo', 'origen', 'mime', 'ancho', 'alto',
+                               'tamano', 'partes', 'huella', 'lote', 'subidoPor', 'en'])
+        && d.keys().hasAll(['clave', 'matricula', 'serie', 'documento', 'tipo', 'origen', 'mime', 'ancho', 'alto',
+                            'tamano', 'partes', 'huella', 'lote', 'subidoPor', 'en'])
+        && d.clave is string && d.clave.matches('^[MS]:.{1,80}$')
+        && id == 'salud_' + hashing.sha256(d.clave).toHexString().lower()
+        && ((d.clave[0:2] == 'M:' && d.matricula == d.clave[2:d.clave.size()])
+            || (d.clave[0:2] == 'S:' && d.serie == d.clave[2:d.clave.size()]))
+        && d.matricula is string && d.matricula.size() <= 80
+        && d.serie is string && d.serie.size() <= 80
+        && d.documento == 'salud'
+        && d.tipo in ['imagen', 'excel']
+        && d.origen is map && d.origen.keys().hasOnly(['nombre', 'hoja'])
+        && d.origen.nombre is string && d.origen.nombre.size() >= 1 && d.origen.nombre.size() <= 120
+        && (!('hoja' in d.origen) || (d.origen.hoja is string && d.origen.hoja.size() <= 31))
+        && d.mime in ['image/png', 'image/jpeg']
+        && d.ancho is int && d.ancho >= 1 && d.ancho <= 5000
+        && d.alto is int && d.alto >= 1 && d.alto <= 5000
+        && d.tamano is int && d.tamano >= 1 && d.tamano <= 3 * 900 * 1024
+        && d.partes is int && d.partes >= 1 && d.partes <= 3
+        && d.huella is string && d.huella.matches('^[0-9a-f]{64}$')
+        && d.lote is string && d.lote.matches('^[A-Za-z0-9]{20}$')
+        && autorAdjuntoValido(d.subidoPor)
+        && d.en == request.time;
+    }
+    match /fichas_adjuntos/{id} {
+      allow get:  if isTeamMember();
+      allow list: if isAdmin() && request.query.limit <= 50;
+      allow create, update: if isAdmin() && hasProfile() && id.matches('^salud_[0-9a-f]{64}$') && metaAdjuntoValida(id)
+                    && (resource == null || resource.data.lote != request.resource.data.lote)
+                    && existsAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote))
+                    && getAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote)).data.accion == (resource == null ? 'alta' : 'reemplazo');
+      // Quitar: la meta se va solo si en el mismo lote se van sus tres partes y queda su «retiro».
+      allow delete: if isAdmin() && hasProfile()
+                    && existsAfter(rutaRegistroAdjunto(id + '_' + resource.data.lote + '_retiro'))
+                    && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/0)
+                    && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/1)
+                    && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/2);
+      match /partes/{n} {
+        allow get: if isTeamMember();
+        allow create, update: if isAdmin() && hasProfile() && n in ['0', '1', '2']
+                      && request.resource.data.keys().hasOnly(['bytes', 'lote'])
+                      && request.resource.data.bytes is bytes
+                      && request.resource.data.bytes.size() >= 1
+                      && request.resource.data.bytes.size() <= 900 * 1024
+                      && existsAfter(rutaAdjunto(id))
+                      // Una parte solo se escribe en la MISMA operación que cambia el lote de su meta.
+                      && (!exists(rutaAdjunto(id)) || get(rutaAdjunto(id)).data.lote != getAfter(rutaAdjunto(id)).data.lote)
+                      && request.resource.data.lote == getAfter(rutaAdjunto(id)).data.lote
+                      && int(n) < getAfter(rutaAdjunto(id)).data.partes;
+        allow delete: if isAdmin() && hasProfile() && n in ['0', '1', '2']
+                      && (!existsAfter(rutaAdjunto(id)) || int(n) >= getAfter(rutaAdjunto(id)).data.partes);
+      }
+    }
+    match /fichas_adjuntos_registro/{rid} {
+      allow get:  if isAdmin();
+      allow list: if isAdmin() && request.query.limit <= 50;
+      allow create: if isAdmin() && hasProfile()
+                    && request.resource.data.keys().hasOnly(['idAdjunto', 'accion', 'lote', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
+                    && request.resource.data.keys().hasAll(['idAdjunto', 'accion', 'lote', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
+                    && request.resource.data.idAdjunto is string
+                    && request.resource.data.idAdjunto.matches('^salud_[0-9a-f]{64}$')
+                    && request.resource.data.accion in ['alta', 'reemplazo', 'retiro']
+                    && request.resource.data.lote is string && request.resource.data.lote.matches('^[A-Za-z0-9]{20}$')
+                    && rid == request.resource.data.idAdjunto + '_' + request.resource.data.lote + (request.resource.data.accion == 'retiro' ? '_retiro' : '')
+                    && (request.resource.data.accion == 'retiro'
+                        ? !existsAfter(rutaAdjunto(request.resource.data.idAdjunto))
+                        : (existsAfter(rutaAdjunto(request.resource.data.idAdjunto))
+                           && getAfter(rutaAdjunto(request.resource.data.idAdjunto)).data.lote == request.resource.data.lote))
+                    && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 120
+                    && request.resource.data.huella is string && request.resource.data.huella.matches('^[0-9a-f]{64}$')
+                    && request.resource.data.tamano is int && request.resource.data.tamano >= 0
+                    && autorAdjuntoValido(request.resource.data.subidoPor)
+                    && request.resource.data.en == request.time;
+      allow update, delete: if false;
+    }
+
     match /responsables_ordenes/{id} {
       allow get:  if isTeamMember();
       allow list: if isTeamMember() && isAdmin() && request.query.limit <= 50;

@@ -187,11 +187,28 @@
     }
   });
 
+  // ── «Diagrama Operativo» (99 §112): un adjunto por transformador, en el sistema ──
+  // Lo leen los miembros del equipo (exportan con él); solo un administrador lo
+  // adjunta, reemplaza o quita. Las reglas del servidor lo vuelven a exigir.
+  let datosAdjuntos = null;
+  const cargarDatosAdjuntos = async () => {
+    await esperarSesion();
+    return (datosAdjuntos = datosAdjuntos || await import('../assets/js/data/fichas_adjuntos.js'));
+  };
+  const adjuntos = {
+    async puedeEscribir() { return (await cargarDatosAdjuntos()).puedeEscribir(); },
+    async leerMeta(id) { return (await cargarDatosAdjuntos()).leerMeta(id); },
+    async leerImagen(id, meta) { return (await cargarDatosAdjuntos()).leerImagen(id, meta); },
+    async guardar(ident, datos, reemplazo) { return (await cargarDatosAdjuntos()).guardar(ident, datos, reemplazo); },
+    async quitar(ident, meta) { return (await cargarDatosAdjuntos()).quitar(ident, meta); }
+  };
+
   const { montarPanelFichas } = await import('../assets/js/ui/fichas/panel.js');
   window.__sgmFichas = montarPanelFichas(document.getElementById('fichasPanel'), {
     origen: 'Parque vivo · Firestore',
     firmaSesion,
     firmasEquipo,
+    adjuntos,
     // El rótulo de origen viaja con los datos (`99 §84`). Cuando el tablero
     // deja de mostrar el listado adjunto, el segmento apaga su banner: si no,
     // seguía anunciando el archivo sobre datos que ya eran del parque vivo.
