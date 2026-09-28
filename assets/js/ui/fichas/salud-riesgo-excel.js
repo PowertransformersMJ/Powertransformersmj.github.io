@@ -77,7 +77,7 @@ export function svgSaludRiesgo(m) {
   // Cuatro cifras, como las tarjetas de la pantalla, SIN sus anotaciones en
   // cursiva («fila 3 de la matriz», «columna Menor», «se muestra: no mueve la
   // casilla», «resultado de fila × columna»): el Ingeniero pidió que no salgan
-  // en el Excel (`99 §109`). En pantalla siguen.
+  // en el Excel (`99 §110`). En pantalla siguen.
   const kpis = m.kpis || [];
   const gap = 16; const kw = (W - 2 * P - gap * 3) / 4; const kh = 112;
   kpis.slice(0, 4).forEach((k, i) => {

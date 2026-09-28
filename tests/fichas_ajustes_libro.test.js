@@ -1,4 +1,4 @@
-// Excel de Mantenimiento Especializado (`99 §109`, pedidos del Ingeniero del
+// Excel de Mantenimiento Especializado (`99 §110`, pedidos del Ingeniero del
 // 2026-09-27): sin la hoja «Beneficios», pies «Pág. N de 4», sin las anotaciones
 // en cursiva de las tarjetas de «Salud y riesgo», y el Diagrama Futuro derecho
 // (su tamaño sale de la hoja). El PI no cambia.
@@ -11,7 +11,7 @@ import JSZip from 'jszip';
 import { exportarFichaPlanificacion } from '../assets/js/ui/fichas/exportar-planificacion.js';
 import { leerLibroParaVista } from '../assets/js/ui/fichas/vista-previa-excel.js';
 import { svgSaludRiesgo } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
-import { cajaDeImagen, quitarHojaDelLibro } from '../assets/js/ui/fichas/ajustes-libro.js';
+import { cajaDeImagen, quitarHojaDelLibro, anclarConTamano } from '../assets/js/ui/fichas/ajustes-libro.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLANTILLA = resolve(__dirname, '..', 'assets', 'plantillas', 'PE-02081-planificacion.xlsx');
@@ -134,3 +134,35 @@ describe('Diagrama Futuro derecho', () => {
     assert.equal(await cajaDeImagen(z, 'xl/drawings/no-existe.xml', 'rId2'), null);
   });
 });
+
+describe('El Futuro se ve del mismo tamaño en todos los programas (revisión §110)', () => {
+  test('su imagen queda anclada a su tamaño (609 × 589), no estirada a las celdas; el logo no cambia', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    const antes = await z.file('xl/drawings/drawing4.xml').async('string');
+    assert.equal(await anclarConTamano(z, 'xl/drawings/drawing4.xml', 'rId2'), true);
+    const x = await z.file('xl/drawings/drawing4.xml').async('string');
+    const una = x.match(/<xdr:oneCellAnchor>[\s\S]*?<\/xdr:oneCellAnchor>/g) || [];
+    assert.equal(una.length, 1);
+    assert.match(una[0], /r:embed="rId2"/);
+    assert.match(una[0], /<xdr:ext cx="5802081" cy="5606143"\/>/);
+    assert.equal(una[0].match(/<xdr:from>[\s\S]*?<\/xdr:from>/)[0],
+      '<xdr:from><xdr:col>5</xdr:col><xdr:colOff>290286</xdr:colOff><xdr:row>8</xdr:row><xdr:rowOff>108856</xdr:rowOff></xdr:from>');
+    assert.match(antes, /<xdr:col>5<\/xdr:col><xdr:colOff>290286<\/xdr:colOff><xdr:row>8<\/xdr:row>/);
+    assert.match(x, /<xdr:twoCellAnchor\b[^>]*>(?:(?!<\/xdr:twoCellAnchor>)[\s\S])*r:embed="rId1"/);
+    // La vista previa lo lee con su tamaño exacto.
+    const m = await leerLibroParaVista(z);
+    const im = m.hojas.find((h) => h.nombre === 'Diagrama Futuro').imagenes.find((i) => /image6/.test(i.ruta));
+    assert.deepEqual([Math.round(im.w), Math.round(im.h), im.rot], [609, 589, 0]);
+  });
+  test('una segunda vez no hay nada que cambiar', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    await anclarConTamano(z, 'xl/drawings/drawing4.xml', 'rId2');
+    assert.equal(await anclarConTamano(z, 'xl/drawings/drawing4.xml', 'rId2'), false);
+  });
+  test('la vista previa lee el giro del Diagrama Actual (270°)', async () => {
+    const m = await leerLibroParaVista(await JSZip.loadAsync(plantilla()));
+    const im = m.hojas.find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.equal(im.rot, 270);
+  });
+});
+

@@ -41,7 +41,7 @@ import { limpiarOcultos } from './limpiar-ocultos.js';
 import { ajustarAltoCasilla } from './alto-casilla.js';
 import { zonaDelActivo } from '../../domain/fichas_zona.js';
 import { svgSaludRiesgo, cajaSaludRiesgo, svgAPng, montarHojaSaludRiesgo } from './salud-riesgo-excel.js';
-import { cajaDeImagen, quitarHojaDelLibro } from './ajustes-libro.js';
+import { cajaDeImagen, quitarHojaDelLibro, anclarConTamano } from './ajustes-libro.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -827,7 +827,7 @@ const IMG_DIAG_FUTURO = 'xl/media/image6.png';    // hoja 4 «Diagrama Futuro»
 // Tamaño en píxeles del recuadro de cada hoja (así lo trae la plantilla).
 const CAJA_ACTUAL = { w: 778, h: 948 };
 const CAJA_FUTURO = { w: 790, h: 842 };
-// El Futuro se dibuja DERECHO (`99 §109`) con el tamaño con que su hoja lo
+// El Futuro se dibuja DERECHO (`99 §110`) con el tamaño con que su hoja lo
 // muestra: el <a:ext> de su imagen en drawing4 (609 × 589 px en la plantilla).
 const DIBUJO_FUTURO = 'xl/drawings/drawing4.xml';
 const RID_IMG_FUTURO = 'rId2';
@@ -996,14 +996,18 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       if (png) zip.file(IMG_DIAG_ACTUAL, png);
     }
     if (svgF) {
-      // DERECHO, no rotado (`99 §109`, el Ingeniero: «en el diagrama futuro sale
+      // DERECHO, no rotado (`99 §110`, el Ingeniero: «en el diagrama futuro sale
       // de lado […] que después no me toque rotarlo»). La imagen del Actual lleva
       // en la plantilla un giro de 270° que compensa el dibujo rotado; la del
       // Futuro NO lo lleva, así que el rotado salía acostado. Se dibuja sin girar,
       // encajado sin deformar en el tamaño que la hoja le da (el doble, para nitidez).
       const caja = (await cajaDeImagen(zip, DIBUJO_FUTURO, RID_IMG_FUTURO)) || CAJA_VISTA_FUTURO;
       const png = await svgAPng(svgF, VB.w, VB.h, caja.w * 2, caja.h * 2);
-      if (png) zip.file(IMG_DIAG_FUTURO, png);
+      if (png) {
+        zip.file(IMG_DIAG_FUTURO, png);
+        // Del tamaño exacto en todos los programas, no estirada a las celdas (revisión `§110`).
+        try { await anclarConTamano(zip, DIBUJO_FUTURO, RID_IMG_FUTURO); } catch (e) { /* queda el ancla de la plantilla */ }
+      }
     }
   } catch (e) { /* los diagramas quedan como en la plantilla */ }
 
@@ -1030,7 +1034,7 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
     }
   }
 
-  // 7c) Mantenimiento: sin la hoja «Beneficios» del libro (`99 §109`, el Ingeniero:
+  // 7c) Mantenimiento: sin la hoja «Beneficios» del libro (`99 §110`, el Ingeniero:
   //     «que la hoja de beneficios […] no aparezca al exportar el excel»). Es el
   //     estudio económico de la plantilla; el texto de beneficios sigue en la hoja
   //     1 (B23). Los pies pasan a «Pág. N de 4». Si no se puede, sale con la hoja

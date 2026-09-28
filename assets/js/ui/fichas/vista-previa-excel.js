@@ -377,8 +377,12 @@ async function leerDibujo(zip, rutaDibujo, geo) {
           bytes = (await zip.file(ruta).async('uint8array')).length;
         }
       }
+      // Giro de la imagen (el Diagrama Actual de la plantilla va a 270°): sin leerlo, la
+      // vista previa lo mostraba acostado aunque en Excel sale derecho (revisión `99 §110`).
+      const giro = attr((x.match(/<a:xfrm\b[^>]*>/) || [''])[0], 'rot');
+      const rot = giro ? (((Math.round(+giro / 60000) % 360) + 360) % 360) : 0;
       // EMF/WMF (el logo de la plantilla) no se dibuja en el navegador: se avisa, pero sí va en el Excel.
-      imagenes.push({ ...caja, capa: capa++, src, bytes, ruta: ruta || '', nota: src ? '' : ('Imagen ' + (ext || '?').toUpperCase() + ' (logo): sí va en el Excel; aquí no se puede dibujar') });
+      imagenes.push({ ...caja, rot, capa: capa++, src, bytes, ruta: ruta || '', nota: src ? '' : ('Imagen ' + (ext || '?').toUpperCase() + ' (logo): sí va en el Excel; aquí no se puede dibujar') });
     } else if (tipo === 'sp') {
       const cuerpo = (x.match(/<xdr:txBody>([\s\S]*?)<\/xdr:txBody>/) || ['', ''])[1];
       const body = (cuerpo.match(/<a:bodyPr\b[^>]*>/) || [''])[0];
@@ -666,6 +670,15 @@ function pintarImagen(im) {
   const d = im.src ? el('img', 'vpx-img') : el('div', 'vpx-img vpx-img--nota', im.nota);
   if (im.src) { d.src = im.src; d.alt = im.ruta; }
   Object.assign(d.style, { left: im.x + 'px', top: im.y + 'px', width: im.w + 'px', height: im.h + 'px' });
+  if (im.rot) {
+    // A 90° o 270° el ancla es la caja YA girada: la imagen va con ancho y alto
+    // cambiados, centrada en ella, y se gira desde el centro (como en Excel).
+    if (im.rot === 90 || im.rot === 270) {
+      Object.assign(d.style, { left: (im.x + (im.w - im.h) / 2) + 'px', top: (im.y + (im.h - im.w) / 2) + 'px',
+        width: im.h + 'px', height: im.w + 'px' });
+    }
+    d.style.transform = 'rotate(' + im.rot + 'deg)';
+  }
   return d;
 }
 

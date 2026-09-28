@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Fichas · AJUSTES DEL LIBRO PE.02081 (`99 §109`)
+// SGM · TRANSPOWER — Fichas · AJUSTES DEL LIBRO PE.02081 (`99 §110`)
 // ──────────────────────────────────────────────────────────────────────────────
 // Pedidos del Ingeniero (2026-09-27) sobre el Excel de Mantenimiento Especializado:
 //   · «necesito que la hoja de beneficios en la ficha técnica de mantenimiento
@@ -49,6 +49,33 @@ export async function cajaDeImagen(zip, rutaDibujo, rId) {
     return w > 20 && h > 20 ? { w, h } : null;
   }
   return null;
+}
+
+/**
+ * Ancla la imagen `rId` de un dibujo a SU tamaño (<a:ext>), no a las celdas.
+ * Un twoCellAnchor estira la imagen al rectángulo de celdas, y cada programa
+ * mide las columnas distinto (Excel para Mac, para Windows, LibreOffice, la
+ * vista previa): el Diagrama Futuro salía angostado ~10 % fuera del Mac en que
+ * se guardó la plantilla (revisión `§110`). Con oneCellAnchor + ext se ve del
+ * mismo tamaño en todos, sin deformar. Conserva la esquina superior izquierda.
+ * @returns {Promise<boolean>} true si la cambió
+ */
+export async function anclarConTamano(zip, rutaDibujo, rId) {
+  const f = zip.file(rutaDibujo);
+  if (!f) return false;
+  const xml = await f.async('string');
+  let hecho = false;
+  const nuevo = xml.replace(/<xdr:twoCellAnchor\b[^>]*>([\s\S]*?)<\/xdr:twoCellAnchor>/g, (a, cuerpo) => {
+    if (hecho || !new RegExp('r:embed="' + escRe(rId) + '"').test(cuerpo)) return a;
+    const de = cuerpo.match(/<xdr:from>[\s\S]*?<\/xdr:from>/);
+    const e = cuerpo.match(/<a:ext cx="(\d+)" cy="(\d+)"\/>/);
+    const pic = cuerpo.match(/<xdr:pic>[\s\S]*<\/xdr:pic>/);
+    if (!de || !e || !pic) return a;
+    hecho = true;
+    return '<xdr:oneCellAnchor>' + de[0] + '<xdr:ext cx="' + e[1] + '" cy="' + e[2] + '"/>' + pic[0] + '<xdr:clientData/></xdr:oneCellAnchor>';
+  });
+  if (hecho) zip.file(rutaDibujo, nuevo);
+  return hecho;
 }
 
 /** Texto de cada texto compartido (índice → texto). */
