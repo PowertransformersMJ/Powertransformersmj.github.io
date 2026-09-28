@@ -368,3 +368,13 @@ usuarios registrados; `conteoPorNivel`, en el mismo archivo, ya los dejaba fuera
 `null`, `''` y espacios son «sin dato» (nulo), y el camino «sin dato» se prueba con su caso; 0 registrado sí es
 un dato. **Gate**: prueba «sin dato de usuarios…» en `tests/fichas_salud_riesgo_excel.test.js`.
 
+
+### L-106 · Un arreglo de seguridad se prueba contra la CLASE, no contra el ejemplo que lo destapó
+**Disparador**: cerrar un hallazgo de denegación, inyección o topes con un parche y darlo por «corregido». ·
+**Cicatriz** (`99 §112.8`): el ReDoS del lector del `.xlsx` se cerró contando etiquetas sin cierre en la hoja, los
+textos y los dibujos, y la prueba solo cubría ese caso. La verificación del cerebro halló el mismo mal por `styles.xml`
+(nunca pasó el filtro) y por el ORDEN (cierres antes que aperturas: la cuenta cuadra) ya en producción, con el ADR
+diciendo «corregido». · **Regla**: antes de declarar cerrado, enumerar TODAS las entradas que llegan al mecanismo
+vulnerable (aquí: cada regex perezosa sobre texto ajeno) y darle a cada una su caso hostil; mejor si la defensa es
+estructural (una pasada lineal que valide el anidamiento de TODA parte leída, o un Worker con tiempo límite) que
+casuística. **Gate** [HONOR] + las pruebas de CF-40.

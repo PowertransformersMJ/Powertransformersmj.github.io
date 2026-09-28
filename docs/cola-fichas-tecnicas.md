@@ -74,6 +74,12 @@
   cancelas, te quedas sin evaluación y sin botón · una clase de estilo que la lámina pide y el CSS no tiene.
 
 - **CF-33 · Cabos que el barrido de `§83.7` dejó a sabiendas (ninguno pierde trabajo en silencio): dos pestañas del módulo no se avisan entre sí · dos filas con la MISMA matrícula en un listado se pisan al guardar y salen ambiguas al restaurar · si la sesión tarda más de 12 s el borrador podría escribirse sin dueño. → Evento `storage` entre pestañas · guardia de matrícula duplicada al guardar · no escribir mientras el uid esté vacío
+- **CF-40 · «Diagrama Operativo»: el lector del `.xlsx` aún se puede congelar** (`99 §112.8`, ⚠️ en producción). (a) ReDoS
+  por `styles.xml` (no pasa por `estructuraSana`) y por el ORDEN de las etiquetas (se cuentan, no se ordenan): ~21-23 s
+  de pestaña congelada con 3-97 KB. (b) El tope contra archivos «bomba» lee un tamaño que el autor del zip falsea.
+  Hoy solo lo mitigan el tope de entrada (15 MB) y que solo adjunta un administrador; no daña datos. Arreglo: validar
+  el anidamiento en UNA pasada lineal para toda parte XML que se lea con regex (estilos, tema, libro, hoja, textos,
+  dibujos) + leer y dibujar en un Worker que se corta a los N segundos (el respaldo para lo que no se prevea).
 
 ## 🤝 Mío, pero con UNA respuesta suya primero
 

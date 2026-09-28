@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-09-27) — FICHAS TÉCNICAS, por partes (orden del Ingeniero)
+## 🎯 Foco (al 2026-09-28) — FICHAS TÉCNICAS, por partes (orden del Ingeniero)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos**: **TODO-67** 🔴 · **TODO-64** 🔴 · **TODO-60** 🔴 ·
 > **TODO-55** 🔴 · **TODO-35/58** 🔴 · **TODO-66** · **TODO-65** · **TODO-62/63** · 47 · 54 · 56 · 57 · 61 · y los fríos de `11`.
@@ -20,7 +20,7 @@
 > **(I) Fichas, esperan su respuesta**: ¿agrandar la letra de «Salud y riesgo» (~6 pt en papel, `§107.8`)? · ¿fijar el
 > tamaño del Diagrama Actual para Windows (`§110.8`)? · ¿quitar también de la pantalla la lectura por potencia (`§111.8`)? · la primera
 > descarga real con folio (`§108.5`) · «[object Object]» en refrigeración del PI (`§103.8`) · borrar las 5 copias viejas de
-> firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`).
+> firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`) · el primer Diagrama Operativo real y autorizar CF-40 (`§112.8`).
 
 ### 🚫 Callejones probados (NO reintentar)
 > **Los de la Fase 9 viven en `99 §52.8-52.9`** (+ `--branch` de filter-repo → **L-25**). Los de dominio (Reprocesar `§20`,

@@ -55,7 +55,7 @@
 ## 🔥 Backend / infra / entorno
 
 ### L-09 · Deploys Firebase los ejecuta Claude (flujo ADR-005, desde 2026-06-06)
-**Disparador**: tocar `firestore.rules` / `firestore.indexes.json` / `storage.rules` / `functions/*`. · **Cicatriz**: sin deploy → `permission-denied` (rules), `FAILED_PRECONDITION` (índices) o código viejo (functions). · **Regla**: Claude ejecuta `firebase deploy --only X` (CLI local autenticado), anuncia el deploy en el MISMO turno y verifica. El director hace los push; NUNCA force-push a `main`. (ADR-005 en `99 §5`; full: `_legacy §0.1.1`.)
+**Disparador**: tocar `firestore.rules` / `firestore.indexes.json` / `storage.rules` / `functions/*`. · **Cicatriz**: sin deploy → `permission-denied` (rules), `FAILED_PRECONDITION` (índices) o código viejo (functions). · **Regla**: Claude ejecuta `firebase deploy --only X` (CLI local autenticado), anuncia el deploy en el MISMO turno y verifica. Los push también los hace Claude (L-01, ADR-051); NUNCA force-push a `main`. (ADR-005 en `99 §5`; full: `_legacy §0.1.1`.)
 
 ### L-10 · Firestore rechaza `undefined` con un `permission-denied` ENGAÑOSO
 **Cicatriz**: payloads con `undefined`/`NaN` (objetos anidados de funciones puras) → SDK Web los enmascara como `permission-denied` aunque seas admin. · **Regla**: `deepClean(payload)` (`assets/js/data/_firestore_clean.js`) — omite `undefined`/`NaN`/`Infinity`/funciones, preserva `null`/`0`/`''`/`false` y tipos Firestore (Timestamp/FieldValue/GeoPoint/DocumentReference) — JUSTO antes de `addDoc`/`setDoc`/`updateDoc`. (Full: `_legacy §0.1.2.6`.)

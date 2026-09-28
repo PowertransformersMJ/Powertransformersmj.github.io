@@ -31,3 +31,13 @@
 
 ### L-98 · Un round-trip por Python o por el editor puede dejar caracteres de control LITERALES en el fuente
 **Disparador**: escribir con `Write`/heredoc un archivo que lleva escapes `\u0000`…`\u001F` en un regex, y luego reescribirlo con un script. · **Cicatriz** (`99 §83.7`): `fichas_borrador.js` quedó con NUL, backspace, VT, FF y DEL **de verdad** dentro del regex de limpieza. Los tests pasaban —un carácter de control literal dentro de una clase de caracteres funciona igual— así que nadie lo vio hasta que un `Read` mostró `[ --]`. · **Regla**: tras un round-trip, barrer lo tocado con `LC_ALL=C grep -c $'[\001-\010\013\014\016-\037\177]'`; y escribir esos escapes como `\u00XX` explícitos, nunca confiar en que el harness los preserve.
+
+### L-105 · Capturar el banco: `--screenshot` de Chrome sin cabeza no espera un flujo asíncrono; se conduce por CDP
+**Disparador**: necesitar la captura en ARCHIVO de un estado del banco que se arma solo (importaciones diferidas, `fetch`,
+esperas) para enviársela al Ingeniero. · **Cicatriz** (`99 §112`): `chrome --headless --screenshot` con
+`--virtual-time-budget=25000` devolvió dos veces solo la cabecera del banco (el flujo no corrió), y la captura de la
+extensión con `save_to_disk` no dejó archivo. · **Regla**: lanzar Chrome sin cabeza con `--remote-debugging-port` y
+conducirlo por CDP desde Node 24 (trae `WebSocket` y `fetch`, sin librerías): `Page.navigate` → sondear
+`Runtime.evaluate('document.title')` hasta la señal que pone el flujo (`LISTO`) → `Page.captureScreenshot` a escala 2 →
+recortar a la ventana con PIL (fuera quedan firmas y datos del fondo). El guion vive en el scratchpad de la sesión
+(`cdp-cap.mjs`); se rehace en 40 líneas. [HONOR]

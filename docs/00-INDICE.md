@@ -53,12 +53,12 @@
 | §39 | ADR-039 — FP/tan δ: localización del defecto por modo (`localizacionDe`/`causaProbableDe`) | 774 |
 | §40 | ADR-040 — FP/tan δ: pendiente predictiva por sección + baseline-proxy; capacitancia descartada (artefacto) | 790 |
 | §41 | ADR-041 — Corriente de excitación: panel propio `excitacion-panel.js`, espejo del tan δ | 804 |
-| §42 | ADR-042 — Excitación: vista "Resumen (todo)" + gating de tablas + fix `reset` (Sets en sitio, L-54) + separación por NIVEL (§42.8) | 822 |
-| §43 | ADR-043 — Excitación: tabla-RESUMEN por nivel (fusión 1+4: banda+KPI+norma+años); detalle por TAP gateado; elegida por el director entre 4 previews | 842 |
-| §44 | ADR-044 — Panel "Valores por prueba" (`tablas-pruebas-panel.js`): rango real, Σ pérdidas, nivel real, diagnóstico multi-norma + acción CBM; aditivo | 860 |
+| §42 | ADR-042 — Excitación: «Resumen (todo)», gating, fix `reset` (L-54), separación por NIVEL | 822 |
+| §43 | ADR-043 — Excitación: tabla-RESUMEN por nivel (banda+KPI+norma+años); detalle por TAP gateado | 842 |
+| §44 | ADR-044 — Panel "Valores por prueba" (`tablas-pruebas-panel.js`): rango, Σ pérdidas, multi-norma + CBM | 860 |
 | §45 | ADR-045 — "Valores por prueba": acordeón por NIVEL + filtro de año por nivel + fix conformidad (`quitarColumnasVeredicto`, L-42) | 878 |
 | §46 | ADR-046 — Excitación: orden por nivel; nace el preview FIEL `_dev/preview-excitacion-fiel.html` (L-56) | 894 |
-| §47 | ADR-047 — Fix modo MIXTO que tumbaba el panel (solo AT·110 visible): layout por-fila + guards + try/catch por nivel; reproducido en navegador | 912 |
+| §47 | ADR-047 — Fix modo MIXTO que tumbaba el panel: layout por-fila + guards + try/catch por nivel | 912 |
 | §48 | ADR-048 — Reorg POR PRUEBA paso 1: "Corriente de excitación" = SEGMENTO unificado `.pe-seg` (gráficas+tablas+JSON); demás pruebas intactas | 930 |
 | §49 | ADR-049 — "Nomenclatura y secciones de aislamiento" pasa DENTRO del segmento Tan δ (reubica `#nomencl` vivo) | 948 |
 | §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (`montarPanelPrueba`, L-57) + fuera-de-criterio en rojo | 968 |
@@ -92,15 +92,15 @@
 | §78 | ADR-078 — **Cédulas** desde directorio privado en Firestore; candado en commit/merge/push. **L-93/94** | 3110 |
 | §79 | ADR-079 — **El rol sale del perfil**: `/admins` deja de dar admin a quien ya tiene perfil | 3186 |
 | §80 | ADR-080 — **Manda el Excel en todos los caminos**: el trigger ya no borra la condición del archivo | 3221 |
-| §81 | ADR-081 — **Potencia y usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, aviso del «1»); la casilla sigue siendo la de la norma | 3264 |
+| §81 | ADR-081 — **Potencia y usuarios EN la casilla** (informativo); la casilla sigue siendo la de la norma | 3264 |
 | §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad (dos TX de un patio compartían ficha) | 3313 |
-| §83 | ADR-083 — **El documento que se firma deja de vivir solo en memoria**: borrador local con dueño y caducidad que nunca pisa ni se equivoca de equipo | 3362 |
+| §83 | ADR-083 — **Borrador local de la ficha** con dueño y caducidad (no pisa ni cruza equipos) | 3362 |
 | §84 | ADR-084 — **La carga tardía ya no borra el listado**; el pie del papel dice su fuente real | 3468 |
-| §85 | ADR-085 — **El alcance lo escribe la redacción del formato** dictada por el Ingeniero; lo que compone el módulo no cuenta como trabajo suyo | 3514 |
-| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos | 3574 |
+| §85 | ADR-085 — **El alcance lo escribe la redacción dictada** por el Ingeniero | 3514 |
+| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; kernel v1.11.0 sin IDs ajenos | 3574 |
 | §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` (nunca «0»); CF-32 refutado | 3632 |
-| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes, ocupación de la plantilla); aún no llegan al Excel (CF-25) | 3713 |
-| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero en la ficha y en el Excel (CF-25); revisión de 12 agentes, 6 confirmados | 3743 |
+| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes) | 3713 |
+| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero, ficha y Excel (CF-25) | 3743 |
 | §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento | 3797 |
 | §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3832 |
 | §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3855 |
@@ -123,6 +123,7 @@
 | §109 | ADR-109 — **Auditoría Nivel-2**: cola 15 ADRs atrás; candado asimétrico (M-07) | 4389 |
 | §110 | ADR-110 — **Mantenimiento sin hoja Beneficios**; Futuro derecho | 4416 |
 | §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota de las 7 variables | 4448 |
+| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto (cronograma) guardado, última hoja | 4467 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -149,7 +150,7 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🧪 `30` (L-20/L-21) + `99 §3` + Skill `claude-api` |
-| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§110` + **L-103** |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§112` + **L-103** |
 | El "por qué" de una decisión / detalle de un § | Capa 1 → `99-HISTORIAL-ADR.md` |
 
 > **Doctrinas** → always-on en `CLAUDE.md §3` (3.1 performance · 3.2 aditivo/API estable · 3.3 verifica · 3.4 IAP · 3.5 observers).

@@ -8,9 +8,8 @@
 > Este nodo es un HUB: enlaza a las hojas de detalle. Lee primero el mapa de
 > abajo; baja a la hoja específica solo si necesitas el detalle fino.
 >
-> Verificado archivo por archivo contra el repo real. El cerebro anterior vive en
-> `_legacy/cerebro-anterior/docs/`; el instalador `brain-kit/` se retiró el 2026-07-23
-> (respaldo íntegro en la bóveda privada).
+> Verificado archivo por archivo contra el repo real. El instalador `brain-kit/` se
+> retiró el 2026-07-23 (respaldo íntegro en la bóveda privada).
 
 ---
 
@@ -31,7 +30,7 @@
 | Migraciones / scripts de datos | `scripts/migrate/*.js` (`tipificar-suministros-fan-db.js`, `v1-to-v2-transformadores.js`) |
 | Tests | `tests/*.test.js` (el conteo vivo lo lleva `05`) |
 | **Importar el Excel real "Salud de Activos"** (la tarea viva del Ingeniero) | `assets/js/domain/importador.js` + `assets/js/data/importar.js` + `admin/importar.html`. El libro trae **3 hojas** (`TX_Potencia` con la cabecera en la fila 1; `TPT_Servicio` y `TX_Respaldo` en la **fila 2**, por eso caen — L-72). Proceso → `60-WORKFLOWS` W-13 · historia → `99 §57` y `§69` |
-| **Fichas Técnicas de reposición** (familia CSS `.ftm-`) | Pantalla: `pages/fichas-tecnicas.html` + `assets/js/ui/fichas/*` (`panel.js` —el monolito—, `ficha-tecnica.js`, `vistas-gerenciales.js`, `evaluacion-masiva.js`, `correcciones.js`, `unifilar.js`, `exportar-planificacion.js` + `limpiar-ocultos.js` (datos ocultos, `§104`) + `alto-casilla.js` (casilla Beneficios que crece, `§105`) + `salud-riesgo-excel.js` (hoja «Salud y riesgo» del Excel de Mantenimiento en lugar del Anexo AT, `§107`) + `ajustes-libro.js` (quitar una hoja, renumerar pies, anclar una imagen a su tamaño, `§110`); Beneficios de Mantenimiento: `domain/beneficios_acciones_mtto.js`, `§105`; zona: `domain/fichas_zona.js`, `§106`). Cálculo (dominio puro, testeable): `assets/js/domain/fichas_*.js` — `fichas_diagnostico` · `fichas_creg_uc` · `fichas_evaluacion_uucc` · `fichas_presupuesto` · `fichas_acciones` · **`fichas_identidad`** (`claveEquipo`, que `unifilar.js` reexporta) · **`fichas_borrador`** (el borrador local: fusión contra disco, dueño por `uid`, caducidad 30 d) · más `acciones_tecnicas.js` (el sustento de las 36 actividades) y `condiciones_deterioro.js`. Estado vivo y cola → [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md) · `99 §61/64/65/66/75/81/82/83/84/85` |
+| **Fichas Técnicas de reposición** (familia CSS `.ftm-`) | Pantalla: `pages/fichas-tecnicas.html` + `assets/js/ui/fichas/*` (`panel.js` —el monolito—, `ficha-tecnica.js`, `vistas-gerenciales.js`, `evaluacion-masiva.js`, `correcciones.js`, `unifilar.js`, `exportar-planificacion.js` + `limpiar-ocultos.js` (datos ocultos, `§104`) + `alto-casilla.js` (casilla Beneficios que crece, `§105`) + `salud-riesgo-excel.js` (hoja «Salud y riesgo» del Excel de Mantenimiento, `§107`) + `ajustes-libro.js` (quitar hoja, renumerar pies, anclar imagen, `§110`) + `diagrama-operativo-{lector,dibujo,hoja,panel}.js` (pestaña y hoja «Diagrama Operativo»: lector `.xlsx`, cronograma homologado, hoja final, `§112`); Beneficios de Mantenimiento: `domain/beneficios_acciones_mtto.js`, `§105`; zona: `domain/fichas_zona.js`, `§106`; adjunto: `domain/fichas_adjunto.js` + `data/fichas_adjuntos.js` → Firestore `fichas_adjuntos/{id}` (+ `partes/{0..2}`) y `fichas_adjuntos_registro`, `§112`). Cálculo (dominio puro, testeable): `assets/js/domain/fichas_*.js` — `fichas_diagnostico` · `fichas_creg_uc` · `fichas_evaluacion_uucc` · `fichas_presupuesto` · `fichas_acciones` · **`fichas_identidad`** (`claveEquipo`, que `unifilar.js` reexporta) · **`fichas_borrador`** (el borrador local: fusión contra disco, dueño por `uid`, caducidad 30 d) · más `acciones_tecnicas.js` (el sustento de las 36 actividades) y `condiciones_deterioro.js`. Estado vivo y cola → [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md) · `99 §61`→`§112` (vía `00`) |
 | **Indicadores de calidad** (SAIDI/SAIFI) | `pages/indicadores-calidad.html` + `assets/js/ui/calidad/*` · hoja `INDICADORES-CALIDAD.md` |
 | **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` |
 | **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` |
@@ -74,7 +73,6 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 - **Frontend / cliente**: HTML5 + CSS (sistema AQUA LIGHT) + JS ES6+ vanilla modular. **Sin framework ni bundler** — los `.js` se cargan como ES modules vía `<script type="module">` o CDN. Hosting GitHub Pages.
 - **Backend**: Firebase (Auth + Firestore + Storage, proyecto `lordpowertransformersmj`) + Cloud Functions (`functions/`) + Vercel para `/api/*` (hoy solo `api/health.js`).
 - **Scripts / herramientas**: `scripts/` — incluye `scripts/migrate/`, `scripts/brain-check.mjs` y `scripts/audit-bloques-pruebas.mjs`. Además `boot-gate.mjs`, `brain-diff.mjs`, `brain-index.mjs`, `brain-archive.mjs`, `dev-server.mjs`, `session-handoff.mjs`.
-- **Tests**: `tests/*.test.js` con el runner nativo `node --test` (`npm run test:unit`).
 - **Docs**: `docs/` = neuronas del cerebro + hojas técnicas del dueño (ver sección final). Las del cerebro anterior están en `_legacy/cerebro-anterior/docs/`.
 - **CI / Deploy**: `.github/workflows/ci.yml` (lint HTML) · `pages.yml` (deploy main → GitHub Pages) · `vercel.json` (`/api`). `sw.js` en raíz es kill-switch (PWA desactivada).
 
@@ -139,11 +137,10 @@ Detalle completo → `docs/MODELO-DATOS-v2.md`.
 
 ## ⚙️ Convenciones espaciales (dónde NO equivocarse)
 
-- **Deploys Firebase (reglas/índices/storage/functions)**: flujo ADR-005 (desde 2026-06-06): **Claude ejecuta los `firebase deploy`** con la CLI local autenticada en la Mac del director (`--only firestore:rules` / `firestore:indexes` / `storage` / `functions`), anunciándolo en el MISMO turno.
+- **Deploys Firebase y git**: los ejecuta Claude (`firebase deploy --only …` con la CLI local autenticada; commit/push/merge) → la regla vive en `CLAUDE.md §2` y los gotchas en `30` **L-01**/**L-09**.
 - **`/suministros/{X}` usa docId compuesto** `{contrato_id}_{codigo}` desde la migración N5 — usar `composeDocId(cid, codigo)` (definido en `domain/contratos.js`, re-exportado por `data/suministros.js`), nunca el código plano (ver `30-LECCIONES`).
 - **No hay bundler**: los `.js` son ES modules directos; rutas relativas importan (`../domain/x.js`). Nada pasa por transpilación.
 - **Lint local con `npm run lint:html`** (NO `npx html-validate` — descarga versión transitoria distinta a la de CI).
-- **Git**: política vigente F3a/ADR-051 (reemplaza ADR-005): **Claude ejecuta commit + push + merge + deploys**, validando cada commit con el Ingeniero (L-01 actualizada). NUNCA force-push a `main`; NUNCA escribir tokens a archivo/commit/log.
 
 ---
 

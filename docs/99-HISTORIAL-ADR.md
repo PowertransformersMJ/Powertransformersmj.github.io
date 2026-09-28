@@ -4463,3 +4463,89 @@ variables se verificaron en `calcularHIBruto` (MO.00418): DGA, edad, ADFQ, furan
 renglones. En vivo (su Chrome, solo lectura, ARJONA): vista previa de Mantenimiento con la matriz hasta la leyenda y la
 nota en «Notas:»; PI con sus 5 hojas y sin la nota; consola limpia. **111.8 No re-auditar.** Que la pantalla aún muestre
 los dos párrafos es a propósito (se le ofreció quitarlos también ahí).
+
+## 112. ADR-112 — «Diagrama Operativo»: la ficha de Mantenimiento adjunta un Excel o una imagen (el cronograma), guardado en el sistema, que sale como última hoja del Excel ⟦OPUS-5.5⟧ (2026-09-28)
+
+> *«necesito que durante la gestión de la ficha técnica en mantenimiento especializado me permita adjuntar un archivo en
+> formato excel o imagen y este se pueda apreciar en una hoja adicional al momento de exportar el documento en excel,
+> esta hoja debe llamarse (Diagrama Operativo)»* · de un Excel, *«lo que está al interior del documento homologado a la
+> hoja, que se aprecie muy bien y de buena calidad»* · *«es diagrama operativo, aquí reposa un cronograma, no tiene nada
+> que ver con el diagrama actual ni futuro»* · uno por transformador, «guardado en el sistema» · muestra: su Excel de
+> Bocagrande, hoja «Cronograma trabajos» · «procede» (fase 1) · «procede por favor» (publicar). Publicado `22907cb`.
+
+**112.1 Causa / punto de partida.** No existía forma de llevar al PE.02081 un documento propio del equipo: el libro sale
+de la plantilla oficial y las hojas se parchean. El contenido es un CRONOGRAMA tipo Gantt (en la muestra, 52 días en
+54 columnas): reducir la hoja entera al marco dejaba la letra en ~2 pt (callejón probado). Storage no sirve para
+guardarlo: en producción niega toda descarga al navegador (`§100`).
+**112.2 Solución.** Comité acotado de diseño (4 críticos Opus + síntesis sobre un candidato del arquitecto; bóveda
+`2026-09-28-diseno-diagrama-operativo`). (a) **Identidad** = `identidadDeEquipo` (`M:matrícula`/`S:serie`), id
+`salud_` + sha256 de esa clave (`domain/fichas_adjunto.js`); NO `claveEquipo` (clave de memoria). (b) **Se dibuja UNA
+vez al adjuntar** y se guarda la IMAGEN aprobada: el papel sale igual en cualquier computador y exportar no vuelve a
+abrir archivos ajenos. (c) **Firestore** `fichas_adjuntos/{id}` (meta) + `partes/{0..2}` (≤ 900 KB cada una, atadas por
+`lote`; tope 2,6 MB) + `fichas_adjuntos_registro` (alta/reemplazo/retiro, sin bytes, id fijo `{id}_{lote}` o
+`{id}_{lote}_retiro`), en UN lote de escritura (`data/fichas_adjuntos.js`, carga diferida). (d) **Lector** propio del
+`.xlsx` (`ui/fichas/diagrama-operativo-lector.js`): solo la hoja elegida; topes 50 MB total / 20 MB por hoja / 30 hojas /
+200 × 1000 celdas / 20.000 celdas y combinadas acotadas; `estructuraSana` cuenta aperturas/cierres de la hoja, los
+textos y los dibujos antes de sus regex (ReDoS; NO cubre los estilos ni el orden, ver 112.8); fechas 1904; inventario honesto de lo que no se reproduce (EMF/WMF/TIFF, gráficos, OLE). (e) **Dibujo**
+(`…-dibujo.js`): HOMOLOGAR — detecta la fila de fechas seguidas (o días 1..31 / semanas «S1…»), angosta esas columnas
+(≥ 16 px) y pone la fecha en vertical; SVG → imagen → lienzo, sin que el SVG toque la página (textos escapados, colores
+validados); la muestra quedó a 1226 × 472 px con letra impresa ~7 pt; bajo 6,5 pt pide confirmación. (f) **Hoja**
+(`…-hoja.js`): clona la hoja 3 de la plantilla (título «DIAGRAMA OPERATIVO», logo), imagen centrada en `oneCellAnchor`,
+área de impresión y pies «Pág. N de T» renumerados en todo el libro; el exportador la monta en el paso 7b-bis
+(`HOJAS_EXTRA` protege de la caché mezclada). (g) **Pestaña** (`…-panel.js` + `panel.js`), entre «Diagrama Futuro» y
+«Plan de acciones», solo en Mantenimiento: vacío → «Adjuntar Excel o imagen» (solo administrador) → propuesta con
+selector de hoja, letra prevista e inventario → «Guardar en el sistema» → guardado con sello (archivo, hoja, fecha,
+autor), «Reemplazar», «Quitar». Equipo REPUESTO con otra identidad: el adjunto del anterior no pasa; se ofrece adjuntar
+el propio o quitar el viejo. Los 4 caminos de exportación lo respetan (si no se pudo leer: «Exportar Excel» pregunta y
+baja sin la hoja y sin folio; la emisión con firmas del equipo se detiene si la hoja falta). (h) **Reglas**
+(`firestore.rules`, bloque ADR-112): leer el adjunto = miembro del equipo (el registro y los listados, solo administrador);
+escribir = administrador con perfil; la meta cambia
+solo con lote nuevo y su registro en el mismo lote de escritura (`existsAfter`/`getAfter`); las partes solo con ese
+cambio de lote; quitar exige el `_retiro` y las tres partes fuera; el registro no se edita ni se borra. **Desplegadas
+ANTES del merge** (2026-09-28).
+**112.3 No-regresión.** Sin adjunto el Excel sale byte a byte igual que antes (4 hojas, «de 4»). El PI no lleva la
+pestaña ni la hoja. «Descartar» el borrador de la ficha no quita el adjunto (vive en el sistema, no en el borrador).
+Reglas: diff 100 % aditivo (0 líneas quitadas). Los módulos nuevos van en archivos nuevos (L-102) y solo importan
+exportaciones que ya existían; los viejos reciben el cableado mínimo (`panel.js` +150 líneas; el exportador, el paso
+7b-bis y una exportación NUEVA, `HOJAS_EXTRA`, que `panel.js` lee como propiedad del import para que un exportador
+viejo en caché no rompa).
+**112.4 Verificación.** 1970 pruebas (1968 pass, 0 fail, 2 skip; 21 en `tests/fichas_diagrama_operativo.test.js`) +
+`lint:html` limpio + **133 de reglas** (14 nuevas en `tests-rules/fichas_adjuntos.rules.test.js`, las dos direcciones,
+L-78). Banco (`banco-fichas`) con la muestra real: adjuntar → propuesta (269 KB, ~7,03 pt) → guardar → exportar 5 hojas,
+«1..5 de 5», cinco firmas; reemplazar por PNG; quitar → 4 hojas; sin permiso de escritura solo lectura; corte de
+conexión → pregunta; repuesto → adjunta el propio; PI intacto. LibreOffice: página 5/5 sin tapar «Notas:». Capturas del banco para él: **L-105**. Revisión
+adversarial (seguridad · Excel/exportación · uso/estado-cero + verificador escéptico, Opus; bóveda
+`2026-09-28-revision-diagrama-operativo`): 17 hallazgos, 4 medios confirmados (ReDoS: un Excel hostil de pocos KB congelaba la pestaña · equipo
+repuesto sin salida · sin selector de hojas cuando la primera daba error · «revise la conexión» cuando en realidad
+faltaba permiso) y 13 bajos (entre ellos: registro no obligatorio en las reglas, «Guardando…» eterno sin red, columnas
+ocultas, fechas 1904); corregidos en `430fd11` salvo el Worker, y el ReDoS solo en parte (112.8). CI y Deploy en verde
+(`22907cb`); los archivos servidos son idénticos a `main`. **En vivo** (su Chrome, pestaña aparte, solo lectura,
+BOCAGRANDE T2-A/M-BCG): la pestaña aparece en su sitio con «Esta ficha no tiene Diagrama Operativo: el Excel sale sin
+esa hoja.», el botón de administrador y el pie «Sin adjunto: no sale en el Excel» (leer la colección NO dio
+`permission-denied`: reglas vivas); vista previa con sus 4 hojas; PI con Ficha Técnica, Beneficios, Actual, Futuro,
+Anexo AT y Plan, sin la pestaña. **No verificado en vivo**: el camino de ESCRITURA (el primer adjunto real lo hace el
+Ingeniero; en el emulador está probado en las dos direcciones).
+**112.5 Anti-patterns evitados.** Storage para bytes que el navegador debe bajar (`§100`) · dibujar en cada exportación
+(el papel cambiaría según el computador) · copiar la hoja nativa al libro (estilos/temas, «reparar») · `foreignObject`
+(ensucia el lienzo en Safari) · omitir en silencio lo que no se puede dibujar · SVG ajeno al DOM · `claveEquipo` como
+identidad persistente.
+**112.6 Archivos.** Nuevos: `assets/js/domain/fichas_adjunto.js`, `assets/js/data/fichas_adjuntos.js`,
+`assets/js/ui/fichas/diagrama-operativo-{lector,dibujo,hoja,panel}.js`, las dos suites. Tocados: `panel.js`,
+`exportar-planificacion.js` (paso 7b-bis, `HOJAS_EXTRA`), `pages/fichas-tecnicas.html` (objeto `adjuntos`),
+`assets/css/fichas-tecnicas.css` (`.ftm-op*`, `.ftm-btn--primario`), `firestore.rules`. INTACTOS: la plantilla, el PI,
+las firmas, `salud-riesgo-excel.js`, `ajustes-libro.js`.
+**112.7 Doctrina.** Free-tier (Firestore, sin Storage ni Functions) · cambios aditivos · preview fiel antes de
+producción (§3.2) · reglas con prueba en las dos direcciones (L-78) · reglas desplegadas antes del código que las usa.
+**112.8 Verificado sano / no re-auditar · pendiente.** XSS sin camino (DOM por `textContent`, SVG escapado y nunca en
+la página); tipo del archivo por sus bytes, no por su nombre; paquete del Excel en 9 combinaciones (PNG/JPEG, con/sin
+Salud, con/sin Beneficios, PI) sin relaciones colgantes ni `sheetId` repetidos; EXIF girado, PNG transparente, 20.000
+px; doble clic en Guardar; cambio de equipo a mitad; 0 datos reales en los commits (la muestra vive fuera del repo).
+**⚠️ ReDoS abierto en producción (hallado 2026-09-28 por la verificación del cerebro, 2 lentes Opus independientes,
+bóveda `2026-09-28-verificacion-cerebro-112`)**: `estructuraSana` no mira `styles.xml` (`leerEstilos`/`paletaTema`
+corren antes, con regex perezosas: 3 KB con `<font>` sin cerrar ≈ 21 s) y compara CUÁNTAS etiquetas abren y cierran,
+no su ORDEN (`</row>`×N antes de `<row>`×N pasa y cuesta ≈ 23 s dentro de los topes). Solo congela la pestaña de quien
+adjunta; no daña datos ni afecta a nadie más. Arreglo propuesto → CF-40, a la espera de su autorización. **Otro
+pendiente sabido**: un Worker con límite de tiempo para el lector (el tope contra «zip-bomb» lee un tamaño que el
+autor del zip puede falsear; mitigado por el tope de entrada de 15 MB y porque solo adjunta un administrador) · con
+muchísimas actividades la letra baja (manda el alto): se avisa y se pide confirmar · el primer adjunto y la primera
+exportación reales, del Ingeniero.
