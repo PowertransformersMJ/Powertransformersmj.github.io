@@ -141,6 +141,27 @@ const FORMATOS_INTERNOS = { 1: '0', 2: '0.00', 3: '#,##0', 4: '#,##0.00', 9: '0%
 
 /* ── lectura ─────────────────────────────────────────────────────────────────── */
 
+/**
+ * Estructura sana ANTES de recorrer con expresiones regulares (revisión §112):
+ * un XML con miles de «<row>» sin cerrar hacía que cada búsqueda recorriera
+ * el resto del texto (tiempo cuadrático) y congelaba la pestaña. Se cuentan las
+ * aperturas y los cierres; si no cuadran o son demasiados, se rechaza.
+ */
+export function estructuraSana(xml, etiqueta, maximo) {
+  const s = String(xml || '');
+  const abre = (s.match(new RegExp('<' + etiqueta + '(?=[\\s>/])', 'g')) || []).length;
+  const solas = (s.match(new RegExp('<' + etiqueta + '(?:\\s[^<>]*)?/>', 'g')) || []).length;
+  const cierra = (s.match(new RegExp('</' + etiqueta + '>', 'g')) || []).length;
+  if (abre > maximo) return 'demasiadas';
+  if (abre !== solas + cierra) return 'dañada';
+  return '';
+}
+function exigirEstructura(xml, etiqueta, maximo, que) {
+  const r = estructuraSana(xml, etiqueta, maximo);
+  if (r === 'demasiadas') throw new Error('El Excel trae demasiados elementos («' + que + '») para leerlo aquí. Defina un área de impresión o copie la hoja a un libro nuevo.');
+  if (r) throw new Error('El Excel parece dañado por dentro («' + que + '» sin cerrar). Ábralo y vuelva a guardarlo en Excel.');
+}
+
 /** Tamaño descomprimido declarado de una parte del zip (JSZip 3). */
 const tamano = (f) => (f && f._data && Number.isFinite(f._data.uncompressedSize) ? f._data.uncompressedSize : 0);
 
@@ -195,9 +216,18 @@ export async function leerHojaAdjunta(bytes, op = {}) {
   const rutaDe = (tipo) => { const r = [...rels.values()].find((x) => new RegExp('/' + tipo + '$').test(x.tipo)); return r ? resolverRuta(libro, r.target) : null; };
   const tema = paletaTema(await leer(rutaDe('theme') || 'xl/theme/theme1.xml'));
   const estilos = leerEstilos(await leer(rutaDe('styles') || 'xl/styles.xml'), tema);
-  const compartidos = [...String(await leer(rutaDe('sharedStrings') || 'xl/sharedStrings.xml')).matchAll(/<si>([\s\S]*?)<\/si>|<si\/>/g)]
+  const ssXml = String(await leer(rutaDe('sharedStrings') || 'xl/sharedStrings.xml'));
+  exigirEstructura(ssXml, 'si', 300000, 'textos');
+  exigirEstructura(ssXml.replace(/<(\w+:)?t\b/g, '<t').replace(/<\/(\w+:)?t>/g, '</t>'), 't', 600000, 'textos');
+  const compartidos = [...ssXml.matchAll(/<si>([\s\S]*?)<\/si>|<si\/>/g)]
     .map((m) => textoDe((m[1] || '').replace(/<rPh\b[\s\S]*?<\/rPh>/g, '')));
-  const x = await fh.async('string');
+  let x;
+  try { x = await fh.async('string'); } catch (e) { throw new Error('El Excel está dañado o es demasiado grande por dentro.'); }
+  exigirEstructura(x, 'row', 50000, 'filas');
+  exigirEstructura(x, 'c', 400000, 'celdas');
+  if ((x.match(/<mergeCell\b/g) || []).length > 5000) throw new Error('La hoja tiene demasiadas celdas combinadas para leerla aquí. Defina un área de impresión.');
+  // Libros con el sistema de fechas de 1904 (plantillas viejas de Mac): +1462 días.
+  const desfase1904 = /<workbookPr\b[^>]*\sdate1904="(1|true)"/.test(String(wb)) ? 1462 : 0;
 
   // Geometría: anchos y altos en píxeles (Arial/Calibri 10-11: 7 px por dígito).
   const fmt = (x.match(/<sheetFormatPr\b[^>]*>/) || [''])[0];
@@ -224,7 +254,12 @@ export async function leerHojaAdjunta(bytes, op = {}) {
       else if (t === 'inlineStr') { texto = textoDe(bloque(dentro, 'is')); valor = texto; }
       else if (t === 'str' || t === 'e') { texto = desXml(v || ''); valor = texto; }
       else if (t === 'b') { texto = v === '1' ? 'VERDADERO' : 'FALSO'; valor = texto; }
-      else if (v != null && v !== '') { valor = +v; texto = String(formatearValor(valor, cod, xf.formato)); }
+      else if (v != null && v !== '') {
+        valor = +v;
+        const esF = FORMATO_FECHA(xf.formato, cod);
+        texto = String(formatearValor(esF ? valor + desfase1904 : valor, cod, xf.formato));
+        if (esF) valor += desfase1904;
+      }
       const relleno = estilos.rellenos[xf.relleno] || null; const borde = estilos.bordes[xf.borde] || {};
       if (!texto && !relleno && !borde.t && !borde.r && !borde.b && !borde.l) continue;
       const esFecha = typeof valor === 'number' && FORMATO_FECHA(xf.formato, cod);
@@ -246,6 +281,10 @@ export async function leerHojaAdjunta(bytes, op = {}) {
     if (!/\/drawing$/.test(r.tipo)) continue;
     const rutaD = resolverRuta(h.ruta, r.target);
     const d = await leer(rutaD);
+    for (const t of ['twoCellAnchor', 'oneCellAnchor', 'absoluteAnchor']) {
+      const n = d.replace(/<(\/?)\w+:(\w*Anchor)\b/g, '<$1$2');
+      exigirEstructura(n, t, 2000, 'dibujos');
+    }
     const relsD = relaciones(await leer(rutaRels(rutaD)));
     for (const a of d.matchAll(/<(?:xdr:)?(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/(?:xdr:)?\1>/g)) {
       const an = a[0];
@@ -292,6 +331,7 @@ export async function leerHojaAdjunta(bytes, op = {}) {
   if (!area) {
     const pts = todas.map((q) => ({ c0: q.c, r0: q.r, c1: q.c, r1: q.r })).concat(combinadas);
     for (const g of [...imagenes, ...formas]) if (g.de) pts.push({ c0: g.de.c, r0: g.de.r, c1: (g.a || g.de).c, r1: (g.a || g.de).r });
+    if (!pts.length && inventario.length) throw new Error('La hoja «' + h.nombre + '» solo trae ' + [...new Set(inventario)].join(', ') + ', que no se puede reproducir. En Excel use «Copiar como imagen» y adjunte esa imagen (PNG o JPG).');
     if (!pts.length) throw new Error('La hoja «' + h.nombre + '» está vacía.');
     area = { c0: Math.min(...pts.map((p) => p.c0)), r0: Math.min(...pts.map((p) => p.r0)), c1: Math.max(...pts.map((p) => p.c1)), r1: Math.max(...pts.map((p) => p.r1)) };
   }
@@ -301,8 +341,13 @@ export async function leerHojaAdjunta(bytes, op = {}) {
   }
   const celdas = todas.filter((q) => q.r >= area.r0 && q.r <= area.r1 && q.c >= area.c0 && q.c <= area.c1);
   if (celdas.length > TOPES.celdas) throw new Error('La hoja tiene demasiadas celdas con contenido (máximo 20.000). Defina un área de impresión.');
+  const vistas = new Set();
   combinadas = combinadas.map((g) => ({ c0: Math.max(g.c0, area.c0), r0: Math.max(g.r0, area.r0), c1: Math.min(g.c1, area.c1), r1: Math.min(g.r1, area.r1) }))
-    .filter((g) => g.c0 <= g.c1 && g.r0 <= g.r1);
+    .filter((g) => { const k = g.c0 + ',' + g.r0 + ',' + g.c1 + ',' + g.r1; if (g.c0 > g.c1 || g.r0 > g.r1 || vistas.has(k)) return false; vistas.add(k); return true; });
+  // Las combinadas se recorren celda a celda al dibujar: su suma también tiene tope.
+  if (combinadas.reduce((t, g) => t + (g.c1 - g.c0 + 1) * (g.r1 - g.r0 + 1), 0) > TOPES.celdas * 20) {
+    throw new Error('La hoja tiene demasiadas celdas combinadas para dibujarla. Defina un área de impresión.');
+  }
 
   const columnas = []; for (let c = area.c0; c <= area.c1; c++) columnas.push(colPx(c));
   const filas = []; for (let r = area.r0; r <= area.r1; r++) filas.push(filaPx(r));

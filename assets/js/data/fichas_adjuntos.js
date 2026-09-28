@@ -15,7 +15,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  collection, doc, getDoc, writeBatch, serverTimestamp, Bytes
+  doc, getDoc, writeBatch, serverTimestamp, Bytes
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
 import { getDbSafe, getAuthSafe } from '../firebase-init.js';
@@ -61,6 +61,7 @@ export async function leerMeta(id) {
     return { hay: true, meta: { ...m, en } };
   } catch (e) {
     console.warn('[fichas-adjuntos] meta:', e && e.code || e);
+    if (e && /permission-denied/.test(String(e.code))) return { error: true, mensaje: 'Sin permiso para leer el Diagrama Operativo (la sesión venció o no tiene acceso). Recargue la página.' };
     return { error: true };
   }
 }
@@ -108,12 +109,14 @@ async function nombreVigente(db, a) {
 /**
  * Guarda (o reemplaza) el adjunto en UNA escritura atómica: meta + los 3
  * espacios de parte (escritos o borrados, sin depender de lo leído) + registro.
+ * La regla EXIGE el registro con id fijo `{id}_{lote}` (revisión §112: sin él,
+ * un cambio no dejaría rastro).
  * @param {{id, clave, matricula, serie}} ident
  * @param {{tipo:'imagen'|'excel', origen:{nombre, hoja?}, mime, ancho, alto, bytes: Uint8Array}} datos
- * @param {boolean} reemplazo  si ya había uno (para el registro)
+ * @param {object|null} previo  la meta que había (reemplazo) o null (alta)
  * @returns {Promise<object>} la meta guardada
  */
-export async function guardar(ident, datos, reemplazo) {
+export async function guardar(ident, datos, previo) {
   const db = getDbSafe(); const a = administrador();
   if (!db || !a) throw new Error('Solo un administrador puede adjuntar o cambiar el Diagrama Operativo.');
   const partes = partir(datos.bytes);
@@ -132,8 +135,8 @@ export async function guardar(ident, datos, reemplazo) {
     if (n < partes.length) b.set(refParte(db, ident.id, n), { bytes: Bytes.fromUint8Array(partes[n]), lote });
     else b.delete(refParte(db, ident.id, n));
   }
-  b.set(doc(collection(db, COLECCION_REGISTRO)), {
-    idAdjunto: ident.id, accion: reemplazo ? 'reemplazo' : 'alta', nombre: origen.nombre, huella, tamano: datos.bytes.length,
+  b.set(doc(db, COLECCION_REGISTRO, ident.id + '_' + lote), {
+    idAdjunto: ident.id, accion: previo ? 'reemplazo' : 'alta', lote, nombre: origen.nombre, huella, tamano: datos.bytes.length,
     subidoPor: autor, en: serverTimestamp()
   });
   await b.commit();
@@ -149,9 +152,9 @@ export async function quitar(ident, meta) {
   const b = writeBatch(db);
   b.delete(refMeta(db, ident.id));
   for (let n = 0; n < PARTES_MAX; n++) b.delete(refParte(db, ident.id, n));
-  b.set(doc(collection(db, COLECCION_REGISTRO)), {
-    idAdjunto: ident.id, accion: 'retiro', nombre: nombreSeguro(meta && meta.origen && meta.origen.nombre), huella: (meta && meta.huella) || '0'.repeat(64),
-    tamano: (meta && meta.tamano) || 0, subidoPor: autor, en: serverTimestamp()
+  b.set(doc(db, COLECCION_REGISTRO, ident.id + '_' + meta.lote + '_retiro'), {
+    idAdjunto: ident.id, accion: 'retiro', lote: meta.lote, nombre: nombreSeguro(meta && meta.origen && meta.origen.nombre), huella: meta.huella,
+    tamano: meta.tamano || 0, subidoPor: autor, en: serverTimestamp()
   });
   await b.commit();
   cache.delete(ident.id);

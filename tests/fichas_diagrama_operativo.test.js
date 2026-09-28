@@ -11,7 +11,7 @@ import JSZip from 'jszip';
 import {
   tipoPorBytes, clasificarArchivo, identidadAdjunto, partir, unir, nombreSeguro, encajar, TOPE_PARTE, TOPE_TOTAL
 } from '../assets/js/domain/fichas_adjunto.js';
-import { leerHojaAdjunta } from '../assets/js/ui/fichas/diagrama-operativo-lector.js';
+import { leerHojaAdjunta, estructuraSana } from '../assets/js/ui/fichas/diagrama-operativo-lector.js';
 import { planoHomologado, svgDeHoja, calendarioDe } from '../assets/js/ui/fichas/diagrama-operativo-dibujo.js';
 import { cajaOperativo } from '../assets/js/ui/fichas/diagrama-operativo-hoja.js';
 import { CAJA_OPERATIVO } from '../assets/js/ui/fichas/diagrama-operativo-panel.js';
@@ -26,15 +26,21 @@ const PNG = Uint8Array.from(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAA
 const EQ = { subestacion: 'SUBESTACION DE PRUEBA', serie: 'S-0001', matricula: 'T0-PRUEBA', zona: 'OCCIDENTE', mva: 30, kv_prim: 110, kv_sec: 13.8, regulacion: 'OLTC', fases: 3 };
 
 /* ── un libro .xlsx mínimo, armado en la prueba ─────────────────────────────── */
-async function libroMinimo({ hoja, compartidos = [], estilos, definidos = '' }) {
+async function libroMinimo({ hoja, compartidos = [], estilos, definidos = '', wbPr = '', dibujo = null }) {
   const z = new JSZip();
   z.file('[Content_Types].xml', '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>');
   z.file('_rels/.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>');
-  z.file('xl/workbook.xml', '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Cronograma" sheetId="1" r:id="rId1"/></sheets>' + definidos + '</workbook>');
+  z.file('xl/workbook.xml', '<?xml version="1.0"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' + wbPr + '<sheets><sheet name="Cronograma" sheetId="1" r:id="rId1"/></sheets>' + definidos + '</workbook>');
   z.file('xl/_rels/workbook.xml.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>');
   z.file('xl/styles.xml', estilos);
   z.file('xl/sharedStrings.xml', '<?xml version="1.0"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + compartidos.map((t) => '<si><t>' + t + '</t></si>').join('') + '</sst>');
   z.file('xl/worksheets/sheet1.xml', hoja);
+  if (dibujo) {
+    z.file('xl/worksheets/_rels/sheet1.xml.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" Target="../drawings/drawing1.xml"/></Relationships>');
+    z.file('xl/drawings/drawing1.xml', dibujo.xml);
+    z.file('xl/drawings/_rels/drawing1.xml.rels', '<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../media/' + dibujo.media + '"/></Relationships>');
+    z.file('xl/media/' + dibujo.media, new Uint8Array([1, 2, 3, 4]));
+  }
   return z.generateAsync({ type: 'uint8array' });
 }
 const ESTILOS = '<?xml version="1.0"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
@@ -214,3 +220,46 @@ describe('La hoja «Diagrama Operativo» en el Excel de Mantenimiento', () => {
     assert.equal(HOJAS_SALUD[HOJAS_SALUD.length - 1].id, 'plan');
   });
 });
+
+describe('Revisión §112: blindaje y más formas de cronograma', () => {
+  test('un XML con etiquetas sin cerrar o demasiadas se rechaza al instante (sin congelar)', async () => {
+    assert.equal(estructuraSana('<row r="1"><c r="A1"/></row><row r="2"/><rowBreaks/>', 'row', 10), '');
+    assert.equal(estructuraSana('<row r="1">'.repeat(5), 'row', 10), 'dañada');
+    const t0 = Date.now();
+    assert.equal(estructuraSana('<row r="1">'.repeat(240000), 'row', 50000), 'demasiadas');
+    assert.ok(Date.now() - t0 < 1000);
+    const hoja = gantt(5).replace('</sheetData>', '<row r="9">'.repeat(3000) + '</sheetData>');
+    await assert.rejects(leerHojaAdjunta(await libroMinimo({ hoja, compartidos: COMPARTIDOS, estilos: ESTILOS })), /dañado/);
+  });
+  test('días numerados 1..31 (con reinicio de mes) y semanas «S1…» también se homologan', async () => {
+    const dias = Array.from({ length: 40 }, (_, i) => '<c r="' + col(2 + i) + '2"><v>' + (((i + 20) % 31) + 1) + '</v></c>').join('');
+    const hojaNum = gantt(2).replace(/<row r="2">[\s\S]*?<\/row>/, '<row r="2"><c r="A2" t="s"><v>1</v></c>' + dias + '</row>');
+    const m = await leerHojaAdjunta(await libroMinimo({ hoja: hojaNum, compartidos: COMPARTIDOS, estilos: ESTILOS }));
+    assert.deepEqual(calendarioDe(m), { fila: 1, c0: 2, c1: 41 });
+    const sems = COMPARTIDOS.concat(Array.from({ length: 30 }, (_, i) => 'S' + (i + 1)));
+    const celdasSem = Array.from({ length: 30 }, (_, i) => '<c r="' + col(2 + i) + '2" t="s"><v>' + (COMPARTIDOS.length + i) + '</v></c>').join('');
+    const hojaSem = gantt(2).replace(/<row r="2">[\s\S]*?<\/row>/, '<row r="2"><c r="A2" t="s"><v>1</v></c>' + celdasSem + '</row>');
+    const m2 = await leerHojaAdjunta(await libroMinimo({ hoja: hojaSem, compartidos: sems, estilos: ESTILOS }));
+    assert.deepEqual(calendarioDe(m2), { fila: 1, c0: 2, c1: 31 });
+  });
+  test('las columnas ocultas del calendario siguen ocultas al homologar', async () => {
+    const hoja = gantt(40).replace('<cols>', '<cols><col min="5" max="6" width="9" hidden="1"/>');
+    const m = await leerHojaAdjunta(await libroMinimo({ hoja, compartidos: COMPARTIDOS, estilos: ESTILOS }));
+    assert.equal(m.columnas[4], 0);
+    const p = planoHomologado(m, { w: 900, h: 400 });
+    assert.equal(p.compactado, true);
+    assert.equal(p.columnas[4], 0);
+    assert.equal(p.columnas[5], 0);
+  });
+  test('un libro con fechas de 1904 muestra la fecha correcta', async () => {
+    const hoja = gantt(8).replace(/<v>46216<\/v>/, '<v>' + (46216 - 1462) + '</v>');
+    const m = await leerHojaAdjunta(await libroMinimo({ hoja, compartidos: COMPARTIDOS, estilos: ESTILOS, wbPr: '<workbookPr date1904="1"/>' }));
+    assert.equal(m.celdas.find((c) => c.r === 1 && c.c === 2).texto, '13/07/2026');
+  });
+  test('una hoja que solo trae una imagen EMF dice qué pasa (no «vacía»)', async () => {
+    const hoja = '<?xml version="1.0"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData/><drawing r:id="rId1"/></worksheet>';
+    const xml = '<xdr:wsDr xmlns:xdr="x" xmlns:a="a" xmlns:r="r"><xdr:oneCellAnchor><xdr:from><xdr:col>0</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>0</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:ext cx="952500" cy="952500"/><xdr:pic><xdr:blipFill><a:blip r:embed="rId1"/></xdr:blipFill></xdr:pic><xdr:clientData/></xdr:oneCellAnchor></xdr:wsDr>';
+    await assert.rejects(leerHojaAdjunta(await libroMinimo({ hoja, estilos: ESTILOS, dibujo: { xml, media: 'image1.emf' } })), /EMF[\s\S]*Copiar como imagen/);
+  });
+});
+

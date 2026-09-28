@@ -109,24 +109,56 @@ export function montarDiagramaOperativo(caja, op) {
     document.body.appendChild(i); i.click(); setTimeout(() => i.remove(), 60000);
   };
 
+  let ajena = null;              // meta de OTRO aparato con la misma matrícula (repuesto)
+  let nodoError = null;
+  const mostrarError = (t) => {
+    if (nodoError && nodoError.isConnected) nodoError.textContent = t;
+    else { nodoError = aviso(t, 'ftm-aviso'); caja.appendChild(nodoError); }
+  };
+  /** Mensaje en español de un error de Firebase o de red. */
+  const traducir = (e) => {
+    const code = e && e.code ? String(e.code) : '';
+    if (/permission-denied/.test(code)) return 'no tiene permiso para esta acción (solo un administrador con perfil).';
+    if (/unavailable|deadline-exceeded|network/.test(code)) return 'sin conexión con el sistema; vuelva a intentarlo.';
+    return e && e.message ? e.message : String(e);
+  };
+  /** Una escritura sin red no termina nunca (Firestore la deja pendiente): tope de 30 s. */
+  const conTope = (promesa) => Promise.race([promesa, new Promise((_, rej) => setTimeout(() => rej(new Error('sin conexión: no se completó en 30 segundos. Vuelva a intentarlo cuando tenga red.')), 30000))]);
+
   async function consultar() {
     pintar(aviso('Consultando el Diagrama Operativo de este transformador…'));
-    ident = await identidadAdjunto(equipo);
-    if (!vivo) return;
-    if (!ident) { pintar(aviso('Este equipo no tiene matrícula ni serie registradas: sin ellas no se puede guardar su Diagrama Operativo.', 'ftm-aviso')); return; }
-    try { escribe = !!(await datos.puedeEscribir()); } catch (_) { escribe = false; }
-    const r = await datos.leerMeta(ident.id);
+    let r;
+    try {
+      ident = await identidadAdjunto(equipo);
+      if (!vivo) return;
+      if (!ident) { pintar(aviso('Este equipo no tiene matrícula ni serie registradas: sin ellas no se puede guardar su Diagrama Operativo.', 'ftm-aviso')); return; }
+      try { escribe = !!(await datos.puedeEscribir()); } catch (_) { escribe = false; }
+      r = await datos.leerMeta(ident.id);
+    } catch (e) { r = { error: true }; }
     if (!vivo) return;
     if (r.error) {
       const b = boton('Reintentar'); b.addEventListener('click', consultar);
-      pintar(aviso('No se pudo consultar el Diagrama Operativo (revise la conexión).', 'ftm-aviso'), b); return;
+      pintar(aviso(r.mensaje || 'No se pudo consultar el Diagrama Operativo (revise la conexión).', 'ftm-aviso'), b); return;
     }
-    meta = r.hay ? r.meta : null;
+    meta = r.hay ? r.meta : null; ajena = null;
     if (meta && !mismaIdentidad({ clave: meta.clave, matricula: meta.matricula, serie: meta.serie }, { clave: ident.clave, matricula: ident.matricula, serie: ident.serie })) {
-      pintar(aviso('El Diagrama Operativo guardado es de otro aparato con la misma matrícula (otra serie): no se usa.', 'ftm-aviso')); meta = null; return;
+      ajena = meta; meta = null;
     }
     if (op.alCambiar) op.alCambiar(meta);
+    if (ajena) return mostrarAjeno();
     return meta ? mostrarGuardado() : mostrarVacio();
+  }
+
+  /** Transformador REPUESTO que heredó la matrícula: el adjunto guardado es del aparato anterior. */
+  function mostrarAjeno() {
+    const nodos = [aviso('El Diagrama Operativo guardado con esta matrícula es de otro aparato (serie ' + (ajena.serie || 'sin serie') + '): no se usa en esta ficha.', 'ftm-aviso')];
+    if (escribe) {
+      const adj = boton('Adjuntar el de este equipo', true); const qui = boton('Quitar el del aparato anterior');
+      adj.addEventListener('click', () => elegir((f) => proponer(f, {})));
+      qui.addEventListener('click', () => quitar(qui));
+      const fila = el('div', 'ftm-op-acciones'); fila.append(adj, qui); nodos.push(fila);
+    } else nodos.push(aviso('Solo un administrador puede cambiarlo.', 'ftm-nota-ref'));
+    pintar(...nodos);
   }
 
   function mostrarVacio() {
@@ -141,7 +173,8 @@ export function montarDiagramaOperativo(caja, op) {
 
   async function mostrarGuardado() {
     pintar(aviso('Cargando la imagen guardada…'));
-    const r = await datos.leerImagen(ident.id, meta);
+    let r;
+    try { r = await datos.leerImagen(ident.id, meta); } catch (e) { r = { error: true, mensaje: 'No se pudo leer la imagen guardada (' + traducir(e) + ')' }; }
     if (!vivo) return;
     const sello = aviso('Guardado en el sistema · ' + (meta.origen && meta.origen.nombre || '') + (meta.origen && meta.origen.hoja ? ' (hoja «' + meta.origen.hoja + '»)' : '')
       + ' · ' + fecha(meta.en) + ' · ' + ((meta.subidoPor && meta.subidoPor.nombre) || '') + '. Lo ven y lo exportan todos; «Descartar» el borrador de la ficha no lo quita.', 'ftm-nota');
@@ -151,68 +184,90 @@ export function montarDiagramaOperativo(caja, op) {
     if (escribe) {
       const rem = boton('Reemplazar'); const qui = boton('Quitar');
       rem.addEventListener('click', () => elegir((f) => proponer(f, {})));
-      qui.addEventListener('click', quitar);
+      qui.addEventListener('click', () => quitar(qui, rem));
       const fila = el('div', 'ftm-op-acciones'); fila.append(rem, qui); nodos.push(fila);
     }
     pintar(...nodos);
   }
 
+  /** Selector de hojas visibles (también cuando la hoja por defecto no se pudo leer). */
+  function selectorHojas(archivo, hojas, actualNombre) {
+    const lbl = el('label', 'ftm-op-hoja', 'Hoja del Excel: ');
+    const sel = el('select');
+    for (const n of hojas) { const o = el('option', null, n); o.value = n; if (n === actualNombre) o.selected = true; sel.appendChild(o); }
+    sel.addEventListener('change', () => proponer(archivo, { hoja: sel.value }));
+    lbl.appendChild(sel); return lbl;
+  }
+
   async function proponer(archivo, opc) {
     pintar(aviso('Leyendo «' + archivo.name + '» y dibujándolo como irá en la hoja…'));
-    let p;
+    let p; let bytes = null;
     try {
-      const bytes = new Uint8Array(await archivo.arrayBuffer());
+      bytes = new Uint8Array(await archivo.arrayBuffer());
       p = await procesarArchivo(bytes, archivo.name, opc);
       p.archivo = archivo;
     } catch (e) {
+      // Si es un Excel con varias hojas, se puede elegir OTRA aunque esta haya fallado.
+      let hojas = [];
+      try { if (bytes && clasificarArchivo(bytes).clase === 'excel') hojas = (await hojasDelLibro(bytes)).filter((h) => h.visible).map((h) => h.nombre); } catch (_) { hojas = []; }
+      if (!vivo) return;
+      const nodos = [aviso('No se pudo usar ' + (opc.hoja ? 'la hoja «' + opc.hoja + '»' : 'el archivo') + ': ' + traducir(e), 'ftm-aviso')];
+      if (hojas.length > 1) { nodos.push(aviso('Puede elegir otra hoja del mismo Excel:', 'ftm-nota-ref')); nodos.push(selectorHojas(archivo, hojas, opc.hoja || '')); }
       const b = boton('Elegir otro archivo'); b.addEventListener('click', () => elegir((f) => proponer(f, {})));
-      const v = boton('Volver'); v.addEventListener('click', () => (meta ? mostrarGuardado() : mostrarVacio()));
-      pintar(aviso('No se pudo usar el archivo: ' + (e && e.message ? e.message : e), 'ftm-aviso'), b, v); return;
+      const v = boton('Volver'); v.addEventListener('click', () => (meta ? mostrarGuardado() : ajena ? mostrarAjeno() : mostrarVacio()));
+      const fila = el('div', 'ftm-op-acciones'); fila.append(b, v); nodos.push(fila);
+      pintar(...nodos); return;
     }
     if (!vivo) return;
     const nodos = [aviso('Así irá en la hoja «Diagrama Operativo» del Excel (página final). Revísela y apruébela.', 'ftm-nota')];
-    if (p.hojas.length > 1) {
-      const lbl = el('label', 'ftm-op-hoja', 'Hoja del Excel: ');
-      const sel = el('select'); for (const n of p.hojas) { const o = el('option', null, n); o.value = n; if (n === p.hoja) o.selected = true; sel.appendChild(o); }
-      sel.addEventListener('change', () => proponer(archivo, { hoja: sel.value }));
-      lbl.appendChild(sel); nodos.push(lbl);
-    }
+    if (p.hojas.length > 1) nodos.push(selectorHojas(archivo, p.hojas, p.hoja));
     nodos.push(imagen(p.bytes, p.mime, 'Vista del Diagrama Operativo'));
     const datosTxt = ['Archivo: ' + p.origen.nombre + (p.hoja ? ' · hoja «' + p.hoja + '»' : ''), 'Peso guardado: ' + kb(p.bytes.length)];
     if (p.letraPrevista != null) datosTxt.push('Letra en el papel: ~' + String(p.letraPrevista).replace('.', ',') + ' pt');
     nodos.push(aviso(datosTxt.join(' · '), 'ftm-nota-ref'));
     for (const a of p.avisos) nodos.push(aviso(a, 'ftm-nota-ref'));
-    if (p.letraPrevista != null && p.letraPrevista < LETRA_MINIMA) nodos.push(aviso('Ojo: la letra quedará pequeña en el papel. Si puede, defina en su Excel un área de impresión solo con lo necesario.', 'ftm-aviso'));
+    if (p.letraPrevista != null && p.letraPrevista < LETRA_MINIMA) nodos.push(aviso('Ojo: la letra quedará en ~' + String(p.letraPrevista).replace('.', ',') + ' pt, pequeña para leerla en el papel. Si puede, defina en su Excel un área de impresión solo con lo necesario (menos actividades o menos días por hoja).', 'ftm-aviso'));
     if (p.inventario.length) nodos.push(aviso('No se puede reproducir y NO saldrá: ' + p.inventario.join(', ') + '. En Excel: «Copiar como imagen» y adjunte la imagen, si lo necesita.', 'ftm-aviso'));
-    const ok = boton(meta ? 'Guardar y reemplazar el actual' : 'Guardar en el sistema', true); const no = boton('Cancelar');
+    const previo = meta || ajena;
+    const ok = boton(previo ? 'Guardar y reemplazar el actual' : 'Guardar en el sistema', true); const no = boton('Cancelar');
     ok.addEventListener('click', () => guardar(p, ok, no));
-    no.addEventListener('click', () => (meta ? mostrarGuardado() : mostrarVacio()));
+    no.addEventListener('click', () => (meta ? mostrarGuardado() : ajena ? mostrarAjeno() : mostrarVacio()));
     const fila = el('div', 'ftm-op-acciones'); fila.append(ok, no); nodos.push(fila);
     pintar(...nodos);
   }
 
   async function guardar(p, ok, no) {
+    const previo = meta || ajena;
+    if (p.letraPrevista != null && p.letraPrevista < LETRA_MINIMA && !globalThis.confirm('La letra quedará en ~' + String(p.letraPrevista).replace('.', ',') + ' pt en el papel, pequeña para leerla. ¿Guardar así?')) return;
     if (p.inventario.length && !globalThis.confirm('Hay partes del Excel que NO saldrán (' + p.inventario.join(', ') + '). ¿Guardar así?')) return;
-    if (meta && !globalThis.confirm('Se reemplaza «' + ((meta.origen && meta.origen.nombre) || 'el actual') + '» por «' + p.origen.nombre + '». El anterior no se conserva (queda anotado en el registro). ¿Continuar?')) return;
+    if (previo && !globalThis.confirm('Se reemplaza «' + ((previo.origen && previo.origen.nombre) || 'el actual') + '» por «' + p.origen.nombre + '». El anterior no se conserva (queda anotado en el registro). ¿Continuar?')) return;
     ok.disabled = true; no.disabled = true; ok.textContent = 'Guardando…';
     try {
-      meta = await datos.guardar(ident, { tipo: p.tipo, origen: p.origen, mime: p.mime, ancho: p.ancho, alto: p.alto, bytes: p.bytes }, !!meta);
+      meta = await conTope(datos.guardar(ident, { tipo: p.tipo, origen: p.origen, mime: p.mime, ancho: p.ancho, alto: p.alto, bytes: p.bytes }, previo));
+      ajena = null;
       if (op.alCambiar) op.alCambiar(meta);
       await mostrarGuardado();
     } catch (e) {
-      ok.disabled = false; no.disabled = false; ok.textContent = 'Guardar en el sistema';
-      caja.appendChild(aviso('No se guardó: ' + (e && e.message ? e.message : e), 'ftm-aviso'));
+      ok.disabled = false; no.disabled = false; ok.textContent = previo ? 'Guardar y reemplazar el actual' : 'Guardar en el sistema';
+      mostrarError('No se guardó: ' + traducir(e));
     }
   }
 
-  async function quitar() {
-    if (!globalThis.confirm('¿Quitar el Diagrama Operativo de este transformador? El Excel saldrá sin esa hoja. Queda anotado en el registro quién lo quitó y cuándo.')) return;
+  async function quitar(...botones) {
+    const previo = meta || ajena;
+    if (!previo) return;
+    if (!globalThis.confirm('¿Quitar el Diagrama Operativo ' + (ajena && !meta ? 'del aparato anterior' : 'de este transformador') + '? El Excel saldrá sin esa hoja. Queda anotado en el registro quién lo quitó y cuándo.')) return;
+    const textos = botones.map((b) => b.textContent);
+    botones.forEach((b) => { b.disabled = true; }); if (botones[0]) botones[0].textContent = 'Quitando…';
     try {
-      await datos.quitar(ident, meta);
-      meta = null;
+      await conTope(datos.quitar(ident, previo));
+      meta = null; ajena = null;
       if (op.alCambiar) op.alCambiar(null);
       mostrarVacio();
-    } catch (e) { caja.appendChild(aviso('No se quitó: ' + (e && e.message ? e.message : e), 'ftm-aviso')); }
+    } catch (e) {
+      botones.forEach((b, k) => { if (b.isConnected) { b.disabled = false; b.textContent = textos[k]; } });
+      mostrarError('No se quitó: ' + traducir(e));
+    }
   }
 
   consultar();

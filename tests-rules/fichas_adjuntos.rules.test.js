@@ -32,18 +32,27 @@ const meta = (extra = {}) => ({
   tamano: 1000, partes: 1, huella: HUELLA, lote: LOTE, subidoPor: { uid: 'fa_admin', nombre: 'Admin Uno' }, en: serverTimestamp(), ...extra
 });
 const registro = (extra = {}) => ({
-  idAdjunto: ID, accion: 'alta', nombre: 'cronograma.xlsx', huella: HUELLA, tamano: 1000,
+  idAdjunto: ID, accion: 'alta', lote: LOTE, nombre: 'cronograma.xlsx', huella: HUELLA, tamano: 1000,
   subidoPor: { uid: 'fa_admin', nombre: 'Admin Uno' }, en: serverTimestamp(), ...extra
 });
-/** El lote completo que escribe la pantalla: meta + los 3 slots (escritos o borrados) + registro. */
-function lote(d, { id = ID, m = meta(), partes = [bytes(1000)], lt = LOTE, reg = registro() } = {}) {
+const idRegistro = (r) => r.idAdjunto + '_' + r.lote + (r.accion === 'retiro' ? '_retiro' : '');
+/** El lote completo que escribe la pantalla: meta + los 3 slots (escritos o borrados) + registro con id fijo. */
+function lote(d, { id = ID, m = meta(), partes = [bytes(1000)], lt = LOTE, reg = registro(), sinRegistro = false, idReg } = {}) {
   const b = writeBatch(d);
   b.set(doc(d, 'fichas_adjuntos', id), m);
   for (let n = 0; n < 3; n++) {
     const r = doc(d, 'fichas_adjuntos', id, 'partes', String(n));
     if (n < partes.length) b.set(r, { bytes: partes[n], lote: lt }); else b.delete(r);
   }
-  b.set(doc(collection(d, 'fichas_adjuntos_registro')), reg);
+  if (!sinRegistro) b.set(doc(d, 'fichas_adjuntos_registro', idReg || idRegistro(reg)), reg);
+  return b.commit();
+}
+function retiro(d, loteMeta, { conRegistro = true } = {}) {
+  const b = writeBatch(d);
+  b.delete(doc(d, 'fichas_adjuntos', ID));
+  for (let n = 0; n < 3; n++) b.delete(doc(d, 'fichas_adjuntos', ID, 'partes', String(n)));
+  const reg = registro({ accion: 'retiro', lote: loteMeta });
+  if (conRegistro) b.set(doc(d, 'fichas_adjuntos_registro', idRegistro(reg)), reg);
   return b.commit();
 }
 
@@ -63,13 +72,21 @@ before(async () => {
 after(async () => { if (testEnv) await testEnv.cleanup(); });
 
 describe('fichas_adjuntos — escribe un admin con perfil; lee el equipo', () => {
-  test('el admin guarda el lote completo (meta + parte + slots borrados + registro)', async () => {
+  test('sin su registro no hay alta; con él, el admin guarda el lote completo', async () => {
+    await assertFails(lote(db('fa_admin'), { sinRegistro: true }));
+    await assertFails(lote(db('fa_admin'), { idReg: ID + '_OTRO' }));
     await assertSucceeds(lote(db('fa_admin')));
   });
   test('un técnico lee la meta y la parte; no las escribe', async () => {
     await assertSucceeds(getDoc(doc(db('fa_tech'), 'fichas_adjuntos', ID)));
     await assertSucceeds(getDoc(doc(db('fa_tech'), 'fichas_adjuntos', ID, 'partes', '0')));
-    await assertFails(lote(db('fa_tech'), { reg: registro({ subidoPor: { uid: 'fa_tech', nombre: 'Tecnico' } }), m: meta({ subidoPor: { uid: 'fa_tech', nombre: 'Tecnico' } }) }));
+    await assertFails(lote(db('fa_tech'), { lt: LOTE2, m: meta({ lote: LOTE2, subidoPor: { uid: 'fa_tech', nombre: 'Tecnico' } }), reg: registro({ accion: 'reemplazo', lote: LOTE2, subidoPor: { uid: 'fa_tech', nombre: 'Tecnico' } }) }));
+  });
+  test('una parte suelta no se puede reescribir sin cambiar el lote de su meta', async () => {
+    await assertFails(setDoc(doc(db('fa_admin'), 'fichas_adjuntos', ID, 'partes', '0'), { bytes: bytes(20), lote: LOTE }));
+  });
+  test('la meta sola con lote nuevo (sin partes ni registro) no pasa', async () => {
+    await assertFails(setDoc(doc(db('fa_admin'), 'fichas_adjuntos', ID), meta({ lote: LOTE2 })));
   });
   test('sin sesión, desactivado o admin de arranque sin perfil: no leen o no escriben', async () => {
     await assertFails(getDoc(doc(testEnv.unauthenticatedContext().firestore(), 'fichas_adjuntos', ID)));
@@ -85,8 +102,9 @@ describe('fichas_adjuntos — escribe un admin con perfil; lee el equipo', () =>
 });
 
 describe('fichas_adjuntos — lo que la regla NO deja pasar', () => {
-  test('un id que no corresponde a la clave', async () => {
-    await assertFails(lote(db('fa_admin'), { id: ID2 }));
+  test('un id que no corresponde a la clave, o una matrícula distinta de la de la clave', async () => {
+    await assertFails(lote(db('fa_admin'), { id: ID2, reg: registro({ idAdjunto: ID2 }) }));
+    await assertFails(lote(db('fa_admin'), { m: meta({ lote: LOTE2, matricula: 'OTRA' }), lt: LOTE2, reg: registro({ accion: 'reemplazo', lote: LOTE2 }) }));
   });
   test('parte de más de 900 KB, parte «3», lote distinto, parte sin meta', async () => {
     await assertFails(lote(db('fa_admin'), { partes: [Bytes.fromUint8Array(new Uint8Array(900 * 1024 + 1))] }));
@@ -108,10 +126,11 @@ describe('fichas_adjuntos — lo que la regla NO deja pasar', () => {
 });
 
 describe('fichas_adjuntos — reemplazar y quitar sin partes sueltas', () => {
+  const LOTE3 = 'QQQQQQQQQQwwwwwwwwww';
   test('reemplazo de 3 partes por 1: los slots 1 y 2 se borran en el mismo lote', async () => {
     const d = db('fa_admin');
-    await assertSucceeds(lote(d, { m: meta({ partes: 3, lote: LOTE2 }), lt: LOTE2, partes: [bytes(10), bytes(10), bytes(10)], reg: registro({ accion: 'reemplazo' }) }));
-    await assertSucceeds(lote(d, { reg: registro({ accion: 'reemplazo' }) }));
+    await assertSucceeds(lote(d, { m: meta({ partes: 3, lote: LOTE2 }), lt: LOTE2, partes: [bytes(10), bytes(10), bytes(10)], reg: registro({ accion: 'reemplazo', lote: LOTE2 }) }));
+    await assertSucceeds(lote(d, { m: meta({ lote: LOTE3 }), lt: LOTE3, reg: registro({ accion: 'reemplazo', lote: LOTE3 }) }));
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       const x = ctx.firestore();
       const p1 = await getDoc(doc(x, 'fichas_adjuntos', ID, 'partes', '1'));
@@ -119,25 +138,29 @@ describe('fichas_adjuntos — reemplazar y quitar sin partes sueltas', () => {
       if (p1.exists() || p2.exists()) throw new Error('quedaron partes sueltas');
     });
   });
-  test('borrar la meta dejando una parte: no; con sus partes y su registro: sí', async () => {
+  test('un reemplazo registrado como «alta», o que repite el lote, no pasa', async () => {
+    const d = db('fa_admin');
+    await assertFails(lote(d, { m: meta({ lote: LOTE2 }), lt: LOTE2, reg: registro({ accion: 'alta', lote: LOTE2 }) }));
+    await assertFails(lote(d, { m: meta({ lote: LOTE3 }), lt: LOTE3, reg: registro({ accion: 'reemplazo', lote: LOTE3 }), idReg: ID + '_' + LOTE3 + 'x' }));
+  });
+  test('borrar la meta dejando una parte o sin su «retiro»: no; completo: sí', async () => {
     const d = db('fa_admin');
     await assertFails(deleteDoc(doc(d, 'fichas_adjuntos', ID)));
-    const b = writeBatch(d);
-    b.delete(doc(d, 'fichas_adjuntos', ID));
-    for (let n = 0; n < 3; n++) b.delete(doc(d, 'fichas_adjuntos', ID, 'partes', String(n)));
-    b.set(doc(collection(d, 'fichas_adjuntos_registro')), registro({ accion: 'retiro' }));
-    await assertSucceeds(b.commit());
+    await assertFails(retiro(d, LOTE3, { conRegistro: false }));
+    await assertSucceeds(retiro(d, LOTE3));
   });
 });
 
 describe('fichas_adjuntos_registro — solo se agrega', () => {
-  test('el admin agrega; nadie edita ni borra; el técnico no agrega', async () => {
+  test('nadie edita ni borra una fila; un registro suelto o con otro id no pasa', async () => {
     const d = db('fa_admin');
-    const r = doc(collection(d, 'fichas_adjuntos_registro'));
-    await assertSucceeds(setDoc(r, registro({ accion: 'retiro' })));
+    const lt = 'RRRRRRRRRRssssssssss';
+    const r = doc(d, 'fichas_adjuntos_registro', ID + '_' + lt + '_retiro');
+    await assertSucceeds(setDoc(r, registro({ accion: 'retiro', lote: lt })));   // retiro sin meta: queda la fila
     await assertFails(updateDoc(r, { nombre: 'otro' }));
     await assertFails(deleteDoc(r));
-    await assertFails(setDoc(doc(collection(db('fa_tech'), 'fichas_adjuntos_registro')), registro({ subidoPor: { uid: 'fa_tech', nombre: 'Tecnico' } })));
-    await assertFails(setDoc(doc(collection(d, 'fichas_adjuntos_registro')), registro({ accion: 'borrado' })));
+    await assertFails(setDoc(doc(d, 'fichas_adjuntos_registro', ID + '_' + lt), registro({ accion: 'alta', lote: lt })));   // alta sin su meta
+    await assertFails(setDoc(doc(d, 'fichas_adjuntos_registro', 'cualquiera'), registro({ accion: 'retiro', lote: lt })));
+    await assertFails(setDoc(doc(db('fa_tech'), 'fichas_adjuntos_registro', ID + '_' + lt + 'x_retiro'), registro({ accion: 'retiro', lote: lt, subidoPor: { uid: 'fa_tech', nombre: 'Tecnico' } })));
   });
 });

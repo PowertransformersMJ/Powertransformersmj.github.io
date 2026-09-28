@@ -920,6 +920,9 @@ service cloud.firestore {
     // administradores con perfil; lo leen los miembros del equipo (exportan con
     // él). Nadie lista partes. Registro que SOLO se agrega y sin bytes.
     function rutaAdjunto(id) { return /databases/$(database)/documents/fichas_adjuntos/$(id); }
+    // Revisión de ADR-112: todo cambio deja su registro con id FIJO (sin él no hay
+    // cambio), como las firmas del equipo (ADR-099).
+    function rutaRegistroAdjunto(rid) { return /databases/$(database)/documents/fichas_adjuntos_registro/$(rid); }
     function autorAdjuntoValido(p) {
       return p is map && p.keys().hasOnly(['uid', 'nombre']) && p.keys().hasAll(['uid', 'nombre'])
         && p.uid == request.auth.uid && p.nombre == profile().get('nombre', '');
@@ -932,6 +935,8 @@ service cloud.firestore {
                             'tamano', 'partes', 'huella', 'lote', 'subidoPor', 'en'])
         && d.clave is string && d.clave.matches('^[MS]:.{1,80}$')
         && id == 'salud_' + hashing.sha256(d.clave).toHexString().lower()
+        && ((d.clave[0:2] == 'M:' && d.matricula == d.clave[2:d.clave.size()])
+            || (d.clave[0:2] == 'S:' && d.serie == d.clave[2:d.clave.size()]))
         && d.matricula is string && d.matricula.size() <= 80
         && d.serie is string && d.serie.size() <= 80
         && d.documento == 'salud'
@@ -952,9 +957,13 @@ service cloud.firestore {
     match /fichas_adjuntos/{id} {
       allow get:  if isTeamMember();
       allow list: if isAdmin() && request.query.limit <= 50;
-      allow create, update: if isAdmin() && hasProfile() && id.matches('^salud_[0-9a-f]{64}$') && metaAdjuntoValida(id);
-      // Quitar: la meta se va solo si en el mismo lote se van sus tres partes.
+      allow create, update: if isAdmin() && hasProfile() && id.matches('^salud_[0-9a-f]{64}$') && metaAdjuntoValida(id)
+                    && (resource == null || resource.data.lote != request.resource.data.lote)
+                    && existsAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote))
+                    && getAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote)).data.accion == (resource == null ? 'alta' : 'reemplazo');
+      // Quitar: la meta se va solo si en el mismo lote se van sus tres partes y queda su «retiro».
       allow delete: if isAdmin() && hasProfile()
+                    && existsAfter(rutaRegistroAdjunto(id + '_' + resource.data.lote + '_retiro'))
                     && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/0)
                     && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/1)
                     && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/2);
@@ -966,6 +975,8 @@ service cloud.firestore {
                       && request.resource.data.bytes.size() >= 1
                       && request.resource.data.bytes.size() <= 900 * 1024
                       && existsAfter(rutaAdjunto(id))
+                      // Una parte solo se escribe en la MISMA operación que cambia el lote de su meta.
+                      && (!exists(rutaAdjunto(id)) || get(rutaAdjunto(id)).data.lote != getAfter(rutaAdjunto(id)).data.lote)
                       && request.resource.data.lote == getAfter(rutaAdjunto(id)).data.lote
                       && int(n) < getAfter(rutaAdjunto(id)).data.partes;
         allow delete: if isAdmin() && hasProfile() && n in ['0', '1', '2']
@@ -976,11 +987,17 @@ service cloud.firestore {
       allow get:  if isAdmin();
       allow list: if isAdmin() && request.query.limit <= 50;
       allow create: if isAdmin() && hasProfile()
-                    && request.resource.data.keys().hasOnly(['idAdjunto', 'accion', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
-                    && request.resource.data.keys().hasAll(['idAdjunto', 'accion', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
+                    && request.resource.data.keys().hasOnly(['idAdjunto', 'accion', 'lote', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
+                    && request.resource.data.keys().hasAll(['idAdjunto', 'accion', 'lote', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
                     && request.resource.data.idAdjunto is string
                     && request.resource.data.idAdjunto.matches('^salud_[0-9a-f]{64}$')
                     && request.resource.data.accion in ['alta', 'reemplazo', 'retiro']
+                    && request.resource.data.lote is string && request.resource.data.lote.matches('^[A-Za-z0-9]{20}$')
+                    && rid == request.resource.data.idAdjunto + '_' + request.resource.data.lote + (request.resource.data.accion == 'retiro' ? '_retiro' : '')
+                    && (request.resource.data.accion == 'retiro'
+                        ? !existsAfter(rutaAdjunto(request.resource.data.idAdjunto))
+                        : (existsAfter(rutaAdjunto(request.resource.data.idAdjunto))
+                           && getAfter(rutaAdjunto(request.resource.data.idAdjunto)).data.lote == request.resource.data.lote))
                     && request.resource.data.nombre is string && request.resource.data.nombre.size() <= 120
                     && request.resource.data.huella is string && request.resource.data.huella.matches('^[0-9a-f]{64}$')
                     && request.resource.data.tamano is int && request.resource.data.tamano >= 0

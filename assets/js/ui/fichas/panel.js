@@ -2441,6 +2441,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const total = totalMantenimiento();
     for (const s of modalCuerpo.querySelectorAll('.ftm-hoja-foot > span:first-child')) {
       if (/^Pág\. [1-3] de [45]$/.test(s.textContent)) s.textContent = s.textContent.replace(/de [45]$/, 'de ' + total);
+      else if (/^Pág\. 5 de 5$|^Sin adjunto/.test(s.textContent)) s.textContent = pieOperativo();
     }
   }
 
@@ -2450,15 +2451,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const eq = actual; const k = claveEquipo(eq);
     if (OPERATIVO.has(k)) return;
     OPERATIVO.set(k, null);
+    let ident = null;
     identidadAdjunto(eq)
-      .then((ident) => (ident ? cfg.adjuntos.leerMeta(ident.id) : { hay: false }))
+      .then((i) => { ident = i; return i ? cfg.adjuntos.leerMeta(i.id) : { hay: false }; })
       .then((r) => {
         if (r.error) { OPERATIVO.delete(k); return; }
-        OPERATIVO.set(k, r.hay ? r.meta : null);
+        const propio = r.hay && ident && mismaIdentidad({ clave: r.meta.clave, matricula: r.meta.matricula, serie: r.meta.serie }, ident);
+        OPERATIVO.set(k, propio ? r.meta : null);
         if (actual === eq) actualizarPiesOperativo();
       })
       .catch(() => OPERATIVO.delete(k));
   }
+
+  const pieOperativo = () => (actual && OPERATIVO.get(claveEquipo(actual)) ? 'Pág. 5 de 5' : 'Sin adjunto: no sale en el Excel');
 
   function hojaOperativo() {
     return '<div class="ftm-hoja">'
@@ -2468,7 +2473,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '<div class="ftm-op" data-ftm-operativo>'
       +   (cfg.adjuntos ? '' : '<div class="ftm-aviso">El Diagrama Operativo no está disponible en esta página.</div>')
       + '</div>'
-      + pieHoja('Pág. 5 de 5', 'PE.02081.PE-FO.03 Ed.01 · Ficha Técnica Planificación Red')
+      + pieHoja(pieOperativo(), 'PE.02081.PE-FO.03 Ed.01 · Ficha Técnica Planificación Red')
       + '</div>';
   }
 
@@ -2499,10 +2504,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const ident = await identidadAdjunto(eq);
     if (!ident) return { nada: true };
     const r = await cfg.adjuntos.leerMeta(ident.id);
-    if (r.error) return { error: 'No se pudo comprobar si esta ficha tiene Diagrama Operativo (revise la conexión).' };
+    if (r.error) return { error: r.mensaje || 'No se pudo comprobar si esta ficha tiene Diagrama Operativo (revise la conexión).' };
     const k = claveEquipo(eq);
     if (!r.hay) { OPERATIVO.set(k, null); return { nada: true }; }
-    if (!mismaIdentidad({ clave: r.meta.clave, matricula: r.meta.matricula, serie: r.meta.serie }, ident)) return { nada: true };
+    if (!mismaIdentidad({ clave: r.meta.clave, matricula: r.meta.matricula, serie: r.meta.serie }, ident)) {
+      OPERATIVO.set(k, null); if (actual === eq) actualizarPiesOperativo();
+      return { nada: true };
+    }
     OPERATIVO.set(k, r.meta);
     const img = await cfg.adjuntos.leerImagen(ident.id, r.meta);
     if (img.error) return { error: img.mensaje || 'No se pudo leer el Diagrama Operativo.' };
@@ -4017,6 +4025,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const opEq = await operativoParaExportar(eq);
       if (opEq.error) { alert(opEq.error + '\n\nNo se emitió.'); return; }
       if (opEq.datos) { if (!exportadorConOperativo(mod)) { alert(AVISO_RECARGAR); return; } estado.diagramaOperativo = opEq.datos; }
+      const avisosEmision = [];
       const idEmision = cfg.firmasEquipo.nuevaEmisionId();
       const folio = folioDeEmision(idEmision);
       const firmas = {};
@@ -4038,7 +4047,11 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       }
       if (!casillas.length) { cerrarEmision(); return; }
       estado.firmas = firmas;
-      const blob = await mod.exportarFichaPlanificacion(eq, estado);
+      const blob = await mod.exportarFichaPlanificacion(eq, estado, { avisos: avisosEmision });
+      // Un papel con folio no sale sin la hoja que debía llevar (revisión de `99 §112`).
+      if (estado.diagramaOperativo && avisosEmision.some((a) => /Diagrama Operativo/.test(a))) {
+        throw new Error('La hoja «Diagrama Operativo» no se pudo armar; no se emitió.');
+      }
       const huellaArchivo = await huellaBytes(new Uint8Array(await blob.arrayBuffer()));
       const base = nombreDelArchivo(mod, eq);
       const nombre = base.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx';
@@ -4199,7 +4212,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // pudo comprobar o leer, se pregunta (nunca se descarga incompleto en silencio).
       const op = await operativoParaExportar(eq);
       if (actual !== eq) return;
-      if (op.error && !globalThis.confirm(op.error + '\n\nPulse Aceptar para descargar SIN la hoja «Diagrama Operativo», o Cancelar para intentar de nuevo.')) return;
+      const sinOperativo = !!op.error;
+      if (op.error && !globalThis.confirm(op.error + '\n\nPulse Aceptar para descargar SIN la hoja «Diagrama Operativo»'
+        + (custodiaDisponible() ? ' (sale solo con su firma y sin folio: un papel con folio no sale incompleto)' : '') + ', o Cancelar para intentar de nuevo.')) return;
       if (op.datos) {
         if (!exportadorConOperativo(mod)) { alert(AVISO_RECARGAR); return; }
         estado.diagramaOperativo = op.datos;
@@ -4208,11 +4223,16 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // cinco»; ya había dicho «yo autorizo verbalmente», §99.11). Solo el custodio
       // las lee; cada imagen se comprueba contra la huella registrada al subirla y
       // cada descarga con firmas del equipo queda registrada con su folio.
-      const registro = await firmasDelEquipoEnEstado(eq, estado);
+      const registro = sinOperativo ? null : await firmasDelEquipoEnEstado(eq, estado);
       if (registro === false || actual !== eq) return;
       // Lo que el exportador no pudo dibujar (la matriz de «Salud y riesgo», `99 §107`).
       const avisosExcel = [];
       let blob = await mod.exportarFichaPlanificacion(eq, estado, { avisos: avisosExcel });
+      // Con folio, el papel no sale sin la hoja «Diagrama Operativo» que debía llevar (`99 §112`).
+      if (registro && estado.diagramaOperativo && avisosExcel.some((a) => /Diagrama Operativo/.test(a))) {
+        alert('La hoja «Diagrama Operativo» no se pudo armar, así que no se emitió el Excel con folio. Vuelva a intentarlo.');
+        return;
+      }
       let nombre = mod.nombreArchivoFicha
         ? nombreDelArchivo(mod, eq)
         : 'Ficha_Planificacion.xlsx';

@@ -41,21 +41,49 @@ function medidor() {
   return (texto, f) => String(texto).length * f.sz * PX_PT * (f.b ? 0.6 : 0.55);
 }
 
+/** ¿Esta celda es una marca de calendario? fecha · número de día/semana · «S1», «Sem 2», «Semana 3». */
+function marcaCalendario(c) {
+  if (c.esFecha) return { tipo: 'fecha' };
+  const t = String(c.texto || '').trim();
+  if (c.esNumero && /^\d{1,2}$/.test(t)) return { tipo: 'num', n: +t };
+  const m = t.match(/^(?:S|Sem\.?|Semana)\s*(\d{1,2})$/i);
+  if (m) return { tipo: 'sem', n: +m[1] };
+  return null;
+}
+/** Un tramo de números es de calendario si avanza de a 1 (y puede volver a 1 tras 28-31). */
+function secuenciaValida(marcas) {
+  if (marcas[0].tipo === 'fecha') return marcas.every((m) => m.tipo === 'fecha');
+  for (let i = 1; i < marcas.length; i++) {
+    const a = marcas[i - 1]; const b = marcas[i];
+    if (b.tipo !== a.tipo) return false;
+    if (b.n !== a.n + 1 && !(b.n === 1 && a.n >= 28)) return false;
+  }
+  return true;
+}
+
 /**
- * La fila de FECHAS seguidas de un cronograma (≥ 7 columnas), o null.
+ * La fila de CALENDARIO de un cronograma (≥ 7 columnas seguidas de fechas, días
+ * numerados o semanas) en el encabezado —antes de la primera fila con barras—, o null.
  * @returns {{fila:number, c0:number, c1:number}|null}
  */
 export function calendarioDe(modelo) {
+  const filasBarras = modelo.celdas.filter((c) => c.relleno && !c.texto).map((c) => c.r);
+  const tope = Math.max(12, Math.min(40, filasBarras.length ? Math.min(...filasBarras) + 1 : 40));
   const porFila = new Map();
-  for (const c of modelo.celdas) if (c.esFecha && c.r < 12) { if (!porFila.has(c.r)) porFila.set(c.r, new Set()); porFila.get(c.r).add(c.c); }
+  for (const c of modelo.celdas) {
+    if (c.r >= tope) continue;
+    const m = marcaCalendario(c); if (!m) continue;
+    if (!porFila.has(c.r)) porFila.set(c.r, new Map());
+    porFila.get(c.r).set(c.c, m);
+  }
   let mejor = null;
   for (const [r, cols] of porFila) {
-    const orden = [...cols].sort((a, b) => a - b);
+    const orden = [...cols.keys()].sort((a, b) => a - b);
     let i0 = 0;
     for (let i = 1; i <= orden.length; i++) {
-      if (i === orden.length || orden[i] !== orden[i - 1] + 1) {
-        const largo = i - i0;
-        if (largo >= 7 && (!mejor || largo > mejor.c1 - mejor.c0 + 1)) mejor = { fila: r, c0: orden[i0], c1: orden[i - 1] };
+      if (i === orden.length || orden[i] !== orden[i - 1] + 1 || !secuenciaValida([cols.get(orden[i - 1]), cols.get(orden[i])])) {
+        const tramo = orden.slice(i0, i);
+        if (tramo.length >= 7 && secuenciaValida(tramo.map((k) => cols.get(k))) && (!mejor || tramo.length > mejor.c1 - mejor.c0 + 1)) mejor = { fila: r, c0: tramo[0], c1: tramo[tramo.length - 1] };
         i0 = i;
       }
     }
@@ -86,12 +114,13 @@ export function planoHomologado(modelo, caja, medir = medidor()) {
   const vertical = new Set();
   let compactado = false;
   if (cal && sz * escala(W0, H0) * ESCALA_IMPRESION < LETRA_MINIMA) {
-    const n = cal.c1 - cal.c0 + 1;
+    let n = 0; for (let c = cal.c0; c <= cal.c1; c++) if (columnas[c] > 0) n++;
     let otras = 0; for (let c = 0; c < columnas.length; c++) if (c < cal.c0 || c > cal.c1) otras += columnas[c];
     // Ancho total que llena el marco a la escala que permite el alto.
     const libre = caja.w / Math.min(1, caja.h / H0) - otras;
-    const ancho = Math.max(ANCHO_MIN_DIA, Math.min(columnas[cal.c0] || ANCHO_MIN_DIA, Math.floor(libre / n)));
-    for (let c = cal.c0; c <= cal.c1; c++) columnas[c] = ancho;
+    const natural = Math.max(...columnas.slice(cal.c0, cal.c1 + 1));
+    const ancho = Math.max(ANCHO_MIN_DIA, Math.min(natural || ANCHO_MIN_DIA, Math.floor(libre / Math.max(1, n))));
+    for (let c = cal.c0; c <= cal.c1; c++) if (columnas[c] > 0) columnas[c] = ancho;   // las ocultas siguen ocultas
     // La fecha en vertical: la fila necesita el largo de «00/00» más aire.
     const f = (modelo.celdas.find((q) => q.r === cal.fila && q.c === cal.c0) || {}).fuente || { sz, nombre: 'Arial' };
     filas[cal.fila] = Math.max(filas[cal.fila], Math.ceil(medir('00/00', f) + 12));
@@ -128,13 +157,13 @@ export function svgDeHoja(modelo, plano, medir = medidor()) {
   const partes = []; const recortes = []; let nRec = 0;
   const celdaEn = new Map(modelo.celdas.map((c) => [c.r + ',' + c.c, c]));
   // Combinadas: la esquina manda (texto, relleno); las de adentro no pintan texto.
-  const comb = new Map(); const dentro = new Set();
+  const comb = new Map(); const dentro = new Set(); const deCelda = new Map();
   for (const g of modelo.combinadas) {
     comb.set(g.r0 + ',' + g.c0, g);
-    for (let r = g.r0; r <= g.r1; r++) for (let c = g.c0; c <= g.c1; c++) if (r !== g.r0 || c !== g.c0) dentro.add(r + ',' + c);
+    for (let r = g.r0; r <= g.r1; r++) for (let c = g.c0; c <= g.c1; c++) { const k = r + ',' + c; if (!deCelda.has(k)) deCelda.set(k, g); if (r !== g.r0 || c !== g.c0) dentro.add(k); }
   }
   const rect = (r, c) => { const g = comb.get(r + ',' + c); return g ? { x: X[g.c0], y: Y[g.r0], w: X[g.c1 + 1] - X[g.c0], h: Y[g.r1 + 1] - Y[g.r0] } : { x: X[c], y: Y[r], w: columnas[c], h: filas[r] }; };
-  const combinadaDe = (r, c) => modelo.combinadas.find((g) => r >= g.r0 && r <= g.r1 && c >= g.c0 && c <= g.c1) || null;
+  const combinadaDe = (r, c) => deCelda.get(r + ',' + c) || null;
 
   // 1) Rellenos.
   for (const c of modelo.celdas) {
@@ -169,7 +198,7 @@ export function svgDeHoja(modelo, plano, medir = medidor()) {
     const id = 'r' + (nRec++);
     if (plano.vertical.has(c.r + ',' + c.c)) {
       // Fecha del calendario en vertical («13/07»), de abajo hacia arriba.
-      const t = c.fecha ? String(c.fecha.getUTCDate()).padStart(2, '0') + '/' + String(c.fecha.getUTCMonth() + 1).padStart(2, '0') : c.texto;
+      const t = c.fecha ? String(c.fecha.getUTCDate()).padStart(2, '0') + '/' + String(c.fecha.getUTCMonth() + 1).padStart(2, '0') : String(c.texto).trim();
       recortes.push('<clipPath id="' + id + '"><rect x="' + n2(b.x) + '" y="' + n2(b.y) + '" width="' + n2(b.w) + '" height="' + n2(b.h) + '"/></clipPath>');
       const cx = b.x + b.w / 2; const cy = b.y + b.h / 2;
       partes.push('<g clip-path="url(#' + id + ')"><text x="' + n2(cx) + '" y="' + n2(cy) + '" transform="rotate(-90 ' + n2(cx) + ' ' + n2(cy) + ')" text-anchor="middle" dominant-baseline="central"' + estilo + '>' + escXml(t) + '</text></g>');
@@ -210,7 +239,9 @@ export function svgDeHoja(modelo, plano, medir = medidor()) {
   }
   for (const g of modelo.imagenes || []) {
     if (!/^image\/(png|jpeg|gif)$/.test(g.mime) || !/^[A-Za-z0-9+/=]+$/.test(g.base64 || '')) continue;
-    const x0 = mapX(g.x); const y0 = mapY(g.y); const w = mapX(g.x + g.w) - x0; const h = mapY(g.y + g.h) - y0;
+    let x0 = mapX(g.x); let y0 = mapY(g.y); let w = mapX(g.x + g.w) - x0; let h = mapY(g.y + g.h) - y0;
+    const prop = g.w / g.h;   // la proporción con que Excel la muestra
+    if (w / h > prop + 1e-6) { const nw = h * prop; x0 += (w - nw) / 2; w = nw; } else if (w / h < prop - 1e-6) { const nh = w / prop; y0 += (h - nh) / 2; h = nh; }
     const rc = g.recorte || { l: 0, t: 0, r: 0, b: 0 };
     const vw = Math.max(0.01, 1 - rc.l - rc.r); const vh = Math.max(0.01, 1 - rc.t - rc.b);
     partes.push('<svg x="' + n2(x0) + '" y="' + n2(y0) + '" width="' + n2(w) + '" height="' + n2(h) + '" viewBox="' + n2(rc.l) + ' ' + n2(rc.t) + ' ' + n2(vw) + ' ' + n2(vh) + '" preserveAspectRatio="none">'
