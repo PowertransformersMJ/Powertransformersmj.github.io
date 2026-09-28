@@ -62,6 +62,8 @@ import {
 import { redaccionBeneficiosPracticas } from '../../domain/beneficios_practicas.js';
 // Las 13 acciones del Ingeniero para Beneficios de Mantenimiento (`99 §105`).
 import { redaccionBeneficiosAcciones, ACCIONES_BENEFICIO } from '../../domain/beneficios_acciones_mtto.js';
+// La zona del activo (BOLIVAR / ORIENTE / OCCIDENTE), no su departamento (`99 §106`).
+import { zonaDelActivo } from '../../domain/fichas_zona.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
   claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas,
@@ -141,13 +143,15 @@ export const HOJAS_FICHA = Object.freeze([
  * Va tercera, no al final: primero qué se hace y para qué, y enseguida la
  * evidencia. De última habría quedado como un anexo que nadie abre.
  */
+// Sin «Anexo AT» (`99 §107`, decisión del Ingeniero: «no necesito que salga la
+// hoja de anexo AT en fichas técnicas por mantenimiento especializado»). El PI
+// la conserva. En el Excel de Mantenimiento su lugar lo toma «Salud y riesgo».
 export const HOJAS_SALUD = Object.freeze([
   { id: 'ficha',   t: 'Ficha Técnica' },
   { id: 'benef',   t: 'Beneficios' },
   { id: 'salud',   t: 'Salud y riesgo' },
   { id: 'diagA',   t: 'Diagrama Actual' },
   { id: 'diagF',   t: 'Diagrama Futuro' },
-  { id: 'anexoAT', t: 'Anexo AT' },
   { id: 'plan',    t: 'Plan de acciones', anexo: true }
 ]);
 
@@ -2131,7 +2135,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     $('[data-ftm="vista-previa"]').hidden = false;
     // Con firmas del equipo: solo el custodio (`§99`).
     emision = null;
-    $('[data-ftm="exportar-equipo"]').hidden = !custodiaDisponible();
+    // Desde `99 §108` «Exportar Excel» lleva SIEMPRE las cinco firmas (decisión
+    // del Ingeniero: «Siempre las cinco»); este botón quedaría repetido y con su
+    // bloqueo por [PENDIENTE] confundía. Se oculta; su código se conserva.
+    $('[data-ftm="exportar-equipo"]').hidden = true;
 
     modalTabs.innerHTML = hojasDe(documento).map((h) =>
       '<button type="button" role="tab" class="ftm-modal-tipo-btn' + (hoja === h.id ? ' is-on' : '')
@@ -2328,6 +2335,83 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   esc(numES(maxU, 0)) + ' usuarios · ancho de banda ' + esc(numES(Math.floor((maxU - 1) / 5), 0))
       +   ' · corte ' + esc(new Date().toLocaleDateString('es-CO')) + '.</p>'
       + '</div>';
+  }
+
+  /**
+   * Lo que dibuja la hoja «Salud y riesgo» del Excel (`99 §107`), con los MISMOS
+   * cálculos y palabras que `hojaSaludRiesgo`: rangos sobre todo el parque,
+   * casilla de la norma, colores de `COLORES_CELDA`. Solo datos: el dibujo lo hace
+   * `salud-riesgo-excel.js`.
+   */
+  function modeloSaludRiesgo(e) {
+    const hi = e.cond_int;
+    const usuarios = e.usuarios;
+    const mva = e.mva;
+    let maxU = 1;
+    for (const x of EQUIPOS) {
+      const u = Number(x.usuarios);
+      if (isFinite(u) && u > maxU) maxU = u;
+    }
+    const rangos = calcularRangosCriticidad(maxU);
+    const nivel = nivelPorUsuarios(usuarios, rangos);
+    const color = (hi != null && nivel) ? colorCelda(hi, nivel) : null;
+    const banda = bandaPotencia(mva);
+    const nivelPot = nivelPorPotencia(mva);
+    const avisoDato = avisoDatoConsecuencia(usuarios, mva);
+    const NOMBRE_HI = { 5: '5 · Muy pobre', 4: '4 · Pobre', 3: '3 · Medio', 2: '2 · Bueno', 1: '1 · Muy bueno' };
+    const VEREDICTO = { VRD: 'Riesgo tolerable', AMRL: 'Atención', NAR: 'Riesgo alto', ROJ: 'Riesgo crítico' };
+    const hexDe = (c) => (COLORES_CELDA[c] && COLORES_CELDA[c].hex) || null;
+    const cuentaParque = conteoPorNivel(EQUIPOS.map((x) => x.usuarios), rangos);
+    const rangoTxt = (i) => (rangos[i] ? numES(rangos[i].min, 0) + '–' + numES(rangos[i].max, 0) : '');
+    const sinDato = (hi == null || !nivel);
+    return {
+      titulo: 'Salud del activo y posición en la matriz de riesgo · ' + (e.subestacion || '')
+        + ' · ' + (e.matricula || e.serie || ''),
+      kpis: [
+        { valor: hi != null ? String(hi) : '—', sub: hi != null ? nombreCondicion(hi) : 'sin dato',
+          etiqueta: 'Condición del activo', tinta: hi != null ? colorCondicion(hi) : null,
+          rol: hi != null ? 'fila ' + hi + ' de la matriz' : '' },
+        { valor: usuarios != null ? numES(usuarios, 0) : '—',
+          sub: nivel ? 'criticidad ' + LABELS_NIVEL[nivel] : 'sin clasificar',
+          etiqueta: 'Usuarios aguas abajo', tinta: null, rol: nivel ? 'columna ' + LABELS_NIVEL[nivel] : '' },
+        { valor: mva != null ? mvaTxt(mva) : '—',
+          sub: mva != null ? 'MVA' + (banda ? ' · banda ' + banda.etiqueta : '') : 'sin dato de placa',
+          etiqueta: 'Capacidad comprometida', tinta: null, rol: 'se muestra: no mueve la casilla' },
+        { valor: color ? (VEREDICTO[color] || color) : '—',
+          sub: color ? ((COLORES_CELDA[color] || {}).label || '') + ' · MO.00418 Tabla 11' : 'falta condición o usuarios',
+          etiqueta: 'Veredicto de riesgo', tinta: color ? hexDe(color) : null,
+          rol: color ? 'resultado de fila × columna' : '' }
+      ],
+      definicion: hi != null ? 'Condición ' + hi + ' · ' + nombreCondicion(hi) + '. ' + definicionCondicion(hi) : '',
+      avisoSinDato: sinDato ? 'Este equipo no se puede situar en la matriz. Falta '
+        + (hi == null ? 'la condición' : 'el número de usuarios aguas abajo')
+        + ': sin ese dato no hay posición que mostrar, y una casilla marcada al azar sería peor que ninguna.' : '',
+      columnas: NIVELES_ORDEN.map((n, i) => ({ etiqueta: (i + 1) + ' · ' + LABELS_NIVEL[n],
+        rango: rangoTxt(i) + ' · ' + cuentaParque[n] + ' eq.' })),
+      filas: [1, 2, 3, 4, 5].map((f) => ({ nombre: NOMBRE_HI[f], celdas: NIVELES_ORDEN.map((n) => {
+        const c = colorCelda(f, n);
+        return { hex: hexDe(c) || '#e9eef4', tinta: c === 'AMRL' ? '#10202c' : '#ffffff', aqui: f === hi && n === nivel };
+      }) })),
+      marca: sinDato ? null : { mva: mva != null ? mvaTxt(mva) + ' MVA' : 'sin MVA',
+        usuarios: usuarios != null ? numES(usuarios, 0) + ' usuario' + (Math.round(usuarios) === 1 ? '' : 's') : 'usuarios sin dato',
+        punto: banda ? banda.punto : null },
+      hayMarca: !sinDato,
+      leyenda: Object.keys(COLORES_CELDA).map((k) => ({ hex: hexDe(k), texto: VEREDICTO[k] || k })),
+      puntos: BANDAS_POTENCIA.map((b) => b.punto),
+      potenciaLeyenda: 'Tamaño del punto: potencia (' + BANDAS_POTENCIA[0].etiqueta + ' … '
+        + BANDAS_POTENCIA[BANDAS_POTENCIA.length - 1].etiqueta + ')',
+      avisoDato: avisoDato ? 'Ojo con el dato de usuarios. ' + avisoDato : '',
+      lectura: (nivelPot && nivel) ? 'Lectura por potencia (informativa, no normativa). Este equipo pesa '
+        + mvaTxt(mva) + ' MVA (banda ' + banda.etiqueta + '). Si la consecuencia se midiera por potencia en vez de por '
+        + 'usuarios, su columna sería ' + LABELS_NIVEL[nivelPot]
+        + (nivelPot === nivel ? ' — la misma en la que ya está.'
+          : ', en vez de ' + LABELS_NIVEL[nivel] + '. La casilla firmada sigue siendo la de la norma.') : '',
+      nota: 'La casilla sale de la norma: condición (fila) × usuarios aguas abajo (columna), en cinco rangos '
+        + 'calculados sobre TODO el parque — por eso este equipo cae en la misma casilla aquí y en la matriz de '
+        + 'Analítica gerencial. La potencia se muestra junto a la posición y no la mueve. Rangos sobre '
+        + EQUIPOS.length + ' equipos · máximo del parque ' + numES(maxU, 0) + ' usuarios · ancho de banda '
+        + numES(Math.floor((maxU - 1) / 5), 0) + ' · corte ' + new Date().toLocaleDateString('es-CO') + '.'
+    };
   }
 
   function cuerpoHoja(e, cual) {
@@ -3251,8 +3335,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const propias = firmaSesion.dataUrl ? casillasDeLaSesion(P, firmaSesion.nombre).map(rolDe) : [];
       return (propias.length ? 'Su firma va en ' + propias.join(' y ') + '; '
         : (firmaSesion.dataUrl ? '' : 'Su firma propia no está cargada (súbala en «Mi firma»); '))
-        + 'las del equipo, en ' + [...new Set(delEquipo)].join(', ') + '. En el Excel, todas salen con '
-        + '«Descargar con firmas del equipo»; «Exportar Excel» sale solo con la suya.' + noLeidas;
+        + 'las del equipo, en ' + [...new Set(delEquipo)].join(', ') + '. En el Excel salen todas con '
+        + '«Exportar Excel», y cada descarga queda registrada con su folio.' + noLeidas;
     }
     if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
       + 'puede subirla en «Mi firma», en esta página. Mientras tanto la ficha sale para firmar a mano.' + noLeidas;
@@ -3344,7 +3428,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + '</div>'
       + banda('Emplazamiento físico del proyecto')
       + '<div class="ftm-hoja-grid2">'
-      +   campoTexto('Zona', e.departamento)
+      +   campoTexto('Zona', zonaDelActivo(e))
       +   campoTexto('Subestación', e.subestacion)
       +   campoInput('Municipio', 'municipio', lleno(P.municipio) ? P.municipio : (e.municipio || ''), '(municipio)')
       +   '<div class="ftm-campo"><span class="ftm-campo-lbl"></span><span class="ftm-campo-val"></span></div>'
@@ -3602,6 +3686,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       uuccDecidida: e.uucc_calculada || '',
       // La casilla BENEFICIOS crece con su texto solo en Mantenimiento (`99 §105`).
       crecerBeneficios: documento === 'salud',
+      // Mantenimiento: la hoja «Salud y riesgo» va al Excel en lugar del Anexo AT (`99 §107`).
+      saludRiesgo: documento === 'salud' ? modeloSaludRiesgo(e) : undefined,
       // Solo las casillas de la sesión; nunca se guarda en el borrador (`§98`).
       firmas: Object.fromEntries(casillasConFirma(e)
         .map((k) => [k, { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel }]))
@@ -3886,7 +3972,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    * Vista previa del Excel (`99 §102`): se arma el MISMO archivo que se
    * descargaría y se muestra hoja por hoja, con lo que viaja oculto. No descarga
    * ni registra nada. Para el custodio lleva las firmas del equipo (lo que sale
-   * con «Descargar con firmas del equipo»); si no, la de la sesión.
+   * con «Exportar Excel», `99 §108`); si no, la de la sesión.
    */
   async function abrirVistaPrevia() {
     if (!actual || cfg.exportador) return;
@@ -3911,14 +3997,12 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       }
       if (actual !== eq) return;
       const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
-      avisos.unshift(conEquipo
-        ? 'Así sale con «Descargar con firmas del equipo». «Exportar Excel» sale igual, pero solo con su firma.'
-        : 'Así sale con «Exportar Excel».');
+      avisos.unshift('Así sale con «Exportar Excel»' + (conEquipo ? ', con las firmas del equipo.' : '.'));
       if (faltan.length) {
-        avisos.push('Casillas [PENDIENTE]: ' + faltan.map((f) => f.campos.join(' y ')).join(' · ') + '.'
-          + (conEquipo ? ' Con ellas no se puede descargar con firmas del equipo.' : ''));
+        avisos.push('Casillas [PENDIENTE]: ' + faltan.map((f) => f.campos.join(' y ')).join(' · ') + '.');
       }
-      const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array' });
+      // Lo que el exportador no pudo dibujar se dice aquí también (`99 §107`).
+      const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array', avisos });
       const { leerLibroParaVista, mostrarVistaPrevia, cargarJSZip } = await import('./vista-previa-excel.js');
       const JSZip = await cargarJSZip();
       const modelo = await leerLibroParaVista(await JSZip.loadAsync(bytes));
@@ -3936,6 +4020,43 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     }
   }
 
+  /**
+   * Estampa en `estado.firmas` las firmas del equipo que pide la ficha (y la de la
+   * sesión), con la misma lógica que la emisión del equipo (§99): huella de los
+   * BYTES contra la registrada, lectura fallida ≠ «no tiene firma». Devuelve
+   * { idEmision, casillas } si entró alguna firma del equipo, null si no aplica
+   * (no es custodio) y false si el Ingeniero canceló o una firma no es la suya.
+   */
+  async function firmasDelEquipoEnEstado(eq, estado) {
+    if (!custodiaDisponible()) return null;
+    const { lecturas, fallidas } = await leerFirmasEquipo(estadoDe(eq).plan);
+    if (fallidas.length && !globalThis.confirm('No se pudo leer la firma de '
+      + fallidas.map((id) => nombreDePersona(id)).join(', ') + ' (revise la conexión).\n\n'
+      + 'Pulse Aceptar para descargar sin ' + (fallidas.length === 1 ? 'esa firma' : 'esas firmas')
+      + ', o Cancelar para intentar de nuevo.')) return false;
+    const plan = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
+    const casillas = [];
+    for (const c of plan) {
+      if (c.origen === 'propia' && firmaSesion.dataUrl) {
+        estado.firmas[c.k] = { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel };
+        casillas.push({ k: c.k, persona: c.id || '', nombre: c.nombre, origen: 'propia', huella: await huellaDataUrl(firmaSesion.dataUrl) });
+      } else if (c.origen === 'equipo') {
+        const l = lecturas.get(c.id);
+        if (!l) continue;
+        const huella = await huellaDataUrl(l.dataUrl);
+        if (huella !== l.huella) {
+          alert('La firma de ' + c.nombre + ' no es la que se registró al subirla; no se descargó. '
+            + 'Revísela en «Firmas del equipo».');
+          return false;
+        }
+        estado.firmas[c.k] = { dataUrl: l.dataUrl, rel: await medirFirma(l.dataUrl) };
+        casillas.push({ k: c.k, persona: c.id, nombre: c.nombre, origen: 'equipo', huella });
+      }
+    }
+    if (!casillas.some((c) => c.origen === 'equipo')) return null;
+    return { idEmision: cfg.firmasEquipo.nuevaEmisionId(), casillas };
+  }
+
   async function exportarExcel() {
     if (!actual) return;
     const btn = $('[data-ftm="exportar"]');
@@ -3949,17 +4070,54 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // La firma se vuelve a pedir justo antes de armar el Excel: si la sesión
       // se cerró en otra pestaña, ya no hay firma que estampar (revisión §98).
       await cargarFirmaSesion();
-      const estado = estadoParaExportar(actual);
+      const eq = actual;
+      const estado = estadoParaExportar(eq);
       // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo
       // se pregunta si falta algo: preguntar por costumbre enseña a decir que sí
       // sin leer.
-      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(actual, estado) : [];
+      const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
       if (faltan.length && !globalThis.confirm(avisoPendientes(faltan))) return;
-      const blob = await mod.exportarFichaPlanificacion(actual, estado);
-      const nombre = mod.nombreArchivoFicha
-        ? nombreDelArchivo(mod, actual)
+      // Las cinco firmas SIEMPRE (`99 §108`, decisión del Ingeniero: «Siempre las
+      // cinco»; ya había dicho «yo autorizo verbalmente», §99.11). Solo el custodio
+      // las lee; cada imagen se comprueba contra la huella registrada al subirla y
+      // cada descarga con firmas del equipo queda registrada con su folio.
+      const registro = await firmasDelEquipoEnEstado(eq, estado);
+      if (registro === false || actual !== eq) return;
+      // Lo que el exportador no pudo dibujar (la matriz de «Salud y riesgo», `99 §107`).
+      const avisosExcel = [];
+      let blob = await mod.exportarFichaPlanificacion(eq, estado, { avisos: avisosExcel });
+      let nombre = mod.nombreArchivoFicha
+        ? nombreDelArchivo(mod, eq)
         : 'Ficha_Planificacion.xlsx';
+      if (registro) {
+        const folio = folioDeEmision(registro.idEmision);
+        const huellaArchivo = await huellaBytes(new Uint8Array(await blob.arrayBuffer()));
+        // Sin registro no hay descarga con firmas del equipo: la trazabilidad es la condición (§99).
+        let registrada = true;
+        try {
+          await cfg.firmasEquipo.registrarEmision(registro.idEmision, {
+            equipo: { matricula: eq.matricula || '', subestacion: eq.subestacion || '', serie: eq.serie || '' },
+            casillas: registro.casillas, huellaArchivo
+          });
+        } catch (errReg) {
+          console.warn('[fichas/panel] no se registró la emisión:', errReg);
+          registrada = false;
+        }
+        if (registrada) {
+          nombre = nombre.replace(/\.xlsx$/i, '') + '_' + folio + '.xlsx';
+          fijarAviso('<div class="ftm-nota">' + esc('Emisión ' + folio + ' registrada: el Excel salió con las firmas del equipo.') + '</div>');
+        } else {
+          // Lo que ya servía no se pierde (`99 §108`): antes «Exportar Excel» siempre
+          // entregaba el archivo con la firma de la sesión. Sin registro, esa es la salida.
+          if (!globalThis.confirm('No se pudo registrar la descarga con las firmas del equipo (revise la conexión). '
+            + 'Sin registro no sale con ellas.\n\nPulse Aceptar para descargarlo solo con su firma, '
+            + 'o Cancelar para intentar de nuevo.') || actual !== eq) return;
+          avisosExcel.length = 0;
+          blob = await mod.exportarFichaPlanificacion(eq, estadoParaExportar(eq), { avisos: avisosExcel });
+        }
+      }
       cfg.descargar(blob, nombre);
+      if (avisosExcel.length) alert(avisosExcel.join('\n\n'));
     } catch (err) {
       console.warn('[fichas/panel] la exportación falló:', err);
       alert('No se pudo generar la ficha en Excel.\n\n' + (err && err.message ? err.message : err));

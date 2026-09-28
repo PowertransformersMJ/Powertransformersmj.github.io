@@ -39,6 +39,8 @@ import { tamanoFirma, FIRMA_PAPEL } from '../../domain/firmas_tamano.js';
 import { fechaParaPapel } from '../../domain/fichas_fechas.js';
 import { limpiarOcultos } from './limpiar-ocultos.js';
 import { ajustarAltoCasilla } from './alto-casilla.js';
+import { zonaDelActivo } from '../../domain/fichas_zona.js';
+import { svgSaludRiesgo, cajaSaludRiesgo, svgAPng, montarHojaSaludRiesgo } from './salud-riesgo-excel.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -312,7 +314,8 @@ export function celdasFichaPlan(equipo = {}, estado = {}) {
     { cell: 'H8',  campo: 'Consecutivo', val: txt(plan.consecutivo), clear: !lleno(plan.consecutivo), pend: false },
     { cell: 'D9',  campo: 'Cód estudio/tarea', val: txt(plan.codestudio), clear: !lleno(plan.codestudio), pend: false },
     { cell: 'H9',  campo: 'Ámbito', val: 'Media Tensión / Alta Tensión', pend: false },
-    { cell: 'D13', campo: 'Zona', val: txt(equipo.departamento), pend: false },
+    // La ZONA del activo, no su departamento (`99 §106`).
+    { cell: 'D13', campo: 'Zona', val: txt(zonaDelActivo(equipo)), pend: false },
     { cell: 'H13', campo: 'Subestación', val: txt(equipo.subestacion), pend: false },
     { cell: 'D14', campo: 'Municipio', val: (lleno(municipio) ? municipio : '[PENDIENTE: MUNICIPIO]'), pend: !lleno(municipio),
       motivo: 'Falta el municipio.' },
@@ -991,6 +994,29 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       if (png) zip.file(IMG_DIAG_FUTURO, png);
     }
   } catch (e) { /* los diagramas quedan como en la plantilla */ }
+
+  // 7b) Mantenimiento: la hoja «Salud y riesgo» (matriz de riesgo) en el lugar
+  //     del «Anexo AT» (`99 §107`). Si la imagen no se puede dibujar, la hoja sale
+  //     igual con un aviso en el marco (el Anexo AT no vuelve); solo si el marco
+  //     mismo no se puede armar queda el Anexo AT. Nunca se deja de emitir, y en
+  //     los dos casos se le avisa a quien descarga (`opts.avisos`), no solo a la consola.
+  if (estado.saludRiesgo) {
+    let conImagen = false; let montada = false;
+    try {
+      const caja = cajaSaludRiesgo(await zip.file('xl/worksheets/sheet3.xml').async('string'));
+      const d = svgSaludRiesgo(estado.saludRiesgo);
+      const png = estado.saludRiesgo.png || await svgAPng(d.svg, d.w, d.h, caja.w * 2, caja.h * 2);
+      conImagen = await montarHojaSaludRiesgo(zip, png || null, caja);
+      montada = true;
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[fichas] no se pudo montar la hoja «Salud y riesgo»:', e && e.message);
+    }
+    if (Array.isArray(opts.avisos) && !conImagen) {
+      opts.avisos.push(montada
+        ? 'La matriz de riesgo no se pudo dibujar: la hoja «Salud y riesgo» del Excel lleva un aviso en su lugar. Vuelva a exportar.'
+        : 'La hoja «Salud y riesgo» no se pudo armar: este Excel lleva el Anexo AT en su lugar. Vuelva a exportar.');
+    }
+  }
 
   // 8) Sin datos ocultos (`99 §104`): vínculo a otro archivo, propiedades y
   //    etiquetas heredadas, impresora, nombres rotos y lo dibujado fuera del área
