@@ -143,3 +143,15 @@ describe('Sin identificadores repetidos', () => {
     assert.notEqual(u6, u3);
   });
 });
+
+describe('Sin «Lectura por potencia» ni la nota de la norma en el Excel (`99 §111`)', () => {
+  test('el dibujo no las lleva aunque el modelo las traiga; el aviso de dato dudoso sí se conserva', () => {
+    const m = { ...MODELO, lectura: 'Lectura por potencia (informativa, no normativa). Este equipo pesa 20 MVA.',
+      nota: 'La casilla sale de la norma: condición (fila) × usuarios aguas abajo (columna).', avisoDato: 'Ojo con el dato de usuarios. Prueba.' };
+    const { svg, h } = svgSaludRiesgo(m);
+    assert.doesNotMatch(svg, /Lectura por potencia/);
+    assert.doesNotMatch(svg, /La casilla sale de la norma/);
+    assert.match(svg, /Ojo con el dato de usuarios/);
+    assert.ok(h < svgSaludRiesgo({ ...m, lectura: '', nota: '' }).h + 1);
+  });
+});

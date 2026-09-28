@@ -142,8 +142,9 @@ export function svgSaludRiesgo(m) {
   y += 34;
 
   if (m.avisoDato) { y += 4; parrafo(m.avisoDato, { tam: 15, color: '#8a4b00', peso: 700 }); }
-  if (m.lectura) { y += 4; parrafo(m.lectura, { tam: 15 }); }
-  if (m.nota) { y += 6; parrafo(m.nota, { tam: 13, color: '#5b6b7c' }); }
+  // Sin la «Lectura por potencia» ni la nota «La casilla sale de la norma…» (`99 §111`,
+  // el Ingeniero: «eliminemos esta parte de la matriz de riesgo, no genera valor»).
+  // El modelo las sigue trayendo (m.lectura, m.nota); en pantalla siguen.
   const H = Math.ceil(y + P);
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '">'
     + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff"/>' + partes.join('') + '</svg>';
