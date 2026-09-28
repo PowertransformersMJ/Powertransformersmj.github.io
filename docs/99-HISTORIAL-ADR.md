@@ -4412,3 +4412,35 @@ exige que `brain-index` del kernel lea `00a-`; reglas que siguen solo en el harn
 (MEMORY.md mezcla proyectos del paraguas y pesa 6,7k que el gate no cuenta). **109.8 No re-auditar.** Branch/SHAs,
 las 4 CF, el conteo de pruebas, los 108 ADRs indexados, la bóveda íntegra y `core.hooksPath` verificados sanos (S0).
 El `ADR-NNN` de las filas de 00 es el único ancla grep de los ADR ≥058 (sus headers no lo repiten): no quitarlo.
+
+## 110. ADR-110 — Excel de Mantenimiento sin la hoja «Beneficios» ni las anotaciones de «Salud y riesgo»; Diagrama Futuro derecho ⟦OPUS-5.5⟧ (2026-09-27)
+
+> *«necesito que estos pequeños comentarios o anotaciones no aparezcan al exportar el documento en excel, también
+> necesito que la hoja de beneficios en la ficha técnica de mantenimiento especializado no aparezca al exportar el
+> excel. […] en el diagrama futuro sale de lado, necesito que se vea bien igual que en el diagrama actual, que después
+> no me toque rotarlo»*; «procede por favor». Publicado `11a4be7`.
+
+**110.1 Causa raíz.** (a) El dibujo de «Salud y riesgo» (`§107`) copiaba la anotación en cursiva de cada tarjeta de la
+pantalla. (b) La hoja «Beneficios» del libro es el estudio económico de la plantilla (K11/Relación B/C, que el sistema no
+escribe, CF-37); salía también en Mantenimiento. (c) La plantilla gira 270° la imagen del Diagrama Actual
+(`<a:xfrm rot="16200000">`) para compensar el dibujo, que se genera rotado; la del Futuro NO lleva ese giro, así que el
+mismo dibujo rotado salía acostado (desde siempre, también en el PI). **110.2 Solución.** `salud-riesgo-excel.js`: las
+tarjetas sin anotación (en pantalla siguen). `ui/fichas/ajustes-libro.js` (nuevo, L-102): `quitarHojaDelLibro` quita la
+hoja, su relación, su tipo y lo que SOLO ella alcanzaba, corre los `localSheetId` y renumera cada pie «Pág. N de T»
+(Mantenimiento: 1..4 de 4; todo se calcula antes de escribir); `cajaDeImagen` lee el `<a:ext>`; `anclarConTamano` pasa
+la imagen a `oneCellAnchor` con su tamaño. Exportador: paso 7c si `estado.sinHojaBeneficios` (el panel lo marca solo en
+Mantenimiento; el texto de beneficios sigue en la hoja 1, B23); el Futuro se dibuja SIN girar, encajado en 609 × 589 al
+doble, y anclado a ese tamaño (un `twoCellAnchor` lo estiraba ~10 % en Windows y en la vista previa, que miden las
+columnas distinto que el Excel para Mac en que se guardó la plantilla). La vista previa lee el giro del Actual y lo
+muestra derecho. Pies de la pantalla de Mantenimiento «de 4»; Beneficios «Va en la Pág. 1 (casilla BENEFICIOS)».
+**110.3 No-regresión.** El PI conserva sus cinco hojas y el Anexo AT; su Futuro también queda derecho (mismo defecto).
+Si quitar la hoja falla, sale con ella y se avisa. El Actual no se tocó. **110.4 Verificación.** 1946 pruebas (1944
+pass, 0 fail, 2 skip; 11 en `tests/fichas_ajustes_libro.test.js`, con chequeo de paquete). Banco + LibreOffice +
+openpyxl: Mantenimiento 4 páginas, cinco firmas; PI 5. Revisión adversarial (2 lentes + verificador, Opus; bóveda
+`2026-09-27-revision-excel-mantenimiento-110`): 1 medio confirmado (el Futuro angostado en Windows) y 2 bajos,
+corregidos antes de publicar. En vivo (su Chrome, solo lectura, ARJONA): vista previa de Mantenimiento con 4 hojas y
+«Datos ocultos (0)», Futuro derecho 1218×1178 a 609×589, Actual derecho, «Salud y riesgo» sin anotaciones y «Pág. 4 de
+4»; PI con 5 hojas y su Futuro derecho; consola limpia. **110.8 No re-auditar / pendiente suyo.** En Excel para Windows
+el Actual (twoCellAnchor girado) podría verse algo angostado, desde siempre; en su Mac sale bien: se le ofreció fijarle
+el tamaño como al Futuro. En LibreOffice la imagen girada del Actual se monta sobre «Notas» (el programa toma el ancla
+como caja sin girar); en Excel no.
