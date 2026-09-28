@@ -4,8 +4,8 @@
 
 | Señal | Valor (al **2026-09-27**) |
 |---|---|
-| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: `§110` (`11a4be7`, en vivo); la cadena desde `§87`, en `00` Capa 1. |
-| **Build** | 🟢 **1944 pass / 0 fail / 2 skip** + `lint:html` limpio + **119 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage necesita el emulador de Firestore al lado — L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-09-27 (local; CI y Deploy en VERDE = `main` `11a4be7`, L-65) |
+| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: `§111` (`17034ff`, en vivo); la cadena desde `§87`, en `00` Capa 1. |
+| **Build** | 🟢 **1947 pass / 0 fail / 2 skip** + `lint:html` limpio + **119 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage necesita el emulador de Firestore al lado — L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-09-27 (local; CI y Deploy en VERDE = `main` `17034ff`, L-65) |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` · `main` == `origin/main` (SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (filter-repo purgó confidenciales) → otra copia debe re-clonar. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **53 índices declarados en el archivo**; la igualdad contra el servidor **sin verificar desde 2026-08-17** (se comprueba con `firestore:indexes`, no con el archivo — L-66). **Firmas**: en Firestore desde `§100` (Storage no entrega descargas al navegador). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |

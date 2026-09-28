@@ -122,6 +122,7 @@
 | §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
 | §109 | ADR-109 — **Auditoría Nivel-2**: cola 15 ADRs atrás; candado asimétrico (M-07) | 4389 |
 | §110 | ADR-110 — **Mantenimiento sin hoja Beneficios**; Futuro derecho | 4416 |
+| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota de las 7 variables | 4448 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

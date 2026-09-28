@@ -4444,3 +4444,22 @@ corregidos antes de publicar. En vivo (su Chrome, solo lectura, ARJONA): vista p
 el Actual (twoCellAnchor girado) podría verse algo angostado, desde siempre; en su Mac sale bien: se le ofreció fijarle
 el tamaño como al Futuro. En LibreOffice la imagen girada del Actual se monta sobre «Notas» (el programa toma el ancla
 como caja sin girar); en Excel no.
+
+## 111. ADR-111 — «Salud y riesgo» (solo Mantenimiento): sin lectura por potencia ni nota de la norma; «Notas:» con la advertencia de las 7 variables ⟦OPUS-5.5⟧ (2026-09-27)
+
+> *«eliminemos esta parte de la matriz de riesgo, no genera valor»* (captura de los dos párrafos bajo la leyenda) ·
+> *«me gustaría que en nota siempre repose algo como: cualquier alteración de las 7 variables con la que se califica
+> cada uno de los activos puede comprometer su estado de salud y/o su operación si no se atiende a tiempo, aun
+> teniendo un estado de salud bueno»* · *«Solo en la ficha de mantenimiento»*. Publicado `17034ff`.
+
+**111.1 Qué.** (a) El dibujo de la hoja del Excel ya no lleva «Lectura por potencia (informativa, no normativa)…» ni
+«La casilla sale de la norma…» (el modelo los sigue trayendo; la PANTALLA los conserva: retiro mínimo, él pidió la hoja
+del Excel). El aviso de dato dudoso de usuarios se mantiene. El dibujo queda más bajo y se imprime algo más grande.
+(b) `NOTA_SALUD_RIESGO` en «Notas:» (B49 y B50, estilo de la plantilla, Arial 10): su texto con solo ortografía
+(tildes, «con las que», «si no»); en un renglón ocupa ~1.218 de 1.246 px y se cortaría en otro programa. Las 7
+variables se verificaron en `calcularHIBruto` (MO.00418): DGA, edad, ADFQ, furanos, cargabilidad, PYT, hermeticidad.
+**111.3 No-regresión.** Solo Mantenimiento: la hoja existe solo ahí (`estado.saludRiesgo`); el PI no la lleva (prueba).
+**111.4 Verificación.** 1949 pruebas (1947 pass, 0 fail, 2 skip). Banco + LibreOffice: página 4 de 4 con la nota en dos
+renglones. En vivo (su Chrome, solo lectura, ARJONA): vista previa de Mantenimiento con la matriz hasta la leyenda y la
+nota en «Notas:»; PI con sus 5 hojas y sin la nota; consola limpia. **111.8 No re-auditar.** Que la pantalla aún muestre
+los dos párrafos es a propósito (se le ofreció quitarlos también ahí).
