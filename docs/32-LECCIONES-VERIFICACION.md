@@ -347,3 +347,24 @@ Cmd+Shift+R desde la extensión no los refrescó. · **Regla**: (1) un riesgo qu
 cierra LEYÉNDOLO en la sesión real (`window.__sgmSession.profile`), no se deja en el ADR; (2) en la validación en vivo,
 comprobar la versión con `import()` del módulo cambiado; si es vieja, `fetch(u, {cache: 'reload'})` de cada módulo
 cambiado y recargar; (3) una exportación NUEVA se pone en un archivo NUEVO (no en uno que el navegador ya tenía): la mezcla de un módulo nuevo con su vecino viejo tumbó la página de Fichas (`99 §102.4`). **Gate** [HONOR] (TODO-57 es el arreglo de fondo).
+
+### L-103 · Editar un .xlsx por TEXTO: reemplazo con función, identidades únicas, y se valida sin Excel real
+**Disparador**: se reescribe XML de un libro (áreas de impresión, hojas clonadas o quitadas, imágenes de la
+plantilla) o se va a declarar «el Excel sale bien». · **Cicatriz** (`99 §107`): `'Salud y riesgo'!$B$2:$R$56`
+como TEXTO de `String.replace` metió el grupo 2 en medio (la misma trampa de CF-38); la hoja clonada repitió el
+`xr:uid` de su original. En esta Mac no se puede abrir Microsoft Excel desde aquí (`osascript` -1743, sin
+«Grabación de pantalla», `§104.5`). · **Regla**: (1) reemplazo SIEMPRE con función cuando el texto nuevo lleva
+datos o `$`; (2) una hoja clonada toma el `xr:uid` de la que reemplaza; quitar una hoja exige correr los
+`localSheetId` de los nombres definidos y los pies «Pág. N de T»; (3) antes de dibujar en una imagen de la
+plantilla, leer su `<a:xfrm rot>` y su `<a:ext>`: la plantilla puede girar una y no la otra; (4) validar con
+LibreOffice → PDF → `pdftoppm` (antes/después), `openpyxl` como lector estricto, chequeo de paquete (cada
+relación y Override con su parte) y un archivo PRUEBA con nombre nuevo en Descargas para que el Ingeniero lo abra.
+**Gate**: `tests/fichas_salud_riesgo_excel.test.js` + `tests/fichas_ajustes_libro.test.js` (paquete sano) · resto [HONOR].
+
+### L-104 · Vacío no es cero: `Number(null)` y `Number('')` dan 0
+**Disparador**: un número de la base decide una clasificación, un color o un veredicto. · **Cicatriz**
+(`99 §107.3`): `nivelPorUsuarios(null)` devolvía «Mínima» y la ficha firmaba «Riesgo tolerable» para 3 equipos sin
+usuarios registrados; `conteoPorNivel`, en el mismo archivo, ya los dejaba fuera. · **Regla**: antes de `Number()`,
+`null`, `''` y espacios son «sin dato» (nulo), y el camino «sin dato» se prueba con su caso; 0 registrado sí es
+un dato. **Gate**: prueba «sin dato de usuarios…» en `tests/fichas_salud_riesgo_excel.test.js`.
+

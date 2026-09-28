@@ -4252,3 +4252,163 @@ de las pruebas ANTES de encadenar el merge. **103.8 Pendiente suyo.** «[object 
 (Anexo AT, pantalla y Excel): el registro guarda la refrigeración como grupo de datos; corrección propuesta y NO hecha
 (él la descartó por ahora). Y qué retirar de los datos ocultos de la plantilla (`§102.2`).
 
+
+## 104. ADR — El Excel PE.02081 sale SIN datos ocultos ⟦OPUS-5.5⟧ (2026-09-25)
+
+> Viendo la pestaña «Datos ocultos del archivo (11)» de la vista previa (`§102`, ficha de ASTREA): *«datos ocultos no
+> necesito que se exporte en los documentos»*. Publicado `79459ce`.
+
+**104.1 Causa raíz.** Todo venía de la PLANTILLA `assets/plantillas/PE-02081-planificacion.xlsx` y viajaba en cada
+Excel (PI, Mantenimiento, con o sin firmas del equipo): vínculo a «PE.02081.PE-FO.03 Ficha tecnica.xlsx» (lo usaba
+Beneficios!K11 → Excel pedía actualizar vínculos), fechas (creada 2018, impresa 2023), propiedades de SharePoint /
+Microsoft 365, etiqueta de clasificación, 3 bloques customXml, 12 nombres #REF!, impresora «Microsoft Print to PDF»,
+la hoja borrada «Anexos MT» en las propiedades y la captura de UPME dibujada fuera del área de impresión (Beneficios y
+Anexo AT). Al revisar aparecieron DOS que la vista previa no mostraba: piezas sueltas de «Anexos MT» (su dibujo, una
+tira vieja de logos de Electricaribe con nombre «firmas-02» —no es una firma—, su impresora) y 36 textos suyos.
+**104.2 Solución.** Archivo NUEVO `ui/fichas/limpiar-ocultos.js` (L-102): `planDeLimpieza` (pura) decide y
+`limpiarOcultos` aplica al final, justo antes de comprimir; si algo falla antes de aplicar, el Excel sale como antes
+(nunca se deja de emitir). K11 pasa de `'[1]Ficha Técnica'!J37` a la MISMA casilla de este libro: da el mismo 0 (el
+sistema no la escribe). Lo dibujado entero fuera del área se quita; las piezas a las que ya ninguna relación llega
+también; los textos sobrantes se VACÍAN sin mover los demás (las celdas los llaman por número). La vista previa
+detecta además piezas sueltas y textos sobrantes, y muestra «#¡DIV/0!» como Excel (Relación B/C).
+**104.3 No-regresión.** Mismas celdas, imágenes, cuadros de texto y firmas; escala y orientación de cada hoja (el papel
+guardado con la impresora era Carta, el mismo que se usa sin ella). 178 KB → 53 KB. **104.4 Verificación.** 1899
+pass / 0 fail (13 nuevas en `tests/fichas_limpiar_ocultos.test.js`). LibreOffice: las 5 páginas impresas IDÉNTICAS
+píxel a píxel antes/después. openpyxl lo abre sin quejas. Paquete sano (cada tipo, relación y r:id existe). En vivo
+(ASTREA, su sesión): «Datos ocultos del archivo (0)»; el Excel generado con el código publicado, 52 KB, sin las piezas.
+**104.5 No verificado.** Abrirlo en Microsoft Excel desde aquí: macOS negó el control de Excel (-1743) y la
+«Grabación de pantalla». Archivo de prueba en Descargas para que él lo abra. **104.8 No re-auditar.** El logo repetido
+dos veces en el mismo sitio de Beneficios es de la plantilla y está DENTRO del área (se ve; no es oculto). Propuesta no
+hecha: K11 «Costos [MCOL]» debería leer el total del proyecto (J78) para que la Relación B/C calcule; hoy, igual que
+antes, sale «$ -» y «#¡DIV/0!».
+
+## 105. ADR — Beneficios de Mantenimiento con las 13 acciones del Ingeniero; la casilla crece en el Excel ⟦OPUS-5.5⟧ (2026-09-27)
+
+> *«me gustaría que en beneficios mejor aparezcan las siguientes acciones […] debe permitirme escoger uno o varios e
+> integrar sus beneficios […] hacer un breve resumen […] riesgo operativo de falla catastrófica […] indicadores de
+> calidad como el orden público»*; *«en beneficios solo debe aparecer lo que hemos construido, no toques el alcance»*;
+> casilla: *«Agrandar la casilla»*; *«procede, déjalo en una página»*. Publicado `69659d1`.
+
+**105.1 Textos.** Las 13 acciones (su orden y sus nombres) y el resumen se redactaron UNO A UNO: por cada una, workflow
+de 3 redactores + 3 revisores adversariales (física/química, firmable, fidelidad y no-solape) + editor, 7 Opus; el
+Ingeniero aprobó cada texto con ajustes literales (fugas: «hermeticidad», no «estanqueidad»; «desmedidamente»;
+termovacío: «minimizando las partes por millón (ppm) de agua…», «confiabilidad dieléctrica durante su operación»;
+NLTC: «reemplazo de la regleta de conmutación y la volanta…»; tablero: sin la cola de negaciones; resumen: sin número
+de usuarios, «prevenir» y no «evitar»). Listas combinables: protecciones (8), accesorios (radiadores, bujes), OLTC
+(ruptor en aceite / en vacío con PARIDAD; sin tecnología salen las dos). Crudos y síntesis →
+`2026-09-25/27-beneficio-*` y `…-beneficios-resumen-final` en la bóveda.
+**105.2 Solución.** `domain/beneficios_acciones_mtto.js` (archivo nuevo, L-102): catálogo + `redaccionBeneficiosAcciones`
+(apertura de `beneficios_practicas` + renglones + resumen; singular con una acción). `panel.js`, solo Mantenimiento:
+la hoja Beneficios muestra SOLO las 13 acciones (`plan.benef_acc`, lista de textos «ACCION»/«ACCION:elemento»);
+la opción principal `beneficios_practicas` conserva su clave y su índice y ahora compone con las acciones; lo escrito
+a mano se respeta; casilla «a medias» que un clic completa; aviso en fichas que armaban Beneficios con las prácticas.
+Las prácticas del manual no se movieron a otra hoja: el Alcance dictado no las usa (`§85`, `§90`). Casilla:
+`ui/fichas/alto-casilla.js` (nuevo) agranda B23:L26 según el texto (Arial 10, ~200 caracteres por línea, margen de
+una línea, tope 409 pt por fila) SOLO en Mantenimiento (`estado.crecerBeneficios`); la hoja 1 conserva «ajustar a una
+página»: con muchas acciones se imprime a menor escala (1 acción ≈42 %, 4 ≈37 %, 13 ≈30 %; antes 43 %) — decisión del
+Ingeniero. `fichas_borrador`: `TOPE_CAMPO` 8000 → 20000 (el texto de 13 acciones corregido a mano se cortaba).
+**105.3 No-regresión.** PI sin cambios (sin lista, su desplegable, su casilla); Alcance igual; exportación igual salvo
+el alto de B23 en Mantenimiento. **105.4 Verificación.** 1921 pass / 0 fail. Revisión adversarial (3 lentes + verificación
+por hallazgo): 4 confirmados y corregidos (tope del borrador, crecimiento también en el PI, clic en «a medias», fichas
+viejas sin aviso). LibreOffice: 1, 4 y 13 acciones con el texto completo y la hoja 1 en una página. Banco: marcar,
+desmarcar, recarga y restauración, «Ninguna», texto a mano, PI. En vivo (ASTREA, su Chrome, solo lectura): 13 acciones,
+12 elementos, sin prácticas, «Sin texto todavía.», Alcance dictado intacto, PI con su desplegable, consola limpia.
+**105.8 No re-auditar.** Las redacciones ALTERNATIVAS del Alcance con «{ACCIONES}» y la automática ya no tienen dónde
+marcar prácticas: dicen «las acciones de mantenimiento que se definan…» (mismo residuo que `§90.3`; el Ingeniero pidió no
+tocar el Alcance). `selectorAcciones`, `fijarAcciones` y sus dos manejadores quedan SIN llamada, conservados por la regla
+«no borres nada» (candidatos a la cola de código muerto).
+
+## 106. ADR — La ZONA del activo (BOLIVAR / ORIENTE / OCCIDENTE), no su departamento ⟦OPUS-5.5⟧ (2026-09-27)
+
+> *«noto que las zonas están mal, me aparece córdoba y las zonas son BOLIVAR, ORIENTE Y OCCIDENTE, cada activo tiene
+> asociado su zona y departamento»*. Publicado `1330bf1` (con `§107`-`§108`).
+
+**106.1 Causa raíz.** La casilla «Zona» de la ficha (pantalla) y D13 del PE.02081 se llenaban con el DEPARTAMENTO.
+El parque trae las dos cosas: en producción los 208 tienen zona (57 BOLIVAR · 89 OCCIDENTE · 62 ORIENTE).
+**106.2 Solución.** `domain/fichas_zona.js` (archivo nuevo, L-102): `zonaDelActivo(equipo)` = la zona registrada; si
+falta, la que corresponde al departamento según `DEPARTAMENTOS` de `schema.js`; si no, vacío (nunca el departamento).
+`panel.js` (`campoTexto('Zona', …)`) y `exportar-planificacion.js` (D13) la usan. **106.3 No-regresión.** Municipio y
+subestación intactos; D13 sigue pasando por `txt()` (prueba de inyección con `zona: '+2+3'`). **106.4 Verificación.**
+Pruebas nuevas en `tests/fichas_zona.test.js`. Banco: activo de Córdoba → OCCIDENTE en pantalla y en D13. En vivo:
+ARJONA y SAN MARTIN DE LOBA muestran ORIENTE en la ficha y en la vista previa del Excel.
+
+## 107. ADR — La hoja «Salud y riesgo» va al Excel de Mantenimiento en lugar del Anexo AT; sin dato de usuarios no hay casilla ⟦OPUS-5.5⟧ (2026-09-27)
+
+> *«al exportar el documento en excel, no se exporta la matriz de riesgo, necesito que se exporte, no necesito que
+> salga la hoja de anexo AT en fichas técnicas por mantenimiento especializado»*. Decidió: Anexo AT fuera «de la
+> pantalla y del Excel»; «Hoja "Salud y riesgo" completa». Publicado `1330bf1`.
+
+**107.1 Causa raíz.** La hoja «Salud y riesgo» (`§81`) solo existía en pantalla: el PE.02081 no tiene hoja para ella.
+**107.2 Solución.** `ui/fichas/salud-riesgo-excel.js` (nuevo, L-102): `svgSaludRiesgo` dibuja lo mismo que la pantalla
+(cuatro cifras, definición, matriz 5×5 MO.00418 Tabla 11 con la casilla encerrada, leyenda, lectura por potencia,
+nota); `svgAPng` la rasteriza en el navegador; `montarHojaSaludRiesgo` CLONA el marco oficial de «Diagrama Actual»
+(título «SALUD Y RIESGO», pie «Pág. 5 de 5», logo) en sheet6 —el lugar del Anexo AT—, le da el `xr:uid` de la hoja que
+reemplaza, renombra la hoja y su área de impresión (reemplazo con FUNCIÓN: «$2» en cadena metía un grupo). Los datos
+los calcula el panel (`modeloSaludRiesgo`, mismos cálculos que `hojaSaludRiesgo`): no hay una segunda matriz. Sin
+imagen la hoja sale igual con un aviso en el marco (`AVISO_SIN_IMAGEN`) y quien descarga lo ve (`opts.avisos`); solo si
+el marco no se puede armar queda el Anexo AT, también avisado. `HOJAS_SALUD` sin `anexoAT`; el PI no cambia.
+**107.3 Revisión (workflow 2 lentes + verificación, Opus; crudo y síntesis en la bóveda `2026-09-27-revision-salud-riesgo-excel`).**
+Dos medios confirmados y corregidos: (1) `nivelPorUsuarios(null|'')` daba «Mínima» (`Number(null)=0`) ⇒ un equipo sin
+dato de usuarios salía con casilla y «Riesgo tolerable» en pantalla, en la matriz gerencial y en el papel. Se arregló
+en el DOMINIO (`matriz_riesgo.js`, lo que ya hacía `conteoPorNivel`); 0 usuarios registrados sigue siendo «Mínima».
+(2) un carácter de control en la subestación dejaba el dibujo sin imagen y volvía EN SILENCIO el Anexo AT ⇒ `esc()`
+los quita (como `escXml`, `§89`). Bajos corregidos: flecha «→» tapada (esquina 250 → 280), punto de potencia sin MVA.
+**107.4 Verificación.** 1935 pruebas (1933 pass, 0 fail, 2 skip; 11 en `tests/fichas_salud_riesgo_excel.test.js`).
+LibreOffice: página 5 dentro del marco, con y sin usuarios. En vivo (su Chrome, solo lectura, `1330bf1`): Mantenimiento
+sin pestaña Anexo AT; vista previa con «Salud y riesgo» de quinta, imagen 2452×1222, «Datos ocultos (0)»; ARJONA en
+Mínima «Riesgo tolerable»; T2-M/M-SML sin casilla y con «Este equipo no se puede situar en la matriz». Matriz
+gerencial: «3 equipo(s) sin condición o sin usuarios: fuera de la matriz» (T2-M/M-BEC cond 1, T3-M/M-GUP cond 2,
+T2-M/M-SML cond 3 = los de TODO-55); la columna Mínima pasa de 147 a 144; la suma sigue en 208. Consola limpia.
+**107.8 No re-auditar / pendiente suyo.** En papel el texto del dibujo queda en ~6 pt y la nota en ~5 pt (marco
+1226×611 px, dibujo de 1600, hoja al 70 %): se le ofreció agrandarlo, sin respuesta. La nota dice «cae en la misma
+casilla aquí y en Analítica gerencial» también cuando no hay casilla (texto de la pantalla, sin tocar). En la
+Priorización gerencial un equipo sin usuarios sigue apareciendo con criticidad «—» y puntaje condición × 1 (su
+comportamiento previsto para nivel nulo).
+
+## 108. ADR — «Exportar Excel» lleva siempre las cinco firmas y registra cada descarga con su folio ⟦OPUS-5.5⟧ (2026-09-27)
+
+> *«al exportar el excel también solo se refleja la firma de miguel jimenez, las demás no, valida y corrige por
+> favor»*; decisión: *«Siempre las cinco»*. Publicado `1330bf1`.
+
+**108.1 Causa raíz (validada en producción, ASTREA).** Las cinco firmas se leían (la vista previa las mostraba), pero
+«Exportar Excel» llevaba por diseño SOLO la de la sesión (`§98`) y «Descargar con firmas del equipo» (`§99`) se negaba
+porque la ficha tenía casillas [PENDIENTE] (Proyecto y Beneficios). **108.2 Solución.** `panel.js`:
+`firmasDelEquipoEnEstado` (misma lógica que la emisión del equipo: plan de estampado, huella de los BYTES contra la
+registrada, lectura fallida ≠ «no tiene firma» → pregunta) estampa las firmas y «Exportar Excel» registra la emisión
+(`fichas_emisiones`) y pone el folio en el nombre del archivo. El aviso de [PENDIENTE] sigue, ya no bloquea. El botón
+«Descargar con firmas del equipo» se OCULTA (su código se conserva). No custodio: solo su firma, sin registro. Revisión
+propia: con el registro caído ya no se entregaba nada ⇒ ahora pregunta y, si acepta, sale solo con la firma de la
+sesión, sin folio (lo que antes siempre hacía). **108.4 Verificación.** Banco: custodio → firma-elab/rev/apr/apr2/rec y
+emisión registrada; `?nocustodio=1` → una firma, 0 emisiones; registro caído + Aceptar → una firma, 0 emisiones;
+Cancelar → nada. En vivo (solo lectura, sin descargar ni registrar): la vista previa de ARJONA y de T2-M/M-SML trae las
+cinco imágenes de firma y dice «Así sale con «Exportar Excel», con las firmas del equipo»; el botón repetido no aparece.
+**108.5 No verificado.** Una descarga real con registro en producción (escribe en `fichas_emisiones` y descarga en su
+Chrome): la hará él. **108.8 No re-auditar.** Una pestaña abierta ANTES del despliegue sigue con el código viejo hasta
+recargarla. `confirmarEmisionEquipo` y su tabla quedan sin botón que los abra, conservados por «nada se borra».
+
+## 109. ADR-109 — Auditoría Nivel-2 del cerebro: la cola viva se quedó 15 ADRs atrás y el candado frenaba documentar, no publicar ⟦OPUS-5.5⟧ (2026-09-27)
+
+> La disparó el VOLUMEN (22 ADRs desde `§86`, gracia agotada) y bloqueaba el commit de `§104`-`§108` ya publicados.
+> Deliberación: bóveda `2026-09-27-auditoria-nivel2/` (`HALLAZGOS.md` + `crudos/`).
+
+**109.1 Qué se hizo.** Skill `auditoria-cerebro`: workflow de 6 sondas Opus de solo lectura (S0-S2 diff/fidelidad/
+frescura, S3 retrieval frío con 5 preguntas reales, S4 deliberación, S5 memoria del harness, S6 economía, S7 voz
+adversarial) + un verificador escéptico: **63 hallazgos**, los 44 medios/altos **reales**; de los 53 del `§86`, 26
+cerrados y 11 reincidentes. **109.2 Lo grave.** (a) La cola de Fichas (`cola-fichas-tecnicas.md`), a la que 05, 10 y
+la memoria mandan como «viva», no se tocaba desde el 09-24: CF-07, CF-21, la Zona de CF-29 y CF-37 seguían abiertos
+tras `§104`-`§107` (reincide B-05). (b) 10 le asignaba al Ingeniero tareas ya hechas (subir firmas) y escondía las
+que sí tiene en casillas `NN.8`. (c) La memoria «no dañar» mandaba probar «Exportar Excel» en producción, que desde
+`§108` REGISTRA un folio. (d) Tres candados, no uno, bloqueaban el commit del cerebro (auditoría, 00 al 111 %, boot
++259c) mientras el código se publicaba igual: cierre a medias reincidente (B-03) → **M-07**. **109.3 Arreglado en
+este cierre (33).** Cola revisada al 09-27 (sin borrar: tachado con su `§`; CF-22 sale de la autorización en bloque);
+10 resellado «(al 2026-09-27)», TODO-35/58 y TODO-66 dicen lo vivo, lista **(I)** con lo que espera respuesta suya;
+boot 31.759 → 31.254 c y 00 17.842 → ~16,0k c SIN pérdida (22 filas a la esencia de su header de 99, etiquetas de
+modelo ⟦…⟧ de §58-§108 que ya están en 99, Doctrinas en una línea; `--branch` de filter-repo pasó a **L-25 (8)**
+antes de podar su único rastro); lecciones **L-103** (OOXML por texto + validar sin Excel real) y **L-104** (vacío no es
+cero); L-94 y L-63 ampliadas; fila de Fichas en la Capa 2; topes nuevos en el manifest (32, 33, 11, cola); cuatro
+memorias del harness corregidas para APUNTAR a su lección. **109.4 Pendiente.** 21 → `TODO-66` (shard real de 00, que
+exige que `brain-index` del kernel lea `00a-`; reglas que siguen solo en el harness; `NN.8` que faltan; enmiendas de
+`§83`), 7 → KERNEL/`TODO-67` (IDs `§173` ajenos, gates 5c y #13, sonda del handoff, candado asimétrico), 2 → DUEÑO
+(MEMORY.md mezcla proyectos del paraguas y pesa 6,7k que el gate no cuenta). **109.8 No re-auditar.** Branch/SHAs,
+las 4 CF, el conteo de pruebas, los 108 ADRs indexados, la bóveda íntegra y `core.hooksPath` verificados sanos (S0).
+El `ADR-NNN` de las filas de 00 es el único ancla grep de los ADR ≥058 (sus headers no lo repiten): no quitarlo.

@@ -61,60 +61,66 @@
 | §47 | ADR-047 — Fix modo MIXTO que tumbaba el panel (solo AT·110 visible): layout por-fila + guards + try/catch por nivel; reproducido en navegador | 912 |
 | §48 | ADR-048 — Reorg POR PRUEBA paso 1: "Corriente de excitación" = SEGMENTO unificado `.pe-seg` (gráficas+tablas+JSON); demás pruebas intactas | 930 |
 | §49 | ADR-049 — "Nomenclatura y secciones de aislamiento" pasa DENTRO del segmento Tan δ (reubica `#nomencl` vivo) | 948 |
-| §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (tablas de `montarPanelPrueba`, L-57) + detalle por informe + fuera-de-criterio en rojo + fix chips… | 968 |
+| §50 | ADR-050 — Tan δ/FP = SEGMENTO unificado espejo de excitación (`montarPanelPrueba`, L-57) + fuera-de-criterio en rojo | 968 |
 | §51 | ADR-051 — Migración del cerebro a brain-kit v1.0 (política git: Claude commit+push+merge+deploy) | 986 |
-| §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores adversariales, 0 refutados) → 123 hallazgos en 6 olas; hallazgo dominante =… | 1004 |
-| §53 | ADR-053 — "HAS TODO TU": G010 cableado (umbrales F18→Health Index, aditivo+fail-safe) + validación normativa TODO-04 (re-atribución tan δ/per-clase;… | 1036 |
+| §52 | ADR-052 — Fase 9: diagnóstico integral (14 auditores + 11 verificadores) → 123 hallazgos en 6 olas | 1004 |
+| §53 | ADR-053 — "HAS TODO TU": G010 (umbrales→HI) + validación normativa TODO-04 + endurecimiento FASE B/E | 1036 |
 | §54 | ADR-054 — Shell: `sgm:session-ready` no llegaba a los listeners de `document` de 10 páginas admin | 1054 |
-| §55 | ADR-055 — TODO-15 completo: ΔC1 de bujes al veredicto (>5% investigar, nunca rojo sin dirección) + caveat 20 °C de IR + clusters 3b/4 validados con refutación… | 1072 |
+| §55 | ADR-055 — TODO-15: ΔC1 de bujes al veredicto + caveat 20 °C de IR + clusters 3b/4 validados | 1072 |
 | §56 | ADR-056 — Dashboard Salud de Activos conectado al parque REAL (`parque_salud.js`, sin fabricar) | 1090 |
 | §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
-| §58 | ADR-058 — Ecosistema `~/Desktop/GitHub-MJ`: kernel canónico PROPIO v1.7.0 con reparto sellado (`brain:pull` + gate #0), `60-WORKFLOWS`,… | 1122 |
+| §58 | ADR-058 — Ecosistema `GitHub-MJ`: kernel canónico propio (`brain:pull` + gate #0) + `60-WORKFLOWS` | 1122 |
 | §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0, sentinel `NINGUNA`) | 1140 |
-| §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso ⟦OPUS-5⟧ | 1158 |
-| §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB con 208 registros embebidos) a `pages/fichas-tecnicas.html` con datos de Firestore; modelo híbrido `.ftm-` (483… | 1181 |
-| §62 | ADR-062 — Auditoría holística (11 auditores) y remediación: datos reales de AFINIA servidos en internet (Pages en modo `legacy` ignoraba el filtro del artefacto)… | 1226 |
-| §63 | ADR-063 — Cola de la auditoría: funciones con topes, 16 índices Firestore nuevos (producción tenía 33 de 37), `ts_calculo` con dos tipos, 5… | 1284 |
-| §64 | ADR-064 — Fichas: el port de ADR-061 trajo el CSS entero pero solo el 44% del marcado; las clases huérfanas nombraban las vistas que faltaban ⟦OPUS-5⟧ | 1343 |
-| §65 | ADR-065 — Gestión de novedades UUCC: barra de contadores, cajón de decisión por equipo (aceptar calculada / mantener registrada / corregir a otra) y… | 1394 |
-| §66 | ADR-066 — Evaluación holística de Fichas Técnicas (6 auditores) y remediación: terciario «0» inflaba el presupuesto 23%, «20.000» kVA se leía como 20, conformidad… | 1436 |
-| §67 | ADR-067 — «Veo información basura»: Cargabilidad y SCADA mostraban equipos inventados sin rotularlos, la matriz vestía la falta de datos de buena noticia y 8 de 10… | 1497 |
-| §68 | ADR-068 — Mantenimiento del cerebro (auditoría Nivel-2, 8 sondas): caché afirmada sin correr, gate de bóveda «íntegro» con 8 deliberaciones sin indexar, mapa sin 4… | 1551 |
-| §69 | ADR-069 — TX_Potencia leída de verdad: los «62 omitidos» eran **57 equipos reales** (cabecera en la fila 2) → 208 válidos y 1.655.376 usuarios (cierra TODO-34). Su… | 1637 |
+| §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso | 1158 |
+| §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB) a `pages/fichas-tecnicas.html` + Firestore; híbrido `.ftm-` | 1181 |
+| §62 | ADR-062 — Auditoría holística (11 auditores): datos de AFINIA servidos por Pages en modo `legacy` | 1226 |
+| §63 | ADR-063 — Cola de la auditoría: topes en funciones, 16 índices Firestore, `ts_calculo` | 1284 |
+| §64 | ADR-064 — Fichas: el port trajo todo el CSS y el 44% del marcado (clases huérfanas = vistas faltantes) | 1343 |
+| §65 | ADR-065 — Novedades UUCC: contadores + cajón de decisión por equipo (aceptar / mantener / corregir) | 1394 |
+| §66 | ADR-066 — Evaluación holística de Fichas (6 auditores): terciario «0» inflaba 23%, «20.000» kVA leído como 20… | 1436 |
+| §67 | ADR-067 — «Veo información basura»: Cargabilidad/SCADA con equipos inventados sin rótulo | 1497 |
+| §68 | ADR-068 — Mantenimiento del cerebro (Nivel-2, 8 sondas): dos gates en verde sin medir | 1551 |
+| §69 | ADR-069 — TX_Potencia: los «62 omitidos» eran 57 equipos reales → 208 válidos (cierra TODO-34) | 1637 |
 | §70 | ADR-070 — Órdenes de Materiales SSEE con página propia, sin firmas escaneadas ni cédulas | 1710 |
-| §71 | ADR-071 — Las firmas salen de la web y pasan a la cuenta de cada quien: ruta `firmas/{uid}` en Storage, solo el dueño lee y escribe la suya, y solo se estampa en la… | 1781 |
-| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no sabía nada de lo construido en las dos tareas anteriores — escribí M-02 y dos tareas después… | 1838 |
-| §73 | ADR-073 — Las reglas que nadie había probado: `firebase deploy` solo COMPILA. 43 pruebas nuevas de `storage.rules` y `test:rules` con los dos emuladores. Auditoría… | 1905 |
+| §71 | ADR-071 — Firmas a la cuenta de cada quien: `firmas/{uid}`, solo el dueño lee y escribe la suya | 1781 |
+| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no se enteró de dos tareas (M-02) | 1838 |
+| §73 | ADR-073 — Reglas sin probar: `firebase deploy` solo COMPILA → 43 pruebas de `storage.rules` + `test:rules` | 1905 |
 | §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta; catálogo de 3 familias | 1983 |
-| §75 | ADR-075 — **Fichas Técnicas**: 5 falsedades del papel firmado corregidas; 5 redacciones por banda; alcance argumentado con condiciones; matriz a color; municipio… | 2642 |
-| §76 | ADR-076 — **Órdenes de Materiales** con la versión del 8-sep, sin firmas ni cédulas y con el parque vivo; recuperar una orden devolvía la primera persona. **L-90**… | 2964 |
-| §77 | ADR-077 — **Registro del equipo de OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, subida orden por orden, sin cédulas; comité de 4 (57 hallazgos).… | 3017 |
-| §78 | ADR-078 — **Cédulas de los responsables** desde un directorio privado en Firestore; candado por huella/forma/binario en commit, mensaje, merge y push. **L-93/94**… | 3110 |
-| §79 | ADR-079 — **El rol sale del perfil**: el bootstrap `/admins` deja de dar admin a quien ya tiene perfil (degradar por fin revoca), en Firestore y Storage. Cierra… | 3186 |
-| §80 | ADR-080 — **Manda el Excel en todos los caminos** (ratificado): el trigger de muestras reemplazaba `salud_actual` entero y borraba la condición del archivo; ahora se… | 3221 |
-| §81 | ADR-081 — **Potencia y usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, aviso del «1»); la casilla sigue siendo la de la norma ⟦OPUS-5⟧ | 3264 |
-| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad (dos TX de un patio compartían ficha) ⟦OPUS-5⟧ | 3313 |
-| §83 | ADR-083 — **El documento que se firma deja de vivir solo en memoria**: borrador local con dueño y caducidad que nunca pisa ni se equivoca de equipo ⟦OPUS-5⟧ | 3362 |
-| §84 | ADR-084 — **La carga tardía deja de borrar el listado** (número de secuencia) y **el pie del papel deja de poder mentir** sobre su fuente (el origen viaja con los datos) ⟦OPUS-5⟧ | 3468 |
-| §85 | ADR-085 — **El alcance lo escribe la redacción del formato** dictada por el Ingeniero; lo que compone el módulo no cuenta como trabajo suyo ⟦OPUS-5⟧ | 3514 |
-| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos ⟦OPUS-5⟧ | 3574 |
-| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` donde falta plata (nunca «0»), dinero tecleado leído sin adivinar; CF-32 refutado ⟦OPUS-5.5⟧ | 3632 |
-| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes, ocupación de la plantilla); aún no llegan al Excel (CF-25) ⟦OPUS-5.5⟧ | 3713 |
-| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero en la ficha y en el Excel (CF-25); revisión de 12 agentes, 6 confirmados ⟦OPUS-5.5⟧ | 3743 |
-| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento ⟦OPUS-5.5⟧ | 3797 |
-| §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas ⟦OPUS-5.5⟧ | 3832 |
-| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido ⟦OPUS-5.5⟧ | 3855 |
-| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso ⟦OPUS-5.5⟧ | 3887 |
-| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 ⟦OPUS-5.5⟧ | 3922 |
-| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve ⟦OPUS-5.5⟧ | 3964 |
-| §96 | ADR-096 — **Mantenimiento sin marcas de fábrica**: Beneficios vacío hasta escoger ⟦OPUS-5.5⟧ | 4014 |
-| §97 | ADR-097 — **Beneficios sin subtítulos y con términos técnicos** ⟦OPUS-5.5⟧ | 4032 |
-| §98 | ADR-098 — **Firma estampada** de la sesión en su casilla (ficha y Excel) ⟦OPUS-5.5⟧ | 4046 |
-| §99 | ADR-099 — **Firmas del equipo bajo custodia** ⟦OPUS-5.5⟧ | 4078 |
-| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) ⟦OPUS-5.5⟧ | 4169 |
-| §101 | ADR-101 — **Firmas de tamaño parejo** ⟦OPUS-5.5⟧ | 4197 |
-| §102 | ADR-102 — **Vista previa del Excel + PDF**; cinco firmas en pantalla ⟦OPUS-5.5⟧ | 4211 |
-| §103 | ADR-103 — **Mantenimiento al PE.02081** ⟦OPUS-5.5⟧ | 4238 |
+| §75 | ADR-075 — **Fichas**: 5 falsedades del papel firmado corregidas; redacción por banda; matriz a color | 2642 |
+| §76 | ADR-076 — **Órdenes de Materiales** versión 8-sep, sin firmas ni cédulas, parque vivo; **L-90** | 2964 |
+| §77 | ADR-077 — **Registro OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, sin cédulas | 3017 |
+| §78 | ADR-078 — **Cédulas** desde directorio privado en Firestore; candado en commit/merge/push. **L-93/94** | 3110 |
+| §79 | ADR-079 — **El rol sale del perfil**: `/admins` deja de dar admin a quien ya tiene perfil | 3186 |
+| §80 | ADR-080 — **Manda el Excel en todos los caminos**: el trigger ya no borra la condición del archivo | 3221 |
+| §81 | ADR-081 — **Potencia y usuarios se leen EN la casilla** de la ficha (punto por banda de MVA, aviso del «1»); la casilla sigue siendo la de la norma | 3264 |
+| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad (dos TX de un patio compartían ficha) | 3313 |
+| §83 | ADR-083 — **El documento que se firma deja de vivir solo en memoria**: borrador local con dueño y caducidad que nunca pisa ni se equivoca de equipo | 3362 |
+| §84 | ADR-084 — **La carga tardía ya no borra el listado**; el pie del papel dice su fuente real | 3468 |
+| §85 | ADR-085 — **El alcance lo escribe la redacción del formato** dictada por el Ingeniero; lo que compone el módulo no cuenta como trabajo suyo | 3514 |
+| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; la disparó el volumen de ADRs y no el calendario; kernel v1.11.0 sin IDs ajenos | 3574 |
+| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` (nunca «0»); CF-32 refutado | 3632 |
+| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes, ocupación de la plantilla); aún no llegan al Excel (CF-25) | 3713 |
+| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero en la ficha y en el Excel (CF-25); revisión de 12 agentes, 6 confirmados | 3743 |
+| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento | 3797 |
+| §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3832 |
+| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3855 |
+| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3887 |
+| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 | 3922 |
+| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve | 3964 |
+| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas**: Beneficios vacío hasta escoger | 4014 |
+| §97 | ADR-097 — **Beneficios sin subtítulos y con términos técnicos** | 4032 |
+| §98 | ADR-098 — **Firma estampada** de la sesión en su casilla (ficha y Excel) | 4046 |
+| §99 | ADR-099 — **Firmas del equipo bajo custodia** | 4078 |
+| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) | 4169 |
+| §101 | ADR-101 — **Firmas de tamaño parejo** | 4197 |
+| §102 | ADR-102 — **Vista previa del Excel + PDF**; cinco firmas en pantalla | 4211 |
+| §103 | ADR-103 — **Mantenimiento al PE.02081** | 4238 |
+| §104 | ADR-104 — **Excel sin datos ocultos** | 4256 |
+| §105 | ADR-105 — **Beneficios con las 13 acciones**; casilla que crece | 4285 |
+| §106 | ADR-106 — **Zona del activo**, no el departamento | 4321 |
+| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin Anexo AT); sin usuarios no hay casilla | 4335 |
+| §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
+| §109 | ADR-109 — **Auditoría Nivel-2**: cola 15 ADRs atrás; candado asimétrico (M-07) | 4389 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -141,14 +147,7 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🧪 `30` (L-20/L-21) + `99 §3` + Skill `claude-api` |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§110` + **L-103** |
 | El "por qué" de una decisión / detalle de un § | Capa 1 → `99-HISTORIAL-ADR.md` |
 
-## Doctrinas (referencia rápida — las always-on viven en CLAUDE.md §3)
-
-| Doctrina | Dónde vive |
-|---|---|
-| Performance (sin `transition:all`, sin animar layout) | `CLAUDE.md §3.1` |
-| API estable (no renombrar IDs/exports; aditivo) | `CLAUDE.md §3.2` |
-| Verifica-no-asumas (evidencia antes de afirmar) | `CLAUDE.md §3.3` |
-| IAP (Impact Analysis Previo, 5 secciones) | `CLAUDE.md §3.4` |
-| Anti-observers globales / concurrencia | `CLAUDE.md §3.5` |
+> **Doctrinas** → always-on en `CLAUDE.md §3` (3.1 performance · 3.2 aditivo/API estable · 3.3 verifica · 3.4 IAP · 3.5 observers).
