@@ -13,8 +13,9 @@
 
 import { identidadAdjunto, clasificarArchivo, TOPE_TOTAL, encajar } from '../../domain/fichas_adjunto.js';
 import { mismaIdentidad } from '../../domain/fichas_identidad.js';
-import { leerHojaAdjunta, hojasDelLibro } from './diagrama-operativo-lector.js';
-import { dibujarHojaAdjunta, LETRA_MINIMA } from './diagrama-operativo-dibujo.js';
+import { hojasDelLibro } from './diagrama-operativo-lector.js';
+import { planoHomologado, svgDeHoja, LETRA_MINIMA } from './diagrama-operativo-dibujo.js';
+import { leerEnTrabajador, rasterizarSvg, revisarPesoSvg } from './diagrama-operativo-seguro.js';
 
 /** Marco de la hoja en el Excel (px), el de la plantilla (prueba: cajaOperativo). */
 export const CAJA_OPERATIVO = Object.freeze({ w: 1226, h: 611 });
@@ -59,7 +60,8 @@ export async function procesarArchivo(bytes, nombre, op = {}) {
     const e = encajar(n.anchoPx, n.altoPx, CAJA_OPERATIVO);
     return { tipo: 'imagen', bytes: n.bytes, mime: n.mime, ancho: e.ancho, alto: e.alto, letraPrevista: null, inventario: [], hojas: [], hoja: '', avisos: n.avisos, origen: { nombre } };
   }
-  const modelo = await leerHojaAdjunta(bytes, op.hoja ? { hoja: op.hoja } : {});
+  // Leer y calcular el dibujo, en otro hilo con tiempo límite (CF-40): la página nunca se traba.
+  const { modelo, dibujo } = await leerEnTrabajador({ tipo: 'leer', bytes, hoja: op.hoja || '', caja: CAJA_OPERATIVO }, { senal: op.senal });
   const hojas = modelo.hojas.filter((h) => h.visible).map((h) => h.nombre);
   const soloImagen = modelo.imagenes.length === 1 && !modelo.celdas.some((c) => String(c.texto || '').trim()) && !modelo.formas.length;
   if (soloImagen) {
@@ -69,7 +71,14 @@ export async function procesarArchivo(bytes, nombre, op = {}) {
     const e = encajar(n.anchoPx, n.altoPx, CAJA_OPERATIVO);
     return { tipo: 'excel', bytes: n.bytes, mime: n.mime, ancho: e.ancho, alto: e.alto, letraPrevista: null, inventario: modelo.inventario, hojas, hoja: modelo.hoja, avisos: n.avisos, origen: { nombre, hoja: modelo.hoja } };
   }
-  const d = await dibujarHojaAdjunta(modelo, CAJA_OPERATIVO);
+  let g = dibujo;
+  if (!g) {
+    // Respaldo (el trabajador no pudo medir textos o no arrancó): lo mismo que `dibujarHojaAdjunta`, con el peso revisado.
+    const plano = planoHomologado(modelo, CAJA_OPERATIVO); const r = svgDeHoja(modelo, plano);
+    revisarPesoSvg(r.svg); g = { svg: r.svg, w: r.w, h: r.h, plano };
+  }
+  if (op.senal && op.senal.aborted) { const x = new Error('Lectura cancelada.'); x.cancelado = true; throw x; }
+  const d = { ...(await rasterizarSvg(g.svg, g.w, g.h, g.plano.s)), letraPrevista: g.plano.letraPrevista, compactado: g.plano.compactado };
   let out = d.png; let mime = 'image/png'; const avisos = [];
   if (out.length > TOPE_TOTAL) {
     const bmp = await createImageBitmap(new Blob([out], { type: 'image/png' }));
@@ -91,6 +100,7 @@ export async function procesarArchivo(bytes, nombre, op = {}) {
 export function montarDiagramaOperativo(caja, op) {
   const { equipo, datos } = op;
   let vivo = true;
+  let lectura = null;   // AbortController de la lectura en curso (CF-40: cerrar la pestaña o elegir otro archivo la cancela)
   let urls = []; let nuevas = [];   // imágenes en pantalla / recién creadas para la próxima
   let ident = null; let meta = null; let escribe = false;
   const limpiarUrl = (todas) => { for (const u of urls) URL.revokeObjectURL(u); urls = []; if (todas) { for (const u of nuevas) URL.revokeObjectURL(u); nuevas = []; } };
@@ -201,15 +211,20 @@ export function montarDiagramaOperativo(caja, op) {
 
   async function proponer(archivo, opc) {
     pintar(aviso('Leyendo «' + archivo.name + '» y dibujándolo como irá en la hoja…'));
+    if (lectura) lectura.abort();
+    lectura = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const senal = lectura ? lectura.signal : undefined;
     let p; let bytes = null;
     try {
       bytes = new Uint8Array(await archivo.arrayBuffer());
-      p = await procesarArchivo(bytes, archivo.name, opc);
+      p = await procesarArchivo(bytes, archivo.name, { ...opc, senal });
       p.archivo = archivo;
     } catch (e) {
       // Si es un Excel con varias hojas, se puede elegir OTRA aunque esta haya fallado.
       let hojas = [];
-      try { if (bytes && clasificarArchivo(bytes).clase === 'excel') hojas = (await hojasDelLibro(bytes)).filter((h) => h.visible).map((h) => h.nombre); } catch (_) { hojas = []; }
+      if (e && e.cancelado) return;
+      // Listar las hojas es barato (solo el libro); tras un tiempo agotado, con límite corto.
+      try { if (bytes && clasificarArchivo(bytes).clase === 'excel') hojas = (await leerEnTrabajador({ tipo: 'hojas', bytes }, { senal, limite: e && e.tiempo ? 5000 : undefined })).hojas.filter((h) => h.visible).map((h) => h.nombre); } catch (_) { hojas = []; }
       if (!vivo) return;
       const nodos = [aviso('No se pudo usar ' + (opc.hoja ? 'la hoja «' + opc.hoja + '»' : 'el archivo') + ': ' + traducir(e), 'ftm-aviso')];
       if (hojas.length > 1) { nodos.push(aviso('Puede elegir otra hoja del mismo Excel:', 'ftm-nota-ref')); nodos.push(selectorHojas(archivo, hojas, opc.hoja || '')); }
@@ -271,7 +286,7 @@ export function montarDiagramaOperativo(caja, op) {
   }
 
   consultar();
-  return { destruir() { vivo = false; limpiarUrl(true); } };
+  return { destruir() { vivo = false; if (lectura) lectura.abort(); limpiarUrl(true); } };
 }
 
 /** Las hojas de un Excel (para quien quiera el listado sin dibujar). */
