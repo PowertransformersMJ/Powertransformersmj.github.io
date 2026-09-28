@@ -3688,6 +3688,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       crecerBeneficios: documento === 'salud',
       // Mantenimiento: la hoja «Salud y riesgo» va al Excel en lugar del Anexo AT (`99 §107`).
       saludRiesgo: documento === 'salud' ? modeloSaludRiesgo(e) : undefined,
+      // Mantenimiento: el Excel sale sin la hoja «Beneficios» del libro (`99 §109`).
+      sinHojaBeneficios: documento === 'salud',
       // Solo las casillas de la sesión; nunca se guarda en el borrador (`§98`).
       firmas: Object.fromEntries(casillasConFirma(e)
         .map((k) => [k, { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel }]))

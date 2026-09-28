@@ -41,6 +41,7 @@ import { limpiarOcultos } from './limpiar-ocultos.js';
 import { ajustarAltoCasilla } from './alto-casilla.js';
 import { zonaDelActivo } from '../../domain/fichas_zona.js';
 import { svgSaludRiesgo, cajaSaludRiesgo, svgAPng, montarHojaSaludRiesgo } from './salud-riesgo-excel.js';
+import { cajaDeImagen, quitarHojaDelLibro } from './ajustes-libro.js';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -826,6 +827,11 @@ const IMG_DIAG_FUTURO = 'xl/media/image6.png';    // hoja 4 «Diagrama Futuro»
 // Tamaño en píxeles del recuadro de cada hoja (así lo trae la plantilla).
 const CAJA_ACTUAL = { w: 778, h: 948 };
 const CAJA_FUTURO = { w: 790, h: 842 };
+// El Futuro se dibuja DERECHO (`99 §109`) con el tamaño con que su hoja lo
+// muestra: el <a:ext> de su imagen en drawing4 (609 × 589 px en la plantilla).
+const DIBUJO_FUTURO = 'xl/drawings/drawing4.xml';
+const RID_IMG_FUTURO = 'rId2';
+const CAJA_VISTA_FUTURO = { w: 609, h: 589 };
 // Caja de dibujo del unifilar (viewBox del SVG que entrega el módulo de diagramas).
 const VB = { w: 640, h: 470 };
 // Totales con SUM cuyo valor en caché se limpia para forzar recálculo.
@@ -990,7 +996,13 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       if (png) zip.file(IMG_DIAG_ACTUAL, png);
     }
     if (svgF) {
-      const png = await svgAPngRotado(svgF, CAJA_FUTURO.w, CAJA_FUTURO.h, VB.w, VB.h);
+      // DERECHO, no rotado (`99 §109`, el Ingeniero: «en el diagrama futuro sale
+      // de lado […] que después no me toque rotarlo»). La imagen del Actual lleva
+      // en la plantilla un giro de 270° que compensa el dibujo rotado; la del
+      // Futuro NO lo lleva, así que el rotado salía acostado. Se dibuja sin girar,
+      // encajado sin deformar en el tamaño que la hoja le da (el doble, para nitidez).
+      const caja = (await cajaDeImagen(zip, DIBUJO_FUTURO, RID_IMG_FUTURO)) || CAJA_VISTA_FUTURO;
+      const png = await svgAPng(svgF, VB.w, VB.h, caja.w * 2, caja.h * 2);
       if (png) zip.file(IMG_DIAG_FUTURO, png);
     }
   } catch (e) { /* los diagramas quedan como en la plantilla */ }
@@ -1015,6 +1027,23 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       opts.avisos.push(montada
         ? 'La matriz de riesgo no se pudo dibujar: la hoja «Salud y riesgo» del Excel lleva un aviso en su lugar. Vuelva a exportar.'
         : 'La hoja «Salud y riesgo» no se pudo armar: este Excel lleva el Anexo AT en su lugar. Vuelva a exportar.');
+    }
+  }
+
+  // 7c) Mantenimiento: sin la hoja «Beneficios» del libro (`99 §109`, el Ingeniero:
+  //     «que la hoja de beneficios […] no aparezca al exportar el excel»). Es el
+  //     estudio económico de la plantilla; el texto de beneficios sigue en la hoja
+  //     1 (B23). Los pies pasan a «Pág. N de 4». Si no se puede, sale con la hoja
+  //     y se avisa. El PI no cambia.
+  if (estado.sinHojaBeneficios) {
+    let quitada = false;
+    try {
+      quitada = await quitarHojaDelLibro(zip, 'Beneficios');
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[fichas] no se pudo quitar la hoja «Beneficios»:', e && e.message);
+    }
+    if (!quitada && Array.isArray(opts.avisos)) {
+      opts.avisos.push('La hoja «Beneficios» no se pudo quitar de este Excel. Vuelva a exportar.');
     }
   }
 

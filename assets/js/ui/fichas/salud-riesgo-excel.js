@@ -74,16 +74,18 @@ export function svgSaludRiesgo(m) {
   // Título de contexto.
   if (m.titulo) { y += 22; texto(P, y, m.titulo, { tam: 22, peso: 700 }); y += 14; }
 
-  // Cuatro cifras, como las tarjetas de la pantalla.
+  // Cuatro cifras, como las tarjetas de la pantalla, SIN sus anotaciones en
+  // cursiva («fila 3 de la matriz», «columna Menor», «se muestra: no mueve la
+  // casilla», «resultado de fila × columna»): el Ingeniero pidió que no salgan
+  // en el Excel (`99 §109`). En pantalla siguen.
   const kpis = m.kpis || [];
-  const gap = 16; const kw = (W - 2 * P - gap * 3) / 4; const kh = 128;
+  const gap = 16; const kw = (W - 2 * P - gap * 3) / 4; const kh = 112;
   kpis.slice(0, 4).forEach((k, i) => {
     const x = P + i * (kw + gap);
     partes.push('<rect x="' + x + '" y="' + y + '" width="' + kw + '" height="' + kh + '" rx="12" fill="#f4f7fa" stroke="#d5dee8" stroke-width="1.5"/>');
     texto(x + 18, y + 50, k.valor, { tam: 38, peso: 800, color: k.tinta || '#10202c' });
     texto(x + 18, y + 76, k.sub, { tam: 16, color: '#26394d' });
     texto(x + 18, y + 100, k.etiqueta, { tam: 15, peso: 700, color: '#5b6b7c' });
-    if (k.rol) texto(x + 18, y + 120, k.rol, { tam: 13, cursiva: true, color: '#5b6b7c' });
   });
   y += kh + 6;
 
