@@ -40,6 +40,18 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
+/**
+ * Lo que SIEMPRE reposa en «Notas:» de la hoja (`99 §111`), dictado por el Ingeniero
+ * (solo ortografía: tildes, «con las que», «si no»). Las 7 variables son las del
+ * índice de salud MO.00418 (`calcularHIBruto`: DGA, edad, ADFQ, furanos, cargabilidad,
+ * PYT, hermeticidad). En dos renglones (B49 y B50, Arial 10): en uno solo ocupa
+ * ~1.218 de 1.246 px y en otro programa se cortaría.
+ */
+export const NOTA_SALUD_RIESGO = Object.freeze([
+  'Cualquier alteración de las 7 variables con las que se califica cada uno de los activos puede comprometer su estado de salud y/o su operación',
+  'si no se atiende a tiempo, aun teniendo un estado de salud bueno.'
+]);
+
 /** Lo que dice la hoja cuando la matriz no se pudo dibujar: el Anexo AT no vuelve (`99 §107`). */
 export const AVISO_SIN_IMAGEN = 'No se pudo dibujar la matriz de riesgo de este equipo. Consulte la hoja «Salud y riesgo» de la ficha en pantalla y vuelva a exportar.';
 
@@ -223,6 +235,9 @@ export async function montarHojaSaludRiesgo(zip, png, caja) {
 
   let hoja = celdaTexto(hojaDiag, 'B3', 'SALUD Y RIESGO');
   hoja = celdaTexto(hoja, 'B56', 'Pág. 5 de 5');
+  // «Notas:» (B48) lleva siempre la advertencia del Ingeniero en sus dos primeros renglones.
+  hoja = celdaTexto(hoja, 'B49', NOTA_SALUD_RIESGO[0]);
+  hoja = celdaTexto(hoja, 'B50', NOTA_SALUD_RIESGO[1]);
   // Sin imagen, la hoja igual reemplaza al Anexo AT y lo dice dentro del marco.
   const conImagen = !!(png && png.length);
   if (!conImagen) hoja = celdaTexto(hoja, 'B10', AVISO_SIN_IMAGEN);

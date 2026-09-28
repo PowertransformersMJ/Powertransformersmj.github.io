@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path';
 import JSZip from 'jszip';
 import { exportarFichaPlanificacion } from '../assets/js/ui/fichas/exportar-planificacion.js';
 import { leerLibroParaVista } from '../assets/js/ui/fichas/vista-previa-excel.js';
-import { svgSaludRiesgo, cajaSaludRiesgo, AVISO_SIN_IMAGEN } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
+import { svgSaludRiesgo, cajaSaludRiesgo, AVISO_SIN_IMAGEN, NOTA_SALUD_RIESGO } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
 import { calcularRangosCriticidad, nivelPorUsuarios } from '../assets/js/domain/matriz_riesgo.js';
 import { HOJAS_SALUD, HOJAS_FICHA } from '../assets/js/ui/fichas/panel.js';
 
@@ -155,3 +155,26 @@ describe('Sin «Lectura por potencia» ni la nota de la norma en el Excel (`99 �
     assert.ok(h < svgSaludRiesgo({ ...m, lectura: '', nota: '' }).h + 1);
   });
 });
+
+describe('«Notas:» de «Salud y riesgo» lleva siempre la advertencia del Ingeniero (`99 §111`)', () => {
+  const TEXTO = 'Cualquier alteración de las 7 variables con las que se califica cada uno de los activos puede comprometer su estado de salud y/o su operación si no se atiende a tiempo, aun teniendo un estado de salud bueno.';
+  test('en B49 y B50, con su estilo, con imagen y sin ella', async () => {
+    assert.equal(NOTA_SALUD_RIESGO.join(' '), TEXTO);
+    for (const png of [PNG, null]) {
+      const z = await libro({ plan: { proyecto: 'P' }, saludRiesgo: { ...MODELO, png } });
+      const x = await z.file('xl/worksheets/sheet6.xml').async('string');
+      assert.match(x, new RegExp('<c r="B49" s="346" t="inlineStr"><is><t>' + NOTA_SALUD_RIESGO[0].replace(/[/()]/g, '.') + '</t></is></c>'));
+      assert.match(x, new RegExp('<c r="B50" s="346" t="inlineStr"><is><t>' + NOTA_SALUD_RIESGO[1] + '</t></is></c>'));
+      const m = await leerLibroParaVista(z);
+      const h = m.hojas.find((q) => q.nombre === 'Salud y riesgo');
+      assert.ok(h.celdas.some((c) => c.texto === NOTA_SALUD_RIESGO[0]));
+      assert.ok(h.celdas.some((c) => c.texto === 'Notas:'));
+    }
+  });
+  test('el PI no la lleva (su Anexo AT no cambia)', async () => {
+    const z = await libro({ plan: { proyecto: 'P' } });
+    assert.doesNotMatch(await z.file('xl/worksheets/sheet6.xml').async('string'), /Cualquier alteración/);
+    assert.doesNotMatch(await z.file('xl/worksheets/sheet3.xml').async('string'), /Cualquier alteración/);
+  });
+});
+
