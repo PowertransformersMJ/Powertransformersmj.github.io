@@ -3455,7 +3455,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + banda('Período de ejecución')
       + bloquePeriodo(e)
       + bloqueFirmas(e)
-      + pieHoja(documento === 'salud' ? 'Pág. 1 de 7' : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
+      + pieHoja(documento === 'salud' ? 'Pág. 1 de 4' : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
   }
 
@@ -3486,14 +3486,17 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         ? 'BENEFICIOS DEL MANTENIMIENTO ESPECIALIZADO' : 'BENEFICIOS DEL PROYECTO')
       + banda('Vista previa del texto')
       + '<div class="ftm-campo-val" data-vista="' + campo + '">' + htmlVista(estadoDe(e).plan[campo]) + '</div>'
-      + pieHoja(documento === 'salud' ? 'Pág. 2 de 7' : 'Pág. 2 de 5', 'PE.02081.PE-FO.03 Ed.01')
+      + pieHoja(documento === 'salud' ? 'Va en la Pág. 1 (casilla BENEFICIOS)' : 'Pág. 2 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
   }
 
   // ── HOJAS 3 y 4 · Diagramas unifilares (independientes) ──
   function hojaDiagrama(e, cual) {
     const D = parametrosDiagrama(e, cual);
-    const pag = cual === 'actual' ? 'Pág. 3 de 5' : 'Pág. 4 de 5';
+    // Mantenimiento: el Excel sale sin «Beneficios», con cuatro páginas (`99 §110`); la pantalla dice lo mismo.
+    const pag = documento === 'salud'
+      ? (cual === 'actual' ? 'Pág. 2 de 4' : 'Pág. 3 de 4')
+      : (cual === 'actual' ? 'Pág. 3 de 5' : 'Pág. 4 de 5');
     const otro = cual === 'actual' ? 'Diagrama Futuro' : 'Diagrama Actual';
     const campos = CAMPOS_DIAG.map(([k, lbl, ph, w]) =>
       '<label>' + esc(lbl) + ' <input class="ftm-diag-input" data-diag="' + k + '" '
@@ -3688,6 +3691,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       crecerBeneficios: documento === 'salud',
       // Mantenimiento: la hoja «Salud y riesgo» va al Excel en lugar del Anexo AT (`99 §107`).
       saludRiesgo: documento === 'salud' ? modeloSaludRiesgo(e) : undefined,
+      // Mantenimiento: el Excel sale sin la hoja «Beneficios» del libro (`99 §110`).
+      sinHojaBeneficios: documento === 'salud',
       // Solo las casillas de la sesión; nunca se guarda en el borrador (`§98`).
       firmas: Object.fromEntries(casillasConFirma(e)
         .map((k) => [k, { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel }]))

@@ -40,6 +40,22 @@
     "docs/60-WORKFLOWS.md": {
       "lines": 160,
       "chars": 14000
+    },
+    "docs/32-LECCIONES-VERIFICACION.md": {
+      "lines": 450,
+      "chars": 42000
+    },
+    "docs/33-LECCIONES-HARNESS.md": {
+      "lines": 120,
+      "chars": 12000
+    },
+    "docs/11-PENDIENTES-FRIOS.md": {
+      "lines": 120,
+      "chars": 10000
+    },
+    "docs/cola-fichas-tecnicas.md": {
+      "lines": 200,
+      "chars": 22000
     }
   },
   "archiveDir": "../brain-private/sgm-transpower/research-archive",
@@ -79,11 +95,12 @@
   "_ssotFactsDescartados": "EVALUADOS Y NO DECLARADOS (2026-07-28, ADR-058): (a) 'MO.00418' y (b) 'lordpowertransformersmj'. Ambos aparecen 20+ y 12+ veces en docs/ como REFERENCIA legitima (citar la norma o el proyecto no es duplicar un hecho). Declararlos disparia warns bloqueantes sin corregir ningun riesgo real = green-tuning al reves. Re-evaluar SOLO si algun dia se versiona el valor (p.ej. 'Ed. 03'), que es cuando el gate #8 sirve.",
   "_specsDirRazon": "RETIRADO 2026-08-21 (auditoria Nivel-2, §68): 'specs' no existe y nunca existio; declararlo solo producia una linea de ruido informativo en cada corrida. Si algun dia se adopta spec-kit, se vuelve a declarar.",
   "deepAudit": {
-    "last": "2026-09-23",
-    "tableFile": "2026-09-23-auditoria-nivel2/HALLAZGOS.md",
-    "coveredHeaderCount": 86,
+    "last": "2026-09-27",
+    "tableFile": "2026-09-27-auditoria-nivel2/HALLAZGOS.md",
+    "coveredHeaderCount": 109,
     "maxAdrGap": 12,
     "maxDays": 30,
     "_que": "Auditoria Nivel-2 del cerebro (skill auditoria-cerebro): correrla cuando el linter lo pida (gate #14). 'last' y 'coveredHeaderCount' se actualizan SOLO al cerrar una auditoria con su tabla de hallazgos escrita. OJO: con coveredHeaderCount en 0 el disparador por VOLUMEN de ADRs (maxAdrGap) quedaba muerto — gap se calculaba como 0 siempre; llevaba apagado desde el dia 1. 'tableFile' es el input de la Sonda 0 de la proxima auditoria: sin el no puede diffear, que es lo que paso en 2026-08-21, la primera con tabla real."
-  }
+  },
+  "_capsNuevos109": "2026-09-27 (auditoria Nivel-2, 99 §109, hallazgos S6 C-09 / S7 C-12): 32, 33, 11 y la cola de Fichas crecian sin tope (32 ya pesaba como 30). Topes con ~10 % de aire para que el aviso pre-shard avise antes de bloquear."
 }
