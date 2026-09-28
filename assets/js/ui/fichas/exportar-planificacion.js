@@ -42,6 +42,14 @@ import { ajustarAltoCasilla } from './alto-casilla.js';
 import { zonaDelActivo } from '../../domain/fichas_zona.js';
 import { svgSaludRiesgo, cajaSaludRiesgo, svgAPng, montarHojaSaludRiesgo } from './salud-riesgo-excel.js';
 import { cajaDeImagen, quitarHojaDelLibro, anclarConTamano } from './ajustes-libro.js';
+import { montarHojaDiagramaOperativo } from './diagrama-operativo-hoja.js';
+
+/**
+ * Hojas que este exportador sabe añadir (`99 §112`). El panel la consulta antes
+ * de descargar con un adjunto: si el navegador trae un exportador VIEJO en caché
+ * (L-102), la marca no está y el panel pide recargar en vez de descargar en silencio.
+ */
+export const HOJAS_EXTRA = Object.freeze(['Diagrama Operativo']);
 
 /* ═══════════════════════════════════════════════════════════════════════════
    DEPENDENCIAS EXTERNAS (plantilla y JSZip)
@@ -1031,6 +1039,18 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       opts.avisos.push(montada
         ? 'La matriz de riesgo no se pudo dibujar: la hoja «Salud y riesgo» del Excel lleva un aviso en su lugar. Vuelva a exportar.'
         : 'La hoja «Salud y riesgo» no se pudo armar: este Excel lleva el Anexo AT en su lugar. Vuelva a exportar.');
+    }
+  }
+
+  // 7b-bis) Mantenimiento: la hoja «Diagrama Operativo» con el adjunto YA APROBADO
+  //     (`99 §112`: el cronograma dibujado u la imagen original), al final del libro.
+  //     Sin adjunto no sale. Si no se puede armar, el Excel sale sin ella y se avisa.
+  if (estado.diagramaOperativo && estado.diagramaOperativo.bytes) {
+    try {
+      await montarHojaDiagramaOperativo(zip, estado.diagramaOperativo);
+    } catch (e) {
+      if (typeof console !== 'undefined') console.warn('[fichas] no se pudo montar «Diagrama Operativo»:', e && e.message);
+      if (Array.isArray(opts.avisos)) opts.avisos.push('La hoja «Diagrama Operativo» no se pudo armar: este Excel sale sin ella. Vuelva a exportar.');
     }
   }
 

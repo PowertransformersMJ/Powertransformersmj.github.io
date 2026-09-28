@@ -64,6 +64,9 @@ import { redaccionBeneficiosPracticas } from '../../domain/beneficios_practicas.
 import { redaccionBeneficiosAcciones, ACCIONES_BENEFICIO } from '../../domain/beneficios_acciones_mtto.js';
 // La zona del activo (BOLIVAR / ORIENTE / OCCIDENTE), no su departamento (`99 §106`).
 import { zonaDelActivo } from '../../domain/fichas_zona.js';
+// «Diagrama Operativo» (`99 §112`): identidad persistente del adjunto de cada transformador.
+import { identidadAdjunto } from '../../domain/fichas_adjunto.js';
+import { mismaIdentidad } from '../../domain/fichas_identidad.js';
 import {
   parametrosDiagrama, fijarParametro, copiarActualAFuturo, unifilarDeEquipo,
   claveEquipo, TITULO_DIAGRAMA, olvidarDiagramas, exportarDiagramas, importarDiagramas,
@@ -152,6 +155,8 @@ export const HOJAS_SALUD = Object.freeze([
   { id: 'salud',   t: 'Salud y riesgo' },
   { id: 'diagA',   t: 'Diagrama Actual' },
   { id: 'diagF',   t: 'Diagrama Futuro' },
+  // El adjunto del Ingeniero (su cronograma de trabajos), la última hoja del Excel (`99 §112`).
+  { id: 'operativo', t: 'Diagrama Operativo' },
   { id: 'plan',    t: 'Plan de acciones', anexo: true }
 ]);
 
@@ -888,7 +893,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     firmaSesion: typeof opciones.firmaSesion === 'function' ? opciones.firmaSesion : null,
     // Firmas del EQUIPO bajo custodia (`99 §99`), solo para el administrador:
     // { disponible(), leer(id), nuevaEmisionId(), registrarEmision(id, datos) }.
-    firmasEquipo: opciones.firmasEquipo || null
+    firmasEquipo: opciones.firmasEquipo || null,
+    // «Diagrama Operativo» guardado en el sistema (`99 §112`):
+    // { leerMeta(id), leerImagen(id, meta), guardar(ident, datos, reemplazo), quitar(ident, meta), puedeEscribir() }.
+    adjuntos: opciones.adjuntos || null
   };
 
   // ── estado vivo del panel ──
@@ -2157,6 +2165,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (btnPlan) btnPlan.hidden = (hoja !== 'plan');
     if (hoja === 'diagA' || hoja === 'diagF') pintarUnifilar();
     if (hoja === 'benef' && documento === 'salud') pintarCasillasBeneficio();
+    montarOperativo();
+    prepararPiesOperativo();
     pintarFirmasEstampadas();
     asegurarFirmasEquipoPantalla();
   }
@@ -2414,6 +2424,96 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     };
   }
 
+  /* ── «Diagrama Operativo» (`99 §112`) ─────────────────────────────────────
+     El adjunto (cronograma de trabajos del Ingeniero) vive en el sistema, uno
+     por transformador. La pestaña lo adjunta y lo muestra; la exportación lo
+     lee y lo pone como última hoja. OPERATIVO recuerda, por equipo, si tiene
+     adjunto (meta) o no (null), para los pies «de 4» / «de 5» de la pantalla. */
+  const OPERATIVO = new Map();
+  let opInst = null;
+
+  function totalMantenimiento() {
+    return 4 + (actual && OPERATIVO.get(claveEquipo(actual)) ? 1 : 0);
+  }
+
+  function actualizarPiesOperativo() {
+    if (documento !== 'salud') return;
+    const total = totalMantenimiento();
+    for (const s of modalCuerpo.querySelectorAll('.ftm-hoja-foot > span:first-child')) {
+      if (/^Pág\. [1-3] de [45]$/.test(s.textContent)) s.textContent = s.textContent.replace(/de [45]$/, 'de ' + total);
+    }
+  }
+
+  /** Consulta una vez por equipo si tiene adjunto (solo la meta, para los pies). */
+  function prepararPiesOperativo() {
+    if (documento !== 'salud' || !cfg.adjuntos || !actual) return;
+    const eq = actual; const k = claveEquipo(eq);
+    if (OPERATIVO.has(k)) return;
+    OPERATIVO.set(k, null);
+    identidadAdjunto(eq)
+      .then((ident) => (ident ? cfg.adjuntos.leerMeta(ident.id) : { hay: false }))
+      .then((r) => {
+        if (r.error) { OPERATIVO.delete(k); return; }
+        OPERATIVO.set(k, r.hay ? r.meta : null);
+        if (actual === eq) actualizarPiesOperativo();
+      })
+      .catch(() => OPERATIVO.delete(k));
+  }
+
+  function hojaOperativo() {
+    return '<div class="ftm-hoja">'
+      + '<div class="ftm-diag-head"><div class="ftm-diag-head-t">DIAGRAMA OPERATIVO</div>'
+      +   '<div class="ftm-hoja-logo"><span class="ftm-hoja-logo-g">afinia</span>'
+      +   '<span class="ftm-hoja-logo-s">Grupo·epm</span></div></div>'
+      + '<div class="ftm-op" data-ftm-operativo>'
+      +   (cfg.adjuntos ? '' : '<div class="ftm-aviso">El Diagrama Operativo no está disponible en esta página.</div>')
+      + '</div>'
+      + pieHoja('Pág. 5 de 5', 'PE.02081.PE-FO.03 Ed.01 · Ficha Técnica Planificación Red')
+      + '</div>';
+  }
+
+  function montarOperativo() {
+    if (opInst) { try { opInst.destruir(); } catch (_) { /* ya no está */ } opInst = null; }
+    if (hoja !== 'operativo' || documento !== 'salud' || !cfg.adjuntos || !actual) return;
+    const caja = modalCuerpo.querySelector('[data-ftm-operativo]');
+    if (!caja) return;
+    const eq = actual; const k = claveEquipo(eq);
+    import('./diagrama-operativo-panel.js').then((m) => {
+      if (actual !== eq || hoja !== 'operativo' || !caja.isConnected) return;
+      opInst = m.montarDiagramaOperativo(caja, {
+        equipo: eq, datos: cfg.adjuntos,
+        alCambiar(meta) { OPERATIVO.set(k, meta || null); if (actual === eq) actualizarPiesOperativo(); }
+      });
+    }).catch((err) => {
+      console.warn('[fichas/panel] Diagrama Operativo:', err);
+      caja.textContent = 'No se pudo cargar el Diagrama Operativo. Recargue la página.';
+    });
+  }
+
+  /**
+   * El adjunto para exportar: {datos:{bytes,mime,ancho,alto}} · {nada:true} ·
+   * {error:'…'} (no se pudo comprobar o leer: distinto de «no hay»).
+   */
+  async function operativoParaExportar(eq) {
+    if (documento !== 'salud' || !cfg.adjuntos) return { nada: true };
+    const ident = await identidadAdjunto(eq);
+    if (!ident) return { nada: true };
+    const r = await cfg.adjuntos.leerMeta(ident.id);
+    if (r.error) return { error: 'No se pudo comprobar si esta ficha tiene Diagrama Operativo (revise la conexión).' };
+    const k = claveEquipo(eq);
+    if (!r.hay) { OPERATIVO.set(k, null); return { nada: true }; }
+    if (!mismaIdentidad({ clave: r.meta.clave, matricula: r.meta.matricula, serie: r.meta.serie }, ident)) return { nada: true };
+    OPERATIVO.set(k, r.meta);
+    const img = await cfg.adjuntos.leerImagen(ident.id, r.meta);
+    if (img.error) return { error: img.mensaje || 'No se pudo leer el Diagrama Operativo.' };
+    return { datos: { bytes: img.bytes, mime: r.meta.mime, ancho: r.meta.ancho, alto: r.meta.alto } };
+  }
+
+  /** ¿El exportador cargado sabe añadir la hoja? (mezcla de caché, L-102) */
+  const exportadorConOperativo = (mod) => Array.isArray(mod && mod.HOJAS_EXTRA) && mod.HOJAS_EXTRA.includes('Diagrama Operativo');
+  const AVISO_RECARGAR = 'Esta página tiene en memoria una versión anterior del exportador y no puede añadir el Diagrama Operativo. '
+    + 'Recargue la página (Cmd+Shift+R o Ctrl+F5) y vuelva a exportar.';
+
   function cuerpoHoja(e, cual) {
     if (cual === 'salud') return hojaSaludRiesgo(e);
     if (cual === 'ficha') return hojaFicha(e);
@@ -2422,6 +2522,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (cual === 'diagF') return hojaDiagrama(e, 'futuro');
     if (cual === 'anexoAT') return hojaAnexo(e);
     if (cual === 'plan') return hojaPlan(e);
+    if (cual === 'operativo') return hojaOperativo(e);
     return '';
   }
 
@@ -3455,7 +3556,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       + banda('Período de ejecución')
       + bloquePeriodo(e)
       + bloqueFirmas(e)
-      + pieHoja(documento === 'salud' ? 'Pág. 1 de 4' : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
+      + pieHoja(documento === 'salud' ? 'Pág. 1 de ' + totalMantenimiento() : 'Pág. 1 de 5', 'PE.02081.PE-FO.03 Ed.01')
       + '</div>';
   }
 
@@ -3495,7 +3596,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     const D = parametrosDiagrama(e, cual);
     // Mantenimiento: el Excel sale sin «Beneficios», con cuatro páginas (`99 §110`); la pantalla dice lo mismo.
     const pag = documento === 'salud'
-      ? (cual === 'actual' ? 'Pág. 2 de 4' : 'Pág. 3 de 4')
+      ? (cual === 'actual' ? 'Pág. 2 de ' + totalMantenimiento() : 'Pág. 3 de ' + totalMantenimiento())
       : (cual === 'actual' ? 'Pág. 3 de 5' : 'Pág. 4 de 5');
     const otro = cual === 'actual' ? 'Diagrama Futuro' : 'Diagrama Actual';
     const campos = CAMPOS_DIAG.map(([k, lbl, ph, w]) =>
@@ -3912,6 +4013,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const estado = estadoParaExportar(eq);
       const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
       if (faltan.length) { alert(textoPendientesEquipo(faltan)); return; }
+      // «Diagrama Operativo» (`99 §112`): un papel con folio no sale incompleto.
+      const opEq = await operativoParaExportar(eq);
+      if (opEq.error) { alert(opEq.error + '\n\nNo se emitió.'); return; }
+      if (opEq.datos) { if (!exportadorConOperativo(mod)) { alert(AVISO_RECARGAR); return; } estado.diagramaOperativo = opEq.datos; }
       const idEmision = cfg.firmasEquipo.nuevaEmisionId();
       const folio = folioDeEmision(idEmision);
       const firmas = {};
@@ -4006,6 +4111,14 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       if (faltan.length) {
         avisos.push('Casillas [PENDIENTE]: ' + faltan.map((f) => f.campos.join(' y ')).join(' · ') + '.');
       }
+      // «Diagrama Operativo» (`99 §112`): la vista previa lo muestra como saldrá.
+      const opVp = await operativoParaExportar(eq);
+      if (actual !== eq) return;
+      if (opVp.error) avisos.push(opVp.error + ' Esta vista sale sin esa hoja.');
+      else if (opVp.datos) {
+        if (exportadorConOperativo(mod)) estado.diagramaOperativo = opVp.datos;
+        else avisos.push(AVISO_RECARGAR);
+      }
       // Lo que el exportador no pudo dibujar se dice aquí también (`99 §107`).
       const bytes = await mod.exportarFichaPlanificacion(eq, estado, { tipoSalida: 'uint8array', avisos });
       const { leerLibroParaVista, mostrarVistaPrevia, cargarJSZip } = await import('./vista-previa-excel.js');
@@ -4082,6 +4195,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // sin leer.
       const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
       if (faltan.length && !globalThis.confirm(avisoPendientes(faltan))) return;
+      // «Diagrama Operativo» (`99 §112`): si hay adjunto, va como última hoja. Si no se
+      // pudo comprobar o leer, se pregunta (nunca se descarga incompleto en silencio).
+      const op = await operativoParaExportar(eq);
+      if (actual !== eq) return;
+      if (op.error && !globalThis.confirm(op.error + '\n\nPulse Aceptar para descargar SIN la hoja «Diagrama Operativo», o Cancelar para intentar de nuevo.')) return;
+      if (op.datos) {
+        if (!exportadorConOperativo(mod)) { alert(AVISO_RECARGAR); return; }
+        estado.diagramaOperativo = op.datos;
+      }
       // Las cinco firmas SIEMPRE (`99 §108`, decisión del Ingeniero: «Siempre las
       // cinco»; ya había dicho «yo autorizo verbalmente», §99.11). Solo el custodio
       // las lee; cada imagen se comprueba contra la huella registrada al subirla y
@@ -4118,7 +4240,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
             + 'Sin registro no sale con ellas.\n\nPulse Aceptar para descargarlo solo con su firma, '
             + 'o Cancelar para intentar de nuevo.') || actual !== eq) return;
           avisosExcel.length = 0;
-          blob = await mod.exportarFichaPlanificacion(eq, estadoParaExportar(eq), { avisos: avisosExcel });
+          const soloPropia = estadoParaExportar(eq);
+          if (estado.diagramaOperativo) soloPropia.diagramaOperativo = estado.diagramaOperativo;
+          blob = await mod.exportarFichaPlanificacion(eq, soloPropia, { avisos: avisosExcel });
         }
       }
       cfg.descargar(blob, nombre);
