@@ -39,6 +39,7 @@ import { lineaDeLaSesion } from './domain/firmas_sesion.js';
 // «Entregado por» con las firmas del equipo que custodia el Ingeniero, como en Fichas (decisión suya,
 // 2026-09-28): qué firma va en cada línea, el folio de cada emisión y a quién pertenece cada clave.
 import { planFirmasOrden, personasEquipoDeOrden, nombreConFolio, firmaDelEquipoAplica, EQUIPO_EN_ORDENES } from './domain/ordenes_firmas.js';
+import { planFirmasOrdenDelegada, personasALeerDelegada, personasDeLaDelegacion, esLineaDelDelegado, delegadaAplica } from './domain/ordenes_firmas_delegadas.js';
 import { idDeNombreDeLista, nombreDePersona, folioDeEmision } from './domain/firmas_equipo.js';
 import { getSession, isAdmin as esAdminDeSesion } from './auth/session-guard.js';
 import { listarV2 as listarParque } from './data/transformadores.js';
@@ -639,10 +640,17 @@ function firmaDe(persona, k) {
   if (lineaDeLaSesion(nombre, FIRMA_SESION.nombre)) {
     return FIRMA_SESION.dataUrl ? { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel } : null;
   }
-  // Del directorio del custodio: SOLO en «ENTREGADO POR» y SOLO de quienes lo autorizaron
-  // (`ordenes_firmas.js`, decisión del Ingeniero 2026-09-28), por CLAVE exacta de la lista.
   const id = idDeNombreDeLista(nombre);
-  if (!id || !firmaDelEquipoAplica(k, id)) return null;
+  if (DELEGACION) {
+    // Sesión DELEGADA (`99 §117`): su línea con su «Mi firma» si la cargó; si no, y las demás
+    // líneas, del directorio del custodio SOLO lo delegado y SOLO en su línea.
+    if (FIRMA_SESION.dataUrl && esLineaDelDelegado(k, nombre, DELEGACION)) return { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel };
+    if (!delegadaAplica(k, id, DELEGACION)) return null;
+  } else if (!id || !firmaDelEquipoAplica(k, id)) {
+    // Del directorio del custodio: SOLO en «ENTREGADO POR» y SOLO de quienes lo autorizaron
+    // (`ordenes_firmas.js`, decisión del Ingeniero 2026-09-28), por CLAVE exacta de la lista.
+    return null;
+  }
   // Al emitir se dibuja con las firmas de ESA emisión (las releídas y registradas), nunca
   // con el caché de la vista previa (revisión: una relectura de fondo podía colarse).
   const f = (EMISION_FIRMAS || FIRMAS_EQUIPO).get(id);
@@ -662,6 +670,8 @@ let EXPORTANDO = false;             // un segundo clic mientras se emite no gene
 const ESPERA_FIRMAS_MS = 8000;      // lectura de una firma del directorio
 const ESPERA_REGISTRO_MS = 12000;   // registro de la emisión
 let _custodia = null;
+let _sinDelegacion = false;         // un técnico sin permiso: se pregunta UNA vez por página
+let DELEGACION = null;              // permiso de esta sesión para usar firmas del custodio (`99 §117`)
 function conTope(promesa, ms, que) {
   let t;
   return Promise.race([promesa, new Promise((_, mal) => { t = setTimeout(() => { const e = new Error(que + ': sin respuesta'); e.code = 'tiempo-agotado'; mal(e); }, ms); })])
@@ -669,11 +679,26 @@ function conTope(promesa, ms, que) {
 }
 async function modulosCustodia() {
   if (_custodia) return _custodia;
+  if (_sinDelegacion) return null;
   try {
-    if (!esAdminDeSesion()) return null;
-    const [fe, em] = await Promise.all([import('./data/firmas_equipo.js'), import('./data/ordenes_emisiones.js')]);
-    if (!fe.puedeCustodiar() || !em.puedeRegistrar()) return null;
-    _custodia = { fe, em };
+    if (esAdminDeSesion()) {
+      const [fe, em] = await Promise.all([import('./data/firmas_equipo.js'), import('./data/ordenes_emisiones.js')]);
+      if (!fe.puedeCustodiar() || !em.puedeRegistrar()) return null;
+      _custodia = { fe, em };
+      return _custodia;
+    }
+    // Otro usuario: ¿el custodio le dio permiso de usar sus firmas en Órdenes? (`99 §117`)
+    const dl = await import('./data/firmas_delegadas.js');
+    if (!dl.puedeUsarDelegacion()) return null;
+    const d = await dl.miDelegacion();
+    if (!d) { _sinDelegacion = true; return null; }
+    if (d.error) return null;       // no se pudo leer: se vuelve a intentar en la próxima
+    DELEGACION = d;
+    _custodia = {
+      delegado: true, delegacion: d,
+      fe: { leerFirma: (id) => dl.leerFirmaDelegada(d.custodio, id), huellaDe: dl.huellaDe },
+      em: { nuevaEmisionOrdenId: dl.nuevaEmisionId, registrarEmisionOrden: (id, datos) => dl.registrarEmisionDelegada(id, { ...datos, delegacion: d }) }
+    };
     return _custodia;
   } catch (e) {
     console.warn('[órdenes] sin firmas del equipo:', e);
@@ -686,12 +711,13 @@ function bytesDeDataUrl(u) {
   for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
   return a;
 }
-/** Relee UNA firma del directorio y la verifica contra su huella: 'ok' · 'no-hay' · 'error' · 'distinta'. */
+/** Relee UNA firma del directorio y la verifica contra su huella: 'ok' · 'no-hay' · 'error' · 'distinta' · 'denegada'. */
 async function releerFirmaEquipo(m, id) {
   let r;
   try {
     const l = await conTope(m.fe.leerFirma(id), ESPERA_FIRMAS_MS, 'firma del equipo');
-    if (l && l.error) r = 'error';
+    if (l && l.denegada) r = 'denegada';   // el custodio retiró el permiso (no es la conexión)
+    else if (l && l.error) r = 'error';
     else if (!l) r = 'no-hay';
     else {
       const huella = await m.fe.huellaDe(bytesDeDataUrl(l.dataUrl));
@@ -707,7 +733,10 @@ async function releerFirmaEquipo(m, id) {
 async function cargarFirmasEquipo() {
   const m = await modulosCustodia();
   if (!m) return;
-  const ids = [...EQUIPO_EN_ORDENES].filter((id) => !CONFIG.entregadoPor.some((p) => lineaDeLaSesion(p.nombre, FIRMA_SESION.nombre) && idDeNombreDeLista(p.nombre) === id));
+  const ids = m.delegado
+    // Delegado: lo que le permitieron (sin su propia copia si ya tiene «Mi firma»).
+    ? personasDeLaDelegacion(m.delegacion).filter((id) => !(FIRMA_SESION.dataUrl && id === m.delegacion.personaPropia))
+    : [...EQUIPO_EN_ORDENES].filter((id) => !CONFIG.entregadoPor.some((p) => lineaDeLaSesion(p.nombre, FIRMA_SESION.nombre) && idDeNombreDeLista(p.nombre) === id));
   await Promise.all(ids.map((id) => releerFirmaEquipo(m, id)));
 }
 /**
@@ -720,7 +749,9 @@ async function prepararFirmasEquipo(o) {
   const m = await modulosCustodia();
   if (!m) return null;
   // Quien no tiene esa firma en su directorio (otro administrador) no vuelve a leerla ni a preguntar.
-  const ids = personasEquipoDeOrden(o, FIRMA_SESION.nombre).filter((id) => ESTADO_EQUIPO.get(id) !== 'no-hay');
+  const ids = (m.delegado
+    ? personasALeerDelegada(o, m.delegacion, { propia: !!FIRMA_SESION.dataUrl })
+    : personasEquipoDeOrden(o, FIRMA_SESION.nombre)).filter((id) => ESTADO_EQUIPO.get(id) !== 'no-hay' && ESTADO_EQUIPO.get(id) !== 'denegada');
   if (!ids.length) return null;
   cargando(true, 'Leyendo las firmas del equipo…');
   const res = await Promise.all(ids.map((id) => releerFirmaEquipo(m, id)));
@@ -728,14 +759,20 @@ async function prepararFirmasEquipo(o) {
   const distinta = ids.find((id, i) => res[i] === 'distinta');
   if (distinta) {
     alert('La firma de ' + nombreDePersona(distinta) + ' no es la que se registró al subirla; no se generó el documento. '
-      + 'Revísela en «Firmas del equipo» (Fichas Técnicas).');
+      + (m.delegado ? 'Avísele a ' + (m.delegacion.custodioNombre || 'el custodio de las firmas') + '.' : 'Revísela en «Firmas del equipo» (Fichas Técnicas).'));
     return false;
+  }
+  const retiradas = ids.filter((id, i) => res[i] === 'denegada');
+  if (retiradas.length) {
+    alert('Ya no tiene permiso para usar la firma de ' + retiradas.map(nombreDePersona).join(', ')
+      + ': el documento sale sin ' + (retiradas.length === 1 ? 'ella' : 'ellas') + '.');
   }
   const fallidas = ids.filter((id, i) => res[i] === 'error');
   if (fallidas.length && !confirm('No se pudo leer la firma de ' + fallidas.map(nombreDePersona).join(', ') + ' (revise la conexión).\n\n'
     + 'Pulse Aceptar para generar el documento sin ' + (fallidas.length === 1 ? 'esa firma' : 'esas firmas') + ', o Cancelar para intentar de nuevo.')) return false;
   try { llenarResponsables(); } catch (_) {}   // el ✒ y el aviso muestran lo que de verdad saldrá
-  const plan = planFirmasOrden(o, FIRMA_SESION.nombre, { propia: !!FIRMA_SESION.dataUrl, equipo: [...FIRMAS_EQUIPO.keys()] });
+  const disponibles = { propia: !!FIRMA_SESION.dataUrl, equipo: [...FIRMAS_EQUIPO.keys()] };
+  const plan = m.delegado ? planFirmasOrdenDelegada(o, m.delegacion, disponibles) : planFirmasOrden(o, FIRMA_SESION.nombre, disponibles);
   const firmas = new Map(); const casillas = [];
   for (const c of plan) {
     if (!c.origen) continue;
@@ -1124,7 +1161,8 @@ function pintarEstadoFirmas() {
   const s = getSession();
   const yo = (s && s.profile && s.profile.nombre) || '';
   const todos = [CONFIG.autorizadoPor].concat(CONFIG.entregadoPor, CONFIG.recibidoPor);
-  const misLineas = todos.filter(p => lineaDeLaSesion(p.nombre, yo));
+  const misLineas = todos.filter(p => lineaDeLaSesion(p.nombre, yo)
+    || (DELEGACION && idDeNombreDeLista(p.nombre) === DELEGACION.personaPropia));
 
   if (!yo) {
     cont.innerHTML = 'Sin sesión: el documento sale con las líneas de firma en blanco.';
@@ -1133,13 +1171,22 @@ function pintarEstadoFirmas() {
   // Sin firmas del equipo (quien no es custodio), el texto de siempre.
   const delEquipo = [...FIRMAS_EQUIPO.keys()].map(nombreDePersona).filter(Boolean);
   const noLeidas = [...ESTADO_EQUIPO].filter(([, e]) => e === 'error' || e === 'distinta').map(([id]) => nombreDePersona(id));
+  const retiradas = [...ESTADO_EQUIPO].filter(([, e]) => e === 'denegada').map(([id]) => nombreDePersona(id));
   const equipoTxt = (delEquipo.length
-    ? ' En «Entregado por» salen también, del directorio de firmas del equipo que usted custodia: <b>' + delEquipo.map(esc).join(', ') + '</b>. '
-      + 'Solo en el PDF o el Excel (cada descarga queda registrada con un folio); al imprimir desde la vista previa esa línea sale en blanco.'
-    : '') + (noLeidas.length ? ' No se pudo leer la firma de ' + noLeidas.map(esc).join(', ') + '.' : '');
+    ? (DELEGACION
+      // Sesión delegada (`99 §117`): las firmas vienen del directorio del custodio, cada una en su línea.
+      ? ' Con permiso de ' + esc(DELEGACION.custodioNombre || 'el custodio') + ', salen del directorio de firmas del equipo, cada una solo en su línea '
+        + '(la del Ingeniero en «Autorizado por»; la de Carlos Martelo o Jorge Rhenals en «Entregado por»): <b>' + delEquipo.map(esc).join(', ') + '</b>. '
+        + 'Solo en el PDF o el Excel (cada descarga queda registrada con un folio); al imprimir desde la vista previa esas líneas salen en blanco.'
+      : ' En «Entregado por» salen también, del directorio de firmas del equipo que usted custodia: <b>' + delEquipo.map(esc).join(', ') + '</b>. '
+        + 'Solo en el PDF o el Excel (cada descarga queda registrada con un folio); al imprimir desde la vista previa esa línea sale en blanco.')
+    : '') + (noLeidas.length ? ' No se pudo leer la firma de ' + noLeidas.map(esc).join(', ') + '.' : '')
+    + (retiradas.length ? ' Ya no tiene permiso para usar la firma de ' + retiradas.map(esc).join(', ') + '.' : '');
   if (!FIRMA_SESION.dataUrl) {
+    const conCopiaPropia = !!(DELEGACION && FIRMAS_EQUIPO.has(DELEGACION.personaPropia));
     cont.innerHTML = 'Aún no ha cargado su firma — cárguela en <b>«Mi firma»</b>, aquí abajo. '
-                   + (equipoTxt ? 'Mientras tanto su línea sale en blanco.' + equipoTxt : 'Mientras tanto el documento sale con las líneas en blanco.');
+                   + (conCopiaPropia ? 'Mientras tanto, en su línea sale la copia de su firma del directorio (autorizada).' + equipoTxt
+                     : (equipoTxt ? 'Mientras tanto su línea sale en blanco.' + equipoTxt : 'Mientras tanto el documento sale con las líneas en blanco.'));
     return;
   }
   cont.innerHTML = (misLineas.length
@@ -2898,7 +2945,7 @@ async function abrirVistaPrevia(ordenOpcional) {
   $('#tituloVista').textContent =
     `Vista previa — Orden de ${o.tipo.toLowerCase()} N.º ${o.numero}` +
     (paginas.length > 1 ? ` (${paginas.length} páginas)` : '') +
-    (conEquipo ? ' · La firma de «Entregado» sale en el PDF o el Excel (con folio); al imprimir desde aquí, en blanco' : '');
+    (conEquipo ? ' · Las firmas del directorio salen en el PDF o el Excel (con folio); al imprimir desde aquí, en blanco' : '');
 
   $('#modalVista').classList.add('ver');
   document.body.style.overflow = 'hidden';
