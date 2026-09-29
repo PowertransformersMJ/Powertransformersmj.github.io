@@ -4641,3 +4641,75 @@ salida olvidada (imprimir) · huella de un archivo que no es el entregado · reu
 `nombre: null` no se produce desde la app. **Pendiente suyo**: la firma de Juan Cardona (cargarla con su autorización y
 sumarlo a `EQUIPO_EN_ORDENES` y a `personaDelEquipo` de las reglas) · la primera descarga real con folio. Otro
 administrador distinto del custodio no lee ni pregunta por firmas que no tiene (`ESTADO_EQUIPO` «no-hay»).
+
+## 115. ADR-115 — Fichas: «Salud y riesgo» con letra más grande en el Excel; el Diagrama Actual anclado a su tamaño con la caja YA girada; sin «Lectura por potencia» ni la nota de la norma en pantalla ⟦OPUS-5.5⟧ (2026-09-28)
+
+> *«procede con lo que hacía falta en fichas técnicas»* = sí a las tres preguntas abiertas (`§107.8` letra de ~6 pt,
+> `§110.8` Actual angostado en Windows, `§111.8` los dos párrafos en pantalla); vista previa (antes/ahora + Excel de
+> PRUEBA) y «procede». Publicado `1c1efee` (rama `3da82fc` + `4f3c204` + `e5beffd`).
+
+**115.1 Causa raíz.**
+- (a) El dibujo de «Salud y riesgo» medía 1600 × ~724 dentro de un marco casi 2:1 (1226 × 611). Quedaba limitado por el
+  ancho (escala 0,766) y, como la hoja imprime al 70 %, la letra salía a ~5,2-6,4 pt.
+- (b) El Actual (twoCellAnchor, girado 270°) se estiraba a las celdas. Windows y la vista previa miden las columnas
+  ~13 % más angostas que el Mac en que se guardó la plantilla, así que salía angostado.
+- (c) Los dos párrafos salieron del Excel en `§111`, pero seguían en pantalla.
+
+**115.2 Solución.**
+- **Dibujo de «Salud y riesgo».** `svgSaludRiesgo` pasa a W 1240, más compacto en alto (escala 0,923). Cada texto baja
+  de tamaño solo si no cabe, medido con los anchos REALES de Arial (`ui/fichas/anchos-arial.js`, NUEVO: tabla por letra
+  + 2 % de holgura). Los párrafos se parten por ancho real y la leyenda pasa de renglón.
+- **Diagrama Actual.** `anclarConTamano` (`ajustes-libro.js`) lo ancla a su tamaño como al Futuro. A 90°/270° Excel
+  guarda el ancla como la caja YA girada (6019800 × 4940300 frente al `<a:ext>` 4940300 × 6019800): así viene en la
+  plantilla y así la lee la vista previa. `ancla-girada.js` (NUEVO) es el seguro por si la caché trae el
+  `ajustes-libro.js` viejo.
+- **Pantalla.** `panel.js` (`hojaSaludRiesgo`) ya no pinta los dos párrafos; `.ftm-sr-leyenda` lleva margen inferior.
+
+**115.3 No-regresión.**
+- Mismo contenido y orden en el dibujo.
+- Las hojas 1 (con las firmas) y 3 (Futuro) salen idénticas píxel a píxel a producción. Mantenimiento conserva sus 4
+  hojas y el PI sus 5.
+- El Actual conserva su esquina superior izquierda y su giro. Si el ancla falla, queda la de la plantilla.
+- **Aceptado:** los títulos inusualmente largos (subestación + matrícula de más de ~48 letras) bajan hasta ~7,3 pt,
+  antes 8,9. Con aviso de dato de usuarios, el veredicto baja 2 % y el subtítulo amarillo 1 %. La letra más chica de la
+  hoja pasa de 5,23 a ≥ 6,36 pt. Lo demás sale igual o más grande: «Riesgo crítico» +14 %; texto normal 6,4 → 7,8 pt;
+  etiquetas de la matriz 5,2 → 6,8 pt.
+
+**115.4 Verificación.**
+- Pruebas: 2052 pass, 0 fail, 2 skip. Nuevas: `tests/fichas_salud_riesgo_letra.test.js` (tamaños en papel frente a
+  producción; nada se sale), `tests/fichas_export_actual.test.js` (exportación completa con un navegador de mentira,
+  Mantenimiento y PI, más el seguro fijo en el exportador) y el seguro en `fichas_ajustes_libro.test.js`.
+- Banco + LibreOffice + vista previa. La tabla de anchos, contra Chrome, sobra +0,7…+5,4 %.
+- Revisión adversarial en dos rondas (Opus; bóveda `2026-09-28-revision-fichas-115`):
+  - Ronda 1: 1 medio (la estimación de ancho achicaba «Riesgo tolerable» 14 % frente a producción) y 1 bajo confirmado
+    (mezcla de caché que deformaba el Actual), más bajos.
+  - Ronda 2: solo bajos.
+  - Todos corregidos salvo lo aceptado en 115.3.
+- En vivo (su Chrome, pestaña aparte, solo lectura, AGUAS BLANCAS): la pestaña sin los dos párrafos y con margen 8 px;
+  vista previa con 4 hojas, Actual 632 × 519 derecho, «Salud y riesgo» con la letra nueva; cargados `anchos-arial.js` y
+  `ancla-girada.js`; consola limpia. No se exportó (sin folio).
+
+**115.5 Anti-patterns evitados.**
+- Ajustar el texto con un ancho PROMEDIO por letra.
+- Anclar una imagen girada con su `<a:ext>` sin cambiar.
+- Dar por buena la imagen en LibreOffice: allí la versión equivocada se veía IGUAL que la de producción.
+- Un export nuevo que dependa de un cambio de comportamiento en un módulo que la caché puede traer viejo (L-102).
+
+**115.6 Archivos.**
+- Nuevos: `ui/fichas/anchos-arial.js`, `ui/fichas/ancla-girada.js` y las 2 pruebas.
+- Tocados: `salud-riesgo-excel.js`, `exportar-planificacion.js`, `ajustes-libro.js`, `panel.js`, `fichas-tecnicas.css`,
+  `tests/fichas_ajustes_libro.test.js`.
+- INTACTOS: `vista-previa-excel.js`, la plantilla, reglas, firmas, `modeloSaludRiesgo` (que sigue armando `lectura` y
+  `nota`: el dibujo no las pinta).
+
+**115.7 Doctrina.** L-102 (lo nuevo en archivos nuevos) · L-103 (xlsx por texto, validado sin Excel real) · L-108.
+
+**115.8 Verificado sano / no re-auditar.**
+- El ancla de la plantilla ES la caja girada: 552 × 524 px frente a 632 × 519 da ×1,145/×0,99, el mismo patrón que el
+  Futuro. LibreOffice 26.2 la lee y la escribe así.
+- Que Excel aplique la regla también a `oneCellAnchor` es conocimiento, no verificado en Excel. El ancla y el `<a:xfrm>`
+  quedan coherentes, así que da igual cuál lea.
+- El Actual crece 80 px solo hacia la derecha en Windows y en la vista previa: queda como en su Mac, igual que el
+  Futuro.
+- Ángulos no rectos: la vista previa gira solo en 90/270 y el export en [45,135) ∪ [225,315). Es teórico: solo hay 270°.
+- **Pendiente suyo:** abrir en su Excel el `PRUEBA_…xlsx` o la primera descarga real.

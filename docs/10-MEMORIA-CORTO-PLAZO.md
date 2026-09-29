@@ -17,8 +17,7 @@
 > **(G)** **Los 9 fixtures con datos REALES del TX 450108 siguen en el repo PÚBLICO** (`TODO-36`, señalado hace 33 días): anonimizarlos conservando la forma del dato, o purgarlos del historial como el 2026-07-21.
 > **(H)** Decir qué se hace con los **3 equipos que su hoja de cargabilidad no trae**: `T1-M/M-CAZ`
 > (Casa de Zinc), `T2-M/M-BEC` (Becerril) y `T2-M/M-SML` (San Martín de Loba) — sin medida 2025.
-> **(I) Fichas, esperan su respuesta**: ¿agrandar la letra de «Salud y riesgo» (~6 pt en papel, `§107.8`)? · ¿fijar el
-> tamaño del Diagrama Actual para Windows (`§110.8`)? · ¿quitar también de la pantalla la lectura por potencia (`§111.8`)? · la primera
+> **(I) Fichas, esperan su respuesta**: abrir en su Excel el `PRUEBA_…xlsx` de `§115` (Actual y letra) · la primera
 > descarga real con folio (`§108.5`) · «[object Object]» en refrigeración del PI (`§103.8`) · borrar las 5 copias viejas de
 > firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`) · el primer Diagrama Operativo real (`§112.8`) · firma de Juan Cardona y 1.ª orden con folio (`§114.8`).
 

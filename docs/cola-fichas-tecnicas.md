@@ -12,6 +12,8 @@
 
 ## Lo que YA está cerrado (no re-auditar sin motivo)
 
+- **`§115`** «Salud y riesgo» con letra más grande (anchos reales de Arial; prueba que falla si un texto baja de
+  producción) · el Actual anclado con su caja YA girada (+ seguro contra caché vieja) · sin los dos párrafos en pantalla.
 - **`§82`** cada TX abre SU ficha: la identidad sale de matrícula/serie, no del «CODIGO SUBESTACION»
   (verificado en banco con dos TX de una subestación, y con prueba que lo vigila).
 - **`§81`** en la casilla de la matriz se leen potencia y usuarios, y es **informativo**: el color sale
