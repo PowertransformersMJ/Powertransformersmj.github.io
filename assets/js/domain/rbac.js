@@ -58,6 +58,10 @@ export const PERMISOS = Object.freeze({
   // Propuestas reclasificación
   'override.manual': ['admin', 'director_proyectos'],
 
+  // Fichas Técnicas · adjuntar/reemplazar el «Diagrama Operativo» (`99 §118`): por rol solo el
+  // admin; a un usuario puntual se le da en permisos_extra (Administración › Usuarios).
+  'fichas.adjuntar_operativo': ['admin'],
+
   // Usuarios
   'usuarios.gestionar': ['admin', 'director_proyectos'],
 

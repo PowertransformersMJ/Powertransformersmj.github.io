@@ -1118,10 +1118,19 @@ service cloud.firestore {
         && autorAdjuntoValido(d.subidoPor)
         && d.en == request.time;
     }
+    // ADR-118 (el Ingeniero, 2026-09-29): además del admin, adjunta y REEMPLAZA quien tenga en su
+    // perfil el permiso «fichas.adjuntar_operativo» (lo pone solo el admin en /usuarios). Quitar,
+    // solo el admin. Espejo de `domain/permiso_operativo.js`.
+    function puedeAdjuntarOperativo() {
+      return hasProfile() && (isAdmin()
+        || (profile().get('activo', false) == true
+            && profile().get('permisos_extra', []) is list
+            && profile().get('permisos_extra', []).hasAny(['fichas.adjuntar_operativo'])));
+    }
     match /fichas_adjuntos/{id} {
       allow get:  if isTeamMember();
       allow list: if isAdmin() && request.query.limit <= 50;
-      allow create, update: if isAdmin() && hasProfile() && id.matches('^salud_[0-9a-f]{64}$') && metaAdjuntoValida(id)
+      allow create, update: if puedeAdjuntarOperativo() && id.matches('^salud_[0-9a-f]{64}$') && metaAdjuntoValida(id)
                     && (resource == null || resource.data.lote != request.resource.data.lote)
                     && existsAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote))
                     && getAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote)).data.accion == (resource == null ? 'alta' : 'reemplazo');
@@ -1133,7 +1142,7 @@ service cloud.firestore {
                     && !existsAfter(/databases/$(database)/documents/fichas_adjuntos/$(id)/partes/2);
       match /partes/{n} {
         allow get: if isTeamMember();
-        allow create, update: if isAdmin() && hasProfile() && n in ['0', '1', '2']
+        allow create, update: if puedeAdjuntarOperativo() && n in ['0', '1', '2']
                       && request.resource.data.keys().hasOnly(['bytes', 'lote'])
                       && request.resource.data.bytes is bytes
                       && request.resource.data.bytes.size() >= 1
@@ -1145,12 +1154,17 @@ service cloud.firestore {
                       && int(n) < getAfter(rutaAdjunto(id)).data.partes;
         allow delete: if isAdmin() && hasProfile() && n in ['0', '1', '2']
                       && (!existsAfter(rutaAdjunto(id)) || int(n) >= getAfter(rutaAdjunto(id)).data.partes);
+        // Quien adjunta con permiso borra SOLO los espacios que sobran en un reemplazo (la meta sigue).
+        allow delete: if puedeAdjuntarOperativo() && n in ['0', '1', '2']
+                      && existsAfter(rutaAdjunto(id)) && int(n) >= getAfter(rutaAdjunto(id)).data.partes;
       }
     }
     match /fichas_adjuntos_registro/{rid} {
       allow get:  if isAdmin();
       allow list: if isAdmin() && request.query.limit <= 50;
-      allow create: if isAdmin() && hasProfile()
+      allow create: if puedeAdjuntarOperativo()
+                    // «retiro» (quitar) solo el admin; alta y reemplazo, también quien tiene el permiso.
+                    && (isAdmin() || request.resource.data.get('accion', '') in ['alta', 'reemplazo'])
                     && request.resource.data.keys().hasOnly(['idAdjunto', 'accion', 'lote', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
                     && request.resource.data.keys().hasAll(['idAdjunto', 'accion', 'lote', 'nombre', 'huella', 'tamano', 'subidoPor', 'en'])
                     && request.resource.data.idAdjunto is string

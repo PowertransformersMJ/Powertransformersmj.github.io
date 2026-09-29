@@ -222,6 +222,8 @@
   };
   const adjuntos = {
     async puedeEscribir() { return (await cargarDatosAdjuntos()).puedeEscribir(); },
+    // Quitar es solo del administrador (99 §118); un módulo viejo en caché no trae la función: decide puedeEscribir.
+    async puedeQuitar() { const d = await cargarDatosAdjuntos(); return typeof d.puedeQuitar === 'function' ? d.puedeQuitar() : d.puedeEscribir(); },
     async leerMeta(id) { return (await cargarDatosAdjuntos()).leerMeta(id); },
     async leerImagen(id, meta) { return (await cargarDatosAdjuntos()).leerImagen(id, meta); },
     async guardar(ident, datos, reemplazo) { return (await cargarDatosAdjuntos()).guardar(ident, datos, reemplazo); },
