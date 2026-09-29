@@ -36,6 +36,10 @@ import { miFirma, firmasDisponibles } from './data/firmas.js';
 // ¿La línea es de la sesión? Por la lista CERRADA de nombres de la misma persona: el perfil del
 // Ingeniero es «ING. MIGUEL JIMENEZ» y la línea dice «MIGUEL JIMENEZ» (2026-09-28, `99 §99.12`).
 import { lineaDeLaSesion } from './domain/firmas_sesion.js';
+// «Entregado por» con las firmas del equipo que custodia el Ingeniero, como en Fichas (decisión suya,
+// 2026-09-28): qué firma va en cada línea, el folio de cada emisión y a quién pertenece cada clave.
+import { planFirmasOrden, personasEquipoDeOrden, nombreConFolio } from './domain/ordenes_firmas.js';
+import { idDeNombreDeLista, nombreDePersona, folioDeEmision } from './domain/firmas_equipo.js';
 import { getSession, isAdmin as esAdminDeSesion } from './auth/session-guard.js';
 import { listarV2 as listarParque } from './data/transformadores.js';
 import { parqueParaOrdenes } from './domain/ordenes_parque.js';
@@ -630,10 +634,110 @@ const FIRMA_SESION = { dataUrl: null, rel: 1, nombre: '', cargada: false };
  * para firmar a mano, igual que el formato en papel.
  */
 function firmaDe(persona) {
-  if (!FIRMA_SESION.dataUrl) return null;
   const nombre = persona && persona.nombre;
-  if (!lineaDeLaSesion(nombre, FIRMA_SESION.nombre)) return null;
-  return { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel };
+  // La línea de la sesión lleva SU firma, nunca la del directorio.
+  if (lineaDeLaSesion(nombre, FIRMA_SESION.nombre)) {
+    return FIRMA_SESION.dataUrl ? { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel } : null;
+  }
+  // Las demás personas DE LA LISTA: la del directorio del custodio (solo si la sesión lo es), por
+  // CLAVE exacta de la lista; nadie más recibe firma (2026-09-28, como Fichas `99 §99`/`§108`).
+  if (SOLO_PROPIA) return null;
+  const id = idDeNombreDeLista(nombre);
+  const f = id ? FIRMAS_EQUIPO.get(id) : null;
+  return f ? { src: f.dataUrl, rel: f.rel } : null;
+}
+
+/* ── Firmas del EQUIPO bajo custodia (solo un administrador custodio, `99 §99`) ──
+   La vista previa usa las ya cargadas; cada PDF o Excel las RELEE sin caché, las
+   compara con la huella registrada al subirlas y queda en `ordenes_emisiones`
+   con su folio. Si el registro falla, se pregunta y el documento sale solo con
+   la firma de la sesión, sin folio (lo mismo que Fichas). */
+const FIRMAS_EQUIPO = new Map();   // clave → { dataUrl, rel, huella }
+let SOLO_PROPIA = false;           // al rehacer un documento sin registro
+let _custodia = null;
+async function modulosCustodia() {
+  if (_custodia) return _custodia;
+  try {
+    if (!esAdminDeSesion()) return null;
+    const [fe, em] = await Promise.all([import('./data/firmas_equipo.js'), import('./data/ordenes_emisiones.js')]);
+    if (!fe.puedeCustodiar() || !em.puedeRegistrar()) return null;
+    _custodia = { fe, em };
+    return _custodia;
+  } catch (e) {
+    console.warn('[órdenes] sin firmas del equipo:', e);
+    return null;
+  }
+}
+function bytesDeDataUrl(u) {
+  const b = atob(String(u || '').split(',')[1] || '');
+  const a = new Uint8Array(b.length);
+  for (let i = 0; i < b.length; i++) a[i] = b.charCodeAt(i);
+  return a;
+}
+/** Relee UNA firma del directorio y la verifica contra su huella: 'ok' · 'no-hay' · 'error' · 'distinta'. */
+async function releerFirmaEquipo(m, id) {
+  const l = await m.fe.leerFirma(id);
+  if (l && l.error) { FIRMAS_EQUIPO.delete(id); return 'error'; }
+  if (!l) { FIRMAS_EQUIPO.delete(id); return 'no-hay'; }
+  const huella = await m.fe.huellaDe(bytesDeDataUrl(l.dataUrl));
+  if (huella !== l.huella) { FIRMAS_EQUIPO.delete(id); return 'distinta'; }
+  FIRMAS_EQUIPO.set(id, { dataUrl: l.dataUrl, rel: await medirRel(l.dataUrl), huella });
+  return 'ok';
+}
+/** Carga las firmas del directorio de las personas de las listas de este formato (vista previa y ✒). */
+async function cargarFirmasEquipo() {
+  const m = await modulosCustodia();
+  if (!m) return;
+  const nombres = [CONFIG.autorizadoPor].concat(CONFIG.entregadoPor, CONFIG.recibidoPor).map((p) => p.nombre);
+  const ids = [...new Set(nombres.filter((n) => !lineaDeLaSesion(n, FIRMA_SESION.nombre)).map(idDeNombreDeLista).filter(Boolean))];
+  for (const id of ids) { try { await releerFirmaEquipo(m, id); } catch (_) { FIRMAS_EQUIPO.delete(id); } }
+}
+/**
+ * Antes de emitir un PDF o Excel: relee las firmas del directorio que pide ESTA orden y arma lo
+ * que se registrará. Devuelve {m, casillas, conEquipo}; null si no hay custodia (sale solo la
+ * firma propia, sin registro); false si se canceló o una firma no es la registrada.
+ */
+async function prepararFirmasEquipo(o) {
+  if (o.conFirmas === false) return null;
+  const m = await modulosCustodia();
+  if (!m) return null;
+  const fallidas = [];
+  for (const id of personasEquipoDeOrden(o, FIRMA_SESION.nombre)) {
+    const r = await releerFirmaEquipo(m, id);
+    if (r === 'error') fallidas.push(id);
+    if (r === 'distinta') {
+      alert('La firma de ' + nombreDePersona(id) + ' no es la que se registró al subirla; no se generó el documento. '
+        + 'Revísela en «Firmas del equipo» (Fichas Técnicas).');
+      return false;
+    }
+  }
+  if (fallidas.length && !confirm('No se pudo leer la firma de ' + fallidas.map(nombreDePersona).join(', ') + ' (revise la conexión).\n\n'
+    + 'Pulse Aceptar para generar el documento sin ' + (fallidas.length === 1 ? 'esa firma' : 'esas firmas') + ', o Cancelar para intentar de nuevo.')) return false;
+  const plan = planFirmasOrden(o, FIRMA_SESION.nombre, { propia: !!FIRMA_SESION.dataUrl, equipo: [...FIRMAS_EQUIPO.keys()] });
+  const casillas = [];
+  for (const c of plan) {
+    if (!c.origen) continue;
+    const huella = c.origen === 'equipo' ? FIRMAS_EQUIPO.get(c.id).huella : await m.fe.huellaDe(bytesDeDataUrl(FIRMA_SESION.dataUrl));
+    casillas.push({ rol: c.k, persona: c.id || '', nombre: c.nombre, origen: c.origen, huella });
+  }
+  return { m, casillas, conEquipo: casillas.some((c) => c.origen === 'equipo') };
+}
+/**
+ * Registra la emisión (si lleva firmas del equipo): {nombre} con el folio · {rehacer: true} si el
+ * registro falló y se aceptó salir solo con la firma propia · {cancelar: true}.
+ */
+async function registrarEmisionSiLleva(fe, o, formato, bytes, nombre) {
+  if (!fe || !fe.conEquipo) return { nombre };
+  try {
+    const huellaArchivo = await fe.m.fe.huellaDe(bytes);
+    const id = fe.m.em.nuevaEmisionOrdenId();
+    await fe.m.em.registrarEmisionOrden(id, { orden: o, formato, casillas: fe.casillas, huellaArchivo });
+    return { nombre: nombreConFolio(nombre, folioDeEmision(id)) };
+  } catch (e) {
+    console.warn('[órdenes] no se registró la emisión con firmas del equipo:', e);
+    return confirm('No se pudo registrar la descarga con firmas del equipo (' + ((e && (e.code || e.message)) || 'error') + ').\n\n'
+      + 'Pulse Aceptar para descargarla solo con su firma, sin folio, o Cancelar para intentar de nuevo.') ? { rehacer: true } : { cancelar: true };
+  }
 }
 
 /** Mide el ancho/alto real de un dataURL para no deformar la firma. */
@@ -1000,16 +1104,21 @@ function pintarEstadoFirmas() {
     cont.innerHTML = 'Sin sesión: el documento sale con las líneas de firma en blanco.';
     return;
   }
+  const delEquipo = [...FIRMAS_EQUIPO.keys()].map(nombreDePersona).filter(Boolean);
+  const equipoTxt = delEquipo.length
+    ? ' Del directorio de firmas del equipo (usted es su custodio) salen también: <b>' + delEquipo.map(esc).join(', ') + '</b>, '
+      + 'cuando la orden los nombra. Cada PDF o Excel con esas firmas queda registrado con un folio.'
+    : '';
   if (!FIRMA_SESION.dataUrl) {
     cont.innerHTML = 'Aún no ha cargado su firma — cárguela en <b>«Mi firma»</b>, aquí abajo. '
-                   + 'Mientras tanto el documento sale con las líneas en blanco.';
+                   + 'Mientras tanto su línea sale en blanco.' + equipoTxt;
     return;
   }
-  cont.innerHTML = misLineas.length
+  cont.innerHTML = (misLineas.length
     ? `Se estampará su firma en <b>${misLineas.length}</b> línea(s) de este documento. `
-      + 'Las demás salen en blanco para firmar a mano.'
+      + 'Quien no tenga firma cargada firma a mano.'
     : 'Su firma está cargada, pero <b>su nombre no figura</b> en ninguna línea de este '
-      + 'documento, así que no se estampará. Solo puede firmar donde aparece usted.';
+      + 'documento, así que no se estampará. Solo puede firmar donde aparece usted.') + equipoTxt;
 }
 
 /* --------------------- Motivo abierto y renglones ---------------------- */
@@ -2799,7 +2908,10 @@ function ajustarZoom(delta) {
    vectoriales, por lo que la calidad de impresión es independiente del zoom.
    ========================================================================== */
 
-async function exportarPDF(ordenOpcional, soloDevolver) {
+async function exportarPDF(ordenOpcional, soloDevolver, rehecho) {
+  // `rehecho`: segunda pasada cuando el registro de la emisión falló y se aceptó
+  // salir solo con la firma propia (la orden ya validada y con sus cédulas).
+  if (rehecho) return armarYGuardarPDF(rehecho.o, soloDevolver, null, true);
   // 1) Primero se valida el formulario (aunque falte la librería, el usuario
   //    debe ver qué campos obligatorios tiene pendientes).
   let o = ordenOpcional || leerOrden();
@@ -2819,8 +2931,22 @@ async function exportarPDF(ordenOpcional, soloDevolver) {
   o = await ordenParaImprimir(o, { preguntar: true });
   if (!o) return null;
 
+  // 4) Firmas del equipo (custodio): se releen y se verifican antes de dibujar.
+  const fe = await prepararFirmasEquipo(o);
+  if (fe === false) return null;
+  return armarYGuardarPDF(o, soloDevolver, fe, false);
+}
+
+/** Dibuja el PDF de una orden ya lista y lo descarga (registrando la emisión si lleva firmas del equipo). */
+async function armarYGuardarPDF(o, soloDevolver, fe, soloPropia) {
+  const JsPDF = LIBS.jspdf;
+  if (!JsPDF) {
+    aviso('La librería de PDF (jsPDF) no está disponible. Verifique su conexión a internet y recargue la página.', 'err', 8000);
+    return null;
+  }
   try {
     cargando(true, 'Generando el PDF…');
+    SOLO_PROPIA = soloPropia;
 
     const doc = new JsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
     doc.setProperties({
@@ -2885,7 +3011,13 @@ async function exportarPDF(ordenOpcional, soloDevolver) {
 
     if (soloDevolver) { cargando(false); return doc; }
 
-    const nombre = nombreArchivo(o, 'pdf');
+    let nombre = nombreArchivo(o, 'pdf');
+    if (fe && fe.conEquipo && !soloPropia) {
+      const r = await registrarEmisionSiLleva(fe, o, 'pdf', new Uint8Array(doc.output('arraybuffer')), nombre);
+      if (r.cancelar) { cargando(false); return null; }
+      if (r.rehacer) { cargando(false); SOLO_PROPIA = false; return armarYGuardarPDF(o, soloDevolver, null, true); }
+      nombre = r.nombre;
+    }
     doc.save(nombre);
     cargando(false);
     aviso(`PDF generado: ${nombre}`, 'ok', 5000);
@@ -2896,6 +3028,8 @@ async function exportarPDF(ordenOpcional, soloDevolver) {
     console.error('Error al generar el PDF:', err);
     aviso('Ocurrió un error al generar el PDF: ' + (err && err.message ? err.message : err), 'err', 8000);
     return null;
+  } finally {
+    SOLO_PROPIA = false;
   }
 }
 
@@ -2992,7 +3126,9 @@ function marcoFila(ws, r) {
 
 /* ------------------------------ Exportación ---------------------------- */
 
-async function exportarExcel(ordenOpcional) {
+async function exportarExcel(ordenOpcional, rehecho) {
+  // `rehecho`: segunda pasada sin registro (ver exportarPDF): la orden ya está lista.
+  if (rehecho) return armarYGuardarExcel(rehecho.o, null, true);
   // 1) Validación previa del formulario.
   let o = ordenOpcional || leerOrden();
   if (!ordenOpcional) {
@@ -3011,6 +3147,19 @@ async function exportarExcel(ordenOpcional) {
   o = await ordenParaImprimir(o, { preguntar: true });
   if (!o) return;
 
+  // 4) Firmas del equipo (custodio): se releen y se verifican antes de armar el libro.
+  const fe = await prepararFirmasEquipo(o);
+  if (fe === false) return;
+  return armarYGuardarExcel(o, fe, false);
+}
+
+/** Arma el Excel de una orden ya lista y lo descarga (registrando la emisión si lleva firmas del equipo). */
+async function armarYGuardarExcel(o, fe, soloPropia) {
+  const ExcelJSLib = LIBS.exceljs;
+  if (!ExcelJSLib) {
+    aviso('La librería de Excel (ExcelJS) no está disponible. Verifique su conexión a internet y recargue la página.', 'err', 8000);
+    return;
+  }
   cargando(true, 'Generando el archivo de Excel…');
 
   try {
@@ -3028,11 +3177,20 @@ async function exportarExcel(ordenOpcional) {
 
     const porPagina = CONFIG.filasTablaPagina;
     const nPag = Math.max(1, Math.ceil((o.items.length || 1) / porPagina));
-    for (let p = 0; p < nPag; p++) hojaOrden(wb, o, p, nPag, idLogo);
+    SOLO_PROPIA = soloPropia;
+    try {
+      for (let p = 0; p < nPag; p++) hojaOrden(wb, o, p, nPag, idLogo);
+    } finally { SOLO_PROPIA = false; }
     hojaDatos(wb, o);
 
-    wb.xlsx.writeBuffer().then(buf => {
-      const nombre = nombreArchivo(o, 'xlsx');
+    return wb.xlsx.writeBuffer().then(async buf => {
+      let nombre = nombreArchivo(o, 'xlsx');
+      if (fe && fe.conEquipo && !soloPropia) {
+        const r = await registrarEmisionSiLleva(fe, o, 'xlsx', new Uint8Array(buf), nombre);
+        if (r.cancelar) { cargando(false); return; }
+        if (r.rehacer) { cargando(false); return armarYGuardarExcel(o, null, true); }
+        nombre = r.nombre;
+      }
       LIBS.descargar(new Blob([buf], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       }), nombre);
@@ -5025,7 +5183,7 @@ else iniciar();
 // Al llegar se repinta la vista previa abierta, para que la firma aparezca sin
 // que el usuario tenga que cerrarla y volver a abrirla.
 function trasCargarFirma() {
-  cargarFirmaDeLaSesion().then(() => {
+  cargarFirmaDeLaSesion().then(() => cargarFirmasEquipo()).catch(() => {}).then(() => {
     try { if (document.getElementById('modalVista').classList.contains('ver')) abrirVistaPrevia(VISTA.orden || undefined); } catch (_) {}
     try { llenarResponsables(); } catch (_) {}   // repinta SOLO la marca ✒ (no «con firmas»)
   });

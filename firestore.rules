@@ -912,6 +912,33 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Órdenes de Entrada/Salida (IT.05801) · emisiones con firmas del equipo ──
+    // Cada PDF o Excel de una orden que lleva firmas del directorio del custodio
+    // queda aquí (decisión del Ingeniero 2026-09-28: «Entregado» como en Fichas).
+    // Mismo contrato que `fichas_emisiones`: SOLO se agrega, a nombre de quien emite.
+    match /ordenes_emisiones/{folio} {
+      allow get:  if isAdmin();
+      allow list: if isAdmin() && request.query.limit <= 50;
+      allow create: if isAdmin() && hasProfile()
+                    && request.resource.data.keys().hasOnly(['orden', 'documento', 'formato', 'casillas', 'huellaArchivo',
+                                                             'custodio', 'custodioNombre', 'en'])
+                    && request.resource.data.keys().hasAll(['orden', 'documento', 'formato', 'casillas', 'huellaArchivo',
+                                                            'custodio', 'custodioNombre', 'en'])
+                    && request.resource.data.orden is map
+                    && request.resource.data.orden.keys().hasOnly(['tipo', 'numero', 'zona', 'fecha'])
+                    && request.resource.data.documento == 'IT.05801'
+                    && request.resource.data.formato in ['pdf', 'xlsx']
+                    && request.resource.data.casillas is list
+                    && request.resource.data.casillas.size() >= 1
+                    && request.resource.data.casillas.size() <= 3
+                    && request.resource.data.huellaArchivo is string
+                    && request.resource.data.huellaArchivo.matches('^[0-9a-f]{64}$')
+                    && request.resource.data.custodio == request.auth.uid
+                    && request.resource.data.custodioNombre == profile().get('nombre', '')
+                    && request.resource.data.en == request.time;
+      allow update, delete: if false;
+    }
+
     // ── Fichas · «Diagrama Operativo» (ADR-112) ──
     // Un adjunto por TRANSFORMADOR: la meta en fichas_adjuntos/{id} y la imagen
     // aprobada en partes/{0..2} (bytes ≤ 900 KB, a lo sumo 3), atadas por `lote`
