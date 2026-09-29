@@ -48,7 +48,11 @@ async function nombreVigente(c) {
   } catch (_) { return c.nombre || ''; }
 }
 
-/** Usuarios activos a quienes se les puede delegar (todos menos el custodio): [{uid, nombre}]. */
+/**
+ * Usuarios activos a quienes se les puede delegar (todos menos el custodio):
+ * [{uid, nombre, etiqueta}] — `nombre` es el del perfil TAL CUAL (la regla lo compara; puede
+ * venir vacío) y `etiqueta` lo que se muestra (el correo si no hay nombre).
+ */
 export async function usuariosParaDelegar() {
   const c = custodio();
   if (!c) return [];
@@ -56,9 +60,9 @@ export async function usuariosParaDelegar() {
   const out = [];
   snap.forEach((d) => {
     const x = d.data() || {};
-    if (d.id !== c.uid && x.activo === true) out.push({ uid: d.id, nombre: String(x.nombre || x.email || d.id) });
+    if (d.id !== c.uid && x.activo === true) out.push({ uid: d.id, nombre: String(x.nombre || ''), etiqueta: String(x.nombre || x.email || d.id) });
   });
-  return out.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  return out.sort((a, b) => a.etiqueta.localeCompare(b.etiqueta, 'es'));
 }
 
 /** Delegaciones vigentes de este custodio: Map uid → {personaPropia, personas, autorizaciones, lote, delegadoNombre}. */
@@ -107,7 +111,9 @@ export async function otorgar(uid, d, vigente = null) {
     return { ok: true };
   } catch (e) {
     console.warn('[delegaciones] otorgar:', e && e.code || e);
-    return { ok: false, motivo: 'No se pudo guardar el permiso (' + ((e && e.code) || 'error') + '). Revise la fecha y el medio de cada autorización.' };
+    return { ok: false, motivo: e && e.code === 'permission-denied'
+      ? 'No se pudo guardar el permiso: lo que hay en pantalla ya no es lo vigente, o este usuario tiene permiso de otro custodio. Recargue la página e inténtelo de nuevo.'
+      : 'No se pudo guardar el permiso (' + ((e && e.code) || 'error') + '). Revise la conexión.' };
   }
 }
 
@@ -133,20 +139,29 @@ export async function retirar(uid, loteVigente) {
 /**
  * Los últimos documentos emitidos por DELEGADOS con firmas de este custodio:
  * [{en: Date|null, emisorNombre, orden, formato, casillas, folio}] (los más nuevos primero).
+ * Se consulta POR DELEGADO (los que alguna vez tuvieron permiso, según el registro): las
+ * emisiones propias del custodio no ocupan la ventana (revisión de `§117`). Índice:
+ * ordenes_emisiones (emisor ASC, en DESC).
  */
-export async function ultimosUsos() {
+export async function ultimosUsos({ porDelegado = 20, total = 40 } = {}) {
   const c = custodio();
   if (!c) return [];
-  const snap = await getDocs(query(collection(getDbSafe(), 'ordenes_emisiones'), orderBy('en', 'desc'), limit(50)));
+  const db = getDbSafe();
+  const reg = await getDocs(query(collection(db, 'firmas_delegados_registro'), where('custodio', '==', c.uid), limit(50)));
+  const uids = new Set();
+  reg.forEach((d) => { const x = d.data() || {}; if (x.delegado) uids.add(String(x.delegado)); });
   const out = [];
-  snap.forEach((d) => {
-    const x = d.data() || {};
-    if (!x.emisor || x.custodio !== c.uid) return;
-    out.push({
-      en: x.en && typeof x.en.toDate === 'function' ? x.en.toDate() : null,
-      emisorNombre: String(x.emisorNombre || ''), orden: x.orden || {}, formato: String(x.formato || ''),
-      casillas: Array.isArray(x.casillas) ? x.casillas : [], folio: folioDeEmision(d.id)
+  for (const uid of uids) {
+    const snap = await getDocs(query(collection(db, 'ordenes_emisiones'), where('emisor', '==', uid), orderBy('en', 'desc'), limit(porDelegado)));
+    snap.forEach((d) => {
+      const x = d.data() || {};
+      if (x.custodio !== c.uid) return;
+      out.push({
+        en: x.en && typeof x.en.toDate === 'function' ? x.en.toDate() : null,
+        emisorNombre: String(x.emisorNombre || ''), orden: x.orden || {}, formato: String(x.formato || ''),
+        casillas: Array.isArray(x.casillas) ? x.casillas : [], folio: folioDeEmision(d.id)
+      });
     });
-  });
-  return out;
+  }
+  return out.sort((a, b) => (b.en ? b.en.getTime() : 0) - (a.en ? a.en.getTime() : 0)).slice(0, total);
 }

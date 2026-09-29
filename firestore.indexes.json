@@ -436,6 +436,14 @@
         { "fieldPath": "suministro_id", "order": "ASCENDING" },
         { "fieldPath": "marca",         "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "ordenes_emisiones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emisor", "order": "ASCENDING" },
+        { "fieldPath": "en",     "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

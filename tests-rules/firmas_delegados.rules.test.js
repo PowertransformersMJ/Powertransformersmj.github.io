@@ -15,6 +15,9 @@ const PROJECT_ID = 'demo-sgm-rules';
 let testEnv;
 const db = (uid) => testEnv.authenticatedContext(uid).firestore();
 const lote = (n) => 'L' + String(n).padStart(19, '0');
+// Folio (id) de una emisión del delegado: 20 letras o dígitos, como los que da Firestore.
+const fol = (t) => ('F' + t + 'x'.repeat(20)).replace(/[^A-Za-z0-9]/g, 'x').slice(0, 20);
+const H = 'e'.repeat(64);   // la huella de las firmas sembradas en el directorio
 const HOY = { fecha: '2026-09-28', medio: 'Autorización verbal al custodio' };
 
 before(async () => {
@@ -75,8 +78,8 @@ function retirar(quien, delegado, loteActual, { conRegistro = true, custodio = '
 const emision = (extra = {}) => ({
   orden: { tipo: 'SALIDA', numero: '777', zona: 'BOLIVAR', fecha: '28/09/2026' },
   documento: 'IT.05801', formato: 'pdf',
-  casillas: [{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: 'b'.repeat(64) },
-    { rol: 'entregado', persona: 'JORGE_RHENALS', nombre: 'JORGE RHENALS', origen: 'equipo', huella: 'c'.repeat(64) }],
+  casillas: [{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: H },
+    { rol: 'entregado', persona: 'JORGE_RHENALS', nombre: 'JORGE RHENALS', origen: 'equipo', huella: H }],
   huellaArchivo: 'a'.repeat(64), custodio: 'fd_admin', custodioNombre: 'Custodio FD',
   // La delegación VIGENTE de Carlos es la del cambio (lote 52): una emisión con un lote viejo no vale.
   emisor: 'fd_carlos', emisorNombre: 'Carlos Sintetico', delegacion: lote(52), en: serverTimestamp(), ...extra
@@ -175,10 +178,10 @@ describe('el directorio del custodio: el delegado lee SOLO lo que se le delegó'
 
 describe('emisiones del delegado (ordenes_emisiones con emisor y delegación)', () => {
   test('Carlos registra la suya: dueño del directorio = custodio, emisor = él, delegación vigente', async () => {
-    await assertSucceeds(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/fd_e1'), emision()));
-    await assertSucceeds(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/fd_e1b'), emision({ formato: 'xlsx',
+    await assertSucceeds(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/' + fol('e1')), emision()));
+    await assertSucceeds(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/' + fol('e1b')), emision({ formato: 'xlsx',
       casillas: [{ rol: 'entregado', persona: 'CARLOS_MARTELO', nombre: 'CARLOS MARTELO', origen: 'propia', huella: 'd'.repeat(64) },
-        { rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: 'b'.repeat(64) }] })));
+        { rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: H }] })));
   });
   test('lo que no cuadra con su delegación: no', async () => {
     const c = (casillas) => ({ casillas });
@@ -192,14 +195,31 @@ describe('emisiones del delegado (ordenes_emisiones con emisor y delegación)', 
       c([{ rol: 'entregado', persona: 'JORGE_RHENALS', nombre: 'JORGE RHENALS', origen: 'propia', huella: 'b'.repeat(64) }]),
       c([{ rol: 'recibido', persona: 'CARLOS_MARTELO', nombre: 'X', origen: 'equipo', huella: 'b'.repeat(64) }]),
       c([{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: 'zz' }]),
-      c([]), { documento: 'PE.02081' }, { en: new Date() }, { extra: 1 }, { delegacion: lote(1) }
+      c([]), { documento: 'PE.02081' }, { en: new Date() }, { extra: 1 }, { delegacion: lote(1) },
+      // Revisión §117: dos casillas en la misma línea, tres casillas, una huella que no es la del directorio,
+      // datos de la orden fuera de forma o de tamaño.
+      c([{ rol: 'entregado', persona: 'CARLOS_MARTELO', nombre: 'CARLOS MARTELO', origen: 'equipo', huella: H },
+        { rol: 'entregado', persona: 'JORGE_RHENALS', nombre: 'JORGE RHENALS', origen: 'equipo', huella: H }]),
+      c([{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: H },
+        { rol: 'entregado', persona: 'CARLOS_MARTELO', nombre: 'CARLOS MARTELO', origen: 'equipo', huella: H },
+        { rol: 'entregado', persona: 'JORGE_RHENALS', nombre: 'JORGE RHENALS', origen: 'equipo', huella: H }]),
+      c([{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'equipo', huella: '1'.repeat(64) }]),
+      c([{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'X'.repeat(81), origen: 'equipo', huella: H }]),
+      { orden: { tipo: 'OTRO', numero: '777', zona: 'BOLIVAR', fecha: '28/09/2026' } },
+      { orden: { tipo: 'SALIDA', numero: '7'.repeat(31), zona: 'BOLIVAR', fecha: '28/09/2026' } },
+      { orden: { tipo: 'SALIDA', numero: '777', zona: ['X'], fecha: '28/09/2026' } },
+      { orden: { tipo: 'SALIDA', numero: 777, zona: 'BOLIVAR', fecha: '28/09/2026' } }
     ];
     let i = 0;
-    for (const m of mal) await assertFails(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/fd_m' + (i++)), emision(m)));
+    for (const m of mal) await assertFails(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/' + fol('m' + (i++))), emision(m)));
+  });
+  test('el folio de una emisión del delegado es un id de 20 letras o dígitos', async () => {
+    await assertFails(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/corto'), emision()));
+    await assertFails(setDoc(doc(db('fd_carlos'), 'ordenes_emisiones/FOLIO-CON-GUIONES-000'), emision()));
   });
   test('un técnico sin delegación no registra; el delegado no lee el registro; ni Fichas', async () => {
-    await assertFails(setDoc(doc(db('fd_otro'), 'ordenes_emisiones/fd_e2'), emision({ emisor: 'fd_otro', emisorNombre: 'Otro Tecnico' })));
-    await assertFails(getDoc(doc(db('fd_carlos'), 'ordenes_emisiones/fd_e1')));
+    await assertFails(setDoc(doc(db('fd_otro'), 'ordenes_emisiones/' + fol('e2')), emision({ emisor: 'fd_otro', emisorNombre: 'Otro Tecnico' })));
+    await assertFails(getDoc(doc(db('fd_carlos'), 'ordenes_emisiones/' + fol('e1'))));
     await assertFails(getDocs(query(collection(db('fd_carlos'), 'ordenes_emisiones'), limit(5))));
     await assertFails(setDoc(doc(db('fd_carlos'), 'fichas_emisiones/fd_f1'), { documento: 'PE.02081' }));
   });
@@ -208,7 +228,7 @@ describe('emisiones del delegado (ordenes_emisiones con emisor y delegación)', 
       casillas: [{ rol: 'autorizado', persona: 'MIGUEL_JIMENEZ', nombre: 'MIGUEL JIMENEZ', origen: 'propia', huella: 'b'.repeat(64) }],
       huellaArchivo: 'a'.repeat(64), custodio: 'fd_admin', custodioNombre: 'Custodio FD', en: serverTimestamp() };
     await assertSucceeds(setDoc(doc(db('fd_admin'), 'ordenes_emisiones/fd_a1'), adm));
-    await assertFails(setDoc(doc(db('fd_admin'), 'ordenes_emisiones/fd_a2'), { ...adm, emisor: 'fd_admin', emisorNombre: 'Custodio FD', delegacion: lote(1) }));
+    await assertFails(setDoc(doc(db('fd_admin'), 'ordenes_emisiones/' + fol('a2')), { ...adm, emisor: 'fd_admin', emisorNombre: 'Custodio FD', delegacion: lote(1) }));
   });
 });
 
@@ -216,11 +236,19 @@ describe('vigencia: retirar, dar de baja o degradar corta en la siguiente petici
   test('retirar exige su registro de retiro; otro admin no retira; después ya no lee ni registra', async () => {
     await assertSucceeds(otorgar('fd_admin', 'fd_baja', deleg({ delegadoNombre: 'Se Da De Baja', personaPropia: 'JORGE_RHENALS', lote: lote(70) })));
     await assertFails(retirar('fd_admin', 'fd_baja', lote(70), { conRegistro: false }));
+    // El registro de retiro no admite datos de más (revisión §117).
+    {
+      const f = db('fd_admin'); const b = writeBatch(f);
+      b.delete(doc(f, 'firmas_delegados/fd_baja'));
+      b.set(doc(f, 'firmas_delegados_registro/fd_baja_' + lote(70) + '_retiro'),
+        { tipo: 'retiro', delegado: 'fd_baja', lote: lote(70), custodio: 'fd_admin', custodioNombre: 'Custodio FD', personas: ['MIGUEL_JIMENEZ'], en: serverTimestamp() });
+      await assertFails(b.commit());
+    }
     await assertFails(retirar('fd_admin2', 'fd_baja', lote(70), { custodio: 'fd_admin2', nombre: 'Otro Admin FD' }));
     await assertSucceeds(getDoc(doc(db('fd_baja'), 'firmas_equipo/fd_admin/personas/MIGUEL_JIMENEZ')));
     await assertSucceeds(retirar('fd_admin', 'fd_baja', lote(70)));
     await assertFails(getDoc(doc(db('fd_baja'), 'firmas_equipo/fd_admin/personas/MIGUEL_JIMENEZ')));
-    await assertFails(setDoc(doc(db('fd_baja'), 'ordenes_emisiones/fd_b1'), emision({ emisor: 'fd_baja', emisorNombre: 'Se Da De Baja', delegacion: lote(70) })));
+    await assertFails(setDoc(doc(db('fd_baja'), 'ordenes_emisiones/' + fol('b1')), emision({ emisor: 'fd_baja', emisorNombre: 'Se Da De Baja', delegacion: lote(70) })));
     await assertFails(updateDoc(doc(db('fd_admin'), 'firmas_delegados_registro/fd_baja_' + lote(70)), { tipo: 'cambio' }));
     await assertFails(deleteDoc(doc(db('fd_admin'), 'firmas_delegados_registro/fd_baja_' + lote(70))));
   });

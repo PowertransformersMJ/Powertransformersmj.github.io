@@ -960,7 +960,8 @@ service cloud.firestore {
         && d.tipo in ['alta', 'cambio', 'retiro'] && d.delegado is string && d.lote is string
         && d.custodio == request.auth.uid && d.custodioNombre == profile().get('nombre', '') && d.en == request.time
         && (d.tipo == 'retiro'
-            ? (id == d.delegado + '_' + d.lote + '_retiro' && exists(r) && get(r).data.custodio == request.auth.uid
+            ? (d.keys().hasOnly(['tipo', 'delegado', 'lote', 'custodio', 'custodioNombre', 'en'])
+               && id == d.delegado + '_' + d.lote + '_retiro' && exists(r) && get(r).data.custodio == request.auth.uid
                && get(r).data.lote == d.lote && !existsAfter(r))
             : (id == d.delegado + '_' + d.lote && existsAfter(r) && getAfter(r).data.custodio == request.auth.uid
                && getAfter(r).data.lote == d.lote && getAfter(r).data.personas == d.personas
@@ -1003,13 +1004,16 @@ service cloud.firestore {
     // Mismo contrato que `fichas_emisiones`: SOLO se agrega, a nombre de quien emite.
     // Rama del DELEGADO (ADR-117): lleva `emisor` (quien emite) y `delegacion` (el lote vigente);
     // `custodio` es el DUEÑO del directorio. Cada casilla, en su línea y de las personas delegadas.
-    function casillaDelegadaOk(x, d) {
+    function casillaDelegadaOk(x, d, c) {
       return x is map && x.keys().hasOnly(['rol', 'persona', 'nombre', 'origen', 'huella'])
+        && x.get('nombre', '') is string && x.get('nombre', '').size() <= 80
         && x.get('huella', '') is string && x.get('huella', '').matches('^[0-9a-f]{64}$')
         && ((x.get('origen', '') == 'propia' && x.get('rol', '') == 'entregado' && x.get('persona', '') == d.personaPropia)
             || (x.get('origen', '') == 'equipo' && x.get('persona', '') in d.personas
                 && ((x.get('rol', '') == 'autorizado' && x.persona == 'MIGUEL_JIMENEZ')
-                    || (x.get('rol', '') == 'entregado' && x.persona in ['CARLOS_MARTELO', 'JORGE_RHENALS']))));
+                    || (x.get('rol', '') == 'entregado' && x.persona in ['CARLOS_MARTELO', 'JORGE_RHENALS']))
+                // La huella declarada es la de la firma que HOY está en el directorio (revisión §117).
+                && x.huella == get(/databases/$(database)/documents/firmas_equipo/$(c)/personas/$(x.persona)).data.huella));
     }
     function emisionDelegadaOk(e) {
       let ruta = rutaDeleg(request.auth.uid);
@@ -1018,9 +1022,15 @@ service cloud.firestore {
         && e.emisor == request.auth.uid && e.emisorNombre == profile().get('nombre', '')
         && e.custodioNombre == d.custodioNombre
         && e.delegacion == d.lote
-        && (e.casillas.size() < 1 || casillaDelegadaOk(e.casillas[0], d))
-        && (e.casillas.size() < 2 || casillaDelegadaOk(e.casillas[1], d))
-        && (e.casillas.size() < 3 || casillaDelegadaOk(e.casillas[2], d));
+        // Una casilla por línea: a lo sumo «Autorizado» y «Entregado» (Recibido va a mano).
+        && e.casillas.size() <= 2
+        && (e.casillas.size() < 2 || e.casillas[0].get('rol', '') != e.casillas[1].get('rol', ''))
+        && e.orden.get('tipo', '') in ['ENTRADA', 'SALIDA']
+        && e.orden.get('numero', '') is string && e.orden.get('numero', '').size() <= 30
+        && e.orden.get('zona', '') is string && e.orden.get('zona', '').size() <= 60
+        && e.orden.get('fecha', '') is string && e.orden.get('fecha', '').size() <= 20
+        && (e.casillas.size() < 1 || casillaDelegadaOk(e.casillas[0], d, e.custodio))
+        && (e.casillas.size() < 2 || casillaDelegadaOk(e.casillas[1], d, e.custodio));
     }
     function emisionComunOk(e) {
       return e.orden is map
@@ -1037,7 +1047,7 @@ service cloud.firestore {
     match /ordenes_emisiones/{folio} {
       allow get:  if isAdmin();
       allow list: if isAdmin() && request.query.limit <= 50;
-      allow create: if hasProfile() && 'emisor' in request.resource.data
+      allow create: if hasProfile() && 'emisor' in request.resource.data && folio.matches('^[A-Za-z0-9]{20}$')
                     && request.resource.data.keys().hasOnly(['orden', 'documento', 'formato', 'casillas', 'huellaArchivo',
                                                              'custodio', 'custodioNombre', 'emisor', 'emisorNombre',
                                                              'delegacion', 'en'])

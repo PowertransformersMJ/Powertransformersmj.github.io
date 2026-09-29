@@ -96,21 +96,24 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
 
   async function pintarCopia() {
     if (!miClave) return;
-    msg1.textContent = '';
     const [copia, propiaUrl] = await Promise.all([datosEquipo.leerFirma(miClave), datosFirma.miFirma()]);
+    const pesada = propiaUrl && bytesDeDataUrl(propiaUrl).length > TOPE_BYTES;
     if (copia && copia.error) { est1.textContent = 'No se pudo consultar la copia (revise la conexión).'; return; }
     const huellaPropia = propiaUrl ? await datosEquipo.huellaDe(bytesDeDataUrl(propiaUrl)) : null;
+    const avisoPeso = pesada ? ' Su «Mi firma» pesa más de 512 KB: vuelva a cargarla recortada para poder copiarla.' : '';
     if (!copia) {
-      est1.textContent = propiaUrl ? 'Su firma aún NO está en el directorio: cuando exporte otro usuario, «Autorizado por» saldrá en blanco.'
-        : 'Aún no ha cargado «Mi firma» (arriba). Cárguela primero y luego cópiela aquí.';
-      bCopiar.textContent = 'Copiar mi firma propia'; bCopiar.disabled = !propiaUrl; bQuitarCopia.hidden = true;
+      est1.textContent = (propiaUrl ? 'Su firma aún NO está en el directorio: cuando exporte otro usuario, «Autorizado por» saldrá en blanco.'
+        : 'Aún no ha cargado «Mi firma» (arriba). Cárguela primero y luego cópiela aquí.') + avisoPeso;
+      bCopiar.textContent = 'Copiar mi firma propia'; bCopiar.disabled = !propiaUrl || pesada; bQuitarCopia.hidden = true;
       return;
     }
     const igual = huellaPropia && copia.huella === huellaPropia;
     est1.textContent = 'Copiada el ' + fechaDMA(copia.autorizacion && copia.autorizacion.fecha)
-      + (igual ? ' · es su firma actual.' : (huellaPropia ? ' · OJO: ya no es su firma actual de «Mi firma»; actualícela.' : '.'));
-    bCopiar.textContent = 'Actualizar la copia'; bCopiar.disabled = !propiaUrl || !!igual; bQuitarCopia.hidden = false;
+      + (igual ? ' · es su firma actual.' : (huellaPropia ? ' · OJO: ya no es su firma actual de «Mi firma»; actualícela.' : '.')) + avisoPeso;
+    bCopiar.textContent = 'Actualizar la copia'; bCopiar.disabled = !propiaUrl || !!igual || pesada; bQuitarCopia.hidden = false;
   }
+  // Si cambia «Mi firma» con la caja abierta, el estado de la copia se actualiza.
+  globalThis.addEventListener('sgm:firma-cambiada', () => { pintarCopia().catch(() => {}); });
   bCopiar.addEventListener('click', async () => {
     bCopiar.disabled = true; msg1.textContent = 'Copiando…';
     try {
@@ -130,7 +133,7 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
   });
   bQuitarCopia.addEventListener('click', async () => {
     if (!globalThis.confirm('¿Retirar la copia de su firma del directorio? Los usuarios autorizados dejarán de estamparla en «Autorizado por».')) return;
-    bQuitarCopia.disabled = true;
+    bQuitarCopia.disabled = true; msg1.textContent = 'Retirando…';
     const r = await datosEquipo.quitarFirma(miClave);
     bQuitarCopia.disabled = false;
     msg1.textContent = r.ok ? 'Retirada.' : (r.motivo || 'No se pudo retirar.');
@@ -139,17 +142,23 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
   });
 
   /** Una fila por usuario: quién es en la lista, qué firmas y con qué autorización. */
-  function filaUsuario(u, vigente) {
+  function filaUsuario(u, vigente, vigentes) {
     const f = el('div', 'fd-fila');
     const cab = el('div', 'fd-cab');
-    cab.appendChild(el('b', 'fe-nombre', u.nombre));
+    cab.appendChild(el('b', 'fe-nombre', u.etiqueta || u.nombre));
     const estado = el('span', 'fe-estado', vigente
       ? 'Con permiso: ' + (vigente.personas || []).map(nombreDePersona).join(', ') + '.'
       : 'Sin permiso.');
     cab.appendChild(estado);
     f.appendChild(cab);
 
+    if (!u.nombre) {
+      // La regla compara con el nombre del perfil: sin nombre no se le puede dar permiso.
+      f.appendChild(el('p', 'fe-msg', 'Este usuario no tiene nombre en su perfil: póngaselo en Administración › Usuarios para poder darle permiso.'));
+      return f;
+    }
     const form = el('form', 'fe-form fd-form');
+    form.setAttribute('aria-label', 'Permiso de ' + (u.etiqueta || u.nombre) + ' para usar firmas en Órdenes E/S');
     const lblQuien = el('label', null, 'Este usuario es, en la lista: ');
     const sel = el('select');
     for (const [v, t] of [['', '— elija —'], ['CARLOS_MARTELO', 'CARLOS MARTELO'], ['JORGE_RHENALS', 'JORGE RHENALS']]) {
@@ -168,6 +177,9 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
       const inF = el('input'); inF.type = 'date'; inF.max = hoyLocalISO(); inF.value = (a && a.fecha) || hoyLocalISO();
       const inM = el('input'); inM.type = 'text'; inM.maxLength = 200;
       inM.value = (a && a.medio) || (p === miClave ? 'Autorización del custodio' : MEDIO_POR_DEFECTO);
+      chk.setAttribute('aria-label', 'Firma de ' + nombreDePersona(p) + ' para ' + (u.etiqueta || u.nombre));
+      inF.setAttribute('aria-label', 'Fecha de la autorización de ' + nombreDePersona(p));
+      inM.setAttribute('aria-label', 'Medio de la autorización de ' + nombreDePersona(p));
       const lf = el('label', null, 'autorizada el '); lf.appendChild(inF);
       const lm = el('label', null, 'medio '); lm.appendChild(inM);
       linea.append(lbl, lf, lm);
@@ -185,6 +197,9 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
       ev.preventDefault();
       msg.textContent = '';
       if (!sel.value) { msg.textContent = 'Elija quién es este usuario en la lista.'; return; }
+      // Dos usuarios con la misma clave: la «Mi firma» de uno saldría sobre el nombre del otro.
+      const otro = [...(vigentes || new Map())].find(([uid, x]) => uid !== u.uid && x && x.personaPropia === sel.value);
+      if (otro) { msg.textContent = 'Otro usuario (' + (otro[1].delegadoNombre || otro[0]) + ') ya figura como ' + nombreDePersona(sel.value) + '. Corríjalo primero.'; return; }
       const personas = dd.DELEGABLES.filter((p) => marcas[p].chk.checked);
       if (!personas.length) { msg.textContent = 'Marque al menos una firma (o retire el permiso).'; return; }
       const autorizaciones = {};
@@ -201,7 +216,7 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
       if (r.ok) { await refrescar(); alCambiar(); }
     });
     bRetirar.addEventListener('click', async () => {
-      if (!globalThis.confirm('¿Retirar el permiso de ' + u.nombre + '? Desde su próxima descarga ya no podrá usar estas firmas.')) return;
+      if (!globalThis.confirm('¿Retirar el permiso de ' + (u.etiqueta || u.nombre) + '? Desde su próxima descarga ya no podrá usar estas firmas.')) return;
       bRetirar.disabled = true; msg.textContent = 'Retirando…';
       const r = await dd.retirar(u.uid, vigente.lote);
       bRetirar.disabled = false;
@@ -216,8 +231,26 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
     try {
       const [usuarios, vigentes] = await Promise.all([dd.usuariosParaDelegar(), dd.delegacionesVigentes()]);
       lista.textContent = '';
-      if (!usuarios.length) { lista.textContent = 'No hay otros usuarios activos.'; return; }
-      for (const u of usuarios) lista.appendChild(filaUsuario(u, vigentes.get(u.uid) || null));
+      for (const u of usuarios) lista.appendChild(filaUsuario(u, vigentes.get(u.uid) || null, vigentes));
+      // Un permiso de alguien que ya no está activo sigue ahí: se muestra para poder retirarlo.
+      const activos = new Set(usuarios.map((u) => u.uid));
+      for (const [uid, v] of vigentes) {
+        if (activos.has(uid)) continue;
+        const f = el('div', 'fd-fila');
+        f.appendChild(el('b', 'fe-nombre', (v.delegadoNombre || uid) + ' (usuario inactivo o que ya no está)'));
+        f.appendChild(el('p', 'fe-estado', 'Conserva permiso para: ' + (v.personas || []).map(nombreDePersona).join(', ') + '. Si lo reactivan, podría volver a usarlas.'));
+        const b = el('button', 'ftm-btn', 'Retirar permiso'); b.type = 'button';
+        const m = el('p', 'fe-msg'); m.setAttribute('aria-live', 'polite');
+        b.addEventListener('click', async () => {
+          if (!globalThis.confirm('¿Retirar el permiso de ' + (v.delegadoNombre || uid) + '?')) return;
+          b.disabled = true; const r = await dd.retirar(uid, v.lote); b.disabled = false;
+          m.textContent = r.ok ? '' : r.motivo;
+          if (r.ok) { await refrescar(); alCambiar(); }
+        });
+        f.append(b, m);
+        lista.appendChild(f);
+      }
+      if (!lista.childElementCount) lista.textContent = 'No hay otros usuarios activos.';
     } catch (e) {
       console.warn('[firmas-delegadas] usuarios:', e);
       lista.textContent = 'No se pudo consultar (revise la conexión).';

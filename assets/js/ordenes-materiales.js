@@ -636,17 +636,21 @@ const FIRMA_SESION = { dataUrl: null, rel: 1, nombre: '', cargada: false };
  */
 function firmaDe(persona, k) {
   const nombre = persona && persona.nombre;
+  const id = idDeNombreDeLista(nombre);
+  if (DELEGACION) {
+    // Sesión DELEGADA (`99 §117`), con la MISMA regla que su plan y su registro (no por el
+    // nombre del perfil): su línea con su «Mi firma» si la cargó; si no, y las demás líneas,
+    // del directorio del custodio SOLO lo delegado y SOLO en su línea.
+    if (esLineaDelDelegado(k, nombre, DELEGACION) && FIRMA_SESION.dataUrl) return { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel };
+    if (!delegadaAplica(k, id, DELEGACION)) return null;
+    const f = (EMISION_FIRMAS || FIRMAS_EQUIPO).get(id);
+    return f ? { src: f.dataUrl, rel: f.rel, equipo: true } : null;
+  }
   // La línea de la sesión lleva SU firma, nunca la del directorio.
   if (lineaDeLaSesion(nombre, FIRMA_SESION.nombre)) {
     return FIRMA_SESION.dataUrl ? { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel } : null;
   }
-  const id = idDeNombreDeLista(nombre);
-  if (DELEGACION) {
-    // Sesión DELEGADA (`99 §117`): su línea con su «Mi firma» si la cargó; si no, y las demás
-    // líneas, del directorio del custodio SOLO lo delegado y SOLO en su línea.
-    if (FIRMA_SESION.dataUrl && esLineaDelDelegado(k, nombre, DELEGACION)) return { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel };
-    if (!delegadaAplica(k, id, DELEGACION)) return null;
-  } else if (!id || !firmaDelEquipoAplica(k, id)) {
+  if (!id || !firmaDelEquipoAplica(k, id)) {
     // Del directorio del custodio: SOLO en «ENTREGADO POR» y SOLO de quienes lo autorizaron
     // (`ordenes_firmas.js`, decisión del Ingeniero 2026-09-28), por CLAVE exacta de la lista.
     return null;
@@ -690,14 +694,18 @@ async function modulosCustodia() {
     // Otro usuario: ¿el custodio le dio permiso de usar sus firmas en Órdenes? (`99 §117`)
     const dl = await import('./data/firmas_delegadas.js');
     if (!dl.puedeUsarDelegacion()) return null;
-    const d = await dl.miDelegacion();
+    let d;
+    try { d = await conTope(dl.miDelegacion(), ESPERA_FIRMAS_MS, 'permiso de firmas'); } catch (_) { d = { error: true }; }
     if (!d) { _sinDelegacion = true; return null; }
     if (d.error) return null;       // no se pudo leer: se vuelve a intentar en la próxima
     DELEGACION = d;
+    // Lee y registra con la delegación VIGENTE (se relee en cada emisión: si el custodio la
+    // cambió con la página abierta, el lote y las personas son los nuevos; revisión de `§117`).
     _custodia = {
-      delegado: true, delegacion: d,
-      fe: { leerFirma: (id) => dl.leerFirmaDelegada(d.custodio, id), huellaDe: dl.huellaDe },
-      em: { nuevaEmisionOrdenId: dl.nuevaEmisionId, registrarEmisionOrden: (id, datos) => dl.registrarEmisionDelegada(id, { ...datos, delegacion: d }) }
+      delegado: true, dl,
+      get delegacion() { return DELEGACION; },
+      fe: { leerFirma: (id) => dl.leerFirmaDelegada(DELEGACION.custodio, id), huellaDe: dl.huellaDe },
+      em: { nuevaEmisionOrdenId: dl.nuevaEmisionId, registrarEmisionOrden: (id, datos) => dl.registrarEmisionDelegada(id, { ...datos, delegacion: DELEGACION }) }
     };
     return _custodia;
   } catch (e) {
@@ -748,10 +756,30 @@ async function prepararFirmasEquipo(o) {
   if (o.conFirmas === false) return null;
   const m = await modulosCustodia();
   if (!m) return null;
-  // Quien no tiene esa firma en su directorio (otro administrador) no vuelve a leerla ni a preguntar.
+  if (m.delegado) {
+    // El permiso se relee en cada emisión (una lectura): cambios o retiros del custodio valen ya.
+    cargando(true, 'Consultando su permiso de firmas…');
+    let d;
+    try { d = await conTope(m.dl.miDelegacion(), ESPERA_FIRMAS_MS, 'permiso de firmas'); } catch (_) { d = { error: true }; }
+    cargando(false);
+    if (!d) {
+      DELEGACION = null; _custodia = null; _sinDelegacion = true; FIRMAS_EQUIPO.clear(); ESTADO_EQUIPO.clear();
+      try { llenarResponsables(); } catch (_) {}
+      alert('Ya no tiene permiso para usar las firmas del directorio: el documento sale sin ellas.');
+      return null;
+    }
+    if (d.error) {
+      if (!confirm('No se pudo consultar su permiso de firmas (revise la conexión).\n\n'
+        + 'Pulse Aceptar para generar el documento sin las firmas del directorio, o Cancelar para intentar de nuevo.')) return false;
+      return null;
+    }
+    DELEGACION = d;
+  }
+  // Quien no tiene esa firma en su directorio (otro administrador) no vuelve a leerla ni a preguntar;
+  // el delegado sí (la firma puede haberse cargado o el permiso cambiado con la página abierta).
   const ids = (m.delegado
     ? personasALeerDelegada(o, m.delegacion, { propia: !!FIRMA_SESION.dataUrl })
-    : personasEquipoDeOrden(o, FIRMA_SESION.nombre)).filter((id) => ESTADO_EQUIPO.get(id) !== 'no-hay' && ESTADO_EQUIPO.get(id) !== 'denegada');
+    : personasEquipoDeOrden(o, FIRMA_SESION.nombre)).filter((id) => m.delegado || (ESTADO_EQUIPO.get(id) !== 'no-hay' && ESTADO_EQUIPO.get(id) !== 'denegada'));
   if (!ids.length) return null;
   cargando(true, 'Leyendo las firmas del equipo…');
   const res = await Promise.all(ids.map((id) => releerFirmaEquipo(m, id)));
@@ -1172,6 +1200,7 @@ function pintarEstadoFirmas() {
   const delEquipo = [...FIRMAS_EQUIPO.keys()].map(nombreDePersona).filter(Boolean);
   const noLeidas = [...ESTADO_EQUIPO].filter(([, e]) => e === 'error' || e === 'distinta').map(([id]) => nombreDePersona(id));
   const retiradas = [...ESTADO_EQUIPO].filter(([, e]) => e === 'denegada').map(([id]) => nombreDePersona(id));
+  const faltan = [...ESTADO_EQUIPO].filter(([, e]) => e === 'no-hay').map(([id]) => nombreDePersona(id));
   const equipoTxt = (delEquipo.length
     ? (DELEGACION
       // Sesión delegada (`99 §117`): las firmas vienen del directorio del custodio, cada una en su línea.
@@ -1181,7 +1210,9 @@ function pintarEstadoFirmas() {
       : ' En «Entregado por» salen también, del directorio de firmas del equipo que usted custodia: <b>' + delEquipo.map(esc).join(', ') + '</b>. '
         + 'Solo en el PDF o el Excel (cada descarga queda registrada con un folio); al imprimir desde la vista previa esa línea sale en blanco.')
     : '') + (noLeidas.length ? ' No se pudo leer la firma de ' + noLeidas.map(esc).join(', ') + '.' : '')
-    + (retiradas.length ? ' Ya no tiene permiso para usar la firma de ' + retiradas.map(esc).join(', ') + '.' : '');
+    + (retiradas.length ? ' Ya no tiene permiso para usar la firma de ' + retiradas.map(esc).join(', ') + '.' : '')
+    + (DELEGACION && faltan.length ? ' La firma de ' + faltan.map(esc).join(', ') + ' aún no está en el directorio de '
+      + esc(DELEGACION.custodioNombre || 'el custodio') + ': esa línea sale en blanco.' : '');
   if (!FIRMA_SESION.dataUrl) {
     const conCopiaPropia = !!(DELEGACION && FIRMAS_EQUIPO.has(DELEGACION.personaPropia));
     cont.innerHTML = 'Aún no ha cargado su firma — cárguela en <b>«Mi firma»</b>, aquí abajo. '
