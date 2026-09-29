@@ -8,11 +8,14 @@
 // en las órdenes de entrada y salida. Juan Cardona no está en el directorio: su
 // línea sale en blanco hasta que se cargue la suya.
 //
-// Reglas (iguales a Fichas):
+// Reglas:
 //  · La línea de quien tiene la sesión lleva SU firma propia (`§71`), nunca la del
 //    directorio; se reconoce por la lista cerrada de nombres (`firmas_sesion.js`).
-//  · Las demás líneas de personas DE LA LISTA llevan la del directorio, buscada por
-//    CLAVE fija (nombre exacto de la lista), nunca por parecido.
+//  · Del directorio SOLO sale la firma de quienes autorizaron su uso en órdenes
+//    (`EQUIPO_EN_ORDENES`) y SOLO en «ENTREGADO POR», buscada por CLAVE fija
+//    (nombre exacto de la lista), nunca por parecido. Revisión 2026-09-28: sin este
+//    límite, una orden del registro con otros nombres llevaba firmas de personas que
+//    no lo autorizaron, o en líneas que no eran la suya.
 //  · Nadie más recibe una firma: su línea queda para firmar a mano.
 //
 // Funciones PURAS: cero DOM, cero Firebase, cero I/O.
@@ -29,6 +32,13 @@ export const LINEAS_ORDEN = Object.freeze([
 ]);
 
 const nombreDe = (orden, k) => String((((orden || {})[k]) || {}).nombre || '').trim();
+
+/** Quienes autorizaron usar su firma del directorio en las órdenes (decisión del Ingeniero, 2026-09-28). */
+export const EQUIPO_EN_ORDENES = Object.freeze(new Set(['CARLOS_MARTELO', 'JORGE_RHENALS']));
+/** La única línea que puede llevar una firma del directorio. */
+export const LINEA_EQUIPO = 'entregado';
+/** ¿La línea `k` puede llevar la firma del directorio de la persona `id`? */
+export function firmaDelEquipoAplica(k, id) { return k === LINEA_EQUIPO && EQUIPO_EN_ORDENES.has(id); }
 
 /**
  * Qué firma lleva cada línea de una orden.
@@ -49,7 +59,7 @@ export function planFirmasOrden(orden, nombreSesion = '', disponibles = {}) {
         ? { k, rol, nombre, origen: 'propia', id, motivo: '' }
         : { k, rol, nombre, origen: null, id, motivo: 'Aún no ha cargado su firma propia.' };
     }
-    if (!id) return { k, rol, nombre, origen: null, id: null, motivo: 'No está en el directorio de firmas del equipo: se firma a mano.' };
+    if (!id || !firmaDelEquipoAplica(k, id)) return { k, rol, nombre, origen: null, id, motivo: 'Se firma a mano.' };
     if (equipo.has(id)) return { k, rol, nombre, origen: 'equipo', id, motivo: '' };
     return { k, rol, nombre, origen: null, id, motivo: 'No hay firma suya en el directorio.' };
   });
@@ -62,7 +72,7 @@ export function personasEquipoDeOrden(orden, nombreSesion = '') {
     const nombre = nombreDe(orden, k);
     if (!nombre || lineaDeLaSesion(nombre, nombreSesion)) continue;
     const id = idDeNombreDeLista(nombre);
-    if (id) ids.add(id);
+    if (id && firmaDelEquipoAplica(k, id)) ids.add(id);
   }
   return [...ids];
 }
