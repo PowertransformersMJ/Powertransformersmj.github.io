@@ -6,7 +6,9 @@
 // Resiliencia:
 //  - Timeout de Auth corto (4s) + failsafe absoluto (7s).
 //  - Detección inmediata si auth.currentUser ya está disponible.
-//  - Timeout independiente en loadProfile (3s).
+//  - El perfil se espera hasta 12 s (aviso «conexión lenta» a los 3,5 s); un error de
+//    conexión se reintenta. Lento o fallido NO es «sin perfil»: se ofrece Reintentar,
+//    que vuelve a leer en la misma página (`99 §116`).
 //  - Detección de unauthorized-domain con mensaje claro.
 //  - Logs [SGM] visibles en consola en cada fase para diagnóstico.
 // ══════════════════════════════════════════════════════════════
@@ -26,8 +28,9 @@ const LOGIN_URL = BASE_URL + 'index.html';
 const HOME_URL  = BASE_URL + 'home.html';
 
 const AUTH_TIMEOUT_MS    = 4000;   // tiempo máximo esperando onAuthStateChanged
-const PROFILE_TIMEOUT_MS = 3500;   // tiempo máximo en cada getDoc de Firestore
-const FAILSAFE_MS        = 7500;   // failsafe absoluto: muestra error y libera UI
+const PROFILE_TIMEOUT_MS = 3500;   // a partir de aquí se avisa «conexión lenta» (antes: se rendía)
+const PROFILE_TOTAL_MS   = 12000;  // tiempo máximo leyendo el perfil (> 10 s: Firestore da la conexión por caída a los 10 s)
+const FAILSAFE_MS        = 7500;   // failsafe de la fase de Auth: muestra error y libera UI
 
 // ── Splash visible mientras se verifica la sesión ──
 function hideBody() {
@@ -79,13 +82,21 @@ function mountSplash(msg = 'Verificando sesión…') {
 function unmountSplash() {
   document.getElementById('sgm-splash')?.remove();
 }
-function showSplashError(msg, href) {
+function showSplashError(msg, href, reintentar = null) {
   let el = document.getElementById('sgm-splash');
   if (!el) { mountSplash(''); el = document.getElementById('sgm-splash'); }
   el.innerHTML =
     '<div style="width:42px;height:42px;border-radius:50%;background:rgba(255,90,110,.12);border:1px solid rgba(255,90,110,.4);display:inline-flex;align-items:center;justify-content:center;color:#ff5a6e;font-size:1.2rem;font-weight:700">!</div>'
     + '<div class="sgm-splash-msg sgm-splash-err" style="color:#ff5a6e;max-width:520px;text-align:center;line-height:1.55;letter-spacing:0;text-transform:none;font-family:system-ui,sans-serif;font-size:.92rem">' + msg + '</div>'
-    + (href ? `<a href="${href}" style="color:#4f8cff;text-decoration:underline;letter-spacing:0;text-transform:none;font-family:system-ui,sans-serif;margin-top:.5rem">Ir al login</a>` : '');
+    + (reintentar ? '<button type="button" id="sgm-splash-reintentar" style="margin-top:.5rem;padding:.55rem 1.3rem;border-radius:8px;border:1px solid #4f8cff;background:#4f8cff;color:#fff;font:600 .9rem system-ui,sans-serif;letter-spacing:0;text-transform:none;cursor:pointer">Reintentar</button>'
+      + '<button type="button" id="sgm-splash-salir" style="margin-top:.25rem;padding:.35rem .9rem;border:0;background:none;color:#8fa0bb;text-decoration:underline;font:.8rem system-ui,sans-serif;letter-spacing:0;text-transform:none;cursor:pointer">Cerrar sesión</button>' : '')
+    + (href && !reintentar ? `<a href="${href}" style="color:#4f8cff;text-decoration:underline;letter-spacing:0;text-transform:none;font-family:system-ui,sans-serif;margin-top:.5rem">Ir al login</a>` : '');
+  // «Reintentar» vuelve a leer DENTRO de la página (el cliente ya está conectado): recargar
+  // arrancaba en frío otra vez (revisión de `§116`). «Cerrar sesión» lo dice y lo hace.
+  const b = document.getElementById('sgm-splash-reintentar');
+  if (b && reintentar) b.addEventListener('click', () => { mountSplash('Verificando su perfil…'); reintentar(); });
+  const x = document.getElementById('sgm-splash-salir');
+  if (x) x.addEventListener('click', () => { logout(); });
 }
 
 hideBody();
@@ -107,33 +118,23 @@ function redirect(url) {
   try { location.replace(url); } catch (_) { location.href = url; }
 }
 
-function timed(promise, ms, label) {
-  return new Promise((resolve) => {
-    const t = setTimeout(() => {
-      console.warn('[SGM] timeout ' + ms + 'ms en:', label);
-      resolve({ timeout: true });
-    }, ms);
-    promise.then((value) => { clearTimeout(t); resolve({ value }); })
-           .catch((err)   => { clearTimeout(t); resolve({ err }); });
+// Una lectura LENTA o FALLIDA no es «no existe» (`99 §116`): se espera hasta
+// PROFILE_TOTAL_MS (a los PROFILE_TIMEOUT_MS se avisa «conexión lenta») y un
+// error se reintenta una vez. Devuelven {estado:'ok', existe, ...} o {estado:'falla'|'tiempo'}.
+async function leerConPaciencia(esperarLectura, db, col, uid) {
+  const r = await esperarLectura(() => getDoc(doc(db, col, uid)), {
+    total: PROFILE_TOTAL_MS, aviso: PROFILE_TIMEOUT_MS,
+    alAvisar: () => { console.warn('[SGM] lectura lenta de /%s/%s: se sigue esperando', col, uid); mountSplash('Conexión lenta: verificando su perfil…'); }
   });
+  if (r.estado === 'falla' || r.estado === 'denegado') console.warn('[SGM] No se pudo leer /%s/%s:', col, uid, r.error);
+  if (r.estado === 'tiempo') console.warn('[SGM] timeout %sms en: getDoc /%s/%s', PROFILE_TOTAL_MS, col, uid);
+  if (r.estado !== 'ok') return { estado: r.estado };
+  const snap = r.valor;
+  return { estado: 'ok', existe: snap.exists(), snap };
 }
 
-async function loadProfile(db, uid) {
-  const r = await timed(getDoc(doc(db, 'usuarios', uid)), PROFILE_TIMEOUT_MS, 'getDoc /usuarios/' + uid);
-  if (r.timeout || r.err) {
-    if (r.err) console.warn('[SGM] No se pudo leer /usuarios/%s:', uid, r.err);
-    return null;
-  }
-  const snap = r.value;
-  if (!snap.exists()) return null;
-  return { uid: snap.id, ...snap.data() };
-}
-
-async function isLegacyAdmin(db, uid) {
-  const r = await timed(getDoc(doc(db, 'admins', uid)), PROFILE_TIMEOUT_MS, 'getDoc /admins/' + uid);
-  if (r.timeout || r.err) return false;
-  return r.value.exists();
-}
+const loadProfile = (esp, db, uid) => leerConPaciencia(esp, db, 'usuarios', uid);
+const isLegacyAdmin = (esp, db, uid) => leerConPaciencia(esp, db, 'admins', uid);
 
 function humanizeAuthError(err) {
   const code = err?.code || '';
@@ -212,20 +213,37 @@ export function ensureSession({ requireAdmin = false } = {}) {
 
     async function handleUser(user) {
       try { unsub(); } catch (_) {}
+      // Auth ya respondió: el failsafe (que habla del dominio de Auth) deja de aplicar.
+      // La lectura del perfil tiene su propio tope (PROFILE_TOTAL_MS) y su propio aviso.
+      clearTimeout(FAILSAFE_TIMER);
       try {
         console.info('[SGM] sesión encontrada:', user.email, '— buscando perfil…');
-        let profile = await loadProfile(db, user.uid);
-
-        if (!profile) {
-          const legacy = await isLegacyAdmin(db, user.uid);
-          if (legacy) {
-            console.info('[SGM] perfil legacy admin (colección /admins) — autorizado.');
-            profile = {
-              uid: user.uid, email: user.email,
-              nombre: user.displayName || user.email,
-              rol: 'admin', activo: true, legacy: true
-            };
-          }
+        // Dentro del try: si este módulo no carga, la página sigue OCULTA con su error
+        // (con un import estático, un fallo la dejaba visible sin verificar; revisión de `§116`).
+        const { esperarLectura, decidirPerfil } = await import('../domain/decision_perfil.js');
+        const lectura = await loadProfile(esperarLectura, db, user.uid);
+        let decision = decidirPerfil(lectura);
+        let admins = null;
+        if (decision === 'consultar-admins') {
+          admins = await isLegacyAdmin(esperarLectura, db, user.uid);
+          decision = decidirPerfil(lectura, admins);
+        }
+        if (decision === 'reintentar') {
+          // No se pudo SABER (conexión): ni perfil de arranque ni cerrar la sesión (`99 §116`).
+          console.warn('[SGM] no se pudo leer el perfil — se ofrece reintentar (sin cerrar sesión).');
+          showSplashError('No se pudo leer su perfil: la conexión con el servidor está lenta o se cortó. '
+            + 'Su sesión sigue abierta.', LOGIN_URL, () => handleUser(user));
+          return;
+        }
+        let profile = null;
+        if (decision === 'perfil') profile = { uid: lectura.snap.id, ...lectura.snap.data() };
+        if (decision === 'legacy') {
+          console.info('[SGM] perfil legacy admin (colección /admins) — autorizado.');
+          profile = {
+            uid: user.uid, email: user.email,
+            nombre: user.displayName || user.email,
+            rol: 'admin', activo: true, legacy: true
+          };
         }
 
         if (!profile || profile.activo === false) {

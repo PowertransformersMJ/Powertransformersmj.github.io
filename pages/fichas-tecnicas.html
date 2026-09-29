@@ -68,7 +68,7 @@
     window.SGM_DATA_SOURCE = async function () {
       if (!window.__sgmSession) {
         await new Promise((res) => {
-          const t = setTimeout(res, 12000);
+          const t = setTimeout(res, 30000);
           window.addEventListener('sgm:session-ready', () => { clearTimeout(t); res(); }, { once: true });
           if (window.__sgmSession) { clearTimeout(t); res(); }
         });
@@ -130,7 +130,7 @@
   catch (err) { console.warn('[fichas] firmas no disponibles:', err); }
   const { getSession } = await import('../assets/js/auth/session-guard.js');
   const esperarSesion = () => (window.__sgmSession ? Promise.resolve() : new Promise((res) => {
-    const t = setTimeout(res, 12000);
+    const t = setTimeout(res, 30000);
     window.addEventListener('sgm:session-ready', () => { clearTimeout(t); res(); }, { once: true });
   }));
   async function firmaSesion() {
