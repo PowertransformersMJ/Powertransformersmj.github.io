@@ -28,18 +28,18 @@
 | §14 | ADR-014 — Identidad/placa CONGELADA por informe (trafo móvil doble config: clase del propio ensayo) | 311 |
 | §15 | ADR-015 — "Reprocesar" funcional: reintento con backoff server-side + presupuesto de tiempo | 332 |
 | §16 | ADR-016 — "Reprocesar" asíncrono observable: persistencia + estado durable + badge en vivo | 353 |
-| §17 | ADR-017 — Reproceso colgado: timeout INTERNO por intento (abort del stream) + watchdog + 2 GiB | 375 |
-| §18 | ADR-018 — "Claude API: terminated" = bodyTimeout de undici corta el stream → dispatcher sin bodyTimeout | 398 |
-| §19 | ADR-019 — 504/deadline-exceeded: presupuesto de reintento sin sitio para intento entero + timeoutSeconds 1500 | 420 |
+| §17 | ADR-017 — Reproceso colgado: timeout INTERNO por intento + watchdog + 2 GiB | 375 |
+| §18 | ADR-018 — «terminated»: bodyTimeout de undici → dispatcher sin bodyTimeout | 398 |
+| §19 | ADR-019 — 504/deadline-exceeded: presupuesto de reintento + timeoutSeconds 1500 | 420 |
 | §20 | ADR-020 — RETIRO de "Reprocesar" (costo > valor). CF queda solo-CARGA; se conserva la robustez de transporte | 440 |
-| §21 | ADR-021 — Previsualización al colisionar por fecha: comparar guardado vs nuevo antes de reemplazar | 462 |
+| §21 | ADR-021 — Colisión por fecha: comparar guardado vs nuevo antes de reemplazar | 462 |
 | §22 | ADR-022 — Calificación global muestra TODAS las pruebas (FP bujes separado) + acción clasificada | 480 |
 | §23 | ADR-023 — Vista CONSOLIDADA % del límite (SUPERSEDED por ADR-024 — mala interpretación) | 500 |
 | §24 | ADR-024 — Tablero MULTI-AÑO (años superpuestos + filtro por prueba); nace el workflow de PREVIEW | 518 |
 | §25 | ADR-025 — Multi-año v2: conserva FASES + valores reales + filtro año GLOBAL + tendencia con PROYECCIÓN | 539 |
 | §26 | ADR-026 — Regresión: multi-año colapsaba informes del MISMO año → identidad por INFORME (no por año) | 560 |
 | §27 | ADR-027 — Multi-año muestra TODAS las pruebas ELÉCTRICAS (familia genérica); ACEITE/DGA EXCLUIDO; no se fabrica | 578 |
-| §28 | ADR-028 — Multi-año TENDENCIA año a año: 1 gráfica por SUB-PRUEBA, orden cronológico; validado con informes reales | 600 |
+| §28 | ADR-028 — Multi-año TENDENCIA: 1 gráfica por SUB-PRUEBA, orden cronológico | 600 |
 | §29 | ADR-029 — Tan δ CONDENSADO en panel único filtrable (`ui/pruebas/tand-panel.js`, barras + filtros) | 628 |
 | §30 | ADR-030 — Modal de colisión por fecha abre AMBOS PDFs (blob URL); modal → `ui/pruebas/modal-upsert.js` | 644 |
 | §31 | ADR-031 — Tan δ "Por devanado": `svgPorDevanado` con leyenda limpia + criterio normativo VISIBLE | 656 |
@@ -49,7 +49,7 @@
 | §35 | ADR-035 — Retiro de "Resultados del informe" vía flag. ⚠️ CORREGIDO por §36 (sobre-retiro) | 716 |
 | §36 | ADR-036 — CORRIGE §35: sección restaurada; solo se filtra el bloque tan δ del detalle (L-51) | 732 |
 | §37 | ADR-037 — Reorden HTML: "Identidad de la unidad" bajo "Resumen de la unidad" (por ID, sin JS) | 746 |
-| §38 | ADR-038 — FP/tan δ: vista Tip-up (ΔFP alta−baja: PD vs humedad) + caveat 20 °C; auditoría 🔵 skill FP | 758 |
+| §38 | ADR-038 — FP/tan δ: vista Tip-up (ΔFP alta−baja) + caveat 20 °C | 758 |
 | §39 | ADR-039 — FP/tan δ: localización del defecto por modo (`localizacionDe`/`causaProbableDe`) | 774 |
 | §40 | ADR-040 — FP/tan δ: pendiente predictiva por sección + baseline-proxy; capacitancia descartada (artefacto) | 790 |
 | §41 | ADR-041 — Corriente de excitación: panel propio `excitacion-panel.js`, espejo del tan δ | 804 |
@@ -77,7 +77,7 @@
 | §63 | ADR-063 — Cola de la auditoría: topes en funciones, 16 índices Firestore, `ts_calculo` | 1284 |
 | §64 | ADR-064 — Fichas: el port trajo todo el CSS y el 44% del marcado (clases huérfanas = vistas faltantes) | 1343 |
 | §65 | ADR-065 — Novedades UUCC: contadores + cajón de decisión por equipo (aceptar / mantener / corregir) | 1394 |
-| §66 | ADR-066 — Evaluación holística de Fichas (6 auditores): terciario «0» inflaba 23%, «20.000» kVA leído como 20… | 1436 |
+| §66 | ADR-066 — Evaluación de Fichas: terciario «0» inflaba 23 %; «20.000» kVA leído como 20 | 1436 |
 | §67 | ADR-067 — «Veo información basura»: Cargabilidad/SCADA con equipos inventados sin rótulo | 1497 |
 | §68 | ADR-068 — Mantenimiento del cerebro (Nivel-2, 8 sondas): dos gates en verde sin medir | 1551 |
 | §69 | ADR-069 — TX_Potencia: los «62 omitidos» eran 57 equipos reales → 208 válidos (cierra TODO-34) | 1637 |
@@ -124,6 +124,8 @@
 | §110 | ADR-110 — **Mantenimiento sin hoja Beneficios**; Futuro derecho | 4416 |
 | §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota de las 7 variables | 4448 |
 | §112 | ADR-112 — **«Diagrama Operativo»**: adjunto (cronograma) guardado, última hoja | 4467 |
+| §113 | ADR-113 — **CF-40**: el Excel adjunto se lee en un hilo con tiempo límite | 4553 |
+| §114 | ADR-114 — **Órdenes E/S**: firma en Autorizado; Entregado con firmas del equipo | 4599 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -150,7 +152,8 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🧪 `30` (L-20/L-21) + `99 §3` + Skill `claude-api` |
-| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§112` + **L-103** |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§113` + **L-103** |
+| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114` (+ `§71`, `§99`, `§108`) |
 | El "por qué" de una decisión / detalle de un § | Capa 1 → `99-HISTORIAL-ADR.md` |
 
 > **Doctrinas** → always-on en `CLAUDE.md §3` (3.1 performance · 3.2 aditivo/API estable · 3.3 verifica · 3.4 IAP · 3.5 observers).

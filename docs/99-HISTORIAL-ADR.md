@@ -4544,8 +4544,100 @@ px; doble clic en Guardar; cambio de equipo a mitad; 0 datos reales en los commi
 bóveda `2026-09-28-verificacion-cerebro-112`)**: `estructuraSana` no mira `styles.xml` (`leerEstilos`/`paletaTema`
 corren antes, con regex perezosas: 3 KB con `<font>` sin cerrar ≈ 21 s) y compara CUÁNTAS etiquetas abren y cierran,
 no su ORDEN (`</row>`×N antes de `<row>`×N pasa y cuesta ≈ 23 s dentro de los topes). Solo congela la pestaña de quien
-adjunta; no daña datos ni afecta a nadie más. Arreglo propuesto → CF-40, a la espera de su autorización. **Otro
+adjunta; no daña datos ni afecta a nadie más. Arreglo propuesto → CF-40 (autorizado y resuelto en `§113`). **Otro
 pendiente sabido**: un Worker con límite de tiempo para el lector (el tope contra «zip-bomb» lee un tamaño que el
 autor del zip puede falsear; mitigado por el tope de entrada de 15 MB y porque solo adjunta un administrador) · con
 muchísimas actividades la letra baja (manda el alto): se avisa y se pide confirmar · el primer adjunto y la primera
 exportación reales, del Ingeniero.
+
+## 113. ADR-113 — CF-40: el Excel adjunto del «Diagrama Operativo» se lee en un hilo aparte con tiempo límite y con su estructura revisada antes de leerlo ⟦OPUS-5.5⟧ (2026-09-28)
+
+> Hallazgo de la verificación del cerebro (`§112.8`, L-106): el ReDoS del lector seguía abierto por `styles.xml` y por el
+> ORDEN de las etiquetas. Propuesta al Ingeniero: «revisar la estructura completa en una sola pasada antes de leerlo» y
+> «un tiempo límite a la lectura, para que nunca pueda trabar la página»; respuesta: «procede por favor». Publicado
+> `54ec71f` (junto con `§114` Autorizado).
+
+**113.1 Causa raíz.** El lector recorre el XML con regex perezosas; cerrar un vector (contar etiquetas) no cerraba la
+clase: estilos sin revisar, cierres antes que aperturas, prefijos que imitan `<c`, bloques cortados en el primer cierre,
+CDATA/comentarios con `<`, el tamaño declarado del zip (falseable), anclas en filas absurdas, textos de cuadros sin tope y
+—hallado en la revisión— el PINTADO del SVG en la página (1.160 cuadros × 32.000 letras: 3,6 s trabada a 1×, 17 s a 4×).
+**113.2 Solución.** (a) `ui/fichas/diagrama-operativo-xml.js` (nuevo): `revisarXml`, una pasada lineal por parte que
+exige cierres en orden, nombres simples, sin DOCTYPE y sin anidar el mismo nombre SOLO en los elementos que el lector
+recorre buscando su cierre (`NO_ANIDAN`; las ecuaciones de Office sí anidan); devuelve el XML saneado (sin comentarios ni
+`<? ?>`, CDATA como texto escapado, `>` de dentro de comillas como `&gt;`) · `leerParteAcotada` (bytes REALES con
+`internalStream`, presupuesto 50 MB; la hoja, 20 MB) · `textoParte` (UTF-8 o UTF-16 con marca) · `dimensionesImagen`
+(PNG/GIF/JPEG por cabecera). (b) Lector: todo XML por el lector acotado ANTES de cualquier regex; regex con
+`(?=[\s>/])` en vez de `\b`; `bloque()` lineal; columnas en arreglo; anclas fuera de los límites de Excel ignoradas;
+sumas X/Y acumuladas; texto por celda ≤ 32.767 y total ≤ 1.000.000 (celdas + cuadros); imágenes contadas UNA vez por
+archivo (el logo repetido), > 120 Mpx fuera del dibujo salvo que sea lo único de la hoja; formatos de número de más de
+255 caracteres (Excel no los admite) como General. (c) `…-seguro.js` + `…-trabajador.js` (nuevos): lectura, plano y SVG
+en un Worker de módulo con límite de 20 s; el trabajador descarga JSZip ANTES de avisar «listo» (una red lenta no se
+culpa al archivo); mensajes marcados; cancelación al cerrar la pestaña; `revisarPesoSvg` (400.000 elementos, 2 M de
+letras) DENTRO del límite; la página solo pinta. Respaldo en la página solo si el trabajador NO arranca (nunca por
+tiempo). El trabajador mide con OffscreenCanvas y la misma fórmula de letra (`medidorFuera`).
+**113.3 No-regresión.** Corpus local de 446 Excel reales (1.231 hojas, incluida la muestra de Bocagrande): 1.279 hojas
+con modelo y SVG idénticos al lector publicado; las 3 diferencias son errores «Maximum call stack» que ahora dan su
+mensaje. En Chrome: el cronograma real da el MISMO PNG por el trabajador y por la página (265/269 KB según el navegador,
+7,03 pt). Las diferencias con archivos fabricados por la revisión son mejoras (UTF-16, CDATA, comentarios, `>` crudo).
+**113.4 Verificación.** 2023 pruebas (2021 pass, 0 fail, 2 skip); 48 en `tests/fichas_diagrama_operativo_blindaje.test.js`
+(cada forma hostil < 1,5 s; el lector publicado tardaba 5-23 s). Chrome real: trabajador pegado cortado a 1,5 s con la
+página en 30/30 latidos (la misma espera en la página: 2/30); cuadros fabricados rechazados en 0,2 s con 22 ms de pausa;
+CDN retenido 22 s → el Excel sano se lee (antes: «dañado»). Revisión adversarial (3 lentes + verificador, Opus; bóveda
+`2026-09-28-revision-cf40-lector`): 2 medios (pintado sin límite, CDN) y 5 regresiones bajas, todas corregidas. La
+ronda de fuzzing se cortó dos veces sin medir (un filtro y luego un desvío del agente); la cubrió una pasada propia
+(`cf40/extra.mjs`) que halló el formato de 100.000 caracteres (arreglado).
+**113.5 Anti-patterns evitados.** Cerrar el ejemplo y no la clase (L-106) · fiarse del tamaño declarado del zip · un tope
+que no mira lo que de verdad cuesta (el pintado) · publicar sobre una ronda vacía como si fuera «sin hallazgos».
+**113.6 Archivos.** Nuevos: `diagrama-operativo-{xml,seguro,trabajador}.js`, la suite de blindaje. Tocados:
+`diagrama-operativo-lector.js`, `diagrama-operativo-panel.js`. INTACTOS: `diagrama-operativo-dibujo.js` (el trabajador le
+pasa su medidor), `-hoja.js`, exportador, plantilla.
+**113.7 Doctrina.** L-102 (lo nuevo en archivos nuevos) · L-106 · caza-bugs con corpus real antes/después.
+**113.8 Verificado sano / pendiente.** Caché mezclada en Pages (trabajador nuevo con lector viejo y al revés) da el mismo
+PNG; clonado de `Date`/`Set` intacto; URL del trabajador bajo `/pages/`; navegador sin trabajadores de módulo cae al
+respaldo en 5 ms con el mismo PNG. **Pendiente**: Firefox y Safari reales sin probar (aquí solo hay Chrome).
+
+## 114. ADR-114 — Órdenes de Entrada/Salida: la firma del Ingeniero en «AUTORIZADO POR» y las del equipo que custodia en «ENTREGADO POR»; el informe de refrigeración con su firma ⟦OPUS-5.5⟧ (2026-09-28)
+
+> *«dirígete un momento a orden de entrada y salida, al exportar el pdf no salen las firmas de autorizado ni entregado,
+> por favor valida y corrige»* · decisiones: «Firmas del equipo, como Fichas» (confirmó que Carlos Martelo y Jorge Rhenals
+> aceptan su uso en órdenes) · refrigeración «Sí, corrígelo» · «Publica ya lo de Autorizado». Publicado `54ec71f`
+> (Autorizado) y `f657b1c` (Entregado + refrigeración).
+
+**114.1 Causa raíz.** (a) Autorizado: `firmaAplicaA` compara nombres EXACTOS; el perfil en producción es «ING. MIGUEL
+JIMENEZ» (`§99.12`) y la línea dice «MIGUEL JIMENEZ» ⇒ su firma nunca se estampaba (y el aviso decía «su nombre no
+figura»). Fichas ya lo había resuelto con una lista cerrada; Órdenes y el informe de refrigeración, no. (b) Entregado: por
+diseño (`§71`) Órdenes solo estampaba la firma de la sesión; las del equipo bajo custodia (`§99`) eran solo de Fichas.
+**114.2 Solución.** `domain/firmas_sesion.js` (nuevo): `lineaDeLaSesion` = igual exacto o dos nombres de la MISMA persona
+de `PERSONAS_EQUIPO` (lista cerrada; nadie más se afloja); lo usan Órdenes y `calculo-refrigeracion.js`.
+`domain/ordenes_firmas.js` (nuevo): del directorio SOLO en «ENTREGADO POR» y SOLO `EQUIPO_EN_ORDENES` = Carlos Martelo y
+Jorge Rhenals, por clave exacta; la línea de la sesión nunca lleva la del directorio. `data/ordenes_emisiones.js` (nuevo)
++ regla `ordenes_emisiones` (solo se agrega, a nombre de quien emite; desplegada ANTES del merge). Órdenes: la vista
+previa usa las firmas cargadas (✒ en el desplegable) y NO las imprime (`@media print` en el propio SVG; el título lo
+avisa); cada PDF o Excel relee las firmas (8 s de tope), compara su huella con la registrada, dibuja con las de ESA
+emisión, arma el archivo UNA vez, registra la huella de esos mismos bytes (12 s de tope) y pone el folio en el nombre;
+sin registro, pregunta y sale solo con la firma propia, sin folio. Candado de doble clic. Quien no es custodio ve y
+obtiene lo de siempre (solo su firma, mismo aviso).
+**114.3 No-regresión.** Sin custodia: 0 lecturas del directorio, 0 registros, el aviso de antes palabra por palabra. Las
+cédulas (`§78`) y su pregunta, intactas. Juan Cardona y «Recibido» se firman a mano.
+**114.4 Verificación.** 2032 pruebas (2030 pass, 0 fail, 2 skip) + 138 de reglas (5 nuevas, dos direcciones). Banco de
+Órdenes (stubs, firmas SINTÉTICAS): PDF y Excel con Autorizado + Entregado y registro con folio; Juan Cardona sin
+registro; registro caído → pregunta → sale sin la de Carlos (verificado por las imágenes del PDF); lectura fallida →
+pregunta; firma alterada → se detiene; sin custodio → como antes; huella registrada = huella del archivo descargado;
+doble clic → un documento; al imprimir la vista previa, 2 de 3 imágenes (la del equipo oculta). Banco del informe de
+refrigeración: firma en «Elaborado / Aprobado» con el perfil «ING. MIGUEL JIMENEZ». Revisión adversarial (3 lentes +
+verificador, Opus; bóveda `2026-09-28-revision-firmas-ordenes`): 1 alto (imprimir desde la vista previa sacaba firmas sin
+registro), 1 medio (la huella del PDF no era la del archivo: jsPDF rearma el documento en cada salida), 9 bajos; todos
+corregidos salvo el endurecimiento opcional de la regla. **En vivo** (su Chrome, solo lectura, su orden N.º 20260216 sin
+tocar): «Se estampará su firma en 1 línea(s)»; Carlos Martelo y Jorge Rhenals con ✒ (sus firmas reales leídas de su
+directorio y verificadas); Juan Cardona sin ✒; la vista previa lleva su firma en «Autorizado». **No verificado en vivo**:
+una descarga real con folio (escribe el registro; la hará él).
+**114.5 Anti-patterns evitados.** Aflojar la comparación de nombres para todos · firmas de otros sin registro por una
+salida olvidada (imprimir) · huella de un archivo que no es el entregado · reutilizar `fichas_emisiones` (solo PE.02081).
+**114.6 Archivos.** Nuevos: `domain/firmas_sesion.js`, `domain/ordenes_firmas.js`, `data/ordenes_emisiones.js`,
+`tests/firmas_sesion.test.js`, `tests/ordenes_firmas.test.js`, `tests-rules/ordenes_emisiones.rules.test.js`. Tocados:
+`ordenes-materiales.js`, `calculo-refrigeracion.js`, `firestore.rules`. INTACTOS: `domain/firmas.js`, Fichas, cédulas.
+**114.7 Doctrina.** Reglas desplegadas antes del código · L-78 · L-106 (toda salida del documento, no solo la pedida).
+**114.8 Verificado sano / pendiente.** El folio es el prefijo del id en mayúsculas, como en Fichas (`§99.8`). Un perfil con
+`nombre: null` no se produce desde la app. **Pendiente suyo**: la firma de Juan Cardona (cargarla con su autorización y
+sumarlo a `EQUIPO_EN_ORDENES` y a `personaDelEquipo` de las reglas) · la primera descarga real con folio. Otro
+administrador distinto del custodio no lee ni pregunta por firmas que no tiene (`ESTADO_EQUIPO` «no-hay»).

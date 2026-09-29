@@ -378,3 +378,13 @@ diciendo «corregido». · **Regla**: antes de declarar cerrado, enumerar TODAS 
 vulnerable (aquí: cada regex perezosa sobre texto ajeno) y darle a cada una su caso hostil; mejor si la defensa es
 estructural (una pasada lineal que valide el anidamiento de TODA parte leída, o un Worker con tiempo límite) que
 casuística. **Gate** [HONOR] + las pruebas de CF-40.
+
+### L-107 · Un documento con firmas ajenas: TODAS sus salidas, y la huella de los bytes que de verdad se entregan
+**Disparador**: estampar firmas de otras personas (directorio del custodio) con registro de cada emisión. · **Cicatriz**
+(`99 §114`): el PDF y el Excel de Órdenes registraban y ponían folio, pero el botón «Imprimir» de la vista previa (y
+Archivo → Imprimir) sacaba la firma de Carlos sin releerla, sin registro y sin folio; y la huella registrada del PDF no
+era la del archivo descargado, porque jsPDF rearma el documento en cada `output()`/`save()` y con imágenes no sale igual.
+La revisión adversarial lo cazó antes de publicar. · **Regla**: antes de publicar, ENUMERAR cada salida del documento
+(descargas, vista previa, imprimir, atajos, copias) y decidir para cada una si lleva las firmas y con qué registro; la
+que no registra, no las lleva (aquí: `@media print` dentro del propio SVG). Y armar el archivo UNA vez: huellar y
+descargar esos mismos bytes. **Gate**: pruebas de `§114` en el banco + [HONOR].
