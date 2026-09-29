@@ -42,6 +42,7 @@ import { ajustarAltoCasilla } from './alto-casilla.js';
 import { zonaDelActivo } from '../../domain/fichas_zona.js';
 import { svgSaludRiesgo, cajaSaludRiesgo, svgAPng, montarHojaSaludRiesgo } from './salud-riesgo-excel.js';
 import { cajaDeImagen, quitarHojaDelLibro, anclarConTamano } from './ajustes-libro.js';
+import { enderezarCajaGirada } from './ancla-girada.js';
 import { montarHojaDiagramaOperativo } from './diagrama-operativo-hoja.js';
 
 /**
@@ -1008,7 +1009,12 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
       if (png) {
         zip.file(IMG_DIAG_ACTUAL, png);
         // Del tamaño exacto en todos los programas, como el Futuro (`§110`): no estirada a las celdas.
-        try { await anclarConTamano(zip, DIBUJO_ACTUAL, RID_IMG_ACTUAL); } catch (e) { /* queda el ancla de la plantilla */ }
+        try {
+          await anclarConTamano(zip, DIBUJO_ACTUAL, RID_IMG_ACTUAL);
+          // Va girada 270°: su ancla es la caja YA girada. Seguro por si el navegador trae un
+          // `ajustes-libro.js` viejo de su caché (L-102): sin él saldría deformada (`99 §115`).
+          await enderezarCajaGirada(zip, DIBUJO_ACTUAL, RID_IMG_ACTUAL);
+        } catch (e) { /* queda el ancla de la plantilla */ }
       }
     }
     if (svgF) {

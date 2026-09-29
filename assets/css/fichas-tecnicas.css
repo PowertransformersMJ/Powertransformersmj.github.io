@@ -297,6 +297,8 @@
 }
 .ftm-sr-aqui { font-size: 10.5px; letter-spacing: .04em; white-space: nowrap; }
 .ftm-sr-leyenda .ftm-sw2 { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+/* Sin los dos párrafos de abajo (`99 §115`) la leyenda quedaba pegada al borde de la hoja. */
+.ftm-sr-leyenda { margin-bottom: 8px; }
 .ftm-sr-marco-muestra { background: #fff; outline: 2px solid #10202c; outline-offset: 1px; }
 
 /* Potencia y usuarios DENTRO de la casilla donde cae el equipo (99 §81). El

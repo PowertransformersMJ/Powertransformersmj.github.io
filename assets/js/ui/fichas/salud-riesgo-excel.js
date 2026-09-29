@@ -11,7 +11,8 @@
 // título y logo, marco, «Notas:», pie) y dentro del marco lleva una IMAGEN con lo
 // mismo que la pantalla: las cuatro cifras, la definición de la condición, la
 // matriz 5×5 con los colores de la MO.00418 Tabla 11 y la casilla del equipo
-// encerrada, la leyenda y la lectura por potencia. Los datos llegan ya calculados
+// encerrada y la leyenda (la lectura por potencia y la nota de la norma salieron
+// en `99 §111`; de la pantalla, en `§115`). Los datos llegan ya calculados
 // por el panel con el MISMO dominio que pinta la pantalla (`matriz_riesgo.js`):
 // aquí solo se dibujan; no hay una segunda matriz que pueda contradecirla.
 //
@@ -21,6 +22,8 @@
 //   · svgAPng(svg, w, h, ancho, alto)  navegador (canvas); null sin DOM
 //   · montarHojaSaludRiesgo(zip, png, caja)  reemplaza la hoja «Anexo AT»
 // ══════════════════════════════════════════════════════════════════════════════
+
+import { anchoArial } from './anchos-arial.js';
 
 const EMU_PX = 9525;
 /** Marco de la hoja de diagramas (filas 9 a 45, columnas B a R; base 0 en el dibujo), con margen: la imagen no toca el borde en ningún programa. */
@@ -55,16 +58,6 @@ export const NOTA_SALUD_RIESGO = Object.freeze([
 /** Lo que dice la hoja cuando la matriz no se pudo dibujar: el Anexo AT no vuelve (`99 §107`). */
 export const AVISO_SIN_IMAGEN = 'No se pudo dibujar la matriz de riesgo de este equipo. Consulte la hoja «Salud y riesgo» de la ficha en pantalla y vuelva a exportar.';
 
-/** Parte un texto en renglones de a lo sumo `n` caracteres (por palabras). */
-function renglones(texto, n) {
-  const out = []; let linea = '';
-  for (const p of String(texto || '').split(/\s+/).filter(Boolean)) {
-    if ((linea + ' ' + p).trim().length > n && linea) { out.push(linea); linea = p; } else linea = (linea + ' ' + p).trim();
-  }
-  if (linea) out.push(linea);
-  return out;
-}
-
 /**
  * Dibuja la hoja como SVG. `m` es el modelo que arma el panel:
  * { titulo, kpis:[{valor, sub, etiqueta, tinta, rol}], definicion, avisoSinDato,
@@ -82,12 +75,19 @@ export function svgSaludRiesgo(m) {
   const texto = (x, yy, t, o = {}) => partes.push('<text x="' + x + '" y="' + yy + '" font-family="' + FUENTE + '" font-size="'
     + (o.tam || 16) + '"' + (o.peso ? ' font-weight="' + o.peso + '"' : '') + ' fill="' + (o.color || '#10202c') + '"'
     + (o.ancla ? ' text-anchor="' + o.ancla + '"' : '') + (o.cursiva ? ' font-style="italic"' : '') + '>' + esc(t) + '</text>');
+  // Ancho REAL de un texto en Arial, letra por letra (`anchos-arial.js`; un promedio por
+  // letra achicaba de más «Riesgo tolerable», revisión 2026-09-28).
+  const ancho = (t, tam, peso) => anchoArial(t, tam, !!peso);
+  // Párrafo partido en renglones por su ancho real (antes, por número de letras).
   const parrafo = (t, o = {}) => {
-    const tam = o.tam || 16; const n = Math.floor((W - 2 * P) / (tam * 0.5));
-    renglones(t, n).forEach((r) => { y += tam * 1.35; texto(P, y, r, o); });
+    const tam = o.tam || 16; const out = []; let linea = '';
+    for (const p of String(t || '').split(/\s+/).filter(Boolean)) {
+      const prueba = linea ? linea + ' ' + p : p;
+      if (linea && ancho(prueba, tam, o.peso) > W - 2 * P) { out.push(linea); linea = p; } else linea = prueba;
+    }
+    if (linea) out.push(linea);
+    out.forEach((r) => { y += tam * 1.35; texto(P, y, r, o); });
   };
-  // Ancho estimado de un texto en Arial (≈ 0,53 del tamaño por carácter; en negrita, 0,58).
-  const ancho = (t, tam, peso) => String(t || '').length * tam * (peso ? 0.58 : 0.53);
   // Un texto que no cabe en su espacio baja de tamaño hasta caber (nunca de `min`).
   const tamQueCabe = (t, tam, peso, disponible, min) => Math.max(min, Math.min(tam, Math.floor(disponible / Math.max(1, ancho(t, 1, peso)))));
 

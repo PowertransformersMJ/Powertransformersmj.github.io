@@ -12,6 +12,7 @@ import { exportarFichaPlanificacion } from '../assets/js/ui/fichas/exportar-plan
 import { leerLibroParaVista } from '../assets/js/ui/fichas/vista-previa-excel.js';
 import { svgSaludRiesgo } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
 import { cajaDeImagen, quitarHojaDelLibro, anclarConTamano } from '../assets/js/ui/fichas/ajustes-libro.js';
+import { enderezarCajaGirada, giroAcostado } from '../assets/js/ui/fichas/ancla-girada.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLANTILLA = resolve(__dirname, '..', 'assets', 'plantillas', 'PE-02081-planificacion.xlsx');
@@ -202,5 +203,54 @@ describe('El Actual también se ve del mismo tamaño en todos los programas (202
       assert.equal(await anclarConTamano(z, 'd.xml', 'rId7'), true);
       assert.match(await z.file('d.xml').async('string'), new RegExp('<xdr:ext ' + ext + '/>'), 'giro' + rot);
     }
+  });
+});
+
+describe('Seguro del Actual girado contra un «ajustes-libro.js» viejo en la caché (L-102, `99 §115`)', () => {
+  // Lo que hacía el `anclarConTamano` publicado antes (5855d48): ancla con el <a:ext> SIN cambiar.
+  const anclarComoAntes = async (z, ruta, rId) => {
+    const xml = await z.file(ruta).async('string');
+    z.file(ruta, xml.replace(/<xdr:twoCellAnchor\b[^>]*>([\s\S]*?)<\/xdr:twoCellAnchor>/g, (a, cuerpo) => {
+      if (!cuerpo.includes('r:embed="' + rId + '"')) return a;
+      const e = cuerpo.match(/<a:ext cx="(\d+)" cy="(\d+)"\/>/);
+      return '<xdr:oneCellAnchor>' + cuerpo.match(/<xdr:from>[\s\S]*?<\/xdr:from>/)[0] + '<xdr:ext cx="' + e[1] + '" cy="' + e[2] + '"/>'
+        + cuerpo.match(/<xdr:pic>[\s\S]*<\/xdr:pic>/)[0] + '<xdr:clientData/></xdr:oneCellAnchor>';
+    }));
+  };
+  const extAncla = async (z, ruta) => (await z.file(ruta).async('string')).match(/<xdr:oneCellAnchor>[\s\S]*?<xdr:ext cx="(\d+)" cy="(\d+)"\/>/).slice(1).map(Number);
+
+  test('el ancla vieja (sin cambiar) queda con la caja girada; una segunda vez no cambia nada', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    await anclarComoAntes(z, 'xl/drawings/drawing3.xml', 'rId2');
+    assert.deepEqual(await extAncla(z, 'xl/drawings/drawing3.xml'), [4940300, 6019800]);
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing3.xml', 'rId2'), true);
+    assert.deepEqual(await extAncla(z, 'xl/drawings/drawing3.xml'), [6019800, 4940300]);
+    const x = await z.file('xl/drawings/drawing3.xml').async('string');
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing3.xml', 'rId2'), false);
+    assert.equal(await z.file('xl/drawings/drawing3.xml').async('string'), x);
+    // Y la vista previa lo lee apaisado, como la plantilla.
+    const im = (await leerLibroParaVista(z)).hojas.find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.deepEqual([Math.round(im.w), Math.round(im.h), im.rot], [632, 519, 270]);
+  });
+
+  test('con el ancla nueva no cambia nada; el Futuro (sin giro) y la plantilla sin anclar tampoco', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    await anclarConTamano(z, 'xl/drawings/drawing3.xml', 'rId2');
+    await anclarConTamano(z, 'xl/drawings/drawing4.xml', 'rId2');
+    const a3 = await z.file('xl/drawings/drawing3.xml').async('string'); const a4 = await z.file('xl/drawings/drawing4.xml').async('string');
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing3.xml', 'rId2'), false);
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing4.xml', 'rId2'), false);
+    assert.equal(await z.file('xl/drawings/drawing3.xml').async('string'), a3);
+    assert.equal(await z.file('xl/drawings/drawing4.xml').async('string'), a4);
+    const t = await JSZip.loadAsync(plantilla());
+    assert.equal(await enderezarCajaGirada(t, 'xl/drawings/drawing3.xml', 'rId2'), false, 'twoCellAnchor de la plantilla: no se toca');
+    assert.equal(await enderezarCajaGirada(t, 'xl/drawings/no-existe.xml', 'rId2'), false);
+  });
+
+  test('qué giros guardan la caja cambiada: de 45° a 135° y de 225° a 315°', () => {
+    for (const [g, esperado] of [[0, false], [44, false], [45, true], [90, true], [134, true], [135, false], [180, false], [225, true], [270, true], [314, true], [315, false], [-90, true], [450, true]]) {
+      assert.equal(giroAcostado(g * 60000), esperado, g + '°');
+    }
+    assert.equal(giroAcostado(undefined), false);
   });
 });
