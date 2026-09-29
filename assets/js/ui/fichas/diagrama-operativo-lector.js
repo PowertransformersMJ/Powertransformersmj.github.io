@@ -19,11 +19,29 @@
 // Lo que no se puede reproducir (EMF/WMF/TIFF, gráficos, objetos incrustados,
 // imágenes enlazadas) va a un INVENTARIO que la pantalla muestra: nunca se omite
 // en silencio.
+//
+// CF-40 (verificación del cerebro, L-106): cada parte se descomprime contando los
+// bytes REALES (`leerParteAcotada`) y pasa por `revisarXml` —una pasada lineal que
+// exige cierres en orden y ningún elemento dentro de otro del mismo nombre—
+// ANTES de cualquier regex; las regex buscan el nombre exacto (`(?=[\s>/])`, no
+// `\b`, que confundía `<c` con `<c:x`). Topes de texto e imágenes para que el
+// dibujo tampoco se dispare. Y todo esto corre en un trabajador con tiempo límite
+// (`diagrama-operativo-seguro.js`): la página nunca se traba.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { cargarJSZip, colIndice, formatearValor } from './vista-previa-excel.js';
+import { revisarXml, leerParteAcotada, textoParte, aBase64, dimensionesImagen } from './diagrama-operativo-xml.js';
 
-export const TOPES = Object.freeze({ total: 50 * 1024 * 1024, hoja: 20 * 1024 * 1024, hojas: 30, columnas: 200, filas: 1000, celdas: 20000 });
+export const TOPES = Object.freeze({
+  total: 50 * 1024 * 1024, hoja: 20 * 1024 * 1024, hojas: 30, columnas: 200, filas: 1000, celdas: 20000,
+  // CF-40: el presupuesto de 50 MB se cuenta en bytes REALES; cada parte cabe en lo que quede (la hoja, en 20 MB).
+  // Texto por celda (32.767: lo máximo de Excel) y total —celdas y cuadros de texto—; imágenes; dibujos y objetos.
+  // (Topes medidos contra el costo real de pintar: 1 M de caracteres ≈ 0,1 s; 100 Mpx de imagen ≈ 0,1 s.)
+  textoCelda: 32767, textoTotal: 1000000, imagenPx: 120e6, imagenesPx: 250e6, imagenesSvg: 120 * 1024 * 1024,
+  dibujos: 4, objetos: 5000
+});
+/** Límites de Excel: más allá no hay columnas ni filas (un ancla que diga otra cosa es falsa). */
+const MAX_COL = 16384; const MAX_FILA = 1048576;
 const EMU_PX = 9525;
 const PX_PT = 96 / 72;
 
@@ -35,7 +53,16 @@ const desXml = (s) => String(s == null ? '' : s)
   .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
   .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(+n)).replace(/&amp;/g, '&');
 const textoDe = (xml) => desXml([...String(xml || '').matchAll(/<(?:\w+:)?t(?:\s[^>]*)?>([^<]*)<\/(?:\w+:)?t>/g)].map((m) => m[1]).join(''));
-const bloque = (xml, n) => (String(xml || '').match(new RegExp('<' + n + '\\b[^>]*>([\\s\\S]*?)</' + n + '>')) || ['', ''])[1];
+/** Contenido del primer elemento `n` (no vacío). Lineal: busca su cierre exacto con indexOf. */
+const bloque = (xml, n) => {
+  const s = String(xml || ''); const re = new RegExp('<(' + n + ')(?=[\\s>/])[^>]*>', 'g'); let m;
+  while ((m = re.exec(s))) {
+    if (m[0].charCodeAt(m[0].length - 2) === 47) continue;   // <n/>: vacío
+    const f = s.indexOf('</' + m[1] + '>', re.lastIndex);
+    return f < 0 ? '' : s.slice(re.lastIndex, f);
+  }
+  return '';
+};
 const refPartes = (ref) => { const m = String(ref || '').replace(/\$/g, '').match(/^([A-Z]+)(\d+)$/i); return m ? { c: colIndice(m[1]), r: +m[2] - 1 } : null; };
 const rango = (ref) => { const [a, b] = String(ref || '').split(':'); const p = refPartes(a); const q = refPartes(b || a); return p && q ? { c0: Math.min(p.c, q.c), r0: Math.min(p.r, q.r), c1: Math.max(p.c, q.c), r1: Math.max(p.r, q.r) } : null; };
 function resolverRuta(base, target) {
@@ -98,8 +125,10 @@ function leerEstilos(xml, tema) {
   const idx = [...bloque(s, 'indexedColors').matchAll(/<rgbColor\b[^>]*>/g)].map((m) => (attr(m[0], 'rgb') || '').slice(-6));
   const indexados = idx.length ? idx : INDEXADOS;
   const formatos = {};
-  for (const m of s.matchAll(/<numFmt\b[^>]*\/>/g)) formatos[num(m[0], 'numFmtId')] = desXml(attr(m[0], 'formatCode'));
-  const fuentes = [...bloque(s, 'fonts').matchAll(/<font\b[^>]*?(?:\/>|>([\s\S]*?)<\/font>)/g)].map((m) => {
+  // Excel no admite códigos de formato de más de 255 caracteres: uno más largo es un archivo alterado y se
+  // lee como «General» (cada celda recorre su código: 100.000 caracteres × miles de celdas trababan el lector).
+  for (const m of s.matchAll(/<numFmt\b[^>]*\/>/g)) { const cod = desXml(attr(m[0], 'formatCode')); formatos[num(m[0], 'numFmtId')] = cod.length <= 255 ? cod : ''; }
+  const fuentes = [...bloque(s, 'fonts').matchAll(/<font(?=[\s>/])[^>]*?(?:\/>|>([\s\S]*?)<\/font>)/g)].map((m) => {
     const f = m[1] || '';
     return {
       b: /<b(?:\s[^>]*)?\/>/.test(f) && !/<b val="(0|false)"/.test(f), i: /<i(?:\s[^>]*)?\/>/.test(f) && !/<i val="(0|false)"/.test(f),
@@ -115,17 +144,17 @@ function leerEstilos(xml, tema) {
     return colorDe((m[1].match(/<fgColor\b[^>]*>/) || [''])[0], tema, indexados) || (tipo === 'solid' ? '#000000' : '#D9D9D9');
   });
   const GRUESO = { hair: 0.5, thin: 1, dotted: 1, dashed: 1, dashDot: 1, dashDotDot: 1, medium: 2, mediumDashed: 2, mediumDashDot: 2, mediumDashDotDot: 2, slantDashDot: 2, thick: 3, double: 3 };
-  const bordes = [...bloque(s, 'borders').matchAll(/<border\b[^>]*?(?:\/>|>([\s\S]*?)<\/border>)/g)].map((m) => {
+  const bordes = [...bloque(s, 'borders').matchAll(/<border(?=[\s>/])[^>]*?(?:\/>|>([\s\S]*?)<\/border>)/g)].map((m) => {
     const b = m[1] || '';
     const lado = (n) => {
-      const t = b.match(new RegExp('<' + n + '\\b[^>]*?(?:/>|>([\\s\\S]*?)</' + n + '>)')) || [];
+      const t = b.match(new RegExp('<' + n + '(?=[\\s>/])[^>]*?(?:/>|>([\\s\\S]*?)</' + n + '>)')) || [];
       const est = attr(t[0] || '', 'style');
       if (!est || est === 'none') return null;
       return { grueso: GRUESO[est] || 1, estilo: est, color: colorDe(((t[1] || '').match(/<color\b[^>]*>/) || [''])[0], tema, indexados) || '#000000' };
     };
     return { t: lado('top'), r: lado('right'), b: lado('bottom'), l: lado('left') };
   });
-  const xfs = [...bloque(s, 'cellXfs').matchAll(/<xf\b([^>]*?)(?:\/>|>([\s\S]*?)<\/xf>)/g)].map((m) => {
+  const xfs = [...bloque(s, 'cellXfs').matchAll(/<xf(?=[\s>/])([^>]*?)(?:\/>|>([\s\S]*?)<\/xf>)/g)].map((m) => {
     const a = ((m[2] || '').match(/<alignment\b[^>]*>/) || [''])[0]; const x = '<x' + m[1] + '>';
     return {
       fuente: num(x, 'fontId') || 0, relleno: num(x, 'fillId') || 0, borde: num(x, 'borderId') || 0, formato: num(x, 'numFmtId') || 0,
@@ -162,8 +191,37 @@ function exigirEstructura(xml, etiqueta, maximo, que) {
   if (r) throw new Error('El Excel parece dañado por dentro («' + que + '» sin cerrar). Ábralo y vuelva a guardarlo en Excel.');
 }
 
-/** Tamaño descomprimido declarado de una parte del zip (JSZip 3). */
+/** Tamaño descomprimido DECLARADO de una parte del zip (JSZip 3): primer filtro, falseable. */
 const tamano = (f) => (f && f._data && Number.isFinite(f._data.uncompressedSize) ? f._data.uncompressedSize : 0);
+
+/**
+ * Lector de partes con presupuesto (CF-40): cuenta los bytes REALES descomprimidos
+ * (total ≤ TOPES.total y cada parte ≤ su tope) y revisa la estructura de cada XML
+ * ANTES de que lo toque una regex.
+ */
+function lectorAcotado(zip) {
+  let gastado = 0;
+  const grande = (que) => { const e = new Error('El Excel es demasiado grande por dentro (' + que + '). Guarde solo la hoja que necesita en un libro nuevo, o adjunte una imagen.'); e.excede = true; return e; };
+  async function bytes(ruta, tope, que) {
+    const f = zip.file(ruta); if (!f) return null;
+    const cabe = Math.min(tope || TOPES.total, TOPES.total - gastado);
+    if (tamano(f) > cabe) throw grande(que);
+    let u;
+    try { u = await leerParteAcotada(f, cabe); } catch (e) {
+      if (e && e.excede) throw grande(que);
+      throw new Error('El Excel está dañado o es demasiado grande por dentro.');
+    }
+    gastado += u.length; return u;
+  }
+  async function xml(ruta, tope, que) {
+    const u = await bytes(ruta, tope, que); if (!u) return '';
+    const r = revisarXml(textoParte(u));
+    if (r.error === 'demasiadas') throw new Error('El Excel trae demasiados elementos («' + que + '») para leerlo aquí. Defina un área de impresión o copie la hoja a un libro nuevo.');
+    if (r.error) throw new Error('El Excel parece dañado por dentro («' + que + '»). Ábralo y vuelva a guardarlo en Excel.');
+    return r.xml;
+  }
+  return { bytes, xml };
+}
 
 async function abrir(bytes) {
   const JSZip = await cargarJSZip();
@@ -172,13 +230,14 @@ async function abrir(bytes) {
   const partes = Object.keys(zip.files).filter((n) => !zip.files[n].dir);
   const total = partes.reduce((s, n) => s + tamano(zip.files[n]), 0);
   if (total > TOPES.total) throw new Error('El Excel es demasiado grande por dentro (' + Math.round(total / 1048576) + ' MB descomprimido; máximo 50 MB).');
-  const ct = zip.file('[Content_Types].xml') ? await zip.file('[Content_Types].xml').async('string') : '';
+  const lee = lectorAcotado(zip);
+  const ct = await lee.xml('[Content_Types].xml', 0, 'tipos');
   if (!/spreadsheetml\.sheet\.main|sheet\.macroEnabled\.main|spreadsheetml\.template\.main/.test(ct)) throw new Error('El archivo no es un libro de Excel (.xlsx).');
-  const raiz = relaciones(zip.file('_rels/.rels') ? await zip.file('_rels/.rels').async('string') : '');
+  const raiz = relaciones(await lee.xml('_rels/.rels', 0, 'relaciones'));
   const relDoc = [...raiz.values()].find((r) => /\/officeDocument$/.test(r.tipo));
   const libro = relDoc ? resolverRuta('', relDoc.target) : 'xl/workbook.xml';
-  const wb = zip.file(libro) ? await zip.file(libro).async('string') : '';
-  const rels = relaciones(zip.file(rutaRels(libro)) ? await zip.file(rutaRels(libro)).async('string') : '');
+  const wb = await lee.xml(libro, 0, 'libro');
+  const rels = relaciones(await lee.xml(rutaRels(libro), 0, 'relaciones'));
   const activa = num((wb.match(/<workbookView\b[^>]*>/) || [''])[0], 'activeTab') || 0;
   const hojas = [...wb.matchAll(/<sheet\b[^>]*\/?>/g)].map((m, i) => {
     const r = rels.get(attr(m[0], 'r:id'));
@@ -189,7 +248,7 @@ async function abrir(bytes) {
   }).filter((h) => h.ruta && zip.file(h.ruta));
   if (!hojas.length) throw new Error('El Excel no tiene hojas que se puedan leer.');
   if (hojas.length > TOPES.hojas) throw new Error('El Excel trae ' + hojas.length + ' hojas (máximo ' + TOPES.hojas + ').');
-  return { zip, libro, wb, hojas };
+  return { zip, libro, wb, rels, hojas, lee };
 }
 
 /** Hojas del libro (para el selector): [{nombre, visible, activa}]. */
@@ -205,24 +264,21 @@ export async function hojasDelLibro(bytes) {
  * @returns {Promise<object>} {hojas, hoja, area, columnas, filas, celdas, combinadas, imagenes, formas, inventario}
  */
 export async function leerHojaAdjunta(bytes, op = {}) {
-  const { zip, libro, wb, hojas } = await abrir(bytes);
+  const { zip, libro, wb, rels, hojas, lee } = await abrir(bytes);
   const visibles = hojas.filter((h) => h.visible);
   const h = (op.hoja && hojas.find((x) => x.nombre === op.hoja)) || visibles.find((x) => x.activa) || visibles[0] || hojas[0];
   const fh = zip.file(h.ruta);
   if (tamano(fh) > TOPES.hoja) throw new Error('La hoja «' + h.nombre + '» es demasiado grande (máximo 20 MB por dentro).');
   const inventario = [];
-  const leer = async (r) => (zip.file(r) ? zip.file(r).async('string') : '');
-  const rels = relaciones(await leer(rutaRels(libro)));
   const rutaDe = (tipo) => { const r = [...rels.values()].find((x) => new RegExp('/' + tipo + '$').test(x.tipo)); return r ? resolverRuta(libro, r.target) : null; };
-  const tema = paletaTema(await leer(rutaDe('theme') || 'xl/theme/theme1.xml'));
-  const estilos = leerEstilos(await leer(rutaDe('styles') || 'xl/styles.xml'), tema);
-  const ssXml = String(await leer(rutaDe('sharedStrings') || 'xl/sharedStrings.xml'));
+  const tema = paletaTema(await lee.xml(rutaDe('theme') || 'xl/theme/theme1.xml', 0, 'tema'));
+  const estilos = leerEstilos(await lee.xml(rutaDe('styles') || 'xl/styles.xml', 0, 'estilos'), tema);
+  const ssXml = String(await lee.xml(rutaDe('sharedStrings') || 'xl/sharedStrings.xml', 0, 'textos'));
   exigirEstructura(ssXml, 'si', 300000, 'textos');
   exigirEstructura(ssXml.replace(/<(\w+:)?t\b/g, '<t').replace(/<\/(\w+:)?t>/g, '</t>'), 't', 600000, 'textos');
   const compartidos = [...ssXml.matchAll(/<si>([\s\S]*?)<\/si>|<si\/>/g)]
-    .map((m) => textoDe((m[1] || '').replace(/<rPh\b[\s\S]*?<\/rPh>/g, '')));
-  let x;
-  try { x = await fh.async('string'); } catch (e) { throw new Error('El Excel está dañado o es demasiado grande por dentro.'); }
+    .map((m) => textoDe((m[1] || '').replace(/<rPh(?=[\s>/])[^>]*?\/>|<rPh(?=[\s>/])[\s\S]*?<\/rPh>/g, '')));
+  const x = await lee.xml(h.ruta, TOPES.hoja, 'hoja «' + h.nombre + '»');
   exigirEstructura(x, 'row', 50000, 'filas');
   exigirEstructura(x, 'c', 400000, 'celdas');
   if ((x.match(/<mergeCell\b/g) || []).length > 5000) throw new Error('La hoja tiene demasiadas celdas combinadas para leerla aquí. Defina un área de impresión.');
@@ -233,17 +289,24 @@ export async function leerHojaAdjunta(bytes, op = {}) {
   const fmt = (x.match(/<sheetFormatPr\b[^>]*>/) || [''])[0];
   const anchoDef = num(fmt, 'defaultColWidth') || ((num(fmt, 'baseColWidth') || 8) + 0.43);
   const altoDef = num(fmt, 'defaultRowHeight') || 15;
-  const cols = [...x.matchAll(/<col\b[^>]*\/>/g)].map((m) => ({ min: num(m[0], 'min') - 1, max: num(m[0], 'max') - 1, w: num(m[0], 'width'), oculta: attr(m[0], 'hidden') === '1' }));
+  const cols = [...x.matchAll(/<col(?=[\s>/])[^>]*\/>/g)].map((m) => ({ min: num(m[0], 'min') - 1, max: num(m[0], 'max') - 1, w: num(m[0], 'width'), oculta: attr(m[0], 'hidden') === '1' }));
+  if (cols.length > MAX_COL) throw new Error('El Excel parece dañado por dentro («columnas»). Ábralo y vuelva a guardarlo en Excel.');
   const pxCol = (w) => Math.trunc(((256 * w + Math.trunc(128 / 7)) / 256) * 7);
-  const colPx = (c) => { const k = cols.find((q) => c >= q.min && c <= q.max); if (k && k.oculta) return 0; return pxCol(k && k.w != null ? k.w : anchoDef); };
+  // Qué definición manda en cada columna (la PRIMERA que la contiene, como antes con find), en un arreglo.
+  const defCol = new Int32Array(MAX_COL).fill(-1);
+  cols.forEach((q, i) => {
+    if (!(q.min <= q.max)) return;
+    for (let c = Math.max(0, q.min); c <= Math.min(MAX_COL - 1, q.max); c++) if (defCol[c] === -1) defCol[c] = i;
+  });
+  const colPx = (c) => { const k = c >= 0 && c < MAX_COL && defCol[c] >= 0 ? cols[defCol[c]] : undefined; if (k && k.oculta) return 0; return pxCol(k && k.w != null ? k.w : anchoDef); };
   const filasXml = new Map();
-  for (const m of x.matchAll(/<row\b([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) filasXml.set(num('<r' + m[1] + '>', 'r') - 1, { at: '<r' + m[1] + '>', cuerpo: m[2] || '' });
+  for (const m of x.matchAll(/<row(?=[\s>/])([^>]*?)(?:\/>|>([\s\S]*?)<\/row>)/g)) filasXml.set(num('<r' + m[1] + '>', 'r') - 1, { at: '<r' + m[1] + '>', cuerpo: m[2] || '' });
   const filaPx = (r) => { const f = filasXml.get(r); if (f && attr(f.at, 'hidden') === '1') return 0; const ht = f ? num(f.at, 'ht') : null; return Math.round((ht != null ? ht : altoDef) * PX_PT); };
 
   // Celdas con contenido o con relleno/borde.
-  const todas = [];
+  const todas = []; let largos = false;
   for (const [, f] of filasXml) {
-    for (const c of f.cuerpo.matchAll(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
+    for (const c of f.cuerpo.matchAll(/<c(?=[\s>/])([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g)) {
       const at = '<c' + c[1] + '>'; const p = refPartes(attr(at, 'r')); if (!p) continue;
       const dentro = c[2] || ''; const t = attr(at, 't'); const si = num(at, 's') || 0;
       const xf = estilos.xfs[si] || estilos.xfs[0] || {};
@@ -260,6 +323,7 @@ export async function leerHojaAdjunta(bytes, op = {}) {
         texto = String(formatearValor(esF ? valor + desfase1904 : valor, cod, xf.formato));
         if (esF) valor += desfase1904;
       }
+      if (texto.length > TOPES.textoCelda) { texto = texto.slice(0, TOPES.textoCelda) + '…'; largos = true; }
       const relleno = estilos.rellenos[xf.relleno] || null; const borde = estilos.bordes[xf.borde] || {};
       if (!texto && !relleno && !borde.t && !borde.r && !borde.b && !borde.l) continue;
       const esFecha = typeof valor === 'number' && FORMATO_FECHA(xf.formato, cod);
@@ -275,22 +339,29 @@ export async function leerHojaAdjunta(bytes, op = {}) {
 
   // Dibujos: imágenes pegadas (png/jpeg/gif) y formas sencillas; lo demás, al inventario.
   const imagenes = []; const formas = [];
-  const relsHoja = relaciones(await leer(rutaRels(h.ruta)));
+  const relsHoja = relaciones(await lee.xml(rutaRels(h.ruta), 0, 'relaciones'));
+  // Cada imagen DISTINTA se lee y se cuenta una vez, aunque la usen muchas anclas (un logo repetido).
+  const medias = new Map(); let pxImagenes = 0; let b64Svg = 0; const grandes = [];
+  const dibujosVistos = new Set();
   for (const r of relsHoja.values()) {
     if (/\/oleObject$|\/package$/.test(r.tipo)) inventario.push('un objeto incrustado (OLE)');
     if (!/\/drawing$/.test(r.tipo)) continue;
     const rutaD = resolverRuta(h.ruta, r.target);
-    const d = await leer(rutaD);
+    if (dibujosVistos.has(rutaD)) continue;
+    dibujosVistos.add(rutaD);
+    if (dibujosVistos.size > TOPES.dibujos) throw new Error('La hoja trae demasiados dibujos para leerla aquí. Defina un área de impresión solo con el cronograma.');
+    const d = await lee.xml(rutaD, 0, 'dibujos');
     for (const t of ['twoCellAnchor', 'oneCellAnchor', 'absoluteAnchor']) {
       const n = d.replace(/<(\/?)\w+:(\w*Anchor)\b/g, '<$1$2');
       exigirEstructura(n, t, 2000, 'dibujos');
     }
-    const relsD = relaciones(await leer(rutaRels(rutaD)));
-    for (const a of d.matchAll(/<(?:xdr:)?(twoCellAnchor|oneCellAnchor|absoluteAnchor)\b[\s\S]*?<\/(?:xdr:)?\1>/g)) {
+    const relsD = relaciones(await lee.xml(rutaRels(rutaD), 0, 'relaciones'));
+    for (const a of d.matchAll(/<(?:xdr:)?(twoCellAnchor|oneCellAnchor|absoluteAnchor)(?=[\s>/])[^>]*?(?:\/>|>[\s\S]*?<\/(?:xdr:)?\1>)/g)) {
       const an = a[0];
       const punto = (t) => {
         const m = an.match(new RegExp('<(?:xdr:)?' + t + '>\\s*<(?:xdr:)?col>(\\d+)</(?:xdr:)?col>\\s*<(?:xdr:)?colOff>(-?\\d+)</(?:xdr:)?colOff>\\s*<(?:xdr:)?row>(\\d+)</(?:xdr:)?row>\\s*<(?:xdr:)?rowOff>(-?\\d+)</(?:xdr:)?rowOff>'));
-        return m ? { c: +m[1], dx: +m[2] / EMU_PX, r: +m[3], dy: +m[4] / EMU_PX } : null;
+        // Un ancla fuera de los límites de Excel es falsa: se ignora (antes obligaba a sumar millones de filas).
+        return m && +m[1] < MAX_COL && +m[3] < MAX_FILA ? { c: +m[1], dx: +m[2] / EMU_PX, r: +m[3], dy: +m[4] / EMU_PX } : null;
       };
       const ext = an.match(/<(?:xdr:)?ext cx="(\d+)" cy="(\d+)"/);
       const caja = { de: punto('from'), a: punto('to'), w: ext ? +ext[1] / EMU_PX : null, h: ext ? +ext[2] / EMU_PX : null };
@@ -306,7 +377,28 @@ export async function leerHojaAdjunta(bytes, op = {}) {
         const src = (an.match(/<a:srcRect\b[^>]*>/) || [''])[0];
         const recorte = src ? { l: (num(src, 'l') || 0) / 100000, t: (num(src, 't') || 0) / 100000, r: (num(src, 'r') || 0) / 100000, b: (num(src, 'b') || 0) / 100000 } : null;
         const mime = extension === 'png' ? 'image/png' : extension === 'gif' ? 'image/gif' : 'image/jpeg';
-        imagenes.push({ ...caja, mime, base64: await zip.file(ruta).async('base64'), recorte });
+        let md = medias.get(ruta);
+        if (!md) {
+          let u;
+          try { u = await lee.bytes(ruta, 0, 'imagen pegada'); } catch (e) {
+            if (e && e.excede) { medias.set(ruta, { fuera: 'una imagen demasiado pesada' }); inventario.push('una imagen demasiado pesada'); continue; }
+            throw e;
+          }
+          // Una imagen de pocos KB puede declarar miles de millones de píxeles: se mide antes de dibujarla.
+          const dim = dimensionesImagen(u); const px = dim ? dim.w * dim.h : 0;
+          md = { base64: aBase64(u), px, dim, grande: px > TOPES.imagenPx };
+          if (!md.grande && pxImagenes + px > TOPES.imagenesPx) md.fuera = 'una imagen demasiado grande (' + dim.w + ' × ' + dim.h + ' px)';
+          else if (!md.grande) pxImagenes += px;
+          medias.set(ruta, md);
+        }
+        if (md.fuera) { inventario.push(md.fuera); continue; }
+        const img = { ...caja, mime, base64: md.base64, recorte };
+        // Más de 120 Mpx: no se dibuja en la hoja; si es lo ÚNICO de la hoja, va como imagen (la pantalla la reduce, como un adjunto suelto).
+        if (md.grande) { grandes.push({ img, dim: md.dim }); continue; }
+        // El SVG repite la imagen en cada ancla: su suma también tiene tope.
+        if (b64Svg + md.base64.length > TOPES.imagenesSvg) { inventario.push('una imagen repetida demasiadas veces'); continue; }
+        b64Svg += md.base64.length;
+        imagenes.push(img);
       } else if (/<(?:xdr:)?(sp|cxnSp)\b/.test(an)) {
         const geom = attr((an.match(/<a:prstGeom\b[^>]*>/) || [''])[0], 'prst') || (/<a:custGeom/.test(an) ? 'custom' : 'rect');
         const spPr = bloque(an, '(?:xdr:)?spPr');
@@ -314,12 +406,17 @@ export async function leerHojaAdjunta(bytes, op = {}) {
         const relleno = /<a:noFill\/>/.test(antesDeLinea) ? null : colorDrawing(bloque(antesDeLinea, 'a:solidFill'), tema);
         const ln = (spPr.match(/<a:ln\b[^>]*>[\s\S]*?<\/a:ln>|<a:ln\b[^>]*\/>/) || [''])[0];
         const linea = !ln || /<a:noFill\/>/.test(ln) ? null : { color: colorDrawing(bloque(ln, 'a:solidFill'), tema) || '#000000', grueso: (num(ln, 'w') || 9525) / EMU_PX };
-        const txt = textoDe(bloque(an, '(?:xdr:)?txBody'));
+        let txt = textoDe(bloque(an, '(?:xdr:)?txBody'));
+        if (txt.length > TOPES.textoCelda) { txt = txt.slice(0, TOPES.textoCelda) + '…'; largos = true; }
         if (geom === 'custom') inventario.push('una forma libre');
         formas.push({ ...caja, geom, relleno, linea, texto: txt });
       }
     }
   }
+
+  if (imagenes.length + formas.length + grandes.length > TOPES.objetos) throw new Error('La hoja trae demasiados dibujos (más de ' + TOPES.objetos.toLocaleString('es-CO') + ') para leerla aquí. Defina un área de impresión solo con el cronograma.');
+  if (grandes.length === 1 && !imagenes.length && !formas.length && !todas.some((q) => String(q.texto || '').trim())) imagenes.push(grandes[0].img);
+  else for (const g of grandes) inventario.push('una imagen demasiado grande (' + g.dim.w + ' × ' + g.dim.h + ' px)');
 
   // Área: la de impresión de ESA hoja; si no hay, lo usado (celdas + dibujos).
   let area = null;
@@ -333,7 +430,8 @@ export async function leerHojaAdjunta(bytes, op = {}) {
     for (const g of [...imagenes, ...formas]) if (g.de) pts.push({ c0: g.de.c, r0: g.de.r, c1: (g.a || g.de).c, r1: (g.a || g.de).r });
     if (!pts.length && inventario.length) throw new Error('La hoja «' + h.nombre + '» solo trae ' + [...new Set(inventario)].join(', ') + ', que no se puede reproducir. En Excel use «Copiar como imagen» y adjunte esa imagen (PNG o JPG).');
     if (!pts.length) throw new Error('La hoja «' + h.nombre + '» está vacía.');
-    area = { c0: Math.min(...pts.map((p) => p.c0)), r0: Math.min(...pts.map((p) => p.r0)), c1: Math.max(...pts.map((p) => p.c1)), r1: Math.max(...pts.map((p) => p.r1)) };
+    area = { c0: Infinity, r0: Infinity, c1: -Infinity, r1: -Infinity };
+    for (const p of pts) { if (p.c0 < area.c0) area.c0 = p.c0; if (p.r0 < area.r0) area.r0 = p.r0; if (p.c1 > area.c1) area.c1 = p.c1; if (p.r1 > area.r1) area.r1 = p.r1; }
   }
   if (area.c1 - area.c0 + 1 > TOPES.columnas || area.r1 - area.r0 + 1 > TOPES.filas) {
     throw new Error('La hoja «' + h.nombre + '» ocupa ' + (area.c1 - area.c0 + 1) + ' columnas × ' + (area.r1 - area.r0 + 1)
@@ -341,6 +439,11 @@ export async function leerHojaAdjunta(bytes, op = {}) {
   }
   const celdas = todas.filter((q) => q.r >= area.r0 && q.r <= area.r1 && q.c >= area.c0 && q.c <= area.c1);
   if (celdas.length > TOPES.celdas) throw new Error('La hoja tiene demasiadas celdas con contenido (máximo 20.000). Defina un área de impresión.');
+  // El texto de los cuadros de texto también cuenta (revisión CF-40: miles de cuadros llenos trababan el dibujo).
+  if (celdas.reduce((t, q) => t + q.texto.length, 0) + formas.reduce((t, g) => t + String(g.texto || '').length, 0) > TOPES.textoTotal) {
+    throw new Error('La hoja tiene demasiado texto para dibujarla en una página. Defina un área de impresión solo con el cronograma.');
+  }
+  if (largos) inventario.push('textos de más de ' + TOPES.textoCelda.toLocaleString('es-CO') + ' caracteres (se recortaron)');
   const vistas = new Set();
   combinadas = combinadas.map((g) => ({ c0: Math.max(g.c0, area.c0), r0: Math.max(g.r0, area.r0), c1: Math.min(g.c1, area.c1), r1: Math.min(g.r1, area.r1) }))
     .filter((g) => { const k = g.c0 + ',' + g.r0 + ',' + g.c1 + ',' + g.r1; if (g.c0 > g.c1 || g.r0 > g.r1 || vistas.has(k)) return false; vistas.add(k); return true; });
@@ -352,8 +455,16 @@ export async function leerHojaAdjunta(bytes, op = {}) {
   const columnas = []; for (let c = area.c0; c <= area.c1; c++) columnas.push(colPx(c));
   const filas = []; for (let r = area.r0; r <= area.r1; r++) filas.push(filaPx(r));
   // Posición absoluta de la hoja → relativa al área.
-  const X = (c) => { let s = 0; for (let k = area.c0; k < c; k++) s += colPx(k); for (let k = c; k < area.c0; k++) s -= colPx(k); return s; };
-  const Y = (r) => { let s = 0; for (let k = area.r0; k < r; k++) s += filaPx(k); for (let k = r; k < area.r0; k++) s -= filaPx(k); return s; };
+  // (Sumas acumuladas: cada columna/fila se suma una vez aunque haya miles de anclas.)
+  const acumulado = (px, base) => {
+    const mas = [0]; const menos = [0];
+    return (k) => {
+      if (k >= base) { const i = k - base; while (mas.length <= i) mas.push(mas[mas.length - 1] + px(base + mas.length - 1)); return mas[i]; }
+      const i = base - k; while (menos.length <= i) menos.push(menos[menos.length - 1] - px(base - menos.length)); return menos[i];
+    };
+  };
+  const X = acumulado(colPx, area.c0);
+  const Y = acumulado(filaPx, area.r0);
   const ubicar = (g) => {
     if (!g.de) return null;
     const x0 = X(g.de.c) + g.de.dx; const y0 = Y(g.de.r) + g.de.dy;
