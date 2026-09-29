@@ -166,3 +166,41 @@ describe('El Futuro se ve del mismo tamaño en todos los programas (revisión §
   });
 });
 
+
+describe('El Actual también se ve del mismo tamaño en todos los programas (2026-09-28)', () => {
+  test('queda anclado a su tamaño, CONSERVA su giro de 270° y el logo no cambia', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    // Antes: la vista previa lee el ancla de la plantilla (la caja YA girada, apaisada).
+    const antes = (await leerLibroParaVista(await JSZip.loadAsync(plantilla()))).hojas
+      .find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.ok(antes.w > antes.h, 'en la plantilla el ancla del Actual es apaisada');
+    assert.equal(await anclarConTamano(z, 'xl/drawings/drawing3.xml', 'rId2'), true);
+    const x = await z.file('xl/drawings/drawing3.xml').async('string');
+    const una = x.match(/<xdr:oneCellAnchor>[\s\S]*?<\/xdr:oneCellAnchor>/g) || [];
+    assert.equal(una.length, 1);
+    assert.match(una[0], /r:embed="rId2"/);
+    // A 270° el ancla es la caja YA girada: ancho y alto cambiados respecto del <a:ext> (519 × 632).
+    assert.match(una[0], /<xdr:ext cx="6019800" cy="4940300"\/>/);
+    assert.match(una[0], /<a:xfrm rot="16200000">/);
+    assert.match(una[0], /<a:ext cx="4940300" cy="6019800"\/>/);
+    assert.equal(una[0].match(/<xdr:from>[\s\S]*?<\/xdr:from>/)[0],
+      '<xdr:from><xdr:col>5</xdr:col><xdr:colOff>294821</xdr:colOff><xdr:row>11</xdr:row><xdr:rowOff>104321</xdr:rowOff></xdr:from>');
+    assert.match(x, /<xdr:twoCellAnchor\b[^>]*>(?:(?!<\/xdr:twoCellAnchor>)[\s\S])*r:embed="rId1"/);
+    // La vista previa lo lee con su caja girada y su giro (y lo muestra derecho, `§110`): sigue apaisada,
+    // casi del mismo tamaño que el ancla de la plantilla (no se deforma).
+    const m = await leerLibroParaVista(z);
+    const im = m.hojas.find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.deepEqual([Math.round(im.w), Math.round(im.h), im.rot], [632, 519, 270]);
+    assert.ok(Math.abs(im.h - antes.h) / antes.h < 0.03, 'alto ' + im.h + ' vs ' + antes.h);
+    assert.equal(Math.round(im.x), Math.round(antes.x)); assert.equal(Math.round(im.y), Math.round(antes.y));
+  });
+
+  test('una imagen sin giro conserva ancho y alto; a 90° también se cambian', async () => {
+    const dib = (rot) => '<xdr:wsDr xmlns:xdr="x" xmlns:a="a"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>9</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:blipFill><a:blip r:embed="rId7"/></xdr:blipFill><xdr:spPr><a:xfrm' + rot + '><a:off x="0" y="0"/><a:ext cx="100" cy="300"/></a:xfrm></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>';
+    for (const [rot, ext] of [['', 'cx="100" cy="300"'], [' rot="5400000"', 'cx="300" cy="100"'], [' rot="10800000"', 'cx="100" cy="300"']]) {
+      const z = new JSZip(); z.file('d.xml', dib(rot));
+      assert.equal(await anclarConTamano(z, 'd.xml', 'rId7'), true);
+      assert.match(await z.file('d.xml').async('string'), new RegExp('<xdr:ext ' + ext + '/>'), 'giro' + rot);
+    }
+  });
+});

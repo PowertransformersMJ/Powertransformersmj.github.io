@@ -73,7 +73,11 @@ function renglones(texto, n) {
  *   potenciaLeyenda, avisoDato, lectura, nota }
  */
 export function svgSaludRiesgo(m) {
-  const W = 1600; const P = 24; const FUENTE = 'Arial, Helvetica, sans-serif';
+  // Proporciones del MARCO (1226 × 611 px, casi 2:1): el dibujo antes medía 1600 × ~706 y
+  // quedaba limitado por el ancho, con la letra en ~6 pt en papel. Más angosto y más compacto
+  // en alto, llena el marco y la MISMA letra sale ~25 % más grande (el Ingeniero, 2026-09-28:
+  // «procede» a agrandar el texto pequeño). Mismo contenido y mismo orden que antes.
+  const W = 1240; const P = 20; const FUENTE = 'Arial, Helvetica, sans-serif';
   const partes = []; let y = P;
   const texto = (x, yy, t, o = {}) => partes.push('<text x="' + x + '" y="' + yy + '" font-family="' + FUENTE + '" font-size="'
     + (o.tam || 16) + '"' + (o.peso ? ' font-weight="' + o.peso + '"' : '') + ' fill="' + (o.color || '#10202c') + '"'
@@ -82,41 +86,45 @@ export function svgSaludRiesgo(m) {
     const tam = o.tam || 16; const n = Math.floor((W - 2 * P) / (tam * 0.5));
     renglones(t, n).forEach((r) => { y += tam * 1.35; texto(P, y, r, o); });
   };
+  // Ancho estimado de un texto en Arial (≈ 0,53 del tamaño por carácter; en negrita, 0,58).
+  const ancho = (t, tam, peso) => String(t || '').length * tam * (peso ? 0.58 : 0.53);
+  // Un texto que no cabe en su espacio baja de tamaño hasta caber (nunca de `min`).
+  const tamQueCabe = (t, tam, peso, disponible, min) => Math.max(min, Math.min(tam, Math.floor(disponible / Math.max(1, ancho(t, 1, peso)))));
 
   // Título de contexto.
-  if (m.titulo) { y += 22; texto(P, y, m.titulo, { tam: 22, peso: 700 }); y += 14; }
+  if (m.titulo) { y += 22; texto(P, y, m.titulo, { tam: tamQueCabe(m.titulo, 22, 700, W - 2 * P, 16), peso: 700 }); y += 12; }
 
   // Cuatro cifras, como las tarjetas de la pantalla, SIN sus anotaciones en
   // cursiva («fila 3 de la matriz», «columna Menor», «se muestra: no mueve la
   // casilla», «resultado de fila × columna»): el Ingeniero pidió que no salgan
   // en el Excel (`99 §110`). En pantalla siguen.
   const kpis = m.kpis || [];
-  const gap = 16; const kw = (W - 2 * P - gap * 3) / 4; const kh = 112;
+  const gap = 14; const kw = (W - 2 * P - gap * 3) / 4; const kh = 100; const util = kw - 32;
   kpis.slice(0, 4).forEach((k, i) => {
     const x = P + i * (kw + gap);
     partes.push('<rect x="' + x + '" y="' + y + '" width="' + kw + '" height="' + kh + '" rx="12" fill="#f4f7fa" stroke="#d5dee8" stroke-width="1.5"/>');
-    texto(x + 18, y + 50, k.valor, { tam: 38, peso: 800, color: k.tinta || '#10202c' });
-    texto(x + 18, y + 76, k.sub, { tam: 16, color: '#26394d' });
-    texto(x + 18, y + 100, k.etiqueta, { tam: 15, peso: 700, color: '#5b6b7c' });
+    texto(x + 16, y + 44, k.valor, { tam: tamQueCabe(k.valor, 36, 800, util, 24), peso: 800, color: k.tinta || '#10202c' });
+    texto(x + 16, y + 68, k.sub, { tam: tamQueCabe(k.sub, 16, 0, util, 13), color: '#26394d' });
+    texto(x + 16, y + 90, k.etiqueta, { tam: tamQueCabe(k.etiqueta, 15, 700, util, 13), peso: 700, color: '#5b6b7c' });
   });
   y += kh + 6;
 
   if (m.definicion) parrafo(m.definicion, { tam: 16 });
   if (m.avisoSinDato) { y += 6; parrafo(m.avisoSinDato, { tam: 16, color: '#b3261e', peso: 700 }); }
-  y += 18;
+  y += 14;
 
   // Matriz 5×5.
-  // 280: «Consecuencia (usuarios aguas abajo) →» mide ~249 px y con 250 la columna 1 tapaba la flecha.
-  const rotW = 280; const cw = (W - 2 * P - rotW) / 5; const hh = 70; const rh = 72;
+  // rotW: «Consecuencia (usuarios aguas abajo) →» en 14 px mide ~270 px; con menos, la columna 1 tapa la flecha.
+  const rotW = 290; const cw = (W - 2 * P - rotW) / 5; const hh = 56; const rh = 58;
   const x0 = P; const y0 = y;
   partes.push('<rect x="' + x0 + '" y="' + y0 + '" width="' + rotW + '" height="' + hh + '" fill="#e9eef4" stroke="#ffffff" stroke-width="2"/>');
-  texto(x0 + 10, y0 + 28, 'Probabilidad de falla (condición) ↓', { tam: 13, peso: 700, color: '#26394d' });
-  texto(x0 + 10, y0 + 50, 'Consecuencia (usuarios aguas abajo) →', { tam: 13, peso: 700, color: '#26394d' });
+  texto(x0 + 10, y0 + 23, 'Probabilidad de falla (condición) ↓', { tam: 14, peso: 700, color: '#26394d' });
+  texto(x0 + 10, y0 + 44, 'Consecuencia (usuarios aguas abajo) →', { tam: 14, peso: 700, color: '#26394d' });
   (m.columnas || []).forEach((c, i) => {
     const x = x0 + rotW + i * cw;
     partes.push('<rect x="' + x + '" y="' + y0 + '" width="' + cw + '" height="' + hh + '" fill="#e9eef4" stroke="#ffffff" stroke-width="2"/>');
-    texto(x + cw / 2, y0 + 30, c.etiqueta, { tam: 17, peso: 700, ancla: 'middle' });
-    texto(x + cw / 2, y0 + 54, c.rango, { tam: 14, color: '#5b6b7c', ancla: 'middle' });
+    texto(x + cw / 2, y0 + 24, c.etiqueta, { tam: tamQueCabe(c.etiqueta, 17, 700, cw - 10, 13), peso: 700, ancla: 'middle' });
+    texto(x + cw / 2, y0 + 45, c.rango, { tam: tamQueCabe(c.rango, 15, 0, cw - 10, 12), color: '#5b6b7c', ancla: 'middle' });
   });
   (m.filas || []).forEach((f, j) => {
     const yy = y0 + hh + j * rh;
@@ -130,33 +138,43 @@ export function svgSaludRiesgo(m) {
         // Sin MVA no hay punto, como en la pantalla: el papel no sugiere una potencia que no está registrada.
         if (m.marca.punto) {
           const r = 3 + 2.4 * m.marca.punto;
-          partes.push('<circle cx="' + (x + 30) + '" cy="' + (yy + rh / 2) + '" r="' + r + '" fill="' + c.tinta + '"/>');
+          partes.push('<circle cx="' + (x + 26) + '" cy="' + (yy + rh / 2) + '" r="' + r + '" fill="' + c.tinta + '"/>');
         }
-        texto(x + 52, yy + rh / 2 - 4, m.marca.mva, { tam: 19, peso: 800, color: c.tinta });
-        texto(x + 52, yy + rh / 2 + 18, m.marca.usuarios, { tam: 15, color: c.tinta });
+        const libre = cw - 54;
+        texto(x + 46, yy + rh / 2 - 3, m.marca.mva, { tam: tamQueCabe(m.marca.mva, 19, 800, libre, 13), peso: 800, color: c.tinta });
+        texto(x + 46, yy + rh / 2 + 17, m.marca.usuarios, { tam: tamQueCabe(m.marca.usuarios, 15, 0, libre, 12), color: c.tinta });
       }
     });
   });
-  y = y0 + hh + 5 * rh + 18;
+  y = y0 + hh + 5 * rh + 14;
 
-  // Leyenda: color = veredicto; el recuadro; el tamaño del punto.
+  // Leyenda: color = veredicto; el recuadro; el tamaño del punto. En el ancho del marco no
+  // cabe en un renglón: pasa al siguiente lo que no quepa.
   let lx = P;
+  const lugar = (w) => { if (lx > P && lx + w > W - P) { lx = P; y += 30; } };
   (m.leyenda || []).forEach((l) => {
+    const w = 30 + ancho(l.texto, 16) + 22; lugar(w);
     partes.push('<rect x="' + lx + '" y="' + (y + 4) + '" width="22" height="22" rx="4" fill="' + l.hex + '"/>');
-    texto(lx + 30, y + 21, l.texto, { tam: 16 }); lx += 30 + l.texto.length * 8.6 + 26;
+    texto(lx + 30, y + 21, l.texto, { tam: 16 }); lx += w;
   });
   if (m.hayMarca) {
+    const t = 'Recuadro: posición de este equipo'; const w = 30 + ancho(t, 16) + 22; lugar(w);
     partes.push('<rect x="' + lx + '" y="' + (y + 4) + '" width="22" height="22" fill="#ffffff" stroke="#10202c" stroke-width="4"/>');
-    texto(lx + 30, y + 21, 'Recuadro: posición de este equipo', { tam: 16 }); lx += 30 + 33 * 8.6 + 26;
+    texto(lx + 30, y + 21, t, { tam: 16 }); lx += w;
   }
-  (m.puntos || []).forEach((p) => { const r = 3 + 2.4 * p; partes.push('<circle cx="' + (lx + r) + '" cy="' + (y + 15) + '" r="' + r + '" fill="#26394d"/>'); lx += 2 * r + 6; });
-  if (m.potenciaLeyenda) texto(lx + 6, y + 21, m.potenciaLeyenda, { tam: 16 });
+  const pts = m.puntos || [];
+  if (pts.length || m.potenciaLeyenda) {
+    const wPts = pts.reduce((a, p) => a + 2 * (3 + 2.4 * p) + 6, 0);
+    lugar(wPts + 6 + ancho(m.potenciaLeyenda || '', 16));
+    pts.forEach((p) => { const r = 3 + 2.4 * p; partes.push('<circle cx="' + (lx + r) + '" cy="' + (y + 15) + '" r="' + r + '" fill="#26394d"/>'); lx += 2 * r + 6; });
+    if (m.potenciaLeyenda) texto(lx + 6, y + 21, m.potenciaLeyenda, { tam: 16 });
+  }
   y += 34;
 
   if (m.avisoDato) { y += 4; parrafo(m.avisoDato, { tam: 15, color: '#8a4b00', peso: 700 }); }
   // Sin la «Lectura por potencia» ni la nota «La casilla sale de la norma…» (`99 §111`,
   // el Ingeniero: «eliminemos esta parte de la matriz de riesgo, no genera valor»).
-  // El modelo las sigue trayendo (m.lectura, m.nota); en pantalla siguen.
+  // El modelo las sigue trayendo (m.lectura, m.nota); tampoco salen ya en pantalla.
   const H = Math.ceil(y + P);
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + W + ' ' + H + '">'
     + '<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="#ffffff"/>' + partes.join('') + '</svg>';

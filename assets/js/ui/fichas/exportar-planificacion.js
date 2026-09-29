@@ -839,6 +839,10 @@ const CAJA_FUTURO = { w: 790, h: 842 };
 // muestra: el <a:ext> de su imagen en drawing4 (609 × 589 px en la plantilla).
 const DIBUJO_FUTURO = 'xl/drawings/drawing4.xml';
 const RID_IMG_FUTURO = 'rId2';
+// El Actual también se ancla a su tamaño (el Ingeniero, 2026-09-28, «procede»; `99 §110.8`):
+// en Excel para Windows se veía algo angostado. Conserva su giro de 270° (va en el <a:xfrm>).
+const DIBUJO_ACTUAL = 'xl/drawings/drawing3.xml';
+const RID_IMG_ACTUAL = 'rId2';
 const CAJA_VISTA_FUTURO = { w: 609, h: 589 };
 // Caja de dibujo del unifilar (viewBox del SVG que entrega el módulo de diagramas).
 const VB = { w: 640, h: 470 };
@@ -1001,7 +1005,11 @@ export async function exportarFichaPlanificacion(equipo, estado = {}, opts = {})
     const svgF = (dg.futuro && dg.futuro.svg) || null;
     if (svgA) {
       const png = await svgAPngRotado(svgA, CAJA_ACTUAL.w, CAJA_ACTUAL.h, VB.w, VB.h);
-      if (png) zip.file(IMG_DIAG_ACTUAL, png);
+      if (png) {
+        zip.file(IMG_DIAG_ACTUAL, png);
+        // Del tamaño exacto en todos los programas, como el Futuro (`§110`): no estirada a las celdas.
+        try { await anclarConTamano(zip, DIBUJO_ACTUAL, RID_IMG_ACTUAL); } catch (e) { /* queda el ancla de la plantilla */ }
+      }
     }
     if (svgF) {
       // DERECHO, no rotado (`99 §110`, el Ingeniero: «en el diagrama futuro sale
