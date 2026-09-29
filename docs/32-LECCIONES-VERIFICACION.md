@@ -388,3 +388,14 @@ La revisión adversarial lo cazó antes de publicar. · **Regla**: antes de publ
 (descargas, vista previa, imprimir, atajos, copias) y decidir para cada una si lleva las firmas y con qué registro; la
 que no registra, no las lleva (aquí: `@media print` dentro del propio SVG). Y armar el archivo UNA vez: huellar y
 descargar esos mismos bytes. **Gate**: pruebas de `§114` en el banco + [HONOR].
+
+### L-108 · Un visor que falla igual no es testigo: se compara contra la FUENTE del formato, y se mide, no se promedia
+**Disparador**: cambiar cómo se ancla, gira o dimensiona algo en un xlsx, o ajustar texto «para que quepa». · **Cicatriz**
+(`99 §115`): el Actual girado se ancló con su `<a:ext>` sin cambiar. En LibreOffice se veía IGUAL que en producción
+(ambos, mal, montados sobre «Notas»), y en Excel habría salido deformado: lo delató la PLANTILLA (ancla apaisada, imagen
+vertical). Y un ancho PROMEDIO por letra achicó «Riesgo tolerable» 14 % en un cambio pedido para AGRANDAR la letra.
+Además, una limpieza «de paso» borró la línea de la función hermana. Solo lo cazó el camino vivo del banco. · **Regla**:
+(1) el testigo es la fuente del formato (la plantilla guardada por Excel) o el programa real, no un visor que puede
+fallar igual; (2) lo que decide un tamaño se mide con las métricas reales y se compara contra producción; (3) una
+limpieza se ubica por su función, no por su texto. **Gate**: `tests/fichas_salud_riesgo_letra.test.js` +
+`tests/fichas_export_actual.test.js` + [HONOR].

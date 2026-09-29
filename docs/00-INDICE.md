@@ -118,14 +118,15 @@
 | §104 | ADR-104 — **Excel sin datos ocultos** | 4256 |
 | §105 | ADR-105 — **Beneficios con las 13 acciones**; casilla que crece | 4285 |
 | §106 | ADR-106 — **Zona del activo**, no el departamento | 4321 |
-| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin Anexo AT); sin usuarios no hay casilla | 4335 |
+| §107 | ADR-107 — **«Salud y riesgo» al Excel**; sin usuarios no hay casilla | 4335 |
 | §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
-| §109 | ADR-109 — **Auditoría Nivel-2**: cola 15 ADRs atrás; candado asimétrico (M-07) | 4389 |
+| §109 | ADR-109 — **Auditoría Nivel-2**; candado asimétrico (M-07) | 4389 |
 | §110 | ADR-110 — **Mantenimiento sin hoja Beneficios**; Futuro derecho | 4416 |
 | §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota de las 7 variables | 4448 |
-| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto (cronograma) guardado, última hoja | 4467 |
+| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4467 |
 | §113 | ADR-113 — **CF-40**: el Excel adjunto se lee en un hilo con tiempo límite | 4553 |
 | §114 | ADR-114 — **Órdenes E/S**: firma en Autorizado; Entregado con firmas del equipo | 4599 |
+| §115 | ADR-115 — **«Salud y riesgo» con letra grande**; Actual con caja girada | 4645 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -152,7 +153,7 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🧪 `30` (L-20/L-21) + `99 §3` + Skill `claude-api` |
-| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§113` + **L-103** |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§115` + **L-103** |
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114` (+ `§71`, `§99`, `§108`) |
 | El "por qué" de una decisión / detalle de un § | Capa 1 → `99-HISTORIAL-ADR.md` |
 
