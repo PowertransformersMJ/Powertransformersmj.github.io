@@ -41,19 +41,34 @@ describe('esperarLectura: paciencia con la primera carga en frío', () => {
     assert.deepEqual(await r, { estado: 'ok', valor: 'PERFIL' });
     assert.equal(avisos, 1);
   });
-  test('un ERROR se reintenta una vez y el segundo intento da el perfil', async () => {
+  const sinConexion = () => Object.assign(new Error('Failed to get document because the client is offline.'), { code: 'unavailable' });
+  test('un error de CONEXIÓN se reintenta tras 1,5 s (el cliente tarda ~1 s en reconectar) y da el perfil', async () => {
     const reloj = relojFalso(); let intentos = 0;
-    const r = esperarLectura(() => { intentos++; return intentos === 1 ? Promise.reject(new Error('unavailable')) : Promise.resolve('PERFIL'); }, { reloj, pausa: 800 });
-    await reloj.avanzar(900);
+    const r = esperarLectura(() => { intentos++; return intentos === 1 ? Promise.reject(sinConexion()) : Promise.resolve('PERFIL'); }, { reloj });
+    await reloj.avanzar(1400); assert.equal(intentos, 1);
+    await reloj.avanzar(200);
     assert.deepEqual(await r, { estado: 'ok', valor: 'PERFIL' });
     assert.equal(intentos, 2);
   });
-  test('dos errores seguidos: falla (sin tercer intento)', async () => {
+  test('errores seguidos: reintentos a los 1,5 s y 3 s más; luego falla', async () => {
     const reloj = relojFalso(); let intentos = 0;
-    const r = esperarLectura(() => { intentos++; return Promise.reject(new Error('unavailable')); }, { reloj, pausa: 800 });
-    await reloj.avanzar(2000);
+    const r = esperarLectura(() => { intentos++; return Promise.reject(sinConexion()); }, { reloj });
+    await reloj.avanzar(6000);
     assert.equal((await r).estado, 'falla');
-    assert.equal(intentos, 2);
+    assert.equal(intentos, 3);
+  });
+  test('un error de PERMISO no se reintenta: «denegado» (no es la conexión)', async () => {
+    const reloj = relojFalso(); let intentos = 0;
+    const r = esperarLectura(() => { intentos++; return Promise.reject(Object.assign(new Error('no'), { code: 'permission-denied' })); }, { reloj });
+    await reloj.avanzar(10);
+    assert.equal((await r).estado, 'denegado');
+    assert.equal(intentos, 1);
+  });
+  test('por defecto espera 12 s (más que los 10 s con que Firestore da la conexión por caída)', async () => {
+    const reloj = relojFalso(); const d = diferida();
+    const r = esperarLectura(() => d.p, { reloj });
+    await reloj.avanzar(10500); d.ok('PERFIL');
+    assert.deepEqual(await r, { estado: 'ok', valor: 'PERFIL' });
   });
   test('sin respuesta en todo el tiempo total: «tiempo» (no «no existe»)', async () => {
     const reloj = relojFalso(); const d = diferida();
@@ -65,7 +80,7 @@ describe('esperarLectura: paciencia con la primera carga en frío', () => {
   test('una excepción al LLAMAR la lectura también se reintenta', async () => {
     const reloj = relojFalso(); let intentos = 0;
     const r = esperarLectura(() => { intentos++; if (intentos === 1) throw new Error('x'); return 'OK'; }, { reloj });
-    await reloj.avanzar(900);
+    await reloj.avanzar(1600);
     assert.deepEqual(await r, { estado: 'ok', valor: 'OK' });
   });
 });
@@ -85,18 +100,35 @@ describe('decidirPerfil: solo un perfil que de verdad NO existe cambia la sesió
     assert.equal(decidirPerfil({ estado: 'ok', existe: false }, { estado: 'ok', existe: false }), 'sin-perfil');
     assert.equal(decidirPerfil({ estado: 'ok', existe: false }, { estado: 'tiempo' }), 'reintentar');
   });
+  test('un perfil NEGADO por las reglas cuenta como inexistente (como antes); /admins negado → sin perfil', () => {
+    assert.equal(decidirPerfil({ estado: 'denegado' }), 'consultar-admins');
+    assert.equal(decidirPerfil({ estado: 'denegado' }, { estado: 'ok', existe: true }), 'legacy');
+    assert.equal(decidirPerfil({ estado: 'ok', existe: false }, { estado: 'denegado' }), 'sin-perfil');
+  });
 });
 
 describe('el guardián de sesión usa la decisión (y ya no se rinde a los 3,5 s)', () => {
   const src = readFileSync(resolve(__dirname, '..', 'assets', 'js', 'auth', 'session-guard.js'), 'utf8');
-  test('importa la decisión, espera hasta 9 s y ofrece «Reintentar» sin cerrar sesión', () => {
-    assert.match(src, /import \{ esperarLectura, decidirPerfil \} from '\.\.\/domain\/decision_perfil\.js';/);
-    assert.match(src, /const PROFILE_TOTAL_MS\s+= 9000;/);
-    assert.match(src, /decision === 'reintentar'[\s\S]{0,400}showSplashError\([\s\S]{0,200}LOGIN_URL, true\);\s*return;/);
+  test('carga la decisión DENTRO del try (fallo = página oculta), espera hasta 12 s y «Reintentar» relee en la misma página', () => {
+    assert.doesNotMatch(src, /^import .*decision_perfil/m);
+    assert.match(src, /try \{[\s\S]{0,400}await import\('\.\.\/domain\/decision_perfil\.js'\)/);
+    assert.match(src, /const PROFILE_TOTAL_MS\s+= 12000;/);
+    assert.match(src, /decision === 'reintentar'[\s\S]{0,400}showSplashError\([\s\S]{0,200}LOGIN_URL, \(\) => handleUser\(user\)\);\s*return;/);
+    assert.doesNotMatch(src, /location\.reload\(\)/);
+    assert.match(src, /id="sgm-splash-salir"[\s\S]{0,400}Cerrar sesión/);
     // El perfil de arranque solo sale de la decisión 'legacy'.
     assert.equal((src.match(/legacy: true/g) || []).length, 1);
     assert.match(src, /if \(decision === 'legacy'\) \{/);
     // Al entrar la sesión de Auth, el failsafe de Auth se apaga.
     assert.match(src, /async function handleUser\(user\) \{[\s\S]{0,300}clearTimeout\(FAILSAFE_TIMER\);/);
+  });
+});
+
+describe('la página de ingreso tampoco toma una lectura lenta como «sin acceso»', () => {
+  const html = readFileSync(resolve(__dirname, '..', 'index.html'), 'utf8');
+  test('al arrancar y al ingresar: con falla de conexión entra (decide el guardián); solo sin perfil cierra sesión', () => {
+    assert.match(html, /catch \(e\) \{ falla = !\(e && \(e\.code === 'permission-denied' \|\| e\.code === 'unauthenticated'\)\); \}\s*[\s\S]{0,300}if \(falla\) \{ location\.replace\('home\.html'\); return; \}/);
+    assert.match(html, /if \(!ok && falla\) \{[\s\S]{0,200}location\.replace\('home\.html'\)/);
+    assert.doesNotMatch(html, /\} catch \(_\) \{\}\s*try \{ await signOut\(auth\); \} catch \(_\) \{\}/);
   });
 });

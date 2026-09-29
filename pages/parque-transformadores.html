@@ -708,7 +708,7 @@ async function loadData(){
     window.SGM_DATA_SOURCE=async function(){
       if(!window.__sgmSession){
         await new Promise((res)=>{
-          const t=setTimeout(res,12000);
+          const t=setTimeout(res,30000);
           window.addEventListener('sgm:session-ready',()=>{clearTimeout(t);res();},{once:true});
           if(window.__sgmSession){clearTimeout(t);res();}
         });

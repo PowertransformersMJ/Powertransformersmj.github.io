@@ -302,6 +302,7 @@
     }
     onAuthStateChanged(auth, async (user) => {
       if (!user) return;
+      let falla = false;
       try {
         const snap = await getDoc(doc(db, 'usuarios', user.uid));
         if (snap.exists() && snap.data().activo !== false) {
@@ -313,7 +314,10 @@
           location.replace('home.html');
           return;
         }
-      } catch (_) {}
+      } catch (e) { falla = !(e && (e.code === 'permission-denied' || e.code === 'unauthenticated')); }
+      // Una lectura LENTA o FALLIDA no es «sin acceso» (99 §116): se entra y el guardián de
+      // la página, con paciencia, decide (y si no puede, ofrece Reintentar sin cerrar sesión).
+      if (falla) { location.replace('home.html'); return; }
       try { await signOut(auth); } catch (_) {}
     });
   })();
@@ -341,15 +345,25 @@
       );
 
       let ok = false;
+      let falla = false;
+      const esFalla = (e) => !(e && (e.code === 'permission-denied' || e.code === 'unauthenticated'));
       try {
         const snap = await getDoc(doc(db, 'usuarios', cred.user.uid));
         if (snap.exists() && snap.data().activo !== false) ok = true;
-      } catch (_) {}
+      } catch (e) { falla = falla || esFalla(e); }
       if (!ok) {
         try {
           const legacy = await getDoc(doc(db, 'admins', cred.user.uid));
           if (legacy.exists()) ok = true;
-        } catch (_) {}
+        } catch (e) { falla = falla || esFalla(e); }
+      }
+
+      // Conexión lenta (99 §116): no se cierra la sesión ni se dice «no tiene perfil»;
+      // entra y el guardián de la página decide con paciencia.
+      if (!ok && falla) {
+        setMsg('⋯ Conexión lenta: verificando su perfil…', 'info');
+        setTimeout(() => location.replace('home.html'), 400);
+        return;
       }
 
       if (!ok) {
