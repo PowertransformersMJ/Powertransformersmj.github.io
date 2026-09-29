@@ -20,7 +20,7 @@
 > **(I) Fichas, esperan su respuesta**: ¿agrandar la letra de «Salud y riesgo» (~6 pt en papel, `§107.8`)? · ¿fijar el
 > tamaño del Diagrama Actual para Windows (`§110.8`)? · ¿quitar también de la pantalla la lectura por potencia (`§111.8`)? · la primera
 > descarga real con folio (`§108.5`) · «[object Object]» en refrigeración del PI (`§103.8`) · borrar las 5 copias viejas de
-> firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`) · el primer Diagrama Operativo real y autorizar CF-40 (`§112.8`).
+> firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`) · el primer Diagrama Operativo real (`§112.8`) · firma de Juan Cardona y 1.ª orden con folio (`§114.8`).
 
 ### 🚫 Callejones probados (NO reintentar)
 > **Los de la Fase 9 viven en `99 §52.8-52.9`** (+ `--branch` de filter-repo → **L-25**). Los de dominio (Reprocesar `§20`,
