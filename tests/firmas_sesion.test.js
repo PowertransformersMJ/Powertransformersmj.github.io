@@ -41,3 +41,11 @@ test('Órdenes usa esta regla en la línea de firma y en el aviso de la pantalla
   assert.doesNotMatch(src, /firmaAplicaA\(/);
   assert.match(src, /autorizadoPor: \{ nombre: 'MIGUEL JIMENEZ'/);
 });
+
+test('el informe de refrigeración usa la misma regla (su línea «Miguel Jimenez» y el perfil «ING. MIGUEL JIMENEZ»)', () => {
+  const src = readFileSync(new URL('../assets/js/calculo-refrigeracion.js', import.meta.url), 'utf8');
+  assert.match(src, /import \{ lineaDeLaSesion \} from '\.\/domain\/firmas_sesion\.js';/);
+  assert.doesNotMatch(src, /firmaAplicaA\(/);
+  assert.match(src, /firmaHTMLDe\('Miguel Jimenez'\)/);
+  assert.equal(lineaDeLaSesion('Miguel Jimenez', 'ING. MIGUEL JIMENEZ'), true);
+});

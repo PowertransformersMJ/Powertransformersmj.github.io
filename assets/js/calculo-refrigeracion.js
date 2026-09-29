@@ -42,7 +42,9 @@ import {
 // línea. Para cualquier otro, el informe sale con el espacio en blanco para
 // firmar a mano. Nadie puede emitir un documento con la firma de otro.
 import { miFirma, firmasDisponibles } from './data/firmas.js';
-import { firmaAplicaA } from './domain/firmas.js';
+// ¿La línea es de la sesión? Por la lista CERRADA de nombres de la misma persona: el perfil del
+// Ingeniero es «ING. MIGUEL JIMENEZ» y la línea dice «Miguel Jimenez» (2026-09-28, `99 §99.12`).
+import { lineaDeLaSesion } from './domain/firmas_sesion.js';
 import { getSession } from './auth/session-guard.js';
 
 // Se precarga: `generateReport()` arma el informe de una sola pasada en otra
@@ -64,7 +66,7 @@ else {
 /** HTML de la firma para la línea de una persona: la suya, o nada. */
 function firmaHTMLDe(nombreDeLaLinea) {
   if (!FIRMA_INFORME.dataUrl) return '';
-  if (!firmaAplicaA(nombreDeLaLinea, FIRMA_INFORME.nombre)) return '';
+  if (!lineaDeLaSesion(nombreDeLaLinea, FIRMA_INFORME.nombre)) return '';
   return `<img src="${FIRMA_INFORME.dataUrl}" alt="Firma de ${escaparHtml(nombreDeLaLinea)}" class="firma-img">`;
 }
 
