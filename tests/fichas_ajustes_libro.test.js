@@ -12,6 +12,7 @@ import { exportarFichaPlanificacion } from '../assets/js/ui/fichas/exportar-plan
 import { leerLibroParaVista } from '../assets/js/ui/fichas/vista-previa-excel.js';
 import { svgSaludRiesgo } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
 import { cajaDeImagen, quitarHojaDelLibro, anclarConTamano } from '../assets/js/ui/fichas/ajustes-libro.js';
+import { enderezarCajaGirada, giroAcostado } from '../assets/js/ui/fichas/ancla-girada.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const PLANTILLA = resolve(__dirname, '..', 'assets', 'plantillas', 'PE-02081-planificacion.xlsx');
@@ -166,3 +167,90 @@ describe('El Futuro se ve del mismo tamaño en todos los programas (revisión §
   });
 });
 
+
+describe('El Actual también se ve del mismo tamaño en todos los programas (2026-09-28)', () => {
+  test('queda anclado a su tamaño, CONSERVA su giro de 270° y el logo no cambia', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    // Antes: la vista previa lee el ancla de la plantilla (la caja YA girada, apaisada).
+    const antes = (await leerLibroParaVista(await JSZip.loadAsync(plantilla()))).hojas
+      .find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.ok(antes.w > antes.h, 'en la plantilla el ancla del Actual es apaisada');
+    assert.equal(await anclarConTamano(z, 'xl/drawings/drawing3.xml', 'rId2'), true);
+    const x = await z.file('xl/drawings/drawing3.xml').async('string');
+    const una = x.match(/<xdr:oneCellAnchor>[\s\S]*?<\/xdr:oneCellAnchor>/g) || [];
+    assert.equal(una.length, 1);
+    assert.match(una[0], /r:embed="rId2"/);
+    // A 270° el ancla es la caja YA girada: ancho y alto cambiados respecto del <a:ext> (519 × 632).
+    assert.match(una[0], /<xdr:ext cx="6019800" cy="4940300"\/>/);
+    assert.match(una[0], /<a:xfrm rot="16200000">/);
+    assert.match(una[0], /<a:ext cx="4940300" cy="6019800"\/>/);
+    assert.equal(una[0].match(/<xdr:from>[\s\S]*?<\/xdr:from>/)[0],
+      '<xdr:from><xdr:col>5</xdr:col><xdr:colOff>294821</xdr:colOff><xdr:row>11</xdr:row><xdr:rowOff>104321</xdr:rowOff></xdr:from>');
+    assert.match(x, /<xdr:twoCellAnchor\b[^>]*>(?:(?!<\/xdr:twoCellAnchor>)[\s\S])*r:embed="rId1"/);
+    // La vista previa lo lee con su caja girada y su giro (y lo muestra derecho, `§110`): sigue apaisada,
+    // casi del mismo tamaño que el ancla de la plantilla (no se deforma).
+    const m = await leerLibroParaVista(z);
+    const im = m.hojas.find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.deepEqual([Math.round(im.w), Math.round(im.h), im.rot], [632, 519, 270]);
+    assert.ok(Math.abs(im.h - antes.h) / antes.h < 0.03, 'alto ' + im.h + ' vs ' + antes.h);
+    assert.equal(Math.round(im.x), Math.round(antes.x)); assert.equal(Math.round(im.y), Math.round(antes.y));
+  });
+
+  test('una imagen sin giro conserva ancho y alto; a 90° también se cambian', async () => {
+    const dib = (rot) => '<xdr:wsDr xmlns:xdr="x" xmlns:a="a"><xdr:twoCellAnchor editAs="oneCell"><xdr:from><xdr:col>1</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>1</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:from><xdr:to><xdr:col>3</xdr:col><xdr:colOff>0</xdr:colOff><xdr:row>9</xdr:row><xdr:rowOff>0</xdr:rowOff></xdr:to><xdr:pic><xdr:blipFill><a:blip r:embed="rId7"/></xdr:blipFill><xdr:spPr><a:xfrm' + rot + '><a:off x="0" y="0"/><a:ext cx="100" cy="300"/></a:xfrm></xdr:spPr></xdr:pic><xdr:clientData/></xdr:twoCellAnchor></xdr:wsDr>';
+    for (const [rot, ext] of [['', 'cx="100" cy="300"'], [' rot="5400000"', 'cx="300" cy="100"'], [' rot="10800000"', 'cx="100" cy="300"']]) {
+      const z = new JSZip(); z.file('d.xml', dib(rot));
+      assert.equal(await anclarConTamano(z, 'd.xml', 'rId7'), true);
+      assert.match(await z.file('d.xml').async('string'), new RegExp('<xdr:ext ' + ext + '/>'), 'giro' + rot);
+    }
+  });
+});
+
+describe('Seguro del Actual girado contra un «ajustes-libro.js» viejo en la caché (L-102, `99 §115`)', () => {
+  // Lo que hacía el `anclarConTamano` publicado antes (5855d48): ancla con el <a:ext> SIN cambiar.
+  const anclarComoAntes = async (z, ruta, rId) => {
+    const xml = await z.file(ruta).async('string');
+    z.file(ruta, xml.replace(/<xdr:twoCellAnchor\b[^>]*>([\s\S]*?)<\/xdr:twoCellAnchor>/g, (a, cuerpo) => {
+      if (!cuerpo.includes('r:embed="' + rId + '"')) return a;
+      const e = cuerpo.match(/<a:ext cx="(\d+)" cy="(\d+)"\/>/);
+      return '<xdr:oneCellAnchor>' + cuerpo.match(/<xdr:from>[\s\S]*?<\/xdr:from>/)[0] + '<xdr:ext cx="' + e[1] + '" cy="' + e[2] + '"/>'
+        + cuerpo.match(/<xdr:pic>[\s\S]*<\/xdr:pic>/)[0] + '<xdr:clientData/></xdr:oneCellAnchor>';
+    }));
+  };
+  const extAncla = async (z, ruta) => (await z.file(ruta).async('string')).match(/<xdr:oneCellAnchor>[\s\S]*?<xdr:ext cx="(\d+)" cy="(\d+)"\/>/).slice(1).map(Number);
+
+  test('el ancla vieja (sin cambiar) queda con la caja girada; una segunda vez no cambia nada', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    await anclarComoAntes(z, 'xl/drawings/drawing3.xml', 'rId2');
+    assert.deepEqual(await extAncla(z, 'xl/drawings/drawing3.xml'), [4940300, 6019800]);
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing3.xml', 'rId2'), true);
+    assert.deepEqual(await extAncla(z, 'xl/drawings/drawing3.xml'), [6019800, 4940300]);
+    const x = await z.file('xl/drawings/drawing3.xml').async('string');
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing3.xml', 'rId2'), false);
+    assert.equal(await z.file('xl/drawings/drawing3.xml').async('string'), x);
+    // Y la vista previa lo lee apaisado, como la plantilla.
+    const im = (await leerLibroParaVista(z)).hojas.find((h) => h.nombre === 'Diagrama Actual').imagenes.find((i) => /image5/.test(i.ruta));
+    assert.deepEqual([Math.round(im.w), Math.round(im.h), im.rot], [632, 519, 270]);
+  });
+
+  test('con el ancla nueva no cambia nada; el Futuro (sin giro) y la plantilla sin anclar tampoco', async () => {
+    const z = await JSZip.loadAsync(plantilla());
+    await anclarConTamano(z, 'xl/drawings/drawing3.xml', 'rId2');
+    await anclarConTamano(z, 'xl/drawings/drawing4.xml', 'rId2');
+    const a3 = await z.file('xl/drawings/drawing3.xml').async('string'); const a4 = await z.file('xl/drawings/drawing4.xml').async('string');
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing3.xml', 'rId2'), false);
+    assert.equal(await enderezarCajaGirada(z, 'xl/drawings/drawing4.xml', 'rId2'), false);
+    assert.equal(await z.file('xl/drawings/drawing3.xml').async('string'), a3);
+    assert.equal(await z.file('xl/drawings/drawing4.xml').async('string'), a4);
+    const t = await JSZip.loadAsync(plantilla());
+    assert.equal(await enderezarCajaGirada(t, 'xl/drawings/drawing3.xml', 'rId2'), false, 'twoCellAnchor de la plantilla: no se toca');
+    assert.equal(await enderezarCajaGirada(t, 'xl/drawings/no-existe.xml', 'rId2'), false);
+  });
+
+  test('qué giros guardan la caja cambiada: de 45° a 135° y de 225° a 315°', () => {
+    for (const [g, esperado] of [[0, false], [44, false], [45, true], [90, true], [134, true], [135, false], [180, false], [225, true], [270, true], [314, true], [315, false], [-90, true], [450, true]]) {
+      assert.equal(giroAcostado(g * 60000), esperado, g + '°');
+    }
+    assert.equal(giroAcostado(undefined), false);
+  });
+});

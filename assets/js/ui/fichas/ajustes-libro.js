@@ -58,6 +58,10 @@ export async function cajaDeImagen(zip, rutaDibujo, rId) {
  * vista previa): el Diagrama Futuro salía angostado ~10 % fuera del Mac en que
  * se guardó la plantilla (revisión `§110`). Con oneCellAnchor + ext se ve del
  * mismo tamaño en todos, sin deformar. Conserva la esquina superior izquierda.
+ * Imagen girada a 90° o 270° (el Diagrama Actual va a 270°): Excel guarda su
+ * ancla como la caja YA girada, con ancho y alto cambiados respecto del <a:ext>
+ * (así viene en la plantilla, y así la lee la vista previa); el ancla nueva
+ * también, o Excel la deformaría (revisión 2026-09-28).
  * @returns {Promise<boolean>} true si la cambió
  */
 export async function anclarConTamano(zip, rutaDibujo, rId) {
@@ -72,7 +76,11 @@ export async function anclarConTamano(zip, rutaDibujo, rId) {
     const pic = cuerpo.match(/<xdr:pic>[\s\S]*<\/xdr:pic>/);
     if (!de || !e || !pic) return a;
     hecho = true;
-    return '<xdr:oneCellAnchor>' + de[0] + '<xdr:ext cx="' + e[1] + '" cy="' + e[2] + '"/>' + pic[0] + '<xdr:clientData/></xdr:oneCellAnchor>';
+    const giro = (cuerpo.match(/<a:xfrm\b[^>]*\brot="(-?\d+)"/) || [])[1];
+    const grados = giro ? (((Math.round(+giro / 60000) % 360) + 360) % 360) : 0;
+    const acostada = (grados >= 45 && grados < 135) || (grados >= 225 && grados < 315);
+    const [cx, cy] = acostada ? [e[2], e[1]] : [e[1], e[2]];
+    return '<xdr:oneCellAnchor>' + de[0] + '<xdr:ext cx="' + cx + '" cy="' + cy + '"/>' + pic[0] + '<xdr:clientData/></xdr:oneCellAnchor>';
   });
   if (hecho) zip.file(rutaDibujo, nuevo);
   return hecho;

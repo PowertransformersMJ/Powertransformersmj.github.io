@@ -2328,22 +2328,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       +   '</div>'
       +   (avisoDato ? '<div class="ftm-aviso ftm-sr-aviso-dato"><b>Ojo con el dato de usuarios.</b> '
             + esc(avisoDato) + '</div>' : '')
-      +   (nivelPot && nivel
-          ? '<p class="ftm-sr-lectura"><b>Lectura por potencia (informativa, no normativa).</b> '
-            + 'Este equipo pesa ' + esc(mvaTxt(mva)) + ' MVA (banda ' + esc(banda.etiqueta) + '). Si la consecuencia '
-            + 'se midiera por potencia en vez de por usuarios, su columna sería <b>'
-            + esc(LABELS_NIVEL[nivelPot]) + '</b>'
-            + (nivelPot === nivel
-                ? ' — la misma en la que ya está.'
-                : ', en vez de <b>' + esc(LABELS_NIVEL[nivel]) + '</b>. La casilla firmada sigue siendo la de la norma.')
-            + '</p>'
-          : '')
-      +   '<p class="ftm-mini-src">La casilla sale de la norma: condición (fila) × usuarios aguas abajo '
-      +   '(columna), en cinco rangos calculados sobre TODO el parque — por eso este equipo cae en la misma '
-      +   'casilla aquí y en la matriz de Analítica gerencial. La potencia se muestra junto a la posición y '
-      +   'no la mueve. Rangos sobre ' + EQUIPOS.length + ' equipos · máximo del parque '
-      +   esc(numES(maxU, 0)) + ' usuarios · ancho de banda ' + esc(numES(Math.floor((maxU - 1) / 5), 0))
-      +   ' · corte ' + esc(new Date().toLocaleDateString('es-CO')) + '.</p>'
+      // Sin la «Lectura por potencia» ni la nota «La casilla sale de la norma…» también en la
+      // PANTALLA (el Ingeniero, 2026-09-28, «procede»; del Excel se retiraron en `99 §111`).
       + '</div>';
   }
 
