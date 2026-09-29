@@ -95,14 +95,15 @@ export async function procesarArchivo(bytes, nombre, op = {}) {
  * Monta la pestaña dentro de `caja`.
  * @param {HTMLElement} caja
  * @param {{equipo: object, datos: object, alCambiar?: (meta: object|null) => void}} op
- *   datos: { leerMeta(id), leerImagen(id, meta), guardar(ident, datos, reemplazo), quitar(ident, meta), puedeEscribir() }
+ *   datos: { leerMeta(id), leerImagen(id, meta), guardar(ident, datos, reemplazo), quitar(ident, meta), puedeEscribir(), puedeQuitar()? }
+ *   (puedeEscribir: adjuntar y reemplazar — admin o con permiso, `99 §118`; puedeQuitar: solo admin)
  */
 export function montarDiagramaOperativo(caja, op) {
   const { equipo, datos } = op;
   let vivo = true;
   let lectura = null;   // AbortController de la lectura en curso (CF-40: cerrar la pestaña o elegir otro archivo la cancela)
   let urls = []; let nuevas = [];   // imágenes en pantalla / recién creadas para la próxima
-  let ident = null; let meta = null; let escribe = false;
+  let ident = null; let meta = null; let escribe = false; let quita = false;
   const limpiarUrl = (todas) => { for (const u of urls) URL.revokeObjectURL(u); urls = []; if (todas) { for (const u of nuevas) URL.revokeObjectURL(u); nuevas = []; } };
   // Al repintar se liberan las imágenes de la pantalla ANTERIOR, no las recién creadas.
   const pintar = (...nodos) => { if (!vivo) return; limpiarUrl(false); urls = nuevas; nuevas = []; caja.replaceChildren(...nodos); };
@@ -128,7 +129,7 @@ export function montarDiagramaOperativo(caja, op) {
   /** Mensaje en español de un error de Firebase o de red. */
   const traducir = (e) => {
     const code = e && e.code ? String(e.code) : '';
-    if (/permission-denied/.test(code)) return 'no tiene permiso para esta acción (solo un administrador con perfil).';
+    if (/permission-denied/.test(code)) return 'no tiene permiso para esta acción (solo un administrador, o quien él autorice). Si se lo acaban de dar o quitar, recargue la página.';
     if (/unavailable|deadline-exceeded|network/.test(code)) return 'sin conexión con el sistema; vuelva a intentarlo.';
     return e && e.message ? e.message : String(e);
   };
@@ -143,6 +144,8 @@ export function montarDiagramaOperativo(caja, op) {
       if (!vivo) return;
       if (!ident) { pintar(aviso('Este equipo no tiene matrícula ni serie registradas: sin ellas no se puede guardar su Diagrama Operativo.', 'ftm-aviso')); return; }
       try { escribe = !!(await datos.puedeEscribir()); } catch (_) { escribe = false; }
+      // Si la página (caché vieja) no trae puedeQuitar, «Quitar» queda oculto: el admin lo recupera al recargar.
+      try { quita = escribe && (typeof datos.puedeQuitar === 'function' ? !!(await datos.puedeQuitar()) : false); } catch (_) { quita = false; }
       r = await datos.leerMeta(ident.id);
     } catch (e) { r = { error: true }; }
     if (!vivo) return;
@@ -163,11 +166,12 @@ export function montarDiagramaOperativo(caja, op) {
   function mostrarAjeno() {
     const nodos = [aviso('El Diagrama Operativo guardado con esta matrícula es de otro aparato (serie ' + (ajena.serie || 'sin serie') + '): no se usa en esta ficha.', 'ftm-aviso')];
     if (escribe) {
-      const adj = boton('Adjuntar el de este equipo', true); const qui = boton('Quitar el del aparato anterior');
+      const adj = boton('Adjuntar el de este equipo', true);
       adj.addEventListener('click', () => elegir((f) => proponer(f, {})));
-      qui.addEventListener('click', () => quitar(qui));
-      const fila = el('div', 'ftm-op-acciones'); fila.append(adj, qui); nodos.push(fila);
-    } else nodos.push(aviso('Solo un administrador puede cambiarlo.', 'ftm-nota-ref'));
+      const fila = el('div', 'ftm-op-acciones'); fila.append(adj);
+      if (quita) { const qui = boton('Quitar el del aparato anterior'); qui.addEventListener('click', () => quitar(qui)); fila.append(qui); }
+      nodos.push(fila);
+    } else nodos.push(aviso('Solo un administrador, o quien él autorice, puede cambiarlo (si se lo acaban de autorizar, recargue la página).', 'ftm-nota-ref'));
     pintar(...nodos);
   }
 
@@ -177,7 +181,7 @@ export function montarDiagramaOperativo(caja, op) {
       const b = boton('Adjuntar Excel o imagen', true);
       b.addEventListener('click', () => elegir((f) => proponer(f, {})));
       nodos.push(b, aviso('Excel (.xlsx) con su cronograma, o una imagen (PNG, JPG). Antes de guardarlo verá cómo queda en la hoja.', 'ftm-nota-ref'));
-    } else nodos.push(aviso('Solo un administrador puede adjuntarlo.', 'ftm-nota-ref'));
+    } else nodos.push(aviso('Solo un administrador, o quien él autorice, puede adjuntarlo (si se lo acaban de autorizar, recargue la página).', 'ftm-nota-ref'));
     pintar(...nodos);
   }
 
@@ -192,10 +196,12 @@ export function montarDiagramaOperativo(caja, op) {
     if (r.error) nodos.push(aviso(r.mensaje || 'No se pudo leer la imagen guardada.', 'ftm-aviso'));
     else nodos.push(imagen(r.bytes, meta.mime, 'Diagrama Operativo guardado'));
     if (escribe) {
-      const rem = boton('Reemplazar'); const qui = boton('Quitar');
+      const rem = boton('Reemplazar');
       rem.addEventListener('click', () => elegir((f) => proponer(f, {})));
-      qui.addEventListener('click', () => quitar(qui, rem));
-      const fila = el('div', 'ftm-op-acciones'); fila.append(rem, qui); nodos.push(fila);
+      const fila = el('div', 'ftm-op-acciones'); fila.append(rem);
+      // Quitar (borra la imagen) es solo del administrador (`99 §118`); corregir = reemplazar.
+      if (quita) { const qui = boton('Quitar'); qui.addEventListener('click', () => quitar(qui, rem)); fila.append(qui); }
+      nodos.push(fila);
     }
     pintar(...nodos);
   }
@@ -264,6 +270,16 @@ export function montarDiagramaOperativo(caja, op) {
       await mostrarGuardado();
     } catch (e) {
       ok.disabled = false; no.disabled = false; ok.textContent = previo ? 'Guardar y reemplazar el actual' : 'Guardar en el sistema';
+      // Con varios que adjuntan (`99 §118`): si otro guardó mientras tanto, decirlo (no «sin permiso»).
+      if (e && /permission-denied/.test(String(e.code || ''))) {
+        let ahora = null;
+        try { const r = await datos.leerMeta(ident.id); ahora = r && r.hay ? r.meta : (r && r.error ? undefined : null); } catch (_) { ahora = undefined; }
+        const antes = previo ? previo.lote : null; const despues = ahora ? ahora.lote : (ahora === null ? null : antes);
+        if (despues !== antes) {
+          mostrarError('No se guardó: mientras tanto otra persona cambió el Diagrama Operativo de este equipo. Recargue la página para verlo y, si hace falta, reemplácelo.');
+          return;
+        }
+      }
       mostrarError('No se guardó: ' + traducir(e));
     }
   }

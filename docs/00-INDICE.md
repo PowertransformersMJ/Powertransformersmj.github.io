@@ -118,15 +118,16 @@
 | §104 | ADR-104 — **Excel sin datos ocultos** | 4256 |
 | §105 | ADR-105 — **Beneficios con las 13 acciones**; casilla que crece | 4285 |
 | §106 | ADR-106 — **Zona del activo**, no el departamento | 4321 |
-| §107 | ADR-107 — **«Salud y riesgo» al Excel**; sin usuarios no hay casilla | 4335 |
+| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin usuarios, sin casilla) | 4335 |
 | §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
-| §109 | ADR-109 — **Auditoría Nivel-2**; candado asimétrico (M-07) | 4389 |
+| §109 | ADR-109 — **Auditoría Nivel-2** (M-07) | 4389 |
 | §110 | ADR-110 — **Sin hoja Beneficios**; Futuro derecho | 4416 |
-| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota de las 7 variables | 4448 |
+| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota 7 variables | 4448 |
 | §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4467 |
-| §113 | ADR-113 — **CF-40**: el Excel adjunto se lee en un hilo con tiempo límite | 4553 |
-| §114 | ADR-114 — **Órdenes E/S**: firma en Autorizado; Entregado con firmas del equipo | 4599 |
+| §113 | ADR-113 — **CF-40**: lector en un hilo con tiempo límite | 4553 |
+| §114 | ADR-114 — **Órdenes E/S**: firmas en Autorizado y Entregado | 4599 |
 | §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4645 |
+| §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4717 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

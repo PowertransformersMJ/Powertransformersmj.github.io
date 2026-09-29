@@ -11,6 +11,8 @@
 // navegador (`99 §100`). Lectura SIEMPRE con la sesión; nunca URL pública.
 // «No hay» ≠ «no se pudo leer» (revisión de §99). Caché en memoria por huella:
 // la segunda exportación no vuelve a bajar las partes.
+// Escribe el administrador o quien tenga el permiso «adjuntar el Diagrama Operativo» en su
+// perfil (`99 §118`, solo alta y reemplazo); quitar, solo el administrador.
 // Este módulo se carga con import() dinámico desde la página de Fichas.
 // ══════════════════════════════════════════════════════════════
 
@@ -20,12 +22,13 @@ import {
 
 import { getDbSafe, getAuthSafe } from '../firebase-init.js';
 import { getSession } from '../auth/session-guard.js';
+import { puedeAdjuntarOperativo, puedeQuitarOperativo } from '../domain/permiso_operativo.js';
 import {
   COLECCION, COLECCION_REGISTRO, PARTES_MAX, partir, unir, huellaHex, loteNuevo, nombreSeguro
 } from '../domain/fichas_adjunto.js';
 
-/** Sesión VIVA con perfil REAL de administrador activo (la regla lo vuelve a exigir). */
-function administrador() {
+/** Sesión VIVA (la del guard y la de Auth coinciden) cuyo perfil cumple `permite` (la regla lo vuelve a exigir). */
+function sesionQue(permite) {
   const s = getSession();
   const uid = (s && s.user && s.user.uid) || null;
   if (!uid) return null;
@@ -34,14 +37,20 @@ function administrador() {
     if (auth && (!auth.currentUser || auth.currentUser.uid !== uid)) return null;
   } catch (_) { /* sin Auth manda la sesión publicada */ }
   const p = (s && s.profile) || {};
-  if (p.rol !== 'admin' || p.activo === false || p.legacy) return null;
+  if (!permite(p)) return null;
   return { uid, nombre: p.nombre || '' };
 }
+/** Adjunta o reemplaza: el administrador, o quien tenga el permiso en su perfil (`99 §118`). */
+const quienAdjunta = () => sesionQue(puedeAdjuntarOperativo);
+/** Quita: solo el administrador. */
+const administrador = () => sesionQue(puedeQuitarOperativo);
 
 /** ¿Hay base de datos? (para leer basta ser del equipo; la regla lo exige). */
 export function disponible() { return !!getDbSafe(); }
-/** ¿Quien tiene la sesión puede adjuntar, reemplazar o quitar? */
-export function puedeEscribir() { return !!(getDbSafe() && administrador()); }
+/** ¿Quien tiene la sesión puede adjuntar o reemplazar? (admin, o con el permiso, `99 §118`) */
+export function puedeEscribir() { return !!(getDbSafe() && quienAdjunta()); }
+/** ¿Puede quitarlo? Solo el administrador. */
+export function puedeQuitar() { return !!(getDbSafe() && administrador()); }
 
 const refMeta = (db, id) => doc(db, COLECCION, id);
 const refParte = (db, id, n) => doc(db, COLECCION, id, 'partes', String(n));
@@ -117,8 +126,8 @@ async function nombreVigente(db, a) {
  * @returns {Promise<object>} la meta guardada
  */
 export async function guardar(ident, datos, previo) {
-  const db = getDbSafe(); const a = administrador();
-  if (!db || !a) throw new Error('Solo un administrador puede adjuntar o cambiar el Diagrama Operativo.');
+  const db = getDbSafe(); const a = quienAdjunta();
+  if (!db || !a) throw new Error('Solo un administrador, o quien él autorice, puede adjuntar o cambiar el Diagrama Operativo.');
   const partes = partir(datos.bytes);
   const lote = loteNuevo(); const huella = await huellaHex(datos.bytes);
   const autor = { uid: a.uid, nombre: await nombreVigente(db, a) };

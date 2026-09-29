@@ -9,6 +9,7 @@ import {
   ROLES, labelRol, isReady
 } from '../data/usuarios.js';
 import { logout, getSession } from '../auth/session-guard.js';
+import { PERMISO_ADJUNTAR_OPERATIVO, conPermisoOperativo } from '../domain/permiso_operativo.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -64,9 +65,11 @@ function render() {
     const estadoPill = u.activo === false
       ? '<span class="cod-pill inactivo">INACTIVO</span>'
       : '<span class="cod-pill activo">ACTIVO</span>';
-    const rolPill = u.rol === 'admin'
+    const rolPill = (u.rol === 'admin'
       ? '<span class="rol-pill admin">ADMINISTRADOR</span>'
-      : '<span class="rol-pill tecnico">TÉCNICO</span>';
+      : '<span class="rol-pill tecnico">TÉCNICO</span>')
+      + (u.rol !== 'admin' && Array.isArray(u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO)
+        ? ' <span class="rol-pill tecnico" title="Puede adjuntar el Diagrama Operativo en Fichas">+ DIAGRAMA OPERATIVO</span>' : '');
     const isMe = u.uid === meUid;
     const deleteBtn = isMe
       ? '<button class="btn-mini" disabled title="No puede eliminarse a sí mismo">Eliminar</button>'
@@ -166,10 +169,25 @@ async function abrirEditar(uid) {
   $('eNombre').value = u.nombre || '';
   $('eRol').value    = u.rol || 'tecnico';
   $('eActivo').checked = u.activo !== false;
+  // Permiso puntual «adjuntar el Diagrama Operativo» (99 §118). El admin ya lo tiene por su rol:
+  // su casilla sale marcada y fija; si en este mismo formulario se le cambia el rol, la casilla lo sigue.
+  sincronizarPermiso(u);
   $('formEditarMsg').textContent = '';
   mEditar.style.display = 'flex';
   $('eNombre').focus();
 }
+
+/** La casilla del permiso según el rol ELEGIDO en el formulario (no el guardado). */
+function sincronizarPermiso(u) {
+  const perm = $('ePermOperativo');
+  if (!perm) return;
+  const tenia = Array.isArray(u && u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO);
+  const esAdmin = $('eRol').value === 'admin';
+  perm.disabled = esAdmin;
+  perm.checked = esAdmin ? true : tenia;
+  perm.title = esAdmin ? 'El administrador ya puede por su rol.' : '';
+}
+$('eRol').addEventListener('change', () => sincronizarPermiso(cache.find((x) => x.uid === $('eUid').value) || {}));
 
 $('formEditar').addEventListener('submit', async (ev) => {
   ev.preventDefault();
@@ -193,7 +211,13 @@ $('formEditar').addEventListener('submit', async (ev) => {
 
   msgEl.className = 'msg'; msgEl.textContent = '⋯ Guardando…';
   try {
-    await actualizar(uid, { nombre, rol, activo });
+    const perm = $('ePermOperativo');
+    const u = cache.find((x) => x.uid === uid) || {};
+    const patch = { nombre, rol, activo };
+    // Solo si cambió: se conservan los demás permisos que ya tuviera (99 §118).
+    const tenia = Array.isArray(u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO);
+    if (perm && !perm.disabled && perm.checked !== tenia) patch.permisos_extra = conPermisoOperativo(u.permisos_extra, perm.checked);
+    await actualizar(uid, patch);
     msgEl.className = 'msg ok'; msgEl.textContent = '✓ Guardado.';
     await cargar();
     setTimeout(() => { mEditar.style.display = 'none'; }, 600);

@@ -2152,6 +2152,26 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 .fe-form { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; font-size: 12px; }
 .fe-msg { flex-basis: 100%; margin: 0; font-size: 12px; color: #b3261e; }
 .fe-aviso { grid-column: 1 / -1; color: var(--ftm-ink-2, #33424d); }
+/* Firmas delegadas en Órdenes E/S (99 §117): quién más puede usar las firmas del custodio. */
+.fd-caja { border-top: 1px solid var(--ftm-line, #d5dee8); margin-top: 14px; padding-top: 12px;
+  /* Este recuadro vive FUERA de .ftm-root (donde se definen los colores del módulo): sin estos,
+     el botón principal salía blanco sobre transparente. Mismos valores que .ftm-root. */
+  --ftm-petrol: var(--brand-deep, #0051d5); --ftm-petrol-deep: var(--brand-700, #003ea0);
+  --ftm-surface-solid: #ffffff; --ftm-surface-soft: rgba(244, 246, 251, .94);
+  --ftm-line: var(--edge-muted, rgba(0, 40, 90, .10)); --ftm-ink-2: var(--ink-2, #1f3656); --ftm-muted: var(--ink-3, #4d6485);
+  --ftm-r-sm: var(--r-sm, 10px); --ftm-dur: var(--dur-fast, 180ms); --ftm-ease: var(--ease-out, cubic-bezier(.25, .1, .25, 1)); }
+.fd-botones { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 4px; }
+.fd-titulo { margin: 0 0 6px; font-size: 14px; }
+.fd-seccion { margin: 10px 0 14px; }
+.fd-sub { margin: 0 0 6px; font-size: 12.5px; font-weight: 600; color: var(--ftm-ink-2, #33424d); }
+.fd-lista { display: grid; gap: 12px; }
+.fd-fila { border: 1px solid var(--ftm-line, #d5dee8); border-radius: 8px; padding: 10px 12px; }
+.fd-cab { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; margin-bottom: 6px; }
+.fd-form { display: grid; gap: 6px; }
+.fd-persona { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; }
+.fd-persona input[type="text"] { min-width: 340px; }
+.fd-tabla { border-collapse: collapse; font-size: 12px; width: 100%; }
+.fd-tabla th, .fd-tabla td { border-bottom: 1px solid var(--ftm-line, #d5dee8); padding: 4px 6px; text-align: left; }
 .fe-aviso:empty { display: none; }
 .ftm-emision-cambio { margin: 0 0 8px; padding: 6px 8px; border-radius: 8px; background: #fff4e5; color: #7a4a00; font-size: 12px; }
 .ftm-emision-ok { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: #e8f5ec; color: #1d5b33; font-size: 12.5px; }

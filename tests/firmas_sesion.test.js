@@ -39,7 +39,7 @@ test('Órdenes usa esta regla en la línea de firma y en el aviso de la pantalla
   assert.match(src, /import \{ lineaDeLaSesion \} from '\.\/domain\/firmas_sesion\.js';/);
   assert.ok((src.match(/lineaDeLaSesion\(/g) || []).length >= 2);
   assert.match(src, /if \(lineaDeLaSesion\(nombre, FIRMA_SESION\.nombre\)\) \{/);   // firmaDe
-  assert.match(src, /todos\.filter\(p => lineaDeLaSesion\(p\.nombre, yo\)\)/);   // aviso de la pantalla
+  assert.match(src, /todos\.filter\(p => lineaDeLaSesion\(p\.nombre, yo\)/);   // aviso de la pantalla (+ la línea del delegado, `99 §117`)
   assert.doesNotMatch(src, /firmaAplicaA\(/);
   assert.match(src, /autorizadoPor: \{ nombre: 'MIGUEL JIMENEZ'/);
 });

@@ -44,8 +44,10 @@
        estampa las firmas que le autorizaron; quedan en SU espacio privado (nunca
        en la página ni en el repositorio). Oculto hasta confirmar el rol. -->
   <details class="ftm-mi-firma" id="firmasEquipoCaja" hidden>
-    <summary>Firmas del equipo · solo usted, como custodio, las ve y las estampa</summary>
+    <summary>Firmas del equipo · usted las custodia (y decide quién más las usa en Órdenes E/S)</summary>
     <div id="panelFirmasEquipo"></div>
+    <!-- Quién más puede usarlas en Órdenes E/S (99 §117): lo decide el custodio. -->
+    <div id="panelFirmasDelegadas"></div>
   </details>
 
   <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ftm- -->
@@ -180,8 +182,31 @@
         alCambiar() { window.dispatchEvent(new CustomEvent('sgm:firmas-equipo-cambiadas')); }
       });
       caja.hidden = false;
-      // Se consulta al ABRIRLO: no se leen firmas que nadie pidió ver.
-      caja.addEventListener('toggle', () => { if (caja.open && panelEquipo) panelEquipo.refrescar(); });
+      // Firmas en Órdenes E/S para otros usuarios (99 §117): módulos NUEVOS, cargados aquí.
+      let panelDelegadas = null;
+      // El oyente va ANTES de la espera: abrir la caja mientras cargan los módulos no se pierde.
+      caja.addEventListener('toggle', () => {
+        if (!caja.open) return;
+        if (panelEquipo) panelEquipo.refrescar();
+        if (panelDelegadas) panelDelegadas.refrescar();
+      });
+      try {
+        const [{ montarFirmasDelegadas }, datosDelegaciones, datosFirma] = await Promise.all([
+          import('../assets/js/ui/fichas/firmas-delegadas-panel.js'),
+          import('../assets/js/data/delegaciones_firmas.js'),
+          import('../assets/js/data/firmas.js')
+        ]);
+        if (datosDelegaciones.puedeOtorgar()) {
+          panelDelegadas = montarFirmasDelegadas(document.getElementById('panelFirmasDelegadas'), {
+            datosEquipo: datos, datosDelegaciones, datosFirma, nombreSesion: s.profile.nombre || '',
+            alCambiar() { window.dispatchEvent(new CustomEvent('sgm:firmas-equipo-cambiadas')); }
+          });
+        }
+      } catch (errDeleg) {
+        console.warn('[fichas] firmas delegadas no disponibles:', errDeleg);
+      }
+      // Se consulta al ABRIRLO: no se leen firmas que nadie pidió ver (si ya se abrió, ahora).
+      if (caja.open && panelDelegadas) panelDelegadas.refrescar();
     } catch (err) {
       console.warn('[fichas] firmas del equipo no disponibles:', err);
     }
@@ -197,6 +222,8 @@
   };
   const adjuntos = {
     async puedeEscribir() { return (await cargarDatosAdjuntos()).puedeEscribir(); },
+    // Quitar es solo del administrador (99 §118); un módulo viejo en caché no trae la función: decide puedeEscribir.
+    async puedeQuitar() { const d = await cargarDatosAdjuntos(); return typeof d.puedeQuitar === 'function' ? d.puedeQuitar() : d.puedeEscribir(); },
     async leerMeta(id) { return (await cargarDatosAdjuntos()).leerMeta(id); },
     async leerImagen(id, meta) { return (await cargarDatosAdjuntos()).leerImagen(id, meta); },
     async guardar(ident, datos, reemplazo) { return (await cargarDatosAdjuntos()).guardar(ident, datos, reemplazo); },
