@@ -121,12 +121,12 @@
 | §107 | ADR-107 — **«Salud y riesgo» al Excel**; sin usuarios no hay casilla | 4335 |
 | §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
 | §109 | ADR-109 — **Auditoría Nivel-2**; candado asimétrico (M-07) | 4389 |
-| §110 | ADR-110 — **Mantenimiento sin hoja Beneficios**; Futuro derecho | 4416 |
+| §110 | ADR-110 — **Sin hoja Beneficios**; Futuro derecho | 4416 |
 | §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota de las 7 variables | 4448 |
 | §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4467 |
 | §113 | ADR-113 — **CF-40**: el Excel adjunto se lee en un hilo con tiempo límite | 4553 |
 | §114 | ADR-114 — **Órdenes E/S**: firma en Autorizado; Entregado con firmas del equipo | 4599 |
-| §115 | ADR-115 — **«Salud y riesgo» con letra grande**; Actual con caja girada | 4645 |
+| §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4645 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
