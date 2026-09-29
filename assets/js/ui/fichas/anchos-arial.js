@@ -30,9 +30,10 @@ const NEGRITA = [
   333, 556, 611, 556, 611, 556, 333, 611, 611, 278, 278, 556, 278, 889, 611, 611,
   611, 611, 389, 556, 333, 611, 556, 778, 556, 556, 500, 389, 280, 389, 584
 ];
-/** Signos fuera de ese rango que usa la hoja (los mismos en normal y en negrita). */
+/** Signos fuera de ese rango que usa la hoja (los mismos en normal y en negrita). El «·» de
+ *  Arial mide 333 (el de Helvetica, 278): va con el de Arial, que es con el que se pinta. */
 const OTROS = {
-  '·': 278, '–': 556, '—': 1000, '…': 1000, '×': 584, '≥': 549, '≤': 549, '«': 556, '»': 556,
+  '·': 333, '–': 556, '—': 1000, '…': 1000, '×': 584, '≥': 549, '≤': 549, '«': 556, '»': 556,
   '°': 400, '¿': 611, '¡': 333, '↓': 1000, '↑': 1000, '→': 1000, '←': 1000, 'í': 278, 'ì': 278, 'î': 278, 'ï': 278
 };
 /** Letra desconocida: se cuenta ancha, para que nunca se salga de su casilla. */
@@ -40,13 +41,17 @@ const DESCONOCIDA = 1000;
 /** Margen por redondeo de cada programa al pintar. */
 const HOLGURA = 1.02;
 
+/** Marcas que no ocupan ancho: tildes sueltas (texto descompuesto), unión y variantes de emoji. */
+const SIN_ANCHO = /^[\u0300-\u036f\u200b-\u200d\u2060\ufe00-\ufe0f]$/;
+
 /** Ancho de UNA letra, en milésimas del tamaño. */
 function anchoLetra(c, negrita) {
   if (OTROS[c] != null) return OTROS[c];
+  if (SIN_ANCHO.test(c)) return 0;
   let k = c.charCodeAt(0);
   if (k < 32 || k > 126) {
     // Letras con tilde o eñe: el ancho de su letra base (á → a, Ñ → N).
-    const base = c.normalize('NFD').replace(/[̀-ͯ]/g, '');
+    const base = c.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (base.length === 1 && base !== c) k = base.charCodeAt(0);
   }
   if (k < 32 || k > 126) return DESCONOCIDA;

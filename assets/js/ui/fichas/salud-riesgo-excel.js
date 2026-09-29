@@ -99,7 +99,8 @@ export function svgSaludRiesgo(m) {
   // casilla», «resultado de fila × columna»): el Ingeniero pidió que no salgan
   // en el Excel (`99 §110`). En pantalla siguen.
   const kpis = m.kpis || [];
-  const gap = 14; const kw = (W - 2 * P - gap * 3) / 4; const kh = 100; const util = kw - 32;
+  // util: el texto arranca a 16 px del borde izquierdo de la tarjeta y puede llegar a 8 px del derecho.
+  const gap = 14; const kw = (W - 2 * P - gap * 3) / 4; const kh = 100; const util = kw - 24;
   kpis.slice(0, 4).forEach((k, i) => {
     const x = P + i * (kw + gap);
     partes.push('<rect x="' + x + '" y="' + y + '" width="' + kw + '" height="' + kh + '" rx="12" fill="#f4f7fa" stroke="#d5dee8" stroke-width="1.5"/>');

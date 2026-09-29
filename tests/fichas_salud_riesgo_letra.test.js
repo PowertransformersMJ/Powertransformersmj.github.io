@@ -13,7 +13,8 @@ import { svgSaludRiesgo } from '../assets/js/ui/fichas/salud-riesgo-excel.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COLORES = ['#1B8E3F', '#F5C518', '#EF7820', '#E53935'];
 const VEREDICTOS = [
-  ['Riesgo tolerable', 'Verde (tolerable) · MO.00418 Tabla 11'],
+  // Los rótulos REALES de COLORES_CELDA (`matriz_riesgo.js`).
+  ['Riesgo tolerable', 'Verde (OK) · MO.00418 Tabla 11'],
   ['Atención', 'Amarillo (atención) · MO.00418 Tabla 11'],
   ['Riesgo alto', 'Naranja (alta) · MO.00418 Tabla 11'],
   ['Riesgo crítico', 'Roja (crítica) · MO.00418 Tabla 11']
@@ -61,6 +62,10 @@ describe('Ancho real de un texto en Arial', () => {
     assert.equal(Math.round(anchoArial('✓', 1000, false)), 1020);
     assert.equal(anchoArial('', 20, true), 0);
     assert.equal(anchoArial(null, 20, true), 0);
+    // Texto descompuesto (tilde suelta tras la letra): mide lo mismo que el compuesto.
+    assert.equal(anchoArial('N\u0303a\u0301', 100, true), anchoArial('Ñá', 100, true));
+    // El «·» con el ancho de Arial (333), no el de Helvetica (278).
+    assert.equal(Math.round(anchoArial('·', 1000, false)), Math.round(333 * 1.02));
   });
 });
 
@@ -91,7 +96,7 @@ describe('«Salud y riesgo»: letra más grande que antes y nada se sale', () =>
       for (const y of t) if (deTarjeta.has(y.texto) && !primero.has(y.texto)) primero.set(y.texto, y);
       const vistos = [...primero.values()];
       assert.equal(vistos.length, deTarjeta.size);
-      for (const x of vistos) assert.ok(anchoArial(x.texto, x.tam, x.negrita) <= kw - 32 + 0.01, x.texto + ' a ' + x.tam + ' px no cabe');
+      for (const x of vistos) assert.ok(anchoArial(x.texto, x.tam, x.negrita) <= kw - 24 + 0.01, x.texto + ' a ' + x.tam + ' px no cabe');
     }
   });
 
@@ -107,6 +112,25 @@ describe('«Salud y riesgo»: letra más grande que antes y nada se sale', () =>
         assert.ok(x.x + anchoArial(x.texto, x.tam, x.negrita) <= W - 20 + 0.5, '«' + x.texto.slice(0, 50) + '» se sale: ' + x.x + ' + ' + anchoArial(x.texto, x.tam, x.negrita).toFixed(1));
       }
     }
+  });
+
+  test('con el aviso de dato de usuarios (el dibujo crece) casi nada baja: veredicto ≥ 95 % de antes y la letra más chica ≥ 6,3 pt', () => {
+    // Condición 5 con 1 usuario y ≥ 20 MVA: cae en Mínima (amarillo) y sale el aviso (revisión §115, ronda 2).
+    const aviso = 'Dato de usuarios a confirmar: 1 usuario aguas abajo para un transformador de 30 MVA no es coherente; revise el dato en Salud de Activos antes de firmar esta ficha.';
+    for (const [veredicto, sub] of VEREDICTOS) {
+      const { t, escala } = textos(svgSaludRiesgo(modelo(veredicto, sub, { avisoDato: aviso })).svg);
+      const v = t.find((x) => x.texto === veredicto && x.tam > 20);
+      assert.ok(v.tam * escala >= 0.95 * 38 * ESCALA_ANTES, veredicto + ' con aviso');
+      const minimo = Math.min(...t.map((x) => pt(x.tam, escala)));
+      assert.ok(minimo >= 6.3, 'con aviso, la letra más chica sale a ' + minimo.toFixed(2) + ' pt (antes 5,2)');
+    }
+  });
+
+  test('un título de largo habitual sale igual o más grande que antes', () => {
+    const titulo = 'Salud del activo y posición en la matriz de riesgo · SUBESTACION EL CARMEN DE BOLIVAR · T1-M/M-CAZ';
+    const { t, escala } = textos(svgSaludRiesgo(modelo(...VEREDICTOS[3], { titulo })).svg);
+    const x = t.find((y) => y.texto === titulo);
+    assert.ok(x.tam * escala >= 22 * ESCALA_ANTES - 0.01, x.tam + ' px × ' + escala.toFixed(3));
   });
 
   test('las etiquetas de columna y la marca caben en su casilla', () => {

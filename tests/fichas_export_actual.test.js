@@ -74,6 +74,22 @@ describe('El Diagrama Actual en la exportación completa', () => {
     const z = await libro({ diagramas: { actual: { svg: SVG } }, saludRiesgo: SALUD, sinHojaBeneficios: true });
     const rels = await z.file('xl/drawings/_rels/drawing6.xml.rels').async('string');
     assert.doesNotMatch(rels, /image5\.png/);
+    // Lo que dibuja la hoja: el logo y su matriz, nada girado ni anclado como el Actual.
+    const d6 = await z.file('xl/drawings/drawing6.xml').async('string');
+    assert.equal((d6.match(/<xdr:(?:one|two)CellAnchor\b/g) || []).length, 2, 'dos anclas: logo y matriz');
+    assert.doesNotMatch(d6, /rot="16200000"/);
+    assert.doesNotMatch(d6, /<xdr:oneCellAnchor>/);
+  });
+
+  test('el seguro del Actual sigue en el exportador, DESPUÉS de anclarlo (si se quita, un ajustes-libro.js viejo en caché lo deformaría)', () => {
+    const src = readFileSync(resolve(__dirname, '..', 'assets', 'js', 'ui', 'fichas', 'exportar-planificacion.js'), 'utf8');
+    assert.match(src, /import \{ enderezarCajaGirada \} from '\.\/ancla-girada\.js';/);
+    const i = src.indexOf('await anclarConTamano(zip, DIBUJO_ACTUAL, RID_IMG_ACTUAL)');
+    const j = src.indexOf('await enderezarCajaGirada(zip, DIBUJO_ACTUAL, RID_IMG_ACTUAL)');
+    assert.ok(i > 0 && j > i, 'enderezarCajaGirada va después de anclarConTamano');
+    assert.ok(!src.slice(i, j).includes('}'), 'en el mismo bloque');
+    assert.match(src, /const DIBUJO_ACTUAL = 'xl\/drawings\/drawing3\.xml';/);
+    assert.match(src, /const RID_IMG_ACTUAL = 'rId2';/);
   });
 
   test('sin dibujo del Actual, su hoja queda como en la plantilla (twoCellAnchor)', async () => {
