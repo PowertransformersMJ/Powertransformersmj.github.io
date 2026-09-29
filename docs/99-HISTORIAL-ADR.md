@@ -4713,3 +4713,54 @@ administrador distinto del custodio no lee ni pregunta por firmas que no tiene (
   Futuro.
 - Ángulos no rectos: la vista previa gira solo en 90/270 y el export en [45,135) ∪ [225,315). Es teórico: solo hay 270°.
 - **Pendiente suyo:** abrir en su Excel el `PRUEBA_…xlsx` o la primera descarga real.
+
+## 116. ADR-116 — Sesión: una lectura LENTA o FALLIDA del perfil ya no es «sin perfil» (ni perfil de arranque, ni fuera de la sesión) ⟦OPUS-5.5⟧ (2026-09-28)
+
+> Hallado en vivo al preparar las firmas delegadas de Órdenes (`§117`): en la primera carga de una pestaña, leer
+> /usuarios tardó más de 3,5 s y el guardián publicó el perfil de ARRANQUE del Ingeniero (su correo como nombre): en
+> Órdenes no salía su firma («Solo puede firmar donde aparece usted»). Al recargar, bien. Publicado `54ae456`.
+
+**116.1 Causa raíz.**
+- `session-guard.js` `loadProfile` devolvía `null` tanto por tiempo agotado (3,5 s) o error como por «no existe».
+- Con `null` y el uid en /admins publicaba el perfil legacy; sin /admins, `signOut` + `login?denied=1`. A un técnico
+  (Carlos, Jorge) una carga en frío lo sacaba de la sesión.
+- `index.html` hacía lo mismo al arrancar y al ingresar.
+
+**116.2 Solución.**
+- `domain/decision_perfil.js` (NUEVO, puro): `esperarLectura` espera la MISMA lectura hasta 12 s, más que los 10 s con
+  que Firestore da la conexión por caída, y avisa «Conexión lenta» a los 3,5 s. Un error de conexión se reintenta a
+  1,5 s y a 3 s; uno de permiso, no. `decidirPerfil` devuelve: perfil · consultar /admins · legacy (solo si /usuarios NO
+  existe y /admins sí) · sin-perfil · reintentar.
+- Guardián: carga esa lógica DENTRO del try (si no carga, la página sigue oculta). En «reintentar» muestra un
+  «Reintentar» que relee en la misma página, más un «Cerrar sesión» explícito. Al entrar la sesión apaga el failsafe de
+  Auth.
+- `index.html`: con falla de conexión entra a home y decide el guardián; solo sin perfil cierra la sesión.
+- Fichas y Parque esperan la sesión hasta 30 s (antes 12).
+
+**116.3 No-regresión.**
+- Sin perfil, al ingreso con `denied`, como antes; `activo:false`, igual.
+- `requireAdmin` sin cambios; el contrato `sgm:session-ready`/`__sgmSession` intacto.
+- Permiso negado sobre /usuarios cuenta como inexistente, como antes.
+
+**116.4 Verificación.**
+- 2061 → 2077 pass.
+- Banco con el módulo REAL y Firebase simulado: rápido · 5 s · 9,5 s (antes, bucle) · un error · caído (3 intentos →
+  Reintentar) · caído y bien al pulsar Reintentar (misma página) · colgado (12 s) · sin perfil con /admins (arranque) ·
+  permiso negado (al ingreso).
+- Revisión adversarial (2 lentes, Opus; bóveda `2026-09-28-comite-firmas-delegadas-ordenes`): 2 medios (tope de 9 s
+  bajo el de Firestore + recarga en frío = bucle; `index.html` seguía cerrando la sesión) y 3 bajos. Todos corregidos
+  en `fa82fc0`.
+- En vivo (su Chrome, pestaña nueva): perfil real, no legacy; «Se estampará su firma»; `decision_perfil.js` cargado de
+  la red.
+
+**116.5 Anti-patterns evitados.** Tratar «no se pudo leer» como «no existe» · recargar para reintentar (arranque en
+frío) · un import estático nuevo en el guardián (fallo abierto).
+
+**116.6 Archivos.** Nuevos: `domain/decision_perfil.js`, `tests/decision_perfil.test.js`. Tocados: `auth/session-guard.js`,
+`index.html`, `pages/fichas-tecnicas.html` y `pages/parque-transformadores.html` (esperas). INTACTOS: `page-guard.js`,
+`admin-guard.js`, reglas.
+
+**116.7 Doctrina.** L-102 (lo nuevo en un archivo nuevo) · L-109.
+
+**116.8 Verificado sano / pendiente.** El reintento a los 800 ms caía antes de que el cliente de Firestore reconectara
+(~1 s), por eso las pausas son de 1,5 y 3 s. Pendiente: ninguno.

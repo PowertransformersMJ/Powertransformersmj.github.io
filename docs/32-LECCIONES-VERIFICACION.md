@@ -399,3 +399,10 @@ Además, una limpieza «de paso» borró la línea de la función hermana. Solo 
 fallar igual; (2) lo que decide un tamaño se mide con las métricas reales y se compara contra producción; (3) una
 limpieza se ubica por su función, no por su texto. **Gate**: `tests/fichas_salud_riesgo_letra.test.js` +
 `tests/fichas_export_actual.test.js` + [HONOR].
+
+### L-109 · «No se pudo leer» no es «no existe»: tres estados, y reintentar sin recargar
+**Cicatriz** (`99 §116`): una lectura lenta del perfil (primera carga en frío, más de 3,5 s) se tomaba como «sin
+perfil». Al Ingeniero le puso un perfil de arranque y en Órdenes no salió su firma; a un técnico lo habría sacado de la
+sesión. **Regla**: toda lectura que DECIDE acceso o identidad distingue ok / no-existe / falla. Espera más que el
+cliente de datos (Firestore da la conexión por caída a los 10 s) y reintenta en la MISMA página: recargar vuelve a
+arrancar en frío. **Gate**: `tests/decision_perfil.test.js`.
