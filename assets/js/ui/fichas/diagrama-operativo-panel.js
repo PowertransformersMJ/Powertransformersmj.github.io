@@ -129,7 +129,7 @@ export function montarDiagramaOperativo(caja, op) {
   /** Mensaje en español de un error de Firebase o de red. */
   const traducir = (e) => {
     const code = e && e.code ? String(e.code) : '';
-    if (/permission-denied/.test(code)) return 'no tiene permiso para esta acción (solo un administrador con perfil).';
+    if (/permission-denied/.test(code)) return 'no tiene permiso para esta acción (solo un administrador, o quien él autorice). Si se lo acaban de dar o quitar, recargue la página.';
     if (/unavailable|deadline-exceeded|network/.test(code)) return 'sin conexión con el sistema; vuelva a intentarlo.';
     return e && e.message ? e.message : String(e);
   };
@@ -144,7 +144,8 @@ export function montarDiagramaOperativo(caja, op) {
       if (!vivo) return;
       if (!ident) { pintar(aviso('Este equipo no tiene matrícula ni serie registradas: sin ellas no se puede guardar su Diagrama Operativo.', 'ftm-aviso')); return; }
       try { escribe = !!(await datos.puedeEscribir()); } catch (_) { escribe = false; }
-      try { quita = escribe && (typeof datos.puedeQuitar === 'function' ? !!(await datos.puedeQuitar()) : true); } catch (_) { quita = false; }
+      // Si la página (caché vieja) no trae puedeQuitar, «Quitar» queda oculto: el admin lo recupera al recargar.
+      try { quita = escribe && (typeof datos.puedeQuitar === 'function' ? !!(await datos.puedeQuitar()) : false); } catch (_) { quita = false; }
       r = await datos.leerMeta(ident.id);
     } catch (e) { r = { error: true }; }
     if (!vivo) return;
@@ -170,7 +171,7 @@ export function montarDiagramaOperativo(caja, op) {
       const fila = el('div', 'ftm-op-acciones'); fila.append(adj);
       if (quita) { const qui = boton('Quitar el del aparato anterior'); qui.addEventListener('click', () => quitar(qui)); fila.append(qui); }
       nodos.push(fila);
-    } else nodos.push(aviso('Solo un administrador, o quien él autorice, puede cambiarlo.', 'ftm-nota-ref'));
+    } else nodos.push(aviso('Solo un administrador, o quien él autorice, puede cambiarlo (si se lo acaban de autorizar, recargue la página).', 'ftm-nota-ref'));
     pintar(...nodos);
   }
 
@@ -180,7 +181,7 @@ export function montarDiagramaOperativo(caja, op) {
       const b = boton('Adjuntar Excel o imagen', true);
       b.addEventListener('click', () => elegir((f) => proponer(f, {})));
       nodos.push(b, aviso('Excel (.xlsx) con su cronograma, o una imagen (PNG, JPG). Antes de guardarlo verá cómo queda en la hoja.', 'ftm-nota-ref'));
-    } else nodos.push(aviso('Solo un administrador, o quien él autorice, puede adjuntarlo.', 'ftm-nota-ref'));
+    } else nodos.push(aviso('Solo un administrador, o quien él autorice, puede adjuntarlo (si se lo acaban de autorizar, recargue la página).', 'ftm-nota-ref'));
     pintar(...nodos);
   }
 
@@ -269,6 +270,16 @@ export function montarDiagramaOperativo(caja, op) {
       await mostrarGuardado();
     } catch (e) {
       ok.disabled = false; no.disabled = false; ok.textContent = previo ? 'Guardar y reemplazar el actual' : 'Guardar en el sistema';
+      // Con varios que adjuntan (`99 §118`): si otro guardó mientras tanto, decirlo (no «sin permiso»).
+      if (e && /permission-denied/.test(String(e.code || ''))) {
+        let ahora = null;
+        try { const r = await datos.leerMeta(ident.id); ahora = r && r.hay ? r.meta : (r && r.error ? undefined : null); } catch (_) { ahora = undefined; }
+        const antes = previo ? previo.lote : null; const despues = ahora ? ahora.lote : (ahora === null ? null : antes);
+        if (despues !== antes) {
+          mostrarError('No se guardó: mientras tanto otra persona cambió el Diagrama Operativo de este equipo. Recargue la página para verlo y, si hace falta, reemplácelo.');
+          return;
+        }
+      }
       mostrarError('No se guardó: ' + traducir(e));
     }
   }

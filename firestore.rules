@@ -1121,6 +1121,11 @@ service cloud.firestore {
     // ADR-118 (el Ingeniero, 2026-09-29): además del admin, adjunta y REEMPLAZA quien tenga en su
     // perfil el permiso «fichas.adjuntar_operativo» (lo pone solo el admin en /usuarios). Quitar,
     // solo el admin. Espejo de `domain/permiso_operativo.js`.
+    function parteDelLote(id, k) {
+      let r = /databases/$(database)/documents/fichas_adjuntos/$(id)/partes/$(string(k));
+      return k >= request.resource.data.partes
+        || (existsAfter(r) && getAfter(r).data.lote == request.resource.data.lote);
+    }
     function puedeAdjuntarOperativo() {
       return hasProfile() && (isAdmin()
         || (profile().get('activo', false) == true
@@ -1132,6 +1137,9 @@ service cloud.firestore {
       allow list: if isAdmin() && request.query.limit <= 50;
       allow create, update: if puedeAdjuntarOperativo() && id.matches('^salud_[0-9a-f]{64}$') && metaAdjuntoValida(id)
                     && (resource == null || resource.data.lote != request.resource.data.lote)
+                    // Revisión de ADR-118: la meta nueva va CON todas sus partes del mismo lote (no queda
+                    // un Diagrama ilegible sin «retiro», ni con permiso ni por error).
+                    && parteDelLote(id, 0) && parteDelLote(id, 1) && parteDelLote(id, 2)
                     && existsAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote))
                     && getAfter(rutaRegistroAdjunto(id + '_' + request.resource.data.lote)).data.accion == (resource == null ? 'alta' : 'reemplazo');
       // Quitar: la meta se va solo si en el mismo lote se van sus tres partes y queda su «retiro».

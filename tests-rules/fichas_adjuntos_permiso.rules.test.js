@@ -93,6 +93,14 @@ describe('con el permiso en su perfil, un técnico adjunta y reemplaza', () => {
       if ((await getDoc(doc(x, 'fichas_adjuntos', ID, 'partes', '1'))).exists()) throw new Error('quedó la parte 1');
     });
   });
+  test('un reemplazo que NO escribe sus partes (deja el diagrama ilegible) no pasa', async () => {
+    const d = db('fp_jorge'); const J = de('fp_jorge', 'Jorge FP'); const L6 = 'MMMMMMMMMMnnnnnnnnnn';
+    const b = writeBatch(d);
+    b.set(doc(d, 'fichas_adjuntos', ID), meta({ lote: L6, partes: 1, ...J }));
+    b.delete(doc(d, 'fichas_adjuntos', ID, 'partes', '1')); b.delete(doc(d, 'fichas_adjuntos', ID, 'partes', '2'));
+    b.set(doc(d, 'fichas_adjuntos_registro', ID + '_' + L6), registro({ accion: 'reemplazo', lote: L6, ...J }));
+    await assertFails(b.commit());
+  });
   test('a nombre de otro, no', async () => {
     const L4 = 'RRRRRRRRRRtttttttttt';
     await assertFails(lote(db('fp_carlos'), { m: meta({ lote: L4, ...de('fp_jorge', 'Jorge FP') }), lt: L4, reg: registro({ accion: 'reemplazo', lote: L4, ...de('fp_jorge', 'Jorge FP') }) }));

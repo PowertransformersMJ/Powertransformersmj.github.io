@@ -169,13 +169,25 @@ async function abrirEditar(uid) {
   $('eNombre').value = u.nombre || '';
   $('eRol').value    = u.rol || 'tecnico';
   $('eActivo').checked = u.activo !== false;
-  // Permiso puntual «adjuntar el Diagrama Operativo» (99 §118). El admin ya lo tiene por su rol.
-  const perm = $('ePermOperativo');
-  if (perm) { perm.checked = Array.isArray(u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO); perm.disabled = u.rol === 'admin'; }
+  // Permiso puntual «adjuntar el Diagrama Operativo» (99 §118). El admin ya lo tiene por su rol:
+  // su casilla sale marcada y fija; si en este mismo formulario se le cambia el rol, la casilla lo sigue.
+  sincronizarPermiso(u);
   $('formEditarMsg').textContent = '';
   mEditar.style.display = 'flex';
   $('eNombre').focus();
 }
+
+/** La casilla del permiso según el rol ELEGIDO en el formulario (no el guardado). */
+function sincronizarPermiso(u) {
+  const perm = $('ePermOperativo');
+  if (!perm) return;
+  const tenia = Array.isArray(u && u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO);
+  const esAdmin = $('eRol').value === 'admin';
+  perm.disabled = esAdmin;
+  perm.checked = esAdmin ? true : tenia;
+  perm.title = esAdmin ? 'El administrador ya puede por su rol.' : '';
+}
+$('eRol').addEventListener('change', () => sincronizarPermiso(cache.find((x) => x.uid === $('eUid').value) || {}));
 
 $('formEditar').addEventListener('submit', async (ev) => {
   ev.preventDefault();
