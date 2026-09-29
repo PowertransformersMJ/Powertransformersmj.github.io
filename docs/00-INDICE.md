@@ -107,17 +107,17 @@
 | §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3887 |
 | §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 | 3922 |
 | §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve | 3964 |
-| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas**: Beneficios vacío hasta escoger | 4014 |
-| §97 | ADR-097 — **Beneficios sin subtítulos y con términos técnicos** | 4032 |
-| §98 | ADR-098 — **Firma estampada** de la sesión en su casilla (ficha y Excel) | 4046 |
+| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas** | 4014 |
+| §97 | ADR-097 — **Beneficios sin subtítulos** | 4032 |
+| §98 | ADR-098 — **Firma estampada** de la sesión | 4046 |
 | §99 | ADR-099 — **Firmas del equipo bajo custodia** | 4078 |
 | §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) | 4169 |
 | §101 | ADR-101 — **Firmas de tamaño parejo** | 4197 |
-| §102 | ADR-102 — **Vista previa del Excel + PDF**; cinco firmas en pantalla | 4211 |
+| §102 | ADR-102 — **Vista previa del Excel + PDF** | 4211 |
 | §103 | ADR-103 — **Mantenimiento al PE.02081** | 4238 |
 | §104 | ADR-104 — **Excel sin datos ocultos** | 4256 |
-| §105 | ADR-105 — **Beneficios con las 13 acciones**; casilla que crece | 4285 |
-| §106 | ADR-106 — **Zona del activo**, no el departamento | 4321 |
+| §105 | ADR-105 — **Beneficios con las 13 acciones** | 4285 |
+| §106 | ADR-106 — **Zona del activo** | 4321 |
 | §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin usuarios, sin casilla) | 4335 |
 | §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
 | §109 | ADR-109 — **Auditoría Nivel-2** (M-07) | 4389 |
@@ -128,6 +128,8 @@
 | §114 | ADR-114 — **Órdenes E/S**: firmas en Autorizado y Entregado | 4599 |
 | §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4645 |
 | §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4717 |
+| §117 | ADR-117 — **Órdenes E/S**: firmas delegadas | 4768 |
+| §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4828 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -154,8 +156,8 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🧪 `30` (L-20/L-21) + `99 §3` + Skill `claude-api` |
-| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§115` + **L-103** |
-| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114` (+ `§71`, `§99`, `§108`) |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§118` + **L-103** |
+| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117` (+ `§71`, `§99`) |
 | El "por qué" de una decisión / detalle de un § | Capa 1 → `99-HISTORIAL-ADR.md` |
 
 > **Doctrinas** → always-on en `CLAUDE.md §3` (3.1 performance · 3.2 aditivo/API estable · 3.3 verifica · 3.4 IAP · 3.5 observers).

@@ -2,10 +2,10 @@
 
 > Nodo de signos vitales. Se **AUTO-CARGA** (con `CLAUDE.md` + `10`). "¿En qué estado está el sistema AHORA?". Tope ~25 líneas / 4k chars (§G.5) — tablero, no bitácora. Detalle histórico → `99` vía `00`.
 
-| Señal | Valor (al **2026-09-28**) |
+| Señal | Valor (al **2026-09-29**) |
 |---|---|
-| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: `§115` (`1c1efee`, en vivo); la cadena desde `§87`, en `00` Capa 1. |
-| **Build** | 🟢 **2052 pass / 0 fail / 2 skip** + `lint:html` limpio + **138 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-09-28 (local; CI y Deploy en VERDE = `main` `1c1efee`, L-65) |
+| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: `§117`+`§118` (`b340cd5`, en vivo); la cadena desde `§87`, en `00` Capa 1. |
+| **Build** | 🟢 **2084 pass / 0 fail / 2 skip** + `lint:html` limpio + **166 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-09-29 (local; CI y Deploy en VERDE = `main` `b340cd5`, L-65) |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` · `main` == `origin/main` (SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (filter-repo purgó confidenciales) → otra copia debe re-clonar. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **53 índices declarados en el archivo**; la igualdad contra el servidor **sin verificar desde 2026-08-17** (se comprueba con `firestore:indexes`, no con el archivo — L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |
