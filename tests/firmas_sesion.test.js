@@ -37,7 +37,17 @@ test('sin nombre no hay firma', () => {
 test('Órdenes usa esta regla en la línea de firma y en el aviso de la pantalla (no la comparación exacta)', () => {
   const src = readFileSync(new URL('../assets/js/ordenes-materiales.js', import.meta.url), 'utf8');
   assert.match(src, /import \{ lineaDeLaSesion \} from '\.\/domain\/firmas_sesion\.js';/);
-  assert.equal((src.match(/lineaDeLaSesion\(/g) || []).length, 2);
+  assert.ok((src.match(/lineaDeLaSesion\(/g) || []).length >= 2);
+  assert.match(src, /if \(lineaDeLaSesion\(nombre, FIRMA_SESION\.nombre\)\) \{/);   // firmaDe
+  assert.match(src, /todos\.filter\(p => lineaDeLaSesion\(p\.nombre, yo\)\)/);   // aviso de la pantalla
   assert.doesNotMatch(src, /firmaAplicaA\(/);
   assert.match(src, /autorizadoPor: \{ nombre: 'MIGUEL JIMENEZ'/);
+});
+
+test('el informe de refrigeración usa la misma regla (su línea «Miguel Jimenez» y el perfil «ING. MIGUEL JIMENEZ»)', () => {
+  const src = readFileSync(new URL('../assets/js/calculo-refrigeracion.js', import.meta.url), 'utf8');
+  assert.match(src, /import \{ lineaDeLaSesion \} from '\.\/domain\/firmas_sesion\.js';/);
+  assert.doesNotMatch(src, /firmaAplicaA\(/);
+  assert.match(src, /firmaHTMLDe\('Miguel Jimenez'\)/);
+  assert.equal(lineaDeLaSesion('Miguel Jimenez', 'ING. MIGUEL JIMENEZ'), true);
 });
