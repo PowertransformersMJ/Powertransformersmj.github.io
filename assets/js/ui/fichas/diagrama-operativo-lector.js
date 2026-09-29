@@ -125,7 +125,9 @@ function leerEstilos(xml, tema) {
   const idx = [...bloque(s, 'indexedColors').matchAll(/<rgbColor\b[^>]*>/g)].map((m) => (attr(m[0], 'rgb') || '').slice(-6));
   const indexados = idx.length ? idx : INDEXADOS;
   const formatos = {};
-  for (const m of s.matchAll(/<numFmt\b[^>]*\/>/g)) formatos[num(m[0], 'numFmtId')] = desXml(attr(m[0], 'formatCode'));
+  // Excel no admite códigos de formato de más de 255 caracteres: uno más largo es un archivo alterado y se
+  // lee como «General» (cada celda recorre su código: 100.000 caracteres × miles de celdas trababan el lector).
+  for (const m of s.matchAll(/<numFmt\b[^>]*\/>/g)) { const cod = desXml(attr(m[0], 'formatCode')); formatos[num(m[0], 'numFmtId')] = cod.length <= 255 ? cod : ''; }
   const fuentes = [...bloque(s, 'fonts').matchAll(/<font(?=[\s>/])[^>]*?(?:\/>|>([\s\S]*?)<\/font>)/g)].map((m) => {
     const f = m[1] || '';
     return {

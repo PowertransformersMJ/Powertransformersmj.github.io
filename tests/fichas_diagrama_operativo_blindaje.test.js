@@ -361,6 +361,12 @@ describe('revisión CF-40: lo que la página pinta está acotado y no se rechaza
     assert.equal(r.error, null, r.error);
     assert.notEqual(r.modelo.celdas[0].texto, '1500');   // aplica el formato (con separador de miles)
   });
+  test('un código de formato de más de 255 caracteres (Excel no lo admite) se lee como General y no demora', async () => {
+    const est = '<styleSheet><numFmts count="1"><numFmt numFmtId="164" formatCode="0' + '#'.repeat(100000) + '"/></numFmts><fonts count="1"><font><sz val="11"/></font></fonts><fills count="1"><fill><patternFill patternType="none"/></fill></fills><borders count="1"><border/></borders><cellXfs count="2"><xf/><xf numFmtId="164"/></cellXfs></styleSheet>';
+    const filas = []; for (let r = 1; r <= 1000; r++) filas.push('<row r="' + r + '">' + ['A', 'B', 'C'].map((c) => '<c r="' + c + r + '" s="1"><v>' + r + '</v></c>').join('') + '</row>');
+    const r = await medir(await libro({ estilos: est, hoja: H(filas.join('')) }));
+    assert.equal(r.error, null, r.error); assert.ok(r.ms < RAPIDO, 'tardó ' + Math.round(r.ms)); assert.equal(r.modelo.celdas[0].texto, '1');
+  });
   test('revisarPesoSvg: cuenta elementos y texto, no los datos de las imágenes', () => {
     assert.doesNotThrow(() => revisarPesoSvg('<svg><image href="data:image/png;base64,' + 'A'.repeat(30 * 1024 * 1024) + '"/></svg>'));
     assert.throws(() => revisarPesoSvg('<svg>' + '<text>x</text>'.repeat(PESO_SVG.elementos) + '</svg>'), /demasiado pesada/);
