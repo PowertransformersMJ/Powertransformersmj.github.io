@@ -33,7 +33,9 @@
 // El módulo ya NO lleva firmas dentro. La única firma que puede estamparse es
 // la de quien tiene la sesión abierta, y solo en SU propia línea del documento.
 import { miFirma, firmasDisponibles } from './data/firmas.js';
-import { firmaAplicaA } from './domain/firmas.js';
+// ¿La línea es de la sesión? Por la lista CERRADA de nombres de la misma persona: el perfil del
+// Ingeniero es «ING. MIGUEL JIMENEZ» y la línea dice «MIGUEL JIMENEZ» (2026-09-28, `99 §99.12`).
+import { lineaDeLaSesion } from './domain/firmas_sesion.js';
 import { getSession, isAdmin as esAdminDeSesion } from './auth/session-guard.js';
 import { listarV2 as listarParque } from './data/transformadores.js';
 import { parqueParaOrdenes } from './domain/ordenes_parque.js';
@@ -630,7 +632,7 @@ const FIRMA_SESION = { dataUrl: null, rel: 1, nombre: '', cargada: false };
 function firmaDe(persona) {
   if (!FIRMA_SESION.dataUrl) return null;
   const nombre = persona && persona.nombre;
-  if (!firmaAplicaA(nombre, FIRMA_SESION.nombre)) return null;
+  if (!lineaDeLaSesion(nombre, FIRMA_SESION.nombre)) return null;
   return { src: FIRMA_SESION.dataUrl, rel: FIRMA_SESION.rel };
 }
 
@@ -992,7 +994,7 @@ function pintarEstadoFirmas() {
   const s = getSession();
   const yo = (s && s.profile && s.profile.nombre) || '';
   const todos = [CONFIG.autorizadoPor].concat(CONFIG.entregadoPor, CONFIG.recibidoPor);
-  const misLineas = todos.filter(p => firmaAplicaA(p.nombre, yo));
+  const misLineas = todos.filter(p => lineaDeLaSesion(p.nombre, yo));
 
   if (!yo) {
     cont.innerHTML = 'Sin sesión: el documento sale con las líneas de firma en blanco.';
@@ -2614,7 +2616,7 @@ function construirPaginas(o) {
       const x = F.colX[i];
       const anchoCol = (F.segs[i][1] - F.segs[i][0]) - (x - F.segs[i][0]) - 4;
 
-      /* Firma de la sesión, solo si esta línea es la de quien tiene la sesión (firmaDe → firmaAplicaA, `99 §71`).
+      /* Firma de la sesión, solo si esta línea es la de quien tiene la sesión (firmaDe → lineaDeLaSesion, `99 §71`).
          Se escala conservando su proporción y se centra sobre la línea de firma. */
       if (o.conFirmas !== false) {
         const fir = firmaDe(pe.p);
