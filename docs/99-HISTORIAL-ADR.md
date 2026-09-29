@@ -4764,3 +4764,106 @@ frío) · un import estático nuevo en el guardián (fallo abierto).
 
 **116.8 Verificado sano / pendiente.** El reintento a los 800 ms caía antes de que el cliente de Firestore reconectara
 (~1 s), por eso las pausas son de 1,5 y 3 s. Pendiente: ninguno.
+
+## 117. ADR-117 — Órdenes E/S: Carlos Martelo y Jorge Rhenals exportan con las firmas autorizadas por el Ingeniero (permiso por usuario, folio) ⟦OPUS-5.5⟧ (2026-09-29)
+
+> *«necesito que los usuarios de Carlos Martelo y Jorge Rhenals al exportar la orden salgan las firmas de ellos y la
+> mía, yo autorizo que eso sea posible con sus usuarios, es un documento interno de control de materiales»*. Decisiones:
+> «Sí, las tres firmas» (cada una solo en su línea); «Copiar mi firma propia» al directorio. Vista previa y «procede».
+> Reglas e índice desplegados ANTES; código publicado `b340cd5`.
+
+**117.1 Causa raíz.**
+- El directorio `firmas_equipo/{custodio}` solo lo leía la sesión del custodio.
+- `ordenes_emisiones` solo aceptaba administradores.
+- La firma del Ingeniero no estaba en el directorio.
+- Los perfiles de Carlos y Jorge («… del Río», «… Garcés») no coinciden con los nombres de la lista.
+
+**117.2 Solución.**
+- **`firmas_delegados/{uid}`**, que solo escribe el custodio, atado a él. Lleva `personas` ⊆ {MIGUEL_JIMENEZ,
+  CARLOS_MARTELO, JORGE_RHENALS}, `autorizaciones` por titular, `personaPropia` (su clave en la lista: sin nombres
+  completos en el repo público), `alcance` 'ordenes' y `lote`. Cada cambio se escribe en un lote junto con
+  `firmas_delegados_registro` (id fijo, solo se agrega).
+- **La regla del directorio** deja LEER al delegado solo lo delegado, y solo del directorio de SU custodio (admin
+  activo).
+- **`ordenes_emisiones`** tiene una rama del delegado: `emisor`, `delegacion` vigente, a lo sumo 2 casillas (una por
+  línea), huella igual a la del directorio, datos acotados y folio de 20 caracteres.
+- **Índice** `ordenes_emisiones (emisor ASC, en DESC)`. Antes de desplegar: servidor 53 = archivo 53 (L-66).
+- **Módulos NUEVOS (L-102):** `domain/ordenes_firmas_delegadas.js`, `data/firmas_delegadas.js`,
+  `data/delegaciones_firmas.js` y `ui/fichas/firmas-delegadas-panel.js`. En «Firmas del equipo» el custodio copia su
+  firma, da o retira permisos y ve los «Últimos usos».
+- **`ordenes-materiales.js`:** el delegado entra por `modulosCustodia`, y el permiso se relee en cada emisión.
+
+**117.3 No-regresión.**
+- El camino del custodio no cambia: en el banco, su firma propia en Autorizado, Carlos del directorio y un solo documento
+  aunque haya doble clic.
+- La rama admin de `ordenes_emisiones` es igual. Fichas, intacto.
+
+**117.4 Verificación.**
+- Reglas: 18 nuevas, 157/157. Pruebas: 12 de dominio, 2077 pass.
+- Banco del delegado (firmas SINTÉTICAS), 10 escenarios: con y sin «Mi firma»; entregada por Jorge; Juan Cardona;
+  permiso sin cruce; permiso retirado a media sesión; registro caído; firma alterada; sin permiso; Excel.
+- Banco del panel.
+- Comité de diseño (3 lentes) y revisión adversarial (3 + verificador; bóveda
+  `2026-09-28-comite-firmas-delegadas-ordenes`): 5 medios y 13 bajos, corregidos salvo lo aceptado en 117.8.
+- En vivo, solo lectura: el panel muestra su firma «aún NO en el directorio», Carlos y Jorge «Sin permiso» ya
+  reconocidos y «Todavía ninguno»; Órdenes del custodio, igual; consola limpia.
+
+**117.5 Anti-patterns evitados.** Uids o nombres completos en el repo público · leer la firma propia de otro · presentar
+«solo en su línea» como seguridad (es de la página; la regla decide quién LEE).
+
+**117.6 Archivos.**
+- Nuevos: los 4 módulos, `tests-rules/firmas_delegados.rules.test.js` y `tests/ordenes_firmas_delegadas.test.js`.
+- Tocados: `firestore.rules`, `firestore.indexes.json`, `ordenes-materiales.js`, `pages/fichas-tecnicas.html`,
+  `fichas-tecnicas.css`, `ui/fichas/firmas-equipo.js` (texto).
+
+**117.7 Doctrina.** Reglas antes que código · L-66 · L-102 · L-107.
+
+**117.8 Verificado sano / aceptado / pendiente.**
+- **Aceptado:** quien puede leer una firma puede copiarla (el registro cubre lo emitido desde la plataforma); el delegado
+  ve la fecha y el medio de las autorizaciones de los otros titulares; la orden no se copia en la emisión (queda como
+  opción ofrecida).
+- **Pendiente suyo:** 1) «Copiar mi firma propia»; 2) dar el permiso a Carlos y a Jorge (y, si quiere, pedirles una
+  confirmación escrita corta); 3) la primera exportación real de uno de ellos, que yo reviso en «Últimos usos».
+
+## 118. ADR-118 — Fichas: permiso PUNTUAL para adjuntar y reemplazar el «Diagrama Operativo» (Carlos Martelo, Jorge Rhenals) ⟦OPUS-5.5⟧ (2026-09-29)
+
+> *«necesito que los usuarios Jorge Rhenals y Carlos Martelo puedan adjuntar el diagrama operativo en el módulo de
+> fichas técnicas»*. Vista previa y «procede». Reglas desplegadas antes; publicado `b340cd5`.
+
+**118.1 Causa raíz.** `fichas_adjuntos` (meta, partes y registro) solo aceptaba administradores (`§112`).
+
+**118.2 Solución.**
+- Permiso `fichas.adjuntar_operativo` en `permisos_extra` del perfil, reutilizando el catálogo RBAC que ya existía.
+  Solo el admin escribe /usuarios, así que nadie se lo da a sí mismo.
+- Casilla «Puede adjuntar el Diagrama Operativo» en Administración › Usuarios. Sigue el rol elegido en el formulario, y
+  la tabla muestra «+ DIAGRAMA OPERATIVO».
+- Reglas: con el permiso se hace alta y reemplazo, y se borran solo las partes que sobran en un reemplazo. Borrar la
+  meta y el registro «retiro» siguen siendo solo del admin. La meta nueva va con TODAS sus partes del mismo lote.
+- `domain/permiso_operativo.js` (NUEVO). `data/fichas_adjuntos.js`: `puedeEscribir` para quien tiene el permiso y
+  `puedeQuitar` solo admin. En la pestaña, «Quitar» solo para el admin y los textos dicen «o quien él autorice».
+
+**118.3 No-regresión.** Las 14 pruebas previas de `fichas_adjuntos` pasan. El admin sigue con Reemplazar y Quitar. Un
+técnico sin permiso solo lee.
+
+**118.4 Verificación.**
+- Reglas: 9 nuevas, 166/166. Unitarias: 7, 2084 pass.
+- Bancos: la pestaña con permiso muestra Reemplazar sin Quitar; como admin, ambos; sin permiso, el aviso. En Usuarios,
+  dar el permiso conserva los demás, quitarlo funciona y la casilla sigue el cambio de rol.
+- Revisión adversarial (2 lentes + verificador; bóveda `2026-09-29-revision-permiso-operativo`): sin altos ni medios
+  tras verificar; 7 bajos corregidos.
+- En vivo, solo lectura: la casilla está en el editor de Carlos, desmarcada; se cerró sin guardar.
+
+**118.5 Anti-patterns evitados.** Abrirlo a todo técnico por rol · nuevo mecanismo de permisos cuando ya había uno.
+
+**118.6 Archivos.**
+- Nuevos: `domain/permiso_operativo.js`, `tests-rules/fichas_adjuntos_permiso.rules.test.js` y
+  `tests/permiso_operativo.test.js`.
+- Tocados: `rbac.js`, `firestore.rules`, `data/fichas_adjuntos.js`, `diagrama-operativo-panel.js`,
+  `pages/fichas-tecnicas.html`, `admin/usuarios.html` y `admin/admin-usuarios.js`.
+
+**118.7 Doctrina.** Reglas antes que código · L-102.
+
+**118.8 Aceptado / pendiente.**
+- **Aceptado:** un técnico autorizado podría subir bytes que no coinciden con la huella (`leerImagen` los rechaza y el
+  registro queda).
+- **Pendiente suyo:** marcar la casilla a Carlos y a Jorge. Si tienen la página abierta, deben recargarla.
