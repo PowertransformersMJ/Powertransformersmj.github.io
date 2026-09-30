@@ -11,6 +11,7 @@
 | **TODO-41** | Cerrar por escrito el ledger de adopción de ADR-058 (adoptar o descartar): nodo `55-CONFIG-INFRA` · lecciones ajenas de verificación de UI · patrón `LD-NN` · índice shardeado · caveat anti-burla del auto-mode. `99 §68`. | 🟢 |
 | **TODO-04** | **✅ PARCIAL**: clusters validados + paquete SALUD ratificado con MO.00418 Ed.02. RESTA: capítulo PRUEBAS ELÉCTRICAS del MO + ratificación del director. | 🟢 parcial |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar). | 🟡 decisión |
+| **TODO-68** | **Prueba de velocidad inestable en CI**: `tests/fichas_diagrama_operativo_blindaje.test.js` «miles de definiciones de columnas» tardó 1623 ms > `RAPIDO` 1500 en el runner de GitHub y dejó en rojo `3cc4cd1` (el mismo árbol pasó en `d6df2d8`). El guardián busca el desastre de 5-23 s de antes, no 1,6 s: subir el umbral solo en CI o medir con margen. `99 §119.9`. | 🟡 |
 | **TODO-14** | Ola 5: separar 5 dominios + partir los monolitos (`99 §52`) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
 | **TODO-09** | Falta el **template xlsm sanitizado** para el flujo "Actualizar desde Excel" (insumo/decisión del Ingeniero: qué estructura publicar). El dashboard ya quedó conectado al parque real en `99 §56`. | 🟢 casi |

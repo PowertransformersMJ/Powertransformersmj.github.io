@@ -4931,10 +4931,27 @@ una regla que pasa con 1 casilla y se cae con 5 · tomar un error de red por «s
   una persona añadida con la página abierta sale tras recargar (lo que se ve es lo que sale) · la carrera de
   milisegundos custodio/delegado al retirar es inofensiva · releer el directorio tras dar un permiso es solo una lectura de más.
 - **Aceptado:** lo de `§117.8` (quien lee una firma puede copiarla; el registro cubre lo emitido).
-- **Pendiente mío:** el mismo retiro sin nombre y el registro con `limit(50)` siguen en el panel de ÓRDENES (`§117`).
+- **Pendiente mío:** el mismo retiro sin nombre y el registro con `limit(50)` siguen en el panel de ÓRDENES (`§117`). → ✅ cerrado en `119.9`.
 - **Pendiente suyo:** «Copiar mi firma propia»; dar el permiso en Fichas a Carlos y Jorge (declara la autorización de
   cada titular, incluidos Jorge Miranda y Erick Vergara); que recarguen; la 1.ª descarga, que reviso en «Últimos usos».
 - **Hecho el 2026-09-30, a su pedido («usa la extensión de Chrome para que tú mismo hagas lo faltante»)**, en su sesión:
   «Copiar mi firma propia» (el directorio queda con las cinco); permiso en Fichas a Carlos y Jorge con las cinco y en
   Órdenes (`§117`) con las tres, autorización «verbal al Ing. Miguel Jimenez» (la suya, «del custodio»). Verificado al
   recargar, contra el servidor. Queda: que recarguen y sus primeros usos.
+
+**119.9 Espejo en Órdenes E/S (`§117`) de los dos huecos de 119.8** ⟦OPUS-5.5⟧ (2026-09-30). Vista previa (banco antes/después)
+y «procede»; publicado `2bee3cb` (código `348e661`). Reglas e índices SIN cambios.
+- **Causa raíz.** `firmas-delegadas-panel.js` `filaUsuario` salía en `if (!u.nombre)` sin botón aunque hubiera permiso vigente
+  (el borrado de `firmas_delegados` no depende del nombre). `delegaciones_firmas.js` `ultimosUsos` leía el registro con un
+  solo `limit(50)`: sin `orderBy`, Firestore devuelve por id y un delegado cuyo uid ordena detrás de ≥50 filas de otro quedaba fuera.
+- **Solución.** Helper interno `botonRetirar` (igual al de Fichas), también en la fila del inactivo; `ultimosUsos` = vigentes ∪
+  registro por id de 50 en 50 (`orderBy(documentId())` + `startAfter`, ≤ 20 páginas). Sin exports nuevos (L-102).
+- **Verificación.** Reglas +3, 191/191 (recorrer el registro de 50 en 50 y no otro admin, un delegado ni una página de 51;
+  retirar a un delegado cuyo perfil quedó sin nombre; «Últimos usos» por emisor). Unitarias 2095. Banco con el código de
+  HEAD servido por `git show` y datos SINTÉTICOS (60 filas de un delegado + la orden de otro ya retirado): antes, sin botón y
+  sin su orden; después, ambos. Retiro = borrado + registro «retiro» en un lote, con el permiso de Fichas del mismo usuario
+  intacto; escritura rechazada conserva y avisa; 50 filas exactas; registro caído. CI y Deploy verdes en `2bee3cb`, servidos
+  = `main`, módulos importados en producción sin sesión (mismas exportaciones, consola limpia). Bóveda `2026-09-30-espejo-119-ordenes`.
+- **Verificado sano.** El rojo de CI en `3cc4cd1` (solo cerebro) fue la prueba de VELOCIDAD del lector del Diagrama Operativo
+  (1623 ms > 1500 en el runner); el mismo árbol pasó en `d6df2d8`: inestable, no regresión (→ `11`).
+- **Pendiente suyo:** ver el panel en su sesión (recargar la página: L-85); lo demás, lo de 119.8.
