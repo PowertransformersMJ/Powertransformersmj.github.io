@@ -6,23 +6,11 @@
 > Se lee on-demand (trigger 🧪 Experiencia) **ANTES de declarar algo desplegado, portado, saneado o
 > auditado**, y antes de poner en pantalla un dato que no venga de la fuente real.
 > Todas son **[HONOR]**: ningún linter las cubre — por eso están escritas.
+> **Las de seguridad, reglas y datos personales** (L-64, L-75, L-76, L-78, L-79, L-91, L-93, L-95,
+> L-106, L-107) se mudaron el 2026-09-30 a la hermana [`35-LECCIONES-SEGURIDAD.md`](35-LECCIONES-SEGURIDAD.md)
+> (`99 §120`: esta hija llegó a su tope). Las que quedan aquí no cambiaron.
 
 ---
-
-### L-64 · El saneador que reintroduce lo que borra (fuga por la lista de lo prohibido)
-**Síntoma.** Se sanea un binario para quitarle datos de cliente y el `.xlsx` queda impecable… pero el
-script que lo limpia lleva escrita, en texto plano, la lista de lo que debe borrar: nombres de
-personas reales, subestaciones, usuario de dominio, fechas de firma. En un repo PÚBLICO la fuga
-simplemente se mudó de archivo. Lo detectó una auditoría adversarial, no el que escribió el script.
-**Regla.** El material sensible que un script necesita **conocer** para eliminarlo vive FUERA del repo
-público — en `../brain-private/` — y el script **falla ruidosamente** si no lo encuentra, en vez de
-sanear a medias. Nunca literales sensibles en código versionado, ni siquiera "para borrarlos".
-**Corolario (más caro que el síntoma).** Al abrir la plantilla PE.02081 aparecieron **firmas
-manuscritas escaneadas** de tres personas, el autor del archivo, GUIDs de la organización M365,
-rutas locales con usuario de dominio y el estudio económico del proyecto real. **Un formato
-institucional recibido por correo es material de cliente hasta que se demuestre lo contrario**:
-descomprimirlo y auditar TODAS sus partes (XML, `.rels`, `docProps`, `media/`) antes de versionarlo.
-**Gate.** [HONOR] — ningún linter lo cubre. Ver `99 §61`.
 
 ### L-65 · Un arreglo desplegado no es un arreglo verificado (GitHub Pages en modo `legacy`)
 **Síntoma.** Se corrige una fuga filtrando el artefacto en `pages.yml`, el commit entra, el workflow
@@ -94,18 +82,6 @@ estaban publicadas sin un botón que las abriera.
 
 ### L-74 · Acotar estilos impide que el módulo se ESCAPE, no que el sitio se COLE
 **Disparador**: portar un módulo suelto a una página del sitio metiendo sus estilos bajo un contenedor (`.oms-scope`, `.pe-scope`). · **Cicatriz** (ADR-070): el módulo traía nombres genéricos (`.modal`, `.btn`, `.aviso`, `.logo`, `.num`, `.sub`) y el sitio **también define `.modal`**, con `max-width: 560px`. La regla acotada gana en las propiedades que DECLARA, pero en las que no declara manda la del sitio: la vista previa del documento salía encajonada a 560 px en una pantalla de 1280, y la captura parecía un fallo de pintado. · **Regla**: acotar es la mitad del trabajo. La otra mitad es **calcular la intersección real** entre las clases que USA el módulo y las que DEFINE el sitio (`aqua-tokens.css` + `aqua-components.css`) y **renombrar con prefijo solo las que chocan** — renombrarlo todo es caro y renombrar de más rompe (un `btn-quitar` convertido en `oms-btn-quitar` deja de encontrar su CSS). Y las capas se toman de los tokens del sitio (`--z-modal`, `--z-toast`), no se inventan: los modales del módulo estaban en 100 y la barra del sitio en 200, así que el documento salía tapado. **Gate** [HONOR]. Ver `99 §70`.
-
-### L-75 · Sanear por la FORMA del campo deja lo que está en texto libre
-**Disparador**: retirar datos personales de un archivo antes de publicarlo. · **Cicatriz** (ADR-070): el saneado sustituyó el patrón `cedula: '…'` y dio el trabajo por hecho; una revisión adversarial encontró que **la cédula real de un trabajador sobrevivía en dos comentarios**, escrita además en sus dos formas (con puntos y sin puntos), a 20 líneas de donde su nombre sí figuraba. Es la misma raíz que el `.gitignore` que protegía la carpeta `450108/` mientras los datos vivían en `_dev/fixtures/450108-*.json` (`99 §68`, A-05): **la regla se escribió contra la FORMA, no contra el DATO**. · **Regla**: sanear se verifica barriendo por el VALOR —cada dato real, en todas sus grafías— sobre los archivos exactos que se van a publicar, y repitiéndolo contra lo YA DESPLEGADO. Y ojo con el barrido en sí: pasar varias rutas en una variable de shell hizo que el `grep` de este entorno (envoltorio de ugrep, **L-70**) las tratara como un solo nombre, avisara `No such file or directory` y devolviera `0` — **un barrido de seguridad que emite un warning no es un barrido**. Rutas explícitas y `/usr/bin/grep`. **Gate** [HONOR]. Ver `99 §70`.
-
-### L-76 · `getDownloadURL` entrega una URL que funciona SIN sesión: las reglas cierran la ruta, no el enlace
-**Disparador**: mover un archivo privado a Firebase Storage «para que quede detrás del login». · **Cicatriz** (ADR-071): al sacar las firmas escaneadas del repo público, el camino evidente era `getDownloadURL()` + `<img src>`. Pero esa URL lleva un token incorporado y **sigue sirviendo el archivo a quien la tenga, sin autenticarse**: basta con que aparezca en un historial, un log, un copiar-pegar o la caché del navegador. Habría movido el problema de sitio —de un PNG público a una URL pública— con la sensación de haberlo resuelto. Las propias reglas del repo ya lo decían en un comentario (`storage.rules`: *"los download-token URLs siguen funcionando; se cierra el acceso por-path"*) y aun así era fácil caer. · **Regla**: para material que NO puede filtrarse, leer con **`getBytes()`/`getBlob()`**, que exige la sesión en CADA lectura y no deja URL pública detrás; convertir a dataURL en memoria. `getDownloadURL` es para lo que puede circular. Y la regla de acceso se escribe sobre el DUEÑO del recurso (`request.auth.uid == uid`), no solo sobre "estar autenticado": si cualquier miembro puede leer la firma de otro, el sitio sirve para falsificar documentos. **Gate** [HONOR]. Ver `99 §71`.
-
-### L-78 · Desplegar unas reglas solo COMPILA: verde en el deploy no es verde en el comportamiento
-**Disparador**: `firebase deploy --only storage` (o `firestore`) sale en verde y se declara la ruta protegida. · **Cicatriz** (ADR-071→073): las reglas de `firmas/{uid}` se desplegaron el 2026-08-31 y se dieron por buenas porque el deploy no protestó. El deploy solo valida la SINTAXIS: no ejecuta una sola petición. La promesa que sostenía todo el mecanismo —«ningún compañero puede descargar la firma ajena»— estuvo 24 h sin una sola prueba, y la suite que la demostró (34 casos) tardó 40 min en escribirse. · **Regla**: una regla nueva no está entregada hasta que existe un caso del emulador que la ejerce en las **dos** direcciones (el dueño SÍ, el ajeno NO). La contra-prueba positiva no es opcional: unas reglas que denieguen TODO pasan los invariantes negativos y dejan la función rota en producción sin que nadie se entere —aquí, `miFirma()` convierte un fallo de permisos en «no hay firma» y el documento sale sin firmar—. Las reglas de Storage necesitan **los dos emuladores** (`--only firestore,storage`): preguntan en Firestore quién es el usuario, y con uno solo pasan en verde por la razón equivocada. **Gate** [HONOR] + CI (`npm run test:rules`). Ver `99 §73`.
-
-### L-79 · En Storage, `read` incluye `list`, y al listar un prefijo los comodines sin ligar valen null
-**Disparador**: leer `allow read: if isTeamMember()` como «puede descargar los objetos que ya conoce». · **Cicatriz** (ADR-073): también puede pedir el **inventario**. Al evaluar un `list` sobre un prefijo ancestro (`pruebas_electricas`, sin unidad), los comodines del match que no quedan ligados se ligan a **null** y el match aplica igual; como `isTeamMember()` no menciona `{unidadId}` ni `{filename}`, la condición da true y se entrega la lista completa de unidades, contratos y documentos. La cara opuesta es más traicionera: `firmas/` SÍ queda cerrado al listado, pero **por un error de evaluación** (`Null value error` al comparar `request.auth.uid == uid` con `uid` nulo), no por una regla — funciona hoy, y nadie lo escribió a propósito. · **Regla**: si el nombre de los objetos ya es información (un padrón de personas, un listado de contratos), el `list` se decide y se prueba aparte del `read`, con un caso que afirme el CONTENIDO del listado, no solo que no falle. Y antes de cerrarlo en todas partes, comprobar quién lo usa: `eliminarUnidad()` necesita `listAll` de admin para borrar los PDFs de una unidad. **Gate** [HONOR]. Ver `99 §73`.
 
 ### L-80 · «Espejo EXACTO» de un helper también copia el defecto — y lo duplica sin avisar
 **Disparador**: un comentario que dice «espejo exacto de los helpers de `firestore.rules`» y tranquiliza. · **Cicatriz** (ADR-073): `adminsBootstrapValido()` está copiado literal en los dos archivos de reglas, y en los dos **no mira el rol**: comprueba estar en `/admins` y no estar desactivado, nada más. Como en `isAdmin()` va en la rama OR, gana. Resultado: degradar a alguien de administrador a técnico desde el panel no le quita nada, ni en los archivos ni en la base de datos. El auditor lo encontró en Storage; que estuviera igual en Firestore solo se supo al ir a mirar. Peor: el propio comentario del helper describe otra intención («uid en `/admins` SIN perfil en `/usuarios` = bootstrap puro») y el cliente implementa esa otra (`session-guard.js` solo consulta `/admins` cuando no hay perfil) — el código es el único de los tres que se aparta. · **Regla**: al encontrar un defecto en un helper duplicado, **buscar el gemelo antes de cerrar el hallazgo**, y probar el invariante en los DOS sitios: una prueba en un solo archivo certifica media verdad. Y cuando el comentario, el cliente y la regla discrepan, el que manda es la regla — la discrepancia es el hallazgo. **Gate** [HONOR]. Ver `99 §73`.
@@ -283,48 +259,6 @@ ANTES de fusionar**, no después. En una fusión a tres vías, lo que no choca e
 vuelto a entrar cualquier cédula nueva. Y el saneado por forma volvió a fallar: la cédula real seguía en
 un comentario (L-75). → `99 §76`.
 
-### L-91 · Pasar un dato de LOCAL a COMPARTIDO: todo lo que era seguro «porque era mío» deja de serlo
-
-Las Órdenes de Materiales vivían en el navegador de quien las hacía; el encargo era «que queden
-almacenadas». Parecía cambiar solo *dónde* se guardan. El comité y el código mostraron cuatro cosas que eran
-correctas **solo por ser locales** y que en compartido rompen: el número propuesto `DDMMAAAA-01` igual para
-todos (el choque pasa a ser el caso normal), el `confirm «¿reemplazar?»` (ahora pisa la orden de un
-compañero sin verla), el archivo que **reemplazaba** la lista al abrirse (resucita lo que otro borró) y el
-texto pintado en la página (ahora lo abre el admin: XSS almacenado).
-
-**La regla**: antes de mover estado de local a compartido, lista **cada supuesto que dependía de un solo
-dueño** —valores por defecto, confirmaciones de reemplazo, fusiones «gana el más reciente», caminos de
-importación, lo que se pinta— y dale a cada uno su versión compartida: crear ≠ editar, versión esperada,
-lápida al borrar, fuentes locales congeladas que solo *ofrecen* subir, escapado verificado. El diseño que
-solo cambia la capa de datos hereda todos esos supuestos sin que nadie lo note. → `99 §77`.
-
-### L-93 · Un candado de datos personales solo en pre-commit tiene seis puertas laterales
-
-Para las cédulas (`99 §78`) el primer candado revisaba lo preparado para commit, por huella de la cédula
-exacta. La revisión adversarial le encontró salidas reales: **merge, cherry-pick y push** no pasan por
-pre-commit; el **mensaje** del commit no se mira; un **PDF/Excel** (justo lo que ahora lleva cédulas) es
-binario y comprimido; un número con **guion, coma o pegado** a otros cae fuera de la expresión; en un
-**worktree** la bóveda no aparece y el candado falla abierto; y una cédula **nueva**, cargada desde la web,
-no tiene huella.
-
-**La regla**: un candado de dato sensible se prueba contra la lista de puertas —commit, mensaje, merge,
-push; texto, binario, nombre de archivo; separadores y ventanas; worktree; dato no registrado— y cada una
-tiene su caso con datos FALSOS (huellas falsas vía `SGM_HUELLAS`). Donde el texto no deja ver (binarios),
-se bloquea por tipo con un escape explícito. DATO (huellas con sal fuera del repo) y FORMA («cédula +
-número») se complementan: uno atrapa lo conocido, el otro lo nuevo.
-
-### L-95 · Un comentario no revoca: lo que la regla EJECUTA es lo que manda
-
-`adminsBootstrapValido()` llevaba meses con un comentario que decía «uid en /admins SIN perfil = bootstrap
-puro»… y un código que aceptaba a cualquiera de /admins mientras estuviera activo (`99 §79`). El cliente
-implementaba la intención del comentario; las reglas, otra cosa. Nadie lo vio leyendo: se vio cuando una
-prueba del emulador ESCRIBIÓ con el uid de un ex-admin degradado y pasó.
-
-**La regla**: cuando el comentario de una regla enuncia una condición, esa condición se prueba con un caso
-que la ejerza; si el caso pasa cuando debía fallar, el defecto es del código, no del comentario. Y el
-hallazgo se deja fijado como test que AFIRMA el comportamiento vigente («🔴 HOY PERMITE»), para que cerrar
-el hueco sea cambiarle el signo y no descubrirlo otra vez.
-
 ### L-97 · Lo que el módulo escribe por defecto no es trabajo del usuario — y si cuenta como tal, se lo borra
 **Disparador**: sembrar un texto, una selección o un valor «por defecto» en un campo que también tiene guardado automático. · **Cicatriz** (`99 §85.4`): al abrir la ficha se dejó escrita la redacción del formato; el borrador de `§83` la vio como «ya tenía texto en pantalla», **se saltó la restauración** del texto del día anterior y al primer tecleo lo reemplazó en disco. La revisión previa a publicar lo paró con veredicto «no publicar». · **Regla**: lo que el sistema compone y puede rehacer solo (aquí, `_ver` numérico) **no cuenta como contenido**; solo cuenta lo que el usuario tecleó o eligió. Distinguirlos en el DOMINIO, no en la pantalla, para que todos los caminos (guardar, restaurar, avisar al salir) lo apliquen igual.
 
@@ -368,26 +302,6 @@ usuarios registrados; `conteoPorNivel`, en el mismo archivo, ya los dejaba fuera
 `null`, `''` y espacios son «sin dato» (nulo), y el camino «sin dato» se prueba con su caso; 0 registrado sí es
 un dato. **Gate**: prueba «sin dato de usuarios…» en `tests/fichas_salud_riesgo_excel.test.js`.
 
-
-### L-106 · Un arreglo de seguridad se prueba contra la CLASE, no contra el ejemplo que lo destapó
-**Disparador**: cerrar un hallazgo de denegación, inyección o topes con un parche y darlo por «corregido». ·
-**Cicatriz** (`99 §112.8`): el ReDoS del lector del `.xlsx` se cerró contando etiquetas sin cierre en la hoja, los
-textos y los dibujos, y la prueba solo cubría ese caso. La verificación del cerebro halló el mismo mal por `styles.xml`
-(nunca pasó el filtro) y por el ORDEN (cierres antes que aperturas: la cuenta cuadra) ya en producción, con el ADR
-diciendo «corregido». · **Regla**: antes de declarar cerrado, enumerar TODAS las entradas que llegan al mecanismo
-vulnerable (aquí: cada regex perezosa sobre texto ajeno) y darle a cada una su caso hostil; mejor si la defensa es
-estructural (una pasada lineal que valide el anidamiento de TODA parte leída, o un Worker con tiempo límite) que
-casuística. **Gate** [HONOR] + las pruebas de CF-40.
-
-### L-107 · Un documento con firmas ajenas: TODAS sus salidas, y la huella de los bytes que de verdad se entregan
-**Disparador**: estampar firmas de otras personas (directorio del custodio) con registro de cada emisión. · **Cicatriz**
-(`99 §114`): el PDF y el Excel de Órdenes registraban y ponían folio, pero el botón «Imprimir» de la vista previa (y
-Archivo → Imprimir) sacaba la firma de Carlos sin releerla, sin registro y sin folio; y la huella registrada del PDF no
-era la del archivo descargado, porque jsPDF rearma el documento en cada `output()`/`save()` y con imágenes no sale igual.
-La revisión adversarial lo cazó antes de publicar. · **Regla**: antes de publicar, ENUMERAR cada salida del documento
-(descargas, vista previa, imprimir, atajos, copias) y decidir para cada una si lleva las firmas y con qué registro; la
-que no registra, no las lleva (aquí: `@media print` dentro del propio SVG). Y armar el archivo UNA vez: huellar y
-descargar esos mismos bytes. **Gate**: pruebas de `§114` en el banco + [HONOR].
 
 ### L-108 · Un visor que falla igual no es testigo: se compara contra la FUENTE del formato, y se mide, no se promedia
 **Disparador**: cambiar cómo se ancla, gira o dimensiona algo en un xlsx, o ajustar texto «para que quepa». · **Cicatriz**
