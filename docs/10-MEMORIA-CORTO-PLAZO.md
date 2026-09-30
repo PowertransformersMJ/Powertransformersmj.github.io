@@ -17,8 +17,8 @@
 > **(G)** **Los 9 fixtures con datos REALES del TX 450108 siguen en el repo PÚBLICO** (`TODO-36`): anonimizarlos conservando la forma del dato, o purgarlos del historial como el 2026-07-21.
 > **(H)** Decir qué se hace con los **3 equipos que su hoja de cargabilidad no trae**: `T1-M/M-CAZ`
 > (Casa de Zinc), `T2-M/M-BEC` (Becerril) y `T2-M/M-SML` (San Martín de Loba) — sin medida 2025.
-> **(I) Suyo**: «Copiar mi firma propia» (sirve a Órdenes y Fichas) · permiso a Carlos y Jorge en Órdenes (`§117`) y en Fichas
-> (`§119`; luego recargan) y sus 1.os usos · 1.er Diagrama Operativo de ellos (`§118`) · abrir en su Excel el `PRUEBA_…xlsx` de `§115` · la primera
+> **(I) Suyo**: firma copiada y permisos de Órdenes (`§117`) y Fichas (`§119`) DADOS (09-30, a su pedido): que Carlos y Jorge
+> recarguen; sus 1.os usos (revisar «Últimos usos») · 1.er Diagrama Operativo de ellos (`§118`) · abrir en su Excel el `PRUEBA_…xlsx` de `§115` · la primera
 > descarga real con folio (`§108.5`) · «[object Object]» en refrigeración del PI (`§103.8`) · borrar las 5 copias viejas de
 > firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`) · el primer Diagrama Operativo real (`§112.8`) · firma de Juan Cardona (`§114.8`).
 
