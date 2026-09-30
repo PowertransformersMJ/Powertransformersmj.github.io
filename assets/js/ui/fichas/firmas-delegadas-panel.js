@@ -141,6 +141,21 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
     alCambiar();
   });
 
+  /** «Retirar permiso» suelto (usuario sin nombre o que ya no está activo): el retiro no depende del nombre. */
+  function botonRetirar(uid, etiqueta, lote) {
+    const caja = el('div', 'fd-botones');
+    const b = el('button', 'ftm-btn', 'Retirar permiso'); b.type = 'button';
+    const m = el('p', 'fe-msg'); m.setAttribute('aria-live', 'polite');
+    b.addEventListener('click', async () => {
+      if (!globalThis.confirm('¿Retirar el permiso de ' + etiqueta + ' en Órdenes E/S?')) return;
+      b.disabled = true; const r = await dd.retirar(uid, lote); b.disabled = false;
+      m.textContent = r.ok ? '' : r.motivo;
+      if (r.ok) { await refrescar(); alCambiar(); }
+    });
+    caja.append(b, m);
+    return caja;
+  }
+
   /** Una fila por usuario: quién es en la lista, qué firmas y con qué autorización. */
   function filaUsuario(u, vigente, vigentes) {
     const f = el('div', 'fd-fila');
@@ -153,8 +168,9 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
     f.appendChild(cab);
 
     if (!u.nombre) {
-      // La regla compara con el nombre del perfil: sin nombre no se le puede dar permiso.
+      // La regla compara con el nombre del perfil: sin nombre no se le puede dar permiso (pero sí retirarlo).
       f.appendChild(el('p', 'fe-msg', 'Este usuario no tiene nombre en su perfil: póngaselo en Administración › Usuarios para poder darle permiso.'));
+      if (vigente) f.appendChild(botonRetirar(u.uid, u.etiqueta || u.uid, vigente.lote));
       return f;
     }
     const form = el('form', 'fe-form fd-form');
@@ -239,15 +255,7 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
         const f = el('div', 'fd-fila');
         f.appendChild(el('b', 'fe-nombre', (v.delegadoNombre || uid) + ' (usuario inactivo o que ya no está)'));
         f.appendChild(el('p', 'fe-estado', 'Conserva permiso para: ' + (v.personas || []).map(nombreDePersona).join(', ') + '. Si lo reactivan, podría volver a usarlas.'));
-        const b = el('button', 'ftm-btn', 'Retirar permiso'); b.type = 'button';
-        const m = el('p', 'fe-msg'); m.setAttribute('aria-live', 'polite');
-        b.addEventListener('click', async () => {
-          if (!globalThis.confirm('¿Retirar el permiso de ' + (v.delegadoNombre || uid) + '?')) return;
-          b.disabled = true; const r = await dd.retirar(uid, v.lote); b.disabled = false;
-          m.textContent = r.ok ? '' : r.motivo;
-          if (r.ok) { await refrescar(); alCambiar(); }
-        });
-        f.append(b, m);
+        f.appendChild(botonRetirar(uid, v.delegadoNombre || uid, v.lote));
         lista.appendChild(f);
       }
       if (!lista.childElementCount) lista.textContent = 'No hay otros usuarios activos.';
