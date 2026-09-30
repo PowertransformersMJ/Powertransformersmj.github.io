@@ -444,6 +444,14 @@
         { "fieldPath": "emisor", "order": "ASCENDING" },
         { "fieldPath": "en",     "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "fichas_emisiones",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "emisor", "order": "ASCENDING" },
+        { "fieldPath": "en",     "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

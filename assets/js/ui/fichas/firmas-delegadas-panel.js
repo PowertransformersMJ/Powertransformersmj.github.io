@@ -64,7 +64,7 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
 
   // ── 1. Su firma en el directorio ──
   const sec1 = el('div', 'fd-seccion');
-  sec1.appendChild(el('p', 'fd-sub', 'Su firma para «Autorizado por» cuando exporta otro usuario'));
+  sec1.appendChild(el('p', 'fd-sub', 'Su firma para cuando exporta otro usuario («Autorizado por» en Órdenes; Elaboración y Revisión en Fichas)'));
   const est1 = el('p', 'fe-estado', 'Consultando…');
   const acc1 = el('div', 'fe-acciones');
   const bCopiar = el('button', 'ftm-btn', 'Copiar mi firma propia'); bCopiar.type = 'button';
@@ -102,7 +102,7 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
     const huellaPropia = propiaUrl ? await datosEquipo.huellaDe(bytesDeDataUrl(propiaUrl)) : null;
     const avisoPeso = pesada ? ' Su «Mi firma» pesa más de 512 KB: vuelva a cargarla recortada para poder copiarla.' : '';
     if (!copia) {
-      est1.textContent = (propiaUrl ? 'Su firma aún NO está en el directorio: cuando exporte otro usuario, «Autorizado por» saldrá en blanco.'
+      est1.textContent = (propiaUrl ? 'Su firma aún NO está en el directorio: cuando exporte otro usuario, su casilla saldrá en blanco («Autorizado por» en Órdenes; Elaboración y Revisión en Fichas).'
         : 'Aún no ha cargado «Mi firma» (arriba). Cárguela primero y luego cópiela aquí.') + avisoPeso;
       bCopiar.textContent = 'Copiar mi firma propia'; bCopiar.disabled = !propiaUrl || pesada; bQuitarCopia.hidden = true;
       return;
@@ -132,7 +132,7 @@ export function montarFirmasDelegadas(contenedor, opts = {}) {
     }
   });
   bQuitarCopia.addEventListener('click', async () => {
-    if (!globalThis.confirm('¿Retirar la copia de su firma del directorio? Los usuarios autorizados dejarán de estamparla en «Autorizado por».')) return;
+    if (!globalThis.confirm('¿Retirar la copia de su firma del directorio? Los usuarios autorizados dejarán de estamparla en «Autorizado por» de Órdenes y en Elaboración y Revisión de Fichas.')) return;
     bQuitarCopia.disabled = true; msg1.textContent = 'Retirando…';
     const r = await datosEquipo.quitarFirma(miClave);
     bQuitarCopia.disabled = false;

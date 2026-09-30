@@ -93,8 +93,8 @@ export function montarFirmasEquipo(contenedor, opts = {}) {
   caja.className = 'fe-caja';
   const ayuda = document.createElement('p');
   ayuda.className = 'fe-ayuda';
-  ayuda.textContent = 'Usted custodia estas firmas: quedan en su espacio privado, no en la página. Solo usted las usa '
-    + 'en Fichas; en Órdenes E/S también quienes autorice más abajo. '
+  ayuda.textContent = 'Usted custodia estas firmas: quedan en su espacio privado, no en la página. Las usan usted y, '
+    + 'en Fichas y en Órdenes E/S, solo quienes autorice más abajo. '
     + 'Cada subida queda registrada con su fecha (por defecto, como autorización verbal). '
     + 'Retirar una firma solo afecta a las descargas futuras: los Excel ya enviados la conservan.';
   caja.appendChild(ayuda);

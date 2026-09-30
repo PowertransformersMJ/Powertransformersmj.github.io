@@ -2172,6 +2172,9 @@ body.aqua .ftm-fmt .ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in.ftm-fmt-in:focus
 .fd-persona input[type="text"] { min-width: 340px; }
 .fd-tabla { border-collapse: collapse; font-size: 12px; width: 100%; }
 .fd-tabla th, .fd-tabla td { border-bottom: 1px solid var(--ftm-line, #d5dee8); padding: 4px 6px; text-align: left; }
+/* Fichas (99 §119): qué firmas hay hoy en el directorio. */
+.fd-dir { margin: 0; padding-left: 18px; font-size: 12.5px; color: var(--ftm-ink-2, #33424d); }
+.fd-dir li { margin: 2px 0; }
 .fe-aviso:empty { display: none; }
 .ftm-emision-cambio { margin: 0 0 8px; padding: 6px 8px; border-radius: 8px; background: #fff4e5; color: #7a4a00; font-size: 12px; }
 .ftm-emision-ok { margin: 0 0 10px; padding: 6px 10px; border-radius: 8px; background: #e8f5ec; color: #1d5b33; font-size: 12.5px; }
