@@ -869,9 +869,34 @@ service cloud.firestore {
       return persona in delegables() && exists(ruta)
         && delegacionVigente(get(ruta).data, c) && persona in get(ruta).data.personas;
     }
+    // ── Firmas DELEGADAS para Fichas Técnicas (ADR-119, decisión del Ingeniero 2026-09-30) ──
+    // «que en el módulo de fichas técnicas Jorge y Carlos puedan exportar el archivo Excel
+    // con todas las firmas; yo lo autorizo». Espejo de Órdenes E/S (ADR-117) en colecciones
+    // PROPIAS (`firmas_delegados_fichas` + su registro): las cinco personas de la lista, cada
+    // una con la autorización de su titular. La regla decide quién LEE la imagen y qué folio
+    // vale; dónde se estampa lo hace cumplir la página (riesgo aceptado, como en ADR-117).
+    function rutaDelegF(u) { return /databases/$(database)/documents/firmas_delegados_fichas/$(u); }
+    function rutaRegDelegF(id) { return /databases/$(database)/documents/firmas_delegados_fichas_registro/$(id); }
+    function delegablesFichas() { return ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA', 'ERICK_VERGARA']; }
+    // Quién cabe en cada casilla del PE.02081, como UNA expresión regular sobre «casilla|persona»:
+    // espejo de FIRMANTES (assets/js/domain/fichas_firmantes.js, `personasPorCasilla`); una prueba
+    // compara las dos. Una sola expresión: el servidor evalúa a lo sumo 1000 por petición.
+    function firmanteCabe(k, persona) {
+      return (k + '|' + persona).matches('^(elab[|](MIGUEL_JIMENEZ|CARLOS_MARTELO|JORGE_RHENALS)|rev[|](JORGE_MIRANDA|MIGUEL_JIMENEZ)|apr[|](JORGE_MIRANDA|ERICK_VERGARA)|apr2[|](ERICK_VERGARA|JORGE_MIRANDA)|rec[|](ERICK_VERGARA))$');
+    }
+    function delegacionFichasVigente(d, c) {
+      return request.auth.uid != c && hasProfile() && profile().get('activo', false) == true
+        && d.custodio == c && d.alcance == 'fichas' && custodioVigente(c);
+    }
+    function delegadoFichasLee(c, persona) {
+      let ruta = rutaDelegF(request.auth.uid);
+      return persona in delegablesFichas() && exists(ruta)
+        && delegacionFichasVigente(get(ruta).data, c) && persona in get(ruta).data.personas;
+    }
     match /firmas_equipo/{custodio}/personas/{persona} {
       allow get:    if (request.auth.uid == custodio && hasProfile() && isAdmin() && personaDelEquipo(persona))
-                    || delegadoLee(custodio, persona);
+                    || delegadoLee(custodio, persona)
+                    || delegadoFichasLee(custodio, persona);
       allow create, update: if hasProfile() && isAdmin() && request.auth.uid == custodio && personaDelEquipo(persona)
                     && request.resource.data.keys().hasOnly(['imagen', 'huella', 'autorizacion', 'registro', 'en'])
                     && request.resource.data.imagen is bytes
@@ -976,9 +1001,120 @@ service cloud.firestore {
       allow create: if hasProfile() && isAdmin() && registroDelegacionValido(id);
       allow update, delete: if false;
     }
+    match /firmas_delegados_fichas/{delegado} {
+      function delegacionFichasValida() {
+        let d = request.resource.data;
+        let u = get(/databases/$(database)/documents/usuarios/$(delegado)).data;
+        let reg = rutaRegDelegF(delegado + '_' + d.lote);
+        return d.keys().hasOnly(['custodio', 'custodioNombre', 'delegadoNombre', 'personaPropia', 'personas',
+                                 'autorizaciones', 'alcance', 'lote', 'en'])
+          && d.keys().hasAll(['custodio', 'custodioNombre', 'delegadoNombre', 'personaPropia', 'personas',
+                              'autorizaciones', 'alcance', 'lote', 'en'])
+          && d.custodio == request.auth.uid && d.custodioNombre == profile().get('nombre', '')
+          && delegado != request.auth.uid && u.get('activo', false) == true && d.delegadoNombre == u.get('nombre', '')
+          && d.personaPropia in ['CARLOS_MARTELO', 'JORGE_RHENALS']
+          && d.personas is list && d.personas.size() >= 1 && d.personas.size() <= 5
+          && d.personas.hasOnly(delegablesFichas()) && d.personas.toSet().size() == d.personas.size()
+          && d.autorizaciones is map && d.autorizaciones.keys().hasOnly(d.personas) && d.autorizaciones.keys().hasAll(d.personas)
+          && (!('MIGUEL_JIMENEZ' in d.personas) || autorizacionOk(d.autorizaciones.MIGUEL_JIMENEZ))
+          && (!('CARLOS_MARTELO' in d.personas) || autorizacionOk(d.autorizaciones.CARLOS_MARTELO))
+          && (!('JORGE_RHENALS' in d.personas) || autorizacionOk(d.autorizaciones.JORGE_RHENALS))
+          && (!('JORGE_MIRANDA' in d.personas) || autorizacionOk(d.autorizaciones.JORGE_MIRANDA))
+          && (!('ERICK_VERGARA' in d.personas) || autorizacionOk(d.autorizaciones.ERICK_VERGARA))
+          && d.alcance == 'fichas' && d.lote is string && d.lote.matches('^[A-Za-z0-9]{20}$') && d.en == request.time
+          && !exists(reg) && existsAfter(reg) && getAfter(reg).data.tipo == (resource == null ? 'alta' : 'cambio');
+      }
+      allow get:    if hasProfile() && ((request.auth.uid == delegado && profile().get('activo', false) == true)
+                                        || (isAdmin() && resource.data.custodio == request.auth.uid));
+      allow list:   if hasProfile() && isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
+      allow create: if hasProfile() && isAdmin() && delegacionFichasValida();
+      allow update: if hasProfile() && isAdmin() && resource.data.custodio == request.auth.uid
+                    && request.resource.data.lote != resource.data.lote && delegacionFichasValida();
+      // Retirar exige su registro de retiro (id fijo); un custodio que ya no es admin retira sin él.
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.custodio
+                    && (!isAdmin() || existsAfter(rutaRegDelegF(delegado + '_' + resource.data.lote + '_retiro')));
+    }
+    function registroDelegacionFichasValido(id) {
+      let d = request.resource.data;
+      let r = rutaDelegF(d.delegado);
+      return d.keys().hasOnly(['tipo', 'delegado', 'delegadoNombre', 'personaPropia', 'personas', 'autorizaciones',
+                               'lote', 'custodio', 'custodioNombre', 'en'])
+        && d.keys().hasAll(['tipo', 'delegado', 'lote', 'custodio', 'custodioNombre', 'en'])
+        && d.tipo in ['alta', 'cambio', 'retiro'] && d.delegado is string && d.lote is string
+        && d.custodio == request.auth.uid && d.custodioNombre == profile().get('nombre', '') && d.en == request.time
+        && (d.tipo == 'retiro'
+            ? (d.keys().hasOnly(['tipo', 'delegado', 'lote', 'custodio', 'custodioNombre', 'en'])
+               && id == d.delegado + '_' + d.lote + '_retiro' && exists(r) && get(r).data.custodio == request.auth.uid
+               && get(r).data.lote == d.lote && !existsAfter(r))
+            : (id == d.delegado + '_' + d.lote && existsAfter(r) && getAfter(r).data.custodio == request.auth.uid
+               && getAfter(r).data.lote == d.lote && getAfter(r).data.personas == d.personas
+               && getAfter(r).data.autorizaciones == d.autorizaciones
+               && getAfter(r).data.personaPropia == d.personaPropia
+               && getAfter(r).data.delegadoNombre == d.delegadoNombre
+               && (d.tipo == 'alta') == !exists(r)));
+    }
+    match /firmas_delegados_fichas_registro/{id} {
+      allow get:  if isAdmin() && resource.data.custodio == request.auth.uid;
+      allow list: if isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
+      allow create: if hasProfile() && isAdmin() && registroDelegacionFichasValido(id);
+      allow update, delete: if false;
+    }
+    // Rama del DELEGADO en `fichas_emisiones` (ADR-119): lleva `emisor` (quien emite) y
+    // `delegacion` (el lote vigente); `custodio` es el DUEÑO del directorio. Cada casilla, una
+    // vez, con una persona delegada que cabe en ella y la huella de la firma que HOY está.
+    // Cuesta contada: el servidor evalúa a lo sumo 1000 expresiones por petición, y el PE.02081
+    // tiene cinco casillas. `x.size() == 5` + leer sus cinco campos (k lo lee `casillasDistintas`)
+    // equivale a «exactamente esas claves»: un campo que falte hace fallar la regla.
+    function casillaFichasDelegadaOk(x, d, c) {
+      return x.size() == 5 && x.nombre.size() <= 80 && x.huella.matches('^[0-9a-f]{64}$')
+        && (x.origen == 'propia'
+            ? x.persona in [d.personaPropia, '']
+            : (x.origen == 'equipo' && x.persona in d.personas && firmanteCabe(x.k, x.persona)
+               && x.huella == get(/databases/$(database)/documents/firmas_equipo/$(c)/personas/$(x.persona)).data.huella));
+    }
+    // Cada casilla una sola vez y todas del formato: las claves, en una lista, sin repetidas.
+    function casillasDistintas(cs) {
+      let n = cs.size();
+      let ks = n == 1 ? [cs[0].k]
+        : n == 2 ? [cs[0].k, cs[1].k]
+        : n == 3 ? [cs[0].k, cs[1].k, cs[2].k]
+        : n == 4 ? [cs[0].k, cs[1].k, cs[2].k, cs[3].k]
+        : [cs[0].k, cs[1].k, cs[2].k, cs[3].k, cs[4].k];
+      return ks.hasOnly(['elab', 'rev', 'apr', 'apr2', 'rec']) && ks.toSet().size() == n;
+    }
+    // Todo el folio del delegado en UNA función sobre `e` (= request.resource.data): cada
+    // `request.resource.data.x` repetido cuenta como varias expresiones.
+    function emisionFichasDelegadaOk(e) {
+      let ruta = rutaDelegF(request.auth.uid);
+      let d = get(ruta).data;
+      let cs = e.casillas;
+      let q = e.equipo;
+      return e.size() == 10
+        && e.keys().hasOnly(['equipo', 'documento', 'casillas', 'huellaArchivo', 'custodio', 'custodioNombre',
+                             'emisor', 'emisorNombre', 'delegacion', 'en'])
+        && e.documento == 'PE.02081' && e.en == request.time
+        && e.huellaArchivo is string && e.huellaArchivo.matches('^[0-9a-f]{64}$')
+        && q.size() == 3 && q.keys().hasOnly(['matricula', 'subestacion', 'serie'])
+        && q.matricula is string && q.matricula.size() <= 120
+        && q.subestacion is string && q.subestacion.size() <= 120
+        && q.serie is string && q.serie.size() <= 120
+        && cs is list && cs.size() >= 1 && cs.size() <= 5
+        && exists(ruta) && delegacionFichasVigente(d, e.custodio)
+        && e.emisor == request.auth.uid && e.emisorNombre == profile().get('nombre', '')
+        && e.custodioNombre == d.custodioNombre
+        && e.delegacion == d.lote
+        && casillaFichasDelegadaOk(cs[0], d, e.custodio)
+        && (cs.size() < 2 || casillaFichasDelegadaOk(cs[1], d, e.custodio))
+        && (cs.size() < 3 || casillaFichasDelegadaOk(cs[2], d, e.custodio))
+        && (cs.size() < 4 || casillaFichasDelegadaOk(cs[3], d, e.custodio))
+        && (cs.size() < 5 || casillaFichasDelegadaOk(cs[4], d, e.custodio))
+        && casillasDistintas(cs);
+    }
     match /fichas_emisiones/{folio} {
       allow get:  if isAdmin();
       allow list: if isAdmin() && request.query.limit <= 50;
+      allow create: if 'emisor' in request.resource.data && folio.matches('^[A-Za-z0-9]{20}$')
+                    && emisionFichasDelegadaOk(request.resource.data);
       allow create: if isAdmin() && hasProfile()
                     && request.resource.data.keys().hasOnly(['equipo', 'documento', 'casillas', 'huellaArchivo',
                                                              'custodio', 'custodioNombre', 'en'])

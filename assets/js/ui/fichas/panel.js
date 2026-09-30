@@ -3370,7 +3370,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   const alCambiarFirmasEquipo = () => {
     firmasEquipoPantalla.generacion += 1;
     firmasEquipoPantalla.cargadas = false;
-    if (actual) asegurarFirmasEquipoPantalla();
+    if (!actual) return;
+    // Un usuario autorizado al que le retiran el permiso (`99 §119`): la ficha deja de mostrarlas ya.
+    if (custodiaDisponible()) asegurarFirmasEquipoPantalla();
+    else pintarFirmasEstampadas();
   };
 
   /** Qué firma lleva cada casilla EN PANTALLA: la propia y, para el custodio, las del equipo. */
@@ -3428,9 +3431,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
         + ' (revise la conexión): su casilla sale en blanco.' : '';
     if (delEquipo.length) {
       const propias = firmaSesion.dataUrl ? casillasDeLaSesion(P, firmaSesion.nombre).map(rolDe) : [];
-      return (propias.length ? 'Su firma va en ' + propias.join(' y ') + '; '
-        : (firmaSesion.dataUrl ? '' : 'Su firma propia no está cargada (súbala en «Mi firma»); '))
-        + 'las del equipo, en ' + [...new Set(delEquipo)].join(', ') + '. En el Excel salen todas con '
+      const antes = propias.length ? 'Su firma va en ' + propias.join(' y ') + '; '
+        : (firmaSesion.dataUrl ? '' : 'Su firma propia no está cargada (súbala en «Mi firma»); ');
+      // Quien exporta sin casilla propia (p. ej. un usuario autorizado, `99 §119`): la frase empieza aquí.
+      return antes + (antes ? 'las' : 'Las firmas') + ' del equipo, en ' + [...new Set(delEquipo)].join(', ') + '. En el Excel salen todas con '
         + '«Exportar Excel», y cada descarga queda registrada con su folio.' + noLeidas;
     }
     if (!firmaSesion.dataUrl) return 'No hay firma suya para estampar (no la ha cargado, o no se pudo leer): '
@@ -4207,7 +4211,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       }
       // Las cinco firmas SIEMPRE (`99 §108`, decisión del Ingeniero: «Siempre las
       // cinco»; ya había dicho «yo autorizo verbalmente», §99.11). Solo el custodio
-      // las lee; cada imagen se comprueba contra la huella registrada al subirla y
+      // las lee, y quien él autorice en Fichas (`99 §119`, la página le da su propio
+      // `cfg.firmasEquipo`); cada imagen se comprueba contra la huella registrada al subirla y
       // cada descarga con firmas del equipo queda registrada con su folio.
       const registro = sinOperativo ? null : await firmasDelEquipoEnEstado(eq, estado);
       if (registro === false || actual !== eq) return;

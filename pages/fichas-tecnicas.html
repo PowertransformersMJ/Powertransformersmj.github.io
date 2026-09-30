@@ -44,10 +44,12 @@
        estampa las firmas que le autorizaron; quedan en SU espacio privado (nunca
        en la página ni en el repositorio). Oculto hasta confirmar el rol. -->
   <details class="ftm-mi-firma" id="firmasEquipoCaja" hidden>
-    <summary>Firmas del equipo · usted las custodia (y decide quién más las usa en Órdenes E/S)</summary>
+    <summary>Firmas del equipo · usted las custodia (y decide quién más las usa en Fichas y en Órdenes E/S)</summary>
     <div id="panelFirmasEquipo"></div>
     <!-- Quién más puede usarlas en Órdenes E/S (99 §117): lo decide el custodio. -->
     <div id="panelFirmasDelegadas"></div>
+    <!-- Quién más puede exportar el Excel de Fichas con ellas (99 §119): lo decide el custodio. -->
+    <div id="panelFirmasDelegadasFichas"></div>
   </details>
 
   <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ftm- -->
@@ -139,7 +141,15 @@
     await esperarSesion();
     if (!firmasDisponibles()) return null;
     const s = getSession();
-    return { nombre: (s && s.profile && s.profile.nombre) || '', dataUrl: await miFirma() };
+    const dataUrl = await miFirma();
+    let nombre = (s && s.profile && s.profile.nombre) || '';
+    // Usuario autorizado en Fichas (99 §119): su casilla se reconoce por SU clave de la lista (su perfil no se llama
+    // igual). Con «Mi firma» lleva la suya; sin ella, la del directorio si se la autorizaron (como en Órdenes, §117).
+    let enLaLista = '';
+    try { enLaLista = usaDelegado() && typeof delegadoFichas.nombreEnLaLista === 'function' ? delegadoFichas.nombreEnLaLista() : ''; }
+    catch (_) { /* el permiso aún no se ha montado: su nombre de perfil, como antes */ }
+    if (enLaLista) nombre = dataUrl ? enLaLista : '';
+    return { nombre, dataUrl };
   }
   const panelFirma = montarFirmaPersonal
     ? montarFirmaPersonal(document.getElementById('panelMiFirma'), {
@@ -162,15 +172,47 @@
   // las reglas del servidor lo vuelven a exigir en cada lectura y escritura.
   let datosEquipo = null;
   const cargarDatosEquipo = async () => (datosEquipo = datosEquipo || await import('../assets/js/data/firmas_equipo.js'));
+  // Un usuario AUTORIZADO por el custodio (99 §119) usa el mismo contrato con su propio
+  // adaptador (lee del directorio del custodio y registra a su nombre). El custodio manda.
+  let delegadoFichas = null;
+  const esCustodio = () => !!(datosEquipo && datosEquipo.puedeCustodiar());
+  const usaDelegado = () => !esCustodio() && !!(delegadoFichas && delegadoFichas.disponible());
   const firmasEquipo = {
-    disponible() { return !!(datosEquipo && datosEquipo.puedeCustodiar()); },
-    async leer(id) { return (await cargarDatosEquipo()).leerFirma(id); },
-    nuevaEmisionId() { return datosEquipo.nuevaEmisionId(); },
-    async registrarEmision(id, datos) { return (await cargarDatosEquipo()).registrarEmision(id, datos); }
+    disponible() { return esCustodio() || usaDelegado(); },
+    async leer(id) { return usaDelegado() ? delegadoFichas.leer(id) : (await cargarDatosEquipo()).leerFirma(id); },
+    nuevaEmisionId() { return usaDelegado() ? delegadoFichas.nuevaEmisionId() : datosEquipo.nuevaEmisionId(); },
+    async registrarEmision(id, datos) {
+      return usaDelegado() ? delegadoFichas.registrarEmision(id, datos) : (await cargarDatosEquipo()).registrarEmision(id, datos);
+    }
   };
+  const avisarFirmasEquipo = () => window.dispatchEvent(new CustomEvent('sgm:firmas-equipo-cambiadas'));
   esperarSesion().then(async () => {
     const s = getSession();
-    if (!s || !s.profile || s.profile.rol !== 'admin') return;
+    if (!s || !s.profile) return;
+    if (s.profile.rol !== 'admin') {
+      // ¿El custodio le dio permiso en Fichas? Si no se pudo saber, exporta como antes (su firma).
+      try {
+        const { adaptadorDelegado } = await import('../assets/js/data/firmas_delegadas_fichas.js');
+        let avisadoRetiro = false;
+        // Llegó, cambió o se retiró el permiso: se repintan las firmas y se recalcula cuál casilla es la suya.
+        const repintar = () => { avisarFirmasEquipo(); window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); };
+        delegadoFichas = await adaptadorDelegado({
+          alCambiar(motivo) {
+            repintar();
+            // Si se lo retiraron con la página abierta, se le dice UNA vez (el Excel sale sin las del equipo).
+            if (motivo && motivo.retirado && !avisadoRetiro) {
+              avisadoRetiro = true;
+              alert('Su permiso para usar las firmas del equipo en Fichas ya no está vigente: desde ahora la ficha '
+                + 'sale sin ellas. Si es un error, pídale al administrador que lo revise.');
+            }
+          }
+        });
+        if (delegadoFichas) repintar();   // la ficha que ya esté abierta las muestra
+      } catch (errDel) {
+        console.warn('[fichas] firmas del equipo (permiso) no disponibles:', errDel);
+      }
+      return;
+    }
     try {
       const datos = await cargarDatosEquipo();
       if (!datos.puedeCustodiar()) return;
@@ -184,11 +226,13 @@
       caja.hidden = false;
       // Firmas en Órdenes E/S para otros usuarios (99 §117): módulos NUEVOS, cargados aquí.
       let panelDelegadas = null;
+      let panelDelegadasFichas = null;   // y en Fichas (99 §119)
       // El oyente va ANTES de la espera: abrir la caja mientras cargan los módulos no se pierde.
       caja.addEventListener('toggle', () => {
         if (!caja.open) return;
         if (panelEquipo) panelEquipo.refrescar();
         if (panelDelegadas) panelDelegadas.refrescar();
+        if (panelDelegadasFichas) panelDelegadasFichas.refrescar();
       });
       try {
         const [{ montarFirmasDelegadas }, datosDelegaciones, datosFirma] = await Promise.all([
@@ -205,8 +249,23 @@
       } catch (errDeleg) {
         console.warn('[fichas] firmas delegadas no disponibles:', errDeleg);
       }
+      try {
+        const [{ montarFirmasDelegadasFichas }, datosDelegFichas] = await Promise.all([
+          import('../assets/js/ui/fichas/firmas-delegadas-fichas-panel.js'),
+          import('../assets/js/data/delegaciones_fichas.js')
+        ]);
+        if (datosDelegFichas.puedeOtorgar()) {
+          panelDelegadasFichas = montarFirmasDelegadasFichas(document.getElementById('panelFirmasDelegadasFichas'), {
+            datosEquipo: datos, datosDelegaciones: datosDelegFichas, nombreSesion: s.profile.nombre || '',
+            alCambiar: avisarFirmasEquipo
+          });
+        }
+      } catch (errDelegF) {
+        console.warn('[fichas] firmas delegadas en Fichas no disponibles:', errDelegF);
+      }
       // Se consulta al ABRIRLO: no se leen firmas que nadie pidió ver (si ya se abrió, ahora).
       if (caja.open && panelDelegadas) panelDelegadas.refrescar();
+      if (caja.open && panelDelegadasFichas) panelDelegadasFichas.refrescar();
     } catch (err) {
       console.warn('[fichas] firmas del equipo no disponibles:', err);
     }
