@@ -4,8 +4,8 @@
 
 | Señal | Valor (al **2026-09-30**) |
 |---|---|
-| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: `§119` (`87dfd84`, en vivo); la cadena desde `§87`, en `00` Capa 1. |
-| **Build** | 🟢 **2095 pass / 0 fail / 2 skip** + `lint:html` limpio + **188 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-09-30 (local; CI y Deploy en VERDE = `main` `87dfd84`, L-65) |
+| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: `§119.9` (`2bee3cb`, espejo en Órdenes); la cadena desde `§87`, en `00` Capa 1. |
+| **Build** | 🟢 **2095 pass / 0 fail / 2 skip** + `lint:html` limpio + **191 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-09-30 (local; CI y Deploy en VERDE = `main` `2bee3cb`, L-65; 1 prueba de velocidad inestable → `11`) |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` · `main` == `origin/main` (SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (filter-repo purgó confidenciales) → otra copia debe re-clonar. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices: archivo = servidor** (`firestore:indexes`, 2026-09-30, L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |
