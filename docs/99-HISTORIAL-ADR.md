@@ -5018,12 +5018,12 @@ Tocados: `CLAUDE.md` (§0), `docs/00-INDICE.md`, `20`, `30`, `32`, `49` (una ref
 `brain:pull`. INTACTOS: todo el código de producto, `05`, `11`, `21`, `31`, `33`, y `99` salvo este ADR.
 
 **120.7 Doctrina.** §G.5 (hija con puntero, one-in-one-out en el arranque) · límite de guardián §G.4 (mover, no
-borrar) · regla del escritor del kernel (bump en el mismo commit + pull en cada repo) · §3.3 (medido, no supuesto).
+borrar) · regla del escritor del kernel (bump en el mismo commit + pull en cada repo) · §3.3 (medido, no supuesto) · **L-111** (lo que este cierre enseñó del worktree).
 
 **120.8 Verificado sano / hallazgos.**
 - **Hallazgo nuevo, NO arreglado aquí (KERNEL):** el gate #5 busca lecciones con `\b([LM]-\d{2})\b`; en `L-100`…
-  `L-110` no hay frontera de palabra tras dos cifras, así que esas once nunca se han validado y una ref colgante a
-  `L-111` saldría en verde. Arreglo: `\d{2,3}` en las tres regex de lecciones de `brain-check` — `\d{2,}` casaría
+  `L-110` no hay frontera de palabra tras dos cifras, así que esas once nunca se han validado y una ref de tres cifras
+  a una lección que no existe saldría en verde. Arreglo: `\d{2,3}` en las tres regex de lecciones de `brain-check` — `\d{2,}` casaría
   «M-4100», un modelo de equipo que ya aparece en una hoja técnica. Probarlo contra los dos repos antes de repartir.
   Anotado como P-01 en la tabla viva de TODO-66 (bóveda `2026-09-27-auditoria-nivel2/HALLAZGOS.md`); familia de TODO-67.
 - **Despejado:** `00a` no exige registro directo del gate #10 (solo lo exigen los nombres `NN-`) y no cabía en el
