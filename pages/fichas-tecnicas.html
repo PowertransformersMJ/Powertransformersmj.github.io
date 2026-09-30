@@ -194,8 +194,21 @@
       try {
         const { adaptadorDelegado } = await import('../assets/js/data/firmas_delegadas_fichas.js');
         let avisadoRetiro = false;
+        // Quién va en «Elaboración» por defecto (99 §120): su nombre de la lista mientras tenga el permiso.
+        let fijarElaborador = () => {};
+        try {
+          const { fijarElaboradorDeLaSesion } = await import('../assets/js/domain/fichas_elaborador_sesion.js');
+          fijarElaborador = () => fijarElaboradorDeLaSesion(usaDelegado() && typeof delegadoFichas.nombreEnLaLista === 'function'
+            ? delegadoFichas.nombreEnLaLista() : '');
+        } catch (errElab) {
+          console.warn('[fichas] elaborador de la sesión no disponible:', errElab);
+        }
         // Llegó, cambió o se retiró el permiso: se repintan las firmas y se recalcula cuál casilla es la suya.
-        const repintar = () => { avisarFirmasEquipo(); window.dispatchEvent(new CustomEvent('sgm:firma-cambiada')); };
+        const repintar = () => {
+          fijarElaborador();
+          avisarFirmasEquipo();
+          window.dispatchEvent(new CustomEvent('sgm:firma-cambiada'));
+        };
         delegadoFichas = await adaptadorDelegado({
           alCambiar(motivo) {
             repintar();

@@ -3371,10 +3371,19 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     firmasEquipoPantalla.generacion += 1;
     firmasEquipoPantalla.cargadas = false;
     if (!actual) return;
+    // Quién va por defecto en «Elaboración» sigue a la sesión y a su permiso (`99 §120`): se repinta su casilla.
+    repintarFirmante('elab');
     // Un usuario autorizado al que le retiran el permiso (`99 §119`): la ficha deja de mostrarlas ya.
     if (custodiaDisponible()) asegurarFirmasEquipoPantalla();
-    else pintarFirmasEstampadas();
+    pintarFirmasEstampadas();
   };
+  /** Vuelve a dibujar la casilla `k` de la hoja abierta (no si se está escribiendo en ella). */
+  function repintarFirmante(k) {
+    const caja = modalCuerpo && modalCuerpo.querySelector('[data-firmante="' + k + '"]');
+    const f = FIRMAS.find((x) => x.k === k);
+    if (!caja || !f || !firmanteHTML || caja.contains(document.activeElement)) return;
+    caja.outerHTML = firmanteHTML(f);
+  }
 
   /** Qué firma lleva cada casilla EN PANTALLA: la propia y, para el custodio, las del equipo. */
   function planPantalla(P) {
