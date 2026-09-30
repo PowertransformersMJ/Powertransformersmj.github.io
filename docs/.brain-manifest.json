@@ -56,6 +56,26 @@
     "docs/cola-fichas-tecnicas.md": {
       "lines": 200,
       "chars": 22000
+    },
+    "docs/00a-INDICE-ADR-001-080.md": {
+      "lines": 120,
+      "chars": 12000
+    },
+    "docs/22-ESPACIAL-MODULOS.md": {
+      "lines": 120,
+      "chars": 12000
+    },
+    "docs/34-LECCIONES-PRUEBAS-ELECTRICAS.md": {
+      "lines": 200,
+      "chars": 20000
+    },
+    "docs/35-LECCIONES-SEGURIDAD.md": {
+      "lines": 200,
+      "chars": 20000
+    },
+    "docs/cola-fichas-tecnicas-cerrados.md": {
+      "lines": 150,
+      "chars": 15000
     }
   },
   "archiveDir": "../brain-private/sgm-transpower/research-archive",
@@ -102,5 +122,6 @@
     "maxDays": 30,
     "_que": "Auditoria Nivel-2 del cerebro (skill auditoria-cerebro): correrla cuando el linter lo pida (gate #14). 'last' y 'coveredHeaderCount' se actualizan SOLO al cerrar una auditoria con su tabla de hallazgos escrita. OJO: con coveredHeaderCount en 0 el disparador por VOLUMEN de ADRs (maxAdrGap) quedaba muerto — gap se calculaba como 0 siempre; llevaba apagado desde el dia 1. 'tableFile' es el input de la Sonda 0 de la proxima auditoria: sin el no puede diffear, que es lo que paso en 2026-08-21, la primera con tabla real."
   },
-  "_capsNuevos109": "2026-09-27 (auditoria Nivel-2, 99 §109, hallazgos S6 C-09 / S7 C-12): 32, 33, 11 y la cola de Fichas crecian sin tope (32 ya pesaba como 30). Topes con ~10 % de aire para que el aviso pre-shard avise antes de bloquear."
+  "_capsNuevos109": "2026-09-27 (auditoria Nivel-2, 99 §109, hallazgos S6 C-09 / S7 C-12): 32, 33, 11 y la cola de Fichas crecian sin tope (32 ya pesaba como 30). Topes con ~10 % de aire para que el aviso pre-shard avise antes de bloquear.",
+  "_capsNuevos120": "2026-09-30 (99 §120): 00, 20, 30, 32 y la cola de Fichas llegaron a su tope. Shard por rango (00a, tramo §1-§80: sin filas nuevas, solo crece si un numero de linea gana una cifra), por modulo (22) y por tema (34, 35), y los CF cerrados de la cola a su archivo. Topes con ~30-40 % de aire en las hijas que crecen; los de las madres NO se tocaron."
 }
