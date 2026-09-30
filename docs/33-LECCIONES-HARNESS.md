@@ -41,3 +41,12 @@ conducirlo por CDP desde Node 24 (trae `WebSocket` y `fetch`, sin librerías): `
 `Runtime.evaluate('document.title')` hasta la señal que pone el flujo (`LISTO`) → `Page.captureScreenshot` a escala 2 →
 recortar a la ventana con PIL (fuera quedan firmas y datos del fondo). El guion vive en el scratchpad de la sesión
 (`cdp-cap.mjs`); se rehace en 40 líneas. [HONOR]
+
+### L-111 · Desde un worktree, `../brain-private` no existe: el pull falla y `brain:check` sale SANO sin comparar
+**Disparador**: tocar el kernel o la bóveda desde una sesión en `.claude/worktrees/<nombre>/`. · **Cicatriz** (`99 §120`):
+`npm run brain:pull` apunta a `../brain-private/kernel/pull.mjs`, que desde ahí no existe; y `brain:check` dijo «kernel
+íntegro (canónico no clonado)» y «archiveDir no existe — gate omitido»: verde **sin** comparar el kernel con el canónico ni
+revisar la bóveda. · **Receta**: `node ~/Desktop/GitHub-MJ/brain-private/kernel/pull.mjs` con la raíz del worktree como
+carpeta actual (el pull escribe en la carpeta desde donde se corre); comprobar a mano con `cmp scripts/X.mjs <canónico>/X.mjs`; y para
+repartir al otro repo, un árbol temporal `git worktree add --detach <tmp> origin/main` — allí tampoco corren sus candados
+de nombres, así que solo se sube el kernel. [HONOR]
