@@ -4934,3 +4934,7 @@ una regla que pasa con 1 casilla y se cae con 5 · tomar un error de red por «s
 - **Pendiente mío:** el mismo retiro sin nombre y el registro con `limit(50)` siguen en el panel de ÓRDENES (`§117`).
 - **Pendiente suyo:** «Copiar mi firma propia»; dar el permiso en Fichas a Carlos y Jorge (declara la autorización de
   cada titular, incluidos Jorge Miranda y Erick Vergara); que recarguen; la 1.ª descarga, que reviso en «Últimos usos».
+- **Hecho el 2026-09-30, a su pedido («usa la extensión de Chrome para que tú mismo hagas lo faltante»)**, en su sesión:
+  «Copiar mi firma propia» (el directorio queda con las cinco); permiso en Fichas a Carlos y Jorge con las cinco y en
+  Órdenes (`§117`) con las tres, autorización «verbal al Ing. Miguel Jimenez» (la suya, «del custodio»). Verificado al
+  recargar, contra el servidor. Queda: que recarguen y sus primeros usos.
