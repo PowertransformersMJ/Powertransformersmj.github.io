@@ -8,7 +8,8 @@ import { readFileSync } from 'node:fs';
 import { test, before, after, describe } from 'node:test';
 import { initializeTestEnvironment, assertFails, assertSucceeds } from '@firebase/rules-unit-testing';
 import {
-  doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, writeBatch, serverTimestamp, collection, query, where, limit, Bytes
+  doc, setDoc, getDoc, getDocs, deleteDoc, updateDoc, writeBatch, serverTimestamp, collection, query, where, orderBy, limit, startAfter,
+  documentId, Bytes
 } from 'firebase/firestore';
 
 const PROJECT_ID = 'demo-sgm-rules';
@@ -36,6 +37,7 @@ before(async () => {
     await u('fd_inactivo', 'tecnico', false, 'Inactivo FD');
     await u('fd_baja', 'tecnico', true, 'Se Da De Baja');
     await u('fd_degradado', 'admin', true, 'Custodio Que Baja');
+    await u('fd_sin_nombre', 'tecnico', true, 'Queda Sin Nombre');
     await setDoc(doc(d, 'admins/fd_arranque'), { email: 'x@x.co' });
     const firma = { imagen: Bytes.fromUint8Array(new Uint8Array([137, 80, 78, 71])), huella: 'e'.repeat(64), autorizacion: HOY, registro: 'r', en: new Date() };
     for (const p of ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA']) {
@@ -230,6 +232,22 @@ describe('emisiones del delegado (ordenes_emisiones con emisor y delegación)', 
     await assertSucceeds(setDoc(doc(db('fd_admin'), 'ordenes_emisiones/fd_a1'), adm));
     await assertFails(setDoc(doc(db('fd_admin'), 'ordenes_emisiones/' + fol('a2')), { ...adm, emisor: 'fd_admin', emisorNombre: 'Custodio FD', delegacion: lote(1) }));
   });
+  // Espejo de §119 en Órdenes: «Últimos usos» recorre el registro de 50 en 50 (antes, un solo limit(50) sin orden).
+  test('el custodio recorre SU registro de permisos de 50 en 50 (por id); otro admin, un delegado o una página de 51 no', async () => {
+    const q1 = await assertSucceeds(getDocs(query(collection(db('fd_admin'), 'firmas_delegados_registro'),
+      where('custodio', '==', 'fd_admin'), orderBy(documentId()), limit(50))));
+    await assertSucceeds(getDocs(query(collection(db('fd_admin'), 'firmas_delegados_registro'),
+      where('custodio', '==', 'fd_admin'), orderBy(documentId()), startAfter(q1.docs[0]), limit(50))));
+    await assertFails(getDocs(query(collection(db('fd_admin2'), 'firmas_delegados_registro'),
+      where('custodio', '==', 'fd_admin'), orderBy(documentId()), limit(50))));
+    await assertFails(getDocs(query(collection(db('fd_carlos'), 'firmas_delegados_registro'),
+      where('custodio', '==', 'fd_admin'), orderBy(documentId()), limit(50))));
+    await assertFails(getDocs(query(collection(db('fd_admin'), 'firmas_delegados_registro'),
+      where('custodio', '==', 'fd_admin'), orderBy(documentId()), limit(51))));
+  });
+  test('el custodio ve los últimos usos de cada delegado (por emisor, los más nuevos primero)', async () => {
+    await assertSucceeds(getDocs(query(collection(db('fd_admin'), 'ordenes_emisiones'), where('emisor', '==', 'fd_carlos'), orderBy('en', 'desc'), limit(20))));
+  });
 });
 
 describe('vigencia: retirar, dar de baja o degradar corta en la siguiente petición', () => {
@@ -251,6 +269,14 @@ describe('vigencia: retirar, dar de baja o degradar corta en la siguiente petici
     await assertFails(setDoc(doc(db('fd_baja'), 'ordenes_emisiones/' + fol('b1')), emision({ emisor: 'fd_baja', emisorNombre: 'Se Da De Baja', delegacion: lote(70) })));
     await assertFails(updateDoc(doc(db('fd_admin'), 'firmas_delegados_registro/fd_baja_' + lote(70)), { tipo: 'cambio' }));
     await assertFails(deleteDoc(doc(db('fd_admin'), 'firmas_delegados_registro/fd_baja_' + lote(70))));
+  });
+  // Espejo de §119 en Órdenes: el panel ofrece «Retirar permiso» a un usuario ACTIVO sin nombre en su perfil.
+  test('retirar el permiso de un delegado cuyo perfil quedó sin nombre (el retiro no depende del nombre)', async () => {
+    await assertSucceeds(otorgar('fd_admin', 'fd_sin_nombre', deleg({ delegadoNombre: 'Queda Sin Nombre', personaPropia: 'JORGE_RHENALS', lote: lote(75) })));
+    await testEnv.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), 'usuarios/fd_sin_nombre'), { nombre: '' }));
+    await assertFails(retirar('fd_admin', 'fd_sin_nombre', lote(75), { conRegistro: false }));
+    await assertSucceeds(retirar('fd_admin', 'fd_sin_nombre', lote(75)));
+    await assertFails(getDoc(doc(db('fd_sin_nombre'), 'firmas_equipo/fd_admin/personas/MIGUEL_JIMENEZ')));
   });
   test('el delegado desactivado ya no lee', async () => {
     await assertSucceeds(otorgar('fd_admin', 'fd_otro', deleg({ delegadoNombre: 'Otro Tecnico', personaPropia: 'JORGE_RHENALS', lote: lote(80) })));
