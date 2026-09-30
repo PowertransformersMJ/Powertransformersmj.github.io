@@ -97,11 +97,11 @@
 | §83 | ADR-083 — **Borrador local de la ficha** con dueño y caducidad (no pisa ni cruza equipos) | 3362 |
 | §84 | ADR-084 — **La carga tardía ya no borra el listado**; el pie del papel dice su fuente real | 3468 |
 | §85 | ADR-085 — **El alcance lo escribe la redacción dictada** por el Ingeniero | 3514 |
-| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos, 6 reincidentes; kernel v1.11.0 sin IDs ajenos | 3574 |
-| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real al papel, `[PENDIENTE]` (nunca «0»); CF-32 refutado | 3632 |
+| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos; kernel sin IDs ajenos | 3574 |
+| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real, `[PENDIENTE]` nunca «0» | 3632 |
 | §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes) | 3713 |
 | §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero, ficha y Excel (CF-25) | 3743 |
-| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones de mantenimiento | 3797 |
+| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones | 3797 |
 | §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3832 |
 | §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3855 |
 | §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3887 |
@@ -130,6 +130,7 @@
 | §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4717 |
 | §117 | ADR-117 — **Órdenes E/S**: firmas delegadas | 4768 |
 | §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4828 |
+| §119 | ADR-119 — **Fichas**: firmas delegadas (Carlos, Jorge) | 4871 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -156,8 +157,8 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🧪 `30` (L-20/L-21) + `99 §3` + Skill `claude-api` |
-| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§118` + **L-103** |
-| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117` (+ `§71`, `§99`) |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` + `20` fila Fichas + `99 §82-§119` + **L-103** |
+| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119` (+ `§71`, `§99`) |
 | El "por qué" de una decisión / detalle de un § | Capa 1 → `99-HISTORIAL-ADR.md` |
 
 > **Doctrinas** → always-on en `CLAUDE.md §3` (3.1 performance · 3.2 aditivo/API estable · 3.3 verifica · 3.4 IAP · 3.5 observers).

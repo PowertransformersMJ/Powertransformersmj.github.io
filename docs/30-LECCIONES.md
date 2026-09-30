@@ -236,3 +236,9 @@ el defecto solo existe en la COSTURA entre los dos caminos.
 por campos o se fusiona con una función pura que declare quién manda sobre cada campo (y que la procedencia
 quede guardada, no deducida). Y eso se prueba donde vive el defecto: una prueba del dominio no lo ve; hace
 falta una de integración que ejecute el trigger de verdad (emulador de Functions, `npm run test:trigger`).
+
+### L-110 · Una regla de Firestore se prueba a CARGA MÁXIMA: tope de 1000 expresiones por petición
+`99 §119`: el folio del delegado pasaba con 1-4 casillas y el emulador lo negó con 5 («maximum of 1000
+expressions»). **Regla**: probar con el máximo real y medir el margen (variante con casillas de más). Abarata:
+una función sobre `e`; `x.size()==N` en vez de listas de claves; una regex en vez de una lista de parejas.
+**Gate**: `tests-rules/firmas_delegados_fichas.rules.test.js` (5 casillas) + [HONOR].

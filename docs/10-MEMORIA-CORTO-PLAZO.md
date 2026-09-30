@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-09-28) — FICHAS TÉCNICAS, por partes (orden del Ingeniero)
+## 🎯 Foco (al 2026-09-30) — FICHAS TÉCNICAS, por partes (orden del Ingeniero)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos**: **TODO-67** 🔴 · **TODO-64** 🔴 · **TODO-60** 🔴 ·
 > **TODO-55** 🔴 · **TODO-35/58** 🔴 · **TODO-66** · **TODO-65** · **TODO-62/63** · 47 · 54 · 56 · 57 · 61 · y los fríos de `11`.
@@ -14,11 +14,11 @@
 > **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
 > **(D)** Tres decisiones de ADR-063: tope en `/alertas_reconocidas`, `defer` en Chart.js, barras de
 > progreso. **(E)** Proteger `main` en la configuración de GitHub. **(F)** Las tres de **TODO-42**.
-> **(G)** **Los 9 fixtures con datos REALES del TX 450108 siguen en el repo PÚBLICO** (`TODO-36`, señalado hace 33 días): anonimizarlos conservando la forma del dato, o purgarlos del historial como el 2026-07-21.
+> **(G)** **Los 9 fixtures con datos REALES del TX 450108 siguen en el repo PÚBLICO** (`TODO-36`): anonimizarlos conservando la forma del dato, o purgarlos del historial como el 2026-07-21.
 > **(H)** Decir qué se hace con los **3 equipos que su hoja de cargabilidad no trae**: `T1-M/M-CAZ`
 > (Casa de Zinc), `T2-M/M-BEC` (Becerril) y `T2-M/M-SML` (San Martín de Loba) — sin medida 2025.
-> **(I) Suyo**: Órdenes (`§117.8`): «Copiar mi firma propia» y el permiso a Carlos y Jorge; 1.ª orden de ellos · Diagrama
-> Operativo (`§118`): permiso ya dado (09-29); falta su 1.er adjunto · abrir en su Excel el `PRUEBA_…xlsx` de `§115` · la primera
+> **(I) Suyo**: «Copiar mi firma propia» (sirve a Órdenes y Fichas) · permiso a Carlos y Jorge en Órdenes (`§117`) y en Fichas
+> (`§119`; luego recargan) y sus 1.os usos · 1.er Diagrama Operativo de ellos (`§118`) · abrir en su Excel el `PRUEBA_…xlsx` de `§115` · la primera
 > descarga real con folio (`§108.5`) · «[object Object]» en refrigeración del PI (`§103.8`) · borrar las 5 copias viejas de
 > firmas en Storage (`§100.8`) · la firma de Erick en un escaneo mayor (`§98.10`) · el primer Diagrama Operativo real (`§112.8`) · firma de Juan Cardona (`§114.8`).
 

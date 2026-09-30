@@ -4867,3 +4867,70 @@ técnico sin permiso solo lee.
 - **Aceptado:** un técnico autorizado podría subir bytes que no coinciden con la huella (`leerImagen` los rechaza y el
   registro queda).
 - **Pendiente suyo:** marcar la casilla a Carlos y a Jorge. Si tienen la página abierta, deben recargarla.
+
+## 119. ADR-119 — Fichas: Carlos Martelo y Jorge Rhenals exportan el Excel PE.02081 con las firmas del equipo que autorice el Ingeniero (permiso por usuario, folio) ⟦OPUS-5.5⟧ (2026-09-30)
+
+> *«necesito que en el módulo de fichas técnicas Jorge y Carlos puedan exportar el archivo excel con todas las firmas.
+> yo lo autorizo»*. Espejo de `§117` (Órdenes). Vista previa y «procede». Reglas e índice desplegados ANTES (servidor
+> 54 → 55, L-66); código publicado `87dfd84`.
+
+**119.1 Causa raíz.**
+- El Excel con las cinco firmas (`§99`/`§108`) solo lo emitía el custodio: el directorio `firmas_equipo/{custodio}` lo
+  leía su sesión (y un delegado de Órdenes, solo 3 personas) y `fichas_emisiones` solo aceptaba administradores.
+- Los perfiles de Carlos y Jorge no se llaman como en la lista (`§117.1`): en Fichas su casilla no era «la de la sesión».
+
+**119.2 Solución.**
+- **`firmas_delegados_fichas/{uid}`** + `…_registro` (colecciones PROPIAS; Órdenes no se toca): `personas` ⊆ las cinco,
+  `autorizaciones` por titular, `personaPropia` ∈ {CARLOS_MARTELO, JORGE_RHENALS}, `alcance` 'fichas', `lote`; cada
+  cambio en un lote con su registro (id fijo, solo se agrega).
+- **Directorio:** `delegadoFichasLee` deja LEER solo lo delegado, del directorio de SU custodio (admin activo).
+- **`fichas_emisiones`, rama del delegado** (`emisionFichasDelegadaOk`): `emisor`, `delegacion` = lote vigente, 1–5
+  casillas distintas y del formato; del directorio solo personas delegadas, en una casilla que les toca según FIRMANTES
+  (`firmanteCabe`, regex espejo de `personasPorCasilla`, con prueba que las compara) y con la huella HOY en el
+  directorio; la propia, con su clave o vacía. Cabe en el tope de 1000 expresiones con margen de 2 casillas (L-110).
+- **Índice** `fichas_emisiones (emisor ASC, en DESC)` para «Últimos usos».
+- **Página:** `fichas-tecnicas.html` da al delegado el MISMO contrato `cfg.firmasEquipo` (`data/firmas_delegadas_fichas.js`
+  → `adaptadorDelegado`): el camino de `panel.js` no cambia y el custodio manda. Su casilla se reconoce por su CLAVE
+  (`nombreEnLaLista`): con «Mi firma» va la suya; sin ella, la del directorio si se la autorizaron (semántica `§117`).
+  El lote se relee en cada folio; un permiso que no se pudo leer se reintenta (L-109); si se retira con la página
+  abierta, la ficha deja de mostrarlas y se le avisa una vez.
+- **Panel del custodio** (`ui/fichas/firmas-delegadas-fichas-panel.js` + `data/delegaciones_fichas.js`): qué firmas hay
+  HOY en el directorio (la suya = la copia de la sección de Órdenes, una para los dos), permisos por usuario con las
+  cinco y sus autorizaciones, «Últimos Excel emitidos» (registro recorrido completo, de 50 en 50).
+
+**119.3 No-regresión.** Mismo adaptador y misma rama admin para el custodio: en vivo, su ficha sigue con su firma en
+Elaboración y cuatro del equipo. Órdenes intacto y aislado (prueba: un permiso no abre el otro); sus textos de la copia
+ahora dicen que sirve a los dos.
+
+**119.4 Verificación.**
+- Reglas: 22 nuevas, 188/188. Unitarias: 11 nuevas, 2095 pass. CI y Deploy verdes; 8 archivos servidos = `main`.
+- Banco de Carlos con el módulo REAL y Firestore simulado (firmas SINTÉTICAS; perfil que no coincide con la lista):
+  cinco firmas en pantalla y en el Excel renderizado, folio y registro; permiso parcial; sin permiso; retirado y
+  cambiado a media sesión; registro caído; red caída al leer firmas y al leer el permiso; con y sin «Mi firma»; su
+  casilla no autorizada; Jorge exportando una ficha de Carlos; vista previa. Banco del panel junto a directorio y Órdenes.
+- Revisión adversarial (3 lentes + verificador por hallazgo; bóveda `2026-09-30-revision-firmas-delegadas-fichas`):
+  9 hallazgos, 5 reales (bajos tras verificar), corregidos: casilla por su clave · permiso con error de red ≠ sin
+  permiso · retirar a un usuario sin nombre · «Últimos usos» paginado · textos de la copia en Órdenes.
+- En vivo, solo lectura: el panel reconoce a Carlos y Jorge «Sin permiso en Fichas», directorio 4/5 (falta su copia),
+  «Todavía ninguno», consola limpia; su ficha como antes.
+
+**119.5 Anti-patterns evitados.** Ampliar la delegación de Órdenes (mezclar alcances) · nombres o uids en el repo ·
+una regla que pasa con 1 casilla y se cae con 5 · tomar un error de red por «sin permiso».
+
+**119.6 Archivos.**
+- Nuevos: `domain/fichas_firmas_delegadas.js`, `data/firmas_delegadas_fichas.js`, `data/delegaciones_fichas.js`,
+  `ui/fichas/firmas-delegadas-fichas-panel.js`, `tests-rules/firmas_delegados_fichas.rules.test.js`,
+  `tests/fichas_firmas_delegadas.test.js`.
+- Tocados: `firestore.rules`, `firestore.indexes.json`, `pages/fichas-tecnicas.html`, `ui/fichas/panel.js` (repintado
+  y nota), `ui/fichas/firmas-equipo.js` y `firmas-delegadas-panel.js` (textos), `fichas-tecnicas.css`.
+
+**119.7 Doctrina.** Reglas antes que código · L-66 · L-102 · L-109 · L-110.
+
+**119.8 Verificado sano / aceptado / pendiente.**
+- **Refutado (no re-auditar):** su copia del directorio en su propia casilla sin «Mi firma» es el diseño (`§117`) ·
+  una persona añadida con la página abierta sale tras recargar (lo que se ve es lo que sale) · la carrera de
+  milisegundos custodio/delegado al retirar es inofensiva · releer el directorio tras dar un permiso es solo una lectura de más.
+- **Aceptado:** lo de `§117.8` (quien lee una firma puede copiarla; el registro cubre lo emitido).
+- **Pendiente mío:** el mismo retiro sin nombre y el registro con `limit(50)` siguen en el panel de ÓRDENES (`§117`).
+- **Pendiente suyo:** «Copiar mi firma propia»; dar el permiso en Fichas a Carlos y Jorge (declara la autorización de
+  cada titular, incluidos Jorge Miranda y Erick Vergara); que recarguen; la 1.ª descarga, que reviso en «Últimos usos».
