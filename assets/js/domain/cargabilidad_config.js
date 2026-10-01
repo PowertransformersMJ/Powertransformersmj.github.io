@@ -39,6 +39,7 @@ export const UMBRALES_SEVERIDAD = Object.freeze({
 });
 
 // ── Ventanas de tendencia (modal · drill-down) ────────────────
+// ⚠️ SIN USO desde `99 §124` (la ventana ya no dibuja la curva de ejemplo / usa las calificaciones oficiales). Se conserva SOLO para que una copia vieja de `modal-detalle.js` en la caché del navegador no falle al importarla (L-102); se retira en la próxima publicación de Cargabilidad.
 export const VENTANAS_TREND = Object.freeze(['24h', '7d', '30d']);
 
 // Perfil sintético horario (24h) usado por trend.js cuando no hay
@@ -73,6 +74,7 @@ export function codigoDevanado(nombre) {
 }
 
 // ── Mapeo diagnóstico DGA / Edad / Furanos / etc. (1..5) ──────
+// ⚠️ SIN USO desde `99 §124` (la ventana ya no dibuja la curva de ejemplo / usa las calificaciones oficiales). Se conserva SOLO para que una copia vieja de `modal-detalle.js` en la caché del navegador no falle al importarla (L-102); se retira en la próxima publicación de Cargabilidad. Su vocabulario («Buena/Aceptable/Media/Alta/Crítica») NO es el oficial del MO.00418: no reusar.
 // Coherente con MO.00418 §A9.7 — escala 1 mejor · 5 crítico.
 export const DIAG_MAP = Object.freeze({
   1: Object.freeze(['Buena',     'ok']),

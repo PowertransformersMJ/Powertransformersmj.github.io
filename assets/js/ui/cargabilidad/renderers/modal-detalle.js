@@ -1,44 +1,23 @@
 // ══════════════════════════════════════════════════════════════
 // Renderer · Modal de detalle (drill-down)
-// Reúne: gauge SVG por devanado · trend SVG con perfil ILUSTRATIVO (no
-// medido) · diagnóstico de 5 calificaciones (las filas del parque no las
-// traen: «—») · workflow de REFERENCIA (4 pasos, no estado real) · ficha
-// técnica. Lo que la ventana afirma sale de `domain/cargabilidad_detalle.js`.
+// Reúne: medidores por devanado · enlace a las curvas horarias MEDIDAS por el
+// SCADA (página «Cargabilidad SCADA», `99 §122`; reemplazó la curva de ejemplo,
+// `99 §124`) · diagnóstico con las 7 calificaciones de Salud de Activos
+// (`domain/cargabilidad_diagnostico.js`) · workflow de REFERENCIA (4 pasos, no
+// estado real) · ficha técnica. Lo que la ventana afirma sale de
+// `domain/cargabilidad_detalle.js`: lo que falta es «—», nunca un valor.
 // ══════════════════════════════════════════════════════════════
 
 import { $, fmt, cap } from './_helpers.js';
 import { sev } from '../../../domain/cargabilidad_severidad.js';
-import {
-  SEVCOL, SEVLBL, DIAG_MAP, PROFILE_24H, DIAG_LABEL, DEV_LABEL,
-} from '../../../domain/cargabilidad_config.js';
+import { SEVCOL, SEVLBL, DEV_LABEL } from '../../../domain/cargabilidad_config.js';
 // Lo que la ventana afirma de un equipo: lo que falta sale «—», nunca un valor.
 import {
-  SIN_DATO, textoODash, diagnosticoDe, condicionDe, fraseCarga, picoPrimario, tensionTexto,
+  SIN_DATO, textoODash, condicionDe, fraseCarga, tensionTexto,
   estadoDevanado, devanadoReferencia, lecturaSobrecarga,
 } from '../../../domain/cargabilidad_detalle.js';
+import { calificacionesDe } from '../../../domain/cargabilidad_diagnostico.js';
 import { store } from '../state.js';
-
-// ── Generación de series sintéticas (24h / 7d / 30d) ─────────
-// Perfil ILUSTRATIVO, no medido: la forma es inventada y solo la escala sale
-// de la medida registrada. Por eso ningún punto puede pasar de esa medida (el
-// tope era 1,02 y en 7 d/30 d dibujaba una sobrecarga que nadie midió): la
-// serie se normaliza para que su máximo sea EXACTAMENTE la medida.
-function makeSeries(peak, win) {
-  if (win === '24h') return PROFILE_24H.map((p, i) => ({
-    x: i, y: peak * p, lbl: String(i).padStart(2, '0') + 'h',
-  }));
-  const days = win === '7d' ? 7 : 30;
-  const fs = [];
-  for (let i = 0; i < days; i++) {
-    const f = 0.82 + 0.18 * Math.sin(i * 1.1) + ((i * 97 % 13) / 13 - 0.5) * 0.12;
-    fs.push(Math.max(0.5, f));
-  }
-  const fmax = Math.max(...fs);
-  return fs.map((f, i) => ({
-    x: i, y: peak * f / fmax,
-    lbl: win === '7d' ? 'D' + (i + 1) : String(i + 1),
-  }));
-}
 
 // ── Gauge semicircular SVG ───────────────────────────────────
 function gauge(label, pct, sub) {
@@ -64,78 +43,18 @@ function gauge(label, pct, sub) {
   </div>`;
 }
 
-// ── Trend chart SVG ─────────────────────────────────────────
-function trendSVG(d, win) {
-  const o = d.P;
-  // Sin corriente medida en el primario no se dibuja nada: `car || 0` pintaba
-  // una curva en «0,0 A» que nadie midió.
-  const peak = picoPrimario(d);
-  if (peak == null) {
-    return `<div class="muted" style="padding:28px 0;text-align:center">${SIN_DATO} Sin corriente medida en el primario: no hay curva que dibujar.</div>`;
-  }
-  const ser = makeSeries(peak, win);
-  const W = 720, H = 290;
-  const ymax = Math.max(210, (o.l2 || 0) * 1.08, peak * 1.15);
-  const X = (i) => i / (ser.length - 1) * W;
-  const Y = (v) => H - v / ymax * H;
-  const pts = ser.map((s, i) => [X(i), Y(s.y)]);
-  const line = 'M' + pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' L');
-  const area = `M0,${H} L` + pts.map(p => p.map(n => n.toFixed(1)).join(',')).join(' L') + ` L${W},${H} Z`;
-  const lvls = [0, 50, 100, 150, 200].filter(v => v <= ymax);
-  const ylab = lvls.map(v =>
-    `<text x="-10" y="${(Y(v) + 4).toFixed(0)}" fill="#6E9A9C" font-size="11" text-anchor="end">${v}</text>
-     <line x1="0" y1="${Y(v).toFixed(0)}" x2="${W}" y2="${Y(v).toFixed(0)}" stroke="rgba(255,255,255,.05)"/>`
-  ).join('');
-  const step = Math.ceil(ser.length / 8);
-  const xlab = ser.map((s, i) =>
-    i % step === 0
-      ? `<text x="${X(i).toFixed(0)}" y="${H + 22}" fill="#6E9A9C" font-size="10.5" text-anchor="middle">${s.lbl}</text>`
-      : ''
-  ).join('');
-  const limLine = (v, c) => v
-    ? `<line x1="0" y1="${Y(v).toFixed(0)}" x2="${W}" y2="${Y(v).toFixed(0)}" stroke="${c}" stroke-width="2" stroke-dasharray="7 5"/>`
-    : '';
-  // Los puntos son del perfil ilustrativo: ninguno se pinta en rojo, porque
-  // no son medidas. Solo la etiqueta del máximo —que ES la medida registrada—
-  // se pinta en rojo si esa medida pasa la ampacidad.
-  const dots = pts.map((p) =>
-    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="var(--aqua)"/>`
-  ).join('');
-  const pi = ser.reduce((mi, s, i, a) => s.y > a[mi].y ? i : mi, 0);
-  return `<svg viewBox="-44 -10 ${W + 70} ${H + 46}" style="width:100%">
-    ${ylab}${xlab}
-    <defs>
-      <linearGradient id="ar" x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0" stop-color="#5EEAD4" stop-opacity=".4"/>
-        <stop offset="1" stop-color="#5EEAD4" stop-opacity="0"/>
-      </linearGradient>
-    </defs>
-    <path d="${area}" fill="url(#ar)"/>
-    ${limLine(o.amp, 'var(--avi)')}${limLine(o.l1, 'var(--ale)')}${limLine(o.l2, 'var(--cri)')}
-    <path d="${line}" fill="none" stroke="var(--aqua)" stroke-width="3" style="filter:drop-shadow(0 0 6px var(--aqua))"/>
-    ${dots}
-    <g>
-      <rect x="${(X(pi) - 30).toFixed(0)}" y="${(Y(ser[pi].y) - 38).toFixed(0)}" width="78" height="28" rx="7"
-            fill="${ser[pi].y > (o.amp || 1e9) ? 'var(--cri)' : 'var(--aqua2)'}"/>
-      <text x="${(X(pi) + 9).toFixed(0)}" y="${(Y(ser[pi].y) - 19).toFixed(0)}" text-anchor="middle" fill="#fff"
-            font-family="Sora" font-weight="800" font-size="13">${fmt(ser[pi].y, 1)} A</text>
-    </g>
-  </svg>`;
-}
+// ── Punto de color de la escala oficial ─────────────────────
+// El texto va claro (contraste sobre el fondo oscuro) y el color oficial
+// (MO.00418, `schema.js`) en el punto.
+const punto = (color) => `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${color};margin-right:6px;vertical-align:middle"></span>`;
 
-// ── Diagnóstico (filas DGA / Edad / etc.) ────────────────────
-function diagRow(k, score) {
-  if (score == null) {
-    return `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
-      <span class="muted" style="font-size:13px">${k}</span>
-      <span style="font-weight:700;color:var(--ink3)">${SIN_DATO}</span>
-    </div>`;
-  }
-  const m = DIAG_MAP[Math.round(score)] || ['—', 'ink3'];
-  const col = m[1] === 'ink3' ? 'var(--ink3)' : `var(--${m[1]})`;
-  return `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
-    <span class="muted" style="font-size:13px">${k}</span>
-    <span style="font-weight:700;color:${col}">${m[0]}</span>
+// ── Una calificación de Salud de Activos ────────────────────
+function filaCalificacion(c) {
+  const valor = c.valor == null ? ''
+    : ` <span class="muted" style="font-weight:400;font-size:11.5px">(${fmt(c.valor, Number.isInteger(c.valor) ? 0 : 2)})</span>`;
+  return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
+    <span class="muted" style="font-size:13px">${c.nombre}</span>
+    <span style="font-weight:700;color:${c.color ? 'var(--ink)' : 'var(--ink3)'}">${c.color ? punto(c.color) : ''}${c.texto}${valor}</span>
   </div>`;
 }
 
@@ -249,7 +168,7 @@ export function renderModal() {
   const overlay = $('#overlay');
   const body = $('#modalBody');
   if (!overlay || !body) return;
-  const { detailIndex, detailWin, rows } = store.state;
+  const { detailIndex, rows } = store.state;
 
   if (detailIndex == null || !rows[detailIndex]) {
     overlay.classList.remove('show');
@@ -271,9 +190,9 @@ export function renderModal() {
   const margin = (oRef.amp && oRef.car != null) ? (oRef.amp - oRef.car) : null;
   const marginPct = (oRef.amp && oRef.car != null) ? ((oRef.amp - oRef.car) / oRef.amp * 100) : null;
   const condCri = (d.cond || '').toUpperCase().includes('OBSOLET');
-  // Las filas del parque NO traen `diag` (tampoco el baseline): leer `d.diag.carg`
-  // reventaba la ventana antes de mostrarse. Sin dato, cada fila sale «—».
-  const diag = diagnosticoDe(d);
+  // Diagnóstico = calificaciones de Salud de Activos (`99 §124`). Las filas del
+  // parque NO traen el `diag` del archivo retirado: leerlo reventaba la ventana.
+  const califs = calificacionesDe(d);
   const cond = condicionDe(d.cond);
 
   const steps = [
@@ -341,23 +260,12 @@ export function renderModal() {
     <div style="display:flex;gap:16px;flex-wrap:wrap">
       <div style="flex:2;min-width:520px;display:flex;flex-direction:column;gap:16px">
         <div class="glass panel">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-            <h3 style="margin:0;font-size:15px">Tendencia de corriente · Devanado Primario</h3>
-            <div style="display:flex;gap:6px" id="winToggle">
-              ${['24h', '7d', '30d'].map(w => `<button class="btn ${w === detailWin ? 'on' : ''}" data-win="${w}" style="padding:6px 12px;font-size:11.5px">${w === '24h' ? '24 h' : w === '7d' ? '7 d' : '30 d'}</button>`).join('')}
-            </div>
-          </div>
-          <div class="legend" style="margin-bottom:10px">
-            <span style="color:var(--aqua)">● Perfil ilustrativo, escalado a la corriente medida (A)</span>
-            <span style="color:var(--avi)">— Ampacidad ${fmt(o.amp, 1)} A</span>
-            <span style="color:var(--ale)">— 1er Límite ${fmt(o.l1, 1)} A</span>
-            <span style="color:var(--cri)">— 2º Límite ${fmt(o.l2, 1)} A</span>
-          </div>
-          <div id="trend">${trendSVG(d, detailWin)}</div>
-          <div class="muted" style="margin-top:6px">
-            ${fraseCarga(d)}
-            <i style="color:var(--ink3)">La forma de la curva NO es medida: solo su máximo es la corriente registrada. Pendiente conexión SCADA histórica.</i>
-          </div>
+          <h3 style="margin:0 0 10px;font-size:15px">Curvas horarias · medidas del SCADA</h3>
+          <div style="font-size:13px;margin-bottom:10px">${fraseCarga(d)}</div>
+          <div class="muted" style="font-size:12px;margin-bottom:14px">La carga hora por hora de este transformador —medida por el SCADA— se ve en «Cargabilidad SCADA» cuando están cargados la homologación y el mes.</div>
+          ${d.id
+            ? `<a class="btn" href="cargabilidad-scada.html#mat=${encodeURIComponent(d.id)}" target="_top" style="display:inline-block;padding:8px 14px;font-size:12.5px;color:var(--ink);text-decoration:none">Abrir sus curvas en Cargabilidad SCADA →</a>`
+            : `<span class="muted" style="font-size:12px">Sin matrícula: no se puede abrir su curva.</span>`}
         </div>
         <div class="glass panel" style="display:flex;align-items:center;justify-content:space-around;gap:10px;flex-wrap:wrap">
           <div style="max-width:160px">
@@ -371,15 +279,12 @@ export function renderModal() {
       </div>
       <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:16px">
         <div class="glass panel">
-          <h3 style="margin:0 0 10px;font-size:15px">Diagnóstico de condición</h3>
-          ${diagRow(DIAG_LABEL.carg, diag.carg)}
-          ${diagRow(DIAG_LABEL.edad, diag.edad)}
-          ${diagRow(DIAG_LABEL.dga,  diag.dga)}
-          ${diagRow(DIAG_LABEL.fur,  diag.fur)}
-          ${diagRow(DIAG_LABEL.herm, diag.herm)}
+          <h3 style="margin:0 0 4px;font-size:15px">Diagnóstico de condición</h3>
+          <div class="muted" style="font-size:11.5px;margin-bottom:6px">Calificaciones de Salud de Activos · MO.00418 (1 Muy Bueno … 5 Muy Pobre)</div>
+          ${califs.map(filaCalificacion).join('')}
           <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px">
             <span class="muted" style="font-size:13px">Condición</span>
-            <span style="font-weight:700;color:var(--ink)">${cond.color ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${cond.color};margin-right:6px;vertical-align:middle"></span>` : ''}${cond.texto}</span>
+            <span style="font-weight:700;color:var(--ink)">${cond.color ? punto(cond.color) : ''}${cond.texto}</span>
           </div>
           <div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:${margin == null ? 'rgba(255,255,255,.06)' : margin < 0 ? 'rgba(251,80,112,.12)' : 'rgba(52,211,153,.1)'};border:1px solid ${margin == null ? 'rgba(255,255,255,.12)' : margin < 0 ? 'rgba(251,80,112,.3)' : 'rgba(52,211,153,.25)'};font-size:12px;color:${margin == null ? 'var(--ink2)' : margin < 0 ? '#FFB0BF' : '#9BF3D3'}">
             Cargabilidad restante: <b>${margin == null ? '—' : fmt(margin, 1) + ' A (' + fmt(marginPct, 0) + '%)'}</b> en ${nombreRef}.${margin != null && margin < 0 ? ' Equipo operando por encima de su capacidad nominal.' : ''}
@@ -398,14 +303,6 @@ export function renderModal() {
         </div>
       </div>
     </div>`;
-
-  // Listeners del toggle de ventana 24h/7d/30d
-  body.querySelectorAll('#winToggle .btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const w = btn.dataset.win;
-      store.setDetailWin(w);
-    });
-  });
 
   const abriendo = !overlay.classList.contains('show');
   overlay.classList.add('show');

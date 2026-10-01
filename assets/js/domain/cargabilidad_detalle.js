@@ -47,6 +47,8 @@ export function textoODash(v) {
  *
  * @returns {{carg:number|null, edad:number|null, dga:number|null, fur:number|null, herm:number|null}}
  */
+// ⚠️ La ventana usa `cargabilidad_diagnostico.js` desde `99 §124` (calificaciones
+// de Salud de Activos). Esta se conserva por compat de caché (L-102) y sus pruebas.
 export function diagnosticoDe(d) {
   const g = (d && d.diag && typeof d.diag === 'object') ? d.diag : {};
   const out = {};
@@ -82,6 +84,7 @@ export function condicionDe(cond) {
  * Sin medida devuelve null —no cero—: la ventana no dibuja curva.
  * @returns {number|null}
  */
+// ⚠️ Sin uso en la ventana desde `99 §124` (no hay curva de ejemplo); compat de caché (L-102).
 export function picoPrimario(d) {
   const car = d && d.P ? d.P.car : null;
   return (typeof car === 'number' && Number.isFinite(car)) ? car : null;
