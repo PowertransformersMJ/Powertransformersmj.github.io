@@ -14,7 +14,6 @@ const _state = {
   live: false,               // simulación tiempo real activa
   lastTs: Date.now(),        // timestamp del último jitter
   detailIndex: null,         // _i del transformador en el modal (null = cerrado)
-  detailWin: '24h',          // sin uso desde 99 §124 (no hay curva de ejemplo); compat de caché (L-102)
 };
 
 const _listeners = new Set();
@@ -70,5 +69,4 @@ export const store = {
   setLastTs(ts){ _state.lastTs = ts; },        // sin notify — solo para el clock
   setDetail(i){ _state.detailIndex = i; notify(); },
   closeDetail(){ _state.detailIndex = null; notify(); },
-  setDetailWin(w){ _state.detailWin = w; notify(); },   // sin uso desde 99 §124; compat de caché (L-102)
 };

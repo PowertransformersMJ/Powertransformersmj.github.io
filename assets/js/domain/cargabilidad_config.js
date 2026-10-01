@@ -38,21 +38,6 @@ export const UMBRALES_SEVERIDAD = Object.freeze({
   // < 80 % → ok
 });
 
-// ── Ventanas de tendencia (modal · drill-down) ────────────────
-// ⚠️ SIN USO desde `99 §124` (la ventana ya no dibuja la curva de ejemplo / usa las calificaciones oficiales). Se conserva SOLO para que una copia vieja de `modal-detalle.js` en la caché del navegador no falle al importarla (L-102); se retira en la próxima publicación de Cargabilidad.
-export const VENTANAS_TREND = Object.freeze(['24h', '7d', '30d']);
-
-// ⚠️ Sin uso desde `99 §124` (la ventana enlaza las curvas MEDIDAS por el SCADA
-// en vez de dibujar este perfil); compat de caché (L-102), se retira en la
-// próxima publicación. Perfil sintético horario relativo al pico [0..1].
-// IMPORTANTE: array CONGELADO solo a nivel raíz. Para usarlo como
-// fuente en cálculos usar `[...PROFILE_24H]` o iterar directamente.
-export const PROFILE_24H = Object.freeze([
-  0.62, 0.58, 0.55, 0.53, 0.52, 0.55, 0.62, 0.71,
-  0.78, 0.82, 0.85, 0.87, 0.86, 0.84, 0.83, 0.85,
-  0.90, 0.96, 1.00, 0.99, 0.94, 0.86, 0.76, 0.68,
-]);
-
 // ── Mapeo de devanados ────────────────────────────────────────
 export const DEVANADOS = Object.freeze(['P', 'S', 'T']);
 export const DEV_LABEL = Object.freeze({
@@ -73,25 +58,3 @@ export function codigoDevanado(nombre) {
   if (lower.startsWith('ter'))  return 'T';
   return null;
 }
-
-// ── Mapeo diagnóstico DGA / Edad / Furanos / etc. (1..5) ──────
-// ⚠️ SIN USO desde `99 §124` (la ventana ya no dibuja la curva de ejemplo / usa las calificaciones oficiales). Se conserva SOLO para que una copia vieja de `modal-detalle.js` en la caché del navegador no falle al importarla (L-102); se retira en la próxima publicación de Cargabilidad. Su vocabulario («Buena/Aceptable/Media/Alta/Crítica») NO es el oficial del MO.00418: no reusar.
-// Coherente con MO.00418 §A9.7 — escala 1 mejor · 5 crítico.
-export const DIAG_MAP = Object.freeze({
-  1: Object.freeze(['Buena',     'ok']),
-  2: Object.freeze(['Aceptable', 'ok']),
-  3: Object.freeze(['Media',     'avi']),
-  4: Object.freeze(['Alta',      'ale']),
-  5: Object.freeze(['Crítica',   'cri']),
-});
-
-// ⚠️ Sin uso desde `99 §124`; compat de caché (L-102). Etiquetas del `diag` viejo.
-export const DIAG_LABEL = Object.freeze({
-  carg: 'Cargabilidad',
-  edad: 'Edad',
-  dga:  'DGA',
-  fur:  'Furanos',
-  herm: 'Hermeticidad',
-  adfq: 'ADFQ',
-  pyt:  'P&T',
-});
