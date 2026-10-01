@@ -44,7 +44,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-71** | 🟡 **Detalle de Cargabilidad PUBLICADO** (`99 §123`, `§124`). Suyo: escalón IEEE («después») · ¿avisar si CRG del Excel ≠ medida? Menores → `§123.9`. | 🟡 |
-| **TODO-69** | 🟡 **Cargabilidad SCADA CON DATOS** (`99 §125`): homologación v2 + ene–abr y jun–sep. **Suyo**: 26 pendientes y 17 correcciones (bóveda `…parametros-scada`); re-exportar septiembre (sin Oriente) y mayo. **Mío**: máx/mín por hora (banda, W-11). | 🟡 |
+| **TODO-69** | 🟡 **Cargabilidad SCADA CON DATOS** (`99 §125`, `§126` máx/mín): ene–abr, jun–sep. **Suyo**: 26 pendientes y 17 correcciones (bóveda `…parametros-scada`); re-exportar septiembre (sin Oriente) y mayo. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§120`) — tabla viva: `bóveda/2026-09-27-auditoria-nivel2/HALLAZGOS.md` (63 hallazgos, estado de los 53 anteriores). Vivo: reglas que solo viven en la memoria del harness · `NN.8` que faltan · enmiendas `§83`. | 🟡 |
