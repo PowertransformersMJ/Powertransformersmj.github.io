@@ -64,12 +64,11 @@
     refrigeracion: { tipo_refrigeracion: '', cantidad_radiadores: null },
     electrico: { tension_primaria_kv: 34.5, tension_secundaria_kv: 13.8,
       corriente_nominal_secundaria_a: 83, corriente_medida_secundaria_a: 90 },
-    salud_actual: { bucket: 'medio' }
+    salud_actual: { bucket: 'medio', eval_dga: 1.75, calif_edad: 4, calif_crg: 3, calif_her: 1 }
   };
   const parqueD = Object.assign(recompute(filaCargabilidad(docV2)), { _i: 1 });
 
   store.setRows([mockD, parqueD], 'baseline');
-  store.state.detailWin = '24h';
   const ver = (i) => { store.state.detailIndex = i; renderModal(); };
   document.querySelectorAll('[data-fila]').forEach((b) =>
     b.addEventListener('click', () => ver(Number(b.dataset.fila))));

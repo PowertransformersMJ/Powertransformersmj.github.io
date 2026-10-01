@@ -33,6 +33,7 @@ const num = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 import { DEPARTAMENTOS } from './schema.js';
+import { filaParqueDesdeTx } from './parque_salud.js';
 
 // Un grupo de datos nunca es texto: `String({})` es «[object Object]», que es lo
 // que salía en «Refrig.» de la ventana de detalle (ver `refrig` más abajo).
@@ -121,8 +122,15 @@ export function filaCargabilidad(tx) {
   }
 
   const kva = num(leer(tx, 'placa.potencia_kva', 'potencia_kva'));
+  // Calificaciones de Salud de Activos para el «Diagnóstico» de la ventana de
+  // detalle (decisión del Ingeniero, `99 §124`): el MISMO mapeo que la página de
+  // Salud de Activos (DGA y ADFQ = evaluaciones compuestas), sin recalcular nada.
+  const sp = filaParqueDesdeTx(tx) || {};
   return {
     id:     txt(leer(tx, 'identificacion.matricula', 'matricula', 'identificacion.codigo', 'codigo', 'id')),
+    // Id del documento en /transformadores: con la matrícula, el enlace a
+    // «Cargabilidad SCADA» abre ESE equipo aunque otro comparta matrícula.
+    docId:  txt(tx.id),
     serie:  txt(leer(tx, 'identificacion.numero_serie', 'placa.serial', 'serie')),
     sub:    txt(leer(tx, 'ubicacion.subestacion_nombre', 'subestacion')),
     // Si el registro no trae zona, se DEDUCE del departamento en vez de dejarla
@@ -148,6 +156,11 @@ export function filaCargabilidad(tx) {
     vt:     txt(leer(tx, 'electrico.tension_terciaria_kv', 'kv_terc')) || 'N/A',
     uucc:   txt(leer(tx, 'identificacion.uucc', 'uucc_registrada', 'uucc')),
     us:     num(leer(tx, 'criticidad.usuarios_aguas_abajo', 'servicio.usuarios_aguas_abajo', 'usuarios')),
+    salud: {
+      dga: sp.calif_dga ?? null, edad: sp.calif_edad ?? null, adfq: sp.calif_adfq ?? null,
+      fur: sp.calif_fur ?? null, crg: sp.calif_crg ?? null, pyt: sp.calif_pyt ?? null,
+      her: sp.calif_her ?? null,
+    },
     P: { amp: P.amp, car: P.car, l1: null, l2: null, pct: P.pct },
     S: { amp: S.amp, car: S.car, l1: null, l2: null, pct: S.pct },
     T: { amp: T.amp, car: T.car, l1: null, l2: null, pct: T.pct },

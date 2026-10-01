@@ -38,13 +38,11 @@ export function textoODash(v) {
 }
 
 /**
- * Calificaciones 1–5 del panel «Diagnóstico de condición».
+ * ⚠️ Sin uso en la ventana desde `99 §124`: el «Diagnóstico» muestra las
+ * calificaciones de Salud de Activos (`cargabilidad_diagnostico.js`, decisión
+ * del Ingeniero). Se conserva por compat de caché (L-102) y sus pruebas.
  *
- * Si la fila no trae `diag` —las del parque no lo traen— las cinco quedan en
- * null y la ventana muestra «—». NO se toman de `salud_actual.calif_*`: esas
- * tienen su propio vocabulario oficial y `calif_crg` tiene deuda abierta
- * (`10` TODO-64.b / TODO-56); mostrarlas aquí es una decisión aparte.
- *
+ * Lee el grupo `diag` del archivo retirado; sin él, las cinco en null.
  * @returns {{carg:number|null, edad:number|null, dga:number|null, fur:number|null, herm:number|null}}
  */
 export function diagnosticoDe(d) {
@@ -78,8 +76,8 @@ export function condicionDe(cond) {
 }
 
 /**
- * Corriente medida del primario, que es la que dibuja la curva de tendencia.
- * Sin medida devuelve null —no cero—: la ventana no dibuja curva.
+ * ⚠️ Sin uso en la ventana desde `99 §124` (ya no dibuja la curva de ejemplo);
+ * compat de caché (L-102). Corriente medida del primario, o null —no cero—.
  * @returns {number|null}
  */
 export function picoPrimario(d) {
@@ -161,7 +159,8 @@ export function lecturaSobrecarga(o) {
 }
 
 /**
- * Frase bajo la curva. Solo afirma lo que sostienen los datos de la fila:
+ * Frase sobre la corriente REGISTRADA en Salud de Activos (va con los
+ * medidores, no con las curvas del SCADA). Solo afirma lo que sostienen los datos de la fila:
  * nombra el devanado que supera su ampacidad (el que fija `cmax`), menciona
  * el 1er límite SCADA solo si ese devanado lo tiene y lo pasa, sin medida no
  * dice que el equipo opere bien, y avisa del devanado con corriente pero sin

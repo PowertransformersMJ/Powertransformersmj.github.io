@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Cargabilidad · MODAL DETALLE
-// Orquesta open/close · cambia ventana 24h/7d/30d · ESC para cerrar.
+// Orquesta open/close · ESC para cerrar (el selector 24h/7d/30d se retiró con la curva de ejemplo, 99 §124).
 // El contenido del modal lo renderea renderers/modal-detalle.js.
 // ══════════════════════════════════════════════════════════════
 
@@ -30,5 +30,5 @@ export function inicializarModal() {
 // (mantiene la API expuesta por el archivo legacy). Se llaman desde
 // los renderers que generan HTML con event-handlers inline.
 export function openDetail(i) { store.setDetail(i); }
-export function setWin(w)    { store.setDetailWin(w); }
+export function setWin(w)    { store.setDetailWin(w); }   // sin uso desde 99 §124 (no hay curva de ejemplo)
 export function closeDetail(){ store.closeDetail(); }

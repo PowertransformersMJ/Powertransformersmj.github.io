@@ -39,10 +39,12 @@ export const UMBRALES_SEVERIDAD = Object.freeze({
 });
 
 // ── Ventanas de tendencia (modal · drill-down) ────────────────
+// ⚠️ SIN USO desde `99 §124` (la ventana ya no dibuja la curva de ejemplo / usa las calificaciones oficiales). Se conserva SOLO para que una copia vieja de `modal-detalle.js` en la caché del navegador no falle al importarla (L-102); se retira en la próxima publicación de Cargabilidad.
 export const VENTANAS_TREND = Object.freeze(['24h', '7d', '30d']);
 
-// Perfil sintético horario (24h) usado por trend.js cuando no hay
-// histórico SCADA. Valores relativos al pico [0..1].
+// ⚠️ Sin uso desde `99 §124` (la ventana enlaza las curvas MEDIDAS por el SCADA
+// en vez de dibujar este perfil); compat de caché (L-102), se retira en la
+// próxima publicación. Perfil sintético horario relativo al pico [0..1].
 // IMPORTANTE: array CONGELADO solo a nivel raíz. Para usarlo como
 // fuente en cálculos usar `[...PROFILE_24H]` o iterar directamente.
 export const PROFILE_24H = Object.freeze([
@@ -73,6 +75,7 @@ export function codigoDevanado(nombre) {
 }
 
 // ── Mapeo diagnóstico DGA / Edad / Furanos / etc. (1..5) ──────
+// ⚠️ SIN USO desde `99 §124` (la ventana ya no dibuja la curva de ejemplo / usa las calificaciones oficiales). Se conserva SOLO para que una copia vieja de `modal-detalle.js` en la caché del navegador no falle al importarla (L-102); se retira en la próxima publicación de Cargabilidad. Su vocabulario («Buena/Aceptable/Media/Alta/Crítica») NO es el oficial del MO.00418: no reusar.
 // Coherente con MO.00418 §A9.7 — escala 1 mejor · 5 crítico.
 export const DIAG_MAP = Object.freeze({
   1: Object.freeze(['Buena',     'ok']),
@@ -82,7 +85,7 @@ export const DIAG_MAP = Object.freeze({
   5: Object.freeze(['Crítica',   'cri']),
 });
 
-// Etiquetas humanas para cada métrica del diag
+// ⚠️ Sin uso desde `99 §124`; compat de caché (L-102). Etiquetas del `diag` viejo.
 export const DIAG_LABEL = Object.freeze({
   carg: 'Cargabilidad',
   edad: 'Edad',
