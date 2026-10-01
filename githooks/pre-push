@@ -7,5 +7,7 @@ if ! command -v node >/dev/null 2>&1; then
   echo "❌ PUSH BLOQUEADO: 'node' no está en PATH y no se pueden revisar cédulas (99 §78). Use --no-verify solo si lo revisó a mano."
   exit 1
 fi
-node scripts/guardia-cedulas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube puede llevar una cédula."; exit 1; }
+REFS=$(cat)
+printf '%s\n' "$REFS" | node scripts/guardia-cedulas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube puede llevar una cédula."; exit 1; }
+printf '%s\n' "$REFS" | node scripts/guardia-scada.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube trae datos de red del SCADA (99 §122)."; exit 1; }
 exit 0

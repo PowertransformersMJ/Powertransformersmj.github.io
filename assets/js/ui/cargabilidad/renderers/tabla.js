@@ -85,7 +85,7 @@ export function renderTabla(rows) {
     const excede = o && o.l1 && o.car > o.l1;
     const w = Math.min(pct || 0, 160) / 160 * 100;
     return `<tr class="t-row" data-i="${d._i}">
-      <td><div style="font-weight:700;">${d.sub}</div><div class="muted">${d.id}</div></td>
+      <td><div style="font-weight:700;">${d.sub}</div><div class="muted">${d.id}</div>${d.id ? `<a class="muted t-scada" href="cargabilidad-scada.html#mat=${encodeURIComponent(d.id)}" target="_top" style="font-size:11px;text-decoration:underline" title="Curvas horarias del SCADA de este equipo (99 §122)">Curvas SCADA</a>` : ''}</td>
       <td class="muted">${cap(d.zona)}</td>
       <td class="mono" style="font-weight:700">${d.pot == null ? '—' : fmt(d.pot / 1000, 1)}</td>
       <td><span class="pill bg-info" style="font-size:10.5px">${devNombre || '—'}</span></td>
@@ -109,7 +109,9 @@ export function renderTabla(rows) {
   }).join('');
 
   tbody.querySelectorAll('.t-row').forEach(tr => {
-    tr.addEventListener('click', () => {
+    tr.addEventListener('click', (ev) => {
+      // El enlace «Curvas SCADA» (99 §122) navega; no abre el detalle de la fila.
+      if (ev.target.closest && ev.target.closest('a.t-scada')) return;
       const i = parseInt(tr.dataset.i, 10);
       if (!Number.isNaN(i)) store.setDetail(i);
     });

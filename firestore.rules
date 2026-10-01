@@ -1357,6 +1357,119 @@ service cloud.firestore {
       allow delete: if isTeamMember() && isAdmin();
     }
 
+    // ── Cargabilidad SCADA (ADR-122, decisión del Ingeniero 2026-09-30) ──────────────
+    // Mediciones horarias del SCADA por punto y mes, ya limpias y compactas (Bytes), su
+    // resumen mensual, el catálogo de lo cargado, la homologación matrícula ↔ punto y el
+    // registro de cada carga. Lee el equipo activo SOLO por id (nada de listados de lo
+    // grande); escribe solo un administrador CON perfil, a su nombre y con la hora del
+    // servidor. Nada se borra. Los datos son operativos del cliente: viven aquí, nunca en el
+    // repositorio público (la guardia scripts/guardia-scada.mjs lo hace cumplir).
+    function scadaAdmin() { return hasProfile() && isAdmin(); }
+    function scadaQuien(p) {
+      return p is map && p.keys().hasOnly(['uid', 'nombre']) && p.uid == request.auth.uid
+        && p.nombre == profile().get('nombre', '');
+    }
+    function scadaSello(d) { return d.actualizadoEn == request.time && scadaQuien(d.actualizadoPor); }
+    match /scada_series/{id} {
+      allow get: if isTeamMember();
+      allow list: if false;
+      allow create, update: if scadaAdmin()
+        && id.matches('[a-z0-9_-]{1,40}__[a-z0-9_-]{1,40}__20[0-9]{2}-(0[1-9]|1[0-2])')
+        && request.resource.data.keys().hasOnly(['schema', 'claveId', 'clave', 'est', 'elem', 'mes', 'n', 'formato', 'niveles',
+             'cargaId', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.schema == 1 && request.resource.data.formato == 'v32le+m8+b8'
+        && id == request.resource.data.claveId + '__' + request.resource.data.mes
+        && request.resource.data.n is int && request.resource.data.n >= 672 && request.resource.data.n <= 744
+        && request.resource.data.niveles is map && request.resource.data.niveles.size() <= 6
+        && request.resource.data.cargaId is string
+        && scadaSello(request.resource.data);
+      allow delete: if false;
+    }
+    match /scada_resumen/{mes} {
+      allow get: if isTeamMember();
+      allow list: if false;
+      allow create, update: if scadaAdmin()
+        && mes.matches('20[0-9]{2}-(0[1-9]|1[0-2])') && request.resource.data.mes == mes
+        && request.resource.data.keys().hasOnly(['schema', 'mes', 'claves', 'cargaId', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.claves is map && request.resource.data.cargaId is string
+        && (resource == null || request.resource.data.claves.keys().hasAll(resource.data.claves.keys()))
+        && scadaSello(request.resource.data);
+      allow delete: if false;
+    }
+    match /scada_catalogo/{id} {
+      allow get: if isTeamMember();
+      allow list: if false;
+      allow create, update: if scadaAdmin() && id == 'estado'
+        && request.resource.data.keys().hasOnly(['schema', 'meses', 'puntos', 'cargaId', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.meses is map && request.resource.data.puntos is map && request.resource.data.cargaId is string
+        && (resource == null || (request.resource.data.meses.keys().hasAll(resource.data.meses.keys())
+            && request.resource.data.puntos.keys().hasAll(resource.data.puntos.keys())))
+        && scadaSello(request.resource.data);
+      allow delete: if false;
+    }
+    // Registro de cada carga: se abre 'iniciada' ANTES del primer lote y se cierra UNA vez, por su autor.
+    match /scada_cargas/{id} {
+      allow get: if isTeamMember();
+      allow list: if isTeamMember() && request.query.limit <= 20;
+      allow create: if scadaAdmin()
+        && request.resource.data.keys().hasOnly(['estado', 'modo', 'meses', 'carpeta', 'plan', 'simulacion', 'abiertaEn', 'por'])
+        && request.resource.data.estado == 'iniciada'
+        && request.resource.data.modo in ['completar', 'reemplazar', 'ensayo']
+        && request.resource.data.abiertaEn == request.time && scadaQuien(request.resource.data.por);
+      allow update: if scadaAdmin()
+        && resource.data.estado == 'iniciada' && resource.data.por.uid == request.auth.uid
+        && request.resource.data.estado in ['completa', 'parcial', 'fallida']
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['estado', 'escrituras', 'duracion_ms', 'error', 'detalle', 'cerradoEn'])
+        && request.resource.data.cerradoEn == request.time;
+      allow delete: if false;
+    }
+    // Homologación: UN documento con versión (rev) y un registro ATADO a cada cambio. Las filas no
+    // disminuyen (una fila que sale del Excel queda «retirada»); una confirmación toca UNA fila.
+    function homologacionConSuRegistro() {
+      let d = request.resource.data;
+      let ruta = /databases/$(database)/documents/scada_homologacion_registro/$(d.ultimoRegistro);
+      let reg = getAfter(ruta).data;
+      return d.ultimoRegistro is string && !exists(ruta) && existsAfter(ruta) && reg.rev == d.rev
+        && (reg.tipo == 'carga_excel'
+          || (resource != null && reg.filaId in resource.data.filas
+              && d.diff(resource.data).affectedKeys().hasOnly(['filas', 'rev', 'ultimoRegistro', 'actualizadoPor', 'actualizadoEn'])
+              && d.filas.diff(resource.data.filas).affectedKeys().hasOnly([reg.filaId])));
+    }
+    match /scada_homologacion/{id} {
+      allow get: if isTeamMember();
+      allow list: if false;
+      allow create, update: if scadaAdmin() && id == 'vigente'
+        && request.resource.data.keys().hasOnly(['schema', 'rev', 'fuente', 'filas', 'ultimoRegistro', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.schema == 1
+        && request.resource.data.rev == (resource == null ? 1 : resource.data.rev + 1)
+        && request.resource.data.filas is map && request.resource.data.filas.size() <= 400
+        && (resource == null || request.resource.data.filas.size() >= resource.data.filas.size())
+        && scadaSello(request.resource.data)
+        && homologacionConSuRegistro();
+      allow delete: if false;
+    }
+    function registroAtadoAVigente(id) {
+      let v = /databases/$(database)/documents/scada_homologacion/vigente;
+      let r = request.resource.data;
+      let tras = getAfter(v).data;
+      return existsAfter(v) && tras.ultimoRegistro == id && tras.rev == r.rev
+        && (r.tipo == 'carga_excel'
+          || (r.filaId is string && r.filaId in tras.filas
+              && tras.filas[r.filaId].get('decision', null) == r.despues
+              && (r.tipo == 'reapertura' ? r.despues == null : r.despues != null)));
+    }
+    match /scada_homologacion_registro/{id} {
+      allow get: if isTeamMember();
+      allow list: if isTeamMember() && request.query.limit <= 20;
+      allow create: if scadaAdmin()
+        && request.resource.data.keys().hasOnly(['tipo', 'rev', 'filaId', 'antes', 'despues', 'resumen', 'por', 'en'])
+        && request.resource.data.tipo in ['carga_excel', 'confirmacion', 'reapertura']
+        && request.resource.data.rev is int
+        && scadaQuien(request.resource.data.por) && request.resource.data.en == request.time
+        && registroAtadoAVigente(id);
+      allow update, delete: if false;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

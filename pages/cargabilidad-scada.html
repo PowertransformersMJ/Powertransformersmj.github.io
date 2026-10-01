@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f4f6fb">
+<meta name="color-scheme" content="light">
+<title>SGM · TRANSPOWER — Cargabilidad SCADA</title>
+<meta name="description" content="Cargabilidad de los transformadores de potencia con las mediciones horarias del SCADA: lista del parque, curvas trifásicas y calificación CRG del MO.00418.">
+<!--
+  SGM · TRANSPOWER — Cargabilidad SCADA (99 §122).
+  · Lista: un transformador por fila con su cargabilidad SCADA del mes (p99 de la fase más
+    cargada ÷ ampacidad del devanado), su calificación CRG (bandas del MO.00418), si la cifra es
+    FIRME o PROVISIONAL (y por qué) y la cifra oficial del Excel de Salud de Activos al lado.
+  · Detalle (#mat=MATRÍCULA): rango de fecha y hora, indicadores, curvas por fase (corriente,
+    tensión, P, Q; S y FP calculados), calidad del dato y descarga CSV.
+  Los datos los carga un administrador en «Datos SCADA» (admin/scada-datos.html). Esta página
+  solo LEE, por id, sin listados de lo grande ni escuchas en vivo (free-tier).
+-->
+<link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+<script type="module" src="../assets/js/auth/page-guard.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/cargabilidad-scada.css"/>
+</head>
+<body class="aqua">
+
+<main class="app-main page-container cscada" id="contenido">
+
+  <div class="page-header">
+    <div class="breadcrumb">Seguimiento / Cargabilidad SCADA</div>
+    <h1 class="page-title">Cargabilidad <em>SCADA</em></h1>
+    <p class="page-subtitle">
+      La carga real de cada transformador, hora por hora, medida por el SCADA y comparada con la
+      ampacidad de su devanado. La calificación usa las bandas CRG del MO.00418; una cifra es
+      <b>firme</b> solo cuando la medida está confirmada y completa, si no se muestra como
+      <b>provisional</b> con su motivo.
+    </p>
+  </div>
+
+  <section id="vista-lista" aria-label="Lista de transformadores">
+    <div class="cs-panel"><div class="cs-esqueleto" style="width:40%"></div><div class="cs-esqueleto" style="width:70%;margin-top:10px"></div></div>
+    <div class="cs-estado" role="status">Cargando…</div>
+  </section>
+  <section id="vista-detalle" aria-label="Detalle del transformador" hidden></section>
+
+</main>
+
+<script type="module" src="../assets/js/ui/cargabilidad-scada/cargabilidad-scada-shell.js"></script>
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>

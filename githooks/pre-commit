@@ -38,6 +38,18 @@ else
   echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron firmas (99 §99)."
 fi
 
+# 🔒 Guardia de datos SCADA (99 §122): ninguna medición, clave de punto ni tabla de
+# homologación del SCADA entra al repo público (por forma; los datos de prueba usan «EstDemo»).
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/guardia-scada.mjs; then
+    echo ""
+    echo "❌ COMMIT BLOQUEADO: el cambio trae datos de red del SCADA (ver arriba)."
+    exit 1
+  fi
+else
+  echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron datos SCADA (99 §122)."
+fi
+
 staged=$(git diff --cached --name-only)
 echo "$staged" | grep -qE '^(CLAUDE\.md|docs/)' || exit 0   # nada del cerebro staged → no aplica
 

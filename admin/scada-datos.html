@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f4f6fb">
+<meta name="color-scheme" content="light">
+<title>SGM · TRANSPOWER — Datos SCADA</title>
+<meta name="description" content="Administración: homologación de transformadores con el SCADA y carga mensual de sus mediciones.">
+<!--
+  SGM · TRANSPOWER — Datos SCADA (99 §122) · solo administradores.
+  · Homologación: el Excel matrícula ↔ punto SCADA y la confirmación, una por una, de las filas dudosas.
+  · Cargar mes: se arrastra la carpeta del mes; se lee EN EL COMPUTADOR (un worker), se muestra
+    la simulación y solo entonces se guarda en Firestore.
+  · Registro: las últimas cargas y cambios.
+  Los datos son operativos del cliente: NUNCA van al repositorio (guardia scripts/guardia-scada.mjs).
+-->
+<link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+<script type="module" src="../assets/js/auth/admin-guard.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/cargabilidad-scada.css"/>
+</head>
+<body class="aqua">
+
+<main class="app-main page-container cscada" id="contenido">
+
+  <div class="page-header">
+    <div class="breadcrumb">Administración / Datos SCADA</div>
+    <h1 class="page-title">Datos <em>SCADA</em></h1>
+    <p class="page-subtitle">
+      Homologación de los transformadores con sus puntos del SCADA y carga mensual de las mediciones que usa
+      «Cargabilidad SCADA». Los archivos se leen en este computador; a la base solo va el resultado, limpio y compacto.
+    </p>
+  </div>
+
+  <div class="cs-tabs" role="tablist" aria-label="Secciones de Datos SCADA">
+    <button type="button" role="tab" id="tab-homologacion" aria-controls="panel-homologacion" aria-selected="true">Homologación</button>
+    <button type="button" role="tab" id="tab-cargar" aria-controls="panel-cargar" aria-selected="false" tabindex="-1">Cargar mes</button>
+    <button type="button" role="tab" id="tab-registro" aria-controls="panel-registro" aria-selected="false" tabindex="-1">Registro</button>
+  </div>
+
+  <section id="panel-homologacion" role="tabpanel" aria-labelledby="tab-homologacion" tabindex="0">
+    <div class="cs-estado" role="status">Cargando…</div>
+  </section>
+  <section id="panel-cargar" role="tabpanel" aria-labelledby="tab-cargar" tabindex="0" hidden>
+    <div class="cs-estado" role="status">Cargando…</div>
+  </section>
+  <section id="panel-registro" role="tabpanel" aria-labelledby="tab-registro" tabindex="0" hidden>
+    <div class="cs-estado" role="status">Cargando…</div>
+  </section>
+
+</main>
+
+<script type="module" src="../assets/js/ui/scada-datos/scada-datos-shell.js"></script>
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
