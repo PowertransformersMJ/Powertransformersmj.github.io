@@ -26,8 +26,6 @@ import { tiempoAdmisible } from './sobrecarga_admisible.js';
 /** Lo que se muestra en lugar de un dato que no existe. */
 export const SIN_DATO = '—';
 
-const CLAVES_DIAG = Object.freeze(['carg', 'edad', 'dga', 'fur', 'herm']);
-
 const num = (v) => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
 
 /** Texto de un campo, o «—». Un objeto nunca se pinta («[object Object]»). */
@@ -35,25 +33,6 @@ export function textoODash(v) {
   if (v == null || typeof v === 'object') return SIN_DATO;
   const s = String(v).trim();
   return s || SIN_DATO;
-}
-
-/**
- * ⚠️ Sin uso en la ventana desde `99 §124`: el «Diagnóstico» muestra las
- * calificaciones de Salud de Activos (`cargabilidad_diagnostico.js`, decisión
- * del Ingeniero). Se conserva por compat de caché (L-102) y sus pruebas.
- *
- * Lee el grupo `diag` del archivo retirado; sin él, las cinco en null.
- * @returns {{carg:number|null, edad:number|null, dga:number|null, fur:number|null, herm:number|null}}
- */
-export function diagnosticoDe(d) {
-  const g = (d && d.diag && typeof d.diag === 'object') ? d.diag : {};
-  const out = {};
-  for (const k of CLAVES_DIAG) {
-    const v = g[k];
-    const n = (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) ? Number(v) : NaN;
-    out[k] = Number.isFinite(n) ? n : null;
-  }
-  return out;
 }
 
 /**
@@ -73,16 +52,6 @@ export function condicionDe(cond) {
   const b = BUCKETS_HI.find((x) => x.key === s.toLowerCase());
   if (b) return { texto: b.label, color: b.color };
   return { texto: s, color: /OBSOLET/i.test(s) ? 'var(--cri)' : null };
-}
-
-/**
- * ⚠️ Sin uso en la ventana desde `99 §124` (ya no dibuja la curva de ejemplo);
- * compat de caché (L-102). Corriente medida del primario, o null —no cero—.
- * @returns {number|null}
- */
-export function picoPrimario(d) {
-  const car = d && d.P ? d.P.car : null;
-  return (typeof car === 'number' && Number.isFinite(car)) ? car : null;
 }
 
 /**

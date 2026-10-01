@@ -8,13 +8,16 @@
 // «dentro de su capacidad» sin dato y la condición «medio» salía en verde.
 //
 // La regla que fijan estas pruebas: lo que falta se muestra «—», nunca un
-// valor, y nada se toma de otra parte para rellenar.
+// valor, y nada se toma de otra parte para rellenar. El «Diagnóstico» (sin
+// `diag` → «—»; desde `99 §124`, las calificaciones de Salud de Activos) se
+// prueba en tests/cargabilidad_diagnostico.test.js; la curva de ejemplo se
+// retiró (§124).
 
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
-  SIN_DATO, textoODash, diagnosticoDe, condicionDe, fraseCarga, picoPrimario, tensionTexto,
+  SIN_DATO, textoODash, condicionDe, fraseCarga, tensionTexto,
   estadoDevanado, devanadoReferencia, lecturaSobrecarga
 } from '../assets/js/domain/cargabilidad_detalle.js';
 import { filaCargabilidad } from '../assets/js/domain/cargabilidad_parque.js';
@@ -36,38 +39,6 @@ const parque = (extra = {}) => recompute(filaCargabilidad({
   ...extra
 }));
 
-describe('diagnosticoDe — sin `diag` no se inventa un diagnóstico', () => {
-
-  // 🔒 El error reportado: `d.diag` indefinido en una fila del parque.
-  test('una fila del parque (sin diag) da las cinco calificaciones en null', () => {
-    const f = parque();
-    assert.equal(f.diag, undefined, 'la fila del parque no trae diag');
-    assert.deepEqual(diagnosticoDe(f), { carg: null, edad: null, dga: null, fur: null, herm: null });
-  });
-
-  // Las calificaciones del registro (calif_crg, calif_edad…) NO se toman para
-  // rellenar: tienen su propia escala y vocabulario oficial, y calif_crg tiene
-  // deuda abierta (10 TODO-64.b / TODO-56). Mostrarlas aquí es decisión aparte.
-  test('no toma calificaciones de salud_actual para rellenar', () => {
-    const d = diagnosticoDe(parque());
-    assert.equal(d.carg, null, 'calif_crg del registro no se cuela');
-    assert.equal(d.edad, null, 'calif_edad del registro no se cuela');
-  });
-
-  test('una fila con diag (formato del archivo original) se respeta', () => {
-    assert.deepEqual(diagnosticoDe({ diag: { carg: 4, edad: 2, dga: 1, fur: 3, herm: 5 } }),
-      { carg: 4, edad: 2, dga: 1, fur: 3, herm: 5 });
-  });
-
-  test('lo que no es número no pasa por calificación', () => {
-    assert.deepEqual(diagnosticoDe({ diag: { carg: '', edad: 'x', dga: {}, fur: true, herm: null } }),
-      { carg: null, edad: null, dga: null, fur: null, herm: null });
-    for (const d of [null, undefined, {}, { diag: null }, { diag: 'x' }]) {
-      assert.deepEqual(diagnosticoDe(d), { carg: null, edad: null, dga: null, fur: null, herm: null });
-    }
-  });
-});
-
 describe('condicionDe — la condición con su nombre oficial, no la clave cruda', () => {
 
   // 🔒 Salía «medio» en verde: la ventana pintaba de verde toda condición
@@ -87,22 +58,6 @@ describe('condicionDe — la condición con su nombre oficial, no la clave cruda
   test('un texto que no es clave se muestra tal cual; OBSOLETO conserva su rojo', () => {
     assert.deepEqual(condicionDe('REGULAR'), { texto: 'REGULAR', color: null });
     assert.deepEqual(condicionDe('OBSOLETO'), { texto: 'OBSOLETO', color: 'var(--cri)' });
-  });
-});
-
-describe('picoPrimario — sin medida del primario no hay curva', () => {
-
-  // 🔒 La curva se dibujaba con `car || 0`: una línea en «0,0 A» que nadie midió.
-  test('sin corriente medida en el primario devuelve null, no cero', () => {
-    assert.equal(picoPrimario(parque()), null);
-    assert.equal(picoPrimario({ P: { car: null } }), null);
-    assert.equal(picoPrimario({}), null);
-    assert.equal(picoPrimario(null), null);
-  });
-
-  test('con medida devuelve la corriente medida, también si es cero', () => {
-    assert.equal(picoPrimario({ P: { car: 160.4 } }), 160.4);
-    assert.equal(picoPrimario({ P: { car: 0 } }), 0, 'un cero medido sí es un dato');
   });
 });
 
