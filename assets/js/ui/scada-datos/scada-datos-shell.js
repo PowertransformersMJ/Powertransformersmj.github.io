@@ -63,16 +63,24 @@ async function pintarRegistro() {
   }
 }
 
+/** El mismo aviso en las tres pestañas (ninguna queda en «Cargando…»). `hijos` crea nodos NUEVOS en cada llamada. */
+function avisoEnTodas(hijos) {
+  for (const id of ['panel-homologacion', 'panel-cargar', 'panel-registro']) poner($(id), el('div', { class: 'cs-estado', role: 'alert' }, ...hijos()));
+}
+
 async function arrancar() {
   await esperarSesion();
+  // Las pestañas responden SIEMPRE, también cuando la página no puede seguir (revisión del 10-01).
+  let registroListo = false;
+  const tabs = pestanas(document.querySelector('.cs-tabs'), (id) => { if (id === 'tab-registro' && registroListo) pintarRegistro(); });
   if (!puedeAdministrar()) {
-    poner($('panel-homologacion'), el('div', { class: 'cs-estado', role: 'alert' }, 'Solo un administrador con perfil puede cargar datos SCADA.'));
+    avisoEnTodas(() => ['Solo un administrador con perfil puede cargar datos SCADA.']);
     return;
   }
   try { await cargarTodo(); }
   catch (e) {
-    poner($('panel-homologacion'), el('div', { class: 'cs-estado', role: 'alert' }, (e && e.message) || 'No se pudo leer la información.',
-      el('br'), el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => location.reload() }, 'Reintentar')));
+    avisoEnTodas(() => [(e && e.message) || 'No se pudo leer la información.',
+      el('br'), el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => location.reload() }, 'Reintentar')]);
     return;
   }
   const refrescar = async () => { await cargarTodo(); homologacion.pintar(estado); carga.pintar(estado); };
@@ -80,9 +88,10 @@ async function arrancar() {
   const carga = montarCargaMes($('panel-cargar'), { alTerminar: refrescar });
   homologacion.pintar(estado);
   carga.pintar(estado);
-  const tabs = pestanas(document.querySelector('.cs-tabs'), (id) => { if (id === 'tab-registro') pintarRegistro(); });
+  registroListo = true;
   const desdeHash = { '#tab=cargar': 'tab-cargar', '#tab=registro': 'tab-registro' }[location.hash];
   if (desdeHash) tabs.activar(desdeHash);
+  else if (document.getElementById('tab-registro').getAttribute('aria-selected') === 'true') pintarRegistro();
 }
 
 arrancar();

@@ -60,7 +60,13 @@ export function montarLista(cont, ctx, { alAbrir }) {
     st.cargando = false;
     if (r.estado === 'fallo') { st.error = 'No se pudo leer el resumen de ' + nombreMes(mes) + ' (revise la conexión).'; dibujar(); return; }
     st.resumen = r.estado === 'ok' ? r.datos : null;
-    st.filas = filasLista({ parque: ctx.parque, homologacion: ctx.homologacion, catalogo: ctx.catalogo, resumenMes: st.resumen, umbrales: ctx.umbrales });
+    try {
+      st.filas = filasLista({ parque: ctx.parque, homologacion: ctx.homologacion, catalogo: ctx.catalogo, resumenMes: st.resumen, umbrales: ctx.umbrales });
+    } catch (e) {
+      // Un dato inesperado no deja la página en «Calculando…»: se dice y se ofrece reintentar.
+      console.warn('[cargabilidad-scada] lista', e);
+      st.error = 'No se pudo calcular ' + nombreMes(mes) + '.';
+    }
     dibujar();
   }
 
@@ -215,7 +221,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     }
     if (!ctx.catalogo || !st.mes) {
       poner(cont, cabeceraVacia(), el('div', { class: 'cs-panel cs-estado' }, 'Todavía no hay mediciones SCADA cargadas.',
-        ctx.esAdmin ? el('div', {}, el('a', { class: 'btn btn--primary btn--sm', href: '../admin/scada-datos.html#tab=cargar' }, 'Cargar un mes')) : el('div', { class: 'cs-ayuda' }, 'Un administrador las carga en «Datos SCADA».')));
+        ctx.esAdmin
+          // Sin homologación, el primer paso es cargarla (la pestaña «Cargar mes» todavía no se puede usar).
+          ? el('div', {}, ctx.homologacion
+            ? el('a', { class: 'btn btn--primary btn--sm', href: '../admin/scada-datos.html#tab=cargar' }, 'Cargar un mes')
+            : el('a', { class: 'btn btn--primary btn--sm', href: '../admin/scada-datos.html' }, 'Cargar la homologación'))
+          : el('div', { class: 'cs-ayuda' }, 'Un administrador las carga en «Datos SCADA».')));
       return;
     }
     if (st.cargando) { poner(cont, cabeceraOrigen(), el('div', { class: 'cs-panel' }, el('div', { class: 'cs-esqueleto', style: 'width:60%' }), el('div', { class: 'cs-esqueleto', style: 'width:85%;margin-top:10px' }), el('p', { class: 'cs-ayuda', role: 'status' }, 'Calculando ' + nombreMes(st.mes) + '…'))); return; }

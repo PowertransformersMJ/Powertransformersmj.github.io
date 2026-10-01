@@ -73,4 +73,8 @@ async function arrancar() {
   navegar();
 }
 
-arrancar();
+arrancar().catch((e) => {
+  console.warn('[cargabilidad-scada] arranque', e);
+  poner($('vista-lista'), el('div', { class: 'cs-estado', role: 'alert' }, 'No se pudo abrir la página.', el('br'),
+    el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => location.reload() }, 'Reintentar')));
+});
