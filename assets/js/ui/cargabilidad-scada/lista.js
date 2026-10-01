@@ -220,13 +220,20 @@ export function montarLista(cont, ctx, { alAbrir }) {
       return;
     }
     if (!ctx.catalogo || !st.mes) {
-      poner(cont, cabeceraVacia(), el('div', { class: 'cs-panel cs-estado' }, 'Todavía no hay mediciones SCADA cargadas.',
+      // Qué falta, paso por paso: sin esto la página se ve «vacía» sin decir por qué.
+      const paso = (listo, texto) => el('li', { class: listo ? 'cs-paso cs-paso--ok' : 'cs-paso' }, el('b', {}, listo ? 'Listo: ' : 'Falta: '), texto);
+      poner(cont, cabeceraVacia(), el('div', { class: 'cs-panel cs-estado' },
+        el('p', { class: 'cs-estado-titulo' }, 'Todavía no hay mediciones SCADA cargadas.'),
+        el('p', {}, 'La lista del parque con la carga de cada transformador aparece aquí cuando estén en la base estos dos pasos:'),
+        el('ol', { class: 'cs-pasos' },
+          paso(!!ctx.homologacion, 'la homologación (el Excel que une cada transformador con su punto del SCADA);'),
+          paso(false, 'al menos un mes de la carpeta «Variables Eléctricas».')),
         ctx.esAdmin
           // Sin homologación, el primer paso es cargarla (la pestaña «Cargar mes» todavía no se puede usar).
           ? el('div', {}, ctx.homologacion
             ? el('a', { class: 'btn btn--primary btn--sm', href: '../admin/scada-datos.html#tab=cargar' }, 'Cargar un mes')
             : el('a', { class: 'btn btn--primary btn--sm', href: '../admin/scada-datos.html' }, 'Cargar la homologación'))
-          : el('div', { class: 'cs-ayuda' }, 'Un administrador las carga en «Datos SCADA».')));
+          : el('div', { class: 'cs-ayuda' }, 'Un administrador los carga en «Datos SCADA».')));
       return;
     }
     if (st.cargando) { poner(cont, cabeceraOrigen(), el('div', { class: 'cs-panel' }, el('div', { class: 'cs-esqueleto', style: 'width:60%' }), el('div', { class: 'cs-esqueleto', style: 'width:85%;margin-top:10px' }), el('p', { class: 'cs-ayuda', role: 'status' }, 'Calculando ' + nombreMes(st.mes) + '…'))); return; }

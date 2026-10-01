@@ -4,7 +4,7 @@
    única señal (cada chip lleva número y palabra).
    ══════════════════════════════════════════════════════════════════════════════ */
 .cscada { --cs-line: var(--edge-muted, rgba(0, 40, 90, .10)); --cs-soft: rgba(244, 246, 251, .9); --cs-ink2: var(--ink-2, #1f3656); --cs-ink3: var(--ink-3, #4d6485); }
-.cscada .cs-panel { background: rgba(255, 255, 255, .78); border: 1px solid var(--cs-line); border-radius: var(--r-md, 14px); padding: 14px 16px; margin: 0 0 14px; }
+.cscada .cs-panel { background: rgba(255, 255, 255, .93); border: 1px solid var(--cs-line); border-radius: var(--r-md, 14px); padding: 14px 16px; margin: 0 0 14px; }
 .cscada .cs-panel h2, .cscada .cs-panel h3 { margin: 0 0 8px; font-size: 15px; color: var(--cs-ink2); }
 .cscada .cs-ayuda { font-size: 12.5px; color: var(--cs-ink3); margin: 4px 0 0; line-height: 1.45; }
 .cscada .cs-origen { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: center; font-size: 12.5px; color: var(--cs-ink2); }
@@ -45,6 +45,14 @@
 /* Estados */
 .cscada .cs-estado { padding: 22px 16px; text-align: center; color: var(--cs-ink3); font-size: 13.5px; }
 .cscada .cs-estado .btn { margin-top: 10px; }
+/* Un enlace con forma de botón: `body.aqua a` (color de enlace) le ganaba a `.btn` y dejaba la letra azul sobre azul. */
+.cscada a.btn, .cscada a.btn:visited { color: #fff; }
+.cscada a.btn--glass, .cscada a.btn--glass:visited { color: var(--ink-1, #0d1f38); }
+.cscada .cs-estado-titulo { margin: 0 0 6px; font-size: 15px; font-weight: 700; color: var(--cs-ink2); }
+.cscada .cs-estado p { margin: 0 0 8px; }
+.cscada .cs-pasos { display: inline-block; text-align: left; margin: 0 0 4px; padding-left: 22px; line-height: 1.6; color: var(--cs-ink2); }
+.cscada .cs-paso b { color: #8a5a00; }
+.cscada .cs-paso--ok b { color: #1a7f37; }
 .cscada .cs-esqueleto { height: 14px; border-radius: 6px; background: linear-gradient(90deg, rgba(0,40,90,.06), rgba(0,40,90,.12), rgba(0,40,90,.06)); background-size: 200% 100%; animation: csBrillo 1.4s linear infinite; }
 @keyframes csBrillo { to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .cscada .cs-esqueleto { animation: none; } }
@@ -70,7 +78,7 @@
 .cscada table.cs-sec th { color: var(--cs-ink3); font-weight: 600; width: 38%; }
 .cscada .cs-niveles { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
 .cscada .cs-niveles button { font: inherit; font-size: 12.5px; padding: 5px 10px; border-radius: 999px; border: 1px solid var(--cs-line); background: #fff; cursor: pointer; color: var(--cs-ink2); }
-.cscada .cs-niveles button[aria-selected="true"], .cscada .cs-niveles button[aria-pressed="true"] { background: rgba(0, 122, 255, .12); border-color: rgba(0, 122, 255, .35); font-weight: 700; }
+.cscada .cs-niveles button[aria-selected="true"], .cscada .cs-niveles button[aria-pressed="true"] { background: #e1efff; border-color: rgba(0, 122, 255, .35); font-weight: 700; }
 .cscada .cs-figura { min-height: 420px; }
 .cscada figcaption { font-size: 12px; color: var(--cs-ink3); margin-top: 6px; }
 .cscada .cs-dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 14px; }
@@ -78,7 +86,7 @@
 /* Administración */
 .cscada .cs-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 12px; }
 .cscada .cs-tabs [role="tab"] { font: inherit; font-size: 13px; padding: 7px 14px; border-radius: 999px; border: 1px solid var(--cs-line); background: #fff; cursor: pointer; color: var(--cs-ink2); }
-.cscada .cs-tabs [role="tab"][aria-selected="true"] { background: rgba(0, 122, 255, .12); border-color: rgba(0, 122, 255, .35); font-weight: 700; }
+.cscada .cs-tabs [role="tab"][aria-selected="true"] { background: #e1efff; border-color: rgba(0, 122, 255, .35); font-weight: 700; }
 .cscada .cs-arrastre { display: block; width: 100%; border: 2px dashed rgba(0, 122, 255, .35); border-radius: 14px; padding: 26px 16px; text-align: center; background: rgba(0, 122, 255, .03); cursor: pointer; font: inherit; color: var(--cs-ink2); }
 .cscada .cs-arrastre.is-sobre { background: rgba(0, 122, 255, .09); }
 .cscada .cs-veredicto { border-radius: 12px; padding: 12px 14px; font-size: 13.5px; margin: 10px 0; border: 1px solid; }
