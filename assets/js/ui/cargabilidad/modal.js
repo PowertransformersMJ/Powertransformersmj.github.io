@@ -1,6 +1,6 @@
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Cargabilidad · MODAL DETALLE
-// Orquesta open/close · cambia ventana 24h/7d/30d · ESC para cerrar.
+// Orquesta open/close · ESC para cerrar (el selector 24h/7d/30d se retiró con la curva de ejemplo, 99 §124).
 // El contenido del modal lo renderea renderers/modal-detalle.js.
 // ══════════════════════════════════════════════════════════════
 

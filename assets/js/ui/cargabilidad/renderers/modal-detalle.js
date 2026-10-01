@@ -50,8 +50,12 @@ const punto = (color) => `<span style="display:inline-block;width:9px;height:9px
 
 // ── Una calificación de Salud de Activos ────────────────────
 function filaCalificacion(c) {
-  const valor = c.valor == null ? ''
-    : ` <span class="muted" style="font-weight:400;font-size:11.5px">(${fmt(c.valor, Number.isInteger(c.valor) ? 0 : 2)})</span>`;
+  // El número como lo muestra Salud de Activos: redondeado a 2 decimales, sin
+  // ceros de más (1,5 y no 1,50), con coma.
+  const r = c.valor == null ? null : Math.round(c.valor * 100) / 100;
+  const dec = r == null || Number.isInteger(r) ? 0 : (Number.isInteger(r * 10) ? 1 : 2);
+  const valor = r == null ? ''
+    : ` <span class="muted" style="font-weight:400;font-size:11.5px">(${fmt(r, dec)})</span>`;
   return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
     <span class="muted" style="font-size:13px">${c.nombre}</span>
     <span style="font-weight:700;color:${c.color ? 'var(--ink)' : 'var(--ink3)'}">${c.color ? punto(c.color) : ''}${c.texto}${valor}</span>
@@ -261,20 +265,22 @@ export function renderModal() {
       <div style="flex:2;min-width:520px;display:flex;flex-direction:column;gap:16px">
         <div class="glass panel">
           <h3 style="margin:0 0 10px;font-size:15px">Curvas horarias · medidas del SCADA</h3>
-          <div style="font-size:13px;margin-bottom:10px">${fraseCarga(d)}</div>
-          <div class="muted" style="font-size:12px;margin-bottom:14px">La carga hora por hora de este transformador —medida por el SCADA— se ve en «Cargabilidad SCADA» cuando están cargados la homologación y el mes.</div>
-          ${d.id
-            ? `<a class="btn" href="cargabilidad-scada.html#mat=${encodeURIComponent(d.id)}" target="_top" style="display:inline-block;padding:8px 14px;font-size:12.5px;color:var(--ink);text-decoration:none">Abrir sus curvas en Cargabilidad SCADA →</a>`
-            : `<span class="muted" style="font-size:12px">Sin matrícula: no se puede abrir su curva.</span>`}
+          <div class="muted" style="font-size:12.5px;margin-bottom:14px">La carga hora por hora de este transformador —medida por el SCADA— se ve en «Cargabilidad SCADA» cuando están cargados la homologación y el mes.</div>
+          ${store.state.source === 'baseline-demo'
+            ? `<span class="muted" style="font-size:12px">Equipo de demostración: no tiene curvas.</span>`
+            : d.id
+              ? `<a class="btn" href="cargabilidad-scada.html#mat=${encodeURIComponent(d.id)}${d.docId ? '&id=' + encodeURIComponent(d.docId) : ''}" target="_top" style="display:inline-block;padding:8px 14px;font-size:12.5px;color:var(--ink);text-decoration:none">Abrir sus curvas en Cargabilidad SCADA →</a>`
+              : `<span class="muted" style="font-size:12px">Sin matrícula: no se puede abrir su curva.</span>`}
         </div>
         <div class="glass panel" style="display:flex;align-items:center;justify-content:space-around;gap:10px;flex-wrap:wrap">
           <div style="max-width:160px">
             <div class="tag" style="margin-bottom:8px">Cargabilidad por devanado</div>
-            <div class="muted" style="font-size:11.5px">Corriente registrada de cada devanado frente a su ampacidad nominal.</div>
+            <div class="muted" style="font-size:11.5px">Corriente registrada en Salud de Activos de cada devanado frente a su ampacidad nominal.</div>
           </div>
           ${gauge('Primario', d.P.pct, subMedidor(d, 'P'))}
           ${gauge('Secundario', d.S.pct, subMedidor(d, 'S'))}
           ${gauge('Terciario', d.T.pct, subMedidor(d, 'T'))}
+          <div style="flex-basis:100%;font-size:12.5px;color:var(--ink2);margin-top:4px">${fraseCarga(d)}</div>
         </div>
       </div>
       <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:16px">

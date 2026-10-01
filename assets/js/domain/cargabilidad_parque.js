@@ -128,6 +128,9 @@ export function filaCargabilidad(tx) {
   const sp = filaParqueDesdeTx(tx) || {};
   return {
     id:     txt(leer(tx, 'identificacion.matricula', 'matricula', 'identificacion.codigo', 'codigo', 'id')),
+    // Id del documento en /transformadores: con la matrícula, el enlace a
+    // «Cargabilidad SCADA» abre ESE equipo aunque otro comparta matrícula.
+    docId:  txt(tx.id),
     serie:  txt(leer(tx, 'identificacion.numero_serie', 'placa.serial', 'serie')),
     sub:    txt(leer(tx, 'ubicacion.subestacion_nombre', 'subestacion')),
     // Si el registro no trae zona, se DEDUCE del departamento en vez de dejarla

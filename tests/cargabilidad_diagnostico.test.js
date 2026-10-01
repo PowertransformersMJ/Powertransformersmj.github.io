@@ -90,3 +90,14 @@ describe('calificacionesDe — las siete del MO.00418, en el orden de Salud de A
     }
   });
 });
+
+describe('filaCargabilidad — id del documento para el enlace a Cargabilidad SCADA', () => {
+  // Con solo la matrícula, «Cargabilidad SCADA» abre el PRIMER equipo que la
+  // tenga; con el id del documento abre ese equipo (`&id=`).
+  test('conserva el id del documento del parque', () => {
+    assert.equal(filaCargabilidad({ id: 'doc-123', ...docV2({}) }).docId, 'doc-123');
+  });
+  test('sin id del documento queda vacío (el enlace va solo con la matrícula)', () => {
+    assert.equal(filaCargabilidad(docV2({})).docId, '');
+  });
+});
