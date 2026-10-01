@@ -16,6 +16,7 @@ import { getDbSafe, getAuthSafe } from '../firebase-init.js';
 import { getSession } from '../auth/session-guard.js';
 import { fusionarHomologacion } from '../domain/scada_carga_homologacion.js';
 import { fundirCatalogo, fundirResumen } from '../domain/scada_carga_importacion.js';
+import { EXTRAS } from '../domain/scada_carga_extras.js';
 
 function quien() {
   const s = getSession();
@@ -126,7 +127,10 @@ function docSerieFirestore(d, cargaId, por) {
   const niveles = {};
   for (const [nv, x] of Object.entries(d.niveles)) {
     niveles[nv] = { kv: x.kv, fam: {} };
-    for (const [f, s] of Object.entries(x.fam)) niveles[nv].fam[f] = { v: bytes(s.v), m: bytes(s.m), b: bytes(s.b) };
+    for (const [f, s] of Object.entries(x.fam)) {
+      niveles[nv].fam[f] = { v: bytes(s.v), m: bytes(s.m), b: bytes(s.b) };
+      for (const k of EXTRAS) if (s[k]) niveles[nv].fam[f][k] = bytes(s[k]);   // máx/mín/instantáneo (`99 §126`)
+    }
   }
   return { schema: 1, claveId: d.claveId, clave: d.clave, est: d.est, elem: d.elem, mes: d.mes, n: d.n, formato: d.formato, niveles,
     cargaId, actualizadoPor: por, actualizadoEn: serverTimestamp() };

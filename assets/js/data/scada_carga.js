@@ -11,6 +11,7 @@ import { doc, getDoc, collection, query, orderBy, limit, getDocs } from 'https:/
 import { getDbSafe } from '../firebase-init.js';
 import { desempaquetar } from '../domain/scada_carga_series.js';
 import { ESCRITURA } from '../domain/scada_carga_config.js';
+import { EXTRAS } from '../domain/scada_carga_extras.js';
 
 const cache = new Map();
 const aU8 = (b) => (b && typeof b.toUint8Array === 'function' ? b.toUint8Array() : (b instanceof Uint8Array ? b : new Uint8Array(0)));
@@ -48,7 +49,11 @@ export function desempaquetarDoc(d) {
   const out = { claveId: d.claveId, mes: d.mes, n: d.n, niveles: {} };
   for (const [nv, x] of Object.entries(d.niveles || {})) {
     out.niveles[nv] = { kv: x.kv, fam: {} };
-    for (const [f, s] of Object.entries(x.fam || {})) out.niveles[nv].fam[f] = desempaquetar({ v: aU8(s.v), m: aU8(s.m), b: aU8(s.b) });
+    for (const [f, s] of Object.entries(x.fam || {})) {
+      const g = { v: aU8(s.v), m: aU8(s.m), b: aU8(s.b) };
+      for (const k of EXTRAS) if (s[k]) g[k] = aU8(s[k]);   // máx/mín/instantáneo, si el mes los trae (`99 §126`)
+      out.niveles[nv].fam[f] = desempaquetar(g);
+    }
   }
   return out;
 }

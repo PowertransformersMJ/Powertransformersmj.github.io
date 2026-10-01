@@ -383,7 +383,7 @@ export function montarCargaMes(cont, { alTerminar }) {
         analisis.conflictos ? el('li', {}, analisis.conflictos + (analisis.conflictos === 1 ? ' hora aparece' : ' horas aparecen') + ' dos veces en la carpeta con valores distintos: se usó el del primer archivo leído.') : null) : null,
       el('details', {}, el('summary', {}, 'Detalle de los archivos'),
         el('ul', { class: 'cs-avisos' },
-          el('li', {}, (a.otrosEstadisticos || 0) + ' archivos de máximo, mínimo o instantáneo (no se usan)'),
+          el('li', {}, ((a.max || 0) + (a.min || 0) + (a.current || 0)) + ' archivos de máximo, mínimo o instantáneo leídos (solo para ver las curvas; no entran en la cifra)' + (a.extrasInvalidos ? ' · ' + a.extrasInvalidos + ' con el encabezado dañado' : '')),
           el('li', {}, (a.noCsv || 0) + ' archivos que no son CSV (no se usan)'),
           el('li', {}, (a.vacios || 0) + ' archivos vacíos'),
           el('li', {}, (a.encabezadoInvalido || 0) + ' con el encabezado de fechas dañado'),

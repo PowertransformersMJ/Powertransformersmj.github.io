@@ -11,6 +11,7 @@
 
 import { CODIGO, TIEMPO } from './scada_carga_config.js';
 import { esCentinela } from './scada_carga_limpieza.js';
+import { EXTRAS, tieneValor } from './scada_carga_extras.js';
 
 const H_MS = 3600 * 1000;
 
@@ -64,14 +65,18 @@ export function deBytesF32(bytes) {
   return out;
 }
 
-/** Empaqueta una familia limpia ({v, b, m}) para guardarla. */
+/** Empaqueta una familia limpia ({v, b, m} y, si los hay, los extras max/min/ins) para guardarla. */
 export function empaquetar(s) {
-  return { v: aBytesF32(s.v), m: new Uint8Array(s.m), b: new Uint8Array(s.b) };
+  const out = { v: aBytesF32(s.v), m: new Uint8Array(s.m), b: new Uint8Array(s.b) };
+  for (const k of EXTRAS) if (tieneValor(s[k])) out[k] = aBytesF32(s[k]);
+  return out;
 }
-/** Desempaqueta lo guardado ({v, m, b} en bytes) → {v: Float32Array, m, b}. */
+/** Desempaqueta lo guardado ({v, m, b} en bytes, extras opcionales) → {v: Float32Array, m, b, max?, min?, ins?}. */
 export function desempaquetar(g) {
   const v = deBytesF32(g.v);
-  return { v, m: new Uint8Array(g.m), b: new Uint8Array(g.b) };
+  const out = { v, m: new Uint8Array(g.m), b: new Uint8Array(g.b) };
+  for (const k of EXTRAS) if (g[k] && g[k].length) out[k] = deBytesF32(g[k]);
+  return out;
 }
 
 /** ¿Dos empaques son iguales byte a byte? (para no reescribir lo que no cambió) */
@@ -97,19 +102,38 @@ export function fusionarCrudo(guardado, nuevo, modo = 'completar') {
   const b = new Uint8Array(n);
   const presente = new Uint8Array(n);
   let conflictos = 0; let nuevas = 0;
+  // De qué exportación salen los extras de cada hora: la MISMA del promedio (§126, revisión adversarial):
+  // 0 = la guardada · 1 = la nueva · 2 = son la misma medida (lo guardado manda; lo vacío se llena).
+  const fuente = new Uint8Array(n).fill(2);
   for (let h = 0; h < n; h++) {
     const g = guardado && guardado.m && guardado.m[h] !== CODIGO.SIN_ARCHIVO;
     const t = !!nuevo.presente[h];
     if (g) { v[h] = guardado.v[h]; b[h] = guardado.b[h]; presente[h] = 1; }
     if (!t) { if (g && !b[h] && nuevo.b[h]) b[h] = nuevo.b[h]; continue; }   // solo llegó la calidad
-    if (!g) { v[h] = nuevo.v[h]; b[h] = nuevo.b[h]; presente[h] = 1; nuevas++; continue; }
+    if (!g) { v[h] = nuevo.v[h]; b[h] = nuevo.b[h]; presente[h] = 1; nuevas++; fuente[h] = 1; continue; }
     const iguales = (Number.isNaN(v[h]) && Number.isNaN(nuevo.v[h])) || v[h] === nuevo.v[h];
     if (!iguales) conflictos++;
     const conValor = Number.isFinite(nuevo.v[h]) && !esCentinela(nuevo.v[h]);
-    if (modo === 'reemplazar' && conValor) { v[h] = nuevo.v[h]; b[h] = nuevo.b[h] || guardado.b[h]; }
-    else if (!b[h] && nuevo.b[h] && iguales) b[h] = nuevo.b[h];   // la calidad que llegó después
+    if (modo === 'reemplazar' && conValor) { v[h] = nuevo.v[h]; b[h] = nuevo.b[h] || guardado.b[h]; fuente[h] = 1; }
+    else {
+      if (!b[h] && nuevo.b[h] && iguales) b[h] = nuevo.b[h];   // la calidad que llegó después
+      if (!iguales) fuente[h] = 0;   // se quedó el promedio guardado: sus extras también
+    }
   }
-  return { v, b, presente, conflictos, nuevas };
+  const out = { v, b, presente, conflictos, nuevas };
+  // Extras (solo para ver): siguen a la exportación del promedio de la hora (fuente), así nunca se
+  // mezclan dos exportaciones en una misma hora. Un mes guardado SIN extras los recibe con «Completar».
+  for (const k of EXTRAS) {
+    const gk = guardado && guardado[k]; const tk = nuevo[k];
+    if (!tieneValor(gk) && !tieneValor(tk)) continue;
+    const e = new Float32Array(n).fill(NaN);
+    for (let h = 0; h < n; h++) {
+      const a = gk ? gk[h] : NaN; const z = tk ? tk[h] : NaN;
+      e[h] = fuente[h] === 1 ? z : (fuente[h] === 0 ? a : (Number.isNaN(a) ? z : a));
+    }
+    out[k] = e;
+  }
+  return out;
 }
 
 /**
@@ -156,7 +180,10 @@ export function recortarRango(porMes, familias, desdeMs, hastaMs) {
   const horas = Math.max(0, Math.round((hastaMs - desdeMs) / H_MS));
   const t = new Float64Array(horas);
   const fam = {};
-  for (const f of familias) fam[f] = { v: new Float32Array(horas).fill(NaN), m: new Uint8Array(horas).fill(21), b: new Uint8Array(horas) };
+  for (const f of familias) {
+    fam[f] = { v: new Float32Array(horas).fill(NaN), m: new Uint8Array(horas).fill(21), b: new Uint8Array(horas) };
+    for (const k of EXTRAS) fam[f][k] = new Float32Array(horas).fill(NaN);
+  }
   const mesesFallidos = [];
   for (let k = 0; k < horas; k++) t[k] = desdeMs + k * H_MS;
   for (const [mes, reg] of Object.entries(porMes || {})) {
@@ -172,6 +199,7 @@ export function recortarRango(porMes, familias, desdeMs, hastaMs) {
         const s = reg && reg.estado === 'ok' && reg.series && reg.series[f];
         if (!s) continue;
         fam[f].v[k] = s.v[idx]; fam[f].m[k] = s.m[idx]; fam[f].b[k] = s.b[idx];
+        for (const e of EXTRAS) if (s[e]) fam[f][e][k] = s[e][idx];
       }
     }
     if (toca && reg && reg.estado === 'fallo') mesesFallidos.push(mes);

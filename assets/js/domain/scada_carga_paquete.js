@@ -3,10 +3,11 @@
 // ──────────────────────────────────────────────────────────────────────────────
 // Un mes del SCADA pesa ~650 MB y la extensión de Chrome solo sube 10 MB por vez. El paquete
 // lleva la MISMA carpeta, adelgazada sin cambiar lo que la página calcula:
-//   · los archivos de promedio y calidad (los únicos que el lector usa) con su encabezado y
-//     SOLO las filas de las estaciones de la homologación (el lector descarta las demás);
-//   · los demás archivos (máx, mín, instantáneo, .xls…) como marcas vacías con su tamaño
-//     original, para que el informe de la carpeta cuente igual;
+//   · los archivos que el lector usa —promedio, calidad y, desde la versión 2 (§126), máximo,
+//     mínimo e instantáneo— con su encabezado y SOLO las filas de las estaciones de la
+//     homologación (el lector descarta las demás);
+//   · los demás archivos (.xls, .txt…) como marcas vacías con su tamaño original, para que el
+//     informe de la carpeta cuente igual;
 //   · un manifiesto con la carpeta, las estaciones del filtro y el tamaño de cada archivo.
 // Va comprimido (gzip) y partido en trozos de ≤ 9 MB con la huella SHA-256 en el nombre. La
 // página junta los trozos, comprueba la huella, descomprime y entrega los archivos al MISMO
@@ -19,7 +20,7 @@ import { estadisticoDeNombre, normalizarTexto } from './scada_carga_csv.js';
 
 export const PAQUETE = Object.freeze({
   firma: 'SGM-SCADA-PAQUETE',
-  version: 1,
+  version: 2,   // 2 (§126): trae también máx, mín e instantáneo. Un paquete 1 se rechaza.
   extension: '.sgmpaq',
   parteMaxBytes: 9 * 1024 * 1024
 });
@@ -27,11 +28,14 @@ export const PAQUETE = Object.freeze({
 const enc = new TextEncoder();
 const dec = new TextDecoder('utf-8');
 
-/** ¿El lector de la página LEE este archivo? (mismo criterio que el worker: CSV de promedio, calidad o sin estadístico). */
+/**
+ * ¿El lector de la página LEE este archivo? Mismo criterio que el worker: CSV de promedio, calidad o sin
+ * estadístico, y —desde `99 §126`, solo para VER— máximo, mínimo e instantáneo.
+ */
 export function seLee(nombre) {
   if (!/\.csv$/i.test(String(nombre || ''))) return false;
   const est = estadisticoDeNombre(nombre);
-  return !est || est === 'average' || est === 'quality';
+  return !est || ['average', 'quality', 'max', 'min', 'current'].includes(est);
 }
 
 /**
@@ -85,6 +89,7 @@ export function leerContenedor(bytes) {
   const nl1 = bytes.indexOf(10);
   if (nl1 < 0) throw new Error('El paquete está dañado (sin encabezado).');
   const firma = dec.decode(bytes.subarray(0, nl1));
+  if (firma === PAQUETE.firma + ' 1') throw new Error('Este paquete se preparó sin máximos, mínimos ni instantáneos (versión anterior): prepare uno nuevo con el empaquetador actual.');
   if (firma !== PAQUETE.firma + ' ' + PAQUETE.version) throw new Error('No es un paquete de datos SCADA de esta versión.');
   const nl2 = bytes.indexOf(10, nl1 + 1);
   if (nl2 < 0) throw new Error('El paquete está dañado (sin manifiesto).');
