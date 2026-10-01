@@ -1,33 +1,43 @@
 // ══════════════════════════════════════════════════════════════
 // Renderer · Modal de detalle (drill-down)
-// Reúne: gauge SVG por devanado · trend SVG con perfil sintético ·
-// diagnóstico 7 variables · workflow de REFERENCIA (4 pasos, no estado real) ·
-// ficha técnica.
+// Reúne: gauge SVG por devanado · trend SVG con perfil ILUSTRATIVO (no
+// medido) · diagnóstico de 5 calificaciones (las filas del parque no las
+// traen: «—») · workflow de REFERENCIA (4 pasos, no estado real) · ficha
+// técnica. Lo que la ventana afirma sale de `domain/cargabilidad_detalle.js`.
 // ══════════════════════════════════════════════════════════════
 
 import { $, fmt, cap } from './_helpers.js';
 import { sev } from '../../../domain/cargabilidad_severidad.js';
 import {
-  SEVCOL, SEVLBL, DIAG_MAP, PROFILE_24H, DIAG_LABEL,
+  SEVCOL, SEVLBL, DIAG_MAP, PROFILE_24H, DIAG_LABEL, DEV_LABEL,
 } from '../../../domain/cargabilidad_config.js';
-import { tiempoAdmisible } from '../../../domain/sobrecarga_admisible.js';
+// Lo que la ventana afirma de un equipo: lo que falta sale «—», nunca un valor.
+import {
+  SIN_DATO, textoODash, diagnosticoDe, condicionDe, fraseCarga, picoPrimario, tensionTexto,
+  estadoDevanado, devanadoReferencia, lecturaSobrecarga,
+} from '../../../domain/cargabilidad_detalle.js';
 import { store } from '../state.js';
 
 // ── Generación de series sintéticas (24h / 7d / 30d) ─────────
+// Perfil ILUSTRATIVO, no medido: la forma es inventada y solo la escala sale
+// de la medida registrada. Por eso ningún punto puede pasar de esa medida (el
+// tope era 1,02 y en 7 d/30 d dibujaba una sobrecarga que nadie midió): la
+// serie se normaliza para que su máximo sea EXACTAMENTE la medida.
 function makeSeries(peak, win) {
   if (win === '24h') return PROFILE_24H.map((p, i) => ({
     x: i, y: peak * p, lbl: String(i).padStart(2, '0') + 'h',
   }));
   const days = win === '7d' ? 7 : 30;
-  const out = [];
+  const fs = [];
   for (let i = 0; i < days; i++) {
     const f = 0.82 + 0.18 * Math.sin(i * 1.1) + ((i * 97 % 13) / 13 - 0.5) * 0.12;
-    out.push({
-      x: i, y: peak * Math.max(0.5, Math.min(1.02, f)),
-      lbl: win === '7d' ? 'D' + (i + 1) : String(i + 1),
-    });
+    fs.push(Math.max(0.5, f));
   }
-  return out;
+  const fmax = Math.max(...fs);
+  return fs.map((f, i) => ({
+    x: i, y: peak * f / fmax,
+    lbl: win === '7d' ? 'D' + (i + 1) : String(i + 1),
+  }));
 }
 
 // ── Gauge semicircular SVG ───────────────────────────────────
@@ -47,7 +57,7 @@ function gauge(label, pct, sub) {
     <svg width="124" height="124" viewBox="0 0 128 128">
       <path d="M${tx0} ${ty0} A${r} ${r} 0 1 1 ${tx1} ${ty1}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="11" stroke-linecap="round"/>
       <path d="M${x0} ${y0} A${r} ${r} 0 ${large} 1 ${x1} ${y1}" fill="none" stroke="${col}" stroke-width="11" stroke-linecap="round" style="filter:drop-shadow(0 0 6px ${col})"/>
-      <text x="64" y="60" text-anchor="middle" font-family="Sora" font-weight="800" font-size="26" fill="${col}">${pct == null ? 'N/A' : pct.toFixed(0) + '%'}</text>
+      <text x="64" y="60" text-anchor="middle" font-family="Sora" font-weight="800" font-size="26" fill="${col}">${pct == null ? SIN_DATO : pct.toFixed(0) + '%'}</text>
       <text x="64" y="80" text-anchor="middle" font-size="10.5" fill="#9FC9C8">${sub}</text>
     </svg>
     <div class="disp" style="font-weight:700;font-size:13px;margin-top:-4px">${label}</div>
@@ -57,7 +67,12 @@ function gauge(label, pct, sub) {
 // ── Trend chart SVG ─────────────────────────────────────────
 function trendSVG(d, win) {
   const o = d.P;
-  const peak = o.car || 0;
+  // Sin corriente medida en el primario no se dibuja nada: `car || 0` pintaba
+  // una curva en «0,0 A» que nadie midió.
+  const peak = picoPrimario(d);
+  if (peak == null) {
+    return `<div class="muted" style="padding:28px 0;text-align:center">${SIN_DATO} Sin corriente medida en el primario: no hay curva que dibujar.</div>`;
+  }
   const ser = makeSeries(peak, win);
   const W = 720, H = 290;
   const ymax = Math.max(210, (o.l2 || 0) * 1.08, peak * 1.15);
@@ -80,10 +95,12 @@ function trendSVG(d, win) {
   const limLine = (v, c) => v
     ? `<line x1="0" y1="${Y(v).toFixed(0)}" x2="${W}" y2="${Y(v).toFixed(0)}" stroke="${c}" stroke-width="2" stroke-dasharray="7 5"/>`
     : '';
-  const dots = pts.map((p, i) => {
-    const above = ser[i].y > (o.amp || 1e9);
-    return `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="${above ? 'var(--cri)' : 'var(--aqua)'}"/>`;
-  }).join('');
+  // Los puntos son del perfil ilustrativo: ninguno se pinta en rojo, porque
+  // no son medidas. Solo la etiqueta del máximo —que ES la medida registrada—
+  // se pinta en rojo si esa medida pasa la ampacidad.
+  const dots = pts.map((p) =>
+    `<circle cx="${p[0].toFixed(1)}" cy="${p[1].toFixed(1)}" r="3" fill="var(--aqua)"/>`
+  ).join('');
   const pi = ser.reduce((mi, s, i, a) => s.y > a[mi].y ? i : mi, 0);
   return `<svg viewBox="-44 -10 ${W + 70} ${H + 46}" style="width:100%">
     ${ylab}${xlab}
@@ -101,7 +118,7 @@ function trendSVG(d, win) {
       <rect x="${(X(pi) - 30).toFixed(0)}" y="${(Y(ser[pi].y) - 38).toFixed(0)}" width="78" height="28" rx="7"
             fill="${ser[pi].y > (o.amp || 1e9) ? 'var(--cri)' : 'var(--aqua2)'}"/>
       <text x="${(X(pi) + 9).toFixed(0)}" y="${(Y(ser[pi].y) - 19).toFixed(0)}" text-anchor="middle" fill="#fff"
-            font-family="Sora" font-weight="800" font-size="13">${ser[pi].y.toFixed(1)} A</text>
+            font-family="Sora" font-weight="800" font-size="13">${fmt(ser[pi].y, 1)} A</text>
     </g>
   </svg>`;
 }
@@ -111,7 +128,7 @@ function diagRow(k, score) {
   if (score == null) {
     return `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
       <span class="muted" style="font-size:13px">${k}</span>
-      <span style="font-weight:700;color:var(--ink3)">Sin dato</span>
+      <span style="font-weight:700;color:var(--ink3)">${SIN_DATO}</span>
     </div>`;
   }
   const m = DIAG_MAP[Math.round(score)] || ['—', 'ink3'];
@@ -128,32 +145,86 @@ function diagRow(k, score) {
 // aislamiento con la curva simplificada IEEE C57.91 (§4.1.3 MO.00418). El
 // veredicto sale del VALOR (factor = corriente/ampacidad) contra la tabla
 // normativa, no de datos fabricados. Se rotula ESTIMACIÓN — la tabla es
-// indicativa y asume carga previa 75% y 30 °C (no sustituye la curva térmica
-// del fabricante). Sin sobrecarga (factor ≤ 1) no se muestra: no hay nada que
-// estimar. Datos ya presentes en el modal → cero lecturas Firestore.
-function sobrecargaAdmisibleCard(o) {
-  const car = (o && typeof o.car === 'number') ? o.car : null;
-  const amp = (o && typeof o.amp === 'number') ? o.amp : null;
-  if (car == null || !amp || amp <= 0) return '';
-  const factor = car / amp;
-  if (factor <= 1) return ''; // dentro de ampacidad: sin sobrecarga que evaluar
-  // Modelo self-consistente: la sobrecarga MEDIDA (factor = corriente/ampacidad)
-  // se trata como sostenida desde carga nominal (cargaInicial=100), de modo que
-  // el pico térmico = la carga medida y el envejecimiento crece con la sobrecarga
-  // (usar 75% daría un pico < nominal → envejecimiento < 1×, engañoso bajo
-  // sobrecarga). Temperatura ambiente 30 °C (trópico, supuesto del módulo).
-  const sob = tiempoAdmisible(factor, 100, 30);
-  const min = sob.minutos;
-  const tFmt = (min == null || !isFinite(min))
-    ? '—'
-    : (min >= 60 ? `${(min / 60).toFixed(1)} h (${min} min)` : `${min} min`);
-  const faa = sob.aceleracion_envejecimiento;
-  const faaFmt = (faa == null) ? '—' : `${faa.toFixed(1)}×`;
+// indicativa (sobrecarga sostenida desde carga nominal, 30 °C) y no sustituye
+// la curva térmica del fabricante. Se muestra la carga MEDIDA (% de la
+// ampacidad) y, aparte, el escalón de la tabla con que se estiman los minutos
+// (antes se mostraba el escalón como si fuera el factor del equipo); el
+// envejecimiento sale de la carga medida. Por encima del último escalón no se
+// estima. Sin sobrecarga (factor ≤ 1) no se muestra. Cero lecturas Firestore.
+function sobrecargaAdmisibleCard(o, nombreDev) {
+  const l = lecturaSobrecarga(o);
+  if (!l) return '';
+  const min = l.minutos;
+  const tFmt = (min == null)
+    ? SIN_DATO
+    : (min >= 60 ? `${fmt(min / 60, 1)} h (${min} min)` : `${min} min`);
+  const faaFmt = (l.envejecimiento == null) ? SIN_DATO : `${fmt(l.envejecimiento, 1)}×`;
+  const cuerpo = l.fueraDeTabla
+    ? `Carga medida <b>${fmt(l.pct, 1)} %</b> de la ampacidad del ${nombreDev}: por encima de ${fmt(l.tope * 100, 0)} %, el último escalón de la tabla simplificada, que no permite estimar tiempo admisible ni envejecimiento.`
+    : `Carga medida <b>${fmt(l.pct, 1)} %</b> de la ampacidad del ${nombreDev} · tiempo admisible <b>${tFmt}</b> (escalón <b>${fmt(l.escalon, 2)}×</b> de la tabla, el más cercano) · envejecimiento del aislamiento <b>${faaFmt}</b> (con la carga medida).`;
   return `<div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);font-size:12px;color:#FCD9A6">
     <div style="font-weight:700;margin-bottom:3px">⚠ Sobrecarga admisible (estimación)</div>
-    Factor <b>${sob.factor_usado}×</b> · tiempo admisible <b>${tFmt}</b> · envejecimiento del aislamiento <b>${faaFmt}</b>.
+    ${cuerpo}
     <div style="color:var(--ink3);margin-top:5px;font-size:11px"><i>IEEE C57.91 §7 · MO.00418 §4.1.3 — curva simplificada; trata la sobrecarga medida como sostenida a 30 °C. Orientativo, no sustituye la curva térmica del fabricante.</i></div>
   </div>`;
+}
+
+// ── Subtítulo de cada medidor ───────────────────────────────
+// Antes: «N/A» (no aplica) para todo lo que faltara, y la corriente de un
+// devanado sin ampacidad no aparecía en ninguna parte.
+function subMedidor(d, k) {
+  const o = d[k] || {};
+  switch (estadoDevanado(d, k)) {
+    case 'medido':        return fmt(o.car, 1) + ' / ' + fmt(o.amp, 1) + ' A';
+    case 'sin_ampacidad': return fmt(o.car, 1) + ' A medidos';
+    case 'sin_medida':    return SIN_DATO + ' / ' + fmt(o.amp, 1) + ' A';
+    case 'no_aplica':     return 'No aplica';
+    default:              return 'Sin dato';
+  }
+}
+
+// ── La ventana, a la vista dentro de la pestaña ─────────────
+// En «Seguimiento Operativo» esta página vive en un iframe que la página madre
+// estira a todo su alto (sin scroll propio). El fondo `position:fixed` cubre
+// entonces el iframe ENTERO y la ventana se pintaba arriba del todo, fuera de
+// la vista de quien bajó hasta la tabla: se oscurecía la pantalla y «el clic
+// no abría nada». Mover la página madre no sirve (el navegador no la desplaza
+// por un elemento fijo), así que al ABRIR se baja la ventana —y su X— hasta
+// la franja del iframe que se está viendo, debajo de la barra fija del sitio.
+// Al cerrar, la tabla sigue donde estaba. Abierta directamente (sin iframe) o
+// con una madre de otro origen, no se desplaza nada.
+function bajadaEnIframe(xArriba) {
+  try {
+    if (window.parent === window) return 0;
+    const marco = window.frameElement;            // null si la madre es de otro origen
+    if (!marco) return 0;
+    const tb = window.parent.document.querySelector('.tb');
+    const barra = tb ? Math.max(0, tb.getBoundingClientRect().bottom) : 0;
+    // La X queda 12 px debajo de la barra (y la ventana, debajo de la X, donde
+    // la pone el padding del fondo).
+    return Math.max(0, Math.round(barra + 12 - xArriba - marco.getBoundingClientRect().top));
+  } catch (_) { return 0; }
+}
+// La X se amarra a la esquina de la ventana (`position:relative` en `.modal`):
+// si siguiera colgada del fondo, durante la animación de apertura —que pone un
+// `transform` en `.modal` y la vuelve su referencia— saltaría `bajar` píxeles.
+// Queda donde siempre respecto a la ventana. Las medidas (padding del fondo,
+// top/right de la X) se LEEN de `seguimiento-cargabilidad.css`, no se copian.
+function llevarALaVista(overlay) {
+  const m = overlay.querySelector('.modal');
+  const x = overlay.querySelector('.close');
+  if (m) { m.style.marginTop = ''; m.style.position = ''; }
+  if (x) { x.style.top = ''; x.style.right = ''; }
+  if (!m || !x) return;
+  const cf = getComputedStyle(overlay);
+  const cx = getComputedStyle(x);
+  const px = (v) => parseFloat(v) || 0;
+  const bajar = bajadaEnIframe(px(cx.top));
+  if (!bajar) return;
+  m.style.marginTop = bajar + 'px';
+  m.style.position = 'relative';
+  x.style.top = (px(cx.top) - px(cf.paddingTop)) + 'px';
+  x.style.right = (px(cx.right) - px(cf.paddingRight)) + 'px';
 }
 
 // ── Renderer principal del modal ────────────────────────────
@@ -167,13 +238,26 @@ export function renderModal() {
     overlay.classList.remove('show');
     return;
   }
-  const d = rows[detailIndex];
+  // Las fuentes vivas traen siempre P, S y T; una fila sin alguno (p. ej. de la
+  // colección en tiempo real, hoy vacía) no debe reventar la ventana.
+  const fila = rows[detailIndex];
+  const d = { ...fila, P: fila.P || {}, S: fila.S || {}, T: fila.T || {} };
   const o = d.P;
   const s = sev(d.cmax);
   const col = SEVCOL[s];
-  const margin = (o.amp && o.car != null) ? (o.amp - o.car) : null;
-  const marginPct = (o.amp && o.car != null) ? ((o.amp - o.car) / o.amp * 100) : null;
+  // La «Cargabilidad restante» y la sobrecarga se leen en el devanado MÁS
+  // cargado (antes, siempre el primario: con el secundario sobrecargado la
+  // caja salía verde y la estimación no aparecía).
+  const kRef = devanadoReferencia(d);
+  const oRef = d[kRef] || o;
+  const nombreRef = DEV_LABEL[kRef].toLowerCase();
+  const margin = (oRef.amp && oRef.car != null) ? (oRef.amp - oRef.car) : null;
+  const marginPct = (oRef.amp && oRef.car != null) ? ((oRef.amp - oRef.car) / oRef.amp * 100) : null;
   const condCri = (d.cond || '').toUpperCase().includes('OBSOLET');
+  // Las filas del parque NO traen `diag` (tampoco el baseline): leer `d.diag.carg`
+  // reventaba la ventana antes de mostrarse. Sin dato, cada fila sale «—».
+  const diag = diagnosticoDe(d);
+  const cond = condicionDe(d.cond);
 
   const steps = [
     // Estados NEUTROS a propósito (G020): es un flujo de REFERENCIA, no un
@@ -205,7 +289,18 @@ export function renderModal() {
 
   const spec = (k, v) => `<div class="spec"><div class="k">${k}</div><div class="v mono">${v}</div></div>`;
 
-  body.innerHTML = `
+  // La ventana habla de corriente «medida» / «registrada». Con la simulación
+  // encendida (o sus valores aún puestos) o con los equipos de demostración, eso
+  // no es cierto: se dice arriba, con todas las letras.
+  const simulada = store.state.live || ['P', 'S', 'T'].some((k) =>
+    fila._base && fila._base[k] != null && fila[k] && fila[k].car !== fila._base[k]);
+  const aviso = simulada
+    ? 'SIMULACIÓN ACTIVA: las corrientes de esta ventana son simuladas, NO medidas.'
+    : (store.state.source === 'baseline-demo'
+      ? 'Equipo de DEMOSTRACIÓN: no es un transformador de su parque.' : '');
+
+  body.innerHTML = `${aviso ? `
+    <div class="glass panel" style="padding:12px 16px;background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.4);color:#FCD9A6;font-weight:700;font-size:13px">⚠ ${aviso}</div>` : ''}
     <div class="glass panel" style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding-right:60px">
       <div style="width:58px;height:58px;border-radius:16px;background:linear-gradient(145deg,${col},#FF8AA0);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px -6px ${col}">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
@@ -214,14 +309,14 @@ export function renderModal() {
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="disp" style="font-size:23px;font-weight:800">Subestación ${d.sub}</span>
           <span class="pill bg-${s}"><span class="dot" style="background:${col};color:${col}"></span>${SEVLBL[s].toUpperCase()} · ${d.cmax == null ? '—' : d.cmax.toFixed(0) + '%'}</span>
-          <span class="pill" style="background:rgba(255,255,255,.08);color:var(--ink2);font-size:11px">Cond. ${d.cond}</span>
+          <span class="pill" style="background:rgba(255,255,255,.08);color:var(--ink2);font-size:11px">Cond. ${cond.texto}</span>
         </div>
-        <div class="tag" style="margin-top:4px">Matrícula ${d.id} · Zona ${cap(d.zona)} · ${cap(d.dep)} · Grupo ${d.grupo} · ${fmt(d.us)} usuarios</div>
+        <div class="tag" style="margin-top:4px">Matrícula ${d.id} · Zona ${textoODash(cap(d.zona))} · ${textoODash(cap(d.dep))} · Grupo ${textoODash(d.grupo)} · ${fmt(d.us)} usuarios</div>
       </div>
       <div style="display:flex;gap:24px;flex-wrap:wrap">
-        ${spec('Potencia', fmt(d.pot) + ' kVA')}
-        ${spec('Tensión', d.vp + ' / ' + d.vs + (d.vt !== 'N/A' ? ' / ' + d.vt : '') + ' kV')}
-        ${spec('Refrig.', d.refrig || '—')}
+        ${spec('Potencia', d.pot == null ? SIN_DATO : fmt(d.pot) + ' kVA')}
+        ${spec('Tensión', tensionTexto(d))}
+        ${spec('Refrig.', textoODash(d.refrig))}
         ${spec('Regul.', d.reg || '—')}
         ${spec('UUCC', d.uucc || '—')}
       </div>
@@ -236,43 +331,43 @@ export function renderModal() {
             </div>
           </div>
           <div class="legend" style="margin-bottom:10px">
-            <span style="color:var(--aqua)">● Corriente medida (A)</span>
+            <span style="color:var(--aqua)">● Perfil ilustrativo, escalado a la corriente medida (A)</span>
             <span style="color:var(--avi)">— Ampacidad ${fmt(o.amp, 1)} A</span>
             <span style="color:var(--ale)">— 1er Límite ${fmt(o.l1, 1)} A</span>
             <span style="color:var(--cri)">— 2º Límite ${fmt(o.l2, 1)} A</span>
           </div>
           <div id="trend">${trendSVG(d, detailWin)}</div>
           <div class="muted" style="margin-top:6px">
-            ${d.cmax > 100 ? 'Corriente supera la ampacidad nominal y el 1er límite SCADA en el pico de demanda.' : 'Equipo operando dentro de su capacidad nominal en la ventana observada.'}
-            <i style="color:var(--ink3)">Serie de perfil — pendiente conexión SCADA histórica.</i>
+            ${fraseCarga(d)}
+            <i style="color:var(--ink3)">La forma de la curva NO es medida: solo su máximo es la corriente registrada. Pendiente conexión SCADA histórica.</i>
           </div>
         </div>
         <div class="glass panel" style="display:flex;align-items:center;justify-content:space-around;gap:10px;flex-wrap:wrap">
           <div style="max-width:160px">
             <div class="tag" style="margin-bottom:8px">Cargabilidad por devanado</div>
-            <div class="muted" style="font-size:11.5px">Estado instantáneo de cada devanado frente a su ampacidad nominal.</div>
+            <div class="muted" style="font-size:11.5px">Corriente registrada de cada devanado frente a su ampacidad nominal.</div>
           </div>
-          ${gauge('Primario', d.P.pct, fmt(d.P.car, 1) + ' / ' + fmt(d.P.amp, 1) + ' A')}
-          ${gauge('Secundario', d.S.pct, d.S.amp ? fmt(d.S.car, 1) + ' / ' + fmt(d.S.amp, 1) + ' A' : 'N/A')}
-          ${gauge('Terciario', d.T.pct, d.T.amp ? fmt(d.T.car, 1) + ' / ' + fmt(d.T.amp, 1) + ' A' : 'N/A')}
+          ${gauge('Primario', d.P.pct, subMedidor(d, 'P'))}
+          ${gauge('Secundario', d.S.pct, subMedidor(d, 'S'))}
+          ${gauge('Terciario', d.T.pct, subMedidor(d, 'T'))}
         </div>
       </div>
       <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:16px">
         <div class="glass panel">
           <h3 style="margin:0 0 10px;font-size:15px">Diagnóstico de condición</h3>
-          ${diagRow(DIAG_LABEL.carg, d.diag.carg)}
-          ${diagRow(DIAG_LABEL.edad, d.diag.edad)}
-          ${diagRow(DIAG_LABEL.dga,  d.diag.dga)}
-          ${diagRow(DIAG_LABEL.fur,  d.diag.fur)}
-          ${diagRow(DIAG_LABEL.herm, d.diag.herm)}
+          ${diagRow(DIAG_LABEL.carg, diag.carg)}
+          ${diagRow(DIAG_LABEL.edad, diag.edad)}
+          ${diagRow(DIAG_LABEL.dga,  diag.dga)}
+          ${diagRow(DIAG_LABEL.fur,  diag.fur)}
+          ${diagRow(DIAG_LABEL.herm, diag.herm)}
           <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px">
             <span class="muted" style="font-size:13px">Condición</span>
-            <span style="font-weight:700;color:${condCri ? 'var(--cri)' : 'var(--ok)'}">${d.cond}</span>
+            <span style="font-weight:700;color:var(--ink)">${cond.color ? `<span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:${cond.color};margin-right:6px;vertical-align:middle"></span>` : ''}${cond.texto}</span>
           </div>
-          <div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:${margin != null && margin < 0 ? 'rgba(251,80,112,.12)' : 'rgba(52,211,153,.1)'};border:1px solid ${margin != null && margin < 0 ? 'rgba(251,80,112,.3)' : 'rgba(52,211,153,.25)'};font-size:12px;color:${margin != null && margin < 0 ? '#FFB0BF' : '#9BF3D3'}">
-            Cargabilidad restante: <b>${margin == null ? '—' : fmt(margin, 1) + ' A (' + fmt(marginPct, 0) + '%)'}</b> en primario.${margin != null && margin < 0 ? ' Equipo operando por encima de su capacidad nominal.' : ''}
+          <div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:${margin == null ? 'rgba(255,255,255,.06)' : margin < 0 ? 'rgba(251,80,112,.12)' : 'rgba(52,211,153,.1)'};border:1px solid ${margin == null ? 'rgba(255,255,255,.12)' : margin < 0 ? 'rgba(251,80,112,.3)' : 'rgba(52,211,153,.25)'};font-size:12px;color:${margin == null ? 'var(--ink2)' : margin < 0 ? '#FFB0BF' : '#9BF3D3'}">
+            Cargabilidad restante: <b>${margin == null ? '—' : fmt(margin, 1) + ' A (' + fmt(marginPct, 0) + '%)'}</b> en ${nombreRef}.${margin != null && margin < 0 ? ' Equipo operando por encima de su capacidad nominal.' : ''}
           </div>
-          ${sobrecargaAdmisibleCard(o)}
+          ${sobrecargaAdmisibleCard(oRef, nombreRef)}
         </div>
         <div class="glass panel" style="flex:1">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
@@ -295,5 +390,7 @@ export function renderModal() {
     });
   });
 
+  const abriendo = !overlay.classList.contains('show');
   overlay.classList.add('show');
+  if (abriendo) llevarALaVista(overlay);
 }

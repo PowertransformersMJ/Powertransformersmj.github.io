@@ -7,7 +7,7 @@ import { filtrosVacios } from '../../domain/cargabilidad_filtros.js';
 
 const _state = {
   rows: [],                  // dataset normalizado (con _i, _base, recompute aplicado)
-  source: 'empty',           // 'baseline' | 'firestore' | 'empty'
+  source: 'empty',           // 'parque' | 'baseline-demo' | 'firestore' | 'empty' (data/seguimiento_cargabilidad.js) · 'baseline' = valor por defecto de setRows (lo usa _dev)
   filtros: filtrosVacios(),  // { q, zona: Set, dep, grupo, dev, sev: Set }
   sort: 'cmax',              // columna activa para ordenar tabla
   dir: -1,                   // 1 asc · -1 desc

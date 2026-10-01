@@ -35,6 +35,22 @@ function jitter() {
   store.setRows(rows, store.state.source);
 }
 
+// Al detener la simulación cada corriente vuelve a su valor MEDIDO (`_base`).
+// Antes se quedaba el último valor simulado, y la tabla («I medida») y la
+// ventana de detalle lo seguían mostrando como si fuera la medida.
+function restaurarMedidas() {
+  const rows = store.state.rows;
+  if (!rows || !rows.length) return;
+  rows.forEach(d => {
+    if (!d._base) return;
+    ['P', 'S', 'T'].forEach(w => {
+      if (d._base[w] != null && d[w]) d[w].car = d._base[w];
+    });
+    recompute(d);
+  });
+  store.setRows(rows, store.state.source);
+}
+
 export function toggleLive() {
   const nuevo = !store.state.live;
   store.setLive(nuevo);
@@ -43,6 +59,7 @@ export function toggleLive() {
   } else {
     if (_timer) clearInterval(_timer);
     _timer = null;
+    restaurarMedidas();
   }
   return nuevo;
 }
@@ -50,6 +67,7 @@ export function toggleLive() {
 export function detenerLive() {
   if (_timer) { clearInterval(_timer); _timer = null; }
   store.setLive(false);
+  restaurarMedidas();
 }
 
 // Establece los valores _base (snapshot inicial) sobre cada

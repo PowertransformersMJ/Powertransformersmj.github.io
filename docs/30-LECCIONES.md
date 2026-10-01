@@ -197,6 +197,16 @@ transacción con lo guardado en ese instante, y la regla exige que no encoja (`k
 escribir lo derivado de una simulación, comprobar que nadie escribió entre medias. **Gate**: pruebas de `ventanaDeMes`
 y `fundirCatalogo` + regla con casos de encoger negados (`tests-rules/scada_carga.rules.test.js`).
 
+### L-114 · Un `<a>` con forma de botón hereda el color de enlace del sitio: el estado vacío también se mira en producción
+
+`99 §122.9`: el Ingeniero abrió «Cargabilidad SCADA» y «no se aprecia nada». La página estaba bien (no hay datos aún),
+pero su único botón, `<a class="btn btn--primary">`, salía azul sobre azul: `body.aqua a` (0,1,2) le gana a `.btn`
+(0,1,0). Y lo elegido con fondo translúcido (`rgba(…,.12)`) se pierde sobre la foto de fondo del shell. En el banco
+se había probado el camino CON datos; el estado vacío —lo PRIMERO que ve el dueño— nunca se miró de cerca. **Regla**:
+(1) un enlace que luce como botón fija su color dentro del alcance del módulo (`.cscada a.btn`); (2) lo seleccionado y
+los paneles de lectura van con fondo sólido o casi sólido sobre la foto; (3) la pantalla vacía dice QUÉ falta y quién lo
+hace, paso por paso, y se valida en vivo igual que la llena. [HONOR]
+
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
 > **Reglas de Firestore/Storage, cédulas, firmas ajenas y saneado de datos** viven en
