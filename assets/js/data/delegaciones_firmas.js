@@ -13,7 +13,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  collection, doc, getDoc, getDocs, query, where, orderBy, limit, writeBatch, serverTimestamp
+  collection, doc, getDoc, getDocs, query, where, orderBy, limit, startAfter, documentId, writeBatch, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { getDbSafe, getAuthSafe } from '../firebase-init.js';
 import { getSession } from '../auth/session-guard.js';
@@ -147,9 +147,18 @@ export async function ultimosUsos({ porDelegado = 20, total = 40 } = {}) {
   const c = custodio();
   if (!c) return [];
   const db = getDbSafe();
-  const reg = await getDocs(query(collection(db, 'firmas_delegados_registro'), where('custodio', '==', c.uid), limit(50)));
-  const uids = new Set();
-  reg.forEach((d) => { const x = d.data() || {}; if (x.delegado) uids.add(String(x.delegado)); });
+  // Quién tuvo permiso alguna vez: los vigentes y TODO el registro, de 50 en 50 (espejo de `§119`: con un solo
+  // `limit(50)` sin orden un delegado podía quedar por fuera cuando el registro de otro crecía).
+  const uids = new Set((await delegacionesVigentes()).keys());
+  let ultimo = null;
+  for (let pagina = 0; pagina < 20; pagina++) {
+    const q = [where('custodio', '==', c.uid), orderBy(documentId()), limit(50)];
+    if (ultimo) q.splice(2, 0, startAfter(ultimo));
+    const reg = await getDocs(query(collection(db, 'firmas_delegados_registro'), ...q));
+    reg.forEach((d) => { const x = d.data() || {}; if (x.delegado) uids.add(String(x.delegado)); });
+    if (reg.size < 50) break;
+    ultimo = reg.docs[reg.docs.length - 1];
+  }
   const out = [];
   for (const uid of uids) {
     const snap = await getDocs(query(collection(db, 'ordenes_emisiones'), where('emisor', '==', uid), orderBy('en', 'desc'), limit(porDelegado)));

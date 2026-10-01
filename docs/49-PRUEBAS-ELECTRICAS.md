@@ -89,7 +89,7 @@ acción CBM vía `accionPrueba`). Cableado ADITIVO en `montarMultiAno` para rela
 bujes/collar (tan δ/excitación conservan su panel). Reusa dominio (L-55); CSS `pe-vp-*`. Tests
 `tests/tablas_pruebas_panel.test.js` (6, guard del bug de nivel). Suite 1185/1185. **Falta validar en la APP**.
 Origen: workflow iterado (fichas `docs/pruebas/*.json` + harnesses `_dev/preview-panel-prueba*.html`). Lección
-→ `30 §L-55` (reusar dominio no reinventar · criterio por tipo · dedup · preview en raíz).
+→ `34 §L-55` (reusar dominio no reinventar · criterio por tipo · dedup · preview en raíz).
 
 ## Estado de las 13 skills (1 por prueba de la batería 7.2.2)
 

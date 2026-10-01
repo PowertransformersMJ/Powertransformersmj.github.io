@@ -4931,10 +4931,103 @@ una regla que pasa con 1 casilla y se cae con 5 · tomar un error de red por «s
   una persona añadida con la página abierta sale tras recargar (lo que se ve es lo que sale) · la carrera de
   milisegundos custodio/delegado al retirar es inofensiva · releer el directorio tras dar un permiso es solo una lectura de más.
 - **Aceptado:** lo de `§117.8` (quien lee una firma puede copiarla; el registro cubre lo emitido).
-- **Pendiente mío:** el mismo retiro sin nombre y el registro con `limit(50)` siguen en el panel de ÓRDENES (`§117`).
+- **Pendiente mío:** el mismo retiro sin nombre y el registro con `limit(50)` siguen en el panel de ÓRDENES (`§117`). → ✅ cerrado en `119.9`.
 - **Pendiente suyo:** «Copiar mi firma propia»; dar el permiso en Fichas a Carlos y Jorge (declara la autorización de
   cada titular, incluidos Jorge Miranda y Erick Vergara); que recarguen; la 1.ª descarga, que reviso en «Últimos usos».
 - **Hecho el 2026-09-30, a su pedido («usa la extensión de Chrome para que tú mismo hagas lo faltante»)**, en su sesión:
   «Copiar mi firma propia» (el directorio queda con las cinco); permiso en Fichas a Carlos y Jorge con las cinco y en
   Órdenes (`§117`) con las tres, autorización «verbal al Ing. Miguel Jimenez» (la suya, «del custodio»). Verificado al
   recargar, contra el servidor. Queda: que recarguen y sus primeros usos.
+
+**119.9 Espejo en Órdenes E/S (`§117`) de los dos huecos de 119.8** ⟦OPUS-5.5⟧ (2026-09-30). Vista previa (banco antes/después)
+y «procede»; publicado `2bee3cb` (código `348e661`). Reglas e índices SIN cambios.
+- **Causa raíz.** `firmas-delegadas-panel.js` `filaUsuario` salía en `if (!u.nombre)` sin botón aunque hubiera permiso vigente
+  (el borrado de `firmas_delegados` no depende del nombre). `delegaciones_firmas.js` `ultimosUsos` leía el registro con un
+  solo `limit(50)`: sin `orderBy`, Firestore devuelve por id y un delegado cuyo uid ordena detrás de ≥50 filas de otro quedaba fuera.
+- **Solución.** Helper interno `botonRetirar` (igual al de Fichas), también en la fila del inactivo; `ultimosUsos` = vigentes ∪
+  registro por id de 50 en 50 (`orderBy(documentId())` + `startAfter`, ≤ 20 páginas). Sin exports nuevos (L-102).
+- **Verificación.** Reglas +3, 191/191 (recorrer el registro de 50 en 50 y no otro admin, un delegado ni una página de 51;
+  retirar a un delegado cuyo perfil quedó sin nombre; «Últimos usos» por emisor). Unitarias 2095. Banco con el código de
+  HEAD servido por `git show` y datos SINTÉTICOS (60 filas de un delegado + la orden de otro ya retirado): antes, sin botón y
+  sin su orden; después, ambos. Retiro = borrado + registro «retiro» en un lote, con el permiso de Fichas del mismo usuario
+  intacto; escritura rechazada conserva y avisa; 50 filas exactas; registro caído. CI y Deploy verdes en `2bee3cb`, servidos
+  = `main`, módulos importados en producción sin sesión (mismas exportaciones, consola limpia). Bóveda `2026-09-30-espejo-119-ordenes`.
+- **Verificado sano.** El rojo de CI en `3cc4cd1` (solo cerebro) fue la prueba de VELOCIDAD del lector del Diagrama Operativo
+  (1623 ms > 1500 en el runner); el mismo árbol pasó en `d6df2d8`: inestable, no regresión (→ `11`).
+- **Pendiente suyo:** ver el panel en su sesión (recargar la página: L-85); lo demás, lo de 119.8.
+
+## 120. ADR-120 — Cerebro: las neuronas llenas se parten en hijas (00, 20, 30, 32, cola de Fichas) y el kernel reconcilia el índice por rangos ⟦OPUS-5.5⟧ (2026-09-30)
+
+> Tras `§119`, cinco neuronas quedaron en su tope: `00` 16000/16000 · `20` 15997/16000 · `30` 39993/40000 ·
+> `32` 41735/42000 · cola de Fichas 20115/22000. El próximo ADR o la próxima lección ya no cabía. Pendiente desde
+> `TODO-66` («shard real de `00-INDICE`») y propuesto por la auditoría del 27-09 (C-05 y C-08 de su tabla viva).
+> Solo cerebro y kernel: cero código de producto.
+
+**120.1 Causa raíz.**
+- Las neuronas crecen por apéndice (una fila por ADR, una lección por tropiezo) y nadie las parte hasta que chocan.
+- El shard de `00` estaba frenado por el kernel: `brain-check` ya leía `00[a-z]-INDICE*` (gates #3/#5a/#9), pero
+  `brain-index` solo reconciliaba `00-INDICE.md`. Probado en copia: con §1-§80 en una hermana y una línea metida en
+  medio de `99`, el kernel viejo dejaba 79 filas desfasadas (79 avisos del gate #3) que había que curar a mano.
+
+**120.2 Solución (§G.5: hijas con puntero desde la madre; no se borra nada).**
+- **Kernel v1.12.0** (bóveda `00d2b19`): `brain-index` recorre las mismas hojas que lee `brain-check`; sin hermanas,
+  idéntico a antes. `VERSION` y README al día. Repartido a este repo y a Líneas AT (su `a29807e`: allí no hay
+  hermanas, su índice quedó igual y su `brain:check` sale sano).
+- **`00` → `00a-INDICE-ADR-001-080.md`**: filas §1-§80 tal cual. Las nuevas siguen entrando al final de `00`
+  (`brain:archive` no cambia). Aviso visible al abrir la Capa 1.
+- **`20` → `22-ESPACIAL-MODULOS.md`**: el detalle archivo por archivo de Fichas, Órdenes de Materiales, Firmas
+  personales y Firmas del EQUIPO. En `20` queda una fila corta por módulo que apunta a `22`.
+- **`30` → `34-LECCIONES-PRUEBAS-ELECTRICAS.md`**: la sección «⚡ Pruebas Eléctricas» completa (18 lecciones). `30`
+  deja el puntero con los IDs.
+- **`32` y `30` → `35-LECCIONES-SEGURIDAD.md`**: L-64, L-75, L-76, L-78, L-79, L-91, L-93, L-95, L-106, L-107 (de
+  `32`) y L-110 (de `30`): reglas de Firestore/Storage, datos personales, firmas de otros.
+- **Cola de Fichas → `cola-fichas-tecnicas-cerrados.md`**: CF-01…07, CF-25, CF-40 (cerrados) y CF-32 (refutado),
+  como manda la propia cola (retirar lo que su ADR ya recogió). La cola deja una línea con el enlace.
+- Registro: `CLAUDE.md §0` (`22`, `34`, `35`), topes nuevos en el manifest (`_capsNuevos120`; los de las
+  madres NO se tocaron), ruteo de `00` Capa 2 (seguridad → `35`, Pruebas Eléctricas → `34`, Fichas y firmas → `22`,
+  fila nueva «¿dónde está `L-NN`?»), nota de mudanza en `30` y `32`, `49:92` (`30 §L-55` → `34`), `10` TODO-66 sin
+  lo ya cerrado. De paso: la fila de IA de `00` mandaba a `30` por L-20/L-21, que viven en `31` desde `§68`.
+
+**120.3 No-regresión.**
+- Ni una letra cambió en lo movido (comparación por script contra `HEAD`): 93/93 lecciones idénticas, 119/119
+  filas del índice (mismo conjunto entre `00` y `00a`), las 4 filas de `20` presentes en `22`, las 15 líneas de la
+  cola presentes en su archivo. Ningún ID cambió de número.
+- Tamaños (`brain:check`): `00` 16000 → ~7.7k · `20` → 13012 · `30` → 26943 · `32` → 30497 · cola → 15376.
+  Hijas: `00a` 9747/12000 · `22` 4626/12000 · `34` 14265/20000 · `35` 12738/20000 · cerrados 5724/15000.
+- Arranque 31383 → 31478 ≤ 31500 (ya con el `05` de `§119.9`, que llegó en paralelo): registrar tres neuronas se
+  pagó compactando (el `docs/` repetido en los nombres de las hijas del §0 y lo ya cerrado de TODO-66). No se subió
+  el objetivo.
+
+**120.4 Verificación.**
+- Laboratorio (copia en el scratchpad): (A) sin hermana, `00` byte-idéntico con el kernel nuevo; (B) con hermana y
+  3 líneas metidas en `99`, 118/119 filas reconciliadas en los dos archivos y gate #3 verde; control con el viejo:
+  79 filas desfasadas.
+- Repo: `npm run brain:index` → «Índice 00 (2 archivos): 120 filas»; `npm run brain:check` SANO (41 docs
+  alcanzables, refs L-/M- resuelven en `30` + 5 hijas); `boot-gate` OK. Las once lecciones de tres cifras
+  (L-100…L-110), que el gate #5 no ve (ver 120.8), comprobadas a mano: todas resuelven.
+
+**120.5 Anti-patterns evitados.** Subir los topes o el objetivo del arranque (maquillar el candado) · comprimir a
+mano las descripciones del índice (pérdida permanente: la lección de TODO-32) · editar `scripts/*.mjs` dentro del
+repo (gate #0) · partir el índice sin enseñarle al kernel a reconciliar la hija · borrar los CF cerrados en vez de
+archivarlos · dejar al otro repo con el kernel viejo (su pre-commit se bloquearía) · `git add` amplio (M-05).
+
+**120.6 Archivos.** Nuevos: `docs/00a-INDICE-ADR-001-080.md`, `docs/22-ESPACIAL-MODULOS.md`,
+`docs/34-LECCIONES-PRUEBAS-ELECTRICAS.md`, `docs/35-LECCIONES-SEGURIDAD.md`, `docs/cola-fichas-tecnicas-cerrados.md`.
+Tocados: `CLAUDE.md` (§0), `docs/00-INDICE.md`, `20`, `30`, `32`, `49` (una referencia), `10`,
+`cola-fichas-tecnicas.md`, `.brain-manifest.json`; `scripts/brain-index.mjs` + `scripts/.kernel-version.json` por
+`brain:pull`. INTACTOS: todo el código de producto, `05`, `11`, `21`, `31`, `33`, y `99` salvo este ADR.
+
+**120.7 Doctrina.** §G.5 (hija con puntero, one-in-one-out en el arranque) · límite de guardián §G.4 (mover, no
+borrar) · regla del escritor del kernel (bump en el mismo commit + pull en cada repo) · §3.3 (medido, no supuesto) · **L-111** (lo que este cierre enseñó del worktree).
+
+**120.8 Verificado sano / hallazgos.**
+- **Hallazgo nuevo, NO arreglado aquí (KERNEL):** el gate #5 busca lecciones con `\b([LM]-\d{2})\b`; en `L-100`…
+  `L-110` no hay frontera de palabra tras dos cifras, así que esas once nunca se han validado y una ref de tres cifras
+  a una lección que no existe saldría en verde. Arreglo: `\d{2,3}` en las tres regex de lecciones de `brain-check` — `\d{2,}` casaría
+  «M-4100», un modelo de equipo que ya aparece en una hoja técnica. Probarlo contra los dos repos antes de repartir.
+  Anotado como P-01 en la tabla viva de TODO-66 (bóveda `2026-09-27-auditoria-nivel2/HALLAZGOS.md`); familia de TODO-67.
+- **Despejado:** `00a` no exige registro directo del gate #10 (solo lo exigen los nombres `NN-`) y no cabía en el
+  arranque: lo anuncia la madre al abrir la Capa 1, que es donde se busca un § · `brain:archive` sigue agregando al final de `00`, que es lo correcto con el tramo viejo en `00a` ·
+  el conteo «hojas referenciadas en CLAUDE.md» bajó de 17 a 12 porque las hijas ya no llevan `docs/` delante; su
+  existencia la sigue cubriendo el gate #10 (un nombre renombrado sin tocar el §0 sale «sin registro»).
+- **No revisada externamente**: no es Decisión Fuerte — todo se revierte con `git revert`, y el kernel con su commit.
