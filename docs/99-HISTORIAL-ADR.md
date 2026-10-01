@@ -5362,3 +5362,58 @@ código**: septiembre sin casi toda ORIENTE (48 claves; ~520 vs ~690 estaciones/
 agosto 30/31; solo ~80 equipos traen las 3 tensiones de línea. **Pendiente**: máx/mín/instantáneo como banda («toda
 la información»; diseño en la bóveda), revisar los 26 pendientes y las 17 correcciones, re-exportar septiembre, mayo.
 Bóveda `2026-10-01-carga-scada-paquete`.
+
+## 126. ADR-126 — Cargabilidad SCADA: máximo, mínimo e instantáneo de cada hora con filtro «Valores a mostrar» y «Fases», y una gráfica grande por magnitud ⟦OPUS-5.5⟧ (2026-10-01)
+
+> «procede por favor, que los valores que hacen falta sean escogibles mediante un filtro, dame la vista previa» ·
+> «procede. también necesito que cada gráfica se vea más grande… puedes tomar como ejemplo MANTENIMIENTO DE LÍNEAS AT,
+> solo de ejemplo sin mezclar ni revolver nada». Vista previa con datos REALES (jun–ago) en su Chrome antes de publicar.
+
+**126.1 Causa raíz.** El lector solo guardaba el PROMEDIO de cada hora (y la calidad): el máximo, el mínimo y el instantáneo
+del exporte se descartaban (§122.2), y la figura apilaba 5 paneles de 175 px con UN recuadro del cursor para todas las
+trazas: poco legible.
+
+**126.2 Solución.**
+- **Datos**: por familia, claves opcionales `max`/`min`/`ins` (Float32 LE en Bytes, solo si traen valor) en el MISMO doc
+  `scada_series` — reglas e índices sin cambios (nada valida dentro de `niveles`; `niveles` exento de índices). Solo
+  para VER: la cifra, la firmeza y la CRG siguen saliendo del promedio. El extra de cada hora sigue a la exportación del
+  promedio de esa hora (`fusionarCrudo`, «fuente»): nunca se mezclan dos exportaciones. Lotes también por bytes (1 MB).
+  Paquete versión 2 (rechaza el 1 con texto llano).
+- **Vista**: filtro «Valores a mostrar» (promedio · máximo · mínimo · instantáneo) y «Fases» (R · S · T), recordado en
+  el navegador; lo que el rango no trae se ve deshabilitado y desmarcado, y nunca queda la figura en blanco
+  (`verEfectivo`). Máx + mín = franja sombreada por fase (polígono por tramo, siempre SVG); instantáneo = puntos.
+  `extrasVisibles` oculta los imposibles (topes, tensión > 1,5×kV o negativa, corriente > 3×A, > 3× el mayor promedio)
+  y una caída de tensión SÍ se ve. Con extras, la escala vertical se ajusta al grueso de los datos y avisa cuántos picos
+  quedan fuera («Autoescala» los muestra). CSV: columnas nuevas al final.
+- **Gráficas grandes** (Líneas AT solo como ejemplo visual): una por magnitud con su título —corriente 400 px (de ella
+  sale la cifra), cargabilidad 320, tensión 320, potencias 340, FP 240—, su leyenda y su recuadro del cursor; zoom
+  compartido con el MISMO rango exacto de fechas en todas.
+- **L-102**: todo lo nuevo se exporta de un archivo NUEVO (`scada_carga_extras.js`); ningún archivo existente gana
+  exportaciones (comprobado contra `main`).
+
+**126.3 No-regresión.** Con los 8 meses reales (1.748 docs): v/m/b, resúmenes y catálogo idénticos byte a byte con y
+sin extras; «Completar» sobre lo guardado (sin extras) solo agrega y una segunda carga escribe 0 (idempotente). Sin
+extras la figura dibuja las mismas curvas. Publicado `2ec909d`; CI y Deploy verdes; servidos = main.
+
+**126.4 Verificación.** 2198 pruebas (6 de extras + ajustes). Vista previa fiel con las páginas reales y datos reales de
+3 transformadores (servidor local con semilla; nada a producción). Revisión adversarial: 1 bloqueante (caché, L-102) +
+2 importantes (paquete v1 silencioso; filtro que dejaba la figura en blanco) + 5 menores — todos corregidos antes de
+publicar. Producción: los 8 meses recargados en «Completar» con el paquete v2 (60 partes; ago 227 · jul 224 · jun 224 · abr 224 ·
+mar 224 · feb 223 · ene 223 · sep 179 series, todas «completa»); cada simulación coincidió con la verificación (mismas
+horas válidas, 0 conflictos); la lista de agosto quedó IGUAL (127 firmes · 43 provisionales · 73 CRG 4–5 · 28 sostenidas)
+y el detalle ene–sep (6.551 h) muestra la franja en las 5 gráficas. Bóveda `2026-10-01-carga-scada-paquete` (§126).
+
+**126.5 Anti-patterns evitados.** Calcular con el «máx» del SCADA · exportaciones nuevas en archivos que el navegador
+tiene en caché · mezclar dos exportaciones en una hora · una escala aplastada por picos falsos · copiar código o datos
+del proyecto vecino (solo se miró la presentación).
+
+**126.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_extras.js`, `tests/scada_carga_extras.test.js`. Tocados:
+`scada_carga_{series,importacion,limpieza,paquete}.js`, `data/scada_carga{,_admin}.js`, worker, `cargabilidad-scada/
+{detalle,graficos}.js`, `importar-mes.js`, CSS, pruebas de dominio y paquete.
+
+**126.7 Doctrina.** L-102 · L-117 (paquete) · L-56 (vista previa fiel) · W-13.
+
+**126.8 Verificado sano / no re-auditar.** Reglas aceptan max/min/ins sin desplegar nada · doc máx ~316 KB, lote ≤ ~1 MB ·
+265 MB los 8 meses (de 89) ≈ 35 MB/mes: el GiB gratis alcanza ~29 meses de historia · el orden de los archivos no cambia
+nada · un punto con solo extras no se crea. **Pendiente**: decidir si el mínimo de tensión por debajo de 0,5 pu se marca
+de otro color (hoy se muestra) · el aviso «Autoescala» es texto (no hay botón propio en la página).

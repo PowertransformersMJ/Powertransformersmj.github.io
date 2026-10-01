@@ -241,6 +241,10 @@ datos reales (lo que se escribiría, byte a byte) más un control negativo que e
 con su huella en el nombre, comprobada al juntar; (4) los paquetes llevan datos reales: salida prohibida dentro del
 repo y su extensión en `.gitignore`; (5) en la pestaña: `element.click()` por JS y sondeos cortos (la evaluación corta a
 los 45 s). **Gate**: `tests/scada_carga_paquete.test.js` (formato, filtro = lector, empaquetador de punta a punta).
+**Y en `§126`** (paquete con máx/mín, 6–8 partes por mes): el límite de 10 MB de la extensión se cuenta por LLAMADA y
+también por `browser_batch` (suma las subidas del lote): una parte por llamada; un campo auxiliar FIJO que reenvía al de
+la página evita volver a buscar el campo que la página repinta; en paralelo alguna subida «no responde a tiempo» aunque
+SÍ llega: se confirma con un contador en la página, no con la respuesta de la herramienta.
 
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
