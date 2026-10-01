@@ -14,6 +14,7 @@ import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
 import { chipCifra, textoBandas } from './lista.js';
 import { dibujarFigura, liberarFigura } from './graficos.js';
 import { FAMILIAS, NIVELES, DEVANADO, CALCULO, MOTIVO, CODIGO, UNIDAD, NOMBRE_FAMILIA, TIEMPO } from '../../domain/scada_carga_config.js';
+import { EXTRAS, NOMBRE_EXTRA, EXTRA_TOPE_X, extrasVisibles } from '../../domain/scada_carga_extras.js';
 import { claveId } from '../../domain/scada_carga_csv.js';
 import {
   analizarClaveHomologada, claveEfectiva, conteosHomologacion, normalizarMatricula, placaDe, AVISOS
@@ -35,6 +36,20 @@ const ESTADOS = { automatica: 'Homologación sin observaciones', confirmada: 'Me
 const MOTIVO_LECTURA = { 20: 'mes que no se pudo leer', 21: 'sin datos cargados' };
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
 
+// Filtro de la vista (`99 §126`): qué valores de cada hora y qué fases se dibujan. Se recuerda en este
+// navegador (comodidad de quien mira; si no se puede leer o guardar, vale el de fábrica).
+const FILTRO_CLAVE = 'cscada-filtro-v1';
+const FILTRO_FABRICA = { ver: { prom: true, max: false, min: false, ins: false }, fases: { R: true, S: true, T: true } };
+function leerFiltro() {
+  try {
+    const g = JSON.parse(localStorage.getItem(FILTRO_CLAVE) || 'null');
+    if (g && g.ver && g.fases) return { ver: { ...FILTRO_FABRICA.ver, ...g.ver }, fases: { ...FILTRO_FABRICA.fases, ...g.fases } };
+  } catch (_) { /* vale el de fábrica */ }
+  return { ver: { ...FILTRO_FABRICA.ver }, fases: { ...FILTRO_FABRICA.fases } };
+}
+function guardarFiltro(f) { try { localStorage.setItem(FILTRO_CLAVE, JSON.stringify(f)); } catch (_) { /* nada */ } }
+const ETIQUETA_VER = { prom: 'Promedio de la hora', max: NOMBRE_EXTRA.max, min: NOMBRE_EXTRA.min, ins: NOMBRE_EXTRA.ins };
+
 function bandasCRG(umbrales) {
   const c = { ...BASELINE_UMBRALES_SALUD.crg, ...((umbrales && umbrales.crg) || {}) };
   return [c.c2_min_excl, c.c3_min_excl, c.c4_min_excl, c.c5_min_excl];
@@ -55,13 +70,23 @@ function calcularNivel(rec, kv, A) {
   const sobre = carga ? horasSostenidasSobre(carga.serie, CALCULO.sobrecargaPct, CALCULO.sobrecargaMinH) : null;
   const desb = estadisticas(desbalanceI(fam, A));
   const deseq = estadisticas(desequilibrioU(fam));
-  return { t: rec.t, fam, val, iF, fisico, resumen, S, fp, carga, sobre, desb, deseq, mesesFallidos: rec.mesesFallidos };
+  const ext = extrasVisibles(fam, kv, A);   // máx/mín/instantáneo para VER (no entran en la cifra)
+  return { t: rec.t, fam, val, iF, fisico, resumen, S, fp, carga, sobre, desb, deseq, ext, mesesFallidos: rec.mesesFallidos };
 }
 
 export function montarDetalle(cont, ctx, { alVolver }) {
   let token = 0;
   let figura = null;
   let actual = null;        // {mat, id, tx, fila, punto, cid, placa, desde, hasta, porNivel, calc, nivel}
+  const filtro = leerFiltro();
+  /** Lo que de verdad se dibuja: un extra que el rango no tiene no cuenta; si no queda nada, el promedio. */
+  function verEfectivo(d) {
+    const hay = (d && d.ext && d.ext.hay) || {};
+    const v = { prom: !!filtro.ver.prom };
+    for (const k of EXTRAS) v[k] = !!filtro.ver[k] && !!hay[k];
+    if (!Object.values(v).some(Boolean)) v.prom = true;
+    return v;
+  }
 
   /** Al salir del detalle: nada de lo que siga cargando o dibujando puede volver a pintar aquí. */
   function cerrar() { token++; liberarFigura(figura); figura = null; poner(cont); }
@@ -254,11 +279,51 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const filas = [];
     for (let k = 0; k < d.t.length; k++) {
       const obs = FAMILIAS.filter((f) => !(d.fam[f].m[k] === CODIGO.VALIDO || d.fam[f].m[k] === CODIGO.RETENIDO)).map((f) => f + ': ' + motivo(d.fam[f].m[k]));
-      filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | ')]);
+      // Columnas nuevas AL FINAL (§126): máx, mín e instantáneo que se muestran (las de antes no se mueven).
+      const extras = FAMILIAS.flatMap((f) => EXTRAS.map((e) => { const x = d.ext.series[f] && d.ext.series[f][e]; return x && Number.isFinite(x[k]) ? x[k] : null; }));
+      filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | '), ...extras]);
     }
+    const nombreExtra = { max: 'max', min: 'min', ins: 'inst' };
     descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
-      ['Inicio_hora_CO', 'Fin_hora_CO', 'IR_A', 'IS_A', 'IT_A', 'URS_kV', 'UST_kV', 'UTR_kV', 'P_MW', 'Q_Mvar', 'S_MVA_calculada', 'FP_calculado', 'I_fase_max_A', 'Cargabilidad_pct', 'Horas_descartadas_por'],
+      ['Inicio_hora_CO', 'Fin_hora_CO', 'IR_A', 'IS_A', 'IT_A', 'URS_kV', 'UST_kV', 'UTR_kV', 'P_MW', 'Q_Mvar', 'S_MVA_calculada', 'FP_calculado', 'I_fase_max_A', 'Cargabilidad_pct', 'Horas_descartadas_por',
+        ...FAMILIAS.flatMap((f) => EXTRAS.map((e) => f + '_' + nombreExtra[e] + '_' + UNIDAD[f]))],
       filas);
+  }
+
+  /**
+   * Filtro «Valores a mostrar» y «Fases» (`99 §126`). Cambiarlo solo vuelve a dibujar: no relee la base.
+   * Un valor que el rango no trae (meses cargados antes de guardar máximos y mínimos) queda deshabilitado.
+   */
+  function filtroValores(d, redibujar) {
+    const hay = d.ext.hay || {};
+    const casilla = (grupo, clave, texto, habil, nota) => {
+      const id = 'csVer-' + grupo + '-' + clave;
+      // Una casilla deshabilitada se ve desmarcada (lo que se ve es lo que se dibuja); la preferencia se conserva.
+      const marcado = (g, k) => (g === 'ver' ? !!verEfectivo(d)[k] : !!filtro[g][k]);   // se ve marcado lo que se dibuja
+      const c = el('input', { type: 'checkbox', id, checked: habil && marcado(grupo, clave), disabled: !habil });
+      c.addEventListener('change', () => {
+        filtro[grupo][clave] = c.checked;
+        // Siempre queda algo que ver (contando solo lo que este rango tiene): si no, vuelve el promedio; sin fases, las tres.
+        if (grupo === 'ver' && !Object.values(verEfectivo(d)).some(Boolean)) filtro.ver.prom = true;
+        if (grupo === 'fases' && !Object.values(filtro.fases).some(Boolean)) filtro.fases = { R: true, S: true, T: true };
+        guardarFiltro(filtro);
+        redibujar();
+        const marcas = document.querySelectorAll('[id^="csVer-"]');
+        for (const m of marcas) { const [, g2, k2] = m.id.split('-'); if (filtro[g2]) m.checked = !m.disabled && marcado(g2, k2); }
+      });
+      return el('label', { class: 'cs-check' + (habil ? '' : ' is-apagado'), for: id, title: habil ? '' : nota(clave) }, c, ' ' + texto);
+    };
+    const guardados = d.ext.guardados || {};
+    const nota = (k) => (guardados[k] ? 'En este rango todos esos valores quedaron ocultos por imposibles.' : 'Este rango no trae ese valor guardado.');
+    return el('div', { class: 'cs-filtros' },
+      el('fieldset', { class: 'cs-filtro' }, el('legend', {}, 'Valores a mostrar'),
+        casilla('ver', 'prom', ETIQUETA_VER.prom, true),
+        EXTRAS.map((k) => casilla('ver', k, ETIQUETA_VER[k], !!hay[k], nota))),
+      el('fieldset', { class: 'cs-filtro' }, el('legend', {}, 'Fases'),
+        ['R', 'S', 'T'].map((k) => casilla('fases', k, 'Fase ' + k, true))),
+      el('p', { class: 'cs-ayuda' }, 'El máximo, el mínimo y el instantáneo son de cada hora según el SCADA: sirven para ver, no entran en la cifra de cargabilidad. Con máximo y mínimo a la vez se sombrea la franja entre ellos.'
+        + (d.ext.ocultos ? ' Se ocultan ' + d.ext.ocultos.toLocaleString('es-CO') + ' valores imposibles (topes del sistema, tensiones en otra escala o picos de más de ' + EXTRA_TOPE_X + ' veces el mayor promedio o la ampacidad).' : '')
+        + (!EXTRAS.some((k) => guardados[k]) ? ' Este rango todavía no tiene máximos, mínimos ni instantáneos guardados.' : '')));
   }
 
   async function pintarNivel(a, nv) {
@@ -275,20 +340,26 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     liberarFigura(figura);
     const fig = el('div', { class: 'cs-figura', role: 'img', 'aria-label': 'Curvas horarias del nivel ' + NIVELES[nv].etiqueta + ': corriente por fase, cargabilidad, tensión, potencias y factor de potencia' });
     figura = fig;
+    const panelFiltro = filtroValores(d, () => dibujar());
     const caja = document.getElementById('csNivel');
     if (!caja) return;
     conservarFoco(() => poner(caja,
       el('div', { class: 'cs-panel' },
         el('h2', {}, 'Curvas por fase'),
         botones,
+        panelFiltro,
         el('figure', { style: 'margin:0' }, fig,
           el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.')),
         el('div', { class: 'cs-acciones' }, el('button', { type: 'button', id: 'csCsvNivel', class: 'btn btn--glass btn--sm', onclick: () => exportarCSV(a, nv) }, 'Descargar CSV del nivel'))),
       el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d)))));
     const mio = token;
     const vigente = () => mio === token && figura === fig;
+    const dibujar = () => dibujarFigura(fig, {
+      t: d.t, fam: d.val, iF: d.iF, pct: d.carga ? d.carga.serie : null, S: d.S, fp: d.fp.serie, A: info.A, bandas: bandasCRG(ctx.umbrales), etiqueta: a.mat + '_' + nv,
+      ext: d.ext.series, ver: verEfectivo(d), fases: filtro.fases
+    }, vigente);
     try {
-      await dibujarFigura(fig, { t: d.t, fam: d.val, iF: d.iF, pct: d.carga ? d.carga.serie : null, S: d.S, fp: d.fp.serie, A: info.A, bandas: bandasCRG(ctx.umbrales), etiqueta: a.mat + '_' + nv }, vigente);
+      await dibujar();
     } catch (e) {
       if (!vigente()) return;
       // El aviso va FUERA del rol «img» (si no, el lector de pantalla no lo anuncia ni ofrece el botón).

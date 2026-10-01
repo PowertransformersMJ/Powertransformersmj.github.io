@@ -60,14 +60,15 @@ const canon = (acc) => JSON.stringify({
 });
 
 describe('paquete preparado: formato', () => {
-  test('qué lee el lector: CSV de promedio, calidad o sin estadístico; nada más', () => {
+  test('qué lee el lector: CSV de promedio, calidad, máx, mín, instantáneo o sin estadístico; nada más', () => {
     assert.equal(seLee('ir_average-20260301.csv'), true);
     assert.equal(seLee('IR_Average-20260102.csv'), true);
     assert.equal(seLee('q_quality-20260301.csv'), true);
     assert.equal(seLee('sin-estadistico.csv'), true);
-    assert.equal(seLee('ir_max-20260301.csv'), false);
-    assert.equal(seLee('q_min_adm1-20260301.csv'), false);
-    assert.equal(seLee('U_Current-20260101.csv'), false);
+    // §126: máximo, mínimo e instantáneo también se leen (solo para ver).
+    assert.equal(seLee('ir_max-20260301.csv'), true);
+    assert.equal(seLee('q_min_adm1-20260301.csv'), true);
+    assert.equal(seLee('U_Current-20260101.csv'), true);
     assert.equal(seLee('P_average-20260101.xls'), false);
   });
   test('el filtro deja el encabezado y SOLO las filas de las estaciones dadas, línea por línea', () => {
@@ -94,6 +95,8 @@ describe('paquete preparado: formato', () => {
     const extra = new Uint8Array(c.length + 1); extra.set(c);
     assert.throws(() => leerContenedor(extra), /bytes de más/);
     assert.throws(() => leerContenedor(enc.encode('OTRA COSA 1\n{}\n')), /No es un paquete/);
+    // Un paquete de la versión 1 (sin máx/mín/instantáneo) se rechaza con un texto claro (§126).
+    assert.throws(() => leerContenedor(enc.encode('SGM-SCADA-PAQUETE 1\n{}\n')), /sin máximos, mínimos ni instantáneos/);
   });
   test('partes: nombre con la huella, juntar en orden, avisar las que faltan y no mezclar paquetes', () => {
     const bytes = new Uint8Array(25).map((_, i) => i);
@@ -124,7 +127,7 @@ describe('paquete preparado: el lector ve lo mismo que con la carpeta', () => {
     const paquete = original.map((a) => ({ ...a, texto: seLee(a.nombre) && a.tamano ? filtrarTexto(a.texto, set) : '' }));
     assert.equal(canon(acumular(paquete)), canon(acumular(original)));
     const acc = acumular(original);
-    assert.equal(acc.archivos.otrosEstadisticos, 1); assert.equal(acc.archivos.noCsv, 1); assert.equal(acc.archivos.vacios, 1);
+    assert.equal(acc.archivos.max, 1); assert.equal(acc.archivos.noCsv, 1); assert.equal(acc.archivos.vacios, 1);
   });
   test('el empaquetador de punta a punta: carpeta en disco → partes → mismo contenido filtrado', () => {
     const dir = mkdtempSync(join(tmpdir(), 'scada-paq-'));

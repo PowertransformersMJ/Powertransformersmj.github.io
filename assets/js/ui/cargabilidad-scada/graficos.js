@@ -10,6 +10,7 @@
 
 import { loadPlotly } from '../../plotly-loader.js';
 import { FASES, FASE_DE, CALCULO } from '../../domain/scada_carga_config.js';
+import { NOMBRE_EXTRA } from '../../domain/scada_carga_extras.js';
 import { xPlotly, intervaloCO } from '../../domain/scada_carga_fecha.js';
 
 const aNulos = (arr) => Array.from(arr, (v) => (Number.isFinite(v) ? v : null));
@@ -39,20 +40,39 @@ export async function dibujarFigura(div, d, vigente = () => true) {
     line: { width: 1.4, ...linea }, customdata: cd, hovertemplate: nombre + ': %{y:,.2f} ' + unidad + '<extra></extra>', ...extra
   });
   const fase = (f) => ({ color: FASES[FASE_DE[f]].color, dash: FASES[FASE_DE[f]].trazo });
-  const datos = [
-    traza(d.fam.IR, 'I fase R', 'y', fase('IR'), 'A'),
-    traza(d.fam.IS, 'I fase S', 'y', fase('IS'), 'A'),
-    traza(d.fam.IT, 'I fase T', 'y', fase('IT'), 'A'),
-    traza(d.fam.URS, 'U R-S', 'y3', fase('URS'), 'kV'),
-    traza(d.fam.UST, 'U S-T', 'y3', fase('UST'), 'kV'),
-    traza(d.fam.UTR, 'U T-R', 'y3', fase('UTR'), 'kV'),
-    traza(d.fam.P, 'P (SCADA)', 'y4', { color: '#0B6E4F' }, 'MW'),
-    traza(d.fam.Q, 'Q (SCADA)', 'y4', { color: '#B5482A', dash: 'dash' }, 'Mvar'),
-    traza(d.S, 'S calculada', 'y4', { color: '#1d2b44', dash: 'dot', width: 1.8 }, 'MVA'),
-    traza(d.fp, 'FP calculado', 'y5', { color: '#4d6485' }, '')
+  // Filtro de la vista (`99 §126`): qué valores de cada hora y qué fases se dibujan. Por defecto, como antes.
+  const ver = { prom: true, max: false, min: false, ins: false, ...(d.ver || {}) };
+  const fases = { R: true, S: true, T: true, ...(d.fases || {}) };
+  const ext = d.ext || {};
+  const CURVAS = [
+    ['IR', 'I fase R', 'y', fase('IR'), 'A'], ['IS', 'I fase S', 'y', fase('IS'), 'A'], ['IT', 'I fase T', 'y', fase('IT'), 'A'],
+    ['URS', 'U R-S', 'y3', fase('URS'), 'kV'], ['UST', 'U S-T', 'y3', fase('UST'), 'kV'], ['UTR', 'U T-R', 'y3', fase('UTR'), 'kV'],
+    ['P', 'P (SCADA)', 'y4', { color: '#0B6E4F' }, 'MW'], ['Q', 'Q (SCADA)', 'y4', { color: '#B5482A', dash: 'dash' }, 'Mvar']
   ];
-  // Primera traza: la fecha del intervalo encabeza el recuadro del cursor.
-  datos[0].hovertemplate = '%{customdata}<br>' + datos[0].hovertemplate;
+  const datos = [];
+  const bandas = [];   // la franja mín–máx va DEBAJO de las líneas (se agrega primero)
+  for (const [f, nombre, eje, linea, unidad] of CURVAS) {
+    if (FASE_DE[f] && !fases[FASE_DE[f]]) continue;
+    const e = ext[f] || {};
+    // Una leyenda por curva (legendgroup): al tocarla se apagan juntos su promedio, su franja y sus extras.
+    const grupo = { legendgroup: f };
+    const franjaSi = ver.max && ver.min && e.max && e.min;
+    if (franjaSi) bandas.push({ ...franja(x, e.max, e.min, nombre + ' (mín–máx)', eje, linea.color, LEYENDA[eje]), ...grupo });
+    if (ver.prom) datos.push(traza(d.fam[f], nombre, eje, linea, unidad, grupo));
+    // Máx y mín como líneas finas: sin entrada propia en la leyenda si ya está la franja (la nombra).
+    if (ver.max && e.max) datos.push(traza(e.max, nombre + ' máx', eje, { ...linea, width: 0.8 }, unidad, { opacity: 0.7, ...grupo, showlegend: !franjaSi && !!LEYENDA[eje] }));
+    if (ver.min && e.min) datos.push(traza(e.min, nombre + ' mín', eje, { ...linea, width: 0.8 }, unidad, { opacity: 0.7, ...grupo, showlegend: !franjaSi && !!LEYENDA[eje] }));
+    if (ver.ins && e.ins) {
+      datos.push(traza(e.ins, nombre + ' (inst.)', eje, { color: linea.color }, unidad,
+        { mode: 'markers', marker: { size: 3, color: linea.color, opacity: 0.8 }, line: undefined, ...grupo, hovertemplate: nombre + ' ' + NOMBRE_EXTRA.ins.toLowerCase() + ': %{y:,.2f} ' + unidad + '<extra></extra>' }));
+    }
+  }
+  datos.push(traza(d.S, 'S calculada', 'y4', { color: '#1d2b44', dash: 'dot', width: 1.8 }, 'MVA'));
+  datos.push(traza(d.fp, 'FP calculado', 'y5', { color: '#4d6485' }, ''));
+  datos.unshift(...bandas);
+  // Primera traza con recuadro: la fecha del intervalo encabeza el recuadro del cursor.
+  const primera = datos.find((t) => t.hoverinfo !== 'skip');
+  if (primera) primera.hovertemplate = '%{customdata}<br>' + primera.hovertemplate;
   const shapes = [];
   const linea = (eje, y, color, dash, ancho = 1) => shapes.push({ type: 'line', xref: 'paper', x0: 0, x1: 1, yref: eje, y0: y, y1: y, line: { color, width: ancho, dash } });
   if (d.A > 0) {
@@ -86,6 +106,34 @@ export async function dibujarFigura(div, d, vigente = () => true) {
   await Plotly.react(div, datos, layout, config);
   if (!vigente()) liberarFigura(div);
 }
+
+/**
+ * Franja entre el mínimo y el máximo de cada hora: un polígono por tramo continuo (máx de ida, mín de
+ * vuelta), así los huecos quedan como huecos. Siempre SVG (el relleno de WebGL no respeta los cortes);
+ * va debajo de las líneas y no entra en el recuadro del cursor (las líneas máx/mín ya lo dicen).
+ */
+function franja(x, mx, mn, nombre, eje, color, leyenda) {
+  const xs = []; const ys = [];
+  let i = 0;
+  const n = mx.length;
+  while (i < n) {
+    while (i < n && !(Number.isFinite(mx[i]) && Number.isFinite(mn[i]))) i++;
+    const a = i;
+    while (i < n && Number.isFinite(mx[i]) && Number.isFinite(mn[i])) i++;
+    if (i - a < 1) continue;
+    for (let k = a; k < i; k++) { xs.push(x[k]); ys.push(mx[k]); }
+    for (let k = i - 1; k >= a; k--) { xs.push(x[k]); ys.push(mn[k]); }
+    xs.push(null); ys.push(null);
+  }
+  return {
+    type: 'scatter', mode: 'lines', x: xs, y: ys, name: nombre, xaxis: 'x', yaxis: eje, fill: 'toself', connectgaps: false,
+    fillcolor: hexAlfa(color, 0.16), line: { width: 0, color }, hoverinfo: 'skip', legend: leyenda, showlegend: !!leyenda
+  };
+}
+const hexAlfa = (hex, a) => {
+  const m = String(hex).match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  return m ? 'rgba(' + parseInt(m[1], 16) + ',' + parseInt(m[2], 16) + ',' + parseInt(m[3], 16) + ',' + a + ')' : hex;
+};
 
 /** Libera la figura (al salir del detalle o cambiar de nivel). */
 export function liberarFigura(div) {

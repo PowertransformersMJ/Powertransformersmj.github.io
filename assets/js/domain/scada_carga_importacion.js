@@ -4,14 +4,16 @@
 // La carpeta del mes se lee EN EL NAVEGADOR (un worker): nada se sube como archivo. Solo se
 // toman las filas de las estaciones homologadas (sus claves y TODO swTrafo de la estación, para
 // que confirmar otro punto de la misma estación tenga efecto sin volver a cargar), de los
-// archivos 'average' (valores) y 'quality' (banderas). current/max/min y los .xls se ignoran
-// (el «max» del SCADA trae picos falsos; los .xls son copias de sus CSV).
+// archivos 'average' (valores) y 'quality' (banderas) y —desde §126, SOLO para ver— 'max', 'min'
+// y 'current' (el «max» del SCADA trae picos falsos: nunca entra en la cifra). Los .xls se ignoran
+// (son copias de sus CSV).
 // Pasos: acumular por día → armar meses por rótulo → fundir con lo guardado → limpiar →
 // resumir → simular (veredicto en lenguaje llano) → plan de escritura en lotes.
 // Funciones PURAS: cero DOM, cero Firebase. Archivo NUEVO (L-102).
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { FAMILIAS, NIVELES, ESCRITURA, CODIGO, TIEMPO } from './scada_carga_config.js';
+import { EXTRAS, EXTRA_DE_ESTADISTICO, LOTE_MAX_BYTES } from './scada_carga_extras.js';
 import { leerArchivo, estadisticoDeNombre, fechaDeNombre, fechaDeCarpeta, claveId } from './scada_carga_csv.js';
 import { limpiarNivel, conteoCodigos } from './scada_carga_limpieza.js';
 import { horasMes, diasMes, idxDe, empaquetar, fusionarCrudo, igualBytes, mesDeFecha } from './scada_carga_series.js';
@@ -24,9 +26,10 @@ const TOL = 1e-6;
 export function crearAcumulador() {
   return {
     dias: new Map(),            // `${cid}|${nivel}|${fam}|${fecha}` → {v, b, pv}
+    extras: new Map(),          // misma clave → {max?, min?, ins?} (Float32Array(24); NaN = sin dato) · `99 §126`
     puntos: new Map(),          // cid → {clave, est, elem, niveles: {N: {kv, texto}}}
     fechas: new Map(),          // fecha → archivos average leídos
-    archivos: { average: 0, quality: 0, otrosEstadisticos: 0, noCsv: 0, vacios: 0, encabezadoInvalido: 0, sinEstadistico: 0 },
+    archivos: { average: 0, quality: 0, max: 0, min: 0, current: 0, extrasInvalidos: 0, otrosEstadisticos: 0, noCsv: 0, vacios: 0, encabezadoInvalido: 0, sinEstadistico: 0 },
     discrepancias: { fechaNombre: 0, fechaCarpeta: 0, ejemplos: [] },
     conflictos: 0,
     invalidos: []
@@ -43,6 +46,9 @@ export function acumularArchivo(acc, arch, objetivo) {
   if (!/\.csv$/i.test(nombre)) { acc.archivos.noCsv++; return; }
   if (!arch.tamano) { acc.archivos.vacios++; return; }
   const est = estadisticoDeNombre(nombre);
+  const extra = est ? EXTRA_DE_ESTADISTICO[est] : null;
+  if (extra) { acumularExtra(acc, arch, objetivo, est, extra); return; }
+  // Defensa: hoy estadisticoDeNombre solo da average/quality/max/min/current, así que no se alcanza.
   if (est && est !== 'average' && est !== 'quality') { acc.archivos.otrosEstadisticos++; return; }
   if (!est) acc.archivos.sinEstadistico++;
   const r = leerArchivo(arch.texto, objetivo, { estadistico: est });
@@ -75,6 +81,25 @@ export function acumularArchivo(acc, arch, objetivo) {
     } else if (f.banderas) {
       for (let h = 0; h < 24; h++) if (!d.b[h]) d.b[h] = f.banderas[h];
     }
+  }
+}
+
+/**
+ * Máximo, mínimo o instantáneo de cada hora (`99 §126`): solo para VER. No cuentan para los días del
+ * mes, las discrepancias ni el veredicto (que siguen siendo los de promedio y calidad); un punto o nivel
+ * que solo traiga extras no se crea (armarMeses solo los usa donde hay promedio o calidad ese día).
+ */
+function acumularExtra(acc, arch, objetivo, est, extra) {
+  const r = leerArchivo(arch.texto, objetivo, { estadistico: 'average' });
+  if (!r.ok) { acc.archivos.extrasInvalidos++; return; }
+  acc.archivos[est]++;
+  for (const f of r.filas) {
+    if (!f.valores) continue;
+    const key = claveId(f.est, f.elem) + '|' + f.nivel + '|' + f.familia + '|' + r.fecha;
+    let e = acc.extras.get(key);
+    if (!e) { e = {}; acc.extras.set(key, e); }
+    if (!e[extra]) e[extra] = new Float32Array(24).fill(NaN);
+    for (let h = 0; h < 24; h++) if (Number.isNaN(e[extra][h]) && !Number.isNaN(f.valores[h])) e[extra][h] = f.valores[h];
   }
 }
 
@@ -125,6 +150,15 @@ export function armarMeses(acc, meses) {
       const i = idxDe(dia, h);
       if (d.pv[h]) { s.v[i] = d.v[h]; s.presente[i] = 1; }
       s.b[i] = d.b[h];
+    }
+    // Extras del mismo punto, nivel, familia y día (solo donde hay promedio o calidad).
+    const x = acc.extras && acc.extras.get(key);
+    if (x) {
+      for (const k of EXTRAS) {
+        if (!x[k]) continue;
+        if (!s[k]) s[k] = new Float32Array(n).fill(NaN);
+        for (let h = 0; h < 24; h++) s[k][idxDe(dia, h)] = x[k][h];
+      }
     }
   }
   return out;
@@ -202,7 +236,13 @@ export function docSinCambios(nuevo, guardadoCrudo) {
   for (const nv of ka) {
     const fa = a[nv].fam; const fb = (b[nv] && b[nv].fam) || {};
     if (Object.keys(fa).sort().join() !== Object.keys(fb).sort().join()) return false;
-    for (const f of Object.keys(fa)) for (const k of ['v', 'm', 'b']) if (!igualBytes(fa[f][k], fb[f] && fb[f][k])) return false;
+    for (const f of Object.keys(fa)) {
+      for (const k of ['v', 'm', 'b', ...EXTRAS]) {
+        const A = fa[f][k]; const B = fb[f] && fb[f][k];
+        if (!A && !B) continue;   // un extra que no está en ninguno de los dos
+        if (!igualBytes(A, B)) return false;
+      }
+    }
   }
   return true;
 }
@@ -210,14 +250,25 @@ export function docSinCambios(nuevo, guardadoCrudo) {
 /** Tamaño aproximado (bytes) de un doc de serie en Firestore. */
 export function tamanoDoc(doc) {
   let t = 300;
-  for (const x of Object.values(doc.niveles || {})) for (const s of Object.values(x.fam || {})) t += s.v.length + s.m.length + s.b.length + 60;
+  for (const x of Object.values(doc.niveles || {})) {
+    for (const s of Object.values(x.fam || {})) {
+      t += s.v.length + s.m.length + s.b.length + 60;
+      for (const k of EXTRAS) if (s[k]) t += s[k].length + 10;
+    }
+  }
   return t;
 }
 
-/** Lotes de escritura (≤ ESCRITURA.loteMaxDocs docs cada uno). */
-export function planLotes(docs, max = ESCRITURA.loteMaxDocs) {
+/** Lotes de escritura: ≤ ESCRITURA.loteMaxDocs docs y ≤ loteMaxBytes cada uno (un doc solo, aunque pese más, va en su lote). */
+export function planLotes(docs, max = ESCRITURA.loteMaxDocs, maxBytes = LOTE_MAX_BYTES) {
   const out = [];
-  for (let i = 0; i < docs.length; i += max) out.push(docs.slice(i, i + max));
+  let lote = []; let bytes = 0;
+  for (const d of docs) {
+    const t = tamanoDoc(d);
+    if (lote.length && (lote.length >= max || bytes + t > maxBytes)) { out.push(lote); lote = []; bytes = 0; }
+    lote.push(d); bytes += t;
+  }
+  if (lote.length) out.push(lote);
   return out;
 }
 

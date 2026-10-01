@@ -93,6 +93,9 @@ export function limpiarNivel(fams, kv) {
     const m = new Uint8Array(n);
     for (let h = 0; h < n; h++) m[h] = codigoCelda(s.v[h], s.b[h], fam, kv, !!s.presente[h]);
     out[fam] = { v: s.v, b: s.b, m };
+    // Extras de §126 (solo para ver) viajan sin tocarse. Lista local a propósito: este archivo no importa
+    // de scada_carga_extras.js (que importa de aquí) y no gana exportaciones nuevas (L-102).
+    for (const k of ['max', 'min', 'ins']) if (s[k]) out[fam][k] = s[k];
   }
   // (i) Fuera de servicio: las tres corrientes en cero y alguna tensión válida.
   const hayI = FAMILIAS_I.every((f) => out[f]);

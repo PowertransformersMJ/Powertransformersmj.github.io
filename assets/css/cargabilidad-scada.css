@@ -111,3 +111,11 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
   .cscada .cs-kpi { padding: 8px 10px; }
   .cscada .cs-kpi-v { font-size: 18px; }
 }
+
+/* Filtro de valores y fases de las curvas (99 §126) */
+.cscada .cs-filtros { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: flex-start; margin: 0 0 8px; }
+.cscada .cs-filtro { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; border: 1px solid var(--cs-line); border-radius: 12px; padding: 6px 12px 8px; margin: 0; background: #fff; }
+.cscada .cs-filtro legend { font-size: 12px; font-weight: 700; color: var(--cs-ink2); padding: 0 4px; }
+.cscada .cs-filtro .cs-check { display: inline-flex; font-size: 13px; color: var(--cs-ink2); cursor: pointer; }
+.cscada .cs-filtro .cs-check.is-apagado { color: var(--cs-ink3); opacity: .6; cursor: not-allowed; }
+.cscada .cs-filtros .cs-ayuda { flex-basis: 100%; margin: 0; }

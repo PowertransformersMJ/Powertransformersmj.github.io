@@ -15,7 +15,7 @@ import {
   crearAcumulador, acumularArchivo, clasificarMeses, armarMeses, procesarPuntoMes, docSerie, docSinCambios, diasDelMes
 } from '../domain/scada_carga_importacion.js';
 import { empaquetar } from '../domain/scada_carga_series.js';
-import { estadisticoDeNombre } from '../domain/scada_carga_csv.js';
+import { seLee } from '../domain/scada_carga_paquete.js';
 
 let acc = null;
 let cancelado = false;
@@ -39,9 +39,8 @@ async function analizar({ archivos, filas }) {
     if (cancelado) { postMessage({ tipo: 'cancelado' }); return; }
     const a = archivos[i];
     const nombre = a.nombre || (a.file && a.file.name) || '';
-    // Mismo criterio que el dominio (acumularArchivo): solo promedios y calidad se leen.
-    const est = estadisticoDeNombre(nombre);
-    const leer = /\.csv$/i.test(nombre) && (!est || est === 'average' || est === 'quality');
+    // Mismo criterio que el dominio (acumularArchivo): promedios, calidad y —para VER— máx, mín e instantáneo.
+    const leer = seLee(nombre);
     let texto = '';
     try { if (leer && a.file.size) texto = await a.file.text(); } catch (e) { texto = ''; }
     // Un paquete preparado trae el tamaño ORIGINAL de cada archivo (los no leídos van vacíos):

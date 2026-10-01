@@ -243,7 +243,7 @@ describe('importación de punta a punta (carpeta sintética)', () => {
     const acc = crearAcumulador();
     for (const a of archivos()) acumularArchivo(acc, a, OBJ);
     assert.equal(acc.archivos.average, 4); assert.equal(acc.archivos.quality, 3);
-    assert.equal(acc.archivos.vacios, 1); assert.equal(acc.archivos.otrosEstadisticos, 1); assert.equal(acc.archivos.noCsv, 1);
+    assert.equal(acc.archivos.vacios, 1); assert.equal(acc.archivos.max, 1); assert.equal(acc.archivos.otrosEstadisticos, 0); assert.equal(acc.archivos.noCsv, 1);   // §126: el máx se lee (solo para ver)
     assert.equal(acc.discrepancias.fechaCarpeta, 1);
     const meses = clasificarMeses(acc);
     assert.deepEqual(meses.map((m) => m.mes + ':' + m.marcado), ['2026-03:true', '2026-07:false']);
