@@ -8,7 +8,7 @@
 ## 🎯 Foco (al 2026-09-30) — FICHAS TÉCNICAS, por partes (orden del Ingeniero)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos**: **TODO-67** 🔴 · **TODO-64** 🔴 · **TODO-60** 🔴 ·
-> **TODO-55** 🔴 · **TODO-35/58** 🔴 · **TODO-66** · **TODO-65** · **TODO-62/63** · 70 · 54 · 56 · 57 · 61 · y los fríos de `11`.
+> **TODO-55** 🔴 · **TODO-35/58** 🔴 · **TODO-66** · **TODO-65** · **TODO-62/63** · 71 · 54 · 56 · 57 · 61 · y los fríos de `11`.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
@@ -43,7 +43,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-70** | 🟡 **Detalle de Cargabilidad** (el clic no abría: `d.diag` indefinido, y otras cifras sin dato): arreglo EN RAMA `293d573`, **espera su «procede»** → ADR + L. Visto, NO tocado: el reloj pisa el rótulo de origen (`cargabilidad-shell.js:69`). | 🟡 |
+| **TODO-71** | 🟡 **Detalle de Cargabilidad PUBLICADO** (`99 §123`). Decide él: escalón IEEE más cercano o superior · calificaciones en «Diagnóstico» · curva de ejemplo → curvas reales `§122`. Menores → `§123.9`. | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA PUBLICADA** (`99 §122`–`.9`). **Suyo**: antes de cargar la homologación, revisar «Parametros SCADA… FINAL.xlsx» (17 correcciones; bóveda `2026-10-01-parametros-scada`); luego homologación y meses (W-13); falta mayo. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
