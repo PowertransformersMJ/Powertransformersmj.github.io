@@ -20,6 +20,7 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { firmaAplicaA } from './firmas.js';
+import { elaboradorDeLaSesion } from './fichas_elaborador_sesion.js';
 
 /** Casillas del formato, en el orden de la plantilla. */
 export const CASILLAS_FIRMA = Object.freeze(['elab', 'rev', 'apr', 'apr2', 'rec']);
@@ -58,10 +59,17 @@ const lleno = (v) => v != null && String(v).trim() !== '';
  * salvo en el SEGUNDO aprobador: no puede repetir a quien ya ocupa el primero
  * (si en el primero quedó ERICK VERGARA —elegido, o de una ficha vieja—, el
  * segundo pasa a JORGE MIRANDA en vez de repetir a Erick; revisión de `§89`).
+ * Y en ELABORACIÓN va quien tiene la sesión, si la página sabe que es de esa lista
+ * (`fichas_elaborador_sesion.js`, `99 §121`); si no, el primero.
  */
 export function indicePorDefecto(k, plan = {}) {
   const lista = FIRMANTES[k] || [];
   if (!lista.length) return -1;
+  if (k === 'elab') {
+    const n = elaboradorDeLaSesion();
+    const i = n ? lista.findIndex((p) => p.nombre === n) : -1;
+    return i >= 0 ? i : 0;
+  }
   if (k === 'apr2') {
     const primero = firmanteDe('apr', plan).nombre;
     const i = lista.findIndex((p) => p.nombre !== primero);
