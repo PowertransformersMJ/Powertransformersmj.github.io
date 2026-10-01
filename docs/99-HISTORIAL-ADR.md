@@ -5169,3 +5169,78 @@ Arreglo `cef4f28` (en `main` solo este cambio: el de TODO-70 sigue en rama esper
 `.cscada a.btn`/`a.btn--glass`, lo elegido con fondo sólido, paneles a .93 y el estado vacío con los dos pasos
 «Listo/Falta» (homologación · al menos un mes) y quién los hace. Verificado: banco (vacío → homologación → mes → lista →
 detalle con curvas; 375 px), 2161 pruebas, CI y Deploy verdes, y en su Chrome con lo servido. Lección L-114.
+
+## 123. ADR-123 — Cargabilidad: la ventana de detalle de la tabla priorizada vuelve a abrir con las filas del parque real, sin cifras sin dato y a la vista dentro de la pestaña de Seguimiento Operativo ⟦OPUS-5.5⟧ (2026-10-01)
+
+> Reporte (hallado al probar `§122`): el clic en una fila de la tabla priorizada no abría el detalle —consola:
+> `TypeError … reading 'carg'` en `modal-detalle.js:263`—. «procede» del Ingeniero: *«paso a paso con workflow para
+> que nada se rompa ni queden cosas huérfanas»*. Publicado `1085d94` + ajuste en vivo `c203d0c` (código `293d573`,
+> `9291cb6`, `1661c66`, `4a5ab64`). Bóveda `2026-10-01-detalle-cargabilidad` (crudos + síntesis + banco).
+
+**123.1 Causa raíz.** (a) `renderModal` leía `d.diag.carg`: NINGUNA fuente viva trae `diag` (ni `filaCargabilidad`
+ni el baseline de demostración); roto desde que se retiraron los datos originales (2026-07-21). (b) Detrás, cifras
+sin dato que la ventana iba a volver a mostrar: Refrig. «[object Object]» (`leer('refrigeracion.tipo',
+'refrigeracion')` caía al GRUPO v2; el campo es `tipo_refrigeracion` — mismo defecto que `§103.8` en Fichas, que
+sigue siendo decisión suya), curva en «0,0 A» sin medida, «supera el 1er límite SCADA» sin límite, «dentro de su
+capacidad» sin medida, condición `medio` en verde, caja verde «en primario» con el secundario sobrecargado, el ESCALÓN
+de la tabla IEEE mostrado como factor del equipo, perfil sintético rotulado «Corriente medida» con puntos rojos
+inventados, y la simulación que dejaba sus valores al detenerse. (c) Dentro de la pestaña de Seguimiento Operativo el
+iframe mide todo su alto y el fondo `position:fixed` lo cubre entero: la ventana quedaba 886 px fuera de la pantalla
+(medido); en producción, además, la barra de PESTAÑAS (sticky, 78→128 px) tapaba la X.
+
+**123.2 Solución.** Dominio puro nuevo `domain/cargabilidad_detalle.js` (lo que la ventana AFIRMA; lo que falta =
+«—»): `diagnosticoDe` (sin `diag`, cinco «—»; NO toma `salud_actual.calif_*`), `condicionDe` (nombre y color oficial
+de `BUCKETS_HI`, en texto claro con punto de color), `estadoDevanado` (medido · sin ampacidad —la corriente se ve— ·
+sin medida · no aplica · sin dato), `devanadoReferencia` (caja y sobrecarga en el devanado MÁS cargado),
+`lecturaSobrecarga` (% medido aparte del escalón; por encima de 1,5× no estima), `fraseCarga` («medida registrada»,
+avisa del devanado con corriente sin ampacidad), `picoPrimario`, `tensionTexto`. `cargabilidad_parque.js`: `refrig`
+lee `tipo_refrigeracion` y `txt()` no convierte objetos. Ventana: curva rotulada «perfil ilustrativo», normalizada a
+la medida y sin puntos rojos; aviso «SIMULACIÓN ACTIVA» o «DEMOSTRACIÓN»; `live.js` restaura lo medido al detener.
+Iframe: al ABRIR se baja la ventana a la primera franja LIBRE de 48 px del iframe (`frameElement` +
+`elementFromPoint` en la madre, sin suponer qué barras hay) y la X se amarra a la ventana (medidas por
+`getComputedStyle`); directa o con madre de otro origen, nada cambia.
+
+**123.3 No-regresión.** Tabla (incl. «Curvas SCADA» de `§122`), mapa de calor, KPIs, filtros, CSV y shell intactos
+(byte a byte, verificado por la lente de costuras). `scada_carga_vista.js` (el otro consumidor de `filaCargabilidad`)
+solo toma porcentajes: sin cambio. L-102: todos los exports nuevos en un archivo nuevo. Página directa: sin
+desplazamiento ni estilos nuevos. Comentarios que contradecían la causa raíz, corregidos (`seguimiento_cargabilidad.js`,
+`state.js`, JSDoc huérfano de `cargabilidad_parque.js`, cabeceras); `_dev/preview-cargabilidad-modal.html` prueba
+también la forma real del parque.
+
+**123.4 Verificación.** 2176 pass / 0 fail / 2 skip (+36: detalle, refrigeración, simulación; rojo comprobado con el
+código anterior) · `lint:html` limpio · banco (página real, Firestore de mentira, 7 equipos sintéticos, madre con
+iframe + `.tb` + `.tab-bar`) · workflow W-06 (3 lentes + crítico; luego 1 revisor del delta), cada hallazgo verificado
+(W-04) · CI y Deploy verdes en `1085d94` y `c203d0c`; 11/11 servidos = `main`. **En vivo** (su sesión, solo lectura,
+pestaña cerrada): 199/199 filas y 10/10 del mapa abren, 0 errores, 0 «[object Object]»/undefined/NaN, condiciones
+oficiales 81/80/15/15/8, 30 con estimación, 16 en el secundario; en la pestaña la X a 160 px bajo las pestañas (128),
+alcanzable, página quieta; simulación con aviso y vuelta a lo medido.
+
+**123.5 Anti-patterns evitados.** Rellenar el diagnóstico con calificaciones de otro módulo · `car || 0` · decir
+«medido» de una simulación · copiar medidas del CSS al JS · `scrollIntoView` desde un elemento fijo · «la primera y
+visible» sin franja (rendija de 14 px entre barras) · dar por buena una posición medida con animaciones congeladas.
+
+**123.6 Archivos.** Nuevos: `assets/js/domain/cargabilidad_detalle.js`, `tests/cargabilidad_detalle.test.js`,
+`tests/cargabilidad_live.test.js`. Modificados: `renderers/modal-detalle.js`, `ui/cargabilidad/live.js`, `state.js`
+(comentario), `domain/cargabilidad_parque.js`, `data/seguimiento_cargabilidad.js` (comentario),
+`pages/seguimiento-cargabilidad.html` (comentario), `_dev/preview-cargabilidad-modal.html`, `tests/cargabilidad_parque.test.js`.
+INTACTOS: `tabla.js`, `heatmap.js`, `kpis.js`, `overview.js`, `filtros.js`, `export.js`, `modal.js`,
+`cargabilidad-shell.js`, CSS, `seguimiento-operativo.html`, reglas e índices.
+
+**123.7 Doctrina.** `CLAUDE.md §3.2` (no se fabrica el dato) · §3.3 (causa leída y reproducida antes de tocar) · W-06
+acotado con Opus + W-04 · L-65 (servidos = main) · L-92 (banco con importmap) · caza-bugs: las DOS entradas de la
+página, no solo la directa.
+
+**123.8 Verificado sano / no re-auditar.** «El iframe crece sin fin (~720 px/s)»: real en el banco, FALSO en
+producción (estable; el banco no carga `tabs.css`); en producción hay un escalonado de +12 px en algunos disparos
+(contenido 1392 → iframe 1606), preexistente y NO agravado (5 aperturas sin cambio). La X «a 18 px de más» en el
+banco: animación congelada del panel oculto. La caché del navegador sirvió el módulo anterior hasta una recarga
+forzada (`max-age=600`, TODO-57). El enlace «Curvas SCADA» navega y no abre la ventana.
+
+**123.9 Pendiente (cola, no tocado).** Decisiones suyas: (1) escalón de la tabla IEEE MÁS CERCANO (hoy; 1,12× usa
+1,10) o el inmediato SUPERIOR (conservador) — toca `sobrecarga_admisible.js`; (2) mostrar en «Diagnóstico» las
+calificaciones de Salud de Activos; (3) cambiar la curva de ejemplo por un enlace a las curvas reales de `§122`.
+Menores: el reloj pisa el rótulo de origen (`cargabilidad-shell.js:69`) · botón inicial «▶ Activar tiempo real» (es
+simulación) · pie fijo «206 transformadores · 145 subestaciones» · escalonado del iframe · suscripción a
+`cargabilidad_transformadores` (las reglas la niegan) · CSV con la clave cruda de la condición · `DIAG_MAP` con
+vocabulario no oficial · exports sin uso en `modal.js` · ícono de cabecera siempre rojizo · `.dot` sin estilo dentro
+de la ventana.

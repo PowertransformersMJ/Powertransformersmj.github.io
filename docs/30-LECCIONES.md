@@ -207,6 +207,19 @@ se había probado el camino CON datos; el estado vacío —lo PRIMERO que ve el 
 los paneles de lectura van con fondo sólido o casi sólido sobre la foto; (3) la pantalla vacía dice QUÉ falta y quién lo
 hace, paso por paso, y se valida en vivo igual que la llena. [HONOR]
 
+
+### L-115 · Una ventana fija dentro de un iframe estirado no se ve donde está el usuario: se prueba por CADA entrada
+
+`99 §123`: el detalle de la tabla de Cargabilidad se arregló, pasó pruebas y banco con la página DIRECTA… y dentro de
+la pestaña de Seguimiento Operativo (iframe que la madre estira a todo su alto) se habría seguido viendo «no abre»: el
+fondo `position:fixed` cubre el iframe entero y la ventana se pintaba en su tope, 886 px fuera de la pantalla. En
+producción, además, la barra de pestañas fija tapaba la X. `scrollIntoView` no sirve (no desplaza la madre por un
+elemento fijo). **Regla**: (1) una pantalla que vive en más de una entrada (directa e iframe) se valida en TODAS, con
+el usuario donde de verdad hace clic (abajo, en la tabla); (2) dentro de un iframe, lo «visible» se mide desde la madre
+(`frameElement` + `elementFromPoint`, con una franja libre, no un píxel) y nunca se supone qué barras fijas tiene;
+(3) al cambiar la FORMA de una fila, recorrer todos sus consumidores en el camino vivo (el detalle llevaba roto desde
+julio porque nadie abrió la ventana). **Gate**: pruebas de `cargabilidad_detalle` + [HONOR] para las entradas.
+
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
 > **Reglas de Firestore/Storage, cédulas, firmas ajenas y saneado de datos** viven en
