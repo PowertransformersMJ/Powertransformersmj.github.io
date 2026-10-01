@@ -190,21 +190,38 @@ function subMedidor(d, k) {
 // la vista de quien bajó hasta la tabla: se oscurecía la pantalla y «el clic
 // no abría nada». Mover la página madre no sirve (el navegador no la desplaza
 // por un elemento fijo), así que al ABRIR se baja la ventana —y su X— hasta
-// la franja del iframe que se está viendo, debajo de la barra fija del sitio.
-// Al cerrar, la tabla sigue donde estaba. Abierta directamente (sin iframe) o
-// con una madre de otro origen, no se desplaza nada.
+// la primera franja del iframe que DE VERDAD se ve: debajo de todo lo fijo de
+// la madre (la barra superior `.tb` y la barra de pestañas, ambas fijas; en
+// producción la de pestañas tapaba la X). Se busca con `elementFromPoint` en
+// la columna de la X, sin suponer qué barras hay. Al cerrar, la tabla sigue
+// donde estaba. Abierta directamente (sin iframe) o con una madre de otro
+// origen, no se desplaza nada.
 function bajadaEnIframe(xArriba) {
   try {
     if (window.parent === window) return 0;
     const marco = window.frameElement;            // null si la madre es de otro origen
     if (!marco) return 0;
-    const tb = window.parent.document.querySelector('.tb');
-    const barra = tb ? Math.max(0, tb.getBoundingClientRect().bottom) : 0;
-    // La X queda 12 px debajo de la barra (y la ventana, debajo de la X, donde
+    const madre = window.parent;
+    const r = marco.getBoundingClientRect();
+    const columna = Math.min(r.right, madre.innerWidth) - 30;   // donde va la X
+    const hasta = Math.min(r.bottom, madre.innerHeight);
+    // Una franja LIBRE de 48 px (cabe la X con margen): entre la barra superior
+    // y la de pestañas hay una rendija de ~14 px donde el iframe asoma.
+    const libre = (y0) => {
+      for (let k = 0; k <= 48; k += 8) {
+        if (madre.document.elementFromPoint(columna, y0 + k) !== marco) return false;
+      }
+      return true;
+    };
+    let y = Math.max(0, Math.ceil(r.top));
+    while (y < hasta && !libre(y)) y += 4;
+    if (y >= hasta) return 0;
+    // La X queda 12 px debajo de lo fijo (y la ventana, debajo de la X, donde
     // la pone el padding del fondo).
-    return Math.max(0, Math.round(barra + 12 - xArriba - marco.getBoundingClientRect().top));
+    return Math.max(0, Math.round(y + 12 - xArriba - r.top));
   } catch (_) { return 0; }
 }
+
 // La X se amarra a la esquina de la ventana (`position:relative` en `.modal`):
 // si siguiera colgada del fondo, durante la animación de apertura —que pone un
 // `transform` en `.modal` y la vuelve su referencia— saltaría `bajar` píxeles.
