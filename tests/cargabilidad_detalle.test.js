@@ -204,6 +204,7 @@ describe('lecturaSobrecarga — el factor medido no se confunde con el escalón 
   // 🔒 La tarjeta decía «Factor 1.1×» con 102 % medido.
   test('separa el factor medido del escalón de la tabla', () => {
     const l = lecturaSobrecarga({ car: 102, amp: 100 });
+    assert.equal(l.pct, 102, 'lo que se muestra es la carga medida');
     assert.equal(l.factor, 1.02);
     assert.equal(l.escalon, 1.1);
     assert.equal(l.fueraDeTabla, false);
@@ -214,9 +215,20 @@ describe('lecturaSobrecarga — el factor medido no se confunde con el escalón 
   test('por encima del último escalón no da minutos ni envejecimiento', () => {
     const l = lecturaSobrecarga({ car: 180, amp: 100 });
     assert.equal(l.factor, 1.8);
+    assert.equal(l.tope, 1.5, 'el último escalón sale de la propia tabla');
     assert.equal(l.fueraDeTabla, true);
     assert.equal(l.minutos, null);
     assert.equal(l.envejecimiento, null);
+  });
+
+  // 🔒 Con 100,3 % el factor redondeado decía «1,00×» bajo «Sobrecarga»; con
+  // 150,4 %, «1,50× por encima del 1,50×». El porcentaje no se contradice.
+  test('cerca de los bordes el porcentaje medido no se contradice', () => {
+    assert.equal(lecturaSobrecarga({ car: 100.3, amp: 100 }).pct, 100.3);
+    const borde = lecturaSobrecarga({ car: 150.4, amp: 100 });
+    assert.equal(borde.pct, 150.4);
+    assert.equal(borde.fueraDeTabla, true);
+    assert.equal(lecturaSobrecarga({ car: 150, amp: 100 }).fueraDeTabla, false, '150 % justo está en la tabla');
   });
 
   test('sin sobrecarga o sin dato: null (no hay nada que estimar)', () => {

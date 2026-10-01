@@ -118,7 +118,7 @@ function trendSVG(d, win) {
       <rect x="${(X(pi) - 30).toFixed(0)}" y="${(Y(ser[pi].y) - 38).toFixed(0)}" width="78" height="28" rx="7"
             fill="${ser[pi].y > (o.amp || 1e9) ? 'var(--cri)' : 'var(--aqua2)'}"/>
       <text x="${(X(pi) + 9).toFixed(0)}" y="${(Y(ser[pi].y) - 19).toFixed(0)}" text-anchor="middle" fill="#fff"
-            font-family="Sora" font-weight="800" font-size="13">${ser[pi].y.toFixed(1)} A</text>
+            font-family="Sora" font-weight="800" font-size="13">${fmt(ser[pi].y, 1)} A</text>
     </g>
   </svg>`;
 }
@@ -146,21 +146,22 @@ function diagRow(k, score) {
 // veredicto sale del VALOR (factor = corriente/ampacidad) contra la tabla
 // normativa, no de datos fabricados. Se rotula ESTIMACIÓN — la tabla es
 // indicativa (sobrecarga sostenida desde carga nominal, 30 °C) y no sustituye
-// la curva térmica del fabricante. Se muestra el factor MEDIDO y, aparte, el
-// escalón de la tabla con que se estima (antes se mostraba el escalón como si
-// fuera el factor del equipo). Por encima del último escalón no se estima.
-// Sin sobrecarga (factor ≤ 1) no se muestra. Cero lecturas Firestore.
+// la curva térmica del fabricante. Se muestra la carga MEDIDA (% de la
+// ampacidad) y, aparte, el escalón de la tabla con que se estiman los minutos
+// (antes se mostraba el escalón como si fuera el factor del equipo); el
+// envejecimiento sale de la carga medida. Por encima del último escalón no se
+// estima. Sin sobrecarga (factor ≤ 1) no se muestra. Cero lecturas Firestore.
 function sobrecargaAdmisibleCard(o, nombreDev) {
   const l = lecturaSobrecarga(o);
   if (!l) return '';
   const min = l.minutos;
   const tFmt = (min == null)
     ? SIN_DATO
-    : (min >= 60 ? `${(min / 60).toFixed(1)} h (${min} min)` : `${min} min`);
+    : (min >= 60 ? `${fmt(min / 60, 1)} h (${min} min)` : `${min} min`);
   const faaFmt = (l.envejecimiento == null) ? SIN_DATO : `${fmt(l.envejecimiento, 1)}×`;
   const cuerpo = l.fueraDeTabla
-    ? `Factor medido <b>${fmt(l.factor, 2)}×</b> en el ${nombreDev}: por encima del último escalón de la tabla simplificada (<b>${fmt(l.escalon, 2)}×</b>), que no permite estimar tiempo admisible ni envejecimiento.`
-    : `Factor medido <b>${fmt(l.factor, 2)}×</b> en el ${nombreDev} (se estima con el escalón <b>${fmt(l.escalon, 2)}×</b> de la tabla) · tiempo admisible <b>${tFmt}</b> · envejecimiento del aislamiento <b>${faaFmt}</b>.`;
+    ? `Carga medida <b>${fmt(l.pct, 1)} %</b> de la ampacidad del ${nombreDev}: por encima de ${fmt(l.tope * 100, 0)} %, el último escalón de la tabla simplificada, que no permite estimar tiempo admisible ni envejecimiento.`
+    : `Carga medida <b>${fmt(l.pct, 1)} %</b> de la ampacidad del ${nombreDev} · tiempo admisible <b>${tFmt}</b> (escalón <b>${fmt(l.escalon, 2)}×</b> de la tabla, el más cercano) · envejecimiento del aislamiento <b>${faaFmt}</b> (con la carga medida).`;
   return `<div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);font-size:12px;color:#FCD9A6">
     <div style="font-weight:700;margin-bottom:3px">⚠ Sobrecarga admisible (estimación)</div>
     ${cuerpo}
@@ -192,36 +193,38 @@ function subMedidor(d, k) {
 // la franja del iframe que se está viendo, debajo de la barra fija del sitio.
 // Al cerrar, la tabla sigue donde estaba. Abierta directamente (sin iframe) o
 // con una madre de otro origen, no se desplaza nada.
-const X_ARRIBA = 16;        // `top` de `.carga-overlay .close`
-function bajadaEnIframe() {
+function bajadaEnIframe(xArriba) {
   try {
     if (window.parent === window) return 0;
     const marco = window.frameElement;            // null si la madre es de otro origen
     if (!marco) return 0;
     const tb = window.parent.document.querySelector('.tb');
     const barra = tb ? Math.max(0, tb.getBoundingClientRect().bottom) : 0;
-    // La X queda 12 px debajo de la barra (la ventana, 14 px más abajo: el padding
-    // de 30 px del fondo en seguimiento-cargabilidad.css).
-    return Math.max(0, Math.round(barra + 12 - X_ARRIBA - marco.getBoundingClientRect().top));
+    // La X queda 12 px debajo de la barra (y la ventana, debajo de la X, donde
+    // la pone el padding del fondo).
+    return Math.max(0, Math.round(barra + 12 - xArriba - marco.getBoundingClientRect().top));
   } catch (_) { return 0; }
 }
 // La X se amarra a la esquina de la ventana (`position:relative` en `.modal`):
 // si siguiera colgada del fondo, durante la animación de apertura —que pone un
 // `transform` en `.modal` y la vuelve su referencia— saltaría `bajar` píxeles.
-// Queda donde siempre: 14 px por encima y 12 px a la derecha de la ventana
-// (16 px del fondo menos los 30 px de su padding; 18 px del borde, idem).
+// Queda donde siempre respecto a la ventana. Las medidas (padding del fondo,
+// top/right de la X) se LEEN de `seguimiento-cargabilidad.css`, no se copian.
 function llevarALaVista(overlay) {
-  const bajar = bajadaEnIframe();
   const m = overlay.querySelector('.modal');
   const x = overlay.querySelector('.close');
-  if (m) {
-    m.style.marginTop = bajar ? bajar + 'px' : '';
-    m.style.position = bajar ? 'relative' : '';
-  }
-  if (x) {
-    x.style.top = bajar ? (X_ARRIBA - 30) + 'px' : '';
-    x.style.right = bajar ? '-12px' : '';
-  }
+  if (m) { m.style.marginTop = ''; m.style.position = ''; }
+  if (x) { x.style.top = ''; x.style.right = ''; }
+  if (!m || !x) return;
+  const cf = getComputedStyle(overlay);
+  const cx = getComputedStyle(x);
+  const px = (v) => parseFloat(v) || 0;
+  const bajar = bajadaEnIframe(px(cx.top));
+  if (!bajar) return;
+  m.style.marginTop = bajar + 'px';
+  m.style.position = 'relative';
+  x.style.top = (px(cx.top) - px(cf.paddingTop)) + 'px';
+  x.style.right = (px(cx.right) - px(cf.paddingRight)) + 'px';
 }
 
 // ── Renderer principal del modal ────────────────────────────
@@ -235,7 +238,10 @@ export function renderModal() {
     overlay.classList.remove('show');
     return;
   }
-  const d = rows[detailIndex];
+  // Las fuentes vivas traen siempre P, S y T; una fila sin alguno (p. ej. de la
+  // colección en tiempo real, hoy vacía) no debe reventar la ventana.
+  const fila = rows[detailIndex];
+  const d = { ...fila, P: fila.P || {}, S: fila.S || {}, T: fila.T || {} };
   const o = d.P;
   const s = sev(d.cmax);
   const col = SEVCOL[s];
@@ -283,7 +289,18 @@ export function renderModal() {
 
   const spec = (k, v) => `<div class="spec"><div class="k">${k}</div><div class="v mono">${v}</div></div>`;
 
-  body.innerHTML = `
+  // La ventana habla de corriente «medida» / «registrada». Con la simulación
+  // encendida (o sus valores aún puestos) o con los equipos de demostración, eso
+  // no es cierto: se dice arriba, con todas las letras.
+  const simulada = store.state.live || ['P', 'S', 'T'].some((k) =>
+    fila._base && fila._base[k] != null && fila[k] && fila[k].car !== fila._base[k]);
+  const aviso = simulada
+    ? 'SIMULACIÓN ACTIVA: las corrientes de esta ventana son simuladas, NO medidas.'
+    : (store.state.source === 'baseline-demo'
+      ? 'Equipo de DEMOSTRACIÓN: no es un transformador de su parque.' : '');
+
+  body.innerHTML = `${aviso ? `
+    <div class="glass panel" style="padding:12px 16px;background:rgba(245,158,11,.14);border-color:rgba(245,158,11,.4);color:#FCD9A6;font-weight:700;font-size:13px">⚠ ${aviso}</div>` : ''}
     <div class="glass panel" style="display:flex;align-items:center;gap:22px;flex-wrap:wrap;padding-right:60px">
       <div style="width:58px;height:58px;border-radius:16px;background:linear-gradient(145deg,${col},#FF8AA0);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 24px -6px ${col}">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>

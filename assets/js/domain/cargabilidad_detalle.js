@@ -124,13 +124,17 @@ export function devanadoReferencia(d) {
  * devanado por encima de su ampacidad. Devuelve null si no hay sobrecarga.
  *
  * La tarjeta mostraba «Factor 1.1×» —el ESCALÓN de la tabla— como si fuera
- * el factor del equipo (102 % medido). Ahora se separan: `factor` es el
- * medido y `escalon` el de la tabla con que se estima. Por encima del último
- * escalón la tabla no sirve: `fueraDeTabla` y ni minutos ni envejecimiento
- * (sería extrapolar una curva simplificada).
+ * el factor del equipo (102 % medido). Ahora se separan: `pct` es la carga
+ * medida (% de la ampacidad, lo que se muestra: un factor de «1,00×» con
+ * 100,3 % se contradecía) y `escalon` el de la tabla con que se estiman los
+ * MINUTOS —el más cercano, como siempre lo hizo `tiempoAdmisible`—; el
+ * envejecimiento sale de la carga medida. Por encima del último escalón la
+ * tabla no sirve: `fueraDeTabla` y ni minutos ni envejecimiento (sería
+ * extrapolar una curva simplificada).
  *
- * @returns {null | {factor:number, escalon:number, fueraDeTabla:boolean,
- *                   minutos:number|null, envejecimiento:number|null}}
+ * @returns {null | {pct:number, factor:number, escalon:number, tope:number,
+ *                   fueraDeTabla:boolean, minutos:number|null,
+ *                   envejecimiento:number|null}}
  */
 export function lecturaSobrecarga(o) {
   const car = num(o && o.car);
@@ -145,8 +149,10 @@ export function lecturaSobrecarga(o) {
   const fueraDeTabla = factor > tope;
   const min = sob.minutos;
   return {
+    pct: Math.round(factor * 1000) / 10,
     factor: Math.round(factor * 100) / 100,
     escalon: sob.factor_usado,
+    tope,
     fueraDeTabla,
     minutos: (fueraDeTabla || min == null || !Number.isFinite(min)) ? null : min,
     envejecimiento: (fueraDeTabla || typeof sob.aceleracion_envejecimiento !== 'number')
