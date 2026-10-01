@@ -5299,3 +5299,66 @@ Excel manda (`99 §74.15`).
 **124.9 Pendiente.** (1) Escalón IEEE más cercano vs superior — *«después»* (decisión suya). (2) ¿Avisar en la ventana
 cuando la calificación «Cargabilidad» del Excel contradice la carga medida? (propuesta, TODO-56). (3) Los menores de
 `§123.9` siguen en cola.
+
+## 125. ADR-125 — Cargabilidad SCADA con datos: «Paquete preparado» para subir cada mes sin arrastrar carpetas, homologación y 8 meses cargados en producción, y arreglos de la revisión ⟦OPUS-5.5⟧ (2026-10-01)
+
+> «estoy validando el nuevo segmento… aún no logro apreciar nada… necesito poder escoger cualquier transformador del
+> parque y… apreciar todos los parámetros eléctricos en sus tres fases… usa la extensión de chrome, podemos lograrlo
+> juntos» · «prefiero que los proceses tú, quedan limpios y menos probabilidad de error» · «Sí, cargamos juntos»
+> (homologación tal cual; correcciones después) · 8 matrículas «usar las del parque» · septiembre «cargarlo ya».
+
+**125.1 Causa raíz.** La página estaba bien; producción no tenía NADA cargado (§122.9). Cargar exigía que el Ingeniero
+arrastrara cada carpeta (~650 MB): la extensión de Chrome solo sube 10 MB por llamada y solo de carpetas permitidas
+(Documents no, Downloads sí), no puede soltar archivos dentro de Chrome y Chrome bloquea servir la carpeta por
+localhost (L-62). Además 8 matrículas del Excel no casaban con el parque (COV T1/T3, NMO, PRC T1A, CPA T2, CER T3/T4,
+BQE T4: letras de clase o sufijo distintos; un solo candidato por subestación).
+
+**125.2 Solución.**
+- **Paquete preparado** (`assets/js/domain/scada_carga_paquete.js` + `scripts/scada-empaquetar.mjs`): la carpeta del
+  mes adelgazada SIN cambiar lo que la página calcula — solo promedio y calidad, solo las filas de las estaciones de la
+  homologación (el lector descarta las demás), los otros archivos como marcas vacías con su tamaño original (el worker
+  acepta `tamano`), gzip, partes ≤ 9 MiB con la huella SHA-256 en el nombre. «Cargar mes → Paquete preparado» junta,
+  comprueba la huella, descomprime (DecompressionStream) y entrega al MISMO worker: veredicto, simulación y guardado
+  iguales. Guardas: paquete hecho con otra homologación (estaciones faltantes, con sus nombres), dos paquetes
+  completos a la vez, partes sueltas en la zona de carpeta → al paquete, > 99 partes, salida dentro del repo (también
+  la raíz y con otras mayúsculas) y `*.sgmpaq` en `.gitignore`.
+- **Lector y guarda leen las mismas filas** (`filasVigentes`: sin retiradas ni excluidas).
+- **Arreglos de la revisión de §122**: confirmar antes de cargar meses guardaba mapa `{}` que tapaba el automático
+  (`mapaDeDecision`); «usar» con todos los niveles en «No usar» se rechaza (eso es «Excluir»); un nivel que aparece
+  tras confirmar pide revisión (`NIVEL_NO_REVISADO`, `niveles_vistos`); con 2 fases en > 50 % de las horas la cifra es
+  provisional («falta una fase en la mayoría de las horas»); el motivo sin cifra nombra la causa (placa sin tensiones /
+  nivel que casa con dos devanados / no coincide con la placa); aviso de mes ausente en el detalle; se rechaza la
+  carpeta madre (varios meses o subcarpetas «_»).
+- **Datos en producción**: homologación v1 (Excel tal cual) y v2 (copia con las 8 matrículas del parque, original
+  intacto: 8 nuevas, 8 retiradas, 26 pendientes); meses ene 223 · feb 223 · mar 224 · abr 224 · jun 224 · jul 224 ·
+  ago 227 · sep 179 series, todos «completa» en el Registro, cargados por la extensión con su autorización.
+
+**125.3 No-regresión.** Reglas e índices SIN cambios (nada valida dentro de `niveles`/`decision`). La ruta de arrastre
+de carpeta queda igual salvo las dos guardas. Publicado `e501c4e` → `main` `c1f8dfa`; CI y Deploy verdes; módulos
+servidos = main.
+
+**125.4 Verificación.** 2192 pruebas (12 nuevas en `tests/scada_carga_paquete.test.js`). Ensayo offline de 7 meses con
+el worker real (0 violaciones; doc máx 108 KB). **Equivalencia con datos reales en los 8 meses: lo que se escribe es
+idéntico byte a byte carpeta vs paquete** (solo cambia el contador «no CSV» por `.DS_Store`); control negativo (una
+estación menos) frenado. Banco con las páginas reales (paquete de 1 y 2 partes, parte dañada, dos meses, parte en la
+zona de carpeta, «No usar» total). Producción: cada veredicto y simulación coincidió con el ensayo; lista de agosto
+208/208 (127 firmes, 43 provisionales); detalle ene–sep = 6552 h con las 3 fases, U, P, Q, S y FP.
+
+**125.5 Anti-patterns evitados.** Escribir a Firestore con credenciales de admin (se saltan las reglas) · un lector
+nuevo para el paquete (se reusó el worker) · confiar en el empaquetado sin probar equivalencia con datos reales ·
+cargar meses antes de cruzar matrículas con el parque · dejar datos reales al alcance de un `git add`.
+
+**125.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_paquete.js`, `scripts/scada-empaquetar.mjs`,
+`tests/scada_carga_paquete.test.js`. Tocados: `importar-mes.js`, worker (`tamano`), `scada_carga_homologacion.js`,
+`homologacion.js` (diálogo), `scada_carga_kpis.js`, `scada_carga_vista.js`, `scada_carga_config.js`, `detalle.js`,
+`.gitignore`. Paquetes en `~/Downloads/paquetes-scada/listos/` (fuera del repo).
+
+**125.7 Doctrina.** W-13 (simulación primero; guardia de omitidos) · L-62 · L-65 · L-117 (nueva).
+
+**125.8 Verificado sano / no re-auditar.** Filtro por estación = lector (misma `normalizarTexto`); BOM, CRLF, `\r`,
+no-UTF-8, vacíos y sin estadístico probados; el orden de los archivos no cambia nada (0 conflictos); `mapa: null` no
+rompe a ningún lector ni a las reglas; 9 MiB pasan el límite de 10 MB de la extensión. **Datos del Ingeniero, no del
+código**: septiembre sin casi toda ORIENTE (48 claves; ~520 vs ~690 estaciones/día), enero 29/31, febrero 27/28,
+agosto 30/31; solo ~80 equipos traen las 3 tensiones de línea. **Pendiente**: máx/mín/instantáneo como banda («toda
+la información»; diseño en la bóveda), revisar los 26 pendientes y las 17 correcciones, re-exportar septiembre, mayo.
+Bóveda `2026-10-01-carga-scada-paquete`.
