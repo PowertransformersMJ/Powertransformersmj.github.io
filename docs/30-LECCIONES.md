@@ -231,6 +231,17 @@ anterior (`max-age=600`): su `import { DIAG_MAP }` falla y el módulo entero no 
 repo (assets, pages, admin, tests, _dev, functions, scripts, api) de que nadie más lo usa. **Gate** [HONOR] (TODO-57 es
 el arreglo de fondo: versionar los assets).
 
+### L-117 · Datos grandes por la extensión: un paquete que alimenta el MISMO lector, y su equivalencia probada con datos reales
+
+`99 §125`: la extensión de Chrome sube ≤ 10 MB por llamada y solo de carpetas permitidas (Downloads sí, Documents no),
+no suelta archivos dentro de Chrome y un clic por coordenadas no llega a una pestaña que no está al frente; un mes del
+SCADA pesa ~650 MB. **Regla**: (1) no se escribe un camino paralelo: se adelgaza el insumo (solo lo que el lector usa,
+marcas con el tamaño original) y se entrega al MISMO lector; (2) antes de producción se prueba la EQUIVALENCIA con los
+datos reales (lo que se escribiría, byte a byte) más un control negativo que el sistema debe frenar; (3) partes ≤ 9 MiB
+con su huella en el nombre, comprobada al juntar; (4) los paquetes llevan datos reales: salida prohibida dentro del
+repo y su extensión en `.gitignore`; (5) en la pestaña: `element.click()` por JS y sondeos cortos (la evaluación corta a
+los 45 s). **Gate**: `tests/scada_carga_paquete.test.js` (formato, filtro = lector, empaquetador de punta a punta).
+
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
 > **Reglas de Firestore/Storage, cédulas, firmas ajenas y saneado de datos** viven en
