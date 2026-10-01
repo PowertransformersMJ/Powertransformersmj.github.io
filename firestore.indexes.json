@@ -454,5 +454,19 @@
       ]
     }
   ],
-  "fieldOverrides": []
+  "fieldOverrides": [
+    { "collectionGroup": "scada_series", "fieldPath": "niveles", "indexes": [] },
+    { "collectionGroup": "scada_resumen", "fieldPath": "claves", "indexes": [] },
+    { "collectionGroup": "scada_catalogo", "fieldPath": "meses", "indexes": [] },
+    { "collectionGroup": "scada_catalogo", "fieldPath": "puntos", "indexes": [] },
+    { "collectionGroup": "scada_homologacion", "fieldPath": "filas", "indexes": [] },
+    { "collectionGroup": "scada_homologacion_registro", "fieldPath": "antes", "indexes": [] },
+    { "collectionGroup": "scada_homologacion_registro", "fieldPath": "despues", "indexes": [] },
+    { "collectionGroup": "scada_homologacion_registro", "fieldPath": "resumen", "indexes": [] },
+    { "collectionGroup": "scada_cargas", "fieldPath": "plan", "indexes": [] },
+    { "collectionGroup": "scada_cargas", "fieldPath": "simulacion", "indexes": [] },
+    { "collectionGroup": "scada_cargas", "fieldPath": "escrituras", "indexes": [] },
+    { "collectionGroup": "scada_cargas", "fieldPath": "detalle", "indexes": [] },
+    { "collectionGroup": "scada_cargas", "fieldPath": "meses", "indexes": [] }
+  ]
 }

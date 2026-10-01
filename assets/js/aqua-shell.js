@@ -226,6 +226,7 @@
         <a href="${u('pages/mantenimiento-brigada.html')}" class="sb-item" data-key="mantenimiento-brigada"><span class="i"><i data-lucide="hard-hat"></i></span>Mantenimiento Brigada</a>
         <a href="${u('pages/seguimiento-operativo.html')}" class="sb-item" data-key="seguimiento"><span class="i"><i data-lucide="activity"></i></span>Seguimiento Operativo</a>
         <a href="${u('pages/seguimiento-cargabilidad.html')}" class="sb-item" data-key="cargabilidad"><span class="i"><i data-lucide="battery-charging"></i></span>Cargabilidad</a>
+        <a href="${u('pages/cargabilidad-scada.html')}" class="sb-item" data-key="cargabilidad-scada"><span class="i"><i data-lucide="chart-line"></i></span>Cargabilidad SCADA</a>
       </div>
       <div class="sb-group">
         <div class="sb-group-title">Análisis</div>
@@ -352,6 +353,7 @@
         <a href="${u('admin/administracion.html')}#tab=importar" class="sb-item sb-admin" data-key="importar"><span class="i"><i data-lucide="upload"></i></span>Importar</a>
         <a href="${u('admin/administracion.html')}#tab=auditoria" class="sb-item sb-admin" data-key="auditoria"><span class="i"><i data-lucide="scroll-text"></i></span>Auditoría</a>
         <a href="${u('admin/umbrales-salud.html')}" class="sb-item sb-admin" data-key="umbrales-salud"><span class="i"><i data-lucide="sliders-horizontal"></i></span>Umbrales de Salud</a>
+        <a href="${u('admin/scada-datos.html')}" class="sb-item sb-admin" data-key="scada-datos"><span class="i"><i data-lucide="folder-up"></i></span>Datos SCADA</a>
         <a href="${u('admin/migrate-contrato-id.html')}" class="sb-item sb-admin" data-key="migrate-contrato-id" title="Acceso temporal · retirar después de ejecutar la migración"><span class="i"><i data-lucide="database-zap"></i></span>Migrar contrato_id</a>
       </div>`;
 
