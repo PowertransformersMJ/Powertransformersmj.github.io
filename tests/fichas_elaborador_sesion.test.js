@@ -70,6 +70,19 @@ describe('con sus firmas: la de Carlos va en SU casilla', () => {
   });
 });
 
+describe('una descarga no cambia de elaborador a la mitad (revisión de §120)', () => {
+  test('exportar, vista previa y emisión leen y estampan sobre el plan CONGELADO de esa descarga', () => {
+    const panel = leer('assets', 'js', 'ui', 'fichas', 'panel.js');
+    assert.match(panel, /function planCongelado\(P\) \{/);
+    assert.match(panel, /function estadoParaExportar\(e, base = planCongelado\(estadoDe\(e\)\.plan\)\)/);
+    assert.match(panel, /const base = planCongelado\(estadoDe\(eq\)\.plan\);\n      const estado = estadoParaExportar\(eq, base\);/);
+    assert.match(panel, /const soloPropia = estadoParaExportar\(eq, base\);/);
+    // Ningún camino de descarga vuelve a leer el plan VIVO para decidir las firmas.
+    assert.doesNotMatch(panel, /leerFirmasEquipo\(estadoDe\(eq\)\.plan\)/);
+    assert.doesNotMatch(panel, /planDeEstampado\(estadoDe\(eq\)\.plan/);
+  });
+});
+
 describe('la página y el Excel usan el MISMO estado', () => {
   test('el Excel toma el firmante de fichas_firmantes.js (el mismo módulo que la pantalla)', () => {
     assert.match(leer('assets', 'js', 'ui', 'fichas', 'exportar-planificacion.js'), /import \{ firmanteDe \} from '\.\.\/\.\.\/domain\/fichas_firmantes\.js';/);

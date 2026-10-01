@@ -3323,12 +3323,6 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   }
   const alCambiarFirma = () => { cargarFirmaSesion(); };
 
-  /** Las casillas de la ficha abierta donde va la firma de la sesión. */
-  function casillasConFirma(e) {
-    if (!firmaSesion.dataUrl || !e) return [];
-    return casillasDeLaSesion(estadoDe(e).plan, firmaSesion.nombre);
-  }
-
   /** Estampa (o retira) la firma de la sesión en los huecos de la hoja abierta y explica dónde va. */
   /** Alto máximo de la firma en la pantalla (el renglón de «Firma:»). */
   const ALTO_FIRMA_PX = 30;
@@ -3377,12 +3371,25 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     if (custodiaDisponible()) asegurarFirmasEquipoPantalla();
     pintarFirmasEstampadas();
   };
-  /** Vuelve a dibujar la casilla `k` de la hoja abierta (no si se está escribiendo en ella). */
+  /**
+   * Vuelve a dibujar la casilla `k` de la hoja abierta. Si el foco estaba en ella (el desplegable o
+   * la fecha), vuelve al mismo control; solo se espera si se está ESCRIBIENDO un nombre o un cargo
+   * a mano («Otra persona», que no depende del valor por defecto). Revisión de `99 §120`.
+   */
   function repintarFirmante(k) {
     const caja = modalCuerpo && modalCuerpo.querySelector('[data-firmante="' + k + '"]');
     const f = FIRMAS.find((x) => x.k === k);
-    if (!caja || !f || !firmanteHTML || caja.contains(document.activeElement)) return;
+    if (!caja || !f || !firmanteHTML) return;
+    const activo = caja.contains(document.activeElement) ? document.activeElement : null;
+    const escribiendo = activo && /^(nom|occ)_/.test(activo.getAttribute('data-plan') || '');
+    if (escribiendo) return;
+    const atributo = activo && ['data-firma-sel', 'data-fecha', 'data-plan'].find((a) => activo.hasAttribute(a));
+    const volver = atributo ? '[' + atributo + '="' + activo.getAttribute(atributo) + '"]' : null;
     caja.outerHTML = firmanteHTML(f);
+    if (volver) {
+      const nueva = modalCuerpo.querySelector('[data-firmante="' + k + '"] ' + volver);
+      if (nueva) nueva.focus();
+    }
   }
 
   /** Qué firma lleva cada casilla EN PANTALLA: la propia y, para el custodio, las del equipo. */
@@ -3777,9 +3784,20 @@ export function montarPanelFichas(contenedor, opciones = {}) {
      8 · ACCIONES · exportar y descargar
      ═════════════════════════════════════════════════════════════════════ */
 
-  /** Estado con la forma que espera `exportar-planificacion.js`. */
-  function estadoParaExportar(e) {
-    const st = estadoDe(e);
+  /**
+   * El plan de la ficha con quien va POR DEFECTO en «Elaboración» escrito, para UNA descarga
+   * (`99 §120`): ese valor sigue a la sesión y a su permiso, y puede cambiar a mitad de una
+   * descarga (permiso que llega o se retira). Se fija al empezar en una COPIA (nunca en el
+   * borrador), y el nombre, la firma y el folio salen de esa misma copia.
+   */
+  function planCongelado(P) {
+    const f = firmanteDe('elab', P);
+    return (P.nom_elab || f.otra || !f.nombre) ? { ...P } : { ...P, nom_elab: f.nombre };
+  }
+
+  /** Estado con la forma que espera `exportar-planificacion.js` (`base`: el plan congelado de esta descarga). */
+  function estadoParaExportar(e, base = planCongelado(estadoDe(e).plan)) {
+    const st = { ...estadoDe(e), plan: base };
     const dA = parametrosDiagrama(e, 'actual');
     const dF = parametrosDiagrama(e, 'futuro');
     return {
@@ -3802,7 +3820,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // Mantenimiento: el Excel sale sin la hoja «Beneficios» del libro (`99 §110`).
       sinHojaBeneficios: documento === 'salud',
       // Solo las casillas de la sesión; nunca se guarda en el borrador (`§98`).
-      firmas: Object.fromEntries(casillasConFirma(e)
+      firmas: Object.fromEntries((firmaSesion.dataUrl ? casillasDeLaSesion(base, firmaSesion.nombre) : [])
         .map((k) => [k, { dataUrl: firmaSesion.dataUrl, rel: firmaSesion.rel }]))
     };
   }
@@ -3879,14 +3897,15 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const faltan = await pendientesDe(eq);
       if (actual !== eq) return;
       if (faltan.length) { alert(textoPendientesEquipo(faltan)); return; }
-      const { lecturas, fallidas } = await leerFirmasEquipo(estadoDe(eq).plan);
+      const base = planCongelado(estadoDe(eq).plan);
+      const { lecturas, fallidas } = await leerFirmasEquipo(base);
       if (actual !== eq) return;
       if (fallidas.length) {
         alert('No se pudieron leer ' + fallidas.length + ' firma(s) del equipo (revise la conexión). '
           + 'No se emite con firmas incompletas: intente de nuevo.');
         return;
       }
-      const plan = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
+      const plan = planDeEstampado(base, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
       emision = { plan, lecturas, equipo: eq };
       pintarEmision();
     } catch (err) {
@@ -4001,9 +4020,10 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // 1) La ficha y las firmas, RELEÍDAS ahora: si cambió un firmante o una
       //    firma se retiró o reemplazó desde que se mostró la tabla, no se emite.
       await cargarFirmaSesion();
-      const releido = await leerFirmasEquipo(estadoDe(eq).plan);
+      const planFijo = planCongelado(estadoDe(eq).plan);
+      const releido = await leerFirmasEquipo(planFijo);
       if (emision !== e || actual !== eq) return;
-      const vivo = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...releido.lecturas.keys()] });
+      const vivo = planDeEstampado(planFijo, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...releido.lecturas.keys()] });
       const firmasIguales = [...e.lecturas.keys()].every((id) => !releido.lecturas.has(id)
         || (releido.lecturas.get(id).huella === e.lecturas.get(id).huella));
       if (releido.fallidas.length || !mismoPlan(vivo, e.plan) || !firmasIguales) {
@@ -4017,7 +4037,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const mod = cfg.exportador
         ? { exportarFichaPlanificacion: cfg.exportador, nombreArchivoFicha: null }
         : await import('./exportar-planificacion.js');
-      const estado = estadoParaExportar(eq);
+      const estado = estadoParaExportar(eq, planFijo);
       const faltan = mod.pendientesFichaPlan ? mod.pendientesFichaPlan(eq, estado) : [];
       if (faltan.length) { alert(textoPendientesEquipo(faltan)); return; }
       // «Diagrama Operativo» (`99 §112`): un papel con folio no sale incompleto.
@@ -4109,8 +4129,8 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       const avisos = [];
       let conEquipo = false;
       if (custodiaDisponible()) {
-        const { lecturas, fallidas } = await leerFirmasEquipo(estadoDe(eq).plan);
-        const plan = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
+        const { lecturas, fallidas } = await leerFirmasEquipo(estado.plan);
+        const plan = planDeEstampado(estado.plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
         for (const c of plan) {
           const l = c.origen === 'equipo' ? lecturas.get(c.id) : null;
           if (l) { estado.firmas[c.k] = { dataUrl: l.dataUrl, rel: await medirFirma(l.dataUrl) }; conEquipo = true; }
@@ -4159,12 +4179,13 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    */
   async function firmasDelEquipoEnEstado(eq, estado) {
     if (!custodiaDisponible()) return null;
-    const { lecturas, fallidas } = await leerFirmasEquipo(estadoDe(eq).plan);
+    // Sobre el plan CONGELADO de esta descarga (`99 §120`), el mismo que imprime los nombres.
+    const { lecturas, fallidas } = await leerFirmasEquipo(estado.plan);
     if (fallidas.length && !globalThis.confirm('No se pudo leer la firma de '
       + fallidas.map((id) => nombreDePersona(id)).join(', ') + ' (revise la conexión).\n\n'
       + 'Pulse Aceptar para descargar sin ' + (fallidas.length === 1 ? 'esa firma' : 'esas firmas')
       + ', o Cancelar para intentar de nuevo.')) return false;
-    const plan = planDeEstampado(estadoDe(eq).plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
+    const plan = planDeEstampado(estado.plan, firmaSesion.nombre, { propia: !!firmaSesion.dataUrl, equipo: [...lecturas.keys()] });
     const casillas = [];
     for (const c of plan) {
       if (c.origen === 'propia' && firmaSesion.dataUrl) {
@@ -4201,7 +4222,9 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // se cerró en otra pestaña, ya no hay firma que estampar (revisión §98).
       await cargarFirmaSesion();
       const eq = actual;
-      const estado = estadoParaExportar(eq);
+      // El plan de ESTA descarga, con el elaborador por defecto ya fijo (`99 §120`).
+      const base = planCongelado(estadoDe(eq).plan);
+      const estado = estadoParaExportar(eq, base);
       // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo
       // se pregunta si falta algo: preguntar por costumbre enseña a decir que sí
       // sin leer.
@@ -4260,7 +4283,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
             + 'Sin registro no sale con ellas.\n\nPulse Aceptar para descargarlo solo con su firma, '
             + 'o Cancelar para intentar de nuevo.') || actual !== eq) return;
           avisosExcel.length = 0;
-          const soloPropia = estadoParaExportar(eq);
+          const soloPropia = estadoParaExportar(eq, base);
           if (estado.diagramaOperativo) soloPropia.diagramaOperativo = estado.diagramaOperativo;
           blob = await mod.exportarFichaPlanificacion(eq, soloPropia, { avisos: avisosExcel });
         }
