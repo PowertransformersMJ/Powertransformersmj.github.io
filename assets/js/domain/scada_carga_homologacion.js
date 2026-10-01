@@ -164,6 +164,7 @@ export const AVISOS = Object.freeze({
   SIN_DATOS_AUN: { bloquea: false, texto: 'Todavía no hay datos cargados de este punto.' },
   DEVANADO_SIN_MEDIDA: { bloquea: false, texto: 'Un devanado de placa no tiene medida SCADA.' },
   CLAVE_CAMBIO: { bloquea: true, texto: 'La clave del Excel cambió después de la confirmación.' },
+  NIVEL_NO_REVISADO: { bloquea: true, texto: 'Apareció un nivel de tensión que no estaba cuando se confirmó: revise a qué devanado corresponde.' },
   RETIRADA: { bloquea: false, texto: 'La fila ya no está en el Excel; conserva su decisión.' }
 });
 
@@ -180,6 +181,16 @@ export function relacionNiveles(resumenPorNivel, mapa, placa) {
   const medido = rb.i.p50 / ra.i.p50;
   const esperado = NIVELES[a].kv / NIVELES[b].kv;
   return { medido, esperado, ok: Math.abs(medido - esperado) / esperado <= CALCULO.relacionNivelesTol };
+}
+
+/**
+ * Mapa nivel → devanado que decidió el Ingeniero, o null. Un mapa VACÍO cuenta como «no decidido»:
+ * confirmar una fila antes de cargar meses guardaba {} (no había niveles que mostrar) y ese {} tapaba
+ * el mapa automático para siempre, sin aviso (revisión adversarial 2026-10-01).
+ */
+export function mapaDeDecision(fila) {
+  const m = fila && fila.decision && fila.decision.mapa;
+  return m && typeof m === 'object' && Object.keys(m).length ? m : null;
 }
 
 /**
@@ -205,10 +216,16 @@ export function avisosFila(fila, ctx) {
   if (ctx.punto) {
     const placa = placaDe(ctx.tx);
     const auto = mapaNivelDevanado(Object.keys(ctx.punto.niveles || {}), placa);
-    mapa = (fila.decision && fila.decision.mapa) || auto.mapa;
-    if (!(fila.decision && fila.decision.mapa)) {
+    const decidido = mapaDeDecision(fila);
+    mapa = decidido || auto.mapa;
+    if (!decidido) {
       if (auto.sinDevanado.length) avisos.push('NIVEL_SIN_DEVANADO');
       if (auto.ambiguos.length) avisos.push('NIVEL_AMBIGUO');
+    } else {
+      // Un mapa decidido fija los niveles que se vieron al confirmar: si un mes posterior trae otro
+      // nivel, no puede quedar fuera del cálculo en silencio (revisión adversarial 2026-10-01).
+      const vistos = new Set(Array.isArray(fila.decision.niveles_vistos) ? fila.decision.niveles_vistos : Object.keys(decidido));
+      if (Object.keys(ctx.punto.niveles || {}).some((nv) => !vistos.has(nv))) avisos.push('NIVEL_NO_REVISADO');
     }
     if (auto.sinMedida.length) avisos.push('DEVANADO_SIN_MEDIDA');
     relacion = ctx.resumenPorNivel ? relacionNiveles(ctx.resumenPorNivel, mapa, placa) : null;

@@ -86,6 +86,8 @@ export const CALCULO = Object.freeze({
   estadistico: 'p99',
   estadisticos: Object.freeze(['p95', 'p98', 'p99', 'max']),
   minFasesValidas: 2,
+  // Si más de esta fracción de las horas válidas tiene solo 2 fases, la cifra no es firme.
+  maxFraccionDosFases: 0.5,
   // Una hora con la corriente por encima de 3 veces la ampacidad es un error de escala, no carga.
   topeFisicoXAmpacidad: 3,
   // Firmeza: cobertura mínima de horas en servicio y horas válidas mínimas.

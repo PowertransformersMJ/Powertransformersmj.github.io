@@ -44,6 +44,13 @@ export function indicePorMatricula(filas) {
   return m;
 }
 
+/** Por qué un nivel con horas medidas no tiene devanado: la causa, no un genérico. */
+function motivoSinDevanado(avisos, placa) {
+  if (!['P', 'S', 'T'].some((x) => placa[x] && placa[x].kv)) return 'la placa del parque no trae tensiones';
+  if ((avisos || []).includes('NIVEL_AMBIGUO')) return 'el nivel medido coincide con más de un devanado';
+  return 'el nivel medido no coincide con la placa';
+}
+
 /**
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
@@ -71,7 +78,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
       sinDatos: !r || !r.i || r.i.n === 0
     };
     niveles.push(fila1);
-    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala });
+    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0 });
   }
   const conPct = devanados.filter((x) => x.pct != null);
   let pctEq = conPct.length ? Math.max(...conPct.map((x) => x.pct)) : null;
@@ -85,7 +92,10 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   else if (!clave) motivoNulo = 'la homologación no trae punto SCADA';
   else if (!punto) motivoNulo = 'sin datos SCADA cargados';
   else if (pctEq == null) motivoNulo = devanados.some((x) => x.escala === 'ESCALA_I' || x.escala === 'ESCALA_INDETERMINADA')
-    ? 'escala de la corriente sospechosa' : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado' : 'sin horas válidas');
+    ? 'escala de la corriente sospechosa'
+    : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado'
+      // Hay horas medidas pero ningún devanado asignado: decir «sin horas válidas» engañaba. Se nombra la causa.
+      : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : 'sin horas válidas'));
   const sostenida = devanados.some((x) => x.d && niveles.find((n) => n.devanado === x.d && n.sostenidaPct != null && n.sostenidaPct > CALCULO.sobrecargaPct));
   const pico = niveles.some((n) => n.picoPct != null && n.picoPct > CALCULO.sobrecargaPct);
   const crg = califCRG(pctEq, umbrales);
