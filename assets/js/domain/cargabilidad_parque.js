@@ -34,7 +34,9 @@ const num = (v) => {
 };
 import { DEPARTAMENTOS } from './schema.js';
 
-const txt = (v) => (v == null ? '' : String(v).trim());
+// Un grupo de datos nunca es texto: `String({})` es «[object Object]», que es lo
+// que salía en «Refrig.» de la ventana de detalle (ver `refrig` más abajo).
+const txt = (v) => (v == null || typeof v === 'object' ? '' : String(v).trim());
 
 /** Lee una ruta anidada sin reventar si falta un tramo. */
 function leer(obj, ...rutas) {
@@ -140,7 +142,12 @@ export function filaCargabilidad(tx) {
     dep:    txt(leer(tx, 'ubicacion.departamento', 'departamento')),
     grupo:  txt(leer(tx, 'identificacion.grupo', 'grupo')),
     pot:    kva,
-    refrig: txt(leer(tx, 'refrigeracion.tipo', 'refrigeracion')),
+    // En el registro v2 la refrigeración es un GRUPO de datos y su tipo vive en
+    // `tipo_refrigeracion`. Se leía `refrigeracion.tipo`, que no existe, y el
+    // respaldo devolvía el grupo entero: «[object Object]». Hoy el campo llega
+    // vacío en el parque (deuda conocida, `data/refrigeracion-transformadores-
+    // afinia.js`) y la ventana muestra «—»; no se rellena con nada.
+    refrig: txt(leer(tx, 'refrigeracion.tipo_refrigeracion', 'refrigeracion.tipo', 'refrigeracion')),
     cond:   txt(leer(tx, 'salud_actual.bucket', 'cond_lbl', 'condicion')) || 'N/D',
     reg:    txt(leer(tx, 'electrico.tipo_tap', 'regulacion')),
     vp:     txt(leer(tx, 'electrico.tension_primaria_kv', 'kv_prim')),
