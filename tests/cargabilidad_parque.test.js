@@ -243,3 +243,45 @@ describe('filaCargabilidad — la zona registrada manda sobre la deducida', () =
     assert.equal(filaCargabilidad(tx).zona, '');
   });
 });
+
+// ══════════════════════════════════════════════════════════════
+// La refrigeración del registro v2 es un GRUPO de datos
+// ──────────────────────────────────────────────────────────────
+// En `/transformadores` la refrigeración es `{ tipo_refrigeracion, … }`.
+// Se leía `refrigeracion.tipo`, que no existe, y el respaldo devolvía el
+// grupo entero: la ventana de detalle mostraba «Refrig. [object Object]».
+// Hoy el tipo llega vacío en el parque (deuda conocida): sale vacío y la
+// ventana pinta «—». Nada se rellena.
+// ══════════════════════════════════════════════════════════════
+
+describe('filaCargabilidad — la refrigeración no sale «[object Object]»', () => {
+
+  test('el grupo vacío del registro v2 da texto vacío, no el objeto', () => {
+    const f = filaCargabilidad(tx({ refrigeracion: { tipo_refrigeracion: '', cantidad_radiadores: null } }));
+    assert.equal(f.refrig, '');
+  });
+
+  test('con tipo registrado se lee de `tipo_refrigeracion`', () => {
+    const f = filaCargabilidad(tx({ refrigeracion: { tipo_refrigeracion: 'ONAF' } }));
+    assert.equal(f.refrig, 'ONAF');
+  });
+
+  test('la proyección plana (texto) se sigue leyendo', () => {
+    const plano = {
+      matricula: 'T-PLANO', subestacion: 'PRUEBA', refrigeracion: 'ONAN',
+      ampacidad_primaria: 100, carga_primaria: 50
+    };
+    assert.equal(filaCargabilidad(plano).refrig, 'ONAN');
+  });
+
+  // 🔒 Ningún campo de la fila puede ser un objeto convertido a texto.
+  test('ningún campo de texto de la fila es «[object Object]»', () => {
+    const f = filaCargabilidad(tx({
+      refrigeracion: {}, identificacion: { matricula: 'T-OBJ', grupo: {} },
+      salud_actual: { crg_pct_medido: 50, bucket: {} }
+    }));
+    assert.ok(!JSON.stringify(f).includes('[object Object]'), JSON.stringify(f));
+    assert.equal(f.grupo, '');
+    assert.equal(f.cond, 'N/D', 'una condición ilegible queda «N/D», como sin dato');
+  });
+});

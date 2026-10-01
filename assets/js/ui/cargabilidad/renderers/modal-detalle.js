@@ -11,6 +11,10 @@ import {
   SEVCOL, SEVLBL, DIAG_MAP, PROFILE_24H, DIAG_LABEL,
 } from '../../../domain/cargabilidad_config.js';
 import { tiempoAdmisible } from '../../../domain/sobrecarga_admisible.js';
+// Lo que la ventana afirma de un equipo: lo que falta sale «—», nunca un valor.
+import {
+  SIN_DATO, textoODash, diagnosticoDe, condicionDe, fraseCarga, picoPrimario, tensionTexto,
+} from '../../../domain/cargabilidad_detalle.js';
 import { store } from '../state.js';
 
 // ── Generación de series sintéticas (24h / 7d / 30d) ─────────
@@ -57,7 +61,12 @@ function gauge(label, pct, sub) {
 // ── Trend chart SVG ─────────────────────────────────────────
 function trendSVG(d, win) {
   const o = d.P;
-  const peak = o.car || 0;
+  // Sin corriente medida en el primario no se dibuja nada: `car || 0` pintaba
+  // una curva en «0,0 A» que nadie midió.
+  const peak = picoPrimario(d);
+  if (peak == null) {
+    return `<div class="muted" style="padding:28px 0;text-align:center">${SIN_DATO} Sin corriente medida en el primario: no hay curva que dibujar.</div>`;
+  }
   const ser = makeSeries(peak, win);
   const W = 720, H = 290;
   const ymax = Math.max(210, (o.l2 || 0) * 1.08, peak * 1.15);
@@ -111,7 +120,7 @@ function diagRow(k, score) {
   if (score == null) {
     return `<div style="display:flex;justify-content:space-between;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:13px">
       <span class="muted" style="font-size:13px">${k}</span>
-      <span style="font-weight:700;color:var(--ink3)">Sin dato</span>
+      <span style="font-weight:700;color:var(--ink3)">${SIN_DATO}</span>
     </div>`;
   }
   const m = DIAG_MAP[Math.round(score)] || ['—', 'ink3'];
@@ -174,6 +183,10 @@ export function renderModal() {
   const margin = (o.amp && o.car != null) ? (o.amp - o.car) : null;
   const marginPct = (o.amp && o.car != null) ? ((o.amp - o.car) / o.amp * 100) : null;
   const condCri = (d.cond || '').toUpperCase().includes('OBSOLET');
+  // Las filas del parque NO traen `diag` (tampoco el baseline): leer `d.diag.carg`
+  // reventaba la ventana antes de mostrarse. Sin dato, cada fila sale «—».
+  const diag = diagnosticoDe(d);
+  const cond = condicionDe(d.cond);
 
   const steps = [
     // Estados NEUTROS a propósito (G020): es un flujo de REFERENCIA, no un
@@ -214,14 +227,14 @@ export function renderModal() {
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <span class="disp" style="font-size:23px;font-weight:800">Subestación ${d.sub}</span>
           <span class="pill bg-${s}"><span class="dot" style="background:${col};color:${col}"></span>${SEVLBL[s].toUpperCase()} · ${d.cmax == null ? '—' : d.cmax.toFixed(0) + '%'}</span>
-          <span class="pill" style="background:rgba(255,255,255,.08);color:var(--ink2);font-size:11px">Cond. ${d.cond}</span>
+          <span class="pill" style="background:rgba(255,255,255,.08);color:var(--ink2);font-size:11px">Cond. ${cond.texto}</span>
         </div>
-        <div class="tag" style="margin-top:4px">Matrícula ${d.id} · Zona ${cap(d.zona)} · ${cap(d.dep)} · Grupo ${d.grupo} · ${fmt(d.us)} usuarios</div>
+        <div class="tag" style="margin-top:4px">Matrícula ${d.id} · Zona ${textoODash(cap(d.zona))} · ${textoODash(cap(d.dep))} · Grupo ${textoODash(d.grupo)} · ${fmt(d.us)} usuarios</div>
       </div>
       <div style="display:flex;gap:24px;flex-wrap:wrap">
-        ${spec('Potencia', fmt(d.pot) + ' kVA')}
-        ${spec('Tensión', d.vp + ' / ' + d.vs + (d.vt !== 'N/A' ? ' / ' + d.vt : '') + ' kV')}
-        ${spec('Refrig.', d.refrig || '—')}
+        ${spec('Potencia', d.pot == null ? SIN_DATO : fmt(d.pot) + ' kVA')}
+        ${spec('Tensión', tensionTexto(d))}
+        ${spec('Refrig.', textoODash(d.refrig))}
         ${spec('Regul.', d.reg || '—')}
         ${spec('UUCC', d.uucc || '—')}
       </div>
@@ -243,7 +256,7 @@ export function renderModal() {
           </div>
           <div id="trend">${trendSVG(d, detailWin)}</div>
           <div class="muted" style="margin-top:6px">
-            ${d.cmax > 100 ? 'Corriente supera la ampacidad nominal y el 1er límite SCADA en el pico de demanda.' : 'Equipo operando dentro de su capacidad nominal en la ventana observada.'}
+            ${fraseCarga(d)}
             <i style="color:var(--ink3)">Serie de perfil — pendiente conexión SCADA histórica.</i>
           </div>
         </div>
@@ -260,16 +273,16 @@ export function renderModal() {
       <div style="flex:1;min-width:300px;display:flex;flex-direction:column;gap:16px">
         <div class="glass panel">
           <h3 style="margin:0 0 10px;font-size:15px">Diagnóstico de condición</h3>
-          ${diagRow(DIAG_LABEL.carg, d.diag.carg)}
-          ${diagRow(DIAG_LABEL.edad, d.diag.edad)}
-          ${diagRow(DIAG_LABEL.dga,  d.diag.dga)}
-          ${diagRow(DIAG_LABEL.fur,  d.diag.fur)}
-          ${diagRow(DIAG_LABEL.herm, d.diag.herm)}
+          ${diagRow(DIAG_LABEL.carg, diag.carg)}
+          ${diagRow(DIAG_LABEL.edad, diag.edad)}
+          ${diagRow(DIAG_LABEL.dga,  diag.dga)}
+          ${diagRow(DIAG_LABEL.fur,  diag.fur)}
+          ${diagRow(DIAG_LABEL.herm, diag.herm)}
           <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:13px">
             <span class="muted" style="font-size:13px">Condición</span>
-            <span style="font-weight:700;color:${condCri ? 'var(--cri)' : 'var(--ok)'}">${d.cond}</span>
+            <span style="font-weight:700;color:${cond.color || 'var(--ink2)'}">${cond.texto}</span>
           </div>
-          <div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:${margin != null && margin < 0 ? 'rgba(251,80,112,.12)' : 'rgba(52,211,153,.1)'};border:1px solid ${margin != null && margin < 0 ? 'rgba(251,80,112,.3)' : 'rgba(52,211,153,.25)'};font-size:12px;color:${margin != null && margin < 0 ? '#FFB0BF' : '#9BF3D3'}">
+          <div style="margin-top:8px;padding:11px 13px;border-radius:12px;background:${margin == null ? 'rgba(255,255,255,.06)' : margin < 0 ? 'rgba(251,80,112,.12)' : 'rgba(52,211,153,.1)'};border:1px solid ${margin == null ? 'rgba(255,255,255,.12)' : margin < 0 ? 'rgba(251,80,112,.3)' : 'rgba(52,211,153,.25)'};font-size:12px;color:${margin == null ? 'var(--ink2)' : margin < 0 ? '#FFB0BF' : '#9BF3D3'}">
             Cargabilidad restante: <b>${margin == null ? '—' : fmt(margin, 1) + ' A (' + fmt(marginPct, 0) + '%)'}</b> en primario.${margin != null && margin < 0 ? ' Equipo operando por encima de su capacidad nominal.' : ''}
           </div>
           ${sobrecargaAdmisibleCard(o)}
