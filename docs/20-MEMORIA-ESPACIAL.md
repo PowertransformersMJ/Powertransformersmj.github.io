@@ -33,6 +33,7 @@
 | **Fichas Técnicas de reposición** (familia CSS `.ftm-`) | `pages/fichas-tecnicas.html` + `assets/js/ui/fichas/*` + dominio puro `assets/js/domain/fichas_*.js` · **archivo por archivo → [`22`](22-ESPACIAL-MODULOS.md)** · estado vivo y cola → [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md) |
 | **Indicadores de calidad** (SAIDI/SAIFI) | `pages/indicadores-calidad.html` + `assets/js/ui/calidad/*` · hoja `INDICADORES-CALIDAD.md` |
 | **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` |
+| **Cargabilidad SCADA** (`§122`, familia `.cscada`) | `pages/cargabilidad-scada.html` (lista y curvas) + `admin/scada-datos.html` (homologación y carga del mes) · archivo por archivo y colecciones `scada_*` → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` |
 | **Órdenes de Materiales SSEE** (formato IT.05801, familia `.oms-`) | `pages/ordenes-materiales.html` + `assets/js/ordenes-materiales.js` · registro, cédulas y firmas → **[`22`](22-ESPACIAL-MODULOS.md)** · **≠ «Órdenes»** (`pages/ordenes.html`: órdenes de TRABAJO) |
 | **Firmas personales** (subir/ver/quitar la propia) | `assets/js/domain/firmas.js` + `assets/js/data/firmas.js` (Firestore `firmas/{uid}`) · dónde se usa → **[`22`](22-ESPACIAL-MODULOS.md)** |

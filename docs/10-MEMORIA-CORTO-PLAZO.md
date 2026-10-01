@@ -43,6 +43,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
+| **TODO-69** | 🟡 **Cargabilidad SCADA (`99 §122`) en rama `bc5e353`, espera su «procede»** (toca reglas): índices (exenciones) → reglas → merge; él carga la homologación y los meses (W-13; **falta mayo**) y confirma las filas dudosas; validar en vivo. Síntesis → bóveda `2026-09-30-cargabilidad-scada`. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§120`) — tabla viva: `bóveda/2026-09-27-auditoria-nivel2/HALLAZGOS.md` (63 hallazgos, estado de los 53 anteriores). Vivo: reglas que solo viven en la memoria del harness · `NN.8` que faltan · enmiendas `§83`. | 🟡 |
@@ -55,7 +56,6 @@
 | **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada**: la banda «mínima» va de 1 a 9.662 usuarios y se traga **144 de 208 equipos** (147 contando los 3 sin dato, `§107.4`); 14 equipos ≥20 MVA declaran ≤10 usuarios (870 MVA, 23 % de la potencia) y 3 traen la celda vacía (`M-BEC`, `M-GUP`, `M-SML`; desde `§107` quedan FUERA de la matriz y su ficha dice «no se puede situar», ya no «Mínima»). Atenuado en el papel por `§81`, pero **el dato sigue faltando**. Opciones y sitios donde iría la regla → `99 §74.24`. **Decide él**: (A) conseguir el dato · (C) excepción «transmisión» · (F) revisar los cortes de la Tabla 9. | 🔴 |
 | **TODO-54** | **Erratas ×10 en la ampacidad**: solo **GUATAPURÍ T2** (primario 5.022 → 502) y **SANTA TERESA T1** (**secundario** 833,7 → 83,7); **Lorica queda descartada** —el ADR se equivocaba— y su primario va al 102,5 %. Hay que dividir el **PAR** (ampacidad y carga), no la ampacidad sola. Verificado contra la hoja 2025 el 09-21; falta su visto bueno y leer producción. `99 §74.23`. | 🟡 |
 | **TODO-56** | **¿Se recalcula `calif_crg`?** Baja de urgencia: con el Excel mandando (`§80`) el override CRG=5 ya no sube la condición de nadie; sí mueve el causante principal. El cruce: **119 cambios sobre 193** (84 suben, 35 bajan). Exige antes/después guardado. Ojo: primero hay que arreglar `TODO-64.b`, que hoy lo BORRA. | 🟡 |
-| **TODO-57** | **Versionar los assets contra la caché**: cada despliegue sirve una MEZCLA de HTML nuevo con módulos viejos. No se arregla con `?v=` en el HTML (son ~997 referencias, 487 dentro de los propios módulos): va un paso de sellado en el despliegue. `99 §74.24`, **L-85**. | 🟡 |
 | **TODO-47** | 🟡 **Dos huecos de `99 §73.9`, decisión suya**: el «solo PNG» mira la etiqueta que declara el cliente, no los bytes; y cualquier miembro obtiene el inventario del almacén con `listAll`. Detalle y propuesta → CF-26 y la cola. | 🟡 |
 
 > **Los pendientes FRÍOS** (decisiones de arquitectura, validaciones diferidas, colas viejas) viven
