@@ -12,6 +12,7 @@
 | **TODO-04** | **✅ PARCIAL**: clusters validados + paquete SALUD ratificado con MO.00418 Ed.02. RESTA: capítulo PRUEBAS ELÉCTRICAS del MO + ratificación del director. | 🟢 parcial |
 | **TODO-13** | Ola 4: G017 movimientos no atómicos = **decisión** (contadores agregados vs Cloud Function vs aceptar). | 🟡 decisión |
 | **TODO-57** | **Versionar los assets contra la caché**: cada despliegue sirve una MEZCLA de HTML nuevo con módulos viejos. No se arregla con `?v=` en el HTML (son ~997 referencias, 487 dentro de los propios módulos): va un paso de sellado en el despliegue. `99 §74.24`, **L-85**. | 🟡 (frío desde 09-30) |
+| **TODO-47** | 🟡 **Dos huecos de `99 §73.9`, decisión suya**: el «solo PNG» mira la etiqueta que declara el cliente, no los bytes; y cualquier miembro obtiene el inventario del almacén con `listAll`. Detalle y propuesta → CF-26 y la cola. | 🟡 (frío desde 10-01) |
 | **TODO-68** | **Prueba de velocidad inestable en CI**: `tests/fichas_diagrama_operativo_blindaje.test.js` «miles de definiciones de columnas» tardó 1623 ms > `RAPIDO` 1500 en el runner de GitHub y dejó en rojo `3cc4cd1` (el mismo árbol pasó en `d6df2d8`). El guardián busca el desastre de 5-23 s de antes, no 1,6 s: subir el umbral solo en CI o medir con margen. `99 §119.9`. | 🟡 |
 | **TODO-14** | Ola 5: separar 5 dominios + partir los monolitos (`99 §52`) = **decisión de arquitectura**. | 🟡 decisión |
 | **TODO-33** | Decisión: ¿reescribir el historial de git para borrar los datos reales de commits antiguos? Irreversible. | 🟡 decisión |
