@@ -1,4 +1,4 @@
-// Fichas · «Elaboración» por defecto según la SESIÓN (`99 §120`): en la sesión de Carlos va
+// Fichas · «Elaboración» por defecto según la SESIÓN (`99 §121`): en la sesión de Carlos va
 // CARLOS MARTELO y en la de Jorge, JORGE RHENALS (con su cargo y su firma); lo elegido a mano
 // manda; sin sesión identificada, el primero de la lista, como antes. Nombres de perfil SINTÉTICOS.
 import { test, describe, afterEach } from 'node:test';
@@ -70,7 +70,7 @@ describe('con sus firmas: la de Carlos va en SU casilla', () => {
   });
 });
 
-describe('una descarga no cambia de elaborador a la mitad (revisión de §120)', () => {
+describe('una descarga no cambia de elaborador a la mitad (revisión de §121)', () => {
   test('exportar, vista previa y emisión leen y estampan sobre el plan CONGELADO de esa descarga', () => {
     const panel = leer('assets', 'js', 'ui', 'fichas', 'panel.js');
     assert.match(panel, /function planCongelado\(P\) \{/);

@@ -3365,7 +3365,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
     firmasEquipoPantalla.generacion += 1;
     firmasEquipoPantalla.cargadas = false;
     if (!actual) return;
-    // Quién va por defecto en «Elaboración» sigue a la sesión y a su permiso (`99 §120`): se repinta su casilla.
+    // Quién va por defecto en «Elaboración» sigue a la sesión y a su permiso (`99 §121`): se repinta su casilla.
     repintarFirmante('elab');
     // Un usuario autorizado al que le retiran el permiso (`99 §119`): la ficha deja de mostrarlas ya.
     if (custodiaDisponible()) asegurarFirmasEquipoPantalla();
@@ -3374,7 +3374,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
   /**
    * Vuelve a dibujar la casilla `k` de la hoja abierta. Si el foco estaba en ella (el desplegable o
    * la fecha), vuelve al mismo control; solo se espera si se está ESCRIBIENDO un nombre o un cargo
-   * a mano («Otra persona», que no depende del valor por defecto). Revisión de `99 §120`.
+   * a mano («Otra persona», que no depende del valor por defecto). Revisión de `99 §121`.
    */
   function repintarFirmante(k) {
     const caja = modalCuerpo && modalCuerpo.querySelector('[data-firmante="' + k + '"]');
@@ -3786,7 +3786,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
 
   /**
    * El plan de la ficha con quien va POR DEFECTO en «Elaboración» escrito, para UNA descarga
-   * (`99 §120`): ese valor sigue a la sesión y a su permiso, y puede cambiar a mitad de una
+   * (`99 §121`): ese valor sigue a la sesión y a su permiso, y puede cambiar a mitad de una
    * descarga (permiso que llega o se retira). Se fija al empezar en una COPIA (nunca en el
    * borrador), y el nombre, la firma y el folio salen de esa misma copia.
    */
@@ -4179,7 +4179,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
    */
   async function firmasDelEquipoEnEstado(eq, estado) {
     if (!custodiaDisponible()) return null;
-    // Sobre el plan CONGELADO de esta descarga (`99 §120`), el mismo que imprime los nombres.
+    // Sobre el plan CONGELADO de esta descarga (`99 §121`), el mismo que imprime los nombres.
     const { lecturas, fallidas } = await leerFirmasEquipo(estado.plan);
     if (fallidas.length && !globalThis.confirm('No se pudo leer la firma de '
       + fallidas.map((id) => nombreDePersona(id)).join(', ') + ' (revise la conexión).\n\n'
@@ -4222,7 +4222,7 @@ export function montarPanelFichas(contenedor, opciones = {}) {
       // se cerró en otra pestaña, ya no hay firma que estampar (revisión §98).
       await cargarFirmaSesion();
       const eq = actual;
-      // El plan de ESTA descarga, con el elaborador por defecto ya fijo (`99 §120`).
+      // El plan de ESTA descarga, con el elaborador por defecto ya fijo (`99 §121`).
       const base = planCongelado(estadoDe(eq).plan);
       const estado = estadoParaExportar(eq, base);
       // Antes de descargar, lo que el Excel va a llevar [PENDIENTE] (CF-06). Solo

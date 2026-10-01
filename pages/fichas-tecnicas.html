@@ -194,7 +194,7 @@
       try {
         const { adaptadorDelegado } = await import('../assets/js/data/firmas_delegadas_fichas.js');
         let avisadoRetiro = false;
-        // Quién va en «Elaboración» por defecto (99 §120): su nombre de la lista mientras tenga el permiso.
+        // Quién va en «Elaboración» por defecto (99 §121): su nombre de la lista mientras tenga el permiso.
         let fijarElaborador = () => {};
         try {
           const { fijarElaboradorDeLaSesion } = await import('../assets/js/domain/fichas_elaborador_sesion.js');

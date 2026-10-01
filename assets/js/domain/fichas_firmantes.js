@@ -60,7 +60,7 @@ const lleno = (v) => v != null && String(v).trim() !== '';
  * (si en el primero quedó ERICK VERGARA —elegido, o de una ficha vieja—, el
  * segundo pasa a JORGE MIRANDA en vez de repetir a Erick; revisión de `§89`).
  * Y en ELABORACIÓN va quien tiene la sesión, si la página sabe que es de esa lista
- * (`fichas_elaborador_sesion.js`, `99 §120`); si no, el primero.
+ * (`fichas_elaborador_sesion.js`, `99 §121`); si no, el primero.
  */
 export function indicePorDefecto(k, plan = {}) {
   const lista = FIRMANTES[k] || [];

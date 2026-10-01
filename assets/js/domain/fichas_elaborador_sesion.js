@@ -1,5 +1,5 @@
 // ══════════════════════════════════════════════════════════════════════════════
-// SGM · TRANSPOWER — Fichas · quién va en «Elaboración» por defecto según la SESIÓN (`99 §120`)
+// SGM · TRANSPOWER — Fichas · quién va en «Elaboración» por defecto según la SESIÓN (`99 §121`)
 // ──────────────────────────────────────────────────────────────────────────────
 // Pedido del Ingeniero (2026-09-30): «en los usuarios de Carlos y Jorge Rhenals aparece
 // solo mi nombre en Elaboró; necesito que aparezca el de ellos, Carlos cuando sea la
