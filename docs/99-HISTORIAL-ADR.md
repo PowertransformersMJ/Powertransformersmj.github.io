@@ -5160,3 +5160,12 @@ PREEXISTENTES). **Diferido**: SheetJS 0.18.5 (el de todo el sitio) es anterior a
 CVE-2024-22363 — solo lo usa un admin con su propio Excel; decisión aparte para el sitio · la ventana de detalle de la
 tabla vieja (`d.diag`). **Pendiente del Ingeniero** (TODO-69): cargar la homologación y los meses (W-13), confirmar las
 filas dudosas, volver a descargar mayo.
+
+**122.9 Validación en vivo a pedido del Ingeniero (2026-10-01, «no se logra apreciar nada»).** En su Chrome: la página
+abría sin errores, pero (a) no hay datos SCADA en producción (homologación y meses sin cargar, TODO-69), así que solo se
+ve el estado vacío, y (b) ese estado era ilegible: su único botón, `<a class="btn btn--primary">`, salía azul sobre azul
+(`body.aqua a` le gana a `.btn`); en «Datos SCADA» la pestaña elegida (fondo `rgba(…,.12)`) se perdía contra la foto.
+Arreglo `cef4f28` (en `main` solo este cambio: el de TODO-70 sigue en rama esperando su «procede»): color propio para
+`.cscada a.btn`/`a.btn--glass`, lo elegido con fondo sólido, paneles a .93 y el estado vacío con los dos pasos
+«Listo/Falta» (homologación · al menos un mes) y quién los hace. Verificado: banco (vacío → homologación → mes → lista →
+detalle con curvas; 375 px), 2161 pruebas, CI y Deploy verdes, y en su Chrome con lo servido. Lección L-114.

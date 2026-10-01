@@ -44,7 +44,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-70** | 🟡 **Detalle de Cargabilidad** (el clic no abría: `d.diag` indefinido, y otras cifras sin dato): arreglo EN RAMA `293d573`, **espera su «procede»** → ADR + L. Visto, NO tocado: el reloj pisa el rótulo de origen (`cargabilidad-shell.js:69`). | 🟡 |
-| **TODO-69** | 🟡 **Cargabilidad SCADA PUBLICADA** (`99 §122`). **Suyo**: antes de cargar la homologación, revisar «Parametros SCADA… FINAL.xlsx» (17 correcciones; bóveda `2026-10-01-parametros-scada`); luego homologación y meses (W-13); falta mayo. | 🟡 |
+| **TODO-69** | 🟡 **Cargabilidad SCADA PUBLICADA** (`99 §122`–`.9`). **Suyo**: antes de cargar la homologación, revisar «Parametros SCADA… FINAL.xlsx» (17 correcciones; bóveda `2026-10-01-parametros-scada`); luego homologación y meses (W-13); falta mayo. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§120`) — tabla viva: `bóveda/2026-09-27-auditoria-nivel2/HALLAZGOS.md` (63 hallazgos, estado de los 53 anteriores). Vivo: reglas que solo viven en la memoria del harness · `NN.8` que faltan · enmiendas `§83`. | 🟡 |
