@@ -11,7 +11,7 @@
 import { el, poner, num } from '../cargabilidad-scada/dom.js';
 import {
   leerFilasHomologacion, fusionarHomologacion, conteosHomologacion, avisosFila, estadoEfectivo, AVISOS, claveEfectiva,
-  analizarClaveHomologada, placaDe, mapaNivelDevanado, normalizarMatricula
+  analizarClaveHomologada, placaDe, mapaNivelDevanado, normalizarMatricula, mapaDeDecision
 } from '../../domain/scada_carga_homologacion.js';
 import { claveId, normalizarTexto } from '../../domain/scada_carga_csv.js';
 import { NIVELES, DEVANADO } from '../../domain/scada_carga_config.js';
@@ -145,7 +145,7 @@ export function montarHomologacion(cont, { alCambiar }) {
     const filasMapa = niveles.map((nv) => {
       const s = el('select', { 'aria-label': 'Devanado del nivel ' + NIVELES[nv].etiqueta },
         el('option', { value: '' }, 'No usar'),
-        ['P', 'S', 'T'].filter((d) => placa[d] && placa[d].kv).map((d) => el('option', { value: d, selected: ((f.decision && f.decision.mapa) || auto.mapa)[nv] === d },
+        ['P', 'S', 'T'].filter((d) => placa[d] && placa[d].kv).map((d) => el('option', { value: d, selected: (mapaDeDecision(f) || auto.mapa)[nv] === d },
           DEVANADO[d] + (placa[d] && placa[d].kv ? ' (' + num(placa[d].kv, 1) + ' kV, ' + (placa[d].A ? num(placa[d].A, 0) + ' A' : 'sin ampacidad') + ')' : ''))));
       mapaSel[nv] = s;
       const r = ev0.r ? ev0.r[nv] : null;
@@ -161,10 +161,19 @@ export function montarHomologacion(cont, { alCambiar }) {
       if (nota.value.trim().length < 10) { msg.textContent = 'Escriba una nota de al menos 10 caracteres (por qué se confirma o se excluye).'; nota.focus(); return; }
       const mapa = {};
       for (const [nv, s] of Object.entries(mapaSel)) if (s.value) mapa[nv] = s.value;
-      const decision = { tipo: tipo.value, clave: selClave.value || null, mapa, nota: nota.value.trim(), clave_excel_vista: f.clave_excel || null, avisos_vistos: [] };
+      // «Usar esta medida» con TODOS los niveles en «No usar» se contradice: eso es «Excluir».
+      if (tipo.value === 'usar' && niveles.length && !Object.keys(mapa).length) {
+        msg.textContent = 'Ningún nivel quedó asignado a un devanado. Si esta medida no es de este transformador, elija «Excluir».';
+        return;
+      }
+      // Sin niveles que mostrar (aún no hay meses) no se guarda mapa: manda el automático (mapaDeDecision).
+      // niveles_vistos: los que se revisaron; un nivel que aparezca después vuelve a pedir revisión.
+      const decision = { tipo: tipo.value, clave: selClave.value || null, mapa: niveles.length ? mapa : null, niveles_vistos: niveles,
+        nota: nota.value.trim(), clave_excel_vista: f.clave_excel || null, avisos_vistos: [] };
       const evD = evaluar(f, ctx, decision);
       const bloq = new Set([...ev0.avisos, ...evD.avisos].filter((a) => AVISOS[a] && AVISOS[a].bloquea));
-      decision.avisos_vistos = [...bloq];
+      // NIVEL_NO_REVISADO lo resuelve esta misma decisión (niveles_vistos): no se marca como visto para siempre.
+      decision.avisos_vistos = [...bloq].filter((x) => x !== 'NIVEL_NO_REVISADO');
       msg.textContent = 'Guardando…';
       const r = await decidirFila(f.id, decision);
       if (!r.ok) { msg.textContent = r.motivo; return; }

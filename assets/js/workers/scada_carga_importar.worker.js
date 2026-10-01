@@ -44,7 +44,10 @@ async function analizar({ archivos, filas }) {
     const leer = /\.csv$/i.test(nombre) && (!est || est === 'average' || est === 'quality');
     let texto = '';
     try { if (leer && a.file.size) texto = await a.file.text(); } catch (e) { texto = ''; }
-    acumularArchivo(acc, { nombre, ruta: a.ruta || '', texto, tamano: a.file ? a.file.size : 0 }, objetivo);
+    // Un paquete preparado trae el tamaño ORIGINAL de cada archivo (los no leídos van vacíos):
+    // así el informe de la carpeta cuenta igual que con la carpeta arrastrada.
+    const tamano = Number.isFinite(a.tamano) ? a.tamano : (a.file ? a.file.size : 0);
+    acumularArchivo(acc, { nombre, ruta: a.ruta || '', texto, tamano }, objetivo);
     if (i % 25 === 0 || i === total - 1) postMessage({ tipo: 'progreso', hechos: i + 1, total });
   }
   const meses = clasificarMeses(acc);

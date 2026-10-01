@@ -387,7 +387,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const mesDef = mesPorDefecto(ctx.catalogo);
     const mesInicial = mes && punto.meses.includes(mes) ? mes : (punto.meses.includes(mesDef) ? mesDef : lim.meses[lim.meses.length - 1]);
     let rango = ventanaDeMes(mesInicial);
-    let aviso = null;
+    // Si el enlace pide un mes que este punto no tiene, se dice (antes saltaba a otro mes en silencio).
+    let aviso = mes && !punto.meses.includes(mes) && !(desde || hasta)
+      ? 'Este punto no tiene datos de ' + nombreMes(mes) + ': se muestra ' + nombreMes(mesInicial) + '.' : null;
     if (desde || hasta) {
       const dl = parseFechaHoraCO(desde); const hl = parseFechaHoraCO(hasta);
       const cand = { desde: dl == null ? null : dl - H_MS, hasta: hl };

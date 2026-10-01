@@ -102,3 +102,6 @@ Ordenes_SSEE_datos.json
 # Excel emitidos desde Fichas (pueden llevar firmas estampadas, 99 §99)
 Ficha_Planificacion_*.xlsx
 Ficha_Mantenimiento_*.xlsx
+
+# Paquetes de datos SCADA (99 §122): llevan datos reales del cliente, NUNCA al repo público.
+*.sgmpaq

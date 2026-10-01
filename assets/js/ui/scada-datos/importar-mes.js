@@ -15,8 +15,9 @@
 
 import { el, poner, num } from '../cargabilidad-scada/dom.js';
 import { informeSimulacion, planLotes, tamanoDoc } from '../../domain/scada_carga_importacion.js';
-import { analizarClaveHomologada, claveEfectiva } from '../../domain/scada_carga_homologacion.js';
+import { analizarClaveHomologada, claveEfectiva, objetivoImportacion } from '../../domain/scada_carga_homologacion.js';
 import { claveId } from '../../domain/scada_carga_csv.js';
+import { PAQUETE, analizarNombreParte, juntarPartes, leerContenedor, estacionesFaltantes } from '../../domain/scada_carga_paquete.js';
 import { ESCRITURA, CODIGO, MOTIVO } from '../../domain/scada_carga_config.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
 import { leerSeriesPunto, leerCatalogo, olvidarCache } from '../../data/scada_carga.js';
@@ -41,6 +42,18 @@ async function leerEntrada(entry, ruta, out) {
   }
 }
 
+/** Huella SHA-256 (hex) de unos bytes. */
+async function huella(bytes) {
+  const d = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(d)].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+/** Descomprime gzip con lo que trae el navegador (sin librerías). */
+async function descomprimir(bytes) {
+  const flujo = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
+  return new Uint8Array(await new Response(flujo).arrayBuffer());
+}
+
 /** Ejecuta tareas con un máximo de N a la vez. */
 async function enParalelo(tareas, n) {
   const out = new Array(tareas.length);
@@ -63,6 +76,9 @@ export function montarCargaMes(cont, { alTerminar }) {
   let progreso = { hechos: 0, total: 0, texto: '' };
   let mensaje = '';
   let resultado = null;
+  // Paquete preparado: partes recibidas por huella → {carpeta, n, partes: Map(i → bytes)}.
+  const paquetes = new Map();
+  let estadoPaquete = '';
 
   const salirConCuidado = (ev) => { ev.preventDefault(); ev.returnValue = ''; };
 
@@ -74,6 +90,10 @@ export function montarCargaMes(cont, { alTerminar }) {
   }
 
   function filasHomologacion() { return (est.homologacion && est.homologacion.filas) || {}; }
+  /** Filas que se calculan (sin retiradas ni excluidas): las que lee el worker y las que exige la guarda del paquete. */
+  function filasVigentes() {
+    return Object.fromEntries(Object.entries(filasHomologacion()).filter(([, f]) => !f.retirada && !(f.decision && f.decision.tipo === 'no_usar')));
+  }
   function clavesHomologadas() {
     const s = new Set();
     for (const f of Object.values(filasHomologacion())) {
@@ -88,7 +108,13 @@ export function montarCargaMes(cont, { alTerminar }) {
   function analizar(archivos, nombreCarpeta) {
     if (!archivos.length) { mensaje = 'La carpeta no trae archivos.'; dibujar(); return; }
     if (archivos.length > MAX_ARCHIVOS) { mensaje = 'Son demasiados archivos (más de ' + MAX_ARCHIVOS + '): cargue un mes a la vez.'; dibujar(); return; }
+    // Una subcarpeta que empieza por «_» no es de un mes (en la carpeta madre hay datos de otro proyecto).
+    if (archivos.some((a) => String(a.ruta || '').split('/').slice(0, -1).some((p) => p.startsWith('_')))) {
+      mensaje = 'La carpeta trae subcarpetas que empiezan por «_», que no son de un mes: arrastre solo la carpeta del mes (por ejemplo «Agosto»).';
+      dibujar(); return;
+    }
     carpeta = nombreCarpeta; analisis = null; plan = null; resultado = null; mensaje = '';
+    paquetes.clear(); estadoPaquete = '';
     fase = 'leyendo'; progreso = { hechos: 0, total: archivos.length, texto: 'Leyendo archivos…' };
     dibujar();
     const w = nuevoWorker();
@@ -98,6 +124,13 @@ export function montarCargaMes(cont, { alTerminar }) {
       else if (m.tipo === 'cancelado') { fase = 'inicio'; mensaje = 'Lectura cancelada.'; dibujar(); }
       else if (m.tipo === 'error') { fase = 'inicio'; mensaje = 'No se pudo leer la carpeta: ' + m.mensaje; dibujar(); }
       else if (m.tipo === 'analizado') {
+        // Varios meses completos a la vez = se arrastró la carpeta madre: se carga un mes por vez.
+        const completos = m.meses.filter((x) => !x.nota && x.dias > 3);
+        if (completos.length > 1) {
+          fase = 'inicio';
+          mensaje = 'La carpeta trae varios meses (' + completos.map((x) => nombreMes(x.mes)).join(', ') + '): cargue un mes a la vez, arrastrando solo la carpeta de ese mes.';
+          dibujar(); return;
+        }
         const claves = clavesHomologadas();
         const informe = informeSimulacion({
           acc: { archivos: m.archivos, discrepancias: m.discrepancias }, meses: m.meses, clavesHomologadas: claves,
@@ -109,7 +142,63 @@ export function montarCargaMes(cont, { alTerminar }) {
         dibujar();
       }
     };
-    w.postMessage({ tipo: 'analizar', archivos, filas: filasHomologacion() });
+    w.postMessage({ tipo: 'analizar', archivos, filas: filasVigentes() });
+  }
+
+  // ── 1b) Paquete preparado: juntar partes, comprobar y entregar al MISMO lector ──────
+  async function recibirPartes(files) {
+    mensaje = '';
+    const ajenos = []; const tocados = new Set();
+    for (const f of files) {
+      const d = analizarNombreParte(f.name);
+      if (!d) { ajenos.push(f.name); continue; }
+      tocados.add(d.sha);
+      if (!paquetes.has(d.sha)) paquetes.set(d.sha, { carpeta: d.carpeta, n: d.n, partes: new Map() });
+      const p = paquetes.get(d.sha);
+      if (p.n !== d.n) { ajenos.push(f.name); continue; }
+      p.partes.set(d.i, new Uint8Array(await f.arrayBuffer()));
+    }
+    if (ajenos.length) mensaje = 'No son partes de un paquete preparado: ' + ajenos.slice(0, 3).join(', ') + (ajenos.length > 3 ? '…' : '') + '.';
+    // Solo cuenta un paquete que se completó con ESTA subida, y uno a la vez.
+    const completos = [...tocados].map((sha) => [sha, paquetes.get(sha)])
+      .filter(([sha, p]) => p && juntarPartes([...p.partes.entries()].map(([i, bytes]) => ({ i, n: p.n, sha, bytes }))).completo);
+    if (completos.length > 1) {
+      for (const [sha] of completos) paquetes.delete(sha);
+      estadoPaquete = '';
+      mensaje = 'Se completaron ' + completos.length + ' paquetes a la vez (' + completos.map(([, p]) => p.carpeta).join(', ') + '): suba las partes de un mes a la vez.';
+      dibujar(); return;
+    }
+    for (const [sha, p] of completos) {
+      const j = juntarPartes([...p.partes.entries()].map(([i, bytes]) => ({ i, n: p.n, sha, bytes })));
+      paquetes.delete(sha);
+      estadoPaquete = 'Comprobando el paquete «' + p.carpeta + '»…';
+      dibujar();
+      try {
+        if (await huella(j.bytes) !== sha) throw new Error('La huella del paquete «' + p.carpeta + '» no coincide: una parte llegó dañada. Súbalas otra vez.');
+        let contenedor;
+        try { contenedor = await descomprimir(j.bytes); } catch (_) { throw new Error('No se pudo descomprimir el paquete «' + p.carpeta + '»: está dañado.'); }
+        const { manifiesto, archivos } = leerContenedor(contenedor);
+        // El paquete solo trae las estaciones de la homologación con que se preparó: si la vigente pide
+        // otra, faltarían sus datos en silencio. Se detiene aquí (guardia de omitidos, W-13).
+        // Las mismas filas que lee el worker (filasVigentes): carpeta y paquete leen lo mismo.
+        const faltan = estacionesFaltantes(objetivoImportacion(filasVigentes()).estaciones, manifiesto.estaciones);
+        if (faltan.length) {
+          throw new Error('El paquete «' + manifiesto.carpeta + '» se preparó con otra homologación: no trae ' + faltan.length + (faltan.length === 1 ? ' estación' : ' estaciones') +
+            ' que la vigente necesita (' + faltan.slice(0, 6).join(', ') + (faltan.length > 6 ? '…' : '') + '). Hay que preparar uno nuevo que las incluya.');
+        }
+        estadoPaquete = '';
+        const lista = archivos.map((a) => ({ file: new File([a.contenido], a.nombre), ruta: a.ruta, nombre: a.nombre, tamano: a.tamano }));
+        analizar(lista, manifiesto.carpeta + ' (paquete preparado)');
+      } catch (e) {
+        estadoPaquete = '';
+        mensaje = (e && e.message) || 'No se pudo leer el paquete.';
+        dibujar();
+      }
+      return;
+    }
+    const pendientes = [...paquetes.values()].map((p) => '«' + p.carpeta + '»: ' + p.partes.size + ' de ' + p.n + (p.n === 1 ? ' parte' : ' partes'));
+    estadoPaquete = pendientes.length ? 'Partes recibidas — ' + pendientes.join(' · ') + '. Faltan las demás.' : '';
+    dibujar();
   }
 
   // ── 3) Simular: leer lo guardado, fundir, limpiar, armar el plan ──────────────────
@@ -230,7 +319,9 @@ export function montarCargaMes(cont, { alTerminar }) {
   function zonaArrastre() {
     const input = el('input', { type: 'file', id: 'carpetaMes', multiple: true, webkitdirectory: true, hidden: true });
     input.addEventListener('change', () => {
-      const lista = [...(input.files || [])].map((file) => ({ file, ruta: file.webkitRelativePath || file.name, nombre: file.name }));
+      const files = [...(input.files || [])];
+      if (files.length && files.every((x) => analizarNombreParte(x.name))) { input.value = ''; recibirPartes(files); return; }
+      const lista = files.map((file) => ({ file, ruta: file.webkitRelativePath || file.name, nombre: file.name }));
       const raiz = lista.length && String(lista[0].ruta).includes('/') ? String(lista[0].ruta).split('/')[0] : lista.length + ' archivos';
       input.value = '';
       analizar(lista, raiz);
@@ -249,9 +340,25 @@ export function montarCargaMes(cont, { alTerminar }) {
       const lista = [];
       try { for (const e of items) await leerEntrada(e, '', lista); }
       catch (e) { mensaje = 'No se pudo recorrer la carpeta.'; dibujar(); return; }
+      // Si lo que se soltó son partes de un paquete preparado, van por su camino.
+      if (lista.length && lista.every((x) => analizarNombreParte(x.nombre))) { recibirPartes(lista.map((x) => x.file)); return; }
       analizar(lista, items.length === 1 ? items[0].name : items.length + ' elementos');
     });
-    return el('div', { class: 'cs-panel' }, zona, input);
+    return el('div', {}, el('div', { class: 'cs-panel' }, zona, input), bloquePaquete());
+  }
+
+  function bloquePaquete() {
+    const input = el('input', { type: 'file', id: 'paqueteMes', multiple: true, accept: PAQUETE.extension });
+    input.addEventListener('change', async () => {
+      const files = [...(input.files || [])];
+      input.value = '';
+      if (files.length) await recibirPartes(files);
+    });
+    return el('div', { class: 'cs-panel' },
+      el('h3', {}, 'Paquete preparado'),
+      el('p', { class: 'cs-ayuda' }, 'Si el mes viene preparado en partes (' + PAQUETE.extension + '), súbalas aquí, juntas o de a una: se juntan, se comprueba su huella y siguen el mismo camino que la carpeta (veredicto, simulación y guardado).'),
+      el('label', { class: 'cs-campo', for: 'paqueteMes' }, 'Partes del paquete', input),
+      estadoPaquete ? el('p', { class: 'cs-ayuda', role: 'status', 'aria-live': 'polite' }, estadoPaquete) : null);
   }
 
   function bloqueVeredicto() {

@@ -268,6 +268,8 @@ export function firmeza(ctx) {
   if (!mideLaCarga(ctx.placa, usados.map((x) => x.d))) motivos.push('no se mide el devanado que lleva la carga');
   if (usados.some((x) => x.cobertura != null && x.cobertura < CALCULO.coberturaMinFirme)) motivos.push('cobertura menor al 50 %');
   if (usados.some((x) => x.n < CALCULO.horasMinFirme)) motivos.push('menos de 72 horas válidas');
+  // Con solo 2 de 3 fases la fase más cargada puede ser la que falta: la cifra es un mínimo, no firme.
+  if (usados.some((x) => x.n > 0 && (x.unaFalta || 0) / x.n > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');
   if ((ctx.devanados || []).some((x) => x.escala === 'ESCALA_I' || x.escala === 'ESCALA_INDETERMINADA')) motivos.push('escala de la corriente sospechosa');
   if ((ctx.mesesFallidos || []).length) motivos.push('un mes del rango no se pudo leer');
   return { firme: motivos.length === 0, motivos };
