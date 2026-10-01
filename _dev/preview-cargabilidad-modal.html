@@ -28,13 +28,21 @@
   <b>Preview fiel</b> del modal de cargabilidad — importa el módulo de PRODUCCIÓN
   <code>modal-detalle.js</code> con un transformador MOCK en <b>sobrecarga (factor 1.18)</b>
   para verificar la card <b>"Sobrecarga admisible (IEEE C57.91)"</b> (G013b · FASE A).
-  Datos ficticios, sin Firestore.
+  Datos ficticios, sin Firestore.<br>
+  <b>Dos filas</b>: la forma VIEJA (con <code>diag</code>, del archivo retirado) y la forma REAL del parque
+  (<code>filaCargabilidad</code> sobre un documento v2: refrigeración como grupo vacío, condición como clave,
+  primario sin medida, secundario sobrecargado, sin <code>diag</code>). La ventana se rompía con la segunda
+  y esta vista previa solo probaba la primera (TODO-70).
+  <div style="margin-top:8px"><button type="button" class="btn" data-fila="0">Forma vieja</button>
+  <button type="button" class="btn" data-fila="1">Forma real del parque</button></div>
 </div>
 <div id="overlay" class="modal-overlay"><div id="modalBody"></div></div>
 
 <script type="module">
   import { renderModal } from '../assets/js/ui/cargabilidad/renderers/modal-detalle.js';
   import { store } from '../assets/js/ui/cargabilidad/state.js';
+  import { filaCargabilidad } from '../assets/js/domain/cargabilidad_parque.js';
+  import { recompute } from '../assets/js/domain/cargabilidad_severidad.js';
 
   // Transformador MOCK en sobrecarga: primario a 118 A sobre 100 A de ampacidad
   // (factor 1.18 → dispara la card de sobrecarga admisible).
@@ -48,10 +56,24 @@
     pot: 10000, vp: '110', vs: '13.8', vt: 'N/A', refrig: 'ONAN', reg: 'OLTC', uucc: '6.2%'
   };
 
-  store.setRows([mockD], 'baseline');
-  store.state.detailIndex = 0;
+  // Forma REAL del parque: la que entrega data/seguimiento_cargabilidad.js.
+  const docV2 = {
+    identificacion: { matricula: 'TD-DEMO-02', uucc: 'N3T2', grupo: '' },
+    ubicacion: { subestacion_nombre: 'DEMO SUR', departamento: 'sucre' },
+    placa: { potencia_kva: 12500 },
+    refrigeracion: { tipo_refrigeracion: '', cantidad_radiadores: null },
+    electrico: { tension_primaria_kv: 34.5, tension_secundaria_kv: 13.8,
+      corriente_nominal_secundaria_a: 83, corriente_medida_secundaria_a: 90 },
+    salud_actual: { bucket: 'medio' }
+  };
+  const parqueD = Object.assign(recompute(filaCargabilidad(docV2)), { _i: 1 });
+
+  store.setRows([mockD, parqueD], 'baseline');
   store.state.detailWin = '24h';
-  renderModal();
+  const ver = (i) => { store.state.detailIndex = i; renderModal(); };
+  document.querySelectorAll('[data-fila]').forEach((b) =>
+    b.addEventListener('click', () => ver(Number(b.dataset.fila))));
+  ver(new URLSearchParams(location.search).get('fila') === 'parque' ? 1 : 0);
 </script>
 </body>
 </html>

@@ -50,9 +50,11 @@ export function ultimoErrorBaseline() {
 
 /**
  * Carga el baseline JSON de cargabilidad. Cachea en memoria.
- * Shape esperado: array de objetos transformador (id, sub, zona,
- * dep, grupo, pot, refrig, cond, reg, vp/vs/vt, uucc, us, P/S/T
- * con amp/car/l1/l2/pct, cmax, diag).
+ * Shape real: array de objetos transformador (id, serie, sub, zona,
+ * dep, grupo, pot, refrig, cond, reg, vp/vs/vt, uucc, us, P/S/T con
+ * amp/car/l1/l2/pct). NO trae `cmax` (lo calcula `recomputeAll`) NI
+ * `diag`: ninguna fuente viva lo trae, y leer `d.diag.carg` dejó sin
+ * abrir la ventana de detalle (`domain/cargabilidad_detalle.js`).
  */
 export async function cargarBaselineLocal() {
   if (_baselineCache) return _baselineCache;

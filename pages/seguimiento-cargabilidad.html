@@ -19,7 +19,8 @@
                             cargabilidad del Excel de Salud de Activos)
   · Baseline local       → assets/data/seguimiento-cargabilidad-baseline.json — SOLO 3
                             transformadores de DEMOSTRACIÓN, último recurso y rotulado
-  · Dominio puro         → assets/js/domain/cargabilidad_{config,severidad,filtros}.js
+  · Dominio puro         → assets/js/domain/cargabilidad_{config,severidad,filtros,parque,detalle}.js
+                            (filas del parque → _parque · lo que afirma la ventana de detalle → _detalle)
   · Data layer           → assets/js/data/seguimiento_cargabilidad.js (Firestore realtime)
   · UI · store / filtros → assets/js/ui/cargabilidad/{state,filtros,live,modal,export}.js
   · UI · renderers       → assets/js/ui/cargabilidad/renderers/*.js

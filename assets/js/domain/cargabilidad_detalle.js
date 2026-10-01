@@ -20,12 +20,15 @@
 // ══════════════════════════════════════════════════════════════
 
 import { BUCKETS_HI } from './schema.js';
-import { codigoDevanado } from './cargabilidad_config.js';
+import { codigoDevanado, DEV_LABEL } from './cargabilidad_config.js';
+import { tiempoAdmisible } from './sobrecarga_admisible.js';
 
 /** Lo que se muestra en lugar de un dato que no existe. */
 export const SIN_DATO = '—';
 
 const CLAVES_DIAG = Object.freeze(['carg', 'edad', 'dga', 'fur', 'herm']);
+
+const num = (v) => (typeof v === 'number' && Number.isFinite(v)) ? v : null;
 
 /** Texto de un campo, o «—». Un objeto nunca se pinta («[object Object]»). */
 export function textoODash(v) {
@@ -85,22 +88,98 @@ export function picoPrimario(d) {
 }
 
 /**
+ * Qué se sabe de UN devanado (`k` = 'P' | 'S' | 'T'):
+ *   'medido'        → corriente y ampacidad: hay porcentaje.
+ *   'sin_ampacidad' → hay corriente medida pero no ampacidad: no se puede
+ *                     evaluar, y la corriente NO se esconde.
+ *   'sin_medida'    → hay ampacidad pero no corriente.
+ *   'no_aplica'     → terciario de un equipo sin tensión terciaria.
+ *   'sin_dato'      → nada.
+ * Los medidores mostraban «N/A» (no aplica) para todo lo que faltaba y
+ * escondían la corriente de un devanado sin ampacidad.
+ */
+export function estadoDevanado(d, k) {
+  const o = d && d[k] ? d[k] : {};
+  const amp = num(o.amp);
+  const car = num(o.car);
+  if (car != null && amp != null && amp > 0) return 'medido';
+  if (car != null) return 'sin_ampacidad';
+  if (amp != null) return 'sin_medida';
+  if (k === 'T' && (!d || d.vt == null || d.vt === '' || d.vt === 'N/A')) return 'no_aplica';
+  return 'sin_dato';
+}
+
+/**
+ * Devanado con el que se leen la «Cargabilidad restante» y la sobrecarga
+ * admisible: el más cargado (el que fija `cmax`), o el primario si no hay
+ * ninguno. Antes era SIEMPRE el primario: con el secundario sobrecargado la
+ * caja salía verde («hay margen») y la estimación de sobrecarga no aparecía.
+ */
+export function devanadoReferencia(d) {
+  return (d && codigoDevanado(d.dev)) || 'P';
+}
+
+/**
+ * Lectura de la sobrecarga admisible (IEEE C57.91, tabla simplificada) de un
+ * devanado por encima de su ampacidad. Devuelve null si no hay sobrecarga.
+ *
+ * La tarjeta mostraba «Factor 1.1×» —el ESCALÓN de la tabla— como si fuera
+ * el factor del equipo (102 % medido). Ahora se separan: `factor` es el
+ * medido y `escalon` el de la tabla con que se estima. Por encima del último
+ * escalón la tabla no sirve: `fueraDeTabla` y ni minutos ni envejecimiento
+ * (sería extrapolar una curva simplificada).
+ *
+ * @returns {null | {factor:number, escalon:number, fueraDeTabla:boolean,
+ *                   minutos:number|null, envejecimiento:number|null}}
+ */
+export function lecturaSobrecarga(o) {
+  const car = num(o && o.car);
+  const amp = num(o && o.amp);
+  if (car == null || amp == null || amp <= 0) return null;
+  const factor = car / amp;
+  if (factor <= 1) return null;
+  // Mismo modelo que ya usaba la tarjeta: sobrecarga sostenida desde carga
+  // nominal (100 %) a 30 °C.
+  const sob = tiempoAdmisible(factor, 100, 30);
+  const tope = tiempoAdmisible(1e6, 100, 30).factor_usado;
+  const fueraDeTabla = factor > tope;
+  const min = sob.minutos;
+  return {
+    factor: Math.round(factor * 100) / 100,
+    escalon: sob.factor_usado,
+    fueraDeTabla,
+    minutos: (fueraDeTabla || min == null || !Number.isFinite(min)) ? null : min,
+    envejecimiento: (fueraDeTabla || typeof sob.aceleracion_envejecimiento !== 'number')
+      ? null : sob.aceleracion_envejecimiento,
+  };
+}
+
+/**
  * Frase bajo la curva. Solo afirma lo que sostienen los datos de la fila:
  * nombra el devanado que supera su ampacidad (el que fija `cmax`), menciona
- * el 1er límite SCADA solo si ese devanado lo tiene y lo pasa, y sin medida
- * no dice que el equipo opere bien.
+ * el 1er límite SCADA solo si ese devanado lo tiene y lo pasa, sin medida no
+ * dice que el equipo opere bien, y avisa del devanado con corriente pero sin
+ * ampacidad, que no se pudo evaluar. Ningún campo dice que la medida sea un
+ * «pico de demanda» ni de qué hora es: se habla de la «medida registrada».
  */
 export function fraseCarga(d) {
   if (!d || typeof d.cmax !== 'number' || !Number.isFinite(d.cmax)) {
     return 'Sin corriente medida: no hay carga que comparar con su ampacidad.';
   }
+  const sinEvaluar = ['P', 'S', 'T']
+    .filter((k) => estadoDevanado(d, k) === 'sin_ampacidad')
+    .map((k) => DEV_LABEL[k].toLowerCase());
+  const nota = !sinEvaluar.length ? ''
+    : sinEvaluar.length === 1
+      ? ` El ${sinEvaluar[0]} tiene corriente medida pero no ampacidad: no se pudo evaluar.`
+      : ` El ${sinEvaluar.join(' y el ')} tienen corriente medida pero no ampacidad: no se pudieron evaluar.`;
   if (d.cmax > 100) {
-    const o = d[codigoDevanado(d.dev) || 'P'] || {};
+    const o = d[devanadoReferencia(d)] || {};
     const pasaL1 = typeof o.l1 === 'number' && typeof o.car === 'number' && o.car > o.l1;
     const quien = d.dev ? ` del ${String(d.dev).toLowerCase()}` : '';
-    return `La corriente${quien} supera su ampacidad nominal${pasaL1 ? ' y el 1er límite SCADA' : ''} en el pico de demanda.`;
+    return `La corriente${quien} supera su ampacidad nominal${pasaL1 ? ' y el 1er límite SCADA' : ''} en la medida registrada.${nota}`;
   }
-  return 'Equipo operando dentro de su capacidad nominal en los devanados medidos.';
+  return `Equipo operando dentro de su capacidad nominal en los devanados con medida y ampacidad.${nota}`;
 }
 
 /** «34.5 / 13.8 kV» (terciaria solo si existe); sin ninguna tensión, «—». */

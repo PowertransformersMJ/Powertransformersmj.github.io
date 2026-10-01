@@ -51,13 +51,6 @@ function leer(obj, ...rutas) {
   return undefined;
 }
 
-/**
- * Porcentaje de un devanado. Manda el oficial; si no hay, se calcula
- * el cociente. Devuelve también si ambos se contradicen.
- *
- * @returns {{amp:number|null, car:number|null, pct:number|null,
- *            cociente:number|null, desacuerdo:boolean}}
- */
 /** Zona operativa que corresponde a un departamento (MO.00418 · `schema.js`). */
 export function zonaDeDepartamento(depto) {
   const d = txt(depto).toLowerCase();
