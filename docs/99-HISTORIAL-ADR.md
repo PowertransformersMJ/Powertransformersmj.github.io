@@ -5244,3 +5244,58 @@ simulación) · pie fijo «206 transformadores · 145 subestaciones» · escalon
 `cargabilidad_transformadores` (las reglas la niegan) · CSV con la clave cruda de la condición · `DIAG_MAP` con
 vocabulario no oficial · exports sin uso en `modal.js` · ícono de cabecera siempre rojizo · `.dot` sin estilo dentro
 de la ventana.
+
+## 124. ADR-124 — Cargabilidad: la ventana de detalle muestra las calificaciones de Salud de Activos y enlaza las curvas horarias medidas por el SCADA en lugar de la curva de ejemplo ⟦OPUS-5.5⟧ (2026-10-01)
+
+> Decisiones del Ingeniero sobre `§123.9`: (1) escalón IEEE más cercano o superior → *«después ajustamos esa parte»*;
+> (2) **sí** a las calificaciones de Salud de Activos en «Diagnóstico»; (3) **sí** al enlace a las curvas reales. Y:
+> *«se llama SCADA es de donde salen las medidas, no porque estemos hablando de límite SCADA, son cosas diferentes…
+> estamos trabajando sobre ilustrar la cargabilidad de los transformadores de potencia tomando los datos desde
+> SCADA»*. Publicado `80afebd` (código `66c4d19` + revisión `7459be2`); retiro de lo conservado por caché `552f89d` (código `32cf1c8`).
+
+**124.1 Punto de partida.** Tras `§123` el «Diagnóstico» salía con cinco «—» (las filas no traen el `diag` del
+archivo retirado) aunque el registro SÍ guarda las siete calificaciones del MO.00418 que muestra Salud de Activos; y
+el panel de tendencia dibujaba un perfil de ejemplo mientras `§122` ya ofrece las curvas medidas por el SCADA.
+
+**124.2 Solución.** `domain/cargabilidad_diagnostico.js` (NUEVO, L-102): `VARIABLES_SALUD` + `calificacionesDe` —
+mismo mapeo (`filaParqueDesdeTx`: DGA y ADFQ = `eval_*`), orden y nombres que la página de Salud de Activos, escala
+Tabla 11 (`schema.js CONDICIONES`), número como allí (2 decimales sin ceros de más), «—» sin dato o fuera de 1–5.
+`filaCargabilidad` trae `salud` y `docId`. Ventana: panel «Curvas horarias · medidas del SCADA» con el enlace
+`cargabilidad-scada.html#mat=…&id=…` (ventana completa; sin botón en la demostración; no promete curvas: producción
+aún no tiene datos SCADA, TODO-69). La frase de la corriente REGISTRADA (Salud de Activos) va con los medidores, no bajo
+«SCADA»: fuente de las medidas ≠ «límite SCADA» ≠ medida del Excel.
+
+**124.3 No-regresión.** Tabla («Curvas SCADA»), mapa de calor, KPIs, filtros, CSV, shell y CSS intactos;
+`scada_carga_vista.js` no usa `salud`/`docId`. Caché: lo que la ventana dejó de importar (PROFILE_24H, VENTANAS_TREND,
+DIAG_MAP, DIAG_LABEL, detailWin/setDetailWin, setWin, diagnosticoDe, picoPrimario) se CONSERVÓ con nota en `80afebd`
+y se retiró en `552f89d` (código `32cf1c8`), pasados 10 min del despliegue (L-116).
+
+**124.4 Verificación.** 2186 pass en `80afebd` (+10; 3 en rojo con la versión anterior de `filaCargabilidad`) → 2180
+tras el retiro (−6 pruebas de lo retirado) · `lint:html` limpio · banco (7 equipos sintéticos, demostración, pestaña
+con `.tb` + `.tab-bar`, el enlace navega la ventana completa) · 1 revisor Opus (W-06/W-04): nada bloqueaba; corregidos
+la frase bajo «SCADA», `&id=`, botón en demo, formato del número y comentarios · CI y Deploy verdes; 9/9 servidos =
+`main`. **En vivo** (su sesión, solo lectura): 199/199 abren; calificaciones en los 199 (DGA y Furanos faltan en 1
+cada uno → «—»); 199 enlaces con `&id=`; el botón abrió el detalle de CURUMANÍ en Cargabilidad SCADA; 0 errores.
+
+**124.5 Anti-patterns evitados.** Recalcular o «arreglar» la calificación del Excel · nombres no oficiales
+(«Buena/Aceptable/…») · prometer curvas que aún no hay · mezclar la medida del Excel con «medidas del SCADA» · borrar
+exportaciones dentro de la ventana de caché.
+
+**124.6 Archivos.** Nuevos: `domain/cargabilidad_diagnostico.js`, `tests/cargabilidad_diagnostico.test.js`.
+Modificados: `renderers/modal-detalle.js`, `domain/cargabilidad_parque.js`, `domain/cargabilidad_config.js`,
+`domain/cargabilidad_detalle.js`, `ui/cargabilidad/state.js`, `ui/cargabilidad/modal.js`,
+`_dev/preview-cargabilidad-modal.html`, `tests/cargabilidad_detalle.test.js`. INTACTOS: `tabla.js`, `heatmap.js`,
+`kpis.js`, `overview.js`, `filtros.js`, `export.js`, `live.js`, shell, CSS, páginas, reglas.
+
+**124.7 Doctrina.** `CLAUDE.md §3.2` (el dato del Excel se muestra, no se fabrica ni se corrige) · reusar la función
+de Salud de Activos (L-57) · L-102 y L-116 (caché) · L-65 · validación en vivo.
+
+**124.8 Verificado sano / hallazgo.** Mapeo idéntico al de Salud de Activos (misma función); nombres y redondeo
+iguales en 15 valores; enlace correcto desde el iframe (sin sandbox ni `<base>`). **Hallazgo**: la calificación
+«Cargabilidad» del Excel NO coincide con la que da la carga medida (bandas CRG del MO.00418) en **123 de 199** equipos
+(p. ej. TALAIGUA NUEVO 117,6 % → 5; el Excel dice 1). Es TODO-56 (ahora visible en la ventana); nada se corrigió: el
+Excel manda (`99 §74.15`).
+
+**124.9 Pendiente.** (1) Escalón IEEE más cercano vs superior — *«después»* (decisión suya). (2) ¿Avisar en la ventana
+cuando la calificación «Cargabilidad» del Excel contradice la carga medida? (propuesta, TODO-56). (3) Los menores de
+`§123.9` siguen en cola.

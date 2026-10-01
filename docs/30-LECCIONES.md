@@ -220,6 +220,17 @@ el usuario donde de verdad hace clic (abajo, en la tabla); (2) dentro de un ifra
 (3) al cambiar la FORMA de una fila, recorrer todos sus consumidores en el camino vivo (el detalle llevaba roto desde
 julio porque nadie abrió la ventana). **Gate**: pruebas de `cargabilidad_detalle` + [HONOR] para las entradas.
 
+
+### L-116 · Retirar una exportación también choca con la caché: el importador VIEJO la sigue pidiendo
+
+`99 §124`: la ventana de Cargabilidad dejó de usar ocho exportaciones (la curva de ejemplo, el vocabulario viejo del
+diagnóstico). Borrarlas en la misma publicación habría tumbado la página a quien tuviera en caché el `modal-detalle.js`
+anterior (`max-age=600`): su `import { DIAG_MAP }` falla y el módulo entero no carga — el espejo de L-102. **Regla**:
+(1) lo que un módulo deja de importar se CONSERVA en esa publicación, con una nota «compat de caché» y su motivo;
+(2) se retira en una publicación POSTERIOR, pasados ≥ 10 min del despliegue; (3) antes de retirarlo, grep en todo el
+repo (assets, pages, admin, tests, _dev, functions, scripts, api) de que nadie más lo usa. **Gate** [HONOR] (TODO-57 es
+el arreglo de fondo: versionar los assets).
+
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
 > **Reglas de Firestore/Storage, cédulas, firmas ajenas y saneado de datos** viven en
