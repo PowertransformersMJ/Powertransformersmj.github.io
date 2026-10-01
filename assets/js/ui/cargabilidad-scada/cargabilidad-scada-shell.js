@@ -54,8 +54,9 @@ async function arrancar() {
   else if (h.status !== 'fulfilled' || h.value.estado === 'fallo') ctx.avisos.push('No se pudo leer la homologación: ninguna cifra se puede calcular por ahora (revise la conexión y recargue).');
   if (c.status === 'fulfilled' && c.value.estado === 'ok') ctx.catalogo = c.value.datos;
   else if (c.status !== 'fulfilled' || c.value.estado === 'fallo') ctx.errorCatalogo = true;
+  // Sin documento de umbrales propio, las bandas de referencia del MO.00418 SON las vigentes (verificado en
+  // producción el 2026-10-01): no se avisa nada; la franja de la lista muestra siempre las bandas en uso.
   ctx.umbrales = u.status === 'fulfilled' ? u.value : null;
-  if (ctx.umbrales && ctx.umbrales._source === 'baseline') ctx.avisos.push('Se usan las bandas CRG de referencia del MO.00418 (no se leyeron los umbrales activos).');
   // «Volver» regresa a la lista tal como estaba (atrás) si se llegó desde ella; si se entró
   // directo con un enlace '#mat=…', va a la lista sin salir de la página.
   let desdeLista = false;
