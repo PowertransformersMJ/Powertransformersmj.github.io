@@ -43,7 +43,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-69** | 🟡 **Cargabilidad SCADA (`99 §122`) en rama `bc5e353`, espera su «procede»** (toca reglas): índices (exenciones) → reglas → merge; él carga la homologación y los meses (W-13; **falta mayo**) y confirma las filas dudosas; validar en vivo. Síntesis → bóveda `2026-09-30-cargabilidad-scada`. | 🟡 |
+| **TODO-69** | 🟡 **Cargabilidad SCADA PUBLICADA** (`99 §122`, `a55eaf3`). **Suyo**: cargar la homologación y los meses en «Datos SCADA» (W-13) y confirmar las filas dudosas; **mayo falta** (volver a descargarlo). Al primer mes real: validar en vivo. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§120`) — tabla viva: `bóveda/2026-09-27-auditoria-nivel2/HALLAZGOS.md` (63 hallazgos, estado de los 53 anteriores). Vivo: reglas que solo viven en la memoria del harness · `NN.8` que faltan · enmiendas `§83`. | 🟡 |

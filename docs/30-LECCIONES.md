@@ -185,6 +185,18 @@ por campos o se fusiona con una función pura que declare quién manda sobre cad
 quede guardada, no deducida). Y eso se prueba donde vive el defecto: una prueba del dominio no lo ve; hace
 falta una de integración que ejecute el trigger de verdad (emulador de Functions, `npm run test:trigger`).
 
+### L-113 · Datos rotulados por el FIN de la hora: el mes es lo que el origen rotula en él, y los agregados compartidos solo crecen
+
+`99 §122`: la lista resumía las 744 horas que el SCADA rotula en agosto (la primera, 00:00 del día 1, es el promedio
+de 23:00 a 00:00 del 31 de julio) y el detalle pedía «agosto» como [1-ago 00:00, 1-sep 00:00): una hora corrida, el
+mes siguiente leído de más y una cifra distinta para el «mismo» mes. Y el catálogo y el resumen se escribían con la
+foto tomada al simular: dos cargas a la vez se borraban meses entre sí (probado en el emulador). **Regla**: (1) la
+ventana de un periodo se define UNA vez, con la convención del origen, y la usan TODAS las vistas (`ventanaDeMes`);
+mostrar las horas como las rotula el origen; (2) un documento que agrega lo de varios escritores se funde DENTRO de una
+transacción con lo guardado en ese instante, y la regla exige que no encoja (`keys().hasAll(resource…keys())`); antes de
+escribir lo derivado de una simulación, comprobar que nadie escribió entre medias. **Gate**: pruebas de `ventanaDeMes`
+y `fundirCatalogo` + regla con casos de encoger negados (`tests-rules/scada_carga.rules.test.js`).
+
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
 > **Reglas de Firestore/Storage, cédulas, firmas ajenas y saneado de datos** viven en

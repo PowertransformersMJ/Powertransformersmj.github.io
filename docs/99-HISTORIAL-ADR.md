@@ -5074,3 +5074,89 @@ recalcular el firmante en cada paso de una descarga.
 **121.8 Aceptado / pendiente.** Los 2 Excel que Carlos ya emitió (F-YTNPUROH, F-RNDIWTQO) salieron con «MIGUEL A.
 JIMENEZ» en Elaboración y la copia de su firma: válidos por su permiso, pero no muestran a Carlos; si deben decir
 Carlos, se vuelven a emitir. Pendiente: que Carlos y Jorge recarguen Fichas.
+
+## 122. ADR-122 — Cargabilidad SCADA: la carga real hora por hora de cada transformador frente a la ampacidad de su devanado (bandas CRG del MO.00418, cifra firme o provisional) y «Datos SCADA» para que el Ingeniero cargue homologación y meses ⟦OPUS-5.5⟧ (2026-09-30 → 2026-10-01)
+
+> Pedido: un módulo profesional de cargabilidad con el Excel «Homologacion de Transformadores SCADA» y la carpeta
+> «Variables Electricas»: lista con búsqueda, filtros y orden; detalle con rango de fecha y hora; curvas trifásicas
+> (I, U, P, Q; S y FP calculados) con zoom, tooltip y huecos; cargabilidad contra la capacidad nominal real con
+> umbrales centralizados; indicadores; validaciones; estados robustos; sin inventar campos ni tocar los originales.
+> Sus decisiones: **bandas CRG del MO.00418** · **base de datos, la carga él** (simulación antes de guardar) · **dudosas
+> con aviso** (no firmes hasta confirmarlas una por una) · **página nueva** junto a «Cargabilidad». «procede» el 10-01.
+> Publicado `c2ffbfd`; índices (13 exenciones) y reglas desplegados ANTES del merge.
+
+**122.1 Causa raíz / punto de partida.** La «Cargabilidad» existente muestra UN número por equipo (la carga medida del
+Excel de Salud de Activos 2025); no había serie horaria ni forma de ver cuándo y cuánto se carga cada devanado. El SCADA
+exporta por día 45 archivos anchos (9 familias × promedio/instantáneo/máx/mín/calidad; sin calidad del 1 al 12 de enero),
+la fecha real está en el ENCABEZADO y la variable en la clave de fila; cada nivel de tensión de un punto es un devanado;
+P y Q son totales trifásicos; hay valores tope (32767, −2147483648, …), tensiones en voltios o ×10 y congelados. Mayo no
+vino en la carpeta. Mediciones y crudos → bóveda `2026-09-30-cargabilidad-scada`.
+
+**122.2 Solución.**
+- **Cifra**: corriente horaria de la fase más cargada (≥ 2 fases válidas) → p99 del periodo ÷ ampacidad del devanado
+  (`electrico.corriente_nominal_*_a`); horas > 3 × ampacidad = escala imposible, fuera. Equipo = máx de devanados
+  (NUNCA se suman niveles). Calificación con `calcularCalifCRG` y los umbrales activos. Calibrada contra la carga
+  oficial 2025 con marzo real: mediana del cociente 0,993. Sobrecarga sostenida = ≥ 2 h seguidas > 100 % (bandera aparte).
+- **Firme / provisional**: firme solo con homologación automática o confirmada, sin circuito sin confirmar, con
+  ampacidad, midiendo el devanado que lleva la carga, cobertura ≥ 50 %, ≥ 72 h válidas, sin escala sospechosa y sin mes
+  sin leer. Solo la cifra firme lleva color; la provisional va en gris con su motivo.
+- **Ventana del mes = las horas que el SCADA ROTULA en él** (`ventanaDeMes`: de la 00:00 del día 1 a la 23:00 del último
+  día, cada rótulo es el fin de su hora). La lista (resumen guardado) y el detalle (rango calculado) usan la misma función
+  y la misma ventana → misma cifra. El detalle muestra las horas como las rotula el SCADA.
+- **Datos** (Firestore, solo lectura por id en la página): `scada_series/{est__elem__AAAA-MM}` (Bytes: valor f32 +
+  código de limpieza + bandera por hora y nivel), `scada_resumen/{mes}`, `scada_catalogo/estado` (punto de compromiso),
+  `scada_cargas` (registro), `scada_homologacion/vigente` + `scada_homologacion_registro` (versión y registro atados).
+- **Carga del mes** (`admin/scada-datos.html`): la carpeta se lee en el navegador (worker); simulación con veredicto,
+  meses (el día suelto y otro año no se marcan), qué se descartó y por qué; se funde con TODO lo guardado del punto-mes
+  (aunque el catálogo no lo nombre); «completar» o «reemplazar» (sin pisar con vacíos ni topes; la calidad nunca se
+  pierde); resumen y catálogo se funden en TRANSACCIÓN y las reglas exigen que solo crezcan; si otra carga terminó
+  mientras se simulaba, no se guarda nada y pide volver a simular.
+- **Homologación**: Excel → vista previa y diferencias; nada se borra (filas «retiradas»); id estable sin tildes ni
+  espacios dobles y herencia de la decisión por matrícula única; avisos por REGLA (circuito, medida compartida,
+  matrícula repetida o sin equipo, nivel sin devanado o ambiguo, relación de corrientes ≠ relación de tensiones, clave
+  cambiada); confirmar/excluir con nota ≥ 10 caracteres, mapa nivel → devanado y avisos vistos.
+- **Guardia de git** `scripts/guardia-scada.mjs` (`0aa8636`): ninguna fila de exporte, clave de punto ni tabla de
+  homologación entra al repo público (por forma; pruebas con estaciones «EstDemo»).
+
+**122.3 No-regresión.** Todo es aditivo (L-102: exportaciones nuevas solo en archivos nuevos). Las reglas existentes no
+cambian ni una línea (el diff de `firestore.rules` solo agrega el bloque SCADA); los 55 índices compuestos quedan iguales
+(servidor = archivo antes y después). La tabla vieja de Cargabilidad solo gana el enlace «Curvas SCADA» por fila; el
+clic en la fila sigue llamando a `store.setDetail` (su ventana de detalle ya estaba rota ANTES: `d.diag` indefinido —
+tarea aparte, no se tocó).
+
+**122.4 Verificación.** Unitarias 2140 pass (30 de dominio y 5 de la guardia, nuevas); reglas 201/201 (las dos
+direcciones; catálogo y resumen no encogen; hasta 6 niveles). Banco con las páginas REALES y datos SINTÉTICOS (Firestore
+de mentira): Excel → marzo → simulación → guardado → lista → detalle (misma cifra, 1 lectura) → confirmar un circuito →
+abril incompleto (todo provisional por cobertura) → falla de lote y reintento → recarga idéntica (0 escrituras) → dos
+pestañas a la vez → celular 375 px → técnico sin permiso → enlace con rango inválido. Revisión adversarial de 2 revisores
+Opus (UI; escritura vs reglas, con sonda de las cargas útiles reales en el emulador 8/8): 21 hallazgos, todos
+verificados y corregidos o diferidos con motivo. **Producción** (`c2ffbfd` + ajustes `a55eaf3`): índices antes = archivo (55); 13 exenciones registradas en el servidor (colecciones vacías: efectivas sin reconstruir); reglas liberadas; CI y Deploy verdes (2140 + 201 de reglas en CI). Verificación de 4 lentes (Opus, solo lectura): 26/26 archivos servidos = `main` byte a byte (incluido el worker, como JavaScript) y 42/42 rutas que importan responden 200; huellas SRI de Plotly y SheetJS correctas con CORS; crítico de completitud: 0 roturas, 4 detalles bajos (3 corregidos en `a55eaf3`, el enlace en todas las filas es su decisión). En vivo con su sesión (solo lectura, pestaña aparte cerrada): «Todavía no hay mediciones» (la regla nueva deja leer el catálogo inexistente), pestañas y registro de «Datos SCADA» sin errores de permiso, menú con las 2 entradas, «Curvas SCADA» en las 199 filas de la tabla vieja. Cazado en vivo: el aviso «no se leyeron los umbrales activos» era FALSO — en producción no existe `umbrales_salud/global` y las bandas de referencia SON las vigentes; retirado (`6eed00c`).
+
+**122.5 Anti-patterns evitados.** Sumar niveles de tensión · tomar la fecha del nombre o de la carpeta · leer la variable
+del nombre del archivo · el «máx» del SCADA (picos falsos) · fundir agregados con la foto de la simulación · leer lo
+guardado solo según el catálogo · un mes en calendario [día 1, día 1 siguiente) sobre datos rotulados por el fin de la
+hora · color de severidad en una cifra no firme · datos reales en el repo público.
+
+**122.6 Archivos.** Nuevos: `pages/cargabilidad-scada.html`, `admin/scada-datos.html`, `assets/css/cargabilidad-scada.css`,
+`assets/js/plotly-loader.js`, `assets/js/domain/scada_carga_{config,csv,limpieza,series,kpis,homologacion,importacion,fecha,vista}.js`,
+`assets/js/data/scada_carga{,_admin}.js`, `assets/js/workers/scada_carga_importar.worker.js`,
+`assets/js/ui/cargabilidad-scada/{cargabilidad-scada-shell,lista,detalle,graficos,dom}.js`,
+`assets/js/ui/scada-datos/{scada-datos-shell,homologacion,importar-mes}.js`, `scripts/guardia-scada.mjs` + `githooks/*`,
+`tests/scada_carga_{dominio,guardia}.test.js`, `tests-rules/scada_carga.rules.test.js`. Tocados: `firestore.rules`
+(bloque nuevo), `firestore.indexes.json` (13 exenciones), `assets/js/aqua-shell.js` (2 entradas de menú),
+`assets/js/ui/cargabilidad/renderers/tabla.js` (enlace). Mapa → `22`.
+
+**122.7 Doctrina.** L-66 (servidor = archivo antes de desplegar) · L-65 (verificar lo servido) · L-102 · L-110 (reglas a
+carga máxima) · L-113 (nueva: ventana de un mes en datos rotulados por el fin de la hora; agregados compartidos en
+transacción y que solo crezcan).
+
+**122.8 Verificado sano / no re-auditar.** Las cargas útiles que escribe la UI pasan las reglas reales (sonda 8/8:
+abrir/cerrar registro, lotes de 8-20 series, homologación con fuente y decisiones con Timestamps, decisión anidada con
+`serverTimestamp` comparada en el registro atado, reabrir, excluir) · tamaños (serie de 6 niveles ≈ 214 KB; lote de 8 ≈
+1,2 MB; resumen de 400 puntos aceptado) · presupuesto de accesos de la regla (lote de 8 ≤ 16 de 20) · id de serie siempre
+`[a-z0-9_-]` · recarga idéntica byte a byte · lista y detalle con la misma función · sin innerHTML con datos en lo nuevo;
+el enlace nuevo de `tabla.js` es seguro (`encodeURIComponent` en comillas dobles; `${d.sub}`/`${d.id}` sin escapar son
+PREEXISTENTES). **Diferido**: SheetJS 0.18.5 (el de todo el sitio) es anterior a los arreglos de CVE-2023-30533 y
+CVE-2024-22363 — solo lo usa un admin con su propio Excel; decisión aparte para el sitio · la ventana de detalle de la
+tabla vieja (`d.diag`). **Pendiente del Ingeniero** (TODO-69): cargar la homologación y los meses (W-13), confirmar las
+filas dudosas, volver a descargar mayo.
