@@ -5031,3 +5031,46 @@ borrar) · regla del escritor del kernel (bump en el mismo commit + pull en cada
   el conteo «hojas referenciadas en CLAUDE.md» bajó de 17 a 12 porque las hijas ya no llevan `docs/` delante; su
   existencia la sigue cubriendo el gate #10 (un nombre renombrado sin tocar el §0 sale «sin registro»).
 - **No revisada externamente**: no es Decisión Fuerte — todo se revierte con `git revert`, y el kernel con su commit.
+
+## 121. ADR-121 — Fichas: «Elaboración» por defecto sigue a la SESIÓN (Carlos Martelo, Jorge Rhenals) con su cargo y su firma ⟦OPUS-5.5⟧ (2026-09-30)
+
+> *«noto que en los usuarios de Carlos y Jorge Rhenals aparece solo mi nombre en Elaboró, necesito que aparezca el de
+> ellos, Carlos cuando sea la sesión con su usuario y Jorge Rhenals cuando sea con su usuario, con sus firmas y todo.
+> Yo apruebo y autorizo esta forma»*. Vista previa y «procede». Publicado `87f9608` (sin reglas nuevas).
+
+**121.1 Causa raíz.** `indicePorDefecto('elab')` devolvía siempre 0 (MIGUEL A. JIMENEZ) y la elección «por defecto»
+no se guarda en el borrador (`§85.4`): en la sesión de Carlos la ficha decía «Miguel» y, con `§119`, estampaba la
+copia de la firma del Ingeniero. Lo vio en vivo: Carlos ya había emitido 2 Excel reales así (GAMBOTE T1, 09-30).
+
+**121.2 Solución.**
+- `domain/fichas_elaborador_sesion.js` (NUEVO, L-102): estado de la PÁGINA con el nombre de la LISTA de quien tiene la
+  sesión. `fichas_firmantes.js` → `indicePorDefecto('elab')` toma ese nombre si está en la lista de Elaboración; si no,
+  0. La pantalla, el Excel y el estampado pasan todos por `firmanteDe`: mismo estado.
+- `pages/fichas-tecnicas.html` lo fija con `delegadoFichas.nombreEnLaLista()` (la clave `personaPropia` de su permiso
+  de Fichas, `§119`; sus perfiles no se llaman como la lista y una comparación aproximada no vale en una firma, `§71.4`)
+  mientras `usaDelegado()`. `panel.js` repinta la casilla al llegar o retirarse el permiso, aunque tenga el foco.
+- **Una descarga no cambia de elaborador a la mitad** (revisión): `planCongelado` escribe el elaborador por defecto en
+  una COPIA del plan al empezar cada descarga, vista previa y emisión; nombre, firma y folio salen de esa copia.
+- Lo elegido a mano manda; sesión del custodio, igual que antes; permiso retirado → vuelve el primero de la lista.
+
+**121.3 No-regresión.** El custodio sigue con su nombre y las cinco firmas (en vivo). `casillasConFirma` quedó sin uso
+y se retiró (lo reemplaza `casillasDeLaSesion(base, …)`).
+
+**121.4 Verificación.** Unitarias: 10 nuevas, 2105 pass; reglas 191/191; CI y Deploy verdes; 6 archivos servidos =
+`main`. Banco con el módulo REAL (firmas SINTÉTICAS): Carlos y Jorge con y sin «Mi firma», permiso que llega con la
+ficha abierta (y con el foco en la casilla), retirado a media sesión y a media descarga (Excel abierto: CARLOS MARTELO,
+su cargo y su propia firma, sin folio), elección manual conservada, custodio, vista previa, Excel renderizado. Revisión
+adversarial (2 lentes + verificador; bóveda `2026-09-30-revision-elaborador-sesion`): 2 reales (1 medio, 1 bajo),
+corregidos. En vivo, solo lectura: su sesión igual, consola limpia, «Últimos usos» con los 2 Excel de Carlos.
+
+**121.5 Anti-patterns evitados.** Deducir quién es por el nombre de perfil · guardar el valor por defecto en el borrador ·
+recalcular el firmante en cada paso de una descarga.
+
+**121.6 Archivos.** Nuevos: `domain/fichas_elaborador_sesion.js`, `tests/fichas_elaborador_sesion.test.js`. Tocados:
+`domain/fichas_firmantes.js`, `ui/fichas/panel.js`, `pages/fichas-tecnicas.html`.
+
+**121.7 Doctrina.** L-102 · L-107 · L-112.
+
+**121.8 Aceptado / pendiente.** Los 2 Excel que Carlos ya emitió (F-YTNPUROH, F-RNDIWTQO) salieron con «MIGUEL A.
+JIMENEZ» en Elaboración y la copia de su firma: válidos por su permiso, pero no muestran a Carlos; si deben decir
+Carlos, se vuelven a emitir. Pendiente: que Carlos y Jorge recarguen Fichas.

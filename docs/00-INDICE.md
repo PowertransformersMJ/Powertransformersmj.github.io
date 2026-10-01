@@ -55,6 +55,7 @@
 | §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4828 |
 | §119 | ADR-119 — **Fichas**: firmas delegadas (Carlos, Jorge) | 4871 |
 | §120 | ADR-120 — **Cerebro partido en hijas** (`00a`, `22`, `34`, `35`, CF cerrados); kernel reconcilia el índice por rangos | 4959 |
+| §121 | ADR-121 — **Fichas**: «Elaboración» por defecto sigue a la sesión (Carlos, Jorge) | 5035 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -82,7 +83,7 @@
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
 | 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82-§119` + **L-103** |
-| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119` (+ `§71`, `§99`) · archivos → `22` |
+| ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
 | El "por qué" de una decisión / detalle de un § | Capa 1 (§1-§80 en `00a`) → `99-HISTORIAL-ADR.md` |
 | ¿Dónde está la lección `L-NN` / `M-NN`? | `grep -n "^### L-NN " docs/3*-LECCIONES*.md` — `30` y sus hijas `31`-`35` |
 

@@ -103,3 +103,10 @@ descargar esos mismos bytes. **Gate**: pruebas de `§114` en el banco + [HONOR].
 expressions»). **Regla**: probar con el máximo real y medir el margen (variante con casillas de más). Abarata:
 una función sobre `e`; `x.size()==N` en vez de listas de claves; una regex en vez de una lista de parejas.
 **Gate**: `tests-rules/firmas_delegados_fichas.rules.test.js` (5 casillas) + [HONOR].
+
+### L-112 · En un papel firmado, nombre y firma salen de UNA foto tomada al empezar
+`99 §121`: el elaborador por defecto pasó a depender de la sesión y del permiso; si el permiso se retiraba a mitad de
+«Exportar Excel», el nombre se recalculaba (el Ingeniero) y la firma ya estampada era la de Carlos. La revisión
+adversarial lo cazó antes de publicar. **Regla**: todo valor que decide QUIÉN firma y que puede cambiar solo (sesión,
+permiso, red) se congela en una COPIA al empezar la descarga; nombre, firma y folio salen de esa copia, nunca del estado
+vivo ni del borrador. **Gate**: `tests/fichas_elaborador_sesion.test.js` («una descarga no cambia de elaborador»).
