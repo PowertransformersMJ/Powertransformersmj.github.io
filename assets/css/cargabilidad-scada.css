@@ -119,3 +119,9 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-filtro .cs-check { display: inline-flex; font-size: 13px; color: var(--cs-ink2); cursor: pointer; }
 .cscada .cs-filtro .cs-check.is-apagado { color: var(--cs-ink3); opacity: .6; cursor: not-allowed; }
 .cscada .cs-filtros .cs-ayuda { flex-basis: 100%; margin: 0; }
+/* Una gráfica por magnitud, grande (99 §126) */
+.cscada .cs-graf { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--cs-line); }
+.cscada .cs-graf:first-child { margin-top: 4px; border-top: 0; padding-top: 0; }
+.cscada .cs-graf-t { margin: 0; font-size: 15px; font-weight: 700; color: var(--cs-ink2); }
+.cscada .cs-graf-t small { font-weight: 500; color: var(--cs-ink3); font-size: 12.5px; }
+.cscada .cs-graf-lienzo { width: 100%; }

@@ -338,7 +338,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] : ' · sin devanado'));
       }));
     liberarFigura(figura);
-    const fig = el('div', { class: 'cs-figura', role: 'img', 'aria-label': 'Curvas horarias del nivel ' + NIVELES[nv].etiqueta + ': corriente por fase, cargabilidad, tensión, potencias y factor de potencia' });
+    // Contenedor de las gráficas (una por magnitud, cada una con su título y su descripción accesible).
+    const fig = el('div', { class: 'cs-figura', 'aria-label': 'Curvas horarias del nivel ' + NIVELES[nv].etiqueta });
     figura = fig;
     const panelFiltro = filtroValores(d, () => dibujar());
     const caja = document.getElementById('csNivel');
