@@ -5417,3 +5417,12 @@ del proyecto vecino (solo se miró la presentación).
 265 MB los 8 meses (de 89) ≈ 35 MB/mes: el GiB gratis alcanza ~29 meses de historia · el orden de los archivos no cambia
 nada · un punto con solo extras no se crea. **Pendiente**: decidir si el mínimo de tensión por debajo de 0,5 pu se marca
 de otro color (hoy se muestra) · el aviso «Autoescala» es texto (no hay botón propio en la página).
+
+**126.9 Filtros de varias opciones y una regresión de §126 (2026-10-01, «permíteme escoger… varias zonas al mismo
+tiempo, igualmente en la calificación de CRG»).** En la lista, «Zona» y «Calificación CRG» pasan a un desplegable con
+casillas que se ve como los demás filtros (nada marcado = Todas; se cierra con clic fuera o Escape; «Quitar filtros» lo
+limpia); `filtrarFilas` acepta una lista y sigue aceptando el valor suelto de antes (prueba nueva). **Regresión cazada al
+leer el código**: el filtro de las curvas de §126 usaba la clase `cs-filtros` —la de la barra de la lista— y su regla
+la cambió de cuadrícula a fila libre en producción; ahora tiene clase propia (`cs-ver`). Publicado `157a7ee`; CI y
+Deploy verdes; servidos = main; en producción: Bolívar + Occidente → 146 de 208, con CRG 5 y 4 → 68; celular sin
+desborde. Lección → L-114.
