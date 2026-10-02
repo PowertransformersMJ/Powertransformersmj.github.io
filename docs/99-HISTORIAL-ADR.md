@@ -5703,3 +5703,49 @@ cambio en ppm que mueve la zona frente a lo medido; «no firme» si cabe en 15 %
 Aviso «zona orientativa» si el gas suficiente es solo H2 (LCB, MBJ, TRE, EBU, OVE). Arreglo «Zona de de 300 a 700 °C».
 Revisión adversarial: 2 mayores (una traza de C2H2 tapaba al CH4) + 1 menor, corregidos con prueba. 2272 pruebas. CI y Deploy verdes a la primera; en producción: LLC «pasaría a T1 con −93 % de metano», TER «justo en la frontera»,
 LCB «orientativa», MAJ «no firme» (+4 ppm de etileno, 2 %); sin errores de consola.
+
+## 132. ADR-132 — Cargabilidad SCADA: «Gases con más carga · ritmo, no ppm» en el triángulo de Duval ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «aquí necesito ver la proyección de los parámetros de los gases, es decir el metano, etileno, acetileno, etano,
+> hidrógeno, monóxido de carbono, dióxido de carbono etc en triángulo de Duval». Tras decirle UNA vez que los ppm no se
+> pueden proyectar con una muestra sin fecha, eligió **«Ritmo por gas + flecha»**. NO revisado externamente.
+
+**132.1 Causa raíz.** El panel de `§131` proyectaba solo la carga; el Ingeniero quería ver los gases. Proyectar ppm exige el
+ritmo de hoy (ppm/día), que necesita dos muestras con fecha: ninguna norma ni artículo lo da desde una sola (bóveda paso 1).
+
+**132.2 Solución.** `domain/scada_carga_termico.js` (nuevo, L-102):
+- Punto caliente ESTIMADO con IEC 60076-7:2018 §8.2.3: ecuaciones en diferencias, paso de 1 min, sobre la corriente horaria medida del devanado que manda.
+- Constantes ONAF de la Tabla 4 y del ejemplo K.1: Δθor 52 K, **Δθhr 26 K**, R 6. Ambiente supuesto de 30 °C.
+- Envejecimiento: Ec. 2.
+- Límites: Tabla 2 (120/140/160 °C) y Tabla 3 (1,8 p.u.). Fuera de ese rango: «más de 160 °C» o «mucho más».
+- Burbujas por encima de 140 °C (§5.3).
+- Huecos del SCADA: hasta 2 h se rellenan; más largos quedan fuera del cálculo y la pantalla lo cuenta.
+
+Por gas, cuántas veces más rápido que hoy se formaría:
+- **CO/CO₂:** rango. Desde el Arrhenius del CO+CO₂ medido en Kraft (≈44 kJ/mol, patente US 6 276 222) a la temperatura media del devanado, hasta V en el punto caliente. Ninguna norma da su ritmo.
+- **Falla térmica:** «×1 (núcleo) a ≥ ×corriente² (conexión o contacto)». La ubicación es un supuesto.
+- **Descargas:** ×1.
+- **Sin gas suficiente:** el motivo según el estado.
+
+Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002, Tabla II). DT tiene su texto propio. No aparece en descargas ni sin gas suficiente. La fila «Zona de Duval» ya no dice «la carga no mueve el punto».
+
+**132.3 No-regresión.** Solo archivos nuevos y la sección agregada en `panel-duval.js`. El panel DGA, los márgenes y la tabla de carga quedan intactos. `feat` `dfcd7d6`, merge `0fbb5dd`; CI y Deploy verdes. 2285 pruebas (13 nuevas, sintéticas).
+
+**132.4 Verificación.**
+- Investigación de 2 Opus + 2 verificadores de fuentes. Leyeron IEC 60076-7:2018 en una copia de tercero cotejada con la muestra oficial de iTeh, IEC 60599:2022, IEEE C57.104-2019 y Duval 2002.
+- Corrigieron dos supuestos míos: Δθhr era 33,8 y es 26; CO/CO₂ no siguen V, que no es norma.
+- Revisión adversarial de 2 lentes + 12 verificaciones: 11 reales (3 mayores: horas inventadas en huecos, ubicación de la falla dada como hecho, «no mueve el punto» junto a la flecha), corregidos con prueba; 1 refutado.
+- Vista previa: DT, D2 y T3 provisional; 375 px sin desborde.
+- Producción con PRA (T3, 125,7 %): 141 °C hoy, 157 °C con +10 %, y fuera de rango desde +20 %; 48 h sin dato excluidas; sin errores de consola.
+
+**132.5–132.7.**
+- Anti-patterns evitados: ppm con ritmo supuesto, V como norma del CO/CO₂, repetir corriente sin límite, la fórmula 322·log.
+- Archivos: `domain/scada_carga_termico.js`, `tests/scada_carga_termico.test.js`, `ui/cargabilidad-scada/panel-duval.js`, `css/cargabilidad-scada.css`.
+- Doctrina: §3.2 (veredicto contra la norma; no fabricar), L-102.
+
+**132.8 Verificado sano / no re-auditar.**
+- Las ecuaciones (18)–(23) se compararon con la solución exponencial; el régimen permanente da 20 + 52 + 26 = 98 °C.
+- El rango del CO nunca se invierte (barrido de 0 a 120 % y f de 1,1 a 2).
+- El texto de PD («depende de la tensión») fue refutado como defecto.
+- **Supuestos a confirmar por el Ingeniero:** ambiente de 30 °C, papel no mejorado, constantes típicas en vez de los protocolos de calentamiento y el criterio del hueco de 2 h.
+- Bóveda: `2026-10-02-duval-proyeccion`, paso 5.
