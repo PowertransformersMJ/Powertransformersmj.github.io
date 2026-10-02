@@ -22,7 +22,7 @@ import {
 import { filaDeTransformador, indicePorMatricula, calcularEquipo, mesPorDefecto } from '../../domain/scada_carga_vista.js';
 import { mesesDelRango, recortarRango, ventanaDeMes } from '../../domain/scada_carga_series.js';
 import { validos } from '../../domain/scada_carga_limpieza.js';
-import { resumenFisico, iFaseMax, serieCargabilidad, serieS, factorPotencia, desbalanceI, desequilibrioU, horasSostenidasSobre, estadisticas } from '../../domain/scada_carga_kpis.js';
+import { resumenFisico, iFaseMax, serieCargabilidad, serieS, factorPotencia, desbalanceI, desequilibrioU, horasSostenidasSobre, estadisticas, maxSostenido } from '../../domain/scada_carga_kpis.js';
 import { resumirParaGuardar } from '../../domain/scada_carga_importacion.js';
 import {
   parseFechaHoraCO, aInputCO, formatoCO, intervaloCO, nombreMes, validarRango, xPlotly
@@ -251,13 +251,18 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const f = d.fisico;
     const kv = NIVELES[nv].kv;
     const fila = (t, v) => el('tr', {}, el('th', { scope: 'row' }, t), el('td', {}, v));
+    // Máximo sostenido con la serie LIMPIA (sin las horas de más de 3 × ampacidad), la misma del indicador «Sobre el 100 %
+    // sostenido» y del panel DGA (`99 §130`); antes salía del resumen en bruto y una hora imposible daba miles de amperios.
+    // Sin ampacidad no hay con qué descartar: queda el del resumen.
+    const sost = d.carga ? maxSostenido(d.iF.map((v, h) => (Number.isFinite(d.carga.serie[h]) ? v : NaN)), CALCULO.sobrecargaMinH) : f.sostenida;
     const escala = { ok: 'sin observaciones', ESCALA_PQ: 'P y Q no cuadran con √3·U·I: revise la escala de las potencias', ESCALA_I: 'la corriente parece estar en otra escala', ESCALA_INDETERMINADA: 'corriente y potencias en escalas dudosas', sin_dato: 'sin datos para comparar', sin_devanado: 'nivel sin devanado asignado' }[info.escala] || info.escala;
     return el('table', { class: 'cs-sec' },
       el('caption', { class: 'cs-ayuda', style: 'text-align:left' }, 'Nivel ' + NIVELES[nv].etiqueta + (info.devanado ? ' → ' + DEVANADO[info.devanado] : ' (sin devanado asignado)')),
       el('tbody', {},
         fila('Cargabilidad del devanado', info.pct == null ? '—' : num(info.pct, 1) + ' % (p99) · ampacidad ' + num(info.A, 0) + ' A'),
         fila('Corriente fase más cargada', f.i.n ? 'p50 ' + num(f.i.p50, 0) + ' A · p95 ' + num(f.i.p95, 0) + ' A · p99 ' + num(f.i.p99, 0) + ' A · máx ' + num(f.i.max, 0) + ' A' : '—'),
-        fila('Máximo sostenido ' + CALCULO.sobrecargaMinH + ' h', f.sostenida ? num(f.sostenida.valor, 0) + ' A desde ' + formatoCO(d.t[f.sostenida.idx]) : '—'),
+        fila('Máximo sostenido ' + CALCULO.sobrecargaMinH + ' h', sost ? num(sost.valor, 0) + ' A desde ' + formatoCO(d.t[sost.idx])
+          + (d.carga && d.carga.excluidas ? ' · sin ' + d.carga.excluidas + ' h de escala imposible' : '') : '—'),
         fila('Tensión de línea promedio', f.u.prom != null ? num(f.u.prom, 2) + ' kV (' + num(100 * f.u.prom / kv, 1) + ' % de ' + num(kv, 1) + ' kV)' : '—'),
         fila('Desequilibrio de tensión', d.deseq.n ? 'p95 ' + num(d.deseq.p95, 2) + ' % · máx ' + num(d.deseq.max, 2) + ' %' : '—'),
         fila('Desbalance de corriente', d.desb.n ? 'p95 ' + num(d.desb.p95, 1) + ' % · máx ' + num(d.desb.max, 1) + ' % (con carga ≥ 5 % de la ampacidad)' : '—'),
