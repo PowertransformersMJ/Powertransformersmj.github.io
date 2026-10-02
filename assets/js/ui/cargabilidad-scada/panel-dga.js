@@ -31,7 +31,7 @@ function barra(n, provisional) {
 }
 
 function cabecera(estado, r, entrada, filas, umbrales) {
-  const caja = (clase, ...hijos) => el('div', { class: 'cs-dga-nivel ' + clase, role: 'status' }, ...hijos);
+  const caja = (clase, ...hijos) => el('div', { class: 'cs-dga-nivel ' + clase }, ...hijos);
   if (estado.estado === 'leyendo') return caja('is-gris', el('b', {}, 'Calculando la carga del rango…'));
   if (estado.estado === 'error') return caja('is-gris', el('b', {}, 'Sin nivel: '), 'no se pudo leer este rango.');
   if (estado.estado === 'sin_scada') return caja('is-gris', el('b', {}, 'Sin nivel: '), estado.motivo || 'sin medición SCADA.',
@@ -56,7 +56,7 @@ function cabecera(estado, r, entrada, filas, umbrales) {
 
 function tarjetaCarga(estado, entrada) {
   if (estado.estado !== 'ok' || !entrada || entrada.pct == null) {
-    return el('div', { class: 'cs-dga-tarjeta' }, el('h4', {}, 'Carga · SCADA'),
+    return el('div', { class: 'cs-dga-tarjeta' }, el('h3', {}, 'Carga · SCADA'),
       el('p', {}, estado.estado === 'leyendo' ? 'Leyendo el rango…' : 'Sin cifra de carga medida en este rango.'));
   }
   const f = [];
@@ -72,8 +72,8 @@ function tarjetaCarga(estado, entrada) {
   if (entrada.picoMax != null && entrada.picoMax > CALCULO.sobrecargaPct && !(entrada.horasSobre100 > 0)) {
     f.push(el('p', { class: 'cs-dga-sub' }, 'Hubo horas sueltas sobre el ' + CALCULO.sobrecargaPct + ' % (máximo ' + num(entrada.picoMax, 1) + ' %) sin llegar a ' + CALCULO.sobrecargaMinH + ' h seguidas. El promedio de cada hora no muestra picos de minutos: véalos con «Máximo de la hora» en las curvas.'));
   }
-  if (entrada.excluidas) f.push(el('p', { class: 'cs-dga-sub' }, 'Se descartaron ' + entrada.excluidas + ' h con valores imposibles (más de 3 veces la ampacidad): no cuentan como sobrecarga.'));
-  return el('div', { class: 'cs-dga-tarjeta' }, el('h4', {}, 'Carga · SCADA'), f);
+  if (entrada.excluidas.length) f.push(el('p', { class: 'cs-dga-sub' }, 'Se descartaron ' + entrada.excluidas.map((x) => x.h + ' h en ' + DEVANADO[x.dev]).join(' y ') + ' con valores imposibles (más de 3 veces la ampacidad): no cuentan como sobrecarga.'));
+  return el('div', { class: 'cs-dga-tarjeta' }, el('h3', {}, 'Carga · SCADA'), f);
 }
 
 function tarjetaGases(g, cg) {
@@ -82,7 +82,7 @@ function tarjetaGases(g, cg) {
   const deDonde = g.dga == null ? null
     : (o.grupos.length ? 'Pesan: ' + o.grupos.map((k) => NOMBRE_CORTO[k] + ' ' + g[k]).join(', ') + ' (' + [...o.familias].map((x) => FAMILIA_TXT[x]).join(' y ') + ').'
       : 'Ningún grupo pasa de Bueno.');
-  return el('div', { class: 'cs-dga-tarjeta' }, el('h4', {}, 'Gases · Salud de Activos'),
+  return el('div', { class: 'cs-dga-tarjeta' }, el('h3', {}, 'Gases · Salud de Activos'),
     el('p', {}, 'DGA oficial: ', el('b', {}, g.dga == null ? 'sin calificación' : Math.round(g.dga) + ' · ' + palabraCondicion(g.dga)),
       el('span', { class: 'cs-dga-sub' }, g.dga == null ? 'Salud de Activos no tiene calificación de gases para este equipo: no se supone ningún valor.'
         : (g.dgaCalculada ? 'Calculada aquí con la regla oficial: ' : '') + 'promedio redondeado de los cuatro grupos (MO.00418 §A3.1).')),
@@ -108,14 +108,14 @@ function lista(titulo, items, n, ordenada, id) {
   const resto = items.slice(n);
   return el('div', { class: 'cs-dga-bloque' }, el('h3', { id }, titulo + ' (' + items.length + ')'),
     el(tag, { class: 'cs-dga-lista' }, items.slice(0, n).map(item)),
-    resto.length ? el('details', { class: 'cs-dga-mas', 'data-k': id }, el('summary', {}, 'Ver ' + (resto.length === 1 ? 'la otra' : 'las otras ' + resto.length)),
+    resto.length ? el('details', { class: 'cs-dga-mas', 'data-k': id }, el('summary', { id: 'csDgaSum-' + id }, 'Ver ' + (resto.length === 1 ? 'la otra' : 'las otras ' + resto.length)),
       el(tag, { class: 'cs-dga-lista', start: ordenada ? String(n + 1) : null }, resto.map(item))) : null);
 }
 
 function tablaDecision(r, filas) {
   const fil = Object.keys(MATRIZ_ATENCION);
   const cols = Object.keys(COLUMNAS_GASES);
-  return el('details', { class: 'cs-dga-mas', 'data-k': 'tabla' }, el('summary', {}, 'Cómo se decide el nivel'),
+  return el('details', { class: 'cs-dga-mas', 'data-k': 'tabla' }, el('summary', { id: 'csDgaSum-tabla' }, 'Cómo se decide el nivel'),
     el('div', { class: 'cs-tabla-caja', style: 'margin-top:8px' },
       el('table', { class: 'cs-tabla cs-dga-tabla' },
         el('caption', {}, 'Carga (filas) × gases (columnas); manda la fila más alta que se cumpla. Sin carga cerca de la capacidad el panel no da nivel. La columna sale de la DGA oficial (promedio de los cuatro grupos); los gases combustibles en 4–5 suben una columna y el acetileno en 5 se trata como los gases 4–5 (MO.00418 §A9.1). La fila severa usa 1,3 p.u., el menor tope de corriente de IEC 60076-7:2005 Tabla 4, como criterio conservador: sin temperatura no se sabe si se superó el de punto caliente.'),
@@ -143,9 +143,13 @@ export function pintarPanelDga(nodo, { tx, estado, calc, porNivel, umbrales, ran
   const g = r ? r.gases : leerGases(tx);
   const cg = r ? r.columna : columnaGases(g);
   const filas = filasCarga(umbrales);
-  // Los desplegables que la persona dejó abiertos siguen abiertos al cambiar el rango.
-  const abiertos = new Set([...nodo.querySelectorAll('details[data-k][open]')].map((d) => d.dataset.k));
-  poner(nodo,
+  // Los desplegables que la persona abrió siguen abiertos al cambiar el rango: se recuerdan en el nodo (no en el
+  // contenido, porque el repintado «leyendo» no trae las listas). El foco vuelve al mismo elemento (por id).
+  const abiertos = nodo._dgaAbiertos || (nodo._dgaAbiertos = new Set());
+  const focoId = nodo.contains(document.activeElement) && document.activeElement.id ? document.activeElement.id : null;
+  // UNA región viva por equipo (no una por repintado): anuncia el nivel cuando termina el cálculo.
+  if (!nodo._dgaVivo) nodo._dgaVivo = el('p', { class: 'cs-dga-vivo', 'aria-live': 'polite' });
+  poner(nodo, nodo._dgaVivo,
     el('div', { class: 'cs-dga-titulo' }, el('h2', { id: 'csDgaTitulo' }, 'Gases disueltos (DGA) y carga'),
       APROBADO ? null : el('span', { class: 'cs-dga-borrador' }, 'Borrador · pendiente del Ingeniero')),
     rango ? el('p', { class: 'cs-ayuda', style: 'margin:0 0 6px' }, 'Nivel para el rango ' + rango + '.') : null,
@@ -154,9 +158,18 @@ export function pintarPanelDga(nodo, { tx, estado, calc, porNivel, umbrales, ran
     r && r.nivel ? lista('Posibles adversidades', r.adversidades, VISIBLES.adversidades, false, 'csDgaAdv') : null,
     r && r.nivel ? lista('Acciones preventivas', r.acciones, VISIBLES.acciones, true, 'csDgaAcc') : null,
     tablaDecision(r, filas),
-    el('details', { class: 'cs-dga-mas', 'data-k': 'limites' }, el('summary', {}, 'Lo que este panel no puede saber'),
+    el('details', { class: 'cs-dga-mas', 'data-k': 'limites' }, el('summary', { id: 'csDgaSum-limites' }, 'Lo que este panel no puede saber'),
       el('ul', { class: 'cs-dga-lista' }, NO_PUEDE_SABER.map((t) => el('li', {}, t)))),
     el('p', { class: 'cs-ayuda' }, NOTA_PIE));
-  for (const d of nodo.querySelectorAll('details[data-k]')) if (abiertos.has(d.dataset.k)) d.open = true;
+  for (const d of nodo.querySelectorAll('details[data-k]')) {
+    const k = d.dataset.k;
+    if (abiertos.has(k)) d.open = true;
+    d.addEventListener('toggle', () => { if (d.open) abiertos.add(k); else abiertos.delete(k); });
+  }
+  if (focoId) { const e = document.getElementById(focoId); if (e && e !== document.activeElement) e.focus({ preventScroll: true }); }
+  const anuncio = estado.estado === 'error' ? 'Gases y carga: sin nivel, no se pudo leer este rango.'
+    : (!r ? '' : (r.nivel ? 'Gases y carga: ' + r.nivel.palabra + ', nivel ' + r.nivel.n + ' de 5' + (r.nivel.provisional ? ', provisional' : '') + '.'
+      : (r.franja.fila === 'R0' ? 'Gases y carga: carga normal, sin nivel.' : 'Gases y carga: sin nivel, ' + r.franja.motivo + '.')));
+  if (anuncio && nodo._dgaVivo.textContent !== anuncio) nodo._dgaVivo.textContent = anuncio;
   nodo.hidden = false;
 }

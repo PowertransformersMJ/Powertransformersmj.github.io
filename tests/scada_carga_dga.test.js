@@ -136,17 +136,22 @@ describe('entradaCarga (serie LIMPIA, solo devanados con cifra)', () => {
     assert.equal(en.horasSobre100, 2); assert.equal(Math.round(en.max2h), 140);
     assert.equal(franjaCarga(en).fila, 'R4');
   });
+  test('las horas descartadas se dan POR DEVANADO (dos devanados con las mismas horas imposibles no se suman)', () => {
+    const pn = { N66: nivel([80, 400, 400, 80], 100), N13: nivel([70, 400, 400, 70], 100) };
+    const en = entradaCarga(calc([{ nivel: 'N66', devanado: 'P', pct: 80 }, { nivel: 'N13', devanado: 'S', pct: 70 }]), pn);
+    assert.deepEqual(en.excluidas, [{ dev: 'P', h: 2 }, { dev: 'S', h: 2 }]);
+  });
   test('sin cifra de equipo: no lee nada y la fila es nula', () => {
     const en = entradaCarga(calc([], { pct: null, motivoNulo: 'escala de la corriente sospechosa' }), {});
     assert.equal(franjaCarga(en).fila, null);
   });
 });
 
-describe('tabla de niveles (ratificada 2026-10-01)', () => {
+describe('tabla de niveles (ratificada 2026-10-01; R2×B = 4 por MO.00418 §4.1.3)', () => {
   test('las 20 celdas', () => {
     assert.deepEqual(MATRIZ_ATENCION, {
       R1: { A: 3, B: 2, C: 3, D: 4, E: 4 },
-      R2: { A: 4, B: 3, C: 4, D: 5, E: 5 },
+      R2: { A: 4, B: 4, C: 4, D: 5, E: 5 },
       R3: { A: 4, B: 4, C: 5, D: 5, E: 5 },
       R4: { A: 5, B: 5, C: 5, D: 5, E: 5 },
     });

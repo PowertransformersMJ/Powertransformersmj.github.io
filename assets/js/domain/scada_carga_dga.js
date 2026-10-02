@@ -56,10 +56,14 @@ export const COLUMNAS_GASES = Object.freeze({
   E: 'Acetileno (C₂H₂) en 5',
 });
 
-/** Tabla ratificada por el Ingeniero (2026-10-01). La columna E va como la D (MO.00418 §A9.1). */
+/**
+ * Tabla ratificada por el Ingeniero (2026-10-01). La columna E va como la D (MO.00418 §A9.1). R2×B = 4 por
+ * decisión suya tras el comité: CRG 5 lleva el índice de salud a 4 o más (MO.00418 §4.1.3). R3×C = 5 la mantuvo
+ * aunque en agosto esa columna C sale del CO y el CO₂ (papel) en los 18 casos.
+ */
 export const MATRIZ_ATENCION = Object.freeze({
   R1: Object.freeze({ A: 3, B: 2, C: 3, D: 4, E: 4 }),
-  R2: Object.freeze({ A: 4, B: 3, C: 4, D: 5, E: 5 }),
+  R2: Object.freeze({ A: 4, B: 4, C: 4, D: 5, E: 5 }),
   R3: Object.freeze({ A: 4, B: 4, C: 5, D: 5, E: 5 }),
   R4: Object.freeze({ A: 5, B: 5, C: 5, D: 5, E: 5 }),
 });
@@ -145,14 +149,14 @@ export function entradaCarga(calc, porNivel) {
     pct: calc ? calc.pct : null, crg: calc ? calc.crg : null, clase: calc ? calc.clase : 'nulo',
     motivoNulo: calc ? calc.motivoNulo : null, motivos: (calc && calc.motivos) || [], devMax: calc ? calc.devMax : null,
     crgOficial: calc && calc.oficial ? calc.oficial.calif : null,
-    horasSobre100: 0, devSobre: null, desde: null, hasta: null, max2h: null, devMax2h: null, picoMax: null, excluidas: 0,
+    horasSobre100: 0, devSobre: null, desde: null, hasta: null, max2h: null, devMax2h: null, picoMax: null, excluidas: [],
   };
   if (!calc || calc.pct == null) return base;
   for (const n of calc.niveles || []) {
     if (!n.devanado || n.pct == null) continue;
     const d = porNivel && porNivel[n.nivel];
     if (!d || !d.carga) continue;
-    base.excluidas += d.carga.excluidas || 0;
+    if (d.carga.excluidas) base.excluidas.push({ dev: n.devanado, h: d.carga.excluidas });   // por devanado: nunca se suman
     if (d.sobre && d.sobre.horas > base.horasSobre100) {
       base.horasSobre100 = d.sobre.horas; base.devSobre = n.devanado;
       base.desde = d.t && d.sobre.primera != null ? d.t[d.sobre.primera] : null;
