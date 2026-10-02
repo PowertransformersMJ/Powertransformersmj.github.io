@@ -5683,3 +5683,23 @@ aceite se parece a PD → la pantalla recomienda los Triángulos 4 y 5 (Duval 20
 texto del panel DGA §127 «la plataforma guarda calificaciones de 1 a 5; el diagnóstico… se hace con las ppm» queda
 desactualizado cuando el equipo tiene ppm: es texto en BORRADOR del Ingeniero, no se tocó sin su «procede».
 Bóveda: `2026-10-02-duval-proyeccion` (paso 1 + paso 2, crudos y síntesis).
+
+**131.9 Carga en producción y verificación (mismo día, «procede» del Ingeniero).** CARGAR GASES con el Excel CORREGIDO:
+**207 equipos**, solo `ultima_dga` + `updatedAt`; foto antes/después con huella ordenada de cada documento: **0 cambios
+ajenos** (también 1 min después), `/muestras` = 0, auditoría `cargar_gases_dga`. Fidelidad Excel → Firestore: misma huella
+SHA-1 de los 7 gases leyendo el Excel por separado (openpyxl). Producción: 50 coloreados (T3 14 · PD 13 · T1 10 · T2 4 ·
+DT 4 · D2 4 · D1 1), 157 en gris, 0 «no confiable». Verificación independiente (Duval 1 + FIST desde la norma, fracciones
+exactas, sin leer el repo): **0 diferencias** en 207. Una falsa alarma de «207 cambiados» resultó ser el orden de las llaves
+del mapa (L-120). Hallazgos del parque (revisor adversarial + recálculo propio; bóveda paso 3):
+- los 13 PD son exactamente los 13 con H2 ≥ 2.000 ppm;
+- 12 con gas suficiente y carga alta con cifra firme (S: PRA, RSI, EDF, MAJ);
+- COS con el mayor C2H4/C2H2 del parque a 61 % de carga;
+- SOF con CO2 < CO;
+- MON T1A/T2A con la misma cifra: gemelos en paralelo (puntos SCADA distintos), no es error.
+
+**131.10 Margen en ppm** (`4b7b882`, merge `bfe1252`). Se cambió «A X puntos de la zona Y: una diferencia entre laboratorios puede cambiarla»: en PD,
+zona de 2 puntos, salía en los 13 y era falso en 12. Ahora `domain/dga_duval_margen.js` `margenPpm`: gas por gas, el primer
+cambio en ppm que mueve la zona frente a lo medido; «no firme» si cabe en 15 % o 1 ppm (criterio pendiente del Ingeniero).
+Aviso «zona orientativa» si el gas suficiente es solo H2 (LCB, MBJ, TRE, EBU, OVE). Arreglo «Zona de de 300 a 700 °C».
+Revisión adversarial: 2 mayores (una traza de C2H2 tapaba al CH4) + 1 menor, corregidos con prueba. 2272 pruebas. CI y Deploy verdes a la primera; en producción: LLC «pasaría a T1 con −93 % de metano», TER «justo en la frontera»,
+LCB «orientativa», MAJ «no firme» (+4 ppm de etileno, 2 %); sin errores de consola.
