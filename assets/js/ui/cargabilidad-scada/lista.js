@@ -11,7 +11,7 @@ import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
 import { filasLista, filtrarFilas, ordenarFilas, mesPorDefecto } from '../../domain/scada_carga_vista.js';
 import { CRG_CHIP, CALCULO } from '../../domain/scada_carga_config.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
-import { leerResumenMes } from '../../data/scada_carga.js';
+import { leerResumenMes, leerSeriesPunto } from '../../data/scada_carga.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 
 const PASO = 100;
@@ -58,8 +58,15 @@ export function montarLista(cont, ctx, { alAbrir }) {
     filtro: { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false },
     orden: { campo: 'pct', dir: 'desc' }
   };
-  let tablaCaja = null; let contador = null;
+  let tablaCaja = null; let contador = null; let kpiCaja = null;
   let turno = 0;   // descarta la respuesta de un mes que ya no es el elegido
+  // Una misma curva pedida dos veces a la vez (la lista verificando y el detalle abriéndose) se lee UNA vez.
+  const curvasEnCurso = new Map();
+  function leerCurvaUnaVez(cid, mes) {
+    const k = cid + '|' + mes;
+    if (!curvasEnCurso.has(k)) curvasEnCurso.set(k, leerSeriesPunto(cid, [mes]).finally(() => curvasEnCurso.delete(k)));
+    return curvasEnCurso.get(k);
+  }
 
   async function cargarMes(mes) {
     const mio = ++turno;
@@ -78,6 +85,33 @@ export function montarLista(cont, ctx, { alAbrir }) {
       st.error = 'No se pudo calcular ' + nombreMes(mes) + '.';
     }
     dibujar();
+    if (st.filas) verificarSobrecarga(mio, mes);
+  }
+
+  // Un nivel con horas imposibles (> 3 × ampacidad) en el mes: su resumen no dice si hubo sobrecarga (`99 §129`). Se lee la
+  // curva del mes de ESE punto (rara vez: 1 fila en 8 meses) y se decide con la serie limpia, como el detalle. El cálculo
+  // va en un archivo aparte, cargado solo si hace falta: si falla, la marca queda «por confirmar» y la lista sigue igual.
+  async function verificarSobrecarga(mio, mes) {
+    const pend = st.filas.filter((x) => x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length);
+    if (!pend.length) return;
+    let mod = null;
+    try { mod = await import('../../domain/scada_carga_sostenida.js'); } catch (e) { console.warn('[cargabilidad-scada] verificar sobrecarga', e); }
+    const porConfirmar = (x) => ({ ...x, sobrecargaPorVerificar: [], verificacion: 'fallo' });
+    // En paralelo y con tope por mes (free-tier): lo que pase del tope queda «por confirmar» y se ve en «Ver curvas».
+    const tope = mod ? mod.MAX_VERIFICAR_MES : 0;
+    const nuevas = await Promise.all(pend.map(async (x, k) => {
+      if (!mod || k >= tope) return porConfirmar(x);
+      try {
+        const doc = (await leerCurvaUnaVez(x.claveId, mes)).porMes[mes];
+        return mod.aplicarVerificacion(x, x.sobrecargaPorVerificar.map((n) => mod.sobrecargaDeCurva(doc, mes, n.nivel, n.A)));
+      } catch (e) { console.warn('[cargabilidad-scada] verificar sobrecarga', e); return porConfirmar(x); }
+    }));
+    if (mio !== turno) return;
+    // Todas las filas a la vez: indicadores, tabla y CSV nunca quedan a medias entre sí.
+    pend.forEach((x, k) => { const i = st.filas.indexOf(x); if (i >= 0) st.filas[i] = nuevas[k]; });
+    // Solo se repintan los indicadores y la tabla: la barra de filtros (y lo que se esté escribiendo) no se toca.
+    if (kpiCaja && kpiCaja.isConnected) { const nuevo = resumenKpis(st.filas); kpiCaja.replaceWith(nuevo); kpiCaja = nuevo; }
+    pintarTabla();
   }
 
   function mostrar(mesPedido) {
@@ -109,12 +143,16 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const prov = filas.filter((x) => x.clase === 'provisional');
     const altos = firmes.filter((x) => x.crg >= 4).length;
     const sost = filas.filter((x) => x.sobrecargaSostenida).length;
+    // Solo las FIRMES (la tarjeta cuenta firmes): en revisión, o sin poder leer su curva («por confirmar»).
+    const revisando = filas.filter((x) => x.clase === 'firme' && x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length).length;
+    const sinConfirmar = filas.filter((x) => x.clase === 'firme' && x.verificacion === 'fallo').length;
     const kpi = (t, v, n) => el('div', { class: 'cs-kpi' }, el('div', { class: 'cs-kpi-t' }, t), el('div', { class: 'cs-kpi-v' }, v), el('div', { class: 'cs-kpi-n' }, n));
     return el('div', { class: 'cs-panel cs-principal' },
       kpi('Con cifra firme', String(firmes.length), 'de ' + filas.length + ' transformadores del parque'),
       kpi('Provisionales', String(prov.length), 'medida por confirmar o incompleta'),
       kpi('CRG 4 y 5 (firmes)', String(altos), 'por encima de ' + textoBandas(ctx.umbrales).split(' / ')[2] + ' %'),
-      kpi('Sobrecarga sostenida', String(sost), 'firmes con ≥ ' + CALCULO.sobrecargaMinH + ' h seguidas sobre el ' + CALCULO.sobrecargaPct + ' %'));
+      kpi('Sobrecarga sostenida', String(sost), 'firmes con ≥ ' + CALCULO.sobrecargaMinH + ' h seguidas sobre el ' + CALCULO.sobrecargaPct + ' %'
+        + (revisando ? ' · ' + revisando + ' en revisión' : '') + (sinConfirmar ? ' · ' + sinConfirmar + ' por confirmar' : '')));
   }
 
   function barraFiltros(filas) {
@@ -174,6 +212,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
     if (x.clase !== 'firme' && x.motivos.length) td.append(el('span', { class: 'cs-sub' }, x.motivos.join(' · ')));
     if (x.sobrecargaSostenida) td.append(el('span', { class: 'cs-sub cs-sostenida' }, 'Sobrecarga sostenida (≥ ' + CALCULO.sobrecargaMinH + ' h sobre el ' + CALCULO.sobrecargaPct + ' %)'));
     else if (x.sobrecargaProvisional) td.append(el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida (cifra provisional)'));
+    else if (x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) td.append(el('span', { class: 'cs-sub' }, 'Revisando la curva del mes (trae horas con valores imposibles)…'));
+    else if (x.verificacion === 'fallo') td.append(el('span', { class: 'cs-sub' }, 'Sobrecarga por confirmar: el mes trae horas con valores imposibles y no se pudo leer su curva (véala en «Ver curvas»)'));
     else if (x.picoAislado) td.append(el('span', { class: 'cs-sub cs-pico' }, 'Pico aislado sobre el 100 % (no sostenido)'));
     return td;
   }
@@ -184,7 +224,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const ofDev = x.delta != null && x.oficial && x.oficial.porDevanado ? x.oficial.porDevanado[x.devMax] : null;
     return el('tr', { class: x.clase === 'provisional' ? 'cs-fila-prov' : (x.clase === 'nulo' ? 'cs-fila-nulo' : null) },
       el('th', { scope: 'row', style: 'position:static;background:none;font-size:13px' },
-        el('a', { href: '#mat=' + encodeURIComponent(x.matricula), onclick: abrir }, x.matricula || '(sin matrícula)'),
+        el('a', { href: '#mat=' + encodeURIComponent(x.matricula), id: 'csMat-' + x.id, onclick: abrir }, x.matricula || '(sin matrícula)'),
         el('span', { class: 'cs-sub' }, [x.subestacion, x.zona].filter(Boolean).join(' · '))),
       celdaCifra(x),
       el('td', {}, x.pct != null && x.devMax ? ({ P: 'Primario', S: 'Secundario', T: 'Terciario' })[x.devMax] : '—'),
@@ -192,7 +232,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
         ofDev != null ? el('span', { class: 'cs-sub' }, ({ P: 'Primario', S: 'Secundario', T: 'Terciario' })[x.devMax] + ' ' + num(ofDev, 1) + ' %') : null),
       el('td', {}, x.delta == null ? '—' : el('span', { class: 'cs-num' }, (x.delta > 0 ? '+' : '') + num(x.delta, 1) + ' pts')),
       el('td', {}, ESTADOS[x.estado] || x.estado, x.avisos.length && x.estado === 'pendiente' ? el('span', { class: 'cs-sub' }, x.avisos.length + (x.avisos.length === 1 ? ' aviso' : ' avisos')) : null),
-      el('td', {}, x.tienePunto ? el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: abrir, 'aria-label': 'Ver curvas de ' + x.matricula }, 'Ver curvas') : el('span', { class: 'cs-sub' }, 'sin datos SCADA')));
+      el('td', {}, x.tienePunto ? el('button', { type: 'button', id: 'csCurvas-' + x.id, class: 'btn btn--glass btn--sm', onclick: abrir, 'aria-label': 'Ver curvas de ' + x.matricula }, 'Ver curvas') : el('span', { class: 'cs-sub' }, 'sin datos SCADA')));
   }
 
   function filasVisibles() {
@@ -236,7 +276,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
       ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida'],
       filas.map((x) => [x.matricula, x.subestacion, x.zona, st.mes, x.pct, x.clase, x.crg, x.pct != null && x.devMax ? dev[x.devMax] : '', x.oficial ? x.oficial.pct : null,
         x.delta != null && x.oficial && x.oficial.porDevanado ? x.oficial.porDevanado[x.devMax] : null,
-        x.delta, ESTADOS[x.estado] || x.estado, x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '), x.sobrecargaSostenida ? 'si' : 'no']));
+        x.delta, ESTADOS[x.estado] || x.estado, x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '),
+        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no')]));
   }
 
   function dibujar() { conservarFoco(dibujarSinFoco); }
@@ -272,7 +313,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
     }
     if (!st.filas) return;
     tablaCaja = el('div', { class: 'cs-tabla-caja' });
-    poner(cont, cabeceraOrigen(), resumenKpis(st.filas), barraFiltros(st.filas), tablaCaja);
+    kpiCaja = resumenKpis(st.filas);
+    poner(cont, cabeceraOrigen(), kpiCaja, barraFiltros(st.filas), tablaCaja);
     pintarTabla();
   }
   function cabeceraVacia() {
