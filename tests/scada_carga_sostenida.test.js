@@ -138,3 +138,23 @@ test('L-102: el archivo nuevo es puro y la lista lo carga con import() (no con i
   assert.match(lista, /import\('\.\.\/\.\.\/domain\/scada_carga_sostenida\.js'\)/);
   assert.ok(!/^import .*scada_carga_sostenida/m.test(lista));
 });
+
+describe('detalle: «Máximo sostenido 2 h» con la serie limpia (`99 §130`)', () => {
+  test('una hora imposible ya no da miles de amperios; sin horas imposibles el valor es el mismo de antes', async () => {
+    const { maxSostenido, serieCargabilidad } = await import('../assets/js/domain/scada_carga_kpis.js');
+    const limpio = (iF, A) => { const c = serieCargabilidad(iF, A); return maxSostenido(iF.map((v, h) => (Number.isFinite(c.serie[h]) ? v : NaN)), 2); };
+    const A = 175;
+    // GBT: dos horas seguidas a 10 × A en un mes de ~0,6 × A con un tramo real de 2 h a 0,6 × A.
+    const gbt = Float32Array.from({ length: 200 }, (_, h) => (h === 40 || h === 41 ? 10 * A : 0.6 * A));
+    assert.equal(Math.round(maxSostenido(gbt, 2).valor), 10 * A);
+    assert.equal(Math.round(limpio(gbt, A).valor), Math.round(0.6 * A));
+    // Sin horas imposibles: idéntico (valor e índice).
+    const normal = Float32Array.from({ length: 200 }, (_, h) => (h >= 80 && h < 83 ? 1.1 * A : 0.7 * A));
+    assert.deepEqual(limpio(normal, A), maxSostenido(normal, 2));
+  });
+  test('la fila del detalle usa la serie limpia (no el resumen en bruto) cuando hay ampacidad', () => {
+    const src = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
+    assert.match(src, /maxSostenido\(d\.iF\.map\(/);
+    assert.ok(!/f\.sostenida\.valor/.test(src));
+  });
+});
