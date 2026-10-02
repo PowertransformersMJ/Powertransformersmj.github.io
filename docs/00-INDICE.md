@@ -67,6 +67,7 @@
 | §130 | ADR-130 — **Cargabilidad SCADA**: «Máximo sostenido 2 h» del detalle con serie limpia | 5599 |
 | §131 | ADR-131 — **Cargabilidad SCADA**: triángulo de Duval hoy y con más carga + carga «solo gases» + regla vieja de Duval corregida | 5630 |
 | §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5707 |
+| §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5753 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
