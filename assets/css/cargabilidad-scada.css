@@ -201,3 +201,7 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-duval-medido { grid-template-columns: minmax(0, .8fr) minmax(0, 1.2fr); }
 @media (max-width: 820px) { .cscada .cs-duval-medido { grid-template-columns: minmax(0, 1fr); } }
 .cscada .cs-duval-libre { max-width: 120px; }
+/* Gases con más carga (99 §132): flecha de tendencia en el triángulo (solo dirección) y tablas de ritmo y temperatura estimada */
+.cscada .cs-duval-flecha { stroke: #0d1f38; stroke-width: 2; stroke-dasharray: 4 3; fill: none; }
+.cscada .cs-duval-flecha-punta { fill: #0d1f38; }
+.cscada .cs-duval-gases { margin-top: 10px; }
