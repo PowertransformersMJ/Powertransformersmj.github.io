@@ -64,6 +64,7 @@
 | §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5431 |
 | §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5505 |
 | §129 | ADR-129 — **Cargabilidad SCADA**: marca «sostenida» de la lista sin falsos | 5554 |
+| §130 | ADR-130 — **Cargabilidad SCADA**: «Máximo sostenido 2 h» del detalle con serie limpia | 5599 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
