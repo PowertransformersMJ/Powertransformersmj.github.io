@@ -5775,3 +5775,20 @@ Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002,
 - NO se agregó en ADV-G-TDGC «el H₂ puede salir sin defecto»: decidiría el criterio de los 13 PD, que sigue pendiente del Ingeniero (`§131.8`).
 
 Archivos: `domain/scada_carga_dga_textos_ppm.js`, `tests/scada_carga_dga_textos_ppm.test.js`, `ui/cargabilidad-scada/panel-dga.js`, comentario de `domain/scada_carga_dga.js`. Bóveda: `2026-10-02-duval-proyeccion`, paso 6.
+
+## 134. ADR-134 — Cargabilidad SCADA: triángulo «con más carga» visible junto al de hoy ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «utiliza la extensión de chrome, veo el triángulo actual, pero el proyectado no se alcanza a apreciar».
+
+**134.1 Causa raíz.** La tendencia de `§132` era una flecha de 15 × 27 px dentro del triángulo de HOY, pegada al punto y al borde de T3 (medido en su Chrome con PRA): no se veía.
+
+**134.2 Solución.** `panel-duval.js`: `triangulo(d, 'proyectado')` + bloque «¿Hacia dónde tendería el punto?» al comienzo del recuadro «Con más carga», a la altura del triángulo de hoy (actual frente a proyectado).
+- El punto de hoy va hueco; la zona destino (`tendenciaDuval(...).destino` = T3) resaltada y las demás tenues.
+- Flecha naranja gruesa con borde blanco hacia el vértice del etileno, con leyenda («hoy», «con más carga»).
+- En descargas no hay flecha y dice «la carga no lo mueve»; sin gas suficiente o sin ppm, el triángulo va en gris con su motivo.
+- El triángulo de HOY queda solo con lo medido.
+- Sigue siendo DIRECCIÓN (Duval 2002, Tabla II), nunca una posición calculada.
+
+**134.3–134.4 Verificación.** Vista previa con T2 (COR), T3 (PRA) y D2 (SRS). Producción `1910657` (CI y Deploy verdes): en su Chrome, PRA muestra los dos triángulos lado a lado; flecha de 36 × 63 px a escala de pantalla; sin errores de consola. 2289 pruebas. Sin revisión adversarial: es un cambio de dibujo verificado a ojo en los 3 casos.
+
+Archivos: `ui/cargabilidad-scada/panel-duval.js`, `css/cargabilidad-scada.css`, `domain/scada_carga_termico.js` (campo `destino`), `tests/scada_carga_termico.test.js`.
