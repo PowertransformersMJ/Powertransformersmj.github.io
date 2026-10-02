@@ -137,3 +137,43 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
   padding: 10px 12px; background: #fff; border: 1px solid var(--cs-line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 40, 90, .14); }
 .cscada .cs-multi-lista .cs-check { display: inline-flex; font-size: 13px; color: var(--cs-ink2); font-weight: 500; white-space: nowrap; cursor: pointer; }
 .cscada .cs-multi-lista .btn { align-self: flex-start; margin-top: 2px; }
+/* Gases disueltos (DGA) y carga (99 §127) — clases propias cs-dga-*; el color nunca es la única señal (número + palabra) */
+.cscada .cs-dga-titulo { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 12px; }
+.cscada .cs-dga-borrador { font-size: 11.5px; font-weight: 600; color: #8a5a00; background: rgba(255, 179, 0, .12); border: 1px solid rgba(255, 179, 0, .35); border-radius: 999px; padding: 2px 10px; }
+.cscada .cs-dga-nivel { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--cs-line); background: var(--cs-soft); color: var(--cs-ink2); font-size: 13.5px; margin: 4px 0 12px; }
+.cscada .cs-dga-nivel b { font-size: 14.5px; }
+.cscada .cs-dga-sub { display: block; flex-basis: 100%; font-size: 12px; color: var(--cs-ink3); font-weight: 400; margin-top: 2px; line-height: 1.45; }
+.cscada .cs-dga-barra { display: inline-flex; gap: 3px; }
+.cscada .cs-dga-barra > span { width: 16px; height: 9px; border-radius: 3px; background: rgba(0, 40, 90, .10); }
+.cscada .cs-dga-nivel.cs-dga-n1 { background: rgba(26, 127, 55, .08); border-color: rgba(26, 127, 55, .25); }
+.cscada .cs-dga-nivel.cs-dga-n2 { background: rgba(0, 128, 128, .08); border-color: rgba(0, 128, 128, .25); }
+.cscada .cs-dga-nivel.cs-dga-n3 { background: rgba(255, 179, 0, .10); border-color: rgba(255, 179, 0, .35); }
+.cscada .cs-dga-nivel.cs-dga-n4 { background: rgba(239, 120, 32, .10); border-color: rgba(239, 120, 32, .35); }
+.cscada .cs-dga-nivel.cs-dga-n5 { background: rgba(255, 59, 48, .09); border-color: rgba(255, 59, 48, .30); color: #a8231d; }
+.cscada .cs-dga-nivel.is-provisional { border-style: dashed; background: rgba(0, 40, 90, .04); color: var(--cs-ink2); }
+.cscada .cs-dga-barra > .is-on.cs-dga-n1 { background: #1a7f37; }
+.cscada .cs-dga-barra > .is-on.cs-dga-n2 { background: #008080; }
+.cscada .cs-dga-barra > .is-on.cs-dga-n3 { background: #c98a00; }
+.cscada .cs-dga-barra > .is-on.cs-dga-n4 { background: #d9661a; }
+.cscada .cs-dga-barra > .is-on.cs-dga-n5 { background: #d0302a; }
+.cscada .cs-dga-barra.is-provisional > .is-on { background: rgba(0, 40, 90, .35); }
+.cscada .cs-dga-medido { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 12px; margin-bottom: 6px; }
+.cscada .cs-dga-tarjeta { border: 1px solid var(--cs-line); border-radius: 12px; padding: 10px 12px; background: #fff; font-size: 13px; color: var(--cs-ink2); }
+.cscada .cs-dga-tarjeta h3 { margin: 0 0 6px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; color: var(--cs-ink3); }
+.cscada .cs-dga-tarjeta p { margin: 0 0 4px; }
+.cscada .cs-dga-grupos { list-style: none; margin: 6px 0; padding: 0; }
+.cscada .cs-dga-grupos li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--cs-line); }
+.cscada .cs-dga-grupos li.is-alto b::after { content: ' ◄'; color: #a8231d; }
+.cscada .cs-dga-bloque h3 { margin: 12px 0 6px; font-size: 14px; }
+.cscada .cs-dga-lista { margin: 0; padding-left: 20px; font-size: 13px; line-height: 1.55; color: var(--cs-ink2); }
+.cscada .cs-dga-lista li { margin: 0 0 6px; }
+.cscada .cs-dga-cuando { color: var(--cs-ink2); font-style: italic; }
+.cscada .cs-dga-fuente { color: var(--cs-ink3); font-size: 12px; }
+.cscada .cs-dga-mas { margin: 8px 0 0; }
+.cscada .cs-dga-mas > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--cs-ink2); }
+.cscada table.cs-dga-tabla { min-width: 680px; font-size: 12px; }
+.cscada .cs-dga-celda.is-aqui { outline: 2px solid var(--cs-ink2); outline-offset: -2px; font-weight: 700; }
+.cscada td.cs-dga-celda.cs-dga-n5 { color: #a8231d; }
+.cscada .cs-dga-aviso { color: #8a5a00; font-weight: 600; }
+/* Región viva del panel (solo para lector de pantalla): esta página no carga base.css (.sr-only) */
+.cscada .cs-dga-vivo { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
