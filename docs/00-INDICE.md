@@ -59,8 +59,10 @@
 | §122 | ADR-122 — **Cargabilidad SCADA**: carga horaria real vs ampacidad del devanado, CRG firme/provisional, «Datos SCADA» (homologación y meses) | 5078 |
 | §123 | ADR-123 — **Detalle de Cargabilidad**: la ventana de la tabla priorizada abre con el parque real, sin cifras sin dato y a la vista en la pestaña (iframe) | 5173 |
 | §124 | ADR-124 — **Detalle de Cargabilidad**: «Diagnóstico» con las 7 calificaciones de Salud de Activos y enlace a las curvas horarias medidas por el SCADA (decisiones del Ingeniero) | 5248 |
-| §125 | ADR-125 — **Cargabilidad SCADA con datos**: «Paquete preparado» (un mes en 3 partes por la extensión, mismo lector), homologación v2 y 8 meses cargados, arreglos de la revisión | 5303 |
-| §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5366 |
+| §125 | ADR-125 — **Cargabilidad SCADA con datos**: «Paquete preparado» (un mes en 3 partes por la extensión, mismo lector), homologación v2 y 8 meses cargados, arreglos de la revisión | 5304 |
+| §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5367 |
+| §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5431 |
+| §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5505 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -68,6 +70,7 @@
 |---|---|
 | ¿Dónde vive un módulo / ruta / flujo / componente? | 🗺️ `20-MEMORIA-ESPACIAL` |
 | Voy a mover/renombrar archivos, refactor, merge, deploy | 🧪 `30-LECCIONES` (gotchas) + 🗺️ `20` |
+| Voy a agregar o retirar una exportación de un módulo JS ya publicado (caché del navegador) | `32` **L-102 (3)**: lo nuevo va en un archivo NUEVO · retirar → `30` **L-116** |
 | Voy a tocar `functions/` o el pipeline de IA (streaming/reintentos/timeouts) | 🤖 `31-LECCIONES-IA` (hija de `30`, L-35/L-43–L-48) |
 | Busco un pendiente que no está en `10` (decisión de arquitectura, validación diferida, cola vieja) | 🧊 `11-PENDIENTES-FRIOS` (hija de `10`) |
 | Necesito saber qué contiene una hoja `docs/*.md` del dueño | 🗂️ `21-ESPACIAL-HOJAS` (hija de `20`) |
@@ -87,8 +90,8 @@
 | 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real) | 🔁 `60-WORKFLOWS` (W-01..W-13) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
-| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82-§119` + **L-103** |
-| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible y página vacía, §122.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · archivos y colecciones `scada_*` → `22` · bóveda `2026-09-30-cargabilidad-scada` |
+| 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82 en adelante` + **L-103** |
+| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
 | 🪟 Ventana de detalle de Cargabilidad (tabla vieja) · una ventana fija dentro de un iframe que no se ve · retirar exportaciones con caché | `99 §123`, `§124` + L-115, L-116 · bóveda `2026-10-01-detalle-cargabilidad` |
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
 | El "por qué" de una decisión / detalle de un § | Capa 1 (§1-§80 en `00a`) → `99-HISTORIAL-ADR.md` |
