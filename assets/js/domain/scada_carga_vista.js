@@ -96,8 +96,27 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado'
       // Hay horas medidas pero ningún devanado asignado: decir «sin horas válidas» engañaba. Se nombra la causa.
       : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : 'sin horas válidas'));
-  const sostenida = devanados.some((x) => x.d && niveles.find((n) => n.devanado === x.d && n.sostenidaPct != null && n.sostenidaPct > CALCULO.sobrecargaPct));
-  const pico = niveles.some((n) => n.picoPct != null && n.picoPct > CALCULO.sobrecargaPct);
+  // Sobrecarga sostenida y pico (`99 §129`). Cuentan SOLO los devanados con cifra válida (no los de escala sospechosa ni
+  // sin ampacidad) y nada si el equipo no tiene cifra. El resumen guardado es de la corriente EN BRUTO: es exacto si el mes
+  // no trae horas imposibles (> 3 × ampacidad) en ese nivel —se sabe por su máximo— y así se usa (probado con los 8 meses
+  // reales: 313 de 313 iguales a la curva limpia). Si las trae, el resumen no alcanza: el nivel queda en
+  // `sobrecargaPorVerificar` y la lista lo decide con la curva del mes (scada_carga_sostenida.js). Antes, esas horas y los
+  // devanados de escala sospechosa marcaban «sostenida» o «pico» falsos (T1-A/M-GBT, T1-M/M-PBN, T1-M/M-MAJ).
+  // El resumen guarda los amperios redondeados a 0,001 (medio paso = 0,0005 A): un valor que cae dentro de ese medio paso
+  // de un umbral (3 × A o el 100 %) tampoco se decide con el resumen; va a la curva, como las horas imposibles.
+  const topeImposible = CALCULO.topeFisicoXAmpacidad * 100;
+  const SOBRE = CALCULO.sobrecargaPct;
+  const tol = (n) => (100 * 0.0005) / n.A;
+  const cuentan = pctEq != null ? niveles.filter((n) => n.devanado && n.pct != null && n.A > 0) : [];
+  const sinImposibles = (n) => n.picoPct == null || n.picoPct + tol(n) <= topeImposible;
+  const pasa = (v, n) => v != null && v - tol(n) > SOBRE;          // seguro por encima del 100 %
+  const enElBorde = (v, n) => v != null && Math.abs(v - SOBRE) < tol(n);
+  const limpios = cuentan.filter(sinImposibles);
+  const sostenida = limpios.some((n) => pasa(n.sostenidaPct, n));
+  const pico = limpios.some((n) => pasa(n.picoPct, n));
+  const porVerificar = sostenida ? [] : cuentan
+    .filter((n) => !sinImposibles(n) || enElBorde(n.sostenidaPct, n) || (!pico && enElBorde(n.picoPct, n)))
+    .map((n) => ({ nivel: n.nivel, devanado: n.devanado, A: n.A }));
   const crg = califCRG(pctEq, umbrales);
   const clase = pctEq == null ? 'nulo' : (f.firme ? 'firme' : 'provisional');
   // Cifra oficial (Excel de Salud de Activos), por devanado y de equipo.
@@ -108,7 +127,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     estado, avisos, relacion, esCircuito, mapa, niveles, devanados, devMax,
     pct: pctEq, crg, firme: clase === 'firme', motivos: f.motivos, motivoNulo, clase,
     sobrecargaSostenida: clase === 'firme' && sostenida, sobrecargaProvisional: clase !== 'firme' && sostenida,
-    picoAislado: !sostenida && pico,
+    picoAislado: !sostenida && pico, sobrecargaPorVerificar: porVerificar,
     oficial: { pct: oficialEq, calif: leer(tx, 'salud_actual.calif_crg') ?? null, porDevanado: of ? { P: of.P.pct, S: of.S.pct, T: of.T.pct } : null },
     delta: pctEq != null && oficialDev != null ? pctEq - oficialDev : null
   };
