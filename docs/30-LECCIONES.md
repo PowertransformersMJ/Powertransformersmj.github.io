@@ -206,6 +206,9 @@ se había probado el camino CON datos; el estado vacío —lo PRIMERO que ve el 
 (1) un enlace que luce como botón fija su color dentro del alcance del módulo (`.cscada a.btn`); (2) lo seleccionado y
 los paneles de lectura van con fondo sólido o casi sólido sobre la foto; (3) la pantalla vacía dice QUÉ falta y quién lo
 hace, paso por paso, y se valida en vivo igual que la llena. [HONOR]
+**Y `§126.9`**: antes de dar un nombre de clase CSS nuevo, buscarlo en la hoja del módulo — `.cs-filtros` ya era la barra de la lista
+y la regla nueva la cambió de cuadrícula a fila libre sin que nadie mirara la lista. Al tocar el CSS de un módulo se revisan
+TODAS sus pantallas, no solo la del cambio. [HONOR]
 
 
 ### L-115 · Una ventana fija dentro de un iframe estirado no se ve donde está el usuario: se prueba por CADA entrada
