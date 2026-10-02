@@ -57,9 +57,13 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
   const db = getDbSafe();
   if (!db) throw new Error('Firebase no inicializado.');
 
-  let creados = 0, actualizados = 0, fallidos = 0, omitidos = 0;
+  let creados = 0, actualizados = 0, fallidos = 0, omitidos = 0, conGases = 0;
   let batch = writeBatch(db);
   let count = 0;
+  // Los ppm de la última DGA van en `ultima_dga` (RAÍZ), reemplazando el mapa entero (`99 §131`): nunca por `ralo`, que
+  // quitaría los gases null, ni con merge, que mezclaría los gases de dos muestras.
+  const importadoEn = new Date().toISOString();
+  const ultimaDga = (g) => ({ gases: g, fuente: 'salud_activos', archivo: String(nombre_archivo || ''), importado_en: importadoEn, fecha_toma: null });
 
   for (let i = 0; i < resultados.length; i++) {
     const r = resultados[i];
@@ -79,18 +83,22 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
             ...(ralo(r.docV2) || {}),
             updatedAt: serverTimestamp()
           }, { merge: true });
+          if (r.gasesPpm) { batch.update(doc(db, COL_TX, existingId), { ultima_dga: ultimaDga(r.gasesPpm) }); count += 1; }
         }
+        if (r.gasesPpm) conGases += 1;
         actualizados += 1;
       } else {
         if (!dryRun) {
           const newRef = doc(colTxRef());
           batch.set(newRef, {
             ...(ralo(r.docV2) || {}),
+            ...(r.gasesPpm ? { ultima_dga: ultimaDga(r.gasesPpm) } : {}),
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
             createdBy: uid || null
           });
         }
+        if (r.gasesPpm) conGases += 1;
         creados += 1;
       }
       count += 1;
@@ -142,5 +150,5 @@ export async function persistirImportacion(resultados, reporte, opts = {}) {
     } catch (_) { /* ignore */ }
   }
 
-  return { jobId, creados, actualizados, fallidos, omitidos, dryRun };
+  return { jobId, creados, actualizados, fallidos, omitidos, dryRun, conGases };
 }

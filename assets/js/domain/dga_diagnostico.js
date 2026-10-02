@@ -33,11 +33,14 @@ const toNum = (v) => {
 //   D2  : descarga alta energía (arco)
 //   DT  : mezcla térmica+descarga
 //
-// La geometría de las zonas está codificada como polígonos en el
-// plano (%C2H4, %C2H2). %CH4 = 100 − %C2H4 − %C2H2.
-//
-// Definición de polígonos adaptada de IEC 60599:2015 Fig. C.1.
+// Corrección `99 §131`: la regla anterior clasificaba mal ~51 % del área
+// (D1 nunca salía, la banda 4–13 % de C2H2 salía D1, T3 exigía C2H2 < 4 %
+// y un 29 % exacto se perdía por redondeo). Ahora la zona sale de
+// `dga_duval.js` (fronteras de Duval 2002, Fig. 1 = IEEE C57.104-2019
+// §6.2.3), sin cambiar el contrato de salida de esta función.
 // ══════════════════════════════════════════════════════════════
+
+import { zonaDuval1 } from './dga_duval.js';
 
 export function duvalTriangle1({ CH4, C2H4, C2H2 } = {}) {
   const ch4  = toNum(CH4);
@@ -50,30 +53,14 @@ export function duvalTriangle1({ CH4, C2H4, C2H2 } = {}) {
   if (total <= 0) {
     return { codigo: 'NORMAL', label: 'Sin gases detectables', referencia: 'IEC 60599' };
   }
-  const pCH4  = (ch4  / total) * 100;
-  const pC2H4 = (c2h4 / total) * 100;
-  const pC2H2 = (c2h2 / total) * 100;
-
-  const codigo = _zonaDuval1(pCH4, pC2H4, pC2H2);
+  const z = zonaDuval1(ch4, c2h4, c2h2);
+  if (!z) return { codigo: 'INDETERMINADO', label: 'Datos incompletos', referencia: 'IEC 60599' };
   return {
-    codigo,
-    label: _labelDuval(codigo),
-    referencia: 'IEC 60599 / Duval Triangle 1',
-    porcentajes: { CH4: pCH4, C2H4: pC2H4, C2H2: pC2H2 }
+    codigo: z.zona,
+    label: _labelDuval(z.zona),
+    referencia: 'Duval 2002, Fig. 1 (IEEE C57.104-2019 §6.2.3)',
+    porcentajes: { CH4: z.pct.CH4, C2H4: z.pct.C2H4, C2H2: z.pct.C2H2 }
   };
-}
-
-function _zonaDuval1(pCH4, pC2H4, pC2H2) {
-  // Reglas simplificadas pero fieles a IEC 60599:2015 Fig. C.1.
-  if (pCH4  >= 98)            return 'PD';  // Descargas parciales
-  if (pC2H2 >= 29)            return 'D2';  // Arco alta energía
-  if (pC2H2 <  4 && pC2H4 < 20)  return 'T1';
-  if (pC2H2 <  4 && pC2H4 < 50)  return 'T2';
-  if (pC2H2 <  4 && pC2H4 >= 50) return 'T3';
-  if (pC2H2 >= 4 && pC2H2 < 13 && pC2H4 < 40) return 'D1';
-  if (pC2H2 >= 13 && pC2H2 < 29 && pC2H4 < 40) return 'D2';
-  // Zona DT (intersección de térmica y descarga)
-  return 'DT';
 }
 
 function _labelDuval(cod) {

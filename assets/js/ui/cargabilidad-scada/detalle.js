@@ -84,14 +84,23 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   let panelDga = null;
   import('./panel-dga.js').then((m) => { panelDga = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
     .catch((e) => console.warn('[cargabilidad-scada] panel DGA', e));
+  // «Triángulo de Duval: hoy y con más carga» (`99 §131`): otra ranura y otro import() aislado, con el MISMO estado.
+  let panelDuval = null;
+  import('./panel-duval.js').then((m) => { panelDuval = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
+    .catch((e) => console.warn('[cargabilidad-scada] triángulo de Duval', e));
   /** Estado EXPLÍCITO del panel: 'leyendo' | 'ok' (con el cálculo recién hecho) | 'error' | 'sin_scada'. */
   function pintarDga(a, estado) {
     if (!a || !a.dgaNodo) return;
     a.dga = estado;
-    if (!panelDga) return;
     const rango = a.desde != null && a.hasta != null ? formatoCO(a.desde + H_MS) + ' a ' + formatoCO(a.hasta) : null;
-    try { panelDga.pintarPanelDga(a.dgaNodo, { tx: a.tx, umbrales: ctx.umbrales, rango, ...estado }); }
-    catch (e) { console.warn('[cargabilidad-scada] panel DGA', e); a.dgaNodo.hidden = true; }
+    if (panelDga) {
+      try { panelDga.pintarPanelDga(a.dgaNodo, { tx: a.tx, umbrales: ctx.umbrales, rango, ...estado }); }
+      catch (e) { console.warn('[cargabilidad-scada] panel DGA', e); a.dgaNodo.hidden = true; }
+    }
+    if (panelDuval && a.duvalNodo) {
+      try { panelDuval.pintarPanelDuval(a.duvalNodo, { tx: a.tx, umbrales: ctx.umbrales, rango, ...estado }); }
+      catch (e) { console.warn('[cargabilidad-scada] triángulo de Duval', e); a.duvalNodo.hidden = true; }
+    }
   }
   /** Lo que de verdad se dibuja: un extra que el rango no tiene no cuenta; si no queda nada, el promedio. */
   function verEfectivo(d) {
@@ -399,7 +408,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
     conservarFoco(() => poner(cont, encabezado(a), avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-esqueleto', style: 'width:50%' }), el('div', { class: 'cs-esqueleto', style: 'width:80%;margin-top:10px' }),
-      el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…')), a.dgaNodo));
+      el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…')), a.dgaNodo, a.duvalNodo));
     pintarDga(a, { estado: { estado: 'leyendo' } });
     if (enfocar) focoTitulo();
     try {
@@ -439,6 +448,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           el('button', { type: 'button', class: 'btn btn--glass btn--sm', style: 'margin-left:8px', onclick: () => cargar(desde, hasta) }, 'Reintentar')) : null,
         sinNada ? el('div', { class: 'cs-panel cs-estado' }, 'No hay horas con dato válido en este rango. Pruebe con otro rango.') : indicadores(a),
         a.dgaNodo,
+        a.duvalNodo,
         el('div', { id: 'csNivel' })));
       pintarDga(a, { estado: { estado: 'ok' }, calc: a.calc, porNivel: a.porNivel });
       const nv = (a.calc.devMax && (a.calc.niveles.find((x) => x.devanado === a.calc.devMax) || {}).nivel) || Object.keys(porNivel).sort((x, y) => NIVELES[y].kv - NIVELES[x].kv)[0];
@@ -447,7 +457,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       if (mio !== token) return;
       console.warn('[cargabilidad-scada] detalle', e);
       conservarFoco(() => poner(cont, encabezado(a), selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
-        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo));
+        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo, a.duvalNodo));
       pintarDga(a, { estado: { estado: 'error' } });
     }
   }
@@ -471,13 +481,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     // Ranura del panel DGA: UN nodo por equipo (al cambiar el rango se reusa: no parpadea).
     const dgaNodo = !cambio && actual.dgaNodo ? actual.dgaNodo
       : el('section', { class: 'cs-panel cs-dga', id: 'csDga', hidden: true, 'aria-labelledby': 'csDgaTitulo' });
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, dga: null };
+    const duvalNodo = !cambio && actual.duvalNodo ? actual.duvalNodo
+      : el('section', { class: 'cs-panel cs-duval', id: 'csDuval', hidden: true, 'aria-labelledby': 'csDuvalTitulo' });
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
         : (!fila ? 'Este transformador no está en la homologación con el SCADA.'
           : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.'));
-      poner(cont, encabezado(actual), el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo);
+      poner(cont, encabezado(actual), el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo, actual.duvalNodo);
       pintarDga(actual, { estado: { estado: 'sin_scada', motivo: motivoSin } });
       focoTitulo();
       return;
