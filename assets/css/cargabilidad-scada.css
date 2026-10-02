@@ -112,16 +112,28 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
   .cscada .cs-kpi-v { font-size: 18px; }
 }
 
-/* Filtro de valores y fases de las curvas (99 §126) */
-.cscada .cs-filtros { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: flex-start; margin: 0 0 8px; }
+/* Filtro de valores y fases de las curvas (99 §126). Clase propia: .cs-filtros es la barra de la lista. */
+.cscada .cs-ver { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: flex-start; margin: 0 0 8px; }
 .cscada .cs-filtro { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; border: 1px solid var(--cs-line); border-radius: 12px; padding: 6px 12px 8px; margin: 0; background: #fff; }
 .cscada .cs-filtro legend { font-size: 12px; font-weight: 700; color: var(--cs-ink2); padding: 0 4px; }
 .cscada .cs-filtro .cs-check { display: inline-flex; font-size: 13px; color: var(--cs-ink2); cursor: pointer; }
 .cscada .cs-filtro .cs-check.is-apagado { color: var(--cs-ink3); opacity: .6; cursor: not-allowed; }
-.cscada .cs-filtros .cs-ayuda { flex-basis: 100%; margin: 0; }
+.cscada .cs-ver .cs-ayuda { flex-basis: 100%; margin: 0; }
 /* Una gráfica por magnitud, grande (99 §126) */
 .cscada .cs-graf { margin: 16px 0 0; padding-top: 10px; border-top: 1px solid var(--cs-line); }
 .cscada .cs-graf:first-child { margin-top: 4px; border-top: 0; padding-top: 0; }
 .cscada .cs-graf-t { margin: 0; font-size: 15px; font-weight: 700; color: var(--cs-ink2); }
 .cscada .cs-graf-t small { font-weight: 500; color: var(--cs-ink3); font-size: 12.5px; }
 .cscada .cs-graf-lienzo { width: 100%; }
+/* Filtros de varias opciones de la lista: zona y CRG (99 §126.9) — se ven como los demás desplegables */
+.cscada .cs-campo-multi { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--cs-ink3); font-weight: 600; min-width: 0; }
+.cscada .cs-multi { position: relative; }
+.cscada .cs-multi-sel { list-style: none; cursor: pointer; font: inherit; font-weight: 500; font-size: 13.5px; color: var(--cs-ink2); padding: 10px 30px 10px 12px; border-radius: 10px;
+  border: 1px solid rgba(0, 40, 90, .12); background: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; position: relative; line-height: 1.3; }
+.cscada .cs-multi-sel::-webkit-details-marker { display: none; }
+.cscada .cs-multi-sel::after { content: '▾'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--cs-ink3); }
+.cscada .cs-multi[open] .cs-multi-sel { border-color: rgba(0, 122, 255, .45); }
+.cscada .cs-multi-lista { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 100%; display: flex; flex-direction: column; gap: 6px;
+  padding: 10px 12px; background: #fff; border: 1px solid var(--cs-line); border-radius: 12px; box-shadow: 0 8px 24px rgba(0, 40, 90, .14); }
+.cscada .cs-multi-lista .cs-check { display: inline-flex; font-size: 13px; color: var(--cs-ink2); font-weight: 500; white-space: nowrap; cursor: pointer; }
+.cscada .cs-multi-lista .btn { align-self: flex-start; margin-top: 2px; }

@@ -148,11 +148,14 @@ const RANGO_CLASE = { firme: 0, provisional: 1, nulo: 2 };
 /** Filtra la lista. */
 export function filtrarFilas(filas, f = {}) {
   const q = sinTildes(f.texto || '');
+  // Zona y CRG admiten VARIAS a la vez (lista); un texto suelto sigue valiendo; vacío = todas.
+  const lista = (v) => (Array.isArray(v) ? v : (v === '' || v == null ? [] : [v])).map(String);
+  const zonas = new Set(lista(f.zona)); const crgs = new Set(lista(f.crg));
   return filas.filter((x) => {
     if (q && !sinTildes(x.matricula + ' ' + x.subestacion + ' ' + x.zona + ' ' + x.departamento).includes(q)) return false;
-    if (f.zona && x.zona !== f.zona) return false;
+    if (zonas.size && !zonas.has(String(x.zona))) return false;
     if (f.estado && x.estado !== f.estado) return false;
-    if (f.crg && String(x.crg) !== String(f.crg)) return false;
+    if (crgs.size && !crgs.has(String(x.crg))) return false;
     if (f.soloSostenida && !x.sobrecargaSostenida) return false;
     if (f.soloFirmes && x.clase !== 'firme') return false;
     return true;
