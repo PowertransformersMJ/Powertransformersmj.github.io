@@ -320,3 +320,14 @@ perfil». Al Ingeniero le puso un perfil de arranque y en Órdenes no salió su 
 sesión. **Regla**: toda lectura que DECIDE acceso o identidad distingue ok / no-existe / falla. Espera más que el
 cliente de datos (Firestore da la conexión por caída a los 10 s) y reintenta en la MISMA página: recargar vuelve a
 arrancar en frío. **Gate**: `tests/decision_perfil.test.js`.
+
+### L-118 · Antes de decir que algo «no mueve» un agregado, se lee cómo se agrega; y el test usa datos que el agregado puede producir
+**Cicatriz** (`99 §127`): le dije al Ingeniero que el CO y el CO₂ «no suben el nivel» del panel DGA, porque no tenían un
+ajuste propio. Falso: la columna sale de `eval_dga`, que es el PROMEDIO de los cuatro grupos, así que el CO y el CO₂
+pesan por ahí (en agosto, los 18 «Inmediato» de R3×C son «Medio» SOLO por el papel). El test que lo «probaba» usaba una
+calificación global 2 con CO 5 y CO₂ 5: un dato que el promedio nunca produce. Lo cazó el comité, no las pruebas.
+**Regla**: (1) antes de afirmar que un componente no influye en un valor compuesto, leer la fórmula del compuesto
+(`calcularEvalDGA`) y decirlo con ella; (2) los datos de prueba de un valor derivado se ARMAN con la función que lo deriva,
+nunca a mano; (3) si ya se le dijo al dueño algo falso, se corrige en el mismo informe y se nombra. **Gate**:
+`tests/scada_carga_dga.test.js` (gases coherentes con `calcularEvalDGA`) + [HONOR].
+

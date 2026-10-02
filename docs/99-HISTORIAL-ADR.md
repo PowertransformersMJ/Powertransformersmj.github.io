@@ -5298,7 +5298,8 @@ Excel manda (`99 §74.15`).
 
 **124.9 Pendiente.** (1) Escalón IEEE más cercano vs superior — *«después»* (decisión suya). (2) ¿Avisar en la ventana
 cuando la calificación «Cargabilidad» del Excel contradice la carga medida? (propuesta, TODO-56). (3) Los menores de
-`§123.9` siguen en cola.
+`§123.9` siguen en cola. *(Enmienda 2026-10-02, auditoría `§128`: de esos menores ya están hechos DIAG_MAP y los exports
+sin uso de `modal.js` —`32cf1c8`, publicado en `552f89d`.)*
 
 ## 125. ADR-125 — Cargabilidad SCADA con datos: «Paquete preparado» para subir cada mes sin arrastrar carpetas, homologación y 8 meses cargados en producción, y arreglos de la revisión ⟦OPUS-5.5⟧ (2026-10-01)
 
@@ -5426,3 +5427,127 @@ leer el código**: el filtro de las curvas de §126 usaba la clase `cs-filtros` 
 la cambió de cuadrícula a fila libre en producción; ahora tiene clase propia (`cs-ver`). Publicado `157a7ee`; CI y
 Deploy verdes; servidos = main; en producción: Bolívar + Occidente → 146 de 208, con CRG 5 y 4 → 68; celular sin
 desborde. Lección → L-114.
+
+## 127. ADR-127 — Cargabilidad SCADA: panel «Gases disueltos (DGA) y carga» con nivel de atención, posibles adversidades y acciones preventivas ⟦OPUS-5.5⟧ (2026-10-01)
+
+> «Me gustaría que en el módulo de cargabilidad SCADA incluyas aparte en un subsegmento la variable DGA y me arrojes
+> posibles adversidades al superar o estar cerca de su capacidad de transformación, al mismo tiempo acciones preventivas
+> que me ayuden a operar los equipos en esta condición y que no fallen. Vamos con workflow paso a paso».
+> **NO revisado externamente** (prompt de Gemini en la bóveda `2026-10-01-dga-carga/prompt-consejo-externo.md`; no se corrió).
+
+**127.1 Causa raíz / punto de partida (verificado en producción, solo lectura).** El DGA del parque son SOLO
+calificaciones 1–5 (5 = peor) en `transformadores/{id}.salud_actual` (`eval_dga` = promedio redondeado de TDGC, CO, CO₂ y
+C₂H₂, MO.00418 §A3.1; 207/208 equipos, falta T1-M/M-SLS), importadas de Salud de Activos: `/muestras` está VACÍA, no hay
+ppm ni fecha de toma (`ts_calculo` es la fecha del CÁLCULO; según el Ingeniero, todas las muestras son de 2025). El SCADA
+trae I, U, P, Q (sin temperatura). Ampacidad = con ventiladores (ONAF), confirmado por el Ingeniero.
+
+**127.2 Solución.** Sección propia en el DETALLE (entre «Indicadores del rango» y las curvas):
+- **Nivel de atención** (Rutina · Seguimiento · Atención · Prioritario · Inmediato; palabra + número) = fila de carga ×
+  columna de gases. Filas: R1 CRG 4 (> 75 %) · R2 CRG 5 (> 90 %) · R3 ≥ 2 h seguidas > 100 % · R4 ≥ 2 h > 130 % (1,3 p.u.,
+  el MENOR tope de corriente de IEC 60076-7:2005 Tabla 4, criterio conservador del área; solo con cifra FIRME, si no →
+  R3 + «posible sobrecarga severa: confirme la medida»). R3/R4 salen de la serie LIMPIA del detalle y solo de devanados con
+  cifra. Columnas: A sin DGA · B 1–2 · C 3 · D 4–5 · E C₂H₂ = 5 (como D, MO.00418 §A9.1); TDGC 4–5 sube una columna.
+  Tabla: R1 A3 B2 C3 D4 E4 · R2 A4 **B4** C4 D5 E5 · R3 A4 B4 **C5** D5 E5 · R4 todo 5.
+- **Decisiones del Ingeniero**: solo actúa cerca o sobre la capacidad (CRG 4–5, o 2 h > 100 % aunque la CRG sea baja); por
+  debajo «Carga normal» sin nivel; sin medición SCADA no hay nivel (la cifra del Excel no sustituye); R2×B = 4 (CRG 5 ⇒
+  HI ≥ 4, MO.00418 §4.1.3); R3×C = 5 se MANTIENE aunque en agosto los 18 R3×C son «C» por el papel (CO/CO₂); publicar con
+  rótulo «Borrador · pendiente del Ingeniero» (`APROBADO = false`) mientras revisa los textos.
+- **Lo medido**: carga (cifra, chip, horas > 100 % con devanado y primera/última hora, máximo sostenido 2 h, horas
+  descartadas por devanado) y gases (DGA oficial, 4 grupos, «Pesan: …» con la familia —papel / combustibles / acetileno—,
+  C₂H₂ = 5 → monitoreo semanal SIEMPRE, texto fijo de la muestra de 2025).
+- **Catálogo** (`scada_carga_dga_textos.js`): 15 adversidades + 17 acciones, cada una con norma y cláusula (IEC 60076-7,
+  IEEE C57.91-2011, IEC 60599:2022) o código MO.00418 §4.3 con su nombre oficial; `inferencia` = criterio del área. Más
+  «Cómo se decide el nivel» (tabla con la casilla del equipo) y «Lo que este panel no puede saber».
+- **Aislamiento**: `panel-dga.js` se carga con `import()` desde `detalle.js` (si falla, la ranura queda oculta y el
+  detalle igual); un nodo por equipo (no parpadea; desplegables y foco se conservan); estado EXPLÍCITO
+  leyendo/ok/error/sin_scada (nunca el cálculo de otro rango); una región viva para el lector de pantalla.
+
+**127.3 No-regresión.** `detalle.js` no cambia exportaciones (solo agrega la ranura en los 4 `poner`); todo lo nuevo en
+archivos NUEVOS (L-102), que importan solo exportaciones ya publicadas; CSS solo agrega `.cs-dga-*`; 0 lecturas nuevas a
+Firestore (los gases salen del parque ya leído). Lista, filtros, curvas y CSV intactos. Publicado `74080a8`; CI y Deploy
+verdes; servidos = main (hash de los 5 archivos).
+
+**127.4 Verificación.** 2234 pruebas (35 nuevas: tabla, monotonía, serie limpia, escala 2,6 × A, R4 provisional,
+datos COHERENTES con `calcularEvalDGA`, catálogo: códigos que existen con su nombre, «prevenir», sin «fuera de norma»).
+Vista previa local con datos reales (LPZ, VAC, LJA) + 2 ejemplos: cambio de mes, falla de lectura, módulo roto a propósito,
+375 px, lista intacta, 0 errores. Revisión adversarial previa a publicar (2 lentes, crudo `crudo-paso3-…` en la bóveda): 1
+importante + 6 menores, corregidos en `6dc8252`. Producción: VAC Inmediato (R3×C, gases = Salud de Activos) · SML R4 · ESA Prioritario
+(R2×B) · LPZ provisional + severa sin confirmar · MAJ columna E · SLS sin nivel · LPS carga normal; 0 errores. Agosto (una
+pasada, 208): sin cifra 38 · carga normal 75 · Inmediato 27 · Prioritario 40 · Atención 14 · Seguimiento 14.
+
+**127.5 Anti-patterns evitados.** Inventar ppm, fecha o tipo de falla · calcular punto caliente o minutos admisibles sin
+temperatura (`sobrecarga_admisible.js` NO se usa: no verificado contra norma) · cortes del OTRO tablero (80/95/100) · un
+120 % sin norma · «peor grupo» (CO ≥ 4 en 124 equipos: fatiga de alarmas) · import estático de un archivo nuevo · decir
+«fuera de norma» · citar SUB-C4-03/SUB-C5-01 (pintura) como radiadores · cruzar el dominio con el tablero de Pruebas
+Eléctricas (ADR-027 excluye DGA de ESE tablero; aquí es Cargabilidad).
+
+**127.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_dga.js`, `assets/js/domain/scada_carga_dga_textos.js`,
+`assets/js/ui/cargabilidad-scada/panel-dga.js`, `tests/scada_carga_dga.test.js`. Tocados: `cargabilidad-scada/detalle.js`
+(ranura), `assets/css/cargabilidad-scada.css` (al final). INTACTOS: lista, gráficos, shell, vista, kpis, config, data,
+reglas, índices, `salud_activos.js`, importador.
+
+**127.7 Doctrina.** W-11 (evidencia → comité → maqueta → vista previa → «procede») · L-102 · L-56 · L-114 (clases
+propias) · caza-bugs · método 3 redactores → 3 revisores → editor · L-118 (nueva).
+
+**127.8 Verificado sano / no re-auditar.** `/muestras` vacía y `muestra_dga_ref` vacío en los 208 · `estados_especiales` y
+`restricciones_operativas` vacíos en los 208 (por eso no hay regla de «tope autorizado») · la marca «Sobrecarga
+sostenida» de la LISTA (serie en bruto) coincide con la serie limpia en 41 de 42 equipos de agosto; el falso es
+T1-A/M-GBT (66 kV a 928 %, horas imposibles) → bug de la lista REPORTADO, sin tocar (espera su sí) · `salud_activos.js` es
+puro y ya estaba en el grafo de la página · 54 KB sin comprimir del panel, cargados una vez. **Pendiente**: su revisión
+de los textos (quitar «Borrador») · consejo externo (Gemini) sin correr · ¿R3×C = 5 por papel? (se mantuvo por decisión
+suya; 18 de 27 «Inmediato» en agosto) · bug GBT de la lista. Bóveda `2026-10-01-dga-carga`. *(Enmienda 2026-10-02,
+auditoría `§128`)*: `dga_diagnostico.js` (Duval/Rogers/Doernenburg) NO aplica aquí: pide ppm y `/muestras` está vacía; no
+conectarlo hasta que haya ppm con fecha · riesgo heredado de `§122`: en los 27 ONAF con ventilación obsoleta la cifra sale
+MÁS BAJA que la real (la ampacidad supone ventiladores sanos) → el nivel puede quedarse corto · deuda: `TODO-64.b` (cada
+muestra nueva borra `calif_crg`) toca los campos que este panel lee · propuestas del comité NO adoptadas: R3×C = 4 y el
+nombre «Urgente» en vez de «Inmediato» (su porqué → síntesis de la bóveda, Paso 3).
+
+## 128. ADR-128 — Auditoría Nivel-2 del cerebro: el candado de auditoría está mal calibrado para el ritmo actual y la síntesis de una deliberación se cerró antes de su decisión ⟦OPUS-5.5⟧ (2026-10-02)
+
+> Disparada por el gate #14 («MUY vencida»: 18 ADRs desde la del 09-27), que BLOQUEÓ el commit del cerebro de §127 con su
+> código ya en producción. El Ingeniero eligió «Hacer la revisión ahora». Deliberación: bóveda `2026-10-02-auditoria-nivel2`
+> (`HALLAZGOS.md` = input de la próxima; crudo `crudos/resultado-workflow.json`).
+
+**128.1 Qué se hizo.** Skill `auditoria-cerebro`: 7 sondas Opus de solo lectura (S0-S2 diff/estado/frescura, S3 retrieval
+frío, S4 fidelidad de deliberación, S5 memoria del harness, S6 economía, S7 voz adversarial) + verificador escéptico de los
+medios/altos. **59 hallazgos**. De los 64 de la auditoría anterior: 26 cerrados que siguen valiendo, 25 abiertos y
+rastreados, 13 REINCIDENTES (agrupados en S0-01, S0-02, S1-01, S2-01).
+
+**128.2 Lo más grave (verificado).** (1) **Gate #14 mal calibrado** (S7-01, alta): los umbrales son del 07-18 (~0,5 ADR/día;
+hoy 3,6), al arrancar no se ve (en `--boot` el gap por volumen no se calcula y dice «SANO») y muerde donde no debe: bloqueó
+el CEREBRO de un cambio cuyo código ya estaba en `main` — reincidencia de M-07 / C-01. (2) **Síntesis congelada antes de la
+decisión** (S4-01/02/03): la de §127 terminaba en el Paso 2 («solo CRG 4–5») y la revisión previa a publicar no estaba en la
+bóveda (solo en /tmp, volátil). (3) **Misión del arranque desfasada** (S1-01): decía solo Fichas con 6 ADRs de Cargabilidad.
+(4) **Pendientes del dueño solo en NN.8** (S2-01, S7-03). (5) **Cola de Fichas**: CF-28 seguía «autorizado en bloque» con una
+propuesta contraria a lo ya decidido en `§103` (S0-02). (6) **El arranque real ≈ 56k chars**: el handoff del hook imprime los
+asuntos completos de 22 commits (11,7k) y nadie lo mide (S6-01, KERNEL).
+
+**128.3 Cerrado en este cierre.** Síntesis §127 Paso 3 + crudo de la revisión + prompt de Gemini en la bóveda · README de la
+bóveda · misión con dos frentes y foco resellado · «Abiertos» = la tabla (−128c) · TODO-69 con punteros y pendientes
+(`§126.8`, Gemini, deuda `TODO-64.b`) · poda pareada de 10 (TODO-61, TODO-55, texto de fríos): **boot 31.456 → 30.755c
+(−701c)** · TODO-37 fuera de 11 (consolidado en `§68.7`/`§86`) y TODO-72 (Firefox/Safari) · 00: fila «exportación en un
+módulo publicado → L-102(3)/L-116», gancho de L-114, bóvedas de Cargabilidad SCADA, Fichas «§82 en adelante», fila §127
+corta · L-62 apunta a L-117 · `§124.9` y `§127.8` enmendados · CF-28 y CF-34 anotados (sin borrar) · 9 memorias del harness
+apuntan en vez de duplicar (gh instalado, L-51 en 34, CF-22/28, v22 → `fichas_diagnostico.js`, cifras rotuladas, comité y
+Fichas como punteros) · `deepAudit` = 2026-10-02.
+
+**128.4 Queda (con dueño).** **KERNEL** (TODO-67): gate #14 visible en `--boot`, que no bloquee un commit SOLO de cerebro y
+calibrado al ritmo (S7-01; **la calibración la decide el Ingeniero**) · handoff del hook con asuntos truncados (S6-01) ·
+versión del linter leída de VERSION (S0-04) · quitar gates que no cazan (#4, #13, 5c; S7-06). **TODO-66**: reglas sin nodo
+dueño (entregar HTML, CREG, redacción 3×3, S5-01) · casilla NN.9 para pendientes (S7-03) · una sola W-11 escrita (S7-02) ·
+resello de la cola de Fichas §110-§121 · guardia de firmas en pre-push (S7-05) · hija 36 para lecciones de Chrome/banco
+(S6-07) · L-113..L-117 a su sección (S6-06) · ADR para `parametros-scada` (S3-04). **DUEÑO**: regla del «procede» fuera de
+Fichas (S5-05: en §127 se publicó con rótulo Borrador por su elección) · costo-cerebro 43 % (S6-13).
+
+**128.5 Anti-patterns evitados.** `--no-verify` · subir el umbral del gate sin su decisión · borrar pendientes (se mueven o
+se consolidan) · puntaje numérico.
+
+**128.6 Archivos.** `docs/05`, `10`, `11`, `00`, `33`, `60`, `cola-fichas-tecnicas.md`, `99` (§124.9, §127, §128),
+`.brain-manifest.json` (deepAudit); memorias del harness; bóveda (`2026-10-01-dga-carga`, `2026-10-02-auditoria-nivel2`, README).
+
+**128.7 Doctrina.** §G.4 (auto-auditoría, captura) · §G.5 (GC pareado: delta del boot ≤ 0) · skill `auditoria-cerebro`.
+
+**128.8 Verificado sano / no re-auditar.** Cada ADR §110-§126 que declara comité/workflow tiene carpeta con crudo · ninguna
+memoria guarda SHAs · los punteros arreglados el 09-27 se sostienen · los topes de todas las neuronas en verde · 41 de 42
+«sostenidas» de la lista coinciden con la serie limpia (el bug GBT es de la lista, `§127.8`).
+

@@ -5,10 +5,9 @@
 
 ---
 
-## 🎯 Foco (al 2026-09-30) — FICHAS TÉCNICAS, por partes (orden del Ingeniero)
+## 🎯 Foco (al 2026-10-02) — FICHAS TÉCNICAS por partes · CARGABILIDAD SCADA (TODO-69)
 
-> Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos**: **TODO-67** 🔴 · **TODO-64** 🔴 · **TODO-60** 🔴 ·
-> **TODO-55** 🔴 · **TODO-35/58** 🔴 · **TODO-66** · **TODO-65** · **TODO-62/63** · 71 · 54 · 56 · 57 · 61 · y los fríos de `11`.
+> Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
@@ -44,20 +43,18 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-71** | 🟡 **Detalle de Cargabilidad PUBLICADO** (`99 §123`, `§124`). Suyo: escalón IEEE («después») · ¿avisar si CRG del Excel ≠ medida? Menores → `§123.9`. | 🟡 |
-| **TODO-69** | 🟡 **Cargabilidad SCADA CON DATOS** (`99 §125`, `§126` máx/mín): ene–abr, jun–sep. **Suyo**: 26 pendientes y 17 correcciones (bóveda `…parametros-scada`); re-exportar septiembre (sin Oriente) y mayo. | 🟡 |
+| **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`-`§127`; DGA en BORRADOR). **Suyo**: aprobar textos DGA · ¿«sostenida» de la lista (GBT)? · ¿0,5 pu en otro color (`§126.8`)? · Gemini del `§127` · 26 pendientes (`§125.2`) y 17 correcciones (bóveda `2026-10-01-parametros-scada`) · re-exportar sep y mayo. Deuda: `TODO-64.b` borra `calif_crg`. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
-| **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§120`) — tabla viva: `bóveda/2026-09-27-auditoria-nivel2/HALLAZGOS.md` (63 hallazgos, estado de los 53 anteriores). Vivo: reglas que solo viven en la memoria del harness · `NN.8` que faltan · enmiendas `§83`. | 🟡 |
+| **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§128`) — tabla viva: `bóveda/2026-10-02-auditoria-nivel2/HALLAZGOS.md` (59; estado de los 64 anteriores). Vivo: reglas sin dueño (harness) · casilla NN.9 de pendientes · resello de la cola de Fichas · guardia de firmas en pre-push. | 🟡 |
 | **TODO-67** | 🔴 **Candados que pueden estar apagados** (`99 §86.4`): los hooks solo corren si alguien ejecutó `git config core.hooksPath githooks` · el candado de cédulas arma las ventanas por «corrida», y una fila CSV puede esconder una · el `pre-commit` sale antes del boot-gate si no toca `docs/` · el gate #5 no mira el kernel (por eso los IDs ajenos reincidieron). A cambio se retira el sub-gate 5c. | 🔴 |
 | **TODO-64** | 🔴 **Cola de `§80`**: **(a)** a los equipos que el trigger viejo pisó les borró la condición del Excel **y el rastro** ⇒ su ficha firma el número del motor; se reparan re-importando el archivo (cuántos son, solo se cuenta en Firestore). **(b)** cada muestra nueva **borra `calif_crg`** ⇒ ficha sin cargabilidad. **(c)** `test:trigger` no está en CI. | 🔴 |
 | **TODO-65** | 🟡 **Puerta lateral a `§78`**: el `<textarea id="nota">` de órdenes sugiere «c.c.: …» (`pages/ordenes-materiales.html:243`) y `sinCedulas` no lo limpia ⇒ una cédula puede entrar a `ordenes_materiales` (lo lee cualquier miembro activo) y salir en la copia `.json` y en el PDF. Decisión: quitar la sugerencia del placeholder y/o limpiar dígitos al guardar. | 🟡 |
-| **TODO-35/58** | **Cola de FICHAS TÉCNICAS → hoja [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md)** (revisada al 09-27). Lo que espera respuesta suya → lista **(I)** de arriba. Los doce **CF-20..CF-31 ya autorizados en bloque** (09-22) entran con su tanda, salvo **CF-22** (su «dónde» ya no existe en Mantenimiento: volver a preguntar). | 🔴 |
-| **TODO-61** | **«Sistema de refrigeración deficiente» no tiene señal**: es una de sus 5 condiciones (`99 §75.13`) y el registro guarda el TIPO de refrigeración, no su ESTADO, así que nunca puede declararse. Ya existen dos fuentes vivas (el veredicto de `acciones_refrigeracion` y el motivo de OE/OS «Reposición de unidad de refrigeración fallada»): **falta que él elija cuál vale** → CF-27 de la cola. | 🟡 |
+| **TODO-35/58** | **Cola de FICHAS TÉCNICAS → hoja [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md)** (revisada al 09-27). Lo que espera respuesta suya → lista **(I)**. **CF-20..CF-31 autorizados en bloque** (09-22), salvo **CF-22** (volver a preguntar) y **CF-28** (decidido por `§103`). | 🔴 |
+| **TODO-61** | **«Refrigeración deficiente» sin señal** (el registro guarda el TIPO, no el ESTADO, `99 §75.13`) → **CF-27** de la cola, autorizado en bloque 09-22 (veredicto de `acciones_refrigeracion`, rotulando la fuente). | 🟡 |
 | **TODO-60** | 🔴 **El Plan de Inversión ignora la criticidad**: `criticidad.nivel` no lo escribe ningún módulo de producción ⇒ `critN = 0` en los 208 y **el 25 % del ranking vale cero** (y la razón «Celda matriz» nunca se imprime). El arreglo ya existe y está probado en las otras tres vistas: derivarla de los usuarios. | 🔴 |
-| **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada**: la banda «mínima» va de 1 a 9.662 usuarios y se traga **144 de 208 equipos** (147 contando los 3 sin dato, `§107.4`); 14 equipos ≥20 MVA declaran ≤10 usuarios (870 MVA, 23 % de la potencia) y 3 traen la celda vacía (`M-BEC`, `M-GUP`, `M-SML`; desde `§107` quedan FUERA de la matriz y su ficha dice «no se puede situar», ya no «Mínima»). Atenuado en el papel por `§81`, pero **el dato sigue faltando**. Opciones y sitios donde iría la regla → `99 §74.24`. **Decide él**: (A) conseguir el dato · (C) excepción «transmisión» · (F) revisar los cortes de la Tabla 9. | 🔴 |
+| **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada**: la banda «mínima» se traga **144 de 208** (147 con los 3 sin dato); 14 equipos ≥20 MVA declaran ≤10 usuarios (870 MVA) → `99 §81.1`, `§107.4`. **El dato sigue faltando**; opciones → `§74.24`. **Decide él**: (A) dato · (C) excepción «transmisión» · (F) cortes de la Tabla 9. | 🔴 |
 | **TODO-54** | **Erratas ×10 en la ampacidad**: solo **GUATAPURÍ T2** (primario 5.022 → 502) y **SANTA TERESA T1** (**secundario** 833,7 → 83,7); **Lorica queda descartada** —el ADR se equivocaba— y su primario va al 102,5 %. Hay que dividir el **PAR** (ampacidad y carga), no la ampacidad sola. Verificado contra la hoja 2025 el 09-21; falta su visto bueno y leer producción. `99 §74.23`. | 🟡 |
 | **TODO-56** | **¿Se recalcula `calif_crg`?** Baja de urgencia: con el Excel mandando (`§80`) el override CRG=5 ya no sube la condición de nadie; sí mueve el causante principal. El cruce: **119 cambios sobre 193** (84 suben, 35 bajan); 10-01: **123/199** ≠ medida (`§124.8`). Exige antes/después guardado. Ojo: primero hay que arreglar `TODO-64.b`, que hoy lo BORRA. | 🟡 |
 
-> **Los pendientes FRÍOS** (decisiones de arquitectura, validaciones diferidas, colas viejas) viven
-> en la hija [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md): no cambian de semana en semana y no
-> tienen por qué pesar en el arranque de cada sesión. Aquí solo lo que está VIVO.
+> **Fríos** (arquitectura, validaciones diferidas, colas viejas) → [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md).

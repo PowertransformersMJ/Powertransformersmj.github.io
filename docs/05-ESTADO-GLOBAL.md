@@ -2,10 +2,10 @@
 
 > Nodo de signos vitales. Se **AUTO-CARGA** (con `CLAUDE.md` + `10`). "¿En qué estado está el sistema AHORA?". Tope ~25 líneas / 4k chars (§G.5) — tablero, no bitácora. Detalle histórico → `99` vía `00`.
 
-| Señal | Valor (al **2026-09-30**) |
+| Señal | Valor (al **2026-10-02**) |
 |---|---|
-| **Misión ahora** | **FICHAS TÉCNICAS, por partes** (cola viva → `docs/cola-fichas-tecnicas.md`). Último publicado: **`§126` máx/mín SCADA y gráficas grandes** (`2ec909d`, 8 meses recargados); antes `§125`. Cadena en `00` Capa 1. |
-| **Build** | 🟢 **2198 pass / 0 fail / 2 skip** + `lint:html` limpio + **201 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-01 (local; CI y Deploy en VERDE = `main` `2ec909d`, servidos = main, L-65; 1 prueba de velocidad inestable → `11`) |
+| **Misión ahora** | **Dos frentes**: FICHAS TÉCNICAS por partes (cola → `docs/cola-fichas-tecnicas.md`) · CARGABILIDAD SCADA (TODO-69). Último publicado: **`§127` DGA y carga** (`74080a8`, BORRADOR). Cadena en `00` Capa 1. |
+| **Build** | 🟢 **2234 pass / 0 fail / 2 skip** + `lint:html` limpio + **201 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-01 (local; CI y Deploy en VERDE = `main` `74080a8`, servidos = main, L-65; 1 prueba de velocidad inestable → `11`) |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` · `main` == `origin/main` (SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (filter-repo purgó confidenciales) → otra copia debe re-clonar. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices + 13 exenciones `scada_*`: archivo = servidor** (2026-10-01, L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |
