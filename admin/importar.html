@@ -117,6 +117,20 @@
       <div id="msg"></div>
     </section>
 
+    <section class="report-card" id="gasesCard">
+      <h3>Cargar solo los gases (ppm de la última DGA)</h3>
+      <p style="font-family: var(--font-mono); font-size: .72rem; color: var(--text-soft);">
+        Guarda únicamente las partes por millón de cada gas de la hoja <code>TX_Potencia</code> en la última DGA de cada
+        transformador (lo usa el triángulo de Duval de Cargabilidad SCADA). No recalcula ni cambia ninguna calificación.
+        Primero simule; el botón de carga se habilita después.
+      </p>
+      <div class="btn-row">
+        <button class="btn-dry"  id="btnGasesDry">SIMULAR GASES</button>
+        <button class="btn-real" id="btnGasesReal" disabled>CARGAR GASES</button>
+      </div>
+      <div id="gasesMsg"></div>
+    </section>
+
     <section class="report-card">
       <h3>Discrepancias Excel ↔ MO.00418 Ed. 02 (primeras 30)</h3>
       <p style="font-family: var(--font-mono); font-size: .72rem; color: var(--text-soft);">
@@ -150,7 +164,12 @@ async function loadSheetJS() {
 const $ = (id) => document.getElementById(id);
 const setMsg = (t, cls = 'msg-ok') => { $('msg').textContent = t; $('msg').className = cls; };
 
-let procesadoActual = null; // { resultados, reporte, nombre }
+let procesadoActual = null; // { resultados, reporte, nombre, hojas }
+// «Cargar solo los gases» (`99 §131`): módulo aparte; si no carga, el importador sigue igual.
+let cargaGases = null;
+import('../assets/js/ui/importar-gases.js')
+  .then((m) => { cargaGases = m.montarCargaGases(() => (procesadoActual ? { hojas: procesadoActual.hojas, nombre: procesadoActual.nombre } : null)); })
+  .catch((e) => { console.warn('[importar] carga de gases', e); const c = document.getElementById('gasesCard'); if (c) c.hidden = true; });
 
 $('dropzone').addEventListener('click', () => $('fileInput').click());
 $('dropzone').addEventListener('dragover', (e) => { e.preventDefault(); $('dropzone').classList.add('hover'); });
@@ -189,7 +208,8 @@ async function procesarArchivo(file) {
 
     const cfgU = await obtenerUmbralesActivos();   // G010: umbrales editados F18
     const { resultados, reporte } = procesarLibro(hojas, new Date(), cfgU);
-    procesadoActual = { resultados, reporte, nombre: file.name };
+    procesadoActual = { resultados, reporte, nombre: file.name, hojas };
+    if (cargaGases) cargaGases.reiniciar();
 
     $('reportWrap').hidden = false;
     $('summary').innerHTML = `

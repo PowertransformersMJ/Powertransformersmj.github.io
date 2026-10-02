@@ -512,7 +512,15 @@ export function parsearFilaTransformador(fila, hoja = '', hoy = new Date(), cfgU
   // una celda vacía en una importación masiva.
   if (!uucc && final.identificacion) delete final.identificacion.uucc;
 
-  return { docV2: final, diagnostico };
+  // ── Los ppm de la última DGA (`99 §131`) ────────────────────────────────
+  // Siempre se leyeron (arriba) pero solo se guardaban las calificaciones. Viajan aparte del documento sanitizado: la
+  // persistencia los escribe en `ultima_dga` (RAÍZ del equipo), reemplazando el mapa entero para no mezclar dos muestras.
+  // Un gas sin valor queda null, nunca 0; una fila sin ningún gas no trae `gasesPpm`.
+  const ppm = { H2, CH4, C2H4, C2H6, C2H2, CO, CO2 };
+  for (const k of Object.keys(ppm)) if (ppm[k] == null || !(ppm[k] >= 0)) ppm[k] = null;
+  const gasesPpm = Object.values(ppm).some((x) => x != null) ? ppm : null;
+
+  return { docV2: final, diagnostico, gasesPpm };
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -544,8 +552,8 @@ export function procesarLibro(hojas, hoy = new Date(), cfgU = null) {
 
     for (const fila of arr) {
       try {
-        const { docV2, diagnostico } = parsearFilaTransformador(fila, hoja, hoy, cfgU);
-        resultados.push({ hoja, docV2, diagnostico });
+        const { docV2, diagnostico, gasesPpm } = parsearFilaTransformador(fila, hoja, hoy, cfgU);
+        resultados.push({ hoja, docV2, diagnostico, gasesPpm });
         reporte.exitosos += 1;
 
         if (diagnostico.diferencia != null && diagnostico.diferencia > 0.5) {
