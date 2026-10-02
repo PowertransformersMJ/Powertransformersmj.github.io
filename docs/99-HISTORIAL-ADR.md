@@ -5749,3 +5749,29 @@ Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002,
 - El texto de PD («depende de la tensión») fue refutado como defecto.
 - **Supuestos a confirmar por el Ingeniero:** ambiente de 30 °C, papel no mejorado, constantes típicas en vez de los protocolos de calentamiento y el criterio del hueco de 2 h.
 - Bóveda: `2026-10-02-duval-proyeccion`, paso 5.
+
+## 133. ADR-133 — Cargabilidad SCADA: los textos del panel DGA sobre las ppm se ajustan a que la plataforma ya las tiene ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «sí, ajusta el texto del panel DGA sobre las ppm» (pendiente de `§131.8`). NO revisado externamente; sigue en BORRADOR.
+
+**133.1 Causa raíz.**
+- «Lo que este panel no puede saber» decía «La plataforma guarda calificaciones de 1 a 5». Desde `§131` es falso: se cargaron las ppm de 207 equipos.
+- La acción ACC-DE-02 mandaba a pedir al laboratorio «de la última muestra, las ppm», que ya están.
+
+**133.2 Solución.** Archivo nuevo `domain/scada_carga_dga_textos_ppm.js` (L-102):
+- `TEXTOS_CON_PPM` para ADV-D-01, ADV-G-TDGC y ACC-DE-02. Se usan solo si el equipo tiene `ultima_dga`; sin ppm siguen los originales.
+- `NO_PUEDE_SABER_TIPO`, que reemplaza SIEMPRE ese ítem: con ppm, «usa solo las calificaciones; el panel del triángulo de Duval, más abajo, lo sugiere con las ppm cuando hay gas suficiente»; sin ppm, «aún no tiene las ppm».
+- `panel-dga.js` elige la variante con `leerUltimaDGA(tx)`.
+- El catálogo `scada_carga_dga_textos.js` NO se edita.
+
+**133.3–133.4 Verificación.**
+- 2289 pruebas (4 nuevas).
+- Vista previa: LPZ con ppm y VAC sin ppm.
+- Producción `cea1a42` (CI y Deploy verdes): PRA (nivel Inmediato) muestra las variantes y ya no el texto viejo; sin errores de consola.
+- Revisión de 2 lentes con verificación: 5 menores reales corregidos (la tendencia chocaba con ACC-DE-02, «decide», condición de gas suficiente, un solo nombre para el panel, comentarios) y 4 refutados.
+
+**133.8 Verificado sano / no re-auditar.**
+- ACC-BC-01 y ACC-R3-03 piden ppm de la PRÓXIMA muestra: siguen ciertos.
+- NO se agregó en ADV-G-TDGC «el H₂ puede salir sin defecto»: decidiría el criterio de los 13 PD, que sigue pendiente del Ingeniero (`§131.8`).
+
+Archivos: `domain/scada_carga_dga_textos_ppm.js`, `tests/scada_carga_dga_textos_ppm.test.js`, `ui/cargabilidad-scada/panel-dga.js`, comentario de `domain/scada_carga_dga.js`. Bóveda: `2026-10-02-duval-proyeccion`, paso 6.
