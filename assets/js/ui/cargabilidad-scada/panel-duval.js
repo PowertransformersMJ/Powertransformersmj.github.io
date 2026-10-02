@@ -42,36 +42,67 @@ function svg(tag, attrs = {}, ...hijos) {
 /** (CH₄, C₂H₄, C₂H₂) en % → coordenadas: CH₄ arriba, C₂H₄ abajo a la derecha, C₂H₂ abajo a la izquierda. */
 const xy = ([m, e]) => [X0 + ((e + m / 2) / 100) * W, Y0 + H - (m / 100) * H];
 
-function triangulo(d) {
+/**
+ * Triángulo de Duval 1. `modo` 'hoy': el punto MEDIDO con su zona. `modo` 'proyectado' (§134, pedido del Ingeniero: «el
+ * proyectado no se alcanza a apreciar»): el mismo punto hueco, la zona hacia la que tendería resaltada y una flecha
+ * gruesa de DIRECCIÓN (Duval 2002, Tabla II). Nunca una posición calculada: ninguna norma da la trayectoria.
+ */
+function triangulo(d, modo = 'hoy') {
+  const proy = modo === 'proyectado';
   const color = d.estado === 'ok';
+  const tend = proy ? tendenciaDuval(d.zona, color) : null;
+  const destino = tend && tend.destino;
   const centro = (pts) => pts.reduce((s, p) => [s[0] + p[0] / pts.length, s[1] + p[1] / pts.length], [0, 0]);
   const zonas = Object.entries(POLIGONOS_DUVAL1).map(([z, pts]) => {
     const p = pts.map(xy);
     const [cx, cy] = z === 'PD' ? [xy([100, 0])[0] + 16, xy([100, 0])[1] + 2] : centro(p);
-    return [svg('polygon', { points: p.map((q) => q.map((v) => v.toFixed(1)).join(',')).join(' '), class: 'cs-duval-z ' + (color ? 'cs-duval-z-' + z : 'is-gris') + (color && d.zona === z ? ' is-aqui' : '') }),
+    const cl = !color ? 'is-gris' : 'cs-duval-z-' + z + (proy ? (z === destino ? ' is-destino' : ' is-tenue') : (d.zona === z ? ' is-aqui' : ''));
+    return [svg('polygon', { points: p.map((q) => q.map((v) => v.toFixed(1)).join(',')).join(' '), class: 'cs-duval-z ' + cl }),
       svg('text', { x: cx.toFixed(1), y: (cy + 4).toFixed(1), class: 'cs-duval-rot', 'text-anchor': 'middle' }, z)];
   });
   const [ax, ay] = xy([100, 0]); const [bx, by] = xy([0, 100]); const [cx, cy] = xy([0, 0]);
-  const punto = d.pct ? (() => { const [px, py] = xy([d.pct.CH4, d.pct.C2H4]); return svg('circle', { cx: px.toFixed(1), cy: py.toFixed(1), r: 6, class: 'cs-duval-punto' + (color ? '' : ' is-gris') }); })() : null;
-  const tend = tendenciaDuval(d.zona, color);
-  const flecha = tend && tend.tipo === 'flecha' && d.pct ? (() => {
-    // Solo DIRECCIÓN (hacia el vértice del etileno), largo fijo: no es una posición proyectada.
-    const [px, py] = xy([d.pct.CH4, d.pct.C2H4]); const [vx, vy] = xy([0, 100]);
-    const L = Math.hypot(vx - px, vy - py); if (L < 22) return null;
-    const ux = (vx - px) / L; const uy = (vy - py) / L; const largo = Math.min(38, L - 10); // la punta (+7) queda dentro
-    const ex = px + ux * largo; const ey = py + uy * largo; const nx = -uy; const ny = ux;
-    const punta = [[ex + ux * 7, ey + uy * 7], [ex + nx * 4.5, ey + ny * 4.5], [ex - nx * 4.5, ey - ny * 4.5]];
-    return [svg('line', { x1: (px + ux * 8).toFixed(1), y1: (py + uy * 8).toFixed(1), x2: ex.toFixed(1), y2: ey.toFixed(1), class: 'cs-duval-flecha' }),
-      svg('polygon', { points: punta.map((q) => q.map((v) => v.toFixed(1)).join(',')).join(' '), class: 'cs-duval-flecha-punta' })];
-  })() : null;
-  const desc = (d.zona ? 'Punto en la zona ' + d.zona + (color ? '' : d.estado === 'incoherente' ? ' (no confiable)' : ' (no concluyente)') : 'Sin punto') +
-    (flecha ? '. Flecha: tendencia con más calor si la falla está en el aceite' : '');
-  return svg('svg', { viewBox: '0 0 350 290', class: 'cs-duval-svg', role: 'img', 'aria-label': 'Triángulo de Duval 1. ' + desc },
+  const pxy = d.pct ? xy([d.pct.CH4, d.pct.C2H4]) : null;
+  const punto = pxy ? svg('circle', { cx: pxy[0].toFixed(1), cy: pxy[1].toFixed(1), r: proy ? 7 : 6, class: 'cs-duval-punto' + (color ? '' : ' is-gris') + (proy ? ' is-hueco' : '') }) : null;
+  let flecha = null;
+  if (tend && tend.tipo === 'flecha' && pxy) {
+    // Solo DIRECCIÓN, hacia el vértice del etileno; largo fijo y la punta siempre dentro del triángulo.
+    const [px, py] = pxy; const [vx, vy] = xy([0, 100]);
+    const L = Math.hypot(vx - px, vy - py);
+    if (L >= 26) {
+      const ux = (vx - px) / L; const uy = (vy - py) / L; const largo = Math.min(84, L - 16);
+      const ex = px + ux * largo; const ey = py + uy * largo; const nx = -uy; const ny = ux;
+      const punta = [[ex + ux * 11, ey + uy * 11], [ex + nx * 7, ey + ny * 7], [ex - nx * 7, ey - ny * 7]];
+      const linea = { x1: (px + ux * 10).toFixed(1), y1: (py + uy * 10).toFixed(1), x2: ex.toFixed(1), y2: ey.toFixed(1) };
+      flecha = [svg('line', { ...linea, class: 'cs-duval-flecha-halo' }), svg('line', { ...linea, class: 'cs-duval-flecha2' }),
+        svg('polygon', { points: punta.map((q) => q.map((v) => v.toFixed(1)).join(',')).join(' '), class: 'cs-duval-flecha2-punta' })];
+    }
+  }
+  // Leyenda arriba a la izquierda (fuera del triángulo): el color nunca es la única señal.
+  const leyenda = proy && pxy ? [
+    svg('circle', { cx: 14, cy: 13, r: 5, class: 'cs-duval-punto is-hueco' + (color ? '' : ' is-gris') }),
+    svg('text', { x: 24, y: 17, class: 'cs-duval-etq-hoy' }, 'hoy'),
+    flecha ? [svg('line', { x1: 7, y1: 33, x2: 19, y2: 33, class: 'cs-duval-flecha2' }), svg('polygon', { points: '19,28 27,33 19,38', class: 'cs-duval-flecha2-punta' }),
+      svg('text', { x: 32, y: 37, class: 'cs-duval-etq' }, 'con más carga')] : null,
+    tend && tend.tipo === 'quieto' ? svg('text', { x: 7, y: 37, class: 'cs-duval-etq' }, 'la carga no lo mueve') : null] : null;
+  const desc = proy
+    ? (tend ? 'Con más carga: ' + tend.texto + (flecha ? ' La flecha da solo la dirección, no una posición.' : '') : 'Sin gas suficiente: no hay tendencia que mostrar.')
+    : (d.zona ? 'Punto en la zona ' + d.zona + (color ? '' : d.estado === 'incoherente' ? ' (no confiable)' : ' (no concluyente)') : 'Sin punto');
+  return svg('svg', { viewBox: '0 0 350 290', class: 'cs-duval-svg' + (proy ? ' cs-duval-svg-proy' : ''), role: 'img', 'aria-label': 'Triángulo de Duval 1' + (proy ? ', con más carga' : '') + '. ' + desc },
     zonas, svg('polygon', { points: [ax, ay, bx, by, cx, cy].map((v) => v.toFixed(1)).join(' '), class: 'cs-duval-borde' }),
     svg('text', { x: ax, y: ay - 8, 'text-anchor': 'middle', class: 'cs-duval-eje' }, '100 % CH₄'),
     svg('text', { x: bx, y: by + 18, 'text-anchor': 'end', class: 'cs-duval-eje' }, '100 % C₂H₄'),
     svg('text', { x: cx, y: cy + 18, 'text-anchor': 'start', class: 'cs-duval-eje' }, '100 % C₂H₂'),
-    flecha, punto);
+    flecha, punto, leyenda);
+}
+
+/** Bloque «hacia dónde tendería» del recuadro «Con más carga»: el triángulo proyectado y su explicación. */
+function proyectado(d) {
+  const tend = tendenciaDuval(d.zona, d.estado === 'ok');
+  const texto = tend ? tend.texto + (tend.tipo === 'flecha' ? ' La flecha da solo la dirección, no una posición calculada (ninguna norma da la trayectoria): en laboratorio, el aceite solo pasa de T2 a 300 °C a T3 a 500 y 800 °C, corriéndose hacia el etileno (Duval 2002, Tabla II).' : '')
+    : d.estado === 'no_concluyente' ? 'Sin gas suficiente para leer el triángulo: no hay tendencia que mostrar.'
+      : d.estado === 'incoherente' ? 'Punto no confiable: no se muestra tendencia.' : 'Sin partes por millón (ppm) de los gases del triángulo: no hay punto ni tendencia.';
+  return el('div', { class: 'cs-duval-proy' }, el('p', { class: 'cs-duval-sub-t' }, '¿Hacia dónde tendería el punto?'), triangulo(d, 'proyectado'),
+    el('p', { class: 'cs-dga-sub' }, texto));
 }
 
 function hoy(d) {
@@ -97,8 +128,6 @@ function hoy(d) {
     partes.push(p('CH₄ ' + num(d.pct.CH4, 1) + ' % · C₂H₄ ' + num(d.pct.C2H4, 1) + ' % · C₂H₂ ' + num(d.pct.C2H2, 1) + ' %'));
     if (d.estado === 'ok') { const mg = margenPpm(d.ultima.gases); if (mg) partes.push(p(textoMargen(mg))); }
     if (d.estado === 'ok') partes.push(p('Una sola muestra: no dice si el defecto está activo ni si crece (no hay velocidad de aumento).'));
-    const tend = tendenciaDuval(d.zona, d.estado === 'ok');
-    if (tend) partes.push(el('p', { class: 'cs-dga-sub' }, el('b', {}, tend.tipo === 'flecha' ? 'Flecha (con más carga): ' : 'Con más carga: '), tend.texto + (tend.tipo === 'flecha' ? ' Es una tendencia, no una posición proyectada: en laboratorio, el aceite solo pasa de T2 a 300 °C a T3 a 500 y 800 °C, corriéndose hacia el etileno (Duval 2002, Tabla II).' : '')));
   }
   if (d.ultima) {
     const fecha = d.ultima.importado_en ? new Date(d.ultima.importado_en) : null;
@@ -179,7 +208,7 @@ function gasesConCarga(d, columnas, calc, porNivel, prov) {
 
 function conMasCarga(nodo, args, d) {
   const { estado, calc, porNivel, umbrales, tx } = args;
-  const caja = (...h) => el('div', { class: 'cs-dga-tarjeta' }, el('h3', {}, 'Con más carga · escenario, no medido'), ...h);
+  const caja = (...h) => el('div', { class: 'cs-dga-tarjeta' }, el('h3', {}, 'Con más carga · escenario, no medido'), proyectado(d), ...h);
   const p = (t, cl) => el('p', { class: cl || 'cs-dga-sub' }, t);
   if (estado.estado === 'leyendo') return caja(p('Calculando la carga del rango…'));
   if (estado.estado === 'error') return caja(p('No se pudo leer este rango.'));
@@ -205,7 +234,7 @@ function conMasCarga(nodo, args, d) {
   const input = el('input', { type: 'number', id: 'csDuvalLibre', min: 1, max: ESCENARIO_LIBRE_MAX, step: 1, value: nodo._duvalLibre, 'aria-label': 'Aumento de carga a elegir, en %', class: 'cs-duval-libre' });
   input.addEventListener('change', () => { nodo._duvalLibre = input.value; pintarPanelDuval(nodo, nodo._duvalArgs); });
   const tendZ = d.estado === 'ok' ? tendenciaDuval(d.zona, true) : null;
-  const zonaTxt = d.estado === 'ok' ? d.zona + ' hoy; la zona con más carga no se calcula: ' + (tendZ && tendZ.tipo === 'flecha' ? 'la flecha del triángulo da solo la dirección' : 'la carga no mueve este tipo de defecto') + ', y solo una muestra nueva lo confirma'
+  const zonaTxt = d.estado === 'ok' ? d.zona + ' hoy; la zona con más carga no se calcula: ' + (tendZ && tendZ.tipo === 'flecha' ? 'el triángulo de arriba da solo la dirección' : 'la carga no mueve este tipo de defecto') + ', y solo una muestra nueva lo confirma'
     : d.estado === 'no_concluyente' ? 'no concluyente en todas (' + (d.significancia.sobreL1.length ? 'muy pocos ppm para el triángulo' : 'gases de fondo') + '): solo una muestra nueva lo dice'
       : d.estado === 'incoherente' ? 'punto no confiable (los ppm no dan la calificación vigente)' : 'sin punto';
   return caja(

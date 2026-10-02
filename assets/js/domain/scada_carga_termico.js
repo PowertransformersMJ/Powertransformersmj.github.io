@@ -137,7 +137,7 @@ export function tendenciaDuval(zona, concluyente) {
   if (!concluyente || !zona) return null;
   const fam = FAMILIA[zona];
   if (fam === 'descarga') return { tipo: 'quieto', texto: 'La carga no mueve este tipo de defecto: depende de la tensión.' };
-  if (zona === 'T3') return { tipo: 'flecha', texto: 'Con más calor en el aceite se queda en T3 y se corre hacia el etileno.' };
-  if (fam === 'mixta') return { tipo: 'flecha', texto: 'La parte térmica, si está en el aceite, tiende hacia más etileno (T3); la parte de descarga no la mueve la carga.' };
-  return { tipo: 'flecha', texto: 'Si la falla está en el aceite, con más calor el punto tiende hacia T3 (más etileno); si está en el papel, se queda en T1 o T2.' };
+  if (zona === 'T3') return { tipo: 'flecha', destino: 'T3', texto: 'Con más calor en el aceite se queda en T3 y se corre hacia el etileno.' };
+  if (fam === 'mixta') return { tipo: 'flecha', destino: 'T3', texto: 'La parte térmica, si está en el aceite, tiende hacia más etileno (T3); la parte de descarga no la mueve la carga.' };
+  return { tipo: 'flecha', destino: 'T3', texto: 'Si la falla está en el aceite, con más calor el punto tiende hacia T3 (más etileno); si está en el papel, se queda en T1 o T2.' };
 }

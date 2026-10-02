@@ -205,3 +205,14 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-duval-flecha { stroke: #0d1f38; stroke-width: 2; stroke-dasharray: 4 3; fill: none; }
 .cscada .cs-duval-flecha-punta { fill: #0d1f38; }
 .cscada .cs-duval-gases { margin-top: 10px; }
+/* Triángulo «con más carga» (99 §134): zona destino resaltada, el resto tenue, punto de hoy hueco y flecha gruesa de dirección */
+.cscada .cs-duval-proy { margin: 2px 0 10px; }
+.cscada .cs-duval-z.is-tenue { opacity: .35; }
+.cscada .cs-duval-z.is-destino { stroke: #b4380a; stroke-width: 2.5; }
+.cscada .cs-duval-punto.is-hueco { fill: #fff; stroke: #0d1f38; stroke-width: 2.5; }
+.cscada .cs-duval-punto.is-hueco.is-gris { stroke: #8a97ab; }
+.cscada .cs-duval-flecha-halo { stroke: #fff; stroke-width: 9; stroke-linecap: round; }
+.cscada .cs-duval-flecha2 { stroke: #c2410c; stroke-width: 4.5; stroke-linecap: round; }
+.cscada .cs-duval-flecha2-punta { fill: #c2410c; stroke: #fff; stroke-width: 1.5; stroke-linejoin: round; }
+.cscada .cs-duval-etq { font-size: 12px; font-weight: 700; fill: #c2410c; }
+.cscada .cs-duval-etq-hoy { font-size: 12px; font-weight: 700; fill: #0d1f38; }
