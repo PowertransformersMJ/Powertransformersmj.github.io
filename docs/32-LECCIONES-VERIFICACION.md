@@ -338,3 +338,12 @@ datos reales que equivale a la fuente y DÓNDE deja de equivaler (aquí: máx > 
 (2) el propio resumen debe poder decir «no sé» — ese caso va a la fuente, con tope de lecturas; (3) «no se pudo leer»
 es «por confirmar», nunca «no». **Gate**: `tests/scada_carga_sostenida.test.js` + [HONOR].
 
+
+### L-120 · Una foto de antes/después compara VALORES, no texto: el servidor devuelve los mapas en otro orden
+**Cicatriz** (`99 §131.9`): tras cargar los gases en producción, comparar `JSON.stringify(ultima_dga)` de la lectura
+inmediata (caché local, orden en que se escribió) con la de un minuto después (servidor, orden alfabético) dio «207
+equipos cambiados» que no cambiaron. Casi se reporta como una escritura extraña. **Regla**: (1) la huella de un documento
+se arma con las llaves ORDENADAS y los Timestamp como número; (2) un «cambiaron todos» exactamente donde se escribió es
+sospecha del comparador antes que del dato: se re-verifica con la comparación ordenada ANTES de decir nada; (3) la
+fidelidad de una carga se prueba con una lectura independiente de la fuente (aquí, openpyxl sobre el Excel) y una huella
+común (SHA-1 de líneas canónicas), no con el mismo código que escribió. **Gate**: [HONOR].

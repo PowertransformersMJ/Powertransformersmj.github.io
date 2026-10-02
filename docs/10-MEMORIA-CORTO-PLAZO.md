@@ -43,7 +43,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-71** | 🟡 **Detalle de Cargabilidad PUBLICADO** (`99 §123`, `§124`). Suyo: escalón IEEE («después») · ¿avisar si CRG del Excel ≠ medida? Menores → `§123.9`. | 🟡 |
-| **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`-`§131`; DGA y Duval en BORRADOR). **Suyo**: «procede» para CARGAR GASES (simulado: 207, `§131.4`) · ¿PD → Triángulos 4/5? · texto DGA «ppm» (`§131.8`) · aprobar textos DGA · ¿0,5 pu en otro color (`§126.8`)? · Gemini del `§127` · 26 pendientes (`§125.2`) y 17 correcciones (bóveda `2026-10-01-parametros-scada`) · re-exportar sep y mayo. Deuda: `TODO-64.b` borra `calif_crg`. | 🟡 |
+| **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`-`§131`; DGA y Duval en BORRADOR). **Suyo**: ¿PD → Triángulos 4/5? y los 13 PD con H2 ≥ 2.000 · criterio «no firme» 15 %/1 ppm · texto DGA «ppm» (`§131.8`) · hallazgos `§131.9` · aprobar textos DGA · ¿0,5 pu en otro color (`§126.8`)? · Gemini del `§127` · 26 pendientes (`§125.2`) y 17 correcciones (bóveda `2026-10-01-parametros-scada`) · re-exportar sep y mayo. Deuda: `TODO-64.b` borra `calif_crg`. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§128`) — tabla viva: `bóveda/2026-10-02-auditoria-nivel2/HALLAZGOS.md` (59; estado de los 64 anteriores). Vivo: reglas sin dueño (harness) · casilla NN.9 de pendientes · resello de la cola de Fichas · guardia de firmas en pre-push. | 🟡 |
