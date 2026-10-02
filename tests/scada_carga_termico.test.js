@@ -83,5 +83,7 @@ describe('ritmo de cada gas con más carga (no ppm)', () => {
     assert.equal(tendenciaDuval('T2', true).tipo, 'flecha'); assert.equal(tendenciaDuval('T3', true).tipo, 'flecha');
     assert.equal(tendenciaDuval('D2', true).tipo, 'quieto'); assert.equal(tendenciaDuval('T2', false), null);
     assert.match(tendenciaDuval('DT', true).texto, /parte térmica/); assert.doesNotMatch(tendenciaDuval('DT', true).texto, /T1 o T2/);
+    for (const z of ['T1', 'T2', 'T3', 'DT']) assert.equal(tendenciaDuval(z, true).destino, 'T3');
+    assert.equal(tendenciaDuval('PD', true).destino, undefined);
   });
 });
