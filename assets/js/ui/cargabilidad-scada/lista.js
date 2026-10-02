@@ -42,10 +42,20 @@ export function chipCifra(x) {
   return el('span', { class: 'chip chip--provisional' }, 'Provisional' + (x.crg ? ' · CRG ' + x.crg : ''));
 }
 
+// Un desplegable de varias opciones (zona, CRG) se cierra al hacer clic fuera: UN solo oyente de clic para la página.
+let cierreMulti = false;
+function cerrarMultiAlClicFuera() {
+  if (cierreMulti) return;
+  cierreMulti = true;
+  document.addEventListener('click', (ev) => {
+    for (const d of document.querySelectorAll('.cscada details.cs-multi[open]')) if (!d.contains(ev.target)) d.open = false;
+  });
+}
+
 export function montarLista(cont, ctx, { alAbrir }) {
   const st = {
     mes: null, resumen: null, filas: null, error: null, cargando: false, visibles: PASO,
-    filtro: { texto: '', zona: '', estado: '', crg: '', soloFirmes: false, soloSostenida: false },
+    filtro: { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false },
     orden: { campo: 'pct', dir: 'desc' }
   };
   let tablaCaja = null; let contador = null;
@@ -118,6 +128,24 @@ export function montarLista(cont, ctx, { alAbrir }) {
       s.addEventListener('change', () => { alCambiar(s.value); st.visibles = PASO; pintarTabla(); });
       return s;
     };
+    // Desplegable de VARIAS opciones (zona, CRG): se ve como los demás filtros; nada marcado = «Todas».
+    const multi = (id, valores, opciones, alCambiar) => {
+      const elegidos = new Set((Array.isArray(valores) ? valores : (valores ? [valores] : [])).map(String));
+      const resumen = () => (!elegidos.size ? 'Todas'
+        : (elegidos.size <= 2 ? opciones.filter(([v]) => elegidos.has(String(v))).map(([, t]) => t).join(', ') : elegidos.size + ' elegidas'));
+      const sum = el('summary', { id, class: 'cs-multi-sel' }, resumen());
+      const aplicar = () => { sum.textContent = resumen(); alCambiar([...elegidos]); st.visibles = PASO; pintarTabla(); };
+      const casillas = opciones.map(([v, txt]) => {
+        const c = el('input', { type: 'checkbox', id: id + '-' + v, checked: elegidos.has(String(v)) });
+        c.addEventListener('change', () => { if (c.checked) elegidos.add(String(v)); else elegidos.delete(String(v)); aplicar(); });
+        return el('label', { class: 'cs-check', for: id + '-' + v }, c, ' ' + txt);
+      });
+      const todas = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { elegidos.clear(); for (const l of casillas) l.querySelector('input').checked = false; aplicar(); } }, 'Todas');
+      cerrarMultiAlClicFuera();
+      const d = el('details', { class: 'cs-multi' }, sum, el('div', { class: 'cs-multi-lista', role: 'group', 'aria-labelledby': id }, casillas, todas));
+      d.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && d.open) { d.open = false; sum.focus(); } });
+      return d;
+    };
     const chk = (id, valor, alCambiar) => {
       const c = el('input', { type: 'checkbox', id, checked: valor });
       c.addEventListener('change', () => { alCambiar(c.checked); st.visibles = PASO; pintarTabla(); });
@@ -126,9 +154,9 @@ export function montarLista(cont, ctx, { alAbrir }) {
     return el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-filtros', role: 'search' },
         el('label', { for: 'csTexto' }, 'Buscar', q),
-        el('label', { for: 'csZona' }, 'Zona', sel('csZona', f.zona, [['', 'Todas'], ...zonas.map((z) => [z, z])], (v) => { f.zona = v; })),
+        el('div', { class: 'cs-campo-multi' }, el('span', {}, 'Zona'), multi('csZona', f.zona, zonas.map((z) => [z, z]), (v) => { f.zona = v; })),
         el('label', { for: 'csEstado' }, 'Medida', sel('csEstado', f.estado, [['', 'Todas'], ...Object.entries(ESTADOS)], (v) => { f.estado = v; })),
-        el('label', { for: 'csCrg' }, 'Calificación CRG', sel('csCrg', f.crg, [['', 'Todas'], ...[5, 4, 3, 2, 1].map((n) => [n, n + ' · ' + CRG_CHIP[n].palabra])], (v) => { f.crg = v; })),
+        el('div', { class: 'cs-campo-multi' }, el('span', {}, 'Calificación CRG'), multi('csCrg', f.crg, [5, 4, 3, 2, 1].map((n) => [n, n + ' · ' + CRG_CHIP[n].palabra]), (v) => { f.crg = v; })),
         el('label', { class: 'cs-check', for: 'csFirmes' }, chk('csFirmes', f.soloFirmes, (v) => { f.soloFirmes = v; }), ' Solo cifras firmes'),
         el('label', { class: 'cs-check', for: 'csSost' }, chk('csSost', f.soloSostenida, (v) => { f.soloSostenida = v; }), ' Solo sobrecarga sostenida')),
       el('div', { class: 'cs-acciones' },
@@ -179,7 +207,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     contador.textContent = todas.length + ' de ' + st.filas.length + ' transformadores';
     if (!todas.length) {
       poner(tablaCaja, el('div', { class: 'cs-estado' }, 'Ningún transformador cumple los filtros.', el('br'),
-        el('button', { type: 'button', id: 'csQuitar', class: 'btn btn--glass btn--sm', onclick: () => { st.filtro = { texto: '', zona: '', estado: '', crg: '', soloFirmes: false, soloSostenida: false }; dibujar(); const q = document.getElementById('csTexto'); if (q) q.focus(); } }, 'Quitar filtros')));
+        el('button', { type: 'button', id: 'csQuitar', class: 'btn btn--glass btn--sm', onclick: () => { st.filtro = { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false }; dibujar(); const q = document.getElementById('csTexto'); if (q) q.focus(); } }, 'Quitar filtros')));
       return;
     }
     const th = (c) => {

@@ -300,6 +300,24 @@ describe('lista', () => {
   });
 });
 
+describe('lista: filtros de varias opciones (zona y CRG)', () => {
+  const filas = [
+    { id: 'a', matricula: 'A', subestacion: 'S1', zona: 'ORIENTE', departamento: '', crg: 5, estado: 'automatica', clase: 'firme' },
+    { id: 'b', matricula: 'B', subestacion: 'S2', zona: 'OCCIDENTE', departamento: '', crg: 3, estado: 'automatica', clase: 'firme' },
+    { id: 'c', matricula: 'C', subestacion: 'S3', zona: 'BOLIVAR', departamento: '', crg: 1, estado: 'pendiente', clase: 'provisional' },
+    { id: 'd', matricula: 'D', subestacion: 'S4', zona: 'ORIENTE', departamento: '', crg: null, estado: 'automatica', clase: 'nulo' }
+  ];
+  const ids = (f) => filtrarFilas(filas, f).map((x) => x.id);
+  test('varias zonas y varias calificaciones a la vez; vacío = todas; un texto suelto sigue valiendo', () => {
+    assert.deepEqual(ids({ zona: ['ORIENTE', 'BOLIVAR'] }), ['a', 'c', 'd']);
+    assert.deepEqual(ids({ crg: ['5', '1'] }), ['a', 'c']);
+    assert.deepEqual(ids({ crg: [5, 3] }), ['a', 'b']);
+    assert.deepEqual(ids({ zona: ['ORIENTE'], crg: ['5', '3'] }), ['a']);
+    assert.deepEqual(ids({ zona: [], crg: [] }), ['a', 'b', 'c', 'd']);
+    assert.deepEqual(ids({ zona: 'OCCIDENTE', crg: '' }), ['b']);   // el filtro de antes (un solo valor)
+  });
+});
+
 describe('fecha y hora de Colombia', () => {
   test('parseo y formato no dependen de la zona del computador', () => {
     const ms = parseFechaHoraCO('2026-08-14T18:00');

@@ -315,7 +315,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     };
     const guardados = d.ext.guardados || {};
     const nota = (k) => (guardados[k] ? 'En este rango todos esos valores quedaron ocultos por imposibles.' : 'Este rango no trae ese valor guardado.');
-    return el('div', { class: 'cs-filtros' },
+    // Clase PROPIA (cs-ver): «cs-filtros» es la barra de filtros de la lista y no se comparte (regresión de §126).
+    return el('div', { class: 'cs-ver' },
       el('fieldset', { class: 'cs-filtro' }, el('legend', {}, 'Valores a mostrar'),
         casilla('ver', 'prom', ETIQUETA_VER.prom, true),
         EXTRAS.map((k) => casilla('ver', k, ETIQUETA_VER[k], !!hay[k], nota))),
