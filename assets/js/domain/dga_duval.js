@@ -20,7 +20,7 @@ export const ZONAS_DUVAL1 = Object.freeze({
     carga: 'La carga no cambia este tipo de defecto: depende de la tensión y del campo eléctrico. El triángulo 1 no usa el hidrógeno: véalo en los ppm y en las pruebas eléctricas.' }),
   T1: Object.freeze({ nombre: 'Falla térmica de baja temperatura', banda: 'menos de 300 °C', familia: 'termica',
     carga: 'Más carga trae más calor de fondo y el papel envejece más rápido. En servicio suele ser papel; en papel el punto se queda en T1 o T2 aunque suba la temperatura (Duval 2002).' }),
-  T2: Object.freeze({ nombre: 'Falla térmica de temperatura media', banda: 'de 300 a 700 °C', familia: 'termica',
+  T2: Object.freeze({ nombre: 'Falla térmica de temperatura media', banda: '300 a 700 °C', familia: 'termica',
     carga: 'Más carga trae más calor de fondo y el papel envejece más rápido. En servicio suele ser papel; en papel el punto se queda en T1 o T2 aunque suba la temperatura (Duval 2002).' }),
   T3: Object.freeze({ nombre: 'Falla térmica de alta temperatura', banda: 'más de 700 °C', familia: 'termica',
     carga: 'Depende del origen: si es una conexión, un contacto o calentamiento por flujo disperso, crece con el cuadrado de la corriente; si es el núcleo, no (depende de la tensión). Lo aclaran la resistencia de devanados y la corriente de excitación.' }),
