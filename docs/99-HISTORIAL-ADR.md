@@ -5551,3 +5551,48 @@ se consolidan) · puntaje numérico.
 memoria guarda SHAs · los punteros arreglados el 09-27 se sostienen · los topes de todas las neuronas en verde · 41 de 42
 «sostenidas» de la lista coinciden con la serie limpia (el bug GBT es de la lista, `§127.8`).
 
+## 129. ADR-129 — Cargabilidad SCADA: la marca «Sobrecarga sostenida» y «Pico aislado» de la lista ya no sale falsa ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «sí, corrige la marca de sostenida en la lista». El defecto lo destapó el comité de `§127` (T1-A/M-GBT, `§127.8`).
+> Deliberación: bóveda `2026-10-02-marca-sostenida`.
+
+**129.1 Causa raíz.** La lista decide con el resumen del mes (`scada_resumen`: `sost.v` y `i.max` de la corriente EN
+BRUTO, `scada_carga_kpis.js:101-104`, guardado por el importador sin ampacidad a propósito). `calcularEquipo` contaba
+además devanados con cifra nula (escala sospechosa) y equipos sin cifra. El detalle y el panel DGA usan la serie LIMPIA
+(sin horas > 3 × ampacidad). En 8 meses reales (313 filas candidatas): **10 marcas falsas** — GBT jun/ago/sep (66 kV a
+928–1.059 %), PBN en 6 meses (devanado de escala sospechosa; fila sin cifra) y el «pico aislado» de MAJ en feb (972 %).
+
+**129.2 Solución.** En `calcularEquipo` (`scada_carga_vista.js`, sin exportaciones nuevas): cuentan solo devanados con
+cifra y equipos con cifra; el resumen decide si el nivel no trae horas imposibles ni cae a medio paso del redondeo
+(0,0005 A) de 3 × A o del 100 % — ahí es exacto (probado: imposibles ⟺ máx > 3 × A; sin ellos, «> 100 %» ⟺ «horas
+limpias > 0»: 0 discrepancias en 313). Si no, el nivel queda en `sobrecargaPorVerificar` y la lista lee la curva del mes
+de ESE punto con `scada_carga_sostenida.js` (archivo NUEVO, `import()` dinámico; en paralelo; tope 10/mes; una sola
+lectura por curva en curso) y decide con la serie limpia. Falla de lectura, curva sin el nivel o sin horas válidas →
+«por confirmar» (solo FIRMES en la tarjeta y en el CSV, que sigue con 14 columnas). Ids estables en el enlace y «Ver
+curvas» de cada fila para no perder el foco cuando la tabla se repinta sola.
+
+**129.3 No-regresión.** Exportaciones de `vista.js` y `lista.js` iguales a `main`; las marcas verdaderas no cambian; el
+detalle y el panel DGA no leen estas marcas. Publicado `3ead4f9`; Deploy verde; CI verde al 2.º intento (TODO-68,
+relanzado por decisión suya); servidos = main (hash).
+
+**129.4 Verificación.** 2247 pruebas (13 nuevas: imposibles, escala sospechosa, sin cifra, bordes del redondeo con A
+decimal, curva que confirma / niega / no decide, fila nueva sin mutar, import dinámico). Vista previa: los tres caminos
+(resumen exacto · revisando la curva → confirmada · curva ilegible → «por confirmar»). **Producción con el código
+publicado: 313/313 iguales a la serie limpia**; 2 filas verificadas por curva (GBT ago, MAJ feb) y las dos sin marca.
+Revisión adversarial (3 lentes + escéptico): 10 menores, 9 confirmados, todos corregidos antes de publicar.
+
+**129.5 Anti-patterns evitados.** Recalcular el resumen con ampacidad (lo haría depender del parque y obligaba a recargar
+8 meses) · guardar «top-K ventanas» (mismo costo) · leer todas las curvas en la lista (free-tier) · import estático de un
+archivo nuevo · afirmar «sin sobrecarga» cuando no se pudo leer.
+
+**129.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_sostenida.js`, `tests/scada_carga_sostenida.test.js`.
+Tocados: `scada_carga_vista.js` (regla), `ui/cargabilidad-scada/lista.js` (verificación, tarjeta, celda, CSV, ids).
+
+**129.7 Doctrina.** L-102 · L-119 (nueva) · caza-bugs · revisión adversarial antes de publicar.
+
+**129.8 Verificado sano / no re-auditar.** La ventana del mes del resumen y la de `ventanaDeMes` son la misma (k = idx) ·
+el importador escribe las series ANTES que el resumen (un resumen nuevo con serie vieja no ocurre) · `leerSeriesPunto` ya
+existía desde `§122` (caché mezclada sin riesgo) · cierra el pendiente «bug GBT de la lista» de `§127.8`.
+**129.9 Pendiente → TODO-69.** La fila «Máximo sostenido 2 h» de la tabla del nivel en el DETALLE sigue en bruto
+(amperios, con horas imposibles) mientras el indicador y el panel DGA usan la serie limpia: ofrecido al Ingeniero.
+
