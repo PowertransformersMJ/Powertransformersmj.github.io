@@ -13,12 +13,23 @@ import { NIVELES_ATENCION, filasCarga, entradaCarga, leerGases, columnaGases, ni
 import { TEXTO_FECHA_MUESTRA } from '../../domain/scada_carga_dga_textos.js';
 import { POLIGONOS_DUVAL1, ZONAS_DUVAL1, REFERENCIA_SIGNIFICANCIA, GASES_DGA, duvalDeEquipo } from '../../domain/dga_duval.js';
 import { margenesCarga, escenarioCarga, corrienteReferencia, ESCENARIOS_FIJOS, ESCENARIO_LIBRE_MAX } from '../../domain/scada_carga_proyeccion.js';
+import { margenPpm, CAMBIO_PEQUENO } from '../../domain/dga_duval_margen.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const W = 280; const H = (W * Math.sqrt(3)) / 2; const X0 = 34; const Y0 = 24;
 const NOMBRE_GAS = { H2: 'Hidrógeno (H₂)', CH4: 'Metano (CH₄)', C2H4: 'Etileno (C₂H₄)', C2H6: 'Etano (C₂H₆)', C2H2: 'Acetileno (C₂H₂)', CO: 'Monóxido de carbono (CO)', CO2: 'Dióxido de carbono (CO₂)' };
 const CORTO = { CH4: 'CH₄', C2H4: 'C₂H₄', C2H2: 'C₂H₂', H2: 'H₂', C2H6: 'C₂H₆' };
 const CALIF = { calif_tdgc: 'gases combustibles', calif_c2h2: 'acetileno', calif_co: 'CO', calif_co2: 'CO₂' };
+const NOMBRE_TRI = { CH4: 'metano', C2H4: 'etileno', C2H2: 'acetileno' };
+/** Qué tan firme es la zona, en ppm de un solo gas (la distancia en puntos engaña cerca de un vértice: PD mide 2 puntos). */
+function textoMargen(mg) {
+  const n = NOMBRE_TRI[mg.gas]; const a = Math.abs(mg.delta);
+  const mas = mg.delta > 0 ? 'más' : 'menos';
+  if (a < 0.05) return 'Está justo en la frontera con ' + mg.zona + ': un poco ' + mas + ' de ' + n + ' la cambia.';
+  return 'Pasaría a ' + mg.zona + ' con unos ' + num(a, a < 10 ? 1 : 0) + ' ppm ' + mas + ' de ' + n + ' (hoy ' + num(mg.valor, mg.valor < 10 ? 1 : 0) + ' ppm' +
+    (mg.valor >= 1 ? ', un ' + num((100 * a) / mg.valor, 0) + ' % de lo medido' : '') + ')' +
+    (mg.pequeno ? ': un cambio así cabe en lo que puede variar entre laboratorios, la zona no es firme.' : '.');
+}
 const lista = (xs, dic) => xs.map((k) => dic[k] || k).join(', ').replace(/, ([^,]*)$/, ' y $1');
 
 function svg(tag, attrs = {}, ...hijos) {
@@ -63,6 +74,7 @@ function hoy(d) {
       partes.push(el('p', { class: 'cs-duval-zona' }, el('b', {}, d.zona + ' · ' + info.nombre)));
       if (info.banda) partes.push(p('Zona de ' + info.banda + ' si la falla está en el aceite; si está en el papel, la zona no indica la temperatura (Duval 2002). No es una temperatura medida.'));
       partes.push(p('Gas suficiente: ' + d.significancia.sobreL1.map((k) => CORTO[k] || k).join(', ') + ' en su límite L1 o más (' + REFERENCIA_SIGNIFICANCIA.fuente + ').'));
+      if (!d.significancia.sobreL1.some((k) => k in NOMBRE_TRI)) partes.push(p('Ninguno de los tres gases del triángulo llega a su L1: la zona sale de gases bajos y es orientativa.', 'cs-dga-sub cs-dga-aviso'));
     } else if (d.estado === 'no_concluyente') {
       partes.push(el('p', { class: 'cs-duval-zona' }, el('b', {}, 'No concluyente'), ' · el punto cae en ' + d.zona));
       const sg = d.significancia;
@@ -70,7 +82,7 @@ function hoy(d) {
       else partes.push(p('Metano, etileno y acetileno suman menos de ' + REFERENCIA_SIGNIFICANCIA.sumaMinTriangulo + ' ppm: muy poco para leer sus proporciones con confianza, por eso no se colorea. Pero ' + lista(sg.sobreL1, CORTO) + (sg.sobreL1.length > 1 ? ' pasan' : ' pasa') + ' su límite L1: no es nivel de fondo; vea los ppm y el panel de gases y carga.', 'cs-dga-sub cs-dga-aviso'));
     }
     partes.push(p('CH₄ ' + num(d.pct.CH4, 1) + ' % · C₂H₄ ' + num(d.pct.C2H4, 1) + ' % · C₂H₂ ' + num(d.pct.C2H2, 1) + ' %'));
-    if (d.estado === 'ok' && d.frontera) partes.push(p('A ' + num(d.frontera.puntos, 1) + ' puntos de la zona ' + d.frontera.zona + (d.frontera.puntos < 2 ? ': una diferencia entre laboratorios puede cambiarla.' : '.')));
+    if (d.estado === 'ok') { const mg = margenPpm(d.ultima.gases); if (mg) partes.push(p(textoMargen(mg))); }
     if (d.estado === 'ok') partes.push(p('Una sola muestra: no dice si el defecto está activo ni si crece (no hay velocidad de aumento).'));
   }
   if (d.ultima) {
@@ -152,6 +164,7 @@ export function pintarPanelDuval(nodo, args) {
       el('ul', { class: 'cs-dga-lista' },
         el('li', {}, 'Triángulo de Duval 1 (aceite mineral) con metano, etileno y acetileno; fronteras de Duval, IEEE Electrical Insulation Magazine 18(3), 2002, Fig. 1 (las mismas de IEEE C57.104-2019 §6.2.3).'),
         el('li', {}, 'Gas suficiente: algún gas en su límite L1 de ' + REFERENCIA_SIGNIFICANCIA.fuente + ' (H₂ 100, CH₄ 75, C₂H₂ 3, C₂H₄ 75, C₂H₆ 75 ppm) y metano + etileno + acetileno de ' + REFERENCIA_SIGNIFICANCIA.sumaMinTriangulo + ' ppm o más (criterio). La norma pide además una velocidad de aumento que con una sola muestra no se puede calcular.'),
+        el('li', {}, 'Qué tan firme es la zona: para cada gas del triángulo, el menor cambio (sumando o restando) que la mueve, frente a lo que se midió de ese gas; se muestra el que pide el cambio relativo más chico. Si alguno cabe en el ' + num(CAMBIO_PEQUENO.relativo * 100, 0) + ' % de lo medido (o en ' + CAMBIO_PEQUENO.ppmMin + ' ppm, para gases en trazas), se avisa que la zona no es firme (criterio, pendiente del Ingeniero). No se usa la distancia en puntos del triángulo: cerca de un vértice engaña (la zona PD mide solo 2 puntos).'),
         el('li', {}, 'Margen hasta cada franja: cuenta exacta sobre la curva medida aumentada parejo (cifra × f hasta pasar la banda CRG; máximo sostenido de 2 h × f hasta pasar el 100 % o el 130 %).'),
         el('li', {}, 'Nivel de atención: la misma tabla del panel de gases y carga, con los gases de hoy (criterio del área).'))),
     el('details', { class: 'cs-dga-mas', 'data-k': 'limites' }, el('summary', { id: 'csDuvalSum-limites' }, 'Lo que esta vista no puede saber'),
