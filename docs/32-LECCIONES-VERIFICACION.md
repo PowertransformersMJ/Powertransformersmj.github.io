@@ -331,3 +331,10 @@ calificación global 2 con CO 5 y CO₂ 5: un dato que el promedio nunca produce
 nunca a mano; (3) si ya se le dijo al dueño algo falso, se corrige en el mismo informe y se nombra. **Gate**:
 `tests/scada_carga_dga.test.js` (gases coherentes con `calcularEvalDGA`) + [HONOR].
 
+### L-119 · Un resumen precalculado decide solo donde se PRUEBA exacto; donde no, se lee la fuente
+**Cicatriz** (`99 §129`): la lista marcaba «sobrecarga sostenida» con el resumen en bruto del mes y el detalle con la
+serie limpia: 10 marcas falsas en 8 meses (GBT, PBN, MAJ). **Regla**: (1) antes de decidir con un resumen, demostrar con
+datos reales que equivale a la fuente y DÓNDE deja de equivaler (aquí: máx > 3 × A, y el medio paso del redondeo);
+(2) el propio resumen debe poder decir «no sé» — ese caso va a la fuente, con tope de lecturas; (3) «no se pudo leer»
+es «por confirmar», nunca «no». **Gate**: `tests/scada_carga_sostenida.test.js` + [HONOR].
+

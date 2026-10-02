@@ -63,6 +63,7 @@
 | §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5367 |
 | §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5431 |
 | §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5505 |
+| §129 | ADR-129 — **Cargabilidad SCADA**: marca «sostenida» de la lista sin falsos | 5554 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -91,7 +92,7 @@
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
 | 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82 en adelante` + **L-103** |
-| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
+| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · marca «sostenida» de la lista (resumen en bruto vs serie limpia) → `§129` + L-119 · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
 | 🪟 Ventana de detalle de Cargabilidad (tabla vieja) · una ventana fija dentro de un iframe que no se ve · retirar exportaciones con caché | `99 §123`, `§124` + L-115, L-116 · bóveda `2026-10-01-detalle-cargabilidad` |
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
 | El "por qué" de una decisión / detalle de un § | Capa 1 (§1-§80 en `00a`) → `99-HISTORIAL-ADR.md` |
