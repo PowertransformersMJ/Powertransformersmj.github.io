@@ -5626,3 +5626,60 @@ la cifra se calcula con ellas; no se pidió) · Archivos: `ui/cargabilidad-scada
 en un nivel de escala sospechosa: la tabla ya lo advierte («la corriente parece estar en otra escala») y la nota dice
 cuántas horas se descartaron. Cierra `§129.9`.
 
+
+## 131. ADR-131 — Cargabilidad SCADA: «Triángulo de Duval: hoy y con más carga» por activo + carga «solo gases» ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «necesito apreciar por cada activo cómo se encuentra el triángulo de Duval con los parámetros de la última prueba (2025)
+> y cómo se comportaría con el incremento de la carga… un actual vs un proyectado conforme a los parámetros de corriente».
+> Decisiones: punto fijo + proyección de carga · referencia USBR · botón «cargar solo gases» (simula primero) · regla vieja
+> en un cambio aparte. NO revisado externamente.
+
+**131.1 Causa raíz.** (a) Los ppm de cada gas SÍ venían en la hoja TX_Potencia del Excel de Salud de Activos (207/208), pero
+el importador solo guardaba las calificaciones: no había con qué dibujar el triángulo. (b) `dga_diagnostico.js`
+`_zonaDuval1` clasificaba mal ~51 % del área (D1 nunca salía; 4–13 % de C2H2 salía D1; T3 exigía C2H2 < 4 %; 29 % exacto
+perdido por redondeo). (c) Ninguna norma da la trayectoria del punto de Duval con la carga: «proyectar el punto» sería un
+dato fabricado.
+
+**131.2 Solución.** Sección nueva en el detalle (debajo del panel DGA §127), `import()` aislado. HOY: Triángulo 1 con
+fronteras de Duval 2002 Fig. 1 (= IEEE C57.104-2019 §6.2.3); coloreado solo con gas suficiente (algún gas en su L1 de USBR
+FIST 3-31 Tabla 3 y CH4+C2H4+C2H2 ≥ 10 ppm, criterio); «no concluyente» en gris («nivel de fondo» solo si nada pasa L1);
+«punto no confiable» si los ppm no reproducen la calificación vigente; distancia a la zona vecina; los 7 gases. CON MÁS
+CARGA: el punto queda FIJO; la curva medida del rango × f: margen exacto hasta cada franja de la matriz §127 (c4/pct,
+c5/pct, 100/máx 2 h, 130/máx 2 h solo con cifra firme; las franjas por debajo de la actual «ya está por encima»),
+escenarios +10/+20/+30/libre 1–100 (horas sostenidas recontadas sobre la serie limpia con 100/f), pérdidas × f²; «Hoy» =
+nivel del panel DGA. DATOS: campo `ultima_dga` en la RAÍZ del transformador (`{gases, fuente, archivo, importado_en,
+fecha_toma:null}`), escrito por la importación completa (mismo lote) y por el botón nuevo «Simular / Cargar gases» de
+`admin/importar.html` (SOLO `ultima_dga` + `updatedAt`, `batch.update`, lotes de 450, auditoría `cargar_gases_dga`; nunca
+`/muestras`: TODO-64.b). Regla vieja: `duvalTriangle1` delega en `zonaDuval1` con su contrato intacto (commit aparte).
+
+**131.3 No-regresión.** Exportaciones viejas intactas; todo lo nuevo en archivos nuevos (L-102); `parsearFilaTransformador`
+solo AGREGA `gasesPpm`; `persistirImportacion` agrega un `update` por equipo existente (cuenta en el lote). El panel DGA
+§127 no cambia. Commits `07d3fb5` (feat) y `ba117cf` (fix regla vieja), merge `2def8ac`. 2266 pruebas, lint OK.
+
+**131.4 Verificación.** Vista previa local con stubs (cero escrituras reales): LPZ T3 concluyente (H2 y C2H4 ≥ L1, a 15
+puntos de DT), VAC/LJA «no concluyente» en gris, equipo sin ppm con aviso, 375 px sin desborde, cambio de mes con el mismo
+nodo y desplegables abiertos, columna libre (12,5 → +13 %; 150 → aviso), sin errores de consola. Simulación «solo gases»
+con el Excel CORREGIDO: 0 escrituras; carga: solo `ultima_dga` + `updatedAt` + auditoría. Recuento real con el código final:
+T1 68 · T2 57 · T3 56 · PD 13 · DT 7 · D2 4 · D1 2; **50 concluyentes** (5 por H2 alto: EBU, LCB, MBJ, OVE, TRE); la
+corrección de la regla vieja cambia 6 equipos (BUE, EBA → D1; GUP, LOR → T3; MAM, SPA → DT). Revisión adversarial de 3
+lentes (dominio, datos, UI): 2 mayores (matrícula repetida = dos equipos distintos en «Salud de Activos 2026-4.xlsx»,
+T1-M/M-CAC → ppm al equipo equivocado; «fondo» con H2/C2H2 sobre L1) y 7 menores, todos corregidos con prueba.
+**Producción** (`2def8ac`; CI verde; Deploy rojo por TODO-68 y verde al 2.º intento): SIMULAR GASES con el Excel CORREGIDO
+→ **207 a escribir**, 0 iguales, SLS sin gases, 0 sin coincidencia, 0 repetidas, **0 escrituras** (clic real de ratón y por
+JS). Panel en LPZ: estado «sin ppm», debajo del panel DGA, márgenes «ya está por encima», sin errores de consola.
+**CARGAR GASES espera el «procede» del Ingeniero.**
+
+**131.5–131.7.** Anti-patterns evitados: proyectar el punto (sin norma) · la fórmula 322·log (sin fuente) · cargar ppm por
+`/muestras` (borra `calif_crg`) · re-importar todo para subir ppm (recalcula calificaciones) · elegir «la primera» de una
+matrícula repetida. Archivos nuevos: `domain/dga_duval.js`, `domain/scada_carga_proyeccion.js`, `domain/dga_ppm_excel.js`,
+`data/dga_ppm.js`, `ui/importar-gases.js`, `ui/cargabilidad-scada/panel-duval.js`, `tests/dga_duval.test.js`. Modificados:
+`admin/importar.html`, `data/importar.js`, `domain/importador.js`, `domain/dga_diagnostico.js`, `ui/cargabilidad-scada/detalle.js`,
+`css/cargabilidad-scada.css`. Doctrina: L-102, §3.2 (veredicto del valor contra la norma; no fabricar), TODO-64.b.
+
+**131.8 Verificado sano / no re-auditar.** Las reglas de Firestore de `transformadores` no restringen llaves: `ultima_dga`
+pasa con rol admin. La importación completa con matrícula repetida sigue ganando la ÚLTIMA fila (la misma de las
+calificaciones de ese documento): coherente, no se tocó. Los 13 PD salen concluyentes por H2: en el Triángulo 1 el gaseo del
+aceite se parece a PD → la pantalla recomienda los Triángulos 4 y 5 (Duval 2008); criterio pendiente del Ingeniero. El
+texto del panel DGA §127 «la plataforma guarda calificaciones de 1 a 5; el diagnóstico… se hace con las ppm» queda
+desactualizado cuando el equipo tiene ppm: es texto en BORRADOR del Ingeniero, no se tocó sin su «procede».
+Bóveda: `2026-10-02-duval-proyeccion` (paso 1 + paso 2, crudos y síntesis).
