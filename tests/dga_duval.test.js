@@ -6,6 +6,7 @@ import {
   zonaDuval1, distanciaFrontera, significancia, leerUltimaDGA, coherenciaConCalificaciones, duvalDeEquipo,
   POLIGONOS_DUVAL1, ZONAS_DUVAL1, REFERENCIA_SIGNIFICANCIA,
 } from '../assets/js/domain/dga_duval.js';
+import { duvalTriangle1 } from '../assets/js/domain/dga_diagnostico.js';
 import { margenesCarga, escenarioCarga, corrienteReferencia } from '../assets/js/domain/scada_carga_proyeccion.js';
 import { gasesDeFila, planCargaGases, ultimaDgaDeFila } from '../assets/js/domain/dga_ppm_excel.js';
 import { parsearFilaTransformador, procesarLibro } from '../assets/js/domain/importador.js';
@@ -53,6 +54,13 @@ describe('zonaDuval1 (Duval 2002, Fig. 1)', () => {
     assert.equal(zonaDuval1(10, null, 2), null);
     assert.equal(zonaDuval1(0, 0, 0), null);
     assert.equal(zonaDuval1(-1, 5, 2), null);
+  });
+  test('la función vieja (duvalTriangle1) ahora delega en la regla correcta y conserva su contrato', () => {
+    const r = duvalTriangle1({ CH4: 50, C2H4: 5, C2H2: 45 });
+    assert.equal(r.codigo, 'D1'); assert.ok(r.label && r.referencia && r.porcentajes);
+    assert.equal(duvalTriangle1({ CH4: 30, C2H4: 60, C2H2: 10 }).codigo, 'T3');
+    assert.equal(duvalTriangle1({ CH4: 70, C2H4: 20, C2H2: 10 }).codigo, 'DT');
+    assert.equal(duvalTriangle1({ CH4: 1 }).codigo, 'INDETERMINADO');
   });
   test('los polígonos cubren el triángulo sin solaparse (centroide de cada uno en su zona)', () => {
     for (const [z, pts] of Object.entries(POLIGONOS_DUVAL1)) {
