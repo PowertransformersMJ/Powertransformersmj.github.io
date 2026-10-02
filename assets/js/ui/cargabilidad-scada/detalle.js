@@ -79,6 +79,20 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   let figura = null;
   let actual = null;        // {mat, id, tx, fila, punto, cid, placa, desde, hasta, porNivel, calc, nivel}
   const filtro = leerFiltro();
+  // Panel «Gases disueltos (DGA) y carga» (`99 §127`): se carga APARTE con import(); si falla, la ranura sigue
+  // oculta y el detalle queda igual que antes. Si llega tarde, pinta el último estado del equipo abierto.
+  let panelDga = null;
+  import('./panel-dga.js').then((m) => { panelDga = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
+    .catch((e) => console.warn('[cargabilidad-scada] panel DGA', e));
+  /** Estado EXPLÍCITO del panel: 'leyendo' | 'ok' (con el cálculo recién hecho) | 'error' | 'sin_scada'. */
+  function pintarDga(a, estado) {
+    if (!a || !a.dgaNodo) return;
+    a.dga = estado;
+    if (!panelDga) return;
+    const rango = a.desde != null && a.hasta != null ? formatoCO(a.desde + H_MS) + ' a ' + formatoCO(a.hasta) : null;
+    try { panelDga.pintarPanelDga(a.dgaNodo, { tx: a.tx, umbrales: ctx.umbrales, rango, ...estado }); }
+    catch (e) { console.warn('[cargabilidad-scada] panel DGA', e); a.dgaNodo.hidden = true; }
+  }
   /** Lo que de verdad se dibuja: un extra que el rango no tiene no cuenta; si no queda nada, el promedio. */
   function verEfectivo(d) {
     const hay = (d && d.ext && d.ext.hay) || {};
@@ -380,7 +394,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
     conservarFoco(() => poner(cont, encabezado(a), avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-esqueleto', style: 'width:50%' }), el('div', { class: 'cs-esqueleto', style: 'width:80%;margin-top:10px' }),
-      el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…'))));
+      el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…')), a.dgaNodo));
+    pintarDga(a, { estado: { estado: 'leyendo' } });
     if (enfocar) focoTitulo();
     try {
       const mesesRango = mesesDelRango(desde, hasta);
@@ -418,14 +433,17 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         fallidos.size ? el('div', { class: 'cs-panel cs-error', role: 'alert' }, 'No se pudo leer ' + [...fallidos].map(nombreMes).join(', ') + ' (revise la conexión): esas horas quedan como hueco y la cifra no es firme.',
           el('button', { type: 'button', class: 'btn btn--glass btn--sm', style: 'margin-left:8px', onclick: () => cargar(desde, hasta) }, 'Reintentar')) : null,
         sinNada ? el('div', { class: 'cs-panel cs-estado' }, 'No hay horas con dato válido en este rango. Pruebe con otro rango.') : indicadores(a),
+        a.dgaNodo,
         el('div', { id: 'csNivel' })));
+      pintarDga(a, { estado: { estado: 'ok' }, calc: a.calc, porNivel: a.porNivel });
       const nv = (a.calc.devMax && (a.calc.niveles.find((x) => x.devanado === a.calc.devMax) || {}).nivel) || Object.keys(porNivel).sort((x, y) => NIVELES[y].kv - NIVELES[x].kv)[0];
       if (nv) await pintarNivel(a, a.nivel && porNivel[a.nivel] ? a.nivel : nv);
     } catch (e) {
       if (mio !== token) return;
       console.warn('[cargabilidad-scada] detalle', e);
       conservarFoco(() => poner(cont, encabezado(a), selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
-        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar'))));
+        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo));
+      pintarDga(a, { estado: { estado: 'error' } });
     }
   }
 
@@ -445,13 +463,17 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const punto = cid && ctx.catalogo && ctx.catalogo.puntos ? ctx.catalogo.puntos[cid] || null : null;
     const matricula = leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || mat;
     const cambio = !actual || actual.tx !== tx;
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel };
+    // Ranura del panel DGA: UN nodo por equipo (al cambiar el rango se reusa: no parpadea).
+    const dgaNodo = !cambio && actual.dgaNodo ? actual.dgaNodo
+      : el('section', { class: 'cs-panel cs-dga', id: 'csDga', hidden: true, 'aria-labelledby': 'csDgaTitulo' });
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, dga: null };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
-      poner(cont, encabezado(actual), el('div', { class: 'cs-panel cs-estado' },
-        !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
-          : (!fila ? 'Este transformador no está en la homologación con el SCADA.'
-            : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.'))));
+      const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
+        : (!fila ? 'Este transformador no está en la homologación con el SCADA.'
+          : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.'));
+      poner(cont, encabezado(actual), el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo);
+      pintarDga(actual, { estado: { estado: 'sin_scada', motivo: motivoSin } });
       focoTitulo();
       return;
     }
