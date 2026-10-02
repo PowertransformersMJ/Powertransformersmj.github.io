@@ -5596,3 +5596,33 @@ existía desde `§122` (caché mezclada sin riesgo) · cierra el pendiente «bug
 **129.9 Pendiente → TODO-69.** La fila «Máximo sostenido 2 h» de la tabla del nivel en el DETALLE sigue en bruto
 (amperios, con horas imposibles) mientras el indicador y el panel DGA usan la serie limpia: ofrecido al Ingeniero.
 
+## 130. ADR-130 — Cargabilidad SCADA: «Máximo sostenido 2 h» del detalle con la serie limpia ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «sí, corrige también el máximo sostenido del detalle» (pendiente `§129.9`).
+
+**130.1 Causa raíz.** En la tabla del nivel del detalle, la fila «Máximo sostenido 2 h» salía de `resumenFisico` (corriente
+EN BRUTO): dos horas imposibles seguidas daban miles de amperios, mientras el indicador «Sobre el 100 % sostenido» y el
+panel DGA usan la serie limpia (sin horas > 3 × ampacidad).
+
+**130.2 Solución.** `detalle.js` (`tablaNivel`): con ampacidad, `maxSostenido` sobre la corriente de las horas que la serie
+limpia conserva (`d.carga.serie` finita), con la nota «· sin N h de escala imposible» cuando descarta (misma redacción del
+indicador «Corriente máxima»); sin ampacidad queda la del resumen. Sin exportaciones nuevas; `maxSostenido` ya se exportaba
+desde `§122` (`bc5e353`).
+
+**130.3 No-regresión / medición.** Producción, 8 meses, todos los niveles con devanado y ampacidad: **3.019 iguales**
+(sin horas imposibles la serie limpia es la bruta) y **13 corregidos**: GBT 66 kV jun/ago/sep (~1.800 A → ~105 A), SBE ene
+(222 → 126 A), PBN 13,8 kV 7 meses (~750 → ~498 A; nivel de escala sospechosa), MAJ feb (mismo valor, solo la nota).
+Publicado `5865ecb`; CI y Deploy verdes a la primera; servidos = main.
+
+**130.4 Verificación.** 2249 pruebas (2 nuevas: la combinación limpia y un candado de que la fila no vuelve al resumen en
+bruto). Vista previa: VAC igual (251 A). Producción: GBT ago 1.624 → **106 A**, PBN ago 770 → **492 A**, VAC 251 A. El
+navegador tenía `detalle.js` viejo en caché (Pages, hasta 10 min): se comprobó con `fetch(u, {cache: 'reload'})` (L-102).
+
+**130.5–130.7.** Anti-patterns: tocar las otras filas en bruto que alimentan la cifra (p50/p95/p99/máx de la corriente:
+la cifra se calcula con ellas; no se pidió) · Archivos: `ui/cargabilidad-scada/detalle.js`, `tests/scada_carga_sostenida.test.js`
+· Doctrina: L-119, L-102.
+
+**130.8 Verificado sano / no re-auditar.** En PBN 13,8 kV el valor limpio (~498 A ≈ 3 × A) es el tope de lo que se conserva
+en un nivel de escala sospechosa: la tabla ya lo advierte («la corriente parece estar en otra escala») y la nota dice
+cuántas horas se descartaron. Cierra `§129.9`.
+
