@@ -7,7 +7,8 @@
 // > 75 %; también con 2 h seguidas sobre el 100 %, que es superar la capacidad); por debajo dice «carga
 // normal». Sin medición SCADA no hay nivel (la cifra del Excel no sustituye a la medida). La tabla es
 // criterio de ingeniería del área sobre IEC 60076-7, IEEE C57.91 e IEC 60599, NO una tabla de norma.
-// Los gases son SOLO calificaciones 1–5 (5 = peor): no hay ppm ni fecha de toma, así que no se diagnostica
+// El nivel se decide con las calificaciones 1–5 (5 = peor), sin fecha de toma; las ppm de la última muestra (§131) las
+// usa el panel de Duval, no esta tabla — así que aquí no se diagnostica
 // el tipo de falla. La columna sale de la DGA OFICIAL (promedio redondeado de TDGC, CO, CO₂ y C₂H₂, como en
 // Salud de Activos): el CO y el CO₂ pesan a través de ese promedio, y el panel dice de qué grupo sale.
 // Nada se escribe en el parque. Archivo NUEVO a propósito (L-102). Funciones PURAS.

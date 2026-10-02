@@ -20,6 +20,8 @@ import {
   APROBADO, CATALOGO_DGA, TEXTO_CARGA_NORMAL, NO_PUEDE_SABER, NOTA_PIE, TEXTO_FECHA_MUESTRA,
   TEXTO_ACETILENO_5, TEXTO_ACETILENO_34
 } from '../../domain/scada_carga_dga_textos.js';
+import { leerUltimaDGA } from '../../domain/dga_duval.js';
+import { textoItem, noPuedeSaber } from '../../domain/scada_carga_dga_textos_ppm.js';
 
 const VISIBLES = { adversidades: 3, acciones: 4 };
 const NOMBRE_CORTO = { tdgc: 'combustibles', co: 'CO', co2: 'CO₂', c2h2: 'acetileno' };
@@ -96,20 +98,20 @@ function tarjetaGases(g, cg) {
     g.grupos ? el('p', { class: 'cs-dga-sub' }, TEXTO_FECHA_MUESTRA) : null);
 }
 
-function item(it) {
-  return el('li', {}, it.texto,
+function item(it, conPpm) {
+  return el('li', {}, textoItem(it, conPpm),
     it.cuando ? el('span', { class: 'cs-dga-cuando' }, ' Cuándo: ' + it.cuando + '.') : null,
     el('span', { class: 'cs-dga-fuente' }, ' [' + it.fuente + (it.inferencia ? ' · criterio de ingeniería' : '') + ']'));
 }
 
-function lista(titulo, items, n, ordenada, id) {
+function lista(titulo, items, n, ordenada, id, conPpm) {
   if (!items.length) return null;
   const tag = ordenada ? 'ol' : 'ul';
   const resto = items.slice(n);
   return el('div', { class: 'cs-dga-bloque' }, el('h3', { id }, titulo + ' (' + items.length + ')'),
-    el(tag, { class: 'cs-dga-lista' }, items.slice(0, n).map(item)),
+    el(tag, { class: 'cs-dga-lista' }, items.slice(0, n).map((it) => item(it, conPpm))),
     resto.length ? el('details', { class: 'cs-dga-mas', 'data-k': id }, el('summary', { id: 'csDgaSum-' + id }, 'Ver ' + (resto.length === 1 ? 'la otra' : 'las otras ' + resto.length)),
-      el(tag, { class: 'cs-dga-lista', start: ordenada ? String(n + 1) : null }, resto.map(item))) : null);
+      el(tag, { class: 'cs-dga-lista', start: ordenada ? String(n + 1) : null }, resto.map((it) => item(it, conPpm)))) : null);
 }
 
 function tablaDecision(r, filas) {
@@ -143,6 +145,9 @@ export function pintarPanelDga(nodo, { tx, estado, calc, porNivel, umbrales, ran
   const g = r ? r.gases : leerGases(tx);
   const cg = r ? r.columna : columnaGases(g);
   const filas = filasCarga(umbrales);
+  // Con las ppm de la última muestra ya cargadas (§131), tres ítems del catálogo cambian por su variante (§133); sin
+  // ppm quedan los del catálogo. El ítem del tipo de defecto de «Lo que este panel no puede saber» cambia siempre.
+  const conPpm = !!leerUltimaDGA(tx);
   // Los desplegables que la persona abrió siguen abiertos al cambiar el rango: se recuerdan en el nodo (no en el
   // contenido, porque el repintado «leyendo» no trae las listas). El foco vuelve al mismo elemento (por id).
   const abiertos = nodo._dgaAbiertos || (nodo._dgaAbiertos = new Set());
@@ -155,11 +160,11 @@ export function pintarPanelDga(nodo, { tx, estado, calc, porNivel, umbrales, ran
     rango ? el('p', { class: 'cs-ayuda', style: 'margin:0 0 6px' }, 'Nivel para el rango ' + rango + '.') : null,
     cabecera(estado, r || { franja: { fila: null, motivo: '' } }, entrada, filas, umbrales),
     el('div', { class: 'cs-dga-medido' }, tarjetaCarga(estado, entrada), tarjetaGases(g, cg)),
-    r && r.nivel ? lista('Posibles adversidades', r.adversidades, VISIBLES.adversidades, false, 'csDgaAdv') : null,
-    r && r.nivel ? lista('Acciones preventivas', r.acciones, VISIBLES.acciones, true, 'csDgaAcc') : null,
+    r && r.nivel ? lista('Posibles adversidades', r.adversidades, VISIBLES.adversidades, false, 'csDgaAdv', conPpm) : null,
+    r && r.nivel ? lista('Acciones preventivas', r.acciones, VISIBLES.acciones, true, 'csDgaAcc', conPpm) : null,
     tablaDecision(r, filas),
     el('details', { class: 'cs-dga-mas', 'data-k': 'limites' }, el('summary', { id: 'csDgaSum-limites' }, 'Lo que este panel no puede saber'),
-      el('ul', { class: 'cs-dga-lista' }, NO_PUEDE_SABER.map((t) => el('li', {}, t)))),
+      el('ul', { class: 'cs-dga-lista' }, noPuedeSaber(NO_PUEDE_SABER, conPpm).map((t) => el('li', {}, t)))),
     el('p', { class: 'cs-ayuda' }, NOTA_PIE));
   for (const d of nodo.querySelectorAll('details[data-k]')) {
     const k = d.dataset.k;
