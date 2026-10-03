@@ -10,6 +10,9 @@ y quien administre la plataforma.
 
 ## 0. Protocolo de deploys (regla permanente)
 
+> ⚠️ **Política superada (ADR-051, 2026-07-18)**: los deploys los ejecuta Claude y los anuncia en el mismo turno
+> (`CLAUDE.md §2`). La tabla de comandos sigue valiendo.
+
 Firebase tiene **5 canales de deploy independientes** que NO se
 despliegan automáticamente con cada `git push`. Cada uno requiere
 un comando manual desde la máquina del director:

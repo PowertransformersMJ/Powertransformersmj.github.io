@@ -15,8 +15,8 @@
 ### L-01 · Push/merge/deploy los ejecuta Claude (ACTUALIZADA 2026-07-18 — antes: "el push lo hace el director")
 **Disparador**: cualquier push/merge. · **Cicatriz**: 2026-04→06 el push del runtime daba 403 → pushaba el director; 2026-06-23 el push funcionó pero Claude se extralimitó (posible ≠ permitido). En la entrevista F3a de la migración (ADR-051, `99 §51`) el Ingeniero CAMBIÓ la regla. · **Regla**: Claude ejecuta commit + push + merge + deploys, **validando cada commit con el Ingeniero** (resumen sin jerga). NUNCA force-push a `main`. JAMÁS tokens a archivo/commit/log. (Historia completa: `_legacy §0.1`.)
 
-### L-02 · `main` solo con pedido explícito
-**Regla**: no tocar `main` salvo orden directa del director.
+### L-02 · ~~`main` solo con pedido explícito~~ (retirada → L-01)
+**RETIRADA (ADR-051, 2026-07-18)** → L-01 y `CLAUDE.md §2`: Claude hace el merge a `main`. Sigue prohibido solo el force-push a `main`. Excepción: lo que toca el papel de Fichas espera su «procede» (L-63).
 
 ### L-03 · Migrar archivo legacy SIN perder detalles visuales
 **Disparador**: portar `*.html` monolítico (JS inline) a arquitectura moderna. · **Cicatriz**: se pierden detalles de UX de Chart.js. · **Regla**: comparar lado a lado contra el original en navegador ANTES de cerrar; copiar `plugins.legend`/`plugins.tooltip` palabra por palabra y replicar el plugin `afterDraw` completo (cada `setLineDash`/`arc`/`fillText` importa). 100% paridad visual; si hay captura del director, ESA manda. (Full: `_legacy §0.1.2.1`.)
@@ -120,7 +120,7 @@
 ## 🪞 Meta: fallos del propio cerebro (Reflejo de Autocrítica `CLAUDE.md §G.4`)
 
 ### M-01 · `brain-check.mjs` ensuciaba la raíz con un archivo `NUL` en cada corrida
-**Disparador**: archivo `NUL` 0-byte huérfano en la raíz. · **Cicatriz**: el linter traía `git rev-parse … 2>NUL` (Windows); en macOS/Linux crea un archivo literal `NUL` en cwd en cada corrida. · **Regla**: `scripts/brain-check.mjs:171` → `2>/dev/null` (2×); tooling POSIX-limpio; ante `NUL` huérfano, grep `2>NUL`.
+**Disparador**: archivo `NUL` 0-byte huérfano en la raíz. · **Cicatriz**: el linter traía `git rev-parse … 2>NUL` (Windows); en macOS/Linux crea un archivo literal `NUL` en cwd en cada corrida. · **Resuelta de raíz**: el kernel ya no lanza procesos (`brain-check.mjs:13`, sin `child_process`). Si vuelve a aparecer un `NUL` huérfano: `grep -rn '2>NUL' scripts/` y lo mismo en el kernel canónico (`../brain-private/kernel/`).
 
 ### M-02 · El mapa espacial se pudre en SILENCIO (el Reflejo de Frescura no tiene gate)
 **Disparador**: buscar dónde vive un módulo y que `20` diga "no está". · **Cicatriz** (auditoría 2026-08-21): `20-ESPACIAL` no nombraba el importador de Salud de Activos —la tarea VIVA del proyecto— ni Fichas Técnicas, ni Indicadores de Calidad, ni Seguimiento Operativo, pese a 4 ADRs seguidos sobre ellos. Un agente frío gastó 16 KB para recibir un "no documentado" FALSO. Ningún gate lo caza: el linter valida que las hojas existan, no que el mapa conozca el código. · **Regla**: al crear/mover una PÁGINA o un módulo `ui/`, la fila en `20` va en el MISMO commit; y al cerrar un ADR que estrena módulo, verificar `grep -c '<slug>' docs/20-MEMORIA-ESPACIAL.md` antes de dar la tarea por cerrada. Ver `99 §68`.
@@ -143,7 +143,14 @@
 el cierre de una tarea incluye el commit del cerebro; si un gate lo bloquea, se resuelve el gate en ese MISMO cierre (auditoría,
 poda sin pérdida) antes de publicar lo siguiente. El rediseño del candado (avisar al publicar con ADRs sin commitear) → KERNEL, TODO-67. [HONOR]
 
-> Pendiente universal: no confiar en `origin/*` sin `git fetch`. Lección→doctrina: promover a `CLAUDE.md §3`. Tope ~350 líneas: shard (ej. `31-LECCIONES-GIT.md`) registrada en §0/`00-INDICE`, puntero madre→hija.
+> Topes de `30` y sus hijas → `docs/.brain-manifest.json` (en caracteres). Cuando se acerque al tope: nueva hija `36-…` registrada en `CLAUDE.md §0` y en `00`, con puntero de la madre a la hija.
+
+## 🤖 IA / Claude API / Cloud Functions → hija `31`
+
+> **Todo lo de IA / Claude API / Cloud Functions vive en la hija** →
+> [`31-LECCIONES-IA.md`](31-LECCIONES-IA.md) (§G.5): streaming largo, reintentos, timeouts, trabajo
+> asíncrono observable y extracción con LLM (prompt, modelo, estructura). Léela ANTES de tocar
+> `functions/` o el pipeline de IA. La hija lleva su propio listado — aquí no se duplican sus IDs.
 
 ## ⚡ Pruebas Eléctricas: dominio, tablero y previews fieles → hija `34`
 
@@ -160,7 +167,7 @@ poda sin pérdida) antes de publicar lo siguiente. El rediseño del candado (avi
 **Cicatriz**: HEIC solo lo pinta Safari (background-image roto en Chrome/Firefox); `background-size:cover` estiró el padding blanco interno de una foto a todo el viewport. · **Regla**: convertir SIEMPRE a JPEG/WebP (`sips -s format jpeg`) y recortar el padding interno ANTES de usar; probar en Chrome. (Origen: `_legacy/CLAUDE-previo.md §9.5`.)
 
 ### L-60 · "Todo sigue igual" tras un deploy → triage con `curl` del asset, no adivinar
-**Regla**: `curl` directo al asset en producción (`https://powertransformersmj.github.io/assets/…`) para separar "no desplegado" vs "cache del navegador" ANTES de tocar código; la PWA vieja causaba esto (por eso `sw.js` es kill-switch). (Origen: `_legacy/CLAUDE-previo.md §9.7`.)
+**Regla**: `curl` directo al asset en producción (`https://powertransformersmj.github.io/assets/…`) para separar "no desplegado" vs "cache del navegador" ANTES de tocar código; la PWA vieja causaba esto (por eso `sw.js` es kill-switch). (Origen: `_legacy/CLAUDE-previo.md §9.7`.) Esto es solo el paso 1: si el servidor ya sirve lo nuevo y él no lo ve, la prueba es el DOM de SU pestaña → **L-85** y **L-102 (2)** (`import()` + `fetch(u,{cache:'reload'})`).
 
 ### L-61 · Glosario del Ingeniero + invariante visual AQUA
 **Regla**: "tal cual" = SIN overlays/velos/scrims sobre la foto (retirar cualquier veil existente); `.aqua-power-scene` (aqua-components.css) cubre SIEMPRE el viewport completo (`position:fixed; inset:0`). Ante ambigüedad visual → preview fiel (L-56) + preguntar. (Origen: `_legacy/CLAUDE-previo.md §9.5/§9.7/§0.1.2`.)
@@ -172,6 +179,10 @@ poda sin pérdida) antes de publicar lo siguiente. El rediseño del candado (avi
 > workflow, preguntarle al servidor, medir un port por su CSS,
 > auditar en paralelo por dimensiones, rotular el dato de demostración. Léela ANTES de declarar algo
 > desplegado, portado o auditado. La hija lleva su propio listado — aquí no se duplican sus IDs.
+
+## 📈 Costuras de datos y Cargabilidad SCADA (L-96, L-113…L-117)
+
+> Lecciones VIVAS aquí (no en `32`): un trigger que pisa lo que otro escribió, y lo aprendido construyendo Cargabilidad SCADA.
 
 ### L-96 · Un trigger que reemplaza un objeto entero borra lo que otro camino escribió
 

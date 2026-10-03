@@ -32,7 +32,7 @@
 | **Importar el Excel real "Salud de Activos"** (la tarea viva del Ingeniero) | `assets/js/domain/importador.js` + `assets/js/data/importar.js` + `admin/importar.html`. 3 hojas; `TPT_Servicio` y `TX_Respaldo` con la cabecera en la **fila 2** (L-72). Proceso → `60-WORKFLOWS` W-13 · historia → `99 §57` y `§69` |
 | **Fichas Técnicas de reposición** (familia CSS `.ftm-`) | `pages/fichas-tecnicas.html` + `assets/js/ui/fichas/*` + dominio puro `assets/js/domain/fichas_*.js` · **archivo por archivo → [`22`](22-ESPACIAL-MODULOS.md)** · estado vivo y cola → [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md) |
 | **Indicadores de calidad** (SAIDI/SAIFI) | `pages/indicadores-calidad.html` + `assets/js/ui/calidad/*` · hoja `INDICADORES-CALIDAD.md` |
-| **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` + dominio `domain/cargabilidad_*.js` (filas del parque → `_parque`; ventana de detalle → `_detalle`) |
+| **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` + dominio `domain/cargabilidad_*.js` (filas del parque → `_parque`; ventana de detalle → `_detalle`); SCADA del seguimiento: `domain/scada_{config,filtros,ranking,violaciones}.js` + `data/seguimiento_scada*.js` + `css/seguimiento-scada.css` (≠ Cargabilidad SCADA, `scada_carga_*` → `22`) |
 | **Cargabilidad SCADA** (`§122`, familia `.cscada`) | `pages/cargabilidad-scada.html` (lista y curvas) + `admin/scada-datos.html` (homologación y carga del mes) · archivo por archivo y colecciones `scada_*` → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` |
 | **Órdenes de Materiales SSEE** (formato IT.05801, familia `.oms-`) | `pages/ordenes-materiales.html` + `assets/js/ordenes-materiales.js` · registro, cédulas y firmas → **[`22`](22-ESPACIAL-MODULOS.md)** · **≠ «Órdenes»** (`pages/ordenes.html`: órdenes de TRABAJO) |
@@ -75,7 +75,7 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 - **Backend**: Firebase (Auth + Firestore + Storage, proyecto `lordpowertransformersmj`) + Cloud Functions (`functions/`) + Vercel para `/api/*` (hoy solo `api/health.js`).
 - **Scripts / herramientas**: `scripts/` — incluye `scripts/migrate/`, `scripts/brain-check.mjs` y `scripts/audit-bloques-pruebas.mjs`. Además `boot-gate.mjs`, `brain-diff.mjs`, `brain-index.mjs`, `brain-archive.mjs`, `dev-server.mjs`, `session-handoff.mjs`.
 - **Docs**: `docs/` = neuronas del cerebro + hojas técnicas del dueño (ver sección final). Las del cerebro anterior están en `_legacy/cerebro-anterior/docs/`.
-- **CI / Deploy**: `.github/workflows/ci.yml` (lint HTML) · `pages.yml` (deploy main → GitHub Pages) · `vercel.json` (`/api`). `sw.js` en raíz es kill-switch (PWA desactivada).
+- **CI / Deploy**: `.github/workflows/ci.yml` (lint HTML + `test:unit` + `test:rules` con emuladores) · `pages.yml` (deploy main → GitHub Pages) · `vercel.json` (`/api`). `sw.js` en raíz es kill-switch (PWA desactivada).
 
 ### 📁 Estructura de carpetas principales
 
@@ -84,13 +84,15 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 | `assets/js/domain/` | Funciones puras de dominio (sin I/O) | Importadas por `data/` y por tests Node |
 | `assets/js/data/` | Data layers Firebase (one-shot + realtime `onSnapshot`) | Importadas por las UIs |
 | `assets/js/admin/` | Controladores de las páginas `admin/*.html` | `<script type="module">` por página |
-| `assets/js/ui/` | Componentes de render por módulo (`pruebas/`, `calidad/`, `cargabilidad/`, `seguimiento/`, `module-shell.js`, `tabs.js`, `contrato-context.js`) | Importados por los shells de página |
+| `assets/js/ui/` | Componentes de render por módulo (`pruebas/`, `calidad/`, `cargabilidad/`, `seguimiento/`, `fichas/`, `cargabilidad-scada/`, `scada-datos/` → `22`; `module-shell.js`, `tabs.js`, `contrato-context.js`, `firma-personal.js`, `importar-gases.js`, `foco-modal.js` (foco accesible de modales)) | Importados por los shells de página |
+| `assets/js/auth/` · `workers/` · `exports/` · `assets/vendor/` | Guards de sesión (`admin-`/`page-`/`session-guard.js`) · Web Worker del importador SCADA · exportadores PDF/XLSX/XLSM · íconos `lucide` locales | Por página / bajo demanda |
 | `assets/css/` | Estilos + sistema AQUA LIGHT | `<link>` por página |
 | `admin/` | UIs de administración (CRUD) | Protegidas por `admin-guard.js` |
 | `pages/` | Páginas públicas/operativas | Protegidas por `page-guard.js` |
 | `functions/` | Cloud Functions (deployable) | `firebase deploy --only functions` |
 | `scripts/migrate/` | Migraciones y tipificaciones de datos | Corre el director con firebase-admin |
 | `tests/` | Suites `node --test` | `npm run test:unit` |
+| `tests-rules/` | Pruebas de reglas Firestore/Storage | `npm run test:rules` (emuladores) |
 
 **⚠️ Reflejo de Frescura (`CLAUDE.md §G.4`):** si mueves/creas/renombras un archivo importante, actualiza esta tabla en el MISMO cambio. Una neurona vieja engaña al próximo "tú" → reproceso/regresión.
 
@@ -132,7 +134,7 @@ Integración cross-módulo: domain puro + idempotencia por marcador + trazabilid
 - `subestaciones/{id}` · `ordenes/{id}` (+ subcol `historial`) · `documentos/{id}` · `muestras/{id}` · `contratos/{cid}` · `suministros/{contratoId_codigo}` (docId compuesto N5, ver `30-LECCIONES`) · `movimientos` · `marcas` · `fallados` · `alertas_config/global` · `alertas_reconocidas/{id}` · `acciones_refrigeracion/{id}` · `umbrales_salud/global` (+ subcol `historial`) · `auditoria` · `importaciones/{jobId}`.
 - `firestore.rules` define además `pruebas_electricas/{id}` (+ subcol `informes/{informeId}` y `diagnostico/{d}`), `contramuestras`, `monitoreo_intensivo`, `parametros_sistema`, `subactividades`/`macroactividades`/`causantes` (catálogos), `propuestas_reclasificacion_fur`, `gate_codes/{hash}`, `correcciones`, `suministros_config`. NO existe bloque `match /catalogos` en rules (el `data/catalogos.js` es genérico por nombre de colección).
 
-Detalle completo → `docs/MODELO-DATOS-v2.md`.
+Documento transformadores v2 y colecciones F17–F37 (al 2026-04-20) → `docs/MODELO-DATOS-v2.md`. Lo posterior (`scada_*`, `firmas*`, `fichas_*`, `ordenes_materiales*`, `ultima_dga`) → `22` y `firestore.rules`.
 
 ---
 
