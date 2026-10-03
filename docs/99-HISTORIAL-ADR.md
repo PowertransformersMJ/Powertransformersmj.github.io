@@ -5792,3 +5792,47 @@ Archivos: `domain/scada_carga_dga_textos_ppm.js`, `tests/scada_carga_dga_textos_
 **134.3–134.4 Verificación.** Vista previa con T2 (COR), T3 (PRA) y D2 (SRS). Producción `1910657` (CI y Deploy verdes): en su Chrome, PRA muestra los dos triángulos lado a lado; flecha de 36 × 63 px a escala de pantalla; sin errores de consola. 2289 pruebas. Sin revisión adversarial: es un cambio de dibujo verificado a ojo en los 3 casos.
 
 Archivos: `ui/cargabilidad-scada/panel-duval.js`, `css/cargabilidad-scada.css`, `domain/scada_carga_termico.js` (campo `destino`), `tests/scada_carga_termico.test.js`.
+
+## 135. ADR-135 — El sitio en celular y tablet: el menú ☰ por fin abre, la barra cabe y lo ancho se desplaza ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «Ingreso a la página pero el sidebar no se logra apreciar desde mi celular. Ajusta que la página se pueda apreciar desde
+> cualquier dispositivo sea celular tablet Pc etc». NO revisado externamente.
+
+**135.1 Causa raíz.**
+- `dd9b5f6` (16-ago) dejó el botón ☰ y el CSS del cajón, y su mensaje decía que el panel deslizante funcionaba. Pero ningún JS lo abría: `sb-open` existía solo en CSS. Por debajo de 1024 px las 66 páginas quedaban SIN menú.
+- La barra superior a 375 px: `.tb-lead` sin estilo hacía que la marca saltara de línea sobre el contenido. `.tb-search{min-width:240px}` sacaba la campana, el perfil y «Cerrar sesión» de la pantalla (desde el píxel 492).
+- Contenido: el `body` recorta en horizontal. Un barrido de 59 páginas a 375 px encontró 24 con contenido cortado y sin forma de verlo: tablas sin caja desplazable, cuadrículas `1fr` estiradas por una gráfica y un estilo en línea que no colapsaba.
+
+**135.2 Solución.**
+- `aqua-shell.js` `bindMenu()`:
+  - abre y cierra con ☰; el velo inyectado, Escape y elegir un destino también cierran;
+  - el foco va al ítem activo, se retiene con Tab y vuelve a ☰;
+  - el resto del `body` queda `inert` mientras el menú está abierto (lectores de pantalla del celular);
+  - con `#tab=` de la misma página el foco pasa al contenido;
+  - se cierra al pasar a más de 1024 px.
+- Marca en `span.tb-brand-txt` y campana con clase `.tb-bell`.
+- `aqua-components.css`, en ≤1024: el cajón y el velo empiezan bajo la barra (`top:64px`); el cajón es casi opaco y sin el encabezado de marca; la barra usa `auto | minmax(0,1fr) | auto` y la búsqueda se encoge.
+- En ≤720: solo el logo (el nombre, visualmente oculto), sin ⌘K ni rol, `main` con 12 px de relleno, y:
+  - `main :has(> table…)` desplazable con `!important`;
+  - `main > table` desplazable;
+  - `canvas` e `input[file]` a `max-width:100%`;
+  - `.tabs` desplazable.
+- En ≤359 se oculta la campana. `.grid-2/3/4` en ≤1024, `.chart-grid` (suministros) y `.scada-shell .grid-2` pasan a `minmax(0,1fr)`.
+- `seguimiento-cargabilidad.html`: el estilo en línea pasa a la clase `grid2-ancha`.
+
+**135.3–135.4 Verificación.**
+- Servidor de vista previa que quita el guardián e inyecta los stubs en TODAS las páginas, con iframes de 375 y 768 px. Mide lo que sale del ancho sin caja desplazable; cero lecturas a Firestore.
+- Resultado: 59/59 sin desbordes en celular y tablet (queda un borde interno de 1 px en una gráfica de Plotly).
+- En 375: ☰ abre y queda a la vista; el velo, Escape, el enlace y Tab funcionan; `inert` en `main` y nunca en la barra.
+- En PC la marca queda idéntica (194 px; «TRANSPOWER» a 94 px) y el menú lateral fijo no cambia.
+- El inicio de sesión en celular se ve completo.
+- Revisión adversarial de 2 lentes con verificación: 4 reales corregidos y 1 refutado (el cajón sobre la ficha: los modales que retienen foco van en z 300).
+- Producción `e810c89` (CI y Deploy verdes) sirve los archivos nuevos.
+- La validación en celular queda en manos del Ingeniero: su Chrome tenía la sesión cerrada y no se inicia sesión por él.
+
+**135.5–135.8.**
+- Anti-patterns evitados: MutationObserver global para envolver tablas (§3.5); barrer producción (lecturas, free-tier); `display:block` en toda tabla (las que cabían se encogían).
+- Archivos: `assets/js/aqua-shell.js`, `assets/css/aqua-components.css`, `assets/css/suministros.css`, `assets/css/seguimiento-scada.css`, `assets/css/seguimiento-cargabilidad.css`, `pages/seguimiento-cargabilidad.html`.
+- Doctrina: L-121.
+- Verificado sano: el cajón no puede abrirse sobre los modales con foco retenido (van en z 300 sobre la barra); los modales admin (z 100) no capturan el teclado.
+- Bóveda: `2026-10-02-sitio-responsive` (con el servidor y el barrido reutilizables).

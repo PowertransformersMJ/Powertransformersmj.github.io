@@ -25,7 +25,7 @@
 | Guard de sesión / roles | `assets/js/auth/session-guard.js` + `page-guard.js` + `admin-guard.js` + `domain/decision_perfil.js` (`§116`) |
 | Reglas de seguridad / índices Firestore / Storage | `firestore.rules` · `firestore.indexes.json` · `storage.rules` (deploy manual vía firebase CLI — flujo ADR-005, ver Convenciones) |
 | Cloud Functions | `functions/index.js` — 4 exports: `onMuestraCreate`, `cronAlertasDiarias`, `extraerPruebasElectricasIA`, `narrativaTendenciaIA` · el email sale por la Firebase Extension "Trigger Email", NO por código propio |
-| Sistema de diseño visual AQUA LIGHT | `assets/css/aqua-tokens.css` + `aqua-components.css` + `assets/js/aqua-shell.js` |
+| Sistema de diseño visual AQUA LIGHT | `assets/css/aqua-tokens.css` + `aqua-components.css` + `assets/js/aqua-shell.js` (barra + menú; cajón ☰ ≤1024 `bindMenu`, reglas de celular ≤720 — `99 §135`) |
 | Foto de fondo | `assets/img/aqua/substation-photo.webp` |
 | Migraciones / scripts de datos | `scripts/migrate/*.js` (`tipificar-suministros-fan-db.js`, `v1-to-v2-transformadores.js`) |
 | Tests | `tests/*.test.js` (el conteo vivo lo lleva `05`) |

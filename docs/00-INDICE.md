@@ -69,6 +69,7 @@
 | §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5707 |
 | §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5753 |
 | §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5779 |
+| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5796 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
