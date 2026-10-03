@@ -165,9 +165,9 @@
                 title="Menú de navegación" aria-label="Abrir menú de navegación">
           <i data-lucide="menu"></i>
         </button>
-        <a href="${u('home.html')}" class="tb-brand">
+        <a href="${u('home.html')}" class="tb-brand" aria-label="Inicio · SGM TRANSPOWER">
           <span class="logo"><i data-lucide="zap"></i></span>
-          SGM · <span class="b">TRANSPOWER</span>
+          <span class="tb-brand-txt">SGM · <span class="b">TRANSPOWER</span></span>
         </a>
       </div>
       <div class="tb-search">
@@ -177,7 +177,7 @@
       </div>
       <div class="tb-right">
         <span class="tb-role" id="tbRole" hidden></span>
-        <button class="btn btn--ghost btn--icon" type="button" title="Notificaciones" aria-label="Notificaciones"><i data-lucide="bell"></i></button>
+        <button class="btn btn--ghost btn--icon tb-bell" type="button" title="Notificaciones" aria-label="Notificaciones"><i data-lucide="bell"></i></button>
         <div class="tb-avatar" id="tbAvatar" title="Perfil">··</div>
         <button class="btn btn--ghost btn--icon" type="button" id="tbLogout" title="Cerrar sesión" aria-label="Cerrar sesión"><i data-lucide="log-out"></i></button>
       </div>`;
@@ -452,6 +452,83 @@
     });
   }
 
+  /* ─── Cajón del menú en tablet y celular (≤ 1024 px) ─────────
+     El botón ☰ y el estilo del cajón existían desde dd9b5f6, pero NADA abría el
+     cajón: por debajo de 1024 px el sitio quedaba sin menú (reportado por el
+     Ingeniero desde su celular, 2026-10-02, `99 §135`). Abre y cierra con ☰, se
+     cierra con el velo, con Escape y al elegir un destino; devuelve el foco al
+     botón y lo retiene dentro del cajón mientras está abierto: con Tab y, para
+     los lectores de pantalla del celular (que no usan Tab), dejando `inert` el
+     resto de la página. */
+  function bindMenu() {
+    const btn = document.getElementById('tbMenu');
+    const sb = document.getElementById('aquaSidebar');
+    if (!btn || !sb || btn.dataset.menuListo) return;
+    btn.dataset.menuListo = '1';
+    let velo = document.querySelector('.sb-backdrop');
+    if (!velo) {
+      velo = document.createElement('div');
+      velo.className = 'sb-backdrop';
+      velo.setAttribute('aria-hidden', 'true');
+      document.body.appendChild(velo);
+    }
+    const mq = window.matchMedia ? window.matchMedia('(max-width: 1024px)') : { matches: true };
+    const abierto = () => document.body.classList.contains('sb-open');
+    const enfocables = () => Array.prototype.filter.call(
+      sb.querySelectorAll('a[href], button:not([disabled])'), (e) => e.offsetParent !== null);
+    // Todo lo que no es la barra, el cajón ni el velo queda inerte mientras el cajón está abierto.
+    const fondo = () => Array.prototype.filter.call(document.body.children,
+      (e) => e !== sb && e !== velo && !e.classList.contains('tb') && e.tagName !== 'SCRIPT');
+    function abrir() {
+      fondo().forEach((e) => { if (!e.hasAttribute('inert')) { e.setAttribute('inert', ''); e.dataset.sbInerte = '1'; } });
+      document.body.classList.add('sb-open');
+      btn.setAttribute('aria-expanded', 'true');
+      btn.setAttribute('aria-label', 'Cerrar menú de navegación');
+      const activo = sb.querySelector('.sb-item.is-active') || enfocables()[0] || sb;
+      setTimeout(() => {
+        try { activo.focus(); if (activo.scrollIntoView) activo.scrollIntoView({ block: 'nearest' }); } catch (_) {}
+      }, 60);
+    }
+    function cerrar(devolverFoco) {
+      if (!abierto()) return;
+      document.querySelectorAll('[data-sb-inerte]').forEach((e) => { e.removeAttribute('inert'); delete e.dataset.sbInerte; });
+      document.body.classList.remove('sb-open');
+      btn.setAttribute('aria-expanded', 'false');
+      btn.setAttribute('aria-label', 'Abrir menú de navegación');
+      if (devolverFoco) { try { btn.focus(); } catch (_) {} }
+    }
+    btn.addEventListener('click', () => (abierto() ? cerrar(true) : abrir()));
+    velo.addEventListener('click', () => cerrar(true));
+    document.addEventListener('keydown', (e) => {
+      if (!abierto()) return;
+      if (e.key === 'Escape') { e.preventDefault(); cerrar(true); return; }
+      if (e.key !== 'Tab') return;
+      // Foco retenido: el tabulador recorre el botón ☰ y el cajón, no la página de detrás.
+      const lista = [btn].concat(enfocables());
+      const i = lista.indexOf(document.activeElement);
+      if (e.shiftKey && i <= 0) { e.preventDefault(); lista[lista.length - 1].focus(); }
+      else if (!e.shiftKey && (i === -1 || i === lista.length - 1)) { e.preventDefault(); lista[0].focus(); }
+    });
+    // Elegir un destino cierra el cajón. Si es la MISMA página (solo cambia la pestaña, #tab=…), no hay recarga: el
+    // foco pasa al contenido para no quedar en un enlace que se oculta.
+    sb.addEventListener('click', (e) => {
+      const a = e.target.closest('a[href]');
+      if (!a || !mq.matches) return;
+      const misma = a.pathname === location.pathname && a.search === location.search;
+      cerrar(false);
+      if (misma) {
+        const main = document.querySelector('main.app-main') || document.querySelector('main');
+        if (main) {
+          if (!main.hasAttribute('tabindex')) main.setAttribute('tabindex', '-1');
+          setTimeout(() => { try { main.focus({ preventScroll: true }); } catch (_) {} }, 0);
+        }
+      }
+    });
+    const alCambiar = () => { if (!mq.matches) cerrar(false); };
+    if (mq.addEventListener) mq.addEventListener('change', alCambiar);
+    else if (mq.addListener) mq.addListener(alCambiar);
+  }
+
   /* ─── Sesión + roles ───────────────────────────────────── */
   function applySession(sess) {
     if (!sess) return;
@@ -516,6 +593,7 @@
     injectSkipLink();   // el ÚLTIMO que inserta al principio del <body> → queda primero
     markActive();
     bindTreeToggle();
+    bindMenu();
     bindLogout();
     bindKeys();
 
