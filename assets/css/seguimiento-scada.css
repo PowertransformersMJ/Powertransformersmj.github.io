@@ -266,7 +266,7 @@
 /* GRID LAYOUTS */
 .scada-shell .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
 .scada-shell .grid-3 { display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 14px; margin-bottom: 14px; }
-@media (max-width: 1100px) { .scada-shell .grid-2, .scada-shell .grid-3 { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .scada-shell .grid-2, .scada-shell .grid-3 { grid-template-columns: minmax(0, 1fr); } } /* §135: se encoge al ancho de la pantalla */
 
 /* CARDS */
 .scada-shell .card { background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }

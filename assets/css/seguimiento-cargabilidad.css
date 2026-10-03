@@ -203,6 +203,8 @@
 .carga-shell .kpi .s { font-size: 11px; color: var(--ink2); }
 
 .carga-shell .grid2 { display: grid; grid-template-columns: 1.5fr 1fr; gap: 18px; }
+/* La 2.ª fila de dos columnas (antes con estilo en línea, que impedía pasar a una columna en celular — `99 §135`) */
+.carga-shell .grid2.grid2-ancha { grid-template-columns: 1.7fr 1fr; }
 .carga-shell .panel { padding: 20px 22px; }
 .carga-shell .panel h3 {
   font-size: 15px; font-weight: 700; margin-bottom: 14px;
@@ -363,7 +365,7 @@
 
 @media (max-width: 1100px) {
   .carga-shell .kpis  { grid-template-columns: repeat(3, 1fr); }
-  .carga-shell .grid2 { grid-template-columns: 1fr; }
+  .carga-shell .grid2, .carga-shell .grid2.grid2-ancha { grid-template-columns: minmax(0, 1fr); }
 }
 @media (max-width: 680px) {
   .carga-shell .kpis { grid-template-columns: repeat(2, 1fr); }

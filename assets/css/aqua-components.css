@@ -209,6 +209,9 @@ body.aqua *, body.aqua *::before, body.aqua *::after {
 .tb-nav a:hover { background: rgba(0,40,90,.05); color: var(--ink-1); opacity: 1; }
 .tb-nav a.is-active { background: rgba(0,122,255,.14); color: var(--brand-deep); }
 .tb-nav a svg, .tb-nav a i { width: 15px; height: 15px; }
+.tb-lead { display: flex; align-items: center; gap: 10px; min-width: 0; }
+/* El nombre va en un span (para ocultarlo en celular): conserva los 12 px entre «SGM ·» y «TRANSPOWER» de siempre */
+.tb-brand-txt { display: inline-flex; align-items: center; gap: 12px; }
 .tb-right { display: flex; align-items: center; gap: 10px; }
 
 .tb-search {
@@ -716,6 +719,52 @@ body.aqua .sb-item.is-active {
   body.sb-open { overflow: hidden; }
 
   .app-main { margin-left: 0; padding: 76px 24px 48px; }
+
+  /* `99 §135` — El cajón y el velo empiezan DEBAJO de la barra superior: el botón ☰ sigue a la vista y cierra el
+     cajón. El cajón casi opaco: sobre el contenido de la página, el vidrio translúcido no se leía. */
+  .sb { top: 64px; padding-top: 12px; }
+  /* La marca ya está en la barra superior; en el cajón su encabezado (absoluto) tapaba «Parque · Inicio» */
+  .sb .sb-brand-head { display: none; }
+  body.sb-open .sb { background: rgba(250, 252, 255, .94); }
+  .sb-backdrop { top: 64px; }
+  /* La barra superior cabe en cualquier ancho: la búsqueda se encoge en vez de empujar la campana, el perfil y
+     «Cerrar sesión» fuera de la pantalla (antes empezaban en el píxel 492 de un celular de 375). */
+  .tb { gap: 12px; grid-template-columns: auto minmax(0, 1fr) auto; }
+  .tb-search { min-width: 0; }
+  .tb-search input { min-width: 0; width: 100%; }
+}
+
+/* Celular: solo el logo de la marca (el nombre sigue para el lector de pantalla), sin atajo ⌘K ni el rótulo del rol */
+@media (max-width: 720px) {
+  .tb { padding: 12px; gap: 8px; }
+  .tb-brand-txt {
+    position: absolute; width: 1px; height: 1px; overflow: hidden;
+    clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
+  }
+  .tb-search { padding: 7px 10px; }
+  .tb-search kbd, .tb-role { display: none; }
+  .tb-right { gap: 4px; }
+  .app-main { padding: 72px 12px 40px; }
+}
+@media (max-width: 359px) {
+  .tb .tb-bell { display: none; }
+}
+
+/* `99 §135` — Celular: lo ancho se desplaza de lado en vez de quedar CORTADO (el `body` recorta lo que se sale: en el
+   barrido de las 66 páginas a 375 px, 24 tenían tablas o tarjetas que no se podían ver). La caja que CONTIENE una tabla
+   que no vive ya en una caja desplazable se vuelve desplazable; la tabla sigue siendo tabla y llena su ancho (volverla
+   `display:block` la encogía al contenido — revisión adversarial). */
+@media (max-width: 720px) {
+  main :has(> table:not(:where(.cs-tabla-caja, .table-scroll, .tbl-wrap, .ftm-tabla-scroll, .pe-tabla-scroll, .ftm-rmx-wrap, .ft-wrap) table)) {
+    /* !important: varias cajas de tabla (p. ej. .table-wrap) recortan con overflow:hidden para redondear esquinas; un
+       desplazable también recorta en las esquinas redondeadas, así que solo cambia que ahora se puede deslizar */
+    max-width: 100% !important; min-width: 0 !important; overflow-x: auto !important; -webkit-overflow-scrolling: touch;
+  }
+  /* Tabla suelta directamente en <main> (páginas de administración): sin caja propia, la tabla misma se desplaza */
+  main > table { display: block; max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  main input[type="file"], main canvas { max-width: 100%; }
+  /* Una fila de pestañas más ancha que la pantalla se desplaza de lado */
+  main .tabs { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1108,7 +1157,8 @@ body.aqua .sb-item.is-active {
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
 .grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
-@media (max-width: 1024px) { .grid-2,.grid-3,.grid-4 { grid-template-columns: 1fr; } }
+/* minmax(0, 1fr): una sola columna que se ENCOGE al ancho de la pantalla; con `1fr` una gráfica ancha la estiraba (`99 §135`) */
+@media (max-width: 1024px) { .grid-2,.grid-3,.grid-4 { grid-template-columns: minmax(0, 1fr); } }
 
 /* ─── HEALTH RING ─────────────────────────────────────────── */
 .hring { position: relative; width: 120px; height: 120px; }
