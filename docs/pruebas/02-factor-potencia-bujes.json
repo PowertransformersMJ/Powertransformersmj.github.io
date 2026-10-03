@@ -32,7 +32,7 @@
       { "norma": "IEEE C57.19.01 / Doble", "umbral": "≤0.5% bueno · 0.5–1 investigar · >1 crítico", "tipo": "orientativa; ΔC1 vs placa manda en seguridad" }
     ],
     "pendiente_de_validar": {
-      "⚠️_banda_C1": "La banda C1 vs placa (±5–10%) sigue 'verificar' (TODO-08, lobe 49)."
+      "⚠️_banda_C1": "La banda C1 vs placa (±5–10%) sigue 'verificar' (TODO-04, lobe 49)."
     }
   },
 
