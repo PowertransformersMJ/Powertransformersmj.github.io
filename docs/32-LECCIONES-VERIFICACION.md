@@ -335,8 +335,8 @@ nunca a mano; (3) si ya se le dijo al dueño algo falso, se corrige en el mismo 
 **Cicatriz** (`99 §129`): la lista marcaba «sobrecarga sostenida» con el resumen en bruto del mes y el detalle con la
 serie limpia: 10 marcas falsas en 8 meses (GBT, PBN, MAJ). **Regla**: (1) antes de decidir con un resumen, demostrar con
 datos reales que equivale a la fuente y DÓNDE deja de equivaler (aquí: máx > 3 × A, y el medio paso del redondeo);
-(2) el propio resumen debe poder decir «no sé» — ese caso va a la fuente, con tope de lecturas; (3) «no se pudo leer»
-es «por confirmar», nunca «no». **Gate**: `tests/scada_carga_sostenida.test.js` + [HONOR].
+(2) el propio resumen debe poder decir «no sé» — ese caso va a la fuente, con tope de lecturas; (3) una lectura que
+falla no es un «no» → **L-109** (tres estados); aquí queda como «por confirmar». **Gate**: `tests/scada_carga_sostenida.test.js` + [HONOR].
 
 
 ### L-120 · Una foto de antes/después compara VALORES, no texto: el servidor devuelve los mapas en otro orden
@@ -353,5 +353,12 @@ común (SHA-1 de líneas canónicas), no con el mismo código que escribió. **G
 fuera»; existían el botón y el CSS, pero NINGÚN código abría el cajón. Mes y medio sin menú en celular y tablet hasta
 que el Ingeniero lo vio en su teléfono. **Regla**: (1) lo que solo se ve en un ancho (≤1024, ≤720) se verifica EN ese
 ancho, tocando el control, no leyendo el diff; (2) antes de decir que algo responsivo funciona, se barre el sitio entero
-con un medidor (iframes de 375/768 px sobre la vista previa con stubs; `bóveda 2026-10-02-sitio-responsive`); (3) una
-clase de estado (`sb-open`) que solo existe en CSS y en ningún JS es una señal de código muerto. **Gate**: [HONOR].
+con un medidor (iframes de 375/768 px sobre la vista previa con stubs; `bóveda 2026-10-02-sitio-responsive`; banco pariente: **L-92**); (3) una
+clase de estado (`sb-open`) que solo existe en CSS y en ningún JS es una señal de código muerto. **Gate**: `tests/shell_menu_estado.test.js` (punto 3) + [HONOR] (1-2).
+
+### L-122 · CI o Deploy en rojo solo por la prueba de velocidad del Diagrama Operativo: relanzar, no subir el umbral
+**Disparador**: un trabajo de CI o Deploy falla y el ÚNICO rojo es `tests/fichas_diagrama_operativo_blindaje.test.js` «miles
+de definiciones de columnas» (~1,6 s > `RAPIDO` 1500 ms en el runner de GitHub). · **Cicatriz** (`99 §119.9`, `§124`, `§136`):
+4 rojos entre 09-30 y 10-02, siempre con el mismo árbol verde en otro intento; el guardián busca el desastre de 5-23 s, no 1,6 s.
+· **Receta**: relanzar solo el trabajo fallido (`gh run rerun <id> --failed`) tras comprobar que el rojo era ESE test; NO subir
+el umbral ni saltarlo (decisión del Ingeniero 2026-10-02, antes TODO-68). Si falla otro test o pasa de ~3 s, es regresión. [HONOR]

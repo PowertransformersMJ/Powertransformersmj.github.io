@@ -45,7 +45,7 @@
       { "norma": "MO.00418 por clase", "umbral": "⚠️ verificar (edición del director)", "tipo": "verificar" }
     ],
     "pendiente_de_validar": {
-      "⚠️_MO00418": "Umbral por clase MO.00418 sigue 'verificar' (TODO-08).",
+      "⚠️_MO00418": "Umbral por clase MO.00418 sigue 'verificar' (TODO-04).",
       "⚠️_correccion_temperatura": "La corrección a Ts depende de tener T del ensayo; sin T → declarar, no inventar."
     }
   },

@@ -80,8 +80,8 @@ Los tests (266 al cierre de v2.0.0) cubren:
 
 Mapa completo de navegación (leer en este orden ante cualquier duda):
 
-1. [`CLAUDE.md`](./CLAUDE.md) — **contrato funcional** · §0 permisos push · §7.1 inventario del repo · §7.2 cómo continuar · §5 plan histórico F0–F37.
-2. [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — mapa de código por capa (dominio / data / UI / rules / tests). Si buscas "dónde está X", empieza aquí.
+1. [`CLAUDE.md`](./CLAUDE.md) — **contrato funcional** · §0 mapa de nodos · §2 git · §7 cómo retomar.
+2. [`docs/ARQUITECTURA.md`](./docs/ARQUITECTURA.md) — mapa HISTÓRICO (v2.0.8, mayo 2026). Si buscas "dónde está X", empieza por [`docs/20-MEMORIA-ESPACIAL.md`](./docs/20-MEMORIA-ESPACIAL.md).
 3. [`docs/MODELO-DATOS-v2.md`](./docs/MODELO-DATOS-v2.md) — diccionario completo del shape v2 (secciones, `salud_actual`, subcolecciones, §9 con todas las colecciones F17–F37).
 4. [`docs/OPERACIONES.md`](./docs/OPERACIONES.md) — runbook de bootstrap, uso diario por rol, troubleshooting.
 5. [`docs/DEPLOY-FUNCTIONS.md`](./docs/DEPLOY-FUNCTIONS.md) — despliegue de Cloud Functions F32 (firebase login, secret Resend, costos estimados).

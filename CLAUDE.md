@@ -7,8 +7,7 @@
 > información vive en su nodo específico (ver §0). El detalle se lee on-demand.
 >
 > **Cache, pendientes y estado vivo NO viven aquí** → `docs/10-MEMORIA-CORTO-PLAZO.md`.
-> Cerebro instalado 2026-07-18 (migración desde el cerebro v1.0.0 vía brain-kit v1.0, ADR-051).
-> Lo anterior (CLAUDE viejo, neuronas, kernel) se preserva íntegro en `_legacy/cerebro-anterior/`.
+> Origen del cerebro y lo preservado en `_legacy/cerebro-anterior/` → `99 §51`.
 
 ---
 
@@ -33,7 +32,7 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | ⚡ **Corto Plazo (WIP)** | `docs/10-MEMORIA-CORTO-PLAZO.md` + hija `11-PENDIENTES-FRIOS.md` | ✅ Siempre (la hija ❌ on-demand) | Sprint actual y pendientes VIVOS. Los fríos (decisiones de arquitectura, validaciones diferidas) → la hija `11`. |
 | 🗺️ **Espacial** | `docs/20-MEMORIA-ESPACIAL.md` + hijas `21-ESPACIAL-HOJAS.md` · `22-ESPACIAL-MODULOS.md` | ❌ on-demand | Trigger de Desorientación: dónde vive un componente, flujos, schema de datos, hojas del dueño (`21`), Fichas/Órdenes/Firmas (`22`). |
 | 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` + hijas `31-LECCIONES-IA.md` · `32-LECCIONES-VERIFICACION.md` · `33-LECCIONES-HARNESS.md` · `34-LECCIONES-PRUEBAS-ELECTRICAS.md` · `35-LECCIONES-SEGURIDAD.md` | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas. Hijas (§G.5): `31` IA/Claude-API/CF · `32` verificar antes de declarar algo desplegado o auditado · `33` entorno, consola y workflows · `34` Pruebas Eléctricas · `35` seguridad y datos personales. |
-| 🗂️ **Índice sináptico** | `docs/00-INDICE.md` | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |
+| 🗂️ **Índice sináptico** | `docs/00-INDICE.md` + hija `00a` (§1–§80) | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |
 | 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un §. NUNCA completo — usa offset/limit. |
 | 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-13 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
 | 🛰️ **Consejo Externo** | `docs/15-CONSEJO-EXTERNO.md` | ❌ on-demand | Trigger de Decisión Fuerte: crítica adversarial de un provider de OTRA familia (config + tiers ahí). |
@@ -41,7 +40,7 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | ⚡🔌 **Transformadores (equipo)** | `docs/50-TRANSFORMADORES-POTENCIA.md` | ❌ on-demand | Lóbulo de dominio del EQUIPO: tipo de transformador, grupo vectorial, cálculos nominales. |
 | 🛠️ **Skills externas** | `~/.claude/skills/` + `skills/` + tool Skill | ❌ on-demand | Expertise portable de método. NO es neurona — recurso paralelo. **Catálogo → `docs/skills-inventory.md`**. |
 
-**Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `20-ESPACIAL`.
+**Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `21`.
 
 ### 🏆 Regla de oro anti-saturación (CÓMO leer el Largo Plazo)
 
@@ -60,7 +59,7 @@ NUNCA leas `docs/99-HISTORIAL-ADR.md` completo (muerte por contexto). En su luga
 - **Proyecto**: **SGM · TRANSPOWER** — plataforma de seguimiento, planificación y control del mantenimiento de transformadores de potencia de AFINIA (CARIBEMAR · Grupo EPM) en el Caribe colombiano. Sin ánimo de lucro; TODO sobre tiers gratuitos. Norma activa: **MO.00418.DE-GAC-AX.01 Ed. 02**. Misión, en sus palabras: *"vamos a ir afinando cada detalle que nos pueda generar mayor valor"*.
 - **Dueño**: **Miguel Jimenez — llámalo "Ingeniero"**. Líder de Transformadores de Potencia; ingeniero electricista y electrónico, especialista en gestión de proyectos, maestría en energías renovables en curso. **NO programa**: él dirige, Claude ejecuta TODO el código. Trato: **tuteo respetuoso, en español, sin jerga** (traduce lo técnico a impacto de negocio/mantenimiento).
 - **Stack**: HTML5 + CSS (variables, sistema de diseño **AQUA LIGHT**) + **JavaScript ES6+ vanilla modular** (sin framework, sin bundler). Dominio puro en `assets/js/domain/` (testable sin Firebase) + data layer en `assets/js/data/`. Tests `npm run test:unit` + lint `npm run lint:html` (el conteo vivo lo lleva `05`). Chart.js (CDN) · Leaflet + OSM.
-- **Hosting / Deploy**: **GitHub Pages** (auto-deploy de `main`) · **Vercel** Hobby para `/api/*` · **Firebase** `lordpowertransformersmj` (Auth + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Claude ejecuta los `firebase deploy` y los anuncia en el MISMO turno (L-09). Detalle → `20-ESPACIAL`.
+- **Hosting / Deploy**: **GitHub Pages** (auto-deploy de `main`) · **Vercel** Hobby para `/api/*` · **Firebase** `lordpowertransformersmj` (Auth + Firestore + Storage) + **Cloud Functions** (`southamerica-east1`). Deploys: los ejecuta Claude y los anuncia en el MISMO turno (§2, L-09). Detalle → `20-ESPACIAL`.
 - **Áreas del repo**: login `index.html` · sitio interno `home.html` + `pages/*` (`session-guard`) · panel `admin/*` (rol `admin`) · `api/*` · `functions/`. Roles `admin`/`tecnico`; verdad en `/usuarios/{uid}`. Detalle → `20-ESPACIAL`.
 - **Reglas del dueño (F3a)**: valida por commit con un resumen claro (qué/por qué/riesgo); *"toma la mejor decisión enfocándote siempre en el objetivo"*; repo PÚBLICO — cero secretos en el cerebro, siempre.
 - **Entorno**: macOS + zsh · paraguas `~/Desktop/GitHub-MJ/` (este repo + la hermana `brain-private/`). Esa hermandad es ESTRUCTURAL: de ella cuelgan el `archiveDir` y el kernel canónico (`99 §58`).
@@ -81,7 +80,7 @@ Encabezado `## NN. ADR-NNN — <título>` + cita del cliente si reportó, y 7 pu
 **NN.1** Causa raíz (RCA §3.3, verificada leyendo código) · **NN.2** Solución estructural · **NN.3** No-regresión (IDs/funciones/callsites intactos, build OK) · **NN.4** Tests/verificación · **NN.5** Anti-patterns evitados (§3) · **NN.6** Archivos modificados/INTACTOS · **NN.7** Doctrina aplicada · **NN.8** *Verificado sano / no re-auditar* (lo que la deliberación DESPEJÓ y sus falsos positivos con su porqué — sin esta casilla se pierde lo más caro de producir).
 
 ### Reglas git
-- **Política del dueño (F3a 2026-07-18, ADR-051 — reemplaza la regla anterior "el push lo hace el director")**: **Claude ejecuta commit + push + merge + TODOS los deploys.** Validación por commit: antes/al commitear, Claude presenta al Ingeniero un resumen claro (qué cambia, por qué, riesgo, rollback) — el Ingeniero no programa, así que sin jerga. Rama de trabajo `DESARROLLO-/-PROYECTO-MJ` → merge a `main` (producción). **NUNCA force-push a `main`.**
+- **Política del dueño (ADR-051)**: **Claude ejecuta commit + push + merge + TODOS los deploys.** Validación por commit: antes/al commitear, Claude presenta al Ingeniero un resumen claro (qué cambia, por qué, riesgo, rollback) — el Ingeniero no programa, así que sin jerga. Rama de trabajo `DESARROLLO-/-PROYECTO-MJ` → merge a `main` (producción). **NUNCA force-push a `main`.**
 - `git add` ESPECÍFICO (NUNCA `-A`/`.`), footer `Co-Authored-By: Claude <MODELO REAL que trabajó> <noreply@anthropic.com>` (Fable 5 / Opus 5 / … — firmar con otro es falsear la autoría, §3.3), commits separados por tipo (código vs cerebro), estilo `feat(area): desc`.
 - NUNCA `--amend`/`--no-verify`/`--no-gpg-sign` sin pedido explícito. NUNCA commitear secrets (`.env`, credenciales, service accounts, tokens) ni `.claude/settings.local.json` ni `Debug/` ni `450108/` (PDFs reales de cliente — repo público).
 - Al cerrar un pendiente, marcar su `TODO-NN` como ✅ + link al §X. Mantén este CLAUDE.md liviano.

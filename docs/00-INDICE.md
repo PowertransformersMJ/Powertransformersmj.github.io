@@ -68,8 +68,9 @@
 | §131 | ADR-131 — **Cargabilidad SCADA**: triángulo de Duval hoy y con más carga + carga «solo gases» + regla vieja de Duval corregida | 5630 |
 | §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5707 |
 | §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5753 |
-| §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5779 |
-| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5796 |
+| §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5783 |
+| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5804 |
+| §136 | ADR-136 — **Cerebro**: mantenimiento minucioso (auditoría de 5 lentes, 55 confirmados) · TODO-68 → L-122 · prueba del ☰ | 5848 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -98,9 +99,13 @@
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
 | 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82 en adelante` + **L-103** |
-| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · marca «sostenida» de la lista (resumen en bruto vs serie limpia) → `§129` + L-119 · triángulo de Duval por activo, ppm `ultima_dga`, márgenes de carga → `§131` · gases con más carga, punto caliente IEC 60076-7 → `§132` (bóveda `2026-10-02-duval-proyeccion`) · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
+| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · marca «sostenida» de la lista (resumen en bruto vs serie limpia) → `§129` + L-119 (bóveda `2026-10-02-marca-sostenida`) · triángulo de Duval por activo, ppm `ultima_dga`, márgenes de carga → `§131` (foto antes/después de una carga: comparar valores, no texto → `§131.9` + L-120) · margen en ppm y criterio «no firme» → `§131.10` · gases con más carga, punto caliente IEC 60076-7 → `§132` · textos del panel DGA con/sin ppm (`scada_carga_dga_textos_ppm.js`; el catálogo no se edita) → `§133` · triángulo «con más carga» aparte del de hoy → `§134` (bóveda `2026-10-02-duval-proyeccion`) · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
 | 🪟 Ventana de detalle de Cargabilidad (tabla vieja) · una ventana fija dentro de un iframe que no se ve · retirar exportaciones con caché | `99 §123`, `§124` + L-115, L-116 · bóveda `2026-10-01-detalle-cargabilidad` |
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
+| 📱 El sitio en celular o tablet: el menú ☰ no abre, la barra no cabe, una tabla o gráfica se corta a 375/768 px · tocar `aqua-shell.js` o `aqua-components.css` | `99 §135` + `32` **L-121** · barrido reutilizable (servidor con stubs + iframes de 375/768) → bóveda `2026-10-02-sitio-responsive/crudos/` |
+| La zona de Duval de una muestra nueva o del motor de salud cambió o no cuadra (`dga_diagnostico.js` · `duvalTriangle1`) | `99 §131` (regla vieja corregida en `ba117cf`: delega en `zonaDuval1` de `domain/dga_duval.js`; cambia 6 equipos; lo ya guardado no se toca) |
+| ¿Volver a auditar Fichas, el escapado de HTML, la doctrina CSS o las reglas de Storage? | ANTES, lo ya DESPEJADO: casillas `NN.8` (`§66.8`, `§68.8`, `§73.8`, `§75.8`) + crudo de la bóveda (23 refutados: mecanismo cierto, consecuencia falsa) |
+| CI o Deploy en rojo solo por la prueba de velocidad del Diagrama Operativo | `32` **L-122**: relanzar el trabajo fallido, no subir el umbral |
 | El "por qué" de una decisión / detalle de un § | Capa 1 (§1-§80 en `00a`) → `99-HISTORIAL-ADR.md` |
 | ¿Dónde está la lección `L-NN` / `M-NN`? | `grep -n "^### L-NN " docs/3*-LECCIONES*.md` — `30` y sus hijas `31`-`35` |
 

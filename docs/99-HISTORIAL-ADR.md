@@ -5681,8 +5681,8 @@ pasa con rol admin. La importación completa con matrícula repetida sigue ganan
 calificaciones de ese documento): coherente, no se tocó. Los 13 PD salen concluyentes por H2: en el Triángulo 1 el gaseo del
 aceite se parece a PD → la pantalla recomienda los Triángulos 4 y 5 (Duval 2008); criterio pendiente del Ingeniero. El
 texto del panel DGA §127 «la plataforma guarda calificaciones de 1 a 5; el diagnóstico… se hace con las ppm» queda
-desactualizado cuando el equipo tiene ppm: es texto en BORRADOR del Ingeniero, no se tocó sin su «procede».
-Bóveda: `2026-10-02-duval-proyeccion` (paso 1 + paso 2, crudos y síntesis).
+desactualizado cuando el equipo tiene ppm: es texto en BORRADOR del Ingeniero, no se tocó sin su «procede» (→ resuelto en `§133`).
+Bóveda: `2026-10-02-duval-proyeccion` (pasos 1–6, crudos y síntesis).
 
 **131.9 Carga en producción y verificación (mismo día, «procede» del Ingeniero).** CARGAR GASES con el Excel CORREGIDO:
 **207 equipos**, solo `ultima_dga` + `updatedAt`; foto antes/después con huella ordenada de cada documento: **0 cambios
@@ -5727,7 +5727,7 @@ Por gas, cuántas veces más rápido que hoy se formaría:
 - **Descargas:** ×1.
 - **Sin gas suficiente:** el motivo según el estado.
 
-Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002, Tabla II). DT tiene su texto propio. No aparece en descargas ni sin gas suficiente. La fila «Zona de Duval» ya no dice «la carga no mueve el punto».
+Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002, Tabla II). DT tiene su texto propio. No aparece en descargas ni sin gas suficiente. La fila «Zona de Duval» ya no dice «la carga no mueve el punto». (→ ubicación reemplazada en `§134`: la flecha va en un segundo triángulo; la regla de solo dirección sigue.)
 
 **132.3 No-regresión.** Solo archivos nuevos y la sección agregada en `panel-duval.js`. El panel DGA, los márgenes y la tabla de carga quedan intactos. `feat` `dfcd7d6`, merge `0fbb5dd`; CI y Deploy verdes. 2285 pruebas (13 nuevas, sintéticas).
 
@@ -5773,8 +5773,12 @@ Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002,
 **133.8 Verificado sano / no re-auditar.**
 - ACC-BC-01 y ACC-R3-03 piden ppm de la PRÓXIMA muestra: siguen ciertos.
 - NO se agregó en ADV-G-TDGC «el H₂ puede salir sin defecto»: decidiría el criterio de los 13 PD, que sigue pendiente del Ingeniero (`§131.8`).
+- Bóveda: `2026-10-02-duval-proyeccion`, paso 6.
 
-Archivos: `domain/scada_carga_dga_textos_ppm.js`, `tests/scada_carga_dga_textos_ppm.test.js`, `ui/cargabilidad-scada/panel-dga.js`, comentario de `domain/scada_carga_dga.js`. Bóveda: `2026-10-02-duval-proyeccion`, paso 6.
+**133.5–133.7.**
+- Anti-patterns evitados: editar el catálogo `scada_carga_dga_textos.js` (BORRADOR del Ingeniero; L-102: lo nuevo en archivo nuevo) · decidir en ADV-G-TDGC el criterio de los 13 PD.
+- Archivos: `domain/scada_carga_dga_textos_ppm.js`, `tests/scada_carga_dga_textos_ppm.test.js`, `ui/cargabilidad-scada/panel-dga.js`, comentario de `domain/scada_carga_dga.js`.
+- Doctrina: L-102 · `CLAUDE.md §3.2`.
 
 ## 134. ADR-134 — Cargabilidad SCADA: triángulo «con más carga» visible junto al de hoy ⟦OPUS-5.5⟧ (2026-10-02)
 
@@ -5791,7 +5795,11 @@ Archivos: `domain/scada_carga_dga_textos_ppm.js`, `tests/scada_carga_dga_textos_
 
 **134.3–134.4 Verificación.** Vista previa con T2 (COR), T3 (PRA) y D2 (SRS). Producción `1910657` (CI y Deploy verdes): en su Chrome, PRA muestra los dos triángulos lado a lado; flecha de 36 × 63 px a escala de pantalla; sin errores de consola. 2289 pruebas. Sin revisión adversarial: es un cambio de dibujo verificado a ojo en los 3 casos.
 
-Archivos: `ui/cargabilidad-scada/panel-duval.js`, `css/cargabilidad-scada.css`, `domain/scada_carga_termico.js` (campo `destino`), `tests/scada_carga_termico.test.js`.
+**134.5–134.8.**
+- Anti-patterns evitados: calcular una posición proyectada del punto (sin norma, `§131.5`) · agrandar la flecha dentro del triángulo de hoy (mezcla lo proyectado con lo medido).
+- Archivos: `ui/cargabilidad-scada/panel-duval.js`, `css/cargabilidad-scada.css`, `domain/scada_carga_termico.js` (campo `destino`), `tests/scada_carga_termico.test.js`.
+- Doctrina: `CLAUDE.md §3.2` (no fabricar: dirección según Duval 2002, Tabla II) · L-56 (vista previa fiel con T2/T3/D2).
+- Verificado sano: sin revisión adversarial a propósito (cambio de dibujo verificado a ojo en COR, PRA y SRS); el campo `destino` de `tendenciaDuval` solo lo lee `panel-duval.js:54`.
 
 ## 135. ADR-135 — El sitio en celular y tablet: el menú ☰ por fin abre, la barra cabe y lo ancho se desplaza ⟦OPUS-5.5⟧ (2026-10-02)
 
@@ -5836,3 +5844,38 @@ Archivos: `ui/cargabilidad-scada/panel-duval.js`, `css/cargabilidad-scada.css`, 
 - Doctrina: L-121.
 - Verificado sano: el cajón no puede abrirse sobre los modales con foco retenido (van en z 300 sobre la barra); los modales admin (z 100) no capturan el teclado.
 - Bóveda: `2026-10-02-sitio-responsive` (con el servidor y el barrido reutilizables).
+
+## 136. ADR-136 — Mantenimiento minucioso del cerebro: auditoría de 5 lentes aplicada (55 confirmados, 12 refutados) · TODO-68 cerrado → L-122 · prueba del ☰ ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «realiza el mantenimiento del cerebro minucioso…» y «procede». NO revisado externamente (es gobernanza del cerebro).
+
+**136.1 Causa raíz.** Seis ADR en un solo día (`§130`–`§135`) dejaron el cerebro desfasado de sí mismo:
+- el arranque decía cosas viejas o repetidas: `10` con TODO-61 duplicado de CF-27, TODO-69 con rango hasta `§131`, un pendiente ya cumplido y el bloque «Ya verificado SANO» como pizarra; `05` con flags que repiten `CLAUDE.md §2`/`§3.2` y la afirmación «`DESARROLLO` == `main`» falsa por SHA;
+- `00` no ruteaba `§133`, `§134`, `§135`, L-120 ni L-121, ni el efecto de `§131` sobre muestras y el motor de salud;
+- `§133` y `§134` sin casillas `.5–.8`, y sin enlace de vuelta desde `§131.8`/`§132.2`;
+- los mapas (`20`/`21`/`22`) omitían el segundo escritor de `ultima_dga` (`data/importar.js`), que `dga_duval.js` es compartido, la familia SCADA vieja del seguimiento, `tests-rules/` y carpetas de `assets/js/`; presentaban `ARQUITECTURA.md` y `MODELO-DATOS-v2.md` como vigentes;
+- lecciones viejas: L-02 contradecía L-01 y `CLAUDE.md §2`; L-40/L-45/L-46 enseñaban Reprocesar (retirado en ADR-020); M-01 apuntaba a código que ya no existe; el puntero a la hija `31` vivía en `34`;
+- la decisión del Ingeniero sobre TODO-68 («solo relanzar») solo existía en una fila de pendientes.
+
+**136.2 Solución.** Workflow acotado de 5 lentes (arranque · índice · espacial · lecciones · bóveda), cada hallazgo verificado por un escéptico; se aplicaron los confirmados:
+- arranque: `10` (pendiente nuevo de celular en (I), TODO-69 a `§134` y textos `§133`, TODO-71 a `§124.9`, TODO-56 con el aviso, TODO-61 → CF-27, CONECTAR D solo en `11`, «Ya verificado SANO» → `00` Capa 2); `05` (punteros en vez de reglas repetidas, rama sin SHA, deuda crítica corta, flag de reorg → TODO-06); `CLAUDE.md` (historia → `99 §51`, hija `00a` en §0, hojas → `21`, deploys → §2);
+- `11`: TODO-40 corregido (sí hay candados de cédulas/firmas/SCADA en todo commit; lo que falta es escaneo de secretos), TODO-12 (9 cargas de SheetJS, `§52.9`, `§122`), TODO-06 con la regla de la reorg;
+- **TODO-68 cerrado**: la decisión del Ingeniero (relanzar el trabajo fallido, no subir el umbral) pasa a **L-122** (`32`, junto a las demás de despliegue);
+- `00` Capa 2: filas de celular/tablet, Duval de muestras y motor de salud, «antes de re-auditar», CI en rojo por velocidad; fila 📈 con `§131.9`/`§131.10`/`§133`/`§134` y bóvedas;
+- `99`: casillas `133.5–133.7` y `134.5–134.8`; enlaces de vuelta en `§131.8` (→ `§133`) y `§132.2` (→ `§134`);
+- `20`/`21`/`22` al día y hojas viejas rotuladas HISTÓRICAS sin moverlas (`OPERACIONES.md §0`, `DEPLOY-FUNCTIONS.md`, `README.md`);
+- lecciones: L-02 retirada → L-01, L-40/L-45/L-46 con el estado del código (ADR-020), M-01 resuelta de raíz, sección propia para L-96/L-113…L-117, puntero a `31` en su madre, L-60 → L-85/L-102, L-119 → L-109, L-121 → L-92;
+- **prueba nueva** `tests/shell_menu_estado.test.js`: toda clase `body.<x>` del CSS se activa en un JS o en el `<body>` de alguna página (gate del punto 3 de L-121);
+- `docs/pruebas/{02,05,06}*.json`: «(TODO-08» → «(TODO-04» (el ID de los umbrales del MO tras la migración, `_legacy/TRIAJE.md:19`);
+- bóveda: README (KB reales, anclas a ADR y lecciones) y título de la síntesis de Duval; memoria: fuente de Salud de Activos, «Opus» por alias, el tablero de Pruebas frente al DGA de Cargabilidad, entrada duplicada fundida.
+
+**136.3 No-regresión.** Solo documentación, una prueba nueva y tres textos de nota en JSON (`⚠️_…`, que el tablero no interpreta). Ninguna función, ID, clase ni ruta cambia. Arranque dentro del objetivo.
+
+**136.4 Verificación.** Prueba nueva verde y con mutación (quitar `classList.add('sb-open')` la pone en rojo; restaurado). `npm run test:unit` completo, `lint:html` y `brain:check` SANO antes del commit. Cada edición se aplicó con reemplazo exacto y aserción de una sola coincidencia.
+
+**136.5–136.8.**
+- Anti-patterns evitados: borrar conocimiento (todo lo retirado de `10`/`05`/`CLAUDE.md` tiene su dueño y se apunta); mover `SESION-*`/`UI-V3` a `_legacy` (rompería enlaces de `CHANGELOG.md`); partir filas de `00`/`22` por gusto.
+- Archivos: `CLAUDE.md`, `README.md`, `docs/{00,05,10,11,20,21,22,30,31,32,34,99}`, `docs/cola-fichas-tecnicas.md`, `docs/OPERACIONES.md`, `docs/DEPLOY-FUNCTIONS.md`, `docs/pruebas/{02,05,06}*.json`, `tests/shell_menu_estado.test.js`.
+- Doctrina: §G.3 (un hecho, un dueño) · §G.4 (frescura, auto-auditoría) · Límite de guardián (apendar, no sobrescribir).
+- **Verificado sano / no re-auditar** (los 12 refutados): TODO-56/69 NO repiten TODO-64.b de más (cada uno dice su efecto propio) · «CI y Deploy en VERDE = `e810c89`» en `05` NO está viejo: es el último despliegue de CÓDIGO (lo posterior es solo cerebro) · la fila 📈 de `00` SÍ nombra DGA/Duval/ppm (un grep la encuentra) · `§134.1` SÍ dice que reemplaza la flecha de `§132` · `ui/fichas/evaluacion-masiva.js` NO importa la familia SCADA vieja (solo la menciona en un comentario) · `UI-V3-DARKMODE` ya está rotulada histórica · el último cambio de `ARQUITECTURA.md` fue `dd9b5f6`, no `7e7bc68` · L-117 (5) no duplica a L-94 · `33` no necesitaba poda (y L-122 fue a `32` para no llevarla a su tope) · `§133` sí da el porqué de no editar el catálogo · L-121 (1) no exige enlaces de familia. **Omitido a propósito**: añadir a (H) de `10` que la lista SCADA de agosto «no trae cifra» para los 3 equipos: el significado de esas columnas del crudo no está verificado y el mismo patrón (`,,,,1`) sale en decenas de equipos.
+- Bóveda: `2026-10-02-mantenimiento-cerebro` (crudo de las 5 lentes + síntesis).

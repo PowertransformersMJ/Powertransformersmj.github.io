@@ -41,7 +41,7 @@
       { "norma": "IEEE C57.152 (PI/DAR)", "umbral": "PI≥1.5 · DAR>1.6 · tendencia", "tipo": "requiere PI/DAR del informe" }
     ],
     "pendiente_de_validar": {
-      "⚠️_clase": "Mínimo por clase (MO.00418) sigue 'verificar' (TODO-08).",
+      "⚠️_clase": "Mínimo por clase (MO.00418) sigue 'verificar' (TODO-04).",
       "⚠️_PI_DAR": "PI/DAR requieren que el informe traiga R a 30s/1min/10min."
     }
   },

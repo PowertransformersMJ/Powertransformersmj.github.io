@@ -10,7 +10,7 @@ alertas cuando quieras activar notificaciones por correo.
 | Trigger | Estado | Deploy fecha | Notas |
 |---|---|---|---|
 | `onMuestraCreate` | ✅ **Activo en producción** | abr 2026 | Recalcula `salud_actual` al crearse muestra. Node 22 · southamerica-east1. |
-| `cronAlertasDiarias` | ⏳ Pendiente | — | Requiere Firebase Extension "Trigger Email" + Gmail App Password (ver §2). |
+| `cronAlertasDiarias` | ✅ Desplegada (`99 §63`, 2026-08-17) | ago 2026 | El correo requiere Firebase Extension "Trigger Email" + Gmail App Password (ver §2). |
 | Cleanup policy Artifact Registry | ✅ Configurada | abr 2026 | 7 días de retención de imágenes Docker. |
 
 ### Regla operativa

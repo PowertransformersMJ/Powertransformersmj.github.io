@@ -4,18 +4,16 @@
 
 | Señal | Valor (al **2026-10-02**) |
 |---|---|
-| **Misión ahora** | **Dos frentes**: FICHAS TÉCNICAS por partes (cola → `docs/cola-fichas-tecnicas.md`) · CARGABILIDAD SCADA (TODO-69). Último publicado: **`§135` sitio en celular y tablet** (`e810c89`; el ☰ no tenía código desde 16-ago); antes `§131`–`§134` Duval (BORRADOR; 207 con gases). Cadena en `00` Capa 1. |
-| **Build** | 🟢 **2289 pass / 0 fail / 2 skip** + `lint:html` limpio + **201 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-02 (local; CI y Deploy en VERDE = `main` `e810c89`, servidos = main, L-65; 1 prueba de velocidad inestable → `11`) |
-| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` == `main` == `origin/main` · `main` == `origin/main` (SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). **Historia reescrita 2026-07-21** (filter-repo purgó confidenciales) → otra copia debe re-clonar. |
+| **Misión ahora** | **Dos frentes**: FICHAS TÉCNICAS por partes (cola → `docs/cola-fichas-tecnicas.md`) · CARGABILIDAD SCADA (TODO-69). Último publicado: **`§135` sitio en celular y tablet** (`e810c89`); antes `§131`–`§134` Duval (BORRADOR; 207 con gases). Cerebro: mantenimiento `§136`. Cadena en `00` Capa 1. |
+| **Build** | 🟢 **2292 pass / 0 fail / 2 skip** + `lint:html` limpio + **201 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-02 (local; CI y Deploy en VERDE = `main` `e810c89`, servidos = main, L-65; 1 prueba de velocidad inestable: relanzar, **L-122**) |
+| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` y `main` con el MISMO contenido (`main` avanza por merge; SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). Historia reescrita 2026-07-21 → `99 §52.8` + L-25. |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices + 13 exenciones `scada_*`: archivo = servidor** (2026-10-01, L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |
-| **Deuda crítica** | 🔴 Cosas que **solo el Ingeniero** puede hacer (GitHub Support + PATs · capítulo del MO · 3 decisiones de ADR-063 · proteger `main`) → lista viva en `10 §Solo puede hacerlo el Ingeniero`. 🔴 La bóveda vive en UN disco sin remoto (TODO-29). |
+| **Deuda crítica** | 🔴 Lo que **solo el Ingeniero** puede hacer → `10 §Solo puede hacerlo el Ingeniero` (B–I). 🔴 La bóveda vive en UN disco sin remoto (TODO-29). |
 
 ## ⚠️ Flags de riesgo activos
 - **🤖 Interinato (desde 2026-07-23)**: si el modelo del turno NO es Fable 5 → cargar la skill `opus-interino-protocolo` (R1-R7). Subagentes/workflows SIEMPRE acotados y con `model: 'opus'`; la cuota Fable se reserva para análisis y decisiones (orden del Ingeniero).
-- **Política git**: Claude hace commit+push+merge+deploys y VALIDA entregando el resumen, no esperando el "sí" (`CLAUDE.md §2` · L-01 · L-63). NUNCA force-push a `main`.
-- **Free-tier sagrado** (Firebase/Vercel/Pages): nada que facture sin aprobación del Ingeniero.
-- **Foco de producto**: reorg POR PRUEBA paso a paso a pedido del director — NO generalizar sin su pedido (`99 §48/50`); su validación en la APP real sigue abierta (TODO-06).
+- **Política git** → `CLAUDE.md §2` + L-63 (validar = entregar el resumen; incluye la excepción de Fichas).
 
 ## 🧩 Sub-sistemas
 Frontend estático ✅ · Firebase (Auth+Firestore+Storage) ✅ · Cloud Functions ✅ · Vercel `/api` ✅ · PWA/SW ⛔ (kill-switch) · Cerebro ✅ (kernel canónico del ecosistema; su versión la reporta `brain:check`). Mapa del ecosistema → `20 §Ecosistema`.
