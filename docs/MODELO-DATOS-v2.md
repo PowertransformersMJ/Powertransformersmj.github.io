@@ -157,7 +157,7 @@ Bloque maestro del Health Index. Reservado en F16; poblado por el motor en F18. 
 | `calif_tdgc` | int 1–5 | TDGC = H₂+CH₄+C₂H₄+C₂H₆ | §A3.1 (a) |
 | `calif_co` / `calif_co2` | int 1–5 | Gases de papel | §A3.1 (b) |
 | `calif_c2h2` | int 1–5 | Acetileno | §A3.1 (c) |
-| `eval_dga` | float 1–5 | MAX(TDGC, C2H2) | §A3.1 (d) |
+| `eval_dga` | float 1–5 | MAX(TDGC, C2H2) ⚠️ **desactualizado**: desde `99 §57` es el PROMEDIO REDONDEADO de TDGC/CO/CO₂/C₂H₂ → `docs/52-DGA-ACEITE-PAPEL.md §1` | §A3.1 (d) |
 | `calif_rd` | int 1–5 | Rigidez dieléctrica | §A3.2 (a) |
 | `calif_ic` | int 1–5 | IC = TI/NN | §A3.2 (b) |
 | `eval_adfq` | float 1–5 | Media(RD, IC) | §A3.2 (c) |
