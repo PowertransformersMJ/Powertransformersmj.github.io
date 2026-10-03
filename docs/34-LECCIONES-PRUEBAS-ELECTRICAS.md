@@ -6,6 +6,10 @@
 > datos de prueba sin cruzar de dominio). Se lee on-demand (trigger 🧪 Experiencia) **ANTES de tocar el
 > tablero, sus paneles o un veredicto**, y ante UI sensible o ambigua. Varias son doctrina always-on en
 > `CLAUDE.md §3.2` (L-36/L-37/L-58, L-56): aquí vive su detalle.
+>
+> **Alcance ampliado (2026-10-02, `99 §137`), sin renombrar el archivo**: es la casa de las lecciones de DOMINIO del
+> diagnóstico —pruebas eléctricas, DGA, carga y salud—. El criterio vigente vive en los lóbulos `49`–`53`; aquí, lo
+> que costó aprenderlo. Las lecciones de verificación de datos (L-113, L-117…L-120) siguen en `30`/`32`.
 
 ---
 
@@ -62,3 +66,12 @@
 
 ### L-58 · Veredicto multi-norma: un chip POR NORMA, nunca un estado consolidado para todos
 **Disparador**: pintar chips/badges por norma · **Cicatriz (ADR-050)**: tan δ 0.51% marcado ✕ en NETA E IEEE — cumple IEEE (≤1%), solo supera NETA (0.5% → investigar); `chipsCriterio(familia, estado)` aplicaba el estado consolidado (peor) a TODOS los chips · **Regla**: cada chip sale de `evaluarMultiNorma(familia, metrica).opticas[i].estado` (nivel→símbolo: 0 ✓ · 1-2 ⚠ · ≥3 ✕; óptica informativa nivel <0 cae al consolidado); el consolidado conservador es solo para el VEREDICTO GLOBAL; "investigar" ≠ "no cumple"; chips deben coincidir con la tabla de diagnóstico.
+
+### L-123 · Antes de crear un criterio de DGA, busca los que ya existen: hoy conviven cuatro
+**Disparador**: escribir una regla que lea gases (zona de falla, «modo de degradación», alerta). · **Cicatriz** (`99 §131`,
+`§137`): la plataforma ya tenía DOS reglas de Duval —una corregida en `dga_duval.js` y la vieja de `dga_diagnostico.js`, que
+clasificaba mal ~51 % del área y se guardaba con cada muestra nueva— y una TERCERA copia en `pages/parque-transformadores.html`
+(idéntica a la corregida por casualidad, sin candado), más Rogers/Doernenburg sin cotejar y los cortes propios de
+`modoDegradacion` (Fichas) sin fuente. · **Regla**: antes de escribir, leer el registro de `52 §7`; reusar `zonaDuval1`;
+si hace falta un criterio nuevo, registrarlo allí con su fuente o rotularlo «criterio del área». [HONOR] (candado
+pendiente: TODO-73)

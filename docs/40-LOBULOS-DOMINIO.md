@@ -17,7 +17,7 @@
 
 ## 🗂️ Categorías esperadas
 
-> Numeración reservada 41–50 para lóbulos de dominio (49=pruebas eléctricas, 50=transformadores/equipo). **No reutilizar** estos números para otras neuronas.
+> Numeración: **41–48** dominios genéricos de software · **49–5x** dominio del transformador (49 pruebas eléctricas, 50 equipo, 51 salud y riesgo, 52 DGA/aceite/papel, 53 carga y térmica). **No reutilizar** estos números para otras neuronas. Del 50 en adelante el linter exige el nombre literal en `CLAUDE.md §0` (registrarlos aquí no basta).
 
 | ID | Lóbulo | Disparador (cliente dice…) | Estado | Cubre |
 |---|---|---|---|---|
@@ -29,12 +29,30 @@
 | **46** | Escalabilidad | "audita escalabilidad", "arquitectura", "modernización código", "refactor estructural" | 🟢 vacío | Anti-deuda técnica, patrones, módulos, límites. |
 | **47** | Copywriting | "audita copy", "voz", "tono", "headlines", "CTAs", "mensajes" | 🟢 vacío | Tono de marca, microcopy, headlines, CTAs, mensajes de error. |
 | **48** | Accesibilidad (a11y) | "audita a11y", "WCAG", "lectores de pantalla", "teclado", "contraste" | 🟢 vacío | ARIA, contraste, navegación teclado, alt texts, foco visible, prefers-reduced-motion. |
-| **49** | Pruebas Eléctricas / Diagnóstico | "pruebas eléctricas", "megóhmetro", "IR/PI/DAR", "FP/tan δ", "DGA", "SFRA", "criterios/cálculos/diagnóstico de transformadores" | 🟠 **activo** → `docs/49-PRUEBAS-ELECTRICAS.md` | Cálculos, criterios NETA/IEEE y diagnóstico de la batería de ensayos a tx de potencia. Hogar de las skills `skills/pruebas-electricas/*`. |
-| **50** | Transformadores de Potencia (equipo) | "tipo de transformador", "bidevanado/tridevanado/auto", "devanado de compensación/estabilización/terciario", "buried delta", "grupo vectorial", "cálculos nominales/relación/impedancia del equipo" | 🟠 **activo** → `docs/50-TRANSFORMADORES-POTENCIA.md` | Tipificación, configuración, grupo vectorial y cálculos nominales/de placa del EQUIPO (distinto de los ENSAYOS, lóbulo 49). Hogar de las skills `skills/transformadores-potencia/*`. |
+| **49** | Pruebas Eléctricas / Diagnóstico | "pruebas eléctricas", "megóhmetro", "IR/PI/DAR", "FP/tan δ", "bujes", "SFRA", "umbrales del semáforo del tablero" | 🟠 **activo** → `docs/49-PRUEBAS-ELECTRICAS.md` | Cálculos, criterios NETA/IEEE y diagnóstico de la batería de ensayos a tx de potencia. Hogar de las skills `skills/pruebas-electricas/*`. |
+| **50** | Transformadores de Potencia (equipo) | "tipo de transformador", "bidevanado/tridevanado/auto", "devanado de compensación/estabilización/terciario", "buried delta", "grupo vectorial", "cálculos nominales/relación/impedancia del equipo" | 🟠 **activo** → `docs/50-TRANSFORMADORES-POTENCIA.md` | Tipificación, configuración, grupo vectorial y cálculos nominales/de placa del EQUIPO (distinto de los ENSAYOS, lóbulo 49) y sus subsistemas: OLTC/DETC, refrigeración, protecciones (punteros). Hogar de las skills `skills/transformadores-potencia/*`. |
+| **51** | Salud y riesgo de los activos | "salud", "HI", "índice de salud", "condición 1–5", "override", "criticidad", "usuarios", "matriz de riesgo", "plan de inversión", "estrategia por condición", "CREG 015/085", "UUCC" | 🟠 **activo** → `docs/51-SALUD-RIESGO-ACTIVOS.md` | Cómo se califica y prioriza el parque (MO.00418): HI, condición oficial del Excel, criticidad, matriz, estrategias, plan de inversión, valoración regulatoria. |
+| **52** | Gases disueltos, aceite y papel | "DGA", "gases", "ppm", "Duval", "gas suficiente", "acetileno", "ADFQ", "rigidez", "furanos", "2FAL", "DP", "vida del papel" | 🟠 **activo** → `docs/52-DGA-ACEITE-PAPEL.md` | Criterio de la DGA (bandas, Duval, significancia, interpretaciones que conviven), del aceite y del papel. |
+| **53** | Carga y térmica | "cargabilidad", "CRG", "ampacidad", "ONAF", "sobrecarga", "sostenida", "punto caliente", "IEC 60076-7", "C57.91", "regla de los 6 °C", "con más carga", "DGA × carga" | 🟠 **activo** → `docs/53-CARGA-TERMICA.md` | Esfuerzo de la operación sobre el equipo: cifra SCADA, ampacidad, sobrecarga, modelo térmico, proyección y puente DGA × carga. |
 
-**Categorías futuras**: cualquier dominio nuevo que el cliente pida análisis
-(ej. analytics/51, devops/52) se agrega aquí + se crea el
-archivo hijo cuando hay contenido real. (50 ya está activo, ver fila arriba.)
+**Categorías futuras**: un dominio nuevo de software ocupa un número libre de 41–48; uno del transformador, el
+siguiente 5x (candidatos SIN contenido real todavía, NO crear: OLTC propio cuando exista un módulo que lo use;
+descargas parciales/termografía/monitoreo en línea; gestión de activos ISO 55000/RCM).
+
+### 🧭 Fronteras ambiguas del dominio del transformador (a qué lóbulo va)
+> El ruteo por síntoma vive en `00` Capa 2; aquí solo se resuelve lo que podría ir en dos lóbulos.
+
+| Tema | Lóbulo | Por qué |
+|---|---|---|
+| Zonas del triángulo de Duval, «gas suficiente», interpretaciones de la DGA | **52** | química del aislamiento |
+| «Con más carga» (ritmo por gas, dirección en el triángulo), punto caliente | **53** | esfuerzo de la operación |
+| CO/CO₂ | **52** qué son (gases del papel) · **53** su ritmo con la temperatura | un hecho, un dueño |
+| DGA y aceite | **52** (no 49) | ADR-027 los excluye del TABLERO de pruebas, no del dominio |
+| Bujes (FP C1/C2, ΔC1, FP de bujes separado de devanados) · umbrales del semáforo | **49** | ensayos del tablero |
+| Ampacidad ONAF ↔ refrigeración | **53** el efecto · **50** el subsistema | la ampacidad supone ventiladores en servicio |
+| OLTC/DETC (paridad OILTAP/VACUTAP) | **50** | subsistema del equipo |
+| Columna CAUSANTE del Excel, HI, criticidad, CREG | **51** | calificación del parque |
+| Lecciones de dominio (pruebas, DGA, carga, salud) | `34` | hija de `30` con alcance ampliado |
 
 ---
 
@@ -139,10 +157,13 @@ esta forma — copiar/adaptar:
 2. **Cuando un lóbulo hijo nace**: actualizar la fila correspondiente en
    este registry (`🟢 vacío` → `🟠 activo`) + agregar fila en `00-INDICE`
    con su ubicación. El linter `brain:check` valida que los `41-*..49-*`
-   estén registrados aquí (no en `CLAUDE.md`).
+   estén registrados aquí; del 50 en adelante, con su nombre literal en `CLAUDE.md §0`.
 3. **Tope blando ~280 líneas para este archivo**. Si crece por encima
    (ej. el registry se vuelve un meta-índice de muchos sub-temas), shard
    por meta-categorías.
 4. **Reflejo de Cierre (`CLAUDE.md §G.4`)**: tras una auditoría especializada,
    verificar antes de cerrar la tarea: ¿lóbulo hijo creado/actualizado?
    ¿skills consultadas registradas? Si no, vuelve y hazlo.
+5. **Frescura del dominio [HONOR]**: si tocas `domain/dga_*`, `scada_carga_*`, `salud_activos`, `matriz_riesgo`,
+   `plan_inversion`, `umbrales_salud_baseline` o `pruebas_electricas_semaforo`, actualiza el lóbulo dueño (49–53)
+   en el mismo cambio. Los lóbulos citan archivo:constante; si el valor cambia, cambia el porqué o el estado.

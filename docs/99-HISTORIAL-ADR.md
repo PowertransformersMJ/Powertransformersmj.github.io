@@ -5879,3 +5879,58 @@ Flecha de tendencia en el SVG: solo la dirección, hacia el etileno (Duval 2002,
 - Doctrina: §G.3 (un hecho, un dueño) · §G.4 (frescura, auto-auditoría) · Límite de guardián (apendar, no sobrescribir).
 - **Verificado sano / no re-auditar** (los 12 refutados): TODO-56/69 NO repiten TODO-64.b de más (cada uno dice su efecto propio) · «CI y Deploy en VERDE = `e810c89`» en `05` NO está viejo: es el último despliegue de CÓDIGO (lo posterior es solo cerebro) · la fila 📈 de `00` SÍ nombra DGA/Duval/ppm (un grep la encuentra) · `§134.1` SÍ dice que reemplaza la flecha de `§132` · `ui/fichas/evaluacion-masiva.js` NO importa la familia SCADA vieja (solo la menciona en un comentario) · `UI-V3-DARKMODE` ya está rotulada histórica · el último cambio de `ARQUITECTURA.md` fue `dd9b5f6`, no `7e7bc68` · L-117 (5) no duplica a L-94 · `33` no necesitaba poda (y L-122 fue a `32` para no llevarla a su tope) · `§133` sí da el porqué de no editar el catálogo · L-121 (1) no exige enlaces de familia. **Omitido a propósito**: añadir a (H) de `10` que la lista SCADA de agosto «no trae cifra» para los 3 equipos: el significado de esas columnas del crudo no está verificado y el mismo patrón (`,,,,1`) sale en decenas de equipos.
 - Bóveda: `2026-10-02-mantenimiento-cerebro` (crudo de las 5 lentes + síntesis).
+
+## 137. ADR-137 — Lóbulos del dominio del transformador: nacen 51 (salud y riesgo), 52 (DGA, aceite y papel) y 53 (carga y térmica); 49, 50 y 34 trascienden; 4 riesgos de veracidad avisados ⟦OPUS-5.5⟧ (2026-10-02)
+
+> «…evalúa las neuronas de conocimientos en el mantenimiento y diagnóstico de transformadores de potencia para evaluar si
+> pueden trascender o incorporar nuevas neuronas, necesito un máximo potencial» + «procede». NO revisado externamente
+> (estructura del cerebro, reversible: no exige W-11).
+
+**137.1 Causa raíz.** El dominio solo tenía dos lóbulos (49 ensayos, 50 equipo) congelados en junio. Todo lo construido
+después —índice de salud y criticidad (`§53`–`§81`), DGA con ppm y Duval (`§127`, `§131`–`§134`), cifra SCADA y modelo
+térmico (`§122`–`§132`)— vivía repartido en ADRs, código, bóveda y memoria, sin un dueño del CRITERIO. Además: 49 decía
+«DGA» en su disparador aunque ADR-027 la sacó del tablero; los umbrales del semáforo y los bujes no tenían dueño; el OLTC
+no tenía cobertura en el cerebro; 40 reservaba «41–50» con ejemplos «analytics/51, devops/52» que chocaban.
+
+**137.2 Solución.** Workflow acotado de 4 fases (inventario → marco de 16 áreas → diseño → crítica adversarial), y mi
+verificación de cada cifra contra su ADR o su archivo antes de escribirla:
+- **Nacen** `51-SALUD-RIESGO-ACTIVOS` (HI, condición del Excel, criticidad, matriz, estrategias, plan de inversión, CREG),
+  `52-DGA-ACEITE-PAPEL` (bandas, monitoreo de C₂H₂, Duval, gas suficiente, margen, registro de las interpretaciones que
+  conviven, ADFQ, papel) y `53-CARGA-TERMICA` (dos escalas de carga, cifra SCADA, ampacidad, sostenida, IEC 60076-7,
+  regla de los 6 °C, «con más carga», DGA × carga). Citan archivo:constante como dueño del VALOR; ellas son dueñas del
+  porqué, la fuente y el estado. Tope 16.000 caracteres (obliga a apuntar, no a copiar).
+- **Trascienden**: 49 (alcance sin DGA, tabla de ESTADO de los umbrales del semáforo, sección de bujes, pendientes
+  obsoletos tachados) · 50 (subsistemas: OLTC con la paridad OILTAP/VACUTAP, refrigeración y protecciones como punteros,
+  puente con 53, pendiente #4 obsoleto) · 34 (casa de las lecciones de DOMINIO, sin renombrar) + **L-123**.
+- **Registro**: `CLAUDE.md §0` funde las filas 40 y 50 en una con los 5 nombres literales (lo exige `brain-check.mjs:463`
+  para 50+) y el 🔵 de §G.2 apunta a `40` + `00` Capa 2; `40` con numeración 41–48 / 49–5x, filas 51–53, tabla de
+  FRONTERAS ambiguas y regla de frescura [HONOR]; `00` Capa 2 con 3 filas de dominio; topes en el manifest para 49–53
+  (49 y 50 no tenían); punteros en `22` y nota aditiva en `MODELO-DATOS-v2.md §2.8`.
+- **Riesgos de veracidad avisados, NO arreglados** (TODO-73): cortes de gases sin fuente en `modoDegradacion` (texto que
+  se firma en Fichas) · `sobrecarga_admisible.js` sin cotejar con C57.91 (detalle de Cargabilidad y TPT) · «ISO 55001»
+  en textos firmables · la copia de Duval en Parque sin candado. Skills por actualizar → TODO-74.
+
+**137.3 No-regresión.** Solo cerebro y una nota en una hoja del dueño. Ningún archivo de código cambia. Arranque medido
+por `boot-gate` antes del commit (la fila fundida AHORRA caracteres frente a las dos que reemplaza).
+
+**137.4 Verificación.** Cifras cotejadas este turno contra: `schema.js` (`PESOS_HI`), `umbrales_salud_baseline.js` (DGA,
+ADFQ, FUR, CRG, EDAD, overrides, 48.312), `matriz_riesgo.js`, `plan_inversion.js`, `dga_duval.js`
+(`REFERENCIA_SIGNIFICANCIA`), `dga_duval_margen.js` (`CAMBIO_PEQUENO` = máx(15 %, 1 ppm)), `monitoreo_intensivo.js`,
+`salud_activos.js` (DP y % de vida), `scada_carga_proyeccion.js` (f²), `pruebas_electricas_semaforo.js`, `99 §57.2`,
+`§122.2`, `§127.2`, `§132`, la bóveda `duval-proyeccion` y la memoria de OLTC. `brain:check` SANO.
+
+**137.5–137.8.**
+- Anti-patterns evitados: una neurona por cada una de las 16 áreas (fragmentación) · colgar 51–53 como «hijas de 50» (la
+  salud no es un subsistema del equipo, y costaba arranque) · un segundo mapa de ~20 filas en 40 (duplica `00` Capa 2) ·
+  49 como dueña del VALOR de los umbrales (dos fuentes que divergen) · copiar texto del MO.00418 o datos del parque con
+  nombre en el repo público (la composición OLTC queda en la memoria) · cambiar la regex del kernel · renombrar 34/49.
+- Archivos: `CLAUDE.md`, `docs/{00,10,11,22,34,40,49,50,51,52,53,99}`, `docs/.brain-manifest.json`, `docs/MODELO-DATOS-v2.md`.
+- Doctrina: §G.4 (neurogénesis con contenido REAL) · §G.3 (un hecho, un dueño) · §G.5 (arranque) · Regla de ADMISIÓN.
+- **Verificado sano / refutado en la verificación** (no re-auditar): (a) la crítica decía que `duval1` de
+  `pages/parque-transformadores.html` usaba la «regla VIEJA»: **FALSO** — da la misma zona que `zonaDuval1` en 2,5 M
+  puntos al azar y en la malla de 80.601 (la bóveda `duval-proyeccion` ya lo registraba); el riesgo es solo la duplicación.
+  (b) «el autotransformador no es evaluable» en CREG: **FALSO**, `fichas_creg_uc.js` trae UC `auto` (N5T11…). (c) El ADR
+  del respaldo TPT no es `§54` (ese es del shell): TPT no tiene ADR propio. (d) `umbrales_salud_baseline.js` NO tiene
+  claves `her`/`pyt`: se califican en `salud_activos.js`. NO verifiqué: el contenido de `§74.21` más allá de su cabecera,
+  las bóvedas de beneficios por dentro y las skills `anthropic-skills:*`.
+- Bóveda: `2026-10-02-neuronas-dominio` (crudo de las 4 fases + síntesis con callejones).

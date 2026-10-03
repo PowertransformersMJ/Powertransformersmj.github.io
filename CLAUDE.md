@@ -36,8 +36,7 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un §. NUNCA completo — usa offset/limit. |
 | 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-13 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
 | 🛰️ **Consejo Externo** | `docs/15-CONSEJO-EXTERNO.md` | ❌ on-demand | Trigger de Decisión Fuerte: crítica adversarial de un provider de OTRA familia (config + tiers ahí). |
-| 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` | ❌ on-demand | Trigger 🔵: registry de dominios; lóbulos hijos (`41-SEGURIDAD`, …, `49-PRUEBAS-ELECTRICAS.md`) nacen on-demand con contenido real. |
-| ⚡🔌 **Transformadores (equipo)** | `docs/50-TRANSFORMADORES-POTENCIA.md` | ❌ on-demand | Lóbulo de dominio del EQUIPO: tipo de transformador, grupo vectorial, cálculos nominales. |
+| 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` (registro + fronteras) | ❌ on-demand | Trigger 🔵. Transformador: `49-PRUEBAS-ELECTRICAS.md` · `50-TRANSFORMADORES-POTENCIA.md` (equipo, OLTC) · `51-SALUD-RIESGO-ACTIVOS.md` · `52-DGA-ACEITE-PAPEL.md` · `53-CARGA-TERMICA.md`. Software (41–48): nacen con contenido real. |
 | 🛠️ **Skills externas** | `~/.claude/skills/` + `skills/` + tool Skill | ❌ on-demand | Expertise portable de método. NO es neurona — recurso paralelo. **Catálogo → `docs/skills-inventory.md`**. |
 
 **Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `21`.
@@ -137,7 +136,7 @@ Al iniciar una conversación nueva estás **estrictamente obligado** a leer SOLO
 - **🟡 Desorientación**: dudas de DÓNDE vive un componente/ruta/flujo → **Memoria Espacial** (`20`) antes de tocar.
 - **🧪 Experiencia**: ANTES de op riesgosa/repetitiva (deploy, mover archivos, tocar reglas/estructura) → **Memoria Procedimental** (`30`) para el gotcha concreto, y **`60-WORKFLOWS`** para el PROCESO repetible (W-01..W-13). Si un síntoma "te suena", ahí está la receta.
 - **🟢 Historia**: "por qué" de una decisión o detalle de un § → Índice → Largo Plazo.
-- **🔵 Auditoría/Dominio**: análisis especializado (seguridad/legal/UX/SEO/perf/pruebas eléctricas/equipo) → (1) skill relevante (catálogo `docs/skills-inventory.md`); (2) `40-LOBULOS` / `49` / `50`; (3) neurogénesis del lóbulo con contenido REAL (§G.4); (4) capturar findings + qué skill usé.
+- **🔵 Auditoría/Dominio**: análisis especializado (seguridad/legal/UX/SEO/perf/transformador) → (1) skill relevante (catálogo `docs/skills-inventory.md`); (2) `40` (fronteras) + `00` Capa 2 → su lóbulo; (3) neurogénesis del lóbulo con contenido REAL (§G.4); (4) capturar findings + qué skill usé.
 - **🛰️ Decisión Fuerte**: ANTES de algo caro de revertir (arquitectura/datos/seguridad/legal) → **`60-WORKFLOWS` W-11** es el checklist CERRADO (cuando dispara: COMPLETO o no se aplicó); skills `proceso-decision-fuerte` + `comite-expertos` + provider externo de `docs/15`. Documenta la decisión como ADR (si no hubo revisor externo, márcala como NO revisada externamente).
 
 **Enrutamiento semántico**: ante una duda, NO escanees el cerebro. Ve al `docs/00-INDICE.md` (capa "síntoma → neurona").

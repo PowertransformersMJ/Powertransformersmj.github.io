@@ -2,7 +2,9 @@
 
 > Lóbulo registrado en `40-LOBULOS-DOMINIO`. Disparador: Trigger 🔵 §G.2 cuando el
 > cliente pide mejorar **cálculos / criterios / diagnóstico** de pruebas eléctricas a
-> transformadores de potencia (megóhmetro, FP/tan δ, relación, excitación, DGA, SFRA…).
+> transformadores de potencia (megóhmetro, FP/tan δ, relación, excitación, bujes, SFRA…).
+> **Alcance (2026-10-02, `99 §137`)**: pruebas eléctricas de campo + Tablero. La **DGA y el aceite** → `52` (las skills
+> `dga` y `analisis-aceite` siguen en `skills/pruebas-electricas/`, pero su criterio vive en 52) · carga y térmica → `53`.
 > Mantenido por Claude bajo demanda del director; **el cliente irá entregando más normas
 > y documentos** para alimentar las neuronas de cada skill.
 
@@ -132,7 +134,7 @@ director (MO.00418 Ed. 02 / IEEE / NETA) y luego fijar en `03-…` + el schema d
 - **SFRA**: sin umbral numérico de consenso IEEE/IEC — interpretación por bandas + métricas CC/ASLE (práctica).
 - **LTC**: transición 40–60 ms y tolerancia de resistores; umbral de nº de operaciones (del fabricante).
 - **Aceite**: límites en servicio por clase (IEEE C57.106 / NETA 100.4); cortes del índice IFT/acidez.
-- **DGA**: ppm exactos del percentil 90/95 por gas (IEEE C57.104-2019 Tablas 1/2, no públicos); cortes de Rogers/Doernenburg/Duval.
+- ~~**DGA**: ppm exactos del percentil 90/95 por gas (IEEE C57.104-2019 Tablas 1/2, no públicos); cortes de Rogers/Doernenburg/Duval.~~ → `52 §7`, `§12` (las fronteras de Duval ya se cotejaron, `99 §131`).
 - **DFR**: escala de % humedad del papel (2/3/4.5 %, CIGRE TB 349/414).
 
 ## ✅ Validación TODO-04 contra fuentes públicas (2026-07-23, ADR-053) — parcial
@@ -169,6 +171,29 @@ fábrica+tendencia) · resistores LTC ±10% y nº operaciones (VACUTAP VM 300k; 
 paridad). HALLAZGO nuevo → TODO-17: `calificarResistencia` (schema) da OK ≤5% mientras semáforo/scorecard usan
 2% (el 5% es el "admisible" IEEE pero rompe consistencia interna; ligado al `.calif` write-only de G012).
 Tabla per-clase (30 GΩ@110 kV): **no confirmable públicamente** — solo el MO.00418 del director puede fijarla.
+
+## 🚦 Umbrales del semáforo del tablero — estado (el VALOR lo manda el código)
+
+> Dueña de la FUENTE y del ESTADO de validación; el número vigente es el de `domain/pruebas_electricas_semaforo.js`
+> (`UMBRALES.*`). Si cambia el código, se actualiza esta tabla en el mismo cambio (`40` regla 5).
+
+| Prueba | Constante | Fuente | Estado |
+|---|---|---|---|
+| tan δ / FP | `tand` (investigar > 0,5 · rojo > 1,0 %) | NETA 100.3 (1,0 % aceite mineral) · IEEE C57.12.90-2015/C57.152 (0,5 % unidad nueva) | ✅ `§53` (atribución corregida) |
+| Excitación | `excitacion` (Δ 10 % si I < 50 mA · 5 % si ≥ 50 mA) | práctica de campo; criterio = FORMA 2+1 (L-53) | ✅ `§55` re-atribuido · ⚠️ el comentario del código aún dice «IEEE Std 62» |
+| Relación | `relacion` (± 0,5 %) | IEC 60076-1 · C57.152 | ✅ `§53` |
+| Resistencia de devanados | `resistencia` (desbalance > 2 %) | NETA D.8 (2–3 % industria, ± 5 % admisible IEEE) | ✅ `§55` · ⚠️ `calificarResistencia` de `schema.js` usa 5 % (TODO-17) |
+| Aislamiento (IR) | `aislamiento.minGohm` (respaldo; el shell recalifica por clase) | NETA 100.5 (5 GΩ > 5 kV); por clase solo el MO.00418 | ⚠️ por clase no confirmable en público · sin corrección a 20 °C (aviso visible, `§55`) |
+| Collar caliente | `collar` (≥ 100 mW) | Doble TDRB, 10 kV | ✅ `§55` re-atribuido |
+| DRM (OLTC) | `drm` (40–70 ms) | banda de cordura del fabricante | ✅ `§55` re-atribuido |
+| Reactancia de dispersión | — (solo en la skill: ± 3 % vs placa, 2 % entre fases) | C57.152 | 🔲 no implementada |
+
+## 🔩 Bujes (punteros)
+- FP C1/C2 y **ΔC1** (± 5 % investigar · > 10 % retiro, solo si la capacitancia AUMENTA o por tendencia; `estadoBushing` =
+  el peor de los dos) → `99 §13`, `§22`, `§55`; skill `factor-potencia-bujes` (+ `transformadores-potencia/bujes-y-accesorios`).
+- **FP de bujes va SEPARADO de los devanados**: cada prueba se califica sola (memoria `feedback_calificacion_global_por_prueba`).
+- Orden de riesgos del buje para el beneficio «Actualización de accesorios» de Fichas → bóveda `2026-09-26-beneficio-accesorios`.
+- Identidad y placa congeladas por INFORME (dos del mismo año no colapsan) → `99 §14`, `§26`.
 
 ## 🔎 Auditoría del panel FP/tan δ (2026-06-09) — gaps de diagnóstico vs la skill
 
@@ -207,8 +232,8 @@ Módulo: `assets/js/ui/pruebas/excitacion-panel.js` (espejo del panel tan δ; he
 
 ## Pendientes / próxima ronda
 
-- Validación del director sobre la skill ejemplar (¿el patrón de 4 neuronas le sirve?) antes
-  de replicar a las 12 restantes.
+- ✅ ~~Validación del director sobre la skill ejemplar (¿el patrón de 4 neuronas le sirve?) antes
+  de replicar a las 12 restantes.~~ Replicado a las 13 (`40 §Skills creadas`).
 - Ingerir las normas/documentos adicionales que el director vaya entregando (alimentar neuronas).
 - Investigación web continua por prueba (IEEE C57.152/C57.104/C57.149 SFRA, etc.).
 - Confirmar el set de mínimos por clase de tensión vs la edición de norma vigente.

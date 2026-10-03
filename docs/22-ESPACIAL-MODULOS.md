@@ -4,6 +4,8 @@
 > 3 caracteres de su tope). Aquí vive, **copiado sin cambiar una letra**, el detalle de dónde está
 > cada archivo de los módulos que más crecen: Fichas Técnicas, Órdenes de Materiales, Firmas y Cargabilidad SCADA (con DGA/Duval). La
 > madre conserva una fila corta por módulo (qué página y qué archivo abre la puerta) y apunta aquí.
+> **El CRITERIO de dominio** (por qué, fuente, estado de validación) no vive aquí: salud y riesgo → `51` · DGA, aceite y
+> papel → `52` · carga y térmica → `53` (`99 §137`).
 > **No se auto-carga.** Si se crea, mueve o retira un archivo de estos módulos, se actualiza AQUÍ en
 > el mismo cambio (Reflejo de Frescura, `CLAUDE.md §G.4` · **M-02**).
 

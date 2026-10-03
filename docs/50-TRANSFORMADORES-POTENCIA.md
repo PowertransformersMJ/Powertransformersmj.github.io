@@ -10,6 +10,9 @@
 > mide y se diagnostica). 50 = el **EQUIPO** (qué es, de qué tipo, qué cálculos
 > nominales y de placa le aplican). Se cruzan, no se duplican: la tipificación (50)
 > define el alcance del plan de pruebas (49).
+>
+> **Desde 2026-10-02 (`99 §137`)** también cubre los SUBSISTEMAS del equipo (OLTC/DETC, refrigeración, protecciones).
+> Hermanos del dominio: salud y riesgo → `51` · DGA, aceite y papel → `52` · carga y térmica → `53` (fronteras en `40`).
 
 ---
 
@@ -142,6 +145,31 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
 
 ---
 
+## 🔁 Cambiador de tomas bajo carga (OLTC) y sin carga (DETC)
+
+> Sin neurona propia hasta que exista un módulo que la use (`40`, candidatos). La composición del parque OLTC por marca
+> y tecnología es dato del cliente → memoria `reference_oltc_parque_y_docs` y carpetas `oltc-metodologia/` y
+> `oltc-capacitacion/` (fuera del repo público).
+
+- **Paridad OILTAP / VACUTAP (regla del Ingeniero, la corrigió dos veces)**: toda bifurcación por tecnología lleva DOS
+  ramas rotuladas, nunca «¿Es VACUTAP? Sí/No» con OILTAP implícito (memoria `feedback_oltc_ambas_tecnologias`).
+- **OILTAP** (ruptura en aceite, resistencias): mantenimiento mayor a 100.000 maniobras O 7 años (lo primero); ~150.000
+  con filtro OF en línea. **VACUTAP** (ruptura en vacío): casi libre de mantenimiento hasta ~300.000 maniobras, por
+  condición. Fuente: documentación pública de MR (enlaces verificados en la memoria); reconfirmar la revisión al usar.
+- DGA del compartimiento del ruptor: razón de Stenestam y el C₂H₂ como señal de arco (ABB, IEEE C57.139) — distinta de
+  la DGA de la cuba (`52`). Pruebas: DRM (`49`, umbral `drm`), R por toma, TTR.
+- Marcas sin fabricante activo: no inventar intervalos; usar IEC 60214-2 y la ruta OEM de la memoria.
+- Skills: `regulacion-tomas` · `pruebas-electricas/cambiador-tomas-ltc` (por actualizar con IEC 60214-1 y C57.139).
+
+## ❄️ Refrigeración y 🛡️ protecciones (punteros)
+- Tipos ONAN/ONAF/OFAF/ODAF y «etapa ≠ MVA gratis» → skill `sistema-refrigeracion` + `_conocimiento/00-fundamentos-transformador.md §E`.
+  Calibración Westinghouse de CFM → `domain/refrigeracion.js` + hoja `MANTENIMIENTO-BRIGADA.md`.
+- **Puente con `53`**: la ampacidad de la plataforma supone ventiladores en servicio (ONAF); «refrigeración deficiente»
+  aún no tiene señal (CF-27).
+- Buchholz, relé RS 2001, DW 2000, válvula de alivio → `_conocimiento/00 §E` + skill `bujes-y-accesorios`; sustento de
+  beneficios → bóveda `2026-09-25-beneficio-protecciones-mecanicas`.
+- Conexión de transformadores regulados (estrella/triángulo/auto) → memoria `project_conexion_regulados`.
+
 ## Pendientes / próxima ronda
 
 1. ✅ **Director validó** la arquitectura de 11 skills (2026-06-08) + aprobó replicar.
@@ -149,6 +177,6 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
    cargabilidad en `gestion-vida-activo`; aceite/DGA → lóbulo 49. **Único pendiente de lectura**:
    tablas [ILEGIBLES] (Códigos Transequipos + C57.104-2019 Tablas 1–4) en HD o directo de la norma.
 3. ✅ **Familia COMPLETA (11/11)** — patrón de 4 neuronas replicado a todas (2026-06-09).
-4. 🔲 Commit de `skills/transformadores-potencia/` (Claude commitea; el director pushea).
+4. ✅ ~~Commit de `skills/transformadores-potencia/` (Claude commitea; el director pushea).~~ Obsoleto: la familia está en el repo y la política git cambió (ADR-051).
 5. 🔲 **Director confirma valores `⚠️ verificar`**: tolerancias, MO.00418 por clase, % por etapa,
    tabla OLTC, base de MVA por par, hot-spot de diseño, criterios de FP de buje y DGA.
