@@ -347,3 +347,11 @@ se arma con las llaves ORDENADAS y los Timestamp como número; (2) un «cambiaro
 sospecha del comparador antes que del dato: se re-verifica con la comparación ordenada ANTES de decir nada; (3) la
 fidelidad de una carga se prueba con una lectura independiente de la fuente (aquí, openpyxl sobre el Excel) y una huella
 común (SHA-1 de líneas canónicas), no con el mismo código que escribió. **Gate**: [HONOR].
+
+### L-121 · Un mensaje de commit no prueba una función: el camino vivo se recorre en el tamaño en que se usa
+**Cicatriz** (`99 §135`): `dd9b5f6` (16-ago) decía «botón de menú con panel deslizante, cierre con Escape y al pulsar
+fuera»; existían el botón y el CSS, pero NINGÚN código abría el cajón. Mes y medio sin menú en celular y tablet hasta
+que el Ingeniero lo vio en su teléfono. **Regla**: (1) lo que solo se ve en un ancho (≤1024, ≤720) se verifica EN ese
+ancho, tocando el control, no leyendo el diff; (2) antes de decir que algo responsivo funciona, se barre el sitio entero
+con un medidor (iframes de 375/768 px sobre la vista previa con stubs; `bóveda 2026-10-02-sitio-responsive`); (3) una
+clase de estado (`sb-open`) que solo existe en CSS y en ningún JS es una señal de código muerto. **Gate**: [HONOR].
