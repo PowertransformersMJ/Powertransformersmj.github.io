@@ -50,4 +50,4 @@ recortar a la ventana con PIL (fuera quedan firmas y datos del fondo). El guion 
 revisar la bóveda. · **Receta**: `node ~/Desktop/GitHub-MJ/brain-private/kernel/pull.mjs` con la raíz del worktree como
 carpeta actual (el pull escribe en la carpeta desde donde se corre); comprobar a mano con `cmp scripts/X.mjs <canónico>/X.mjs`; y para
 repartir al otro repo, un árbol temporal `git worktree add --detach <tmp> origin/main` — allí tampoco corren sus candados
-de nombres, así que solo se sube el kernel. [HONOR]
+de nombres, así que solo se sube el kernel. [HONOR] · **Y una conversación de más de 48 h** (10-05, `99 §139`): si solo hubo compactaciones y ningún SessionStart, el pre-commit dice «COMMIT BLOQUEADO: presupuesto de boot excedido» aunque el arranque quepa; es el canario de `boot-gate.mjs` (`docs/.boot-marker` > 48 h). Los ganchos sí viven: `node scripts/session-handoff.mjs --boot-echo` y reintentar (no usar `BOOT_CANARY_SKIP`).
