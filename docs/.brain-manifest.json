@@ -47,7 +47,7 @@
     },
     "docs/33-LECCIONES-HARNESS.md": {
       "lines": 120,
-      "chars": 12000
+      "chars": 14000
     },
     "docs/11-PENDIENTES-FRIOS.md": {
       "lines": 120,
@@ -144,5 +144,6 @@
   },
   "_capsNuevos109": "2026-09-27 (auditoria Nivel-2, 99 §109, hallazgos S6 C-09 / S7 C-12): 32, 33, 11 y la cola de Fichas crecian sin tope (32 ya pesaba como 30). Topes con ~10 % de aire para que el aviso pre-shard avise antes de bloquear.",
   "_capsNuevos120": "2026-09-30 (99 §120): 00, 20, 30, 32 y la cola de Fichas llegaron a su tope. Shard por rango (00a, tramo §1-§80: sin filas nuevas, solo crece si un numero de linea gana una cifra), por modulo (22) y por tema (34, 35), y los CF cerrados de la cola a su archivo. Topes con ~30-40 % de aire en las hijas que crecen; los de las madres NO se tocaron.",
-  "_capsNuevos137": "2026-10-02 (99 §137): nacen 51/52/53 (16k: obliga a apuntar en vez de copiar ADRs); 49 y 50 no tenían tope: se les pone con ~20 % de aire sobre su tamaño tras trascender (49: 20,7k; 50: 12,5k)."
+  "_capsNuevos137": "2026-10-02 (99 §137): nacen 51/52/53 (16k: obliga a apuntar en vez de copiar ADRs); 49 y 50 no tenían tope: se les pone con ~20 % de aire sobre su tamaño tras trascender (49: 20,7k; 50: 12,5k).",
+  "_capsNuevos139": "2026-10-05 (99 §139): 33 pasó su tope (12.026/12.000) al ampliar lecciones de consola, bancos y Chrome; sube a 14.000 y la hija 36 (Chrome y bancos, S6-07) nace en la próxima ronda."
 }

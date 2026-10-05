@@ -26,6 +26,8 @@ workflow. Verde en Actions ≠ cambio en producción. Y antes de tocar `pages.ym
 público. Si un dato no debe verse, no se arregla con `.gitignore` ni con filtros de publicación —
 se mueve detrás de la autenticación. El catálogo de 206 equipos se resolvió leyendo de Firestore.
 **Gate.** [HONOR]. Ver `99 §62`.
+**Receta en uso** (desde `99 §90.5`): por cada archivo del sitio que cambió, `curl -s -o /tmp/x "$URL?cb=$(date +%s)"` y `cmp /tmp/x <ruta del repo>`; «idénticos byte a byte» es la evidencia. No comparar pasando el contenido por `echo` o por variables de la consola: un archivo con `\u0000` dio «character not in range» y un falso «falta».
+**Y antes de publicar** (`§103.5`, 09-25): las pruebas van en un paso APARTE; se lee `fail 0` y solo entonces se mergea. Una cadena `npm run test:unit | grep …; … git merge …` sigue aunque haya fallos (`;` no mira el resultado y la tubería devuelve el de `grep`): así salió `1f13f55` con una prueba vieja en rojo; lo frenaron CI y Deploy y la página no cambió. [HONOR]
 
 ### L-66 · Lo DECLARADO en el repo no es lo que hay en producción (índices de Firestore)
 **Síntoma.** El archivo declaraba 37 índices y producción tenía 33: los 4 de
@@ -40,6 +42,7 @@ del usuario que filtra. Igual con las CF: `maxInstances` no acota nada hasta des
 al backend: **el repo describe una intención; producción es un hecho aparte**.
 **Corolario.** Un `where` + `orderBy` nuevo lleva su índice en el MISMO turno: declarado y desplegado.
 **Gate.** [HONOR]. Ver `99 §63`.
+**Y `§117`**: `firestore.indexes.json` se edita como TEXTO, insertando solo el índice nuevo: reescribirlo con un serializador (`json.dumps`) reformateó el archivo entero y el cambio dejó de poderse revisar (se restauró con `git checkout` y se insertó a mano).
 
 ### L-67 · Una hoja de estilos sin marcado detrás es un port a medias
 **Síntoma.** El dueño dice que un módulo portado «no está como lo diseñó». Difícil de confirmar
@@ -292,8 +295,8 @@ datos o `$`; (2) una hoja clonada toma el `xr:uid` de la que reemplaza; quitar u
 `localSheetId` de los nombres definidos y los pies «Pág. N de T»; (3) antes de dibujar en una imagen de la
 plantilla, leer su `<a:xfrm rot>` y su `<a:ext>`: la plantilla puede girar una y no la otra; (4) validar con
 LibreOffice → PDF → `pdftoppm` (antes/después), `openpyxl` como lector estricto, chequeo de paquete (cada
-relación y Override con su parte) y un archivo PRUEBA con nombre nuevo en Descargas para que el Ingeniero lo abra.
-**Gate**: `tests/fichas_salud_riesgo_excel.test.js` + `tests/fichas_ajustes_libro.test.js` (paquete sano) · resto [HONOR].
+relación y Override con su parte) y un archivo PRUEBA con nombre nuevo en Descargas para que el Ingeniero lo abra. (5) una plantilla oficial arrastra datos que no se ven —vínculos a otros libros, propiedades de SharePoint/Microsoft 365 y etiqueta de clasificación, nombres #REF!, impresora, hojas borradas y dibujos fuera del área de impresión—: se quitan al exportar (`99 §104`, `limpiar-ocultos.js`); los textos sobrantes de la tabla de textos compartidos se VACÍAN sin moverlos, porque las celdas los llaman por número; las pruebas del DETECTOR (vista previa) van contra la PLANTILLA, donde esos datos siguen, y las del exportador comprueban que el archivo sale sin ellos; (6) una casilla COMBINADA no crece sola con el texto (Excel no ajusta el alto de las combinadas): su alto se calcula con `ui/fichas/alto-casilla.js` (parámetros y tope en `§105.2`); con «ajustar a una página» la hoja se imprime más chica en vez de pasar a dos.
+**Gate**: `tests/fichas_salud_riesgo_excel.test.js` + `tests/fichas_ajustes_libro.test.js` (paquete sano) + `tests/fichas_limpiar_ocultos.test.js` + `tests/fichas_alto_casilla.test.js` · resto [HONOR].
 
 ### L-104 · Vacío no es cero: `Number(null)` y `Number('')` dan 0
 **Disparador**: un número de la base decide una clasificación, un color o un veredicto. · **Cicatriz**
@@ -362,3 +365,6 @@ de definiciones de columnas» (~1,6 s > `RAPIDO` 1500 ms en el runner de GitHub)
 4 rojos entre 09-30 y 10-02, siempre con el mismo árbol verde en otro intento; el guardián busca el desastre de 5-23 s, no 1,6 s.
 · **Receta**: relanzar solo el trabajo fallido (`gh run rerun <id> --failed`) tras comprobar que el rojo era ESE test; NO subir
 el umbral ni saltarlo (decisión del Ingeniero 2026-10-02, antes TODO-68). Si falla otro test o pasa de ~3 s, es regresión. [HONOR]
+
+### L-124 · Un aviso automático se verifica como una cifra: si anuncia que algo falta, comprobar que falta
+**Cicatriz** (2026-10-01, dos veces el mismo día): (a) «Cargabilidad SCADA» publicó «no se leyeron los umbrales activos» y era falso: en producción no existe `umbrales_salud/global` porque no hace falta, y las bandas del MO.00418 SON las vigentes (`99 §122.4`, retirado en `6eed00c`); (b) en el libro de parámetros SCADA por punto, 12 de 21 avisos de «la escala cambia entre meses» eran falsos (ceros nocturnos, congelamientos, cambios de signo; `§138`, bóveda `2026-10-01-parametros-scada`). Las cifras estaban exactas; lo que engañaba eran las observaciones. **Regla**: (1) antes de mostrar un aviso de falta, comprobar en producción si falta de verdad o si su ausencia es el estado normal (L-109: «no existe» no es «no se pudo leer»); (2) un detector de anomalías se valida por cuántos falsos da sobre los casos reales, no con el caso que lo motivó; (3) no se silencia (L-81): se afina hasta que acierte, y al entregar se separa lo verificado (cifras) de lo orientativo (observaciones). [HONOR]

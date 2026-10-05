@@ -84,8 +84,9 @@ Trivial / reversible / mecánico → trabajo directo (+ `caza-bugs` si hay estad
 2. **Detección de fila-cabecera** antes de importar hojas con títulos encima (columnas `__EMPTY`).
 3. **Simulación primero (dry-run)**: reportar creados/actualizados EXACTOS contra el total esperado, antes de escribir nada.
 4. **Guard de omitidos**: toda fila que no entra se REPORTA. Una importación que omite en silencio es peor que una que falla.
-5. **El drag&drop lo hace el Ingeniero** en su Chrome (L-62) — no simularlo por él.
+5. **Subir el archivo**: por defecto lo arrastra el Ingeniero en su Chrome (L-62). **Excepción a pedido suyo** (`99 §125`, 10-01: *«prefiero que los proceses tú, quedan limpios y menos probabilidad de error»*): si el insumo ya está en su disco, Claude lo prepara (meses SCADA: «paquete preparado», `scripts/scada-empaquetar.mjs`) y lo sube por la extensión desde Descargas, una parte por llamada (`file_upload` ≤ 10 MB → L-117), como en `§125` y `§131`. **Escribir** en producción solo con la simulación del paso 3 a la vista y su «procede» para esa tanda (`§131.4` → `§131.9`).
 6. **Verificar el tablero vivo** tras la carga (W-10 + validación live), no solo el log del importador.
+7. **Comprobar la carga**: foto antes/después que compara VALORES con las llaves ordenadas (L-120) y fidelidad con una lectura independiente de la fuente; una matrícula repetida en el Excel puede ser dos equipos distintos: no se escoge «la primera», se reporta y no se escribe (`§131`).
 
 ---
 

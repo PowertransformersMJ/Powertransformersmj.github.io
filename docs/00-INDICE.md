@@ -22,56 +22,58 @@
 | §85 | ADR-085 — **El alcance lo escribe la redacción dictada** por el Ingeniero | 3514 |
 | §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos; kernel sin IDs ajenos | 3574 |
 | §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real, `[PENDIENTE]` nunca «0» | 3632 |
-| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes) | 3713 |
-| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero, ficha y Excel (CF-25) | 3743 |
-| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones | 3797 |
-| §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3832 |
-| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3855 |
-| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3887 |
-| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 | 3922 |
-| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve | 3964 |
-| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas** | 4014 |
-| §97 | ADR-097 — **Beneficios sin subtítulos** | 4032 |
-| §98 | ADR-098 — **Firma estampada** de la sesión | 4046 |
-| §99 | ADR-099 — **Firmas del equipo bajo custodia** | 4078 |
-| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) | 4169 |
-| §101 | ADR-101 — **Firmas de tamaño parejo** | 4197 |
-| §102 | ADR-102 — **Vista previa del Excel + PDF** | 4211 |
-| §103 | ADR-103 — **Mantenimiento al PE.02081** | 4238 |
-| §104 | ADR-104 — **Excel sin datos ocultos** | 4256 |
-| §105 | ADR-105 — **Beneficios con las 13 acciones** | 4285 |
-| §106 | ADR-106 — **Zona del activo** | 4321 |
-| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin usuarios, sin casilla) | 4335 |
-| §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4368 |
-| §109 | ADR-109 — **Auditoría Nivel-2** (M-07) | 4389 |
-| §110 | ADR-110 — **Sin hoja Beneficios**; Futuro derecho | 4416 |
-| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota 7 variables | 4448 |
-| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4467 |
-| §113 | ADR-113 — **CF-40**: lector en un hilo con tiempo límite | 4553 |
-| §114 | ADR-114 — **Órdenes E/S**: firmas en Autorizado y Entregado | 4599 |
-| §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4645 |
-| §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4717 |
-| §117 | ADR-117 — **Órdenes E/S**: firmas delegadas | 4768 |
-| §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4828 |
-| §119 | ADR-119 — **Fichas**: firmas delegadas (Carlos, Jorge) | 4871 |
-| §120 | ADR-120 — **Cerebro partido en hijas** (`00a`, `22`, `34`, `35`, CF cerrados); kernel reconcilia el índice por rangos | 4959 |
-| §121 | ADR-121 — **Fichas**: «Elaboración» por defecto sigue a la sesión (Carlos, Jorge) | 5035 |
-| §122 | ADR-122 — **Cargabilidad SCADA**: carga horaria real vs ampacidad del devanado, CRG firme/provisional, «Datos SCADA» (homologación y meses) | 5078 |
-| §123 | ADR-123 — **Detalle de Cargabilidad**: la ventana de la tabla priorizada abre con el parque real, sin cifras sin dato y a la vista en la pestaña (iframe) | 5173 |
-| §124 | ADR-124 — **Detalle de Cargabilidad**: «Diagnóstico» con las 7 calificaciones de Salud de Activos y enlace a las curvas horarias medidas por el SCADA (decisiones del Ingeniero) | 5248 |
-| §125 | ADR-125 — **Cargabilidad SCADA con datos**: «Paquete preparado» (un mes en 3 partes por la extensión, mismo lector), homologación v2 y 8 meses cargados, arreglos de la revisión | 5304 |
-| §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5367 |
-| §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5431 |
-| §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5505 |
-| §129 | ADR-129 — **Cargabilidad SCADA**: marca «sostenida» de la lista sin falsos | 5554 |
-| §130 | ADR-130 — **Cargabilidad SCADA**: «Máximo sostenido 2 h» del detalle con serie limpia | 5599 |
-| §131 | ADR-131 — **Cargabilidad SCADA**: triángulo de Duval hoy y con más carga + carga «solo gases» + regla vieja de Duval corregida | 5630 |
-| §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5707 |
-| §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5753 |
-| §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5783 |
-| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5804 |
-| §136 | ADR-136 — **Cerebro**: mantenimiento minucioso (auditoría de 5 lentes, 55 confirmados) · TODO-68 → L-122 · prueba del ☰ | 5848 |
-| §137 | ADR-137 — **Cerebro · dominio**: nacen los lóbulos 51 (salud y riesgo), 52 (DGA, aceite y papel) y 53 (carga y térmica); 49/50/34 trascienden · TODO-73 | 5883 |
+| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes) | 3715 |
+| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero, ficha y Excel (CF-25) | 3747 |
+| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones | 3801 |
+| §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3836 |
+| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3859 |
+| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3891 |
+| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 | 3926 |
+| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve | 3968 |
+| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas** | 4020 |
+| §97 | ADR-097 — **Beneficios sin subtítulos** | 4039 |
+| §98 | ADR-098 — **Firma estampada** de la sesión | 4054 |
+| §99 | ADR-099 — **Firmas del equipo bajo custodia** | 4086 |
+| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) | 4178 |
+| §101 | ADR-101 — **Firmas de tamaño parejo** | 4206 |
+| §102 | ADR-102 — **Vista previa del Excel + PDF** | 4220 |
+| §103 | ADR-103 — **Mantenimiento al PE.02081** | 4247 |
+| §104 | ADR-104 — **Excel sin datos ocultos** | 4266 |
+| §105 | ADR-105 — **Beneficios con las 13 acciones** | 4296 |
+| §106 | ADR-106 — **Zona del activo** | 4332 |
+| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin usuarios, sin casilla) | 4346 |
+| §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4380 |
+| §109 | ADR-109 — **Auditoría Nivel-2** (M-07) | 4401 |
+| §110 | ADR-110 — **Sin hoja Beneficios**; Futuro derecho | 4428 |
+| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota 7 variables | 4460 |
+| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4479 |
+| §113 | ADR-113 — **CF-40**: lector en un hilo con tiempo límite | 4566 |
+| §114 | ADR-114 — **Órdenes E/S**: firmas en Autorizado y Entregado | 4613 |
+| §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4660 |
+| §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4732 |
+| §117 | ADR-117 — **Órdenes E/S**: firmas delegadas | 4783 |
+| §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4845 |
+| §119 | ADR-119 — **Fichas**: firmas delegadas (Carlos, Jorge) | 4890 |
+| §120 | ADR-120 — **Cerebro partido en hijas** (`00a`, `22`, `34`, `35`, CF cerrados); kernel reconcilia el índice por rangos | 4980 |
+| §121 | ADR-121 — **Fichas**: «Elaboración» por defecto sigue a la sesión (Carlos, Jorge) | 5056 |
+| §122 | ADR-122 — **Cargabilidad SCADA**: carga horaria real vs ampacidad del devanado, CRG firme/provisional, «Datos SCADA» (homologación y meses) | 5099 |
+| §123 | ADR-123 — **Detalle de Cargabilidad**: la ventana de la tabla priorizada abre con el parque real, sin cifras sin dato y a la vista en la pestaña (iframe) | 5196 |
+| §124 | ADR-124 — **Detalle de Cargabilidad**: «Diagnóstico» con las 7 calificaciones de Salud de Activos y enlace a las curvas horarias medidas por el SCADA (decisiones del Ingeniero) | 5271 |
+| §125 | ADR-125 — **Cargabilidad SCADA con datos**: «Paquete preparado» (un mes en 3 partes por la extensión, mismo lector), homologación v2 y 8 meses cargados, arreglos de la revisión | 5327 |
+| §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5393 |
+| §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5459 |
+| §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5533 |
+| §129 | ADR-129 — **Cargabilidad SCADA**: marca «sostenida» de la lista sin falsos | 5582 |
+| §130 | ADR-130 — **Cargabilidad SCADA**: «Máximo sostenido 2 h» del detalle con serie limpia | 5627 |
+| §131 | ADR-131 — **Cargabilidad SCADA**: triángulo de Duval hoy y con más carga + carga «solo gases» + regla vieja de Duval corregida | 5658 |
+| §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5738 |
+| §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5784 |
+| §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5814 |
+| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5835 |
+| §136 | ADR-136 — **Cerebro**: mantenimiento minucioso (auditoría de 5 lentes, 55 confirmados) · TODO-68 → L-122 · prueba del ☰ | 5879 |
+| §137 | ADR-137 — **Cerebro · dominio**: nacen los lóbulos 51 (salud y riesgo), 52 (DGA, aceite y papel) y 53 (carga y térmica); 49/50/34 trascienden · TODO-73 | 5914 |
+| §138 | ADR-138 — **Cargabilidad SCADA: libro de parámetros por punto** (columna C de la homologación): entregable aparte, 17 posibles correcciones, 104 medidas fuera | 5969 |
+| §139 | ADR-139 — **Cerebro: documentación total de la conversación 09-23 → 10-05** (notas a ADRs, lecciones, cola, memoria y bóveda; sin código) | 5996 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -79,6 +81,7 @@
 |---|---|
 | ¿Dónde vive un módulo / ruta / flujo / componente? | 🗺️ `20-MEMORIA-ESPACIAL` |
 | Voy a mover/renombrar archivos, refactor, merge, deploy | 🧪 `30-LECCIONES` (gotchas) + 🗺️ `20` |
+| Otra sesión de Claude trabaja a la vez (mismo repo, misma rama o la bóveda): números de ADR/L, qué sube a `main` | `30` **M-08** (mismo repo) + **M-05** (bóveda) |
 | Voy a agregar o retirar una exportación de un módulo JS ya publicado (caché del navegador) | `32` **L-102 (3)**: lo nuevo va en un archivo NUEVO · retirar → `30` **L-116** |
 | Voy a tocar `functions/` o el pipeline de IA (streaming/reintentos/timeouts) | 🤖 `31-LECCIONES-IA` (hija de `30`, L-35/L-43–L-48) |
 | Busco un pendiente que no está en `10` (decisión de arquitectura, validación diferida, cola vieja) | 🧊 `11-PENDIENTES-FRIOS` (hija de `10`) |
@@ -103,7 +106,8 @@
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
 | 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82 en adelante` + **L-103** |
-| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · marca «sostenida» de la lista (resumen en bruto vs serie limpia) → `§129` + L-119 (bóveda `2026-10-02-marca-sostenida`) · triángulo de Duval por activo, ppm `ultima_dga`, márgenes de carga → `§131` (foto antes/después de una carga: comparar valores, no texto → `§131.9` + L-120) · margen en ppm y criterio «no firme» → `§131.10` · gases con más carga, punto caliente IEC 60076-7 → `§132` · textos del panel DGA con/sin ppm (`scada_carga_dga_textos_ppm.js`; el catálogo no se edita) → `§133` · triángulo «con más carga» aparte del de hoy → `§134` (bóveda `2026-10-02-duval-proyeccion`) · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
+| ✍️ Redactar o retocar un texto que se FIRMA (Beneficios, Alcance de Fichas) | memoria `feedback_redaccion_beneficios` (vocabulario y método) + `32` **L-88** + bóveda `2026-09-2[5-7]-beneficio-*` (`99 §105`) · preguntas suyas sin respuesta → cola de Fichas, «Tuyo» 9 |
+| 📈 Cargabilidad SCADA: curvas horarias, homologación con el SCADA, carga de un mes, ventana de un mes | `99 §122` + L-113 · L-114 (botón ilegible, página vacía y clase CSS compartida entre pantallas, §122.9/§126.9) · cargar un mes sin arrastrar (paquete preparado, `scripts/scada-empaquetar.mjs`) → `§125` + L-117 · máx/mín/instantáneo, filtro y gráficas grandes → `§126` · DGA × carga (adversidades y acciones preventivas) → `§127` + L-118 · marca «sostenida» de la lista (resumen en bruto vs serie limpia) → `§129` + L-119 (bóveda `2026-10-02-marca-sostenida`) · triángulo de Duval por activo, ppm `ultima_dga`, márgenes de carga → `§131` (foto antes/después de una carga: comparar valores, no texto → `§131.9` + L-120) · margen en ppm y criterio «no firme» → `§131.10` · gases con más carga, punto caliente IEC 60076-7 → `§132` · textos del panel DGA con/sin ppm (`scada_carga_dga_textos_ppm.js`; el catálogo no se edita) → `§133` · triángulo «con más carga» aparte del de hoy → `§134` (bóveda `2026-10-02-duval-proyeccion`) · un aviso automático de «falta» que resultó falso → `32` **L-124** · libro de parámetros por punto (columna C) → `§138` · archivos y colecciones `scada_*` → `22` · bóvedas `2026-09-30-cargabilidad-scada` · `2026-10-01-carga-scada-paquete` · `2026-10-01-parametros-scada` (TODO-69) · `2026-10-01-dga-carga` |
 | 🪟 Ventana de detalle de Cargabilidad (tabla vieja) · una ventana fija dentro de un iframe que no se ve · retirar exportaciones con caché | `99 §123`, `§124` + L-115, L-116 · bóveda `2026-10-01-detalle-cargabilidad` |
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
 | 📱 El sitio en celular o tablet: el menú ☰ no abre, la barra no cabe, una tabla o gráfica se corta a 375/768 px · tocar `aqua-shell.js` o `aqua-components.css` | `99 §135` + `32` **L-121** · barrido reutilizable (servidor con stubs + iframes de 375/768) → bóveda `2026-10-02-sitio-responsive/crudos/` |

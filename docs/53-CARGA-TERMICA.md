@@ -23,19 +23,21 @@
 - Corriente horaria de la fase más cargada (≥ 2 fases válidas) → **p99 del periodo ÷ ampacidad del devanado**
   (`electrico.corriente_nominal_*_a`). Horas > 3 × ampacidad = escala imposible, fuera. Equipo = máximo de sus
   devanados: **NUNCA se suman niveles**. Calibrada contra la carga oficial 2025: mediana del cociente 0,993.
-- **Firme / provisional**: firme solo con homologación confirmada, ampacidad, el devanado que lleva la carga,
-  cobertura ≥ 50 %, ≥ 72 h válidas y sin escala sospechosa; la provisional va en gris con su motivo.
+- **Firme / provisional**: firme solo si se cumple TODO: homologación automática (sin avisos que la frenen) o confirmada por el Ingeniero —y confirmada si lo que se mide es un circuito—, ampacidad en cada devanado, se mide el devanado que lleva la carga, cobertura ≥ 50 %, ≥ 72 h válidas, las 3 fases en la mayoría de las horas (con solo 2 en más del 50 % es provisional, `§125.2`), sin escala sospechosa y sin mes del rango sin leer (`firmeza` en `scada_carga_kpis.js`); la provisional va en gris con su motivo.
 - Ventana del mes = las horas que el SCADA ROTULA en él (`ventanaDeMes`). Gotchas → L-113, L-117 (`30`).
+- Las horas del SCADA se leen en **hora de Colombia, UTC−5 fijo** (sin horario de verano): calendario, lista y curvas no dependen de la zona del computador (`domain/scada_carga_fecha.js`, `99 §122`).
 - Homologación SCADA ↔ transformador, valores tope y escala ×10 → `99 §122`, `§125`; bóveda `2026-10-01-parametros-scada`.
 
 ## 3. Ampacidad
 - Es la de **ventiladores en servicio (ONAF)**, confirmado por el Ingeniero (`99 §127.1`). Si la refrigeración falla,
   la ampacidad real es menor y la cifra subestima: hoy nada lo cruza («refrigeración deficiente» sin señal → CF-27).
+  Hoy son **27 equipos ONAF con ventilación obsoleta** (dato del diseño de `§122`, bóveda `2026-09-30-cargabilidad-scada/diseno-v2.md`; riesgo anotado en `99 §127.8`): en ellos la cifra medida y el nivel del panel DGA pueden quedarse cortos.
 - Erratas ×10 conocidas en la ampacidad: hay que dividir el PAR (ampacidad y carga), no la ampacidad sola (TODO-54).
 
 ## 4. Sobrecarga sostenida
 - **≥ 2 h seguidas > 100 %** (criterio del Ingeniero, `§122.2`) · fila severa **≥ 2 h > 130 % (1,3 p.u.)**: el MENOR
   tope de corriente de IEC 60076-7:2005 Tabla 4, criterio conservador del área, solo con cifra FIRME (`§127.2`).
+  La edición 2018 (§7.2, Tabla 3, leída en `§132`) mantiene 1,3 p.u. para unidades GRANDES y da 1,5 p.u. a las medianas en carga cíclica normal y en emergencia larga: el 130 % sigue siendo el tope más conservador de la norma vigente (bóveda `2026-10-02-duval-proyeccion`, crudo del paso 5).
 - La marca de la LISTA (resumen en bruto) decide solo donde se probó exacta; si no, lee la curva del mes con la serie
   limpia (`§129`, L-119). El «Máximo sostenido 2 h» del detalle sale de la serie limpia (`§130`).
 
@@ -77,6 +79,7 @@
   (A sin DGA · B 1–2 · C 3 · D 4–5 · E C₂H₂ = 5). Sin medición SCADA no hay nivel. Catálogo de 15 adversidades y 17
   acciones con norma y cláusula: **BORRADOR** (`APROBADO = false`), sin revisión externa (TODO-69). Textos con/sin ppm:
   `scada_carga_dga_textos_ppm.js` (el catálogo no se edita, L-102). Lección: L-118.
+- ⚠️ **Dos rótulos «Borrador»**: el del panel DGA lo apaga `APROBADO` (`domain/scada_carga_dga_textos.js:13`); el del triángulo de Duval está escrito fijo en `ui/cargabilidad-scada/panel-duval.js:274` y no lo mira. Cuando él apruebe los textos, se quitan los dos o se decide panel por panel.
 
 ## 10. Pendientes (solo punteros)
 - TODO-69 (supuestos del §5, textos DGA, 0,5 pu) · TODO-54 (erratas de ampacidad) · TODO-71 (detalle de la tabla vieja)

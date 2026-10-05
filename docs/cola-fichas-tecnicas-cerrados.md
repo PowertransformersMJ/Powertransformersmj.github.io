@@ -21,6 +21,8 @@
 | ~~**CF-07**~~ | ✅ **CERRADO `99 §107.3` (publicado 09-27, `1330bf1`)** — `nivelPorUsuarios` devuelve nulo sin dato: la ficha dice «no se puede situar», sin veredicto, y la matriz gerencial lo cuenta fuera (en vivo: los 3 de TODO-55). Lo que decía: **Al equipo sin usuarios registrados la hoja le asigna «criticidad Mínima» y firma un veredicto**, sin avisar. | `panel.js` (hoja salud/riesgo) + `matriz_riesgo.js` (`avisoDatoConsecuencia` no cubre el vacío) | Sin usuarios no hay columna: aviso de «no se puede situar» y sin veredicto |
 | ~~**CF-32**~~ | ❎ **REFUTADO con evidencia (`99 §87`, `2fa7241`)**: el exportador escribe todo texto como celda de texto (`t="inlineStr"`) y ni LibreOffice ni SheetJS lo evalúan; la «fórmula viva» es riesgo del CSV, que la evaluación masiva ya neutraliza. El apóstrofo propuesto **imprimía «'» en el papel** y no protegía nada: NO se aplicó. Queda un candado de prueba que falla si lo tecleado se vuelve fórmula o recibe el apóstrofo. | `tests/fichas_exportar_planificacion.test.js` | — |
 
+> **Nota 2026-10-05 sobre CF-05** (la fila se conserva tal cual): desde la revisión de `99 §87.4b` el Valor Real ya NO se lee con `montoCOP` sino con `leerMonto` (solo cifras escritas a la colombiana; lo demás sale `[PENDIENTE]` y avisa). `montoCOP` sigue leyendo solo el catálogo.
+
 ## Del bloque 🟠 MEDIO/MENOR
 
 - ~~**CF-40**~~ ✅ **CERRADO `99 §113` (publicado 09-28, `54ec71f`)**: estructura revisada en una pasada + lectura en un Worker con 20 s de límite. Lo que decía: **«Diagrama Operativo»: el lector del `.xlsx` aún se puede congelar** (`99 §112.8`). (a) ReDoS
