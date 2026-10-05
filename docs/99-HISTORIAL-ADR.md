@@ -3710,6 +3710,8 @@ las redacciones inserta subestación/matrícula con el mismo `String.replace` de
 parque). **Publicación retenida** hasta el visto bueno del Ingeniero sobre el preview (artifact privado
 «El Excel que se firma» + tres `.xlsx` de ejemplo).
 
+**87.9 Nota (2026-10-05).** La «pregunta abierta» de 87.8 (repetida en `§90.5`) se resolvió el 09-24: Valor Real vacío ⇒ en blanco (J36 y su total), sin aviso; solo lo ilegible dice `[PENDIENTE]` → `§93`.
+
 ## 88. ADR — Período de ejecución y firmas con la forma del Excel PE.02081 ⟦OPUS-5.5⟧ (2026-09-23)
 
 > Pedido, con captura del documento de Mantenimiento: *«me gustaría que esta parte se pueda apreciar como
@@ -3739,6 +3741,8 @@ plantilla; capturas a 2× con Chrome sin cabeza de los dos documentos. Commit `8
 conecta cuando el Ingeniero entregue los parámetros. Los NOMBRES de personas no pueden vivir en el código
 (repo público): si son fijos, irán a su navegador o a un documento de configuración en Firestore. La
 plantilla escribe «Lider Planificacion» sin tildes: la pantalla lo copia tal cual hasta que él diga.
+
+**88.5 Nota (2026-10-05).** Dos frases de 88.4 quedaron viejas: (a) lo tecleado en los firmantes ya llega al Excel: CF-25 se cerró en `§89`; (b) «los NOMBRES de personas no pueden vivir en el código» era más estricto que lo vigente y se le corrigió al Ingeniero en `§89.2`: `§78.3` ya aceptaba que los nombres son públicos; lo que nunca va al repo son cédulas y firmas escaneadas.
 
 ## 89. ADR — Quién firma el PE.02081: la lista dictada por el Ingeniero, en la ficha y en el Excel (CF-25) ⟦OPUS-5.5⟧ (2026-09-23)
 
@@ -4011,6 +4015,8 @@ de edición también sale impreso encima de la hoja: es anterior (CF-39), no de 
 `exportar-planificacion.js`, `panel.js`, `fichas_fechas.js`, `beneficios_practicas.js` y `fichas-tecnicas.css`
 servidos idénticos al repo con anti-caché (L-65).
 
+**95.10 Enmiendas (nota 2026-10-05).** 09-25 → `§96` (nada pre-marcado) y `§97` (sin subtítulos, términos más técnicos); **09-27 → `§105`, que SUPERA este modelo**: Beneficios de Mantenimiento muestra solo las 13 acciones del Ingeniero, con textos aprobados uno a uno; de `beneficios_practicas.js` solo se reusa la apertura. Leer `§105` antes de tocar Beneficios.
+
 ## 96. ADR — En Mantenimiento nada viene marcado: Beneficios vacío hasta que el Ingeniero escoja ⟦OPUS-5.5⟧ (2026-09-25)
 
 > Pedido (captura del texto ya compuesto al abrir, equipo de ASTREA): *«aquí no debe reposar nada hasta que yo
@@ -4028,6 +4034,7 @@ desmarcar la última → vacío con «Sin texto todavía.», Alcance intacto.
 **96.8 Verificado sano.** «Marcar las suyas» sigue marcando la banda entera del equipo: es explícito del Ingeniero.
 **96.9 Publicación (09-25).** Orden del Ingeniero: *«procede»*. Merge `0499e0d`; CI y Deploy verdes; `panel.js` y
 `beneficios_practicas.js` servidos idénticos al repo con anti-caché (L-65).
+**96.10 Nota (2026-10-05).** Sin revisión independiente: seguía alcanzado el límite mensual de gasto de los agentes (se le dijo al Ingeniero); solo verificación propia en el banco. Sigue vivo de aquí que en Mantenimiento nada viene marcado de fábrica (`seleccionAcciones`); la hoja Beneficios la rehízo `§105` con su propia revisión adversarial.
 
 ## 97. ADR — Beneficios sin subtítulos y con términos más técnicos, uno por acción ⟦OPUS-5.5⟧ (2026-09-25)
 
@@ -4042,6 +4049,7 @@ técnicos. Los amplios de `§92` siguen como `beneficioAmplio`. Crudo → bóved
 **97.2 Verificación.** Pruebas: 15-32 palabras, sin cifras ni normas, diagnóstico no «reduce», lo irreversible
 negado, OILTAP/VACUTAP en breve, sin subtítulos → 1856 pass; banco con tres prácticas.
 **97.3 Límite.** La introducción y el cierre se conservan (no se pidió quitarlos); se le ofreció retirarlos.
+**97.5 Nota (2026-10-05).** Superado el 09-27 por `§105` (ver 95.10): Beneficios ya no muestra las 32 prácticas; la oferta de 97.3 quedó atrás.
 
 ## 98. ADR — La firma de quien tiene la sesión se estampa en su casilla, en la ficha y en el Excel ⟦OPUS-5.5⟧ (2026-09-25)
 
@@ -4165,6 +4173,7 @@ emulador. Otros defectos vistos: «Mi firma» puede quedar en «Inicie sesión»
 panel; una lectura fallida tarda ~2 min en rendirse (reintentos del SDK). **Queda para el Ingeniero**: la ruta.
 **99.14 Corrección (09-25).** «“Mi firma” puede quedar en “Inicie sesión” si la sesión llega antes de montar el
 panel» (99.13) fue un diagnóstico EQUIVOCADO: el panel esperaba los ~2 min de reintentos del 503 sin repintar. Ver `§100`.
+**99.15 Nota posterior (2026-10-05).** Ya no rige: (a) desde `§108` (09-27) «Exportar Excel» del custodio lleva las cinco firmas con registro y folio; el botón «Descargar con firmas del equipo» quedó OCULTO (su código se conserva) y el [PENDIENTE] solo avisa (contra 99.3 y 99.11); (b) «cargada por Claude» (99.5) no se cumplió al pie de la letra: con su «procede por favor», Claude las cargó desde su Chrome, con su sesión y por el formulario de la página (99.13); fue por orden suya, no regla nueva; (c) la respuesta de Gemini que la cabecera da por pendiente llegó ese mismo día y está verificada en 99.10.
 
 ## 100. ADR — Las firmas pasan de Storage a Firestore: Storage no entrega las descargas al navegador ⟦OPUS-5.5⟧ (2026-09-25)
 
@@ -4251,6 +4260,7 @@ de `1f13f55` fallaron; se actualizó la prueba a la regla nueva y `2897195` sali
 de las pruebas ANTES de encadenar el merge. **103.8 Pendiente suyo.** «[object Object]» en «Tipo de refrigeración»
 (Anexo AT, pantalla y Excel): el registro guarda la refrigeración como grupo de datos; corrección propuesta y NO hecha
 (él la descartó por ahora). Y qué retirar de los datos ocultos de la plantilla (`§102.2`).
+**103.9 Precisión (2026-10-05).** El «[object Object]» no lo descartó: cerró sin contestar las dos preguntas de ese momento y enseguida reclamó «porque me preguntas por salud de activos» (confusión de nombres, `30` L-61). Sigue abierto en `10` (lista I). En el código, `panel.js` pasa con `String()` el grupo de datos de la refrigeración (el tipo vive en `tipo_refrigeracion`, como en `§123.1`); desde `§107` solo lo muestra el Anexo AT del PI. Lo de los datos ocultos lo cerró `§104`.
 
 
 ## 104. ADR — El Excel PE.02081 sale SIN datos ocultos ⟦OPUS-5.5⟧ (2026-09-25)
@@ -4281,6 +4291,7 @@ píxel a píxel antes/después. openpyxl lo abre sin quejas. Paquete sano (cada 
 dos veces en el mismo sitio de Beneficios es de la plantilla y está DENTRO del área (se ve; no es oculto). Propuesta no
 hecha: K11 «Costos [MCOL]» debería leer el total del proyecto (J78) para que la Relación B/C calcule; hoy, igual que
 antes, sale «$ -» y «#¡DIV/0!».
+**104.9 Nota (2026-10-05).** La prueba en Excel real (`104.5`) sigue sin hacerse. No hace falta otro archivo: todos los `PRUEBA_*.xlsx` de Descargas salen del exportador con la limpieza. El más reciente es el de `§115` (`Descargas/Fichas_vista_previa_2026-09-28/PRUEBA_Ficha_Mantenimiento_FINAL_publicado_2026-09-28.xlsx`), revisado sin vínculo externo, sin propiedades de Microsoft 365 y sin impresora. Al abrirlo, el Ingeniero confirma también lo de `§104`: que Excel no pida «reparar» ni «actualizar vínculos».
 
 ## 105. ADR — Beneficios de Mantenimiento con las 13 acciones del Ingeniero; la casilla crece en el Excel ⟦OPUS-5.5⟧ (2026-09-27)
 
@@ -4364,6 +4375,7 @@ T2-M/M-SML cond 3 = los de TODO-55); la columna Mínima pasa de 147 a 144; la su
 casilla aquí y en Analítica gerencial» también cuando no hay casilla (texto de la pantalla, sin tocar). En la
 Priorización gerencial un equipo sin usuarios sigue apareciendo con criticidad «—» y puntaje condición × 1 (su
 comportamiento previsto para nivel nulo).
+**107.9 Nota (2026-10-05).** Lo que 107.8 deja abierto ya se resolvió: la letra se agrandó en `§115`, y la nota «cae en la misma casilla…» ya no se muestra en ningún lado (fuera del Excel desde `§111`, fuera de la pantalla desde `§115`). Su texto se sigue armando en `modeloSaludRiesgo` sin pintarse (código sin llamada, en la cola de Fichas).
 
 ## 108. ADR — «Exportar Excel» lleva siempre las cinco firmas y registra cada descarga con su folio ⟦OPUS-5.5⟧ (2026-09-27)
 
@@ -4549,6 +4561,7 @@ pendiente sabido**: un Worker con límite de tiempo para el lector (el tope cont
 autor del zip puede falsear; mitigado por el tope de entrada de 15 MB y porque solo adjunta un administrador) · con
 muchísimas actividades la letra baja (manda el alto): se avisa y se pide confirmar · el primer adjunto y la primera
 exportación reales, del Ingeniero.
+**112.9 Nota (2026-10-05).** NO revisado externamente: el 09-28 se le dejó en el chat el texto para pedirle a Gemini una segunda opinión sobre el diseño (consulta opcional); no se corrió y el texto no quedó en la bóveda (`2026-09-28-diseno-diagrama-operativo/` no lo tiene). Hubo solo el comité interno (112.2) y la revisión adversarial (112.4).
 
 ## 113. ADR-113 — CF-40: el Excel adjunto del «Diagrama Operativo» se lee en un hilo aparte con tiempo límite y con su estructura revisada antes de leerlo ⟦OPUS-5.5⟧ (2026-09-28)
 
@@ -4595,6 +4608,7 @@ pasa su medidor), `-hoja.js`, exportador, plantilla.
 **113.8 Verificado sano / pendiente.** Caché mezclada en Pages (trabajador nuevo con lector viejo y al revés) da el mismo
 PNG; clonado de `Date`/`Set` intacto; URL del trabajador bajo `/pages/`; navegador sin trabajadores de módulo cae al
 respaldo en 5 ms con el mismo PNG. **Pendiente**: Firefox y Safari reales sin probar (aquí solo hay Chrome).
+**113.9 Nota (2026-10-05).** El «corpus local» de 113.3 son los `.xlsx` de la carpeta Descargas del Ingeniero, los de `oltc-metodologia/entregables/` del paraguas, la plantilla y las muestras del banco: material suyo que solo se MIDE (conteos, tiempos y huellas), nunca se copia al repo ni se cita. La lista, la foto de huellas (`base.json`), `cf40/extra.mjs` y los Excel fabricados por la revisión vivían en el scratchpad y ya no existen (`33` L-92). Antes de volver a tocar el lector, se rehace la foto con el lector de `main`: por cada hoja visible, la huella del modelo y del SVG.
 
 ## 114. ADR-114 — Órdenes de Entrada/Salida: la firma del Ingeniero en «AUTORIZADO POR» y las del equipo que custodia en «ENTREGADO POR»; el informe de refrigeración con su firma ⟦OPUS-5.5⟧ (2026-09-28)
 
@@ -4641,6 +4655,7 @@ salida olvidada (imprimir) · huella de un archivo que no es el entregado · reu
 `nombre: null` no se produce desde la app. **Pendiente suyo**: la firma de Juan Cardona (cargarla con su autorización y
 sumarlo a `EQUIPO_EN_ORDENES` y a `personaDelEquipo` de las reglas) · la primera descarga real con folio. Otro
 administrador distinto del custodio no lee ni pregunta por firmas que no tiene (`ESTADO_EQUIPO` «no-hay»).
+**114.9 Notas (2026-10-05).** (a) NO revisado externamente: lleva a Órdenes el patrón de `§99`, que sí tuvo consejo de Gemini (`§99.10`); aquí hubo solo la revisión adversarial interna (114.4). (b) Para sumar la firma de Juan Cardona u otra persona ya no bastan las dos listas de 114.8: desde `§117`/`§119` la clave de cada persona se repite en más listas cerradas del código y de las reglas. Receta → `35` L-107 («Receta: preparar la firma de una persona»).
 
 ## 115. ADR-115 — Fichas: «Salud y riesgo» con letra más grande en el Excel; el Diagrama Actual anclado a su tamaño con la caja YA girada; sin «Lectura por potencia» ni la nota de la norma en pantalla ⟦OPUS-5.5⟧ (2026-09-28)
 
@@ -4825,6 +4840,8 @@ frío) · un import estático nuevo en el guardián (fallo abierto).
 - **Pendiente suyo:** 1) «Copiar mi firma propia»; 2) dar el permiso a Carlos y a Jorge (y, si quiere, pedirles una
   confirmación escrita corta); 3) la primera exportación real de uno de ellos, que yo reviso en «Últimos usos».
 
+**117.9 Consejo externo y cierre de pendientes.** El pedido a Gemini (W-11, capa 6) quedó listo en la bóveda (`2026-09-28-comite-firmas-delegadas-ordenes/prompt-consejo-externo.md`); el Ingeniero dio «procede» sin traer la respuesta. **NO revisada externamente.** Los pendientes 1) y 2) de 117.8 (copiar su firma y dar el permiso a Carlos y a Jorge) se hicieron el 2026-09-30, a su pedido (`§119.8`); queda el 3).
+
 ## 118. ADR-118 — Fichas: permiso PUNTUAL para adjuntar y reemplazar el «Diagrama Operativo» (Carlos Martelo, Jorge Rhenals) ⟦OPUS-5.5⟧ (2026-09-29)
 
 > *«necesito que los usuarios Jorge Rhenals y Carlos Martelo puedan adjuntar el diagrama operativo en el módulo de
@@ -4867,6 +4884,8 @@ técnico sin permiso solo lee.
 - **Aceptado:** un técnico autorizado podría subir bytes que no coinciden con la huella (`leerImagen` los rechaza y el
   registro queda).
 - **Pendiente suyo:** marcar la casilla a Carlos y a Jorge. Si tienen la página abierta, deben recargarla.
+
+**118.9 Hecho a su pedido (2026-09-29).** Reportó que con el usuario de Carlos aún no se podía adjuntar. No era un error: el permiso seguía sin marcar (`permisos_extra` vacío en los dos). A su pedido («usa la extensión de Chrome para que tú mismo lo hagas»), desde su sesión de administrador se marcó «Puede adjuntar el Diagrama Operativo» a Carlos y a Jorge, y se verificó en la base que los dos tienen `fichas.adjuntar_operativo`. Lo que queda está en `10` (I): que recarguen y hagan su primer adjunto.
 
 ## 119. ADR-119 — Fichas: Carlos Martelo y Jorge Rhenals exportan el Excel PE.02081 con las firmas del equipo que autorice el Ingeniero (permiso por usuario, folio) ⟦OPUS-5.5⟧ (2026-09-30)
 
@@ -4955,6 +4974,8 @@ y «procede»; publicado `2bee3cb` (código `348e661`). Reglas e índices SIN ca
 - **Verificado sano.** El rojo de CI en `3cc4cd1` (solo cerebro) fue la prueba de VELOCIDAD del lector del Diagrama Operativo
   (1623 ms > 1500 en el runner); el mismo árbol pasó en `d6df2d8`: inestable, no regresión (→ `11`).
 - **Pendiente suyo:** ver el panel en su sesión (recargar la página: L-85); lo demás, lo de 119.8.
+
+**119.10 Consejo externo.** No hubo pedido a Gemini ni comité propio: se apoyó en el comité de `§117` y en su revisión adversarial (3 lentes + verificador). **NO revisada externamente.**
 
 ## 120. ADR-120 — Cerebro: las neuronas llenas se parten en hijas (00, 20, 30, 32, cola de Fichas) y el kernel reconcilia el índice por rangos ⟦OPUS-5.5⟧ (2026-09-30)
 
@@ -5170,6 +5191,8 @@ Arreglo `cef4f28` (en `main` solo este cambio: el de TODO-70 sigue en rama esper
 «Listo/Falta» (homologación · al menos un mes) y quién los hace. Verificado: banco (vacío → homologación → mes → lista →
 detalle con curvas; 375 px), 2161 pruebas, CI y Deploy verdes, y en su Chrome con lo servido. Lección L-114.
 
+**122.10 Consejo externo.** El diseño pasó por el comité de 3 lentes (bóveda `2026-09-30-cargabilidad-scada/diseno-v2.md`, que pedía esta marca si no se consultaba a Gemini); el consejo externo de `15` no se corrió. **NO revisada externamente.**
+
 ## 123. ADR-123 — Cargabilidad: la ventana de detalle de la tabla priorizada vuelve a abrir con las filas del parque real, sin cifras sin dato y a la vista dentro de la pestaña de Seguimiento Operativo ⟦OPUS-5.5⟧ (2026-10-01)
 
 > Reporte (hallado al probar `§122`): el clic en una fila de la tabla priorizada no abría el detalle —consola:
@@ -5364,6 +5387,9 @@ agosto 30/31; solo ~80 equipos traen las 3 tensiones de línea. **Pendiente**: m
 la información»; diseño en la bóveda), revisar los 26 pendientes y las 17 correcciones, re-exportar septiembre, mayo.
 Bóveda `2026-10-01-carga-scada-paquete`.
 
+**125.9 Nota posterior (2026-10-05).** La homologación vigente (v2) salió de una COPIA con las 8 matrículas de `125.1` escritas como en el parque («… (matriculas como el parque).xlsx», en Descargas del Ingeniero), y al entregar se le dijo que podía borrar las copias. Si vuelve a subir su Excel ORIGINAL (por ejemplo, con las 17 correcciones), esas 8 filas reaparecen con la matrícula que no casa con el parque y las buenas pasan a «retiradas» (`fusionarHomologacion`). Antes de subirlo: corregir esas 8 matrículas en su original o partir de la copia.
+**125.10 Nota posterior (2026-10-05).** «Mes completo» se mide por DÍAS (≥ 90 %, `mesCompletoMin`), no por estaciones: septiembre (30/30 días, 155 de 203 puntos, sin casi toda ORIENTE) es el mes con que abre la lista (`mesPorDefecto`). El último mes con todo el parque es agosto; una cifra «del parque» de septiembre se lee con esa falta hasta re-exportarlo completo y cargarlo en «Completar» (TODO-69).
+
 ## 126. ADR-126 — Cargabilidad SCADA: máximo, mínimo e instantáneo de cada hora con filtro «Valores a mostrar» y «Fases», y una gráfica grande por magnitud ⟦OPUS-5.5⟧ (2026-10-01)
 
 > «procede por favor, que los valores que hacen falta sean escogibles mediante un filtro, dame la vista previa» ·
@@ -5427,6 +5453,8 @@ leer el código**: el filtro de las curvas de §126 usaba la clase `cs-filtros` 
 la cambió de cuadrícula a fila libre en producción; ahora tiene clase propia (`cs-ver`). Publicado `157a7ee`; CI y
 Deploy verdes; servidos = main; en producción: Bolívar + Occidente → 146 de 208, con CRG 5 y 4 → 68; celular sin
 desborde. Lección → L-114.
+
+**126.10 Nota posterior (2026-10-05).** El «28 sostenidas» de agosto (`126.4`) se contó con la regla vieja de la lista, que `§129` corrigió (10 marcas falsas en 8 meses; en agosto, al menos GBT). Sirve para probar que la recarga no cambió nada, pero NO es el número real de equipos con sobrecarga sostenida: ese sale de la lista publicada desde `§129`.
 
 ## 127. ADR-127 — Cargabilidad SCADA: panel «Gases disueltos (DGA) y carga» con nivel de atención, posibles adversidades y acciones preventivas ⟦OPUS-5.5⟧ (2026-10-01)
 
@@ -5500,7 +5528,7 @@ auditoría `§128`)*: `dga_diagnostico.js` (Duval/Rogers/Doernenburg) NO aplica 
 conectarlo hasta que haya ppm con fecha · riesgo heredado de `§122`: en los 27 ONAF con ventilación obsoleta la cifra sale
 MÁS BAJA que la real (la ampacidad supone ventiladores sanos) → el nivel puede quedarse corto · deuda: `TODO-64.b` (cada
 muestra nueva borra `calif_crg`) toca los campos que este panel lee · propuestas del comité NO adoptadas: R3×C = 4 y el
-nombre «Urgente» en vez de «Inmediato» (su porqué → síntesis de la bóveda, Paso 3).
+nombre «Urgente» en vez de «Inmediato» (su porqué → síntesis de la bóveda, Paso 3). *(Nota 2026-10-05)* «Dejar Inmediato» fue su respuesta a R3×C (no bajarlo a 4, Prioritario), no al nombre del nivel. «Urgente» no se le preguntó: se le ofreció como opcional el 10-02 y no lo respondió. Queda abierto en TODO-69, no rechazado (bóveda `2026-10-01-dga-carga/SINTESIS.md`, Paso 3).
 
 ## 128. ADR-128 — Auditoría Nivel-2 del cerebro: el candado de auditoría está mal calibrado para el ritmo actual y la síntesis de una deliberación se cerró antes de su decisión ⟦OPUS-5.5⟧ (2026-10-02)
 
@@ -5696,6 +5724,7 @@ del mapa (L-120). Hallazgos del parque (revisor adversarial + recálculo propio;
 - COS con el mayor C2H4/C2H2 del parque a 61 % de carga;
 - SOF con CO2 < CO;
 - MON T1A/T2A con la misma cifra: gemelos en paralelo (puntos SCADA distintos), no es error.
+- *(Nota 2026-10-05)* Otros tres hallazgos que se le dieron ese día: acetileno alto con hidrógeno bajo en SGE-T2, MTB-T2 y UNN (C₂H₂/H₂ > 2: posible aceite del compartimiento del cambiador; criterio, no norma) · aceite casi sin gas en T2-PTL, T1-A/M-MBR y T2-BEC (¿aceite nuevo o tratado?) · las cargas medidas más altas tienen poco gas (CUR, SML, SAM, PTL, BEC): la muestra de 2025 no dice si esa carga ya generó gas → recomendación: muestra nueva antes de concluir.
 
 **131.10 Margen en ppm** (`4b7b882`, merge `bfe1252`). Se cambió «A X puntos de la zona Y: una diferencia entre laboratorios puede cambiarla»: en PD,
 zona de 2 puntos, salía en los 13 y era falso en 12. Ahora `domain/dga_duval_margen.js` `margenPpm`: gas por gas, el primer
@@ -5703,6 +5732,8 @@ cambio en ppm que mueve la zona frente a lo medido; «no firme» si cabe en 15 %
 Aviso «zona orientativa» si el gas suficiente es solo H2 (LCB, MBJ, TRE, EBU, OVE). Arreglo «Zona de de 300 a 700 °C».
 Revisión adversarial: 2 mayores (una traza de C2H2 tapaba al CH4) + 1 menor, corregidos con prueba. 2272 pruebas. CI y Deploy verdes a la primera; en producción: LLC «pasaría a T1 con −93 % de metano», TER «justo en la frontera»,
 LCB «orientativa», MAJ «no firme» (+4 ppm de etileno, 2 %); sin errores de consola.
+
+**131.11 Nota (2026-10-05).** Lo cazó la captura de la vista previa, no las pruebas: el ayudante que arma el SVG metía las listas anidadas como TEXTO y el triángulo salía sin zonas; se corrigió con `hijos.flat(Infinity)` y se comprobó contando 8 polígonos (L-56: lo visual se mira, no se supone).
 
 ## 132. ADR-132 — Cargabilidad SCADA: «Gases con más carga · ritmo, no ppm» en el triángulo de Duval ⟦OPUS-5.5⟧ (2026-10-02)
 
@@ -5934,3 +5965,63 @@ ADFQ, FUR, CRG, EDAD, overrides, 48.312), `matriz_riesgo.js`, `plan_inversion.js
   claves `her`/`pyt`: se califican en `salud_activos.js`. NO verifiqué: el contenido de `§74.21` más allá de su cabecera,
   las bóvedas de beneficios por dentro y las skills `anthropic-skills:*`.
 - Bóveda: `2026-10-02-neuronas-dominio` (crudo de las 4 fases + síntesis con callejones).
+
+## 138. ADR-138 — Cargabilidad SCADA: libro de parámetros por punto de la homologación (columna C), entregado como Excel aparte; 17 posibles correcciones y 104 medidas fuera ⟦OPUS-5.5⟧ (2026-10-01; registrado el 2026-10-05)
+
+> *«columna c hoja 1 es lo que debes buscar en la data de variables eléctricas y darme los parámetros, cada uno de ellos»*.
+> Entregable fuera de la plataforma: no cambió código ni datos de producción. NO revisado externamente (análisis, no
+> decisión de arquitectura). Faltaba su ADR (auditoría `§128.4`, S3-04).
+
+**138.1 Interpretación.** La pestaña que abre el Excel es «Homologacion de Transformadores» y su columna C («swTrafo
+(IR_Average)») trae los puntos SCADA; la 1.ª pestaña son datos crudos. Se le dijo en el propio libro («Cómo se hizo»).
+**138.2 Solución.** Escaneo de «Variables Electricas» (enero–agosto) por punto → libro «Parametros SCADA por punto (columna
+C) 2026-10-01 - FINAL.xlsx» en su carpeta de Cargabilidad (ruta → memoria `project_cargabilidad_scada`): hojas Cómo se
+hizo · Resumen por transformador · Parámetros (detalle) · Posibles correcciones · Fuera de la homologación. Borradores
+v1–v4 en la misma carpeta (él decide). El Excel de origen no se tocó.
+**138.3 Resultado.** 208 filas, 203 puntos distintos (3 compartidos), 1 «NO ENCONTRADO». Parámetros que existen: I R/S/T,
+U RS/ST/TR, P, Q y U de barra (nada más); 2.579 series; solo 86 puntos traen los 8. **17 posibles correcciones** a la
+homologación (por balance de potencia o correlación). Coherencia √3·U·I frente a √(P²+Q²) por nivel: 285 sí, 31 no, 19
+sin juicio. **104 medidas vivas** de transformadores y autotransformadores que la columna C no nombra: confirmar cuáles
+son de AFINIA.
+**138.4 Verificación.** Cuatro rondas adversariales (Opus, solo lectura): al cierre 2.579/2.579 filas exactas en dos
+recálculos independientes, 16/16 correcciones confirmadas (+1 hallada en la cuarta) y 90/90 de «fuera» exactas.
+**138.5–138.8.**
+- Callejones (no repetir; detalle en la bóveda `2026-10-01-parametros-scada/SINTESIS.md`): «≥ 30.000 = tope» borra
+  tensiones reales en voltios · detectar cambio de escala por mediana mensual simple da falsos (12 de 21 → `32` L-124) ·
+  inicio/fin por mediana diaria corre un día · «nombre casi igual» por prefijo une subestaciones vecinas · picos con el
+  p99 con signo.
+- Pendiente suyo → TODO-69 (26 filas por revisar con las 17 correcciones; las 104; al aplicarlas, partir de la copia v2,
+  `§125.9`). Archivos del repo: ninguno.
+
+## 139. ADR-139 — Documentación total de la conversación 2026-09-23 → 10-05: lo que solo vivía en el chat pasa a su nodo dueño; notas a ADRs sin reescribirlos; sin tocar código ⟦OPUS-5.5⟧ (2026-10-05)
+
+> *«documenta absolutamente todo y luego dime cómo debe continuar nuestra nueva conversación»*. NO revisado externamente
+> (gobernanza del cerebro, reversible).
+
+**139.1 Causa raíz.** Doce días y 51 ADRs (`§87`–`§137`) escritos en caliente, con varias compactaciones de contexto.
+Quedaron sin nodo: preferencias y formas de trabajar del Ingeniero dichas solo en el chat; preguntas suyas sin respuesta
+(Beneficios, fechas bajo las firmas, copia de la orden); punteros hacia adelante de ADRs superados (`§87`, `§88`, `§95`,
+`§97`, `§99`, `§107`, `§117`, `§118`); marcas «NO revisada externamente» (`§112`, `§114`, `§117`, `§119`, `§122`); tropiezos
+de la consola y de los bancos; rutas de sus insumos; y el libro de parámetros SCADA sin ADR (→ `§138`).
+**139.2 Solución.** Workflow acotado (Opus): un resumen por tramo → verificadores que contrastan cada hueco con el cerebro
+y el código (`grep`/`sed`) → crítico de completitud que deduplica, resuelve choques de numeración y busca pedidos sin
+rastro. Cada hecho fue a SU nodo: notas apendadas a ADRs (nunca reescritos), lecciones (L-124, M-08 y ampliaciones de
+L-29, L-61, L-63, L-65, L-66, L-70, L-71, L-77, L-78, L-92, L-94, L-103, L-105, L-106, L-107, L-114), cola de Fichas
+(CF-41…CF-44, código sin llamada, puntos 9-10 de «Tuyo»), `11` (TODO-75 y notas), lóbulos `50`/`52`/`53`, `20`/`22`,
+`00`, W-13, memoria del asistente y bóveda (direcciones de artifacts, banco de gases).
+**139.3 No-regresión.** Solo documentación; ningún archivo de código. Arranque medido por `boot-gate`.
+**139.4 Verificación.** Las 90 ediciones (+ este ADR) las aplicó un agente por grupo de archivos sin cruce, con el ancla exigida una sola vez y el texto literal; 0 omitidas; revisé el diff completo antes del commit. Además: `npm run test:unit` 2292 pass / 0 fail / 2 skip y `lint:html` limpio (10-05); CI y Deploy verdes
+en `main` `8dadc14`; `brain:index` + `brain:check` SANO tras aplicar.
+**139.5–139.8.**
+- Anti-patterns evitados: reescribir ADRs · engordar `10`/`05` con lo no vivo · datos de cliente, cédulas, firmas o texto
+  del MO.00418 en el repo público (rutas del disco y direcciones de artifacts → memoria y bóveda) · una lección nueva por
+  cada tropiezo (`33` está al tope: se ampliaron las existentes).
+- Crudo → bóveda `2026-10-05-documentacion-total/` (resúmenes por tramo, huecos verificados, lista final del crítico y `RELEVO.md`: cómo seguir en la conversación nueva).
+- `33` quedó 26 caracteres sobre su tope con las ampliaciones: el tope sube a 14.000 y la hija `36` (Chrome y bancos, S6-07 de TODO-66) nace en la próxima ronda.
+- **Verificado sano / refutado en la verificación** (no re-auditar): `pages.yml` SÍ retira los `scripts/*.mjs` sueltos y
+  la configuración · el «reinicio» de la DGA está verificado para termovacío y secado, no para todo tratamiento · el
+  código sin llamada de Fichas se rige por L-18 (cuarentenar), no por L-116 · `fichas_firmantes` ya estaba en `22` · el
+  tropiezo de `1f13f55` fue una tubería a `grep` seguida de `;`, no a `tail` · lo que congeló su pestaña fue un
+  `confirm()`, no un `alert()` · el scratchpad se poda con la sesión viva (no «murió con la sesión»), y no todas las
+  entradas de `launch.json` están muertas · el 503 de `§100` no se investigó por decisión suya, no por falta de
+  herramientas · los PRUEBA de Descargas son 11, no 9 · la carpeta `Mayo` trae solo dos registros de error.

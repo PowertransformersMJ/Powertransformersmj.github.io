@@ -168,6 +168,7 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
   aún no tiene señal (CF-27).
 - Buchholz, relé RS 2001, DW 2000, válvula de alivio → `_conocimiento/00 §E` + skill `bujes-y-accesorios`; sustento de
   beneficios → bóveda `2026-09-25-beneficio-protecciones-mecanicas`.
+- **Hechos fijados al redactar los Beneficios firmados** (`99 §105`; sustento → bóveda `2026-09-2[5-7]-beneficio-*`; no re-discutir sin evidencia nueva): la fuga bajo el nivel del aceite EXPULSA aceite; solo la que da a un espacio de gas aspira aire húmedo; el oxígeno por fuga cuenta solo en diseños sellados, la humedad en todos · radiador perforado: con conservador sale aceite, no entra aire · OLTC: el resorte del ruptor completa la conmutación aunque falle el motor; el riesgo del mando es la maniobra inconclusa, el sobrepaso de tomas extremas o la posición errada · NLTC: la inmovilidad forma una película en los contactos; se ejercita sin tensión y, según las pruebas eléctricas, se reemplazan la regleta y la volanta y se vuelve a medir · tablero: el disparo falso viene de sal o humedad haciendo puente entre bornes (en un circuito aislado de tierra, una sola derivación no dispara), y si el tablero falla, la diferencial de la subestación sigue actuando.
 - Conexión de transformadores regulados (estrella/triángulo/auto) → memoria `project_conexion_regulados`.
 
 ## Pendientes / próxima ronda

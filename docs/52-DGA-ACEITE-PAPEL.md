@@ -73,6 +73,7 @@ criterio, buscar los que ya existen.
 - Fuentes DISTINTAS, no mezclar: límites en servicio por clase de IEEE C57.106 / NETA 100.4 (skill
   `pruebas-electricas/analisis-aceite`, ⚠️ verificar; no cita IEC 60422) y las EETT AFINIA del aceite del ruptor
   del OLTC (memoria `project_oltc_metodologia`).
+- **Qué hace cada tratamiento** (fronteras de los textos firmados de Beneficios, `99 §105`): termovacío = agua y gases del ACEITE (ppm de agua, rigidez); al papel solo le quita humedad superficial · regeneración = ácidos y lodos de la oxidación (acidez, factor de disipación, tensión interfacial); la tierra adsorbente también le quita el inhibidor, por eso se reinhibe · secado de la parte activa = agua del PAPEL en profundidad; encoge el aislamiento, por eso se reaprietan los devanados · antes del termovacío o del secado se registra la DGA como referencia: el tratamiento borra la huella de gases y el seguimiento arranca de nuevo · la humedad del papel se ESTIMA (por el agua del aceite o la respuesta dieléctrica), no se mide. Sustento y callejones → bóveda `2026-09-26-beneficio-{termovacio,regeneracion,secado-parte-activa}` y `2026-09-27-beneficio-toma-muestras`.
 
 ## 10. Papel (furanos, DP y vida)
 - Cortes FUR (ppb de 2FAL) y juicio experto desde calificación 4 (§A9.2) → `umbrales_salud_baseline.js` (`fur`).
