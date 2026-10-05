@@ -6025,3 +6025,4 @@ en `main` `8dadc14`; `brain:index` + `brain:check` SANO tras aplicar.
   `confirm()`, no un `alert()` · el scratchpad se poda con la sesión viva (no «murió con la sesión»), y no todas las
   entradas de `launch.json` están muertas · el 503 de `§100` no se investigó por decisión suya, no por falta de
   herramientas · los PRUEBA de Descargas son 11, no 9 · la carpeta `Mayo` trae solo dos registros de error.
+- Al publicar, el pre-commit bloqueó con «presupuesto de boot excedido» aunque el arranque cabía (31.129 de 31.500): era el canario de `boot-gate.mjs`, porque esta conversación llevaba más de 48 h sin SessionStart. Se renovó la marca con `session-handoff.mjs --boot-echo`, como indica el candado, y se registró en `33` L-111.
