@@ -799,7 +799,7 @@ export function seleccionAcciones(equipo, st, campo) {
   });
 }
 
-function resolverPlantilla(tpl, equipo, st, campo) {
+export function resolverPlantilla(tpl, equipo, st, campo) {
   // `{ACCIONES}` lo compone el Ingeniero marcando en la ficha. Si no ha marcado
   // ninguna NO se deja el hueco ni se inventa un plan: se dice que están por
   // definir, que es lo único cierto en ese momento.
@@ -807,18 +807,24 @@ function resolverPlantilla(tpl, equipo, st, campo) {
   // Sin potencia, «de — MVA» se lee como un guion de redacción y no como un
   // dato que falta. En una frase que se firma, el hueco se declara (`99 §85`).
   const mvaP = potenciaProyecto(equipo, st);
-  return String(tpl || '')
-    .replace(/\{MVA\}/g, mvaP != null ? mvaTxt(mvaP) : '[PENDIENTE: POTENCIA]')
-    .replace(/\{SUB\}/g, equipo.subestacion || '')
+  const valor = {
+    MVA: mvaP != null ? mvaTxt(mvaP) : '[PENDIENTE: POTENCIA]',
+    SUB: equipo.subestacion || '',
     // La matrícula identifica al EQUIPO en el papel (`99 §85`): el Ingeniero la
     // pidió junto a la potencia en la apertura del alcance. `codigo` NO entra
     // como respaldo: por el camino del listado es el «CODIGO SUBESTACION», que
     // los dos TX de un patio comparten (`§82`), y el papel acabaría nombrando
     // al equipo equivocado. Sin matrícula ni serie se declara el hueco, como
     // hace el resto del módulo, en vez de dejar la frase muda.
-    .replace(/\{MATRICULA\}/g, equipo.matricula || equipo.serie || '[PENDIENTE: MATRÍCULA]')
-    .replace(/\{ACCIONES\}/g, escogidas
-      || 'las acciones de mantenimiento que se definan según los resultados del diagnóstico del activo');
+    MATRICULA: equipo.matricula || equipo.serie || '[PENDIENTE: MATRÍCULA]',
+    ACCIONES: escogidas
+      || 'las acciones de mantenimiento que se definan según los resultados del diagnóstico del activo'
+  };
+  // Reemplazo con FUNCIÓN y en una sola pasada (CF-38, L-103). Con texto,
+  // `String.replace` interpreta `$&`, `$\`` o `$'` dentro del nombre de la
+  // subestación y cambiaría la frase que se firma; y en cadena, un dato que
+  // contuviera `{MATRICULA}` se volvería a sustituir.
+  return String(tpl || '').replace(/\{(MVA|SUB|MATRICULA|ACCIONES)\}/g, (_m, k) => String(valor[k]));
 }
 
 /**
