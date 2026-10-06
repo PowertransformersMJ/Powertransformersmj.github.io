@@ -1119,6 +1119,8 @@ Pedido del director (2026-06-10): "que los niveles de tensión se desplieguen y 
 
 **57.7 Doctrina + restante**: §3.3 aplicado (el código manda sobre la nota del plan: sheet_to_json usa cabeceras-objeto, no header:1) · multi-escenario antes de decidir (memoria "ir más allá"). **RESTA (vivo en `10`)**: drag&drop del Ingeniero (Simulación→Importar) + verificación viva del tablero + template sanitizado (cierra TODO-09) + hojas TPT_Servicio/TX_Respaldo requieren detección de fila-cabecera (títulos encima) + capítulo PRUEBAS ELÉCTRICAS del MO pendiente (TODO-04). ⚠️ El anexo entregado es SALUD DE ACTIVOS; no trae tablas per-clase de pruebas eléctricas. Cache: n/a.
 
+**57.8 Nota (2026-10-06, `§140`).** Las cifras del monitoreo intensivo del acetileno que el código atribuye a «MO.00418 §A9.1» (`monitoreo_intensivo.js`: 15 ppm sostenido y 0,5 ppm/día) NO están en el texto del MO.00418.DE-GAC-AX.01 Ed. 02: su Nota Técnica (§4.1, págs. 6-7) habla de «el umbral técnico definido para transiciones críticas» sin cifra, y «ppm» no aparece en todo el PDF (leído con `pdftotext` el 10-06). «§A9.x» es numeración interna del plan (`MODELO-DATOS-v2.md`), no del MO. Lo que sí trae: Tabla 3, calificación 5 = C₂H₂ ≥ 7. Origen de las dos cifras: pregunta abierta al Ingeniero (el `.docx` MO.00418.AM-AX.01 viejo está cifrado y no se pudo leer).
+
 ## 58. ADR — Ecosistema GitHub-MJ: kernel canónico propio v1.7.0, 60-WORKFLOWS y Antigravity ⟦OPUS-5⟧ (2026-07-29)
 
 > Pedido del Ingeniero (2026-07-28): *"copiar la organización de mi amigo — una única carpeta con todos los proyectos y el cerebro, que comparten conocimiento… ahora no hay forma de que se comparta un cerebro nuevo"*, + *"verifica el cerebro actual que usa mi amigo, está mucho más avanzado"*, + *"ya tengo Antigravity, lo puedo usar como consejo externo"*.
@@ -6026,3 +6028,59 @@ en `main` `8dadc14`; `brain:index` + `brain:check` SANO tras aplicar.
   entradas de `launch.json` están muertas · el 503 de `§100` no se investigó por decisión suya, no por falta de
   herramientas · los PRUEBA de Descargas son 11, no 9 · la carpeta `Mayo` trae solo dos registros de error.
 - Al publicar, el pre-commit bloqueó con «presupuesto de boot excedido» aunque el arranque cabía (31.129 de 31.500): era el canario de `boot-gate.mjs`, porque esta conversación llevaba más de 48 h sin SessionStart. Se renovó la marca con `session-handoff.mjs --boot-echo`, como indica el candado, y se registró en `33` L-111.
+
+## 140. ADR-140 — Fichas: CF-38 publicado (redacciones con reemplazo por función); CF-43/CF-44 preparados en rama con ejemplos de sus datos, esperan su «procede»; decisiones de TODO-69 en una sola tanda ⟦OPUS-5.5⟧ (2026-10-06)
+
+> *«primero los dos riesgos del papel de Fichas (CF-43 y CF-44) con ejemplos para mi «procede», después los arreglos graves de Fichas
+> uno por uno, y prepárame en una sola tanda las decisiones pendientes de Cargabilidad SCADA»*. NO revisado externamente: lo que
+> toca el papel firmado espera su «procede»; CF-38 no cambia el papel con datos reales.
+
+**140.1 Causa raíz.** (a) **CF-38**: `resolverPlantilla` (`ui/fichas/panel.js`) encadenaba `String.replace` de TEXTO: «$&», «$`» o
+«$'» en un nombre alteraban la frase firmada («PATIO $& NORTE» → «PATIO {SUB} NORTE») y un dato con `{MATRICULA}` se re-sustituía.
+(b) **CF-43**: `modoDegradacion` imprimía frases falsas —acetileno «solo» por arco; etileno = punto caliente del devanado por carga;
+«prácticamente ausente» hasta 99 ppm; «sin etileno relevante» sin dato— y citaba IEEE C57.104 · IEC 60599 · Duval para cortes
+(15 · 500 · 1.000/100 ppm) que no están en IEEE C57.104-1991 (FIST 3-31), ni —por fuentes secundarias— en la 2008, ni en IEC 60599,
+ni en el MO.00418 Ed. 02 (0 «ppm» en el PDF). Duval no se calcula en esa ruta. Los cortes llegaron en `ec20f47` (08-15) desde el
+módulo suelto, sin fuente. (c) **CF-44**: «ISO 55001» SÍ tiene sustento —la Guía MO.00418.DE-GAC §3 (pág. 4) y el AX.01 (pág. 4) la
+citan; según EPM, AFINIA certificó su sistema en 2023 (CREG 015/2018, 6.3.3.4)—, pero la frase la ponía como fuente del criterio de
+reposición, que ISO 55001 no fija (lo dice su alcance). (d) El cerebro daba por ratificados con el MO los 15 ppm y 0,5 ppm/día del
+monitoreo intensivo (nota `§57.8`).
+
+**140.2 Solución.** (a) CF-38 PUBLICADO: un solo `replace` con función; `resolverPlantilla` se exporta (aditivo). (b) CF-43/44 en la
+rama `fichas/cf-43-44-textos-con-fuente` (`95489c9`, NO fusionada): frases fieles a IEC 60599:2022 §4.1/§4.2; severidad del acetileno
+por la Tabla 3 del MO; los cortes rotulados «criterio del área» (si él los ratifica); títulos «Falla térmica localizada» y «Descarga
+de alta energía (arco) o falla térmica severa» (la clave `k` no cambia); sin «Duval» donde no se calcula (también en el trabajo del
+arco); metano solo si > 0; ISO 55001 como «sistema de gestión de activos de la empresa» y «de la empresa» en su V2. (c) Dos páginas
+en `~/Downloads`: `Fichas_para_su_procede.html` (textos de las funciones reales con su Excel 2026-4; CF-43, CF-44, CF-36, CF-35) y
+`Decisiones_Cargabilidad_SCADA.html` (11 decisiones con la recomendada). CF-36/CF-35: arreglo medido en copia (diff y render en la
+bóveda), sin rama todavía.
+
+**140.3 No-regresión.** CF-38: 408 combinaciones redacción × equipo × selección idénticas a la versión anterior; 0 de 206
+subestaciones/matrículas del Excel traen «$» o llaves. CF-43: 206/206 equipos conservan exactamente sus modos. Índices de las
+redacciones intactos (`99 §85.3`).
+
+**140.4 Verificación (bitácora de interinato).** Suite: main 2303/0/2 tras CF-38; rama 2329/0/2 (+26 en
+`tests/fichas_gases_con_fuente.test.js`; 2 aserciones que fijaban frases falsas, actualizadas). Lint limpio. Workflow de 8 agentes
+Opus (5 entender + 3 refutar); los refutadores corrigieron el borrador: «> 300 °C» no lo garantiza un valor absoluto (C₂H₄ 500 con
+CH₄ ≥ ~2.100 da T1), «gaseo del aceite» es débil con H₂ ≥ 1.000, títulos, ratificar umbrales, el certificador de AFINIA (EPM: PMM
+Enterprise Certification 2023-03-15; la prensa: ICONTEC) y una frase propuesta para `:327` que habría sido falsedad nueva. Releído
+por mí en el PDF: 0 «ppm», Tabla 3 C₂H₂ ≥ 7, «fallas térmicas de alta energía o presencia de arcos» (pág. 6), ISO 55001 en Guía y
+AX.01. ⚠️ **NO verificados**: CI y Deploy de `f4edcb9` (el modo automático bloqueó `gh run list`) ni lo servido (L-65).
+
+**140.5 Anti-patterns evitados.** Ningún texto firmado publicado sin su «procede» · ningún disparador movido · ninguna norma citada
+sin fuente leída (IEEE 2008/2019 quedan «no verificado») · callejón: atribuir a «su Guía Metodológica» la reposición en `:327`
+(el MO solo lleva a PI la condición 5 o furanos 4-5) · datos del cliente solo en Descargas y bóveda.
+
+**140.6 Archivos.** Publicado: `assets/js/ui/fichas/panel.js` (`resolverPlantilla`), `tests/fichas_plantilla_reemplazo.test.js`
+(`69f83ca`; main `f4edcb9`). En rama: `assets/js/domain/fichas_diagnostico.js`, `assets/js/ui/fichas/panel.js` (V2),
+`tests/fichas_gases_con_fuente.test.js`, `tests/fichas_diagnostico.test.js`, `tests/fichas_mantenimiento.test.js`. INTACTOS:
+disparadores, `condiciones_deterioro.js`, exportador, `TRABAJO_POR_MODO` (salvo la cita del arco).
+
+**140.7 Doctrina.** `CLAUDE.md §3.2` y §3.3 (el PDF del MO, no el cerebro) · L-103 · L-63 (CF-38 sin cambio de papel → publicado con
+resumen) · interinato R1/R4/R6 · W-11 por pasos (paso 2 Duval y paso 3 acetileno 7–14,9 ppm, uno por turno).
+
+**140.8 Verificado sano / no re-auditar.** CF-38: el único sitio vulnerable era `panel.js` (los dominios de beneficios y el exportador
+ya usan función, `§87`). Los 13 equipos «descargas» dan PD en `zonaDuval1` y los 3 «térmico» dan T3: hoy solo «arco» discrepa (COS y
+SLS T3; T1-TPS PD). «Muy inferior al hidrógeno» es cierto por construcción. `functions/domain` es copia generada no versionada y
+ninguna Cloud Function usa estos textos. Hallazgos de paso → cola CF-45…CF-48. Crudo y síntesis → bóveda
+`2026-10-06-fichas-cf43-cf44-todo69/`.

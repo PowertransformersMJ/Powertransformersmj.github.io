@@ -5,10 +5,10 @@
 
 ---
 
-## 🎯 Foco (al 2026-10-05) — FICHAS TÉCNICAS por partes · CARGABILIDAD SCADA (TODO-69)
+## 🎯 Foco (al 2026-10-06) — FICHAS TÉCNICAS por partes · CARGABILIDAD SCADA (TODO-69)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
-> **Al retomar (10-05)**: preguntarle por dónde sigue — TODO-73 (4 riesgos; cada arreglo con vista previa y su «procede») · sus decisiones de TODO-69 · la cola de Fichas · su celular (I). Relevo completo → bóveda `2026-10-05-documentacion-total/RELEVO.md`.
+> **Al retomar (10-06)**: esperan SUS respuestas a dos páginas en `~/Downloads` (`99 §140`): `Fichas_para_su_procede.html` (CF-43/44 en rama `fichas/cf-43-44-textos-con-fuente`; CF-36, CF-35) y `Decisiones_Cargabilidad_SCADA.html` (11 de TODO-69). ⚠️ CI/Deploy de `f4edcb9` sin verificar (`§140.4`). Relevo anterior → bóveda `2026-10-05-documentacion-total/RELEVO.md`.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
@@ -40,8 +40,8 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-71** | 🟡 **Detalle de Cargabilidad PUBLICADO** (`99 §123`, `§124`). Suyo: escalón IEEE («después»). Menores vivos → `§124.9` (los de `§123.9` menos lo ya hecho). | 🟡 |
-| **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`-`§134`; panel DGA, Duval y sus textos en BORRADOR). **Suyo**: ¿PD → Triángulos 4/5? y los 13 PD con H2 ≥ 2.000 · criterio «no firme» 15 %/1 ppm · supuestos de `§132.8` (30 °C, papel, constantes típicas, hueco 2 h) · hallazgos `§131.9` · aprobar textos DGA (variantes con/sin ppm, `§133`) · ¿0,5 pu en otro color (`§126.8`)? · ¿«Urgente» en vez de «Inmediato» (`§127.8`)? · Gemini del `§127` · 26 pendientes (`§125.2`) y 17 correcciones (bóveda `2026-10-01-parametros-scada`) (partir de la copia v2, `§125.9`) · 104 medidas fuera de la homologación: ¿cuáles son de AFINIA? (`§138`) · re-exportar sep y mayo. Deuda: `TODO-64.b` borra `calif_crg`. | 🟡 |
-| **TODO-73** | 🟡 **Riesgos de veracidad del dominio** (`99 §137`; avisados, no arreglados): `modoDegradacion` de Fichas con cortes de gases sin fuente en un texto que se FIRMA · `sobrecarga_admisible.js` («IEEE C57.91 Tabla 6») sin cotejar, lo usan el detalle de Cargabilidad y TPT · «ISO 55001» en textos firmables · la copia de Duval de Parque es idéntica hoy pero sin candado. Lo de Fichas → CF-43/CF-44 de la cola; todo espera su «procede». | 🟡 |
+| **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`-`§134`; panel DGA, Duval y sus textos en BORRADOR). **Suyo** (en una tanda, `§140`): ¿PD → Triángulos 4/5? y los 13 PD con H2 ≥ 2.000 · criterio «no firme» 15 %/1 ppm · supuestos de `§132.8` (30 °C, papel, constantes típicas, hueco 2 h) · hallazgos `§131.9` · aprobar textos DGA (variantes con/sin ppm, `§133`) · ¿0,5 pu en otro color (`§126.8`)? · ¿«Urgente» en vez de «Inmediato» (`§127.8`)? · Gemini del `§127` · 26 pendientes (`§125.2`) y 17 correcciones (bóveda `2026-10-01-parametros-scada`) (partir de la copia v2, `§125.9`) · 104 medidas fuera de la homologación: ¿cuáles son de AFINIA? (`§138`) · re-exportar sep y mayo. Deuda: `TODO-64.b` borra `calif_crg`. | 🟡 |
+| **TODO-73** | 🟡 **Riesgos de veracidad del dominio** (`99 §137`): Fichas (`modoDegradacion` sin fuente · «ISO 55001») → rama + ejemplos `§140`, espera su «procede» · `sobrecarga_admisible.js` («IEEE C57.91 Tabla 6») sin cotejar (detalle de Cargabilidad y TPT) · copia de Duval de Parque sin candado · 15 ppm y 0,5 ppm/día del monitoreo NO están en el MO (`§57.8`): preguntarle. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo · Gemini · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini. Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §86`, `§109`, `§128`) — tabla viva: `bóveda/2026-10-02-auditoria-nivel2/HALLAZGOS.md` (59; estado de los 64 anteriores). Vivo: reglas sin dueño (harness) · casilla NN.9 de pendientes · resello de la cola de Fichas · guardia de firmas en pre-push. | 🟡 |
