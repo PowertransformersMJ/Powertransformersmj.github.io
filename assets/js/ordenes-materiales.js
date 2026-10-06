@@ -51,7 +51,7 @@ import * as REG from './data/ordenes_materiales.js';
 // Ítems (pedido del 2026-10-06): cantidad corregible en la tabla y material «Otro» escrito a mano.
 import { MATERIAL_OTRO, leerCantidad, sumarCantidades, problemasOtro, unidadesSugeridas } from './domain/ordenes_items.js';
 // Filtro por zona y consolidado de entregas por transformador (pedido del 2026-10-06).
-import { zonasDe, enZona, claveZona, filasEntregas, resumenPorTransformador, SIN_TRANSFORMADOR } from './domain/ordenes_consolidado.js';
+import { zonasDe, enZona, claveZona, filasConsolidado, resumenPorTransformador, SIN_TRANSFORMADOR } from './domain/ordenes_consolidado.js';
 import {
   claveDe, normalizarNumero, problemaNumero, candidatasDeSubida, situacionDeSubida,
   seleccionadaPorDefecto, siguienteNumeroLibre, huella, esDelRegistro, llaveDeMarca
@@ -1978,18 +1978,30 @@ function pintarFiltroZona() {
 }
 
 /**
- * Consolidado en Excel de los materiales ENTREGADOS (órdenes de SALIDA del registro)
- * de la zona elegida, con la subestación y el transformador de cada orden: una fila
- * por material, un resumen por transformador y una hoja con el criterio.
+ * Consolidado en Excel de los materiales de las órdenes del TIPO escogido (entrada,
+ * salida o ambas) del registro, en la zona elegida, con la subestación y el
+ * transformador de cada orden: una fila por material, un resumen por transformador
+ * y una hoja con el criterio. El tipo se escoge PRIMERO (pedido del 2026-10-06).
  */
 function exportarEntregasExcel() {
   const ExcelJSLib = LIBS.exceljs;
   if (!ExcelJSLib) { aviso('La librería de Excel no está disponible. Verifique su conexión y recargue la página.', 'err', 8000); return; }
   if (REGISTRO.estado !== 'ok') { aviso('El registro del equipo no se ha podido leer: pulse «Actualizar» y vuelva a intentarlo.', 'err', 8000); return; }
   const zona = claveZona(($('#filtroZona') || {}).value || '');
-  const filas = filasEntregas(estado.ordenes, { zona });
+  const selTipo = $('#tipoConsolidado');
+  // Con el HTML viejo en caché (`30 L-85`) no hay selector: se conserva lo publicado primero (salidas).
+  const tipo = selTipo ? selTipo.value : 'SALIDA';
+  if (!tipo) {
+    selTipo.classList.add('falta');
+    selTipo.focus();
+    aviso('Escoja primero el tipo de orden del consolidado: entradas, salidas o ambas.', 'warn', 7000);
+    return;
+  }
+  if (selTipo) selTipo.classList.remove('falta');
+  const nomTipo = { ENTRADA: 'ENTRADA', SALIDA: 'SALIDA', AMBAS: 'ENTRADA y SALIDA' }[tipo];
+  const filas = filasConsolidado(estado.ordenes, { zona, tipo });
   if (!filas.length) {
-    aviso(`No hay órdenes de SALIDA ${zona ? 'de la zona ' + zona + ' ' : ''}en el registro para consolidar.`, 'warn', 7000);
+    aviso(`No hay órdenes de ${nomTipo} ${zona ? 'de la zona ' + zona + ' ' : ''}en el registro para consolidar.`, 'warn', 7000);
     return;
   }
   const resumen = resumenPorTransformador(filas);
@@ -2016,37 +2028,38 @@ function exportarEntregasExcel() {
     const conCant = (ws, col) => ws.getColumn(col).eachCell((c, i) => { if (i > 1) c.numFmt = '#,##0.###'; });
     const fechaDe = iso => (/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso.slice(8, 10) + '/' + iso.slice(5, 7) + '/' + iso.slice(0, 4) : '');
 
-    // 1) Una fila por material entregado
-    const ws = wb.addWorksheet('Entregas', { views: [{ state: 'frozen', ySplit: 1 }],
+    // 1) Una fila por material
+    const ws = wb.addWorksheet('Materiales', { views: [{ state: 'frozen', ySplit: 1 }],
       pageSetup: { paperSize: 9, orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 } });
-    const cab = ['Zona', 'Subestación', 'Transformador', 'Fecha', 'No. de orden', 'Ítem', 'Código / UC', 'Descripción',
+    const cab = ['Tipo', 'Zona', 'Subestación', 'Transformador', 'Fecha', 'No. de orden', 'Ítem', 'Código / UC', 'Descripción',
       'Unidad', 'Cantidad', 'Origen', 'Destino', 'Motivo', 'Entregado por', 'Recibido por'];
-    const anchos = [12, 22, 18, 11, 14, 6, 12, 40, 8, 10, 22, 22, 40, 18, 18];
+    const anchos = [10, 12, 22, 18, 11, 14, 6, 12, 40, 8, 10, 22, 22, 40, 18, 18];
     ws.columns = cab.map((t, i) => ({ header: t, key: 'k' + i, width: anchos[i] }));
-    filas.forEach(f => ws.addRow([f.zona, f.conTransformador ? f.subestacion : SIN_TRANSFORMADOR, f.transformador,
+    filas.forEach(f => ws.addRow([f.tipo, f.zona, f.conTransformador ? f.subestacion : SIN_TRANSFORMADOR, f.transformador,
       f.fecha || fechaDe(f.fechaISO), f.numero, f.item, f.codigo, f.descripcion, f.unidad, f.cantidad,
       f.origen, f.destino, f.motivo, f.entrego, f.recibio]));
-    encabezar(ws, cab.length); conCant(ws, 10);
+    encabezar(ws, cab.length); conCant(ws, 11);
 
-    // 2) Resumen por transformador y material
+    // 2) Resumen por transformador y material (entradas y salidas, cada una en su fila)
     const rs = wb.addWorksheet('Por transformador', { views: [{ state: 'frozen', ySplit: 1 }] });
-    const cabR = ['Zona', 'Subestación', 'Transformador', 'Código / UC', 'Descripción', 'Unidad', 'Cantidad entregada', 'N.º de órdenes', 'Última entrega'];
-    rs.columns = cabR.map((t, i) => ({ header: t, key: 'r' + i, width: [12, 22, 18, 12, 40, 8, 14, 12, 14][i] }));
-    resumen.forEach(r => rs.addRow([r.zona, r.conTransformador ? r.subestacion : SIN_TRANSFORMADOR, r.transformador,
+    const cabR = ['Tipo', 'Zona', 'Subestación', 'Transformador', 'Código / UC', 'Descripción', 'Unidad', 'Cantidad', 'N.º de órdenes', 'Última fecha'];
+    rs.columns = cabR.map((t, i) => ({ header: t, key: 'r' + i, width: [10, 12, 22, 18, 12, 40, 8, 12, 12, 14][i] }));
+    resumen.forEach(r => rs.addRow([r.tipo, r.zona, r.conTransformador ? r.subestacion : SIN_TRANSFORMADOR, r.transformador,
       r.codigo, r.descripcion, r.unidad, r.cantidad, r.ordenes, fechaDe(r.ultima)]));
-    encabezar(rs, cabR.length); conCant(rs, 7);
+    encabezar(rs, cabR.length); conCant(rs, 8);
 
     // 3) Criterio (lo que el consolidado incluye y lo que no)
-    const sinTr = new Set(filas.filter(f => !f.conTransformador).map(f => f.numero)).size;
-    const ordenesN = new Set(filas.map(f => f.numero)).size;
+    const sinTr = new Set(filas.filter(f => !f.conTransformador).map(f => f.tipo + '|' + f.numero)).size;   // entrada y salida numeran aparte
+    const ordenesN = new Set(filas.map(f => f.tipo + '|' + f.numero)).size;
     const nt = wb.addWorksheet('Notas');
     nt.columns = [{ width: 34 }, { width: 90 }];
     [
       ['Generado', new Date().toLocaleString('es-CO')],
+      ['Tipo de orden', nomTipo],
       ['Zona', zona || 'Todas las zonas'],
-      ['Buscador', 'No se aplica: el consolidado cubre todas las salidas de la zona, aunque la lista esté filtrada por texto.'],
-      ['Qué incluye', 'Los materiales de las órdenes de SALIDA (entregados en campo) guardadas en el registro del equipo.'],
-      ['Qué no incluye', 'Órdenes de ENTRADA, y órdenes guardadas solo en un navegador (pendientes de subir).'],
+      ['Buscador', `No se aplica: el consolidado cubre todas las órdenes de ${nomTipo} de la zona, aunque la lista esté filtrada por texto.`],
+      ['Qué incluye', `Los materiales de las órdenes de ${nomTipo} guardadas en el registro del equipo.`],
+      ['Qué no incluye', (tipo === 'AMBAS' ? 'Ó' : `Órdenes de ${tipo === 'ENTRADA' ? 'SALIDA' : 'ENTRADA'}, y ó`) + 'rdenes guardadas solo en un navegador (pendientes de subir).'],
       ['Transformador y subestación', 'Salen del campo «Transformador» de cada orden. Si la orden no lo trae, la fila dice «' + SIN_TRANSFORMADOR + '»: no se deduce del destino.'],
       ['Órdenes consolidadas', String(ordenesN)],
       ['Órdenes sin transformador', String(sinTr)],
@@ -2058,11 +2071,11 @@ function exportarEntregasExcel() {
     wb.xlsx.writeBuffer().then(buf => {
       const fecha = new Date().toISOString().slice(0, 10);
       LIBS.descargar(new Blob([buf], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
-        `Entregas_por_transformador_${(zona || 'TODAS').replace(/[^\w-]+/g, '_')}_${fecha}.xlsx`);
+        `Consolidado_${{ ENTRADA: 'Entradas', SALIDA: 'Salidas', AMBAS: 'Entradas_y_salidas' }[tipo]}_por_transformador_${(zona || 'TODAS').replace(/[^\w-]+/g, '_')}_${fecha}.xlsx`);
       cargando(false);
-      aviso(`Consolidado exportado: ${ordenesN} orden(es) de salida, ${filas.length} línea(s) de material` +
+      aviso(`Consolidado exportado: ${ordenesN} orden(es) de ${nomTipo.toLowerCase()}, ${filas.length} línea(s) de material` +
         (sinTr ? `; ${sinTr} orden(es) sin transformador.` : '.') +
-        (norm(($('#buscarOrden') || {}).value || '') ? ' El texto del buscador no se aplica: van todas las salidas de la zona.' : ''), 'ok', 9000);
+        (norm(($('#buscarOrden') || {}).value || '') ? ` El texto del buscador no se aplica: van todas las órdenes de ${nomTipo.toLowerCase()} de la zona.` : ''), 'ok', 9000);
     }).catch(err => { cargando(false); console.error(err); aviso('Error al escribir el consolidado: ' + err.message, 'err', 8000); });
   } catch (err) {
     cargando(false); console.error(err);
@@ -5510,6 +5523,8 @@ function conectarEventos() {
   if (fz) fz.addEventListener('change', pintarOrdenes);
   const be = $('#btnEntregasExcel');
   if (be) be.addEventListener('click', exportarEntregasExcel);
+  const tc = $('#tipoConsolidado');
+  if (tc) tc.addEventListener('change', () => tc.classList.remove('falta'));
   const btnG = $('#btnGuardadas');   // ausente con el HTML viejo en caché (`30 L-85`)
   if (btnG) btnG.addEventListener('click', irAGuardadas);
   $('#btnCerrarViz').onclick   = cerrarIndicadores;

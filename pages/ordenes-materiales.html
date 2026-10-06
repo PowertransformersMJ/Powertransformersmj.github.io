@@ -390,8 +390,15 @@
             <button type="button" class="oms-btn mini" id="btnActualizarRegistro">Actualizar</button>
           </div>
           <div class="fila-entregas">
-            <button type="button" class="oms-btn excel" id="btnEntregasExcel">Exportar entregas por transformador (Excel)</button>
-            <span class="ayuda-entregas">Materiales de las órdenes de <b>salida</b> de la zona elegida, con la subestación y el transformador de cada orden.</span>
+            <!-- Pedido del 2026-10-06: «permíteme escoger primero si es orden de entrada o salida». -->
+            <select id="tipoConsolidado" aria-label="Tipo de orden del consolidado">
+              <option value="">Tipo de orden…</option>
+              <option value="ENTRADA">Entradas</option>
+              <option value="SALIDA">Salidas</option>
+              <option value="AMBAS">Entradas y salidas</option>
+            </select>
+            <button type="button" class="oms-btn excel" id="btnEntregasExcel">Exportar consolidado por transformador (Excel)</button>
+            <span class="ayuda-entregas">Escoja primero el tipo de orden. El Excel trae los materiales de ese tipo en la zona elegida, con la subestación y el transformador de cada orden.</span>
           </div>
           <div class="lista-ordenes" id="listaOrdenes"></div>
         </div>

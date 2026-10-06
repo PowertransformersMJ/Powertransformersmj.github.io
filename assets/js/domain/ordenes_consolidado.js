@@ -5,8 +5,11 @@
 // me permita exportar un consolidado en excel de todos los suministros que
 // han sido entregados y sobre que transformador y subestacion».
 //
-// Módulo PURO (sin DOM ni Firebase). «Entregado» = material de una orden de
-// SALIDA: sale de la bodega y se entrega en campo. El transformador y su
+// Módulo PURO (sin DOM ni Firebase). Desde el mismo día (segundo pedido: «permíteme
+// escoger primero si es orden de entrada o salida») el consolidado es del TIPO que él
+// escoge: ENTRADA, SALIDA o ambos. En su uso real las órdenes de ENTRADA también
+// llevan material de la bodega a la subestación (OCCIDENTE: BOSQUE → COROZAL…),
+// así que no se presume cuál es «entrega»: se le pregunta. El transformador y su
 // subestación salen SOLO del campo «Transformador» de la orden, que el
 // formulario escribe como «MATRÍCULA · S/E SUBESTACIÓN». Si la orden no lo
 // trae, se dice; NO se deduce del destino (puede ser una bodega).
@@ -51,19 +54,29 @@ export function partirTransformador(texto) {
 const nombre = (p) => String((p && p.nombre) || '').trim();
 const txt = (v) => String(v == null ? '' : v).trim();
 
+/** Tipos que se pueden consolidar. */
+export const TIPOS_CONSOLIDADO = Object.freeze(['ENTRADA', 'SALIDA', 'AMBAS']);
+
+/** ¿La orden es del tipo pedido? 'AMBAS' acepta entrada y salida. */
+export function deTipo(o, tipo) {
+  const t = String(tipo || '').toUpperCase();
+  return t === 'AMBAS' ? (o.tipo === 'ENTRADA' || o.tipo === 'SALIDA') : o.tipo === t;
+}
+
 /**
- * Una fila por material ENTREGADO (órdenes de SALIDA), de la zona pedida.
- * Orden: zona, subestación (las órdenes sin transformador al final), transformador, fecha y número.
+ * Una fila por material de las órdenes del TIPO pedido (ENTRADA, SALIDA o AMBAS) y de la zona pedida.
+ * Orden: zona, subestación (las órdenes sin transformador al final), transformador, tipo, fecha y número.
  */
-export function filasEntregas(ordenes, opciones) {
+export function filasConsolidado(ordenes, opciones) {
   const zona = opciones && opciones.zona;
+  const tipo = (opciones && opciones.tipo) || 'SALIDA';
   const filas = [];
   (Array.isArray(ordenes) ? ordenes : []).forEach((o) => {
-    if (!o || o.tipo !== 'SALIDA' || !enZona(o, zona)) return;
+    if (!o || !deTipo(o, tipo) || !enZona(o, zona)) return;
     const tr = partirTransformador(o.transformador);
     (Array.isArray(o.items) ? o.items : []).forEach((it, i) => {
       filas.push({
-        fechaISO: txt(o.fechaISO), fecha: txt(o.fecha), numero: txt(o.numero), zona: claveZona(o.zona),
+        tipo: o.tipo, fechaISO: txt(o.fechaISO), fecha: txt(o.fecha), numero: txt(o.numero), zona: claveZona(o.zona),
         subestacion: tr.subestacion, transformador: tr.matricula, conTransformador: !!tr.matricula,
         origen: txt(o.origen), destino: txt(o.destino), item: i + 1,
         codigo: txt(it && it.codigo), descripcion: txt(it && it.descripcion), unidad: txt(it && it.unidad),
@@ -77,10 +90,16 @@ export function filasEntregas(ordenes, opciones) {
     a.zona.localeCompare(b.zona, 'es') ||
     vacioAlFinal(a.subestacion, b.subestacion) ||
     vacioAlFinal(a.transformador, b.transformador) ||
+    a.tipo.localeCompare(b.tipo) ||
     a.fechaISO.localeCompare(b.fechaISO) ||
     a.numero.localeCompare(b.numero, 'es', { numeric: true }) ||
     a.item - b.item);
   return filas;
+}
+
+/** Lo publicado primero (solo SALIDA): se conserva con el mismo comportamiento. */
+export function filasEntregas(ordenes, opciones) {
+  return filasConsolidado(ordenes, { zona: opciones && opciones.zona, tipo: 'SALIDA' });
 }
 
 /**
@@ -92,9 +111,10 @@ export function resumenPorTransformador(filas) {
   const m = new Map();
   const n = (s) => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
   (Array.isArray(filas) ? filas : []).forEach((f) => {
-    const k = [f.zona, f.subestacion, f.transformador, n(f.descripcion), n(f.unidad)].join('|');
+    // Entradas y salidas del mismo material no se mezclan: cada tipo, su fila.
+    const k = [f.zona, f.subestacion, f.transformador, f.tipo, n(f.descripcion), n(f.unidad)].join('|');
     const a = m.get(k) || {
-      zona: f.zona, subestacion: f.subestacion, transformador: f.transformador, conTransformador: f.conTransformador,
+      tipo: f.tipo, zona: f.zona, subestacion: f.subestacion, transformador: f.transformador, conTransformador: f.conTransformador,
       codigo: f.codigo, descripcion: f.descripcion, unidad: f.unidad, cantidad: 0, ordenes: new Set(), ultima: ''
     };
     a.cantidad = Number((a.cantidad + f.cantidad).toFixed(3));

@@ -14,7 +14,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import {
-  claveZona, zonasDe, enZona, partirTransformador, filasEntregas, resumenPorTransformador, SIN_TRANSFORMADOR
+  claveZona, zonasDe, enZona, partirTransformador, filasEntregas, filasConsolidado, resumenPorTransformador,
+  deTipo, TIPOS_CONSOLIDADO, SIN_TRANSFORMADOR
 } from '../assets/js/domain/ordenes_consolidado.js';
 
 const orden = (o) => ({
@@ -83,6 +84,37 @@ describe('filasEntregas', () => {
   });
 });
 
+describe('el tipo de orden se escoge (segundo pedido: «escoger primero si es orden de entrada o salida»)', () => {
+  // En OCCIDENTE todas sus órdenes son de ENTRADA (BOSQUE → COROZAL…): con «solo salidas» no salía nada.
+  const ords = [
+    orden({ numero: '5', tipo: 'ENTRADA', zona: 'OCCIDENTE', origen: 'BOSQUE', destino: 'COROZAL', transformador: 'T1-M/M-CRZ · S/E COROZAL' }),
+    orden({ numero: '5', tipo: 'SALIDA', zona: 'OCCIDENTE', transformador: 'T1-M/M-CRZ · S/E COROZAL' }),
+    orden({ numero: '6', tipo: 'ENTRADA', zona: 'BOLIVAR' })
+  ];
+  test('los tres tipos que se ofrecen', () => assert.deepEqual([...TIPOS_CONSOLIDADO], ['ENTRADA', 'SALIDA', 'AMBAS']));
+  test('deTipo', () => {
+    assert.equal(deTipo({ tipo: 'ENTRADA' }, 'ENTRADA'), true);
+    assert.equal(deTipo({ tipo: 'ENTRADA' }, 'SALIDA'), false);
+    assert.equal(deTipo({ tipo: 'SALIDA' }, 'AMBAS'), true);
+    assert.equal(deTipo({ tipo: 'OTRO' }, 'AMBAS'), false);
+  });
+  test('ENTRADA en OCCIDENTE trae la entrada a Corozal', () => {
+    const f = filasConsolidado(ords, { zona: 'OCCIDENTE', tipo: 'ENTRADA' });
+    assert.deepEqual(f.map(x => x.tipo + ' ' + x.numero + ' ' + x.subestacion), ['ENTRADA 5 COROZAL']);
+  });
+  test('AMBAS trae las dos y cada fila dice su tipo', () => {
+    assert.deepEqual(filasConsolidado(ords, { zona: 'OCCIDENTE', tipo: 'AMBAS' }).map(x => x.tipo), ['ENTRADA', 'SALIDA']);
+  });
+  test('el resumen no mezcla entradas con salidas del mismo material', () => {
+    const r = resumenPorTransformador(filasConsolidado(ords, { zona: 'OCCIDENTE', tipo: 'AMBAS' }));
+    assert.deepEqual(r.map(x => x.tipo + ':' + x.cantidad), ['ENTRADA:1', 'SALIDA:1']);
+  });
+  test('sin tipo, por compatibilidad, son salidas (lo publicado primero)', () => {
+    assert.deepEqual(filasConsolidado(ords, { zona: 'OCCIDENTE' }).map(x => x.tipo), ['SALIDA']);
+    assert.deepEqual(filasEntregas(ords, { zona: 'OCCIDENTE' }).map(x => x.tipo), ['SALIDA']);
+  });
+});
+
 describe('resumenPorTransformador', () => {
   test('suma por transformador y material, cuenta órdenes y guarda la última fecha', () => {
     const f = filasEntregas([
@@ -106,22 +138,28 @@ describe('resumenPorTransformador', () => {
 describe('la pantalla trae el filtro y el consolidado', () => {
   const html = readFileSync(new URL('../pages/ordenes-materiales.html', import.meta.url), 'utf8');
   const js = readFileSync(new URL('../assets/js/ordenes-materiales.js', import.meta.url), 'utf8');
-  test('selector de zona y botón de exportar en «Órdenes guardadas»', () => {
+  test('selector de zona, selector de tipo y botón de exportar en «Órdenes guardadas»', () => {
     assert.match(html, /<select id="filtroZona" aria-label="Filtrar las órdenes por zona">/);
-    assert.match(html, /id="btnEntregasExcel">Exportar entregas por transformador \(Excel\)<\/button>/);
+    assert.match(html, /<select id="tipoConsolidado"[\s\S]{0,120}<option value="">Tipo de orden…<\/option>\s*<option value="ENTRADA">Entradas<\/option>\s*<option value="SALIDA">Salidas<\/option>\s*<option value="AMBAS">Entradas y salidas<\/option>/);
+    assert.match(html, /id="btnEntregasExcel">Exportar consolidado por transformador \(Excel\)<\/button>/);
+  });
+  test('sin escoger el tipo no se exporta: se pide primero', () => {
+    assert.match(js, /if \(!tipo\) \{\s*selTipo\.classList\.add\('falta'\);/);
+    assert.match(js, /Escoja primero el tipo de orden del consolidado/);
   });
   test('la lista y las pendientes respetan la zona', () => {
     assert.match(js, /estado\.ordenes\.filter\(o => enZona\(o, zona\)/);
     assert.match(js, /filasPendientes\(zona\)/);
   });
   test('el consolidado usa la zona elegida, solo el registro, y dice su criterio', () => {
-    assert.match(js, /filasEntregas\(estado\.ordenes, \{ zona \}\)/);
-    assert.match(js, /addWorksheet\('Entregas'/);
+    assert.match(js, /filasConsolidado\(estado\.ordenes, \{ zona, tipo \}\)/);
+    assert.match(js, /addWorksheet\('Materiales'/);
     assert.match(js, /addWorksheet\('Por transformador'/);
     assert.match(js, /addWorksheet\('Notas'\)/);
   });
   test('con el HTML viejo en caché (L-85) los elementos nuevos se buscan con guarda', () => {
     assert.doesNotMatch(js, /\$\('#filtroZona'\)\.addEventListener/);
     assert.doesNotMatch(js, /\$\('#btnEntregasExcel'\)\.(addEventListener|onclick)/);
+    assert.doesNotMatch(js, /\$\('#tipoConsolidado'\)\.(addEventListener|onclick)/);
   });
 });
