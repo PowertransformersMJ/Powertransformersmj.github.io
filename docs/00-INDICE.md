@@ -77,7 +77,7 @@
 | §140 | ADR-140 — **Fichas: CF-38 publicado · CF-43/CF-44 (gases e ISO 55001 en el papel) en rama con ejemplos, esperan «procede» · decisiones de TODO-69 en una tanda** | 6032 |
 | §141 | ADR-141 — **Órdenes E/S: cantidad corregible en la tabla de materiales y material «Otro» escrito a mano** (sin cédulas, sin signos que el PDF no imprime, que quepa en el renglón) | 6088 |
 | §142 | ADR-142 — **Órdenes E/S: «Órdenes guardadas»** (dónde reposan; Ver · PDF · Excel · Editar desde la lista, también las pendientes sin conexión) | 6130 |
-| §143 | ADR-143 — **Órdenes E/S: filtro por zona y consolidado de entregas por transformador y subestación** (Excel; «entregado» = SALIDA, a confirmar) | 6167 |
+| §143 | ADR-143 — **Órdenes E/S: filtro por zona y consolidado de entregas por transformador y subestación** (Excel; el tipo —entradas, salidas o ambas— lo escoge él, `§143.9`) | 6167 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
