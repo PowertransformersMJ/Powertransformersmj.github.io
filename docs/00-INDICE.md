@@ -75,6 +75,7 @@
 | §138 | ADR-138 — **Cargabilidad SCADA: libro de parámetros por punto** (columna C de la homologación): entregable aparte, 17 posibles correcciones, 104 medidas fuera | 5971 |
 | §139 | ADR-139 — **Cerebro: documentación total de la conversación 09-23 → 10-05** (notas a ADRs, lecciones, cola, memoria y bóveda; sin código) | 5998 |
 | §140 | ADR-140 — **Fichas: CF-38 publicado · CF-43/CF-44 (gases e ISO 55001 en el papel) en rama con ejemplos, esperan «procede» · decisiones de TODO-69 en una tanda** | 6032 |
+| §141 | ADR-141 — **Órdenes E/S: cantidad corregible en la tabla de materiales y material «Otro» escrito a mano** (sin cédulas, sin signos que el PDF no imprime, que quepa en el renglón) | 6088 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

@@ -6084,3 +6084,45 @@ ya usan función, `§87`). Los 13 equipos «descargas» dan PD en `zonaDuval1` y
 SLS T3; T1-TPS PD). «Muy inferior al hidrógeno» es cierto por construcción. `functions/domain` es copia generada no versionada y
 ninguna Cloud Function usa estos textos. Hallazgos de paso → cola CF-45…CF-48. Crudo y síntesis → bóveda
 `2026-10-06-fichas-cf43-cf44-todo69/`.
+
+## 141. ADR-141 — Órdenes E/S: la cantidad se corrige en la tabla de materiales y existe el material «Otro» escrito a mano ⟦OPUS-5.5⟧ (2026-10-06)
+
+> *«necesito que en esta parte de ordenes de entrada y salida, posterior a agregar al item, me permitas modificar las
+> cantidades. adicionalmente agrega un material que se llame otro y me permitas ingresarlo de forma manual»*. Publicado con
+> resumen (no es papel de Fichas, L-63). NO revisado externamente (UI aditiva, reversible).
+
+**141.1 Causa raíz.** La tabla pintaba la cantidad como texto (`pintarItems`): corregirla exigía quitar el ítem y volver a
+agregarlo. El desplegable solo ofrecía el catálogo (`CONFIG.materiales` o la lista importada): un material fuera de él no
+podía entrar a la orden.
+**141.2 Solución.** (a) La cantidad es una casilla (`.cant-item`): lo válido se guarda en `input`; en `change` lo inválido
+vuelve a la cantidad que tenía al entrar (`dataset.orig`); Escape deshace; la rueda suelta la casilla; los atajos
+Ctrl+S/E/P/Q/I confirman la casilla enfocada antes de leer la orden. (b) «Otro» (valor `__OTRO__`, siempre al final y fuera de
+los grupos, sobrevive a importar listas): abre `#descOtro` y vuelve escribible `#unidad` con `datalist` de las unidades del
+catálogo; se imprime lo escrito, nunca la etiqueta (como el motivo «Otro»). Antes de agregar: `problemasOtro` (vacío, límites
+de `LIMITES`, documento de identidad con `pareceDocumento` —CC/C.C./cédula/CE/TI con puntos, «No.», «de ciudadanía»—, signos
+fuera de Windows-1252 que la Helvetica del PDF no imprime) + `cabeDescripcion` (misma geometría y letra mínima que `ajustar`:
+5,5 pt PDF y 6 pt Excel) + `cabeUnidad`. (c) `leerCantidad`: > 0, hasta 3 decimales y 9 enteros (lo que imprime el papel);
+`sumarCantidades` sin error de coma flotante. (d) Guardas si falta el HTML nuevo (L-85). Dominio nuevo y puro
+`assets/js/domain/ordenes_items.js`.
+**141.3 No-regresión.** Aditivo: ningún ID/clase/función renombrado; el documento, el Excel, el registro (`aDocumento`) y
+`firestore.rules` no cambian; el ítem «Otro» es `{codigo:'', descripcion, unidad, cantidad}` como cualquier otro. El ancho
+de la tabla en 375 px es idéntico al publicado (362 en 281, con desplazamiento lateral: ya existía).
+**141.4 Verificación.** `tests/ordenes_items.test.js` (63) · suite 2366/0/2 · lint limpio. Banco local con la página REAL
+y Firestore en memoria (bóveda `2026-10-06-ordenes-cantidad-otro/crudos/banco-ord/`): agregar, corregir con Enter, 0 que
+vuelve con aviso, «Otro» vacío / con cédula / largo / unidad larga, recarga (borrador), vista previa y Excel (hojas «Orden» y
+«Datos»), Ctrl+Q con la casilla a medio escribir (sale el valor nuevo), rueda, y HTML publicado + JS nuevo sin errores.
+Revisión adversarial de 2 lentes (Opus): 1 alta (atajos leían la cantidad vieja) y 5 medias/bajas, todas corregidas y
+re-verificadas. **Servido = main** (10-06, `curl` con anti-caché + `shasum`, L-65): `ordenes-materiales.js`, `ordenes_items.js`, el HTML, el CSS y `ui/fichas/panel.js` de CF-38 (cierra lo «no verificado» de `§140.4` en lo servido; CI y Deploy siguen sin consultar: el modo automático bloquea `gh run list`).
+**141.5 Anti-patterns evitados.** Confirmar solo en `change` (los atajos leen antes) · `blur` dentro de `leerOrden` (la llama el
+temporizador del borrador: soltaría la casilla mientras se escribe) · imprimir la etiqueta «Otro» · cifras que el papel
+imprime distinto de lo escrito.
+**141.6 Archivos.** `pages/ordenes-materiales.html` · `assets/js/ordenes-materiales.js` · `assets/css/ordenes-materiales.css` ·
+`assets/js/domain/ordenes_items.js` (nuevo) · `tests/ordenes_items.test.js` (nuevo). Commit `7c3ba3c`, main `c380079`.
+INTACTOS: `ordenes_registro.js`, `data/ordenes_materiales.js`, `firestore.rules`, el dibujo del PDF y del Excel.
+**141.7 Doctrina.** `CLAUDE.md §3.2` (aditivo) · L-85 · L-103 (medir con la métrica del documento) · `§78` (sin cédulas) ·
+interinato R4 (verificación en vivo) · L-63.
+**141.8 Verificado sano / no re-auditar.** Ningún repintado asíncrono de la tabla con una casilla enfocada; quitar otro ítem
+mientras se edita no desfasa índices; la orden abierta del registro detecta el cambio de cantidad (la huella incluye
+`items[].cantidad`); un material del catálogo llamado literalmente «Otro» no se confunde (valor ≠ `__OTRO__`); todo lo escrito
+se escapa (`esc`) en tabla, vista previa e indicadores. Abierto, no de este cambio: nota, motivo «Otro», zona y empresa de
+vigilancia siguen sin filtro de cédulas (→ TODO-65, puede reusar `pareceDocumento`).
