@@ -61,7 +61,7 @@ describe('cada orden guardada se ve y se descarga sin tocar el formulario', () =
     }
   });
   test('las órdenes pendientes (sin conexión) también se ven y se descargan', () => {
-    assert.match(js, /function filasPendientes\(\)/);
+    assert.match(js, /function filasPendientes\(zona\)/);
     for (const d of ['data-pver', 'data-ppdf', 'data-pexcel']) assert.match(js, new RegExp(`${d}="\\$\\{i\\}"`));
     assert.match(js, /cont\.innerHTML = pend \+ visibles\.map/);
     assert.match(js, /if \(REGISTRO\.estado !== 'ok'\) \{ cont\.innerHTML = pend; return; \}/);

@@ -579,6 +579,18 @@
    El diálogo va al top layer con showModal(): no necesita z-index. */
 .oms-scope .fila-buscar{ display:flex; gap:8px; align-items:center; margin:10px 0 12px; }
 .oms-scope .fila-buscar input[type=search]{ flex:1 1 auto; min-width:0; }
+/* Zona y consolidado de entregas (pedido del 2026-10-06). */
+.oms-scope .fila-buscar #filtroZona{ flex:0 0 auto; width:auto; min-width:150px; }
+.oms-scope .fila-entregas{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; }
+.oms-scope .fila-entregas .ayuda-entregas{ font-size:.78rem; color:var(--tinta-2); flex:1 1 220px; }
+/* En celular (DESPUÉS de las reglas base, para que no las pisen): el buscador ocupa su renglón,
+   el selector se estira junto a «Actualizar» y el botón de exportar baja de renglón en vez de cortarse. */
+@media (max-width:720px){
+  .oms-scope .fila-buscar{ flex-wrap:wrap; }
+  .oms-scope .fila-buscar input[type=search]{ flex:1 1 100%; }
+  .oms-scope .fila-buscar #filtroZona{ flex:1 1 auto; }
+  .oms-scope .fila-entregas .oms-btn{ white-space:normal; flex:1 1 100%; justify-content:center; text-align:center; }
+}
 .oms-scope .item-orden .quien{ display:block; margin-top:2px; }
 .oms-scope .item-orden .pend{
   font-size:.68rem; font-weight:800; letter-spacing:.4px; text-transform:uppercase;
