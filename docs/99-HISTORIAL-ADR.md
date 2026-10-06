@@ -6193,6 +6193,13 @@ reglas pisadas en celular —un `@media` no suma especificidad: va DESPUÉS de l
 en «Notas», rango de tildes escrito con caracteres invisibles → `\u0300-\u036f`).
 **143.5 Anti-patterns evitados.** Deducir la subestación del destino (puede ser una bodega) · sumar unidades distintas ·
 `@media` antes de la regla base que pisa.
+**143.9 Nota (2026-10-06, mismo día, `6860b2d`).** La interpretación «entregado = SALIDA» quedó superada por él con su pantalla
+de OCCIDENTE: allí TODAS sus órdenes son de ENTRADA (BOSQUE → COROZAL, SAHAGÚN…) y el consolidado decía «no hay». Pidió
+*«permíteme escoger primero si es orden de entrada o salida para exportar el consolidado en excel»*: selector «Tipo de orden…»
+(Entradas / Salidas / Entradas y salidas, obligatorio), botón «Exportar consolidado por transformador (Excel)», hoja
+«Materiales» con columna «Tipo», «Por transformador» sin mezclar tipos, órdenes contadas por tipo + número.
+`filasConsolidado({zona, tipo})` + `deTipo`; `filasEntregas` se conserva. 23 pruebas; suite 2403/0/2; banco con órdenes como
+las suyas. Lección de dominio: en su operación «entrada» no es «a bodega» — no presumir el sentido de un tipo, preguntarlo.
 **143.6 Archivos.** `pages/ordenes-materiales.html` · `assets/js/ordenes-materiales.js` · `assets/css/ordenes-materiales.css` ·
 `assets/js/domain/ordenes_consolidado.js` (nuevo) · `tests/ordenes_consolidado.test.js` (nuevo) · `tests/ordenes_guardadas.test.js`.
 Commit `efd46ac`, main `ee904f3`.
