@@ -6126,3 +6126,40 @@ mientras se edita no desfasa índices; la orden abierta del registro detecta el 
 `items[].cantidad`); un material del catálogo llamado literalmente «Otro» no se confunde (valor ≠ `__OTRO__`); todo lo escrito
 se escapa (`esc`) en tabla, vista previa e indicadores. Abierto, no de este cambio: nota, motivo «Otro», zona y empresa de
 vigilancia siguen sin filtro de cédulas (→ TODO-65, puede reusar `pareceDocumento`).
+
+## 142. ADR-142 — Órdenes E/S: «Órdenes guardadas» — dónde reposan y verlas o descargarlas desde la lista ⟦OPUS-5.5⟧ (2026-10-06)
+
+> *«necesito poder apreciar en el modulo de gestion de ordenes de entrada y salida donde quedan almacenadas las ordenes …
+> quiero que me permita apreciarlas verlas o descargarlas posterior a guardarlas»*. Publicado con resumen (L-63). NO revisado
+> externamente (UI aditiva, reversible).
+
+**142.1 Causa raíz.** Las órdenes SÍ se guardaban (registro del equipo, `ordenes_materiales`, `§77`) y se listaban en la
+sección 6, pero al final de una página larga, bajo «Listas desplegables», con un título que no decía «guardadas» y con solo
+«Abrir» (que REEMPLAZA el formulario) y «Eliminar». Las guardadas sin conexión (pendientes del navegador) ni se listaban: solo
+un aviso con «Revisar y subir».
+**142.2 Solución.** Enlace «Órdenes guardadas (N · P pend.)» en la barra (`#btnGuardadas`, `<a href="#panelRegistro">`: sin
+JS el ancla sirve; con JS descuenta la barra fija y enfoca `#tituloGuardadas`); sección 6 renombrada «Órdenes guardadas ·
+registro del equipo» con el texto de dónde reposan; por orden: Ver · PDF · Excel · Editar (antes «Abrir», mismo `data-abrir`)
+· Eliminar, que pasan la ORDEN del registro a `abrirVistaPrevia` / `exportarPDF` / `exportarExcel` (el mismo camino de «Ver la
+que ya existe»); las pendientes (`LOCAL.candidatas()`) se listan rotuladas «Pendiente» con Ver · PDF · Excel; al guardar,
+aviso que dice dónde quedó y fila «recién guardada» por 10 min.
+**142.3 No-regresión.** Aditivo: `data-abrir`/`data-eliminar`, el registro, `firestore.rules`, el PDF y el Excel no cambian.
+El enlace NO relee el registro (cada lectura cuesta hasta 500 documentos de la cuota gratuita) salvo que la lectura de apertura
+haya fallado.
+**142.4 Verificación.** `tests/ordenes_guardadas.test.js` (14) · suite 2380/0/2 · lint limpio. Banco de Órdenes
+(`§141`, bóveda): guardar → fila resaltada + aviso; el enlace lleva a la sección con el título visible bajo la barra y el foco
+en él; Ver con el formulario en OTRA orden muestra la guardada sin tocar el formulario; PDF y Excel desde la fila (hojas
+«Orden» y «Datos» con las cantidades guardadas); una pendiente sembrada se ve y se descarga; HTML publicado + JS nuevo sin
+errores. Revisión adversarial (1 Opus): firmas, folio y cédulas NO se mezclan entre órdenes (todo sale de la orden pasada;
+`aplicarCedulas` copia, `EMISION_FIRMAS` por emisión); 6 mejoras aplicadas (pendientes, «recién» que caduca, sin relectura,
+foco, `aria-label` por fila, enlace que sirve sin JS).
+**142.5 Anti-patterns evitados.** Releer el registro en cada clic · leer el formulario en una descarga de la lista · prometer
+«todas» cuando las pendientes no estaban.
+**142.6 Archivos.** `pages/ordenes-materiales.html` · `assets/js/ordenes-materiales.js` · `assets/css/ordenes-materiales.css` ·
+`tests/ordenes_guardadas.test.js` (nuevo). Commit `c66999d`, main `92e76e1`.
+**142.7 Doctrina.** `CLAUDE.md §3.2` (aditivo; free-tier: sin lecturas de más) · L-85 · L-94 (descargar con firmas registra un
+folio, igual que exportar abierta) · interinato R4.
+**142.8 Verificado sano / no re-auditar.** La orden del registro (`ordenDesdeRegistro`) trae las mismas claves que `leerOrden`;
+con `ordenOpcional` las exportaciones no llaman a `validar` ni leen `#conFirmas`, `#autorizado` ni `estado.cargada`;
+`EXPORTANDO` y la capa «cargando» impiden dos emisiones; un técnico ya podía «Abrir» y exportar cualquier orden del registro:
+no hay más exposición. Límite conocido: se listan las 500 de fecha más reciente (`TOPE_LECTURA`; el aviso «Hay más» ya existe).
