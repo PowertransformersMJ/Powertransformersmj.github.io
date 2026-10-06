@@ -1642,7 +1642,9 @@ const REGISTRO = {
   truncado: false,
   cargadoEn: null,
   leyendo: false,
-  guardando: false
+  guardando: false,
+  recien: null,         // {clave, en}: la orden que se acaba de guardar se resalta unos minutos
+  pendVista: []         // órdenes solo de este navegador que se pintaron en la lista (índice = data-p*)
 };
 
 /** Lo que vive solo en este navegador y podría subirse. */
@@ -1867,11 +1869,17 @@ function pintarEstadoRegistro() {
 function pintarOrdenes() {
   const cont = $('#listaOrdenes');
   $('#cntOrd').textContent = REGISTRO.estado === 'ok' ? estado.ordenes.length : '—';
+  const pend = filasPendientes();
+  const cg = $('#cntGuardadas');   // ausente con el HTML viejo en caché (`30 L-85`)
+  if (cg) {
+    cg.textContent = (REGISTRO.estado === 'ok' ? estado.ordenes.length : '—') +
+      (REGISTRO.pendVista.length ? ` · ${REGISTRO.pendVista.length} pend.` : '');
+  }
   pintarEstadoRegistro();
-  if (REGISTRO.estado !== 'ok') { cont.innerHTML = ''; return; }
+  if (REGISTRO.estado !== 'ok') { cont.innerHTML = pend; return; }
 
   if (!estado.ordenes.length) {
-    cont.innerHTML = '<p class="sin-datos">El registro del equipo todavía no tiene órdenes. ' +
+    cont.innerHTML = pend + '<p class="sin-datos">El registro del equipo todavía no tiene órdenes. ' +
       'La primera que guarde aparecerá aquí para todos.</p>';
     return;
   }
@@ -1886,32 +1894,85 @@ function pintarOrdenes() {
         (o.items || []).some(it => norm(it.descripcion).includes(q)));
 
   if (!visibles.length) {
-    cont.innerHTML = `<p class="sin-datos">Ninguna de las ${estado.ordenes.length} órdenes del registro coincide con «${esc(q)}».</p>`;
+    cont.innerHTML = pend + `<p class="sin-datos">Ninguna de las ${estado.ordenes.length} órdenes del registro coincide con «${esc(q)}».</p>`;
     return;
   }
 
   const yo = miUid();
   const admin = esAdminDeSesion();
-  cont.innerHTML = visibles.map(o => {
+  cont.innerHTML = pend + visibles.map(o => {
     const autoria = (o.migradaDe ? 'subida por ' : 'guardó ') + esc(nombreDe(o.creadoPor)) +
       (o.migradaDe ? '' : ' ' + esc(hace(o.creadoEn)));
     const edicion = o.version > 1
       ? ` · editó ${esc(nombreDe(o.actualizadoPor))} ${esc(hace(o.actualizadoEn))}` : '';
     const abierta = estado.cargada && estado.cargada.clave === o.clave ? ' · <b>abierta en el formulario</b>' : '';
     const puedeEliminar = admin || (yo && o.creadoPor.uid === yo);
+    // «Recién guardada» dura unos minutos: después ya no es cierto que lo último lo guardó uno.
+    const recien = !!(REGISTRO.recien && REGISTRO.recien.clave === o.clave && Date.now() - REGISTRO.recien.en < 10 * 60000);
+    const nom = `${esc(o.tipo)} N.º ${esc(o.numero)}`;
     return `
-    <div class="item-orden">
+    <div class="item-orden${recien ? ' recien' : ''}" data-clave="${esc(o.clave)}">
       <span class="badge ${o.tipo === 'ENTRADA' ? 'entrada' : 'salida'}">${esc(o.tipo)}</span>
       <span class="no">N.º ${esc(o.numero)}</span>
       <span class="meta">${esc(o.fecha)} ${esc(o.hora)} · ${esc(o.origen)} → ${esc(o.destino)} · ${o.items.length} ítem(s)
-        <span class="quien">${autoria}${edicion}${abierta}</span></span>
+        <span class="quien">${autoria}${edicion}${abierta}${recien ? ' · <b>recién guardada</b>' : ''}</span></span>
       <span class="acciones">
-        <button type="button" class="oms-btn mini" data-abrir="${esc(o.clave)}">Abrir</button>
-        ${puedeEliminar ? `<button type="button" class="oms-btn mini peligro" data-eliminar="${esc(o.clave)}">Eliminar</button>` : ''}
+        <button type="button" class="oms-btn mini" data-ver="${esc(o.clave)}" title="Ver el documento sin cargarlo en el formulario" aria-label="Ver la orden ${nom}">Ver</button>
+        <button type="button" class="oms-btn mini pdf" data-pdf="${esc(o.clave)}" title="Descargar esta orden en PDF" aria-label="Descargar en PDF la orden ${nom}">PDF</button>
+        <button type="button" class="oms-btn mini excel" data-excel="${esc(o.clave)}" title="Descargar esta orden en Excel" aria-label="Descargar en Excel la orden ${nom}">Excel</button>
+        <button type="button" class="oms-btn mini" data-abrir="${esc(o.clave)}" title="Cargarla en el formulario para corregirla" aria-label="Editar la orden ${nom}">Editar</button>
+        ${puedeEliminar ? `<button type="button" class="oms-btn mini peligro" data-eliminar="${esc(o.clave)}" aria-label="Eliminar la orden ${nom}">Eliminar</button>` : ''}
       </span>
     </div>`;
   }).join('') +
     (q ? `<p class="sin-datos">Mostrando ${visibles.length} de ${estado.ordenes.length} órdenes del registro.</p>` : '');
+}
+
+/**
+ * Órdenes que están solo en este navegador (guardadas sin conexión o traídas de un
+ * archivo): también se ven y se descargan desde la lista, rotuladas «Pendiente»,
+ * hasta que se suban con «Revisar y subir». Antes no había cómo verlas.
+ */
+function filasPendientes() {
+  REGISTRO.pendVista = SUBIDA.abierta ? [] : LOCAL.candidatas().filter(c => c && c.orden);
+  return REGISTRO.pendVista.map((c, i) => {
+    const o = c.orden;
+    const nom = `${esc(o.tipo || '')} N.º ${esc(o.numero || 's/n')}`;
+    return `
+    <div class="item-orden pendiente">
+      <span class="badge pend">Pendiente</span>
+      <span class="no">${o.tipo ? esc(o.tipo) + ' · ' : ''}N.º ${esc(o.numero || 's/n')}</span>
+      <span class="meta">${esc(o.fecha || '')} ${esc(o.hora || '')} · ${esc(o.origen || '')} → ${esc(o.destino || '')} · ${(o.items || []).length} ítem(s)
+        <span class="quien">solo en este equipo: súbala con «Revisar y subir» cuando haya conexión</span></span>
+      <span class="acciones">
+        <button type="button" class="oms-btn mini" data-pver="${i}" aria-label="Ver la orden pendiente ${nom}">Ver</button>
+        <button type="button" class="oms-btn mini pdf" data-ppdf="${i}" aria-label="Descargar en PDF la orden pendiente ${nom}">PDF</button>
+        <button type="button" class="oms-btn mini excel" data-pexcel="${i}" aria-label="Descargar en Excel la orden pendiente ${nom}">Excel</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+/**
+ * Lleva a la lista de órdenes guardadas (sección 6). No vuelve a leer el registro
+ * (cada lectura cuesta hasta 500 documentos de la cuota gratuita): solo si la
+ * lectura de la apertura falló; para refrescar está «Actualizar».
+ */
+function irAGuardadas(ev) {
+  const p = $('#panelRegistro');
+  if (!p) return;
+  if (ev) ev.preventDefault();      // es un enlace a #panelRegistro: sin JS, el ancla sola sirve
+  // La barra de botones queda fija arriba (en celular ocupa cuatro renglones): se
+  // descuenta su alto para que el título de la sección no quede tapado.
+  const barra = $('.barra');
+  const cs = barra ? getComputedStyle(barra) : null;
+  const tapa = cs && cs.position === 'sticky' ? (parseFloat(cs.top) || 0) + barra.offsetHeight : 0;
+  const y = p.getBoundingClientRect().top + window.scrollY - tapa - 12;
+  window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+  // El teclado y el lector de pantalla llegan con la vista: se enfoca el título.
+  const t = $('#tituloGuardadas');
+  if (t) t.focus({ preventScroll: true });
+  if (REGISTRO.estado !== 'ok' && REGISTRO.estado !== 'cargando') cargarRegistro(false);
 }
 
 /** Aviso de edición + tipo y número fijos mientras la orden venga del registro. */
@@ -2004,10 +2065,12 @@ function trasGuardar(orden, ajustes, modo) {
     LOCAL.marcarSubida(orden.clave, huella(orden));
   }
   guardarBorrador();
+  REGISTRO.recien = { clave: orden.clave, en: Date.now() };
   pintarBarraEdicion(); pintarOrdenes(); pintarPendientes(); pintarAlmacenamiento();
-  aviso(modo === 'editar'
+  aviso((modo === 'editar'
     ? `Orden ${orden.numero} actualizada en el registro del equipo (versión ${orden.version}).`
-    : `Orden ${orden.numero} guardada en el registro del equipo.`, 'ok', 6000);
+    : `Orden ${orden.numero} guardada en el registro del equipo.`) +
+    ' La encuentra en «Órdenes guardadas» (botón de arriba o sección 6), donde puede verla o descargarla.', 'ok', 9000);
   if (ajustes && ajustes.length) aviso('Al guardar: ' + ajustes.join('; ') + '.', 'warn', 9000);
   if (DATOS.handle) DATOS.escribir(true);
 }
@@ -2103,7 +2166,7 @@ async function resolverFalloGuardado(e, o, plan) {
     LOCAL.agregarPendiente(o);
     pintarPendientes(); pintarAlmacenamiento();
     if (DATOS.handle) DATOS.escribir(true);
-    aviso('Orden guardada como PENDIENTE en este equipo. Súbala desde «Registro del equipo» cuando haya conexión.', 'warn', 10000);
+    aviso('Orden guardada como PENDIENTE en este equipo: la ve en «Órdenes guardadas» y la sube desde allí con «Revisar y subir» cuando haya conexión.', 'warn', 10000);
   }
   return null;
 }
@@ -2156,6 +2219,7 @@ const SITUACION_TXT = {
 const esMarcable = (s) => s === 'nueva' || s === 'distinta' || s === 'borrada';
 
 function pintarPendientes() {
+  if ($('#listaOrdenes')) pintarOrdenes();      // las pendientes también se listan (Ver / PDF / Excel)
   const el = $('#avisoPendientes');
   if (!el) return;
   const n = SUBIDA.abierta ? 0 : LOCAL.candidatas().length;
@@ -5230,6 +5294,27 @@ function conectarEventos() {
     const be = ev.target.closest('[data-eliminar]');
     if (ba) abrirDelRegistro(ba.dataset.abrir);
     if (be) eliminarDelRegistro(be.dataset.eliminar);
+    // Ver y descargar una orden guardada SIN cargarla en el formulario: el mismo
+    // camino que «Ver la que ya existe» (la orden del registro, con sus firmas y su
+    // folio como cualquier emisión). El formulario no se toca.
+    const bv = ev.target.closest('[data-ver], [data-pdf], [data-excel], [data-pver], [data-ppdf], [data-pexcel]');
+    if (!bv) return;
+    const d = bv.dataset;
+    let o;
+    if (d.pver != null || d.ppdf != null || d.pexcel != null) {
+      const c = REGISTRO.pendVista[Number(d.pver != null ? d.pver : d.ppdf != null ? d.ppdf : d.pexcel)];
+      o = c && c.orden;
+    } else {
+      const clave = d.ver || d.pdf || d.excel;
+      o = estado.ordenes.find(x => x.clave === clave);
+    }
+    if (!o) { aviso('Esa orden ya no está en la lista: pulse «Actualizar».', 'warn'); return; }
+    const verla = d.ver != null || d.pver != null, pdf = d.pdf != null || d.ppdf != null;
+    Promise.resolve(verla ? abrirVistaPrevia(o) : pdf ? exportarPDF(o) : exportarExcel(o)).catch(e => {
+      console.error('No se pudo generar el documento de la orden:', e);
+      cargando(false);
+      aviso('No se pudo generar el documento de esa orden: ' + (e && e.message ? e.message : 'error desconocido') + '.', 'err', 8000);
+    });
   });
   // Tras un despliegue, un navegador puede traer la página vieja de caché con
   // este código nuevo (`30 L-85`): sin estos elementos, el módulo sigue
@@ -5304,6 +5389,8 @@ function conectarEventos() {
   });
   /* --- Indicadores --- */
   $('#btnIndicadores').onclick = abrirIndicadores;
+  const btnG = $('#btnGuardadas');   // ausente con el HTML viejo en caché (`30 L-85`)
+  if (btnG) btnG.addEventListener('click', irAGuardadas);
   $('#btnCerrarViz').onclick   = cerrarIndicadores;
   $('#btnVizExcel').onclick    = exportarIndicadoresExcel;
   $('#btnLimpiarFiltros').onclick = () => { FILTROS.limpiar(); pintarIndicadores(); };
@@ -5487,7 +5574,7 @@ else {
 }
 
 // El registro del equipo exige sesión y perfil activo (reglas de Firestore).
-// Una sola lectura al abrir; después, el botón «Actualizar».
+// Una sola lectura al abrir; después, el botón «Actualizar» («Órdenes guardadas» solo relee si la de apertura falló).
 let registroEnCamino = false;
 function trasSesionRegistro() {
   if (registroEnCamino) return;
