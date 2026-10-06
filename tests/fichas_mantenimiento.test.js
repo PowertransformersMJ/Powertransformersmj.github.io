@@ -365,7 +365,7 @@ describe('modoDegradacion — solo se enumera lo que se midió', () => {
     const e = modoDegradacion(EQUIPO, { h2: 1200 }).dominante.e;
     assert.equal(modoDegradacion(EQUIPO, { h2: 1200 }).dominante.k, 'descargas');
     assert.ok(!/\(\s*ppm\)/.test(e), `paréntesis vacío: «${e}»`);
-    assert.match(e, /sin etileno relevante/);
+    assert.match(e, /sin dato de etileno en la muestra/); // CF-43: sin dato no se afirma una medida
   });
 
   // El PI comparte esta función: el arreglo tiene que servirle igual.

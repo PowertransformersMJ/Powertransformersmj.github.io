@@ -182,33 +182,56 @@ export function modoDegradacion(equipo, diag) {
       n: 'ASTM D5837 · IEC 61198 · CIGRÉ 445 (curva de Chendong)'
     });
   }
+  // CF-43 (`99 §137`, `52 §7`): los tres cortes de gases (500 · 15 · 1.000/100
+  // ppm) NO salen de ninguna norma ni del MO.00418 —IEEE C57.104 1991/2008 no
+  // los trae y el MO solo califica el acetileno (Tabla 3, C₂H₂ ≥ 7)—, así que
+  // el papel los declara «criterio del área» y cita la norma solo para lo que
+  // sí sostiene: QUÉ gas se forma en cada tipo de falla (IEC 60599:2022 §4.1 y
+  // §4.2). Las frases viejas afirmaban tres cosas falsas en un texto que se
+  // firma: que el acetileno «solo» sale de un arco, que el etileno es la firma
+  // del punto caliente del devanado por carga, y que hasta 99 ppm de etileno es
+  // «prácticamente ausente». Tampoco se nombra el triángulo de Duval: esta
+  // función no lo calcula. El metano solo se escribe si se midió (el 0 de la
+  // hoja es relleno de «no lo sé», como en `soloMedido`).
+  const ch4 = g('ch4') != null && g('ch4') > 0 ? ` y metano (CH₄) en ${numES(d.ch4)} ppm` : '';
+  // Los títulos tampoco pueden afirmar más que el gas: el etileno alto es una
+  // falla térmica LOCALIZADA (en el aceite o en el papel, según los demás gases),
+  // no necesariamente «en el aislamiento»; y el acetileno sale también de un
+  // punto muy caliente, no solo de un arco (en el parque, 2 de los 6 equipos con
+  // este modo dan zona T3 en el triángulo de la plataforma). La clave `k` no
+  // cambia: el trabajo propuesto y las condiciones se siguen eligiendo igual.
   if (termi) {
     M.push({
       k: 'termico',
-      t: 'Falla térmica en el aislamiento',
-      e: `etileno (C₂H₄) en ${numES(d.c2h4)} ppm` +
-         (d.ch4 != null ? ` y metano (CH₄) en ${numES(d.ch4)} ppm` : '') +
-         ', firma de sobrecalentamiento por superación de la temperatura del punto más caliente (hot-spot)',
-      n: 'IEEE C57.104 · IEC 60599'
+      t: 'Falla térmica localizada',
+      e: `etileno (C₂H₄) en ${numES(d.c2h4)} ppm${ch4}, gases propios de una falla térmica localizada, ` +
+         'por ejemplo en una conexión o un contacto defectuoso, por corrientes circulantes o en un punto ' +
+         'caliente del núcleo',
+      n: 'IEC 60599:2022 §4.1; el umbral de 500 ppm de etileno es criterio del área'
     });
   }
   if (arco) {
     M.push({
       k: 'arco',
-      t: 'Descarga de alta energía (arco)',
-      e: `acetileno (C₂H₂) en ${numES(d.c2h2, 1)} ppm, gas que solo se genera por arco eléctrico`,
-      n: 'IEEE C57.104 · IEC 60599 · triángulo de Duval'
+      t: 'Descarga de alta energía (arco) o falla térmica severa',
+      e: `acetileno (C₂H₂) en ${numES(d.c2h2, 1)} ppm, en la franja de calificación 5 del MO.00418 ` +
+         '(C₂H₂ ≥ 7 ppm); el acetileno se forma en cantidad significativa principalmente por arcos eléctricos ' +
+         'y, en menor cantidad, por puntos calientes de muy alta temperatura',
+      n: 'MO.00418.DE-GAC-AX.01 Ed. 02, Tabla 3 · IEC 60599:2022 §4.1; el umbral de 15 ppm es criterio del área'
     });
   }
   if (descP) {
     M.push({
       k: 'descargas',
       t: 'Descargas parciales / falla de baja energía',
-      e: `hidrógeno (H₂) en ${numES(d.h2)} ppm` +
-         (d.ch4 != null ? ` y metano (CH₄) en ${numES(d.ch4)} ppm` : '') +
-         (g('c2h4') != null ? `, con etileno prácticamente ausente (${numES(d.c2h4, 1)} ppm)` : ', sin etileno relevante') +
-         ' — firma compatible con descargas parciales, no con envejecimiento térmico del papel',
-      n: 'IEEE C57.104 · IEC 60599 · triángulo de Duval (confirmar con muestreo dirigido)'
+      e: `hidrógeno (H₂) en ${numES(d.h2)} ppm${ch4}` +
+         (g('c2h4') != null && g('c2h4') > 0
+           ? `, con etileno de ${numES(d.c2h4, 1)} ppm, muy inferior al hidrógeno`
+           : ', sin dato de etileno en la muestra') +
+         ' — predominio de hidrógeno compatible con descargas parciales, que por sí solo no indica ' +
+         'envejecimiento térmico del papel (ese lo confirman el CO/CO₂ y los furanos)',
+      n: 'IEC 60599:2022 §4.1 y §4.2; los umbrales de 1.000 ppm de hidrógeno y 100 ppm de etileno son ' +
+         'criterio del área (confirmar con medición de descargas parciales y muestreo dirigido)'
     });
   }
   if (aceit) {
@@ -324,7 +347,11 @@ export function redaccionAlcance(equipo, diag) {
   if (f.usuarios > 0) {
     t += `La afectación asociada a una falla del activo alcanza ${numES(f.usuarios)} usuarios. `;
   }
-  t += 'En consecuencia, y en el marco de la gestión de activos (ISO 55001), la reposición por una unidad de ' +
+  // CF-44 (`99 §137`, `51 §12`): ISO 55001 es la norma del SISTEMA de gestión
+  // de activos de la empresa —el MO.00418 la cita como documento de referencia
+  // y AFINIA certificó su sistema en 2023—, pero no fija criterios técnicos de
+  // reposición: lo dice su propio alcance. El papel la nombra como lo que es.
+  t += 'En consecuencia, en el marco del sistema de gestión de activos de la empresa (ISO 55001), la reposición por una unidad de ' +
     'igual capacidad y mejor estado de salud se establece como medida prioritaria de mitigación de riesgo, ' +
     'orientada a garantizar la disponibilidad, la seguridad operacional y la sostenibilidad del suministro en ' +
     'la zona de influencia.';
@@ -414,7 +441,8 @@ const TRABAJO_POR_MODO = Object.freeze({
     a: 'inspección interna dirigida al origen del arco —con revisión del conmutador bajo carga '
      + '(OLTC) y de sus contactos— y muestreo de gases con periodicidad acortada hasta descartar '
      + 'la evolución del defecto',
-    n: 'IEEE C57.104 · IEC 60599 · triángulo de Duval'
+    // Sin «triángulo de Duval»: esta ruta no lo calcula (CF-43).
+    n: 'IEEE C57.104 · IEC 60599'
   },
   descargas: {
     rev: true,

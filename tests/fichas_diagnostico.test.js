@@ -126,7 +126,7 @@ describe('modoDegradacion — decide por el valor medido', () => {
   test('descargas parciales: H₂ alto con etileno ausente', () => {
     const md = modoDegradacion(EQUIPO_B, { h2: 1500, ch4: 80, c2h4: 5 });
     assert.equal(md.dominante.k, 'descargas');
-    assert.match(md.dominante.e, /descargas parciales, no con envejecimiento térmico del papel/);
+    assert.match(md.dominante.e, /compatible con descargas parciales, que por sí solo no indica envejecimiento térmico del papel/); // CF-43
   });
 
   test('alerta de incoherencia: la fuente culpa al papel y los furanos la desmienten', () => {
