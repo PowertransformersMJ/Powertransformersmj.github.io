@@ -75,3 +75,13 @@ clasificaba mal ~51 % del área y se guardaba con cada muestra nueva— y una TE
 `modoDegradacion` (Fichas) sin fuente. · **Regla**: antes de escribir, leer el registro de `52 §7`; reusar `zonaDuval1`;
 si hace falta un criterio nuevo, registrarlo allí con su fuente o rotularlo «criterio del área». [HONOR] (candado
 pendiente: TODO-73)
+
+### L-125 · Una cifra que el código pone junto a una norma se busca EN la norma antes de firmarla
+**Disparador**: un texto que se firma (o el cerebro) cita una norma al lado de un umbral, o dice «ratificado con …». · **Cicatriz**
+(`99 §140`, nota `§57.8`): `modoDegradacion` cerraba con «conforme a IEEE C57.104 · IEC 60599 · triángulo de Duval» unos cortes
+(15 · 500 · 1.000/100 ppm) que ninguna trae; decía que el acetileno «solo» sale de un arco (IEC 60599:2022 §4.1: *principalmente*)
+y que 500 ppm de etileno son el punto caliente del devanado por carga (es una falla térmica localizada); y el cerebro daba por
+«ratificados con el MO» 15 ppm y 0,5 ppm/día, cuando el PDF del MO no dice «ppm» ni una vez. · **Regla**: (1) la norma se cita
+para el PRINCIPIO (qué gas da cada falla); el umbral propio se rotula «criterio del área» solo con el sí del Ingeniero; (2)
+«ratificado con X» exige la página leída en la sesión (`pdftotext` del PDF de `~/Downloads`); (3) un valor absoluto en ppm no
+garantiza la temperatura de la falla (C₂H₄ 500 con CH₄ alto da T1): sin Duval calculado no se imprime un rango en °C. [HONOR]

@@ -68,26 +68,26 @@
 | §55 | ADR-055 — TODO-15: ΔC1 de bujes al veredicto + caveat 20 °C de IR + clusters 3b/4 validados | 1072 |
 | §56 | ADR-056 — Dashboard Salud de Activos conectado al parque REAL (`parque_salud.js`, sin fabricar) | 1090 |
 | §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
-| §58 | ADR-058 — Ecosistema `GitHub-MJ`: kernel canónico propio (`brain:pull` + gate #0) + `60-WORKFLOWS` | 1122 |
-| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0, sentinel `NINGUNA`) | 1140 |
-| §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso | 1158 |
-| §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB) a `pages/fichas-tecnicas.html` + Firestore; híbrido `.ftm-` | 1181 |
-| §62 | ADR-062 — Auditoría holística (11 auditores): datos de AFINIA servidos por Pages en modo `legacy` | 1226 |
-| §63 | ADR-063 — Cola de la auditoría: topes en funciones, 16 índices Firestore, `ts_calculo` | 1284 |
-| §64 | ADR-064 — Fichas: el port trajo todo el CSS y el 44% del marcado (clases huérfanas = vistas faltantes) | 1343 |
-| §65 | ADR-065 — Novedades UUCC: contadores + cajón de decisión por equipo (aceptar / mantener / corregir) | 1394 |
-| §66 | ADR-066 — Evaluación de Fichas: terciario «0» inflaba 23 %; «20.000» kVA leído como 20 | 1436 |
-| §67 | ADR-067 — «Veo información basura»: Cargabilidad/SCADA con equipos inventados sin rótulo | 1497 |
-| §68 | ADR-068 — Mantenimiento del cerebro (Nivel-2, 8 sondas): dos gates en verde sin medir | 1551 |
-| §69 | ADR-069 — TX_Potencia: los «62 omitidos» eran 57 equipos reales → 208 válidos (cierra TODO-34) | 1637 |
-| §70 | ADR-070 — Órdenes de Materiales SSEE con página propia, sin firmas escaneadas ni cédulas | 1710 |
-| §71 | ADR-071 — Firmas a la cuenta de cada quien: `firmas/{uid}`, solo el dueño lee y escribe la suya | 1781 |
-| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no se enteró de dos tareas (M-02) | 1838 |
-| §73 | ADR-073 — Reglas sin probar: `firebase deploy` solo COMPILA → 43 pruebas de `storage.rules` + `test:rules` | 1905 |
-| §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta; catálogo de 3 familias | 1983 |
-| §75 | ADR-075 — **Fichas**: 5 falsedades del papel firmado corregidas; redacción por banda; matriz a color | 2642 |
-| §76 | ADR-076 — **Órdenes de Materiales** versión 8-sep, sin firmas ni cédulas, parque vivo; **L-90** | 2964 |
-| §77 | ADR-077 — **Registro OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, sin cédulas | 3017 |
-| §78 | ADR-078 — **Cédulas** desde directorio privado en Firestore; candado en commit/merge/push. **L-93/94** | 3110 |
-| §79 | ADR-079 — **El rol sale del perfil**: `/admins` deja de dar admin a quien ya tiene perfil | 3186 |
-| §80 | ADR-080 — **Manda el Excel en todos los caminos**: el trigger ya no borra la condición del archivo | 3221 |
+| §58 | ADR-058 — Ecosistema `GitHub-MJ`: kernel canónico propio (`brain:pull` + gate #0) + `60-WORKFLOWS` | 1124 |
+| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0, sentinel `NINGUNA`) | 1142 |
+| §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso | 1160 |
+| §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB) a `pages/fichas-tecnicas.html` + Firestore; híbrido `.ftm-` | 1183 |
+| §62 | ADR-062 — Auditoría holística (11 auditores): datos de AFINIA servidos por Pages en modo `legacy` | 1228 |
+| §63 | ADR-063 — Cola de la auditoría: topes en funciones, 16 índices Firestore, `ts_calculo` | 1286 |
+| §64 | ADR-064 — Fichas: el port trajo todo el CSS y el 44% del marcado (clases huérfanas = vistas faltantes) | 1345 |
+| §65 | ADR-065 — Novedades UUCC: contadores + cajón de decisión por equipo (aceptar / mantener / corregir) | 1396 |
+| §66 | ADR-066 — Evaluación de Fichas: terciario «0» inflaba 23 %; «20.000» kVA leído como 20 | 1438 |
+| §67 | ADR-067 — «Veo información basura»: Cargabilidad/SCADA con equipos inventados sin rótulo | 1499 |
+| §68 | ADR-068 — Mantenimiento del cerebro (Nivel-2, 8 sondas): dos gates en verde sin medir | 1553 |
+| §69 | ADR-069 — TX_Potencia: los «62 omitidos» eran 57 equipos reales → 208 válidos (cierra TODO-34) | 1639 |
+| §70 | ADR-070 — Órdenes de Materiales SSEE con página propia, sin firmas escaneadas ni cédulas | 1712 |
+| §71 | ADR-071 — Firmas a la cuenta de cada quien: `firmas/{uid}`, solo el dueño lee y escribe la suya | 1783 |
+| §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no se enteró de dos tareas (M-02) | 1840 |
+| §73 | ADR-073 — Reglas sin probar: `firebase deploy` solo COMPILA → 43 pruebas de `storage.rules` + `test:rules` | 1907 |
+| §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta; catálogo de 3 familias | 1985 |
+| §75 | ADR-075 — **Fichas**: 5 falsedades del papel firmado corregidas; redacción por banda; matriz a color | 2644 |
+| §76 | ADR-076 — **Órdenes de Materiales** versión 8-sep, sin firmas ni cédulas, parque vivo; **L-90** | 2966 |
+| §77 | ADR-077 — **Registro OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, sin cédulas | 3019 |
+| §78 | ADR-078 — **Cédulas** desde directorio privado en Firestore; candado en commit/merge/push. **L-93/94** | 3112 |
+| §79 | ADR-079 — **El rol sale del perfil**: `/admins` deja de dar admin a quien ya tiene perfil | 3188 |
+| §80 | ADR-080 — **Manda el Excel en todos los caminos**: el trigger ya no borra la condición del archivo | 3223 |

@@ -15,65 +15,66 @@
 
 | § | Qué resuelve (hook para decidir si leerlo) | Línea |
 |---|---|---|
-| §81 | ADR-081 — **Potencia y usuarios EN la casilla** (informativo); la casilla sigue siendo la de la norma | 3264 |
-| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad (dos TX de un patio compartían ficha) | 3313 |
-| §83 | ADR-083 — **Borrador local de la ficha** con dueño y caducidad (no pisa ni cruza equipos) | 3362 |
-| §84 | ADR-084 — **La carga tardía ya no borra el listado**; el pie del papel dice su fuente real | 3468 |
-| §85 | ADR-085 — **El alcance lo escribe la redacción dictada** por el Ingeniero | 3514 |
-| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos; kernel sin IDs ajenos | 3574 |
-| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real, `[PENDIENTE]` nunca «0» | 3632 |
-| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes) | 3715 |
-| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero, ficha y Excel (CF-25) | 3747 |
-| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones | 3801 |
-| §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3836 |
-| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3859 |
-| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3891 |
-| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 | 3926 |
-| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve | 3968 |
-| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas** | 4020 |
-| §97 | ADR-097 — **Beneficios sin subtítulos** | 4039 |
-| §98 | ADR-098 — **Firma estampada** de la sesión | 4054 |
-| §99 | ADR-099 — **Firmas del equipo bajo custodia** | 4086 |
-| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) | 4178 |
-| §101 | ADR-101 — **Firmas de tamaño parejo** | 4206 |
-| §102 | ADR-102 — **Vista previa del Excel + PDF** | 4220 |
-| §103 | ADR-103 — **Mantenimiento al PE.02081** | 4247 |
-| §104 | ADR-104 — **Excel sin datos ocultos** | 4266 |
-| §105 | ADR-105 — **Beneficios con las 13 acciones** | 4296 |
-| §106 | ADR-106 — **Zona del activo** | 4332 |
-| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin usuarios, sin casilla) | 4346 |
-| §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4380 |
-| §109 | ADR-109 — **Auditoría Nivel-2** (M-07) | 4401 |
-| §110 | ADR-110 — **Sin hoja Beneficios**; Futuro derecho | 4428 |
-| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota 7 variables | 4460 |
-| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4479 |
-| §113 | ADR-113 — **CF-40**: lector en un hilo con tiempo límite | 4566 |
-| §114 | ADR-114 — **Órdenes E/S**: firmas en Autorizado y Entregado | 4613 |
-| §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4660 |
-| §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4732 |
-| §117 | ADR-117 — **Órdenes E/S**: firmas delegadas | 4783 |
-| §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4845 |
-| §119 | ADR-119 — **Fichas**: firmas delegadas (Carlos, Jorge) | 4890 |
-| §120 | ADR-120 — **Cerebro partido en hijas** (`00a`, `22`, `34`, `35`, CF cerrados); kernel reconcilia el índice por rangos | 4980 |
-| §121 | ADR-121 — **Fichas**: «Elaboración» por defecto sigue a la sesión (Carlos, Jorge) | 5056 |
-| §122 | ADR-122 — **Cargabilidad SCADA**: carga horaria real vs ampacidad del devanado, CRG firme/provisional, «Datos SCADA» (homologación y meses) | 5099 |
-| §123 | ADR-123 — **Detalle de Cargabilidad**: la ventana de la tabla priorizada abre con el parque real, sin cifras sin dato y a la vista en la pestaña (iframe) | 5196 |
-| §124 | ADR-124 — **Detalle de Cargabilidad**: «Diagnóstico» con las 7 calificaciones de Salud de Activos y enlace a las curvas horarias medidas por el SCADA (decisiones del Ingeniero) | 5271 |
-| §125 | ADR-125 — **Cargabilidad SCADA con datos**: «Paquete preparado» (un mes en 3 partes por la extensión, mismo lector), homologación v2 y 8 meses cargados, arreglos de la revisión | 5327 |
-| §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5393 |
-| §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5459 |
-| §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5533 |
-| §129 | ADR-129 — **Cargabilidad SCADA**: marca «sostenida» de la lista sin falsos | 5582 |
-| §130 | ADR-130 — **Cargabilidad SCADA**: «Máximo sostenido 2 h» del detalle con serie limpia | 5627 |
-| §131 | ADR-131 — **Cargabilidad SCADA**: triángulo de Duval hoy y con más carga + carga «solo gases» + regla vieja de Duval corregida | 5658 |
-| §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5738 |
-| §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5784 |
-| §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5814 |
-| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5835 |
-| §136 | ADR-136 — **Cerebro**: mantenimiento minucioso (auditoría de 5 lentes, 55 confirmados) · TODO-68 → L-122 · prueba del ☰ | 5879 |
-| §137 | ADR-137 — **Cerebro · dominio**: nacen los lóbulos 51 (salud y riesgo), 52 (DGA, aceite y papel) y 53 (carga y térmica); 49/50/34 trascienden · TODO-73 | 5914 |
-| §138 | ADR-138 — **Cargabilidad SCADA: libro de parámetros por punto** (columna C de la homologación): entregable aparte, 17 posibles correcciones, 104 medidas fuera | 5969 |
-| §139 | ADR-139 — **Cerebro: documentación total de la conversación 09-23 → 10-05** (notas a ADRs, lecciones, cola, memoria y bóveda; sin código) | 5996 |
+| §81 | ADR-081 — **Potencia y usuarios EN la casilla** (informativo); la casilla sigue siendo la de la norma | 3266 |
+| §82 | ADR-082 — **Cada TX abre SU ficha**: el «CODIGO SUBESTACION» dejó de ser la identidad (dos TX de un patio compartían ficha) | 3315 |
+| §83 | ADR-083 — **Borrador local de la ficha** con dueño y caducidad (no pisa ni cruza equipos) | 3364 |
+| §84 | ADR-084 — **La carga tardía ya no borra el listado**; el pie del papel dice su fuente real | 3470 |
+| §85 | ADR-085 — **El alcance lo escribe la redacción dictada** por el Ingeniero | 3516 |
+| §86 | ADR-086 — **Auditoría Nivel-2**: 53 hallazgos; kernel sin IDs ajenos | 3576 |
+| §87 | ADR-087 — **Tanda B, el Excel que se firma**: Valor Real, `[PENDIENTE]` nunca «0» | 3634 |
+| §88 | ADR-088 — **Período y firmas con la forma del Excel** (Aprobación con dos firmantes) | 3717 |
+| §89 | ADR-089 — **Quién firma**: lista dictada por el Ingeniero, ficha y Excel (CF-25) | 3749 |
+| §90 | ADR-090 — **El Alcance muestra solo el alcance**: fuera el selector de acciones | 3803 |
+| §91 | ADR-091 — **Fechas con calendario**: se ven «dd/mm/aaaa» y el calendario se abre al tocarlas | 3838 |
+| §92 | ADR-092 — **Beneficios por práctica**: el selector pasa a Beneficios y propone el texto con lo escogido | 3861 |
+| §93 | ADR-093 — **Valor Real vacío ⇒ en blanco** (J36 y su total), no `[PENDIENTE]` ni aviso | 3893 |
+| §94 | ADR-094 — **Año de entrada con calendario de años** desde 2020 | 3928 |
+| §95 | ADR-095 — **Beneficios de Mantenimiento** siguen a las prácticas marcadas, en breve | 3970 |
+| §96 | ADR-096 — **Mantenimiento sin casillas pre-marcadas** | 4022 |
+| §97 | ADR-097 — **Beneficios sin subtítulos** | 4041 |
+| §98 | ADR-098 — **Firma estampada** de la sesión | 4056 |
+| §99 | ADR-099 — **Firmas del equipo bajo custodia** | 4088 |
+| §100 | ADR-100 — **Firmas en Firestore** (Storage daba 503) | 4180 |
+| §101 | ADR-101 — **Firmas de tamaño parejo** | 4208 |
+| §102 | ADR-102 — **Vista previa del Excel + PDF** | 4222 |
+| §103 | ADR-103 — **Mantenimiento al PE.02081** | 4249 |
+| §104 | ADR-104 — **Excel sin datos ocultos** | 4268 |
+| §105 | ADR-105 — **Beneficios con las 13 acciones** | 4298 |
+| §106 | ADR-106 — **Zona del activo** | 4334 |
+| §107 | ADR-107 — **«Salud y riesgo» al Excel** (sin usuarios, sin casilla) | 4348 |
+| §108 | ADR-108 — **Siempre las cinco firmas** y folio al exportar | 4382 |
+| §109 | ADR-109 — **Auditoría Nivel-2** (M-07) | 4403 |
+| §110 | ADR-110 — **Sin hoja Beneficios**; Futuro derecho | 4430 |
+| §111 | ADR-111 — **«Salud y riesgo»**: sin lectura por potencia; nota 7 variables | 4462 |
+| §112 | ADR-112 — **«Diagrama Operativo»**: adjunto, última hoja | 4481 |
+| §113 | ADR-113 — **CF-40**: lector en un hilo con tiempo límite | 4568 |
+| §114 | ADR-114 — **Órdenes E/S**: firmas en Autorizado y Entregado | 4615 |
+| §115 | ADR-115 — **«Salud y riesgo» letra grande**; Actual anclado | 4662 |
+| §116 | ADR-116 — **Sesión**: lectura lenta ≠ sin perfil | 4734 |
+| §117 | ADR-117 — **Órdenes E/S**: firmas delegadas | 4785 |
+| §118 | ADR-118 — **Diagrama Operativo**: permiso puntual para adjuntar | 4847 |
+| §119 | ADR-119 — **Fichas**: firmas delegadas (Carlos, Jorge) | 4892 |
+| §120 | ADR-120 — **Cerebro partido en hijas** (`00a`, `22`, `34`, `35`, CF cerrados); kernel reconcilia el índice por rangos | 4982 |
+| §121 | ADR-121 — **Fichas**: «Elaboración» por defecto sigue a la sesión (Carlos, Jorge) | 5058 |
+| §122 | ADR-122 — **Cargabilidad SCADA**: carga horaria real vs ampacidad del devanado, CRG firme/provisional, «Datos SCADA» (homologación y meses) | 5101 |
+| §123 | ADR-123 — **Detalle de Cargabilidad**: la ventana de la tabla priorizada abre con el parque real, sin cifras sin dato y a la vista en la pestaña (iframe) | 5198 |
+| §124 | ADR-124 — **Detalle de Cargabilidad**: «Diagnóstico» con las 7 calificaciones de Salud de Activos y enlace a las curvas horarias medidas por el SCADA (decisiones del Ingeniero) | 5273 |
+| §125 | ADR-125 — **Cargabilidad SCADA con datos**: «Paquete preparado» (un mes en 3 partes por la extensión, mismo lector), homologación v2 y 8 meses cargados, arreglos de la revisión | 5329 |
+| §126 | ADR-126 — **Cargabilidad SCADA: máx/mín/instantáneo** con filtro «Valores a mostrar» y «Fases» (solo para ver; la cifra igual) + una gráfica grande por magnitud con zoom compartido; 8 meses recargados | 5395 |
+| §127 | ADR-127 — **Cargabilidad SCADA**: panel DGA × carga (adversidades y acciones; borrador) | 5461 |
+| §128 | ADR-128 — **Auditoría Nivel-2 del cerebro** (59 hallazgos; gate #14 mal calibrado) | 5535 |
+| §129 | ADR-129 — **Cargabilidad SCADA**: marca «sostenida» de la lista sin falsos | 5584 |
+| §130 | ADR-130 — **Cargabilidad SCADA**: «Máximo sostenido 2 h» del detalle con serie limpia | 5629 |
+| §131 | ADR-131 — **Cargabilidad SCADA**: triángulo de Duval hoy y con más carga + carga «solo gases» + regla vieja de Duval corregida | 5660 |
+| §132 | ADR-132 — **Cargabilidad SCADA**: gases con más carga (ritmo por gas, punto caliente estimado IEC 60076-7, flecha) | 5740 |
+| §133 | ADR-133 — **Cargabilidad SCADA**: textos del panel DGA sobre las ppm (variantes con/sin ppm) | 5786 |
+| §134 | ADR-134 — **Cargabilidad SCADA**: triángulo «con más carga» visible junto al de hoy | 5816 |
+| §135 | ADR-135 — **Interfaz**: el sitio en celular y tablet (menú ☰ con su código, barra que cabe, lo ancho desplazable) | 5837 |
+| §136 | ADR-136 — **Cerebro**: mantenimiento minucioso (auditoría de 5 lentes, 55 confirmados) · TODO-68 → L-122 · prueba del ☰ | 5881 |
+| §137 | ADR-137 — **Cerebro · dominio**: nacen los lóbulos 51 (salud y riesgo), 52 (DGA, aceite y papel) y 53 (carga y térmica); 49/50/34 trascienden · TODO-73 | 5916 |
+| §138 | ADR-138 — **Cargabilidad SCADA: libro de parámetros por punto** (columna C de la homologación): entregable aparte, 17 posibles correcciones, 104 medidas fuera | 5971 |
+| §139 | ADR-139 — **Cerebro: documentación total de la conversación 09-23 → 10-05** (notas a ADRs, lecciones, cola, memoria y bóveda; sin código) | 5998 |
+| §140 | ADR-140 — **Fichas: CF-38 publicado · CF-43/CF-44 (gases e ISO 55001 en el papel) en rama con ejemplos, esperan «procede» · decisiones de TODO-69 en una tanda** | 6032 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -112,6 +113,7 @@
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
 | 📱 El sitio en celular o tablet: el menú ☰ no abre, la barra no cabe, una tabla o gráfica se corta a 375/768 px · tocar `aqua-shell.js` o `aqua-components.css` | `99 §135` + `32` **L-121** · barrido reutilizable (servidor con stubs + iframes de 375/768) → bóveda `2026-10-02-sitio-responsive/crudos/` |
 | La zona de Duval de una muestra nueva o del motor de salud cambió o no cuadra (`dga_diagnostico.js` · `duvalTriangle1`) | `99 §131` (regla vieja corregida en `ba117cf`: delega en `zonaDuval1` de `domain/dga_duval.js`; cambia 6 equipos; lo ya guardado no se toca) |
+| El papel firmado de Fichas habla de gases (arco, térmica, descargas) o de «ISO 55001»: ¿de dónde sale cada corte y cada cita? | `99 §140` (los cortes no son de norma; frases con fuente en rama) · `52 §7` · nota `§57.8` (los 15 ppm y 0,5 ppm/día del monitoreo NO están en el MO) |
 | ¿Volver a auditar Fichas, el escapado de HTML, la doctrina CSS o las reglas de Storage? | ANTES, lo ya DESPEJADO: casillas `NN.8` (`§66.8`, `§68.8`, `§73.8`, `§75.8`) + crudo de la bóveda (23 refutados: mecanismo cierto, consecuencia falsa) |
 | CI o Deploy en rojo solo por la prueba de velocidad del Diagrama Operativo | `32` **L-122**: relanzar el trabajo fallido, no subir el umbral |
 | El "por qué" de una decisión / detalle de un § | Capa 1 (§1-§80 en `00a`) → `99-HISTORIAL-ADR.md` |

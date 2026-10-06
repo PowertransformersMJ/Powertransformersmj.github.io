@@ -84,9 +84,12 @@
 - `MODELO-DATOS-v2.md §2.8` dice `MAX(TDGC, C2H2)`: desactualizado, manda `52 §1`.
 
 ## 12. Riesgos de veracidad abiertos (→ TODO-73)
-- «ISO 55001» en textos que se FIRMAN (`fichas_diagnostico.js:327`, beneficio V2 de `ui/fichas/panel.js:240`) y en la
-  bitácora de auditoría (`audit.js`, `admin/auditoria.html`: «§9.1 compliance»): afirmación de alineación sin sustento
-  documentado. Fichas espera su «procede».
+- «ISO 55001» en textos que se FIRMAN (`fichas_diagnostico.js:327`, beneficio V2 de `ui/fichas/panel.js:240`): **SÍ tiene
+  sustento** (`99 §140`): la Guía MO.00418.DE-GAC §3 (pág. 4) y el AX.01 (pág. 4) la citan; según EPM, AFINIA certificó su
+  sistema de gestión de activos bajo ISO 55001:2014 en 2023 (CREG 015/2018 6.3.3.4; vigencia hoy y certificador NO
+  verificados: EPM dice PMM Enterprise Certification, la prensa ICONTEC). ISO 55001 NO fija criterios técnicos de reposición
+  (su alcance): el criterio sale del MO. Redacción corregida en rama, espera su «procede». Sigue sin cotejar «§9.1 compliance»
+  de `audit.js` / `admin/auditoria.html`.
 - Gestión de activos (CIGRE TB 761/445, ISO 55000/55001, RCM): **cero contenido verificado** en el cerebro; investigar
   y verificar en la web antes de escribir una línea (pendiente frío en `11`).
 

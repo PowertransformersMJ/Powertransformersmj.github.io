@@ -22,7 +22,9 @@
 
 ## 2. Monitoreo intensivo de C₂H₂ (MO.00418 §A9.1)
 - `domain/monitoreo_intensivo.js` (`BASELINES_C2H2`): velocidad crítica 0,5 ppm/día; 15 ppm sostenido = bloqueante;
-  C₂H₂ = 5 → monitoreo semanal SIEMPRE (`99 §127.2`). Ratificado en `99 §57`.
+  C₂H₂ = 5 → monitoreo semanal SIEMPRE (`99 §127.2`). ⚠️ **El 15 y el 0,5 NO están en el texto del MO Ed. 02** (nota `99 §57.8`):
+  su Nota Técnica habla de «el umbral técnico definido para transiciones críticas» sin cifra; lo único del MO es la Tabla 3
+  (calificación 5 = C₂H₂ ≥ 7). «§A9.1» es numeración del plan, no del MO. Origen: preguntarle al Ingeniero.
 - ⚠️ En la práctica no actúa: `/muestras` está VACÍA (`99 §127.1`) y la velocidad necesita dos muestras con fecha.
 
 ## 3. Triángulo de Duval 1 — tipo de falla, no SI hay falla
@@ -55,7 +57,7 @@
 | Duval 1 | `domain/dga_duval.js` | ✅ verificada contra fuente (`§131`) |
 | Duval 1 (copia) | `pages/parque-transformadores.html:1082` | ✅ idéntica hoy; sin candado (TODO-73) |
 | Rogers / Doernenburg | `domain/dga_diagnostico.js` (`rogersRatios`, cita IEEE C57.104 §4 / Anexo B) | ⚠️ cortes sin cotejar |
-| `modoDegradacion` (texto que se FIRMA en Fichas) | `domain/fichas_diagnostico.js:161-164` (C₂H₂ ≥ 15 · H₂ ≥ 1.000 con C₂H₄ < 100 · C₂H₄ ≥ 500) | ⚠️ sin fuente (TODO-73; Fichas espera su «procede») |
+| `modoDegradacion` (texto que se FIRMA en Fichas) | `domain/fichas_diagnostico.js:162-164` (C₂H₂ ≥ 15 · H₂ ≥ 1.000 con C₂H₄ < 100 · C₂H₄ ≥ 500) | ⚠️ cortes sin norma (ni IEEE C57.104-1991, ni la 2008 por secundarias, ni IEC 60599, ni el MO). Rama con frases fieles a IEC 60599:2022 §4.1/§4.2, cortes «criterio del área» si él los ratifica y sin «Duval» (no se calcula ahí): `99 §140`, espera su «procede» |
 
 **Regla [HONOR]**: ninguna interpretación NUEVA de la DGA sin pasar por esta tabla (y por `34`): antes de crear un
 criterio, buscar los que ya existen.
