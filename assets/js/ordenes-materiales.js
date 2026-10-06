@@ -48,6 +48,8 @@ import { parqueParaOrdenes } from './domain/ordenes_parque.js';
 // todo el equipo. El navegador solo guarda el borrador, las listas y lo que
 // quedó pendiente de subir.
 import * as REG from './data/ordenes_materiales.js';
+// Ítems (pedido del 2026-10-06): cantidad corregible en la tabla y material «Otro» escrito a mano.
+import { MATERIAL_OTRO, leerCantidad, sumarCantidades, problemasOtro, unidadesSugeridas } from './domain/ordenes_items.js';
 import {
   claveDe, normalizarNumero, problemaNumero, candidatasDeSubida, situacionDeSubida,
   seleccionadaPorDefecto, siguienteNumeroLibre, huella, esDelRegistro, llaveDeMarca
@@ -1073,6 +1075,21 @@ function refrescarListas() {
     grupo: m.grupo || '',
     datos: { unidad: m.unidad || '', codigo: m.codigo || '', referencia: m.referencia || '' }
   })));
+  // «Otro» va siempre al final y fuera de los grupos: no es parte del catálogo,
+  // así que importar otra lista de materiales no lo borra.
+  const selMat = $('#descripcion');
+  const prevMat = selMat.dataset.otro === '1' ? MATERIAL_OTRO.valor : '';
+  const oOtro = document.createElement('option');
+  oOtro.value = MATERIAL_OTRO.valor; oOtro.textContent = MATERIAL_OTRO.texto;
+  selMat.appendChild(oOtro);
+  if (prevMat) selMat.value = prevMat;
+  const dl = $('#unidadesSugeridas');
+  if (dl) {
+    dl.innerHTML = '';
+    unidadesSugeridas(estado.listas.materiales).forEach(u => {
+      const o = document.createElement('option'); o.value = u; dl.appendChild(o);
+    });
+  }
 
   $('#cntOD').textContent  = od.length;
   $('#cntMat').textContent = estado.listas.materiales.length;
@@ -1321,7 +1338,9 @@ function pintarItems() {
         <td class="n">${i + 1}</td>
         <td>${it.codigo ? `<b style="color:#005089">${esc(it.codigo)}</b> · ` : ''}${esc(it.descripcion)}</td>
         <td class="u">${esc(it.unidad || '')}</td>
-        <td class="q">${esc(fmtCantidad(it.cantidad))}</td>
+        <td class="q"><input type="number" class="cant-item" data-i="${i}" min="0" step="any" inputmode="decimal"
+          value="${esc(String(parseFloat(Number(it.cantidad).toFixed(3))))}" aria-label="Cantidad del ítem ${i + 1}"
+          title="Corrija la cantidad y pulse Enter"></td>
         <td class="acc"><button type="button" class="btn-quitar" data-i="${i}" title="Quitar ítem" aria-label="Quitar ítem ${i + 1}">✕</button></td>
       </tr>`).join('');
   }
@@ -1335,31 +1354,97 @@ function pintarItems() {
   guardarBorrador();
 }
 
+/** ¿Está elegido «Otro» en el desplegable de materiales? */
+function materialEsOtro() { return $('#descripcion').value === MATERIAL_OTRO.valor; }
+
+/**
+ * Al cambiar de material. Con «Otro» se abre la descripción escrita a mano y la
+ * unidad deja de ser automática; con un material del catálogo todo vuelve a
+ * como estaba (la unidad la pone el catálogo).
+ */
+function alMaterial() {
+  const sel = $('#descripcion');
+  const otro = materialEsOtro();
+  const u = $('#unidad');
+  // Con el HTML viejo en caché (`30 L-85`) estas casillas no existen: «Otro» no se
+  // ofrece de verdad y el módulo no debe caerse por ello.
+  const wOtro = $('#w-descOtro'), dOtro = $('#descOtro');
+  sel.dataset.otro = otro ? '1' : '';
+  if (wOtro) wOtro.hidden = !otro;
+  u.readOnly = !otro;
+  marcarOK('descOtro'); marcarOK('unidad');
+  if (otro) {
+    u.value = '';
+    u.setAttribute('list', 'unidadesSugeridas');
+    u.placeholder = 'Ej.: UND';
+    if (dOtro) setTimeout(() => dOtro.focus(), 0);
+  } else {
+    u.removeAttribute('list');
+    u.placeholder = '—';
+    const op = sel.selectedOptions[0];
+    u.value = (op && op.dataset.unidad) || '';
+    if (dOtro) dOtro.value = '';
+  }
+  if (sel.value) marcarOK('descripcion');
+}
+
+/**
+ * ¿Cabe un texto escrito a mano en el formato? Se mide con la MISMA métrica y la
+ * misma letra mínima con que el documento lo va a dibujar: la descripción se
+ * encoge hasta 5,5 pt en el PDF y 6 pt en el Excel (`ajustar`); la unidad no se
+ * encoge. Si no cabe ahí, se saldría de su casilla en el papel.
+ */
+function cabeDescripcion(desc) {
+  const T = GEO.tabla, C = T.cols;
+  const anchoPdf = C[2] - (C[1] + T.padDesc) - 3;
+  return anchoTexto(desc, 5.5, false) <= anchoPdf && anchoTexto(desc, 6, false) <= ANCHO_DESC_XLS;
+}
+function cabeUnidad(u) {
+  const T = GEO.tabla, C = T.cols;
+  return anchoTexto(u, T.txtSize, false) <= (C[3] - C[2]) - 4;
+}
+
 function agregarItem() {
   const selDesc = $('#descripcion');
-  const desc = selDesc.value.trim();
+  const otro = materialEsOtro();
+  // Con «Otro» se imprime lo escrito, nunca la etiqueta (igual que el motivo).
+  const desc = otro ? ($('#descOtro') ? $('#descOtro').value : '').trim().replace(/\s+/g, ' ') : selDesc.value.trim();
   const cant = $('#cantidad').value;
 
   let ok = true;
-  if (!desc) { marcarError('descripcion'); ok = false; } else marcarOK('descripcion');
-  const n = Number(String(cant).replace(',', '.'));
-  if (!cant || !isFinite(n) || n <= 0) { marcarError('cantidad'); ok = false; } else marcarOK('cantidad');
-  if (!ok) { aviso('Revise la descripción y la cantidad antes de agregar el ítem.', 'err'); return; }
+  let primerError = '';
+  if (!selDesc.value) { marcarError('descripcion'); ok = false; } else marcarOK('descripcion');
+  if (otro) {
+    marcarOK('descOtro'); marcarOK('unidad');
+    const uTxt = $('#unidad').value.trim();
+    const P = problemasOtro({ descripcion: desc, unidad: uTxt });
+    if (!P.some(p => p.campo === 'descripcion') && !cabeDescripcion(desc)) {
+      P.push({ campo: 'descripcion', mensaje: 'La descripción no cabe en el renglón del formato ni con la letra más pequeña: acórtela.' });
+    }
+    if (!P.some(p => p.campo === 'unidad') && !cabeUnidad(uTxt)) {
+      P.push({ campo: 'unidad', mensaje: 'La unidad no cabe en su columna del formato: use una abreviatura (UND, Mts, Kg…).' });
+    }
+    P.forEach(p => marcarError(p.campo === 'descripcion' ? 'descOtro' : 'unidad', p.mensaje));
+    if (P.length) { ok = false; primerError = P[0].mensaje; }
+  }
+  const n = leerCantidad(cant);
+  if (n == null) { marcarError('cantidad'); ok = false; } else marcarOK('cantidad');
+  if (!ok) { aviso(primerError || 'Revise la descripción y la cantidad antes de agregar el ítem.', 'err'); return; }
 
   const op = selDesc.selectedOptions[0];
-  const unidad = (op && op.dataset.unidad) || $('#unidad').value || '';
-  const codigo = (op && op.dataset.codigo) || '';
+  const unidad = otro ? $('#unidad').value.trim() : ((op && op.dataset.unidad) || $('#unidad').value || '');
+  const codigo = otro ? '' : ((op && op.dataset.codigo) || '');
 
   // Si el material ya existe con la misma unidad, se acumula la cantidad
   const ya = estado.items.find(x => norm(x.descripcion) === norm(desc) && norm(x.unidad) === norm(unidad));
   if (ya) {
-    ya.cantidad = Number(ya.cantidad) + n;
+    ya.cantidad = sumarCantidades(ya.cantidad, n);   // 0,1 + 0,2 = 0,3, no 0,30000000000000004
     aviso(`Cantidad acumulada en el ítem existente: ${fmtCantidad(ya.cantidad)} ${unidad}.`, 'warn');
   } else {
     estado.items.push({ descripcion: desc, unidad, codigo, cantidad: n });
   }
 
-  selDesc.value = ''; $('#unidad').value = ''; $('#cantidad').value = '';
+  selDesc.value = ''; alMaterial(); $('#unidad').value = ''; $('#cantidad').value = '';
   pintarItems();
   selDesc.focus();
 }
@@ -2602,7 +2687,7 @@ function limpiarFormulario(pedirConfirmacion, mensaje) {
   if (typeof medirRenglones === 'function') medirRenglones();
   $('#autorizado').value = CONFIG.autorizadoPor.nombre;
   if ($('#conFirmas')) $('#conFirmas').checked = true;
-  $('#unidad').value = '';
+  alMaterial();                    // vacía la unidad y cierra «Otro» si estaba abierto
   pintarItems();
   estado.cargada = null;           // lo que venga ahora es una orden nueva
   pintarBarraEdicion();
@@ -5068,11 +5153,66 @@ function conectarEventos() {
 
   /* --- Materiales --- */
   $('#btnAgregarItem').onclick = agregarItem;
-  $('#descripcion').onchange = ev => {
-    const op = ev.target.selectedOptions[0];
-    $('#unidad').value = (op && op.dataset.unidad) || '';
-    if (ev.target.value) marcarOK('descripcion');
-  };
+  $('#descripcion').onchange = alMaterial;
+  const descOtroEl = $('#descOtro');   // ausente con el HTML viejo en caché (`30 L-85`)
+  if (descOtroEl) descOtroEl.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); $('#unidad').focus(); } });
+  $('#unidad').addEventListener('keydown', ev => { if (ev.key === 'Enter' && materialEsOtro()) { ev.preventDefault(); $('#cantidad').focus(); } });
+  // Cantidad corregible después de agregar el ítem. Lo válido se guarda MIENTRAS
+  // se escribe (así un atajo como Ctrl+S o Ctrl+P, que lee la orden sin que la
+  // casilla pierda el foco, ya ve la cantidad nueva); lo que no es válido no se
+  // acepta y, al salir de la casilla, vuelve a la cantidad que tenía al entrar.
+  const ITEMS = $('#cuerpoItems');
+  const itemDe = inp => estado.items[Number(inp.dataset.i)];
+  const pintarCant = n => String(parseFloat(Number(n).toFixed(3)));
+  ITEMS.addEventListener('focusin', ev => {
+    const inp = ev.target.closest('.cant-item');
+    const it = inp && itemDe(inp);
+    if (it) inp.dataset.orig = String(it.cantidad);
+  });
+  ITEMS.addEventListener('input', ev => {
+    const inp = ev.target.closest('.cant-item');
+    const it = inp && itemDe(inp);
+    if (!it) return;
+    const n = leerCantidad(inp.value);
+    inp.classList.toggle('error', n == null);
+    if (n != null && n !== Number(it.cantidad)) { it.cantidad = n; marcarOK('items'); guardarBorrador(); }
+  });
+  ITEMS.addEventListener('change', ev => {
+    const inp = ev.target.closest('.cant-item');
+    const it = inp && itemDe(inp);
+    if (!it) return;
+    inp.classList.remove('error');
+    const n = leerCantidad(inp.value);
+    if (n == null) {
+      const orig = inp.dataset.orig != null ? Number(inp.dataset.orig) : Number(it.cantidad);
+      it.cantidad = orig;
+      inp.value = pintarCant(orig);
+      guardarBorrador();
+      aviso(`La cantidad del ítem ${Number(inp.dataset.i) + 1} debe ser un número mayor que cero, con hasta 3 decimales: se dejó ${fmtCantidad(orig)}.`, 'err');
+      return;
+    }
+    if (n !== Number(it.cantidad)) { it.cantidad = n; guardarBorrador(); }
+    inp.dataset.orig = String(n);
+  });
+  ITEMS.addEventListener('keydown', ev => {
+    const inp = ev.target.closest('.cant-item');
+    if (!inp) return;
+    if (ev.key === 'Enter') { ev.preventDefault(); inp.blur(); }
+    else if (ev.key === 'Escape') {
+      // Deshace lo escrito en esta casilla: vuelve a la cantidad que tenía al entrar.
+      const it = itemDe(inp);
+      if (it && inp.dataset.orig != null) { it.cantidad = Number(inp.dataset.orig); guardarBorrador(); }
+      if (it) inp.value = pintarCant(it.cantidad);
+      inp.classList.remove('error');
+      inp.blur();
+    }
+  });
+  // La rueda del ratón o el trackpad sobre una casilla enfocada movería la
+  // cantidad sin que nadie lo note: se suelta la casilla y la página se desplaza.
+  ITEMS.addEventListener('wheel', ev => {
+    const inp = ev.target.closest('.cant-item');
+    if (inp && inp === document.activeElement) inp.blur();
+  }, { passive: true });
   $('#cantidad').addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); agregarItem(); } });
   $('#cuerpoItems').addEventListener('click', ev => {
     const b = ev.target.closest('.btn-quitar');
@@ -5222,6 +5362,10 @@ function conectarEventos() {
   document.addEventListener('keydown', ev => {
     if (!(ev.ctrlKey || ev.metaKey)) return;
     const k = ev.key.toLowerCase();
+    // Una cantidad a medio corregir se confirma ANTES de guardar o exportar: así lo
+    // impreso y lo guardado es lo que se ve, y Escape queda solo para la ventana.
+    const a = document.activeElement;
+    if (['s', 'e', 'p', 'q', 'i'].includes(k) && a && a.classList && a.classList.contains('cant-item')) a.blur();
     if (k === 's')      { ev.preventDefault(); guardarOrden(); }
     else if (k === 'p') { ev.preventDefault(); exportarPDF(enVista() ? (VISTA.orden || undefined) : undefined); }
     else if (k === 'e') { ev.preventDefault(); exportarExcel(enVista() ? (VISTA.orden || undefined) : undefined); }
