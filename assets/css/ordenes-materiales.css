@@ -267,6 +267,11 @@
 .oms-scope .tabla-items .u{ text-align:center; width:88px; }
 .oms-scope .tabla-items .q{ text-align:right; width:104px; font-variant-numeric:tabular-nums; }
 .oms-scope .tabla-items .acc{ width:56px; text-align:center; }
+/* Cantidad corregible en la tabla (pedido del 2026-10-06): la casilla hereda el estilo de las demás. */
+.oms-scope .tabla-items .q input.cant-item{ text-align:right; padding:5px 8px; font-variant-numeric:tabular-nums; }
+.oms-scope .tabla-items .q input.cant-item.error{ border-color:var(--error); background:var(--error-bg); }
+/* «Otro»: la descripción escrita a mano ocupa su propio renglón bajo la fila de agregar. */
+.oms-scope .fila-agregar .campo-otro{ grid-column:1 / -1; }
 .oms-scope .tabla-items .vacia td{
   text-align:center; color:var(--tinta-2); font-style:italic; padding:22px 10px; background:#fff;
 }
@@ -493,6 +498,8 @@
   .oms-scope .fila-agregar{ grid-template-columns:1fr 1fr; }
   .oms-scope .fila-agregar .campo:first-child{ grid-column:span 2; }
   .oms-scope .fila-agregar .oms-btn{ grid-column:span 2; justify-content:center; }
+  /* En celular el botón baja al final: la descripción de «Otro» se escribe antes de agregar. */
+  .oms-scope .fila-agregar .oms-btn{ order:1; }
   .oms-scope .tarjeta > .cuerpo{ padding:14px; }
   .oms-scope .modal-cuerpo{ padding:12px 6px; }
   .oms-scope .tabla-items{ font-size:.8rem; }
