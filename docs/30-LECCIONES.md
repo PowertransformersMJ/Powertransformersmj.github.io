@@ -267,6 +267,15 @@ también por `browser_batch` (suma las subidas del lote): una parte por llamada;
 la página evita volver a buscar el campo que la página repinta; en paralelo alguna subida «no responde a tiempo» aunque
 SÍ llega: se confirma con un contador en la página, no con la respuesta de la herramienta.
 
+### L-126 · Una casilla editable dentro de una tabla: lo válido se confirma al escribir, no al salir
+**Disparador**: convertir en casilla un dato que alimenta un documento o un guardado (cantidad, monto, fecha). · **Cicatriz**
+(`99 §141`): la cantidad de Órdenes se confirmaba en `change`; Ctrl+S/P/Q leían la orden con la casilla aún enfocada y el
+PDF firmado salía con la cifra vieja mientras la pantalla mostraba la nueva, y Escape (que debía cerrar la vista previa)
+borraba lo escrito. · **Regla**: (1) lo válido se guarda en `input`; `change` solo revierte lo inválido al valor que tenía al
+entrar; (2) los atajos que leen el formulario sueltan primero la casilla enfocada (`blur`), NUNCA dentro de la función que
+lee (la llama un temporizador mientras se escribe); (3) la rueda sobre un `type=number` enfocado lo cambia sin que se note:
+soltarla; (4) lo que se pinta en la casilla sale formateado igual que en el papel. Gate: `tests/ordenes_items.test.js`.
+
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 
 > **Reglas de Firestore/Storage, cédulas, firmas ajenas y saneado de datos** viven en
