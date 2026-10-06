@@ -353,6 +353,17 @@
 .oms-scope .item-orden .no{ font-weight:700; font-size:.92rem; }
 .oms-scope .item-orden .meta{ font-size:.79rem; color:var(--tinta-2); flex:1 1 200px; min-width:0; }
 .oms-scope .item-orden .acciones{ display:flex; gap:6px; }
+/* Ver · PDF · Excel · Editar · Eliminar (pedido del 2026-10-06): en pantallas angostas bajan de renglón. */
+.oms-scope .item-orden .acciones{ flex-wrap:wrap; }
+.oms-scope .item-orden.recien{ border-color:var(--azul); box-shadow:0 0 0 3px rgba(0,111,183,.14); }
+.oms-scope .oms-btn .cuenta{ font-weight:800; font-variant-numeric:tabular-nums; }
+.oms-scope a.oms-btn{ text-decoration:none; }
+.oms-scope .badge.pend{ background:#FFF1D6; color:#7A4300; }
+.oms-scope .item-orden.pendiente{ border-style:dashed; }
+/* Sin JS (o con el JS viejo en caché), el enlace «Órdenes guardadas» salta solo a la sección:
+   este margen la deja visible bajo la barra fija. Con JS se calcula el alto exacto. */
+.oms-scope #panelRegistro{ scroll-margin-top:90px; }
+.oms-scope #tituloGuardadas:focus{ outline:none; }
 .oms-scope .sin-datos{ color:var(--tinta-2); font-style:italic; font-size:.87rem; padding:6px 0; }
 /* ===================== MODAL DE VISTA PREVIA ===================== */
 .oms-scope .oms-modal{
@@ -500,6 +511,7 @@
   .oms-scope .fila-agregar .oms-btn{ grid-column:span 2; justify-content:center; }
   /* En celular el botón baja al final: la descripción de «Otro» se escribe antes de agregar. */
   .oms-scope .fila-agregar .oms-btn{ order:1; }
+  .oms-scope #panelRegistro{ scroll-margin-top:270px; }
   .oms-scope .tarjeta > .cuerpo{ padding:14px; }
   .oms-scope .modal-cuerpo{ padding:12px 6px; }
   .oms-scope .tabla-items{ font-size:.8rem; }
