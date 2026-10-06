@@ -6163,3 +6163,40 @@ folio, igual que exportar abierta) · interinato R4.
 con `ordenOpcional` las exportaciones no llaman a `validar` ni leen `#conFirmas`, `#autorizado` ni `estado.cargada`;
 `EXPORTANDO` y la capa «cargando» impiden dos emisiones; un técnico ya podía «Abrir» y exportar cualquier orden del registro:
 no hay más exposición. Límite conocido: se listan las 500 de fecha más reciente (`TOPE_LECTURA`; el aviso «Hay más» ya existe).
+
+## 143. ADR-143 — Órdenes E/S: filtro por zona en «Órdenes guardadas» y consolidado de entregas por transformador y subestación ⟦OPUS-5.5⟧ (2026-10-06)
+
+> *«me gustaria que exista un filtro por zona, y adicionalmente me permita exportar un consolidado en excel de todos los
+> suministros que han sido entregados y sobre que transformador y subestacion»*. Publicado con resumen (L-63). NO revisado
+> externamente (UI y exportación aditivas). **Interpretación tomada, a confirmar con él**: «entregado» = material de órdenes
+> de SALIDA (si quiere las ENTRADA también, es un cambio de una línea en `filasEntregas`).
+
+**143.1 Causa raíz.** La lista de órdenes guardadas solo tenía buscador de texto. El «Consolidado del histórico» (sección 7)
+saca entradas y salidas juntas, con el transformador como un solo texto («MATRÍCULA · S/E SUBESTACIÓN»), sin zona ni resumen
+por transformador.
+**143.2 Solución.** `#filtroZona` junto al buscador (zonas presentes, `claveZona` sin tildes ni mayúsculas; filtra lista y
+pendientes; el contador de la barra no se filtra). «Exportar entregas por transformador (Excel)» (`#btnEntregasExcel`) con la
+zona elegida: hojas «Entregas» (una fila por material de SALIDA: zona, subestación, transformador, fecha, n.º, material,
+unidad, cantidad, origen, destino, motivo, entregó, recibió), «Por transformador» (suma por material, n.º de órdenes, última
+entrega; unidades distintas no se suman) y «Notas» (criterio, zona, que el buscador no se aplica, órdenes sin
+transformador, aviso si el registro está truncado). Transformador y subestación salen SOLO del campo de la orden
+(`partirTransformador`); si no lo trae, «(la orden no indica transformador)»: no se deduce del destino. Dominio puro nuevo
+`assets/js/domain/ordenes_consolidado.js`.
+**143.3 No-regresión.** Aditivo: el histórico, los indicadores (su `fZona` es independiente y normaliza igual), el registro,
+el PDF y el Excel de la orden no cambian. Sin cédulas (solo `.nombre` del registro).
+**143.4 Verificación.** `tests/ordenes_consolidado.test.js` (16) · suite 2396/0/2 · lint limpio. Banco de Órdenes: 5 órdenes
+en BOLIVAR/ORIENTE (con y sin transformador, una ENTRADA): el selector ofrece las dos zonas, ORIENTE deja 1 de 5, el Excel de
+BOLIVAR trae las 3 salidas (la ENTRADA y ORIENTE fuera) con la fila sin transformador rotulada; celular 375 px; HTML
+publicado + JS nuevo sin errores. Revisión adversarial (1 Opus): `partirTransformador` acierta con todo lo que el módulo ha
+escrito (`textoTransformador` desde `6f6c72a`; el módulo del 26-ago no tenía el campo); 5 detalles corregidos (botón cortado y
+reglas pisadas en celular —un `@media` no suma especificidad: va DESPUÉS de la regla base—, contador de pendientes, buscador
+en «Notas», rango de tildes escrito con caracteres invisibles → `\u0300-\u036f`).
+**143.5 Anti-patterns evitados.** Deducir la subestación del destino (puede ser una bodega) · sumar unidades distintas ·
+`@media` antes de la regla base que pisa.
+**143.6 Archivos.** `pages/ordenes-materiales.html` · `assets/js/ordenes-materiales.js` · `assets/css/ordenes-materiales.css` ·
+`assets/js/domain/ordenes_consolidado.js` (nuevo) · `tests/ordenes_consolidado.test.js` (nuevo) · `tests/ordenes_guardadas.test.js`.
+Commit `efd46ac`, main `ee904f3`.
+**143.7 Doctrina.** `CLAUDE.md §3.2` (aditivo; no fabricar el dato) · L-85 · L-126 · interinato R4.
+**143.8 Verificado sano / no re-auditar.** Tipo solo ENTRADA/SALIDA (reglas y `ordenDesdeRegistro`), así que SALIDA = la rama
+«Salidas» del histórico; fechas de `o.fecha` (respaldo `fechaISO`); opciones del selector con `new Option` (escapadas) y la
+elección se conserva en cada repintado; índices `data-p*` alineados con las pendientes filtradas.
