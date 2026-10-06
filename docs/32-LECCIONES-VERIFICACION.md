@@ -358,6 +358,7 @@ que el Ingeniero lo vio en su teléfono. **Regla**: (1) lo que solo se ve en un 
 ancho, tocando el control, no leyendo el diff; (2) antes de decir que algo responsivo funciona, se barre el sitio entero
 con un medidor (iframes de 375/768 px sobre la vista previa con stubs; `bóveda 2026-10-02-sitio-responsive`; banco pariente: **L-92**); (3) una
 clase de estado (`sb-open`) que solo existe en CSS y en ningún JS es una señal de código muerto. **Gate**: `tests/shell_menu_estado.test.js` (punto 3) + [HONOR] (1-2).
+**Y en `§143`**: una regla de celular dentro de un `@media` escrita ANTES de la regla base de igual especificidad no se aplica (el `@media` no suma especificidad): el bloque de celular va DESPUÉS, y se mide el estilo calculado (`getComputedStyle`) a 375 px, no se supone.
 
 ### L-122 · CI o Deploy en rojo solo por la prueba de velocidad del Diagrama Operativo: relanzar, no subir el umbral
 **Disparador**: un trabajo de CI o Deploy falla y el ÚNICO rojo es `tests/fichas_diagrama_operativo_blindaje.test.js` «miles
