@@ -4042,7 +4042,7 @@ function deduplicar(res) {
 
 function mostrarAvisoImport(clase, html) {
   const el = $('#avisoImport');
-  el.className = 'oms-aviso ver' + clase;
+  el.className = 'oms-aviso ver ' + clase;   // con espacio: sin él quedaba «verok» y el aviso nunca se veía
   el.innerHTML = html;
 }
 
