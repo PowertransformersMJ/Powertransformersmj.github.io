@@ -43,7 +43,7 @@ export function sanitizarMovimiento(input) {
   const valTotal = (valTotalSrc != null)
     ? valTotalSrc
     : ((cantidad != null && valU != null) ? cantidad * valU : null);
-  return {
+  const out = {
     contrato_id:         str(src.contrato_id),
     codigo:              str(src.codigo).toUpperCase(),
     anio:                num(src.anio),
@@ -62,6 +62,31 @@ export function sanitizarMovimiento(input) {
     odt:                 str(src.odt),
     usuario:             str(src.usuario),
     observaciones:       str(src.observaciones)
+  };
+  // Campos ADITIVOS (2026-10-07, nexo con Órdenes E/S): solo se escriben cuando vienen, así un
+  // movimiento manual queda idéntico. El enlace con la orden NO puede perderse en el saneo: sin él,
+  // la orden y su movimiento se contarían dos veces (`99 §147`).
+  const fechaEntrega = str(src.fecha_entrega);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(fechaEntrega)) out.fecha_entrega = fechaEntrega;
+  const oes = sanitizarEnlaceOrden(src.orden_es);
+  if (oes) out.orden_es = oes;
+  return out;
+}
+
+/** Enlace con la orden E/S de origen, o null si no viene o está incompleto. */
+export function sanitizarEnlaceOrden(v) {
+  if (!v || typeof v !== 'object') return null;
+  const clave = str(v.clave);
+  if (!clave) return null;
+  const cant = num(v.cantidad);
+  return {
+    clave,
+    tipo:          str(v.tipo).toUpperCase(),
+    numero:        str(v.numero),
+    fechaISO:      str(v.fechaISO),
+    creadoEn:      num(v.creadoEn) || 0,
+    cantidad:      cant == null ? 0 : cant,
+    transformador: str(v.transformador)
   };
 }
 

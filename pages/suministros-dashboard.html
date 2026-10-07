@@ -56,6 +56,7 @@
     <div class="kpi-card kpi-slate">
       <div class="kpi-label">Movimientos registrados</div>
       <div class="kpi-value" id="kRegistros">—</div>
+      <div class="kpi-foot" id="kRegistrosNota" style="font-size: 11px; color: var(--ink-3); margin-top: 4px"></div>
     </div>
     <div class="kpi-card kpi-teal">
       <div class="kpi-label">Unidades movidas</div>
@@ -182,11 +183,11 @@
       <canvas id="chRankValor"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Distribución por zona <span style="font-weight:400; font-size:11px">(solo movimientos registrados)</span></h3>
+      <h3>Distribución por zona <span class="rotulo-dist" style="font-weight:400; font-size:11px">(solo movimientos registrados)</span></h3>
       <canvas id="chZona"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Distribución por departamento <span style="font-weight:400; font-size:11px">(solo movimientos registrados)</span></h3>
+      <h3>Distribución por departamento <span class="rotulo-dist" style="font-weight:400; font-size:11px">(solo movimientos registrados)</span></h3>
       <canvas id="chDepto"></canvas>
     </div>
   </div>
@@ -252,7 +253,7 @@
   </div>
 
   <!-- Vista cruzada -->
-  <h2 class="section-head">Vista cruzada <span style="font-weight:400; font-size:11px; text-transform:none">(solo movimientos registrados)</span></h2>
+  <h2 class="section-head">Vista cruzada <span class="rotulo-dist" style="font-weight:400; font-size:11px; text-transform:none">(solo movimientos registrados)</span></h2>
   <div class="inv-toolbar">
     <div class="inv-filters">
       <select class="form-select" id="fxZona">

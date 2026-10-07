@@ -142,6 +142,20 @@
     </p>
   </form>
 
+  <!-- 2026-10-07 (`99 §147`): las entregas de las órdenes de entrada con ítems del contrato se registran
+       aquí como EGRESO enlazado a su orden. Oculto si el contrato no tiene nexo. -->
+  <section id="regOrdenes" class="form-fieldset" hidden style="margin-top:22px">
+    <h3 class="form-fieldset-title" style="margin:0 0 6px">Entregas de órdenes de entrada y salida por registrar</h3>
+    <p class="page-subtitle" style="margin:0 0 10px">Cada entrega de una orden de ENTRADA con ítems del contrato se registra como EGRESO,
+      enlazada a su orden, con el transformador, la zona y el departamento del parque. Primero se revisa; nada se escribe hasta pulsar «Registrar».</p>
+    <div style="display:flex; gap:8px; flex-wrap:wrap">
+      <button type="button" class="btn btn-secondary" id="btnRevisarEntregas">Revisar entregas pendientes</button>
+      <button type="button" class="btn btn-primary" id="btnRegistrarEntregas" disabled>Registrar seleccionadas</button>
+    </div>
+    <div id="regMsg" class="msg" style="margin-top:8px"></div>
+    <div id="regCuerpo"></div>
+  </section>
+
   <!-- Template de una línea de suministro · clonado por +Agregar más suministros -->
   <template id="lineaTemplate">
     <div class="linea-suministro" data-linea-idx="">

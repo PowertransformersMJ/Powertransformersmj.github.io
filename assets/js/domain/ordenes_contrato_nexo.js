@@ -16,6 +16,9 @@
 //     mismo transformador, se AVISA de posible doble registro (no se suma dos veces
 //     en silencio, ni se esconde ninguno de los dos).
 //  4. El contrato lo CALCULA al abrirse leyendo las órdenes: no se escriben copias.
+//     → Actualizado (2026-10-07, `99 §147`): por decisión suya, cada entrega se REGISTRA además
+//       como movimiento enlazado a su orden (`orden_es`). Lo registrado descuenta como movimiento;
+//       lo que falta por registrar sigue calculándose aquí. Nunca se cuenta dos veces.
 //
 // Módulo PURO (sin DOM ni Firebase): las pruebas usan datos sintéticos (el
 // repositorio es público; el caso real vive en la bóveda).
@@ -123,11 +126,14 @@ export const SIN_TRANSFORMADOR = '(la orden no indica transformador)';
 export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}) {
   const cfg = NEXO_CONTRATOS[String(contratoId || '')];
   const vacio = { activo: false, porItem: {}, transformadores: [], zonas: [], totalValor: 0, lineas: 0, ordenesQueCuentan: 0,
-    noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [] };
+    noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [],
+    porItemPendiente: {}, totalPendiente: 0, totalRegistrado: 0, lineasDetalle: [], resumenEstados: { registrado: 0, por_registrar: 0, desfasado: 0 } };
   if (!cfg) return vacio;
   const cat = new Map((catalogo || []).map((s) => [String(s.codigo || '').toUpperCase(), s]));
-  const r = { ...vacio, activo: true, noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [] };
+  const r = { ...vacio, activo: true, noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [],
+    porItemPendiente: {}, lineasDetalle: [], resumenEstados: { registrado: 0, por_registrar: 0, desfasado: 0 } };
   const trafos = new Map();
+  const pares = new Map();        // (orden, Sxx): dos renglones del mismo ítem en una orden suman uno solo
   const fuera = new Map();
   const r3 = (n) => Math.round(n * 1000) / 1000;
   const anotarFuera = (it, motivo) => {
@@ -171,8 +177,15 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
       const ti = t.items.get(codigo) || { codigo, nombre: s.nombre || codigo, unidad: s.unidad || '', cantidad: 0, valorUnitario: vu, valor: 0 };
       ti.cantidad = sumarCantidades(ti.cantidad, q); ti.valor += valor;
       t.items.set(codigo, ti);
-      t.ordenes.set(o.tipo + '|' + o.numero, { numero: String(o.numero || ''), fecha: f.slice(0, 10) });
+      t.ordenes.set(o.tipo + '|' + o.numero, { numero: String(o.numero || ''), fecha: f.slice(0, 10), clave: String(o.clave || '') });
       trafos.set(kt, t);
+      const kp = String(o.clave || (o.tipo + '_' + o.numero)) + '|' + codigo;
+      const par = pares.get(kp) || { claveOrden: String(o.clave || (o.tipo + '_' + o.numero)), tipo: o.tipo, numero: String(o.numero || ''),
+        fechaISO: f.slice(0, 10), creadoEn: Number(o.creadoEn) || 0, codigo, nombre: s.nombre || codigo, unidad: s.unidad || '',
+        cantidad: 0, valorUnitario: vu, transformador: String(o.transformador || '').trim(), matricula, subestacion,
+        zona: claveZona(o.zona), claveTrafo: kt };
+      par.cantidad = sumarCantidades(par.cantidad, q);
+      pares.set(kp, par);
       r.totalValor += valor; r.lineas++;
     }
     if (cuenta) r.ordenesQueCuentan++; else r.noCuentan.ordenes.sinItems++;
@@ -195,12 +208,82 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
   r.totalValor = r3(r.totalValor);
   r.noCuentan.materiales = [...fuera.values()].sort((a, b) => a.motivo.localeCompare(b.motivo) || a.descripcion.localeCompare(b.descripcion, 'es'));
 
-  // Aviso de doble registro: un EGRESO del mismo ítem al mismo transformador también por movimiento.
+  // Movimientos enlazados a su orden (`orden_es`): lo registrado descuenta como movimiento; aquí solo
+  // queda lo PENDIENTE. Un movimiento enlazado nunca dispara el aviso de doble registro.
+  const enlazados = new Map();
+  for (const m of (Array.isArray(movimientos) ? movimientos : [])) {
+    if (!m || m.tipo !== 'EGRESO' || !m.orden_es || !m.orden_es.clave) continue;
+    if (m.contrato_id && String(m.contrato_id) !== String(contratoId)) continue;
+    const k = String(m.orden_es.clave) + '|' + String(m.suministro_id || '').toUpperCase();
+    const e = enlazados.get(k) || { cantidad: 0, codigos: [], enlace: m.orden_es, valor: 0 };
+    e.cantidad = sumarCantidades(e.cantidad, Number(m.cantidad) || 0);
+    e.valor += Number(m.valor_total) || 0;
+    if (m.codigo) e.codigos.push(String(m.codigo));
+    enlazados.set(k, e);
+  }
+  const usados = new Set();
+  let totalPend = 0, totalReg = 0;
+  for (const [k, par] of [...pares.entries()].sort((a, b) => a[1].fechaISO.localeCompare(b[1].fechaISO) ||
+       a[1].numero.localeCompare(b[1].numero) || a[1].codigo.localeCompare(b[1].codigo))) {
+    const e = enlazados.get(k);
+    if (e) usados.add(k);
+    const registrado = e ? e.cantidad : 0;
+    const pendiente = Math.max(0, Number((par.cantidad - registrado).toFixed(3)));
+    let estado = 'por_registrar';
+    if (registrado > 0) {
+      const cambio = registrado !== par.cantidad ||
+        normal(e.enlace.transformador) !== normal(par.transformador) ||
+        String(e.enlace.fechaISO || '') !== par.fechaISO ||
+        (Number(e.enlace.creadoEn) > 0 && par.creadoEn > 0 && Number(e.enlace.creadoEn) !== par.creadoEn);
+      estado = cambio ? 'desfasado' : 'registrado';
+    }
+    r.resumenEstados[estado]++;
+    if (pendiente > 0) {
+      const pi = r.porItemPendiente[par.codigo] || { codigo: par.codigo, cantidad: 0, valor: 0 };
+      pi.cantidad = sumarCantidades(pi.cantidad, pendiente); pi.valor += pendiente * par.valorUnitario;
+      r.porItemPendiente[par.codigo] = pi;
+      totalPend += pendiente * par.valorUnitario;
+    }
+    if (e) totalReg += e.valor;
+    r.lineasDetalle.push({ ...par, valor: r3(par.cantidad * par.valorUnitario), estado, registrado, pendiente,
+      movimientos: e ? e.codigos.slice().sort() : [] });
+  }
+  r.totalPendiente = r3(totalPend);
+  r.totalRegistrado = r3(totalReg);
+  // Estado por orden dentro de cada transformador (para la sección del tablero).
+  const estadoDe = new Map(r.lineasDetalle.map((l) => [l.claveOrden + '|' + l.claveTrafo, []]));
+  for (const l of r.lineasDetalle) estadoDe.get(l.claveOrden + '|' + l.claveTrafo).push(l);
+  for (const t of r.transformadores) {
+    t.ordenes = t.ordenes.map((o) => {
+      const ls = estadoDe.get(o.clave + '|' + t.clave) || [];
+      const est = new Set(ls.map((l) => l.estado));
+      return { ...o, estado: est.size === 1 ? [...est][0] : (est.has('desfasado') ? 'desfasado' : 'mixto'),
+        movimientos: ls.flatMap((l) => l.movimientos) };
+    });
+  }
+  const huerfanos = [...enlazados.entries()].filter(([k]) => !usados.has(k));
+  if (huerfanos.length) {
+    const valorH = huerfanos.reduce((s, [, e]) => s + e.valor, 0);
+    r.avisos.push(`${huerfanos.length} movimiento(s) enlazado(s) a una orden que ya no existe, ya no trae ese ítem o quedó fuera ` +
+      `de la vigencia (${huerfanos.flatMap(([, e]) => e.codigos).join(', ')}; ${Math.round(valorH).toLocaleString('es-CO')} pesos). ` +
+      'Siguen contando como movimiento: si la orden se rehízo con otro número, esa entrega se está descontando dos veces. Revíselos en el Histórico.');
+  }
+  if (r.resumenEstados.desfasado) {
+    r.avisos.push(`${r.resumenEstados.desfasado} entrega(s) cambiaron en la orden después de registradas. Manda la orden: ` +
+      'se descuenta solo lo que falte; si la orden bajó, corrija el movimiento en el Histórico (eliminar con justificación y volver a registrar).');
+  }
+
+  // Aviso de doble registro: un EGRESO NO enlazado (manual o de Brigada) del mismo ítem al mismo transformador
+  // que una entrega por orden (registrada o no).
   const conOrden = new Set();
   for (const t of r.transformadores) for (const i of t.items) conOrden.add(i.codigo + '#' + t.clave);
   const dobles = new Set();
   for (const m of (Array.isArray(movimientos) ? movimientos : [])) {
     if (!m || m.tipo !== 'EGRESO') continue;
+    // Un enlazado que SÍ casó con su orden no es doble registro; un huérfano (orden rehecha con otro
+    // número, ítem cambiado) sí entra al chequeo contra las entregas por orden.
+    if (m.orden_es && m.orden_es.clave &&
+        usados.has(String(m.orden_es.clave) + '|' + String(m.suministro_id || '').toUpperCase())) continue;
     const kt = normal(m.matricula || m.transformador_id) + '|' + normal(m.subestacion);
     const k = String(m.suministro_id || '').toUpperCase() + '#' + kt;
     if (conOrden.has(k)) dobles.add(k);

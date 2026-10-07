@@ -19,8 +19,12 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  crear as crearMovimiento, computarStock, isReady, StockInsuficienteError
+  crear as crearMovimiento, computarStock, isReady, StockInsuficienteError,
+  listar as listarMovimientos
 } from '../data/movimientos.js';
+// Por espacio de nombres: si el navegador guarda un data/movimientos.js viejo (sin registrarDesdeOrden),
+// la pestaña NO se rompe al cargar; el botón pide recargar (L-102).
+import * as movimientosApi from '../data/movimientos.js';
 import { suscribir as suscribirSuministros } from '../data/suministros.js';
 import { suscribir as suscribirTransformadores } from '../data/transformadores.js';
 import { getContratoActivo, withContratoFiltro } from '../ui/contrato-context.js';
@@ -29,6 +33,9 @@ import { getContratoActivo, withContratoFiltro } from '../ui/contrato-context.js
 import { calcularNexo, existenciaConOrdenes, NEXO_CONTRATOS } from '../domain/ordenes_contrato_nexo.js';
 import { listar as listarOrdenes } from '../data/ordenes_materiales.js';
 import { obtenerConfig } from '../data/suministros_config.js';
+// Registro en Movimientos de las entregas de Órdenes E/S (2026-10-07, `99 §147`).
+import { planificarRegistro } from '../domain/ordenes_movimientos_registro.js';
+import { computarStockDesdeMovimientos } from '../domain/stock_calculo.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -109,18 +116,32 @@ function rebuildDatalistTrafos() {
 
 // ── Nexo con Órdenes E/S: una lectura por visita, solo en contratos con nexo ──
 let promesaOrdenesNexo = null;
+let promesaMovsNexo = null;
 let promesaConfig = null;
+/** Órdenes de la vigencia (una lectura por visita) + movimientos del contrato (frescos en cada consulta:
+ *  si otra pestaña registró entregas, lo pendiente no se descuenta dos veces junto al stock fresco). */
+async function datosNexo(cid, { movsFrescos = true } = {}) {
+  if (!promesaOrdenesNexo) promesaOrdenesNexo = listarOrdenes({ desde: NEXO_CONTRATOS[cid].desde, hasta: NEXO_CONTRATOS[cid].hasta });
+  if (!promesaMovsNexo || movsFrescos) promesaMovsNexo = listarMovimientos({ contrato_id: cid });
+  try {
+    const [{ ordenes, truncado }, movimientos] = await Promise.all([promesaOrdenesNexo, promesaMovsNexo]);
+    return { ordenes, truncado: !!truncado, movimientos };
+  } catch (err) {
+    promesaOrdenesNexo = null; promesaMovsNexo = null;   // se reintenta la próxima vez
+    throw err;
+  }
+}
+/** Lo que falta por REGISTRAR de las órdenes (lo registrado ya descuenta como movimiento: no se cuenta dos veces). */
 async function entregadoPorOrdenes(codigo) {
   const cid = getContratoActivo();
   if (!cid || !NEXO_CONTRATOS[cid]) return { cantidad: 0, ok: true };
-  if (!promesaOrdenesNexo) promesaOrdenesNexo = listarOrdenes({ desde: NEXO_CONTRATOS[cid].desde, hasta: NEXO_CONTRATOS[cid].hasta });
   try {
-    const { ordenes, truncado } = await promesaOrdenesNexo;
-    const n = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid });
-    return { cantidad: n.porItem[codigo] ? n.porItem[codigo].cantidad : 0, ok: true, parcial: !!truncado };
+    const { ordenes, truncado, movimientos } = await datosNexo(cid);
+    const n = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid, movimientos });
+    const pend = n.porItemPendiente || n.porItem || {};      // módulo viejo en caché: todo cuenta como pendiente
+    return { cantidad: pend[codigo] ? pend[codigo].cantidad : 0, ok: true, parcial: truncado };
   } catch (err) {
     console.warn('[nexo] no se pudieron leer las órdenes E/S:', err);
-    promesaOrdenesNexo = null;           // se reintenta en la próxima línea
     return { cantidad: 0, ok: false };
   }
 }
@@ -244,7 +265,7 @@ async function aplicarSuministroLinea(lineaEl) {
       // Si mientras tanto se escogió otro suministro en la línea, esta respuesta ya no aplica.
       if (vigente()) {
         f.stockActual.value = `${s.actual} (ini ${s.inicial}, +${s.ingresado}, -${s.egresadoMovimientos}` +
-          (s.entregadoOrdenes ? `, -${s.entregadoOrdenes} órdenes E/S` : '') +
+          (s.entregadoOrdenes ? `, -${s.entregadoOrdenes} órdenes E/S por registrar` : '') +
           (ent.ok ? '' : ' · sin leer órdenes E/S') + (ent.parcial ? ' · parcial: más de 500 órdenes en la vigencia' : '') + ')';
         lineaState.set(lineaEl, ent.ok
           ? { suministro: found, conNexo: true, disponible: s.actual, permiteNegativo: neg }
@@ -629,3 +650,108 @@ fillAnios();
 agregarLinea();    // primera línea siempre presente
 arrancar();
 actualizarBtnGuardar();   // estado inicial: disabled hasta llenar
+
+// ══════════════════════════════════════════════════════════════
+// Entregas de Órdenes E/S por registrar (2026-10-07, `99 §147`)
+// Vista previa → casillas → «Registrar seleccionadas». Una transacción por entrega
+// (data/movimientos.js#registrarDesdeOrden): repetir no duplica, una orden que cambió
+// no se registra y la existencia se valida igual que un egreso manual.
+// ══════════════════════════════════════════════════════════════
+const regSec = $('regOrdenes');           // ausente con el HTML viejo en caché (`30 L-85`)
+let planReg = null;
+let confirmandoReg = false;   // confirmación en dos clics dentro de la página (sin diálogo del navegador)
+const ddmm = (iso) => String(iso || '').slice(0, 10).split('-').reverse().join('/');
+
+async function revisarEntregas() {
+  const cid = getContratoActivo();
+  const cuerpo = $('regCuerpo'), btnReg = $('btnRegistrarEntregas');
+  btnReg.disabled = true; planReg = null; confirmandoReg = false; btnReg.classList.remove('btn-danger');
+  cuerpo.innerHTML = '<p class="msg">Leyendo órdenes, movimientos y parque…</p>';
+  try {
+    promesaOrdenesNexo = null; promesaMovsNexo = null;          // lectura fresca
+    const { ordenes, truncado, movimientos } = await datosNexo(cid);
+    if (!cacheTrafos.length) throw new Error('el parque de transformadores todavía no cargó; espere un momento y vuelva a revisar');
+    if (!cacheSums.length) throw new Error('el catálogo del contrato todavía no cargó; espere un momento y vuelva a revisar');
+    if (typeof movimientosApi.registrarDesdeOrden !== 'function') throw new Error('el navegador tiene una versión anterior del programa: recargue la página (Cmd+Shift+R)');
+    const nexo = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid, movimientos });
+    const existencias = Object.fromEntries(cacheSums.map((s) => [s.codigo,
+      computarStockDesdeMovimientos(s.stock_inicial, movimientos.filter((m) => m.suministro_id === s.codigo)).actual]));
+    planReg = planificarRegistro({ nexo, parque: cacheTrafos, catalogo: cacheSums, contratoId: cid, existencias });
+    const p = planReg;
+    const fila = (x, conCasilla, i) => {
+      const l = x.linea || x;
+      return `<tr>${conCasilla ? `<td><input type="checkbox" class="reg-sel" data-i="${i}" checked aria-label="Registrar esta entrega"></td>` : '<td></td>'}
+        <td>${escHtml(ddmm(l.fechaISO))}</td><td>${escHtml(l.tipo)} ${escHtml(l.numero)}</td>
+        <td><code>${escHtml(l.codigo)}</code> ${escHtml(l.nombre)}</td><td style="text-align:right">${escHtml(String(l.cantidad))}</td>
+        <td>${escHtml(x.payload ? x.payload.matricula + ' · ' + x.payload.subestacion : l.transformador)}</td>
+        <td>${escHtml(x.payload ? x.payload.zona + ' / ' + x.payload.departamento : (l.zona || ''))}</td>
+        <td style="text-align:right">${x.payload ? fmtCOP(x.payload.valor_total) : fmtCOP(l.valor)}</td>
+        <td style="font-size:12px">${escHtml(x.motivo || (l.movimientos && l.movimientos.length ? l.movimientos.join(', ') : ''))}</td></tr>`;
+    };
+    const tabla = (titulo, filas, conCasilla) => !filas.length ? '' : `<h4 style="margin:14px 0 6px">${titulo} (${filas.length})</h4>
+      <div class="table-scroll"><table class="data-table"><thead><tr><th></th><th>Fecha</th><th>Orden</th><th>Ítem</th><th style="text-align:right">Cant.</th>
+      <th>Transformador</th><th>Zona / depto.</th><th style="text-align:right">Valor</th><th>${conCasilla ? '' : 'Motivo / MOV'}</th></tr></thead>
+      <tbody>${filas.map((x, i) => fila(x, conCasilla, i)).join('')}</tbody></table></div>`;
+    cuerpo.innerHTML =
+      `<p class="msg">${p.porRegistrar.length} por registrar (${fmtCOP(p.valorPorRegistrar)}) · ${p.registrados.length} ya registradas · ` +
+      `${p.noRegistrables.length} no registrables · ${p.desfasados.length} desfasadas.` +
+      (truncado ? ' <b>Parcial:</b> hay más de 500 órdenes en la vigencia.' : '') + '</p>' +
+      (nexo.avisos.length ? nexo.avisos.map((a) => `<p class="msg err">⚠ ${escHtml(a)}</p>`).join('') : '') +
+      tabla('Por registrar', p.porRegistrar, true) +
+      tabla('No registrables (no se adivina: corrija la orden o el parque)', p.noRegistrables.map((x) => ({ ...x.linea, motivo: x.motivo })), false) +
+      tabla('Desfasadas (la orden cambió después de registrada)', p.desfasados, false);
+    btnReg.disabled = !p.porRegistrar.length;
+    btnReg.textContent = `Registrar seleccionadas (${p.porRegistrar.length})`;
+    cuerpo.querySelectorAll('.reg-sel').forEach((c) => c.addEventListener('change', () => {
+      const n = cuerpo.querySelectorAll('.reg-sel:checked').length;
+      confirmandoReg = false; btnReg.classList.remove('btn-danger');
+      btnReg.disabled = !n; btnReg.textContent = `Registrar seleccionadas (${n})`;
+    }));
+  } catch (err) {
+    console.error(err);
+    cuerpo.innerHTML = `<p class="msg err">✗ No se pudo revisar: ${escHtml(err.message || String(err))}</p>`;
+  }
+}
+
+async function registrarEntregas() {
+  if (!planReg) return;
+  const cuerpo = $('regCuerpo'), btnReg = $('btnRegistrarEntregas'), msg = $('regMsg');
+  const sel = [...cuerpo.querySelectorAll('.reg-sel:checked')].map((c) => planReg.porRegistrar[+c.dataset.i]).filter(Boolean);
+  if (!sel.length) return;
+  // Primer clic: pide confirmar en el mismo botón. Segundo clic: registra.
+  if (!confirmandoReg) {
+    confirmandoReg = true;
+    btnReg.classList.add('btn-danger');
+    btnReg.textContent = `Confirmar: registrar ${sel.length} entrega(s) como EGRESO`;
+    msg.className = 'msg'; msg.textContent = 'Revise la tabla. Pulse de nuevo para registrar; cambie una casilla para cancelar.';
+    return;
+  }
+  confirmandoReg = false; btnReg.classList.remove('btn-danger');
+  const uid = window.__sgmSession && window.__sgmSession.user && window.__sgmSession.user.uid;
+  btnReg.disabled = true;
+  const res = { registrado: [], ya_estaba: 0, orden_cambio: [], error: [] };
+  for (let i = 0; i < sel.length; i++) {
+    msg.className = 'msg'; msg.textContent = `Registrando ${i + 1} de ${sel.length}…`;
+    try {
+      const r = await movimientosApi.registrarDesdeOrden(sel[i], uid);
+      if (r.estado === 'registrado') res.registrado.push(r.codigo);
+      else if (r.estado === 'ya_estaba') res.ya_estaba++;
+      else res.orden_cambio.push(`${sel[i].linea.numero} ${sel[i].linea.codigo}: ${r.motivo}`);
+    } catch (err) {
+      res.error.push(`${sel[i].linea.numero} ${sel[i].linea.codigo}: ${err.message || err}`);
+    }
+  }
+  msg.className = 'msg ' + (res.error.length || res.orden_cambio.length ? 'err' : 'ok');
+  msg.textContent = `${res.registrado.length ? '✓' : '✗'} ${res.registrado.length} registrada(s)` + (res.registrado.length ? ` (${res.registrado[0]} … ${res.registrado[res.registrado.length - 1]})` : '') +
+    (res.ya_estaba ? ` · ${res.ya_estaba} ya estaban` : '') +
+    (res.orden_cambio.length ? ` · sin registrar por cambio en la orden: ${res.orden_cambio.join('; ')}` : '') +
+    (res.error.length ? ` · con error: ${res.error.join('; ')}` : '');
+  await revisarEntregas();
+}
+
+if (regSec) {
+  const cidReg = getContratoActivo();
+  regSec.hidden = !(cidReg && NEXO_CONTRATOS[cidReg]);
+  $('btnRevisarEntregas').addEventListener('click', revisarEntregas);
+  $('btnRegistrarEntregas').addEventListener('click', registrarEntregas);
+}

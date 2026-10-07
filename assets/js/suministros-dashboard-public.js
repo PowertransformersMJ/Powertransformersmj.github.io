@@ -20,8 +20,12 @@ import { valoresContrato } from '../js/domain/stock_calculo.js';
 // Nexo con Órdenes E/S (2026-10-07): lo entregado a cada transformador por las órdenes firmadas
 // descuenta del contrato. Se CALCULA al abrir (no se escriben copias): editar o eliminar una orden
 // se refleja solo. Decisiones del Ingeniero → domain/ordenes_contrato_nexo.js.
-import { calcularNexo, existenciaConOrdenes, NEXO_CONTRATOS, SIN_TRANSFORMADOR } from '../js/domain/ordenes_contrato_nexo.js';
+import { calcularNexo, existenciaConOrdenes, NEXO_CONTRATOS, SIN_TRANSFORMADOR, claveTransformador } from '../js/domain/ordenes_contrato_nexo.js';
 import { listar as listarOrdenes } from '../js/data/ordenes_materiales.js';
+// Indicadores completos (2026-10-07, `99 §147`): zona y departamento salen del parque para lo que
+// todavía no está registrado como movimiento (se lee solo si hay entregas por registrar).
+import { listarV2 as listarParque } from '../js/data/transformadores.js';
+import { resolverTransformador } from '../js/domain/ordenes_movimientos_registro.js';
 
 const $ = (id) => document.getElementById(id);
 const info = $('infoBox');
@@ -43,6 +47,7 @@ const kValDisponible = $('kValDisponible');
 const kEjecucionPct  = $('kEjecucionPct');
 const kValContratoNota = $('kValContratoNota');   // ausente con el HTML viejo en caché (`30 L-85`)
 const kValConsumidoNota = $('kValConsumidoNota'); // ídem (nexo con Órdenes E/S)
+const kRegistrosNota = $('kRegistrosNota');       // ídem (entregas por registrar)
 
 // Tabla stock
 const tbody    = $('tbody');
@@ -64,6 +69,8 @@ let contratoDoc = null;      // /contratos/{id}: su monto_total es el «Valor co
 let ordenesNexo = null;
 let nexo = null;
 let stockLlego = false;
+let parqueNexo = null;       // null = sin leer; [] o lista al llegar (solo si hay entregas por registrar)
+let leyendoParque = false;
 let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
@@ -142,7 +149,8 @@ function actualizarKPIs() {
   if (kValConsumidoNota) {
     const vMov = cacheStockGlobal.reduce((s, r) => s + (+(r._calc.stock.egresadoMovimientos ?? r._calc.stock.egresado) || 0) * (+r.valor_unitario || 0), 0);
     kValConsumidoNota.textContent = nexo && nexo.activo
-      ? `Movimientos ${fmtCOP(vMov)} · Órdenes E/S ${fmtCOP(nexo.totalValor)}` + (ordenesNexo && ordenesNexo.truncado ? ' · parcial' : '')
+      ? `Movimientos ${fmtCOP(vMov)}` + (nexo.totalRegistrado ? ` (de órdenes E/S ${fmtCOP(nexo.totalRegistrado)})` : '') +
+        ` · Órdenes por registrar ${fmtCOP(nexo.totalPendiente)}` + (ordenesNexo && ordenesNexo.truncado ? ' · parcial' : '')
       : '';
   }
   if (kValContratoNota) {
@@ -168,13 +176,16 @@ function actualizarKPIs() {
   if (nexo && nexo.activo) {
     // Con nexo: movimientos y órdenes por la MISMA clave (matrícula|subestación): un trafo atendido
     // por los dos caminos cuenta una vez (transformador_id puede ser el id del documento, no la matrícula).
-    const claveMov = (m) => (m.matricula || m.transformador_id) ? normTxt(m.matricula || m.transformador_id) + '|' + normTxt(m.subestacion) : '';
-    trafos = new Set(cacheMovs.map(claveMov).filter(Boolean));
+    trafos = new Set(cacheMovs.map(claveTrafoMov).filter(Boolean));
     nexo.transformadores.forEach((t) => { if (t.matricula !== SIN_TRANSFORMADOR) trafos.add(t.clave); });
   } else {
     trafos = new Set(cacheMovs.map((m) => m.transformador_id).filter(Boolean));
   }
   kRegistros.textContent     = fmtInt(registros);
+  if (kRegistrosNota) {
+    const pend = nexo && nexo.activo ? (nexo.lineasDetalle || []).filter((l) => l.pendiente > 0).length : 0;
+    kRegistrosNota.textContent = pend ? `+${pend} entrega(s) de órdenes por registrar` : '';
+  }
   kUnidades.textContent      = fmtInt(unidades);
   kDescripciones.textContent = fmtInt(descs.size);
   kTxAtendidos.textContent   = fmtInt(trafos.size);
@@ -259,14 +270,14 @@ function chartHorizontalBar(canvasId, dataPairs, label, formatter = fmtInt, colo
     }
   });
 }
-function chartDoughnut(canvasId, dataPairs, label, colorMap = null) {
+function chartDoughnut(canvasId, dataPairs, label, colorMap = null, formatter = fmtInt) {
   const ctx = document.getElementById(canvasId);
   if (!ctx) return;
   destroyChart(canvasId);
   const labels = dataPairs.map(([k]) => k);
   const data   = dataPairs.map(([, v]) => v);
   const colors = colorMap
-    ? labels.map((l) => colorMap[l] || '#94A3B8')
+    ? labels.map((l) => colorMap[l] || colorMap[String(l).split(' · ')[0]] || '#94A3B8')
     : labels.map((_, i) => COLOR_BARS[i % COLOR_BARS.length]);
   charts[canvasId] = new Chart(ctx, {
     type: 'doughnut',
@@ -276,7 +287,7 @@ function chartDoughnut(canvasId, dataPairs, label, colorMap = null) {
       maintainAspectRatio: false,
       plugins: {
         legend: { position: 'right', labels: { font: { size: 11 } } },
-        tooltip: { callbacks: { label: (c) => `${c.label}: ${fmtInt(c.parsed)}` } }
+        tooltip: { callbacks: { label: (c) => `${c.label}: ${formatter(c.parsed)}` } }
       },
       cutout: '55%'
     }
@@ -295,7 +306,8 @@ function rankingPor(field, valueFn, topN = 10) {
 function rankingItems(campo, topN = 10) {
   const acc = new Map(rankingPor('suministro_id', campo === 'cantidad' ? (m) => +m.cantidad || 0 : (m) => +m.valor_total || 0, 1000));
   if (nexo && nexo.activo) {
-    for (const i of Object.values(nexo.porItem)) acc.set(i.codigo, (acc.get(i.codigo) || 0) + (campo === 'cantidad' ? i.cantidad : i.valor));
+    // Solo lo PENDIENTE de las órdenes: lo registrado ya viene en los egresos (no se cuenta dos veces).
+    for (const i of Object.values(nexo.porItemPendiente || nexo.porItem || {})) acc.set(i.codigo, (acc.get(i.codigo) || 0) + (campo === 'cantidad' ? i.cantidad : i.valor));
   }
   return [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, topN);
 }
@@ -308,29 +320,65 @@ function renderCharts() {
     .map(([k, v]) => [`${k} ${nombreSum(k)}`, v]);
   chartHorizontalBar('chRankValor', rankVal, 'COP', fmtCOP, () => '#EA580C');
 
-  const porZona = new Map();
-  const porDepto = new Map();
-  for (const m of cacheMovs) {
-    if (m.tipo !== 'EGRESO') continue;
-    const z = m.zona || 'sin zona';
-    porZona.set(z, (porZona.get(z) || 0) + 1);
-    const d = (m.departamento || 'sin depto').toUpperCase();
-    porDepto.set(d, (porDepto.get(d) || 0) + 1);
+  // Pesos entregados + transformadores atendidos (decisión 2026-10-07): un registro de 8 motoventiladores
+  // no pesa lo mismo que un relé, y sumar unidades mezclaría kg, m y Und.
+  const acc = (clave) => {
+    const m = new Map();
+    for (const e of egresosCombinados()) {
+      const k = clave(e);
+      const x = m.get(k) || { valor: 0, trafos: new Set() };
+      x.valor += e.valor; if (e.claveTrafo) x.trafos.add(e.claveTrafo);
+      m.set(k, x);
+    }
+    return [...m.entries()].sort((a, b) => b[1].valor - a[1].valor)
+      .map(([k, x]) => [`${k} · ${x.trafos.size} ${x.trafos.size === 1 ? 'trafo' : 'trafos'}`, x.valor]);
+  };
+  chartDoughnut('chZona', acc((e) => e.zona || 'sin zona'), 'COP', COLOR_BY_ZONA, fmtCOP);
+  chartHorizontalBar('chDepto', acc((e) => nombreDepto(e.departamento)), 'COP', fmtCOP, () => '#2563EB');
+  const fuente = nexo && nexo.activo ? 'movimientos + órdenes por registrar' : 'movimientos registrados';
+  document.querySelectorAll('.rotulo-dist').forEach((x) => {
+    x.textContent = x.closest('.section-head') ? `(unidades por accesorio · ${fuente})` : `(pesos entregados · ${fuente})`;
+  });
+}
+
+const DEPTOS = { bolivar: 'Bolívar', cordoba: 'Córdoba', sucre: 'Sucre', cesar: 'Cesar', magdalena: 'Magdalena' };
+function nombreDepto(d) { const k = normTxt(d); return DEPTOS[k] || (k ? k.toUpperCase() : 'sin depto'); }
+
+/**
+ * Todo lo entregado a transformadores: los EGRESOS (manuales, de Brigada o de órdenes registradas)
+ * y las entregas de órdenes que aún faltan por registrar (con zona y departamento del parque).
+ * Lo registrado nunca se suma dos veces: de las órdenes solo entra lo PENDIENTE.
+ */
+function egresosCombinados() {
+  const vu = new Map(cacheStockGlobal.map((s) => [s.codigo, +s.valor_unitario || 0]));
+  const out = cacheMovs.filter((m) => m.tipo === 'EGRESO').map((m) => ({
+    suministro_id: m.suministro_id, cantidad: +m.cantidad || 0, valor: +m.valor_total || ((+m.cantidad || 0) * (vu.get(m.suministro_id) || 0)),
+    zona: String(m.zona || '').toUpperCase(), departamento: m.departamento || '',
+    claveTrafo: claveTrafoMov(m)
+  }));
+  if (nexo && nexo.activo) {
+    for (const l of (nexo.lineasDetalle || [])) {
+      if (!(l.pendiente > 0)) continue;
+      const tr = parqueNexo ? resolverTransformador(parqueNexo, l.matricula, l.subestacion) : { ok: false };
+      out.push({ suministro_id: l.codigo, cantidad: l.pendiente, valor: l.pendiente * l.valorUnitario,
+        zona: tr.ok ? tr.trafo.zona : (l.zona || ''), departamento: tr.ok ? tr.trafo.departamento : '',
+        claveTrafo: l.claveTrafo && l.claveTrafo !== '|' && !l.claveTrafo.startsWith('|#') ? l.claveTrafo : '' });
+    }
   }
-  chartDoughnut('chZona', [...porZona.entries()], 'registros', COLOR_BY_ZONA);
-  chartHorizontalBar('chDepto', [...porDepto.entries()], 'Egresos');
+  return out;
 }
 
 function renderCruzado() {
   const z = fxZona.value;
   const d = fxDepto.value;
-  const filt = cacheMovs.filter((m) => {
-    if (m.tipo !== 'EGRESO') return false;
+  const todos = egresosCombinados();
+  const filt = todos.filter((m) => {
     if (z && m.zona !== z) return false;
-    if (d && m.departamento !== d) return false;
+    if (d && normTxt(m.departamento) !== d) return false;
     return true;
   });
-  cruzadoCount.textContent = `Mostrando ${filt.length} de ${cacheMovs.length} movimientos`;
+  cruzadoCount.textContent = `Mostrando ${filt.length} de ${todos.length} entregas` +
+    (nexo && nexo.activo && nexo.totalPendiente ? ' (movimientos + órdenes por registrar)' : '');
   const acc = new Map();
   for (const m of filt) {
     const k = m.suministro_id || '—';
@@ -356,10 +404,16 @@ function recomputarTodo() {
     : null;
   cacheStockGlobal = cacheStockGlobal.map((r) => {
     const base = r._stockMov || r.stock || { inicial: r.stock_inicial || 0, ingresado: 0, egresado: 0, actual: r.stock_inicial || 0 };
-    const ent = nexo && nexo.porItem[r.codigo] ? nexo.porItem[r.codigo].cantidad : 0;
+    const pend = nexo ? (nexo.porItemPendiente || nexo.porItem || {}) : {};    // módulo viejo en caché: todo es pendiente
+    const ent = pend[r.codigo] ? pend[r.codigo].cantidad : 0;
     const fila = { ...r, _stockMov: base, stock: existenciaConOrdenes(base, ent) };
     return { ...fila, _calc: calcularPorItem(fila) };
   });
+  if (nexo && nexo.activo && (nexo.totalPendiente == null || nexo.totalPendiente > 0) && parqueNexo === null && !leyendoParque) {
+    leyendoParque = true;
+    listarParque({}).then((rows) => { parqueNexo = rows || []; }, (err) => { console.warn('[nexo] parque:', err); parqueNexo = []; })
+      .then(() => { leyendoParque = false; if (stockLlego) recomputarTodo(); });
+  }
   // Pre-calcular estado por ítem para evitar repetir en cada render.
   actualizarKPIs();
   renderTabla();
@@ -370,6 +424,21 @@ function recomputarTodo() {
 }
 
 /* ─── Nexo con Órdenes E/S: entregado por transformador ─── */
+/**
+ * Clave del transformador de un movimiento. Si viene de una orden, la MISMA clave del nexo (texto de
+ * la orden): así un trafo no cuenta doble aunque la orden no traiga «· S/E» y el movimiento sí.
+ */
+function claveTrafoMov(m) {
+  if (m && m.orden_es && String(m.orden_es.transformador || '').trim()) return claveTransformador(m.orden_es.transformador);
+  return (m && (m.matricula || m.transformador_id)) ? normTxt(m.matricula || m.transformador_id) + '|' + normTxt(m.subestacion) : '';
+}
+/** Departamento de un transformador de la sección: del movimiento enlazado o, si falta, del parque. */
+function deptoTrafo(t) {
+  const m = cacheMovs.find((x) => x.departamento && claveTrafoMov(x) === t.clave);
+  if (m) return nombreDepto(m.departamento);
+  if (parqueNexo) { const r = resolverTransformador(parqueNexo, t.matricula, t.subestacion); if (r.ok) return nombreDepto(r.trafo.departamento); }
+  return '';
+}
 function normTxt(v) {
   return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 }
@@ -393,23 +462,39 @@ function renderNexo() {
   const n = nexo;
   const nTr = n.transformadores.filter((t) => t.matricula !== SIN_TRANSFORMADOR).length;
   const fecha = (iso) => iso ? iso.split('-').reverse().join('/') : '';
+  const est = n.resumenEstados || { registrado: 0, por_registrar: n.lineas || 0, desfasado: 0 };
   alc.innerHTML = `Cuentan las órdenes de <b>ENTRADA</b> (bodega → subestación) del <b>${fecha(cfg.desde)}</b> al <b>${fecha(cfg.hasta)}</b>, ` +
     `con los ítems exactos del contrato: <b>${n.ordenesQueCuentan}</b> ${n.ordenesQueCuentan === 1 ? 'orden' : 'órdenes'}, ` +
     `<b>${nTr}</b> ${nTr === 1 ? 'transformador' : 'transformadores'}, <b>${fmtCOP(n.totalValor)}</b>. ` +
-    'Se calcula al abrir: si una orden se corrige o se elimina, aquí se refleja solo.' +
+    `Entregas: <b>${est.registrado}</b> registradas en Movimientos · <b>${est.por_registrar}</b> por registrar` +
+    (est.desfasado ? ` · <b>${est.desfasado}</b> desfasadas (la orden cambió)` : '') + '. ' +
+    'Lo registrado ya es un movimiento (Histórico); lo que falta por registrar se calcula aquí al abrir.' +
     (ordenesNexo.truncado ? ' <b>Parcial:</b> hay más de 500 órdenes en la vigencia y aquí entran las 500 más recientes: lo entregado puede ser mayor.' : '');
   avisos.innerHTML = n.avisos.map((a) => `<div class="info-msg warn" style="display:block">⚠ ${escHtml(a)}</div>`).join('');
   tb.innerHTML = n.transformadores.length ? n.transformadores.map((t) => `
     <tr>
       <td><code>${escHtml(t.matricula)}</code>${t.subestacion ? `<div style="font-size:11px;color:var(--ink-3)">S/E ${escHtml(t.subestacion)}</div>` : ''}</td>
-      <td>${escHtml(t.zona || '—')}</td>
+      <td>${escHtml(t.zona || '—')}${deptoTrafo(t) ? `<div style="font-size:11px;color:var(--ink-3)">${escHtml(deptoTrafo(t))}</div>` : ''}</td>
       <td>${t.items.map((i) => `<div><code>${escHtml(i.codigo)}</code> ${escHtml(i.nombre)} · <b>${fmtInt(i.cantidad)}</b> ${escHtml(i.unidad)} × ${fmtCOP(i.valorUnitario)}</div>`).join('')}</td>
       <td style="text-align:right; font-family: var(--font-mono); font-weight:700;">${fmtCOP(t.valor)}</td>
-      <td style="font-size:12px">${t.ordenes.map((o) => `ENTRADA ${escHtml(o.numero)} · ${fecha(o.fecha)}`).join('<br>')}</td>
+      <td style="font-size:12px">${t.ordenes.map((o) => `ENTRADA ${escHtml(o.numero)} · ${fecha(o.fecha)}` +
+        (o.estado === 'registrado' ? ` · <span style="color:#16A34A">${escHtml((o.movimientos || []).join(', '))}</span>`
+          : o.estado === 'desfasado' ? ' · <span style="color:#DC2626">⚠ desfasada</span>'
+          : o.estado === 'mixto' ? ' · <span style="color:#EA580C">en parte registrada</span>'
+          : ' · <span style="color:#EA580C">por registrar</span>')).join('<br>')}</td>
     </tr>`).join('')
     : '<tr><td colspan="5" class="td-empty">Ninguna orden de entrada trae ítems del contrato en la vigencia del pedido.</td></tr>';
+  const porDep = new Map();
+  for (const t of n.transformadores) {
+    const d = deptoTrafo(t) || 'sin depto';
+    const x = porDep.get(d) || { valor: 0, trafos: 0 };
+    x.valor += t.valor; if (t.matricula !== SIN_TRANSFORMADOR) x.trafos++;
+    porDep.set(d, x);
+  }
   zonas.innerHTML = n.zonas.length
-    ? 'Por zona: ' + n.zonas.map((z) => `<b>${escHtml(z.zona || 'sin zona')}</b> ${fmtCOP(z.valor)} (${z.transformadores} ${z.transformadores === 1 ? 'trafo' : 'trafos'})`).join(' · ')
+    ? 'Por zona: ' + n.zonas.map((z) => `<b>${escHtml(z.zona || 'sin zona')}</b> ${fmtCOP(z.valor)} (${z.transformadores} ${z.transformadores === 1 ? 'trafo' : 'trafos'})`).join(' · ') +
+      '<br>Por departamento: ' + [...porDep.entries()].sort((a, b) => b[1].valor - a[1].valor)
+        .map(([d, x]) => `<b>${escHtml(d)}</b> ${fmtCOP(x.valor)} (${x.trafos} ${x.trafos === 1 ? 'trafo' : 'trafos'})`).join(' · ')
     : '';
   if (fuera) {
     const o = n.noCuentan.ordenes;
