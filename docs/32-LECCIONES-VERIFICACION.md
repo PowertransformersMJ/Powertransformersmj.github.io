@@ -379,3 +379,11 @@ justo los meses de ahora (lo halló la revisión adversarial, no las pruebas). �
 por bueno con `getComputedStyle(el).display` y una captura, no con su texto; al concatenar clases, el espacio va dentro de
 la cadena (`'x ver ' + clase`); (2) todo tope de seguridad sobre una serie de tiempo se cuenta desde lo más reciente, y lo
 que deja fuera se dice en cifras («N órdenes anteriores…»). [HONOR]
+
+### L-128 · Antes de recomendar qué significa una columna de cantidades, cuadrarla contra el documento de valor
+**Cicatriz** (`99 §145.9`, 2026-10-07): pregunté si la «Cantidad» del Libro4 de un contrato era «existencia de hoy» o
+«cantidad pactada» y recomendé la primera, porque unas cifras bajaban y eso «parecía un conteo». La cargué así. Una hora
+después él trajo el pedido: Σ cantidad × precio de su Excel daba $2.269.222.125 contra $2.269.395.067 del pedido, así que
+era lo pactado. Hubo que corregir datos de producción y el tablero. · **Regla**: cuando una hoja trae cantidades y precios
+de un contrato, ANTES de preguntar o recomendar, multiplicar y comparar contra el valor del contrato (pedido, aceptación,
+adiciones), y pedir ese documento si no está. Una recomendación sin ese cuadre es una suposición; dila como tal. [HONOR]

@@ -79,7 +79,7 @@
 | §142 | ADR-142 — **Órdenes E/S: «Órdenes guardadas»** (dónde reposan; Ver · PDF · Excel · Editar desde la lista, también las pendientes sin conexión) | 6130 |
 | §143 | ADR-143 — **Órdenes E/S: filtro por zona y consolidado de entregas por transformador y subestación** (Excel; el tipo —entradas, salidas o ambas— lo escoge él, `§143.9`) | 6167 |
 | §144 | ADR-144 — **Órdenes E/S: indicadores por accesorio, zona, motivo y mes** (apartado en la página + panel; cantidad en su unidad al escoger un accesorio; aviso «verok» invisible) | 6211 |
-| §145 | ADR-145 — **Contrato 4125000143: inventario ajustado a su Libro4.xlsx** (cantidad = existencia de hoy; valores unitarios, unidades y nombres; vuelta atrás en la bóveda) | 6264 |
+| §145 | ADR-145 — **Contrato 4125000143: inventario ajustado a su Libro4.xlsx** (Libro4 = cantidad pactada, `§145.9`; valores unitarios y unidades; el «Valor contrato» del tablero sale del pedido registrado) | 6264 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
