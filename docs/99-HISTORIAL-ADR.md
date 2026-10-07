@@ -6207,3 +6207,56 @@ Commit `efd46ac`, main `ee904f3`.
 **143.8 Verificado sano / no re-auditar.** Tipo solo ENTRADA/SALIDA (reglas y `ordenDesdeRegistro`), así que SALIDA = la rama
 «Salidas» del histórico; fechas de `o.fecha` (respaldo `fechaISO`); opciones del selector con `new Option` (escapadas) y la
 elección se conserva en cada repintado; índices `data-p*` alineados con las pendientes filtradas.
+
+## 144. ADR-144 — Órdenes E/S: indicadores por accesorio, zona, motivo y mes (panel mejorado + apartado en la página) ⟦OPUS-5.5⟧ (2026-10-06)
+
+> *«me gustaria que en el segmento de ordenes de entrada y salida exista un apartado de indicadores donde se puedan apreciar
+> por accesorios, zona, motivo y meses. antes de construir todo esto dame preview»*. Preview con 5 decisiones → su respuesta:
+> *«procede con las recomendadas»*. NO revisado externamente (UI y cálculo aditivos sobre datos ya cargados).
+
+**144.1 Causa raíz.** El panel YA existía (modal `#modalViz`, botón «Indicadores» o Ctrl/Cmd+I) con zona, mes y motivo, pero
+escondido entre 9 botones, sin vista por accesorio (solo la tabla «Material movido») y con defectos que nadie veía:
+el aviso de alcance NUNCA se mostraba (`'oms-aviso ver' + 'ok'` = «verok»: ni el «Parcial» del tope de 500); zona contada por
+texto crudo («Occidente» ≠ «OCCIDENTE»: 4 zonas siendo 3); cada motivo «Otro» una barra suelta y corte en «10 primeros»;
+la serie de meses ignoraba Desde/Hasta y el mes en curso parecía una caída; en celular el SVG de motivos (1120 de ancho)
+dejaba la letra en ~3 px; «Material movido» ordenaba mezclando unidades; el Excel decía «órdenes guardadas en este equipo»
+(falso desde `§77`). El mismo «verok» escondía los 9 avisos de la carga de listas (sección 5).
+**144.2 Solución.** Decisiones suyas (las 5 recomendadas): accesorio = TODO material de las órdenes (descripción + unidad)
+con su lista del catálogo como etiqueta; ranking por número de órdenes con la cantidad al lado; al escoger un accesorio,
+zona/motivo/mes pasan a CANTIDAD en su unidad (encabezados y Excel lo dicen); motivos: los 8 + «Otro (texto libre)» en una
+barra con sus textos en un desplegable; tarjeta «7 · Indicadores» en la página + panel completo (Almacenamiento → 8); sin
+bloque de transformadores (la lista de órdenes del accesorio ya trae el transformador). Panel: filtros Motivo y Accesorio
+(solo lo que hay en el registro, por lista y con unidad), atajos Este año / Últimos 12 meses / Todo, bloque «Accesorios más
+movidos» (tocar = escoger), ficha del accesorio con sus órdenes y transformador (`partirTransformador`, nunca del destino),
+tarjeta Transformadores, línea «Calidad del dato», «Sin zona» al final, mes en curso marcado y tope de lectura respetado.
+Barras HTML (texto completo encima) para accesorios y motivos; SVG de zona y mes al ancho real del recuadro. Excel: 9 hojas
+intactas + «Por accesorio»; «Alcance» con los filtros nuevos. Dominio puro nuevo `assets/js/domain/ordenes_indicadores.js`.
+**144.3 No-regresión.** IDs del panel intactos (`#modalViz #vizZona #vizMes #vizMotivo #fZona #fTipo …`), origen, destino,
+responsables, «Material movido» y las 9 hojas siguen; filtros guardados en la misma clave `ssee.orden.filtros.v1`
+(los nuevos arrancan vacíos y uno obsoleto se limpia); HTML viejo en caché + JS nuevo sin errores (guardas L-85). Sin lecturas
+nuevas a Firestore: todo sale de `estado.ordenes` (tope 500).
+**144.4 Verificación.** Preview primero (W-11 paso a paso: 5 capturas, hoy vs propuesta, escritorio y celular a 375 px)
+y su «procede». `tests/ordenes_indicadores.test.js` (34) · suite 2437/0/2 · lint limpio. Banco de Órdenes con semilla de 53
+órdenes sintéticas con trampas (`?semilla=1`): cifras iguales al panel viejo donde deben (53 órdenes, motivos 19/9/8/6/4/3/2,
+accesorios 12/11/9), zona unificada (3, no 4), Excel abierto con ExcelJS (11 hojas con accesorio; las 9 de siempre con su
+nombre), aviso de la sección 5 visible (antes `display:none`, «verwarn»), HTML publicado + JS nuevo sin errores, 375 px sin
+desborde de página. Revisión adversarial (2 lentes + 1 refutador por hallazgo, 10 Opus): 6 confirmados y corregidos — el
+tope de 120 meses cortaba el FINAL de la serie (un «Desde» de hace >10 años o una fecha 2016-por-2026 borraban los meses de
+ahora; ahora se cuenta desde el final, y las fechas imposibles —antes del 2000 o >1 año adelante— van aparte); ranking y
+«Material movido» con cifras distintas sin rótulo; textos «Otro» perdidos en el Excel (hoja «Motivos escritos a mano»); mes
+incompleto y registro parcial sin marcar en el Excel; filtros perdidos al abrir mientras carga (`llenarFiltrosViz`, se
+limpian solo con el registro leído); aviso que mandaba a la «sección 7». Y 4 menores: tarjeta → panel sin filtros viejos,
+tarjeta con «Parcial» y «en curso», desempate del ranking por nombre (no sumando unidades), hoja «Órdenes del accesorio».
+**144.5 Anti-patterns evitados.** Sumar o escalar juntas unidades distintas · fabricar familias o grupos de motivo sin su
+tabla · deducir el transformador del destino · contar las pendientes de subir (cada computador vería otra cifra) · Chart.js.
+**144.6 Archivos.** `pages/ordenes-materiales.html` · `assets/js/ordenes-materiales.js` · `assets/css/ordenes-materiales.css` ·
+`assets/js/domain/ordenes_indicadores.js` (nuevo) · `tests/ordenes_indicadores.test.js` (nuevo). Commits `1ef762a` (avisos de la sección 5, aparte) + `d2e0505`; main `642c6ba`.
+**144.7 Doctrina.** `CLAUDE.md §3.2` (aditivo, no fabricar) · W-11 paso a paso (preview → sus decisiones → construir) · L-85 ·
+L-105 · interinato R4.
+**144.8 Verificado sano / no re-auditar.** Tooltip «solo con ratón»: los móviles disparan mouseenter al tocar (y las barras
+nuevas escriben el detalle). Las tablas de material y de órdenes del accesorio sobresalen a 375 px DENTRO de su recuadro con
+desplazamiento propio (`overflow-x:auto`): la página no se desborda (medido con el emulador; Chrome sin cabeza corta a ~500,
+L-105). El resumen de la tarjeta se recalcula en cada `pintarOrdenes` (también al teclear en el buscador): ≤ 500 órdenes,
+milisegundos — no se optimizó a propósito. «En 9 hojas» escrito a mano no era defecto hasta agregar hojas: ahora se cuenta.
+Pendientes de subir: NO se suman (cada computador vería otra cifra); solo se informan. Familias de accesorio y % por falla:
+esperan una tabla suya (no se fabrican). Crudos → bóveda `2026-10-06-ordenes-indicadores/`.

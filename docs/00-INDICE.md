@@ -78,6 +78,7 @@
 | §141 | ADR-141 — **Órdenes E/S: cantidad corregible en la tabla de materiales y material «Otro» escrito a mano** (sin cédulas, sin signos que el PDF no imprime, que quepa en el renglón) | 6088 |
 | §142 | ADR-142 — **Órdenes E/S: «Órdenes guardadas»** (dónde reposan; Ver · PDF · Excel · Editar desde la lista, también las pendientes sin conexión) | 6130 |
 | §143 | ADR-143 — **Órdenes E/S: filtro por zona y consolidado de entregas por transformador y subestación** (Excel; el tipo —entradas, salidas o ambas— lo escoge él, `§143.9`) | 6167 |
+| §144 | ADR-144 — **Órdenes E/S: indicadores por accesorio, zona, motivo y mes** (apartado en la página + panel; cantidad en su unidad al escoger un accesorio; aviso «verok» invisible) | 6211 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
