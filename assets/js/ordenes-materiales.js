@@ -51,7 +51,12 @@ import * as REG from './data/ordenes_materiales.js';
 // Ítems (pedido del 2026-10-06): cantidad corregible en la tabla y material «Otro» escrito a mano.
 import { MATERIAL_OTRO, leerCantidad, sumarCantidades, problemasOtro, unidadesSugeridas } from './domain/ordenes_items.js';
 // Filtro por zona y consolidado de entregas por transformador (pedido del 2026-10-06).
-import { zonasDe, enZona, claveZona, filasConsolidado, resumenPorTransformador, SIN_TRANSFORMADOR } from './domain/ordenes_consolidado.js';
+import { zonasDe, enZona, claveZona, filasConsolidado, resumenPorTransformador, SIN_TRANSFORMADOR, partirTransformador } from './domain/ordenes_consolidado.js';
+// Indicadores por accesorio, zona, motivo y mes (pedido del 2026-10-06).
+import {
+  MOTIVO_OTRO, SIN_DATO, filtrarOrdenes, agrupar, serieMensual, porAccesorio, motivosOtros, transformadoresDistintos,
+  grupoMotivo, cantidadEnOrden
+} from './domain/ordenes_indicadores.js';
 import {
   claveDe, normalizarNumero, problemaNumero, candidatasDeSubida, situacionDeSubida,
   seleccionadaPorDefecto, siguienteNumeroLibre, huella, esDelRegistro, llaveDeMarca
@@ -1821,6 +1826,7 @@ async function cargarRegistro(manual) {
   } finally {
     REGISTRO.leyendo = false;
     pintarOrdenes(); pintarPendientes(); pintarBarraEdicion(); pintarAlmacenamiento();
+    if ($('#modalViz').classList.contains('ver')) pintarIndicadores();
   }
 }
 
@@ -1880,6 +1886,7 @@ function pintarOrdenes() {
     cg.textContent = (REGISTRO.estado === 'ok' ? estado.ordenes.length : '—') + (nPend ? ` · ${nPend} pend.` : '');
   }
   pintarEstadoRegistro();
+  pintarResumenIndicadores();
   if (REGISTRO.estado !== 'ok') { cont.innerHTML = pend; return; }
 
   if (!estado.ordenes.length) {
@@ -4797,20 +4804,25 @@ const VIZ = {
 
 const FILTROS = {
   CLAVE: 'ssee.orden.filtros.v1',
-  desde: '', hasta: '', zona: '', tipo: '',
+  desde: '', hasta: '', zona: '', tipo: '', motivo: '', accesorio: '',
 
   leer() {
     const g = LS.leer(this.CLAVE, null);
     if (g) Object.assign(this, g);
   },
   guardar() {
-    LS.escribir(this.CLAVE, { desde: this.desde, hasta: this.hasta, zona: this.zona, tipo: this.tipo });
+    LS.escribir(this.CLAVE, { desde: this.desde, hasta: this.hasta, zona: this.zona, tipo: this.tipo,
+                              motivo: this.motivo, accesorio: this.accesorio });
   },
   desdeUI() {
     this.desde = $('#fDesde').value;
     this.hasta = $('#fHasta').value;
     this.zona  = $('#fZona').value;
     this.tipo  = $('#fTipo').value;
+    // Motivo y accesorio: ausentes con el HTML viejo en caché (`30 L-85`).
+    const fm = $('#fMotivo'), fa = $('#fAccesorio');
+    this.motivo    = fm ? fm.value : '';
+    this.accesorio = fa ? fa.value : '';
     this.guardar();
   },
   aUI() {
@@ -4818,23 +4830,45 @@ const FILTROS = {
     $('#fHasta').value = this.hasta || '';
     $('#fZona').value  = this.zona  || '';
     $('#fTipo').value  = this.tipo  || '';
+    const fm = $('#fMotivo'), fa = $('#fAccesorio');
+    if (fm) fm.value = this.motivo || '';
+    if (fa) fa.value = this.accesorio || '';
   },
   limpiar() {
-    this.desde = this.hasta = this.zona = this.tipo = '';
+    this.desde = this.hasta = this.zona = this.tipo = this.motivo = this.accesorio = '';
     this.guardar(); this.aUI();
   },
-  activos() { return !!(this.desde || this.hasta || this.zona || this.tipo); }
+  activos() { return !!(this.desde || this.hasta || this.zona || this.tipo || this.motivo || this.accesorio); }
 };
 
-/** Aplica los filtros al histórico. */
-function ordenesFiltradas() {
-  return estado.ordenes.filter(o => {
-    if (FILTROS.tipo && o.tipo !== FILTROS.tipo) return false;
-    if (FILTROS.zona && norm(o.zona) !== norm(FILTROS.zona)) return false;
-    if (FILTROS.desde && (!o.fechaISO || o.fechaISO < FILTROS.desde)) return false;
-    if (FILTROS.hasta && (!o.fechaISO || o.fechaISO > FILTROS.hasta)) return false;
-    return true;
+/**
+ * Aplica los filtros al histórico. `sinAccesorio` deja fuera el filtro de
+ * accesorio: el ranking de accesorios se calcula con todos los demás filtros,
+ * para que el escogido se vea en su contexto y se pueda cambiar por otro.
+ */
+function ordenesFiltradas(sinAccesorio) {
+  const conMot = !!$('#fMotivo'), conAcc = !!$('#fAccesorio');
+  return filtrarOrdenes(estado.ordenes, {
+    desde: FILTROS.desde, hasta: FILTROS.hasta, zona: FILTROS.zona, tipo: FILTROS.tipo,
+    motivo: conMot ? FILTROS.motivo : '',
+    accesorio: conAcc && !sinAccesorio ? FILTROS.accesorio : ''
+  }, CONFIG.motivos);
+}
+
+/** Lista del catálogo de cada material (para el ranking y el filtro de accesorios). */
+function grupoDeMaterial() {
+  const m = new Map();
+  (estado.listas.materiales || []).forEach(x => {
+    const k = norm(x.descripcion);
+    if (k && !m.has(k)) m.set(k, x.grupo || 'Sin lista');
   });
+  return it => m.get(norm(it && it.descripcion)) || 'Fuera del catálogo';
+}
+
+/** 'aaaa-mm' de hoy. */
+function mesDeHoy() {
+  const h = new Date();
+  return h.getFullYear() + '-' + String(h.getMonth() + 1).padStart(2, '0');
 }
 
 /* ----------------------------- Agregación ------------------------------ */
@@ -4853,38 +4887,6 @@ function contarPor(ordenes, obtenerClave) {
     });
   });
   return Array.from(m.values()).sort((a, b) => b.total - a.total || a.clave.localeCompare(b.clave, 'es'));
-}
-
-const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-function etiquetaMes(iso) {                      // '2026-08' → 'ago 26'
-  const [a, m] = iso.split('-');
-  return MESES[Number(m) - 1] + ' ' + a.slice(2);
-}
-
-/** Serie mensual completa: incluye los meses sin órdenes, para no falsear la tendencia. */
-function porMes(ordenes) {
-  const con = ordenes.filter(o => o.fechaISO);
-  const sinFecha = ordenes.length - con.length;
-  if (!con.length) return { serie: [], sinFecha };
-
-  const m = new Map();
-  con.forEach(o => {
-    const k = o.fechaISO.slice(0, 7);
-    const a = m.get(k) || { clave: k, ENTRADA: 0, SALIDA: 0, total: 0 };
-    if (o.tipo === 'ENTRADA') a.ENTRADA++; else if (o.tipo === 'SALIDA') a.SALIDA++;
-    a.total++; m.set(k, a);
-  });
-
-  const claves = Array.from(m.keys()).sort();
-  const [aI, mI] = claves[0].split('-').map(Number);
-  const [aF, mF] = claves[claves.length - 1].split('-').map(Number);
-  const serie = [];
-  for (let a = aI, mes = mI; a < aF || (a === aF && mes <= mF); mes === 12 ? (mes = 1, a++) : mes++) {
-    const k = a + '-' + String(mes).padStart(2, '0');
-    serie.push(m.get(k) || { clave: k, ENTRADA: 0, SALIDA: 0, total: 0 });
-    if (serie.length > 120) break;                        // tope de seguridad: 10 años
-  }
-  return { serie: serie.map(x => Object.assign({}, x, { etiqueta: etiquetaMes(x.clave) })), sinFecha };
 }
 
 /** Material agregado por unidad. NUNCA mezcla unidades distintas. */
@@ -4920,18 +4922,48 @@ function calcularIndicadores() {
 
   const fechas = ord.map(o => o.fechaISO).filter(Boolean).sort();
 
+  // Con un accesorio escogido, zona, motivo y mes muestran SU cantidad (una sola unidad).
+  const acc = $('#fAccesorio') ? FILTROS.accesorio : '';
+  const grupoDe = grupoDeMaterial();
+  const ficha = acc ? (porAccesorio(ord, grupoDe).find(a => a.clave === acc) || null) : null;
+
+  // «Sin zona» al final y con su nombre, no compitiendo con las zonas reales.
+  const zona = agrupar(ord, o => claveZona(o.zona), acc);
+  const iSin = zona.findIndex(z => z.clave === SIN_DATO);
+  if (iSin >= 0) zona.push(Object.assign(zona.splice(iSin, 1)[0], { clave: 'Sin zona' }));
+
+  // Calidad del dato: lo que el panel no puede ubicar, dicho en cifras.
+  const calidad = {
+    sinZona: ord.filter(o => !claveZona(o.zona)).length,
+    motivoOtro: ord.filter(o => grupoMotivo(o, CONFIG.motivos) === MOTIVO_OTRO).length,
+    sinTrafo: ord.filter(o => !String(o.transformador || '').trim()).length,
+    fueraCatalogo: ord.reduce((s, o) => s + (o.items || []).filter(it => grupoDe(it) === 'Fuera del catálogo').length, 0)
+  };
+
+  // Con tope de lectura, la serie mensual no baja del mes de la orden más antigua leída.
+  const masAntigua = REGISTRO.truncado ? estado.ordenes.map(o => o.fechaISO).filter(Boolean).sort()[0] : '';
+
   return {
     ordenes: ord,
     total: ord.length, entradas, salidas, lineas,
     sedes: sedes.size,
+    zonas: zonasDe(ord).length,
+    trafos: transformadoresDistintos(ord),
     desde: fechas[0] || '', hasta: fechas[fechas.length - 1] || '',
-    zona:    contarPor(ord, o => o.zona),
-    motivo:  contarPor(ord, o => o.motivo),
+    acc, ficha, unidad: ficha ? ficha.unidad : '',
+    accesorios: porAccesorio(ordenesFiltradas(true), grupoDe),
+    zona, calidad,
+    // Las órdenes del accesorio escogido, las más recientes primero, con su transformador.
+    ordenesAcc: acc ? ord.slice().sort((a, b) => String(b.fechaISO || '').localeCompare(String(a.fechaISO || '')))
+      .map(o => ({ o, cantidad: cantidadEnOrden(o, acc), tr: partirTransformador(o.transformador) })) : [],
+    motivo:  agrupar(ord, o => grupoMotivo(o, CONFIG.motivos), acc),
+    otrosMotivos: motivosOtros(ord, CONFIG.motivos),
     origen:  contarPor(ord, o => o.origen),
     destino: contarPor(ord, o => o.destino),
     entrega: contarPor(ord, o => (o.entregado || {}).nombre),
     recibe:  contarPor(ord, o => (o.recibido  || {}).nombre),
-    mes:     porMes(ord),
+    mes:     serieMensual(ord, acc, { desde: FILTROS.desde, hasta: FILTROS.hasta || mesDeHoy(), mesActual: mesDeHoy(),
+                                      minimo: masAntigua }),
     material: porMaterial(ord)
   };
 }
@@ -5006,12 +5038,12 @@ function graficoBarrasH(datos, opts) {
       if (!v) return;
       const w = esc(v) - (k > 0 ? VIZ.gap : 0);
       const ultimo = (serie === 'SALIDA') || !f.SALIDA;
-      s += `<g fill="${color}" class="viz-marca" data-tip="${esc_(f.clave)}|${serie}: ${v} orden(es)">` +
+      s += `<g fill="${color}" class="viz-marca" data-tip="${esc_(f.clave)}|${serie}: ${nfmt(v)} ${esc_(opts.unidad || 'orden(es)')}">` +
            barraH(x + (k > 0 ? VIZ.gap : 0), yb, Math.max(w, 1), alturaBarra, 4, ultimo) + `</g>`;
       x += esc(v);
     });
 
-    s += `<text x="${anchoEtq + esc(f.total) + 8}" y="${y + altoFila / 2 + 4}" class="viz-valor">${f.total}</text>`;
+    s += `<text x="${anchoEtq + esc(f.total) + 8}" y="${y + altoFila / 2 + 4}" class="viz-valor">${nfmt(f.total)}</text>`;
   });
 
   return s + '</svg>';
@@ -5050,24 +5082,69 @@ function graficoColumnas(serie, opts) {
       const arriba = (serieN === 'ENTRADA') || !f.ENTRADA;
       const alto = Math.max(h, 1);
       const r = arriba ? Math.min(4, ancho / 2, alto / 2) : 0;
-      s += `<g fill="${color}" class="viz-marca" data-tip="${esc_(f.etiqueta)}|${serieN}: ${v} orden(es)">` +
+      s += `<g fill="${color}" class="viz-marca${f.enCurso || f.incompleto ? ' en-curso' : ''}" data-tip="${esc_(f.etiqueta)}${f.enCurso ? ' (en curso)' : f.incompleto ? ' (incompleto)' : ''}|${serieN}: ${nfmt(v)} ${esc_(opts.unidad || 'orden(es)')}">` +
            (r
              ? `<path d="M${x} ${yb - alto + r}a${r} ${r} 0 0 1 ${r} ${-r}h${ancho - 2 * r}a${r} ${r} 0 0 1 ${r} ${r}v${alto - r}h${-ancho}z"/>`
              : `<path d="M${x} ${yb - alto}h${ancho}v${alto}h${-ancho}z"/>`) + `</g>`;
       yb -= esc(v);
     });
 
-    if (f.total) s += `<text x="${cx}" y="${padSup + plotH - esc(f.total) - 6}" text-anchor="middle" class="viz-valor">${f.total}</text>`;
+    if (f.total) s += `<text x="${cx}" y="${padSup + plotH - esc(f.total) - 6}" text-anchor="middle" class="viz-valor">${nfmt(f.total)}</text>`;
 
     // Etiqueta de mes: una de cada n si hay muchos, para que no colisionen
     const cada = Math.ceil(serie.length / 14);
     if (i % cada === 0 || i === serie.length - 1) {
-      s += `<text x="${cx}" y="${H - 18}" text-anchor="middle" class="viz-eje">${esc_(f.etiqueta)}</text>`;
+      s += `<text x="${cx}" y="${H - 18}" text-anchor="middle" class="viz-eje">${esc_(f.etiqueta)}${f.enCurso ? '*' : ''}</text>`;
     }
   });
 
   s += `<line x1="${padIzq}" y1="${padSup + plotH}" x2="${W - padDer}" y2="${padSup + plotH}" stroke="${VIZ.ejes}" stroke-width="1"/>`;
   return s + '</svg>';
+}
+
+/**
+ * Barras horizontales en HTML, con el texto completo encima de cada barra.
+ * Para accesorios y motivos: sus nombres son largos y en el celular un SVG
+ * de ancho fijo los dejaba ilegibles. El detalle de entrada y salida va
+ * escrito (no solo al pasar el mouse), así también se lee en pantalla táctil.
+ * Con `opts.accion`, cada fila es un botón con `data-<accion>`.
+ */
+function barrasLista(datos, opts) {
+  opts = opts || {};
+  const filas = datos.slice(0, opts.tope || datos.length);
+  if (!filas.length) return `<p class="sin-datos">${esc(opts.vacio || 'Sin datos para los filtros aplicados.')}</p>`;
+  const max = Math.max(...filas.map(f => f.total)) || 1;
+  const html = filas.map(f => {
+    const etq = `<span class="bl-etq">${esc(f.clave === undefined ? '' : (f.etiqueta || f.clave))}` +
+      (f.chip ? ` <span class="bl-chip">${esc(f.chip)}</span>` : '') + `</span>`;
+    const barra = `<span class="bl-barra" aria-hidden="true">` +
+      (f.ENTRADA ? `<i class="e" style="width:${(f.ENTRADA / max) * 100}%"></i>` : '') +
+      (f.SALIDA ? `<i class="s" style="width:${(f.SALIDA / max) * 100}%"></i>` : '') + `</span>`;
+    const val = `<span class="bl-val">${opts.detalle(f)}</span>`;
+    if (!opts.accion) return `<div class="bl-fila">${etq}${barra}${val}</div>`;
+    const sel = opts.seleccion === f.clave;
+    return `<button type="button" class="bl-fila${sel ? ' sel' : ''}" data-${opts.accion}="${esc(f.clave)}"` +
+      ` aria-pressed="${sel}" title="${esc(opts.titulo || '')}">${etq}${barra}${val}</button>`;
+  }).join('');
+  const resto = datos.length - filas.length;
+  return `<div class="barras-lista">${html}</div>` +
+    (resto > 0 ? `<p class="viz-nota">… y ${resto} más. ${esc(opts.resto || '')}</p>` : '');
+}
+
+/** Detalle escrito de una barra: total y su reparto entre entradas y salidas. */
+function detalleES(f, unidad) {
+  const u = unidad ? ' ' + esc(unidad) : '';
+  const tot = unidad ? nfmt(f.total) + u : `${f.total} ${f.total === 1 ? 'orden' : 'órdenes'}`;
+  return `<b>${tot}</b>` +
+    (f.ENTRADA ? ` · <span class="pt pt-e"></span>${nfmt(f.ENTRADA)}` : '') +
+    (f.SALIDA ? ` · <span class="pt pt-s"></span>${nfmt(f.SALIDA)}` : '');
+}
+
+/** Ancho real disponible para un gráfico (SVG a escala 1: el texto no se encoge). */
+function anchoDe(sel, base) {
+  const el = $(sel);
+  const w = el ? el.clientWidth : 0;
+  return w > 200 ? Math.min(Math.round(w), 760) : (base || 560);
 }
 
 /* Escape local para no chocar con `esc()` dentro de plantillas SVG */
@@ -5078,16 +5155,33 @@ function esc_(t) { return esc(t); }
 function pintarIndicadores() {
   const d = calcularIndicadores();
   const totalHist = estado.ordenes.length;
+  const u = d.unidad;
 
   /* --- Alcance de los datos: lo primero, para que nadie lea de más --- */
   const alc = $('#vizAlcance');
-  alc.className = 'oms-aviso ver' + (d.total ? 'ok' : 'warn');
-  alc.innerHTML = d.total
+  const nPend = SUBIDA.abierta ? 0 : LOCAL.candidatas().filter(c => c && c.orden).length;
+  const masAntigua = estado.ordenes.map(o => o.fechaISO).filter(Boolean).sort()[0];
+  // Antes decía 'oms-aviso ver' + 'ok' = «verok»: el aviso nunca se veía (ni el «Parcial»).
+  alc.className = 'oms-aviso ver ' + (REGISTRO.estado !== 'ok' ? 'err' : d.total ? 'ok' : 'warn');
+  alc.innerHTML = REGISTRO.estado !== 'ok'
+    ? (REGISTRO.estado === 'cargando'
+        ? 'El registro del equipo todavía está cargando: las cifras aparecen en cuanto llegue.'
+        : '<b>No se pudo leer el registro del equipo</b>: las cifras no son confiables hasta pulsar «Actualizar» en «Órdenes guardadas».')
+    : d.total
     ? `Calculado sobre <b>${d.total}</b> ${d.total === 1 ? 'orden guardada' : 'órdenes guardadas'}` +
       (FILTROS.activos() ? ` (de ${totalHist} en el registro, tras aplicar los filtros)` : ' del registro del equipo') +
-      (d.desde ? ` · del <b>${fechaAtexto(d.desde)}</b> al <b>${fechaAtexto(d.hasta)}</b>` : '') +
-      `. <span style="color:var(--tinta-2)">Solo incluye lo guardado en el registro del equipo.</span>` +
-      (REGISTRO.truncado ? ` <b>Parcial:</b> el registro tiene más órdenes y aquí entran solo las ${totalHist} de fecha más reciente.` : '')
+      (d.desde ? ` · del <b>${fechaAtexto(d.desde)}</b> al <b>${fechaAtexto(d.hasta)}</b>` : '') + '.' +
+      (REGISTRO.truncado ? ` <b>Parcial:</b> el registro tiene más órdenes y aquí entran solo las ${totalHist} más recientes` +
+        (masAntigua ? `, desde el ${fechaAtexto(masAntigua)}` : '') + '.' : '') +
+      (nPend ? ` <b>${nPend}</b> orden(es) de este navegador pendientes de subir no entran.` : '') +
+      (() => {
+        const c = d.calidad, partes = [];
+        if (c.sinZona) partes.push(`${c.sinZona} sin zona`);
+        if (c.motivoOtro) partes.push(`${c.motivoOtro} con motivo escrito a mano`);
+        if (c.sinTrafo) partes.push(`${c.sinTrafo} sin transformador`);
+        if (c.fueraCatalogo) partes.push(`${c.fueraCatalogo} línea(s) de material fuera del catálogo`);
+        return partes.length ? `<br><span class="viz-nota">Calidad del dato: ${partes.join(' · ')}.</span>` : '';
+      })()
     : (totalHist
         ? `Ninguna de las <b>${totalHist}</b> órdenes guardadas cumple los filtros aplicados.`
         : '<b>Todavía no hay órdenes guardadas.</b> Diligencie una orden y pulse «Guardar orden» para empezar a ver indicadores.');
@@ -5100,15 +5194,70 @@ function pintarIndicadores() {
   $('#kLineas').textContent = d.lineas;
   $('#kLineasSub').textContent = d.total ? (d.lineas / d.total).toFixed(1).replace('.', ',') + ' por orden' : '—';
   $('#kSedes').textContent = d.sedes;
-  $('#kZonas').textContent = d.zona.length;
+  $('#kZonas').textContent = d.zonas;
+  const kt = $('#kTrafos');           // tarjeta nueva: ausente con el HTML viejo en caché (`30 L-85`)
+  if (kt) kt.textContent = d.trafos;
+
+  /* --- Qué se está midiendo: órdenes, o la cantidad del accesorio escogido --- */
+  const nomAcc = d.ficha ? d.ficha.descripcion : '';
+  $$('#cuerpoViz .viz-modo').forEach(x => {
+    x.textContent = d.acc ? `· cantidad de «${nomAcc || 'accesorio escogido'}»${u ? ' en ' + u : ''}` : '· número de órdenes';
+  });
+
+  /* --- Por accesorio (nuevo) --- */
+  const va = $('#vizAccesorios');
+  if (va) {
+    va.innerHTML = barrasLista(d.accesorios.map(a => Object.assign({}, a, {
+      etiqueta: a.descripcion + ' · ' + a.unidad, chip: a.grupo })), {
+      tope: 12, accion: 'acc', seleccion: d.acc,
+      titulo: 'Ver zona, motivo y mes de este accesorio',
+      vacio: 'Las órdenes filtradas no traen materiales.',
+      resto: 'Escójalos en el filtro «Accesorio» o descargue el Excel.',
+      detalle: a => `<b>${a.total} ${a.total === 1 ? 'orden' : 'órdenes'}</b>` +
+        (a.cantE ? ` · <span class="pt pt-e"></span>${nfmt(a.cantE)} ${esc(a.unidad)}` : '') +
+        (a.cantS ? ` · <span class="pt pt-s"></span>${nfmt(a.cantS)} ${esc(a.unidad)}` : '')
+    });
+  }
+  const fa = $('#vizAccFicha');
+  if (fa) {
+    fa.hidden = !d.acc;
+    fa.innerHTML = !d.acc ? '' : d.ficha
+      ? `<div class="acc-cab"><b>${esc(d.ficha.descripcion)}</b> · ${esc(u)} <span class="bl-chip">${esc(d.ficha.grupo)}</span>` +
+        `<button type="button" class="oms-btn mini" data-quitar-acc="1">Quitar accesorio ✕</button></div>` +
+        `<div class="acc-datos">` +
+        `<span><span class="pt pt-e"></span>En órdenes de entrada: <b>${nfmt(d.ficha.cantE)} ${esc(u)}</b> (${d.ficha.ENTRADA} ${d.ficha.ENTRADA === 1 ? 'orden' : 'órdenes'})</span>` +
+        `<span><span class="pt pt-s"></span>En órdenes de salida: <b>${nfmt(d.ficha.cantS)} ${esc(u)}</b> (${d.ficha.SALIDA} ${d.ficha.SALIDA === 1 ? 'orden' : 'órdenes'})</span>` +
+        `<span>Transformadores: <b>${d.ficha.transformadores}</b></span><span>Zonas: <b>${d.ficha.zonas}</b></span></div>` +
+        `<p class="viz-nota">Las gráficas de zona, motivo y mes muestran ahora la <b>cantidad</b> de este accesorio en ${esc(u)}, no el número de órdenes.</p>` +
+        `<details class="viz-otros"><summary>Ver sus ${d.ordenesAcc.length} ${d.ordenesAcc.length === 1 ? 'orden' : 'órdenes'}, con el transformador de cada una</summary>` +
+        `<div class="tabla-scroll"><table class="tabla-items tabla-viz"><thead><tr><th>Orden</th><th>Fecha</th><th>Zona</th><th>Transformador</th><th class="q">Cantidad</th></tr></thead><tbody>` +
+        d.ordenesAcc.slice(0, 20).map(x => `<tr><td><span class="pt ${x.o.tipo === 'ENTRADA' ? 'pt-e' : 'pt-s'}"></span>${esc(x.o.numero)}</td>` +
+          `<td>${esc(x.o.fechaISO ? fechaAtexto(x.o.fechaISO) : '—')}</td><td>${esc(claveZona(x.o.zona) || '—')}</td>` +
+          `<td>${x.tr.matricula ? esc(x.tr.matricula) + (x.tr.subestacion ? ' · S/E ' + esc(x.tr.subestacion) : '') : '<span class="viz-nota">' + esc(SIN_TRANSFORMADOR) + '</span>'}</td>` +
+          `<td class="q">${nfmt(x.cantidad)} ${esc(u)}</td></tr>`).join('') +
+        `</tbody></table></div>` + (d.ordenesAcc.length > 20 ? `<p class="viz-nota">… y ${d.ordenesAcc.length - 20} más en el Excel.</p>` : '') + `</details>`
+      : `<div class="acc-cab">El accesorio escogido no aparece en las órdenes con estos filtros.` +
+        `<button type="button" class="oms-btn mini" data-quitar-acc="1">Quitar accesorio ✕</button></div>`;
+  }
 
   /* --- Gráficos --- */
-  $('#vizZona').innerHTML   = graficoBarrasH(d.zona,   { titulo: 'Órdenes por zona', anchoEtiqueta: 130, ancho: 560 });
-  $('#vizMes').innerHTML    = graficoColumnas(d.mes.serie, { titulo: 'Órdenes por mes', ancho: 560 });
-  $('#vizMesNota').innerHTML = d.mes.sinFecha
-    ? `<b>${d.mes.sinFecha}</b> orden(es) sin fecha quedan fuera de este gráfico.` : '';
-  $('#vizMotivo').innerHTML = graficoBarrasH(d.motivo, { titulo: 'Órdenes por motivo', anchoEtiqueta: 470,
-                                                        maxCaracteres: 62, ancho: 1120, tope: 10 });
+  const unidadTip = d.acc ? u : '';
+  $('#vizZona').innerHTML   = graficoBarrasH(d.zona, { titulo: 'Por zona', anchoEtiqueta: anchoDe('#vizZona') < 420 ? 96 : 130,
+                                                       ancho: anchoDe('#vizZona'), unidad: unidadTip });
+  $('#vizMes').innerHTML    = graficoColumnas(d.mes.serie, { titulo: 'Por mes', ancho: anchoDe('#vizMes'), unidad: unidadTip });
+  const enCurso = d.mes.serie.find(s => s.enCurso);
+  $('#vizMesNota').innerHTML = [
+    enCurso ? `* ${esc(enCurso.etiqueta)} va en curso: el mes todavía no termina.` : '',
+    d.mes.serie.some(s => s.incompleto) ? `${esc(d.mes.serie.find(s => s.incompleto).etiqueta)} está incompleto: el registro tiene más órdenes de las que se leen (tope de 500).` : '',
+    d.mes.sinFecha ? `<b>${d.mes.sinFecha}</b> orden(es) sin fecha quedan fuera de este gráfico.` : ''
+  ].filter(Boolean).join(' ');
+  // Motivos: los 8 de la lista y «Otro (texto libre)» en UNA barra; sus textos se listan aparte.
+  $('#vizMotivo').innerHTML = barrasLista(d.motivo, { detalle: f => detalleES(f, unidadTip) }) +
+    (d.otrosMotivos.length
+      ? `<details class="viz-otros"><summary>Ver los textos de «${esc(MOTIVO_OTRO)}» (${d.otrosMotivos.length})</summary><ul>` +
+        d.otrosMotivos.map(m => `<li>${esc(m.texto)} <span class="viz-nota">(${m.ordenes} ${m.ordenes === 1 ? 'orden' : 'órdenes'})</span></li>`).join('') +
+        '</ul></details>'
+      : '');
   $('#vizOrigen').innerHTML = graficoBarrasH(d.origen, { titulo: 'Sedes de origen', anchoEtiqueta: 160, ancho: 560, tope: 10 });
   $('#vizDestino').innerHTML = graficoBarrasH(d.destino, { titulo: 'Sedes de destino', anchoEtiqueta: 160, ancho: 560, tope: 10 });
 
@@ -5117,12 +5266,18 @@ function pintarIndicadores() {
   if (!d.material.length) {
     tb.innerHTML = '<p class="sin-datos">Sin materiales para los filtros aplicados.</p>';
   } else {
+    // Por unidad comparable («UND» = «und») y en orden fijo; dentro de cada unidad, por cantidad.
     const porUnidad = new Map();
     d.material.forEach(m => {
-      if (!porUnidad.has(m.unidad)) porUnidad.set(m.unidad, []);
-      porUnidad.get(m.unidad).push(m);
+      const k = norm(m.unidad);
+      if (!porUnidad.has(k)) porUnidad.set(k, { u: m.unidad, lista: [] });
+      porUnidad.get(k).lista.push(m);
     });
-    tb.innerHTML = Array.from(porUnidad).map(([u, lista]) => `
+    const ORDEN_U = ['und', 'mts', 'kg', 'gl'];
+    const pos = k => (ORDEN_U.indexOf(k) < 0 ? 99 : ORDEN_U.indexOf(k));
+    tb.innerHTML = Array.from(porUnidad).sort((a, b) => pos(a[0]) - pos(b[0]) || a[0].localeCompare(b[0], 'es'))
+      .map(([, g]) => [g.u, g.lista.slice().sort((x, y) => (y.entradas + y.salidas) - (x.entradas + x.salidas))])
+      .map(([u, lista]) => `
       <h4 class="viz-sub">Unidad: <b>${esc(u)}</b> <span class="viz-nota">(${lista.length} material(es))</span></h4>
       <table class="tabla-items tabla-viz">
         <thead><tr>
@@ -5178,18 +5333,97 @@ function conectarTooltips() {
 /* --------------------------- Modal y filtros ---------------------------- */
 
 function abrirIndicadores() {
-  // Las zonas del desplegable salen de lo realmente registrado
-  const zonas = Array.from(new Set(estado.ordenes.map(o => (o.zona || '').trim()).filter(Boolean)))
-    .sort((a, b) => a.localeCompare(b, 'es'));
-  const sel = $('#fZona'), prev = FILTROS.zona;
+  // Las zonas del desplegable salen de lo realmente registrado, sin repetir por tildes o mayúsculas.
+  const zonas = zonasDe(estado.ordenes);
+  const sel = $('#fZona');
   sel.innerHTML = '<option value="">Todas las zonas</option>' +
     zonas.map(z => `<option value="${esc(z)}">${esc(z)}</option>`).join('');
-  if (prev && zonas.some(z => norm(z) === norm(prev))) sel.value = prev; else if (prev) FILTROS.zona = '';
+  FILTROS.zona = FILTROS.zona && zonas.includes(claveZona(FILTROS.zona)) ? claveZona(FILTROS.zona) : '';
+
+  const fm = $('#fMotivo');             // ausente con el HTML viejo en caché (`30 L-85`)
+  if (fm) {
+    const motivos = CONFIG.motivos.concat([MOTIVO_OTRO]);
+    fm.innerHTML = '<option value="">Todos los motivos</option>' +
+      motivos.map(m => `<option value="${esc(m)}">${esc(m)}</option>`).join('');
+    if (!motivos.includes(FILTROS.motivo)) FILTROS.motivo = '';
+  }
+  const fa = $('#fAccesorio');
+  if (fa) {
+    // Solo los materiales que de verdad aparecen en el registro, por lista del catálogo y con su unidad.
+    const lista = porAccesorio(estado.ordenes, grupoDeMaterial());
+    const grupos = new Map();
+    lista.forEach(a => { if (!grupos.has(a.grupo)) grupos.set(a.grupo, []); grupos.get(a.grupo).push(a); });
+    fa.innerHTML = '<option value="">Todos los accesorios</option>' + Array.from(grupos)
+      .sort((x, y) => (x[0] === 'Fuera del catálogo') - (y[0] === 'Fuera del catálogo') || x[0].localeCompare(y[0], 'es'))
+      .map(([g, l]) => `<optgroup label="${esc(g)}">` + l.slice().sort((x, y) => x.descripcion.localeCompare(y.descripcion, 'es'))
+        .map(a => `<option value="${esc(a.clave)}">${esc(a.descripcion)} · ${esc(a.unidad)} (${a.total})</option>`).join('') + '</optgroup>')
+      .join('');
+    if (!lista.some(a => a.clave === FILTROS.accesorio)) FILTROS.accesorio = '';
+  }
 
   FILTROS.aUI();
-  pintarIndicadores();
+  // Visible ANTES de pintar: los gráficos toman el ancho real de su recuadro.
   $('#modalViz').classList.add('ver');
   document.body.style.overflow = 'hidden';
+  pintarIndicadores();
+}
+
+/** Escoge (o suelta, si ya estaba) un accesorio y repinta. */
+function escogerAccesorio(clave) {
+  FILTROS.accesorio = FILTROS.accesorio === clave ? '' : (clave || '');
+  FILTROS.guardar(); FILTROS.aUI();
+  pintarIndicadores();
+}
+
+/** Atajos de periodo: llenan Desde y Hasta. */
+function periodoRapido(cual) {
+  const h = new Date();
+  const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  if (cual === 'anio') { FILTROS.desde = h.getFullYear() + '-01-01'; FILTROS.hasta = ''; }
+  else if (cual === '12m') { FILTROS.desde = iso(new Date(h.getFullYear(), h.getMonth() - 11, 1)); FILTROS.hasta = ''; }
+  else { FILTROS.desde = FILTROS.hasta = ''; }
+  FILTROS.guardar(); FILTROS.aUI();
+  pintarIndicadores();
+}
+
+/**
+ * Tarjeta «Indicadores» en la página (pedido: «un apartado»): resumen del
+ * registro completo y la puerta al panel. Los 3 accesorios más movidos abren
+ * el panel ya filtrado por ese accesorio.
+ */
+function pintarResumenIndicadores() {
+  const cont = $('#indResumen');
+  if (!cont) return;                   // ausente con el HTML viejo en caché (`30 L-85`)
+  if (REGISTRO.estado !== 'ok') {
+    cont.innerHTML = `<p class="sin-datos">${REGISTRO.estado === 'cargando' ? 'Cargando el registro del equipo…' : 'No se pudo leer el registro del equipo.'}</p>`;
+    return;
+  }
+  const ord = estado.ordenes;
+  if (!ord.length) {
+    cont.innerHTML = '<p class="sin-datos">Los indicadores aparecen cuando haya órdenes guardadas en el registro del equipo.</p>';
+    return;
+  }
+  const acc = porAccesorio(ord, grupoDeMaterial());
+  const meses = serieMensual(ord).serie;
+  const pico = meses.reduce((m, x) => (x.total > (m ? m.total : -1) ? x : m), null);
+  const ultimo = meses[meses.length - 1];
+  const motivo = agrupar(ord, o => grupoMotivo(o, CONFIG.motivos))[0];
+  cont.innerHTML = `<div class="estado-listas">
+      <div class="pastilla"><div class="k">Órdenes</div><div class="v">${ord.length}</div>
+        <div class="f"><span class="pt pt-e"></span>${ord.filter(o => o.tipo === 'ENTRADA').length} · <span class="pt pt-s"></span>${ord.filter(o => o.tipo === 'SALIDA').length}</div></div>
+      <div class="pastilla"><div class="k">Accesorios distintos</div><div class="v">${acc.length}</div><div class="f">con su unidad</div></div>
+      <div class="pastilla"><div class="k">Zonas</div><div class="v">${zonasDe(ord).length}</div><div class="f">con movimientos</div></div>
+      <div class="pastilla"><div class="k">Mes con más órdenes</div><div class="v">${pico ? esc(pico.etiqueta) : '—'}</div>
+        <div class="f">${pico ? pico.total + ' órdenes' : ''}${ultimo ? ' · último: ' + esc(ultimo.etiqueta) + ' (' + ultimo.total + ')' : ''}</div></div>
+    </div>` +
+    (acc.length ? `<p class="ind-sub">Accesorios más movidos <span class="viz-nota">(toque uno para ver su zona, motivo y mes)</span></p>` +
+      barrasLista(acc.slice(0, 3).map(a => Object.assign({}, a, { etiqueta: a.descripcion + ' · ' + a.unidad })), {
+        accion: 'abrir-acc', titulo: 'Abrir los indicadores de este accesorio',
+        detalle: a => `<b>${a.total} ${a.total === 1 ? 'orden' : 'órdenes'}</b>` +
+          (a.cantE ? ` · <span class="pt pt-e"></span>${nfmt(a.cantE)} ${esc(a.unidad)}` : '') +
+          (a.cantS ? ` · <span class="pt pt-s"></span>${nfmt(a.cantS)} ${esc(a.unidad)}` : '')
+      }) : '') +
+    (motivo ? `<p class="ind-sub">Motivo más frecuente: <b>${esc(motivo.clave)}</b> <span class="viz-nota">(${motivo.total} órdenes)</span></p>` : '');
 }
 
 function cerrarIndicadores() {
@@ -5235,33 +5469,41 @@ function exportarIndicadoresExcel() {
      ['Filtro · hasta', FILTROS.hasta ? fechaAtexto(FILTROS.hasta) : '(sin filtro)'],
      ['Filtro · zona', FILTROS.zona || '(todas)'],
      ['Filtro · tipo', FILTROS.tipo || '(todos)'],
+     ['Filtro · motivo', FILTROS.motivo || '(todos)'],
+     ['Filtro · accesorio', d.ficha ? d.ficha.descripcion + ' · ' + d.unidad : '(todos)'],
+     ['Qué cuentan las hojas por zona, motivo y mes', d.acc
+       ? `Cantidad de «${d.ficha ? d.ficha.descripcion : 'accesorio escogido'}» en ${d.unidad || 'su unidad'}`
+       : 'Número de órdenes'],
      ['Periodo cubierto', d.desde ? fechaAtexto(d.desde) + ' a ' + fechaAtexto(d.hasta) : '(sin fechas)'],
      ['Entradas', d.entradas], ['Salidas', d.salidas],
      ['Líneas de material', d.lineas], ['Sedes involucradas', d.sedes],
      ['ADVERTENCIA', 'Las cantidades NO se suman entre unidades distintas.'],
      ['ADVERTENCIA', 'El neto E−S no es un inventario: es la diferencia entre lo registrado.'],
-     ['ADVERTENCIA', 'Solo incluye órdenes guardadas en este equipo.']
+     ['ADVERTENCIA', 'Solo incluye órdenes del registro del equipo; las pendientes de subir de este computador no entran.']
     ].forEach(f => wa.addRow(f));
     cabecera(wa, 2);
 
-    const hojaConteo = (nombre, lista, rotulo) => {
+    // Con accesorio escogido, zona, motivo y mes traen su CANTIDAD: la unidad va en el encabezado.
+    const enU = (rot, conU) => (conU && d.acc && d.unidad ? `${rot} (${d.unidad})` : rot);
+    const hojaConteo = (nombre, lista, rotulo, conU) => {
       const ws = wb.addWorksheet(nombre);
-      ws.columns = [{ header: rotulo, width: 46 }, { header: 'Entradas', width: 12 },
-                    { header: 'Salidas', width: 12 }, { header: 'Total', width: 12 }];
+      ws.columns = [{ header: rotulo, width: 46 }, { header: enU('Entradas', conU), width: 14 },
+                    { header: enU('Salidas', conU), width: 14 }, { header: enU('Total', conU), width: 14 }];
       lista.forEach(r => ws.addRow([r.clave, r.ENTRADA, r.SALIDA, r.total]));
       cabecera(ws, 4);
     };
-    hojaConteo('Por zona', d.zona, 'Zona');
-    hojaConteo('Por motivo', d.motivo, 'Motivo');
+    hojaConteo('Por zona', d.zona, 'Zona', true);
+    hojaConteo('Por motivo', d.motivo, 'Motivo', true);
     hojaConteo('Por origen', d.origen, 'Sede de origen');
     hojaConteo('Por destino', d.destino, 'Sede de destino');
     hojaConteo('Entregado por', d.entrega, 'Entregado por');
     hojaConteo('Recibido por', d.recibe, 'Recibido por');
 
     const wm = wb.addWorksheet('Por mes');
-    wm.columns = [{ header: 'Mes', width: 12 }, { header: 'Entradas', width: 12 },
-                  { header: 'Salidas', width: 12 }, { header: 'Total', width: 12 }];
-    d.mes.serie.forEach(r => wm.addRow([r.clave, r.ENTRADA, r.SALIDA, r.total]));
+    wm.columns = [{ header: 'Mes', width: 12 }, { header: enU('Entradas', true), width: 14 },
+                  { header: enU('Salidas', true), width: 14 }, { header: enU('Total', true), width: 14 },
+                  { header: 'Nota', width: 22 }];
+    d.mes.serie.forEach(r => wm.addRow([r.clave, r.ENTRADA, r.SALIDA, r.total, r.enCurso ? 'mes en curso' : '']));
     cabecera(wm, 4);
 
     const wt = wb.addWorksheet('Por material');
@@ -5273,13 +5515,23 @@ function exportarIndicadoresExcel() {
                                        m.entradas, m.salidas, m.neto, m.nOrdenes]));
     cabecera(wt, 7);
 
+    // Por accesorio (pedido del 2026-10-06): en cuántas órdenes aparece cada uno y su cantidad en SU unidad.
+    const wac = wb.addWorksheet('Por accesorio');
+    wac.columns = [{ header: 'Accesorio', width: 46 }, { header: 'Unidad', width: 10 }, { header: 'Lista del catálogo', width: 20 },
+                   { header: 'Órdenes de entrada', width: 12 }, { header: 'Órdenes de salida', width: 12 },
+                   { header: 'Total de órdenes', width: 12 }, { header: 'Cantidad en entradas', width: 14 },
+                   { header: 'Cantidad en salidas', width: 14 }, { header: 'Transformadores', width: 14 }, { header: 'Zonas', width: 10 }];
+    d.accesorios.forEach(a => wac.addRow([a.descripcion, a.unidad, a.grupo, a.ENTRADA, a.SALIDA, a.total,
+                                          a.cantE, a.cantS, a.transformadores, a.zonas]));
+    cabecera(wac, 10);
+
     wb.xlsx.writeBuffer().then(buf => {
       const fecha = new Date().toISOString().slice(0, 10);
       LIBS.descargar(new Blob([buf], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       }), `Indicadores_Ordenes_SSEE_${fecha}.xlsx`);
       cargando(false);
-      aviso(`Indicadores exportados: ${d.total} orden(es) en 9 hojas.`, 'ok', 6000);
+      aviso(`Indicadores exportados: ${d.total} orden(es) en ${wb.worksheets.length} hojas.`, 'ok', 6000);
     }).catch(err => { cargando(false); console.error(err); aviso('Error al escribir: ' + err.message, 'err', 8000); });
 
   } catch (err) {
@@ -5530,8 +5782,26 @@ function conectarEventos() {
   $('#btnCerrarViz').onclick   = cerrarIndicadores;
   $('#btnVizExcel').onclick    = exportarIndicadoresExcel;
   $('#btnLimpiarFiltros').onclick = () => { FILTROS.limpiar(); pintarIndicadores(); };
-  ['fDesde', 'fHasta', 'fZona', 'fTipo'].forEach(id =>
-    $('#' + id).addEventListener('change', () => { FILTROS.desdeUI(); pintarIndicadores(); }));
+  ['fDesde', 'fHasta', 'fZona', 'fTipo', 'fMotivo', 'fAccesorio'].forEach(id => {
+    const el = $('#' + id);           // motivo y accesorio: ausentes con el HTML viejo en caché (`30 L-85`)
+    if (el) el.addEventListener('change', () => { FILTROS.desdeUI(); pintarIndicadores(); });
+  });
+  // Accesorios del panel: tocar una barra la escoge; «Quitar accesorio» la suelta. Atajos de periodo.
+  $('#cuerpoViz').addEventListener('click', ev => {
+    const b = ev.target.closest('[data-acc], [data-quitar-acc], [data-periodo]');
+    if (!b) return;
+    if (b.dataset.periodo) periodoRapido(b.dataset.periodo);
+    else escogerAccesorio(b.dataset.quitarAcc ? '' : b.dataset.acc);
+  });
+  const ir = $('#indResumen');        // tarjeta «Indicadores» de la página
+  if (ir) ir.addEventListener('click', ev => {
+    const b = ev.target.closest('[data-abrir-acc]');
+    if (!b) return;
+    FILTROS.accesorio = b.dataset.abrirAcc; FILTROS.guardar();
+    abrirIndicadores();
+  });
+  const bai = $('#btnAbrirIndicadores');
+  if (bai) bai.addEventListener('click', abrirIndicadores);
   $('#modalViz').addEventListener('click', ev => { if (ev.target.id === 'modalViz') cerrarIndicadores(); });
 
   /* --- Almacenamiento y respaldo --- */
