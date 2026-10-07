@@ -8,7 +8,7 @@
 ## 🎯 Foco (al 2026-10-06) — FICHAS TÉCNICAS por partes · CARGABILIDAD SCADA (TODO-69)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
-> **Al retomar (10-06)**: esperan SUS respuestas a dos páginas en `~/Downloads` (`99 §140`; Órdenes `§141`–`§143` publicados): `Fichas_para_su_procede.html` (CF-43/44 en rama `fichas/cf-43-44-textos-con-fuente`; CF-36, CF-35) y `Decisiones_Cargabilidad_SCADA.html` (11 de TODO-69). CI sin consultar (el modo automático bloquea `gh run list`; lo servido sí = main, `§141.4`). Relevo anterior → bóveda `2026-10-05-documentacion-total/RELEVO.md`.
+> **Al retomar (10-06)**: esperan SUS respuestas: `~/Downloads/Fichas_para_su_procede.html` (CF-43/44 en rama `fichas/cf-43-44-textos-con-fuente`; CF-36/35) y `Decisiones_Cargabilidad_SCADA.html` (11 de TODO-69), `99 §140`; + 5 decisiones del PREVIEW de Indicadores de Órdenes (rama `ordenes/indicadores-preview`, bóveda `2026-10-06-ordenes-indicadores/SINTESIS.md`). CI sin consultar (`gh run list` bloqueado; servido = main, `§141.4`).
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
