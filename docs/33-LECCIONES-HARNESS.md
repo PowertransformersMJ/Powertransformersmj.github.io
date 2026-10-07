@@ -41,7 +41,7 @@ extensión con `save_to_disk` no dejó archivo. · **Regla**: lanzar Chrome sin 
 conducirlo por CDP desde Node 24 (trae `WebSocket` y `fetch`, sin librerías): `Page.navigate` → sondear
 `Runtime.evaluate('document.title')` hasta la señal que pone el flujo (`LISTO`) → `Page.captureScreenshot` a escala 2 →
 recortar a la ventana con PIL (fuera quedan firmas y datos del fondo). El guion vivía en el scratchpad de la sesión
-(`cdp-cap.mjs`) y ya se podó (L-92): se rehace en 40 líneas. [HONOR]
+(`cdp-cap.mjs`) y ya se podó (L-92): se rehace en 40 líneas. [HONOR] · **Sin CDP también sirve** (10-06): el banco inyecta un guion que sondea y actúa solo (`?clic=<id>`), `--virtual-time-budget=20000` y se mata Chrome apenas existe el PNG (no sale solo). **A 375 px Chrome sin cabeza CORTA la imagen** (ventana mínima ~500): se captura un iframe del ancho exacto (`marco.html`, bóveda `2026-10-06-ordenes-indicadores`).
 
 ### L-111 · Desde un worktree, `../brain-private` no existe: el pull falla y `brain:check` sale SANO sin comparar
 **Disparador**: tocar el kernel o la bóveda desde una sesión en `.claude/worktrees/<nombre>/`. · **Cicatriz** (`99 §120`):
