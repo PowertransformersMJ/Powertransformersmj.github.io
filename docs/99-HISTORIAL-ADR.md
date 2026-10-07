@@ -6260,3 +6260,34 @@ L-105). El resumen de la tarjeta se recalcula en cada `pintarOrdenes` (también 
 milisegundos — no se optimizó a propósito. «En 9 hojas» escrito a mano no era defecto hasta agregar hojas: ahora se cuenta.
 Pendientes de subir: NO se suman (cada computador vería otra cifra); solo se informan. Familias de accesorio y % por falla:
 esperan una tabla suya (no se fabrican). Crudos → bóveda `2026-10-06-ordenes-indicadores/`.
+
+## 145. ADR-145 — Contrato 4125000143: inventario ajustado a su Libro4.xlsx (dato de producción, sin cambio de código) ⟦OPUS-5.5⟧ (2026-10-07)
+
+> *«actualiza el inventario para el contrato 4125000143 conforme al documento excel»*. Vista previa en Excel y pregunta
+> cerrada → su decisión: la «Cantidad» del Excel es la **existencia de hoy** (conteo), no el inicial pactado.
+
+**145.1 Causa raíz.** El catálogo del contrato (cargado el 2026-04-27 desde su `.xlsm` con `scripts/import-contrato.js`) tenía 21 de 25 valores
+unitarios en 0, tres unidades erradas (Membrana en Kg, Cable en Und, Silica en Und) y existencias de abril. La pestaña
+«Importar» no sirve para este Excel: solo lee la hoja `Catalogo_Suministros` con códigos `S01…S25`, y un Excel de precios
+con «Item 1…25» se descarta completo sin error visible.
+**145.2 Solución.** Guion firebase-admin, en simulación por defecto. Con `--aplicar` hace UNA transacción: lee los 25
+documentos y los movimientos, escribe, valida con `sanitizarSuministro`/`validarSuministro` y deja auditoría en
+`/auditoria` (24 `actualizar` + 1 `importar_excel`, con la sha256 del Excel).
+- Item N ↔ S{N} se confirmó por nombre y unidad.
+- `stock_inicial = cantidad + egresos − ingresos`: la existencia mostrada queda igual al Excel y el histórico se conserva.
+  S04 queda con inicial 75 = 69 en bodega + 6 del egreso `MOV-2026-0001` (T1-M/M-CHG Chiriguaná, 19-may), con una nota en
+  `observaciones`.
+- Del Excel se toman también los valores unitarios, las 3 unidades y los nombres (Tipo 1 FN-063 / Tipo 2 FN-050).
+- Marcas, `fan_db_key` y movimientos intactos.
+**145.3 No-regresión.** Sin cambio de código ni de reglas. Se tocan solo 5 campos de 24 documentos de `suministros`
+(`4125000143_Sxx`). El contrato 4123000081 no se toca.
+**145.4 Verificación.** Lectura posterior desde cero: 25/25 cuadran en existencia, unidad, nombre y valor unitario. El valor
+del inventario en la plataforma es $2.269.222.125, igual a la suma del Excel. El movimiento sigue y hay 25 entradas de
+auditoría. Vuelta atrás (`revertir.mjs`, desde la copia leída dentro de la misma transacción) probada en simulación.
+**145.5 Anti-patterns evitados.** Movimientos de «ajuste» falsos: solo existen INGRESO y EGRESO, y un egreso sin
+transformador se contaría como consumo por zona → fabricar entregas. Escribir sin vista previa. Pisar el histórico.
+**145.6 Archivos.** Ninguno del repo. Guion, copia de antes, simulación y vuelta atrás → bóveda
+`2026-10-07-inventario-4125000143/`.
+**145.7 Doctrina.** `CLAUDE.md §3.2` (no fabricar datos) · W-11 paso a paso (dato real → vista previa → su decisión) · L-30.
+**145.8 Verificado sano / no re-auditar.** La credencial `~/.firebase/sa-transpower.json` es la del seeder (`scripts/import-contrato.js`).
+Ninguna lectura tocó datos personales: los guiones omiten uid, email y usuario.
