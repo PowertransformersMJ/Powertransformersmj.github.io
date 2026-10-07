@@ -404,10 +404,23 @@
         </div>
       </section>
 
-      <!-- ============ 7. ALMACENAMIENTO Y RESPALDO ============ -->
+      <!-- ============ 7. INDICADORES ============ -->
+      <!-- Pedido del 2026-10-06: «un apartado de indicadores … por accesorios, zona, motivo y meses». -->
+      <section class="tarjeta" id="panelIndicadores">
+        <header>
+          <h2><span class="oms-num">7</span> Indicadores</h2>
+          <span class="nota-h">Resumen del registro del equipo. El panel completo muestra los indicadores por accesorio, zona, motivo y mes, con filtros y descarga a Excel.</span>
+        </header>
+        <div class="cuerpo">
+          <div class="ind-resumen" id="indResumen"><p class="sin-datos">Cargando el registro del equipo…</p></div>
+          <button type="button" class="oms-btn" id="btnAbrirIndicadores">Ver indicadores por accesorio, zona, motivo y mes</button>
+        </div>
+      </section>
+
+      <!-- ============ 8. ALMACENAMIENTO Y RESPALDO ============ -->
       <section class="tarjeta" id="panelDatos">
         <header>
-          <h2><span class="oms-num">7</span> Almacenamiento y respaldo</h2>
+          <h2><span class="oms-num">8</span> Almacenamiento y respaldo</h2>
           <span class="nota-h">Dónde viven sus datos y cómo protegerlos</span>
         </header>
         <div class="cuerpo">
@@ -507,6 +520,14 @@
               <option value="SALIDA">Solo salidas</option>
             </select>
           </div>
+          <!-- Pedido del 2026-10-06: indicadores por accesorio y por motivo. -->
+          <div class="campo"><label for="fMotivo">Motivo</label><select id="fMotivo"></select></div>
+          <div class="campo campo-acc"><label for="fAccesorio">Accesorio</label><select id="fAccesorio"></select></div>
+          <div class="viz-periodos" role="group" aria-label="Periodo rápido">
+            <button type="button" class="oms-btn mini" data-periodo="anio">Este año</button>
+            <button type="button" class="oms-btn mini" data-periodo="12m">Últimos 12 meses</button>
+            <button type="button" class="oms-btn mini" data-periodo="todo">Todo</button>
+          </div>
           <button type="button" class="oms-btn mini" id="btnLimpiarFiltros">Limpiar filtros</button>
         </div>
 
@@ -518,6 +539,7 @@
           <div class="kpi"><div class="k">Líneas de material</div><div class="v" id="kLineas">0</div><div class="s" id="kLineasSub">—</div></div>
           <div class="kpi"><div class="k">Sedes involucradas</div><div class="v" id="kSedes">0</div><div class="s">origen o destino</div></div>
           <div class="kpi"><div class="k">Zonas</div><div class="v" id="kZonas">0</div><div class="s">con movimientos</div></div>
+          <div class="kpi"><div class="k">Transformadores</div><div class="v" id="kTrafos">0</div><div class="s">indicados en las órdenes</div></div>
         </div>
 
         <!-- Leyenda única: un color significa lo mismo en todo el panel -->
@@ -526,11 +548,15 @@
           <span><span class="pt pt-s"></span> Salida</span>
         </div>
 
+        <div class="viz-acc-ficha" id="vizAccFicha" hidden></div>
+
         <div class="viz-grid">
-          <figure class="viz-fig"><figcaption>Órdenes por zona</figcaption><div id="vizZona"></div></figure>
-          <figure class="viz-fig"><figcaption>Órdenes por mes</figcaption><div id="vizMes"></div>
+          <figure class="viz-fig ancha"><figcaption>Accesorios más movidos <span class="viz-nota">· en cuántas órdenes aparece cada uno, y su cantidad en su unidad. Toque uno para ver su zona, motivo y mes.</span></figcaption>
+            <div id="vizAccesorios"></div></figure>
+          <figure class="viz-fig"><figcaption>Por zona <span class="viz-modo"></span></figcaption><div id="vizZona"></div></figure>
+          <figure class="viz-fig"><figcaption>Por mes <span class="viz-modo"></span></figcaption><div id="vizMes"></div>
             <p class="viz-nota" id="vizMesNota"></p></figure>
-          <figure class="viz-fig ancha"><figcaption>Órdenes por motivo <span class="viz-nota">(10 primeros)</span></figcaption><div id="vizMotivo"></div></figure>
+          <figure class="viz-fig ancha"><figcaption>Por motivo <span class="viz-modo"></span></figcaption><div id="vizMotivo"></div></figure>
           <figure class="viz-fig"><figcaption>Sedes de origen <span class="viz-nota">(10 primeras)</span></figcaption><div id="vizOrigen"></div></figure>
           <figure class="viz-fig"><figcaption>Sedes de destino <span class="viz-nota">(10 primeras)</span></figcaption><div id="vizDestino"></div></figure>
         </div>

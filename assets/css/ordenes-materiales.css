@@ -462,11 +462,59 @@
 .oms-scope .tabla-viz .q{ text-align:right; font-variant-numeric:tabular-nums; width:auto; }
 .oms-scope .tabla-viz .q.pos{ color:var(--serie-e-ink); font-weight:700; }
 .oms-scope .tabla-viz .q.neg{ color:var(--serie-s-ink); font-weight:700; }
+/* Indicadores por accesorio, zona, motivo y mes (pedido del 2026-10-06).
+   Accesorios y motivos van en barras HTML con el texto completo encima: en el
+   celular un SVG de ancho fijo los dejaba de 3 px. */
+.oms-scope .viz-filtros .campo-acc{ min-width:260px; flex:1 1 260px; }
+.oms-scope .viz-filtros .campo-acc select{ width:100%; }
+.oms-scope .viz-periodos{ display:flex; gap:6px; flex-wrap:wrap; align-items:flex-end; }
+.oms-scope .barras-lista{ display:flex; flex-direction:column; gap:2px; }
+.oms-scope .bl-fila{
+  display:grid; grid-template-columns:minmax(0,1fr) auto; gap:4px 12px; align-items:center;
+  width:100%; padding:6px 8px; border:1px solid transparent; border-radius:8px;
+  background:none; text-align:left; font:inherit; color:inherit;
+}
+.oms-scope button.bl-fila{ cursor:pointer; }
+.oms-scope button.bl-fila:hover{ background:#F2F7FA; }
+.oms-scope button.bl-fila.sel{ background:var(--serie-e-bg); border-color:#9CC3E6; }
+.oms-scope .bl-etq{ grid-column:1 / -1; font-size:.84rem; color:var(--tinta); line-height:1.3; }
+.oms-scope .bl-chip{
+  display:inline-block; font-size:.66rem; font-weight:700; color:var(--tinta-2); background:#EEF2F5;
+  border-radius:10px; padding:1px 7px; margin-left:4px; vertical-align:1px; white-space:nowrap;
+}
+.oms-scope .bl-barra{ display:flex; gap:2px; height:12px; min-width:0; overflow:hidden; }
+.oms-scope .bl-barra i{ display:block; height:100%; border-radius:3px; min-width:3px; flex:none; }
+.oms-scope .bl-barra i.e{ background:var(--serie-e); }
+.oms-scope .bl-barra i.s{ background:var(--serie-s); }
+.oms-scope .bl-val{ font-size:.78rem; color:var(--tinta-2); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.oms-scope .bl-val b{ color:var(--tinta); }
+.oms-scope .viz-acc-ficha{
+  border:1px solid #9CC3E6; background:var(--serie-e-bg); border-radius:var(--radio-s);
+  padding:12px 14px; margin:0 0 14px;
+}
+.oms-scope .viz-acc-ficha[hidden]{ display:none; }
+.oms-scope .viz-acc-ficha .acc-cab{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:.9rem; }
+.oms-scope .viz-acc-ficha .acc-cab .oms-btn{ margin-left:auto; }
+.oms-scope .viz-acc-ficha .acc-datos{ display:flex; gap:6px 18px; flex-wrap:wrap; font-size:.84rem; margin-top:8px; }
+.oms-scope .viz-modo{ font-weight:400; text-transform:none; letter-spacing:0; color:var(--tinta-2); font-size:.78rem; }
+.oms-scope .viz-otros{ font-size:.8rem; margin-top:8px; color:var(--tinta); }
+.oms-scope .viz-otros summary{ cursor:pointer; color:var(--azul-osc); font-weight:600; }
+.oms-scope .viz-otros ul{ margin:6px 0 0; padding-left:20px; }
+.oms-scope svg.viz .en-curso{ opacity:.5; }
+.oms-scope .ind-resumen{ margin-bottom:12px; }
+.oms-scope .tabla-scroll{ overflow-x:auto; margin-top:8px; }
+.oms-scope .viz-acc-ficha .tabla-viz td{ padding:5px 8px; }
+.oms-scope .ind-sub{ font-size:.84rem; font-weight:700; color:var(--azul-osc); margin:14px 0 4px; }
 @media (max-width:720px){
   .oms-scope .viz-cuerpo{ padding:12px 10px 50px; }
   .oms-scope .viz-grid{ grid-template-columns:1fr; }
   .oms-scope .viz-filtros .campo{ min-width:calc(50% - 6px); }
   .oms-scope .kpi .v{ font-size:1.7rem; }
+  .oms-scope .kpis{ grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .oms-scope .kpi{ padding:10px 12px; }
+  .oms-scope .viz-filtros .campo-acc{ min-width:100%; }
+  .oms-scope .bl-fila{ grid-template-columns:1fr; }
+  .oms-scope .bl-val{ white-space:normal; }
 }
 /* ===================== NOTIFICACIONES ===================== */
 .oms-scope .tostadas{ position:fixed; right:18px; bottom:18px; z-index:200; display:flex; flex-direction:column; gap:9px; max-width:min(380px,88vw); }
