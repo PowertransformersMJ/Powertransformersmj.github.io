@@ -6291,3 +6291,26 @@ transformador se contaría como consumo por zona → fabricar entregas. Escribir
 **145.7 Doctrina.** `CLAUDE.md §3.2` (no fabricar datos) · W-11 paso a paso (dato real → vista previa → su decisión) · L-30.
 **145.8 Verificado sano / no re-auditar.** La credencial `~/.firebase/sa-transpower.json` es la del seeder (`scripts/import-contrato.js`).
 Ninguna lectura tocó datos personales: los guiones omiten uid, email y usuario.
+**145.9 Corrección (2026-10-07, mismo día, `ac872d4`, main `568195d`).** Reportó *«valida los valores en la pagina, el valor
+disponible no coincide»* y adjuntó el pedido 5626000011 y la aceptación de oferta. **Mi recomendación inicial estaba
+errada**: Libro4 × precios = $2.269.222.125, casi exacto el pedido ($1.354.182.029 + adición $915.213.038 =
+$2.269.395.067 sin IVA). Libro4 es la cantidad PACTADA, no la existencia; él lo confirmó (L-128).
+
+Hallazgo: el egreso `MOV-2026-0001` lo eliminó él desde la página a las 14:25 («Justificación: MJ»). Mi guion lo detectó
+porque exigía el estado revisado.
+
+Correcciones de datos (transacción, auditoría y copia en la bóveda):
+- inicial = Libro4 en los 25 (S04 de 75 a 69);
+- S15 a $35.024.062,50, como dice la aceptación;
+- notas cambiadas a «cantidad pactada»;
+- `contratos/4125000143.monto_total` = $2.269.395.067, con el desglose en `observaciones`.
+
+Código: el tablero (`suministros-dashboard-public.js`) toma el «Valor contrato» de `monto_total` cuando existe; si no,
+conserva cantidades × precio (4123000081 no cambia). Disponible = contrato − consumido. Una nota bajo la tarjeta indica la
+fuente y los $172.942 que el pedido no reparte en unidades. Función pura `valoresContrato` (`domain/stock_calculo.js`,
+3 pruebas); suite 2440/0/2.
+
+Banco con el catálogo real: hoy muestra $2.269.395.067 / disponible $2.269.395.067. Con un egreso de prueba de 6 × S04 el
+disponible baja a $2.239.010.077. 4123000081 sigue por cantidades. Con el HTML viejo en caché funciona sin errores.
+
+Queda a la vista: la lista de admin de contratos usa «ejecutado» manual, y `fecha_inicio` = fecha de importación.
