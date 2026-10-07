@@ -106,7 +106,8 @@ export function diferenciaConOrden({ orden, enlace, codigo, cantidad, unidadCata
     return 'la fecha de la orden quedó fuera de la vigencia del contrato';
   }
   const creado = aMs(orden.creadoEn);
-  if (creado > 0 && Number(oe.creadoEn) > 0 && creado !== Number(oe.creadoEn)) return 'la orden se eliminó y se volvió a crear';
+  // Milisegundos enteros en las dos puntas (el SDK puede traer la fracción de los microsegundos).
+  if (creado > 0 && Number(oe.creadoEn) > 0 && Math.floor(creado) !== Math.floor(Number(oe.creadoEn))) return 'la orden se eliminó y se volvió a crear';
   if (f !== String(oe.fechaISO || '')) return `cambió la fecha de la orden (${ddmmaaaa(oe.fechaISO)} → ${ddmmaaaa(f)})`;
   if (normal(orden.transformador) !== normal(oe.transformador)) return 'cambió el transformador de la orden';
   if (unidadCatalogo == null) return null;
@@ -214,12 +215,12 @@ export function hayQueSincronizar(nexo) {
 
 /** Resultado vacío del registro automático. */
 export function resultadoVacio() {
-  return { registrados: [], corregidos: [], retirados: [], pendientes: [], errores: [], sinPermiso: 0 };
+  return { registrados: [], corregidos: [], retirados: [], pendientes: [], errores: [], sinPermiso: 0, diferidas: 0 };
 }
 
 /** ¿El registro automático hizo o dejó algo que valga la pena contar? */
 export function hayNovedad(r) {
-  return !!(r && (r.registrados.length || r.corregidos.length || r.retirados.length || r.pendientes.length || r.errores.length));
+  return !!(r && (r.registrados.length || r.corregidos.length || r.retirados.length || r.pendientes.length || r.errores.length || r.diferidas));
 }
 
 /**
@@ -240,11 +241,14 @@ export function textoSincronizacion(r, contratoId) {
     partes.push(`${r.pendientes.length} queda(n) por registrar: ` + r.pendientes.slice(0, 3).map((p) =>
       `${p.linea.codigo} de ${p.linea.tipo} ${p.linea.numero} — ${p.motivo}`).join('; ') + (r.pendientes.length > 3 ? '; …' : ''));
   }
+  if (r.diferidas) {
+    partes.push(`${r.diferidas} entrega(s) se registrarán al abrir el contrato (el parque de transformadores no cargó en esta página)`);
+  }
   if (r.errores.length) {
     partes.push(r.sinPermiso
       ? `${r.errores.length} cambio(s) necesitan a un administrador: se harán solos cuando un administrador abra el contrato`
       : `${r.errores.length} no se pudieron hacer ahora (${r.errores[0]}); se reintentan al abrir el contrato`);
   }
-  const tipo = r.errores.length ? 'err' : (r.pendientes.length ? 'warn' : 'ok');
+  const tipo = r.errores.length ? 'err' : (r.pendientes.length || r.diferidas ? 'warn' : 'ok');
   return { texto: `Contrato ${contratoId}: ` + partes.join(' · ') + '.', tipo };
 }

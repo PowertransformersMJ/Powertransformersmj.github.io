@@ -152,6 +152,15 @@ describe('movimientos · el técnico registra entregas de órdenes', () => {
   test('usuario desactivado → negado', async () => {
     await assertFails(registrar('apagado', { mov: movimiento('apagado', { codigo: 'MOV-2026-0019' }) }));
   });
+  test('reutilizar un MOV ya asignado sin avanzar el contador → negado', async () => {
+    await assertFails(setDoc(doc(db('tecA'), 'movimientos', ID), movimiento('tecA', { codigo: 'MOV-2026-0018' })));
+  });
+  test('código de otro año que el del movimiento → negado', async () => {
+    await assertFails(registrar('tecA', { mov: movimiento('tecA', { codigo: 'MOV-2031-0019' }) }));
+  });
+  test('primer movimiento de un año sin contador: arranca en 1 → permitido', async () => {
+    await assertSucceeds(registrar('tecA', { anio: 2027, mov: movimiento('tecA', { codigo: 'MOV-2027-0001', anio: 2027 }) }));
+  });
   test('editar un movimiento → sigue siendo solo del admin', async () => {
     await assertSucceeds(registrar('tecA'));
     await assertFails(updateDoc(doc(db('tecA'), 'movimientos', ID), { observaciones: 'x' }));
@@ -172,6 +181,19 @@ describe('movimientos · el técnico retira solo lo que la orden ya no respalda'
     });
   });
   test('la orden lo respalda tal cual → negado', async () => {
+    await assertFails(deleteDoc(doc(db('tecA'), 'movimientos', ID)));
+  });
+  test('creación de la orden con microsegundos (como en producción) y orden intacta → negado', async () => {
+    const conMicros = new Timestamp(1767268800, 367123000);
+    await sembrar(async (d) => {
+      await setDoc(doc(d, 'ordenes_materiales', 'ENTRADA_100'), orden({ creadoEn: conMicros }));
+      await setDoc(doc(d, 'movimientos', ID), movimiento('tecA', { codigo: 'MOV-2026-0018' }, { creadoEn: conMicros.toMillis() }));
+    });
+    if (Number.isInteger(conMicros.toMillis())) throw new Error('la prueba debía traer la fracción de los microsegundos');
+    await assertFails(deleteDoc(doc(db('tecA'), 'movimientos', ID)));
+  });
+  test('la orden guarda el transformador con un espacio al final y está intacta → negado', async () => {
+    await sembrar((d) => updateDoc(doc(d, 'ordenes_materiales', 'ENTRADA_100'), { transformador: 'T-1 · S/E UNO ' }));
     await assertFails(deleteDoc(doc(db('tecA'), 'movimientos', ID)));
   });
   test('la orden cambió (otra versión) → permitido', async () => {

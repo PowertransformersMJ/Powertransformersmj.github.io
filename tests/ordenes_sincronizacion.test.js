@@ -133,6 +133,35 @@ test('diferenciaConOrden: la orden tal cual lo respalda; cada cambio da su motiv
   assert.equal(dif(o, { unidadCatalogo: null }), null, 'sin la unidad del catálogo no se puede saber: no se toca');
 });
 
+test('la creación con fracción de microsegundos no cuenta como «orden rehecha» (nexo y transacción)', () => {
+  const o = orden({ creadoEn: 1767268800367.123 });
+  const m = registrado(o, 'MOV-2026-0001');
+  const enlaceEntero = { ...m, orden_es: { ...m.orden_es, creadoEn: 1767268800367 } };
+  assert.equal(hayQueSincronizar(nexoDe([o], [enlaceEntero])), false);
+  assert.equal(diferenciaConOrden({ orden: o, enlace: enlaceEntero.orden_es, codigo: 'S03', cantidad: 3, unidadCatalogo: 'Und', cfg: CFG }), '');
+});
+
+test('lectura de órdenes recortada (más de 500): lo enlazado a órdenes no leídas NO es huérfano', () => {
+  const vieja = orden({ clave: 'ENTRADA_V1', numero: 'V1', fechaISO: '2026-01-10' });
+  const m = registrado(vieja, 'MOV-2026-0001');
+  const nueva = orden({ clave: 'ENTRADA_N2', numero: 'N2', fechaISO: '2026-05-01' });
+  const sinCorte = calcularNexo({ ordenes: [nueva], catalogo: CAT, contratoId: CID, movimientos: [m] });
+  assert.equal(sinCorte.huerfanos.length, 1, 'sin corte se toma por huérfano (lectura completa: la orden no existe)');
+  const conCorte = calcularNexo({ ordenes: [nueva], catalogo: CAT, contratoId: CID, movimientos: [m], corte: '2026-05-01' });
+  assert.equal(conCorte.huerfanos.length, 0);
+  assert.ok(!conCorte.avisos.some((a) => /ya no existe/.test(a)));
+  const plan = planificarSincronizacion({ nexo: conCorte, parque: PARQUE, catalogo: CAT, contratoId: CID });
+  assert.equal(plan.retirar.length, 0);
+});
+
+test('aviso: sin parque en la página las entregas quedan para la apertura del contrato', () => {
+  const r = resultadoVacio();
+  r.diferidas = 2;
+  const t = textoSincronizacion(r, CID);
+  assert.equal(t.tipo, 'warn');
+  assert.match(t.texto, /2 entrega\(s\) se registrarán al abrir el contrato/);
+});
+
 test('diferenciaConOrden acepta la creación como Timestamp de Firestore (lectura en la transacción)', () => {
   const m = registrado(orden(), 'MOV-2026-0001');
   const conTs = orden({ creadoEn: { toMillis: () => 111 } });

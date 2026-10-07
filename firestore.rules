@@ -620,18 +620,28 @@ service cloud.firestore {
         return !exists(ruta)
           || get(ruta).data.tipo != 'ENTRADA'
           || get(ruta).data.fechaISO != d.orden_es.get('fechaISO', '')
-          || get(ruta).data.get('transformador', '') != d.orden_es.get('transformador', '')
+          || get(ruta).data.get('transformador', '').trim() != d.orden_es.get('transformador', '')
+          // El SDK web guarda la creación en ms CON la fracción de los microsegundos; toMillis() de la
+          // regla es entero: se recorta antes de comparar (si no, siempre daría «distinto»).
           || (get(ruta).data.creadoEn is timestamp
-              && get(ruta).data.creadoEn.toMillis() != d.orden_es.get('creadoEn', 0))
+              && get(ruta).data.creadoEn.toMillis() != math.floor(d.orden_es.get('creadoEn', 0)))
           || ('version' in d.orden_es && get(ruta).data.version != d.orden_es.version);
       }
       function movValorDelCatalogo(d) {
         return d.valor_unitario == get(/databases/$(database)/documents/suministros/$(d.contrato_id + '_' + d.suministro_id)).data.valor_unitario
           && d.valor_total == d.cantidad * d.valor_unitario;
       }
+      // El código es el valor NUEVO del contador, que avanza de a uno en esta misma escritura
+      // (sin tocar el contador no se puede reutilizar un MOV ya asignado) y su año es el del movimiento.
+      function movContadorRuta(d) {
+        return /databases/$(database)/documents/suministros_config/$('correlativo_mov_' + string(d.anio));
+      }
       function movConsumeElContador(d) {
-        return int(d.codigo.split('-')[2])
-          == getAfter(/databases/$(database)/documents/suministros_config/$('correlativo_mov_' + string(d.anio))).data.ultimo;
+        let c = movContadorRuta(d);
+        let n = getAfter(c).data.ultimo;
+        return d.codigo.split('-')[1] == string(d.anio)
+          && int(d.codigo.split('-')[2]) == n
+          && n == (exists(c) ? get(c).data.ultimo + 1 : 1);
       }
 
       allow read: if isTeamMember();

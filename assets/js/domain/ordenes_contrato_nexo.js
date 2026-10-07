@@ -118,12 +118,15 @@ export const SIN_TRANSFORMADOR = '(la orden no indica transformador)';
  * @param {object[]} p.catalogo     suministros del contrato: { codigo, nombre, unidad, valor_unitario }
  * @param {string}   p.contratoId
  * @param {object[]} [p.movimientos] movimientos del contrato (para el aviso de doble registro)
+ * @param {string}   [p.corte]  si la lectura de órdenes salió recortada (más de 500): la fecha más antigua
+ *                   leída. Lo enlazado a órdenes de esa fecha o anteriores NO se toma por huérfano: su orden
+ *                   puede existir y simplemente no vino en la lectura.
  * @returns {{ activo:boolean, porItem:object, transformadores:object[], zonas:object[],
  *            totalValor:number, lineas:number, ordenesQueCuentan:number,
  *            noCuentan:{ ordenes:{fueraDeVigencia:number, otroTipo:number, sinItems:number}, materiales:object[] },
  *            avisos:string[] }}
  */
-export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}) {
+export function calcularNexo({ ordenes, catalogo, contratoId, movimientos, corte } = {}) {
   const cfg = NEXO_CONTRATOS[String(contratoId || '')];
   const vacio = { activo: false, porItem: {}, transformadores: [], zonas: [], totalValor: 0, lineas: 0, ordenesQueCuentan: 0,
     noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [],
@@ -237,7 +240,7 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
       const cambio = registrado !== par.cantidad ||
         normal(e.enlace.transformador) !== normal(par.transformador) ||
         String(e.enlace.fechaISO || '') !== par.fechaISO ||
-        (Number(e.enlace.creadoEn) > 0 && par.creadoEn > 0 && Number(e.enlace.creadoEn) !== par.creadoEn);
+        (Number(e.enlace.creadoEn) > 0 && par.creadoEn > 0 && Math.floor(Number(e.enlace.creadoEn)) !== Math.floor(par.creadoEn));
       estado = cambio ? 'desfasado' : 'registrado';
     }
     r.resumenEstados[estado]++;
@@ -264,7 +267,9 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
         movimientos: ls.flatMap((l) => l.movimientos) };
     });
   }
-  const huerfanos = [...enlazados.entries()].filter(([k]) => !usados.has(k));
+  const corteF = /^\d{4}-\d{2}-\d{2}$/.test(String(corte || '')) ? String(corte) : '';
+  const huerfanos = [...enlazados.entries()].filter(([k, e]) => !usados.has(k) &&
+    !(corteF && String((e.enlace && e.enlace.fechaISO) || '') <= corteF));
   // Para el registro automático (`99 §148`): cada huérfano con sus ids, para retirarlo si la orden ya no lo respalda.
   r.huerfanos = huerfanos.map(([, e]) => ({ claveOrden: e.claveOrden, codigo: e.codigo, ids: e.ids.slice(),
     codigos: e.codigos.slice().sort(), cantidad: e.cantidad, valor: r3(e.valor), enlace: e.enlace }));

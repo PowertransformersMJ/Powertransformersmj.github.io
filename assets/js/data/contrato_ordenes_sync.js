@@ -104,12 +104,14 @@ export async function ejecutarPlan(plan, uid) {
 /**
  * Tablero del contrato: con los datos que ya leyó, registra lo pendiente, corrige lo desfasado y
  * retira lo huérfano. No hace nada (ni escribe) si todo está al día.
+ * `corte`: si la lectura de órdenes salió recortada (más de 500), la fecha más antigua leída; lo enlazado
+ * a órdenes de esa fecha o anteriores no se toma por huérfano (no se pudo comprobar).
  * @returns {Promise<object|null>} resultado (ver resultadoVacio) o null si no había nada que hacer
  */
-export function sincronizarContrato({ contratoId, ordenes, catalogo, movimientos, parque, existencias, uid }) {
+export function sincronizarContrato({ contratoId, ordenes, catalogo, movimientos, parque, existencias, uid, corte }) {
   return enCola(async () => {
-    if (!NEXO_CONTRATOS[contratoId] || !apiLista()) return null;
-    const nexo = calcularNexo({ ordenes, catalogo, contratoId, movimientos });
+    if (!NEXO_CONTRATOS[contratoId] || !apiLista() || !Array.isArray(parque)) return null;
+    const nexo = calcularNexo({ ordenes, catalogo, contratoId, movimientos, corte });
     if (!REGM.hayQueSincronizar(nexo)) return null;
     const plan = REGM.planificarSincronizacion({ nexo, parque, catalogo, contratoId, existencias });
     return ejecutarPlan(plan, uid);
@@ -136,8 +138,19 @@ export function sincronizarOrden({ clave, parque, uid }) {
       const catalogo = await listarSuministros({ contrato_id: cid });
       const nexo = calcularNexo({ ordenes: orden ? [orden] : [], catalogo, contratoId: cid, movimientos: movs });
       if (!REGM.hayQueSincronizar(nexo)) continue;
-      const plan = REGM.planificarSincronizacion({ nexo, parque, catalogo, contratoId: cid });
-      out.push({ contratoId: cid, resultado: await ejecutarPlan(plan, uid) });
+      const plan = REGM.planificarSincronizacion({ nexo, parque: parque || [], catalogo, contratoId: cid });
+      // Sin el parque (no cargó en la página) no se ubica el transformador: solo se hacen los retiros, que no lo
+      // necesitan. Las correcciones y registros quedan para la apertura del contrato (como en el tablero): así una
+      // corrección nunca retira el movimiento viejo sin poder registrar el nuevo.
+      let diferidas = 0;
+      if (!Array.isArray(parque)) {
+        diferidas = plan.corregir.length + plan.porRegistrar.length + plan.noRegistrables.length;
+        plan.corregir = []; plan.porRegistrar = []; plan.noRegistrables = [];
+      }
+      if (!plan.retirar.length && !plan.corregir.length && !plan.porRegistrar.length && !plan.noRegistrables.length && !diferidas) continue;
+      const resultado = await ejecutarPlan(plan, uid);
+      resultado.diferidas = diferidas;
+      out.push({ contratoId: cid, resultado });
     }
     return out;
   });

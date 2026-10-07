@@ -2239,14 +2239,15 @@ async function reflejarEnContrato(claves) {
     const [SYNC, RM] = await Promise.all([
       import('./data/contrato_ordenes_sync.js'), import('./domain/ordenes_movimientos_registro.js')]);
     if (typeof SYNC.sincronizarOrden !== 'function' || typeof RM.textoSincronizacion !== 'function') return;
+    // null si el parque no cargó: entonces solo se retira lo que la orden ya no respalda (no hace falta el
+    // parque) y lo demás queda para la apertura del contrato.
     let parque = PARQUE_CRUDO;
     if (!parque && promesaParque) parque = await promesaParque.catch(() => null);
     for (const clave of lista) {
-      const res = await SYNC.sincronizarOrden({ clave, parque: parque || [], uid });
+      const res = await SYNC.sincronizarOrden({ clave, parque: Array.isArray(parque) ? parque : null, uid });
       for (const { contratoId, resultado } of res) {
         const t = RM.textoSincronizacion(resultado, contratoId);
-        if (!t.texto) continue;
-        aviso(t.texto + (parque ? '' : ' (El parque de transformadores no cargó en esta página.)'), t.tipo, 14000);
+        if (t.texto) aviso(t.texto, t.tipo, 14000);
       }
     }
   } catch (e) {

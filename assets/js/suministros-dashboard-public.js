@@ -403,11 +403,16 @@ function renderCruzado() {
 }
 
 // ── Suscripciones ──
+/** Lectura de órdenes recortada (más de 500): la fecha más antigua leída; lo anterior no se pudo comprobar. */
+function corteOrdenes() {
+  if (!ordenesNexo || !ordenesNexo.truncado || !ordenesNexo.ordenes || !ordenesNexo.ordenes.length) return '';
+  return ordenesNexo.ordenes.map((o) => String(o.fechaISO || '').slice(0, 10)).filter(Boolean).sort()[0] || '';
+}
 function recomputarTodo() {
   // Nexo: lo entregado por órdenes E/S se descuenta de la existencia de cada ítem. `_stockMov` guarda la
   // existencia SOLO por movimientos, para no descontar dos veces si se recalcula sin un emit nuevo.
   nexo = (ordenesNexo && ordenesNexo.ordenes)
-    ? calcularNexo({ ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal, contratoId: getContratoActivo(), movimientos: cacheMovs })
+    ? calcularNexo({ ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal, contratoId: getContratoActivo(), movimientos: cacheMovs, corte: corteOrdenes() })
     : null;
   cacheStockGlobal = cacheStockGlobal.map((r) => {
     const base = r._stockMov || r.stock || { inicial: r.stock_inicial || 0, ingresado: 0, egresado: 0, actual: r.stock_inicial || 0 };
@@ -459,7 +464,7 @@ async function autoRegistrar() {
     if (typeof SYNC.sincronizarContrato !== 'function' || typeof RM.textoSincronizacion !== 'function') { sincAviso = null; renderNexo(); return; }
     const existencias = Object.fromEntries(cacheStockGlobal.map((r) => [r.codigo, ((r._stockMov || r.stock) || {}).actual]));
     const res = await SYNC.sincronizarContrato({ contratoId: cid, ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal,
-      movimientos: cacheMovs, parque: parqueNexo, existencias, uid });
+      movimientos: cacheMovs, parque: parqueNexo, existencias, uid, corte: corteOrdenes() });
     const t = res ? RM.textoSincronizacion(res, cid) : { texto: '' };
     sincAviso = t.texto ? t : null;
   } catch (err) {

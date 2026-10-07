@@ -131,13 +131,18 @@ async function datosNexo(cid, { movsFrescos = true } = {}) {
     throw err;
   }
 }
+/** Lectura recortada (más de 500 órdenes): la fecha más antigua leída; lo enlazado a órdenes anteriores no es huérfano. */
+function corteDe(ordenes, truncado) {
+  if (!truncado || !ordenes || !ordenes.length) return '';
+  return ordenes.map((o) => String(o.fechaISO || '').slice(0, 10)).filter(Boolean).sort()[0] || '';
+}
 /** Lo que falta por REGISTRAR de las órdenes (lo registrado ya descuenta como movimiento: no se cuenta dos veces). */
 async function entregadoPorOrdenes(codigo) {
   const cid = getContratoActivo();
   if (!cid || !NEXO_CONTRATOS[cid]) return { cantidad: 0, ok: true };
   try {
     const { ordenes, truncado, movimientos } = await datosNexo(cid);
-    const n = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid, movimientos });
+    const n = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid, movimientos, corte: corteDe(ordenes, truncado) });
     const pend = n.porItemPendiente || n.porItem || {};      // módulo viejo en caché: todo cuenta como pendiente
     return { cantidad: pend[codigo] ? pend[codigo].cantidad : 0, ok: true, parcial: truncado };
   } catch (err) {
@@ -673,7 +678,7 @@ async function revisarEntregas() {
     if (!cacheTrafos.length) throw new Error('el parque de transformadores todavía no cargó; espere un momento y vuelva a revisar');
     if (!cacheSums.length) throw new Error('el catálogo del contrato todavía no cargó; espere un momento y vuelva a revisar');
     if (typeof movimientosApi.registrarDesdeOrden !== 'function') throw new Error('el navegador tiene una versión anterior del programa: recargue la página (Cmd+Shift+R)');
-    const nexo = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid, movimientos });
+    const nexo = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid, movimientos, corte: corteDe(ordenes, truncado) });
     const existencias = Object.fromEntries(cacheSums.map((s) => [s.codigo,
       computarStockDesdeMovimientos(s.stock_inicial, movimientos.filter((m) => m.suministro_id === s.codigo)).actual]));
     planReg = planificarRegistro({ nexo, parque: cacheTrafos, catalogo: cacheSums, contratoId: cid, existencias });
