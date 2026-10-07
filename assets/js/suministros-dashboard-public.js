@@ -17,6 +17,11 @@ import { withContratoFiltro, getContratoActivo } from '../js/ui/contrato-context
 // Valor del contrato desde el pedido registrado (2026-10-07: «el valor disponible no coincide»).
 import { obtener as obtenerContrato } from '../js/data/contratos.js';
 import { valoresContrato } from '../js/domain/stock_calculo.js';
+// Nexo con Órdenes E/S (2026-10-07): lo entregado a cada transformador por las órdenes firmadas
+// descuenta del contrato. Se CALCULA al abrir (no se escriben copias): editar o eliminar una orden
+// se refleja solo. Decisiones del Ingeniero → domain/ordenes_contrato_nexo.js.
+import { calcularNexo, existenciaConOrdenes, NEXO_CONTRATOS, SIN_TRANSFORMADOR } from '../js/domain/ordenes_contrato_nexo.js';
+import { listar as listarOrdenes } from '../js/data/ordenes_materiales.js';
 
 const $ = (id) => document.getElementById(id);
 const info = $('infoBox');
@@ -37,6 +42,7 @@ const kValConsumido  = $('kValConsumido');
 const kValDisponible = $('kValDisponible');
 const kEjecucionPct  = $('kEjecucionPct');
 const kValContratoNota = $('kValContratoNota');   // ausente con el HTML viejo en caché (`30 L-85`)
+const kValConsumidoNota = $('kValConsumidoNota'); // ídem (nexo con Órdenes E/S)
 
 // Tabla stock
 const tbody    = $('tbody');
@@ -54,6 +60,10 @@ let cacheMovs = [];          // G016: llega en el mismo emit de suscribirStockGl
 let cacheAccionesBrig = [];  // Microfase 6 · acciones de refrigeración del contrato
 let configCache = null;
 let contratoDoc = null;      // /contratos/{id}: su monto_total es el «Valor contrato» cuando está registrado
+// Nexo con Órdenes E/S: null = apagado o todavía sin leer; { ordenes, truncado } al llegar; { error } si falla.
+let ordenesNexo = null;
+let nexo = null;
+let stockLlego = false;
 let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
@@ -129,6 +139,12 @@ function actualizarKPIs() {
                             contratoDoc && contratoDoc.monto_total);
   const { valorContrato, valorConsumido, valorDisponible } = v;
   const ejec = v.ejecucion;
+  if (kValConsumidoNota) {
+    const vMov = cacheStockGlobal.reduce((s, r) => s + (+(r._calc.stock.egresadoMovimientos ?? r._calc.stock.egresado) || 0) * (+r.valor_unitario || 0), 0);
+    kValConsumidoNota.textContent = nexo && nexo.activo
+      ? `Movimientos ${fmtCOP(vMov)} · Órdenes E/S ${fmtCOP(nexo.totalValor)}` + (ordenesNexo && ordenesNexo.truncado ? ' · parcial' : '')
+      : '';
+  }
   if (kValContratoNota) {
     kValContratoNota.textContent = v.fuente === 'contrato'
       ? `Valor registrado del contrato · cantidades × precio: ${fmtCOP(v.valorCantidades)}` +
@@ -148,7 +164,16 @@ function actualizarKPIs() {
   const registros = cacheMovs.length;
   const unidades = cacheMovs.reduce((s, m) => s + (+m.cantidad || 0), 0);
   const descs = new Set(cacheMovs.map((m) => m.suministro_id).filter(Boolean));
-  const trafos = new Set(cacheMovs.map((m) => m.transformador_id).filter(Boolean));
+  let trafos;
+  if (nexo && nexo.activo) {
+    // Con nexo: movimientos y órdenes por la MISMA clave (matrícula|subestación): un trafo atendido
+    // por los dos caminos cuenta una vez (transformador_id puede ser el id del documento, no la matrícula).
+    const claveMov = (m) => (m.matricula || m.transformador_id) ? normTxt(m.matricula || m.transformador_id) + '|' + normTxt(m.subestacion) : '';
+    trafos = new Set(cacheMovs.map(claveMov).filter(Boolean));
+    nexo.transformadores.forEach((t) => { if (t.matricula !== SIN_TRANSFORMADOR) trafos.add(t.clave); });
+  } else {
+    trafos = new Set(cacheMovs.map((m) => m.transformador_id).filter(Boolean));
+  }
   kRegistros.textContent     = fmtInt(registros);
   kUnidades.textContent      = fmtInt(unidades);
   kDescripciones.textContent = fmtInt(descs.size);
@@ -193,7 +218,8 @@ function renderTabla() {
       <td><span class="unidad-pill">${escHtml(r.unidad || 'Und')}</span></td>
       <td style="text-align:right; font-family: var(--font-mono);">${fmtInt(stock.inicial)}</td>
       <td style="text-align:right; font-family: var(--font-mono); color:#16A34A;">+${fmtInt(stock.ingresado)}</td>
-      <td style="text-align:right; font-family: var(--font-mono); color:#EA580C;">−${fmtInt(stock.egresado)}</td>
+      <td style="text-align:right; font-family: var(--font-mono); color:#EA580C;">−${fmtInt(stock.egresado)}${stock.entregadoOrdenes
+        ? `<div style="font-size:10.5px;color:var(--ink-3);white-space:nowrap">mov. ${fmtInt(stock.egresadoMovimientos)} · órdenes ${fmtInt(stock.entregadoOrdenes)}</div>` : ''}</td>
       <td style="text-align:right; font-family: var(--font-mono); font-weight:700;">${fmtInt(stock.actual)}</td>
       <td style="text-align:right; font-family: var(--font-mono);">${pctRest != null ? fmtPct(pctRest) : '—'}</td>
       <td><span class="estado-stock-pill ${meta.value}">${meta.prefix} ${escHtml(meta.label)}</span></td>
@@ -265,12 +291,20 @@ function rankingPor(field, valueFn, topN = 10) {
   }
   return [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, topN);
 }
+/** Ranking por ítem: egresos de movimientos + lo entregado por órdenes E/S (nexo). */
+function rankingItems(campo, topN = 10) {
+  const acc = new Map(rankingPor('suministro_id', campo === 'cantidad' ? (m) => +m.cantidad || 0 : (m) => +m.valor_total || 0, 1000));
+  if (nexo && nexo.activo) {
+    for (const i of Object.values(nexo.porItem)) acc.set(i.codigo, (acc.get(i.codigo) || 0) + (campo === 'cantidad' ? i.cantidad : i.valor));
+  }
+  return [...acc.entries()].sort((a, b) => b[1] - a[1]).slice(0, topN);
+}
 function renderCharts() {
-  const rankUni = rankingPor('suministro_id', (m) => +m.cantidad || 0, 10)
+  const rankUni = rankingItems('cantidad')
     .map(([k, v]) => [`${k} ${nombreSum(k)}`, v]);
   chartHorizontalBar('chRankUnidades', rankUni, 'Unidades');
 
-  const rankVal = rankingPor('suministro_id', (m) => +m.valor_total || 0, 10)
+  const rankVal = rankingItems('valor')
     .map(([k, v]) => [`${k} ${nombreSum(k)}`, v]);
   chartHorizontalBar('chRankValor', rankVal, 'COP', fmtCOP, () => '#EA580C');
 
@@ -315,13 +349,80 @@ function renderCruzado() {
 
 // ── Suscripciones ──
 function recomputarTodo() {
+  // Nexo: lo entregado por órdenes E/S se descuenta de la existencia de cada ítem. `_stockMov` guarda la
+  // existencia SOLO por movimientos, para no descontar dos veces si se recalcula sin un emit nuevo.
+  nexo = (ordenesNexo && ordenesNexo.ordenes)
+    ? calcularNexo({ ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal, contratoId: getContratoActivo(), movimientos: cacheMovs })
+    : null;
+  cacheStockGlobal = cacheStockGlobal.map((r) => {
+    const base = r._stockMov || r.stock || { inicial: r.stock_inicial || 0, ingresado: 0, egresado: 0, actual: r.stock_inicial || 0 };
+    const ent = nexo && nexo.porItem[r.codigo] ? nexo.porItem[r.codigo].cantidad : 0;
+    const fila = { ...r, _stockMov: base, stock: existenciaConOrdenes(base, ent) };
+    return { ...fila, _calc: calcularPorItem(fila) };
+  });
   // Pre-calcular estado por ítem para evitar repetir en cada render.
-  cacheStockGlobal = cacheStockGlobal.map((r) => ({ ...r, _calc: calcularPorItem(r) }));
   actualizarKPIs();
   renderTabla();
   renderCharts();
   renderCruzado();
   renderWidgetBrigada();
+  renderNexo();
+}
+
+/* ─── Nexo con Órdenes E/S: entregado por transformador ─── */
+function normTxt(v) {
+  return String(v == null ? '' : v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
+}
+function renderNexo() {
+  const sec = $('nexoOrdenes');
+  if (!sec) return;                       // HTML viejo en caché (`30 L-85`): el tablero sigue como antes
+  const cid = getContratoActivo();
+  const conNexo = !!(cid && NEXO_CONTRATOS[cid]);
+  document.querySelectorAll('.nexo-rotulo').forEach((x) => { x.hidden = !conNexo; });
+  if (!conNexo) { sec.hidden = true; return; }
+  sec.hidden = false;
+  const alc = $('nexoAlcance'), tb = $('nexoTbody'), zonas = $('nexoZonas'), avisos = $('nexoAvisos'), fuera = $('nexoNoCuentan');
+  const cfg = NEXO_CONTRATOS[cid];
+  if (!ordenesNexo || (!ordenesNexo.error && !nexo)) { alc.textContent = 'Leyendo las órdenes de entrada y salida…'; tb.innerHTML = ''; return; }
+  if (ordenesNexo.error) {
+    alc.innerHTML = `<b>No se pudieron leer las órdenes de entrada y salida</b> (${escHtml(ordenesNexo.error)}). ` +
+      'Las cifras de arriba cuentan solo los movimientos.';
+    tb.innerHTML = ''; zonas.innerHTML = ''; avisos.innerHTML = ''; if (fuera) fuera.hidden = true;
+    return;
+  }
+  const n = nexo;
+  const nTr = n.transformadores.filter((t) => t.matricula !== SIN_TRANSFORMADOR).length;
+  const fecha = (iso) => iso ? iso.split('-').reverse().join('/') : '';
+  alc.innerHTML = `Cuentan las órdenes de <b>ENTRADA</b> (bodega → subestación) del <b>${fecha(cfg.desde)}</b> al <b>${fecha(cfg.hasta)}</b>, ` +
+    `con los ítems exactos del contrato: <b>${n.ordenesQueCuentan}</b> ${n.ordenesQueCuentan === 1 ? 'orden' : 'órdenes'}, ` +
+    `<b>${nTr}</b> ${nTr === 1 ? 'transformador' : 'transformadores'}, <b>${fmtCOP(n.totalValor)}</b>. ` +
+    'Se calcula al abrir: si una orden se corrige o se elimina, aquí se refleja solo.' +
+    (ordenesNexo.truncado ? ' <b>Parcial:</b> hay más de 500 órdenes en la vigencia y aquí entran las 500 más recientes: lo entregado puede ser mayor.' : '');
+  avisos.innerHTML = n.avisos.map((a) => `<div class="info-msg warn" style="display:block">⚠ ${escHtml(a)}</div>`).join('');
+  tb.innerHTML = n.transformadores.length ? n.transformadores.map((t) => `
+    <tr>
+      <td><code>${escHtml(t.matricula)}</code>${t.subestacion ? `<div style="font-size:11px;color:var(--ink-3)">S/E ${escHtml(t.subestacion)}</div>` : ''}</td>
+      <td>${escHtml(t.zona || '—')}</td>
+      <td>${t.items.map((i) => `<div><code>${escHtml(i.codigo)}</code> ${escHtml(i.nombre)} · <b>${fmtInt(i.cantidad)}</b> ${escHtml(i.unidad)} × ${fmtCOP(i.valorUnitario)}</div>`).join('')}</td>
+      <td style="text-align:right; font-family: var(--font-mono); font-weight:700;">${fmtCOP(t.valor)}</td>
+      <td style="font-size:12px">${t.ordenes.map((o) => `ENTRADA ${escHtml(o.numero)} · ${fecha(o.fecha)}`).join('<br>')}</td>
+    </tr>`).join('')
+    : '<tr><td colspan="5" class="td-empty">Ninguna orden de entrada trae ítems del contrato en la vigencia del pedido.</td></tr>';
+  zonas.innerHTML = n.zonas.length
+    ? 'Por zona: ' + n.zonas.map((z) => `<b>${escHtml(z.zona || 'sin zona')}</b> ${fmtCOP(z.valor)} (${z.transformadores} ${z.transformadores === 1 ? 'trafo' : 'trafos'})`).join(' · ')
+    : '';
+  if (fuera) {
+    const o = n.noCuentan.ordenes;
+    fuera.hidden = !(n.noCuentan.materiales.length || o.otroTipo || o.sinItems);
+    $('nexoNoCuentanCuerpo').innerHTML =
+      `<p style="margin:6px 0">${o.sinItems} orden(es) de entrada sin ítems del contrato · ${o.otroTipo} de SALIDA ` +
+      '(no tocan el contrato). Solo se leen las órdenes de la vigencia del pedido.</p>' +
+      (n.noCuentan.materiales.length ? `<table class="data-table"><thead><tr><th scope="col">Material de la orden</th><th scope="col">Unidad</th>` +
+        `<th scope="col" style="text-align:right">Cantidad</th><th scope="col">Por qué no cuenta</th></tr></thead><tbody>` +
+        n.noCuentan.materiales.map((m) => `<tr><td>${escHtml(m.descripcion)}</td><td>${escHtml(m.unidad)}</td>` +
+          `<td style="text-align:right; font-family: var(--font-mono);">${fmtInt(m.cantidad)}</td><td style="font-size:12px">${escHtml(m.motivo)}</td></tr>`).join('') +
+        '</tbody></table>' : '');
+  }
 }
 
 /* ─── Microfase 6 · Widget "Consumo por Mantenimiento Brigada" ─── */
@@ -381,6 +482,15 @@ function arrancar() {
   if (unsubAccionesBrig)  try { unsubAccionesBrig(); }  catch (_) {}
 
   const filtros = withContratoFiltro();
+  const cidNexo = getContratoActivo();
+  if (cidNexo && NEXO_CONTRATOS[cidNexo]) {
+    const cfgNexo = NEXO_CONTRATOS[cidNexo];
+    listarOrdenes({ desde: cfgNexo.desde, hasta: cfgNexo.hasta })
+      .then((r) => { ordenesNexo = { ordenes: r.ordenes || [], truncado: !!r.truncado }; },
+            (err) => { console.warn('[nexo] no se pudieron leer las órdenes E/S:', err); ordenesNexo = { error: err.message || String(err) }; })
+      // Sin el stock todavía, solo la sección (si no, la tabla diría «Sin suministros sembrados.» un instante).
+      .then(() => { if (stockLlego) recomputarTodo(); else renderNexo(); });
+  }
   // Una sola lectura del contrato por visita (free-tier): trae el monto registrado.
   const cidContrato = getContratoActivo();
   if (cidContrato) {
@@ -393,6 +503,7 @@ function arrancar() {
   // cacheMovs de aquí en vez de re-suscribir esas colecciones (antes se leían
   // 2× cada una por visita). nombreSum saca el nombre de cacheStockGlobal.
   unsubStock = suscribirStockGlobal(filtros, ({ suministros, movimientos, config }) => {
+    stockLlego = true;
     cacheStockGlobal = suministros;
     cacheMovs = movimientos || [];
     configCache = config || null;

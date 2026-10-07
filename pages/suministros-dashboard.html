@@ -83,6 +83,8 @@
     <div class="kpi-card kpi-orange">
       <div class="kpi-label">Valor consumido</div>
       <div class="kpi-value" id="kValConsumido">—</div>
+      <!-- 2026-10-07: nexo con Órdenes E/S — cuánto viene de movimientos y cuánto de órdenes. -->
+      <div class="kpi-foot" id="kValConsumidoNota" style="font-size: 11px; color: var(--ink-3); margin-top: 4px"></div>
     </div>
     <div class="kpi-card kpi-teal">
       <div class="kpi-label">Valor disponible</div>
@@ -139,23 +141,52 @@
     </div>
   </div>
 
+  <!-- Nexo con Órdenes E/S (pedido del 2026-10-07): lo entregado a cada transformador por las órdenes
+       de entrada firmadas. Oculto hasta que el JS lo llene (con el JS viejo en caché no aparece). -->
+  <section id="nexoOrdenes" hidden>
+    <h2 class="section-head">Entregado por órdenes de entrada y salida, por transformador</h2>
+    <p id="nexoAlcance" style="font-size:13px; color:var(--ink-2); margin:0 0 10px"></p>
+    <div id="nexoAvisos"></div>
+    <div class="table-wrap">
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Transformador</th>
+              <th scope="col">Zona</th>
+              <th scope="col">Ítems del contrato · cantidad × valor unitario</th>
+              <th scope="col" style="text-align:right">Dinero (COP)</th>
+              <th scope="col">Órdenes</th>
+            </tr>
+          </thead>
+          <tbody id="nexoTbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <p id="nexoZonas" style="font-size:13px; color:var(--ink-2); margin:10px 0 0"></p>
+    <details id="nexoNoCuentan" hidden style="margin-top:10px">
+      <summary style="cursor:pointer; font-weight:600; color:var(--ink-2)">Lo que no cuenta para el contrato (solo cantidades)</summary>
+      <div id="nexoNoCuentanCuerpo"></div>
+    </details>
+  </section>
+
   <!-- Distribución (charts) -->
   <h2 class="section-head">Distribución y ranking</h2>
   <div class="chart-grid">
     <div class="chart-card">
-      <h3>Top 10 suministros por unidades consumidas</h3>
+      <h3>Top 10 suministros por unidades consumidas <span class="nexo-rotulo" hidden style="font-weight:400; font-size:11px">(movimientos + órdenes E/S)</span></h3>
       <canvas id="chRankUnidades"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Top 10 suministros por valor consumido (COP)</h3>
+      <h3>Top 10 suministros por valor consumido (COP) <span class="nexo-rotulo" hidden style="font-weight:400; font-size:11px">(movimientos + órdenes E/S)</span></h3>
       <canvas id="chRankValor"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Distribución por zona</h3>
+      <h3>Distribución por zona <span style="font-weight:400; font-size:11px">(solo movimientos registrados)</span></h3>
       <canvas id="chZona"></canvas>
     </div>
     <div class="chart-card">
-      <h3>Distribución por departamento</h3>
+      <h3>Distribución por departamento <span style="font-weight:400; font-size:11px">(solo movimientos registrados)</span></h3>
       <canvas id="chDepto"></canvas>
     </div>
   </div>
@@ -221,7 +252,7 @@
   </div>
 
   <!-- Vista cruzada -->
-  <h2 class="section-head">Vista cruzada</h2>
+  <h2 class="section-head">Vista cruzada <span style="font-weight:400; font-size:11px; text-transform:none">(solo movimientos registrados)</span></h2>
   <div class="inv-toolbar">
     <div class="inv-filters">
       <select class="form-select" id="fxZona">
