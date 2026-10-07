@@ -24,6 +24,11 @@ import {
 import { suscribir as suscribirSuministros } from '../data/suministros.js';
 import { suscribir as suscribirTransformadores } from '../data/transformadores.js';
 import { getContratoActivo, withContratoFiltro } from '../ui/contrato-context.js';
+// Nexo con Órdenes E/S (2026-10-07): la existencia de esta pestaña descuenta lo entregado por las
+// órdenes de entrada firmadas, igual que el tablero (L-86: la misma cuenta en todos los caminos).
+import { calcularNexo, existenciaConOrdenes, NEXO_CONTRATOS } from '../domain/ordenes_contrato_nexo.js';
+import { listar as listarOrdenes } from '../data/ordenes_materiales.js';
+import { obtenerConfig } from '../data/suministros_config.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -100,6 +105,28 @@ function rebuildDatalistTrafos() {
     const sub  = ub.subestacion_nombre || t.subestacion || '';
     return `<option value="${escHtml(matr)}">${escHtml(matr + (sub ? ' · ' + sub : ''))}</option>`;
   }).join('');
+}
+
+// ── Nexo con Órdenes E/S: una lectura por visita, solo en contratos con nexo ──
+let promesaOrdenesNexo = null;
+let promesaConfig = null;
+async function entregadoPorOrdenes(codigo) {
+  const cid = getContratoActivo();
+  if (!cid || !NEXO_CONTRATOS[cid]) return { cantidad: 0, ok: true };
+  if (!promesaOrdenesNexo) promesaOrdenesNexo = listarOrdenes({ desde: NEXO_CONTRATOS[cid].desde, hasta: NEXO_CONTRATOS[cid].hasta });
+  try {
+    const { ordenes, truncado } = await promesaOrdenesNexo;
+    const n = calcularNexo({ ordenes, catalogo: cacheSums, contratoId: cid });
+    return { cantidad: n.porItem[codigo] ? n.porItem[codigo].cantidad : 0, ok: true, parcial: !!truncado };
+  } catch (err) {
+    console.warn('[nexo] no se pudieron leer las órdenes E/S:', err);
+    promesaOrdenesNexo = null;           // se reintenta en la próxima línea
+    return { cantidad: 0, ok: false };
+  }
+}
+async function permiteNegativo() {
+  if (!promesaConfig) promesaConfig = obtenerConfig().catch(() => ({}));
+  return !!(await promesaConfig).permitirNegativo;
 }
 
 // ── Lookup helpers ──
@@ -181,7 +208,12 @@ const lineaState = new WeakMap();
 async function aplicarSuministroLinea(lineaEl) {
   const f = lineaFields(lineaEl);
   const found = buscarSuministro(f.sumId.value);
-  lineaState.set(lineaEl, { suministro: found });
+  const cidLinea = getContratoActivo();
+  const conNexo = !!(found && cidLinea && NEXO_CONTRATOS[cidLinea]);
+  // Con nexo: mientras se calcula la existencia (con órdenes E/S) un EGRESO queda bloqueado (revisión 10-07).
+  lineaState.set(lineaEl, conNexo ? { suministro: found, conNexo: true, cargando: true } : { suministro: found });
+  if (conNexo) actualizarBtnGuardar();
+  const vigente = () => (lineaState.get(lineaEl) || {}).suministro === found;
   if (!found) {
     f.marca.value = '';
     f.unidad.value = '';
@@ -204,11 +236,30 @@ async function aplicarSuministroLinea(lineaEl) {
   try {
     const cid = getContratoActivo() || (found.contrato_id || '');
     const stock = await computarStock(found.codigo, cid);
-    if (stock) f.stockActual.value = `${stock.actual} (ini ${stock.inicial}, +${stock.ingresado}, -${stock.egresado})`;
-    else f.stockActual.value = '—';
+    if (stock && conNexo) {
+      // Con nexo: también descuenta lo entregado por órdenes E/S (la misma cifra del tablero).
+      const ent = await entregadoPorOrdenes(found.codigo);
+      const s = existenciaConOrdenes(stock, ent.cantidad);
+      const neg = await permiteNegativo();
+      // Si mientras tanto se escogió otro suministro en la línea, esta respuesta ya no aplica.
+      if (vigente()) {
+        f.stockActual.value = `${s.actual} (ini ${s.inicial}, +${s.ingresado}, -${s.egresadoMovimientos}` +
+          (s.entregadoOrdenes ? `, -${s.entregadoOrdenes} órdenes E/S` : '') +
+          (ent.ok ? '' : ' · sin leer órdenes E/S') + (ent.parcial ? ' · parcial: más de 500 órdenes en la vigencia' : '') + ')';
+        lineaState.set(lineaEl, ent.ok
+          ? { suministro: found, conNexo: true, disponible: s.actual, permiteNegativo: neg }
+          : { suministro: found, conNexo: true, sinExistencia: 'no se pudieron leer las órdenes E/S' });
+      }
+    } else if (stock) {
+      if (vigente()) f.stockActual.value = `${stock.actual} (ini ${stock.inicial}, +${stock.ingresado}, -${stock.egresado})`;
+    } else {
+      if (vigente()) f.stockActual.value = '—';
+      if (conNexo && vigente()) lineaState.set(lineaEl, { suministro: found, conNexo: true, sinExistencia: 'no se pudo calcular la existencia' });
+    }
   } catch (err) {
     console.warn('No se pudo computar stock:', err);
-    f.stockActual.value = '—';
+    if (vigente()) f.stockActual.value = '—';
+    if (conNexo && vigente()) lineaState.set(lineaEl, { suministro: found, conNexo: true, sinExistencia: 'no se pudo calcular la existencia' });
   }
   actualizarValorTotalLinea(lineaEl);
 }
@@ -266,6 +317,7 @@ function validarFormulario() {
   if (lineas.length === 0) {
     return { ok: false, motivo: 'Agrega al menos una línea de suministro' };
   }
+  const pedidoEgreso = new Map();   // EGRESO acumulado por código (nexo)
   for (let i = 0; i < lineas.length; i++) {
     const f = lineaFields(lineas[i]);
     const data = lineaState.get(lineas[i]) || {};
@@ -275,6 +327,23 @@ function validarFormulario() {
     const cant = parseInt(f.cantidad.value, 10);
     if (!Number.isInteger(cant) || cant < 1) {
       return { ok: false, motivo: `Línea #${i + 1}: la cantidad debe ser un entero ≥ 1` };
+    }
+    // Contratos con nexo: un EGRESO no puede pasar de lo que queda contando lo entregado por órdenes E/S
+    // (salvo que la configuración permita negativos). Las líneas del MISMO ítem se suman. La transacción
+    // del data layer sigue validando solo con movimientos; esta es la barrera que ve las órdenes.
+    if (tipoSeleccionado() === 'EGRESO' && data.conNexo) {
+      if (data.cargando) return { ok: false, motivo: `Línea #${i + 1}: calculando la existencia con órdenes E/S…` };
+      if (data.sinExistencia) return { ok: false, motivo: `Línea #${i + 1}: ${data.sinExistencia}; vuelva a escoger el suministro o recargue` };
+      if (!data.permiteNegativo && typeof data.disponible === 'number') {
+        const cod = data.suministro.codigo;
+        const acum = (pedidoEgreso.get(cod) || 0) + cant;
+        pedidoEgreso.set(cod, acum);
+        if (acum > data.disponible) {
+          return { ok: false, motivo: acum === cant
+            ? `Línea #${i + 1}: la cantidad (${cant}) supera lo que queda (${data.disponible}), contando lo entregado por órdenes E/S`
+            : `Línea #${i + 1}: las líneas de ${cod} suman ${acum} y solo quedan ${data.disponible}, contando lo entregado por órdenes E/S` };
+        }
+      }
     }
   }
   return { ok: true, motivo: '' };
@@ -437,6 +506,9 @@ btnLimpiar.addEventListener('click', () => {
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
   formMsg.className = 'msg'; formMsg.textContent = '';
+  // Se revalida al guardar: el botón pudo quedar habilitado mientras se calculaba una existencia.
+  const vGuardar = validarFormulario();
+  if (!vGuardar.ok) { formMsg.className = 'msg err'; formMsg.textContent = '✗ ' + vGuardar.motivo; actualizarBtnGuardar(); return; }
 
   // Validaciones top-level.
   if (!trafoSel) {

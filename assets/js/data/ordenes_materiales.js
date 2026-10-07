@@ -18,7 +18,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  collection, doc, getDoc, getDocs, query, orderBy, limit,
+  collection, doc, getDoc, getDocs, query, where, orderBy, limit,
   runTransaction, serverTimestamp
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 
@@ -115,11 +115,15 @@ function registroBitacora(tx, accion, clave, nota, antes) {
 
 /**
  * Las órdenes del registro, las de fecha más reciente primero.
+ * `opts.desde`/`opts.hasta` ('aaaa-mm-dd'): solo ese rango (nexo con el contrato, 2026-10-07):
+ * lee menos y el tope de 500 aplica dentro de la vigencia. Sin opts, la lectura de siempre.
  * @returns {Promise<{ordenes: object[], truncado: boolean}>}
  */
-export async function listar() {
+export async function listar(opts = {}) {
   try {
-    const q = query(collection(db(), COLECCION), orderBy('fechaISO', 'desc'), limit(TOPE_LECTURA + 1));
+    const rango = opts && opts.desde && opts.hasta
+      ? [where('fechaISO', '>=', String(opts.desde)), where('fechaISO', '<=', String(opts.hasta))] : [];
+    const q = query(collection(db(), COLECCION), ...rango, orderBy('fechaISO', 'desc'), limit(TOPE_LECTURA + 1));
     const snap = await conEspera(getDocs(q));
     const ordenes = snap.docs.map((d) => ordenDesdeRegistro(d.id, d.data()));
     const truncado = ordenes.length > TOPE_LECTURA;
