@@ -147,7 +147,8 @@
   <section id="regOrdenes" class="form-fieldset" hidden style="margin-top:22px">
     <h3 class="form-fieldset-title" style="margin:0 0 6px">Entregas de órdenes de entrada y salida por registrar</h3>
     <p class="page-subtitle" style="margin:0 0 10px">Cada entrega de una orden de ENTRADA con ítems del contrato se registra como EGRESO,
-      enlazada a su orden, con el transformador, la zona y el departamento del parque. Primero se revisa; nada se escribe hasta pulsar «Registrar».</p>
+      enlazada a su orden, con el transformador, la zona y el departamento del parque. Se registran SOLAS al guardar la orden y al abrir
+      el contrato; aquí puede revisar las que quedaron pendientes (y por qué) y registrarlas a mano. Nada se escribe hasta pulsar «Registrar».</p>
     <div style="display:flex; gap:8px; flex-wrap:wrap">
       <button type="button" class="btn btn-secondary" id="btnRevisarEntregas">Revisar entregas pendientes</button>
       <button type="button" class="btn btn-primary" id="btnRegistrarEntregas" disabled>Registrar seleccionadas</button>

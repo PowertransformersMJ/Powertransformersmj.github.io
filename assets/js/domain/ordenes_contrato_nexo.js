@@ -127,11 +127,12 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
   const cfg = NEXO_CONTRATOS[String(contratoId || '')];
   const vacio = { activo: false, porItem: {}, transformadores: [], zonas: [], totalValor: 0, lineas: 0, ordenesQueCuentan: 0,
     noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [],
-    porItemPendiente: {}, totalPendiente: 0, totalRegistrado: 0, lineasDetalle: [], resumenEstados: { registrado: 0, por_registrar: 0, desfasado: 0 } };
+    porItemPendiente: {}, totalPendiente: 0, totalRegistrado: 0, lineasDetalle: [], resumenEstados: { registrado: 0, por_registrar: 0, desfasado: 0 },
+    huerfanos: [] };
   if (!cfg) return vacio;
   const cat = new Map((catalogo || []).map((s) => [String(s.codigo || '').toUpperCase(), s]));
   const r = { ...vacio, activo: true, noCuentan: { ordenes: { fueraDeVigencia: 0, otroTipo: 0, sinItems: 0 }, materiales: [] }, avisos: [],
-    porItemPendiente: {}, lineasDetalle: [], resumenEstados: { registrado: 0, por_registrar: 0, desfasado: 0 } };
+    porItemPendiente: {}, lineasDetalle: [], resumenEstados: { registrado: 0, por_registrar: 0, desfasado: 0 }, huerfanos: [] };
   const trafos = new Map();
   const pares = new Map();        // (orden, Sxx): dos renglones del mismo ítem en una orden suman uno solo
   const fuera = new Map();
@@ -181,7 +182,7 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
       trafos.set(kt, t);
       const kp = String(o.clave || (o.tipo + '_' + o.numero)) + '|' + codigo;
       const par = pares.get(kp) || { claveOrden: String(o.clave || (o.tipo + '_' + o.numero)), tipo: o.tipo, numero: String(o.numero || ''),
-        fechaISO: f.slice(0, 10), creadoEn: Number(o.creadoEn) || 0, codigo, nombre: s.nombre || codigo, unidad: s.unidad || '',
+        fechaISO: f.slice(0, 10), creadoEn: Number(o.creadoEn) || 0, version: Number.isInteger(o.version) ? o.version : 0, codigo, nombre: s.nombre || codigo, unidad: s.unidad || '',
         cantidad: 0, valorUnitario: vu, transformador: String(o.transformador || '').trim(), matricula, subestacion,
         zona: claveZona(o.zona), claveTrafo: kt };
       par.cantidad = sumarCantidades(par.cantidad, q);
@@ -215,10 +216,12 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
     if (!m || m.tipo !== 'EGRESO' || !m.orden_es || !m.orden_es.clave) continue;
     if (m.contrato_id && String(m.contrato_id) !== String(contratoId)) continue;
     const k = String(m.orden_es.clave) + '|' + String(m.suministro_id || '').toUpperCase();
-    const e = enlazados.get(k) || { cantidad: 0, codigos: [], enlace: m.orden_es, valor: 0 };
+    const e = enlazados.get(k) || { cantidad: 0, codigos: [], ids: [], enlace: m.orden_es, valor: 0,
+      claveOrden: String(m.orden_es.clave), codigo: String(m.suministro_id || '').toUpperCase() };
     e.cantidad = sumarCantidades(e.cantidad, Number(m.cantidad) || 0);
     e.valor += Number(m.valor_total) || 0;
     if (m.codigo) e.codigos.push(String(m.codigo));
+    if (m.id) e.ids.push(String(m.id));
     enlazados.set(k, e);
   }
   const usados = new Set();
@@ -246,7 +249,7 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
     }
     if (e) totalReg += e.valor;
     r.lineasDetalle.push({ ...par, valor: r3(par.cantidad * par.valorUnitario), estado, registrado, pendiente,
-      movimientos: e ? e.codigos.slice().sort() : [] });
+      movimientos: e ? e.codigos.slice().sort() : [], movimientoIds: e ? e.ids.slice() : [] });
   }
   r.totalPendiente = r3(totalPend);
   r.totalRegistrado = r3(totalReg);
@@ -262,15 +265,19 @@ export function calcularNexo({ ordenes, catalogo, contratoId, movimientos } = {}
     });
   }
   const huerfanos = [...enlazados.entries()].filter(([k]) => !usados.has(k));
+  // Para el registro automático (`99 §148`): cada huérfano con sus ids, para retirarlo si la orden ya no lo respalda.
+  r.huerfanos = huerfanos.map(([, e]) => ({ claveOrden: e.claveOrden, codigo: e.codigo, ids: e.ids.slice(),
+    codigos: e.codigos.slice().sort(), cantidad: e.cantidad, valor: r3(e.valor), enlace: e.enlace }));
   if (huerfanos.length) {
     const valorH = huerfanos.reduce((s, [, e]) => s + e.valor, 0);
     r.avisos.push(`${huerfanos.length} movimiento(s) enlazado(s) a una orden que ya no existe, ya no trae ese ítem o quedó fuera ` +
       `de la vigencia (${huerfanos.flatMap(([, e]) => e.codigos).join(', ')}; ${Math.round(valorH).toLocaleString('es-CO')} pesos). ` +
-      'Siguen contando como movimiento: si la orden se rehízo con otro número, esa entrega se está descontando dos veces. Revíselos en el Histórico.');
+      'Se retiran solos cuando la orden ya no los respalda (al guardarla o al abrir el contrato); mientras tanto siguen contando como ' +
+      'movimiento: si la orden se rehízo con otro número, esa entrega se está descontando dos veces hasta que se retire.');
   }
   if (r.resumenEstados.desfasado) {
     r.avisos.push(`${r.resumenEstados.desfasado} entrega(s) cambiaron en la orden después de registradas. Manda la orden: ` +
-      'se descuenta solo lo que falte; si la orden bajó, corrija el movimiento en el Histórico (eliminar con justificación y volver a registrar).');
+      'se corrigen solas (se elimina el movimiento viejo con su justificación y se registra el de la orden); mientras tanto se descuenta solo lo que falte.');
   }
 
   // Aviso de doble registro: un EGRESO NO enlazado (manual o de Brigada) del mismo ítem al mismo transformador

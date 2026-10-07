@@ -162,10 +162,10 @@ tbody.addEventListener('click', async (e) => {
   if (act === 'del') {
     const m = await obtener(id);
     if (!m) return showInfo('Movimiento no encontrado.', 'err');
-    // Enlazado a una orden E/S (`99 §147`): si se borra, la orden lo vuelve a descontar como «por registrar».
+    // Enlazado a una orden E/S (`99 §147`/`§148`): manda la orden; si se borra, se vuelve a registrar solo.
     const avisoOrden = m.orden_es && m.orden_es.clave
-      ? `\n\nOJO: viene de la orden ${m.orden_es.tipo || ''} N.º ${m.orden_es.numero || ''}. Si lo elimina, el contrato seguirá ` +
-        'descontando esa entrega por la orden (quedará «por registrar» en la pestaña Movimiento).' : '';
+      ? `\n\nOJO: viene de la orden ${m.orden_es.tipo || ''} N.º ${m.orden_es.numero || ''}. Manda la orden: mientras la orden ` +
+        'diga esta entrega, se volverá a registrar sola al abrir el contrato. Para quitarla de verdad, corrija o elimine la orden.' : '';
     const justificacion = prompt(
       `Eliminar el movimiento ${m.codigo} (${m.tipo} ${m.cantidad} × ${m.suministro_id}).${avisoOrden}\n\n` +
       `JUSTIFICACIÓN OBLIGATORIA (queda en /auditoria):`

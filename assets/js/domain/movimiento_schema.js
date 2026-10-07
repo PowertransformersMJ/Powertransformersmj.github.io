@@ -79,7 +79,7 @@ export function sanitizarEnlaceOrden(v) {
   const clave = str(v.clave);
   if (!clave) return null;
   const cant = num(v.cantidad);
-  return {
+  const out = {
     clave,
     tipo:          str(v.tipo).toUpperCase(),
     numero:        str(v.numero),
@@ -88,6 +88,11 @@ export function sanitizarEnlaceOrden(v) {
     cantidad:      cant == null ? 0 : cant,
     transformador: str(v.transformador)
   };
+  // Versión de la orden al registrar (`99 §148`): la regla deja al equipo retirar el movimiento solo si
+  // la orden cambió desde entonces. Aditivo: los enlaces anteriores no la traen.
+  const ver = num(v.version);
+  if (Number.isInteger(ver) && ver > 0) out.version = ver;
+  return out;
 }
 
 export function validarMovimiento(doc) {

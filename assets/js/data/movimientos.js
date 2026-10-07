@@ -33,7 +33,10 @@ import { generarCodigoMov } from '../domain/schema.js';
 import { composeDocId } from '../domain/contratos.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
 import { obtenerConfig } from './suministros_config.js';
-import { codigoDelItem, unidadComparable } from '../domain/ordenes_contrato_nexo.js';
+import { NEXO_CONTRATOS } from '../domain/ordenes_contrato_nexo.js';
+// Por espacio de nombres (`30 L-85`): si el navegador mezcla un ordenes_movimientos_registro.js viejo
+// (sin estas funciones), este módulo igual carga y las páginas que lo usan no se caen.
+import * as REGM from '../domain/ordenes_movimientos_registro.js';
 
 const COL_NAME = 'movimientos';
 const COL_SUMINISTROS = 'suministros';
@@ -281,6 +284,7 @@ export async function registrarDesdeOrden(item, uid) {
   // Sin el enlace (p. ej. el navegador mezcló un módulo viejo del esquema) NO se escribe: se contaría dos veces.
   if (!docId || !sane0.orden_es) throw new Error('falta el enlace con la orden: recargue la página (Cmd+Shift+R) y vuelva a revisar.');
   if (sane0.tipo !== 'EGRESO' || !sane0.cantidad || !sane0.contrato_id) throw new Error('registrarDesdeOrden: el movimiento no es un egreso válido.');
+  if (typeof REGM.cantidadDelItemEnOrden !== 'function') throw new Error('el navegador tiene una versión anterior del programa: recargue la página (Cmd+Shift+R).');
   const config = await obtenerConfig();
   const permitirNegativo = !!config.permitirNegativo;
   const maxPrevio = await maxSecuencialAnio(sane0.anio);
@@ -295,11 +299,8 @@ export async function registrarDesdeOrden(item, uid) {
     if (!sumSnap.exists()) throw new Error(`Suministro ${sane0.suministro_id} no existe en el contrato ${sane0.contrato_id}.`);
     const o = os.data();
     // Mismas reglas del nexo: solo renglones del ítem con la unidad del contrato y cantidad válida.
-    const uCat = unidadComparable(sumSnap.data().unidad);
-    const cant = (o.items || []).filter((it) => it && codigoDelItem(it.descripcion) === sane0.suministro_id &&
-        unidadComparable(it.unidad) === uCat && Number.isFinite(Number(it.cantidad)) && Number(it.cantidad) > 0)
-      .reduce((s, it) => s + Number(it.cantidad), 0);
-    if (Number(cant.toFixed(3)) !== sane0.cantidad ||
+    const cant = REGM.cantidadDelItemEnOrden(o.items, sane0.suministro_id, sumSnap.data().unidad);
+    if (cant !== sane0.cantidad ||
         String(o.transformador || '').trim() !== sane0.orden_es.transformador ||
         String(o.fechaISO || '') !== sane0.orden_es.fechaISO) {
       return { estado: 'orden_cambio', motivo: 'la orden cambió desde la vista previa' };
@@ -310,7 +311,14 @@ export async function registrarDesdeOrden(item, uid) {
     const v = validarStockMovimiento(stock.actual, 'EGRESO', sane0.cantidad, permitirNegativo);
     if (!v.ok && v.faltante != null) throw new StockInsuficienteError(sane0.suministro_id, v.faltante, v.resultado);
     const codigo = await siguienteCodigoEnTx(tx, sane0.anio, maxPrevio);
-    const final = sanitizarMovimiento({ ...payload, codigo });
+    // El enlace y el valor se toman de lo leído EN la transacción (`99 §148`): la creación y la versión
+    // exactas de la orden (la regla del equipo las compara) y el valor unitario vigente del contrato.
+    const vuCat = Number(sumSnap.data().valor_unitario);
+    const vu = Number.isFinite(vuCat) && vuCat >= 0 ? vuCat : Number(payload.valor_unitario) || 0;
+    const creadoMs = o.creadoEn && typeof o.creadoEn.toMillis === 'function' ? o.creadoEn.toMillis() : Number(o.creadoEn) || 0;
+    const final = sanitizarMovimiento({ ...payload, codigo, valor_unitario: vu, valor_total: sane0.cantidad * vu,
+      orden_es: { ...payload.orden_es, creadoEn: creadoMs || payload.orden_es.creadoEn || 0,
+        version: Number.isInteger(o.version) ? o.version : 0 } });
     const errs = validarMovimiento(final);
     if (errs.length > 0) throw new Error('Validación falló:\n  · ' + errs.join('\n  · '));
     tx.set(ref, { ...final, createdBy: uid || null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
@@ -323,6 +331,50 @@ export async function registrarDesdeOrden(item, uid) {
     }));
   }
   return res;
+}
+
+/**
+ * Retira un movimiento enlazado a una orden E/S que la orden YA NO respalda (registro automático,
+ * `99 §148`): la orden se eliminó, cambió (cantidad, transformador, fecha) o dejó de traer el ítem.
+ * La comprobación se repite DENTRO de la transacción con la orden leída en ese instante: si otra
+ * persona ya lo corrigió o la orden lo respalda, no se toca ('vigente'). Deja su justificación en la
+ * bitácora como cualquier eliminación.
+ * @returns {Promise<{estado:'retirado'|'vigente'|'ya_no_estaba', codigo?:string, motivo?:string}>}
+ */
+export async function retirarMovimientoDeOrden(id, uid) {
+  if (typeof REGM.diferenciaConOrden !== 'function') throw new Error('el navegador tiene una versión anterior del programa: recargue la página (Cmd+Shift+R).');
+  const ref = docRef(id);
+  const res = await runTransaction(db(), async (tx) => {
+    const ms = await tx.get(ref);
+    if (!ms.exists()) return { estado: 'ya_no_estaba' };
+    const m = ms.data();
+    if (!m.orden_es || !m.orden_es.clave) throw new Error('el movimiento no viene de una orden: no se retira automáticamente.');
+    const os = await tx.get(doc(db(), 'ordenes_materiales', String(m.orden_es.clave)));
+    const ss = await tx.get(suministroRef(m.suministro_id, m.contrato_id));
+    const motivo = REGM.diferenciaConOrden({
+      orden: os.exists() ? os.data() : null, enlace: m.orden_es, codigo: m.suministro_id, cantidad: m.cantidad,
+      unidadCatalogo: ss.exists() ? (ss.data().unidad || '') : null, cfg: NEXO_CONTRATOS[String(m.contrato_id || '')]
+    });
+    if (!motivo) return { estado: 'vigente', codigo: m.codigo };
+    tx.delete(ref);
+    return { estado: 'retirado', codigo: m.codigo, motivo, prev: m };
+  });
+  if (res.estado === 'retirado') {
+    const m = res.prev;
+    await auditarSeguro(auditar({
+      accion: 'eliminar', coleccion: COL_NAME, docId: id, uid,
+      nota: `Eliminado ${m.codigo} (${m.tipo} ${m.cantidad} × ${m.suministro_id}). Justificación: corrección automática — ` +
+        `${res.motivo} (orden ${m.orden_es.tipo} N.º ${m.orden_es.numero}).`
+    }));
+    delete res.prev;
+  }
+  return res;
+}
+
+/** Movimientos enlazados a una orden (por su clave), de cualquier contrato. */
+export async function listarEnlazadosDeOrden(claveOrden) {
+  const snap = await getDocs(query(collRef(), where('orden_es.clave', '==', String(claveOrden))));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 /**

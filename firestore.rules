@@ -101,6 +101,12 @@ service cloud.firestore {
     function isContratoIdValido(v) {
       return v is string && v.matches('^[0-9]{8,14}$');
     }
+    // Contratos con nexo a Órdenes E/S (espejo de NEXO_CONTRATOS en
+    // assets/js/domain/ordenes_contrato_nexo.js; una prueba de amarre falla si
+    // no coinciden). Solo en ellos el equipo registra entregas de órdenes (99 §148).
+    function isContratoConNexo(v) {
+      return v in ['4125000143'];
+    }
     // Acepta docId legacy (id == codigo) y docId multi-contrato
     // ({contrato_id}_{codigo}) introducido en N3-N5. La parte
     // tras el "_" debe ser exactamente el codigo del payload.
@@ -569,26 +575,76 @@ service cloud.firestore {
     // Decisión 6·A del plan: WRITE solo admin. Tecnico/brigadista no
     // crean movimientos. La aplicación cliente envuelve crear() en
     // runTransaction (F39); aquí validamos invariantes server-side.
+    // EXCEPCIÓN (99 §148, decisión del Ingeniero «permitirles registrar»): el
+    // equipo registra y corrige SOLO los egresos ENLAZADOS a una orden de
+    // ENTRADA de un contrato con nexo: id fijo «oes_<contrato>_<orden>_<Sxx>»,
+    // la orden existe tal como se leyó (versión), valor del catálogo y
+    // consecutivo MOV tomado del contador en la misma transacción. Retirar uno
+    // solo vale si la orden ya no lo respalda. Lo demás sigue siendo del admin.
     match /movimientos/{id} {
+      function movCamposValidos(d) {
+        return isCodigoMovimientoValido(d.codigo)
+          && isTipoMovimientoValido(d.tipo)
+          && isCodigoSuministroValido(d.suministro_id)
+          && (!('contrato_id' in d) || d.contrato_id == '' || isContratoIdValido(d.contrato_id))
+          && d.cantidad is int
+          && d.cantidad >= 1
+          && d.transformador_id is string
+          && d.transformador_id.size() > 0
+          && d.matricula is string
+          && d.matricula.size() > 0
+          && d.anio is int
+          && d.anio >= 2000
+          && d.anio <= 2100
+          && d.valor_total is number
+          && d.valor_total >= 0;
+      }
+      function movOrdenRuta(clave) {
+        return /databases/$(database)/documents/ordenes_materiales/$(clave);
+      }
+      function movEsDeOrden(d) {
+        return d.get('orden_es', null) is map
+          && d.orden_es.get('clave', '') is string
+          && d.orden_es.clave.size() > 0
+          && isContratoConNexo(d.get('contrato_id', ''))
+          && id == 'oes_' + d.contrato_id + '_' + d.orden_es.clave + '_' + d.suministro_id;
+      }
+      function movOrdenLoRespalda(d) {
+        let o = get(movOrdenRuta(d.orden_es.clave)).data;
+        return o.tipo == 'ENTRADA'
+          && o.fechaISO == d.orden_es.get('fechaISO', '')
+          && o.version == d.orden_es.get('version', -1);
+      }
+      function movOrdenYaNoLoRespalda(d) {
+        let ruta = movOrdenRuta(d.orden_es.clave);
+        return !exists(ruta)
+          || get(ruta).data.tipo != 'ENTRADA'
+          || get(ruta).data.fechaISO != d.orden_es.get('fechaISO', '')
+          || get(ruta).data.get('transformador', '') != d.orden_es.get('transformador', '')
+          || (get(ruta).data.creadoEn is timestamp
+              && get(ruta).data.creadoEn.toMillis() != d.orden_es.get('creadoEn', 0))
+          || ('version' in d.orden_es && get(ruta).data.version != d.orden_es.version);
+      }
+      function movValorDelCatalogo(d) {
+        return d.valor_unitario == get(/databases/$(database)/documents/suministros/$(d.contrato_id + '_' + d.suministro_id)).data.valor_unitario
+          && d.valor_total == d.cantidad * d.valor_unitario;
+      }
+      function movConsumeElContador(d) {
+        return int(d.codigo.split('-')[2])
+          == getAfter(/databases/$(database)/documents/suministros_config/$('correlativo_mov_' + string(d.anio))).data.ultimo;
+      }
+
       allow read: if isTeamMember();
-      allow create: if isAdmin()
-                    && isCodigoMovimientoValido(request.resource.data.codigo)
-                    && isTipoMovimientoValido(request.resource.data.tipo)
-                    && isCodigoSuministroValido(request.resource.data.suministro_id)
-                    && (!('contrato_id' in request.resource.data)
-                        || request.resource.data.contrato_id == ''
-                        || isContratoIdValido(request.resource.data.contrato_id))
-                    && request.resource.data.cantidad is int
-                    && request.resource.data.cantidad >= 1
-                    && request.resource.data.transformador_id is string
-                    && request.resource.data.transformador_id.size() > 0
-                    && request.resource.data.matricula is string
-                    && request.resource.data.matricula.size() > 0
-                    && request.resource.data.anio is int
-                    && request.resource.data.anio >= 2000
-                    && request.resource.data.anio <= 2100
-                    && request.resource.data.valor_total is number
-                    && request.resource.data.valor_total >= 0;
+      allow create: if isAdmin() && movCamposValidos(request.resource.data);
+      allow create: if isTeamMember()
+                    && movCamposValidos(request.resource.data)
+                    && request.resource.data.tipo == 'EGRESO'
+                    && movEsDeOrden(request.resource.data)
+                    && exists(movOrdenRuta(request.resource.data.orden_es.clave))
+                    && movOrdenLoRespalda(request.resource.data)
+                    && movValorDelCatalogo(request.resource.data)
+                    && movConsumeElContador(request.resource.data)
+                    && request.resource.data.createdBy == request.auth.uid;
       // Update permitido solo para corregir typos de campos no críticos
       // (observaciones, odt). Codigo, tipo, cantidad, suministro_id,
       // transformador_id NO se pueden cambiar — para corregir un
@@ -600,6 +656,9 @@ service cloud.firestore {
                     && request.resource.data.suministro_id == resource.data.suministro_id
                     && request.resource.data.transformador_id == resource.data.transformador_id;
       allow delete: if isAdmin();
+      allow delete: if isTeamMember()
+                    && movEsDeOrden(resource.data)
+                    && movOrdenYaNoLoRespalda(resource.data);
     }
 
     // ── /correcciones/{id} ──
@@ -627,8 +686,26 @@ service cloud.firestore {
     // ── /suministros_config/{id} ──
     // Singleton /suministros_config/global con permitirNegativo y umbrales.
     match /suministros_config/{id} {
+      // Contador del consecutivo MOV por año (99 §147/§148): el equipo lo avanza
+      // DE A UNO al registrar una entrega de una orden (la regla del movimiento
+      // exige que su código sea el valor nuevo del contador en la misma transacción).
+      function contadorMovValido(d) {
+        return id.matches('^correlativo_mov_[0-9]{4}$')
+          && d.keys().hasOnly(['anio', 'ultimo', 'updatedAt'])
+          && d.anio is int
+          && id == 'correlativo_mov_' + string(d.anio)
+          && d.ultimo is int
+          && d.updatedAt == request.time;
+      }
       allow read: if isTeamMember();
       allow write: if isAdmin();
+      allow create: if isTeamMember()
+                    && contadorMovValido(request.resource.data)
+                    && request.resource.data.ultimo == 1;
+      allow update: if isTeamMember()
+                    && contadorMovValido(request.resource.data)
+                    && request.resource.data.anio == resource.data.anio
+                    && request.resource.data.ultimo == resource.data.ultimo + 1;
     }
 
     // ── /acciones_refrigeracion/{id} ──
