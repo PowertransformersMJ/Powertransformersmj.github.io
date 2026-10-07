@@ -142,3 +142,38 @@ describe('DEFAULT_SUMINISTROS_CONFIG', () => {
     assert.throws(() => { DEFAULT_SUMINISTROS_CONFIG.permitirNegativo = true; });
   });
 });
+
+// Valor del contrato desde el pedido (2026-10-07): el disponible debe cuadrar con los documentos.
+import { valoresContrato } from '../assets/js/domain/stock_calculo.js';
+
+test('valoresContrato: con monto registrado, el valor del contrato es el del pedido y el disponible = pedido − consumido', () => {
+  const items = [
+    { valor_unitario: 5064165, stock: { inicial: 69, egresado: 6 } },
+    { valor_unitario: 35024062.5, stock: { inicial: 1, egresado: 0 } }
+  ];
+  const v = valoresContrato(items, 2269395067);
+  assert.equal(v.fuente, 'contrato');
+  assert.equal(v.valorContrato, 2269395067);
+  assert.equal(v.valorConsumido, 6 * 5064165);
+  assert.equal(v.valorDisponible, 2269395067 - 6 * 5064165);
+  assert.equal(v.valorCantidades, 69 * 5064165 + 35024062.5);
+  assert.equal(v.diferencia, 2269395067 - v.valorCantidades);
+});
+
+test('valoresContrato: sin monto registrado (0, vacío o inválido) conserva el cálculo por cantidades', () => {
+  const items = [{ valor_unitario: 100, stock: { inicial: 10, egresado: 3 } }];
+  for (const m of [0, undefined, null, '', 'abc', -5]) {
+    const v = valoresContrato(items, m);
+    assert.equal(v.fuente, 'cantidades');
+    assert.equal(v.valorContrato, 1000);
+    assert.equal(v.valorDisponible, 700);
+    assert.equal(v.diferencia, 0);
+  }
+});
+
+test('valoresContrato: el disponible nunca es negativo y la ejecución se mide contra el valor del contrato', () => {
+  const v = valoresContrato([{ valor_unitario: 100, stock: { inicial: 1, egresado: 50 } }], 1000);
+  assert.equal(v.valorDisponible, 0);
+  assert.equal(v.ejecucion, 5);
+  assert.deepEqual(valoresContrato([], 0), { valorContrato: 0, valorCantidades: 0, valorConsumido: 0, valorDisponible: 0, ejecucion: 0, fuente: 'cantidades', diferencia: 0 });
+});

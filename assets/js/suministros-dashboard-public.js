@@ -14,6 +14,9 @@ import { suscribir as suscribirAccionesRefrig } from '../js/data/acciones_refrig
 import { estadoStock, ESTADOS_STOCK } from '../js/domain/schema.js';
 import { computarKpisBrigada } from '../js/domain/dashboard_brigada_kpis.js';
 import { withContratoFiltro, getContratoActivo } from '../js/ui/contrato-context.js';
+// Valor del contrato desde el pedido registrado (2026-10-07: «el valor disponible no coincide»).
+import { obtener as obtenerContrato } from '../js/data/contratos.js';
+import { valoresContrato } from '../js/domain/stock_calculo.js';
 
 const $ = (id) => document.getElementById(id);
 const info = $('infoBox');
@@ -33,6 +36,7 @@ const kValContrato   = $('kValContrato');
 const kValConsumido  = $('kValConsumido');
 const kValDisponible = $('kValDisponible');
 const kEjecucionPct  = $('kEjecucionPct');
+const kValContratoNota = $('kValContratoNota');   // ausente con el HTML viejo en caché (`30 L-85`)
 
 // Tabla stock
 const tbody    = $('tbody');
@@ -49,6 +53,7 @@ let cacheStockGlobal = [];   // [{...sumDoc, stock: {inicial, ingresado, egresad
 let cacheMovs = [];          // G016: llega en el mismo emit de suscribirStockGlobal (sin re-suscribir)
 let cacheAccionesBrig = [];  // Microfase 6 · acciones de refrigeración del contrato
 let configCache = null;
+let contratoDoc = null;      // /contratos/{id}: su monto_total es el «Valor contrato» cuando está registrado
 let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
@@ -112,19 +117,24 @@ function calcularPorItem(rowGlobal) {
 function actualizarKPIs() {
   // Stock-side
   let stockIni = 0, dispon = 0, consum = 0, criticos = 0;
-  let valorContrato = 0, valorConsumido = 0;
   for (const r of cacheStockGlobal) {
     const { stock, est } = r._calc;
     stockIni += stock.inicial;
     dispon   += Math.max(0, stock.actual);
     consum   += stock.egresado;
     if (est === 'CRITICO' || est === 'AGOTADO' || est === 'NEGATIVO') criticos += 1;
-    const valU = +r.valor_unitario || 0;
-    valorContrato  += stock.inicial * valU;
-    valorConsumido += stock.egresado * valU;
   }
-  const valorDisponible = Math.max(0, valorContrato - valorConsumido);
-  const ejec = valorContrato > 0 ? valorConsumido / valorContrato : 0;
+  // Pesos: el valor del contrato es su monto registrado (pedido); sin él, cantidades × precio.
+  const v = valoresContrato(cacheStockGlobal.map((r) => ({ valor_unitario: r.valor_unitario, stock: r._calc.stock })),
+                            contratoDoc && contratoDoc.monto_total);
+  const { valorContrato, valorConsumido, valorDisponible } = v;
+  const ejec = v.ejecucion;
+  if (kValContratoNota) {
+    kValContratoNota.textContent = v.fuente === 'contrato'
+      ? `Valor registrado del contrato · cantidades × precio: ${fmtCOP(v.valorCantidades)}` +
+        (Math.round(v.diferencia) ? ` (${v.diferencia > 0 ? 'sin asignar a unidades' : 'por encima del contrato'}: ${fmtCOP(Math.abs(v.diferencia))})` : '')
+      : 'Cantidades × precio (el contrato no tiene valor registrado)';
+  }
   kStockIni.textContent      = fmtInt(stockIni);
   kDisponible.textContent    = fmtInt(dispon);
   kConsumido.textContent     = fmtInt(consum);
@@ -371,6 +381,13 @@ function arrancar() {
   if (unsubAccionesBrig)  try { unsubAccionesBrig(); }  catch (_) {}
 
   const filtros = withContratoFiltro();
+  // Una sola lectura del contrato por visita (free-tier): trae el monto registrado.
+  const cidContrato = getContratoActivo();
+  if (cidContrato) {
+    obtenerContrato(cidContrato)
+      .then((c) => { contratoDoc = c; if (cacheStockGlobal.length) actualizarKPIs(); })
+      .catch((err) => console.warn('[dashboard] no se pudo leer /contratos/' + cidContrato + ':', err));
+  }
   // G016: una sola suscripción. suscribirStockGlobal ya lee 'suministros' y
   // 'movimientos' internamente y ahora expone ambos en el emit → tomamos
   // cacheMovs de aquí en vez de re-suscribir esas colecciones (antes se leían

@@ -115,3 +115,41 @@ export const DEFAULT_SUMINISTROS_CONFIG = Object.freeze({
   umbral_critico_pct:  0.20,
   umbral_medio_pct:    0.50
 });
+
+/**
+ * Valores en pesos del contrato para el tablero (pedido del Ingeniero, 2026-10-07: «el valor
+ * disponible no coincide» con el pedido 5626000011).
+ * Antes el «Valor contrato» era SIEMPRE Σ inicial × valor unitario, y el pedido no se reparte
+ * exacto en unidades (en 4125000143 quedan $172.941,50 sin asignar): el disponible nunca
+ * cuadraba con los documentos. Ahora, si el contrato tiene `monto_total` registrado, ese es el
+ * valor; si no (contratos sin valor cargado), se conserva el cálculo por cantidades.
+ *
+ * Args:
+ *   items       — [{ valor_unitario, stock: { inicial, egresado } }]
+ *   montoTotal  — monto_total del contrato (0, vacío o inválido = no registrado).
+ * Returns:
+ *   { valorContrato, valorCantidades, valorConsumido, valorDisponible, ejecucion,
+ *     fuente: 'contrato' | 'cantidades', diferencia }   (diferencia = contrato − cantidades)
+ */
+export function valoresContrato(items, montoTotal) {
+  let valorCantidades = 0;
+  let valorConsumido = 0;
+  for (const r of (Array.isArray(items) ? items : [])) {
+    const valU = Number.isFinite(+r?.valor_unitario) ? +r.valor_unitario : 0;
+    const ini = Number.isFinite(+r?.stock?.inicial) ? +r.stock.inicial : 0;
+    const egr = Number.isFinite(+r?.stock?.egresado) ? +r.stock.egresado : 0;
+    valorCantidades += ini * valU;
+    valorConsumido += egr * valU;
+  }
+  const monto = Number.isFinite(+montoTotal) && +montoTotal > 0 ? +montoTotal : 0;
+  const valorContrato = monto || valorCantidades;
+  return {
+    valorContrato,
+    valorCantidades,
+    valorConsumido,
+    valorDisponible: Math.max(0, valorContrato - valorConsumido),
+    ejecucion: valorContrato > 0 ? valorConsumido / valorContrato : 0,
+    fuente: monto ? 'contrato' : 'cantidades',
+    diferencia: monto ? monto - valorCantidades : 0
+  };
+}
