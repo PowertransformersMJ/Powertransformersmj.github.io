@@ -369,3 +369,13 @@ el umbral ni saltarlo (decisión del Ingeniero 2026-10-02, antes TODO-68). Si fa
 
 ### L-124 · Un aviso automático se verifica como una cifra: si anuncia que algo falta, comprobar que falta
 **Cicatriz** (2026-10-01, dos veces el mismo día): (a) «Cargabilidad SCADA» publicó «no se leyeron los umbrales activos» y era falso: en producción no existe `umbrales_salud/global` porque no hace falta, y las bandas del MO.00418 SON las vigentes (`99 §122.4`, retirado en `6eed00c`); (b) en el libro de parámetros SCADA por punto, 12 de 21 avisos de «la escala cambia entre meses» eran falsos (ceros nocturnos, congelamientos, cambios de signo; `§138`, bóveda `2026-10-01-parametros-scada`). Las cifras estaban exactas; lo que engañaba eran las observaciones. **Regla**: (1) antes de mostrar un aviso de falta, comprobar en producción si falta de verdad o si su ausencia es el estado normal (L-109: «no existe» no es «no se pudo leer»); (2) un detector de anomalías se valida por cuántos falsos da sobre los casos reales, no con el caso que lo motivó; (3) no se silencia (L-81): se afina hasta que acierte, y al entregar se separa lo verificado (cifras) de lo orientativo (observaciones). [HONOR]
+
+### L-127 · Un aviso se verifica VISIBLE, no solo con texto; y un tope de seguridad corta lo viejo, nunca lo reciente
+**Cicatriz** (`99 §144`, 2026-10-06): (a) `'oms-aviso ver' + 'ok'` armaba la clase «verok»: el aviso tenía su texto
+(`innerText` correcto) pero `display:none`. En Órdenes, el alcance de Indicadores (con el «Parcial» del tope de 500) y los 9
+avisos de la carga de listas NUNCA se vieron desde el 26-ago; las pruebas leían el texto y pasaban. (b) La serie mensual
+tenía un tope de 120 meses contado desde el PRINCIPIO: un «Desde» de hace 15 años o una fecha 2016-por-2026 dejaban fuera
+justo los meses de ahora (lo halló la revisión adversarial, no las pruebas). · **Regla**: (1) en el preview, un aviso se da
+por bueno con `getComputedStyle(el).display` y una captura, no con su texto; al concatenar clases, el espacio va dentro de
+la cadena (`'x ver ' + clase`); (2) todo tope de seguridad sobre una serie de tiempo se cuenta desde lo más reciente, y lo
+que deja fuera se dice en cifras («N órdenes anteriores…»). [HONOR]
