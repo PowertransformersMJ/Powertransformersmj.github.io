@@ -134,6 +134,8 @@ function abrirDetalle(m) {
       <div><strong>ODT:</strong> ${escHtml(m.odt || '—')}</div>
       <div><strong>Usuario:</strong> ${escHtml(m.usuario || '—')}</div>
       <div style="grid-column: 1 / -1;"><strong>Observaciones:</strong> ${escHtml(m.observaciones || '—')}</div>
+      ${m.orden_es && m.orden_es.clave ? `<div style="grid-column: 1 / -1;"><strong>Orden de origen:</strong> ${escHtml(m.orden_es.tipo || '')} N.º ${escHtml(m.orden_es.numero || '')}` +
+        ` · entregado el ${escHtml(String(m.fecha_entrega || m.orden_es.fechaISO || '').split('-').reverse().join('/'))}</div>` : ''}
       <div style="grid-column: 1 / -1; padding-top: 8px; border-top: 1px solid rgba(0,40,90,.1); font-size:11px; color: var(--ink-3);">
         Creado: ${fmtFecha(m.createdAt)} · uid: <code>${escHtml(m.createdBy || '—')}</code>
       </div>
@@ -160,8 +162,12 @@ tbody.addEventListener('click', async (e) => {
   if (act === 'del') {
     const m = await obtener(id);
     if (!m) return showInfo('Movimiento no encontrado.', 'err');
+    // Enlazado a una orden E/S (`99 §147`): si se borra, la orden lo vuelve a descontar como «por registrar».
+    const avisoOrden = m.orden_es && m.orden_es.clave
+      ? `\n\nOJO: viene de la orden ${m.orden_es.tipo || ''} N.º ${m.orden_es.numero || ''}. Si lo elimina, el contrato seguirá ` +
+        'descontando esa entrega por la orden (quedará «por registrar» en la pestaña Movimiento).' : '';
     const justificacion = prompt(
-      `Eliminar el movimiento ${m.codigo} (${m.tipo} ${m.cantidad} × ${m.suministro_id}).\n\n` +
+      `Eliminar el movimiento ${m.codigo} (${m.tipo} ${m.cantidad} × ${m.suministro_id}).${avisoOrden}\n\n` +
       `JUSTIFICACIÓN OBLIGATORIA (queda en /auditoria):`
     );
     if (!justificacion || !justificacion.trim()) {
@@ -216,7 +222,8 @@ btnExportCsv.addEventListener('click', () => {
   if (rows.length === 0) { showInfo('No hay filas para exportar con los filtros actuales.', 'err'); return; }
   const headers = ['codigo','anio','tipo','suministro_id','suministro_nombre','marca',
                    'matricula','subestacion','zona','departamento','cantidad',
-                   'valor_unitario','valor_total','odt','usuario','observaciones'];
+                   'valor_unitario','valor_total','odt','usuario','observaciones',
+                   'fecha_entrega','orden'];     // al final (2026-10-07): no corre las columnas de siempre
   const escCsv = (v) => {
     const s = String(v ?? '');
     if (s.includes(',') || s.includes('"') || s.includes('\n')) {
@@ -226,7 +233,9 @@ btnExportCsv.addEventListener('click', () => {
   };
   const csv = [
     headers.join(','),
-    ...rows.map((r) => headers.map((h) => escCsv(r[h])).join(','))
+    ...rows.map((r) => headers.map((h) => escCsv(h === 'orden'
+      ? (r.orden_es && r.orden_es.clave ? `${r.orden_es.tipo || ''} ${r.orden_es.numero || ''}`.trim() : '')
+      : r[h])).join(','))
   ].join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);

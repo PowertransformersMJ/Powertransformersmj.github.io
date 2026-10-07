@@ -33,6 +33,7 @@ import { generarCodigoMov } from '../domain/schema.js';
 import { composeDocId } from '../domain/contratos.js';
 import { auditar, persistirAuditoria } from '../domain/audit.js';
 import { obtenerConfig } from './suministros_config.js';
+import { codigoDelItem, unidadComparable } from '../domain/ordenes_contrato_nexo.js';
 
 const COL_NAME = 'movimientos';
 const COL_SUMINISTROS = 'suministros';
@@ -56,6 +57,32 @@ function db() {
   return d;
 }
 function collRef() { return collection(db(), COL_NAME); }
+
+// ── Consecutivo MOV único por año (decisión del Ingeniero 2026-10-07, `99 §147`) ──
+// Antes cada suministro llevaba su numeración: MOV-2026-0001 se repetía entre accesorios y podía
+// reutilizar un número borrado. Ahora un contador por año en /suministros_config (solo admin, como
+// /movimientos) se lee y escribe DENTRO de la transacción: dos guardados a la vez no repiten código
+// y un número borrado no vuelve a usarse.
+function correlativoRef(anio) { return doc(db(), 'suministros_config', `correlativo_mov_${+anio}`); }
+
+/** Mayor secuencial del año entre los movimientos existentes (arranque del contador; fuera de la tx).
+ *  Si el contador ya existe, no hace falta leer el año entero. */
+async function maxSecuencialAnio(anio) {
+  const c = await getDoc(correlativoRef(anio));
+  if (c.exists()) return 0;
+  const snap = await getDocs(query(collRef(), where('anio', '==', +anio)));
+  return siguienteSecuencial(snap.docs.map((d) => d.data().codigo), anio) - 1;
+}
+
+/** Dentro de la transacción: el siguiente código del año. Solo lecturas antes; escribe el contador. */
+async function siguienteCodigoEnTx(tx, anio, maxPrevio) {
+  const ref = correlativoRef(anio);
+  const s = await tx.get(ref);
+  const ultimo = Math.max(s.exists() ? (+s.data().ultimo || 0) : 0, +maxPrevio || 0);
+  const n = ultimo + 1;
+  tx.set(ref, { anio: +anio, ultimo: n, updatedAt: serverTimestamp() });
+  return generarCodigoMov(anio, n);
+}
 function docRef(id) { return doc(db(), COL_NAME, id); }
 
 /**
@@ -172,6 +199,7 @@ export async function crear(payload, uid) {
 
   const config = await obtenerConfig();
   const permitirNegativo = !!config.permitirNegativo;
+  const maxPrevio = await maxSecuencialAnio(sane.anio);
 
   // 2. Tx: lee correlativo y movimientos previos, valida stock, escribe.
   const ref = doc(collRef());  // pre-genera id de documento
@@ -214,12 +242,8 @@ export async function crear(payload, uid) {
       throw new StockInsuficienteError(sane.suministro_id, v.faltante, v.resultado);
     }
 
-    // Genera código (lee sólo los del año target para correlativo compacto).
-    const codigosAnio = movs
-      .filter((m) => +m.anio === +sane.anio)
-      .map((m) => m.codigo);
-    const sec = siguienteSecuencial(codigosAnio, sane.anio);
-    const codigo = generarCodigoMov(sane.anio, sec);
+    // Código: consecutivo único del año (contador leído y escrito en esta misma transacción).
+    const codigo = await siguienteCodigoEnTx(tx, sane.anio, maxPrevio);
 
     // Sanitiza nuevamente con el código real para validación final.
     const final = sanitizarMovimiento({ ...payload, codigo });
@@ -240,6 +264,65 @@ export async function crear(payload, uid) {
     uid, nota: `${sane.tipo} ${sane.cantidad} × ${sane.suministro_id} → ${sane.matricula}`
   }));
   return movId;
+}
+
+/**
+ * Registra como EGRESO una entrega de una orden E/S (plan de domain/ordenes_movimientos_registro.js),
+ * enlazada a su orden. Una transacción por (orden, ítem), con id fijo:
+ *  · si el movimiento ya existe, no hace nada (repetir no duplica);
+ *  · si la orden ya no existe o cambió desde la vista previa (cantidad del ítem, transformador o fecha),
+ *    no escribe y lo dice;
+ *  · valida la existencia del ítem igual que crear().
+ * @returns {Promise<{estado:'registrado'|'ya_estaba'|'orden_cambio', codigo?:string, motivo?:string}>}
+ */
+export async function registrarDesdeOrden(item, uid) {
+  const { docId, payload } = item || {};
+  const sane0 = sanitizarMovimiento({ ...payload, codigo: 'MOV-0000-0000' });
+  // Sin el enlace (p. ej. el navegador mezcló un módulo viejo del esquema) NO se escribe: se contaría dos veces.
+  if (!docId || !sane0.orden_es) throw new Error('falta el enlace con la orden: recargue la página (Cmd+Shift+R) y vuelva a revisar.');
+  if (sane0.tipo !== 'EGRESO' || !sane0.cantidad || !sane0.contrato_id) throw new Error('registrarDesdeOrden: el movimiento no es un egreso válido.');
+  const config = await obtenerConfig();
+  const permitirNegativo = !!config.permitirNegativo;
+  const maxPrevio = await maxSecuencialAnio(sane0.anio);
+  const ref = docRef(docId);
+  const ordenRef = doc(db(), 'ordenes_materiales', sane0.orden_es.clave);
+  const res = await runTransaction(db(), async (tx) => {
+    const ya = await tx.get(ref);
+    if (ya.exists()) return { estado: 'ya_estaba', codigo: ya.data().codigo };
+    const os = await tx.get(ordenRef);
+    if (!os.exists()) return { estado: 'orden_cambio', motivo: 'la orden ya no existe' };
+    const sumSnap = await tx.get(suministroRef(sane0.suministro_id, sane0.contrato_id));
+    if (!sumSnap.exists()) throw new Error(`Suministro ${sane0.suministro_id} no existe en el contrato ${sane0.contrato_id}.`);
+    const o = os.data();
+    // Mismas reglas del nexo: solo renglones del ítem con la unidad del contrato y cantidad válida.
+    const uCat = unidadComparable(sumSnap.data().unidad);
+    const cant = (o.items || []).filter((it) => it && codigoDelItem(it.descripcion) === sane0.suministro_id &&
+        unidadComparable(it.unidad) === uCat && Number.isFinite(Number(it.cantidad)) && Number(it.cantidad) > 0)
+      .reduce((s, it) => s + Number(it.cantidad), 0);
+    if (Number(cant.toFixed(3)) !== sane0.cantidad ||
+        String(o.transformador || '').trim() !== sane0.orden_es.transformador ||
+        String(o.fechaISO || '') !== sane0.orden_es.fechaISO) {
+      return { estado: 'orden_cambio', motivo: 'la orden cambió desde la vista previa' };
+    }
+    const movsSnap = await getDocs(query(collRef(),
+      where('suministro_id', '==', sane0.suministro_id), where('contrato_id', '==', sane0.contrato_id)));
+    const stock = computarStockDesdeMovimientos(+sumSnap.data().stock_inicial || 0, movsSnap.docs.map((d) => d.data()));
+    const v = validarStockMovimiento(stock.actual, 'EGRESO', sane0.cantidad, permitirNegativo);
+    if (!v.ok && v.faltante != null) throw new StockInsuficienteError(sane0.suministro_id, v.faltante, v.resultado);
+    const codigo = await siguienteCodigoEnTx(tx, sane0.anio, maxPrevio);
+    const final = sanitizarMovimiento({ ...payload, codigo });
+    const errs = validarMovimiento(final);
+    if (errs.length > 0) throw new Error('Validación falló:\n  · ' + errs.join('\n  · '));
+    tx.set(ref, { ...final, createdBy: uid || null, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    return { estado: 'registrado', codigo };
+  });
+  if (res.estado === 'registrado') {
+    await auditarSeguro(auditar({
+      accion: 'crear', coleccion: COL_NAME, docId, uid,
+      nota: `EGRESO ${sane0.cantidad} × ${sane0.suministro_id} → ${sane0.matricula} · desde orden ${sane0.orden_es.tipo} N.º ${sane0.orden_es.numero} (${res.codigo})`
+    }));
+  }
+  return res;
 }
 
 /**

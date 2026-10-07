@@ -19,6 +19,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
 import { getDbSafe, isFirebaseConfigured } from '../firebase-init.js';
 import { getContratoActivo } from '../ui/contrato-context.js';
+import { NEXO_CONTRATOS } from '../domain/ordenes_contrato_nexo.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -142,7 +143,11 @@ btnResetear.addEventListener('click', async () => {
     }
 
     resetMsg.className = 'reset-msg is-ok';
-    resetMsg.textContent = `✓ ${borrados} movimiento${borrados === 1 ? '' : 's'} eliminado${borrados === 1 ? '' : 's'}. Stock vuelve al stock_inicial de cada suministro.`;
+    // Desde el nexo con Órdenes E/S (`99 §146`–`§147`) ya no vuelve al inicial: lo entregado por órdenes sigue descontando.
+    resetMsg.textContent = `✓ ${borrados} movimiento${borrados === 1 ? '' : 's'} eliminado${borrados === 1 ? '' : 's'}. ` +
+      (NEXO_CONTRATOS[cid]
+        ? 'La existencia queda en el inicial menos lo entregado por las órdenes de entrada (que vuelven a quedar «por registrar»).'
+        : 'Stock vuelve al stock_inicial de cada suministro.');
     statCount.textContent = '0';
     confirmInput.value = '';
     btnResetear.disabled = true;
