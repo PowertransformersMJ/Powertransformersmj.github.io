@@ -7016,3 +7016,35 @@ interinato R2/R4 (prueba del escenario en el mismo commit; banco antes/después)
 - Las claves con punto que el formulario puede escribir son identificadores simples (sin tildes ni caracteres reservados).
 - Observado y NO tocado (previo, cosmético): los enlaces `inventario.html#edit:<id>` de admin mapa/alertas no abren el
   editor; y `cargar()` borra el aviso «✓ actualizado» al recargar la tabla.
+
+## 155. ADR-155 — El botón «Mapa» abre el mapa nuevo (decisión del Ingeniero: opción 2) ⟦OPUS-5.5⟧ (2026-10-08)
+
+> *«en que parte del sidebar debo escoger»* → se le ofrecieron (1, recomendada) un botón nuevo «Mapa de Colombia» bajo «Mapa» o
+> (2) que «Mapa» abra el mapa nuevo. *«prefiero la opcion 2»*. NO revisado externamente; cambio de una línea + estilos propios.
+
+**155.1 Causa raíz.** Ningún botón del menú llevaba a `pages/mapa-v2.html`: el menú «PARQUE → Mapa» abre
+`pages/activos.html#tab=mapa`, cuya pestaña cargaba `mapa.html` (el viejo). Él solo podía verlo con el enlace directo.
+
+**155.2 Solución.** La pestaña «Mapa» de Activos carga `mapa-v2.html` (antes `mapa.html`). Todo lo que ya llevaba a esa pestaña
+(menú, `cobertura.html` «Abrir mapa interactivo», la redirección de `/pages/mapa.html` en `aqua-shell.js`) llega ahora al mapa
+nuevo, sin tocar el menú ni el shell. Dentro de la pestaña (iframe de ~1070 × 580 px, `body.is-embedded`) el mapa se ajusta al
+alto de la pestaña y queda lado a lado con su ficha desde 860 px (la regla de 1100 px los apilaba y el mapa de 640 px no cabía):
+reglas SOLO para `body.is-embedded` en `assets/css/mapa-colombia.css`.
+
+**155.3 No-regresión.** `pages/mapa.html` y `assets/js/mapa-render.js` siguen en el repo, intactos (ya no se ven desde el menú) ·
+`mapa-v2.html` abierto directo se ve igual que antes (las reglas nuevas solo aplican embebido) · menú, shell y demás pestañas
+sin cambios · el rótulo «Borrador · pendiente del Ingeniero» se queda hasta que él diga.
+
+**155.4 Verificación.** Unitarias 2530/0/2 · lint limpio · banco (con franja de vista previa, L-135): la pestaña «Mapa» abre
+`mapa-v2.html`, sin menú repetido, sin errores; a 1440 px: pestaña 1070 × 580, mapa 626 × 540 y ficha 320 px lado a lado; «Ampliar»
+llena la pestaña y Esc vuelve; a 375 px, apilados.
+
+**155.5 Anti-patterns evitados.** Tocar el menú o el shell de todas las páginas · borrar el mapa viejo.
+
+**155.6 Archivos.** Modificados: `pages/activos.html` (1 línea), `assets/css/mapa-colombia.css` (reglas embebidas). INTACTOS:
+`aqua-shell.js`, `pages/mapa.html`, `mapa-render.js`, el resto de pestañas.
+
+**155.7 Doctrina.** `CLAUDE.md §3.2` (aditivo; preview antes de producción) · su regla: no tocar lo no pedido.
+
+**155.8 Verificado sano / no re-auditar.** El aviso «el fondo no responde» en la captura del banco es de la captura sin cabeza
+(OSM no le sirve teselas), no del sitio.
