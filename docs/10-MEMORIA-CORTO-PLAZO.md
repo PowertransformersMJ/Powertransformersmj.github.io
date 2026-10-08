@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-10-07) — ÓRDENES E/S + CONTRATO 4125000143 (`§141`–`§148`, TODO-76) · en espera: Fichas · Cargabilidad
+## 🎯 Foco (al 2026-10-07) — MAPA DE COLOMBIA (`§152`, TODO-78) · antes: Órdenes E/S (TODO-76) · en espera: Fichas · Cargabilidad
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 > **Al retomar**: Órdenes/Contrato: `§148` publicado (main `776e31f`); suyo → TODO-76; falta el técnico en vivo (TODO-62). En espera: dos páginas de `~/Downloads` (Fichas CF-43/44/36/35 · 11 de TODO-69) → `99 §140`.
@@ -42,8 +42,9 @@
 |---|---|---|
 | **TODO-71** | 🟡 **Detalle de Cargabilidad PUBLICADO** (`99 §123`, `§124`). Suyo: escalón IEEE («después»). Menores vivos → `§124.9` (los de `§123.9` menos lo ya hecho). | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`-`§134`, `§138`; panel DGA y Duval en BORRADOR). **Suyo**: 11 decisiones con la recomendada + su trabajo (26/17 de la homologación, 104 medidas, re-exportar sep y mayo) en UNA página → `99 §140` (copia: bóveda `2026-10-06-fichas-cf43-cf44-todo69/crudos`). Deuda: `TODO-64.b` borra `calif_crg`. | 🟡 |
+| **TODO-78** | 🟡 **Mapa de Colombia** (`99 §152`): `mapa-v2.html` en Borrador, sin enlazar. **Suyo** → `§152.9`: pestaña (1b) · coordenadas (SIG AFINIA) · red UPME · zonas. | 🟡 |
 | **TODO-76** | 🟡 **Órdenes E/S + Contrato** (`99 §141`–`§148`): **suyo**: familias de accesorio y % por falla (su tabla, `§144.8`) · «ejecutado» manual y fecha_inicio (real: 2025-12-23, Orden de inicio 064) de la lista de contratos (`§145.9`: «dejemos asi») · ¿«Importar» del contrato con su Libro4 + vista previa? (ofrecido 10-07). Brigada/refrigeración y la transacción de `movimientos.js` solo ven lo ya registrado; las tarjetas de stock suman kg, m y unidades (`§146.8`). | 🟡 |
-| **TODO-73** | 🟡 **Riesgos de veracidad del dominio** (`99 §137`): Fichas (`modoDegradacion` sin fuente · «ISO 55001») → rama + ejemplos `§140`, espera su «procede» · `sobrecarga_admisible.js` («IEEE C57.91 Tabla 6») sin cotejar (detalle de Cargabilidad y TPT) · copia de Duval de Parque sin candado · 15 ppm y 0,5 ppm/día del monitoreo NO están en el MO (`§57.8`): preguntarle. | 🟡 |
+| **TODO-73** | 🟡 **Riesgos de veracidad del dominio** (`99 §137`): Fichas (`modoDegradacion` sin fuente · «ISO 55001» · municipio por NOMBRE: VALENCIA y PUEBLO NUEVO homónimos, `§152.9`-5) → rama + ejemplos `§140`, espera su «procede» · `sobrecarga_admisible.js` («IEEE C57.91 Tabla 6») sin cotejar (detalle de Cargabilidad y TPT) · copia de Duval de Parque sin candado · 15 ppm y 0,5 ppm/día del monitoreo NO están en el MO (`§57.8`): preguntarle. | 🟡 |
 | **TODO-62** | **Registro OE/OS**: ✅ orden de PRUEBA en producción (`99 §77.5`). Falta: sesión de TÉCNICO en vivo (y `§148`: su 1.ª orden con ítems del contrato deja un `oes_…` con su `createdBy`) · Gemini (solo si él lo pide, `§150`) · ¿consecutivo por ZONA? | 🟡 |
 | **TODO-63** | **Cédulas**: ✅ las 9 cargadas (`99 §78.5`). Falta su decisión: ¿rastro de quién lee cada cédula, o basta así? + Gemini (si él lo pide). Cédula nueva → `guardia-cedulas.mjs --registrar`. | 🟡 |
 | **TODO-66** | 🟡 **Cola de las auditorías Nivel-2** (`99 §128`, `§149`) — tabla viva: `bóveda/2026-10-07-auditoria-nivel2/HALLAZGOS.md`. Vivo → `§149.4` (partir 30, 32, cola y 20; memoria; banco canónico) · resello de la cola de Fichas · guardia de firmas en pre-push. | 🟡 |
