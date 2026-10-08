@@ -6969,8 +6969,9 @@ mapa del teléfono: «Subestación Eléctrica ISA», entre la Carrera 17, la Cal
 Esas calles (geocodificadas con Nominatim) rodean el punto que el KMZ llama NUEVA MONTERIA (8.755902, -75.857202) y no el de
 MONTERIA (1,3 km al NO, más allá de la Carrera 17): **el KMZ estaba bien y OpenStreetMap tiene los nombres cruzados.**
 `confirmar.mjs NMON` subió su confianza a alta con la evidencia, SIN mover la coordenada (+1 auditoría `confirmar_posicion`).
-Montería queda en su punto del KMZ por descarte (y su 80 MVA en la UPME = 2 × 40 MVA del parque): se le pregunta si la da por
-confirmada. Siguen por confirmar Cañabraval y Pozo Azul.
+Montería quedaba en su punto del KMZ por descarte; **confirmada** el mismo día con su foto de campo con GPS («SSEE Montería
+TR-2 M-AT», 30-jul-2023: 8.7636° N, 75.8668° W, a 3,8 m del punto del KMZ) → `confirmar.mjs MON`. Siguen por confirmar
+Cañabraval y Pozo Azul.
 
 ## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
 
