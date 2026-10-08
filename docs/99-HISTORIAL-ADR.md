@@ -7143,3 +7143,75 @@ IDÉNTICO a `filasLista` sobre producción (`referencia.json`) · salud 85/83/16
 
 **157.6 Archivos.** `assets/js/domain/mapa_parque.js`, `assets/js/ui/mapa/mapa-colombia.js`, `assets/css/mapa-colombia.css`,
 `pages/mapa-v2.html`, `tests/mapa_parque.test.js`. INTACTOS: Cargabilidad SCADA (página y dominio), datos.
+
+## 158. ADR-158 — Cargabilidad SCADA: los 77 «sin medición» de septiembre, diagnosticados; el motivo dice la causa real y la homologación se corrige con lo que ya está en su disco (relevo de Sampués) ⟦OPUS-5.5⟧ (2026-10-08)
+
+> *«en el modulo de cargabilidad SCADA cuales son esos equipos que no tienen medicion? valida por favor no tiene medicion o la
+> medicion no ha sido constante? solucionemos este problema»* · sus respuestas: la estación renombrada es Sampués · «prepáralo y
+> muéstramelo» · rótulo nuevo con vista previa · «Procede con todo» · Casacará T1 = 2.000 kVA. NO revisado externamente;
+> diagnóstico con 3 Opus en solo lectura. Deliberación: bóveda `2026-10-08-scada-sin-medicion` (`SINTESIS.md` y `crudos/`).
+
+**158.1 Causa raíz.**
+- **Diagnóstico (sep-2026, 77 TX sin cifra).**
+  - 42 tuvieron cifra en otros meses y 35 nunca. Al fondo: **44 sí se miden** pero falló el exporte o el nombre · 23 esperan
+    una confirmación o un dato suyo · 3 no llevaron carga · 7 sin medición útil (Excel de los 77 en sus Descargas).
+  - Causa principal: **el exporte de septiembre del SCADA no trae 34 S/E de Oriente.** Más 6 del sur del Magdalena que solo
+    vinieron el 1-sep. Comprobado en el disco; la copia de Descargas es idéntica y no se perdió nada al empaquetar ni al cargar.
+- **El motivo engañaba.** `calcularEquipo` decía «sin horas válidas» para cuatro cosas distintas: no vino en el exporte, el
+  SCADA no la renueva, en cero con tensión (sin carga) y P/Q sin corriente.
+- **Homologación.** Tamalameque y Santa Lucía apuntan a una estación vieja congelada; la viva tiene otro nombre (en la
+  bóveda). El SCADA renombró la estación de Sampués (vale desde el 22-ago) y su T2 no tenía punto. Casa de Zinc traía la matrícula de Casacará.
+
+**158.2 Solución.**
+- **Motivo con la causa** (`motivoSinHoras`, `scada_carga_vista.js`). Se lee del resumen guardado:
+  - sin resumen o sin horas de corriente → «no vino en el exporte del SCADA»;
+  - `sP99` > 0 → «sin corriente válida (sí llega la potencia)»;
+  - `des` ≥ `CALCULO.horasMinSinCarga` (24) → «sin carga (fuera de servicio o en reserva)»;
+  - lo demás → «medida congelada o marcada no válida por el SCADA».
+- **Relevo de estación en el paquete preparado.** `aplicarRelevos` (`scada_carga_paquete.js`) + `--relevo
+  ESTACION=NUEVA@AAAA-MM-DD` en `scripts/scada-empaquetar.mjs`:
+  - desde esa fecha, las filas de la estación nueva se escriben con el nombre de siempre y las de la vieja se descartan;
+  - antes de la fecha, las de la nueva se descartan;
+  - el punto conserva su historial; el manifiesto anota los relevos;
+  - los nombres reales van SOLO en la orden (repo público, guardia).
+  - **Sampués: relevo desde el 2026-08-22** (la orden exacta está en la bóveda y en la memoria del proyecto), que cada mes
+    nuevo debe repetir. Se eligió el 22 porque del 14 al 21 la nueva trae datos de puesta en servicio.
+- **Homologación v3** (copia de la v2, `§125.9`): CAZ con su matrícula · T2-SAM con el segundo transformador de su estación ·
+  SLC y TAN a la estación viva (filas 30, 158, 180 y 193; detalle en la bóveda). Los 8 meses se re-empaquetan con el relevo y se cargan: ene–jul en «Completar» y ago–sep en «Reemplazar»
+  (con «Completar» quedarían las horas «Not Renewed» de Sampués).
+
+**158.3 No-regresión.** Ninguna cifra cambia por el motivo: comprobado con los 208 TX de septiembre de producción, 0 cifras
+distintas, y solo cambian los 48 «sin horas válidas». En la simulación de la carga, ningún otro equipo cambia en los 8 meses;
+el historial ene–jul de T1-SAM y el de Casa de Zinc quedan idénticos. Sin relevos, un paquete queda byte a byte como antes.
+
+**158.4 Verificación.**
+- Unitarias 2544/0/2 (12 nuevas, `tests/scada_carga_sin_medicion.test.js`, estaciones «EstDemo») · lint · guardia limpia.
+- Simulación offline con el código de la rama: TAN 50–55 % · SLC 50–59 % · T1-SAM sep 57,4 % firme · T2-SAM sep 73,0 % firme ·
+  CAZ 22–28 %.
+- Vista previa con la página real, sus datos y la franja roja (puerto 8134). Consola limpia.
+- La carga en producción y su verificación se anotan en `158.9`.
+
+**158.5 Anti-patterns evitados.** Nombres reales de puntos en el repo · cambiar la clave de T1-SAM a la estación nueva (escondía
+ene–jul: regresión de visibilidad) · dividir PBN entre 2 (inventar el factor) · confirmar un circuito muerto · escribir en
+Firestore con credenciales de admin (la carga va por la página).
+
+**158.6 Archivos.** `assets/js/domain/scada_carga_vista.js`, `scada_carga_config.js`, `scada_carga_paquete.js`,
+`scripts/scada-empaquetar.mjs`, `tests/scada_carga_sin_medicion.test.js`. INTACTOS: el lector y el worker de la página, la
+limpieza, la firmeza y el mapa (lee el motivo nuevo sin cambios).
+
+**158.7 Doctrina.** W-11 paso a paso (diagnóstico → sus decisiones → vista previa → «procede») · W-13 (simulación primero,
+foto antes/después) · L-117 · `CLAUDE.md §3.2` (aditivo, preview fiel).
+
+**158.8 Verificado sano / no re-auditar.**
+- El empaquetado y la carga de septiembre NO perdieron datos: el hueco viene del exporte. Comparación clave por clave
+  disco ↔ resumen: 0 faltantes en ago y sep.
+- Los huecos de Ferrocarril (feb, jul) y Santa Teresa (jul) son valores congelados que sí vinieron.
+- Falso positivo descartado: dos estaciones de nombre parecido NO son la medida de ningún circuito de las 18 S/E.
+- **Pendientes suyos** (TODO-69, Excel de los 77):
+  - re-exportar septiembre (43 estaciones; preguntar si cambió algo el 1-sep);
+  - 16 circuitos por confirmar;
+  - ampacidades y placas (SCL, SOF, ECJ T2, PLO, SLV, T3-GUP, Bosque T4) y el criterio de Cereté T1;
+  - PBN ×2, circuitos muertos y Cuiva (SCADA / Operación);
+  - T1-BEC y T1-SML, firmes pero quizá inflados;
+  - **Casacará T1 = 2.000 kVA (su respuesta): su ampacidad en el parque es la de 5 MVA** (corregirla es otra escritura, con su
+    visto bueno).

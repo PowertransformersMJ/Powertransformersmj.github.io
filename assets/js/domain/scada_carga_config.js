@@ -110,7 +110,9 @@ export const CALCULO = Object.freeze({
   // Relación entre niveles (dos devanados): diferencia admitida frente a la relación de tensiones.
   relacionNivelesTol: 0.25,
   // Mapa nivel → devanado: tensión de placa a ±10 %.
-  toleranciaNivelPlaca: 0.10
+  toleranciaNivelPlaca: 0.10,
+  // Sin ninguna hora válida: con al menos estas horas de corriente en cero CON tensión, el motivo es «sin carga» (`99 §158`).
+  horasMinSinCarga: 24
 });
 
 /** Tiempo: los valores son el promedio de la hora que TERMINA en el rótulo (medido); hora de Colombia. */
