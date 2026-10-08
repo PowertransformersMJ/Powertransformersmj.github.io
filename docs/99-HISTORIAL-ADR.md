@@ -7271,3 +7271,28 @@ datos, consumidores) + 1 escéptico por hallazgo (13 agentes, solo lectura).
   - Réplica del detalle con las series reales: lista = detalle en sep (47), ago (7) y abr (7).
   - Agosto re-empaquetado SIN `--relevo`: aplica el relevo desde la hoja (3.501 renombradas, 5.336 descartadas) y su
     contenido es idéntico byte a byte al paquete cargado (1.324 archivos, 0 distintos).
+
+**158.11 Nota posterior (2026-10-08): ampacidad de Casacará T1 corregida a 2 MVA (su «sí, corrige la ampacidad»).**
+- Análisis previo con 3 lentes Opus en solo lectura (modelo, consumidores, fuentes). Los 2 MVA están confirmados por sus hojas
+  de operación («CASACARA 2 MVA») y por el SCADA (máx. 1,55 MVA). Cuenta: 2000/(√3·34,5) = 33,47 A y 2000/(√3·13,8) = 83,67 A.
+- **Causa raíz.**
+  - El 2026-09-08 se corrigió la potencia de 5000 a 2000 sin tocar la ampacidad.
+  - Al día siguiente, `§74.23` importó la hoja Cargabilidad_2025, que repite la matrícula CAC en dos filas: «CASA DE ZINC»
+    de 2 MVA y «CASACARA» de 5 MVA. Al parque llegó la de 5 MVA.
+  - La carga medida (59,75 / 143,19 A) también era 71,4 % × la ampacidad de 5 MVA. Corregir solo la ampacidad habría
+    mostrado una sobrecarga FALSA de 178 % en Cargabilidad (Excel).
+- **Su decisión**: corregir la ampacidad Y la carga medida. Se escribió por `actualizarCampos`, desde su sesión y con su
+  bitácora (`actualizar` + `corregir_ampacidad` con la nota).
+  - `electrico.corriente_nominal_primaria_a` 83,67 → 33,47 y `…secundaria_a` 200,5 → 83,67.
+  - `electrico.corriente_medida_primaria_a` 59,75 → 23,90 y `…secundaria_a` 143,19 → 59,75: la fila de 2 MVA de su hoja,
+    mismo 71,4 %.
+- **Verificado**:
+  - El documento entero contra la copia de la mañana: solo cambian esas 4 claves y `updatedAt`.
+  - Cargabilidad SCADA en vivo: ago 35,6 % → **88,9 % CRG 4 firme**, ene 68,6 % CRG 3. Sin sobrecarga sostenida.
+  - Cargabilidad (Excel): 24 A / 33 A, 71 % «Normal», sin alarma.
+- **NO tocado** (su decisión, queda anotado): `salud_actual` (31 %, CRG 1) se calculó sobre 5 MVA. Con 2 MVA sería CRG 3–4 y
+  podría subir el HI; se corrige en su Excel de Salud de Activos.
+- **Riesgo**: sus libros de Salud de Activos aún traen 83,67 / 200,5 A (el «2026-4» incluso 5000 kVA). Reimportarlos sin
+  corregirlos deshace esta corrección en silencio (`set` con `merge`).
+- **De paso**: el límite operativo de 20 A en 34,5 kV de su Hoja2 queda por debajo de lo que el SCADA ya mide. Es una pregunta
+  para Operación.
