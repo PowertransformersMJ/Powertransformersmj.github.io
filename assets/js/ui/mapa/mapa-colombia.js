@@ -70,15 +70,19 @@ function crearMapa() {
 
   // Fondos gratuitos y sin clave (CARTO pasó a exigir clave y mostraba marcas de agua).
   const fondoMapa = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19, className: 'mc-fondo-suave',
+    maxZoom: 19, className: 'mc-fondo-suave', zIndex: 1,
     attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores de OpenStreetMap</a>'
   });
   const fondoRelieve = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
-    maxZoom: 17, subdomains: 'abc',
+    maxZoom: 17, subdomains: 'abc', zIndex: 2,
     attribution: 'Datos: © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores de OpenStreetMap</a>, SRTM | Estilo: © <a href="https://opentopomap.org" target="_blank" rel="noopener">OpenTopoMap</a> (<a href="https://creativecommons.org/licenses/by-sa/3.0/" target="_blank" rel="noopener">CC-BY-SA</a>)'
   });
   fondoMapa.addTo(mapa);
   vigilarFondo(fondoMapa, fondoRelieve, mapa);
+  // Mapa y Relieve se encienden a voluntad (casillas, no opción única: pedido del Ingeniero 2026-10-08). Con los dos, el
+  // relieve va encima a media transparencia para ver ambos; solo, a pleno.
+  const mezclar = () => fondoRelieve.setOpacity(mapa.hasLayer(fondoMapa) && mapa.hasLayer(fondoRelieve) ? 0.5 : 1);
+  mapa.on('layeradd layerremove', (e) => { if (e.layer === fondoMapa || e.layer === fondoRelieve) mezclar(); });
   estado.fondos = { 'Mapa (OpenStreetMap)': fondoMapa, 'Relieve (OpenTopoMap)': fondoRelieve };
   L.control.scale({ imperial: false, position: 'bottomright' }).addTo(mapa);
   mapa.on('zoomend', clasesZoom);
@@ -101,6 +105,7 @@ function vigilarFondo(fondo, alterno, mapa) {
     }, 4000);
   });
   fondo.on('tileload', () => { ultimaBuena = Date.now(); $('mcFondoAviso').hidden = true; });
+  fondo.on('remove', () => { $('mcFondoAviso').hidden = true; });   // apagado a propósito: no hay nada que avisar
   $('mcCambiarFondo').addEventListener('click', () => {
     mapa.removeLayer(fondo);
     alterno.addTo(mapa);
@@ -659,7 +664,8 @@ async function arrancar() {
   const parque = cargarParque();
   try {
     await cargarGeografia();
-    estado.controlCapas = window.L.control.layers(estado.fondos, estado.capas, { collapsed: true, position: 'topright' }).addTo(estado.mapa);
+    // Sin «capas base» de opción única: los dos fondos son casillas, como el resto de capas.
+    estado.controlCapas = window.L.control.layers({}, { ...estado.fondos, ...estado.capas }, { collapsed: true, position: 'topright' }).addTo(estado.mapa);
   } catch (err) {
     console.error(err);
     aviso('No se pudo leer la geografía: ' + (err.message || err), 'err');
