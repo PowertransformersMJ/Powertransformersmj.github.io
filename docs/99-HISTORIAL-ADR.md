@@ -6958,6 +6958,12 @@ está en el archivo). Comprobado: 146 en el servidor idénticos al lote; el mapa
 revisar»); en su Chrome, la pestaña Mapa muestra 146 puntos y «146 de 147». Registro con huellas y `--deshacer` en la bóveda
 (`registro/carga-aplicada.json`).
 
+**153.11 La Salvación (2026-10-08).** El Ingeniero entregó una foto de campo del transformador con marca de agua GPS
+(*«SSEE Salvación»*, 31-ene-2025, 10.1605° N, 73.9635° W, El Copey). Validada: cae en El Copey (Cesar, DANE), igual que su
+registro (cesar / Oriente), a 1,18 km del poblado y a 2,4 km de la S/E El Copey (otra instalación). Cargada `SLV` con confianza
+alta y fuente `foto_ingeniero` (mismo autor que la carga: `--deshacer` la cubre) + 1 auditoría; la foto queda en la bóveda.
+Resultado: **147 de 147** S/E con punto, verificado en el servidor y en su Chrome.
+
 ## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
 
 > Origen: el hallazgo de `§153.8` («Inventario borra la matrícula al editar… → tarea aparte»), leído en el código el 10-08 y
