@@ -80,11 +80,17 @@ const heartbeat = () => {
   const backup = !backupOptOut && manifest.lastOffsiteBackup ? dias(manifest.lastOffsiteBackup) : null;
   const da = manifest.deepAudit || {};
   const audDias = da.last ? dias(da.last) : null;
-  const audToca = audDias != null && da.maxDays && audDias > da.maxDays;
+  // v1.13: también por VOLUMEN de decisiones (antes decía «al día» mientras el linter la daba por MUY vencida).
+  let audGap = 0;
+  try {
+    const h = readFileSync(join(ROOT, 'docs', '99-HISTORIAL-ADR.md'), 'utf-8');
+    audGap = da.coveredHeaderCount ? (h.match(/^##\s+/gm) || []).length - da.coveredHeaderCount : 0;
+  } catch { audGap = 0; }
+  const audToca = audDias != null && ((da.maxDays && audDias > da.maxDays) || (da.maxAdrGap && audGap >= da.maxAdrGap));
   lines.push('', '🧭 EN CRISTIANO (para el dueño):',
     `   · Mantenimiento del cerebro: ${costoPct != null ? costoPct + '% del trabajo del mes (meta: menos del 30%)' : 'sin medir aún'}${costoPct > 30 ? ' 🔴' : ''}`,
     `   · Copia de seguridad externa: ${backupOptOut ? 'ninguna, por decisión del dueño — la bóveda vive en UNA sola copia' : backup != null ? `hace ${backup} día(s)${backup > 35 ? ' ⚠️ TOCA renovarla' : ' ✅'}` : '⚠️ NUNCA hecha'}`,
-    `   · Revisión profunda del cerebro: ${audDias != null ? (audToca ? `⚠️ TOCA (última hace ${audDias} días)` : `al día (hace ${audDias} días)`) : '⚠️ nunca'}${audToca || (backup != null && backup > 35) ? ' → di: "haz el mantenimiento mensual"' : ''}`);
+    `   · Revisión profunda del cerebro: ${audDias != null ? (audToca ? `⚠️ TOCA (última hace ${audDias} días${audGap ? `, ${audGap} decisiones nuevas sin revisar` : ''})` : `al día (hace ${audDias} días${audGap ? `, ${audGap} decisiones nuevas` : ''})`) : '⚠️ nunca'}${audToca || (backup != null && backup > 35) ? ' → di: "haz el mantenimiento mensual"' : ''}`);
   return lines.join('\n');
 };
 
@@ -117,7 +123,8 @@ try {
     `- Bóveda (brain-private): ${b ? (b.dirty ? `⚠️ SUCIA — ${b.dirty} archivo(s) sin commitear${b.remoto ? ' (commitear+pushear)' : ' (commitear; sin remoto)'}` : 'limpia ✅') : '(no accesible)'}`,
     ``,
     `## Últimos commits (24h)`,
-    git(['log', '--since=24hours', '--format=- %h %s']) || '- (ninguno)',
+    // v1.13: máximo 8 commits y asuntos recortados (el eco completo llegó a ~11,7k chars por arranque).
+    git(['log', '--since=24hours', '-n', '8', '--format=- %h %<(110,trunc)%s']) || '- (ninguno)',
   ].join('\n');
   writeFileSync(OUT, foto, 'utf8');
 

@@ -84,6 +84,7 @@
 | §147 | ADR-147 — **Contrato ↔ Órdenes E/S**: entregas como movimientos enlazados | 6427 |
 | §148 | ADR-148 — **Contrato ↔ Órdenes E/S**: registro automático (equipo, reglas) | 6522 |
 | §149 | ADR-149 — **Cerebro**: auditoría Nivel-2 (44 hallazgos, M-10, hija 36) | 6615 |
+| §150 | ADR-150 — **Cerebro**: freno al PUBLICAR, consejo externo a pedido, memoria liviana | 6681 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

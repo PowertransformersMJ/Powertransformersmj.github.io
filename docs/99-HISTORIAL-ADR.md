@@ -6675,3 +6675,51 @@ del 10-02, `2026-10-07-auditoria-nivel2`).
 **149.8 Verificado sano / no re-auditar.** Los 16 ADRs §129-§148 con deliberación tienen carpeta y crudo · ninguna memoria guarda
 SHAs · los punteros de la memoria SGM al cerebro resuelven · 2493/238 y lo servido = `776e31f` coinciden con `§148` · el banco
 archivado arranca desde la bóveda.
+
+**149.9 Decisiones del Ingeniero sobre las filas DUEÑO (2026-10-07)** → `§150` (4 de 5; queda el costo-cerebro en (J)).
+
+## 150. ADR-150 — Decisiones del Ingeniero sobre el cerebro: frenar al PUBLICAR (no al documentar), segunda opinión externa solo si la pide, memoria de sesión más liviana y rótulo «Borrador» también fuera de Fichas ⟦OPUS-5.5⟧ (2026-10-07)
+
+> Preguntadas al cerrar la auditoría (`§149`, filas DUEÑO); eligió las cuatro recomendadas: «Frenar al publicar» · «Solo si
+> usted lo pide» · «Sí, agrupar» · «Sí, con rótulo». NO revisado externamente (por su propia decisión 2).
+
+**150.1 Causa raíz.** El gate #14 frenaba GUARDAR la documentación y no PUBLICAR el código: tres veces (09-27, 10-02, 10-07)
+el código llegó a `main` citando ADRs sin guardar (M-07 → M-10). Las otras tres eran reglas escritas que la práctica no seguía
+(consejo externo «SIEMPRE»), memoria de arranque sin medir (+18 % en 5 días) y una regla abierta desde el 10-02 (S5-05).
+
+**150.2 Solución.**
+- **Kernel 1.13.0** (`brain-private/kernel`, `brain:pull`): #14 cuenta el volumen también en `--boot` y tiene encabezado propio;
+  un downgrade DECLARADO `{gate: 14, adr}` lo deja en aviso (sin ADR no aplica: Líneas AT sigue igual); el heartbeat dice «TOCA»
+  también por volumen; el eco del handoff ≤ 8 commits con asuntos de 110c; la versión del banner sale del sello; **5c retirado**
+  (one-in-one-out del freno).
+- **Instancia**: manifest `downgrades: [{gate: 14, modo: aviso, adr: 99 §150}]` (visible en cada corrida) · `githooks/pre-push` →
+  **`scripts/freno-publicar.mjs`**: un push a `main` cuyo CÓDIGO (assets, functions, pages, admin, api, reglas, tests) cita
+  `99 §N` sin el encabezado `## N.` en el `docs/99` de ese mismo commit se BLOQUEA. Los `firebase deploy` no pasan por git:
+  se despliegan después de commitear su ADR [HONOR] (M-10).
+- **W-11** (`60`): el prompt de consejo externo se entrega solo cuando él lo pide; si no, el ADR dice «NO revisado externamente».
+- **L-63** (nota) y `60 §W-11` «Modo paso a paso»: fuera de Fichas, los textos técnicos que él aprueba se publican con el rótulo
+  «Borrador · pendiente del Ingeniero» hasta su «procede» (en Fichas, el papel sigue esperando su «procede» antes de publicarse).
+- **MEMORY.md** (memoria del harness, se carga en cada sesión): las 13 líneas de decks/OLTC/comité/conexión en UN puntero con sus
+  disparadores; la de «PR SUPERSEDED» fundida en la política git: 8.311 → 6.198 bytes, sin borrar ninguna memoria.
+
+**150.3 No-regresión.** El freno pasa con el `main` actual (`38d8bca`) y habría frenado `3e29ad3` (§146-§147) y `776e31f`
+(§146-§148), comprobado con `--rev`. Admin, cédulas y SCADA del pre-push intactos. `brain:check` y `boot-gate` sanos con 1.13.0.
+
+**150.4 Verificación.** `tests/freno_publicar.test.js` (6: citas con decimales y sin confundir «199 §», encabezados, faltantes,
+stdin de pre-push, solo código, amarre del hook) · suite completa · `brain:check` (SANO con el DOWNGRADE visible) · casos reales
+`--rev`.
+
+**150.5 Anti-patterns evitados.** Subir el umbral en silencio · degradar un gate sin ADR (el kernel lo exige) · cambiar Líneas AT
+sin su decisión · borrar memorias.
+
+**150.6 Archivos.** Kernel: `brain-check.mjs`, `session-handoff.mjs`, `VERSION` (1.13.0), `README.md` (bóveda). Repo:
+`scripts/*.mjs` del kernel (pull) + `.kernel-version.json`, `scripts/freno-publicar.mjs` (nuevo), `githooks/pre-push`,
+`tests/freno_publicar.test.js` (nuevo), `docs/.brain-manifest.json`, `docs/10`, `30` (L-63, M-10), `60`, `99`, `00`. Memorias:
+`MEMORY.md`, `feedback_workflow_paso_a_paso.md`.
+
+**150.7 Doctrina.** M-07 → M-10 · §G.3 (admisión: el freno es un gate, no [HONOR]) · kernel: severidad hardcodeada, downgrade
+visible con ADR.
+
+**150.8 Verificado sano / no re-auditar.** `core.hooksPath = githooks` está puesto en este repo (y lo comparten los worktrees) ·
+el freno no mira `docs/` (los nodos del cerebro citan lo que quieran) · pendiente suyo: costo-cerebro (**(J)**).
+

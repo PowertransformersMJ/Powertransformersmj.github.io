@@ -150,5 +150,13 @@
   "_capsNuevos120": "2026-09-30 (99 §120): 00, 20, 30, 32 y la cola de Fichas llegaron a su tope. Shard por rango (00a, tramo §1-§80: sin filas nuevas, solo crece si un numero de linea gana una cifra), por modulo (22) y por tema (34, 35), y los CF cerrados de la cola a su archivo. Topes con ~30-40 % de aire en las hijas que crecen; los de las madres NO se tocaron.",
   "_capsNuevos137": "2026-10-02 (99 §137): nacen 51/52/53 (16k: obliga a apuntar en vez de copiar ADRs); 49 y 50 no tenían tope: se les pone con ~20 % de aire sobre su tamaño tras trascender (49: 20,7k; 50: 12,5k).",
   "_capsNuevos139": "2026-10-05 (99 §139): 33 pasó su tope (12.026/12.000) al ampliar lecciones de consola, bancos y Chrome; sube a 14.000 y la hija 36 (Chrome y bancos, S6-07) nace en la próxima ronda.",
-  "_capsNuevos149": "36-LECCIONES-CHROME-BANCO nace de 33 (L-62, L-92, L-94, L-105) y de 30 (L-117), sin cambiar una letra; 33 vuelve a su tope de 12.000 (el de 14.000 de §139 era un aplazamiento). Auditoria 2026-10-07, 99 §149."
+  "_capsNuevos149": "36-LECCIONES-CHROME-BANCO nace de 33 (L-62, L-92, L-94, L-105) y de 30 (L-117), sin cambiar una letra; 33 vuelve a su tope de 12.000 (el de 14.000 de §139 era un aplazamiento). Auditoria 2026-10-07, 99 §149.",
+  "downgrades": [
+    {
+      "gate": 14,
+      "modo": "aviso",
+      "adr": "99 §150",
+      "razon": "Decisión del Ingeniero 2026-10-07 («Frenar al publicar»): documentar nunca se bloquea; el freno es githooks/pre-push → scripts/freno-publicar.mjs (M-10)."
+    }
+  ]
 }

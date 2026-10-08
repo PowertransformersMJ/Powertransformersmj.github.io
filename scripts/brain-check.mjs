@@ -14,7 +14,7 @@
 //
 //   node scripts/brain-check.mjs           → --full (default): TODO (pre-commit / manual)
 //   node scripts/brain-check.mjs --boot    → arranque LIVIANO + SILENCIOSO (presupuesto de stdout;
-//                                            NO lee 99-HISTORIAL; el hook re-inyecta cada línea)
+//                                            de 99-HISTORIAL solo cuenta encabezados (#14, v1.13); el hook re-inyecta cada línea)
 //
 // Checks (fija) · v1.3 F0-§50: #1→#10 · #6b/#11 QUITADOS · #13 endurecida · +5c/+7b/+tableFile:
 //   (2) Caps chars+líneas [warn] · pre-shard ≥90% [info] (8) SSoT: hecho duplicado fuera del nodo dueño [warn, --full]
@@ -22,18 +22,23 @@
 //   (3) Desync 00→99 [warn, --full]                     (10) Huérfanas: BFS 2º orden + neurona NN- sin registro directo [warn, --full]
 //   (4) Frescura cache SW↔05 [warn, opcional]           (12) Fechas stale en 05/10 [info, --boot]
 //   (5) Refs cruzadas ADR/L-M/hojas [warn]              (13) Specs: checklist con evidencia RESOLUBLE [warn, --full]
-//       + 5c) cita viva a lección ⚰️ cuarentenada [warn] (14) deepAudit Nivel-2 vencida [info] + tableFile existe [warn]
+//       (5c retirado en v1.13: no cazó nada en 4 auditorías) (14) deepAudit Nivel-2 vencida [info→warn tras gracia;
+//                                                        downgrade declarado {gate:14,adr} → aviso] + tableFile existe [warn]
 //   (6) Skills↔inventario [warn, --full]                (15) Schema del manifest: clave desconocida [warn]
 //   (7) archiveDir íntegro [warn, --full]               (16) Fiabilidad: `verificado-vivo` stale [info, --full]
 //       + 7b) bóveda: commits ≠ origin vía fs [warn]
 // ===========================================================
-const KERNEL_VERSION = '1.9.0';
 import { readFileSync, readdirSync, existsSync, statSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { createHash } from 'crypto';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+// v1.13: la versión del banner sale del sello del kernel (antes, una constante que se pudrió: decía 1.9.0 con kernel 1.12.0).
+const KERNEL_VERSION = (() => {
+  try { return JSON.parse(readFileSync(join(ROOT, 'scripts', '.kernel-version.json'), 'utf-8')).version || '?'; }
+  catch { return '?'; }
+})();
 const DOCS = join(ROOT, 'docs');
 let problems = 0;
 const BOOT = process.argv.includes('--boot');
@@ -292,15 +297,7 @@ if (!BOOT && existsSync(leccionesPath)) {
   if (!referenced.size) info('sin refs L-NN/M-NN aún');
   else if (!dangling.length) ok(`refs L-/M- (${referenced.size} usadas / ${defined.size} def) resuelven en 30${leccionesShards.length ? `+${leccionesShards.length} shard(s)` : ''}`);
   else warn(`refs L-/M- COLGANTES: ${dangling.join(', ')}`);
-  // 5c) Tombstones-lite (v1.3 §50): lección ⚰️ citada desde nodos VIVOS (99 puede: es historia).
-  const quarantined = new Set([...leccionesText.matchAll(/^###\s+([LM]-\d{2})\b[^\n]*⚰️/gm)].map((m) => m[1]));
-  if (quarantined.size) {
-    const liveText = [claude, existsSync(estadoPath) ? read(estadoPath) : '',
-      existsSync(cortoPath) ? read(cortoPath) : '', existsSync(espacialPath) ? read(espacialPath) : ''].join('\n');
-    const cited = [...quarantined].filter((id) => new RegExp(`\\b${id}\\b`).test(liveText)).sort();
-    if (cited.length) warn(`nodo VIVO cita lección ⚰️ cuarentenada: ${cited.join(', ')} → apuntar al reemplazo o retirar la cita`);
-    else ok(`${quarantined.size} lección(es) ⚰️ sin citas desde nodos vivos`);
-  }
+  // 5c) retirado en v1.13 (no cazó nada en 4 auditorías; su regex no veía L-100+): one-in-one-out del freno al publicar.
 }
 if (BOOT) head('  ⏭️  5a/5b omitidas en --boot');
 const refDocs = new Set([...claude.matchAll(/docs\/([\w-]+\.md)/g)].map((m) => m[1]));
@@ -516,14 +513,16 @@ else {
   }
 }
 
-// 14) deepAudit — auditoría Nivel-2 vigente [nudge info; días en --boot, headers solo en --full]
+// 14) deepAudit — auditoría Nivel-2 vigente [nudge info; v1.13: días Y volumen también en --boot]
+head('\n14) Auditoría Nivel-2 (deepAudit):');
 {
   const da = manifest.deepAudit;
   if (da && da.last) {
     const days = Math.floor((new Date() - new Date(da.last)) / 86400000);
     let due = da.maxDays && days > da.maxDays ? `hace ${days} días (> ${da.maxDays})` : null;
     let gap = 0;
-    if (!BOOT && da.maxAdrGap && existsSync(histPath)) {
+    // v1.13: el volumen se cuenta también en --boot (antes el arranque decía SANO mientras el pre-commit bloqueaba).
+    if (da.maxAdrGap && existsSync(histPath)) {
       const headers = (read(histPath).match(/^##\s+/gm) || []).length;
       gap = da.coveredHeaderCount ? headers - da.coveredHeaderCount : 0;
       if (gap >= da.maxAdrGap) due = (due ? due + ' y ' : '') + `${gap} ADRs nuevos (≥ ${da.maxAdrGap})`;
@@ -531,7 +530,12 @@ else {
     // v1.6 F3 §53 (escalación con GRACIA — el nudge info se ignoró semanas; el warn BLOQUEA commits
     // del cerebro vía pre-commit): vencida dentro de gracia (maxDays+7 / gap+6) = info; pasada = WARN.
     const pastGrace = (da.maxDays && days > da.maxDays + 7) || (da.maxAdrGap && gap >= da.maxAdrGap + 6);
-    if (due && pastGrace) warn(`🔬 auditoría Nivel-2 MUY vencida (${due}; gracia agotada) → correr skill auditoria-cerebro / mantenimiento-general AHORA`);
+    // v1.13: un downgrade DECLARADO {gate: 14, adr} la deja en aviso (no bloquea el commit del cerebro): el freno pasa a
+    // otro punto (p. ej. al publicar). Visible en cada corrida por el bloque de downgrades; sin ADR no aplica.
+    const dg14 = (Array.isArray(manifest.downgrades) ? manifest.downgrades : [])
+      .find((d) => d && typeof d === 'object' && Number(d.gate) === 14 && d.adr);
+    if (due && pastGrace && dg14) info(`🔬 auditoría Nivel-2 MUY vencida (${due}) — AVISO, no bloquea (downgrade #14, ${dg14.adr}) → correr skill auditoria-cerebro`);
+    else if (due && pastGrace) warn(`🔬 auditoría Nivel-2 MUY vencida (${due}; gracia agotada) → correr skill auditoria-cerebro / mantenimiento-general AHORA`);
     else if (due) info(`🔬 auditoría Nivel-2 VENCIDA: última ${da.last}, ${due} → correr skill auditoria-cerebro (§173)`);
     // v1.3 §50: la tabla de la auditoría debe EXISTIR (sin ella la Sonda 0 no puede diffear).
     if (!BOOT && da.tableFile && archiveDir && existsSync(archiveDir) && !existsSync(join(archiveDir, da.tableFile)))
