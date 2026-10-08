@@ -41,6 +41,8 @@
   background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; border-radius: 10px; padding: .5rem .8rem; font-size: .85rem;
   display: flex; gap: .6rem; align-items: center;
 }
+/* `display:flex` le gana al atributo `hidden` (regla del navegador): sin esto el aviso salía SIEMPRE. */
+.mc-fondo-aviso[hidden] { display: none; }
 
 /* Controles de vista */
 .mc-vistas a {
