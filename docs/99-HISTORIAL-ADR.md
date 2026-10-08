@@ -7068,3 +7068,21 @@ Chrome con su usuario).
 capturas lo atribuí a la captura sin cabeza (FALSO: L-136); lo destapó su Chrome real con 20 teselas cargadas y el aviso a la
 vista (`hidden: true`, `display: flex`). Arreglo: `.mc-fondo-aviso[hidden]{display:none}`; comprobado por estilo calculado
 (al cargar `none`; con falla real `flex`).
+
+## 156. ADR-156 — Mapa y Relieve se encienden a voluntad (casillas, ya no opción única) ⟦OPUS-5.5⟧ (2026-10-08)
+
+> *«necesito que me permitas activar el relieve tambien escogerlos a mi voluntad»* (con pantallazo del control de capas: «Mapa
+> (OpenStreetMap)» y «Relieve (OpenTopoMap)» eran botones de opción única). NO revisado externamente; cambio acotado al control.
+
+**156.1 Causa raíz.** Los dos fondos entraban al control de Leaflet como «capas base», que son excluyentes por diseño.
+
+**156.2 Solución.** Los dos fondos pasan a casillas, junto a las demás capas: se puede encender uno, los dos o ninguno. Con los dos,
+el relieve va encima (zIndex 2) a media transparencia (opacidad 0,5) para ver ambos; solo, a pleno. Apagar el mapa a propósito
+oculta el aviso de fondo caído. «Cambiar a Relieve» del aviso sigue igual.
+
+**156.3 No-regresión.** Al abrir, igual que antes (solo el mapa de OpenStreetMap encendido) · resto de capas y del mapa intactos.
+
+**156.4 Verificación.** Unitarias y lint en verde · banco: 0 botones de opción, 2 casillas; ambos → relieve 0,5 sobre el mapa;
+solo relieve → 1; ninguno → fondo liso; volver → igual que al abrir; aviso oculto.
+
+**156.6 Archivos.** `assets/js/ui/mapa/mapa-colombia.js` (fondos y control de capas). INTACTOS: todo lo demás.
