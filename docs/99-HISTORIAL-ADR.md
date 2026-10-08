@@ -7046,5 +7046,11 @@ llena la pestaña y Esc vuelve; a 375 px, apilados.
 
 **155.7 Doctrina.** `CLAUDE.md §3.2` (aditivo; preview antes de producción) · su regla: no tocar lo no pedido.
 
-**155.8 Verificado sano / no re-auditar.** El aviso «el fondo no responde» en la captura del banco es de la captura sin cabeza
-(OSM no le sirve teselas), no del sitio.
+**155.8 Verificado sano / no re-auditar.** La pestaña carga el mapa nuevo con el parque real (208 TX · 147 S/E, revisado en su
+Chrome con su usuario).
+
+**155.9 Corrección (mismo día): el aviso «El fondo del mapa no responde» salía SIEMPRE** (desde `§152`). `.mc-fondo-aviso` tiene
+`display:flex`, que le gana a la regla del navegador `[hidden]{display:none}`: con `hidden=true` el aviso se veía igual. En sus
+capturas lo atribuí a la captura sin cabeza (FALSO: L-136); lo destapó su Chrome real con 20 teselas cargadas y el aviso a la
+vista (`hidden: true`, `display: flex`). Arreglo: `.mc-fondo-aviso[hidden]{display:none}`; comprobado por estilo calculado
+(al cargar `none`; con falla real `flex`).
