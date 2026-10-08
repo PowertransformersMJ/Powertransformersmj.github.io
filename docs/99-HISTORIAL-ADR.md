@@ -2601,6 +2601,11 @@ sobrecarga**.
 cargabilidad no debía arrastrarla— · el import fue por clave puntual, no por payload completo, así
 que ningún otro campo pudo borrarse.
 
+> **Nota de corrección (verificada 2026-09-21 contra la hoja 2025; pasada aquí desde TODO-54 el 2026-10-07, `§149`):** las
+> erratas ×10 son solo **GUATAPURÍ T2** (primario 5.022 → 502) y **SANTA TERESA T1** (en el **secundario**: 833,7 → 83,7).
+> **LORICA T1 queda descartada** —este ADR se equivocaba— y su primario va al 102,5 %. Se divide el **PAR** (ampacidad y
+> carga), no la ampacidad sola. Falta su visto bueno y leer producción (TODO-54).
+
 **74.24 «No veo lo que te pedí en producción»: la respuesta estaba en el chat, no en la herramienta
 (2026-09-09/10).** El Ingeniero pidió un ranking de equipos que superan su ampacidad **en cada
 devanado** y luego **ordenado por potencia**. Se lo respondí con tablas en la conversación y le dije
@@ -6163,6 +6168,7 @@ folio, igual que exportar abierta) · interinato R4.
 con `ordenOpcional` las exportaciones no llaman a `validar` ni leen `#conFirmas`, `#autorizado` ni `estado.cargada`;
 `EXPORTANDO` y la capa «cargando» impiden dos emisiones; un técnico ya podía «Abrir» y exportar cualquier orden del registro:
 no hay más exposición. Límite conocido: se listan las 500 de fecha más reciente (`TOPE_LECTURA`; el aviso «Hay más» ya existe).
+Crudos → bóveda `2026-10-06-ordenes-guardadas/` (añadido en `§149`).
 
 ## 143. ADR-143 — Órdenes E/S: filtro por zona en «Órdenes guardadas» y consolidado de entregas por transformador y subestación ⟦OPUS-5.5⟧ (2026-10-06)
 
@@ -6207,6 +6213,7 @@ Commit `efd46ac`, main `ee904f3`.
 **143.8 Verificado sano / no re-auditar.** Tipo solo ENTRADA/SALIDA (reglas y `ordenDesdeRegistro`), así que SALIDA = la rama
 «Salidas» del histórico; fechas de `o.fecha` (respaldo `fechaISO`); opciones del selector con `new Option` (escapadas) y la
 elección se conserva en cada repintado; índices `data-p*` alineados con las pendientes filtradas.
+Crudos → bóveda `2026-10-06-ordenes-zona-entregas/` (su síntesis quedó en «entregado = SALIDA»; la corrige `§143.9`, anotado en `§149`).
 
 ## 144. ADR-144 — Órdenes E/S: indicadores por accesorio, zona, motivo y mes (panel mejorado + apartado en la página) ⟦OPUS-5.5⟧ (2026-10-06)
 
@@ -6263,6 +6270,9 @@ esperan una tabla suya (no se fabrican). Crudos → bóveda `2026-10-06-ordenes-
 
 ## 145. ADR-145 — Contrato 4125000143: inventario ajustado a su Libro4.xlsx (dato de producción, sin cambio de código) ⟦OPUS-5.5⟧ (2026-10-07)
 
+> ⚠️ **Corregido en `§145.9`**: Libro4 = cantidad **PACTADA** (no la existencia de hoy), el valor del contrato sale del pedido y
+> sí hubo cambio de código. Lo de abajo es la primera lectura (marca añadida en `§149`).
+
 > *«actualiza el inventario para el contrato 4125000143 conforme al documento excel»*. Vista previa en Excel y pregunta
 > cerrada → su decisión: la «Cantidad» del Excel es la **existencia de hoy** (conteo), no el inicial pactado.
 
@@ -6283,7 +6293,7 @@ documentos y los movimientos, escribe, valida con `sanitizarSuministro`/`validar
 (`4125000143_Sxx`). El contrato 4123000081 no se toca.
 **145.4 Verificación.** Lectura posterior desde cero: 25/25 cuadran en existencia, unidad, nombre y valor unitario. El valor
 del inventario en la plataforma es $2.269.222.125, igual a la suma del Excel. El movimiento sigue y hay 25 entradas de
-auditoría. Vuelta atrás (`revertir.mjs`, desde la copia leída dentro de la misma transacción) probada en simulación.
+auditoría. Vuelta atrás (`revertir.mjs`, desde la copia leída dentro de la misma transacción) probada en simulación. ⚠️ Tras `145.9` NO usarla sola: vuelve a ANTES de §145 (21 precios en 0) y no restaura `contratos/4125000143.monto_total`; para eso está `antes-correccion.json` en la bóveda (nota de `§149`).
 **145.5 Anti-patterns evitados.** Movimientos de «ajuste» falsos: solo existen INGRESO y EGRESO, y un egreso sin
 transformador se contaría como consumo por zona → fabricar entregas. Escribir sin vista previa. Pisar el histórico.
 **145.6 Archivos.** Ninguno del repo. Guion, copia de antes, simulación y vuelta atrás → bóveda
@@ -6314,3 +6324,354 @@ Banco con el catálogo real: hoy muestra $2.269.395.067 / disponible $2.269.395.
 disponible baja a $2.239.010.077. 4123000081 sigue por cantidades. Con el HTML viejo en caché funciona sin errores.
 
 Queda a la vista: la lista de admin de contratos usa «ejecutado» manual, y `fecha_inicio` = fecha de importación.
+
+## 146. ADR-146 — Nexo Contrato 4125000143 ↔ Órdenes E/S: lo entregado a cada transformador descuenta del contrato (vista calculada) ⟦OPUS-5.5⟧ (2026-10-07)
+
+> *«necesito que ahora hagas un nexo con el segmento del contrato y el segmento de ordenes de entrada y salida y actualices
+> conforme a los items cantidades y dinero direccionado para cada transformador. dame preview antes de proceder, vamos con
+> workflow»*. Preview con datos reales (Excel) + workflow de diseño; sus 4 decisiones, todas las recomendadas. NO revisado
+> externamente; revisión adversarial interna (10 Opus).
+
+**146.1 Causa raíz.** Los dos módulos no se hablaban. Las 19 órdenes de ENTRADA (Bosque → subestación) traían material del
+contrato hacia 14 transformadores, pero el contrato seguía con su consumo en $0, porque solo contaba `/movimientos`.
+
+**146.2 Solución.** Camino A del workflow: **vista CALCULADA**. El contrato lee las órdenes al abrir y no escribe nada.
+- Decisiones suyas:
+  - cuentan las ENTRADA dentro de la vigencia del pedido (23/12/2025–22/12/2026);
+  - solo los 25 nombres EXACTOS de la lista «Accesorios» → S01–S25; Bodega Membrillal y Krenz quedan fuera;
+  - manda la orden firmada; un egreso del mismo ítem al mismo transformador solo se AVISA como posible doble registro;
+  - se calcula al abrir.
+- Dominio puro `domain/ordenes_contrato_nexo.js`: `NEXO_CONTRATOS`, `TABLA_ACCESORIOS`, `EXCLUIDOS`, `calcularNexo`,
+  `existenciaConOrdenes`.
+  - No mezcla unidades. Admite decimales.
+  - Agrupa el transformador sin tildes.
+  - Las órdenes sin transformador forman un grupo por zona.
+- Tablero:
+  - existencia y dinero con órdenes;
+  - «−Egresos» separado en «mov. · órdenes»;
+  - nota del consumido (movimientos · órdenes);
+  - Trafos atendidos, con la clave matrícula|S/E cuando hay nexo;
+  - Top 10 con órdenes;
+  - sección nueva «Entregado por órdenes E/S, por transformador»: ítems, cantidad × valor unitario, dinero, órdenes,
+    subtotal por zona y lo que no cuenta.
+- Pestaña Movimiento:
+  - muestra la misma existencia;
+  - bloquea un egreso que pase lo que queda (suma las líneas del mismo ítem);
+  - bloquea mientras calcula o si no puede calcular, y revalida al guardar.
+- `data/ordenes_materiales.listar(opts)` acepta `{desde, hasta}`: lee solo la vigencia, con el tope de 500 dentro de ella.
+  Sin `opts`, igual que antes.
+
+Con los datos reales:
+- consumido $603.988.796 (26,6 %); disponible $1.665.406.271;
+- Tipo 1 73 → 37; Tipo 2 69 → 53; Buje 66/110 kV 8 → 5; Buchholz 6 → 3; Radiadores 10 → 8; Ind. devanados 5 → 4.
+
+**146.3 No-regresión.**
+- 4123000081 y la página sin `contratoId` quedan IGUAL: no leen órdenes, no bloquean y «Trafos atendidos» se calcula
+  como antes.
+- La tabla de stock conserva sus 11 columnas.
+- HTML viejo + JS nuevo funciona sin errores (L-85). Con HTML nuevo + JS viejo, la sección y los rótulos quedan ocultos.
+- El módulo de Órdenes, su papel y su Excel no cambian.
+- Sin reglas, índices ni funciones nuevas. Una lectura de órdenes por visita, acotada a la vigencia.
+
+**146.4 Verificación.**
+- `tests/ordenes_contrato_nexo.test.js` (20, SOLO datos sintéticos; incluye el amarre que falla si la lista «Accesorios»
+  cambia sin la tabla). Suite 2460/0/2. Lint limpio.
+- Caso real fuera del repo (`caso-real.mjs` en la bóveda): $603.988.796, 17 líneas, 14 órdenes, 14 trafos.
+- Banco con la foto real (`?semillanexo=1`):
+  - tablero idéntico al preview;
+  - Movimiento muestra «37 (ini 73, +0, -0, -36 órdenes E/S)»;
+  - 38 se bloquea; 20 + 20 se bloquea («suman 40 y solo quedan 37»); 20 + 17 pasa; un INGRESO no se bloquea;
+  - mientras calcula, «calculando…»;
+  - doble registro, avisado;
+  - 4123000081 igual a antes;
+  - HTML viejo sin errores.
+- Revisión adversarial (2 lentes + refutadores): 6 confirmados y corregidos.
+  - Movimiento: varias líneas del mismo ítem y Guardar habilitado mientras calcula.
+  - «Trafos atendidos» doble: `transformador_id` puede ser el id del documento.
+  - Órdenes sin transformador mal atribuidas por zona.
+  - El bloqueo alteraba 4123000081.
+  - Con más de 500 órdenes se descontaba de menos sin avisar.
+
+**146.5 Anti-patterns evitados.**
+- Escribir copias que se desfasan (camino B).
+- Emparejar por parecido: inventa consumo y deja ítems en negativo.
+- Datos reales en pruebas de un repo público.
+- Una regla aplicada a un solo camino (L-86): la pestaña Movimiento usa la misma cuenta que el tablero.
+
+**146.6 Archivos.**
+- Nuevos: `assets/js/domain/ordenes_contrato_nexo.js`, `tests/ordenes_contrato_nexo.test.js`.
+- Modificados: `assets/js/suministros-dashboard-public.js`, `pages/suministros-dashboard.html`,
+  `assets/js/admin/admin-suministros-movimiento.js`, `assets/js/data/ordenes_materiales.js` (`listar(opts)`, aditivo).
+- Commit `fac6bc5`, main `3ad5a0b`.
+
+**146.7 Doctrina.** `CLAUDE.md §3.2` (aditivo; no fabricar) · W-11 paso a paso · L-85 · L-86 · L-127 · L-128.
+
+**146.8 Verificado sano / no re-auditar.**
+- Un técnico puede leer las órdenes desde el tablero: `list` pide miembro del equipo y `limit ≤ 501`.
+- Rango y orden sobre `fechaISO` no necesitan índice compuesto.
+- Una orden eliminada sale sola del cálculo.
+- El banco mostró 0 órdenes al principio por su simulador, que solo entendía `==`; el código estaba bien.
+
+Límites conocidos (TODO-76):
+- Cálculo de refrigeración y Brigada siguen con la existencia sin órdenes.
+- La transacción de `movimientos.js` no ve las órdenes.
+- Las tarjetas de unidades suman kg, m y unidades (defecto previo).
+
+**146.9 Superada en parte (2026-10-07).** `§147` registra lo entregado como movimientos ENLAZADOS a su orden (desde el
+navegador) y `§148` lo hace solo; «no escribe nada» y la decisión 4 valen solo hasta `§147`. El antipatrón 146.5 (camino B)
+sigue valiendo para copias SIN enlace (en la bóveda, B era el registro desde el SERVIDOR: su «por qué no» sigue valiendo para esa
+variante). Los límites de arriba → `10` TODO-76.
+
+Crudos → bóveda `2026-10-07-nexo-contrato-ordenes/`.
+
+## 147. ADR-147 — Entregas de Órdenes E/S registradas como movimientos enlazados + indicadores completos por zona y departamento ⟦OPUS-5.5⟧ (2026-10-07)
+
+> *«necesito que los indicadores se aprecien de forma completa, zona, departamento, todo. adicionalmente, registra en movimientos
+> donde se han instalado estos accesorios»*. Preview (Excel) + workflow de diseño + 4 decisiones suyas, todas las recomendadas.
+> Registro en producción desde SU Chrome con su «sí». NO revisado externamente; revisión adversarial interna (6 Opus).
+
+**147.1 Causa raíz.** El nexo (`§146`) descontaba lo entregado, pero lo hacía calculando sin escribir.
+- Por eso Movimientos, el Histórico, el CSV, Brigada y las gráficas por zona, por departamento y la vista cruzada, que
+  leen solo `/movimientos`, mostraban 0.
+- Además, el código MOV era por suministro: se repetía entre ítems y podía reutilizar un número borrado.
+
+**147.2 Solución.**
+- **Reemplaza la decisión 4 de `§146`** para lo registrado. Cada entrega de una orden de ENTRADA con ítems del contrato
+  se escribe como EGRESO **enlazado**:
+  - campos `orden_es` y `fecha_entrega`, que el esquema conserva; un movimiento manual queda idéntico;
+  - id fijo `oes_<cid>_<orden>_<Sxx>`;
+  - transformador (id del documento del parque), subestación, zona y departamento tomados del **parque**;
+  - usuario «Órdenes E/S».
+- `planificarRegistro` (`domain/ordenes_movimientos_registro.js`) clasifica cada línea en registrable, no registrable
+  (decimales, sin transformador, no hallado, ambiguo, supera lo que queda) o desfasada.
+- `registrarDesdeOrden` (`data/movimientos.js`) hace una transacción por (orden, ítem):
+  - salta si el movimiento ya existe;
+  - no escribe si la orden cambió (mismas reglas que el nexo);
+  - valida la existencia.
+- **Consecutivo MOV único por año**: contador `suministros_config/correlativo_mov_<año>` dentro de la transacción. También
+  lo usa `crear()` (formulario manual y Brigada).
+- **Nexo:** con los movimientos enlazados expone `porItemPendiente`, `totalPendiente`, `totalRegistrado`,
+  `lineasDetalle` y estados. Lo registrado descuenta como movimiento y del nexo solo cuenta lo PENDIENTE.
+  - Avisa los huérfanos (orden rehecha: cuentan doble, con la plata) y los desfasados.
+  - Un enlazado que casó con su orden nunca es «doble registro».
+- **Tablero:**
+  - zona y departamento en PESOS + número de trafos;
+  - vista cruzada y Top 10 con egresos + pendientes (parque leído solo si hay pendientes);
+  - notas «Movimientos $X (de órdenes $Y) · por registrar $Z» y «+N por registrar»;
+  - estado por orden en la sección, con departamento y subtotal.
+- **Pestaña Movimiento:** «Entregas de órdenes E/S por registrar», con vista previa, casillas y confirmación en DOS
+  clics dentro de la página (sin `confirm` nativo).
+- **Histórico:** orden de origen en el detalle, aviso al borrar un enlazado y CSV con `fecha_entrega` y `orden` al final.
+- **Resetear:** mensaje según el contrato tenga nexo o no.
+
+**147.3 No-regresión.**
+- Sin cambios en reglas, índices ni funciones de servidor.
+- 4123000081 queda igual: «Trafos atendidos» y el nexo apagado como antes. En sus gráficas cambia la medida: ahora es
+  en pesos.
+- HTML viejo + JS nuevo sin errores. Con un módulo viejo en caché, la pestaña no se rompe y el registro se niega sin
+  enlace (L-102).
+- Antes de registrar, publicado y servido (10/10 = main) más 10 min de caché, y verificado que SU pestaña cargaba el JS
+  nuevo.
+
+**147.4 Verificación.**
+- Pruebas: 19 sintéticas nuevas (registro, enlace, desfase, huérfano, unidades); suite 2475/0/2; lint limpio.
+- Caso real fuera del repo (`plan-real.mjs`).
+- Banco con la foto real y el parque: 17 registradas y cifras idénticas.
+- **Producción:**
+  - Contador de 2026 sembrado en 1 con auditoría: MOV-2026-0001 se usó y se borró el 07/10.
+  - La vista previa en su sesión dio **18** entregas: entró la orden ENTRADA 20260723, 1 Buje 34,5 kV → T1-M/M-SOF San
+    Onofre, $12.285.000. Total $616.273.796, 15 trafos, 0 no registrables.
+  - Con su «sí»: 18 registradas (MOV-2025-0001 y MOV-2026-0002…0018). Lectura directa de la base: 18, todas con
+    `orden_es`.
+  - Tablero: consumido $616.273.796 sin cambio · 18 movimientos · 62 unidades · 7 descripciones · 15 trafos · sin
+    avisos · zona Bolívar 8 / Occidente 5 / Oriente 2 · depto Bolívar 8 / Sucre 4 / Cesar 2 / Córdoba 1 · Histórico 18
+    filas.
+- **Revisión adversarial**, 4 confirmados y corregidos:
+  - caché mezclada;
+  - trafo sin «· S/E» contado doble;
+  - orden rehecha contada doble sin aviso;
+  - procedimiento de publicación.
+
+**147.5 Anti-patterns evitados.**
+- Escribir sin enlace (doble conteo).
+- Adivinar cantidades o transformadores.
+- Reutilizar códigos.
+- Registrar con el JS viejo vivo.
+- Diálogos nativos que la automatización no puede pulsar.
+
+**147.6 Archivos.**
+- Nuevos: `domain/ordenes_movimientos_registro.js`, `tests/ordenes_movimientos_registro.test.js`.
+- Modificados: `domain/movimiento_schema.js`, `domain/ordenes_contrato_nexo.js`, `data/movimientos.js`,
+  `admin/admin-suministros-movimiento.js` + `.html`, `suministros-dashboard-public.js` + `.html`,
+  `admin/admin-suministros-historico.js`, `admin/admin-suministros-resetear.js`.
+- Commit `e0a3773`, main `3e29ad3`.
+
+**147.7 Doctrina.** `CLAUDE.md §3.2` · W-11 paso a paso · L-85 · L-86 · L-102 · L-128.
+
+**147.8 Verificado sano / no re-auditar.**
+- Las reglas de `/movimientos` no tienen lista cerrada de campos: `orden_es` pasa sin desplegar reglas.
+- `suministros_config` ya es solo admin. → **Superado por `§148.2`**: el equipo avanza `correlativo_mov_<año>` (`firestore.rules`, `/suministros_config`).
+- El rango de fechas en `ordenes_materiales` no pide índice.
+
+Vuelta atrás, en este orden (**válida solo antes de `§148`**; después, la de `§148`):
+1. Borrar los `oes_…` con justificación (las órdenes los vuelven a descontar).
+2. Después, si hiciera falta, revertir el código.
+
+Crudos → bóveda `2026-10-07-movimientos-desde-ordenes/`.
+
+## 148. ADR-148 — Las entregas de Órdenes E/S se registran SOLAS en el contrato (al guardar/eliminar la orden y al abrir el contrato) ⟦OPUS-5.5⟧ (2026-10-07)
+
+> *«necesito que al yo generar alguna orden de entrada y este involucre los items del contrato 4125000143 automaticamente se
+> refleje en indicadores, movimiento, historico todo lo referente en control y gestion operativa»*. Tres decisiones suyas, las
+> recomendadas salvo la 3: «Al guardar + al abrir el contrato» · «Se corrigen solos» · **«Sí, permitirles registrar»** (se le
+> advirtió que abre permisos sobre el dinero del contrato). NO revisado externamente; revisión adversarial interna (8 Opus).
+
+**148.1 Causa raíz.** Tras `§147` el registro era MANUAL: alguien con rol admin debía abrir la pestaña Movimiento y pulsar
+«Registrar». Una orden nueva o corregida quedaba «por registrar» (vista calculada) y Movimientos, Histórico y Brigada no la veían.
+
+**148.2 Solución.**
+- **Un motor, dos caminos** (`assets/js/data/contrato_ordenes_sync.js`):
+  - `sincronizarOrden(clave)`: Órdenes E/S lo llama tras guardar, editar, subir pendientes y eliminar
+    (`ordenes-materiales.js#reflejarEnContrato`, carga perezosa por `import()`; nunca bloquea: la orden ya quedó guardada).
+    Lee solo esa orden (fresca), sus movimientos enlazados (`orden_es.clave`) y el catálogo.
+  - `sincronizarContrato`: el tablero del contrato (`suministros-dashboard-public.js#autoRegistrar`), UNA vez por visita, con
+    los datos que ya leyó; los movimientos nuevos llegan por la suscripción y el tablero se recalcula.
+- **Plan puro** (`domain/ordenes_movimientos_registro.js`): `planificarSincronizacion` = registrar + `corregir` (la orden cambió:
+  se retira el viejo y se registra el de la orden, mismo id fijo) + `retirar` (huérfanos: orden eliminada, sin el ítem, fuera de
+  vigencia). `diferenciaConOrden` repite la prueba DENTRO de la transacción con la orden del instante; `null` = no se puede saber
+  → no se toca. `textoSincronizacion` = el aviso sin jerga.
+- **Escritura** (`data/movimientos.js`): `retirarMovimientoDeOrden` (transacción que relee movimiento, orden y catálogo; deja la
+  justificación «corrección automática — <motivo>» en `auditoria`); `registrarDesdeOrden` toma de la transacción la creación y la
+  **versión** de la orden y el valor unitario del catálogo; `listarEnlazadosDeOrden`.
+- **Nexo**: `huerfanos` estructurado con ids, `movimientoIds` por línea, `version` en el par; parámetro `corte` para la lectura
+  recortada (>500 órdenes): lo enlazado a órdenes no leídas no es huérfano.
+- **Reglas (mínimo privilegio, desplegadas)**: el equipo activo crea SOLO el EGRESO enlazado — id `oes_<cid>_<orden>_<Sxx>`,
+  contrato con nexo (`isContratoConNexo`, amarrado a `NEXO_CONTRATOS` por prueba), orden de ENTRADA existente con la misma fecha y
+  versión, valor del catálogo y `valor_total = cantidad × valor_unitario`, `createdBy` = quien escribe, y el código = el valor nuevo
+  del contador que avanza DE A UNO en la misma escritura y con su año. Retira SOLO si la orden ya no lo respalda (no existe, otro
+  tipo/fecha/transformador/creación, u otra versión). El contador `correlativo_mov_<año>` lo avanza de a uno (crear solo en 1).
+  Editar movimientos y todo lo manual sigue siendo del admin.
+- Textos: Histórico (borrar un enlazado: «se volverá a registrar sola mientras la orden lo diga»), Resetear, pestaña Movimiento,
+  avisos del nexo.
+
+**148.3 No-regresión.**
+- Admin intacto (su `create` es el de siempre, refactorizado a `movCamposValidos`). 4123000081 sin nexo: nada cambia.
+- Caché mezclada: imports por espacio de nombres en `movimientos.js` y en el motor + `import()` perezoso en las páginas: con un
+  módulo viejo solo se pierde el registro automático, no la página (`32 L-85`).
+- Producción al publicar: 18 enlazados al día, plan vacío → la publicación NO escribió nada; actúa desde la próxima orden.
+- Editar solo la nota de una orden (otra versión, mismo contenido) NO corrige ni gasta consecutivo.
+
+**148.4 Verificación.**
+- Unitarias 2493/0/2 (+18 en `tests/ordenes_sincronizacion.test.js`) · lint limpio · **reglas 238/238** (+37 en
+  `tests-rules/movimientos_ordenes.rules.test.js`, en las dos direcciones, una de punta a punta con el armado real del programa).
+- Banco con la foto real (`/__banco/flujo.html`, almacén compartido entre páginas y tiempo real): abrir el tablero registró 17;
+  editar 2→3 corrigió MOV-2025-0001→0002; solo la nota, sin cambios; orden nueva → MOV-2025-0003; eliminarla → retirada con su
+  justificación; Histórico 17; parque caído en Órdenes → solo aviso y el tablero corrigió al abrir.
+- **Revisión adversarial** (2 lentes + refutadores): 4 confirmados y corregidos, con prueba que falla con la regla vieja:
+  1. 🔴 la regla de retiro comparaba la creación con fracción de microsegundos contra `toMillis()` entero → un técnico podía
+     borrar una entrega válida (y lo mismo con un espacio al final del transformador) → `math.floor` + `trim()` (L-129);
+  2. el MOV no exigía que el contador avanzara (se podía repetir uno ya asignado) ni el año del código;
+  3. en Órdenes sin parque una corrección retiraba el viejo sin registrar el nuevo → sin parque solo se retira;
+  4. con >500 órdenes el tablero inventaba huérfanos en cada visita → `corte`.
+  Refutados: «inflar cantidades por la regla» (el técnico ya puede editar cualquier orden y el movimiento sin respaldo queda como
+  huérfano visible); «año sin contador» (2025=1 y 2026=18 existen en producción).
+- Publicado: reglas desplegadas ANTES del código; main `776e31f`.
+
+**148.5 Anti-patterns evitados.** Borrar con una foto vieja (cada retiro se recomprueba en su transacción) · bloquear el guardado de
+la orden · reglas que niegan el caso legítimo (prueba de punta a punta) · comparar tiempos SDK↔reglas sin recortar · contar doble.
+
+**148.6 Archivos.** Nuevos: `data/contrato_ordenes_sync.js`, `tests/ordenes_sincronizacion.test.js`,
+`tests-rules/movimientos_ordenes.rules.test.js`. Modificados: `firestore.rules`, `data/movimientos.js`,
+`domain/ordenes_movimientos_registro.js`, `domain/ordenes_contrato_nexo.js`, `domain/movimiento_schema.js`,
+`ordenes-materiales.js`, `suministros-dashboard-public.js`, `admin/admin-suministros-{movimiento,historico,resetear}.js`,
+`admin/suministros-movimiento.html`. Commits `4adb9a0` + `41dc243`, main `776e31f`.
+
+**148.7 Doctrina.** `CLAUDE.md §3.2` (free-tier: una sola lectura por visita, nada si está al día) · `§3.5` (transacciones) ·
+L-78 (regla probada en las dos direcciones) · L-85 · L-102 · L-129.
+
+**148.8 Verificado sano / no re-auditar.**
+- Los 18 enlaces de `§147` no traen `version`: si un TÉCNICO cambia solo la cantidad de una de esas órdenes, la regla le niega el
+  retiro y el aviso dice que lo hará un administrador; lo corrige solo la próxima apertura del contrato por un admin. Es a propósito.
+- `sincIntentada` evita bucles con el tiempo real; dos personas a la vez no duplican (id fijo + `ya_estaba`/`vigente`).
+
+**148.9 Pendiente y riesgos aceptados (añadido en `§149`).**
+- **Pendiente → TODO-62**: el camino del TÉCNICO no corrió en vivo (banco con sesión admin; reglas solo en el emulador, que en
+  esta misma regla no reprodujo producción, L-129). Comprobar con su primera orden con ítems del contrato: debe existir su
+  `oes_…` con `createdBy` = ese técnico; si falta, el aviso amarillo lo esconde y el admin lo tapa al abrir el contrato.
+- **Opción recomendada que él no eligió**: «No — solo el administrador registra» (los técnicos guardan la orden y la entrega
+  queda por registrar hasta que un admin abre el contrato). Su porqué no quedó registrado (respondió «Sí» sin razón escrita; no
+  se reconstruye). La alternativa de servidor (Cloud Function) ya se había evaluado y descartado en la bóveda de `§146`
+  (`2026-10-07-nexo-contrato-ordenes/SINTESIS.md`, «Por qué no B»: más piezas en producción, guion con credencial). Revisión
+  externa (W-11 capa 6): NO hecha; queda en **(J)**.
+- **Riesgos aceptados**: un técnico, escribiendo a mano en la base, podría (1) retirar un enlazado cuya orden cambió SOLO de
+  versión — se vuelve a registrar en la siguiente sincronización y queda en `auditoria`; (2) registrar contra una orden real un
+  ítem o cantidad que la orden no trae — queda como huérfano visible con su valor y su uid, y lo retira un admin al abrir el
+  contrato. Un mapa derivado en la orden NO lo cerraría: lo escribe el mismo técnico (puede editar cualquier orden).
+
+Vuelta atrás, en este orden: 1) revertir el merge `776e31f` y desplegar `firestore.rules` de `3e29ad3`; 2) recién entonces,
+si se quiere, borrar los `oes_…` con justificación (antes de esto se volverían a registrar solos); 3) revertir `e0a3773` para
+volver a `§146`. Crudos → bóveda `2026-10-07-registro-automatico/`.
+
+## 149. ADR-149 — Auditoría Nivel-2 del cerebro: por tercera vez el código se publicó con su cerebro bloqueado, y el arranque no nombraba el frente vivo ⟦OPUS-5.5⟧ (2026-10-07)
+
+> Disparada por el gate #14 («MUY vencida»: 20 ADRs desde la del 10-02), que BLOQUEÓ el commit del cerebro de §146-§148 con su
+> código ya en `main`. El Ingeniero: «procede con los dos pendientes». Deliberación: bóveda `2026-10-07-auditoria-nivel2`
+> (`HALLAZGOS.md` = input de la próxima; crudo `crudos/resultado-workflow.json`).
+
+**149.1 Qué se hizo.** Skill `auditoria-cerebro`: 7 sondas Opus de solo lectura (S0 diff, S1-S2 estado y frescura, S3 retrieval
+frío, S4 fidelidad de deliberación, S5 memoria del harness, S6 economía, S7 voz adversarial) + verificador escéptico. **44
+hallazgos** (28 medios/altos, todos reproducidos). De los 59 del 10-02: 32 cerrados que siguen valiendo, 1 cerrado en falso
+(S5-10), 16 abiertos y rastreados, **10 REINCIDENTES**. **Retrieval-drill 5/5 correctas** (el cerebro entrega; Q2 costó ~18k de
+más porque la regla estaba dispersa → L-130).
+
+**149.2 Lo más grave (verificado).** (1) **Cierre a medias por 3.ª vez** (S0-01/S7-01, alta): `§146`-`§148` se publicaron (con
+reglas de permisos) mientras el gate #14 bloqueaba su cerebro, aunque el arranque lo anunciaba desde el 10-05 → **M-10**. (2)
+**Misión y foco del arranque** decían Fichas · Cargabilidad con 8 ADRs seguidos de Órdenes/Contrato y su orden del 10-06 (S1-02).
+(3) **Síntesis y ADRs superados sin marca** (S3-01, S4-01…S4-04): §143 «SALIDA», §146 «no escribe», §147.8 «solo admin», recetas
+de vuelta atrás que hoy reharían los movimientos, la síntesis de §148 invertía el porqué de un refutado. (4) **00 sobre su tope**
+(+60 % en 5 días) y 5 neuronas ≥ 90 % sin plan; a 33 se le había subido el tope en vez de partirla (S6-03, S6-04). (5) El banco que
+verificó §148 no se podía repetir desde la bóveda (S7-02). (6) Las filas DUEÑO del 10-02 nunca le llegaron (S7-05).
+
+**149.3 Cerrado en este cierre.** Misión de `05` (frente en curso: Órdenes E/S + Contrato; esperan: Fichas, Cargabilidad) y foco
+de `10` resellados al 10-07 · TODO-76 sube de `11` a `10` con lo suyo (familias y % por falla `§144.8`, «ejecutado» y fecha_inicio
+`§145.9`) · TODO-62 suma la verificación del técnico en vivo de `§148` · TODO-69, TODO-54 (nota en `§74.23`), TODO-67 (frase del
+gate sin § fijo), TODO-65 (`#nota`) y «CI sin ver» podados/corregidos · **(J)** en la lista del Ingeniero · marcas sin reescribir
+en `§145`, `§145.4`, `§146.9`, `§147.8`, `§148.9` (pendiente, opción recomendada, riesgos aceptados, vuelta atrás encadenada),
+crudos de `§142`/`§143` · **hija `36-LECCIONES-CHROME-BANCO`** (L-62, L-92, L-94, L-105 de 33 + L-117 de 30, sin cambiar una
+letra; 33 vuelve a 12.000) · **L-130** (publicar → servido → 10 min → su módulo, antes de escribir datos) · **M-10** · 00: filas
+§129-§148 ≤ ~90c, fila 📈 comprimida con sus ganchos, Capa 2 «Órdenes E/S y Contrato», regla de largo, ruta a 36 · 20 y 22 con
+Contratos · `60 §W-11` «Modo paso a paso» · memorias: foco y paso a paso apuntan al cerebro; paraguas con gh, L-51 en 34 y la
+excepción de Fichas · bóveda: 5 síntesis y 6 filas del README corregidas, banco de §148 completo y probado (`node server.mjs`,
+10/10 rutas 200), reproducción del refutador, tabla del 10-02 reconciliada (7 filas).
+**GC pareado**: boot 31.386 → **31.238c** (−148c), con la misión nueva, TODO-76 y el relevo del frente vivo adentro.
+**Verificación del cierre** (4 Opus: 3 verificadores por grupo de sondas + crítico de completitud): 27 fallas del propio cierre
+(punteros a lecciones movidas, (J) sin el consejo externo, relevo sin el frente vivo, TODO-66 incompleto, archivos sin preparar),
+todas corregidas antes del commit (crudo en la bóveda).
+
+**149.4 Queda (con dueño).** **KERNEL** (TODO-67, un solo bump): #14 visible en `--boot` y que no bloquee un commit SOLO del
+cerebro; heartbeat que cuente también el volumen; handoff truncado; versión del banner desde VERSION; aviso de sello de 05 en el
+gate #16; quitar #4, #13, 5c y el canario de 48 h (one-in-one-out). **TODO-66**: partir 30 («Costuras de datos», ≈6,7k a una hija),
+32 («papel firmado y Excel»: L-87, L-88, L-89, L-100, L-103, L-108, L-128, ≈9,5k a una hija) y la cola («Lo que YA está cerrado» a
+`cola-fichas-tecnicas-cerrados.md`) · reglas que el cerebro delega a la memoria (S5-03) · unificar copias de memoria entre slugs ·
+OLTC → ESTADO.md · banco canónico de Órdenes en la bóveda + gate · podar `launch.json` · **20** (93 %: pasar a `22` el detalle
+por módulo que queda en la madre) y **00** (90 %: vigilarlo; filas ≤ 90c). Reglas del cierre escritas en la skill
+`auditoria-cerebro` ([HONOR]): el ADR que cierra un hallazgo cita su ID y marca su fila en el mismo cierre; una fila DUEÑO sin
+línea en (J) deja la auditoría sin cerrar (gate posible → KERNEL). **DUEÑO (J)**, con la opción recomendada: calibración del
+gate #14 → que avise y NUNCA bloquee un commit solo del cerebro, y que el freno pase a publicar código cuyo ADR no esté guardado
+(M-10) · MEMORY.md → agrupar decks/OLTC en un puntero (~3,5k menos por sesión) · costo-cerebro → contar solo los commits de
+cerebro sueltos · consejo externo de W-11 → solo cuando él lo pida, y el ADR lo dice · rótulo «Borrador» fuera de Fichas (S5-05
+del 10-02) → lo decide él.
+
+**149.5 Anti-patterns evitados.** `--no-verify` · subir un tope o el umbral del gate sin su decisión · reescribir historia (todo
+va como marca o nota) · borrar pendientes (se mueven) · puntaje numérico · dar por cerrado un arreglo de memoria en un solo slug.
+
+**149.6 Archivos.** `CLAUDE.md` (§0: 36, Contratos), `docs/05`, `10`, `11`, `00`, `00a` (líneas), `20`, `22`, `30` (M-10, puntero a 36, tope), `33`, `34`, `53`,
+`36` (nueva), `60`, `99` (§74.23, §142, §143, §145, §146.9, §147.8, §148.9, §149), `.brain-manifest.json` (caps 33/36, deepAudit);
+memorias de los dos slugs; skill `auditoria-cerebro` (2 reglas de cierre); bóveda (5 síntesis, README, banco, rev-auto, tabla
+del 10-02, `2026-10-07-auditoria-nivel2`).
+
+**149.7 Doctrina.** §G.4 (auto-auditoría, captura) · §G.5 (GC pareado; partir, no subir topes) · M-07 → M-10 · skill `auditoria-cerebro`.
+
+**149.8 Verificado sano / no re-auditar.** Los 16 ADRs §129-§148 con deliberación tienen carpeta y crudo · ninguna memoria guarda
+SHAs · los punteros de la memoria SGM al cerebro resuelven · 2493/238 y lo servido = `776e31f` coinciden con `§148` · el banco
+archivado arranca desde la bóveda.

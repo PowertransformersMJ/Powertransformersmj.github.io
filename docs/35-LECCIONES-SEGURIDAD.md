@@ -112,3 +112,14 @@ una función sobre `e`; `x.size()==N` en vez de listas de claves; una regex en v
 adversarial lo cazó antes de publicar. **Regla**: todo valor que decide QUIÉN firma y que puede cambiar solo (sesión,
 permiso, red) se congela en una COPIA al empezar la descarga; nombre, firma y folio salen de esa copia, nunca del estado
 vivo ni del borrador. **Gate**: `tests/fichas_elaborador_sesion.test.js` («una descarga no cambia de elaborador»).
+
+### L-129 · Un tiempo que cruza del SDK a una regla se compara en milisegundos ENTEROS (y se prueba con microsegundos)
+**Disparador**: una regla de Firestore compara `timestamp.toMillis()` contra un número que guardó el navegador. · **Cicatriz**
+(`99 §148`): el enlace de la entrega guardaba `orden.creadoEn.toMillis()` del SDK web, que trae la FRACCIÓN de los
+microsegundos (1767268800367.123); la regla `toMillis()` da entero. «Distinto» salía siempre verdadero y cualquier técnico
+podía borrar una entrega que la orden seguía respaldando. Las 32 pruebas pasaban porque el emulador sembrado con
+`Timestamp.fromMillis` no tiene microsegundos; lo cazó la revisión adversarial antes de publicar. Mismo patrón: el enlace
+guardaba el transformador recortado y la orden no. · **Regla**: en la regla, `math.floor(...)` del lado del número y `trim()`
+del lado del texto que el programa recorta; en el JS, `Math.floor` en las dos puntas. Toda prueba de reglas con tiempos siembra
+un `new Timestamp(s, 367123000)` (con microsegundos), no `fromMillis`. **Gate**: `tests-rules/movimientos_ordenes.rules.test.js`
+(«creación de la orden con microsegundos… → negado»), que falla con la regla vieja.

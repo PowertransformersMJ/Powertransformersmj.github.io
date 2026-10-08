@@ -2,14 +2,14 @@
 
 > Nodo de signos vitales. Se **AUTO-CARGA** (con `CLAUDE.md` + `10`). "¿En qué estado está el sistema AHORA?". Tope ~25 líneas / 4k chars (§G.5) — tablero, no bitácora. Detalle histórico → `99` vía `00`.
 
-| Señal | Valor (al **2026-10-06**) |
+| Señal | Valor (al **2026-10-07**) |
 |---|---|
-| **Misión ahora** | **Dos frentes**: FICHAS TÉCNICAS por partes (cola → `docs/cola-fichas-tecnicas.md`) · CARGABILIDAD SCADA (TODO-69). Último publicado: **`§145` Contrato 4125000143: inventario y valor del pedido** (main `568195d`, 10-07); antes `§144` indicadores de Órdenes; CF-43/44 en rama esperando su «procede». Antes: `§135` sitio en celular (`e810c89`) y Duval `§131`–`§134` (BORRADOR). Cadena en `00` Capa 1. |
-| **Build** | 🟢 **2440 pass / 0 fail / 2 skip** + `lint:html` limpio + **201 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-06 (local; servido = main `568195d` el 10-07 (curl); CI sin ver; último CI/Deploy visto en VERDE: `f0157ee` (10-05), L-65; 1 prueba de velocidad inestable: relanzar, **L-122**) |
-| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` y `main` con el MISMO contenido (`main` avanza por merge; SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). Historia reescrita 2026-07-21 → `99 §52.8` + L-25. |
+| **Misión ahora** | **Frente en curso** (orden suya del 10-06): **ÓRDENES E/S + CONTRATO 4125000143** (`§141`–`§148`; pendientes → TODO-76 · TODO-62 · TODO-65). **Esperan su respuesta**: FICHAS (CF-43/44 en rama; cola → `docs/cola-fichas-tecnicas.md`) · CARGABILIDAD SCADA (TODO-69). Último publicado: **`§148` las entregas de Órdenes se registran SOLAS en el contrato** (reglas + main `776e31f`, 10-07). Cadena → `00` Capa 1. |
+| **Build** | 🟢 **2493 pass / 0 fail / 2 skip** + `lint:html` limpio + **238 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-07 (local + emulador de reglas; servido = main `776e31f` el 10-07 (curl); CI y Deploy en VERDE en `776e31f` (`gh run list`, 10-07; la prueba de velocidad inestable se relanzó, **L-122**) |
+| **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` y `main` con el MISMO contenido (`main` avanza por merge; SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices + 13 exenciones `scada_*`: archivo = servidor** (2026-10-01, L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-09-08 |
-| **Deuda crítica** | 🔴 Lo que **solo el Ingeniero** puede hacer → `10 §Solo puede hacerlo el Ingeniero` (B–I). 🔴 La bóveda vive en UN disco sin remoto (TODO-29). |
+| **Deuda crítica** | 🔴 Lo que **solo el Ingeniero** puede hacer → `10 §Solo puede hacerlo el Ingeniero` (B–J). |
 
 ## ⚠️ Flags de riesgo activos
 - **🤖 Interinato (desde 2026-07-23)**: si el modelo del turno NO es Fable 5 → cargar la skill `opus-interino-protocolo` (R1-R7). Subagentes/workflows SIEMPRE acotados y con `model: 'opus'`; la cuota Fable se reserva para análisis y decisiones (orden del Ingeniero).
