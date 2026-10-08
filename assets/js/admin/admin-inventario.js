@@ -4,9 +4,12 @@
 // ══════════════════════════════════════════════════════════════
 
 import {
-  listar, obtener, crear, actualizar, eliminar,
+  listar, obtener, crear, actualizarCampos, eliminar,
   ESTADOS, DEPARTAMENTOS, estadoLabel, departamentoLabel, isReady
 } from '../data/transformadores.js';
+import {
+  valoresFormulario, entradaDesdeFormulario, parcheEdicionInventario
+} from '../domain/inventario_edicion.js';
 import { logoutAdmin, ADMIN_ROUTES } from './admin-auth.js';
 import { bucketColor } from '../ui-helpers.js';
 
@@ -44,6 +47,10 @@ const formMsg  = $('formMsg');
 const btnSave  = $('btnSave');
 const fDeptFilter  = $('fDept');
 const fEstadoFilter = $('fEstado');
+
+// Equipo abierto para editar: su id y la foto del formulario al abrirlo.
+// Al guardar se escribe solo lo que cambió respecto a esa foto (ADR-154).
+let edicion = null;
 
 // ── Poblar selects ──
 function fillSelects() {
@@ -127,41 +134,40 @@ function closeModal() {
   modal.style.display = 'none';
   form.reset();
   fId.value = '';
+  edicion = null;
 }
 function fillForm(t) {
+  const v = valoresFormulario(t);
   fId.value     = t.id || '';
-  fCodigo.value = t.codigo || '';
-  fNombre.value = t.nombre || '';
-  fDeptMain.value = t.departamento || '';
-  fEstadoMain.value = t.estado || 'operativo';
-  fMun.value    = t.municipio || '';
-  fSub.value    = t.subestacion || '';
-  fPot.value    = t.potencia_kva ?? '';
-  fTp.value     = t.tension_primaria_kv ?? '';
-  fTs.value     = t.tension_secundaria_kv ?? '';
-  fMarca.value  = t.marca || '';
-  fModelo.value = t.modelo || '';
-  fSerial.value = t.serial || '';
-  fFf.value     = t.fecha_fabricacion || '';
-  fFi.value     = t.fecha_instalacion || '';
-  fLat.value    = t.latitud ?? '';
-  fLng.value    = t.longitud ?? '';
-  fObs.value    = t.observaciones || '';
+  fCodigo.value = v.codigo;
+  fNombre.value = v.nombre;
+  fDeptMain.value = v.departamento;
+  fEstadoMain.value = v.estado;
+  fMun.value    = v.municipio;
+  fSub.value    = v.subestacion;
+  fPot.value    = v.potencia_kva;
+  fTp.value     = v.tension_primaria_kv;
+  fTs.value     = v.tension_secundaria_kv;
+  fMarca.value  = v.marca;
+  fModelo.value = v.modelo;
+  fSerial.value = v.serial;
+  fFf.value     = v.fecha_fabricacion;
+  fFi.value     = v.fecha_instalacion;
+  fLat.value    = v.latitud;
+  fLng.value    = v.longitud;
+  fObs.value    = v.observaciones;
   // v2 fields
-  const id = t.identificacion || {};
-  const ub = t.ubicacion || {};
-  fTipoActivo.value = id.tipo_activo || 'POTENCIA';
-  fUUCC.value       = id.uucc || '';
-  fGrupo.value      = id.grupo || '';
-  fZona.value       = ub.zona || '';
+  fTipoActivo.value = v.tipo_activo;
+  fUUCC.value       = v.uucc;
+  fGrupo.value      = v.grupo;
+  fZona.value       = v.zona;
 }
 function readForm() {
-  return {
+  return entradaDesdeFormulario({
     codigo: fCodigo.value,
     nombre: fNombre.value,
     departamento: fDeptMain.value,
     estado: fEstadoMain.value,
-    estado_servicio: fEstadoMain.value,
     municipio: fMun.value,
     subestacion: fSub.value,
     potencia_kva: fPot.value,
@@ -175,23 +181,11 @@ function readForm() {
     latitud: fLat.value,
     longitud: fLng.value,
     observaciones: fObs.value,
-    // v2 explicit sections (sanitizer reconcilia con flat)
-    identificacion: {
-      codigo:      fCodigo.value,
-      nombre:      fNombre.value,
-      tipo_activo: fTipoActivo.value,
-      uucc:        fUUCC.value,
-      grupo:       fGrupo.value
-    },
-    ubicacion: {
-      departamento: fDeptMain.value,
-      zona:         fZona.value,
-      municipio:    fMun.value,
-      subestacion_nombre: fSub.value,
-      latitud:      fLat.value,
-      longitud:     fLng.value
-    }
-  };
+    tipo_activo: fTipoActivo.value,
+    uucc: fUUCC.value,
+    grupo: fGrupo.value,
+    zona: fZona.value
+  });
 }
 
 // ── Cargar ──
@@ -228,6 +222,10 @@ tbody.addEventListener('click', async (e) => {
       const t = await obtener(id);
       if (!t) return showInfo('Registro no encontrado.', 'err');
       fillForm(t);
+      // La foto se toma de lo que QUEDÓ en pantalla (un <select> o una
+      // fecha que no acepta el valor guardado queda vacío): así lo que el
+      // usuario no toca nunca se escribe.
+      edicion = { id: t.id, inicial: readForm() };
       openModal(true);
     } catch (err) { showInfo('Error al cargar: ' + err.message, 'err'); }
     return;
@@ -258,8 +256,13 @@ form.addEventListener('submit', async (e) => {
     const data = readForm();
     const uid = (window.__sgmAdmin && window.__sgmAdmin.uid) || null;
     if (fId.value) {
-      await actualizar(fId.value, data);
-      showInfo(`✓ Transformador ${data.codigo} actualizado.`, 'ok');
+      if (!edicion || edicion.id !== fId.value) {
+        throw new Error('No se sabe qué equipo se está editando. Cierra y vuelve a abrirlo con el lápiz.');
+      }
+      const { parche, diff, errores } = parcheEdicionInventario(edicion.inicial, data);
+      if (errores.length > 0) throw new Error('Validación v2 falló:\n  · ' + errores.join('\n  · '));
+      const escribio = await actualizarCampos(fId.value, parche, { uid, diff });
+      showInfo(escribio ? `✓ Transformador ${data.codigo} actualizado.` : `Sin cambios en ${data.codigo}.`, 'ok');
     } else {
       await crear(data, uid);
       showInfo(`✓ Transformador ${data.codigo} creado.`, 'ok');
@@ -276,7 +279,7 @@ form.addEventListener('submit', async (e) => {
 });
 
 // ── Eventos UI ──
-$('btnNuevo').addEventListener('click', () => { form.reset(); fId.value = ''; openModal(false); });
+$('btnNuevo').addEventListener('click', () => { form.reset(); fId.value = ''; edicion = null; openModal(false); });
 $('btnCancel').addEventListener('click', closeModal);
 $('modalClose').addEventListener('click', closeModal);
 modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
