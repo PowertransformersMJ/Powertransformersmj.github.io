@@ -58,14 +58,13 @@ Trivial / reversible / mecánico → trabajo directo (+ `caza-bugs` si hay estad
 10. **CIERRE** — ADR en `99` + fila en `00` + lección en `30` + `brain:check` verde. (`npm run brain:archive -- --adr NN --title "…"` hace la plomería; el juicio lo escribo yo.)
 
 **🔒 Artefactos visibles al Ingeniero (si falta uno, el flujo está INCOMPLETO):**
-(a) el **preview fiel** cuando es UI · (b) el **prompt de consejo externo** en bloque copiable · (c) el **reporte de validación live**. Se entregan SIEMPRE, sin que los pida.
+(a) el **preview fiel** cuando es UI · (b) el **prompt de consejo externo** en bloque copiable **solo cuando él lo pide** (decisión suya 2026-10-07, `§150`; si no, el ADR dice «NO revisado externamente») · (c) el **reporte de validación live**. (a) y (c) se entregan SIEMPRE, sin que los pida.
 
 **Modo «paso a paso»** (cuando él lo pide; `§127`, `§131`–`§132`, `§144`–`§147`): tras la capa 1 (solo lectura, con conteos
 REALES de producción) se le entrega un informe sin jerga con maqueta, y cada punto de CRITERIO de dominio va como pregunta
-cerrada con una opción recomendada y su porqué: ese veredicto es SUYO (la capa 7 queda para lo técnico). Si sus textos de
-dominio se publican con el rótulo «Borrador» hasta su «procede» fuera de Fichas → L-63 (nota; lo decide él). Cuando no se
-entrega el prompt (b), el ADR lo dice («NO revisado externamente»): si eso puede ser normal o el «SIEMPRE» de arriba manda está
-pendiente de su decisión (**(J)** de `10`).
+cerrada con una opción recomendada y su porqué: ese veredicto es SUYO (la capa 7 queda para lo técnico). Sus textos de
+dominio se publican con el rótulo «Borrador · pendiente del Ingeniero» hasta su «procede» (también fuera de Fichas; en Fichas
+el papel espera su «procede» antes de publicarse) → L-63 (nota, `§150`).
 
 ---
 
