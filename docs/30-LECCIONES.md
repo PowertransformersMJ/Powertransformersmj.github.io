@@ -75,6 +75,9 @@
 ### L-15 · setDoc(merge:true) sobre colección con rules de enums obligatorios
 **Cicatriz**: las rules evalúan `request.resource.data` merged-post; si el doc no existía, campos requeridos (`codigo`, `estado`) quedan `undefined` → falla la rule. · **Regla**: rellenar defaults seguros en el data layer respetando valores existentes. (Full: `_legacy §9.9` / v2.8.1.)
 
+### L-134 · `updateDoc` con un mapa REEMPLAZA el mapa entero: un formulario parcial borra lo que no muestra
+**Disparador**: guardar desde un formulario que muestra solo parte del documento. · **Cicatriz** (`99 §154`): Inventario sanitizaba ~21 casillas y escribía las secciones completas → el 1.er «Guardar» vaciaba matrícula, condición y año en los 208 (simulado; nadie lo había usado). Las reglas no lo frenan. · **Regla**: escribir SOLO lo que cambió, con claves de punto (`'placa.marca'`), contra la foto del formulario al abrir (`domain/inventario_edicion.js`); probar en el emulador. [HONOR]
+
 ---
 
 ### L-72 · Una hoja de Excel cuyo título está en la fila 2 se lee como una hoja SIN columnas

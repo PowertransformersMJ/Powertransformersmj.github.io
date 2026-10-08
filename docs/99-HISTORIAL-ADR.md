@@ -6949,3 +6949,70 @@ admin de Subestaciones, Fichas.
    deja así? (el mapa usa el registrado; corregirlo en uno solo de los dos lados les quita el punto).
 5. **¿La matrícula sigue a la posición o al aparato** cuando un transformador se traslada? (la doble llave cubre ambos casos).
 6. Siguen de `§152.9`: pestaña Mapa (1b) · red UPME · zonas.
+
+## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
+
+> Origen: el hallazgo de `§153.8` («Inventario borra la matrícula al editar… → tarea aparte»), leído en el código el 10-08 y
+> aquí reproducido con datos SINTÉTICOS. NO revisado externamente; sin comité (arreglo acotado y reversible). Verificación:
+> unitarias + emulador + banco antes/después + lectura de producción (solo `.get()`). Evidencia: bóveda `2026-10-08-inventario-edicion`.
+
+**154.1 Causa raíz (verificada).** `admin/inventario.html` muestra 21 casillas. `readForm` armaba solo esas; `actualizar`
+(`data/transformadores.js`) las pasaba por `sanitizarTransformador`, que devuelve TODAS las secciones con su valor por defecto
+para lo que no llega, y escribía el resultado con `updateDoc`. En Firestore una clave de primer nivel con un mapa REEMPLAZA el
+mapa guardado entero (comprobado en el emulador). El primer «Guardar» —aunque no se cambiara nada— dejaba
+`identificacion.matricula = ''`, `ubicacion.subestacionId = ''`, `salud_actual` en blanco (condición oficial `hi_final`,
+`bucket` y todas las calificaciones), `fabricacion.ano_fabricacion = null` (la edad), usuarios (`servicio`, `criticidad`),
+corrientes nominales y medidas, `fases`, placa extra (norma, n.º de fábrica, etapas ONAN/ONAF), protecciones en `false` y
+`estados_especiales` vacío. Además un equipo «fallado» se abría como «retirado» (el formulario leía la proyección v1 `estado`).
+Las reglas lo dejaban pasar: el `update` de admin no exige secciones.
+
+**154.2 Solución.**
+- **`domain/inventario_edicion.js`** (puro): `valoresFormulario(t)` (lo que muestra al abrir; el estado sale de
+  `estado_servicio`) · `entradaDesdeFormulario(v)` (la forma de siempre de `readForm`; la usa también el alta) ·
+  `parcheEdicionInventario(inicial, actual)`: compara el formulario al ABRIR —foto de lo que QUEDÓ en pantalla, con las
+  conversiones del navegador (una fecha o un `<select>` que no acepta el valor guardado quedan vacíos)— con el formulario al
+  GUARDAR y devuelve solo lo que cambió: claves con punto (`placa.marca`) + su copia en la raíz (proyección v1), el diff para la
+  bitácora y las mismas validaciones de siempre.
+- **`data/transformadores.js`**: `actualizarCampos(id, parche, {uid, diff})` — `updateDoc` con claves de punto (cada una toca SOLO
+  ese campo) + `updatedAt` + bitácora con autor y diff; sin cambios no escribe. `actualizar` se conserva (aditivo) con un aviso:
+  ya no la llama nadie.
+- **`admin-inventario.js`**: guarda la foto al abrir (`edicion`) y escribe con `actualizarCampos`.
+
+**154.3 No-regresión.** El alta (`crear`) recibe la misma forma (banco: alta nueva OK). IDs del formulario, tabla, filtros y
+borrado intactos. Las validaciones dicen lo mismo. Menos escrituras: abrir y guardar sin cambios = 0.
+
+**154.4 Verificación.**
+- **Producción, SOLO LECTURA** (firebase-admin, solo `.get()`, 10-08 14:01 UTC): **208 equipos, 0 con la matrícula vacía** → el
+  daño NO ha ocurrido; la bitácora no tiene NINGUNA entrada `actualizar` de transformadores (nadie usó el editor);
+  `ubicacion.subestacionId` vacío en los 208 (nunca se llenó, `§153.1`). Simulación en memoria de «abrir y guardar sin cambios»
+  sobre cada equipo real: **los 208 habrían perdido datos, en 37 campos distintos** (matrícula, año de fabricación y la condición
+  en los 208; usuarios y corrientes en ~205). Raíz = secciones en los 16 campos del formulario (0 divergencias); 0 «fallado» hoy.
+- **Unitarias 2530/0/2** (+10 `tests/inventario_edicion.test.js`): sin cambios no escribe; cada una de las 21 casillas escribe
+  solo su campo y su copia en la raíz; borrar a propósito sí se guarda; UUCC fuera de catálogo y fecha en otro formato se
+  conservan si nadie las toca; «fallado» se muestra como tal. **Mutante** con el camino viejo → 8 de 10 fallan (matrícula `''`).
+- **Emulador: 242/0 reglas** (+4 `tests-rules/inventario_edicion.rules.test.js`): el camino viejo BORRA matrícula, S/E,
+  condición, año y usuarios; el nuevo cambia solo la marca y deja el resto idéntico; un técnico sigue sin poder; la bitácora
+  guarda el diff con rutas de punto.
+- **Banco con la página REAL** (Firestore en memoria con la semántica de `updateDoc` probada en el emulador; `/__antes/` = lo
+  publicado): ANTES, cambiar la marca → 1 escritura de 35 claves y el equipo sin matrícula, condición, año, usuarios ni
+  corrientes. DESPUÉS: sin cambios → 0 escrituras; marca → `placa.marca`, `marca`, `updatedAt` y todo lo demás idéntico;
+  bitácora con autor y diff; código vacío → mismo error y 0 escrituras; alta nueva OK; consola limpia. `lint:html` limpio.
+
+**154.5 Anti-patterns evitados.** Escribir el documento entero desde un formulario parcial · dar por buena la semántica de
+Firestore sin el emulador · «reparar» producción sin daño comprobado · quitar o renombrar `actualizar`.
+
+**154.6 Archivos.** Nuevos: `assets/js/domain/inventario_edicion.js`, `tests/inventario_edicion.test.js`,
+`tests-rules/inventario_edicion.rules.test.js`. Modificados: `assets/js/admin/admin-inventario.js`,
+`assets/js/data/transformadores.js`. INTACTOS: `domain/transformador_schema.js`, `firestore.rules`, el importador,
+`admin/inventario.html`.
+
+**154.7 Doctrina.** `CLAUDE.md §3.2` (aditivo, free-tier) · `§3.5` (editar = `update`, ahora campo por campo) · **L-134** ·
+interinato R2/R4 (prueba del escenario en el mismo commit; banco antes/después).
+
+**154.8 Verificado sano / no re-auditar.**
+- Solo `admin-inventario.js` llamaba `transformadores.actualizar` (grep en `assets/`, `pages/`, `admin/`, `home.html`); las
+  demás páginas solo leen el parque.
+- No hay datos que reparar: los 208 conservan matrícula y condición (lectura del 10-08).
+- Las claves con punto que el formulario puede escribir son identificadores simples (sin tildes ni caracteres reservados).
+- Observado y NO tocado (previo, cosmético): los enlaces `inventario.html#edit:<id>` de admin mapa/alertas no abren el
+  editor; y `cargar()` borra el aviso «✓ actualizado» al recargar la tabla.

@@ -88,6 +88,7 @@
 | §151 | ADR-151 — **Cerebro**: documentación total de la sesión 10-06 → 10-07 | 6740 |
 | §152 | ADR-152 — **Mapa de Colombia**: fondo arreglado + mapa DANE en Borrador (parque por municipio) | 6774 |
 | §153 | ADR-153 — **Mapa**: S/E ubicadas con el KMZ del Ingeniero (142/147) y sus transformadores | 6854 |
+| §154 | ADR-154 — **Inventario**: editar guarda solo lo que cambió (ya no borra matrícula ni condición) | 6953 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -102,6 +103,7 @@
 | Necesito saber qué contiene una hoja `docs/*.md` del dueño | 🗂️ `21-ESPACIAL-HOJAS` (hija de `20`) |
 | Voy a lanzar agentes/workflow o fiarme de un barrido por consola | 🛠️ `33-LECCIONES-HARNESS` (hija de `30`) |
 | Conduzco SU Chrome, subo datos por la extensión o monto/capturo un banco local · voy a ESCRIBIR datos desde su pestaña tras publicar (**L-130**) | 🌐 `36-LECCIONES-CHROME-BANCO` (hija de `30`) |
+| Voy a GUARDAR desde un formulario que no muestra todo el documento (editar un equipo, una S/E…) | `30` **L-134** + `99 §154` (`actualizarCampos`) |
 | Validar si algo es código muerto antes de borrar | 🧪 `30-LECCIONES` + `_legacy/README.md` |
 | Bug recurrente / 2 fallos en el mismo síntoma | Capa 1 → tramo de `99-HISTORIAL-ADR` |
 | ¿Qué hay pendiente? estado del sprint | ⚡ `10-CORTO-PLAZO` (TODO-NN) |
