@@ -6950,6 +6950,14 @@ admin de Subestaciones, Fichas.
 5. **¿La matrícula sigue a la posición o al aparato** cuando un transformador se traslada? (la doble llave cubre ambos casos).
 6. Siguen de `§152.9`: pestaña Mapa (1b) · red UPME · zonas.
 
+**153.10 Carga aplicada (2026-10-08).** *«procede con todas, las que falta por confirmar también móntalas y después te
+confirmo»*. Prevuelo (1 Opus, solo lectura): APTO, 0 bloqueantes; producción releída sin cambios. `cargar-subestaciones.mjs
+--escribir` creó **146** documentos en `/subestaciones` (117 alta · 25 media · **4 «por confirmar»**: MONTERÍA, NUEVA MONTERÍA,
+CAÑABRAVAL, POZO AZUL, con su duda en la verificación) + 1 entrada `importar_kmz` en `/auditoria`. LA SALVACIÓN no se cargó (no
+está en el archivo). Comprobado: 146 en el servidor idénticos al lote; el mapa publicado los une (146 con punto, 0 «por
+revisar»); en su Chrome, la pestaña Mapa muestra 146 puntos y «146 de 147». Registro con huellas y `--deshacer` en la bóveda
+(`registro/carga-aplicada.json`).
+
 ## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
 
 > Origen: el hallazgo de `§153.8` («Inventario borra la matrícula al editar… → tarea aparte»), leído en el código el 10-08 y
