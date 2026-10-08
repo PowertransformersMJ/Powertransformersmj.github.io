@@ -10,4 +10,6 @@ fi
 REFS=$(cat)
 printf '%s\n' "$REFS" | node scripts/guardia-cedulas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube puede llevar una cédula."; exit 1; }
 printf '%s\n' "$REFS" | node scripts/guardia-scada.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube trae datos de red del SCADA (99 §122)."; exit 1; }
+# 🛑 Freno al PUBLICAR (99 §150, M-10): a main no sube código que cite un ADR que no esté guardado en su docs/99.
+printf '%s\n' "$REFS" | node scripts/freno-publicar.mjs --push || { echo "❌ PUSH BLOQUEADO: freno al publicar (99 §150)."; exit 1; }
 exit 0
