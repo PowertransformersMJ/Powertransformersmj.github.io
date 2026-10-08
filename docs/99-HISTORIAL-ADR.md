@@ -6964,6 +6964,14 @@ registro (cesar / Oriente), a 1,18 km del poblado y a 2,4 km de la S/E El Copey 
 alta y fuente `foto_ingeniero` (mismo autor que la carga: `--deshacer` la cubre) + 1 auditoría; la foto queda en la bóveda.
 Resultado: **147 de 147** S/E con punto, verificado en el servidor y en su Chrome.
 
+**153.12 Nueva Montería confirmada (2026-10-08).** El Ingeniero compartió la ubicación de una foto suya en la S/E (captura del
+mapa del teléfono: «Subestación Eléctrica ISA», entre la Carrera 17, la Calle 29 y la Variante Oriental, «Bonanza, Montería»).
+Esas calles (geocodificadas con Nominatim) rodean el punto que el KMZ llama NUEVA MONTERIA (8.755902, -75.857202) y no el de
+MONTERIA (1,3 km al NO, más allá de la Carrera 17): **el KMZ estaba bien y OpenStreetMap tiene los nombres cruzados.**
+`confirmar.mjs NMON` subió su confianza a alta con la evidencia, SIN mover la coordenada (+1 auditoría `confirmar_posicion`).
+Montería queda en su punto del KMZ por descarte (y su 80 MVA en la UPME = 2 × 40 MVA del parque): se le pregunta si la da por
+confirmada. Siguen por confirmar Cañabraval y Pozo Azul.
+
 ## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
 
 > Origen: el hallazgo de `§153.8` («Inventario borra la matrícula al editar… → tarea aparte»), leído en el código el 10-08 y
