@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
   DPTO_DANE, DANE_DE_DPTO, normal, bandaDe, coordenadaDe, fichaTx, pasaFiltros, resumenParque, buscarEnMapa,
-  ZONA_EXCEPCIONES, zonaDeMunicipio, codigoMunicipio, municipioDeSubestacionMapa
+  ZONA_EXCEPCIONES, zonaDeMunicipio, codigoMunicipio, municipioDeSubestacionMapa,
+  codigoSubestacion, etiquetaTx, indiceUbicaciones
 } from '../assets/js/domain/mapa_parque.js';
 
 const tx = (o) => ({ id: o.id || 'd' + Math.random().toString(36).slice(2, 7),
@@ -175,3 +176,112 @@ test('rótulos de los 5 departamentos de AFINIA caen DENTRO de su área de servi
   const mp = a.objects.mpios.geometries.find((g) => g.properties.cod === '13001');
   assert.ok(dentro(r.mpios['13001'], anillos(a, mp)), 'rótulo de Cartagena dentro de Cartagena');
 });
+
+test('código de la S/E en la matrícula (la llave de /subestaciones) y rótulo corto del transformador', () => {
+  assert.equal(codigoSubestacion('T1-M/M-VAC'), 'VAC');
+  assert.equal(codigoSubestacion('T-KDR04'), 'KDR');
+  assert.equal(codigoSubestacion('T1A-A/M-NMON'), 'NMON');
+  assert.equal(codigoSubestacion('t2-m/m-plo'), 'PLO', 'minúsculas');
+  assert.equal(codigoSubestacion(''), '');
+  assert.equal(etiquetaTx('T1-M/M-VAC'), 'T1');
+  assert.equal(etiquetaTx('T1A-A/M-NMON'), 'T1A');
+  assert.equal(etiquetaTx('T-KDR04'), 'KDR04', 'sin número tras la T: la última parte');
+  assert.equal(etiquetaTx('T3A/M-TER'), 'T3A', 'matrícula real sin guion tras la A');
+  assert.equal(etiquetaTx(''), '');
+});
+
+test('posiciones de /subestaciones: solo coordenadas válidas dentro de Colombia y de S/E activas', () => {
+  const fuente = { latitud: 8.2597, longitud: -76.1329, confianza: 'alta', verificacion: 'cae en Valencia (DANE)' };
+  const idx = indiceUbicaciones([
+    { id: 'VAC', latitud: 8.2597, longitud: -76.1329, nombre: 'VALENCIA', departamento: 'cordoba', ubicacion_fuente: fuente },
+    { id: 'vaa', latitud: '10.2888', longitud: '-73.3992' },            // texto numérico y id en minúsculas
+    { id: 'MAL', latitud: 40.4, longitud: -3.7 },                       // fuera de Colombia (Madrid)
+    { id: 'CER', latitud: 0, longitud: 0 },                             // golfo de Guinea
+    { id: 'VAC2', latitud: '', longitud: '' },                          // sin posición
+    { id: 'NUL', latitud: null, longitud: -75 },
+    { id: 'INA', latitud: 9, longitud: -75, activa: false },            // inactiva
+    { latitud: 9, longitud: -75 }                                       // sin id
+  ]);
+  assert.deepEqual([...idx.keys()], ['VAC', 'VAA']);
+  assert.deepEqual(idx.get('VAC').coordenada, [8.2597, -76.1329]);
+  assert.equal(idx.get('VAC').confianza, 'alta');
+  assert.equal(idx.get('VAC').editadaAMano, false);
+  assert.deepEqual(indiceUbicaciones(null), new Map());
+});
+
+test('procedencia: si la posición se editó a mano, ya no se presume su confianza; los alias no le quitan la llave a un id', () => {
+  const idx = indiceUbicaciones([
+    { id: 'KDR', latitud: 10.36, longitud: -75.49, nombre: 'CANDELARIA', departamento: 'bolivar', codigos_alias: ['CDR', 'VAC'],
+      ubicacion_fuente: { latitud: 10.358838, longitud: -75.485424, confianza: 'alta', verificacion: 'x' } },
+    { id: 'VAC', latitud: 8.26, longitud: -76.13, nombre: 'VALENCIA', departamento: 'cordoba' }
+  ]);
+  assert.equal(idx.get('KDR').editadaAMano, true, 'la raíz ya no es la coordenada que respalda la fuente');
+  assert.equal(idx.get('KDR').confianza, '');
+  assert.equal(idx.get('CDR'), idx.get('KDR'), 'alias de la tabla de Fichas');
+  assert.equal(idx.get('VAC').nombre, 'VALENCIA', 'un alias no pisa un id');
+});
+
+test('doble llave: el código Y el nombre + departamento registrados; si no casan, sin punto y «por revisar»', () => {
+  const idx = indiceUbicaciones([{ id: 'VAC', latitud: 8.26, longitud: -76.13, nombre: 'VALENCIA', departamento: 'cordoba' }]);
+  const r = resumenParque([
+    tx({ sid: '', sub: 'VALENCIA', dep: 'cordoba', mat: 'T1-M/M-VAC' }),
+    tx({ sid: '', sub: 'OTRA', dep: 'cordoba', mat: 'T1-M/M-VAC' })        // equipo trasladado sin cambiar su matrícula
+  ], {}, idx);
+  const por = (n) => r.subestaciones.find((s) => s.nombre === n);
+  assert.deepEqual(por('VALENCIA').coordenada, [8.26, -76.13]);
+  assert.equal(por('OTRA').coordenada, null);
+  assert.match(por('OTRA').porRevisar, /VAC/);
+  assert.equal(r.ubicadas, 1);
+  // sin matrícula (Inventario la puede vaciar), el código del equipo hace de matrícula
+  const sinMat = resumenParque([{ id: 'x', codigo: 'T1-M/M-VAC', identificacion: { codigo: 'T1-M/M-VAC', matricula: '' },
+    ubicacion: { subestacion_nombre: 'VALENCIA', departamento: 'cordoba' } }], {}, idx);
+  assert.equal(sinMat.ubicadas, 1);
+});
+
+test('resumen con posiciones: la S/E toma la de su código; homónimos con su propia posición; matrículas en conflicto → sin punto', () => {
+  const idx = indiceUbicaciones([{ id: 'VAC', latitud: 8.26, longitud: -76.13, nombre: 'VALENCIA', departamento: 'cordoba' },
+    { id: 'VAA', latitud: 10.29, longitud: -73.4, nombre: 'VALENCIA', departamento: 'cesar' }]);
+  const r = resumenParque([
+    tx({ sid: '', sub: 'VALENCIA', dep: 'cordoba', zona: 'OCCIDENTE', mat: 'T1-M/M-VAC' }),
+    tx({ sid: '', sub: 'VALENCIA', dep: 'cesar', zona: 'ORIENTE', mat: 'T1-M/M-VAA' }),
+    tx({ sid: '', sub: 'MIXTA', dep: 'sucre', zona: 'OCCIDENTE', mat: 'T1-M/M-VAC' }),
+    tx({ sid: '', sub: 'MIXTA', dep: 'sucre', zona: 'OCCIDENTE', mat: 'T2-M/M-VAA' }),
+    tx({ sid: '', sub: 'SIN DOC', dep: 'bolivar', mat: 'T1-M/M-ZZZ' })
+  ], {}, idx);
+  const por = (n, d) => r.subestaciones.find((s) => s.nombre === n && s.departamento === d);
+  assert.deepEqual(por('VALENCIA', 'cordoba').coordenada, [8.26, -76.13]);
+  assert.deepEqual(por('VALENCIA', 'cesar').coordenada, [10.29, -73.4]);
+  assert.equal(por('VALENCIA', 'cordoba').codigo, 'VAC');
+  assert.equal(por('MIXTA', 'sucre').codigo, '', 'dos códigos en la misma S/E: no se adivina');
+  assert.equal(por('MIXTA', 'sucre').coordenada, null);
+  assert.equal(por('SIN DOC', 'bolivar').coordenada, null);
+  assert.equal(r.ubicadas, 2);
+  assert.equal(r.sinUbicar, 2);
+  assert.equal(por('VALENCIA', 'cordoba').tx[0].etiqueta, 'T1');
+  // sin índice: igual que antes (la del equipo, si la trae)
+  assert.equal(resumenParque([tx({ sid: '', mat: 'T1-M/M-VAC' })]).ubicadas, 0);
+});
+
+test('revisión adversarial: id automático de la página admin, códigos repetidos, coordenada suelta de un equipo y filtros', () => {
+  // La página admin crea con id automático: manda el campo `codigo`.
+  const auto = indiceUbicaciones([{ id: 'q8ZtR2mK1vLx', codigo: 'MON', nombre: 'MONTERIA', departamento: 'cordoba', latitud: 8.76, longitud: -75.87 }]);
+  assert.ok(auto.has('MON'));
+  assert.equal(auto.get('Q8ZTR2MK1VLX'), auto.get('MON'), 'el id queda como alias');
+  // Dos documentos con el mismo código: no se elige uno a ciegas.
+  const dobles = indiceUbicaciones([{ id: 'a', codigo: 'ABC', latitud: 9, longitud: -75 }, { id: 'b', codigo: 'ABC', latitud: 9.5, longitud: -75 }]);
+  assert.equal(dobles.has('ABC'), false);
+  // Con índice, la coordenada suelta de un equipo (aquí, en Madrid) no hace punto ni cuenta como validada.
+  const idx = indiceUbicaciones([{ id: 'VAC', latitud: 8.26, longitud: -76.13, nombre: 'VALENCIA', departamento: 'cordoba' }]);
+  const r = resumenParque([
+    tx({ sid: '', sub: 'OTRA', dep: 'cordoba', mat: 'T1-M/M-XYZ', lat: 40.4, lng: -3.7 }),
+    tx({ sid: '', sub: 'VALENCIA', dep: 'cordoba', mat: 'T1-M/M-VAC' })
+  ], {}, idx);
+  assert.equal(r.subestaciones.find((s) => s.nombre === 'OTRA').coordenada, null);
+  assert.equal(r.ubicadas, 1);
+  // El código de la S/E sale de TODOS sus equipos: filtrar por salud no le cambia el punto.
+  const idx2 = indiceUbicaciones([{ id: 'ABC', latitud: 9, longitud: -75, nombre: 'X', departamento: 'bolivar' }]);
+  const parque = [tx({ sid: '', sub: 'X', dep: 'bolivar', mat: 'T1-M/M-ABC', hi: 5 }), tx({ sid: '', sub: 'X', dep: 'bolivar', mat: 'T2-M/M-ABD', hi: 1 })];
+  assert.equal(resumenParque(parque, {}, idx2).subestaciones[0].coordenada, null, 'matrículas en conflicto');
+  assert.equal(resumenParque(parque, { banda: '5' }, idx2).subestaciones[0].coordenada, null, 'el filtro no resuelve el conflicto');
+});
+
