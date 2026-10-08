@@ -108,8 +108,8 @@
 ## 🛠️ Claude Code, entorno y herramientas → hija `33`
 
 > **Lo que muerde por el ENTORNO y no por el código** vive en
-> [`33-LECCIONES-HARNESS.md`](33-LECCIONES-HARNESS.md) (§G.5): activar skills, automatizar el Chrome
-> del Ingeniero, el `grep` que no es GNU grep, cómo se le pasan datos a un workflow y por qué un
+> [`33-LECCIONES-HARNESS.md`](33-LECCIONES-HARNESS.md) (§G.5): activar skills (su Chrome y el banco → `36`),
+> el `grep` que no es GNU grep, cómo se le pasan datos a un workflow y por qué un
 > workflow de horas no sobrevive. Léela ANTES de lanzar trabajo largo con agentes o de fiarte de un
 > barrido por consola. La hija lleva su propio listado — aquí no se duplican sus IDs.
 ---
@@ -149,7 +149,14 @@ poda sin pérdida) antes de publicar lo siguiente. El rediseño del candado (avi
 ### M-09 · El cerebro escribió «ratificado» sin la página
 **Cicatriz** (`99 §140`, `§57.8`): ADR-057 y `52 §2` dieron por ratificadas con el MO.00418 dos cifras que su texto no trae, y el error viajó a tres nodos y a un relevo. · **Regla**: en el cerebro, «ratificado / verificado contra <documento>» lleva su página o cláusula; sin ella se escribe «según el plan» o «no verificado». Detalle de dominio → `34` L-125. [HONOR]
 
-> Topes de `30` y sus hijas → `docs/.brain-manifest.json` (en caracteres). Cuando se acerque al tope: nueva hija `36-…` registrada en `CLAUDE.md §0` y en `00`, con puntero de la madre a la hija.
+### M-10 · Un [HONOR] que reincidió dos veces no se reescribe: se vuelve candado DONDE SE PUBLICA, o se retira
+**Cicatriz** (`99 §149`, S0-01/S7-01): M-07 se rompió por tercera vez (09-27, 10-02, 10-07). El 10-07 el arranque anunciaba
+desde el 10-05 que el gate #14 bloquearía el cerebro desde `§146`, y aun así se publicaron `§146`, `§147` y `§148` (con reglas
+de permisos) con su cerebro sin commitear. Anunciar no frena. · **Regla**: cuando una regla [HONOR] reincide dos veces, el
+cierre que la detecta propone su candado en el punto de PUBLICACIÓN (merge/push a `main`) o su retiro; reescribirla otra vez
+en prosa no cuenta como cierre. La forma del candado de M-07 la decide él (**(J)** en `10`). [HONOR] hasta que exista ese candado.
+
+> Topes de `30` y sus hijas → `docs/.brain-manifest.json` (en caracteres). Cuando se acerque al tope: nueva hija (la siguiente libre es `37-…`) registrada en `CLAUDE.md §0` y en `00`, con puntero de la madre a la hija. **Subir un tope del manifest exige un ADR que diga por qué no se partió la neurona; sin ese ADR, el tope no sube** (`§149`, S0-05) [HONOR].
 
 ## 🤖 IA / Claude API / Cloud Functions → hija `31`
 
@@ -186,7 +193,7 @@ poda sin pérdida) antes de publicar lo siguiente. El rediseño del candado (avi
 > auditar en paralelo por dimensiones, rotular el dato de demostración. Léela ANTES de declarar algo
 > desplegado, portado o auditado. La hija lleva su propio listado — aquí no se duplican sus IDs.
 
-## 📈 Costuras de datos y Cargabilidad SCADA (L-96, L-113…L-117)
+## 📈 Costuras de datos y Cargabilidad SCADA (L-96, L-113…L-116; L-117 → `36`)
 
 > Lecciones VIVAS aquí (no en `32`): un trigger que pisa lo que otro escribió, y lo aprendido construyendo Cargabilidad SCADA.
 
@@ -252,21 +259,6 @@ anterior (`max-age=600`): su `import { DIAG_MAP }` falla y el módulo entero no 
 repo (assets, pages, admin, tests, _dev, functions, scripts, api) de que nadie más lo usa. **Gate** [HONOR] (TODO-57 es
 el arreglo de fondo: versionar los assets).
 
-### L-117 · Datos grandes por la extensión: un paquete que alimenta el MISMO lector, y su equivalencia probada con datos reales
-
-`99 §125`: la extensión de Chrome sube ≤ 10 MB por llamada y solo de carpetas permitidas (Downloads sí, Documents no),
-no suelta archivos dentro de Chrome y un clic por coordenadas no llega a una pestaña que no está al frente; un mes del
-SCADA pesa ~650 MB. **Regla**: (1) no se escribe un camino paralelo: se adelgaza el insumo (solo lo que el lector usa,
-marcas con el tamaño original) y se entrega al MISMO lector; (2) antes de producción se prueba la EQUIVALENCIA con los
-datos reales (lo que se escribiría, byte a byte) más un control negativo que el sistema debe frenar; (3) partes ≤ 9 MiB
-con su huella en el nombre, comprobada al juntar; (4) los paquetes llevan datos reales: salida prohibida dentro del
-repo y su extensión en `.gitignore`; (5) en la pestaña: `element.click()` por JS y sondeos cortos (la evaluación corta a
-los 45 s). **Gate**: `tests/scada_carga_paquete.test.js` (formato, filtro = lector, empaquetador de punta a punta).
-**Y en `§126`** (paquete con máx/mín, 6–8 partes por mes): el límite de 10 MB de la extensión se cuenta por LLAMADA y
-también por `browser_batch` (suma las subidas del lote): una parte por llamada; un campo auxiliar FIJO que reenvía al de
-la página evita volver a buscar el campo que la página repinta; en paralelo alguna subida «no responde a tiempo» aunque
-SÍ llega: se confirma con un contador en la página, no con la respuesta de la herramienta.
-
 ### L-126 · Una casilla editable dentro de una tabla: lo válido se confirma al escribir, no al salir
 **Disparador**: convertir en casilla un dato que alimenta un documento o un guardado (cantidad, monto, fecha). · **Cicatriz**
 (`99 §141`): la cantidad de Órdenes se confirmaba en `change`; Ctrl+S/P/Q leían la orden con la casilla aún enfocada y el
@@ -275,6 +267,11 @@ borraba lo escrito. · **Regla**: (1) lo válido se guarda en `input`; `change` 
 entrar; (2) los atajos que leen el formulario sueltan primero la casilla enfocada (`blur`), NUNCA dentro de la función que
 lee (la llama un temporizador mientras se escribe); (3) la rueda sobre un `type=number` enfocado lo cambia sin que se note:
 soltarla; (4) lo que se pinta en la casilla sale formateado igual que en el papel. Gate: `tests/ordenes_items.test.js`.
+
+## 🌐 Chrome del Ingeniero, extensión y banco → hija `36`
+
+> Automatizar SU navegador, subir datos por la extensión y el banco local de pruebas viven en
+> [`36-LECCIONES-CHROME-BANCO.md`](36-LECCIONES-CHROME-BANCO.md) (§G.5, 2026-10-07, `99 §149`; salieron de `33` y de aquí).
 
 ## 🔐 Seguridad, reglas y datos personales → hija `35`
 

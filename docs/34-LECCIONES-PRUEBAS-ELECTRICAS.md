@@ -9,7 +9,7 @@
 >
 > **Alcance ampliado (2026-10-02, `99 §137`), sin renombrar el archivo**: es la casa de las lecciones de DOMINIO del
 > diagnóstico —pruebas eléctricas, DGA, carga y salud—. El criterio vigente vive en los lóbulos `49`–`53`; aquí, lo
-> que costó aprenderlo. Las lecciones de verificación de datos (L-113, L-117…L-120) siguen en `30`/`32`.
+> que costó aprenderlo. Las lecciones de verificación de datos siguen fuera: L-113 en `30`, L-117 en `36`, L-118…L-120 en `32`.
 
 ---
 

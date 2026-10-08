@@ -60,6 +60,13 @@ Trivial / reversible / mecánico → trabajo directo (+ `caza-bugs` si hay estad
 **🔒 Artefactos visibles al Ingeniero (si falta uno, el flujo está INCOMPLETO):**
 (a) el **preview fiel** cuando es UI · (b) el **prompt de consejo externo** en bloque copiable · (c) el **reporte de validación live**. Se entregan SIEMPRE, sin que los pida.
 
+**Modo «paso a paso»** (cuando él lo pide; `§127`, `§131`–`§132`, `§144`–`§147`): tras la capa 1 (solo lectura, con conteos
+REALES de producción) se le entrega un informe sin jerga con maqueta, y cada punto de CRITERIO de dominio va como pregunta
+cerrada con una opción recomendada y su porqué: ese veredicto es SUYO (la capa 7 queda para lo técnico). Si sus textos de
+dominio se publican con el rótulo «Borrador» hasta su «procede» fuera de Fichas → L-63 (nota; lo decide él). Cuando no se
+entrega el prompt (b), el ADR lo dice («NO revisado externamente»): si eso puede ser normal o el «SIEMPRE» de arriba manda está
+pendiente de su decisión (**(J)** de `10`).
+
 ---
 
 ## ⚡ W-12 — Verificación de criterio multi-norma *(propio de SGM)*

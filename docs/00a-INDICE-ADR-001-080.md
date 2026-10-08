@@ -85,9 +85,9 @@
 | §72 | ADR-072 — «Documenta absolutamente todo»: el cerebro no se enteró de dos tareas (M-02) | 1840 |
 | §73 | ADR-073 — Reglas sin probar: `firebase deploy` solo COMPILA → 43 pruebas de `storage.rules` + `test:rules` | 1907 |
 | §74 | ADR-074 — Las 39 discrepancias que no lo eran: el terciario vivía en otra ruta; catálogo de 3 familias | 1985 |
-| §75 | ADR-075 — **Fichas**: 5 falsedades del papel firmado corregidas; redacción por banda; matriz a color | 2644 |
-| §76 | ADR-076 — **Órdenes de Materiales** versión 8-sep, sin firmas ni cédulas, parque vivo; **L-90** | 2966 |
-| §77 | ADR-077 — **Registro OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, sin cédulas | 3019 |
-| §78 | ADR-078 — **Cédulas** desde directorio privado en Firestore; candado en commit/merge/push. **L-93/94** | 3112 |
-| §79 | ADR-079 — **El rol sale del perfil**: `/admins` deja de dar admin a quien ya tiene perfil | 3188 |
-| §80 | ADR-080 — **Manda el Excel en todos los caminos**: el trigger ya no borra la condición del archivo | 3223 |
+| §75 | ADR-075 — **Fichas**: 5 falsedades del papel firmado corregidas; redacción por banda; matriz a color | 2649 |
+| §76 | ADR-076 — **Órdenes de Materiales** versión 8-sep, sin firmas ni cédulas, parque vivo; **L-90** | 2971 |
+| §77 | ADR-077 — **Registro OE/OS** en Firestore: crear ≠ editar, versión, lápida al borrar, sin cédulas | 3024 |
+| §78 | ADR-078 — **Cédulas** desde directorio privado en Firestore; candado en commit/merge/push. **L-93/94** | 3117 |
+| §79 | ADR-079 — **El rol sale del perfil**: `/admins` deja de dar admin a quien ya tiene perfil | 3193 |
+| §80 | ADR-080 — **Manda el Excel en todos los caminos**: el trigger ya no borra la condición del archivo | 3228 |

@@ -36,6 +36,7 @@
 | **Cargabilidad SCADA** (`§122`, familia `.cscada`) | `pages/cargabilidad-scada.html` (lista y curvas) + `admin/scada-datos.html` (homologación y carga del mes) · archivo por archivo y colecciones `scada_*` → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` |
 | **Órdenes de Materiales SSEE** (formato IT.05801, familia `.oms-`) | `pages/ordenes-materiales.html` + `assets/js/ordenes-materiales.js` · registro, cédulas y firmas → **[`22`](22-ESPACIAL-MODULOS.md)** · **≠ «Órdenes»** (`pages/ordenes.html`: órdenes de TRABAJO) |
+| **Contratos de suministro · Movimientos · nexo con Órdenes E/S** (`§145`–`§148`) | `pages/contrato.html` (pestañas: `pages/suministros-dashboard.html`, `admin/suministros-movimiento.html`) · nexo y registro automático → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Firmas personales** (subir/ver/quitar la propia) | `assets/js/domain/firmas.js` + `assets/js/data/firmas.js` (Firestore `firmas/{uid}`) · dónde se usa → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Firmas del EQUIPO** (custodio admin; delegados `§117`/`§119`) | `assets/js/domain/firmas_equipo.js` + `assets/js/data/firmas_equipo.js` · delegaciones, folio y candado → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | Historia/decisión de un subsistema (§NN) | `00-INDICE.md` → `99-HISTORIAL-ADR.md` |
@@ -156,6 +157,6 @@ Documento transformadores v2 y colecciones F17–F37 (al 2026-04-20) → `docs/M
 > Si tras leer este nodo sigues sin ubicar algo, NO adivines: lee la hoja de
 > detalle enlazada arriba, o el ADR § correspondiente vía `docs/00-INDICE.md`.
 >
-> **📏 Capacidad (`CLAUDE.md §G.5`): ~280 líneas.** Al acercarse, SHARD por
-> sub-área (ej. extraer `js/` a `21-ESPACIAL-FRONTEND.md`), registrar en
+> **📏 Capacidad (`CLAUDE.md §G.5`): el tope que aprieta es el de CARACTERES** (manifest). Al acercarse, SHARD por
+> sub-área (ej. extraer `js/` a una hija con número libre: `21` y `22` ya existen), registrar en
 > `CLAUDE.md §0` + `00-INDICE`, dejar puntero aquí.
