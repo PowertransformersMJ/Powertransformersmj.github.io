@@ -6776,7 +6776,7 @@ el freno no mira `docs/` (los nodos del cerebro citan lo que quieran) · pendien
 > *«necesito que te situes en el segmento de mapa en la pagina y vayas construyendo el mapa geografico de colombia en un
 > maximo nivel»*. W-11 paso a paso: Paso 1 de solo lectura (geografía, dominio y el parque real) → construcción aislada en
 > página NUEVA sin enlazar → rótulo «Borrador · pendiente del Ingeniero». NO revisado externamente (consejo externo solo a
-> pedido, `§150`); revisión adversarial interna (Opus).
+> pedido, `§150`); revisión adversarial interna (Opus). Deliberación: bóveda `2026-10-07-mapa-colombia` (`SINTESIS.md`).
 
 **152.1 Punto de partida (leído, no supuesto).**
 - La pestaña Mapa (`pages/mapa.html` + `assets/js/mapa-render.js`, dentro de `activos.html`) pinta solo equipos con
