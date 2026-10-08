@@ -67,3 +67,13 @@ página-arnés (`flujo.html`) con el almacén y los oyentes en el padre y cada p
 (una semilla dentro del iframe crea su propio almacén); simulador con campos con punto, tiempo real (re-llamar a los oyentes
 tras cada escritura) y fechas con `toMillis`; un interruptor para tumbar una colección (`?caida=transformadores`). Banco de
 referencia: bóveda `2026-10-07-registro-automatico/crudos/banco/` (`node server.mjs <repo>`). **Gate**: [HONOR].
+
+### L-135 · Un banco abierto en SU Chrome se rotula en TODAS sus páginas, o él cree que producción se vació
+**Disparador**: abrirle al Ingeniero una vista previa local (`localhost:813x`) en su Chrome. · **Cicatriz** (2026-10-08, `99 §153`):
+le abrí el banco del mapa para que viera las posiciones; desde su menú lateral navegó a Cargabilidad SCADA, Fichas y Órdenes
+(también en `localhost`, con datos simulados solo del mapa) y las vio vacías: «aquí hicimos un excelente trabajo y hoy, no aparece
+nada». Producción estaba intacta (30 páginas revisadas en su Chrome, cero escrituras desde la víspera); la pista fue el avatar
+«IS» (Ingeniero Sintético del banco) en vez de «IM». · **Regla**: todo banco que se le abra a él inyecta una franja fija y roja
+en cada página («VISTA PREVIA EN ESTE COMPUTADOR — no es la plataforma real…») y el mensaje que acompaña el enlace dice qué
+páginas traen datos. Ante «se vació X», mirar PRIMERO el origen de su pestaña y el avatar antes de auditar el código.
+**Gate**: [HONOR] (la franja vive en `server-mapa.mjs` del banco de la bóveda).
