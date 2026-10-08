@@ -1,0 +1,142 @@
+/* ═══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Mapa geográfico de Colombia (Etapa 1, familia .mc-)
+   Sistema AQUA LIGHT. Archivo NUEVO (el viejo mapa.css sigue para pages/mapa.html).
+═══════════════════════════════════════════════════════════════ */
+
+.mc-borrador {
+  display: inline-block; vertical-align: middle; margin-left: .5rem;
+  font: 600 .68rem/1 var(--font-body, Inter), sans-serif; letter-spacing: .04em;
+  color: #9a3412; background: #ffedd5; border: 1px solid #fdba74; border-radius: 999px; padding: .3rem .6rem;
+}
+
+.mc-barra { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: .2rem 0 .9rem; }
+.mc-barra .form-select { width: auto; flex: 0 1 11.5rem; min-width: 9.5rem; }
+.mc-buscar { position: relative; flex: 1 1 15rem; min-width: 13rem; }
+.mc-buscar .form-input { width: 100%; }
+.mc-resultados {
+  position: absolute; z-index: 1200; left: 0; right: 0; top: calc(100% + 4px); margin: 0; padding: .3rem 0; list-style: none;
+  background: var(--surface-1, #fff); border: 1px solid var(--edge-accent, #d6e2f0); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(13,31,56,.14); max-height: 320px; overflow: auto;
+}
+.mc-resultados li { padding: .45rem .8rem; cursor: pointer; font-size: .88rem; color: var(--ink-2, #1f3656); }
+.mc-resultados li small { color: var(--ink-3, #4d6485); font-size: .76rem; }
+.mc-resultados li:hover, .mc-resultados li.mc-activo { background: rgba(37,99,235,.08); }
+.mc-resultados .mc-res-municipio::before { content: '◻ '; color: #2563EB; }
+.mc-resultados .mc-res-subestacion::before { content: '⚡ '; }
+.mc-resultados .mc-res-transformador::before { content: '▣ '; color: #64748b; }
+.mc-resultados .mc-res-nada { color: var(--ink-3, #4d6485); cursor: default; }
+
+.mc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1rem; align-items: start; }
+.mc-mapa-wrap {
+  position: relative; border-radius: 14px; overflow: hidden;
+  border: 1px solid var(--edge-accent, #d6e2f0); box-shadow: 0 8px 28px rgba(13,31,56,.08); background: #eef3f8;
+}
+#mcMapa { width: 100%; height: 640px; background: #eaf1f7; }
+.mc-mapa-wrap:fullscreen #mcMapa { height: 100vh; }
+
+.mc-fondo-suave { filter: saturate(.55) brightness(1.03) contrast(.96); }
+
+.mc-fondo-aviso {
+  position: absolute; z-index: 1000; left: 50%; top: 12px; transform: translateX(-50%);
+  background: #fff7ed; color: #9a3412; border: 1px solid #fdba74; border-radius: 10px; padding: .5rem .8rem; font-size: .85rem;
+  display: flex; gap: .6rem; align-items: center;
+}
+
+/* Controles de vista */
+.mc-vistas a {
+  width: auto !important; padding: 0 .6rem; font: 600 .74rem/30px var(--font-body, Inter), sans-serif;
+  color: var(--ink-2, #1f3656) !important; white-space: nowrap;
+}
+.mc-vistas a:hover { color: #2563EB !important; }
+
+/* Rótulos de departamento */
+.mc-rotulo {
+  background: rgba(255,255,255,.93); border: 1px solid rgba(13,31,56,.18); border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(13,31,56,.14); padding: .35rem .55rem .45rem; white-space: nowrap;
+  transform: translate(-50%, -50%); font-family: var(--font-body, Inter), sans-serif; text-align: center;
+}
+.mc-rotulo b { display: block; font: 700 .72rem/1.15 'Space Grotesk', var(--font-body, Inter), sans-serif; letter-spacing: .06em; color: #0d1f38; }
+.mc-rotulo span { display: block; font-size: .68rem; color: #4d6485; margin: .1rem 0 .25rem; }
+.mc-nombre-mpio {
+  transform: translate(-50%, -50%); white-space: nowrap; font: 600 .66rem/1 var(--font-body, Inter), sans-serif;
+  color: #1f3656; text-shadow: 0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff;
+}
+
+/* Barra de salud (rótulos y panel) */
+.mc-barra-salud { display: flex; height: 7px; width: 100%; min-width: 90px; border-radius: 99px; overflow: hidden; background: #e2e8f0; }
+.mc-barra-salud i { display: block; height: 100%; }
+.mc-barra-salud.vacia { display: block; }
+
+/* Ficha lateral */
+.mc-panel {
+  background: var(--surface-1, #fff); border: 1px solid var(--edge-accent, #d6e2f0); border-radius: 14px;
+  padding: 1rem 1.05rem; max-height: 640px; overflow: auto; box-shadow: 0 8px 28px rgba(13,31,56,.06);
+  color: var(--ink-2, #1f3656); font-size: .9rem;
+}
+.mc-panel h2 { font: 700 1.05rem/1.25 'Space Grotesk', var(--font-body, Inter), sans-serif; margin: .1rem 0 .6rem; color: #0d1f38; }
+.mc-panel h2 small, .mc-panel h3 small { font-weight: 500; color: var(--ink-3, #4d6485); font-size: .72rem; }
+.mc-panel h3 { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-3, #4d6485); margin: 1rem 0 .45rem; }
+.mc-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: .5rem; margin-bottom: .7rem; }
+.mc-kpis div { background: rgba(37,99,235,.05); border-radius: 10px; padding: .5rem .55rem; }
+.mc-kpis b { display: block; font: 700 1.08rem/1.1 'Space Grotesk', sans-serif; color: #0d1f38; }
+.mc-kpis span { font-size: .7rem; color: var(--ink-3, #4d6485); }
+.mc-kpis .mc-pend { background: #fff7ed; }
+.mc-nota { font-size: .8rem; color: var(--ink-3, #4d6485); margin: .5rem 0; line-height: 1.45; }
+.mc-nota.err { color: #b91c1c; }
+.mc-nota.mc-pend { color: #9a3412; }
+.mc-meta { font-size: .8rem; color: var(--ink-3, #4d6485); margin: -.3rem 0 .6rem; }
+.mc-leyenda { list-style: none; padding: 0; margin: .5rem 0 0; display: grid; grid-template-columns: 1fr 1fr; gap: .2rem .8rem; font-size: .78rem; }
+.mc-leyenda i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
+.mc-leyenda b { color: #0d1f38; }
+.mc-tabla { width: 100%; border-collapse: collapse; font-size: .8rem; }
+.mc-tabla th { text-align: left; font-weight: 600; color: var(--ink-3, #4d6485); border-bottom: 1px solid #e2e8f0; padding: .3rem .25rem; }
+.mc-tabla td { padding: .35rem .25rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
+.mc-tabla .n { text-align: right; font-variant-numeric: tabular-nums; }
+.mc-tabla tr.mc-clic { cursor: pointer; }
+.mc-tabla tr.mc-clic:hover td { background: rgba(37,99,235,.06); }
+.mc-tabla td:last-child { width: 38%; }
+.mc-enlace { background: none; border: 0; padding: 0; color: #2563EB; font: inherit; font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.mc-volver { background: none; border: 0; color: #2563EB; font-weight: 600; cursor: pointer; padding: 0; margin-bottom: .5rem; font-size: .82rem; }
+.mc-subs { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; }
+.mc-sub {
+  width: 100%; display: flex; align-items: center; gap: .5rem; text-align: left; cursor: pointer;
+  background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 9px; padding: .4rem .5rem; font-size: .8rem; color: #1f3656;
+}
+.mc-sub:hover { border-color: #93c5fd; background: #eff6ff; }
+.mc-sub-nom { flex: 1; font-weight: 600; }
+.mc-sub-n { color: var(--ink-3, #4d6485); font-size: .74rem; }
+.mc-chip {
+  display: inline-block; font-size: .68rem; font-weight: 700; padding: .12rem .45rem; border-radius: 99px; white-space: nowrap;
+  color: #fff; background: var(--c); text-shadow: 0 0 2px rgba(0,0,0,.25);
+}
+.mc-cargando { color: var(--ink-3, #4d6485); }
+
+.mc-fuentes { font-size: .74rem; color: var(--ink-3, #4d6485); margin: .8rem 0 1.4rem; line-height: 1.5;
+  background: rgba(255,255,255,.92); border: 1px solid var(--edge-accent, #d6e2f0); border-radius: 12px; padding: .6rem .8rem; }
+
+.mc-tip { font-size: .78rem; }
+
+/* «Ampliar»: el mapa y su ficha ocupan la ventana (CSS, no la API de pantalla completa: dentro del iframe y en iPhone no responde) */
+body.mc-ampliado { overflow: hidden; }
+body.mc-ampliado .mc-grid {
+  position: fixed; inset: 0; z-index: 2000; margin: 0; padding: 8px; overflow: auto;
+  background: var(--surface-0, #f4f8fc);
+}
+body.mc-ampliado #mcMapa { height: calc(100vh - 16px); }
+body.mc-ampliado .mc-panel { max-height: calc(100vh - 16px); }
+
+/* Leaflet en AQUA LIGHT */
+.leaflet-container { font-family: var(--font-body, Inter), sans-serif; }
+.leaflet-control-layers { border-radius: 12px !important; border: 1px solid #d6e2f0 !important; box-shadow: 0 8px 24px rgba(13,31,56,.12) !important; font-size: .8rem; }
+.leaflet-control-attribution { font-size: .62rem; }
+
+@media (max-width: 1100px) {
+  .mc-grid { grid-template-columns: 1fr; }
+  .mc-panel { max-height: none; }
+  body.mc-ampliado .mc-panel { max-height: none; }
+}
+@media (max-width: 720px) {
+  #mcMapa { height: 70vh; min-height: 380px; }
+  .mc-barra .form-select { flex: 1 1 45%; min-width: 0; }
+  .mc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}

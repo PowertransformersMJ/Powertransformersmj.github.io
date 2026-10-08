@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <title>SGM · TRANSPOWER — Mapa de Colombia</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/inventario.css"/>
+  <link rel="stylesheet" href="../assets/css/mapa-colombia.css"/>
+
+  <!-- Leaflet 1.9.4 -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+          integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin></script>
+  <!-- topojson-client 3.1.0 (ISC): la geografía viaja en TopoJSON, 2-2,6 veces más liviana que GeoJSON -->
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"
+          integrity="sha384-Ukv1p/xTma6P4/2bY5KzWBw+ydSpXmhCMtyciIQVDJ1RmOxtCYNMF1uXT9T63H67" crossorigin="anonymous"></script>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Inicio / Activos / Mapa</div>
+    <h1 class="page-title">Mapa de <em>Colombia</em> <span class="mc-borrador">Borrador · pendiente del Ingeniero</span></h1>
+    <p class="page-subtitle">
+      Límites oficiales del DANE (MGN 2025): el país, sus 33 departamentos y los 138 municipios del área de AFINIA, con el
+      parque resumido por departamento y zona y su salud oficial. Las subestaciones aparecerán como puntos cuando se valide su
+      ubicación.
+    </p>
+  </div>
+
+  <div class="mc-barra" role="search">
+    <div class="mc-buscar">
+      <input type="search" id="mcBuscar" class="form-input" placeholder="Buscar municipio, subestación o transformador…"
+             autocomplete="off" aria-label="Buscar en el mapa" aria-controls="mcResultados" aria-expanded="false"/>
+      <ul id="mcResultados" class="mc-resultados" hidden></ul>
+    </div>
+    <select id="mcZona" class="form-select" aria-label="Zona"><option value="">Todas las zonas</option></select>
+    <select id="mcDepto" class="form-select" aria-label="Departamento"><option value="">Todos los departamentos</option></select>
+    <select id="mcSalud" class="form-select" aria-label="Salud"><option value="">Toda la salud</option></select>
+    <select id="mcTipo" class="form-select" aria-label="Tipo de activo"><option value="">Todos los tipos</option></select>
+  </div>
+
+  <div id="mcAviso" class="info-msg" style="display:none"></div>
+
+  <div class="mc-grid">
+    <div class="mc-mapa-wrap">
+      <div id="mcMapa" role="application" aria-label="Mapa de Colombia con el parque de AFINIA"></div>
+      <div id="mcFondoAviso" class="mc-fondo-aviso" hidden>
+        El fondo del mapa no responde. <button type="button" id="mcCambiarFondo" class="btn-secondary">Cambiar a Relieve</button>
+      </div>
+    </div>
+    <aside id="mcPanel" class="mc-panel" aria-live="polite">
+      <p class="mc-cargando">Leyendo el parque…</p>
+    </aside>
+  </div>
+
+  <p class="mc-fuentes">
+    Límites: <a href="https://geoportal.dane.gov.co/" target="_blank" rel="noopener">DANE – Marco Geoestadístico Nacional 2025</a>
+    (simplificados para la web; regenerables con <code>scripts/mapa-geo/construir.mjs</code>). Zonas AFINIA dibujadas por
+    departamento completo: <b>aproximadas</b> hasta validar la lista de municipios de cada zona.
+  </p>
+
+</main>
+<footer class="page-foot">
+  <span>SGM · TRANSPOWER — Caribe Colombiano</span>
+  <span>© <span id="yr">2026</span> · Zona interna</span>
+</footer>
+
+<script type="module" src="../assets/js/ui/mapa/mapa-colombia.js"></script>
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
