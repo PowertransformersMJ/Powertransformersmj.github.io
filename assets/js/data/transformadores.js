@@ -188,6 +188,11 @@ export async function actualizar(id, data, opts = {}) {
   // en v2 hacemos lo mismo: rehidrata el documento canónico y
   // escribe todo. Los callers que quieran updates parciales
   // (p.ej. solo `estado_servicio`) deben usar `actualizarParcial`.
+  //
+  // ⚠️ ADR-154: cada sección que escribe REEMPLAZA la guardada, así que
+  // borra todo lo que `data` no traiga (matrícula, condición de salud,
+  // año de fabricación…). Un formulario que muestra solo parte del equipo
+  // NO debe usarla: `actualizarCampos` + `domain/inventario_edicion.js`.
   const prev = opts.prev || (await obtener(id));
   const payload = prepararDoc(data);
   delete payload.createdBy;
@@ -203,6 +208,24 @@ export async function actualizar(id, data, opts = {}) {
     accion: 'actualizar', coleccion: 'transformadores', docId: id,
     uid: opts.uid, diff: diffSimple(a, b)
   }));
+}
+
+/**
+ * Guarda una edición CAMPO POR CAMPO (ADR-154). `parche` viene de
+ * `parcheEdicionInventario` (domain/inventario_edicion.js): claves con
+ * punto ('placa.marca'), cada una toca SOLO ese campo, así que lo que el
+ * formulario no muestra queda como estaba. Sin cambios no escribe nada.
+ *
+ * @returns {Promise<boolean>} true si escribió.
+ */
+export async function actualizarCampos(id, parche, opts = {}) {
+  if (!parche || Object.keys(parche).length === 0) return false;
+  await updateDoc(docRef(id), { ...parche, updatedAt: serverTimestamp() });
+  await auditarSeguro(auditar({
+    accion: 'actualizar', coleccion: 'transformadores', docId: id,
+    uid: opts.uid, diff: opts.diff || null
+  }));
+  return true;
 }
 
 /**
