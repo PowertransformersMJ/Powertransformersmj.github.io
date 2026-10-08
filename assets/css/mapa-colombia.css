@@ -175,3 +175,14 @@ body.mc-ampliado .mc-panel { max-height: calc(100vh - 16px); }
   .mc-barra .form-select { flex: 1 1 45%; min-width: 0; }
   .mc-kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
+
+/* Dentro de la pestaña «Mapa» de Activos (iframe, body.is-embedded): el mapa y su ficha a la medida de la pestaña, lado a
+   lado desde 860 px (la pestaña mide ~1070 px en un escritorio y la regla de 1100 px los apilaba). */
+body.is-embedded #mcMapa { height: max(420px, calc(100vh - 40px)); }
+body.is-embedded .mc-panel { max-height: max(420px, calc(100vh - 40px)); }
+@media (min-width: 860px) {
+  body.is-embedded .mc-grid { grid-template-columns: minmax(0, 1fr) 320px; }
+}
+@media (max-width: 859px) {
+  body.is-embedded .mc-panel { max-height: none; }
+}
