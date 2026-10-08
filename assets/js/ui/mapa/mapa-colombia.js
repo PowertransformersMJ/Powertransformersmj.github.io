@@ -2,23 +2,29 @@
 // SGM · TRANSPOWER — Mapa geográfico de Colombia (Etapa 1)
 // ──────────────────────────────────────────────────────────────
 // Pedido del Ingeniero (2026-10-07): «construyendo el mapa geográfico de Colombia en un máximo nivel».
-// Etapa 1 (no necesita coordenadas): límites oficiales DANE MGN 2025 (país, 33 departamentos, 138
-// municipios del área AFINIA y, a pedido, los 1.122 del país), zonas AFINIA (aproximadas), el parque
-// resumido por departamento con su salud oficial, buscador, filtros y ficha lateral.
-// Una sola lectura del parque por visita (listarV2); filtros y búsqueda en el navegador.
+// Etapa 1: límites oficiales DANE MGN 2025 (país, 33 departamentos, 138 municipios del área AFINIA y, a
+// pedido, los 1.122 del país), zonas AFINIA (aproximadas), el parque resumido por departamento con su salud
+// oficial, buscador, filtros y ficha lateral. Etapa 2 (2026-10-08, 99 §153): cada subestación con posición
+// validada (/subestaciones/{código de la matrícula}) es un punto del color de su peor salud, y al acercarse
+// se ven sus transformadores. Una sola lectura del parque y otra de las subestaciones por visita.
 // Lógica pura → domain/mapa_parque.js. Geografía → assets/geo/ (se regenera con scripts/mapa-geo/).
 // ══════════════════════════════════════════════════════════════
 
 import { listarV2, isReady } from '../../data/transformadores.js';
+import { listar as listarSubestaciones } from '../../data/subestaciones.js';
+import { LIMITE_TRANSFORMADORES } from '../../domain/limites_lectura.js';
 import { CONDICIONES, ZONAS, DEPARTAMENTOS, TIPOS_ACTIVO } from '../../domain/schema.js';
 // municipioDeSubestacionMapa usa la tabla oficial de municipio por subestación (Fichas, 2026-09-10): S/E de cada municipio.
-import { DPTO_DANE, DANE_DE_DPTO, COLOR_ZONA, resumenParque, buscarEnMapa, municipioDeSubestacionMapa } from '../../domain/mapa_parque.js';
+import { DPTO_DANE, DANE_DE_DPTO, COLOR_ZONA, resumenParque, buscarEnMapa, municipioDeSubestacionMapa,
+  indiceUbicaciones } from '../../domain/mapa_parque.js';
 
 const $ = (id) => document.getElementById(id);
 const GEO = '../assets/geo/';
 const COLOMBIA = [[-4.25, -81.9], [13.45, -66.85]];          // incluye San Andrés y Providencia
 const ZOOM_MPIOS = 8;                                          // municipios del área AFINIA desde aquí
 const ZOOM_NOMBRES_MPIO = 10;                                  // nombres de municipio desde aquí
+const ZOOM_NUMERO_SE = 9;                                      // el punto de la S/E muestra cuántos TX tiene
+const ZOOM_DETALLE_SE = 12;                                    // nombre de la S/E y sus transformadores
 const COLOR_BANDA = Object.fromEntries(CONDICIONES.map((c) => [c.value, c.color]));
 const NOMBRE_BANDA = Object.fromEntries(CONDICIONES.map((c) => [c.value, c.label]));
 const NOMBRE_DEPTO = Object.fromEntries(DEPARTAMENTOS.map((d) => [d.value, d.label]));
@@ -29,7 +35,8 @@ const estado = {
   mapa: null, txs: [], parqueError: null, resumen: null,
   capas: {}, rotulos: null, nombresMpio: null, seleccion: null, resaltado: null,
   municipios: [], afiniaBounds: null, filtros: {},
-  capasDepto: {}, capasMpio: {}, capasMpioPais: {}, subsPorMun: new Map(), munDeSub: new Map(), lienzo: null
+  capasDepto: {}, capasMpio: {}, capasMpioPais: {}, subsPorMun: new Map(), munDeSub: new Map(), lienzo: null,
+  ubicaciones: new Map(), ubicacionesError: null, marcadores: new Map(), grupoPuntos: null
 };
 
 function esc(s) {
@@ -56,7 +63,9 @@ function crearMapa() {
   // UN solo lienzo para todas las capas vectoriales: con un lienzo por capa, el de encima se quedaba con todos los
   // clics (los municipios no respondían). En un solo lienzo gana lo último dibujado: municipios sobre departamentos.
   estado.lienzo = L.canvas({ padding: 0.5 });
-  mapa.createPane('mc-rotulos').style.zIndex = '650';
+  // Rótulos y nombres DEBAJO de los puntos de subestación (marcadores, 600) y encima de los límites (400): un rótulo de
+  // departamento no tapa ningún punto.
+  mapa.createPane('mc-rotulos').style.zIndex = '590';
   mapa.getPane('mc-rotulos').style.pointerEvents = 'none';
 
   // Fondos gratuitos y sin clave (CARTO pasó a exigir clave y mostraba marcas de agua).
@@ -72,6 +81,7 @@ function crearMapa() {
   vigilarFondo(fondoMapa, fondoRelieve, mapa);
   estado.fondos = { 'Mapa (OpenStreetMap)': fondoMapa, 'Relieve (OpenTopoMap)': fondoRelieve };
   L.control.scale({ imperial: false, position: 'bottomright' }).addTo(mapa);
+  mapa.on('zoomend', clasesZoom);
   return mapa;
 }
 
@@ -262,23 +272,96 @@ function porZoom() {
   poner(estado.grupoRotulos, estado.capaRotulos, z >= 6 && z <= 10);
 }
 
+/** Los puntos de S/E crecen con el zoom: número de transformadores desde el 9; nombre y transformadores desde el 12.
+ *  Registrado al crear el mapa: funciona aunque la geografía no cargue. */
+function clasesZoom() {
+  const m = estado.mapa;
+  if (!m) return;
+  const z = m.getZoom();
+  const c = m.getContainer();
+  c.classList.toggle('mc-z-num', z >= ZOOM_NUMERO_SE);
+  c.classList.toggle('mc-z-det', z >= ZOOM_DETALLE_SE);
+}
+
 /* ─────────────────────────── Parque ─────────────────────────── */
 
 async function cargarParque() {
   if (!isReady()) { estado.parqueError = 'Firebase no configurado: el mapa muestra solo la geografía.'; return; }
-  try {
-    estado.txs = await listarV2({});
-  } catch (err) {
-    console.warn('[mapa] parque:', err);
-    estado.parqueError = 'No se pudo leer el parque (' + (err.message || err) + '). El mapa muestra solo la geografía.';
+  // Nunca hay más subestaciones que transformadores: el mismo tope de lectura.
+  const [parque, subs] = await Promise.allSettled([listarV2({}), listarSubestaciones({ limite: LIMITE_TRANSFORMADORES })]);
+  if (parque.status === 'fulfilled') estado.txs = parque.value;
+  else {
+    console.warn('[mapa] parque:', parque.reason);
+    estado.parqueError = 'No se pudo leer el parque (' + ((parque.reason && parque.reason.message) || parque.reason) + '). El mapa muestra solo la geografía.';
+  }
+  if (subs.status === 'fulfilled') estado.ubicaciones = indiceUbicaciones(subs.value);
+  else {
+    console.warn('[mapa] subestaciones:', subs.reason);
+    estado.ubicacionesError = 'No se pudieron leer las posiciones de las subestaciones: el mapa las resume por departamento y municipio.';
   }
 }
 
 function recalcular() {
-  estado.resumen = resumenParque(estado.txs, estado.filtros);
+  estado.resumen = resumenParque(estado.txs, estado.filtros, estado.ubicaciones);
+  // La ficha abierta se re-lee del resumen nuevo (los filtros cambian sus transformadores y su peor salud).
+  const sel = estado.seleccion;
+  if (sel && sel.tipo === 'subestacion') {
+    const nueva = estado.resumen.subestaciones.find((x) => x.clave === sel.sub.clave);
+    // Si el filtro la deja fuera, la ficha sigue (su posición no cambia) pero sin transformadores y lo dice.
+    sel.sub = nueva || { ...sel.sub, tx: [], fueraDeFiltro: true };
+  }
   indexarMunicipios();
   pintarRotulos();
+  pintarPuntos();
   pintarPanel();
+}
+
+/* ─────────────────────────── Puntos de subestación ─────────────────────────── */
+
+/** Un punto por S/E con posición validada y algún transformador que pase los filtros: color = su peor salud,
+ *  número = cuántos tiene; de cerca, su nombre y una ficha por transformador (clic → la S/E con ese equipo). */
+function pintarPuntos() {
+  const L = window.L;
+  if (!estado.mapa || !L) return;
+  if (!estado.grupoPuntos) estado.grupoPuntos = L.layerGroup().addTo(estado.mapa);
+  estado.grupoPuntos.clearLayers();
+  estado.marcadores = new Map();
+  const r = estado.resumen;
+  if (!r) return;
+  for (const s of r.subestaciones) {
+    if (!s.coordenada) continue;
+    const color = s.peor == null ? '#94a3b8' : COLOR_BANDA[s.peor];
+    const fichas = s.tx.map((t) => `<i data-tx="${esc(t.id)}" style="--c:${t.banda == null ? '#94a3b8' : COLOR_BANDA[t.banda]}" title="${esc(t.matricula || t.codigo)} · ${t.mva == null ? '—' : fmt(t.mva) + ' MVA'} · ${esc(t.banda == null ? 'Sin dato' : NOMBRE_BANDA[t.banda])}">${esc(t.etiqueta || t.matricula || '?')}</i>`).join('');
+    const mk = L.marker(s.coordenada, {
+      riseOnHover: true, keyboard: true,
+      icon: L.divIcon({ className: 'mc-se', iconSize: null,
+        html: `<span class="mc-se-punto" style="--c:${color}"><b>${s.tx.length}</b></span><span class="mc-se-nom">${esc(s.nombre)}</span><span class="mc-se-tx">${fichas}</span>` })
+    });
+    mk.bindTooltip(`S/E ${esc(s.nombre)} · ${s.tx.length} TX · peor salud: ${esc(s.peor == null ? 'sin dato' : NOMBRE_BANDA[s.peor])}`, { direction: 'top', offset: [0, -10], className: 'mc-tip' });
+    mk.on('click', (e) => {
+      const t = e.originalEvent && e.originalEvent.target && e.originalEvent.target.closest && e.originalEvent.target.closest('[data-tx]');
+      seleccionar({ tipo: 'subestacion', sub: s, tx: t ? t.dataset.tx : null });
+    });
+    // El resaltado se aplica cada vez que el punto entra al mapa (Leaflet rehace el ícono al prender la capa).
+    mk.on('add', () => marcarActivo(s.clave, mk));
+    estado.grupoPuntos.addLayer(mk);
+    estado.marcadores.set(s.clave, mk);
+  }
+  // La capa aparece en el control solo cuando hay posiciones (sin documentos, el mapa queda como en §152).
+  if (estado.controlCapas && !estado.puntosEnControl && estado.ubicaciones.size) {
+    estado.controlCapas.addOverlay(estado.grupoPuntos, 'Subestaciones (posición validada)');
+    estado.puntosEnControl = true;
+  }
+}
+
+/** Marca el punto (y la ficha del transformador) de la selección vigente; desmarca los demás. */
+function marcarActivo(clave, mk) {
+  const el = mk.getElement();
+  if (!el) return;
+  const sel = estado.seleccion;
+  const activa = Boolean(sel && sel.tipo === 'subestacion' && sel.sub.coordenada && sel.sub.clave === clave);
+  el.classList.toggle('mc-se-activa', activa);
+  el.querySelectorAll('[data-tx]').forEach((i) => i.classList.toggle('mc-tx-activo', activa && i.dataset.tx === sel.tx));
 }
 
 /** Municipio (DIVIPOLA) de cada subestación por la tabla oficial de Fichas, sin adivinar (regla en el dominio). */
@@ -363,13 +446,21 @@ function panelGeneral(r) {
   return `<h2>Parque en el mapa${filtrado ? ' <small>(filtrado)</small>' : ''}</h2>
     <div class="mc-kpis"><div><b>${fmt(r.total)}</b><span>transformadores</span></div><div><b>${fmt(r.subestaciones.length)}</b><span>subestaciones</span></div>
       <div class="${r.ubicadas ? '' : 'mc-pend'}"><b>${fmt(r.ubicadas)} de ${fmt(r.subestaciones.length)}</b><span>con ubicación validada</span></div></div>
-    ${!r.total ? '<p class="mc-nota">Ningún transformador cumple los filtros actuales.</p>' : r.ubicadas ? '' : `<p class="mc-nota">Las subestaciones aún no tienen coordenadas validadas: el parque se resume por el <b>departamento registrado</b>, y ${fmt(estado.munDeSub.size)} de ${fmt(r.subestaciones.length)} ya se ubican en su <b>municipio</b> por la tabla oficial de Fichas (clic en un municipio para verlas).</p>`}
+    ${!r.total ? '<p class="mc-nota">Ningún transformador cumple los filtros actuales.</p>' : r.ubicadas ? notaPuntos(r) : estado.ubicacionesError ? `<p class="mc-nota err">${esc(estado.ubicacionesError)}</p>` : `<p class="mc-nota">Las subestaciones aún no tienen coordenadas validadas: el parque se resume por el <b>departamento registrado</b>, y ${fmt(estado.munDeSub.size)} de ${fmt(r.subestaciones.length)} ya se ubican en su <b>municipio</b> por la tabla oficial de Fichas (clic en un municipio para verlas).</p>`}
     <h3>Salud oficial</h3>${barraSalud(r.bandas, r.total)}
     <ul class="mc-leyenda">${CONDICIONES.map((c) => `<li><i style="background:${c.color}"></i>${esc(c.label)} <b>${fmt(r.bandas[c.value])}</b></li>`).join('')}${r.bandas.sin ? `<li><i style="background:#cbd5e1"></i>Sin dato <b>${fmt(r.bandas.sin)}</b></li>` : ''}</ul>
     <h3>Por departamento <small>(clic para ver)</small></h3>
     <table class="mc-tabla"><thead><tr><th>Departamento</th><th class="n">TX</th><th class="n">S/E</th><th>Salud</th></tr></thead><tbody>${filas(r.porDepartamento, NOMBRE_DEPTO, true)}</tbody></table>
     <h3>Por zona</h3>
     <table class="mc-tabla"><thead><tr><th>Zona</th><th class="n">TX</th><th class="n">S/E</th><th>Salud</th></tr></thead><tbody>${filas(r.porZona, NOMBRE_ZONA, false)}</tbody></table>`;
+}
+
+/** Leyenda de los puntos y las S/E que aún no tienen posición (se le piden al Ingeniero). */
+function notaPuntos(r) {
+  const sin = r.subestaciones.filter((s) => !s.coordenada);
+  return `<p class="mc-nota">Cada punto es una subestación: su <b>color</b> es la peor salud de sus transformadores y el
+      <b>número</b>, cuántos tiene. De cerca se ven su nombre y cada transformador (clic en uno para abrirlo).</p>
+    ${sin.length ? `<h3>Sin posición validada <small>(${fmt(sin.length)})</small></h3>${listaSubestaciones(sin)}` : ''}`;
 }
 
 function listaSubestaciones(subs) {
@@ -397,10 +488,27 @@ function fichaSubestacion(s) {
   return `<button type="button" class="mc-volver" data-volver>← Todo el parque</button>
     <h2>S/E ${esc(s.nombre)}</h2>
     <p class="mc-meta">${esc(NOMBRE_DEPTO[s.departamento] || s.departamento)} · zona ${esc(NOMBRE_ZONA[s.zona] || s.zona || '—')}${mun ? ` · <button type="button" class="mc-enlace" data-mun="${esc(cod)}">${esc(mun.nom)}</button>` : ''}</p>
-    ${s.coordenada ? '' : `<p class="mc-nota mc-pend">Aún sin punto en el mapa: se resalta ${mun ? 'su <b>municipio</b> según la tabla oficial de Fichas' : 'su <b>departamento registrado</b> (la tabla oficial no trae su municipio)'}.</p>`}
+    ${s.fueraDeFiltro ? '<p class="mc-nota mc-pend">Ninguno de sus transformadores cumple los filtros actuales.</p>' : ''}
+    ${s.porRevisar ? `<p class="mc-nota mc-pend">Posición por revisar: ${esc(s.porRevisar)}, no de esta subestación.</p>` : ''}
+    ${s.coordenada ? bloquePosicion(s) : `<p class="mc-nota mc-pend">Aún sin posición validada: se resalta ${mun ? 'su <b>municipio</b> según la tabla oficial de Fichas' : 'su <b>departamento registrado</b> (la tabla oficial no trae su municipio)'}.</p>`}
     <table class="mc-tabla"><thead><tr><th>Transformador</th><th>Tipo</th><th class="n">MVA</th><th>Salud</th></tr></thead><tbody>
-    ${s.tx.map((t) => `<tr><td><code>${esc(t.matricula || t.codigo)}</code></td><td>${esc(NOMBRE_TIPO[t.tipo] || t.tipo || '—')}</td><td class="n">${t.mva == null ? '—' : fmt(t.mva)}</td><td>${chipBanda(t.banda)}</td></tr>`).join('')}
+    ${s.tx.map((t) => `<tr class="${estado.seleccion && estado.seleccion.tx === t.id ? 'mc-fila-activa' : ''}"><td><code>${esc(t.matricula || t.codigo)}</code></td><td>${esc(NOMBRE_TIPO[t.tipo] || t.tipo || '—')}</td><td class="n">${t.mva == null ? '—' : fmt(t.mva)}</td><td>${chipBanda(t.banda)}</td></tr>`).join('')}
     </tbody></table>`;
+}
+
+/** Posición de la S/E y de dónde sale (documento de /subestaciones y su `ubicacion_fuente`). */
+function bloquePosicion(s) {
+  const [lat, lng] = s.coordenada;
+  const u = s.ubicacion || {};
+  const f = u.fuente || {};
+  const coord = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  const origen = u.editadaAMano ? 'Posición editada a mano después de la carga (sin procedencia registrada).'
+    : [f.archivo ? `Archivo «${f.archivo}»${f.fecha_fuente ? ' (' + f.fecha_fuente + ')' : ''}` : '', u.confianza ? `confianza ${u.confianza}` : '', u.verificacion].filter(Boolean).join(' · ');
+  return `<div class="mc-posicion">
+      <span><b>Posición</b> ${esc(coord)}${u.municipio ? ` · ${esc(u.municipio)}` : ''}</span>
+      <a href="https://www.google.com/maps?q=${encodeURIComponent(lat.toFixed(6) + ',' + lng.toFixed(6))}" target="_blank" rel="noopener">Abrir en Google Maps ↗</a>
+      ${origen ? `<small>${esc(origen)}</small>` : ''}
+    </div>`;
 }
 
 function fichaMunicipio(m) {
@@ -432,7 +540,8 @@ function seleccionar(sel, { desdePanel = false } = {}) {
   const m = estado.mapa;
   if (estado.resaltado) { estado.resaltado.setStyle(estado.resaltado._mcBase || {}); estado.resaltado = null; }
   let capa = sel && sel.capa;
-  if (sel && sel.tipo === 'subestacion') {
+  const conPunto = sel && sel.tipo === 'subestacion' && sel.sub.coordenada;
+  if (sel && sel.tipo === 'subestacion' && !conPunto) {
     const cod = estado.munDeSub.get(sel.sub.clave);
     capa = (cod && estado.capasMpio[cod]) || estado.capasDepto[sel.sub.departamento];
   }
@@ -447,6 +556,12 @@ function seleccionar(sel, { desdePanel = false } = {}) {
     const esDepto = capa === estado.capasDepto[sel.dep || (sel.sub && sel.sub.departamento)];
     if (!esDepto || !m.getBounds().contains(capa.getBounds())) m.flyToBounds(capa.getBounds(), { padding: [24, 24], duration: 0.7, maxZoom: esDepto ? 9 : 11 });
   }
+  if (conPunto) {
+    if (estado.grupoPuntos && !m.hasLayer(estado.grupoPuntos)) estado.grupoPuntos.addTo(m);
+    m.flyTo(sel.sub.coordenada, Math.max(m.getZoom(), 14), { duration: 0.7 });
+  }
+  // El punto activo (y su transformador) se marcan; los demás vuelven a normal.
+  for (const [clave, mk] of estado.marcadores) marcarActivo(clave, mk);
   pintarPanel();
   // En pantallas angostas la ficha queda debajo del mapa: se lleva a la vista (salvo si el clic vino de ella).
   if (sel && !desdePanel && window.matchMedia('(max-width: 1100px)').matches) {
@@ -474,7 +589,7 @@ function buscador() {
     cerrar();
     inp.value = x.etiqueta;
     if (x.tipo === 'municipio') seleccionar({ tipo: 'municipio', mun: x.ref });
-    else seleccionar({ tipo: 'subestacion', sub: x.tipo === 'subestacion' ? x.ref : x.ref.sub });
+    else seleccionar({ tipo: 'subestacion', sub: x.tipo === 'subestacion' ? x.ref : x.ref.sub, tx: x.tipo === 'transformador' ? x.ref.id : null });
   };
   const buscar = () => {
     // Los 138 de AFINIA primero; los del resto del país, si ya se leyeron (ya vienen sin los de AFINIA).
@@ -537,19 +652,21 @@ function titulo(s) {
 async function arrancar() {
   if (!window.L || !window.topojson) { aviso('No se pudo cargar la librería del mapa (revise la conexión).', 'err'); return; }
   estado.mapa = crearMapa();
+  clasesZoom();
   controlesVista(estado.mapa);
   filtros();
   buscador();
   const parque = cargarParque();
   try {
     await cargarGeografia();
-    window.L.control.layers(estado.fondos, estado.capas, { collapsed: true, position: 'topright' }).addTo(estado.mapa);
+    estado.controlCapas = window.L.control.layers(estado.fondos, estado.capas, { collapsed: true, position: 'topright' }).addTo(estado.mapa);
   } catch (err) {
     console.error(err);
     aviso('No se pudo leer la geografía: ' + (err.message || err), 'err');
   }
   await parque;
   if (estado.parqueError) aviso(estado.parqueError, 'err');
+  else if (estado.ubicacionesError) aviso(estado.ubicacionesError, '');
   recalcular();
 }
 

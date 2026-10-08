@@ -6850,3 +6850,102 @@ W-11 · L-56 · L-102 · `§150` (ADR antes del merge).
 5. **Fichas** (hallazgo de esta obra): `municipioDeSubestacion` busca primero por NOMBRE → la ficha de VALENCIA (Córdoba, VAC)
    imprimiría VALLEDUPAR y la de PUEBLO NUEVO (Magdalena, PLO) el Pueblo Nuevo de Córdoba (en vez de Ariguaní). Toca el papel:
    espera su «procede» (TODO-73).
+
+## 153. ADR-153 — Subestaciones ubicadas con el archivo «UBI SUB» del Ingeniero (146 de 147 validadas) y el mapa con un punto por subestación y sus transformadores ⟦OPUS-5.5⟧ (2026-10-08)
+
+> *«te comparto archivo kmz para que ubiques las subestaciones, esto en virtud de constatar y tener seguridad de donde se
+> encuentra la instalacion, las que no encuentres por favor me solicitas la posicion geofrafica. adicionalmente, permiteme
+> apreciar la ubicacion de los transformadores de potencia conforme a la subestacion.»* W-11 paso a paso: cruce y validación
+> de SOLO lectura → banco con la foto real → código publicado SIN datos → la carga a producción espera su «procede».
+> NO revisado externamente; verificación adversarial interna (3 Opus + revisión del código y de la carga con 2 Opus y 6
+> escépticos). Deliberación: bóveda `2026-10-08-ubicacion-subestaciones` (`SINTESIS.md`).
+
+**153.1 Punto de partida (leído hoy en producción).** 208 transformadores, ninguno con coordenadas; `ubicacion.subestacionId`
+vacío en todos; `/subestaciones` VACÍA (la edita la pestaña Subestaciones, solo admin, que ya trae latitud/longitud). El KMZ
+(`UBI SUB.csv.kmz`, sha256 `e6d51a8e3f22…`) trae 164 puntos con nombre; sus campos de texto redondean a 4 decimales (la
+geometría trae la precisión completa) y el CSV de origen perdió la Ñ («COVEQAS», «SIMA?A»).
+
+**153.2 Solución.**
+- **Llave de la subestación = código al final de la matrícula** (T1-M/M-VAC → VAC): comprobado 147 S/E ↔ 147 códigos, sin
+  repetidos. Une transformador → S/E sin tocar los 208 documentos.
+- **Cruce** (scratchpad → bóveda): código → nombre en la tabla oficial de Fichas → nombre del KMZ; si no, nombre exacto o sin el
+  calificativo «(DEPTO)». **146 de 147** con punto; **LA SALVACIÓN (cesar, SLV) no está en el archivo → se le pide su posición.**
+- **Validación de cada punto, SOLO con fuentes independientes del archivo** (el KMZ coincide casi punto por punto con la UPME:
+  142 de 164 a ≤ 50 m; la UPME no corrobora): municipio DANE que contiene el punto contra la tabla oficial; S/E de
+  OpenStreetMap con su MISMO nombre a ≤ 1 km; poblado DANE/OSM con su nombre a ≤ 3 km; contradicciones (sobre el punto otra
+  S/E de OSM con otro nombre; su poblado homónimo del mismo municipio a > 5 km). «Alta» exige el MISMO nombre (un parecido
+  solo vale con una S/E de OSM a ≤ 0,1 km, p. ej. «Termocandelaria»). Resultado: **117 alta · 25 media** (caen en su
+  municipio, nada los confirma con su nombre ni los contradice) · **4 por confirmar**: MONTERÍA y NUEVA MONTERÍA (OSM con los nombres al revés;
+  a favor del KMZ: la UPME registra 80 MVA en «MONTERIA» = sus 2 × 40 MVA) · CAÑABRAVAL y POZO AZUL (a 8,2 y 7,6 km de su
+  poblado) · y LA SALVACIÓN sin punto. Solo se cargan las 142.
+- **Municipio** del documento: el del punto; si discrepa con la tabla, el del poblado homónimo según el DANE (Bocas de Uré →
+  San José de Uré, Coveñas → Coveñas) y, si no hay, la tabla cuando el punto está a < 0,5 km del límite simplificado (Ternera).
+- **Mapa** (`mapa-colombia.js` + `domain/mapa_parque.js`): una lectura de `/subestaciones` por visita (tope
+  `LIMITE_TRANSFORMADORES`), `indiceUbicaciones` (solo coordenadas válidas dentro de Colombia y S/E activas), la posición de la
+  S/E manda sobre la de cada equipo; un punto por S/E del color de su peor salud con su número de transformadores (zoom ≥ 9) y,
+  de cerca (zoom ≥ 12), su nombre y una ficha por transformador (T1, T2… del color de su salud; clic → la ficha con ese equipo
+  marcado). Ficha de la S/E con posición, «Abrir en Google Maps», fuente y verificación. Lista «Sin posición validada».
+  Rótulos de departamento DEBAJO de los puntos (pane 590). Filtros, buscador (un transformador abre su S/E con él marcado).
+- **Documento** (red-team de datos): id = código de la matrícula; campos del schema con `nombre`/`departamento`/`zona` del
+  parque (la doble llave del mapa); `codigo_tabla_fichas` + `codigos_alias` (7 códigos de la tabla difieren: CDR/KDR, AYA/AYAR,
+  LPA/LPS, LLE/LLC, MNZ/MZN, NMO/NMON, PUL/PTL); procedencia en el mapa `ubicacion_fuente` que COPIA la coordenada (si alguien
+  la edita a mano, el mapa lo dice) y nunca en `observaciones` (la página admin lo vacía).
+- **Mapa: doble llave** — el punto se pone si casan el código Y el nombre + departamento registrados; si no (equipo trasladado
+  sin cambiar su matrícula), la S/E queda «por revisar» sin punto. Si la matrícula falta (Inventario la puede vaciar), sirve el
+  código del equipo. El índice se arma por el campo `codigo` (la página admin crea con id automático; el id queda de alias) y
+  dos documentos con el mismo código no dan punto. Con índice, el ÚNICO origen del punto es el documento (la coordenada suelta
+  de un equipo no se dibuja ni cuenta). El código de la S/E sale de TODOS sus equipos (un filtro no la mueve).
+- **Carga** (`cargar-subestaciones.mjs`, bóveda): revisa por defecto; con `--escribir` crea las 142 en UN lote con `create()`
+  (nunca sobrescribe), valida schema, caja de AFINIA e ids únicos, + 1 entrada en `/auditoria`; `--deshacer` borra solo lo que
+  la carga creó y nadie editó después.
+
+**153.3 No-regresión.** Sin documentos en `/subestaciones` el mapa es el de `§152` (comprobado en el banco: 0 puntos, mismas
+notas). La pestaña Mapa vieja y los 208 transformadores no se tocan. La página admin de Subestaciones solo lista lo que haya.
+
+**153.4 Verificación.**
+- Unitarias **2520/0/2** (+21 en `tests/mapa_parque.test.js`) · `lint:html` limpio.
+- **Emparejamiento a ciegas** (Opus independiente, sin ver el cruce): **idéntico, 147/147**.
+- **Escéptico de posiciones** (50 casos): los 5 «REVISAR» de la 1.ª pasada son confiables (falla la tabla o la UPME, no el
+  punto); detectó que el KMZ ≈ UPME (142/164 a ≤ 50 m), Montería/Nueva Montería al revés en OSM y Cañabraval lejos de su poblado.
+- **Red-team de datos**: recomendó `/subestaciones` sin tocar los 208 y 6 ajustes, todos aplicados.
+- **Revisión del código y de la carga** (2 lentes + 6 escépticos): 6 hallazgos medios CONFIRMADOS y corregidos — punto con la
+  coordenada suelta de un equipo · índice por id automático · ficha vieja al filtrar · deshacer dependiente del KMZ y del
+  scratchpad · huella del archivo equivocada · confianza «alta» por nombre parecido; y 8 menores (filtro que cambiaba el
+  código, resaltado horneado, clases de zoom sin geografía, capa vacía en el control, rótulo «T3A/M», auditoría sin autor,
+  deshacer sin huella, nombre crudo «COVEQAS»).
+- **Banco con la foto real**: 142 puntos; 5 «sin posición»; Bocagrande con T1/T2; T2-M/M-MAT → su S/E con la ficha marcada;
+  Muy pobre → 9 puntos rojos; S/E filtrada fuera → ficha con aviso; capa apagada y prendida conserva el resaltado correcto;
+  sin documentos = idéntico a `§152`; 375 px sin desborde; consola limpia.
+- **Carga en modo revisar** contra producción: 142 a crear, 0 existentes, 0 choques.
+
+**153.5 Anti-patterns evitados.** Copiar posiciones de un cliente al repo público · emparejar por nombre solo (homónimos) ·
+duplicar la posición en cada transformador · sobrescribir en producción · inventar la posición que falta.
+
+**153.6 Archivos.** Modificados: `assets/js/domain/mapa_parque.js`, `assets/js/ui/mapa/mapa-colombia.js`,
+`assets/css/mapa-colombia.css`, `pages/mapa-v2.html`, `tests/mapa_parque.test.js`. INTACTOS: transformadores, reglas, la página
+admin de Subestaciones, Fichas.
+
+**153.7 Doctrina.** `CLAUDE.md §3.2` (free-tier: una lectura con tope; aditivo; preview antes de producción) · W-11 · L-56 ·
+`§150` (ADR antes del merge).
+
+**153.8 Verificado sano / no re-auditar.**
+- La llave código-de-matrícula es 1:1 con las 147 S/E de hoy; ningún alias choca con un id.
+- El sanitizador de la página admin no altera ningún documento de la carga; la página los lista, filtra y edita conservando
+  `ubicacion_fuente` y los alias (`updateDoc` solo escribe sus claves).
+- Órdenes E/S NO mueven equipos (solo leen el parque); quien escribe la ubicación de un transformador es Inventario o el
+  importador. Inventario borra la matrícula al editar (bug previo, leído en el código) → tarea aparte.
+- Lote de 143 escrituras ≈ 129 KB, lejos de los topes de Firestore.
+- Falsos positivos descartados: «Santa Elena / El Paraíso / La Europa lejos de su poblado» (homónimos de otros municipios) ·
+  Candelaria («Termocandelaria» de OSM a 50 m sí es su predio).
+
+**153.9 Decisiones suyas (TODO-78).**
+1. **«Procede» para cargar las 142 posiciones** en producción (`cargar-subestaciones.mjs --escribir`; se deshace con `--deshacer`).
+2. **Cinco subestaciones**: LA SALVACIÓN (no está en el archivo) → su posición · MONTERÍA / NUEVA MONTERÍA (¿el archivo está
+   bien? a favor: 80 MVA registrados en «MONTERIA» = sus 2 × 40) · CAÑABRAVAL y POZO AZUL (a 8,2 y 7,6 km de su poblado:
+   ¿confirma el predio?).
+3. **Tabla oficial de municipios (Fichas)**: Coveñas → Coveñas, Bocas de Uré → San José de Uré, La Mojana → San Benito Abad;
+   7 códigos distintos a la matrícula (CDR/KDR, AYA/AYAR, LPA/LPS, LLE/LLC, MNZ/MZN, NMO/NMON, PUL/PTL). Toca el papel → «procede».
+4. **Departamento del parque = zona operativa** en Mata de Caña, Santa Teresa, Río Viejo (Cesar) y Santa Inés (Córdoba): ¿se
+   deja así? (el mapa usa el registrado; corregirlo en uno solo de los dos lados les quita el punto).
+5. **¿La matrícula sigue a la posición o al aparato** cuando un transformador se traslada? (la doble llave cubre ambos casos).
+6. Siguen de `§152.9`: pestaña Mapa (1b) · red UPME · zonas.

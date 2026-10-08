@@ -72,6 +72,64 @@ export function municipioDeSubestacionMapa(sub, municipios) {
   return nombre ? codigoMunicipio(nombre, s.departamento, municipios) : null;
 }
 
+/**
+ * Código de la subestación al final de la matrícula (T1-M/M-VAC → VAC · T-KDR04 → KDR): la llave de
+ * `/subestaciones/{código}`. Misma regla que la tabla oficial de Fichas (`municipios_subestacion.js`).
+ */
+export function codigoSubestacion(matricula) {
+  const m = normal(matricula).toUpperCase().replace(/[^A-Z0-9]+/g, ' ').trim().match(/([A-Z]{2,4})\s*\d*$/);
+  return m ? m[1] : '';
+}
+
+/** Rótulo corto del transformador dentro de su subestación: T1-M/M-VAC → «T1» · T-KDR04 → «KDR04». */
+export function etiquetaTx(matricula) {
+  const m = String(matricula || '').trim();
+  const pref = m.match(/^T\d+[A-Z]?(?=[-/\s]|$)/i);     // T1-M/M-VAC · T2A-A/M-… · T3A/M-TER (sin guion tras la A)
+  if (pref) return pref[0].toUpperCase();
+  const partes = m.split(/[-/]/).filter(Boolean);
+  return partes.length ? partes[partes.length - 1].toUpperCase() : '';
+}
+
+/** Recuadro de Colombia (con San Andrés): una posición fuera de él es un error de captura, no se dibuja. */
+const COLOMBIA_LAT = [-4.3, 13.6];
+const COLOMBIA_LNG = [-82, -66.8];
+
+/**
+ * Posiciones de las subestaciones (documentos de `/subestaciones`, id = código de la matrícula; `codigos_alias` = otros
+ * códigos con que se la nombra, p. ej. el de la tabla de Fichas). Entra solo una coordenada válida dentro de Colombia de
+ * una S/E activa; lo demás se ignora (sin posición no hay punto). Un alias nunca le quita la llave a un id.
+ * `editadaAMano`: la coordenada ya no es la que respalda su procedencia (`ubicacion_fuente`).
+ * @param {object[]} docs
+ * @returns {Map<string, {id:string, coordenada:[number,number], nombre:string, departamento:string, municipio:string,
+ *           fuente:object|null, confianza:string, verificacion:string, editadaAMano:boolean}>}
+ */
+export function indiceUbicaciones(docs) {
+  const out = new Map();
+  const alias = [];
+  const repetidos = new Set();
+  for (const d of Array.isArray(docs) ? docs : []) {
+    // Llave = `codigo` (la página admin crea con id automático y deja editar el código); el id es un alias más.
+    const cod = String((d && (d.codigo || d.id)) || '').trim().toUpperCase();
+    if (!cod || d.activa === false || d.latitud == null || d.longitud == null || d.latitud === '' || d.longitud === '') continue;
+    const lat = Number(d.latitud);
+    const lng = Number(d.longitud);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
+    if (lat < COLOMBIA_LAT[0] || lat > COLOMBIA_LAT[1] || lng < COLOMBIA_LNG[0] || lng > COLOMBIA_LNG[1]) continue;
+    if (out.has(cod)) { repetidos.add(cod); continue; }    // dos documentos con el mismo código: no se elige uno a ciegas
+    const f = d.ubicacion_fuente && typeof d.ubicacion_fuente === 'object' ? d.ubicacion_fuente : null;
+    const editada = Boolean(f) && (Number(f.latitud) !== lat || Number(f.longitud) !== lng);
+    const e = { id: cod, coordenada: [lat, lng], nombre: String(d.nombre || ''), departamento: normal(d.departamento),
+      municipio: String(d.municipio || ''), fuente: f, confianza: editada ? '' : String((f && f.confianza) || ''),
+      verificacion: editada ? '' : String((f && f.verificacion) || ''), editadaAMano: editada };
+    out.set(cod, e);
+    const otros = (Array.isArray(d.codigos_alias) ? d.codigos_alias : []).concat(d.id && String(d.id).toUpperCase() !== cod ? [d.id] : []);
+    for (const a of otros) alias.push([String(a || '').trim().toUpperCase(), e]);
+  }
+  for (const cod of repetidos) out.delete(cod);
+  for (const [a, e] of alias) if (a && !out.has(a) && !repetidos.has(a) && !repetidos.has(e.id)) out.set(a, e);
+  return out;
+}
+
 /** Colores de zona (los de la plataforma). */
 export const COLOR_ZONA = Object.freeze({ BOLIVAR: '#2563EB', OCCIDENTE: '#16A34A', ORIENTE: '#EA580C' });
 
@@ -118,11 +176,16 @@ export function fichaTx(tx) {
     departamento: normal(u.departamento || (tx && tx.departamento) || ''),
     zona: String(u.zona || '').toUpperCase(),
     municipio: String(u.municipio || (tx && tx.municipio) || ''),
-    coordenada: coordenadaDe(tx)
+    coordenada: coordenadaDe(tx),
+    // Si la matrícula falta (editar en Inventario la puede vaciar), el código del equipo es la misma matrícula.
+    codigoSE: codigoSubestacion(id.matricula || (tx && tx.matricula) || id.codigo || (tx && tx.codigo) || ''),
+    etiqueta: etiquetaTx(id.matricula || (tx && tx.matricula) || '')
   };
 }
 
 const bandasVacias = () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, sin: 0 });
+/** Una subestación = su id; sin id, su nombre + departamento (hay homónimos en departamentos distintos). */
+const claveSE = (f) => f.subestacionId || ('#' + normal(f.subestacion) + '|' + f.departamento);
 const peorDe = (a, b) => (a == null ? b : b == null ? a : Math.max(a, b));
 
 /** ¿Pasa el equipo los filtros del mapa? (zona, departamento, banda — 'sin' = sin dato —, tipo) */
@@ -141,19 +204,27 @@ export function pasaFiltros(f, filtros = {}) {
  * Resumen del parque para el mapa.
  * @param {object[]} txs  documentos v2 de /transformadores
  * @param {object} [filtros]
+ * @param {Map} [ubicaciones]  `indiceUbicaciones(/subestaciones)`: la posición de la S/E manda sobre la de cada equipo
  * @returns {{ total:number, bandas:object, subestaciones:object[], porDepartamento:object, porZona:object,
  *             ubicadas:number, sinUbicar:number }}
  */
-export function resumenParque(txs, filtros = {}) {
-  const fichas = (Array.isArray(txs) ? txs : []).map(fichaTx).filter((f) => pasaFiltros(f, filtros));
+export function resumenParque(txs, filtros = {}, ubicaciones = null) {
+  const todas = (Array.isArray(txs) ? txs : []).map(fichaTx);
+  // El código de cada S/E sale de TODOS sus equipos (no de los filtrados): un filtro de salud no mueve una instalación.
+  const codigosDe = new Map();
+  for (const f of todas) {
+    const k = claveSE(f);
+    if (!codigosDe.has(k)) codigosDe.set(k, new Set());
+    if (f.codigoSE) codigosDe.get(k).add(f.codigoSE);
+  }
+  const fichas = todas.filter((f) => pasaFiltros(f, filtros));
   const subs = new Map();
   const porDepartamento = {};
   const porZona = {};
   const bandas = bandasVacias();
   for (const f of fichas) {
     bandas[f.banda == null ? 'sin' : f.banda]++;
-    // Una subestación = su id; sin id, su nombre + departamento (hay homónimos en departamentos distintos).
-    const ks = f.subestacionId || ('#' + normal(f.subestacion) + '|' + f.departamento);
+    const ks = claveSE(f);
     const s = subs.get(ks) || { clave: ks, id: f.subestacionId, nombre: f.subestacion || '(sin subestación)',
       departamento: f.departamento, zona: f.zona, municipio: f.municipio, coordenada: null, peor: null, tx: [] };
     s.tx.push(f);
@@ -173,8 +244,21 @@ export function resumenParque(txs, filtros = {}) {
   }
   const cerrar = (m) => Object.fromEntries(Object.entries(m).map(([k, x]) =>
     [k, { ...x, subestaciones: x.subestaciones.size, mva: Math.round(x.mva * 10) / 10 }]));
-  const lista = [...subs.values()].map((s) => ({ ...s,
-    tx: s.tx.slice().sort((a, b) => (b.banda || 0) - (a.banda || 0) || a.codigo.localeCompare(b.codigo, 'es')) }))
+  const lista = [...subs.values()].map((s) => {
+    // Código de la S/E: el de sus matrículas, si todas dicen el mismo (si discrepan no se adivina).
+    const cods = [...(codigosDe.get(s.clave) || [])];
+    const codigo = cods.length === 1 ? cods[0] : '';
+    const cand = codigo && ubicaciones && typeof ubicaciones.get === 'function' ? ubicaciones.get(codigo) : null;
+    // Doble llave: el código Y el nombre + departamento registrados. Si el equipo cambió de S/E sin cambiar su matrícula,
+    // el código apuntaría a otra posición: no se pone punto y la S/E queda «por revisar» (nunca se adivina).
+    const casa = cand && normal(cand.nombre) === normal(s.nombre) && cand.departamento === s.departamento;
+    const ub = casa ? cand : null;
+    return { ...s, codigo, ubicacion: ub, porRevisar: cand && !casa ? `la posición ${cand.id} es de «${cand.nombre}» (${cand.departamento})` : '',
+      // Con índice, el ÚNICO origen del punto es el documento validado de la S/E (la coordenada suelta de un equipo no
+      // se dibuja ni cuenta como «validada»). Sin índice (uso anterior), la del equipo.
+      coordenada: ubicaciones ? (ub ? ub.coordenada : null) : s.coordenada,
+      tx: s.tx.slice().sort((a, b) => (b.banda || 0) - (a.banda || 0) || a.codigo.localeCompare(b.codigo, 'es')) };
+  })
     .sort((a, b) => (b.peor || 0) - (a.peor || 0) || b.tx.length - a.tx.length || a.nombre.localeCompare(b.nombre, 'es'));
   const ubicadas = lista.filter((s) => s.coordenada).length;
   return { total: fichas.length, bandas, subestaciones: lista, porDepartamento: cerrar(porDepartamento),
