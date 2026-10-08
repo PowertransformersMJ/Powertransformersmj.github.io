@@ -16,7 +16,7 @@
 // Funciones PURAS. Archivo NUEVO (L-102). Sin nombres reales (la guardia lo hace cumplir).
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { estadisticoDeNombre, normalizarTexto } from './scada_carga_csv.js';
+import { estadisticoDeNombre, normalizarTexto, fechaDeEncabezado } from './scada_carga_csv.js';
 
 export const PAQUETE = Object.freeze({
   firma: 'SGM-SCADA-PAQUETE',
@@ -60,6 +60,41 @@ export function filtrarTexto(texto, estaciones) {
 }
 
 /**
+ * Relevo de estación (`99 §158`). A veces el SCADA RENOMBRA una estación: la vieja queda congelada («Not Renewed») y la
+ * medida sigue con otro nombre. Para que el punto y su historial sigan siendo los MISMOS, desde `desde` (fecha del
+ * archivo, inclusive) las filas de `nueva` se escriben con el nombre de `est` y las de `est` se descartan; antes de
+ * `desde`, las de `nueva` se descartan (son de la puesta en servicio). Cada relevo lo confirma el Ingeniero y llega por
+ * el empaquetador (`--relevo`): los nombres reales nunca entran al repo. Solo el paquete preparado lo aplica (arrastrar
+ * la carpeta del mes no). Un archivo sin fecha legible en el encabezado sale tal cual.
+ * @param {string} texto  un archivo del exporte (encabezado + filas)
+ * @param {Array<{est: string, nueva: string, desde: string}>} relevos  `desde` en AAAA-MM-DD
+ * @returns {{texto: string, renombradas: number, descartadas: number}}
+ */
+export function aplicarRelevos(texto, relevos) {
+  const t = String(texto || '');
+  const nada = { texto: t, renombradas: 0, descartadas: 0 };
+  if (!relevos || !relevos.length) return nada;
+  const lineas = t.split('\n');
+  const cab = fechaDeEncabezado(String(lineas[0] || '').replace(/^\uFEFF/, ''));
+  if (!cab.ok) return nada;
+  const R = relevos.map((r) => ({ est: String(r.est).trim(), vieja: normalizarTexto(r.est), nueva: normalizarTexto(r.nueva), activo: cab.fecha >= r.desde }));
+  const out = [lineas[0]];
+  let renombradas = 0; let descartadas = 0;
+  for (let i = 1; i < lineas.length; i++) {
+    const l = lineas[i];
+    const coma = l.indexOf(',');
+    const segs = coma < 0 ? null : l.slice(0, coma).split('/');
+    const e = segs && segs.length >= 6 ? normalizarTexto(segs[1]) : null;
+    const r = e ? R.find((x) => x.vieja === e || x.nueva === e) : null;
+    if (!r) { out.push(l); continue; }
+    if (e === r.vieja ? r.activo : !r.activo) { descartadas++; continue; }
+    if (e === r.nueva) { segs[1] = r.est; out.push(segs.join('/') + l.slice(coma)); renombradas++; continue; }
+    out.push(l);
+  }
+  return { texto: out.join('\n'), renombradas, descartadas };
+}
+
+/**
  * Arma el contenedor (sin comprimir).
  * @param {{carpeta: string, creado: string, estaciones: string[], origen?: object}} meta
  * @param {Array<{ruta: string, nombre: string, tamano: number, contenido: Uint8Array|null}>} archivos
@@ -71,6 +106,8 @@ export function armarContenedor(meta, archivos) {
     version: PAQUETE.version, carpeta: meta.carpeta, creado: meta.creado,
     estaciones: [...meta.estaciones].sort(), origen: meta.origen || null, archivos: lista
   };
+  // Solo si hubo relevos (§158): así un paquete sin relevos queda byte a byte como antes.
+  if (meta.relevos && meta.relevos.length) manifiesto.relevos = meta.relevos.map((r) => ({ est: r.est, nueva: r.nueva, desde: r.desde }));
   const cab = enc.encode(PAQUETE.firma + ' ' + PAQUETE.version + '\n' + JSON.stringify(manifiesto) + '\n');
   const total = cab.length + lista.reduce((s, a) => s + a.bytes, 0);
   const out = new Uint8Array(total);

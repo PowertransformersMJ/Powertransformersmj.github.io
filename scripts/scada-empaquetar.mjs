@@ -17,7 +17,7 @@ import { gzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { leerFilasHomologacion, fusionarHomologacion, objetivoImportacion } from '../assets/js/domain/scada_carga_homologacion.js';
-import { PAQUETE, seLee, filtrarTexto, armarContenedor, partir, nombreParte } from '../assets/js/domain/scada_carga_paquete.js';
+import { PAQUETE, seLee, filtrarTexto, aplicarRelevos, armarContenedor, partir, nombreParte } from '../assets/js/domain/scada_carga_paquete.js';
 import { normalizarTexto } from '../assets/js/domain/scada_carga_csv.js';
 
 const REPO = resolve(new URL('..', import.meta.url).pathname);
@@ -58,32 +58,48 @@ export function estacionesDelExcel(rutaExcel) {
   return objetivoImportacion(fusionarHomologacion(r.filas, null).filas).estaciones;
 }
 
+/**
+ * Relevos de estación de `--relevo` (`99 §158`): «ESTACION=NUEVA@AAAA-MM-DD», varios separados por coma.
+ * Desde esa fecha, las filas de NUEVA se leen como de ESTACION (el SCADA la renombró). Lo confirma el Ingeniero.
+ */
+export function leerRelevos(texto) {
+  return String(texto || '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => {
+    const m = x.match(/^([^=@]+)=([^=@]+)@(\d{4}-\d{2}-\d{2})$/);
+    if (!m) throw new Error('--relevo «' + x + '»: se escribe ESTACION=NUEVA@AAAA-MM-DD.');
+    const est = m[1].trim(); const nueva = m[2].trim();
+    if (!est || !nueva || normalizarTexto(est) === normalizarTexto(nueva)) throw new Error('--relevo «' + x + '»: la estación y la nueva deben ser distintas.');
+    return { est, nueva, desde: m[3] };
+  });
+}
+
 /** Prepara el paquete de una carpeta de mes. Devuelve el informe y los trozos (sin escribirlos). */
-export function empaquetar({ carpeta, estaciones, creado = new Date().toISOString(), parteMax = PAQUETE.parteMaxBytes }) {
+export function empaquetar({ carpeta, estaciones, relevos = [], creado = new Date().toISOString(), parteMax = PAQUETE.parteMaxBytes }) {
   const raiz = resolve(carpeta);
   const nombreCarpeta = basename(raiz);
   if (/^_/.test(nombreCarpeta)) throw new Error('La carpeta empieza por «_»: no es un mes.');
   const set = new Set(estaciones);
   const enc = new TextEncoder();
   const archivos = [];
-  let bytesOrigen = 0; let leidos = 0;
+  let bytesOrigen = 0; let leidos = 0; let renombradas = 0; let descartadas = 0;
   for (const f of recorrer(raiz)) {
     bytesOrigen += f.tamano;
     let contenido = null;
     if (seLee(f.nombre) && f.tamano) {
-      contenido = enc.encode(filtrarTexto(readFileSync(f.abs, 'utf8'), set));
+      let texto = readFileSync(f.abs, 'utf8');
+      if (relevos.length) { const r = aplicarRelevos(texto, relevos); texto = r.texto; renombradas += r.renombradas; descartadas += r.descartadas; }
+      contenido = enc.encode(filtrarTexto(texto, set));
       leidos++;
     }
     archivos.push({ ruta: f.ruta, nombre: f.nombre, tamano: f.tamano, contenido });
   }
-  const contenedor = armarContenedor({ carpeta: nombreCarpeta, creado, estaciones, origen: { archivos: archivos.length, bytes: bytesOrigen } }, archivos);
+  const contenedor = armarContenedor({ carpeta: nombreCarpeta, creado, estaciones, relevos, origen: { archivos: archivos.length, bytes: bytesOrigen } }, archivos);
   const gz = new Uint8Array(gzipSync(contenedor, { level: 9 }));
   const sha = createHash('sha256').update(gz).digest('hex');
   const trozos = partir(gz, Math.min(parteMax, PAQUETE.parteMaxBytes));
   if (trozos.length > 99) throw new Error('El paquete daría ' + trozos.length + ' partes (máximo 99): ¿es la carpeta de UN mes?');
   const partes = trozos.map((bytes, k) => ({ nombre: nombreParte(nombreCarpeta, k + 1, trozos.length, sha), bytes }));
   return {
-    carpeta: nombreCarpeta, archivos: archivos.length, leidos, bytesOrigen,
+    carpeta: nombreCarpeta, archivos: archivos.length, leidos, bytesOrigen, relevos: { renombradas, descartadas },
     bytesContenedor: contenedor.length, bytesComprimido: gz.length, sha, partes
   };
 }
@@ -104,10 +120,13 @@ if (esPrincipal) {
   const est = [...new Set([...estacionesDelExcel(excel), ...extra])];
   // --parte-kb: trozos más chicos (solo para probar el armado de varias partes).
   const kb = Number(argumento('parte-kb')) || 0;
-  const r = empaquetar({ carpeta, estaciones: est, ...(kb > 0 ? { parteMax: kb * 1024 } : {}) });
+  // --relevo "ESTACION=NUEVA@AAAA-MM-DD": estación que el SCADA renombró (§158; nombres reales solo aquí, nunca en el repo).
+  const relevos = leerRelevos(argumento('relevo'));
+  const r = empaquetar({ carpeta, estaciones: est, relevos, ...(kb > 0 ? { parteMax: kb * 1024 } : {}) });
   mkdirSync(salida, { recursive: true });
   for (const p of r.partes) writeFileSync(join(salida, p.nombre), p.bytes);
   const mb = (b) => (b / 1048576).toFixed(1) + ' MB';
   console.log(`${r.carpeta}: ${r.archivos} archivos (${mb(r.bytesOrigen)}), ${r.leidos} leídos; paquete ${mb(r.bytesContenedor)} → ${mb(r.bytesComprimido)} comprimido en ${r.partes.length} parte(s) de ≤ ${mb(PAQUETE.parteMaxBytes)}; ${est.length} estaciones; sha ${r.sha.slice(0, 12)}…`);
   for (const p of r.partes) console.log('  ' + p.nombre + '  ' + mb(p.bytes.length));
+  if (relevos.length) console.log(`  relevos: ${relevos.length} · filas renombradas ${r.relevos.renombradas} · descartadas ${r.relevos.descartadas}`);
 }
