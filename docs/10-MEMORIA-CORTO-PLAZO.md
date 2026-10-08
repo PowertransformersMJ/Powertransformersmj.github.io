@@ -8,7 +8,7 @@
 ## 🎯 Foco (al 2026-10-07) — MAPA DE COLOMBIA (`§152`, TODO-78) · antes: Órdenes E/S (TODO-76) · en espera: Fichas · Cargabilidad
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
-> **Al retomar**: Órdenes/Contrato: `§148` publicado (main `776e31f`); suyo → TODO-76; falta el técnico en vivo (TODO-62). En espera: dos páginas de `~/Downloads` (Fichas CF-43/44/36/35 · 11 de TODO-69) → `99 §140`.
+> **Al retomar**: Mapa: `§152` publicado en Borrador; suyo → TODO-78 (`§152.9`). Órdenes: suyo → TODO-76; técnico en vivo (TODO-62). En espera: dos páginas de `~/Downloads` (Fichas CF-43/44/36/35 · 11 de TODO-69) → `99 §140`.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
 > **(B)** GitHub Support "remove sensitive data" + revocar los PAT viejos (**TODO-08**). **(C)** Entregar el capítulo PRUEBAS ELÉCTRICAS del MO (**TODO-04**).
