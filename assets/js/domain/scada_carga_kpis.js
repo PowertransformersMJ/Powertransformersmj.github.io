@@ -92,6 +92,19 @@ export function horasSostenidasSobre(arr, umbral, N) {
 const mediana = (v) => (v.length ? percentilOrdenado([...v].sort((a, b) => a - b), 0.5) : null);
 
 /**
+ * Horas en que llegó ALGÚN dato de corriente (`99 §158`): las que en alguna fase no son «sin archivo» (1), de un mes que
+ * no se pudo leer (20) ni de un mes sin datos (21). El detalle por rango arma las tres fases aunque el mes no las traiga
+ * (códigos 21), así que sus `horas` nunca son 0: con esto distingue «no vino en el exporte» de «vino, pero no sirve».
+ */
+export function horasConCorriente(fam) {
+  const fs = FAMILIAS_I.map((f) => fam && fam[f]).filter(Boolean);
+  if (!fs.length) return 0;
+  let k = 0;
+  for (let h = 0; h < fs[0].m.length; h++) if (fs.some((x) => x.m[h] !== CODIGO.SIN_ARCHIVO && x.m[h] !== 20 && x.m[h] !== 21)) k++;
+  return k;
+}
+
+/**
  * Resumen FÍSICO de un nivel (sin ampacidad): lo que guarda el importador por mes y lo que la
  * página calcula para el rango. La cargabilidad se obtiene después dividiendo por la ampacidad.
  * @param {Object<string, {v, m, b}>} fam  series del nivel (mismo largo)

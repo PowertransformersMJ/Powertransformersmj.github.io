@@ -26,6 +26,12 @@ function argumento(nombre) {
   const i = process.argv.indexOf('--' + nombre);
   return i > 0 ? process.argv[i + 1] : null;
 }
+/** TODOS los valores de un argumento repetido (`--relevo a --relevo b`). */
+function argumentos(nombre) {
+  const out = [];
+  for (let i = 2; i < process.argv.length - 1; i++) if (process.argv[i] === '--' + nombre) out.push(process.argv[i + 1]);
+  return out;
+}
 
 /** Archivos de la carpeta, recursivo y en orden estable: [{abs, ruta}] con ruta 'Mes/día/archivo'. */
 function recorrer(raiz) {
@@ -66,14 +72,63 @@ export function leerRelevos(texto) {
   return String(texto || '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => {
     const m = x.match(/^([^=@]+)=([^=@]+)@(\d{4}-\d{2}-\d{2})$/);
     if (!m) throw new Error('--relevo «' + x + '»: se escribe ESTACION=NUEVA@AAAA-MM-DD.');
-    const est = m[1].trim(); const nueva = m[2].trim();
-    if (!est || !nueva || normalizarTexto(est) === normalizarTexto(nueva)) throw new Error('--relevo «' + x + '»: la estación y la nueva deben ser distintas.');
-    return { est, nueva, desde: m[3] };
+    return relevo(m[1], m[2], m[3], '--relevo «' + x + '»');
   });
+}
+
+/** Un relevo validado: estaciones distintas y una fecha que exista. */
+function relevo(est, nueva, desde, donde) {
+  est = String(est || '').trim(); nueva = String(nueva || '').trim(); desde = String(desde || '').trim();
+  if (!est || !nueva || normalizarTexto(est) === normalizarTexto(nueva)) throw new Error(donde + ': la estación y la nueva deben ser distintas.');
+  const m = desde.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  const d = m ? new Date(Date.UTC(+m[1], +m[2] - 1, +m[3])) : null;
+  if (!d || d.getUTCFullYear() !== +m[1] || d.getUTCMonth() !== +m[2] - 1 || d.getUTCDate() !== +m[3]) {
+    throw new Error(donde + ': la fecha «' + desde + '» no existe (se escribe AAAA-MM-DD).');
+  }
+  return { est, nueva, desde };
+}
+
+/**
+ * Relevos guardados en el MISMO Excel de la homologación (`99 §158`): una hoja cuyo nombre diga «relevo» con las
+ * columnas ESTACION · NUEVA · DESDE (fecha como texto AAAA-MM-DD). Así cada mes se empaqueta con ellos sin que nadie los
+ * tenga que recordar. La página solo lee la hoja de la homologación: esta hoja no le cambia nada.
+ */
+export function relevosDelExcel(rutaExcel) {
+  const require = createRequire(join(REPO, 'package.json'));
+  const XLSX = require('xlsx');
+  const wb = XLSX.read(readFileSync(rutaExcel), { type: 'buffer' });
+  const hoja = wb.SheetNames.find((n) => /relevo/i.test(n));
+  if (!hoja) return [];
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: false, defval: '' });
+  const cab = (aoa[0] || []).map((c) => normalizarTexto(c).normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  const col = (re) => cab.findIndex((c) => re.test(c));
+  const [ce, cn, cd] = [col(/^estacion/), col(/^nueva/), col(/^desde/)];
+  if (ce < 0 || cn < 0 || cd < 0) throw new Error('La hoja «' + hoja + '» debe traer las columnas ESTACION, NUEVA y DESDE.');
+  return aoa.slice(1).filter((f) => f.some((c) => String(c).trim()))
+    .map((f, i) => relevo(f[ce], f[cn], f[cd], 'Hoja «' + hoja + '», fila ' + (i + 2)));
+}
+
+/** Junta relevos (Excel + orden): los iguales se dejan una vez; dos distintos para la misma estación son un error. */
+export function juntarRelevos(...listas) {
+  const out = [];
+  for (const r of listas.flat()) {
+    const igual = out.find((x) => normalizarTexto(x.est) === normalizarTexto(r.est) && normalizarTexto(x.nueva) === normalizarTexto(r.nueva) && x.desde === r.desde);
+    if (igual) continue;
+    const choca = out.find((x) => [x.est, x.nueva].some((a) => [r.est, r.nueva].some((b) => normalizarTexto(a) === normalizarTexto(b))));
+    if (choca) throw new Error('Dos relevos distintos tocan la misma estación (' + choca.est + '/' + choca.nueva + ' y ' + r.est + '/' + r.nueva + ').');
+    out.push(r);
+  }
+  return out;
 }
 
 /** Prepara el paquete de una carpeta de mes. Devuelve el informe y los trozos (sin escribirlos). */
 export function empaquetar({ carpeta, estaciones, relevos = [], creado = new Date().toISOString(), parteMax = PAQUETE.parteMaxBytes }) {
+  // Un relevo que no casa con la homologación se perdería sin aviso (sus filas renombradas no pasan el filtro): se frena.
+  const homologadas = new Set(estaciones.map(normalizarTexto));
+  for (const r of juntarRelevos(relevos)) {
+    if (!homologadas.has(normalizarTexto(r.est))) throw new Error('Relevo ' + r.est + '→' + r.nueva + ': «' + r.est + '» no es una estación de la homologación (escríbala como en la columna C).');
+    if (homologadas.has(normalizarTexto(r.nueva))) throw new Error('Relevo ' + r.est + '→' + r.nueva + ': «' + r.nueva + '» ya es una estación de la homologación; el relevo la escondería.');
+  }
   const raiz = resolve(carpeta);
   const nombreCarpeta = basename(raiz);
   if (/^_/.test(nombreCarpeta)) throw new Error('La carpeta empieza por «_»: no es un mes.');
@@ -121,12 +176,13 @@ if (esPrincipal) {
   // --parte-kb: trozos más chicos (solo para probar el armado de varias partes).
   const kb = Number(argumento('parte-kb')) || 0;
   // --relevo "ESTACION=NUEVA@AAAA-MM-DD": estación que el SCADA renombró (§158; nombres reales solo aquí, nunca en el repo).
-  const relevos = leerRelevos(argumento('relevo'));
+  // Los de la hoja «Relevos» del Excel + los de la orden (`--relevo` se puede repetir).
+  const relevos = juntarRelevos(relevosDelExcel(excel), leerRelevos(argumentos('relevo').join(',')));
   const r = empaquetar({ carpeta, estaciones: est, relevos, ...(kb > 0 ? { parteMax: kb * 1024 } : {}) });
   mkdirSync(salida, { recursive: true });
   for (const p of r.partes) writeFileSync(join(salida, p.nombre), p.bytes);
   const mb = (b) => (b / 1048576).toFixed(1) + ' MB';
   console.log(`${r.carpeta}: ${r.archivos} archivos (${mb(r.bytesOrigen)}), ${r.leidos} leídos; paquete ${mb(r.bytesContenedor)} → ${mb(r.bytesComprimido)} comprimido en ${r.partes.length} parte(s) de ≤ ${mb(PAQUETE.parteMaxBytes)}; ${est.length} estaciones; sha ${r.sha.slice(0, 12)}…`);
   for (const p of r.partes) console.log('  ' + p.nombre + '  ' + mb(p.bytes.length));
-  if (relevos.length) console.log(`  relevos: ${relevos.length} · filas renombradas ${r.relevos.renombradas} · descartadas ${r.relevos.descartadas}`);
+  if (relevos.length) console.log(`  relevos: ${relevos.map((x) => x.est + '←' + x.nueva + ' desde ' + x.desde).join(' · ')} · filas renombradas ${r.relevos.renombradas} · descartadas ${r.relevos.descartadas}`);
 }

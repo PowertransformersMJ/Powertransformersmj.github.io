@@ -11,7 +11,9 @@ import { crearAcumulador, acumularArchivo } from '../assets/js/domain/scada_carg
 import { objetivoImportacion, fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
 import { filasLista } from '../assets/js/domain/scada_carga_vista.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
-import { empaquetar, leerRelevos } from '../scripts/scada-empaquetar.mjs';
+import { empaquetar, leerRelevos, juntarRelevos, relevosDelExcel } from '../scripts/scada-empaquetar.mjs';
+import { horasConCorriente } from '../assets/js/domain/scada_carga_kpis.js';
+import { createRequire } from 'node:module';
 
 const MV = 'Mv' + 'Moment';
 const cab = (d, m, a) => ',' + Array.from({ length: 24 }, (_, h) => d + '/' + String(m).padStart(2, '0') + '/' + String(a).slice(2) + ' ' + h + ':00').join(',');
@@ -123,13 +125,81 @@ describe('equipo sin ninguna hora válida: el motivo dice la causa', () => {
   test('corriente en cero con tensión: «sin carga», no «sin medición»', () => {
     assert.equal(motivo({ [cid]: { N13_8: nivel({ servicio: 104, des: 616, uProm: 13.6 }) } }).motivoNulo, 'sin carga (fuera de servicio o en reserva)');
     // Pocas horas en cero con tensión no bastan para decir «sin carga».
-    assert.equal(motivo({ [cid]: { N13_8: nivel({ servicio: 710, des: 10 }) } }).motivoNulo, 'medida congelada o marcada no válida por el SCADA');
+    assert.equal(motivo({ [cid]: { N13_8: nivel({ servicio: 710, des: 10 }) } }).motivoNulo, 'medida en cero, congelada o marcada no válida por el SCADA');
   });
   test('lo demás: congelada o marcada no válida por el SCADA', () => {
-    assert.equal(motivo({ [cid]: { N13_8: nivel({}) } }).motivoNulo, 'medida congelada o marcada no válida por el SCADA');
+    assert.equal(motivo({ [cid]: { N13_8: nivel({}) } }).motivoNulo, 'medida en cero, congelada o marcada no válida por el SCADA');
   });
   test('con horas válidas la cifra sale y no hay motivo (nada cambia para los que ya tenían cifra)', () => {
     const x = motivo({ [cid]: { N13_8: nivel({ i: { n: 700, p50: 400, p95: 600, p98: 620, p99: 640, max: 650, unaFalta: 0 }, sost: { v: 630 }, cob: 0.97, rUI: 1 }) } });
     assert.equal(x.motivoNulo, null); assert.ok(x.pct > 79 && x.pct < 81);
+  });
+});
+
+describe('revisión adversarial del 2026-10-08 (§158.10)', () => {
+  const tx = { id: 'a', identificacion: { matricula: 'T1-X/X-DM1' }, ubicacion: { subestacion_nombre: 'DEMO UNO' },
+    electrico: { tension_primaria_kv: 34.5, tension_secundaria_kv: 13.8, corriente_nominal_primaria_a: 300, corriente_nominal_secundaria_a: 800 } };
+  const aoa = [['SUBESTACION', 'MATRICULA', 'swTrafo'], ['DEMO UNO', 'T1-X/X-DM1', '/EstDemo1/swTrafo1']];
+  const { filas } = fusionarHomologacion(leerFilasHomologacion(aoa).filas, null);
+  const cid = claveId('EstDemo1', 'swTrafo1');
+  const vacio = { n: 0, p50: null, p95: null, p98: null, p99: null, max: null, iMax: null, prom: null, unaFalta: 0 };
+  const nivel = (o) => ({ i: vacio, sost: null, horas: 720, servicio: 720, des: 0, cob: 0, sMax: null, sP99: null, uProm: null, ...o });
+  const lista = (puntoNiveles, claves, extra = {}) => filasLista({ parque: [tx], homologacion: { filas },
+    catalogo: { meses: { '2026-09': { completo: true } }, puntos: { [cid]: { niveles: puntoNiveles, ...extra } } }, resumenMes: { mes: extra.mes || '2026-09', claves } })[0];
+  test('un nivel SIN devanado no decide el motivo: su «potencia» de ruido no tapa un equipo sin carga', () => {
+    const x = lista({ N13_8: {}, N110: {} }, { [cid]: { N13_8: nivel({ servicio: 123, des: 597, uProm: 13.6 }), N110: nivel({ sP99: 0.04, uProm: 112 }) } });
+    assert.equal(x.motivoNulo, 'sin carga (fuera de servicio o en reserva)');
+  });
+  test('detalle por rango: tres fases armadas pero sin ningún dato (arch = 0) → «no vino en el exporte», como la lista', () => {
+    assert.equal(lista({ N34_5: {} }, { [cid]: { N34_5: nivel({ horas: 720, arch: 0, uProm: 34.4 }) } }).motivoNulo, 'no vino en el exporte del SCADA');
+    // con algún dato de corriente que no sirve, ya no es «no vino»
+    assert.equal(lista({ N34_5: {} }, { [cid]: { N34_5: nivel({ horas: 720, arch: 30 }) } }).motivoNulo, 'medida en cero, congelada o marcada no válida por el SCADA');
+  });
+  test('un mes anterior al primer mes del punto: «aún no aparecía en el exporte», no «no vino»', () => {
+    const x = filasLista({ parque: [tx], homologacion: { filas },
+      catalogo: { meses: {}, puntos: { [cid]: { niveles: { N13_8: {} }, meses: ['2026-08', '2026-09'] } } }, resumenMes: { mes: '2026-03', claves: {} } })[0];
+    assert.equal(x.motivoNulo, 'el punto SCADA aún no aparecía en el exporte');
+    const y = filasLista({ parque: [tx], homologacion: { filas },
+      catalogo: { meses: {}, puntos: { [cid]: { niveles: { N13_8: {} }, meses: ['2026-01', '2026-08'] } } }, resumenMes: { mes: '2026-09', claves: {} } })[0];
+    assert.equal(y.motivoNulo, 'no vino en el exporte del SCADA');
+  });
+  test('horasConCorriente: no cuenta «sin archivo» (1), mes ilegible (20) ni mes sin datos (21)', () => {
+    const fase = (codigos) => ({ v: new Float32Array(codigos.length), m: Uint8Array.from(codigos), b: new Uint8Array(codigos.length) });
+    assert.equal(horasConCorriente({ IR: fase([21, 21, 1, 20]), IS: fase([21, 1, 1, 20]) }), 0);
+    assert.equal(horasConCorriente({ IR: fase([21, 6, 1, 0]), IS: fase([5, 21, 1, 21]) }), 3);
+    assert.equal(horasConCorriente({ URS: fase([0, 0]) }), 0);
+  });
+  test('el empaquetador frena un relevo que no casa con la homologación o que escondería una estación homologada', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scada-relevo2-'));
+    try {
+      const raiz = join(dir, 'Agosto'); mkdirSync(join(raiz, '22Agosto'), { recursive: true });
+      writeFileSync(join(raiz, '22Agosto', 'ir_average-20260822.csv'), dia(22));
+      assert.throws(() => empaquetar({ carpeta: raiz, estaciones: OBJ.estaciones, relevos: [{ est: 'EstDémo1', nueva: 'EstDemo1F', desde: '2026-08-22' }] }), /no es una estación de la homologación/);
+      assert.throws(() => empaquetar({ carpeta: raiz, estaciones: [...OBJ.estaciones, 'estdemo1f'], relevos: RELEVO }), /escondería/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+  test('relevos: fecha imposible, iguales repetidos y choques', () => {
+    assert.throws(() => leerRelevos('EstDemo1=EstDemo1F@2026-13-01'), /no existe/);
+    assert.throws(() => leerRelevos('EstDemo1=EstDemo1F@2026-02-30'), /no existe/);
+    assert.deepEqual(juntarRelevos(RELEVO, leerRelevos('EstDemo1=EstDemo1F@2026-08-22')), RELEVO);
+    assert.throws(() => juntarRelevos(RELEVO, leerRelevos('EstDemo1=EstDemo1G@2026-09-01')), /misma estación/);
+  });
+  test('relevos guardados en una hoja «Relevos» del Excel de la homologación', () => {
+    const XLSX = createRequire(import.meta.url)('xlsx');
+    const dir = mkdtempSync(join(tmpdir(), 'scada-relevo-xlsx-'));
+    try {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['SUBESTACION', 'MATRICULA', 'swTrafo'], ['DEMO UNO', 'T1-X/X-DM1', '/EstDemo1/swTrafo1']]), 'Homologacion de Transformadores');
+      const ruta = join(dir, 'h.xlsx');
+      XLSX.writeFile(wb, ruta);
+      assert.deepEqual(relevosDelExcel(ruta), []);                       // sin hoja de relevos: ninguno
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['ESTACIÓN', 'NUEVA', 'DESDE'], ['EstDemo1', 'EstDemo1F', '2026-08-22'], ['', '', '']]), 'Relevos de estación');
+      XLSX.writeFile(wb, ruta);
+      assert.deepEqual(relevosDelExcel(ruta), RELEVO);
+      const mal = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(mal, XLSX.utils.aoa_to_sheet([['ESTACION', 'NUEVA'], ['EstDemo1', 'EstDemo1F']]), 'Relevos');
+      XLSX.writeFile(mal, ruta);
+      assert.throws(() => relevosDelExcel(ruta), /ESTACION, NUEVA y DESDE/);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

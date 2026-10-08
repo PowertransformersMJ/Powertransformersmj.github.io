@@ -647,7 +647,7 @@ const pct1 = (v) => Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1
 
 /** «95,2 % · CRG 5» (y «provisional» si la cifra no es firme), o el motivo de que no haya cifra. */
 function textoCarga(t) {
-  if (t.crg == null) return t.cargaMotivo ? `sin medición (${t.cargaMotivo})` : 'sin medición';
+  if (t.crg == null) return t.cargaMotivo ? `sin medición — ${t.cargaMotivo}` : 'sin medición';
   return `${pct1(t.cargaPct)} % · CRG ${t.crg} ${NOMBRE_CRG[t.crg]}${t.cargaClase === 'provisional' ? ' (provisional)' : ''}`;
 }
 function celdaCarga(t) {

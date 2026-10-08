@@ -7215,3 +7215,59 @@ foto antes/después) · L-117 · `CLAUDE.md §3.2` (aditivo, preview fiel).
   - T1-BEC y T1-SML, firmes pero quizá inflados;
   - **Casacará T1 = 2.000 kVA (su respuesta): su ampacidad en el parque es la de 5 MVA** (corregirla es otra escritura, con su
     visto bueno).
+
+**158.9 Nota posterior (2026-10-08): carga en producción, hecha y verificada.** Con su «Procede con todo», por la página Datos
+SCADA y su Chrome:
+- Homologación v3 guardada (versión 3): 1 nueva, 3 cambiadas y 1 retirada, igual a la simulación.
+- Los 8 meses cargados: ene–jul en «Completar» (2 series nuevas por mes) y ago–sep en «Reemplazar» (4 y 3 series).
+  - Cada simulación de la página coincidió con la offline: el resto de los puntos salió «ya estaban iguales».
+  - Las horas «distintas» (2.736 en agosto y 12.186 en septiembre) son todas del punto de T1-SAM.
+- Foto antes/después (valores, llaves ordenadas):
+  - Solo entran 2 puntos nuevos y solo cambian los 2 de Sampués en ago y sep. Las decisiones de la homologación quedan
+    intactas y las 8 cargas, «completa».
+  - Única diferencia con la simulación offline: enero, 34,5 kV de Santa Lucía, en sMax/sP99/rUI. La corriente es idéntica.
+    La página leyó archivos «Q_average_…» que el filtro de la simulación excluía, así que lo guardado es lo completo.
+- En vivo (main `5f0853f`):
+  - Septiembre: 97 firmes, 37 provisionales, 74 sin cifra (antes 77). Ningún «sin horas válidas». T1-SAM 57,4 %, T2-SAM
+    73,0 %, SLC 58,0 %.
+  - Agosto: 130 firmes. TAN 52,3 %, SLC 59,3 %, T1-SAM 142,5 % provisional, T2-SAM 71,0 %.
+  - Mapa: «Sin medición» 74, CRG 1 = 34 y CRG 3 = 22. Consola limpia.
+- Cada mes nuevo DEBE empaquetarse con el mismo relevo (orden exacta en la memoria del proyecto y en la bóveda).
+
+**158.10 Nota posterior (2026-10-08): revisión adversarial de lo publicado y sus correcciones.** 3 lentes Opus (código,
+datos, consumidores) + 1 escéptico por hallazgo (13 agentes, solo lectura).
+- **Datos sanos**:
+  - 12 comprobaciones independientes. Solo entran 2 puntos y solo cambian los 2 de Sampués en ago–sep.
+  - Ninguna otra serie se reescribió (conservan el cargaId del 1-oct).
+  - La serie de T1-SAM de agosto se reproduce desde el disco, antes y después.
+  - El corte del 22 es el mejor a nivel de día.
+- **7 defectos confirmados**, todos de redacción o de solidez; ninguno cambiaba una cifra. Quedan corregidos:
+  1. El detalle decía «medida congelada» donde la lista dice «no vino en el exporte» (T1/T3-SGE, sep). Causa:
+     `recortarRango` arma las tres fases con código 21, así que `horas` > 0. Arreglo: `horasConCorriente` (kpis) → `arch`
+     en el resumen del detalle. Se importa por espacio de nombres, para que un `kpis.js` viejo en caché no rompa el detalle.
+  2. Un nivel SIN devanado decidía el motivo: T3-NCO en abril salía «llega la potencia» por 0,04 MVA de ruido. Ahora
+     mandan los niveles con devanado.
+  3. «No vino» para un punto que aún no existía (T2-SAM, ene–jul). Ahora dice «el punto SCADA aún no aparecía en el
+     exporte»: la lista pasa el `mes`.
+  4. El texto por defecto omitía «en cero» (T2-BCG, ago: todo cero sin tensión). Ahora es «medida en cero, congelada o
+     marcada no válida por el SCADA».
+  5. El mapa decía «sin medición (sin carga (…))». Ahora usa «sin medición — …» (`mapa-colombia.js?v=158`).
+  6. Relevo frágil:
+     - una estación mal escrita se perdía sin aviso y el informe contaba «renombradas»;
+     - un segundo `--relevo` se ignoraba;
+     - una fecha imposible pasaba;
+     - el relevo dependía de recordarlo cada mes.
+     Arreglo:
+     - el empaquetador frena un relevo cuya estación no está en la homologación o que escondería una homologada;
+     - `--relevo` se puede repetir y la fecha se valida;
+     - **los relevos se leen solos de una hoja «Relevos de estación» del MISMO Excel de la homologación** (la página solo
+       lee la hoja de la homologación). La v3 ya la trae.
+  7. La simulación offline (scratchpad) filtraba archivos con otra regla que la página («Q_average_…»). Queda anotado en
+     la bóveda; producción no tiene nada que corregir.
+- **Verificación**:
+  - Unitarias 2551/0/2 (+7 pruebas, una por defecto) · lint · guardia limpia.
+  - Con la foto de producción, código publicado contra corregido en 8 meses × 208: **0 cifras, clases ni CRG distintas**.
+    Solo cambian los 3 textos previstos.
+  - Réplica del detalle con las series reales: lista = detalle en sep (47), ago (7) y abr (7).
+  - Agosto re-empaquetado SIN `--relevo`: aplica el relevo desde la hoja (3.501 renombradas, 5.336 descartadas) y su
+    contenido es idéntico byte a byte al paquete cargado (1.324 archivos, 0 distintos).

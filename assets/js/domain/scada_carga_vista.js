@@ -53,25 +53,33 @@ function motivoSinDevanado(avisos, placa) {
 
 /**
  * Por qué un punto con datos cargados no da NINGUNA hora válida (`99 §158`). «Sin horas válidas» juntaba causas distintas
- * —77 equipos en septiembre de 2026—; con el resumen guardado se nombra la que se sabe:
- *   · el periodo no trae su corriente (sin resumen, o resumen sin horas de corriente: solo tensiones) → no vino en el exporte;
+ * —77 equipos en septiembre de 2026—; con el resumen se nombra la que se sabe. Mandan los niveles CON devanado (un nivel
+ * sin devanado no decide: su ruido daba «llega la potencia» a un equipo sin carga); si no hay ninguno, todos.
+ *   · ninguna hora de corriente llegó (sin resumen; resumen sin corriente —solo tensiones—; en el detalle, `arch` = 0):
+ *     antes del primer mes del punto → aún no aparecía en el exporte; si no → no vino en el exporte;
  *   · la potencia sí llega (sP99 > 0) → la corriente no llega válida;
  *   · corriente en cero CON tensión al menos `horasMinSinCarga` horas → sin carga (fuera de servicio o en reserva);
- *   · si no, lo que queda: valores congelados, en cero o que el propio SCADA marcó no válidos.
+ *   · si no, lo que queda: valores en cero sin tensión, congelados o que el propio SCADA marcó no válidos.
  */
-function motivoSinHoras(resumenPorNivel) {
-  const rs = Object.values(resumenPorNivel || {}).filter((r) => r && typeof r === 'object' && r.horas > 0);
-  if (!rs.length) return 'no vino en el exporte del SCADA';
+function motivoSinHoras(resumenPorNivel, niveles, { mes = null, punto = null } = {}) {
+  const conDev = new Set((niveles || []).filter((n) => n.devanado).map((n) => n.nivel));
+  const todos = Object.entries(resumenPorNivel || {}).filter(([, r]) => r && typeof r === 'object');
+  const usar = conDev.size ? todos.filter(([nv]) => conDev.has(nv)) : todos;
+  const rs = usar.map(([, r]) => r).filter((r) => (r.arch ?? r.horas) > 0);
+  if (!rs.length) {
+    const meses = (punto && punto.meses) || [];
+    return mes && meses.length && mes < [...meses].sort()[0] ? 'el punto SCADA aún no aparecía en el exporte' : 'no vino en el exporte del SCADA';
+  }
   if (rs.some((r) => r.sP99 > 0)) return 'sin corriente válida (sí llega la potencia)';
   if (rs.some((r) => (r.des || 0) >= CALCULO.horasMinSinCarga)) return 'sin carga (fuera de servicio o en reserva)';
-  return 'medida congelada o marcada no válida por el SCADA';
+  return 'medida en cero, congelada o marcada no válida por el SCADA';
 }
 
 /**
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
  */
-export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [] }) {
+export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null }) {
   const placa = placaDe(tx);
   const clave = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
   const esCircuito = !!clave && !esElementoTransformador(clave.elem);
@@ -111,7 +119,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     ? 'escala de la corriente sospechosa'
     : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado'
       // Hay horas medidas pero ningún devanado asignado: decir «sin horas válidas» engañaba. Se nombra la causa.
-      : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : motivoSinHoras(resumenPorNivel)));
+      : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : motivoSinHoras(resumenPorNivel, niveles, { mes, punto })));
   // Sobrecarga sostenida y pico (`99 §129`). Cuentan SOLO los devanados con cifra válida (no los de escala sospechosa ni
   // sin ampacidad) y nada si el equipo no tiene cifra. El resumen guardado es de la corriente EN BRUTO: es exacto si el mes
   // no trae horas imposibles (> 3 × ampacidad) en ese nivel —se sabe por su máximo— y así se usa (probado con los 8 meses
@@ -165,7 +173,7 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
     const cid = k ? claveId(k.est, k.elem) : null;
     const punto = cid ? puntos[cid] || null : null;
     const r = cid ? claves[cid] || null : null;
-    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico });
+    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes });
     return {
       id: tx.id,
       matricula: leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || '',
