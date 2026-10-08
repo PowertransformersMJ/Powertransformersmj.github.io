@@ -7215,3 +7215,21 @@ foto antes/después) · L-117 · `CLAUDE.md §3.2` (aditivo, preview fiel).
   - T1-BEC y T1-SML, firmes pero quizá inflados;
   - **Casacará T1 = 2.000 kVA (su respuesta): su ampacidad en el parque es la de 5 MVA** (corregirla es otra escritura, con su
     visto bueno).
+
+**158.9 Nota posterior (2026-10-08): carga en producción, hecha y verificada.** Con su «Procede con todo», por la página Datos
+SCADA y su Chrome:
+- Homologación v3 guardada (versión 3): 1 nueva, 3 cambiadas y 1 retirada, igual a la simulación.
+- Los 8 meses cargados: ene–jul en «Completar» (2 series nuevas por mes) y ago–sep en «Reemplazar» (4 y 3 series).
+  - Cada simulación de la página coincidió con la offline: el resto de los puntos salió «ya estaban iguales».
+  - Las horas «distintas» (2.736 en agosto y 12.186 en septiembre) son todas del punto de T1-SAM.
+- Foto antes/después (valores, llaves ordenadas):
+  - Solo entran 2 puntos nuevos y solo cambian los 2 de Sampués en ago y sep. Las decisiones de la homologación quedan
+    intactas y las 8 cargas, «completa».
+  - Única diferencia con la simulación offline: enero, 34,5 kV de Santa Lucía, en sMax/sP99/rUI. La corriente es idéntica.
+    La página leyó archivos «Q_average_…» que el filtro de la simulación excluía, así que lo guardado es lo completo.
+- En vivo (main `5f0853f`):
+  - Septiembre: 97 firmes, 37 provisionales, 74 sin cifra (antes 77). Ningún «sin horas válidas». T1-SAM 57,4 %, T2-SAM
+    73,0 %, SLC 58,0 %.
+  - Agosto: 130 firmes. TAN 52,3 %, SLC 59,3 %, T1-SAM 142,5 % provisional, T2-SAM 71,0 %.
+  - Mapa: «Sin medición» 74, CRG 1 = 34 y CRG 3 = 22. Consola limpia.
+- Cada mes nuevo DEBE empaquetarse con el mismo relevo (orden exacta en la memoria del proyecto y en la bóveda).
