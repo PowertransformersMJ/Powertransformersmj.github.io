@@ -6970,8 +6970,11 @@ Esas calles (geocodificadas con Nominatim) rodean el punto que el KMZ llama NUEV
 MONTERIA (1,3 km al NO, más allá de la Carrera 17): **el KMZ estaba bien y OpenStreetMap tiene los nombres cruzados.**
 `confirmar.mjs NMON` subió su confianza a alta con la evidencia, SIN mover la coordenada (+1 auditoría `confirmar_posicion`).
 Montería quedaba en su punto del KMZ por descarte; **confirmada** el mismo día con su foto de campo con GPS («SSEE Montería
-TR-2 M-AT», 30-jul-2023: 8.7636° N, 75.8668° W, a 3,8 m del punto del KMZ) → `confirmar.mjs MON`. Siguen por confirmar
-Cañabraval y Pozo Azul.
+TR-2 M-AT», 30-jul-2023: 8.7636° N, 75.8668° W, a 3,8 m del punto del KMZ) → `confirmar.mjs MON`. **Cañabraval** (foto con
+GPS 14-mar-2025, a 46 m, tomada desde afuera del cerramiento; se ve su transformador de 2.000 kVA) y **Pozo Azul** (foto con GPS
+9-ago-2025 junto al transformador, a 7 m; placa 176972-AT de 1000 kVA) también confirmadas → **ninguna S/E «por confirmar»**:
+las 4 que el escéptico marcó tenían el punto del KMZ bien (la lejanía al poblado y los nombres cruzados de OSM eran de la
+referencia, no del archivo).
 
 ## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
 
@@ -7095,3 +7098,48 @@ oculta el aviso de fondo caído. «Cambiar a Relieve» del aviso sigue igual.
 solo relieve → 1; ninguno → fondo liso; volver → igual que al abrir; aviso oculto.
 
 **156.6 Archivos.** `assets/js/ui/mapa/mapa-colombia.js` (fondos y control de capas). INTACTOS: todo lo demás.
+
+**156.7 Corrección (mismo día, con `§157`).** `mezclar()` llamaba `setOpacity` sobre el relieve APAGADO (sin contenedor) al apagar
+o prender «Mapa» → error en consola y el control podía quedar desincronizado. En la prueba de `§156` no se revisó la consola
+DESPUÉS de los clics (solo al cargar). Ahora solo ajusta si el relieve está en el mapa; banco: 8 cambios seguidos, 0 errores.
+
+## 157. ADR-157 — Mapa: filtro de salud por estado (1–5, varios a la vez) y filtro de Cargabilidad SCADA (CRG 1–5) ⟦OPUS-5.5⟧ (2026-10-08)
+
+> *«necesito que me permitas filtrar por estado de salud 1, 2, 3, 4 y 5. adicionalmente tambien me permitas aplicar un filtro de
+> la variable CARGABILIDAD (aqui tomalo del segmento de cargabilidad SCADA)»*. NO revisado externamente; revisión adversarial
+> interna (1 Opus).
+
+**157.1 Causa raíz.** La salud era una lista de UNA opción («Toda la salud» o una banda); el mapa no conocía la cargabilidad.
+
+**157.2 Solución.**
+- **Salud**: botones marcables «1 Muy bueno … 5 Muy pobre · Sin dato», varios a la vez (ninguno = todos), con su conteo sobre
+  todo el parque. `pasaFiltros` acepta `bandas` (lista; `banda` suelta sigue valiendo).
+- **Cargabilidad SCADA**: la MISMA cifra de la página Cargabilidad SCADA — mismas lecturas (`leerHomologacion`, `leerCatalogo`,
+  `leerResumenMes(mesPorDefecto)`, `obtenerUmbralesActivos`) y la misma función `filasLista` —, leída DESPUÉS de pintar el mapa
+  (importes perezosos; ~190 KB, 3 documentos + umbrales por visita). Botones «1 Baja · 2 Moderada · 3 Media · 4 Alta · 5 Crítica
+  · Sin medición» (varios a la vez) + «Solo cifras firmes»; inactivos mientras lee y si la lectura falla (el resto del mapa sigue).
+- Ficha de la S/E: columna «Carga SCADA (mes)» por transformador; color de severidad SOLO si la cifra es firme (regla de SCADA),
+  provisional en gris y rotulada; sin cifra, «sin medición» con su motivo. Panel: barra y leyenda de CRG del mes.
+- El color del punto sigue siendo la salud oficial.
+- De paso: `mezclar()` del relieve (`§156`) llamaba `setOpacity` con el relieve apagado → error en consola al apagar «Mapa»
+  (`§156.7`); ahora solo ajusta si el relieve está en el mapa.
+
+- **Revisión adversarial (1 Opus)**: paridad EXACTA con la página SCADA confirmada (208 de 208, también con «solo firmes»
+  94 = 94). Corregidos: (1) caché mezclada — la página y el código llevan `?v=157` (también el import del dominio) y, si llega
+  una página vieja con el código nuevo, se usa la lista de salud de antes (comprobado en el banco: mapa entero, «Muy pobre» = 9,
+  0 errores); (2) la barra CRG del panel mostraba nombres de salud al pasar el ratón; (3) el panel coloreaba también lo
+  provisional — ahora las cifras firmes van con los colores CRG de la página SCADA y las provisionales en gris; (4) los conteos
+  de cada grupo siguen a los DEMÁS filtros; (5) sin parque, el filtro decía «leyendo…» para siempre; (6) cursor de «cargando»
+  tras un fallo; (7) botón marcado con contraste bajo → fondo blanco, borde del color y ✓; (8) al volver con «atrás» las listas
+  repuestas no se aplicaban (previo, arreglado de paso).
+
+**157.3 No-regresión.** Sin marcar nada, el mapa es el de antes · buscador, puntos, fichas y capas intactos · la página Cargabilidad
+SCADA no se toca (solo se reutilizan sus funciones).
+
+**157.4 Verificación.** Unitarias en verde (+2 en `tests/mapa_parque.test.js`) · lint limpio · banco con el parque COMPLETO y los
+documentos SCADA de producción (semillas locales): CRG 1→32 · 2→6 · 3→21 · 4→29 · 5→43 (28 firmes) · sin medición 77 —
+IDÉNTICO a `filasLista` sobre producción (`referencia.json`) · salud 85/83/16/15/9 · salud 4+5 → 24 TX en 20 S/E · relieve:
+8 cambios seguidos, 0 errores.
+
+**157.6 Archivos.** `assets/js/domain/mapa_parque.js`, `assets/js/ui/mapa/mapa-colombia.js`, `assets/css/mapa-colombia.css`,
+`pages/mapa-v2.html`, `tests/mapa_parque.test.js`. INTACTOS: Cargabilidad SCADA (página y dominio), datos.
