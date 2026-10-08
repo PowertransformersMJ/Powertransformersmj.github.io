@@ -6770,3 +6770,83 @@ el freno no mira `docs/` (los nodos del cerebro citan lo que quieran) · pendien
 
 **151.3 Verificación.** `brain:check` sano · boot ≤ 31.386 (GC de la auditoría respetado) · crudo del barrido en la bóveda
 `2026-10-07-auditoria-nivel2/crudos/barrido-sesion.json`.
+
+## 152. ADR-152 — Mapa geográfico de Colombia: fondo de la pestaña Mapa arreglado (Etapa 0) y mapa nuevo en «Borrador» con límites oficiales DANE y el parque por departamento y municipio (Etapa 1) ⟦OPUS-5.5⟧ (2026-10-07)
+
+> *«necesito que te situes en el segmento de mapa en la pagina y vayas construyendo el mapa geografico de colombia en un
+> maximo nivel»*. W-11 paso a paso: Paso 1 de solo lectura (geografía, dominio y el parque real) → construcción aislada en
+> página NUEVA sin enlazar → rótulo «Borrador · pendiente del Ingeniero». NO revisado externamente (consejo externo solo a
+> pedido, `§150`); revisión adversarial interna (Opus).
+
+**152.1 Punto de partida (leído, no supuesto).**
+- La pestaña Mapa (`pages/mapa.html` + `assets/js/mapa-render.js`, dentro de `activos.html`) pinta solo equipos con
+  latitud/longitud: en producción (10-07) **0 de 208** transformadores las tienen (147 S/E, 5 departamentos, 3 zonas).
+- Su fondo estaba roto: con `body.aqua` usaba CARTO Voyager sin clave → teselas de 2 KB con «API KEY REQUIRED» (CARTO exige
+  clave desde ~09-2026); la rama oscura usaba `{s}.tile.openstreetmap.org` con el subdominio `d`, que no existe.
+
+**152.2 Solución.**
+- **Etapa 0 (producción, pestaña vieja)**: OSM `https://tile.openstreetmap.org/{z}/{x}/{y}.png` sin subdominios (su política de
+  teselas) y la nota de `mapa.html` ya no manda a cargar coordenadas a mano.
+- **Etapa 1 (`pages/mapa-v2.html`, sin enlazar)**:
+  - **Geografía** DANE MGN 2025 (WGS84; zip con SHA-256 fijado en `scripts/mapa-geo/construir.mjs`, mapshaper 0.7.80):
+    `assets/geo/` = 33 departamentos · área AFINIA (138 municipios con DIVIPOLA, 5 departamentos, 3 zonas) · 1.122 municipios
+    del país (se leen solo si se piden) · rótulos (el de cada departamento AFINIA DENTRO de su área de servicio).
+  - **Zonas** (`domain/mapa_parque.js#zonaDeMunicipio`): BOLIVAR = 13 · OCCIDENTE = 23 + 70 · ORIENTE = 20 + los 11 del Magdalena
+    (MO.00418) + 5 excepciones de la región de Loba deducidas de la zona REGISTRADA de sus S/E (13074, 13300, 13580, 13600,
+    13667). Rotuladas «aproximadas».
+  - **Mapa**: fondos OSM y Relieve (OpenTopoMap, con su atribución); UN solo lienzo para todas las capas (con uno por capa, el de
+    encima se quedaba con todos los clics); zoom entero (el fraccionario emborronaba el fondo); municipios desde el zoom 8 y sus
+    nombres desde el 10; vistas Colombia / Caribe AFINIA / «Ampliar» (CSS, Esc vuelve; la API de pantalla completa no responde en
+    el iframe ni en iPhone); aviso de fondo caído solo si 6 teselas fallan en 15 s y ninguna llega en 6 s.
+  - **Parque**: UNA lectura por visita (`listarV2`); salud oficial `Math.round(salud_actual.hi_final)` como el Parque
+    (85/83/16/15/9); filtros zona/departamento/salud/tipo; rótulos «DEPTO · N TX · M S/E» con barra de salud; ficha general,
+    de departamento, de municipio y de subestación; KPI «0 de 147 con ubicación validada».
+  - **Municipio de cada S/E** (`municipioDeSubestacionMapa`): tabla oficial de Fichas (2026-09-10) con el CÓDIGO de la matrícula
+    primero y el nombre después; matrículas en conflicto → ninguno. **146 de 147** ubicadas en su municipio (falta LA SALVACION,
+    que no está en la tabla). La S/E resalta su municipio; sin él, su departamento registrado.
+  - **Buscador**: municipios AFINIA, los del país (si no hay resultado, se leen una vez y se repite), S/E y transformadores; ↑/↓ y
+    Enter; cada resultado con su departamento (distingue las dos «S/E VALENCIA» y las dos «PUEBLO NUEVO»).
+- **Nada de coordenadas en el repo público**: el geoportal UPME (`…/UPME_EN_DI_SUBESTACION_consulta/MapServer/0`) tiene puntos,
+  pero sus términos son uso no comercial y prohíben reproducir sin autorización → solo revisión LOCAL en la bóveda.
+
+**152.3 No-regresión.** La pestaña Mapa conserva todo salvo el fondo (mismo `initMap`, mismos marcadores) · `activos.html` sin
+cambio · el mapa nuevo no escribe en Firestore · todo lo nuevo en archivos NUEVOS (L-102) · familia CSS propia `.mc-`.
+
+**152.4 Verificación.**
+- Unitarias **2514/0/2** (+15 en `tests/mapa_parque.test.js`: zona por municipio contra el archivo DANE, DIVIPOLA sin adivinar,
+  homónimos por matrícula, rótulos dentro del área —falla con los rótulos viejos, que caían en Pivijay—, sin datos de activos en la
+  geografía) · `lint:html` limpio.
+- Banco con la foto real del parque (`?semillaparque=1`): Córdoba 59 TX / 42 S/E / 835 MVA · Montería 14 TX / 9 S/E · Muy pobre
+  9 · Bolívar + Muy pobre 4 · estado cero («Ningún transformador cumple los filtros») · Medellín por el país · clic en municipio
+  sobre el lienzo · S/E → su municipio → de vuelta · Ampliar / Esc · geografía caída: aviso y fichas sin errores · consola limpia.
+- **Revisión adversarial** (10 hallazgos, todos corregidos): lienzos separados robaban los clics · el resaltado volvía a un estilo
+  ya tocado · el rótulo de Magdalena caía fuera del área · zonas de Loba · atribución del Relieve · SHA del DANE sin fijar · la capa
+  del país duplicaba los 138 · panel sin guarda antes de leer el parque · buscador (código, país, flechas, aviso pegado) · la ficha
+  de municipio sin sus S/E · KPI de «ubicadas» · Ampliar sin estilos · ruta del script en la página.
+
+**152.5 Anti-patterns evitados.** Inventar puntos (sin coordenada validada no hay punto) · adivinar el municipio por nombre ·
+publicar datos de terceros sin licencia · fondos con clave o de pago (Esri factura pasado el cupo) · leer el parque más de una vez.
+
+**152.6 Archivos.** Nuevos: `pages/mapa-v2.html`, `assets/js/ui/mapa/mapa-colombia.js`, `assets/css/mapa-colombia.css`,
+`assets/js/domain/mapa_parque.js`, `assets/geo/*` (4), `scripts/mapa-geo/construir.mjs`, `tests/mapa_parque.test.js`.
+Modificados: `assets/js/mapa-render.js`, `pages/mapa.html`. INTACTOS: `activos.html`, `domain/municipios_subestacion.js`, Fichas.
+
+**152.7 Doctrina.** `CLAUDE.md §3.2` (free-tier: una lectura, geografía estática; cambios aditivos; preview antes de producción) ·
+W-11 · L-56 · L-102 · `§150` (ADR antes del merge).
+
+**152.8 Verificado sano / no re-auditar.**
+- Fuentes descartadas con su porqué: geoBoundaries (licencias mezcladas, sin DIVIPOLA, 2020) · Natural Earth (16 ríos, sin Sinú ni
+  San Jorge) · Esri (cuenta y cobro) · Stadia (no comercial) · CARTO (clave). DANE permite usar y transformar citando la fuente.
+- 5 S/E cuyo municipio oficial queda en OTRO departamento que el registrado — Mata de Caña → El Banco, Coveñas → San Antero,
+  Santa Inés → San Marcos, Santa Teresa → Regidor, Río Viejo → Río Viejo —: matrícula y nombre coinciden; es la tabla, no un error
+  del mapa (el departamento registrado puede ser el administrativo). Se le muestra, no se corrige.
+- Revisión local UPME (bóveda): 132 alta · 14 media · 1 sin ubicar. No sale de la bóveda.
+
+**152.9 Decisiones suyas (TODO-78).**
+1. Enlazar el mapa nuevo a la pestaña Mapa (Etapa 1b). Recomendado: sí, tras mirarlo.
+2. Coordenadas de las 147 S/E: pedir la tabla oficial al SIG de AFINIA (recomendado); UPME solo como revisión local.
+3. Red de transmisión UPME (líneas STN/STR) en el mapa: pedir autorización a la UPME antes.
+4. Zonas: confirmar la lista de municipios de cada zona (hoy aproximadas).
+5. **Fichas** (hallazgo de esta obra): `municipioDeSubestacion` busca primero por NOMBRE → la ficha de VALENCIA (Córdoba, VAC)
+   imprimiría VALLEDUPAR y la de PUEBLO NUEVO (Magdalena, PLO) el Pueblo Nuevo de Córdoba (en vez de Ariguaní). Toca el papel:
+   espera su «procede» (TODO-73).

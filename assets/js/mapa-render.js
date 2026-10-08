@@ -99,21 +99,11 @@ export function initMap(containerId) {
     zoomControl: true
   });
 
-  // Tile layer Aqua-aware: si el body es Aqua (tema claro perla),
-  // usamos CARTO Voyager (gris claro, perfecto para fondo perla);
-  // si es legacy oscuro, mantenemos OpenStreetMap original.
-  const isAqua = typeof document !== 'undefined' && document.body && document.body.classList.contains('aqua');
-  const tileUrl = isAqua
-    ? 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
-  const tileAttr = isAqua
-    ? '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · &copy; <a href="https://carto.com/">CARTO</a> · SGM · TRANSPOWER'
-    : '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · SGM · TRANSPOWER';
-
-  window.L.tileLayer(tileUrl, {
-    attribution: tileAttr,
-    maxZoom: 19,
-    subdomains: 'abcd'
+  // Fondo: OpenStreetMap sin subdominios (su política de teselas). CARTO pasó a exigir clave y
+  // devolvía teselas con «API KEY REQUIRED»; el subdominio «d» de OSM no existe (99 §152).
+  window.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · SGM · TRANSPOWER',
+    maxZoom: 19
   }).addTo(mapRef);
 
   return mapRef;
