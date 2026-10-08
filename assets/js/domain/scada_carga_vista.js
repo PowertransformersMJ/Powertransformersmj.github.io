@@ -52,6 +52,22 @@ function motivoSinDevanado(avisos, placa) {
 }
 
 /**
+ * Por qué un punto con datos cargados no da NINGUNA hora válida (`99 §158`). «Sin horas válidas» juntaba causas distintas
+ * —77 equipos en septiembre de 2026—; con el resumen guardado se nombra la que se sabe:
+ *   · el periodo no trae su corriente (sin resumen, o resumen sin horas de corriente: solo tensiones) → no vino en el exporte;
+ *   · la potencia sí llega (sP99 > 0) → la corriente no llega válida;
+ *   · corriente en cero CON tensión al menos `horasMinSinCarga` horas → sin carga (fuera de servicio o en reserva);
+ *   · si no, lo que queda: valores congelados, en cero o que el propio SCADA marcó no válidos.
+ */
+function motivoSinHoras(resumenPorNivel) {
+  const rs = Object.values(resumenPorNivel || {}).filter((r) => r && typeof r === 'object' && r.horas > 0);
+  if (!rs.length) return 'no vino en el exporte del SCADA';
+  if (rs.some((r) => r.sP99 > 0)) return 'sin corriente válida (sí llega la potencia)';
+  if (rs.some((r) => (r.des || 0) >= CALCULO.horasMinSinCarga)) return 'sin carga (fuera de servicio o en reserva)';
+  return 'medida congelada o marcada no válida por el SCADA';
+}
+
+/**
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
  */
@@ -95,7 +111,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     ? 'escala de la corriente sospechosa'
     : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado'
       // Hay horas medidas pero ningún devanado asignado: decir «sin horas válidas» engañaba. Se nombra la causa.
-      : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : 'sin horas válidas'));
+      : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : motivoSinHoras(resumenPorNivel)));
   // Sobrecarga sostenida y pico (`99 §129`). Cuentan SOLO los devanados con cifra válida (no los de escala sospechosa ni
   // sin ampacidad) y nada si el equipo no tiene cifra. El resumen guardado es de la corriente EN BRUTO: es exacto si el mes
   // no trae horas imposibles (> 3 × ampacidad) en ese nivel —se sabe por su máximo— y así se usa (probado con los 8 meses
