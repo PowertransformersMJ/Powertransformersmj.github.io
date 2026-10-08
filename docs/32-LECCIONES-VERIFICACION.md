@@ -245,6 +245,14 @@ Dos defectos del mismo tipo, cazados el mismo día sobre la misma matriz de ries
 (`getBoundingClientRect`, `getComputedStyle(...).backgroundColor`), no mirando el código; y si el
 documento se imprime, se declara `print-color-adjust: exact` en el mismo cambio. → `99 §75.15`.
 
+### L-133 · El PDF con Helvetica estándar solo imprime Windows-1252: Ω, μ y ≥ salen cambiados en el papel firmado
+**Disparador**: texto libre que termina en un PDF de jsPDF sin fuente embebida (Órdenes, `ordenes-materiales.js`;
+`exports/pdf.js`). · **Cicatriz** (`99 §141`): en el material «Otro», «Ω», «≥», la «μ» griega, «⌀» y un espacio invisible salían
+en el PDF como otro signo, mientras la vista previa y el Excel los mostraban bien (probado con la librería real). · **Regla**:
+todo campo libre que va al PDF pasa por `caracterNoImprimible` (`domain/ordenes_items.js`); si falla, se rechaza nombrando el
+signo y pidiéndolo con letras («ohm», «micro», «mayor o igual»). Se prueba con «MΩ» en el PDF DESCARGADO, no en la vista previa.
+Hoy solo lo cumple el material «Otro» (resto → TODO-65). [HONOR]
+
 ### L-90 · Vaciar un dato que sirve de LLAVE rompe en silencio todo lo que buscaba por él
 
 `§70` vació las cédulas del módulo de Órdenes de Materiales porque el repositorio es público. Estaba

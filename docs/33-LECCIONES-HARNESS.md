@@ -22,6 +22,9 @@
 
 ### L-98 · Un round-trip por Python o por el editor puede dejar caracteres de control LITERALES en el fuente
 **Disparador**: escribir con `Write`/heredoc un archivo que lleva escapes `\u0000`…`\u001F` en un regex, y luego reescribirlo con un script. · **Cicatriz** (`99 §83.7`): `fichas_borrador.js` quedó con NUL, backspace, VT, FF y DEL **de verdad** dentro del regex de limpieza. Los tests pasaban —un carácter de control literal dentro de una clase de caracteres funciona igual— así que nadie lo vio hasta que un `Read` mostró `[ --]`. · **Regla**: tras un round-trip, barrer lo tocado con `LC_ALL=C grep -c $'[\001-\010\013\014\016-\037\177]'`; y escribir esos escapes como `\u00XX` explícitos, nunca confiar en que el harness los preserve.
+· **Y el rango de tildes** (`99 §143.4`): `normalize('NFD').replace(/[\u0300-\u036f]/g,'')` se escribe SIEMPRE con escapes. Con los
+caracteres combinantes literales funciona, pero no se ve al revisar y un copiar/pegar lo puede perder sin aviso (los nombres
+con tilde dejan de coincidir). Barrido: `grep -rlP '\[\x{0300}-\x{036f}\]' assets/js functions` (11 archivos el 10-07 → `11` TODO-77).
 
 ### L-111 · Desde un worktree, `../brain-private` no existe: el pull falla y `brain:check` sale SANO sin comparar
 **Disparador**: tocar el kernel o la bóveda desde una sesión en `.claude/worktrees/<nombre>/`. · **Cicatriz** (`99 §120`):
@@ -31,6 +34,17 @@ revisar la bóveda. · **Receta**: `node ~/Desktop/GitHub-MJ/brain-private/kerne
 carpeta actual (el pull escribe en la carpeta desde donde se corre); comprobar a mano con `cmp scripts/X.mjs <canónico>/X.mjs`; y para
 repartir al otro repo, un árbol temporal `git worktree add --detach <tmp> origin/main` — allí tampoco corren sus candados
 de nombres, así que solo se sube el kernel. [HONOR] · **Y una conversación de más de 48 h** (10-05, `99 §139`): si solo hubo compactaciones y ningún SessionStart, el pre-commit dice «COMMIT BLOQUEADO: presupuesto de boot excedido» aunque el arranque quepa; es el canario de `boot-gate.mjs` (`docs/.boot-marker` > 48 h). Los ganchos sí viven: `node scripts/session-handoff.mjs --boot-echo` y reintentar (no usar `BOOT_CANARY_SKIP`).
+
+### L-132 · El gancho PreCompact no puede devolver `hookSpecificOutput`: la orden de consolidar nunca llega
+**Disparador**: tocar `session-handoff.mjs` o los ganchos de `.claude/settings.json`, o dar por hecho que «el PreCompact me
+obliga a consolidar `10`». · **Cicatriz** (`/compact` del 10-06, verificado en la transcripción): el harness rechazó la salida
+de `--precompact` («Hook JSON output validation failed — hookSpecificOutput.hookEventName: expected one of … SessionStart»).
+La foto `docs/.handoff-auto.md` sí se escribe (va antes de imprimir), pero la ORDEN (`additionalContext`) no llega al modelo.
+El mismo JSON viene desde el kernel v1.0 y lo trae Líneas AT: con toda probabilidad nunca llegó. · **Regla**: un gancho solo
+devuelve `hookSpecificOutput` con un `hookEventName` que el harness acepte para ese evento; en PreCompact, como mucho un
+mensaje para el usuario. Mientras no haya un camino comprobado, consolidar `10` antes de compactar es [HONOR]. Lo que SÍ llega
+tras compactar es el `SessionStart` (brain-check `--boot` + handoff). **Arreglo** → kernel (cola de TODO-67): se da por hecho
+cuando una compactación real ya no muestra el error.
 
 ## 🌐 Chrome del Ingeniero, extensión y banco → hija `36`
 

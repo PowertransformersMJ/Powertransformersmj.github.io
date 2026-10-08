@@ -158,6 +158,12 @@ en prosa no cuenta como cierre. **Candado de M-07 elegido por él (`§150`)**: d
 `githooks/pre-push` → `scripts/freno-publicar.mjs` frena el push a `main` de código que cite `99 §N` sin su ADR guardado. Los
 `firebase deploy` (reglas, funciones) no pasan por git: se despliegan DESPUÉS de commitear su ADR [HONOR].
 
+### M-11 · Mover una lección de neurona deja punteros POR ARCHIVO que ningún gate ve
+**Cicatriz** (`99 §149`): al pasar L-62, L-92, L-94, L-105 y L-117 a `36`, quedaron «L-117 (`30`)», «L-94 (docs/33)» y
+«hijas `31`-`35`» en 34, 53, 00, la cabecera de 33 y dos memorias; el gate #5 salió verde porque resuelve por ID, no por archivo.
+Lo cazó el verificador del cierre. · **Regla**: al mover lecciones, `grep -rn "L-NN"` en `docs/`, `CLAUDE.md` y las memorias de
+los DOS slugs, y corregir cada puntero que nombra el archivo viejo; la cabecera de la hija avisa de las referencias internas. [HONOR]
+
 > Topes de `30` y sus hijas → `docs/.brain-manifest.json` (en caracteres). Cuando se acerque al tope: nueva hija (la siguiente libre es `37-…`) registrada en `CLAUDE.md §0` y en `00`, con puntero de la madre a la hija. **Subir un tope del manifest exige un ADR que diga por qué no se partió la neurona; sin ese ADR, el tope no sube** (`§149`, S0-05) [HONOR].
 
 ## 🤖 IA / Claude API / Cloud Functions → hija `31`

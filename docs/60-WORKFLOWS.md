@@ -51,11 +51,11 @@ Trivial / reversible / mecánico → trabajo directo (+ `caza-bugs` si hay estad
    • **UI** → **preview FIEL** (módulo real + scope + composición del shell, L-56) **ANTES** de tocar producción. Aquí NO sirve un mockup bonito: el fallo histórico fue creer un preview que no reproducía el shell.
    • **Normativo** → W-08 con la fuente primaria en mano.
 5. **COMITÉ ×3 ACOTADO** (`comite-expertos`) — ≥1 escéptico + ≥1 ejecutor.
-6. **CONSEJO EXTERNO** (`docs/15`, **Gemini vía Antigravity, solo-lectura**) — prompt autocontenido y CRUDO (anti-anclaje). Humano en el medio. **Verificar cada afirmación: es insumo, NUNCA oráculo** (ya propuso model IDs inválidos, `99 §77`).
+6. **CONSEJO EXTERNO** — **solo si él lo pide** (`§150`; si no, se salta y el ADR lo dice) (`docs/15`, **Gemini vía Antigravity, solo-lectura**) — prompt autocontenido y CRUDO (anti-anclaje). Humano en el medio. **Verificar cada afirmación: es insumo, NUNCA oráculo** (ya propuso model IDs inválidos, `99 §77`).
 7. **VEREDICTO** — decido yo, con el criterio de éxito escrito ANTES de codear.
 8. **IMPLEMENTAR.**
 9. **VALIDACIÓN LIVE en Chrome real** (`validacion-live-chrome`, no preview headless). Entrego el **REPORTE**: la lista CERRADA de caminos que recorrí — qué recorrí, no "pasó".
-10. **CIERRE** — ADR en `99` + fila en `00` + lección en `30` + `brain:check` verde. (`npm run brain:archive -- --adr NN --title "…"` hace la plomería; el juicio lo escribo yo.)
+10. **CIERRE** — ADR en `99` + fila en `00` + lección en `30` + `brain:check` verde. **El ADR se commitea ANTES del merge a `main`** (si no, `pre-push` → `freno-publicar.mjs` lo frena, `§150`); lo verificado tras publicar (servido, CI) se anota después. (`npm run brain:archive -- --adr NN --title "…"` hace la plomería; el juicio lo escribo yo.)
 
 **🔒 Artefactos visibles al Ingeniero (si falta uno, el flujo está INCOMPLETO):**
 (a) el **preview fiel** cuando es UI · (b) el **prompt de consejo externo** en bloque copiable **solo cuando él lo pide** (decisión suya 2026-10-07, `§150`; si no, el ADR dice «NO revisado externamente») · (c) el **reporte de validación live**. (a) y (c) se entregan SIEMPRE, sin que los pida.

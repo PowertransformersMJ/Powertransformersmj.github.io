@@ -18,6 +18,11 @@
 
 ### L-94 · Validar en vivo sin tocar lo que el Ingeniero tiene abierto
 **Disparador**: validar un despliegue con la sesión del Ingeniero en Chrome. · **Cicatriz** (`99 §78`): una pestaña nueva cayó en la pantalla de acceso —inició sesión SIN «Mantener sesión en este dispositivo», que usa `browserSessionPersistence`: la sesión vive solo en ESA pestaña— y la suya tenía un formulario sin guardar (el aviso de salida bloquea recargar). · **Receta**: no recargar ni descartar; desde SU pestaña, `await import('/assets/js/data/<modulo>.js?v=N')` carga el módulo nuevo y comparte la misma instancia de Firebase y sesión (mismas URLs de `firebase-init.js` y `session-guard.js`), así se prueban reglas y datos en producción; nunca escribir la contraseña. · **Y en el banco local**: con el panel Browser oculto los temporizadores se frenan y `javascript_tool` corta a los 45 s: acciones cortas sin esperas largas y lectura del estado en llamadas aparte. · **Ampliación (`99 §108`)**: una acción que ESCRIBE en producción no sirve para validar: «Exportar Excel» del custodio registra la emisión con folio en `fichas_emisiones`. En vivo se recorre la **vista previa** (solo lectura); la descarga real es del Ingeniero; el Excel se prueba en el banco o con `?nocustodio=1`. · **Por defecto** (`§107`→`§135`): pestaña APARTE, solo lectura, cerrada al terminar (si cae en el acceso → la receta de arriba; sin sesión → su lista (I)). **Nunca un diálogo en su pestaña**: un `confirm()` de prueba congeló el SGM hasta que él pulsó Aceptar (`§102`); se prueban en el banco.
+· **Ampliación (`99 §147`, 10-07)**: la extensión solo alcanza las pestañas de SU grupo «Claude». Su pestaña con sesión, fuera
+del grupo, no se puede conducir, y una nueva dentro del grupo cae en el acceso: (A) él inicia sesión en la pestaña del grupo o
+(B) arrastra su pestaña al grupo. Nunca se escribe su contraseña. Si la conexión no encuentra navegador: Chrome cerrado,
+extensión sin instalar o panel lateral sin sesión en la misma cuenta; una captura suya confirma el grupo y se reintenta. Si la
+pestaña queda abierta al terminar, se le dice.
 
 ### L-105 · Capturar el banco: `--screenshot` de Chrome sin cabeza no espera un flujo asíncrono; se conduce por CDP
 **Disparador**: necesitar la captura en ARCHIVO de un estado del banco que se arma solo (importaciones diferidas, `fetch`,
@@ -52,3 +57,13 @@ encontró dispersa (S3-02, `§149`). · **Regla**: (1) servido = main archivo po
 ≥ 10 min (max-age=600 del CDN de Pages; sin `?v=`, L-102); (3) en SU pestaña, `import()` del módulo y comprobar que trae la
 función nueva; si no, `fetch(u, {cache:'reload'})` y recargar. Sin los tres, no se escribe. **Gate**: [HONOR] + el código
 escritor se niega con un módulo viejo (`registrarDesdeOrden` exige `orden_es`, `§147`).
+
+### L-131 · Un flujo ENTRE páginas (guardar en una, ver en otra) se prueba con el almacén en el PADRE
+**Disparador**: verificar en el banco algo que nace en una página y se ve en otra (guardar una orden → el contrato la registra →
+el Histórico la muestra). · **Cicatriz** (`99 §148`): el simulador de Firestore vivía en la memoria de cada página; al navegar se
+perdía, no entendía campos con punto (`orden_es.clave`), su `onSnapshot` era de una sola lectura (el tablero no veía lo recién
+escrito) y sus fechas no tenían `toMillis` (la creación de la orden salía en 0 y todo parecía «desfasado»). · **Regla**: una
+página-arnés (`flujo.html`) con el almacén y los oyentes en el padre y cada página en un iframe; **sembrar SOLO en el padre**
+(una semilla dentro del iframe crea su propio almacén); simulador con campos con punto, tiempo real (re-llamar a los oyentes
+tras cada escritura) y fechas con `toMillis`; un interruptor para tumbar una colección (`?caida=transformadores`). Banco de
+referencia: bóveda `2026-10-07-registro-automatico/crudos/banco/` (`node server.mjs <repo>`). **Gate**: [HONOR].
