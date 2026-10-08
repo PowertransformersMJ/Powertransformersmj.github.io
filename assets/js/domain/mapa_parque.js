@@ -158,8 +158,9 @@ export function coordenadaDe(tx) {
   return [lat, lng];
 }
 
-/** Lo que el mapa necesita de un transformador v2. */
-export function fichaTx(tx) {
+/** Lo que el mapa necesita de un transformador v2. `cargas` (opcional): id → cifra de Cargabilidad SCADA del mes
+ *  (`{pct, crg, clase, motivo}`, la MISMA de la página Cargabilidad SCADA: `domain/scada_carga_vista.js#filasLista`). */
+export function fichaTx(tx, cargas = null) {
   const id = (tx && tx.identificacion) || {};
   const u = (tx && tx.ubicacion) || {};
   const kva = Number(tx && tx.placa && tx.placa.potencia_kva);
@@ -179,24 +180,41 @@ export function fichaTx(tx) {
     coordenada: coordenadaDe(tx),
     // Si la matrícula falta (editar en Inventario la puede vaciar), el código del equipo es la misma matrícula.
     codigoSE: codigoSubestacion(id.matricula || (tx && tx.matricula) || id.codigo || (tx && tx.codigo) || ''),
-    etiqueta: etiquetaTx(id.matricula || (tx && tx.matricula) || '')
+    etiqueta: etiquetaTx(id.matricula || (tx && tx.matricula) || ''),
+    ...cargaDe(tx && tx.id, cargas)
   };
 }
+
+/** Cifra SCADA del equipo (o vacía): CRG 1…5 solo si hay porcentaje; sin él, «sin medición» con su motivo. */
+function cargaDe(id, cargas) {
+  const c = id && cargas && typeof cargas.get === 'function' ? cargas.get(String(id)) : null;
+  const pct = c && Number.isFinite(Number(c.pct)) && c.pct !== null ? Number(c.pct) : null;
+  const crg = pct != null && [1, 2, 3, 4, 5].includes(Number(c.crg)) ? Number(c.crg) : null;
+  return { cargaPct: pct, crg, cargaClase: crg == null ? 'nulo' : (c.clase === 'firme' ? 'firme' : 'provisional'),
+    cargaMotivo: c ? String(c.motivo || '') : '' };
+}
+
+/** Valores elegidos de un filtro múltiple (lista o un valor suelto); vacío = todos. */
+const elegidos = (v) => (Array.isArray(v) ? v : (v === '' || v == null ? [] : [v])).map(String);
 
 const bandasVacias = () => ({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, sin: 0 });
 /** Una subestación = su id; sin id, su nombre + departamento (hay homónimos en departamentos distintos). */
 const claveSE = (f) => f.subestacionId || ('#' + normal(f.subestacion) + '|' + f.departamento);
 const peorDe = (a, b) => (a == null ? b : b == null ? a : Math.max(a, b));
 
-/** ¿Pasa el equipo los filtros del mapa? (zona, departamento, banda — 'sin' = sin dato —, tipo) */
+/**
+ * ¿Pasa el equipo los filtros del mapa? zona, departamento, tipo; salud oficial `bandas` (varias a la vez: '1'…'5', 'sin';
+ * `banda` suelta sigue valiendo); Cargabilidad SCADA `crgs` (varias: '1'…'5', 'sin' = sin medición) y `soloFirmes`.
+ */
 export function pasaFiltros(f, filtros = {}) {
   if (filtros.zona && f.zona !== filtros.zona) return false;
   if (filtros.departamento && f.departamento !== filtros.departamento) return false;
   if (filtros.tipo && f.tipo !== filtros.tipo) return false;
-  if (filtros.banda) {
-    if (filtros.banda === 'sin') { if (f.banda != null) return false; }
-    else if (f.banda !== Number(filtros.banda)) return false;
-  }
+  const bandas = elegidos(filtros.bandas != null ? filtros.bandas : filtros.banda);
+  if (bandas.length && !bandas.includes(f.banda == null ? 'sin' : String(f.banda))) return false;
+  const crgs = elegidos(filtros.crgs);
+  if (crgs.length && !crgs.includes(f.crg == null ? 'sin' : String(f.crg))) return false;
+  if (filtros.soloFirmes && f.cargaClase !== 'firme') return false;
   return true;
 }
 
@@ -208,8 +226,8 @@ export function pasaFiltros(f, filtros = {}) {
  * @returns {{ total:number, bandas:object, subestaciones:object[], porDepartamento:object, porZona:object,
  *             ubicadas:number, sinUbicar:number }}
  */
-export function resumenParque(txs, filtros = {}, ubicaciones = null) {
-  const todas = (Array.isArray(txs) ? txs : []).map(fichaTx);
+export function resumenParque(txs, filtros = {}, ubicaciones = null, cargas = null) {
+  const todas = (Array.isArray(txs) ? txs : []).map((t) => fichaTx(t, cargas));
   // El código de cada S/E sale de TODOS sus equipos (no de los filtrados): un filtro de salud no mueve una instalación.
   const codigosDe = new Map();
   for (const f of todas) {
@@ -222,8 +240,12 @@ export function resumenParque(txs, filtros = {}, ubicaciones = null) {
   const porDepartamento = {};
   const porZona = {};
   const bandas = bandasVacias();
+  const crgs = bandasVacias();
+  const crgsFirmes = bandasVacias();
   for (const f of fichas) {
     bandas[f.banda == null ? 'sin' : f.banda]++;
+    crgs[f.crg == null ? 'sin' : f.crg]++;
+    if (f.cargaClase === 'firme') crgsFirmes[f.crg]++;
     const ks = claveSE(f);
     const s = subs.get(ks) || { clave: ks, id: f.subestacionId, nombre: f.subestacion || '(sin subestación)',
       departamento: f.departamento, zona: f.zona, municipio: f.municipio, coordenada: null, peor: null, tx: [] };
@@ -261,7 +283,7 @@ export function resumenParque(txs, filtros = {}, ubicaciones = null) {
   })
     .sort((a, b) => (b.peor || 0) - (a.peor || 0) || b.tx.length - a.tx.length || a.nombre.localeCompare(b.nombre, 'es'));
   const ubicadas = lista.filter((s) => s.coordenada).length;
-  return { total: fichas.length, bandas, subestaciones: lista, porDepartamento: cerrar(porDepartamento),
+  return { total: fichas.length, bandas, crgs, crgsFirmes, subestaciones: lista, porDepartamento: cerrar(porDepartamento),
     porZona: cerrar(porZona), ubicadas, sinUbicar: lista.length - ubicadas };
 }
 

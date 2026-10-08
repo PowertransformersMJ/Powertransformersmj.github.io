@@ -11,7 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
   <link rel="stylesheet" href="../assets/css/inventario.css"/>
-  <link rel="stylesheet" href="../assets/css/mapa-colombia.css"/>
+  <link rel="stylesheet" href="../assets/css/mapa-colombia.css?v=157"/>
 
   <!-- Leaflet 1.9.4 -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
@@ -43,8 +43,13 @@
     </div>
     <select id="mcZona" class="form-select" aria-label="Zona"><option value="">Todas las zonas</option></select>
     <select id="mcDepto" class="form-select" aria-label="Departamento"><option value="">Todos los departamentos</option></select>
-    <select id="mcSalud" class="form-select" aria-label="Salud"><option value="">Toda la salud</option></select>
     <select id="mcTipo" class="form-select" aria-label="Tipo de activo"><option value="">Todos los tipos</option></select>
+  </div>
+
+  <div class="mc-chips-fila">
+    <div class="mc-chips" id="mcSalud" role="group" aria-label="Filtrar por salud oficial (1 a 5)"><span class="mc-chips-tit">Salud</span></div>
+    <div class="mc-chips" id="mcCrg" role="group" aria-label="Filtrar por Cargabilidad SCADA"><span class="mc-chips-tit">Cargabilidad SCADA <small id="mcCrgMes">· leyendo…</small></span></div>
+    <label class="mc-check"><input type="checkbox" id="mcSoloFirmes" disabled> Solo cifras firmes</label>
   </div>
 
   <div id="mcAviso" class="info-msg" style="display:none"></div>
@@ -73,7 +78,7 @@
   <span>© <span id="yr">2026</span> · Zona interna</span>
 </footer>
 
-<script type="module" src="../assets/js/ui/mapa/mapa-colombia.js"></script>
+<script type="module" src="../assets/js/ui/mapa/mapa-colombia.js?v=157"></script>
 <script src="../assets/vendor/lucide/lucide.min.js" defer></script>
 <script src="../assets/js/aqua.js" defer></script>
 <script src="../assets/js/aqua-shell.js" defer></script>

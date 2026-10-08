@@ -15,8 +15,9 @@ import { listar as listarSubestaciones } from '../../data/subestaciones.js';
 import { LIMITE_TRANSFORMADORES } from '../../domain/limites_lectura.js';
 import { CONDICIONES, ZONAS, DEPARTAMENTOS, TIPOS_ACTIVO } from '../../domain/schema.js';
 // municipioDeSubestacionMapa usa la tabla oficial de municipio por subestación (Fichas, 2026-09-10): S/E de cada municipio.
+// `?v=157`: el dominio cambió (filtros múltiples y CRG); la versión evita mezclar este archivo con uno viejo en caché (L-102).
 import { DPTO_DANE, DANE_DE_DPTO, COLOR_ZONA, resumenParque, buscarEnMapa, municipioDeSubestacionMapa,
-  indiceUbicaciones } from '../../domain/mapa_parque.js';
+  indiceUbicaciones } from '../../domain/mapa_parque.js?v=157';
 
 const $ = (id) => document.getElementById(id);
 const GEO = '../assets/geo/';
@@ -34,9 +35,10 @@ const NOMBRE_TIPO = Object.fromEntries(TIPOS_ACTIVO.map((t) => [t.value, t.label
 const estado = {
   mapa: null, txs: [], parqueError: null, resumen: null,
   capas: {}, rotulos: null, nombresMpio: null, seleccion: null, resaltado: null,
-  municipios: [], afiniaBounds: null, filtros: {},
+  municipios: [], afiniaBounds: null, filtros: { bandas: [], crgs: [], soloFirmes: false },
   capasDepto: {}, capasMpio: {}, capasMpioPais: {}, subsPorMun: new Map(), munDeSub: new Map(), lienzo: null,
-  ubicaciones: new Map(), ubicacionesError: null, marcadores: new Map(), grupoPuntos: null
+  ubicaciones: new Map(), ubicacionesError: null, marcadores: new Map(), grupoPuntos: null,
+  cargas: null, mesScada: null, cargasError: null
 };
 
 function esc(s) {
@@ -81,7 +83,8 @@ function crearMapa() {
   vigilarFondo(fondoMapa, fondoRelieve, mapa);
   // Mapa y Relieve se encienden a voluntad (casillas, no opción única: pedido del Ingeniero 2026-10-08). Con los dos, el
   // relieve va encima a media transparencia para ver ambos; solo, a pleno.
-  const mezclar = () => fondoRelieve.setOpacity(mapa.hasLayer(fondoMapa) && mapa.hasLayer(fondoRelieve) ? 0.5 : 1);
+  // Solo si el relieve está en el mapa: con él apagado no tiene contenedor y setOpacity falla (se ajusta al encenderlo).
+  const mezclar = () => { if (mapa.hasLayer(fondoRelieve)) fondoRelieve.setOpacity(mapa.hasLayer(fondoMapa) ? 0.5 : 1); };
   mapa.on('layeradd layerremove', (e) => { if (e.layer === fondoMapa || e.layer === fondoRelieve) mezclar(); });
   estado.fondos = { 'Mapa (OpenStreetMap)': fondoMapa, 'Relieve (OpenTopoMap)': fondoRelieve };
   L.control.scale({ imperial: false, position: 'bottomright' }).addTo(mapa);
@@ -307,7 +310,7 @@ async function cargarParque() {
 }
 
 function recalcular() {
-  estado.resumen = resumenParque(estado.txs, estado.filtros, estado.ubicaciones);
+  estado.resumen = resumenParque(estado.txs, estado.filtros, estado.ubicaciones, estado.cargas);
   // La ficha abierta se re-lee del resumen nuevo (los filtros cambian sus transformadores y su peor salud).
   const sel = estado.seleccion;
   if (sel && sel.tipo === 'subestacion') {
@@ -319,7 +322,11 @@ function recalcular() {
   pintarRotulos();
   pintarPuntos();
   pintarPanel();
+  pintarConteos();
 }
+
+/** ¿Hay algún filtro puesto? (una lista vacía no cuenta) */
+const hayFiltros = () => { const f = estado.filtros; return Boolean(f.zona || f.departamento || f.tipo || (f.bandas || []).length || (f.crgs || []).length || f.soloFirmes); };
 
 /* ─────────────────────────── Puntos de subestación ─────────────────────────── */
 
@@ -336,7 +343,7 @@ function pintarPuntos() {
   for (const s of r.subestaciones) {
     if (!s.coordenada) continue;
     const color = s.peor == null ? '#94a3b8' : COLOR_BANDA[s.peor];
-    const fichas = s.tx.map((t) => `<i data-tx="${esc(t.id)}" style="--c:${t.banda == null ? '#94a3b8' : COLOR_BANDA[t.banda]}" title="${esc(t.matricula || t.codigo)} · ${t.mva == null ? '—' : fmt(t.mva) + ' MVA'} · ${esc(t.banda == null ? 'Sin dato' : NOMBRE_BANDA[t.banda])}">${esc(t.etiqueta || t.matricula || '?')}</i>`).join('');
+    const fichas = s.tx.map((t) => `<i data-tx="${esc(t.id)}" style="--c:${t.banda == null ? '#94a3b8' : COLOR_BANDA[t.banda]}" title="${esc(t.matricula || t.codigo)} · ${t.mva == null ? '—' : fmt(t.mva) + ' MVA'} · ${esc(t.banda == null ? 'Sin dato' : NOMBRE_BANDA[t.banda])}${estado.cargas ? ' · carga SCADA ' + esc(textoCarga(t)) : ''}">${esc(t.etiqueta || t.matricula || '?')}</i>`).join('');
     const mk = L.marker(s.coordenada, {
       riseOnHover: true, keyboard: true,
       icon: L.divIcon({ className: 'mc-se', iconSize: null,
@@ -405,9 +412,12 @@ function pintarRotulos() {
 
 function barraSalud(bandas, total) {
   if (!total) return '<i class="mc-barra-salud vacia"></i>';
-  const seg = [1, 2, 3, 4, 5, 'sin'].filter((k) => bandas[k]).map((k) =>
-    `<i style="flex:${bandas[k]};background:${k === 'sin' ? '#cbd5e1' : COLOR_BANDA[k]}" title="${esc(k === 'sin' ? 'Sin dato' : NOMBRE_BANDA[k])}: ${bandas[k]}"></i>`).join('');
-  return `<span class="mc-barra-salud">${seg}</span>`;
+  return barra([1, 2, 3, 4, 5, 'sin'].map((k) => [bandas[k], k === 'sin' ? '#cbd5e1' : COLOR_BANDA[k], k === 'sin' ? 'Sin dato' : NOMBRE_BANDA[k]]));
+}
+/** Barra apilada: [[cantidad, color, nombre], …] (los tramos en cero no se dibujan). */
+function barra(tramos) {
+  const seg = tramos.filter(([n]) => n).map(([n, c, t]) => `<i style="flex:${n};background:${c}" title="${esc(t)}: ${n}"></i>`).join('');
+  return seg ? `<span class="mc-barra-salud">${seg}</span>` : '<i class="mc-barra-salud vacia"></i>';
 }
 
 function chipBanda(b) {
@@ -447,13 +457,14 @@ function pintarPanel() {
 function panelGeneral(r) {
   const filas = (obj, nombres, attr) => Object.entries(obj).sort((a, b) => b[1].transformadores - a[1].transformadores).map(([k, x]) =>
     `<tr ${attr ? `data-dep="${esc(k)}" class="mc-clic"` : ''}><td>${esc(nombres[k] || k)}</td><td class="n">${fmt(x.transformadores)}</td><td class="n">${fmt(x.subestaciones)}</td><td>${barraSalud(x.bandas, x.transformadores)}</td></tr>`).join('');
-  const filtrado = Object.values(estado.filtros).some(Boolean);
+  const filtrado = hayFiltros();
   return `<h2>Parque en el mapa${filtrado ? ' <small>(filtrado)</small>' : ''}</h2>
     <div class="mc-kpis"><div><b>${fmt(r.total)}</b><span>transformadores</span></div><div><b>${fmt(r.subestaciones.length)}</b><span>subestaciones</span></div>
       <div class="${r.ubicadas ? '' : 'mc-pend'}"><b>${fmt(r.ubicadas)} de ${fmt(r.subestaciones.length)}</b><span>con ubicación validada</span></div></div>
     ${!r.total ? '<p class="mc-nota">Ningún transformador cumple los filtros actuales.</p>' : r.ubicadas ? notaPuntos(r) : estado.ubicacionesError ? `<p class="mc-nota err">${esc(estado.ubicacionesError)}</p>` : `<p class="mc-nota">Las subestaciones aún no tienen coordenadas validadas: el parque se resume por el <b>departamento registrado</b>, y ${fmt(estado.munDeSub.size)} de ${fmt(r.subestaciones.length)} ya se ubican en su <b>municipio</b> por la tabla oficial de Fichas (clic en un municipio para verlas).</p>`}
     <h3>Salud oficial</h3>${barraSalud(r.bandas, r.total)}
     <ul class="mc-leyenda">${CONDICIONES.map((c) => `<li><i style="background:${c.color}"></i>${esc(c.label)} <b>${fmt(r.bandas[c.value])}</b></li>`).join('')}${r.bandas.sin ? `<li><i style="background:#cbd5e1"></i>Sin dato <b>${fmt(r.bandas.sin)}</b></li>` : ''}</ul>
+    ${bloqueCargaPanel(r)}
     <h3>Por departamento <small>(clic para ver)</small></h3>
     <table class="mc-tabla"><thead><tr><th>Departamento</th><th class="n">TX</th><th class="n">S/E</th><th>Salud</th></tr></thead><tbody>${filas(r.porDepartamento, NOMBRE_DEPTO, true)}</tbody></table>
     <h3>Por zona</h3>
@@ -496,8 +507,8 @@ function fichaSubestacion(s) {
     ${s.fueraDeFiltro ? '<p class="mc-nota mc-pend">Ninguno de sus transformadores cumple los filtros actuales.</p>' : ''}
     ${s.porRevisar ? `<p class="mc-nota mc-pend">Posición por revisar: ${esc(s.porRevisar)}, no de esta subestación.</p>` : ''}
     ${s.coordenada ? bloquePosicion(s) : `<p class="mc-nota mc-pend">Aún sin posición validada: se resalta ${mun ? 'su <b>municipio</b> según la tabla oficial de Fichas' : 'su <b>departamento registrado</b> (la tabla oficial no trae su municipio)'}.</p>`}
-    <table class="mc-tabla"><thead><tr><th>Transformador</th><th>Tipo</th><th class="n">MVA</th><th>Salud</th></tr></thead><tbody>
-    ${s.tx.map((t) => `<tr class="${estado.seleccion && estado.seleccion.tx === t.id ? 'mc-fila-activa' : ''}"><td><code>${esc(t.matricula || t.codigo)}</code></td><td>${esc(NOMBRE_TIPO[t.tipo] || t.tipo || '—')}</td><td class="n">${t.mva == null ? '—' : fmt(t.mva)}</td><td>${chipBanda(t.banda)}</td></tr>`).join('')}
+    <table class="mc-tabla"><thead><tr><th>Transformador</th><th class="n">MVA</th><th>Salud</th><th>Carga SCADA${estado.mesScada ? ` <small>${esc(mesCorto(estado.mesScada))}</small>` : ''}</th></tr></thead><tbody>
+    ${s.tx.map((t) => `<tr class="${estado.seleccion && estado.seleccion.tx === t.id ? 'mc-fila-activa' : ''}"><td><code>${esc(t.matricula || t.codigo)}</code><small class="mc-tipo">${esc(NOMBRE_TIPO[t.tipo] || t.tipo || '')}</small></td><td class="n">${t.mva == null ? '—' : fmt(t.mva)}</td><td>${chipBanda(t.banda)}</td><td>${celdaCarga(t)}</td></tr>`).join('')}
     </tbody></table>`;
 }
 
@@ -521,7 +532,7 @@ function fichaMunicipio(m) {
   const afinia = Boolean(estado.capasMpio[m.cod]);
   const subs = estado.subsPorMun.get(m.cod) || [];
   const ntx = subs.reduce((n, s) => n + s.tx.length, 0);
-  const filtrado = Object.values(estado.filtros).some(Boolean);
+  const filtrado = hayFiltros();
   let cuerpo;
   if (!afinia) cuerpo = '<p class="mc-nota">Fuera del área de servicio de AFINIA.</p>';
   else if (!estado.resumen) cuerpo = '<p class="mc-cargando">Leyendo el parque…</p>';
@@ -626,17 +637,120 @@ function buscador() {
   inp.addEventListener('blur', () => setTimeout(cerrar, 150));
 }
 
+const NOMBRE_CRG = { 1: 'Baja', 2: 'Moderada', 3: 'Media', 4: 'Alta', 5: 'Crítica' };
+// Los mismos tonos de los chips CRG de la página Cargabilidad SCADA (chip--success, --teal, --warn, crg4, --danger).
+const COLOR_CRG = { 1: '#1CC870', 2: '#30D1B0', 3: '#FF9500', 4: '#F0645A', 5: '#C91A14' };
+const GRIS_PROVISIONAL = '#94a3b8';
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+const mesCorto = (m) => { const [a, n] = String(m || '').split('-'); return n ? `${MESES[Number(n) - 1]} ${a}` : String(m || ''); };
+const pct1 = (v) => Number(v).toLocaleString('es-CO', { maximumFractionDigits: 1 });
+
+/** «95,2 % · CRG 5» (y «provisional» si la cifra no es firme), o el motivo de que no haya cifra. */
+function textoCarga(t) {
+  if (t.crg == null) return t.cargaMotivo ? `sin medición (${t.cargaMotivo})` : 'sin medición';
+  return `${pct1(t.cargaPct)} % · CRG ${t.crg} ${NOMBRE_CRG[t.crg]}${t.cargaClase === 'provisional' ? ' (provisional)' : ''}`;
+}
+function celdaCarga(t) {
+  if (!estado.cargas) return `<small class="mc-sub-n">${estado.cargasError ? 'no disponible' : 'leyendo…'}</small>`;
+  if (t.crg == null) return `<small class="mc-sub-n" title="${esc(t.cargaMotivo || '')}">sin medición</small>`;
+  // Regla de Cargabilidad SCADA: solo la cifra FIRME lleva color de severidad; la provisional va neutra.
+  const firme = t.cargaClase === 'firme';
+  return `<span class="mc-chip" style="--c:${firme ? COLOR_CRG[t.crg] : GRIS_PROVISIONAL}" title="${esc(textoCarga(t))}">${pct1(t.cargaPct)} % · ${t.crg}</span>${firme ? '' : '<small class="mc-sub-n"> provisional</small>'}`;
+}
+function bloqueCargaPanel(r) {
+  if (!estado.cargas) return `<h3>Cargabilidad SCADA</h3><p class="mc-nota">${esc(estado.cargasError || 'Leyendo la cargabilidad del último mes completo…')}</p>`;
+  const crgs = r.crgs || {}; const firmes = r.crgsFirmes || {};
+  const conCifra = [1, 2, 3, 4, 5].reduce((n, k) => n + (crgs[k] || 0), 0);
+  const provisionales = conCifra - [1, 2, 3, 4, 5].reduce((n, k) => n + (firmes[k] || 0), 0);
+  // Regla de Cargabilidad SCADA: solo la cifra FIRME lleva color de severidad; lo provisional va en gris.
+  const tramos = [1, 2, 3, 4, 5].map((k) => [firmes[k] || 0, COLOR_CRG[k], `CRG ${k} ${NOMBRE_CRG[k]} (firmes)`])
+    .concat([[provisionales, GRIS_PROVISIONAL, 'Provisionales (cualquier CRG)'], [crgs.sin || 0, '#cbd5e1', 'Sin medición']]);
+  return `<h3>Cargabilidad SCADA <small>(${esc(mesCorto(estado.mesScada))}, la de la página Cargabilidad SCADA)</small></h3>${r.total ? barra(tramos) : '<i class="mc-barra-salud vacia"></i>'}
+    <ul class="mc-leyenda">${[1, 2, 3, 4, 5].map((k) => `<li><i style="background:${COLOR_CRG[k]}"></i>CRG ${k} ${NOMBRE_CRG[k]} <b>${fmt(crgs[k])}</b>${crgs[k] && crgs[k] !== firmes[k] ? ` <small>(${fmt(firmes[k])} firmes)</small>` : ''}</li>`).join('')}<li><i style="background:#cbd5e1"></i>Sin medición <b>${fmt(crgs.sin)}</b></li></ul>
+    <p class="mc-nota">${fmt(conCifra)} de ${fmt(r.total)} con cifra del mes${provisionales ? ` (${fmt(provisionales)} provisionales, en gris en la barra)` : ''}; el color del punto sigue siendo la salud oficial.</p>`;
+}
+
+/** Botones marcables (varios a la vez; ninguno = todos) con su conteo sobre TODO el parque. */
+function grupoChips(id, opciones, clave) {
+  const g = $(id);
+  if (!g) return;
+  g.insertAdjacentHTML('beforeend', opciones.map(([v, t, c]) =>
+    `<button type="button" class="mc-chip-f" aria-pressed="false" data-v="${esc(v)}" style="--c:${c}"><i></i>${esc(t)} <b data-n></b></button>`).join(''));
+  g.addEventListener('click', (e) => {
+    const b = e.target.closest('.mc-chip-f');
+    if (!b || b.disabled) return;
+    b.setAttribute('aria-pressed', String(b.getAttribute('aria-pressed') !== 'true'));
+    estado.filtros[clave] = [...g.querySelectorAll('.mc-chip-f[aria-pressed="true"]')].map((x) => x.dataset.v);
+    recalcular();
+  });
+}
+
 function filtros() {
   const llenar = (id, ops) => { const s = $(id); ops.forEach(([v, t]) => s.insertAdjacentHTML('beforeend', `<option value="${esc(v)}">${esc(t)}</option>`)); };
   llenar('mcZona', ZONAS.map((z) => [z.value, z.label]));
   llenar('mcDepto', DEPARTAMENTOS.map((d) => [d.value, d.label]));
-  llenar('mcSalud', CONDICIONES.map((c) => [String(c.value), c.label]).concat([['sin', 'Sin dato']]));
   llenar('mcTipo', TIPOS_ACTIVO.map((t) => [t.value, t.label]));
-  const leer = () => {
-    estado.filtros = { zona: $('mcZona').value, departamento: $('mcDepto').value, banda: $('mcSalud').value, tipo: $('mcTipo').value };
-    recalcular();
+  const salud = $('mcSalud');
+  if (salud && salud.tagName === 'SELECT') {
+    // Página vieja en caché con este código (L-102): la lista de antes, una banda a la vez.
+    llenar('mcSalud', CONDICIONES.map((c) => [String(c.value), c.label]).concat([['sin', 'Sin dato']]));
+    salud.addEventListener('change', () => { estado.filtros.bandas = salud.value ? [salud.value] : []; recalcular(); });
+  } else {
+    grupoChips('mcSalud', CONDICIONES.map((c) => [String(c.value), `${c.value} ${c.label}`, c.color]).concat([['sin', 'Sin dato', '#cbd5e1']]), 'bandas');
+  }
+  grupoChips('mcCrg', [1, 2, 3, 4, 5].map((k) => [String(k), `${k} ${NOMBRE_CRG[k]}`, COLOR_CRG[k]]).concat([['sin', 'Sin medición', '#cbd5e1']]), 'crgs');
+  if ($('mcCrg')) { $('mcCrg').setAttribute('aria-busy', 'true'); $('mcCrg').querySelectorAll('.mc-chip-f').forEach((b) => { b.disabled = true; }); }
+  const leer = (repintar = true) => {
+    Object.assign(estado.filtros, { zona: $('mcZona').value, departamento: $('mcDepto').value, tipo: $('mcTipo').value });
+    if (repintar) recalcular();
   };
-  ['mcZona', 'mcDepto', 'mcSalud', 'mcTipo'].forEach((id) => $(id).addEventListener('change', leer));
+  ['mcZona', 'mcDepto', 'mcTipo'].forEach((id) => $(id).addEventListener('change', () => leer()));
+  // Al volver con «atrás» el navegador repone las listas: el mapa las toma (antes mostraba un filtro que no aplicaba).
+  leer(false);
+  window.addEventListener('pageshow', (e) => { if (e.persisted) leer(); });
+  if ($('mcSoloFirmes')) $('mcSoloFirmes').addEventListener('change', (e) => { estado.filtros.soloFirmes = e.target.checked; recalcular(); });
+}
+
+/** Conteo de cada botón: cuántos quedan con los DEMÁS filtros puestos (sin contar el propio grupo). */
+function pintarConteos() {
+  if (!estado.txs.length) return;
+  const f = estado.filtros;
+  const poner = (id, cuenta) => { const g = $(id); if (g && cuenta) g.querySelectorAll('.mc-chip-f').forEach((b) => { b.querySelector('[data-n]').textContent = fmt(cuenta[b.dataset.v]); }); };
+  poner('mcSalud', resumenParque(estado.txs, { ...f, bandas: [] }, null, estado.cargas).bandas);
+  if (estado.cargas) poner('mcCrg', resumenParque(estado.txs, { ...f, crgs: [] }, null, estado.cargas).crgs);
+}
+
+/** Cargabilidad SCADA del último mes completo: la MISMA cifra de la página Cargabilidad SCADA (mismas lecturas y
+ *  `filasLista`), leída después de pintar el mapa (3 documentos + umbrales; nada si falla: el filtro queda inactivo). */
+async function cargarCargas() {
+  const marcar = (txt, ok) => {
+    if ($('mcCrgMes')) $('mcCrgMes').textContent = txt;
+    if ($('mcCrg')) { $('mcCrg').removeAttribute('aria-busy'); $('mcCrg').querySelectorAll('.mc-chip-f').forEach((b) => { b.disabled = !ok; }); }
+    if ($('mcSoloFirmes')) $('mcSoloFirmes').disabled = !ok;
+  };
+  if (!estado.txs.length) {
+    estado.cargasError = 'Sin el parque no se puede cruzar la Cargabilidad SCADA.';
+    marcar('· no disponible', false);
+    pintarPanel();
+    return;
+  }
+  try {
+    const [datos, vista, umb] = await Promise.all([import('../../data/scada_carga.js'), import('../../domain/scada_carga_vista.js'), import('../../data/umbrales_salud.js')]);
+    const [h, c, u] = await Promise.all([datos.leerHomologacion(), datos.leerCatalogo(), umb.obtenerUmbralesActivos().catch(() => null)]);
+    if (!h || h.estado !== 'ok' || !c || c.estado !== 'ok') throw new Error('sin homologación o catálogo SCADA');
+    const mes = vista.mesPorDefecto(c.datos);
+    const r = mes ? await datos.leerResumenMes(mes) : null;
+    if (!r || r.estado !== 'ok') throw new Error('sin resumen del mes ' + (mes || ''));
+    const filas = vista.filasLista({ parque: estado.txs, homologacion: h.datos, catalogo: c.datos, resumenMes: r.datos, umbrales: u });
+    estado.cargas = new Map(filas.map((f) => [String(f.id), { pct: f.pct, crg: f.crg, clase: f.clase, motivo: f.motivoNulo || '' }]));
+    estado.mesScada = mes;
+    marcar('· ' + mesCorto(mes), true);
+  } catch (err) {
+    console.warn('[mapa] cargabilidad SCADA:', err);
+    estado.cargasError = 'No se pudo leer la Cargabilidad SCADA: el filtro queda inactivo (el resto del mapa funciona).';
+    marcar('· no disponible', false);
+  }
+  recalcular();
 }
 
 function aviso(msg, tipo) {
@@ -674,6 +788,7 @@ async function arrancar() {
   if (estado.parqueError) aviso(estado.parqueError, 'err');
   else if (estado.ubicacionesError) aviso(estado.ubicacionesError, '');
   recalcular();
+  cargarCargas();
 }
 
 arrancar();

@@ -285,3 +285,33 @@ test('revisión adversarial: id automático de la página admin, códigos repeti
   assert.equal(resumenParque(parque, { banda: '5' }, idx2).subestaciones[0].coordenada, null, 'el filtro no resuelve el conflicto');
 });
 
+
+test('salud oficial: varias bandas a la vez (1…5 y «sin dato»); la banda suelta de antes sigue valiendo', () => {
+  const p = [tx({ id: 'a', hi: 1 }), tx({ id: 'b', hi: 4 }), tx({ id: 'c', hi: 5 }), tx({ id: 'd', hi: null })];
+  assert.equal(resumenParque(p, { bandas: ['4', '5'] }).total, 2);
+  assert.equal(resumenParque(p, { bandas: ['1', 'sin'] }).total, 2);
+  assert.equal(resumenParque(p, { bandas: [] }).total, 4, 'ninguna marcada = todas');
+  assert.equal(resumenParque(p, { banda: '4' }).total, 1);
+});
+
+test('Cargabilidad SCADA: la cifra del mes por equipo, filtro por CRG (varias), «sin medición» y solo firmes', () => {
+  const p = [tx({ id: 'a' }), tx({ id: 'b' }), tx({ id: 'c' }), tx({ id: 'd' })];
+  const cargas = new Map([
+    ['a', { pct: 95.2, crg: 5, clase: 'firme' }],
+    ['b', { pct: 70, crg: 3, clase: 'provisional' }],
+    ['c', { pct: null, crg: null, clase: 'nulo', motivo: 'sin homologación' }]
+  ]);                                                  // «d» no está: sin medición
+  const r = resumenParque(p, {}, null, cargas);
+  const f = (id) => r.subestaciones[0].tx.find((x) => x.id === id);
+  assert.equal(f('a').crg, 5); assert.equal(f('a').cargaClase, 'firme'); assert.equal(f('a').cargaPct, 95.2);
+  assert.equal(f('b').cargaClase, 'provisional');
+  assert.equal(f('c').crg, null); assert.equal(f('c').cargaMotivo, 'sin homologación');
+  assert.equal(f('d').crg, null); assert.equal(f('d').cargaClase, 'nulo');
+  assert.deepEqual(r.crgs, { 1: 0, 2: 0, 3: 1, 4: 0, 5: 1, sin: 2 });
+  assert.equal(resumenParque(p, { crgs: ['5', '3'] }, null, cargas).total, 2);
+  assert.equal(resumenParque(p, { crgs: ['sin'] }, null, cargas).total, 2);
+  assert.equal(resumenParque(p, { soloFirmes: true }, null, cargas).total, 1);
+  assert.equal(resumenParque(p, { crgs: ['3'], soloFirmes: true }, null, cargas).total, 0, 'la de CRG 3 es provisional');
+  // un porcentaje sin calificación válida no inventa CRG
+  assert.equal(resumenParque([tx({ id: 'x' })], {}, null, new Map([['x', { pct: 50, crg: 9 }]])).subestaciones[0].tx[0].crg, null);
+});

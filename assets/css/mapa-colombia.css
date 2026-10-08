@@ -26,6 +26,29 @@
 .mc-resultados .mc-res-transformador::before { content: '▣ '; color: #64748b; }
 .mc-resultados .mc-res-nada { color: var(--ink-3, #4d6485); cursor: default; }
 
+/* Filtros de varias opciones: salud oficial (1–5) y Cargabilidad SCADA (CRG 1–5); ninguno marcado = todos */
+.mc-chips-fila {
+  display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; align-items: center; margin: -.3rem 0 .9rem; padding: .55rem .75rem;
+  background: rgba(255,255,255,.9); border: 1px solid var(--edge-accent, #d6e2f0); border-radius: 12px;
+}
+.mc-chips { display: flex; flex-wrap: wrap; gap: .35rem; align-items: center; }
+.mc-chips-tit { font: 700 .72rem/1 var(--font-body, Inter), sans-serif; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-3, #4d6485); margin-right: .2rem; }
+.mc-chips-tit small { text-transform: none; letter-spacing: 0; font-weight: 600; }
+.mc-chip-f {
+  display: inline-flex; align-items: center; gap: .35rem; cursor: pointer; font: 600 .76rem/1 var(--font-body, Inter), sans-serif;
+  color: var(--ink-2, #1f3656); background: rgba(255,255,255,.85); border: 1px solid #d6e2f0; border-radius: 99px; padding: .32rem .6rem;
+}
+.mc-chip-f i { width: 9px; height: 9px; border-radius: 50%; background: var(--c); display: inline-block; }
+.mc-chip-f b { font-weight: 700; color: var(--ink-3, #4d6485); }
+.mc-chip-f[aria-pressed="true"] { background: #fff; border: 2px solid var(--c); padding: calc(.32rem - 1px) calc(.6rem - 1px); color: #0d1f38; box-shadow: 0 0 0 2px rgba(13,31,56,.08); }
+.mc-chip-f[aria-pressed="true"]::before { content: '✓'; font-weight: 800; color: #0d1f38; }
+.mc-chip-f[aria-pressed="true"] b { color: #0d1f38; }
+.mc-chip-f:disabled { opacity: .5; cursor: not-allowed; }
+.mc-chips[aria-busy="true"] .mc-chip-f:disabled { cursor: progress; }
+.mc-chip-f:focus-visible { outline: 2px solid #2563EB; outline-offset: 2px; }
+.mc-check { display: inline-flex; gap: .35rem; align-items: center; font-size: .8rem; color: var(--ink-2, #1f3656); }
+.mc-tipo { display: block; font-size: .66rem; color: var(--ink-3, #4d6485); }
+
 .mc-grid { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 1rem; align-items: start; }
 .mc-mapa-wrap {
   position: relative; border-radius: 14px; overflow: hidden;
