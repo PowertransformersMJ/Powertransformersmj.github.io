@@ -26,6 +26,9 @@ import { listar as listarOrdenes } from '../js/data/ordenes_materiales.js';
 // todavía no está registrado como movimiento (se lee solo si hay entregas por registrar).
 import { listarV2 as listarParque } from '../js/data/transformadores.js';
 import { resolverTransformador } from '../js/domain/ordenes_movimientos_registro.js';
+// Registro AUTOMÁTICO (2026-10-07, `99 §148`): al abrir el contrato, lo que falta por registrar de las
+// órdenes se registra solo en Movimientos (y lo que cambió se corrige). Se carga perezoso.
+import { getSession } from '../js/auth/session-guard.js';
 
 const $ = (id) => document.getElementById(id);
 const info = $('infoBox');
@@ -71,6 +74,10 @@ let nexo = null;
 let stockLlego = false;
 let parqueNexo = null;       // null = sin leer; [] o lista al llegar (solo si hay entregas por registrar)
 let leyendoParque = false;
+let parqueFallo = false;
+// Registro automático: una vez por visita. null = sin novedad · { texto, tipo } = lo que se muestra.
+let sincIntentada = false;
+let sincAviso = null;
 let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
@@ -396,11 +403,16 @@ function renderCruzado() {
 }
 
 // ── Suscripciones ──
+/** Lectura de órdenes recortada (más de 500): la fecha más antigua leída; lo anterior no se pudo comprobar. */
+function corteOrdenes() {
+  if (!ordenesNexo || !ordenesNexo.truncado || !ordenesNexo.ordenes || !ordenesNexo.ordenes.length) return '';
+  return ordenesNexo.ordenes.map((o) => String(o.fechaISO || '').slice(0, 10)).filter(Boolean).sort()[0] || '';
+}
 function recomputarTodo() {
   // Nexo: lo entregado por órdenes E/S se descuenta de la existencia de cada ítem. `_stockMov` guarda la
   // existencia SOLO por movimientos, para no descontar dos veces si se recalcula sin un emit nuevo.
   nexo = (ordenesNexo && ordenesNexo.ordenes)
-    ? calcularNexo({ ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal, contratoId: getContratoActivo(), movimientos: cacheMovs })
+    ? calcularNexo({ ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal, contratoId: getContratoActivo(), movimientos: cacheMovs, corte: corteOrdenes() })
     : null;
   cacheStockGlobal = cacheStockGlobal.map((r) => {
     const base = r._stockMov || r.stock || { inicial: r.stock_inicial || 0, ingresado: 0, egresado: 0, actual: r.stock_inicial || 0 };
@@ -409,11 +421,12 @@ function recomputarTodo() {
     const fila = { ...r, _stockMov: base, stock: existenciaConOrdenes(base, ent) };
     return { ...fila, _calc: calcularPorItem(fila) };
   });
-  if (nexo && nexo.activo && (nexo.totalPendiente == null || nexo.totalPendiente > 0) && parqueNexo === null && !leyendoParque) {
+  if (nexo && nexo.activo && (nexo.totalPendiente == null || nexo.totalPendiente > 0 || hayQueRegistrar(nexo)) && parqueNexo === null && !leyendoParque) {
     leyendoParque = true;
-    listarParque({}).then((rows) => { parqueNexo = rows || []; }, (err) => { console.warn('[nexo] parque:', err); parqueNexo = []; })
+    listarParque({}).then((rows) => { parqueNexo = rows || []; }, (err) => { console.warn('[nexo] parque:', err); parqueNexo = []; parqueFallo = true; })
       .then(() => { leyendoParque = false; if (stockLlego) recomputarTodo(); });
   }
+  autoRegistrar();
   // Pre-calcular estado por ítem para evitar repetir en cada render.
   actualizarKPIs();
   renderTabla();
@@ -421,6 +434,51 @@ function recomputarTodo() {
   renderCruzado();
   renderWidgetBrigada();
   renderNexo();
+}
+
+/* ─── Registro automático de las entregas de Órdenes E/S (`99 §148`) ─── */
+/** ¿Hay entregas por registrar, desfasadas o movimientos huérfanos? (sin importar módulos nuevos) */
+function hayQueRegistrar(n) {
+  if (!n || !n.activo) return false;
+  const e = n.resumenEstados || {};
+  return !!(e.por_registrar || e.desfasado || (n.huerfanos && n.huerfanos.length));
+}
+/**
+ * Una vez por visita, con las órdenes, el catálogo, los movimientos y el parque ya leídos: registra lo
+ * pendiente, corrige lo desfasado y retira lo que la orden ya no respalda. Lo hace quien abra el
+ * contrato (decisión del Ingeniero: el equipo puede registrar). Los movimientos nuevos llegan solos por
+ * la suscripción y el tablero se recalcula. Si falla, todo sigue calculándose como antes.
+ */
+async function autoRegistrar() {
+  if (sincIntentada || !stockLlego || !nexo || !hayQueRegistrar(nexo) || !ordenesNexo || !ordenesNexo.ordenes) return;
+  if (parqueNexo === null || parqueFallo) return;              // sin parque no se ubica el transformador
+  const cid = getContratoActivo();
+  const s = getSession();
+  const uid = s && s.user && s.user.uid;
+  if (!cid || !uid) return;
+  sincIntentada = true;
+  sincAviso = { texto: 'Registrando en Movimientos las entregas de las órdenes de entrada…', tipo: 'info' };
+  renderNexo();
+  try {
+    const [SYNC, RM] = await Promise.all([import('./data/contrato_ordenes_sync.js'), import('./domain/ordenes_movimientos_registro.js')]);
+    if (typeof SYNC.sincronizarContrato !== 'function' || typeof RM.textoSincronizacion !== 'function') { sincAviso = null; renderNexo(); return; }
+    const existencias = Object.fromEntries(cacheStockGlobal.map((r) => [r.codigo, ((r._stockMov || r.stock) || {}).actual]));
+    const res = await SYNC.sincronizarContrato({ contratoId: cid, ordenes: ordenesNexo.ordenes, catalogo: cacheStockGlobal,
+      movimientos: cacheMovs, parque: parqueNexo, existencias, uid, corte: corteOrdenes() });
+    const t = res ? RM.textoSincronizacion(res, cid) : { texto: '' };
+    sincAviso = t.texto ? t : null;
+  } catch (err) {
+    console.warn('[nexo] registro automático:', err);
+    sincAviso = { texto: 'No se pudieron registrar ahora las entregas de las órdenes (' + (err.message || err) +
+      '). Siguen contando como «por registrar» y se intentará de nuevo la próxima vez que se abra el contrato.', tipo: 'err' };
+  }
+  renderNexo();
+}
+function htmlSincAviso() {
+  if (!sincAviso) return '';
+  const color = { ok: '#16A34A', info: '#2563EB', warn: '#EA580C', err: '#DC2626' }[sincAviso.tipo] || '#2563EB';
+  const icono = { ok: '✓', info: '⟳', warn: '⚠', err: '✗' }[sincAviso.tipo] || '';
+  return `<div class="info-msg" style="display:block; border-left-color:${color}">${icono} ${escHtml(sincAviso.texto)}</div>`;
 }
 
 /* ─── Nexo con Órdenes E/S: entregado por transformador ─── */
@@ -468,9 +526,10 @@ function renderNexo() {
     `<b>${nTr}</b> ${nTr === 1 ? 'transformador' : 'transformadores'}, <b>${fmtCOP(n.totalValor)}</b>. ` +
     `Entregas: <b>${est.registrado}</b> registradas en Movimientos · <b>${est.por_registrar}</b> por registrar` +
     (est.desfasado ? ` · <b>${est.desfasado}</b> desfasadas (la orden cambió)` : '') + '. ' +
-    'Lo registrado ya es un movimiento (Histórico); lo que falta por registrar se calcula aquí al abrir.' +
+    'Lo registrado ya es un movimiento (Histórico). Las entregas se registran solas al guardar la orden y al abrir este contrato; ' +
+    'mientras tanto, lo que falta por registrar se calcula aquí.' +
     (ordenesNexo.truncado ? ' <b>Parcial:</b> hay más de 500 órdenes en la vigencia y aquí entran las 500 más recientes: lo entregado puede ser mayor.' : '');
-  avisos.innerHTML = n.avisos.map((a) => `<div class="info-msg warn" style="display:block">⚠ ${escHtml(a)}</div>`).join('');
+  avisos.innerHTML = htmlSincAviso() + n.avisos.map((a) => `<div class="info-msg warn" style="display:block">⚠ ${escHtml(a)}</div>`).join('');
   tb.innerHTML = n.transformadores.length ? n.transformadores.map((t) => `
     <tr>
       <td><code>${escHtml(t.matricula)}</code>${t.subestacion ? `<div style="font-size:11px;color:var(--ink-3)">S/E ${escHtml(t.subestacion)}</div>` : ''}</td>
@@ -624,3 +683,6 @@ fxZona.addEventListener('change', renderCruzado);
 fxDepto.addEventListener('change', renderCruzado);
 
 arrancar();
+// Si los datos llegan antes que la sesión, el registro automático espera a que la sesión esté lista.
+window.addEventListener('sgm:session-ready', () => autoRegistrar(), { once: true });
+document.addEventListener('sgm:session-ready', () => autoRegistrar(), { once: true });

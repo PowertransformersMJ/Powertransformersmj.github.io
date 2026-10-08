@@ -146,7 +146,8 @@ btnResetear.addEventListener('click', async () => {
     // Desde el nexo con Órdenes E/S (`99 §146`–`§147`) ya no vuelve al inicial: lo entregado por órdenes sigue descontando.
     resetMsg.textContent = `✓ ${borrados} movimiento${borrados === 1 ? '' : 's'} eliminado${borrados === 1 ? '' : 's'}. ` +
       (NEXO_CONTRATOS[cid]
-        ? 'La existencia queda en el inicial menos lo entregado por las órdenes de entrada (que vuelven a quedar «por registrar»).'
+        ? 'La existencia queda en el inicial menos lo entregado por las órdenes de entrada, que se vuelven a registrar solas ' +
+          'como movimientos la próxima vez que se abra el contrato (manda la orden).'
         : 'Stock vuelve al stock_inicial de cada suministro.');
     statCount.textContent = '0';
     confirmInput.value = '';

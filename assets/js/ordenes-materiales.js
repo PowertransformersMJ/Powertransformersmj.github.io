@@ -1160,6 +1160,10 @@ function llenarResponsables() {
  * (`opciones` conserva la selección que el usuario ya hubiera hecho).
  */
 let ESTADO_PARQUE = 'cargando';   // 'cargando' | 'listo' | 'error'
+// Documentos del parque tal como llegan (con su id, zona y departamento): el registro automático de
+// entregas en el contrato (`99 §148`) los usa para ubicar el transformador sin volver a leer el parque.
+let PARQUE_CRUDO = null;
+let promesaParque = null;
 
 function llenarTransformadores() {
   const sel = $('#transformador');
@@ -1193,8 +1197,13 @@ function llenarTransformadores() {
  * opcional y la orden se emite igual; solo se avisa en el propio desplegable.
  */
 async function cargarParque() {
+  promesaParque = (async () => {
+    const crudo = await listarParque();
+    PARQUE_CRUDO = Array.isArray(crudo) ? crudo : [];
+    return PARQUE_CRUDO;
+  })();
   try {
-    CONFIG.transformadores = parqueParaOrdenes(await listarParque());
+    CONFIG.transformadores = parqueParaOrdenes(await promesaParque);
     ESTADO_PARQUE = 'listo';
   } catch (err) {
     console.warn('[ordenes-materiales] no se pudo leer el parque:', err);
@@ -2210,6 +2219,41 @@ function trasGuardar(orden, ajustes, modo) {
     ' La encuentra en «Órdenes guardadas» (botón de arriba o sección 6), donde puede verla o descargarla.', 'ok', 9000);
   if (ajustes && ajustes.length) aviso('Al guardar: ' + ajustes.join('; ') + '.', 'warn', 9000);
   if (DATOS.handle) DATOS.escribir(true);
+  reflejarEnContrato(orden.clave);
+}
+
+/* ------------- Contrato: las entregas se registran solas (99 §148) ------------- *
+   Pedido del Ingeniero: «al yo generar alguna orden de entrada y este involucre los
+   items del contrato 4125000143 automaticamente se refleje en indicadores, movimiento,
+   historico». Después de guardar, subir o eliminar una orden se registra (o corrige o
+   retira) su entrega en Movimientos del contrato. Nunca bloquea: la orden ya quedó
+   guardada; si algo falla, el contrato lo hace solo al abrirse. Carga perezosa: si el
+   navegador mezcla archivos viejos, solo se pierde este paso, no la página (`30 L-85`). */
+async function reflejarEnContrato(claves) {
+  const lista = [].concat(claves).filter(Boolean);
+  if (!lista.length) return;
+  try {
+    const s = getSession();
+    const uid = s && s.user && s.user.uid;
+    if (!uid) return;
+    const [SYNC, RM] = await Promise.all([
+      import('./data/contrato_ordenes_sync.js'), import('./domain/ordenes_movimientos_registro.js')]);
+    if (typeof SYNC.sincronizarOrden !== 'function' || typeof RM.textoSincronizacion !== 'function') return;
+    // null si el parque no cargó: entonces solo se retira lo que la orden ya no respalda (no hace falta el
+    // parque) y lo demás queda para la apertura del contrato.
+    let parque = PARQUE_CRUDO;
+    if (!parque && promesaParque) parque = await promesaParque.catch(() => null);
+    for (const clave of lista) {
+      const res = await SYNC.sincronizarOrden({ clave, parque: Array.isArray(parque) ? parque : null, uid });
+      for (const { contratoId, resultado } of res) {
+        const t = RM.textoSincronizacion(resultado, contratoId);
+        if (t.texto) aviso(t.texto, t.tipo, 14000);
+      }
+    }
+  } catch (e) {
+    console.warn('[ordenes → contrato]', e);
+    aviso('La orden quedó guardada, pero ahora no se pudo reflejar en el contrato: se reflejará sola al abrir el contrato.', 'warn', 10000);
+  }
 }
 
 /** Explica el fallo y devuelve otro plan de guardado si el usuario lo pide. */
@@ -2323,6 +2367,7 @@ async function eliminarDelRegistro(clave) {
     if (estado.cargada && estado.cargada.clave === clave) { estado.cargada = null; guardarBorrador(); }
     aviso(`Orden ${o.numero} eliminada del registro del equipo.`, 'ok');
     if (DATOS.handle) DATOS.escribir(true);
+    reflejarEnContrato(clave);
   } catch (e) {
     if (e.codigo === 'version') {
       ponerEnRegistro(e.actual);
@@ -2468,6 +2513,7 @@ async function subirMarcadas() {
 
   SUBIDA.enCurso = true;
   const res = { subidas: 0, conflicto: 0, fallidas: 0, cortada: false };
+  const subidas = [];
   for (let i = 0; i < marcadas.length; i++) {
     const f = marcadas[i];
     pintarSubida(`Subiendo ${i + 1} de ${marcadas.length}…`);
@@ -2482,6 +2528,7 @@ async function subirMarcadas() {
       f.hecha = true;
       f.resultado = r.ajustes.length ? 'Ajustes: ' + r.ajustes.join('; ') + '.' : '';
       res.subidas++;
+      subidas.push(r.orden.clave);
     } catch (e) {
       if (e.codigo === 'existe' || e.codigo === 'version' || e.codigo === 'borrada' || e.codigo === 'no-existe') {
         res.conflicto++;
@@ -2497,6 +2544,7 @@ async function subirMarcadas() {
   SUBIDA.resumen = res;
   pintarSubida(); pintarOrdenes(); pintarAlmacenamiento();
   if (res.subidas && DATOS.handle) DATOS.escribir(true);
+  reflejarEnContrato(subidas);
 }
 
 function descartarNoMarcadas() {
