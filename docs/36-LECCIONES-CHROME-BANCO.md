@@ -77,3 +77,12 @@ nada». Producción estaba intacta (30 páginas revisadas en su Chrome, cero esc
 en cada página («VISTA PREVIA EN ESTE COMPUTADOR — no es la plataforma real…») y el mensaje que acompaña el enlace dice qué
 páginas traen datos. Ante «se vació X», mirar PRIMERO el origen de su pestaña y el avatar antes de auditar el código.
 **Gate**: [HONOR] (la franja vive en `server-mapa.mjs` del banco de la bóveda).
+
+### L-136 · Una captura que contradice al DOM se investiga: no es «artefacto» hasta probarlo con el estilo CALCULADO
+**Disparador**: un elemento que el código «oculta» aparece en una captura. · **Cicatriz** (`99 §155.9`): el aviso «El fondo del
+mapa no responde» salió en las capturas del banco (07 y 08-oct) y lo despaché como artefacto de Chrome sin cabeza; en realidad
+`display:flex` de su clase anulaba el atributo `hidden` y el aviso se veía SIEMPRE, también en producción. Lo destapó su Chrome real.
+· **Regla**: verificar visibilidad con `getComputedStyle(el).display` (no con `el.hidden`); toda clase propia con `display` lleva
+su `[hidden]{display:none}`; y si una captura contradice lo que el código dice, se busca la causa antes de culpar a la captura.
+**Gate**: [HONOR].
+
