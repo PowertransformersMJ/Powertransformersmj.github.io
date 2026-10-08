@@ -90,6 +90,7 @@
 | §153 | ADR-153 — **Mapa**: S/E ubicadas con el KMZ del Ingeniero (142/147) y sus transformadores | 6854 |
 | §154 | ADR-154 — **Inventario**: editar guarda solo lo que cambió (ya no borra matrícula ni condición) | 6967 |
 | §155 | ADR-155 — **Mapa**: el botón «Mapa» abre el mapa nuevo (opción 2 suya) | 7034 |
+| §156 | ADR-156 — **Mapa**: Mapa y Relieve a voluntad (casillas) | 7072 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
