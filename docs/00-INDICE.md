@@ -75,16 +75,17 @@
 | §138 | ADR-138 — **Cargabilidad SCADA**: libro de parámetros por punto (columna C) | 5976 |
 | §139 | ADR-139 — **Cerebro**: documentación de la conversación 09-23 → 10-05 | 6003 |
 | §140 | ADR-140 — **Fichas**: CF-38 · CF-43/44 en rama · decisiones de TODO-69 | 6037 |
-| §141 | ADR-141 — **Órdenes E/S**: cantidad corregible y material «Otro» | 6093 |
-| §142 | ADR-142 — **Órdenes E/S**: «Órdenes guardadas» (ver, PDF, Excel, editar) | 6135 |
-| §143 | ADR-143 — **Órdenes E/S**: filtro por zona y entregas por transformador | 6173 |
-| §144 | ADR-144 — **Órdenes E/S**: indicadores por accesorio, zona, motivo y mes | 6218 |
-| §145 | ADR-145 — **Contrato 4125000143**: inventario de Libro4 (pactado, `§145.9`) | 6271 |
-| §146 | ADR-146 — **Contrato ↔ Órdenes E/S**: nexo calculado (luego §147/§148 escriben) | 6328 |
-| §147 | ADR-147 — **Contrato ↔ Órdenes E/S**: entregas como movimientos enlazados | 6427 |
-| §148 | ADR-148 — **Contrato ↔ Órdenes E/S**: registro automático (equipo, reglas) | 6522 |
-| §149 | ADR-149 — **Cerebro**: auditoría Nivel-2 (44 hallazgos, M-10, hija 36) | 6615 |
-| §150 | ADR-150 — **Cerebro**: freno al PUBLICAR, consejo externo a pedido, memoria liviana | 6681 |
+| §141 | ADR-141 — **Órdenes E/S**: cantidad corregible y material «Otro» | 6096 |
+| §142 | ADR-142 — **Órdenes E/S**: «Órdenes guardadas» (ver, PDF, Excel, editar) | 6138 |
+| §143 | ADR-143 — **Órdenes E/S**: filtro por zona y entregas por transformador | 6176 |
+| §144 | ADR-144 — **Órdenes E/S**: indicadores por accesorio, zona, motivo y mes | 6222 |
+| §145 | ADR-145 — **Contrato 4125000143**: inventario de Libro4 (pactado, `§145.9`) | 6275 |
+| §146 | ADR-146 — **Contrato ↔ Órdenes E/S**: nexo calculado (luego §147/§148 escriben) | 6338 |
+| §147 | ADR-147 — **Contrato ↔ Órdenes E/S**: entregas como movimientos enlazados | 6440 |
+| §148 | ADR-148 — **Contrato ↔ Órdenes E/S**: registro automático (equipo, reglas) | 6535 |
+| §149 | ADR-149 — **Cerebro**: auditoría Nivel-2 (44 hallazgos, M-10, hija 36) | 6628 |
+| §150 | ADR-150 — **Cerebro**: freno al PUBLICAR, consejo externo a pedido, memoria liviana | 6694 |
+| §151 | ADR-151 — **Cerebro**: documentación total de la sesión 10-06 → 10-07 | 6740 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

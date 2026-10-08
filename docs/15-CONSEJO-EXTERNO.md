@@ -12,6 +12,10 @@
 
 ## §0 — MODELO EXTERNO ACTIVO
 
+**Cuándo se entrega (decisión del Ingeniero 2026-10-07, `99 §150`)**: en SGM el prompt de consejo externo se entrega SOLO
+cuando él lo pide. El disparador 🛰️ sigue marcando la decisión y se le ofrece en una línea; si no lo pide, el ADR dice «NO
+revisado externamente» y no se espera su respuesta para publicar.
+
 **Provider activo**: **Gemini (Google) vía Antigravity** — familia distinta a Claude
 (Google DeepMind vs Anthropic: otro corpus, otro entrenamiento, otros puntos ciegos)
 → red team legítimo.
@@ -180,7 +184,7 @@ consejo suene seguro y esté mal:
 > Costo real: 3 rondas = ~6 viajes manuales tuyos. Por eso el disparador se mantiene
 > ESTRECHO (§2.2/§2.3) — el consejo externo no es para lo rutinario.
 
-1. **Marco la decisión** como 🛰️ "vale consejo externo" + elijo el tier (§3) + te entrego un **prompt autocontenido** (el modelo externo no tiene memoria de nuestro trabajo → el contexto va en el prompt, y las rutas del repo se citan porque sí las puede leer).
+1. **Marco la decisión** como 🛰️ "vale consejo externo" + elijo el tier (§3) + te entrego (solo si lo pides, `99 §150`) un **prompt autocontenido** (el modelo externo no tiene memoria de nuestro trabajo → el contexto va en el prompt, y las rutas del repo se citan porque sí las puede leer).
 2. **Anti-anclaje**: en las decisiones TOP, **fijo MI postura primero** y la omito del prompt; así el modelo externo no me ancla y comparo después. En las ligeras, el orden no importa.
 3. Me pegas la respuesta → la trato como **peer review**: adopto lo correcto, **refuto con razones** lo erróneo, **sintetizo** una postura más fuerte, y te digo explícito **qué cambié y qué descarté**.
 4. **El resultado** (decisión final + qué aportó/cambió el modelo externo) queda en el **ADR/lección** correspondiente → el cerebro recuerda el porqué.

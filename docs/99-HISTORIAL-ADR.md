@@ -6071,6 +6071,9 @@ CH₄ ≥ ~2.100 da T1), «gaseo del aceite» es débil con H₂ ≥ 1.000, tít
 Enterprise Certification 2023-03-15; la prensa: ICONTEC) y una frase propuesta para `:327` que habría sido falsedad nueva. Releído
 por mí en el PDF: 0 «ppm», Tabla 3 C₂H₂ ≥ 7, «fallas térmicas de alta energía o presencia de arcos» (pág. 6), ISO 55001 en Guía y
 AX.01. ⚠️ **NO verificados**: CI y Deploy de `f4edcb9` (el modo automático bloqueó `gh run list`) ni lo servido (L-65).
+→ **Nota (2026-10-07, `§151`)**: lo servido de CF-38 ya está comprobado: `assets/js/ui/fichas/panel.js` en Pages es idéntico
+byte a byte al de main `6a75027` (no cambió desde `f4edcb9`; trae `export function resolverPlantilla`). El CI propio de `f4edcb9`
+no se consultó, pero los CI en verde del 10-07 ya corren con ese código. Cerrado: no re-auditar.
 
 **140.5 Anti-patterns evitados.** Ningún texto firmado publicado sin su «procede» · ningún disparador movido · ninguna norma citada
 sin fuente leída (IEEE 2008/2019 quedan «no verificado») · callejón: atribuir a «su Guía Metodológica» la reposición en `:327`
@@ -6206,6 +6209,7 @@ de OCCIDENTE: allí TODAS sus órdenes son de ENTRADA (BOSQUE → COROZAL, SAHAG
 «Materiales» con columna «Tipo», «Por transformador» sin mezclar tipos, órdenes contadas por tipo + número.
 `filasConsolidado({zona, tipo})` + `deTipo`; `filasEntregas` se conserva. 23 pruebas; suite 2403/0/2; banco con órdenes como
 las suyas. Lección de dominio: en su operación «entrada» no es «a bodega» — no presumir el sentido de un tipo, preguntarlo.
+Main `d613bbd` (para deshacerlo: revertir esa fusión); servido = main según el commit del cerebro `ce4c61c` (añadido en `§151`).
 **143.6 Archivos.** `pages/ordenes-materiales.html` · `assets/js/ordenes-materiales.js` · `assets/css/ordenes-materiales.css` ·
 `assets/js/domain/ordenes_consolidado.js` (nuevo) · `tests/ordenes_consolidado.test.js` (nuevo) · `tests/ordenes_guardadas.test.js`.
 Commit `efd46ac`, main `ee904f3`.
@@ -6325,6 +6329,12 @@ disponible baja a $2.239.010.077. 4123000081 sigue por cantidades. Con el HTML v
 
 Queda a la vista: la lista de admin de contratos usa «ejecutado» manual, y `fecha_inicio` = fecha de importación.
 
+
+**145.10 Nota (2026-10-07, `§151`).** Al borrado de MOV-2026-0001 y a los dos hallazgos («ejecutado» manual y fecha_inicio)
+respondió *«dejemos asi.»* y siguió con el nexo: se toma como «no tocar por ahora», no como «nunca», y no se le vuelve a preguntar
+sin motivo nuevo. La fecha real de inicio tiene fuente: la Orden de inicio 064 dice **23-12-2025**. Cotejo de Claude que no se le
+ha planteado: el nexo cuenta a T1-M/M-CHG por la ENTRADA 20260216 (**4** × S04) y el egreso borrado era de **6** × S04 del 19-may;
+si fueron entregas distintas, al consumido le faltan 6 × $5.064.165 = $30.384.990 (→ TODO-76).
 ## 146. ADR-146 — Nexo Contrato 4125000143 ↔ Órdenes E/S: lo entregado a cada transformador descuenta del contrato (vista calculada) ⟦OPUS-5.5⟧ (2026-10-07)
 
 > *«necesito que ahora hagas un nexo con el segmento del contrato y el segmento de ordenes de entrada y salida y actualices
@@ -6341,6 +6351,9 @@ contrato hacia 14 transformadores, pero el contrato seguía con su consumo en $0
   - solo los 25 nombres EXACTOS de la lista «Accesorios» → S01–S25; Bodega Membrillal y Krenz quedan fuera;
   - manda la orden firmada; un egreso del mismo ítem al mismo transformador solo se AVISA como posible doble registro;
   - se calcula al abrir.
+  - *Nota (`§151`)*: en la decisión 1 rechazó dos alternativas: (a) excluir la ENTRADA 20251228 de Bocagrande (T1-A/M-BCG,
+    2 × S03 = $11.870.906, hoy MOV-2025-0001) aunque se le advirtió que pudo salir del 4123000081 → se cobra al 4125000143;
+    (b) que las SALIDA devolvieran unidades y dinero al contrato → se muestran aparte. No se reabre sin que él lo pida.
 - Dominio puro `domain/ordenes_contrato_nexo.js`: `NEXO_CONTRATOS`, `TABLA_ACCESORIOS`, `EXCLUIDOS`, `calcularNexo`,
   `existenciaConOrdenes`.
   - No mezcla unidades. Admite decimales.
@@ -6723,3 +6736,37 @@ visible con ADR.
 **150.8 Verificado sano / no re-auditar.** `core.hooksPath = githooks` está puesto en este repo (y lo comparten los worktrees) ·
 el freno no mira `docs/` (los nodos del cerebro citan lo que quieran) · pendiente suyo: costo-cerebro (**(J)**).
 
+
+## 151. ADR-151 — Cerebro: documentación total de la sesión 10-06 → 10-07 (lo que no había quedado escrito) ⟦OPUS-5.5⟧ (2026-10-07)
+
+> *«documenta absolutamente todo»*. Barrido de la sesión completa (resumen de la transcripción en 3 tramos, 3 lectores Opus +
+> 1 verificador que descartó lo ya escrito): **15 faltantes confirmados**, todos escritos. Sin código de producto.
+
+**151.1 Qué faltaba y dónde quedó.**
+- **L-132** (`33`): el gancho PreCompact devuelve `hookSpecificOutput` con un evento que el harness rechaza: la orden de consolidar
+  nunca llegó al modelo (verificado en la transcripción; mismo defecto en el kernel y en Líneas AT) → cola del kernel (TODO-67,
+  README del kernel).
+- **L-133** (`32`): el PDF con Helvetica estándar solo imprime Windows-1252 (Ω, μ, ≥ salen cambiados) → TODO-65 suma
+  `caracterNoImprimible` para zona, motivo «Otro», nota y empresa.
+- **L-131** (`36`): probar un flujo entre páginas con el almacén en el padre (banco de `§148`) · **L-94** ampliada: la extensión solo
+  alcanza su grupo «Claude» · **L-98** ampliada: rango de tildes con escapes → **TODO-77** (`11`, 11 archivos) · **M-11** (`30`):
+  mover lecciones deja punteros por archivo que ningún gate ve.
+- Notas sin reescribir: `§140.4` (lo servido de CF-38 ya comprobado) · `§143.9` (main `d613bbd`) · `§145.10` («dejemos asi»,
+  fecha real de inicio 23-12-2025 por la Orden de inicio 064, cotejo de Chiriguaná 4 vs 6 × S04) · `§146.2` (las dos alternativas
+  que rechazó en la decisión 1).
+- **Pendientes**: TODO-76 suma fecha_inicio real, «dejemos asi» y la oferta de adaptar «Importar» a su Libro4 · TODO-62/63
+  «Gemini (solo si él lo pide)» · TODO-56 baja a `11` («baja de urgencia»; libera arranque).
+- **Procedimiento**: CLAUDE.md §2 y W-11 paso 10 — el ADR se commitea ANTES del merge a `main` (freno, `§150`) · `15` §0/§4 y
+  W-11 paso 6 — consejo externo solo a pedido · `20`: fila de candados de git completa (pre-commit, commit-msg, pre-merge-commit,
+  pre-push, freno).
+- **Memoria**: fuentes del contrato 4125000143 (Libro4 bueno en Documents, ruta con errata; los de Descargas son otros) · cierre
+  respondiendo de entrada «¿está todo en producción?» · la compactación también pierde el trato: tuteo · política git con el
+  orden ADR → merge. **Skill** `proceso-decision-fuerte`: excepción de SGM para el artefacto (b).
+- **Bóveda**: alternativas rechazadas en la síntesis del nexo · CF-38 verificado en la de Fichas · `DECISIONES.md` de la auditoría
+  · kernel README (Líneas AT en 1.11.0 y el defecto del PreCompact) · `launch.json` del banco apunta a la bóveda.
+
+**151.2 Descartado por el verificador** (ya estaba o no sirve a una sesión futura): duplicados fusionados, la pestaña abierta como
+«pedido suyo» (fue iniciativa de Claude) y el origen «Brigada» del MOV-2026-0001 (no verificable).
+
+**151.3 Verificación.** `brain:check` sano · boot ≤ 31.386 (GC de la auditoría respetado) · crudo del barrido en la bóveda
+`2026-10-07-auditoria-nivel2/crudos/barrido-sesion.json`.
