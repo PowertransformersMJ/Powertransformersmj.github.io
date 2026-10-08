@@ -24,6 +24,8 @@ import { mesesDelRango, recortarRango, ventanaDeMes } from '../../domain/scada_c
 import { validos } from '../../domain/scada_carga_limpieza.js';
 import { resumenFisico, iFaseMax, serieCargabilidad, serieS, factorPotencia, desbalanceI, desequilibrioU, horasSostenidasSobre, estadisticas, maxSostenido } from '../../domain/scada_carga_kpis.js';
 import { resumirParaGuardar } from '../../domain/scada_carga_importacion.js';
+// Por espacio de nombres (no por nombre): con un kpis.js viejo en caché el detalle sigue funcionando (L-102, `99 §158`).
+import * as KPIS from '../../domain/scada_carga_kpis.js';
 import {
   parseFechaHoraCO, aInputCO, formatoCO, intervaloCO, nombreMes, validarRango, xPlotly
 } from '../../domain/scada_carga_fecha.js';
@@ -62,7 +64,8 @@ function calcularNivel(rec, kv, A) {
   for (const f of FAMILIAS) val[f] = validos(fam[f]);
   const iF = iFaseMax(fam).serie;
   const fisico = resumenFisico(fam, kv);
-  const resumen = resumirParaGuardar(fisico, fam);
+  // `arch`: horas con algún dato de corriente (el motivo «no vino en el exporte» del rango, `99 §158`).
+  const resumen = { ...resumirParaGuardar(fisico, fam), arch: typeof KPIS.horasConCorriente === 'function' ? KPIS.horasConCorriente(fam) : undefined };
   const S = serieS(fam);
   const sRef = fisico.s.max;
   const fp = factorPotencia(fam, sRef);
