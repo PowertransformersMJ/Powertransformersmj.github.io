@@ -87,6 +87,7 @@
 | §150 | ADR-150 — **Cerebro**: freno al PUBLICAR, consejo externo a pedido, memoria liviana | 6694 |
 | §151 | ADR-151 — **Cerebro**: documentación total de la sesión 10-06 → 10-07 | 6740 |
 | §152 | ADR-152 — **Mapa de Colombia**: fondo arreglado + mapa DANE en Borrador (parque por municipio) | 6774 |
+| §153 | ADR-153 — **Mapa**: S/E ubicadas con el KMZ del Ingeniero (142/147) y sus transformadores | 6854 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
