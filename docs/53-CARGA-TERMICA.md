@@ -33,6 +33,7 @@
   la ampacidad real es menor y la cifra subestima: hoy nada lo cruza («refrigeración deficiente» sin señal → CF-27).
   Hoy son **27 equipos ONAF con ventilación obsoleta** (dato del diseño de `§122`, bóveda `2026-09-30-cargabilidad-scada/diseno-v2.md`; riesgo anotado en `99 §127.8`): en ellos la cifra medida y el nivel del panel DGA pueden quedarse cortos.
 - Erratas ×10 conocidas en la ampacidad: hay que dividir el PAR (ampacidad y carga), no la ampacidad sola (TODO-54).
+- Al corregir la POTENCIA de placa, corregir también la ampacidad y la carga medida que se derivó de ella: Casacará T1 quedó con la ampacidad de 5 MVA tras pasar a 2 MVA (`99 §158.11`). Su Excel de Salud de Activos aún trae la vieja: no reimportarlo sin corregirlo.
 
 ## 4. Sobrecarga sostenida
 - **≥ 2 h seguidas > 100 %** (criterio del Ingeniero, `§122.2`) · fila severa **≥ 2 h > 130 % (1,3 p.u.)**: el MENOR
