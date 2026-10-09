@@ -163,6 +163,15 @@ export async function escribirResumen(mes, clavesNuevas, cargaId) {
   const db = getDbSafe();
   const por = await yo();
   const ref = doc(db, 'scada_resumen', mes);
+  // Cada nivel con horas trae sus horas más altas (`top`, `99 §159`). Si no las trae, el lector de archivos es de una
+  // versión anterior (caché del navegador): guardar así borraría las que el punto ya tenía. Se detiene y se dice.
+  for (const niveles of Object.values(clavesNuevas || {})) {
+    for (const r of Object.values(niveles || {})) {
+      if (r && r.i && r.i.n > 0 && !Array.isArray(r.top)) {
+        throw new Error('El lector de archivos de esta pestaña es de una versión anterior: recargue la página (Cmd+Shift+R) y vuelva a guardar ' + mes + '.');
+      }
+    }
+  }
   await runTransaction(db, async (tx) => {
     const snap = await tx.get(ref);
     const claves = fundirResumen(snap.exists() ? snap.data().claves : null, clavesNuevas);

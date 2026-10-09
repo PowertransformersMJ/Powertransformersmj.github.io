@@ -216,3 +216,35 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-duval-flecha2-punta { fill: #c2410c; stroke: #fff; stroke-width: 1.5; stroke-linejoin: round; }
 .cscada .cs-duval-etq { font-size: 12px; font-weight: 700; fill: #c2410c; }
 .cscada .cs-duval-etq-hoy { font-size: 12px; font-weight: 700; fill: #0d1f38; }
+
+/* ── Periodo de varios meses e historia del equipo (`99 §159`) ── */
+.cscada .cs-seg-grupo { display: inline-flex; border: 1px solid var(--cs-line, #d6e2f0); border-radius: 10px; overflow: hidden; background: #fff; }
+.cscada .cs-seg { border: 0; background: transparent; padding: 7px 12px; font: inherit; font-size: 13px; color: var(--cs-ink2, #33475b); cursor: pointer; }
+.cscada .cs-seg + .cs-seg { border-left: 1px solid var(--cs-line, #d6e2f0); }
+.cscada .cs-seg--on { background: #0d1f38; color: #fff; font-weight: 600; }
+.cscada .cs-seg:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+.cscada .cs-tira { display: flex; gap: 2px; flex-wrap: nowrap; }
+.cscada .cs-tira-mes { display: inline-block; width: 16px; height: 13px; border-radius: 3px; background: #e2e8f0; font-style: normal; }
+.cscada .cs-tira--crg1, .cscada .cs-tira--crg2 { background: #bfe8cf; }
+.cscada .cs-tira--crg3 { background: #ffd8a8; }
+.cscada .cs-tira--crg4 { background: #f7a49e; }
+.cscada .cs-tira--crg5, .cscada .cs-tira--sost { background: #c91a14; }
+.cscada .cs-tira--prov { background: #dbe2ea; }
+/* Provisional con sobrecarga: trama gris (el rojo es solo para lo firme). */
+.cscada .cs-tira--sostp { background: repeating-linear-gradient(45deg, #dbe2ea, #dbe2ea 3px, #64748b 3px, #64748b 5px); }
+.cscada .cs-tira--vacio { background: repeating-linear-gradient(45deg, #fff, #fff 3px, #e5e7eb 3px, #e5e7eb 6px); border: 1px solid #e5e7eb; }
+.cscada .cs-historia h3 { margin: 0 0 4px; font-size: 16px; }
+.cscada .cs-hist { display: grid; grid-template-columns: 210px 1fr; gap: 10px 16px; margin: 10px 0 0; }
+.cscada .cs-hist dt { color: var(--cs-ink3, #4d6485); font-size: 13px; }
+.cscada .cs-hist dd { margin: 0; }
+.cscada .cs-hist-dev { border: 1px solid var(--cs-line, #d6e2f0); border-radius: 10px; padding: 8px 10px; margin: 0 0 6px; }
+.cscada .cs-hist-dia { margin-left: 6px; padding: 2px 8px; }
+.cscada .cs-hist-prov { color: var(--cs-ink3, #4d6485); font-style: italic; }
+.cscada .cs-hist-meses { display: flex; flex-wrap: wrap; gap: 4px; }
+.cscada .cs-hist-mes { font-size: 12px; padding: 2px 7px; border-radius: 999px; border: 1px solid var(--cs-line, #d6e2f0); background: #fff; }
+.cscada .cs-hist-mes--crg4, .cscada .cs-hist-mes--crg5 { border-color: rgba(201, 26, 20, .35); color: #a8231d; }
+.cscada .cs-hist-mes--crg3 { border-color: rgba(255, 149, 0, .45); color: #9a5a00; }
+.cscada .cs-hist-mes--prov { color: var(--cs-ink3, #4d6485); border-style: dashed; font-style: italic; }
+.cscada .cs-hist-mes--vacio { color: #94a3b8; border-style: dotted; }
+.cscada .cs-hist-mes--sost { font-weight: 700; }
+@media (max-width: 640px) { .cscada .cs-hist { grid-template-columns: 1fr; } }

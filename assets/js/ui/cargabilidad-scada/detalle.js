@@ -409,7 +409,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     a.desde = desde; a.hasta = hasta;
     liberarFigura(figura); figura = null;
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
-    conservarFoco(() => poner(cont, encabezado(a), avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
+    conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-esqueleto', style: 'width:50%' }), el('div', { class: 'cs-esqueleto', style: 'width:80%;margin-top:10px' }),
       el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…')), a.dgaNodo, a.duvalNodo));
     pintarDga(a, { estado: { estado: 'leyendo' } });
@@ -446,7 +446,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       a.porNivel = porNivel;
       a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
-      conservarFoco(() => poner(cont, encabezado(a), avisoEl(), selectorRango(a),
+      conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, avisoEl(), selectorRango(a),
         fallidos.size ? el('div', { class: 'cs-panel cs-error', role: 'alert' }, 'No se pudo leer ' + [...fallidos].map(nombreMes).join(', ') + ' (revise la conexión): esas horas quedan como hueco y la cifra no es firme.',
           el('button', { type: 'button', class: 'btn btn--glass btn--sm', style: 'margin-left:8px', onclick: () => cargar(desde, hasta) }, 'Reintentar')) : null,
         sinNada ? el('div', { class: 'cs-panel cs-estado' }, 'No hay horas con dato válido en este rango. Pruebe con otro rango.') : indicadores(a),
@@ -459,7 +459,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     } catch (e) {
       if (mio !== token) return;
       console.warn('[cargabilidad-scada] detalle', e);
-      conservarFoco(() => poner(cont, encabezado(a), selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
+      conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo, a.duvalNodo));
       pintarDga(a, { estado: { estado: 'error' } });
     }
@@ -486,7 +486,11 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       : el('section', { class: 'cs-panel cs-dga', id: 'csDga', hidden: true, 'aria-labelledby': 'csDgaTitulo' });
     const duvalNodo = !cambio && actual.duvalNodo ? actual.duvalNodo
       : el('section', { class: 'cs-panel cs-duval', id: 'csDuval', hidden: true, 'aria-labelledby': 'csDuvalTitulo' });
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null };
+    // Historia del equipo (`99 §159`): UN nodo por equipo, fijo arriba del rango (no se recalcula al cambiar el rango).
+    const historiaNodo = !cambio && actual.historiaNodo ? actual.historiaNodo
+      : el('section', { class: 'cs-panel cs-historia', id: 'csHistoria', hidden: true, 'aria-labelledby': 'csHistoriaTitulo' });
+    const historiaLista = !cambio && actual.historiaLista;
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
@@ -497,6 +501,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       focoTitulo();
       return;
     }
+    if (!actual.historiaLista) pintarHistoriaDe(actual);
     // Rango: el del enlace (rótulos: primera y última hora) si es válido; si no, el mes pedido; si no, el mes por defecto.
     const lim = limites(actual);
     const mesDef = mesPorDefecto(ctx.catalogo);
@@ -513,6 +518,38 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       else aviso = 'El rango del enlace no es válido (' + v.errores.map((e) => e.texto.replace(/\.$/, '')).join('; ') + '): se muestra ' + nombreMes(mesInicial) + '.';
     }
     cargar(rango.desde, rango.hasta, { enfocar: true, aviso });
+  }
+
+  /** La historia va en un archivo aparte (L-102): si no carga, el detalle sigue igual y la sección se oculta. */
+  async function pintarHistoriaDe(a) {
+    // El MISMO equipo reabierto (enlace, atrás) reusa su nodo: la historia sigue siendo «vigente» mientras el nodo lo sea.
+    const nodo = a.historiaNodo;
+    const vigente = () => !!actual && actual.historiaNodo === nodo;
+    a.historiaLista = true;
+    try {
+      const mod = await import('./historia.js');
+      if (!vigente()) return;
+      const res = await mod.pintarHistoria(nodo, { a, ctx, vigente, alVerDia: (ms) => verDia(actual, ms), alReintentar: () => pintarHistoriaDe(actual) });
+      // Con meses que no se pudieron leer, se rehace al reabrir el equipo (y ofrece «Reintentar»).
+      if (vigente() && res && res.completa === false) actual.historiaLista = false;
+    } catch (e) {
+      console.warn('[cargabilidad-scada] historia', e);
+      if (!vigente()) return;
+      actual.historiaLista = false;
+      poner(nodo, el('p', { class: 'cs-ayuda' }, 'No se pudo armar la historia del equipo (revise la conexión).'),
+        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => pintarHistoriaDe(actual) }, 'Reintentar'));
+    }
+  }
+
+  /** «Ver ese día»: el rango de las curvas pasa al día de ese rótulo (00:00 a 23:00) sin rehacer la historia. */
+  function verDia(a, ms) {
+    if (!a || actual !== a || ms == null) return;
+    const dia = aInputCO(ms).slice(0, 10);
+    const d0 = parseFechaHoraCO(dia + 'T00:00'); const d1 = parseFechaHoraCO(dia + 'T23:00');
+    if (d0 == null || d1 == null) return;
+    const desde = d0 - H_MS; const hasta = d1;
+    history.replaceState(null, '', hashDe(a, desde, hasta));
+    cargar(desde, hasta).then(() => { const s = document.getElementById('csDesde'); if (s) s.scrollIntoView({ block: 'center' }); });
   }
 
   function focoTitulo() { const t = document.getElementById('csDetTitulo'); if (t) t.focus({ preventScroll: false }); }

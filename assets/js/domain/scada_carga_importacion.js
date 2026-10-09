@@ -17,7 +17,7 @@ import { EXTRAS, EXTRA_DE_ESTADISTICO, LOTE_MAX_BYTES } from './scada_carga_extr
 import { leerArchivo, estadisticoDeNombre, fechaDeNombre, fechaDeCarpeta, claveId } from './scada_carga_csv.js';
 import { limpiarNivel, conteoCodigos } from './scada_carga_limpieza.js';
 import { horasMes, diasMes, idxDe, empaquetar, fusionarCrudo, igualBytes, mesDeFecha } from './scada_carga_series.js';
-import { resumenFisico } from './scada_carga_kpis.js';
+import { resumenFisico, iFaseMax } from './scada_carga_kpis.js';
 import { nombreMes } from './scada_carga_fecha.js';
 
 const TOL = 1e-6;
@@ -198,6 +198,27 @@ export function procesarPuntoMes(nuevo, guardado, modo = 'completar') {
   return { niveles, resumen, conteos, conflictos, nuevas };
 }
 
+/**
+ * Horas de MAYOR corriente que se guardan por nivel y mes (`99 §159`): con ellas el p99 de un PERIODO de hasta 12 meses
+ * (≤ 8.928 h) sale EXACTO combinando meses —el p99 del periodo está siempre entre las 1 % más altas, y nunca son más de 90
+ * aunque todas caigan en un mismo mes—, sin leer las curvas. Constante aquí (no en la configuración) a propósito: con una
+ * configuración vieja en caché, el importador nuevo no guardaría la serie entera.
+ */
+export const TOP_HORAS = 90;
+
+/**
+ * Las `TOP_HORAS` corrientes horarias más altas (fase más cargada, horas válidas), de mayor a menor, redondeadas a
+ * 0,001 A como el p99 del mes. Lista de números A PROPÓSITO (no bytes): cualquier versión de la página de carga la
+ * escribe tal cual en Firestore, también una abierta antes de publicar (L-102); pesa ~0,4 MiB el resumen del mes.
+ */
+export function topHoras(limpio) {
+  const iF = iFaseMax(limpio).serie;
+  const v = [];
+  for (const x of iF) if (Number.isFinite(x)) v.push(x);
+  v.sort((a, b) => b - a);
+  return v.slice(0, TOP_HORAS).map((x) => Math.round(x * 1000) / 1000);
+}
+
 /** Lo que se guarda del resumen físico (solo números y su posición en el mes). */
 export function resumirParaGuardar(r, limpio) {
   let desde = null;
@@ -213,7 +234,9 @@ export function resumirParaGuardar(r, limpio) {
     horas: r.horas, servicio: r.servicio, des: r.desenergizadas,
     cob: r.cobertura == null ? null : Math.round(r.cobertura * 1000) / 1000,
     sMax: red(r.s.max), sP99: red(r.s.p99), rUI: red(r.rUI), uProm: red(r.u.prom), sP: r.sP, flujoInverso: r.flujoInverso,
-    desde
+    desde,
+    // Las horas más altas del mes (de mayor a menor) para el p99 exacto de un periodo (`99 §159`).
+    top: topHoras(limpio)
   };
 }
 
