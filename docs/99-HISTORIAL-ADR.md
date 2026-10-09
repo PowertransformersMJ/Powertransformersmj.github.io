@@ -7410,3 +7410,19 @@ anula · entregar a la página publicada un tipo que no sabe escribir · nombres
   mensual (p99 de todas las horas; la escala se juzga sobre el periodo); lo pedido es el p99 exacto.
 - Dato del SCADA, no defecto: en SBE la mayor corriente limpia del primario es una hora suelta de 204 % (06-ene 13:00)
   mientras su secundario nunca pasó de 115 %; se muestra tal cual y «Ver ese día» la deja revisar.
+
+**159.9 Nota posterior (2026-10-09): publicado, 9 meses recargados y verificado en vivo.** Con su «procede»: main `290f4ca`
+(los 6 archivos servidos, comprobado con curl). Recarga en su Chrome por la página Datos SCADA (módulos refrescados con
+`fetch(u, {cache: 'reload'})` y comprobados con `import()`, L-102), un mes a la vez en «Completar»: la simulación de los 9 dio
+**0 series por guardar** (223/223/224/224/224/224/227/178/169 iguales) y cada uno guardó solo su resumen.
+- **Foto antes/después** (`.get()`): los 9 resúmenes idénticos campo por campo salvo `top`; 1.932 punto-mes y 3.603 niveles sin
+  altas ni bajas; catálogo y homologación idénticos; 9 cargas nuevas (`completar`, `completa`, series 0). Los 16 punto-mes sin
+  `top` (2 por mes, ene–sep) tienen n = 0 y no son de ningún equipo.
+- **En vivo** (su Chrome): ene–oct 127 firmes / 49 provisionales / 74 CRG 4–5 / 38 sostenida, 208 filas, 0 «falta preparar»;
+  historia de T2-MAJ igual a la vista previa.
+- **Verificación independiente** (2 Opus, solo lectura): (a) la huella de las 208 filas de la página es la misma que el recálculo
+  desde cero con los módulos del repo y Firestore; el p99 del periodo es idéntico al de todas las horas de las curvas en 6
+  equipos y 13 niveles; (b) `top` correcto en los 3.182 niveles con horas (largo min(n, 90), orden, p99 del mes) y valor a valor
+  contra 10 curvas reales; el resumen más grande pesa 387,8 KiB (37,9 % de 1 MiB). Ninguna afirmación del ADR contradicha.
+- Teórico, no hoy: `topsDe` pasa la lista a Float32; sobre 16.384 A perdería el redondeo a 0,001 (el mayor `top` del parque es
+  9.006 A, una hora imposible). Si algún día importa, leer la lista en Float64.
