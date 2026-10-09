@@ -139,13 +139,17 @@ export const FASES = Object.freeze({
 });
 export const FASE_DE = Object.freeze({ IR: 'R', IS: 'S', IT: 'T', URS: 'R', UST: 'S', UTR: 'T' });
 
-/** Chips de la calificación CRG (número + palabra; el color nunca es la única señal). */
+/**
+ * Chips de la calificación CRG (número + palabra; el color nunca es la única señal). Las palabras son la escala de
+ * condición del MO.00418 (Guía Fig. 3, AX.01 Tabla 11) = `CONDICIONES` de schema.js, por decisión del Ingeniero
+ * (2026-10-09, `99 §160`). Escritas aquí a propósito: este archivo no importa otros (L-102).
+ */
 export const CRG_CHIP = Object.freeze({
-  1: Object.freeze({ palabra: 'Baja', clase: 'chip--success' }),
-  2: Object.freeze({ palabra: 'Moderada', clase: 'chip--teal' }),
-  3: Object.freeze({ palabra: 'Media', clase: 'chip--warn' }),
-  4: Object.freeze({ palabra: 'Alta', clase: 'cs-chip--crg4' }),
-  5: Object.freeze({ palabra: 'Crítica', clase: 'chip--danger' })
+  1: Object.freeze({ palabra: 'Muy Bueno', clase: 'chip--success' }),
+  2: Object.freeze({ palabra: 'Bueno', clase: 'chip--teal' }),
+  3: Object.freeze({ palabra: 'Medio', clase: 'chip--warn' }),
+  4: Object.freeze({ palabra: 'Pobre', clase: 'cs-chip--crg4' }),
+  5: Object.freeze({ palabra: 'Muy Pobre', clase: 'chip--danger' })
 });
 
 /** Nombres de devanado para la pantalla. */
