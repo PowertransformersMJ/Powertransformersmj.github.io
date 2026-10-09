@@ -7457,3 +7457,8 @@ Bueno», filtro «5 · Muy Pobre … 1 · Muy Bueno», periodo y detalle; mapa: 
 **160.5 Anti-patterns evitados / doctrina.** Reemplazo masivo de «Alta»/«Crítica» (rompería prioridades y papeles) · cambiar
 colores no pedidos (el «Medio» de la CRG sigue naranja y el de la salud amarillo: decisión aparte suya) · nuevo import en un
 módulo publicado. Lo que dicta va literal (las palabras); la forma de escribirlas, la de la plataforma.
+
+**160.6 Nota posterior (2026-10-09): publicado y verificado en vivo.** main `bd10843` (los 2 archivos servidos, curl). En su
+Chrome, tras recargar: Cargabilidad SCADA septiembre con chips «CRG 5 · Muy Pobre … CRG 1 · Muy Bueno» y filtro «5 · Muy
+Pobre … 1 · Muy Bueno»; mapa con «1 Muy Bueno 34 · 2 Bueno 6 · 3 Medio 22 · 4 Pobre 29 · 5 Muy Pobre 43» y la leyenda igual.
+Una pestaña abierta antes de publicar sigue con las palabras viejas hasta recargar (solo cambian valores: no rompe nada).
