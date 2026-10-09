@@ -7296,3 +7296,23 @@ datos, consumidores) + 1 escéptico por hallazgo (13 agentes, solo lectura).
   corregirlos deshace esta corrección en silencio (`set` con `merge`).
 - **De paso**: el límite operativo de 20 A en 34,5 kV de su Hoja2 queda por debajo de lo que el SCADA ya mide. Es una pregunta
   para Operación.
+
+**158.12 Nota posterior (2026-10-09): octubre 1–7 cargado (su pedido).** Se empaquetó con la v3; el relevo de Sampués salió
+solo de su hoja (2.555 filas renombradas). Se cargó en «Completar» (mes nuevo): 169 series, 0 conflictos.
+- **Foto antes/después**: solo se agrega 2026-10 (días 1–7, `completo: false`). Los otros 8 meses, el catálogo y la
+  homologación quedan idénticos.
+- **Revisión independiente** (2 Opus, solo lectura): sin problemas.
+  - Reconstrucción offline con el camino de la página (`seLee` + relevo): 169/169 resúmenes y series idénticos byte a byte.
+    El paquete es igual al disco en sus 315 archivos.
+  - Sampués T1 y T2 tienen 168/168 h válidas solo gracias al relevo.
+- **Qué ve el Ingeniero**:
+  - La página sigue abriendo septiembre (último mes completo). Octubre sale como «incompleto: 7 de 31 días».
+  - Octubre trae 0 firmes, 122 provisionales y 86 sin cifra. La cobertura se mide contra 744 h, así que el tope es 22,6 %
+    (`§122.4`). Será firme desde ~16–17 días y pasará a abrir por defecto con 28 días.
+- **El exporte de octubre repite el hueco de septiembre**: no trae las 43 estaciones (34 de Oriente, 6 del sur del
+  Magdalena, Tamalameque, Ariguaní y Casa de Zinc). Ni siquiera las 6 del sur del Magdalena, que en septiembre trajeron un
+  día. Se confirma que la lista de puntos del exporte cambió el 1–2 de septiembre (pedido al área SCADA, TODO-69).
+- **De paso**:
+  - CTA, MAY, PTE y UNN tienen la señal marcada no válida desde mediados de septiembre, y sigue así en octubre.
+  - LPR, MTE, PZL y SAR traen P/Q unas 1000 veces más alta (¿kW en vez de MW?). Solo afecta la curva de potencia del
+    detalle, no la cifra.
