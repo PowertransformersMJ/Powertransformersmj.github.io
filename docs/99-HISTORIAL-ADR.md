@@ -7509,3 +7509,8 @@ cuando cambia una entrega, al volver tras > 1 min o con «Actualizar».
 `§148`) · emparejar «Otro» por parecido (decisión 2 de `§146`) · escucha en vivo de órdenes (free-tier) · pisar a otra persona del
 equipo que editaba la misma orden minutos antes (versión verificada; el borrado lleva la versión). Memoria:
 `feedback_contrato_conforme_ordenes`.
+
+**161.6 Nota posterior (2026-10-09): publicado y verificado en vivo.** main `71039dc` (los 5 archivos servidos, curl). En su
+Chrome: contrato 4125000143 con 19 órdenes, 18 transformadores, $734.757.342, 21 registradas · 0 por registrar; Chiriguaná 8 × S04
+($40.513.320, ENTRADA 20260212 y 20260216); S02 en 4; sello «Órdenes leídas a las 16:49 · Actualizar». El HTML del tablero va en
+el iframe con `?contratoId=…` (otra entrada de caché): hasta 10 min tras publicar puede verse sin el sello (nace oculto: no rompe).
