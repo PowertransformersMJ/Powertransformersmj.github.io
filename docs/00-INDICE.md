@@ -94,6 +94,7 @@
 | §157 | ADR-157 — **Mapa**: filtros de salud 1–5 y de Cargabilidad SCADA (CRG) | 7106 |
 | §158 | ADR-158 — **Cargabilidad SCADA**: los 77 sin medición; motivo con la causa; relevo de Sampués | 7147 |
 | §159 | ADR-159 — **Cargabilidad SCADA por periodo** (p99 exacto con `top`) e historia del equipo | 7320 |
+| §160 | ADR-160 — **CRG con la escala del MO**: Muy Bueno · Bueno · Medio · Pobre · Muy Pobre | 7430 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
