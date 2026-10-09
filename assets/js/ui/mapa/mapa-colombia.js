@@ -637,7 +637,8 @@ function buscador() {
   inp.addEventListener('blur', () => setTimeout(cerrar, 150));
 }
 
-const NOMBRE_CRG = { 1: 'Baja', 2: 'Moderada', 3: 'Media', 4: 'Alta', 5: 'Crítica' };
+// Escala de condición del MO.00418, la misma de Cargabilidad SCADA (CRG_CHIP) y de la salud (`99 §160`).
+const NOMBRE_CRG = { 1: 'Muy Bueno', 2: 'Bueno', 3: 'Medio', 4: 'Pobre', 5: 'Muy Pobre' };
 // Los mismos tonos de los chips CRG de la página Cargabilidad SCADA (chip--success, --teal, --warn, crg4, --danger).
 const COLOR_CRG = { 1: '#1CC870', 2: '#30D1B0', 3: '#FF9500', 4: '#F0645A', 5: '#C91A14' };
 const GRIS_PROVISIONAL = '#94a3b8';

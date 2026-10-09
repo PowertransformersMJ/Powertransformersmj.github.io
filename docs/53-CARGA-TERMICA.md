@@ -13,7 +13,7 @@
 ---
 
 ## 1. Dos escalas de carga que NO son la misma
-- **CRG del MO.00418 §A3.4** (> 60/65/75/90 %): `umbrales_salud_baseline.js` (`crg`). La cifra de CARGABILIDAD es el
+- **CRG del MO.00418 §A3.4** (Ed. 02: AX.01 §4.1.3, Tabla 7) (> 60/65/75/90 %); se NOMBRA con la escala de condición Muy Bueno … Muy Pobre (`99 §160`): `umbrales_salud_baseline.js` (`crg`). La cifra de CARGABILIDAD es el
   dato OFICIAL de Planificación AT y tiene prioridad (`calcularCalifCRG`, decisión del Ingeniero 2026-07-27, `99 §57.2 c`).
   **CRG 5 ⇒ HI ≥ 4** (override §A5, MO.00418 §4.1.3) → `51 §1`.
 - **Cortes 80/95/100 % del tablero viejo** `seguimiento-cargabilidad` (`cargabilidad_config.js`): **sin fuente

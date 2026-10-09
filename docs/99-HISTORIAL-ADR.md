@@ -7426,3 +7426,34 @@ anula · entregar a la página publicada un tipo que no sabe escribir · nombres
   contra 10 curvas reales; el resumen más grande pesa 387,8 KiB (37,9 % de 1 MiB). Ninguna afirmación del ADR contradicha.
 - Teórico, no hoy: `topsDe` pasa la lista a Float32; sobre 16.384 A perdería el redondeo a 0,001 (el mayor `top` del parque es
   9.006 A, una hora imposible). Si algún día importa, leer la lista en Float64.
+
+## 160. ADR-160 — La calificación de cargabilidad CRG se nombra con la escala de condición del MO.00418: Muy Bueno · Bueno · Medio · Pobre · Muy Pobre ⟦OPUS-5.5⟧ (2026-10-09)
+
+> *«las evaluaciones para cargabilidad son las siguientes 1. MUY BUENO 2. BUENO 3. MEDIO 4. POBRE 5. MUY POBRE por favor
+> implementalo asi en la calificacion»*. Estudio en solo lectura (3 Opus: pantalla, norma, textos aprobados y papel).
+> NO revisado externamente. Deliberación: bóveda `2026-10-08-scada-sin-medicion` (`crudos/crg/`).
+
+**160.1 Causa raíz.** Las palabras «Baja · Moderada · Media · Alta · Crítica» las puso Claude al construir Cargabilidad SCADA
+(`CRG_CHIP`, commit bc5e353, `§122`) y el mapa las copió (`NOMBRE_CRG`, `§157`); el Ingeniero aprobó las BANDAS, nunca las
+palabras. La norma solo da números para la CRG (AX.01 §4.1.3, Tabla 7) y nombra la escala de condición 1–5 como Muy Bueno …
+Muy Pobre (Guía Fig. 3; AX.01 Tabla 11), la misma que la plataforma ya usaba para la CRG en Salud de Activos y en el
+diagnóstico de Cargabilidad (Excel, `§124`): dos pantallas decían una cosa y dos otra.
+
+**160.2 Solución.** Solo las 10 palabras: `CRG_CHIP` (`scada_carga_config.js`; escritas literal, el archivo no importa otros —
+L-102) y `NOMBRE_CRG` (`mapa-colombia.js`). Se escriben como `CONDICIONES` de `schema.js` («Muy Bueno», «Muy Pobre»): la
+misma forma que la salud en las mismas pantallas. Llegan solas a: chip de la cifra, filtro «Calificación CRG», peor mes del
+periodo, tarjeta del detalle, panel de gases y carga, globos, leyenda y botones del mapa.
+
+**160.3 No-regresión.** Números 1–5, bandas 60/65/75/90 %, colores, filtros (guardan el número), CSV (número), Firestore
+(`calif_crg` entero; la CRG del SCADA no se guarda) e importador intactos. Nada que se firme ni ningún texto aprobado muestra
+la CRG con palabra (Fichas, órdenes, panel DGA: solo número). NO se tocan los usos que solo comparten palabras: prioridad de
+la ficha y de órdenes, severidad de alertas, criticidad por usuarios («Moderada» del MO §4.2.1), nivel de atención DGA×carga.
+
+**160.4 Verificación.** `tests/scada_carga_crg_nombres.test.js` (2: `CRG_CHIP` = `CONDICIONES`; `NOMBRE_CRG` sin el vocabulario
+viejo) · unitarias 2574/0/2 · lint. Vista previa con datos reales (puerto 8135): chips «CRG 5 · Muy Pobre … CRG 1 · Muy
+Bueno», filtro «5 · Muy Pobre … 1 · Muy Bueno», periodo y detalle; mapa: «1 Muy Bueno 34 · 2 Bueno 6 · 3 Medio 22 · 4 Pobre
+29 · 5 Muy Pobre 43». Publicación y verificación en vivo → `160.5`.
+
+**160.5 Anti-patterns evitados / doctrina.** Reemplazo masivo de «Alta»/«Crítica» (rompería prioridades y papeles) · cambiar
+colores no pedidos (el «Medio» de la CRG sigue naranja y el de la salud amarillo: decisión aparte suya) · nuevo import en un
+módulo publicado. Lo que dicta va literal (las palabras); la forma de escribirlas, la de la plataforma.
