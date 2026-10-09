@@ -146,6 +146,13 @@
        aquí como EGRESO enlazado a su orden. Oculto si el contrato no tiene nexo. -->
   <section id="regOrdenes" class="form-fieldset" hidden style="margin-top:22px">
     <h3 class="form-fieldset-title" style="margin:0 0 6px">Entregas de órdenes de entrada y salida por registrar</h3>
+    <!-- 2026-10-09: las órdenes se leen una vez y se vuelven a leer si cambia una entrega registrada, al volver a la
+         pestaña tras más de un minuto o con «Actualizar». Oculto hasta que el JS lo llene (con el JS viejo no aparece). -->
+    <p id="nexoLectura" hidden style="font-size:12px; color:var(--ink-3); margin:0 0 8px">
+      <span id="nexoLecturaTexto" aria-live="polite"></span>
+      <button type="button" class="btn btn-secondary" id="btnActualizarOrdenes" title="Volver a leer las órdenes de entrada y salida"
+        style="height:auto; padding:3px 12px; font-size:12px; margin-left:8px">Actualizar</button>
+    </p>
     <p class="page-subtitle" style="margin:0 0 10px">Cada entrega de una orden de ENTRADA con ítems del contrato se registra como EGRESO,
       enlazada a su orden, con el transformador, la zona y el departamento del parque. Se registran SOLAS al guardar la orden y al abrir
       el contrato; aquí puede revisar las que quedaron pendientes (y por qué) y registrarlas a mano. Nada se escribe hasta pulsar «Registrar».</p>

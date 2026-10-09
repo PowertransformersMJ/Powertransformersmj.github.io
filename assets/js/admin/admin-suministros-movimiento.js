@@ -118,18 +118,68 @@ function rebuildDatalistTrafos() {
 let promesaOrdenesNexo = null;
 let promesaMovsNexo = null;
 let promesaConfig = null;
-/** Órdenes de la vigencia (una lectura por visita) + movimientos del contrato (frescos en cada consulta:
- *  si otra pestaña registró entregas, lo pendiente no se descuenta dos veces junto al stock fresco). */
+// Relectura de las órdenes (2026-10-09): la pestaña las guardaba toda la visita mientras leía los movimientos
+// frescos; si una orden se editaba o eliminaba (y el registro automático retiraba o creaba su movimiento
+// enlazado), mezclaba la orden VIEJA con los movimientos nuevos. Ahora se releen si cambió un movimiento
+// enlazado desde la consulta anterior, al volver a la pestaña tras más de un minuto y con «Actualizar».
+// Reglas en domain/contrato_relectura.js, cargado perezoso (L-102): si falta, la pestaña sigue como antes.
+let REL = null;
+let relectorMov = null;
+let lecturasOrdenesEnCurso = 0;
+let ordenesLeidasMs = null;   // hora de la última lectura buena (sello «Órdenes leídas a las hh:mm»)
+let ultimoIntentoMs = null;   // hora del último intento, bueno o no
+let errorOrdenes = '';
+let firmaEnlazadosMov = null; // huella de los movimientos enlazados de la consulta anterior
+/** La MISMA lectura acotada de siempre (desde/hasta de la vigencia), con su hora para el sello. */
+function leerOrdenesNexo(cid) {
+  lecturasOrdenesEnCurso++;
+  pintarLecturaOrdenes();
+  const p = listarOrdenes({ desde: NEXO_CONTRATOS[cid].desde, hasta: NEXO_CONTRATOS[cid].hasta });
+  p.then(() => { ordenesLeidasMs = Date.now(); errorOrdenes = ''; },
+         (err) => { errorOrdenes = (err && err.message) || String(err); })
+    .then(() => { lecturasOrdenesEnCurso = Math.max(0, lecturasOrdenesEnCurso - 1); ultimoIntentoMs = Date.now(); pintarLecturaOrdenes(); });
+  return p;
+}
+/** Órdenes de la vigencia (una lectura, que se repite si cambió un movimiento enlazado) + movimientos del
+ *  contrato (frescos en cada consulta: si otra pestaña registró entregas, lo pendiente no se descuenta dos
+ *  veces junto al stock fresco). */
 async function datosNexo(cid, { movsFrescos = true } = {}) {
-  if (!promesaOrdenesNexo) promesaOrdenesNexo = listarOrdenes({ desde: NEXO_CONTRATOS[cid].desde, hasta: NEXO_CONTRATOS[cid].hasta });
+  const ordenesNuevas = !promesaOrdenesNexo;
+  // Órdenes frescas: la huella anterior ya no sirve de comparación (otra consulta en paralelo no relee de más).
+  if (ordenesNuevas) { promesaOrdenesNexo = leerOrdenesNexo(cid); firmaEnlazadosMov = null; }
   if (!promesaMovsNexo || movsFrescos) promesaMovsNexo = listarMovimientos({ contrato_id: cid });
   try {
-    const [{ ordenes, truncado }, movimientos] = await Promise.all([promesaOrdenesNexo, promesaMovsNexo]);
+    const pOrd = promesaOrdenesNexo;
+    let [{ ordenes, truncado }, movimientos] = await Promise.all([pOrd, promesaMovsNexo]);
+    if (REL) {
+      // Un movimiento enlazado cambió desde la consulta anterior: la orden cambió → las órdenes en memoria están viejas.
+      const firma = REL.firmaEnlazados(movimientos);
+      if (!ordenesNuevas && REL.cambiaronEnlazados(firmaEnlazadosMov, firma) && promesaOrdenesNexo === pOrd) {
+        promesaOrdenesNexo = leerOrdenesNexo(cid);
+      }
+      firmaEnlazadosMov = firma;
+    }
+    // Si esta u otra consulta pidió órdenes nuevas mientras tanto, se usan esas (nunca la orden vieja con los movimientos nuevos).
+    if (promesaOrdenesNexo && promesaOrdenesNexo !== pOrd) ({ ordenes, truncado } = await promesaOrdenesNexo);
     return { ordenes, truncado: !!truncado, movimientos };
   } catch (err) {
     promesaOrdenesNexo = null; promesaMovsNexo = null;   // se reintenta la próxima vez
     throw err;
   }
+}
+/** Sello «Órdenes leídas a las hh:mm» + botón «Actualizar», junto al rótulo del nexo (sección de entregas). */
+function pintarLecturaOrdenes() {
+  const caja = $('nexoLectura'), txt = $('nexoLecturaTexto'), btn = $('btnActualizarOrdenes');
+  if (!caja || !txt) return;                             // HTML viejo en caché (`30 L-85`)
+  const cid = getContratoActivo();
+  if (!REL || !(cid && NEXO_CONTRATOS[cid])) { caja.hidden = true; return; }
+  caja.hidden = false;
+  const leyendo = lecturasOrdenesEnCurso > 0;
+  // Si la lectura falla, esta pestaña NO sigue con las anteriores (bloquea el egreso): el sello no ofrece hora vieja.
+  const error = leyendo ? '' : errorOrdenes;
+  txt.textContent = REL.textoLectura({ leidasMs: error ? null : ordenesLeidasMs, leyendo, error }) ||
+    'Las órdenes se leen al escoger un suministro o al revisar las entregas.';
+  if (btn) btn.disabled = leyendo;
 }
 /** Lectura recortada (más de 500 órdenes): la fecha más antigua leída; lo enlazado a órdenes anteriores no es huérfano. */
 function corteDe(ordenes, truncado) {
@@ -665,11 +715,18 @@ actualizarBtnGuardar();   // estado inicial: disabled hasta llenar
 const regSec = $('regOrdenes');           // ausente con el HTML viejo en caché (`30 L-85`)
 let planReg = null;
 let confirmandoReg = false;   // confirmación en dos clics dentro de la página (sin diálogo del navegador)
+let revisionMostrada = false; // ya se pulsó «Revisar»: una relectura de órdenes la repinta (2026-10-09)
+let registrandoEntregas = false;
 const ddmm = (iso) => String(iso || '').slice(0, 10).split('-').reverse().join('/');
 
-async function revisarEntregas() {
+async function revisarEntregas({ conservarSeleccion = false } = {}) {
   const cid = getContratoActivo();
   const cuerpo = $('regCuerpo'), btnReg = $('btnRegistrarEntregas');
+  // Relectura automática: las casillas que la persona desmarcó siguen desmarcadas (por id de la entrega).
+  const desmarcados = conservarSeleccion && planReg
+    ? new Set([...cuerpo.querySelectorAll('.reg-sel:not(:checked)')].map((c) => (planReg.porRegistrar[+c.dataset.i] || {}).docId).filter(Boolean))
+    : null;
+  revisionMostrada = true;
   btnReg.disabled = true; planReg = null; confirmandoReg = false; btnReg.classList.remove('btn-danger');
   cuerpo.innerHTML = '<p class="msg">Leyendo órdenes, movimientos y parque…</p>';
   try {
@@ -707,6 +764,11 @@ async function revisarEntregas() {
       tabla('Desfasadas (la orden cambió después de registrada)', p.desfasados, false);
     btnReg.disabled = !p.porRegistrar.length;
     btnReg.textContent = `Registrar seleccionadas (${p.porRegistrar.length})`;
+    if (desmarcados && desmarcados.size) {
+      cuerpo.querySelectorAll('.reg-sel').forEach((c) => { if (desmarcados.has((p.porRegistrar[+c.dataset.i] || {}).docId)) c.checked = false; });
+      const n = cuerpo.querySelectorAll('.reg-sel:checked').length;
+      btnReg.disabled = !n; btnReg.textContent = `Registrar seleccionadas (${n})`;
+    }
     cuerpo.querySelectorAll('.reg-sel').forEach((c) => c.addEventListener('change', () => {
       const n = cuerpo.querySelectorAll('.reg-sel:checked').length;
       confirmandoReg = false; btnReg.classList.remove('btn-danger');
@@ -734,6 +796,7 @@ async function registrarEntregas() {
   confirmandoReg = false; btnReg.classList.remove('btn-danger');
   const uid = window.__sgmSession && window.__sgmSession.user && window.__sgmSession.user.uid;
   btnReg.disabled = true;
+  registrandoEntregas = true;   // una relectura automática no repinta la revisión a mitad del registro
   const res = { registrado: [], ya_estaba: 0, orden_cambio: [], error: [] };
   for (let i = 0; i < sel.length; i++) {
     msg.className = 'msg'; msg.textContent = `Registrando ${i + 1} de ${sel.length}…`;
@@ -751,12 +814,46 @@ async function registrarEntregas() {
     (res.ya_estaba ? ` · ${res.ya_estaba} ya estaban` : '') +
     (res.orden_cambio.length ? ` · sin registrar por cambio en la orden: ${res.orden_cambio.join('; ')}` : '') +
     (res.error.length ? ` · con error: ${res.error.join('; ')}` : '');
+  registrandoEntregas = false;
   await revisarEntregas();
 }
 
 if (regSec) {
   const cidReg = getContratoActivo();
   regSec.hidden = !(cidReg && NEXO_CONTRATOS[cidReg]);
-  $('btnRevisarEntregas').addEventListener('click', revisarEntregas);
+  $('btnRevisarEntregas').addEventListener('click', () => revisarEntregas());
   $('btnRegistrarEntregas').addEventListener('click', registrarEntregas);
+}
+
+// ══════════════════════════════════════════════════════════════
+// Relectura de las órdenes E/S (2026-10-09): al volver a la pestaña tras más de un minuto y con
+// «Actualizar». (El cambio de un movimiento enlazado se detecta en datosNexo, en cada consulta.)
+// ══════════════════════════════════════════════════════════════
+/** Vuelve a leer las órdenes y repinta lo que las usa: la revisión de entregas (si se abrió) y la existencia de cada línea. */
+async function actualizarOrdenesMovimiento({ forzar = false } = {}) {
+  const cid = getContratoActivo();
+  if (!cid || !NEXO_CONTRATOS[cid]) return;
+  promesaOrdenesNexo = null;                             // la próxima consulta las lee de nuevo
+  const lineas = [...lineasContainer.querySelectorAll('.linea-suministro')]
+    .filter((el) => (lineaState.get(el) || {}).conNexo && lineaFields(el).sumId.value);
+  const conRevision = revisionMostrada && !registrandoEntregas && !!regSec;
+  if (conRevision) await revisarEntregas({ conservarSeleccion: true });   // relee órdenes, movimientos y parque
+  if (lineas.length) await Promise.all(lineas.map((el) => aplicarSuministroLinea(el)));
+  else if (!conRevision && forzar) { try { await datosNexo(cid); } catch (_) { /* el sello lo cuenta */ } }
+  // Sin nada en pantalla que use órdenes (y sin «Actualizar»), no se lee: la próxima consulta las leerá frescas.
+}
+if (getContratoActivo() && NEXO_CONTRATOS[getContratoActivo()]) {
+  import('../domain/contrato_relectura.js').then((m) => {
+    if (typeof m.crearRelector !== 'function' || typeof m.firmaEnlazados !== 'function' || typeof m.textoLectura !== 'function') return;
+    REL = m;
+    let forzarSiguiente = false;
+    relectorMov = m.crearRelector({ leer: () => { const forzar = forzarSiguiente; forzarSiguiente = false; return actualizarOrdenesMovimiento({ forzar }); } });
+    pintarLecturaOrdenes();
+    $('btnActualizarOrdenes')?.addEventListener('click', () => { forzarSiguiente = true; relectorMov.ya(); });
+    document.addEventListener('visibilitychange', () => {
+      if (m.releerAlVolver({ visible: document.visibilityState === 'visible', ultimaLecturaMs: ultimoIntentoMs,
+        ahoraMs: Date.now(), leyendo: lecturasOrdenesEnCurso > 0 || relectorMov.leyendo() })) relectorMov.ya();
+    });
+    window.addEventListener('beforeunload', () => { try { relectorMov.parar(); } catch (_) {} });
+  }, (err) => console.warn('[nexo] relectura de órdenes no disponible:', err));
 }
