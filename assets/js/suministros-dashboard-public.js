@@ -78,6 +78,20 @@ let parqueFallo = false;
 // Registro automático: una vez por visita. null = sin novedad · { texto, tipo } = lo que se muestra.
 let sincIntentada = false;
 let sincAviso = null;
+// Relectura de las órdenes (2026-10-09): se leen al abrir y NO hay escucha en vivo sobre ellas (free-tier),
+// pero los movimientos sí llegan en vivo. Si cambia un movimiento ENLAZADO (la orden se editó o eliminó en
+// Órdenes E/S y el registro automático lo retiró o lo creó), o la pestaña vuelve a verse tras más de un
+// minuto, se vuelven a leer; si no, la orden vieja en memoria inflaba las cifras hasta recargar.
+// Reglas en domain/contrato_relectura.js, cargado perezoso (L-102): si falta, el tablero sigue como antes.
+let REL = null;               // el módulo, cuando cargue
+let relector = null;          // agrupa los pedidos de relectura y nunca lee dos veces a la vez
+let lecturaInicial = null;    // promesa de la primera lectura de órdenes de la visita
+let leyendoOrdenes = false;
+let relecturaEnEspera = false;
+let ordenesLeidasMs = null;   // hora de la última lectura buena (sello «Órdenes leídas a las hh:mm»)
+let ultimoIntentoMs = null;   // hora del último intento, bueno o no (para «al volver a la pestaña»)
+let errorRelectura = '';      // la última RElectura falló: se siguen mostrando las órdenes anteriores
+let huellaEnlazados = null;     // huella de los movimientos enlazados del último emit
 let unsubStock = null;
 let unsubAccionesBrig = null;
 let charts = {};
@@ -452,6 +466,9 @@ function hayQueRegistrar(n) {
 async function autoRegistrar() {
   if (sincIntentada || !stockLlego || !nexo || !hayQueRegistrar(nexo) || !ordenesNexo || !ordenesNexo.ordenes) return;
   if (parqueNexo === null || parqueFallo) return;              // sin parque no se ubica el transformador
+  // Con las órdenes por releer (cambió un movimiento enlazado), no se sincroniza con la orden vieja en memoria:
+  // al llegar las nuevas, recomputarTodo vuelve a llamar aquí (2026-10-09).
+  if (relecturaEnEspera || leyendoOrdenes) return;
   const cid = getContratoActivo();
   const s = getSession();
   const uid = s && s.user && s.user.uid;
@@ -508,6 +525,7 @@ function renderNexo() {
   document.querySelectorAll('.nexo-rotulo').forEach((x) => { x.hidden = !conNexo; });
   if (!conNexo) { sec.hidden = true; return; }
   sec.hidden = false;
+  pintarLecturaOrdenes();
   const alc = $('nexoAlcance'), tb = $('nexoTbody'), zonas = $('nexoZonas'), avisos = $('nexoAvisos'), fuera = $('nexoNoCuentan');
   const cfg = NEXO_CONTRATOS[cid];
   if (!ordenesNexo || (!ordenesNexo.error && !nexo)) { alc.textContent = 'Leyendo las órdenes de entrada y salida…'; tb.innerHTML = ''; return; }
@@ -617,6 +635,75 @@ function renderWidgetBrigada() {
   }
 }
 
+/* ─── Relectura de las órdenes E/S (2026-10-09) ─── */
+/**
+ * Lee las órdenes de la vigencia (la MISMA lectura acotada con desde/hasta de siempre) y recalcula.
+ * La primera vez, si falla, la sección lo dice como antes; en una RElectura que falla se conservan las
+ * órdenes ya leídas y el sello lo avisa.
+ */
+function leerOrdenesNexo() {
+  const cid = getContratoActivo();
+  const cfgNexo = cid && NEXO_CONTRATOS[cid];
+  if (!cfgNexo) return Promise.resolve();
+  leyendoOrdenes = true; relecturaEnEspera = false;
+  pintarLecturaOrdenes();
+  return listarOrdenes({ desde: cfgNexo.desde, hasta: cfgNexo.hasta })
+    .then((r) => { ordenesNexo = { ordenes: r.ordenes || [], truncado: !!r.truncado }; ordenesLeidasMs = Date.now(); errorRelectura = ''; },
+          (err) => {
+            console.warn('[nexo] no se pudieron leer las órdenes E/S:', err);
+            const msg = (err && err.message) || String(err);
+            if (ordenesNexo && ordenesNexo.ordenes) errorRelectura = msg;   // se siguen mostrando las anteriores
+            else ordenesNexo = { error: msg };
+          })
+    .then(() => {
+      leyendoOrdenes = false; ultimoIntentoMs = Date.now();
+      // Sin el stock todavía, solo la sección (si no, la tabla diría «Sin suministros sembrados.» un instante).
+      if (stockLlego) recomputarTodo(); else renderNexo();
+      pintarLecturaOrdenes();
+    });
+}
+/** Sello «Órdenes leídas a las hh:mm» + botón «Actualizar», junto al rótulo del nexo. */
+function pintarLecturaOrdenes() {
+  const caja = $('nexoLectura'), txt = $('nexoLecturaTexto'), btn = $('btnActualizarOrdenes');
+  if (!caja || !txt) return;                             // HTML viejo en caché (`30 L-85`)
+  const cid = getContratoActivo();
+  // Oculto sin el módulo, sin nexo o mientras la primera lectura no termina (la sección ya dice «Leyendo…»).
+  if (!REL || !(cid && NEXO_CONTRATOS[cid]) || ultimoIntentoMs == null) { caja.hidden = true; return; }
+  caja.hidden = false;
+  const leyendo = leyendoOrdenes || relecturaEnEspera;
+  txt.textContent = REL.textoLectura({ leidasMs: ordenesLeidasMs, leyendo, error: errorRelectura });
+  if (btn) btn.disabled = leyendo;
+}
+/** (a) Cada emit de movimientos: si cambió un movimiento ENLAZADO, se piden las órdenes de nuevo (agrupado). */
+function vigilarEnlazados() {
+  if (!REL) return;
+  const firma = REL.firmaEnlazados(cacheMovs);
+  const cambio = REL.cambiaronEnlazados(huellaEnlazados, firma);
+  huellaEnlazados = firma;
+  if (cambio && relector) {
+    relecturaEnEspera = true;
+    relector.pedir();
+    pintarLecturaOrdenes();
+  }
+}
+/** Carga perezosa de las reglas de relectura; sin ellas todo sigue como antes (una lectura por visita). */
+function cargarRelectura() {
+  import('./domain/contrato_relectura.js').then((m) => {
+    if (typeof m.crearRelector !== 'function' || typeof m.firmaEnlazados !== 'function' || typeof m.textoLectura !== 'function') return;
+    REL = m;
+    // Nunca se solapa con la primera lectura: la espera y lee después (pudo empezar antes del cambio).
+    relector = m.crearRelector({ leer: async () => { try { await lecturaInicial; } catch (_) {} return leerOrdenesNexo(); } });
+    if (stockLlego) huellaEnlazados = m.firmaEnlazados(cacheMovs);   // punto de partida
+    pintarLecturaOrdenes();
+  }, (err) => console.warn('[nexo] relectura de órdenes no disponible:', err));
+}
+/** (b) Al volver a la pestaña, si la última lectura tiene más de un minuto. */
+function alVolverALaPestana() {
+  if (!REL || !relector) return;
+  if (REL.releerAlVolver({ visible: document.visibilityState === 'visible', ultimaLecturaMs: ultimoIntentoMs,
+    ahoraMs: Date.now(), leyendo: leyendoOrdenes || relector.leyendo() || relector.esperando() })) relector.ya();
+}
+
 function arrancar() {
   if (!isReady()) {
     showInfo('⚠ Firebase no configurado.', 'err');
@@ -628,12 +715,8 @@ function arrancar() {
   const filtros = withContratoFiltro();
   const cidNexo = getContratoActivo();
   if (cidNexo && NEXO_CONTRATOS[cidNexo]) {
-    const cfgNexo = NEXO_CONTRATOS[cidNexo];
-    listarOrdenes({ desde: cfgNexo.desde, hasta: cfgNexo.hasta })
-      .then((r) => { ordenesNexo = { ordenes: r.ordenes || [], truncado: !!r.truncado }; },
-            (err) => { console.warn('[nexo] no se pudieron leer las órdenes E/S:', err); ordenesNexo = { error: err.message || String(err) }; })
-      // Sin el stock todavía, solo la sección (si no, la tabla diría «Sin suministros sembrados.» un instante).
-      .then(() => { if (stockLlego) recomputarTodo(); else renderNexo(); });
+    lecturaInicial = leerOrdenesNexo();
+    cargarRelectura();
   }
   // Una sola lectura del contrato por visita (free-tier): trae el monto registrado.
   const cidContrato = getContratoActivo();
@@ -651,6 +734,7 @@ function arrancar() {
     cacheStockGlobal = suministros;
     cacheMovs = movimientos || [];
     configCache = config || null;
+    vigilarEnlazados();
     recomputarTodo();
   }, (err) => {
     console.error(err);
@@ -673,6 +757,7 @@ function arrancar() {
 window.addEventListener('beforeunload', () => {
   if (unsubStock)        try { unsubStock(); }        catch (_) {}
   if (unsubAccionesBrig) try { unsubAccionesBrig(); } catch (_) {}
+  if (relector) try { relector.parar(); } catch (_) {}
   for (const k of Object.keys(charts)) destroyChart(k);
 });
 
@@ -681,6 +766,9 @@ fBusqueda.addEventListener('input', renderTabla);
 fEstado.addEventListener('change', renderTabla);
 fxZona.addEventListener('change', renderCruzado);
 fxDepto.addEventListener('change', renderCruzado);
+// Relectura de las órdenes: botón «Actualizar» (ausente con el HTML viejo) y vuelta a la pestaña.
+$('btnActualizarOrdenes')?.addEventListener('click', () => { if (relector) relector.ya(); });
+document.addEventListener('visibilitychange', alVolverALaPestana);
 
 arrancar();
 // Si los datos llegan antes que la sesión, el registro automático espera a que la sesión esté lista.

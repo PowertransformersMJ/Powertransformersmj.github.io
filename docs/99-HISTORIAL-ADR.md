@@ -7462,3 +7462,50 @@ módulo publicado. Lo que dicta va literal (las palabras); la forma de escribirl
 Chrome, tras recargar: Cargabilidad SCADA septiembre con chips «CRG 5 · Muy Pobre … CRG 1 · Muy Bueno» y filtro «5 · Muy
 Pobre … 1 · Muy Bueno»; mapa con «1 Muy Bueno 34 · 2 Bueno 6 · 3 Medio 22 · 4 Pobre 29 · 5 Muy Pobre 43» y la leyenda igual.
 Una pestaña abierta antes de publicar sigue con las palabras viejas hasta recargar (solo cambian valores: no rompe nada).
+
+## 161. ADR-161 — Contrato 4125000143 «conforme a las órdenes»: se reconcilia orden por orden, se corrigen 4 órdenes con sus hechos y el tablero deja de mostrar cifras viejas tras editar una orden ⟦OPUS-5.5⟧ (2026-10-09)
+
+> *«estoy notando que hay discrepancia entre las ordenes de entrada y salida los items asociados al contrato 4125000143 en
+> comparacion con el modulo de control y gestion operativa conforme a las ordenes, por favor valida y corrije, memorizalo»* ·
+> luego *«estoy teniendo problemas con chiriguana, en la orden de salida no concuerda con lo que aparece en el control y
+> gestion operativa del contrato»*. Sus respuestas: 20260311 → Bosconia · Chiriguaná 20260212 y 20260216 = dos entregas reales ·
+> Corozal 20260223 = 23/02/2026 · Krenz = URE (no cuentan) · la SALIDA 09102026-1 «es una entrega: pasarla a ENTRADA» · los 4
+> radiadores de Lorica son del contrato. Sin respuesta (no se tocan): termómetro MR de Talaigua y 3 deshumidificadores ABB.
+> NO revisado externamente; estudio 3 Opus (datos, código, pantalla) en solo lectura; arreglo de código con 1 Opus en copia
+> aislada. Deliberación: bóveda `2026-10-09-contrato-conforme-ordenes` (`crudos/`).
+
+**161.1 Causa raíz.** «Control y Gestión Operativa» = `pages/contrato.html?id=4125000143`. El CÁLCULO cuadraba (19/19 entregas
+con su movimiento, $612.788.644 por los dos caminos). Las diferencias venían de (a) cómo se escribieron las órdenes: ítem del
+contrato con «Otro» (Lorica), transformador ≠ destino (20260311), fecha del día de digitación (Corozal), una entrega hecha como
+SALIDA (en su operación las entregas Bosque → S/E son ENTRADA, `§143.9`; las SALIDA no descuentan, `§146`); (b) lo que por su
+decisión no cuenta (Krenz de la URE, Bodega Membrillal) pero Órdenes E/S muestra en «Accesorios»; y (c) un DEFECTO: el tablero
+y la pestaña Movimiento leían las órdenes una vez por visita y los movimientos en vivo → al editar una orden con el contrato
+abierto mezclaban la orden VIEJA con el movimiento nuevo («1 por registrar», valor y existencia inflados) hasta recargar.
+
+**161.2 Solución.**
+- **Datos** (en SU sesión, por la página Órdenes E/S; el registro automático `§148` rehízo los movimientos): ENTRADA 20260910
+  «Otro» → «Suministro de radiadores» × 4 (MOV-2026-0024) · ENTRADA 20260223 fecha → 23/02/2026 (MOV-2026-0023 reemplaza al 0018) ·
+  SALIDA 09102026-1 → «Convertir en orden nueva» como ENTRADA 09102026-1 con el mismo contenido (T2-A/M-ZRG, 2 × S04; MOV-2026-0025)
+  y eliminación de la SALIDA (queda lápida). La 20260311 → Bosconia la corrigió el equipo antes (MOV-2026-0022).
+- **Código**: `domain/contrato_relectura.js` (NUEVO, puro, `import()`): huella de los movimientos enlazados, «releer al volver»
+  (> 60 s), relector que agrupa (1,5 s) y nunca lee dos veces a la vez, sello «Órdenes leídas a las hh:mm» + «Actualizar».
+  `suministros-dashboard-public.js` y `admin-suministros-movimiento.js` releen con la MISMA lectura acotada (sin escucha en vivo
+  de `ordenes_materiales`); `autoRegistrar` no sincroniza con una orden por releer. HTML nuevo nace oculto (L-85).
+
+**161.3 No-regresión.** Mismas cifras con las órdenes al día (vista previa con la foto de hoy: 19 órdenes, 18 TX, $734.757.342,
+21/21). Ninguna exportación ni id renombrados; con el JS viejo en caché todo sigue como antes. Sin lecturas extra salvo
+cuando cambia una entrega, al volver tras > 1 min o con «Actualizar».
+
+**161.4 Verificación.**
+- Reconciliación final en producción (`.get()`): 24 órdenes, 21 entregas registradas de 21, 0 por registrar, 0 desfasadas,
+  0 huérfanas; consumido **$734.757.342** (= $612.788.644 + $111.840.368 Lorica + $10.128.330 Zaragocilla); S02 6 entregados /
+  4 en existencia · S03 32 / 41 · S04 22 / 47. Chiriguaná: 8 × S04 (sus dos órdenes); los 2 Krenz fuera.
+- Defecto reproducido y corregido en el banco con la foto de hoy (sin nombres): editar la 20260910 y retirar su movimiento con el
+  contrato abierto → `main` queda en «20 registradas · 1 por registrar», $734.757.342, «mov. 2 · órdenes 4»; con el arreglo, a los
+  ~2 s: 18 órdenes, $622.916.974, 20/20, S02 en 8; pestaña Movimiento 20 ya registradas, 0 por registrar; consola limpia.
+- Unitarias 2590/0/2 (16 nuevas, `tests/contrato_relectura.test.js`) · lint. Publicación y vivo → `161.5`.
+
+**161.5 Anti-patterns evitados / doctrina.** Deducir hechos (se le preguntaron) · borrar movimientos a mano (manda la orden,
+`§148`) · emparejar «Otro» por parecido (decisión 2 de `§146`) · escucha en vivo de órdenes (free-tier) · pisar a otra persona del
+equipo que editaba la misma orden minutos antes (versión verificada; el borrado lleva la versión). Memoria:
+`feedback_contrato_conforme_ordenes`.
