@@ -7316,3 +7316,97 @@ solo de su hoja (2.555 filas renombradas). Se cargó en «Completar» (mes nuevo
   - CTA, MAY, PTE y UNN tienen la señal marcada no válida desde mediados de septiembre, y sigue así en octubre.
   - LPR, MTE, PZL y SAR traen P/Q unas 1000 veces más alta (¿kW en vez de MW?). Solo afecta la curva de potencia del
     detalle, no la cifra.
+
+## 159. ADR-159 — Cargabilidad SCADA por PERIODO de varios meses (carga del periodo + peor mes) e «Historia del equipo»: desde cuándo supera su capacidad y el día de su mayor corriente por devanado ⟦OPUS-5.5⟧ (2026-10-09)
+
+> *«me gustaria escoger un rango de fechas para tener un espectro a nivel general y no solo por mes. tambien al seleccionar
+> los equipos me gustaria apreciar en que mes dia o fecha empezo a superar su capacidad de transformacion y que dia del año
+> ha sido su mayor corriente en todos sus devanados»* · sus decisiones: lista = «Carga del periodo + peor mes» · periodo «Por
+> meses» (hasta 12) · «empezó a superar» = 2 h seguidas sobre el 100 % (la primera hora suelta, como nota) · los meses
+> provisionales cuentan **igual** que los firmes (se rotulan; NO fue la opción recomendada) · «procede» tras la vista previa.
+> NO revisado externamente; estudio (3 Opus) y revisión adversarial (3 lentes + refutadores, Opus) en solo lectura.
+> Deliberación: bóveda `2026-10-08-scada-sin-medicion` (`SINTESIS.md` §periodo y `crudos/periodo/`).
+
+**159.1 Causa raíz.**
+- La lista solo sabía mirar UN mes. La cifra del módulo (p99 de la fase más cargada ÷ ampacidad) **no sale de las cifras de
+  cada mes**. Errores medidos en 15 equipos (ene–sep) contra el p99 exacto: promedio de los p99 −10,2 puntos (hasta −30,1) ·
+  mediana −14,2 (hasta −37,3; un equipo pasaba de CRG 5 a 3) · peor mes +8,4 (hasta +29,6; otro pasaba de CRG 1 a 4).
+- Leer las curvas de todo el parque en cada consulta: más de 1.600 documentos, ~265 MB (`§126.8`) — rompe el free-tier.
+- El detalle no tenía memoria de meses: «desde cuándo supera» y el día de la mayor corriente exigían abrir mes por mes.
+
+**159.2 Solución.**
+- **Las horas más altas de cada mes, guardadas.** `resumirParaGuardar` (`scada_carga_importacion.js`) guarda en el resumen
+  mensual `top`: las `TOP_HORAS` = 90 corrientes horarias más altas del nivel (fase más cargada, horas válidas), de mayor a
+  menor, redondeadas a 0,001 A. Con eso el p99 de un periodo de hasta 12 meses (≤ 8.928 h) sale **exacto**: cae siempre
+  entre las 90 más altas de la unión, y esas están dentro de las 90 más altas de cada mes.
+  - Va como **lista de números**, no como bytes: un `Uint8Array` del importador nuevo llegaba a un `escribirResumen` viejo
+    (pestaña abierta antes de publicar) y Firestore lo rechazaba. Pesa: el resumen más grande pasa a ~388 KiB (38 % de 1 MiB).
+  - `escribirResumen` se detiene con «El lector de archivos de esta pestaña es de una versión anterior: recargue…» si un
+    nivel con horas llega sin `top` (importador viejo en caché): guardar así borraría las que el punto ya tenía.
+- **Dominio puro nuevo** `scada_carga_periodo.js` (archivo nuevo, L-102, cargado con `import()`):
+  - `p99DePeriodo` (mismo rango más cercano que `estadisticas`, posición ⌈0,99·N⌉ − 1);
+  - `resumenPeriodo` arma un resumen sintético por nivel con la forma del mensual; `filasPeriodo` lo pasa por el MISMO
+    `calcularEquipo` (bandas, firmeza, motivo, con `mes` = el último del periodo) → la cifra del periodo no tiene lógica propia;
+  - **cobertura**: un mes que el parque no cargó (mayo) no cuenta; tampoco los días que el parque aún no cargó de un mes
+    INCOMPLETO (`horasNoCargadas`, solo en periodos de varios meses: un mes solo se ve igual que en «Un mes»); un mes que
+    vino para el parque y no para el equipo, sí (hueco suyo);
+  - `agregadosDeMeses`: peor mes, meses en CRG 4–5, meses con sobrecarga sostenida, primera sostenida («desde el inicio de
+    los datos» solo si el punto no tiene meses antes; si los tiene, «desde el inicio del periodo»). **Por devanado, solo los
+    niveles que cuentan** con la compuerta de la lista (`nivelCuenta`: el equipo con cifra ese mes y el nivel con la suya —
+    sin escala sospechosa, con ampacidad—); un mes con horas imposibles (`nivelConImposibles`, > 3 × A con el medio paso de
+    redondeo) no da máximo ni sobrecarga desde el resumen: queda «por confirmar» y la historia lo decide con la curva limpia;
+  - si algún mes del rango se cargó sin `top`, la cifra no se inventa: «falta preparar <meses>».
+- **Lista** (`lista.js`): «Un mes / Varios meses» con Desde/Hasta y «Todo lo cargado» (tope de 12 meses de CALENDARIO y
+  extremos en meses cargados); columnas Carga del periodo · Peor mes · Mayor corriente (confiable; «sin contar <mes>» si hay
+  imposibles) · Desde cuándo supera · Mes a mes (tira; provisional con sobrecarga en trama gris, el rojo es solo lo firme);
+  tarjetas y CSV del periodo. «Un mes» queda como estaba; el orden de una columna que no existe en el otro modo vuelve a la cifra.
+- **Detalle** (`historia.js`, nuevo, `import()`): «Historia del equipo · todo lo cargado» con «Supera su capacidad desde» (día
+  y hora de la primera ventana de 2 h, la hora suelta anterior como nota, «Sin cifra en lo cargado» si nunca tuvo cifra),
+  «Mayor corriente por devanado» (A, % de su ampacidad, día y hora, «Ver ese día» con id para el foco; si no hay número, el
+  motivo de la lista) y «Mes a mes». Horas exactas de la curva (`hitosDeCurva`, máx. 6 curvas por equipo). Con meses que no se
+  pudieron leer: «Reintentar» y se rehace al reabrir.
+- **Hash**: `#periodo=AAAA-MM_AAAA-MM`; al abrir un equipo desde un periodo, el detalle llega con ese rango; `#mes=` saca la
+  lista de «Varios meses».
+
+**159.3 No-regresión.** «Un mes» idéntico a `main`: septiembre, 208 filas y 4 tarjetas iguales (comparadas en dos pestañas).
+Un periodo de UN mes da la cifra, la clase, la CRG y el motivo de la lista de ese mes (1.872 filas, 208 × 9 meses). Ningún id,
+clase ni función existente se renombró; todo lo que importan los archivos nuevos ya existía en `main` (mezclas de caché
+probadas sin errores, L-102). Los resúmenes viejos sin `top` siguen sirviendo para «Un mes».
+
+**159.4 Verificación.**
+- Unitarias 2572/0/2 (21 nuevas, `tests/scada_carga_periodo.test.js`: p99 exacto contra todas las horas, mes único = mes,
+  sin `top` → «falta preparar», mes incompleto, compuerta por devanado, inicio de los datos/del periodo) · lint · guardia.
+- Simulación offline de los 9 paquetes con el código de la rama: resúmenes idénticos a producción salvo `top` (1.916/1.916
+  punto-mes) y p99 del mes = p99 desde sus horas más altas en el 100 %.
+- Vista previa (página real, franja roja, puerto 8135): ene–oct 127 firmes / 49 provisionales / 74 CRG 4–5 / 38 con
+  sobrecarga sostenida; historia de T2-MAJ = sus curvas; «Ver ese día» abre el día y deja el foco; celular sin desborde;
+  consola limpia.
+- Revisión adversarial: 17 hallazgos, **15 confirmados y corregidos** (mes incompleto, mayor corriente con imposibles,
+  compuerta por devanado, «inicio de los datos», motivo del mes único, orden entre modos, 12 meses de calendario, color de la
+  tira, «Reintentar», foco, `#mes=`, tipo de `top`, guardia del lector viejo), 2 refutados (`159.8`).
+- Publicación, recarga de los 9 meses en «Completar» y verificación en vivo → `159.9`.
+
+**159.5 Anti-patterns evitados.** Promediar percentiles · leer todas las curvas del parque por consulta · inventar la cifra del
+periodo con meses sin `top` · excluir los provisionales (él decidió que cuentan) · contar por devanado lo que la lista del mes
+anula · entregar a la página publicada un tipo que no sabe escribir · nombres de puntos SCADA en el repo.
+
+**159.6 Archivos.** NUEVOS: `assets/js/domain/scada_carga_periodo.js`, `assets/js/ui/cargabilidad-scada/historia.js`,
+`tests/scada_carga_periodo.test.js`. Modificados: `scada_carga_importacion.js` (`top`), `scada_carga_admin.js` (guardia),
+`lista.js`, `detalle.js`, `cargabilidad-scada-shell.js`, `cargabilidad-scada.css`. INTACTOS: limpieza, firmeza, bandas,
+`calcularEquipo`, lector, worker, verificación de sostenida (`§129`) y mapa.
+
+**159.7 Doctrina.** W-11 por pasos (estudio → maqueta y decisiones suyas → construir aislado → vista previa con datos reales
+→ revisión adversarial → su «procede») · free-tier (0 lecturas de curvas para la lista) · una sola lógica de cifra
+(`calcularEquipo`) · L-102 (archivos nuevos por `import()`; el productor no entrega lo que el consumidor publicado no sabe escribir).
+
+**159.8 Verificado sano / no re-auditar.**
+- p99 del periodo = p99 de TODAS las horas de las curvas reales (5 equipos, 11 niveles, ene–sep).
+- «Completar» sobre un mes ya cargado reescribe el resumen de TODOS los puntos del paquete aunque ninguna serie cambie
+  (1.916/1.916 idénticos, `top` incluido). Los 2 puntos por mes que no vienen en el paquete tienen n = 0 y no piden «preparar».
+- Reglas de `scada_resumen`: `top` va dentro de `claves` (mapa); ningún campo nuevo de primer nivel; índice de `claves` exento.
+- **Refutado** — «un nivel ausente en algunos meses vuelve provisional una cifra firme mes a mes»: es la regla de firmeza de
+  siempre (cobertura ≥ 50 %) aplicada a la cobertura REAL del periodo; uno de sus ejemplos era falso.
+- **Refutado** — «el p99 del periodo mezcla horas imposibles de meses anulados por escala»: es la misma regla que la cifra
+  mensual (p99 de todas las horas; la escala se juzga sobre el periodo); lo pedido es el p99 exacto.
+- Dato del SCADA, no defecto: en SBE la mayor corriente limpia del primario es una hora suelta de 204 % (06-ene 13:00)
+  mientras su secundario nunca pasó de 115 %; se muestra tal cual y «Ver ese día» la deja revisar.

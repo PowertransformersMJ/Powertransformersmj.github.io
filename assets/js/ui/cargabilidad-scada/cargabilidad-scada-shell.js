@@ -22,7 +22,7 @@ let detalle = null;
 
 function leerHash() {
   const p = new URLSearchParams(location.hash.replace(/^#/, ''));
-  return { mat: p.get('mat'), id: p.get('id'), desde: p.get('desde'), hasta: p.get('hasta'), mes: p.get('mes') };
+  return { mat: p.get('mat'), id: p.get('id'), desde: p.get('desde'), hasta: p.get('hasta'), mes: p.get('mes'), periodo: p.get('periodo') };
 }
 
 function navegar() {
@@ -34,7 +34,7 @@ function navegar() {
   } else {
     vD.hidden = true; vL.hidden = false;
     detalle.cerrar();
-    lista.mostrar(h.mes);
+    lista.mostrar(h.mes, h.periodo);
   }
 }
 
@@ -62,9 +62,11 @@ async function arrancar() {
   let desdeLista = false;
   // Se abre con el MES de la lista (misma ventana, misma cifra) y el id del equipo (dos equipos
   // con la misma matrícula no se confunden).
-  const abrir = (mat, mes, id) => {
+  // Con «Varios meses» (`99 §159`) llega el rango del periodo (rótulos de la primera y la última hora).
+  const abrir = (mat, mes, id, rango) => {
     desdeLista = true;
-    location.hash = 'mat=' + encodeURIComponent(mat) + (id ? '&id=' + encodeURIComponent(id) : '') + (mes ? '&mes=' + mes : '');
+    location.hash = 'mat=' + encodeURIComponent(mat) + (id ? '&id=' + encodeURIComponent(id) : '') + (mes ? '&mes=' + mes : '')
+      + (rango && rango.desde && rango.hasta ? '&desde=' + rango.desde + '&hasta=' + rango.hasta : '');
   };
   const volver = () => { if (desdeLista) { desdeLista = false; history.back(); } else location.hash = ''; };
   lista = montarLista($('vista-lista'), ctx, { alAbrir: abrir });

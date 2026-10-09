@@ -291,7 +291,7 @@ tercero. Al revalidar el arreglo, Chrome seguía con los módulos viejos (`max-a
 Cmd+Shift+R desde la extensión no los refrescó. · **Regla**: (1) un riesgo que depende de un dato de producción se
 cierra LEYÉNDOLO en la sesión real (`window.__sgmSession.profile`), no se deja en el ADR; (2) en la validación en vivo,
 comprobar la versión con `import()` del módulo cambiado; si es vieja, `fetch(u, {cache: 'reload'})` de cada módulo
-cambiado y recargar; (3) una exportación NUEVA se pone en un archivo NUEVO (no en uno que el navegador ya tenía): la mezcla de un módulo nuevo con su vecino viejo tumbó la página de Fichas (`99 §102.4`). **Gate** [HONOR] (TODO-57 es el arreglo de fondo).
+cambiado y recargar; (3) una exportación NUEVA se pone en un archivo NUEVO (no en uno que el navegador ya tenía): la mezcla de un módulo nuevo con su vecino viejo tumbó la página de Fichas (`99 §102.4`); (4) un productor nuevo no le entrega a un consumidor ya publicado un TIPO que no sabe escribir: `top` como `Uint8Array` hacía fallar el `escribirResumen` viejo de una pestaña abierta antes de publicar; va como lista de números (`99 §159`). **Gate** [HONOR] (TODO-57 es el arreglo de fondo).
 
 ### L-103 · Editar un .xlsx por TEXTO: reemplazo con función, identidades únicas, y se valida sin Excel real
 **Disparador**: se reescribe XML de un libro (áreas de impresión, hojas clonadas o quitadas, imágenes de la
