@@ -95,6 +95,7 @@
 | §158 | ADR-158 — **Cargabilidad SCADA**: los 77 sin medición; motivo con la causa; relevo de Sampués | 7147 |
 | §159 | ADR-159 — **Cargabilidad SCADA por periodo** (p99 exacto con `top`) e historia del equipo | 7320 |
 | §160 | ADR-160 — **CRG con la escala del MO**: Muy Bueno · Bueno · Medio · Pobre · Muy Pobre | 7430 |
+| §161 | ADR-161 — **Contrato conforme a las órdenes**: 4 órdenes corregidas; el tablero relee las órdenes | 7466 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
