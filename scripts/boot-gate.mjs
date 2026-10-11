@@ -8,7 +8,7 @@
 //
 // ⚠️ INSTANCE-SIDE a propósito: el kernel (brain-check.mjs, escritor único
 // = inmobiliaria) mantiene boot-budget INFORMATIVO hasta que los 3 repos
-// estén bajo presupuesto (condición §173). Inmobiliaria adopta el BLOQUEO
+// estén bajo presupuesto (condición del ADR-173 del ecosistema de origen). El repo de origen adoptó el BLOQUEO
 // primero, aquí. Cuando la condición ×3 se cumpla y el gate suba al kernel,
 // BORRAR este script y su bloque del pre-commit (one-in-one-out).
 //

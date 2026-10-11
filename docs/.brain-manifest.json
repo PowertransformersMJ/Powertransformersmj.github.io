@@ -153,8 +153,10 @@
   "_orphanAllowlistRazon": "Sidecars escritos por HOOK (session-handoff.mjs --boot-echo), gitignored, efimeros: handoff-auto (foto de sesion), estado-auto (heartbeat) y boot-marker (canario que valida boot-gate). Su ruta de lectura es el hook SessionStart, no el grafo de neuronas; ademas el gate #10 no puede alcanzarlos por diseno (su regex exige empezar por \\w, y estos empiezan por punto).",
   "peers": [],
   "_peersRazon": "Vacio A PROPOSITO: no hay repos hermanos con cerebro todavia. Ademas el gate #11 (peer-hash) fue retirado en el kernel v1.3 y sustituido por el gate #0 (identidad contra el canonico), que es bloqueante y no necesita peers.",
-  "lastOffsiteBackup": "NINGUNA",
-  "_lastOffsiteBackupRazon": "DECISION DEL INGENIERO 2026-07-28 (ADR-059): la boveda es de uso LOCAL, sin repo remoto. El sentinel 'NINGUNA' (kernel v1.8.0) le dice al banner que esto es una decision tomada, no una tarea pendiente — asi no queda una alarma permanente que nadie atendera y que taparia a las que si importan. El banner sigue diciendo el HECHO: la boveda vive en UNA sola copia. Verificado el mismo dia: Time Machine SIN destinos configurados, o sea que no hay ninguna otra copia en la maquina. Si algun dia se hace una copia real (disco externo), poner aqui su fecha ISO y el banner vuelve a vigilar la frescura. DISPARADOR DE REAPERTURA (2026-10-11, 99 §162): desde §78 y §99 la bóveda es insumo de las guardias de cédulas y firmas (sus huellas no se rehacen sin los originales) y ya pesa ~1 GB → se le volvió a preguntar (lista J de 10).",
+  "lastOffsiteBackup": "",
+  "_lastOffsiteBackupRazon": "DECISIÓN DEL INGENIERO 2026-10-11 (99 §162.10): copia MENSUAL de la bóveda fuera de este disco (reabre la de ADR-059 del 07-28: desde §78 y §99 la bóveda es insumo de los candados de cédulas y firmas y pesa ~1 GB). Vacío = decidida y aún no hecha → el arranque dice «NUNCA hecha ⚠️». Se hace con el disco conectado: `../brain-private/respaldo-boveda.sh /Volumes/<disco>` (git bundle + huella; probado el 10-11: 368 MB, restaura). Después, poner aquí la fecha ISO; el arranque avisa «TOCA renovarla» a los 35 días.",
+  "costoCerebroModo": "sueltos",
+  "_costoCerebroModoRazon": "DECISIÓN DEL INGENIERO 2026-10-11 (99 §162.10): el costo-cerebro cuenta solo los commits de cerebro SUELTOS; el commit con «ADR-NNN» que sigue a un cambio de producto es su documentación obligatoria (CLAUDE.md §2), no mantenimiento. Kernel v1.14.0.",
   "ssotFacts": [
     {
       "regex": "kernel v1\\.\\d+\\.\\d+",
