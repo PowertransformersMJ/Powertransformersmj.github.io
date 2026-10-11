@@ -28,7 +28,8 @@
 - **Periodo de varios meses** (`99 §159`): su cifra es el p99 de TODAS sus horas (exacto con las 90 más altas de cada mes),
   NUNCA el promedio ni la mediana de los p99 mensuales (subestiman ~10–14 pts, hasta 37) ni el peor mes (sobrestima ~8).
 - Las horas del SCADA se leen en **hora de Colombia, UTC−5 fijo** (sin horario de verano): calendario, lista y curvas no dependen de la zona del computador (`domain/scada_carga_fecha.js`, `99 §122`).
-- Homologación SCADA ↔ transformador, valores tope y escala ×10 → `99 §122`, `§125`; bóveda `2026-10-01-parametros-scada`.
+- Homologación SCADA ↔ transformador, valores tope y escala ×10 → `99 §122`, `§125`; bóveda `2026-10-01-parametros-scada`. Sin medición
+  (motivo con la causa, hueco del exporte de 43 S/E desde el 1–2 sep, homologación v3, relevo de estación) → `§158`.
 
 ## 3. Ampacidad
 - Es la de **ventiladores en servicio (ONAF)**, confirmado por el Ingeniero (`99 §127.1`). Si la refrigeración falla,
