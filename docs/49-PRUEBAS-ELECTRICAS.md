@@ -243,5 +243,6 @@ Módulo: `assets/js/ui/pruebas/excitacion-panel.js` (espejo del panel tan δ; he
 - El **Tablero de Pruebas Eléctricas con IA** (ADR-003→ADR-010, ver `99 §3..§10`) es el
   consumidor: la IA extrae lecturas crudas; estas skills aportan el **diagnóstico determinista**
   (corregir, criteriar por jerarquía, emitir veredicto + causa probable).
-- Mapa de archivos del tablero → `10-MEMORIA-CORTO-PLAZO §MAPA DE ARCHIVOS CLAVE`.
+- Mapa de archivos del tablero → `22-ESPACIAL-MODULOS.md` (sección «📚 Subsistema Pruebas Eléctricas — extracción IA / tendencia», que salió de `20` el 2026-10-11).
+  *(Corregido 2026-10-11, `99 §162`: apuntaba a una sección de `10` retirada el 2026-07-18.)*
 - Catálogo de skills del repo → `skills-inventory.md` (sección Pruebas Eléctricas).

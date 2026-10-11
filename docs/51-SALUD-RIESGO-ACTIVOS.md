@@ -36,6 +36,10 @@
   `fusionarConservandoCondicion` (`99 §80`). Cola abierta → TODO-64.
 - Hoja que vale: `TX_Potencia`, con la cabecera en la fila correcta (`99 §69`, L-72); qué hacer con `TPT_Servicio` y
   `TX_Respaldo` → TODO-42.
+- Corregir la placa NO recalcula lo guardado: Casacará T1 pasó a 2 MVA y se corrigieron su ampacidad y su carga
+  (`99 §158.11`, `53 §3`), pero `salud_actual` (31 %, CRG 1) sigue calculada sobre 5 MVA; con 2 MVA sería CRG 3–4 y el HI
+  podría subir. Por decisión suya se corrige en SU Excel de Salud de Activos (TODO-69). Inventario ya no vacía la
+  condición al guardar: escribe solo lo que cambió (`§154`, L-134 en `30`).
 
 ## 4. Qué significa cada banda
 - Orden de lectura único 1 → 5 en todas las vistas, y una definición por banda pensada en riesgo y continuidad del
@@ -58,8 +62,15 @@
 - `domain/estrategias.js`: condición 1–5 → macroactividad + subactividades + mitigaciones + periodicidad; alimenta la
   autogeneración de órdenes. Mapa actividad ↔ modo de degradación: `domain/acciones_tecnicas.js` (L-88; sustento en la
   bóveda `2026-09-10-sustento-tecnico-actividades`).
-- La redacción firmable de los beneficios vive en el código, la bóveda y la memoria `feedback_redaccion_beneficios`:
-  aquí solo se apunta.
+- **Textos que se FIRMAN** (Beneficios/Alcance de Fichas, `99 §92`, `§105.1`): el texto vive en el código
+  (`domain/beneficios_acciones_mtto.js`); el criterio, aquí. Vocabulario aprobado por él: «hermeticidad» (no
+  «estanqueidad»), «desmedidamente»; nombrar la VARIABLE sin cifras («partes por millón (ppm) de agua», rigidez
+  dieléctrica, SAIDI y SAIFI; sin número de usuarios); «… confiable(s) durante su operación»; cierres EN POSITIVO;
+  «prevenir», no «evitar». Lo que dicta va literal (salvo ortografía, avisándole) y un hecho que afirma se comprueba en
+  el código antes de publicarlo.
+- Método: por texto, 3 redactores con enfoques distintos → 3 revisores adversariales (física, firmable, fidelidad y
+  no-solape) → editor; se le presenta el texto, lo corregido y la palabra suya que se matizó (L-88 en `38`). Respaldo y
+  casos: memoria `feedback_redaccion_beneficios`. *(Hasta 2026-10-11 aquí solo se apuntaba a la memoria; `99 §162`.)*
 
 ## 8. Plan de inversión
 - `domain/plan_inversion.js` `PESOS_PI_BASELINE`: HI 0,40 · criticidad 0,25 · vida utilizada 0,15 · costo de reemplazo
@@ -71,8 +82,11 @@
 ## 9. Valoración regulatoria (CREG 015/2018)
 - `domain/fichas_creg_uc.js` (UC por nivel, devanados bi/tri/auto y regulación) + `fichas_evaluacion_uucc.js`.
 - **Trampa de las dos tablas**: CREG 015/2018 publica los mismos códigos UC en las Tablas 15/16 (pesos dic-2017) y
-  51/52 (pesos dic-2007); la ficha PE.02081 usa las de **2007** (memoria `reference_creg015_dos_juegos_tablas`).
-  Ajustes de centavos: no redondear (`99 §87`, callejón en `10`).
+  51/52 (pesos dic-2007); la ficha PE.02081 usa las de **2007** (`costo`/`unit` de `fichas_creg_uc.js`; respaldo: memoria
+  `reference_creg015_dos_juegos_tablas`). Ajustes de centavos: no redondear (`99 §87`, callejón en `10`).
+- **Valor CREG**: la columna «Valor CREG Unitario» de la ficha lleva el COSTO DE INSTALACIÓN de la UC, no el $/MVA;
+  Total = instalación + MVA del proyecto × $/MVA, con la instalación UNA sola vez (nunca × cantidad); una UC fuera del
+  catálogo deja el total [PENDIENTE], no se inventa (`domain/fichas_presupuesto.js`, `costoUC` de `fichas_creg_uc.js`).
 
 ## 10. Respaldo y servicio (TPT, OTC, MO.00418 §A9.3)
 - `domain/tpt_respaldo.js`: mismas reglas de salud que POTENCIA; usa `tiempoAdmisible` de `sobrecarga_admisible.js`,
@@ -80,7 +94,10 @@
 
 ## 11. Trampas conocidas
 - Cada muestra nueva borra `calif_crg` (TODO-64.b) → no crear `/muestras` «para tener historial».
-- Matrícula repetida en el Excel = DOS equipos distintos: los planes de carga no escriben ninguno de los dos (`99 §131`).
+- Matrícula repetida en el Excel = DOS equipos distintos (CAC: «CASA DE ZINC» 2 MVA y «CASACARA» 5 MVA). Los planes de ppm
+  no escriben ninguno (`99 §131`, `dga_ppm_excel.js`), pero la importación completa gana la ÚLTIMA fila (`§131.8`) y la de
+  Cargabilidad_2025 (`§74.23`) llevó al parque la de 5 MVA (`§158.11`): revisar las repetidas ANTES de importar.
+  *(Corregido 2026-10-11, `99 §162`: decía «los planes de carga no escriben ninguno», cierto solo para los de ppm.)*
 - `MODELO-DATOS-v2.md §2.8` dice `MAX(TDGC, C2H2)`: desactualizado, manda `52 §1`.
 
 ## 12. Riesgos de veracidad abiertos (→ TODO-73)

@@ -17,7 +17,7 @@
 
 ## 🗂️ Categorías esperadas
 
-> Numeración: **41–48** dominios genéricos de software · **49–5x** dominio del transformador (49 pruebas eléctricas, 50 equipo, 51 salud y riesgo, 52 DGA/aceite/papel, 53 carga y térmica). **No reutilizar** estos números para otras neuronas. Del 50 en adelante el linter exige el nombre literal en `CLAUDE.md §0` (registrarlos aquí no basta).
+> Numeración: **41–48** dominios genéricos de software · **49–5x** dominio del transformador y su operación (49 pruebas eléctricas, 50 equipo, 51 salud y riesgo, 52 DGA/aceite/papel, 53 carga y térmica, 54 suministros y órdenes E/S). **No reutilizar** estos números para otras neuronas. Del 50 en adelante el linter exige el nombre literal en `CLAUDE.md §0` (registrarlos aquí no basta).
 
 | ID | Lóbulo | Disparador (cliente dice…) | Estado | Cubre |
 |---|---|---|---|---|
@@ -34,10 +34,17 @@
 | **51** | Salud y riesgo de los activos | "salud", "HI", "índice de salud", "condición 1–5", "override", "criticidad", "usuarios", "matriz de riesgo", "plan de inversión", "estrategia por condición", "CREG 015/085", "UUCC" | 🟠 **activo** → `docs/51-SALUD-RIESGO-ACTIVOS.md` | Cómo se califica y prioriza el parque (MO.00418): HI, condición oficial del Excel, criticidad, matriz, estrategias, plan de inversión, valoración regulatoria. |
 | **52** | Gases disueltos, aceite y papel | "DGA", "gases", "ppm", "Duval", "gas suficiente", "acetileno", "ADFQ", "rigidez", "furanos", "2FAL", "DP", "vida del papel" | 🟠 **activo** → `docs/52-DGA-ACEITE-PAPEL.md` | Criterio de la DGA (bandas, Duval, significancia, interpretaciones que conviven), del aceite y del papel. |
 | **53** | Carga y térmica | "cargabilidad", "CRG", "ampacidad", "ONAF", "sobrecarga", "sostenida", "punto caliente", "IEC 60076-7", "C57.91", "regla de los 6 °C", "con más carga", "DGA × carga" | 🟠 **activo** → `docs/53-CARGA-TERMICA.md` | Esfuerzo de la operación sobre el equipo: cifra SCADA, ampacidad, sobrecarga, modelo térmico, proyección y puente DGA × carga. |
+| **54** | Suministros, contrato y órdenes E/S | "contrato", "4125000143", "órdenes de entrada/salida", "OE/OS", "Libro4", "nexo", "movimientos", "no cuadra con las órdenes" | 🟠 **activo** → `docs/54-SUMINISTROS-ORDENES.md` | Suministro de accesorios del parque: órdenes de Materiales E/S, contrato 4125000143 y su nexo con ellas («la orden manda»), qué descuenta, valor y cantidades, movimientos enlazados e indicadores. |
 
 **Categorías futuras**: un dominio nuevo de software ocupa un número libre de 41–48; uno del transformador, el
 siguiente 5x (candidatos SIN contenido real todavía, NO crear: OLTC propio cuando exista un módulo que lo use;
 descargas parciales/termografía/monitoreo en línea; gestión de activos ISO 55000/RCM).
+
+**Evaluado y NO nacido (2026-10-11, `99 §162`)**: territorio del parque (zona por municipio —DIVIPOLA con excepciones,
+«aproximada», `mapa_parque.js`— frente a la zona registrada del activo —`fichas_zona.js`—, llave de la S/E = código al
+final de la matrícula, licencias DANE/UPME). Hoy cabe en ~1,5k caracteres y sus decisiones son suyas. Nace como
+`55-TERRITORIO-PARQUE` cuando él confirme las zonas por municipio (TODO-78) o un 2.º módulo derive la zona por municipio;
+mientras, la ruta vive en `00` Capa 2 (`99 §152`–`§157`).
 
 ### 🧭 Fronteras ambiguas del dominio del transformador (a qué lóbulo va)
 > El ruteo por síntoma vive en `00` Capa 2; aquí solo se resuelve lo que podría ir en dos lóbulos.
@@ -52,6 +59,9 @@ descargas parciales/termografía/monitoreo en línea; gestión de activos ISO 55
 | Ampacidad ONAF ↔ refrigeración | **53** el efecto · **50** el subsistema | la ampacidad supone ventiladores en servicio |
 | OLTC/DETC (paridad OILTAP/VACUTAP) | **50** | subsistema del equipo |
 | Columna CAUSANTE del Excel, HI, criticidad, CREG | **51** | calificación del parque |
+| Órdenes de TRABAJO (`pages/ordenes.html`) y estrategias por condición | **51** (`§7`), no 54 | las de Materiales E/S son otro dominio (`99 §70.2`) |
+| Accesorio (radiador, buje, Buchholz, motoventilador…) | **50** como subsistema del equipo · **54** su suministro, entrega y descuento del contrato | un hecho, un dueño |
+| Cédulas, firmas y permisos de quien firma una orden E/S | `35` (reglas) · `22` (archivos) · **54** solo apunta | datos personales fuera del repo |
 | Lecciones de dominio (pruebas, DGA, carga, salud) | `34` | hija de `30` con alcance ampliado |
 
 ---
@@ -165,5 +175,6 @@ esta forma — copiar/adaptar:
    verificar antes de cerrar la tarea: ¿lóbulo hijo creado/actualizado?
    ¿skills consultadas registradas? Si no, vuelve y hazlo.
 5. **Frescura del dominio [HONOR]**: si tocas `domain/dga_*`, `scada_carga_*`, `salud_activos`, `matriz_riesgo`,
-   `plan_inversion`, `umbrales_salud_baseline` o `pruebas_electricas_semaforo`, actualiza el lóbulo dueño (49–53)
+   `plan_inversion`, `umbrales_salud_baseline` o `pruebas_electricas_semaforo` (→ 49–53), u `ordenes_contrato_nexo`,
+   `ordenes_movimientos_registro`, `contrato_relectura` o `stock_calculo` (→ 54), actualiza el lóbulo dueño
    en el mismo cambio. Los lóbulos citan archivo:constante; si el valor cambia, cambia el porqué o el estado.

@@ -33,6 +33,7 @@
 | **W-11** | **🛡️ FLUJO FUERTE COMPLETO** | Decisión Fuerte (`15 §2`) **o** UI sensible no trivial | Que el flujo se aplique **A MEDIAS** (faltó el preview fiel / el prompt de consejo / la validación live) | Checklist CERRADO de 10 capas (↓). **Cuando dispara: COMPLETO o NO se aplicó.** Skill `proceso-decision-fuerte` |
 | **W-12** | **⚡ Verificación de criterio multi-norma** *(propio)* | Al añadir/cambiar/citar un criterio de prueba eléctrica | Veredicto sacado del TEXTO de la IA en vez del VALOR contra la NORMA; criterio sin clase de tensión; norma mal atribuida; fusión indebida de calificaciones | Ver detalle ↓ |
 | **W-13** | **📥 Importación de datos reales del Ingeniero** *(propio)* | Antes de cargar un Excel/entregable real a producción | Cabeceras que cambian, filas-título, silencios (filas omitidas sin reportar), sobre-escritura de datos buenos | Ver detalle ↓ |
+| **W-14** | **🤝 Cierre de turno con el Ingeniero** *(propio)* | Al cerrar cada turno de trabajo con él | Que se le diga «listo» sin que esté en producción, que se le mezclen frentes o se le pierda el idioma | Ver la sección W-14 abajo |
 
 ---
 
@@ -64,7 +65,11 @@ Trivial / reversible / mecánico → trabajo directo (+ `caza-bugs` si hay estad
 REALES de producción) se le entrega un informe sin jerga con maqueta, y cada punto de CRITERIO de dominio va como pregunta
 cerrada con una opción recomendada y su porqué: ese veredicto es SUYO (la capa 7 queda para lo técnico). Sus textos de
 dominio se publican con el rótulo «Borrador · pendiente del Ingeniero» hasta su «procede» (también fuera de Fichas; en Fichas
-el papel espera su «procede» antes de publicarse) → L-63 (nota, `§150`).
+el papel espera su «procede» antes de publicarse) → L-63 (nota, `§150`). **Secuencia practicada** (`§152`–`§161`): (1) solo
+lectura con conteos reales → (2) informe + maqueta + preguntas cerradas con la recomendada → (3) construir AISLADO (archivos nuevos
+por `import()`, L-102; rama o página sin enlazar) → (4) vista previa con SUS datos reales y franja roja (L-135) → (5) revisión
+adversarial acotada (lentes + escépticos, Opus) → (6) su «procede» → ADR → `main` → (7) servido y verificado en SU Chrome (L-130);
+si se escriben datos, simulación + foto antes/después (W-13).
 
 ---
 
@@ -93,6 +98,27 @@ el papel espera su «procede» antes de publicarse) → L-63 (nota, `§150`).
 5. **Subir el archivo**: por defecto lo arrastra el Ingeniero en su Chrome (L-62). **Excepción a pedido suyo** (`99 §125`, 10-01: *«prefiero que los proceses tú, quedan limpios y menos probabilidad de error»*): si el insumo ya está en su disco, Claude lo prepara (meses SCADA: «paquete preparado», `scripts/scada-empaquetar.mjs`) y lo sube por la extensión desde Descargas, una parte por llamada (`file_upload` ≤ 10 MB → L-117), como en `§125` y `§131`. **Escribir** en producción solo con la simulación del paso 3 a la vista y su «procede» para esa tanda (`§131.4` → `§131.9`).
 6. **Verificar el tablero vivo** tras la carga (W-10 + validación live), no solo el log del importador.
 7. **Comprobar la carga**: foto antes/después que compara VALORES con las llaves ordenadas (L-120) y fidelidad con una lectura independiente de la fuente; una matrícula repetida en el Excel puede ser dos equipos distintos: no se escoge «la primera», se reporta y no se escribe (`§131`).
+8. **Mes SCADA** (`§158`–`§159`; rutas de disco y paquetes vigentes → memoria del proyecto y bóveda `2026-10-08-scada-sin-medicion`):
+   empaquetar con la homologación VIGENTE (los relevos de estación salen solos de su hoja «Relevos de estación»: el informe debe
+   decir filas renombradas > 0) → subir con la pestaña de Datos SCADA RECARGADA (el resumen guarda `top`; una pestaña vieja se
+   detiene con «recargue la página») → simular → **«Completar»** para un mes nuevo, uno a medias o estaciones que faltaban (nunca
+   pisa horas) · **«Reemplazar»** solo si la simulación muestra horas guardadas que deben cambiar (relevo aplicado tarde: con
+   «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después
+   (paso 7). Un periodo que dice «falta preparar <mes>» se arregla recargando ese mes en «Completar» (0 curvas, solo el resumen).
+
+---
+
+## 🤝 W-14 — Cierre de turno con el Ingeniero *(propio de SGM)*
+
+**Disparador:** cada vez que se cierra un turno con él. Reglas que vivían solo en la memoria del asistente (`§151.1`, auditoría `§162`).
+
+1. **Primera línea: sí o no a «¿está todo en producción?»**, verificado EN el turno (`git fetch` + lo servido, L-65); luego código,
+   datos y cerebro por separado. Nada se le da por publicado sin esa evidencia.
+2. **Solo los pendientes del frente en curso** (→ `10`); los de otros frentes, solo si los pide.
+3. **Un HTML SUELTO** (tablero, banco, ejemplos) se entrega en Descargas + archivo enviado + abierto en Chrome; las páginas del
+   SITIO se entregan con el deploy, el enlace en vivo y capturas.
+4. **Los pasos de pantalla** se le ofrecen hechos con la extensión de su Chrome; se ejecutan solo si los pide en ese turno.
+5. **Tras una compactación del contexto**, revisar idioma (español) y trato (tuteo, «Ingeniero») antes de escribirle.
 
 ---
 

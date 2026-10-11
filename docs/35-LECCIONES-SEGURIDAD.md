@@ -123,3 +123,12 @@ guardaba el transformador recortado y la orden no. · **Regla**: en la regla, `m
 del lado del texto que el programa recorta; en el JS, `Math.floor` en las dos puntas. Toda prueba de reglas con tiempos siembra
 un `new Timestamp(s, 367123000)` (con microsegundos), no `fromMillis`. **Gate**: `tests-rules/movimientos_ordenes.rules.test.js`
 («creación de la orden con microsegundos… → negado»), que falla con la regla vieja.
+
+### L-140 · Las posiciones de las S/E del cliente no entran al repo público, tampoco en una prueba ni en un ADR
+**Disparador**: escribir una prueba, fixture, semilla o ADR del mapa o de la ubicación de una S/E. · **Cicatriz** (`99 §152`–`§153`,
+auditoría 2026-10-11, `§162`): la regla «ninguna coordenada en el repo» se cumplió en el código y en la carga (`/subestaciones`,
+bóveda), pero `tests/mapa_parque.test.js` copió del KMZ del Ingeniero la posición de tres S/E y `§153.11`–`.12` escribió tres
+coordenadas de sus fotos con GPS; ningún candado lo vio (las guardias son de cédulas, firmas y SCADA). · **Regla**: en pruebas,
+coordenadas FICTICIAS dentro de Colombia (como `EstDemo` en SCADA); en el cerebro, «coordenadas en la bóveda»; la real vive en
+Firestore y en la bóveda. Purgar lo que ya quedó en el historial es decisión del Ingeniero. **Gate**: [HONOR] (candidato: guardia
+que rechace en `tests/` y `docs/` coordenadas con ≥ 4 decimales dentro de la caja de AFINIA → TODO-67).

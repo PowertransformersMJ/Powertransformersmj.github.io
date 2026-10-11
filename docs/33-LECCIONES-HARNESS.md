@@ -46,6 +46,14 @@ mensaje para el usuario. Mientras no haya un camino comprobado, consolidar `10` 
 tras compactar es el `SessionStart` (brain-check `--boot` + handoff). **Arreglo** → kernel (cola de TODO-67): se da por hecho
 cuando una compactación real ya no muestra el error.
 
+### L-141 · La memoria del asistente no es dueña de una regla del cerebro
+**Disparador**: cerrar una tarea dejando una regla o receta «en la memoria», o escribir en una neurona «→ memoria `x`» como fuente.
+· **Cicatriz** (auditorías 10-02, 10-07 y `99 §162`): la receta de un mes SCADA, «la orden manda» y el cierre de turno vivían solo
+en `~/.claude/…/memory` (fuera de git, dos slugs que divergen, la del paraguas sin algunas); un nodo citaba como dueña una memoria
+que no existía en el otro slug. · **Regla**: la memoria guarda preferencias, rutas de disco y datos del cliente; la REGLA vive en su
+nodo (`30`–`38`, `5x`, `60`) y la memoria apunta a él. Si un nodo cita una memoria, es solo respaldo. Antes de tocar un puntero en
+la memoria del paraguas, confirmar de qué proyecto es el ID (la «L-88» de allí es de Líneas AT). **Gate**: [HONOR] (candidato → TODO-67).
+
 ## 🌐 Chrome del Ingeniero, extensión y banco → hija `36`
 
 > L-62, L-92, L-94 y L-105 viven en [`36-LECCIONES-CHROME-BANCO.md`](36-LECCIONES-CHROME-BANCO.md) (§G.5, 2026-10-07, `99 §149`).

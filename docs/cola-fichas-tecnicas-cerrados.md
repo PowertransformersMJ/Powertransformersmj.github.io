@@ -8,6 +8,29 @@
 
 ---
 
+## Lo que YA está cerrado (no re-auditar sin motivo)
+
+- **`§115`** «Salud y riesgo» con letra más grande (anchos reales de Arial; prueba que falla si un texto baja de
+  producción) · el Actual anclado con su caja YA girada (+ seguro contra caché vieja) · sin los dos párrafos en pantalla.
+- **`§82`** cada TX abre SU ficha: la identidad sale de matrícula/serie, no del «CODIGO SUBESTACION»
+  (verificado en banco con dos TX de una subestación, y con prueba que lo vigila).
+- **`§81`** en la casilla de la matriz se leen potencia y usuarios, y es **informativo**: el color sale
+  solo de `colorCelda(hi, nivel)`; hay prueba que falla si la potencia mueve la columna.
+- **`§75`** las cinco afirmaciones falsas del papel · un solo catálogo de acciones (registrado vs línea
+  base) · el sustento técnico de las 36 actividades · «conservación del activo» · las 5 condiciones
+  literales del Ingeniero con prueba anti-paráfrasis · la inversión fuera del alcance de mantenimiento
+  en las **dos** vías de escritura.
+- **`§80`** manda el Excel de Salud de Activos en todos los caminos (de aquí en adelante; lo ya pisado
+  es TODO-64).
+- El Excel sale de la **plantilla oficial real** (se parchean celdas conservando estilo) y el «Valor CREG
+  Total» va como **fórmula viva** `F36+(MVA × $/MVA)`, auditable por el revisor.
+- El presupuesto **no inventa cifra**: sin UC en catálogo o sin potencia, imprime `[PENDIENTE]` con motivo.
+- El municipio se rellena solo desde `Municipios.xlsx` con las tres reglas del Ingeniero.
+- Por debajo del mínimo del catálogo CREG **no se propone banda** (decisión suya, escrita en el código).
+- **303 pruebas** del módulo en verde (17 archivos) y el lado del cálculo separado de la pantalla.
+- **CF-01…CF-07, CF-25, CF-40** (cerrados) y **CF-32** (refutado): sus filas, tal cual, más abajo, en esta hoja (`99 §120`).
+
+
 ## Del bloque 🔴 GRAVE
 
 | id | Qué pasa | Dónde | Arreglo |

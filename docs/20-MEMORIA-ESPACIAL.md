@@ -30,17 +30,18 @@
 | Migraciones / scripts de datos | `scripts/migrate/*.js` (`tipificar-suministros-fan-db.js`, `v1-to-v2-transformadores.js`) |
 | Candados de git (`core.hooksPath = githooks`, lo comparten los worktrees) | `pre-commit`: `guardia-cedulas`, `guardia-firmas`, `guardia-scada` y, solo si el commit toca `CLAUDE.md`/`docs/`, `brain-check` + `boot-gate` (TODO-67) · `commit-msg`: cédulas y SCADA en el MENSAJE · `pre-merge-commit`: cédulas · `pre-push`: cédulas, SCADA y **`freno-publicar.mjs`** (código que cite `99 §N` sin su ADR no sube a `main`, `§150`) · los `firebase deploy` no pasan por git (M-10) · kernel en `../brain-private/kernel` (`brain:pull`) |
 | Tests | `tests/*.test.js` (el conteo vivo lo lleva `05`) |
-| **Importar el Excel real "Salud de Activos"** (la tarea viva del Ingeniero) | `assets/js/domain/importador.js` + `assets/js/data/importar.js` + `admin/importar.html`. 3 hojas; `TPT_Servicio` y `TX_Respaldo` con la cabecera en la **fila 2** (L-72). Proceso → `60-WORKFLOWS` W-13 · historia → `99 §57` y `§69` · Abierta sola, `admin/importar.html` redirige a `admin/administracion.html#tab=importar` (la pestaña la carga en un iframe): lo hace `LEGACY_REDIRECTS` de `aqua-shell.js` (30 páginas viejas); `?legacy=keep` la abre sola (así se usa en la vista previa con stubs). |
+| **Importar el Excel real "Salud de Activos"** | `admin/importar.html` + `assets/js/domain/importador.js` + `assets/js/data/importar.js` · hojas, alias y trampas → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Fichas Técnicas de reposición** (familia CSS `.ftm-`) | `pages/fichas-tecnicas.html` + `assets/js/ui/fichas/*` + dominio puro `assets/js/domain/fichas_*.js` · **archivo por archivo → [`22`](22-ESPACIAL-MODULOS.md)** · estado vivo y cola → [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md) |
 | **Indicadores de calidad** (SAIDI/SAIFI) | `pages/indicadores-calidad.html` + `assets/js/ui/calidad/*` · hoja `INDICADORES-CALIDAD.md` |
-| **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` + dominio `domain/cargabilidad_*.js` (filas del parque → `_parque`; ventana de detalle → `_detalle`); SCADA del seguimiento: `domain/scada_{config,filtros,ranking,violaciones}.js` + `data/seguimiento_scada*.js` + `css/seguimiento-scada.css` (≠ Cargabilidad SCADA, `scada_carga_*` → `22`) |
-| **Cargabilidad SCADA** (`§122`, familia `.cscada`) | `pages/cargabilidad-scada.html` (lista y curvas) + `admin/scada-datos.html` (homologación y carga del mes) · archivo por archivo y colecciones `scada_*` → **[`22`](22-ESPACIAL-MODULOS.md)** |
-| **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` · editar: `admin/inventario.html` + `domain/inventario_edicion.js` (`§154`) |
-| **Mapa geográfico de Colombia** (`§152`, familia `.mc-`) | `pages/mapa-v2.html` + `assets/js/ui/mapa/mapa-colombia.js` + `assets/css/mapa-colombia.css` · dominio `domain/mapa_parque.js` · geografía DANE MGN 2025 en `assets/geo/` (regenerar: `scripts/mapa-geo/construir.mjs`) · posiciones de S/E en `/subestaciones/{código de la matrícula}` (`§153`; edita la pestaña Subestaciones, admin) · la pestaña Mapa de `pages/activos.html` (botón «Mapa») abre `mapa-v2.html` desde `§155`; el viejo `pages/mapa.html` + `mapa-render.js` queda en el repo sin enlazar |
+| **Seguimiento operativo / cargabilidad** | `pages/seguimiento-operativo.html` + `assets/js/ui/seguimiento/*` · `pages/seguimiento-cargabilidad.html` + `assets/js/ui/cargabilidad/*` + dominio `domain/cargabilidad_*.js` (filas del parque → `_parque`; ventana de detalle → `_detalle`); SCADA del seguimiento: `domain/scada_{config,filtros,ranking,violaciones}.js` + `data/seguimiento_scada*.js` + `css/seguimiento-scada.css` (≠ Cargabilidad SCADA, `scada_carga_*` → `23`) |
+| **Cargabilidad SCADA** (`§122`, familia `.cscada`) | `pages/cargabilidad-scada.html` (lista y curvas) + `admin/scada-datos.html` (homologación y carga del mes) · archivo por archivo y colecciones `scada_*` → **[`23`](23-ESPACIAL-SCADA.md)** · cargar un mes → `60 §W-13` |
+| **Parque de transformadores / Salud de Activos** | `pages/parque-transformadores.html` · `pages/salud.html` + `assets/js/activos-shell.js` + `domain/salud_activos.js` · `99 §56` · editar: `admin/inventario.html` + `domain/inventario_edicion.js` + `data/transformadores.js#actualizarCampos` (`§154`) |
+| **Mapa geográfico de Colombia** (`§152`–`§157`, familia `.mc-`) | `pages/mapa-v2.html` (pestaña «Mapa» de `pages/activos.html`, `§155`) · archivo por archivo, geografía y posiciones → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Órdenes de Materiales SSEE** (formato IT.05801, familia `.oms-`) | `pages/ordenes-materiales.html` + `assets/js/ordenes-materiales.js` · registro, cédulas y firmas → **[`22`](22-ESPACIAL-MODULOS.md)** · **≠ «Órdenes»** (`pages/ordenes.html`: órdenes de TRABAJO) |
 | **Contratos de suministro · Movimientos · nexo con Órdenes E/S** (`§145`–`§148`) | `pages/contrato.html` (pestañas: `pages/suministros-dashboard.html`, `admin/suministros-movimiento.html`) · nexo y registro automático → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Firmas personales** (subir/ver/quitar la propia) | `assets/js/domain/firmas.js` + `assets/js/data/firmas.js` (Firestore `firmas/{uid}`) · dónde se usa → **[`22`](22-ESPACIAL-MODULOS.md)** |
 | **Firmas del EQUIPO** (custodio admin; delegados `§117`/`§119`) | `assets/js/domain/firmas_equipo.js` + `assets/js/data/firmas_equipo.js` · delegaciones, folio y candado → **[`22`](22-ESPACIAL-MODULOS.md)** |
+| **Pruebas Eléctricas** (extracción IA, tendencia) | `pages/pruebas-electricas.html` + `assets/js/pruebas-electricas-shell.js` · archivo por archivo → **[`22`](22-ESPACIAL-MODULOS.md)** · hoja `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` |
 | Historia/decisión de un subsistema (§NN) | `00-INDICE.md` → `99-HISTORIAL-ADR.md` |
 | Reglas permanentes históricas (informes, deep-clean, anti-datalist, etc.) | `30-LECCIONES.md` (condensado) · `_legacy/CLAUDE-previo.md §0.1.2.*` (full) |
 
@@ -48,18 +49,8 @@
 
 ## 🌐 Ecosistema — el paraguas `~/Desktop/GitHub-MJ/` (ADR-058, 2026-07-28)
 
-El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico único**.
-
-```
-~/Desktop/GitHub-MJ/
-├── brain-private/   bóveda privada (repo git aparte, NUNCA pública)
-│   ├── kernel/          🔑 KERNEL CANÓNICO (VERSION + .mjs) — escritor único
-│   ├── NUEVO-PROYECTO.md  receta: un proyecto nuevo nace conectado
-│   └── sgm-transpower/research-archive/  = `archiveDir` (crudos de deliberación)
-├── powertransformersmj.github.io/   ESTE repo (público)
-├── oltc-capacitacion/ · oltc-metodologia/   trabajo (work/ + entregables/)
-└── _archivo/   linajes viejos y capturas — no se toca, no se borra
-```
+El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico único**. El árbol del paraguas vive en
+`~/Desktop/GitHub-MJ/CLAUDE.md` (Claude Code lo carga solo, por estar en la carpeta madre); aquí, lo propio del repo:
 
 - **Hermandad `repo ↔ brain-private` = ESTRUCTURAL**: de ella cuelgan `archiveDir` y el reparto
   del kernel (`npm run brain:pull` → `../brain-private/kernel/pull.mjs`). Romperla **NO da error**
@@ -78,7 +69,7 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 - **Backend**: Firebase (Auth + Firestore + Storage, proyecto `lordpowertransformersmj`) + Cloud Functions (`functions/`) + Vercel para `/api/*` (hoy solo `api/health.js`).
 - **Scripts / herramientas**: `scripts/` — incluye `scripts/migrate/`, `scripts/brain-check.mjs` y `scripts/audit-bloques-pruebas.mjs`. Además `boot-gate.mjs`, `brain-diff.mjs`, `brain-index.mjs`, `brain-archive.mjs`, `dev-server.mjs`, `session-handoff.mjs`.
 - **Docs**: `docs/` = neuronas del cerebro + hojas técnicas del dueño (ver sección final). Las del cerebro anterior están en `_legacy/cerebro-anterior/docs/`.
-- **CI / Deploy**: `.github/workflows/ci.yml` (lint HTML + `test:unit` + `test:rules` con emuladores) · `pages.yml` (deploy main → GitHub Pages) · `vercel.json` (`/api`). `sw.js` en raíz es kill-switch (PWA desactivada).
+- **CI / Deploy**: `.github/workflows/ci.yml` (lint HTML + `test:unit` + `test:rules` con emuladores) · `pages.yml` (deploy main → GitHub Pages) · `vercel.json` (`/api`). `sw.js` en raíz es kill-switch (PWA desactivada); si algún día se reactiva, el protocolo de bump vuelve a `CLAUDE.md` y su versión vigente pasa a `05`.
 
 ### 📁 Estructura de carpetas principales
 
@@ -87,9 +78,10 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 | `assets/js/domain/` | Funciones puras de dominio (sin I/O) | Importadas por `data/` y por tests Node |
 | `assets/js/data/` | Data layers Firebase (one-shot + realtime `onSnapshot`) | Importadas por las UIs |
 | `assets/js/admin/` | Controladores de las páginas `admin/*.html` | `<script type="module">` por página |
-| `assets/js/ui/` | Componentes de render por módulo (`pruebas/`, `calidad/`, `cargabilidad/`, `seguimiento/`, `fichas/`, `cargabilidad-scada/`, `scada-datos/` → `22`; `module-shell.js`, `tabs.js`, `contrato-context.js`, `firma-personal.js`, `importar-gases.js`, `foco-modal.js` (foco accesible de modales)) | Importados por los shells de página |
+| `assets/js/ui/` | Componentes de render por módulo (`pruebas/`, `calidad/`, `cargabilidad/`, `seguimiento/`, `fichas/`, `mapa/` → `22`; `cargabilidad-scada/`, `scada-datos/` → `23`; `module-shell.js`, `tabs.js`, `contrato-context.js`, `firma-personal.js`, `importar-gases.js`, `foco-modal.js` (foco accesible de modales)) | Importados por los shells de página |
 | `assets/js/auth/` · `workers/` · `exports/` · `assets/vendor/` | Guards de sesión (`admin-`/`page-`/`session-guard.js`) · Web Worker del importador SCADA · exportadores PDF/XLSX/XLSM · íconos `lucide` locales | Por página / bajo demanda |
 | `assets/css/` | Estilos + sistema AQUA LIGHT | `<link>` por página |
+| `assets/geo/` | Geografía DANE MGN 2025 (TopoJSON); se regenera con `scripts/mapa-geo/construir.mjs` | `fetch` desde `ui/mapa/mapa-colombia.js` |
 | `admin/` | UIs de administración (CRUD) | Protegidas por `admin-guard.js` |
 | `pages/` | Páginas públicas/operativas | Protegidas por `page-guard.js` |
 | `functions/` | Cloud Functions (deployable) | `firebase deploy --only functions` |
@@ -98,14 +90,6 @@ El repo NO vive suelto: es un miembro de un ecosistema con **kernel canónico ú
 | `tests-rules/` | Pruebas de reglas Firestore/Storage | `npm run test:rules` (emuladores) |
 
 **⚠️ Reflejo de Frescura (`CLAUDE.md §G.4`):** si mueves/creas/renombras un archivo importante, actualiza esta tabla en el MISMO cambio. Una neurona vieja engaña al próximo "tú" → reproceso/regresión.
-
----
-
-## 📚 Subsistema Pruebas Eléctricas — extracción IA / tendencia (detalle único)
-
-- **Extracción IA de PDFs (Pruebas Eléctricas)** — CF `functions/index.js#extraerPruebasElectricasIA` (PDF desde Storage → `sanitizarInforme` en `domain/pruebas_electricas_schema.js`); cliente `data/pruebas_electricas.js#extraerConIA`; render `ui/pruebas/*` (tabla, gráficas SVG con eje Y dinámico, panel genérico por bloques con `derivarTablaTAP`). Shell `assets/js/pruebas-electricas-shell.js` (~2,4k líneas) + motor multi-norma `domain/pruebas_electricas_multinorma.js` (+ `_recomendaciones`, `_semaforo`). (`bloquesDeExtra` es LOCAL de `ui/pruebas/grafico-generico.js`.) Detalle completo → `REPOSITORIO-PRUEBAS-ELECTRICAS.md §13` + el arco de ADRs 003→020 en `99`.
-  - **Workflow de auditoría/completitud por sección** (detectar→clasificar→corregir→verificar; auditor `scripts/audit-bloques-pruebas.mjs`) → hoja `workflow-auditoria-secciones-pruebas.md`.
-  - **Tendencia temporal** (multi-informe): pestaña "Tendencia" + `domain/pruebas_electricas_tendencia.js` (`bloquesTendencia` — escalar peor-caso por prueba vs umbral; determinista, reusa el render genérico). F1-F3 consolidadas: timeline + narrativa IA vía Cloud Function `narrativaTendenciaIA` (desplegada) y cliente `data/pruebas_electricas.js` (httpsCallable, 120s).
 
 ---
 
@@ -160,5 +144,5 @@ Documento transformadores v2 y colecciones F17–F37 (al 2026-04-20) → `docs/M
 > detalle enlazada arriba, o el ADR § correspondiente vía `docs/00-INDICE.md`.
 >
 > **📏 Capacidad (`CLAUDE.md §G.5`): el tope que aprieta es el de CARACTERES** (manifest). Al acercarse, SHARD por
-> sub-área (ej. extraer `js/` a una hija con número libre: `21` y `22` ya existen), registrar en
+> sub-área (ej. extraer `js/` a una hija con número libre: `21`, `22` y `23` ya existen; la próxima es `24`), registrar en
 > `CLAUDE.md §0` + `00-INDICE`, dejar puntero aquí.
