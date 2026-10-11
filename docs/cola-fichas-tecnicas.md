@@ -9,29 +9,9 @@
 > verificado; la confirmación en vivo es parte del arreglo, no de este inventario.
 > Al cerrar un punto: marcarlo ✅ con su `§` y retirarlo cuando el ADR lo recoja (§G.3). El ADR que resuelve un CF lo nombra.
 > **Revisada al 2026-09-27** contra `§94`-`§108` (auditoría `99 §109`).
-> **Ampliada el 2026-10-05** (`99 §139`): CF-41…CF-44, el código sin llamada y los puntos 9-10 de «Tuyo». El resello completo contra `§110`–`§137` sigue pendiente (TODO-66).
+> **Ampliada** el 2026-10-05 (`99 §139`: CF-41…CF-44, código sin llamada, «Tuyo» 9-10) y el 2026-10-11 (`§162`: CF-49). El resello contra `§110`–`§161` sigue pendiente (TODO-66).
 
-## Lo que YA está cerrado (no re-auditar sin motivo)
-
-- **`§115`** «Salud y riesgo» con letra más grande (anchos reales de Arial; prueba que falla si un texto baja de
-  producción) · el Actual anclado con su caja YA girada (+ seguro contra caché vieja) · sin los dos párrafos en pantalla.
-- **`§82`** cada TX abre SU ficha: la identidad sale de matrícula/serie, no del «CODIGO SUBESTACION»
-  (verificado en banco con dos TX de una subestación, y con prueba que lo vigila).
-- **`§81`** en la casilla de la matriz se leen potencia y usuarios, y es **informativo**: el color sale
-  solo de `colorCelda(hi, nivel)`; hay prueba que falla si la potencia mueve la columna.
-- **`§75`** las cinco afirmaciones falsas del papel · un solo catálogo de acciones (registrado vs línea
-  base) · el sustento técnico de las 36 actividades · «conservación del activo» · las 5 condiciones
-  literales del Ingeniero con prueba anti-paráfrasis · la inversión fuera del alcance de mantenimiento
-  en las **dos** vías de escritura.
-- **`§80`** manda el Excel de Salud de Activos en todos los caminos (de aquí en adelante; lo ya pisado
-  es TODO-64).
-- El Excel sale de la **plantilla oficial real** (se parchean celdas conservando estilo) y el «Valor CREG
-  Total» va como **fórmula viva** `F36+(MVA × $/MVA)`, auditable por el revisor.
-- El presupuesto **no inventa cifra**: sin UC en catálogo o sin potencia, imprime `[PENDIENTE]` con motivo.
-- El municipio se rellena solo desde `Municipios.xlsx` con las tres reglas del Ingeniero.
-- Por debajo del mínimo del catálogo CREG **no se propone banda** (decisión suya, escrita en el código).
-- **303 pruebas** del módulo en verde (17 archivos) y el lado del cálculo separado de la pantalla.
-- **CF-01…CF-07, CF-25, CF-40** (cerrados) y **CF-32** (refutado): sus filas, tal cual, en [`cola-fichas-tecnicas-cerrados.md`](cola-fichas-tecnicas-cerrados.md) (`99 §120`).
+> **Lo ya cerrado** (`§75`, `§80`–`§82`, `§115`, plantilla, presupuesto, municipio, CF cerrados) → [`cola-fichas-tecnicas-cerrados.md`](cola-fichas-tecnicas-cerrados.md) §«Lo que YA está cerrado» (`99 §162`) — no re-auditar sin motivo.
 
 ---
 
@@ -74,6 +54,7 @@
 - **CF-46 · Al adjuntar el Excel se lee la PRIMERA hoja con datos** (`evaluacion-masiva.js:187-193`): en «Salud de Activos 2026-4.xlsx» es CONTRAMUESTRAS, no TX_Potencia (avisa, pero no lee lo que él quiere). → preferir la hoja `TX_Potencia` si existe.
 - **CF-47 · Desde el parque vivo la ficha no ve los gases**: `diagnosticoDeEquipo` lee `det`/`ensayos` y las ppm viven en `ultima_dga` (leído en código; Firestore no mirado). Los modos de gases solo salen con el Excel adjunto. Decisión de arquitectura: preguntarle.
 - **CF-48 · Menores del papel**: «(ISO 50001)» respalda «menores pérdidas» en el Beneficio V5 del PI (`fichas_diagnostico.js:~380`; la norma no fija pérdidas) · `{SUB}` vacío deja «en la subestación , cuyo» (el dominio ya dice `[PENDIENTE: SUBESTACIÓN]`) · T1-TPS figura 250 kVA en el Excel («0,25 MVA» en el papel).
+- **CF-49 · El municipio del papel se busca primero por NOMBRE** (`domain/municipios_subestacion.js#municipioDeSubestacion`): con homónimos, la ficha de VALENCIA (Córdoba) imprimiría VALLEDUPAR y la de PUEBLO NUEVO (Magdalena, PLO) el Pueblo Nuevo de Córdoba (en vez de Ariguaní). Lo halló `99 §152.9`-5 (mapa, 10-07). **Toca el papel: espera su «procede»** (antes en TODO-73). La tabla oficial de municipios de Fichas de `§153.9`-3 (TODO-78) va con este punto.
 
 ## 🤝 Mío, pero con UNA respuesta suya primero
 

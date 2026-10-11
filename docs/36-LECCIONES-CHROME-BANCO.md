@@ -7,6 +7,8 @@
 > internas de estas lecciones a `30`/`33` (p. ej. «L-117 (`30`)») hoy son `36`. Se lee on-demand (trigger 🧪 Experiencia)
 > **antes de conducir su Chrome, subir datos por la extensión o montar/capturar un banco**.
 
+> **Corte natural al llegar al 90 %** (auditoría 10-11, `99 §162`, S6-04): banco local (L-92, L-105, L-131, L-135) · su Chrome y
+> la extensión (L-62, L-94, L-117, L-130, L-136).
 ---
 
 ### L-62 · Automatizar el Chrome del Ingeniero: subir archivos = gesto humano; localhost bloqueado
@@ -48,6 +50,8 @@ los 45 s). **Gate**: `tests/scada_carga_paquete.test.js` (formato, filtro = lect
 también por `browser_batch` (suma las subidas del lote): una parte por llamada; un campo auxiliar FIJO que reenvía al de
 la página evita volver a buscar el campo que la página repinta; en paralelo alguna subida «no responde a tiempo» aunque
 SÍ llega: se confirma con un contador en la página, no con la respuesta de la herramienta.
+**Y `§158.10`**: la simulación offline usa la MISMA función de filtro que la página (`seLee`), nunca una propia: una que filtraba
+«Q_average_…» con otra regla dio una diferencia falsa en enero (`§158.12` ya la usó: 169/169 idénticos).
 
 ### L-130 · Antes de ESCRIBIR datos de producción desde SU pestaña con un JS recién publicado: servido, 10 min y su módulo
 **Disparador**: se acaba de publicar código y lo siguiente es escribir datos reales desde la pestaña del Ingeniero (registrar,
@@ -57,6 +61,8 @@ encontró dispersa (S3-02, `§149`). · **Regla**: (1) servido = main archivo po
 ≥ 10 min (max-age=600 del CDN de Pages; sin `?v=`, L-102); (3) en SU pestaña, `import()` del módulo y comprobar que trae la
 función nueva; si no, `fetch(u, {cache:'reload'})` y recargar. Sin los tres, no se escribe. **Gate**: [HONOR] + el código
 escritor se niega con un módulo viejo (`registrarDesdeOrden` exige `orden_es`, `§147`).
+**Y `§161.6`**: un HTML que va en un iframe con `?query` (`suministros-dashboard.html?contratoId=…`) es OTRA entrada de caché:
+recargar la pestaña madre no lo renueva. El curl de (1) va a esa URL exacta y, durante los 10 min, lo nuevo nace oculto (L-85).
 
 ### L-131 · Un flujo ENTRE páginas (guardar en una, ver en otra) se prueba con el almacén en el PADRE
 **Disparador**: verificar en el banco algo que nace en una página y se ve en otra (guardar una orden → el contrato la registra →

@@ -38,18 +38,19 @@ adjuntos son una BASE, no el límite — se amplía con investigación web (norm
 ### Mapa de capítulos EG → a qué lóbulo alimenta (para lecturas dirigidas futuras)
 | Cap. EG | Tema | Alimenta |
 |---|---|---|
-| 1 | Aceite aislante (química, degradación, lodos, fluidos alt.) | **49** (`analisis-aceite`) |
-| 2 | Papel aislante (celulosa, vida útil, **cargabilidad/punto caliente IEEE C57.91**, sobrecarga) | **50** (`gestion-vida-activo`) + 49 |
-| 3 | Diagnóstico de laboratorio (ASTM/IEC/IEEE, **códigos de acción Transequipos**, azufre corrosivo, **DGA IEEE C57.104-2019**, furánicos, metales) | **49** (`dga`, `analisis-aceite`) |
+| 1 | Aceite aislante (química, degradación, lodos, fluidos alt.) | **52** (`analisis-aceite`) |
+| 2 | Papel aislante (celulosa, vida útil, **cargabilidad/punto caliente IEEE C57.91**, sobrecarga) | **53** (punto caliente, sobrecarga) + **52** (papel, DP) + 50 (`gestion-vida-activo`) |
+| 3 | Diagnóstico de laboratorio (ASTM/IEC/IEEE, **códigos de acción Transequipos**, azufre corrosivo, **DGA IEEE C57.104-2019**, furánicos, metales) | **52** (`dga`, `analisis-aceite`) |
 | 4 | Diagnóstico de campo (PEC, IV, **SFRA**, **FDS/DFR**, emisiones acústicas, termografía, coronografía, monitoreo en línea) | **49** (sfra, dfr, etc.) |
 | 5 | Mantenimiento en campo (secado/vacío, humedad, **gestión de confiabilidad y vida útil**, formulaciones frío/caliente) | **50** (`gestion-vida-activo`) |
 | 6 ✅ | **Protecciones** (físicas/eléctricas) + **tipos de refrigeración (notación IEEE)** | **50** (`sistema-refrigeracion`, `bujes-y-accesorios`) — **leído** |
 
-> ⚠️ **Frontera de dominio (memoria `feedback_no_fabricar_datos_dominio`)**: Caps 1/3/4 de EG son
-> **aceite/papel/DGA/ensayos** → territorio del lóbulo **49** (no inventar datos de aceite en el
-> tablero de pruebas ELÉCTRICAS). El EQUIPO (lóbulo 50) toma de EG sobre todo Caps 2/5/6.
+> ⚠️ **Frontera de dominio (desde `99 §137`)**: aceite/DGA/papel (Caps 1/3) → `52`; ensayos de campo
+> (Cap 4) → `49`; cargabilidad y punto caliente (Cap 2.4.5/2.4.6) → `53`. El tablero de pruebas ELÉCTRICAS
+> no lleva datos de aceite (ADR-027). El EQUIPO (lóbulo 50) toma de EG sobre todo Caps 2/5/6.
 > Lecturas dirigidas pendientes: **Cap 2.4.5/2.4.6** (cargabilidad/punto caliente/sobrecarga,
-> IEEE C57.91) para `gestion-vida-activo`.
+> IEEE C57.91) para `gestion-vida-activo`; su criterio es de `53`.
+> *(Corregido 2026-10-11, `99 §162`: decía «Caps 1/3/4 → lóbulo 49», escrito antes de que nacieran 52 y 53.)*
 
 ---
 
@@ -133,11 +134,12 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
 **✅ Plasmado en `gestion-vida-activo` (lóbulo 50, EG Caps 2/5 · IEEE C57.91):**
 - Papel/celulosa: **DP 1000–1200 nuevo → 150–250 fin de vida**; carbonización ~150 °C; el
   **punto caliente gobierna la vida** (IEEE C57.91); Montsinger ≈ **6–8 °C duplican el
-  envejecimiento**. Agua: papel <2 %, aceite objetivo ~20 ppm (límite 30). → `gestion-vida-activo/references/01,02`.
+  envejecimiento** (la plataforma usa 6 K de IEC 60076-7: dueña `53 §6`). Agua: papel <2 %, aceite objetivo ~20 ppm (límite 30). → `gestion-vida-activo/references/01,02`.
 - Cooling (EG cap. 6) — plasmado en `_conocimiento/00 §E` + `sistema-refrigeracion` (ONAN/ONAF/OFAF/ODAF + "etapa ≠ MVA gratis").
 - Mantenimiento/secado: criterios de confiabilidad (RS%, IC frío/caliente) → `⚠️ verificar` valores exactos (sigue pendiente con el director).
 
-**Frontera 49 (NO va al lóbulo 50): EG Caps 1/3/4 = aceite/DGA/ensayos** → lóbulo `49-PRUEBAS`:
+**Frontera (NO va al lóbulo 50; desde `99 §137`): EG Caps 1/3 = aceite/DGA/papel → `52`; Cap 4 = ensayos → `49`**
+(corregido 2026-10-11, `99 §162`; antes: «Caps 1/3/4 → lóbulo `49-PRUEBAS`»):
 - DGA IEEE C57.104-2019 (Status 1/2/3, NEI), triángulos de Duval, furánicos, azufre corrosivo.
 - ⚠️ **Tablas [ILEGIBLES] en el scan comprimido** (NO fabricar): "Códigos de Acción de
   Mantenimiento" de Transequipos y las **Tablas 1–4 numéricas de IEEE C57.104-2019**. Relectura en
@@ -175,7 +177,7 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
 
 1. ✅ **Director validó** la arquitectura de 11 skills (2026-06-08) + aprobó replicar.
 2. ✅ **EG + ABB leídos completos** (subagentes, 2026-06-08). Tipificación en la ejemplar; papel/
-   cargabilidad en `gestion-vida-activo`; aceite/DGA → lóbulo 49. **Único pendiente de lectura**:
+   cargabilidad en `gestion-vida-activo`; aceite/DGA → lóbulo 49 (hoy `52`, desde `99 §137`). **Único pendiente de lectura**:
    tablas [ILEGIBLES] (Códigos Transequipos + C57.104-2019 Tablas 1–4) en HD o directo de la norma.
 3. ✅ **Familia COMPLETA (11/11)** — patrón de 4 neuronas replicado a todas (2026-06-09).
 4. ✅ ~~Commit de `skills/transformadores-potencia/` (Claude commitea; el director pushea).~~ Obsoleto: la familia está en el repo y la política git cambió (ADR-051).

@@ -52,6 +52,15 @@
 
 ### L-28 · UI gated por rol admin: re-render al `sgm:session-ready` (carrera intermitente)
 **Disparador**: UI condicionada a `esAdmin()` / `window.__sgmSession` · **Cicatriz**: la "X" de borrar aparecía a veces sí a veces no — `session-guard.js` resuelve el perfil ASÍNCRONO y setea `__sgmSession` + dispara `sgm:session-ready`; si el `onSnapshot` de datos llega antes, el gate queda en false · **Regla**: además del primer render, escuchar `window.addEventListener('sgm:session-ready', () => reRender())` (patrón de `contrato-info.js`, `aqua-shell.js`); nunca asumir sesión lista en el primer render.
+
+### L-139 · Leaflet en esta plataforma: un solo lienzo, capas que no se excluyen y nada de pantalla completa en el iframe
+**Disparador**: tocar `assets/js/ui/mapa/mapa-colombia.js` o agregar una capa. · **Cicatriz** (`99 §152`, `§156`): con un lienzo por
+capa, el de encima se quedaba con todos los clics; los fondos como «capas base» eran excluyentes (él quería verlos juntos); `setOpacity`
+sobre una capa apagada (sin contenedor) daba error al hacer clic; la API de pantalla completa no responde en el iframe; CARTO exige
+clave y `{s}.tile.openstreetmap.org` con el subdominio `d` no existe. · **Regla**: (1) UN `L.canvas` compartido (`estado.lienzo`) para
+las capas vectoriales; (2) fondos y capas como casillas (`control.layers({}, …)`) y todo ajuste pregunta antes `mapa.hasLayer(capa)`;
+(3) zoom entero (`zoomSnap: 1`); (4) «Ampliar» por CSS; (5) teselas sin clave (`tile.openstreetmap.org`, OpenTopoMap con atribución);
+(6) la consola se lee DESPUÉS de cada gesto (encender y apagar capas), no solo al cargar (`§156.7`). Fuentes descartadas → `§152.8`. [HONOR]
 ## 🔥 Backend / infra / entorno
 
 ### L-09 · Deploys Firebase los ejecuta Claude (flujo ADR-005, desde 2026-06-06)
@@ -76,7 +85,7 @@
 **Cicatriz**: las rules evalúan `request.resource.data` merged-post; si el doc no existía, campos requeridos (`codigo`, `estado`) quedan `undefined` → falla la rule. · **Regla**: rellenar defaults seguros en el data layer respetando valores existentes. (Full: `_legacy §9.9` / v2.8.1.)
 
 ### L-134 · `updateDoc` con un mapa REEMPLAZA el mapa entero: un formulario parcial borra lo que no muestra
-**Disparador**: guardar desde un formulario que muestra solo parte del documento. · **Cicatriz** (`99 §154`): Inventario sanitizaba ~21 casillas y escribía las secciones completas → el 1.er «Guardar» vaciaba matrícula, condición y año en los 208 (simulado; nadie lo había usado). Las reglas no lo frenan. · **Regla**: escribir SOLO lo que cambió, con claves de punto (`'placa.marca'`), contra la foto del formulario al abrir (`domain/inventario_edicion.js`); probar en el emulador. [HONOR]
+**Disparador**: guardar desde un formulario que muestra solo parte del documento. · **Cicatriz** (`99 §154`): Inventario sanitizaba ~21 casillas y escribía las secciones completas → el 1.er «Guardar» vaciaba matrícula, condición y año en los 208 (simulado; nadie lo había usado). Las reglas no lo frenan. · **Regla**: escribir SOLO lo que cambió, con claves de punto (`'placa.marca'`), contra la foto del formulario al abrir (`domain/inventario_edicion.js`); probar en el emulador. [HONOR] La herramienta: `data/transformadores.js#actualizarCampos` (claves de punto, con bitácora); también corrige un dato de producción quirúrgicamente (Casacará T1, `99 §158.11`: solo 4 claves + `updatedAt`).
 
 ---
 
@@ -167,7 +176,7 @@ en prosa no cuenta como cierre. **Candado de M-07 elegido por él (`§150`)**: d
 Lo cazó el verificador del cierre. · **Regla**: al mover lecciones, `grep -rn "L-NN"` en `docs/`, `CLAUDE.md` y las memorias de
 los DOS slugs, y corregir cada puntero que nombra el archivo viejo; la cabecera de la hija avisa de las referencias internas. [HONOR]
 
-> Topes de `30` y sus hijas → `docs/.brain-manifest.json` (en caracteres). Cuando se acerque al tope: nueva hija (la siguiente libre es `37-…`) registrada en `CLAUDE.md §0` y en `00`, con puntero de la madre a la hija. **Subir un tope del manifest exige un ADR que diga por qué no se partió la neurona; sin ese ADR, el tope no sube** (`§149`, S0-05) [HONOR].
+> Topes de `30` y sus hijas → `docs/.brain-manifest.json` (en caracteres). Cuando se acerque al tope: nueva hija (la siguiente libre es `39-…`, la última que descubre el gate #5 con `3[1-9]-LECCIONES`; ver TODO-67) registrada en `CLAUDE.md §0` y en `00`, con puntero de la madre a la hija. **Subir un tope del manifest exige un ADR que diga por qué no se partió la neurona; sin ese ADR, el tope no sube** (`§149`, S0-05) [HONOR].
 
 ## 🤖 IA / Claude API / Cloud Functions → hija `31`
 
@@ -204,80 +213,12 @@ los DOS slugs, y corregir cada puntero que nombra el archivo viejo; la cabecera 
 > auditar en paralelo por dimensiones, rotular el dato de demostración. Léela ANTES de declarar algo
 > desplegado, portado o auditado. La hija lleva su propio listado — aquí no se duplican sus IDs.
 
-## 📈 Costuras de datos y Cargabilidad SCADA (L-96, L-113…L-116; L-117 → `36`)
+## 🧵 Costuras de datos, caché e iframes → hija `37`
 
-> Lecciones VIVAS aquí (no en `32`): un trigger que pisa lo que otro escribió, y lo aprendido construyendo Cargabilidad SCADA.
-
-### L-96 · Un trigger que reemplaza un objeto entero borra lo que otro camino escribió
-
-`onMuestraCreate` hacía `update({ salud_actual: snapshotDelMotor })`. Correcto cuando el motor era el único
-que escribía ahí; destructivo desde que el importador del Excel pasó a fijar la condición oficial en ese
-MISMO objeto (`99 §80`). El dominio estaba bien, el importador estaba bien, y aun así el dato se perdía:
-el defecto solo existe en la COSTURA entre los dos caminos.
-
-**La regla**: cuando dos caminos escriben el mismo sub-objeto, ninguno lo reemplaza entero — se actualiza
-por campos o se fusiona con una función pura que declare quién manda sobre cada campo (y que la procedencia
-quede guardada, no deducida). Y eso se prueba donde vive el defecto: una prueba del dominio no lo ve; hace
-falta una de integración que ejecute el trigger de verdad (emulador de Functions, `npm run test:trigger`).
-
-### L-113 · Datos rotulados por el FIN de la hora: el mes es lo que el origen rotula en él, y los agregados compartidos solo crecen
-
-`99 §122`: la lista resumía las 744 horas que el SCADA rotula en agosto (la primera, 00:00 del día 1, es el promedio
-de 23:00 a 00:00 del 31 de julio) y el detalle pedía «agosto» como [1-ago 00:00, 1-sep 00:00): una hora corrida, el
-mes siguiente leído de más y una cifra distinta para el «mismo» mes. Y el catálogo y el resumen se escribían con la
-foto tomada al simular: dos cargas a la vez se borraban meses entre sí (probado en el emulador). **Regla**: (1) la
-ventana de un periodo se define UNA vez, con la convención del origen, y la usan TODAS las vistas (`ventanaDeMes`);
-mostrar las horas como las rotula el origen; (2) un documento que agrega lo de varios escritores se funde DENTRO de una
-transacción con lo guardado en ese instante, y la regla exige que no encoja (`keys().hasAll(resource…keys())`); antes de
-escribir lo derivado de una simulación, comprobar que nadie escribió entre medias. **Gate**: pruebas de `ventanaDeMes`
-y `fundirCatalogo` + regla con casos de encoger negados (`tests-rules/scada_carga.rules.test.js`).
-
-### L-114 · Un `<a>` con forma de botón hereda el color de enlace del sitio: el estado vacío también se mira en producción
-
-`99 §122.9`: el Ingeniero abrió «Cargabilidad SCADA» y «no se aprecia nada». La página estaba bien (no hay datos aún),
-pero su único botón, `<a class="btn btn--primary">`, salía azul sobre azul: `body.aqua a` (0,1,2) le gana a `.btn`
-(0,1,0). Y lo elegido con fondo translúcido (`rgba(…,.12)`) se pierde sobre la foto de fondo del shell. En el banco
-se había probado el camino CON datos; el estado vacío —lo PRIMERO que ve el dueño— nunca se miró de cerca. **Regla**:
-(1) un enlace que luce como botón fija su color dentro del alcance del módulo (`.cscada a.btn`); (2) lo seleccionado y
-los paneles de lectura van con fondo sólido o casi sólido sobre la foto; (3) la pantalla vacía dice QUÉ falta y quién lo
-hace, paso por paso, y se valida en vivo igual que la llena. [HONOR]
-**Y `§126.9`**: antes de dar un nombre de clase CSS nuevo, buscarlo en la hoja del módulo — `.cs-filtros` ya era la barra de la lista
-y la regla nueva la cambió de cuadrícula a fila libre sin que nadie mirara la lista. Al tocar el CSS de un módulo se revisan
-TODAS sus pantallas, no solo la del cambio. [HONOR]
-**Y del banco de `§122`**: el `append` nativo del DOM no ignora `null` ni `undefined`: los escribe como texto («null» salió en el cuadro «Revisar» de la homologación). El ayudante `el()` del módulo sí los salta; con `append` directo, filtrar antes (`.filter(Boolean)`). [HONOR]
-
-
-### L-115 · Una ventana fija dentro de un iframe estirado no se ve donde está el usuario: se prueba por CADA entrada
-
-`99 §123`: el detalle de la tabla de Cargabilidad se arregló, pasó pruebas y banco con la página DIRECTA… y dentro de
-la pestaña de Seguimiento Operativo (iframe que la madre estira a todo su alto) se habría seguido viendo «no abre»: el
-fondo `position:fixed` cubre el iframe entero y la ventana se pintaba en su tope, 886 px fuera de la pantalla. En
-producción, además, la barra de pestañas fija tapaba la X. `scrollIntoView` no sirve (no desplaza la madre por un
-elemento fijo). **Regla**: (1) una pantalla que vive en más de una entrada (directa e iframe) se valida en TODAS, con
-el usuario donde de verdad hace clic (abajo, en la tabla); (2) dentro de un iframe, lo «visible» se mide desde la madre
-(`frameElement` + `elementFromPoint`, con una franja libre, no un píxel) y nunca se supone qué barras fijas tiene;
-(3) al cambiar la FORMA de una fila, recorrer todos sus consumidores en el camino vivo (el detalle llevaba roto desde
-julio porque nadie abrió la ventana). **Gate**: pruebas de `cargabilidad_detalle` + [HONOR] para las entradas.
-
-
-### L-116 · Retirar una exportación también choca con la caché: el importador VIEJO la sigue pidiendo
-
-`99 §124`: la ventana de Cargabilidad dejó de usar ocho exportaciones (la curva de ejemplo, el vocabulario viejo del
-diagnóstico). Borrarlas en la misma publicación habría tumbado la página a quien tuviera en caché el `modal-detalle.js`
-anterior (`max-age=600`): su `import { DIAG_MAP }` falla y el módulo entero no carga — el espejo de L-102. **Regla**:
-(1) lo que un módulo deja de importar se CONSERVA en esa publicación, con una nota «compat de caché» y su motivo;
-(2) se retira en una publicación POSTERIOR, pasados ≥ 10 min del despliegue; (3) antes de retirarlo, grep en todo el
-repo (assets, pages, admin, tests, _dev, functions, scripts, api) de que nadie más lo usa. **Gate** [HONOR] (TODO-57 es
-el arreglo de fondo: versionar los assets).
-
-### L-126 · Una casilla editable dentro de una tabla: lo válido se confirma al escribir, no al salir
-**Disparador**: convertir en casilla un dato que alimenta un documento o un guardado (cantidad, monto, fecha). · **Cicatriz**
-(`99 §141`): la cantidad de Órdenes se confirmaba en `change`; Ctrl+S/P/Q leían la orden con la casilla aún enfocada y el
-PDF firmado salía con la cifra vieja mientras la pantalla mostraba la nueva, y Escape (que debía cerrar la vista previa)
-borraba lo escrito. · **Regla**: (1) lo válido se guarda en `input`; `change` solo revierte lo inválido al valor que tenía al
-entrar; (2) los atajos que leen el formulario sueltan primero la casilla enfocada (`blur`), NUNCA dentro de la función que
-lee (la llama un temporizador mientras se escribe); (3) la rueda sobre un `type=number` enfocado lo cambia sin que se note:
-soltarla; (4) lo que se pinta en la casilla sale formateado igual que en el papel. Gate: `tests/ordenes_items.test.js`.
+> Lo que se rompe en la **COSTURA** entre dos caminos (dos escritores del mismo objeto, la ventana de un periodo, la caché de un
+> módulo, un iframe, una casilla que alimenta un papel, lo derivado que se corrige en su fuente) vive en
+> [`37-LECCIONES-COSTURAS-DATOS.md`](37-LECCIONES-COSTURAS-DATOS.md) (§G.5, 2026-10-11, `99 §162`; salió de aquí sin cambiar
+> una letra). IDs: L-96, L-113…L-116, L-126, L-137, L-138. L-117 → `36`.
 
 ## 🌐 Chrome del Ingeniero, extensión y banco → hija `36`
 

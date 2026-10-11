@@ -30,13 +30,13 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | 🧠 **Tronco Encefálico** | `CLAUDE.md` (este) | ✅ Siempre | Router + identidad + doctrinas + gobernanza. |
 | 🩺 **Estado Global (signos vitales)** | `docs/05-ESTADO-GLOBAL.md` | ✅ Siempre (boot) | Snapshot de salud: build, branch, flags de riesgo. "¿Dónde estoy parado?" antes de tocar nada. |
 | ⚡ **Corto Plazo (WIP)** | `docs/10-MEMORIA-CORTO-PLAZO.md` + hija `11-PENDIENTES-FRIOS.md` | ✅ Siempre (la hija ❌ on-demand) | Sprint actual y pendientes VIVOS. Los fríos (decisiones de arquitectura, validaciones diferidas) → la hija `11`. |
-| 🗺️ **Espacial** | `docs/20-MEMORIA-ESPACIAL.md` + hijas `21-ESPACIAL-HOJAS.md` · `22-ESPACIAL-MODULOS.md` | ❌ on-demand | Trigger de Desorientación: dónde vive un componente, flujos, schema de datos, hojas del dueño (`21`), Fichas/Órdenes/Contratos/Firmas (`22`). |
-| 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` + hijas `31-LECCIONES-IA.md` · `32-LECCIONES-VERIFICACION.md` · `33-LECCIONES-HARNESS.md` · `34-LECCIONES-PRUEBAS-ELECTRICAS.md` · `35-LECCIONES-SEGURIDAD.md` · `36-LECCIONES-CHROME-BANCO.md` | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas. Hijas (§G.5): `31` IA/Claude-API/CF · `32` verificar antes de declarar algo desplegado o auditado · `33` entorno, consola y workflows · `34` Pruebas Eléctricas · `35` seguridad y datos personales · `36` su Chrome, extensión y banco. |
-| 🗂️ **Índice sináptico** | `docs/00-INDICE.md` + hija `00a` (§1–§80) | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |
+| 🗺️ **Espacial** | `docs/20-MEMORIA-ESPACIAL.md` + hijas `21-ESPACIAL-HOJAS.md` · `22-ESPACIAL-MODULOS.md` · `23-ESPACIAL-SCADA.md` | ❌ on-demand | Trigger de Desorientación: dónde vive un componente, flujos, schema de datos, hojas del dueño (`21`), módulos archivo por archivo (`22`), Cargabilidad SCADA (`23`). |
+| 🧪 **Procedimental (experiencia)** | `docs/30-LECCIONES.md` + hijas (§G.5) `31-LECCIONES-IA.md` · `32-LECCIONES-VERIFICACION.md` · `33-LECCIONES-HARNESS.md` · `34-LECCIONES-PRUEBAS-ELECTRICAS.md` · `35-LECCIONES-SEGURIDAD.md` · `36-LECCIONES-CHROME-BANCO.md` · `37-LECCIONES-COSTURAS-DATOS.md` · `38-LECCIONES-PAPEL-EXCEL.md` | ❌ on-demand | Trigger de Experiencia: ANTES de una op riesgosa/repetitiva (deploy, tocar reglas/estructura) o si un síntoma "te suena". Gotchas + recetas. `32` = verificar antes de declarar algo desplegado o auditado; las demás, lo que dice su nombre. |
+| 🗂️ **Índice sináptico** | `docs/00-INDICE.md` + hijas `00a` (§1–§80) · `00b` (§81–§140) | ❌ on-demand | ANTES de leer el historial (offset exacto) Y para el enrutamiento semántico (síntoma → neurona). |
 | 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un §. NUNCA completo — usa offset/limit. |
-| 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-13 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
+| 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-14 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
 | 🛰️ **Consejo Externo** | `docs/15-CONSEJO-EXTERNO.md` | ❌ on-demand | Trigger de Decisión Fuerte: crítica adversarial de un provider de OTRA familia (config + tiers ahí). |
-| 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` (registro + fronteras) | ❌ on-demand | Trigger 🔵. Transformador: `49-PRUEBAS-ELECTRICAS.md` · `50-TRANSFORMADORES-POTENCIA.md` (equipo, OLTC) · `51-SALUD-RIESGO-ACTIVOS.md` · `52-DGA-ACEITE-PAPEL.md` · `53-CARGA-TERMICA.md`. Software (41–48): nacen con contenido real. |
+| 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` (registro + fronteras) | ❌ on-demand | Trigger 🔵. Transformador: `49-PRUEBAS-ELECTRICAS.md` · `50-TRANSFORMADORES-POTENCIA.md` (equipo, OLTC) · `51-SALUD-RIESGO-ACTIVOS.md` · `52-DGA-ACEITE-PAPEL.md` · `53-CARGA-TERMICA.md`. Suministros: `54-SUMINISTROS-ORDENES.md` (contrato y órdenes E/S). |
 | 🛠️ **Skills externas** | `~/.claude/skills/` + `skills/` + tool Skill | ❌ on-demand | Expertise portable de método. NO es neurona — recurso paralelo. **Catálogo → `docs/skills-inventory.md`**. |
 
 **Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `21`.
@@ -115,12 +115,6 @@ Antes de CUALQUIER commit no-trivial: 5 secciones → (A) archivos a modificar, 
 ### 3.7 🧠 Calidad por defecto — auto-crítica SIEMPRE · Comité ×3 por iniciativa propia
 - **Auto-crítica SIEMPRE (casi gratis)**: antes de entregar CUALQUIER respuesta sustantiva, una pasada interna — *"¿qué falla? ¿asumí algo falso? ¿se puede mejorar?"* — y corrige.
 - **Comité ×3 por INICIATIVA PROPIA (caro)**: dispara `comite-expertos` sin que lo pidan cuando la respuesta sea una DECISIÓN cara de revertir, con incertidumbre genuina o un entregable importante. Anúncialo. NO en lo trivial. [HONOR]
-
----
-
-## §4 — Cache / Service Worker — SECCIÓN DORMIDA (no hay nada que bumpear)
-
-`sw.js` es un **kill-switch** que se auto-desregistra: la PWA se desactivó a propósito (los deploys quedaban invisibles). Si algún día se reactiva, el protocolo de bump se restaura AQUÍ y su versión vigente pasa a `05`.
 
 ---
 

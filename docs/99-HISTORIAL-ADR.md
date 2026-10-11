@@ -5397,6 +5397,10 @@ Bóveda `2026-10-01-carga-scada-paquete`.
 **125.9 Nota posterior (2026-10-05).** La homologación vigente (v2) salió de una COPIA con las 8 matrículas de `125.1` escritas como en el parque («… (matriculas como el parque).xlsx», en Descargas del Ingeniero), y al entregar se le dijo que podía borrar las copias. Si vuelve a subir su Excel ORIGINAL (por ejemplo, con las 17 correcciones), esas 8 filas reaparecen con la matrícula que no casa con el parque y las buenas pasan a «retiradas» (`fusionarHomologacion`). Antes de subirlo: corregir esas 8 matrículas en su original o partir de la copia.
 **125.10 Nota posterior (2026-10-05).** «Mes completo» se mide por DÍAS (≥ 90 %, `mesCompletoMin`), no por estaciones: septiembre (30/30 días, 155 de 203 puntos, sin casi toda ORIENTE) es el mes con que abre la lista (`mesPorDefecto`). El último mes con todo el parque es agosto; una cifra «del parque» de septiembre se lee con esa falta hasta re-exportarlo completo y cargarlo en «Completar» (TODO-69).
 
+**125.11 Nota posterior (2026-10-11, `§162`).** `listos/` y `v2/` son OBSOLETOS: no traen el relevo de Sampués y subirlos
+dañaría T1/T2-SAM. Vigentes: `paso2-2026-10-08/` y `octubre-2026-10-09/` (`§158.9`, `§158.12`); listado y huellas → bóveda
+`2026-10-08-scada-sin-medicion` (`crudos/insumos/`). Cómo cargar un mes → `60 §W-13` (paso 8).
+
 ## 126. ADR-126 — Cargabilidad SCADA: máximo, mínimo e instantáneo de cada hora con filtro «Valores a mostrar» y «Fases», y una gráfica grande por magnitud ⟦OPUS-5.5⟧ (2026-10-01)
 
 > «procede por favor, que los valores que hacen falta sean escogibles mediante un filtro, dame la vista previa» ·
@@ -6093,6 +6097,10 @@ SLS T3; T1-TPS PD). «Muy inferior al hidrógeno» es cierto por construcción. 
 ninguna Cloud Function usa estos textos. Hallazgos de paso → cola CF-45…CF-48. Crudo y síntesis → bóveda
 `2026-10-06-fichas-cf43-cf44-todo69/`.
 
+**140.9 Nota posterior (2026-10-11, `§162`).** De las 11 decisiones de TODO-69: la 6 (segunda opinión de Gemini) la absorbió
+la regla general de `§150` (solo si él la pide); la 9 (septiembre sin ORIENTE) cambió de base con `§158` (el exporte no trae
+43 S/E); la 11 es TODO-71 (cotejar primero la tabla). Quedan 8 por responder.
+
 ## 141. ADR-141 — Órdenes E/S: la cantidad se corrige en la tabla de materiales y existe el material «Otro» escrito a mano ⟦OPUS-5.5⟧ (2026-10-06)
 
 > *«necesito que en esta parte de ordenes de entrada y salida, posterior a agregar al item, me permitas modificar las
@@ -6334,7 +6342,8 @@ Queda a la vista: la lista de admin de contratos usa «ejecutado» manual, y `fe
 respondió *«dejemos asi.»* y siguió con el nexo: se toma como «no tocar por ahora», no como «nunca», y no se le vuelve a preguntar
 sin motivo nuevo. La fecha real de inicio tiene fuente: la Orden de inicio 064 dice **23-12-2025**. Cotejo de Claude que no se le
 ha planteado: el nexo cuenta a T1-M/M-CHG por la ENTRADA 20260216 (**4** × S04) y el egreso borrado era de **6** × S04 del 19-may;
-si fueron entregas distintas, al consumido le faltan 6 × $5.064.165 = $30.384.990 (→ TODO-76).
+si fueron entregas distintas, al consumido le faltan 6 × $5.064.165 = $30.384.990 (→ TODO-76). → **CERRADA en `§161.7`**
+(Chiriguaná = dos entregas reales; no falta nada — nota de `§162`).
 ## 146. ADR-146 — Nexo Contrato 4125000143 ↔ Órdenes E/S: lo entregado a cada transformador descuenta del contrato (vista calculada) ⟦OPUS-5.5⟧ (2026-10-07)
 
 > *«necesito que ahora hagas un nexo con el segmento del contrato y el segmento de ordenes de entrada y salida y actualices
@@ -6959,22 +6968,28 @@ revisar»); en su Chrome, la pestaña Mapa muestra 146 puntos y «146 de 147». 
 (`registro/carga-aplicada.json`).
 
 **153.11 La Salvación (2026-10-08).** El Ingeniero entregó una foto de campo del transformador con marca de agua GPS
-(*«SSEE Salvación»*, 31-ene-2025, 10.1605° N, 73.9635° W, El Copey). Validada: cae en El Copey (Cesar, DANE), igual que su
+(*«SSEE Salvación»*, 31-ene-2025, coordenadas en la bóveda, El Copey). Validada: cae en El Copey (Cesar, DANE), igual que su
 registro (cesar / Oriente), a 1,18 km del poblado y a 2,4 km de la S/E El Copey (otra instalación). Cargada `SLV` con confianza
 alta y fuente `foto_ingeniero` (mismo autor que la carga: `--deshacer` la cubre) + 1 auditoría; la foto queda en la bóveda.
 Resultado: **147 de 147** S/E con punto, verificado en el servidor y en su Chrome.
 
 **153.12 Nueva Montería confirmada (2026-10-08).** El Ingeniero compartió la ubicación de una foto suya en la S/E (captura del
 mapa del teléfono: «Subestación Eléctrica ISA», entre la Carrera 17, la Calle 29 y la Variante Oriental, «Bonanza, Montería»).
-Esas calles (geocodificadas con Nominatim) rodean el punto que el KMZ llama NUEVA MONTERIA (8.755902, -75.857202) y no el de
+Esas calles (geocodificadas con Nominatim) rodean el punto que el KMZ llama NUEVA MONTERIA (coordenadas en la bóveda) y no el de
 MONTERIA (1,3 km al NO, más allá de la Carrera 17): **el KMZ estaba bien y OpenStreetMap tiene los nombres cruzados.**
 `confirmar.mjs NMON` subió su confianza a alta con la evidencia, SIN mover la coordenada (+1 auditoría `confirmar_posicion`).
 Montería quedaba en su punto del KMZ por descarte; **confirmada** el mismo día con su foto de campo con GPS («SSEE Montería
-TR-2 M-AT», 30-jul-2023: 8.7636° N, 75.8668° W, a 3,8 m del punto del KMZ) → `confirmar.mjs MON`. **Cañabraval** (foto con
+TR-2 M-AT», 30-jul-2023: coordenadas en la bóveda, a 3,8 m del punto del KMZ) → `confirmar.mjs MON`. **Cañabraval** (foto con
 GPS 14-mar-2025, a 46 m, tomada desde afuera del cerramiento; se ve su transformador de 2.000 kVA) y **Pozo Azul** (foto con GPS
 9-ago-2025 junto al transformador, a 7 m; placa 176972-AT de 1000 kVA) también confirmadas → **ninguna S/E «por confirmar»**:
 las 4 que el escéptico marcó tenían el punto del KMZ bien (la lejanía al poblado y los nombres cruzados de OSM eran de la
 referencia, no del archivo).
+
+**153.13 Nota posterior (2026-10-11, `§162`).** (1) Las coordenadas de `153.11`–`.12` se retiraron de este texto (repo
+público, L-140); el original está en la bóveda (`2026-10-11-auditoria-nivel2/crudos/coordenadas-retiradas-del-repo.txt`) y
+sigue en el historial de git hasta que él decida purgarlo (TODO-78). (2) `--deshacer` tras las confirmaciones borra 143 y
+CONSERVA MON, NMON, CNB y PZL (su `updatedAt` cambió con `confirmar.mjs`): para volver a cero, borrar esas 4 aparte con su
+auditoría. (3) El Excel de revisión de TX por departamento de TODO-78 sale de `crudos/revision-tx/` de la bóveda de ubicación.
 
 ## 154. ADR-154 — Inventario (admin): editar un transformador guarda SOLO lo que cambió; ya no borra la matrícula, la condición de salud ni lo demás que el formulario no muestra ⟦OPUS-5.5⟧ (2026-10-08)
 
@@ -7144,6 +7159,9 @@ IDÉNTICO a `filasLista` sobre producción (`referencia.json`) · salud 85/83/16
 **157.6 Archivos.** `assets/js/domain/mapa_parque.js`, `assets/js/ui/mapa/mapa-colombia.js`, `assets/css/mapa-colombia.css`,
 `pages/mapa-v2.html`, `tests/mapa_parque.test.js`. INTACTOS: Cargabilidad SCADA (página y dominio), datos.
 
+**157.9 Nota (2026-10-11, `§162`).** Crudo no archivado: la revisión adversarial interna (1 Opus) dejó sus correcciones en
+`157.2`; no hay carpeta de bóveda (igual que la revisión de `§152.4`).
+
 ## 158. ADR-158 — Cargabilidad SCADA: los 77 «sin medición» de septiembre, diagnosticados; el motivo dice la causa real y la homologación se corrige con lo que ya está en su disco (relevo de Sampués) ⟦OPUS-5.5⟧ (2026-10-08)
 
 > *«en el modulo de cargabilidad SCADA cuales son esos equipos que no tienen medicion? valida por favor no tiene medicion o la
@@ -7232,7 +7250,8 @@ SCADA y su Chrome:
     73,0 %, SLC 58,0 %.
   - Agosto: 130 firmes. TAN 52,3 %, SLC 59,3 %, T1-SAM 142,5 % provisional, T2-SAM 71,0 %.
   - Mapa: «Sin medición» 74, CRG 1 = 34 y CRG 3 = 22. Consola limpia.
-- Cada mes nuevo DEBE empaquetarse con el mismo relevo (orden exacta en la memoria del proyecto y en la bóveda).
+- Cada mes nuevo DEBE empaquetarse con el mismo relevo (orden exacta en la memoria del proyecto y en la bóveda). → *Superado
+  por `158.10`: el relevo se lee solo de la hoja «Relevos de estación» de la v3 (nota de `§162`).*
 
 **158.10 Nota posterior (2026-10-08): revisión adversarial de lo publicado y sus correcciones.** 3 lentes Opus (código,
 datos, consumidores) + 1 escéptico por hallazgo (13 agentes, solo lectura).
@@ -7427,6 +7446,13 @@ anula · entregar a la página publicada un tipo que no sabe escribir · nombres
 - Teórico, no hoy: `topsDe` pasa la lista a Float32; sobre 16.384 A perdería el redondeo a 0,001 (el mayor `top` del parque es
   9.006 A, una hora imposible). Si algún día importa, leer la lista en Float64.
 
+**159.10 Nota posterior (2026-10-11, `§162`).** Lo recomendado que él NO eligió, para no re-plantearlo sin motivo nuevo:
+(a) «¿cuentan los meses provisionales?» → recomendado: solo los firmes (el provisional en gris); porqué: LPZ mostraría agosto
+148,6 % provisional en vez de julio 137,4 % firme. (b) «¿cuentan para fijar desde cuándo supera y la mayor corriente?» →
+recomendado: solo firmes; porqué: T1-SAM saldría sobrecargado desde enero al 176 % con una relación de corrientes ≈ 24 en vez
+de 2,5. Riesgo aceptado por él (10-09): lo provisional pesa igual; se mitiga con rótulo y trama gris. Crudo → bóveda
+`2026-10-08-scada-sin-medicion/crudos/periodo/`.
+
 ## 160. ADR-160 — La calificación de cargabilidad CRG se nombra con la escala de condición del MO.00418: Muy Bueno · Bueno · Medio · Pobre · Muy Pobre ⟦OPUS-5.5⟧ (2026-10-09)
 
 > *«las evaluaciones para cargabilidad son las siguientes 1. MUY BUENO 2. BUENO 3. MEDIO 4. POBRE 5. MUY POBRE por favor
@@ -7462,6 +7488,10 @@ módulo publicado. Lo que dicta va literal (las palabras); la forma de escribirl
 Chrome, tras recargar: Cargabilidad SCADA septiembre con chips «CRG 5 · Muy Pobre … CRG 1 · Muy Bueno» y filtro «5 · Muy
 Pobre … 1 · Muy Bueno»; mapa con «1 Muy Bueno 34 · 2 Bueno 6 · 3 Medio 22 · 4 Pobre 29 · 5 Muy Pobre 43» y la leyenda igual.
 Una pestaña abierta antes de publicar sigue con las palabras viejas hasta recargar (solo cambian valores: no rompe nada).
+
+**160.8 Nota (2026-10-11, `§162`).** Lo ofrecido sin respuesta está en `160.7`, que quedó escrita dentro de `§161` (tras
+`161.6`). Dos ofrecibles del estudio que no se le plantearon: anteponer «CRG» en los botones del mapa (Salud y CRG dicen igual
+«1 Muy Bueno»…) y el «Carga normal» del panel DGA para CRG 1–3, que convive con «CRG 3 · Medio» (`crudos/crg/`).
 
 ## 161. ADR-161 — Contrato 4125000143 «conforme a las órdenes»: se reconcilia orden por orden, se corrigen 4 órdenes con sus hechos y el tablero deja de mostrar cifras viejas tras editar una orden ⟦OPUS-5.5⟧ (2026-10-09)
 
@@ -7523,3 +7553,113 @@ sale naranja en Cargabilidad y amarillo en Salud). Ninguno se hace sin su pedido
 borrado el 07/10) queda CERRADA por sus respuestas del 10-09: Chiriguaná = las ENTRADA 20260212 y 20260216 (dos entregas reales,
 8 × S04) y los 2 Krenz de la 20260212 son de la URE; la pregunta se le hizo citando ese registro del 19-may. (2) Reconciliación
 repetida el 10-11 (`.get()`): igual que el 10-09 — 24 órdenes, 21/21, $734.757.342, nada pendiente.
+
+**161.8 Nota (2026-10-11, `§162`).** (1) Ofrecido sin respuesta: aviso en el formulario cuando una SALIDA vaya Bosque → S/E con
+ítems del contrato. (2) Propuestas del estudio (lente código) sin decisión: el motivo «no es un ítem del contrato (Bodega
+Membrillal u otra lista)» explica mal un «Otro» escrito a mano · aviso al agregar un «Otro» parecido a un ítem · Sxx en el
+ranking de indicadores · atajo «Vigencia del contrato» · el filtro de periodo de Órdenes E/S se recuerda por navegador (con
+«Este año», S03 da 30 en Órdenes contra 32 en el contrato). (3) Termómetro MR y deshumidificadores ABB: el estudio recomienda
+dejar fuera los ABB (los ítems del contrato son de otra marca). (4) Indicio sin verificar para TODO-62: MOV-2026-0019 y 0020 los
+registró el sistema el 10-08 al guardar órdenes otra persona del equipo (no se leyó su rol). Crudo → bóveda
+`2026-10-09-contrato-conforme-ordenes` (`SINTESIS.md`, `crudos/estudio-3-lentes.json`).
+
+## 162. ADR-162 — Cerebro: auditoría Nivel-2 del 2026-10-11 y neurogénesis — nacen `00b`, `23`, `37`, `38` y el lóbulo `54`; 13 neuronas fortalecidas; las coordenadas reales salen del repo ⟦OPUS-5.5⟧ (2026-10-11)
+
+> *«antes de seguir con SCADA realicemos el mantenimiento minucioso y adecuado del cerebro, valida si pueden crecer nuevas
+> neuronas o fortalecer las que ya estan»*. Skill `auditoria-cerebro` (sondas 0–7) + una sonda de neurogénesis por dominio y
+> otra por procedimiento/espacio: 8 agentes Opus de solo lectura (7 sondas + drill frío) y 1 verificador escéptico (54 ítems:
+> 34 confirmados, 13 ajustados, 7 duplicados, 0 refutados); ejecución con 3 agentes Opus en frentes disjuntos (bóveda, memoria, lóbulos). NO revisado
+> externamente (`§150`: solo si él lo pide). Deliberación: bóveda `2026-10-11-auditoria-nivel2` (`HALLAZGOS.md` + `crudos/`).
+
+**162.1 Causa raíz.**
+- **Topes**: 12 ADR sin auditoría (gate #14). `00` (100,6 %) y `20` (100,3 %) sobre su tope; `30` (98 %), `32` (98 %) y la cola de
+  Fichas (95 %) con el corte escrito en `§149.4` y sin ejecutar (S0-01, S6-02, S6-03: reincidentes). El arranque a 21c de su
+  objetivo: la poda del 10-07 no se sostuvo (31.238 → 31.479c, tercera vez; S0-02).
+- **Conocimiento que el cerebro no entregaba**: la receta de cargar un mes SCADA, «la orden manda» y el cierre de turno vivían
+  solo en la memoria del asistente (S2-02, S5-02, SP-08); el criterio del contrato y de las Órdenes E/S no tenía dueño (15 ADR,
+  ~53 KB del 99; SD-01); pendientes suyos escondidos en notas de ADR (`§140`, `§153.9`, `§158.12`, `§161`; S2-03, S2-05, S5-04, SD-05).
+- **Dato del cliente en el repo público**: `tests/mapa_parque.test.js` traía la posición de 3 S/E copiada del KMZ y `§153.11`–`.12`
+  3 coordenadas de sus fotos con GPS, contra `§152.2`/`§153.5`; ningún candado lo vigila (SP-01, alta).
+- **Bóveda**: síntesis congeladas antes de su decisión final (ubicación y mapa; S4-01/S4-02, reincidente), propuestas de estudios
+  sin rastro (S4-04), el banco de `§159`–`§161` solo en un scratchpad (S0-03), y una sola copia en disco aunque ya alimenta los
+  candados de cédulas y firmas (S7-01, alta, decisión suya).
+- **Retrieval-drill frío 5/5 correcto**, pero Q1 («cargar un mes SCADA») costó ~80k caracteres y ~35k del 99.
+
+**162.2 Solución.**
+- **Neurogénesis por tope, sin cambiar una letra** (comprobado por bloque contra `HEAD`): `00b-INDICE-ADR-081-140` (60 filas) ·
+  `23-ESPACIAL-SCADA` (la fila de Cargabilidad SCADA de `22`) · `37-LECCIONES-COSTURAS-DATOS` (L-96, L-113…L-116, L-126 de `30`;
+  nuevas L-137 relectura y L-138 «lo derivado se corrige en su fuente») · `38-LECCIONES-PAPEL-EXCEL` (L-87, L-88, L-89, L-100,
+  L-103, L-108, L-128, L-133 de `32`). `20` → `22`: Mapa, Importador y la sección de Pruebas Eléctricas; el árbol del ecosistema
+  apunta al `CLAUDE.md` del paraguas. Cola de Fichas: «Lo ya cerrado» → su hoja de cerrados; nace **CF-49** (municipio por NOMBRE).
+- **Lóbulo nuevo `54-SUMINISTROS-ORDENES`** (criterio, no copia de ADR): vocabulario ENTRADA/SALIDA, «la orden manda», qué
+  descuenta del 4125000143, valor y cantidades, movimientos (supera la decisión 6 del PLAN-SUMINISTROS), indicadores, fuentes.
+  **Territorio del parque: evaluado y NO nacido** (condición en `40`; mientras, fila de ruteo en `00`).
+- **Fortalecidas**: `53` (motivos de «sin medición», relevo, periodo, mes incompleto, lo que NO se renombra de la CRG, insumos) ·
+  `51` (matrícula repetida, Casacará con salud sobre 5 MVA, Valor CREG Unitario, vocabulario firmable) · `50` (fronteras → `52`/`53`)
+  · `49` (puntero muerto) · `40` (registro de 54 y territorio) · `60` (W-13 paso 8 «mes SCADA», secuencia paso a paso, **W-14
+  cierre de turno**) · `00` (rutas a 37, 38, 54, Mapa/territorio; fila 📈 acortada) · lecciones L-139 (Leaflet), L-140
+  (coordenadas) y L-141 (la memoria no es dueña de reglas, `33`) + notas en L-101, L-102, L-117, L-125, L-130, L-134.
+- **Pizarra y estado**: GC de `10` (lo ya ADR fuera; TODO-71 → `11`; TODO-79 nuevo en `11`); pendientes escondidos a sus filas;
+  (B) sin el TODO-08 fantasma; (H) reescrita; `05` sin SHA servido escrito a mano (→ handoff/`git fetch`).
+- **99**: notas posteriores 125.11, 140.9, 145.10 (cerrada en `§161.7`), 153.13, 157.9, 158 (relevo superado), 159.10, 160.8 y
+  161.8; 3 coordenadas retiradas (original en la bóveda).
+- **Código**: la prueba del mapa usa coordenadas ficticias (23/23).
+- **CLAUDE.md**: registra `00b`, `23`, `37`, `38`, `54` y W-14; retira `§4` dormida (su frase vive en `20`). **Manifest**: topes de
+  `00b`, `23`, `37`, `38`, `54` y de `15`, `21`, `40` (faltaban: los del manifest reemplazan a los de fábrica); **`60` sube de
+  14.000 a 17.000** (absorbió procesos de la memoria; partir un catálogo de 14 procesos separaría el catálogo de sus recetas; si
+  pasa 17.000, W-11 sale a su hija); `deepAudit` al 10-11; razón del downgrade corregida; disparador de reapertura de la copia.
+- **Memoria** (dos slugs): punteros al cerebro (54, 37, 38, W-13, W-14, L-140); Mapa y SCADA al día; `MEMORY.md` 6.959 → 4.578c
+  (SGM) y 8.461 → 7.226c (paraguas). **Bóveda**: secciones «Superada»/«Notas» apendadas en 4 síntesis, banco rescatado,
+  homologación v3 e inventario de paquetes en `crudos/insumos/`, README al día, volcado de la memoria y de las skills de método.
+
+**162.3 No-regresión.** Las 14 lecciones, las 60 filas del índice y las filas SCADA, Mapa e Importador movidas son idénticas a
+`HEAD`. Arranque **31.479 → 30.923c** (−556; ≤ 31.238 del cierre del 10-07; margen 577c). Ninguna neurona sobre el 90 % de su tope (`20`
+89,1 %, cola 89,9 %, `40` 89,2 %). Ningún ID L-/M-, TODO ni CF renumerado; ninguna lección pierde su encabezado. Producto: solo
+cambia la prueba del mapa.
+
+**162.4 Verificación y lo que queda (con dueño).**
+- `brain:index` + `brain:check` + `boot-gate` + `test:unit` + `lint:html` + grep de M-11 sobre los IDs movidos (docs, CLAUDE y
+  los dos slugs: ningún puntero al archivo viejo) + verificador del cierre (agente) → cifras en `162.9`.
+- **KERNEL** (TODO-67, un solo bump en `brain-private/kernel`): gate #5 con `[LM]-\d{2,3}` y recorriendo todo `docs/` (ciego a 37 de
+  147 lecciones; S7-08/SP-03, reincidente) · hijas `3[1-9][a-z]?-LECCIONES` (con 37 y 38 solo queda el 39; SP-15) · «§173» e
+  «Inmobiliaria» fuera de los mensajes (S0-06/S2-10/S7-02) · pre-shard que cuente las neuronas sobre su tope (S6-05) · #7 que
+  resuelva «bóveda `X`» y avise una síntesis más vieja que la nota posterior de su ADR (S4-05) · aviso de memorias citadas que no
+  existen y arranque real con `MEMORY.md` (S5-11/SP-13) · quitar #4, #13 y el canario de 48 h (S7-11) · sub-sección fuera de su
+  ADR (S7-05) · guardia de coordenadas (L-140) · registro de qué gate disparó (S7-13).
+- **TODO-66**: nodos que aún nombran la memoria como dueña (S5-01, parcial) · copias de memoria entre slugs · OLTC → ESTADO.md
+  (S5-07) · banco canónico + `launch.json` (S0-03) · resello de la cola de Fichas · guardia de firmas en pre-push (S7-09) · freno
+  del lado del servidor en CI (S7-07).
+- **DUEÑO (J)** con la recomendada: costo-cerebro (contar los commits de cerebro sueltos: 28 % en vez de 50 %) · copia mensual de la
+  bóveda fuera de este disco (sí) · purgar del historial de git las coordenadas ya publicadas (TODO-78).
+
+**162.5 Anti-patterns evitados.** Reescribir historia (todo apendado; solo se retiraron 3 coordenadas, con el original en la
+bóveda) · subir un tope sin ADR (solo `60`, justificado arriba) · mezclar cerebros (la «32 · L-88» de la memoria del paraguas es de
+Líneas AT y no se tocó) · copiar ADR dentro de un lóbulo · escribir nombres de puntos SCADA en el repo · editar el kernel desde el
+repo · borrar memorias · cambiar la doctrina §3.7 sin su palabra.
+
+**162.6 Archivos.** Nuevos: `docs/00b-…`, `23-…`, `37-…`, `38-…`, `54-…`. Tocados: `CLAUDE.md`, `00`, `05`, `10`, `11`, `20`, `21`,
+`22`, `30`, `32`, `33`, `34`, `35`, `36`, `40`, `49`, `50`, `51`, `53`, `60`, cola y cerrados, `99`, manifest, `tests/mapa_parque.test.js`.
+INTACTOS: código de producto, reglas, Functions, kernel.
+
+**162.7 Doctrina.** `§G.4` (neurogénesis, frescura, GC) · `§G.5` (sharding; one-in-one-out en CLAUDE) · M-11 · L-140 · interinato
+R1/R7 · workflows acotados con Opus.
+
+**162.8 Verificado sano / no re-auditar.** El freno de `§150` se cumplió en todos los merges de `§152`–`§161` · los githooks están
+activos (`core.hooksPath`, también en worktrees) · referencias L-/M- sanas a mano con `\d{2,3}` (152 definidas = 147 + L-137…L-141, 0 duplicadas, 0
+colgantes) · CI de main en verde y lo servido = `origin/main` (curl) · 4 CF y 55 índices = servidor · `52` no se desfasó · OLTC
+propio sigue sin nacer · `160.7` dentro de `§161` no es defecto si el índice lo dice (ahora también `160.8`) · falso positivo: la
+«L-88» del paraguas · las coordenadas genéricas de Cartagena (10,39 / −75,5) en dos pruebas son de la ciudad, no de una S/E.
+
+**162.9 Verificación del cierre (2026-10-11, agente Opus de solo lectura).** `brain:check` SANO (kernel v1.13.0 = canónico; 162
+entradas del índice válidas; 50 documentos alcanzables) · `boot-gate` 30.857c ≤ 31.500 (margen 643; en `HEAD` 31.479; tras corregir sus fallas, 30.923c) ·
+`test:unit` 2590 pass / 0 fail / 2 skip · `lint:html` limpio · `mapa_parque` 23/23 · idénticos a `HEAD` bloque por bloque: las 14
+lecciones, las 60 filas de `00b`, las filas SCADA, Mapa e Importador y la sección de Pruebas Eléctricas · 152 lecciones, 0 duplicadas
+ni colgantes · guardias de SCADA y de cédulas limpias en los 30 archivos tocados; ningún número de las coordenadas retiradas queda en
+`docs/`, `tests/` ni `CLAUDE.md` · más de 20 afirmaciones de dominio nuevas cotejadas con el código. **Fallas del propio cierre que
+encontró y quedaron corregidas (13)**: 2 posiciones reales redondeadas a 2 decimales en la prueba del mapa (Valencia del Cesar y
+Montería) → ficticias · el corte natural de `36` no estaba escrito → cabecera de `36` · TODO-66 sin el freno en CI · `33` faltaba en
+`162.6` · las cifras del verificador y el número de agentes · «147» → 152 lecciones · faltaba esta `162.9` · TODO-69 y `53` no
+apuntaban a `160.8` · la síntesis de SCADA citaba `§125.6` por `§125.11` · S0-02 marcado sin su margen · S0-01 al 71 % · el nombre
+del Excel de revisión de TX igual en memoria y síntesis. **No verificado** (sin red ni producción en esa corrida): CI y lo servido,
+CF e índices contra el servidor, la salud de Casacará.
+

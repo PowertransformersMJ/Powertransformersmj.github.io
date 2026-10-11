@@ -19,7 +19,7 @@
 - `MANTENIMIENTO-BRIGADA.md` — módulo Selección ONAF: calculadora de refrigeración ONAN→ONAF conforme IEEE C57.12.00 / C57.91-2011 / ANSI C57.12.91 + Westinghouse.
 - `MANTENIMIENTO-PREDICTIVO.md` — refactor del tablero estático de Pruebas Eléctricas (TransformerOps) a módulo modular sobre Firestore realtime + sistema Aqua.
 - `PLAN-SERVICIOS-EXTERNOS.md` — guía paso a paso (legacy, para no-programadores) de conexión con Firebase, Node.js, GitHub Pages y Vercel.
-- `PLAN-SUMINISTROS.md` — plan v2.2 de integración Suministros + Repuestos (F38–F50) a partir de los fuentes `.jsx`/`.xlsm`, con decisiones bloqueantes aprobadas. Es un plan: lo construido difiere (no existen `suministros-stock` ni `suministros-correcciones`).
+- `PLAN-SUMINISTROS.md` — plan v2.2 de integración Suministros + Repuestos (F38–F50) a partir de los fuentes `.jsx`/`.xlsm`, con decisiones bloqueantes aprobadas. Es un plan: lo construido difiere (no existen `suministros-stock` ni `suministros-correcciones`; la decisión 6, «solo admin», la supera `99 §148`). Criterio vigente → `54`.
 - `INDICADORES-CALIDAD.md` — dashboard SAIDI_E/SAIFI_E (refactor F40): impacto de causas controlables + proyección Jun–Dic con OLS y bandas IC95%.
 - `REPOSITORIO-PRUEBAS-ELECTRICAS.md` — arquitectura del repositorio digital de pruebas por número de serie (extiende `pages/pruebas-electricas.html`); su §13 documenta la extracción con IA (ADR-003).
 - `CONTRATO_4125000143_ANALISIS.md` · `MICROCIRUGIA-CONTRATOS-2026-04-27.md` — diagnóstico del módulo Suministros/Contratos (diff del `.xlsm` vs el template canónico + inventario).

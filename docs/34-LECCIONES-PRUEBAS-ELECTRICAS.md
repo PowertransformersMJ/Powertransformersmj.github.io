@@ -9,7 +9,7 @@
 >
 > **Alcance ampliado (2026-10-02, `99 §137`), sin renombrar el archivo**: es la casa de las lecciones de DOMINIO del
 > diagnóstico —pruebas eléctricas, DGA, carga y salud—. El criterio vigente vive en los lóbulos `49`–`53`; aquí, lo
-> que costó aprenderlo. Las lecciones de verificación de datos siguen fuera: L-113 en `30`, L-117 en `36`, L-118…L-120 en `32`.
+> que costó aprenderlo. Las lecciones de verificación de datos siguen fuera: L-113 en `37`, L-117 en `36`, L-118…L-120 en `32`.
 
 ---
 
@@ -85,3 +85,5 @@ y que 500 ppm de etileno son el punto caliente del devanado por carga (es una fa
 para el PRINCIPIO (qué gas da cada falla); el umbral propio se rotula «criterio del área» solo con el sí del Ingeniero; (2)
 «ratificado con X» exige la página leída en la sesión (`pdftotext` del PDF de `~/Downloads`); (3) un valor absoluto en ppm no
 garantiza la temperatura de la falla (C₂H₄ 500 con CH₄ alto da T1): sin Duval calculado no se imprime un rango en °C. [HONOR]
+**Y `§160`**: vale también para las PALABRAS de una escala: «Baja…Crítica» de la CRG las puso Claude y él solo había aprobado las
+bandas. Una escala se nombra con el vocabulario de la norma o el que la plataforma ya usa (`CONDICIONES` de `schema.js`), nunca con uno inventado.

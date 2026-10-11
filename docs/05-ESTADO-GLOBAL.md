@@ -2,10 +2,10 @@
 
 > Nodo de signos vitales. Se **AUTO-CARGA** (con `CLAUDE.md` + `10`). "¿En qué estado está el sistema AHORA?". Tope ~25 líneas / 4k chars (§G.5) — tablero, no bitácora. Detalle histórico → `99` vía `00`.
 
-| Señal | Valor (al **2026-10-09**) |
+| Señal | Valor (al **2026-10-11**) |
 |---|---|
-| **Misión ahora** | **Último frente** (10-08/09): **CARGABILIDAD SCADA** (`§158`–`§160`, TODO-69) y **CONTRATO = ÓRDENES** (`§161`, TODO-76). **Esperan su respuesta**: MAPA (TODO-78) · FICHAS (CF-43/44 en rama; cola → `docs/cola-fichas-tecnicas.md`). Último publicado: **`§161` contrato = órdenes**; cerebro: auditoría `§149` y freno al publicar `§150` (main `6a75027`, 10-07). Cadena → `00` Capa 1. |
-| **Build** | 🟢 **2590 pass / 0 fail / 2 skip** + `lint:html` limpio + **242 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-09 (local + emulador de reglas); servido = main `71039dc` (10-09, §161, curl + página en vivo); CI VERDE (`gh run list`, 10-08; prueba de velocidad inestable → relanzar, **L-122**) |
+| **Misión ahora** | **Último frente**: CEREBRO — mantenimiento Nivel-2 y neurogénesis (`§162`, 10-11). Siguen **CARGABILIDAD SCADA** (`§158`–`§160`, TODO-69) y **CONTRATO = ÓRDENES** (`§161`, TODO-76). **Esperan su respuesta**: MAPA (TODO-78) · FICHAS (CF-43/44 en rama; cola → `docs/cola-fichas-tecnicas.md`). Cadena → `00` Capa 1. |
+| **Build** | 🟢 **2590 pass / 0 fail / 2 skip** + `lint:html` limpio + **242 tests de reglas** + `test:trigger` (1, emulador de Functions) (Storage: con el de Firestore al lado, L-78) + candado `guardia:cedulas`. · verificado-vivo: 2026-10-11 (local; CI de main en verde, `gh run list`; prueba de velocidad inestable → relanzar, **L-122**). Lo servido → handoff o `git fetch` + curl (L-65), nunca de memoria. |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` y `main` con el MISMO contenido (`main` avanza por merge; SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). |
 | **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices + 13 exenciones `scada_*`: archivo = servidor** (2026-10-01, L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-10-09 |

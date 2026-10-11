@@ -16,6 +16,10 @@
 - **CRG del MO.00418 §A3.4** (Ed. 02: AX.01 §4.1.3, Tabla 7) (> 60/65/75/90 %); se NOMBRA con la escala de condición Muy Bueno … Muy Pobre (`99 §160`): `umbrales_salud_baseline.js` (`crg`). La cifra de CARGABILIDAD es el
   dato OFICIAL de Planificación AT y tiene prioridad (`calcularCalifCRG`, decisión del Ingeniero 2026-07-27, `99 §57.2 c`).
   **CRG 5 ⇒ HI ≥ 4** (override §A5, MO.00418 §4.1.3) → `51 §1`.
+- Las palabras de la CRG son SOLO las de la escala de condición (`CRG_CHIP` = `CONDICIONES`, candado
+  `tests/scada_carga_crg_nombres.test.js`). NO renombrar lo que solo comparte palabras: prioridad de la ficha y de órdenes,
+  severidad de alertas, criticidad por usuarios («Moderada», MO §4.2.1 → `51 §6`) y nivel de atención DGA × carga
+  (`99 §160.3`). Ofrecido sin respuesta: MAYÚSCULAS y el color de «Medio» (naranja en CRG, amarillo en salud) → `§160.7`; prefijo «CRG» en los botones del mapa y «Carga normal» del panel DGA → `§160.8`.
 - **Cortes 80/95/100 % del tablero viejo** `seguimiento-cargabilidad` (`cargabilidad_config.js`): **sin fuente
   normativa**; no mezclarlos con la CRG.
 
@@ -24,18 +28,40 @@
   (`electrico.corriente_nominal_*_a`). Horas > 3 × ampacidad = escala imposible, fuera. Equipo = máximo de sus
   devanados: **NUNCA se suman niveles**. Calibrada contra la carga oficial 2025: mediana del cociente 0,993.
 - **Firme / provisional**: firme solo si se cumple TODO: homologación automática (sin avisos que la frenen) o confirmada por el Ingeniero —y confirmada si lo que se mide es un circuito—, ampacidad en cada devanado, se mide el devanado que lleva la carga, cobertura ≥ 50 %, ≥ 72 h válidas, las 3 fases en la mayoría de las horas (con solo 2 en más del 50 % es provisional, `§125.2`), sin escala sospechosa y sin mes del rango sin leer (`firmeza` en `scada_carga_kpis.js`); la provisional va en gris con su motivo.
-- Ventana del mes = las horas que el SCADA ROTULA en él (`ventanaDeMes`). Gotchas → L-113 (`30`), L-117 (`36`).
+- Ventana del mes = las horas que el SCADA ROTULA en él (`ventanaDeMes`). Gotchas → L-113 (`37`), L-117 (`36`).
 - **Periodo de varios meses** (`99 §159`): su cifra es el p99 de TODAS sus horas (exacto con las 90 más altas de cada mes),
   NUNCA el promedio ni la mediana de los p99 mensuales (subestiman ~10–14 pts, hasta 37) ni el peor mes (sobrestima ~8).
+- **Periodo e historia** (`§159`, `scada_carga_periodo.js`): «Supera su capacidad desde» = la PRIMERA ventana de 2 h
+  seguidas > 100 % (la sostenida del §4; la hora suelta anterior, como nota). Los meses PROVISIONALES cuentan igual que
+  los firmes y se rotulan: decisión del Ingeniero, NO la recomendada (no «corregirla» excluyéndolos). Cobertura: no cuentan
+  un mes que el parque no cargó ni los días aún no cargados de un mes incompleto (solo en varios meses); un mes que vino
+  para el parque y no para el equipo SÍ cuenta (hueco suyo).
+- **Mes incompleto** (`§158.12`): solo, su cobertura se mide contra el mes entero (7 de 31 días ⇒ máx. 22,6 % ⇒
+  provisional; firme hacia los 16–17 días). Es «completo» con ≥ 90 % de sus días (`TIEMPO.mesCompletoMin`); la página abre
+  por defecto el último mes completo (`mesPorDefecto`).
 - Las horas del SCADA se leen en **hora de Colombia, UTC−5 fijo** (sin horario de verano): calendario, lista y curvas no dependen de la zona del computador (`domain/scada_carga_fecha.js`, `99 §122`).
 - Homologación SCADA ↔ transformador, valores tope y escala ×10 → `99 §122`, `§125`; bóveda `2026-10-01-parametros-scada`. Sin medición
   (motivo con la causa, hueco del exporte de 43 S/E desde el 1–2 sep, homologación v3, relevo de estación) → `§158`.
+  Insumos vigentes (homologación v3 con su hoja «Relevos de estación», paquetes) → bóveda `2026-10-08-scada-sin-medicion`
+  (`crudos/insumos/`) y memoria del proyecto; nunca al repo. Cómo cargar un mes → `60 §W-13` (paso 8).
+- **Sin medición: el motivo dice la causa** (`motivoSinHoras`, `scada_carga_vista.js`; `§158.2`, `.10`): «no vino en el
+  exporte del SCADA» · «el punto SCADA aún no aparecía en el exporte» · «sin corriente válida (sí llega la potencia)» ·
+  «sin carga (fuera de servicio o en reserva)» (≥ `CALCULO.horasMinSinCarga` = 24 h en cero con tensión) · «medida en
+  cero, congelada o marcada no válida por el SCADA». Deciden solo los niveles CON devanado. Antes de pedir datos, mirar si
+  el punto vino en el exporte (sep-2026: 44 de 77 sí se medían; falló el exporte o el nombre, `§158.1`).
+- **El SCADA renombra estaciones**: el punto conserva su historial y el relevo se declara en la hoja «Relevos de
+  estación» del Excel de homologación (`§158.10`); sin él, el punto queda en la estación vieja que el SCADA ya no renueva
+  (Sampués solo tiene horas válidas gracias al relevo, `§158.12`). La cifra usa SOLO la corriente: P/Q mal escaladas
+  (~×1000 en 4 puntos, `§158.12`) solo dañan la curva de potencia.
 
 ## 3. Ampacidad
 - Es la de **ventiladores en servicio (ONAF)**, confirmado por el Ingeniero (`99 §127.1`). Si la refrigeración falla,
   la ampacidad real es menor y la cifra subestima: hoy nada lo cruza («refrigeración deficiente» sin señal → CF-27).
   Hoy son **27 equipos ONAF con ventilación obsoleta** (dato del diseño de `§122`, bóveda `2026-09-30-cargabilidad-scada/diseno-v2.md`; riesgo anotado en `99 §127.8`): en ellos la cifra medida y el nivel del panel DGA pueden quedarse cortos.
 - Erratas ×10 conocidas en la ampacidad: hay que dividir el PAR (ampacidad y carga), no la ampacidad sola (TODO-54).
+- Vistas desde el SCADA, solo informativas y sin tocar: posibles erratas en la cifra OFICIAL de Salud de Activos
+  (Ariguaní; El Carmen y Sampués, corrientes copiadas entre T1 y T2; Membrillal T1) y un circuito cuya limpieza descartó casi todo agosto → síntesis
+  de la bóveda `2026-10-08-scada-sin-medicion` y TODO-54.
 - Al corregir la POTENCIA de placa, corregir también la ampacidad y la carga medida que se derivó de ella: Casacará T1 quedó con la ampacidad de 5 MVA tras pasar a 2 MVA (`99 §158.11`). Su Excel de Salud de Activos aún trae la vieja: no reimportarlo sin corregirlo.
 
 ## 4. Sobrecarga sostenida
