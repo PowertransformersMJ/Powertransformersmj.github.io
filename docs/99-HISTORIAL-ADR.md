@@ -7452,7 +7452,7 @@ la ficha y de órdenes, severidad de alertas, criticidad por usuarios («Moderad
 **160.4 Verificación.** `tests/scada_carga_crg_nombres.test.js` (2: `CRG_CHIP` = `CONDICIONES`; `NOMBRE_CRG` sin el vocabulario
 viejo) · unitarias 2574/0/2 · lint. Vista previa con datos reales (puerto 8135): chips «CRG 5 · Muy Pobre … CRG 1 · Muy
 Bueno», filtro «5 · Muy Pobre … 1 · Muy Bueno», periodo y detalle; mapa: «1 Muy Bueno 34 · 2 Bueno 6 · 3 Medio 22 · 4 Pobre
-29 · 5 Muy Pobre 43». Publicación y verificación en vivo → `160.5`.
+29 · 5 Muy Pobre 43». Publicación y verificación en vivo → `160.6`; lo ofrecido sin respuesta → `160.7`.
 
 **160.5 Anti-patterns evitados / doctrina.** Reemplazo masivo de «Alta»/«Crítica» (rompería prioridades y papeles) · cambiar
 colores no pedidos (el «Medio» de la CRG sigue naranja y el de la salud amarillo: decisión aparte suya) · nuevo import en un
@@ -7503,7 +7503,7 @@ cuando cambia una entrega, al volver tras > 1 min o con «Actualizar».
 - Defecto reproducido y corregido en el banco con la foto de hoy (sin nombres): editar la 20260910 y retirar su movimiento con el
   contrato abierto → `main` queda en «20 registradas · 1 por registrar», $734.757.342, «mov. 2 · órdenes 4»; con el arreglo, a los
   ~2 s: 18 órdenes, $622.916.974, 20/20, S02 en 8; pestaña Movimiento 20 ya registradas, 0 por registrar; consola limpia.
-- Unitarias 2590/0/2 (16 nuevas, `tests/contrato_relectura.test.js`) · lint. Publicación y vivo → `161.5`.
+- Unitarias 2590/0/2 (16 nuevas, `tests/contrato_relectura.test.js`) · lint. Publicación y vivo → `161.6`.
 
 **161.5 Anti-patterns evitados / doctrina.** Deducir hechos (se le preguntaron) · borrar movimientos a mano (manda la orden,
 `§148`) · emparejar «Otro» por parecido (decisión 2 de `§146`) · escucha en vivo de órdenes (free-tier) · pisar a otra persona del
@@ -7514,3 +7514,12 @@ equipo que editaba la misma orden minutos antes (versión verificada; el borrado
 Chrome: contrato 4125000143 con 19 órdenes, 18 transformadores, $734.757.342, 21 registradas · 0 por registrar; Chiriguaná 8 × S04
 ($40.513.320, ENTRADA 20260212 y 20260216); S02 en 4; sello «Órdenes leídas a las 16:49 · Actualizar». El HTML del tablero va en
 el iframe con `?contratoId=…` (otra entrada de caché): hasta 10 min tras publicar puede verse sin el sello (nace oculto: no rompe).
+
+**160.7 Nota posterior (2026-10-09): ofrecido, sin respuesta suya.** (1) Escribir las palabras en MAYÚSCULAS como él las dictó
+(hoy «Muy Bueno … Muy Pobre», la forma de `CONDICIONES`); (2) igualar los colores de la CRG a los de la salud (en el mapa «3 Medio»
+sale naranja en Cargabilidad y amarillo en Salud). Ninguno se hace sin su pedido.
+
+**161.7 Nota de cierre (2026-10-11).** (1) La pregunta abierta de `§145.10` (egreso manual de 6 × S04 a Chiriguaná del 19-may,
+borrado el 07/10) queda CERRADA por sus respuestas del 10-09: Chiriguaná = las ENTRADA 20260212 y 20260216 (dos entregas reales,
+8 × S04) y los 2 Krenz de la 20260212 son de la URE; la pregunta se le hizo citando ese registro del 19-may. (2) Reconciliación
+repetida el 10-11 (`.get()`): igual que el 10-09 — 24 órdenes, 21/21, $734.757.342, nada pendiente.

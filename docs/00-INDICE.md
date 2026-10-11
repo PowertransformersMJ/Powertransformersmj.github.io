@@ -94,7 +94,7 @@
 | §157 | ADR-157 — **Mapa**: filtros de salud 1–5 y de Cargabilidad SCADA (CRG) | 7106 |
 | §158 | ADR-158 — **Cargabilidad SCADA**: los 77 sin medición; motivo con la causa; relevo de Sampués | 7147 |
 | §159 | ADR-159 — **Cargabilidad SCADA por periodo** (p99 exacto con `top`) e historia del equipo | 7320 |
-| §160 | ADR-160 — **CRG con la escala del MO**: Muy Bueno · Bueno · Medio · Pobre · Muy Pobre | 7430 |
+| §160 | ADR-160 — **CRG con la escala del MO**: Muy Bueno · Bueno · Medio · Pobre · Muy Pobre (lo ofrecido → `§160.7`, al final) | 7430 |
 | §161 | ADR-161 — **Contrato conforme a las órdenes**: 4 órdenes corregidas; el tablero relee las órdenes | 7466 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
@@ -104,7 +104,7 @@
 | ¿Dónde vive un módulo / ruta / flujo / componente? | 🗺️ `20-MEMORIA-ESPACIAL` |
 | Voy a mover/renombrar archivos, refactor, merge, deploy | 🧪 `30-LECCIONES` (gotchas) + 🗺️ `20` |
 | Otra sesión de Claude trabaja a la vez (mismo repo, misma rama o la bóveda): números de ADR/L, qué sube a `main` | `30` **M-08** (mismo repo) + **M-05** (bóveda) |
-| Voy a agregar o retirar una exportación de un módulo JS ya publicado (caché del navegador) | `32` **L-102 (3)**: lo nuevo va en un archivo NUEVO · retirar → `30` **L-116** |
+| Voy a agregar o retirar una exportación de un módulo JS ya publicado (caché del navegador) | `32` **L-102 (3)**: lo nuevo va en un archivo NUEVO; **(4)** no entregar un tipo que el módulo publicado no sepa escribir · retirar → `30` **L-116** |
 | Voy a tocar `functions/` o el pipeline de IA (streaming/reintentos/timeouts) | 🤖 `31-LECCIONES-IA` (hija de `30`, L-35/L-43–L-48) |
 | Busco un pendiente que no está en `10` (decisión de arquitectura, validación diferida, cola vieja) | 🧊 `11-PENDIENTES-FRIOS` (hija de `10`) |
 | Necesito saber qué contiene una hoja `docs/*.md` del dueño | 🗂️ `21-ESPACIAL-HOJAS` (hija de `20`) |
@@ -131,10 +131,10 @@
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
 | 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82 en adelante` + **L-103** |
 | ✍️ Redactar o retocar un texto que se FIRMA (Beneficios, Alcance de Fichas) | memoria `feedback_redaccion_beneficios` (vocabulario y método) + `32` **L-88** + bóveda `2026-09-2[5-7]-beneficio-*` (`99 §105`) · preguntas suyas sin respuesta → cola de Fichas, «Tuyo» 9 |
-| 📈 Cargabilidad SCADA: curvas horarias, homologación, carga de un mes, DGA × carga, Duval | 🎯 `53-CARGA-TERMICA` (cada tema con su §) · Capa 1 `§122`–`§138` · archivos y `scada_*` → `22` · L-113 · L-114 (botón ilegible, CSS compartida) · L-117 (un mes en paquete, `36`) · L-118 · L-119 (sostenida) · L-120 (antes/después: valores) · L-124 (aviso «falta» falso) · bóvedas `2026-09-30`…`2026-10-02` (TODO-69) |
+| 📈 Cargabilidad SCADA: curvas horarias, homologación, carga de un mes, DGA × carga, Duval | 🎯 `53-CARGA-TERMICA` (cada tema con su §) · Capa 1 `§122`–`§138` · archivos y `scada_*` → `22` · L-113 · L-114 (botón ilegible, CSS compartida) · L-117 (un mes en paquete, `36`) · L-118 · L-119 (sostenida) · L-120 (antes/después: valores) · L-124 (aviso «falta» falso) · bóvedas `2026-09-30`…`2026-10-02` (TODO-69) · sin medición, relevo, periodo con `top`, nombres CRG → `§158`–`§160` + bóveda `2026-10-08-scada-sin-medicion` |
 | 🪟 Ventana de detalle de Cargabilidad (tabla vieja) · una ventana fija dentro de un iframe que no se ve · retirar exportaciones con caché | `99 §123`, `§124` + L-115, L-116 · bóveda `2026-10-01-detalle-cargabilidad` |
 | ✒ Firmas en Órdenes E/S o en el informe de refrigeración | `99 §114`, `§117`, `§119`, `§121` (+ `§71`, `§99`) · archivos → `22` |
-| 📦 Órdenes E/S y Contrato 4125000143: Libro4 y valor, nexo, movimientos enlazados y automáticos, reglas del técnico | `99 §141` en adelante · `22` (filas Órdenes y Contratos) · L-128 (`32`) · L-129 (`35`) · vocabulario: entregas a trafo = órdenes de ENTRADA (`§143.9`) |
+| 📦 Órdenes E/S y Contrato 4125000143: Libro4 y valor, nexo, movimientos enlazados y automáticos, reglas del técnico | `99 §141` en adelante · `22` (filas Órdenes y Contratos) · L-128 (`32`) · L-129 (`35`) · vocabulario: entregas a trafo = órdenes de ENTRADA (`§143.9`) · «no cuadra con las órdenes» → `§161` + bóveda `2026-10-09-contrato-conforme-ordenes` |
 | 📱 El sitio en celular o tablet: el menú ☰ no abre, la barra no cabe, una tabla o gráfica se corta a 375/768 px · tocar `aqua-shell.js` o `aqua-components.css` | `99 §135` + `32` **L-121** · barrido reutilizable (servidor con stubs + iframes de 375/768) → bóveda `2026-10-02-sitio-responsive/crudos/` |
 | La zona de Duval de una muestra nueva o del motor de salud cambió o no cuadra (`dga_diagnostico.js` · `duvalTriangle1`) | `99 §131` (regla vieja corregida en `ba117cf`: delega en `zonaDuval1` de `domain/dga_duval.js`; cambia 6 equipos; lo ya guardado no se toca) |
 | El papel firmado de Fichas habla de gases (arco, térmica, descargas) o de «ISO 55001»: ¿de dónde sale cada corte y cada cita? | `99 §140` (los cortes no son de norma; frases con fuente en rama) · `52 §7` · nota `§57.8` (los 15 ppm y 0,5 ppm/día del monitoreo NO están en el MO) |
