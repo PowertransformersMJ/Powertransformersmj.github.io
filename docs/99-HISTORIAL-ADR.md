@@ -7514,3 +7514,7 @@ equipo que editaba la misma orden minutos antes (versión verificada; el borrado
 Chrome: contrato 4125000143 con 19 órdenes, 18 transformadores, $734.757.342, 21 registradas · 0 por registrar; Chiriguaná 8 × S04
 ($40.513.320, ENTRADA 20260212 y 20260216); S02 en 4; sello «Órdenes leídas a las 16:49 · Actualizar». El HTML del tablero va en
 el iframe con `?contratoId=…` (otra entrada de caché): hasta 10 min tras publicar puede verse sin el sello (nace oculto: no rompe).
+
+**160.7 Nota posterior (2026-10-09): ofrecido, sin respuesta suya.** (1) Escribir las palabras en MAYÚSCULAS como él las dictó
+(hoy «Muy Bueno … Muy Pobre», la forma de `CONDICIONES`); (2) igualar los colores de la CRG a los de la salud (en el mapa «3 Medio»
+sale naranja en Cargabilidad y amarillo en Salud). Ninguno se hace sin su pedido.
