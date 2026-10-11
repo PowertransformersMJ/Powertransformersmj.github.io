@@ -7,7 +7,7 @@
 // ¿manifest? ¿kernel byte-idéntico al de ESTE repo?
 //
 // ⚠️ NUNCA va en SessionStart ni en --boot (inventario federado ≠ salud local;
-//    ROOT/.. en otra máquina puede ser cualquier cosa — ADR §173).
+//    ROOT/.. en otra máquina puede ser cualquier cosa — ADR-173 del ecosistema de origen).
 //    Uso: npm run brain:diff (manual, p.ej. al sospechar drift o al crear un repo).
 //
 // La detección TERMINA en una fila TODO accionable (impresa al final), no en

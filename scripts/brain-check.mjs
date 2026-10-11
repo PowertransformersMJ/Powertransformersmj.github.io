@@ -7,7 +7,7 @@
 // Este archivo es IDÉNTICO en todos los repos del ecosistema — escritor único = este canónico.
 // v1.7 (delta propio vs 1.6.0): gate #5 acepta LECCIONES SHARDEADAS (30 + 3X-LECCIONES-*.md).
 // Los DATOS (topes/budgets/rutas) son INSTANCE: viven en docs/.brain-manifest.json.
-// ⚠️ La SEVERIDAD de cada gate está HARDCODEADA aquí (anti green-tuning, ADR §173):
+// ⚠️ La SEVERIDAD de cada gate está HARDCODEADA aquí (anti green-tuning, ADR-173 del ecosistema de origen):
 // el manifest NUNCA puede degradar un warn; solo aporta datos. Campo `downgrades`
 // (con ADR citado) se IMPRIME en cada corrida — visible, no silencioso.
 // READ-ONLY: reporta, no modifica. Sin child_process (portabilidad + byte-identidad ×repos).
@@ -70,10 +70,10 @@ if (existsSync(MANIFEST_PATH)) {
 const KNOWN_KEYS = new Set([
   'brainTemplateVersion', 'repo', 'bootCharsTarget', 'alwaysOn', 'caps', 'archiveDir',
   'deepAudit', 'peers', 'kernelFiles', 'ssotFacts', 'specsDir', 'staleDays', 'ignoreDirs',
-  'downgrades', 'orphanAllowlist', 'verifiedLiveStaleDays', 'verifiedLiveScan', 'lastOffsiteBackup',
+  'downgrades', 'orphanAllowlist', 'verifiedLiveStaleDays', 'verifiedLiveScan', 'lastOffsiteBackup', 'costoCerebroModo',
 ]);
 for (const k of Object.keys(manifest)) {
-  if (!k.startsWith('_') && !KNOWN_KEYS.has(k)) warn(`manifest: clave desconocida "${k}" (¿typo? un typo apaga gates en silencio) — schema v1.2`);
+  if (!k.startsWith('_') && !KNOWN_KEYS.has(k)) warn(`manifest: clave desconocida "${k}" (¿typo? un typo apaga gates en silencio) — schema v1.3`);
 }
 if (Array.isArray(manifest.downgrades) && manifest.downgrades.length) {
   for (const d of manifest.downgrades) info(`DOWNGRADE activo: ${typeof d === 'string' ? d : JSON.stringify(d)} (visible por diseño — exige ADR)`);
@@ -166,7 +166,7 @@ if (BOOT && okCaps) say(`  ✅ ${okCaps}/${capCount} neuronas dentro de tope`);
 if (preShard.length) info(`pre-shard: ${preShard.length} neurona(s) ≥90% de su cap (${preShard.join(', ')}) — planear shard/GC ANTES de reventar`);
 if (BOOT_CHARS_TARGET) {
   const bootTok = Math.round(bootChars / 3.5);
-  // INFORMATIVO por diseño MIENTRAS los 3 repos no estén bajo presupuesto (condición §173;
+  // INFORMATIVO por diseño MIENTRAS los 3 repos no estén bajo presupuesto (condición del ADR-173 del ecosistema de origen;
   // al cumplirse ×3, este gate sube a warn EN EL KERNEL, no por manifest).
   if (bootChars > Math.round(BOOT_CHARS_TARGET * 1.1))
     info(`BOOT always-on = ${bootChars}c (~${bootTok} tok) vs objetivo ${BOOT_CHARS_TARGET}c — destilar/diferir (informativo)`);
@@ -282,17 +282,17 @@ if (!BOOT && existsSync(leccionesPath)) {
   // Sus defs `### L-NN` cuentan igual que las de la madre — 30 deja el puntero, la def vive
   // en la hija. Mismo idioma que el índice shardeado (00[a-z]?-INDICE, línea ~132).
   // Sin esto, shardear lecciones convierte cada def de la hija en ref COLGANTE (warn bloqueante).
-  const leccionesShards = readdirSync(DOCS).filter((f) => /^3[1-9]-LECCIONES.*\.md$/.test(f)).sort();
+  const leccionesShards = readdirSync(DOCS).filter((f) => /^3[1-9][a-z]?-LECCIONES.*\.md$/.test(f)).sort();
   const leccionesText = [leccionesPath, ...leccionesShards.map((f) => join(DOCS, f))].map(read).join('\n');
   const cortoPath = join(DOCS, '10-MEMORIA-CORTO-PLAZO.md');
   const espacialPath = join(DOCS, '20-MEMORIA-ESPACIAL.md');
   const estadoPath = join(DOCS, '05-ESTADO-GLOBAL.md');
   const histText = existsSync(histPath) ? read(histPath) : '';
   const indiceText = indexPaths.length ? readIndex() : '';
-  const defined = new Set([...leccionesText.matchAll(/^###\s+([LM]-\d{2})\b/gm)].map((m) => m[1]));
+  const defined = new Set([...leccionesText.matchAll(/^###\s+([LM]-\d{2,3})\b/gm)].map((m) => m[1]));
   const allBrain = [claude, indiceText, existsSync(estadoPath) ? read(estadoPath) : '', leccionesText, histText,
     existsSync(cortoPath) ? read(cortoPath) : '', existsSync(espacialPath) ? read(espacialPath) : ''].join('\n');
-  const referenced = new Set([...allBrain.matchAll(/\b([LM]-\d{2})\b/g)].map((m) => m[1]));
+  const referenced = new Set([...allBrain.matchAll(/\b([LM]-\d{2,3})\b/g)].map((m) => m[1]));
   const dangling = [...referenced].filter((r) => !defined.has(r)).sort();
   if (!referenced.size) info('sin refs L-NN/M-NN aún');
   else if (!dangling.length) ok(`refs L-/M- (${referenced.size} usadas / ${defined.size} def) resuelven en 30${leccionesShards.length ? `+${leccionesShards.length} shard(s)` : ''}`);
@@ -509,7 +509,7 @@ else {
       if (n) { warn(`${s}: ${n} ítem(s) tickeado(s) SIN evidencia resoluble (1º: "${first}…") → anclar §/TODO/ruta/URL/sha`); badTicks += n; }
     }
     if (!badTicks) ok(`ticks de checklist con evidencia en ${specs.length - noCk} spec(s) con checklist`);
-    if (noCk) info(`${noCk} spec(s) sin sección "## Checklist" (los previos a la convención §173 — info)`);
+    if (noCk) info(`${noCk} spec(s) sin sección "## Checklist" (los previos a la convención — info)`);
   }
 }
 
@@ -536,11 +536,11 @@ head('\n14) Auditoría Nivel-2 (deepAudit):');
       .find((d) => d && typeof d === 'object' && Number(d.gate) === 14 && d.adr);
     if (due && pastGrace && dg14) info(`🔬 auditoría Nivel-2 MUY vencida (${due}) — AVISO, no bloquea (downgrade #14, ${dg14.adr}) → correr skill auditoria-cerebro`);
     else if (due && pastGrace) warn(`🔬 auditoría Nivel-2 MUY vencida (${due}; gracia agotada) → correr skill auditoria-cerebro / mantenimiento-general AHORA`);
-    else if (due) info(`🔬 auditoría Nivel-2 VENCIDA: última ${da.last}, ${due} → correr skill auditoria-cerebro (§173)`);
+    else if (due) info(`🔬 auditoría Nivel-2 VENCIDA: última ${da.last}, ${due} → correr skill auditoria-cerebro`);
     // v1.3 §50: la tabla de la auditoría debe EXISTIR (sin ella la Sonda 0 no puede diffear).
     if (!BOOT && da.tableFile && archiveDir && existsSync(archiveDir) && !existsSync(join(archiveDir, da.tableFile)))
       warn(`deepAudit.tableFile "${da.tableFile}" NO existe en archiveDir → la Sonda 0 de la próxima auditoría no tiene input`);
-  } else info('manifest sin deepAudit — la auditoría Nivel-2 no tiene disparador (declararlo, §173)');
+  } else info('manifest sin deepAudit — la auditoría Nivel-2 no tiene disparador (declararlo en el manifest)');
 }
 
 // 16) Fiabilidad: marcadores `verificado-vivo:` stale [info, --full]

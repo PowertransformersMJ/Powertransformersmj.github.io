@@ -7663,3 +7663,16 @@ apuntaban a `160.8` · la síntesis de SCADA citaba `§125.6` por `§125.11` · 
 del Excel de revisión de TX igual en memoria y síntesis. **No verificado** (sin red ni producción en esa corrida): CI y lo servido,
 CF e índices contra el servidor, la salud de Casacará.
 
+**162.10 Decisiones del Ingeniero en el cierre (2026-10-11), las cuatro con la recomendada.** (1) **Copia mensual de la bóveda
+fuera de este disco** (reabre ADR-059): `brain-private/respaldo-boveda.sh /Volumes/<disco>` hace un `git bundle` con toda la
+historia + su huella y se niega a guardar en este disco; probado sobre una carpeta temporal (368 MB, `git clone` del bundle la
+restaura completa). No había disco conectado: la 1.ª copia es suya (lista (J) de `10`); el manifest queda con `lastOffsiteBackup`
+vacío (el arranque dice «NUNCA hecha ⚠️») y, con la fecha puesta, avisa a los 35 días. (2) **Costo-cerebro = solo commits de
+cerebro sueltos**: kernel 1.14.0 (`costoCerebroModo: "sueltos"`, por instancia) → **28 %** (76 de 275; 61 ADR que acompañan un
+cambio no cuentan), antes 50 % en rojo. (3) **Purgar del historial las coordenadas** junto con (B) y (G): queda en (B). (4)
+**Kernel 1.14.0** (canónico en `brain-private/kernel`, repartido aquí): gate #5 con `[LM]-\d{2,3}` → «152 usadas / 152 def» (antes
+110: ciego a 42 lecciones), hijas `3[1-9][a-z]?-LECCIONES`, mensajes sin el «§173» ajeno, clave nueva en el esquema del manifest.
+`mantenimiento-lineas-at` sigue en 1.11.0: prueba en seco del 1.14 sobre una copia de su `docs/` → gate #5 igual (100/100,
+SANO); su `brain:pull` queda para una sesión abierta en ese repo (regla 3 del paraguas). Cierra S0-05, S7-12, S7-01 (decidida),
+S7-08/SP-03, SP-15 y S0-06/S2-10.
+
