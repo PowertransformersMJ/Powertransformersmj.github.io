@@ -166,6 +166,12 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
 ## ❄️ Refrigeración y 🛡️ protecciones (punteros)
 - Tipos ONAN/ONAF/OFAF/ODAF y «etapa ≠ MVA gratis» → skill `sistema-refrigeracion` + `_conocimiento/00-fundamentos-transformador.md §E`.
   Calibración Westinghouse de CFM → `domain/refrigeracion.js` + hoja `MANTENIMIENTO-BRIGADA.md`.
+  ⚠️ **Estudio 2026-10-12/13 (TODO-80, Borrador hasta sus decisiones; bóveda `2026-10-12-refrigeracion-onaf-onan`)**:
+  - las 4 pendientes «Westinghouse» salen del folleto **Krenz-Vent** (TRACOL 2019) y solo coinciden en 115/125 %;
+  - la calculadora toma el kVA del inventario (CON ventiladores) como ONAN y sobrestima el aire en r − 1;
+  - no hay fórmula mundial de «ventiladores por MVA»: manda el número probado por el fabricante;
+  - escoger el régimen = N-1 + horas de ventiladores + sitio + salud/accesorios + costo; el MO.00418 solo da el disparo y la
+    escalera de mitigación.
 - **Puente con `53`**: la ampacidad de la plataforma supone ventiladores en servicio (ONAF); «refrigeración deficiente»
   aún no tiene señal (CF-27).
 - Buchholz, relé RS 2001, DW 2000, válvula de alivio → `_conocimiento/00 §E` + skill `bujes-y-accesorios`; sustento de
