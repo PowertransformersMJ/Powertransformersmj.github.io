@@ -218,7 +218,7 @@ los DOS slugs, y corregir cada puntero que nombra el archivo viejo; la cabecera 
 > Lo que se rompe en la **COSTURA** entre dos caminos (dos escritores del mismo objeto, la ventana de un periodo, la caché de un
 > módulo, un iframe, una casilla que alimenta un papel, lo derivado que se corrige en su fuente) vive en
 > [`37-LECCIONES-COSTURAS-DATOS.md`](37-LECCIONES-COSTURAS-DATOS.md) (§G.5, 2026-10-11, `99 §162`; salió de aquí sin cambiar
-> una letra). IDs: L-96, L-113…L-116, L-126, L-137, L-138. L-117 → `36`.
+> una letra). IDs: L-96, L-113…L-116, L-126, L-137, L-138, L-142. L-117 → `36`.
 
 ## 🌐 Chrome del Ingeniero, extensión y banco → hija `36`
 
