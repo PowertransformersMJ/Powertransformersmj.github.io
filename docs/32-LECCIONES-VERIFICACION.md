@@ -293,3 +293,14 @@ justo los meses de ahora (lo halló la revisión adversarial, no las pruebas). �
 por bueno con `getComputedStyle(el).display` y una captura, no con su texto; al concatenar clases, el espacio va dentro de
 la cadena (`'x ver ' + clase`); (2) todo tope de seguridad sobre una serie de tiempo se cuenta desde lo más reciente, y lo
 que deja fuera se dice en cifras («N órdenes anteriores…»). [HONOR]
+
+### L-143 · Una herramienta no se mide con otra herramienta propia: la vara es el dato de fábrica o de campo
+**Disparador**: comparar dos calculadoras, dos métodos o dos versiones y concluir «esta pide de más» o «esa se queda corta». ·
+**Cicatriz** (TODO-80, 2026-10-13, bóveda `2026-10-12-refrigeracion-onaf-onan`): la comparación con Mantenimiento Brigada midió
+a la plataforma con la calculadora v1 y tituló «+725 ventiladores» y «36 casos bajo el 90 %». Contra la vara objetiva (lo que
+instaló WEG en 9 transformadores de AFINIA) las dos se pasaban casi igual, unas 2,5 veces, porque las dos suponían pérdidas del
+1 % y las reales son 0,29–0,64 %. Además, la propia v1 traía el caudal del Tipo 1 12 % alto, tomado de la curva de otro motor. ·
+**Regla**: (1) antes de comparar, nombrar la vara y su origen (dossier, prueba, medición), nunca la herramienta propia; (2) si
+no hay vara externa, decir «contra X, que tampoco está validado» y bajar el tono de los titulares; (3) el dato de una ficha
+se cruza con su texto impreso (potencia, tensión, frecuencia), no solo con la curva. [HONOR]
+
