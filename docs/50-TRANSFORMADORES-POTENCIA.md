@@ -170,7 +170,8 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
   - las 4 pendientes «Westinghouse» salen del folleto **Krenz-Vent** (TRACOL 2019) y solo coinciden en 115/125 %;
   - la calculadora toma el kVA del inventario (CON ventiladores) como ONAN y sobrestima el aire en r − 1;
   - **vara objetiva = lo que instaló el fabricante** (9 WEG de AFINIA con dossier): el aire sigue a 780·Pk·(r−1) con las
-    pérdidas MEDIDAS (0,29–0,64 %); suponer el 1 % de Krenz pide ≈ 2,5 veces. Método SGM v2 y calculadora v2 → bóveda;  - no hay fórmula mundial de «ventiladores por MVA»: manda el número probado por el fabricante;
+    pérdidas MEDIDAS (0,29–0,64 %); suponer el 1 % de Krenz pide ≈ 2,5 veces. Método SGM v2 y calculadora v2 → bóveda;
+  - no hay fórmula mundial de «ventiladores por MVA»: manda el número probado por el fabricante;
   - escoger el régimen = N-1 + horas de ventiladores + sitio + salud/accesorios + costo; el MO.00418 solo da el disparo y la
     escalera de mitigación.
 - **Puente con `53`**: la ampacidad de la plataforma supone ventiladores en servicio (ONAF); «refrigeración deficiente»
