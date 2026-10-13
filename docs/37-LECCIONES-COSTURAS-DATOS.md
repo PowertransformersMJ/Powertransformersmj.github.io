@@ -95,3 +95,14 @@ en vivo de colecciones enteras (free-tier). **Gate**: `tests/contrato_relectura.
 movimiento no sirve: el registro automático lo vuelve a crear desde la orden (MOV-2026-0002 → 0021). · **Regla**: reconciliar en
 solo lectura (`.get()`), preguntarle los HECHOS, corregir la FUENTE por su página y en su sesión, y dejar que lo derivado se rehaga.
 El criterio del dominio (qué descuenta, cómo cambiar el tipo de una orden) vive en `54 §2`. **Gate**: [HONOR].
+
+### L-142 · Un mismo campo leído con dos significados por dos módulos: la potencia del inventario
+**Disparador**: un módulo toma un campo del inventario «tal cual» como dato de placa (potencia, relación, tipo). · **Cicatriz**
+(TODO-80, comparación del 2026-10-13 en la bóveda `2026-10-12-refrigeracion-onaf-onan`): la calculadora de refrigeración pone
+`POTENCIA (KVA)` en la casilla ONAN (`calculo-refrigeracion.js:645`), mientras el unifilar y Fichas leen esa misma potencia como
+ONAF (`ui/fichas/unifilar.js:136-139`, `ui/fichas/panel.js:3665`). En los ONAF eso infla el aire en r − 1. Pero corregir solo esa
+casilla deja la pantalla CORTA, por la pendiente baja del 166 %, el caudal del Tipo 4 y la tolerancia del 5 %: hay que corregir
+todo junto. · **Regla**: antes de leer un campo compartido, buscar con grep cómo lo leen los otros módulos. Si discrepan, el campo
+va a la casilla del significado verificado (la ONAF) y la pantalla pide el dato que falta (la ONAN o la relación); no se deduce.
+**Gate**: [HONOR].
+
