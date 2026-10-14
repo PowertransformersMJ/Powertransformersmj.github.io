@@ -7728,6 +7728,9 @@ pero nada lo unía al formato. No había dónde guardarlo, reabrirlo ni versiona
 - Siembra de producción con `firebase-admin`, probada antes en simulación: la configuración (3 editores, almacén firestore,
   contrato), 5 logos y 2 fichas (F24 y FN063).
 
+**Tras publicar (2026-10-14, main 11d0a49):** Deploy · GitHub Pages ✅ y CI · Lint + Tests ✅; `pages/informe-brigada.html` → 200; el
+`aqua-shell.js` servido trae la entrada del menú y el dominio servido trae `ALMACEN_POR_DEFECTO = 'firestore'`; reglas en main = desplegadas.
+
 **163.5 Anti-patterns evitados.**
 - No se adivinó la potencia del inventario (L-142).
 - No se usó Storage para lo que lee el navegador (L-29).
