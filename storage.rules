@@ -150,6 +150,72 @@ service firebase.storage {
       allow delete: if isSignedIn() && request.auth.uid == custodio;
     }
 
+    // ── Informe de Mantenimiento Brigada · F60-ADM (TODO-81) ──
+    // Fotos y anexos por informe; marca (logos), firmas de terceros (solo
+    // editores las leen) y fichas de fabricante. Todo inmutable: reemplazar
+    // = ruta nueva. Las versiones emitidas siguen apuntando a lo que usaron.
+    // `resource == null` en cada create: lo que ya existe no se reescribe (el
+    // emulador dejaba pasar una subida encima por la rama create).
+    // `get` y no `read`: en Storage `read` incluye LISTAR, y nadie necesita
+    // enumerar estas carpetas (ver «límites conocidos» de
+    // tests-rules/storage.rules.test.js). Editores = lista de uid de
+    // informes_brigada_config/general en Firestore (nunca nombres).
+    // TOPE DE STORAGE: una evaluación lee como máximo DOS documentos de
+    // Firestore (firebase.google.com/docs/storage/security/rules-conditions).
+    // ibrEditor ya lee dos (usuarios/{uid} y la configuración): NINGUNA regla
+    // de este bloque puede leer un tercero (p. ej. el informe) — el emulador no
+    // aplica el tope y en producción fallaría. Lo cuida una prueba estática
+    // (tests/informe_brigada_datos_estatico.test.js). Por eso las fotos no miran
+    // el estado del informe: son inmutables y nadie las borra desde el
+    // navegador; lo emitido queda congelado en Firestore (versiones/{n}).
+    function ibrEditor() {
+      return hasProfile() && profile().activo == true
+        && request.auth.uid in firestore.get(/databases/(default)/documents/informes_brigada_config/general).data.editores;
+    }
+    function ibrHuella(h) { return h is string && h.matches('^[0-9a-f]{64}$'); }
+
+    match /informes_brigada/{informeId}/archivos/{archivoId} {
+      allow get: if isTeamMember();
+      allow create: if resource == null && ibrEditor()
+        && archivoId.matches('^a[A-Za-z0-9]{20}$')
+        && request.resource.size >= 1 && request.resource.size <= 700 * 1024
+        && request.resource.contentType.matches('^image/(jpeg|png)$')
+        && ibrHuella(request.resource.metadata.huella);
+      allow update, delete: if false;
+    }
+    match /informes_brigada_marca/logos/{clave}/{huella} {
+      allow get: if isTeamMember();
+      allow create: if resource == null && hasProfile() && isAdmin()
+        && clave in ['applus-encabezado', 'together-encabezado', 'applus-portada', 'together-portada', 'afinia-portada']
+        && ibrHuella(huella) && request.resource.metadata.huella == huella
+        && request.resource.size >= 1 && request.resource.size <= 1024 * 1024
+        && request.resource.contentType.matches('^image/(png|jpeg)$');
+      // Nadie borra un logo: las versiones emitidas lo siguen usando (reemplazar = huella nueva).
+      allow update, delete: if false;
+    }
+    match /informes_brigada_marca/firmas/{clave}/{huella} {
+      allow get: if ibrEditor();
+      allow create: if resource == null && hasProfile() && isAdmin()
+        && clave.matches('^[a-z0-9-]{2,40}$')
+        && ibrHuella(huella) && request.resource.metadata.huella == huella
+        && request.resource.size >= 1 && request.resource.size <= 512 * 1024
+        && request.resource.contentType == 'image/png'
+        && request.resource.metadata.autorizacion_fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && request.resource.metadata.autorizacion_medio.size() >= 3;
+      allow update: if false;
+      allow delete: if hasProfile() && isAdmin();
+    }
+    match /informes_brigada_marca/fichas/{fichaId} {
+      allow get: if isTeamMember();
+      allow create: if resource == null && ibrEditor()
+        && fichaId.matches('^[a-z0-9_-]{3,80}$')
+        && request.resource.size >= 1 && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('^image/(png|jpeg)$')
+        && ibrHuella(request.resource.metadata.huella);
+      // Nadie borra una ficha: las versiones emitidas la siguen usando.
+      allow update, delete: if false;
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{allPaths=**} {
       allow read, write: if false;

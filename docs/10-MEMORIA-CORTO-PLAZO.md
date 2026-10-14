@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-10-13) — INFORME DE MANTENIMIENTO BRIGADA (TODO-81) · en pausa: refrigeración (TODO-80) · SCADA (TODO-69) · CONTRATO (TODO-76)
+## 🎯 Foco (al 2026-10-14) — INFORME DE MANTENIMIENTO BRIGADA (TODO-81, publicado) · en pausa: refrigeración (TODO-80) · SCADA (TODO-69) · CONTRATO (TODO-76)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 > **Al retomar**: suyo → TODO-69 · TODO-76 · TODO-78; técnico en vivo → TODO-62; Fichas CF-43/44/36/35 → `99 §140`; mantenimiento del cerebro → `§162`.
@@ -40,7 +40,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-81** | 🟡 **Informe de Mantenimiento Brigada** (W-11 paso a paso): F60 de Applus para «Actualización y repotenciación del sistema de refrigeración»; 12 decisiones suyas → bóveda `2026-10-13-informe-mantenimiento-brigada`. Construido AISLADO en la rama `informe-brigada`; falta vista previa real, 3 decisiones y su «procede». | 🟡 |
+| **TODO-81** | 🟡 **Informe de Mantenimiento Brigada** PUBLICADO (`99 §163`): F60 de Applus para «Actualización y repotenciación del sistema de refrigeración», PDF y Word. Falta de él: imágenes de firmas + autorización de cada firmante, visto bueno de Applus y abrir el Word en Microsoft Word. | 🟡 |
 | **TODO-80** | ⏸️ **Refrigeración ONAN/ONAF** (W-11 paso 2, en pausa por orden suya): informe v2 (25 decisiones) y **Método SGM v2 + calculadora v2.1** (D1–D8 suyas) en `~/Downloads/`; estudio → bóveda `2026-10-12-refrigeracion-onaf-onan`. | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`–`§160`; DGA y Duval en BORRADOR). **Suyo**: 8 decisiones de `§140` (la 6 la absorbió `§150`; la 9 cambió con `§158`; la 11 = TODO-71) · re-exportar sep y oct (faltan 43 S/E) y mayo (`§125`) · circuitos, placas y arreglos de campo (pasos 3–5, `§158.8`) · corregir Casacará (2 MVA) en su Excel de Salud (`§158.11`). Para el área SCADA/Operación: 4 señales no válidas y 4 con P/Q ×1000 (`§158.12`), límite de 20 A de Casacará (`§158.11`). Ofrecido → `§160.7`–`.8`. Cargar un mes → `60 §W-13` (8). | 🟡 |
 | **TODO-78** | 🟡 **Mapa de Colombia** (`99 §152`–`§157`). **Suyo**: revisión de TX por depto (Excel) · red UPME · zonas · `§153.9`-3 (municipios de Fichas → CF-49), -4 (depto = zona en 4 S/E), -5 (¿la matrícula sigue a la posición o al aparato?) · quitar «Borrador» (`§155`). | 🟡 |

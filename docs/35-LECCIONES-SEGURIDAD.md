@@ -132,3 +132,12 @@ coordenadas de sus fotos con GPS; ningún candado lo vio (las guardias son de c�
 coordenadas FICTICIAS dentro de Colombia (como `EstDemo` en SCADA); en el cerebro, «coordenadas en la bóveda»; la real vive en
 Firestore y en la bóveda. Purgar lo que ya quedó en el historial es decisión del Ingeniero. **Gate**: [HONOR] (candidato: guardia
 que rechace en `tests/` y `docs/` coordenadas con ≥ 4 decimales dentro de la caja de AFINIA → TODO-67).
+
+### L-144 · El emulador de Storage NO aplica el tope de 2 lecturas de documentos por regla: se cuida con una prueba estática
+**Disparador**: una regla de `storage.rules` que lee documentos de Firestore (`firestore.get`/`exists`) para decidir. · **Cicatriz**
+(`99 §163`, TODO-81): la primera regla de fotos del Informe de Brigada leía la configuración Y el informe; el emulador la dejó
+pasar, pero en producción Storage niega cualquier regla que lea más de 2 documentos. Lo halló la revisión de seguridad, no las
+pruebas. · **Regla**: toda regla de Storage que mire Firestore lleva una prueba ESTÁTICA que cuenta sus `firestore.get`/`exists`
+(≤ 2) y que se verificó con una mutación; las pruebas del emulador no bastan. Y lo que el navegador debe LEER va a Firestore
+(L-29). **Gate**: `tests/informe_brigada_datos_estatico.test.js` (patrón reutilizable).
+

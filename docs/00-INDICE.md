@@ -38,6 +38,7 @@
 | §160 | ADR-160 — **CRG con la escala del MO** (Muy Bueno…Muy Pobre); lo ofrecido → `§160.7` (dentro de §161) | 7456 |
 | §161 | ADR-161 — **Contrato conforme a las órdenes**: 4 órdenes corregidas; el tablero relee las órdenes | 7496 |
 | §162 | ADR-162 — **Cerebro**: auditoría Nivel-2 + neurogénesis (00b, 23, 37, 38, lóbulo 54) | 7566 |
+| §163 | ADR-163 — **Informe de Mantenimiento Brigada**: F60 de Applus (refrigeración) con listado como Fichas, PDF y Word · TODO-81 | 7679 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
