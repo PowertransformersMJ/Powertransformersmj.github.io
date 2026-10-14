@@ -7676,3 +7676,93 @@ cambio no cuentan), antes 50 % en rojo. (3) **Purgar del historial las coordenad
 SANO); su `brain:pull` queda para una sesión abierta en ese repo (regla 3 del paraguas). Cierra S0-05, S7-12, S7-01 (decidida),
 S7-08/SP-03, SP-15 y S0-06/S2-10.
 
+## 163. ADR-163 — Informe de Mantenimiento Brigada: el F60 de Applus para «Actualización y repotenciación del sistema de refrigeración», con listado como Fichas, PDF y Word (TODO-81)
+
+> *«vamos a implementar un segmento en producción llamado informe de mantenimiento brigada, te adjunto entregable de cómo debe
+> ser el entregable final, adicionalmente usemos el mismo parámetro que fichas técnicas, tú me permites ver todo el listado de
+> transformadores, yo lo selecciono y ahí se construye el informe. El entregable debe ser tal cual respetando todo el entorno
+> paso a paso todo en lo absoluto»* · *«este modelo de informe es para las actividades de actualización y repotenciación del
+> sistema de refrigeración»* · y, tras la construcción aislada: *«procede»* (2026-10-14).
+
+**163.1 Causa raíz / necesidad.** La brigada entregaba el informe F60-ADM V.11 de Applus armado a mano en Word
+(`~/Downloads/INFORME T1-M_M-BOA.pdf`, 19 hojas). La plataforma ya sabía casi todo lo de la portada (inventario y salud),
+pero nada lo unía al formato. No había dónde guardarlo, reabrirlo ni versionarlo.
+
+**163.2 Solución estructural.**
+- **Página nueva** `pages/informe-brigada.html`, con entrada propia en el menú (decisión 1). Sigue el patrón de Fichas: listado
+  del parque con `listarV2` → equipo → actividad (la lista cerrada de motivos de Órdenes de materiales; solo
+  «Actualización y repotenciación del sistema de refrigeración.» tiene modelo) → editor por secciones del F60, con el origen de
+  cada dato y los faltantes → hojas (el mismo render del dominio) → PDF del navegador (carta) y Word propio.
+- **Dominio puro** `assets/js/domain/informe_brigada_*.js`: plantilla «forma + 19 erratas» (decisión 7), modelo, documento
+  y `docx`. El Word es OOXML propio, sin dependencias: `zip_almacenado.js` y `png_simple.js`.
+- **Datos:** `data/informes_brigada*.js`, con control de concurrencia por `rev`. Emitir congela la versión en
+  `versiones/{n}`; anular solo lo hace un admin; borrar, nadie. El modo local de la vista previa no escribe nada.
+- **Imágenes en Firestore por defecto** (`ALMACEN_POR_DEFECTO = 'firestore'`): fotos (reducidas y sin GPS, decisión 5),
+  5 logos de marca y biblioteca de fichas.
+- **Firmas de terceros SIEMPRE en Firestore**, aunque la configuración diga `storage`; así no queda ningún enlace permanente.
+  Solo se estampan al EMITIR (decisión 4).
+- **Reglas:** solo bloques nuevos en `firestore.rules` y `storage.rules`. Editores por uid en
+  `informes_brigada_config/general` (decisión 3: Miguel Jimenez, Carlos Martelo y Jorge Rhenals; nunca nombres en el código).
+- **Índices:** exenciones nuevas para `bytes` y `contenido`.
+- **Anexo de cálculo** = SOLO dos tablas, ventiladores actuales y proyectados, sin cálculo ni gráfica (decisión 9).
+- **Potencia:** ONAN y ONAF se confirman en cada informe (decisión 8).
+- **La acción de refrigeración** solo se lee y nunca se modifica (decisión 12).
+
+**163.3 No-regresión.**
+- 43 archivos nuevos. Los únicos existentes que se tocaron:
+  - `firestore.rules` y `storage.rules`: solo líneas añadidas;
+  - `firestore.indexes.json`: 5 exenciones nuevas;
+  - `assets/js/aqua-shell.js`: 1 línea del menú.
+- Las pestañas de Mantenimiento Brigada, la calculadora, el Consolidado y las acciones no cambian.
+- Fichas no se toca.
+
+**163.4 Verificación.**
+- Unitarias: 2868 de 2870 (2 omitidas, las de siempre); 278 son propias.
+- Reglas en el emulador: 283 de 283. Lint: 0.
+- Barrido de datos de cliente en el código: 0.
+- PDF con datos BOA (solo en el scratch) frente a la maqueta aprobada: 18 hojas, porque el anexo de cálculo quedó en dos
+  tablas. Diferencias de 0,00–0,15 % de píxeles, salvo dos fotos que en el modelo se agrandaron a mano.
+- Word convertido con LibreOffice: mismos saltos de hoja. **En Microsoft Word real, NV.**
+- Banco con datos inventados: listado → actividad → crear → editor → hojas, sin errores.
+- Revisores Opus independientes: fidelidad, seguridad y flujo (workflow `wf_e6dcd267-46b`), más un revisor previo a publicar.
+- Siembra de producción con `firebase-admin`, probada antes en simulación: la configuración (3 editores, almacén firestore,
+  contrato), 5 logos y 2 fichas (F24 y FN063).
+
+**163.5 Anti-patterns evitados.**
+- No se adivinó la potencia del inventario (L-142).
+- No se usó Storage para lo que lee el navegador (L-29).
+- No se metieron nombres ni datos de BOA en el repo público.
+- No se borra nada emitido.
+- No se marcó una vista previa como publicada.
+
+**163.6 Archivos.**
+- **Nuevos:** `pages/informe-brigada.html`; `assets/js/domain/informe_brigada_{plantilla,modelo,documento,docx,formato,
+  formulario,fotos,listado,rutas}.js`, `zip_almacenado.js`, `png_simple.js`; `assets/js/data/informes_brigada{,_almacen,
+  _local}.js`; `assets/js/ui/informe-brigada/*`; `assets/css/informe-brigada{,-papel}.css`; `tests/informe_brigada_*`;
+  `tests-rules/informes_brigada.rules.test.js`.
+- **Tocados:** `firestore.rules`, `storage.rules`, `firestore.indexes.json` y `assets/js/aqua-shell.js`.
+- **INTACTOS:** pestañas y JS de Mantenimiento Brigada, Fichas y `acciones_refrigeracion`.
+
+**163.7 Doctrina aplicada.** W-11 paso a paso:
+1. Entender en solo lectura, con conteos reales: 208 equipos y 3 usuarios.
+2. Maqueta y 12 preguntas cerradas.
+3. Construcción AISLADA en la rama `informe-brigada`.
+4. Revisión adversarial.
+5. Su «procede».
+6. Este ADR antes del merge.
+
+Decisiones de criterio, SUYAS. NO revisado externamente (sin consejo externo: no lo pidió, `§150`).
+
+**163.8 Verificado sano / no re-auditar.**
+- Los cortes de renglón de Word no se pueden igualar: 9 combinaciones probadas. Se garantiza el formato.
+- Los 3 cambios de texto 20–22 (pie «Figura N.» uniforme y sin dobles espacios) se aprobaron con el «procede».
+- Se exentaron `partes/bytes` y `versiones/contenido`. Eso también exenta `fichas_adjuntos/*/partes` (tampoco se consulta por
+  `bytes`): sin efecto en consultas.
+- El emulador de Storage NO aplica el tope de 2 lecturas de documentos por regla. Se cubre con una prueba estática
+  (→ lección).
+- Pendiente suyo:
+  - las imágenes de las firmas, con la autorización de cada firmante;
+  - el visto bueno de Applus;
+  - abrir el Word en Microsoft Word.
+- Salidas con datos BOA: solo locales.
+- Bóveda: `2026-10-13-informe-mantenimiento-brigada/SINTESIS.md`.
