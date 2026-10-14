@@ -118,10 +118,10 @@ Acceso a un modelo de otra familia (no-Claude) como **segunda opinión adversari
   personales sensibles (ubicación en tiempo real, biométricos de acceso, etc.).
 
 **Decisiones de infra costosa**:
-- **n/a** — el proyecto es sin ánimo de lucro y vive 100% en tiers gratuitos (GitHub
-  Pages + Firebase Spark + Vercel Hobby). Si algún día se acerca a los límites de Spark
-  (50k lecturas/día, 1 GB Firestore, 5 GB Storage) y hay que decidir upgrade vs.
-  optimización de queries → eso sí dispara 🛰️.
+- **n/a** — el proyecto es sin ánimo de lucro y vive en las cuotas gratuitas (GitHub
+  Pages + Vercel Hobby + Firebase **Blaze**, pago por uso: lo exige Cloud Functions; `PLAN-SERVICIOS-EXTERNOS.md:12`).
+  Pasarse de la cuota gratis genera cobro: si algo se acerca (lecturas/día, GB de Firestore o de Storage)
+  y hay que decidir pagar vs. optimizar → eso sí dispara 🛰️. *(Decía «Spark»; corregido 2026-10-13, TODO-81.)*
 
 ### §2.3 — Decisiones rutinarias de ESTE proyecto que NO requieren 🛰️
 
