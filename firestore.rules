@@ -1557,6 +1557,261 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // Informe de Mantenimiento Brigada · formato F60-ADM (TODO-81)
+    // Lo LEE el equipo activo; lo ARMAN solo los editores de
+    // informes_brigada_config/general (lista de uid, nunca nombres); ANULA un
+    // administrador; nadie borra. `rev` sube de a uno (nadie pisa a otro en
+    // silencio) y emitir deja su copia congelada en versiones/{n} en la MISMA
+    // escritura. Las mismas constantes viven en
+    // assets/js/domain/informe_brigada_rutas.js (una prueba las amarra).
+    // ══════════════════════════════════════════════════════════════
+    function ibrRutaConfig() { return /databases/$(database)/documents/informes_brigada_config/general; }
+    function ibrRutaInforme(id) { return /databases/$(database)/documents/informes_brigada/$(id); }
+    function ibrRutaVersion(id, n) { return /databases/$(database)/documents/informes_brigada/$(id)/versiones/$(n); }
+    function ibrRutaParteFicha(f) { return /databases/$(database)/documents/informes_brigada_fichas/$(f)/partes/0; }
+    function ibrEditor() {
+      return hasProfile() && profile().activo == true
+        && exists(ibrRutaConfig())
+        && request.auth.uid in get(ibrRutaConfig()).data.editores;
+    }
+    function ibrAutor(p) {
+      return p is map && p.keys().hasOnly(['uid', 'nombre']) && p.keys().hasAll(['uid', 'nombre'])
+        && p.uid == request.auth.uid && p.nombre == profile().get('nombre', '');
+    }
+    function ibrHuella(h) { return h is string && h.matches('^[0-9a-f]{64}$'); }
+    function ibrSello(d) { return ibrAutor(d.actualizadoPor) && d.actualizadoEn == request.time; }
+    function ibrClaves() {
+      return ['esquema', 'modelo', 'actividad', 'equipo_ref', 'estado', 'version', 'rev', 'contenido',
+              'anulacion', 'creadoPor', 'creadoEn', 'actualizadoPor', 'actualizadoEn', 'emitidoPor', 'emitidoEn'];
+    }
+    function ibrEquipoRef(e) {
+      return e is map && e.keys().hasOnly(['transformador_id', 'matricula', 'subestacion', 'serie'])
+        && e.keys().hasAll(['transformador_id', 'matricula'])
+        && e.matricula is string && e.matricula.size() >= 1 && e.matricula.size() <= 40
+        && e.transformador_id is string && e.transformador_id.size() <= 128;
+    }
+    function ibrFijos(d, r) {
+      return d.esquema == r.esquema && d.modelo == r.modelo && d.actividad == r.actividad
+        && d.equipo_ref == r.equipo_ref && d.creadoPor == r.creadoPor && d.creadoEn == r.creadoEn;
+    }
+    function ibrEmisionIgual(d, r) {
+      return d.get('emitidoPor', null) == r.get('emitidoPor', null) && d.get('emitidoEn', null) == r.get('emitidoEn', null);
+    }
+    // Una firma estampada al emitir: es la del firmante escogido en ESA línea del contenido emitido
+    // (misma clave y mismo nombre) y su imagen está en la carpeta de ESE firmante (Storage o Firestore).
+    // Así nadie estampa la firma de otro escribiendo directo a la base.
+    function ibrFirmaVersion(e, c) {
+      return e is map && e.keys().hasOnly(['rol', 'clave', 'nombre', 'firma']) && e.keys().hasAll(['rol', 'clave', 'nombre', 'firma'])
+        && e.rol in ['elaborado', 'revisado', 'aprobado']
+        && e.clave is string && e.clave.matches('^f-[a-z0-9-]{1,38}$')
+        && c.firmas[e.rol].firmante == e.clave
+        && c.firmas[e.rol].nombre == e.nombre
+        && e.firma is map && e.firma.keys().hasOnly(['almacen', 'ruta', 'huella', 'mime', 'ancho', 'alto'])
+        && ibrHuella(e.firma.huella)
+        && (e.firma.ruta == 'informes_brigada_marca/firmas/' + e.clave + '/' + e.firma.huella
+          || e.firma.ruta == 'informes_brigada_bin/firma_' + e.clave + '_' + e.firma.huella[0:16]);
+    }
+    function ibrFirmasVersion(f, c) {
+      return f is list && f.size() <= 3
+        && (f.size() < 1 || ibrFirmaVersion(f[0], c))
+        && (f.size() < 2 || (ibrFirmaVersion(f[1], c) && f[1].rol != f[0].rol))
+        && (f.size() < 3 || (ibrFirmaVersion(f[2], c) && f[2].rol != f[0].rol && f[2].rol != f[1].rol));
+    }
+
+    match /informes_brigada_config/{doc} {
+      allow get: if isTeamMember() && doc == 'general';
+      allow list: if false;
+      allow create, update: if doc == 'general' && hasProfile() && isAdmin()
+        && request.resource.data.keys().hasOnly(['editores', 'contrato_defecto', 'almacen', 'firmantes', 'marca', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.keys().hasAll(['editores', 'contrato_defecto', 'almacen', 'firmantes', 'marca', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.editores is list && request.resource.data.editores.size() <= 10
+        && request.resource.data.contrato_defecto is string && request.resource.data.contrato_defecto.size() <= 20
+        && request.resource.data.almacen in ['storage', 'firestore']
+        && request.resource.data.firmantes is list && request.resource.data.firmantes.size() <= 20
+        && request.resource.data.marca is map
+        && ibrSello(request.resource.data);
+      allow delete: if false;
+    }
+
+    match /informes_brigada/{id} {
+      allow get: if isTeamMember();
+      allow list: if isTeamMember() && request.query.limit <= 200;
+      allow create: if ibrEditor()
+        && request.resource.data.keys().hasOnly(ibrClaves())
+        && request.resource.data.keys().hasAll(['esquema', 'modelo', 'actividad', 'equipo_ref', 'estado', 'version', 'rev',
+                                                'contenido', 'creadoPor', 'creadoEn', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.esquema == 'ibr@1'
+        && request.resource.data.modelo == 'F60-REFRIG@1'
+        && request.resource.data.actividad == 'Actualización y repotenciación del sistema de refrigeración.'
+        && ibrEquipoRef(request.resource.data.equipo_ref)
+        && request.resource.data.estado == 'borrador' && request.resource.data.version == 0 && request.resource.data.rev == 1
+        && request.resource.data.contenido is map
+        && request.resource.data.get('anulacion', null) == null
+        && !('emitidoPor' in request.resource.data) && !('emitidoEn' in request.resource.data)
+        && ibrAutor(request.resource.data.creadoPor) && request.resource.data.creadoEn == request.time
+        && ibrSello(request.resource.data);
+      allow update: if resource.data.estado != 'anulado'
+        && request.resource.data.keys().hasOnly(ibrClaves())
+        && ibrFijos(request.resource.data, resource.data)
+        && request.resource.data.rev == resource.data.rev + 1
+        && request.resource.data.contenido is map
+        && ibrSello(request.resource.data)
+        && (
+          // 1) guardar el borrador
+          (ibrEditor() && resource.data.estado == 'borrador' && request.resource.data.estado == 'borrador'
+            && request.resource.data.version == resource.data.version
+            && ibrEmisionIgual(request.resource.data, resource.data)
+            && request.resource.data.get('anulacion', null) == null)
+          // 2) corregir un emitido: vuelve a borrador sin tocar contenido ni versión
+          || (ibrEditor() && resource.data.estado == 'emitido' && request.resource.data.estado == 'borrador'
+            && request.resource.data.version == resource.data.version
+            && request.resource.data.contenido == resource.data.contenido
+            && ibrEmisionIgual(request.resource.data, resource.data)
+            && request.resource.data.get('anulacion', null) == null)
+          // 3) emitir: versión + 1 con su copia congelada idéntica en la misma escritura
+          || (ibrEditor() && resource.data.estado == 'borrador' && request.resource.data.estado == 'emitido'
+            && request.resource.data.version == resource.data.version + 1
+            && ibrAutor(request.resource.data.emitidoPor) && request.resource.data.emitidoEn == request.time
+            && request.resource.data.get('anulacion', null) == null
+            && existsAfter(ibrRutaVersion(id, string(request.resource.data.version)))
+            && getAfter(ibrRutaVersion(id, string(request.resource.data.version))).data.contenido == request.resource.data.contenido)
+          // 4) anular: solo un administrador con perfil; el contenido no cambia
+          || (hasProfile() && isAdmin() && request.resource.data.estado == 'anulado'
+            && request.resource.data.version == resource.data.version
+            && request.resource.data.contenido == resource.data.contenido
+            && ibrEmisionIgual(request.resource.data, resource.data)
+            && request.resource.data.anulacion is map
+            && request.resource.data.anulacion.keys().hasOnly(['motivo', 'por', 'en'])
+            && request.resource.data.anulacion.keys().hasAll(['motivo', 'por', 'en'])
+            && request.resource.data.anulacion.motivo is string
+            && request.resource.data.anulacion.motivo.size() >= 10 && request.resource.data.anulacion.motivo.size() <= 500
+            && ibrAutor(request.resource.data.anulacion.por)
+            && request.resource.data.anulacion.en == request.time)
+        );
+      allow delete: if false;
+
+      match /versiones/{n} {
+        allow get: if isTeamMember();
+        allow list: if isTeamMember() && request.query.limit <= 50;
+        allow create: if ibrEditor()
+          && n.matches('^[1-9][0-9]{0,3}$')
+          && getAfter(ibrRutaInforme(id)).data.estado == 'emitido'
+          && getAfter(ibrRutaInforme(id)).data.version == int(n)
+          && get(ibrRutaInforme(id)).data.version == int(n) - 1
+          && request.resource.data.keys().hasOnly(['version', 'contenido', 'huella', 'motivo', 'firmas', 'marca', 'emitidoPor', 'en'])
+          && request.resource.data.keys().hasAll(['version', 'contenido', 'huella', 'motivo', 'firmas', 'marca', 'emitidoPor', 'en'])
+          && request.resource.data.version == int(n)
+          && request.resource.data.contenido == getAfter(ibrRutaInforme(id)).data.contenido
+          && ibrHuella(request.resource.data.huella)
+          && request.resource.data.motivo is string && request.resource.data.motivo.size() <= 500
+          && (int(n) == 1 || request.resource.data.motivo.size() >= 10)
+          && ibrFirmasVersion(request.resource.data.firmas, request.resource.data.contenido)
+          && request.resource.data.marca is map
+          && ibrAutor(request.resource.data.emitidoPor) && request.resource.data.en == request.time;
+        allow update, delete: if false;
+      }
+
+      // Solo con almacen == 'firestore' (contingencia de L-29 / 99 §100). Una foto por documento.
+      match /archivos/{a} {
+        allow get: if isTeamMember();
+        allow list: if false;
+        allow create: if ibrEditor() && a.matches('^a[A-Za-z0-9]{20}$')
+          && request.resource.data.keys().hasOnly(['bytes', 'mime', 'ancho', 'alto', 'tamano', 'huella', 'subidoPor', 'en'])
+          && request.resource.data.keys().hasAll(['bytes', 'mime', 'ancho', 'alto', 'tamano', 'huella', 'subidoPor', 'en'])
+          && request.resource.data.bytes is bytes
+          && request.resource.data.bytes.size() >= 1 && request.resource.data.bytes.size() <= 700 * 1024
+          && request.resource.data.tamano == request.resource.data.bytes.size()
+          && request.resource.data.mime in ['image/jpeg', 'image/png']
+          && request.resource.data.ancho is int && request.resource.data.ancho >= 1 && request.resource.data.ancho <= 4000
+          && request.resource.data.alto is int && request.resource.data.alto >= 1 && request.resource.data.alto <= 4000
+          && ibrHuella(request.resource.data.huella)
+          && ibrAutor(request.resource.data.subidoPor) && request.resource.data.en == request.time
+          && get(ibrRutaInforme(id)).data.estado == 'borrador';
+        allow update: if false;
+        // Solo de un borrador que nunca se emitió (un anulado queda congelado con sus fotos).
+        allow delete: if ibrEditor() && get(ibrRutaInforme(id)).data.version == 0
+          && get(ibrRutaInforme(id)).data.estado == 'borrador';
+      }
+    }
+
+    // Biblioteca de fichas de fabricante (la comparten todos los informes).
+    // La meta NUNCA lleva los bytes: así listar la biblioteca no baja imágenes.
+    // Con almacen == 'firestore' los bytes van aparte en partes/0 (se suben
+    // primero; la meta exige que existan, con la misma huella y tamaño).
+    match /informes_brigada_fichas/{f} {
+      allow get: if isTeamMember();
+      allow list: if isTeamMember() && request.query.limit <= 100;
+      allow create: if ibrEditor() && f.matches('^[a-z0-9_-]{3,80}$')
+        && request.resource.data.keys().hasOnly(['titulo', 'marca', 'modelo', 'almacen', 'ruta', 'mime', 'ancho', 'alto',
+                                                 'tamano', 'huella', 'subidoPor', 'en'])
+        && request.resource.data.keys().hasAll(['titulo', 'marca', 'modelo', 'almacen', 'ruta', 'mime', 'ancho', 'alto',
+                                                'tamano', 'huella', 'subidoPor', 'en'])
+        && request.resource.data.titulo is string && request.resource.data.titulo.size() >= 3 && request.resource.data.titulo.size() <= 120
+        && request.resource.data.mime in ['image/jpeg', 'image/png']
+        && request.resource.data.tamano is int && request.resource.data.tamano >= 1
+        && ibrHuella(request.resource.data.huella)
+        && ((request.resource.data.almacen == 'storage'
+              && request.resource.data.ruta == 'informes_brigada_marca/fichas/' + f
+              && request.resource.data.tamano <= 2 * 1024 * 1024)
+          || (request.resource.data.almacen == 'firestore'
+              && request.resource.data.ruta == 'informes_brigada_fichas/' + f + '/partes/0'
+              && exists(ibrRutaParteFicha(f))
+              && get(ibrRutaParteFicha(f)).data.huella == request.resource.data.huella
+              && get(ibrRutaParteFicha(f)).data.bytes.size() == request.resource.data.tamano))
+        && ibrAutor(request.resource.data.subidoPor) && request.resource.data.en == request.time;
+      allow update: if false;
+      allow delete: if false;   // nadie borra una ficha: las versiones emitidas la siguen usando
+
+      match /partes/{p} {
+        allow get: if isTeamMember();
+        allow list: if false;
+        allow create: if ibrEditor() && p == '0' && f.matches('^[a-z0-9_-]{3,80}$')
+          && request.resource.data.keys().hasOnly(['bytes', 'mime', 'huella', 'subidoPor', 'en'])
+          && request.resource.data.keys().hasAll(['bytes', 'mime', 'huella', 'subidoPor', 'en'])
+          && request.resource.data.bytes is bytes
+          && request.resource.data.bytes.size() >= 1 && request.resource.data.bytes.size() <= 900 * 1024
+          && request.resource.data.mime in ['image/jpeg', 'image/png']
+          && ibrHuella(request.resource.data.huella)
+          && ibrAutor(request.resource.data.subidoPor) && request.resource.data.en == request.time;
+        allow update: if false;
+        allow delete: if false;   // las versiones emitidas siguen usando la ficha
+      }
+    }
+
+    // Solo con almacen == 'firestore': logos (los lee el equipo) y firmas de terceros (solo editores).
+    match /informes_brigada_bin/{b} {
+      allow get: if (resource.data.clase == 'firma' && ibrEditor())
+                 || (resource.data.clase == 'logo' && isTeamMember());
+      allow list: if false;
+      allow create: if hasProfile() && isAdmin()
+        && b.matches('^(logo|firma)_[a-z0-9-]{2,40}_[0-9a-f]{16}$')
+        && request.resource.data.keys().hasOnly(['clase', 'clave', 'bytes', 'mime', 'ancho', 'alto', 'tamano', 'huella',
+                                                 'autorizacion', 'subidoPor', 'en'])
+        && request.resource.data.keys().hasAll(['clase', 'clave', 'bytes', 'mime', 'ancho', 'alto', 'tamano', 'huella',
+                                                'subidoPor', 'en'])
+        && request.resource.data.clase in ['logo', 'firma']
+        && b == request.resource.data.clase + '_' + request.resource.data.clave + '_' + request.resource.data.huella[0:16]
+        && request.resource.data.bytes is bytes
+        && request.resource.data.bytes.size() >= 1 && request.resource.data.bytes.size() <= 900 * 1024
+        && request.resource.data.tamano == request.resource.data.bytes.size()
+        && ibrHuella(request.resource.data.huella)
+        && ((request.resource.data.clase == 'logo' && request.resource.data.mime in ['image/png', 'image/jpeg']
+              && request.resource.data.clave in ['applus-encabezado', 'together-encabezado', 'applus-portada', 'together-portada', 'afinia-portada']
+              && !('autorizacion' in request.resource.data))
+          || (request.resource.data.clase == 'firma' && request.resource.data.mime == 'image/png'
+              && request.resource.data.autorizacion is map
+              && request.resource.data.autorizacion.keys().hasOnly(['fecha', 'medio'])
+              && request.resource.data.autorizacion.keys().hasAll(['fecha', 'medio'])
+              && request.resource.data.autorizacion.fecha is string
+              && request.resource.data.autorizacion.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+              && request.resource.data.autorizacion.medio is string && request.resource.data.autorizacion.medio.size() >= 3))
+        && ibrAutor(request.resource.data.subidoPor) && request.resource.data.en == request.time;
+      allow update: if false;
+      // Un logo no se borra (las versiones emitidas lo usan); una firma sí: el titular puede revocar su autorización.
+      allow delete: if hasProfile() && isAdmin() && resource.data.clase == 'firma';
+    }
+
     // ── Resto: cerrado por defecto ──
     match /{document=**} {
       allow read, write: if false;

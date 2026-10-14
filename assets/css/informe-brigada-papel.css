@@ -1,0 +1,156 @@
+/* ═══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Informe de Mantenimiento Brigada · PAPEL F60-ADM
+   Hojas carta (612 × 792 pt) del formato Applus. Todo cuelga de
+   .ibr-papel (prefijo ibr-): no toca nada del resto del sitio.
+   Medidas en pt tomadas del modelo. Impresión: Carta, márgenes
+   «Ninguno» (esta hoja ya trae @page).
+═══════════════════════════════════════════════════════════════ */
+
+@page { size: letter portrait; margin: 0; }
+
+.ibr-papel {
+  --ibr-an: "Arial Narrow", "Liberation Sans Narrow", Arial, sans-serif;
+  --ibr-ar: Arial, "Liberation Sans", Helvetica, sans-serif;
+  --ibr-ta: Tahoma, Verdana, sans-serif;
+  --ibr-ws: -0.5pt;   /* medido: con 441,9 pt de ancho el borde derecho cae a ±0,4 pt del modelo */
+  --ibr-dyt: 0.5pt;   /* Chrome asienta la línea base ≈0,5 pt más arriba que Word */
+  color: #000;
+  letter-spacing: 0;
+  line-height: normal;
+  text-align: left;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+/* Word no aplicó interletrado (kerning) en el modelo; el atajo «font:» lo reinicia, por eso !important. */
+.ibr-papel,
+.ibr-papel * { box-sizing: border-box; font-kerning: none !important; }
+.ibr-papel img { max-width: none !important; max-height: none !important; }
+.ibr-papel b { font-weight: 700; }
+
+/* Escenario de medición (fuera de pantalla, sigue teniendo tamaño) */
+.ibr-escenario { position: absolute; left: -30000px; top: 0; width: 612pt; visibility: hidden; pointer-events: none; }
+.ibr-medidor { position: absolute; left: 0; top: 0; width: 612pt; height: 0; overflow: hidden; }
+/* Copia para imprimir: fuera de pantalla hasta el momento de imprimir */
+#ibrImpresion { position: absolute; left: -30000px; top: 0; }
+
+/* ---------- hoja carta ---------- */
+.ibr-papel .ibr-hoja {
+  position: relative; display: block; width: 612pt; height: 792pt; overflow: hidden;
+  background: #fff; margin: 0 auto 18px; padding: 0; border: 0;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, .25);
+}
+
+/* ---------- encabezado y pie (iguales en todas las hojas) ---------- */
+.ibr-papel .ibr-logo { position: absolute; object-fit: fill; z-index: 2; } /* llena su recuadro, como el modelo (Word estiró el de AFINIA); la configuración avisa si la proporción es otra */
+.ibr-papel .ibr-enc-dir { position: absolute; left: 92.1pt; top: 44.09pt; font: 7pt/8.033pt var(--ibr-ar); color: #333; white-space: nowrap; z-index: 1; } /* debajo del logo, como el modelo (el logo es PNG transparente: su trazo pasa por encima) */
+.ibr-papel .ibr-enc-dir b { color: #7F7F7F; }
+.ibr-papel .ibr-enc-dir .ibr-web { color: #0000FF; text-decoration: underline; text-decoration-thickness: 0.5pt; text-underline-offset: 0.6pt; margin-left: 3pt; }
+.ibr-papel .ibr-pie-codigo { position: absolute; left: 381.6pt; top: 727.3pt; font: bold 9pt/10.05pt var(--ibr-ar); white-space: nowrap; }
+.ibr-papel .ibr-pie-num { position: absolute; left: 505pt; top: 720pt; width: 22.2pt; height: 24.2pt; background: #ED7D31; color: #fff; font: 11pt/12.29pt var(--ibr-ar); text-align: center; padding-top: 6.3pt; }
+.ibr-papel .ibr-pie-franja { position: absolute; left: 0; top: 750.4pt; width: 612pt; height: 41.6pt; background: #FB6600; }
+
+/* ---------- marca de agua (borrador / anulado): encima del contenido, también al imprimir ---------- */
+.ibr-papel .ibr-agua {
+  position: absolute; left: 0; top: 0; width: 612pt; height: 792pt; z-index: 20; pointer-events: none;
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.ibr-papel .ibr-agua span {
+  display: block; transform: rotate(-52deg); white-space: nowrap;
+  font: bold 54pt/1 var(--ibr-ar); color: rgba(200, 0, 0, .14); letter-spacing: 2pt;
+}
+
+/* ---------- recuadros «pendiente» (logo, foto, firma o anexo que todavía no está) ---------- */
+.ibr-papel .ibr-pendiente {
+  position: absolute; display: flex; align-items: center; justify-content: center; text-align: center;
+  border: 0.75pt dashed #C0392B; background: repeating-linear-gradient(45deg, #fff 0 6pt, #fdf1f0 6pt 12pt);
+  color: #A93226; font: 8pt/1.2 var(--ibr-ar); padding: 2pt; overflow: hidden;
+}
+.ibr-papel .ibr-foto-falla { position: absolute; }
+
+/* ---------- bloques del cuerpo (x 85,0 → 526,9 pt) ---------- */
+.ibr-papel .ibr-blq { position: absolute; left: 85pt; width: 441.9pt; top: 0; margin: 0; padding: 0; }
+.ibr-papel .ibr-p { font: 11pt/12.455pt var(--ibr-an); text-align: justify; word-spacing: var(--ibr-ws); }
+.ibr-papel .ibr-p.ibr-cont { text-align-last: justify; }
+.ibr-papel .ibr-p .ibr-ult,
+.ibr-papel .ibr-vin .ibr-ult { word-spacing: 0; } /* último renglón: espacio natural, como Word */
+.ibr-papel mark.ibr-mark { background: #FFFF00; color: inherit; padding: 0; }
+.ibr-papel .ibr-falta { color: #C0392B; background: #fdecea; }
+.ibr-papel .ibr-h { font: bold 11pt/12.455pt var(--ibr-an); white-space: nowrap; padding-left: 18.1pt; z-index: 0; }
+.ibr-papel .ibr-h .ibr-n { display: inline-block; width: 18pt; }
+.ibr-papel .ibr-h.ibr-n3 .ibr-n { width: 36pt; }
+.ibr-papel .ibr-h.ibr-plano { padding-left: 0; }
+.ibr-papel .ibr-h.ibr-manual { padding-left: 18.1pt; }
+/* las barras grises y las viñetas se dibujan en la capa SVG de la hoja */
+.ibr-papel .ibr-pie-tabla { font: bold italic 9pt/10.05pt var(--ibr-ar); text-align: center; padding-left: 0.4pt; }
+.ibr-papel .ibr-etq { font: bold 11pt/12.455pt var(--ibr-an); }
+.ibr-papel .ibr-vin { font: 10pt/11.3pt var(--ibr-an); color: #808080; text-align: justify; word-spacing: var(--ibr-ws); padding-left: 18.1pt; }
+.ibr-papel .ibr-vin.ibr-cont { text-align-last: justify; }
+.ibr-papel .ibr-anx-tit { font: bold 11pt/12.455pt var(--ibr-an); text-align: center; }
+.ibr-papel .ibr-anx-img .ibr-anx-foto { position: absolute; display: block; }
+
+/* ---------- cuadrículas de fotos ---------- */
+.ibr-papel .ibr-cuad { left: 0; width: 612pt; }
+.ibr-papel .ibr-cuad .ibr-capa { z-index: 3; } /* las reglas van encima de las fotos */
+.ibr-papel .ibr-foto { position: absolute; overflow: hidden; }
+.ibr-papel .ibr-foto img { position: absolute; left: 0; top: 0; display: block; width: 100%; height: 100%; object-fit: fill; }
+.ibr-papel .ibr-foto.ibr-pendiente { overflow: hidden; }
+/* Difuminado blanco de los bordes: rampa de 15,8 pt con el perfil medido en la máscara del modelo
+   (pt desde el borde → opacidad de la foto). Capas de degradado: imprimen blanco (la máscara CSS imprime negro). */
+.ibr-papel .ibr-dif { position: absolute; pointer-events: none; z-index: 1; }
+.ibr-papel .ibr-dif-l, .ibr-papel .ibr-dif-r { top: 0; bottom: 0; width: 15.8pt; }
+.ibr-papel .ibr-dif-t, .ibr-papel .ibr-dif-b { left: 0; right: 0; height: 15.8pt; }
+.ibr-papel .ibr-dif-l { left: 0; }
+.ibr-papel .ibr-dif-r { right: 0; }
+.ibr-papel .ibr-dif-t { top: 0; }
+.ibr-papel .ibr-dif-b { bottom: 0; }
+.ibr-papel .ibr-dif-l { background: linear-gradient(to right, rgba(255,255,255,1) 0pt, rgba(255,255,255,.99) 1.1pt, rgba(255,255,255,.97) 2.3pt, rgba(255,255,255,.93) 3.4pt, rgba(255,255,255,.87) 4.5pt, rgba(255,255,255,.77) 5.6pt, rgba(255,255,255,.63) 6.8pt, rgba(255,255,255,.48) 7.9pt, rgba(255,255,255,.34) 9pt, rgba(255,255,255,.21) 10.1pt, rgba(255,255,255,.13) 11.3pt, rgba(255,255,255,.06) 12.4pt, rgba(255,255,255,.03) 13.5pt, rgba(255,255,255,.01) 14.6pt, rgba(255,255,255,0) 15.8pt); }
+.ibr-papel .ibr-dif-r { background: linear-gradient(to left, rgba(255,255,255,1) 0pt, rgba(255,255,255,.99) 1.1pt, rgba(255,255,255,.97) 2.3pt, rgba(255,255,255,.93) 3.4pt, rgba(255,255,255,.87) 4.5pt, rgba(255,255,255,.77) 5.6pt, rgba(255,255,255,.63) 6.8pt, rgba(255,255,255,.48) 7.9pt, rgba(255,255,255,.34) 9pt, rgba(255,255,255,.21) 10.1pt, rgba(255,255,255,.13) 11.3pt, rgba(255,255,255,.06) 12.4pt, rgba(255,255,255,.03) 13.5pt, rgba(255,255,255,.01) 14.6pt, rgba(255,255,255,0) 15.8pt); }
+.ibr-papel .ibr-dif-t { background: linear-gradient(to bottom, rgba(255,255,255,1) 0pt, rgba(255,255,255,.99) 1.1pt, rgba(255,255,255,.97) 2.3pt, rgba(255,255,255,.93) 3.4pt, rgba(255,255,255,.87) 4.5pt, rgba(255,255,255,.77) 5.6pt, rgba(255,255,255,.63) 6.8pt, rgba(255,255,255,.48) 7.9pt, rgba(255,255,255,.34) 9pt, rgba(255,255,255,.21) 10.1pt, rgba(255,255,255,.13) 11.3pt, rgba(255,255,255,.06) 12.4pt, rgba(255,255,255,.03) 13.5pt, rgba(255,255,255,.01) 14.6pt, rgba(255,255,255,0) 15.8pt); }
+.ibr-papel .ibr-dif-b { background: linear-gradient(to top, rgba(255,255,255,1) 0pt, rgba(255,255,255,.99) 1.1pt, rgba(255,255,255,.97) 2.3pt, rgba(255,255,255,.93) 3.4pt, rgba(255,255,255,.87) 4.5pt, rgba(255,255,255,.77) 5.6pt, rgba(255,255,255,.63) 6.8pt, rgba(255,255,255,.48) 7.9pt, rgba(255,255,255,.34) 9pt, rgba(255,255,255,.21) 10.1pt, rgba(255,255,255,.13) 11.3pt, rgba(255,255,255,.06) 12.4pt, rgba(255,255,255,.03) 13.5pt, rgba(255,255,255,.01) 14.6pt, rgba(255,255,255,0) 15.8pt); }
+.ibr-papel .ibr-ovalo { position: absolute; border: 1.5pt solid #EE0000; border-radius: 50%; z-index: 2; }
+.ibr-papel .ibr-pie-fig { position: absolute; font: 10pt/11.4pt var(--ibr-an); text-align: justify; }
+.ibr-papel .ibr-pie-fig.ibr-centro { text-align: center; }
+
+/* ---------- tablas (geometría en JS; líneas en SVG para conservar 0,5 pt exactos) ---------- */
+.ibr-papel .ibr-capa { position: absolute; left: 0; top: 0; overflow: visible; }
+.ibr-papel .ibr-tcel { position: absolute; text-align: center; white-space: nowrap; }
+.ibr-papel .ibr-tcel.ibr-t10 { font: 10pt/11.32pt var(--ibr-an); }
+.ibr-papel .ibr-tcel.ibr-t11 { font: 11pt/12.455pt var(--ibr-an); }
+.ibr-papel .ibr-tcel.ibr-rot { text-align: left; font: bold 11pt/11.32pt var(--ibr-an); }
+.ibr-papel .ibr-tcel.ibr-neg { font-weight: 700; }
+.ibr-papel .ibr-tcel.ibr-envolver { white-space: normal; }
+.ibr-papel .ibr-esc { display: inline-block; transform-origin: 0 50%; }
+
+/* desfase vertical del texto respecto a Word (medido) */
+.ibr-papel .ibr-p, .ibr-papel .ibr-h, .ibr-papel .ibr-vin, .ibr-papel .ibr-etq, .ibr-papel .ibr-pie-tabla,
+.ibr-papel .ibr-anx-tit, .ibr-papel .ibr-pie-fig, .ibr-papel .ibr-tcel, .ibr-papel .ibr-por-tx, .ibr-papel .ibr-por-t,
+.ibr-papel .ibr-enc-dir, .ibr-papel .ibr-pie-codigo, .ibr-papel .ibr-pie-num { translate: 0 var(--ibr-dyt); }
+
+/* ---------- portada ---------- */
+.ibr-papel .ibr-por { position: absolute; }
+.ibr-papel .ibr-por-tx { position: absolute; font: bold 10pt/11.4pt var(--ibr-an); white-space: nowrap; }
+.ibr-papel .ibr-por-t { text-align: center; font: bold 10pt/11.2pt var(--ibr-an); }
+.ibr-papel .ibr-por-anx { font: 9pt/10.26pt var(--ibr-an); white-space: nowrap; } /* sin recorte: cortaría las tildes; si no cabe se comprime (ajustarAnchos) */
+.ibr-papel .ibr-por-indice { position: absolute; left: 322.1pt; top: 262.31pt; }
+/* Número y texto en el MISMO renglón: Chrome los asienta juntos en la línea base. Número en Tahoma comprimida al 77,778 %. */
+.ibr-papel .ibr-por-indice div { position: absolute; left: 0; height: 12.1pt; white-space: nowrap; font: 10pt/12.1pt var(--ibr-an); }
+.ibr-papel .ibr-por-indice .ibr-ni { display: inline-block; width: 9.5pt; font: 10pt/12.1pt var(--ibr-ta); transform: scaleX(0.77778); transform-origin: 0 0; }
+.ibr-papel .ibr-por-indice .ibr-n2 .ibr-ni { margin-left: 15.8pt; width: 18pt; }
+.ibr-papel .ibr-firma { position: absolute; object-fit: contain; z-index: 2; }
+
+/* ---------- impresión ---------- */
+@media print {
+  html.ibr-imprimiendo,
+  html.ibr-imprimiendo body {
+    margin: 0 !important; padding: 0 !important; background: #fff !important;
+    height: auto !important; min-height: 0 !important; overflow: visible !important; display: block !important;
+  }
+  html.ibr-imprimiendo body > :not(#ibrImpresion) { display: none !important; }
+  html.ibr-imprimiendo #ibrImpresion { position: static !important; left: auto !important; }
+  .ibr-papel { padding: 0 !important; overflow: visible !important; }
+  .ibr-papel .ibr-hoja {
+    margin: 0 !important; box-shadow: none !important;
+    break-after: page; page-break-after: always; break-inside: avoid;
+  }
+  .ibr-papel .ibr-hoja:last-child { break-after: auto; page-break-after: auto; }
+}

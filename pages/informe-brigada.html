@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <meta name="theme-color" content="#f4f6fb"/>
+  <meta name="color-scheme" content="light"/>
+  <title>SGM · TRANSPOWER — Informe de Mantenimiento Brigada</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/page-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/tabs.css"/>
+  <link rel="stylesheet" href="../assets/css/informe-brigada.css"/>
+  <link rel="stylesheet" href="../assets/css/informe-brigada-papel.css"/>
+</head>
+<body class="aqua">
+<main class="app-main page-container">
+
+  <div class="page-header">
+    <div class="breadcrumb">Mantenimiento / Informe de Mantenimiento Brigada</div>
+    <h1 class="page-title">Informe de <em>Mantenimiento Brigada</em></h1>
+    <p class="page-subtitle">
+      Escoja un transformador del parque y arme, sección por sección, el informe de la
+      actividad en el formato F60-ADM: llega lleno lo que la plataforma ya sabe, se
+      completa lo de campo y sale en PDF (carta) y en Word.
+    </p>
+  </div>
+
+  <!-- Franja de estado del segmento (vista previa, modo local, avisos). La llena app.js. -->
+  <div id="ibrFranja" class="ibr-franja" role="status" aria-live="polite"></div>
+
+  <!-- El módulo se monta aquí: todo su marcado vive bajo el prefijo .ibr- -->
+  <div id="ibrApp" class="ibr-raiz"><p class="ibr-cargando">Cargando el parque de transformadores…</p></div>
+
+</main>
+
+<script type="module">
+  // ── Fuente de datos ────────────────────────────────────────────────────────
+  // Convención del repo (`pages/fichas-tecnicas.html`): el parque vivo llega por
+  // `window.SGM_DATA_SOURCE`. Se espera a que el guard confirme la sesión ANTES de
+  // leer Firestore (evento en WINDOW, lección ADR-054). UNA sola consulta con
+  // tope (`listarV2({ limite: 500 })`): la salud sale de `salud_actual` del mismo
+  // documento, así que no hace falta una segunda lectura.
+  // Si la fuente no existe o falla, la página lo dice: no lleva datos incrustados
+  // ni fabrica ejemplos.
+  if (typeof window.SGM_DATA_SOURCE !== 'function') {
+    window.SGM_DATA_SOURCE = async function () {
+      if (!window.__sgmSession) {
+        await new Promise((res) => {
+          const t = setTimeout(res, 30000);
+          window.addEventListener('sgm:session-ready', () => { clearTimeout(t); res(); }, { once: true });
+          if (window.__sgmSession) { clearTimeout(t); res(); }
+        });
+      }
+      const m = await import('../assets/js/data/transformadores.js');
+      return m.listarV2({ limite: 500 });
+    };
+  }
+
+  // ── Módulo (L-102: archivos nuevos por import(), un fallo no tumba la página) ──
+  const raiz = document.getElementById('ibrApp');
+  try {
+    const { montarInformeBrigada } = await import('../assets/js/ui/informe-brigada/app.js');
+    window.__sgmInformeBrigada = await montarInformeBrigada(raiz, { fuente: window.SGM_DATA_SOURCE });
+  } catch (err) {
+    console.error('[informe-brigada] no se pudo cargar el módulo:', err);
+    raiz.textContent = 'No se pudo cargar el Informe de Mantenimiento Brigada. '
+      + 'Recargue la página con Cmd + Shift + R (Ctrl + Shift + R en Windows).';
+  }
+</script>
+
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>
