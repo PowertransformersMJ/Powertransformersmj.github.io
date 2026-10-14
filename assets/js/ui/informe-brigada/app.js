@@ -18,7 +18,7 @@ import { montarEditor } from './editor.js';
 import { montarConfiguracion } from './configuracion.js';
 
 /** Al publicar se cambia a 'publicado' y la franja de vista previa se va. */
-export const ESTADO_SEGMENTO = 'vista_previa';
+export const ESTADO_SEGMENTO = 'publicado';
 
 const LIMITE_PARQUE_POR_DEFECTO = 500;
 
@@ -98,7 +98,7 @@ function pedidoLocal() {
 function configVacia(claves) {
   const marca = {};
   for (const k of (claves || [])) marca[k] = null;
-  return { editores: [], contrato_defecto: '', almacen: 'storage', firmantes: [], marca };
+  return { editores: [], contrato_defecto: '', almacen: 'firestore', firmantes: [], marca };
 }
 
 /**
@@ -229,7 +229,7 @@ export async function montarInformeBrigada(raiz, { fuente, forzarLocal = false, 
   };
   ctx.recalcularPermisos();
 
-  const modoAlmacen = ctx.modo === 'local' ? 'local' : ((ctx.config && ctx.config.almacen) || 'storage');
+  const modoAlmacen = ctx.modo === 'local' ? 'local' : ((ctx.config && ctx.config.almacen) || 'firestore');
   ctx.almacen = dep.almacen.crearAlmacen({ modo: modoAlmacen });
   const opcionesResolver = (o = {}) => ({ ...o, config: ctx.config });
   ctx.resolverUrls = (refs, o) => dep.almacen.resolverUrls(refs, opcionesResolver(o));
@@ -278,7 +278,7 @@ export async function montarInformeBrigada(raiz, { fuente, forzarLocal = false, 
   const pintarBarra = () => {
     const chipModo = ctx.modo === 'local'
       ? '<span class="chip chip--warn">Modo local · solo este navegador</span>'
-      : '<span class="chip chip--brand">Plataforma · ' + esc((ctx.config && ctx.config.almacen) || 'storage') + '</span>';
+      : '<span class="chip chip--brand">Plataforma · ' + esc((ctx.config && ctx.config.almacen) || 'firestore') + '</span>';
     const chipRol = ctx.puedeEditar
       ? '<span class="chip chip--success">Usted arma informes</span>'
       : '<span class="chip">Solo lectura</span>';
@@ -298,7 +298,7 @@ export async function montarInformeBrigada(raiz, { fuente, forzarLocal = false, 
     ctx.config = nueva;
     ctx.estadoConfig = 'ok';
     ctx.recalcularPermisos();
-    const modo = ctx.modo === 'local' ? 'local' : (nueva.almacen || 'storage');
+    const modo = ctx.modo === 'local' ? 'local' : (nueva.almacen || 'firestore');
     if (!ctx.almacen || ctx.almacen.modo !== modo) ctx.almacen = dep.almacen.crearAlmacen({ modo });
     pintarFranja(franja, ctx, esc);
     pintarBarra();

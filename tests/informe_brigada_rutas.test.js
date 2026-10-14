@@ -207,7 +207,8 @@ describe('configuración (editores por uid; nunca nombres en el código)', () =>
     assert.ok(Object.values(c.marca).every((v) => v === null));
     const d = normalizarConfig({ editores: ['u1', 'u1', '', 'u2'], almacen: 'otro', firmantes: [{ nombre: 'ana prueba' }] });
     assert.deepEqual(d.editores, ['u1', 'u2']);
-    assert.equal(d.almacen, 'storage');
+    assert.equal(d.almacen, ALMACEN_POR_DEFECTO);
+    assert.equal(ALMACEN_POR_DEFECTO, 'firestore', 'por defecto Firestore: Storage niega descargas al navegador (L-29)');
     assert.equal(d.firmantes[0].nombre, 'ANA PRUEBA');
     assert.equal(d.firmantes[0].clave, 'f-ana-prueba');
     assert.equal(configDePrueba('uid-x').almacen, 'local');

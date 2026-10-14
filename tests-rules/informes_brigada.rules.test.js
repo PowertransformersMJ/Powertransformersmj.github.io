@@ -576,7 +576,7 @@ describe('capa de datos (data/informes_brigada.js) contra las reglas', () => {
 });
 
 describe('capa de datos (data/informes_brigada_almacen.js) contra las reglas', () => {
-  test('Storage: el editor sube una foto a su borrador y el equipo la lee; una firma solo la leen los editores', async () => {
+  test('Storage: el editor sube una foto a su borrador y el equipo la lee; una firma va a Firestore y solo la leen los editores', async () => {
     const inf = await repoDe('ib_editor').crear(NUEVO());
     const aid = nuevoIdArchivo();
     const meta = await almacenDe('ib_editor', 'storage').subirArchivo(inf.id, aid, JPEG, { mime: 'image/jpeg', ancho: 10, alto: 10, tamano: JPEG.length, huella: sha(JPEG) }, autor('ib_editor'));
@@ -587,8 +587,11 @@ describe('capa de datos (data/informes_brigada_almacen.js) contra las reglas', (
     const firma = await almacenDe('ib_admin', 'storage').subirFirma('f-capa-prueba', PNG, { mime: 'image/png', ancho: 1, alto: 1, autorizacion: { fecha: '2026-10-01', medio: 'correo de prueba' } }, autor('ib_admin'));
     // repetir la misma firma no falla (ya está: no se reescribe)
     await almacenDe('ib_admin', 'storage').subirFirma('f-capa-prueba', PNG, { mime: 'image/png', ancho: 1, alto: 1, autorizacion: { fecha: '2026-10-01', medio: 'correo de prueba' } }, autor('ib_admin'));
-    assert.deepEqual([...await almacenDe('ib_editor', 'storage').bytes(firma)], [...PNG]);
-    await assert.rejects(almacenDe('ib_tecnico', 'storage').bytes(firma));
+    // Decisión del Ingeniero (2026-10-14): aun con almacén «storage», la firma va a Firestore (sin enlace permanente).
+    assert.equal(firma.almacen, 'firestore');
+    assert.ok(firma.ruta.startsWith('informes_brigada_bin/firma_'));
+    assert.deepEqual([...await almacenDe('ib_editor', 'firestore').bytes(firma)], [...PNG]);
+    await assert.rejects(almacenDe('ib_tecnico', 'firestore').bytes(firma));
     const logo = await almacenDe('ib_admin', 'storage').subirLogo('together-portada', PNG, { mime: 'image/png', ancho: 1, alto: 1 }, autor('ib_admin'));
     assert.deepEqual([...await almacenDe('ib_tecnico', 'storage').bytes(logo)], [...PNG]);
   });

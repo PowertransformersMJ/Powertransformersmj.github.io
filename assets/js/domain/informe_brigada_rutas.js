@@ -40,8 +40,9 @@ export const COL = Object.freeze({
   bin: 'informes_brigada_bin'
 });
 
-/** Adaptador de imágenes por defecto (decisión 5: Storage). */
-export const ALMACEN_POR_DEFECTO = 'storage';
+/** Adaptador de imágenes por defecto: Firestore. Decisión 5 (fotos guardadas con el informe) + su «procede» del 2026-10-14:
+ *  en producción Storage niega las descargas al navegador (L-29, `99 §100`) y en esta Mac no hay gcloud/gsutil para su CORS. */
+export const ALMACEN_POR_DEFECTO = 'firestore';
 /** Los que acepta el documento de configuración (las reglas lo exigen). */
 export const ALMACENES = Object.freeze(['storage', 'firestore']);
 /** Las 5 piezas de la marca Applus/AFINIA del formato (se suben una vez; nunca al repo). */

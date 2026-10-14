@@ -60,7 +60,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
     return {
       editores: Array.isArray(x.editores) ? x.editores.slice() : [],
       contrato_defecto: String(x.contrato_defecto || ''),
-      almacen: x.almacen === 'firestore' ? 'firestore' : 'storage',
+      almacen: x.almacen === 'storage' ? 'storage' : 'firestore',
       firmantes: Array.isArray(x.firmantes) ? x.firmantes : [],
       marca
     };
@@ -111,9 +111,9 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       +   '<input class="ibr-input" type="text" maxlength="20" data-cfg-contrato value="' + esc(borrador.contrato_defecto) + '" aria-label="Contrato por defecto">'
       +   '<p class="ibr-ayuda">Llega lleno en cada informe nuevo y se puede cambiar en cada uno.</p></section>'
       + '<section class="ibr-cfg-bloque"><h3 class="ibr-sub">Dónde se guardan las imágenes</h3>'
-      +   '<label class="ibr-casilla"><input type="radio" name="ibrCfgAlmacen" value="storage"' + (borrador.almacen === 'storage' ? ' checked' : '') + '> Storage (lo decidido)</label> '
-      +   '<label class="ibr-casilla"><input type="radio" name="ibrCfgAlmacen" value="firestore"' + (borrador.almacen === 'firestore' ? ' checked' : '') + '> Firestore (contingencia)</label>'
-      +   '<p class="ibr-ayuda">En producción Storage ha negado las descargas al navegador (lección L-29). Antes de publicar se prueba la lectura en vivo; si falla, se pasa a Firestore sin cambiar código. Las imágenes ya guardadas se siguen leyendo de donde quedaron.</p></section>'
+      +   '<label class="ibr-casilla"><input type="radio" name="ibrCfgAlmacen" value="firestore"' + (borrador.almacen === 'firestore' ? ' checked' : '') + '> Firestore (lo vigente)</label> '
+      +   '<label class="ibr-casilla"><input type="radio" name="ibrCfgAlmacen" value="storage"' + (borrador.almacen === 'storage' ? ' checked' : '') + '> Storage (no usar: el navegador no puede leerlo)</label>'
+      +   '<p class="ibr-ayuda">Las fotos, los logos y las fichas se guardan en Firestore: en producción Storage niega las descargas al navegador (lección L-29) y las imágenes quedarían ilegibles. Las firmas de terceros van SIEMPRE a Firestore. Las imágenes ya guardadas se siguen leyendo de donde quedaron.</p></section>'
       + '<section class="ibr-cfg-bloque"><h3 class="ibr-sub">Logos de la marca</h3>'
       +   '<p class="ibr-ayuda">Applus, «Together beyond standards» y AFINIA, tal cual el formato. Se cargan una vez; no viven en el código.</p>'
       +   '<ul class="ibr-cfg-lista">' + logos + '</ul></section>'
@@ -163,7 +163,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       return;
     }
     if (el.matches('[data-cfg-contrato]')) { borrador.contrato_defecto = el.value.trim(); marcarSucio(); return; }
-    if (el.name === 'ibrCfgAlmacen') { borrador.almacen = el.value === 'firestore' ? 'firestore' : 'storage'; marcarSucio(); return; }
+    if (el.name === 'ibrCfgAlmacen') { borrador.almacen = el.value === 'storage' ? 'storage' : 'firestore'; marcarSucio(); return; }
     if (el.matches('[data-cfg-logo]')) {
       const clave = el.getAttribute('data-cfg-logo');
       const archivo = el.files && el.files[0];

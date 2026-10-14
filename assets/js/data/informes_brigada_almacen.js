@@ -392,6 +392,13 @@ export function crearAlmacen({ modo = ALMACEN_POR_DEFECTO, nuevo = false, storag
   const a = modo === 'storage' ? almacenStorage({ storage, sdk: sdkStorage })
     : modo === 'firestore' ? almacenFirestore({ db, sdk: sdkFirestore })
       : almacenLocal();
+  if (modo === 'storage') {
+    // Firmas de terceros SIEMPRE en Firestore (decisión del Ingeniero, 2026-10-14): en Storage un editor
+    // podría sacar un enlace permanente a la firma. Aquí ni se sube ni se lee una firma por Storage.
+    const fs = almacenFirestore({ db, sdk: sdkFirestore });
+    a.subirFirma = (...args) => fs.subirFirma(...args);
+    a.urlFirma = (...args) => fs.urlFirma(...args);
+  }
   if (!nuevo) registro.set(modo, a);
   return a;
 }

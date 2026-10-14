@@ -467,6 +467,11 @@
     { "collectionGroup": "scada_cargas", "fieldPath": "simulacion", "indexes": [] },
     { "collectionGroup": "scada_cargas", "fieldPath": "escrituras", "indexes": [] },
     { "collectionGroup": "scada_cargas", "fieldPath": "detalle", "indexes": [] },
-    { "collectionGroup": "scada_cargas", "fieldPath": "meses", "indexes": [] }
+    { "collectionGroup": "scada_cargas", "fieldPath": "meses", "indexes": [] },
+    { "collectionGroup": "archivos", "fieldPath": "bytes", "indexes": [] },
+    { "collectionGroup": "informes_brigada_bin", "fieldPath": "bytes", "indexes": [] },
+    { "collectionGroup": "partes", "fieldPath": "bytes", "indexes": [] },
+    { "collectionGroup": "informes_brigada", "fieldPath": "contenido", "indexes": [] },
+    { "collectionGroup": "versiones", "fieldPath": "contenido", "indexes": [] }
   ]
 }

@@ -146,3 +146,15 @@ describe('storage.rules · bloque del informe: ≤ 2 documentos de Firestore por
     }
   });
 });
+
+describe('firmas de terceros SIEMPRE en Firestore (decisión del Ingeniero, 2026-10-14)', () => {
+  test('con almacén «storage», subir y leer firmas se delega al adaptador de Firestore', () => {
+    const c = codigo(ALMACEN);
+    const i = c.indexOf('export function crearAlmacen');
+    const cuerpo = c.slice(i, c.indexOf('\n}', i));
+    assert.match(cuerpo, /if \(modo === 'storage'\)/);
+    assert.match(cuerpo, /a\.subirFirma = \(\.\.\.args\) => fs\.subirFirma\(\.\.\.args\)/);
+    assert.match(cuerpo, /a\.urlFirma = \(\.\.\.args\) => fs\.urlFirma\(\.\.\.args\)/);
+  });
+});
+
