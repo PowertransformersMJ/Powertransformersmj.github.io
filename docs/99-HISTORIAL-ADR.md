@@ -7780,3 +7780,11 @@ Decisiones de criterio, SUYAS. NO revisado externamente (sin consejo externo: no
 - Pruebas: 2869/2871, reglas 283/283, lint 0 y banco con nombres inventados.
 - Commit `74c5a00`.
 
+**163.10 Ajuste del 2026-10-15: tipo de mantenimiento** (pedido suyo, con captura del título).
+- En la Portada se escoge CORRECTIVO, PREVENTIVO o PREDICTIVO, y el título «INFORME DE MANTENIMIENTO …» sale de ahí.
+- «actividades correctivas» del objetivo general y del alcance concuerda con la clase escogida (`{actividades_clase}`):
+  ningún papel dice «preventivo» arriba y «correctivas» abajo. Los textos se siguen pudiendo editar a mano.
+- Por defecto CORRECTIVO, como el modelo; los borradores existentes no cambian.
+- Sin cambio de reglas. Pruebas 2870/2872; banco con título y textos concordando.
+- Commit `23c4e5b`.
+

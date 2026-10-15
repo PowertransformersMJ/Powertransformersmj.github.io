@@ -60,6 +60,7 @@ export const SECCIONES = Object.freeze([
     id: 'portada', titulo: 'Portada',
     ayuda: 'Contrato y asunto de la portada. Los logos de Applus, Together y AFINIA los sube un administrador una sola vez.',
     campos: Object.freeze([
+      T('portada.clase', 'Tipo de mantenimiento', 'lista', { opciones: P.CLASES_MANTENIMIENTO, ayuda: 'Sale en el título: «INFORME DE MANTENIMIENTO …». También ajusta «actividades correctivas / preventivas / predictivas» en el objetivo general y el alcance.' }),
       T('portada.contrato', 'Contrato', 'texto', { max: 20, ayuda: 'Lo deja un administrador en la configuración; se puede cambiar en este informe.' }),
       T('portada.asunto', 'Asunto', 'texto')
     ])
