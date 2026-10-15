@@ -62,7 +62,7 @@ export const TOPES = Object.freeze({
 });
 
 export const LIMITES = Object.freeze({
-  editores: 10, firmantes: 20, contrato: 20, motivoMin: 10, motivoMax: 500,
+  editores: 10, firmantes: 20, contrato: 20, personas: 30, nombrePersona: 60, motivoMin: 10, motivoMax: 500,
   listado: 200, recientes: 100, deEquipo: 50, versiones: 50, fichas: 100, acciones: 5,
   matricula: 40, transformadorId: 128, nombreFirmante: 120, tituloFichaMin: 3, tituloFichaMax: 120
 });
@@ -394,6 +394,20 @@ function firmanteNormal(f) {
  * La configuración tal como la usa la pantalla, con valores por defecto.
  * Nunca trae nombres en el código: los editores son uid escogidos por el admin.
  */
+/** Nombres del personal: texto recortado, sin vacíos ni repetidos (la comparación ignora mayúsculas y tildes). */
+function listaPersonas(v) {
+  const vistos = new Set();
+  const out = [];
+  for (const x of (Array.isArray(v) ? v : [])) {
+    const n = str(x).replace(/\s+/g, ' ').trim();
+    const k = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toUpperCase();
+    if (!n || vistos.has(k)) continue;
+    vistos.add(k);
+    out.push(n);
+  }
+  return out;
+}
+
 export function normalizarConfig(datos) {
   const d = datos && typeof datos === 'object' ? datos : {};
   const editores = [...new Set((Array.isArray(d.editores) ? d.editores : []).map(str).filter(Boolean))];
@@ -404,6 +418,9 @@ export function normalizarConfig(datos) {
     contrato_defecto: str(d.contrato_defecto).trim(),
     almacen: ALMACENES.includes(d.almacen) || d.almacen === 'local' ? d.almacen : ALMACEN_POR_DEFECTO,
     firmantes: (Array.isArray(d.firmantes) ? d.firmantes : []).map(firmanteNormal).filter(Boolean),
+    // Personal del informe (2026-10-15, dictado por el Ingeniero): listas desplegables de 2.2. Viven en la base, nunca en el código.
+    ingenieros: listaPersonas(d.ingenieros),
+    tecnicos: listaPersonas(d.tecnicos),
     marca,
     actualizadoPor: d.actualizadoPor && d.actualizadoPor.uid ? { uid: str(d.actualizadoPor.uid), nombre: str(d.actualizadoPor.nombre) } : null,
     actualizadoEn: aIso(d.actualizadoEn)
@@ -426,6 +443,10 @@ export function configParaGuardar(config) {
   if (c.contrato_defecto.length > LIMITES.contrato) errores.push(`El contrato admite máximo ${LIMITES.contrato} caracteres.`);
   if (!ALMACENES.includes(c.almacen)) errores.push('El almacén debe ser Storage o Firestore.');
   if (c.firmantes.length > LIMITES.firmantes) errores.push(`Máximo ${LIMITES.firmantes} firmantes.`);
+  for (const [k, nombre] of [['ingenieros', 'ingenieros'], ['tecnicos', 'técnicos']]) {
+    if (c[k].length > LIMITES.personas) errores.push(`Máximo ${LIMITES.personas} ${nombre}.`);
+    if (c[k].some((n) => n.length > LIMITES.nombrePersona)) errores.push(`Hay un nombre de ${nombre} demasiado largo (máximo ${LIMITES.nombrePersona}).`);
+  }
   const claves = new Set();
   for (const f of c.firmantes) {
     if (!f.nombre) errores.push('Hay un firmante sin nombre.');
@@ -444,6 +465,8 @@ export function configParaGuardar(config) {
     contrato_defecto: c.contrato_defecto,
     almacen: c.almacen,
     firmantes: c.firmantes,
+    ingenieros: c.ingenieros,
+    tecnicos: c.tecnicos,
     marca: c.marca
   };
   return { payload, errores };

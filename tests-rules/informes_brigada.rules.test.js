@@ -557,8 +557,12 @@ describe('capa de datos (data/informes_brigada.js) contra las reglas', () => {
 
   test('configuración: la guarda el admin con la forma que exige la regla; sin sesión la lectura dice «sin permiso»', async () => {
     const a = repoDe('ib_admin');
-    await a.guardarConfig({ ...CONFIG(), firmantes: [{ nombre: 'Ana Prueba', cargo: 'Cargo de prueba', firma: null }] });
+    await a.guardarConfig({ ...CONFIG(), firmantes: [{ nombre: 'Ana Prueba', cargo: 'Cargo de prueba', firma: null }],
+      ingenieros: ['Beto Ensayo', 'Ciro Ficticio'], tecnicos: ['Dora Simulada', 'Eva Inventada'] });
     const c = (await a.leerConfig()).config;
+    // Personal de 2.2 (2026-10-15): la regla admite las dos listas y vuelven tal cual.
+    assert.deepEqual(c.ingenieros, ['Beto Ensayo', 'Ciro Ficticio']);
+    assert.deepEqual(c.tecnicos, ['Dora Simulada', 'Eva Inventada']);
     assert.deepEqual(c.editores, ['ib_editor', 'ib_admin', 'ib_inactivo']);
     assert.equal(c.firmantes[0].clave, 'f-ana-prueba');
     await assert.rejects(repoDe('ib_editor').guardarConfig(CONFIG()), esCodigo('sin_permiso'));

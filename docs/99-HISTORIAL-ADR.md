@@ -7769,3 +7769,14 @@ Decisiones de criterio, SUYAS. NO revisado externamente (sin consejo externo: no
   - abrir el Word en Microsoft Word.
 - Salidas con datos BOA: solo locales.
 - Bóveda: `2026-10-13-informe-mantenimiento-brigada/SINTESIS.md`.
+
+**163.9 Ajuste del 2026-10-15: personal por lista desplegable** (pedido suyo, con captura de 2.2).
+- «Ingeniero» y «Técnicos» se escogen de listas guardadas en `informes_brigada_config/general` (`ingenieros`, `tecnicos`). El
+  admin las edita en Configuración; nunca van en el código.
+- El desplegable antepone «Ing.» y el párrafo dice «el ingeniero <nombre>».
+- Un técnico ya escogido no se ofrece en otra fila. Un nombre que salga de la lista se conserva marcado «ya no está en la lista».
+- La regla admite las dos listas (≤ 30). Se desplegó ANTES del código. Las listas se sembraron literales, como las dictó
+  (3 ingenieros, 5 técnicos).
+- Pruebas: 2869/2871, reglas 283/283, lint 0 y banco con nombres inventados.
+- Commit `74c5a00`.
+

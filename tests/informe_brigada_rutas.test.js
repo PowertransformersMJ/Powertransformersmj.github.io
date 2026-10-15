@@ -215,10 +215,26 @@ describe('configuración (editores por uid; nunca nombres en el código)', () =>
     assert.deepEqual(configDePrueba('uid-x').editores, ['uid-x']);
   });
 
+  test('personal de 2.2: listas sin vacíos ni repetidos (ignora mayúsculas y tildes) y van a lo que se guarda', () => {
+    const c = normalizarConfig({ ingenieros: ['  Ana   Prueba ', 'ana prueba', '', 'Beto Ensayo'], tecnicos: ['Ciro Ficticio', 'CIRO FICTÍCIO', 'Dora Simulada'] });
+    assert.deepEqual(c.ingenieros, ['Ana Prueba', 'Beto Ensayo']);
+    assert.deepEqual(c.tecnicos, ['Ciro Ficticio', 'Dora Simulada']);
+    assert.deepEqual(normalizarConfig(undefined).ingenieros, []);
+    assert.deepEqual(normalizarConfig({ tecnicos: 'no-lista' }).tecnicos, []);
+    const { payload, errores } = configParaGuardar({ editores: ['u1'], ingenieros: ['Ana Prueba'], tecnicos: ['Ciro Ficticio'] });
+    assert.deepEqual(errores, []);
+    assert.deepEqual(payload.ingenieros, ['Ana Prueba']);
+    assert.deepEqual(payload.tecnicos, ['Ciro Ficticio']);
+    const largo = configParaGuardar({ tecnicos: ['x'.repeat(61)] });
+    assert.ok(largo.errores.some((e) => /demasiado largo/.test(e)));
+    const muchos = configParaGuardar({ ingenieros: Array.from({ length: 31 }, (_, i) => 'Persona ' + i) });
+    assert.ok(muchos.errores.some((e) => /Máximo 30 ingenieros/.test(e)));
+  });
+
   test('configParaGuardar rechaza lo que la regla negaría', () => {
     assert.deepEqual(configParaGuardar(CONFIG).errores, []);
     const p = configParaGuardar(CONFIG).payload;
-    assert.deepEqual(Object.keys(p).sort(), ['almacen', 'contrato_defecto', 'editores', 'firmantes', 'marca']);
+    assert.deepEqual(Object.keys(p).sort(), ['almacen', 'contrato_defecto', 'editores', 'firmantes', 'ingenieros', 'marca', 'tecnicos']);
     assert.ok(configParaGuardar({ editores: Array.from({ length: 11 }, (_, i) => 'u' + i) }).errores.length);
     assert.ok(configParaGuardar({ contrato_defecto: '1'.repeat(21) }).errores.length);
     assert.ok(configParaGuardar({ almacen: 'local' }).errores.length);

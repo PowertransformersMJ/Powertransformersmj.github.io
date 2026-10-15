@@ -433,6 +433,7 @@ export function montarEditor(contenedor, { ctx, informe, alVolver }) {
           + '</select>';
       }
       case 'lista':
+        if (c.opcionesDe) return selectPersonas(c, base, v, []);
         if (c.libre) {
           return '<input class="ibr-input" type="text" list="ibrDlConsignacion"' + base + ' value="' + esc(v == null ? '' : v) + '">';
         }
@@ -493,11 +494,28 @@ export function montarEditor(contenedor, { ctx, informe, alVolver }) {
     return '<span class="ibr-origen ibr-origen--plantilla">Plantilla</span>';
   }
 
+  /* Lista desplegable de personas (Ingeniero y técnicos de 2.2): los nombres salen de la configuración.
+     El valor guardado es el nombre sin título (el párrafo ya dice «el ingeniero …»); la opción muestra el prefijo.
+     Un valor que ya no esté en la lista se conserva y se muestra (nunca se pierde lo escrito). */
+  function selectPersonas(c, base, v, excluir) {
+    const lista = (ctx.config && Array.isArray(ctx.config[c.opcionesDe])) ? ctx.config[c.opcionesDe] : [];
+    const actual = v == null ? '' : String(v);
+    const opciones = lista.filter((n) => n === actual || !excluir.includes(n));
+    return '<select class="ibr-select"' + base + '>'
+      + '<option value=""' + (actual ? '' : ' selected') + '>' + esc(lista.length ? (c.vacio || '— Escoja —') : 'Sin nombres: el administrador los agrega en Configuración') + '</option>'
+      + opciones.map((n) => '<option value="' + esc(n) + '"' + (n === actual ? ' selected' : '') + '>' + esc((c.prefijo || '') + n) + '</option>').join('')
+      + (actual && !lista.includes(actual) ? '<option value="' + esc(actual) + '" selected>' + esc((c.prefijo || '') + actual) + ' (ya no está en la lista)</option>' : '')
+      + '</select>';
+  }
+
   /* listas de textos (técnicos, ODT) */
   function listaTextosHtml(c) {
     const arr = Array.isArray(valor(c.ruta)) ? valor(c.ruta) : [];
     const dis = editable() ? '' : ' disabled';
-    const filas = arr.map((t, i) => '<li><input class="ibr-input" type="text" aria-label="' + esc(c.etiqueta) + ' ' + (i + 1) + '" data-ruta="' + esc(c.ruta + '.' + i) + '" value="' + esc(t) + '"' + dis + '>'
+    const control = (t, i) => c.opcionesDe
+      ? selectPersonas(c, ' aria-label="' + esc(c.etiqueta) + ' ' + (i + 1) + '" data-ruta="' + esc(c.ruta + '.' + i) + '"' + dis, t, arr.filter((x, j) => j !== i && x))
+      : '<input class="ibr-input" type="text" aria-label="' + esc(c.etiqueta) + ' ' + (i + 1) + '" data-ruta="' + esc(c.ruta + '.' + i) + '" value="' + esc(t) + '"' + dis + '>';
+    const filas = arr.map((t, i) => '<li>' + control(t, i)
       + (editable() ? ' <button type="button" class="ibr-btn ibr-btn--chico" data-accion="lista-quitar" data-lista="' + esc(c.ruta) + '" data-i="' + i + '" aria-label="Quitar">✕</button>' : '') + '</li>').join('');
     return '<div class="ibr-campo' + (bloqueantes.has(c.ruta) ? ' ibr-campo--falta' : '') + '" data-campo="' + esc(c.ruta) + '">'
       + '<div class="ibr-campo-cab"><span class="ibr-campo-et">' + esc(c.etiqueta) + '</span>'
@@ -841,6 +859,8 @@ export function montarEditor(contenedor, { ctx, informe, alVolver }) {
       cambiar((c) => M.cambiarCampo(M.cambiarCampo(c, 'salud.numero', n), 'salud.texto', nombre));
       return;
     }
+    // Técnicos por lista desplegable: al escoger uno se repinta para que las demás filas ya no lo ofrezcan.
+    if (ruta.startsWith('personal.tecnicos.')) { cambiar((c) => M.cambiarCampo(c, ruta, r.v), { repintar: 'todo' }); return; }
     cambiar((c) => M.cambiarCampo(c, ruta, r.v));
   });
 

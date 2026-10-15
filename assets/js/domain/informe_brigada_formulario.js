@@ -85,8 +85,8 @@ export const SECCIONES = Object.freeze([
   Object.freeze({
     id: 's2_2', titulo: '2.2 Personal y fechas',
     campos: Object.freeze([
-      T('personal.ingeniero', 'Ingeniero', 'texto'),
-      T('personal.tecnicos', 'Técnicos', 'lista_textos', { agregar: 'Agregar técnico' }),
+      T('personal.ingeniero', 'Ingeniero', 'lista', { opcionesDe: 'ingenieros', prefijo: 'Ing. ', vacio: '— Escoja el ingeniero —' }),
+      T('personal.tecnicos', 'Técnicos', 'lista_textos', { agregar: 'Agregar técnico', opcionesDe: 'tecnicos', vacio: '— Escoja el técnico —' }),
       T('trabajo.fecha_inicio', 'Fecha de inicio', 'fecha'),
       T('trabajo.fecha_fin', 'Fecha de fin', 'fecha', { ayuda: 'Sale en la portada como «FECHA DE EJECUCIÓN».' }),
       TXT('personal', 'Párrafo del personal')
