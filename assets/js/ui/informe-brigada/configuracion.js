@@ -62,6 +62,8 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       contrato_defecto: String(x.contrato_defecto || ''),
       almacen: x.almacen === 'storage' ? 'storage' : 'firestore',
       firmantes: Array.isArray(x.firmantes) ? x.firmantes : [],
+      ingenieros: Array.isArray(x.ingenieros) ? x.ingenieros.slice() : [],
+      tecnicos: Array.isArray(x.tecnicos) ? x.tecnicos.slice() : [],
       marca
     };
   }
@@ -107,6 +109,12 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       + '<section class="ibr-cfg-bloque"><h3 class="ibr-sub">Quiénes arman el informe</h3>'
       +   '<p class="ibr-ayuda">Solo ellos crean, editan y emiten. Los demás del equipo los ven. Se guardan por usuario (uid), nunca por nombre en el código.</p>'
       +   listaUsuarios + '</section>'
+      + '<section class="ibr-cfg-bloque"><h3 class="ibr-sub">Personal del informe (2.2)</h3>'
+      +   '<p class="ibr-ayuda">Son las listas desplegables de «Ingeniero» y «Técnicos». Un nombre por renglón, sin «Ing.»: la lista lo antepone y el párrafo ya dice «el ingeniero …».</p>'
+      +   '<div class="ibr-cfg-personas">'
+      +     '<label class="ibr-campo"><span class="ibr-campo-et">Ingenieros</span><textarea class="ibr-input" rows="4" data-cfg-personas="ingenieros" aria-label="Ingenieros, uno por renglón">' + esc(borrador.ingenieros.join('\n')) + '</textarea></label>'
+      +     '<label class="ibr-campo"><span class="ibr-campo-et">Técnicos</span><textarea class="ibr-input" rows="6" data-cfg-personas="tecnicos" aria-label="Técnicos, uno por renglón">' + esc(borrador.tecnicos.join('\n')) + '</textarea></label>'
+      +   '</div></section>'
       + '<section class="ibr-cfg-bloque"><h3 class="ibr-sub">Contrato por defecto</h3>'
       +   '<input class="ibr-input" type="text" maxlength="20" data-cfg-contrato value="' + esc(borrador.contrato_defecto) + '" aria-label="Contrato por defecto">'
       +   '<p class="ibr-ayuda">Llega lleno en cada informe nuevo y se puede cambiar en cada uno.</p></section>'
@@ -163,6 +171,11 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       return;
     }
     if (el.matches('[data-cfg-contrato]')) { borrador.contrato_defecto = el.value.trim(); marcarSucio(); return; }
+    if (el.matches('[data-cfg-personas]')) {
+      const k = el.getAttribute('data-cfg-personas');
+      if (k === 'ingenieros' || k === 'tecnicos') { borrador[k] = el.value.split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean); marcarSucio(); }
+      return;
+    }
     if (el.name === 'ibrCfgAlmacen') { borrador.almacen = el.value === 'storage' ? 'storage' : 'firestore'; marcarSucio(); return; }
     if (el.matches('[data-cfg-logo]')) {
       const clave = el.getAttribute('data-cfg-logo');

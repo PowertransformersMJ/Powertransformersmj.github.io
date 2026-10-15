@@ -1623,12 +1623,15 @@ service cloud.firestore {
       allow get: if isTeamMember() && doc == 'general';
       allow list: if false;
       allow create, update: if doc == 'general' && hasProfile() && isAdmin()
-        && request.resource.data.keys().hasOnly(['editores', 'contrato_defecto', 'almacen', 'firmantes', 'marca', 'actualizadoPor', 'actualizadoEn'])
+        && request.resource.data.keys().hasOnly(['editores', 'contrato_defecto', 'almacen', 'firmantes', 'ingenieros', 'tecnicos', 'marca', 'actualizadoPor', 'actualizadoEn'])
         && request.resource.data.keys().hasAll(['editores', 'contrato_defecto', 'almacen', 'firmantes', 'marca', 'actualizadoPor', 'actualizadoEn'])
         && request.resource.data.editores is list && request.resource.data.editores.size() <= 10
         && request.resource.data.contrato_defecto is string && request.resource.data.contrato_defecto.size() <= 20
         && request.resource.data.almacen in ['storage', 'firestore']
         && request.resource.data.firmantes is list && request.resource.data.firmantes.size() <= 20
+        // Personal de 2.2 (listas desplegables; 2026-10-15): opcionales, listas cortas de nombres.
+        && request.resource.data.get('ingenieros', []) is list && request.resource.data.get('ingenieros', []).size() <= 30
+        && request.resource.data.get('tecnicos', []) is list && request.resource.data.get('tecnicos', []).size() <= 30
         && request.resource.data.marca is map
         && ibrSello(request.resource.data);
       allow delete: if false;
