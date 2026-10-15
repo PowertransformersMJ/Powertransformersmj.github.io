@@ -20,7 +20,8 @@ import { numES, listaY, fechaDMA, rangoFechas, ordinalEs, mayusculasEs, tipoTitu
 import {
   ACTIVIDAD_REFRIGERACION, MODELOS, modeloDeActividad, FORMATO, TEXTOS, IDS_TEXTOS, FRASES, CONCLUSIONES, RECOMENDACIONES,
   DISPOSICIONES, FIGURAS_DEFECTO, SECCIONES_FIGURAS, MATERIAL_DEFECTO, HERRAMIENTAS_DEFECTO, SST_DEFECTO, PERSONAS_DEFECTO,
-  HALLAZGO_DEFECTO, ANEXOS_DEFECTO, MARCA_CLAVES, MARCA_GEOMETRIA, NOMBRE_CONDICION, ROLES_FIRMA, AJUSTES_CUADRICULA, rellenar
+  HALLAZGO_DEFECTO, ANEXOS_DEFECTO, MARCA_CLAVES, MARCA_GEOMETRIA, NOMBRE_CONDICION, ROLES_FIRMA, AJUSTES_CUADRICULA, rellenar,
+  ACTIVIDADES_POR_CLASE
 } from './informe_brigada_plantilla.js';
 
 export const ESQUEMA = 'ibr@1';
@@ -210,6 +211,7 @@ export function variablesDelInforme(c) {
   const saludN = num(s.numero);
   return {
     clase: o(p.clase), titulo: o(p.titulo), asunto: o(p.asunto), subtitulo_anexos: o(p.subtitulo_anexos),
+    actividades_clase: lleno(p.clase) ? (ACTIVIDADES_POR_CLASE[String(p.clase).trim().toUpperCase()] || null) : null,
     cliente: FORMATO.cliente, contrato: o(p.contrato),
     matricula: o(e.matricula), subestacion: o(e.subestacion),
     // Zona y departamento van en MAYÚSCULAS en el papel (el departamento con su tilde), se escriban como se escriban.

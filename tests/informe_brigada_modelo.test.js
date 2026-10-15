@@ -418,3 +418,22 @@ describe('correcciones de la revisión (pies, ajustes, faltantes locales y respa
     assert.equal(f.contenido.equipo.zona, base.equipo.zona);
   });
 });
+
+describe('tipo de mantenimiento (2026-10-15): correctivo, preventivo o predictivo', () => {
+  test('por defecto CORRECTIVO; al cambiarlo, el título y «actividades …» concuerdan', async () => {
+    const M = await import('../assets/js/domain/informe_brigada_modelo.js');
+    const P = await import('../assets/js/domain/informe_brigada_plantilla.js');
+    assert.deepEqual([...P.CLASES_MANTENIMIENTO], ['CORRECTIVO', 'PREVENTIVO', 'PREDICTIVO']);
+    let c = M.informeVacio();
+    assert.equal(c.portada.clase, 'CORRECTIVO');
+    assert.match(M.textoPlantilla('obj_general', c), /actividades correctivas de mantenimiento menor/);
+    assert.match(M.textoPlantilla('alcance', c), /^Se realizaron actividades correctivas de mantenimiento menor/);
+    for (const [clase, palabra] of [['PREVENTIVO', 'preventivas'], ['PREDICTIVO', 'predictivas']]) {
+      c = M.cambiarCampo(c, 'portada.clase', clase);
+      assert.equal(M.variablesDelInforme(c).clase, clase);
+      assert.match(M.textoPlantilla('obj_general', c), new RegExp('actividades ' + palabra + ' de mantenimiento menor'));
+      assert.match(M.textoPlantilla('alcance', c), new RegExp('^Se realizaron actividades ' + palabra));
+    }
+  });
+});
+
