@@ -7813,3 +7813,39 @@ Carlos, ya te paso la de Johan y David»*).
   - en el banco, con nombres inventados: la línea es exclusiva, se guarda, y el informe nuevo trae las tres líneas con su
     firmante; la línea con firma dice «se estampa solo al emitir».
 - Commit `a344919`. Script: bóveda `crudos/firmantes.mjs`.
+
+**163.12 Ajuste del 2026-10-16: firma de Johan Utria** (línea «Aprobado por»; el Ingeniero la entregó en el chat como imagen).
+- **Imagen**: JPG de 156×110 con fondo blanco. Se normalizó con la copia LITERAL de `normalizarImagen` de Fichas, corrida en
+  Chrome sin cabeza: fondo claro transparente, recortada al trazo y sin ampliar (§99.11: firmas limpias). Quedó un PNG RGBA
+  de 156×108, de 9 768 bytes, sin metadatos (solo IHDR, IDAT e IEND).
+- **Autorización**: fecha 2026-10-16. Medio: «Autorización verbal al Ing. Miguel Jimenez; imagen entregada por él el
+  2026-10-16 para el Informe de Brigada». Es la fórmula de las firmas delegadas de Fichas, con quién la entregó y cuándo. En
+  el binario NO se puede editar: corregirla exige borrarlo y crearlo de nuevo.
+- **Producción** (`firma_johan.mjs`, primero en simulación y luego `--escribir`):
+  - CREA `informes_brigada_bin/firma_f-johan-utria_<huella16>`;
+  - en la configuración cambia SOLO la firma de JOHAN UTRIA;
+  - escribe con precondición de versión (`lastUpdateTime`) y exige un solo administrador.
+  - Al releer: los bytes son idénticos, la huella coincide, y Carlos, David, editores, contrato, almacén, marca y listas
+    no cambiaron.
+- **Verificación**:
+  - Banco integrador con las 3 líneas reales (Carlos con firma, David sin firma, Johan con firma), emitido: 49 de 49 chequeos,
+    2 firmas estampadas, PDF y Word.
+  - La variante con el JPG tal cual dejó un recuadro gris en la hoja; la normalizada no deja ninguno.
+- **Revisión adversarial**: 3 Opus (`wf_052a5c3b-8ed`), por fidelidad, papel/Word y escritura. Ninguno encontró algo que
+  bloquee. Se aplicaron sus 3 mejoras antes de escribir:
+  1. la redacción de la autorización;
+  2. un control de «los otros firmantes no cambian» que de verdad compara;
+  3. la precondición de versión y el administrador único.
+- **NN.8 Verificado sano / no re-auditar**:
+  - Trazo fiel: el alfa coincide exactamente con la fórmula de Fichas en los 16 848 px.
+  - Las 2 filas recortadas no tenían trazo. El remate superior ya tocaba el borde en el JPG entregado.
+  - Las firmas se estampan con 24 pt de alto (≈ 320 ppp): 156 px no se pixelan.
+  - Que salga más chica que la de Carlos es §101: firma alta, 69 % del área. Lo que más se nota es su trazo fino (0,13 mm),
+    y eso viene de la imagen; no se engrosa.
+  - El Word lleva el PNG idéntico byte a byte. Chrome estira la imagen un 1,7 % a lo ancho, 0,2 mm: no se nota.
+- **Riesgos y pendientes**:
+  - La pantalla de Configuración guarda el documento COMPLETO con lo que cargó al abrirse. Si estaba abierta desde antes de
+    esta escritura, recargar ANTES de guardar; si no, la firma de Johan se borra de la configuración.
+  - Propuesto, no hecho: que «Cargar firma» del módulo use la normalización de Fichas (L-145).
+  - Falta la firma de David Miranda.
+- Bóveda: `crudos/firma_johan.mjs` + `crudos/workflow/verificar-firma-johan.json`.
