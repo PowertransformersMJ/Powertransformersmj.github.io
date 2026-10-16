@@ -11,10 +11,12 @@
 // ══════════════════════════════════════════════════════════════════════════════
 
 import {
-  PARAMS_FOTO, PARAMS_ANEXO, PARAMS_FICHA, PARAMS_FIRMA, PARAMS_LOGO,
+  PARAMS_FOTO, PARAMS_ANEXO, PARAMS_FICHA, PARAMS_LOGO,
   planEscalado, intentosJpeg, elegirResultado, validarEntrada, metadatosEn, pesoLegible
 } from '../../domain/informe_brigada_fotos.js';
 import { huellaHex } from '../../domain/fichas_adjunto.js';
+import * as FL from '../../domain/informe_brigada_firma_limpia.js';
+import { FIRMA_PORTADA } from '../../domain/informe_brigada_documento.js';
 
 const ROJO_OVALO = '#EE0000';
 const ANCHO_FOTO_PT = 229.8;       // ancho de una foto en la cuadrícula de dos columnas (para el grosor de 1,5 pt)
@@ -160,8 +162,51 @@ export function prepararFoto(archivo) { return prepararJpeg(archivo, PARAMS_FOTO
 export function prepararImagenAnexo(archivo) { return prepararJpeg(archivo, PARAMS_ANEXO, 'La imagen del anexo', { pngPrimero: true }); }
 /** Ficha técnica de fabricante (imagen). */
 export function prepararFicha(archivo) { return prepararJpeg(archivo, PARAMS_FICHA, 'La ficha técnica'); }
-/** Firma de un tercero: PNG transparente (se estampa solo al EMITIR). */
-export function prepararFirma(archivo) { return prepararPng(archivo, PARAMS_FIRMA, 'La firma'); }
+/**
+ * Firma de un tercero → PNG con el fondo claro TRANSPARENTE y recortada al trazo, con la MISMA matemática de
+ * Fichas (L-145, `99 §163.14`); nunca se amplía. Antes solo se redibujaba y un JPG dejaba un recuadro gris en la
+ * hoja emitida. Los lienzos se usan como en Fichas (sin suavizado «alto»), para que salga lo mismo que allá.
+ */
+export async function prepararFirma(archivo) {
+  await leerYValidar(archivo);
+  const dec = await decodificar(archivo);
+  let c0 = null; let c = null;
+  try {
+    const m0 = FL.medidasDeTrabajo(dec.ancho, dec.alto);
+    c0 = lienzo(m0.ancho, m0.alto);
+    const g0 = c0.getContext('2d');
+    g0.drawImage(dec.fuente, 0, 0, m0.ancho, m0.alto);
+    const px = g0.getImageData(0, 0, m0.ancho, m0.alto);
+    const caja = FL.limpiarFondo(px.data, m0.ancho, m0.alto);
+    if (!caja) throw new Error('No se encontró el trazo de la firma: use una imagen con la firma en tinta oscura sobre fondo claro.');
+    g0.putImageData(px, 0, 0);
+    const r = FL.recorteDeFirma(caja, m0.ancho, m0.alto);
+    c = lienzo(r.ancho, r.alto);
+    c.getContext('2d').drawImage(c0, r.x, r.y, r.w, r.h, 0, 0, r.ancho, r.alto);
+    let png = await aBlob(c, 'image/png');
+    if (png.size > FL.FIRMA_LIMPIA.tope) {
+      // segundo intento: sin el velo del papel (foto de celular sobre papel gris claro)
+      FL.quitarVelo(px.data);
+      g0.putImageData(px, 0, 0);
+      const g = c.getContext('2d');
+      g.clearRect(0, 0, r.ancho, r.alto);
+      g.drawImage(c0, r.x, r.y, r.w, r.h, 0, 0, r.ancho, r.alto);
+      png = await aBlob(c, 'image/png');
+    }
+    if (png.size > FL.FIRMA_LIMPIA.tope) {
+      throw new Error(`La firma recortada pesa ${pesoLegible(png.size)} (máximo ${pesoLegible(FL.FIRMA_LIMPIA.tope)}): escanéela sobre papel blanco, recortada a la firma.`);
+    }
+    const avisos = [];
+    const ppp = FL.pppImpresa(r.ancho, r.alto, FIRMA_PORTADA);
+    if (ppp > 0 && ppp < 200) avisos.push(`La imagen de la firma es pequeña (${Math.round(ppp)} ppp al imprimirla): puede verse pixelada. Si hay una más grande, mejor.`);
+    return { ...(await cerrarSalida(png, 'image/png', r.ancho, r.alto, avisos)), transparente: true };
+  } finally {
+    if (c0) soltar(c0);
+    if (c) soltar(c);
+    dec.cerrar();
+  }
+}
+
 /** Logo de la marca: PNG (conserva la transparencia). */
 export function prepararLogo(archivo) { return prepararPng(archivo, PARAMS_LOGO, 'El logo'); }
 

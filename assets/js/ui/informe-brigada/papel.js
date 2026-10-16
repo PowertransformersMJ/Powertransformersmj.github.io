@@ -197,13 +197,15 @@ function portada(ctx, nro) {
     const [y1, y2, xn] = filas[k];
     tx(75.5, y1, esc(f.rotulo));
     tx(192.6, y1, esc(f.casilla));
-    tx(xn, y2 - 0.4, esc(f.nombre), '', XM - xn - 3);
+    // con firma estampada, un nombre muy largo se comprime para terminar 3 pt antes de ella (§163.14)
+    const finNombre = f.firmaRef && Number.isFinite(f.firmaXPt) ? Math.min(XM - 3, f.firmaXPt - 3) : XM - 3;
+    tx(xn, y2 - 0.4, esc(f.nombre), '', finNombre - xn);
     if (f.fecha) tx(FIRMA_POSICION.xFecha, y1, esc(f.fecha), 'font-weight:400');
     if (f.firmaRef) {
       const url = urlSegura(safeUrlDe(ctx, f.firmaRef));
       const tam = f.firmaTamPt || { ancho: 60, alto: 22 };
       if (url) {
-        add(`<img class="ibr-firma" src="${esc(url)}" alt="Firma" data-ref="${esc(f.firmaRef)}" data-pendiente="Firma no disponible" style="left:${PT(FIRMA_POSICION.xFirma)};top:${PT(y1 + FIRMA_POSICION.dyFirma)};width:${PT(tam.ancho)};height:${PT(tam.alto)}">`);
+        add(`<img class="ibr-firma" src="${esc(url)}" alt="Firma" data-ref="${esc(f.firmaRef)}" data-pendiente="Firma no disponible" style="left:${PT(Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 270.5) - tam.ancho / 2)};top:${PT(y1 + FIRMA_POSICION.dyFirma)};width:${PT(tam.ancho)};height:${PT(tam.alto)}">`);
       } else ctx.avisos.add('No se pudo leer una firma del almacenamiento: la línea «' + f.rotulo + '» sale sin firma.');
     }
   });
