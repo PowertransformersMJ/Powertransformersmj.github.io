@@ -7880,3 +7880,54 @@ chat).
   - recargar la pantalla de Configuración antes de guardar en ella (163.12);
   - abrir el Word en Microsoft Word real (sigue sin verificar);
   - la propuesta de L-145 para el botón «Cargar firma».
+
+**163.14 Ajuste del 2026-10-16: firmas centradas bajo la fecha y «Cargar firma» que limpia el fondo** (pedido suyo:
+*«sí, ajusta el botón cargar firma»* · *«las firmas deben quedar ordenadas, justo debajo de la fecha centrado proporcional a
+los espacios, todas las firmas»*).
+- **Su decisión (W-11, maqueta con las 3 firmas reales y pregunta cerrada)**: opción **A** de tres (A: igual peso y más
+  grandes; B: llenar la caja; C: tamaño actual, solo centradas).
+- **Portada** (`informe_brigada_documento.js`; el papel y el Word usan los mismos números):
+  - Cada firma va CENTRADA en la fecha: `FIRMA_POSICION.xCentro = 270,5` pt. La fecha «dd/mm/aaaa» empieza en 250 y mide
+    41,03 pt en Arial Narrow 10; una prueba lo compara con `anchoTextoPt`.
+  - Va 11,5 pt bajo su renglón. `firmaXPt` es el borde izquierdo.
+  - `FIRMA_PORTADA` = 1600 pt² (antes 1200) en una caja de 92 × 26 pt:
+    - 26 pt es lo que cabe bajo la fecha de «Elaborado» sin acercarse a «Revisado por:»;
+    - 92 pt deja 5 pt hasta la línea que divide la portada.
+  - Medido: Word centros 270,50; PDF de Chrome entre 270,38 y 270,75 (ajusta al píxel). Carlos 74,3 × 21,5 · David
+    84,2 × 19,0 · Johan 37,6 × 26 (la topa el alto).
+- **Botón «Cargar firma»** (`imagenes.js` → `prepararFirma`):
+  - Acepta PNG o JPG.
+  - Vuelve transparente el fondo claro y recorta al trazo con la MISMA matemática de Fichas, en el dominio nuevo
+    `informe_brigada_firma_limpia.js` (archivo propio por L-102). Una prueba compara sus números con `firmas-equipo.js`.
+  - Nunca amplía.
+  - Si pasa de 512 KB, hace un segundo intento sin el velo del papel (alfa ≤ 40). Una foto de celular de 4000×3000 sobre
+    papel gris: Fichas la rechaza (934 KB) y aquí sale en 61 KB.
+  - Avisa si la firma saldría por debajo de 200 ppp.
+  - La configuración muestra una **miniatura** de la firma ya limpia.
+  - La fecha de autorización por defecto es la LOCAL.
+- **Nombre largo**: con firma estampada, se comprime para terminar 3 pt antes de ella (papel y Word). Ninguno de los
+  nombres reales lo necesita.
+- **Verificación**:
+  - El botón nuevo da la MISMA huella sha-256 que las firmas ya publicadas de Johan y David; la de Carlos sale idéntica.
+  - Una imagen sin trazo da error claro.
+  - Banco emitido con las 3 firmas: 49 de 49; las 20 hojas con el mismo texto; solo cambia la zona de las firmas.
+  - Banco de pantalla: un JPG crema de 900×300 sale como PNG transparente de 791×174, con miniatura visible. Las miniaturas
+    ilegibles no dejan recuadro (`[hidden]`).
+  - Unitarias 2887/2889, lint 0. En producción hay 2 informes, ambos borradores: nada emitido cambia de aspecto.
+- **Revisión adversarial**: 3 Opus (`wf_37cf88e2-d50`): código, papel/Word y botón con 31 imágenes difíciles. Ninguno
+  encontró algo que bloquee. Se aplicaron:
+  - pruebas que ahora sí matan 15 mutaciones (guardas del código de `prepararFirma` y del papel, respaldo del Word);
+  - el respaldo del papel también centra;
+  - el segundo intento sin velo;
+  - la miniatura;
+  - el nombre comprimido.
+- **NN.8 Verificado sano / no re-auditar**:
+  - Las 32 combinaciones de módulos viejos y nuevos tras publicar (L-102): ninguna tumba la página ni da NaN.
+  - Un documento viejo con un papel nuevo cae centrado.
+  - Las hojas 2 a 20 salen idénticas.
+  - El redondeo de Chrome no empeoró (máximo 0,38 pt).
+- **Queda** (propuesto, no hecho):
+  - Guardas contra fotos malas (poca luz, fondo oscuro, sombra). La miniatura ya permite verlas antes de emitir.
+  - Una carrera ANTERIOR en Configuración: si se pulsa «Guardar configuración» mientras se sube una firma, la firma puede
+    quedar sin enlace. Un aviso no sirve, porque el otro guardado lo pisa; hace falta encolar el guardado.
+  - Retirar `PARAMS_FIRMA` en una publicación posterior.
