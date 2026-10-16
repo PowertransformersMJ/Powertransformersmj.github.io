@@ -7974,3 +7974,5 @@ mientras se sube la firma»*).
     más a la izquierda. Los nombres de dos palabras no se tocan.
 - **Queda a su criterio**: el guardado automático de una imagen también guarda los cambios pendientes (ahora se avisa);
   la otra opción sería enlazar sin arrastrarlos.
+- **Aprobado por el Ingeniero (2026-10-16)**, viendo la vista previa con el código publicado (PDF, Word y portada completa):
+  *«perfecto, me agrada como se ve ahora»*. Queda cerrado el acomodo de las firmas; no re-abrir sin un pedido suyo.
