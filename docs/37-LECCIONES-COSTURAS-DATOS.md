@@ -126,3 +126,21 @@ módulo que estampe firmas. · **Cicatriz** (`99 §163.12`, 2026-10-16, firma de
 
 **Gate**: desde `§163.14` el botón usa la misma limpieza (`informe_brigada_firma_limpia.js`). `tests/informe_brigada_firma_limpia.test.js`
 compara sus números con los de Fichas y exige que `prepararFirma` los use: si alguien vuelve al redibujo viejo, falla.
+
+### L-146 · «Esperar a que termine el guardado y luego guardar» no es un turno: hace falta una cola
+**Disparador**: una pantalla guarda el MISMO documento desde varios lados (el botón «Guardar», una imagen que termina de
+subir, otra imagen…) y el guardado reemplaza el borrador con lo leído del servidor. · **Cicatriz** (`99 §163.15`,
+Configuración del Informe de Brigada):
+- el primer arreglo, `while (enCurso) await enCurso;` antes de guardar, funcionó con UNA imagen y lo probé solo con una;
+- con dos, despiertan juntas: la primera toma el candado (`if (ocupado) return false`) y la segunda choca y se pierde en
+  silencio;
+- las pruebas que solo leían el texto del código pasaban igual. Lo encontró la revisión adversarial.
+
+**Regla**:
+- toda escritura del documento compartido entra a UNA cola de promesas (`cola_turnos.js`: `ultima = ultima.then(tarea)`);
+- el cambio que depende de lo guardado (enlazar la imagen) se aplica DENTRO del turno, buscando por clave, no por
+  posición;
+- si el usuario editó durante el guardado, no se le reemplaza el borrador;
+- se prueba con un guardado LENTO de mentira y 2 o más escritores a la vez, más una copia rota a propósito que debe fallar.
+
+**Gate**: `tests/cola_turnos.test.js` (comportamiento) + las guardas de `tests/informe_brigada_firma_limpia.test.js`.

@@ -94,8 +94,8 @@ describe('firma limpia: la MISMA matemática de Fichas (L-145)', () => {
     for (const p of pasos) { const k = cuerpo.indexOf(p, desde); assert.ok(k >= 0, 'falta o está fuera de orden: ' + p); desde = k; }
     assert.ok(!cuerpo.includes('prepararPng('), 'la firma ya no pasa por el redibujo viejo');
   });
-  test('el papel centra la firma con firmaXPt (o con el centro de la fecha) y comprime un nombre largo ante ella', () => {
-    assert.ok(PAPEL.includes('left:${PT(Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 270.5) - tam.ancho / 2)}'));
+  test('el papel centra la firma con firmaXPt (o con el centro de todo el renglón) y comprime un nombre largo ante ella', () => {
+    assert.ok(PAPEL.includes('left:${PT(Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 241.8) - tam.ancho / 2)}'));
     assert.ok(PAPEL.includes('const finNombre = f.firmaRef && Number.isFinite(f.firmaXPt) ? Math.min(XM - 3, f.firmaXPt - 3) : XM - 3;'));
   });
   test('ppp al imprimir: la de 156 px (Johan) pasa de 200; una de 60 px no', () => {
@@ -105,10 +105,12 @@ describe('firma limpia: la MISMA matemática de Fichas (L-145)', () => {
   });
 });
 
-describe('firma estampada: centrada bajo la fecha, mismo peso visual, dentro de su caja (§163.14)', () => {
-  test('el centro de la fecha «dd/mm/aaaa» está en x = 270,5 pt (medida de Arial Narrow 10)', () => {
+describe('firma estampada: centrada bajo todo «Fecha / Firma: dd/mm/aaaa», mismo peso visual, dentro de su caja (§163.14–15)', () => {
+  test('el centro es el de TODO el renglón «Fecha / Firma: dd/mm/aaaa»: x = 241,8 pt (§163.15, no solo los números)', () => {
     const anchoFecha = anchoTextoPt('16/10/2026', { tam: 10, negrita: false, angosta: true }) / 1.03;   // sin la holgura del 3 %
-    assert.ok(Math.abs(FIRMA_POSICION.xFecha + anchoFecha / 2 - FIRMA_POSICION.xCentro) < 0.05, 'centro ' + (FIRMA_POSICION.xFecha + anchoFecha / 2));
+    const fin = FIRMA_POSICION.xFecha + anchoFecha;
+    assert.equal(FIRMA_POSICION.xCasilla, 192.6, 'donde empieza «Fecha / Firma:» en el papel y en el Word');
+    assert.ok(Math.abs((FIRMA_POSICION.xCasilla + fin) / 2 - FIRMA_POSICION.xCentro) < 0.05, 'centro ' + (FIRMA_POSICION.xCasilla + fin) / 2);
   });
   test('la caja es de 92 × 26 pt y la superficie de 1600 pt² (opción A de su maqueta)', () => {
     assert.deepEqual({ ...FIRMA_PORTADA }, { area: 1600, altoMax: 26, anchoMax: 92 });
@@ -122,6 +124,7 @@ describe('firma estampada: centrada bajo la fecha, mismo peso visual, dentro de 
       assert.ok(t.ancho <= 92 + 1e-9 && t.alto <= 26 + 1e-9, `proporción ${rel}: ${t.ancho} × ${t.alto}`);
       assert.ok(t.ancho * t.alto <= 1600 + 1e-6, `proporción ${rel}: superficie`);
       assert.ok(x + t.ancho <= XM - 5 + 1e-9, `proporción ${rel}: a 5 pt o más de la división`);
+      assert.ok(x >= FIRMA_POSICION.xCasilla - 1e-9, `proporción ${rel}: nunca empieza a la izquierda de «Fecha / Firma:»`);
       assert.ok(571.1 + FIRMA_POSICION.dyFirma + t.alto <= yTextoSiguiente - 4.9, `proporción ${rel}: lejos de «Revisado por:»`);
     }
   });
@@ -129,5 +132,30 @@ describe('firma estampada: centrada bajo la fecha, mismo peso visual, dentro de 
     const [carlos, david, johan] = [625 / 181, 572 / 129, 156 / 108].map((r) => tamanoFirma(r, FIRMA_PORTADA));
     assert.ok(Math.abs(carlos.ancho * carlos.alto - 1600) < 1e-6 && Math.abs(david.ancho * david.alto - 1600) < 1e-6);
     assert.equal(johan.alto, 26, 'la casi cuadrada la topa el alto');
+  });
+});
+
+describe('configuración: todo guardado pasa por la cola de turnos (§163.15; el comportamiento, en tests/cola_turnos.test.js)', () => {
+  const CFG = readFileSync(resolve(AQUI, '../assets/js/ui/informe-brigada/configuracion.js'), 'utf8');
+  test('guardar y guardarConCambio corren en un turno de la cola; nadie llama guardarAhora fuera de ellas', () => {
+    assert.match(CFG, /import \{ crearColaDeTurnos \} from '\.\.\/\.\.\/domain\/cola_turnos\.js';/);
+    assert.match(CFG, /function guardar\(opciones\) \{ return cola\.enTurno\(\(\) => guardarAhora\(opciones\)\); \}/);
+    assert.match(CFG, /return cola\.enTurno\(\(\) => \(cambio\(\) === false \? null : guardarAhora\(opciones\)\)\);/);
+    const llamadas = CFG.match(/guardarAhora\(/g) || [];
+    assert.equal(llamadas.length, 3, 'solo la definición y las dos de la cola');
+    assert.ok(!/\bocupado\b|esperarLibre|enCurso/.test(CFG), 'sin el candado viejo');
+  });
+  test('la firma se enlaza EN su turno, buscando al firmante por su CLAVE; el logo también en su turno', () => {
+    const f = CFG.slice(CFG.indexOf('const ok = await guardarConCambio(() => {'), CFG.indexOf("estado('No se pudo cargar la firma:"));
+    assert.ok(f.includes('borrador.firmantes.findIndex((x) => x && x.clave === f.clave)'), 'por clave, no por posición');
+    assert.ok(f.indexOf('findIndex') < f.indexOf('borrador.firmantes = borrador.firmantes.map('), 'busca y luego enlaza, dentro del turno');
+    const l = CFG.slice(CFG.indexOf('const meta = await almacenParaSubir().subirLogo('), CFG.indexOf("estado('No se pudo cargar el logo:"));
+    assert.ok(/guardarConCambio\(\(\) => \{ conPendientes = sucio; borrador\.marca\[clave\] = meta; \}/.test(l));
+  });
+  test('lo que el Ingeniero edita MIENTRAS se guarda no se borra', () => {
+    const g = CFG.slice(CFG.indexOf('async function guardarAhora('), CFG.indexOf("cont.addEventListener('change'"));
+    assert.ok(g.includes('const visto = cambios;') && g.includes('if (cambios === visto) {'), 'solo se reemplaza el borrador si no hubo ediciones');
+    assert.match(CFG, /const marcarSucio = \(\) => \{ sucio = true; cambios\+\+;/);
+    assert.equal((CFG.match(/sucio = true; cambios\+\+;/g) || []).length, 3, 'marcarSucio, agregar y quitar firmante');
   });
 });

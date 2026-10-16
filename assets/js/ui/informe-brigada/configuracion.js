@@ -14,6 +14,8 @@
 // ══════════════════════════════════════════════════════════════
 
 // Fecha de hoy en la hora LOCAL (en Colombia, de 7 p. m. a medianoche la de UTC ya es mañana; §99.11).
+import { crearColaDeTurnos } from '../../domain/cola_turnos.js';
+
 const HOY = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 /**
@@ -51,8 +53,12 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
   let borrador = normal(configInicial);
   let usuarios = null;        // null = sin leer
   let errorUsuarios = '';
-  let ocupado = false;
+  // Todo guardado (el del Ingeniero, el de cada firma y el de cada logo) corre en su TURNO, uno a la vez y en orden.
+  // Una imagen recién subida se enlaza recién cuando le toca, sobre lo que quedó guardado (`99 §163.15`): antes, si se
+  // guardaba mientras se subía, o si dos imágenes terminaban a la vez, la segunda quedaba sin enlace en silencio.
+  const cola = crearColaDeTurnos();
   let sucio = false;
+  let cambios = 0;   // sube con cada edición del Ingeniero: si cambia DURANTE un guardado, su borrador no se pisa
 
   function normal(c) {
     const x = copia(c) || {};
@@ -134,7 +140,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       + '<section class="ibr-cfg-bloque"><h3 class="ibr-sub">Firmantes</h3>'
       +   '<p class="ibr-banda ibr-banda--aviso">Las firmas solo se estampan al EMITIR, y solo si el nombre de la línea es el del firmante. En borrador, nunca.</p>'
       +   (firmantes ? '<ul class="ibr-cfg-lista">' + firmantes + '</ul>' : '<p class="ibr-tenue">Sin firmantes.</p>')
-      +   '<div class="ibr-cfg-nuevo"><input class="ibr-input" type="text" data-cfg-nuevo-nombre placeholder="NOMBRE DEL FIRMANTE" aria-label="Nombre del firmante">'
+      +   '<div class="ibr-cfg-nuevo"><input class="ibr-input" type="text" data-cfg-nuevo-nombre maxlength="40" placeholder="NOMBRE DEL FIRMANTE" aria-label="Nombre del firmante">'
       +   '<input class="ibr-input" type="text" data-cfg-nuevo-cargo placeholder="Cargo" aria-label="Cargo del firmante">'
       +   '<button type="button" class="ibr-btn ibr-btn--chico" data-cfg-agregar-firmante>＋ Agregar firmante</button></div></section>'
       + '<div class="ibr-cfg-pie"><button type="button" class="ibr-btn ibr-btn--primario" data-cfg-guardar>Guardar configuración</button>'
@@ -155,28 +161,43 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
   }
 
   const estado = (t) => { const el = cont.querySelector('[data-cfg-estado]'); if (el) el.textContent = t; };
-  const marcarSucio = () => { sucio = true; estado('Hay cambios sin guardar.'); };
+  const marcarSucio = () => { sucio = true; cambios++; estado('Hay cambios sin guardar.'); };
 
-  async function guardar({ silencioso = false } = {}) {
-    if (ocupado) return false;
-    ocupado = true;
-    estado('Guardando…');
+  /** Guarda el borrador en su turno. → true si quedó guardado. */
+  function guardar(opciones) { return cola.enTurno(() => guardarAhora(opciones)); }
+
+  /**
+   * En su turno: aplica `cambio` al borrador (p. ej. enlazar una imagen recién subida) y guarda.
+   * Si `cambio()` devuelve false no se guarda nada y se devuelve null.
+   */
+  function guardarConCambio(cambio, opciones) {
+    return cola.enTurno(() => (cambio() === false ? null : guardarAhora(opciones)));
+  }
+
+  /** Solo dentro de un turno de la cola. */
+  async function guardarAhora({ silencioso = false } = {}) {
+    const visto = cambios;
     try {
+      estado('Guardando…');
       await ctx.repo.guardarConfig(borrador);
       const r = await ctx.repo.leerConfig();
       const nueva = (r && r.config) || borrador;
-      borrador = normal(nueva);
-      sucio = false;
       alGuardar(nueva);
-      pintar();
-      estado('Configuración guardada.');
+      if (cambios === visto) {
+        borrador = normal(nueva);
+        sucio = false;
+        pintar();
+        estado('Configuración guardada.');
+      } else {
+        // El Ingeniero editó algo MIENTRAS se guardaba: se conserva su borrador (antes se borraba en silencio).
+        pintar();
+        estado('Guardado. Hay cambios hechos mientras se guardaba: falta «Guardar configuración».');
+      }
       if (!silencioso) ctx.avisar('Configuración del informe guardada.', 'ok');
       return true;
     } catch (err) {
       estado('No se pudo guardar: ' + ((err && err.message) || err));
       return false;
-    } finally {
-      ocupado = false;
     }
   }
 
@@ -207,17 +228,16 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       const archivo = el.files && el.files[0];
       el.value = '';
       if (!archivo) return;
-      if (ocupado) { estado('Espere: se está guardando la configuración; vuelva a escoger el logo en un momento.'); return; }
       estado('Preparando el logo…');
       try {
         const IM = await dep.cargar('imagenes');
         const prep = await IM.prepararLogo(archivo);
         estado('Subiendo el logo…');
         const meta = await almacenParaSubir().subirLogo(clave, prep.blob, { mime: prep.mime, ancho: prep.ancho, alto: prep.alto, tamano: prep.tamano, huella: prep.huella }, ctx.autor());
-        borrador.marca[clave] = meta;
-        // Solo se dice «cargado» si la configuración quedó guardada (si no, el estado ya explica qué falló).
-        if (await guardar({ silencioso: true })) {
-          ctx.avisar('Logo cargado.', 'ok');
+        // Se enlaza en su turno, sobre lo que quedó guardado. Solo se dice «cargado» si la configuración quedó guardada.
+        let conPendientes = false;
+        if (await guardarConCambio(() => { conPendientes = sucio; borrador.marca[clave] = meta; }, { silencioso: true })) {
+          ctx.avisar('Logo cargado.' + (conPendientes ? ' Se guardaron también los cambios que estaban pendientes.' : ''), 'ok');
           avisosLogo(clave, prep, P.MARCA_GEOMETRIA).forEach((t) => ctx.avisar(t, 'aviso', 0));
         }
       } catch (err) {
@@ -236,7 +256,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       const clave = dep.rutas.claveFirmante(nombre);
       if (borrador.firmantes.some((f) => f.clave === clave)) { estado('Ya hay un firmante con ese nombre.'); return; }
       borrador.firmantes = borrador.firmantes.concat([{ clave, nombre, cargo, firma: null }]);
-      sucio = true;
+      sucio = true; cambios++;
       pintar();
       estado('Firmante agregado: falta «Guardar configuración».');
       return;
@@ -245,7 +265,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
     if (q) {
       const i = Number(q.getAttribute('data-cfg-quitar-firmante'));
       borrador.firmantes = borrador.firmantes.filter((_, k) => k !== i);
-      sucio = true;
+      sucio = true; cambios++;
       pintar();
       estado('Firmante quitado: falta «Guardar configuración». Los informes ya emitidos conservan su firma.');
       return;
@@ -257,8 +277,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       return;
     }
     const sub = t.closest('[data-cfg-firma-subir]');
-    if (sub && ocupado) { estado('Espere: se está guardando la configuración.'); return; }
-    if (sub && !ocupado) {
+    if (sub) {
       const i = Number(sub.getAttribute('data-cfg-firma-subir'));
       const f = borrador.firmantes[i];
       const archivo = (cont.querySelector('[data-cfg-firma-archivo="' + i + '"]').files || [])[0];
@@ -275,9 +294,23 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
         estado('Subiendo la firma…');
         const meta = await almacenParaSubir().subirFirma(f.clave, prep.blob,
           { mime: prep.mime, ancho: prep.ancho, alto: prep.alto, tamano: prep.tamano, huella: prep.huella, autorizacion: { fecha, medio } }, ctx.autor());
-        borrador.firmantes = borrador.firmantes.map((x, k) => (k === i ? { ...x, firma: { ...meta, autorizacion: meta.autorizacion || { fecha, medio } } } : x));
-        if (await guardar({ silencioso: true })) {
-          ctx.avisar('Firma de ' + f.nombre + ' registrada. Se estampa solo al emitir.', 'ok');
+        // Se enlaza en su TURNO, sobre lo que quedó guardado, buscando al firmante por su clave (la lista pudo
+        // cambiar de orden o perder a alguien mientras se subía).
+        let fuera = false; let conPendientes = false;
+        const ok = await guardarConCambio(() => {
+          const k = borrador.firmantes.findIndex((x) => x && x.clave === f.clave);
+          if (k < 0) { fuera = true; return false; }
+          conPendientes = sucio;
+          borrador.firmantes = borrador.firmantes.map((x, j) => (j === k ? { ...x, firma: { ...meta, autorizacion: meta.autorizacion || { fecha, medio } } } : x));
+          return true;
+        }, { silencioso: true });
+        if (fuera) {
+          estado('La firma se subió, pero ' + f.nombre + ' ya no está entre los firmantes: no se enlazó.' + (sucio ? ' Falta «Guardar configuración».' : ''));
+          sub.disabled = false;
+          return;
+        }
+        if (ok) {
+          ctx.avisar('Firma de ' + f.nombre + ' registrada. Se estampa solo al emitir.' + (conPendientes ? ' Se guardaron también los cambios que estaban pendientes.' : ''), 'ok');
           (prep.avisos || []).forEach((t) => ctx.avisar(t, 'aviso', 0));
         } else sub.disabled = false;
       } catch (err) {

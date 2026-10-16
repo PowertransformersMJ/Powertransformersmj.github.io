@@ -675,8 +675,8 @@ function portadaXml(A, d) {
       if (img) {
         const propia = f.firmaTamPt && f.firmaTamPt.ancho > 0 && f.firmaTamPt.alto > 0;
         const { ancho, alto } = propia ? f.firmaTamPt : tamanoFirma(img.ancho / img.alto, FIRMA_PORTADA);
-        // centrada bajo la fecha, como en el papel (§163.14)
-        const x = propia && Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 270.5) - ancho / 2;
+        // centrada bajo TODO el renglón «Fecha / Firma: dd/mm/aaaa», como en el papel (§163.15)
+        const x = propia && Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 241.8) - ancho / 2;
         anclasFirma.push(anclada(A, 'document', img, x, y1 + FIRMA_POSICION.dyFirma, ancho, alto, { nombre: `Firma ${f.rol || k + 1}` }));
       }
     }

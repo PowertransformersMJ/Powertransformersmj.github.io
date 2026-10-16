@@ -7931,3 +7931,46 @@ los espacios, todas las firmas»*).
   - Una carrera ANTERIOR en Configuración: si se pulsa «Guardar configuración» mientras se sube una firma, la firma puede
     quedar sin enlace. Un aviso no sirve, porque el otro guardado lo pisa; hace falta encolar el guardado.
   - Retirar `PARAMS_FIRMA` en una publicación posterior.
+
+**163.15 Ajuste del 2026-10-16: firmas bajo TODO el renglón «Fecha / Firma: fecha» y cola de turnos en Configuración**
+(pedido suyo, con captura del renglón: *«cuando hablaba de debajo de la fecha es todo, no solo donde aparecen los números;
+justo debajo de lo que te adjunto, centrado, todo proporcional que se vea ordenado»* · *«sí, corrige lo de guardar
+mientras se sube la firma»*).
+- **Centro**: `FIRMA_POSICION.xCentro` = 241,8 pt = centro de TODO el renglón. Va de `xCasilla` 192,6, donde empieza
+  «Fecha / Firma:», al fin de la fecha en 291,03. Antes era 270,5, solo bajo la fecha.
+  - Tamaños de la opción A sin cambio. La firma más ancha, de 92 pt, va de 195,8 a 287,8, y nunca empieza a la izquierda
+    de «Fecha / Firma:» (hay prueba).
+  - Medido: Word 241,80 en las tres; PDF de Chrome 241,5–241,9. El centro de la tinta de las firmas se separa a lo sumo
+    0,4 pt del de la tinta del renglón.
+- **Cola de turnos** (dominio nuevo `cola_turnos.js`, archivo propio por L-102). En Configuración, el guardado del
+  Ingeniero, el de cada firma y el de cada logo corren uno a la vez y en orden (`guardar` / `guardarConCambio`). Cada
+  imagen se enlaza EN su turno, buscando al firmante por clave.
+  - Antes, si se guardaba mientras se subía una imagen, o si dos imágenes terminaban a la vez, la segunda se perdía en
+    silencio.
+  - El primer intento de este turno (`esperarLibre`) arreglaba una sola imagen, pero no dos ni más. Lo halló la revisión
+    y se cambió por la cola; ver NN.8.
+  - Lo que el Ingeniero edita MIENTRAS se guarda ya no se borra (contador `cambios`).
+  - Si una firma o un logo se guarda junto con cambios pendientes, se avisa.
+  - Nombre de firmante nuevo: hasta 40 letras.
+- **Verificación**:
+  - Unitarias 2897/2899, lint 0.
+  - Pruebas de COMPORTAMIENTO de la cola (`tests/cola_turnos.test.js`): una copia rota a propósito falla.
+  - Banco de pantalla con el guardado retrasado 0,8–1,5 s:
+    - 2 firmas + «Guardar» en medio: quedan las 2;
+    - 3 firmas seguidas: las 3;
+    - 5 logos seguidos: los 5;
+    - editar el contrato en medio: se conserva y avisa «falta Guardar configuración».
+  - Emisión de banco con las 3 firmas reales en PDF y Word.
+- **Revisión adversarial**: 2 Opus (`wf_5d764224-17e`).
+  - Portada: lista para publicar.
+  - Cola: NO lista con `esperarLibre`; se rehízo como cola. Se aplicaron todas sus mejoras: comentario de
+    `FIRMA_PORTADA`, títulos y datos de las pruebas, prueba de un nombre real largo, `maxlength`.
+- **NN.8 Verificado sano / no re-auditar**:
+  - Callejón `esperarLibre()`: «esperar a que no haya guardado y luego guardar» NO es un turno. Varios que esperan
+    despiertan a la vez, el primero toma el candado y los demás chocan. Un turno se toma con la verificación y la acción
+    en el MISMO paso síncrono (cola de promesas).
+  - Las pruebas que solo leen el texto del código no detectan carreras: hacen falta pruebas que ejecuten.
+  - Ahora un nombre completo de cuatro palabras se comprime al 76–90 % junto a la firma, porque la firma empieza 28,7 pt
+    más a la izquierda. Los nombres de dos palabras no se tocan.
+- **Queda a su criterio**: el guardado automático de una imagen también guarda los cambios pendientes (ahora se avisa);
+  la otra opción sería enlazar sin arrastrarlos.
