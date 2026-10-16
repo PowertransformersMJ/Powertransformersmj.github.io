@@ -496,6 +496,17 @@ export function prellenar({ equipo, config = null, accion = null, actividad = AC
   const contrato = txt(config && config.contrato_defecto);
   if (contrato) { c.portada.contrato = contrato; origen(c, 'portada.contrato', 'configuracion', contrato); }
 
+  // Firmantes por defecto (Elaborado / Revisado / Aprobado) de la configuración: llegan llenos y se pueden cambiar.
+  const firmantes = (config && Array.isArray(config.firmantes)) ? config.firmantes : [];
+  c.firmas = c.firmas || {};
+  for (const rol of ROLES_FIRMA) {
+    const f = firmantes.find((x) => x && x.rol === rol && lleno(x.nombre));
+    if (!f) continue;
+    const nombre = mayusculasEs(String(f.nombre).trim());
+    c.firmas[rol] = { nombre, firmante: lleno(f.clave) ? String(f.clave) : null };
+    origen(c, 'firmas.' + rol + '.nombre', 'configuracion', nombre);
+  }
+
   const listo = accion ? aplicarAccion(c, accion) : sincronizar(c);
   // Los pies de la plantilla se resuelven al crear con lo que ya se sabe.
   return listo;

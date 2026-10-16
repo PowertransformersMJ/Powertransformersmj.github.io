@@ -437,3 +437,21 @@ describe('tipo de mantenimiento (2026-10-15): correctivo, preventivo o predictiv
   });
 });
 
+describe('firmantes por defecto de la configuración (2026-10-16)', () => {
+  test('un informe NUEVO llega con Elaborado / Revisado / Aprobado de la configuración; se puede cambiar', async () => {
+    const R = await import('../assets/js/domain/informe_brigada_rutas.js');
+    const config = R.normalizarConfig({ firmantes: [
+      { nombre: 'Ana Prueba', rol: 'elaborado' }, { nombre: 'Beto Ensayo', rol: 'revisado' },
+      { nombre: 'Ciro Ficticio', rol: 'aprobado' }, { nombre: 'Dora Simulada', rol: 'otro' }] });
+    assert.deepEqual(config.firmantes.map((f) => f.rol), ['elaborado', 'revisado', 'aprobado', '']);
+    const c = M.prellenar({ equipo: txPrueba(), config });
+    assert.deepEqual(c.firmas.elaborado, { nombre: 'ANA PRUEBA', firmante: 'f-ana-prueba' });
+    assert.deepEqual(c.firmas.revisado, { nombre: 'BETO ENSAYO', firmante: 'f-beto-ensayo' });
+    assert.deepEqual(c.firmas.aprobado, { nombre: 'CIRO FICTICIO', firmante: 'f-ciro-ficticio' });
+    const c2 = M.asignarFirmante(c, 'revisado', null);
+    assert.deepEqual(c2.firmas.revisado, { nombre: '', firmante: null });
+    const sin = M.prellenar({ equipo: txPrueba(), config: R.normalizarConfig({}) });
+    assert.equal((sin.firmas.elaborado || {}).nombre || '', '');
+  });
+});
+
