@@ -179,7 +179,7 @@ describe('estado: marca de agua y firmas (decisión 4)', () => {
     assert.equal(e.firmaRef, 'firma:elaborado');
     assert.equal(e.fecha, '22/03/2026', 'fecha de emisión en hora de Colombia');
     assert.ok(e.firmaTamPt.ancho > 0 && e.firmaTamPt.alto <= 26);
-    assert.ok(Math.abs(e.firmaXPt + e.firmaTamPt.ancho / 2 - 270.5) < 0.01, 'centrada bajo la fecha (§163.14)');
+    assert.ok(Math.abs(e.firmaXPt + e.firmaTamPt.ancho / 2 - 241.8) < 0.01, 'centrada bajo todo «Fecha / Firma: dd/mm/aaaa» (§163.15)');
     assert.equal(r.firmaXPt, null);
     assert.equal(r.firmaRef, null);
     assert.equal(a.firmaRef, null);

@@ -205,7 +205,7 @@ function portada(ctx, nro) {
       const url = urlSegura(safeUrlDe(ctx, f.firmaRef));
       const tam = f.firmaTamPt || { ancho: 60, alto: 22 };
       if (url) {
-        add(`<img class="ibr-firma" src="${esc(url)}" alt="Firma" data-ref="${esc(f.firmaRef)}" data-pendiente="Firma no disponible" style="left:${PT(Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 270.5) - tam.ancho / 2)};top:${PT(y1 + FIRMA_POSICION.dyFirma)};width:${PT(tam.ancho)};height:${PT(tam.alto)}">`);
+        add(`<img class="ibr-firma" src="${esc(url)}" alt="Firma" data-ref="${esc(f.firmaRef)}" data-pendiente="Firma no disponible" style="left:${PT(Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 241.8) - tam.ancho / 2)};top:${PT(y1 + FIRMA_POSICION.dyFirma)};width:${PT(tam.ancho)};height:${PT(tam.alto)}">`);
       } else ctx.avisos.add('No se pudo leer una firma del almacenamiento: la línea «' + f.rotulo + '» sale sin firma.');
     }
   });

@@ -12,7 +12,7 @@ import {
   construirDocx, docxBytes, MIME_DOCX, GEOM_CUADRICULA, refsDeImagenes, fotosConMarcas, claveMarcada, escXml
 } from '../assets/js/domain/informe_brigada_docx.js';
 import { pngColor } from '../assets/js/domain/png_simple.js';
-import { geometriaCuadricula, FIRMA_PORTADA } from '../assets/js/domain/informe_brigada_documento.js';
+import { geometriaCuadricula, FIRMA_PORTADA, FIRMA_POSICION } from '../assets/js/domain/informe_brigada_documento.js';
 import { tamanoFirma } from '../assets/js/domain/firmas_tamano.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -480,20 +480,21 @@ describe('correcciones de la revisión de fidelidad (Word = papel)', () => {
     assert.match(doc.slice(doc.lastIndexOf('<w:r>', j), j), /<w:w w:val="91"\/>|<w:w w:val="90"\/>/);
   });
 
-  test('firma emitida CENTRADA bajo la fecha (centro x = 270,5 pt), como en el papel (§163.14)', async () => {
+  test('firma emitida CENTRADA bajo todo «Fecha / Firma: dd/mm/aaaa» (centro x = 241,8 pt), como en el papel (§163.15)', async () => {
     const { doc } = await abrir(documentoDePrueba({ estado: 'emitido' }), imagenesDePrueba());
     const i = doc.indexOf('name="Firma elaborado');
     const ancla = doc.slice(doc.lastIndexOf('<wp:anchor', i), i);
     const x = Number((ancla.match(/<wp:positionH relativeFrom="page"><wp:posOffset>(-?\d+)<\/wp:posOffset>/) || [])[1]);
     const cx = Number((ancla.match(/<wp:extent cx="(\d+)"/) || [])[1]);
     assert.ok(x > 0 && cx > 0, 'ancla con posición y tamaño');
-    assert.ok(Math.abs((x + cx / 2) / 12700 - 270.5) < 0.01, 'centro ' + (x + cx / 2) / 12700);
+    assert.equal(FIRMA_POSICION.xCentro, 241.8);
+    assert.ok(Math.abs((x + cx / 2) / 12700 - 241.8) < 0.01, 'centro ' + (x + cx / 2) / 12700);
     assert.ok(cx / 12700 <= 92 + 1e-6, 'ancho dentro de la caja');
     assert.ok(Math.abs(cx / 12700 - tamanoFirma(6 / 8, FIRMA_PORTADA).ancho) < 0.01, 'sin tamaño del documento, el Word usa la caja NUEVA');
   });
   test('firma emitida: con el tamaño y el borde que calcula el documento, el Word usa ESOS números', async () => {
     const d = documentoDePrueba({ estado: 'emitido' });
-    d.portada.firmas[0] = { ...d.portada.firmas[0], firmaTamPt: { ancho: 80, alto: 20 }, firmaXPt: 225 };   // 225 ≠ 270,5 − 40: prueba que LEE firmaXPt
+    d.portada.firmas[0] = { ...d.portada.firmas[0], firmaTamPt: { ancho: 80, alto: 20 }, firmaXPt: 225 };   // 225 ≠ 241,8 − 40: prueba que LEE firmaXPt
     const { doc } = await abrir(d, imagenesDePrueba());
     const i = doc.indexOf('name="Firma elaborado');
     const ancla = doc.slice(doc.lastIndexOf('<wp:anchor', i), i);
@@ -503,15 +504,24 @@ describe('correcciones de la revisión de fidelidad (Word = papel)', () => {
   test('nombre muy largo junto a una firma ancha: se comprime para terminar antes de ella; uno corto no se toca (§163.14)', async () => {
     const d = documentoDePrueba({ estado: 'emitido' });
     const largo = 'NOMBRE PRUEBA SEGUNDO APELLIDO LARGUISIMO';
-    d.portada.firmas[0] = { ...d.portada.firmas[0], nombre: largo, firmaTamPt: { ancho: 92, alto: 20 }, firmaXPt: 224.5 };
+    d.portada.firmas[0] = { ...d.portada.firmas[0], nombre: largo, firmaTamPt: { ancho: 92, alto: 20 }, firmaXPt: 195.8 };
     const { doc } = await abrir(d, imagenesDePrueba());
     const j = doc.indexOf(largo);
     const w = Number((doc.slice(doc.lastIndexOf('<w:r>', j), j).match(/<w:w w:val="(\d+)"\/>/) || [])[1]);
     assert.ok(w > 0 && w < 100, 'comprimido: ' + w);
     const d2 = documentoDePrueba({ estado: 'emitido' });
-    d2.portada.firmas[0] = { ...d2.portada.firmas[0], firmaTamPt: { ancho: 92, alto: 20 }, firmaXPt: 224.5 };
+    d2.portada.firmas[0] = { ...d2.portada.firmas[0], firmaTamPt: { ancho: 92, alto: 20 }, firmaXPt: 195.8 };
     const r2 = await abrir(d2, imagenesDePrueba());
     const k = r2.doc.indexOf('INGENIERO PRUEBA UNO');
     assert.doesNotMatch(r2.doc.slice(r2.doc.lastIndexOf('<w:r>', k), k), /<w:w /, 'un nombre corto queda igual');
+  });
+  test('un nombre completo real de cuatro palabras junto a una firma como la de Carlos se comprime poco (≈ 82 %)', async () => {
+    const d = documentoDePrueba({ estado: 'emitido' });
+    const real = 'CARLOS ALBERTO MARTELO PÉREZ';
+    d.portada.firmas[0] = { ...d.portada.firmas[0], nombre: real, firmaTamPt: { ancho: 74.3, alto: 21.54 }, firmaXPt: 204.65 };
+    const { doc } = await abrir(d, imagenesDePrueba());
+    const j = doc.indexOf(real);
+    const w = Number((doc.slice(doc.lastIndexOf('<w:r>', j), j).match(/<w:w w:val="(\d+)"\/>/) || [])[1]);
+    assert.ok(w >= 80 && w <= 84, 'escala ' + w);
   });
 });
