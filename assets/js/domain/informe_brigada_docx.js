@@ -23,9 +23,9 @@
 import { crearZip } from './zip_almacenado.js';
 import { pngColor, pngVineta, pngMarcador } from './png_simple.js';
 import { tipoPorBytes } from './fichas_adjunto.js';
-import { tamanoFirma, FIRMA_PAPEL } from './firmas_tamano.js';
+import { tamanoFirma } from './firmas_tamano.js';
 import { DISPOSICIONES } from './informe_brigada_plantilla.js';
-import { geometriaCuadricula, FOTO_MARGEN, FIRMA_POSICION } from './informe_brigada_documento.js';
+import { geometriaCuadricula, FOTO_MARGEN, FIRMA_POSICION, FIRMA_PORTADA } from './informe_brigada_documento.js';
 
 export const MIME_DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
 
@@ -663,17 +663,21 @@ function portadaXml(A, d) {
     const fecha = emitido && f.fecha ? TAB(B10) + run(f.fecha, { fuente: AN, tam: 10 }) : '';
     firmas += P(run(f.rotulo || '', B10) + TAB(B10) + run(f.casilla || 'Fecha / Firma:', B10) + fecha,
       { antes: y1 - abajo, linea: 11.4, tabs: [{ pos: tw(F.xCasilla - F.xRotulo) }, { pos: tw(FIRMA_POSICION.xFecha - F.xRotulo) }] });
-    firmas += P(run(String(f.nombre || '').toLocaleUpperCase('es-CO'), B10), { antes: y2 - (y1 + 11.4), linea: 11.4 });
+    // con firma estampada, un nombre muy largo se comprime para terminar 3 pt antes de ella, como en el papel (§163.14)
+    const nom = String(f.nombre || '').toLocaleUpperCase('es-CO');
+    const topeNom = emitido && f.firmaRef && Number.isFinite(f.firmaXPt) ? f.firmaXPt - 3 - F.xRotulo : 0;
+    const escNom = topeNom > 0 ? escalaQueCabe(nom, { tam: 10, negrita: true }, topeNom) : 1;
+    firmas += P(run(nom, escNom < 1 ? { ...B10, esc: escNom } : B10), { antes: y2 - (y1 + 11.4), linea: 11.4 });
     abajo = y2 + 11.4;
     // la firma SOLO en la versión emitida (nunca en borrador): imagen flotante bajo «Fecha / Firma:»
     if (emitido && f.firmaRef) {
       const img = A.imagen(f.firmaRef, { clase: 'firma' });
       if (img) {
-        const t = f.firmaTamPt && f.firmaTamPt.ancho > 0 && f.firmaTamPt.alto > 0
-          ? f.firmaTamPt
-          : tamanoFirma(img.ancho / img.alto, { area: FIRMA_PAPEL.areaPt2, altoMax: 24, anchoMax: 88 });
-        const { ancho, alto } = t;
-        anclasFirma.push(anclada(A, 'document', img, FIRMA_POSICION.xFirma, y1 + FIRMA_POSICION.dyFirma, ancho, alto, { nombre: `Firma ${f.rol || k + 1}` }));
+        const propia = f.firmaTamPt && f.firmaTamPt.ancho > 0 && f.firmaTamPt.alto > 0;
+        const { ancho, alto } = propia ? f.firmaTamPt : tamanoFirma(img.ancho / img.alto, FIRMA_PORTADA);
+        // centrada bajo la fecha, como en el papel (§163.14)
+        const x = propia && Number.isFinite(f.firmaXPt) ? f.firmaXPt : (FIRMA_POSICION.xCentro || 270.5) - ancho / 2;
+        anclasFirma.push(anclada(A, 'document', img, x, y1 + FIRMA_POSICION.dyFirma, ancho, alto, { nombre: `Firma ${f.rol || k + 1}` }));
       }
     }
   });

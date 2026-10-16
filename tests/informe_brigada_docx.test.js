@@ -12,7 +12,8 @@ import {
   construirDocx, docxBytes, MIME_DOCX, GEOM_CUADRICULA, refsDeImagenes, fotosConMarcas, claveMarcada, escXml
 } from '../assets/js/domain/informe_brigada_docx.js';
 import { pngColor } from '../assets/js/domain/png_simple.js';
-import { geometriaCuadricula } from '../assets/js/domain/informe_brigada_documento.js';
+import { geometriaCuadricula, FIRMA_PORTADA } from '../assets/js/domain/informe_brigada_documento.js';
+import { tamanoFirma } from '../assets/js/domain/firmas_tamano.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const raiz = (...p) => resolve(__dirname, '..', ...p);
@@ -479,10 +480,38 @@ describe('correcciones de la revisión de fidelidad (Word = papel)', () => {
     assert.match(doc.slice(doc.lastIndexOf('<w:r>', j), j), /<w:w w:val="91"\/>|<w:w w:val="90"\/>/);
   });
 
-  test('firma emitida en la MISMA posición que el papel (x = 232 pt)', async () => {
+  test('firma emitida CENTRADA bajo la fecha (centro x = 270,5 pt), como en el papel (§163.14)', async () => {
     const { doc } = await abrir(documentoDePrueba({ estado: 'emitido' }), imagenesDePrueba());
     const i = doc.indexOf('name="Firma elaborado');
     const ancla = doc.slice(doc.lastIndexOf('<wp:anchor', i), i);
-    assert.match(ancla, new RegExp(`<wp:positionH relativeFrom="page"><wp:posOffset>${Math.round(232 * 12700)}</wp:posOffset>`));
+    const x = Number((ancla.match(/<wp:positionH relativeFrom="page"><wp:posOffset>(-?\d+)<\/wp:posOffset>/) || [])[1]);
+    const cx = Number((ancla.match(/<wp:extent cx="(\d+)"/) || [])[1]);
+    assert.ok(x > 0 && cx > 0, 'ancla con posición y tamaño');
+    assert.ok(Math.abs((x + cx / 2) / 12700 - 270.5) < 0.01, 'centro ' + (x + cx / 2) / 12700);
+    assert.ok(cx / 12700 <= 92 + 1e-6, 'ancho dentro de la caja');
+    assert.ok(Math.abs(cx / 12700 - tamanoFirma(6 / 8, FIRMA_PORTADA).ancho) < 0.01, 'sin tamaño del documento, el Word usa la caja NUEVA');
+  });
+  test('firma emitida: con el tamaño y el borde que calcula el documento, el Word usa ESOS números', async () => {
+    const d = documentoDePrueba({ estado: 'emitido' });
+    d.portada.firmas[0] = { ...d.portada.firmas[0], firmaTamPt: { ancho: 80, alto: 20 }, firmaXPt: 225 };   // 225 ≠ 270,5 − 40: prueba que LEE firmaXPt
+    const { doc } = await abrir(d, imagenesDePrueba());
+    const i = doc.indexOf('name="Firma elaborado');
+    const ancla = doc.slice(doc.lastIndexOf('<wp:anchor', i), i);
+    assert.match(ancla, new RegExp(`<wp:positionH relativeFrom="page"><wp:posOffset>${Math.round(225 * 12700)}</wp:posOffset>`));
+    assert.match(ancla, new RegExp(`<wp:extent cx="${Math.round(80 * 12700)}" cy="${Math.round(20 * 12700)}"`));
+  });
+  test('nombre muy largo junto a una firma ancha: se comprime para terminar antes de ella; uno corto no se toca (§163.14)', async () => {
+    const d = documentoDePrueba({ estado: 'emitido' });
+    const largo = 'NOMBRE PRUEBA SEGUNDO APELLIDO LARGUISIMO';
+    d.portada.firmas[0] = { ...d.portada.firmas[0], nombre: largo, firmaTamPt: { ancho: 92, alto: 20 }, firmaXPt: 224.5 };
+    const { doc } = await abrir(d, imagenesDePrueba());
+    const j = doc.indexOf(largo);
+    const w = Number((doc.slice(doc.lastIndexOf('<w:r>', j), j).match(/<w:w w:val="(\d+)"\/>/) || [])[1]);
+    assert.ok(w > 0 && w < 100, 'comprimido: ' + w);
+    const d2 = documentoDePrueba({ estado: 'emitido' });
+    d2.portada.firmas[0] = { ...d2.portada.firmas[0], firmaTamPt: { ancho: 92, alto: 20 }, firmaXPt: 224.5 };
+    const r2 = await abrir(d2, imagenesDePrueba());
+    const k = r2.doc.indexOf('INGENIERO PRUEBA UNO');
+    assert.doesNotMatch(r2.doc.slice(r2.doc.lastIndexOf('<w:r>', k), k), /<w:w /, 'un nombre corto queda igual');
   });
 });

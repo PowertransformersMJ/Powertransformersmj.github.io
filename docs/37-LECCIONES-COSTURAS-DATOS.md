@@ -110,8 +110,8 @@ va a la casilla del significado verificado (la ONAF) y la pantalla pide el dato 
 ### L-145 · Una firma de tercero en JPG: dos módulos la preparan distinto, y solo uno quita el fondo
 **Disparador**: llega la firma de una persona como foto o JPG con fondo blanco, para el Informe de Brigada o para cualquier
 módulo que estampe firmas. · **Cicatriz** (`99 §163.12`, 2026-10-16, firma de Johan Utria, 156×110 px):
-- el botón «Cargar firma» del Informe de Brigada (`imagenes.js` → `prepararFirma` → `prepararPng`) solo redibuja la imagen.
-  Emitida así, la hoja mostró un recuadro gris (el fondo del JPG no es blanco puro);
+- el botón «Cargar firma» del Informe de Brigada (`imagenes.js` → `prepararFirma` → `prepararPng`) solo redibujaba la imagen.
+  Emitida así, la hoja mostró un recuadro gris (el fondo del JPG no es blanco puro). Corregido en `§163.14`;
 - Fichas (`firmas-equipo.js` → `normalizarImagen`) vuelve transparente el fondo claro y recorta al trazo. Así están las 6
   firmas cargadas.
 
@@ -124,4 +124,5 @@ módulo que estampe firmas. · **Cicatriz** (`99 §163.12`, 2026-10-16, firma de
 - una firma alta (proporción menor de unos 2 : 1) sale más chica que una ancha: la topa el alto del renglón (§101). Si se ve
   pequeña, se pide una imagen con trazo más grueso; no se engrosa.
 
-**Gate**: [HONOR] hasta que el botón del módulo use la misma normalización (propuesto en `§163.12`).
+**Gate**: desde `§163.14` el botón usa la misma limpieza (`informe_brigada_firma_limpia.js`). `tests/informe_brigada_firma_limpia.test.js`
+compara sus números con los de Fichas y exige que `prepararFirma` los use: si alguien vuelve al redibujo viejo, falla.

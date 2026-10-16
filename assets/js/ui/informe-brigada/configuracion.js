@@ -13,7 +13,8 @@
 // Las reglas del servidor vuelven a exigir que quien guarde sea administrador.
 // ══════════════════════════════════════════════════════════════
 
-const HOY = () => new Date().toISOString().slice(0, 10);
+// Fecha de hoy en la hora LOCAL (en Colombia, de 7 p. m. a medianoche la de UTC ya es mañana; §99.11).
+const HOY = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
 
 /**
  * Avisos al cargar un logo (no impiden cargarlo):
@@ -91,6 +92,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
     const firmantes = borrador.firmantes.map((f, i) => {
       const fi = f.firma;
       return '<li class="ibr-cfg-firmante"><div><b>' + esc(f.nombre) + '</b>' + (f.cargo ? ' <span class="ibr-tenue">· ' + esc(f.cargo) + '</span>' : '')
+        + (fi ? '<img class="ibr-cfg-firma-vista" data-cfg-firma-vista="' + i + '" alt="Firma de ' + esc(f.nombre) + ' tal como se estampa" hidden>' : '')
         + '<div class="ibr-mini">' + (fi ? '✓ Firma registrada · autorizada el ' + esc(dep.formato.fechaDMA(fi.autorizacion && fi.autorizacion.fecha)) + ' por ' + esc((fi.autorizacion && fi.autorizacion.medio) || '—') : '○ Sin firma: su línea se firma a mano') + '</div></div>'
         + '<label class="ibr-casilla">Línea por defecto en informes nuevos: <select class="ibr-select" data-cfg-rol="' + i + '" aria-label="Línea por defecto de ' + esc(f.nombre) + '">'
         +   [['', '— ninguna —'], ['elaborado', 'Elaborado por'], ['revisado', 'Revisado por'], ['aprobado', 'Aprobado por']]
@@ -101,7 +103,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
         + '<button type="button" class="ibr-btn ibr-btn--chico ibr-btn--peligro" data-cfg-quitar-firmante="' + i + '">Quitar</button>'
         + '</div>'
         + '<div class="ibr-cfg-firma-form" data-cfg-firma-form="' + i + '" hidden>'
-        + '<label class="ibr-campo"><span class="ibr-campo-et">Imagen de la firma (PNG con fondo transparente)</span><input class="ibr-input" type="file" accept="image/png" data-cfg-firma-archivo="' + i + '"></label>'
+        + '<label class="ibr-campo"><span class="ibr-campo-et">Imagen de la firma (PNG o JPG; se le quita el fondo blanco y se recorta al trazo)</span><input class="ibr-input" type="file" accept="image/png,image/jpeg" data-cfg-firma-archivo="' + i + '"></label>'
         + '<label class="ibr-campo"><span class="ibr-campo-et">Fecha en que el titular autorizó usarla</span><input class="ibr-input" type="date" data-cfg-firma-fecha="' + i + '" value="' + HOY() + '"></label>'
         + '<label class="ibr-campo"><span class="ibr-campo-et">Medio de la autorización (correo, acta…)</span><input class="ibr-input" type="text" data-cfg-firma-medio="' + i + '" placeholder="Correo del 14/10/2026"></label>'
         + '<button type="button" class="ibr-btn ibr-btn--primario ibr-btn--chico" data-cfg-firma-subir="' + i + '">Subir firma</button>'
@@ -138,6 +140,18 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       + '<div class="ibr-cfg-pie"><button type="button" class="ibr-btn ibr-btn--primario" data-cfg-guardar>Guardar configuración</button>'
       +   '<span class="ibr-ayuda" data-cfg-estado role="status">' + (sucio ? 'Hay cambios sin guardar.' : '') + '</span></div>'
       + '</div>';
+    vistasFirma();
+  }
+
+  /** Miniatura de cada firma registrada, ya limpia, tal como se estampa (así se ve ANTES de emitir; §163.14). */
+  function vistasFirma() {
+    const al = ctx.almacen;
+    if (!al || typeof al.urlFirma !== 'function') return;
+    cont.querySelectorAll('[data-cfg-firma-vista]').forEach((img) => {
+      const f = borrador.firmantes[Number(img.getAttribute('data-cfg-firma-vista'))];
+      if (!f || !f.firma || !f.firma.ruta) return;
+      Promise.resolve(al.urlFirma(f.firma)).then((u) => { if (u && img.isConnected) { img.src = u; img.hidden = false; } }, () => { /* sin permiso o sin red: queda el texto */ });
+    });
   }
 
   const estado = (t) => { const el = cont.querySelector('[data-cfg-estado]'); if (el) el.textContent = t; };
@@ -251,7 +265,7 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       const fecha = cont.querySelector('[data-cfg-firma-fecha="' + i + '"]').value;
       const medio = cont.querySelector('[data-cfg-firma-medio="' + i + '"]').value.trim();
       if (!f) return;
-      if (!archivo) { estado('Escoja la imagen PNG de la firma.'); return; }
+      if (!archivo) { estado('Escoja la imagen de la firma (PNG o JPG).'); return; }
       if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha) || medio.length < 3) { estado('Escriba la fecha y el medio con que el titular autorizó usar su firma.'); return; }
       sub.disabled = true;
       try {
@@ -262,8 +276,10 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
         const meta = await almacenParaSubir().subirFirma(f.clave, prep.blob,
           { mime: prep.mime, ancho: prep.ancho, alto: prep.alto, tamano: prep.tamano, huella: prep.huella, autorizacion: { fecha, medio } }, ctx.autor());
         borrador.firmantes = borrador.firmantes.map((x, k) => (k === i ? { ...x, firma: { ...meta, autorizacion: meta.autorizacion || { fecha, medio } } } : x));
-        if (await guardar({ silencioso: true })) ctx.avisar('Firma de ' + f.nombre + ' registrada. Se estampa solo al emitir.', 'ok');
-        else sub.disabled = false;
+        if (await guardar({ silencioso: true })) {
+          ctx.avisar('Firma de ' + f.nombre + ' registrada. Se estampa solo al emitir.', 'ok');
+          (prep.avisos || []).forEach((t) => ctx.avisar(t, 'aviso', 0));
+        } else sub.disabled = false;
       } catch (err) {
         estado('No se pudo cargar la firma: ' + ((err && err.message) || err));
         sub.disabled = false;

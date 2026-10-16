@@ -27,7 +27,7 @@ import {
 } from './informe_brigada_plantilla.js';
 import { variablesDelInforme, ajusteLimpio } from './informe_brigada_modelo.js';
 import { normalizarNombre } from './firmas.js';
-import { tamanoFirma, FIRMA_PAPEL } from './firmas_tamano.js';
+import { tamanoFirma } from './firmas_tamano.js';
 
 const txt = (v) => (v == null ? '' : String(v).trim());
 const lleno = (v) => v != null && String(v).trim() !== '';
@@ -42,10 +42,21 @@ const espacios = (s) => String(s).replace(/\s+/g, ' ').trim();
 const ALTO_CUERPO = FORMATO.cuerpo.abajo - FORMATO.cuerpo.arriba;
 /** Renglón de un título de anexo (Arial Narrow Bold 11). */
 const RENGLON_TITULO = 12.455;
-/** Tamaño de la firma estampada en la casilla «Fecha / Firma:» de la portada (pt). */
-export const FIRMA_PORTADA = Object.freeze({ area: FIRMA_PAPEL.areaPt2, altoMax: 24, anchoMax: 88 });
-/** Dónde va la firma estampada y su fecha (pt de la hoja). El papel y el Word usan ESTOS números. */
-export const FIRMA_POSICION = Object.freeze({ xFirma: 232.0, dyFirma: 11.5, xFecha: 250.0 });
+/**
+ * Tamaño de la firma estampada en la casilla «Fecha / Firma:» de la portada (pt). Pedido del Ingeniero (2026-10-16,
+ * `99 §163.14`, opción A de su maqueta): *«ordenadas, justo debajo de la fecha, centrado, proporcional a los espacios,
+ * todas las firmas»*. Mismo peso visual para todas (§101: misma superficie) pero más grandes que antes (1200 → 1600 pt²),
+ * dentro de una caja de 92 × 26 pt: 26 es lo que cabe bajo la fecha de «Elaborado» sin acercarse a «Revisado por:», y
+ * 92 deja 5 pt hasta la línea que divide la portada.
+ */
+export const FIRMA_PORTADA = Object.freeze({ area: 1600, altoMax: 26, anchoMax: 92 });
+/**
+ * Dónde va la firma estampada y su fecha (pt de la hoja). El papel y el Word usan ESTOS números.
+ * `xCentro`: centro de la fecha «dd/mm/aaaa» que empieza en `xFecha` (Arial Narrow 10: 8 cifras de 0,556 em y 2 barras
+ * de 0,278 em, al 82 % → 41,03 pt). Cada firma se centra ahí, `dyFirma` debajo del renglón de la fecha.
+ * `xFirma` es el borde izquierdo de antes (se conserva por si una pantalla vieja lo pide).
+ */
+export const FIRMA_POSICION = Object.freeze({ xFirma: 232.0, dyFirma: 11.5, xFecha: 250.0, xCentro: 270.5 });
 
 /**
  * ¿La firma guardada en la versión es la del firmante de ESA línea? (cierre de seguridad, además
@@ -200,11 +211,14 @@ export function construirDocumento(contenido, { estado = 'borrador', version = 0
       // y la imagen está en la carpeta de ESE firmante (nunca la firma de otro).
       const vale = !!(v && nombre && normalizarNombre(v.nombre) === normalizarNombre(nombre) && firmaCorrespondeALinea(v, linea));
       const rel = vale && num(v.firma.ancho) > 0 && num(v.firma.alto) > 0 ? num(v.firma.ancho) / num(v.firma.alto) : 2.5;
+      const tam = vale ? tamanoFirma(rel, FIRMA_PORTADA) : null;
       return {
         rol: f.rol, rotulo: f.rotulo, casilla: f.casilla, nombre,
         firmaRef: vale ? 'firma:' + f.rol : null,
         fecha: vale && fecha ? fecha : null,
-        firmaTamPt: vale ? tamanoFirma(rel, FIRMA_PORTADA) : null
+        firmaTamPt: tam,
+        // borde izquierdo para que quede CENTRADA bajo la fecha (§163.14)
+        firmaXPt: tam ? Math.round((FIRMA_POSICION.xCentro - tam.ancho / 2) * 1000) / 1000 : null
       };
     })
   };
