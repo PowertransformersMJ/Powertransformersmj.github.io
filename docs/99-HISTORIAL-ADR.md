@@ -7788,3 +7788,28 @@ Decisiones de criterio, SUYAS. NO revisado externamente (sin consejo externo: no
 - Sin cambio de reglas. Pruebas 2870/2872; banco con título y textos concordando.
 - Commit `23c4e5b`.
 
+
+**163.11 Ajuste del 2026-10-16: firmantes por defecto y firma de Carlos Martelo** (pedido suyo, con captura de las líneas:
+*«Elaborado por Carlos Martelo / Revisado por David Miranda / Aprobado por Johan Utria — implementa de inmediato la firma de
+Carlos, ya te paso la de Johan y David»*).
+- Cada firmante de la configuración puede ocupar una **línea por defecto** (`rol`: elaborado, revisado o aprobado). Una línea
+  la ocupa un solo firmante: al asignarla a otro, se le quita al anterior.
+- Todo informe NUEVO llega con las tres líneas llenas (origen «configuración») y se pueden cambiar en cada informe. Los
+  borradores ya creados no cambian: ahí se escogen del desplegable.
+- **En producción:**
+  - los tres firmantes: CARLOS MARTELO (elaborado), DAVID MIRANDA (revisado) y JOHAN UTRIA (aprobado);
+  - la firma de Carlos, copiada de la firma del equipo (`firmas_equipo`). Se verificó que la huella sha-256 coincide y que
+    es PNG de 625 × 181. Va con su autorización (2026-09-25, verbal) y la orden del Ingeniero de usarla aquí.
+  - Queda en `informes_brigada_bin/firma_f-carlos-martelo_<huella16>`, que es la ruta que exige la regla
+    `ibrFirmaVersion`.
+  - Se escribió con `firebase-admin`: primero en simulación y luego con `--escribir`. La firma se CREA (no pisa nada) y de
+    la configuración solo se tocan `firmantes` y el sello.
+- La firma se estampa **solo al EMITIR** y solo si el nombre de la línea es el del firmante. En borrador, nunca.
+- David y Johan quedan «sin firma: se firma a mano» hasta que lleguen sus imágenes con su autorización.
+- Sin cambio de reglas: la configuración no valida la forma de cada firmante y el estampado copia solo
+  `almacen/ruta/huella/mime/ancho/alto`.
+- **Verificación:**
+  - pruebas 2871/2873 (2 omitidas de siempre), reglas 283/283, lint 0;
+  - en el banco, con nombres inventados: la línea es exclusiva, se guarda, y el informe nuevo trae las tres líneas con su
+    firmante; la línea con firma dice «se estampa solo al emitir».
+- Commit `a344919`. Script: bóveda `crudos/firmantes.mjs`.
