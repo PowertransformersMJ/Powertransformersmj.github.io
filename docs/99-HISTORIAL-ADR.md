@@ -7849,3 +7849,34 @@ Carlos, ya te paso la de Johan y David»*).
   - Propuesto, no hecho: que «Cargar firma» del módulo use la normalización de Fichas (L-145).
   - Falta la firma de David Miranda.
 - Bóveda: `crudos/firma_johan.mjs` + `crudos/workflow/verificar-firma-johan.json`.
+
+**163.13 Ajuste del 2026-10-16: firma de David Miranda — las tres líneas quedan firmadas** (el Ingeniero la entregó en el
+chat).
+- **Imagen**: JPG de 572×129 con fondo casi blanco puro. Mismo procedimiento que en 163.12: la copia literal del
+  `normalizarImagen` de Fichas, corrida en Chrome. Quedó un PNG RGBA de 572×129 (no hubo que recortar: el margen de Fichas
+  cubre toda la imagen), de 33 839 bytes, sin metadatos. Misma fórmula de autorización que la de Johan.
+- **Producción** (`firma_david.mjs`, primero en simulación y luego `--escribir`): CREA
+  `informes_brigada_bin/firma_f-david-miranda_<huella16>` y en la configuración cambia SOLO la firma de DAVID MIRANDA.
+  - Al releer: los bytes son idénticos y Carlos y Johan quedan intactos, tanto en la configuración como en sus imágenes.
+  - Una segunda corrida responde «ya está cargada» y no toca nada.
+- **Banco**: informe emitido con las TRES firmas reales; 49 de 49 chequeos, PDF y Word. Las firmas de Carlos y Johan quedan
+  en la misma posición y con los mismos píxeles que en la emisión de dos firmas; las hojas 2 a 20 son idénticas.
+- **Revisión adversarial**: 3 Opus (`wf_9ca6e3ac-866`). Ninguno encontró nada que bloquee. Se aplicó lo que propusieron:
+  - el comentario del script citaba la revisión de Johan;
+  - el script se detiene si el binario releído no coincide;
+  - si el binario ya existía, se verifica antes de enlazarlo;
+  - una segunda corrida dice «ya está cargada»;
+  - **prueba de reglas nueva**: emitir con las 3 firmas a la vez (`552536c`; reglas 284/284). La rama de 3 elementos de
+    `ibrFirmasVersion` no tenía prueba, y un revisor la había comprobado aparte en un emulador aislado.
+- **NN.8 Verificado sano / no re-auditar**:
+  - David queda con la misma superficie que Carlos (§101: 72,9×16,5 pt, al 83 % de `anchoMax`); solo Johan topa `altoMax`.
+  - Unos 560 ppp: la resolución sobra.
+  - La normalización de Fichas aclara los grises medios: el núcleo oscuro, el 53 % del trazo, no cambia; la tinta conservada
+    es el 90 %. Ninguna parte visible desaparece. Una fotocopia muy contrastada puede puntear la «D»: es así en todo el
+    sistema (L-145), no en esta imagen.
+  - Chrome achata la firma un 4,3 % al imprimir el PDF, porque ajusta al píxel de 0,75 pt; el Word sale exacto. Es
+    imperceptible (0,25 mm). Mejora posible en el código: ajustar el recuadro a múltiplos de 0,75 pt.
+- **Pendiente**:
+  - recargar la pantalla de Configuración antes de guardar en ella (163.12);
+  - abrir el Word en Microsoft Word real (sigue sin verificar);
+  - la propuesta de L-145 para el botón «Cargar firma».
