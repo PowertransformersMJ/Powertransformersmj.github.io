@@ -92,6 +92,10 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       const fi = f.firma;
       return '<li class="ibr-cfg-firmante"><div><b>' + esc(f.nombre) + '</b>' + (f.cargo ? ' <span class="ibr-tenue">· ' + esc(f.cargo) + '</span>' : '')
         + '<div class="ibr-mini">' + (fi ? '✓ Firma registrada · autorizada el ' + esc(dep.formato.fechaDMA(fi.autorizacion && fi.autorizacion.fecha)) + ' por ' + esc((fi.autorizacion && fi.autorizacion.medio) || '—') : '○ Sin firma: su línea se firma a mano') + '</div></div>'
+        + '<label class="ibr-casilla">Línea por defecto en informes nuevos: <select class="ibr-select" data-cfg-rol="' + i + '" aria-label="Línea por defecto de ' + esc(f.nombre) + '">'
+        +   [['', '— ninguna —'], ['elaborado', 'Elaborado por'], ['revisado', 'Revisado por'], ['aprobado', 'Aprobado por']]
+              .map(([v, t]) => '<option value="' + v + '"' + ((f.rol || '') === v ? ' selected' : '') + '>' + t + '</option>').join('')
+        + '</select></label>'
         + '<div class="ibr-hueco-botones">'
         + '<button type="button" class="ibr-btn ibr-btn--chico" data-cfg-firma="' + i + '">' + (fi ? 'Cambiar firma' : 'Cargar firma') + '</button>'
         + '<button type="button" class="ibr-btn ibr-btn--chico ibr-btn--peligro" data-cfg-quitar-firmante="' + i + '">Quitar</button>'
@@ -171,6 +175,13 @@ export function montarConfiguracion(cont, { ctx, configInicial, alGuardar }) {
       return;
     }
     if (el.matches('[data-cfg-contrato]')) { borrador.contrato_defecto = el.value.trim(); marcarSucio(); return; }
+    if (el.matches('[data-cfg-rol]')) {
+      // Una línea la ocupa un solo firmante: si otro la tenía, queda sin línea.
+      const i = Number(el.getAttribute('data-cfg-rol'));
+      const rol = ['elaborado', 'revisado', 'aprobado'].includes(el.value) ? el.value : '';
+      borrador.firmantes = borrador.firmantes.map((f, j) => (j === i ? { ...f, rol } : (rol && f.rol === rol ? { ...f, rol: '' } : f)));
+      marcarSucio(); pintar(); return;
+    }
     if (el.matches('[data-cfg-personas]')) {
       const k = el.getAttribute('data-cfg-personas');
       if (k === 'ingenieros' || k === 'tecnicos') { borrador[k] = el.value.split('\n').map((s) => s.replace(/\s+/g, ' ').trim()).filter(Boolean); marcarSucio(); }

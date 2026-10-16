@@ -387,7 +387,9 @@ function firmanteNormal(f) {
     const a = f.firma.autorizacion || {};
     firma.autorizacion = { fecha: str(a.fecha), medio: str(a.medio) };
   }
-  return { clave, nombre, cargo: str(f.cargo).trim(), firma };
+  // Línea de la portada que ocupa por defecto en cada informe NUEVO (2026-10-16, dictado por el Ingeniero); se puede cambiar.
+  const rol = ['elaborado', 'revisado', 'aprobado'].includes(f.rol) ? f.rol : '';
+  return { clave, nombre, cargo: str(f.cargo).trim(), rol, firma };
 }
 
 /**
