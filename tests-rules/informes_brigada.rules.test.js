@@ -263,6 +263,23 @@ describe('5 · emitir y corregir: versión + 1 con su copia congelada idéntica'
     await assertSucceeds(intento('ef_10', [{ ...buena, firma: meta('f-ana-prueba', { almacen: 'firestore', ruta: `informes_brigada_bin/firma_f-ana-prueba_${H.slice(0, 16)}` }) }]));
     await assertSucceeds(intento('ef_11', []));
   });
+  test('firmas al emitir: las TRES líneas a la vez (Elaborado, Revisado, Aprobado), cada una con su firmante (§163.12)', async () => {
+    // nombres inventados; imágenes en Firestore (informes_brigada_bin), como las firmas de terceros en producción
+    const C = { ...CONTENIDO, firmas: { elaborado: { nombre: 'ANA PRUEBA', firmante: 'f-ana-prueba' }, revisado: { nombre: 'BETO PRUEBA', firmante: 'f-beto-prueba' }, aprobado: { nombre: 'CIRO PRUEBA', firmante: 'f-ciro-prueba' } } };
+    const meta = (clave, extra = {}) => ({ almacen: 'firestore', ruta: `informes_brigada_bin/firma_${clave}_${H.slice(0, 16)}`, huella: H, mime: 'image/png', ancho: 572, alto: 129, ...extra });
+    const linea = (rol, clave, nombre) => ({ rol, clave, nombre, firma: meta(clave) });
+    const a = linea('elaborado', 'f-ana-prueba', 'ANA PRUEBA');
+    const b = linea('revisado', 'f-beto-prueba', 'BETO PRUEBA');
+    const c = linea('aprobado', 'f-ciro-prueba', 'CIRO PRUEBA');
+    const intento = async (id, firmas) => { await sembrar(id, { contenido: C }); return emitir('ib_editor', id, { contenido: C, firmas }); };
+    await assertFails(intento('ef3_1', [a, b, { ...c, firma: meta('f-beto-prueba') }]));                  // la imagen de otro en «aprobado»
+    await assertFails(intento('ef3_2', [a, b, { ...b }]));                                               // una línea repetida
+    await assertFails(intento('ef3_3', [a, b, c, { ...c }]));                                            // cuatro firmas
+    await assertFails(intento('ef3_4', [a, b, { ...c, firma: meta('f-ciro-prueba', { autorizacion: { fecha: '2026-10-16', medio: 'verbal' } }) }]));   // la autorización no viaja
+    await assertFails(intento('ef3_5', [a, { ...b, nombre: 'BETO OTRO' }, c]));                          // nombre distinto al de su línea
+    await assertSucceeds(intento('ef3_6', [a, b, c]));
+    await assertSucceeds(intento('ef3_7', [c, a, b]));                                                   // el orden no importa
+  });
   test('versiones: solo se agregan; se listan con tope 50', async () => {
     await sembrar('e_4');
     await assertSucceeds(emitir('ib_editor', 'e_4'));
