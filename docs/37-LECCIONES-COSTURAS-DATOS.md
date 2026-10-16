@@ -106,3 +106,22 @@ todo junto. · **Regla**: antes de leer un campo compartido, buscar con grep có
 va a la casilla del significado verificado (la ONAF) y la pantalla pide el dato que falta (la ONAN o la relación); no se deduce.
 **Gate**: [HONOR].
 
+
+### L-145 · Una firma de tercero en JPG: dos módulos la preparan distinto, y solo uno quita el fondo
+**Disparador**: llega la firma de una persona como foto o JPG con fondo blanco, para el Informe de Brigada o para cualquier
+módulo que estampe firmas. · **Cicatriz** (`99 §163.12`, 2026-10-16, firma de Johan Utria, 156×110 px):
+- el botón «Cargar firma» del Informe de Brigada (`imagenes.js` → `prepararFirma` → `prepararPng`) solo redibuja la imagen.
+  Emitida así, la hoja mostró un recuadro gris (el fondo del JPG no es blanco puro);
+- Fichas (`firmas-equipo.js` → `normalizarImagen`) vuelve transparente el fondo claro y recorta al trazo. Así están las 6
+  firmas cargadas.
+
+**Regla**:
+- una firma de tercero se normaliza con el `normalizarImagen` de Fichas. Si se carga por script, se usa la copia LITERAL de esa
+  función corrida en Chrome (banco), no una reimplementación;
+- se verifica estampada en un informe EMITIDO de banco: PDF del navegador y Word;
+- nunca se amplía (§99.11: firmas limpias). 156 px bastan en la portada del Informe (24 pt de alto ≈ 320 ppp). El aviso de
+  Fichas por debajo de 300 px vale para su Excel, no para esta portada;
+- una firma alta (proporción menor de unos 2 : 1) sale más chica que una ancha: la topa el alto del renglón (§101). Si se ve
+  pequeña, se pide una imagen con trazo más grueso; no se engrosa.
+
+**Gate**: [HONOR] hasta que el botón del módulo use la misma normalización (propuesto en `§163.12`).
