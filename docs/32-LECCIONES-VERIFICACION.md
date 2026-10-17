@@ -304,3 +304,19 @@ instaló WEG en 9 transformadores de AFINIA) las dos se pasaban casi igual, unas
 no hay vara externa, decir «contra X, que tampoco está validado» y bajar el tono de los titulares; (3) el dato de una ficha
 se cruza con su texto impreso (potencia, tensión, frecuencia), no solo con la curva. [HONOR]
 
+
+### L-147 · Lo que se le promete al dueño sobre cómo queda un PDF se MIDE en el PDF, no se deduce del CSS
+**Disparador**: antes de describirle al Ingeniero qué protege, tapa o marca algo en un PDF (marca de agua, firma, sello),
+sobre todo si va dentro de una pregunta para que DECIDA. · **Cicatriz** (`99 §163.16`, en pausa):
+- le ofrecí «firmas en el PDF del borrador, con la marca BORRADOR impresa encima, que no se puede borrar» porque en el CSS la
+  marca está en la capa de arriba (`z-index` 20 contra 2);
+- en el PDF real la marca es una diagonal que no pasa por las firmas (0 píxeles encima), cada firma es una imagen aparte
+  que se puede extraer, y la marca es un texto que se quita en un paso;
+- él decidió con esa información falsa. Lo atrapó la revisión adversarial, antes de publicar.
+
+**Regla**: toda afirmación sobre el PDF o el Word entregado se comprueba sobre el ARCHIVO, antes de usarla como argumento
+de una opción:
+- `fitz` / `pdfimages` / recortes: qué hay encima de qué, qué se puede extraer, qué se puede quitar;
+- si no se midió, se dice «no verificado».
+
+Si ya se le dijo algo falso: se le corrige con los números y vuelve a decidir (W-11). **Gate**: [HONOR].
