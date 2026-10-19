@@ -320,3 +320,19 @@ de una opción:
 - si no se midió, se dice «no verificado».
 
 Si ya se le dijo algo falso: se le corrige con los números y vuelve a decidir (W-11). **Gate**: [HONOR].
+
+### L-149 · Un número que se despejó de un dato no «comprueba» ese dato, ni es una medida
+**Disparador**: explicarle al Ingeniero de dónde sale una constante del método. Pasa sobre todo en el modo pedagógico, donde
+se busca una historia limpia («tres ingredientes»). · **Cicatriz** (refrigeración ONAF, 18-19 oct, bóveda `SINTESIS` §2026-10-19):
+- se le dijo que el 780 «sale de» 1,1328 × 2,398 × 2.118,88, y que el aire «sale 5 a 6 °C más caliente»;
+- también, que los 40 °C del aire y el 751 de WEG ponían el método «del lado seguro»;
+- pero el 2,398 se había despejado de la misma recta Krenz: el único dato empírico es 7,8·(r − 1);
+- los 5–6 °C son un equivalente de cálculo (lo medido es ~7 °C), los 40 °C no mueven el 780 y el 751 tiene un rango de
+  445 a 1.225.
+Lo atraparon dos revisores independientes de la guía en PDF, y se le corrigió en el chat. · **Regla**: antes de explicar una
+constante, separar con su etiqueta:
+- (1) el dato empírico de origen;
+- (2) lo que solo lo reescribe (despejado o ajustado);
+- (3) lo que lo contrasta de verdad (una medición o un fabricante independiente).
+Solo (3) se llama comprobación o «lado seguro». Un valor despejado nunca se presenta como lo que marcaría un instrumento en
+campo. **Gate**: [HONOR].
