@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-10-14) — INFORME DE MANTENIMIENTO BRIGADA (TODO-81, publicado) · en pausa: refrigeración (TODO-80) · SCADA (TODO-69) · CONTRATO (TODO-76)
+## 🎯 Foco (al 2026-10-18) — REFRIGERACIÓN ONAN/ONAF (TODO-80) · en pausa: firmas del borrador (TODO-81) · SCADA (TODO-69) · CONTRATO (TODO-76)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 > **Al retomar**: suyo → TODO-69 · TODO-76 · TODO-78; técnico en vivo → TODO-62; Fichas CF-43/44/36/35 → `99 §140`; mantenimiento del cerebro → `§162`.
@@ -41,7 +41,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-81** | 🟡 **Informe de Mantenimiento Brigada** PUBLICADO (`99 §163`): F60 Applus, PDF y Word; 3 firmas centradas (§163.15). ⏸ Firmas en borrador: rama `informe-brigada-firmas-borrador`, espera su 1/2/3. Falta de él: Applus, Word en Word. | 🟡 |
-| **TODO-80** | ⏸️ **Refrigeración ONAN/ONAF** (W-11 paso 2, en pausa por orden suya): informe v2 (25 decisiones) y **Método SGM v2 + calculadora v2.1** (D1–D8 suyas) en `~/Downloads/`; estudio → bóveda `2026-10-12-refrigeracion-onaf-onan`. | 🟡 |
+| **TODO-80** | 🔄 **Refrigeración ONAN/ONAF** (W-11 paso 2): explicándole el método paso a paso (va en el paso 5). 18-oct: placas del parque con doble lectura → 131 de 135 ONAF con r de placa y 43 con pérdidas; Excel en `~/Downloads/`, crudos en la bóveda (`placas-2026-10-18`, L-148). D1–D8 suyas. | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`–`§160`; DGA y Duval en BORRADOR). **Suyo**: 8 decisiones de `§140` (la 6 la absorbió `§150`; la 9 cambió con `§158`; la 11 = TODO-71) · re-exportar sep y oct (faltan 43 S/E) y mayo (`§125`) · circuitos, placas y arreglos de campo (pasos 3–5, `§158.8`) · corregir Casacará (2 MVA) en su Excel de Salud (`§158.11`). Para el área SCADA/Operación: 4 señales no válidas y 4 con P/Q ×1000 (`§158.12`), límite de 20 A de Casacará (`§158.11`). Ofrecido → `§160.7`–`.8`. Cargar un mes → `60 §W-13` (8). | 🟡 |
 | **TODO-78** | 🟡 **Mapa de Colombia** (`99 §152`–`§157`). **Suyo**: revisión de TX por depto (Excel) · red UPME · zonas · `§153.9`-3 (municipios de Fichas → CF-49), -4 (depto = zona en 4 S/E), -5 (¿la matrícula sigue a la posición o al aparato?) · quitar «Borrador» (`§155`). | 🟡 |
 | **TODO-76** | 🟡 **Órdenes E/S + Contrato** (`99 §141`–`§148`, `§161`; criterio → `54`). **Suyo**: ¿el termómetro MR de Talaigua y los 3 deshumidificadores ABB salieron del contrato? (el estudio recomienda dejar fuera los ABB). **Ofrecido**: aviso si una SALIDA va Bosque → S/E · familias de accesorio y % por falla (`§144.8`) · «Importar» con su Libro4 · 5 propuestas del estudio de `§161` (`§161.8`). Límites → `§146.8`. | 🟡 |
