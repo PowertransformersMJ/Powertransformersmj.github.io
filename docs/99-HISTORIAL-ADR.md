@@ -8027,6 +8027,9 @@ pública sin credenciales → 404 · `git ls-remote` → en GitHub `main` = `550
 `*.bundle` en el árbol; `ESTADO-ESPEJO.md` lista el bundle y `secretos/` como «fuera por regla» · en este Mac
 `git config cerebro.rol` = `nucleo` y existe `.git/cerebro-nucleo` · `githooks/pre-commit` rechaza al satélite fuera de
 `buzon/entrantes/` · `brain:check` SANO con este ADR.
+*Verificado después (2026-10-19, 18:51):* los tres lotes del espejo ya están en GitHub — `git ls-remote` → `main` =
+`6e48124`, una sincronización que ya trae este ADR, el README de la bóveda y el kernel 1.14.0 de Líneas AT; el «seguían
+sin subir» de arriba quedó resuelto.
 
 **164.5 Anti-patterns evitados.** NO se reescribió `§59` (append-only: se matiza aquí y se apunta) · NO se contó el espejo
 como respaldo para callar el aviso de `lastOffsiteBackup` (la misma mentira que evitó `§59.5`) · NO se dio por hecho que el
