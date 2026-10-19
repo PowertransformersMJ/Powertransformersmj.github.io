@@ -87,3 +87,16 @@ para el PRINCIPIO (qué gas da cada falla); el umbral propio se rotula «criteri
 garantiza la temperatura de la falla (C₂H₄ 500 con CH₄ alto da T1): sin Duval calculado no se imprime un rango en °C. [HONOR]
 **Y `§160`**: vale también para las PALABRAS de una escala: «Baja…Crítica» de la CRG las puso Claude y él solo había aprobado las
 bandas. Una escala se nombra con el vocabulario de la norma o el que la plataforma ya usa (`CONDICIONES` de `schema.js`), nunca con uno inventado.
+
+### L-150 · La resistencia de devanados de un informe se usa con su temperatura y su física, no con la columna «referida» ni con el rótulo «Fase A»
+**Disparador**: tomar la resistencia de devanados de un informe de contratista para estimar pérdidas (rama R3 de ventiladores,
+TODO-80) o compararla entre años. · **Cicatriz** (2026-10-19, 161 informes de los 1.970 de la carpeta del Ingeniero, dos lectores
+ciegos + árbitro): (1) en los CPC100 de las brigadas la columna «R. Ref. 75 °C» trae un factor 1,265 que no sale de ninguna
+temperatura, y a veces la temperatura de la tarjeta contradice el factor; (2) tablas en «Ω» que son mΩ (darían miles de kW);
+(3) «Fase A/B/C» no dice si es entre bornes o fase-neutro: es ×1,5 o ×3 en I²R; (4) un terciario de 1/3 de la potencia no
+reparte la carga y uno con potencia propia sí; (5) la misma serie aparece en dos posiciones porque el equipo se movió. ·
+**Regla**: R MEDIDA + temperatura de la prueba, corregida aquí; el modo sale del grupo de conexión y se CONFIRMA con el equilibrio
+AT ≈ BT (mediana 1,0–1,3 por familia de informes) y con Pk de placa ≥ ΣI²R; unidad imposible (I²R fuera de 0,03–3 % de S) se
+corrige ×/÷ 1000 con aviso; «R corr.» sin temperatura = medida a la del aceite (lado seguro); el terciario se clasifica con la
+placa (secundario principal ≥ 90 % de la AT → AT + BT). Medido así, Pk ÷ ΣI²R = 1,04–1,42 (mediana 1,13, n = 16). Crudo y
+scripts en la bóveda (`pruebas-2026-10-19/`). [HONOR]
