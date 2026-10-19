@@ -69,7 +69,7 @@
 | §56 | ADR-056 — Dashboard Salud de Activos conectado al parque REAL (`parque_salud.js`, sin fabricar) | 1090 |
 | §57 | ADR-057 — Importador del Excel real «Salud de Activos» + MO.00418 Ed.02 ratificado (DGA/CRG/HER) ⟦FABLE-5⟧ | 1104 |
 | §58 | ADR-058 — Ecosistema `GitHub-MJ`: kernel canónico propio (`brain:pull` + gate #0) + `60-WORKFLOWS` | 1124 |
-| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0, sentinel `NINGUNA`) | 1142 |
+| §59 | ADR-059 — Cierre del 058: bóveda de uso LOCAL (kernel v1.8.0, sentinel `NINGUNA`) → matices `§162.10`, `§164` | 1142 |
 | §60 | ADR-060 — Hosting: Pages no nos prohíbe nada → NO se migra; runbook a Cloudflare listo por si acaso | 1160 |
 | §61 | ADR-061 — Fichas Técnicas: de módulo suelto (1,8 MB) a `pages/fichas-tecnicas.html` + Firestore; híbrido `.ftm-` | 1183 |
 | §62 | ADR-062 — Auditoría holística (11 auditores): datos de AFINIA servidos por Pages en modo `legacy` | 1228 |

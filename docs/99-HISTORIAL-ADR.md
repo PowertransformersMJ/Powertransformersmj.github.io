@@ -7976,3 +7976,71 @@ mientras se sube la firma»*).
   la otra opción sería enlazar sin arrastrarlos.
 - **Aprobado por el Ingeniero (2026-10-16)**, viendo la vista previa con el código publicado (PDF, Word y portada completa):
   *«perfecto, me agrada como se ve ahora»*. Queda cerrado el acomodo de las firmas; no re-abrir sin un pedido suyo.
+
+## 164. ADR-164 — Cerebro: el cerebro tiene un espejo PRIVADO en GitHub (`PowertransformersMJ/cerebro-mj`); matiza ADR-059 — no es remoto ni respaldo de la bóveda ⟦OPUS-5.5⟧ (2026-10-19)
+
+> Decisión del Ingeniero (2026-10-19): guardar todo su cerebro —bóveda, kernel, skills, agentes, memoria y el cerebro de
+> cada proyecto— en un repo privado de GitHub para que **su otro PC** (otra cuenta de Claude, token classic) lo lea, lo
+> revise y le deje pautas en un buzón. El espejo se construyó en una sesión del paraguas; se registra AQUÍ porque
+> `§59.2 (a)` dice «bóveda de uso LOCAL, sin repo remoto» y el cerebro no puede contradecirse.
+
+**164.1 Causa raíz.** Tres nodos afirmaban «sin remoto» como hecho absoluto: `§59.2 (a)`, TODO-29 en `11` y la línea 🔴
+del README de `research-archive` en la bóveda; el router del paraguas (`../CLAUDE.md`) ya nombraba el espejo, pero con
+«ADR que lo registre: pendiente». Desde el 10-19 hay una copia de casi toda la bóveda en GitHub: leídas sin matiz, esas
+frases quedan a medias, y el error contrario —creer que la bóveda YA tiene remoto, y por tanto respaldo— también es falso.
+Faltaba UNA decisión escrita que dijera qué es el espejo y qué no.
+
+**164.2 Decisión.**
+- **Existe** un espejo del cerebro en `PowertransformersMJ/cerebro-mj` (`~/Desktop/GitHub-MJ/cerebro-mj`, hermano de
+  `brain-private`). Es **PRIVADO**.
+- **No lleva** secretos (la cuenta de servicio de `mantenimiento-lineas-at/secretos/`, tokens, `.env`, sesiones de
+  `firebase`/`gcloud`/`gh`; los valores sensibles dentro de archivos que sí viajan van tachados por
+  `herramientas/redacciones.json`, p. ej. la sal de `huellas-cedulas.json`), ni el `RESPALDO-pre-rewrite-*.bundle` de
+  115 MB, ni la **historia de git** de `brain-private` (copia la foto del último commit, sin su `.git`). Tampoco las firmas
+  manuscritas de personas reales. La lista exacta la regenera cada sincronización en `cerebro-mj/ESTADO-ESPEJO.md`.
+- **Sí lleva material real de cliente** (AFINIA): lo que la bóveda guarda viaja, incluidos los PDF de contrato de
+  `confidencial-retirado-*` (`cerebro-mj/CLAUDE.md §5`). Por eso es privado: la regla 5 del paraguas («la bóveda nunca se
+  hace pública») vale igual para el espejo.
+- **NO es respaldo** ni es el remoto de la bóveda: le faltan los secretos, el bundle y la historia. El respaldo sigue siendo
+  la copia mensual `brain-private/respaldo-boveda.sh /Volumes/<disco>` (`§162.10`, lista (J) de `10`), y
+  `lastOffsiteBackup` del manifest **no cambia** por el espejo.
+- **Quién escribe**: SOLO este Mac (rol `nucleo`, atado al equipo por la huella `.git/cerebro-nucleo`), con
+  `cerebro-mj/herramientas/sincronizar.sh` (trae el buzón, regenera la copia, escanea secretos, commitea y sube). **El otro
+  PC** (rol `satelite`) lee todo y **solo escribe en `buzon/entrantes/`**: su pre-commit lo frena fuera de ahí, y el Mac
+  detiene la sincronización si el remoto trae cambios fuera del buzón. Lo que llega al buzón son DATOS hasta revisarlo, y
+  se integra en el origen canónico con la gobernanza de cada proyecto (un cambio a SGM → sesión dentro de este repo y su
+  ADR aquí).
+- **Qué queda de ADR-059**: la bóveda en sí (`brain-private`, con su historia) sigue **sin remoto** y vive en este disco;
+  lo que deja de ser cierto es que *nada* de ella esté fuera de él. `CLAUDE.md §G.4` («se pushea en cuanto tenga remoto»)
+  sigue siendo literal —el espejo no es ese remoto—, así que el router no se toca.
+- **Riesgo aceptado**: el material de cliente queda ahora también en GitHub (privado) y lo lee otro equipo del Ingeniero.
+  Las precauciones del acceso de ese equipo viven en `cerebro-mj/README.md` (privado), no en este repo público.
+- Referencias: `~/Desktop/GitHub-MJ/cerebro-mj/CLAUDE.md` (reglas de núcleo y satélite), `README.md` (montaje del otro PC
+  y del token) y la skill `cerebro-espejo`.
+
+**164.3 No-regresión.** Cero cambios de producto, kernel y manifest: solo texto de cerebro (`99`, `00`, `11`, el README de
+la bóveda y el router del paraguas). `lastOffsiteBackup` intacto (vacío = copia mensual decidida y aún no hecha).
+
+**164.4 Verificación (2026-10-19).** `gh repo view PowertransformersMJ/cerebro-mj --json visibility` → `PRIVATE`; la API
+pública sin credenciales → 404 · `git ls-remote` → en GitHub `main` = `5503e0c` (espejo 1/3); los commits 2/3 y 3/3
+(bóveda, `36e5e6f`) seguían sin subir al escribir esto · `cerebro-mj/boveda/.git` no existe (sin historia) y no hay ningún
+`*.bundle` en el árbol; `ESTADO-ESPEJO.md` lista el bundle y `secretos/` como «fuera por regla» · en este Mac
+`git config cerebro.rol` = `nucleo` y existe `.git/cerebro-nucleo` · `githooks/pre-commit` rechaza al satélite fuera de
+`buzon/entrantes/` · `brain:check` SANO con este ADR.
+
+**164.5 Anti-patterns evitados.** NO se reescribió `§59` (append-only: se matiza aquí y se apunta) · NO se contó el espejo
+como respaldo para callar el aviso de `lastOffsiteBackup` (la misma mentira que evitó `§59.5`) · NO se dio por hecho que el
+espejo estaba entero en GitHub: se consultó el remoto · NO se citó una ADR de Líneas AT (la numeración se repite).
+
+**164.6 Archivos.** MODIFICADOS — `docs/99` (este §), `docs/00` (fila §164 + ruteo), `docs/00a` (la fila §59 apunta a sus matices), `docs/11` (TODO-29); fuera del repo:
+`../brain-private/sgm-transpower/research-archive/README.md` (commit en la bóveda) y `../CLAUDE.md` del paraguas (sin git).
+INTACTOS — todo el producto, `CLAUDE.md` del repo, `05`, `10`, el manifest y el kernel.
+
+**164.7 Doctrina.** §3.3 (privacidad, contenido y remoto comprobados por comando, no de memoria) · §G.3 (decisión → `99` +
+`00`; SSoT: el funcionamiento del espejo vive en `cerebro-mj/CLAUDE.md`, aquí solo la decisión) · límite de guardián
+(apendar, no sobrescribir) · regla 2 del paraguas (la ADR va en el proyecto dueño de la ADR-059). **Decisión NO revisada
+externamente** (§G.2 🛰️): es reversible (borrar el repo privado y revocar el token).
+
+**164.8 Verificado sano / no re-auditar.** «La bóveda ya tiene remoto» → falso: el espejo no trae su historia ni sus
+secretos. «El espejo cumple la copia mensual» → falso, por lo mismo; (J) sigue pendiente. «Hay que editar `CLAUDE.md §G.4`»
+→ no: sigue cierto para la bóveda. La «ADR-059» que nombra el router del paraguas es esta de SGM, no una de Líneas AT.
