@@ -39,6 +39,7 @@
 | §161 | ADR-161 — **Contrato conforme a las órdenes**: 4 órdenes corregidas; el tablero relee las órdenes | 7496 |
 | §162 | ADR-162 — **Cerebro**: auditoría Nivel-2 + neurogénesis (00b, 23, 37, 38, lóbulo 54) | 7566 |
 | §163 | ADR-163 — **Informe de Mantenimiento Brigada**: F60 de Applus (refrigeración) con listado como Fichas, PDF y Word · TODO-81 | 7679 |
+| §164 | ADR-164 — **Cerebro**: espejo PRIVADO en GitHub (`cerebro-mj`); matiza ADR-059, no es respaldo · TODO-29 | 7980 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -47,6 +48,7 @@
 | ¿Dónde vive un módulo / ruta / flujo / componente? | 🗺️ `20-MEMORIA-ESPACIAL` (módulos → `22`; Cargabilidad SCADA → `23`) |
 | Voy a mover/renombrar archivos, refactor, merge, deploy | 🧪 `30-LECCIONES` (gotchas) + 🗺️ `20` |
 | Otra sesión de Claude trabaja a la vez (mismo repo, misma rama o la bóveda): números de ADR/L, qué sube a `main` | `30` **M-08** (mismo repo) + **M-05** (bóveda) |
+| 🪞 ¿El cerebro está en GitHub? Espejo `cerebro-mj`, el otro PC y su buzón · ¿la bóveda tiene remoto o respaldo? | `99 §164` (qué es y qué no) + `../cerebro-mj/CLAUDE.md` · respaldo real → `§162.10` y (J) de `10` |
 | Voy a agregar o retirar una exportación de un módulo JS ya publicado (caché del navegador) | `32` **L-102 (3)**: lo nuevo va en un archivo NUEVO; **(4)** no entregar un tipo que el módulo publicado no sepa escribir · retirar → `37` **L-116** |
 | Voy a tocar `functions/` o el pipeline de IA (streaming/reintentos/timeouts) | 🤖 `31-LECCIONES-IA` (hija de `30`, L-35/L-43–L-48) |
 | Busco un pendiente que no está en `10` (decisión de arquitectura, validación diferida, cola vieja) | 🧊 `11-PENDIENTES-FRIOS` (hija de `10`) |
