@@ -100,3 +100,14 @@ AT ≈ BT (mediana 1,0–1,3 por familia de informes) y con Pk de placa ≥ ΣI�
 corrige ×/÷ 1000 con aviso; «R corr.» sin temperatura = medida a la del aceite (lado seguro); el terciario se clasifica con la
 placa (secundario principal ≥ 90 % de la AT → AT + BT). Medido así, Pk ÷ ΣI²R = 1,04–1,42 (mediana 1,13, n = 16). Crudo y
 scripts en la bóveda (`pruebas-2026-10-19/`). [HONOR]
+
+### L-151 · Sin protocolo, el P0 sale de los vatios de la prueba de excitación calibrados con el parque, no del SCADA
+**Disparador**: un equipo sin protocolo ni P0 en placa cuyo balance térmico (índice de radiadores, TODO-80) necesita P0. ·
+**Cicatriz** (2026-10-19, 2 lectores ciegos de los 1.970 informes + 3 refutadores): (1) el balance P_AT − P_BT del SCADA no
+recupera la placa: el error de medida es ~3 × P0 y un desfase fijo es idéntico a P0; (2) la toma central del barrido no siempre
+es la nominal, y usarla con la tensión nominal infla W 4–18 %. · **Regla**: P0 ≈ c·ΣW·xⁿ, con ΣW = vatios de las 3 fases a
+10 kV y x = tensión del devanado energizado EN LA TOMA PROBADA (YN: V/√3; D: V) ÷ tensión de prueba. Calibrado con 25 equipos
+con P0 de placa: n ≈ 1,7, error mediano 5 %, ±14 % por equipo. Se excluye la prueba posterior a un disparo (remanencia, +10 %).
+Todos los equipos de la calibración son de 2010 en adelante; en un núcleo más viejo el P0 puede quedar arriba, así que el
+valor central no sirve de techo. El PEI de la UE es para equipos nuevos de 50 Hz: es referencia, no cota. Crudo en la bóveda
+(`vacio-2026-10-19/`). [HONOR]
