@@ -8030,6 +8030,8 @@ pública sin credenciales → 404 · `git ls-remote` → en GitHub `main` = `550
 *Verificado después (2026-10-19, 18:51):* los tres lotes del espejo ya están en GitHub — `git ls-remote` → `main` =
 `6e48124`, una sincronización que ya trae este ADR, el README de la bóveda y el kernel 1.14.0 de Líneas AT; el «seguían
 sin subir» de arriba quedó resuelto.
+*Publicado (2026-10-19):* merge a `main` = `e2ff8a7` · CI «Lint + Tests» ✅ y «Deploy · GitHub Pages» ✅ · servido:
+`docs/99-HISTORIAL-ADR.md` y `docs/00-INDICE.md` con anti-caché (`?cb=`) → 200 y traen «ADR-164» (L-65).
 
 **164.5 Anti-patterns evitados.** NO se reescribió `§59` (append-only: se matiza aquí y se apunta) · NO se contó el espejo
 como respaldo para callar el aviso de `lastOffsiteBackup` (la misma mentira que evitó `§59.5`) · NO se dio por hecho que el
