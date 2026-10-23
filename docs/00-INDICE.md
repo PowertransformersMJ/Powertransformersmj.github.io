@@ -41,6 +41,7 @@
 | §163 | ADR-163 — **Informe de Mantenimiento Brigada**: F60 de Applus (refrigeración) con listado como Fichas, PDF y Word · TODO-81 | 7679 |
 | §164 | ADR-164 — **Cerebro**: espejo PRIVADO en GitHub (`cerebro-mj`); matiza ADR-059, no es respaldo · TODO-29 | 7980 |
 | §165 | ADR-165 — **Cargabilidad SCADA**: todos los devanados de placa (tensión, ampacidad, potencia calculada, carga) en lista, CSV y detalle · TODO-69 | 8049 |
+| §166 | ADR-166 — **Cargabilidad SCADA**: placa característica de cada equipo en su detalle (foto, lectura, diferencias); carga admin, foto atada a sus bytes · TODO-69 | 8105 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

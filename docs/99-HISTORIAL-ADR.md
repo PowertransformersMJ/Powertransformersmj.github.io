@@ -8101,3 +8101,61 @@ equipos y el detalle de Río Sinú T1A la carga por devanado de septiembre (P 16
 8-oct: Casacará ya no sale). **Lorica T1 CONFIRMADA en producción**: secundario 8.367 A a 13,8 kV (= 200 MVA sobre 20); la
 cifra del equipo la da el primario (112,1 %), así que hoy no la falsea, pero el dato sigue mal: TODO-54 la daba por
 descartada. No se corrigió ningún dato.
+
+## 166. ADR-166 — Cargabilidad SCADA: la placa característica de cada transformador en su detalle (foto, lo leído de la placa y las diferencias con la plataforma), cargada por el administrador con reglas que atan la foto a sus bytes (TODO-69) ⟦OPUS-5.5⟧ (2026-10-22)
+
+> «también necesito que me permita apreciar la placa característica de cada transformador» → «dame un preview de tu
+> propuesta» (banco con franja roja) → «me gusta tu propuesta, procede por favor» (2026-10-22): autoriza publicar el
+> panel y subir a producción las fotos y lecturas de sus placas.
+
+**166.1 Causa raíz.** La plataforma no tenía la placa: las fotos viven en su carpeta «Placas Trafos» (JPG y PDF) y las
+lecturas en la bóveda (frente 3 de `wf_34cc6555-676`). Storage no entrega descargas al navegador en producción (`§100`),
+así que la foto va en Firestore en partes, como `fichas_adjuntos`.
+
+**166.2 Solución.** Archivos NUEVOS (L-102): `domain/placa_caracteristica.js` (lectura de textos de placa: tensiones con
+toma y rango ±, corrientes sin relaciones de TC; `revisionPlaca` compara serie por partes, potencia/etapa, año, fases,
+tensión nominal/toma/fuera y ampacidad POR DEVANADO con las corrientes impresas y las esperadas a la tensión de la
+plataforma y de la placa; `revisarPlacaPaquete` revisa el paquete contra el parque vivo), `data/placas_caracteristicas.js`
+(lee meta y foto; verifica lote y SHA-256), `data/placas_caracteristicas_admin.js` (UNA placa por lote: meta + 3 ranuras de
+parte + registro), `ui/cargabilidad-scada/panel-placa.js` (plegado, con el conteo de diferencias en el resumen; visor que
+gira sin recortar, tamaño real, se cierra al navegar), `admin/placas-caracteristicas.html` + `ui/placas-carga/` (subir las
+partes del paquete → «Revisar y simular»: nuevas/cambian/iguales/rechazadas por huellas → «Guardar» con confirmación →
+verificación leyendo los BYTES). `detalle.js` lo carga con `import()`; si falla, la ranura queda oculta.
+Colecciones: `placas_caracteristicas/{txId}` + `partes/{0..2}` (JPEG ≤ 900 KB) + `placas_caracteristicas_registro`
+(solo agregar). Reglas: carga el admin con perfil que firma (`carga.por` = su uid, `carga.en` = hora del servidor) con un
+`paquete` NUEVO por cambio; las partes solo en la MISMA operación que cambia la carga y con su lote; **con una parte, su
+SHA-256 = `foto.huella`; la parte 0 empieza `FF D8 FF`; la matrícula = la de `transformadores/{id}` tal cual** (el
+dominio la compara sin espacios ni mayúsculas y guarda la del inventario); retiro solo con sus 3 partes y su registro;
+un «retiro» solo de una placa que existía con ese paquete. La guardia del repo (`guardia-scada.mjs`) bloquea un JPEG en
+base64 y los archivos del paquete; `.gitignore` también.
+
+**166.3 No-regresión.** Nada del inventario se escribe: las diferencias solo se MUESTRAN (cada corrección se decide
+aparte; la ampacidad, siempre con su carga). Cifra, bandas, devanados (ADR-165) e IDs intactos. Sin placa: «sin placa
+registrada»; sin red: «no se pudo leer» con Reintentar.
+
+**166.4 Verificación.** `tests/placa_caracteristica.test.js` (16, sintéticos) · `test:unit` 2.930 (2.928 en verde, 2
+omitidas como antes) · `test:rules` 298/298 con `tests-rules/placas_caracteristicas.rules.test.js` (14: dos direcciones,
+huella ≠ bytes, parte 0 no JPEG, matrícula ajena, transformador inexistente, retiro sembrado) · lint · guardia: el paquete
+real queda bloqueado. Banco (puerto 8136, franja roja L-135): simular 205 nuevas / 205 iguales; guardar 1.025 escrituras,
+205/205 verificadas por bytes; panel y visor en escritorio y móvil sin errores de consola.
+Datos preparados en la bóveda (`placa/scripts/preparar_banco.py` v2 + `empaquetar.py`): **205 placas** (3 equipos sin foto
+en la carpeta), 55,7 MB, máx. 504 KB, 1 parte cada una; PDF con PyMuPDF a 200 ppp sobre blanco; foto reconstruida desde los
+píxeles (sin Exif/GPS, sin comentarios; se comprueba por marcadores); 10 partes de ≈ 8,3 MiB en Descargas.
+
+**166.5 Anti-patterns evitados.** Corregir el inventario desde la placa; confiar en la huella que declara quien escribe
+(se ata a los bytes); lotes de muchas placas (> 20 consultas de regla); comparar JSON por orden (huella de datos);
+«verificado» leyendo solo la meta; exportar desde un módulo ya publicado (L-102); fotos o lecturas reales en el repo.
+
+**166.6 Archivos.** Nuevos: los 6 de 166.2, `tests-rules/placas_caracteristicas.rules.test.js`. Modificados:
+`detalle.js`, `css/cargabilidad-scada.css`, `firestore.rules`, `scripts/guardia-scada.mjs` (+ su prueba), `.gitignore`,
+`docs/23`. INTACTOS: `transformadores` (solo se lee), `scada_carga_*`, Storage.
+
+**166.7 Doctrina.** §3.2 (aditivo, nada fabricado: «se leyó de la foto el … por N lectores»), §3.3, W-11 practicado:
+lectura (`wf_34cc6555-676`) → construcción aislada → banco → revisión adversarial `wf_75d2fa08-02f` (2 lentes: 3 altas —
+9 PDF negros, placa vieja elegida, emparejamiento ignorado—, 4 medias, 4 bajas; todas corregidas) → W-01 red-team de reglas
+`wf_1f4457fa-96b` (1 baja de escalada: «retiro» sembrado; y endurecer integridad) → aplicado. NO revisado externamente.
+**Decisión suya pendiente**: las correcciones de datos que la placa señala, una a una (Lorica T1 ×10, entre otras).
+
+**166.8 Verificado sano / no re-auditar.** Cuota: 55,7 MB en Firestore, lejos de 1 GiB. `get` para el equipo, `list` solo
+admin con `limit ≤ 50`. 73 de las fotos elegidas traían GPS en el original: las salidas no traen ninguno. Dentro de una
+lectura no se mezclan placa vieja y nueva. Crudo: bóveda `2026-10-22-devanados-scada/placa/`.
