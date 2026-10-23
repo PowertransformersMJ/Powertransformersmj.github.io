@@ -8412,3 +8412,10 @@ y sus pruebas. Datos: `placas_caracteristicas` (102, reemplazo de lectura con la
 
 **170.7 Doctrina.** §3.3 (la pregunta del Ingeniero destapó que «de placa» era en parte calculado: se verificó TODO contra
 fotos antes de afirmarlo); W-11 con vista previa fiel; L-152 (el guardado lo acepta ÉL); L-117. NO revisado externamente.
+
+**170.8 Verificado tras publicar (2026-10-23).** `main` 5dc49a7; CI y Deploy de Pages en verde; los 3 módulos servidos = `main`
+(shasum). Datos: en SU Chrome, 5 de 5 partes → simulación **0 nuevas · 102 cambian · 0 iguales · 0 rechazadas**; el guardado lo
+aceptó ÉL (L-152) → **102 de 102 guardadas y verificadas por bytes** (carga `placas-v2-20261023-202610232011`). Barrido de solo
+lectura en producción con los módulos publicados: 205 placas, 0 errores, **707 etapas con corriente impresa y 48 calculadas**,
+21 planos, 2 «futuro», 22 terciarios de compensación sin límite. Cargabilidad SCADA con recarga completa (sin vista previa):
+Bosque T2 dice «(345 A, impresa en la placa)», plano y «futuro». `05` re-sellado (estaba en 2026-10-11).
