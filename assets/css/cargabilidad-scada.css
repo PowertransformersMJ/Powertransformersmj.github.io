@@ -286,3 +286,14 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cs-placa-visor .btn[aria-pressed="true"] { background: rgba(255, 255, 255, .32); }
 .cs-placa-visor-lienzo { flex: 1; min-height: 0; display: flex; align-items: center; justify-content: center; overflow: auto; }
 .cs-placa-grande { max-width: 100%; max-height: 100%; object-fit: contain; }
+
+/* Cargabilidad mes a mes y acumulada (TODO-69, 2026-10-23) — clases propias cs-mensual-* */
+.cscada .cs-mensual h3 { margin: 0 0 4px; font-size: 16px; }
+.cscada .cs-mensual-graf { min-height: 320px; margin: 6px 0 10px; }
+.cscada .cs-mensual-tabla td .chip { margin-right: 6px; }
+.cscada .cs-mensual-tabla .cs-sub { display: block; }
+.cscada .cs-mensual-nulo { color: #5b6b82; font-style: italic; }
+.cscada .cs-mensual-caja { margin-top: 8px; }
+.cscada table.cs-mensual-tabla { min-width: 0; }
+.cscada .cs-mensual-tabla tbody th { position: static; background: none; }
+.cscada .cs-mensual-cap { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }

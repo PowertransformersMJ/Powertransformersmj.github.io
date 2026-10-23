@@ -39,9 +39,11 @@ export function leerCatalogo() { return leerUno('scada_catalogo', 'estado'); }
 export async function leerResumenMes(mes) {
   const k = 'r|' + mes;
   if (cache.has(k)) return cache.get(k);
-  const r = await leerUno('scada_resumen', mes);
-  if (r.estado !== 'fallo') cache.set(k, r);
-  return r;
+  // La historia y «mes a mes» piden los mismos meses a la vez: la lectura EN CURSO también se comparte (un fallo no se
+  // guarda, para que «Reintentar» vuelva a leer).
+  const p = leerUno('scada_resumen', mes).then((r) => { if (r.estado === 'fallo') cache.delete(k); return r; });
+  cache.set(k, p);
+  return p;
 }
 
 /** Convierte un doc de serie guardado en {niveles: {N: {kv, fam: {IR: {v: Float32Array, m, b}}}}}. */

@@ -129,7 +129,12 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   }
 
   /** Al salir del detalle: nada de lo que siga cargando o dibujando puede volver a pintar aquí. */
-  function cerrar() { token++; liberarFigura(figura); figura = null; poner(cont); }
+  function cerrar() {
+    token++; liberarFigura(figura); figura = null;
+    // La gráfica de «mes a mes» también se libera (Plotly deja un oyente de tamaño por gráfica); al reabrir se rehace.
+    if (actual && actual.mensualNodo) { liberarFigura(actual.mensualNodo); actual.mensualLista = false; }
+    poner(cont);
+  }
 
   function buscarTx(mat, id) {
     if (id) { const t = ctx.parque.find((tx) => tx.id === id); if (t) return t; }
@@ -461,7 +466,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     } catch (e) { a.previo = null; }
     liberarFigura(figura); figura = null;
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
-    conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
+    conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, a.mensualNodo, avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-esqueleto', style: 'width:50%' }), el('div', { class: 'cs-esqueleto', style: 'width:80%;margin-top:10px' }),
       el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…')), a.dgaNodo, a.duvalNodo));
     pintarDga(a, { estado: { estado: 'leyendo' } });
@@ -499,7 +504,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
       a.leyendo = false;
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
-      conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, avisoEl(), selectorRango(a),
+      conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, a.mensualNodo, avisoEl(), selectorRango(a),
         fallidos.size ? el('div', { class: 'cs-panel cs-error', role: 'alert' }, 'No se pudo leer ' + [...fallidos].map(nombreMes).join(', ') + ' (revise la conexión): esas horas quedan como hueco y la cifra no es firme.',
           el('button', { type: 'button', class: 'btn btn--glass btn--sm', style: 'margin-left:8px', onclick: () => cargar(desde, hasta) }, 'Reintentar')) : null,
         sinNada ? el('div', { class: 'cs-panel cs-estado' }, 'No hay horas con dato válido en este rango. Pruebe con otro rango.') : indicadores(a),
@@ -513,7 +518,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       if (mio !== token) return;
       a.leyendo = false; a.calc = null; a.porNivel = null;
       console.warn('[cargabilidad-scada] detalle', e);
-      conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
+      conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, a.mensualNodo, selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo, a.duvalNodo));
       pintarDga(a, { estado: { estado: 'error' } });
     }
@@ -544,10 +549,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const historiaNodo = !cambio && actual.historiaNodo ? actual.historiaNodo
       : el('section', { class: 'cs-panel cs-historia', id: 'csHistoria', hidden: true, 'aria-labelledby': 'csHistoriaTitulo' });
     const historiaLista = !cambio && actual.historiaLista;
+    // «Cargabilidad mes a mes y acumulada» (TODO-69): UN nodo por equipo, debajo de la historia, con su import() aislado.
+    if (cambio && actual && actual.mensualNodo) liberarFigura(actual.mensualNodo);
+    const mensualNodo = !cambio && actual.mensualNodo ? actual.mensualNodo
+      : el('section', { class: 'cs-panel cs-mensual', id: 'csMensual', hidden: true, 'aria-labelledby': 'csMensualTitulo' });
+    const mensualLista = !cambio && actual.mensualLista;
     const placaNodo = !cambio && actual.placaNodo ? actual.placaNodo
       : el('section', { class: 'cs-panel cs-placa', id: 'csPlaca', hidden: true, 'aria-labelledby': 'csPlacaTitulo' });
     const placaLista = !cambio && actual.placaLista;
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, placaNodo, placaLista };
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
@@ -561,6 +571,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     }
     pintarPlacaDe(actual);
     if (!actual.historiaLista) pintarHistoriaDe(actual);
+    if (!actual.mensualLista) pintarMensualDe(actual);
     // Rango: el del enlace (rótulos: primera y última hora) si es válido; si no, el mes pedido; si no, el mes por defecto.
     const lim = limites(actual);
     const mesDef = mesPorDefecto(ctx.catalogo);
@@ -597,6 +608,26 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       actual.historiaLista = false;
       poner(nodo, el('p', { class: 'cs-ayuda' }, 'No se pudo armar la historia del equipo (revise la conexión).'),
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => pintarHistoriaDe(actual) }, 'Reintentar'));
+    }
+  }
+
+  /** «Cargabilidad mes a mes y acumulada» en archivo aparte (L-102): si no carga, la sección se oculta y el detalle sigue. */
+  async function pintarMensualDe(a) {
+    const nodo = a.mensualNodo;
+    const vigente = () => !!actual && actual.mensualNodo === nodo;
+    a.mensualLista = true;
+    try {
+      const mod = await import('./panel-mensual.js');
+      if (!vigente()) return;
+      const res = await mod.pintarMensual(nodo, { a, ctx, vigente, alReintentar: () => pintarMensualDe(actual) });
+      // Con meses que no se pudieron leer (o si se dejó la página antes de dibujar), se rehace al reabrir el equipo.
+      if (vigente() && res && res.completa === false) actual.mensualLista = false;
+    } catch (e) {
+      console.warn('[cargabilidad-scada] mensual', e);
+      if (!vigente()) return;
+      actual.mensualLista = false;
+      poner(nodo, el('p', { class: 'cs-ayuda' }, 'No se pudo armar la cargabilidad mes a mes (revise la conexión).'),
+        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => pintarMensualDe(actual) }, 'Reintentar'));
     }
   }
 
