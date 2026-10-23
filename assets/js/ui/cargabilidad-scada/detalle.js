@@ -13,6 +13,8 @@
 import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
 import { chipCifra, textoBandas } from './lista.js';
 import { devanadosDe, TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto } from '../../domain/scada_carga_devanados.js';
+import { limitesDePlaca } from '../../domain/placa_etapas.js';
+import { filasDevanadosPlaca } from '../../domain/scada_devanados_placa.js';
 import { dibujarFigura, liberarFigura } from './graficos.js';
 import { FAMILIAS, NIVELES, DEVANADO, CALCULO, MOTIVO, CODIGO, UNIDAD, NOMBRE_FAMILIA, TIEMPO } from '../../domain/scada_carga_config.js';
 import { EXTRAS, NOMBRE_EXTRA, EXTRA_TOPE_X, extrasVisibles } from '../../domain/scada_carga_extras.js';
@@ -100,7 +102,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     if (!a || !a.placaNodo || !panelPlaca || a.placaLista) return;
     a.placaLista = true;
     const nodo = a.placaNodo;
-    panelPlaca.pintarPlaca(nodo, { tx: a.tx, titulo: a.mat, vigente: () => !!actual && actual.placaNodo === nodo })
+    panelPlaca.pintarPlaca(nodo, { tx: a.tx, titulo: a.mat, vigente: () => !!actual && actual.placaNodo === nodo,
+      // La placa leída llena la tabla «Devanados de placa» (tensión, potencia y corriente de la PLACA).
+      alLeer: (placa) => { if (!actual || actual.placaNodo !== nodo) return; actual.limitesPlaca = placa ? limitesDePlaca(placa, actual.tx) : null; actual.placaLeida = true; refrescarDevanados(actual); } })
       // Con error, se vuelve a intentar al reabrir el equipo (L-109).
       .then((r) => { if (r && r.error && actual && actual.placaNodo === nodo) actual.placaLista = false; })
       .catch((e) => { console.warn('[cargabilidad-scada] placa', e); nodo.hidden = true; if (actual && actual.placaNodo === nodo) actual.placaLista = false; });
@@ -194,33 +198,70 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         hom.avisos.filter((k) => AVISOS[k]).map((k) => el('li', {}, AVISOS[k].texto))) : null);
   }
 
-  /** Todos los devanados de placa: tensión, ampacidad, potencia del devanado y lo que el SCADA mide de cada uno en el rango. */
+  /** La tabla de devanados se rehace cuando llega la placa leída (sin repintar el resto del detalle). */
+  function refrescarDevanados(a) {
+    const caja = document.getElementById('csDevanadosCaja');
+    if (caja && actual === a) caja.replaceWith(tablaDevanados(a));
+  }
+
+  /**
+   * «Devanados de placa»: por devanado, tensión, potencia y corriente nominal de la PLACA leída (la impresa; si la placa no la
+   * graba, la calculada con su potencia y su tensión) y lo que el SCADA mide de cada uno en el rango. Sin placa leída, los
+   * valores de la plataforma, rotulados (2026-10-23: «si tomamos los valores de placa, ¿por qué calculas potencia?»).
+   */
   function tablaDevanados(a) {
     // Mientras se lee el rango: el mapa nivel → devanado (sin resúmenes) y «…» en las cargas; nunca cifras de otro rango.
     const calc = a.calc || a.previo || null;
     const ds = devanadosDe(a.tx, a.calc || null).map((d) => (a.calc ? d : { ...d, niveles: devanadosDe(a.tx, calc).find((y) => y.d === d.d).niveles }));
-    if (!ds.length) return el('p', { class: 'cs-dato', style: 'margin:6px 0 0' }, el('b', {}, 'Devanados: '), 'la placa del parque no trae tensiones ni ampacidades');
+    if (!ds.length) return el('p', { class: 'cs-dato', id: 'csDevanadosCaja', style: 'margin:6px 0 0' }, el('b', {}, 'Devanados: '), 'la placa del parque no trae tensiones ni ampacidades');
     const mono = Number(leer(a.tx, 'electrico.fases')) === 1;
     const circuito = !!(calc && calc.esCircuito && calc.estado !== 'confirmada');
     const leyendo = !a.calc && !!a.leyendo;
     const rango = a.calc && a.desde != null && a.hasta != null ? ' · corriente y cargabilidad del rango ' + formatoCO(a.desde + H_MS) + ' a ' + formatoCO(a.hasta)
       + (a.calc.clase === 'provisional' ? ' (provisional)' : '') + (a.calc.pct == null && a.calc.motivoNulo ? ' (sin cifra: ' + a.calc.motivoNulo + ')' : '') : '';
     const vacio = (d) => (leyendo && d.niveles.length ? '…' : '—');
-    return el('div', { class: 'cs-tabla-caja', style: 'margin-top:10px' },
+    const filas = filasDevanadosPlaca(ds, a.limitesPlaca || null);
+    const conPlaca = filas.some((f) => f.tension.origen === 'placa');
+    const origenA = { impresa: 'impresa en la placa', calculada: 'calculada de la placa (la placa no la graba)', plataforma: 'de la plataforma' };
+    const leyenda = conPlaca
+      ? ' · tensión, potencia y corriente nominal de la placa leída (la corriente impresa; si la placa no la graba, calculada con su potencia y su tensión)'
+      : (a.placaLeida ? ' · sin placa leída: valores de la plataforma; potencia = ' : ' · leyendo la placa… mientras tanto, valores de la plataforma; potencia = ')
+        + (mono ? 'tensión × ampacidad (monofásico)' : '√3 × tensión × ampacidad');
+    const potencia = (f, d) => {
+      if (f.potencia.compensacion) return [el('span', {}, 'compensación'), el('span', { class: 'cs-sub' }, 'no lleva carga: sin límite')];
+      if (!f.potencia.mva.length) return ['—'];
+      const txt = f.potencia.mva.map((m) => mvaTexto(m)).join(' / ') + ' MVA';
+      return [el('span', { class: 'cs-num' }, txt),
+        f.potencia.origen === 'placa' ? el('span', { class: 'cs-sub' }, f.potencia.nombres.join(' / ')) : el('span', { class: 'cs-sub' }, 'calculada (sin placa)'),
+        d.conexion === 'fase_neutro' && f.potencia.origen !== 'placa' ? el('span', { class: 'cs-sub' }, 'devanado entre fase y neutro (tensión ÷ √3)') : null];
+    };
+    const ampacidad = (f, d) => {
+      if (f.potencia.compensacion) return ['—'];
+      if (!f.ampacidad.A) return ['—', d.aviso ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null];
+      return [ampTexto(f.ampacidad.A) + ' A', el('span', { class: 'cs-sub' }, origenA[f.ampacidad.origen] || ''),
+        f.ampacidad.onan ? el('span', { class: 'cs-sub' }, 'ONAN ' + ampTexto(f.ampacidad.onan) + ' A' + (f.ampacidad.onanOrigen === 'impresa' ? ' (impresa)' : ' (calculada)')) : null,
+        f.ampacidad.plataforma ? el('span', { class: 'cs-sub' + (f.ampacidad.plataformaEsOnan ? '' : ' cs-dev-aviso') },
+          f.ampacidad.plataformaEsOnan ? 'la plataforma usa la ONAN (' + ampTexto(f.ampacidad.plataforma) + ' A)' : 'la plataforma tiene ' + ampTexto(f.ampacidad.plataforma) + ' A: por corregir') : null,
+        f.ampacidad.origen === 'plataforma' && d.aviso ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null];
+    };
+    return el('div', { class: 'cs-tabla-caja', id: 'csDevanadosCaja', style: 'margin-top:10px' },
       el('table', { class: 'cs-tabla cs-tabla-dev', id: 'csDevanados' },
-        el('caption', {}, el('b', {}, 'Devanados de placa'), ' · potencia calculada = ' + (mono ? 'tensión × ampacidad (monofásico)' : '√3 × tensión × ampacidad')
-          + ' · ampacidad = corriente nominal con ventiladores en servicio, si los tiene' + rango),
-        el('thead', {}, el('tr', {}, ['Devanado', 'Tensión', 'Ampacidad', 'Potencia calculada', 'Lo mide el SCADA', 'Corriente p99', 'Cargabilidad'].map((t) => el('th', { scope: 'col' }, t)))),
-        el('tbody', {}, ds.map((d) => el('tr', { class: d.manda ? 'cs-dev-manda' : null },
-          el('th', { scope: 'row' }, d.nombre, d.manda ? el('span', { class: 'cs-sub' }, 'da la cifra del equipo') : null),
-          el('td', {}, d.kv ? kvTexto(d.kv) + ' kV' : '—'),
-          el('td', {}, d.A ? ampTexto(d.A) + ' A' : '—'),
-          el('td', {}, el('span', { class: 'cs-num' }, d.mva != null ? mvaTexto(d.mva) + ' MVA' : '—'),
-            d.conexion === 'fase_neutro' ? el('span', { class: 'cs-sub' }, 'devanado entre fase y neutro (tensión ÷ √3)') : null,
-            d.aviso ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null),
-          el('td', {}, d.niveles.length ? 'en ' + d.niveles.join(', ') + (circuito ? ' (un circuito, sin confirmar)' : '') : 'no se mide'),
-          el('td', {}, d.iP99 != null ? ampTexto(d.iP99) + ' A' : vacio(d)),
-          el('td', {}, d.pct != null ? pctTexto(d.pct) + ' %' : vacio(d)))))));
+        el('caption', {}, el('b', {}, 'Devanados de placa'), leyenda + rango),
+        el('thead', {}, el('tr', {}, ['Devanado', 'Tensión', 'Potencia', 'Corriente nominal (ampacidad)', 'Lo mide el SCADA', 'Corriente p99', 'Cargabilidad'].map((t) => el('th', { scope: 'col' }, t)))),
+        el('tbody', {}, filas.map((f, k) => {
+          const d = ds[k];
+          return el('tr', { class: f.manda ? 'cs-dev-manda' : null },
+            el('th', { scope: 'row' }, f.nombre, f.manda ? el('span', { class: 'cs-sub' }, 'da la cifra del equipo') : null),
+            el('td', {}, f.tension.kv ? kvTexto(f.tension.kv) + ' kV' : '—',
+              f.tension.origen === 'placa' && f.tension.kvSistema && f.tension.kv && Math.abs(f.tension.kv / f.tension.kvSistema - 1) > 0.005
+                ? el('span', { class: 'cs-sub' }, 'sistema ' + kvTexto(f.tension.kvSistema) + ' kV') : null),
+            el('td', {}, ...potencia(f, d)),
+            el('td', {}, ...ampacidad(f, d)),
+            el('td', {}, f.niveles.length ? 'en ' + f.niveles.join(', ') + (circuito ? ' (un circuito, sin confirmar)' : '') : 'no se mide'),
+            el('td', {}, f.iP99 != null ? ampTexto(f.iP99) + ' A' : vacio(d)),
+            el('td', {}, f.pct != null ? pctTexto(f.pct) + ' %' : vacio(d),
+              f.pctOficial != null ? el('span', { class: 'cs-sub' }, 'oficial ' + pctTexto(f.pctOficial) + ' % (con la ampacidad de la plataforma)') : null));
+        }))));
   }
 
   function selectorRango(a) {
@@ -557,7 +598,10 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const placaNodo = !cambio && actual.placaNodo ? actual.placaNodo
       : el('section', { class: 'cs-panel cs-placa', id: 'csPlaca', hidden: true, 'aria-labelledby': 'csPlacaTitulo' });
     const placaLista = !cambio && actual.placaLista;
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista };
+    // La placa leída (para la tabla de devanados) se conserva mientras sea el mismo equipo, como su panel.
+    const limitesPlaca = !cambio && actual.limitesPlaca ? actual.limitesPlaca : null;
+    const placaLeida = !cambio && !!actual.placaLeida;
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista, limitesPlaca, placaLeida };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
