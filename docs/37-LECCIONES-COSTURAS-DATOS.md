@@ -144,3 +144,13 @@ Configuración del Informe de Brigada):
 - se prueba con un guardado LENTO de mentira y 2 o más escritores a la vez, más una copia rota a propósito que debe fallar.
 
 **Gate**: `tests/cola_turnos.test.js` (comportamiento) + las guardas de `tests/informe_brigada_firma_limpia.test.js`.
+
+### L-154 · Comparar placa con plataforma en AMPERIOS a la tensión de la placa, y no confundir un par «línea/fase» con dos conexiones
+**Disparador**: validar la potencia o la ampacidad de un devanado contra su placa. · **Cicatriz** (`99 §169`, 2026-10-23): la
+primera validación (√3 · kV de la PLATAFORMA · ampacidad frente a los kVA de placa) dio 51 «diferencias», y 28 eran solo de tensión:
+placas de 30, 14,82, 14,3, 13,2 o 63,5 kV, y monofásicos a 7,967 kV. Además, «tomar la menor de las tensiones con √3 entre ellas
+como la de fase» descartaba la Δ de una placa Y–Δ reconectable («Y 110 kV – Δ 63,5 kV»), que también guarda √3 entre sus tensiones.
+**Regla**: la corriente de placa se calcula a la tensión de placa de la CONEXIÓN del equipo (la que esté a ≤ 10 % de la de la
+plataforma) y se compara en amperios con la ampacidad. La tensión de fase solo se descarta cuando va en par «línea/fase» con «/»
+(«13800/7967 V», «115000GrdY/66395 V»). Antes de llamar «error» a una diferencia, se mira la foto.
+**Gate**: `tests/placa_etapas.test.js` (formatos sintéticos de los dos casos).
