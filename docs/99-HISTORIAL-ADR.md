@@ -8456,3 +8456,10 @@ plano no trae; tocar la condición oficial; escribir sin el dry-run de la cifra.
 
 **171.7 Doctrina.** §3.3 (la placa leída del plano, cifra por cifra, antes de escribir), W-11 (cada valor lo autorizó él; el
 clasificador frenó la escritura y él concedió el permiso), L-152. NO revisado externamente.
+
+**171.8 Verificado tras publicar (2026-10-23).** `main` 21bc751; CI y Deploy de Pages en verde; `placa_caracteristica.js` servido =
+`main`. Placa sin «futuro»: simulación 1 cambia / 0 rechazadas, guardado aceptado por ÉL → 1 de 1 verificada por bytes (carga
+`placas-v3-bqe2-20261023-202610232041`). En su Chrome, Bosque T2: ampacidad 345 / 1.674 A, potencia calculada 39,4 / 40,0 MVA,
+**A la fecha 79,1 % CRG 4 · Pobre** (sep: 80,3 % / 81,3 %), límites «impresa en la placa», aviso de plano sin «futuro». La
+revisión de placa con el código publicado y los datos de producción: 1 diferencia NO grave (conexión alternativa); su pestaña
+traía el módulo anterior en caché (L-102, ≤ 10 min).
