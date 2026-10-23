@@ -13,13 +13,30 @@
 // archivo y de su prueba son SINTÉTICOS (misma forma de escritura, cifras inventadas): el repo es público.
 // ══════════════════════════════════════════════════════════════
 
-import { tensionesPlaca } from './placa_caracteristica.js';
+import { tensionesPlaca, corrientesA } from './placa_caracteristica.js';
 
 const R3 = Math.sqrt(3);
 const ETAPAS = ['ONAN', 'ONAF1', 'ONAF2'];
 const KV_PLATAFORMA = { P: 'tension_primaria_kv', S: 'tension_secundaria_kv', T: 'tension_terciaria_kv' };
 const NOMBRE_DEV = { P: 'primario', S: 'secundario', T: 'terciario' };
 const COMPENSACION = /compensaci[oó]n|estabilizaci[oó]n|no\s+cargable/i;
+// Marcas de la FUENTE de la lectura, escritas en sus notas al cotejarla con los archivos (2026-10-23).
+const MARCA_PLANO = /\[documento: plano del fabricante\]/i;
+const MARCA_FUTURO = /\[equipo FUTURO\]/i;
+
+/**
+ * La corriente que la placa IMPRIME para una etapa, si la trae: se busca entre las corrientes escritas en la lectura (la
+ * tensión del devanado, las notas y el texto de potencias) la que cuadra con la calculada — a ±0,6 % o, si la placa la graba
+ * en entero, a medio amperio. Una toma distinta de la nominal cae fuera (difiere ≥ 1 %). Sin coincidencia → null.
+ */
+function impresaDe(calc, impresas) {
+  let mejor = null;
+  for (const v of impresas) {
+    const dif = Math.abs(v - calc);
+    if ((dif <= 0.006 * calc || (Number.isInteger(v) && dif <= 0.5)) && (mejor == null || dif < Math.abs(mejor - calc))) mejor = v;
+  }
+  return mejor;
+}
 
 /** Etapas del equipo de la placa ({ONAN, ONAF1, ONAF2…} kVA) → lista ascendente de kVA. */
 function etapasEquipo(datos) {
@@ -209,9 +226,12 @@ export function kvDePlaca(texto, kvPlataforma = null) {
  * (`kvDePlaca`).
  * @param {object|null} placa  `{datos}` de la placa leída
  * @param {object} tx          transformador (para saber si tiene terciario y su número de fases)
- * @returns {{P?: object, S?: object, T?: object, nota: string|null}}  por devanado: {kva: [..], nombres: [..], kv, A: [..],
- *   kvPlataforma, difKv (la tensión de placa no es la de la plataforma, más del 5 %), compensa (la placa lo da como terciario
- *   de compensación/estabilización)}; `nota` explica lo que la placa no trae legible (ese devanado usa la plataforma)
+ * @returns {{P?: object, S?: object, T?: object, nota: string|null, documento: 'plano'|'placa', futuro: boolean}}  por devanado:
+ *   {kva: [..], nombres: [..], kv, A: [..], origenA: ['impresa'|'calculada'…], kvPlataforma, difKv (la tensión de placa no
+ *   es la de la plataforma, más del 5 %), compensa (terciario de compensación/estabilización: SIN límite de carga →
+ *   `sinLimite`, A null)}; `nota` explica lo que la placa no trae legible (ese devanado usa la plataforma). `A` = la corriente
+ *   IMPRESA cuando la placa la trae y coincide; si no, la calculada (kVA / (√3·kV)). `documento`/`futuro`: la lectura viene de
+ *   un plano del fabricante o de la placa de un equipo marcado «futuro» (marcas en las notas).
  */
 export function limitesDePlaca(placa, tx) {
   const datos = (placa && placa.datos) || null;
@@ -219,22 +239,32 @@ export function limitesDePlaca(placa, tx) {
   const tres = !!(e.tension_terciaria_kv);
   const r = etapasPorDevanado(datos, { tres, kvPrimario: Number(e.tension_primaria_kv) || null });
   const mono = Number((datos && datos.fases) || e.fases) === 1;
-  const out = { nota: r.nota, fuente: r.fuente };
+  const notas = String((datos && datos.notas) || '');
+  const out = { nota: r.nota, fuente: r.fuente, documento: MARCA_PLANO.test(notas) ? 'plano' : 'placa', futuro: MARCA_FUTURO.test(notas) };
   const tension = (datos && datos.tension) || {};
   const sinTension = [];
   for (const d of ['P', 'S', 'T']) {
     const kva = r[d];
+    const compensa = d === 'T' && COMPENSACION.test(String(tension.T || ''));
+    // Terciario de compensación: la placa no le da carga → sin límite (aunque el protocolo traiga su potencia térmica).
+    if (compensa) { out.T = { kva: null, nombres: [], kv: kvDePlaca(tension.T, Number(e[KV_PLATAFORMA.T]) || null), A: null, origenA: [],
+      kvPlataforma: Number(e[KV_PLATAFORMA.T]) || null, difKv: false, compensa: true, sinLimite: true }; continue; }
     if (!kva) continue;
     const kvPlat = Number(e[KV_PLATAFORMA[d]]) || null;
     const kv = kvDePlaca(tension[d], kvPlat);
     if (!kv) sinTension.push(NOMBRE_DEV[d]);
     // Monofásico: la placa da la tensión de fase y la plataforma la de línea (13,8 kV ↔ 7,967 kV): no es diferencia.
     const fase = mono && kv && kvPlat && Math.abs(kv * R3 / kvPlat - 1) < 0.02;
+    const calc = kv ? kva.map((s) => (mono ? s / kv : s / (R3 * kv))) : null;
+    // Las corrientes que la lectura trae escritas: primero las de la tensión del devanado, luego notas y potencias.
+    const impresas = [tension[d], notas, datos && datos.potencias_texto].flatMap((x) => corrientesA(String(x || '')));
+    const imp = calc ? calc.map((c) => impresaDe(c, impresas)) : null;
     out[d] = {
       kva, nombres: kva.map((_, k) => (kva.length === 1 ? 'ONAN' : ETAPAS[Math.min(k, ETAPAS.length - 1)])), kv,
-      A: kv ? kva.map((s) => (mono ? s / kv : s / (R3 * kv))) : null,
+      A: calc ? calc.map((c, k) => (imp[k] != null ? imp[k] : c)) : null,
+      origenA: calc ? imp.map((v) => (v != null ? 'impresa' : 'calculada')) : [],
       kvPlataforma: kvPlat, difKv: !!(kv && kvPlat && !fase && Math.abs(kv / kvPlat - 1) > 0.05),
-      compensa: d === 'T' && COMPENSACION.test(String(tension.T || ''))
+      compensa: false
     };
   }
   if (sinTension.length) {

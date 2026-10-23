@@ -8370,3 +8370,45 @@ conexión en servicio de Tolú Viejo T1A, Zaragocilla T3, Manzanillo T3/T4, Cham
 en 14,49 kV; planos con nombre de otra subestación en Mandinguilla T1 y Hatillo de Loba T1. Propuesto (espera su «procede»):
 usar la corriente IMPRESA cuando la placa la trae y rotular «impresa» o «calculada»; terciario de compensación sin límite.
 Crudos: bóveda `2026-10-23-diferencias-placa-ampacidad/corrientes-impresas/`.
+
+## 170. ADR-170 — Cargabilidad SCADA: la corriente límite de cada devanado es la IMPRESA en la placa (o se dice «calculada»); terciario de compensación sin límite; lecturas de plano o de equipo «futuro» marcadas; 102 placas completadas con lo verificado en sus fotos (TODO-69, TODO-54) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «¿validaste que los valores sean de placa y no calculados de cada transformador?» → `§169.11` → «procede, dame preview
+> antes de lanzar en producción» → vista previa en su Chrome (Bosque T2, Gambote T3, Momil, Ciénaga de Oro) → «procede, y al
+> final dame un resumen puntual de qué hiciste y qué está pendiente» (2026-10-23).
+
+**170.1 Causa raíz.** Las corrientes límite del panel (ADR-169) eran CALCULADAS (kVA ÷ √3·kV de placa) sin decirlo; la lectura
+guardada de 100+ placas no traía la corriente que la placa sí imprime; un terciario de COMPENSACIÓN recibía un límite que su
+placa no da (Gambote T3: potencia del protocolo de pruebas); y 21 lecturas son de PLANOS del fabricante, 2 de equipos «futuro».
+
+**170.2 Solución.** (1) `limitesDePlaca` busca la corriente IMPRESA (texto de tensión del devanado, notas y potencias) que
+cuadre con cada etapa — ±0,6 % o redondeo a entero; otra toma (≥ 1 %) no cuenta — y la usa; cada etapa lleva `origenA`
+('impresa'/'calculada'). (2) Terciario de compensación → `sinLimite` (sin etapas ni %). (3) Marcas `[documento: plano del
+fabricante]` y `[equipo FUTURO]` en las notas → `documento`/`futuro`. (4) Panel: «(345 A, impresa en la placa)» / «(105 A,
+calculada de la placa)», «(impresa)/(calculada)» en las líneas de la gráfica, aviso de plano y de «futuro», «Límites de placa:
+ninguno (terciario de compensación)». (5) DATOS: a 102 placas (paquete `placas-v2-20261023`, misma foto) se les agrega la
+corriente de placa de cada devanado verificada en la foto (`wf_1c837f24-783`, `wf_06c4a88a-a0e`), las marcas de fuente
+(`wf_90fd576d-0ef`: 21 planos; «futuro» SOLO donde el archivo lo dice: Bosque T2 y Gambote T3 — «Nuevo» no cuenta) y 6
+lecturas corregidas por la foto (Nueva Montería: la toma nominal es la 11; Río Sinú T2A: fila de la toma 5; Chinú Planta T2:
+terciario de compensación; El Burro: serie 56190119; San Antero: la «serie» era el CP del plano).
+
+**170.3 No-regresión.** La cifra oficial no cambia; `revisionPlaca` (panel de placa) da las mismas conclusiones (las impresas
+ya coincidían con las esperadas); los textos de tensión siguen dando la misma tensión nominal (la corriente va tras « · », sin
+unidad V). Módulos ya publicados: solo importan exportaciones existentes (`corrientesA` ya estaba en producción, L-102).
+
+**170.4 Verificación.** Pruebas: `placa_etapas` 15, `scada_devanados_mes` 10, `scada_carga_mensual` 14; `test:unit` 2.975
+(2.973 en verde, 2 omitidas). Arnés con DOM falso sobre los 206 equipos con las placas v2: **703 etapas impresas, 48
+calculadas** (14 devanados cuya placa no imprime corriente + etapas que la placa no trae o están gastadas), 21 planos, 2
+«futuro», 3 terciarios sin límite, 0 textos rotos. Vista previa fiel en su Chrome: módulos de la rama por jsDelivr (commit
+fijo) + datos v2 de 4 placas solo en la pestaña, franja roja; nada escrito.
+
+**170.5 Anti-patterns evitados.** Llamar «de placa» a una cifra calculada; tomar como impresa la corriente de otra toma; darle
+límite de carga a un terciario de compensación; tratar «Nuevo» como «futuro»; fusionar un rótulo con un número («ONAF1 401,6»
+leído como 1.401,6 — se cazó al contar las calculadas que no debían quedar); poner datos de cliente en el repo.
+
+**170.6 Archivos.** `domain/placa_etapas.js`, `domain/scada_devanados_mes.js`, `ui/cargabilidad-scada/panel-devanados-mes.js`
+y sus pruebas. Datos: `placas_caracteristicas` (102, reemplazo de lectura con la misma foto). Bóveda:
+`2026-10-23-diferencias-placa-ampacidad/placas-v2/` (script, correcciones, clasificación, registro de cambios).
+
+**170.7 Doctrina.** §3.3 (la pregunta del Ingeniero destapó que «de placa» era en parte calculado: se verificó TODO contra
+fotos antes de afirmarlo); W-11 con vista previa fiel; L-152 (el guardado lo acepta ÉL); L-117. NO revisado externamente.

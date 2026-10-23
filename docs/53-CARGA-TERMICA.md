@@ -34,6 +34,8 @@
 - **Cada devanado frente a su PLACA** (`99 §169`): límite = la mayor etapa de la placa (ONAF; ONAN si la placa solo trae una;
   ONAF II si tres) a la tensión de placa de la CONEXIÓN del equipo; también el % de ONAN (sin ventiladores). La cifra oficial
   sigue con la ampacidad de la plataforma; si no es la de placa, se avisa y se corrige en la revisión uno a uno (TODO-54).
+  La corriente límite es la IMPRESA en la placa cuando la trae (se rotula «impresa» o «calculada», `99 §170`); un
+  terciario de COMPENSACIÓN no tiene límite de carga; una lectura de plano o de equipo «futuro» se advierte.
   Con la ventilación OBSOLETA el límite usable es la ONAN, no la ONAF (Corozal y Chiriguaná: ~120–135 % de su ONAN, `§169.9`).
 - **Periodo de varios meses** (`99 §159`): su cifra es el p99 de TODAS sus horas (exacto con las 90 más altas de cada mes),
   NUNCA el promedio ni la mediana de los p99 mensuales (subestiman ~10–14 pts, hasta 37) ni el peor mes (sobrestima ~8).

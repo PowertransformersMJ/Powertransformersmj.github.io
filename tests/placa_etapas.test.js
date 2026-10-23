@@ -109,3 +109,31 @@ test('límites: sin tensión legible lo dice la nota; el terciario de compensaci
   assert.equal(L.P.A, null); assert.match(L.nota, /no trae legible la tensión del primario/);
   assert.equal(L.T.compensa, true); assert.equal(L.S.compensa, false);
 });
+
+test('corriente IMPRESA: si la placa la graba y cuadra, se usa y se rotula; una toma distinta o sin dato → calculada', () => {
+  const tx = { electrico: { tension_primaria_kv: 34.5, tension_secundaria_kv: 13.8 } };
+  const placa = (S, notas = null) => ({ datos: { etapas_kva: { ONAN: 4000, ONAF1: 5000 }, notas, tension: { P: '34500 V', S } } });
+  const L = limitesDePlaca(placa('13800/7967 V · corriente de placa 167,4/209,2 A'), tx);
+  assert.deepEqual(L.S.origenA, ['impresa', 'impresa']); assert.deepEqual(L.S.A, [167.4, 209.2]);
+  assert.deepEqual(L.P.origenA, ['calculada', 'calculada']); casi(L.P.A[1], 83.67);
+  // Grabada en entero (redondeo de la placa) también vale; la de otra toma (≈ 2 % arriba) no.
+  const ent = limitesDePlaca(placa('13800 V · corriente de placa 167/209 A'), tx);
+  assert.deepEqual(ent.S.origenA, ['impresa', 'impresa']);
+  const toma = limitesDePlaca(placa('13800 V', 'Corriente BT en la toma 1: 171,4/214,2 A'), tx);
+  assert.deepEqual(toma.S.origenA, ['calculada', 'calculada']); casi(toma.S.A[1], 209.18);
+  // Solo una etapa impresa: cada etapa con su origen.
+  const una = limitesDePlaca(placa('13800 V · corriente de placa ONAN 167,35 A'), tx);
+  assert.deepEqual(una.S.origenA, ['impresa', 'calculada']);
+});
+
+test('fuente de la lectura y terciario de compensación: marcas en las notas; el terciario no tiene límite de carga', () => {
+  const tx = { electrico: { tension_primaria_kv: 66, tension_secundaria_kv: 34.5, tension_terciaria_kv: 13.8 } };
+  const L = limitesDePlaca({ datos: { etapas_kva: { ONAN: 20000, ONAF1: 25000 }, potencias_texto: 'AT 20/25; MT 20/25; TERC 7/8 MVA',
+    notas: '[documento: plano del fabricante] [equipo FUTURO] Plano del dossier.',
+    tension: { P: '66 kV', S: '34,5 kV', T: '6600 V, devanado de compensación no cargable' } } }, tx);
+  assert.equal(L.documento, 'plano'); assert.equal(L.futuro, true);
+  assert.equal(L.T.sinLimite, true); assert.equal(L.T.A, null); assert.equal(L.T.compensa, true);
+  const sin = limitesDePlaca({ datos: { etapas_kva: { ONAN: 5000 }, notas: 'Placa de fábrica.', tension: { P: '34500 V', S: '13800 V' } } },
+    { electrico: { tension_primaria_kv: 34.5, tension_secundaria_kv: 13.8 } });
+  assert.equal(sin.documento, 'placa'); assert.equal(sin.futuro, false);
+});

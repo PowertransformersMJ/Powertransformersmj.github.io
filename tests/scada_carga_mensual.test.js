@@ -168,6 +168,9 @@ test('bloque por devanado: lógica en el dominio (probada aparte), textos con el
   assert.match(src, /const dudosa = AVISO_PLACA\.has\(base\.aviso\) \|\| u\.difA;/);
   assert.match(src, /insidetextfont: \{ color: d === 'S' \? '#1d2b44' : '#ffffff' \}/, 'texto legible sobre el ámbar');
   assert.match(src, /bgcolor: 'rgba\(255,255,255,0\.85\)'/, 'rótulos de los umbrales con fondo');
+  assert.match(src, /const ORIGEN_A = \{ impresa: 'impresa en la placa', calculada: 'calculada de la placa', plataforma: 'de la plataforma' \}/, 'cada corriente límite dice de dónde sale');
+  assert.match(src, /PLANO de placa del fabricante/); assert.match(src, /marcado «futuro»/);
+  assert.match(src, /'ninguno \(terciario de compensación\)'/);
   const men = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-mensual.js', import.meta.url), 'utf8');
   assert.match(men, /pintarDevanadosMes\(devNodo, \{ serie, mat: a\.mat, tx: a\.tx,/);
 });
