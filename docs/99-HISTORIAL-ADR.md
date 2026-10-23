@@ -8228,3 +8228,11 @@ placa del equipo como me lo habías propuesto»: la vista previa que aprobó mos
 revisión lo dejé plegado en una línea —cambio posterior a su «procede», no consultado— y no se veía. Ahora abre por defecto
 (se puede plegar). Además, el detalle muestra la nota de la homologación decidida (`ADR-167`). Banco: abierto con foto, nota
 visible, consola limpia. **Lección**: lo que él aprueba en la vista previa no se cambia después sin preguntarle.
+
+**167.10 Homologación y primario (2026-10-23).** «sí confírmala con 13,8 kV, deja el primario con anotación pendiente por
+validar con SCADA»: en Datos SCADA (su Chrome, el mismo diálogo «Revisar» de la página) la fila de Lorica T1 queda «usar»,
+su mismo punto, mapa {13,8 kV → secundario}, 34,5 kV «No usar», niveles vistos ambos, aviso visto RELACION_NIVELES
+(medida 1,51 frente a 2,50), con su nota. `salud_actual.crg_nota` suma «Carga del primario (343 A, del Excel antiguo):
+pendiente por validar con SCADA». Cargabilidad SCADA, módulos renovados: **67,4 % CRG 3 · Medio**, la da el secundario
+(569 A máx., 0 h sostenidas, cobertura 93 %); primario «no se mide»; la nota se lee en el equipo; placa abierta, «coincide en
+lo comparado».

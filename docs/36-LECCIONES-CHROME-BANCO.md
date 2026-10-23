@@ -99,3 +99,9 @@ el clic abrió el cuadro y la extensión ya no respondió (ni clic, ni lectura, 
 sobrescribir `window.confirm` para aceptarlo solo lo negó el clasificador de la sesión. · **Regla**: simular, dejar el cuadro
 abierto y pedirle que pulse «Aceptar» en su pestaña; luego leer el resultado. Nunca anular el `confirm`: es su punto de control
 de la escritura. **Gate**: [HONOR].
+
+### L-153 · Lo que el Ingeniero aprueba en la vista previa no se cambia después sin preguntarle
+**Disparador**: una revisión posterior a su «procede» sugiere cambiar cómo se ve algo que él aprobó. · **Cicatriz**
+(`99 §166.10`): la placa salía abierta en la vista previa aprobada; la dejé plegada por una revisión y él no la encontró
+(«no aparece la placa como me lo habías propuesto»). · **Regla**: la vista previa aprobada es el contrato; un cambio de
+presentación posterior se le consulta o se publica igual a lo aprobado. **Gate**: [HONOR].
