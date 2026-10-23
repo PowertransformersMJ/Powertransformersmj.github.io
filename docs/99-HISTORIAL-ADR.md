@@ -8275,3 +8275,12 @@ cifra provisional; acumulado «firme» sin un mes que no se leyó; esconder un m
 **168.7 Doctrina.** W-11 (construcción aislada → revisión adversarial `wf_2b3e883d-aef`, 1 alta + 4 medias aplicadas → vista
 previa fiel → su «procede»), L-153 (se publica igual a lo aprobado, sin la columna de referencia que él descartó), §3.2. NO
 revisado externamente. Crudo: bóveda `2026-10-23-cargabilidad-mensual/`.
+
+**168.8 Verificado tras publicar (2026-10-23).** `main` ccee7a2; Deploy de Pages en verde; CI falló UNA vez por una prueba de
+TIEMPO ajena al cambio (`tests/fichas_diagrama_operativo_blindaje.test.js`, «miles de definiciones de columnas»: 1.627 ms en el
+servidor de GitHub) y en el reintento quedó en verde. Los 5 archivos servidos = `main` (shasum). Datos de Lorica T1 desde su
+Chrome, verificados al releer: `crg_pct_medido` 66,5, `calif_crg` 3, `crg_periodo` «2026-01 a 2026-10», nota nueva, carga del
+secundario 556,48 A; condición oficial intacta («muy bueno», 1,434). En su Chrome, recargada (módulos renovados): la sección
+sale debajo de la historia, sin la columna de promedio, «A la fecha: 66,5 % CRG 3 · Medio, enero a octubre 2026», mayo como
+hueco, octubre gris rayado (provisional); el indicador «Cifra oficial» ya dice 66,5 %. **Pendiente ofrecido**: ese indicador y la
+columna de la lista se rotulan «(Excel)» aunque en los equipos revisados la cifra ya sale del SCADA.
