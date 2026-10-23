@@ -50,6 +50,11 @@ function chip(pct, firme, umbrales, aviso, difA = false) {
 }
 const de = (lista, d) => (lista || []).find((x) => x.d === d) || null;
 
+// % frente al límite mayor, con su nombre; un terciario de compensación no tiene límite de carga.
+const pctTexto = (i, u) => (u.sinLimite ? 'sin límite de carga (compensación)' : num(pctDe(i, u.onaf), 1) + ' % de ' + u.tope);
+const pctCorto = (i, lim) => { const v = pctDe(i, lim); return v == null ? '—' : num(v, 1) + ' %'; };
+// De dónde sale cada corriente límite: la que GRABA la placa, la calculada con su potencia y su tensión, o la de la plataforma.
+const ORIGEN_A = { impresa: 'impresa en la placa', calculada: 'calculada de la placa', plataforma: 'de la plataforma' };
 const mvaEq = (u, i) => (i != null && u.f ? mvaTexto(i * u.f) + ' ' + MVA_EQ : 'sin potencia (falta la tensión)');
 
 // La placa leída de cada equipo, una vez por sesión (el panel de placa hace su propia lectura): solo las lecturas buenas.
@@ -78,7 +83,7 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
     const fmtCarga = (v) => (v == null ? '—' : unidad === 'A' ? ampTexto(v) + ' A' : mvaTexto(v) + ' MVA eq.');
     const maxY = Math.max(...lim.filter((v) => v != null), ...val.filter((v) => v != null)) * 1.32 || 1;
     const xs = registrados.map((b, k) => nombres[k] + '<br><b>' + (val[k] == null ? ROTULO_ESTADO[estado[b.d]] || 'sin cifra'
-      : fmtCarga(val[k]) + ' · ' + num(pctDe(hoy[k].iP99, U[b.d].onaf), 1) + ' % de ' + U[b.d].tope) + '</b>');
+      : fmtCarga(val[k]) + ' · ' + pctTexto(hoy[k].iP99, U[b.d])) + '</b>');
     await Plotly.newPlot(div, [
       { type: 'bar', name: 'Límite mayor', x: xs, y: lim, width: 0.62,
         marker: { color: registrados.map((b) => tinte(color(b), 0.14)), line: { color: registrados.map(color), width: 1.8 } },
@@ -89,7 +94,7 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
       { type: 'bar', name: 'A la fecha', x: xs, y: val, width: 0.34, marker: { color: registrados.map(color),
         pattern: { fillmode: 'overlay', shape: registrados.map((b, k) => (val[k] != null && (!firme || AVISO_PLACA.has(b.aviso) || U[b.d].difA) ? '/' : '')), size: 6, solidity: 0.3 } },
         customdata: val.map((v, k) => (v == null ? ROTULO_ESTADO[estado[registrados[k].d]] || 'sin cifra'
-          : fmtCarga(v) + ' · ' + num(pctDe(hoy[k].iP99, U[registrados[k].d].onaf), 1) + ' % de ' + U[registrados[k].d].tope
+          : fmtCarga(v) + ' · ' + pctTexto(hoy[k].iP99, U[registrados[k].d])
           + (U[registrados[k].d].onan ? ' · ' + num(pctDe(hoy[k].iP99, U[registrados[k].d].onan), 1) + ' % de ONAN' : ''))),
         hovertemplate: '%{customdata}<extra>A la fecha</extra>' },
       // ONAN: una marca horizontal sobre cada barra (su cifra va escrita encima de la barra).
@@ -132,7 +137,9 @@ export async function pintarDevanadosMes(nodo, opts) {
       el('button', { type: 'button', class: 'btn btn-sm', onclick: () => { placas.delete(tx.id); pintarDevanadosMes(nodo, opts); } }, 'Reintentar'))
     : el('p', { class: 'cs-ayuda' }, !lp ? 'Este equipo no tiene placa registrada: los límites son los de la plataforma (ampacidad y su potencia).'
       : 'Límites tomados de la placa característica' + (enPlataforma.length ? '; el ' + enPlataforma.join(' y el ') + ' usa'
-        + (enPlataforma.length > 1 ? 'n' : '') + ' la ampacidad de la plataforma' + (lp.nota ? ' (' + lp.nota + ')' : '') : '') + '.');
+        + (enPlataforma.length > 1 ? 'n' : '') + ' la ampacidad de la plataforma' + (lp.nota ? ' (' + lp.nota + ')' : '') : '') + '.'
+        + (lp.documento === 'plano' ? ' La lectura es del PLANO de placa del fabricante, no de una foto de la placa instalada.' : '')
+        + (lp.futuro ? ' Es la placa de un equipo marcado «futuro»: confirmar en campo que es el que está en servicio.' : ''));
   // Estado de cada devanado A LA FECHA (para el resumen y su bloque).
   const ed = estadoDevanados(serie, registrados);
   const { algunoLeido, conCifraEq } = ed;
@@ -147,7 +154,8 @@ export async function pintarDevanadosMes(nodo, opts) {
     const idTit = 'csDevmes' + d;
     const { conNiveles, conCifra, hoy, motivo, niveles } = ed.porDevanado[d];
     const limites = el('p', { class: 'cs-dato' }, el('b', {}, u.dePlaca ? 'Límites de placa: ' : 'Límites (de la plataforma): '),
-      u.etapas.length ? u.etapas.map((e) => e.nombre + ' ' + mvaTexto(e.mva) + ' MVA (' + ampTexto(e.A) + ' A)').join(' · ') : '—',
+      u.sinLimite ? 'sin límite de carga: terciario de compensación' : u.etapas.length
+        ? u.etapas.map((e) => e.nombre + ' ' + mvaTexto(e.mva) + ' MVA (' + ampTexto(e.A) + ' A, ' + (ORIGEN_A[e.origen] || 'calculada de la placa') + ')').join(' · ') : '—',
       u.dePlaca && u.kv ? el('span', { class: 'cs-sub' }, ' a ' + kvTexto(u.kv) + ' kV de placa') : null);
     // La ampacidad que usa la plataforma frente a la ONAF de placa: si no cuadran, se avisa (se corrige aparte).
     const difA = u.difA;
@@ -157,8 +165,8 @@ export async function pintarDevanadosMes(nodo, opts) {
       u.compensa && 'la placa lo da como terciario de compensación o estabilización: no está hecho para llevar carga'].filter(Boolean);
     const tramo = conCifraEq ? (conCifraEq.acumulado.nMeses > 1 ? nombreMes(conCifraEq.acumulado.desde) + ' a ' + nombreMes(conCifraEq.mes) : nombreMes(conCifraEq.mes)) : '';
     const linHoy = hoy && hoy.pct != null
-      ? el('p', { class: 'cs-dato' }, el('b', {}, 'A la fecha: '), ampTexto(hoy.iP99) + ' A · ' + mvaEq(u, hoy.iP99) + ' · ' + num(pctDe(hoy.iP99, u.onaf), 1) + ' % de '
-        + u.tope + (u.onan ? ' · ' + num(pctDe(hoy.iP99, u.onan), 1) + ' % de ONAN' : '') + ' ',
+      ? el('p', { class: 'cs-dato' }, el('b', {}, 'A la fecha: '), ampTexto(hoy.iP99) + ' A · ' + mvaEq(u, hoy.iP99) + ' · ' + pctTexto(hoy.iP99, u)
+        + (u.onan ? ' · ' + num(pctDe(hoy.iP99, u.onan), 1) + ' % de ONAN' : '') + ' ',
         chip(hoy.pct, conCifraEq.acumulado.firme, umbrales, base.aviso, u.difA),
         el('span', { class: 'cs-sub' }, ' ' + tramo + (hoy.manda ? ' · da la cifra del equipo' : '')))
       : null;
@@ -166,7 +174,8 @@ export async function pintarDevanadosMes(nodo, opts) {
       limites, ...avisos.map((t) => el('p', { class: 'cs-devmes-aviso' }, t)), linHoy);
     const sec = (...hijos) => el('section', { class: 'cs-devmes', style: 'border-left: 5px solid ' + (COLOR_DEV[d] || SIN), 'aria-labelledby': idTit }, ...hijos);
     if (!algunoLeido) { bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'No se pudo leer ningún mes: sin cifras por ahora (Reintentar, arriba); se muestran solo sus límites.'))); continue; }
-    if (!conNiveles) { bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'Este devanado no tiene señal del SCADA en uso (no se mide, o su señal quedó fuera en la homologación): se muestran solo sus límites.'))); continue; }
+    if (!conNiveles) { bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'Este devanado no tiene señal del SCADA en uso (no se mide, o su señal quedó fuera en la homologación)'
+      + (u.sinLimite ? '.' : ': se muestran solo sus límites.')))); continue; }
     if (!conCifra) {
       // El motivo, del último mes CARGADO y LEÍDO en que el devanado se mide (nunca el de un mes hueco): `estadoDevanados`.
       bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'Se mide en ' + niveles.join(' y ') + ', pero no tiene cifra: ' + motivo + '.')));
@@ -179,18 +188,18 @@ export async function pintarDevanadosMes(nodo, opts) {
       const m = de(x.mensual.devanados, d); const a = de(x.acumulado.devanados, d);
       const celdasMes = !m || m.pct == null ? [el('td', { class: 'cs-mensual-nulo', colspan: u.onan ? '4' : '3' }, motivoSinCifra(m, x.mensual))]
         : [el('td', {}, ampTexto(m.iP99) + ' A'), el('td', {}, mvaEq(u, m.iP99)),
-          el('td', {}, el('b', {}, num(pctDe(m.iP99, u.onaf), 1) + ' %'), ' ', chip(m.pct, x.mensual.firme, umbrales, base.aviso, u.difA)),
-          u.onan ? el('td', {}, num(pctDe(m.iP99, u.onan), 1) + ' %') : null];
+          el('td', {}, el('b', {}, pctCorto(m.iP99, u.onaf)), ' ', chip(m.pct, x.mensual.firme, umbrales, base.aviso, u.difA)),
+          u.onan ? el('td', {}, pctCorto(m.iP99, u.onan)) : null];
       return el('tr', {}, el('th', { scope: 'row' }, nombreMes(x.mes)), ...celdasMes,
         a && a.pct != null
-          ? el('td', {}, ampTexto(a.iP99) + ' A · ' + mvaEq(u, a.iP99) + ' · ', el('b', {}, num(pctDe(a.iP99, u.onaf), 1) + ' %'),
+          ? el('td', {}, ampTexto(a.iP99) + ' A · ' + mvaEq(u, a.iP99) + ' · ', el('b', {}, pctCorto(a.iP99, u.onaf)),
             x.acumulado.firme ? null : el('span', { class: 'cs-sub' }, 'provisional'))
           : el('td', { class: 'cs-mensual-nulo' }, motivoSinCifra(a, x.acumulado)));
     });
     const tabla = el('div', { class: 'cs-tabla-caja cs-mensual-caja' }, el('table', { class: 'cs-tabla cs-mensual-tabla' },
       el('caption', { class: 'cs-mensual-cap' }, base.nombre + ' de ' + mat + ' por mes'),
       el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Mes'), el('th', { scope: 'col' }, 'Corriente del mes'),
-        el('th', { scope: 'col' }, 'Potencia equivalente'), el('th', { scope: 'col' }, '% de ' + u.tope + (!u.dePlaca ? '' : u.onan ? ' (con ventiladores)' : ' (sin ventiladores)')),
+        el('th', { scope: 'col' }, 'Potencia equivalente'), el('th', { scope: 'col' }, u.sinLimite ? '% del límite (no tiene)' : '% de ' + u.tope + (!u.dePlaca ? '' : u.onan ? ' (con ventiladores)' : ' (sin ventiladores)')),
         u.onan ? el('th', { scope: 'col' }, '% de ONAN (sin ventiladores)') : null, el('th', { scope: 'col' }, 'Acumulada a la fecha'))),
       el('tbody', {}, filas)));
     bloques.push(sec(cab, graf, tabla));
@@ -198,6 +207,7 @@ export async function pintarDevanadosMes(nodo, opts) {
   const ayuda = el('p', { class: 'cs-ayuda' },
     'Corriente = la de la fase más cargada que solo se supera el 1 % de las horas: del mes, o de todas las horas a la fecha (como máximo los últimos 12 meses). ',
     'ONAN = potencia de placa sin ventiladores; ONAF = con ventiladores (la mayor etapa); si la placa solo trae ONAN, ese es su límite. Su corriente es la de esa potencia a la tensión de placa de la conexión del equipo. ',
+    'Cada corriente límite dice de dónde sale: «impresa en la placa» (la graba la placa) o «calculada de la placa» (potencia ÷ (√3 × tensión de placa), cuando la placa no la graba). ',
     'Potencia equivalente (MVA eq.) = la corriente medida a la tensión de placa; no es la potencia que mide el SCADA con P y Q. ',
     'Arriba, en barras: el límite mayor de cada devanado (barra clara), su ONAN (marca naranja) y su carga a la fecha (barra de adentro). Cada devanado tiene su color: '
       + registrados.map((b) => b.nombre.toLowerCase() + ' ' + (NOMBRE_COLOR[b.d] || 'gris')).join(', ') + '; lo provisional o con aviso de placa va rayado.');
@@ -222,11 +232,11 @@ export async function pintarDevanadosMes(nodo, opts) {
       // Una ampacidad de plataforma más de 2 veces distinta del límite (un ×10) no entra en la escala: se nombra arriba.
       const topes = [u.onaf.A, u.fueraEscala ? null : base.A].filter((v) => v > 0);
       const maxY = Math.max(...topes.map((v) => v * 1.15), ...y.filter((v) => v != null).map((v) => v * 1.12), ...yA.filter((v) => v != null).map((v) => v * 1.12));
-      const texto = (v) => (v && v.pct != null ? [ampTexto(v.iP99) + ' A', f ? mvaTexto(v.iP99 * f) + ' ' + MVA_EQ : 'sin potencia', num(pctDe(v.iP99, u.onaf), 1) + ' % de ' + u.tope] : ['', '', '']);
+      const texto = (v) => (v && v.pct != null ? [ampTexto(v.iP99) + ' A', f ? mvaTexto(v.iP99 * f) + ' ' + MVA_EQ : 'sin potencia', pctTexto(v.iP99, u)] : ['', '', '']);
       const datos = [
         { type: 'bar', name: 'Corriente del mes', x, y, marker: { color: COLOR_DEV[d] || SIN,
           pattern: { fillmode: 'overlay', shape: serie.map((s, k) => (y[k] != null && (dudosa || !s.mensual.firme) ? '/' : '')), size: 6, solidity: 0.3 } },
-          text: mes.map((v) => (v && v.pct != null ? num(pctDe(v.iP99, u.onaf), 1) + ' %' : '')), textposition: 'inside', insidetextanchor: 'end',
+          text: mes.map((v) => (v && v.pct != null && !u.sinLimite ? pctCorto(v.iP99, u.onaf) : '')), textposition: 'inside', insidetextanchor: 'end',
           insidetextfont: { color: d === 'S' ? '#1d2b44' : '#ffffff' },
           customdata: mes.map(texto), hovertemplate: '%{x}: %{customdata[0]} · %{customdata[1]} · %{customdata[2]}<extra>Del mes</extra>' },
         { type: 'scatter', mode: 'lines+markers', name: 'Acumulada a la fecha', x, y: yA, connectgaps: false,
@@ -250,7 +260,8 @@ export async function pintarDevanadosMes(nodo, opts) {
       u.etapas.forEach((e, k) => {
         const ult = k === u.etapas.length - 1;
         shapes.push(lineaH(e.A, ult ? C_ONAF : C_ONAN, ult ? 'dash' : 'dot', ult ? 1.6 : 1.4));
-        annotations.push(nota(e.A, ult ? C_ONAF : C_ONAN, (u.dePlaca ? e.nombre + ' ' : 'Ampacidad ') + mvaTexto(e.mva) + ' MVA = ' + ampTexto(e.A) + ' A',
+        annotations.push(nota(e.A, ult ? C_ONAF : C_ONAN, (u.dePlaca ? e.nombre + ' ' : 'Ampacidad ') + mvaTexto(e.mva) + ' MVA = ' + ampTexto(e.A) + ' A'
+          + (e.origen === 'impresa' ? ' (impresa)' : e.origen === 'calculada' ? ' (calculada)' : ''),
           lado(k), k === vecina && base.A > e.A));
       });
       if (conPlataforma) {

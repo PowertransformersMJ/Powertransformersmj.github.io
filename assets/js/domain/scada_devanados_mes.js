@@ -20,23 +20,31 @@ export const pctDe = (i, lim) => (i != null && lim && lim.A > 0 ? 100 * i / lim.
  * plataforma no es ese límite (más del 2 %); `fueraEscala`: difiere más de 2 veces (un ×10 aplastaría la gráfica).
  * @param {{d: string, A: number, mva: number|null, kv: number|null}} base  el devanado de `devanadosDe` (plataforma)
  * @param {object|null} lp  `limitesDePlaca(placa, tx)` o null
- * @returns {{etapas: Array<{nombre, mva, A}>, onaf: {nombre, mva, A}, onan: {nombre, mva, A}|null, f: number|null,
- *   dePlaca: boolean, kv, tope: string, difA: boolean, fueraEscala: boolean, difKv: boolean, kvPlataforma, compensa: boolean}}
+ * Terciario de COMPENSACIÓN (`sinLimite`): la placa no le da carga → sin etapas ni límite; sus cifras se muestran sin %.
+ * @returns {{etapas: Array<{nombre, mva, A, origen}>, onaf: {nombre, mva, A, origen}, onan: {nombre, mva, A, origen}|null,
+ *   f: number|null, dePlaca: boolean, kv, tope: string, difA: boolean, fueraEscala: boolean, difKv: boolean, kvPlataforma,
+ *   compensa: boolean, sinLimite: boolean}}  `origen` de cada corriente: 'impresa' (la graba la placa) o 'calculada'
  */
 export function umbralesDevanado(base, lp) {
   const p = lp && lp[base.d];
+  if (p && p.sinLimite) {
+    const f = base.mva != null && base.A > 0 ? base.mva / base.A : null;
+    return { etapas: [], onaf: { nombre: 'sin límite', mva: null, A: null, origen: null }, onan: null, f, dePlaca: true, kv: p.kv, tope: 'sin límite',
+      difA: false, fueraEscala: false, difKv: false, kvPlataforma: p.kvPlataforma ?? null, compensa: true, sinLimite: true };
+  }
   if (p && p.A && p.A.length) {
-    const etapas = p.kva.map((s, k) => ({ nombre: ETIQ[p.nombres[k]] || p.nombres[k], mva: s / 1000, A: p.A[k] }));
+    const etapas = p.kva.map((s, k) => ({ nombre: ETIQ[p.nombres[k]] || p.nombres[k], mva: s / 1000, A: p.A[k],
+      origen: (p.origenA && p.origenA[k]) || 'calculada' }));
     const onaf = etapas[etapas.length - 1];
     const r = base.A > 0 ? base.A / onaf.A : 1;
     return { etapas, onaf, onan: etapas.length > 1 ? etapas[0] : null, f: onaf.mva / onaf.A, dePlaca: true, kv: p.kv, tope: onaf.nombre,
       difA: Math.abs(r - 1) > 0.02, fueraEscala: r > 2 || r < 0.5, difKv: !!p.difKv, kvPlataforma: p.kvPlataforma ?? null,
-      compensa: !!p.compensa };
+      compensa: !!p.compensa, sinLimite: false };
   }
   const f = base.mva != null && base.A > 0 ? base.mva / base.A : null;
-  const onaf = { nombre: 'ampacidad', mva: base.mva, A: base.A };
+  const onaf = { nombre: 'ampacidad', mva: base.mva, A: base.A, origen: 'plataforma' };
   return { etapas: base.A ? [onaf] : [], onaf, onan: null, f, dePlaca: false, kv: base.kv, tope: 'la ampacidad',
-    difA: false, fueraEscala: false, difKv: false, kvPlataforma: null, compensa: false };
+    difA: false, fueraEscala: false, difKv: false, kvPlataforma: null, compensa: false, sinLimite: false };
 }
 
 /** Por qué un devanado no tiene cifra en una fila: primero el motivo del equipo; si el equipo sí tiene cifra, sin niveles =

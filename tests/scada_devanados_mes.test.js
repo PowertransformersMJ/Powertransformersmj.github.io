@@ -76,3 +76,12 @@ test('estado: la cifra a la fecha sale del último mes con acumulada', () => {
   const e = estadoDevanados(serie, [{ d: 'S' }]);
   assert.equal(e.conCifraEq.mes, '2026-02'); assert.equal(e.porDevanado.S.hoy.iP99, 410);
 });
+
+test('umbrales: cada corriente lleva su origen (impresa/calculada/plataforma); el terciario de compensación queda sin límite', () => {
+  const u = umbralesDevanado({ d: 'S', A: 209.2, mva: 5, kv: 13.8 },
+    { S: { kva: [4000, 5000], nombres: ['ONAN', 'ONAF1'], kv: 13.8, A: [167.4, 209.2], origenA: ['impresa', 'calculada'] } });
+  assert.deepEqual(u.etapas.map((e) => e.origen), ['impresa', 'calculada']);
+  assert.equal(umbralesDevanado({ d: 'P', A: 100, mva: 6, kv: 34.5 }, null).onaf.origen, 'plataforma');
+  const t = umbralesDevanado({ d: 'T', A: 400, mva: 9.6, kv: 13.8 }, { T: { kva: null, A: null, sinLimite: true, compensa: true, kv: 6.6 } });
+  assert.equal(t.sinLimite, true); assert.equal(t.etapas.length, 0); assert.equal(pctDe(300, t.onaf), null); assert.equal(t.difA, false);
+});
