@@ -78,6 +78,11 @@ test('L-102 y compilación: el panel es un archivo nuevo y el detalle no importa
   }
   const det = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
   assert.match(det, /import\('\.\/panel-placa\.js'\)/);
+  // Abierto por defecto, como en la vista previa aprobada (2026-10-23): plegado, el Ingeniero no veía la placa.
+  const panel = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-placa.js', import.meta.url), 'utf8');
+  assert.match(panel, /el\('details', \{ class: 'cs-placa-det', open: true \}/);
+  // La nota de la homologación decidida se ve en el equipo.
+  assert.match(det, /a\.fila\.decision\.nota/);
 });
 
 test('tensión: nominal, una toma del cambiador (aviso) o fuera (grave)', () => {
