@@ -8419,3 +8419,40 @@ aceptó ÉL (L-152) → **102 de 102 guardadas y verificadas por bytes** (carga 
 lectura en producción con los módulos publicados: 205 placas, 0 errores, **707 etapas con corriente impresa y 48 calculadas**,
 21 planos, 2 «futuro», 22 terciarios de compensación sin límite. Cargabilidad SCADA con recarga completa (sin vista previa):
 Bosque T2 dice «(345 A, impresa en la placa)», plano y «futuro». `05` re-sellado (estaba en 2026-10-11).
+
+## 171. ADR-171 — Bosque T2 con los datos de su placa (WEG 40 MVA, hoja de 67 kV): ampacidades 344,7 / 1.673,5 A, cargabilidad oficial 79,1 % (CRG 4) del SCADA y datos de placa; una placa reconectable no se marca «no coincide» (TODO-54) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «trafo 2 de bosque es de 40 MVA, ¿qué placa tienes tú como trafo 2 de bosque?» → «usa la información que está en la carpeta
+> y actualiza, hay un error con trafo 2 de bosque en producción» → «sí, te concedo el permiso, procede» (2026-10-23).
+
+**171.1 Causa raíz.** La ficha decía 40 MVA (serie 1081983130, 2023) pero sus ampacidades eran 289 / 1.381 A — las de 33 MVA
+(familia Trafo-Union de Bosque T1, Bocagrande y Mamonal, copiada en el Excel, `§169.9`): la tabla de devanados calculaba
+«33,0 MVA» y el secundario daba 98,6 % (CRG 5). Su CRG oficial (60 %, CRG 1) era del Excel antiguo; 16 datos de placa vacíos.
+El panel de placa marcaba como diferencia GRAVE «110 kV ≠ 66 kV» aunque la placa es religable a 67 kV.
+
+**171.2 Solución.** (a) Datos con `actualizarCampos` desde su Chrome (admin, bitácora `diff`), **27 campos, 27/27 verificados al
+releer**, tomados del plano de la carpeta (`Bosque/TR-2`, hoja de 67 kV = la conexión del sistema de 66 kV): ampacidades P
+344,7 A y S 1.673,5 A (corrientes de placa ONAF en la toma nominal 11A/B/C); marca/modelo WEG tipo 16967304 (raíz y
+`placa.*`), ONAN 35.000 / ONAF 40.000 kVA, IEC 60076, Brasil, YNyn0d11, OLTC MR VM III 650Y 72,5/C 12233W de 21 posiciones,
+78.473 kg / 24.138 kg / 28.085 L, ONAN/ONAF. (b) Cargabilidad oficial = «A la fecha» (`§168`) con las ampacidades de placa:
+**79,1 % CRG 4** (ene–oct 2026, 9 meses, firme; S 1.323,77 A ÷ 1.673,5 A; P 269,84 ÷ 344,7 = 78,3 %), con su fuente
+(`crg_fuente/crg_periodo/crg_nota`); cargas medidas P/S = las del SCADA; el motor (reproduce 1,35 con CRG 1) da 1,5 «bueno»
+en `hi_bruto/hi_recalculado`. (c) `revisionPlaca`: si la plataforma está en la conexión alternativa que nombra la placa
+(«religable/reconectable a X kV»), se anota sin marcarla grave. (d) Su placa sin la marca «futuro» (él confirmó que está en
+servicio): paquete `placas-v3-bqe2-20261023`.
+
+**171.3 No-regresión.** Intactos: condición oficial del Excel (1,3 «muy bueno»), potencia 40.000 kVA, serie, año, tensiones
+66 / 13,8 kV (las del SCADA), matrícula, impedancia (el plano la trae en blanco). El dry-run con los módulos de producción dio la
+cifra antes de escribir.
+
+**171.4 Verificación.** `tests/placa_caracteristica.test.js` (+1: reconectable no grave; sin alternativa sigue grave) ·
+`test:unit` 2.976 (2.974 en verde, 2 omitidas) · 27/27 campos releídos.
+
+**171.5 Anti-patterns evitados.** Cambiar la tensión de 66 a 67 kV (rompería el nivel del SCADA); inventar la impedancia que el
+plano no trae; tocar la condición oficial; escribir sin el dry-run de la cifra.
+
+**171.6 Archivos.** `domain/placa_caracteristica.js`, `tests/placa_caracteristica.test.js`. Datos: `transformadores/<Bosque T2>`,
+`placas_caracteristicas/<Bosque T2>` (notas). Bóveda: `2026-10-23-diferencias-placa-ampacidad/placas-v3/`.
+
+**171.7 Doctrina.** §3.3 (la placa leída del plano, cifra por cifra, antes de escribir), W-11 (cada valor lo autorizó él; el
+clasificador frenó la escritura y él concedió el permiso), L-152. NO revisado externamente.
