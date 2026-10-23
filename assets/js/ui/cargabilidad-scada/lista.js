@@ -14,6 +14,7 @@ import { nombreMes, aInputCO, formatoCO } from '../../domain/scada_carga_fecha.j
 import { ventanaDeMes } from '../../domain/scada_carga_series.js';
 import { leerResumenMes, leerSeriesPunto } from '../../data/scada_carga.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
+import { TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto, CSV_DEV_CAB, csvDevanados } from '../../domain/scada_carga_devanados.js';
 
 const PASO = 100;
 const ESTADOS = { automatica: 'Automática', confirmada: 'Confirmada', pendiente: 'Por confirmar', excluida: 'Excluida', sin_homologacion: 'Sin homologación' };
@@ -21,6 +22,7 @@ const ESTADOS = { automatica: 'Automática', confirmada: 'Confirmada', pendiente
 const COLUMNAS_PERIODO = [
   { campo: 'matricula', texto: 'Transformador' },
   { campo: 'pct', texto: 'Carga del periodo' },
+  { campo: null, texto: 'Devanados: tensión · ampacidad · potencia · carga' },
   { campo: 'peor', texto: 'Peor mes' },
   { campo: 'mayor', texto: 'Mayor corriente' },
   { campo: null, texto: 'Desde cuándo supera su capacidad' },
@@ -57,7 +59,7 @@ function leerPeriodo(t) {
 const COLUMNAS = [
   { campo: 'matricula', texto: 'Transformador' },
   { campo: 'pct', texto: 'Cargabilidad SCADA' },
-  { campo: null, texto: 'Devanado' },
+  { campo: null, texto: 'Devanados: tensión · ampacidad · potencia · carga' },
   { campo: 'oficial', texto: 'Oficial (Excel)' },
   { campo: 'delta', texto: 'Diferencia (mismo devanado)' },
   { campo: null, texto: 'Medida' },
@@ -380,6 +382,17 @@ export function montarLista(cont, ctx, { alAbrir }) {
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: exportar }, 'Descargar lista (CSV)')));
   }
 
+  /** Todos los devanados de placa del equipo, uno por línea; en negrilla el que da la cifra. */
+  function celdaDevanados(x) {
+    // Campo propio: una fila de un módulo de dominio viejo en caché (max-age 600, L-102) no lo trae y se ve lo de antes.
+    const ds = Array.isArray(x.devanadosPlaca) ? x.devanadosPlaca.filter((d) => d && d.nombre) : [];
+    if (!ds.length) return el('td', {}, x.pct != null && x.devMax ? DEV[x.devMax] : '—');
+    return el('td', { class: 'cs-devs' }, ds.map((d) => el('span', { class: 'cs-dev' + (d.manda ? ' cs-dev--manda' : '') },
+      d.nombre + ' ' + [d.kv ? kvTexto(d.kv) + ' kV' : 'sin tensión', d.A ? ampTexto(d.A) + ' A' : 'sin ampacidad', d.mva != null ? mvaTexto(d.mva) + ' MVA' : null,
+        d.pct != null ? pctTexto(d.pct) + ' %' : null].filter(Boolean).join(' · ') + (d.manda ? ' — da la cifra' : ''),
+      d.aviso && d.aviso !== 'sin_tension' && d.aviso !== 'sin_ampacidad' ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null)));
+  }
+
   function celdaCifra(x) {
     const td = el('td', {});
     if (x.pct == null) {
@@ -406,7 +419,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
         el('a', { href: '#mat=' + encodeURIComponent(x.matricula), id: 'csMat-' + x.id, onclick: abrir }, x.matricula || '(sin matrícula)'),
         el('span', { class: 'cs-sub' }, [x.subestacion, x.zona].filter(Boolean).join(' · '))),
       celdaCifra(x),
-      el('td', {}, x.pct != null && x.devMax ? ({ P: 'Primario', S: 'Secundario', T: 'Terciario' })[x.devMax] : '—'),
+      celdaDevanados(x),
       el('td', {}, el('span', { class: 'cs-num' }, of), x.oficial && x.oficial.calif ? el('span', { class: 'cs-sub' }, 'CRG ' + x.oficial.calif + ' en Salud de Activos') : null,
         ofDev != null ? el('span', { class: 'cs-sub' }, ({ P: 'Primario', S: 'Secundario', T: 'Terciario' })[x.devMax] + ' ' + num(ofDev, 1) + ' %') : null),
       el('td', {}, x.delta == null ? '—' : el('span', { class: 'cs-num' }, (x.delta > 0 ? '+' : '') + num(x.delta, 1) + ' pts')),
@@ -473,7 +486,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
       el('th', { scope: 'row', style: 'position:static;background:none;font-size:13px' },
         el('a', { href: '#mat=' + encodeURIComponent(x.matricula), id: 'csMat-' + x.id, onclick: abrir }, x.matricula || '(sin matrícula)'),
         el('span', { class: 'cs-sub' }, [x.subestacion, x.zona].filter(Boolean).join(' · '))),
-      celdaCifra(x), celdaPeor(p), celdaMayor(p), celdaDesde(p), celdaMeses(p),
+      celdaCifra(x), celdaDevanados(x), celdaPeor(p), celdaMayor(p), celdaDesde(p), celdaMeses(p),
       el('td', {}, ESTADOS[x.estado] || x.estado, x.avisos.length && x.estado === 'pendiente' ? el('span', { class: 'cs-sub' }, x.avisos.length + (x.avisos.length === 1 ? ' aviso' : ' avisos')) : null),
       el('td', {}, x.tienePunto ? el('button', { type: 'button', id: 'csCurvas-' + x.id, class: 'btn btn--glass btn--sm', onclick: abrir, 'aria-label': 'Ver curvas de ' + x.matricula }, 'Ver curvas') : el('span', { class: 'cs-sub' }, 'sin datos SCADA')));
   }
@@ -520,11 +533,11 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const filas = filasVisibles();
     const dev = { P: 'Primario', S: 'Secundario', T: 'Terciario' };
     descargarCSV('cargabilidad_scada_' + st.mes + '.csv',
-      ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida'],
+      ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida', ...CSV_DEV_CAB],
       filas.map((x) => [x.matricula, x.subestacion, x.zona, st.mes, x.pct, x.clase, x.crg, x.pct != null && x.devMax ? dev[x.devMax] : '', x.oficial ? x.oficial.pct : null,
         x.delta != null && x.oficial && x.oficial.porDevanado ? x.oficial.porDevanado[x.devMax] : null,
         x.delta, ESTADOS[x.estado] || x.estado, x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '),
-        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no')]));
+        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no'), ...csvDevanados(x.devanadosPlaca)]));
   }
 
   function exportarPeriodo() {
@@ -532,12 +545,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     descargarCSV('cargabilidad_scada_' + desde + '_a_' + hasta + '.csv',
       ['Matricula', 'Subestacion', 'Zona', 'Periodo_desde', 'Periodo_hasta', 'Meses_con_cifra', 'Carga_periodo_pct', 'Clase', 'CRG', 'Peor_mes', 'Peor_mes_pct', 'Peor_mes_clase',
         'Meses_CRG4_5', 'Mayor_corriente_devanado', 'Mayor_corriente_A', 'Mayor_corriente_pct', 'Mayor_corriente_hora_CO', 'Mayor_corriente_por_confirmar',
-        'Primer_mes_sobrecarga_sostenida', 'Desde_inicio_de_los_datos', 'Primer_mes_hora_sobre_100', 'Meses_con_sobrecarga_sostenida', 'Medida', 'Motivos'],
+        'Primer_mes_sobrecarga_sostenida', 'Desde_inicio_de_los_datos', 'Primer_mes_hora_sobre_100', 'Meses_con_sobrecarga_sostenida', 'Medida', 'Motivos', ...CSV_DEV_CAB],
       filas.map((x) => { const p = x.periodo; const pm = p.peorMes; const mc = p.mayorCorriente; const ps = p.primeraSostenida; return [
         x.matricula, x.subestacion, x.zona, desde, hasta, p.mesesConCifra, x.pct, x.clase, x.crg, pm ? pm.mes : '', pm ? pm.pct : null, pm ? pm.clase : '',
         p.mesesCRG45, mc ? DEV[mc.devanado] : '', mc ? mc.max : null, mc ? mc.pct : null, mc && mc.ms != null ? formatoCO(mc.ms) : '', mc && mc.porConfirmar ? 'si' : 'no',
         ps ? ps.mes : '', ps ? (ps.inicioDatos ? 'si' : (ps.inicioPeriodo ? 'inicio del periodo' : 'no')) : '', p.primeraHora ? p.primeraHora.mes : '', p.mesesSostenida, ESTADOS[x.estado] || x.estado,
-        x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | ')]; }));
+        x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '), ...csvDevanados(x.devanadosPlaca)]; }));
   }
 
   function dibujar() { conservarFoco(dibujarSinFoco); }

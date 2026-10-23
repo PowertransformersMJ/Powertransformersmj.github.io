@@ -17,6 +17,7 @@ import {
 } from './scada_carga_homologacion.js';
 import { cargabilidad, atribuirEscala, califCRG, firmeza } from './scada_carga_kpis.js';
 import { filaCargabilidad } from './cargabilidad_parque.js';
+import { devanadosDe } from './scada_carga_devanados.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -181,7 +182,9 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
       zona: leer(tx, 'ubicacion.zona') || '', departamento: leer(tx, 'ubicacion.departamento') || '',
       potenciaKva: Number(leer(tx, 'placa.potencia_kva')) || null,
       filaId: fila ? fila.id : null, claveId: cid, tienePunto: !!punto,
-      ...c
+      ...c,
+      // Todos los devanados de placa con su potencia, su ampacidad y su carga (pedido del Ingeniero, 2026-10-22).
+      devanadosPlaca: devanadosDe(tx, c)
     };
   });
 }

@@ -12,6 +12,7 @@
 
 import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
 import { chipCifra, textoBandas } from './lista.js';
+import { devanadosDe, TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto } from '../../domain/scada_carga_devanados.js';
 import { dibujarFigura, liberarFigura } from './graficos.js';
 import { FAMILIAS, NIVELES, DEVANADO, CALCULO, MOTIVO, CODIGO, UNIDAD, NOMBRE_FAMILIA, TIEMPO } from '../../domain/scada_carga_config.js';
 import { EXTRAS, NOMBRE_EXTRA, EXTRA_TOPE_X, extrasVisibles } from '../../domain/scada_carga_extras.js';
@@ -155,8 +156,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   }
 
   function encabezado(a) {
-    const tx = a.tx; const p = a.placa;
-    const devTxt = ['P', 'S', 'T'].filter((d) => p[d].kv).map((d) => DEVANADO[d] + ' ' + num(p[d].kv, 1) + ' kV' + (p[d].A ? ' · ' + num(p[d].A, 0) + ' A' : ' · sin ampacidad'));
+    const tx = a.tx;
+    // El estado de la homologación no depende del rango: mientras se lee, el del mapa sin resúmenes.
+    const hom = a.calc || a.previo || null;
     return el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-volver' }, el('button', { type: 'button', id: 'csVolver', class: 'btn btn--ghost btn--sm', onclick: alVolver }, '← Volver a la lista')),
       el('div', { class: 'cs-cab' },
@@ -164,11 +166,40 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         el('span', { class: 'cs-dato' }, el('b', {}, 'Subestación: '), leer(tx, 'ubicacion.subestacion_nombre') || (a.fila && a.fila.subestacion) || '—'),
         el('span', { class: 'cs-dato' }, el('b', {}, 'Zona: '), leer(tx, 'ubicacion.zona') || '—'),
         el('span', { class: 'cs-dato' }, el('b', {}, 'Potencia: '), leer(tx, 'placa.potencia_kva') ? num(Number(leer(tx, 'placa.potencia_kva')) / 1000, 1) + ' MVA' : '—')),
-      el('p', { class: 'cs-dato', style: 'margin:6px 0 0' }, el('b', {}, 'Placa: '), devTxt.length ? devTxt.join(' · ') : 'sin tensiones de placa'),
+      tablaDevanados(a),
       el('p', { class: 'cs-dato', style: 'margin:4px 0 0' }, el('b', {}, 'Punto SCADA: '), a.fila ? (claveEfectiva(a.fila) || 'sin punto') : 'sin homologación',
-        a.calc ? ' · ' + (ESTADOS[a.calc.estado] || a.calc.estado) : ''),
-      a.calc && a.calc.estado === 'pendiente' && a.calc.avisos.length ? el('ul', { class: 'cs-avisos' },
-        a.calc.avisos.filter((k) => AVISOS[k]).map((k) => el('li', {}, AVISOS[k].texto))) : null);
+        hom ? ' · ' + (ESTADOS[hom.estado] || hom.estado) : ''),
+      hom && hom.estado === 'pendiente' && hom.avisos.length ? el('ul', { class: 'cs-avisos' },
+        hom.avisos.filter((k) => AVISOS[k]).map((k) => el('li', {}, AVISOS[k].texto))) : null);
+  }
+
+  /** Todos los devanados de placa: tensión, ampacidad, potencia del devanado y lo que el SCADA mide de cada uno en el rango. */
+  function tablaDevanados(a) {
+    // Mientras se lee el rango: el mapa nivel → devanado (sin resúmenes) y «…» en las cargas; nunca cifras de otro rango.
+    const calc = a.calc || a.previo || null;
+    const ds = devanadosDe(a.tx, a.calc || null).map((d) => (a.calc ? d : { ...d, niveles: devanadosDe(a.tx, calc).find((y) => y.d === d.d).niveles }));
+    if (!ds.length) return el('p', { class: 'cs-dato', style: 'margin:6px 0 0' }, el('b', {}, 'Devanados: '), 'la placa del parque no trae tensiones ni ampacidades');
+    const mono = Number(leer(a.tx, 'electrico.fases')) === 1;
+    const circuito = !!(calc && calc.esCircuito && calc.estado !== 'confirmada');
+    const leyendo = !a.calc && !!a.leyendo;
+    const rango = a.calc && a.desde != null && a.hasta != null ? ' · corriente y cargabilidad del rango ' + formatoCO(a.desde + H_MS) + ' a ' + formatoCO(a.hasta)
+      + (a.calc.clase === 'provisional' ? ' (provisional)' : '') + (a.calc.pct == null && a.calc.motivoNulo ? ' (sin cifra: ' + a.calc.motivoNulo + ')' : '') : '';
+    const vacio = (d) => (leyendo && d.niveles.length ? '…' : '—');
+    return el('div', { class: 'cs-tabla-caja', style: 'margin-top:10px' },
+      el('table', { class: 'cs-tabla cs-tabla-dev', id: 'csDevanados' },
+        el('caption', {}, el('b', {}, 'Devanados de placa'), ' · potencia calculada = ' + (mono ? 'tensión × ampacidad (monofásico)' : '√3 × tensión × ampacidad')
+          + ' · ampacidad = corriente nominal con ventiladores en servicio, si los tiene' + rango),
+        el('thead', {}, el('tr', {}, ['Devanado', 'Tensión', 'Ampacidad', 'Potencia calculada', 'Lo mide el SCADA', 'Corriente p99', 'Cargabilidad'].map((t) => el('th', { scope: 'col' }, t)))),
+        el('tbody', {}, ds.map((d) => el('tr', { class: d.manda ? 'cs-dev-manda' : null },
+          el('th', { scope: 'row' }, d.nombre, d.manda ? el('span', { class: 'cs-sub' }, 'da la cifra del equipo') : null),
+          el('td', {}, d.kv ? kvTexto(d.kv) + ' kV' : '—'),
+          el('td', {}, d.A ? ampTexto(d.A) + ' A' : '—'),
+          el('td', {}, el('span', { class: 'cs-num' }, d.mva != null ? mvaTexto(d.mva) + ' MVA' : '—'),
+            d.conexion === 'fase_neutro' ? el('span', { class: 'cs-sub' }, 'devanado entre fase y neutro (tensión ÷ √3)') : null,
+            d.aviso ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null),
+          el('td', {}, d.niveles.length ? 'en ' + d.niveles.join(', ') + (circuito ? ' (un circuito, sin confirmar)' : '') : 'no se mide'),
+          el('td', {}, d.iP99 != null ? ampTexto(d.iP99) + ' A' : vacio(d)),
+          el('td', {}, d.pct != null ? pctTexto(d.pct) + ' %' : vacio(d)))))));
   }
 
   function selectorRango(a) {
@@ -407,6 +438,11 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const mio = ++token;
     const a = actual;
     a.desde = desde; a.hasta = hasta;
+    // El encabezado no muestra cifras de otro rango mientras se lee este (ni si falla).
+    a.calc = null; a.porNivel = null; a.leyendo = true;
+    try {
+      a.previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosHomologacion((ctx.homologacion && ctx.homologacion.filas) || {}), umbrales: ctx.umbrales });
+    } catch (e) { a.previo = null; }
     liberarFigura(figura); figura = null;
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
     conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
@@ -445,6 +481,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       }
       a.porNivel = porNivel;
       a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
+      a.leyendo = false;
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
       conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, avisoEl(), selectorRango(a),
         fallidos.size ? el('div', { class: 'cs-panel cs-error', role: 'alert' }, 'No se pudo leer ' + [...fallidos].map(nombreMes).join(', ') + ' (revise la conexión): esas horas quedan como hueco y la cifra no es firme.',
@@ -458,6 +495,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       if (nv) await pintarNivel(a, a.nivel && porNivel[a.nivel] ? a.nivel : nv);
     } catch (e) {
       if (mio !== token) return;
+      a.leyendo = false; a.calc = null; a.porNivel = null;
       console.warn('[cargabilidad-scada] detalle', e);
       conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo, a.duvalNodo));

@@ -248,3 +248,11 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-hist-mes--vacio { color: #94a3b8; border-style: dotted; }
 .cscada .cs-hist-mes--sost { font-weight: 700; }
 @media (max-width: 640px) { .cscada .cs-hist { grid-template-columns: 1fr; } }
+/* Devanados de placa por transformador (2026-10-22): uno por línea en la lista; tabla en el detalle */
+.cscada .cs-devs { font-size: 12px; color: var(--cs-ink2); }
+.cscada .cs-dev { display: block; white-space: nowrap; line-height: 1.5; font-variant-numeric: tabular-nums; }
+.cscada .cs-dev--manda { font-weight: 700; }
+.cscada .cs-dev--aviso, .cscada .cs-dev-aviso { color: #9a5b00; }
+.cscada table.cs-tabla-dev { min-width: 640px; }
+.cscada .cs-tabla-dev tbody th { position: static; background: none; font-size: 12.5px; }
+.cscada .cs-tabla-dev tr.cs-dev-manda th, .cscada .cs-tabla-dev tr.cs-dev-manda td { background: rgba(0, 122, 255, .06); }
