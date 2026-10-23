@@ -8092,3 +8092,12 @@ primarios y 154 secundarios entre 0,9 y 1,1 × placa. El 1,5 no choca con placas
 modo «Varios meses» usa el p99 de TODAS las horas del periodo por devanado. **Pendiente**: Lorica T1 sale con errata ×10 en
 el parque del 8-oct aunque TODO-54/`§74.23` la daban por descartada → leer producción antes de corregir nada.
 Crudo: bóveda `2026-10-22-devanados-scada/`. NO revisado externamente.
+
+**165.9 Verificado tras publicar (2026-10-22).** `main` bd60fe3; CI y Deploy de Pages en verde; los 6 archivos servidos =
+`main` (shasum). En SU Chrome con la extensión (sesión real «IM»): al principio la pestaña traía la columna vieja por la
+caché de 10 min (L-102); con `fetch(…, {cache:'reload'})` de los módulos y recarga, la lista muestra «Devanados» en los 208
+equipos y el detalle de Río Sinú T1A la carga por devanado de septiembre (P 161 A · 68,4 %, S 225 A · 44,9 %, T 751 A ·
+119,7 % — da la cifra); consola sin errores. En producción hay **11 avisos en 8 equipos** (no 13 en 9 como en el banco del
+8-oct: Casacará ya no sale). **Lorica T1 CONFIRMADA en producción**: secundario 8.367 A a 13,8 kV (= 200 MVA sobre 20); la
+cifra del equipo la da el primario (112,1 %), así que hoy no la falsea, pero el dato sigue mal: TODO-54 la daba por
+descartada. No se corrigió ningún dato.
