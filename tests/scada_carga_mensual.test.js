@@ -178,7 +178,8 @@ test('bloque por devanado: lógica en el dominio (probada aparte), textos con el
 test('importaciones: cada nombre importado por los módulos de «mes a mes» existe en el módulo que lo exporta', () => {
   const base = new URL('../assets/js/', import.meta.url);
   const archivos = ['ui/cargabilidad-scada/panel-mensual.js', 'ui/cargabilidad-scada/panel-devanados-mes.js',
-    'domain/scada_carga_mensual.js', 'domain/placa_etapas.js', 'domain/scada_devanados_mes.js'];
+    'domain/scada_carga_mensual.js', 'domain/placa_etapas.js', 'domain/scada_devanados_mes.js',
+    'ui/cargabilidad-scada/detalle.js', 'ui/cargabilidad-scada/panel-placa.js', 'domain/scada_devanados_placa.js'];
   for (const f of archivos) {
     const src = readFileSync(new URL(f, base), 'utf8');
     for (const m of src.matchAll(/^import \{([^}]+)\} from '(\.[^']+)';/gm)) {

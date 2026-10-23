@@ -60,7 +60,7 @@ function textoComparado(r) {
  * @param {HTMLElement} nodo  la sección `#csPlaca` del equipo
  * @param {{tx: object, titulo: string, vigente: () => boolean}} ctx
  */
-export async function pintarPlaca(nodo, { tx, titulo, vigente = () => true }) {
+export async function pintarPlaca(nodo, { tx, titulo, vigente = () => true, alLeer = null }) {
   cerrarVisor();
   nodo.hidden = false;
   const resumen = el('summary', {}, el('span', { id: 'csPlacaTitulo', class: 'cs-placa-tit' }, 'Placa característica'), el('span', { class: 'cs-sub cs-placa-res' }, 'leyendo…'));
@@ -73,10 +73,12 @@ export async function pintarPlaca(nodo, { tx, titulo, vigente = () => true }) {
   if (r.error) {
     ponerRes('no se pudo leer');
     const b = el('button', { type: 'button', class: 'btn btn--glass btn--sm' }, 'Reintentar');
-    b.addEventListener('click', () => { b.disabled = true; pintarPlaca(nodo, { tx, titulo, vigente }); });
+    b.addEventListener('click', () => { b.disabled = true; pintarPlaca(nodo, { tx, titulo, vigente, alLeer }); });
     poner(cuerpo, el('p', { class: 'cs-ayuda', role: 'alert' }, r.mensaje || 'No se pudo leer la placa.', ' ', b));
     return { error: true };
   }
+  // La placa leída va también a la tabla «Devanados de placa» del detalle (sus valores salen de aquí, 2026-10-23).
+  if (typeof alLeer === 'function') { try { alLeer(r.hay ? r.placa : null); } catch (e) { console.warn('[cargabilidad-scada] placa → devanados', e); } }
   if (!r.hay) {
     ponerRes('sin placa registrada');
     poner(cuerpo, el('p', { class: 'cs-ayuda' }, 'Este transformador no tiene placa registrada (sin foto en la carpeta de placas o sin lectura).'));

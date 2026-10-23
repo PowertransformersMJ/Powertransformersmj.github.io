@@ -8463,3 +8463,43 @@ clasificador frenó la escritura y él concedió el permiso), L-152. NO revisado
 **A la fecha 79,1 % CRG 4 · Pobre** (sep: 80,3 % / 81,3 %), límites «impresa en la placa», aviso de plano sin «futuro». La
 revisión de placa con el código publicado y los datos de producción: 1 diferencia NO grave (conexión alternativa); su pestaña
 traía el módulo anterior en caché (L-102, ≤ 10 min).
+
+## 172. ADR-172 — Cargabilidad SCADA: la tabla «Devanados de placa» con la tensión, la potencia y la corriente de la PLACA (calculada solo si la placa no la graba); la cifra oficial con la corriente de placa (TODO-69, TODO-54) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «esta parte no me agrada (Potencia calculada 39,4 / 40,0 MVA): si estamos tomando los valores de placa, ¿por qué calculas
+> potencia? Donde sí debemos calcular corriente es en las placas que no traen ampacidad; del resto todos los valores son de
+> placa» → vista previa en su Chrome (Bosque T2, Momil, Santa Teresa T1) → «procede, usa la corriente de placa también para la
+> cifra oficial» (2026-10-23).
+
+**172.1 Causa raíz.** La tabla se titulaba «Devanados de placa» pero mostraba la tensión y la ampacidad de la PLATAFORMA y una
+potencia CALCULADA (√3 · kV · A); la cifra oficial (lista, detalle, «A la fecha») usa la ampacidad de la plataforma, que en 36
+devanados no era la de placa (24 distintas + 12 vacías).
+
+**172.2 Solución.** (1) `domain/scada_devanados_placa.js` (NUEVO): por devanado, tensión, potencia (etapas) y corriente nominal
+de la placa (`limitesDePlaca`: la impresa; si la placa no la graba, calculada con su potencia y su tensión); cargabilidad del
+rango contra esa corriente; si la plataforma difiere, se anota («por corregir», o «usa la ONAN» si es la ONAN de placa) con la
+cifra oficial al lado; sin placa, valores de la plataforma rotulados. (2) `panel-placa.js` entrega al detalle la placa que ya
+lee (`alLeer`, sin otra lectura); `detalle.js` rehace la tabla al llegar. (3) DATOS — la cifra oficial con la corriente de
+placa: `electrico.corriente_nominal_*` = la corriente de placa (etapa mayor) en todos los devanados con placa legible que
+difieren (32 de 36; 404 ya coincidían); errata ×10 → también su carga ÷ 10 (Santa Teresa S, Guatapurí T2 P). **Excepciones
+(quedan como están, por decidir)**: Momil (ventilación OBSOLETA en su Excel: sigue en la ONAN de placa, impresa), Ferrocarril
+(dos placas, 250 / 1.000 kVA: confirmar en campo), Monterrey (placa de 30 kV con corrientes grabadas que no cuadran),
+terciarios de compensación con ampacidad en la plataforma (Bosque T4, Candelaria T5).
+
+**172.3 No-regresión.** La cifra oficial de salud (`salud_actual`, del Excel o de la revisión uno a uno) no se toca; la
+condición oficial tampoco. Con la tabla, ningún cálculo nuevo de carga: la corriente p99 sale del mismo cálculo.
+
+**172.4 Verificación.** `tests/scada_devanados_placa.test.js` (5) + importaciones del detalle y el panel de placa; `test:unit`
+2.981 (2.979 en verde, 2 omitidas). Vista previa fiel en su Chrome (tabla de la rama por jsDelivr con los datos del SCADA de la
+página): Bosque T2 345 / 1.674 A impresas, 80,3 / 81,3 %; Momil ONAF calculada 105 A, «la plataforma usa la ONAN», 76 % vs
+oficial 95 %; Santa Teresa S 73,7 % vs oficial 7,4 % (×10). Plan de datos en seco: 22 equipos, 33 campos, 0 choques.
+
+**172.5 Anti-patterns evitados.** Llamar «de placa» a una cifra de la plataforma; calcular potencia que la placa trae; pasar a
+ONAF un equipo con la ventilación fuera de servicio; aplicar una placa dudosa (dos placas) a la cifra oficial.
+
+**172.6 Archivos.** Nuevos: `domain/scada_devanados_placa.js`, `tests/scada_devanados_placa.test.js`. Modificados:
+`ui/cargabilidad-scada/detalle.js`, `ui/cargabilidad-scada/panel-placa.js`, `tests/scada_carga_mensual.test.js`. Datos:
+`transformadores/*` (corrientes nominales de placa, bitácora `diff`).
+
+**172.7 Doctrina.** «Todo con base a la placa» (decisión del Ingeniero); W-11 con vista previa fiel; ampacidad siempre con su
+carga; lo dudoso queda como está y se le pregunta. NO revisado externamente.
