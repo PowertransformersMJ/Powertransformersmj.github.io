@@ -8513,3 +8513,51 @@ Desastre 97,9 % (provisional), Coveñas T2 90,9 %, Santa Teresa T1 72,3 % CRG 3 
 cifra (Pueblo Nuevo 54,2 %, San Carlos 52 %, SLV 45,6 %, San Onofre 68,7 %, ECJ T2 46,8 %; Guatapurí T3 se mide un circuito).
 En SU Chrome la tabla nueva cargó pero `panel-placa.js` venía de la caché (versión sin `alLeer`, L-102): quedaba «leyendo la
 placa…» → **respaldo**: si el panel no entrega la placa (caché o falla), el detalle la lee por su cuenta (`placaParaTabla`).
+
+## 173. ADR-173 — Placas v4: Magangué T2A y Montería T2A con su corriente IMPRESA de media tensión; una corriente de las notas que cuadra mejor con OTRO devanado ya no se rotula «impresa» (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> Lo propuesto tras `§172`, que él devolvió para que se hiciera: «completar las lecturas de Magangué T2 y Montería T2A para que
+> digan «impresa». Es una carga de 2 placas y te pedirá «Aceptar»» + «falta la revisión en vivo de la tabla nueva» (2026-10-23).
+
+**173.1 Causa raíz.** (a) Las dos placas graban la corriente de media tensión, pero la lectura no la había copiado a su tensión:
+la tabla la mostraba «calculada». Magangué T2A (plano WEG, tabla «MEDIA TENSIÓN · 34500 V»): 234,3 / 318,0 A (14 / 19 MVA).
+Montería T2A (foto Trafo-Union, tabla «CORRIENTE», columna 34500 V): 251 / 201 / 167 A (ONAF II / ONAF I / ONAN). (b) Al
+revisarlo apareció un defecto de la regla: Montería T2A secundario ONAN (167,35 A) salía «impresa» con 168 A, que son del
+primario (las notas traen las de alta tensión, 210 / 168 / 131 A; cae a ±0,6 %). `limitesDePlaca` buscaba en un pozo común (tensión del
+devanado + notas + potencias) sin preguntar de qué devanado era la cifra.
+
+**173.2 Solución.** (1) DATOS — paquete `placas-v4-mge-mon-20261023` (2 placas, desde v2): «· corriente de placa 234,3/318,0 A»
+y «· corriente de placa 167/201/251 A» en la tensión del secundario; huella de datos recalculada; la foto no se toca.
+(2) CÓDIGO — `placa_etapas.js`: primero se calcula la corriente de todos los devanados; la corriente escrita en la tensión del
+propio devanado siempre es suya, y la de notas o potencias se descarta si una etapa de OTRO devanado la explica estrictamente
+mejor (`esDeOtro`; un empate, dos devanados con la misma corriente, no la quita). Sin exportaciones nuevas (L-102).
+
+**173.3 No-regresión.** Misma forma del objeto de `limitesDePlaca` (P/S/T, nota, documento, futuro). Regla vieja vs nueva con
+los datos de PRODUCCIÓN en su Chrome (205 placas leídas + su transformador): **462 devanados, 0 diferencias**; en la bóveda
+(4 capas, 885 combinaciones de plataforma simulada): 0 diferencias, y sin la carga v4 la única sería Montería T2A S ONAN.
+
+**173.4 Verificación.** `tests/placa_etapas.test.js` +1 (falla con la regla anterior, pasa con la nueva); `test:unit` 2.983
+(2.981 en verde, 2 omitidas); `lint:html` limpio. Carga: simulación «2 cambian / 0 rechazadas», él aceptó; releídas: huella
+guardada = la del paquete y = la recalculada de lo guardado; fotos con su lote. En vivo (módulos frescos): Montería T2A S
+251 A impresa, ONAN 167 A (impresa); Magangué T2A S 318 A impresa, ONAN 234 A (impresa); Bosque T2 345 / 1.674 A impresas.
+Placas con su corriente mayor impresa: 421 de 440 devanados con límite (19 calculadas: la placa no la graba; 22 terciarios de
+compensación sin límite). Revisión adversarial `wf_b992e81c-bf4` (3 lentes + 2 refutaciones, Opus): forma del objeto idéntica
+(500.000 casos sintéticos: solo «impresa → calculada», nunca al revés), 6.462 evaluaciones de flota sin diferencias; 0
+defectos reales.
+
+**173.5 Anti-patterns evitados.** Rotular «impresa» una cifra de otro devanado; tocar la foto o reescribir la placa entera para
+agregar una cifra; publicar un cambio de regla sin medir su efecto sobre la flota real.
+
+**173.6 Archivos.** Modificados: `assets/js/domain/placa_etapas.js`, `tests/placa_etapas.test.js`. Datos:
+`placas_caracteristicas/{Magangué T2A, Montería T2A}`. Bóveda: `…/2026-10-23-diferencias-placa-ampacidad/placas-v4/`
+(script, registro, auditorías; crudo + `SINTESIS-revision-impresa.md` de la revisión; el paquete en Descargas). INTACTOS: `scada_devanados_placa.js`, `scada_devanados_mes.js`, el panel y el
+detalle (consumen la misma forma).
+
+**173.7 Doctrina.** «Todo con base a la placa»; la cifra de placa se verifica contra el documento (plano o foto) antes de
+cargarla; L-155. NO revisado externamente.
+
+**173.8 Verificado sano / no re-auditar.** CMR T2A (secundario y terciario con la MISMA corriente de placa): el empate es
+legítimo, la cifra vale para los dos. Límites CONOCIDOS de la regla (refutados como defecto: no hay caso en la flota): no lee el rótulo
+AT/MT de la nota, así que una cifra impresa para dos devanados cuyas corrientes difieren < 0,5 A sin ser iguales iría al más
+cercano (pares reales más próximos: 0,61 A en Montería, 1,14 A, 1,90 A); y un devanado sin tensión legible o de compensación no
+compite. Remedio si aparece: la corriente propia en la tensión del devanado (L-155). Momil, Ferrocarril, Monterrey y Bosque T4 siguen como `§172` (suyos).
