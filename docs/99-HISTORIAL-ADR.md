@@ -8578,3 +8578,41 @@ legítimo, la cifra vale para los dos. Límites CONOCIDOS de la regla (refutados
 AT/MT de la nota, así que una cifra impresa para dos devanados cuyas corrientes difieren < 0,5 A sin ser iguales iría al más
 cercano (pares reales más próximos: 0,61 A en Montería, 1,14 A, 1,90 A); y un devanado sin tensión legible o de compensación no
 compite. Remedio si aparece: la corriente propia en la tensión del devanado (L-155). Momil, Ferrocarril, Monterrey y Bosque T4 siguen como `§172` (suyos).
+
+## 174. ADR-174 — Cargabilidad SCADA: detalle de los umbrales de placa en las barras de «Cada devanado» (recuadro de umbrales, leyenda y tabla con la lectura en palabras) (TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «me gustaría que exista detalle de los umbrales en las gráficas para una mejor interpretación» (captura de Río Sinú T1A:
+> el rótulo «ONAF … A» del terciario quedaba detrás de su barra; los nombres de la gráfica de potencia salían inclinados y
+> cortados) → vista previa fiel en su Chrome → «procede, publícalo en producción» (2026-10-23).
+
+**174.1 Causa raíz.** En el resumen en barras (`panel-devanados-mes.js`, `dibujarResumen`) los umbrales eran TEXTO de la caja
+clara (`textposition: 'outside'`): Plotly lo dibuja bajo la barra de carga, así que una carga sobre la ONAF lo tapaba. No había
+leyenda (qué es caja, marca, barra) y la etiqueta de abajo de la gráfica de MVA era tan larga que Plotly la inclinaba.
+
+**174.2 Solución.** (1) UN recuadro por devanado, anotación ENCIMA de los datos sobre lo más alto (su caja o su barra), con
+sus umbrales de mayor a menor en su color (rojo con ventiladores, naranja sin); las etapas bajas siguen como marcas (también la
+ONAF intermedia de placas de tres etapas). Espacio arriba según los renglones (`escalaRotulos`). Primer intento —rótulos sobre
+cada línea, la ONAN bajo la suya si quedaba cerca— DESCARTADO en la vista previa: con tres etapas y un devanado diez veces menor
+que otro, se pisaban. (2) Nombres de abajo en tres renglones, `tickangle: 0`. (3) Leyenda HTML. (4) Tabla «Detalle de los
+umbrales de placa»: una columna por etapa (A, MVA, impresa/calculada, carga al %), la carga a la fecha y la LECTURA:
+«no necesita ventiladores» · «al borde de la ONAN» (≥ 90 %, banda CRG 5) · «necesita los ventiladores» · «supera la ONAF en
+X A» · compensación. Lógica pura en `domain/scada_umbrales_detalle.js` (NUEVO, L-102).
+
+**174.3 No-regresión.** Mismos datos y mismas cifras (`umbralesDevanado`, `serieMensualEquipo`); los bloques por devanado, sus
+gráficas mes a mes y sus tablas no cambian. Sin placa, el límite sigue siendo la ampacidad de la plataforma (rótulo gris).
+
+**174.4 Verificación.** `tests/scada_umbrales_detalle.test.js` (6) + cableado/L-102 en `scada_carga_mensual.test.js`;
+`test:unit` 2.988 (2.986 en verde, 2 omitidas); `lint:html` limpio. Vista previa fiel en SU Chrome (módulos de la rama por
+jsDelivr, datos reales): Río Sinú T1A (primario «al borde de la ONAN» 98,6 %; terciario «supera la ONAF en 103 A»), Montería
+T2A (tres etapas), Santa Teresa T1 (una etapa), Momil («al borde de la ONAN» 97,4 %), Bosque T4 (compensación, sin señal),
+Valencia T1 (supera la ONAN en 39 A).
+
+**174.5 Anti-patterns evitados.** Rótulos que la barra tapa; rótulos por línea que se pisan con escalas distintas; inclinar
+textos; decir «no necesita ventiladores» a una carga al 98 % de la ONAN; inventar un límite para un terciario de compensación.
+
+**174.6 Archivos.** Nuevos: `assets/js/domain/scada_umbrales_detalle.js`, `tests/scada_umbrales_detalle.test.js`. Modificados:
+`assets/js/ui/cargabilidad-scada/panel-devanados-mes.js`, `assets/css/cargabilidad-scada.css`, `tests/scada_carga_mensual.test.js`.
+INTACTOS: `scada_devanados_mes.js`, `placa_etapas.js`, `detalle.js`, `panel-mensual.js`.
+
+**174.7 Doctrina.** UI sensible con vista previa fiel (L-56) y su «procede»; el veredicto en palabras sale del VALOR contra la
+placa. NO revisado externamente.
