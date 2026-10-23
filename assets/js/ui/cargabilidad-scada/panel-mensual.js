@@ -51,6 +51,8 @@ function celda(x, { conDevanado }) {
  */
 export async function pintarMensual(nodo, { a, ctx, vigente = () => true, conPromedio = false, alReintentar = null }) {
   const titulo = el('h3', { id: 'csMensualTitulo' }, 'Cargabilidad mes a mes y acumulada');
+  // Al repintar (Reintentar) se liberan las gráficas anteriores de esta sección (las del equipo y las de sus devanados).
+  if (window.Plotly) nodo.querySelectorAll('.js-plotly-plot').forEach((g) => { try { window.Plotly.purge(g); } catch (_) { /* nada */ } });
   nodo.hidden = false;
   poner(nodo, titulo, el('div', { class: 'cs-esqueleto', style: 'height:180px' }), el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo los meses…'));
   const meses = mesesDelEquipo(ctx.catalogo, a.punto);
@@ -89,11 +91,16 @@ export async function pintarMensual(nodo, { a, ctx, vigente = () => true, conPro
     'Barras grises rayadas = mes provisional (el color de la CRG solo va en lo firme). Líneas grises: cortes CRG ' + bandas.map((v) => num(v, 0)).join(' · ') + ' %; roja: 100 %.',
     fallidos.length ? el('span', { class: 'cs-error' }, ' No se pudieron leer: ' + fallidos.join(', ') + '. ') : null,
     fallidos.length && alReintentar ? el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: (ev) => { ev.currentTarget.disabled = true; alReintentar(); } }, 'Reintentar') : null);
+  // «Cada devanado con sus límites de ampacidad y potencia» (2026-10-23): archivo aparte con import(); si falla, se oculta.
+  const devNodo = el('div', { class: 'cs-devmes-cont', hidden: true });
+  import('./panel-devanados-mes.js')
+    .then((m) => (vigente() ? m.pintarDevanadosMes(devNodo, { serie, mat: a.mat, tx: a.tx, umbrales: ctx.umbrales, vigente }) : null))
+    .catch((e) => { console.warn('[cargabilidad-scada] devanados mes a mes', e); devNodo.hidden = true; });
   poner(nodo, titulo,
     ultimo ? el('p', { class: 'cs-dato' }, el('b', {}, 'A la fecha: '), pctTexto(ultimo.acumulado.pct) + ' ', chip(ultimo.acumulado),
       el('span', { class: 'cs-sub' }, ' ' + (ultimo.acumulado.nMeses > 1 ? nombreMes(ultimo.acumulado.desde) + ' a ' + nombreMes(ultimo.mes) : nombreMes(ultimo.mes))
         + (ultimo.acumulado.firme ? '' : ' · provisional'))) : null,
-    grafica, tabla, ayuda);
+    grafica, tabla, ayuda, devNodo);
 
   try {
     const Plotly = await loadPlotly();

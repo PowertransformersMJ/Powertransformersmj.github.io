@@ -18,10 +18,15 @@
 
 import { filasLista } from './scada_carga_vista.js';
 import { filasPeriodo, MAX_MESES_PERIODO } from './scada_carga_periodo.js';
+import { devanadosDe } from './scada_carga_devanados.js';
 
-const resumida = (x) => (x ? {
-  pct: x.pct, crg: x.crg ?? null, clase: x.clase, firme: !!x.firme, devMax: x.devMax || null, motivoNulo: x.motivoNulo || null
-} : { pct: null, crg: null, clase: 'nulo', firme: false, devMax: null, motivoNulo: 'sin cálculo' });
+// `devanados` (2026-10-23, «la cargabilidad de cada devanado con sus límites de potencia y ampacidad»): los de
+// `devanadosDe` (ADR-165) sobre la MISMA fila: tensión, ampacidad y potencia del devanado (sus límites), corriente p99 y
+// carga; sin cifra del equipo, sus devanados tampoco la tienen. La fila de la lista ya los trae (`devanadosPlaca`): se usan.
+const resumida = (x, tx) => (x ? {
+  pct: x.pct, crg: x.crg ?? null, clase: x.clase, firme: !!x.firme, devMax: x.devMax || null, motivoNulo: x.motivoNulo || null,
+  devanados: x.devanadosPlaca || (tx ? devanadosDe(tx, x) : [])
+} : { pct: null, crg: null, clase: 'nulo', firme: false, devMax: null, motivoNulo: 'sin cálculo', devanados: tx ? devanadosDe(tx, null) : [] });
 
 /**
  * Los meses del tramo: los que el parque cargó, desde el primer mes con datos del punto (o el primero del parque si el
@@ -52,8 +57,9 @@ function calendario(a, b) {
  *          resumenes: Object<string, object|null>, umbrales?: object, estadistico?: string, meses?: string[]}} ctx
  *   `resumenes[mes]` = `scada_resumen/<mes>` (con `claves`); null si el mes no se pudo leer.
  * @returns {Array<{mes: string, leido: boolean, cargado: boolean,
- *   mensual: {pct, crg, clase, firme, devMax, motivoNulo},
- *   acumulado: {pct, crg, clase, firme, devMax, motivoNulo, desde: string, nMeses: number},
+ *   mensual: {pct, crg, clase, firme, devMax, motivoNulo, devanados},
+ *   acumulado: {pct, crg, clase, firme, devMax, motivoNulo, devanados, desde: string, nMeses: number},
+ *   (`devanados` = `devanadosDe` de esa fila: {d, nombre, kv, A, mva, conexion, niveles, pct, iP99, manda, aviso})
  *   promedio: {pct: number|null, nMeses: number}}>}
  */
 export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumenes, umbrales, estadistico, meses }) {
@@ -64,11 +70,11 @@ export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumene
   const leidos = cargados.filter((m) => resumenes && resumenes[m]);
   const mensual = {};
   for (const m of leidos) {
-    mensual[m] = resumida(filasLista({ parque: [tx], homologacion, catalogo, resumenMes: resumenes[m], umbrales, estadistico })[0]);
+    mensual[m] = resumida(filasLista({ parque: [tx], homologacion, catalogo, resumenMes: resumenes[m], umbrales, estadistico })[0], tx);
   }
   return lista.map((mes) => {
     if (!enParque.has(mes)) {
-      const hueco = { ...resumida(null), motivoNulo: 'este mes no está cargado en la plataforma' };
+      const hueco = { ...resumida(null, tx), motivoNulo: 'este mes no está cargado en la plataforma' };
       return { mes, leido: false, cargado: false, mensual: hueco, acumulado: { ...hueco, desde: mes, nMeses: 0 }, promedio: { pct: null, nMeses: 0 } };
     }
     const leido = !!(resumenes && resumenes[mes]);
@@ -78,12 +84,12 @@ export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumene
     const desdeCal = Math.floor(k0 / 12) + '-' + String((k0 % 12) + 1).padStart(2, '0');
     const tramo = leidos.filter((x) => x >= desdeCal && x <= mes);
     const faltan = cargados.filter((x) => noLeidos.has(x) && x >= desdeCal && x <= mes);
-    let acumulado = { ...resumida(null), motivoNulo: leido ? 'sin cálculo' : 'no se pudo leer este mes', desde: tramo[0] || mes, nMeses: tramo.length };
+    let acumulado = { ...resumida(null, tx), motivoNulo: leido ? 'sin cálculo' : 'no se pudo leer este mes', desde: tramo[0] || mes, nMeses: tramo.length };
     if (leido && faltan.length) acumulado = { ...acumulado, motivoNulo: 'no se pudo leer ' + faltan.join(', ') };
     else if (leido && tramo.length) {
       const filasPorMes = Object.fromEntries(tramo.map((m) => [m, []]));
       const fila = tramo.length === 1 ? mensual[mes]
-        : resumida(filasPeriodo({ parque: [tx], homologacion, catalogo, meses: tramo, resumenes, filasPorMes, umbrales, estadistico })[0]);
+        : resumida(filasPeriodo({ parque: [tx], homologacion, catalogo, meses: tramo, resumenes, filasPorMes, umbrales, estadistico })[0], tx);
       acumulado = { ...fila, desde: tramo[0], nMeses: tramo.length };
     }
     const conCifra = tramo.map((m) => mensual[m]).filter((x) => x && x.pct != null);
@@ -91,6 +97,6 @@ export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumene
       pct: leido && !faltan.length && conCifra.length ? conCifra.reduce((s, x) => s + x.pct, 0) / conCifra.length : null,
       nMeses: conCifra.length
     };
-    return { mes, leido, cargado: true, mensual: leido ? mensual[mes] : { ...resumida(null), motivoNulo: 'no se pudo leer este mes' }, acumulado, promedio };
+    return { mes, leido, cargado: true, mensual: leido ? mensual[mes] : { ...resumida(null, tx), motivoNulo: 'no se pudo leer este mes' }, acumulado, promedio };
   });
 }
