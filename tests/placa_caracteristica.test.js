@@ -126,3 +126,15 @@ test('paquete: rechaza placas sin huella de datos y fotos con metadatos de cáma
   const r = revisarPlacaPaquete({ id: 'abcdef02', meta }, new Map([[txMin.id, txMin]]));
   assert.equal(r.ok, true); assert.equal(r.meta.matricula, 't1-x '); assert.equal(meta.matricula, 'T1-X');
 });
+
+test('placa reconectable: la plataforma en la conexión alternativa no es un error grave, se anota', () => {
+  const t = tx({ tension_primaria_kv: 66, corriente_nominal_primaria_a: 344.7, tension_secundaria_kv: 13.8, corriente_nominal_secundaria_a: 1673.5 },
+    { potencia_kva: 40000 });
+  const p = { datos: { serie: 'AB-12345', etapas_kva: { ONAN: 35000, ONAF1: 40000 },
+    tension: { P: '115 kV ± 10 × 0,9 % (religable a 67 kV ± 10 × 1,5 %) · corriente de placa 301,6/344,7 A', S: '13,8 kV' } } };
+  const d = diferencias(p, t).filter((x) => /Tensión primario/.test(x.campo));
+  assert.equal(d.length, 1); assert.equal(d[0].grave, false); assert.match(d[0].nota, /conexión alternativa/);
+  // Sin la conexión alternativa, sigue siendo «no coincide».
+  const q = { datos: { ...p.datos, tension: { P: '115 kV ± 10 × 0,9 %', S: '13,8 kV' } } };
+  assert.equal(diferencias(q, t).find((x) => /Tensión primario/.test(x.campo)).grave, true);
+});

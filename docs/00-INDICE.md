@@ -46,6 +46,7 @@
 | §168 | ADR-168 — **Cargabilidad SCADA**: mes a mes y acumulada a la fecha en cada equipo; «A la fecha» = cargabilidad oficial en la revisión · TODO-69 | 8240 |
 | §169 | ADR-169 — **Cargabilidad SCADA**: cada devanado mes a mes frente a sus límites de PLACA (ONAN/ONAF); potencias placa ↔ plataforma ↔ Excel de Salud de Activos · TODO-69/54 | 8288 |
 | §170 | ADR-170 — **Cargabilidad SCADA**: corriente límite IMPRESA en la placa (o «calculada»); terciario de compensación sin límite; planos y «futuro» marcados; 102 placas completadas · TODO-69/54 | 8374 |
+| §171 | ADR-171 — **Bosque T2** con su placa (WEG 40 MVA, 67 kV): ampacidades 344,7/1.673,5 A, CRG oficial 79,1 % (CRG 4); placa reconectable no grave · TODO-54 | 8423 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
