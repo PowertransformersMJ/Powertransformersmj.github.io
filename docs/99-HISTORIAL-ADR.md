@@ -8169,3 +8169,49 @@ importante: ampacidad del secundario ×10** (836,7 A en placa · 8.366,7 A en la
 recortar; consola sin errores. Barrido de solo lectura del parque en producción: **205 con placa, 3 sin, 0 errores de
 lectura, todas con foto; 57 equipos con 91 diferencias (36 importantes)**: ampacidad 31, año 22, tensión 22, serie 13,
 potencia 3. Ningún dato del inventario cambió: cada corrección es decisión suya, una a una (`§166.7`).
+
+## 167. ADR-167 — Lorica T1 contra su placa y su cargabilidad desde el SCADA (67,4 %); una muestra nueva ya no borra la cargabilidad (TODO-54) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «vamos uno a uno, empecemos por Lorica T1» → «1 y 2 sí, procede; actualiza la cargabilidad con base a cargabilidad SCADA,
+> lo que tenía en excel era información antigua, la información de SCADA es información reciente» → «te concedo el permiso»
+> → «usa el 67,4 % y corrige el error» (2026-10-23).
+
+**167.1 Causa raíz.** (a) Lorica T1: secundario con ampacidad 8.366,7 A y carga 8.574,29 A (×10; la placa imprime 627,6 /
+836,7 A) y 16 datos de placa vacíos. (b) Su cargabilidad oficial (44 %, CRG 1) era del Excel antiguo. El SCADA de sep da DOS
+cifras: 34,5 kV 112,1 % y 13,8 kV 67,4 %; hora a hora (jul–sep) la potencia de 34,5 kV es 1,55–1,64 × la de 13,8 kV (mediana
+1,59), estable: esa señal mide más que T1 (Lorica T2 comparte la barra de 34,5 kV) o tiene un TC mal configurado; el lado
+de 13,8 kV es coherente (√3·U·I ÷ S = 1,003). (c) Defecto: `functions/index.js#onMuestraCreate` llamaba
+`snapshotSaludCompleto` SIN `cargaActual` → `calcularCalifCRG({})` nulo → cada muestra nueva dejaba `calif_crg` y
+`crg_pct_medido` vacíos. En producción aún no hizo daño (ningún recálculo desde la importación del 2026-09-09; el único
+equipo sin CRG, T1-M/M-SLV, viene así del Excel).
+
+**167.2 Solución.** (a) Datos de Lorica T1 con `actualizarCampos` desde su Chrome (admin, bitácora `diff`), 18 campos
+verificados al releer: S 836,7 A y su carga 857,43 A; marca/modelo Siemens cKOSM 14510 s/30 (raíz y `placa.*`), ONAN 15.000
+/ ONAF 20.000 kVA, IEC 76, Colombia, Dyn1, OLTC 21 posiciones, Zcc 7,7 %, 37.000 kg / 9.625 kg / 11.000 L, ONAN/ONAF.
+(b) Cargabilidad oficial = 67,4 % (CRG 3) del lado de 13,8 kV (p99 sep 563,8 A ÷ 836,7 A), con su fuente
+(`salud_actual.crg_fuente/crg_periodo/crg_nota`); el recálculo del motor al lado (`hi_bruto`/`hi_recalculado` 2,325 → 2,425,
+«bueno») con las funciones del propio motor; la condición oficial del Excel («muy bueno») NO se toca (`§74.14`).
+**Criterio del Ingeniero**: la cargabilidad del SCADA (reciente) reemplaza la del Excel (antigua), equipo por equipo en
+esta revisión. (c) `domain/salud_carga_vigente.js` (NUEVO, L-102): `cargaActualDesdeTransformador` (manda el % oficial; si
+no hay, carga medida ÷ ampacidad, como el importador) y `conservarFuenteCRG`; el trigger los usa.
+
+**167.3 No-regresión.** Intactos en Lorica: potencia, serie, ampacidad y carga del primario, matrícula, condición oficial.
+El trigger conserva la condición del Excel como antes (`fusionarConservandoCondicion`). Solo se despliega `onMuestraCreate`.
+
+**167.4 Verificación.** `tests/salud_carga_vigente.test.js` (5) · `test:unit` 2.936 (2.934 en verde, 2 omitidas) ·
+`test:trigger` (emulador: la muestra conserva 67,4 %, CRG 3 y su fuente) · revisión de placa de Lorica después: 0
+diferencias en 7 comparados · el motor reproducía 2,325 exacto con CRG 1 antes de calcular con CRG 3.
+
+**167.5 Anti-patterns evitados.** Tomar el mayor de los dos lados del SCADA sin mirar si cuadran; borrar la carga del
+primario (343 A del Excel) sin pedirlo; escribir la condición oficial; reemplazar `salud_actual` entero.
+
+**167.6 Archivos.** Nuevos: `assets/js/domain/salud_carga_vigente.js`, `tests/salud_carga_vigente.test.js`. Modificados:
+`functions/index.js`, `functions/tests/onMuestraCreate.test.mjs`, `docs/51 §3`. Datos: `transformadores/<Lorica T1>`.
+
+**167.7 Doctrina.** §3.2 (aditivo), §3.3 (dos lecturas independientes de la placa; la relación de potencias hora a hora
+antes de elegir el lado), W-11 (cada valor lo decidió él). NO revisado externamente.
+
+**167.8 Verificado sano / pendiente.** En Cargabilidad SCADA Lorica T1 sigue en 112,1 % (provisional) porque su
+homologación no está confirmada y el cálculo toma el mayor lado: confirmarla con solo 13,8 kV es SU decisión. Pendiente
+suyo: carga del primario (343 A del Excel); que SCADA/Operación revise la señal de 34,5 kV; corregir su Excel (una
+reimportación devolvería 8.366,7 A y 44 %). Crudo: bóveda `2026-10-23-diferencias-placa-ampacidad/revision-uno-a-uno/`.
