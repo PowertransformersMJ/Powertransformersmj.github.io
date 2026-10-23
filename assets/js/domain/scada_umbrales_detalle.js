@@ -3,8 +3,8 @@
 // ──────────────────────────────────────────────────────────────
 // Pedido del Ingeniero (2026-10-23): «me gustaría que exista detalle de los umbrales en las gráficas para una mejor
 // interpretación». Lo que decide el resumen en barras de «Cada devanado» (`ui/cargabilidad-scada/panel-devanados-mes.js`)
-// sin tocar el DOM: dónde está la carga frente a cada umbral (sin ventiladores, con ventiladores, por encima), qué columnas
-// de etapa lleva la tabla de detalle y si el rótulo de la ONAN debe ir bajo su línea para no pisar el de la ONAF.
+// sin tocar el DOM: dónde está la carga frente a cada umbral (sin ventiladores, al borde, con ventiladores, por encima), qué
+// columnas de etapa lleva la tabla de detalle y cuánto espacio arriba necesita el recuadro de umbrales de cada barra.
 // Funciones PURAS. Archivo NUEVO (L-102): el panel lo importa; ningún módulo ya publicado importa de aquí algo que no exista.
 // ══════════════════════════════════════════════════════════════
 
@@ -55,14 +55,11 @@ export function columnasEtapas(registrados, U) {
 }
 
 /**
- * ¿El rótulo de la ONAN va DEBAJO de su línea? Sí cuando queda a menos de `cerca` (fracción de la escala) del límite mayor:
- * así los dos rótulos no se pisan (el del límite mayor va encima de su línea).
- * @param {number|null} onan  valor de la ONAN en la escala de la gráfica
- * @param {number|null} tope  valor del límite mayor
- * @param {number} maxY       tope de la escala
- * @param {number} [cerca=0.1]
+ * Factor del tope de la escala para que el recuadro de umbrales (un renglón por umbral) quepa encima del devanado más alto:
+ * 1 renglón → 1,255; 2 → 1,33 (el de antes); 3 → 1,405.
+ * @param {number} renglones  el mayor número de renglones de un recuadro
  */
-export function onanDebajo(onan, tope, maxY, cerca = 0.1) {
-  if (onan == null || tope == null || !(maxY > 0)) return false;
-  return Math.abs(tope - onan) < cerca * maxY;
+export function escalaRotulos(renglones) {
+  const n = Math.max(1, Math.min(4, Math.round(Number(renglones) || 0)));
+  return 1.18 + 0.075 * n;
 }

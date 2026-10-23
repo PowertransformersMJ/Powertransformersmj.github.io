@@ -24,7 +24,7 @@ import { califCRG } from '../../domain/scada_carga_kpis.js';
 import { leerPlaca } from '../../data/placas_caracteristicas.js';
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
 import { umbralesDevanado, motivoSinCifra, estadoDevanados, pctDe } from '../../domain/scada_devanados_mes.js';
-import { lecturaUmbral, columnasEtapas, onanDebajo } from '../../domain/scada_umbrales_detalle.js';
+import { lecturaUmbral, columnasEtapas, escalaRotulos } from '../../domain/scada_umbrales_detalle.js';
 import { loadPlotly } from '../../plotly-loader.js';
 
 const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -93,25 +93,21 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
     const bajas = registrados.flatMap((b, k) => U[b.d].etapas.slice(0, -1).map((e) => ({ k, e, v: en(e, U[b.d]) }))).filter((x) => x.v != null);
     const fmt = (v) => (v == null ? '—' : unidad === 'A' ? ampTexto(v) + ' A' : mvaTexto(v) + ' MVA');
     const fmtCarga = (v) => (v == null ? '—' : unidad === 'A' ? ampTexto(v) + ' A' : mvaTexto(v) + ' MVA eq.');
-    const maxY = Math.max(...lim.filter((v) => v != null), ...val.filter((v) => v != null)) * 1.32 || 1;
+    // Los umbrales de cada devanado, de mayor a menor, cada uno en su color (el mismo de su marca en la barra).
+    const renglones = registrados.map((b, k) => (lim[k] == null ? [] : [
+      { t: (U[b.d].dePlaca ? U[b.d].tope : 'Ampacidad') + ' ' + fmt(lim[k]), c: colorUmbral(U[b.d], U[b.d].tope) },
+      ...bajas.filter((x) => x.k === k).reverse().map((x) => ({ t: x.e.nombre + ' ' + fmt(x.v), c: colorUmbral(U[b.d], x.e.nombre) }))]));
+    const maxY = Math.max(...lim.filter((v) => v != null), ...val.filter((v) => v != null)) * escalaRotulos(Math.max(0, ...renglones.map((r) => r.length))) || 1;
     // Abajo, en tres renglones derechos (sin inclinarse): devanado, su carga a la fecha y su % del límite mayor.
     const xs = registrados.map((b, k) => nombres[k] + '<br><b>' + (val[k] == null ? ROTULO_ESTADO[estado[b.d]] || 'sin cifra' : fmtCarga(val[k])) + '</b>'
       + (val[k] == null ? '' : '<br>' + pctRotulo(hoy[k].iP99, U[b.d])));
     const origen = (e) => (e && ORIGEN_A[e.origen] ? ' (' + ORIGEN_A[e.origen] + ')' : '');
-    const rotulo = (k, v, texto, c, debajo) => ({ x: xs[k], xref: 'x', y: v, yref: 'y', xanchor: 'center', yanchor: debajo ? 'top' : 'bottom',
-      yshift: debajo ? -3 : 3, showarrow: false, text: texto, font: { size: 11, color: c }, bgcolor: 'rgba(255,255,255,0.92)',
-      bordercolor: c, borderwidth: 1, borderpad: 2 });
-    const annotations = [];
-    registrados.forEach((b, k) => {
-      const u = U[b.d];
-      if (lim[k] != null) annotations.push(rotulo(k, lim[k], (u.dePlaca ? u.tope : 'Ampacidad') + ' ' + fmt(lim[k]), colorUmbral(u, u.tope), false));
-      // De arriba hacia abajo: una etapa muy cerca de la de encima escribe su rótulo bajo su línea (no se pisan).
-      let arriba = lim[k];
-      for (const x of bajas.filter((y) => y.k === k).reverse()) {
-        annotations.push(rotulo(k, x.v, x.e.nombre + ' ' + fmt(x.v), colorUmbral(u, x.e.nombre), onanDebajo(x.v, arriba, maxY)));
-        arriba = x.v;
-      }
-    });
+    // UN recuadro por devanado, encima de lo más alto (su caja o su barra): se dibuja sobre los datos, así ninguna barra lo
+    // tapa y los umbrales no se pisan entre sí aunque estén muy juntos o la escala sea la de otro devanado mucho mayor.
+    const annotations = renglones.map((r, k) => (!r.length ? null : { x: xs[k], xref: 'x', y: Math.max(lim[k], val[k] ?? 0), yref: 'y',
+      xanchor: 'center', yanchor: 'bottom', yshift: 4, showarrow: false, align: 'left',
+      text: r.map((x) => '<span style="color:' + x.c + '">' + x.t + '</span>').join('<br>'), font: { size: 11 },
+      bgcolor: 'rgba(255,255,255,0.92)', bordercolor: '#c3cede', borderwidth: 1, borderpad: 3 })).filter(Boolean);
     await Plotly.newPlot(div, [
       { type: 'bar', name: 'Límite mayor', x: xs, y: lim, width: 0.62,
         marker: { color: registrados.map((b) => tinte(color(b), 0.14)), line: { color: registrados.map(color), width: 1.8 } },

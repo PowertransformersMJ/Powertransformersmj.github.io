@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { lecturaUmbral, columnasEtapas, onanDebajo, BORDE } from '../assets/js/domain/scada_umbrales_detalle.js';
+import { lecturaUmbral, columnasEtapas, escalaRotulos, BORDE } from '../assets/js/domain/scada_umbrales_detalle.js';
 
 const et = (nombre, A, mva = null, origen = 'calculada') => ({ nombre, A, mva, origen });
 const dos = { etapas: [et('ONAN', 300), et('ONAF', 400)], onan: et('ONAN', 300), onaf: et('ONAF', 400), tope: 'ONAF', dePlaca: true, sinLimite: false };
@@ -47,17 +47,17 @@ test('columnas: las etapas que traen los devanados, en orden ONAN → ONAF → O
   assert.deepEqual(columnasEtapas([], U), []);
 });
 
-test('rótulos: la ONAN va bajo su línea solo si queda muy cerca del límite mayor', () => {
-  assert.equal(onanDebajo(131, 157, 300), true);    // 26 de 300 = 8,7 % de la escala
-  assert.equal(onanDebajo(158, 236, 320), false);   // 78 de 320 = 24 %
-  assert.equal(onanDebajo(null, 236, 320), false); assert.equal(onanDebajo(100, null, 320), false); assert.equal(onanDebajo(1, 2, 0), false);
+test('escala: espacio arriba para el recuadro de umbrales según sus renglones (2 = el 1,32 de antes)', () => {
+  casi(escalaRotulos(1), 1.255); casi(escalaRotulos(2), 1.33); casi(escalaRotulos(3), 1.405);
+  casi(escalaRotulos(0), 1.255); casi(escalaRotulos(9), 1.48); casi(escalaRotulos(undefined), 1.255);
 });
 
-test('panel: importa el detalle desde el archivo NUEVO, rotula los umbrales encima de los datos y no inclina los nombres', () => {
+test('panel: importa el detalle desde el archivo NUEVO, un recuadro de umbrales encima de los datos y nombres sin inclinar', () => {
   const src = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-devanados-mes.js', import.meta.url), 'utf8');
-  assert.match(src, /import \{ lecturaUmbral, columnasEtapas, onanDebajo \} from '\.\.\/\.\.\/domain\/scada_umbrales_detalle\.js'/);
-  // Los rótulos son anotaciones (se dibujan ENCIMA de las barras) con fondo y borde; ya no texto de la barra clara.
-  assert.match(src, /bgcolor: 'rgba\(255,255,255,0\.92\)',\s*bordercolor: c, borderwidth: 1/);
+  assert.match(src, /import \{ lecturaUmbral, columnasEtapas, escalaRotulos \} from '\.\.\/\.\.\/domain\/scada_umbrales_detalle\.js'/);
+  // Los umbrales van en UN recuadro por devanado, anotación ENCIMA de lo más alto (caja o barra), con fondo y borde.
+  assert.match(src, /y: Math\.max\(lim\[k\], val\[k\] \?\? 0\)/);
+  assert.match(src, /bgcolor: 'rgba\(255,255,255,0\.92\)', bordercolor: '#c3cede', borderwidth: 1/);
   assert.doesNotMatch(src, /textposition: 'outside'/);
   assert.match(src, /tickangle: 0/);
   assert.match(src, /poner\(nodo, titulo, origen, resumen, leyenda, detalle, \.\.\.bloques, ayuda\)/);
