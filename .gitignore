@@ -105,3 +105,7 @@ Ficha_Mantenimiento_*.xlsx
 
 # Paquetes de datos SCADA (99 §122): llevan datos reales del cliente, NUNCA al repo público.
 *.sgmpaq
+
+# Paquete de placas características (ADR-166): fotos y lecturas reales de las placas, NUNCA al repo público.
+paquete-placas*/
+placas-parte-*.json

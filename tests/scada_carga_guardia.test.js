@@ -29,6 +29,10 @@ describe('bloquea por forma', () => {
     assert.ok(archivoSospechoso('ir_' + 'average-20260310.csv'));
     assert.ok(!archivoSospechoso('tests/fixtures/otra-cosa.csv'));
     assert.ok(!archivoSospechoso('docs/homologacion.md'));
+    // El paquete de placas características (ADR-166) tampoco entra.
+    assert.ok(archivoSospechoso('paquete-placas-2026-10-22/placas-parte-01.json'));
+    assert.ok(archivoSospechoso('placas-parte-7.json'));
+    assert.ok(!archivoSospechoso('admin/placas-caracteristicas.html'));
   });
 });
 
@@ -49,5 +53,13 @@ describe('deja pasar', () => {
       if (revisarTexto(t).length) con.push(f);
     }
     assert.deepEqual(con, []);
+  });
+});
+
+describe('fotos embebidas (placas características, ADR-166)', () => {
+  test('un JPEG largo en base64 se bloquea; un texto corto con la marca, no', () => {
+    const marca = '/9' + 'j/';
+    assert.match(motivoEnLinea('"b64":"' + marca + '4AAQSkZJRg' + 'A'.repeat(500) + '"'), /foto embebida/);
+    assert.equal(motivoEnLinea('empieza por ' + marca + ' en base64'), '');
   });
 });

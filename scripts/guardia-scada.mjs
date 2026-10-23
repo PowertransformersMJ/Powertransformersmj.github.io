@@ -12,6 +12,8 @@
 //     swTrafo, swTrf o swAuto con número, circuito de tres letras y 3xx, o línea LN con número),
 //     con o sin el nivel de tensión en medio;
 //   · un archivo .csv/.xls/.xlsx cuyo nombre hable del exporte o de la homologación.
+//   · una foto JPEG embebida en texto (base64 largo) o un archivo del paquete de placas características
+//     (fotos y lecturas reales de las placas, ADR-166).
 // Los datos de prueba usan estaciones inventadas que empiezan por «EstDemo»: pasan.
 // Revisa SOLO lo que se agrega (líneas nuevas del diff y archivos nuevos), y el
 // mensaje del commit (también es público). Nunca imprime lo que encontró.
@@ -35,6 +37,9 @@ const FILA = new RegExp('Mv' + 'Moment');
 const CLAVE = /\/\s*((?=[A-Za-zÀ-ÿñÑ0-9]*[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*k[vV]\s*\/)?\s*(swTr[A-Za-z]*\d+|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
 const ARCHIVO = new RegExp('(variables[ _-]?el[eé]ctricas|homologaci[oó]n|swtrafo|' + 'mv' + 'moment|_average[-_]|_quality[-_]|ir_current|p_average|urs_average)', 'i');
 const TABLA = /\.(csv|xls|xlsx)$/i;
+// Una foto JPEG en base64 (empieza por «/9j/») de cientos de caracteres; y los archivos del paquete de placas.
+const FOTO_B64 = new RegExp('/9' + 'j/[A-Za-z0-9+/]{400,}');
+const PAQUETE_PLACAS = /(placas-parte-\d+\.json|paquete-placas)/i;
 
 /** ¿Este texto trae un dato SCADA con forma real? Devuelve el motivo (sin el dato) o ''. */
 export function motivoEnLinea(linea) {
@@ -42,6 +47,7 @@ export function motivoEnLinea(linea) {
   if (DEMO.test(s)) return '';
   if (FILA.test(s)) return 'fila de un exporte del SCADA';
   if (CLAVE.test(s)) return 'clave de un punto SCADA';
+  if (FOTO_B64.test(s)) return 'foto embebida (placa u otra imagen real)';
   return '';
 }
 
@@ -57,7 +63,7 @@ export function revisarTexto(texto) {
 
 /** ¿El nombre de un archivo preparado delata un exporte o la homologación? */
 export function archivoSospechoso(ruta) {
-  return TABLA.test(ruta) && ARCHIVO.test(ruta);
+  return (TABLA.test(ruta) && ARCHIVO.test(ruta)) || PAQUETE_PLACAS.test(ruta);
 }
 
 function git(args) {
@@ -123,7 +129,7 @@ function principal(argv) {
     for (const h of revisarTexto(limpio)) bloqueos.push((i >= 0 ? 'mensaje del commit' : ruta) + ', línea ' + h.n + ' (' + h.motivo + ')');
   } else {
     const nuevos = git(['diff', '--cached', '--name-only', '--diff-filter=ACR', '-z']).split('\0').filter(Boolean);
-    for (const f of nuevos) if (archivoSospechoso(f)) bloqueos.push(f + ' (tabla con nombre de exporte SCADA o de homologación)');
+    for (const f of nuevos) if (archivoSospechoso(f)) bloqueos.push(f + ' (tabla de exporte SCADA, de homologación o paquete de placas)');
     for (const [f, lineas] of lineasAgregadas()) {
       // Esta misma guardia y su prueba describen las formas: se revisan con la misma regla (usan EstDemo).
       lineas.forEach((l) => {
@@ -137,6 +143,7 @@ function principal(argv) {
     console.log('🔒 guardia-scada: lo que se va a publicar trae DATOS DE RED del SCADA (el repo es público):');
     for (const x of [...new Set(bloqueos)].slice(0, 30)) console.log('   · ' + x);
     console.log('   Las mediciones y la homologación se cargan en «Datos SCADA» (administración), nunca al repositorio.');
+    console.log('   Las placas características (fotos y lecturas) se cargan en «Placas características» (administración).');
     console.log('   En pruebas use estaciones inventadas que empiecen por «EstDemo».');
     return 1;
   }

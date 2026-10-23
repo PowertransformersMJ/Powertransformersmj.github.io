@@ -1415,6 +1415,123 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Placa característica de cada transformador (TODO-69, ADR-166) ─────────────────────────────
+    // Lo leído de la placa + la foto JPEG en partes ≤ 900 KB atadas por `lote` (método de fichas_adjuntos;
+    // Storage no entrega descargas, §100). Lee el equipo; carga el administrador con perfil, que firma la carga.
+    // Cada carga trae un `paquete` NUEVO, sus partes en la MISMA operación y su registro de solo agregar.
+    // Nada de aquí toca el inventario: las diferencias con la placa solo se muestran.
+    function rutaPlaca(id) { return /databases/$(database)/documents/placas_caracteristicas/$(id); }
+    function rutaPartePlaca(id, k) { return /databases/$(database)/documents/placas_caracteristicas/$(id)/partes/$(string(k)); }
+    function rutaRegPlaca(rid) { return /databases/$(database)/documents/placas_caracteristicas_registro/$(rid); }
+    function fotoPlacaValida(f) {
+      return f == null || (f is map
+        && f.keys().hasOnly(['partes', 'lote', 'huella', 'mime', 'ancho', 'alto', 'bytes', 'origen'])
+        && f.keys().hasAll(['partes', 'lote', 'huella', 'mime', 'ancho', 'alto', 'bytes', 'origen'])
+        && f.partes is int && f.partes >= 1 && f.partes <= 3
+        && f.lote is string && f.lote.matches('^[A-Za-z0-9]{8,40}$')
+        && f.huella is string && f.huella.matches('^[0-9a-f]{64}$')
+        && f.mime == 'image/jpeg' && f.origen in ['foto', 'pdf']
+        && f.ancho is int && f.ancho >= 1 && f.ancho <= 5000
+        && f.alto is int && f.alto >= 1 && f.alto <= 5000
+        && f.bytes is int && f.bytes >= 1 && f.bytes <= f.partes * 900 * 1024);
+    }
+    function datosPlacaValidos(d) {
+      return d is map && d.keys().hasOnly(['fabricante', 'serie', 'serie_nota', 'anio', 'norma', 'fases', 'potencias_texto', 'etapas_kva', 'tension',
+          'impedancia_pct', 'impedancia_base_kva', 'perdidas_carga_w', 'perdidas_base_kva', 'perdidas_temp_c', 'perdidas_vacio_w',
+          'elevacion_devanado_c', 'elevacion_aceite_c', 'ambiente_max_c', 'altitud_m', 'masa_total_kg', 'aceite_l', 'ventiladores', 'notas'])
+        && (d.get('notas', null) == null || (d.notas is string && d.notas.size() <= 4000))
+        && (d.get('serie', null) == null || (d.serie is string && d.serie.size() <= 120))
+        && (d.get('potencias_texto', null) == null || (d.potencias_texto is string && d.potencias_texto.size() <= 600))
+        && d.get('etapas_kva', {}) is map && d.get('etapas_kva', {}).size() <= 6
+        && d.get('tension', {}) is map && d.get('tension', {}).keys().hasOnly(['P', 'S', 'T']);
+    }
+    function fuentePlacaValida(f) {
+      return f is map && f.keys().hasOnly(['tipo', 'fecha', 'lecturas', 'estado', 'confianza', 'alertas', 'huella_datos'])
+        && f.tipo == 'lectura_de_foto' && f.fecha is string && f.fecha.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && f.huella_datos is string && f.huella_datos.matches('^[0-9a-f]{64}$')
+        && (f.get('alertas', null) == null || (f.alertas is string && f.alertas.size() <= 2000));
+    }
+    // Parte k: si sobra (sin foto o k >= partes) NO existe después; si toca, existe con el lote de la foto. Con una
+    // sola parte (todas las del paquete), su SHA-256 debe ser la huella declarada: la huella queda atada a los bytes.
+    function partePlacaDelLote(id, k) {
+      let f = request.resource.data.foto;
+      return (f == null || k >= f.partes)
+        ? !existsAfter(rutaPartePlaca(id, k))
+        : (existsAfter(rutaPartePlaca(id, k)) && getAfter(rutaPartePlaca(id, k)).data.lote == f.lote
+           && (k != 0 || f.partes != 1 || hashing.sha256(getAfter(rutaPartePlaca(id, k)).data.bytes).toHexString().lower() == f.huella));
+    }
+    match /placas_caracteristicas/{id} {
+      allow get:  if isTeamMember();
+      allow list: if isAdmin() && request.query.limit <= 50;
+      allow create, update: if isAdmin() && hasProfile()
+                    && id.matches('^[A-Za-z0-9]{6,64}$')
+                    && request.resource.data.keys().hasOnly(['schema', 'matricula', 'datos', 'fuente', 'foto', 'carga'])
+                    && request.resource.data.keys().hasAll(['schema', 'matricula', 'datos', 'fuente', 'foto', 'carga'])
+                    && request.resource.data.schema == 1
+                    && request.resource.data.matricula is string && request.resource.data.matricula.trim().size() >= 3
+                    && request.resource.data.matricula.size() <= 40
+                    // La placa es de ESE transformador: su matrícula es la del inventario.
+                    && get(/databases/$(database)/documents/transformadores/$(id)).data.get('identificacion', {}).get('matricula', '') == request.resource.data.matricula
+                    && datosPlacaValidos(request.resource.data.datos)
+                    && fuentePlacaValida(request.resource.data.fuente)
+                    && fotoPlacaValida(request.resource.data.foto)
+                    && request.resource.data.carga is map
+                    && request.resource.data.carga.keys().hasOnly(['por', 'en', 'paquete'])
+                    && request.resource.data.carga.por == request.auth.uid
+                    && request.resource.data.carga.en == request.time
+                    && request.resource.data.carga.paquete is string && request.resource.data.carga.paquete.matches('^[A-Za-z0-9-]{4,40}$')
+                    && (resource == null || resource.data.carga.paquete != request.resource.data.carga.paquete)
+                    && partePlacaDelLote(id, 0) && partePlacaDelLote(id, 1) && partePlacaDelLote(id, 2)
+                    && existsAfter(rutaRegPlaca(id + '_' + request.resource.data.carga.paquete));
+      // Retirar: la meta se va solo con sus tres partes y deja su «retiro».
+      allow delete: if isAdmin() && hasProfile()
+                    && existsAfter(rutaRegPlaca(id + '_' + resource.data.carga.paquete + '_retiro'))
+                    && !existsAfter(rutaPartePlaca(id, 0)) && !existsAfter(rutaPartePlaca(id, 1)) && !existsAfter(rutaPartePlaca(id, 2));
+      match /partes/{n} {
+        allow get: if isTeamMember();
+        allow create, update: if isAdmin() && hasProfile() && n in ['0', '1', '2']
+                      && request.resource.data.keys().hasOnly(['bytes', 'lote'])
+                      && request.resource.data.bytes is bytes
+                      && request.resource.data.bytes.size() >= 1
+                      && request.resource.data.bytes.size() <= 900 * 1024
+                      // La parte 0 empieza como un JPEG (FF D8 FF).
+                      && (n != '0' || request.resource.data.bytes.toHexString()[0:6].upper() == 'FFD8FF')
+                      && existsAfter(rutaPlaca(id)) && getAfter(rutaPlaca(id)).data.foto != null
+                      // Solo en la MISMA operación que cambia la carga de su meta.
+                      && (!exists(rutaPlaca(id)) || get(rutaPlaca(id)).data.carga.paquete != getAfter(rutaPlaca(id)).data.carga.paquete)
+                      && request.resource.data.lote == getAfter(rutaPlaca(id)).data.foto.lote
+                      && int(n) < getAfter(rutaPlaca(id)).data.foto.partes;
+        // Borrar solo lo que sobra, o todo cuando la meta se va.
+        allow delete: if isAdmin() && hasProfile() && n in ['0', '1', '2']
+                      && (!existsAfter(rutaPlaca(id)) || getAfter(rutaPlaca(id)).data.foto == null
+                          || int(n) >= getAfter(rutaPlaca(id)).data.foto.partes);
+      }
+    }
+    match /placas_caracteristicas_registro/{rid} {
+      allow get:  if isAdmin();
+      allow list: if isAdmin() && request.query.limit <= 50;
+      allow create: if isAdmin() && hasProfile()
+                    && request.resource.data.keys().hasOnly(['idPlaca', 'accion', 'paquete', 'matricula', 'huella', 'huellaDatos', 'por', 'en'])
+                    && request.resource.data.keys().hasAll(['idPlaca', 'accion', 'paquete', 'matricula', 'huella', 'huellaDatos', 'por', 'en'])
+                    && request.resource.data.idPlaca is string && request.resource.data.idPlaca.matches('^[A-Za-z0-9]{6,64}$')
+                    && request.resource.data.accion in ['alta', 'reemplazo', 'retiro']
+                    && request.resource.data.paquete is string && request.resource.data.paquete.matches('^[A-Za-z0-9-]{4,40}$')
+                    && request.resource.data.matricula is string && request.resource.data.matricula.size() <= 40
+                    && rid == request.resource.data.idPlaca + '_' + request.resource.data.paquete
+                              + (request.resource.data.accion == 'retiro' ? '_retiro' : '')
+                    // Un «retiro» solo de una placa que EXISTÍA con ese paquete y se va en esta misma operación.
+                    && (request.resource.data.accion == 'retiro'
+                        ? (exists(rutaPlaca(request.resource.data.idPlaca))
+                           && get(rutaPlaca(request.resource.data.idPlaca)).data.carga.paquete == request.resource.data.paquete
+                           && !existsAfter(rutaPlaca(request.resource.data.idPlaca)))
+                        : (existsAfter(rutaPlaca(request.resource.data.idPlaca))
+                           && getAfter(rutaPlaca(request.resource.data.idPlaca)).data.carga.paquete == request.resource.data.paquete))
+                    && request.resource.data.huella is string && request.resource.data.huella.matches('^([0-9a-f]{64}|sinfoto)$')
+                    && request.resource.data.huellaDatos is string && request.resource.data.huellaDatos.matches('^[0-9a-f]{64}$')
+                    && request.resource.data.por == request.auth.uid && request.resource.data.en == request.time;
+      allow update, delete: if false;
+    }
+
     match /responsables_ordenes/{id} {
       allow get:  if isTeamMember();
       allow list: if isTeamMember() && isAdmin() && request.query.limit <= 50;

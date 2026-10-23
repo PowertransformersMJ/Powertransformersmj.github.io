@@ -92,6 +92,19 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   let panelDuval = null;
   import('./panel-duval.js').then((m) => { panelDuval = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
     .catch((e) => console.warn('[cargabilidad-scada] triángulo de Duval', e));
+  // «Placa característica» (TODO-69): otra ranura con su import() aislado; si falla, queda oculta y el detalle sigue igual.
+  let panelPlaca = null;
+  import('./panel-placa.js').then((m) => { panelPlaca = m; if (actual) pintarPlacaDe(actual); })
+    .catch((e) => console.warn('[cargabilidad-scada] placa', e));
+  function pintarPlacaDe(a) {
+    if (!a || !a.placaNodo || !panelPlaca || a.placaLista) return;
+    a.placaLista = true;
+    const nodo = a.placaNodo;
+    panelPlaca.pintarPlaca(nodo, { tx: a.tx, titulo: a.mat, vigente: () => !!actual && actual.placaNodo === nodo })
+      // Con error, se vuelve a intentar al reabrir el equipo (L-109).
+      .then((r) => { if (r && r.error && actual && actual.placaNodo === nodo) actual.placaLista = false; })
+      .catch((e) => { console.warn('[cargabilidad-scada] placa', e); nodo.hidden = true; if (actual && actual.placaNodo === nodo) actual.placaLista = false; });
+  }
   /** Estado EXPLÍCITO del panel: 'leyendo' | 'ok' (con el cálculo recién hecho) | 'error' | 'sin_scada'. */
   function pintarDga(a, estado) {
     if (!a || !a.dgaNodo) return;
@@ -445,7 +458,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     } catch (e) { a.previo = null; }
     liberarFigura(figura); figura = null;
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
-    conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
+    conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, avisoEl(), selectorRango(a), el('div', { class: 'cs-panel' },
       el('div', { class: 'cs-esqueleto', style: 'width:50%' }), el('div', { class: 'cs-esqueleto', style: 'width:80%;margin-top:10px' }),
       el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo ' + formatoCO(desde + H_MS) + ' a ' + formatoCO(hasta) + '…')), a.dgaNodo, a.duvalNodo));
     pintarDga(a, { estado: { estado: 'leyendo' } });
@@ -483,7 +496,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
       a.leyendo = false;
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
-      conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, avisoEl(), selectorRango(a),
+      conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, avisoEl(), selectorRango(a),
         fallidos.size ? el('div', { class: 'cs-panel cs-error', role: 'alert' }, 'No se pudo leer ' + [...fallidos].map(nombreMes).join(', ') + ' (revise la conexión): esas horas quedan como hueco y la cifra no es firme.',
           el('button', { type: 'button', class: 'btn btn--glass btn--sm', style: 'margin-left:8px', onclick: () => cargar(desde, hasta) }, 'Reintentar')) : null,
         sinNada ? el('div', { class: 'cs-panel cs-estado' }, 'No hay horas con dato válido en este rango. Pruebe con otro rango.') : indicadores(a),
@@ -497,7 +510,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       if (mio !== token) return;
       a.leyendo = false; a.calc = null; a.porNivel = null;
       console.warn('[cargabilidad-scada] detalle', e);
-      conservarFoco(() => poner(cont, encabezado(a), a.historiaNodo, selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
+      conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, selectorRango(a), el('div', { class: 'cs-panel cs-estado', role: 'alert' }, 'No se pudo calcular este rango.', el('br'),
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => cargar(desde, hasta) }, 'Reintentar')), a.dgaNodo, a.duvalNodo));
       pintarDga(a, { estado: { estado: 'error' } });
     }
@@ -528,17 +541,22 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const historiaNodo = !cambio && actual.historiaNodo ? actual.historiaNodo
       : el('section', { class: 'cs-panel cs-historia', id: 'csHistoria', hidden: true, 'aria-labelledby': 'csHistoriaTitulo' });
     const historiaLista = !cambio && actual.historiaLista;
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista };
+    const placaNodo = !cambio && actual.placaNodo ? actual.placaNodo
+      : el('section', { class: 'cs-panel cs-placa', id: 'csPlaca', hidden: true, 'aria-labelledby': 'csPlacaTitulo' });
+    const placaLista = !cambio && actual.placaLista;
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, placaNodo, placaLista };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
         : (!fila ? 'Este transformador no está en la homologación con el SCADA.'
           : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.'));
-      poner(cont, encabezado(actual), el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo, actual.duvalNodo);
+      poner(cont, encabezado(actual), actual.placaNodo, el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo, actual.duvalNodo);
+      pintarPlacaDe(actual);
       pintarDga(actual, { estado: { estado: 'sin_scada', motivo: motivoSin } });
       focoTitulo();
       return;
     }
+    pintarPlacaDe(actual);
     if (!actual.historiaLista) pintarHistoriaDe(actual);
     // Rango: el del enlace (rótulos: primera y última hora) si es válido; si no, el mes pedido; si no, el mes por defecto.
     const lim = limites(actual);
