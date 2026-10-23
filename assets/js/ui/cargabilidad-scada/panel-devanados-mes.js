@@ -24,7 +24,7 @@ import { califCRG } from '../../domain/scada_carga_kpis.js';
 import { leerPlaca } from '../../data/placas_caracteristicas.js';
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
 import { umbralesDevanado, motivoSinCifra, estadoDevanados, pctDe } from '../../domain/scada_devanados_mes.js';
-import { lecturaUmbral, columnasEtapas, escalaRotulos } from '../../domain/scada_umbrales_detalle.js';
+import { lecturaUmbral, columnasEtapas, escalaRotulos, partirRenglon } from '../../domain/scada_umbrales_detalle.js';
 import { loadPlotly } from '../../plotly-loader.js';
 
 const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -98,15 +98,23 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
       { t: (U[b.d].dePlaca ? U[b.d].tope : 'Ampacidad') + ' ' + fmt(lim[k]), c: colorUmbral(U[b.d], U[b.d].tope) },
       ...bajas.filter((x) => x.k === k).reverse().map((x) => ({ t: x.e.nombre + ' ' + fmt(x.v), c: colorUmbral(U[b.d], x.e.nombre) }))]));
     const maxY = Math.max(...lim.filter((v) => v != null), ...val.filter((v) => v != null)) * escalaRotulos(Math.max(0, ...renglones.map((r) => r.length))) || 1;
-    // Abajo, en tres renglones derechos (sin inclinarse): devanado, su carga a la fecha y su % del límite mayor.
-    const xs = registrados.map((b, k) => nombres[k] + '<br><b>' + (val[k] == null ? ROTULO_ESTADO[estado[b.d]] || 'sin cifra' : fmtCarga(val[k])) + '</b>'
-      + (val[k] == null ? '' : '<br>' + pctRotulo(hoy[k].iP99, U[b.d])));
+    // Ancho de cada devanado en la tarjeta: con tres devanados en una tarjeta angosta, letra más chica y renglones partidos.
+    const porDev = Math.max(60, ((div.clientWidth || 420) - 62) / Math.max(1, registrados.length));
+    const letra = porDev < 130 ? 10 : 11;
+    const maxCar = Math.max(9, Math.floor(porDev / (letra * 0.6)));
+    // Abajo, derechos (sin inclinarse): devanado, su carga a la fecha y su % del límite mayor; un renglón largo se parte en dos.
+    const partes = registrados.map((b, k) => [
+      partirRenglon(nombres[k], maxCar),
+      partirRenglon(val[k] == null ? ROTULO_ESTADO[estado[b.d]] || 'sin cifra' : fmtCarga(val[k]), maxCar).map((t) => '<b>' + t + '</b>'),
+      val[k] == null ? [] : partirRenglon(pctRotulo(hoy[k].iP99, U[b.d]), maxCar)].flat());
+    const xs = partes.map((p) => p.join('<br>'));
+    const renglonesAbajo = Math.max(1, ...partes.map((p) => p.length));
     const origen = (e) => (e && ORIGEN_A[e.origen] ? ' (' + ORIGEN_A[e.origen] + ')' : '');
     // UN recuadro por devanado, encima de lo más alto (su caja o su barra): se dibuja sobre los datos, así ninguna barra lo
     // tapa y los umbrales no se pisan entre sí aunque estén muy juntos o la escala sea la de otro devanado mucho mayor.
     const annotations = renglones.map((r, k) => (!r.length ? null : { x: xs[k], xref: 'x', y: Math.max(lim[k], val[k] ?? 0), yref: 'y',
       xanchor: 'center', yanchor: 'bottom', yshift: 4, showarrow: false, align: 'left',
-      text: r.map((x) => '<span style="color:' + x.c + '">' + x.t + '</span>').join('<br>'), font: { size: 11 },
+      text: r.map((x) => '<span style="color:' + x.c + '">' + x.t + '</span>').join('<br>'), font: { size: letra },
       bgcolor: 'rgba(255,255,255,0.92)', bordercolor: '#c3cede', borderwidth: 1, borderpad: 3 })).filter(Boolean);
     await Plotly.newPlot(div, [
       { type: 'bar', name: 'Límite mayor', x: xs, y: lim, width: 0.62,
@@ -125,9 +133,9 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
         customdata: bajas.map((x) => x.e.nombre + ' ' + fmt(x.v) + origen(x.e)),
         hovertemplate: '%{customdata}<extra>Etapa de placa</extra>' }
     ], {
-      title: { text: titulo, font: { size: 13 }, x: 0, xanchor: 'left' }, barmode: 'overlay', height: 310, dragmode: false,
-      margin: { l: 52, r: 10, t: 34, b: 74 }, font: { family: fuente, size: 12, color: '#1f3656' }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#fff',
-      showlegend: false, xaxis: { type: 'category', fixedrange: true, tickangle: 0 },
+      title: { text: titulo, font: { size: 13 }, x: 0, xanchor: 'left' }, barmode: 'overlay', height: 250 + 15 * renglonesAbajo, dragmode: false,
+      margin: { l: 52, r: 10, t: 34, b: 16 + 15 * renglonesAbajo }, font: { family: fuente, size: 12, color: '#1f3656' }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#fff',
+      showlegend: false, xaxis: { type: 'category', fixedrange: true, tickangle: 0, tickfont: { size: letra + 1 } },
       yaxis: { title: { text: unidad }, range: [0, maxY], gridcolor: '#eef1f6', fixedrange: true }, annotations
     }, { displaylogo: false, responsive: true, locale: 'es', displayModeBar: false });
   };
@@ -137,14 +145,22 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
   await una(resM, { titulo: 'Potencia equivalente frente a ' + deQue, unidad: 'MVA', en: (x) => x.mva });
 }
 
-/** Leyenda de las barras de arriba (HTML, legible sin pasar el cursor): qué es la caja, la marca, la barra y el rayado. */
+/** Leyenda de las barras de arriba (HTML, legible sin pasar el cursor), armada con lo que HAY: límites de placa (con o sin
+ *  ventiladores), ampacidad de la plataforma (sin placa legible), marcas de las etapas bajas, rayado. */
 function leyendaResumen(registrados, U) {
   const it = (clase, texto) => el('span', { class: 'cs-ley-it' }, el('i', { class: 'cs-ley ' + clase, 'aria-hidden': 'true' }), texto);
-  const tres = registrados.some((b) => U[b.d].etapas.length > 2);
+  const us = registrados.map((b) => U[b.d]).filter((u) => !u.sinLimite && u.etapas.length);
+  const dePlaca = us.filter((u) => u.dePlaca); const sinPlaca = us.some((u) => !u.dePlaca);
+  const conVent = dePlaca.some((u) => u.tope !== 'ONAN'); const conOnan = dePlaca.some((u) => u.onan || u.tope === 'ONAN');
+  const marcas = dePlaca.some((u) => u.etapas.length > 1); const tres = dePlaca.some((u) => u.etapas.length > 2);
+  const colores = [conVent && 'rojo con ventiladores', conOnan && 'naranja sin ventiladores', sinPlaca && 'gris la ampacidad de la plataforma'].filter(Boolean);
+  const caja = !dePlaca.length ? 'Caja clara: la ampacidad de la plataforma (no hay placa leída)'
+    : 'Caja clara: límite mayor de placa (' + (conVent ? 'ONAF, con ventiladores; si la placa no trae ventiladores, la ONAN' : 'la ONAN: la placa no trae ventiladores') + ')'
+      + (sinPlaca ? '; sin placa legible, la ampacidad de la plataforma' : '');
   return el('div', { class: 'cs-devmes-ley', role: 'note', 'aria-label': 'Cómo leer las barras' },
-    it('cs-ley-recuadro', 'Recuadro: los umbrales de placa del devanado, de mayor a menor (rojo con ventiladores, naranja sin ventiladores)'),
-    it('cs-ley-caja', 'Caja clara: límite mayor de placa (ONAF, con ventiladores; si la placa no trae ventiladores, la ONAN)'),
-    it('cs-ley-onan', 'Marca: ONAN, límite sin ventiladores' + (tres ? ' (en placas de tres etapas, otra marca para la ONAF intermedia)' : '')),
+    us.length ? it('cs-ley-recuadro', 'Recuadro: los umbrales de cada devanado, de mayor a menor' + (colores.length ? ' (' + colores.join(', ') + ')' : '')) : null,
+    us.length ? it('cs-ley-caja', caja) : null,
+    marcas ? it('cs-ley-onan', 'Marca: ONAN, límite sin ventiladores' + (tres ? ' (en placas de tres etapas, otra marca para la ONAF intermedia)' : '')) : null,
     it('cs-ley-barra', 'Barra llena: carga a la fecha'),
     it('cs-ley-raya', 'Rayada: cifra provisional o con aviso de placa'),
     el('span', { class: 'cs-ley-it' }, 'Colores: ' + registrados.map((b) => b.nombre.toLowerCase() + ' ' + (NOMBRE_COLOR[b.d] || 'gris')).join(', ')));
@@ -154,12 +170,14 @@ const tramoDe = (c) => (!c ? '' : c.acumulado.nMeses > 1 ? nombreMes(c.acumulado
 const nombreTope = (u) => (u.dePlaca ? 'la ' + u.tope : 'la ampacidad de la plataforma');
 // La lectura de la carga frente a sus umbrales, en palabras (`lecturaUmbral`).
 const LECTURA = {
-  sinLimite: () => 'Terciario de compensación: no lleva carga',
+  sinLimite: () => 'Terciario de compensación: la placa no le da límite de carga (no está hecho para llevar carga)',
   holgado: (l, u) => (u.onan ? 'No necesita ventiladores: está dentro de la ONAN' : 'Dentro de su límite') + '; le faltan '
     + ampTexto(l.margenA) + ' A para ' + nombreTope(u),
   borde: (l, u) => 'Al borde de la ONAN (' + num(l.pctOnan, 1) + ' %): sin ventiladores le faltan ' + ampTexto(l.margenOnanA)
     + ' A; con ventiladores, ' + ampTexto(l.margenA) + ' A para ' + nombreTope(u),
   ventiladores: (l, u) => 'Necesita los ventiladores: pasa la ONAN y está dentro de ' + nombreTope(u) + ' (le faltan ' + ampTexto(l.margenA) + ' A)',
+  bordeTope: (l, u) => (u.onan ? 'Necesita los ventiladores y está al borde de ' : 'Al borde de ') + nombreTope(u) + ' (' + num(l.pctTope, 1)
+    + ' %): le faltan ' + ampTexto(l.margenA) + ' A',
   supera: (l, u) => 'Supera ' + nombreTope(u) + ' en ' + ampTexto(l.excesoA) + ' A (' + num(l.pctTope - 100, 1) + ' % por encima)'
 };
 
@@ -167,8 +185,12 @@ const LECTURA = {
  * Detalle de los umbrales (tabla bajo las barras): por devanado, cada etapa de placa con su corriente, su potencia, de dónde
  * sale la corriente y la carga a la fecha frente a ella; la carga y su lectura en palabras.
  */
-function detalleUmbrales(registrados, U, ed, conCifraEq, mat) {
+function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales) {
   const cols = columnasEtapas(registrados, U);
+  // «Al borde» = la banda CRG 5 de los umbrales de salud configurados (la misma del chip de calificación).
+  const esBorde = (p) => califCRG(p, umbrales) === 5;
+  const todos = registrados.every((b) => U[b.d].dePlaca); const ninguno = registrados.every((b) => !U[b.d].dePlaca);
+  const deQue = todos ? ' de placa' : ninguno ? ' (la ampacidad de la plataforma: no hay placa leída)' : ' (de placa o, sin placa legible, de la plataforma)';
   if (!cols.length && !registrados.some((b) => U[b.d].sinLimite)) return null;
   const titCol = (n) => (n === 'ONAN' ? 'ONAN · sin ventiladores' : n === 'ampacidad' ? 'Ampacidad de la plataforma' : n + ' · con ventiladores');
   const firme = !!(conCifraEq && conCifraEq.acumulado.firme);
@@ -180,22 +202,26 @@ function detalleUmbrales(registrados, U, ed, conCifraEq, mat) {
         const e = u.etapas.find((x) => x.nombre === n);
         if (!e) return el('td', { class: 'cs-mensual-nulo' }, '—');
         return el('td', {}, el('b', {}, ampTexto(e.A) + ' A'), e.mva != null ? ' · ' + mvaTexto(e.mva) + ' MVA' : '',
-          el('br'), el('span', { class: 'cs-sub' }, ORIGEN_A[e.origen] || 'calculada de la placa'),
-          i != null ? [el('br'), 'carga al ', el('b', {}, num(100 * i / e.A, 1) + ' %')] : null);
+          el('span', { class: 'cs-sub' }, ORIGEN_A[e.origen] || 'calculada de la placa'),
+          i != null ? ['carga al ', el('b', {}, num(100 * i / e.A, 1) + ' %')] : null);
       });
+    // Sin columnas de etapa (todos sin límite con corriente), la fila conserva su celda bajo «Límite».
+    if (!u.sinLimite && !cols.length) celdas.push(el('td', { class: 'cs-mensual-nulo' }, '—'));
     const carga = i != null
-      ? el('td', {}, el('b', {}, ampTexto(i) + ' A'), el('br'), mvaEq(u, i), firme ? null : el('span', { class: 'cs-sub' }, ' · provisional'))
+      ? el('td', {}, el('b', {}, ampTexto(i) + ' A'), el('br'), mvaEq(u, i), firme ? null : el('span', { class: 'cs-sub' }, 'provisional'))
       : el('td', { class: 'cs-mensual-nulo' }, ROTULO_ESTADO[ed.porDevanado[b.d].estado] || 'sin cifra');
-    const l = lecturaUmbral(i, u);
-    const lect = l ? el('td', { class: 'cs-lect cs-lect--' + l.clase }, LECTURA[l.clase](l, u)) : el('td', { class: 'cs-mensual-nulo' }, '—');
+    const l = lecturaUmbral(i, u, esBorde);
+    // «Holgado» en verde solo si la calificación del límite mayor también lo es (CRG 1–3); en CRG 4, sin color: no contradice el chip.
+    const clase = l && l.clase === 'holgado' && (califCRG(l.pctTope, umbrales) || 0) >= 4 ? 'neutro' : l && l.clase;
+    const lect = l ? el('td', { class: 'cs-lect cs-lect--' + clase }, LECTURA[l.clase](l, u)) : el('td', { class: 'cs-mensual-nulo' }, '—');
     return el('tr', {}, el('th', { scope: 'row', style: 'border-left: 4px solid ' + (COLOR_DEV[b.d] || SIN) },
       b.nombre + (b.kv ? ' ' + kvTexto(b.kv) + ' kV' : '')), ...celdas, carga, lect);
   });
   return el('div', { class: 'cs-devmes-det' },
-    el('p', { class: 'cs-dato' }, el('b', {}, 'Detalle de los umbrales de placa'),
-      el('span', { class: 'cs-sub' }, conCifraEq ? ' · carga a la fecha (' + tramoDe(conCifraEq) + ')' : ' · sin carga a la fecha')),
+    el('p', { class: 'cs-dato' }, el('b', {}, 'Detalle de los umbrales' + deQue),
+      el('span', { class: 'cs-sub' }, conCifraEq ? '· carga a la fecha (' + tramoDe(conCifraEq) + ')' : '· sin carga a la fecha')),
     el('div', { class: 'cs-tabla-caja cs-mensual-caja' }, el('table', { class: 'cs-tabla cs-mensual-tabla' },
-      el('caption', { class: 'cs-mensual-cap' }, 'Umbrales de placa de cada devanado de ' + mat + ' y la carga a la fecha frente a cada uno'),
+      el('caption', { class: 'cs-mensual-cap' }, 'Umbrales de cada devanado de ' + mat + deQue + ' y la carga a la fecha frente a cada uno'),
       el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Devanado'),
         ...(cols.length ? cols.map((n) => el('th', { scope: 'col' }, titCol(n))) : [el('th', { scope: 'col' }, 'Límite')]),
         el('th', { scope: 'col' }, 'Carga a la fecha'), el('th', { scope: 'col' }, 'Lectura'))),
@@ -237,7 +263,7 @@ export async function pintarDevanadosMes(nodo, opts) {
   const resM = el('div', { class: 'cs-devmes-res-graf', role: 'img', 'aria-label': 'Potencia equivalente a la fecha de cada devanado de ' + mat + ' frente a sus límites; los bloques de abajo traen las cifras.' });
   const resumen = el('div', { class: 'cs-devmes-res' }, resA, resM);
   const leyenda = leyendaResumen(registrados, U);
-  const detalle = detalleUmbrales(registrados, U, ed, conCifraEq, mat);
+  const detalle = detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales);
   const bloques = [];
   const graficas = [];
   for (const base of registrados) {

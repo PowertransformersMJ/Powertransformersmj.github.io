@@ -323,5 +323,10 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-lect--supera { color: #b42318; }
 .cscada .cs-lect--ventiladores { color: #8a5a00; }
 .cscada .cs-lect--borde { color: #8a5a00; }
+.cscada .cs-lect--bordeTope { color: #b45309; }
+.cscada .cs-lect--neutro { color: #1f3656; }
+/* En el detalle, «impresa/calculada», «provisional» y el tramo van en su propio renglón sin hueco (el .cs-sub general es bloque). */
+.cscada .cs-devmes-det .cs-dato .cs-sub { display: inline; margin-left: 8px; }
+.cscada .cs-devmes-det td .cs-sub { margin: 0 0 2px; }
 .cscada .cs-lect--holgado { color: #1f6b3a; }
 .cscada .cs-lect--sinLimite { color: #5b6b82; font-weight: 400; }
