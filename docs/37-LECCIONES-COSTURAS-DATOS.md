@@ -154,3 +154,11 @@ como la de fase» descartaba la Δ de una placa Y–Δ reconectable («Y 110 kV 
 plataforma) y se compara en amperios con la ampacidad. La tensión de fase solo se descarta cuando va en par «línea/fase» con «/»
 («13800/7967 V», «115000GrdY/66395 V»). Antes de llamar «error» a una diferencia, se mira la foto.
 **Gate**: `tests/placa_etapas.test.js` (formatos sintéticos de los dos casos).
+
+### L-155 · Las notas de una placa son un pozo COMÚN: una corriente de otro devanado puede pasar por «impresa»
+**Disparador**: rotular una corriente «impresa en la placa» buscándola en las notas o en el texto de potencias. · **Cicatriz**
+(`99 §173`, 2026-10-23): Montería T2A — las notas traen las corrientes de alta tensión (210 / 168 / 131 A) y el secundario (ONAN
+167,35 A) tomó los 168 A del primario, que caen a ±0,6 %. El rótulo decía «impresa» con una cifra ajena.
+**Regla**: la corriente escrita en la tensión del devanado es suya; la de notas o potencias solo vale si ninguna etapa de OTRO
+devanado la explica mejor (un empate sí vale). Al cargar una placa, su corriente propia va en su tensión («· corriente de placa»).
+**Gate**: `tests/placa_etapas.test.js` (caso sintético que falla con la regla anterior).
