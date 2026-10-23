@@ -8222,3 +8222,9 @@ Node 22, sin error). Datos de Lorica T1 desde su Chrome: 9 campos más, verifica
 del secundario 563,82 A = p99 del SCADA detrás del 67,4 %). Intactos: `hi_final` 1,434, «muy bueno», la carga del primario
 (343 A). Cargabilidad SCADA, recargada: «Oficial» **67,4 % CRG 3** · secundario 837 A · 20,0 MVA · 67,4 % sin aviso; la
 cifra SCADA del equipo sigue en 112,1 % provisional (la da el primario de 34,5 kV) hasta que él decida la homologación.
+
+**166.10 Corrección tras publicar (2026-10-23).** «noto que cuando entro a los equipos en el segmento SCADA, no aparece la
+placa del equipo como me lo habías propuesto»: la vista previa que aprobó mostraba el panel ABIERTO (foto + lectura); tras la
+revisión lo dejé plegado en una línea —cambio posterior a su «procede», no consultado— y no se veía. Ahora abre por defecto
+(se puede plegar). Además, el detalle muestra la nota de la homologación decidida (`ADR-167`). Banco: abierto con foto, nota
+visible, consola limpia. **Lección**: lo que él aprueba en la vista previa no se cambia después sin preguntarle.
