@@ -181,7 +181,10 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         el('span', { class: 'cs-dato' }, el('b', {}, 'Potencia: '), leer(tx, 'placa.potencia_kva') ? num(Number(leer(tx, 'placa.potencia_kva')) / 1000, 1) + ' MVA' : '—')),
       tablaDevanados(a),
       el('p', { class: 'cs-dato', style: 'margin:4px 0 0' }, el('b', {}, 'Punto SCADA: '), a.fila ? (claveEfectiva(a.fila) || 'sin punto') : 'sin homologación',
-        hom ? ' · ' + (ESTADOS[hom.estado] || hom.estado) : ''),
+        hom ? ' · ' + (ESTADOS[hom.estado] || hom.estado) : '',
+        // La nota de la decisión del Ingeniero (por qué se confirmó o excluyó) se lee en el equipo, no solo en la administración.
+        hom && (hom.estado === 'confirmada' || hom.estado === 'excluida') && a.fila && a.fila.decision && a.fila.decision.nota
+          ? el('span', { class: 'cs-sub' }, ' — ' + a.fila.decision.nota) : null),
       hom && hom.estado === 'pendiente' && hom.avisos.length ? el('ul', { class: 'cs-avisos' },
         hom.avisos.filter((k) => AVISOS[k]).map((k) => el('li', {}, AVISOS[k].texto))) : null);
   }

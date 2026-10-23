@@ -1,9 +1,10 @@
 // ══════════════════════════════════════════════════════════════
 // SGM · TRANSPOWER — Cargabilidad SCADA · panel «PLACA CARACTERÍSTICA» del equipo · TODO-69, ADR-166
 // ──────────────────────────────────────────────────────────────
-// Plegado por defecto (no empuja el rango ni las curvas); en el resumen, cuántas diferencias tiene. Dentro: la foto
-// (ampliar, girar, tamaño real, abrir aparte), lo que se leyó de la placa y las diferencias con la plataforma, con
-// lo que se comparó y lo que no. Solo se MUESTRA: ningún dato oficial cambia desde aquí.
+// ABIERTO por defecto, como en la vista previa que aprobó el Ingeniero (2026-10-22; plegarlo lo escondía, 2026-10-23);
+// se puede plegar, y el resumen dice cuántas diferencias tiene. Dentro: la foto (ampliar, girar, tamaño real, abrir
+// aparte), lo que se leyó de la placa y las diferencias con la plataforma, con lo que se comparó y lo que no. Solo se
+// MUESTRA: ningún dato oficial cambia desde aquí.
 // Archivo NUEVO (L-102), cargado con import() desde detalle.js: si falla, su ranura queda oculta.
 // ══════════════════════════════════════════════════════════════
 
@@ -64,7 +65,7 @@ export async function pintarPlaca(nodo, { tx, titulo, vigente = () => true }) {
   nodo.hidden = false;
   const resumen = el('summary', {}, el('span', { id: 'csPlacaTitulo', class: 'cs-placa-tit' }, 'Placa característica'), el('span', { class: 'cs-sub cs-placa-res' }, 'leyendo…'));
   const cuerpo = el('div', { class: 'cs-placa-cuerpo' }, el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo la placa…'));
-  const det = el('details', { class: 'cs-placa-det' }, resumen, cuerpo);
+  const det = el('details', { class: 'cs-placa-det', open: true }, resumen, cuerpo);
   poner(nodo, det);
   const ponerRes = (t) => { resumen.lastChild.textContent = t; };
   const r = await leerPlaca(tx && tx.id);
