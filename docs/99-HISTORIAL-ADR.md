@@ -8215,3 +8215,10 @@ antes de elegir el lado), W-11 (cada valor lo decidió él). NO revisado externa
 homologación no está confirmada y el cálculo toma el mayor lado: confirmarla con solo 13,8 kV es SU decisión. Pendiente
 suyo: carga del primario (343 A del Excel); que SCADA/Operación revise la señal de 34,5 kV; corregir su Excel (una
 reimportación devolvería 8.366,7 A y 44 %). Crudo: bóveda `2026-10-23-diferencias-placa-ampacidad/revision-uno-a-uno/`.
+
+**167.9 Verificado tras publicar (2026-10-23).** `onMuestraCreate` desplegada (`firebase deploy --only functions:onMuestraCreate`,
+Node 22, sin error). Datos de Lorica T1 desde su Chrome: 9 campos más, verificados al releer (`crg_pct_medido` 67,4,
+`calif_crg` 3, fuente `scada` / `2026-09` / nota, `hi_bruto` y `hi_recalculado` 2,425, `bucket_recalculado` «bueno» y la carga
+del secundario 563,82 A = p99 del SCADA detrás del 67,4 %). Intactos: `hi_final` 1,434, «muy bueno», la carga del primario
+(343 A). Cargabilidad SCADA, recargada: «Oficial» **67,4 % CRG 3** · secundario 837 A · 20,0 MVA · 67,4 % sin aviso; la
+cifra SCADA del equipo sigue en 112,1 % provisional (la da el primario de 34,5 kV) hasta que él decida la homologación.
