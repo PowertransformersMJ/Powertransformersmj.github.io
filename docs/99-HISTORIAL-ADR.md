@@ -8045,3 +8045,50 @@ secretos. «El espejo cumple la copia mensual» → falso, por lo mismo; (J) sig
 *Recortado (2026-10-19, a pedido del Ingeniero):* se retiraron de este texto público los detalles de qué guarda el espejo
 y cómo se protege (dónde están las credenciales, qué valores van tachados, qué documentos de cliente viajan, cómo funciona
 el candado); viven en el espejo privado. La versión anterior sigue en el historial de git de este repo (`01a9547`).
+
+## 165. ADR-165 — Cargabilidad SCADA: todos los devanados de placa de cada transformador (tensión, ampacidad, potencia calculada y carga), en la lista, «Varios meses», el CSV y el detalle (TODO-69) ⟦OPUS-5.5⟧ (2026-10-22)
+
+> «situate en cargabilidad SCADA, necesito que se pueda apreciar la potencia de todos los devanados y su ampacidad por cada
+> transformador» (2026-10-22). Tras la vista previa en su Chrome: «no veo en producción lo que te pedí, valida con la
+> extensión de chrome» → se publica.
+
+**165.1 Causa raíz.** La lista solo nombraba el devanado que da la cifra y el detalle daba tensión y amperios en una línea
+de texto, con UNA potencia de placa por equipo. En los de tres devanados (110/34,5/13,8 kV) cada uno tiene su potencia y
+puede ser el terciario el sobrecargado (Río Sinú T1A: terciario 15 MVA al 119,7 %, primario al 68 %), sin que se viera.
+El parque no guarda potencia por devanado (`MODELO-DATOS-v2`): solo tensión y ampacidad (`electrico.*`).
+
+**165.2 Solución.** Archivo NUEVO `domain/scada_carga_devanados.js` (L-102): `devanadosDe(tx, calc)` da por devanado
+tensión, ampacidad, potencia CALCULADA (√3·kV·A; monofásico kV·A, o ÷√3 si cuadra mejor con la placa = devanado
+fase-neutro), niveles SCADA que lo miden, carga p99 y si da la cifra. La carga por devanado solo se publica si el equipo
+tiene cifra (circuito sin confirmar / excluida / sin homologación no dan número, tampoco sus devanados). Aviso si un
+devanado supera 1,5 × la placa, con causa: ≈ ×10 errata (TODO-54), ≈ √3 o 3 parece monofásico, otra = ampacidad de otra
+potencia. `filasLista`/`filasPeriodo` agregan `devanadosPlaca` (campo propio); lista: columna «Devanados: tensión ·
+ampacidad · potencia · carga» en ambos modos y 12 columnas de CSV (`*_potencia_calc_MVA`); detalle: tabla `#csDevanados`
+con el rango (y «…» mientras lee) en lugar de la línea «Placa:».
+
+**165.3 No-regresión.** Cifra del equipo, bandas, firmeza, sostenida, oficial y orden: intactos (la función solo lee
+`calc`). El `devanados` interno de `calcularEquipo` no se toca. El detalle no importa nada nuevo de `lista.js` (prueba de
+texto). Sin campo nuevo (módulo viejo en caché) la celda cae en lo de antes. IDs y rutas intactos.
+
+**165.4 Verificación.** `tests/scada_carga_devanados.test.js` (15, sintéticos: potencias, monofásicos, avisos, compuerta
+sin cifra, integración con `filasLista`, CSV, L-102 y compilación de lista/detalle) · `test:unit` 2.912 en verde (2 omitidas, como antes) · lint ·
+banco con el parque del 8-oct y el SCADA de septiembre (puerto 8136, franja roja L-135): 13 avisos en 9 equipos, circuitos
+sin carga por devanado, sin errores de consola. Validación en su Chrome con la extensión tras publicar.
+
+**165.5 Anti-patterns evitados.** Inventar una «potencia de placa por devanado» (se rotula CALCULADA); sumar niveles;
+exportar desde un módulo ya publicado (L-102); mostrar números donde la regla del Ingeniero dice que no hay.
+
+**165.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_devanados.js`, `tests/scada_carga_devanados.test.js`.
+Modificados: `domain/scada_carga_vista.js`, `domain/scada_carga_periodo.js`, `ui/cargabilidad-scada/lista.js`,
+`ui/cargabilidad-scada/detalle.js`, `css/cargabilidad-scada.css`, `docs/23`, `docs/53 §3`. INTACTOS: `scada_carga_kpis.js`,
+`scada_carga_config.js`, datos de Firestore (nada se escribe).
+
+**165.7 Doctrina.** §3.2 (aditivo), §3.3 (lectura real antes de construir: 202/208 con P y S), W-11 secuencia practicada
+(lectura → construcción aislada → banco → revisión adversarial `wf_2b7b948d-071`: 2 altas y 4 medias corregidas).
+**Decisión de criterio pendiente suya**: el umbral 1,5 × placa y los textos de causa son propuesta del equipo.
+
+**165.8 Verificado sano / no re-auditar.** √3·kV·A vale en estrella y en delta (tensión y corriente de línea); 182
+primarios y 154 secundarios entre 0,9 y 1,1 × placa. El 1,5 no choca con placas ONAN (máx. ONAF/ONAN del parque 1,2). El
+modo «Varios meses» usa el p99 de TODAS las horas del periodo por devanado. **Pendiente**: Lorica T1 sale con errata ×10 en
+el parque del 8-oct aunque TODO-54/`§74.23` la daban por descartada → leer producción antes de corregir nada.
+Crudo: bóveda `2026-10-22-devanados-scada/`. NO revisado externamente.
