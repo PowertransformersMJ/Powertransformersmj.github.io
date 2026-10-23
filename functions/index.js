@@ -47,6 +47,7 @@ const IA_DISPATCHER = new Agent({ bodyTimeout: 0, headersTimeout: 0, keepAliveTi
 // La carpeta ./domain/ se sincroniza automáticamente desde
 // ../assets/js/domain/ por functions/prepare-deploy.mjs (predeploy hook).
 import { snapshotSaludCompleto, fusionarConservandoCondicion } from './domain/salud_activos.js';
+import { cargaActualDesdeTransformador, conservarFuenteCRG } from './domain/salud_carga_vigente.js';
 import { mergeConBaseline } from './domain/umbrales_salud_baseline.js';
 
 // G010: lee la config de umbrales editada por el admin (F18) con
@@ -130,6 +131,9 @@ export const onMuestraCreate = onDocumentCreated(
       muestraDGA: dga, muestraADFQ: adfq, muestraFUR: fur,
       her: tx.salud_actual && tx.salud_actual.ubicacion_fuga_dominante,
       pyt: tx.salud_actual && tx.salud_actual.calif_pyt,
+      // Sin la carga, el motor dejaba la cargabilidad (CRG) en nulo con cada muestra nueva (ADR-167): el % oficial
+      // del equipo manda y, si no hay, carga medida ÷ ampacidad, como en el importador.
+      cargaActual: cargaActualDesdeTransformador(tx),
       umbrales: await leerUmbralesActivos(db)   // G010: config F18
     });
 
@@ -139,7 +143,7 @@ export const onMuestraCreate = onDocumentCreated(
     // reemplazaba `salud_actual` entero y borraba en silencio la condición del
     // Excel en cuanto alguien subía una muestra; el motor queda al lado, en
     // `hi_recalculado`, que es lo que hace reversible la decisión.
-    const vigente = fusionarConservandoCondicion(tx.salud_actual, snap);
+    const vigente = conservarFuenteCRG(tx.salud_actual, fusionarConservandoCondicion(tx.salud_actual, snap));
     await txRef.update({ salud_actual: vigente });
     await txRef.collection('historial_hi').add({
       trigger: 'muestra_nueva',
