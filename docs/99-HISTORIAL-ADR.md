@@ -8503,3 +8503,13 @@ ONAF un equipo con la ventilación fuera de servicio; aplicar una placa dudosa (
 
 **172.7 Doctrina.** «Todo con base a la placa» (decisión del Ingeniero); W-11 con vista previa fiel; ampacidad siempre con su
 carga; lo dudoso queda como está y se le pregunta. NO revisado externamente.
+
+**172.8 Verificado tras publicar (2026-10-23).** `main` cce4e93; CI y Pages en verde; 3 archivos servidos = `main`. DATOS: 22
+transformadores, **33 campos escritos y releídos** (corrientes nominales de placa + 2 cargas ÷ 10); barrido después: **435
+devanados = placa**, solo difieren las 5 excepciones (Ferrocarril ×2, Momil ×2, Monterrey). Cifra «A la fecha» con la
+corriente de placa (ene–oct 2026): Guatapurí T2 **101,1 % CRG 5** (el ×10 la escondía), Río Sinú T2A 116,8 % CRG 5, El
+Desastre 97,9 % (provisional), Coveñas T2 90,9 %, Santa Teresa T1 72,3 % CRG 3 (provisional; antes 59,7 %), Mariangola
+88,6 %, El Difícil 81,2 %, Zaragocilla T3 81,3 %, San Jacinto T2A 87,7 %; y 6 equipos que no tenían ampacidad ya tienen
+cifra (Pueblo Nuevo 54,2 %, San Carlos 52 %, SLV 45,6 %, San Onofre 68,7 %, ECJ T2 46,8 %; Guatapurí T3 se mide un circuito).
+En SU Chrome la tabla nueva cargó pero `panel-placa.js` venía de la caché (versión sin `alLeer`, L-102): quedaba «leyendo la
+placa…» → **respaldo**: si el panel no entrega la placa (caché o falla), el detalle la lee por su cuenta (`placaParaTabla`).
