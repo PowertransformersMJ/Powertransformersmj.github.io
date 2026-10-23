@@ -49,6 +49,7 @@
 | §171 | ADR-171 — **Bosque T2** con su placa (WEG 40 MVA, 67 kV): ampacidades 344,7/1.673,5 A, CRG oficial 79,1 % (CRG 4); placa reconectable no grave · TODO-54 | 8440 |
 | §172 | ADR-172 — **Cargabilidad SCADA**: tabla «Devanados de placa» con valores de PLACA; la cifra oficial con la corriente de placa (32 devanados) · TODO-69/54 | 8484 |
 | §173 | ADR-173 — **Placas v4** (Magangué T2A, Montería T2A: corriente de MT impresa) + una corriente de las notas que cuadra mejor con OTRO devanado no se rotula «impresa» (L-155) · TODO-54/69 | 8534 |
+| §174 | ADR-174 — **Cargabilidad SCADA**: detalle de los umbrales de placa en las barras (recuadro, leyenda, tabla con la lectura «al borde de la ONAN»/«supera la ONAF») · TODO-69 | 8582 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

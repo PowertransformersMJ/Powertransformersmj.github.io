@@ -308,3 +308,25 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-devmes-aviso { color: #8a5a00; font-weight: 600; margin: 2px 0; }
 .cscada .cs-devmes-res { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin: 0 0 12px; }
 .cscada .cs-devmes-res-graf { min-height: 270px; border: 1px solid var(--cs-line); border-radius: 12px; background: #fff; padding: 4px; }
+/* Detalle de los umbrales (2026-10-23): leyenda de las barras y tabla con la carga frente a cada etapa de placa */
+.cscada .cs-devmes-ley { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: -4px 0 10px; font-size: 12.5px; color: #33475f; }
+.cscada .cs-ley-it { display: inline-flex; align-items: center; gap: 6px; }
+.cscada .cs-ley { display: inline-block; flex: none; }
+.cscada .cs-ley-recuadro { width: 16px; height: 12px; border: 1px solid #c3cede; background: #fff; border-radius: 2px; box-shadow: inset 0 3px 0 #fff, inset 0 4px 0 #C91A14, inset 0 7px 0 #fff, inset 0 8px 0 #B85C00; }
+.cscada .cs-ley-caja { width: 16px; height: 12px; border: 1.8px solid #5b6b82; background: rgba(91, 107, 130, 0.14); border-radius: 2px; }
+.cscada .cs-ley-onan { width: 18px; height: 0; border-top: 3px solid #B85C00; }
+.cscada .cs-ley-barra { width: 8px; height: 14px; background: #5b6b82; border-radius: 1px; }
+.cscada .cs-ley-raya { width: 12px; height: 14px; background: repeating-linear-gradient(135deg, #5b6b82 0 2px, #fff 2px 5px); }
+.cscada .cs-devmes-det { margin: 0 0 14px; }
+.cscada .cs-devmes-det td, .cscada .cs-devmes-det th { vertical-align: top; }
+.cscada .cs-lect { font-weight: 600; }
+.cscada .cs-lect--supera { color: #b42318; }
+.cscada .cs-lect--ventiladores { color: #8a5a00; }
+.cscada .cs-lect--borde { color: #8a5a00; }
+.cscada .cs-lect--bordeTope { color: #b45309; }
+.cscada .cs-lect--neutro { color: #1f3656; }
+/* En el detalle, «impresa/calculada», «provisional» y el tramo van en su propio renglón sin hueco (el .cs-sub general es bloque). */
+.cscada .cs-devmes-det .cs-dato .cs-sub { display: inline; margin-left: 8px; }
+.cscada .cs-devmes-det td .cs-sub { margin: 0 0 2px; }
+.cscada .cs-lect--holgado { color: #1f6b3a; }
+.cscada .cs-lect--sinLimite { color: #5b6b82; font-weight: 400; }
