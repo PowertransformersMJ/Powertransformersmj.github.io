@@ -147,7 +147,12 @@ export function revisionPlaca(placa, tx) {
     if (!tp.nominal.length) { if (t[k]) sinComparar.push('tensión ' + DEV[k].toLowerCase()); continue; }
     comparados.push('tensión ' + DEV[k].toLowerCase());
     if (tp.nominal.some((c) => cerca(c, kv, 0.005) || cerca(c * R3, kv, 0.005))) continue;
-    if (tp.min != null && kv >= tp.min * 0.995 && kv <= tp.max * 1.005) add('Tensión ' + DEV[k].toLowerCase(), t[k], kv + ' kV', 'la plataforma tiene una toma del cambiador, no la tensión nominal');
+    // Placa RECONECTABLE («110 kV … (religable a 67 kV …)», «reconectable a 66 kV»): la plataforma puede estar en la otra
+    // conexión que la placa nombra; no es error, se anota (2026-10-23, Bosque T2).
+    const alternas = [...String(t[k] || '').matchAll(/(?:religable|reconectable|conexi[oó]n\s+alternativa)\s*(?:a\s*)?(\d+(?:[.,]\d+)?)\s*kV/gi)]
+      .map((m) => Number(m[1].replace(',', '.')));
+    if (alternas.some((c) => cerca(c, kv, 0.02))) add('Tensión ' + DEV[k].toLowerCase(), t[k], kv + ' kV', 'la plataforma está en la conexión alternativa que nombra la placa (reconectable)');
+    else if (tp.min != null && kv >= tp.min * 0.995 && kv <= tp.max * 1.005) add('Tensión ' + DEV[k].toLowerCase(), t[k], kv + ' kV', 'la plataforma tiene una toma del cambiador, no la tensión nominal');
     else add('Tensión ' + DEV[k].toLowerCase(), t[k], kv + ' kV', 'no coincide con la placa', true);
   }
   // Ampacidades: contra las corrientes impresas en el texto de ESE devanado y las que dan las etapas de la placa
