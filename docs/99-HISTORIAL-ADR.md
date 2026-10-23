@@ -8595,17 +8595,25 @@ ONAF intermedia de placas de tres etapas). Espacio arriba según los renglones (
 cada línea, la ONAN bajo la suya si quedaba cerca— DESCARTADO en la vista previa: con tres etapas y un devanado diez veces menor
 que otro, se pisaban. (2) Nombres de abajo en tres renglones, `tickangle: 0`. (3) Leyenda HTML. (4) Tabla «Detalle de los
 umbrales de placa»: una columna por etapa (A, MVA, impresa/calculada, carga al %), la carga a la fecha y la LECTURA:
-«no necesita ventiladores» · «al borde de la ONAN» (≥ 90 %, banda CRG 5) · «necesita los ventiladores» · «supera la ONAF en
-X A» · compensación. Lógica pura en `domain/scada_umbrales_detalle.js` (NUEVO, L-102).
+«no necesita ventiladores» · «al borde de la ONAN» · «necesita los ventiladores» · «al borde de la ONAF / de su límite» ·
+«supera la ONAF en X A» · compensación. «Al borde» = la banda CRG 5 de los umbrales de salud CONFIGURADOS (`califCRG`, la del
+chip), no un 90 % fijo; «holgado» va en verde solo si el límite mayor está en CRG 1–3. Leyenda y título según lo que hay
+(placa, una etapa, ampacidad de la plataforma). Nombres de abajo partidos según el ancho de la tarjeta. Lógica pura en
+`domain/scada_umbrales_detalle.js` (NUEVO, L-102).
 
 **174.3 No-regresión.** Mismos datos y mismas cifras (`umbralesDevanado`, `serieMensualEquipo`); los bloques por devanado, sus
 gráficas mes a mes y sus tablas no cambian. Sin placa, el límite sigue siendo la ampacidad de la plataforma (rótulo gris).
 
 **174.4 Verificación.** `tests/scada_umbrales_detalle.test.js` (6) + cableado/L-102 en `scada_carga_mensual.test.js`;
-`test:unit` 2.988 (2.986 en verde, 2 omitidas); `lint:html` limpio. Vista previa fiel en SU Chrome (módulos de la rama por
+`test:unit` 2.989 (2.987 en verde, 2 omitidas); `lint:html` limpio. Revisión adversarial `wf_019d3858-81b` (2 lentes con
+Plotly real en un arnés de 11 escenarios + 11 refutaciones, Opus): 4 defectos REALES corregidos antes de publicar — (1) placa de
+una sola etapa o sin placa al 97,5 % de su único límite salía «holgado» en VERDE junto a un CRG 5 (el borde solo se medía contra
+la ONAN); (2) leyenda y tabla decían «de placa / ONAN» con la ampacidad de la plataforma; (3) renglones largos de abajo se
+pisaban con tres devanados en tarjetas de ~340 px; (4) renglón en blanco en las celdas (`.cs-sub` es bloque). Vista previa fiel en SU Chrome (módulos de la rama por
 jsDelivr, datos reales): Río Sinú T1A (primario «al borde de la ONAN» 98,6 %; terciario «supera la ONAF en 103 A»), Montería
 T2A (tres etapas), Santa Teresa T1 (una etapa), Momil («al borde de la ONAN» 97,4 %), Bosque T4 (compensación, sin señal),
-Valencia T1 (supera la ONAN en 39 A).
+Valencia T1 (supera la ONAN en 39 A); tras la revisión: Puerto Libertador T2 (sin placa: leyenda y título de la ampacidad
+de la plataforma) y Río Sinú T1A en tarjeta de 336 px (renglones partidos, sin pisarse).
 
 **174.5 Anti-patterns evitados.** Rótulos que la barra tapa; rótulos por línea que se pisan con escalas distintas; inclinar
 textos; decir «no necesita ventiladores» a una carga al 98 % de la ONAN; inventar un límite para un terciario de compensación.
@@ -8615,4 +8623,9 @@ textos; decir «no necesita ventiladores» a una carga al 98 % de la ONAN; inven
 INTACTOS: `scada_devanados_mes.js`, `placa_etapas.js`, `detalle.js`, `panel-mensual.js`.
 
 **174.7 Doctrina.** UI sensible con vista previa fiel (L-56) y su «procede»; el veredicto en palabras sale del VALOR contra la
-placa. NO revisado externamente.
+placa. Crudo + síntesis de la revisión → bóveda `2026-10-23-umbrales-graficas/`. NO revisado externamente.
+
+**174.8 Verificado sano / no re-auditar.** Refutados (no son defecto con datos reales): el empate de rótulos del primer intento
+(nunca llegó a producción); terciario de compensación con corriente (no ocurre en el parque; igual se cambió el texto a «la
+placa no le da límite de carga»); tabla sin columnas de etapa (caso inventado; igual se añadió su celda). Viene de ANTES y no se
+tocó: en la gráfica mes a mes de cada devanado la «Ampacidad» de la plataforma va en rojo y escribe «— MVA» si falta la tensión.
