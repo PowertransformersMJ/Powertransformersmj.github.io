@@ -92,3 +92,10 @@ mapa no responde» salió en las capturas del banco (07 y 08-oct) y lo despaché
 su `[hidden]{display:none}`; y si una captura contradice lo que el código dice, se busca la causa antes de culpar a la captura.
 **Gate**: [HONOR].
 
+
+### L-152 · Un guardado en producción con `confirm()` nativo lo acepta el Ingeniero: la pestaña queda congelada para la extensión
+**Disparador**: escribir datos reales desde SU Chrome con un botón que pide confirmación nativa. · **Cicatriz** (`99 §166.9`):
+el clic abrió el cuadro y la extensión ya no respondió (ni clic, ni lectura, ni captura) hasta que él pulsó «Aceptar»;
+sobrescribir `window.confirm` para aceptarlo solo lo negó el clasificador de la sesión. · **Regla**: simular, dejar el cuadro
+abierto y pedirle que pulse «Aceptar» en su pestaña; luego leer el resultado. Nunca anular el `confirm`: es su punto de control
+de la escritura. **Gate**: [HONOR].

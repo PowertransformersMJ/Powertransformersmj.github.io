@@ -8159,3 +8159,13 @@ lectura (`wf_34cc6555-676`) → construcción aislada → banco → revisión ad
 **166.8 Verificado sano / no re-auditar.** Cuota: 55,7 MB en Firestore, lejos de 1 GiB. `get` para el equipo, `list` solo
 admin con `limit ≤ 50`. 73 de las fotos elegidas traían GPS en el original: las salidas no traen ninguno. Dentro de una
 lectura no se mezclan placa vieja y nueva. Crudo: bóveda `2026-10-22-devanados-scada/placa/`.
+
+**166.9 Verificado tras publicar (2026-10-23).** `main` d789a3c; CI y Deploy de Pages en verde; los 8 archivos servidos =
+`main` (shasum); reglas desplegadas (`firebase deploy --only firestore:rules`, compilan). En SU Chrome con la extensión
+(sesión real «IM»): 10 de 10 partes, simulación **205 nuevas · 0 rechazadas**; el guardado lo aceptó ÉL en el cuadro de
+confirmación (L-152) → **205 de 205 guardadas y verificadas por bytes** (carga `placas-2026-10-22-202610231203`). Cargabilidad
+SCADA (módulos renovados con `cache:'reload'`): Lorica T1 muestra foto (1200×1600), 6 tablas de lectura y **1 diferencia
+importante: ampacidad del secundario ×10** (836,7 A en placa · 8.366,7 A en la plataforma, igual que `§165.9`); visor gira sin
+recortar; consola sin errores. Barrido de solo lectura del parque en producción: **205 con placa, 3 sin, 0 errores de
+lectura, todas con foto; 57 equipos con 91 diferencias (36 importantes)**: ampacidad 31, año 22, tensión 22, serie 13,
+potencia 3. Ningún dato del inventario cambió: cada corrección es decisión suya, una a una (`§166.7`).
