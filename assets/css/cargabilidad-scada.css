@@ -321,5 +321,6 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada .cs-lect { font-weight: 600; }
 .cscada .cs-lect--supera { color: #b42318; }
 .cscada .cs-lect--ventiladores { color: #8a5a00; }
+.cscada .cs-lect--borde { color: #8a5a00; }
 .cscada .cs-lect--holgado { color: #1f6b3a; }
 .cscada .cs-lect--sinLimite { color: #5b6b82; font-weight: 400; }

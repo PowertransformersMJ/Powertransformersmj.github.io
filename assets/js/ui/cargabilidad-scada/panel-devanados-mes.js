@@ -160,6 +160,8 @@ const LECTURA = {
   sinLimite: () => 'Terciario de compensación: no lleva carga',
   holgado: (l, u) => (u.onan ? 'No necesita ventiladores: está dentro de la ONAN' : 'Dentro de su límite') + '; le faltan '
     + ampTexto(l.margenA) + ' A para ' + nombreTope(u),
+  borde: (l, u) => 'Al borde de la ONAN (' + num(l.pctOnan, 1) + ' %): sin ventiladores le faltan ' + ampTexto(l.margenOnanA)
+    + ' A; con ventiladores, ' + ampTexto(l.margenA) + ' A para ' + nombreTope(u),
   ventiladores: (l, u) => 'Necesita los ventiladores: pasa la ONAN y está dentro de ' + nombreTope(u) + ' (le faltan ' + ampTexto(l.margenA) + ' A)',
   supera: (l, u) => 'Supera ' + nombreTope(u) + ' en ' + ampTexto(l.excesoA) + ' A (' + num(l.pctTope - 100, 1) + ' % por encima)'
 };

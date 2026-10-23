@@ -14,24 +14,29 @@ const ORDEN = ['ONAN', 'ONAF', 'ONAF II'];
  * Dónde está una corriente frente a los umbrales de su devanado (`umbralesDevanado`).
  * @param {number|null} i  corriente a la fecha (A)
  * @param {object} u       umbrales del devanado: {onaf, onan, tope, dePlaca, sinLimite}
- * @returns {null | {clase: 'sinLimite'|'holgado'|'ventiladores'|'supera', pctOnan: number|null, pctTope: number|null,
- *   margenA: number|null, excesoA: number|null}}
- *   `holgado`: no pasa la ONAN (o, sin ONAN aparte, su único límite); `ventiladores`: pasa la ONAN sin pasar la ONAF (necesita
- *   los ventiladores); `supera`: pasa el límite mayor. `margenA` = lo que falta para el límite mayor; `excesoA` = lo que lo pasa.
- *   null si no hay corriente o el devanado no tiene límite con corriente.
+ * @returns {null | {clase: 'sinLimite'|'holgado'|'borde'|'ventiladores'|'supera', pctOnan: number|null, pctTope: number|null,
+ *   margenA: number|null, margenOnanA: number|null, excesoA: number|null}}
+ *   `holgado`: no pasa la ONAN (o, sin ONAN aparte, su único límite); `borde`: no la pasa pero va a `BORDE` % o más de ella
+ *   (sin ventiladores le queda poco); `ventiladores`: pasa la ONAN sin pasar la ONAF (necesita los ventiladores); `supera`:
+ *   pasa el límite mayor. `margenA` = lo que falta para el límite mayor; `margenOnanA` = lo que falta para la ONAN; `excesoA` =
+ *   lo que pasa el límite mayor. null si no hay corriente o el devanado no tiene límite con corriente.
  */
 export function lecturaUmbral(i, u) {
   if (!u) return null;
-  if (u.sinLimite) return { clase: 'sinLimite', pctOnan: null, pctTope: null, margenA: null, excesoA: null };
+  if (u.sinLimite) return { clase: 'sinLimite', pctOnan: null, pctTope: null, margenA: null, margenOnanA: null, excesoA: null };
   const tope = u.onaf && u.onaf.A > 0 ? u.onaf.A : null;
   if (i == null || !Number.isFinite(i) || tope == null) return null;
   const onan = u.onan && u.onan.A > 0 ? u.onan.A : null;
   const pctTope = 100 * i / tope;
   const pctOnan = onan != null ? 100 * i / onan : null;
-  if (i > tope) return { clase: 'supera', pctOnan, pctTope, margenA: null, excesoA: i - tope };
-  const clase = onan != null && i > onan ? 'ventiladores' : 'holgado';
-  return { clase, pctOnan, pctTope, margenA: tope - i, excesoA: null };
+  if (i > tope) return { clase: 'supera', pctOnan, pctTope, margenA: null, margenOnanA: null, excesoA: i - tope };
+  if (onan != null && i > onan) return { clase: 'ventiladores', pctOnan, pctTope, margenA: tope - i, margenOnanA: null, excesoA: null };
+  const clase = onan != null && pctOnan >= BORDE ? 'borde' : 'holgado';
+  return { clase, pctOnan, pctTope, margenA: tope - i, margenOnanA: onan != null ? onan - i : null, excesoA: null };
 }
+
+/** Desde qué % de la ONAN la carga está «al borde» sin ventiladores: el 90 % de la banda CRG 5 (MO.00418). */
+export const BORDE = 90;
 
 /**
  * Columnas de etapa de la tabla de detalle: las etapas que traen los devanados, en orden ONAN → ONAF → ONAF II, y al final

@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { lecturaUmbral, columnasEtapas, onanDebajo } from '../assets/js/domain/scada_umbrales_detalle.js';
+import { lecturaUmbral, columnasEtapas, onanDebajo, BORDE } from '../assets/js/domain/scada_umbrales_detalle.js';
 
 const et = (nombre, A, mva = null, origen = 'calculada') => ({ nombre, A, mva, origen });
 const dos = { etapas: [et('ONAN', 300), et('ONAF', 400)], onan: et('ONAN', 300), onaf: et('ONAF', 400), tope: 'ONAF', dePlaca: true, sinLimite: false };
@@ -16,8 +16,12 @@ test('lectura: dentro de ONAN, entre ONAN y ONAF (necesita ventiladores) y por e
   assert.equal(b.clase, 'ventiladores'); casi(b.margenA, 50);
   const c = lecturaUmbral(460, dos);
   assert.equal(c.clase, 'supera'); casi(c.excesoA, 60); casi(c.pctTope, 115); assert.equal(c.margenA, null);
-  // En el borde exacto no «supera»: igual a la ONAN sigue sin ventiladores; igual a la ONAF, con ventiladores.
-  assert.equal(lecturaUmbral(300, dos).clase, 'holgado'); assert.equal(lecturaUmbral(400, dos).clase, 'ventiladores');
+  // En el borde exacto no «supera»: igual a la ONAN sigue sin ventiladores (al borde); igual a la ONAF, con ventiladores.
+  assert.equal(lecturaUmbral(300, dos).clase, 'borde'); assert.equal(lecturaUmbral(400, dos).clase, 'ventiladores');
+  // «Al borde» desde el 90 % de la ONAN (banda CRG 5): le dice cuánto le falta sin y con ventiladores.
+  const borde = lecturaUmbral(280, dos);
+  assert.equal(borde.clase, 'borde'); casi(borde.margenOnanA, 20); casi(borde.margenA, 120);
+  assert.equal(lecturaUmbral(269, dos).clase, 'holgado'); assert.equal(lecturaUmbral(270, dos).clase, 'borde'); assert.equal(BORDE, 90);
 });
 
 test('lectura: placa de una sola etapa (ONAN), sin placa (ampacidad), compensación y sin carga', () => {
