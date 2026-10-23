@@ -142,6 +142,7 @@ function leyendaResumen(registrados, U) {
   const it = (clase, texto) => el('span', { class: 'cs-ley-it' }, el('i', { class: 'cs-ley ' + clase, 'aria-hidden': 'true' }), texto);
   const tres = registrados.some((b) => U[b.d].etapas.length > 2);
   return el('div', { class: 'cs-devmes-ley', role: 'note', 'aria-label': 'Cómo leer las barras' },
+    it('cs-ley-recuadro', 'Recuadro: los umbrales de placa del devanado, de mayor a menor (rojo con ventiladores, naranja sin ventiladores)'),
     it('cs-ley-caja', 'Caja clara: límite mayor de placa (ONAF, con ventiladores; si la placa no trae ventiladores, la ONAN)'),
     it('cs-ley-onan', 'Marca: ONAN, límite sin ventiladores' + (tres ? ' (en placas de tres etapas, otra marca para la ONAF intermedia)' : '')),
     it('cs-ley-barra', 'Barra llena: carga a la fecha'),
