@@ -31,6 +31,10 @@
 - Ventana del mes = las horas que el SCADA ROTULA en él (`ventanaDeMes`). Gotchas → L-113 (`37`), L-117 (`36`).
 - **Mes a mes y acumulada** (`99 §168`, detalle de cada equipo): mes = «Un mes»; acumulada = «Varios meses» desde el primer mes con
   datos (12 meses de calendario). **«A la fecha» = la cargabilidad oficial** al revisar cada equipo (decisión suya 2026-10-23).
+- **Cada devanado frente a su PLACA** (`99 §169`): límite = la mayor etapa de la placa (ONAF; ONAN si la placa solo trae una;
+  ONAF II si tres) a la tensión de placa de la CONEXIÓN del equipo; también el % de ONAN (sin ventiladores). La cifra oficial
+  sigue con la ampacidad de la plataforma; si no es la de placa, se avisa y se corrige en la revisión uno a uno (TODO-54).
+  Con la ventilación OBSOLETA el límite usable es la ONAN, no la ONAF (Corozal y Chiriguaná: ~120–135 % de su ONAN, `§169.9`).
 - **Periodo de varios meses** (`99 §159`): su cifra es el p99 de TODAS sus horas (exacto con las 90 más altas de cada mes),
   NUNCA el promedio ni la mediana de los p99 mensuales (subestiman ~10–14 pts, hasta 37) ni el peor mes (sobrestima ~8).
 - **Periodo e historia** (`§159`, `scada_carga_periodo.js`): «Supera su capacidad desde» = la PRIMERA ventana de 2 h

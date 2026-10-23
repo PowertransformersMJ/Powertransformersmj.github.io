@@ -55,6 +55,6 @@
 | **TODO-35/58** | **Cola de FICHAS TÉCNICAS → hoja [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md)** (revisada al 09-27). Lo que espera respuesta suya → lista **(I)**. **CF-20..CF-31 autorizados en bloque** (09-22), salvo **CF-22** (volver a preguntar) y **CF-28** (decidido por `§103`). | 🔴 |
 | **TODO-60** | 🔴 **El Plan de Inversión ignora la criticidad**: `criticidad.nivel` no lo escribe ningún módulo de producción ⇒ `critN = 0` en los 208 y **el 25 % del ranking vale cero** (y la razón «Celda matriz» nunca se imprime). El arreglo ya existe y está probado en las otras tres vistas: derivarla de los usuarios. | 🔴 |
 | **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada**: la banda «mínima» se traga **144 de 208** (147 con los 3 sin dato); 14 equipos ≥20 MVA declaran ≤10 usuarios (870 MVA) → `99 §81.1`, `§107.4`. **El dato sigue faltando**; opciones → `§74.24`. **Decide él**: (A) dato · (C) excepción «transmisión» · (F) cortes de la Tabla 9. | 🔴 |
-| **TODO-54** | **Ampacidades contra la placa** (14 equipos; ×10: GUATAPURÍ T2, STA TERESA T1, LORICA T1) → bóveda `2026-10-23-diferencias-placa-ampacidad`. Lorica T1 ✅ (`§167`). Siguen 13. | 🟡 |
+| **TODO-54** | **Ampacidades contra la placa** (`§169.9`): 24 devanados + 18 tensiones (×10 GUATAPURÍ T2, STA TERESA T1) → bóveda `2026-10-23-diferencias-placa-ampacidad`. Lorica ✅ (`§167`); sigue STA TERESA. Su Excel: `.xlsx` de `§169.9`. | 🟡 |
 
 > **Fríos** (arquitectura, validaciones diferidas, colas viejas) → [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md).

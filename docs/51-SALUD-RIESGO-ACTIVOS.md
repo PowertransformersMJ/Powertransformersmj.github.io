@@ -102,6 +102,10 @@
   Cargabilidad_2025 (`§74.23`) llevó al parque la de 5 MVA (`§158.11`): revisar las repetidas ANTES de importar.
   *(Corregido 2026-10-11, `99 §162`: decía «los planes de carga no escriben ninguno», cierto solo para los de ppm.)*
 - `MODELO-DATOS-v2.md §2.8` dice `MAX(TDGC, C2H2)`: desactualizado, manda `52 §1`.
+- **Ampacidades del Excel copiadas de otra fila** (`99 §169.9`, cotejo con la FOTO de 58 placas): familias 502/1 255 A (30 MVA),
+  289/1 381 A (33 MVA), 66,94/167,35 A (4 MVA) puestas en equipos de otra potencia; y años de REPARACIÓN tomados como de
+  fabricación (la edad pesa en el HI). No usar la ampacidad ni el año del Excel sin la placa; lista para corregir en SU Excel →
+  `~/Downloads/Comparacion placa vs Salud de Activos 2026-10-23.xlsx` (local; crudos en la bóveda).
 
 ## 12. Riesgos de veracidad abiertos (→ TODO-73)
 - «ISO 55001» en textos que se FIRMAN (`fichas_diagnostico.js:327`, beneficio V2 de `ui/fichas/panel.js:240`): **SÍ tiene
