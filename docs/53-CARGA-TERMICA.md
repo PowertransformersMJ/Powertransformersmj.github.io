@@ -29,6 +29,8 @@
   devanados: **NUNCA se suman niveles**. Calibrada contra la carga oficial 2025: mediana del cociente 0,993.
 - **Firme / provisional**: firme solo si se cumple TODO: homologación automática (sin avisos que la frenen) o confirmada por el Ingeniero —y confirmada si lo que se mide es un circuito—, ampacidad en cada devanado, se mide el devanado que lleva la carga, cobertura ≥ 50 %, ≥ 72 h válidas, las 3 fases en la mayoría de las horas (con solo 2 en más del 50 % es provisional, `§125.2`), sin escala sospechosa y sin mes del rango sin leer (`firmeza` en `scada_carga_kpis.js`); la provisional va en gris con su motivo.
 - Ventana del mes = las horas que el SCADA ROTULA en él (`ventanaDeMes`). Gotchas → L-113 (`37`), L-117 (`36`).
+- **Mes a mes y acumulada** (`99 §168`, detalle de cada equipo): mes = «Un mes»; acumulada = «Varios meses» desde el primer mes con
+  datos (12 meses de calendario). **«A la fecha» = la cargabilidad oficial** al revisar cada equipo (decisión suya 2026-10-23).
 - **Periodo de varios meses** (`99 §159`): su cifra es el p99 de TODAS sus horas (exacto con las 90 más altas de cada mes),
   NUNCA el promedio ni la mediana de los p99 mensuales (subestiman ~10–14 pts, hasta 37) ni el peor mes (sobrestima ~8).
 - **Periodo e historia** (`§159`, `scada_carga_periodo.js`): «Supera su capacidad desde» = la PRIMERA ventana de 2 h

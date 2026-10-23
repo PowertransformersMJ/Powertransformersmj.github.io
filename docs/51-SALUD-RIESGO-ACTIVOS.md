@@ -42,7 +42,7 @@
   condición al guardar: escribe solo lo que cambió (`§154`, L-134 en `30`).
 - **Cargabilidad (CRG) desde el SCADA** (decisión del Ingeniero 2026-10-23, `99 §167`): el SCADA (reciente) reemplaza al Excel
   (antiguo), equipo por equipo en la revisión de placas; el % lleva su fuente (`crg_fuente/crg_periodo/crg_nota`) y una muestra
-  nueva ya no lo borra (`domain/salud_carga_vigente.js`). Lorica T1: el lado coherente (13,8 kV), por decisión suya.
+  nueva ya no lo borra (`domain/salud_carga_vigente.js`). Lorica T1: el lado coherente (13,8 kV); la cifra es la «A la fecha» (acumulada, `99 §168`).
 
 ## 4. Qué significa cada banda
 - Orden de lectura único 1 → 5 en todas las vistas, y una definición por banda pensada en riesgo y continuidad del

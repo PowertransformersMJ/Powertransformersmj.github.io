@@ -8236,3 +8236,42 @@ su mismo punto, mapa {13,8 kV → secundario}, 34,5 kV «No usar», niveles vist
 pendiente por validar con SCADA». Cargabilidad SCADA, módulos renovados: **67,4 % CRG 3 · Medio**, la da el secundario
 (569 A máx., 0 h sostenidas, cobertura 93 %); primario «no se mide»; la nota se lee en el equipo; placa abierta, «coincide en
 lo comparado».
+
+## 168. ADR-168 — Cargabilidad SCADA: la cargabilidad mes a mes y acumulada a la fecha en cada transformador; la cifra «A la fecha» es la cargabilidad oficial en la revisión equipo por equipo (TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «¿cómo estás estimando la cargabilidad? ¿por mes o modo general?» → «hagamos un segmento de la variable donde se pueda
+> apreciar el transcurso de mes a mes y de forma acumulada (promedio a la fecha), cuando lo tengas dame preview antes de
+> subirlo a producción; la idea es replicar esto en todos los equipos» → vista previa en su Chrome → «procede conforme a tu
+> propuesta» (2026-10-23).
+
+**168.1 Causa raíz.** La cifra de cada equipo se veía de UN periodo a la vez («Un mes» o «Varios meses»); no había cómo ver
+su evolución ni con qué criterio fijar la oficial (para Lorica T1 se había usado solo septiembre, `§167`).
+
+**168.2 Solución.** `domain/scada_carga_mensual.js` (NUEVO, L-102) orquesta las funciones de la lista para UN equipo: cada mes =
+`filasLista` («Un mes»); acumulada = `filasPeriodo` («Varios meses») desde el primer mes con datos hasta ese mes, en una
+ventana de 12 meses de CALENDARIO: p99 de TODAS las horas, nunca el promedio de los meses (`§159`). Mes que el parque no cargó
+= hueco con motivo; mes que no se pudo LEER = sin cifra en todo acumulado que lo contenga. `ui/cargabilidad-scada/panel-mensual.js`
+(NUEVO): «A la fecha» + barras por mes (color CRG solo si es firme; provisional gris rayado) + línea acumulada + cortes CRG y
+100 % + tabla + Reintentar; `detalle.js` lo pone debajo de la historia (`#csMensual`, import() aislado, libera su gráfica).
+`data/scada_carga.js`: la lectura en curso de un resumen se comparte (historia y panel no leen dos veces). **Decisiones suyas
+(las recomendadas)**: (1) se queda la ACUMULADA; el promedio simple de los meses solo se mostró en la vista previa (pesa igual un
+mes incompleto y esconde picos: Lorica 64,6 % frente a 66,5 %); (2) la cifra «A la fecha» es la **cargabilidad oficial** al
+revisar cada equipo. Lorica T1: 67,4 % (solo sep) → **66,5 % CRG 3** (ene–oct 2026, 5.687 h, secundario 556,48 A ÷ 836,7 A).
+
+**168.3 No-regresión.** Lista, «Varios meses», historia, placa, DGA y Duval intactos; el panel no calcula nada propio (prueba:
+mes = `filasLista`, acumulado = `filasPeriodo`). Si su módulo no carga, la ranura queda oculta.
+
+**168.4 Verificación.** `tests/scada_carga_mensual.test.js` (10, sintéticos) · `test:unit` 2.946 (2.944 en verde, 2 omitidas) ·
+banco (8136): ranura entre historia y DGA, sin errores · vista previa FIEL en su Chrome (módulos como blob sobre producción, franja
+roja, nada publicado): Lorica ene 58,5 → sep 67,4 % por mes, acumulada 66,5 %; El Difícil T1 acumulada 103,4 % CRG 5.
+
+**168.5 Anti-patterns evitados.** Promediar cifras mensuales (`§159`); un cálculo paralelo al de la lista; color de CRG en una
+cifra provisional; acumulado «firme» sin un mes que no se leyó; esconder un mes sin cargar.
+
+**168.6 Archivos.** Nuevos: `domain/scada_carga_mensual.js`, `ui/cargabilidad-scada/panel-mensual.js`,
+`tests/scada_carga_mensual.test.js`. Modificados: `ui/cargabilidad-scada/detalle.js`, `data/scada_carga.js`,
+`css/cargabilidad-scada.css`, `docs/23`, `docs/53 §2`. Datos: `transformadores/<Lorica T1>.salud_actual` (cargabilidad).
+
+**168.7 Doctrina.** W-11 (construcción aislada → revisión adversarial `wf_2b3e883d-aef`, 1 alta + 4 medias aplicadas → vista
+previa fiel → su «procede»), L-153 (se publica igual a lo aprobado, sin la columna de referencia que él descartó), §3.2. NO
+revisado externamente. Crudo: bóveda `2026-10-23-cargabilidad-mensual/`.
