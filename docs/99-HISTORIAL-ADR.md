@@ -8352,3 +8352,9 @@ confirmar en campo (San Luis: ¿otra unidad?; Ferrocarril: dos placas; Bosque T4
 Corozal y Chiriguaná ⇒ ~120–135 % de su ONAN) y 9 matrículas distintas por serie. Entregable LOCAL (datos de cliente, NUNCA al
 repo): `~/Downloads/Comparacion placa vs Salud de Activos 2026-10-23.xlsx`; crudos y síntesis: bóveda
 `2026-10-23-diferencias-placa-ampacidad/excel-salud/`.
+
+**169.10 Verificado tras publicar (2026-10-23).** `main` 3292347; CI y Deploy de Pages en verde; los 6 archivos servidos = `main`
+(shasum). En su Chrome, con recarga completa (sin vista previa; los 3 módulos nuevos en 200): Bosque T2 «A la fecha» 78,3 % de
+ONAF y 89,5 % de ONAN en el primario (67 kV de placa), 79,1 % / 90,4 % en el secundario, chip «Con la ampacidad de la plataforma:
+95,9 % · CRG 5 · por revisar», 4 gráficas; Aguas Blancas T1 (placa de una sola etapa) dice «% de ONAN» en barras, bloque y tabla,
+y su ampacidad en la plataforma ya es la de placa (33,5 A: el 502 A está solo en el Excel).
