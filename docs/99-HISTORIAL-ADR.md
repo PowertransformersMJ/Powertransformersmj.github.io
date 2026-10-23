@@ -8358,3 +8358,15 @@ repo): `~/Downloads/Comparacion placa vs Salud de Activos 2026-10-23.xlsx`; crud
 ONAF y 89,5 % de ONAN en el primario (67 kV de placa), 79,1 % / 90,4 % en el secundario, chip «Con la ampacidad de la plataforma:
 95,9 % · CRG 5 · por revisar», 4 gráficas; Aguas Blancas T1 (placa de una sola etapa) dice «% de ONAN» en barras, bloque y tabla,
 y su ampacidad en la plataforma ya es la de placa (33,5 A: el 502 A está solo en el Excel).
+
+**169.11 ¿De placa o calculados? (pregunta del Ingeniero, 2026-10-23).** Potencias y tensiones = de la placa leída; las
+CORRIENTES límite del panel = CALCULADAS (kVA ÷ (√3 · kV de placa)) — el panel no lo aclaraba. Cotejo con las IMPRESAS (texto
+de la lectura + foto, `wf_1c837f24-783` y `wf_06c4a88a-a0e`): de 441 devanados, **411 coinciden** (redondeo de la placa), 15
+la placa no imprime corriente y **0 contradicciones** a la toma nominal. Las tomas no nominales imprimen otra cifra (Magangué
+T2: 236,2 A a 110 kV y 243 A en la toma 14; la plataforma tomó la de la toma 14). Lo que SÍ toca límites: Gambote T3 (terciario
+de COMPENSACIÓN con kVA del protocolo, no de la placa — el panel le pinta un límite que no existe; placa leída = la del equipo
+«FUTURO», el Excel ya trae su serie y 30 MVA) y Bosque T2 (única fuente: plano «Futuro» sin serie). Por confirmar en campo:
+conexión en servicio de Tolú Viejo T1A, Zaragocilla T3, Manzanillo T3/T4, Chambacú T1/T2 y Bosque T4; Simití T1 con la BT fija
+en 14,49 kV; planos con nombre de otra subestación en Mandinguilla T1 y Hatillo de Loba T1. Propuesto (espera su «procede»):
+usar la corriente IMPRESA cuando la placa la trae y rotular «impresa» o «calculada»; terciario de compensación sin límite.
+Crudos: bóveda `2026-10-23-diferencias-placa-ampacidad/corrientes-impresas/`.
