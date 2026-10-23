@@ -38,8 +38,11 @@ before(async () => {
     estado_servicio: 'operativo',
     placa: { potencia_kva: 10000 },
     fabricacion: { ano_fabricacion: 1998 },
+    electrico: { corriente_nominal_secundaria_a: 418.4, corriente_medida_secundaria_a: 300 },
     salud_actual: {
       hi_final: 4.6, bucket: 'muy_pobre',
+      // ADR-167: la cargabilidad oficial (fijada desde el SCADA) y su fuente deben sobrevivir a la muestra.
+      crg_pct_medido: 67.4, calif_crg: 3, crg_fuente: 'scada', crg_periodo: '2026-09',
       hi_recalculado: 2.1, bucket_recalculado: 'bueno',
       condicion_fuente: 'excel', overrides_aplicados: ['_importacion_v2'],
       ts_calculo: '2026-09-08T00:00:00.000Z'
@@ -78,6 +81,10 @@ test('una muestra nueva NO pisa la condición del Excel, y sí actualiza el rec�
   assert.notEqual(salud.hi_recalculado, 2.1, 'el recálculo se actualizó con las muestras nuevas');
   assert.notEqual(salud.hi_recalculado, salud.hi_final, 'motor y Excel difieren, y manda el Excel');
   assert.ok(salud.calif_c2h2 != null, 'las calificaciones de la muestra sí entran');
+  assert.equal(salud.crg_pct_medido, 67.4, 'la muestra no borra la cargabilidad oficial (ADR-167)');
+  assert.equal(salud.calif_crg, 3);
+  assert.equal(salud.crg_fuente, 'scada', 'ni su fuente');
+  assert.equal(salud.crg_periodo, '2026-09');
 
   const hist = await db.collection('transformadores').doc(TX).collection('historial_hi').get();
   assert.ok(hist.size >= 1, 'queda snapshot en el historial');

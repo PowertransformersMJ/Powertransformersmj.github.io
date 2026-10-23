@@ -40,6 +40,9 @@
   (`99 §158.11`, `53 §3`), pero `salud_actual` (31 %, CRG 1) sigue calculada sobre 5 MVA; con 2 MVA sería CRG 3–4 y el HI
   podría subir. Por decisión suya se corrige en SU Excel de Salud de Activos (TODO-69). Inventario ya no vacía la
   condición al guardar: escribe solo lo que cambió (`§154`, L-134 en `30`).
+- **Cargabilidad (CRG) desde el SCADA** (decisión del Ingeniero 2026-10-23, `99 §167`): el SCADA (reciente) reemplaza al Excel
+  (antiguo), equipo por equipo en la revisión de placas; el % lleva su fuente (`crg_fuente/crg_periodo/crg_nota`) y una muestra
+  nueva ya no lo borra (`domain/salud_carga_vigente.js`). Lorica T1: el lado coherente (13,8 kV), por decisión suya.
 
 ## 4. Qué significa cada banda
 - Orden de lectura único 1 → 5 en todas las vistas, y una definición por banda pensada en riesgo y continuidad del
