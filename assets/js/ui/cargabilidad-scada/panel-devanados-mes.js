@@ -221,7 +221,7 @@ function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales) {
     el('p', { class: 'cs-dato' }, el('b', {}, 'Detalle de los umbrales' + deQue),
       el('span', { class: 'cs-sub' }, conCifraEq ? '· carga a la fecha (' + tramoDe(conCifraEq) + ')' : '· sin carga a la fecha')),
     el('div', { class: 'cs-tabla-caja cs-mensual-caja' }, el('table', { class: 'cs-tabla cs-mensual-tabla' },
-      el('caption', { class: 'cs-mensual-cap' }, 'Umbrales de cada devanado de ' + mat + deQue + ' y la carga a la fecha frente a cada uno'),
+      el('caption', { class: 'cs-mensual-cap' }, 'Umbrales' + deQue + ' de cada devanado de ' + mat + ' y la carga a la fecha frente a cada uno'),
       el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Devanado'),
         ...(cols.length ? cols.map((n) => el('th', { scope: 'col' }, titCol(n))) : [el('th', { scope: 'col' }, 'Límite')]),
         el('th', { scope: 'col' }, 'Carga a la fecha'), el('th', { scope: 'col' }, 'Lectura'))),
