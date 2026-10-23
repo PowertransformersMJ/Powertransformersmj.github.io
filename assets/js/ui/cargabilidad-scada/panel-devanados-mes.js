@@ -24,6 +24,7 @@ import { califCRG } from '../../domain/scada_carga_kpis.js';
 import { leerPlaca } from '../../data/placas_caracteristicas.js';
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
 import { umbralesDevanado, motivoSinCifra, estadoDevanados, pctDe } from '../../domain/scada_devanados_mes.js';
+import { lecturaUmbral, columnasEtapas, onanDebajo } from '../../domain/scada_umbrales_detalle.js';
 import { loadPlotly } from '../../plotly-loader.js';
 
 const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -69,7 +70,17 @@ async function placaDe(idTx) {
 /** Por qué un devanado no tiene cifra A LA FECHA, para el resumen: se mide sin cifra · sin señal en uso · sin lectura. */
 const ROTULO_ESTADO = { sinCifra: 'se mide, sin cifra', sinSenal: 'sin señal en uso', sinLectura: 'sin lectura de los meses' };
 
-/** Resumen en barras: por devanado, su límite mayor (barra clara), su ONAN (marca) y su carga a la fecha, en A y en MVA. */
+// Color del rótulo de un umbral: ONAN naranja, el mayor de placa rojo, la ampacidad de la plataforma gris.
+const colorUmbral = (u, nombre) => (!u.dePlaca ? '#4d6485' : nombre === 'ONAN' ? C_ONAN : C_ONAF);
+// % del límite mayor, corto, para el rótulo de abajo de cada barra.
+const pctRotulo = (i, u) => (u.sinLimite ? 'sin límite (compensación)' : num(pctDe(i, u.onaf), 1) + ' % de ' + u.tope);
+
+/**
+ * Resumen en barras: por devanado, su límite mayor (caja clara), sus otras etapas (marcas) y su carga a la fecha, en A y en
+ * MVA. Cada umbral lleva su rótulo ENCIMA de los datos (con fondo y borde de su color), así la barra nunca lo tapa (pedido
+ * 2026-10-23: «detalle de los umbrales en las gráficas para una mejor interpretación»); la leyenda y la tabla de detalle van
+ * debajo, en HTML.
+ */
 async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, fuente, estado }) {
   const nombres = registrados.map((b) => b.nombre + (b.kv ? ' ' + kvTexto(b.kv) + ' kV' : ''));
   const hoy = registrados.map((b) => (conCifraEq ? de(conCifraEq.acumulado.devanados, b.d) : null));
@@ -77,40 +88,119 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
   const color = (b) => COLOR_DEV[b.d] || SIN;
   const una = async (div, { titulo, unidad, en }) => {
     const lim = registrados.map((b) => en(U[b.d].onaf, U[b.d]));
-    const onan = registrados.map((b) => (U[b.d].onan ? en(U[b.d].onan, U[b.d]) : null));
     const val = registrados.map((b, k) => (hoy[k] && hoy[k].pct != null ? en({ A: hoy[k].iP99, mva: U[b.d].f ? hoy[k].iP99 * U[b.d].f : null }, U[b.d]) : null));
+    // Las etapas por debajo de la mayor (ONAN y, en placas de tres etapas, la ONAF intermedia): una marca cada una.
+    const bajas = registrados.flatMap((b, k) => U[b.d].etapas.slice(0, -1).map((e) => ({ k, e, v: en(e, U[b.d]) }))).filter((x) => x.v != null);
     const fmt = (v) => (v == null ? '—' : unidad === 'A' ? ampTexto(v) + ' A' : mvaTexto(v) + ' MVA');
     const fmtCarga = (v) => (v == null ? '—' : unidad === 'A' ? ampTexto(v) + ' A' : mvaTexto(v) + ' MVA eq.');
     const maxY = Math.max(...lim.filter((v) => v != null), ...val.filter((v) => v != null)) * 1.32 || 1;
-    const xs = registrados.map((b, k) => nombres[k] + '<br><b>' + (val[k] == null ? ROTULO_ESTADO[estado[b.d]] || 'sin cifra'
-      : fmtCarga(val[k]) + ' · ' + pctTexto(hoy[k].iP99, U[b.d])) + '</b>');
+    // Abajo, en tres renglones derechos (sin inclinarse): devanado, su carga a la fecha y su % del límite mayor.
+    const xs = registrados.map((b, k) => nombres[k] + '<br><b>' + (val[k] == null ? ROTULO_ESTADO[estado[b.d]] || 'sin cifra' : fmtCarga(val[k])) + '</b>'
+      + (val[k] == null ? '' : '<br>' + pctRotulo(hoy[k].iP99, U[b.d])));
+    const origen = (e) => (e && ORIGEN_A[e.origen] ? ' (' + ORIGEN_A[e.origen] + ')' : '');
+    const rotulo = (k, v, texto, c, debajo) => ({ x: xs[k], xref: 'x', y: v, yref: 'y', xanchor: 'center', yanchor: debajo ? 'top' : 'bottom',
+      yshift: debajo ? -3 : 3, showarrow: false, text: texto, font: { size: 11, color: c }, bgcolor: 'rgba(255,255,255,0.92)',
+      bordercolor: c, borderwidth: 1, borderpad: 2 });
+    const annotations = [];
+    registrados.forEach((b, k) => {
+      const u = U[b.d];
+      if (lim[k] != null) annotations.push(rotulo(k, lim[k], (u.dePlaca ? u.tope : 'Ampacidad') + ' ' + fmt(lim[k]), colorUmbral(u, u.tope), false));
+      // De arriba hacia abajo: una etapa muy cerca de la de encima escribe su rótulo bajo su línea (no se pisan).
+      let arriba = lim[k];
+      for (const x of bajas.filter((y) => y.k === k).reverse()) {
+        annotations.push(rotulo(k, x.v, x.e.nombre + ' ' + fmt(x.v), colorUmbral(u, x.e.nombre), onanDebajo(x.v, arriba, maxY)));
+        arriba = x.v;
+      }
+    });
     await Plotly.newPlot(div, [
       { type: 'bar', name: 'Límite mayor', x: xs, y: lim, width: 0.62,
         marker: { color: registrados.map((b) => tinte(color(b), 0.14)), line: { color: registrados.map(color), width: 1.8 } },
-        // Encima de cada barra, sus límites: ONAN (naranja, si la placa trae ventiladores) y el mayor (rojo).
-        text: lim.map((v, k) => (v == null ? '' : (onan[k] != null ? '<span style="color:' + C_ONAN + '">ONAN ' + fmt(onan[k]) + '</span><br>' : '')
-          + (U[registrados[k].d].dePlaca ? U[registrados[k].d].tope + ' ' : 'ampacidad ') + fmt(v))), textposition: 'outside', cliponaxis: false,
-        textfont: { color: C_ONAF, size: 11 }, textangle: 0, hovertemplate: '%{text}<extra>Límite</extra>' },
+        customdata: registrados.map((b, k) => (lim[k] == null ? '' : (U[b.d].dePlaca ? U[b.d].tope : 'Ampacidad') + ' ' + fmt(lim[k]) + origen(U[b.d].onaf))),
+        hovertemplate: '%{customdata}<extra>Límite mayor</extra>' },
       { type: 'bar', name: 'A la fecha', x: xs, y: val, width: 0.34, marker: { color: registrados.map(color),
         pattern: { fillmode: 'overlay', shape: registrados.map((b, k) => (val[k] != null && (!firme || AVISO_PLACA.has(b.aviso) || U[b.d].difA) ? '/' : '')), size: 6, solidity: 0.3 } },
         customdata: val.map((v, k) => (v == null ? ROTULO_ESTADO[estado[registrados[k].d]] || 'sin cifra'
           : fmtCarga(v) + ' · ' + pctTexto(hoy[k].iP99, U[registrados[k].d])
           + (U[registrados[k].d].onan ? ' · ' + num(pctDe(hoy[k].iP99, U[registrados[k].d].onan), 1) + ' % de ONAN' : ''))),
         hovertemplate: '%{customdata}<extra>A la fecha</extra>' },
-      // ONAN: una marca horizontal sobre cada barra (su cifra va escrita encima de la barra).
-      { type: 'scatter', mode: 'markers', name: 'ONAN (placa)', x: xs, y: onan, cliponaxis: false,
-        marker: { symbol: 'line-ew', size: 46, line: { color: C_ONAN, width: 3 } },
-        customdata: onan.map((v) => (v == null ? '' : 'ONAN ' + fmt(v))), hovertemplate: '%{customdata}<extra>Sin ventiladores</extra>' }
+      // Las etapas de abajo: una marca horizontal en cada barra (ONAN naranja; la ONAF intermedia, roja).
+      { type: 'scatter', mode: 'markers', name: 'Etapas (placa)', x: bajas.map((x) => xs[x.k]), y: bajas.map((x) => x.v), cliponaxis: false,
+        marker: { symbol: 'line-ew', size: 46, line: { color: bajas.map((x) => colorUmbral(U[registrados[x.k].d], x.e.nombre)), width: 3 } },
+        customdata: bajas.map((x) => x.e.nombre + ' ' + fmt(x.v) + origen(x.e)),
+        hovertemplate: '%{customdata}<extra>Etapa de placa</extra>' }
     ], {
-      title: { text: titulo, font: { size: 13 }, x: 0, xanchor: 'left' }, barmode: 'overlay', height: 280, dragmode: false,
-      margin: { l: 52, r: 10, t: 34, b: 58 }, font: { family: fuente, size: 12, color: '#1f3656' }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#fff',
-      showlegend: false, xaxis: { type: 'category', fixedrange: true }, yaxis: { title: { text: unidad }, range: [0, maxY], gridcolor: '#eef1f6', fixedrange: true }
+      title: { text: titulo, font: { size: 13 }, x: 0, xanchor: 'left' }, barmode: 'overlay', height: 310, dragmode: false,
+      margin: { l: 52, r: 10, t: 34, b: 74 }, font: { family: fuente, size: 12, color: '#1f3656' }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#fff',
+      showlegend: false, xaxis: { type: 'category', fixedrange: true, tickangle: 0 },
+      yaxis: { title: { text: unidad }, range: [0, maxY], gridcolor: '#eef1f6', fixedrange: true }, annotations
     }, { displaylogo: false, responsive: true, locale: 'es', displayModeBar: false });
   };
   const deQue = registrados.every((b) => U[b.d].dePlaca) ? 'sus límites de placa' : 'sus límites (de placa o, sin placa, de la plataforma)';
   await una(resA, { titulo: 'Corriente frente a ' + deQue, unidad: 'A', en: (x) => x.A });
   if (!resM.isConnected) return;
   await una(resM, { titulo: 'Potencia equivalente frente a ' + deQue, unidad: 'MVA', en: (x) => x.mva });
+}
+
+/** Leyenda de las barras de arriba (HTML, legible sin pasar el cursor): qué es la caja, la marca, la barra y el rayado. */
+function leyendaResumen(registrados, U) {
+  const it = (clase, texto) => el('span', { class: 'cs-ley-it' }, el('i', { class: 'cs-ley ' + clase, 'aria-hidden': 'true' }), texto);
+  const tres = registrados.some((b) => U[b.d].etapas.length > 2);
+  return el('div', { class: 'cs-devmes-ley', role: 'note', 'aria-label': 'Cómo leer las barras' },
+    it('cs-ley-caja', 'Caja clara: límite mayor de placa (ONAF, con ventiladores; si la placa no trae ventiladores, la ONAN)'),
+    it('cs-ley-onan', 'Marca: ONAN, límite sin ventiladores' + (tres ? ' (en placas de tres etapas, otra marca para la ONAF intermedia)' : '')),
+    it('cs-ley-barra', 'Barra llena: carga a la fecha'),
+    it('cs-ley-raya', 'Rayada: cifra provisional o con aviso de placa'),
+    el('span', { class: 'cs-ley-it' }, 'Colores: ' + registrados.map((b) => b.nombre.toLowerCase() + ' ' + (NOMBRE_COLOR[b.d] || 'gris')).join(', ')));
+}
+
+const tramoDe = (c) => (!c ? '' : c.acumulado.nMeses > 1 ? nombreMes(c.acumulado.desde) + ' a ' + nombreMes(c.mes) : nombreMes(c.mes));
+const nombreTope = (u) => (u.dePlaca ? 'la ' + u.tope : 'la ampacidad de la plataforma');
+// La lectura de la carga frente a sus umbrales, en palabras (`lecturaUmbral`).
+const LECTURA = {
+  sinLimite: () => 'Terciario de compensación: no lleva carga',
+  holgado: (l, u) => (u.onan ? 'No necesita ventiladores: está dentro de la ONAN' : 'Dentro de su límite') + '; le faltan '
+    + ampTexto(l.margenA) + ' A para ' + nombreTope(u),
+  ventiladores: (l, u) => 'Necesita los ventiladores: pasa la ONAN y está dentro de ' + nombreTope(u) + ' (le faltan ' + ampTexto(l.margenA) + ' A)',
+  supera: (l, u) => 'Supera ' + nombreTope(u) + ' en ' + ampTexto(l.excesoA) + ' A (' + num(l.pctTope - 100, 1) + ' % por encima)'
+};
+
+/**
+ * Detalle de los umbrales (tabla bajo las barras): por devanado, cada etapa de placa con su corriente, su potencia, de dónde
+ * sale la corriente y la carga a la fecha frente a ella; la carga y su lectura en palabras.
+ */
+function detalleUmbrales(registrados, U, ed, conCifraEq, mat) {
+  const cols = columnasEtapas(registrados, U);
+  if (!cols.length && !registrados.some((b) => U[b.d].sinLimite)) return null;
+  const titCol = (n) => (n === 'ONAN' ? 'ONAN · sin ventiladores' : n === 'ampacidad' ? 'Ampacidad de la plataforma' : n + ' · con ventiladores');
+  const firme = !!(conCifraEq && conCifraEq.acumulado.firme);
+  const filas = registrados.map((b) => {
+    const u = U[b.d]; const h = ed.porDevanado[b.d].hoy; const i = h && h.pct != null ? h.iP99 : null;
+    const celdas = u.sinLimite
+      ? [el('td', { colspan: String(Math.max(cols.length, 1)), class: 'cs-mensual-nulo' }, 'sin límite de carga (terciario de compensación)')]
+      : cols.map((n) => {
+        const e = u.etapas.find((x) => x.nombre === n);
+        if (!e) return el('td', { class: 'cs-mensual-nulo' }, '—');
+        return el('td', {}, el('b', {}, ampTexto(e.A) + ' A'), e.mva != null ? ' · ' + mvaTexto(e.mva) + ' MVA' : '',
+          el('br'), el('span', { class: 'cs-sub' }, ORIGEN_A[e.origen] || 'calculada de la placa'),
+          i != null ? [el('br'), 'carga al ', el('b', {}, num(100 * i / e.A, 1) + ' %')] : null);
+      });
+    const carga = i != null
+      ? el('td', {}, el('b', {}, ampTexto(i) + ' A'), el('br'), mvaEq(u, i), firme ? null : el('span', { class: 'cs-sub' }, ' · provisional'))
+      : el('td', { class: 'cs-mensual-nulo' }, ROTULO_ESTADO[ed.porDevanado[b.d].estado] || 'sin cifra');
+    const l = lecturaUmbral(i, u);
+    const lect = l ? el('td', { class: 'cs-lect cs-lect--' + l.clase }, LECTURA[l.clase](l, u)) : el('td', { class: 'cs-mensual-nulo' }, '—');
+    return el('tr', {}, el('th', { scope: 'row', style: 'border-left: 4px solid ' + (COLOR_DEV[b.d] || SIN) },
+      b.nombre + (b.kv ? ' ' + kvTexto(b.kv) + ' kV' : '')), ...celdas, carga, lect);
+  });
+  return el('div', { class: 'cs-devmes-det' },
+    el('p', { class: 'cs-dato' }, el('b', {}, 'Detalle de los umbrales de placa'),
+      el('span', { class: 'cs-sub' }, conCifraEq ? ' · carga a la fecha (' + tramoDe(conCifraEq) + ')' : ' · sin carga a la fecha')),
+    el('div', { class: 'cs-tabla-caja cs-mensual-caja' }, el('table', { class: 'cs-tabla cs-mensual-tabla' },
+      el('caption', { class: 'cs-mensual-cap' }, 'Umbrales de placa de cada devanado de ' + mat + ' y la carga a la fecha frente a cada uno'),
+      el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Devanado'),
+        ...(cols.length ? cols.map((n) => el('th', { scope: 'col' }, titCol(n))) : [el('th', { scope: 'col' }, 'Límite')]),
+        el('th', { scope: 'col' }, 'Carga a la fecha'), el('th', { scope: 'col' }, 'Lectura'))),
+      el('tbody', {}, filas))));
 }
 
 /**
@@ -147,6 +237,8 @@ export async function pintarDevanadosMes(nodo, opts) {
   const resA = el('div', { class: 'cs-devmes-res-graf', role: 'img', 'aria-label': 'Corriente a la fecha de cada devanado de ' + mat + ' frente a sus límites; los bloques de abajo traen las cifras.' });
   const resM = el('div', { class: 'cs-devmes-res-graf', role: 'img', 'aria-label': 'Potencia equivalente a la fecha de cada devanado de ' + mat + ' frente a sus límites; los bloques de abajo traen las cifras.' });
   const resumen = el('div', { class: 'cs-devmes-res' }, resA, resM);
+  const leyenda = leyendaResumen(registrados, U);
+  const detalle = detalleUmbrales(registrados, U, ed, conCifraEq, mat);
   const bloques = [];
   const graficas = [];
   for (const base of registrados) {
@@ -209,9 +301,8 @@ export async function pintarDevanadosMes(nodo, opts) {
     'ONAN = potencia de placa sin ventiladores; ONAF = con ventiladores (la mayor etapa); si la placa solo trae ONAN, ese es su límite. Su corriente es la de esa potencia a la tensión de placa de la conexión del equipo. ',
     'Cada corriente límite dice de dónde sale: «impresa en la placa» (la graba la placa) o «calculada de la placa» (potencia ÷ (√3 × tensión de placa), cuando la placa no la graba). ',
     'Potencia equivalente (MVA eq.) = la corriente medida a la tensión de placa; no es la potencia que mide el SCADA con P y Q. ',
-    'Arriba, en barras: el límite mayor de cada devanado (barra clara), su ONAN (marca naranja) y su carga a la fecha (barra de adentro). Cada devanado tiene su color: '
-      + registrados.map((b) => b.nombre.toLowerCase() + ' ' + (NOMBRE_COLOR[b.d] || 'gris')).join(', ') + '; lo provisional o con aviso de placa va rayado.');
-  poner(nodo, titulo, origen, resumen, ...bloques, ayuda);
+    'Arriba, en barras: cada devanado con sus umbrales de placa rotulados (la leyenda dice qué es cada cosa) y, debajo, el detalle de cada umbral con la carga a la fecha frente a él.');
+  poner(nodo, titulo, origen, resumen, leyenda, detalle, ...bloques, ayuda);
   nodo.hidden = false;
 
   try {
