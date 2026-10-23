@@ -14,6 +14,7 @@ import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
 import { chipCifra, textoBandas } from './lista.js';
 import { devanadosDe, TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto } from '../../domain/scada_carga_devanados.js';
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
+import { leerPlaca } from '../../data/placas_caracteristicas.js';
 import { filasDevanadosPlaca } from '../../domain/scada_devanados_placa.js';
 import { dibujarFigura, liberarFigura } from './graficos.js';
 import { FAMILIAS, NIVELES, DEVANADO, CALCULO, MOTIVO, CODIGO, UNIDAD, NOMBRE_FAMILIA, TIEMPO } from '../../domain/scada_carga_config.js';
@@ -97,7 +98,17 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   // «Placa característica» (TODO-69): otra ranura con su import() aislado; si falla, queda oculta y el detalle sigue igual.
   let panelPlaca = null;
   import('./panel-placa.js').then((m) => { panelPlaca = m; if (actual) pintarPlacaDe(actual); })
-    .catch((e) => console.warn('[cargabilidad-scada] placa', e));
+    .catch((e) => { console.warn('[cargabilidad-scada] placa', e); if (actual) placaParaTabla(actual); });
+  /** Respaldo: si el panel de placa no le entregó la placa a la tabla (versión anterior en caché, L-102, o falló), se lee aquí. */
+  function placaParaTabla(a) {
+    if (!a || a.placaLeida || a.leyendoPlacaTabla) return;
+    a.leyendoPlacaTabla = true;
+    leerPlaca(a.tx && a.tx.id).then((r) => {
+      a.leyendoPlacaTabla = false;
+      if (actual !== a || a.placaLeida || !r || r.error) return;
+      a.limitesPlaca = r.hay ? limitesDePlaca(r.placa, a.tx) : null; a.placaLeida = true; refrescarDevanados(a);
+    }).catch(() => { a.leyendoPlacaTabla = false; });
+  }
   function pintarPlacaDe(a) {
     if (!a || !a.placaNodo || !panelPlaca || a.placaLista) return;
     a.placaLista = true;
@@ -106,8 +117,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       // La placa leída llena la tabla «Devanados de placa» (tensión, potencia y corriente de la PLACA).
       alLeer: (placa) => { if (!actual || actual.placaNodo !== nodo) return; actual.limitesPlaca = placa ? limitesDePlaca(placa, actual.tx) : null; actual.placaLeida = true; refrescarDevanados(actual); } })
       // Con error, se vuelve a intentar al reabrir el equipo (L-109).
-      .then((r) => { if (r && r.error && actual && actual.placaNodo === nodo) actual.placaLista = false; })
-      .catch((e) => { console.warn('[cargabilidad-scada] placa', e); nodo.hidden = true; if (actual && actual.placaNodo === nodo) actual.placaLista = false; });
+      .then((r) => { if (r && r.error && actual && actual.placaNodo === nodo) actual.placaLista = false; if (actual && actual.placaNodo === nodo) placaParaTabla(actual); })
+      .catch((e) => { console.warn('[cargabilidad-scada] placa', e); nodo.hidden = true; if (actual && actual.placaNodo === nodo) { actual.placaLista = false; placaParaTabla(actual); } });
   }
   /** Estado EXPLÍCITO del panel: 'leyendo' | 'ok' (con el cálculo recién hecho) | 'error' | 'sin_scada'. */
   function pintarDga(a, estado) {

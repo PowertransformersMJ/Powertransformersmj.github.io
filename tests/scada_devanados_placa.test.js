@@ -53,3 +53,10 @@ test('la plataforma con la ONAN de la placa (ventilación fuera de servicio) se 
     { P: { kva: [5000, 6250], nombres: ['ONAN', 'ONAF1'], kv: 34.5, A: [83.67, 104.6], origenA: ['impresa', 'calculada'] } });
   assert.equal(p.ampacidad.plataforma, 83.67); assert.equal(p.ampacidad.plataformaEsOnan, true); assert.equal(p.pctOficial, 95.6);
 });
+
+test('respaldo: si el panel de placa no entrega la placa (versión en caché o falla), la tabla la lee por su cuenta', () => {
+  const det = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
+  assert.match(det, /import \{ leerPlaca \} from '\.\.\/\.\.\/data\/placas_caracteristicas\.js'/);
+  assert.match(det, /function placaParaTabla\(a\)/);
+  assert.equal((det.match(/placaParaTabla\(actual\)/g) || []).length, 3, 'tras el panel, si falla el panel y si no carga su módulo');
+});
