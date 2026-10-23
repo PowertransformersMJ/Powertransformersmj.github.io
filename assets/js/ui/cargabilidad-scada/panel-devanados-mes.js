@@ -154,7 +154,7 @@ export async function pintarDevanadosMes(nodo, opts) {
     const idTit = 'csDevmes' + d;
     const { conNiveles, conCifra, hoy, motivo, niveles } = ed.porDevanado[d];
     const limites = el('p', { class: 'cs-dato' }, el('b', {}, u.dePlaca ? 'Límites de placa: ' : 'Límites (de la plataforma): '),
-      u.sinLimite ? 'sin límite de carga: terciario de compensación' : u.etapas.length
+      u.sinLimite ? 'ninguno (terciario de compensación)' : u.etapas.length
         ? u.etapas.map((e) => e.nombre + ' ' + mvaTexto(e.mva) + ' MVA (' + ampTexto(e.A) + ' A, ' + (ORIGEN_A[e.origen] || 'calculada de la placa') + ')').join(' · ') : '—',
       u.dePlaca && u.kv ? el('span', { class: 'cs-sub' }, ' a ' + kvTexto(u.kv) + ' kV de placa') : null);
     // La ampacidad que usa la plataforma frente a la ONAF de placa: si no cuadran, se avisa (se corrige aparte).
