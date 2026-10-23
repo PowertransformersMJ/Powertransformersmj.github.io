@@ -7336,6 +7336,23 @@ solo de su hoja (2.555 filas renombradas). Se cargó en «Completar» (mes nuevo
   - LPR, MTE, PZL y SAR traen P/Q unas 1000 veces más alta (¿kW en vez de MW?). Solo afecta la curva de potencia del
     detalle, no la cifra.
 
+**158.13 Nota posterior (2026-10-23): octubre 1–22 cargado (su pedido: «he cargado más días… procésalos»).** Carpeta
+`Octubre` entera con la v3 → `octubre-2026-10-23/` (5 partes, sha `384dfa936c60…`; relevo de Sampués: 8.030 filas
+renombradas). Simulación: 169 series en 32 lotes, 76,8 % de horas válidas (29 % = días 23–31 sin archivo); su «procede» →
+«Completar»; guardado 169 series + 1 resumen. Reemplaza a `octubre-2026-10-09/` como paquete vigente.
+- **Foto antes/después** (lista de octubre, 208 equipos, página recargada): firmes 0 → **94**; provisionales 125 → 33; CRG 4–5
+  firmes 0 → 46; sobrecarga sostenida 0 → 14; 0 equipos pierden su cifra, 2 la ganan (PTE, CTA, provisionales); mediana
+  +0,1 pts. Mayor alza: T1-A/M-MAM 73,8 → 98,1 % (los dos devanados lo confirman: 283 A en 66 kV, 1.237 A en 13,8 kV).
+  Periodo ene → oct sin «falta preparar».
+- **Verificación independiente** `wf_fa0c2acc-411` (2 Opus, solo lectura): paquete = disco byte a byte (991 archivos tras
+  relevo y filtro); días 01–07 idénticos al paquete del 10-09 (315/315); días 08–22 con 100 % de horas (el 13 nace un punto
+  de tensión en SMC T1A).
+- **Rarezas del exporte, sin efecto en cifras**: carpetas 21–22 con la fecha del día SIGUIENTE en el nombre (el encabezado
+  manda); en la del 15, un duplicado `u_quality-…(1).csv` idéntico al del 15.
+- **Suyo**: «MovilCor» aparece desde el 19 (34,5 kV, casi todo en 0) con los mismos elementos que Corozal 34,5 kV, cuyo lado
+  de 34,5 kV de T1-M/M-COR está congelado desde el 13: ¿móvil en Corozal? No homologada, no se cargó. Siguen faltando las 43
+  estaciones del exporte (57 puntos, TODO-69).
+
 ## 159. ADR-159 — Cargabilidad SCADA por PERIODO de varios meses (carga del periodo + peor mes) e «Historia del equipo»: desde cuándo supera su capacidad y el día de su mayor corriente por devanado ⟦OPUS-5.5⟧ (2026-10-09)
 
 > *«me gustaria escoger un rango de fechas para tener un espectro a nivel general y no solo por mes. tambien al seleccionar
