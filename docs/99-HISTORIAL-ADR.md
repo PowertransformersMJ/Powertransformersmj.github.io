@@ -8284,3 +8284,71 @@ secundario 556,48 A; condición oficial intacta («muy bueno», 1,434). En su Ch
 sale debajo de la historia, sin la columna de promedio, «A la fecha: 66,5 % CRG 3 · Medio, enero a octubre 2026», mayo como
 hueco, octubre gris rayado (provisional); el indicador «Cifra oficial» ya dice 66,5 %. **Pendiente ofrecido**: ese indicador y la
 columna de la lista se rotulan «(Excel)» aunque en los equipos revisados la cifra ya sale del SCADA.
+
+## 169. ADR-169 — Cargabilidad SCADA: cada devanado mes a mes frente a sus límites de PLACA (ONAN y ONAF); validación de potencias placa ↔ plataforma ↔ Excel de Salud de Activos (TODO-69, TODO-54) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «ahora necesito que se vea la cargabilidad de cada devanado con sus límites de potencia y ampacidad, dame preview antes de
+> lanzar en producción» → «me gustaría verlos en barras» → «colores por devanado» → «valida las potencias, recuerda que todo
+> es con base a la placa; en las gráficas ubica umbrales de potencia ONAN y ONAF» → vista previa en su Chrome → «avancemos con
+> todo y dejemos los pendientes para el final; también necesitaré que compares las potencias de placa con el listado de salud
+> de activos» (2026-10-23).
+
+**169.1 Causa raíz.** El detalle daba la cifra del equipo (la del devanado que manda) sin la carga de cada devanado ni sus
+límites, y los únicos límites eran los de la plataforma (la ampacidad que vino del Excel), que en 24 devanados NO son los de la
+placa (169.9).
+
+**169.2 Solución.** (1) `domain/placa_etapas.js` (NUEVO): etapas de placa por devanado (dos devanados: las del equipo; tres: el
+texto de potencias con cuatro estrategias y, de respaldo, la potencia escrita junto a la tensión; el primario leído debe ser el
+del equipo o no se inventa nada) · `kvDePlaca`: la tensión de placa de la CONEXIÓN del equipo (la que esté a ≤ 10 % de la de la
+plataforma; si ninguna, la primera; nunca la de fase de un par «línea/fase»; normaliza «66,0 +5/-19x0,96% kV» y «7 621,023 V»)
+· `limitesDePlaca`: kVA, nombres, kV, corrientes, `difKv`, `compensa` y la nota de lo que no se lee. (2)
+`domain/scada_devanados_mes.js` (NUEVO): `umbralesDevanado` (el límite MAYOR real: ONAN si la placa trae una sola etapa, ONAF
+II si tres), `motivoSinCifra`, `estadoDevanados`. (3) `ui/cargabilidad-scada/panel-devanados-mes.js` (NUEVO, `import()` desde
+`panel-mensual.js`): arriba, barras por devanado en A y en MVA equivalentes (barra clara = límite mayor, marca naranja = ONAN,
+barra de adentro = carga a la fecha; un color por devanado; rayado lo provisional o por revisar); por devanado, límites de placa,
+avisos (ampacidad ≠ placa, tensión ≠ placa, terciario de compensación), «A la fecha» con % del límite y % de ONAN, barras por mes
+con las líneas ONAN y ONAF, y tabla. (4) `domain/scada_carga_mensual.js`: cada fila trae sus `devanados` (`devanadosDe` sobre la
+MISMA fila). **La cifra oficial NO cambia**: sigue con la ampacidad de la plataforma; si difiere de la placa, el chip dice
+«Con la ampacidad de la plataforma: X % · CRG n · por revisar» (se corrige en la revisión uno a uno, TODO-54).
+
+**169.3 No-regresión.** Lista, «Varios meses», historia, placa y «mes a mes» intactos; los módulos YA publicados solo importan
+exportaciones que ya existen en producción (L-102; prueba nueva de importaciones); si el `import()` falla, el bloque se oculta.
+
+**169.4 Verificación.** Pruebas: `placa_etapas` 13, `scada_devanados_mes` 9 (NUEVA), `scada_carga_mensual` 14; `test:unit`
+2.972 (2.970 en verde, 2 omitidas). Arnés con DOM falso (de la revisión) que corre el panel REAL sobre los 206 equipos del banco:
+0 «% de ONAF» en placas de una sola etapa (eran 70 equipos), 0 «sin señal en uso» en devanados que se miden (eran 142), 0 motivos
+tomados del mes hueco (eran 16); sin excepciones con ningún mes leído ni con la placa en error (un «Reintentar», sin texto doble).
+Vista previa fiel en su Chrome (Magangué T2, Lorica T1, Bosque T2) antes de la revisión. Datos de cliente en el código: los
+ejemplos de formato son SINTÉTICOS (comprobado contra el banco; solo coincide la designación estándar «13800/7967 V»).
+
+**169.5 Anti-patterns evitados.** Límites de la plataforma vendidos como de placa; «ONAF» en una placa solo-ONAN; la tensión de
+FASE como de línea (corriente √3 mayor); un ×10 que aplasta la escala; el motivo de otro mes; textos de placas reales en un repo
+público; calificar el % de placa con la CRG de otra base.
+
+**169.6 Archivos.** Nuevos: `domain/placa_etapas.js`, `domain/scada_devanados_mes.js`, `ui/cargabilidad-scada/panel-devanados-mes.js`,
+`tests/placa_etapas.test.js`, `tests/scada_devanados_mes.test.js`. Modificados: `domain/scada_carga_mensual.js`,
+`ui/cargabilidad-scada/panel-mensual.js`, `css/cargabilidad-scada.css`, `tests/scada_carga_mensual.test.js`, `docs/23`, `docs/53`,
+`docs/51`, `docs/10`. INTACTOS: `detalle.js`, `panel-placa.js`, `placa_caracteristica.js`, datos de Firestore.
+
+**169.7 Doctrina.** W-11: vista previa → «avancemos con todo» → revisión adversarial `wf_35a84d97-dfa` (3 revisores + 3
+escépticos: 18 de 25 hallazgos confirmados, 0 altos; medios: rótulo «ONAF» fijo, motivo de otro mes, «sin señal» en devanados
+medidos, textos reales en pruebas y comentarios) → todo aplicado. L-153: lo que cambió tras la vista previa es VERACIDAD
+(rótulos, chip, avisos), no diseño; se le informa. NO revisado externamente. Crudos: bóveda `2026-10-23-cargabilidad-mensual/`.
+
+**169.8 Verificado sano / no re-auditar.** (a) Placa «110 kV … / 66 kV …» con la plataforma en 66: se toma 110 a propósito — la
+relación de las corrientes MEDIDAS (P/S) es la de 110 kV; no agregar la conexión tras « / ». (b) Un terciario de compensación que
+imprime su potencia se muestra (fiel a la placa) con aviso. (c) «CAPAC. MVA a/b (LV=…)» deja el secundario sin dato: no se
+inventa de las corrientes. (d) La carrera de Plotly entre las dos barras del resumen no es alcanzable (microtareas).
+
+**169.9 Potencias de placa ↔ plataforma ↔ Excel de Salud de Activos.** De 441 devanados con límites de placa, **24** tienen la
+ampacidad de la plataforma distinta de la placa (×10 Lorica S —ya corregida, `§167`—, Santa Teresa S, Guatapurí T2 P; ×4
+Ferrocarril; ×2,4 Casacará; ×0,6–0,87 Berrugas, El Difícil, Momil, Mariangola, Bosque T2, Monterrey; 3–6 % El Desastre, San Luis,
+San Jacinto, Zaragocilla T3, Magangué T2, Galeras) y **18** la tensión (Nueva Cospique ×4: placa 110 kV, plataforma 66; tres
+primarios de 30 kV con 34,5 en la plataforma; Corozal 14,82 kV; Bosque T4 BT con selector D-Y; un terciario de compensación). En
+el Excel (hoja `TX_Potencia`, versión del 18-oct) la potencia es la ONAF de placa en 201 de 204 equipos; verificado contra la FOTO
+(`wf_354902de-bf0`, 58 equipos): 48 datos para corregir en SU Excel (ampacidades copiadas de otra fila: 502/1 255 A de 30 MVA en
+uno de 2 MVA, 289/1 381 A de 33 MVA en uno de 40 MVA; digitación 83,67 → 88,67; años de reparación como de fabricación), 15 por
+confirmar en campo (San Luis: ¿otra unidad?; Ferrocarril: dos placas; Bosque T4: posición del selector; ventilación OBSOLETA en
+Corozal y Chiriguaná ⇒ ~120–135 % de su ONAN) y 9 matrículas distintas por serie. Entregable LOCAL (datos de cliente, NUNCA al
+repo): `~/Downloads/Comparacion placa vs Salud de Activos 2026-10-23.xlsx`; crudos y síntesis: bóveda
+`2026-10-23-diferencias-placa-ampacidad/excel-salud/`.

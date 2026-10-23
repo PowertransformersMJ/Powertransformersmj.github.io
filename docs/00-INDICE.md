@@ -44,6 +44,7 @@
 | §166 | ADR-166 — **Cargabilidad SCADA**: placa característica de cada equipo en su detalle (foto, lectura, diferencias); carga admin, foto atada a sus bytes · TODO-69 | 8105 |
 | §167 | ADR-167 — **Lorica T1** contra su placa + cargabilidad del SCADA (67,4 %, 13,8 kV); una muestra nueva ya no borra la CRG · TODO-54 | 8173 |
 | §168 | ADR-168 — **Cargabilidad SCADA**: mes a mes y acumulada a la fecha en cada equipo; «A la fecha» = cargabilidad oficial en la revisión · TODO-69 | 8240 |
+| §169 | ADR-169 — **Cargabilidad SCADA**: cada devanado mes a mes frente a sus límites de PLACA (ONAN/ONAF); potencias placa ↔ plataforma ↔ Excel de Salud de Activos · TODO-69/54 | 8288 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

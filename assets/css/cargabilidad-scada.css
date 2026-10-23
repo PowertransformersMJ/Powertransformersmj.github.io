@@ -297,3 +297,14 @@ dialog.cs-dialogo textarea { font: inherit; font-size: 13px; border: 1px solid v
 .cscada table.cs-mensual-tabla { min-width: 0; }
 .cscada .cs-mensual-tabla tbody th { position: static; background: none; }
 .cscada .cs-mensual-cap { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+
+/* Cada devanado con sus límites de ampacidad y potencia (TODO-69, 2026-10-23) — clases propias cs-devmes-* */
+.cscada .cs-devmes-tit { margin: 18px 0 6px; font-size: 15px; }
+.cscada .cs-devmes { border: 1px solid var(--cs-line); border-radius: 12px; padding: 10px 12px; margin: 0 0 12px; background: #fff; }
+.cscada .cs-devmes h5 { margin: 0 0 2px; font-size: 14px; }
+.cscada .cs-devmes .cs-dato { margin: 2px 0; }
+.cscada .cs-devmes .cs-dato .cs-sub { display: inline; margin-left: 6px; }
+.cscada .cs-devmes-graf { min-height: 260px; margin: 6px 0 8px; }
+.cscada .cs-devmes-aviso { color: #8a5a00; font-weight: 600; margin: 2px 0; }
+.cscada .cs-devmes-res { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; margin: 0 0 12px; }
+.cscada .cs-devmes-res-graf { min-height: 270px; border: 1px solid var(--cs-line); border-radius: 12px; background: #fff; padding: 4px; }

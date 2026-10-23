@@ -10,6 +10,7 @@ import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain
 import { filasLista } from '../assets/js/domain/scada_carga_vista.js';
 import { filasPeriodo } from '../assets/js/domain/scada_carga_periodo.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
+import { devanadosDe } from '../assets/js/domain/scada_carga_devanados.js';
 import { serieMensualEquipo, mesesDelEquipo } from '../assets/js/domain/scada_carga_mensual.js';
 
 function azar(semilla) { let s = semilla >>> 0; return () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296); }
@@ -120,4 +121,70 @@ test('el tope de 12 cuenta meses de CALENDARIO: un hueco dentro del rango no ala
   const s = serieMensualEquipo({ tx, homologacion, catalogo: cat, punto: cat.puntos[cid], resumenes: res });
   const ene26 = s.find((x) => x.mes === '2026-01');
   assert.equal(ene26.acumulado.desde, '2025-02'); assert.equal(ene26.acumulado.nMeses, 11);
+});
+
+test('cada devanado con sus límites: los de devanadosDe sobre la MISMA fila del mes y del acumulado', () => {
+  for (const k of [0, 1, 3]) {
+    const m = MESES[k];
+    const x = filasLista({ parque: [tx], homologacion, catalogo, resumenMes: resumenes[m] })[0];
+    assert.deepEqual(serie[k].mensual.devanados, devanadosDe(tx, x));
+    const p = k === 0 ? x : filasPeriodo({ parque: [tx], homologacion, catalogo, meses: MESES.slice(0, k + 1), resumenes, filasPorMes: {} })[0];
+    assert.deepEqual(serie[k].acumulado.devanados, devanadosDe(tx, p));
+  }
+  const sec = serie[3].acumulado.devanados.find((d) => d.d === 'S');
+  assert.equal(sec.A, 800); assert.equal(sec.kv, 13.8); assert.ok(Math.abs(sec.mva - Math.sqrt(3) * 13.8 * 800 / 1000) < 1e-9);
+  assert.ok(Math.abs(sec.iP99 - sec.pct * 800 / 100) < 1e-9);
+  const pri = serie[3].acumulado.devanados.find((d) => d.d === 'P');
+  assert.equal(pri.pct, null, 'el primario no se mide: sin carga, con sus límites');
+  assert.equal(pri.A, 300);
+  // Un mes sin datos: devanados con sus límites y sin carga.
+  assert.ok(serie[2].mensual.devanados.every((d) => d.pct == null && d.A > 0));
+});
+
+test('L-102 y compilación: el bloque por devanado es un archivo nuevo cargado con import() desde «mes a mes»', async () => {
+  const { spawnSync } = await import('node:child_process');
+  for (const f of ['ui/cargabilidad-scada/panel-mensual.js', 'ui/cargabilidad-scada/panel-devanados-mes.js']) {
+    const src = readFileSync(new URL('../assets/js/' + f, import.meta.url), 'utf8');
+    const r = spawnSync(process.execPath, ['--input-type=module', '--check'], { input: src, encoding: 'utf8' });
+    assert.equal(r.status, 0, f + ': ' + r.stderr);
+  }
+  const mensual = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-mensual.js', import.meta.url), 'utf8');
+  assert.match(mensual, /import\('\.\/panel-devanados-mes\.js'\)/);
+  assert.doesNotMatch(mensual, /^import .*panel-devanados-mes/m);
+});
+
+test('bloque por devanado: lógica en el dominio (probada aparte), textos con el límite real de la placa, MVA equivalentes', () => {
+  const src = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-devanados-mes.js', import.meta.url), 'utf8');
+  assert.match(src, /import \{ limitesDePlaca \} from '\.\.\/\.\.\/domain\/placa_etapas\.js'/);
+  assert.match(src, /import \{ umbralesDevanado, motivoSinCifra, estadoDevanados, pctDe \} from '\.\.\/\.\.\/domain\/scada_devanados_mes\.js'/);
+  assert.match(src, /import \{ leerPlaca \} from '\.\.\/\.\.\/data\/placas_caracteristicas\.js'/);
+  // Ningún «% de ONAF» fijo: el nombre del límite sale de la placa (ONAN si solo trae una etapa) — `tests/scada_devanados_mes.test.js`.
+  assert.doesNotMatch(src, /' % de ONAF'|'% de ONAF|\? 'ONAF' :/);
+  assert.match(src, /' % de ' \+ u\.tope/);
+  assert.match(src, /const MVA_EQ = 'MVA equivalentes'/);
+  assert.match(src, /fixedrange: true/);
+  assert.match(src, /no es la ' \+ u\.tope \+ ' de la placa/);
+  assert.match(src, /if \(difA\) return el\('span', \{ class: 'chip chip--provisional' \}, 'Con la ampacidad de la plataforma: '/, 'ampacidad ≠ placa: chip neutro con la cifra de la plataforma');
+  assert.match(src, /const dudosa = AVISO_PLACA\.has\(base\.aviso\) \|\| u\.difA;/);
+  assert.match(src, /insidetextfont: \{ color: d === 'S' \? '#1d2b44' : '#ffffff' \}/, 'texto legible sobre el ámbar');
+  assert.match(src, /bgcolor: 'rgba\(255,255,255,0\.85\)'/, 'rótulos de los umbrales con fondo');
+  const men = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-mensual.js', import.meta.url), 'utf8');
+  assert.match(men, /pintarDevanadosMes\(devNodo, \{ serie, mat: a\.mat, tx: a\.tx,/);
+});
+
+test('importaciones: cada nombre importado por los módulos de «mes a mes» existe en el módulo que lo exporta', () => {
+  const base = new URL('../assets/js/', import.meta.url);
+  const archivos = ['ui/cargabilidad-scada/panel-mensual.js', 'ui/cargabilidad-scada/panel-devanados-mes.js',
+    'domain/scada_carga_mensual.js', 'domain/placa_etapas.js', 'domain/scada_devanados_mes.js'];
+  for (const f of archivos) {
+    const src = readFileSync(new URL(f, base), 'utf8');
+    for (const m of src.matchAll(/^import \{([^}]+)\} from '(\.[^']+)';/gm)) {
+      const destino = readFileSync(new URL(m[2], new URL(f, base)), 'utf8');
+      for (const nombre of m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean)) {
+        const exporta = new RegExp('export (?:async )?(?:function\\*?|const|let|class) ' + nombre + '\\b').test(destino)
+          || new RegExp('export \\{[^}]*\\b' + nombre + '\\b').test(destino);
+        assert.ok(exporta, f + ' importa «' + nombre + '» de ' + m[2] + ', que no lo exporta');
+      }
+    }
+  }
 });
