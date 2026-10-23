@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-10-18) — REFRIGERACIÓN ONAN/ONAF (TODO-80) · en pausa: firmas del borrador (TODO-81) · SCADA (TODO-69) · CONTRATO (TODO-76)
+## 🎯 Foco (al 2026-10-23) — SCADA: placa ↔ plataforma uno a uno (TODO-54/69) · en pausa: REFRIGERACIÓN (TODO-80) · firmas (TODO-81) · CONTRATO (TODO-76)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 > **Al retomar**: suyo → TODO-69 · TODO-76 · TODO-78; técnico en vivo → TODO-62; Fichas CF-43/44/36/35 → `99 §140`; mantenimiento del cerebro → `§162`.
@@ -55,6 +55,6 @@
 | **TODO-35/58** | **Cola de FICHAS TÉCNICAS → hoja [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md)** (revisada al 09-27). Lo que espera respuesta suya → lista **(I)**. **CF-20..CF-31 autorizados en bloque** (09-22), salvo **CF-22** (volver a preguntar) y **CF-28** (decidido por `§103`). | 🔴 |
 | **TODO-60** | 🔴 **El Plan de Inversión ignora la criticidad**: `criticidad.nivel` no lo escribe ningún módulo de producción ⇒ `critN = 0` en los 208 y **el 25 % del ranking vale cero** (y la razón «Celda matriz» nunca se imprime). El arreglo ya existe y está probado en las otras tres vistas: derivarla de los usuarios. | 🔴 |
 | **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada**: la banda «mínima» se traga **144 de 208** (147 con los 3 sin dato); 14 equipos ≥20 MVA declaran ≤10 usuarios (870 MVA) → `99 §81.1`, `§107.4`. **El dato sigue faltando**; opciones → `§74.24`. **Decide él**: (A) dato · (C) excepción «transmisión» · (F) cortes de la Tabla 9. | 🔴 |
-| **TODO-54** | **Ampacidades contra la placa** (`§169.9`): 24 devanados + 18 tensiones (×10 GUATAPURÍ T2, STA TERESA T1) → bóveda `2026-10-23-diferencias-placa-ampacidad`. Lorica ✅ (`§167`); sigue STA TERESA. Su Excel: `.xlsx` de `§169.9`. | 🟡 |
+| **TODO-54** | **Ampacidades contra la placa** (`§169.9`): 24 devanados + 18 tensiones (×10 GUATAPURÍ T2, STA TERESA T1) → bóveda `2026-10-23-diferencias-placa-ampacidad`. Lorica ✅ (`§167`); sigue STA TERESA. Su Excel: `.xlsx` de `§169.9`; campo: `§169.11`. | 🟡 |
 
 > **Fríos** (arquitectura, validaciones diferidas, colas viejas) → [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md).
