@@ -38,6 +38,17 @@ function impresaDe(calc, impresas) {
   return mejor;
 }
 
+/**
+ * Una corriente de las notas o del texto de potencias es de OTRO devanado si cuadra mejor con una etapa de otro devanado
+ * que con esta (p. ej. «corrientes AT 210/168/131 A»: 168 A es la ONAF del primario, no la ONAN de 167,35 A del
+ * secundario). Un empate (dos devanados con la misma corriente) no la quita. La de la tensión del propio devanado no pasa
+ * por aquí: esa siempre es suya.
+ */
+function esDeOtro(v, calc, rivales) {
+  const mia = Math.abs(v - calc);
+  return rivales.some((c) => Math.abs(v - c) < mia - 1e-6);
+}
+
 /** Etapas del equipo de la placa ({ONAN, ONAF1, ONAF2…} kVA) → lista ascendente de kVA. */
 function etapasEquipo(datos) {
   const e = (datos && datos.etapas_kva) || {};
@@ -243,22 +254,31 @@ export function limitesDePlaca(placa, tx) {
   const out = { nota: r.nota, fuente: r.fuente, documento: MARCA_PLANO.test(notas) ? 'plano' : 'placa', futuro: MARCA_FUTURO.test(notas) };
   const tension = (datos && datos.tension) || {};
   const sinTension = [];
+  // Primero la corriente calculada de cada devanado: hace falta para saber de quién es cada corriente de las notas.
+  const base = {};
   for (const d of ['P', 'S', 'T']) {
     const kva = r[d];
     const compensa = d === 'T' && COMPENSACION.test(String(tension.T || ''));
+    if (compensa || !kva) { base[d] = { compensa, kva }; continue; }
+    const kvPlat = Number(e[KV_PLATAFORMA[d]]) || null;
+    const kv = kvDePlaca(tension[d], kvPlat);
+    base[d] = { compensa, kva, kvPlat, kv, calc: kv ? kva.map((s) => (mono ? s / kv : s / (R3 * kv))) : null };
+  }
+  const comunes = [notas, datos && datos.potencias_texto].flatMap((x) => corrientesA(String(x || '')));
+  for (const d of ['P', 'S', 'T']) {
+    const { compensa, kva, kvPlat, kv, calc } = base[d];
     // Terciario de compensación: la placa no le da carga → sin límite (aunque el protocolo traiga su potencia térmica).
     if (compensa) { out.T = { kva: null, nombres: [], kv: kvDePlaca(tension.T, Number(e[KV_PLATAFORMA.T]) || null), A: null, origenA: [],
       kvPlataforma: Number(e[KV_PLATAFORMA.T]) || null, difKv: false, compensa: true, sinLimite: true }; continue; }
     if (!kva) continue;
-    const kvPlat = Number(e[KV_PLATAFORMA[d]]) || null;
-    const kv = kvDePlaca(tension[d], kvPlat);
     if (!kv) sinTension.push(NOMBRE_DEV[d]);
     // Monofásico: la placa da la tensión de fase y la plataforma la de línea (13,8 kV ↔ 7,967 kV): no es diferencia.
     const fase = mono && kv && kvPlat && Math.abs(kv * R3 / kvPlat - 1) < 0.02;
-    const calc = kv ? kva.map((s) => (mono ? s / kv : s / (R3 * kv))) : null;
-    // Las corrientes que la lectura trae escritas: primero las de la tensión del devanado, luego notas y potencias.
-    const impresas = [tension[d], notas, datos && datos.potencias_texto].flatMap((x) => corrientesA(String(x || '')));
-    const imp = calc ? calc.map((c) => impresaDe(c, impresas)) : null;
+    // Las corrientes que la lectura trae escritas: las de la tensión del devanado, y las de notas y potencias que no sean
+    // de otro devanado (`esDeOtro`).
+    const propias = corrientesA(String(tension[d] || ''));
+    const rivales = ['P', 'S', 'T'].filter((o) => o !== d && base[o] && base[o].calc).flatMap((o) => base[o].calc);
+    const imp = calc ? calc.map((c) => impresaDe(c, [...propias, ...comunes.filter((v) => !esDeOtro(v, c, rivales))])) : null;
     out[d] = {
       kva, nombres: kva.map((_, k) => (kva.length === 1 ? 'ONAN' : ETAPAS[Math.min(k, ETAPAS.length - 1)])), kv,
       A: calc ? calc.map((c, k) => (imp[k] != null ? imp[k] : c)) : null,

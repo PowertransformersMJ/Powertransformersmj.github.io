@@ -126,6 +126,24 @@ test('corriente IMPRESA: si la placa la graba y cuadra, se usa y se rotula; una 
   assert.deepEqual(una.S.origenA, ['impresa', 'calculada']);
 });
 
+test('corriente IMPRESA: la de las notas que cuadra mejor con OTRO devanado no se presta; la propia y el empate sí valen', () => {
+  const tx = { electrico: { tension_primaria_kv: 110, tension_secundaria_kv: 34.5, tension_terciaria_kv: 13.8 } };
+  const placa = (S, T = '13,8 kV', bt = '22,0/27,5') => ({ datos: { etapas_kva: { ONAN: 32000, ONAF1: 40000 },
+    potencias_texto: 'potencia (MVA): AT 32,0/40,0; MT 10,0/12,5; BT ' + bt, notas: 'Corrientes AT 168/210 A.',
+    tension: { P: '110 kV', S, T } } });
+  // 168/210 A son del primario (167,96/209,95 A); el secundario (167,35/209,18 A) no las toma aunque caigan a ±0,6 %.
+  const L = limitesDePlaca(placa('34,5 kV'), tx);
+  assert.deepEqual(L.P.origenA, ['impresa', 'impresa']); assert.deepEqual(L.P.A, [168, 210]);
+  assert.deepEqual(L.S.origenA, ['calculada', 'calculada']); casi(L.S.A[0], 167.35, 0.01);
+  // Con su propia corriente en su tensión, el secundario sí es «impresa» (y la del primario no le gana).
+  const propia = limitesDePlaca(placa('34,5 kV · corriente de placa 167/209 A'), tx);
+  assert.deepEqual(propia.S.origenA, ['impresa', 'impresa']); assert.deepEqual(propia.S.A, [167, 209]);
+  // Empate: dos devanados con la misma corriente de placa → la de las notas vale para los dos.
+  const tx2 = { electrico: { tension_primaria_kv: 110, tension_secundaria_kv: 34.5, tension_terciaria_kv: 34.5 } };
+  const emp = limitesDePlaca({ datos: { ...placa('34,5 kV', '34,5 kV', '10,0/12,5').datos, notas: 'Corrientes MT y BT 167/209 A.' } }, tx2);
+  assert.deepEqual(emp.S.origenA, ['impresa', 'impresa']); assert.deepEqual(emp.T.origenA, ['impresa', 'impresa']);
+});
+
 test('fuente de la lectura y terciario de compensación: marcas en las notas; el terciario no tiene límite de carga', () => {
   const tx = { electrico: { tension_primaria_kv: 66, tension_secundaria_kv: 34.5, tension_terciaria_kv: 13.8 } };
   const L = limitesDePlaca({ datos: { etapas_kva: { ONAN: 20000, ONAF1: 25000 }, potencias_texto: 'AT 20/25; MT 20/25; TERC 7/8 MVA',
