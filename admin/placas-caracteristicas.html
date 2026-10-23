@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#f4f6fb">
+<meta name="color-scheme" content="light">
+<title>SGM · TRANSPOWER — Placas características</title>
+<meta name="description" content="Administración: carga de la placa característica (foto y lectura) de cada transformador.">
+<!--
+  SGM · TRANSPOWER — Placas características (TODO-69, ADR-166) · solo administradores.
+  Se eligen los archivos del paquete (los arma el preparador en el computador del Ingeniero), se revisan contra
+  el parque vivo, se muestra la simulación y solo entonces se guarda en Firestore. Las fotos y lecturas son
+  datos del cliente: NUNCA van al repositorio.
+-->
+<link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+<script type="module" src="../assets/js/auth/admin-guard.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="../assets/css/aqua-tokens.css"/>
+<link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+<link rel="stylesheet" href="../assets/css/cargabilidad-scada.css"/>
+</head>
+<body class="aqua">
+
+<main class="app-main page-container cscada" id="contenido">
+
+  <div class="page-header">
+    <div class="breadcrumb">Administración / Placas características</div>
+    <h1 class="page-title">Placas <em>características</em></h1>
+    <p class="page-subtitle">
+      La foto de la placa de cada transformador y lo que se leyó de ella. Se ve en el detalle de Cargabilidad SCADA.
+      Los archivos se revisan en este computador; a la base solo va lo que el simulador muestra.
+    </p>
+  </div>
+
+  <section id="placasCarga" class="cs-panel">
+    <div class="cs-estado" role="status">Cargando…</div>
+  </section>
+
+</main>
+
+<script type="module" src="../assets/js/ui/placas-carga/placas-carga.js"></script>
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>

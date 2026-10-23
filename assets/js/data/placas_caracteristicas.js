@@ -33,12 +33,14 @@ async function huella(bytes) {
   return [...new Uint8Array(buf)].map((x) => x.toString(16).padStart(2, '0')).join('');
 }
 
-const cache = new Map();   // id → {huella, bytes}
+const cache = new Map();   // id → {clave: lote+huella, bytes} (máximo 20 fotos en memoria)
+const TOPE_CACHE = 20;
 
 /** Los bytes de la foto, verificados (mismo lote y misma huella): {bytes} · {error:true, mensaje}. */
 export async function leerFoto(idTx, foto) {
+  const clave = foto ? String(foto.lote) + ':' + String(foto.huella) : null;
   const c = cache.get(idTx);
-  if (c && foto && c.huella === foto.huella) return { bytes: c.bytes };
+  if (c && clave && foto.huella && c.clave === clave) return { bytes: c.bytes };
   const db = getDbSafe();
   if (!db || !foto || !idValido(idTx)) return { error: true, mensaje: 'Sin foto.' };
   try {
@@ -52,7 +54,8 @@ export async function leerFoto(idTx, foto) {
     }
     const bytes = unir(partes);
     if (foto.huella && await huella(bytes) !== foto.huella) return { error: true, mensaje: 'La foto guardada no coincide con su huella.' };
-    cache.set(idTx, { huella: foto.huella, bytes });
+    cache.delete(idTx); cache.set(idTx, { clave, bytes });
+    while (cache.size > TOPE_CACHE) cache.delete(cache.keys().next().value);
     return { bytes };
   } catch (e) {
     console.warn('[placa] foto:', (e && e.code) || e);

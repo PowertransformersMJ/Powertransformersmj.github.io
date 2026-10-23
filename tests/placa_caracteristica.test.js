@@ -3,7 +3,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { numeros, tensionesKv, corrientesA, topePlacaKva, diferencias, seccionesPlaca, unir } from '../assets/js/domain/placa_caracteristica.js';
+import { numeros, tensionesKv, tensionesPlaca, corrientesA, topePlacaKva, diferencias, revisionPlaca, revisarPlacaPaquete, seccionesPlaca, unir } from '../assets/js/domain/placa_caracteristica.js';
 
 test('números de placa: coma decimal, punto o espacio de miles', () => {
   assert.deepEqual(numeros('13 800 V').map((x) => x.v), [13800]);
@@ -13,13 +13,15 @@ test('números de placa: coma decimal, punto o espacio de miles', () => {
 
 test('tensiones y corrientes impresas', () => {
   assert.ok(tensionesKv('34,5 kV (conmutador 36225–32775 V)').includes(34.5));
-  assert.deepEqual(tensionesKv('13 800 V'), [13.8]);
+  assert.deepEqual(tensionesPlaca('13 800 V').nominal, [13.8]);
   assert.ok(tensionesKv('13,8/7,96 kV').includes(7.96));
   assert.deepEqual(corrientesA('BT 600,1/800,2 A y AT 240,0/320,0 A'), [600.1, 800.2, 240, 320]);
+  assert.deepEqual(corrientesA('CT1 200/5 A'), []);
+  assert.ok(!numeros('AT pos 6 219/289 A').some((x) => x.v === 6219));
 });
 
-const tx = (e, pl = {}, extra = {}) => ({ id: 'x', electrico: e, placa: { potencia_kva: 20000, serial: 'AB-123', ...pl }, ...extra });
-const placa = (datos) => ({ datos: { serie: 'AB 123', etapas_kva: { ONAN: 15000, ONAF1: 20000 }, ...datos } });
+const tx = (e, pl = {}, extra = {}) => ({ id: 'x', electrico: e, placa: { potencia_kva: 20000, serial: 'AB-12345', ...pl }, ...extra });
+const placa = (datos) => ({ datos: { serie: 'AB-12345', etapas_kva: { ONAN: 15000, ONAF1: 20000 }, ...datos } });
 
 test('coincide: sin diferencias (la ampacidad cuadra con la potencia a su tensión)', () => {
   const t = tx({ tension_primaria_kv: 34.5, corriente_nominal_primaria_a: 334.7, tension_secundaria_kv: 13.8, corriente_nominal_secundaria_a: 836.7 });
@@ -44,7 +46,7 @@ test('tres devanados: el secundario con su propia potencia no se marca', () => {
 });
 
 test('tensión que no casa con la placa, serie distinta, potencia y año', () => {
-  const t = tx({ tension_primaria_kv: 66 }, { serial: 'ZZ-999', potencia_kva: 30000 }, { fabricacion: { ano_fabricacion: 1990 } });
+  const t = tx({ tension_primaria_kv: 66 }, { serial: 'ZZ-99999', potencia_kva: 30000 }, { fabricacion: { ano_fabricacion: 1990 } });
   const d = diferencias(placa({ tension: { P: '110 kV (OLTC 115,5–93,5 kV)' }, anio: 2012 }), t);
   assert.deepEqual(d.map((x) => x.campo).sort(), ['Año de fabricación', 'Potencia', 'Serie', 'Tensión primario']);
 });
@@ -76,4 +78,46 @@ test('L-102 y compilación: el panel es un archivo nuevo y el detalle no importa
   }
   const det = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
   assert.match(det, /import\('\.\/panel-placa\.js'\)/);
+});
+
+test('tensión: nominal, una toma del cambiador (aviso) o fuera (grave)', () => {
+  const t = tensionesPlaca('33000 V (5 pos: 34650 a 31350 V)');
+  assert.deepEqual(t.nominal, [33]); assert.equal(t.max, 34.65);
+  const d = diferencias(placa({ tension: { P: '33000 V (5 pos: 34650 a 31350 V)' } }), tx({ tension_primaria_kv: 34.5 }));
+  assert.equal(d.length, 1); assert.match(d[0].nota, /toma del cambiador/); assert.equal(d[0].grave, false);
+  assert.ok(tensionesPlaca('110,0 kV ±8x1,25%').min < 100);
+});
+
+test('la ampacidad que cuadra con la tensión de la PLACA apunta a la tensión, no a la potencia', () => {
+  const d = diferencias(placa({ tension: { S: '14300 V' } }), tx({ tension_primaria_kv: 34.5, corriente_nominal_primaria_a: 334.7, tension_secundaria_kv: 13.8, corriente_nominal_secundaria_a: 807.5 }));
+  assert.ok(d.some((x) => x.campo === 'Tensión secundario' && x.grave));
+  assert.ok(d.some((x) => x.campo === 'Ampacidad secundario' && /revisar la tensión/.test(x.nota) && !x.grave));
+});
+
+test('serie por partes: CP y serie de WEG, lectura incompleta y error de un dígito', () => {
+  assert.deepEqual(diferencias(placa({ serie: 'CP 40917725 / serie 2088316450' }), tx({}, { serial: '2088316450' })), []);
+  assert.match(diferencias(placa({ serie: '82231' }), tx({}, { serial: '82231604' }))[0].nota, /incompleta/);
+  assert.match(diferencias(placa({ serie: '3348027' }), tx({}, { serial: '33480127' }))[0].nota, /uno o dos caracteres/);
+});
+
+test('revisión: dice qué se comparó y qué no', () => {
+  const r = revisionPlaca(placa({}), tx({}, { serial: '' }));
+  assert.ok(r.comparados.includes('potencia')); assert.ok(r.sinComparar.includes('serie'));
+});
+
+test('paquete: rechaza placas sin huella de datos y fotos con metadatos de cámara', () => {
+  const tx1 = { id: 'abcdef01', identificacion: { matricula: 'T1-X' } };
+  const parque = new Map([[tx1.id, tx1]]);
+  const meta = { schema: 1, matricula: 'T1-X', datos: {}, fuente: { huella_datos: 'c'.repeat(64) }, foto: null };
+  assert.equal(revisarPlacaPaquete({ id: 'abcdef01', meta }, parque).ok, true);
+  assert.match(revisarPlacaPaquete({ id: 'abcdef01', meta: { ...meta, fuente: {} } }, parque).motivo, /huella/);
+  const jpegExif = new Uint8Array([0xFF, 0xD8, 0xFF, 0xE1, 0x00, 0x04, 0x45, 0x78, 0xFF, 0xDA]);
+  const b64 = Buffer.from(jpegExif).toString('base64');
+  const conFoto = { ...meta, foto: { partes: 1, lote: 'loteloteA1', huella: 'd'.repeat(64), bytes: jpegExif.length } };
+  assert.match(revisarPlacaPaquete({ id: 'abcdef01', meta: conFoto, partes: [{ lote: 'loteloteA1', b64 }] }, parque).motivo, /metadatos/);
+  assert.match(revisarPlacaPaquete({ id: 'zzzzzz99', meta }, parque).motivo, /no está en el parque/);
+  // Se compara sin espacios ni mayúsculas, pero se guarda la matrícula del inventario tal cual (la regla la exige idéntica).
+  const txMin = { id: 'abcdef02', identificacion: { matricula: 't1-x ' } };
+  const r = revisarPlacaPaquete({ id: 'abcdef02', meta }, new Map([[txMin.id, txMin]]));
+  assert.equal(r.ok, true); assert.equal(r.meta.matricula, 't1-x '); assert.equal(meta.matricula, 'T1-X');
 });

@@ -101,7 +101,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     a.placaLista = true;
     const nodo = a.placaNodo;
     panelPlaca.pintarPlaca(nodo, { tx: a.tx, titulo: a.mat, vigente: () => !!actual && actual.placaNodo === nodo })
-      .catch((e) => { console.warn('[cargabilidad-scada] placa', e); nodo.hidden = true; });
+      // Con error, se vuelve a intentar al reabrir el equipo (L-109).
+      .then((r) => { if (r && r.error && actual && actual.placaNodo === nodo) actual.placaLista = false; })
+      .catch((e) => { console.warn('[cargabilidad-scada] placa', e); nodo.hidden = true; if (actual && actual.placaNodo === nodo) actual.placaLista = false; });
   }
   /** Estado EXPLÍCITO del panel: 'leyendo' | 'ok' (con el cálculo recién hecho) | 'error' | 'sin_scada'. */
   function pintarDga(a, estado) {
