@@ -62,6 +62,12 @@
 - Vistas desde el SCADA, solo informativas y sin tocar: posibles erratas en la cifra OFICIAL de Salud de Activos
   (Ariguaní; El Carmen y Sampués, corrientes copiadas entre T1 y T2; Membrillal T1) y un circuito cuya limpieza descartó casi todo agosto → síntesis
   de la bóveda `2026-10-08-scada-sin-medicion` y TODO-54.
+- **Devanados de placa por transformador** (pedido del Ingeniero 2026-10-22; BORRADOR hasta su «procede»): la lista y el detalle muestran
+  cada devanado con tensión, ampacidad y **potencia CALCULADA** = √3 × kV × A (no hay campo de potencia por devanado; monofásico:
+  kV × A, o kV × A ÷ √3 si cuadra mejor con la placa: devanado entre fase y neutro). La carga de un devanado se publica SOLO si el
+  equipo tiene cifra (circuito sin confirmar, excluida o sin homologación no dan número, tampoco sus devanados). Aviso si un devanado
+  supera 1,5 × la placa, con su causa probable: ≈ ×10 → errata (corregir ampacidad y carga juntas, TODO-54); ≈ √3 o 3 → parece
+  monofásico (confirmar fases); otra → la ampacidad parece de otra potencia (placa cambiada, p. ej. Casacará). `scada_carga_devanados.js`.
 - Al corregir la POTENCIA de placa, corregir también la ampacidad y la carga medida que se derivó de ella: Casacará T1 quedó con la ampacidad de 5 MVA tras pasar a 2 MVA (`99 §158.11`). Su Excel de Salud de Activos aún trae la vieja: no reimportarlo sin corregirlo.
 
 ## 4. Sobrecarga sostenida

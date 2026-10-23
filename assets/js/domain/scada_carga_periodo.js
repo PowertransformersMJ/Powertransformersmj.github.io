@@ -21,6 +21,7 @@ import { iFaseMax, serieCargabilidad, horasSostenidasSobre } from './scada_carga
 import { calcularEquipo, filaDeTransformador, indicePorMatricula } from './scada_carga_vista.js';
 import { conteosHomologacion, analizarClaveHomologada, claveEfectiva } from './scada_carga_homologacion.js';
 import { claveId } from './scada_carga_csv.js';
+import { devanadosDe } from './scada_carga_devanados.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -239,6 +240,7 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
       delta: null,
       // Para ordenar la lista por estas columnas (ordenarFilas usa x[campo]).
       peor: ag.peorMes ? ag.peorMes.pct : null, mayor: ag.mayorCorriente ? ag.mayorCorriente.pct : null,
+      devanadosPlaca: devanadosDe(tx, { ...c, ...cifra }),
       periodo: { meses, faltanPreparar: faltan, ...ag }
     };
   });
