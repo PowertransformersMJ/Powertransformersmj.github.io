@@ -19,6 +19,9 @@ describe('bloquea por forma', () => {
     assert.equal(motivoEnLinea(clave('Inventad', 'LN' + '570', '34.5kV')), 'clave de un punto SCADA');
     assert.equal(motivoEnLinea(clave('Inventad', 'swTrf3')), 'clave de un punto SCADA');
     assert.equal(motivoEnLinea(clave('Inventad', 'swAuto1')), 'clave de un punto SCADA');
+    // Un elemento de transformador con errata y la forma de un alias de elemento, sin barra inicial (ADR-181).
+    assert.equal(motivoEnLinea(clave('Inventad', 'swTa' + 'fo1', '13.8kV')), 'clave de un punto SCADA');
+    assert.equal(motivoEnLinea('Inventad' + S + 'swTa' + 'fo1=swTrafo1'), 'clave de un punto SCADA');
   });
   test('una fila de exporte', () => {
     assert.equal(motivoEnLinea(fila('Ficticia')), 'fila de un exporte del SCADA');
