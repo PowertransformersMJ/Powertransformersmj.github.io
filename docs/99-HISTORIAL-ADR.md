@@ -8671,3 +8671,41 @@ subestación. Los terciarios (6,9 kV T1/T2; BT2 7,967 kV T4) no se registran: es
 SUYO: oficial de T4 (93 % CRG 5 en su Excel) frente a 74 % CRG 3 del SCADA; las dos «oficiales» de la plataforma no cuadran entre
 sí (equipo 21/68/52/93 vs devanado 34/48/63/98); su Excel aún dice 66 kV; T3 en reserva (confirmar conexión y la unidad «T1» de
 su placa). El aviso «potencia monofásica» que aparece en la lista es de Mata de Caña y El Paraíso, no de NCO.
+
+## 176. ADR-176 — Puerto Libertador: T1 con su lado de 13,8 kV (el de 34,5 kV mide T1 + T2) y T2 con su placa (4000 kVA, 167 A) y su circuito de salida; las dos cifras firmes (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «sigamos con Puerto Libertador T1» → «es así como dices, el lado de 34.5 kV mide la suma de T1 + T2» + foto de la placa del TR2
+> → «sí, procede; [ese circuito] es la única salida del TR2» (2026-10-23).
+
+**176.1 Causa raíz.** T1 marcaba 141,7 % (CRG 5, «posible sobrecarga sostenida», provisional) porque su cifra salía del lado de
+34,5 kV del punto SCADA del transformador, que mide la ENTRADA COMÚN de los dos transformadores: I34,5 = 0,4 × (I13,8 de T1 + I del circuito de salida del TR2),
+R² 0,99996 en 2.611 h (2025 igual); con ese circuito en ~0 A la relación vuelve a 2,49 (TC sanos). De ahí el aviso de relación de
+corrientes (1,61 frente a 2,50). T2 no tenía cifra (homologado a un circuito) y la plataforma le daba ampacidades de 3 MVA
+(50,2/125,5 A) con potencia y serie de 4000 kVA; su foto en la carpeta era la de San Martín de Loba TR-2.
+
+**176.2 Solución.** (1) Homologación T1 (decisión «usar»): 13,8 kV → secundario, 34,5 kV → «No usar». (2) Placa del TR2 (foto del
+Ingeniero: reparación TRADELCA S.A.S. 2020, serie 176780) cargada a `placas_caracteristicas` (paquete `placas-v5-ptl2-20261023`).
+(3) Datos del TR2 con su placa: ampacidades 66,94 / 167 A impresas; potencia ONAN 4000 kVA; Dyn5; Z 7,343 %; NLTC 5 pos.; ONAN;
+4040 kg (9 campos). (4) Homologación T2 («usar»): su circuito de salida → secundario (su única salida, confirmado). Sin código nuevo.
+
+**176.3 No-regresión.** Placa y plataforma del T1 ya eran correctas (no se tocaron). Cifra oficial de salud intacta. Las
+decisiones de homologación se reabren desde «Revisar» si cambia el campo.
+
+**176.4 Verificación.** Placa: simulación «1 nueva», aceptada; releída (huella de datos y foto = paquete; validador de la página y
+`limitesDePlaca`: 66,94/167 A «impresa»). Datos: plan en seco con valor esperado, 9/9 escritos y releídos. Homologación: decisiones
+releídas de la base. En vivo (página recargada): septiembre T1 **95,4 % CRG 5** firme (pico aislado > 100 %, no sostenido), T2
+**85,3 % CRG 4** firme; octubre 1–22 T1 85,5 % CRG 4, T2 87,7 % CRG 4; firmes de septiembre 104 → 106. Diagnóstico con 2 Opus
+(`wf_e86bf926-773`) → bóveda `2026-10-23-provisionales-septiembre/`; detalle → `…/revision-uno-a-uno/05-PTL-T1-T2.md`.
+
+**176.5 Anti-patterns evitados.** Publicar como sobrecarga una suma de dos equipos; «corregir» un TC sano; usar un circuito sin
+confirmar que es la única salida; dejar la ampacidad de 3 MVA en un equipo de 4 MVA.
+
+**176.6 Archivos.** Datos: `transformadores/{T2-M/M-PTL}`, `placas_caracteristicas/{T2-M/M-PTL}`, homologación (2 filas).
+Cerebro: este ADR + índice.
+
+**176.7 Doctrina.** «Todo con base a la placa»; plan en seco + su «procede»; lo dudoso queda suyo. NO revisado externamente.
+
+**176.8 Verificado sano / no re-auditar.** El 141,7 % NO era un TC errado ni una placa errada (relación 2,49 con el circuito del TR2 en 0). P y Q
+del 34,5 kV inservibles; P/Q de dos circuitos dañadas o ×10 (no afectan: la cifra usa corriente). Queda SUYO: ventiladores del
+T1 (inventario y Salud «ONAF OBSOLETA», hoja de cargabilidad «OPERATIVA»: sin ellos, 124 % de la ONAN); su Excel dice 3000 kVA y
+serie 224109 para el T2 (es la de T2-M/M-SML); el peso manuscrito de 4040 kg es bajo para 4 MVA; la foto vieja de la carpeta TR-2.
