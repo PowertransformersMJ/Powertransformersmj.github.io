@@ -5,7 +5,7 @@
 
 ---
 
-## 🎯 Foco (al 2026-10-23) — SCADA: placa ↔ plataforma uno a uno (TODO-54/69) · en pausa: REFRIGERACIÓN (TODO-80) · firmas (TODO-81) · CONTRATO (TODO-76)
+## 🎯 Foco (al 2026-10-24) — SCADA: placa ↔ plataforma uno a uno (TODO-54/69) · sigue: SCADA ↔ REFRIGERACIÓN (TODO-80) · firmas (TODO-81) · CONTRATO (TODO-76)
 
 > Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 > **Al retomar**: suyo → TODO-69 · TODO-76 · TODO-78; técnico en vivo → TODO-62; Fichas CF-43/44/36/35 → `99 §140`; mantenimiento del cerebro → `§162`.
@@ -41,7 +41,7 @@
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
 | **TODO-81** | 🟡 **Informe de Mantenimiento Brigada** PUBLICADO (`99 §163`): F60 Applus, PDF y Word; 3 firmas centradas (§163.15). ⏸ Firmas en borrador: rama `informe-brigada-firmas-borrador`, espera su 1/2/3. Falta de él: Applus, Word en Word. | 🟡 |
-| **TODO-80** | 🔄 **Refrigeración ONAN/ONAF** (W-11 paso 2): guía PDF v3, Excel de placas v2 y Excel R3 (116 ONAF) en `~/Downloads/`; sin Pk de placa: 414 FN063 vs 866; P0 sin placa: excitación calibrada (L-151). D2 suyo: reserva opcional. Suyo: D1, D3 (factor 1,13), D4–D11 (L-148–L-151). | 🟡 |
+| **TODO-80** | 🔄 **Refrigeración ONAN/ONAF** (W-11 paso 2) · **nexo con SCADA** al cerrar sus provisionales (10-24, `§181.8`) · guía v3, placas v2 y R3 (116 ONAF) en Descargas; sin Pk de placa: 414 FN063 vs 866; P0 sin placa: excitación calibrada (L-151). D2 suyo: reserva opcional. Suyo: D1, D3 (factor 1,13), D4–D11 (L-148–L-151). | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`–`§166`; DGA, Duval: BORRADOR). **Suyo**: 8 decisiones de `§140` (la 6 la absorbió `§150`; la 9 cambió con `§158`; la 11 = TODO-71) · re-exportar sep y oct (faltan 43 S/E) y mayo (`§125`) · circuitos y arreglos de campo (pasos 3–5, `§158.8`) · corregir lo que la placa señala, uno a uno (`§166.7`) · corregir Casacará (2 MVA) en su Excel de Salud (`§158.11`). Para el área SCADA/Operación: 4 señales no válidas y 4 con P/Q ×1000 (`§158.12`), límite de 20 A de Casacará (`§158.11`). Ofrecido → `§160.7`–`.8`. Cargar un mes → `60 §W-13` (8). | 🟡 |
 | **TODO-78** | 🟡 **Mapa de Colombia** (`99 §152`–`§157`). **Suyo**: revisión de TX por depto (Excel) · red UPME · zonas · `§153.9`-3 (municipios de Fichas → CF-49), -4 (depto = zona en 4 S/E), -5 (¿la matrícula sigue a la posición o al aparato?) · quitar «Borrador» (`§155`). | 🟡 |
 | **TODO-76** | 🟡 **Órdenes E/S + Contrato** (`99 §141`–`§148`, `§161`; criterio → `54`). **Suyo**: ¿el termómetro MR de Talaigua y los 3 deshumidificadores ABB salieron del contrato? (el estudio recomienda dejar fuera los ABB). **Ofrecido**: aviso si una SALIDA va Bosque → S/E · familias de accesorio y % por falla (`§144.8`) · «Importar» con su Libro4 · 5 propuestas del estudio de `§161` (`§161.8`). Límites → `§146.8`. | 🟡 |
@@ -55,6 +55,6 @@
 | **TODO-35/58** | **Cola de FICHAS TÉCNICAS → hoja [`cola-fichas-tecnicas.md`](cola-fichas-tecnicas.md)** (revisada al 09-27). Lo que espera respuesta suya → lista **(I)**. **CF-20..CF-31 autorizados en bloque** (09-22), salvo **CF-22** (volver a preguntar) y **CF-28** (decidido por `§103`). | 🔴 |
 | **TODO-60** | 🔴 **El Plan de Inversión ignora la criticidad**: `criticidad.nivel` no lo escribe ningún módulo de producción ⇒ `critN = 0` en los 208 y **el 25 % del ranking vale cero** (y la razón «Celda matriz» nunca se imprime). El arreglo ya existe y está probado en las otras tres vistas: derivarla de los usuarios. | 🔴 |
 | **TODO-55** | 🔴 **La criticidad por usuarios no distingue casi nada**: la banda «mínima» se traga **144 de 208** (147 con los 3 sin dato); 14 equipos ≥20 MVA declaran ≤10 usuarios (870 MVA) → `99 §81.1`, `§107.4`. **El dato sigue faltando**; opciones → `§74.24`. **Decide él**: (A) dato · (C) excepción «transmisión» · (F) cortes de la Tabla 9. | 🔴 |
-| **TODO-54** | **Ampacidades = corriente de placa** en 435 devanados (`§172`/`§173`; LOR `§167`, BQE T2 `§171`, NCO…BST `§175`–`§181`). **Suyo**: Momil (ventilación obsoleta), Ferrocarril (dos placas), Monterrey (30 kV); campo `§169.11`; Excel `§169.9`. | 🟡 |
+| **TODO-54** | **Ampacidades = corriente de placa** en 435 devanados (`§167`–`§181`). **Suyo**: Momil (ventilación obsoleta), Ferrocarril (dos placas), Monterrey (30 kV); campo `§169.11`; Excel `§169.9`. | 🟡 |
 
 > **Fríos** (arquitectura, validaciones diferidas, colas viejas) → [`11-PENDIENTES-FRIOS.md`](11-PENDIENTES-FRIOS.md).
