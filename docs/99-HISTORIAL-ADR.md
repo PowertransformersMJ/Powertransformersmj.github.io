@@ -8753,3 +8753,36 @@ entró en servicio a mediados de julio de 2025?; pedir al área SCADA reparar la
 34,5 kV de San Benito; oficiales de San Benito sin respaldo (Excel 82 % = 0,82 × ampacidad; 2025 95,6 % del canal malo,
 inferencia); la carga «medida» de Lorica en su Excel (102,5 %) es un reparto. Mismo patrón posible en otros 34,5 kV (Santa Rosa,
 Zambrano, Toluviejo, Mojana, Copey).
+
+## 178. ADR-178 — Cargabilidad SCADA: un nivel que el SCADA mide pero la homologación dejó en «No usar» se rotula «medida excluida en la homologación» con su motivo, no «no se mide» (TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «San Benito de Abad, ¿cómo quedó 34,5 kV?» → la página decía «no se mide», pero el SCADA sí lo mide (se excluyó por escala
+> errada) → «sí, corrígelo» → vista previa fiel en su Chrome → «sí, publícalo en producción» (2026-10-23).
+
+**178.1 Causa raíz.** La tabla de devanados, la historia del equipo, el bloque «Cada devanado» y las curvas solo distinguían
+«tiene nivel asignado» / «no lo tiene»: un nivel que la decisión de homologación dejó en «No usar» salía como «no se mide»,
+«sin señal en uso» o «sin devanado», aunque el SCADA lo midiera (San Benito: escalas erradas; Puerto Libertador y Lorica: suma de
+dos transformadores).
+
+**178.2 Solución.** `domain/scada_niveles_excluidos.js` (NUEVO, L-102): `nivelesExcluidos({tx, fila, punto})` = niveles del punto
+que una decisión «usar» dejó sin devanado (y que ya estaban vistos al decidir), con el devanado que les toca por tensión y la nota
+de la decisión; `notaCorta`. La tabla dice «en 34,5 kV, excluida en la homologación» + el motivo; la historia, «medida en 34,5 kV
+excluida en la homologación: …»; «Cada devanado», «medida excluida (homologación)» y «El SCADA mide este devanado en 34,5 kV, pero
+esa medida se excluyó…»; las curvas, el botón «34,5 kV · excluida (homologación)» y, al verlo, «Medida excluida en la
+homologación: … Se muestra solo para ver: no entra en ninguna cifra». «Mes a mes» pasa la fila y el punto al bloque por devanado.
+
+**178.3 No-regresión.** Sin cambio de cifras ni de cálculo: solo textos. Sin decisión, con «Excluir», con un nivel sin devanado
+por tensión o con un nivel nuevo sin revisar, los textos siguen como antes («no se mide», «sin devanado», «por revisar»).
+
+**178.4 Verificación.** `tests/scada_niveles_excluidos.test.js` (6) + L-102 de las importaciones; `test:unit` 2.995 (2.993 en
+verde, 2 omitidas); `lint:html` y guardia SCADA limpios. Vista previa fiel en SU Chrome (la página completa con los módulos de la
+rama por jsDelivr): San Benito con los cinco textos nuevos y la nota «escalas erradas».
+
+**178.5 Anti-patterns evitados.** Decir «no se mide» de una medida que existe; repetir en cada vista una lógica distinta (una sola
+función pura); publicar sin vista previa.
+
+**178.6 Archivos.** Nuevos: `assets/js/domain/scada_niveles_excluidos.js`, `tests/scada_niveles_excluidos.test.js`. Modificados:
+`ui/cargabilidad-scada/{detalle,historia,panel-devanados-mes,panel-mensual}.js`, `tests/scada_carga_mensual.test.js`.
+
+**178.7 Doctrina.** Producción conforme por sí misma (regla suya del 2026-10-23); UI sensible con vista previa fiel y su
+«procede». NO revisado externamente.

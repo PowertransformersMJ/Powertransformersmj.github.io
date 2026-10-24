@@ -180,7 +180,7 @@ test('importaciones: cada nombre importado por los módulos de «mes a mes» exi
   const archivos = ['ui/cargabilidad-scada/panel-mensual.js', 'ui/cargabilidad-scada/panel-devanados-mes.js',
     'domain/scada_carga_mensual.js', 'domain/placa_etapas.js', 'domain/scada_devanados_mes.js',
     'ui/cargabilidad-scada/detalle.js', 'ui/cargabilidad-scada/panel-placa.js', 'domain/scada_devanados_placa.js',
-    'domain/scada_umbrales_detalle.js'];
+    'domain/scada_umbrales_detalle.js', 'domain/scada_niveles_excluidos.js', 'ui/cargabilidad-scada/historia.js'];
   for (const f of archivos) {
     const src = readFileSync(new URL(f, base), 'utf8');
     for (const m of src.matchAll(/^import \{([^}]+)\} from '(\.[^']+)';/gm)) {
