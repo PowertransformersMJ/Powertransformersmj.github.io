@@ -8830,3 +8830,59 @@ confirma); no es el cambiador (ninguna posición lo explica); no es la placa (fo
 para el área SCADA: el escalado de corriente y potencia de las 3 bahías de 34,5 kV, la tensión saturada y una de las líneas con la
 medida muerta (0 A en todo 2026) en el extremo de Chinú Planta. Queda en los pendientes del documento de Salud: el 55 % es
 0,55 × ampacidad (dato puesto) y la plataforma guarda una corriente «medida» de 91,1 % calculada (secundario = 2,5 × primario).
+
+## 180. ADR-180 — Zambrano T1A (tres devanados) con su cifra firme por el secundario: el aviso de relación no aplica a sus dos salidas; datos de placa de T1A y T2 (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-24)
+
+> «sí, procede con los dos» (sobre Santa Rosa) → «ok, continuemos» → diagnóstico de Zambrano → «Zambrano: están ambos alimentados
+> por el mismo interruptor a nivel de 66 kV, el trafo 1 es tridevanado» → «sí, procede con los dos» (2026-10-24).
+
+**180.1 Causa raíz.** El T1A (66 / 34,5 / 13,8 kV; 48 / 24 / 24 MVA con ventiladores) salía **90,6 % CRG 5 provisional** por el aviso
+de relación de niveles (medida 0,30 frente a 2,50). Esa prueba (`relacionNiveles`) compara la corriente de los dos niveles medidos
+como si la energía pasara de uno al otro (transformador de dos devanados). En el T1A los dos niveles del punto son el SECUNDARIO y
+el TERCIARIO, dos lados que no están en serie; además, el terciario INYECTA generación de día por su circuito (hasta ≈13 MW de 7 a
+19 h desde enero de 2026; la forma es de planta solar, inferencia). La relación cambia con la generación (jun 0,30 · jul 0,55 · ago
+0,63 · oct 0,05): es un FALSO POSITIVO ESTRUCTURAL, no una medida mala. Las medidas son sanas: el 66 kV no se mide en el punto
+porque T1 y T2 se alimentan del mismo interruptor de 66 kV (lo confirmó el Ingeniero), y el balance con la línea de 66 kV que llega
+de El Carmen, medida en sus dos puntas, cierra hora a hora (R² 0,998–0,9999: entra por 66 kV = salida de 34,5 kV − generación del
+terciario + T2 + pérdidas). √3·U·I/S = 1,00 en todos los niveles, sin topes ni banderas malas; barras de 13,8 kV del T1A y del T2
+separadas (1,02 frente a 0,96 pu). Refuta el «mismo patrón posible» (escala errada) que anotó ADR-177.8 para Zambrano.
+
+**180.2 Solución (DATOS).** (a) Homologación del T1A confirmada («usar»): 34,5 kV → secundario y 13,8 kV → terciario, con la nota
+de por qué el aviso no aplica, el interruptor común de 66 kV y el balance. (b) Datos de placa del T1A (17 campos): marca Siemens y
+modelo (raíz y `placa.*`), norma IEC 76, ONAN/ONAF 36.000 / 48.000 kVA, 3 fases, YNyn0d11, Z 19,38 % (AT/MT sobre 36 MVA), cambiador
+bajo carga de 21 posiciones (72.600–59.400 V), ONAN/ONAF, 70.700 kg, aceite 11.000 kg / 12.520 L, país Colombia. Del T2 (15 campos):
+marca Brown Boveri y modelo (raíz y `placa.*`), ONAN 6.000 kVA, 3 fases, Dyn (la placa no trae el índice horario), Z 7,6 %,
+cambiador sin tensión de 9 posiciones, ONAN, 18.000 kg, aceite 5.600 kg, y **tensión de baja 13,8 → 14,0 kV** (raíz y
+`electrico.*`, como dice su placa). Sin código nuevo.
+
+**180.3 No-regresión.** Potencias, tensiones de alta, ampacidades (419,9 / 401,6 / 1.004,1 A y 52,5 / 248 A, impresas), años y series
+sin tocar (releídos). La SERIE del T1A no se cambió: la placa dice «P9 154212 - 15812» y la plataforma «154212-15812»; es la
+identidad del equipo y se cambia solo si el Ingeniero lo pide. T2: con 14,0 kV el nivel de 13,8 kV del SCADA sigue asignado
+(1,4 % < 10 %) y su cifra no cambia (83,6 % sep, 82,2 % oct); su potencia por devanado pasa de «5,93» a «6,01 MVA», coherente con
+6 MVA. Cifras oficiales de salud intactas.
+
+**180.4 Verificación.** Planes en seco con valor esperado: 0 choques; 17/17 y 15/15 escritos y releídos. Decisión releída de la base
+(usar, el punto del T1A, 34,5 → S, 13,8 → T, los dos niveles vistos). En vivo (página recargada): T1A sep **90,6 % CRG 5 FIRME** «Confirmada»
+(terciario 49,0 %, primario «no se mide»); oct 1–22 91,5 % CRG 5 **provisional por cobertura** (ver 180.8); placa «coincide en lo
+comparado». Firmes sep 108 → 109 (provisionales 31 → 30); oct sin cambio (101). Diagnóstico con 2 Opus (`wf_80b879a9-3df`) → bóveda
+`2026-10-23-provisionales-septiembre/`; registro → `…/revision-uno-a-uno/08-ZMB-T1A-T2.md`.
+
+**180.5 Anti-patterns evitados.** Excluir una medida sana porque un aviso lo pide; tratar al terciario como carga cuando inyecta;
+cambiar la regla para todo el parque sin revisar a quién más mueve (ver 180.8, Boston); tocar la serie sin pedido.
+
+**180.6 Archivos.** Datos: `transformadores/{T1A-A/M-ZMB, T2-A/M-ZMB}`, homologación (1 fila). Cerebro: este ADR + índice + punteros
+en `10`/`11`.
+
+**180.7 Doctrina.** «Todo con base a la placa»; producción conforme por sí misma; plan en seco + su «procede». NO revisado
+externamente.
+
+**180.8 Verificado sano / no re-auditar.** No es escala errada ni entrada común en los niveles medidos (el balance de la línea lo
+prueba); el primario nunca manda (≈45–48 %, la generación lo descarga). Queda: (a) **campo**: la cifra es contra la ampacidad CON
+ventiladores; sin ellos el secundario estaría al ≈121 % de su ONAN (301 A) → confirmar que los ventiladores funcionan. (b) Octubre
+provisional: del 9 al 18-oct el 13,8 kV del T1A (y su circuito) estuvo en 0 A y 0 kV; la limpieza lo cuenta «cero sin
+explicación» (la regla de «fuera de servicio» exige tensión válida) → cobertura del terciario 37,5 %; observación aparte. (c) **La
+regla** `relacionNiveles` da el mismo falso positivo en Boston T1A (tres devanados, P + S medidos, 1,74 frente a 3,19) y pasa de
+chiripa en El Banco T1A; cambio mínimo probado en copia (no probar la relación si hay un tercer devanado con kV y ampacidad de
+placa, o si los dos niveles caen en el mismo devanado: solo mueve esos 3; los 6 avisos útiles de dos devanados quedan) → hacerlo
+JUNTO con Boston, que pasaría solo a firme con 110,2 % CRG 5 y cuyo terciario no se ve porque el SCADA lo nombra con una errata.
+La regla hoy no tiene tests. (d) Documento de Salud (TODO-82): oficial 95 % frente a devanado 93,1 %; terciario «medido» 0 A.
