@@ -35,8 +35,10 @@ const FILA = new RegExp('Mv' + 'Moment');
 // con alguna minúscula (los modelos de equipos «ZN045/FN050» no son estaciones); los circuitos son
 // tres letras y un número de la serie 3xx, o una línea LNnnn. Desde 2026-10-24 (ADR-181) el elemento de transformador es
 // cualquier «sw» + mayúscula + letras + número (también los que traen una errata en el nombre) y la barra inicial es
-// opcional («Estacion/elemento=homologado», la forma de un alias de elemento).
-const CLAVE = /\/?\s*((?=[A-Za-zÀ-ÿñÑ0-9]*[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*k[vV]\s*\/)?\s*(sw[A-Z][A-Za-z]*\d+|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
+// opcional («Estacion/elemento=homologado», la forma de un alias de elemento); el elemento puede llevar una o dos letras
+// tras el número, el nivel puede venir en «KV», y la estación se mira con un tope de largo (sin tope, una línea larga
+// sin barras costaba tiempo cuadrático: revisión adversarial 2026-10-24).
+const CLAVE = /\/?\s*((?=[A-Za-zÀ-ÿñÑ0-9]{0,9}[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*[kK]\s*[vV]\s*\/)?\s*(sw[A-Z][A-Za-z]*\d+[A-Za-z]{0,2}|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
 const ARCHIVO = new RegExp('(variables[ _-]?el[eé]ctricas|homologaci[oó]n|swtrafo|' + 'mv' + 'moment|_average[-_]|_quality[-_]|ir_current|p_average|urs_average)', 'i');
 const TABLA = /\.(csv|xls|xlsx)$/i;
 // Una foto JPEG en base64 (empieza por «/9j/») de cientos de caracteres; y los archivos del paquete de placas.

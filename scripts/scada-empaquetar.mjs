@@ -177,7 +177,7 @@ export function empaquetar({ carpeta, estaciones, relevos = [], alias = [], crea
   const enc = new TextEncoder();
   const archivos = [];
   let bytesOrigen = 0; let leidos = 0; let renombradas = 0; let descartadas = 0;
-  const al = { renombradas: 0, descartadas: 0 };
+  const al = { renombradas: 0, descartadas: 0, horasRellenadas: 0 };
   for (const f of recorrer(raiz)) {
     bytesOrigen += f.tamano;
     let contenido = null;
@@ -185,7 +185,7 @@ export function empaquetar({ carpeta, estaciones, relevos = [], alias = [], crea
       let texto = readFileSync(f.abs, 'utf8');
       if (relevos.length) { const r = aplicarRelevos(texto, relevos); texto = r.texto; renombradas += r.renombradas; descartadas += r.descartadas; }
       // Alias de elemento DESPUÉS de los relevos: la estación ya tiene su nombre homologado.
-      if (alias.length) { const r = aplicarAliasElemento(texto, alias); texto = r.texto; al.renombradas += r.renombradas; al.descartadas += r.descartadas; }
+      if (alias.length) { const r = aplicarAliasElemento(texto, alias); texto = r.texto; al.renombradas += r.renombradas; al.descartadas += r.descartadas; al.horasRellenadas += r.horasRellenadas; }
       contenido = enc.encode(filtrarTexto(texto, set));
       leidos++;
     }
@@ -230,6 +230,6 @@ if (esPrincipal) {
   const mb = (b) => (b / 1048576).toFixed(1) + ' MB';
   console.log(`${r.carpeta}: ${r.archivos} archivos (${mb(r.bytesOrigen)}), ${r.leidos} leídos; paquete ${mb(r.bytesContenedor)} → ${mb(r.bytesComprimido)} comprimido en ${r.partes.length} parte(s) de ≤ ${mb(PAQUETE.parteMaxBytes)}; ${est.length} estaciones; sha ${r.sha.slice(0, 12)}…`);
   for (const p of r.partes) console.log('  ' + p.nombre + '  ' + mb(p.bytes.length));
-  if (alias.length) console.log(`  alias: ${alias.map((x) => x.est + '/' + x.de + '→' + x.a).join(' · ')} · filas renombradas ${r.alias.renombradas} · descartadas ${r.alias.descartadas}`);
+  if (alias.length) console.log(`  alias: ${alias.map((x) => x.est + '/' + x.de + '→' + x.a).join(' · ')} · filas renombradas ${r.alias.renombradas} · fundidas en la fila real ${r.alias.descartadas} (horas rellenadas ${r.alias.horasRellenadas})`);
   if (relevos.length) console.log(`  relevos: ${relevos.map((x) => x.est + '←' + x.nueva + ' desde ' + x.desde).join(' · ')} · filas renombradas ${r.relevos.renombradas} · descartadas ${r.relevos.descartadas}`);
 }

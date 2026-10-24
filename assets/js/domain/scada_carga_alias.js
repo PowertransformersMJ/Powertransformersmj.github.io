@@ -6,11 +6,14 @@
 // devanado queda «sin medida». Un alias, que confirma el Ingeniero y vive en la hoja «Alias de elemento»
 // del Excel de la homologación (o en `--alias`), escribe esas filas con el elemento homologado para que
 // su nivel se sume al MISMO punto. Reglas:
-//   · gana siempre la fila real: si el MISMO archivo ya trae el elemento homologado con ese nivel y esa
-//     variable, la fila del alias se descarta (nunca dos filas para una misma medida);
+//   · nunca dos filas para una misma medida: si el MISMO archivo ya trae el elemento homologado con ese nivel
+//     y esa variable (o otro alias ya la trajo), la fila del alias se funde en ella y solo llena sus horas
+//     vacías; en las horas con valor gana la real;
 //   · el alias solo apunta a un elemento homologado de su estación, y el elemento con errata no puede ser
 //     el de ninguna fila de la homologación (lo escondería);
-//   · solo el paquete preparado lo aplica, después de los relevos de estación (`99 §158`).
+//   · solo el paquete preparado lo aplica, después de los relevos de estación (`99 §158`). El empaquetador
+//     valida contra el Excel (no ve las decisiones de la página); la página vuelve a validar el manifiesto
+//     contra la homologación vigente, con sus decisiones, antes de leer el paquete (`99 §181`).
 // Funciones PURAS. Archivo NUEVO (L-102): solo importa exportaciones ya publicadas. Sin nombres reales.
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -57,14 +60,19 @@ export function validarAlias(alias, filas) {
 }
 
 /**
- * Escribe las filas de cada elemento con errata con el nombre del elemento homologado. Gana la fila real.
+ * Escribe las filas de cada elemento con errata con el nombre del elemento homologado. Nunca deja dos filas para una
+ * misma medida (estación + nivel + elemento homologado + variable): si el archivo ya trae esa medida —la fila REAL, u
+ * otra fila de alias ya renombrada—, la del alias se funde en ella y solo LLENA sus horas vacías («null» o en blanco);
+ * en las horas con valor gana la que ya estaba (la real siempre, aunque venga después en el archivo). Así el día en que
+ * el SCADA corrija el nombre a mitad de jornada no se pierden horas (revisión adversarial 2026-10-24).
  * @param {string} texto  un archivo del exporte (encabezado + filas)
  * @param {Array<{est: string, de: string, a: string}>} alias  ya validados
- * @returns {{texto: string, renombradas: number, descartadas: number}}
+ * @returns {{texto: string, renombradas: number, descartadas: number, horasRellenadas: number}}
+ *          descartadas = filas del alias fundidas en otra fila de la misma medida
  */
 export function aplicarAliasElemento(texto, alias) {
   const t = String(texto || '');
-  if (!alias || !alias.length) return { texto: t, renombradas: 0, descartadas: 0 };
+  if (!alias || !alias.length) return { texto: t, renombradas: 0, descartadas: 0, horasRellenadas: 0 };
   const A = alias.map((x) => ({ est: normalizarTexto(x.est), de: normalizarTexto(x.de), a: normalizarTexto(x.a), aTxt: String(x.a).trim() }));
   const lineas = t.split('\n');
   const partes = lineas.map((l, i) => {
@@ -73,24 +81,50 @@ export function aplicarAliasElemento(texto, alias) {
     const segs = coma < 0 ? null : l.slice(0, coma).split('/');
     return segs && segs.length >= 6 ? { coma, segs, est: normalizarTexto(segs[1]), elem: normalizarTexto(segs[3]) } : null;
   });
-  // 1.ª pasada: qué medidas REALES del elemento homologado trae este archivo (nivel + variable).
-  const reales = new Set();
-  for (const p of partes) {
-    if (!p) continue;
-    if (A.some((x) => x.est === p.est && x.a === p.elem)) reales.add(p.est + '|' + niv(p.segs[2]) + '|' + p.elem + '|' + tok(p.segs[4]));
+  const medida = (est, nivel, elem, variable) => est + '|' + niv(nivel) + '|' + elem + '|' + tok(variable);
+  // 1.ª pasada: la fila REAL de cada medida del elemento homologado (la primera, si el archivo trae dos).
+  const duena = new Map();   // medida → índice de la línea que la lleva
+  for (let i = 1; i < lineas.length; i++) {
+    const p = partes[i];
+    if (!p || !A.some((x) => x.est === p.est && x.a === p.elem)) continue;
+    const k = medida(p.est, p.segs[2], p.elem, p.segs[4]);
+    if (!duena.has(k)) duena.set(k, i);
   }
-  // 2.ª pasada: renombrar (o descartar si la real ya está).
-  const out = [lineas[0]];
-  let renombradas = 0; let descartadas = 0;
+  // 2.ª pasada: renombrar, o fundir en la fila que ya lleva esa medida.
+  const out = lineas.slice();   // null = línea quitada
+  let renombradas = 0; let descartadas = 0; let horasRellenadas = 0;
   for (let i = 1; i < lineas.length; i++) {
     const p = partes[i];
     const x = p ? A.find((y) => y.est === p.est && y.de === p.elem) : null;
-    if (!x) { out.push(lineas[i]); continue; }
-    if (reales.has(x.est + '|' + niv(p.segs[2]) + '|' + x.a + '|' + tok(p.segs[4]))) { descartadas++; continue; }
-    const segs = p.segs.slice();
-    segs[3] = segs[3].replace(segs[3].trim(), x.aTxt);
-    out.push(segs.join('/') + lineas[i].slice(p.coma));
-    renombradas++;
+    if (!x) continue;
+    const k = medida(x.est, p.segs[2], x.a, p.segs[4]);
+    const j = duena.get(k);
+    if (j == null) {
+      const segs = p.segs.slice();
+      segs[3] = segs[3].replace(segs[3].trim(), x.aTxt);
+      out[i] = segs.join('/') + lineas[i].slice(p.coma);
+      duena.set(k, i);
+      renombradas++;
+      continue;
+    }
+    out[i] = null;
+    descartadas++;
+    horasRellenadas += llenarHorasVacias(out, j, lineas[i].slice(p.coma + 1));
   }
-  return { texto: out.join('\n'), renombradas, descartadas };
+  return { texto: out.filter((l) => l !== null).join('\n'), renombradas, descartadas, horasRellenadas };
+}
+
+const vacia = (c) => { const s = String(c == null ? '' : c).trim(); return s === '' || /^null$/i.test(s); };
+
+/** Llena las celdas vacías de la línea `j` de `out` con las de `otras` (texto de celdas). Devuelve cuántas llenó. */
+function llenarHorasVacias(out, j, otras) {
+  const l = out[j];
+  const coma = l.indexOf(',');
+  const cr = l.endsWith('\r') ? '\r' : '';
+  const celdas = l.slice(coma + 1, cr ? -1 : undefined).split(',');
+  const de = String(otras).replace(/\r$/, '').split(',');
+  let n = 0;
+  for (let h = 0; h < Math.min(celdas.length, de.length); h++) if (vacia(celdas[h]) && !vacia(de[h])) { celdas[h] = de[h]; n++; }
+  if (n) out[j] = l.slice(0, coma + 1) + celdas.join(',') + cr;
+  return n;
 }

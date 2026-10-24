@@ -18,6 +18,7 @@ import { informeSimulacion, planLotes, tamanoDoc } from '../../domain/scada_carg
 import { analizarClaveHomologada, claveEfectiva, objetivoImportacion } from '../../domain/scada_carga_homologacion.js';
 import { claveId } from '../../domain/scada_carga_csv.js';
 import { PAQUETE, analizarNombreParte, juntarPartes, leerContenedor, estacionesFaltantes } from '../../domain/scada_carga_paquete.js';
+import { validarAlias } from '../../domain/scada_carga_alias.js';
 import { ESCRITURA, CODIGO, MOTIVO } from '../../domain/scada_carga_config.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
 import { leerSeriesPunto, leerCatalogo, olvidarCache } from '../../data/scada_carga.js';
@@ -186,6 +187,9 @@ export function montarCargaMes(cont, { alTerminar }) {
           throw new Error('El paquete «' + manifiesto.carpeta + '» se preparó con otra homologación: no trae ' + faltan.length + (faltan.length === 1 ? ' estación' : ' estaciones') +
             ' que la vigente necesita (' + faltan.slice(0, 6).join(', ') + (faltan.length > 6 ? '…' : '') + '). Hay que preparar uno nuevo que las incluya.');
         }
+        // Alias de elemento (`99 §181`): el empaquetador los validó contra el Excel; aquí se validan otra vez contra la
+        // homologación VIGENTE, con las decisiones del Ingeniero (un alias no puede esconder un punto ya confirmado).
+        if (Array.isArray(manifiesto.alias) && manifiesto.alias.length) validarAlias(manifiesto.alias, filasHomologacion());
         estadoPaquete = '';
         const lista = archivos.map((a) => ({ file: new File([a.contenido], a.nombre), ruta: a.ruta, nombre: a.nombre, tamano: a.tamano }));
         analizar(lista, manifiesto.carpeta + ' (paquete preparado)');
