@@ -94,7 +94,7 @@ export async function pintarMensual(nodo, { a, ctx, vigente = () => true, conPro
   // «Cada devanado con sus límites de ampacidad y potencia» (2026-10-23): archivo aparte con import(); si falla, se oculta.
   const devNodo = el('div', { class: 'cs-devmes-cont', hidden: true });
   import('./panel-devanados-mes.js')
-    .then((m) => (vigente() ? m.pintarDevanadosMes(devNodo, { serie, mat: a.mat, tx: a.tx, umbrales: ctx.umbrales, vigente }) : null))
+    .then((m) => (vigente() ? m.pintarDevanadosMes(devNodo, { serie, mat: a.mat, tx: a.tx, umbrales: ctx.umbrales, vigente, fila: a.fila, punto: a.punto }) : null))
     .catch((e) => { console.warn('[cargabilidad-scada] devanados mes a mes', e); devNodo.hidden = true; });
   poner(nodo, titulo,
     ultimo ? el('p', { class: 'cs-dato' }, el('b', {}, 'A la fecha: '), pctTexto(ultimo.acumulado.pct) + ' ', chip(ultimo.acumulado),

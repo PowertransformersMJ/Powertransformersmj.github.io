@@ -16,6 +16,7 @@ import { devanadosDe, TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctText
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
 import { leerPlaca } from '../../data/placas_caracteristicas.js';
 import { filasDevanadosPlaca } from '../../domain/scada_devanados_placa.js';
+import { nivelesExcluidos, notaCorta } from '../../domain/scada_niveles_excluidos.js';
 import { dibujarFigura, liberarFigura } from './graficos.js';
 import { FAMILIAS, NIVELES, DEVANADO, CALCULO, MOTIVO, CODIGO, UNIDAD, NOMBRE_FAMILIA, TIEMPO } from '../../domain/scada_carga_config.js';
 import { EXTRAS, NOMBRE_EXTRA, EXTRA_TOPE_X, extrasVisibles } from '../../domain/scada_carga_extras.js';
@@ -232,6 +233,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       + (a.calc.clase === 'provisional' ? ' (provisional)' : '') + (a.calc.pct == null && a.calc.motivoNulo ? ' (sin cifra: ' + a.calc.motivoNulo + ')' : '') : '';
     const vacio = (d) => (leyendo && d.niveles.length ? '…' : '—');
     const filas = filasDevanadosPlaca(ds, a.limitesPlaca || null);
+    // Un nivel que el SCADA mide pero que la homologación dejó en «No usar» no es «no se mide» (pedido 2026-10-23).
+    const excl = nivelesExcluidos({ tx: a.tx, fila: a.fila, punto: a.punto });
+    const loMide = (f) => {
+      if (f.niveles.length) return ['en ' + f.niveles.join(', ') + (circuito ? ' (un circuito, sin confirmar)' : '')];
+      const ex = excl.porDevanado[f.d];
+      if (!ex) return ['no se mide'];
+      return [el('span', {}, 'en ' + ex.map((nv) => NIVELES[nv].etiqueta).join(', ') + ', excluida en la homologación'),
+        excl.nota ? el('span', { class: 'cs-sub cs-dev-aviso' }, notaCorta(excl.nota)) : null];
+    };
     const conPlaca = filas.some((f) => f.tension.origen === 'placa');
     const origenA = { impresa: 'impresa en la placa', calculada: 'calculada de la placa (la placa no la graba)', plataforma: 'de la plataforma' };
     const leyenda = conPlaca
@@ -268,7 +278,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
                 ? el('span', { class: 'cs-sub' }, 'sistema ' + kvTexto(f.tension.kvSistema) + ' kV') : null),
             el('td', {}, ...potencia(f, d)),
             el('td', {}, ...ampacidad(f, d)),
-            el('td', {}, f.niveles.length ? 'en ' + f.niveles.join(', ') + (circuito ? ' (un circuito, sin confirmar)' : '') : 'no se mide'),
+            el('td', {}, ...loMide(f)),
             el('td', {}, f.iP99 != null ? ampTexto(f.iP99) + ' A' : vacio(d)),
             el('td', {}, f.pct != null ? pctTexto(f.pct) + ' %' : vacio(d),
               f.pctOficial != null ? el('span', { class: 'cs-sub' }, 'oficial ' + pctTexto(f.pctOficial) + ' % (con la ampacidad de la plataforma)') : null));
@@ -373,7 +383,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const sost = d.carga ? maxSostenido(d.iF.map((v, h) => (Number.isFinite(d.carga.serie[h]) ? v : NaN)), CALCULO.sobrecargaMinH) : f.sostenida;
     const escala = { ok: 'sin observaciones', ESCALA_PQ: 'P y Q no cuadran con √3·U·I: revise la escala de las potencias', ESCALA_I: 'la corriente parece estar en otra escala', ESCALA_INDETERMINADA: 'corriente y potencias en escalas dudosas', sin_dato: 'sin datos para comparar', sin_devanado: 'nivel sin devanado asignado' }[info.escala] || info.escala;
     return el('table', { class: 'cs-sec' },
-      el('caption', { class: 'cs-ayuda', style: 'text-align:left' }, 'Nivel ' + NIVELES[nv].etiqueta + (info.devanado ? ' → ' + DEVANADO[info.devanado] : ' (sin devanado asignado)')),
+      el('caption', { class: 'cs-ayuda', style: 'text-align:left' }, 'Nivel ' + NIVELES[nv].etiqueta + (info.devanado ? ' → ' + DEVANADO[info.devanado]
+        : nivelesExcluidos({ tx: a.tx, fila: a.fila, punto: a.punto }).porNivel[nv] ? ' (medida excluida en la homologación: no entra en ninguna cifra)' : ' (sin devanado asignado)')),
       el('tbody', {},
         fila('Cargabilidad del devanado', info.pct == null ? '—' : num(info.pct, 1) + ' % (p99) · ampacidad ' + num(info.A, 0) + ' A'),
         fila('Corriente fase más cargada', f.i.n ? 'p50 ' + num(f.i.p50, 0) + ' A · p95 ' + num(f.i.p95, 0) + ' A · p99 ' + num(f.i.p99, 0) + ' A · máx ' + num(f.i.max, 0) + ' A' : '—'),
@@ -466,12 +477,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     a.nivel = nv;
     const d = a.porNivel[nv];
     const info = a.calc.niveles.find((x) => x.nivel === nv) || {};
+    const excl = nivelesExcluidos({ tx: a.tx, fila: a.fila, punto: a.punto });
     // Botones de alternar (aria-pressed), no pestañas: una sola figura que cambia de nivel.
     const botones = el('div', { class: 'cs-niveles', role: 'group', 'aria-label': 'Nivel de tensión medido' },
       Object.keys(a.porNivel).sort((x, y) => NIVELES[y].kv - NIVELES[x].kv).map((k) => {
         const i = a.calc.niveles.find((x) => x.nivel === k) || {};
-        return el('button', { type: 'button', id: 'csNivelBtn-' + k, 'aria-pressed': String(k === nv), onclick: () => { if (k !== nv) pintarNivel(a, k); } },
-          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] : ' · sin devanado'));
+        const fuera = !i.devanado && excl.porNivel[k];
+        return el('button', { type: 'button', id: 'csNivelBtn-' + k, 'aria-pressed': String(k === nv), title: fuera && excl.nota ? excl.nota : null,
+          onclick: () => { if (k !== nv) pintarNivel(a, k); } },
+          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
       }));
     liberarFigura(figura);
     // Contenedor de las gráficas (una por magnitud, cada una con su título y su descripción accesible).
@@ -484,6 +498,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       el('div', { class: 'cs-panel' },
         el('h2', {}, 'Curvas por fase'),
         botones,
+        !info.devanado && excl.porNivel[nv] ? el('p', { class: 'cs-devmes-aviso' }, 'Medida excluida en la homologación'
+          + ((n) => (n ? ': ' + (/[.…]$/.test(n) ? n : n + '.') : '.'))(notaCorta(excl.nota, 220)) + ' Se muestra solo para ver: no entra en ninguna cifra.') : null,
         panelFiltro,
         el('figure', { style: 'margin:0' }, fig,
           el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.')),

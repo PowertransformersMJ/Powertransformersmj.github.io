@@ -25,6 +25,8 @@ import { leerPlaca } from '../../data/placas_caracteristicas.js';
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
 import { umbralesDevanado, motivoSinCifra, estadoDevanados, pctDe } from '../../domain/scada_devanados_mes.js';
 import { lecturaUmbral, columnasEtapas, escalaRotulos, partirRenglon } from '../../domain/scada_umbrales_detalle.js';
+import { nivelesExcluidos, notaCorta } from '../../domain/scada_niveles_excluidos.js';
+import { NIVELES } from '../../domain/scada_carga_config.js';
 import { loadPlotly } from '../../plotly-loader.js';
 
 const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
@@ -68,7 +70,8 @@ async function placaDe(idTx) {
 }
 
 /** Por qué un devanado no tiene cifra A LA FECHA, para el resumen: se mide sin cifra · sin señal en uso · sin lectura. */
-const ROTULO_ESTADO = { sinCifra: 'se mide, sin cifra', sinSenal: 'sin señal en uso', sinLectura: 'sin lectura de los meses' };
+const ROTULO_ESTADO = { sinCifra: 'se mide, sin cifra', sinSenal: 'sin señal en uso', sinLectura: 'sin lectura de los meses',
+  excluida: 'medida excluida (homologación)' };
 
 // Color del rótulo de un umbral: ONAN naranja, el mayor de placa rojo, la ampacidad de la plataforma gris.
 const colorUmbral = (u, nombre) => (!u.dePlaca ? '#4d6485' : nombre === 'ONAN' ? C_ONAN : C_ONAF);
@@ -185,7 +188,7 @@ const LECTURA = {
  * Detalle de los umbrales (tabla bajo las barras): por devanado, cada etapa de placa con su corriente, su potencia, de dónde
  * sale la corriente y la carga a la fecha frente a ella; la carga y su lectura en palabras.
  */
-function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales) {
+function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales, estado = {}) {
   const cols = columnasEtapas(registrados, U);
   // «Al borde» = la banda CRG 5 de los umbrales de salud configurados (la misma del chip de calificación).
   const esBorde = (p) => califCRG(p, umbrales) === 5;
@@ -209,7 +212,7 @@ function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales) {
     if (!u.sinLimite && !cols.length) celdas.push(el('td', { class: 'cs-mensual-nulo' }, '—'));
     const carga = i != null
       ? el('td', {}, el('b', {}, ampTexto(i) + ' A'), el('br'), mvaEq(u, i), firme ? null : el('span', { class: 'cs-sub' }, 'provisional'))
-      : el('td', { class: 'cs-mensual-nulo' }, ROTULO_ESTADO[ed.porDevanado[b.d].estado] || 'sin cifra');
+      : el('td', { class: 'cs-mensual-nulo' }, ROTULO_ESTADO[estado[b.d] || ed.porDevanado[b.d].estado] || 'sin cifra');
     const l = lecturaUmbral(i, u, esBorde);
     // «Holgado» en verde solo si la calificación del límite mayor también lo es (CRG 1–3); en CRG 4, sin color: no contradice el chip.
     const clase = l && l.clase === 'holgado' && (califCRG(l.pctTope, umbrales) || 0) >= 4 ? 'neutro' : l && l.clase;
@@ -235,7 +238,9 @@ function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales) {
  * @returns {Promise<{completa: boolean}>}
  */
 export async function pintarDevanadosMes(nodo, opts) {
-  const { serie, mat, tx, umbrales, vigente = () => true } = opts;
+  const { serie, mat, tx, umbrales, vigente = () => true, fila = null, punto = null } = opts;
+  // Un devanado cuyo nivel el SCADA mide pero la homologación dejó en «No usar»: «medida excluida», no «sin señal».
+  const excl = nivelesExcluidos({ tx, fila, punto });
   const leido = [...serie].reverse().find((x) => x.cargado && x.leido) || serie[serie.length - 1];
   const registrados = (leido && leido.acumulado.devanados && leido.acumulado.devanados.length ? leido.acumulado.devanados
     : (leido && leido.mensual.devanados)) || [];
@@ -258,12 +263,12 @@ export async function pintarDevanadosMes(nodo, opts) {
   // Estado de cada devanado A LA FECHA (para el resumen y su bloque).
   const ed = estadoDevanados(serie, registrados);
   const { algunoLeido, conCifraEq } = ed;
-  const estado = Object.fromEntries(registrados.map((b) => [b.d, ed.porDevanado[b.d].estado]));
+  const estado = Object.fromEntries(registrados.map((b) => [b.d, ed.porDevanado[b.d].estado === 'sinSenal' && excl.porDevanado[b.d] ? 'excluida' : ed.porDevanado[b.d].estado]));
   const resA = el('div', { class: 'cs-devmes-res-graf', role: 'img', 'aria-label': 'Corriente a la fecha de cada devanado de ' + mat + ' frente a sus límites; los bloques de abajo traen las cifras.' });
   const resM = el('div', { class: 'cs-devmes-res-graf', role: 'img', 'aria-label': 'Potencia equivalente a la fecha de cada devanado de ' + mat + ' frente a sus límites; los bloques de abajo traen las cifras.' });
   const resumen = el('div', { class: 'cs-devmes-res' }, resA, resM);
   const leyenda = leyendaResumen(registrados, U);
-  const detalle = detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales);
+  const detalle = detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales, estado);
   const bloques = [];
   const graficas = [];
   for (const base of registrados) {
@@ -291,8 +296,14 @@ export async function pintarDevanadosMes(nodo, opts) {
       limites, ...avisos.map((t) => el('p', { class: 'cs-devmes-aviso' }, t)), linHoy);
     const sec = (...hijos) => el('section', { class: 'cs-devmes', style: 'border-left: 5px solid ' + (COLOR_DEV[d] || SIN), 'aria-labelledby': idTit }, ...hijos);
     if (!algunoLeido) { bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'No se pudo leer ningún mes: sin cifras por ahora (Reintentar, arriba); se muestran solo sus límites.'))); continue; }
-    if (!conNiveles) { bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'Este devanado no tiene señal del SCADA en uso (no se mide, o su señal quedó fuera en la homologación)'
-      + (u.sinLimite ? '.' : ': se muestran solo sus límites.')))); continue; }
+    if (!conNiveles) {
+      const ex = excl.porDevanado[d];
+      bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, ex
+        ? 'El SCADA mide este devanado en ' + ex.map((nv) => NIVELES[nv].etiqueta).join(' y ') + ', pero esa medida se excluyó en la homologación'
+          + (excl.nota ? ' (' + notaCorta(excl.nota).replace(/\.$/, '') + ')' : '') + (u.sinLimite ? '.' : ': se muestran solo sus límites.')
+        : 'Este devanado no tiene señal del SCADA en uso (no se mide, o su señal quedó fuera en la homologación)' + (u.sinLimite ? '.' : ': se muestran solo sus límites.'))));
+      continue;
+    }
     if (!conCifra) {
       // El motivo, del último mes CARGADO y LEÍDO en que el devanado se mide (nunca el de un mes hueco): `estadoDevanados`.
       bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'Se mide en ' + niveles.join(' y ') + ', pero no tiene cifra: ' + motivo + '.')));

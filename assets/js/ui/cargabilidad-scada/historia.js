@@ -13,7 +13,8 @@ import { leerResumenMes, leerSeriesPunto } from '../../data/scada_carga.js';
 import { calcularEquipo } from '../../domain/scada_carga_vista.js';
 import { conteosHomologacion } from '../../domain/scada_carga_homologacion.js';
 import { nombreMes, formatoCO } from '../../domain/scada_carga_fecha.js';
-import { DEVANADO, CALCULO } from '../../domain/scada_carga_config.js';
+import { DEVANADO, CALCULO, NIVELES } from '../../domain/scada_carga_config.js';
+import { nivelesExcluidos, notaCorta } from '../../domain/scada_niveles_excluidos.js';
 import { agregadosDeMeses, hitosDeCurva, nivelCuenta } from '../../domain/scada_carga_periodo.js';
 import { sobrecargaDeCurva, aplicarVerificacion } from '../../domain/scada_carga_sostenida.js';
 
@@ -162,7 +163,13 @@ export async function pintarHistoria(nodo, { a, ctx, alVerDia, vigente, alReinte
       const n = ((x && x.niveles) || []).find((y) => y.devanado === d);
       if (n) ultimo = { x, n };
     }
-    if (!ultimo) return 'no se mide en el SCADA';
+    if (!ultimo) {
+      // El SCADA sí lo mide, pero la homologación lo dejó en «No usar» (p. ej. una escala errada): no es «no se mide».
+      const ex = nivelesExcluidos({ tx: a.tx, fila: a.fila, punto: a.punto });
+      const nv = (ex.porDevanado[d] || [])[0];
+      if (nv) return 'medida en ' + NIVELES[nv].etiqueta + ' excluida en la homologación' + (ex.nota ? ': ' + notaCorta(ex.nota) : '');
+      return 'no se mide en el SCADA';
+    }
     const { x, n } = ultimo;
     if (x.pct == null && x.motivoNulo) return 'sin cifra: ' + x.motivoNulo;
     if (n.escala === 'ESCALA_I' || n.escala === 'ESCALA_INDETERMINADA') return 'sin cifra: escala de la corriente sospechosa';
