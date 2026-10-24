@@ -51,6 +51,7 @@
 | §173 | ADR-173 — **Placas v4** (Magangué T2A, Montería T2A: corriente de MT impresa) + una corriente de las notas que cuadra mejor con OTRO devanado no se rotula «impresa» (L-155) · TODO-54/69 | 8534 |
 | §174 | ADR-174 — **Cargabilidad SCADA**: detalle de los umbrales de placa en las barras (recuadro, leyenda, tabla con la lectura «al borde de la ONAN»/«supera la ONAF») · TODO-69 | 8582 |
 | §175 | ADR-175 — **Nueva Cospique T1–T4** con los datos de su placa (primario 110 kV, no 66): homologación automática y cifra firme · TODO-54/69 | 8633 |
+| §176 | ADR-176 — **Puerto Libertador**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 con su placa (4000 kVA) y su circuito de salida; cifras firmes · TODO-54/69 | 8675 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
