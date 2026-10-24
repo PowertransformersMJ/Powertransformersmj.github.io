@@ -8629,3 +8629,45 @@ placa. Crudo + síntesis de la revisión → bóveda `2026-10-23-umbrales-grafic
 (nunca llegó a producción); terciario de compensación con corriente (no ocurre en el parque; igual se cambió el texto a «la
 placa no le da límite de carga»); tabla sin columnas de etapa (caso inventado; igual se añadió su celda). Viene de ANTES y no se
 tocó: en la gráfica mes a mes de cada devanado la «Ampacidad» de la plataforma va en rojo y escribe «— MVA» si falta la tensión.
+
+## 175. ADR-175 — Nueva Cospique T1–T4 con los datos de su PLACA: primario 110 kV (estaba en 66), potencias, impedancia, conexión, cambiador, masas; homologación automática y cifra firme (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> Captura «PROVISIONALES 36» → «¿qué pasa con Nueva Cospique?» → «los transformadores de Nueva Cospique todos son alimentados
+> a 110 kV por primario… vayamos a los datos técnicos de la placa, esos son los valores reales: tensiones, potencia, corriente,
+> todo» → «procede con Nueva Cospique, el resto lo vamos trabajando uno por uno» (2026-10-23).
+
+**175.1 Causa raíz.** La plataforma tenía el primario de los cuatro en **66 kV** (heredado del Excel de Salud) y las placas dicen
+**110 kV**; el SCADA lo confirma (112 kV medidos; I13,8/I110 = 7,8–7,9 frente a 7,97 esperado) y las ampacidades de alta ya eran
+de 110 kV (262,4 / 157,5 / 105 A). El nivel de 110 kV del SCADA no encontraba devanado (tolerancia ±10 %) → aviso BLOQUEANTE
+«un nivel medido no coincide con ninguna tensión de placa» + «un devanado de placa no tiene medida SCADA» → homologación
+«Pendiente», cifra provisional y solo del lado de 13,8 kV. Conocido desde el 30-sep (bóveda), quedó para su confirmación.
+
+**175.2 Solución (DATOS).** 70 campos de PLACA en los 4 (`transformadores/*`, `actualizarCampos` con bitácora `diff`): tensión
+de alta 66 → 110 kV en `tension_primaria_kv` y `electrico.tension_primaria_kv`; T1/T2 BT 2.091,7 A impresa; potencias ONAN/ONAF;
+marca, modelo, norma, país; grupo de conexión; impedancia; tipo y descripción del cambiador; masa y aceite; refrigeración. Detalle
+campo a campo → bóveda `2026-10-23-diferencias-placa-ampacidad/revision-uno-a-uno/04-NCO-T1-T4.md`. Sin código nuevo.
+
+**175.3 No-regresión.** La tensión de alta solo la muestran inventario, mapa, ficha técnica, unifilar, informe de brigada y
+exportes (verificado con grep): no entra en HI, matriz de riesgo ni criticidad. Serie, año, potencia y corrientes de alta ya
+coincidían; la cifra oficial de salud (`salud_actual`) no se tocó.
+
+**175.4 Verificación.** Plan en seco con valor esperado por campo: 0 choques; escritos 70/70 y releídos 70/70. Página recargada:
+homologación «Automática» en los 4, sin avisos; septiembre T1 26,7 % CRG 1, T2 55,3 % CRG 1, T4 74,0 % CRG 3 FIRMES (antes
+26,1 / 54,3 / 72,5 % provisionales), T3 0,9 % provisional (una hora con carga); octubre 1–22 T1 29,1 %, T2 56,7 %, T4 74,0 %
+firmes, T3 sin carga. Firmes de septiembre 101 → 104. Diagnóstico previo con 2 Opus (`wf_7570f28f-083`, exporte + placas) →
+bóveda `2026-10-23-provisionales-septiembre/`.
+
+**175.5 Anti-patterns evitados.** Confirmar a mano la homologación tapando el dato malo; registrar terciarios de estabilización
+como devanados de carga; tocar la cifra oficial sin pedido.
+
+**175.6 Archivos.** Datos: `transformadores/{T1,T2,T3,T4-A/M-NCO}`. Código y cerebro: solo este ADR + índice + `10`.
+
+**175.7 Doctrina.** «Todo con base a la placa» (decisión del Ingeniero); plan en seco + su «procede»; lo dudoso queda suyo.
+NO revisado externamente.
+
+**175.8 Verificado sano / no re-auditar.** El SCADA de NCospiq está sano (99,99 % «Actual»; P de entrada = P de salida ±0,4 %;
+los 19 circuitos suman 0,996 de los transformadores): ningún punto mide un circuito. «Cospiqu» (66 kV, T1-A/M-COS) es OTRA
+subestación. Los terciarios (6,9 kV T1/T2; BT2 7,967 kV T4) no se registran: estabilización, sin potencia o no medidos. Queda
+SUYO: oficial de T4 (93 % CRG 5 en su Excel) frente a 74 % CRG 3 del SCADA; las dos «oficiales» de la plataforma no cuadran entre
+sí (equipo 21/68/52/93 vs devanado 34/48/63/98); su Excel aún dice 66 kV; T3 en reserva (confirmar conexión y la unidad «T1» de
+su placa). El aviso «potencia monofásica» que aparece en la lista es de Mata de Caña y El Paraíso, no de NCO.
