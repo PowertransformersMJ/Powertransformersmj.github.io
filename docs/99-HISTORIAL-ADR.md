@@ -8786,3 +8786,47 @@ función pura); publicar sin vista previa.
 
 **178.7 Doctrina.** Producción conforme por sí misma (regla suya del 2026-10-23); UI sensible con vista previa fiel y su
 «procede». NO revisado externamente.
+
+## 179. ADR-179 — Santa Rosa T1 con su cifra por el lado de 13,8 kV (las tres bahías de 34,5 kV de la estación tienen escalas erradas) y los datos de su placa (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «sí, actualiza la nota de Lorica y sigamos con Santa Rosa» → diagnóstico → «sí, procede con los dos» (2026-10-23).
+
+**179.1 Causa raíz.** Santa Rosa (un solo transformador, 4 MVA) salía en **100,8 % CRG 5 provisional** en septiembre y 97,1 % en
+octubre (con «posible sobrecarga sostenida»), por el aviso de relación de niveles (medida 1,11 frente a 2,50 esperada). Las TRES
+bahías de 34,5 kV de la estación (la del transformador y las dos líneas) tienen ESCALAS ERRADAS: corriente × ~2,2 y potencia
+× 2,3–2,7 (casi el mismo factor: relación de TC o escalado mal configurado); la tensión queda pegada en el tope de 32,767 kV en el
+69–98 % de las horas. Es crónico desde enero de 2025. Lo confirman dos medidores independientes: el reconectador de la línea que lo
+alimenta lleva 0,39 × la corriente de 13,8 kV del T1 (teórico 0,40) todos los meses, y el otro extremo de una de sus líneas (en
+La Unión) mide unas 2 veces menos que el de Santa Rosa. El 13,8 kV es sano: cuadra con sus dos circuitos (suma 1,00 en septiembre).
+Ninguna de las 5 posiciones del cambiador explica el desvío (−52 a −57 %). La placa coincide con la plataforma.
+
+**179.2 Solución (DATOS).** (a) Homologación confirmada («usar»): 13,8 kV → secundario y 34,5 kV en «No usar», con la nota «escalas
+erradas» (ADR-178 la muestra como «medida excluida en la homologación»). (b) Los 14 datos de placa que faltaban (16 campos: marca y
+modelo van en la raíz y en `placa.*`): marca Transformadores Suntec S.A.S., modelo OTHV3, norma NTC, ONAN 4.000 kVA, 3 fases, Dyn5,
+Z 6,94 %, NLTC + descripción del cambiador (5 posiciones, 35.363–31.912 V, nominal en la 2), refrigeración ONAN, 10.063 kg, aceite
+2.525 kg / 2.910 L, país Colombia. Sin código nuevo.
+
+**179.3 No-regresión.** Serie, potencia, año, tensiones y ampacidades (66,94 / 167,35 A, impresas) ya eran de placa: no se tocaron
+(releídas después de escribir). `electrico.tap_actual` no viene en la placa: queda vacío. Cifras oficiales de salud intactas
+(el 55 % del documento de Salud va a su lista de pendientes, TODO-82).
+
+**179.4 Verificación.** Plan en seco con valor esperado: 0 choques; 16/16 escritos y releídos. Decisión releída de la base y fila
+«Confirmada» tras recargar (ya no está entre los pendientes: quedan 30 de 217). En vivo (página recargada): sep **45,5 % CRG 1** y oct 1–22 **44,2 % CRG 1**,
+firmes (antes 100,8 % / 97,1 % provisionales); la tabla dice «en 34,5 kV, excluida en la homologación» con el motivo; placa
+«coincide en lo comparado», con fabricante, norma y 3 fases. Firmes: sep 107 → 108, oct 100 → 101. Diagnóstico con 2 Opus
+(`wf_db75f6a5-b3e`) → bóveda `2026-10-23-provisionales-septiembre/`; registro → `…/revision-uno-a-uno/07-SRS-T1.md`.
+
+**179.5 Anti-patterns evitados.** Corregir por un factor un canal saturado (la tensión está topada); confundir con la otra
+subestación de nombre parecido (Santa Rosa del Sur, otra fila y otro equipo); cambiar la cifra oficial del documento de Salud para
+«resolverlo».
+
+**179.6 Archivos.** Datos: `transformadores/{T1-M/M-SRS}`, homologación (1 fila). Cerebro: este ADR + índice + punteros en `10`/`11`.
+
+**179.7 Doctrina.** «Todo con base a la placa»; producción conforme por sí misma (regla suya del 2026-10-23); plan en seco + su
+«procede». NO revisado externamente.
+
+**179.8 Verificado sano / no re-auditar.** No es una entrada común ni otra bahía (un solo transformador; la línea que lo alimenta lo
+confirma); no es el cambiador (ninguna posición lo explica); no es la placa (foto 2021 + termografía 2025 con la misma serie). Queda
+para el área SCADA: el escalado de corriente y potencia de las 3 bahías de 34,5 kV, la tensión saturada y una de las líneas con la
+medida muerta (0 A en todo 2026) en el extremo de Chinú Planta. Queda en los pendientes del documento de Salud: el 55 % es
+0,55 × ampacidad (dato puesto) y la plataforma guarda una corriente «medida» de 91,1 % calculada (secundario = 2,5 × primario).
