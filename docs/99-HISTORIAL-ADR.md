@@ -8709,3 +8709,47 @@ Cerebro: este ADR + índice.
 del 34,5 kV inservibles; P/Q de dos circuitos dañadas o ×10 (no afectan: la cifra usa corriente). Queda SUYO: ventiladores del
 T1 (inventario y Salud «ONAF OBSOLETA», hoja de cargabilidad «OPERATIVA»: sin ellos, 124 % de la ONAN); su Excel dice 3000 kVA y
 serie 224109 para el T2 (es la de T2-M/M-SML); el peso manuscrito de 4040 kg es bajo para 4 MVA; la foto vieja de la carpeta TR-2.
+
+## 177. ADR-177 — Lorica T2 con los datos de su placa (primario 33 kV, no 34,5) y San Benito de Abad T1 con su placa y su cifra por el lado de 13,8 kV (el de 34,5 kV tiene escalas erradas) (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-23)
+
+> «en Lorica pasa igual que Puerto Libertador, trafo 1 y 2 están alimentados del mismo interruptor a nivel de 34,5 kV» → «sí,
+> procede con los tres; continuamos con San Benito de Abad cuando finalices con Lorica» (2026-10-23).
+
+**177.1 Causa raíz.** (a) LORICA: el 34,5 kV del punto del T1 mide la entrada común T1 + T2 (I34,5 = 1,03 · k · (I13,8 de T1 +
+carga del T2), k = U13,8/U34,5 medida = 0,42, R² 0,995). El T1 ya estaba resuelto por 13,8 kV (ADR-167). El T2 sale por un
+circuito cuya medida en la estación está MUERTA (0 A) desde el 2025-07-14, justo cuando lo tomó: aunque se confirme no da cifra.
+Su plataforma tenía el primario en 34,5 kV (el del sistema) con la corriente impresa a 33 kV → potencia «20,9 MVA». (b) SAN
+BENITO DE ABAD (un solo transformador): el 34,5 kV del punto tiene ESCALAS ERRADAS desde enero de 2026 (tensión × 0,77,
+corriente × 2,15, potencia × 4: 9,2 MVA en un equipo de 4 MVA) → 134,3 % provisional. El 13,8 kV es sano (= suma de sus 2
+circuitos a 0,997) y lo confirma un tercer medidor: la línea radial de 34,5 kV que lo alimenta desde otra subestación lleva 0,396 ×
+esa corriente (r 0,998) y se apaga con él. Placa confirmada por 2 pruebas de relación (2021 y 17-sep-2026).
+
+**177.2 Solución (DATOS).** Lorica T2: 17 campos de placa (tensión de alta 34,5 → 33 kV en raíz y `electrico.*`, marca, modelo,
+norma, etapas 15/20 MVA, país, Dyn11, Z 3,7 % base 15 MVA, NLTC, refrigeración, masas). San Benito T1: 14 campos de placa (marca,
+modelo, norma, ONAN 4 MVA, país, Dyn5, Z 6,14 %, NLTC, ONAN, 9.875 kg, 2.918 L) + homologación confirmada con 13,8 kV →
+secundario y 34,5 kV «No usar». Lorica T2 queda PENDIENTE de homologar. Sin código nuevo.
+
+**177.3 No-regresión.** Ampacidades, potencias, series y años ya eran de placa: no se tocaron. La tensión de alta solo se muestra
+(ADR-175.3); con 33 kV el nivel de 34,5 kV del SCADA sigue asignado al primario (diferencia 4,3 % < 10 %). Cifras oficiales de
+salud intactas.
+
+**177.4 Verificación.** Planes en seco con valor esperado: 0 choques; 17/17 y 14/14 escritos y releídos; decisión de homologación
+releída de la base. En vivo (página recargada): Lorica T2 primario 33 kV · 350 A · 20,0 MVA, sigue «por confirmar» sin cifra;
+San Benito T1 sep **58,6 % CRG 1** y oct 1–22 **51,8 % CRG 1**, firmes (antes 134,3 % / 109 % provisionales); Lorica T1 sin cambio
+(67,4 % / 65,4 % CRG 3). Firmes: sep 106 → 107, oct 99 → 100. Diagnóstico con 4 Opus (`wf_06ec4d3d-f25`, `wf_8841c3d8-941`) →
+bóveda `2026-10-23-provisionales-septiembre/`; registro → `…/revision-uno-a-uno/06-LOR-T2-y-SBA-T1.md`.
+
+**177.5 Anti-patterns evitados.** Corregir por un factor un canal con escalas distintas por variable y banda muerta; confirmar una
+homologación a una medida muerta; publicar como firme una carga estimada por diferencia (Lorica T2 ~40 %).
+
+**177.6 Archivos.** Datos: `transformadores/{T2-M/M-LOR, T1-M/M-SBA}`, homologación (1 fila). Cerebro: este ADR + índice.
+
+**177.7 Doctrina.** «Todo con base a la placa»; plan en seco + su «procede». NO revisado externamente.
+
+**177.8 Verificado sano / no re-auditar.** San Benito: no es otra bahía ni una suma (un solo equipo; la línea que lo alimenta lo
+confirma); no es la placa (TTR 2021 y 2026). Lorica: el +3 % del medidor de 34,5 kV ya existía con el T1 solo (2025); T1 Dyn1 y T2
+Dyn11 no pueden ir en paralelo en 13,8 kV (barras separadas, coherente). Queda SUYO: ¿el circuito del T2 es su única salida? ¿el T2
+entró en servicio a mediados de julio de 2025?; pedir al área SCADA reparar la medida de ese circuito en Lorica y las escalas del
+34,5 kV de San Benito; oficiales de San Benito sin respaldo (Excel 82 % = 0,82 × ampacidad; 2025 95,6 % del canal malo,
+inferencia); la carga «medida» de Lorica en su Excel (102,5 %) es un reparto. Mismo patrón posible en otros 34,5 kV (Santa Rosa,
+Zambrano, Toluviejo, Mojana, Copey).
