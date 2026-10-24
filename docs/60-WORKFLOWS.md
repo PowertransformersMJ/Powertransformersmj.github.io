@@ -99,8 +99,8 @@ si se escriben datos, simulación + foto antes/después (W-13).
 6. **Verificar el tablero vivo** tras la carga (W-10 + validación live), no solo el log del importador.
 7. **Comprobar la carga**: foto antes/después que compara VALORES con las llaves ordenadas (L-120) y fidelidad con una lectura independiente de la fuente; una matrícula repetida en el Excel puede ser dos equipos distintos: no se escoge «la primera», se reporta y no se escribe (`§131`).
 8. **Mes SCADA** (`§158`–`§159`; rutas de disco y paquetes vigentes → memoria del proyecto y bóveda `2026-10-08-scada-sin-medicion`):
-   empaquetar con la homologación VIGENTE (los relevos de estación salen solos de su hoja «Relevos de estación»: el informe debe
-   decir filas renombradas > 0) → subir con la pestaña de Datos SCADA RECARGADA (el resumen guarda `top`; una pestaña vieja se
+   empaquetar con la homologación VIGENTE (los relevos de estación salen solos de su hoja «Relevos de estación» y los alias de
+   elemento de su hoja «Alias de elemento», `§181`: el informe debe decir filas renombradas > 0 en los dos) → subir con la pestaña de Datos SCADA RECARGADA (el resumen guarda `top`; una pestaña vieja se
    detiene con «recargue la página») → simular → **«Completar»** para un mes nuevo, uno a medias o estaciones que faltaban (nunca
    pisa horas) · **«Reemplazar»** solo si la simulación muestra horas guardadas que deben cambiar (relevo aplicado tarde: con
    «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después

@@ -8886,3 +8886,73 @@ chiripa en El Banco T1A; cambio mínimo probado en copia (no probar la relación
 placa, o si los dos niveles caen en el mismo devanado: solo mueve esos 3; los 6 avisos útiles de dos devanados quedan) → hacerlo
 JUNTO con Boston, que pasaría solo a firme con 110,2 % CRG 5 y cuyo terciario no se ve porque el SCADA lo nombra con una errata.
 La regla hoy no tiene tests. (d) Documento de Salud (TODO-82): oficial 95 % frente a devanado 93,1 %; terciario «medido» 0 A.
+
+## 181. ADR-181 — Boston T1A: sobrecarga REAL (110 % CRG 5) con su terciario a la vista — alias de elemento en el empaquetador para un nivel que el SCADA exporta con una errata en el nombre; la prueba de relación no se aplica a un tres devanados; placa (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-24)
+
+> «sí, sigamos con Boston» → diagnóstico con 3 Opus → «sí, procede con los tres» (placa · terciario con el alias y la recarga de
+> los meses · la regla) (2026-10-24).
+
+**181.1 Causa raíz.** Boston T1A (único transformador de la subestación; ABB 1991, 110 / 34,5 / 13,8 kV, 60 / 30 / 35 MVA con
+ventiladores, YNyn0d11) salía **110,2 % CRG 5 provisional** por dos cosas: (a) la prueba de relación de niveles (1,74 frente a
+3,19) suponía dos devanados en serie, pero con el primario y el secundario medidos el terciario se lleva el 40 % de la potencia —
+mismo falso positivo estructural de Zambrano (ADR-180); (b) el terciario de 13,8 kV SÍ se mide, pero el SCADA lo exporta bajo un
+elemento con una ERRATA en el nombre: el navegador solo toma elementos de transformador por su nombre y, aunque lo tomara, sería
+otro punto (una fila de homologación toma sus niveles de UN elemento). El empaquetador no filtra por elemento: los paquetes sí
+traían esas filas. Es el único caso del parque en ene–oct 2026. **La sobrecarga es real** (4 pruebas independientes: balance de
+tres devanados P110 = 1,0098·(P34,5 + P13,8), R² 0,99998; la reactiva del propio equipo sigue la impedancia de placa; la barra de
+110 kV cierra a 0,5 MW y las tres líneas cuadran con sus otras puntas; escalas 0,995–0,999, sin topes): el equipo entero va sobre
+placa (S110 p99 de septiembre 63,8 MVA de 60), con un escalón desde junio de 2026 (+9 a +13 puntos sobre 2025).
+
+**181.2 Solución.** (1) **Alias de elemento** (archivo NUEVO `domain/scada_carga_alias.js`: `validarAlias`, `aplicarAliasElemento`;
+`scripts/scada-empaquetar.mjs`: `--alias "ESTACION/ELEMENTO=HOMOLOGADO"` y hoja «Alias de elemento» del Excel de homologación,
+aplicado después de los relevos; `armarContenedor` anota `manifiesto.alias`): las filas del elemento con errata se escriben con
+el nombre del elemento homologado y su nivel se suma al MISMO punto. Nunca dos filas por medida: si llega también la fila real (u
+otro alias), se funden y el alias solo llena las horas vacías; en las horas con valor gana la real. La página
+(`ui/scada-datos/importar-mes.js`) vuelve a validar los alias del manifiesto contra la homologación vigente CON sus decisiones.
+Homologación vigente: copia «v3 corregida 2026-10-08 + alias 2026-10-24» (en el disco del Ingeniero). (2) **La regla**:
+`relacionNiveles` devuelve null si los dos niveles caen en el mismo devanado o hay un tercer devanado con tensión Y ampacidad de
+placa (un terciario de estabilización, kV sin ampacidad, se sigue probando). (3) **Placa** de Boston T1A: 17 campos vacíos (marca,
+modelo, norma, ONAN/ONAF 36/60 MVA, 3 fases, YNyn0d11, Z 12,8 % AT/BT sobre 36 MVA, OLTC 21 posiciones, ONAN/ONAF1/ONAF2, masas,
+aceite, país). (4) **Guardia** del repo público: el elemento de transformador es cualquier «sw» + mayúscula + letras + número (con
+una o dos letras tras el número), barra inicial opcional, nivel en «kV» o «KV», y la estación se mira con un tope (sin tope una
+línea larga sin barras costaba tiempo cuadrático).
+
+**181.3 No-regresión.** Sin alias el paquete sale byte a byte igual que antes (revisado). Con el alias, los 9 meses re-empaquetados
+difieren de los vigentes SOLO en las filas del alias, con los mismos valores (ene 683 · feb 803 · mar 913 · abr 881 · jun 876 · jul
+902 · ago 882 · sep 864 · oct 660 = 7.464 filas; 0 diferencias ajenas; mismas 147 estaciones y relevo de Sampués). Re-empaquetados
+con el código final de la revisión salen con el mismo contenido que los ya subidos (archivo por archivo). La regla, medida sobre
+los datos vivos de producción (sep y oct): solo 3 filas llevan hoy el aviso y solo cambia Zambrano T1A, que sigue «Confirmada».
+L-102: la regla solo cambia el cuerpo de una función publicada; el archivo nuevo solo importa exportaciones publicadas.
+
+**181.4 Verificación.** `test:unit` 3.018 (3.016 en verde, 2 omitidas): 12 del alias, 10 de la regla (no tenía), 8 de la guardia.
+Placa: plan en seco 0 choques, 17/17 releídos. Recarga: los 9 meses en «Completar» con la página recargada, cada simulación «1 serie
+por guardar; las demás ya estaban iguales» y cada guardado «1 serie y 1 resumen». En vivo: Boston **Automática, FIRME, sin
+avisos, «Homologación sin observaciones»**, con los tres devanados — sep 110,2 % CRG 5 (P 104,0 %, T 73,8 %) con sobrecarga
+sostenida; oct 1–22 105,4 % CRG 5; mes a mes ene 89,7 · feb 93,3 · mar 95,6 · abr 95,9 · jun 105,7 · jul 109,8 · ago 110,5 · sep
+110,2 · oct 105,4; a la fecha **107,8 % CRG 5**; placa «coincide en lo comparado». Firmes sep 109 → 110, oct 101 → 102.
+Revisión adversarial con 3 Opus (`wf_05e9b248-079`): 6 defectos de bordes futuros (ninguno tocaba los datos cargados), 5
+corregidos antes de publicar y 1 documentado (181.8). Diagnóstico `wf_f0066667-44a` → bóveda
+`2026-10-23-provisionales-septiembre/`; registro → `…/revision-uno-a-uno/09-BST-T1A.md`.
+
+**181.5 Anti-patterns evitados.** Renombrar el elemento en el SCADA desde aquí (no es nuestro); ampliar el filtro del navegador
+(crearía un punto aparte y tocaría tres módulos publicados); sumar dos filas de una misma medida; confirmar la fila a mano antes
+de que entrara el terciario (habría vuelto a «nivel no revisado»); publicar la regla sin medir a quién mueve; poner el nombre real
+del elemento en el repo (la guardia ahora lo atrapa).
+
+**181.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_alias.js`, `tests/scada_carga_alias.test.js`,
+`tests/scada_carga_relacion_niveles.test.js`. Modificados: `scripts/scada-empaquetar.mjs`, `assets/js/domain/scada_carga_paquete.js`
+(1 línea), `assets/js/domain/scada_carga_homologacion.js` (`relacionNiveles`), `assets/js/ui/scada-datos/importar-mes.js`,
+`scripts/guardia-scada.mjs`, `tests/scada_carga_guardia.test.js`. Datos: `transformadores/{T1A-A/M-BST}` y `scada_series` +
+`scada_resumen` de Boston en 9 meses. Cerebro: este ADR, índice, `05`, `10`, `11`, `23`, `60` (W-13 paso 8).
+
+**181.7 Doctrina.** Producción conforme por sí misma; cambios aditivos; L-102; W-13 (simulación a la vista, foto antes/después);
+plan en seco + su «procede». NO revisado externamente.
+
+**181.8 Verificado sano / no re-auditar.** La sobrecarga NO es artefacto (181.1); las ampacidades de la plataforma son las de ONAF2
+de placa; el terciario es de 35 MVA y de carga (lleva reactores limitadores). Queda: (a) **campo, urgente**: el 110 % supone los
+DOS grupos de ventiladores; con uno sería ≈138 % y sin ellos ≈184 %; la fila del documento de Salud pide verificar la refrigeración
+y cambiar 3 termómetros de devanado (suelen arrancar los ventiladores); el cambiador bajo carga salió insatisfactorio en la prueba
+de agosto de 2025; Duval a 4 puntos de PD. (b) **Área SCADA**: corregir el nombre del elemento (el alias lo absorbe; cuando lleguen
+los dos, se funden) y una línea de 34,5 kV que lee ≈2/3. (c) **Documento de Salud** (TODO-82): el 89 % oficial es el PRIMARIO de
+su Excel; el «secundario 96 %» de la plataforma viene de otro documento. (d) Documentado, no corregido: el empaquetador valida los
+alias contra el Excel (no ve las decisiones); lo cubre la validación de la página antes de leer el paquete.
