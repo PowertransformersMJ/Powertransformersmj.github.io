@@ -54,6 +54,7 @@
 | §176 | ADR-176 — **Puerto Libertador**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 con su placa (4000 kVA) y su circuito de salida; cifras firmes · TODO-54/69 | 8675 |
 | §177 | ADR-177 — **Lorica T2** con su placa (primario 33 kV) y **San Benito de Abad T1** con su placa y cifra por 13,8 kV (34,5 kV con escalas erradas) · TODO-54/69 | 8713 |
 | §178 | ADR-178 — **Cargabilidad SCADA**: nivel medido pero excluido en la homologación → «medida excluida en la homologación» con su motivo (no «no se mide») · TODO-69 | 8757 |
+| §179 | ADR-179 — **Santa Rosa T1** por su 13,8 kV (las 3 bahías de 34,5 kV con escalas erradas) y con sus datos de placa; cifra firme 45,5 % · TODO-54/69 | 8790 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
