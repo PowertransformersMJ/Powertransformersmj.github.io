@@ -8931,7 +8931,7 @@ avisos, «Homologación sin observaciones»**, con los tres devanados — sep 11
 sostenida; oct 1–22 105,4 % CRG 5; mes a mes ene 89,7 · feb 93,3 · mar 95,6 · abr 95,9 · jun 105,7 · jul 109,8 · ago 110,5 · sep
 110,2 · oct 105,4; a la fecha **107,8 % CRG 5**; placa «coincide en lo comparado». Firmes sep 109 → 110, oct 101 → 102.
 Revisión adversarial con 3 Opus (`wf_05e9b248-079`): 6 defectos de bordes futuros (ninguno tocaba los datos cargados), 5
-corregidos antes de publicar y 1 documentado (181.8). Diagnóstico `wf_f0066667-44a` → bóveda
+corregidos antes de publicar y 1 documentado (181.8). **Publicado** (`main` fe09920; despliegue lento por fallas 502 de GitHub, terminó en verde): lo servido = `main` en los 3 archivos; en vivo la guarda devuelve null en un tres devanados y sigue avisando en un dos devanados con relación mala, y `validarAlias` acepta el alias de Boston contra la homologación vigente con decisiones. Diagnóstico `wf_f0066667-44a` → bóveda
 `2026-10-23-provisionales-septiembre/`; registro → `…/revision-uno-a-uno/09-BST-T1A.md`.
 
 **181.5 Anti-patterns evitados.** Renombrar el elemento en el SCADA desde aquí (no es nuestro); ampliar el filtro del navegador
