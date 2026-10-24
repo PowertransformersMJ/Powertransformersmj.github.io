@@ -8949,8 +8949,10 @@ del elemento en el repo (la guardia ahora lo atrapa).
 plan en seco + su «procede». NO revisado externamente.
 
 **181.8 Verificado sano / no re-auditar.** La sobrecarga NO es artefacto (181.1); las ampacidades de la plataforma son las de ONAF2
-de placa; el terciario es de 35 MVA y de carga (lleva reactores limitadores). Queda: (a) **campo, urgente**: el 110 % supone los
-DOS grupos de ventiladores; con uno sería ≈138 % y sin ellos ≈184 %; la fila del documento de Salud pide verificar la refrigeración
+de placa; el terciario es de 35 MVA y de carga (lleva reactores limitadores). Queda: (a) **campo**: el 110 % supone los DOS grupos de
+ventiladores (con uno sería ≈138 % y sin ellos ≈184 %) — **el Ingeniero confirmó (2026-10-24) que están OPERATIVOS**: la
+comparación contra ONAF2 es la correcta y la sobrecarga es CON ventilación plena; siguiente frente al cerrar los provisionales:
+nexo Cargabilidad SCADA ↔ sistema de refrigeración (TODO-80); la fila del documento de Salud pide verificar la refrigeración
 y cambiar 3 termómetros de devanado (suelen arrancar los ventiladores); el cambiador bajo carga salió insatisfactorio en la prueba
 de agosto de 2025; Duval a 4 puntos de PD. (b) **Área SCADA**: corregir el nombre del elemento (el alias lo absorbe; cuando lleguen
 los dos, se funden) y una línea de 34,5 kV que lee ≈2/3. (c) **Documento de Salud** (TODO-82): el 89 % oficial es el PRIMARIO de
