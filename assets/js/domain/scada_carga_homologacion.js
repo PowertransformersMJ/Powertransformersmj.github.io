@@ -175,6 +175,12 @@ export const AVISOS = Object.freeze({
 export function relacionNiveles(resumenPorNivel, mapa, placa) {
   const niveles = Object.keys(mapa || {});
   if (niveles.length !== 2) return null;
+  // La relación solo vale si TODA la corriente pasa de un lado al otro: dos niveles en dos devanados DISTINTOS y
+  // ningún tercer devanado con tensión Y ampacidad de placa (ese puede llevar carga o generación: Zambrano y Boston,
+  // `99 §180`–`§181`). Un terciario de estabilización (kV sin ampacidad) no saca carga: se sigue probando.
+  const usados = new Set(niveles.map((n) => mapa[n]));
+  const otroConCarga = ['P', 'S', 'T'].some((d) => !usados.has(d) && placa && placa[d] && placa[d].kv && placa[d].A);
+  if (usados.size !== 2 || otroConCarga) return null;
   const [a, b] = niveles.sort((x, y) => NIVELES[y].kv - NIVELES[x].kv);   // a = alta, b = baja
   const ra = resumenPorNivel[a]; const rb = resumenPorNivel[b];
   if (!ra || !rb || !(ra.i && ra.i.p50 > 0) || !(rb.i && rb.i.p50 > 0)) return null;

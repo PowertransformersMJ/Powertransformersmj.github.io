@@ -56,6 +56,7 @@
 | §178 | ADR-178 — **Cargabilidad SCADA**: nivel medido pero excluido en la homologación → «medida excluida en la homologación» con su motivo (no «no se mide») · TODO-69 | 8757 |
 | §179 | ADR-179 — **Santa Rosa T1** por su 13,8 kV (las 3 bahías de 34,5 kV con escalas erradas) y con sus datos de placa; cifra firme 45,5 % · TODO-54/69 | 8790 |
 | §180 | ADR-180 — **Zambrano T1A** (tres devanados): el aviso de relación no aplica a sus dos salidas (el terciario inyecta); firme 90,6 % por el secundario; placas de T1A y T2 · TODO-54/69 | 8834 |
+| §181 | ADR-181 — **Boston T1A**: sobrecarga REAL 110 % CRG 5 con su terciario (alias de elemento en el empaquetador); la prueba de relación no aplica a un tres devanados; placa · TODO-54/69 | 8890 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

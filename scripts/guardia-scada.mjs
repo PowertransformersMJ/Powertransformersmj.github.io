@@ -9,8 +9,8 @@
 // Bloquea por FORMA, sin lista de nombres reales en el repo:
 //   · una línea con la marca de fila de los exportes del SCADA (la palabra del tipo de medida);
 //   · una clave de punto con forma real: barra, estación, barra, elemento (transformador
-//     swTrafo, swTrf o swAuto con número, circuito de tres letras y 3xx, o línea LN con número),
-//     con o sin el nivel de tensión en medio;
+//     «sw» + mayúscula + letras con número —swTrafo, swTrf, swAuto o uno con errata—, circuito de tres letras
+//     y 3xx, o línea LN con número), con o sin el nivel de tensión en medio y con o sin la barra inicial;
 //   · un archivo .csv/.xls/.xlsx cuyo nombre hable del exporte o de la homologación.
 //   · una foto JPEG embebida en texto (base64 largo) o un archivo del paquete de placas características
 //     (fotos y lecturas reales de las placas, ADR-166).
@@ -33,8 +33,12 @@ const DEMO = /EstDemo/;
 const FILA = new RegExp('Mv' + 'Moment');
 // Ejemplos con forma: '/EstDemo1/swTrafo1', '/EstDemo1 /13.8kV  /swTrafo1' — el primer segmento es la estación,
 // con alguna minúscula (los modelos de equipos «ZN045/FN050» no son estaciones); los circuitos son
-// tres letras y un número de la serie 3xx, o una línea LNnnn.
-const CLAVE = /\/\s*((?=[A-Za-zÀ-ÿñÑ0-9]*[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*k[vV]\s*\/)?\s*(swTr[A-Za-z]*\d+|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
+// tres letras y un número de la serie 3xx, o una línea LNnnn. Desde 2026-10-24 (ADR-181) el elemento de transformador es
+// cualquier «sw» + mayúscula + letras + número (también los que traen una errata en el nombre) y la barra inicial es
+// opcional («Estacion/elemento=homologado», la forma de un alias de elemento); el elemento puede llevar una o dos letras
+// tras el número, el nivel puede venir en «KV», y la estación se mira con un tope de largo (sin tope, una línea larga
+// sin barras costaba tiempo cuadrático: revisión adversarial 2026-10-24).
+const CLAVE = /\/?\s*((?=[A-Za-zÀ-ÿñÑ0-9]{0,9}[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*[kK]\s*[vV]\s*\/)?\s*(sw[A-Z][A-Za-z]*\d+[A-Za-z]{0,2}|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
 const ARCHIVO = new RegExp('(variables[ _-]?el[eé]ctricas|homologaci[oó]n|swtrafo|' + 'mv' + 'moment|_average[-_]|_quality[-_]|ir_current|p_average|urs_average)', 'i');
 const TABLA = /\.(csv|xls|xlsx)$/i;
 // Una foto JPEG en base64 (empieza por «/9j/») de cientos de caracteres; y los archivos del paquete de placas.

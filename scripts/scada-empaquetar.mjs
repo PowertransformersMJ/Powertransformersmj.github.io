@@ -19,6 +19,7 @@ import { createRequire } from 'node:module';
 import { leerFilasHomologacion, fusionarHomologacion, objetivoImportacion } from '../assets/js/domain/scada_carga_homologacion.js';
 import { PAQUETE, seLee, filtrarTexto, aplicarRelevos, armarContenedor, partir, nombreParte } from '../assets/js/domain/scada_carga_paquete.js';
 import { normalizarTexto } from '../assets/js/domain/scada_carga_csv.js';
+import { validarAlias, aplicarAliasElemento } from '../assets/js/domain/scada_carga_alias.js';
 
 const REPO = resolve(new URL('..', import.meta.url).pathname);
 
@@ -121,14 +122,54 @@ export function juntarRelevos(...listas) {
   return out;
 }
 
+/**
+ * Alias de elemento de `--alias`: «ESTACION/ELEMENTO=HOMOLOGADO», varios separados por coma. Las filas de
+ * ELEMENTO se escriben como de HOMOLOGADO (el SCADA exporta un nivel del transformador con una errata). Lo confirma el Ingeniero.
+ */
+export function leerAlias(texto) {
+  return String(texto || '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => {
+    const m = x.match(/^([^/=]+)\/([^/=]+)=([^/=]+)$/);
+    if (!m) throw new Error('--alias «' + x + '»: se escribe ESTACION/ELEMENTO=HOMOLOGADO.');
+    return { est: m[1].trim(), de: m[2].trim(), a: m[3].trim() };
+  });
+}
+
+/** Alias guardados en el MISMO Excel (hoja cuyo nombre diga «alias»: ESTACION · ELEMENTO · HOMOLOGADO). La página no la lee. */
+export function aliasDelExcel(rutaExcel) {
+  const require = createRequire(join(REPO, 'package.json'));
+  const XLSX = require('xlsx');
+  const wb = XLSX.read(readFileSync(rutaExcel), { type: 'buffer' });
+  const hoja = wb.SheetNames.find((n) => /alias/i.test(n));
+  if (!hoja) return [];
+  const aoa = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: false, defval: '' });
+  const cab = (aoa[0] || []).map((c) => normalizarTexto(c).normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+  const col = (re) => cab.findIndex((c) => re.test(c));
+  const [ce, cd, ca] = [col(/^estacion/), col(/^elemento/), col(/^homologado/)];
+  if (ce < 0 || cd < 0 || ca < 0) throw new Error('La hoja «' + hoja + '» debe traer las columnas ESTACION, ELEMENTO y HOMOLOGADO.');
+  return aoa.slice(1).filter((f) => f.some((c) => String(c).trim())).map((f) => ({ est: String(f[ce]).trim(), de: String(f[cd]).trim(), a: String(f[ca]).trim() }));
+}
+
+/** Filas de la homologación del Excel (para validar los alias), con las MISMAS opciones que la página. */
+export function filasDelExcel(rutaExcel) {
+  const require = createRequire(join(REPO, 'package.json'));
+  const XLSX = require('xlsx');
+  const wb = XLSX.read(readFileSync(rutaExcel), { type: 'buffer' });
+  const hoja = wb.SheetNames.find((n) => /homolog/i.test(n)) || wb.SheetNames[0];
+  const r = leerFilasHomologacion(XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: false, defval: '' }));
+  if (!r.ok) throw new Error(r.motivo);
+  return fusionarHomologacion(r.filas, null).filas;
+}
+
 /** Prepara el paquete de una carpeta de mes. Devuelve el informe y los trozos (sin escribirlos). */
-export function empaquetar({ carpeta, estaciones, relevos = [], creado = new Date().toISOString(), parteMax = PAQUETE.parteMaxBytes }) {
+export function empaquetar({ carpeta, estaciones, relevos = [], alias = [], creado = new Date().toISOString(), parteMax = PAQUETE.parteMaxBytes }) {
   // Un relevo que no casa con la homologación se perdería sin aviso (sus filas renombradas no pasan el filtro): se frena.
   const homologadas = new Set(estaciones.map(normalizarTexto));
   for (const r of juntarRelevos(relevos)) {
     if (!homologadas.has(normalizarTexto(r.est))) throw new Error('Relevo ' + r.est + '→' + r.nueva + ': «' + r.est + '» no es una estación de la homologación (escríbala como en la columna C).');
     if (homologadas.has(normalizarTexto(r.nueva))) throw new Error('Relevo ' + r.est + '→' + r.nueva + ': «' + r.nueva + '» ya es una estación de la homologación; el relevo la escondería.');
   }
+  // Un alias fuera de la homologación no tendría efecto (su fila no pasa el filtro): se frena igual que un relevo.
+  for (const x of alias) if (!homologadas.has(normalizarTexto(x.est))) throw new Error('Alias ' + x.est + '/' + x.de + '→' + x.a + ': «' + x.est + '» no es una estación de la homologación.');
   const raiz = resolve(carpeta);
   const nombreCarpeta = basename(raiz);
   if (/^_/.test(nombreCarpeta)) throw new Error('La carpeta empieza por «_»: no es un mes.');
@@ -136,25 +177,28 @@ export function empaquetar({ carpeta, estaciones, relevos = [], creado = new Dat
   const enc = new TextEncoder();
   const archivos = [];
   let bytesOrigen = 0; let leidos = 0; let renombradas = 0; let descartadas = 0;
+  const al = { renombradas: 0, descartadas: 0, horasRellenadas: 0 };
   for (const f of recorrer(raiz)) {
     bytesOrigen += f.tamano;
     let contenido = null;
     if (seLee(f.nombre) && f.tamano) {
       let texto = readFileSync(f.abs, 'utf8');
       if (relevos.length) { const r = aplicarRelevos(texto, relevos); texto = r.texto; renombradas += r.renombradas; descartadas += r.descartadas; }
+      // Alias de elemento DESPUÉS de los relevos: la estación ya tiene su nombre homologado.
+      if (alias.length) { const r = aplicarAliasElemento(texto, alias); texto = r.texto; al.renombradas += r.renombradas; al.descartadas += r.descartadas; al.horasRellenadas += r.horasRellenadas; }
       contenido = enc.encode(filtrarTexto(texto, set));
       leidos++;
     }
     archivos.push({ ruta: f.ruta, nombre: f.nombre, tamano: f.tamano, contenido });
   }
-  const contenedor = armarContenedor({ carpeta: nombreCarpeta, creado, estaciones, relevos, origen: { archivos: archivos.length, bytes: bytesOrigen } }, archivos);
+  const contenedor = armarContenedor({ carpeta: nombreCarpeta, creado, estaciones, relevos, alias, origen: { archivos: archivos.length, bytes: bytesOrigen } }, archivos);
   const gz = new Uint8Array(gzipSync(contenedor, { level: 9 }));
   const sha = createHash('sha256').update(gz).digest('hex');
   const trozos = partir(gz, Math.min(parteMax, PAQUETE.parteMaxBytes));
   if (trozos.length > 99) throw new Error('El paquete daría ' + trozos.length + ' partes (máximo 99): ¿es la carpeta de UN mes?');
   const partes = trozos.map((bytes, k) => ({ nombre: nombreParte(nombreCarpeta, k + 1, trozos.length, sha), bytes }));
   return {
-    carpeta: nombreCarpeta, archivos: archivos.length, leidos, bytesOrigen, relevos: { renombradas, descartadas },
+    carpeta: nombreCarpeta, archivos: archivos.length, leidos, bytesOrigen, relevos: { renombradas, descartadas }, alias: al,
     bytesContenedor: contenedor.length, bytesComprimido: gz.length, sha, partes
   };
 }
@@ -178,11 +222,14 @@ if (esPrincipal) {
   // --relevo "ESTACION=NUEVA@AAAA-MM-DD": estación que el SCADA renombró (§158; nombres reales solo aquí, nunca en el repo).
   // Los de la hoja «Relevos» del Excel + los de la orden (`--relevo` se puede repetir).
   const relevos = juntarRelevos(relevosDelExcel(excel), leerRelevos(argumentos('relevo').join(',')));
-  const r = empaquetar({ carpeta, estaciones: est, relevos, ...(kb > 0 ? { parteMax: kb * 1024 } : {}) });
+  // --alias "ESTACION/ELEMENTO=HOMOLOGADO" + hoja «Alias de elemento» del Excel.
+  const alias = validarAlias([...aliasDelExcel(excel), ...leerAlias(argumentos('alias').join(','))], filasDelExcel(excel));
+  const r = empaquetar({ carpeta, estaciones: est, relevos, alias, ...(kb > 0 ? { parteMax: kb * 1024 } : {}) });
   mkdirSync(salida, { recursive: true });
   for (const p of r.partes) writeFileSync(join(salida, p.nombre), p.bytes);
   const mb = (b) => (b / 1048576).toFixed(1) + ' MB';
   console.log(`${r.carpeta}: ${r.archivos} archivos (${mb(r.bytesOrigen)}), ${r.leidos} leídos; paquete ${mb(r.bytesContenedor)} → ${mb(r.bytesComprimido)} comprimido en ${r.partes.length} parte(s) de ≤ ${mb(PAQUETE.parteMaxBytes)}; ${est.length} estaciones; sha ${r.sha.slice(0, 12)}…`);
   for (const p of r.partes) console.log('  ' + p.nombre + '  ' + mb(p.bytes.length));
+  if (alias.length) console.log(`  alias: ${alias.map((x) => x.est + '/' + x.de + '→' + x.a).join(' · ')} · filas renombradas ${r.alias.renombradas} · fundidas en la fila real ${r.alias.descartadas} (horas rellenadas ${r.alias.horasRellenadas})`);
   if (relevos.length) console.log(`  relevos: ${relevos.map((x) => x.est + '←' + x.nueva + ' desde ' + x.desde).join(' · ')} · filas renombradas ${r.relevos.renombradas} · descartadas ${r.relevos.descartadas}`);
 }

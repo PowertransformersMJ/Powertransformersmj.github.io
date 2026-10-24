@@ -19,6 +19,19 @@ describe('bloquea por forma', () => {
     assert.equal(motivoEnLinea(clave('Inventad', 'LN' + '570', '34.5kV')), 'clave de un punto SCADA');
     assert.equal(motivoEnLinea(clave('Inventad', 'swTrf3')), 'clave de un punto SCADA');
     assert.equal(motivoEnLinea(clave('Inventad', 'swAuto1')), 'clave de un punto SCADA');
+    // Un elemento de transformador con errata y la forma de un alias de elemento, sin barra inicial (ADR-181).
+    assert.equal(motivoEnLinea(clave('Inventad', 'swTa' + 'fo1', '13.8kV')), 'clave de un punto SCADA');
+    assert.equal(motivoEnLinea('Inventad' + S + 'swTa' + 'fo1=swTrafo1'), 'clave de un punto SCADA');
+    // Elemento con letras tras el número y nivel en «KV» (revisión adversarial 2026-10-24).
+    assert.equal(motivoEnLinea(clave('Inventad', 'swTraf' + '1F')), 'clave de un punto SCADA');
+    assert.equal(motivoEnLinea(clave('Inventad', 'swTraf' + '3F', '13.8KV')), 'clave de un punto SCADA');
+    assert.equal(motivoEnLinea(clave('Inventad', 'swTrafo1', '13.8 KV')), 'clave de un punto SCADA');
+  });
+  test('una línea larga sin barras no la cuelga (búsqueda con tope)', () => {
+    const t0 = Date.now();
+    assert.equal(motivoEnLinea('A'.repeat(200000)), '');
+    assert.equal(motivoEnLinea('a'.repeat(200000)), '');
+    assert.ok(Date.now() - t0 < 1500, 'tardó ' + (Date.now() - t0) + ' ms');
   });
   test('una fila de exporte', () => {
     assert.equal(motivoEnLinea(fila('Ficticia')), 'fila de un exporte del SCADA');
