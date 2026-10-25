@@ -18,6 +18,8 @@ import {
 import { cargabilidad, atribuirEscala, califCRG, firmeza } from './scada_carga_kpis.js';
 import { filaCargabilidad } from './cargabilidad_parque.js';
 import { devanadosDe } from './scada_carga_devanados.js';
+// Suma de circuitos (2026-10-24): archivo NUEVO; sin suma en la decisión, nada de esto cambia una cifra (L-102).
+import { especSuma, estadoSumaNivel, componerResumen, textoSuma } from './scada_carga_suma.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -86,29 +88,45 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   const esCircuito = !!clave && !esElementoTransformador(clave.elem);
   const { avisos, mapa, relacion } = fila ? avisosFila(fila, { ...conteos, tx, punto, resumenPorNivel }) : { avisos: [], mapa: null, relacion: null };
   const estado = estadoEfectivo(fila, avisos);
+  // Suma de circuitos: un nivel que la decisión manda SUMAR solo da cifra con su derivado válido (el del mes, el del
+  // periodo o el del rango del detalle); si no, queda sin cifra con su motivo. NUNCA la medida propia del transformador.
+  const spec = especSuma(fila);
+  const sumaNiveles = []; const motivosSuma = []; const avisosSuma = [];
   const niveles = [];
   const devanados = [];
   for (const nv of Object.keys((punto && punto.niveles) || {}).sort((a, b) => NIVELES[b].kv - NIVELES[a].kv)) {
     const d = mapa ? mapa[nv] || null : null;
     const r = resumenPorNivel ? resumenPorNivel[nv] : null;
     const A = d ? placa[d].A : null;
+    const sp = spec && d ? spec.porNivel[nv] || null : null;
+    const es = sp && r ? estadoSumaNivel(r, sp) : null;   // sin resumen del nivel no hay cifra que bloquear
+    const bloqueado = !!(es && es.estado !== 'ok');
     const escala = r && d ? atribuirEscala(r, A) : (r ? 'sin_devanado' : 'sin_dato');
-    let pct = d && r ? cargabilidad(r, A, estadistico) : null;
+    let pct = d && r && !bloqueado ? cargabilidad(r, A, estadistico) : null;
     if (escala === 'ESCALA_I' || escala === 'ESCALA_INDETERMINADA') pct = null;
-    const sostPct = d && r && r.sost && A > 0 ? 100 * r.sost.v / A : null;
-    const picoPct = d && r && r.i && r.i.max != null && A > 0 ? 100 * r.i.max / A : null;
+    const sostPct = d && r && !bloqueado && r.sost && A > 0 ? 100 * r.sost.v / A : null;
+    const picoPct = d && r && !bloqueado && r.i && r.i.max != null && A > 0 ? 100 * r.i.max / A : null;
     const fila1 = {
-      nivel: nv, etiqueta: NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
+      nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + ' · suma de circuitos' : NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
       pct, escala, cobertura: r ? r.cob : null, n: r && r.i ? r.i.n : 0, sostenidaPct: sostPct, picoPct,
-      sinDatos: !r || !r.i || r.i.n === 0
+      sinDatos: !r || !r.i || r.i.n === 0,
+      ...(sp ? { suma: { de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null } } : {})
     };
+    if (sp) {
+      sumaNiveles.push({ nivel: nv, etiqueta: NIVELES[nv].etiqueta, devanado: d, de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null, derivado: (r && r.derivado) || null });
+      if (es && es.motivo) motivosSuma.push(es.motivo);
+      if (es && es.aviso) avisosSuma.push(es.aviso);
+    }
     niveles.push(fila1);
     if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0 });
   }
   const conPct = devanados.filter((x) => x.pct != null);
   let pctEq = conPct.length ? Math.max(...conPct.map((x) => x.pct)) : null;
   const devMax = conPct.length ? conPct.reduce((a, b) => (b.pct > a.pct ? b : a)).d : null;
-  const f = firmeza({ estadoHomologacion: estado, esCircuito, devanados, placa, mesesFallidos });
+  const f0 = firmeza({ estadoHomologacion: estado, esCircuito, devanados, placa, mesesFallidos });
+  // La suma agrega sus motivos (D4: no cuadra → provisional); sin suma, `f` es exactamente la firmeza de siempre.
+  const extraSuma = [...new Set([...motivosSuma, ...avisosSuma])];
+  const f = extraSuma.length ? { firme: false, motivos: [...f0.motivos, ...extraSuma] } : f0;
   // Un circuito sin confirmar o una homologación excluida NO dan número (decisión del Ingeniero).
   let motivoNulo = null;
   if (estado === 'excluida') { pctEq = null; motivoNulo = 'homologación excluida'; }
@@ -116,6 +134,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   else if (esCircuito && estado !== 'confirmada') { pctEq = null; motivoNulo = 'se mide un circuito, no el transformador'; }
   else if (!clave) motivoNulo = 'la homologación no trae punto SCADA';
   else if (!punto) motivoNulo = 'sin datos SCADA cargados';
+  else if (pctEq == null && motivosSuma.length) motivoNulo = motivosSuma[0];
   else if (pctEq == null) motivoNulo = devanados.some((x) => x.escala === 'ESCALA_I' || x.escala === 'ESCALA_INDETERMINADA')
     ? 'escala de la corriente sospechosa'
     : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado'
@@ -154,8 +173,16 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     sobrecargaSostenida: clase === 'firme' && sostenida, sobrecargaProvisional: clase !== 'firme' && sostenida,
     picoAislado: !sostenida && pico, sobrecargaPorVerificar: porVerificar,
     oficial: { pct: oficialEq, calif: leer(tx, 'salud_actual.calif_crg') ?? null, porDevanado: of ? { P: of.P.pct, S: of.S.pct, T: of.T.pct } : null },
-    delta: pctEq != null && oficialDev != null ? pctEq - oficialDev : null
+    delta: pctEq != null && oficialDev != null ? pctEq - oficialDev : null,
+    // Campo NUEVO, solo con suma (cada consumidor lo lee con guarda: un módulo viejo en caché no lo trae).
+    ...(spec ? { suma: { niveles: sumaNiveles, texto: textoSuma(spec), veredicto: peorVeredicto(sumaNiveles) } } : {})
   };
+}
+
+/** El peor veredicto de los niveles sumados con derivado válido (null si ninguno lo tiene). */
+function peorVeredicto(ns) {
+  const peso = { ok: 0, sin_contraste: 1, no_cuadra: 2 };
+  return ns.reduce((a, n) => (n.estado === 'ok' && n.veredicto && (a == null || peso[n.veredicto] > peso[a]) ? n.veredicto : a), null);
 }
 
 /**
@@ -173,7 +200,9 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;
     const punto = cid ? puntos[cid] || null : null;
-    const r = cid ? claves[cid] || null : null;
+    // Con suma de circuitos, el nivel sumado es su resumen DERIVADO (o un registro sin cifra); sin suma, el mismo objeto.
+    // Con el catálogo: si otro transformador de la estación mide esa barra (D5), el nivel queda sin cifra.
+    const r = cid ? componerResumen(claves, cid, fila, puntos) || null : null;
     const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes });
     return {
       id: tx.id,

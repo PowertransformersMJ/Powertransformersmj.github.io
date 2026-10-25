@@ -103,10 +103,19 @@ export function montarLista(cont, ctx, { alAbrir }) {
   let turno = 0;   // descarta la respuesta de un mes que ya no es el elegido
   // Una misma curva pedida dos veces a la vez (la lista verificando y el detalle abriéndose) se lee UNA vez.
   const curvasEnCurso = new Map();
-  function leerCurvaUnaVez(cid, mes) {
-    const k = cid + '|' + mes;
-    if (!curvasEnCurso.has(k)) curvasEnCurso.set(k, leerSeriesPunto(cid, [mes]).finally(() => curvasEnCurso.delete(k)));
+  // Con suma de circuitos (2026-10-24), la curva del mes se compone con la de sus circuitos: el lector va en un archivo
+  // aparte, cargado con import() solo si hace falta (si falla, la marca queda «por confirmar», como cualquier fallo).
+  function leerCurvaUnaVez(cid, mes, fila = null) {
+    const k = cid + '|' + mes + (fila ? '|suma' : '');
+    if (!curvasEnCurso.has(k)) {
+      const lectura = fila ? import('../../data/scada_carga_suma.js').then((m) => m.leerSeriesEquipo(cid, [mes], fila)) : leerSeriesPunto(cid, [mes]);
+      curvasEnCurso.set(k, lectura.finally(() => curvasEnCurso.delete(k)));
+    }
     return curvasEnCurso.get(k);
+  }
+  /** La fila de la homologación de una fila de la lista, SOLO si mide con suma de circuitos (si no, null: lo de siempre). */
+  function filaConSuma(x) {
+    return x && x.suma && x.filaId && ctx.homologacion && ctx.homologacion.filas ? ctx.homologacion.filas[x.filaId] || null : null;
   }
 
   // El orden elegido en un modo no pasa al otro si esa columna no existe allí (vuelve a la cifra, de mayor a menor).
@@ -150,7 +159,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const nuevas = await Promise.all(pend.map(async (x, k) => {
       if (!mod || k >= tope) return porConfirmar(x);
       try {
-        const doc = (await leerCurvaUnaVez(x.claveId, mes)).porMes[mes];
+        const doc = (await leerCurvaUnaVez(x.claveId, mes, filaConSuma(x))).porMes[mes];
         return mod.aplicarVerificacion(x, x.sobrecargaPorVerificar.map((n) => mod.sobrecargaDeCurva(doc, mes, n.nivel, n.A)));
       } catch (e) { console.warn('[cargabilidad-scada] verificar sobrecarga', e); return porConfirmar(x); }
     }));
@@ -176,7 +185,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const nuevas = await Promise.all(pend.map(async (x, k) => {
       if (!mod || k >= tope) return porConfirmar(x);
       try {
-        const doc = (await leerCurvaUnaVez(x.claveId, mes)).porMes[mes];
+        const doc = (await leerCurvaUnaVez(x.claveId, mes, filaConSuma(x))).porMes[mes];
         return mod.aplicarVerificacion(x, x.sobrecargaPorVerificar.map((n) => mod.sobrecargaDeCurva(doc, mes, n.nivel, n.A)));
       } catch (e) { console.warn('[cargabilidad-scada] verificar sobrecarga', e); return porConfirmar(x); }
     }));
@@ -382,6 +391,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
         el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: exportar }, 'Descargar lista (CSV)')));
   }
 
+  /** ¿Algún nivel del devanado se mide por suma de circuitos? (rótulo de `calcularEquipo`; con guarda, campo opcional). */
+  const porSuma = (d) => Array.isArray(d.niveles) && d.niveles.some((t) => /suma de circuitos/.test(String(t)));
   /** Todos los devanados de placa del equipo, uno por línea; en negrilla el que da la cifra. */
   function celdaDevanados(x) {
     // Campo propio: una fila de un módulo de dominio viejo en caché (max-age 600, L-102) no lo trae y se ve lo de antes.
@@ -390,6 +401,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
     return el('td', { class: 'cs-devs' }, ds.map((d) => el('span', { class: 'cs-dev' + (d.manda ? ' cs-dev--manda' : '') },
       d.nombre + ' ' + [d.kv ? kvTexto(d.kv) + ' kV' : 'sin tensión', d.A ? ampTexto(d.A) + ' A' : 'sin ampacidad', d.mva != null ? mvaTexto(d.mva) + ' MVA' : null,
         d.pct != null ? pctTexto(d.pct) + ' %' : null].filter(Boolean).join(' · ') + (d.manda ? ' — da la cifra' : ''),
+      // Un devanado medido por suma de circuitos lo dice (su cifra es un dato derivado, no la medida propia).
+      porSuma(d) ? el('span', { class: 'cs-sub' }, 'por suma de circuitos') : null,
       d.aviso && d.aviso !== 'sin_tension' && d.aviso !== 'sin_ampacidad' ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null)));
   }
 
@@ -397,9 +410,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const td = el('td', {});
     if (x.pct == null) {
       td.append(el('span', { class: 'cs-num' }, '—'), chipCifra(x), el('span', { class: 'cs-sub' }, x.motivoNulo || ''));
+      if (x.suma && x.suma.texto) td.append(el('span', { class: 'cs-sub' }, x.suma.texto));
       return td;
     }
     td.append(el('span', { class: 'cs-num' }, num(x.pct, 1) + ' %'), ' ', chipCifra(x));
+    // Campo nuevo con guarda: una fila de un dominio viejo en caché no lo trae (L-102).
+    if (x.suma && x.suma.texto) td.append(el('span', { class: 'cs-sub' }, x.suma.texto));
     if (x.clase !== 'firme' && x.motivos.length) td.append(el('span', { class: 'cs-sub' }, x.motivos.join(' · ')));
     const enMeses = x.periodo ? ' en ' + x.periodo.mesesSostenida + (x.periodo.mesesSostenida === 1 ? ' mes' : ' meses') : '';
     if (x.sobrecargaSostenida) td.append(el('span', { class: 'cs-sub cs-sostenida' }, 'Sobrecarga sostenida (≥ ' + CALCULO.sobrecargaMinH + ' h sobre el ' + CALCULO.sobrecargaPct + ' %)' + enMeses));
@@ -528,16 +544,20 @@ export function montarLista(cont, ctx, { alAbrir }) {
         el('button', { type: 'button', id: 'csMas', class: 'btn btn--glass btn--sm', onclick: () => { st.visibles += PASO; pintarTabla(); } }, 'Mostrar ' + Math.min(PASO, todas.length - vis.length) + ' más')) : null);
   }
 
+  /** Origen de la cifra cuando sale de una suma de circuitos (dato derivado); vacío si no (campo con guarda). */
+  const textoSumaCSV = (x) => (x && x.suma && x.suma.texto ? x.suma.texto + ' (dato derivado)' : '');
+
   function exportar() {
     if (st.modo === 'periodo' && st.periodo) { exportarPeriodo(); return; }
     const filas = filasVisibles();
     const dev = { P: 'Primario', S: 'Secundario', T: 'Terciario' };
     descargarCSV('cargabilidad_scada_' + st.mes + '.csv',
-      ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida', ...CSV_DEV_CAB],
+      // 'Suma_de_circuitos': columna NUEVA al final (las de antes no se mueven); vacía si la fila no mide con suma.
+      ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida', ...CSV_DEV_CAB, 'Suma_de_circuitos'],
       filas.map((x) => [x.matricula, x.subestacion, x.zona, st.mes, x.pct, x.clase, x.crg, x.pct != null && x.devMax ? dev[x.devMax] : '', x.oficial ? x.oficial.pct : null,
         x.delta != null && x.oficial && x.oficial.porDevanado ? x.oficial.porDevanado[x.devMax] : null,
         x.delta, ESTADOS[x.estado] || x.estado, x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '),
-        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no'), ...csvDevanados(x.devanadosPlaca)]));
+        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no'), ...csvDevanados(x.devanadosPlaca), textoSumaCSV(x)]));
   }
 
   function exportarPeriodo() {
@@ -545,12 +565,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     descargarCSV('cargabilidad_scada_' + desde + '_a_' + hasta + '.csv',
       ['Matricula', 'Subestacion', 'Zona', 'Periodo_desde', 'Periodo_hasta', 'Meses_con_cifra', 'Carga_periodo_pct', 'Clase', 'CRG', 'Peor_mes', 'Peor_mes_pct', 'Peor_mes_clase',
         'Meses_CRG4_5', 'Mayor_corriente_devanado', 'Mayor_corriente_A', 'Mayor_corriente_pct', 'Mayor_corriente_hora_CO', 'Mayor_corriente_por_confirmar',
-        'Primer_mes_sobrecarga_sostenida', 'Desde_inicio_de_los_datos', 'Primer_mes_hora_sobre_100', 'Meses_con_sobrecarga_sostenida', 'Medida', 'Motivos', ...CSV_DEV_CAB],
+        'Primer_mes_sobrecarga_sostenida', 'Desde_inicio_de_los_datos', 'Primer_mes_hora_sobre_100', 'Meses_con_sobrecarga_sostenida', 'Medida', 'Motivos', ...CSV_DEV_CAB, 'Suma_de_circuitos'],
       filas.map((x) => { const p = x.periodo; const pm = p.peorMes; const mc = p.mayorCorriente; const ps = p.primeraSostenida; return [
         x.matricula, x.subestacion, x.zona, desde, hasta, p.mesesConCifra, x.pct, x.clase, x.crg, pm ? pm.mes : '', pm ? pm.pct : null, pm ? pm.clase : '',
         p.mesesCRG45, mc ? DEV[mc.devanado] : '', mc ? mc.max : null, mc ? mc.pct : null, mc && mc.ms != null ? formatoCO(mc.ms) : '', mc && mc.porConfirmar ? 'si' : 'no',
         ps ? ps.mes : '', ps ? (ps.inicioDatos ? 'si' : (ps.inicioPeriodo ? 'inicio del periodo' : 'no')) : '', p.primeraHora ? p.primeraHora.mes : '', p.mesesSostenida, ESTADOS[x.estado] || x.estado,
-        x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '), ...csvDevanados(x.devanadosPlaca)]; }));
+        x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '), ...csvDevanados(x.devanadosPlaca), textoSumaCSV(x)]; }));
   }
 
   function dibujar() { conservarFoco(dibujarSinFoco); }

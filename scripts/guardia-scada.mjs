@@ -11,6 +11,8 @@
 //   · una clave de punto con forma real: barra, estación, barra, elemento (transformador
 //     «sw» + mayúscula + letras con número —swTrafo, swTrf, swAuto o uno con errata—, circuito de tres letras
 //     y 3xx, o línea LN con número), con o sin el nivel de tensión en medio y con o sin la barra inicial;
+//   · el nombre SUELTO de un circuito (tres letras y 3xx) o de una línea (LN con número), sin la estación: la forma que
+//     usa la suma de circuitos («13,8 kV = suma de circuitos A + B»); los de prueba son «EDM3xx»;
 //   · un archivo .csv/.xls/.xlsx cuyo nombre hable del exporte o de la homologación.
 //   · una foto JPEG embebida en texto (base64 largo) o un archivo del paquete de placas características
 //     (fotos y lecturas reales de las placas, ADR-166).
@@ -39,6 +41,9 @@ const FILA = new RegExp('Mv' + 'Moment');
 // tras el número, el nivel puede venir en «KV», y la estación se mira con un tope de largo (sin tope, una línea larga
 // sin barras costaba tiempo cuadrático: revisión adversarial 2026-10-24).
 const CLAVE = /\/?\s*((?=[A-Za-zÀ-ÿñÑ0-9]{0,9}[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*[kK]\s*[vV]\s*\/)?\s*(sw[A-Z][A-Za-z]*\d+[A-Za-z]{0,2}|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
+// Un circuito o una línea SUELTOS (sin '/estación/'), desde la suma de circuitos (2026-10-24): «EDM3xx» es el de prueba;
+// un color «#RRGGBB» (p. ej. el ámbar de la paleta) no es un circuito.
+const SUELTO = /(?<!#)\b(?!EDM3\d{2}\b)[A-Z]{3}3\d{2}\b|\bLN\d{3}\b/;
 const ARCHIVO = new RegExp('(variables[ _-]?el[eé]ctricas|homologaci[oó]n|swtrafo|' + 'mv' + 'moment|_average[-_]|_quality[-_]|ir_current|p_average|urs_average)', 'i');
 const TABLA = /\.(csv|xls|xlsx)$/i;
 // Una foto JPEG en base64 (empieza por «/9j/») de cientos de caracteres; y los archivos del paquete de placas.
@@ -51,6 +56,7 @@ export function motivoEnLinea(linea) {
   if (DEMO.test(s)) return '';
   if (FILA.test(s)) return 'fila de un exporte del SCADA';
   if (CLAVE.test(s)) return 'clave de un punto SCADA';
+  if (SUELTO.test(s)) return 'nombre de un circuito o línea del SCADA';
   if (FOTO_B64.test(s)) return 'foto embebida (placa u otra imagen real)';
   return '';
 }

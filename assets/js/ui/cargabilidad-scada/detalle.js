@@ -34,7 +34,10 @@ import * as KPIS from '../../domain/scada_carga_kpis.js';
 import {
   parseFechaHoraCO, aInputCO, formatoCO, intervaloCO, nombreMes, validarRango, xPlotly
 } from '../../domain/scada_carga_fecha.js';
-import { leerSeriesPunto } from '../../data/scada_carga.js';
+// Suma de circuitos (2026-10-24): archivos NUEVOS. Sin suma en la decisión, `leerSeriesEquipo` lee lo mismo que
+// `leerSeriesPunto` y el detalle sale idéntico.
+import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
+import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 
 const H_MS = 3600e3;
@@ -42,6 +45,25 @@ const OFF = TIEMPO.offsetColombiaH * H_MS;
 const ESTADOS = { automatica: 'Homologación sin observaciones', confirmada: 'Medida confirmada por el Ingeniero', pendiente: 'Medida por confirmar', excluida: 'Medida excluida', sin_homologacion: 'Sin homologación' };
 const MOTIVO_LECTURA = { 20: 'mes que no se pudo leer', 21: 'sin datos cargados' };
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
+const FASE_CORTA = { IR: 'R', IS: 'S', IT: 'T' };
+
+/**
+ * «13,8 kV = suma de circuitos A + B (dato derivado; la medida propia del transformador se conserva y no se usa: su fase S
+ * lee 2,02 ×)». Los nombres salen de la decisión guardada; la razón, del cuadre de los meses del rango (si ya se leyó).
+ */
+function textoSumaDetalle(a) {
+  const spec = especSuma(a.fila);
+  if (!spec || spec.cid !== a.cid) return null;
+  return Object.entries(spec.porNivel).map(([nv, sp]) => {
+    const der = a.sumaRango && a.sumaRango[nv];
+    const rz = (der && der.razones) || {};
+    const distintas = ['IR', 'IS', 'IT'].filter((F) => rz[F] && (Math.abs(rz[F].min - 1) > SUMA.tolCuadre || Math.abs(rz[F].max - 1) > SUMA.tolCuadre))
+      // Se comparan los textos ya redondeados: dos razones que se leen iguales van una sola vez (nunca «2,02–2,02»).
+      .map((F) => 'fase ' + FASE_CORTA[F] + ' lee ' + (num(rz[F].min, 2) === num(rz[F].max, 2) ? num(rz[F].min, 2) : num(rz[F].min, 2) + '–' + num(rz[F].max, 2)) + ' ×');
+    return NIVELES[nv].etiqueta + ' = suma de circuitos ' + sp.elems.join(' + ') + ' (dato derivado; la medida propia del transformador se conserva y no se usa'
+      + (distintas.length ? ': su ' + distintas.join(', su ') : '') + ')';
+  }).join(' · ');
+}
 
 // Filtro de la vista (`99 §126`): qué valores de cada hora y qué fases se dibujan. Se recuerda en este
 // navegador (comodidad de quien mira; si no se puede leer o guardar, vale el de fábrica).
@@ -202,6 +224,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         el('span', { class: 'cs-dato' }, el('b', {}, 'Potencia: '), leer(tx, 'placa.potencia_kva') ? num(Number(leer(tx, 'placa.potencia_kva')) / 1000, 1) + ' MVA' : '—')),
       tablaDevanados(a),
       el('p', { class: 'cs-dato', style: 'margin:4px 0 0' }, el('b', {}, 'Punto SCADA: '), a.fila ? (claveEfectiva(a.fila) || 'sin punto') : 'sin homologación',
+        a.fila && textoSumaDetalle(a) ? ' · ' + textoSumaDetalle(a) : '',
         hom ? ' · ' + (ESTADOS[hom.estado] || hom.estado) : '',
         // La nota de la decisión del Ingeniero (por qué se confirmó o excluyó) se lee en el equipo, no solo en la administración.
         hom && (hom.estado === 'confirmada' || hom.estado === 'excluida') && a.fila && a.fila.decision && a.fila.decision.nota
@@ -397,10 +420,22 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         fila('Factor de potencia', d.fp.prom != null ? 'promedio ' + num(d.fp.prom, 3) + (d.fp.min != null ? ' · mínimo ' + num(d.fp.min, 3) + ' (' + intervaloCO(d.t[d.fp.iMin]) + ')' : '') : '—'),
         fila('Flujo de potencia inverso', f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
         fila('Escala de la medida', escala),
-        fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : ''))));
+        fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')),
+        info.suma ? fila('Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
+  }
+  /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */
+  function textoSumaNivel(a, nv, info) {
+    const der = a.sumaRango && a.sumaRango[nv];
+    const base = info.suma.de.join(' + ') + ' (corrientes sumadas hora por hora; tensión, P y Q del transformador)';
+    if (!der || der.estado !== 'ok') return base + ' · ' + (a.calc && a.calc.motivoNulo ? a.calc.motivoNulo : 'falta calcular la suma de este rango');
+    const h = der.horas || {};
+    const v = { ok: 'cuadra', no_cuadra: 'no cuadra: cifra provisional', sin_contraste: 'sin contraste: cifra provisional' }[der.veredicto] || '';
+    return base + ' · transformador ÷ suma: ' + (textoCuadre(der) || '—') + (v ? ' (' + v + ')' : '')
+      + (h.bandaMuerta || h.abiertas ? ' · en los meses del rango: ' + [h.bandaMuerta ? h.bandaMuerta + ' h por banda muerta validada con el transformador' : null,
+        h.abiertas ? h.abiertas + ' h con un circuito abierto (aporta 0)' : null].filter(Boolean).join(' y ') : '');
   }
 
-  function tablaCalidad(d) {
+  function tablaCalidad(d, esSuma = false) {
     const codigos = new Set();
     const porFam = {};
     for (const f of FAMILIAS) {
@@ -409,7 +444,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     }
     const orden = [...codigos].sort((x, y) => x - y);
     const total = d.t.length || 1;
-    const texto = (k) => MOTIVO[k] || MOTIVO_LECTURA[k] || ('código ' + k);
+    // En un nivel sumado, el «retenido» de las corrientes es la banda muerta de los circuitos validada con el transformador.
+    const texto = (k) => (esSuma && k === CODIGO.RETENIDO ? MOTIVO[k] + ' · en las corrientes: banda muerta validada con el transformador' : (MOTIVO[k] || MOTIVO_LECTURA[k] || ('código ' + k)));
     return el('details', {}, el('summary', {}, 'Calidad del dato (horas por motivo)'),
       el('div', { class: 'cs-tabla-caja', style: 'margin-top:8px' },
         el('table', { class: 'cs-tabla', style: 'min-width:640px' },
@@ -421,18 +457,21 @@ export function montarDetalle(cont, ctx, { alVolver }) {
 
   function exportarCSV(a, nv) {
     const d = a.porNivel[nv];
+    // Nivel sumado: columna NUEVA al FINAL ('Origen') y el nombre del archivo lo dice; los demás niveles salen como siempre.
+    const info = (a.calc && a.calc.niveles.find((x) => x.nivel === nv)) || {};
+    const origen = info.suma ? 'IR, IS, IT = suma de circuitos ' + info.suma.de.join(' + ') + ' (derivada); U, P y Q = del transformador' : null;
     const motivo = (k) => MOTIVO[k] || MOTIVO_LECTURA[k] || ('código ' + k);
     const filas = [];
     for (let k = 0; k < d.t.length; k++) {
       const obs = FAMILIAS.filter((f) => !(d.fam[f].m[k] === CODIGO.VALIDO || d.fam[f].m[k] === CODIGO.RETENIDO)).map((f) => f + ': ' + motivo(d.fam[f].m[k]));
       // Columnas nuevas AL FINAL (§126): máx, mín e instantáneo que se muestran (las de antes no se mueven).
       const extras = FAMILIAS.flatMap((f) => EXTRAS.map((e) => { const x = d.ext.series[f] && d.ext.series[f][e]; return x && Number.isFinite(x[k]) ? x[k] : null; }));
-      filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | '), ...extras]);
+      filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | '), ...extras, ...(origen ? [origen] : [])]);
     }
     const nombreExtra = { max: 'max', min: 'min', ins: 'inst' };
-    descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
+    descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + (origen ? '_suma-circuitos' : '') + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
       ['Inicio_hora_CO', 'Fin_hora_CO', 'IR_A', 'IS_A', 'IT_A', 'URS_kV', 'UST_kV', 'UTR_kV', 'P_MW', 'Q_Mvar', 'S_MVA_calculada', 'FP_calculado', 'I_fase_max_A', 'Cargabilidad_pct', 'Horas_descartadas_por',
-        ...FAMILIAS.flatMap((f) => EXTRAS.map((e) => f + '_' + nombreExtra[e] + '_' + UNIDAD[f]))],
+        ...FAMILIAS.flatMap((f) => EXTRAS.map((e) => f + '_' + nombreExtra[e] + '_' + UNIDAD[f])), ...(origen ? ['Origen'] : [])],
       filas);
   }
 
@@ -485,7 +524,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         const fuera = !i.devanado && excl.porNivel[k];
         return el('button', { type: 'button', id: 'csNivelBtn-' + k, 'aria-pressed': String(k === nv), title: fuera && excl.nota ? excl.nota : null,
           onclick: () => { if (k !== nv) pintarNivel(a, k); } },
-          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
+          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] + (i.suma ? ' · suma de circuitos' : '') : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
       }));
     liberarFigura(figura);
     // Contenedor de las gráficas (una por magnitud, cada una con su título y su descripción accesible).
@@ -502,9 +541,10 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           + ((n) => (n ? ': ' + (/[.…]$/.test(n) ? n : n + '.') : '.'))(notaCorta(excl.nota, 220)) + ' Se muestra solo para ver: no entra en ninguna cifra.') : null,
         panelFiltro,
         el('figure', { style: 'margin:0' }, fig,
-          el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.')),
+          el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.'
+            + (info.suma ? ' En este nivel las corrientes son la suma hora por hora de los circuitos ' + info.suma.de.join(' + ') + ' (una hora vale solo si valen todos); la tensión, P y Q son las del transformador; el máximo, el mínimo y el instantáneo no se calculan para una suma.' : ''))),
         el('div', { class: 'cs-acciones' }, el('button', { type: 'button', id: 'csCsvNivel', class: 'btn btn--glass btn--sm', onclick: () => exportarCSV(a, nv) }, 'Descargar CSV del nivel'))),
-      el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d)))));
+      el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d, !!info.suma)))));
     const mio = token;
     const vigente = () => mio === token && figura === fig;
     const dibujar = () => dibujarFigura(fig, {
@@ -528,7 +568,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const a = actual;
     a.desde = desde; a.hasta = hasta;
     // El encabezado no muestra cifras de otro rango mientras se lee este (ni si falla).
-    a.calc = null; a.porNivel = null; a.leyendo = true;
+    a.calc = null; a.porNivel = null; a.leyendo = true; a.sumaRango = null;
     try {
       a.previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosHomologacion((ctx.homologacion && ctx.homologacion.filas) || {}), umbrales: ctx.umbrales });
     } catch (e) { a.previo = null; }
@@ -543,7 +583,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       const mesesRango = mesesDelRango(desde, hasta);
       const existentes = mesesRango.filter((m) => (a.punto.meses || []).includes(m));
       let porMes;
-      try { porMes = (await leerSeriesPunto(a.cid, existentes)).porMes; }
+      // Con suma de circuitos, cada mes llega con sus niveles sumados (compuestos con el mes completo) y su derivado.
+      // Rige el mismo candado de la lista: el derivado GUARDADO de cada mes y, con el catálogo, D5 (barra compartida).
+      try { porMes = (await leerSeriesEquipo(a.cid, existentes, a.fila, { puntos: (ctx.catalogo && ctx.catalogo.puntos) || null })).porMes; }
       catch (e) { porMes = Object.fromEntries(existentes.map((m) => [m, { estado: 'fallo' }])); }
       if (mio !== token) return;
       const porNivel = {}; const resumenPorNivel = {}; const fallidos = new Set();
@@ -567,6 +609,18 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         const A = i && i.devanado ? a.placa[i.devanado].A : null;
         porNivel[nv] = calcularNivel(porNivel[nv], NIVELES[nv].kv, A);
         resumenPorNivel[nv] = porNivel[nv].resumen;
+      }
+      // Suma de circuitos: el nivel sumado lleva el derivado del RANGO (válido solo si cada mes leído trae el suyo); sin él,
+      // calcularEquipo lo deja sin cifra (nunca la medida propia del transformador).
+      const spec = especSuma(a.fila);
+      a.sumaRango = {};
+      if (spec && spec.cid === a.cid) {
+        for (const [nv, sp] of Object.entries(spec.porNivel)) {
+          if (!resumenPorNivel[nv]) continue;
+          const conDatos = existentes.filter((m) => porMes[m] && porMes[m].estado === 'ok').map((m) => ({ mes: m, derivado: (porMes[m].derivado && porMes[m].derivado[nv]) || null }));
+          a.sumaRango[nv] = derivadoDeMeses(conDatos, sp);
+          resumenPorNivel[nv] = { ...resumenPorNivel[nv], derivado: a.sumaRango[nv] };
+        }
       }
       a.porNivel = porNivel;
       a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });

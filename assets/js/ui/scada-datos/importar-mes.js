@@ -15,14 +15,18 @@
 
 import { el, poner, num } from '../cargabilidad-scada/dom.js';
 import { informeSimulacion, planLotes, tamanoDoc } from '../../domain/scada_carga_importacion.js';
-import { analizarClaveHomologada, claveEfectiva, objetivoImportacion } from '../../domain/scada_carga_homologacion.js';
+import { analizarClaveHomologada, claveEfectiva, objetivoImportacion, conteosHomologacion, normalizarMatricula } from '../../domain/scada_carga_homologacion.js';
 import { claveId } from '../../domain/scada_carga_csv.js';
 import { PAQUETE, analizarNombreParte, juntarPartes, leerContenedor, estacionesFaltantes } from '../../domain/scada_carga_paquete.js';
 import { validarAlias } from '../../domain/scada_carga_alias.js';
-import { ESCRITURA, CODIGO, MOTIVO } from '../../domain/scada_carga_config.js';
+import { ESCRITURA, CODIGO, MOTIVO, NIVELES } from '../../domain/scada_carga_config.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
-import { leerSeriesPunto, leerCatalogo, olvidarCache } from '../../data/scada_carga.js';
+import { leerSeriesPunto, leerCatalogo, olvidarCache, leerResumenMes } from '../../data/scada_carga.js';
 import { abrirCarga, cerrarCarga, escribirSeries, escribirResumen, escribirCatalogo, cargaIdDelCatalogo } from '../../data/scada_carga_admin.js';
+// Suma de circuitos (2026-10-24): archivo NUEVO. Sin sumas en la homologación, la carga es la de siempre.
+import { especSuma, aliasTocaSuma, componerResumen, textoSuma, textoCuadre, claveSuma } from '../../domain/scada_carga_suma.js';
+import { calcularEquipo } from '../../domain/scada_carga_vista.js';
+import { obtenerUmbralesActivos } from '../../data/umbrales_salud.js';
 
 const MAX_ARCHIVOS = 20000;
 const LECTURAS_SIMULTANEAS = 6;
@@ -80,12 +84,15 @@ export function montarCargaMes(cont, { alTerminar }) {
   // Paquete preparado: partes recibidas por huella → {carpeta, n, partes: Map(i → bytes)}.
   const paquetes = new Map();
   let estadoPaquete = '';
+  // Sumas de circuitos con que el lector leyó la carpeta: si la homologación cambia después, la simulación se detiene.
+  let firmaSumasLeidas = null;
 
   const salirConCuidado = (ev) => { ev.preventDefault(); ev.returnValue = ''; };
 
   function nuevoWorker() {
     if (worker) worker.terminate();
-    worker = new Worker(new URL('../../workers/scada_carga_importar.worker.js', import.meta.url), { type: 'module' });
+    // '?v=': una página nueva nunca usa un lector viejo guardado en la caché del navegador (suma de circuitos, 2026-10-24).
+    worker = new Worker(new URL('../../workers/scada_carga_importar.worker.js?v=suma1', import.meta.url), { type: 'module' });
     worker.onerror = (e) => { mensaje = 'El lector de archivos falló: ' + ((e && e.message) || 'error'); fase = 'inicio'; dibujar(); };
     return worker;
   }
@@ -101,8 +108,19 @@ export function montarCargaMes(cont, { alTerminar }) {
       if (f.retirada || (f.decision && f.decision.tipo === 'no_usar')) continue;
       const k = analizarClaveHomologada(claveEfectiva(f));
       if (k) s.add(claveId(k.est, k.elem));
+      // Los circuitos de una suma también se esperan en la carpeta: el informe avisa si falta alguno.
+      const sp = especSuma(f);
+      if (sp) for (const x of Object.values(sp.porNivel)) for (const c of x.cids) s.add(c);
     }
     return [...s];
+  }
+  /** Filas vigentes con suma de circuitos (con su id). */
+  function filasConSuma() {
+    return Object.entries(filasVigentes()).map(([id, f]) => ({ id, f, spec: especSuma(f) })).filter((x) => x.spec);
+  }
+  /** Las sumas vigentes en un texto comparable (transformador, nivel, circuitos y fases): cambia si cambia cualquiera. */
+  function firmaSumas() {
+    return JSON.stringify(filasConSuma().map((x) => [x.spec.cid, Object.values(x.spec.porNivel).map((p) => p.firma).sort()]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
   }
 
   // ── 1) Leer la carpeta ─────────────────────────────────────────────────────────
@@ -143,6 +161,7 @@ export function montarCargaMes(cont, { alTerminar }) {
         dibujar();
       }
     };
+    firmaSumasLeidas = firmaSumas();
     w.postMessage({ tipo: 'analizar', archivos, filas: filasVigentes() });
   }
 
@@ -190,6 +209,8 @@ export function montarCargaMes(cont, { alTerminar }) {
         // Alias de elemento (`99 §181`): el empaquetador los validó contra el Excel; aquí se validan otra vez contra la
         // homologación VIGENTE, con las decisiones del Ingeniero (un alias no puede esconder un punto ya confirmado).
         if (Array.isArray(manifiesto.alias) && manifiesto.alias.length) validarAlias(manifiesto.alias, filasHomologacion());
+        // Un alias tampoco puede tocar un circuito de una suma de circuitos (lo cambiaría o lo escondería).
+        if (Array.isArray(manifiesto.alias) && manifiesto.alias.length) aliasTocaSuma(manifiesto.alias, filasHomologacion());
         estadoPaquete = '';
         const lista = archivos.map((a) => ({ file: new File([a.contenido], a.nombre), ruta: a.ruta, nombre: a.nombre, tamano: a.tamano }));
         analizar(lista, manifiesto.carpeta + ' (paquete preparado)');
@@ -212,6 +233,11 @@ export function montarCargaMes(cont, { alTerminar }) {
     fase = 'simulando'; mensaje = ''; progreso = { hechos: 0, total: 0, texto: 'Leyendo lo ya guardado de esos meses…' };
     dibujar();
     try {
+      // El lector calcula las sumas con la homologación que había al LEER la carpeta: si después se guardó, quitó o cambió
+      // una suma de circuitos, el plan no la tendría en cuenta. Se detiene y se dice.
+      if (firmaSumas() !== firmaSumasLeidas) {
+        throw new Error('La suma de circuitos de la homologación cambió después de leer la carpeta: vuelva a leer la carpeta (o el paquete) antes de simular.');
+      }
       olvidarCache();   // lo guardado se lee fresco: otra pestaña pudo cargar algo
       const cat = await leerCatalogo();
       if (cat.estado === 'fallo') throw new Error('No se pudo leer qué hay guardado (revise la conexión).');
@@ -239,13 +265,19 @@ export function montarCargaMes(cont, { alTerminar }) {
         };
         worker.postMessage({ tipo: 'procesar', meses, guardados, modo });
       });
+      // Con sumas de circuitos, un lector viejo (caché del navegador) no calcula los derivados: guardar así dejaría el
+      // mes sin su suma. Se detiene y se dice.
+      if (filasConSuma().length && procesado.versionSuma == null) {
+        throw new Error('El lector de archivos de esta pestaña es de una versión anterior y no calcula la suma de circuitos: recargue la página (Cmd+Shift+R) y vuelva a simular.');
+      }
+      const sumas = await bloqueSumas(procesado, meses);
       const tamanos = procesado.docs.map(tamanoDoc);
       const grande = Math.max(0, ...tamanos);
       // El resumen y el catálogo se funden al GUARDAR, en una transacción con lo guardado en ese
       // instante. `cargaIdBase` detecta si otra carga terminó entre la simulación y el guardado.
       plan = {
         ...procesado, meses, tamanoTotal: tamanos.reduce((a, b) => a + b, 0), tamanoMax: grande,
-        lotes: planLotes(procesado.docs), cargaIdBase: catalogo ? catalogo.cargaId || null : null, propias: []
+        lotes: planLotes(procesado.docs), cargaIdBase: catalogo ? catalogo.cargaId || null : null, propias: [], sumas
       };
       fase = 'plan';
     } catch (e) {
@@ -255,9 +287,65 @@ export function montarCargaMes(cont, { alTerminar }) {
     dibujar();
   }
 
+  /**
+   * Lo que la simulación dice de cada suma de circuitos (sin escribir nada): por fila, nivel y mes, horas con las tres
+   * fases, cuántas por banda muerta, el cuadre con el transformador, el veredicto y la cifra del mes (la MISMA función
+   * de la lista). Además, cuántos puntos MEDIDOS (todos menos los resúmenes derivados) cambiarían de cifra frente a lo
+   * guardado: al volver a cargar un mes ya completo se espera 0 (la suma va aparte y no toca ninguna medida).
+   */
+  async function bloqueSumas(procesado, meses) {
+    const conSuma = filasConSuma();
+    if (!conSuma.length) return null;
+    const filasH = filasHomologacion();
+    const conteos = conteosHomologacion(filasH);
+    const parque = (est && est.parque) || [];
+    // Las bandas CRG ACTIVAS, las mismas de la lista (sin documento propio, las del MO.00418): la misma CRG en los dos lados.
+    const umbrales = await obtenerUmbralesActivos().catch(() => null);
+    // El catálogo como quedará al guardar (lo guardado + lo de esta carga): D5 se revisa con él, como en la página.
+    const puntosCat = { ...((est.catalogo && est.catalogo.puntos) || {}) };
+    for (const [cid, p] of Object.entries((procesado.catalogo && procesado.catalogo.puntos) || {})) {
+      const g = puntosCat[cid];
+      puntosCat[cid] = { ...(g || {}), ...p, niveles: { ...((g && g.niveles) || {}), ...(p.niveles || {}) } };
+    }
+    const lineas = [];
+    for (const { f, spec } of conSuma) {
+      const tx = parque.find((t) => normalizarMatricula((t.identificacion && (t.identificacion.matricula || t.identificacion.codigo)) || t.codigo) === normalizarMatricula(f.matricula)) || null;
+      for (const mes of meses) {
+        const claves = (procesado.resumen && procesado.resumen[mes]) || {};
+        // Ni el transformador ni la suma en esta carga para ese mes. (Circuitos SIN el transformador: el lector tapó el
+        // derivado viejo con «falta» y se dice en su línea.)
+        if (!claves[spec.cid] && !claves[claveSuma(spec.cid)]) continue;
+        const punto = puntosCat[spec.cid] || null;
+        let cifra = null;
+        try {
+          if (tx && punto && claves[spec.cid]) cifra = calcularEquipo({ tx, fila: f, punto, resumenPorNivel: componerResumen(claves, spec.cid, f, puntosCat), conteos, umbrales, mes });
+        } catch (e) { console.warn('[scada-datos] suma de circuitos', e); }
+        for (const nv of Object.keys(spec.porNivel)) {
+          const d = (procesado.derivados || []).find((x) => x.mes === mes && x.base === spec.cid && x.nivel === nv);
+          lineas.push({ matricula: f.matricula, mes, nivel: nv, texto: textoSuma(spec, nv), resumen: d ? d.resumen : null, cifra });
+        }
+      }
+    }
+    // Puntos medidos que cambiarían de cifra (una lectura del resumen guardado por mes; informativo). Un punto que aún no
+    // está guardado (un circuito que entra por primera vez) no cuenta.
+    let ajenos = 0; let comparados = true;
+    for (const mes of meses) {
+      const r = await leerResumenMes(mes);
+      if (r.estado === 'fallo') { comparados = false; continue; }
+      const guardadas = r.estado === 'ok' && r.datos && r.datos.claves ? r.datos.claves : {};
+      for (const [cid, niveles] of Object.entries((procesado.resumen && procesado.resumen[mes]) || {})) {
+        if (/--suma$/.test(cid) || !guardadas[cid]) continue;
+        const firma = (x) => JSON.stringify(Object.keys(x || {}).sort().map((nv) => [nv, x[nv] && x[nv].i ? [x[nv].i.n, x[nv].i.p99] : null, x[nv] ? x[nv].cob : null]));
+        if (firma(niveles) !== firma(guardadas[cid])) ajenos++;
+      }
+    }
+    // Una línea sin su derivado (el lector no lo devolvió): guardar así dejaría el mes sin su suma. No se deja guardar.
+    return { lineas, ajenos: comparados ? ajenos : null, sinCalcular: lineas.some((x) => !x.resumen) };
+  }
+
   // ── 4) Guardar ─────────────────────────────────────────────────────────────────
   async function guardar() {
-    if (!plan || plan.tamanoMax > ESCRITURA.docMaxBytes) return;
+    if (!plan || plan.tamanoMax > ESCRITURA.docMaxBytes || (plan.sumas && plan.sumas.sinCalcular)) return;
     fase = 'escribiendo'; mensaje = '';
     progreso = { hechos: 0, total: plan.lotes.length, texto: 'Guardando series…' };
     dibujar();
@@ -416,11 +504,35 @@ export function montarCargaMes(cont, { alTerminar }) {
         el('li', {}, num(100 * validas / (leidas || 1), 1) + ' % de las horas-dato leídas quedaron válidas tras la limpieza' + (c[CODIGO.SIN_ARCHIVO] ? ' (las horas de días sin archivo quedan como hueco).' : '.')),
         plan.conflictos ? el('li', {}, plan.conflictos + ' horas traen un valor distinto al guardado: ' + (modo === 'completar' ? 'se conserva el guardado.' : 'se usa el nuevo.')) : null,
         grande ? el('li', { class: 'cs-error' }, 'Una serie supera el tamaño admitido por la base: no se puede guardar. Avise al equipo técnico.') : null),
+      plan.sumas ? bloquePlanSumas(plan.sumas) : null,
       filasCod.length ? el('details', {}, el('summary', {}, 'Qué se descartó y por qué'),
         el('table', { class: 'cs-sec' }, el('thead', {}, el('tr', {}, el('th', { scope: 'col' }, 'Motivo'), el('th', { scope: 'col' }, 'Horas-dato'), el('th', { scope: 'col' }, '%'))), el('tbody', {}, filasCod))) : null,
       el('div', { class: 'cs-acciones' },
-        el('button', { type: 'button', class: 'btn btn--primary', disabled: grande || (!plan.docs.length && !plan.sinCambios), onclick: guardar }, 'Guardar en la base'),
+        el('button', { type: 'button', class: 'btn btn--primary', disabled: grande || (!plan.docs.length && !plan.sinCambios) || !!(plan.sumas && plan.sumas.sinCalcular), onclick: guardar }, 'Guardar en la base'),
         el('button', { type: 'button', class: 'btn btn--ghost', onclick: () => { fase = 'analizado'; plan = null; dibujar(); } }, 'Volver')));
+  }
+
+  /** Bloque «Suma de circuitos» del plan: lo que se va a guardar APARTE, con su cuadre. */
+  function bloquePlanSumas(sumas) {
+    const VEREDICTO = { ok: 'cuadra con el transformador', no_cuadra: 'NO cuadra con el transformador: la cifra saldrá provisional', sin_contraste: 'no se pudo contrastar con el transformador: la cifra saldrá provisional' };
+    const items = sumas.lineas.map((x) => {
+      const r = x.resumen; const d = r && r.derivado;
+      const cab = x.matricula + ' · ' + nombreMes(x.mes) + ' · ' + (x.texto || 'suma de circuitos');
+      if (!d) return el('li', { class: 'cs-error' }, cab + ': no se calculó la suma (el lector no la devolvió): no se puede guardar así. Recargue la página (Cmd+Shift+R) y vuelva a leer la carpeta.');
+      if (d.estado === 'sin_nivel') return el('li', { class: 'cs-error' }, cab + ': ' + (d.sinNivel || []).join(' y ') + ' llegó en esta carpeta pero no mide ' + NIVELES[x.nivel].etiqueta + '; revise el nivel o el nombre en la homologación. Ese mes quedará sin cifra en ese nivel.');
+      if (d.estado !== 'ok') return el('li', { class: 'cs-error' }, cab + ': falta ' + (d.faltan || []).join(' y ') + ' en esta carpeta; ese mes quedará sin cifra en ese nivel.');
+      const h = d.horas || {};
+      const cifra = x.cifra && x.cifra.pct != null ? 'cifra del mes ' + num(x.cifra.pct, 1) + ' %' + (x.cifra.crg ? ' (CRG ' + x.cifra.crg + ')' : '') + (x.cifra.clase === 'firme' ? ', firme' : ', provisional') : 'sin cifra del mes' + (x.cifra && x.cifra.motivoNulo ? ' (' + x.cifra.motivoNulo + ')' : '');
+      return el('li', {}, el('b', {}, cab), el('br'),
+        (h.completas || 0) + ' h con las tres fases' + (h.bandaMuerta ? ' (' + h.bandaMuerta + ' por banda muerta validada con el transformador)' : '') + (h.fueraServicio ? ' · ' + h.fueraServicio + ' h con todos los circuitos abiertos' : '')
+          + ' · transformador ÷ suma: ' + (textoCuadre(d) || '—') + ' → ' + (VEREDICTO[d.veredicto] || d.veredicto) + ' · ' + cifra + '.', el('br'),
+        el('span', { class: 'cs-sub' }, 'Se guarda aparte como resumen derivado; la medida del transformador no cambia.'));
+    });
+    return el('div', { class: 'cs-panel', style: 'margin-top:10px' },
+      el('h3', {}, 'Suma de circuitos'),
+      el('ul', { class: 'cs-avisos' }, items.length ? items : el('li', {}, 'El transformador de la suma no viene en esta carpeta: no se calcula ninguna suma.'),
+        el('li', {}, sumas.ajenos == null ? 'No se pudo comparar con lo guardado cuántos puntos ajenos a las sumas cambian de cifra (revise la conexión).'
+          : 'Puntos medidos que cambian de cifra frente a lo guardado (la suma va aparte): ' + sumas.ajenos + '. Al volver a cargar un mes ya completo debe ser 0; con días u horas nuevas es normal que cambien.')));
   }
 
   function bloqueResultado() {

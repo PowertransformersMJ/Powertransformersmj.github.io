@@ -9,7 +9,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { el, poner, num } from './dom.js';
-import { leerResumenMes, leerSeriesPunto } from '../../data/scada_carga.js';
+import { leerResumenMes } from '../../data/scada_carga.js';
 import { calcularEquipo } from '../../domain/scada_carga_vista.js';
 import { conteosHomologacion } from '../../domain/scada_carga_homologacion.js';
 import { nombreMes, formatoCO } from '../../domain/scada_carga_fecha.js';
@@ -17,6 +17,9 @@ import { DEVANADO, CALCULO, NIVELES } from '../../domain/scada_carga_config.js';
 import { nivelesExcluidos, notaCorta } from '../../domain/scada_niveles_excluidos.js';
 import { agregadosDeMeses, hitosDeCurva, nivelCuenta } from '../../domain/scada_carga_periodo.js';
 import { sobrecargaDeCurva, aplicarVerificacion } from '../../domain/scada_carga_sostenida.js';
+// Suma de circuitos (2026-10-24): archivos NUEVOS; sin suma en la decisión, la historia lee y calcula lo mismo (L-102).
+import { componerResumen } from '../../domain/scada_carga_suma.js';
+import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 
 const MAX_CURVAS = 6;   // curvas de mes que la historia puede leer por equipo (cada una de 70 a 260 KB)
 const SOBRE = CALCULO.sobrecargaPct;
@@ -47,7 +50,8 @@ export async function pintarHistoria(nodo, { a, ctx, alVerDia, vigente, alReinte
   const leidas = await Promise.all(meses.map((m) => leerResumenMes(m)));
   if (!vigente()) return;
   const fallidos = meses.filter((m, k) => leidas[k].estado === 'fallo');
-  const rDe = (k) => (leidas[k].estado === 'ok' && leidas[k].datos && leidas[k].datos.claves ? leidas[k].datos.claves[a.cid] || null : null);
+  // Con suma de circuitos, el nivel sumado de cada mes es su resumen DERIVADO (o un registro sin cifra), como en la lista.
+  const rDe = (k) => (leidas[k].estado === 'ok' && leidas[k].datos && leidas[k].datos.claves ? componerResumen(leidas[k].datos.claves, a.cid, a.fila, (ctx.catalogo && ctx.catalogo.puntos) || null) || null : null);
   // Curvas: UNA lectura por mes como mucho, con tope; lo que no alcance queda dicho como «por confirmar».
   const curvas = new Map(); let leidasCurvas = 0;
   async function curva(mes) {
@@ -55,7 +59,8 @@ export async function pintarHistoria(nodo, { a, ctx, alVerDia, vigente, alReinte
     if (leidasCurvas >= MAX_CURVAS) return null;
     leidasCurvas++;
     let doc = null;
-    try { doc = (await leerSeriesPunto(a.cid, [mes])).porMes[mes]; } catch (e) { console.warn('[cargabilidad-scada] historia', e); }
+    // Con suma de circuitos, la curva del mes trae sus niveles sumados (+ las lecturas de los circuitos); sin suma, la misma.
+    try { doc = (await leerSeriesEquipo(a.cid, [mes], a.fila, { puntos: (ctx.catalogo && ctx.catalogo.puntos) || null })).porMes[mes]; } catch (e) { console.warn('[cargabilidad-scada] historia', e); }
     curvas.set(mes, doc);
     return doc;
   }

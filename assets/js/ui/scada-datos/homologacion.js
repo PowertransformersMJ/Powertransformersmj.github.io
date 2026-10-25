@@ -13,11 +13,14 @@ import {
   leerFilasHomologacion, fusionarHomologacion, conteosHomologacion, avisosFila, estadoEfectivo, AVISOS, claveEfectiva,
   analizarClaveHomologada, placaDe, mapaNivelDevanado, normalizarMatricula, mapaDeDecision
 } from '../../domain/scada_carga_homologacion.js';
-import { claveId, normalizarTexto } from '../../domain/scada_carga_csv.js';
+import { claveId, normalizarTexto, esElementoTransformador } from '../../domain/scada_carga_csv.js';
 import { NIVELES, DEVANADO } from '../../domain/scada_carga_config.js';
 import { mesPorDefecto } from '../../domain/scada_carga_vista.js';
 import { guardarHomologacion, decidirFila } from '../../data/scada_carga_admin.js';
 import { leerResumenMes } from '../../data/scada_carga.js';
+import { nombreMes } from '../../domain/scada_carga_fecha.js';
+// Suma de circuitos (2026-10-24): archivo NUEVO. Sin suma en la decisión, el diálogo evalúa y guarda lo de siempre.
+import { SUMA, erroresSuma, componerResumen, claveSuma, firmaSuma, textoCuadre, claveEnSumaAjena } from '../../domain/scada_carga_suma.js';
 
 const SHEETJS = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
 const SHEETJS_SRI = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
@@ -46,6 +49,7 @@ export function montarHomologacion(cont, { alCambiar }) {
   let soloPendientes = true;
   let resumenUltimo = null;
   let mesResumen = null;
+  let cargaResumen = null;   // la carga del catálogo con que se leyó: tras cargar ese MISMO mes, se vuelve a leer
   let avisoGuardado = '';   // sobrevive al repintado que sigue a un guardado
 
   function contexto() {
@@ -70,7 +74,8 @@ export function montarHomologacion(cont, { alCambiar }) {
     const k = analizarClaveHomologada(claveEfectiva(fila));
     const cid = k ? claveId(k.est, k.elem) : null;
     const punto = cid ? ctx.puntos[cid] || null : null;
-    const r = cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[cid] : null;
+    // Con suma de circuitos, el nivel sumado se evalúa con su resumen DERIVADO (como en la página); sin suma, el mismo objeto.
+    const r = cid && resumenUltimo && resumenUltimo.claves ? componerResumen(resumenUltimo.claves, cid, fila, ctx.puntos) : null;
     const tx = txDeFila(fila, ctx);
     const a = avisosFila(fila, { ...ctx.conteos, tx, punto, resumenPorNivel: r });
     return { ...a, estado: estadoEfectivo(fila, a.avisos), tx, punto, cid, r };
@@ -142,15 +147,80 @@ export function montarHomologacion(cont, { alCambiar }) {
     const opcionesClave = [...new Set([f.clave_excel, claveEfectiva(f), ...candidatos].filter(Boolean))];
     const selClave = el('select', { id: 'dlgClave' }, opcionesClave.map((c) => el('option', { value: c, selected: c === claveEfectiva(f) }, c)));
     const mapaSel = {};
+    // Suma de circuitos, por nivel: «Medir con: la medida del transformador | la suma de circuitos» (D5: con la casilla de
+    // barra propia). Los nombres de los circuitos se escriben (pueden no estar aún en los datos cargados) o se toman de las
+    // sugerencias: los puntos de esta estación que no son un transformador.
+    const sumaGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.suma && typeof f.decision.suma === 'object') ? f.decision.suma : {};
+    const rPropio = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[ev0.cid] || null : null;
+    const derUltimo = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[claveSuma(ev0.cid)] || null : null;
+    const sugeridos = [...new Set(Object.values(ctx.puntos).filter((p) => estN && normalizarTexto(p.est) === estN && !esElementoTransformador(p.elem)).map((p) => p.elem))]
+      .sort((x, y) => x.localeCompare(y, 'es'));
+    const listaDe = (t) => String(t || '').split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
+    const medirSel = {}; const sumaUI = {};
+    const VEREDICTO = { ok: 'cuadra', no_cuadra: 'no cuadra: la cifra saldrá provisional', sin_contraste: 'sin contraste: la cifra saldrá provisional' };
+    const textoCuadreUltimo = (nv, lista) => {
+      const r = derUltimo && derUltimo[nv]; const d = r && r.derivado;
+      const cids = k ? lista.map((e) => claveId(k.est, e)) : [];
+      if (d && d.estado === 'ok' && cids.length && d.firma === firmaSuma(nv, cids, SUMA.fases)) {
+        return 'Último mes cargado (' + nombreMes(mesResumen) + '): suma ' + (r.i && r.i.p99 != null ? num(r.i.p99, 0) + ' A (p99)' : 'sin horas válidas')
+          + ' · transformador ÷ suma: ' + (textoCuadre(d) || '—') + ' (' + (VEREDICTO[d.veredicto] || d.veredicto) + ').';
+      }
+      return 'El cuadre con el transformador se calculará al volver a cargar los meses.';
+    };
+    function bloqueSuma(nv) {
+      const g = sumaGuardada[nv] || {};
+      const idDe = 'dlgSumaDe-' + nv; const idBarra = 'dlgSumaBarra-' + nv;
+      const de = el('input', { type: 'text', id: idDe, maxlength: 200, autocomplete: 'off', style: 'width:100%', placeholder: 'nombres de los circuitos, separados por comas' });
+      de.value = (Array.isArray(g.de) ? g.de : []).join(', ');
+      const barra = el('input', { type: 'checkbox', id: idBarra, checked: g.barra_propia === true });
+      const cuadre = el('p', { class: 'cs-ayuda', role: 'status', 'aria-live': 'polite' });
+      const pintarCuadre = () => { cuadre.textContent = textoCuadreUltimo(nv, listaDe(de.value)); };
+      de.addEventListener('input', pintarCuadre);
+      pintarCuadre();
+      const agregar = (e) => {
+        const l = listaDe(de.value);
+        if (!l.some((x) => normalizarTexto(x) === normalizarTexto(e))) { de.value = [...l, e].join(', '); pintarCuadre(); }
+      };
+      sumaUI[nv] = { de, barra };
+      // Envuelto en un div: `hidden` en el fieldset no basta (la hoja de estilos le da display:flex a .cs-rango).
+      return el('div', {}, el('fieldset', { class: 'cs-rango', style: 'margin-top:8px' }, el('legend', {}, NIVELES[nv].etiqueta + ' · suma de circuitos'),
+        el('p', { class: 'cs-ayuda' }, 'Las corrientes de este nivel salen de la suma, hora por hora, de los circuitos de su barra (una hora vale solo si valen todos). La tensión, P y Q siguen siendo las del transformador. La medida propia del transformador se conserva, pero no se usa.'),
+        el('label', { for: idDe, class: 'cs-campo' }, 'Circuitos (como los escribe el SCADA, separados por comas)', de),
+        sugeridos.length
+          ? el('p', { class: 'cs-ayuda' }, 'Circuitos de esta estación en los datos cargados: ', ...sugeridos.map((e) => el('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => agregar(e) }, '+ ' + e)))
+          : el('p', { class: 'cs-ayuda' }, 'Los circuitos de esta estación todavía no están en los datos cargados: escriba sus nombres; entran al volver a cargar los meses.'),
+        el('label', { class: 'cs-check', for: idBarra }, barra, ' La barra de este nivel la alimenta solo este transformador (obligatorio para usar la suma)'),
+        cuadre));
+    }
+    const bloquesSuma = [];
     const filasMapa = niveles.map((nv) => {
       const s = el('select', { 'aria-label': 'Devanado del nivel ' + NIVELES[nv].etiqueta },
         el('option', { value: '' }, 'No usar'),
         ['P', 'S', 'T'].filter((d) => placa[d] && placa[d].kv).map((d) => el('option', { value: d, selected: (mapaDeDecision(f) || auto.mapa)[nv] === d },
           DEVANADO[d] + (placa[d] && placa[d].kv ? ' (' + num(placa[d].kv, 1) + ' kV, ' + (placa[d].A ? num(placa[d].A, 0) + ' A' : 'sin ampacidad') + ')' : ''))));
       mapaSel[nv] = s;
-      const r = ev0.r ? ev0.r[nv] : null;
-      return el('tr', {}, el('td', {}, NIVELES[nv].etiqueta), el('td', {}, s),
-        el('td', {}, r && r.i && r.i.p99 != null ? num(r.i.p99, 0) + ' A (p99 del último mes)' : 'sin datos del último mes'));
+      // El p99 del último mes es el de la medida PROPIA del transformador (el de la suma va en su bloque, con su cuadre).
+      const r = rPropio ? rPropio[nv] : null;
+      const medir = el('select', { id: 'dlgMedir-' + nv, 'aria-label': 'Con qué se mide el nivel ' + NIVELES[nv].etiqueta },
+        el('option', { value: 'medida' }, 'Medir con la medida del transformador'),
+        el('option', { value: 'suma', selected: !!sumaGuardada[nv] }, 'Medir con la suma de circuitos'));
+      medirSel[nv] = medir;
+      const bloque = bloqueSuma(nv);
+      const celdaP99 = el('td', {});
+      // Un nivel en «No usar» no se mide con nada: el selector queda inactivo (y su suma, si la había, no se guarda).
+      // Con la suma, la celda dice que el p99 es el de la medida PROPIA del transformador (no el que se usa).
+      const sincronizar = () => {
+        medir.disabled = !s.value;
+        bloque.hidden = medir.disabled || medir.value !== 'suma';
+        celdaP99.textContent = r && r.i && r.i.p99 != null
+          ? num(r.i.p99, 0) + ' A (p99 del último mes' + (!medir.disabled && medir.value === 'suma' ? ', de la medida propia del transformador: no se usa' : '') + ')'
+          : 'sin datos del último mes';
+      };
+      medir.addEventListener('change', sincronizar);
+      s.addEventListener('change', sincronizar);
+      sincronizar();
+      bloquesSuma.push(bloque);
+      return el('tr', {}, el('td', {}, NIVELES[nv].etiqueta), el('td', {}, s), el('td', {}, medir), celdaP99);
     });
     const tipo = el('select', { id: 'dlgTipo' }, el('option', { value: 'usar' }, 'Confirmar: usar esta medida'), el('option', { value: 'no_usar' }, 'Excluir: no calcular este transformador'));
     if (f.decision && f.decision.tipo === 'no_usar') tipo.value = 'no_usar';
@@ -170,6 +240,35 @@ export function montarHomologacion(cont, { alCambiar }) {
       // niveles_vistos: los que se revisaron; un nivel que aparezca después vuelve a pedir revisión.
       const decision = { tipo: tipo.value, clave: selClave.value || null, mapa: niveles.length ? mapa : null, niveles_vistos: niveles,
         nota: nota.value.trim(), clave_excel_vista: f.clave_excel || null, avisos_vistos: [] };
+      // Suma de circuitos: solo con «Confirmar: usar esta medida» y solo los niveles marcados (sin suma, la decisión de siempre).
+      const suma = {};
+      if (tipo.value === 'usar') {
+        for (const nv of niveles) {
+          if (!medirSel[nv] || medirSel[nv].disabled || medirSel[nv].value !== 'suma') continue;
+          suma[nv] = { de: listaDe(sumaUI[nv].de.value), fases: [...SUMA.fases], barra_propia: !!sumaUI[nv].barra.checked };
+        }
+      }
+      // Sin los niveles a la vista (no se leyeron los datos cargados), guardar borraría la suma de circuitos que ya tiene.
+      if (tipo.value === 'usar' && !niveles.length && Object.keys(sumaGuardada).length) {
+        msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su suma de circuitos.';
+        return;
+      }
+      // La medida elegida no puede ser un circuito que otra fila ya suma: la misma corriente contaría en dos equipos.
+      const ajena = tipo.value === 'usar' ? claveEnSumaAjena(selClave.value || null, ctx.filas, f.id) : null;
+      if (ajena) {
+        msg.textContent = '«' + selClave.value + '» es un circuito de la suma de circuitos de otra fila (' + ajena + '): no puede ser también la medida de esta fila. Elija otro punto SCADA.';
+        return;
+      }
+      if (Object.keys(suma).length) {
+        // Con otra clave elegida, la suma sería de otro punto: se exige la misma clave con que se revisaron los niveles.
+        if ((selClave.value || null) !== (claveEfectiva(f) || null)) {
+          msg.textContent = 'La suma de circuitos se define sobre el punto SCADA revisado. Para cambiar de punto: ponga primero «Medir con la medida del transformador» en el nivel sumado, guarde, y vuelva a abrir «Revisar» para definir la suma sobre el punto nuevo.';
+          return;
+        }
+        decision.suma = suma;
+        const errores = erroresSuma(f, decision, { filas: ctx.filas, puntos: ctx.puntos, filaId: f.id });
+        if (errores.length) { msg.textContent = errores.join(' '); return; }
+      }
       const evD = evaluar(f, ctx, decision);
       const bloq = new Set([...ev0.avisos, ...evD.avisos].filter((a) => AVISOS[a] && AVISOS[a].bloquea));
       // NIVEL_NO_REVISADO lo resuelve esta misma decisión (niveles_vistos): no se marca como visto para siempre.
@@ -197,6 +296,7 @@ export function montarHomologacion(cont, { alCambiar }) {
         el('label', { for: 'dlgClave' }, 'Punto SCADA', selClave)),
       niveles.length ? el('table', { class: 'cs-sec', style: 'margin-top:10px' }, el('caption', { class: 'cs-ayuda' }, 'Nivel medido → devanado (la cargabilidad se compara con la ampacidad de ese devanado)'),
         el('tbody', {}, filasMapa)) : el('p', { class: 'cs-ayuda' }, 'Este punto todavía no tiene datos cargados: el mapa de niveles se podrá revisar después de cargar un mes.'),
+      ...bloquesSuma,
       el('label', { for: 'dlgNota', class: 'cs-campo', style: 'margin-top:10px' }, 'Nota (obligatoria)'), nota, msg,
       el('div', { class: 'cs-acciones' },
         el('button', { type: 'button', class: 'btn btn--primary', onclick: confirmar }, 'Guardar decisión'),
@@ -236,10 +336,13 @@ export function montarHomologacion(cont, { alCambiar }) {
   async function pintar(estado) {
     est = estado;
     const mes = mesPorDefecto(est.catalogo);
-    if (mes !== mesResumen) {
+    // También tras una carga nueva del MISMO mes (otro `cargaId`): su resumen trae la suma recién calculada.
+    const carga = (est.catalogo && est.catalogo.cargaId) || null;
+    if (mes !== mesResumen || carga !== cargaResumen) {
       const r = mes ? await leerResumenMes(mes) : null;
       resumenUltimo = r && r.estado === 'ok' ? r.datos : null;
       mesResumen = r && r.estado === 'fallo' ? null : mes;
+      cargaResumen = r && r.estado === 'fallo' ? null : carga;
     }
     const avisoError = est.errorHomologacion ? el('div', { class: 'cs-panel', role: 'alert' }, 'No se pudo leer la homologación vigente (revise la conexión): no guarde un Excel hasta poder verla.') : null;
     poner(cont, avisoError, seccionExcel(), seccionTabla());
