@@ -57,6 +57,14 @@ que no existía en el otro slug. · **Regla**: la memoria guarda preferencias, r
 nodo (`30`–`38`, `5x`, `60`) y la memoria apunta a él. Si un nodo cita una memoria, es solo respaldo. Antes de tocar un puntero en
 la memoria del paraguas, confirmar de qué proyecto es el ID (la «L-88» de allí es de Líneas AT). **Gate**: [HONOR] (candidato → TODO-67).
 
+### L-156 · Un commit bloqueado dentro de una cadena NO la detiene si su salida pasa por un `grep`
+**Disparador**: encadenar `git commit … | grep … ; git push && git checkout main && git merge …` en un solo comando.
+· **Cicatriz** (2026-10-24 y 10-26, `99 §181`–`§182`): dos veces el pre-commit bloqueó el ADR (archivo de la bóveda sin fila; canario
+del arranque vencido a las 48 h en una sesión larga) y la cadena siguió: el `grep` que mostraba el error salió con 0, se empujó la
+rama y el merge falló a medias por los cambios preparados. `main` no se tocó, pero fue suerte. · **Regla**: el commit va SOLO, con
+su salida a un archivo, y se mira su código de salida antes de empujar; el merge a `main` va en otro comando con `set -e`. Canario
+vencido en una sesión viva → `node scripts/session-handoff.mjs --boot-echo` y reintentar. **Gate**: [HONOR].
+
 ## 🌐 Chrome del Ingeniero, extensión y banco → hija `36`
 
 > L-62, L-92, L-94 y L-105 viven en [`36-LECCIONES-CHROME-BANCO.md`](36-LECCIONES-CHROME-BANCO.md) (§G.5, 2026-10-07, `99 §149`).
