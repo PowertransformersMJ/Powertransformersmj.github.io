@@ -167,8 +167,47 @@ describe('2 · crear un informe: solo un editor activo, en borrador, v0, rev 1',
     await assertFails(crear('ib_editor', 'c_e2', { version: 1 }));
     await assertFails(crear('ib_editor', 'c_e3', { rev: 2 }));
   });
-  test('otra actividad, otro modelo, otro esquema o equipo sin matrícula: no', async () => {
-    await assertFails(crear('ib_editor', 'c_i1', { actividad: 'Mantenimiento de rutina PSM.' }));
+  // Actividad escrita a mano (pedido del Ingeniero, 2026-10-26): de la lista o la que se escriba, con el
+  // único modelo (F60). La misma regla que assets/js/domain/informe_brigada_actividad.js.
+  test('actividad: otra de la lista o una escrita a mano sí (de 3 a 200 caracteres, una línea, sin espacios sobrantes)', async () => {
+    await assertSucceeds(crear('ib_editor', 'c_act_psm', { actividad: 'Mantenimiento de rutina PSM.' }));
+    await assertSucceeds(crear('ib_editor', 'c_act_mano', { actividad: 'Cambio de bujes de baja tensión' }));
+    await assertSucceeds(crear('ib_editor', 'c_act_3', { actividad: 'abc' }));
+    await assertSucceeds(crear('ib_editor', 'c_act_200', { actividad: 'x'.repeat(200) }));
+    await assertSucceeds(crear('ib_editor', 'c_act_emoji', { actividad: 'ab' + '\u{1F600}'.repeat(99) }));   // size() cuenta como .length: 2 + 198 = 200
+    await assertSucceeds(crear('ib_editor', 'c_act_num', { actividad: '123' }));
+    await assertSucceeds(crear('ib_editor', 'c_act_tilde', { actividad: '\u00d1and\u00fa \u00fcber \u00c1rbol' }));
+  });
+  test('actividad: vacía, corta, de 201 caracteres, de varias líneas, con espacios sobrantes o con controles: no', async () => {
+    await assertFails(crear('ib_editor', 'c_act_vacia', { actividad: '' }));
+    await assertFails(crear('ib_editor', 'c_act_corta', { actividad: 'ab' }));
+    await assertFails(crear('ib_editor', 'c_act_201', { actividad: 'x'.repeat(201) }));
+    await assertFails(crear('ib_editor', 'c_act_emoji_201', { actividad: 'ab' + '\u{1F600}'.repeat(99) + 'c' }));
+    await assertFails(crear('ib_editor', 'c_act_lineas', { actividad: 'Primera línea\nSegunda línea' }));
+    await assertFails(crear('ib_editor', 'c_act_crlf', { actividad: 'Primera línea\r\nSegunda línea' }));
+    await assertFails(crear('ib_editor', 'c_act_sep', { actividad: 'Primera línea\u2028Segunda línea' }));
+    await assertFails(crear('ib_editor', 'c_act_lado', { actividad: ' Con espacio al lado' }));
+    await assertFails(crear('ib_editor', 'c_act_lado2', { actividad: 'Con espacio al lado ' }));
+    await assertFails(crear('ib_editor', 'c_act_doble', { actividad: 'Con  dos espacios' }));
+    await assertFails(crear('ib_editor', 'c_act_tab', { actividad: 'Con\ttabulador' }));
+    await assertFails(crear('ib_editor', 'c_act_duro', { actividad: 'Con\u00a0espacio duro' }));
+    await assertFails(crear('ib_editor', 'c_act_bom', { actividad: 'Con\ufeffmarca invisible' }));
+    await assertFails(crear('ib_editor', 'c_act_ctrl', { actividad: 'Con\u0007control' }));
+    await assertFails(crear('ib_editor', 'c_act_numero', { actividad: 12345 }));
+    await assertFails(crear('ib_editor', 'c_act_nula', { actividad: null }));
+  });
+  // Revisión 2026-10-26: marcas invisibles de copiar y pegar (el navegador las quita; la regla no las deja pasar)
+  // y actividades que se ven en blanco. U+180E: el motor de las reglas lo contaba como espacio y el navegador no.
+  test('actividad: marcas invisibles, o sin ninguna letra ni número: no', async () => {
+    const MALAS = {
+      c_inv_180e: 'Cambio\u180Ede bujes', c_inv_zwsp: 'Cambio de bujes\u200B', c_inv_zwsp3: '\u200B\u200B\u200B', c_inv_shy: 'Trans\u00ADformador',
+      c_inv_lrm: 'Cambio de bujes\u200E', c_inv_iso: '\u2068Juan\u2069 revisi\u00f3n', c_inv_wj: 'Cambio\u2060 de bujes', c_inv_hangul: '\u3164\u3164\u3164',
+      c_inv_ffa0: 'abc\uFFA0', c_vacia_puntos: '...', c_vacia_braille: '\u2800\u2800\u2800', c_vacia_zwj: '\u200D\u200D\u200D',
+      c_vacia_emoji: '\u{1F600}'.repeat(100), c_vacia_nuevas: '\uA7C0\uA7C0\uA7C0'
+    };
+    for (const [id, actividad] of Object.entries(MALAS)) await assertFails(crear('ib_editor', id, { actividad }));
+  });
+  test('otro modelo, otro esquema o equipo sin matrícula: no', async () => {
     await assertFails(crear('ib_editor', 'c_i2', { modelo: 'OTRO@1' }));
     await assertFails(crear('ib_editor', 'c_i3', { esquema: 'ibr@2' }));
     await assertFails(crear('ib_editor', 'c_i4', { equipo_ref: { transformador_id: 'x', subestacion: 'y' } }));
@@ -211,6 +250,14 @@ describe('4 · guardar el borrador: rev + 1 exacto; la identidad no cambia', () 
     await assertFails(guardar('ib_editor', 'g_2', { rev: 2, actividad: 'Mantenimiento de rutina PSM.' }));
     await assertFails(guardar('ib_editor', 'g_2', { rev: 2, creadoPor: autor('ib_admin') }));
     await assertFails(guardar('ib_editor', 'g_2', { rev: 2, creadoEn: serverTimestamp() }));
+  });
+  test('actividad escrita a mano: el borrador se guarda con la misma; cambiarla después de crear no (aunque la nueva sirva)', async () => {
+    await assertSucceeds(crear('ib_editor', 'g_act', { actividad: 'Cambio de bujes de baja tensión' }));
+    await assertFails(guardar('ib_editor', 'g_act', { rev: 2, actividad: 'Cambio de bujes de alta tensión' }));
+    await assertFails(guardar('ib_editor', 'g_act', { rev: 2, actividad: ACT }));
+    await assertFails(guardar('ib_editor', 'g_act', { rev: 2, actividad: 'Cambio de bujes de baja tensión.' }));
+    await assertSucceeds(guardar('ib_editor', 'g_act', { rev: 2, contenido: { a: 1 } }));
+    await assertFails(guardar('ib_editor', 'g_act', { rev: 3, actividad: 'Otra actividad válida' }));
   });
   test('técnico no editor no guarda; nadie se marca emitido sin versión ni anulado sin ser admin', async () => {
     await sembrar('g_3');
@@ -586,6 +633,24 @@ describe('capa de datos (data/informes_brigada.js) contra las reglas', () => {
     const sinSesion = crearRepositorio({ sdk: FS, db: anon().firestore(), sesion: () => null });
     assert.equal((await sinSesion.leerConfig()).estado, 'sin_permiso');
     await sembrarConfig();
+  });
+
+  test('actividad escrita a mano (2026-10-26): la capa de datos la guarda normalizada y la regla la acepta; la inválida ni llega', async () => {
+    const r = repoDe('ib_editor');
+    assert.equal((await r.leerConfig()).estado, 'ok');
+    const inf = await r.crear({ ...NUEVO(), actividad: '  Cambio de  bujes\tde baja tensión ' });
+    assert.equal(inf.actividad, 'Cambio de bujes de baja tensión');
+    const leido = await r.obtener(inf.id);
+    assert.equal(leido.actividad, 'Cambio de bujes de baja tensión');
+    assert.equal(leido.modelo, 'F60-REFRIG@1');
+    assert.equal((await r.guardar(inf.id, { ...CONTENIDO, nota: 'sigue' }, 1)).rev, 2);
+    assert.equal((await r.obtener(inf.id)).actividad, 'Cambio de bujes de baja tensión', 'guardar no toca la actividad');
+    for (const mala of ['', 'x'.repeat(201), 'Primera línea\nSegunda línea', '\u200B\u200B\u200B', '...']) {
+      await assert.rejects(r.crear({ ...NUEVO(), actividad: mala }), esCodigo('validacion'), JSON.stringify(mala));
+    }
+    // Las marcas invisibles se quitan ANTES de guardar: la regla (que las rechaza) acepta lo que guarda la pantalla.
+    const conMarcas = await r.crear({ ...NUEVO(), actividad: '\u2068Cambio de bujes\u2069\u200B ' });
+    assert.equal((await r.obtener(conMarcas.id)).actividad, 'Cambio de bujes');
   });
 
   test('acciones de refrigeración: el lector recibe la matrícula y el tope; nada se escribe', async () => {

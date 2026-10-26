@@ -2,17 +2,34 @@
 // Informe de Mantenimiento Brigada · VENTANA DEL EQUIPO (selector)
 // ──────────────────────────────────────────────────────────────
 // Al pulsar «Informe» en el listado: los informes que ya tiene ese equipo
-// (abrir) y «Nuevo informe» (escoger la actividad de la lista cerrada de
-// motivos; hoy solo «Actualización y repotenciación del sistema de
-// refrigeración.» tiene modelo, decisión 2).
+// (abrir) y «Nuevo informe». La ACTIVIDAD se escribe a mano o se escoge de las
+// sugerencias (la lista de motivos de Órdenes de materiales); viene escrita la
+// de refrigeración (pedido del Ingeniero, 2026-10-26). Toda actividad válida
+// arma el informe con el único modelo que existe, el F60 de refrigeración
+// (decisión 2); sus textos se ajustan en el editor. La regla de la actividad
+// (una línea, de 3 a 200 caracteres, sin espacios sobrantes) vive en
+// `domain/informe_brigada_actividad.js`, la misma que aplican planCrear y las reglas.
 // La acción de refrigeración registrada es OPCIONAL: si existe se ofrece para
 // llenar los ventiladores (desmarcada) y NUNCA se modifica (decisión 12).
-// La ventana atrapa el foco y se cierra con Esc (`ui/foco-modal.js`).
+// La ventana atrapa el foco y se cierra con Esc (`ui/foco-modal.js`); con una
+// ventana encima de otra (la confirmación de «borrador abierto»), Esc cierra
+// SOLO la de arriba.
 // ══════════════════════════════════════════════════════════════
 
 import { atraparFoco } from '../foco-modal.js';
+// Archivo NUEVO (L-102): nunca está viejo en la caché del navegador.
+import { normalizarActividad, avisoActividad } from '../../domain/informe_brigada_actividad.js';
 
 let contador = 0;
+// Ventanas abiertas de este módulo, la de arriba al final. Cada trampa de foco escucha Esc en
+// `document` y la de abajo se registró primero: sin esta pila, un Esc en la confirmación cerraba
+// también «Nuevo informe» y se perdía la actividad escrita (revisión 2026-10-26).
+const abiertas = [];
+/** La ventana de arriba que sigue en la página (una que alguien quitó sin cerrarla no tapa a las demás). */
+const ventanaDeArriba = () => {
+  for (let i = abiertas.length - 1; i >= 0; i--) if (abiertas[i].isConnected) return abiertas[i];
+  return null;
+};
 
 /**
  * Ventana modal mínima con el sistema AQUA (`.ibr-velo` + `.ibr-ventana`).
@@ -41,9 +58,18 @@ export function crearVentana({ titulo = '', subtitulo = '', ancho = '', alCerrar
   const cerrar = () => {
     if (!vivo) return;
     vivo = false;
+    const i = abiertas.indexOf(velo);
+    if (i >= 0) abiertas.splice(i, 1);
     if (trampa) { trampa.soltar(); trampa = null; }
     velo.remove();
     if (typeof alCerrar === 'function') alCerrar();
+  };
+  abiertas.push(velo);
+  // Esc: lo atiende una sola ventana, la de arriba (las trampas de abajo también lo oyen).
+  const alEsc = (ev) => {
+    if ((ev && ev.__ibrEscAtendido) || ventanaDeArriba() !== velo) return;
+    if (ev) ev.__ibrEscAtendido = true;
+    cerrar();
   };
   velo.querySelector('[data-v="cerrar"]').addEventListener('click', cerrar);
   // Clic en el fondo: cierra solo si el clic EMPEZÓ y TERMINÓ en el fondo (L-101: un arrastre desde un campo no cierra).
@@ -55,7 +81,7 @@ export function crearVentana({ titulo = '', subtitulo = '', ancho = '', alCerrar
     cuerpo: velo.querySelector('[data-v="cuerpo"]'),
     pie: velo.querySelector('[data-v="pie"]'),
     cerrar,
-    atrapar(autoFoco) { if (trampa) trampa.soltar(); trampa = atraparFoco(ventana, { alCerrar: cerrar, autoFoco, escape }); }
+    atrapar(autoFoco) { if (trampa) trampa.soltar(); trampa = atraparFoco(ventana, { alCerrar: alEsc, autoFoco, escape }); }
   };
   return api;
 }
@@ -123,21 +149,25 @@ export function abrirSelector({ ctx, equipo, alAbrir, alCrear }) {
 
   const v = crearVentana({ titulo: (equipo.matricula || '—') + ' · ' + (equipo.subestacion || 'Subestación sin nombre'), subtitulo: sub, ancho: 'media' });
 
+  // Sugerencias: la lista de motivos (las 8). La actividad también se escribe a mano.
   const actividades = Array.isArray(P.ACTIVIDADES) ? P.ACTIVIDADES : [];
-  const opciones = actividades.map((a) => {
-    const conModelo = !!P.modeloDeActividad(a);
-    return '<option value="' + esc(a) + '"' + (conModelo ? '' : ' disabled') + (a === P.ACTIVIDAD_REFRIGERACION ? ' selected' : '') + '>'
-      + esc(a) + (conModelo ? '' : ' (sin modelo todavía)') + '</option>';
-  }).join('');
+  contador += 1;
+  const idSugerencias = 'ibrSelActividades' + contador;
+  const sugerencias = actividades.map((a) => '<option value="' + esc(a) + '"></option>').join('');
 
   v.cuerpo.innerHTML = ''
     + '<h3 class="ibr-sub">Informes de este equipo</h3>'
     + '<div data-s="lista" class="ibr-sel-lista"><p class="ibr-nota">Leyendo los informes…</p></div>'
     + '<h3 class="ibr-sub">Nuevo informe</h3>'
     + (ctx.puedeEditar
-      ? '<label class="ibr-campo"><span class="ibr-campo-et">Actividad</span>'
-        + '<select class="ibr-select" data-s="actividad">' + opciones + '</select></label>'
-        + '<p class="ibr-ayuda">El modelo F60 aplica a «' + esc(P.ACTIVIDAD_REFRIGERACION || '') + '». Las demás actividades todavía no tienen modelo.</p>'
+      ? '<div class="ibr-campo"><label class="ibr-campo-et" for="' + idSugerencias + 'Campo">Actividad</label>'
+        + '<input type="text" class="ibr-input" id="' + idSugerencias + 'Campo" data-s="actividad" list="' + idSugerencias + '"'
+        + ' autocomplete="off" aria-describedby="' + idSugerencias + 'Aviso ' + idSugerencias + 'Ayuda ' + idSugerencias + 'Modelo"'
+        + ' value="' + esc(P.ACTIVIDAD_REFRIGERACION || '') + '">'
+        + '<datalist id="' + idSugerencias + '">' + sugerencias + '</datalist>'
+        + '<span class="ibr-ayuda" id="' + idSugerencias + 'Aviso" data-s="actividad-aviso" aria-live="polite"></span></div>'
+        + '<p class="ibr-ayuda" id="' + idSugerencias + 'Ayuda">Escoja una de la lista (borre el texto para verlas todas) o escriba la suya, en una sola línea.</p>'
+        + '<p class="ibr-ayuda" id="' + idSugerencias + 'Modelo">El informe se arma con el modelo F60 de refrigeración; sus textos se ajustan en el editor.</p>'
         + '<div data-s="accion" class="ibr-sel-accion"><p class="ibr-tenue">Buscando acciones de refrigeración de este equipo…</p></div>'
         + '<p class="ibr-ayuda">Llega lleno lo que la plataforma sabe (inventario, salud, 60 Hz, contrato); todo se puede corregir.</p>'
       : '<p class="ibr-nota">' + (ctx.estadoConfig === 'sin_config'
@@ -148,7 +178,11 @@ export function abrirSelector({ ctx, equipo, alAbrir, alCrear }) {
 
   const $ = (s) => v.el.querySelector('[data-s="' + s + '"]');
   $('cancelar').addEventListener('click', () => v.cerrar());
-  v.atrapar(ctx.puedeEditar ? '[data-s="actividad"]' : '[data-s="cancelar"]');
+  // En pantalla táctil el foco inicial NO va al campo de texto: sacaría el teclado y taparía
+  // «Informes de este equipo» (antes era una lista desplegable, que no lo saca).
+  let tactil = false;
+  try { tactil = typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches; } catch (_) { /* sin matchMedia: escritorio */ }
+  v.atrapar(ctx.puedeEditar && !tactil ? '[data-s="actividad"]' : '[data-s="cancelar"]');
 
   /* informes del equipo */
   let informesDelEquipo = null;   // null = todavía no se sabe
@@ -205,18 +239,45 @@ export function abrirSelector({ ctx, equipo, alAbrir, alCrear }) {
     if (caja) caja.innerHTML = '<p class="ibr-tenue">No se pudieron leer las acciones de refrigeración. El informe se arma igual.</p>';
   });
 
-  /* crear */
+  /* actividad: escrita a mano o de las sugerencias; se revisa mientras se escribe */
   let creando = false;
+  const campoAct = $('actividad');
+  const avisoAct = $('actividad-aviso');
+  /** Revisa la actividad; devuelve el error (o null). `estricto`: vacío también va en rojo (al salir o al crear). */
+  const revisarActividad = (estricto = false) => {
+    const a = avisoActividad(campoAct.value, { lista: actividades, estricto });
+    campoAct.classList.toggle('ibr-input--malo', a.error);
+    campoAct.setAttribute('aria-invalid', a.error ? 'true' : 'false');
+    const clase = a.error ? 'ibr-campo-error' : 'ibr-ayuda';
+    if (avisoAct.className !== clase) avisoAct.className = clase;
+    // Solo si cambia: reescribir el mismo texto en cada tecla hace que el lector de pantalla lo repita.
+    if (avisoAct.textContent !== a.texto) avisoAct.textContent = a.texto;
+    if (!creando) $('crear').disabled = !a.sirve;
+    return a.sirve ? null : a.texto;
+  };
+  campoAct.addEventListener('input', () => revisarActividad(false));
+  // Al salir del campo se ve tal como se guardará (sin espacios sobrantes ni marcas invisibles).
+  campoAct.addEventListener('blur', () => {
+    const act = normalizarActividad(campoAct.value);
+    if (act !== campoAct.value) campoAct.value = act;
+    revisarActividad(true);
+  });
+  revisarActividad(false);
+  // Viene escrita la de refrigeración: queda SELECCIONADA para que lo que se escriba la reemplace
+  // (con el cursor al inicio, lo escrito quedaba pegado delante y la actividad no se cambia después de crear).
+  if (document.activeElement === campoAct) { try { campoAct.select(); } catch (_) { /* nada */ } }
+
+  /* crear */
   $('crear').addEventListener('click', async (ev) => {
     if (creando || ev.detail > 1) return;   // L-101: un doble clic no crea dos informes
-    const actividad = $('actividad').value;
-    const modelo = P.modeloDeActividad(actividad);
-    if (!modelo) { ctx.avisar('Esa actividad todavía no tiene modelo de informe.', 'aviso'); return; }
+    const err = revisarActividad(true);
+    if (err) { ctx.avisar(err, 'aviso'); campoAct.focus(); return; }
+    const actividad = normalizarActividad(campoAct.value);
     const usar = $('usar-accion') && $('usar-accion').checked;
     const idx = $('cual-accion') ? Number($('cual-accion').value) : 0;
     const accion = usar ? (acciones[idx] || null) : null;
     // Un equipo con un borrador abierto de la misma actividad: casi siempre se quiere seguir ese, no crear otro.
-    const abierto = (informesDelEquipo || []).find((x) => x && x.estado === 'borrador' && x.actividad === actividad);
+    const abierto = (informesDelEquipo || []).find((x) => x && x.estado === 'borrador' && normalizarActividad(x.actividad) === actividad);
     if (abierto) {
       creando = true;
       const seguir = await confirmar({
@@ -234,6 +295,8 @@ export function abrirSelector({ ctx, equipo, alAbrir, alCrear }) {
     try {
       const r = ctx.dep.modelo.prellenar({ equipo, config: ctx.config, accion, actividad });
       const contenido = r && r.esquema ? r : (r && r.contenido) || r;
+      // El modelo lo decide el dominio: el de la actividad o, si no tiene, el único que existe (F60).
+      const modelo = (contenido && contenido.modelo) || P.modeloDeActividad(P.ACTIVIDAD_REFRIGERACION);
       const eq = (contenido && contenido.equipo) || {};
       const doc = await ctx.repo.crear({
         equipo_ref: {
@@ -249,9 +312,9 @@ export function abrirSelector({ ctx, equipo, alAbrir, alCrear }) {
     } catch (err) {
       console.error('[informe-brigada] crear:', err);
       ctx.avisar('No se pudo crear el informe: ' + ((err && err.message) || err), 'error', 0);
-      boton.disabled = false;
       boton.textContent = 'Crear informe';
       creando = false;
+      revisarActividad();   // vuelve a habilitar «Crear informe» si la actividad sirve
     }
   });
   return v;

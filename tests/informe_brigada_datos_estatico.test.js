@@ -31,7 +31,8 @@ describe('el repositorio LOCAL no toca la plataforma', () => {
   test('el dominio de la capa de datos es puro (sin red, sin DOM)', () => {
     assert.ok(!/firebasejs|gstatic|document\.|window\.|localStorage/.test(codigo(RUTAS)));
     const estaticos = [...codigo(RUTAS).matchAll(/^import[\s\S]*?from\s+'([^']+)'/gm)].map((m) => m[1]);
-    assert.deepEqual(estaticos.sort(), ['./fichas_adjunto.js', './firmas.js']);
+    // + la actividad escrita a mano (2026-10-26): archivo nuevo, puro y sin importaciones (L-102).
+    assert.deepEqual(estaticos.sort(), ['./fichas_adjunto.js', './firmas.js', './informe_brigada_actividad.js']);
   });
 });
 

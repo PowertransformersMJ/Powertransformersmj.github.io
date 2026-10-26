@@ -1708,6 +1708,16 @@ service cloud.firestore {
         && e.matricula is string && e.matricula.size() >= 1 && e.matricula.size() <= 40
         && e.transformador_id is string && e.transformador_id.size() <= 128;
     }
+    // Actividad (pedido del Ingeniero, 2026-10-26): de la lista de motivos o escrita a mano; todas usan
+    // el único modelo (F60). Una sola línea, sin espacios sobrantes (ni a los lados ni dobles), sin
+    // caracteres de control ni marcas invisibles de copiar y pegar, de 3 a 200 caracteres y con al menos
+    // una letra latina (con o sin tilde) o un número. Los mismos patrones y topes viven en
+    // assets/js/domain/informe_brigada_actividad.js (una prueba los amarra). Después de crear no cambia (ibrFijos).
+    function ibrActividad(a) {
+      return a is string && a.size() >= 3 && a.size() <= 200
+        && a.matches('^[^\\p{Cc}\\p{Z}\\x{00AD}\\x{115F}\\x{1160}\\x{180E}\\x{200B}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{3164}\\x{FEFF}\\x{FFA0}]+( [^\\p{Cc}\\p{Z}\\x{00AD}\\x{115F}\\x{1160}\\x{180E}\\x{200B}\\x{200E}\\x{200F}\\x{202A}-\\x{202E}\\x{2060}-\\x{2064}\\x{2066}-\\x{2069}\\x{3164}\\x{FEFF}\\x{FFA0}]+)*$')
+        && a.matches('.*[0-9A-Za-z\\x{00C0}-\\x{00D6}\\x{00D8}-\\x{00F6}\\x{00F8}-\\x{024F}].*');
+    }
     function ibrFijos(d, r) {
       return d.esquema == r.esquema && d.modelo == r.modelo && d.actividad == r.actividad
         && d.equipo_ref == r.equipo_ref && d.creadoPor == r.creadoPor && d.creadoEn == r.creadoEn;
@@ -1763,7 +1773,7 @@ service cloud.firestore {
                                                 'contenido', 'creadoPor', 'creadoEn', 'actualizadoPor', 'actualizadoEn'])
         && request.resource.data.esquema == 'ibr@1'
         && request.resource.data.modelo == 'F60-REFRIG@1'
-        && request.resource.data.actividad == 'Actualización y repotenciación del sistema de refrigeración.'
+        && ibrActividad(request.resource.data.actividad)
         && ibrEquipoRef(request.resource.data.equipo_ref)
         && request.resource.data.estado == 'borrador' && request.resource.data.version == 0 && request.resource.data.rev == 1
         && request.resource.data.contenido is map

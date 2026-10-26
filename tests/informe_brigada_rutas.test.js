@@ -330,15 +330,25 @@ describe('contenido: que Firestore lo acepte', () => {
 });
 
 describe('cambios de estado (los mismos que exige firestore.rules)', () => {
-  test('crear: solo la actividad de refrigeración tiene modelo; borrador, v0, rev 1', () => {
+  test('crear: toda actividad válida (de la lista o escrita a mano) con el único modelo; borrador, v0, rev 1', () => {
     const b = borrador();
     assert.equal(b.esquema, ESQUEMA);
     assert.equal(b.modelo, MODELO_REFRIGERACION);
+    assert.equal(b.actividad, ACTIVIDAD_REFRIGERACION);
     assert.equal(b.estado, 'borrador');
     assert.equal(b.version, 0);
     assert.equal(b.rev, 1);
     assert.equal(b.anulacion, null);
-    codigo(() => planCrear({ equipo_ref: EQUIPO, actividad: 'Mantenimiento de rutina PSM.', contenido: CONTENIDO }), 'validacion');
+    // Pedido del Ingeniero (2026-10-26): otra actividad de la lista o una escrita a mano también crean, con el F60.
+    const psm = planCrear({ equipo_ref: EQUIPO, actividad: 'Mantenimiento de rutina PSM.', contenido: CONTENIDO });
+    assert.equal(psm.actividad, 'Mantenimiento de rutina PSM.');
+    assert.equal(psm.modelo, MODELO_REFRIGERACION);
+    const mano = planCrear({ equipo_ref: EQUIPO, actividad: '  Cambio de  bujes\tde baja tensión ', contenido: CONTENIDO });
+    assert.equal(mano.actividad, 'Cambio de bujes de baja tensión', 'se guarda normalizada: así la regla la acepta');
+    assert.equal(planCrear({ equipo_ref: EQUIPO, actividad: 'x'.repeat(200), contenido: CONTENIDO }).actividad.length, 200);
+    for (const mala of ['', '   ', 'ab', 'x'.repeat(201), 'Primera línea\nSegunda línea', 'Con\u0007control', undefined, null, 42]) {
+      codigo(() => planCrear({ equipo_ref: EQUIPO, actividad: mala, contenido: CONTENIDO }), 'validacion');
+    }
     codigo(() => planCrear({ equipo_ref: EQUIPO, actividad: ACTIVIDAD_REFRIGERACION, modelo: 'OTRO@1', contenido: CONTENIDO }), 'validacion');
     codigo(() => planCrear({ equipo_ref: { matricula: '' }, actividad: ACTIVIDAD_REFRIGERACION, contenido: CONTENIDO }), 'validacion');
   });
@@ -430,7 +440,10 @@ describe('amarres: las constantes son las de las reglas y las de la plataforma',
   test('firestore.rules exige el mismo esquema, modelo, actividad y topes', () => {
     assert.ok(REGLAS_FS.includes(`'${ESQUEMA}'`));
     assert.ok(REGLAS_FS.includes(`'${MODELO_REFRIGERACION}'`));
-    assert.ok(REGLAS_FS.includes(`'${ACTIVIDAD_REFRIGERACION}'`));
+    // La actividad (2026-10-26): ya no el texto fijo de refrigeración sino la regla de informe_brigada_actividad.js
+    // (el patrón y los topes se amarran en tests/informe_brigada_actividad.test.js).
+    assert.ok(REGLAS_FS.includes('&& ibrActividad(request.resource.data.actividad)'));
+    assert.ok(!REGLAS_FS.includes(`actividad == '${ACTIVIDAD_REFRIGERACION}'`));
     assert.ok(REGLAS_FS.includes('700 * 1024'));
     assert.ok(REGLAS_FS.includes('900 * 1024'));
     assert.ok(REGLAS_FS.includes(`size() <= ${LIMITES.editores}`));
