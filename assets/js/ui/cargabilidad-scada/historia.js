@@ -20,6 +20,8 @@ import { sobrecargaDeCurva, aplicarVerificacion } from '../../domain/scada_carga
 // Suma de circuitos (2026-10-24): archivos NUEVOS; sin suma en la decisión, la historia lee y calcula lo mismo (L-102).
 import { componerResumen } from '../../domain/scada_carga_suma.js';
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
+// Sobrecarga por devanado (2026-10-26): archivo NUEVO; aquí solo para el equipo medido por un circuito sin confirmar.
+import { sobrecargaDelPeriodo, esCircuitoSinConfirmar } from '../../domain/scada_carga_sobrecarga.js';
 
 const MAX_CURVAS = 6;   // curvas de mes que la historia puede leer por equipo (cada una de 70 a 260 KB)
 const SOBRE = CALCULO.sobrecargaPct;
@@ -182,10 +184,17 @@ export async function pintarHistoria(nodo, { a, ctx, alVerDia, vigente, alReinte
     return 'sin horas medidas en lo cargado';
   };
   const placa = a.placa || {};
+  // Sin cifra por un circuito sin confirmar: la lista dice «posible sobrecarga» por devanado; aquí, lo mismo y sus meses.
+  const filasMes = porMes.map((p) => p.fila);
+  const ultima = filasMes.filter(Boolean).pop() || null;
+  const sobCircuito = esCircuitoSinConfirmar(ultima) ? sobrecargaDelPeriodo(ultima, filasMes) : null;
   const filasDev = ['P', 'S', 'T'].filter((d) => placa[d] && placa[d].kv).map((d) => {
     const g = devs.find((x) => x.devanado === d);
     const kv = num(placa[d].kv, 1) + ' kV';
-    if (!g) return el('div', { class: 'cs-hist-dev' }, el('b', {}, DEVANADO[d] + ' ' + kv), ' · ', el('span', { class: 'cs-sub', style: 'display:inline' }, motivoDev(d)));
+    const dc = sobCircuito && sobCircuito.tipo === 'circuito' ? sobCircuito.devanados.find((z) => z.devanado === d) : null;
+    if (!g) return el('div', { class: 'cs-hist-dev' }, el('b', {}, DEVANADO[d] + ' ' + kv), ' · ', el('span', { class: 'cs-sub', style: 'display:inline' }, motivoDev(d)),
+      dc ? el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida en ' + dc.meses + (dc.meses === 1 ? ' mes' : ' meses') + (dc.pct != null ? ' (hasta ' + num(dc.pct, 1) + ' %)' : '')
+        + ': se mide un circuito; vale si es la única salida del transformador.') : null);
     const pend = g.pendientes.length ? g.pendientes.map(nombreMes).join(', ') : null;
     const cabeza = g.pct != null
       ? [num(g.max, 1) + ' A · ', el('b', {}, num(g.pct, 0) + ' %'), ' de ' + num(g.A, 0) + ' A · ', el('b', {}, g.ms != null ? formatoCO(g.ms) : nombreMes(g.mes)), prov(g.clase), ' ', verDia(g.ms, d)]

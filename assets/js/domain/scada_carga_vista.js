@@ -20,6 +20,8 @@ import { filaCargabilidad } from './cargabilidad_parque.js';
 import { devanadosDe } from './scada_carga_devanados.js';
 // Suma de circuitos (2026-10-24): archivo NUEVO; sin suma en la decisión, nada de esto cambia una cifra (L-102).
 import { especSuma, estadoSumaNivel, componerResumen, textoSuma } from './scada_carga_suma.js';
+// Sobrecarga por devanado (2026-10-26): archivo NUEVO; solo NOMBRA las marcas de siempre y evalúa los circuitos sin confirmar.
+import { sobrecargaDeMes, tieneSobrecarga } from './scada_carga_sobrecarga.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -204,7 +206,7 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
     // Con el catálogo: si otro transformador de la estación mide esa barra (D5), el nivel queda sin cifra.
     const r = cid ? componerResumen(claves, cid, fila, puntos) || null : null;
     const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes });
-    return {
+    const x = {
       id: tx.id,
       matricula: leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || '',
       subestacion: leer(tx, 'ubicacion.subestacion_nombre') || (fila && fila.subestacion) || '',
@@ -215,6 +217,8 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
       // Todos los devanados de placa con su potencia, su ampacidad y su carga (pedido del Ingeniero, 2026-10-22).
       devanadosPlaca: devanadosDe(tx, c)
     };
+    // Qué devanado se sobrecarga y de qué tipo (firme · posible · circuito sin confirmar). Campo NUEVO: se lee con guarda.
+    return { ...x, sobrecarga: sobrecargaDeMes(x) };
   });
 }
 
@@ -231,7 +235,8 @@ export function filtrarFilas(filas, f = {}) {
     if (zonas.size && !zonas.has(String(x.zona))) return false;
     if (f.estado && x.estado !== f.estado) return false;
     if (crgs.size && !crgs.has(String(x.crg))) return false;
-    if (f.soloSostenida && !x.sobrecargaSostenida) return false;
+    // «Con sobrecarga sostenida»: firmes, posibles (cifra provisional) y medidos por un circuito sin confirmar (2026-10-26).
+    if (f.soloSostenida && !tieneSobrecarga(x)) return false;
     if (f.soloFirmes && x.clase !== 'firme') return false;
     return true;
   });

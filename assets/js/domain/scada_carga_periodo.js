@@ -24,6 +24,8 @@ import { claveId } from './scada_carga_csv.js';
 import { devanadosDe } from './scada_carga_devanados.js';
 // Suma de circuitos (2026-10-24): archivo NUEVO; sin suma en la decisión, el periodo da lo mismo que antes (L-102).
 import { especSuma, componerResumen, derivadoDeMeses } from './scada_carga_suma.js';
+// Sobrecarga por devanado (2026-10-26): archivo NUEVO; solo nombra el devanado y cuenta sus meses.
+import { sobrecargaDelPeriodo } from './scada_carga_sobrecarga.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -235,7 +237,7 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     const cifra = sinPreparar ? { pct: null, crg: null, clase: 'nulo', firme: false, motivoNulo: 'falta preparar ' + faltan.join(', ') } : {};
     const clase = cifra.clase || c.clase;
     const sost = ag.mesesSostenida > 0;
-    return {
+    const x = {
       id: tx.id, matricula: base.matricula || '', subestacion: base.subestacion || '', zona: base.zona || '', departamento: base.departamento || '',
       potenciaKva: base.potenciaKva || null, filaId: fila ? fila.id : null, claveId: cid, tienePunto: !!punto,
       ...c, ...cifra,
@@ -247,6 +249,8 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
       devanadosPlaca: devanadosDe(tx, { ...c, ...cifra }),
       periodo: { meses, faltanPreparar: faltan, ...ag }
     };
+    // Qué devanado se sobrecargó y en cuántos meses, con las filas de cada mes (2026-10-26). Campo NUEVO: se lee con guarda.
+    return { ...x, sobrecarga: sobrecargaDelPeriodo(x, idx.map((m) => m.get(tx.id) || null)) };
   });
 }
 
