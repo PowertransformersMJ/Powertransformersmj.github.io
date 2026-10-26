@@ -9029,3 +9029,49 @@ pedir el protocolo de fábrica; (c) **nexo con refrigeración (TODO-80)**: Berru
 salió de la fase S doble y de la ampacidad vieja de 4 MVA; real ≈31 % de la ONAF); (d) **documento de Salud** (TODO-82): su 64 %
 parece salir del canal inflado; (e) otras bahías con una fase ≈2× o ≈½ (barrido sin verificar): revisarlas una por una con esta
 herramienta.
+
+## 183. ADR-183 — Informe de Mantenimiento Brigada: la ACTIVIDAD de un informe nuevo se puede escribir a mano (con la lista como sugerencias); toda actividad válida usa el modelo F60 (TODO-81) ⟦OPUS-5.5⟧ (2026-10-26)
+
+> «necesito que te sitúes en el segmento de informe mantenimiento brigada y me permitas escribir manualmente ACTIVIDAD» (captura de
+> «Nuevo informe») → vista previa en su Chrome → «sí, procede, publícalo en producción» (2026-10-26).
+
+**183.1 Causa raíz.** La actividad era una lista cerrada en tres capas: el `<select>` de `ui/informe-brigada/selector.js` (las 8 de
+la lista de motivos de Órdenes de materiales, 7 deshabilitadas «sin modelo todavía»), el dominio (`informeVacio`/`prellenar` y
+`planCrear` rechazaban otra actividad) y `firestore.rules` (al crear exigía el texto exacto de refrigeración). Era la decisión 2 de
+`§163` («solo refrigeración tiene modelo»); el Ingeniero ahora pide escribirla.
+
+**183.2 Solución.** Campo de texto con sugerencias (`<input list>` + `<datalist>` con las 8), que llega escrito y SELECCIONADO con la de
+refrigeración (lo que se escribe lo reemplaza). Toda actividad válida usa el único modelo (F60-REFRIG@1); la ventana lo dice («sus
+textos se ajustan en el editor»). Validación idéntica en las tres capas: archivo NUEVO `domain/informe_brigada_actividad.js`
+(`normalizarActividad`, `errorActividad`, `avisoActividad`, patrones y topes) usado por `planCrear`, `informeVacio`/`prellenar` y el
+selector, y la función `ibrActividad` de las reglas: una sola línea, sin espacios sobrantes (a los lados ni dobles), sin caracteres de
+control ni marcas invisibles de copiar y pegar, de 3 a 200 (`size()` = `.length`; un emoji vale 2) y con al menos una letra latina o un
+número. La actividad sigue INMUTABLE después de crear (`ibrFijos` intacto). La lista de 8 y su amarre con Órdenes de materiales no
+cambian.
+
+**183.3 No-regresión.** Los informes viejos (refrigeración) se abren, guardan, emiten y corrigen igual; los dos repositorios (nube y
+local) pasan por `planCrear`; L-102: los archivos publicados no ganan exports (prueba que lo fija). Orden de publicación: REGLAS
+primero (con el sitio nuevo y reglas viejas, otra actividad daría «sin permiso»).
+
+**183.4 Verificación.** `test:unit` 3.097 (3.095 en verde, 2 omitidas): 22+ del archivo nuevo (topes, normalizar, amarre del patrón con
+las reglas, 4.000 textos al azar con el mismo veredicto que la regla, L-102); `test:rules` 305/305 (acepta otra de la lista, una escrita,
+3 y 200; rechaza vacía, 2, 201, varias líneas, espacios sobrantes, tabulador, espacio duro, marcas invisibles, control, no-texto; no se
+cambia después de crear); prueba de mutación de la regla. Revisión adversarial con 2 Opus (`wf_4694b289-772`): 8 hallazgos corregidos
+(marcas invisibles, cursor al inicio → `select()`, palabras largas → CSS, Esc en la confirmación cerraba también la ventana → pila de
+ventanas del módulo, aviso neutro al borrar, teclado en teléfono, `aria-live` sin repetir). Vista previa en su Chrome (banco local).
+
+**183.5 Anti-patterns evitados.** Aflojar solo el navegador (la base lo habría rechazado); dejar la regla sin prueba (`§73`); tocar la
+utilidad compartida `foco-modal.js` (la usa Fichas); cambiar la lista de motivos.
+
+**183.6 Archivos.** Nuevos: `assets/js/domain/informe_brigada_actividad.js`, `tests/informe_brigada_actividad.test.js`. Modificados:
+`assets/js/ui/informe-brigada/selector.js`, `assets/js/domain/informe_brigada_{modelo,rutas}.js`, `assets/css/informe-brigada.css`,
+`firestore.rules` (`ibrActividad`), `tests-rules/informes_brigada.rules.test.js`, `tests/informe_brigada_{modelo,rutas,datos_local,
+datos_estatico}.test.js`. Cerebro: este ADR, índice, `05`, `22`.
+
+**183.7 Doctrina.** Pedido del Ingeniero; UI sensible con vista previa fiel y su «procede»; reglas con prueba en las dos direcciones
+(`35`, `§73`); L-102. NO revisado externamente.
+
+**183.8 Verificado sano / no re-auditar.** La actividad no se imprime en el papel (solo lista del equipo y encabezado del editor); los
+textos del F60 ya eran editables. Chrome filtra el `datalist` por lo escrito: con el texto puesto no muestra las 8 (la ayuda dice
+«borre el texto para verlas todas»). `functions/domain/` recibirá el archivo nuevo en el próximo deploy de funciones
+(`prepare-deploy.mjs`).
