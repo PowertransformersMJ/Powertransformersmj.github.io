@@ -9078,3 +9078,45 @@ datos_estatico}.test.js`. Cerebro: este ADR, índice, `05`, `22`.
 textos del F60 ya eran editables. Chrome filtra el `datalist` por lo escrito: con el texto puesto no muestra las 8 (la ayuda dice
 «borre el texto para verlas todas»). `functions/domain/` recibirá el archivo nuevo en el próximo deploy de funciones
 (`prepare-deploy.mjs`).
+
+## 184. ADR-184 — Ovejas: T1 por su lado de 13,8 kV (el de 34,5 kV mide la entrada común T1 + T2) y T2 por su circuito de salida; placas de los dos (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-26)
+
+> «continuemos en lo que estábamos de SCADA, venía Ovejas» → diagnóstico → «sí, mismo interruptor y [el circuito] es la única salida;
+> procede» (2026-10-26).
+
+**184.1 Causa raíz.** Mismo patrón de Puerto Libertador (ADR-176). El T1 (5 MVA) salía **109,7 % CRG 5 provisional** porque el 34,5
+kV de su punto mide la ENTRADA COMÚN de T1 + T2 (mismo interruptor, confirmado por el Ingeniero): I34,5 = 0,42·(I13,8 del T1 + I del
+circuito de salida del T2), R² 0,9999, todos los meses desde enero de 2025; en las horas con el T2 sin carga la entrada es solo el T1;
+la línea de 34,5 kV que llega desde Tolú Viejo mide lo mismo (0,98 por fase, r 0,9999); planeación ya lo trata como «7,3 MVA» de los
+dos. El 13,8 kV del T1 cuadra con sus dos circuitos; el T2 (2,3 MVA) no tiene medida propia y su único circuito de salida es toda su
+carga (el T2 por diferencia coincide con él, p50 0,00 A). T1 Dyn5 y T2 Dyn11: no pueden ir en paralelo por 13,8 kV (barras separadas).
+Escalas sanas en 34,5 kV.
+
+**184.2 Solución (DATOS).** (a) Homologación T1 «usar»: 13,8 kV → secundario y 34,5 kV en «No usar» (nota «entrada común»; ADR-178 lo
+muestra como «medida excluida en la homologación»). (b) Homologación T2 «usar» con el circuito de salida como su punto, 13,8 kV →
+secundario (nota «única salida»). (c) Placas: T1 15 campos (Siemens CKOUM 1997, IEC 76, ONAN 5.000 kVA, 3 fases, Dyn5, 6,1 %, NLTC 5
+posiciones, ONAN, 10.500 kg, aceite 2.192 kg, Colombia); T2 16 campos (WEG OTHV3 2019, IEC 60076, ONAN 2.300 kVA, 3 fases, Dyn11,
+7,43 %, NLTC 5 posiciones, ONAN, 7.979 kg, aceite 1.722 kg / 1.985 L, Colombia). Sin código nuevo.
+
+**184.3 No-regresión.** Ampacidades (83,67/209,18 y 38,49/96,22 A, impresas), potencias, series, años y tensiones sin tocar
+(releídos). Cifras oficiales de salud intactas.
+
+**184.4 Verificación.** Planes en seco 0 choques; 15/15 y 16/16 releídos; decisiones releídas de la base. En vivo: T1 sep **63,9 %
+CRG 2** · oct 1–22 **61,4 % CRG 2**, firmes (antes 109,7 % / 106,9 % provisionales); T2 sep **94,5 % CRG 5** firme · oct 94,9 %
+provisional por cobertura (el circuito trae muchas horas marcadas no válidas por el SCADA; antes: sin cifra). Firmes sep 111 → 113,
+oct 103 → 104. Diagnóstico con 2 Opus (`wf_e2842acc-5dc`) → bóveda `2026-10-23-provisionales-septiembre/`; registro →
+`…/revision-uno-a-uno/11-OVE-T1-T2.md`.
+
+**184.5 Anti-patterns evitados.** Repartir la entrada común por capacidad; usar la «suma de circuitos» para el T1 (su propio 13,8 kV
+es mejor: los circuitos traen banda muerta); confirmar el circuito del T2 sin la palabra del Ingeniero.
+
+**184.6 Archivos.** Datos: `transformadores/{T1-M/M-OVE, T2-M/M-OVE}`, homologación (2 filas). Cerebro: este ADR + índice.
+
+**184.7 Doctrina.** «Todo con base a la placa»; producción conforme por sí misma; plan en seco + su «procede». NO revisado externamente.
+
+**184.8 Verificado sano / no re-auditar.** No es escala, ni otro equipo, ni tres devanados. Queda: (a) **operación**: el T2 de 2,3 MVA
+va casi lleno (94,5 %, subiendo desde 87–88 % en 2025, sin ventiladores) mientras el T1 va al ~64 %; no se puede pasar carga cerrando
+un enlace entre sus barras de 13,8 kV (Dyn5/Dyn11); (b) **área SCADA**: horas «no válidas» del circuito del T2 con valores normales, P/Q
+de los circuitos mal escaladas, U/P/Q del 13,8 kV del T1 con banda muerta; (c) **documento de Salud** (TODO-82): T2 oficial 59 % CRG 1
+frente a 94,5 % CRG 5; la «carga medida» de 110 % de la plataforma en los 4 devanados es el pico 2025 de la entrada común cargado al T1;
+(d) el 99,4 % del T1 en febrero de 2026 sale de 3 h del 18-feb con los circuitos congelados: evento puntual por revisar.
