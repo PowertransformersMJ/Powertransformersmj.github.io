@@ -423,6 +423,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     if (x.pct == null) {
       td.append(el('span', { class: 'cs-num' }, '—'), chipCifra(x), el('span', { class: 'cs-sub' }, x.motivoNulo || ''));
       if (x.suma && x.suma.texto) td.append(el('span', { class: 'cs-sub' }, x.suma.texto));
+      // Un periodo sin cifra (escala sospechosa, falta preparar un mes…) cuyos meses sí marcaron «posible»: se dice, como
+      // en la lista de cada mes (si no, el indicador lo contaba y la fila callaba).
+      if (x.sobrecargaProvisional) {
+        const enMeses0 = x.periodo ? ' en ' + x.periodo.mesesSostenida + (x.periodo.mesesSostenida === 1 ? ' mes' : ' meses') : '';
+        td.append(el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida (cifra provisional)' + enMeses0 + dondeSobrecarga(x)));
+      }
       // Sin cifra porque se mide un circuito sin confirmar: si es su única salida, su corriente es la del transformador.
       if (x.sobrecarga && x.sobrecarga.tipo === 'circuito') {
         td.append(el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida (≥ ' + CALCULO.sobrecargaMinH + ' h sobre el ' + CALCULO.sobrecargaPct + ' %)' + dondeSobrecarga(x)),
