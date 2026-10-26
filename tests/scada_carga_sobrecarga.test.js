@@ -195,5 +195,7 @@ describe('revisión adversarial', () => {
     assert.match(l, /el\('span', \{ class: r\.severo \? 'cs-sub cs-sostenida' : 'cs-sub' \}, r\.texto\)/);
     assert.match(l, /cs\.sin_cifra \? cs\.sin_cifra \+ ' sin cifra del periodo' : null/);
     assert.equal((l.match(/marcaSobrecarga\(td, x\)/g) || []).length, 3, 'la función y sus dos usos: con cifra y sin cifra');
+    // `td.append(…, null)` escribe el texto «null» en la celda (lo vio la vista previa, 2026-10-26): nunca un null al append nativo.
+    assert.doesNotMatch(l, /td\.append\([^;]*: null\)/);
   });
 });

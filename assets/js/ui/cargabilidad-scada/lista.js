@@ -417,7 +417,9 @@ export function montarLista(cont, ctx, { alAbrir }) {
   function marcaSobrecarga(td, x) {
     const r = rotuloSobrecarga(x);
     if (!r) return false;
-    td.append(el('span', { class: r.severo ? 'cs-sub cs-sostenida' : 'cs-sub' }, r.texto), r.nota ? el('span', { class: 'cs-sub' }, r.nota) : null);
+    // Ojo: el `append` nativo escribe «null» si recibe null (no es el `el` de dom.js): la nota se agrega solo si existe.
+    td.append(el('span', { class: r.severo ? 'cs-sub cs-sostenida' : 'cs-sub' }, r.texto));
+    if (r.nota) td.append(el('span', { class: 'cs-sub' }, r.nota));
     return true;
   }
 
