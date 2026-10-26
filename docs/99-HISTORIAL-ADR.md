@@ -9058,7 +9058,10 @@ las reglas, 4.000 textos al azar con el mismo veredicto que la regla, L-102); `t
 3 y 200; rechaza vacía, 2, 201, varias líneas, espacios sobrantes, tabulador, espacio duro, marcas invisibles, control, no-texto; no se
 cambia después de crear); prueba de mutación de la regla. Revisión adversarial con 2 Opus (`wf_4694b289-772`): 8 hallazgos corregidos
 (marcas invisibles, cursor al inicio → `select()`, palabras largas → CSS, Esc en la confirmación cerraba también la ventana → pila de
-ventanas del módulo, aviso neutro al borrar, teclado en teléfono, `aria-live` sin repetir). Vista previa en su Chrome (banco local).
+ventanas del módulo, aviso neutro al borrar, teclado en teléfono, `aria-live` sin repetir). Vista previa en su Chrome (banco local). **Publicado (2026-10-26)**: reglas desplegadas primero (`firebase deploy --only firestore:rules`: «released rules»), luego `main`
+46c44f9 (CI y Pages en verde; lo servido = `main` en 5 archivos; caché vencida). En vivo, SIN crear informes: la ventana trae el
+campo de texto con 8 sugerencias y el texto seleccionado; una actividad escrita activa «Crear informe» con «Actividad escrita a mano.»;
+«a» lo apaga con «La actividad es muy corta: escriba al menos 3 caracteres.» (`aria-invalid`).
 
 **183.5 Anti-patterns evitados.** Aflojar solo el navegador (la base lo habría rechazado); dejar la regla sin prueba (`§73`); tocar la
 utilidad compartida `foco-modal.js` (la usa Fichas); cambiar la lista de motivos.
