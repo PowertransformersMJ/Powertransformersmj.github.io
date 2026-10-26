@@ -8958,3 +8958,68 @@ de agosto de 2025; Duval a 4 puntos de PD. (b) **Área SCADA**: corregir el nomb
 los dos, se funden) y una línea de 34,5 kV que lee ≈2/3. (c) **Documento de Salud** (TODO-82): el 89 % oficial es el PRIMARIO de
 su Excel; el «secundario 96 %» de la plataforma viene de otro documento. (d) Documentado, no corregido: el empaquetador valida los
 alias contra el Excel (no ve las decisiones); lo cubre la validación de la página antes de leer el paquete.
+
+## 182. ADR-182 — Berrugas T1: su lado de 13,8 kV se mide con la SUMA de los circuitos de su barra (la fase S del transformador llega ×2 y el 34,5 kV ×½ en el SCADA); nueva capacidad «medir un nivel con la suma de circuitos»; placa (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-26)
+
+> «sí, sigamos con Berrugas» → diagnóstico → «¿a qué te refieres con excluir una fase?» → «vayamos con la sumatoria de los
+> circuitos para tener datos reales» → diseño → «sí, procede con las cinco recomendadas» → vista previa en su Chrome → «sí,
+> procede; Dyn11 y sí tiene ventiladores» (2026-10-24/26).
+
+**182.1 Causa raíz.** Berrugas T1 (único transformador; WEG 2023, 34,5/13,8 kV, 5/6,5 MVA ONAN/ONAF) salía **49,6 % provisional
+en septiembre y 60,3 % CRG 2 en octubre** con el aviso de relación (9,84 frente a 2,50). No es «un lado por 4»: son DOS escalas
+erradas de ×2. (a) En 13,8 kV la FASE S del transformador lee 2,02 × la suma de sus dos circuitos (R y T cuadran a 0,99–1,00; la S
+tiene un escalado propio en el SCADA: pasos de 2,0 A frente a 0,9756 A) — la página toma la fase más cargada, justo esa. (b) En
+34,5 kV las tres fases leen ½ y P/Q tienen banda muerta. Lo confirma un medidor independiente: la línea de 34,5 kV que lo alimenta
+en radial desde San Onofre (se apaga con él) lleva 1,00 × la corriente esperada desde el 13,8 kV corregido y 2,0 × lo que lee el
+34,5 kV de Berrugas. Crónico desde enero de 2025. **Carga real ≈24–30 % CRG 1** (17 meses entre 20 y 34 %). La homologación decidía
+por NIVEL: «13,8 kV usar» dejaba FIRME el doble; «34,5 kV usar», la mitad; recargar no servía (lo guardado no se borra).
+
+**182.2 Solución.** (1) **Nueva capacidad** (vía A′ del diseño `wf_34d0767e-b81`): la decisión de homologación puede decir, por
+nivel, «medir con la SUMA de circuitos» (lista de elementos de la MISMA estación + casilla obligatoria «la barra la alimenta solo
+este transformador» + nota). Los circuitos se importan como medidas REALES con su nombre; el worker calcula la suma hora por hora
+y fase por fase al cargar el mes y la guarda APARTE como resumen derivado `scada_resumen/{mes}.claves['<cid>--suma']` con su sello
+(tipo, versión, firma de la lista, cuadre por fase contra el transformador, veredicto, huella `base_i` de la medida propia); la
+medida propia nunca se pisa; no hay serie ni punto derivado; las curvas se suman al leer (`data/scada_carga_suma.js`). Candado en
+`calcularEquipo`: sin derivado válido (falta, otra firma, otra versión, desfasado, barra compartida, circuito sin ese nivel) el
+nivel queda SIN cifra, nunca con la medida propia. U, P y Q del nivel = las del transformador (rotuladas). Criterios del
+Ingeniero: D1 banda muerta de los circuitos aceptada solo en horas donde la suma cuadra ±10 % con las fases sanas del
+transformador («banda muerta validada»); D2 las tres fases; D3 circuito abierto con barra energizada = 0; D4 mes que no cuadra =
+provisional con motivo; D5 solo con barra propia (bloqueo si otro transformador mide ese nivel, también al leer). (2) **Placa** de
+Berrugas: 15 campos (marca WEG, IEC 60076, ONAN/ONAF 5.000/6.500 kVA, 3 fases, **Dyn11** —decisión suya: lo de la placa—, Z 7,05 %,
+NLTC 5 posiciones, **ONAN/ONAF —tiene ventiladores, confirmado por él—**, 14.000 kg, aceite 3.376 kg / 3.793 L, Colombia).
+
+**182.3 No-regresión.** Sin suma, TODO queda igual: prueba explícita (worker, lista, periodo, mes a mes, detalle, historia,
+homologación) y comparación del código nuevo contra el publicado sobre la semilla de 208 filas: 0 diferencias. Reglas de Firestore
+sin cambios (resumen = mapa libre; la decisión cabe; la serie de un circuito cumple el patrón). L-102: 2 archivos nuevos que solo
+importan exportaciones publicadas; 10 módulos publicados sin exports nuevos; worker con `?v=suma1` y freno por versión.
+
+**182.4 Verificación (antes de publicar).** `test:unit` 3.066 (3.064 en verde, 2 omitidas): 47 de la suma (incluye el worker real
+en Node), guardia 8, reglas 12/12 en el emulador. Datos reales (los 9 paquetes vigentes con el código nuevo): ene 33,0 % (prov.,
+cobertura) · feb 20,3 · mar 27,1 · abr 32,5 · jun 30,7 · jul 28,9 · ago 28,1 · **sep 24,2** · **oct 29,8** — CRG 1; 8/9 firmes;
+ene–oct 30,4 %; cuadre transformador ÷ suma R 1,00 · S 2,01–2,03 · T 0,98–0,99; potencia/corriente 0,993–1,009. Revisión
+adversarial con 3 Opus (`wf_7a22ed8a-dad`): 20 hallazgos, todos corregidos con prueba. Vista previa en su Chrome (banco local con
+sus datos de septiembre): lista 24,2 % CRG 1 confirmada con «Secundario por suma de circuitos»; detalle; diálogo «Revisar».
+Placa: plan en seco 0 choques, 15/15 releídos.
+
+**182.5 Anti-patterns evitados.** Corregir por un factor (inferido); excluir la fase S (subestima ≈1,5 pts y deja 2 fases); suma
+parcial con un circuito faltante; guardar la suma como serie o punto del catálogo (no se puede quitar después y se confundiría
+con una medida); sumar P/Q de circuitos (congeladas); guardar la decisión antes de que el sitio sirva el código nuevo.
+
+**182.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_suma.js`, `assets/js/data/scada_carga_suma.js`,
+`tests/scada_carga_suma.test.js`. Modificados: `workers/scada_carga_importar.worker.js`, `ui/scada-datos/{importar-mes,homologacion}.js`,
+`domain/{scada_carga_vista,scada_carga_periodo}.js`, `ui/cargabilidad-scada/{lista,detalle,historia,panel-devanados-mes}.js`,
+`scripts/guardia-scada.mjs` (nombres sueltos de circuito/línea), `tests/{scada_carga_guardia,scada_carga_mensual}.test.js`,
+`tests-rules/scada_carga.rules.test.js`. Datos: `transformadores/{T1-M/M-BER}`. Cerebro: este ADR, índice, `05`, `10`, `11`, `23`,
+`53` §2, `60` (W-13 paso 8).
+
+**182.7 Doctrina.** W-11 (Decisión Fuerte: diseño con mapa + 2 vías + juez; decisiones de criterio SUYAS con la recomendada);
+«no fabricar datos» (lo derivado rotulado y aparte); cambios aditivos; L-102; vista previa fiel y su «procede». NO revisado
+externamente (se le ofreció).
+
+**182.8 Verificado sano / no re-auditar.** La placa y la relación 34,5/13,8 están bien (prueba de relación 2026); no es la ampacidad
+(ya era la de placa, ADR-172). Queda: (a) **área SCADA**: escalado de la fase S del 13,8 kV, de las tres fases del 34,5 kV y la P
+de la línea de San Onofre; (b) **pruebas**: el informe de junio de 2026 concluye que el grupo real es Dyn5 (la placa dice Dyn11):
+pedir el protocolo de fábrica; (c) **nexo con refrigeración (TODO-80)**: Berrugas debe SALIR de la lista de ventiladores (su 100,7 %
+salió de la fase S doble y de la ampacidad vieja de 4 MVA; real ≈31 % de la ONAF); (d) **documento de Salud** (TODO-82): su 64 %
+parece salir del canal inflado; (e) otras bahías con una fase ≈2× o ≈½ (barrido sin verificar): revisarlas una por una con esta
+herramienta.

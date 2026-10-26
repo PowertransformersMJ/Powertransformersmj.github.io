@@ -6,19 +6,23 @@
 //   ← {tipo: 'analizar', archivos: [{file, ruta, nombre}], filas}      (filas = homologación)
 //   → {tipo: 'progreso', hechos, total} … {tipo: 'analizado', …}
 //   ← {tipo: 'procesar', meses, guardados: {'cid|mes': serie desempaquetada}, modo}
-//   → {tipo: 'procesado', docs, resumen, catalogo, conteos, conflictos, sinCambios}
+//   → {tipo: 'procesado', docs, resumen, catalogo, conteos, conflictos, sinCambios, derivados, versionSuma}
+// Suma de circuitos (2026-10-24): 'analizar' también lee los circuitos de cada suma (medidas REALES con su nombre) y
+// guarda las filas; 'procesar' calcula al final los resúmenes DERIVADOS ('<cid>--suma') con el dominio puro. Nunca toca
+// el resumen del transformador, ni agrega una serie derivada, ni pone algo derivado en el catálogo.
 // Archivo NUEVO (L-102). Worker de módulo.
 // ══════════════════════════════════════════════════════════════
 
-import { objetivoImportacion } from '../domain/scada_carga_homologacion.js';
 import {
   crearAcumulador, acumularArchivo, clasificarMeses, armarMeses, procesarPuntoMes, docSerie, docSinCambios, diasDelMes
 } from '../domain/scada_carga_importacion.js';
 import { empaquetar } from '../domain/scada_carga_series.js';
 import { seLee } from '../domain/scada_carga_paquete.js';
+import { objetivoConSumas, especSuma, derivadosDelMes, SUMA } from '../domain/scada_carga_suma.js';
 
 let acc = null;
 let cancelado = false;
+let filasAnalisis = {};   // la homologación con que se leyó la carpeta (las sumas se calculan con ella)
 
 function empaquetado(guardado) {
   if (!guardado) return null;
@@ -33,7 +37,9 @@ function empaquetado(guardado) {
 async function analizar({ archivos, filas }) {
   cancelado = false;
   acc = crearAcumulador();
-  const objetivo = objetivoImportacion(filas);
+  filasAnalisis = filas || {};
+  // Las estaciones y los puntos de siempre (objetivoImportacion) MÁS los circuitos de cada suma de circuitos.
+  const objetivo = objetivoConSumas(filasAnalisis);
   const total = archivos.length;
   for (let i = 0; i < total; i++) {
     if (cancelado) { postMessage({ tipo: 'cancelado' }); return; }
@@ -61,13 +67,19 @@ function procesar({ meses, guardados, modo }) {
   const armados = armarMeses(acc, meses);
   const docs = []; const resumen = {}; const conteos = {}; let conflictos = 0; let sinCambios = 0;
   const puntos = {};
+  // Puntos que entran en alguna suma (el transformador y sus circuitos): solo de ellos se guardan los niveles del mes.
+  const specs = Object.values(filasAnalisis || {}).map(especSuma).filter(Boolean);
+  const involucrados = new Set(specs.flatMap((s) => [s.cid, ...Object.values(s.porNivel).flatMap((x) => x.cids)]));
+  const derivados = [];
   for (const [mes, porPunto] of armados) {
     resumen[mes] = {};
+    const porCid = {};
     for (const [cid, nuevo] of porPunto) {
       const g = guardados ? guardados[cid + '|' + mes] || null : null;
       const p = procesarPuntoMes(nuevo, g, modo);
       conflictos += p.conflictos;
       resumen[mes][cid] = p.resumen;
+      if (involucrados.has(cid)) porCid[cid] = { niveles: p.niveles };
       for (const porFam of Object.values(p.conteos)) for (const c of Object.values(porFam)) for (const [k, v] of Object.entries(c)) conteos[k] = (conteos[k] || 0) + v;
       const meta = acc.puntos.get(cid);
       const doc = docSerie(cid, mes, meta, p.niveles);
@@ -76,10 +88,18 @@ function procesar({ meses, guardados, modo }) {
       if (!puntos[cid]) puntos[cid] = { clave: meta.clave, est: meta.est, elem: meta.elem, niveles: meta.niveles, meses: [] };
       puntos[cid].meses.push(mes);
     }
+    // Resúmenes DERIVADOS del mes, aparte: claves '<cid>--suma' (el del transformador queda como vino).
+    if (specs.length) {
+      const der = derivadosDelMes({ mes, porCid, filas: filasAnalisis });
+      Object.assign(resumen[mes], der);
+      for (const [clave, porNivel] of Object.entries(der)) {
+        for (const [nivel, r] of Object.entries(porNivel)) derivados.push({ mes, clave, nivel, base: r.derivado.base, resumen: r });
+      }
+    }
   }
   const catalogoMeses = {};
   for (const mes of meses) { const d = diasDelMes(acc, mes); catalogoMeses[mes] = { dias: d.mascara, nDias: d.dias, completo: d.completo }; }
-  postMessage({ tipo: 'procesado', docs, resumen, catalogo: { meses: catalogoMeses, puntos }, conteos, conflictos, sinCambios });
+  postMessage({ tipo: 'procesado', docs, resumen, catalogo: { meses: catalogoMeses, puntos }, conteos, conflictos, sinCambios, derivados, versionSuma: SUMA.version });
 }
 
 self.onmessage = async (ev) => {

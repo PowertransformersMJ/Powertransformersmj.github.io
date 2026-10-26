@@ -27,6 +27,12 @@ describe('bloquea por forma', () => {
     assert.equal(motivoEnLinea(clave('Inventad', 'swTraf' + '3F', '13.8KV')), 'clave de un punto SCADA');
     assert.equal(motivoEnLinea(clave('Inventad', 'swTrafo1', '13.8 KV')), 'clave de un punto SCADA');
   });
+  test('el nombre SUELTO de un circuito o de una línea, sin la estación (suma de circuitos, 2026-10-24)', () => {
+    const c1 = 'XYZ' + '301'; const c2 = 'XYZ' + '302';
+    assert.equal(motivoEnLinea('13,8 kV = suma de circuitos ' + c1 + ' + ' + c2), 'nombre de un circuito o línea del SCADA');
+    assert.equal(motivoEnLinea('Secundario por suma de circuitos ' + c1), 'nombre de un circuito o línea del SCADA');
+    assert.equal(motivoEnLinea('la línea ' + 'LN' + '570'), 'nombre de un circuito o línea del SCADA');
+  });
   test('una línea larga sin barras no la cuelga (búsqueda con tope)', () => {
     const t0 = Date.now();
     assert.equal(motivoEnLinea('A'.repeat(200000)), '');
@@ -56,6 +62,10 @@ describe('deja pasar', () => {
     assert.equal(motivoEnLinea('ZN045' + S + 'FN050' + S + 'FN063'), '');
     assert.equal(motivoEnLinea('SUB1__swTrafo1__66kV'), '');
     assert.equal(motivoEnLinea('../assets/css/aqua-tokens.css'), '');
+    // Los circuitos de prueba «EDM3xx», un color «#RRGGBB» y un número de más cifras no son circuitos.
+    assert.equal(motivoEnLinea('suma de circuitos ' + 'EDM' + '301 + ' + 'EDM' + '302'), '');
+    assert.equal(motivoEnLinea("'#" + 'EAB' + "308'"), '');
+    assert.equal(motivoEnLinea('ABC' + '3012'), '');
   });
   test('el repositorio actual no tiene ningún falso positivo', () => {
     const archivos = execFileSync('git', ['ls-files'], { encoding: 'utf8' }).split('\n')

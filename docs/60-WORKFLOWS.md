@@ -105,6 +105,7 @@ si se escriben datos, simulación + foto antes/después (W-13).
    pisa horas) · **«Reemplazar»** solo si la simulación muestra horas guardadas que deben cambiar (relevo aplicado tarde: con
    «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después
    (paso 7). Un periodo que dice «falta preparar <mes>» se arregla recargando ese mes en «Completar» (0 curvas, solo el resumen).
+   Con una **suma de circuitos** decidida (`§182`), el plan muestra su bloque (cuadre R/S/T «ok») y cada recarga rehace la suma.
 
 ---
 

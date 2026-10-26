@@ -22,6 +22,8 @@ import { calcularEquipo, filaDeTransformador, indicePorMatricula } from './scada
 import { conteosHomologacion, analizarClaveHomologada, claveEfectiva } from './scada_carga_homologacion.js';
 import { claveId } from './scada_carga_csv.js';
 import { devanadosDe } from './scada_carga_devanados.js';
+// Suma de circuitos (2026-10-24): archivo NUEVO; sin suma en la decisión, el periodo da lo mismo que antes (L-102).
+import { especSuma, componerResumen, derivadoDeMeses } from './scada_carga_suma.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -218,8 +220,10 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;
     const punto = cid ? puntos[cid] || null : null;
-    const rDe = (mes) => (cid && resumenes && resumenes[mes] && resumenes[mes].claves ? resumenes[mes].claves[cid] || null : null);
-    const sint = resumenPeriodo(meses.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] })));
+    // Con suma de circuitos, cada mes trae su nivel sumado DERIVADO (o un registro sin cifra); sin suma, el mismo objeto.
+    const rMes = Object.fromEntries((meses || []).map((mes) => [mes, cid && resumenes && resumenes[mes] && resumenes[mes].claves ? componerResumen(resumenes[mes].claves, cid, fila, puntos) || null : null]));
+    const rDe = (mes) => rMes[mes] || null;
+    const sint = conDerivado(resumenPeriodo(meses.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] }))), fila, cid, meses, rDe);
     // `mes` = el último del periodo: si TODO el periodo es anterior al primer mes del punto, el motivo lo dice como en la lista.
     const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: meses[meses.length - 1] || null });
     const hayAntes = !!punto && (punto.meses || []).some((m) => m < meses[0]);
@@ -244,6 +248,24 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
       periodo: { meses, faltanPreparar: faltan, ...ag }
     };
   });
+}
+
+/**
+ * Suma de circuitos: `resumenPeriodo` arma cada nivel con los números de sus meses y deja fuera el sello `derivado`. Al
+ * nivel sumado se le vuelve a poner el derivado del PERIODO: válido solo si cada mes con datos del transformador trae el
+ * suyo; si falta en alguno, `calcularEquipo` deja el nivel sin cifra con «falta calcular la suma de circuitos de <mes>»
+ * (como `faltaTop`). Sin suma devuelve lo mismo que recibe.
+ */
+function conDerivado(sint, fila, cid, meses, rDe) {
+  const spec = especSuma(fila);
+  if (!spec || spec.cid !== cid) return sint;
+  const porNivel = { ...sint.porNivel };
+  for (const [nv, sp] of Object.entries(spec.porNivel)) {
+    if (!porNivel[nv]) continue;
+    const conDatos = (meses || []).filter((mes) => rDe(mes)).map((mes) => ({ mes, derivado: (rDe(mes)[nv] && rDe(mes)[nv].derivado) || null }));
+    porNivel[nv] = { ...porNivel[nv], derivado: derivadoDeMeses(conDatos, sp) };
+  }
+  return { ...sint, porNivel };
 }
 
 // ── Lo exacto, con la curva de UN mes (el detalle la lee solo cuando hace falta) ───────────────────────────────────

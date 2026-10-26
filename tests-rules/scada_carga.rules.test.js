@@ -76,6 +76,19 @@ describe('series, resumen y catálogo', () => {
     await assertSucceeds(getDoc(doc(db('scd_tec'), 'scada_catalogo/estado')));
     await assertSucceeds(getDoc(doc(db('scd_tec'), 'scada_resumen/2026-03')));
   });
+  test('suma de circuitos (2026-10-24): el circuito es una serie real y el derivado una clave más del resumen, SIN cambiar reglas', async () => {
+    // El circuito de EstDemo1 (EDM301) se guarda como cualquier punto real.
+    const circuito = serie({ claveId: 'estdemo1__edm301', clave: '/EstDemo1/EDM301', elem: 'EDM301' });
+    await assertSucceeds(setDoc(doc(db('scd_admin'), 'scada_series/estdemo1__edm301__2026-03'), circuito));
+    // El derivado va aparte, bajo '<cid>--suma', con su sello (mapas, números y listas de texto o números).
+    const derivado = { tipo: 'suma_circuitos', v: 1, firma: 'v1|N13_8|estdemo1__edm301+estdemo1__edm302|IR,IS,IT', de: ['EDM301', 'EDM302'], fases: ['IR', 'IS', 'IT'],
+      base: 'estdemo1__swtrafo1', estado: 'ok', horas: { completas: 700 }, cuadre: { porFase: { IR: { n: 600, razon: 1, cuadra: true } }, veredicto: 'ok' }, referencias: ['IR', 'IT'], veredicto: 'ok', signosP: [1, 1] };
+    const r = { schema: 1, mes: '2026-06', cargaId: 'c1', actualizadoPor: YO, actualizadoEn: serverTimestamp(),
+      claves: { estdemo1__swtrafo1: { N13_8: { i: { p99: 100 } } }, 'estdemo1__swtrafo1--suma': { N13_8: { i: { n: 700, p99: 60 }, top: [61, 60], derivado } } } };
+    await assertSucceeds(setDoc(doc(db('scd_admin'), 'scada_resumen/2026-06'), r));
+    // Tampoco se puede quitar después (las claves solo crecen).
+    await assertFails(setDoc(doc(db('scd_admin'), 'scada_resumen/2026-06'), { ...r, claves: { estdemo1__swtrafo1: r.claves.estdemo1__swtrafo1 }, cargaId: 'c2' }));
+  });
   test('catálogo y resumen solo crecen: otra carga no puede borrar meses, puntos ni claves', async () => {
     const r = { schema: 1, mes: '2026-05', claves: { a__b: {}, c__d: {} }, cargaId: 'c1', actualizadoPor: YO, actualizadoEn: serverTimestamp() };
     await assertSucceeds(setDoc(doc(db('scd_admin'), 'scada_resumen/2026-05'), r));
@@ -142,5 +155,15 @@ describe('homologación con versión y registro atado', () => {
     await assertSucceeds(confirmar(3, 'h9', 'r2', null));    // reabrir
     await assertFails(updateDoc(doc(db('scd_admin'), 'scada_homologacion_registro/h9'), { tipo: 'x' }));
     await assertFails(deleteDoc(doc(db('scd_admin'), 'scada_homologacion/vigente')));
+  });
+  test('suma de circuitos (2026-10-24): la decisión con `suma` se guarda con su registro igual, sin cambiar reglas', async () => {
+    const d = db('scd_admin'); const b = writeBatch(d);
+    const dec = { tipo: 'usar', clave: '/EstDemo1/swTrafo1', mapa: { N13_8: 'S' }, niveles_vistos: ['N13_8'], nota: 'suma de circuitos EstDemo1', avisos_vistos: [],
+      suma: { N13_8: { de: ['EDM301', 'EDM302'], fases: ['IR', 'IS', 'IT'], barra_propia: true } }, por: YO, en: serverTimestamp() };   // circuitos de EstDemo1
+    b.update(doc(d, 'scada_homologacion/vigente'), new FieldPath('filas', 'r1', 'decision'), dec, 'rev', 4, 'ultimoRegistro', 'h10', 'actualizadoPor', YO, 'actualizadoEn', serverTimestamp());
+    b.set(doc(d, 'scada_homologacion_registro/h10'), { tipo: 'confirmacion', rev: 4, filaId: 'r1', antes: null, despues: dec, por: YO, en: serverTimestamp() });
+    await assertSucceeds(b.commit());
+    const leida = await getDoc(doc(db('scd_tec'), 'scada_homologacion/vigente'));
+    if (!leida.data().filas.r1.decision.suma) throw new Error('la suma no quedó en la decisión');
   });
 });

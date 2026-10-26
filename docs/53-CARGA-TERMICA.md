@@ -61,6 +61,11 @@
   estación» del Excel de homologación (`§158.10`); sin él, el punto queda en la estación vieja que el SCADA ya no renueva
   (Sampués solo tiene horas válidas gracias al relevo, `§158.12`). La cifra usa SOLO la corriente: P/Q mal escaladas
   (~×1000 en 4 puntos, `§158.12`) solo dañan la curva de potencia.
+- **Medida propia mal escalada → SUMA DE CIRCUITOS** (`99 §182`): si la medida de un nivel del transformador llega mal escalada en
+  el SCADA y su barra la alimenta SOLO ese transformador, la homologación puede medir ese nivel con la suma, hora por hora y fase
+  por fase, de los circuitos de la barra (decisión suya con nota y casilla «barra propia»). NO es «sumar niveles»: es la misma
+  corriente medida aguas abajo. Se guarda aparte, rotulada «suma de circuitos»; la medida propia no se pisa; cada mes se
+  contrasta con las fases sanas del transformador (±10 %; si no cuadra → provisional). Sin suma válida, el nivel no da cifra.
 
 ## 3. Ampacidad
 - Es la de **ventiladores en servicio (ONAF)**, confirmado por el Ingeniero (`99 §127.1`). Si la refrigeración falla,
