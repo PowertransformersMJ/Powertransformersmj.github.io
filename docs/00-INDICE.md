@@ -58,6 +58,7 @@
 | §180 | ADR-180 — **Zambrano T1A** (tres devanados): el aviso de relación no aplica a sus dos salidas (el terciario inyecta); firme 90,6 % por el secundario; placas de T1A y T2 · TODO-54/69 | 8834 |
 | §181 | ADR-181 — **Boston T1A**: sobrecarga REAL 110 % CRG 5 con su terciario (alias de elemento en el empaquetador); la prueba de relación no aplica a un tres devanados; placa · TODO-54/69 | 8890 |
 | §182 | ADR-182 — **Berrugas T1** por la SUMA de los circuitos de su barra (fase S ×2 y 34,5 kV ×½ en el SCADA); nueva capacidad «suma de circuitos»; placa (Dyn11, ONAN/ONAF) · TODO-54/69 | 8962 |
+| §183 | ADR-183 — **Informe Brigada**: la ACTIVIDAD de un informe nuevo se escribe a mano (lista como sugerencias; modelo F60); reglas `ibrActividad` · TODO-81 | 9033 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

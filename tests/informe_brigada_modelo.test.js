@@ -47,12 +47,31 @@ describe('inventario → equipo', () => {
 });
 
 describe('informe vacío', () => {
-  test('solo la actividad de refrigeración tiene modelo', () => {
+  test('toda actividad válida usa el único modelo (F60 de refrigeración); la vacía, corta, larga o de varias líneas no', () => {
     const c = M.informeVacio();
     assert.equal(c.esquema, 'ibr@1');
     assert.equal(c.modelo, 'F60-REFRIG@1');
     assert.equal(c.actividad, ACTIVIDADES[0]);
-    assert.throws(() => M.informeVacio({ actividad: ACTIVIDADES[1] }), /todavía no tiene modelo/);
+    // Pedido del Ingeniero (2026-10-26): la actividad se escoge de la lista o se escribe a mano.
+    for (const a of [ACTIVIDADES[1], ACTIVIDADES[7], 'Cambio de bujes de baja tensión']) {
+      const x = M.informeVacio({ actividad: a });
+      assert.equal(x.modelo, 'F60-REFRIG@1', a);
+      assert.equal(x.actividad, a);
+      assert.deepEqual(x.portada, c.portada, 'la portada nace con los textos del modelo F60 (se ajustan en el editor)');
+    }
+    assert.equal(M.informeVacio({ actividad: '  Cambio   de bujes\u00a0de baja ' }).actividad, 'Cambio de bujes de baja', 'se guarda sin espacios sobrantes');
+    assert.throws(() => M.informeVacio({ actividad: '' }), /Escriba la actividad/);
+    assert.throws(() => M.informeVacio({ actividad: 'ab' }), /muy corta/);
+    assert.throws(() => M.informeVacio({ actividad: 'x'.repeat(201) }), /muy larga/);
+    assert.throws(() => M.informeVacio({ actividad: 'Primera línea\nSegunda línea' }), /una sola línea/);
+  });
+  test('prellenar con una actividad escrita a mano: mismo modelo y mismo prellenado que refrigeración', () => {
+    const ref = M.prellenar({ equipo: txPrueba(), config: configPrueba() });
+    const otra = M.prellenar({ equipo: txPrueba(), config: configPrueba(), actividad: ' Revisión  general del transformador ' });
+    assert.equal(otra.actividad, 'Revisión general del transformador');
+    assert.equal(otra.modelo, ref.modelo);
+    assert.deepEqual({ ...otra, actividad: null }, { ...ref, actividad: null });
+    assert.throws(() => M.prellenar({ equipo: txPrueba(), actividad: '  ' }), /Escriba la actividad/);
   });
   test('es JSON puro: sin undefined y sin listas dentro de listas (L-30)', () => {
     const c = M.informeVacio();

@@ -117,7 +117,13 @@ describe('repositorio local: el ciclo completo de un informe', () => {
     await esError(r.crear(NUEVO()), 'sin_permiso');
     como(EDITOR);
     assert.equal((await r.crear(NUEVO())).estado, 'borrador');
-    await esError(r.crear({ ...NUEVO(), actividad: 'Mantenimiento de rutina PSM.' }), 'validacion');
+    // Actividad de la lista o escrita a mano (2026-10-26): crea con el F60 y se guarda normalizada; la inválida no.
+    assert.equal((await r.crear({ ...NUEVO(), actividad: 'Mantenimiento de rutina PSM.' })).actividad, 'Mantenimiento de rutina PSM.');
+    const mano = await r.crear({ ...NUEVO(), actividad: '  Cambio  de bujes de baja tensión ' });
+    assert.equal(mano.actividad, 'Cambio de bujes de baja tensión');
+    assert.equal(mano.modelo, 'F60-REFRIG@1');
+    assert.equal((await r.obtener(mano.id)).actividad, 'Cambio de bujes de baja tensión');
+    for (const mala of ['', 'ab', 'x'.repeat(201), 'Primera línea\nSegunda línea']) await esError(r.crear({ ...NUEVO(), actividad: mala }), 'validacion');
   });
 
   test('lo armado sobrevive a recargar; si el navegador no deja guardar, sigue en memoria y lo dice', async () => {

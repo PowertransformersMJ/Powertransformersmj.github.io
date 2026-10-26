@@ -23,6 +23,8 @@ import {
   HALLAZGO_DEFECTO, ANEXOS_DEFECTO, MARCA_CLAVES, MARCA_GEOMETRIA, NOMBRE_CONDICION, ROLES_FIRMA, AJUSTES_CUADRICULA, rellenar,
   ACTIVIDADES_POR_CLASE
 } from './informe_brigada_plantilla.js';
+// Archivo NUEVO (L-102): la actividad escrita a mano se normaliza y se valida igual que en las reglas.
+import { normalizarActividad, errorActividad } from './informe_brigada_actividad.js';
 
 export const ESQUEMA = 'ibr@1';
 
@@ -380,16 +382,22 @@ function origen(c, ruta, fuente, original, extra) {
 
 /**
  * Informe nuevo desde la plantilla de su actividad. Solo «Actualización y repotenciación
- * del sistema de refrigeración.» tiene modelo hoy (decisión 2); otra actividad → error.
+ * del sistema de refrigeración.» tiene modelo propio (decisión 2). Desde 2026-10-26 la
+ * actividad también se escribe a mano (pedido del Ingeniero): toda actividad válida
+ * (`informe_brigada_actividad.js`) arma el informe con ese único modelo, el F60 de
+ * refrigeración, y sus textos se ajustan en el editor. Actividad vacía, corta, larga o
+ * de varias líneas → error.
  */
 export function informeVacio({ actividad = ACTIVIDAD_REFRIGERACION } = {}) {
-  const id = modeloDeActividad(actividad);
-  if (!id) throw new Error('La actividad «' + txt(actividad) + '» todavía no tiene modelo de informe.');
+  const errAct = errorActividad(actividad);
+  if (errAct) throw new Error(errAct);
+  const act = normalizarActividad(actividad);
+  const id = modeloDeActividad(act) || modeloDeActividad(ACTIVIDAD_REFRIGERACION);
   const m = MODELOS[id];
   const c = {
     esquema: ESQUEMA,
     modelo: id,
-    actividad: m.actividad,
+    actividad: act,
     portada: { clase: m.tipo.clase, titulo: m.tipo.titulo, asunto: m.tipo.asunto, subtitulo_anexos: m.tipo.subtitulo_anexos, contrato: '' },
     equipo: {
       transformador_id: '', matricula: '', subestacion: '', zona: '', departamento: '',
@@ -453,6 +461,7 @@ export function informeVacio({ actividad = ACTIVIDAD_REFRIGERACION } = {}) {
  * @param {object} p.equipo   documento del inventario (o el resultado de `equipoDesdeInventario`)
  * @param {object} [p.config] configuración del informe (contrato por defecto)
  * @param {object} [p.accion] acción de refrigeración ELEGIDA por el usuario (opcional; solo se lee)
+ * @param {string} [p.actividad] de la lista de motivos o escrita a mano (se normaliza; ver `informeVacio`)
  */
 export function prellenar({ equipo, config = null, accion = null, actividad = ACTIVIDAD_REFRIGERACION } = {}) {
   const c = informeVacio({ actividad });

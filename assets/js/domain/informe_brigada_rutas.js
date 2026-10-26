@@ -19,13 +19,16 @@
 
 import { tipoPorBytes } from './fichas_adjunto.js';
 import { normalizarNombre } from './firmas.js';
+// Archivo NUEVO (L-102): la actividad escrita a mano se normaliza y se valida igual que en las reglas.
+import { normalizarActividad, errorActividad } from './informe_brigada_actividad.js';
 
 // ── Identidad del esquema (las reglas las exigen con el texto exacto) ──────────
 export const ESQUEMA = 'ibr@1';
 export const MODELO_REFRIGERACION = 'F60-REFRIG@1';
 /** Texto EXACTO de la lista de motivos (assets/js/ordenes-materiales.js:118). */
 export const ACTIVIDAD_REFRIGERACION = 'Actualización y repotenciación del sistema de refrigeración.';
-/** Modelos que hoy admite la base, con su actividad (solo refrigeración tiene modelo). */
+/** Modelos que hoy admite la base, con la actividad para la que se hizo. Solo refrigeración tiene modelo
+ *  propio; desde 2026-10-26 cualquier otra actividad (de la lista o escrita a mano) usa también ese modelo. */
 export const MODELOS_ADMITIDOS = Object.freeze({ [MODELO_REFRIGERACION]: ACTIVIDAD_REFRIGERACION });
 
 // ── Colecciones de Firestore ───────────────────────────────────────────────────
@@ -685,16 +688,21 @@ function marcaDeEmision(marca) {
 
 /**
  * Datos de un informe nuevo (sin sellos de autor ni fechas).
+ * La actividad se escoge de la lista de motivos o se escribe a mano (pedido del Ingeniero,
+ * 2026-10-26): se guarda normalizada (`informe_brigada_actividad.js`) y con el único modelo
+ * que existe. Las reglas (`ibrActividad`) vuelven a exigir lo mismo.
  * @returns {object} esquema, modelo, actividad, equipo_ref, estado, version, rev, contenido, anulacion
  */
 export function planCrear({ equipo_ref, actividad, modelo, contenido } = {}) {
   const mod = modelo || MODELO_REFRIGERACION;
   if (!MODELOS_ADMITIDOS[mod]) throw new ErrorIBR('validacion', 'Ese modelo de informe todavía no existe.');
-  if (actividad !== MODELOS_ADMITIDOS[mod]) throw new ErrorIBR('validacion', 'Esa actividad todavía no tiene modelo de informe; hoy solo «' + ACTIVIDAD_REFRIGERACION + '».');
+  const errAct = errorActividad(actividad);
+  if (errAct) throw new ErrorIBR('validacion', errAct);
+  const act = normalizarActividad(actividad);
   const { equipo_ref: er, errores } = normalizarEquipoRef(equipo_ref);
   if (errores.length) throw new ErrorIBR('validacion', errores.join(' '));
   return {
-    esquema: ESQUEMA, modelo: mod, actividad, equipo_ref: er,
+    esquema: ESQUEMA, modelo: mod, actividad: act, equipo_ref: er,
     estado: 'borrador', version: 0, rev: 1,
     contenido: prepararContenido(contenido),
     anulacion: null
