@@ -8999,7 +8999,13 @@ cobertura) · feb 20,3 · mar 27,1 · abr 32,5 · jun 30,7 · jul 28,9 · ago 28
 ene–oct 30,4 %; cuadre transformador ÷ suma R 1,00 · S 2,01–2,03 · T 0,98–0,99; potencia/corriente 0,993–1,009. Revisión
 adversarial con 3 Opus (`wf_7a22ed8a-dad`): 20 hallazgos, todos corregidos con prueba. Vista previa en su Chrome (banco local con
 sus datos de septiembre): lista 24,2 % CRG 1 confirmada con «Secundario por suma de circuitos»; detalle; diálogo «Revisar».
-Placa: plan en seco 0 choques, 15/15 releídos.
+Placa: plan en seco 0 choques, 15/15 releídos. **Publicado y en producción (2026-10-26)**: `main` d041198, lo servido = `main`
+(6 archivos), espera de la caché de 10 min; la decisión de la fila se guardó DESPUÉS desde el diálogo nuevo (releída: usar, 13,8 kV →
+S con la suma de los dos circuitos, tres fases, barra propia; 34,5 kV fuera); los 9 meses recargados en «Completar», cada plan «2
+series por guardar» (los circuitos), «puntos medidos que cambian de cifra: 0» y suma «cuadra» (S 2,01–2,03); en vivo: mes a mes ene
+33,0 (prov.) · feb 20,3 · mar 27,1 · abr 32,5 · jun 30,7 · jul 28,9 · ago 28,1 · **sep 24,2** · **oct 29,8** %, **a la fecha 30,4 %
+CRG 1**; detalle «en 13,8 kV · suma de circuitos» y 34,5 kV «excluida en la homologación» con la nota; placa «coincide en lo
+comparado». Firmes sep 110 → 111, oct 102 → 103; Boston y Zambrano sin cambio.
 
 **182.5 Anti-patterns evitados.** Corregir por un factor (inferido); excluir la fase S (subestima ≈1,5 pts y deja 2 fases); suma
 parcial con un circuito faltante; guardar la suma como serie o punto del catálogo (no se puede quitar después y se confundiría
