@@ -5,10 +5,12 @@
 // confirmar, cada una con su tipo; (3) las marcas de siempre NO cambian (misma compuerta de `calcularEquipo`, `99 §129`).
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { filasLista, filtrarFilas } from '../assets/js/domain/scada_carga_vista.js';
 import { aplicarVerificacion } from '../assets/js/domain/scada_carga_sostenida.js';
 import {
-  sobrecargaDeMes, sobrecargaDelPeriodo, tieneSobrecarga, conteoSobrecarga, textoDevanados, esCircuitoSinConfirmar
+  sobrecargaDeMes, sobrecargaDelPeriodo, tieneSobrecarga, conteoSobrecarga, textoDevanados, esCircuitoSinConfirmar,
+  rotuloSobrecarga, csvSobrecarga, CSV_SOBRECARGA_CAB
 } from '../assets/js/domain/scada_carga_sobrecarga.js';
 import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
@@ -124,7 +126,74 @@ describe('periodo y conteo', () => {
     const circ = circuito({ N13_8: r(1.0 * A_S, 1.4 * A_S, 1.38 * A_S) });
     const nada = fila({ N13_8: r(0.8 * A_S, 0.9 * A_S, 0.85 * A_S) });
     const vieja = { sobrecargaSostenida: true };
-    assert.deepEqual(conteoSobrecarga([firme, posible, circ, nada, vieja]), { firme: 2, posible: 1, circuito: 1, total: 4 });
+    assert.deepEqual(conteoSobrecarga([firme, posible, circ, nada, vieja]), { firme: 2, posible: 1, sin_cifra: 0, circuito: 1, total: 4 });
     assert.equal(filtrarFilas([firme, posible, circ, nada], { soloSostenida: true }).length, 3);
+  });
+});
+
+// Revisión adversarial (2026-10-26): lo que encontró y su arreglo.
+describe('revisión adversarial', () => {
+  const m = (sost) => fila({ N13_8: r(1.0 * A_S, 1.2 * A_S, sost * A_S) });
+  test('periodo SIN cifra cuyos meses fueron FIRMES: «sin_cifra», no «posible (cifra provisional)»; dice la clase de sus meses', () => {
+    const e = m(1.038); const f = m(1.03);
+    assert.equal(e.sobrecarga.tipo, 'firme'); assert.equal(f.sobrecarga.tipo, 'firme');
+    // Así queda la fila del periodo cuando a un mes le faltan sus horas más altas: sin cifra, clase nula, marca «provisional».
+    const per = { ...e, pct: null, clase: 'nulo', motivoNulo: 'falta preparar 2026-02', sobrecargaSostenida: false, sobrecargaProvisional: true, periodo: { mesesSostenida: 2 } };
+    per.sobrecarga = sobrecargaDelPeriodo(per, [e, f]);
+    assert.equal(per.sobrecarga.tipo, 'sin_cifra');
+    assert.deepEqual(per.sobrecarga.porClase, { firme: 2, posible: 0, circuito: 0 });
+    const rt = rotuloSobrecarga(per);
+    assert.equal(rt.severo, false);
+    assert.doesNotMatch(rt.texto, /provisional/);
+    assert.equal(rt.texto, 'Sobrecarga sostenida (≥ 2 h sobre el 100 %) en 2 meses (2 con cifra firme): secundario 13,8 kV en 2 meses (hasta 103,8 %)');
+    assert.match(rt.nota, /El periodo no tiene cifra/);
+    assert.deepEqual(conteoSobrecarga([per]), { firme: 0, posible: 0, sin_cifra: 1, circuito: 0, total: 1 });
+    assert.deepEqual(csvSobrecarga(per), ['periodo sin cifra (meses con sobrecarga)', 'secundario 13,8 kV en 2 meses (hasta 103,8 %)']);
+    // Una fila vieja (dominio en caché, sin `sobrecarga`) con la misma marca cae en el mismo tipo.
+    assert.equal(rotuloSobrecarga({ ...per, sobrecarga: undefined }).tipo, 'sin_cifra');
+  });
+  test('periodo provisional con meses firmes: «posible» y lo dice', () => {
+    const e = m(1.05);
+    const per = { ...e, clase: 'provisional', sobrecargaSostenida: false, sobrecargaProvisional: true, periodo: { mesesSostenida: 1 } };
+    per.sobrecarga = sobrecargaDelPeriodo(per, [e]);
+    assert.equal(per.sobrecarga.tipo, 'posible');
+    assert.equal(rotuloSobrecarga(per).texto, 'Posible sobrecarga sostenida (cifra provisional) en 1 mes (1 con cifra firme): secundario 13,8 kV en 1 mes (hasta 105,0 %)');
+  });
+  test('dos niveles en el MISMO devanado: el devanado cuenta una vez por mes (manda el de mayor máximo sostenido)', () => {
+    const x = fila({ N13_8: r(1.0 * A_S, 1.2 * A_S, 1.05 * A_S) });
+    const doble = { ...x, niveles: [...x.niveles, { ...x.niveles[0], nivel: 'N34_5', sostenidaPct: 108 }] };
+    const s1 = sobrecargaDeMes(doble);
+    assert.deepEqual(s1.devanados.map((d) => [d.devanado, d.nivel, d.pct]), [['S', 'N34_5', 108]]);
+    const sp = sobrecargaDelPeriodo(doble, [doble]);
+    assert.equal(sp.devanados[0].meses, 1);
+  });
+  test('la curva se dice también en el periodo (sola o junto a meses medidos)', () => {
+    const x0 = fila({ N13_8: r(0.6 * A_S, 11 * A_S, 9.28 * A_S) });
+    const c = aplicarVerificacion(x0, [{ horas: 3, max: 120, excluidas: 2 }]);
+    const medido = m(1.06);
+    const solo = sobrecargaDelPeriodo(c, [c]);
+    assert.equal(textoDevanados(solo), 'secundario 13,8 kV en 1 mes (confirmada con la curva)');
+    const mixto = sobrecargaDelPeriodo(medido, [c, medido]);
+    assert.equal(textoDevanados(mixto), 'secundario 13,8 kV en 2 meses (hasta 106,0 %; 1 mes confirmado con la curva)');
+  });
+  test('rótulos de un mes: firme con color; posible y circuito neutros; CSV sin artículos', () => {
+    const x = fila({ N34_5: r(1.02 * A_P, 1.2 * A_P, 1.10 * A_P), N13_8: r(1.0 * A_S, 1.15 * A_S, 1.05 * A_S) });
+    const rf = rotuloSobrecarga(x);
+    assert.equal(rf.severo, true);
+    assert.equal(rf.texto, 'Sobrecarga sostenida (≥ 2 h sobre el 100 %) en el primario 34,5 kV (hasta 110,0 %) y el secundario 13,8 kV (hasta 105,0 %)');
+    assert.deepEqual(csvSobrecarga(x), ['firme', 'primario 34,5 kV (hasta 110,0 %); secundario 13,8 kV (hasta 105,0 %)']);
+    const rp = rotuloSobrecarga(fila({ N13_8: r(1.0 * A_S, 1.2 * A_S, 1.1 * A_S, 0.3) }));
+    assert.equal(rp.severo, false); assert.match(rp.texto, /^Posible sobrecarga sostenida \(cifra provisional\) en el secundario/);
+    const rc = rotuloSobrecarga(circuito({ N13_8: r(1.0 * A_S, 1.4 * A_S, 1.38 * A_S) }));
+    assert.equal(rc.severo, false); assert.match(rc.nota, /única salida/);
+    assert.equal(rotuloSobrecarga(fila({ N13_8: r(0.8 * A_S, 0.9 * A_S, 0.85 * A_S) })), null);
+    assert.deepEqual(csvSobrecarga(fila({ N13_8: r(0.8 * A_S, 0.9 * A_S, 0.85 * A_S) })), ['', '']);
+    assert.deepEqual(CSV_SOBRECARGA_CAB, ['Sobrecarga_sostenida_tipo', 'Sobrecarga_sostenida_devanados']);
+  });
+  test('la lista usa los rótulos del dominio (y nada de color en lo que no es firme)', () => {
+    const l = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/lista.js', import.meta.url), 'utf8');
+    assert.match(l, /el\('span', \{ class: r\.severo \? 'cs-sub cs-sostenida' : 'cs-sub' \}, r\.texto\)/);
+    assert.match(l, /cs\.sin_cifra \? cs\.sin_cifra \+ ' sin cifra del periodo' : null/);
+    assert.equal((l.match(/marcaSobrecarga\(td, x\)/g) || []).length, 3, 'la función y sus dos usos: con cifra y sin cifra');
   });
 });

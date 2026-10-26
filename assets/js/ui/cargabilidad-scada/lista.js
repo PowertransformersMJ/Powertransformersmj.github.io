@@ -16,7 +16,7 @@ import { leerResumenMes, leerSeriesPunto } from '../../data/scada_carga.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 import { TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto, CSV_DEV_CAB, csvDevanados } from '../../domain/scada_carga_devanados.js';
 // Sobrecarga por devanado (2026-10-26): archivo NUEVO; cada fila trae `sobrecarga` (con guarda: un dominio viejo en caché no).
-import { conteoSobrecarga, textoDevanados } from '../../domain/scada_carga_sobrecarga.js';
+import { conteoSobrecarga, rotuloSobrecarga, csvSobrecarga, CSV_SOBRECARGA_CAB as CSV_SOB_CAB } from '../../domain/scada_carga_sobrecarga.js';
 
 const PASO = 100;
 const ESTADOS = { automatica: 'Automática', confirmada: 'Confirmada', pendiente: 'Por confirmar', excluida: 'Excluida', sin_homologacion: 'Sin homologación' };
@@ -345,6 +345,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
       kpi('CRG 4 y 5 (firmes)', String(altos), 'por encima de ' + textoBandas(ctx.umbrales).split(' / ')[2] + ' %' + (per ? ' en el periodo' : '')),
       kpi('Sobrecarga sostenida', String(cs.total), [cs.firme + (cs.firme === 1 ? ' firme' : ' firmes'),
         cs.posible ? cs.posible + ' con cifra provisional' : null,
+        cs.sin_cifra ? cs.sin_cifra + ' sin cifra del periodo' : null,
         cs.circuito ? cs.circuito + ' medido' + (cs.circuito === 1 ? '' : 's') + ' por un circuito sin confirmar' : null].filter(Boolean).join(' · ')
         + ' · ≥ ' + CALCULO.sobrecargaMinH + ' h seguidas sobre el ' + CALCULO.sobrecargaPct + ' %' + (per ? ' en algún mes' : '')
         + (revisando ? ' · ' + revisando + ' en revisión' : '') + (sinConfirmar ? ' · ' + sinConfirmar + ' por confirmar' : '')));
@@ -412,10 +413,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
       d.aviso && d.aviso !== 'sin_tension' && d.aviso !== 'sin_ampacidad' ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null)));
   }
 
-  /** Dónde está la sobrecarga: « en el secundario 13,8 kV (hasta …)» en un mes; «: secundario … en 9 meses (…)» en un periodo. */
-  function dondeSobrecarga(x) {
-    const s = x.sobrecarga; const t = textoDevanados(s);
-    return t ? (s.meses != null ? ': ' + t : ' ' + t) : '';
+  /** El rótulo de la sobrecarga (con su devanado) y su nota; solo lo FIRME va con color de severidad. */
+  function marcaSobrecarga(td, x) {
+    const r = rotuloSobrecarga(x);
+    if (!r) return false;
+    td.append(el('span', { class: r.severo ? 'cs-sub cs-sostenida' : 'cs-sub' }, r.texto), r.nota ? el('span', { class: 'cs-sub' }, r.nota) : null);
+    return true;
   }
 
   function celdaCifra(x) {
@@ -423,27 +426,17 @@ export function montarLista(cont, ctx, { alAbrir }) {
     if (x.pct == null) {
       td.append(el('span', { class: 'cs-num' }, '—'), chipCifra(x), el('span', { class: 'cs-sub' }, x.motivoNulo || ''));
       if (x.suma && x.suma.texto) td.append(el('span', { class: 'cs-sub' }, x.suma.texto));
-      // Un periodo sin cifra (escala sospechosa, falta preparar un mes…) cuyos meses sí marcaron «posible»: se dice, como
-      // en la lista de cada mes (si no, el indicador lo contaba y la fila callaba).
-      if (x.sobrecargaProvisional) {
-        const enMeses0 = x.periodo ? ' en ' + x.periodo.mesesSostenida + (x.periodo.mesesSostenida === 1 ? ' mes' : ' meses') : '';
-        td.append(el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida (cifra provisional)' + enMeses0 + dondeSobrecarga(x)));
-      }
-      // Sin cifra porque se mide un circuito sin confirmar: si es su única salida, su corriente es la del transformador.
-      if (x.sobrecarga && x.sobrecarga.tipo === 'circuito') {
-        td.append(el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida (≥ ' + CALCULO.sobrecargaMinH + ' h sobre el ' + CALCULO.sobrecargaPct + ' %)' + dondeSobrecarga(x)),
-          el('span', { class: 'cs-sub' }, 'Por confirmar: se mide un circuito; vale si es la única salida del transformador.'));
-      }
+      // Sin cifra pero con sobrecarga: un periodo cuyos meses la marcaron (escala sospechosa, falta preparar un mes…) o un
+      // circuito sin confirmar (si es su única salida, su corriente es la del transformador). El indicador los cuenta.
+      marcaSobrecarga(td, x);
       return td;
     }
     td.append(el('span', { class: 'cs-num' }, num(x.pct, 1) + ' %'), ' ', chipCifra(x));
     // Campo nuevo con guarda: una fila de un dominio viejo en caché no lo trae (L-102).
     if (x.suma && x.suma.texto) td.append(el('span', { class: 'cs-sub' }, x.suma.texto));
     if (x.clase !== 'firme' && x.motivos.length) td.append(el('span', { class: 'cs-sub' }, x.motivos.join(' · ')));
-    const enMeses = x.periodo ? ' en ' + x.periodo.mesesSostenida + (x.periodo.mesesSostenida === 1 ? ' mes' : ' meses') : '';
-    if (x.sobrecargaSostenida) td.append(el('span', { class: 'cs-sub cs-sostenida' }, 'Sobrecarga sostenida (≥ ' + CALCULO.sobrecargaMinH + ' h sobre el ' + CALCULO.sobrecargaPct + ' %)' + enMeses + dondeSobrecarga(x)));
-    else if (x.sobrecargaProvisional) td.append(el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida (cifra provisional)' + enMeses + dondeSobrecarga(x)));
-    else if (x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) td.append(el('span', { class: 'cs-sub' }, 'Revisando la curva del mes (trae horas con valores imposibles)…'));
+    if (marcaSobrecarga(td, x)) return td;   // firme o posible, con su devanado
+    if (x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) td.append(el('span', { class: 'cs-sub' }, 'Revisando la curva del mes (trae horas con valores imposibles)…'));
     else if (x.verificacion === 'fallo') td.append(el('span', { class: 'cs-sub' }, 'Sobrecarga por confirmar: el mes trae horas con valores imposibles y no se pudo leer su curva (véala en «Ver curvas»)'));
     else if (x.picoAislado) td.append(el('span', { class: 'cs-sub cs-pico' }, 'Pico aislado sobre el 100 % (no sostenido)'));
     return td;
@@ -569,10 +562,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
 
   /** Origen de la cifra cuando sale de una suma de circuitos (dato derivado); vacío si no (campo con guarda). */
   const textoSumaCSV = (x) => (x && x.suma && x.suma.texto ? x.suma.texto + ' (dato derivado)' : '');
-  /** Sobrecarga por devanado (2026-10-26): dos columnas NUEVAS al final; vacías si la fila no la tiene (campo con guarda). */
-  const TIPO_SOB = { firme: 'firme', posible: 'posible (cifra provisional)', circuito: 'por confirmar (se mide un circuito)' };
-  const CSV_SOB_CAB = ['Sobrecarga_sostenida_tipo', 'Sobrecarga_sostenida_devanados'];
-  const csvSobrecarga = (x) => (x && x.sobrecarga && x.sobrecarga.tipo ? [TIPO_SOB[x.sobrecarga.tipo] || x.sobrecarga.tipo, textoDevanados(x.sobrecarga).replace(/^en el /, '')] : ['', '']);
+  // Sobrecarga por devanado (2026-10-26): dos columnas NUEVAS al final (CSV_SOB_CAB, csvSobrecarga); vacías si no la tiene.
 
   function exportar() {
     if (st.modo === 'periodo' && st.periodo) { exportarPeriodo(); return; }
