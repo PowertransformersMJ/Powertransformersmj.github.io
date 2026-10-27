@@ -9157,6 +9157,10 @@ agosto 37 (29 · 8) · marzo 29 (24 · 3 · 2) · octubre 17 (15 · 2); 0 celdas
 coherentes con la lista. Revisión adversarial (1 Opus): 1 media (periodo sin cifra rotulado «provisional») + 3 bajas (devanado
 contado dos veces, curva sin decir, artículo del CSV) — corregidas con prueba. La vista previa atrapó además un «null» en cada
 etiqueta (`append` nativo, L-157). Placa de San Luis: 3 lectores independientes + conciliador (`wf_53387a4f-38d`), 15/15 releídos.
+**Publicado y verificado en vivo** (main `c2c677e`, servido 20:33, caché vencida 20:43; CI verde al relanzar la prueba de velocidad
+del lector de Fichas, L-122): periodo ene–oct **51** (39 · 10 · 1 sin cifra · 1 circuito: San Luis salió con su placa), 0 celdas con
+«null»; CSV con las 2 columnas nuevas al final (51 filas); San Luis en la lista 8,4 / 20,9 A · 0,50 MVA y en Seguimiento de
+Cargabilidad 69 % «Normal» (antes 111,5 %).
 
 **185.5 Anti-patterns evitados.** Cambiar las marcas existentes; dar color a lo provisional; llamar «provisional» a un periodo cuyos
 meses fueron firmes; exportar nuevo desde un archivo publicado; confirmar el circuito de San Luis sin su palabra. Y uno cometido y
