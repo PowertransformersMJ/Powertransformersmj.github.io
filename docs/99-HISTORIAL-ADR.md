@@ -9249,3 +9249,42 @@ las dos direcciones). NO revisado externamente.
 v1 NO cubre: cambio a mitad de mes, suma de circuitos con cambio, otra estación, reemplazo o traslado de la unidad (la placa es la de
 hoy para todos los meses), un formulario para registrar cambios. Becerril (área SCADA): el 13,8 kV del T1 perdido desde el 9-jun,
 fases de un circuito rotuladas corridas, un circuito en 0 A del 13-mar al 9-abr estando cargado, sep–oct sin la estación.
+
+## 187. ADR-187 — Cargabilidad SCADA: filtro «Devanado sobrecargado» (primario · secundario · terciario, con conteos) (TODO-69) ⟦OPUS-5.5⟧ (2026-10-27)
+
+> «¿quedó conforme lo que te solicité de la cargabilidad por devanados?» → sí (50 catalogados, cada uno con su devanado) + oferta
+> de un filtro → «sí, agrega el filtro por devanado» → vista previa → «sí, procede, publícalo».
+
+**187.1 Causa raíz.** ADR-185 dejó cada sobrecarga con su devanado en la etiqueta, pero para ver «solo los terciarios» había que
+leer las 50 filas: la lista no filtraba por devanado.
+
+**187.2 Solución.** Dominio NUEVO `scada_carga_filtro_devanado.js` (L-102): `devanadosSobrecargados` (de `sobrecarga.devanados` y de
+`sobrecargaAnterior.devanados`, ADR-186), `pasaFiltroDevanado`, `conteoPorDevanado`. `filtrarFilas` lo aplica con `f.devSobre`; la
+lista lo muestra junto a Zona y CRG («Devanado sobrecargado»: Primario/Secundario/Terciario con la cuenta de la vista; «Todos»), en
+el estado inicial y en «Quitar filtros». Se combina con los demás filtros y con el CSV.
+
+**187.3 No-regresión.** Sin devanados elegidos `pasaFiltroDevanado` devuelve verdadero (nada cambia); el helper `multi` gana un
+parámetro opcional con «Todas» por defecto (Zona y CRG iguales). Una fila de un dominio viejo en caché no dice su devanado: con el
+filtro activo no entra (≤ 10 min).
+
+**187.4 Verificación.** 3130 pass (4 nuevas en `tests/scada_carga_filtro_devanado.test.js`). Vista previa en SU Chrome con los
+módulos del commit de la rama: ene–oct Primario 37 · Secundario 35 · Terciario 6 (Río Sinú, Tierralta, La Jagua T1A y T2A, Mompox,
+Calamar T1A) · P o S 44 (sin duplicar); agosto 26 · 26 · 4. Revisión adversarial (2 lentes + verificación, `wf_322ebea4-6ab`):
+0 diferencias sin filtro en 1296 combinaciones contra el `filtrarFilas` anterior; 13 hallazgos, todos bajos. Corregidos: el filtro se
+aplica también en `filasVisibles` con el archivo NUEVO (con un `vista.js` viejo en caché aparecía y no filtraba), resumen en masculino
+(«Los tres», nombres sin números con dos marcados para que no se corte) y rótulo asociado al resumen para lectores de pantalla.
+Vista previa tras las correcciones: Terciario (6) · «Primario, Terciario» 43 · «Los tres» 50 = el indicador.
+
+**187.5 Anti-patterns evitados.** Exportar desde un archivo publicado; contar un equipo dos veces; un filtro que esconda la sobrecarga
+de antes de un cambio de medida.
+
+**187.6 Archivos.** Nuevo `assets/js/domain/scada_carga_filtro_devanado.js` y su prueba; modificados `domain/scada_carga_vista.js`
+(`filtrarFilas`) y `ui/cargabilidad-scada/lista.js`. INTACTOS: el cálculo, la importación, el detalle.
+
+**187.7 Doctrina.** Vista previa fiel + su «procede». NO revisado externamente.
+
+**187.8 Verificado sano / no re-auditar.** El filtro conserva lo marcado al pasar de «Un mes» a «Varios meses» (como Zona y CRG). Los
+conteos son del mes o periodo cargado, sin los demás filtros (un equipo con dos devanados cuenta en los dos); una fila que la curva del
+mes decide después no repinta la barra (como el resto de los filtros). «Todos» = sin filtrar (lo aprobado). Queda, PREEXISTENTE (ADR-185):
+si un nivel ya confirma la sobrecarga, otro nivel del mismo equipo con horas imposibles no se revisa con la curva, y ese devanado no
+aparece en la etiqueta ni en el filtro.
