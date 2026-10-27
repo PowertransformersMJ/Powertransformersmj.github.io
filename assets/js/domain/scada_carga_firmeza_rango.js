@@ -62,7 +62,7 @@ export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargada
       const fam = recortarMes(rec, mes, desdeMs);
       if (!fam) return null;
       const r = resumirParaGuardar(resumenFisico(fam, NIVELES[nv].kv), fam);
-      return r ? { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, fuera: (noCargadas && noCargadas[mes]) || 0 } : null;
+      return r ? { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, fuera: (noCargadas && noCargadas[mes]) || 0 } : null;
     });
     const f = firmezaDeMeses(lista);
     out[i.devanado] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio) };

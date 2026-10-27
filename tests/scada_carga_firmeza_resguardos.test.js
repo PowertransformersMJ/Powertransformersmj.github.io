@@ -51,9 +51,11 @@ describe('cobertura en los meses en que midió: horas en servicio, días sin car
     assert.equal(r.mesesMedidos, 2); assert.equal(r.mesesSinServicio, 0);
     assert.ok(Math.abs(r.coberturaFirmeza - 700 / (720 + 144)) < 1e-12);
   });
-  test('un mes fuera de servicio todo el mes no cuenta (no había nada que medir)', () => {
-    const r = firmezaDeMeses([{ n: 700, cob: 1, servicio: 700 }, { n: 0, cob: null, servicio: 0 }, { n: 0, cob: null, servicio: 0 }, null]);
+  test('un mes desenergizado todo el mes no cuenta (no había nada que medir); uno que no vino en el exporte sí', () => {
+    const r = firmezaDeMeses([{ n: 700, cob: 1, servicio: 700, horas: 720 }, { n: 0, cob: null, servicio: 0, horas: 720 }, { n: 0, cob: null, servicio: 0, horas: 744 }, null]);
     assert.deepEqual({ ...r, coberturaFirmeza: Math.round(r.coberturaFirmeza * 1e6) / 1e6 }, { coberturaFirmeza: 1, mesesMedidos: 1, mesesSinServicio: 2 });
+    // Sin horas (el punto no vino en el exporte) o sin saber cuántas: es un mes en que no midió.
+    assert.equal(firmezaDeMeses([{ n: 0, cob: null, servicio: 0, horas: 0 }, { n: 0, cob: null, servicio: 0 }]).mesesSinServicio, 0);
   });
   test('con las horas en servicio no se infla el mes por la cobertura redondeada', () => {
     assert.equal(firmezaDeMeses([{ n: 1, cob: 0.001, servicio: 744 }]).coberturaFirmeza, 1 / 744);
@@ -99,6 +101,14 @@ describe('periodo de la lista: resguardos', () => {
     const s = p.devanados.find((d) => d.d === 'S');
     assert.equal(s.mesesMedidos, 2); assert.equal(s.mesesTotal, 2);
     assert.equal(p.firme, true, p.motivos.join('; '));
+  });
+  test('los meses que NO vinieron en el exporte sí cuentan como meses en que no midió', () => {
+    const meses = ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05'];
+    const porMes = Object.fromEntries(meses.map((m, k) => [m, k < 2 ? nivelR(700, 720) : nivelR(0, 0, 0)]));
+    const p = periodoDe(meses, porMes);
+    const s = p.devanados.find((d) => d.d === 'S');
+    assert.equal(s.mesesMedidos, 2); assert.equal(s.mesesTotal, 5);
+    assert.ok(p.motivos.includes('midió menos de la mitad de los meses'), p.motivos.join('; '));
   });
   test('la frontera: midió exactamente la mitad de los meses → firme', () => {
     const meses = ['2026-01', '2026-02', '2026-03', '2026-04'];

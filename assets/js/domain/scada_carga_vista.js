@@ -141,7 +141,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     // Varios meses (2026-10-27): la cobertura del devanado en los meses en que midió y cuántos midió (ver `firmeza`).
     const fp = d && firmezaPeriodo ? firmezaPeriodo[d] || null : null;
     if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0,
-      servicio: r && r.servicio != null ? r.servicio : null,
+      servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
       ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }
   // Señal de sobrecarga de cada devanado para `firmeza` (lo que solo muestra un devanado que mide poco no se da por firme).

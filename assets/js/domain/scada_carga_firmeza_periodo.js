@@ -14,9 +14,10 @@ export const FRACCION_MESES_MIN = 0.5;
 /**
  * Lo de UN devanado en los meses en que midió. Cobertura del mes = horas válidas ÷ horas en servicio, con las horas en
  * servicio del resumen (`servicio`; si un módulo viejo no lo trae, n ÷ cobertura) MENOS los días que el parque aún no cargó
- * (`fuera`): no son hueco (`99 §159`, como `resumenPeriodo`). Un mes sin horas en servicio (fuera de servicio todo el mes)
- * no cuenta ni como medido ni como no medido: no había nada que medir (revisión adversarial 2026-10-27).
- * @param {Array<{n:number, cob:number|null, servicio?:number|null, fuera?:number}|null>} porMes  un registro por mes
+ * (`fuera`): no son hueco (`99 §159`, como `resumenPeriodo`). Un mes con horas pero TODAS fuera de servicio (desenergizado
+ * todo el mes) no cuenta ni como medido ni como no medido: no había nada que medir (revisión adversarial 2026-10-27). Un
+ * mes sin horas (`horas` = 0: el punto no vino en el exporte) SÍ es un mes en que no midió.
+ * @param {Array<{n:number, cob:number|null, servicio?:number|null, horas?:number|null, fuera?:number}|null>} porMes  un registro por mes
  * @returns {{coberturaFirmeza: number|null, mesesMedidos: number, mesesSinServicio: number}}
  */
 export function firmezaDeMeses(porMes) {
@@ -27,7 +28,7 @@ export function firmezaDeMeses(porMes) {
     const base = x.servicio != null ? x.servicio : (nx > 0 && x.cob > 0 ? nx / x.cob : null);
     if (base == null) continue;
     const s = Math.max(nx, base - (x.fuera > 0 ? x.fuera : 0));
-    if (!(s > 0)) { sinServicio++; continue; }
+    if (!(s > 0)) { if (x.horas > 0) sinServicio++; continue; }
     if (!nx) continue;
     n += nx; serv += s; medidos++;
   }
@@ -40,14 +41,14 @@ export function firmezaDeMeses(porMes) {
  * @param {number} mesesTotal  meses del periodo que el parque cargó
  * @param {number[]} [fueraPorMes]  horas que el parque aún no cargó de cada mes (mismo orden que `filasMes`)
  * @returns {Object<string, {coberturaFirmeza:number|null, mesesMedidos:number, mesesTotal:number}>}
- *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo fuera de servicio todo el mes.
+ *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo desenergizado todo el mes.
  */
 export function firmezaPeriodoDeFilas(filasMes, mesesTotal, fueraPorMes = []) {
   const por = {};
   (filasMes || []).forEach((x, k) => {
     if (!x || !Array.isArray(x.devanados)) return;
     for (const d of x.devanados) {
-      if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura, servicio: d.servicio, fuera: (fueraPorMes && fueraPorMes[k]) || 0 });
+      if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura, servicio: d.servicio, horas: d.horas, fuera: (fueraPorMes && fueraPorMes[k]) || 0 });
     }
   });
   return Object.fromEntries(Object.entries(por).map(([d, l]) => {
