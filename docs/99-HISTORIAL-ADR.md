@@ -9120,3 +9120,64 @@ un enlace entre sus barras de 13,8 kV (Dyn5/Dyn11); (b) **área SCADA**: horas �
 de los circuitos mal escaladas, U/P/Q del 13,8 kV del T1 con banda muerta; (c) **documento de Salud** (TODO-82): T2 oficial 59 % CRG 1
 frente a 94,5 % CRG 5; la «carga medida» de 110 % de la plataforma en los 4 devanados es el pico 2025 de la entrada común cargado al T1;
 (d) el 99,4 % del T1 en febrero de 2026 sale de 3 h del 18-feb con los circuitos congelados: evento puntual por revisar.
+
+## 185. ADR-185 — Cargabilidad SCADA: la sobrecarga sostenida se ubica POR DEVANADO y se cataloga entera (firmes · posibles · periodo sin cifra · circuitos sin confirmar); placa de San Luis T1 (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-26)
+
+> «ubique los equipos sobrecargados sea el devanado primario, secundario o terciario; noto que hay equipos que están sobrecargados
+> y no lo estás catalogando, por favor valida» → auditoría → «las tres mejoras» → vista previa → «sí, publícalo»; San Luis: foto
+> de la placa → «sí, A y B» + «1983, el de la placa» (2026-10-26).
+
+**185.1 Causa raíz** (leída en código y en producción, ene–oct 2026). (a) El indicador «Sobrecarga sostenida» (`lista.js`) y el filtro
+(`filtrarFilas`) contaban SOLO las firmes: 10 equipos con «Posible sobrecarga (cifra provisional)» quedaban fuera y, por el orden
+firmes › provisionales, detrás de «Mostrar 100 más» (filas 142–151 de 208), entre ellos los dos más cargados del parque (Curumaní T1
+primario 162,6 % y Sampués T1 secundario 174,2 % sostenidos). (b) Un equipo medido por un circuito sin confirmar no tiene cifra y
+`calcularEquipo` no evalúa nada sin cifra (`cuentan` vacío): San Luis T1 y Becerril T2 no salían. (c) La etiqueta nunca decía el
+devanado; la columna de devanados muestra el p99 y «da la cifra», que puede ser otro. (d) Un periodo SIN cifra (escala sospechosa,
+falta preparar un mes) cuyos meses marcaron sobrecarga llevaba la marca provisional pero ninguna etiqueta (Pueblo Nuevo T1).
+
+**185.2 Solución.** Dominio NUEVO `scada_carga_sobrecarga.js` (L-102): por fila, el TIPO (firme · posible · sin_cifra · circuito) y
+los devanados con ≥ 2 h seguidas sobre el 100 % (uno por devanado, su nivel y su máximo sostenido; en un periodo, cuántos meses y
+cuántos los confirmó la curva), con la MISMA compuerta de `calcularEquipo`; `rotuloSobrecarga` (solo lo firme lleva color) y
+`csvSobrecarga`. `filasLista`/`filasPeriodo` agregan `sobrecarga`; `aplicarVerificacion` recuerda qué nivel decidió la curva
+(`sobrecargaCurva`). Lista: el indicador cuenta los cuatro tipos con su rótulo, el filtro «Solo con sobrecarga sostenida» los
+reúne y la etiqueta nombra el devanado («…en 9 meses: primario 34,5 kV en 9 meses (hasta 112,0 %) y secundario 13,8 kV en 9 meses
+(hasta 106,2 %)»); 2 columnas NUEVAS al final de los dos CSV. Historia del detalle: el equipo medido por un circuito dice su posible
+sobrecarga por devanado. **Datos**: San Luis T1 (`10y6BQtjmb6ZSE371xyO`) con la placa (Siemens 1983, reparado por C.D.M. Ltda en
+2026-03, serie 65007, 500 kVA): corrientes nominales 5 → 8,37 A y 13 → 20,92 A, ONAN 500, marca, 3 fases, Dyn11, 4,44 %, NLTC
+5 posiciones, ONAN, 2.670 kg, 781 L, ICONTEC y año 1991 → 1983 (15 campos con bitácora `diff`).
+
+**185.3 No-regresión.** Las marcas de siempre (`sobrecargaSostenida`, `sobrecargaProvisional`, `picoAislado`, `sobrecargaPorVerificar`,
+`pct`, `clase`) no cambian: prueba de invariancia sobre una rejilla de 72 casos. Columnas de los CSV solo al final. Toda exportación
+nueva en el archivo nuevo; cada consumidor lee `sobrecarga` con guarda (L-102). San Luis: potencia, serie, tensiones, carga medida
+(5,58/14,5 A) y la cifra oficial de Salud (69 % CRG 3) intactas (releídas).
+
+**185.4 Verificación.** 3112 pass / 0 fail (17 pruebas nuevas en `tests/scada_carga_sobrecarga.test.js`). Vista previa en SU Chrome con
+los módulos del commit de la rama (L-157): periodo ene–oct **52** (39 firmes · 10 provisionales · 1 sin cifra · 2 circuitos);
+agosto 37 (29 · 8) · marzo 29 (24 · 3 · 2) · octubre 17 (15 · 2); 0 celdas con «null»; detalle de San Luis y de Panceguitas
+coherentes con la lista. Revisión adversarial (1 Opus): 1 media (periodo sin cifra rotulado «provisional») + 3 bajas (devanado
+contado dos veces, curva sin decir, artículo del CSV) — corregidas con prueba. La vista previa atrapó además un «null» en cada
+etiqueta (`append` nativo, L-157). Placa de San Luis: 3 lectores independientes + conciliador (`wf_53387a4f-38d`), 15/15 releídos.
+
+**185.5 Anti-patterns evitados.** Cambiar las marcas existentes; dar color a lo provisional; llamar «provisional» a un periodo cuyos
+meses fueron firmes; exportar nuevo desde un archivo publicado; confirmar el circuito de San Luis sin su palabra. Y uno cometido y
+corregido: el primer barrido por devanado (consola) contó mal los meses —p. ej. «Panceguitas primario 2 meses» cuando son 9— y se le
+dijo así en el chat; la tabla buena salió del código de la página (L-158).
+
+**185.6 Archivos.** Nuevo `assets/js/domain/scada_carga_sobrecarga.js`, `tests/scada_carga_sobrecarga.test.js`. Modificados:
+`domain/scada_carga_vista.js`, `domain/scada_carga_periodo.js`, `domain/scada_carga_sostenida.js`, `ui/cargabilidad-scada/lista.js`,
+`ui/cargabilidad-scada/historia.js`, `tests/scada_carga_suma.test.js`. Datos: `transformadores/10y6BQtjmb6ZSE371xyO`. INTACTOS:
+`calcularEquipo`, worker, importador, homologación. Bóveda: `2026-10-26-scada-sobrecarga-por-devanado/`.
+
+**185.7 Doctrina.** Lo que no se cataloga no existe para quien decide; una cifra provisional se rotula, no se esconde (L-81);
+«todo con base a la placa»; vista previa fiel + su «procede». NO revisado externamente.
+
+**185.8 Verificado sano / no re-auditar.** NO son sobrecarga: las entradas comunes de 34,5 kV (Lorica, Ovejas, Puerto Libertador,
+SBA, SRS: miden dos transformadores), Gambote T1 66 kV (~1.000 %, escala) y los picos de una hora (7 equipos, ya rotulados). Tres
+Palmas T1–T3 y Chinú Planta T2 siguen «por confirmar con la curva» (provisionales pendientes). San Luis T1 con su placa: el circuito
+llega a ~86 % sostenido → sale de los sobrecargados (era el 13 A errado); sigue sin cifra hasta confirmar que el circuito es su única
+salida. Pueblo Nuevo T1: sus 199 % de ene–feb son de una medida dudosa (escala) → por revisar, no prueba de sobrecarga. Queda:
+(a) su Excel de Salud trae 5/13 A y 1991 para San Luis (una reimportación los devuelve; pendientes de Salud); (b) la placa
+característica guardada de San Luis es la de la unidad anterior (Magnetron 300 kVA): reemplazarla con la foto nueva (ofrecido);
+(c) Becerril: en 10-mar el interruptor del T1 en 13,8 kV midió la SUMA de los dos circuitos de la S/E; el Ingeniero dice barras
+separadas (cada transformador con su circuito) → análisis en curso antes de cambiar la homologación; (d) Fichas «Refrigeración» = «[object Object]» (`ui/fichas/panel.js`)
+→ tarea aparte.

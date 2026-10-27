@@ -105,3 +105,12 @@ de la escritura. **Gate**: [HONOR].
 (`99 §166.10`): la placa salía abierta en la vista previa aprobada; la dejé plegada por una revisión y él no la encontró
 («no aparece la placa como me lo habías propuesto»). · **Regla**: la vista previa aprobada es el contrato; un cambio de
 presentación posterior se le consulta o se publica igual a lo aprobado. **Gate**: [HONOR].
+
+### L-157 · Vista previa en SU Chrome con los archivos del COMMIT de la rama (no copiados a mano); y lo que solo ella ve
+**Disparador**: cambio de varios módulos que se quiere ver con sus datos reales antes de publicar. · **Cicatriz** (`99 §185.4`):
+pegar 33 KB de parches en la consola arriesga una errata; empujar la rama y, en una pestaña NUEVA de producción, leer los módulos
+de `raw.githubusercontent.com/…/<sha>/…` (CORS abierto), reescribir sus `import` (cambiados → `blob:`, el resto → producción) y montar
+la lista en contenedores clonados funcionó, sin tocar producción. Esa vista previa atrapó lo que 3112 pruebas no: `td.append(x, null)`
+escribe el texto «null» (el `append` nativo no es el `el` de `dom.js`). · **Regla**: vista previa desde el SHA empujado; nunca
+`null` al `append` nativo. **Gate**: prueba en `tests/scada_carga_sobrecarga.test.js` (patrón `td.append(…: null)`) + [HONOR].
+

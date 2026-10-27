@@ -11,6 +11,7 @@
 import { FAMILIAS, CALCULO } from './scada_carga_config.js';
 import { recortarRango, ventanaDeMes } from './scada_carga_series.js';
 import { iFaseMax, serieCargabilidad, horasSostenidasSobre, estadisticas } from './scada_carga_kpis.js';
+import { sobrecargaDeMes } from './scada_carga_sobrecarga.js';
 
 /**
  * Sobrecarga de UN nivel en el mes, con la serie limpia (sin las horas de más de 3 × ampacidad).
@@ -47,12 +48,17 @@ export function aplicarVerificacion(fila, resultados) {
   }
   const sost = lista.some((r) => r.horas > 0);
   const pico = !sost && (!!fila.picoAislado || lista.some((r) => r.max != null && r.max > CALCULO.sobrecargaPct));
-  return {
+  // Qué niveles decidió la curva (en el orden de `sobrecargaPorVerificar`): la lista nombra su devanado (2026-10-26).
+  const pv = fila.sobrecargaPorVerificar || [];
+  const curva = lista.map((r, i) => (r.horas > 0 && pv[i] ? { nivel: pv[i].nivel, devanado: pv[i].devanado } : null)).filter(Boolean);
+  const nueva = {
     ...fila,
     sobrecargaSostenida: fila.clase === 'firme' && sost,
     sobrecargaProvisional: fila.clase !== 'firme' && sost,
     picoAislado: pico,
     sobrecargaPorVerificar: [],
     verificacion: 'ok',
+    sobrecargaCurva: curva,
   };
+  return { ...nueva, sobrecarga: sobrecargaDeMes(nueva) };
 }
