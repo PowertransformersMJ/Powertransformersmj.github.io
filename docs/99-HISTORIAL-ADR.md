@@ -9370,3 +9370,57 @@ Queda ABIERTO (suyo/campo): Sucre — confirmar que sigue el Suntec (el ABB de 8
 Curumaní T1 — ventiladores «OBSOLETA» (sin ellos su p99 es 111 % de la ONAN) y su 13,8 kV ~7 % bajo; Chinú — qué bahía es el ABB y
 cuál el WEG (indicio, límites iguales). Corrige lo dicho antes: `§185.1` (Curumaní T1 162,6 % y Sampués T1 174,2 % NO eran del equipo)
 y `53 §3` («Sampués, corrientes copiadas»: Salud le asigna a cada uno la mitad de la estación, coherente con el paralelo).
+
+## 189. ADR-189 — Cargabilidad SCADA: los «sin cifra» medidos por un circuito y casos especiales (19 decisiones, placa de Bosque T4, 8 meses recargados) — datos, sin código (TODO-69) ⟦OPUS-5.5⟧ (2026-10-27)
+
+> «sigamos con lo pendiente respecto a cargabilidad SCADA» → inventario en producción → diagnóstico con los crudos (5 grupos, analista +
+> verificador independiente) → simulación en SU Chrome → «Sí, aplica todo» · «Sí, es la única» · San Martín de Loba «No sé / en
+> paralelo» · «Sí, excluir con nota» → «continua» (tras una pausa a mitad de la recarga) (2026-10-27).
+
+**189.1 Causa raíz** (crudos ene-2025 → oct-2026, fotos de placa, cifras reproducidas al decimal). 23 equipos sin cifra: 17 medidos por un
+circuito sin confirmar (la plataforma no da cifra hasta que el Ingeniero confirma que el circuito es toda la carga), 1 escala errada,
+1 placa mal registrada, 4 con la medida muerta. Al revisar los segundos transformadores apareció además una sobrecarga FALSA firme:
+**San Martín de Loba T1 (149 %)** y **Montelíbano T1 (111 %)** se medían por su 34,5 kV, que es la ENTRADA COMÚN con el T2 (barra de
+13,8 kV partida; mismo patrón que Curumaní, `§188`).
+
+**189.2 Solución (solo datos; reversa = «Reabrir» por fila).** 19 decisiones con `decidirFila` (rev 25 → 44, releídas IDÉNTICAS; plan en
+la bóveda `2026-10-27-sin-cifra-circuitos/`), `avisos_vistos` del último mes como «Revisar»:
+- Circuito confirmado como toda la carga (13,8 kV → S): Ánimas Bajas, Monterrey, Puerto Badel, Pozo Azul (su circuito llega con el
+  nombre de otro: no es el de San Luis, sus cortes no coinciden), La Europa, Santa Elena, Guatapurí T3 (barra partida desde ago-2025),
+  Mata de Caña T1/T2 (banco de dos monofásicas entre R y T: misma corriente) y El Paraíso T1/T2 (cada unidad en su fase: la más cargada
+  para las dos). Ariguaní: el circuito que llega desde ago-2025 en lugar del interruptor congelado.
+- San Martín de Loba: T1 y T2 cada uno por su circuito desde may-2026, con medida anterior «Excluir» hasta abr-2026 (no se sabe si el
+  T2 iba en vacío o en paralelo; la entrada común no se reparte).
+- Solo por 13,8 kV (34,5 kV «No usar»): Montelíbano T1 (entrada común) y Pueblo Nuevo (corrientes ×2 y ×4: queda sin cifra «escala
+  sospechosa», sin el falso 199 %).
+- Excluidos con nota y carga estimada: Lorica T2 (bahía sin medida desde ago-2025; 32–39 %), Montelíbano T2 (22 meses en 0; 60–74 %),
+  Cañabraval (1–2 A, caída desde el 26-sep).
+- Placa Bosque T4 (`actualizarCampos` con diff): secundario 13,8 → **66 kV**, 787,3 → **1.312,2 A** (los 787,3 eran la conexión
+  110 kV en estrella); terciario de compensación sin ampacidad.
+- Recarga «Completar» de ene, feb, mar, abr, jun, jul, ago y sep: 1–2 series nuevas por mes, «0 puntos que cambian de cifra» en los 8.
+
+**189.3 No-regresión.** Simulación con los módulos de producción: 0 diferencias en las otras filas (mes a mes y periodo). Las tres filas
+excluidas salen del objetivo de importación (sus series viejas quedan; se reimportan al reabrir).
+
+**189.4 Verificación en vivo** (ene–oct): firmes 149 → **155**, provisionales 36 → **44**, sin cifra 23 → **9**, sobrecarga 47 → **46**.
+Ánimas Bajas 69,7 % (provisional: una fase) · Monterrey 13,1 % · Puerto Badel 26,2 % · Pozo Azul 28,7 % · La Europa 37,1 % · Santa
+Elena 28,7 % · Mata de Caña 13,3 % · El Paraíso 29,5 % · Guatapurí T3 **79,4 %** CRG 4 · Bosque T4 46,6 % · Ariguaní 29,1 % · San Martín
+de Loba T1 62,8 % / T2 **91,7 %** CRG 5 · Montelíbano T1 **98,9 %** CRG 5 con sobrecarga sostenida real en 4 meses (jun–sep 100–106 %).
+La foto antes/después con llaves ordenadas se perdió con la pausa (la pestaña se recargó): queda como evidencia el «0 puntos que cambian
+de cifra» que la propia página calculó en cada uno de los 8 meses.
+
+**189.5 Anti-patterns evitados.** Confirmar un circuito sin probar que es la única salida (balances, saltos, cortes); repartir una entrada
+común; «sin carga» sin saberlo; confirmar una bahía muerta (daría 0–0,4 % firme falso); calcular corriente desde la potencia (la
+plataforma no lo hace; Cereté queda sin cifra con su motivo correcto).
+
+**189.6 Archivos.** Ninguno de código. Datos: homologación (19 filas), parque (Bosque T4, 4 campos), resúmenes y series de 8 meses.
+Bóveda: crudos `wf_5cc4662d-ffc`, plan y síntesis.
+
+**189.7 Doctrina.** W-13 (simulación + su autorización por tanda) · analista + verificador independiente · preguntas cerradas con la
+recomendada. NO revisado externamente.
+
+**189.8 Verificado sano / no re-auditar.** Cereté T1 (corriente del interruptor nunca válida; por circuitos ~80–100 %), Cuiva (testigo
+~35–45 %) y El Carmen T2A (en vacío; su punto de 110/66 kV fue renombrado: alias pendiente para la próxima recarga) quedan sin cifra
+con su motivo correcto. El Carmen T1A firme 100–106 % es real. Queda ABIERTO (campo/área SCADA): San Luis T1 (cambio de unidad sin fecha;
+su circuito congelado desde jun), lectura del relé de Pueblo Nuevo (probable > 100 % desde abr), fase S de Ánimas Bajas, fase T de
+Puerto Badel, TC de Cañabraval, puntos de Lorica T2 y Montelíbano T2, ventiladores de Guatapurí T3.
