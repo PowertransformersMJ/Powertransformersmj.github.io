@@ -240,7 +240,8 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     const sint = conDerivado(resumenPeriodo(mesesP.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] }))), fila, cid, mesesP, rDe);
     // `mes` = el último del periodo: si TODO el periodo es anterior al primer mes del punto, el motivo lo dice como en la lista.
     // Firmeza por el devanado que da la cifra, contado en los meses en que midió (decisión del Ingeniero, 2026-10-27).
-    const firmezaPeriodo = firmezaPeriodoDeFilas(mesesP.map(filaMes), mesesP.length);
+    // Los días que el parque aún no cargó no son hueco (`99 §159`): se descuentan como en `resumenPeriodo`.
+    const firmezaPeriodo = firmezaPeriodoDeFilas(mesesP.map(filaMes), mesesP.length, mesesP.map((m) => noCargadas[m] || 0));
     const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: mesFin, firmezaPeriodo });
     const hayAntes = !!punto && (punto.meses || []).some((m) => m < mesesP[0]);
     const ag = agregadosDeMeses(mesesP.map((mes) => ({ mes, fila: filaMes(mes), r: rDe(mes) })), { hayAntes });

@@ -268,13 +268,25 @@ export function mideLaCarga(placa, devanadosMedidos) {
   return d.has('P') || (d.has('S') && d.has('T'));
 }
 
+/** Por qué un devanado MIDE POCO (cobertura, horas o meses): las mismas tres pruebas que se le exigen a la cifra. */
+function midePoco(x) {
+  const m = [];
+  const cob = x.coberturaFirmeza != null ? x.coberturaFirmeza : x.cobertura;
+  if (cob != null && cob < CALCULO.coberturaMinFirme) m.push('cobertura menor al 50 %');
+  if (x.n < CALCULO.horasMinFirme) m.push('menos de 72 horas válidas');
+  if (x.mesesTotal > 0 && (x.mesesMedidos || 0) / x.mesesTotal < FRACCION_MESES_MIN) m.push('midió menos de la mitad de los meses');
+  return m;
+}
+
 /**
  * FIRMEZA de la cifra del equipo. firme = true solo si se cumple TODO; si no, los motivos.
  * Cobertura y horas las decide el devanado que DA LA CIFRA (decisión del Ingeniero, 2026-10-27, «en mes y periodo»): un
  * devanado que mide poco y no da la cifra ya no vuelve provisional al equipo, porque el otro, bien medido, lleva la misma
  * carga. Con varios meses, ese devanado se cuenta solo en los meses en que midió (`coberturaFirmeza`, de
  * scada_carga_firmeza_periodo.js) y debe haber medido al menos la mitad de los meses (`mesesMedidos` / `mesesTotal`).
- * @param {{estadoHomologacion, esCircuito, devanados: Array<{d, A, pct, cobertura, n, escala, coberturaFirmeza?, mesesMedidos?, mesesTotal?}>, placa, mesesFallidos}} ctx
+ * Dos resguardos (revisión adversarial 2026-10-27): en un tridevanado, el devanado que mide la carga también debe medir
+ * bien; y la sobrecarga (o las horas imposibles) que solo muestra un devanado que mide poco deja la cifra provisional.
+ * @param {{estadoHomologacion, esCircuito, devanados: Array<{d, A, pct, cobertura, n, escala, coberturaFirmeza?, mesesMedidos?, mesesTotal?, sobre?}>, placa, mesesFallidos}} ctx
  */
 export function firmeza(ctx) {
   const motivos = [];
@@ -286,10 +298,16 @@ export function firmeza(ctx) {
   if (!mideLaCarga(ctx.placa, usados.map((x) => x.d))) motivos.push('no se mide el devanado que lleva la carga');
   const cifra = usados.length ? usados.reduce((a, b) => (b.pct > a.pct ? b : a)) : null;
   if (cifra) {
-    const cob = cifra.coberturaFirmeza != null ? cifra.coberturaFirmeza : cifra.cobertura;
-    if (cob != null && cob < CALCULO.coberturaMinFirme) motivos.push('cobertura menor al 50 %');
-    if (cifra.n < CALCULO.horasMinFirme) motivos.push('menos de 72 horas válidas');
-    if (cifra.mesesTotal > 0 && (cifra.mesesMedidos || 0) / cifra.mesesTotal < FRACCION_MESES_MIN) motivos.push('midió menos de la mitad de los meses');
+    const mc = midePoco(cifra);
+    motivos.push(...mc);
+    const bien = usados.filter((x) => !midePoco(x).length);
+    // Tridevanado: el primario lleva S+T, así que «el otro lleva la misma carga» no vale; el devanado que mide la carga
+    // también tiene que medir bien (revisión adversarial 2026-10-27). En dos devanados no cambia nada.
+    if (!mc.length && mideLaCarga(ctx.placa, usados.map((x) => x.d)) && !mideLaCarga(ctx.placa, bien.map((x) => x.d))) motivos.push('el devanado que lleva la carga mide poco');
+    // Lo que solo muestra un devanado que mide poco no se da por firme: si su sobrecarga (o sus horas imposibles) no la
+    // muestra también un devanado bien medido, provisional (así no sale «sobrecarga firme» ni R4 de una medida dudosa).
+    const senal = (l) => Math.max(0, ...l.map((x) => x.sobre || 0));
+    if (senal(usados.filter((x) => midePoco(x).length)) > senal(bien)) motivos.push('sobrecarga que solo muestra un devanado que mide poco');
   }
   // Con solo 2 de 3 fases la fase más cargada puede ser la que falta: la cifra es un mínimo, no firme.
   if (usados.some((x) => x.n > 0 && (x.unaFalta || 0) / x.n > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');

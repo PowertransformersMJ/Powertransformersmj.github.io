@@ -12,31 +12,46 @@
 export const FRACCION_MESES_MIN = 0.5;
 
 /**
- * Lo de UN devanado en los meses en que midió. Cobertura del mes = horas válidas ÷ horas en servicio: se recompone el
- * total de horas en servicio de cada mes (n ÷ cobertura) para que la cobertura junta pese cada mes por sus horas.
- * @param {Array<{n:number, cob:number}>} porMes  un registro por mes (los meses sin medida se ignoran)
- * @returns {{coberturaFirmeza: number|null, mesesMedidos: number}}
+ * Lo de UN devanado en los meses en que midió. Cobertura del mes = horas válidas ÷ horas en servicio, con las horas en
+ * servicio del resumen (`servicio`; si un módulo viejo no lo trae, n ÷ cobertura) MENOS los días que el parque aún no cargó
+ * (`fuera`): no son hueco (`99 §159`, como `resumenPeriodo`). Un mes sin horas en servicio (fuera de servicio todo el mes)
+ * no cuenta ni como medido ni como no medido: no había nada que medir (revisión adversarial 2026-10-27).
+ * @param {Array<{n:number, cob:number|null, servicio?:number|null, fuera?:number}|null>} porMes  un registro por mes
+ * @returns {{coberturaFirmeza: number|null, mesesMedidos: number, mesesSinServicio: number}}
  */
 export function firmezaDeMeses(porMes) {
-  let n = 0; let serv = 0; let medidos = 0;
+  let n = 0; let serv = 0; let medidos = 0; let sinServicio = 0;
   for (const x of porMes || []) {
-    if (!x || !(x.n > 0) || !(x.cob > 0)) continue;
-    n += x.n; serv += x.n / x.cob; medidos++;
+    if (!x) continue;
+    const nx = x.n > 0 ? x.n : 0;
+    const base = x.servicio != null ? x.servicio : (nx > 0 && x.cob > 0 ? nx / x.cob : null);
+    if (base == null) continue;
+    const s = Math.max(nx, base - (x.fuera > 0 ? x.fuera : 0));
+    if (!(s > 0)) { sinServicio++; continue; }
+    if (!nx) continue;
+    n += nx; serv += s; medidos++;
   }
-  return { coberturaFirmeza: serv > 0 ? n / serv : null, mesesMedidos: medidos };
+  return { coberturaFirmeza: serv > 0 ? n / serv : null, mesesMedidos: medidos, mesesSinServicio: sinServicio };
 }
 
 /**
  * Para la lista por periodo: de las filas de cada mes del equipo (las de `filasLista`, con `devanados`) → por devanado.
  * @param {Array<object|null>} filasMes  una por mes del periodo (null si el equipo no tiene fila ese mes)
  * @param {number} mesesTotal  meses del periodo que el parque cargó
+ * @param {number[]} [fueraPorMes]  horas que el parque aún no cargó de cada mes (mismo orden que `filasMes`)
  * @returns {Object<string, {coberturaFirmeza:number|null, mesesMedidos:number, mesesTotal:number}>}
+ *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo fuera de servicio todo el mes.
  */
-export function firmezaPeriodoDeFilas(filasMes, mesesTotal) {
+export function firmezaPeriodoDeFilas(filasMes, mesesTotal, fueraPorMes = []) {
   const por = {};
-  for (const x of filasMes || []) {
-    if (!x || !Array.isArray(x.devanados)) continue;
-    for (const d of x.devanados) if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura });
-  }
-  return Object.fromEntries(Object.entries(por).map(([d, l]) => [d, { ...firmezaDeMeses(l), mesesTotal }]));
+  (filasMes || []).forEach((x, k) => {
+    if (!x || !Array.isArray(x.devanados)) return;
+    for (const d of x.devanados) {
+      if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura, servicio: d.servicio, fuera: (fueraPorMes && fueraPorMes[k]) || 0 });
+    }
+  });
+  return Object.fromEntries(Object.entries(por).map(([d, l]) => {
+    const f = firmezaDeMeses(l);
+    return [d, { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesTotal - f.mesesSinServicio) }];
+  }));
 }
