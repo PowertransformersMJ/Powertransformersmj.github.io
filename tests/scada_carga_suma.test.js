@@ -756,8 +756,9 @@ describe('revisión adversarial 2026-10-24: candado del detalle, D5 después de 
     assert.match(h, /const ajena = tipo\.value === 'usar' \? claveEnSumaAjena\(selClave\.value \|\| null, ctx\.filas, f\.id\) : null;/);
     const l = src('ui/cargabilidad-scada/lista.js');
     // Desde 2026-10-26 la siguen las dos columnas de la sobrecarga por devanado (también al final; las de antes no se mueven).
-    assert.equal((l.match(/\.\.\.CSV_DEV_CAB, 'Suma_de_circuitos', \.\.\.CSV_SOB_CAB\]/g) || []).length, 2, 'columna NUEVA al final de los dos CSV');
-    assert.equal((l.match(/\.\.\.csvDevanados\(x\.devanadosPlaca\), textoSumaCSV\(x\), \.\.\.csvSobrecarga\(x\)\]/g) || []).length, 2);
+    // …y desde el mismo día la columna del cambio de medida (también al final).
+    assert.equal((l.match(/\.\.\.CSV_DEV_CAB, 'Suma_de_circuitos', \.\.\.CSV_SOB_CAB, 'Cambio_de_medida'\]/g) || []).length, 2, 'columna NUEVA al final de los dos CSV');
+    assert.equal((l.match(/\.\.\.csvDevanados\(x\.devanadosPlaca\), textoSumaCSV\(x\), \.\.\.csvSobrecarga\(x\), csvCambio\(x\)\]/g) || []).length, 2);
     assert.match(l, /porSuma\(d\) \? el\('span', \{ class: 'cs-sub' \}, 'por suma de circuitos'\) : null/);
     const pd = src('ui/cargabilidad-scada/panel-devanados-mes.js');
     assert.match(pd, /porSuma\(niveles\) \? el\('p', \{ class: 'cs-sub' \}, SUB_SUMA\) : null/);

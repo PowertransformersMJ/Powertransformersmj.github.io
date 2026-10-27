@@ -22,6 +22,8 @@ import { devanadosDe } from './scada_carga_devanados.js';
 import { especSuma, estadoSumaNivel, componerResumen, textoSuma } from './scada_carga_suma.js';
 // Sobrecarga por devanado (2026-10-26): archivo NUEVO; solo NOMBRA las marcas de siempre y evalúa los circuitos sin confirmar.
 import { sobrecargaDeMes, tieneSobrecarga } from './scada_carga_sobrecarga.js';
+// Cambio de medida desde un mes (2026-10-26): archivo NUEVO; sin medidas anteriores devuelve la MISMA fila (nada cambia).
+import { filaDelMes, filasDelMes, motivoSinCarga } from './scada_carga_cambio_medida.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -194,11 +196,14 @@ function peorVeredicto(ns) {
 export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrales, estadistico }) {
   const filasH = (homologacion && homologacion.filas) || {};
   const porMat = indicePorMatricula(filasH);
-  const conteos = conteosHomologacion(filasH);
+  // Cada mes se calcula con la medida que regía ESE mes (cambio de medida); sin cambios, las mismas filas de siempre.
+  const mesLista = resumenMes && resumenMes.mes ? resumenMes.mes : null;
+  const conteos = conteosHomologacion(filasDelMes(filasH, mesLista));
   const puntos = (catalogo && catalogo.puntos) || {};
   const claves = (resumenMes && resumenMes.claves) || {};
   return (parque || []).map((tx) => {
-    const fila = filaDeTransformador(tx, porMat);
+    const base = filaDeTransformador(tx, porMat);
+    const fila = base ? filaDelMes(base, mesLista) : null;
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;
     const punto = cid ? puntos[cid] || null : null;
@@ -215,7 +220,11 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
       filaId: fila ? fila.id : null, claveId: cid, tienePunto: !!punto,
       ...c,
       // Todos los devanados de placa con su potencia, su ampacidad y su carga (pedido del Ingeniero, 2026-10-22).
-      devanadosPlaca: devanadosDe(tx, c)
+      devanadosPlaca: devanadosDe(tx, c),
+      // Cambio de medida (campo NUEVO, solo en equipos con medidas anteriores; se lee con guarda). «Sin carga»: sin cifra
+      // con su motivo propio, nunca 0 % ni «excluida por el Ingeniero».
+      ...(fila && fila.cambioMedida ? { cambioMedida: fila.cambioMedida } : {}),
+      ...(fila && fila.cambioMedida && fila.cambioMedida.tipo === 'sin_carga' ? { motivoNulo: motivoSinCarga(fila.cambioMedida), sinCarga: true } : {})
     };
     // Qué devanado se sobrecarga y de qué tipo (firme · posible · circuito sin confirmar). Campo NUEVO: se lee con guarda.
     return { ...x, sobrecarga: sobrecargaDeMes(x) };
@@ -236,7 +245,8 @@ export function filtrarFilas(filas, f = {}) {
     if (f.estado && x.estado !== f.estado) return false;
     if (crgs.size && !crgs.has(String(x.crg))) return false;
     // «Con sobrecarga sostenida»: firmes, posibles (cifra provisional) y medidos por un circuito sin confirmar (2026-10-26).
-    if (f.soloSostenida && !tieneSobrecarga(x)) return false;
+    // …y los que la tuvieron antes de un cambio de medida (periodo, `sobrecargaAnterior`, 2026-10-26).
+    if (f.soloSostenida && !tieneSobrecarga(x) && !x.sobrecargaAnterior) return false;
     if (f.soloFirmes && x.clase !== 'firme') return false;
     return true;
   });

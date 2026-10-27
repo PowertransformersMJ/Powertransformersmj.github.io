@@ -26,6 +26,8 @@ import { devanadosDe } from './scada_carga_devanados.js';
 import { especSuma, componerResumen, derivadoDeMeses } from './scada_carga_suma.js';
 // Sobrecarga por devanado (2026-10-26): archivo NUEVO; solo nombra el devanado y cuenta sus meses.
 import { sobrecargaDelPeriodo } from './scada_carga_sobrecarga.js';
+// Cambio de medida desde un mes (2026-10-26): archivo NUEVO; sin medidas anteriores el periodo da lo mismo que antes.
+import { segmentoDelMes, mesesDelSegmento, filasDelMes, sobrecargaAntesDelCambio, motivoSinCarga } from './scada_carga_cambio_medida.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -213,30 +215,41 @@ export function horasNoCargadas(catalogo, meses) {
 export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes, filasPorMes, umbrales, estadistico }) {
   const filasH = (homologacion && homologacion.filas) || {};
   const porMat = indicePorMatricula(filasH);
-  const conteos = conteosHomologacion(filasH);
+  // Cambio de medida (decisión del Ingeniero, 2026-10-26): el periodo se calcula con la configuración del ÚLTIMO mes (la
+  // vigente) y SOLO con sus meses; lo de antes del cambio va aparte (`sobrecargaAnterior`). Sin cambios: lo de siempre.
+  const mesFin = meses && meses.length ? meses[meses.length - 1] : null;
+  const conteos = conteosHomologacion(filasDelMes(filasH, mesFin));
   const puntos = (catalogo && catalogo.puntos) || {};
-  const idx = (meses || []).map((m) => new Map(((filasPorMes && filasPorMes[m]) || []).map((x) => [x.id, x])));
+  const idx = new Map((meses || []).map((m) => [m, new Map(((filasPorMes && filasPorMes[m]) || []).map((x) => [x.id, x]))]));
   const noCargadas = horasNoCargadas(catalogo, meses);
   return (parque || []).map((tx) => {
-    const fila = filaDeTransformador(tx, porMat);
+    const filaBase = filaDeTransformador(tx, porMat);
+    const seg = filaBase ? segmentoDelMes(filaBase, mesFin) : null;
+    const fila = seg ? seg.fila : filaBase;
+    const mesesP = seg ? mesesDelSegmento(seg, meses) : meses;
+    const filaMes = (mes) => (idx.get(mes) && idx.get(mes).get(tx.id)) || null;
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;
     const punto = cid ? puntos[cid] || null : null;
     // Con suma de circuitos, cada mes trae su nivel sumado DERIVADO (o un registro sin cifra); sin suma, el mismo objeto.
-    const rMes = Object.fromEntries((meses || []).map((mes) => [mes, cid && resumenes && resumenes[mes] && resumenes[mes].claves ? componerResumen(resumenes[mes].claves, cid, fila, puntos) || null : null]));
+    const rMes = Object.fromEntries((mesesP || []).map((mes) => [mes, cid && resumenes && resumenes[mes] && resumenes[mes].claves ? componerResumen(resumenes[mes].claves, cid, fila, puntos) || null : null]));
     const rDe = (mes) => rMes[mes] || null;
-    const sint = conDerivado(resumenPeriodo(meses.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] }))), fila, cid, meses, rDe);
+    const sint = conDerivado(resumenPeriodo(mesesP.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] }))), fila, cid, mesesP, rDe);
     // `mes` = el último del periodo: si TODO el periodo es anterior al primer mes del punto, el motivo lo dice como en la lista.
-    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: meses[meses.length - 1] || null });
-    const hayAntes = !!punto && (punto.meses || []).some((m) => m < meses[0]);
-    const ag = agregadosDeMeses(meses.map((mes, j) => ({ mes, fila: idx[j].get(tx.id) || null, r: rDe(mes) })), { hayAntes });
-    const base = idx.map((m) => m.get(tx.id)).find(Boolean) || {};
+    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: mesFin });
+    const hayAntes = !!punto && (punto.meses || []).some((m) => m < mesesP[0]);
+    const ag = agregadosDeMeses(mesesP.map((mes) => ({ mes, fila: filaMes(mes), r: rDe(mes) })), { hayAntes });
+    const base = (meses || []).map(filaMes).find(Boolean) || {};
     // Meses cargados SIN sus horas más altas en un nivel que da la cifra: no se inventa, se pide preparar.
     const faltan = [...new Set((c.niveles || []).filter((n) => n.devanado && sint.faltaTop[n.nivel]).flatMap((n) => sint.faltaTop[n.nivel]))].sort();
     const sinPreparar = faltan.length > 0 && c.pct == null;
     const cifra = sinPreparar ? { pct: null, crg: null, clase: 'nulo', firme: false, motivoNulo: 'falta preparar ' + faltan.join(', ') } : {};
     const clase = cifra.clase || c.clase;
     const sost = ag.mesesSostenida > 0;
+    // Cambio de medida: qué configuración se muestra y la sobrecarga de los meses de ANTES del cambio (campos NUEVOS, con guarda).
+    const cm = fila && fila.cambioMedida ? fila.cambioMedida : null;
+    const mesesAntes = cm && seg.desde ? (meses || []).filter((m) => m < seg.desde) : [];
+    const antes = mesesAntes.length ? sobrecargaAntesDelCambio(mesesAntes.map(filaMes)) : null;
     const x = {
       id: tx.id, matricula: base.matricula || '', subestacion: base.subestacion || '', zona: base.zona || '', departamento: base.departamento || '',
       potenciaKva: base.potenciaKva || null, filaId: fila ? fila.id : null, claveId: cid, tienePunto: !!punto,
@@ -247,10 +260,13 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
       // Para ordenar la lista por estas columnas (ordenarFilas usa x[campo]).
       peor: ag.peorMes ? ag.peorMes.pct : null, mayor: ag.mayorCorriente ? ag.mayorCorriente.pct : null,
       devanadosPlaca: devanadosDe(tx, { ...c, ...cifra }),
-      periodo: { meses, faltanPreparar: faltan, ...ag }
+      periodo: { meses: mesesP, faltanPreparar: faltan, ...ag },
+      ...(cm ? { cambioMedida: { ...cm, mesesAntes } } : {}),
+      ...(antes ? { sobrecargaAnterior: { ...antes, hasta: mesesAntes[mesesAntes.length - 1] } } : {}),
+      ...(cm && cm.tipo === 'sin_carga' && c.pct == null ? { motivoNulo: motivoSinCarga(cm), sinCarga: true } : {})
     };
     // Qué devanado se sobrecargó y en cuántos meses, con las filas de cada mes (2026-10-26). Campo NUEVO: se lee con guarda.
-    return { ...x, sobrecarga: sobrecargaDelPeriodo(x, idx.map((m) => m.get(tx.id) || null)) };
+    return { ...x, sobrecarga: sobrecargaDelPeriodo(x, mesesP.map(filaMes)) };
   });
 }
 

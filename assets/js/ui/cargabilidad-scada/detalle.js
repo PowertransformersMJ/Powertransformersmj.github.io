@@ -37,6 +37,8 @@ import {
 // Suma de circuitos (2026-10-24): archivos NUEVOS. Sin suma en la decisión, `leerSeriesEquipo` lee lo mismo que
 // `leerSeriesPunto` y el detalle sale idéntico.
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
+// Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
+import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga } from '../../domain/scada_carga_cambio_medida.js';
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 
@@ -230,7 +232,22 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         hom && (hom.estado === 'confirmada' || hom.estado === 'excluida') && a.fila && a.fila.decision && a.fila.decision.nota
           ? el('span', { class: 'cs-sub' }, ' — ' + a.fila.decision.nota) : null),
       hom && hom.estado === 'pendiente' && hom.avisos.length ? el('ul', { class: 'cs-avisos' },
-        hom.avisos.filter((k) => AVISOS[k]).map((k) => el('li', {}, AVISOS[k].texto))) : null);
+        hom.avisos.filter((k) => AVISOS[k]).map((k) => el('li', {}, AVISOS[k].texto))) : null,
+      avisoCambioMedida(a));
+  }
+
+  /** Equipo con cambio de medida: qué configuración se ve y un enlace a cada una de las otras (nunca se mezclan). */
+  function avisoCambioMedida(a) {
+    if (!a.segmentos || !a.segmento) return null;
+    const nombre = (s) => (s.tipo === 'sin_carga' ? 'sin carga ' : (s.tipo === 'vigente' ? 'medida de hoy ' : 'medida anterior ')) + textoVentana(s);
+    const ir = (s) => {
+      const q = 'mat=' + encodeURIComponent(a.mat) + (a.tx && a.tx.id ? '&id=' + encodeURIComponent(a.tx.id) : '') + (s.tipo === 'vigente' ? '' : '&mes=' + s.hasta);
+      location.hash = q;
+    };
+    const otros = a.segmentos.filter((s) => s !== a.segmentoBase);
+    return el('p', { class: 'cs-dato cs-cambio-medida', style: 'margin:6px 0 0' }, el('b', {}, 'Cambio de medida: '),
+      'se muestra la ' + nombre(a.segmento) + (a.segmento.nota ? ' (' + a.segmento.nota + ')' : '') + '. Las cifras de una configuración no se mezclan con las de otra. ',
+      otros.map((s, i) => el('button', { type: 'button', id: 'csCambioMedida-' + i, class: 'btn btn--glass btn--sm', style: 'margin:2px 6px 0 0', onclick: () => ir(s) }, 'Ver ' + nombre(s))));
   }
 
   /** La tabla de devanados se rehace cuando llega la placa leída (sin repintar el resto del detalle). */
@@ -656,10 +673,17 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       return;
     }
     const filasH = (ctx.homologacion && ctx.homologacion.filas) || {};
-    const fila = filaDeTransformador(tx, indicePorMatricula(filasH));
+    const filaBase = filaDeTransformador(tx, indicePorMatricula(filasH));
+    // Cambio de medida: la configuración del mes pedido (o del INICIO del rango del enlace: un rango nunca cruza el cambio);
+    // sin mes pedido, la de hoy. Sin cambios de medida: la misma fila de siempre y el mismo punto.
+    const mesDe = (t) => (typeof t === 'string' && /^\d{4}-\d{2}/.test(t) ? t.slice(0, 7) : null);
+    const segs = filaBase ? segmentosDeFila(filaBase) : [];
+    const seg = filaBase ? segmentoDelMes(filaBase, mes || mesDe(desde) || mesDe(hasta)) : null;
+    const fila = seg ? seg.fila : filaBase;
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;
-    const punto = cid && ctx.catalogo && ctx.catalogo.puntos ? ctx.catalogo.puntos[cid] || null : null;
+    const puntoTodo = cid && ctx.catalogo && ctx.catalogo.puntos ? ctx.catalogo.puntos[cid] || null : null;
+    const punto = seg && segs.length > 1 ? puntoDelSegmento(puntoTodo, seg) : puntoTodo;
     const matricula = leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || mat;
     const cambio = !actual || actual.tx !== tx;
     // Ranura del panel DGA: UN nodo por equipo (al cambiar el rango se reusa: no parpadea).
@@ -682,12 +706,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     // La placa leída (para la tabla de devanados) se conserva mientras sea el mismo equipo, como su panel.
     const limitesPlaca = !cambio && actual.limitesPlaca ? actual.limitesPlaca : null;
     const placaLeida = !cambio && !!actual.placaLeida;
-    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista, limitesPlaca, placaLeida };
+    actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista, limitesPlaca, placaLeida,
+      // Campos NUEVOS (cambio de medida): solo con más de una configuración.
+      ...(segs.length > 1 ? { segmentos: segs, segmento: seg, segmentoBase: segs.find((s) => s.desde === seg.desde && s.hasta === seg.hasta) || null } : {}) };
     if (!punto || !(punto.meses || []).length) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
+        : (seg && seg.tipo === 'sin_carga' ? 'Sin cifra: ' + motivoSinCarga(seg.fila.cambioMedida) + '.'
         : (!fila ? 'Este transformador no está en la homologación con el SCADA.'
-          : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.'));
+          : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.')));
       poner(cont, encabezado(actual), actual.placaNodo, el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo, actual.duvalNodo);
       pintarPlacaDe(actual);
       pintarDga(actual, { estado: { estado: 'sin_scada', motivo: motivoSin } });
