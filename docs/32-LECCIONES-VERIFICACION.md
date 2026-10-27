@@ -336,3 +336,11 @@ constante, separar con su etiqueta:
 - (3) lo que lo contrasta de verdad (una medición o un fabricante independiente).
 Solo (3) se llama comprobación o «lado seguro». Un valor despejado nunca se presenta como lo que marcaría un instrumento en
 campo. **Gate**: [HONOR].
+
+### L-158 · Contar con el código de la página, no con un barrido propio en la consola
+**Disparador**: auditar en producción lo que la página muestra (cuántos, cuáles, por devanado). · **Cicatriz** (`99 §185.5`): un
+barrido escrito a mano en la consola contó mal los meses por devanado («Panceguitas: primario 2 meses»; son 9) y se le dijo así al
+Ingeniero; el detalle del equipo y la vista previa —el mismo código de la página— daban 9. · **Regla**: un número que se le entrega
+sale del módulo de la página (o se contrasta con él en 2–3 equipos antes de entregarlo); el barrido propio solo encuentra
+candidatos. **Gate**: [HONOR].
+
