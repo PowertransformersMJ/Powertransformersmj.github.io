@@ -9222,6 +9222,14 @@ dominio; `wf_fcf5681b-945`); revisión adversarial de 4 lentes con verificación
 transitorios de pestañas abiertas antes de publicar, cubiertos por el procedimiento). Vista previa con franja roja en SU Chrome
 (periodo ene–oct: contador 51 → 50 = 39 · 9 · 1 sin cifra · 1 antes de un cambio; T2 93,2 % confirmada; T1 con «antes del
 cambio: sobrecarga sostenida 4 meses, primario hasta 123,7 % y secundario hasta 119,7 %»).
+**Publicado y verificado en vivo** (main `100f596`; regla desplegada ANTES del código; servido 22:24, caché vencida 22:34; CI verde).
+Datos (con su «sí, todo»): decisiones de Becerril T2 y T1 escritas con `decidirFila` (rev 13 → 15), releídas idénticas al plan
+(bóveda `decisiones-becerril-PLAN.json`); jun, jul y ago recargados en «Completar» con los paquetes vigentes: cada plan «1 serie por
+guardar, 226–229 iguales, 0 puntos que cambian de cifra», suma de Berrugas «cuadra». En vivo: homologación T1/T2 «Confirmada» con
+«Medida anterior (…) hasta abr-2026» / «Sin carga hasta abr-2026»; abril: T1 122,1 % firme con su sobrecarga (medida anterior), T2
+«sin carga»; agosto: T1 **92,9 %**, T2 **94,7 %**; periodo ene–oct: T1 **91,9 %** CRG 5 con «antes del cambio: sobrecarga sostenida
+4 meses», T2 **93,2 %**; contador 50 (39 · 9 · 1 · 1); firmes 141 → 143; detalle del T1: hoy (jun–ago, máx. 95 %) y «Ver la medida
+anterior» rehace historia (ene–abr, supera desde enero) y mes a mes, sin entrada nueva en el historial.
 
 **186.5 Anti-patterns evitados.** Repartir la entrada común por capacidad; fabricar un 0 % para «sin carga»; mezclar dos
 configuraciones en una cifra; tocar el importador (el punto más frágil de la caché) para un caso que no lo necesita; un formulario
