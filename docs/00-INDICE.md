@@ -64,6 +64,7 @@
 | §186 | ADR-186 — **Cambio de MEDIDA desde un mes** («medidas anteriores» en la homologación; regla que no deja perderlas); caso **Becerril** (una barra → barras separadas en may-2026) · TODO-54/69 | 9202 |
 | §187 | ADR-187 — **Filtro «Devanado sobrecargado»** (primario · secundario · terciario, con conteos) · TODO-69 | 9266 |
 | §188 | ADR-188 — **Homologación de los 8 «por confirmar»** (entrada común, paralelo, puntos cruzados, banco monofásico) · TODO-69 | 9309 |
+| §189 | ADR-189 — **Sin cifra medidos por circuito** (19 decisiones, placa Bosque T4, entradas comunes de San Martín de Loba y Montelíbano) · TODO-69 | 9374 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
