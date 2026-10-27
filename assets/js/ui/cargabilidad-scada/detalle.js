@@ -37,6 +37,9 @@ import {
 // Suma de circuitos (2026-10-24): archivos NUEVOS. Sin suma en la decisión, `leerSeriesEquipo` lee lo mismo que
 // `leerSeriesPunto` y el detalle sale idéntico.
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
+// Firmeza de varios meses por el devanado que da la cifra (2026-10-27): archivo NUEVO; sin él la firmeza es la del rango.
+import { firmezaDelRango, esDeMesesCompletos } from '../../domain/scada_carga_firmeza_rango.js';
+import { horasNoCargadas } from '../../domain/scada_carga_periodo.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
 import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga, filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
@@ -389,8 +392,14 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       if (e.iMax != null && e.iMax >= 0) { iMax = d.iF[e.iMax]; iMaxMs = d.t[e.iMax]; iMaxPct = e.max; }
     } else if (r && r.i.max != null && r.i.iMax != null && r.i.iMax >= 0) { iMax = r.i.max; iMaxMs = d.t[r.i.iMax]; }
     const deOtroNivel = ref && ref.devanado !== c.devMax ? ' (nivel ' + NIVELES[ref.nivel].etiqueta + ')' : '';
+    // La cobertura que decide la firmeza: la del devanado que da la cifra (2026-10-27); en varios meses, la de los meses
+    // en que midió. Antes era la menor de todos los devanados, y con la regla nueva contradecía al chip «firme».
+    const dCifra = c.devMax ? (c.devanados || []).find((x) => x.d === c.devMax) || null : null;
+    const conMeses = !!(dCifra && dCifra.coberturaFirmeza != null && dCifra.mesesTotal > 0);
     const cobertura = c.niveles.filter((x) => x.devanado).map((x) => x.cobertura).filter((x) => x != null);
-    const cob = cobertura.length ? Math.min(...cobertura) : (ref ? ref.cobertura : null);
+    const cob = dCifra ? (conMeses ? dCifra.coberturaFirmeza : dCifra.cobertura)
+      : (cobertura.length ? Math.min(...cobertura) : (ref ? ref.cobertura : null));
+    const delDev = dCifra ? 'del ' + DEVANADO[c.devMax].toLowerCase() + ' · ' : '';
     const sobreH = d && d.sobre ? d.sobre.horas : null;
     const kva = Number(leer(a.tx, 'placa.potencia_kva')) || null;
     const sMax = d ? d.fisico.s.max : null;
@@ -409,7 +418,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           sobreH ? 'primera ' + intervaloCO(d.t[d.sobre.primera]) + ' · última ' + intervaloCO(d.t[d.sobre.ultima])
             : (sobreH === 0 ? 'ninguna ventana de ' + CALCULO.sobrecargaMinH + ' h seguidas' : (c.motivoNulo || 'sin ampacidad o sin datos'))),
         kpi('Cobertura', cob != null ? el('span', {}, num(100 * cob, 0), el('small', {}, ' %')) : '—',
-          r ? r.servicio + ' h en servicio · ' + r.des + ' h fuera de servicio' : 'horas válidas sobre horas en servicio'),
+          conMeses ? delDev + 'en los meses en que midió (' + dCifra.mesesMedidos + ' de ' + dCifra.mesesTotal + ')'
+            : (r ? delDev + r.servicio + ' h en servicio · ' + r.des + ' h fuera de servicio' : 'horas válidas sobre horas en servicio')),
         kpi('Potencia aparente máx.' + deOtroNivel, sMax != null ? el('span', {}, num(sMax, 1), el('small', {}, ' MVA')) : '—',
           sMax != null && kva ? num(100 * sMax / (kva / 1000), 0) + ' % de ' + num(kva / 1000, 1) + ' MVA de placa (S = √(P²+Q²))' : 'S = √(P² + Q²) con P y Q del SCADA'),
         kpi('Cifra oficial (Excel)', of && of.pct != null ? el('span', {}, num(of.pct, 1), el('small', {}, ' %')) : '—',
@@ -622,6 +632,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         rec.mesesFallidos.forEach((m) => fallidos.add(m));
         porNivel[nv] = { t: rec.t, fam: rec.fam, mesesFallidos: rec.mesesFallidos };
       }
+      const recs = Object.fromEntries(Object.entries(porNivel).map(([nv, r]) => [nv, { t: r.t, fam: r.fam }]));
       // Primero el mapa nivel → devanado (de la homologación), luego la ampacidad por nivel.
       const previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosDe(a), umbrales: ctx.umbrales });
       for (const nv of Object.keys(porNivel)) {
@@ -643,7 +654,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         }
       }
       a.porNivel = porNivel;
-      a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosDe(a), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
+      // Varios meses COMPLETOS: firmeza por el devanado que da la cifra, contado en los meses (cargados por el parque) en
+      // que midió, como la lista por periodo. Un rango libre (que corta un mes) se queda con la cobertura del rango.
+      const mesesCargados = mesesRango.filter((m) => !!(ctx.catalogo && ctx.catalogo.meses && ctx.catalogo.meses[m]));
+      let firmezaPeriodo = null;
+      if (esDeMesesCompletos(desde, hasta, mesesRango)) {
+        try { firmezaPeriodo = firmezaDelRango(recs, previo.niveles, mesesCargados, desde, horasNoCargadas(ctx.catalogo, mesesCargados)); }
+        catch (e) { console.warn('[cargabilidad-scada] firmeza del rango', e); firmezaPeriodo = null; }
+      }
+      a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosDe(a), umbrales: ctx.umbrales, mesesFallidos: [...fallidos], firmezaPeriodo });
       a.leyendo = false;
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
       conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, a.mensualNodo, avisoEl(), selectorRango(a),

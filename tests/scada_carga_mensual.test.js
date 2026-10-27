@@ -95,7 +95,10 @@ test('un resumen que no existe (vacío) cuenta como mes sin datos del exporte, c
   const s = serieMensualEquipo({ tx, homologacion, catalogo, punto, resumenes: { ...resumenes, '2026-02': { mes: '2026-02', claves: {} } } });
   const lista = filasLista({ parque: [tx], homologacion, catalogo, resumenMes: { mes: '2026-02', claves: {} } })[0];
   assert.equal(s[1].leido, true); assert.equal(s[1].mensual.motivoNulo, lista.motivoNulo);
-  const p = filasPeriodo({ parque: [tx], homologacion, catalogo, meses: MESES, resumenes: { ...resumenes, '2026-02': { mes: '2026-02', claves: {} } }, filasPorMes: {} })[0];
+  // Como la lista: «Varios meses» recibe las filas de cada mes (la firmeza se cuenta en los meses en que midió, 2026-10-27).
+  const rs = { ...resumenes, '2026-02': { mes: '2026-02', claves: {} } };
+  const fpm = Object.fromEntries(MESES.map((m) => [m, filasLista({ parque: [tx], homologacion, catalogo, resumenMes: rs[m] })]));
+  const p = filasPeriodo({ parque: [tx], homologacion, catalogo, meses: MESES, resumenes: rs, filasPorMes: fpm })[0];
   assert.equal(s[3].acumulado.pct, p.pct); assert.equal(s[3].acumulado.firme, !!p.firme);
 });
 

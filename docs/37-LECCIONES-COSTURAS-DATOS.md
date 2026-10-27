@@ -162,3 +162,12 @@ plataforma) y se compara en amperios con la ampacidad. La tensión de fase solo 
 **Regla**: la corriente escrita en la tensión del devanado es suya; la de notas o potencias solo vale si ninguna etapa de OTRO
 devanado la explica mejor (un empate sí vale). Al cargar una placa, su corriente propia va en su tensión («· corriente de placa»).
 **Gate**: `tests/placa_etapas.test.js` (caso sintético que falla con la regla anterior).
+
+### L-160 · En un resumen SCADA, «0 horas» es que el punto no vino en el exporte; fuera de servicio es «horas > 0, todas desenergizadas»
+**Disparador**: descontar meses u horas «fuera de servicio» de una cuenta de cobertura o de meses medidos. · **Cicatriz** (`99 §190`,
+2026-10-27): el primer arreglo tomó «servicio 0» como fuera de servicio y un equipo sin exporte en sep–oct subió a firme; lo atrapó la
+comparación contra producción en la vista previa, no las pruebas. Mismo día: el acumulado «mes a mes» llamaba al periodo sin las filas
+de cada mes y contradecía a la lista.
+**Regla**: fuera de servicio = `horas > 0` y `servicio` (menos los días sin cargar) = 0; con `horas` = 0 o sin dato es un mes SIN medir.
+Toda vista que dice «lo mismo que la lista» le pasa las MISMAS entradas que la lista (filas de cada mes incluidas).
+**Gate**: `tests/scada_carga_firmeza_resguardos.test.js` (exporte vs desenergizado) y `scada_carga_firmeza_periodo.test.js` (acumulado = lista).

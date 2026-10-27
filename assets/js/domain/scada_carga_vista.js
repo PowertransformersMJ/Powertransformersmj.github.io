@@ -26,6 +26,8 @@ import { sobrecargaDeMes, tieneSobrecarga } from './scada_carga_sobrecarga.js';
 import { filaDelMes, filasDelMes, motivoSinCarga } from './scada_carga_cambio_medida.js';
 // Filtro «Devanado sobrecargado» (2026-10-27): archivo NUEVO; sin devanados elegidos no filtra nada.
 import { pasaFiltroDevanado } from './scada_carga_filtro_devanado.js';
+// El umbral de sobrecarga SEVERA (R4) del panel DGA, para la señal de cada devanado en `firmeza` (2026-10-27).
+import { SEVERA_PCT } from './scada_carga_dga.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -85,10 +87,22 @@ function motivoSinHoras(resumenPorNivel, niveles, { mes = null, punto = null } =
 }
 
 /**
+ * Señal de sobrecarga de UN nivel (2026-10-27): 0 nada · 1 sostenida sobre el 100 % (o en el borde) · 2 severa (sobre
+ * `SEVERA_PCT`, la de R4) · 3 horas imposibles (> 3 × ampacidad). Con la misma tolerancia de redondeo que la sostenida.
+ */
+function senalSobrecarga(n) {
+  const tol = (100 * 0.0005) / n.A;
+  if (n.picoPct != null && n.picoPct + tol > CALCULO.topeFisicoXAmpacidad * 100) return 3;
+  if (n.sostenidaPct == null) return 0;
+  if (n.sostenidaPct > SEVERA_PCT) return 2;
+  return n.sostenidaPct + tol > CALCULO.sobrecargaPct ? 1 : 0;
+}
+
+/**
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
  */
-export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null }) {
+export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null, firmezaPeriodo = null }) {
   const placa = placaDe(tx);
   const clave = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
   const esCircuito = !!clave && !esElementoTransformador(clave.elem);
@@ -124,8 +138,14 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
       if (es && es.aviso) avisosSuma.push(es.aviso);
     }
     niveles.push(fila1);
-    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0 });
+    // Varios meses (2026-10-27): la cobertura del devanado en los meses en que midió y cuántos midió (ver `firmeza`).
+    const fp = d && firmezaPeriodo ? firmezaPeriodo[d] || null : null;
+    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0,
+      servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
+      ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }
+  // Señal de sobrecarga de cada devanado para `firmeza` (lo que solo muestra un devanado que mide poco no se da por firme).
+  for (const x of devanados) x.sobre = Math.max(0, ...niveles.filter((n) => n.devanado === x.d && n.A > 0).map(senalSobrecarga));
   const conPct = devanados.filter((x) => x.pct != null);
   let pctEq = conPct.length ? Math.max(...conPct.map((x) => x.pct)) : null;
   const devMax = conPct.length ? conPct.reduce((a, b) => (b.pct > a.pct ? b : a)).d : null;

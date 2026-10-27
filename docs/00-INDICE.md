@@ -65,6 +65,7 @@
 | §187 | ADR-187 — **Filtro «Devanado sobrecargado»** (primario · secundario · terciario, con conteos) · TODO-69 | 9266 |
 | §188 | ADR-188 — **Homologación de los 8 «por confirmar»** (entrada común, paralelo, puntos cruzados, banco monofásico) · TODO-69 | 9309 |
 | §189 | ADR-189 — **Sin cifra medidos por circuito** (19 decisiones, placa Bosque T4, entradas comunes de San Martín de Loba y Montelíbano) · TODO-69 | 9374 |
+| §190 | ADR-190 — **Firmeza por el devanado que da la cifra** (mes, periodo y detalle; resguardos: días sin cargar, meses fuera de servicio, tridevanado, sobrecarga de un devanado mal medido) · TODO-69 | 9428 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
