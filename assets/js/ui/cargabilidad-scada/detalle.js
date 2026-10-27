@@ -25,7 +25,7 @@ import {
   analizarClaveHomologada, claveEfectiva, conteosHomologacion, normalizarMatricula, placaDe, AVISOS
 } from '../../domain/scada_carga_homologacion.js';
 import { filaDeTransformador, indicePorMatricula, calcularEquipo, mesPorDefecto } from '../../domain/scada_carga_vista.js';
-import { mesesDelRango, recortarRango, ventanaDeMes } from '../../domain/scada_carga_series.js';
+import { mesesDelRango, recortarRango, ventanaDeMes, msInicio, horasMes } from '../../domain/scada_carga_series.js';
 import { validos } from '../../domain/scada_carga_limpieza.js';
 import { resumenFisico, iFaseMax, serieCargabilidad, serieS, factorPotencia, desbalanceI, desequilibrioU, horasSostenidasSobre, estadisticas, maxSostenido } from '../../domain/scada_carga_kpis.js';
 import { resumirParaGuardar } from '../../domain/scada_carga_importacion.js';
@@ -37,6 +37,8 @@ import {
 // Suma de circuitos (2026-10-24): archivos NUEVOS. Sin suma en la decisión, `leerSeriesEquipo` lee lo mismo que
 // `leerSeriesPunto` y el detalle sale idéntico.
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
+// Firmeza de varios meses por el devanado que da la cifra (2026-10-27): archivo NUEVO; sin él la firmeza es la del rango.
+import { firmezaDeMeses } from '../../domain/scada_carga_firmeza_periodo.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
 import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga, filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
@@ -104,6 +106,41 @@ function calcularNivel(rec, kv, A) {
   const deseq = estadisticas(desequilibrioU(fam));
   const ext = extrasVisibles(fam, kv, A);   // máx/mín/instantáneo para VER (no entran en la cifra)
   return { t: rec.t, fam, val, iF, fisico, resumen, S, fp, carga, sobre, desb, deseq, ext, mesesFallidos: rec.mesesFallidos };
+}
+
+/** Las horas de UN mes dentro de un rango ya recortado (mismo índice que `recortarRango`); null si el mes no cae en él. */
+function recortarMes(rec, mes, desdeMs) {
+  const horas = rec.t.length;
+  const k0 = Math.max(0, Math.round((msInicio(mes, 0) - desdeMs) / H_MS));
+  const k1 = Math.min(horas, Math.round((msInicio(mes, 0) - desdeMs) / H_MS) + horasMes(mes));
+  if (k1 <= k0) return null;
+  const fam = {};
+  for (const [f, x] of Object.entries(rec.fam)) {
+    fam[f] = {};
+    for (const [k, arr] of Object.entries(x)) fam[f][k] = arr && typeof arr.subarray === 'function' ? arr.subarray(k0, k1) : arr;
+  }
+  return fam;
+}
+
+/**
+ * Rango de VARIOS meses: por devanado, su cobertura en los meses en que midió y cuántos midió (la misma regla que la lista
+ * por periodo, `firmeza`). Un solo mes cargado en el rango → null (la firmeza de siempre).
+ */
+function firmezaDelRango(recs, niveles, mesesCargados, desdeMs) {
+  if (!mesesCargados || mesesCargados.length < 2) return null;
+  const out = {};
+  for (const [nv, rec] of Object.entries(recs)) {
+    const i = (niveles || []).find((x) => x.nivel === nv);
+    if (!i || !i.devanado || !rec) continue;
+    const lista = mesesCargados.map((mes) => {
+      const fam = recortarMes(rec, mes, desdeMs);
+      if (!fam) return null;
+      const r = resumirParaGuardar(resumenFisico(fam, NIVELES[nv].kv), fam);
+      return { n: r && r.i ? r.i.n : 0, cob: r ? r.cob : null };
+    });
+    out[i.devanado] = { ...firmezaDeMeses(lista), mesesTotal: mesesCargados.length };
+  }
+  return out;
 }
 
 export function montarDetalle(cont, ctx, { alVolver }) {
@@ -622,6 +659,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         rec.mesesFallidos.forEach((m) => fallidos.add(m));
         porNivel[nv] = { t: rec.t, fam: rec.fam, mesesFallidos: rec.mesesFallidos };
       }
+      const recs = Object.fromEntries(Object.entries(porNivel).map(([nv, r]) => [nv, { t: r.t, fam: r.fam }]));
       // Primero el mapa nivel → devanado (de la homologación), luego la ampacidad por nivel.
       const previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosDe(a), umbrales: ctx.umbrales });
       for (const nv of Object.keys(porNivel)) {
@@ -643,7 +681,11 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         }
       }
       a.porNivel = porNivel;
-      a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosDe(a), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
+      // Varios meses: firmeza por el devanado que da la cifra, contado en los meses (cargados por el parque) en que midió.
+      const mesesCargados = mesesRango.filter((m) => !!(ctx.catalogo && ctx.catalogo.meses && ctx.catalogo.meses[m]));
+      let firmezaPeriodo = null;
+      try { firmezaPeriodo = firmezaDelRango(recs, previo.niveles, mesesCargados, desde); } catch (e) { firmezaPeriodo = null; }
+      a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosDe(a), umbrales: ctx.umbrales, mesesFallidos: [...fallidos], firmezaPeriodo });
       a.leyendo = false;
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
       conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, a.mensualNodo, avisoEl(), selectorRango(a),

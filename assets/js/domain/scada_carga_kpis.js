@@ -20,6 +20,7 @@
 import { CALCULO, FAMILIAS_I, FAMILIAS_U, CODIGO } from './scada_carga_config.js';
 import { validos } from './scada_carga_limpieza.js';
 import { calcularCalifCRG } from './salud_activos.js';
+import { FRACCION_MESES_MIN } from './scada_carga_firmeza_periodo.js';
 
 const finitos = (arr) => { const o = []; for (let i = 0; i < arr.length; i++) if (Number.isFinite(arr[i])) o.push(arr[i]); return o; };
 
@@ -269,7 +270,11 @@ export function mideLaCarga(placa, devanadosMedidos) {
 
 /**
  * FIRMEZA de la cifra del equipo. firme = true solo si se cumple TODO; si no, los motivos.
- * @param {{estadoHomologacion, esCircuito, devanados: Array<{d, A, cobertura, n, escala}>, placa, mesesFallidos}} ctx
+ * Cobertura y horas las decide el devanado que DA LA CIFRA (decisión del Ingeniero, 2026-10-27, «en mes y periodo»): un
+ * devanado que mide poco y no da la cifra ya no vuelve provisional al equipo, porque el otro, bien medido, lleva la misma
+ * carga. Con varios meses, ese devanado se cuenta solo en los meses en que midió (`coberturaFirmeza`, de
+ * scada_carga_firmeza_periodo.js) y debe haber medido al menos la mitad de los meses (`mesesMedidos` / `mesesTotal`).
+ * @param {{estadoHomologacion, esCircuito, devanados: Array<{d, A, pct, cobertura, n, escala, coberturaFirmeza?, mesesMedidos?, mesesTotal?}>, placa, mesesFallidos}} ctx
  */
 export function firmeza(ctx) {
   const motivos = [];
@@ -279,8 +284,13 @@ export function firmeza(ctx) {
   if (!usados.length) motivos.push('sin dato en ningún devanado');
   if ((ctx.devanados || []).some((x) => !(x.A > 0))) motivos.push('falta la ampacidad de un devanado');
   if (!mideLaCarga(ctx.placa, usados.map((x) => x.d))) motivos.push('no se mide el devanado que lleva la carga');
-  if (usados.some((x) => x.cobertura != null && x.cobertura < CALCULO.coberturaMinFirme)) motivos.push('cobertura menor al 50 %');
-  if (usados.some((x) => x.n < CALCULO.horasMinFirme)) motivos.push('menos de 72 horas válidas');
+  const cifra = usados.length ? usados.reduce((a, b) => (b.pct > a.pct ? b : a)) : null;
+  if (cifra) {
+    const cob = cifra.coberturaFirmeza != null ? cifra.coberturaFirmeza : cifra.cobertura;
+    if (cob != null && cob < CALCULO.coberturaMinFirme) motivos.push('cobertura menor al 50 %');
+    if (cifra.n < CALCULO.horasMinFirme) motivos.push('menos de 72 horas válidas');
+    if (cifra.mesesTotal > 0 && (cifra.mesesMedidos || 0) / cifra.mesesTotal < FRACCION_MESES_MIN) motivos.push('midió menos de la mitad de los meses');
+  }
   // Con solo 2 de 3 fases la fase más cargada puede ser la que falta: la cifra es un mínimo, no firme.
   if (usados.some((x) => x.n > 0 && (x.unaFalta || 0) / x.n > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');
   if ((ctx.devanados || []).some((x) => x.escala === 'ESCALA_I' || x.escala === 'ESCALA_INDETERMINADA')) motivos.push('escala de la corriente sospechosa');

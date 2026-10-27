@@ -28,6 +28,7 @@ import { especSuma, componerResumen, derivadoDeMeses } from './scada_carga_suma.
 import { sobrecargaDelPeriodo } from './scada_carga_sobrecarga.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; sin medidas anteriores el periodo da lo mismo que antes.
 import { segmentoDelMes, mesesDelSegmento, filasDelMes, sobrecargaAntesDelCambio, motivoSinCarga } from './scada_carga_cambio_medida.js';
+import { firmezaPeriodoDeFilas } from './scada_carga_firmeza_periodo.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -238,7 +239,9 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     const rDe = (mes) => rMes[mes] || null;
     const sint = conDerivado(resumenPeriodo(mesesP.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] }))), fila, cid, mesesP, rDe);
     // `mes` = el último del periodo: si TODO el periodo es anterior al primer mes del punto, el motivo lo dice como en la lista.
-    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: mesFin });
+    // Firmeza por el devanado que da la cifra, contado en los meses en que midió (decisión del Ingeniero, 2026-10-27).
+    const firmezaPeriodo = firmezaPeriodoDeFilas(mesesP.map(filaMes), mesesP.length);
+    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: mesFin, firmezaPeriodo });
     const hayAntes = !!punto && (punto.meses || []).some((m) => m < mesesP[0]);
     const ag = agregadosDeMeses(mesesP.map((mes) => ({ mes, fila: filaMes(mes), r: rDe(mes) })), { hayAntes });
     const base = (meses || []).map(filaMes).find(Boolean) || {};

@@ -88,7 +88,7 @@ function motivoSinHoras(resumenPorNivel, niveles, { mes = null, punto = null } =
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
  */
-export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null }) {
+export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null, firmezaPeriodo = null }) {
   const placa = placaDe(tx);
   const clave = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
   const esCircuito = !!clave && !esElementoTransformador(clave.elem);
@@ -124,7 +124,10 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
       if (es && es.aviso) avisosSuma.push(es.aviso);
     }
     niveles.push(fila1);
-    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0 });
+    // Varios meses (2026-10-27): la cobertura del devanado en los meses en que midió y cuántos midió (ver `firmeza`).
+    const fp = d && firmezaPeriodo ? firmezaPeriodo[d] || null : null;
+    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0,
+      ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }
   const conPct = devanados.filter((x) => x.pct != null);
   let pctEq = conPct.length ? Math.max(...conPct.map((x) => x.pct)) : null;
