@@ -9305,3 +9305,68 @@ conteos son del mes o periodo cargado, sin los demás filtros (un equipo con dos
 mes decide después no repinta la barra (como el resto de los filtros). «Todos» = sin filtrar (lo aprobado). Queda, PREEXISTENTE (ADR-185):
 si un nivel ya confirma la sobrecarga, otro nivel del mismo equipo con horas imposibles no se revisa con la curva, y ese devanado no
 aparece en la etiqueta ni en el filtro.
+
+## 188. ADR-188 — Cargabilidad SCADA: homologación de los 8 «por confirmar» (Curumaní, Sampués, Chinú Planta, Sucre, Tres Palmas) — datos, sin código (TODO-69) ⟦OPUS-5.5⟧ (2026-10-27)
+
+> «continuemos con los pendientes de cargabilidad SCADA» → diagnóstico con los crudos (5 analistas + 5 verificadores independientes)
+> → simulación en SU Chrome → sus respuestas: Curumaní «Sí, aplica y recarga» · Sampués «Sí, en paralelo» · Chinú «Sí, y T2 solo por
+> 34,5 kV» · Sucre y Tres Palmas «Aplica las dos» (2026-10-27).
+
+**188.1 Causa raíz** (verificada en los crudos ene-2025 → oct-2026, en las placas y reproduciendo al decimal las cifras de la página).
+Ninguna era sobrecarga real del equipo señalado: era la MEDIDA.
+- **Curumaní T1 (152,9 % «posible»)**: el 34,5 kV del interruptor es la ENTRADA COMÚN de T1+T2 (su P = la de los tres circuitos,
+  0,998–1,003; barra de 34,5 kV cierra en +0,03 MW). La barra de 13,8 kV está PARTIDA 20 meses sin un relevo: el T1 lleva dos
+  circuitos (T1 = 1,014 × su suma, error 2–3 A) y el T2 el tercero (los saltos de ese circuito mueven al T1 0,06). El T2 estaba
+  homologado a un circuito DEL T1 (sin cifra). El 13,8 kV del T1 lee ~7 % bajo frente a su propia P y U (escala, área SCADA).
+- **Sampués T1 (146,3 %)**: hasta el 21-ago-2026 el punto medía la entrada común del T1 y el T2 EN PARALELO: impedancia vista 3,1–3,6 %
+  (dos de 5 MVA), nunca el 6,46 % de uno (por reactiva absorbida y por caída de tensión, dos métodos; en el patio nuevo el T2 solo da
+  5,3–6,1 %: el método distingue). El 34,5 kV viejo traía la corriente ×1/10. Desde el 22-ago (relevo) cada uno tiene su interruptor
+  (reparto estable 45,6/54,4).
+- **Chinú Planta T1 (103,9 %)**: puntos CRUZADOS en el Excel: el único 34,5/13,8 kV es swTrafo2 (su 13,8 kV = suma de sus circuitos;
+  P 34,5 = P 13,8); el T1 se dividía con la corriente de un 60 MVA. El 110 kV de swTrafo1 iba en pasos de 10 A hasta el 9-jul y luego
+  marca 5–8 % de más (y un pico falso de 164 % ese día).
+- **Sucre T1**: la placa de 30 kV ES real (foto nov-2022, serie de la plataforma); el aviso «nivel sin devanado» venía de la red de
+  34,5 kV. Ese 34,5 kV es del equipo (correlación 0,96) pero inservible (pasos de 1 A, congelado 73–86 % de las horas).
+- **Tres Palmas T1/T2/T3 (67,4 %)**: banco de 3 monofásicas de 250 kVA, triángulo/estrella (las 3 placas; 7 conexiones probadas, gana
+  la de triángulo). En 34,5 kV cada línea suma dos unidades y se dividía por la corriente de una; su tensión está mal escalada desde
+  el 19-ago-2025 (×0,866).
+
+**188.2 Solución (solo datos; reversa = «Reabrir» por fila).** 10 decisiones escritas con `decidirFila` (rev 15 → 25), releídas
+IDÉNTICAS al plan (bóveda `2026-10-27-provisionales-homologacion/decisiones-PLAN.json`); `avisos_vistos` = los bloqueantes del último
+mes antes ∪ después, como la pantalla «Revisar»:
+- Curumaní T1: 13,8 kV → S, 34,5 kV «No usar». T2: su circuito real (13,8 kV → S) + RECARGA de ene–ago en «Completar» (7 meses: cada
+  plan «1–2 series por guardar, 225–230 iguales, 0 puntos que cambian de cifra»; entraron el circuito del T2 y, en ene–abr, el circuito
+  que Becerril T1 usa desde mayo — no cambia su cifra, que en ene–abr sale de su medida anterior).
+- Sampués T1: medida de hoy desde sep-2026 (34,5 → P, 13,8 → S) + medida anterior hasta ago-2026 con decisión «Excluir» y la nota
+  (no «sin carga», que sería falso; no repartir 46/54, que sería fabricar). T2: igual, anterior hasta jul-2026 (desde ago su punto propio).
+- Chinú Planta: T1 → swTrafo2 (34,5 → P, 13,8 → S); T2 → swTrafo1 SOLO por 34,5 kV (110 kV «No usar»). T3 sin cambio. La fila
+  huérfana de la matrícula mal escrita YA estaba «retirada» (no hubo que excluirla).
+- Sucre: 13,8 kV → S, 34,5 kV «No usar»; placa intacta. Tres Palmas (las 3): 13,8 kV → S, 34,5 kV «No usar», clave compartida
+  confirmada; cifra = fase más cargada para las tres.
+
+**188.3 No-regresión.** Simulación en su Chrome con los módulos de producción: 0 diferencias en las otras 198 filas, mes a mes y en el
+periodo. Sin cambios de código, reglas ni placas.
+
+**188.4 Verificación en vivo** (página recargada, ene–oct): firmes 142 → **149**, provisionales 42 → **36**, sobrecarga 50 → **48**
+(40 firmes · 6 provisionales · 1 sin cifra · 1 antes de un cambio). Curumaní T1 **85,4 %** CRG 4 · T2 **100,4 %** CRG 5 con sobrecarga
+sostenida firme en 3 meses (hasta 109,3 %) · Sampués T1 **57,4 %** (sep–oct), T2 **72,1 %** firme, detalle con «Medida excluida» y su
+nota + «Ver la medida de hoy» · Chinú T1 **49,2 %**, T2 **34,7 %** (CRG 1) · Sucre **95,2 %** firme · Tres Palmas **31,1 %** (sigue
+provisional por cobertura). Resúmenes ene–ago antes/después con llaves ordenadas (L-120): 0 valores cambiados, solo los 2 puntos nuevos.
+
+**188.5 Anti-patterns evitados.** Repartir una entrada común por capacidad; «sin carga» para un equipo que sí llevaba carga; aceptar
+el aviso de relación de todos los meses (solo el del último mes, como la pantalla); escribir sin simular; comparar resúmenes sin
+ordenar las llaves (el primer cotejo dio 84 «cambios» que eran solo orden).
+
+**188.6 Archivos.** Ninguno de código. Datos: homologación vigente (10 filas) + resúmenes y series de ene–ago. Bóveda: crudos de los
+dos workflows (`wf_bac114c6-cf9` diagnóstico, `wf_84752353-cc4` verificación), plan y síntesis.
+
+**188.7 Doctrina.** W-13 (simulación + foto antes/después + su autorización por tanda); deliberación con analista + verificador
+independiente por estación; preguntas cerradas con la recomendada. NO revisado externamente.
+
+**188.8 Verificado sano / no re-auditar.** Curumaní: sin relevos en 20 meses, fases sin cruzar, escala del 34,5 kV sana (0,984–0,992).
+Chinú: sin cambio de configuración desde ene-2025; la línea de 110 kV solo alimenta los dos 110/34,5 kV. Sampués: la línea solo
+alimenta la estación; el pico de julio es carga real (reconectador). Sucre: las 57 horas que fijan el p99 son carga nocturna real.
+Queda ABIERTO (suyo/campo): Sucre — confirmar que sigue el Suntec (el ABB de 8/10 MVA rotulado para Sucre daría ~48 %) y la toma;
+Curumaní T1 — ventiladores «OBSOLETA» (sin ellos su p99 es 111 % de la ONAN) y su 13,8 kV ~7 % bajo; Chinú — qué bahía es el ABB y
+cuál el WEG (indicio, límites iguales). Corrige lo dicho antes: `§185.1` (Curumaní T1 162,6 % y Sampués T1 174,2 % NO eran del equipo)
+y `53 §3` («Sampués, corrientes copiadas»: Salud le asigna a cada uno la mitad de la estación, coherente con el paralelo).

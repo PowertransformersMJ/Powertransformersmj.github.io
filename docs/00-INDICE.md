@@ -63,6 +63,7 @@
 | §185 | ADR-185 — **Sobrecarga por DEVANADO**: el indicador y el filtro catalogan firmes, posibles, periodo sin cifra y circuitos (39 → 52); la etiqueta nombra el devanado; placa de **San Luis T1** (8,37/20,92 A) · L-157/L-158 · TODO-54/69 | 9137 |
 | §186 | ADR-186 — **Cambio de MEDIDA desde un mes** («medidas anteriores» en la homologación; regla que no deja perderlas); caso **Becerril** (una barra → barras separadas en may-2026) · TODO-54/69 | 9202 |
 | §187 | ADR-187 — **Filtro «Devanado sobrecargado»** (primario · secundario · terciario, con conteos) · TODO-69 | 9266 |
+| §188 | ADR-188 — **Homologación de los 8 «por confirmar»** (entrada común, paralelo, puntos cruzados, banco monofásico) · TODO-69 | 9309 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
