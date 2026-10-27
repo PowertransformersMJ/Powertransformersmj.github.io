@@ -34,35 +34,35 @@
 | §156 | ADR-156 — **Mapa**: Mapa y Relieve a voluntad (casillas) | 7099 |
 | §157 | ADR-157 — **Mapa**: filtros de salud 1–5 y de Cargabilidad SCADA (CRG) | 7121 |
 | §158 | ADR-158 — **Cargabilidad SCADA**: los 77 sin medición; motivo con la causa; relevo de Sampués; cargas de octubre (1–7 y **1–22**, `.12`/`.13`) | 7165 |
-| §159 | ADR-159 — **Cargabilidad SCADA por periodo** (p99 exacto con `top`) e historia del equipo | 7356 |
-| §160 | ADR-160 — **CRG con la escala del MO** (Muy Bueno…Muy Pobre); lo ofrecido → `§160.7` (dentro de §161) | 7473 |
-| §161 | ADR-161 — **Contrato conforme a las órdenes**: 4 órdenes corregidas; el tablero relee las órdenes | 7513 |
-| §162 | ADR-162 — **Cerebro**: auditoría Nivel-2 + neurogénesis (00b, 23, 37, 38, lóbulo 54) | 7583 |
-| §163 | ADR-163 — **Informe de Mantenimiento Brigada**: F60 de Applus (refrigeración) con listado como Fichas, PDF y Word · TODO-81 | 7696 |
-| §164 | ADR-164 — **Cerebro**: espejo PRIVADO en GitHub (`cerebro-mj`); matiza ADR-059, no es respaldo · TODO-29 | 7997 |
-| §165 | ADR-165 — **Cargabilidad SCADA**: todos los devanados de placa (tensión, ampacidad, potencia calculada, carga) en lista, CSV y detalle · TODO-69 | 8066 |
-| §166 | ADR-166 — **Cargabilidad SCADA**: placa característica de cada equipo en su detalle (foto, lectura, diferencias); carga admin, foto atada a sus bytes · TODO-69 | 8122 |
-| §167 | ADR-167 — **Lorica T1** contra su placa + cargabilidad del SCADA (67,4 %, 13,8 kV); una muestra nueva ya no borra la CRG · TODO-54 | 8190 |
-| §168 | ADR-168 — **Cargabilidad SCADA**: mes a mes y acumulada a la fecha en cada equipo; «A la fecha» = cargabilidad oficial en la revisión · TODO-69 | 8257 |
-| §169 | ADR-169 — **Cargabilidad SCADA**: cada devanado mes a mes frente a sus límites de PLACA (ONAN/ONAF); potencias placa ↔ plataforma ↔ Excel de Salud de Activos · TODO-69/54 | 8305 |
-| §170 | ADR-170 — **Cargabilidad SCADA**: corriente límite IMPRESA en la placa (o «calculada»); terciario de compensación sin límite; planos y «futuro» marcados; 102 placas completadas · TODO-69/54 | 8391 |
-| §171 | ADR-171 — **Bosque T2** con su placa (WEG 40 MVA, 67 kV): ampacidades 344,7/1.673,5 A, CRG oficial 79,1 % (CRG 4); placa reconectable no grave · TODO-54 | 8440 |
-| §172 | ADR-172 — **Cargabilidad SCADA**: tabla «Devanados de placa» con valores de PLACA; la cifra oficial con la corriente de placa (32 devanados) · TODO-69/54 | 8484 |
-| §173 | ADR-173 — **Placas v4** (Magangué T2A, Montería T2A: corriente de MT impresa) + una corriente de las notas que cuadra mejor con OTRO devanado no se rotula «impresa» (L-155) · TODO-54/69 | 8534 |
-| §174 | ADR-174 — **Cargabilidad SCADA**: detalle de los umbrales de placa en las barras (recuadro, leyenda, tabla con la lectura «al borde de la ONAN»/«supera la ONAF») · TODO-69 | 8582 |
-| §175 | ADR-175 — **Nueva Cospique T1–T4** con los datos de su placa (primario 110 kV, no 66): homologación automática y cifra firme · TODO-54/69 | 8633 |
-| §176 | ADR-176 — **Puerto Libertador**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 con su placa (4000 kVA) y su circuito de salida; cifras firmes · TODO-54/69 | 8675 |
-| §177 | ADR-177 — **Lorica T2** con su placa (primario 33 kV) y **San Benito de Abad T1** con su placa y cifra por 13,8 kV (34,5 kV con escalas erradas) · TODO-54/69 | 8713 |
-| §178 | ADR-178 — **Cargabilidad SCADA**: nivel medido pero excluido en la homologación → «medida excluida en la homologación» con su motivo (no «no se mide») · TODO-69 | 8757 |
-| §179 | ADR-179 — **Santa Rosa T1** por su 13,8 kV (las 3 bahías de 34,5 kV con escalas erradas) y con sus datos de placa; cifra firme 45,5 % · TODO-54/69 | 8790 |
-| §180 | ADR-180 — **Zambrano T1A** (tres devanados): el aviso de relación no aplica a sus dos salidas (el terciario inyecta); firme 90,6 % por el secundario; placas de T1A y T2 · TODO-54/69 | 8834 |
-| §181 | ADR-181 — **Boston T1A**: sobrecarga REAL 110 % CRG 5 con su terciario (alias de elemento en el empaquetador); la prueba de relación no aplica a un tres devanados; placa · TODO-54/69 | 8890 |
-| §182 | ADR-182 — **Berrugas T1** por la SUMA de los circuitos de su barra (fase S ×2 y 34,5 kV ×½ en el SCADA); nueva capacidad «suma de circuitos»; placa (Dyn11, ONAN/ONAF) · TODO-54/69 | 8962 |
-| §183 | ADR-183 — **Informe Brigada**: la ACTIVIDAD de un informe nuevo se escribe a mano (lista como sugerencias; modelo F60); reglas `ibrActividad` · TODO-81 | 9033 |
-| §184 | ADR-184 — **Ovejas**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 por su circuito de salida (94,5 % CRG 5); placas de los dos · TODO-54/69 | 9082 |
-| §185 | ADR-185 — **Sobrecarga por DEVANADO**: el indicador y el filtro catalogan firmes, posibles, periodo sin cifra y circuitos (39 → 52); la etiqueta nombra el devanado; placa de **San Luis T1** (8,37/20,92 A) · L-157/L-158 · TODO-54/69 | 9124 |
-| §186 | ADR-186 — **Cambio de MEDIDA desde un mes** («medidas anteriores» en la homologación; regla que no deja perderlas); caso **Becerril** (una barra → barras separadas en may-2026) · TODO-54/69 | 9189 |
-| §187 | ADR-187 — **Filtro «Devanado sobrecargado»** (primario · secundario · terciario, con conteos) · TODO-69 | 9253 |
+| §159 | ADR-159 — **Cargabilidad SCADA por periodo** (p99 exacto con `top`) e historia del equipo | 7369 |
+| §160 | ADR-160 — **CRG con la escala del MO** (Muy Bueno…Muy Pobre); lo ofrecido → `§160.7` (dentro de §161) | 7486 |
+| §161 | ADR-161 — **Contrato conforme a las órdenes**: 4 órdenes corregidas; el tablero relee las órdenes | 7526 |
+| §162 | ADR-162 — **Cerebro**: auditoría Nivel-2 + neurogénesis (00b, 23, 37, 38, lóbulo 54) | 7596 |
+| §163 | ADR-163 — **Informe de Mantenimiento Brigada**: F60 de Applus (refrigeración) con listado como Fichas, PDF y Word · TODO-81 | 7709 |
+| §164 | ADR-164 — **Cerebro**: espejo PRIVADO en GitHub (`cerebro-mj`); matiza ADR-059, no es respaldo · TODO-29 | 8010 |
+| §165 | ADR-165 — **Cargabilidad SCADA**: todos los devanados de placa (tensión, ampacidad, potencia calculada, carga) en lista, CSV y detalle · TODO-69 | 8079 |
+| §166 | ADR-166 — **Cargabilidad SCADA**: placa característica de cada equipo en su detalle (foto, lectura, diferencias); carga admin, foto atada a sus bytes · TODO-69 | 8135 |
+| §167 | ADR-167 — **Lorica T1** contra su placa + cargabilidad del SCADA (67,4 %, 13,8 kV); una muestra nueva ya no borra la CRG · TODO-54 | 8203 |
+| §168 | ADR-168 — **Cargabilidad SCADA**: mes a mes y acumulada a la fecha en cada equipo; «A la fecha» = cargabilidad oficial en la revisión · TODO-69 | 8270 |
+| §169 | ADR-169 — **Cargabilidad SCADA**: cada devanado mes a mes frente a sus límites de PLACA (ONAN/ONAF); potencias placa ↔ plataforma ↔ Excel de Salud de Activos · TODO-69/54 | 8318 |
+| §170 | ADR-170 — **Cargabilidad SCADA**: corriente límite IMPRESA en la placa (o «calculada»); terciario de compensación sin límite; planos y «futuro» marcados; 102 placas completadas · TODO-69/54 | 8404 |
+| §171 | ADR-171 — **Bosque T2** con su placa (WEG 40 MVA, 67 kV): ampacidades 344,7/1.673,5 A, CRG oficial 79,1 % (CRG 4); placa reconectable no grave · TODO-54 | 8453 |
+| §172 | ADR-172 — **Cargabilidad SCADA**: tabla «Devanados de placa» con valores de PLACA; la cifra oficial con la corriente de placa (32 devanados) · TODO-69/54 | 8497 |
+| §173 | ADR-173 — **Placas v4** (Magangué T2A, Montería T2A: corriente de MT impresa) + una corriente de las notas que cuadra mejor con OTRO devanado no se rotula «impresa» (L-155) · TODO-54/69 | 8547 |
+| §174 | ADR-174 — **Cargabilidad SCADA**: detalle de los umbrales de placa en las barras (recuadro, leyenda, tabla con la lectura «al borde de la ONAN»/«supera la ONAF») · TODO-69 | 8595 |
+| §175 | ADR-175 — **Nueva Cospique T1–T4** con los datos de su placa (primario 110 kV, no 66): homologación automática y cifra firme · TODO-54/69 | 8646 |
+| §176 | ADR-176 — **Puerto Libertador**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 con su placa (4000 kVA) y su circuito de salida; cifras firmes · TODO-54/69 | 8688 |
+| §177 | ADR-177 — **Lorica T2** con su placa (primario 33 kV) y **San Benito de Abad T1** con su placa y cifra por 13,8 kV (34,5 kV con escalas erradas) · TODO-54/69 | 8726 |
+| §178 | ADR-178 — **Cargabilidad SCADA**: nivel medido pero excluido en la homologación → «medida excluida en la homologación» con su motivo (no «no se mide») · TODO-69 | 8770 |
+| §179 | ADR-179 — **Santa Rosa T1** por su 13,8 kV (las 3 bahías de 34,5 kV con escalas erradas) y con sus datos de placa; cifra firme 45,5 % · TODO-54/69 | 8803 |
+| §180 | ADR-180 — **Zambrano T1A** (tres devanados): el aviso de relación no aplica a sus dos salidas (el terciario inyecta); firme 90,6 % por el secundario; placas de T1A y T2 · TODO-54/69 | 8847 |
+| §181 | ADR-181 — **Boston T1A**: sobrecarga REAL 110 % CRG 5 con su terciario (alias de elemento en el empaquetador); la prueba de relación no aplica a un tres devanados; placa · TODO-54/69 | 8903 |
+| §182 | ADR-182 — **Berrugas T1** por la SUMA de los circuitos de su barra (fase S ×2 y 34,5 kV ×½ en el SCADA); nueva capacidad «suma de circuitos»; placa (Dyn11, ONAN/ONAF) · TODO-54/69 | 8975 |
+| §183 | ADR-183 — **Informe Brigada**: la ACTIVIDAD de un informe nuevo se escribe a mano (lista como sugerencias; modelo F60); reglas `ibrActividad` · TODO-81 | 9046 |
+| §184 | ADR-184 — **Ovejas**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 por su circuito de salida (94,5 % CRG 5); placas de los dos · TODO-54/69 | 9095 |
+| §185 | ADR-185 — **Sobrecarga por DEVANADO**: el indicador y el filtro catalogan firmes, posibles, periodo sin cifra y circuitos (39 → 52); la etiqueta nombra el devanado; placa de **San Luis T1** (8,37/20,92 A) · L-157/L-158 · TODO-54/69 | 9137 |
+| §186 | ADR-186 — **Cambio de MEDIDA desde un mes** («medidas anteriores» en la homologación; regla que no deja perderlas); caso **Becerril** (una barra → barras separadas en may-2026) · TODO-54/69 | 9202 |
+| §187 | ADR-187 — **Filtro «Devanado sobrecargado»** (primario · secundario · terciario, con conteos) · TODO-69 | 9266 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

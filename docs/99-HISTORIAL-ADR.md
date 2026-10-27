@@ -7353,6 +7353,19 @@ renombradas). Simulación: 169 series en 32 lotes, 76,8 % de horas válidas (29 
   de 34,5 kV de T1-M/M-COR está congelado desde el 13: ¿móvil en Corozal? No homologada, no se cargó. Siguen faltando las 43
   estaciones del exporte (57 puntos, TODO-69).
 
+**158.14 Nota posterior (2026-10-27): octubre 1–26 cargado (su pedido: «he cargado otro día para que lo proceses»).** Carpeta
+`Octubre` entera con la homologación vigente (v3 + alias) → `octubre-2026-10-27/` (6 partes, sha `a12c75d963b2…`; alias de
+Boston 780 filas, relevo de Sampués 9.490). Simulación: 171 series en 32 lotes, «0 ya estaban iguales», suma de Berrugas «cuadra»;
+«Completar»; guardado 171 series + 1 resumen. Reemplaza a `octubre-2026-10-26/` (días 1–25) como paquete vigente.
+- **Foto antes/después** (resumen de octubre, 172 claves): 0 niveles pierden horas, 256 ganan, 62 iguales (sin datos en octubre);
+  catálogo `nDias` 25 → 26. p99 entre −7,2 % y +1 % (mediana 0); solo 2 bajan > 3 %: Monterrey 34,5 kV y Sampués 13,8 kV (el alza
+  del 22–23 pesa menos con más horas). Periodo ene–oct: firmes 143 → 142, provisionales 41 → 42, sobrecarga 50 (igual).
+- **El único cambio de clase** (probado recalculando con 25 días): Las Palomas T1 pasa a provisional porque su 13,8 kV no trae
+  NINGUNA hora en octubre y cada día nuevo pesa como hueco suyo: cobertura del devanado 0,500 → 0,498. Correcto; hueco para el
+  área SCADA.
+- **Dos intentos perdidos sin escribir nada**: el clic de la extensión en «Guardar en la base» cayó en el enlace de Inicio (el
+  panel «Cargar mes» seguía oculto bajo la pestaña Homologación) → L-159.
+
 ## 159. ADR-159 — Cargabilidad SCADA por PERIODO de varios meses (carga del periodo + peor mes) e «Historia del equipo»: desde cuándo supera su capacidad y el día de su mayor corriente por devanado ⟦OPUS-5.5⟧ (2026-10-09)
 
 > *«me gustaria escoger un rango de fechas para tener un espectro a nivel general y no solo por mes. tambien al seleccionar

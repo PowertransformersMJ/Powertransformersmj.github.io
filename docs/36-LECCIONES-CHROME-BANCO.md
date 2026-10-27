@@ -114,3 +114,8 @@ la lista en contenedores clonados funcionó, sin tocar producción. Esa vista pr
 escribe el texto «null» (el `append` nativo no es el `el` de `dom.js`). · **Regla**: vista previa desde el SHA empujado; nunca
 `null` al `append` nativo. **Gate**: prueba en `tests/scada_carga_sobrecarga.test.js` (patrón `td.append(…: null)`) + [HONOR].
 
+
+### L-159 · En «Datos SCADA», «Guardar en la base» se pulsa desde la página, no con el clic de la extensión
+**Cicatriz** (`99 §158.14`): dos veces el clic por referencia cayó en el enlace de Inicio (el panel «Cargar mes» seguía oculto bajo
+otra pestaña) y la página se fue sin guardar. · **Regla**: tras simular, `boton.click()` desde la página y seguir «Guardando series… n
+de N» con lecturas cortas (< 40 s); un intento perdido se repite en «Completar» («0 ya estaban iguales»). **Gate**: [HONOR].
