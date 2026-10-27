@@ -9424,3 +9424,63 @@ recomendada. NO revisado externamente.
 con su motivo correcto. El Carmen T1A firme 100–106 % es real. Queda ABIERTO (campo/área SCADA): San Luis T1 (cambio de unidad sin fecha;
 su circuito congelado desde jun), lectura del relé de Pueblo Nuevo (probable > 100 % desde abr), fase S de Ánimas Bajas, fase T de
 Puerto Badel, TC de Cañabraval, puntos de Lorica T2 y Montelíbano T2, ventiladores de Guatapurí T3.
+
+## 190. ADR-190 — Cargabilidad SCADA: la firmeza la decide el devanado que da la cifra, contado en los meses en que midió (mes, periodo y detalle), con sus resguardos (TODO-69) ⟦OPUS-5.5⟧ (2026-10-27)
+
+> «nos encontramos trabajando en cargabilidad SCADA, entiendo hacen falta varios equipos para que queden conformes … alineémonos» →
+> «Grupo 1 primero» (13 provisionales solo porque mide poco un devanado que NO da la cifra) → «Sí, en mes y periodo» → vista previa
+> en su Chrome → «Procede, publícalo» (2026-10-27).
+
+**190.1 Causa raíz** (código leído y reproducido con datos reales). `firmeza` exigía cobertura ≥ 50 % y ≥ 72 h a TODOS los devanados
+usados: un devanado bien medido daba la cifra y el otro, mal medido, volvía provisional al equipo aunque los dos llevan la misma carga.
+En el periodo, además, los meses en que ese devanado (o su estación) no vino contaban como hueco: Chambacú T1 y T2 salían provisionales
+con sus 9 meses firmes.
+
+**190.2 Solución estructural.**
+- `firmeza` (kpis): cobertura, horas y meses los decide el devanado que DA LA CIFRA (`midePoco`); la fase que falta, la homologación y
+  la escala siguen igual para todos.
+- Varios meses (archivo NUEVO `scada_carga_firmeza_periodo.js`): cobertura del devanado SOLO en los meses en que midió (horas en
+  servicio del resumen) y al menos la mitad de los meses (`FRACCION_MESES_MIN` = 0,5). La lista por periodo le pasa las filas de cada mes.
+- Detalle (archivo NUEVO `scada_carga_firmeza_rango.js`): corta las curvas del rango por mes, las resume como el importador y cuenta
+  igual que la lista, SOLO en rangos de meses completos. El indicador «Cobertura» muestra el devanado de la cifra («en los meses en
+  que midió (N de M)»), ya no el peor de todos.
+- El acumulado «mes a mes» recibe las filas de cada mes (antes llamaba al periodo sin ellas y contradecía a la lista).
+- Resguardos (revisión adversarial de 3 lentes): (a) los días que el parque aún no cargó no son hueco (`§159`); (b) un mes con horas
+  y TODAS desenergizadas no cuenta, pero un mes con 0 horas (el punto no vino en el exporte) SÍ es un mes sin medir; (c) tridevanado:
+  el devanado que mide la carga también tiene que medir bien; (d) con la cifra bien medida, una sobrecarga, una severa (> 130 %, la de
+  R4) o horas imposibles que solo muestra un devanado que mide poco dejan la cifra provisional («sobrecarga que solo muestra un
+  devanado que mide poco»; señal 0–3 por devanado calculada en `calcularEquipo`).
+
+**190.3 No-regresión.** Comparación de 2.080 filas con los módulos de producción (208 equipos × 9 meses + periodo): **ninguna cifra
+cambia**, ninguna fila baja; solo cambian clase, motivos y marcas de sobrecarga de las que suben y, en el periodo, la clase de esos meses.
+En las que siguen provisionales el motivo ahora es el real (casi siempre «falta una fase en la mayoría de las horas» → Grupo 3). Acumulado
+«mes a mes» = lista en los 208. L-102: las 8 mezclas viejo/nuevo de kpis, vista y periodo cargan sin error y ninguna es más permisiva
+que la regla nueva; campos nuevos (`servicio`, `horas`, `sobre`, `coberturaFirmeza`, `mesesMedidos`, `mesesTotal`) leídos con guarda.
+
+**190.4 Tests / verificación.** `test:unit` 3157 ✅ (2 omitidas), lint ✅; 27 pruebas en `scada_carga_firmeza_periodo` + `_resguardos`
+(9 fallan con el código anterior). Vista previa fiel en su Chrome (módulos del commit `7bea87b`, franja roja): ene–oct firmes 155 →
+**173**, provisionales 44 → **26**, CRG 4–5 firmes 83 → **92**, sobrecarga 46 (39 firmes · 6 provisionales → **44** · 1 · 1). Suben en
+el periodo 18: Chambacú T1/T2, ARJ, CBY, CTA, ESA, LLC, LPS, La Ye, MAJ, MAN, Río Viejo T1/T2, SCL, SML, SMN, VAA y La Jagua T1A; en el mes
+a mes, 42 meses de 26 equipos. Las 5 sobrecargas nuevas firmes (La Ye, Simaña, Río Viejo T1/T2, La Jagua T1A) están en el devanado de la cifra.
+
+**190.5 Anti-patterns evitados.** Afirmar «ninguno baja» solo con el mes de hoy (el mes a medio cargar habría bajado equipos en la
+próxima carga parcial); tomar «servicio 0» como fuera de servicio (un equipo real sin exporte en sep–oct subía a firme: lo atrapó la
+vista previa); R4 o «sobrecarga firme» desde un devanado mal medido; contar como mes entero el borde de un rango libre; `catch` mudo;
+pruebas que solo buscan texto (las funciones del rango ahora se ejecutan en las pruebas).
+
+**190.6 Archivos.** Modificados: `scada_carga_kpis.js`, `scada_carga_vista.js`, `scada_carga_periodo.js`, `scada_carga_mensual.js`,
+`ui/cargabilidad-scada/detalle.js`, `tests/scada_carga_mensual.test.js`. NUEVOS: `scada_carga_firmeza_periodo.js`,
+`scada_carga_firmeza_rango.js`, `tests/scada_carga_firmeza_periodo.test.js`, `tests/scada_carga_firmeza_resguardos.test.js`.
+INTACTOS: `lista.js`, `historia.js`, `panel-mensual.js`, `scada_carga_sobrecarga.js`, `scada_carga_dga.js` (solo se lee `SEVERA_PCT`),
+`scada_carga_sostenida.js`, datos de producción (nada escrito).
+
+**190.7 Doctrina.** Regla de criterio SUYA con la recomendada (W-11) · vista previa fiel antes de producción (L-56, L-157) · revisión
+adversarial de 3 lentes (regla · detalle · caché L-102) con su crudo en la bóveda (`2026-10-27-firmeza-devanado-cifra/`) · L-102.
+NO revisado externamente.
+
+**190.8 Verificado sano / no re-auditar.** Los índices del corte por mes coinciden hora a hora con `recortarRango` (bisiestos, 30/31,
+cambio de año); el resumen del corte de un mes completo = el guardado. Del parque real: de los 18, el único tridevanado (La Jagua T1A)
+tiene el primario bien medido; las 6 sobrecargas en un devanado mal medido las confirma el bien medido (La Ye, Simaña, Simití).
+`functions/domain/` es copia generada (no se sincroniza a mano). Queda ANOTADO (ya pasaba antes): la fila del periodo cuenta los meses
+antes de que existiera el punto y el detalle que abre solo los del punto (pueden diferir en clase); un nivel sin fase IR toma otra
+referencia de horas en servicio en el detalle (no cambia la clase).
