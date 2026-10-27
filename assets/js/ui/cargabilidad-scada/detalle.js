@@ -250,7 +250,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const ir = (s) => location.replace('#mat=' + encodeURIComponent(a.mat) + (a.tx && a.tx.id ? '&id=' + encodeURIComponent(a.tx.id) : '') + (s.tipo === 'vigente' ? '' : '&mes=' + s.hasta));
     const otros = a.segmentos.filter((s) => s !== a.segmentoBase);
     return el('p', { class: 'cs-dato cs-cambio-medida', style: 'margin:6px 0 0' }, el('b', {}, 'Cambio de medida: '),
-      'se muestra ' + nombre(a.segmento) + (a.segmento.nota && a.segmento.tipo !== 'sin_carga' ? ': ' + a.segmento.nota : '') + '. Las cifras de una configuración no se mezclan con las de otra. ',
+      'se muestra ' + nombre(a.segmento) + (a.segmento.nota && a.segmento.tipo !== 'sin_carga' ? ': ' + a.segmento.nota.replace(/[.\s]+$/, '') : '') + '. Las cifras de una configuración no se mezclan con las de otra. ',
       otros.map((s, i) => el('button', { type: 'button', id: 'csCambioMedida-' + i, class: 'btn btn--glass btn--sm', style: 'margin:2px 6px 0 0', onclick: () => ir(s) }, 'Ver ' + nombre(s))));
   }
 
