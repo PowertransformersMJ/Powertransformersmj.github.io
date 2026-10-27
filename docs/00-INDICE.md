@@ -61,6 +61,7 @@
 | §183 | ADR-183 — **Informe Brigada**: la ACTIVIDAD de un informe nuevo se escribe a mano (lista como sugerencias; modelo F60); reglas `ibrActividad` · TODO-81 | 9033 |
 | §184 | ADR-184 — **Ovejas**: T1 por su 13,8 kV (el 34,5 kV mide T1 + T2) y T2 por su circuito de salida (94,5 % CRG 5); placas de los dos · TODO-54/69 | 9082 |
 | §185 | ADR-185 — **Sobrecarga por DEVANADO**: el indicador y el filtro catalogan firmes, posibles, periodo sin cifra y circuitos (39 → 52); la etiqueta nombra el devanado; placa de **San Luis T1** (8,37/20,92 A) · L-157/L-158 · TODO-54/69 | 9124 |
+| §186 | ADR-186 — **Cambio de MEDIDA desde un mes** («medidas anteriores» en la homologación; regla que no deja perderlas); caso **Becerril** (una barra → barras separadas en may-2026) · TODO-54/69 | 9189 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
