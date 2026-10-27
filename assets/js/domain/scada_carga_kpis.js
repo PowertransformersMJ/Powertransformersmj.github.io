@@ -307,7 +307,7 @@ export function firmeza(ctx) {
     // Lo que solo muestra un devanado que mide poco no se da por firme: si su sobrecarga (o sus horas imposibles) no la
     // muestra también un devanado bien medido, provisional (así no sale «sobrecarga firme» ni R4 de una medida dudosa).
     const senal = (l) => Math.max(0, ...l.map((x) => x.sobre || 0));
-    if (senal(usados.filter((x) => midePoco(x).length)) > senal(bien)) motivos.push('sobrecarga que solo muestra un devanado que mide poco');
+    if (!mc.length && senal(usados.filter((x) => midePoco(x).length)) > senal(bien)) motivos.push('sobrecarga que solo muestra un devanado que mide poco');
   }
   // Con solo 2 de 3 fases la fase más cargada puede ser la que falta: la cifra es un mínimo, no firme.
   if (usados.some((x) => x.n > 0 && (x.unaFalta || 0) / x.n > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');
