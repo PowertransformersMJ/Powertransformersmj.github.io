@@ -73,7 +73,7 @@
   Hoy son **27 equipos ONAF con ventilación obsoleta** (dato del diseño de `§122`, bóveda `2026-09-30-cargabilidad-scada/diseno-v2.md`; riesgo anotado en `99 §127.8`): en ellos la cifra medida y el nivel del panel DGA pueden quedarse cortos.
 - Erratas ×10 conocidas en la ampacidad: hay que dividir el PAR (ampacidad y carga), no la ampacidad sola (TODO-54).
 - Vistas desde el SCADA, solo informativas y sin tocar: posibles erratas en la cifra OFICIAL de Salud de Activos
-  (Ariguaní; El Carmen y Sampués, corrientes copiadas entre T1 y T2; Membrillal T1) y un circuito cuya limpieza descartó casi todo agosto → síntesis
+  (Ariguaní; El Carmen y Sampués, corrientes copiadas entre T1 y T2 —Sampués NO: iban en paralelo y Salud da a cada uno la mitad, `99 §188.8`—; Membrillal T1) y un circuito cuya limpieza descartó casi todo agosto → síntesis
   de la bóveda `2026-10-08-scada-sin-medicion` y TODO-54.
 - **Devanados de placa por transformador** (pedido del Ingeniero 2026-10-22; BORRADOR hasta su «procede»): la lista y el detalle muestran
   cada devanado con tensión, ampacidad y **potencia CALCULADA** = √3 × kV × A (no hay campo de potencia por devanado; monofásico:
