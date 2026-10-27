@@ -50,8 +50,12 @@ describe('filtro «Devanado sobrecargado»', () => {
   });
   test('la lista: filtro con su rótulo y sus conteos, «Todos» y «Quitar filtros» lo limpia', () => {
     const l = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/lista.js', import.meta.url), 'utf8');
-    assert.match(l, /el\('span', \{\}, 'Devanado sobrecargado'\), multi\('csDevSobre', f\.devSobre \|\| \[\],/);
-    assert.match(l, /DEVANADOS_FILTRO\.map\(\(\[d, n\]\) => \[d, n \+ ' \(' \+ conteoDev\[d\] \+ '\)'\]\), \(v\) => \{ f\.devSobre = v; \}, 'Todos'\)/);
+    assert.match(l, /el\('span', \{ id: 'csDevSobre-rotulo' \}, 'Devanado sobrecargado'\), multi\('csDevSobre', f\.devSobre \|\| \[\],/);
+    assert.match(l, /DEVANADOS_FILTRO\.map\(\(\[d, n\]\) => \[d, n \+ ' \(' \+ conteoDev\[d\] \+ '\)'\]\), \(v\) => \{ f\.devSobre = v; \}, 'Todos',/);
+    // Revisión adversarial: el devanado se filtra también desde el archivo nuevo (un vista.js viejo en caché no lo conoce),
+    // resumen en masculino («Los tres», «… elegidos») y el rótulo visible nombra al grupo para un lector de pantalla.
+    assert.match(l, /filtrarFilas\(st\.filas \|\| \[\], st\.filtro\)\.filter\(\(x\) => pasaFiltroDevanado\(x, st\.filtro\.devSobre\)\)/);
+    assert.match(l, /todasMarcadas: 'Los tres', elegidas: ' elegidos', rotuloId: 'csDevSobre-rotulo'/);
     assert.equal((l.match(/soloSostenida: false, devSobre: \[\] \}/g) || []).length, 2, 'estado inicial y «Quitar filtros»');
     const v = readFileSync(new URL('../assets/js/domain/scada_carga_vista.js', import.meta.url), 'utf8');
     assert.match(v, /if \(!pasaFiltroDevanado\(x, f\.devSobre\)\) return false;/);
