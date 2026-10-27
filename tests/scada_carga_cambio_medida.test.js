@@ -102,7 +102,7 @@ describe('la medida de cada mes', () => {
     const t2 = fila(lista(filas, '2026-04'), 't2');
     assert.equal(t2.pct, null); assert.equal(t2.claveId, null); assert.equal(t2.sinCarga, true);
     assert.equal(t2.motivoNulo, motivoSinCarga({ hasta: '2026-04', nota: NOTA_T2 }));
-    assert.match(t2.motivoNulo, /^sin carga hasta abr-2026 \(según el Ingeniero: /);
+    assert.equal(t2.motivoNulo, 'sin carga hasta abr-2026 (según el Ingeniero)');
     assert.equal(t2.sobrecarga, null); assert.equal(t2.sobrecargaSostenida, false);
     // Sin el cambio, el T2 mostraba el circuito que en realidad era carga del T1 (el doble conteo).
     assert.ok(fila(lista(hoy, '2026-04'), 't2').pct == null, 'hoy: circuito sin confirmar');
@@ -141,8 +141,12 @@ describe('periodo: la configuración vigente y lo de antes aparte', () => {
     const t1a = fila(per(filas, MESES.slice(0, 4)), 't1');
     assert.equal(t1a.claveId, SW); assert.equal(t1a.sobrecargaSostenida, true); assert.deepEqual(t1a.cambioMedida.mesesAntes, []);
   });
-  test('sobrecargaAntesDelCambio: firme si algún mes fue firme; null sin sobrecarga', () => {
+  test('sobrecargaAntesDelCambio: firme si algún mes fue firme; un circuito sin confirmar también cuenta; null sin sobrecarga', () => {
     assert.equal(sobrecargaAntesDelCambio([null, { sobrecargaSostenida: false }]), null);
+    const circ = { pct: null, esCircuito: true, estado: 'pendiente', sobrecarga: { tipo: 'circuito', devanados: [{ devanado: 'S', nombre: 'Secundario', nivel: 'N13_8', etiqueta: '13,8 kV', pct: 120 }] },
+      niveles: [{ nivel: 'N13_8', devanado: 'S', pct: 110, A: 100, sostenidaPct: 120, picoPct: 125 }] };
+    const sc = sobrecargaAntesDelCambio([circ]);
+    assert.equal(sc.tipo, 'circuito'); assert.equal(sc.meses, 1);
     const { filas } = homConCambio();
     const s = sobrecargaAntesDelCambio(['2026-01', '2026-02'].map((m) => fila(lista(filas, m), 't1')));
     assert.equal(s.tipo, 'firme'); assert.equal(s.meses, 2);
@@ -172,8 +176,13 @@ describe('escritura: decisionConCambio y erroresCambioMedida', () => {
     assert.ok(erroresCambioMedida(filas[i1], { ...d, previas: { 'abril': d.previas['2026-04'] } }).length >= 1);
     assert.equal(erroresCambioMedida(filas[i1], { ...d, previas: { '2026-04': { ...d.previas['2026-04'], nota: 'corta' } } }).length, 1);
     assert.equal(erroresCambioMedida(filas[i1], { ...d, previas: { '2026-04': { tipo: 'medida', clave_excel: '/EstDemo2/swTrafo1', decision: null, nota: 'otra estación (demo)' } } }).length, 1);
-    assert.equal(erroresCambioMedida(filas[i1], { ...d, previas: { '2026-04': { tipo: 'medida', clave_excel: '/EstDemo1/EDM303', decision: null, nota: 'un circuito que no es el del Excel' } } }).length, 1);
+    // Una medida anterior cuya decisión apunta a un circuito que no es la clave del Excel (ni la de entonces ni la de hoy).
+    assert.equal(erroresCambioMedida(filas[i1], { ...d, previas: { '2026-04': { tipo: 'medida', clave_excel: '/EstDemo1/swTrafo1', decision: { tipo: 'usar', clave: '/EstDemo1/EDM303' }, nota: 'un circuito que no es el del Excel' } } }).length, 1);
     assert.deepEqual(erroresCambioMedida(filas[i1], { tipo: 'usar', clave: '/EstDemo1/swTrafo1' }), [], 'sin previas no hay nada que validar');
+    // Recargar el Excel con otra clave no invalida la medida anterior: vale la clave del Excel que ella misma guardó.
+    const filaExcelNuevo = { ...filas[i2], clave_excel: '/EstDemo1/EDM309' };
+    const dCirc = { ...filas[i2].decision, clave: '/EstDemo1/EDM309', previas: { '2026-04': { tipo: 'medida', clave_excel: '/EstDemo1/EDM303', decision: null, nota: 'antes medía su circuito (demo)' } } };
+    assert.deepEqual(erroresCambioMedida(filaExcelNuevo, dCirc), []);
   });
 });
 
@@ -181,7 +190,8 @@ describe('pantallas (lo que no corre en Node queda en el código)', () => {
   const src = (f) => readFileSync(new URL('../assets/js/' + f, import.meta.url), 'utf8');
   test('«Revisar» conserva las medidas anteriores y «Reabrir» pide un segundo clic', () => {
     const h = src('ui/scada-datos/homologacion.js');
-    assert.match(h, /if \(tieneCambiosDeMedida\(f\.decision\)\) \{[\s\S]{0,400}decision\.previas = f\.decision\.previas;/);
+    // Copia las previas aunque traigan llaves inválidas (la validación lo dice): nunca las pierde en silencio.
+    assert.match(h, /if \(tienePreviasGuardadas\(f\.decision\)\) \{[\s\S]{0,500}decision\.previas = f\.decision\.previas;/);
     assert.match(h, /if \(tieneCambiosDeMedida\(f\.decision\) && !reabrirConfirmado\) \{/);
   });
   test('el detalle abre UNA configuración (la del mes pedido) y ofrece las otras', () => {
@@ -189,6 +199,14 @@ describe('pantallas (lo que no corre en Node queda en el código)', () => {
     assert.match(d, /const seg = filaBase \? segmentoDelMes\(filaBase, mes \|\| mesDe\(desde\) \|\| mesDe\(hasta\)\) : null;/);
     assert.match(d, /const punto = seg && segs\.length > 1 \? puntoDelSegmento\(puntoTodo, seg\) : puntoTodo;/);
     assert.match(d, /avisoCambioMedida\(a\)\);/);
+    // Revisión adversarial: OTRA configuración del mismo equipo rehace la historia y el mes a mes; los botones no ensucian
+    // el historial («Volver a la lista» vuelve a la lista).
+    assert.match(d, /const otraConfig = !cambio && \(actual\.llaveSeg \|\| ''\) !== llaveSeg;/);
+    assert.match(d, /const historiaLista = !cambio && !otraConfig && actual\.historiaLista;/);
+    assert.match(d, /const mensualLista = !cambio && !otraConfig && actual\.mensualLista;/);
+    assert.match(d, /const ir = \(s\) => location\.replace\(/);
+    const pm = src('ui/cargabilidad-scada/panel-mensual.js');
+    assert.match(pm, /const meses = mesesDelEquipo\(ctx\.catalogo, a\.punto\)\.filter\(\(m\) => !sg \|\|/);
   });
   test('la regla de Firestore impide que una confirmación pierda las medidas anteriores', () => {
     const reglas = readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
@@ -199,7 +217,8 @@ describe('pantallas (lo que no corre en Node queda en el código)', () => {
     const m = await import('../assets/js/domain/scada_carga_cambio_medida.js');
     for (const [f, rx] of [['domain/scada_carga_vista.js', /import \{([^}]+)\} from '\.\/scada_carga_cambio_medida\.js'/], ['domain/scada_carga_periodo.js', /import \{([^}]+)\} from '\.\/scada_carga_cambio_medida\.js'/],
       ['ui/cargabilidad-scada/lista.js', /import \{([^}]+)\} from '\.\.\/\.\.\/domain\/scada_carga_cambio_medida\.js'/], ['ui/cargabilidad-scada/detalle.js', /import \{([^}]+)\} from '\.\.\/\.\.\/domain\/scada_carga_cambio_medida\.js'/],
-      ['ui/scada-datos/homologacion.js', /import \{([^}]+)\} from '\.\.\/\.\.\/domain\/scada_carga_cambio_medida\.js'/]]) {
+      ['ui/scada-datos/homologacion.js', /import \{([^}]+)\} from '\.\.\/\.\.\/domain\/scada_carga_cambio_medida\.js'/],
+      ['ui/cargabilidad-scada/historia.js', /import \{([^}]+)\} from '\.\.\/\.\.\/domain\/scada_carga_cambio_medida\.js'/]]) {
       const nombres = src(f).match(rx)[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0]).filter(Boolean);
       for (const n of nombres) assert.ok(n in m, f + ' importa «' + n + '», que no existe');
     }

@@ -55,7 +55,9 @@ export async function pintarMensual(nodo, { a, ctx, vigente = () => true, conPro
   if (window.Plotly) nodo.querySelectorAll('.js-plotly-plot').forEach((g) => { try { window.Plotly.purge(g); } catch (_) { /* nada */ } });
   nodo.hidden = false;
   poner(nodo, titulo, el('div', { class: 'cs-esqueleto', style: 'height:180px' }), el('p', { class: 'cs-ayuda', role: 'status' }, 'Leyendo los meses…'));
-  const meses = mesesDelEquipo(ctx.catalogo, a.punto);
+  // Cambio de medida (campo NUEVO con guarda): solo los meses de la configuración que muestra el detalle; sin cambio, todos.
+  const sg = a.segmento || null;
+  const meses = mesesDelEquipo(ctx.catalogo, a.punto).filter((m) => !sg || ((sg.desde == null || m >= sg.desde) && (sg.hasta == null || m <= sg.hasta)));
   if (!a.cid || !meses.length) { poner(nodo, titulo, el('p', { class: 'cs-ayuda' }, 'Este equipo no tiene meses del SCADA cargados.')); return { completa: true }; }
   const leidas = await Promise.all(meses.map((m) => leerResumenMes(m)));
   if (!vigente()) return { completa: true };

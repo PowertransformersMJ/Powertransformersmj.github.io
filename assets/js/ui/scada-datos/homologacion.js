@@ -23,7 +23,7 @@ import { nombreMes } from '../../domain/scada_carga_fecha.js';
 import { SUMA, erroresSuma, componerResumen, claveSuma, firmaSuma, textoCuadre, claveEnSumaAjena } from '../../domain/scada_carga_suma.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO. «Revisar» CONSERVA las medidas anteriores (el diálogo rehace la
 // decisión desde cero: sin esto las borraría) y «Reabrir» avisa antes de borrarlas. Sin medidas anteriores, todo igual.
-import { tieneCambiosDeMedida, llavesPrevias, erroresCambioMedida, textoMes, segmentos as segmentosDeFila, textoVentana } from '../../domain/scada_carga_cambio_medida.js';
+import { tieneCambiosDeMedida, tienePreviasGuardadas, llavesPrevias, erroresCambioMedida, textoMes, segmentos as segmentosDeFila, textoVentana } from '../../domain/scada_carga_cambio_medida.js';
 
 const SHEETJS = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
 const SHEETJS_SRI = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
@@ -244,8 +244,8 @@ export function montarHomologacion(cont, { alCambiar }) {
       const decision = { tipo: tipo.value, clave: selClave.value || null, mapa: niveles.length ? mapa : null, niveles_vistos: niveles,
         nota: nota.value.trim(), clave_excel_vista: f.clave_excel || null, avisos_vistos: [] };
       // Medidas anteriores (cambio de medida): se copian TAL CUAL; la medida de hoy no puede ser una exclusión.
-      if (tieneCambiosDeMedida(f.decision)) {
-        if (tipo.value !== 'usar') { msg.textContent = 'Esta fila tiene un cambio de medida (' + llavesPrevias(f.decision).map((k) => 'hasta ' + textoMes(k)).join(', ') + '): la medida de hoy debe ser «usar». Para excluirla, primero hay que quitar el cambio de medida.'; return; }
+      if (tienePreviasGuardadas(f.decision)) {
+        if (tipo.value !== 'usar') { msg.textContent = 'Esta fila tiene un cambio de medida (' + llavesPrevias(f.decision).map((k) => 'hasta ' + textoMes(k)).join(', ') + '): la medida de hoy debe ser «usar». Para excluirla: «Reabrir» (borra la decisión con su cambio de medida; queda en el registro) y luego «Excluir».'; return; }
         decision.previas = f.decision.previas;
       }
       // Suma de circuitos: solo con «Confirmar: usar esta medida» y solo los niveles marcados (sin suma, la decisión de siempre).

@@ -111,9 +111,9 @@ export function textoVentana(seg) {
   return '';
 }
 
-/** Motivo de un mes «sin carga» (declarado por el Ingeniero: no hay medida, no se fabrica un 0 %). */
+/** Motivo de un mes «sin carga» (declarado por el Ingeniero: no hay medida, no se fabrica un 0 %). Su nota va en el detalle. */
 export function motivoSinCarga(cambio) {
-  return 'sin carga ' + textoVentana(cambio) + ' (según el Ingeniero' + (cambio && cambio.nota ? ': ' + cambio.nota : '') + ')';
+  return 'sin carga ' + textoVentana(cambio) + ' (según el Ingeniero)';
 }
 
 /**
@@ -125,9 +125,17 @@ export function sobrecargaAntesDelCambio(filasMes) {
   const xs = (filasMes || []).filter(Boolean);
   const firme = xs.some((x) => x.sobrecargaSostenida);
   const posible = !firme && xs.some((x) => x.sobrecargaProvisional);
-  if (!firme && !posible) return null;
-  const s = sobrecargaDelPeriodo({ pct: 1, sobrecargaSostenida: firme, sobrecargaProvisional: posible }, xs);
-  return s ? { ...s, tipo: firme ? 'firme' : 'posible' } : null;
+  // Un circuito sin confirmar (sin cifra) también se cuenta, con su tipo (revisión adversarial 2026-10-26).
+  const circuito = !firme && !posible && xs.some((x) => x.sobrecarga && x.sobrecarga.tipo === 'circuito');
+  if (!firme && !posible && !circuito) return null;
+  const s = sobrecargaDelPeriodo({ pct: 1, sobrecargaSostenida: true }, xs);
+  return s ? { ...s, tipo: firme ? 'firme' : (posible ? 'posible' : 'circuito') } : null;
+}
+
+/** ¿La decisión trae ALGO en `previas` (aunque sus llaves no sean válidas)? El diálogo las copia igual y la validación lo dice. */
+export function tienePreviasGuardadas(decision) {
+  const p = decision && decision.previas;
+  return !!(p && typeof p === 'object' && !Array.isArray(p) && Object.keys(p).length);
 }
 
 // ── Escritura (la arma Claude o, después, un formulario; siempre con decidirFila) ─────────────────────────────────
@@ -179,8 +187,10 @@ export function erroresCambioMedida(fila, decision) {
     const k2 = analizarClaveHomologada(clave);
     if (!k2) { e.push('La medida anterior hasta ' + textoMes(k) + ' no tiene punto SCADA.'); continue; }
     if (est && normalizarTexto(k2.est) !== est) e.push('La medida anterior hasta ' + textoMes(k) + ' es de otra estación SCADA (la primera versión solo admite la misma).');
-    // v1: la medida anterior es la del Excel de la fila o un interruptor de la estación (así el importador ya la trae).
-    const delExcel = fila && fila.clave_excel && normalizarTexto(fila.clave_excel) === normalizarTexto(clave);
+    // v1: la medida anterior es la del Excel (la de HOY o la que tenía cuando se registró el cambio, guardada en la previa:
+    // recargar el Excel con otra clave no la invalida) o un interruptor de la estación.
+    const igual = (a) => a && normalizarTexto(a) === normalizarTexto(clave);
+    const delExcel = igual(fila && fila.clave_excel) || igual(x.clave_excel);
     if (!delExcel && !esElementoTransformador(k2.elem)) e.push('La medida anterior hasta ' + textoMes(k) + ' debe ser la del Excel de la fila o un interruptor del transformador.');
   }
   return e;

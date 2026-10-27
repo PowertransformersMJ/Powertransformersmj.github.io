@@ -221,12 +221,14 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
   const conteos = conteosHomologacion(filasDelMes(filasH, mesFin));
   const puntos = (catalogo && catalogo.puntos) || {};
   const idx = new Map((meses || []).map((m) => [m, new Map(((filasPorMes && filasPorMes[m]) || []).map((x) => [x.id, x]))]));
-  const noCargadas = horasNoCargadas(catalogo, meses);
+  const noCargadasTodo = horasNoCargadas(catalogo, meses);
   return (parque || []).map((tx) => {
     const filaBase = filaDeTransformador(tx, porMat);
     const seg = filaBase ? segmentoDelMes(filaBase, mesFin) : null;
     const fila = seg ? seg.fila : filaBase;
     const mesesP = seg ? mesesDelSegmento(seg, meses) : meses;
+    // Los días no cargados se corrigen solo en periodos de VARIOS meses: con los meses de la configuración que se muestra.
+    const noCargadas = mesesP && meses && mesesP.length !== meses.length ? horasNoCargadas(catalogo, mesesP) : noCargadasTodo;
     const filaMes = (mes) => (idx.get(mes) && idx.get(mes).get(tx.id)) || null;
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;

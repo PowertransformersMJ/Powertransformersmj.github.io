@@ -38,7 +38,7 @@ import {
 // `leerSeriesPunto` y el detalle sale idéntico.
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
-import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga } from '../../domain/scada_carga_cambio_medida.js';
+import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga, filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 
@@ -227,7 +227,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       tablaDevanados(a),
       el('p', { class: 'cs-dato', style: 'margin:4px 0 0' }, el('b', {}, 'Punto SCADA: '), a.fila ? (claveEfectiva(a.fila) || 'sin punto') : 'sin homologación',
         a.fila && textoSumaDetalle(a) ? ' · ' + textoSumaDetalle(a) : '',
-        hom ? ' · ' + (ESTADOS[hom.estado] || hom.estado) : '',
+        hom ? ' · ' + (a.segmento && a.segmento.tipo === 'sin_carga' ? 'Sin carga (según el Ingeniero)' : (ESTADOS[hom.estado] || hom.estado)) : '',
         // La nota de la decisión del Ingeniero (por qué se confirmó o excluyó) se lee en el equipo, no solo en la administración.
         hom && (hom.estado === 'confirmada' || hom.estado === 'excluida') && a.fila && a.fila.decision && a.fila.decision.nota
           ? el('span', { class: 'cs-sub' }, ' — ' + a.fila.decision.nota) : null),
@@ -236,17 +236,21 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       avisoCambioMedida(a));
   }
 
+  /** Conteos de la homologación como rigen en la configuración que se ve (sin cambios de medida: los de siempre). */
+  function conteosDe(a) {
+    const filasH = (ctx.homologacion && ctx.homologacion.filas) || {};
+    return conteosHomologacion(a && a.segmento ? filasDelMes(filasH, a.segmento.hasta || a.segmento.desde) : filasH);
+  }
+
   /** Equipo con cambio de medida: qué configuración se ve y un enlace a cada una de las otras (nunca se mezclan). */
   function avisoCambioMedida(a) {
     if (!a.segmentos || !a.segmento) return null;
-    const nombre = (s) => (s.tipo === 'sin_carga' ? 'sin carga ' : (s.tipo === 'vigente' ? 'medida de hoy ' : 'medida anterior ')) + textoVentana(s);
-    const ir = (s) => {
-      const q = 'mat=' + encodeURIComponent(a.mat) + (a.tx && a.tx.id ? '&id=' + encodeURIComponent(a.tx.id) : '') + (s.tipo === 'vigente' ? '' : '&mes=' + s.hasta);
-      location.hash = q;
-    };
+    const nombre = (s) => (s.tipo === 'sin_carga' ? 'el tramo sin carga' : (s.tipo === 'vigente' ? 'la medida de hoy' : 'la medida anterior')) + ' (' + textoVentana(s) + ')';
+    // Sin entrada nueva en el historial: «← Volver a la lista» sigue volviendo a la lista (location.replace sí avisa el cambio).
+    const ir = (s) => location.replace('#mat=' + encodeURIComponent(a.mat) + (a.tx && a.tx.id ? '&id=' + encodeURIComponent(a.tx.id) : '') + (s.tipo === 'vigente' ? '' : '&mes=' + s.hasta));
     const otros = a.segmentos.filter((s) => s !== a.segmentoBase);
     return el('p', { class: 'cs-dato cs-cambio-medida', style: 'margin:6px 0 0' }, el('b', {}, 'Cambio de medida: '),
-      'se muestra la ' + nombre(a.segmento) + (a.segmento.nota ? ' (' + a.segmento.nota + ')' : '') + '. Las cifras de una configuración no se mezclan con las de otra. ',
+      'se muestra ' + nombre(a.segmento) + (a.segmento.nota && a.segmento.tipo !== 'sin_carga' ? ': ' + a.segmento.nota : '') + '. Las cifras de una configuración no se mezclan con las de otra. ',
       otros.map((s, i) => el('button', { type: 'button', id: 'csCambioMedida-' + i, class: 'btn btn--glass btn--sm', style: 'margin:2px 6px 0 0', onclick: () => ir(s) }, 'Ver ' + nombre(s))));
   }
 
@@ -587,7 +591,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     // El encabezado no muestra cifras de otro rango mientras se lee este (ni si falla).
     a.calc = null; a.porNivel = null; a.leyendo = true; a.sumaRango = null;
     try {
-      a.previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosHomologacion((ctx.homologacion && ctx.homologacion.filas) || {}), umbrales: ctx.umbrales });
+      a.previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosDe(a), umbrales: ctx.umbrales });
     } catch (e) { a.previo = null; }
     liberarFigura(figura); figura = null;
     const avisoEl = () => (aviso ? el('div', { class: 'cs-panel', role: 'status' }, aviso) : null);
@@ -618,9 +622,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         rec.mesesFallidos.forEach((m) => fallidos.add(m));
         porNivel[nv] = { t: rec.t, fam: rec.fam, mesesFallidos: rec.mesesFallidos };
       }
-      const filasH = (ctx.homologacion && ctx.homologacion.filas) || {};
       // Primero el mapa nivel → devanado (de la homologación), luego la ampacidad por nivel.
-      const previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
+      const previo = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel: null, conteos: conteosDe(a), umbrales: ctx.umbrales });
       for (const nv of Object.keys(porNivel)) {
         const i = previo.niveles.find((x) => x.nivel === nv);
         const A = i && i.devanado ? a.placa[i.devanado].A : null;
@@ -640,7 +643,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         }
       }
       a.porNivel = porNivel;
-      a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
+      a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosDe(a), umbrales: ctx.umbrales, mesesFallidos: [...fallidos] });
       a.leyendo = false;
       const sinNada = Object.values(porNivel).every((d) => !d.resumen.i.n);
       conservarFoco(() => poner(cont, encabezado(a), a.placaNodo, a.historiaNodo, a.mensualNodo, avisoEl(), selectorRango(a),
@@ -686,20 +689,24 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const punto = seg && segs.length > 1 ? puntoDelSegmento(puntoTodo, seg) : puntoTodo;
     const matricula = leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || mat;
     const cambio = !actual || actual.tx !== tx;
+    // Cambio de medida: OTRA configuración del mismo equipo rehace la historia y el mes a mes (no la placa ni DGA, que son del
+    // equipo). Sin cambios de medida la llave es siempre '' y todo queda como antes.
+    const llaveSeg = seg && segs.length > 1 ? (seg.desde || '') + '_' + (seg.hasta || '') : '';
+    const otraConfig = !cambio && (actual.llaveSeg || '') !== llaveSeg;
     // Ranura del panel DGA: UN nodo por equipo (al cambiar el rango se reusa: no parpadea).
     const dgaNodo = !cambio && actual.dgaNodo ? actual.dgaNodo
       : el('section', { class: 'cs-panel cs-dga', id: 'csDga', hidden: true, 'aria-labelledby': 'csDgaTitulo' });
     const duvalNodo = !cambio && actual.duvalNodo ? actual.duvalNodo
       : el('section', { class: 'cs-panel cs-duval', id: 'csDuval', hidden: true, 'aria-labelledby': 'csDuvalTitulo' });
     // Historia del equipo (`99 §159`): UN nodo por equipo, fijo arriba del rango (no se recalcula al cambiar el rango).
-    const historiaNodo = !cambio && actual.historiaNodo ? actual.historiaNodo
+    const historiaNodo = !cambio && !otraConfig && actual.historiaNodo ? actual.historiaNodo
       : el('section', { class: 'cs-panel cs-historia', id: 'csHistoria', hidden: true, 'aria-labelledby': 'csHistoriaTitulo' });
-    const historiaLista = !cambio && actual.historiaLista;
+    const historiaLista = !cambio && !otraConfig && actual.historiaLista;
     // «Cargabilidad mes a mes y acumulada» (TODO-69): UN nodo por equipo, debajo de la historia, con su import() aislado.
-    if (cambio && actual && actual.mensualNodo) liberarFigura(actual.mensualNodo);
-    const mensualNodo = !cambio && actual.mensualNodo ? actual.mensualNodo
+    if ((cambio || otraConfig) && actual && actual.mensualNodo) liberarFigura(actual.mensualNodo);
+    const mensualNodo = !cambio && !otraConfig && actual.mensualNodo ? actual.mensualNodo
       : el('section', { class: 'cs-panel cs-mensual', id: 'csMensual', hidden: true, 'aria-labelledby': 'csMensualTitulo' });
-    const mensualLista = !cambio && actual.mensualLista;
+    const mensualLista = !cambio && !otraConfig && actual.mensualLista;
     const placaNodo = !cambio && actual.placaNodo ? actual.placaNodo
       : el('section', { class: 'cs-panel cs-placa', id: 'csPlaca', hidden: true, 'aria-labelledby': 'csPlacaTitulo' });
     const placaLista = !cambio && actual.placaLista;
@@ -708,9 +715,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const placaLeida = !cambio && !!actual.placaLeida;
     actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista, limitesPlaca, placaLeida,
       // Campos NUEVOS (cambio de medida): solo con más de una configuración.
-      ...(segs.length > 1 ? { segmentos: segs, segmento: seg, segmentoBase: segs.find((s) => s.desde === seg.desde && s.hasta === seg.hasta) || null } : {}) };
+      ...(segs.length > 1 ? { segmentos: segs, segmento: seg, segmentoBase: segs.find((s) => s.desde === seg.desde && s.hasta === seg.hasta) || null, llaveSeg } : {}) };
     if (!punto || !(punto.meses || []).length) {
-      actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosHomologacion(filasH), umbrales: ctx.umbrales });
+      actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosDe(actual), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
         : (seg && seg.tipo === 'sin_carga' ? 'Sin cifra: ' + motivoSinCarga(seg.fila.cambioMedida) + '.'
         : (!fila ? 'Este transformador no está en la homologación con el SCADA.'

@@ -435,15 +435,17 @@ export function montarLista(cont, ctx, { alAbrir }) {
     if (cm.tipo === 'medida') td.append(el('span', { class: 'cs-sub' }, 'Medida anterior al cambio de ' + textoMes(cm.vigenteDesde) + (cm.nota ? ': ' + cm.nota : '')));
     if (cm.tipo === 'vigente' && cm.mesesAntes && cm.mesesAntes.length) {
       td.append(el('span', { class: 'cs-sub' }, 'Cambio de medida desde ' + textoMes(cm.desde) + ': la cifra es de la medida de hoy; '
-        + cm.mesesAntes.length + (cm.mesesAntes.length === 1 ? ' mes anterior' : ' meses anteriores') + ' con otra medida.'));
+        + cm.mesesAntes.length + (cm.mesesAntes.length === 1 ? ' mes anterior' : ' meses anteriores') + ' ' + textoAntes(cm) + '.'));
     }
     const a = x.sobrecargaAnterior;
     if (a) {
       const t = textoDevanados(a);
-      td.append(el('span', { class: 'cs-sub' }, 'Antes del cambio (hasta ' + textoMes(a.hasta) + '): sobrecarga sostenida' + (a.tipo === 'firme' ? '' : ' (cifra provisional)')
+      td.append(el('span', { class: 'cs-sub' }, 'Antes del cambio (hasta ' + textoMes(a.hasta) + '): sobrecarga sostenida' + (a.tipo === 'firme' ? '' : (a.tipo === 'circuito' ? ' (por confirmar: se medía un circuito)' : ' (cifra provisional)'))
         + ' en ' + a.meses + (a.meses === 1 ? ' mes' : ' meses') + (t ? ': ' + t : '') + '.'));
     }
   }
+  /** Qué hubo antes de la medida de hoy: «sin carga» no es «otra medida». */
+  function textoAntes(cm) { return cm && cm.anterior && cm.anterior.tipo === 'sin_carga' ? 'sin carga (según el Ingeniero)' : 'con otra medida'; }
 
   function celdaCifra(x) {
     const td = el('td', {});
@@ -481,7 +483,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
       el('td', {}, el('span', { class: 'cs-num' }, of), x.oficial && x.oficial.calif ? el('span', { class: 'cs-sub' }, 'CRG ' + x.oficial.calif + ' en Salud de Activos') : null,
         ofDev != null ? el('span', { class: 'cs-sub' }, ({ P: 'Primario', S: 'Secundario', T: 'Terciario' })[x.devMax] + ' ' + num(ofDev, 1) + ' %') : null),
       el('td', {}, x.delta == null ? '—' : el('span', { class: 'cs-num' }, (x.delta > 0 ? '+' : '') + num(x.delta, 1) + ' pts')),
-      el('td', {}, ESTADOS[x.estado] || x.estado, x.avisos.length && x.estado === 'pendiente' ? el('span', { class: 'cs-sub' }, x.avisos.length + (x.avisos.length === 1 ? ' aviso' : ' avisos')) : null),
+      el('td', {}, x.sinCarga ? 'Sin carga (según el Ingeniero)' : (ESTADOS[x.estado] || x.estado), x.avisos.length && x.estado === 'pendiente' ? el('span', { class: 'cs-sub' }, x.avisos.length + (x.avisos.length === 1 ? ' aviso' : ' avisos')) : null),
       el('td', {}, x.tienePunto ? el('button', { type: 'button', id: 'csCurvas-' + x.id, class: 'btn btn--glass btn--sm', onclick: abrir, 'aria-label': 'Ver curvas de ' + x.matricula }, 'Ver curvas') : el('span', { class: 'cs-sub' }, 'sin datos SCADA')));
   }
 
@@ -513,7 +515,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
       el('span', { class: 'cs-sub' }, m.ms != null ? formatoCO(m.ms) : nombreMes(m.mes)),
       m.clase !== 'firme' ? el('span', { class: 'cs-sub' }, 'mes provisional') : null, pend);
   }
-  function celdaDesde(p) {
+  function celdaDesde(p, x = null) {
+    // Cambio de medida: la sobrecarga de ANTES del cambio también se dice aquí (no «No ha superado su capacidad»).
+    if (!p.primeraSostenida && x && x.sobrecargaAnterior) {
+      return el('td', {}, 'Antes del cambio de medida (hasta ' + textoMes(x.sobrecargaAnterior.hasta) + ')',
+        el('span', { class: 'cs-sub' }, x.sobrecargaAnterior.meses + (x.sobrecargaAnterior.meses === 1 ? ' mes' : ' meses') + ' con sobrecarga sostenida; con la medida de hoy no la ha tenido.'));
+    }
     const s = p.primeraSostenida; const h = p.primeraHora;
     if (s) {
       return el('td', {}, s.inicioDatos ? 'Desde el inicio de los datos (' + nombreMes(s.mes) + ')'
@@ -532,7 +539,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const cajas = mesesEntre(st.periodo.desde, st.periodo.hasta).map((mes) => {
       const m = porMes.get(mes);
       if (!todos.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': no cargado' });
-      if (otraMedida.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': otra medida (antes del cambio de medida)' });
+      if (otraMedida.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + textoAntes(x.cambioMedida) + ' (antes del cambio de medida)' });
       if (!m || m.pct == null) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + ((m && m.motivoNulo) || 'sin cifra') });
       const cls = m.clase === 'firme' ? (m.sost ? 'cs-tira--sost' : 'cs-tira--crg' + (m.crg || 0)) : (m.sost ? 'cs-tira--prov cs-tira--sostp' : 'cs-tira--prov');
       return el('i', { class: 'cs-tira-mes ' + cls, title: nombreMes(mes) + ': ' + num(m.pct, 1) + ' %' + (m.crg ? ' · CRG ' + m.crg : '') + (m.clase === 'firme' ? ' firme' : ' provisional') + (m.sost ? ' · sobrecarga sostenida' : (m.pico ? ' · pico aislado' : '')) });
@@ -541,14 +548,16 @@ export function montarLista(cont, ctx, { alAbrir }) {
       el('span', { class: 'cs-sub' }, corto(st.periodo.desde) + ' → ' + corto(st.periodo.hasta)));
   }
   function filaPeriodo(x) {
-    const abrir = (ev) => { ev.preventDefault(); alAbrir(x.matricula, null, x.id, rangoAlAbrir(x)); };
+    // Con cambio de medida, el detalle abre la configuración que muestra la fila (una «sin carga» no tiene rango que dar).
+    const mesCfg = x.cambioMedida && x.cambioMedida.tipo !== 'vigente' ? x.cambioMedida.hasta : null;
+    const abrir = (ev) => { ev.preventDefault(); alAbrir(x.matricula, mesCfg, x.id, mesCfg && !x.claveId ? null : rangoAlAbrir(x)); };
     const p = x.periodo;
     return el('tr', { class: x.clase === 'provisional' ? 'cs-fila-prov' : (x.clase === 'nulo' ? 'cs-fila-nulo' : null) },
       el('th', { scope: 'row', style: 'position:static;background:none;font-size:13px' },
         el('a', { href: '#mat=' + encodeURIComponent(x.matricula), id: 'csMat-' + x.id, onclick: abrir }, x.matricula || '(sin matrícula)'),
         el('span', { class: 'cs-sub' }, [x.subestacion, x.zona].filter(Boolean).join(' · '))),
-      celdaCifra(x), celdaDevanados(x), celdaPeor(p), celdaMayor(p), celdaDesde(p), celdaMeses(p, x),
-      el('td', {}, ESTADOS[x.estado] || x.estado, x.avisos.length && x.estado === 'pendiente' ? el('span', { class: 'cs-sub' }, x.avisos.length + (x.avisos.length === 1 ? ' aviso' : ' avisos')) : null),
+      celdaCifra(x), celdaDevanados(x), celdaPeor(p), celdaMayor(p), celdaDesde(p, x), celdaMeses(p, x),
+      el('td', {}, x.sinCarga ? 'Sin carga (según el Ingeniero)' : (ESTADOS[x.estado] || x.estado), x.avisos.length && x.estado === 'pendiente' ? el('span', { class: 'cs-sub' }, x.avisos.length + (x.avisos.length === 1 ? ' aviso' : ' avisos')) : null),
       el('td', {}, x.tienePunto ? el('button', { type: 'button', id: 'csCurvas-' + x.id, class: 'btn btn--glass btn--sm', onclick: abrir, 'aria-label': 'Ver curvas de ' + x.matricula }, 'Ver curvas') : el('span', { class: 'cs-sub' }, 'sin datos SCADA')));
   }
 
@@ -596,8 +605,11 @@ export function montarLista(cont, ctx, { alAbrir }) {
   const csvCambio = (x) => {
     const cm = x && x.cambioMedida; if (!cm) return '';
     const a = x.sobrecargaAnterior;
-    return (cm.tipo === 'sin_carga' ? 'sin carga hasta ' + textoMes(cm.hasta) : (cm.tipo === 'medida' ? 'medida anterior hasta ' + textoMes(cm.hasta) : 'medida desde ' + textoMes(cm.desde)))
-      + (a ? '; antes del cambio: sobrecarga sostenida ' + (a.tipo === 'firme' ? 'firme' : 'posible') + ' en ' + a.meses + ' meses (' + textoDevanados(a, { csv: true }) + ')' : '');
+    const t = a ? textoDevanados(a, { csv: true }) : '';
+    return (cm.tipo === 'sin_carga' ? 'sin carga hasta ' + textoMes(cm.hasta) : (cm.tipo === 'medida' ? 'medida anterior hasta ' + textoMes(cm.hasta)
+      : 'medida desde ' + textoMes(cm.desde) + (cm.anterior ? '; antes, ' + (cm.anterior.tipo === 'sin_carga' ? 'sin carga' : 'otra medida') + ' hasta ' + textoMes(cm.anterior.hasta) : '')))
+      + (a ? '; antes del cambio: sobrecarga sostenida ' + ({ firme: 'firme', posible: 'posible', circuito: 'por confirmar (circuito)' }[a.tipo] || a.tipo)
+        + ' en ' + a.meses + (a.meses === 1 ? ' mes' : ' meses') + (t ? ' — ' + t : '') : '');
   };
 
   function exportar() {
