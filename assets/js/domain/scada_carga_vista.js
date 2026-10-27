@@ -24,6 +24,8 @@ import { especSuma, estadoSumaNivel, componerResumen, textoSuma } from './scada_
 import { sobrecargaDeMes, tieneSobrecarga } from './scada_carga_sobrecarga.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; sin medidas anteriores devuelve la MISMA fila (nada cambia).
 import { filaDelMes, filasDelMes, motivoSinCarga } from './scada_carga_cambio_medida.js';
+// Filtro «Devanado sobrecargado» (2026-10-27): archivo NUEVO; sin devanados elegidos no filtra nada.
+import { pasaFiltroDevanado } from './scada_carga_filtro_devanado.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -247,6 +249,8 @@ export function filtrarFilas(filas, f = {}) {
     // «Con sobrecarga sostenida»: firmes, posibles (cifra provisional) y medidos por un circuito sin confirmar (2026-10-26).
     // …y los que la tuvieron antes de un cambio de medida (periodo, `sobrecargaAnterior`, 2026-10-26).
     if (f.soloSostenida && !tieneSobrecarga(x) && !x.sobrecargaAnterior) return false;
+    // Devanado sobrecargado: el de su sobrecarga sostenida (o la de antes de un cambio de medida) está entre los elegidos.
+    if (!pasaFiltroDevanado(x, f.devSobre)) return false;
     if (f.soloFirmes && x.clase !== 'firme') return false;
     return true;
   });

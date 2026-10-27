@@ -19,6 +19,8 @@ import { TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto, CSV_DEV_CA
 import { conteoSobrecarga, rotuloSobrecarga, csvSobrecarga, CSV_SOBRECARGA_CAB as CSV_SOB_CAB, tieneSobrecarga, textoDevanados } from '../../domain/scada_carga_sobrecarga.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; las filas lo traen en `cambioMedida` (con guarda).
 import { textoMes } from '../../domain/scada_carga_cambio_medida.js';
+// Filtro «Devanado sobrecargado» (2026-10-27): archivo NUEVO.
+import { DEVANADOS_FILTRO, conteoPorDevanado, pasaFiltroDevanado } from '../../domain/scada_carga_filtro_devanado.js';
 
 const PASO = 100;
 const ESTADOS = { automatica: 'Automática', confirmada: 'Confirmada', pendiente: 'Por confirmar', excluida: 'Excluida', sin_homologacion: 'Sin homologación' };
@@ -100,7 +102,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
   const st = {
     modo: 'mes', periodo: null,   // periodo: {desde, hasta, meses, aviso} con «Varios meses» (`99 §159`)
     mes: null, resumen: null, filas: null, error: null, cargando: false, visibles: PASO,
-    filtro: { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false },
+    filtro: { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false, devSobre: [] },
     orden: { campo: 'pct', dir: 'desc' }
   };
   let tablaCaja = null; let contador = null; let kpiCaja = null;
@@ -358,6 +360,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
 
   function barraFiltros(filas) {
     const f = st.filtro;
+    const conteoDev = conteoPorDevanado(filas);
     const zonas = [...new Set(filas.map((x) => x.zona).filter(Boolean))].sort();
     const q = el('input', { type: 'search', id: 'csTexto', value: f.texto, placeholder: 'Matrícula, subestación, zona…', autocomplete: 'off' });
     let t = null;
@@ -368,18 +371,26 @@ export function montarLista(cont, ctx, { alAbrir }) {
       return s;
     };
     // Desplegable de VARIAS opciones (zona, CRG): se ve como los demás filtros; nada marcado = «Todas».
-    const multi = (id, valores, opciones, alCambiar) => {
+    // `o` (opcional, devanados 2026-10-27): textos en masculino y nombres cortos en el resumen con 2 o más marcadas (los
+    // números quedan en las casillas; con todas, «Los tres»). Sin `o`, Zona y CRG quedan exactamente como antes.
+    const multi = (id, valores, opciones, alCambiar, todasTxt = 'Todas', o = null) => {
       const elegidos = new Set((Array.isArray(valores) ? valores : (valores ? [valores] : [])).map(String));
-      const resumen = () => (!elegidos.size ? 'Todas'
-        : (elegidos.size <= 2 ? opciones.filter(([v]) => elegidos.has(String(v))).map(([, t]) => t).join(', ') : elegidos.size + ' elegidas'));
-      const sum = el('summary', { id, class: 'cs-multi-sel' }, resumen());
+      const resumen = () => {
+        if (!elegidos.size) return todasTxt;
+        const marcadas = opciones.filter(([v]) => elegidos.has(String(v)));
+        if (o && marcadas.length === opciones.length && o.todasMarcadas) return o.todasMarcadas;
+        if (marcadas.length === 1) return marcadas[0][1];
+        if (elegidos.size <= 2) return marcadas.map(([v, t]) => (o && o.corto ? o.corto[v] || t : t)).join(', ');
+        return elegidos.size + (o && o.elegidas ? o.elegidas : ' elegidas');
+      };
+      const sum = el('summary', { id, class: 'cs-multi-sel', ...(o && o.rotuloId ? { 'aria-labelledby': o.rotuloId + ' ' + id } : {}) }, resumen());
       const aplicar = () => { sum.textContent = resumen(); alCambiar([...elegidos]); st.visibles = PASO; pintarTabla(); };
       const casillas = opciones.map(([v, txt]) => {
         const c = el('input', { type: 'checkbox', id: id + '-' + v, checked: elegidos.has(String(v)) });
         c.addEventListener('change', () => { if (c.checked) elegidos.add(String(v)); else elegidos.delete(String(v)); aplicar(); });
         return el('label', { class: 'cs-check', for: id + '-' + v }, c, ' ' + txt);
       });
-      const todas = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { elegidos.clear(); for (const l of casillas) l.querySelector('input').checked = false; aplicar(); } }, 'Todas');
+      const todas = el('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => { elegidos.clear(); for (const l of casillas) l.querySelector('input').checked = false; aplicar(); } }, todasTxt);
       cerrarMultiAlClicFuera();
       const d = el('details', { class: 'cs-multi' }, sum, el('div', { class: 'cs-multi-lista', role: 'group', 'aria-labelledby': id }, casillas, todas));
       d.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && d.open) { d.open = false; sum.focus(); } });
@@ -396,6 +407,11 @@ export function montarLista(cont, ctx, { alAbrir }) {
         el('div', { class: 'cs-campo-multi' }, el('span', {}, 'Zona'), multi('csZona', f.zona, zonas.map((z) => [z, z]), (v) => { f.zona = v; })),
         el('label', { for: 'csEstado' }, 'Medida', sel('csEstado', f.estado, [['', 'Todas'], ...Object.entries(ESTADOS)], (v) => { f.estado = v; })),
         el('div', { class: 'cs-campo-multi' }, el('span', {}, 'Calificación CRG'), multi('csCrg', f.crg, [5, 4, 3, 2, 1].map((n) => [n, n + ' · ' + CRG_CHIP[n].palabra]), (v) => { f.crg = v; })),
+        // Devanado sobrecargado (pedido del Ingeniero, 2026-10-27): con cuántos equipos lo tienen en el mes o el periodo
+        // cargado (sin los demás filtros; un equipo con dos devanados cuenta en los dos).
+        el('div', { class: 'cs-campo-multi' }, el('span', { id: 'csDevSobre-rotulo' }, 'Devanado sobrecargado'), multi('csDevSobre', f.devSobre || [],
+          DEVANADOS_FILTRO.map(([d, n]) => [d, n + ' (' + conteoDev[d] + ')']), (v) => { f.devSobre = v; }, 'Todos',
+          { corto: Object.fromEntries(DEVANADOS_FILTRO), todasMarcadas: 'Los tres', elegidas: ' elegidos', rotuloId: 'csDevSobre-rotulo' })),
         el('label', { class: 'cs-check', for: 'csFirmes' }, chk('csFirmes', f.soloFirmes, (v) => { f.soloFirmes = v; }), ' Solo cifras firmes'),
         el('label', { class: 'cs-check', for: 'csSost' }, chk('csSost', f.soloSostenida, (v) => { f.soloSostenida = v; }), ' Solo con sobrecarga sostenida')),
       el('div', { class: 'cs-acciones' },
@@ -562,7 +578,9 @@ export function montarLista(cont, ctx, { alAbrir }) {
   }
 
   function filasVisibles() {
-    return ordenarFilas(filtrarFilas(st.filas || [], st.filtro), st.orden.campo, st.orden.dir);
+    // El devanado se filtra también aquí, con el archivo NUEVO (nunca viejo en caché): un vista.js viejo no lo conoce (L-102).
+    const xs = filtrarFilas(st.filas || [], st.filtro).filter((x) => pasaFiltroDevanado(x, st.filtro.devSobre));
+    return ordenarFilas(xs, st.orden.campo, st.orden.dir);
   }
 
   function pintarTabla() { conservarFoco(pintarTablaSinFoco); }
@@ -573,7 +591,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     contador.textContent = todas.length + ' de ' + st.filas.length + ' transformadores';
     if (!todas.length) {
       poner(tablaCaja, el('div', { class: 'cs-estado' }, 'Ningún transformador cumple los filtros.', el('br'),
-        el('button', { type: 'button', id: 'csQuitar', class: 'btn btn--glass btn--sm', onclick: () => { st.filtro = { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false }; dibujar(); const q = document.getElementById('csTexto'); if (q) q.focus(); } }, 'Quitar filtros')));
+        el('button', { type: 'button', id: 'csQuitar', class: 'btn btn--glass btn--sm', onclick: () => { st.filtro = { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false, devSobre: [] }; dibujar(); const q = document.getElementById('csTexto'); if (q) q.focus(); } }, 'Quitar filtros')));
       return;
     }
     const th = (c) => {
