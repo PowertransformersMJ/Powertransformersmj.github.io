@@ -9274,6 +9274,10 @@ Calamar T1A) · P o S 44 (sin duplicar); agosto 26 · 26 · 4. Revisión adversa
 aplica también en `filasVisibles` con el archivo NUEVO (con un `vista.js` viejo en caché aparecía y no filtraba), resumen en masculino
 («Los tres», nombres sin números con dos marcados para que no se corte) y rótulo asociado al resumen para lectores de pantalla.
 Vista previa tras las correcciones: Terciario (6) · «Primario, Terciario» 43 · «Los tres» 50 = el indicador.
+**Publicado y verificado en vivo** (main `d355169`; servido 09:57, caché vencida 10:07; CI y despliegue verdes). En SU Chrome, periodo
+ene–oct, sin vista previa: opciones «Primario (37) · Secundario (35) · Terciario (6)»; cada una deja exactamente esas filas y todas
+con su rótulo de sobrecarga; «Primario, Secundario» 44 · «Los tres» 50 (= el indicador); «Quitar filtros» (con una búsqueda sin
+resultados) vuelve a «Todos» con las 100 primeras filas.
 
 **187.5 Anti-patterns evitados.** Exportar desde un archivo publicado; contar un equipo dos veces; un filtro que esconda la sobrecarga
 de antes de un cambio de medida.
