@@ -166,4 +166,22 @@ describe('homologación con versión y registro atado', () => {
     const leida = await getDoc(doc(db('scd_tec'), 'scada_homologacion/vigente'));
     if (!leida.data().filas.r1.decision.suma) throw new Error('la suma no quedó en la decisión');
   });
+  test('cambio de medida (2026-10-26): una confirmación no puede perder las medidas anteriores; «Reabrir» sí las quita', async () => {
+    const confirmarR2 = (rev, reg, decision) => {
+      const d = db('scd_admin'); const b = writeBatch(d);
+      const dec = decision ? { ...decision, por: YO, en: serverTimestamp() } : null;
+      b.update(doc(d, 'scada_homologacion/vigente'), new FieldPath('filas', 'r2', 'decision'), dec, 'rev', rev, 'ultimoRegistro', reg, 'actualizadoPor', YO, 'actualizadoEn', serverTimestamp());
+      b.set(doc(d, 'scada_homologacion_registro/' + reg), { tipo: decision ? 'confirmacion' : 'reapertura', rev, filaId: 'r2', antes: null, despues: dec, por: YO, en: serverTimestamp() });
+      return b.commit();
+    };
+    const base = { tipo: 'usar', clave: '/EstDemo2/EDM302', mapa: { N13_8: 'S' }, niveles_vistos: ['N13_8'], nota: 'Desde may-2026 su circuito', avisos_vistos: ['CLAVE_CIRCUITO'] };
+    const previas = { '2026-04': { tipo: 'sin_carga', nota: 'Hasta abr-2026 sin carga (demo)' } };
+    await assertSucceeds(confirmarR2(5, 'h11', { ...base, previas }));                       // registrar el cambio
+    await assertFails(confirmarR2(6, 'h12', { ...base }));                                    // un diálogo viejo lo borraría: NO
+    await assertFails(confirmarR2(6, 'h12', { ...base, previas: {} }));                       // tampoco vaciándolo
+    await assertSucceeds(confirmarR2(6, 'h13', { ...base, nota: 'Revisado otra vez', previas }));   // conservándolo, sí
+    await assertSucceeds(confirmarR2(7, 'h14', { ...base, previas: { ...previas, '2026-08': { tipo: 'medida', clave_excel: '/EstDemo2/EDM302', decision: null, nota: 'Otro cambio (demo)' } } }));
+    await assertSucceeds(confirmarR2(8, 'h15', null));                                        // «Reabrir» las quita (queda en el registro)
+    await assertSucceeds(confirmarR2(9, 'h16', { ...base }));                                 // sin medidas anteriores: lo de siempre
+  });
 });

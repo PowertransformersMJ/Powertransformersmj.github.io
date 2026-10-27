@@ -1660,7 +1660,16 @@ service cloud.firestore {
         && (r.tipo == 'carga_excel'
           || (r.filaId is string && r.filaId in tras.filas
               && tras.filas[r.filaId].get('decision', null) == r.despues
-              && (r.tipo == 'reapertura' ? r.despues == null : r.despues != null)));
+              && (r.tipo == 'reapertura' ? r.despues == null : r.despues != null)
+              && previasSeConservan(v, r)));
+    }
+    // Cambio de medida (2026-10-26): una CONFIRMACIÓN no puede perder las medidas anteriores de la fila (`decision.previas`):
+    // un diálogo viejo en caché, o abierto antes del cambio, rehace la decisión desde cero y las borraría sin aviso. Solo
+    // «Reabrir» (decisión null, queda en el registro) las quita.
+    function previasSeConservan(v, r) {
+      let antes = get(v).data.filas.get(r.filaId, {}).get('decision', null);
+      return r.tipo != 'confirmacion' || antes == null || !('previas' in antes) || antes.previas.size() == 0
+        || (r.despues.get('previas', null) is map && r.despues.previas.keys().hasAll(antes.previas.keys()));
     }
     match /scada_homologacion_registro/{id} {
       allow get: if isTeamMember();

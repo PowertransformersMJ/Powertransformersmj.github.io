@@ -22,6 +22,8 @@ import { componerResumen } from '../../domain/scada_carga_suma.js';
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 // Sobrecarga por devanado (2026-10-26): archivo NUEVO; aquí solo para el equipo medido por un circuito sin confirmar.
 import { sobrecargaDelPeriodo, esCircuitoSinConfirmar } from '../../domain/scada_carga_sobrecarga.js';
+// Cambio de medida (2026-10-26): archivo NUEVO; los conteos de la configuración que se ve (sin cambios: los de siempre).
+import { filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
 
 const MAX_CURVAS = 6;   // curvas de mes que la historia puede leer por equipo (cada una de 70 a 260 KB)
 const SOBRE = CALCULO.sobrecargaPct;
@@ -48,7 +50,7 @@ export async function pintarHistoria(nodo, { a, ctx, alVerDia, vigente, alReinte
   const meses = [...((a.punto && a.punto.meses) || [])].sort();
   if (!meses.length) { poner(nodo, titulo, el('p', { class: 'cs-ayuda' }, 'Este punto no tiene meses cargados.')); return; }
   const filasH = (ctx.homologacion && ctx.homologacion.filas) || {};
-  const conteos = conteosHomologacion(filasH);
+  const conteos = conteosHomologacion(a.segmento ? filasDelMes(filasH, a.segmento.hasta || a.segmento.desde) : filasH);
   const leidas = await Promise.all(meses.map((m) => leerResumenMes(m)));
   if (!vigente()) return;
   const fallidos = meses.filter((m, k) => leidas[k].estado === 'fallo');

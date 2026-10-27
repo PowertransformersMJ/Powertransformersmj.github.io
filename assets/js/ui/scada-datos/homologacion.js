@@ -21,6 +21,9 @@ import { leerResumenMes } from '../../data/scada_carga.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
 // Suma de circuitos (2026-10-24): archivo NUEVO. Sin suma en la decisión, el diálogo evalúa y guarda lo de siempre.
 import { SUMA, erroresSuma, componerResumen, claveSuma, firmaSuma, textoCuadre, claveEnSumaAjena } from '../../domain/scada_carga_suma.js';
+// Cambio de medida desde un mes (2026-10-26): archivo NUEVO. «Revisar» CONSERVA las medidas anteriores (el diálogo rehace la
+// decisión desde cero: sin esto las borraría) y «Reabrir» avisa antes de borrarlas. Sin medidas anteriores, todo igual.
+import { tieneCambiosDeMedida, tienePreviasGuardadas, llavesPrevias, erroresCambioMedida, textoMes, segmentos as segmentosDeFila, textoVentana } from '../../domain/scada_carga_cambio_medida.js';
 
 const SHEETJS = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
 const SHEETJS_SRI = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
@@ -240,6 +243,11 @@ export function montarHomologacion(cont, { alCambiar }) {
       // niveles_vistos: los que se revisaron; un nivel que aparezca después vuelve a pedir revisión.
       const decision = { tipo: tipo.value, clave: selClave.value || null, mapa: niveles.length ? mapa : null, niveles_vistos: niveles,
         nota: nota.value.trim(), clave_excel_vista: f.clave_excel || null, avisos_vistos: [] };
+      // Medidas anteriores (cambio de medida): se copian TAL CUAL; la medida de hoy no puede ser una exclusión.
+      if (tienePreviasGuardadas(f.decision)) {
+        if (tipo.value !== 'usar') { msg.textContent = 'Esta fila tiene un cambio de medida (' + llavesPrevias(f.decision).map((k) => 'hasta ' + textoMes(k)).join(', ') + '): la medida de hoy debe ser «usar». Para excluirla: «Reabrir» (borra la decisión con su cambio de medida; queda en el registro) y luego «Excluir».'; return; }
+        decision.previas = f.decision.previas;
+      }
       // Suma de circuitos: solo con «Confirmar: usar esta medida» y solo los niveles marcados (sin suma, la decisión de siempre).
       const suma = {};
       if (tipo.value === 'usar') {
@@ -258,6 +266,10 @@ export function montarHomologacion(cont, { alCambiar }) {
       if (ajena) {
         msg.textContent = '«' + selClave.value + '» es un circuito de la suma de circuitos de otra fila (' + ajena + '): no puede ser también la medida de esta fila. Elija otro punto SCADA.';
         return;
+      }
+      if (decision.previas) {
+        const errCambio = erroresCambioMedida(f, { ...decision, ...(Object.keys(suma).length ? { suma } : {}) });
+        if (errCambio.length) { msg.textContent = errCambio.join(' '); return; }
       }
       if (Object.keys(suma).length) {
         // Con otra clave elegida, la suma sería de otro punto: se exige la misma clave con que se revisaron los niveles.
@@ -279,7 +291,14 @@ export function montarHomologacion(cont, { alCambiar }) {
       cerrar();
       await alCambiar();
     }
+    let reabrirConfirmado = false;
     async function reabrir() {
+      // Reabrir borra TODA la decisión, también las medidas anteriores (quedan en el registro): se pide un segundo clic.
+      if (tieneCambiosDeMedida(f.decision) && !reabrirConfirmado) {
+        reabrirConfirmado = true;
+        msg.textContent = 'Esta fila tiene un cambio de medida (' + llavesPrevias(f.decision).map((k) => 'hasta ' + textoMes(k)).join(', ') + '). Reabrir lo borra junto con la decisión (queda en el registro). Pulse otra vez «Reabrir» para confirmar.';
+        return;
+      }
       msg.textContent = 'Guardando…';
       const r = await decidirFila(f.id, null);
       if (!r.ok) { msg.textContent = r.motivo; return; }
@@ -323,7 +342,10 @@ export function montarHomologacion(cont, { alCambiar }) {
       el('tbody', {}, visibles.map(({ f, e }) => el('tr', {},
         el('td', {}, f.matricula), el('td', {}, f.subestacion), el('td', {}, claveEfectiva(f) || '(sin punto)'),
         el('td', {}, el('span', { class: CHIP_ESTADO[e.estado] }, ETIQUETA_ESTADO[e.estado] || e.estado),
-          f.decision && f.decision.por ? el('span', { class: 'cs-sub' }, (f.decision.tipo === 'no_usar' ? 'Excluida' : 'Confirmada') + ' por ' + f.decision.por.nombre) : null),
+          f.decision && f.decision.por ? el('span', { class: 'cs-sub' }, (f.decision.tipo === 'no_usar' ? 'Excluida' : 'Confirmada') + ' por ' + f.decision.por.nombre) : null,
+          // Cambio de medida: cada configuración anterior, con su ventana (la de hoy es la de esta fila).
+          tieneCambiosDeMedida(f.decision) ? segmentosDeFila(f).filter((x) => x.tipo !== 'vigente').map((x) => el('span', { class: 'cs-sub' },
+            (x.tipo === 'sin_carga' ? 'Sin carga ' : 'Medida anterior (' + (claveEfectiva(x.fila) || 'sin punto') + ') ') + textoVentana(x))) : null),
         el('td', {}, e.avisos.length ? e.avisos.map((a) => el('span', { class: 'cs-sub' }, '• ' + (AVISOS[a] ? AVISOS[a].texto : a))) : '—'),
         el('td', {}, el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: () => dialogoRevisar(f, ctx) }, 'Revisar'))))));
     sec.append(el('h2', {}, 'Filas de la homologación'),

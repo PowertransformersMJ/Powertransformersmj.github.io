@@ -9185,3 +9185,59 @@ característica guardada de San Luis es la de la unidad anterior (Magnetron 300 
 (c) Becerril: en 10-mar el interruptor del T1 en 13,8 kV midió la SUMA de los dos circuitos de la S/E; el Ingeniero dice barras
 separadas (cada transformador con su circuito) → análisis en curso antes de cambiar la homologación; (d) Fichas «Refrigeración» = «[object Object]» (`ui/fichas/panel.js`)
 → tarea aparte.
+
+## 186. ADR-186 — Cargabilidad SCADA: la MEDIDA de un transformador puede cambiar desde un mes («medidas anteriores» en la homologación); caso Becerril (una barra → barras separadas en mayo de 2026) (TODO-54, TODO-69) ⟦OPUS-5.5⟧ (2026-10-26)
+
+> Auditoría de sobrecargas (ADR-185) → «T2 y T1 es común por 34,5 kV y por 13,8 kV los circuitos asociados» → análisis de datos
+> crudos → «medida que cambia por fecha» + «sí, fue en mayo» → W-11 completo → «vigente + lo anterior» → vista previa → «sí, todo».
+
+**186.1 Causa raíz.** La homologación da UN punto por transformador para TODOS los meses (`claveEfectiva` sin mes; lista, periodo,
+detalle e historia con un solo cid). Becerril cambió de configuración en mayo de 2026 (el mes sin datos), verificado por un analista y
+un verificador independiente (`wf_5ad5b68a-e18`, bóveda): hasta abril UNA barra de 13,8 kV, el interruptor del T1 medía los DOS
+circuitos (cociente 0,99 contra su suma, R² 0,99) y el T1 iba al 107–120 % sostenido; el T2 sin carga. Desde mayo barras separadas,
+cada transformador con su circuito (visto directo del 5 al 9-jun; el reparto ya era el nuevo el 1-jun 00:00). Ningún punto fijo sirve
+a los dos tramos: con «T2 = su circuito» fijo, feb–abr mostraba al T2 «posible 105–115 %» cuando no llevaba carga (doble conteo de lo
+que era carga del T1); con «T1 = su circuito» fijo, ene–abr lo bajaría al 64–70 %.
+
+**186.2 Solución.** La decisión sigue siendo la medida de HOY y guarda `decision.previas` = mapa por el ÚLTIMO mes en que rigió cada
+medida anterior: `{tipo:'medida', clave_excel, decision, nota}` o `{tipo:'sin_carga', nota}` (L-30: mapa, no arreglo). Dominio NUEVO
+`scada_carga_cambio_medida.js` (L-102): `filaDelMes` (sin previas devuelve la MISMA fila), `segmentos`, `puntoDelSegmento`,
+`sobrecargaAntesDelCambio`, `decisionConCambio`, `erroresCambioMedida` (v1: misma estación, clave del Excel —la de hoy o la guardada
+en la previa— o interruptor; sin suma de circuitos; base «usar»). Consumidores: la lista de un mes calcula cada mes con su medida
+(«sin carga» = sin cifra con su motivo, nunca 0 % ni «Excluida»); el periodo, el detalle, la historia y el mes a mes miran UNA
+configuración (la del último mes pedido) y lo de antes va aparte (decisión del Ingeniero «vigente + lo anterior»: nota en la fila,
+«Desde cuándo», contador «antes de un cambio de medida», filtro y columna `Cambio_de_medida` al final del CSV); el detalle ofrece
+botones a las otras configuraciones (sin ensuciar el historial). «Revisar» conserva las previas y «Reabrir» pide un segundo clic.
+**Regla de Firestore** `previasSeConservan`: una confirmación no puede perder las previas (un diálogo viejo en caché las borraría);
+solo «Reabrir» (queda en el registro). La importación NO cambia (el circuito nuevo entra por ser la clave de hoy).
+
+**186.3 No-regresión.** Comparación en SU Chrome, código publicado contra el nuevo, con los datos reales: **0 diferencias** en los
+9 meses × 208 transformadores y en 3 periodos (ene–oct, ago–oct, sep); la revisión adversarial lo repitió (120 comparaciones,
+8 semillas, 0). Con Becerril simulado en memoria solo cambian sus dos filas. Columnas de los CSV solo al final.
+
+**186.4 Verificación.** 3126 pass (14 nuevas en `tests/scada_carga_cambio_medida.test.js` + guardas por fuente); reglas 306/306 en el
+emulador (caso nuevo en las dos direcciones). Diseño W-11: evidencia de 4 lectores + arquitecto + comité ×3 (escéptico, ejecutor,
+dominio; `wf_fcf5681b-945`); revisión adversarial de 4 lentes con verificación de cada hallazgo (`wf_1817617e-02b`: 26 hallazgos,
+24 confirmados — 2 altos: la historia y el mes a mes no se rehacían al cambiar de configuración —, todos corregidos menos dos
+transitorios de pestañas abiertas antes de publicar, cubiertos por el procedimiento). Vista previa con franja roja en SU Chrome
+(periodo ene–oct: contador 51 → 50 = 39 · 9 · 1 sin cifra · 1 antes de un cambio; T2 93,2 % confirmada; T1 con «antes del
+cambio: sobrecarga sostenida 4 meses, primario hasta 123,7 % y secundario hasta 119,7 %»).
+
+**186.5 Anti-patterns evitados.** Repartir la entrada común por capacidad; fabricar un 0 % para «sin carga»; mezclar dos
+configuraciones en una cifra; tocar el importador (el punto más frágil de la caché) para un caso que no lo necesita; un formulario
+de UI para dos escrituras (queda para cuando otra S/E lo pida); creer la «prueba de tensiones» (el verificador la refutó: cambio de
+calibración del medidor).
+
+**186.6 Archivos.** Nuevos: `assets/js/domain/scada_carga_cambio_medida.js`, `tests/scada_carga_cambio_medida.test.js`. Modificados:
+`domain/scada_carga_vista.js`, `domain/scada_carga_periodo.js`, `ui/cargabilidad-scada/{lista,detalle,historia,panel-mensual}.js`,
+`ui/scada-datos/homologacion.js`, `firestore.rules`, `tests-rules/scada_carga.rules.test.js`, `tests/scada_carga_suma.test.js`.
+INTACTOS: `calcularEquipo`, worker e importador, `scada_carga_suma.js`, `scada_carga_alias.js`. Bóveda: `2026-10-26-cambio-de-medida/`.
+
+**186.7 Doctrina.** W-11 completo (evidencia antes de opinión; criterio del Ingeniero con la recomendada; vista previa fiel; regla en
+las dos direcciones). NO revisado externamente.
+
+**186.8 Verificado sano / no re-auditar.** Sin previas todo es idéntico (comparado en vivo). La previa conserva su `clave_excel`
+(recargar el Excel no la invalida ni le inventa CLAVE_CAMBIO); `fusionarHomologacion` conserva `decision` entera, previas incluidas.
+v1 NO cubre: cambio a mitad de mes, suma de circuitos con cambio, otra estación, reemplazo o traslado de la unidad (la placa es la de
+hoy para todos los meses), un formulario para registrar cambios. Becerril (área SCADA): el 13,8 kV del T1 perdido desde el 9-jun,
+fases de un circuito rotuladas corridas, un circuito en 0 A del 13-mar al 9-abr estando cargado, sep–oct sin la estación.
