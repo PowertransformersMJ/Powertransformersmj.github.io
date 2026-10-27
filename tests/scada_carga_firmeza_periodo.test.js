@@ -10,6 +10,7 @@ import { firmezaDeMeses, firmezaPeriodoDeFilas, FRACCION_MESES_MIN } from '../as
 import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
 import { filasLista } from '../assets/js/domain/scada_carga_vista.js';
 import { filasPeriodo } from '../assets/js/domain/scada_carga_periodo.js';
+import { serieMensualEquipo } from '../assets/js/domain/scada_carga_mensual.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
 import { TOP_HORAS } from '../assets/js/domain/scada_carga_importacion.js';
 
@@ -91,6 +92,21 @@ describe('periodo de la lista: un devanado que midió solo un mes ya no lo vuelv
     const fpm = Object.fromEntries(meses.map((m) => [m, filasLista({ parque: [tx], homologacion: { filas }, catalogo, resumenMes: solo[m] })]));
     const p = filasPeriodo({ parque: [tx], homologacion: { filas }, catalogo, meses, resumenes: solo, filasPorMes: fpm })[0];
     assert.equal(p.firme, false); assert.ok(p.motivos.includes('midió menos de la mitad de los meses'));
+  });
+  test('el acumulado «mes a mes» del detalle dice lo mismo que la lista (le llegan las filas de cada mes)', () => {
+    // S da la cifra (~73 %) y solo mide enero y febrero: cobertura del periodo < 50 %, pero midió bien la mitad de los meses.
+    const tx2 = { ...tx, electrico: { ...tx.electrico, corriente_nominal_secundaria_a: 600 } };
+    const rs = Object.fromEntries(meses.map((m, k) => [m, { mes: m, claves: { [cid]: k < 2
+      ? { N34_5: nivel(serie(160, 650)), N13_8: nivel(serie(400, 600)) }
+      : { N34_5: nivel(serie(160, 650)) } } }]));
+    const fpm = Object.fromEntries(meses.map((m) => [m, filasLista({ parque: [tx2], homologacion: { filas }, catalogo, resumenMes: rs[m] })]));
+    const lista = filasPeriodo({ parque: [tx2], homologacion: { filas }, catalogo, meses, resumenes: rs, filasPorMes: fpm })[0];
+    assert.equal(lista.devMax, 'S');
+    assert.ok(lista.devanados.find((d) => d.d === 'S').cobertura < 0.5);
+    assert.equal(lista.firme, true);
+    const serieM = serieMensualEquipo({ tx: tx2, homologacion: { filas }, catalogo, punto: catalogo.puntos[cid], resumenes: rs, meses });
+    const abril = serieM[serieM.length - 1].acumulado;
+    assert.equal(abril.nMeses, 4); assert.equal(abril.pct, lista.pct); assert.equal(abril.firme, lista.firme);
   });
   test('el detalle aplica la misma regla en un rango de varios meses', () => {
     const d = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');

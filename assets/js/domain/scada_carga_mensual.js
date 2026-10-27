@@ -69,8 +69,12 @@ export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumene
   const enParque = new Set(cargados);
   const leidos = cargados.filter((m) => resumenes && resumenes[m]);
   const mensual = {};
+  // La fila completa de cada mes se le pasa al acumulado como en «Varios meses»: la firmeza del periodo se cuenta en los
+  // meses en que midió el devanado de la cifra (2026-10-27); sin ellas, el acumulado podía contradecir a la lista.
+  const filaDelMes = {};
   for (const m of leidos) {
-    mensual[m] = resumida(filasLista({ parque: [tx], homologacion, catalogo, resumenMes: resumenes[m], umbrales, estadistico })[0], tx);
+    filaDelMes[m] = filasLista({ parque: [tx], homologacion, catalogo, resumenMes: resumenes[m], umbrales, estadistico })[0] || null;
+    mensual[m] = resumida(filaDelMes[m], tx);
   }
   return lista.map((mes) => {
     if (!enParque.has(mes)) {
@@ -87,7 +91,7 @@ export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumene
     let acumulado = { ...resumida(null, tx), motivoNulo: leido ? 'sin cálculo' : 'no se pudo leer este mes', desde: tramo[0] || mes, nMeses: tramo.length };
     if (leido && faltan.length) acumulado = { ...acumulado, motivoNulo: 'no se pudo leer ' + faltan.join(', ') };
     else if (leido && tramo.length) {
-      const filasPorMes = Object.fromEntries(tramo.map((m) => [m, []]));
+      const filasPorMes = Object.fromEntries(tramo.map((m) => [m, filaDelMes[m] ? [filaDelMes[m]] : []]));
       const fila = tramo.length === 1 ? mensual[mes]
         : resumida(filasPeriodo({ parque: [tx], homologacion, catalogo, meses: tramo, resumenes, filasPorMes, umbrales, estadistico })[0], tx);
       acumulado = { ...fila, desde: tramo[0], nMeses: tramo.length };
