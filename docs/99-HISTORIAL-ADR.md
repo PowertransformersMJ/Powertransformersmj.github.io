@@ -9543,3 +9543,7 @@ Las reglas de Firestore no restringen las llaves de la decisión; la fusión al 
 diálogo «Revisar» abierto con el código viejo borraría la marca al guardar (vuelve a provisional, nunca a firme falso); por eso las
 marcas se escriben con el despliegue ya en vivo. La marca no verifica qué fase falta: depende del conocimiento del Ingeniero. Quedan 18:
 detalle y quién actúa en la bóveda `2026-10-28-provisionales-26/SINTESIS.md`.
+
+**191.9 Verificado en vivo** (2026-10-28, código `49f1458` descargado): marcas escritas con el despliegue en vivo (rev 48 → 52,
+releídas IDÉNTICAS). Ene–oct firmes 181, provisionales 18, CRG 4–5 firmes 93, sobrecarga 46 (44 · 1 · 1). Detalle de Mata de Caña
+T1: 13,3 % CRG 1 firme, «4111 con solo 2 fases (fase S sin carga por diseño: banco de dos monofásicas)».
