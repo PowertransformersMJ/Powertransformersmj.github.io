@@ -267,9 +267,11 @@ export function montarHomologacion(cont, { alCambiar }) {
         }
       }
       // Sin los niveles a la vista (no se leyeron los datos cargados), guardar borraría la suma de circuitos que ya tiene.
-      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || fscGuardada)) {
+      // Tampoco con un mapa decidido (un nivel en «No usar»): guardar sin niveles lo cambiaría por el automático.
+      const mapaGuardado = !!(f.decision && f.decision.tipo === 'usar' && f.decision.mapa && Object.keys(f.decision.mapa).length);
+      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || fscGuardada || mapaGuardado)) {
         msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su '
-          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : 'fase sin carga por diseño') + '.';
+          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (fscGuardada ? 'fase sin carga' : 'asignación de niveles')) + '.';
         return;
       }
       // La medida elegida no puede ser un circuito que otra fila ya suma: la misma corriente contaría en dos equipos.

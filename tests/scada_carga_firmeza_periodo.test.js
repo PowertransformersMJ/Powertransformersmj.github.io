@@ -46,7 +46,7 @@ describe('cobertura de un devanado en los meses en que midió', () => {
     const r = firmezaDeMeses([{ n: 600, cob: 0.8 }, null, { n: 0, cob: 0 }, { n: 300, cob: 0.5 }]);
     assert.equal(r.mesesMedidos, 2);
     assert.equal(Math.round(r.coberturaFirmeza * 1e6) / 1e6, Math.round((900 / (750 + 600)) * 1e6) / 1e6);
-    assert.deepEqual(firmezaDeMeses([]), { coberturaFirmeza: null, mesesMedidos: 0, mesesSinServicio: 0 });
+    assert.deepEqual(firmezaDeMeses([]), { coberturaFirmeza: null, mesesMedidos: 0, mesesSinServicio: 0, nMedido: 0, unaFaltaMedida: 0 });
   });
   test('desde las filas de cada mes, por devanado, con los meses del periodo', () => {
     const fm = [{ devanados: [{ d: 'P', n: 600, cobertura: 0.9 }, { d: 'S', n: 500, cobertura: 0.8 }] }, null, { devanados: [{ d: 'P', n: 700, cobertura: 1 }] }];

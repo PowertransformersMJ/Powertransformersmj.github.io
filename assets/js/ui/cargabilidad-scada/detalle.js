@@ -420,7 +420,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           sobreH ? 'primera ' + intervaloCO(d.t[d.sobre.primera]) + ' · última ' + intervaloCO(d.t[d.sobre.ultima])
             : (sobreH === 0 ? 'ninguna ventana de ' + CALCULO.sobrecargaMinH + ' h seguidas' : (c.motivoNulo || 'sin ampacidad o sin datos'))),
         kpi('Cobertura', cob != null ? el('span', {}, num(100 * cob, 0), el('small', {}, ' %')) : '—',
-          conMeses ? delDev + 'en los meses en que midió (' + dCifra.mesesMedidos + ' de ' + dCifra.mesesTotal + ')'
+          conMeses ? delDev + 'en los meses en que midió (' + dCifra.mesesMedidos + ' de ' + dCifra.mesesTotal
+            + (dCifra.mesesReserva ? '; ' + dCifra.mesesReserva + (dCifra.mesesReserva === 1 ? ' mes' : ' meses') + ' en reserva no cuentan' : '') + ')'
             : (r ? delDev + r.servicio + ' h en servicio · ' + r.des + ' h fuera de servicio' : 'horas válidas sobre horas en servicio')),
         kpi('Potencia aparente máx.' + deOtroNivel, sMax != null ? el('span', {}, num(sMax, 1), el('small', {}, ' MVA')) : '—',
           sMax != null && kva ? num(100 * sMax / (kva / 1000), 0) + ' % de ' + num(kva / 1000, 1) + ' MVA de placa (S = √(P²+Q²))' : 'S = √(P² + Q²) con P y Q del SCADA'),

@@ -9,7 +9,7 @@ import { esUnidadReserva, mesEnReserva, MOTIVO_RESERVA, RESERVA } from '../asset
 import { firmezaDelRango } from '../assets/js/domain/scada_carga_firmeza_rango.js';
 import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
 import { filasLista } from '../assets/js/domain/scada_carga_vista.js';
-import { filasPeriodo } from '../assets/js/domain/scada_carga_periodo.js';
+import { filasPeriodo, resumenPeriodo } from '../assets/js/domain/scada_carga_periodo.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
 import { TOP_HORAS } from '../assets/js/domain/scada_carga_importacion.js';
 import { recortarRango, ventanaDeMes, horasMes } from '../assets/js/domain/scada_carga_series.js';
@@ -29,6 +29,12 @@ describe('qué mes es de reserva', () => {
     assert.equal(mesEnReserva([nv('P', 30, null, 744, 744), nv('S', 0, null, 744, 100)]), false, 'horas válidas sin cifra (escala)');
     assert.equal(mesEnReserva([]), false);
   });
+  test('revisión: carga por el MÁXIMO, devanado sin registro y días sin cargar', () => {
+    assert.equal(mesEnReserva([{ ...nv('P', 720, 1, 744, 744), pctMax: 110 }, nv('S', 0, null, 744, 144)]), false, 'una sobrecarga corta no se esconde');
+    assert.equal(mesEnReserva([nv('P', 0, null, null, null), nv('S', 0, null, 744, 120)]), false, 'un devanado sin registro no se descarta');
+    assert.equal(mesEnReserva([nv('P', 20, 1, 720, 720), nv('S', 0, null, 720, 520)]), false, '200 h fuera de 720: menos de la mitad');
+    assert.equal(mesEnReserva([nv('P', 20, 1, 720, 720), nv('S', 0, null, 720, 520)], 360), true, 'con 360 h sin cargar, 200 de 360 sí es la mitad');
+  });
   test('solo con la marca en una decisión «usar»', () => {
     assert.equal(esUnidadReserva({ decision: { tipo: 'usar', unidad_reserva: true } }), true);
     assert.equal(esUnidadReserva({ decision: { tipo: 'no_usar', unidad_reserva: true } }), false);
@@ -42,10 +48,10 @@ const tx = { id: 'a', identificacion: { matricula: 'T3-X/X-DM1' }, ubicacion: { 
   electrico: { tension_primaria_kv: 110, tension_secundaria_kv: 13.8, corriente_nominal_primaria_a: 105, corriente_nominal_secundaria_a: 836.7 } };
 const cid = claveId('EstDemo1', 'swTrafo3');
 const red = (x) => Math.round(x * 1000) / 1000;
-function nivel(valores, horas, servicio) {
+function nivel(valores, horas, servicio, unaFalta = 0) {
   const n = valores.length;
   const e = estadisticas(Float32Array.from(valores.length ? valores : [0]));
-  const i = n ? { n, p50: red(e.p50), p95: red(e.p95), p98: red(e.p98), p99: red(e.p99), max: red(e.max), iMax: 0, prom: red(e.prom), unaFalta: 0 }
+  const i = n ? { n, p50: red(e.p50), p95: red(e.p95), p98: red(e.p98), p99: red(e.p99), max: red(e.max), iMax: 0, prom: red(e.prom), unaFalta: Math.min(unaFalta, n) }
     : { n: 0, p50: null, p95: null, p98: null, p99: null, max: null, iMax: -1, prom: null, unaFalta: 0 };
   return { i, sost: null, horas, servicio, des: horas - servicio, cob: servicio > 0 ? n / servicio : null, sMax: null, sP99: null, rUI: 1, uProm: 13.6,
     sP: 1, flujoInverso: 0, desde: 0, top: [...Float32Array.from([...valores].sort((a, b) => b - a).slice(0, TOP_HORAS))] };
@@ -93,6 +99,35 @@ describe('mes y periodo de una unidad de reserva', () => {
   });
 });
 
+describe('revisión: el ruido de los meses en reserva no cuenta para las 72 h ni para «falta una fase»', () => {
+  const ms = ['2026-03', '2026-04', '2026-05', '2026-06', '2026-07', '2026-08'];
+  const cat = { meses: Object.fromEntries(ms.map((m) => [m, { completo: true }])), puntos: { [cid]: { niveles: { N110: {}, N13_8: {} }, meses: ms } } };
+  const ruido = () => ({ N110: nivel(serie(1, 40).map((v) => Math.fround(1 + (v % 2))), 744, 744), N13_8: nivel([], 744, 100) });
+  const corrida = (agosto) => {
+    const res = Object.fromEntries(ms.map((m) => [m, { mes: m, claves: { [cid]: m === '2026-08' ? agosto : ruido() } }]));
+    const h = homologacion({ unidad_reserva: true });
+    const fpm = Object.fromEntries(ms.map((m) => [m, filasLista({ parque: [tx], homologacion: h, catalogo: cat, resumenMes: res[m] })]));
+    return { mes: fpm['2026-08'][0], periodo: filasPeriodo({ parque: [tx], homologacion: h, catalogo: cat, meses: ms, resumenes: res, filasPorMes: fpm })[0] };
+  };
+  test('operó 70 h en agosto: el mes y el periodo quedan provisionales por «menos de 72 horas válidas»', () => {
+    const r = corrida({ N110: nivel(serie(60, 70), 744, 744), N13_8: nivel(serie(600, 60), 744, 600) });
+    assert.equal(r.mes.firme, false);
+    assert.equal(r.periodo.firme, false, 'antes salía firme con las 200 h de ruido');
+    assert.ok(r.periodo.motivos.includes('menos de 72 horas válidas'), r.periodo.motivos.join('; '));
+  });
+  test('con dos fases en la mayoría de las horas de agosto, el periodo también dice «falta una fase»', () => {
+    const r = corrida({ N110: nivel(serie(60, 300), 744, 744, 250), N13_8: nivel(serie(600, 300), 744, 600) });
+    assert.ok(r.periodo.motivos.includes('falta una fase en la mayoría de las horas'), r.periodo.motivos.join('; '));
+  });
+  test('el valor típico del periodo no lo pondera el ruido de la reserva (la relación entre niveles)', () => {
+    const r1 = { N13_8: nivel(serie(400, 500), 744, 700) }; const r2 = { N13_8: nivel(Array(500).fill(1), 744, 700) };
+    const sin = resumenPeriodo([{ mes: '2026-07', r: r2 }, { mes: '2026-08', r: r1 }]).porNivel.N13_8.i.p50;
+    const con = resumenPeriodo([{ mes: '2026-07', r: r2, reserva: true }, { mes: '2026-08', r: r1 }]).porNivel.N13_8.i.p50;
+    assert.equal(con, r1.N13_8.i.p50);
+    assert.ok(sin < con);
+  });
+});
+
 // ── Detalle: el rango de meses completos cuenta igual ───────────────────────────────────────────────────────────────
 function curvas(mes, ok, valor, kv) {
   const n = horasMes(mes); const fam = {};
@@ -125,6 +160,7 @@ test('detalle: con la marca, el mes en reserva no cuenta en el rango', () => {
 test('el detalle y el diálogo «Revisar» usan la marca (y el diálogo la conserva)', () => {
   const d = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
   assert.match(d, /\{ reserva: esUnidadReserva\(a\.fila\) \}/);
+  assert.match(d, /' en reserva no cuentan'/);
   const h = readFileSync(new URL('../assets/js/ui/scada-datos/homologacion.js', import.meta.url), 'utf8');
   assert.match(h, /decision\.unidad_reserva = true;/);
 });

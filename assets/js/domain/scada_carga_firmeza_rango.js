@@ -72,8 +72,9 @@ export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargada
   const enReserva = mesesCargados.map((mes, k) => reserva && mesEnReserva(porNivel.map((x) => {
     const r = x.meses[k];
     const n = r && r.i ? r.i.n : 0;
-    return { devanado: x.d, n, pct: n > 0 && x.A > 0 ? cargabilidad(r, x.A) : null, horas: r ? r.horas : null, servicio: r ? r.servicio : null };
-  })));
+    return { devanado: x.d, n, pct: n > 0 && x.A > 0 ? cargabilidad(r, x.A) : null,
+      pctMax: n > 0 && x.A > 0 && r.i.max != null ? 100 * r.i.max / x.A : null, horas: r ? r.horas : null, servicio: r ? r.servicio : null };
+  }), (noCargadas && noCargadas[mes]) || 0));
   const nReserva = enReserva.filter(Boolean).length;
   const out = {};
   for (const x of porNivel) {
@@ -82,11 +83,12 @@ export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargada
       if (!r || enReserva[k]) return null;
       // Fase sin carga por diseño: el resguardo, mes a mes (solo lo usa `calcularEquipo` si el nivel lleva la marca).
       if (r.i && faseSinCargaMide(r.i.n, r.i.unaFalta)) mide = true;
-      return { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, fuera: (noCargadas && noCargadas[mesesCargados[k]]) || 0 };
+      return { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, unaFalta: r.i ? r.i.unaFalta : 0, fuera: (noCargadas && noCargadas[mesesCargados[k]]) || 0 };
     });
     const f = firmezaDeMeses(lista);
     out[x.d] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio - nReserva),
-      ...(mide ? { faseSinCargaMideMes: true } : {}) };
+      ...(mide ? { faseSinCargaMideMes: true } : {}),
+      ...(nReserva ? { mesesReserva: nReserva, nFirmeza: f.nMedido, unaFaltaFirmeza: f.unaFaltaMedida } : {}) };
   }
   return out;
 }
