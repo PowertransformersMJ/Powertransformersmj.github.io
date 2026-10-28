@@ -58,7 +58,8 @@ describe('cobertura en los meses en que midió: horas en servicio, días sin car
     assert.equal(firmezaDeMeses([{ n: 0, cob: null, servicio: 0, horas: 0 }, { n: 0, cob: null, servicio: 0 }]).mesesSinServicio, 0);
   });
   test('con las horas en servicio no se infla el mes por la cobertura redondeada', () => {
-    assert.equal(firmezaDeMeses([{ n: 1, cob: 0.001, servicio: 744 }]).coberturaFirmeza, 1 / 744);
+    // 80 h (no 1 h: desde 2026-10-28 un mes con menos de 72 h es un mes casi sin medida, que no cuenta como medido).
+    assert.equal(firmezaDeMeses([{ n: 80, cob: 0.108, servicio: 744 }]).coberturaFirmeza, 80 / 744);
   });
 });
 

@@ -186,7 +186,9 @@ export function procesarPuntoMes(nuevo, guardado, modo = 'completar', opciones =
       conflictos += fz.conflictos; nuevas += fz.nuevas;
       crudo[f] = fz;
     }
-    const limpio = limpiarNivel(crudo, kv, opciones);   // opciones: bandera «Invalid» no confiable (`scada_carga_invalid.js`)
+    // opciones: bandera «Invalid» no confiable (`scada_carga_invalid.js`) y banda muerta, solo en sus niveles (`scada_carga_banda_muerta.js`)
+    const bm = opciones && Array.isArray(opciones.bandaMuerta) ? opciones.bandaMuerta.includes(nv) : false;
+    const limpio = limpiarNivel(crudo, kv, { ...opciones, bandaMuerta: bm });
     niveles[nv] = { kv, fam: {} };
     conteos[nv] = {};
     for (const [f, s] of Object.entries(limpio)) {

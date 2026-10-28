@@ -480,10 +480,10 @@ describe('SIN suma, todo da exactamente lo mismo que antes (no-regresión)', () 
     const w = readFileSync(new URL('../assets/js/workers/scada_carga_importar.worker.js', import.meta.url), 'utf8');
     assert.match(w, /const objetivo = objetivoConSumas\(filasAnalisis\);/);
     assert.match(w, /if \(specs\.length\) \{/);
-    assert.match(w, /derivados, versionSuma: SUMA\.version, versionInvalid: VERSION_INVALID \}\);/);
+    assert.match(w, /derivados, versionSuma: SUMA\.version, versionInvalid: VERSION_INVALID, versionBandaMuerta: VERSION_BANDA_MUERTA \}\);/);
     assert.doesNotMatch(w, /resumen\[mes\]\[cid\] = .*derivad/, 'el resumen del transformador queda como vino');
     const im = readFileSync(new URL('../assets/js/ui/scada-datos/importar-mes.js', import.meta.url), 'utf8');
-    assert.match(im, /scada_carga_importar\.worker\.js\?v=invalid1/);
+    assert.match(im, /scada_carga_importar\.worker\.js\?v=banda1/);
     assert.match(im, /if \(filasConSuma\(\)\.length && procesado\.versionSuma == null\)/);
     assert.match(im, /if \(Array\.isArray\(manifiesto\.alias\) && manifiesto\.alias\.length\) validarAlias\(manifiesto\.alias, filasHomologacion\(\)\)/);
     assert.match(im, /aliasTocaSuma\(manifiesto\.alias, filasHomologacion\(\)\)/);
@@ -749,7 +749,7 @@ describe('revisión adversarial 2026-10-24: candado del detalle, D5 después de 
     assert.match(im, /if \(d\.estado === 'sin_nivel'\)/);
     const h = src('ui/scada-datos/homologacion.js');
     assert.match(h, /if \(mes !== mesResumen \|\| carga !== cargaResumen\) \{/, 'tras cargar el MISMO mes se vuelve a leer su resumen');
-    assert.match(h, /if \(tipo\.value === 'usar' && !niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada \|\| mapaGuardado\)\) \{/, 'sin niveles a la vista no se borra la suma');
+    assert.match(h, /if \(tipo\.value === 'usar' && !niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada \|\| bmGuardada \|\| mapaGuardado\)\) \{/, 'sin niveles a la vista no se borra la suma');
     assert.match(h, /ponga primero «Medir con la medida del transformador» en el nivel sumado, guarde, y vuelva a abrir «Revisar»/);
     assert.match(h, /medir\.disabled = !s\.value;/); assert.match(h, /de la medida propia del transformador: no se usa/);
     assert.match(h, /if \(!medirSel\[nv\] \|\| medirSel\[nv\]\.disabled \|\| medirSel\[nv\]\.value !== 'suma'\) continue;/);

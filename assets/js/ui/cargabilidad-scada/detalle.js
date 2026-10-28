@@ -455,7 +455,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         fila('Flujo de potencia inverso', f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
         fila('Escala de la medida', escala),
         fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')
-          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')),
+          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')
+          + (info.bandaMuerta != null ? ' · corriente con banda muerta: el valor repetido cuenta como válido si la tensión se movió (escalón de ' + num(info.bandaMuerta, 3) + ' A'
+            + (info.bandaMuertaPct != null ? ' = ' + num(info.bandaMuertaPct, 1) + ' puntos' : '') + ', según la decisión de la homologación)' : '')),
         info.suma ? fila('Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
   }
   /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */

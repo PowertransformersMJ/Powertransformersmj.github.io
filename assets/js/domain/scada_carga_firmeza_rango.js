@@ -15,6 +15,9 @@ import { resumirParaGuardar } from './scada_carga_importacion.js';
 import { firmezaDeMeses } from './scada_carga_firmeza_periodo.js';
 import { faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
 import { mesEnReserva } from './scada_carga_reserva.js';
+// Mes casi sin medida (2026-10-28): archivo NUEVO.
+import { mesCasiSinMedida } from './scada_carga_mes_casi_sin_medida.js';
+import { p99DePeriodo } from './scada_carga_periodo.js';
 
 const H_MS = 3600e3;
 
@@ -85,9 +88,19 @@ export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargada
       if (r.i && faseSinCargaMide(r.i.n, r.i.unaFalta)) mide = true;
       return { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, unaFalta: r.i ? r.i.unaFalta : 0, fuera: (noCargadas && noCargadas[mesesCargados[k]]) || 0 };
     });
+    // Mes casi sin medida: el p99 del rango SIN esos meses (todos los meses con horas, como la cifra), para el resguardo.
+    let hayCasi = false; const partesSin = [];
+    x.meses.forEach((r, k) => {
+      if (!r || !r.i || !(r.i.n > 0)) return;
+      const fuera = (noCargadas && noCargadas[mesesCargados[k]]) || 0;
+      if (mesCasiSinMedida(r.i.n, Math.max(r.i.n, (r.servicio != null ? r.servicio : (r.horas || 0)) - fuera))) hayCasi = true;
+      else partesSin.push({ n: r.i.n, top: r.top || null });
+    });
     const f = firmezaDeMeses(lista);
     out[x.d] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio - nReserva),
       ...(mide ? { faseSinCargaMideMes: true } : {}),
+      // Mes casi sin medida (2026-10-28): el p99 sin esos meses, para el resguardo de `calcularEquipo`.
+      ...(hayCasi ? { p99SinMesesCasi: p99DePeriodo(partesSin).p99 } : {}),
       ...(nReserva ? { mesesReserva: nReserva, nFirmeza: f.nMedido, unaFaltaFirmeza: f.unaFaltaMedida } : {}) };
   }
   return out;

@@ -10,7 +10,8 @@
 //   (tensiones) fuera de [0,5; 1,5] × el nivel → 7 · valor tope del sistema → 4 · cero → 6.
 // Pasada de serie (por nivel y mes):
 //   (i)   corriente en cero en las 3 fases con tensión presente → 9 «fuera de servicio» (no es hueco);
-//   (ii)  el MISMO valor ≥ 6 h seguidas en I, P o Q → 5 «congelado»;
+//   (ii)  el MISMO valor ≥ 6 h seguidas en I, P o Q → 5 «congelado» (con banda muerta marcada, la corriente → 10 si la
+//         tensión del nivel se movió en el tramo);
 //   (iii) tensión quieta ≥ 6 h: si la corriente se movió → 10 «retenido» (válido, banda muerta);
 //         si la corriente también quedó quieta → 5; sin corriente medida, 5 solo con ≥ 24 h.
 // Funciones PURAS. Archivo NUEVO (L-102).
@@ -66,6 +67,21 @@ function corridasIguales(v, m, minLargo) {
   return out;
 }
 
+/** ¿Alguna tensión con celda VÁLIDA tomó al menos dos valores distintos en [a, z)? (antes de la pasada iii) */
+function tensionSeMovio(fams, a, z) {
+  for (const f of FAMILIAS_U) {
+    const s = fams[f];
+    if (!s) continue;
+    let primero = null;
+    for (let h = a; h < z; h++) {
+      if (s.m[h] !== CODIGO.VALIDO) continue;
+      if (primero == null) primero = s.v[h];
+      else if (s.v[h] !== primero) return true;
+    }
+  }
+  return false;
+}
+
 /** Corriente de la fase más cargada por hora con lo VÁLIDO (NaN si menos de 2 fases). */
 function iMaxHoraria(fams, n) {
   const out = new Float32Array(n).fill(NaN);
@@ -84,14 +100,16 @@ function iMaxHoraria(fams, n) {
  * Limpia un nivel completo de un mes. Modifica y devuelve `fams[fam].m` (Uint8Array).
  * @param {Object<string, {v: Float32Array, b: Uint8Array, presente: Uint8Array}>} fams
  * @param {number} kv  tensión nominal del nivel
- * @param {{aceptarInvalid?: boolean}} [opciones]  `aceptarInvalid`: la bandera «Invalid» de este punto no es confiable
- *   (decisión del Ingeniero, `scada_carga_invalid.js`): sus horas se juzgan como si fueran «Actual». La bandera cruda no cambia.
+ * @param {{aceptarInvalid?: boolean, bandaMuerta?: boolean}} [opciones]  `aceptarInvalid`: la bandera «Invalid» de este punto no
+ *   es confiable (decisión del Ingeniero, `scada_carga_invalid.js`): sus horas se juzgan como si fueran «Actual». La bandera
+ *   cruda no cambia. `bandaMuerta`: la corriente de este nivel solo se renueva al cambiar un escalón (`scada_carga_banda_muerta.js`).
  * @returns {Object<string, {v, b, m}>}
  */
 export function limpiarNivel(fams, kv, opciones = {}) {
   const n = Object.values(fams)[0] ? Object.values(fams)[0].v.length : 0;
   const out = {};
   const aceptarInvalid = !!(opciones && opciones.aceptarInvalid);
+  const bandaMuerta = !!(opciones && opciones.bandaMuerta);
   for (const [fam, s] of Object.entries(fams)) {
     const m = new Uint8Array(n);
     for (let h = 0; h < n; h++) {
@@ -111,10 +129,15 @@ export function limpiarNivel(fams, kv, opciones = {}) {
     for (const f of FAMILIAS_I) out[f].m[h] = CODIGO.DESENERGIZADO;
     for (const f of ['P', 'Q']) if (out[f] && out[f].m[h] === CODIGO.CERO) out[f].m[h] = CODIGO.DESENERGIZADO;
   }
-  // (ii) Congelado en I, P y Q.
+  // (ii) Congelado en I, P y Q. Con banda muerta (marca del Ingeniero, `scada_carga_banda_muerta.js`), la corriente quieta
+  // de ESTE nivel es válida («retenida») si alguna tensión del nivel se movió dentro del tramo: la medida está viva y solo
+  // no cambió de escalón. P y Q, como siempre.
   for (const f of [...FAMILIAS_I, 'P', 'Q']) {
     if (!out[f]) continue;
-    for (const [a, z] of corridasIguales(out[f].v, out[f].m, CONGELADO_MIN_H)) for (let h = a; h < z; h++) out[f].m[h] = CODIGO.CONGELADO;
+    for (const [a, z] of corridasIguales(out[f].v, out[f].m, CONGELADO_MIN_H)) {
+      const codigo = bandaMuerta && FAMILIAS_I.includes(f) && tensionSeMovio(out, a, z) ? CODIGO.RETENIDO : CODIGO.CONGELADO;
+      for (let h = a; h < z; h++) out[f].m[h] = codigo;
+    }
   }
   // (iii) Tensión quieta: retenida si la corriente se movió; congelada si no.
   const iF = iMaxHoraria(out, n);
