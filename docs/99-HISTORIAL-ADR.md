@@ -9757,3 +9757,16 @@ fase); en Tres Palmas los tramos quietos legítimos llegan a 105–169 h en la f
 tope sin esa condición rompía el caso real. La muerte de Maracayo congeló I, U, P y Q juntas (la banda muerta no la habría colado). El
 «DISTINTO» del primer control era el orden de las claves del JSON, no los datos (comparación profunda: 0 diferencias). San Andrés T1:
 en 729 h en que miden los dos, T1 = 1,02 × T2 (p10–p90 1,01–1,03) → ~83 %, CRG 4, la misma que su cifra provisional (79,8 %).
+
+**195.9 Verificado en vivo (2026-10-28).** Merge `4a940e5`; con la caché vencida y la página recargada, los 7 módulos nuevos en uso
+(`toString`). Marcas (`decidirFila`, rev 60 → 63): Tres Palmas T1/T2/T3 con `banda_muerta {N13_8: 0.976}` y su nota; comparación
+profunda: de 217 filas solo cambiaron esas 3. San Andrés T1 NO tiene decisión (homologación automática): escribirle la nota exigía
+confirmarla, que el Ingeniero no pidió → la corroboración queda solo en `195.8`. Reproceso del punto (carga `JjRq6SAM0MbZMjEQYLdM`,
+«completa», 9 series + 9 resúmenes): control previo sin la marca = lo guardado en 9 de 9; byte a byte, valores, banderas y extras
+idénticos; los códigos cambian solo en 13,8 kV: corrientes congelado → retenido y 206 h de tensión retenida → congelada (la regla de
+siempre de la tensión, ahora con la corriente válida: quieta, no la «retiene»); releído: 9 de 9 IGUALES. Página recargada, periodo
+ene–oct: **191 firmes · 9 provisionales · 8 sin cifra**, CRG 4–5 firmes 95 (sin cambio); Tres Palmas ×3 31,1 % CRG 1 firmes, Maracayo
+59,7 % CRG 1 firme, Puerto Escondido y San Carlos siguen firmes. Una pestaña abierta antes de escribir las marcas mostró 188/12 (los meses
+retenidos sin la marca en su homologación vieja → el resguardo «sin marca»): correcto; recargada, 191/9 (L-161). Quedan 9 provisionales,
+todos del área SCADA o la brigada: El Desastre, San Andrés T1, San Felipe, Casa de Zinc, Santa Elena, Santa Teresa, San Luis, Tres
+Esquinas y Ferrocarril (pedido de `§194`).
