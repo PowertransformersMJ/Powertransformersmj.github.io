@@ -9661,3 +9661,42 @@ IDÉNTICAS). Reproceso: una carga «completar» (`reproceso: bandera Invalid no 
 16 resúmenes IGUALES a lo calculado, 0 horas «Invalid» como hueco, las demás claves de cada mes intactas. Ene–oct: firmes 187,
 provisionales 13, sin cifra 8, CRG 4–5 firmes 95, sobrecarga 46 (44 · 1 · 1). La Europa T1 44,0 % CRG 1 firme (detalle: cobertura 92 %,
 7 de 7); Ovejas T2 93,3 % CRG 5 firme; San Luis T1 86,0 % CRG 4 provisional.
+
+## 194. ADR-194 — Cargabilidad SCADA: Maracayo T1 con la bandera «Invalid» no confiable; Ferrocarril aplazado; pedido consolidado al área SCADA y la brigada (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «procede con todo para que quede conforme» (2026-10-28).
+
+**194.1 Causa raíz.** Maracayo T1: la bandera «Invalid» de su bahía es falsa desde ene-2025 (las horas marcadas siguen a sus
+circuitos igual que las «Actual»); el 34,5 kV se renueva por pasos de ~2 A; y la medida MURIÓ el 26-jun-2026 (valores fijos): de jul a
+oct solo 1–86 horas válidas por mes. Ferrocarril T1: su 20,1 % sale de UNA hora; su único circuito está en otra estación del
+SCADA que el Excel de homologación no nombra, así que los paquetes preparados no lo traen.
+
+**194.2 Solución.**
+- Maracayo T1 (`decidirFila`, rev 59 → 60, IDÉNTICA): 13,8 kV → S, 34,5 kV «No usar», `invalid_no_confiable`. Control previo: reprocesar
+  SIN la marca = lo guardado en 9 de 9. Reproceso (carga «completar» completa: 9 series, 9 resúmenes), releído: 9 de 9 IGUALES, 0 horas
+  «Invalid» como hueco. Resultado: 62,5 % CRG 2 → **59,7 % CRG 1, PROVISIONAL** (cobertura: jul–oct casi sin medida); 5 meses firmes
+  (ene–jun). Queda firme cuando el área SCADA reviva la medida. (Al Ingeniero se le había dicho «59,8 % firme»: era solo ene–jun; corregido.)
+- Ferrocarril T1: APLAZADO a su próximo re-exporte (empaquetar con la estación del circuito y cargar en «Completar» con la decisión);
+  cargarlo hoy exigía re-empaquetar 8 meses (~450 MB) y seguiría provisional (~6 %: falta la fase R en ene–abr).
+- Pedido consolidado al área SCADA y la brigada (`wf_451b005e-7ca`, redactor + verificador contra las fuentes y el exporte crudo al
+  26-oct): `~/Downloads/Pedido_SCADA_y_Brigada_Cargabilidad_2026-10-28.html` (copia en la bóveda). 12 filas SCADA prioridad alta,
+  28 del resto (11 sin confirmar o sin cifra, 17 ya confirmadas con la señal por corregir en origen) y 14 de brigada (6 ALTA). Hallazgo
+  del verificador: desde el 1-sep-2026 el exporte histórico dejó de traer ~167 estaciones (43 con transformadores seguidos): re-exportar
+  sep–oct no sirve hasta que el área SCADA las restituya (fila A1).
+
+**194.3 No-regresión.** Maracayo: 0 filas ajenas en la simulación; ene–oct sigue en 187 firmes · 13 provisionales · 8 sin cifra.
+
+**194.4 Verificación.** En vivo (página recargada): Maracayo T1 59,7 % CRG 1 provisional, 5 meses firmes; totales sin cambio.
+
+**194.5 Anti-patterns evitados.** Prometer «firme» con un periodo distinto del que mira la lista; cambiar la clave de Ferrocarril sin
+datos cargados (lo dejaba sin cifra); una escritura en segundo plano «suelta» (la bloqueó el control de permisos: se hizo en una llamada
+directa y visible).
+
+**194.6 Archivos.** Ninguno de código. Datos: homologación (Maracayo T1), series y resúmenes de su punto. Entregable en Descargas.
+
+**194.7 Doctrina.** Su orden «procede con todo» · simulación con control antes de escribir · decir lo que NO quedó conforme y por qué.
+NO revisado externamente.
+
+**194.8 Verificado sano / no re-auditar.** Lo que sigue pendiente depende del área SCADA o de la brigada (medidas muertas, congeladas,
+con banda muerta o mal escaladas) y de su re-exporte; está en el pedido. No hay arreglo honesto desde la plataforma para San Felipe,
+Casa de Zinc, Santa Elena, Santa Teresa ni San Andrés T1 (no hay otro punto que mida su carga).
