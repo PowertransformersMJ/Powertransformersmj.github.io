@@ -28,6 +28,8 @@ import { filaDelMes, filasDelMes, motivoSinCarga } from './scada_carga_cambio_me
 import { pasaFiltroDevanado } from './scada_carga_filtro_devanado.js';
 // El umbral de sobrecarga SEVERA (R4) del panel DGA, para la señal de cada devanado en `firmeza` (2026-10-27).
 import { SEVERA_PCT } from './scada_carga_dga.js';
+// Fase sin carga por diseño (banco de dos monofásicas, 2026-10-28): archivo NUEVO; sin la marca en la decisión, nada cambia.
+import { faseSinCarga, faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -126,10 +128,13 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     if (escala === 'ESCALA_I' || escala === 'ESCALA_INDETERMINADA') pct = null;
     const sostPct = d && r && !bloqueado && r.sost && A > 0 ? 100 * r.sost.v / A : null;
     const picoPct = d && r && !bloqueado && r.i && r.i.max != null && A > 0 ? 100 * r.i.max / A : null;
+    // Banco de dos monofásicas (marca del Ingeniero): la fase marcada no existe. Con suma de circuitos no aplica.
+    const fsc = d && !sp ? faseSinCarga(fila, nv) : null;
     const fila1 = {
       nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + ' · suma de circuitos' : NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
       pct, escala, cobertura: r ? r.cob : null, n: r && r.i ? r.i.n : 0, sostenidaPct: sostPct, picoPct,
       sinDatos: !r || !r.i || r.i.n === 0,
+      ...(fsc ? { faseSinCarga: fsc } : {}),
       ...(sp ? { suma: { de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null } } : {})
     };
     if (sp) {
@@ -140,7 +145,10 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     niveles.push(fila1);
     // Varios meses (2026-10-27): la cobertura del devanado en los meses en que midió y cuántos midió (ver `firmeza`).
     const fp = d && firmezaPeriodo ? firmezaPeriodo[d] || null : null;
-    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0,
+    // Con la marca, sus horas de dos fases no son «falta una fase». El resguardo se mira también mes a mes (varios meses).
+    const unaFalta = r && r.i ? r.i.unaFalta || 0 : 0;
+    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: fsc ? 0 : unaFalta,
+      ...(fsc ? { faseSinCarga: fsc, faseSinCargaMide: faseSinCargaMide(fila1.n, unaFalta) || !!(fp && fp.faseSinCargaMideMes) } : {}),
       servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
       ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }

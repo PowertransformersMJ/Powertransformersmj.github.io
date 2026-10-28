@@ -286,7 +286,8 @@ function midePoco(x) {
  * scada_carga_firmeza_periodo.js) y debe haber medido al menos la mitad de los meses (`mesesMedidos` / `mesesTotal`).
  * Dos resguardos (revisión adversarial 2026-10-27): en un tridevanado, el devanado que mide la carga también debe medir
  * bien; y la sobrecarga (o las horas imposibles) que solo muestra un devanado que mide poco deja la cifra provisional.
- * @param {{estadoHomologacion, esCircuito, devanados: Array<{d, A, pct, cobertura, n, escala, coberturaFirmeza?, mesesMedidos?, mesesTotal?, sobre?}>, placa, mesesFallidos}} ctx
+ * Fase sin carga por diseño (2026-10-28): el devanado llega con `unaFalta` 0 y `faseSinCargaMide` (resguardo).
+ * @param {{estadoHomologacion, esCircuito, devanados: Array<{d, A, pct, cobertura, n, escala, coberturaFirmeza?, mesesMedidos?, mesesTotal?, sobre?, faseSinCargaMide?}>, placa, mesesFallidos}} ctx
  */
 export function firmeza(ctx) {
   const motivos = [];
@@ -311,6 +312,8 @@ export function firmeza(ctx) {
   }
   // Con solo 2 de 3 fases la fase más cargada puede ser la que falta: la cifra es un mínimo, no firme.
   if (usados.some((x) => x.n > 0 && (x.unaFalta || 0) / x.n > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');
+  // Banco de dos monofásicas (2026-10-28): si la fase marcada sin carga por diseño empieza a medir, la marca ya no se cree.
+  if (usados.some((x) => x.faseSinCargaMide)) motivos.push('la fase marcada sin carga está midiendo');
   if ((ctx.devanados || []).some((x) => x.escala === 'ESCALA_I' || x.escala === 'ESCALA_INDETERMINADA')) motivos.push('escala de la corriente sospechosa');
   if ((ctx.mesesFallidos || []).length) motivos.push('un mes del rango no se pudo leer');
   return { firme: motivos.length === 0, motivos };

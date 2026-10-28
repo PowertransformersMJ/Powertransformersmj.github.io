@@ -13,6 +13,7 @@ import { NIVELES } from './scada_carga_config.js';
 import { resumenFisico } from './scada_carga_kpis.js';
 import { resumirParaGuardar } from './scada_carga_importacion.js';
 import { firmezaDeMeses } from './scada_carga_firmeza_periodo.js';
+import { faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
 
 const H_MS = 3600e3;
 
@@ -58,14 +59,18 @@ export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargada
   for (const [nv, rec] of Object.entries(recs || {})) {
     const i = (niveles || []).find((x) => x.nivel === nv);
     if (!i || !i.devanado || !rec) continue;
+    let mide = false;
     const lista = mesesCargados.map((mes) => {
       const fam = recortarMes(rec, mes, desdeMs);
       if (!fam) return null;
       const r = resumirParaGuardar(resumenFisico(fam, NIVELES[nv].kv), fam);
+      // Fase sin carga por diseño: el resguardo, mes a mes (solo lo usa `calcularEquipo` si el nivel lleva la marca).
+      if (r && r.i && faseSinCargaMide(r.i.n, r.i.unaFalta)) mide = true;
       return r ? { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, fuera: (noCargadas && noCargadas[mes]) || 0 } : null;
     });
     const f = firmezaDeMeses(lista);
-    out[i.devanado] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio) };
+    out[i.devanado] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio),
+      ...(mide ? { faseSinCargaMideMes: true } : {}) };
   }
   return out;
 }

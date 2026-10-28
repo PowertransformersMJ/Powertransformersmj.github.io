@@ -9484,3 +9484,62 @@ tiene el primario bien medido; las 6 sobrecargas en un devanado mal medido las c
 `functions/domain/` es copia generada (no se sincroniza a mano). Queda ANOTADO (ya pasaba antes): la fila del periodo cuenta los meses
 antes de que existiera el punto y el detalle que abre solo los del punto (pueden diferir en clase); un nivel sin fase IR toma otra
 referencia de horas en servicio en el detalle (no cambia la clase).
+
+**190.9 Verificado en vivo** (2026-10-27, tras vencer la caché, módulos nuevos descargados): ene–oct firmes 173, provisionales 26,
+CRG 4–5 firmes 92, sobrecarga 46 (44 · 1 · 1). CI del merge: una prueba de TIEMPO de Fichas (no relacionada) falló en el runner;
+relanzada, y el mismo contenido (`a50a185`) había pasado.
+
+## 191. ADR-191 — Cargabilidad SCADA: los 26 provisionales diagnosticados; «No usar» en 4 equipos y marca «fase sin carga por diseño» para los bancos de dos monofásicas (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «dime cuales son esos provisionales para subsanarlos» → lista de 26 + diagnóstico con crudos → «mata de caña solo son 2 fases ·
+> el paraiso igual · puerto escondido vamonos con lo que esta en 13.8 kV · gambote … 13.8 kV · el desastre dime cual es tu
+> criterio · las delicias … 13.8 kV · loma del balsamo … 34.5 kV» → El Desastre «Dejar los dos lados» · Las Delicias «Sí, con
+> 13,8 kV» (2026-10-27/28).
+
+**191.1 Causa raíz** (crudos ene-2025 → oct-2026, `wf_5ad4d24f-b17`: 6 grupos, analista + verificador independiente). De los 26:
+diseño (bancos de dos monofásicas: Mata de Caña T1/T2 fase S, El Paraíso T1/T2 fase T — la tercera fase no existe) · un lado con
+la medida dañada y el otro sano (Puerto Escondido: fase T de 34,5 kV fija en 59,02 A «Not Renewed» desde ene-2025; Gambote: la fase
+R de 66 kV traía la TENSIÓN de la barra ene–jun y el tope 32767 jun–oct; Las Delicias: 34,5 kV renovado por pasos, cobertura 47 %;
+Loma del Bálsamo: bandera «Invalid» falsa en 13,8 kV y escala que no cuadra) · y medidas del SCADA con banda muerta, banderas
+falsas o sin renovar (el resto, detalle en la bóveda).
+
+**191.2 Solución.**
+- Datos (sus decisiones, `decidirFila`, rev 44 → 48, releídas IDÉNTICAS): Puerto Escondido y Gambote y Las Delicias por 13,8 kV,
+  Loma del Bálsamo por 34,5 kV (el otro nivel «No usar», nota con la causa).
+- Código (archivo NUEVO `scada_carga_fase_sin_carga.js`): marca por nivel en la decisión `fases_sin_carga = {N13_8: 'IS'}`. Ese
+  nivel no cuenta sus horas de dos fases como «falta una fase» y la cifra no cambia. Resguardo, mirado MES A MES (también en varios
+  meses y en el detalle): si las horas con tres fases pasan del mayor de 6 h o el 5 % de las válidas, vuelve a provisional («la fase
+  marcada sin carga está midiendo»). Un nivel por suma de circuitos no la usa. El diálogo «Revisar» la muestra, la conserva al guardar
+  con el mismo punto y el nivel asignado, no guarda sin ver los niveles y avisa que «Excluir»/«Reabrir» la quitan; el detalle dice
+  «fase X sin carga por diseño» junto a las horas de dos fases.
+- El Desastre sin cambio: en las horas en que miden los dos lados, el 13,8 kV marca ~4 % más (estable mes a mes); usar solo el
+  34,5 kV daba 89,9 % CRG 4 firme y subestima. Queda 97,9 % CRG 5 provisional hasta que el área SCADA quite la banda muerta (~10 A)
+  del 13,8 kV y la brigada lea la toma y la relación de TC.
+
+**191.3 No-regresión.** El código sin la marca: 0 diferencias en 2.080 filas (208 × 9 meses + periodo). Simulación de las 8
+decisiones: 0 filas ajenas cambian; solo las 8 pasan a firme.
+
+**191.4 Verificación.** `test:unit` 3166 ✅ (2 omitidas), lint ✅, guardia SCADA ✅; pruebas nuevas en `scada_carga_fase_sin_carga.test.js`.
+Revisión adversarial de 2 lentes (`wf_92da71b6-6f2`, regla y diálogo/caché, con emulador de reglas): 0 altos ni medios; los bajos,
+corregidos arriba. En vivo
+tras las 4 decisiones de datos: firmes 173 → 177, provisionales 26 → 22, CRG 4–5 firmes 92 → 93; Puerto Escondido 84,1 % CRG 4,
+Gambote 57,9 % CRG 1, Las Delicias 63,5 % CRG 2, Loma del Bálsamo 51,3 % CRG 1, las 4 firmes y «confirmada».
+
+**191.5 Anti-patterns evitados.** Afirmar la causa de una diferencia entre lados sin separar desbalance (Dyn11) de escala (lo corrigió
+el verificador en El Desastre); homologar Tres Esquinas por su circuito de salida tal cual (daría 72 % FIRME falso: lee ×2); estimar cifras con
+reconectadores o diferencias que la plataforma no reproduce; marcar «sin carga» por fecha para una unidad de reserva (no aplica).
+
+**191.6 Archivos.** NUEVOS: `assets/js/domain/scada_carga_fase_sin_carga.js`, `tests/scada_carga_fase_sin_carga.test.js`. Modificados:
+`scada_carga_vista.js` (marca → `unaFalta` 0 + resguardo), `scada_carga_kpis.js` (motivo del resguardo), `ui/scada-datos/homologacion.js`
+(muestra, conserva y no pierde la marca), `scada_carga_firmeza_periodo.js` y `scada_carga_firmeza_rango.js` (resguardo por mes),
+`ui/cargabilidad-scada/detalle.js` (rótulo). Datos: homologación (4 filas nuevas + 4 marcas). INTACTOS: limpieza, importación, sumas.
+
+**191.7 Doctrina.** Decisiones de criterio SUYAS con la recomendada · analista + verificador independiente · simulación con sus datos
+(0 ajenas) antes de escribir · L-102 (archivo nuevo, campos con guarda). NO revisado externamente.
+
+**191.8 Verificado sano / no re-auditar.** Gambote: 13,8 kV y 66 kV cuadran (0,99) y el 66 kV está sano desde el 13-oct-2026 (se puede
+reabrir). Puerto Escondido: los dos lados llevan la misma carga (0,96). Ferrocarril: su 20,1 % sale de UNA hora (carga real ~5–7 %).
+Las reglas de Firestore no restringen las llaves de la decisión; la fusión al subir un Excel copia la decisión entera. ACEPTADO: un
+diálogo «Revisar» abierto con el código viejo borraría la marca al guardar (vuelve a provisional, nunca a firme falso); por eso las
+marcas se escriben con el despliegue ya en vivo. La marca no verifica qué fase falta: depende del conocimiento del Ingeniero. Quedan 18:
+detalle y quién actúa en la bóveda `2026-10-28-provisionales-26/SINTESIS.md`.
