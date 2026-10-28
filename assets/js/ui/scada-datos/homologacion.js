@@ -154,6 +154,9 @@ export function montarHomologacion(cont, { alCambiar }) {
     // barra propia). Los nombres de los circuitos se escriben (pueden no estar aún en los datos cargados) o se toman de las
     // sugerencias: los puntos de esta estación que no son un transformador.
     const sumaGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.suma && typeof f.decision.suma === 'object') ? f.decision.suma : {};
+    // Fase sin carga por diseño (banco de dos monofásicas, 2026-10-28, `99 §191`): el diálogo no la fija; la muestra y la
+    // conserva al guardar con el mismo punto y el nivel asignado (sin esto, «Guardar» la borraba).
+    const fscGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.fases_sin_carga && typeof f.decision.fases_sin_carga === 'object') ? f.decision.fases_sin_carga : null;
     const rPropio = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[ev0.cid] || null : null;
     const derUltimo = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[claveSuma(ev0.cid)] || null : null;
     const sugeridos = [...new Set(Object.values(ctx.puntos).filter((p) => estN && normalizarTexto(p.est) === estN && !esElementoTransformador(p.elem)).map((p) => p.elem))]
@@ -248,6 +251,10 @@ export function montarHomologacion(cont, { alCambiar }) {
         if (tipo.value !== 'usar') { msg.textContent = 'Esta fila tiene un cambio de medida (' + llavesPrevias(f.decision).map((k) => 'hasta ' + textoMes(k)).join(', ') + '): la medida de hoy debe ser «usar». Para excluirla: «Reabrir» (borra la decisión con su cambio de medida; queda en el registro) y luego «Excluir».'; return; }
         decision.previas = f.decision.previas;
       }
+      if (fscGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) {
+        const fsc = Object.fromEntries(Object.entries(fscGuardada).filter(([nv]) => decision.mapa && decision.mapa[nv]));
+        if (Object.keys(fsc).length) decision.fases_sin_carga = fsc;
+      }
       // Suma de circuitos: solo con «Confirmar: usar esta medida» y solo los niveles marcados (sin suma, la decisión de siempre).
       const suma = {};
       if (tipo.value === 'usar') {
@@ -310,6 +317,9 @@ export function montarHomologacion(cont, { alCambiar }) {
       el('p', { class: 'cs-dato' }, el('b', {}, 'En el Excel: '), f.texto_excel || '(sin punto)'),
       el('ul', { class: 'cs-avisos' }, ev0.avisos.length ? ev0.avisos.map((a) => el('li', {}, (AVISOS[a] ? AVISOS[a].texto : a) + (AVISOS[a] && AVISOS[a].bloquea ? '' : ' (informativo)'))) : el('li', {}, 'Sin avisos.')),
       rel ? el('p', { class: 'cs-ayuda' }, 'Relación de corrientes entre los dos lados: medida ' + num(rel.medido, 2) + ' frente a ' + num(rel.esperado, 2) + ' esperada por las tensiones de placa.') : null,
+      fscGuardada ? el('p', { class: 'cs-ayuda' }, 'Fase sin carga por diseño (banco de dos monofásicas): '
+        + Object.entries(fscGuardada).map(([nv, ph]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', fase ' + String(ph).slice(1)).join(' · ')
+        + '. Se conserva al guardar con el mismo punto y ese nivel asignado.') : null,
       el('div', { class: 'cs-filtros', style: 'margin-top:10px' },
         el('label', {}, 'Decisión', tipo),
         el('label', { for: 'dlgClave' }, 'Punto SCADA', selClave)),

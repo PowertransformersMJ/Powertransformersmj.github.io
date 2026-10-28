@@ -28,6 +28,8 @@ import { filaDelMes, filasDelMes, motivoSinCarga } from './scada_carga_cambio_me
 import { pasaFiltroDevanado } from './scada_carga_filtro_devanado.js';
 // El umbral de sobrecarga SEVERA (R4) del panel DGA, para la señal de cada devanado en `firmeza` (2026-10-27).
 import { SEVERA_PCT } from './scada_carga_dga.js';
+// Fase sin carga por diseño (banco de dos monofásicas, 2026-10-28): archivo NUEVO; sin la marca en la decisión, nada cambia.
+import { faseSinCarga, faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -140,7 +142,11 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     niveles.push(fila1);
     // Varios meses (2026-10-27): la cobertura del devanado en los meses en que midió y cuántos midió (ver `firmeza`).
     const fp = d && firmezaPeriodo ? firmezaPeriodo[d] || null : null;
-    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: r && r.i ? r.i.unaFalta || 0 : 0,
+    // Banco de dos monofásicas (marca del Ingeniero): la fase marcada no existe; sus horas de dos fases no son «falta una fase».
+    const fsc = d ? faseSinCarga(fila, nv) : null;
+    const unaFalta = r && r.i ? r.i.unaFalta || 0 : 0;
+    if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: fsc ? 0 : unaFalta,
+      ...(fsc ? { faseSinCarga: fsc, faseSinCargaMide: faseSinCargaMide(fila1.n, unaFalta) } : {}),
       servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
       ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }
