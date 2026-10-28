@@ -344,3 +344,11 @@ Ingeniero; el detalle del equipo y la vista previa —el mismo código de la pá
 sale del módulo de la página (o se contrasta con él en 2–3 equipos antes de entregarlo); el barrido propio solo encuentra
 candidatos. **Gate**: [HONOR].
 
+
+### L-161 · Comparar datos de Firestore EN PROFUNDIDAD, y leer la lista con la página recargada después de escribir
+**Disparador**: un control «lo reprocesado = lo guardado» o «¿cambió otra fila?» antes o después de escribir en producción. ·
+**Cicatriz** (`99 §195.9`): `JSON.stringify` dio «DISTINTO» en 9 de 9 controles y «otras filas cambiadas» en decenas de filas: era el
+orden de las claves entre lecturas (comparación profunda: 0 diferencias). Y la lista de una pestaña abierta ANTES de escribir las marcas
+mostró 188/12 en vez de 191/9: la página guarda la homologación con que abrió. · **Regla**: comparar con una función profunda que no
+dependa del orden (y Timestamps por `toMillis`); verificar la lista con la página RECARGADA después de la última escritura.
+**Gate**: [HONOR].
