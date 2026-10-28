@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { limpiarNivel } from '../assets/js/domain/scada_carga_limpieza.js';
 import { procesarPuntoMes } from '../assets/js/domain/scada_carga_importacion.js';
-import { invalidNoConfiable, puntosInvalidNoConfiable, reprocesarGuardado } from '../assets/js/domain/scada_carga_invalid.js';
+import { invalidNoConfiable, puntosInvalidNoConfiable, reprocesarGuardado, conMarcaInvalid } from '../assets/js/domain/scada_carga_invalid.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
 import { CODIGO, BANDERA, FAMILIAS } from '../assets/js/domain/scada_carga_config.js';
 
@@ -52,16 +52,23 @@ describe('volver a limpiar un mes ya guardado', () => {
     const conMarca = procesarPuntoMes({ N13_8: crudo() }, null, 'completar', { aceptarInvalid: true });
     const r = reprocesarGuardado({ niveles: guardado.niveles });
     assert.equal(r.resumen.N13_8.i.n, 36);
-    assert.deepEqual(r.resumen, conMarca.resumen);
+    assert.equal(r.resumen.N13_8.invalidAceptadas, 12, 'el resumen deja el rastro de las horas aceptadas');
+    const { invalidAceptadas, ...resto } = r.resumen.N13_8;
+    assert.deepEqual(resto, conMarca.resumen.N13_8);
     for (const f of FAMILIAS) {
       assert.deepEqual([...r.niveles.N13_8.fam[f].m], [...conMarca.niveles.N13_8.fam[f].m], f);
       assert.deepEqual([...r.niveles.N13_8.fam[f].v], [...guardado.niveles.N13_8.fam[f].v], f + ' valores');
     }
   });
-  test('sin horas «Invalid», volver a limpiar no cambia nada', () => {
+  test('sin horas «Invalid», volver a limpiar no cambia nada (salvo el rastro en 0)', () => {
     const c = crudo(); for (const f of FAMILIAS) for (let h = 24; h < 36; h++) c[f].b[h] = BANDERA.ACTUAL;
     const g = procesarPuntoMes({ N13_8: c }, null, 'completar');
-    assert.deepEqual(reprocesarGuardado({ niveles: g.niveles }).resumen, g.resumen);
+    const { invalidAceptadas, ...resto } = reprocesarGuardado({ niveles: g.niveles }).resumen.N13_8;
+    assert.equal(invalidAceptadas, 0); assert.deepEqual(resto, g.resumen.N13_8);
+  });
+  test('un limpiador viejo (que ignora la opción) se detiene en vez de guardar lo de siempre', () => {
+    const viejo = procesarPuntoMes({ N13_8: crudo() }, null, 'completar');   // como lo daría un módulo viejo en caché
+    assert.throws(() => conMarcaInvalid(viejo), /versión anterior/);
   });
 });
 
@@ -77,7 +84,10 @@ describe('la marca en la homologación', () => {
   });
   test('el importador la aplica y el diálogo «Revisar» la conserva', () => {
     const w = readFileSync(new URL('../assets/js/workers/scada_carga_importar.worker.js', import.meta.url), 'utf8');
-    assert.match(w, /procesarPuntoMes\(nuevo, g, modo, conInvalid\.has\(cid\) \? \{ aceptarInvalid: true \} : \{\}\)/);
+    assert.match(w, /conInvalid\.has\(cid\) \? conMarcaInvalid\(procesarPuntoMes\(nuevo, g, modo, \{ aceptarInvalid: true \}\)\) : procesarPuntoMes\(nuevo, g, modo\)/);
+    const im = readFileSync(new URL('../assets/js/ui/scada-datos/importar-mes.js', import.meta.url), 'utf8');
+    assert.match(im, /puntosInvalidNoConfiable\(filasVigentes\(\)\)\.size && procesado\.versionInvalid == null/);
+    assert.match(im, /\+ '\|' \+ JSON\.stringify\(\[\.\.\.puntosInvalidNoConfiable\(filasVigentes\(\)\)\]\.sort\(\)\)/);
     const h = readFileSync(new URL('../assets/js/ui/scada-datos/homologacion.js', import.meta.url), 'utf8');
     assert.match(h, /decision\.invalid_no_confiable = true;/);
   });
