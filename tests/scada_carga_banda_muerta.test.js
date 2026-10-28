@@ -9,7 +9,8 @@ import { readFileSync } from 'node:fs';
 import { limpiarNivel } from '../assets/js/domain/scada_carga_limpieza.js';
 import { procesarPuntoMes, TOP_HORAS } from '../assets/js/domain/scada_carga_importacion.js';
 import {
-  bandaMuerta, puntosBandaMuerta, conMarcaBandaMuerta, reprocesarConMarcas, motivoBandaMuerta, MOTIVO_BANDA_MUERTA, TOPE_BANDA_MUERTA_PCT
+  bandaMuerta, puntosBandaMuerta, conMarcaBandaMuerta, reprocesarConMarcas, motivoBandaMuerta, MOTIVO_BANDA_MUERTA, TOPE_BANDA_MUERTA_PCT,
+  MOTIVO_BANDA_MUERTA_SIN_MARCA, BANDA_MUERTA_SOLA_H, horasRetenidasI
 } from '../assets/js/domain/scada_carga_banda_muerta.js';
 import { estadisticas } from '../assets/js/domain/scada_carga_kpis.js';
 import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
@@ -75,6 +76,45 @@ describe('limpieza con banda muerta', () => {
     assert.ok(todos([...p.niveles.N34_5.fam.IT.m], 0, N, CODIGO.CONGELADO));
     assert.equal(p.resumen.N34_5.i.n, 0);
     assert.ok(p.resumen.N13_8.i.n > 0);
+  });
+});
+
+describe('revisión adversarial 2026-10-28: corriente muerta con la tensión viva y módulos viejos', () => {
+  /** 72 h: tensión viva todo el tiempo; las corrientes según `i(f, h)`. */
+  function crudo72(i) {
+    const fams = {};
+    for (const f of FAMILIAS) {
+      const v = new Float32Array(72); const b = new Uint8Array(72).fill(BANDERA.ACTUAL); const presente = new Uint8Array(72).fill(1);
+      for (let h = 0; h < 72; h++) v[h] = f[0] === 'I' ? Math.fround(i(f, h)) : (f[0] === 'U' ? 13.8 + (h % 3) / 100 : Math.fround(0.1 + (h % 5) / 100));
+      fams[f] = { v, b, presente };
+    }
+    return fams;
+  }
+  test('las tres corrientes quietas más de 24 h (medida de corriente muerta): congeladas aunque la tensión se mueva', () => {
+    const out = limpiarNivel(crudo72(() => PASO * 16), 13.8, { bandaMuerta: true });
+    for (const f of ['IR', 'IS', 'IT']) assert.ok(todos(codigos(out, f), 0, 72, CODIGO.CONGELADO), f);
+  });
+  test('una fase quieta más de 24 h mientras otra se mueve: retenida (banda muerta legítima de la fase poco cargada)', () => {
+    const out = limpiarNivel(crudo72((f, h) => (f === 'IR' ? PASO * 4 : PASO * (7 + (Math.floor(h / 8) % 2)))), 13.8, { bandaMuerta: true });
+    assert.ok(todos(codigos(out, 'IR'), 0, 72, CODIGO.RETENIDO));
+  });
+  test('hasta 24 h basta con que se mueva la tensión', () => {
+    assert.equal(BANDA_MUERTA_SOLA_H, 24);
+    const out = limpiarNivel(crudo72((f, h) => PASO * (h < 24 ? 16 : 17 + (h % 2))), 13.8, { bandaMuerta: true });
+    for (const f of ['IR', 'IS', 'IT']) assert.ok(todos(codigos(out, f), 0, 24, CODIGO.RETENIDO), f);
+  });
+  test('la limpieza solo se activa con `true`: la lista de niveles de un importador viejo no la activa', () => {
+    assert.ok(todos(codigos(limpiarNivel(crudo(), 13.8, { bandaMuerta: ['N13_8'] }), 'IT'), 0, N, CODIGO.CONGELADO));
+  });
+  test('una corriente «retenida» en un nivel SIN marca detiene la carga (algún módulo viejo en caché)', () => {
+    const p = procesarPuntoMes({ N13_8: crudo(13.8), N34_5: crudo(34.5) }, null, 'completar', { bandaMuerta: ['N13_8', 'N34_5'] });
+    assert.throws(() => conMarcaBandaMuerta(p, ['N13_8']), /versión anterior/);
+    assert.doesNotThrow(() => conMarcaBandaMuerta(p, ['N13_8', 'N34_5']));
+  });
+  test('horasRetenidasI cuenta las horas con alguna corriente retenida', () => {
+    const out = limpiarNivel(crudo(), 13.8, { bandaMuerta: true });
+    assert.equal(horasRetenidasI(out), N);
+    assert.equal(horasRetenidasI(limpiarNivel(crudo(), 13.8)), 0);
   });
 });
 
@@ -153,6 +193,19 @@ describe('la cifra: firme solo con un escalón de hasta 5 puntos', () => {
     const x = filaCon({ banda_muerta: { N13_8: 2 } });
     assert.equal(x.firme, false);
     assert.deepEqual(x.motivos, [MOTIVO_BANDA_MUERTA]);
+  });
+  test('meses limpiados con banda muerta y la marca ya quitada: provisional hasta volver a limpiarlos', () => {
+    const sinMarca = filaCon({});
+    assert.equal(sinMarca.firme, true, 'sin horas retenidas, lo de siempre');
+    const nivelOrig = nivel;
+    try {
+      // el mismo resumen, con el rastro de las horas tomadas por banda muerta
+      Object.assign(nivel, { bandaMuertaAceptadas: 400 });
+      const x = filaCon({});
+      assert.equal(x.firme, false);
+      assert.deepEqual(x.motivos, [MOTIVO_BANDA_MUERTA_SIN_MARCA]);
+      assert.equal(filaCon({ banda_muerta: { N13_8: 0.977 } }).firme, true, 'con la marca, firme');
+    } finally { delete nivelOrig.bandaMuertaAceptadas; }
   });
   test('el motivo mira solo devanados con cifra y exige un número dentro del tope', () => {
     assert.equal(TOPE_BANDA_MUERTA_PCT, 5);

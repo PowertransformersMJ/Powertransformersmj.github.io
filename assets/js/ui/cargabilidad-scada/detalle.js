@@ -39,6 +39,8 @@ import {
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 // Firmeza de varios meses por el devanado que da la cifra (2026-10-27): archivo NUEVO; sin él la firmeza es la del rango.
 import { firmezaDelRango, esDeMesesCompletos } from '../../domain/scada_carga_firmeza_rango.js';
+// Corriente con banda muerta (2026-10-28): archivo NUEVO; las horas «retenidas» del rango, para saber si la marca sigue.
+import { horasRetenidasI } from '../../domain/scada_carga_banda_muerta.js';
 import { horasNoCargadas } from '../../domain/scada_carga_periodo.js';
 // Unidad de reserva (2026-10-28): archivo NUEVO; sin la marca, el rango cuenta como siempre.
 import { esUnidadReserva } from '../../domain/scada_carga_reserva.js';
@@ -645,7 +647,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         const i = previo.niveles.find((x) => x.nivel === nv);
         const A = i && i.devanado ? a.placa[i.devanado].A : null;
         porNivel[nv] = calcularNivel(porNivel[nv], NIVELES[nv].kv, A);
-        resumenPorNivel[nv] = porNivel[nv].resumen;
+        const retenidas = horasRetenidasI(porNivel[nv].fam);
+        resumenPorNivel[nv] = retenidas ? { ...porNivel[nv].resumen, bandaMuertaAceptadas: retenidas } : porNivel[nv].resumen;
       }
       // Suma de circuitos: el nivel sumado lleva el derivado del RANGO (válido solo si cada mes leído trae el suyo); sin él,
       // calcularEquipo lo deja sin cifra (nunca la medida propia del transformador).

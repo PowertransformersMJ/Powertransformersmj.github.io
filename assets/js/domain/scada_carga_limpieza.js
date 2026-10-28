@@ -82,6 +82,31 @@ function tensionSeMovio(fams, a, z) {
   return false;
 }
 
+/** Horas de un tramo quieto que la banda muerta acepta SIN que otra fase se mueva (= `scada_carga_banda_muerta.js`). */
+const BANDA_MUERTA_SOLA_H = 24;
+
+/**
+ * ¿La banda muerta acepta el tramo quieto [a, z) de la corriente `f`? Alguna tensión se movió y, en un tramo de más de
+ * 24 h, también otra fase de corriente (revisión adversarial 2026-10-28: con las tres corrientes muertas y la tensión viva,
+ * la cifra salía firme y baja). Las fases se miran con su celda buena (válida, o ya marcada en esta misma pasada).
+ */
+function retenidaPorBandaMuerta(fams, f, a, z) {
+  if (!tensionSeMovio(fams, a, z)) return false;
+  if (z - a <= BANDA_MUERTA_SOLA_H) return true;
+  const buena = (c) => c === CODIGO.VALIDO || c === CODIGO.CONGELADO || c === CODIGO.RETENIDO;
+  for (const g of FAMILIAS_I) {
+    const s = fams[g];
+    if (g === f || !s) continue;
+    let primero = null;
+    for (let h = a; h < z; h++) {
+      if (!buena(s.m[h])) continue;
+      if (primero == null) primero = s.v[h];
+      else if (s.v[h] !== primero) return true;
+    }
+  }
+  return false;
+}
+
 /** Corriente de la fase más cargada por hora con lo VÁLIDO (NaN si menos de 2 fases). */
 function iMaxHoraria(fams, n) {
   const out = new Float32Array(n).fill(NaN);
@@ -100,7 +125,7 @@ function iMaxHoraria(fams, n) {
  * Limpia un nivel completo de un mes. Modifica y devuelve `fams[fam].m` (Uint8Array).
  * @param {Object<string, {v: Float32Array, b: Uint8Array, presente: Uint8Array}>} fams
  * @param {number} kv  tensión nominal del nivel
- * @param {{aceptarInvalid?: boolean, bandaMuerta?: boolean}} [opciones]  `aceptarInvalid`: la bandera «Invalid» de este punto no
+ * @param {{aceptarInvalid?: boolean, bandaMuerta?: true}} [opciones]  `aceptarInvalid`: la bandera «Invalid» de este punto no
  *   es confiable (decisión del Ingeniero, `scada_carga_invalid.js`): sus horas se juzgan como si fueran «Actual». La bandera
  *   cruda no cambia. `bandaMuerta`: la corriente de este nivel solo se renueva al cambiar un escalón (`scada_carga_banda_muerta.js`).
  * @returns {Object<string, {v, b, m}>}
@@ -109,7 +134,9 @@ export function limpiarNivel(fams, kv, opciones = {}) {
   const n = Object.values(fams)[0] ? Object.values(fams)[0].v.length : 0;
   const out = {};
   const aceptarInvalid = !!(opciones && opciones.aceptarInvalid);
-  const bandaMuerta = !!(opciones && opciones.bandaMuerta);
+  // Solo `true` (revisión adversarial 2026-10-28): un importador viejo en caché pasa la LISTA de niveles del punto, y con
+  // `!!` se activaba en todos sus niveles sin que la autocomprobación lo viera.
+  const bandaMuerta = !!opciones && opciones.bandaMuerta === true;
   for (const [fam, s] of Object.entries(fams)) {
     const m = new Uint8Array(n);
     for (let h = 0; h < n; h++) {
@@ -130,12 +157,12 @@ export function limpiarNivel(fams, kv, opciones = {}) {
     for (const f of ['P', 'Q']) if (out[f] && out[f].m[h] === CODIGO.CERO) out[f].m[h] = CODIGO.DESENERGIZADO;
   }
   // (ii) Congelado en I, P y Q. Con banda muerta (marca del Ingeniero, `scada_carga_banda_muerta.js`), la corriente quieta
-  // de ESTE nivel es válida («retenida») si alguna tensión del nivel se movió dentro del tramo: la medida está viva y solo
-  // no cambió de escalón. P y Q, como siempre.
+  // de ESTE nivel es válida («retenida») si alguna tensión del nivel se movió dentro del tramo y, si el tramo pasa de 24 h,
+  // además otra fase de corriente se movió en él: la medida está viva y solo no cambió de escalón. P y Q, como siempre.
   for (const f of [...FAMILIAS_I, 'P', 'Q']) {
     if (!out[f]) continue;
     for (const [a, z] of corridasIguales(out[f].v, out[f].m, CONGELADO_MIN_H)) {
-      const codigo = bandaMuerta && FAMILIAS_I.includes(f) && tensionSeMovio(out, a, z) ? CODIGO.RETENIDO : CODIGO.CONGELADO;
+      const codigo = bandaMuerta && FAMILIAS_I.includes(f) && retenidaPorBandaMuerta(out, f, a, z) ? CODIGO.RETENIDO : CODIGO.CONGELADO;
       for (let h = a; h < z; h++) out[f].m[h] = codigo;
     }
   }
