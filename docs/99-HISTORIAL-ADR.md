@@ -9606,3 +9606,51 @@ en el detalle por rango la reserva del agregado y la relación entre niveles se 
 (rev 55 → 56, releída IDÉNTICA). Ene–oct firmes 185, provisionales 14, CRG 4–5 firmes 94, sobrecarga 46 (44 · 1 · 1). Detalle de
 Nueva Cospique T3: 55,5 % CRG 1 firme, «Cobertura 67 % del primario · en los meses en que midió (1 de 1; 8 meses en reserva no
 cuentan)», sus meses «en reserva (sin carga apreciable)».
+
+## 193. ADR-193 — Cargabilidad SCADA: San Luis T1 (cambio de unidad en mayo) y la marca «bandera Invalid no confiable» para La Europa T1 y Ovejas T2 (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «procede con la europa y ovejas, san luis se cambió en mayo» (2026-10-28).
+
+**193.1 Causa raíz.** San Luis T1: su circuito de 13,8 kV es toda su carga (bifásico R-T; su reconectador lo sigue), pero hasta
+mayo de 2026 servía otra unidad (Magnetron 300 kVA, 5/13 A); la Siemens de 500 kVA (placa de reparación mar-2026) entró en mayo.
+Con la placa actual, ene–abr darían 67–76 % y esconderían la sobrecarga real de la unidad vieja (~111–127 %). La Europa T1 y Ovejas
+T2: el SCADA marca «Invalid» horas bien medidas de su circuito (las «Invalid» siguen a la medida independiente igual que las
+«Actual», con la curva del día y decimales; `§191`, bóveda `2026-10-28-provisionales-26/`).
+
+**193.2 Solución.**
+- Datos (San Luis T1, `decidirFila`, rev 56 → 57, releída IDÉNTICA): circuito confirmado como toda la carga (13,8 kV → S) con MEDIDA
+  ANTERIOR hasta 2026-05 «excluida» (nota: otra unidad de 300 kVA; con ella ~111–127 %, no calculable con la placa actual).
+- Código (archivo NUEVO `scada_carga_invalid.js`): marca `decision.invalid_no_confiable = true`. `limpiarNivel` acepta
+  `{aceptarInvalid}`: SOLO la bandera «Invalid» se juzga como «Actual» (la bandera cruda no cambia; «Not Renewed», sin archivo,
+  congelado, cero, tope y escala siguen igual). El importador la aplica a los puntos marcados y `reprocesarGuardado` vuelve a
+  limpiar los meses ya guardados desde sus series (sin releer las carpetas). Resguardos: si queda una hora «Invalid» como hueco en
+  un punto marcado (limpiador viejo en caché) se detiene con «recargue»; cada resumen deja `invalidAceptadas`; el lector declara
+  `versionInvalid` (y sube a `?v=invalid1`); la simulación se detiene si la marca cambió después de leer la carpeta; «Revisar» la
+  muestra y la conserva.
+
+**193.3 No-regresión.** Sin marcas, la limpieza es idéntica byte a byte (revisión); simulación de San Luis: 0 filas ajenas. Simulación
+de la reprocesada (código `6dd7432`, sus series reales): 0 filas ajenas.
+
+**193.4 Verificación.** `test:unit` 3185 ✅ (2 omitidas), lint ✅, guardia ✅; `tests/scada_carga_invalid.test.js`. Revisión adversarial
+de 2 lentes (`wf_e5576496-f0b`): 0 altos; MEDIO (módulos viejos ignoraban la marca en silencio; la marca no quedaba registrada en lo
+guardado) corregido. Simulación: San Luis T1 «se mide un circuito» → 86,0 % CRG 4 provisional (solo junio; jul–oct congelado);
+La Europa T1 37,1 % → 44,0 % CRG 1 firme (7 de 7 meses); Ovejas T2 93,6 % → 93,3 % CRG 5 firme (9 de 9). Horas válidas: La Europa
+jul 19 → 744, ago 2 → 696; Ovejas ene 308 → 665.
+
+**193.5 Anti-patterns evitados.** Calcular ene–abr de San Luis con la placa de la unidad nueva (escondía una sobrecarga real); aceptar
+«Not Renewed» o valores congelados junto con «Invalid»; volver a cargar 9 meses de paquetes para cambiar dos puntos; confiar en un
+parámetro nuevo de una función ya publicada sin comprobar que lo aplicó (L-102); nombrar circuitos reales en el repositorio (la
+guardia lo bloqueó).
+
+**193.6 Archivos.** NUEVOS: `assets/js/domain/scada_carga_invalid.js`, `tests/scada_carga_invalid.test.js`. Modificados:
+`scada_carga_limpieza.js` (opción), `scada_carga_importacion.js` (pasa la opción), `workers/scada_carga_importar.worker.js`,
+`ui/scada-datos/importar-mes.js`, `ui/scada-datos/homologacion.js`, `tests/scada_carga_suma.test.js`. Datos: homologación (San Luis T1;
+La Europa T1 y Ovejas T2 con la marca), series y resúmenes de esos 2 puntos (reprocesados). INTACTOS: cálculo de la cifra, lista, detalle.
+
+**193.7 Doctrina.** Su decisión con la recomendada · simulación con sus datos antes de escribir · L-102 con autocomprobación · revisión
+adversarial. NO revisado externamente.
+
+**193.8 Verificado sano / no re-auditar.** La reprocesada sin la marca devuelve lo guardado byte a byte (se puede deshacer sin las
+carpetas). La marca es por fila y su efecto por punto: cada uno de estos 2 puntos tiene una sola fila y no entra en ninguna suma.
+ACEPTADO: un «Revisar» abierto con código viejo borraría la marca (por eso se escribe con el despliegue en vivo y la página recargada).
+Pendiente del área SCADA: corregir la bandera de esos dos circuitos y reparar el de San Luis (congelado desde el 17-jun, pasos de 2 A).
