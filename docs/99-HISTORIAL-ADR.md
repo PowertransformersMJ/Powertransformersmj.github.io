@@ -9654,3 +9654,10 @@ adversarial. NO revisado externamente.
 carpetas). La marca es por fila y su efecto por punto: cada uno de estos 2 puntos tiene una sola fila y no entra en ninguna suma.
 ACEPTADO: un «Revisar» abierto con código viejo borraría la marca (por eso se escribe con el despliegue en vivo y la página recargada).
 Pendiente del área SCADA: corregir la bandera de esos dos circuitos y reparar el de San Luis (congelado desde el 17-jun, pasos de 2 A).
+
+**193.9 Verificado en vivo** (2026-10-28, código `fdcbb0b` servido y caché vencida; página recargada con los módulos nuevos
+comprobados). Control previo: reprocesar SIN la marca = lo guardado en 16 de 16 meses-punto. Marcas escritas (rev 57 → 59, releídas
+IDÉNTICAS). Reproceso: una carga «completar» (`reproceso: bandera Invalid no confiable`, completa: 16 series, 9 resúmenes); releído:
+16 resúmenes IGUALES a lo calculado, 0 horas «Invalid» como hueco, las demás claves de cada mes intactas. Ene–oct: firmes 187,
+provisionales 13, sin cifra 8, CRG 4–5 firmes 95, sobrecarga 46 (44 · 1 · 1). La Europa T1 44,0 % CRG 1 firme (detalle: cobertura 92 %,
+7 de 7); Ovejas T2 93,3 % CRG 5 firme; San Luis T1 86,0 % CRG 4 provisional.
