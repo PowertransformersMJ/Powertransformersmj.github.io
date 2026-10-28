@@ -18,7 +18,7 @@
 
 import {
   CODIGO, FAMILIAS_I, FAMILIAS_U, BANDERAS_VALIDAS, CENTINELAS, CENTINELA_ABS, TOLERANCIA_CENTINELA,
-  PLAUSIBILIDAD_U, CONGELADO_MIN_H, U_CONGELADO_SIN_I_H, VARIACION_I_RETENIDO, CODIGOS_VALIDOS
+  PLAUSIBILIDAD_U, CONGELADO_MIN_H, U_CONGELADO_SIN_I_H, VARIACION_I_RETENIDO, CODIGOS_VALIDOS, BANDERA
 } from './scada_carga_config.js';
 
 const esU = (fam) => FAMILIAS_U.includes(fam);
@@ -84,14 +84,20 @@ function iMaxHoraria(fams, n) {
  * Limpia un nivel completo de un mes. Modifica y devuelve `fams[fam].m` (Uint8Array).
  * @param {Object<string, {v: Float32Array, b: Uint8Array, presente: Uint8Array}>} fams
  * @param {number} kv  tensión nominal del nivel
+ * @param {{aceptarInvalid?: boolean}} [opciones]  `aceptarInvalid`: la bandera «Invalid» de este punto no es confiable
+ *   (decisión del Ingeniero, `scada_carga_invalid.js`): sus horas se juzgan como si fueran «Actual». La bandera cruda no cambia.
  * @returns {Object<string, {v, b, m}>}
  */
-export function limpiarNivel(fams, kv) {
+export function limpiarNivel(fams, kv, opciones = {}) {
   const n = Object.values(fams)[0] ? Object.values(fams)[0].v.length : 0;
   const out = {};
+  const aceptarInvalid = !!(opciones && opciones.aceptarInvalid);
   for (const [fam, s] of Object.entries(fams)) {
     const m = new Uint8Array(n);
-    for (let h = 0; h < n; h++) m[h] = codigoCelda(s.v[h], s.b[h], fam, kv, !!s.presente[h]);
+    for (let h = 0; h < n; h++) {
+      const b = aceptarInvalid && s.b[h] === BANDERA.INVALID ? BANDERA.ACTUAL : s.b[h];
+      m[h] = codigoCelda(s.v[h], b, fam, kv, !!s.presente[h]);
+    }
     out[fam] = { v: s.v, b: s.b, m };
     // Extras de §126 (solo para ver) viajan sin tocarse. Lista local a propósito: este archivo no importa
     // de scada_carga_extras.js (que importa de aquí) y no gana exportaciones nuevas (L-102).

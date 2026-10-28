@@ -169,7 +169,7 @@ export function armarMeses(acc, meses) {
  * @param {object|null} guardado  {niveles: {N: {fam: {IR: {v: Float32Array, m, b}}}}} o null
  * @returns {{niveles: Object, resumen: Object, conteos: Object, conflictos: number, nuevas: number}}
  */
-export function procesarPuntoMes(nuevo, guardado, modo = 'completar') {
+export function procesarPuntoMes(nuevo, guardado, modo = 'completar', opciones = {}) {
   const niveles = {}; const resumen = {}; const conteos = {};
   let conflictos = 0; let nuevas = 0;
   const nivelesTodos = new Set([...Object.keys(nuevo || {}), ...Object.keys((guardado && guardado.niveles) || {})]);
@@ -186,7 +186,7 @@ export function procesarPuntoMes(nuevo, guardado, modo = 'completar') {
       conflictos += fz.conflictos; nuevas += fz.nuevas;
       crudo[f] = fz;
     }
-    const limpio = limpiarNivel(crudo, kv);
+    const limpio = limpiarNivel(crudo, kv, opciones);   // opciones: bandera «Invalid» no confiable (`scada_carga_invalid.js`)
     niveles[nv] = { kv, fam: {} };
     conteos[nv] = {};
     for (const [f, s] of Object.entries(limpio)) {

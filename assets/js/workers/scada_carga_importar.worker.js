@@ -19,6 +19,8 @@ import {
 import { empaquetar } from '../domain/scada_carga_series.js';
 import { seLee } from '../domain/scada_carga_paquete.js';
 import { objetivoConSumas, especSuma, derivadosDelMes, SUMA } from '../domain/scada_carga_suma.js';
+// Bandera «Invalid» no confiable de un punto (2026-10-28): archivo NUEVO; sin marcas, se limpia como siempre.
+import { puntosInvalidNoConfiable } from '../domain/scada_carga_invalid.js';
 
 let acc = null;
 let cancelado = false;
@@ -71,12 +73,13 @@ function procesar({ meses, guardados, modo }) {
   const specs = Object.values(filasAnalisis || {}).map(especSuma).filter(Boolean);
   const involucrados = new Set(specs.flatMap((s) => [s.cid, ...Object.values(s.porNivel).flatMap((x) => x.cids)]));
   const derivados = [];
+  const conInvalid = puntosInvalidNoConfiable(filasAnalisis);
   for (const [mes, porPunto] of armados) {
     resumen[mes] = {};
     const porCid = {};
     for (const [cid, nuevo] of porPunto) {
       const g = guardados ? guardados[cid + '|' + mes] || null : null;
-      const p = procesarPuntoMes(nuevo, g, modo);
+      const p = procesarPuntoMes(nuevo, g, modo, conInvalid.has(cid) ? { aceptarInvalid: true } : {});
       conflictos += p.conflictos;
       resumen[mes][cid] = p.resumen;
       if (involucrados.has(cid)) porCid[cid] = { niveles: p.niveles };
