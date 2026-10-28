@@ -264,8 +264,9 @@ export function montarHomologacion(cont, { alCambiar }) {
         }
       }
       // Sin los niveles a la vista (no se leyeron los datos cargados), guardar borraría la suma de circuitos que ya tiene.
-      if (tipo.value === 'usar' && !niveles.length && Object.keys(sumaGuardada).length) {
-        msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su suma de circuitos.';
+      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || fscGuardada)) {
+        msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su '
+          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : 'fase sin carga por diseño') + '.';
         return;
       }
       // La medida elegida no puede ser un circuito que otra fila ya suma: la misma corriente contaría en dos equipos.
@@ -319,7 +320,7 @@ export function montarHomologacion(cont, { alCambiar }) {
       rel ? el('p', { class: 'cs-ayuda' }, 'Relación de corrientes entre los dos lados: medida ' + num(rel.medido, 2) + ' frente a ' + num(rel.esperado, 2) + ' esperada por las tensiones de placa.') : null,
       fscGuardada ? el('p', { class: 'cs-ayuda' }, 'Fase sin carga por diseño (banco de dos monofásicas): '
         + Object.entries(fscGuardada).map(([nv, ph]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', fase ' + String(ph).slice(1)).join(' · ')
-        + '. Se conserva al guardar con el mismo punto y ese nivel asignado.') : null,
+        + '. Se conserva al guardar con el mismo punto y ese nivel asignado; «Excluir» o «Reabrir» la quitan.') : null,
       el('div', { class: 'cs-filtros', style: 'margin-top:10px' },
         el('label', {}, 'Decisión', tipo),
         el('label', { for: 'dlgClave' }, 'Punto SCADA', selClave)),

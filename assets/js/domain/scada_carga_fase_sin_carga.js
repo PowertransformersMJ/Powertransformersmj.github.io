@@ -10,11 +10,14 @@
 
 export const FASES_CORRIENTE = ['IR', 'IS', 'IT'];
 
-/** Tope de horas con tres fases antes de decir que la fase marcada está midiendo: el mayor de 24 h o el 5 % de las válidas. */
-export const TOPE_TRES_FASES = { horas: 24, fraccion: 0.05 };
+/** Tope de horas con tres fases antes de decir que la fase marcada está midiendo: el mayor de 6 h o el 5 % de las válidas
+ * (6 h y no 24: en un rango corto del detalle, 24 h serían un tercio de las 72 h mínimas). Se evalúa POR MES (ver
+ * `scada_carga_firmeza_periodo.js`), para que en un año la suma no lo diluya. */
+export const TOPE_TRES_FASES = { horas: 6, fraccion: 0.05 };
 
 /**
  * La fase marcada sin carga por diseño en ese nivel, o null.
+ * Un nivel medido por SUMA de circuitos no la usa (las tres fases salen de los circuitos): eso lo decide quien llama.
  * @param {object|null} fila  fila de la homologación (con `decision`), la del mes que se calcula
  * @param {string} nivel      p. ej. 'N13_8'
  * @returns {'IR'|'IS'|'IT'|null}

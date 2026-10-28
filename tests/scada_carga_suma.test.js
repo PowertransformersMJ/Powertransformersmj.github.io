@@ -749,7 +749,7 @@ describe('revisión adversarial 2026-10-24: candado del detalle, D5 después de 
     assert.match(im, /if \(d\.estado === 'sin_nivel'\)/);
     const h = src('ui/scada-datos/homologacion.js');
     assert.match(h, /if \(mes !== mesResumen \|\| carga !== cargaResumen\) \{/, 'tras cargar el MISMO mes se vuelve a leer su resumen');
-    assert.match(h, /if \(tipo\.value === 'usar' && !niveles\.length && Object\.keys\(sumaGuardada\)\.length\) \{/, 'sin niveles a la vista no se borra la suma');
+    assert.match(h, /if \(tipo\.value === 'usar' && !niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada\)\) \{/, 'sin niveles a la vista no se borra la suma');
     assert.match(h, /ponga primero «Medir con la medida del transformador» en el nivel sumado, guarde, y vuelva a abrir «Revisar»/);
     assert.match(h, /medir\.disabled = !s\.value;/); assert.match(h, /de la medida propia del transformador: no se usa/);
     assert.match(h, /if \(!medirSel\[nv\] \|\| medirSel\[nv\]\.disabled \|\| medirSel\[nv\]\.value !== 'suma'\) continue;/);

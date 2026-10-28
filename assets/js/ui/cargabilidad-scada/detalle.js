@@ -451,7 +451,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         fila('Factor de potencia', d.fp.prom != null ? 'promedio ' + num(d.fp.prom, 3) + (d.fp.min != null ? ' · mínimo ' + num(d.fp.min, 3) + ' (' + intervaloCO(d.t[d.fp.iMin]) + ')' : '') : '—'),
         fila('Flujo de potencia inverso', f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
         fila('Escala de la medida', escala),
-        fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')),
+        fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')
+          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga por diseño: banco de dos monofásicas)' : '')),
         info.suma ? fila('Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
   }
   /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */

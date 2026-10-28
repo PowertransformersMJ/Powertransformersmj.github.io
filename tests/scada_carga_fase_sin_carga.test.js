@@ -43,13 +43,13 @@ describe('la marca en la decisión', () => {
     assert.equal(faseSinCarga({ decision: { tipo: 'no_usar', fases_sin_carga: { N13_8: 'IS' } } }, 'N13_8'), null);
     assert.equal(faseSinCarga(null, 'N13_8'), null);
   });
-  test('la fase marcada «mide» si las horas con tres fases pasan del mayor de 24 h o el 5 %', () => {
-    assert.deepEqual(TOPE_TRES_FASES, { horas: 24, fraccion: 0.05 });
+  test('la fase marcada «mide» si las horas con tres fases pasan del mayor de 6 h o el 5 %', () => {
+    assert.deepEqual(TOPE_TRES_FASES, { horas: 6, fraccion: 0.05 });
     assert.equal(faseSinCargaMide(600, 600), false);
-    assert.equal(faseSinCargaMide(600, 576), false, '24 h con tres fases: todavía no');
     assert.equal(faseSinCargaMide(600, 570), false, '30 h = el 5 % de 600: en el tope, todavía no');
     assert.equal(faseSinCargaMide(600, 560), true, '40 h: pasa del 5 %');
-    assert.equal(faseSinCargaMide(100, 70), true, '30 h: pasa de 24 h aunque el 5 % sea 5');
+    assert.equal(faseSinCargaMide(100, 94), false, '6 h: en el piso, todavía no');
+    assert.equal(faseSinCargaMide(100, 93), true, '7 h: pasa del piso de 6 h (el 5 % serían 5)');
   });
 });
 
@@ -71,6 +71,16 @@ describe('cifra y firmeza de un banco de dos monofásicas', () => {
     assert.equal(x.firme, false);
     assert.deepEqual(x.motivos, ['la fase marcada sin carga está midiendo']);
   });
+  test('el resguardo se mira MES A MES: un mes que mide no se diluye en el periodo', () => {
+    const h = homologacion({ fases_sin_carga: { N13_8: 'IS' } });
+    // Febrero: 40 h con tres fases (pasa su tope de 30). Sumado con enero: 40 de 1.200 h, bajo el tope de 60 del periodo.
+    const resumenes = { '2026-01': { mes: '2026-01', claves: { [cid]: { N13_8: nivel(600, 600) } } }, '2026-02': { mes: '2026-02', claves: { [cid]: { N13_8: nivel(600, 560) } } } };
+    const fpm = Object.fromEntries(meses.map((m) => [m, filasLista({ parque: [tx], homologacion: h, catalogo, resumenMes: resumenes[m] })]));
+    assert.equal(fpm['2026-02'][0].firme, false);
+    const p = filasPeriodo({ parque: [tx], homologacion: h, catalogo, meses, resumenes, filasPorMes: fpm })[0];
+    assert.equal(p.firme, false);
+    assert.ok(p.motivos.includes('la fase marcada sin carga está midiendo'), p.motivos.join('; '));
+  });
   test('en varios meses también (el periodo suma las horas de dos fases)', () => {
     const h = homologacion({ fases_sin_carga: { N13_8: 'IS' } });
     const resumenes = Object.fromEntries(meses.map((m) => [m, { mes: m, claves: { [cid]: { N13_8: nivel(600, 600) } } }]));
@@ -84,4 +94,11 @@ test('el diálogo «Revisar» conserva la marca al guardar (si no, la borraba)',
   const src = readFileSync(new URL('../assets/js/ui/scada-datos/homologacion.js', import.meta.url), 'utf8');
   assert.match(src, /if \(Object\.keys\(fsc\)\.length\) decision\.fases_sin_carga = fsc;/);
   assert.match(src, /Fase sin carga por diseño \(banco de dos monofásicas\)/);
+  // Sin leer los niveles (catálogo no leído) no se guarda: se perdería la marca.
+  assert.match(src, /!niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada\)/);
+});
+
+test('un nivel medido por suma de circuitos no usa la marca (sus tres fases salen de los circuitos)', () => {
+  const src = readFileSync(new URL('../assets/js/domain/scada_carga_vista.js', import.meta.url), 'utf8');
+  assert.match(src, /const fsc = d && !sp \? faseSinCarga\(fila, nv\) : null;/);
 });

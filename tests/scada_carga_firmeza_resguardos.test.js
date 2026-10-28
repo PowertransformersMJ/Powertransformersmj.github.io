@@ -186,6 +186,7 @@ describe('detalle: firmeza de un rango de meses completos', () => {
     const resumen = (m) => resumirParaGuardar(resumenFisico(series[m], NIVELES.N13_8.kv), series[m]);
     const lista = firmezaDeMeses(meses.map((m) => { const r = resumen(m); return { n: r.i.n, cob: r.cob, servicio: r.servicio }; }));
     assert.equal(fr.S.mesesMedidos, 2); assert.equal(fr.S.mesesTotal, 2, 'abril fuera de servicio no cuenta');
+    assert.equal(fr.S.faseSinCargaMideMes, true, 'las curvas sintéticas traen las tres fases: si el nivel tuviera la marca, el resguardo saltaría');
     assert.equal(fr.S.mesesMedidos, lista.mesesMedidos);
     assert.ok(Math.abs(fr.S.coberturaFirmeza - lista.coberturaFirmeza) < 1e-12);
     assert.equal(firmezaDelRango({ N13_8: rec }, [{ nivel: 'N13_8', devanado: 'S' }], ['2026-02'], desde), null, 'un solo mes: la firmeza de siempre');
