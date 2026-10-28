@@ -161,6 +161,9 @@ export function montarHomologacion(cont, { alCambiar }) {
     const reservaGuardada = !!(f.decision && f.decision.tipo === 'usar' && f.decision.unidad_reserva === true);
     // Bandera «Invalid» no confiable del punto (2026-10-28, `99 §193`): igual, se muestra y se conserva con el mismo punto.
     const invalidGuardada = !!(f.decision && f.decision.tipo === 'usar' && f.decision.invalid_no_confiable === true);
+    // Corriente con banda muerta (2026-10-28, `99 §195`): igual que la fase sin carga, se muestra y se conserva con el mismo
+    // punto y el nivel asignado.
+    const bmGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.banda_muerta && typeof f.decision.banda_muerta === 'object') ? f.decision.banda_muerta : null;
     const rPropio = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[ev0.cid] || null : null;
     const derUltimo = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[claveSuma(ev0.cid)] || null : null;
     const sugeridos = [...new Set(Object.values(ctx.puntos).filter((p) => estN && normalizarTexto(p.est) === estN && !esElementoTransformador(p.elem)).map((p) => p.elem))]
@@ -261,6 +264,10 @@ export function montarHomologacion(cont, { alCambiar }) {
       }
       if (reservaGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) decision.unidad_reserva = true;
       if (invalidGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) decision.invalid_no_confiable = true;
+      if (bmGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) {
+        const bm = Object.fromEntries(Object.entries(bmGuardada).filter(([nv]) => decision.mapa && decision.mapa[nv]));
+        if (Object.keys(bm).length) decision.banda_muerta = bm;
+      }
       // Suma de circuitos: solo con «Confirmar: usar esta medida» y solo los niveles marcados (sin suma, la decisión de siempre).
       const suma = {};
       if (tipo.value === 'usar') {
@@ -272,9 +279,9 @@ export function montarHomologacion(cont, { alCambiar }) {
       // Sin los niveles a la vista (no se leyeron los datos cargados), guardar borraría la suma de circuitos que ya tiene.
       // Tampoco con un mapa decidido (un nivel en «No usar»): guardar sin niveles lo cambiaría por el automático.
       const mapaGuardado = !!(f.decision && f.decision.tipo === 'usar' && f.decision.mapa && Object.keys(f.decision.mapa).length);
-      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || fscGuardada || mapaGuardado)) {
+      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || fscGuardada || bmGuardada || mapaGuardado)) {
         msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su '
-          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (fscGuardada ? 'fase sin carga' : 'asignación de niveles')) + '.';
+          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (fscGuardada ? 'fase sin carga' : (bmGuardada ? 'banda muerta' : 'asignación de niveles'))) + '.';
         return;
       }
       // La medida elegida no puede ser un circuito que otra fila ya suma: la misma corriente contaría en dos equipos.
@@ -327,6 +334,9 @@ export function montarHomologacion(cont, { alCambiar }) {
       el('ul', { class: 'cs-avisos' }, ev0.avisos.length ? ev0.avisos.map((a) => el('li', {}, (AVISOS[a] ? AVISOS[a].texto : a) + (AVISOS[a] && AVISOS[a].bloquea ? '' : ' (informativo)'))) : el('li', {}, 'Sin avisos.')),
       rel ? el('p', { class: 'cs-ayuda' }, 'Relación de corrientes entre los dos lados: medida ' + num(rel.medido, 2) + ' frente a ' + num(rel.esperado, 2) + ' esperada por las tensiones de placa.') : null,
       invalidGuardada ? el('p', { class: 'cs-ayuda' }, 'Bandera «Invalid» no confiable: en este punto las horas marcadas «Invalid» se toman como buenas (el resto de la limpieza sigue igual). Se conserva al guardar con el mismo punto; «Excluir» o «Reabrir» la quitan. Al quitarla, sus meses se vuelven a limpiar desde lo guardado (no hace falta releer las carpetas).') : null,
+      bmGuardada ? el('p', { class: 'cs-ayuda' }, 'Corriente con banda muerta: '
+        + Object.entries(bmGuardada).map(([nv, a]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', escalón de ' + String(a).replace('.', ',') + ' A').join(' · ')
+        + '. El valor que se repite se toma como bueno solo con bandera buena y si la tensión del punto se movió en ese tramo; la cifra es firme solo si el escalón no pasa de 5 puntos. Se conserva al guardar con el mismo punto y ese nivel asignado; «Excluir» o «Reabrir» la quitan.') : null,
       reservaGuardada ? el('p', { class: 'cs-ayuda' }, 'Unidad de reserva: un mes sin carga apreciable queda «en reserva» y no cuenta para la firmeza. Se conserva al guardar con el mismo punto; «Excluir» o «Reabrir» la quitan.') : null,
       fscGuardada ? el('p', { class: 'cs-ayuda' }, 'Fase sin carga (p. ej., banco de dos monofásicas o red de dos fases): '
         + Object.entries(fscGuardada).map(([nv, ph]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', fase ' + String(ph).slice(1)).join(' · ')

@@ -84,7 +84,8 @@ describe('la marca en la homologación', () => {
   });
   test('el importador la aplica y el diálogo «Revisar» la conserva', () => {
     const w = readFileSync(new URL('../assets/js/workers/scada_carga_importar.worker.js', import.meta.url), 'utf8');
-    assert.match(w, /conInvalid\.has\(cid\) \? conMarcaInvalid\(procesarPuntoMes\(nuevo, g, modo, \{ aceptarInvalid: true \}\)\) : procesarPuntoMes\(nuevo, g, modo\)/);
+    assert.match(w, /if \(conInvalid\.has\(cid\)\) op\.aceptarInvalid = true;/);
+    assert.match(w, /let p = procesarPuntoMes\(nuevo, g, modo, op\);\n\s+if \(op\.aceptarInvalid\) p = conMarcaInvalid\(p\);/);
     const im = readFileSync(new URL('../assets/js/ui/scada-datos/importar-mes.js', import.meta.url), 'utf8');
     assert.match(im, /puntosInvalidNoConfiable\(filasVigentes\(\)\)\.size && procesado\.versionInvalid == null/);
     assert.match(im, /\+ '\|' \+ JSON\.stringify\(\[\.\.\.puntosInvalidNoConfiable\(filasVigentes\(\)\)\]\.sort\(\)\)/);

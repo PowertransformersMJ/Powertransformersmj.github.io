@@ -9700,3 +9700,60 @@ NO revisado externamente.
 **194.8 Verificado sano / no re-auditar.** Lo que sigue pendiente depende del área SCADA o de la brigada (medidas muertas, congeladas,
 con banda muerta o mal escaladas) y de su re-exporte; está en el pedido. No hay arreglo honesto desde la plataforma para San Felipe,
 Casa de Zinc, Santa Elena, Santa Teresa ni San Andrés T1 (no hay otro punto que mida su carga).
+
+## 195. ADR-195 — Cargabilidad SCADA: marca «corriente con banda muerta» (Tres Palmas) y regla de todo el parque «mes casi sin medida = mes no medido» (Maracayo) (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «solucionemos esos provisionales por favor» → sus respuestas: Tres Palmas «Sí, con resguardos» · meses caídos «Sí, y antes
+> muéstrame quién cambia» · San Andrés T1 «Nota de corroboración, sigue provisional» · tras la vista previa: «Procede, publícalo».
+
+**195.1 Causa raíz.** De los 13 provisionales, 9 no tienen arreglo honesto desde la plataforma (medidas muertas, congeladas, con
+umbral de renovación grueso o mal escaladas: área SCADA y brigada, pedido de `§194`). Los otros 4 sí:
+- **Tres Palmas T1/T2/T3** (un punto): corriente en escalones de 0,976 A (3,1 puntos) que solo se renueva al cambiar un escalón; la
+  regla «6 h con el mismo valor = congelado» descartaba 205–612 h por fase y mes (443 h válidas en el año, 70 % de dos fases).
+- **Maracayo T1**: su medida murió el 26-jun; jul–oct trajeron 1–86 h válidas y contaban como «medido con cobertura casi cero»,
+  hundiendo la cobertura del periodo, mientras que un mes SIN ningún dato no penalizaba igual (incoherencia de la regla de `§190`).
+
+**195.2 Solución.**
+- **Banda muerta** (archivo nuevo `scada_carga_banda_muerta.js`; marca `decision.banda_muerta = {N13_8: <escalón A>}`): la limpieza de
+  ESE punto y nivel toma una corriente repetida (≥ 6 h, bandera buena) como «retenida» solo si una tensión del nivel se movió en el
+  tramo y, si el tramo pasa de 24 h, también otra fase de corriente. Firme solo si el escalón ≤ 5 puntos de la ampacidad; meses limpiados
+  con la marca ya quitada → provisional («vuelva a limpiar el mes»). Importador (`?v=banda1`, `versionBandaMuerta`, firma), autocomprobación
+  «recargue» (también si aparece una corriente retenida en un nivel SIN marca), `reprocesarConMarcas` para los meses guardados, rastro
+  `bandaMuertaAceptadas`, diálogo que la muestra y la conserva, rótulo en el detalle.
+- **Mes casi sin medida** (archivo nuevo `scada_carga_mes_casi_sin_medida.js`, todo el parque): un mes en que el devanado midió menos de
+  72 h y menos de la mitad de lo que estuvo en servicio, teniendo ≥ 72 h en servicio, cuenta como mes NO medido (fuera de la cobertura y
+  de los meses medidos; sigue en el total: la mitad de los meses se sigue exigiendo). Resguardo: si es ESA regla la que vuelve firme al
+  equipo (con la regla de antes no lo era) y la cifra o la sobrecarga dependen de esos meses (`sinMesesCasi`: p99, sostenida y pico sin
+  ellos, en el periodo y en el detalle) → provisional «la cifra depende de meses que casi no midieron». El mes suelto no cambia.
+
+**195.3 No-regresión.** Vista previa en SU Chrome con los módulos del commit (L-157), 2.080 filas (208 × 9 meses + periodo): los 9 meses
+sueltos IDÉNTICOS; el periodo 187 → 188 firmes solo por Maracayo; NINGÚN firme cae. Un primer borrador bajaba a Puerto Escondido y San
+Carlos por una décima (cifra sin el mes de la bahía caída): corregido con «¿ya era firme con la regla de antes?». Tres Palmas simulada
+con la marca (en memoria): control sin la marca = lo guardado en 9 de 9; con ella 31,1 % CRG 1 FIRME (4.290 h, cobertura 0,667, 7 de 9
+meses firmes; jun y jul provisionales por la comunicación real) y ningún otro equipo cambia → 191 firmes · 9 provisionales · 8 sin cifra.
+
+**195.4 Tests.** `scada_carga_banda_muerta.test.js` (22) y `scada_carga_mes_casi_sin_medida.test.js` (13), con los casos de la revisión;
+suite 3.220 / 2 omitidas; lint OK. Revisión adversarial `wf_ad177217-189` (2 revisores + 7 verificadores): 6 confirmados, todos
+corregidos en `227ecf0` — corriente muerta con tensión viva aceptada (MEDIO: tope de 24 h sin otra fase), marca quitada sin volver a
+limpiar (BAJO), candado del resguardo por devanado y no por equipo en un tridevanado (MEDIO), sobrecarga que solo traen los meses casi
+sin medida (MEDIO), mes con poco servicio pero bien medido tratado como caído (BAJO: + «menos de la mitad»), lista de niveles de un
+importador viejo activando la limpieza en todos los niveles (BAJO: solo `true`). 1 refutado (vista vieja en memoria).
+
+**195.5 Anti-patterns evitados.** Inventar la carga de San Andrés T1 con la de su gemelo (queda nota de corroboración, la cifra sigue
+siendo la suya); aceptar la banda muerta de San Felipe, Tres Esquinas, Casa de Zinc o El Desastre (escalón de 10–30 % de la lectura o
+la potencia se mueve mientras la corriente no); una exportación nueva en un archivo viejo (L-102); un resguardo que castigaba lo que la
+regla de antes ya daba por firme.
+
+**195.6 Archivos.** Nuevos: `domain/scada_carga_banda_muerta.js`, `domain/scada_carga_mes_casi_sin_medida.js` y sus tests. Modificados:
+`scada_carga_limpieza.js`, `_importacion.js` (marca por nivel), `_firmeza_periodo.js`, `_firmeza_rango.js`, `_periodo.js`, `_vista.js`,
+`workers/scada_carga_importar.worker.js`, `ui/scada-datos/importar-mes.js`, `ui/scada-datos/homologacion.js`, `ui/cargabilidad-scada/detalle.js`.
+INTACTOS: `scada_carga_kpis.js` (`firmeza`), reglas de Firestore, `functions/`.
+
+**195.7 Doctrina.** Decisiones de criterio SUYAS (W-11 con la recomendada) · la vista previa con datos reales es el contrato (L-153) ·
+la cifra sale de la medida del propio equipo · L-102 · revisión adversarial antes de publicar. NO revisado externamente.
+
+**195.8 Verificado sano / no re-auditar.** Tensión «viva» sola NO prueba que el canal de corriente viva (por eso el tope de 24 h con otra
+fase); en Tres Palmas los tramos quietos legítimos llegan a 105–169 h en la fase R (3–4 A) y en ~70 % de ellos otra fase se mueve: un
+tope sin esa condición rompía el caso real. La muerte de Maracayo congeló I, U, P y Q juntas (la banda muerta no la habría colado). El
+«DISTINTO» del primer control era el orden de las claves del JSON, no los datos (comparación profunda: 0 diferencias). San Andrés T1:
+en 729 h en que miden los dos, T1 = 1,02 × T2 (p10–p90 1,01–1,03) → ~83 %, CRG 4, la misma que su cifra provisional (79,8 %).

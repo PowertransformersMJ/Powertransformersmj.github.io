@@ -29,6 +29,8 @@ import { sobrecargaDelPeriodo } from './scada_carga_sobrecarga.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; sin medidas anteriores el periodo da lo mismo que antes.
 import { segmentoDelMes, mesesDelSegmento, filasDelMes, sobrecargaAntesDelCambio, motivoSinCarga } from './scada_carga_cambio_medida.js';
 import { firmezaPeriodoDeFilas } from './scada_carga_firmeza_periodo.js';
+// Mes casi sin medida (2026-10-28): archivo NUEVO.
+import { mesCasiSinMedida } from './scada_carga_mes_casi_sin_medida.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -85,6 +87,7 @@ export function resumenPeriodo(porMes) {
     let n = 0; let horas = 0; let serv = 0; let des = 0; let unaFalta = 0; let fi = 0; let sP = 0;
     let max = null; let sost = null; let sMax = null; let sP99 = null;
     const p50 = []; const prom = []; const rUI = []; const uProm = []; const partes = []; const sinTop = [];
+    const partesSinCasi = []; let hayCasi = false; let sostSin = null; let maxSin = null; let bmA = 0;
     for (const { mes, r, noCargadas, reserva } of porMes) {
       const x = r && r[nv];
       // Los días que el parque no cargó no cuentan, como un mes no cargado (el resumen los trae como horas del mes).
@@ -102,6 +105,11 @@ export function resumenPeriodo(porMes) {
       const top = topsDe(x.top);
       if (nm && !top) sinTop.push(mes);
       partes.push({ n: nm, top });
+      // Mes casi sin medida (2026-10-28): el p99 SIN esos meses, para saber si la cifra depende de ellos.
+      if (mesCasiSinMedida(nm, Math.max(nm, (x.servicio != null ? x.servicio : (x.horas || 0)) - fuera))) hayCasi = true;
+      else { partesSinCasi.push({ n: nm, top }); sostSin = mayor(sostSin, x.sost && x.sost.v); maxSin = mayor(maxSin, i.max); }
+      // Banda muerta (2026-10-28): las horas que se tomaron como buenas, para saber si la marca sigue en la decisión.
+      if (x.bandaMuertaAceptadas > 0) bmA += x.bandaMuertaAceptadas;
     }
     const p = p99DePeriodo(partes);
     if (sinTop.length) faltaTop[nv] = sinTop;
@@ -109,7 +117,10 @@ export function resumenPeriodo(porMes) {
       i: { n, p50: pond(p50), p95: null, p98: null, p99: p.p99, max, iMax: null, prom: pond(prom), unaFalta },
       sost: sost == null ? null : { v: sost, idx: null },
       horas, servicio: serv, des, cob: serv > 0 ? Math.round((n / serv) * 1000) / 1000 : null,
-      sMax, sP99, rUI: pond(rUI), uProm: pond(uProm), sP: sP < 0 ? -1 : 1, flujoInverso: fi, desde: null
+      sMax, sP99, rUI: pond(rUI), uProm: pond(uProm), sP: sP < 0 ? -1 : 1, flujoInverso: fi, desde: null,
+      // Mes casi sin medida (2026-10-28): la cifra (p99), el máximo sostenido y el pico SIN esos meses, para el resguardo.
+      ...(hayCasi ? { sinMesesCasi: { p99: p99DePeriodo(partesSinCasi).p99, sost: sostSin, max: maxSin } } : {}),
+      ...(bmA ? { bandaMuertaAceptadas: bmA } : {})
     };
   }
   return { porNivel, faltaTop };

@@ -32,6 +32,9 @@ import { SEVERA_PCT } from './scada_carga_dga.js';
 import { faseSinCarga, faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
 // Unidad de reserva (2026-10-28): archivo NUEVO; sin la marca en la decisión, nada cambia.
 import { esUnidadReserva, mesEnReserva, MOTIVO_RESERVA, horasNoCargadasDelMes } from './scada_carga_reserva.js';
+// Corriente con banda muerta (marca del Ingeniero) y mes casi sin medida (2026-10-28): archivos NUEVOS.
+import { bandaMuerta, motivoBandaMuerta, motivoBandaMuertaSinMarca } from './scada_carga_banda_muerta.js';
+import { motivoMesCasiSinMedida, reglaDeAntes } from './scada_carga_mes_casi_sin_medida.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -133,11 +136,17 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     const picoPct = d && r && !bloqueado && r.i && r.i.max != null && A > 0 ? 100 * r.i.max / A : null;
     // Banco de dos monofásicas (marca del Ingeniero): la fase marcada no existe. Con suma de circuitos no aplica.
     const fsc = d && !sp ? faseSinCarga(fila, nv) : null;
+    // Banda muerta (marca del Ingeniero): el escalón de la medida, en A y en puntos de la ampacidad. Con suma no aplica.
+    const bm = d && !sp ? bandaMuerta(fila, nv) : null;
+    const bmPct = bm != null ? (A > 0 ? 100 * bm / A : null) : undefined;
+    // Horas limpiadas con banda muerta sin la marca en la decisión de hoy (se quitó y no se volvió a limpiar): sin tope.
+    const bmSinMarca = !!(d && !sp && bm == null && r && r.bandaMuertaAceptadas > 0);
     const fila1 = {
       nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + ' · suma de circuitos' : NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
       pct, escala, cobertura: r ? r.cob : null, n: r && r.i ? r.i.n : 0, sostenidaPct: sostPct, picoPct,
       sinDatos: !r || !r.i || r.i.n === 0,
       ...(fsc ? { faseSinCarga: fsc } : {}),
+      ...(bm != null ? { bandaMuerta: bm, bandaMuertaPct: bmPct } : {}),
       ...(sp ? { suma: { de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null } } : {})
     };
     if (sp) {
@@ -155,6 +164,12 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
       ...(fsc ? { faseSinCarga: fsc, faseSinCargaMide: faseSinCargaMide(fila1.n, unaFalta) || !!(fp && fp.faseSinCargaMideMes) } : {}),
       // Unidad de reserva: las 72 h y «falta una fase» con las horas de los meses que cuentan (campos nuevos, con guarda).
       ...(fp && fp.mesesReserva ? { mesesReserva: fp.mesesReserva, nFirmeza: fp.nFirmeza, unaFaltaFirmeza: fsc ? 0 : fp.unaFaltaFirmeza } : {}),
+      ...(bm != null ? { bandaMuertaPct: bmPct } : {}),
+      ...(bmSinMarca ? { bandaMuertaSinMarca: true } : {}),
+      // Mes casi sin medida: la cifra y la sobrecarga del devanado SIN esos meses (del detalle o del resumen del periodo) y
+      // su cobertura con la regla de antes, para el resguardo.
+      ...sinMesesCasi(fp, r, A, pct, estadistico),
+      ...(fp && fp.coberturaConCasi != null ? { coberturaConCasi: fp.coberturaConCasi, mesesMedidosConCasi: fp.mesesMedidosConCasi } : {}),
       servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
       ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }
@@ -164,8 +179,13 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   let pctEq = conPct.length ? Math.max(...conPct.map((x) => x.pct)) : null;
   const devMax = conPct.length ? conPct.reduce((a, b) => (b.pct > a.pct ? b : a)).d : null;
   const f0 = firmeza({ estadoHomologacion: estado, esCircuito, devanados, placa, mesesFallidos });
-  // La suma agrega sus motivos (D4: no cuadra → provisional); sin suma, `f` es exactamente la firmeza de siempre.
-  const extraSuma = [...new Set([...motivosSuma, ...avisosSuma])];
+  // La suma agrega sus motivos (D4: no cuadra → provisional); sin suma, `f` es exactamente la firmeza de siempre. También
+  // la banda muerta (escalón mayor que el tope, o meses limpiados con ella sin la marca) y los meses casi sin medida cuando
+  // son ellos los que vuelven firme al equipo y la cifra o la sobrecarga dependen de esos meses (2026-10-28).
+  const firmeAntes = !devanados.some((x) => x.coberturaConCasi != null)
+    || firmeza({ estadoHomologacion: estado, esCircuito, devanados: devanados.map(reglaDeAntes), placa, mesesFallidos }).firme;
+  const extraSuma = [...new Set([...motivosSuma, ...avisosSuma, motivoBandaMuerta(devanados), motivoBandaMuertaSinMarca(devanados),
+    motivoMesCasiSinMedida(devanados, pctEq, firmeAntes)].filter(Boolean))];
   const f = extraSuma.length ? { firme: false, motivos: [...f0.motivos, ...extraSuma] } : f0;
   // Un circuito sin confirmar o una homologación excluida NO dan número (decisión del Ingeniero).
   let motivoNulo = null;
@@ -222,6 +242,20 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     ...(enReserva ? { enReserva: true } : {}),
     // Campo NUEVO, solo con suma (cada consumidor lo lee con guarda: un módulo viejo en caché no lo trae).
     ...(spec ? { suma: { niveles: sumaNiveles, texto: textoSuma(spec), veredicto: peorVeredicto(sumaNiveles) } } : {})
+  };
+}
+
+/**
+ * `{pctSinMesesCasi, sobreSinMesesCasi}` si el periodo o rango tuvo meses casi sin medida en ese nivel (solo con el p99):
+ * la cifra y la señal de sobrecarga SIN esos meses; si no, `{}`.
+ */
+function sinMesesCasi(fp, r, A, pct, estadistico) {
+  if (pct == null || estadistico !== 'p99' || !(A > 0)) return {};
+  const sm = fp && fp.sinMesesCasi ? fp.sinMesesCasi : (r && r.sinMesesCasi ? r.sinMesesCasi : null);
+  if (!sm) return {};
+  return {
+    pctSinMesesCasi: sm.p99 != null ? 100 * sm.p99 / A : null,
+    sobreSinMesesCasi: senalSobrecarga({ A, sostenidaPct: sm.sost != null ? 100 * sm.sost / A : null, picoPct: sm.max != null ? 100 * sm.max / A : null })
   };
 }
 

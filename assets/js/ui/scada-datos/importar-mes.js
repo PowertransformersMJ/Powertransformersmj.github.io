@@ -28,6 +28,8 @@ import { especSuma, aliasTocaSuma, componerResumen, textoSuma, textoCuadre, clav
 import { calcularEquipo } from '../../domain/scada_carga_vista.js';
 // Bandera «Invalid» no confiable de un punto (2026-10-28): archivo NUEVO; sin marcas, nada cambia.
 import { puntosInvalidNoConfiable } from '../../domain/scada_carga_invalid.js';
+// Corriente con banda muerta de un punto (2026-10-28): archivo NUEVO; sin marcas, nada cambia.
+import { puntosBandaMuerta } from '../../domain/scada_carga_banda_muerta.js';
 import { obtenerUmbralesActivos } from '../../data/umbrales_salud.js';
 
 const MAX_ARCHIVOS = 20000;
@@ -94,7 +96,7 @@ export function montarCargaMes(cont, { alTerminar }) {
   function nuevoWorker() {
     if (worker) worker.terminate();
     // '?v=': una página nueva nunca usa un lector viejo guardado en la caché del navegador (suma de circuitos, 2026-10-24).
-    worker = new Worker(new URL('../../workers/scada_carga_importar.worker.js?v=invalid1', import.meta.url), { type: 'module' });
+    worker = new Worker(new URL('../../workers/scada_carga_importar.worker.js?v=banda1', import.meta.url), { type: 'module' });
     worker.onerror = (e) => { mensaje = 'El lector de archivos falló: ' + ((e && e.message) || 'error'); fase = 'inicio'; dibujar(); };
     return worker;
   }
@@ -124,7 +126,9 @@ export function montarCargaMes(cont, { alTerminar }) {
   function firmaSumas() {
     return JSON.stringify(filasConSuma().map((x) => [x.spec.cid, Object.values(x.spec.porNivel).map((p) => p.firma).sort()]).sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)))
       // La bandera «Invalid» no confiable también se aplica con la homologación de cuando se LEYÓ la carpeta (2026-10-28).
-      + '|' + JSON.stringify([...puntosInvalidNoConfiable(filasVigentes())].sort());
+      + '|' + JSON.stringify([...puntosInvalidNoConfiable(filasVigentes())].sort())
+      // Y la banda muerta de la corriente (2026-10-28), con sus niveles.
+      + '|' + JSON.stringify([...puntosBandaMuerta(filasVigentes()).entries()].sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)));
   }
 
   // ── 1) Leer la carpeta ─────────────────────────────────────────────────────────
@@ -240,7 +244,7 @@ export function montarCargaMes(cont, { alTerminar }) {
       // El lector calcula las sumas con la homologación que había al LEER la carpeta: si después se guardó, quitó o cambió
       // una suma de circuitos, el plan no la tendría en cuenta. Se detiene y se dice.
       if (firmaSumas() !== firmaSumasLeidas) {
-        throw new Error('La suma de circuitos (o la bandera «Invalid» no confiable) de la homologación cambió después de leer la carpeta: vuelva a leer la carpeta (o el paquete) antes de simular.');
+        throw new Error('La suma de circuitos (o la bandera «Invalid» no confiable, o la banda muerta) de la homologación cambió después de leer la carpeta: vuelva a leer la carpeta (o el paquete) antes de simular.');
       }
       olvidarCache();   // lo guardado se lee fresco: otra pestaña pudo cargar algo
       const cat = await leerCatalogo();
@@ -273,6 +277,9 @@ export function montarCargaMes(cont, { alTerminar }) {
       // mes sin su suma. Se detiene y se dice.
       if (puntosInvalidNoConfiable(filasVigentes()).size && procesado.versionInvalid == null) {
         throw new Error('El lector de archivos de esta pestaña es de una versión anterior y no aplica la bandera «Invalid» no confiable: recargue la página (Cmd+Shift+R) y vuelva a simular.');
+      }
+      if (puntosBandaMuerta(filasVigentes()).size && procesado.versionBandaMuerta == null) {
+        throw new Error('El lector de archivos de esta pestaña es de una versión anterior y no aplica la banda muerta de la corriente: recargue la página (Cmd+Shift+R) y vuelva a simular.');
       }
       if (filasConSuma().length && procesado.versionSuma == null) {
         throw new Error('El lector de archivos de esta pestaña es de una versión anterior y no calcula la suma de circuitos: recargue la página (Cmd+Shift+R) y vuelva a simular.');

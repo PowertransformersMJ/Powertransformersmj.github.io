@@ -39,6 +39,8 @@ import {
 import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 // Firmeza de varios meses por el devanado que da la cifra (2026-10-27): archivo NUEVO; sin él la firmeza es la del rango.
 import { firmezaDelRango, esDeMesesCompletos } from '../../domain/scada_carga_firmeza_rango.js';
+// Corriente con banda muerta (2026-10-28): archivo NUEVO; las horas «retenidas» del rango, para saber si la marca sigue.
+import { horasRetenidasI } from '../../domain/scada_carga_banda_muerta.js';
 import { horasNoCargadas } from '../../domain/scada_carga_periodo.js';
 // Unidad de reserva (2026-10-28): archivo NUEVO; sin la marca, el rango cuenta como siempre.
 import { esUnidadReserva } from '../../domain/scada_carga_reserva.js';
@@ -455,7 +457,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         fila('Flujo de potencia inverso', f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
         fila('Escala de la medida', escala),
         fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')
-          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')),
+          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')
+          + (info.bandaMuerta != null ? ' · corriente con banda muerta: el valor repetido cuenta como válido si la tensión se movió (escalón de ' + num(info.bandaMuerta, 3) + ' A'
+            + (info.bandaMuertaPct != null ? ' = ' + num(info.bandaMuertaPct, 1) + ' puntos' : '') + ', según la decisión de la homologación)' : '')),
         info.suma ? fila('Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
   }
   /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */
@@ -643,7 +647,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         const i = previo.niveles.find((x) => x.nivel === nv);
         const A = i && i.devanado ? a.placa[i.devanado].A : null;
         porNivel[nv] = calcularNivel(porNivel[nv], NIVELES[nv].kv, A);
-        resumenPorNivel[nv] = porNivel[nv].resumen;
+        const retenidas = horasRetenidasI(porNivel[nv].fam);
+        resumenPorNivel[nv] = retenidas ? { ...porNivel[nv].resumen, bandaMuertaAceptadas: retenidas } : porNivel[nv].resumen;
       }
       // Suma de circuitos: el nivel sumado lleva el derivado del RANGO (válido solo si cada mes leído trae el suyo); sin él,
       // calcularEquipo lo deja sin cifra (nunca la medida propia del transformador).

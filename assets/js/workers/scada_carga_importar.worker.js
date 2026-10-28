@@ -21,6 +21,8 @@ import { seLee } from '../domain/scada_carga_paquete.js';
 import { objetivoConSumas, especSuma, derivadosDelMes, SUMA } from '../domain/scada_carga_suma.js';
 // Bandera «Invalid» no confiable de un punto (2026-10-28): archivo NUEVO; sin marcas, se limpia como siempre.
 import { puntosInvalidNoConfiable, conMarcaInvalid, VERSION_INVALID } from '../domain/scada_carga_invalid.js';
+// Corriente con banda muerta de un punto (2026-10-28): archivo NUEVO; sin marcas, se limpia como siempre.
+import { puntosBandaMuerta, conMarcaBandaMuerta, VERSION_BANDA_MUERTA } from '../domain/scada_carga_banda_muerta.js';
 
 let acc = null;
 let cancelado = false;
@@ -74,12 +76,18 @@ function procesar({ meses, guardados, modo }) {
   const involucrados = new Set(specs.flatMap((s) => [s.cid, ...Object.values(s.porNivel).flatMap((x) => x.cids)]));
   const derivados = [];
   const conInvalid = puntosInvalidNoConfiable(filasAnalisis);
+  const conBanda = puntosBandaMuerta(filasAnalisis);
   for (const [mes, porPunto] of armados) {
     resumen[mes] = {};
     const porCid = {};
     for (const [cid, nuevo] of porPunto) {
       const g = guardados ? guardados[cid + '|' + mes] || null : null;
-      const p = conInvalid.has(cid) ? conMarcaInvalid(procesarPuntoMes(nuevo, g, modo, { aceptarInvalid: true })) : procesarPuntoMes(nuevo, g, modo);
+      const op = {};
+      if (conInvalid.has(cid)) op.aceptarInvalid = true;
+      if (conBanda.has(cid)) op.bandaMuerta = conBanda.get(cid);
+      let p = procesarPuntoMes(nuevo, g, modo, op);
+      if (op.aceptarInvalid) p = conMarcaInvalid(p);
+      if (op.bandaMuerta) p = conMarcaBandaMuerta(p, op.bandaMuerta);
       conflictos += p.conflictos;
       resumen[mes][cid] = p.resumen;
       if (involucrados.has(cid)) porCid[cid] = { niveles: p.niveles };
@@ -102,7 +110,7 @@ function procesar({ meses, guardados, modo }) {
   }
   const catalogoMeses = {};
   for (const mes of meses) { const d = diasDelMes(acc, mes); catalogoMeses[mes] = { dias: d.mascara, nDias: d.dias, completo: d.completo }; }
-  postMessage({ tipo: 'procesado', docs, resumen, catalogo: { meses: catalogoMeses, puntos }, conteos, conflictos, sinCambios, derivados, versionSuma: SUMA.version, versionInvalid: VERSION_INVALID });
+  postMessage({ tipo: 'procesado', docs, resumen, catalogo: { meses: catalogoMeses, puntos }, conteos, conflictos, sinCambios, derivados, versionSuma: SUMA.version, versionInvalid: VERSION_INVALID, versionBandaMuerta: VERSION_BANDA_MUERTA });
 }
 
 self.onmessage = async (ev) => {
