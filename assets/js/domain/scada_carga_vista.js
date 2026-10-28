@@ -30,6 +30,8 @@ import { pasaFiltroDevanado } from './scada_carga_filtro_devanado.js';
 import { SEVERA_PCT } from './scada_carga_dga.js';
 // Fase sin carga por diseño (banco de dos monofásicas, 2026-10-28): archivo NUEVO; sin la marca en la decisión, nada cambia.
 import { faseSinCarga, faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
+// Unidad de reserva (2026-10-28): archivo NUEVO; sin la marca en la decisión, nada cambia.
+import { esUnidadReserva, mesEnReserva, MOTIVO_RESERVA, horasNoCargadasDelMes } from './scada_carga_reserva.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -104,7 +106,7 @@ function senalSobrecarga(n) {
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
  */
-export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null, firmezaPeriodo = null }) {
+export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null, firmezaPeriodo = null, fueraMes = 0 }) {
   const placa = placaDe(tx);
   const clave = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
   const esCircuito = !!clave && !esElementoTransformador(clave.elem);
@@ -116,6 +118,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   const sumaNiveles = []; const motivosSuma = []; const avisosSuma = [];
   const niveles = [];
   const devanados = [];
+  const nivelesReserva = [];
   for (const nv of Object.keys((punto && punto.niveles) || {}).sort((a, b) => NIVELES[b].kv - NIVELES[a].kv)) {
     const d = mapa ? mapa[nv] || null : null;
     const r = resumenPorNivel ? resumenPorNivel[nv] : null;
@@ -143,12 +146,15 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
       if (es && es.aviso) avisosSuma.push(es.aviso);
     }
     niveles.push(fila1);
+    nivelesReserva.push({ devanado: d, n: fila1.n, pct, pctMax: picoPct, horas: r && r.horas != null ? r.horas : null, servicio: r && r.servicio != null ? r.servicio : null });
     // Varios meses (2026-10-27): la cobertura del devanado en los meses en que midió y cuántos midió (ver `firmeza`).
     const fp = d && firmezaPeriodo ? firmezaPeriodo[d] || null : null;
     // Con la marca, sus horas de dos fases no son «falta una fase». El resguardo se mira también mes a mes (varios meses).
     const unaFalta = r && r.i ? r.i.unaFalta || 0 : 0;
     if (d) devanados.push({ d, A, pct, cobertura: fila1.cobertura, n: fila1.n, escala, unaFalta: fsc ? 0 : unaFalta,
       ...(fsc ? { faseSinCarga: fsc, faseSinCargaMide: faseSinCargaMide(fila1.n, unaFalta) || !!(fp && fp.faseSinCargaMideMes) } : {}),
+      // Unidad de reserva: las 72 h y «falta una fase» con las horas de los meses que cuentan (campos nuevos, con guarda).
+      ...(fp && fp.mesesReserva ? { mesesReserva: fp.mesesReserva, nFirmeza: fp.nFirmeza, unaFaltaFirmeza: fsc ? 0 : fp.unaFaltaFirmeza } : {}),
       servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
       ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }
@@ -174,6 +180,11 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     : (devanados.some((x) => !(x.A > 0)) ? 'sin ampacidad del devanado'
       // Hay horas medidas pero ningún devanado asignado: decir «sin horas válidas» engañaba. Se nombra la causa.
       : (!devanados.length && niveles.some((n) => !n.sinDatos) ? motivoSinDevanado(avisos, placa) : motivoSinHoras(resumenPorNivel, niveles, { mes, punto })));
+  // Unidad de reserva (marca del Ingeniero): un mes (o rango) sin carga apreciable queda sin cifra «en reserva» y no cuenta
+  // para la firmeza de varios meses. Solo con la medida aceptada y datos del punto; si ese mes llevó carga, todo igual.
+  const enReserva = esUnidadReserva(fila) && !!clave && !!punto && estado !== 'excluida' && estado !== 'sin_homologacion'
+    && !(esCircuito && estado !== 'confirmada') && mesEnReserva(nivelesReserva, fueraMes);
+  if (enReserva) { pctEq = null; motivoNulo = MOTIVO_RESERVA; }
   // Sobrecarga sostenida y pico (`99 §129`). Cuentan SOLO los devanados con cifra válida (no los de escala sospechosa ni
   // sin ampacidad) y nada si el equipo no tiene cifra. El resumen guardado es de la corriente EN BRUTO: es exacto si el mes
   // no trae horas imposibles (> 3 × ampacidad) en ese nivel —se sabe por su máximo— y así se usa (probado con los 8 meses
@@ -208,6 +219,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     picoAislado: !sostenida && pico, sobrecargaPorVerificar: porVerificar,
     oficial: { pct: oficialEq, calif: leer(tx, 'salud_actual.calif_crg') ?? null, porDevanado: of ? { P: of.P.pct, S: of.S.pct, T: of.T.pct } : null },
     delta: pctEq != null && oficialDev != null ? pctEq - oficialDev : null,
+    ...(enReserva ? { enReserva: true } : {}),
     // Campo NUEVO, solo con suma (cada consumidor lo lee con guarda: un módulo viejo en caché no lo trae).
     ...(spec ? { suma: { niveles: sumaNiveles, texto: textoSuma(spec), veredicto: peorVeredicto(sumaNiveles) } } : {})
   };
@@ -228,6 +240,8 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
   const porMat = indicePorMatricula(filasH);
   // Cada mes se calcula con la medida que regía ESE mes (cambio de medida); sin cambios, las mismas filas de siempre.
   const mesLista = resumenMes && resumenMes.mes ? resumenMes.mes : null;
+  // Días del mes que el parque aún no cargó (solo los usa la unidad de reserva: no son horas «en servicio»).
+  const fueraMes = horasNoCargadasDelMes(catalogo, mesLista);
   const conteos = conteosHomologacion(filasDelMes(filasH, mesLista));
   const puntos = (catalogo && catalogo.puntos) || {};
   const claves = (resumenMes && resumenMes.claves) || {};
@@ -240,7 +254,7 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
     // Con suma de circuitos, el nivel sumado es su resumen DERIVADO (o un registro sin cifra); sin suma, el mismo objeto.
     // Con el catálogo: si otro transformador de la estación mide esa barra (D5), el nivel queda sin cifra.
     const r = cid ? componerResumen(claves, cid, fila, puntos) || null : null;
-    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes });
+    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes, fueraMes });
     const x = {
       id: tx.id,
       matricula: leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || '',

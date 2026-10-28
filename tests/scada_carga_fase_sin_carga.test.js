@@ -93,9 +93,9 @@ describe('cifra y firmeza de un banco de dos monofásicas', () => {
 test('el diálogo «Revisar» conserva la marca al guardar (si no, la borraba)', () => {
   const src = readFileSync(new URL('../assets/js/ui/scada-datos/homologacion.js', import.meta.url), 'utf8');
   assert.match(src, /if \(Object\.keys\(fsc\)\.length\) decision\.fases_sin_carga = fsc;/);
-  assert.match(src, /Fase sin carga por diseño \(banco de dos monofásicas\)/);
+  assert.match(src, /Fase sin carga \(p\. ej\., banco de dos monofásicas o red de dos fases\)/);
   // Sin leer los niveles (catálogo no leído) no se guarda: se perdería la marca.
-  assert.match(src, /!niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada\)/);
+  assert.match(src, /!niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada \|\| mapaGuardado\)/);
 });
 
 test('un nivel medido por suma de circuitos no usa la marca (sus tres fases salen de los circuitos)', () => {

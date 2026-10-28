@@ -9547,3 +9547,57 @@ detalle y quién actúa en la bóveda `2026-10-28-provisionales-26/SINTESIS.md`.
 **191.9 Verificado en vivo** (2026-10-28, código `49f1458` descargado): marcas escritas con el despliegue en vivo (rev 48 → 52,
 releídas IDÉNTICAS). Ene–oct firmes 181, provisionales 18, CRG 4–5 firmes 93, sobrecarga 46 (44 · 1 · 1). Detalle de Mata de Caña
 T1: 13,3 % CRG 1 firme, «4111 con solo 2 fases (fase S sin carga por diseño: banco de dos monofásicas)».
+
+## 192. ADR-192 — Cargabilidad SCADA: las 4 propuestas (San Andrés de Sotavento T2, El Brillante T1, Ánimas Bajas T1, Nueva Cospique T3) y la marca «unidad de reserva» (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «procede con las propuestas» (las del diagnóstico `wf_5ad4d24f-b17`, `§191`, con su recomendada) (2026-10-28).
+
+**192.1 Causa raíz** (crudos, `§191.1` y bóveda `2026-10-28-provisionales-26/`). San Andrés T2: la fase S del 34,5 kV marcó 0 del
+1-ene al 8-abr-2026 (defecto, volvió sola) y los dos lados dejan de renovarse en épocas distintas. El Brillante T1: el 34,5 kV llega en
+amperios enteros y queda congelado el 85–95 % de las horas; la fase S de 13,8 kV no lleva carga (sus dos circuitos tampoco; dos juegos
+de TC de alta muestran la huella de S sin carga; el TC de S sí mide cuando hay). Ánimas Bajas T1: la S marca 0 con umbral ~2 A y picos
+de 2–4 A; aun si «I S» fuera el neutro, un neutro en ~0 implica carga equilibrada, así que la fase mayor (R o T) da la cifra correcta.
+Nueva Cospique T3: unidad de reserva; operó solo del 10 al 30-ago-2026; el resto, 13,8 kV sin corriente con tensión y 110 kV en 0–1 A.
+
+**192.2 Solución.**
+- Datos (`decidirFila`, rev 52 → 55, releídas IDÉNTICAS): San Andrés T2 con MEDIDA ANTERIOR hasta mar-2026 (solo 13,8 kV) y los dos
+  lados desde abril (`erroresCambioMedida` sin errores); El Brillante T1 por 13,8 kV (34,5 kV «No usar») con `fases_sin_carga
+  {N13_8: 'IS'}`; Ánimas Bajas T1 con `fases_sin_carga {N13_8: 'IS'}` (nota: el área SCADA lee IA/IB/IC/IN en el relé y corrige P y Q).
+- Código (archivo NUEVO `scada_carga_reserva.js`): marca `decision.unidad_reserva = true` (SOLO los equipos marcados). Un mes es «en
+  reserva» si ningún devanado lleva carga apreciable (sin horas válidas, o p99 Y máximo bajo el 5 % de su ampacidad; horas válidas sin
+  cifra o un devanado sin registro → no) y alguno no tiene horas válidas y estuvo fuera de servicio la mitad del mes o más (sin contar
+  los días aún no cargados). Ese mes queda sin cifra («en reserva (sin carga apreciable)», `enReserva`) y no cuenta para la firmeza de
+  varios meses (lista, periodo, acumulado y detalle de meses completos): ni en la cobertura, ni en los meses, ni en las 72 h, ni en
+  «falta una fase» (`nFirmeza`, `unaFaltaFirmeza`), ni pondera la relación entre niveles del periodo. Un mes con carga cuenta como
+  siempre. El detalle dice cuántos meses quedaron en reserva. El diálogo «Revisar» la muestra, la conserva y no guarda sin ver los
+  niveles si hay un mapa decidido. El rótulo de la fase sin carga deja de decir «banco de dos monofásicas» (también aplica a una red de
+  dos fases).
+
+**192.3 No-regresión.** Código sin marcas: 0 diferencias en 2.080 filas. Simulación de las 4 decisiones: 0 filas ajenas; solo las 4
+pasan a firme (y los 8 meses de reserva de Nueva Cospique T3 quedan sin cifra).
+
+**192.4 Verificación.** `test:unit` 3178 ✅ (2 omitidas), lint ✅, guardia ✅; `tests/scada_carga_reserva.test.js`. Revisión
+adversarial de 2 lentes (`wf_dd8da9b2-82e`): 1 ALTO (el ruido de la reserva contaba para las 72 h y «falta una fase»: firme falso
+con 48–70 h de operación), 3 MEDIOS (sobrecarga corta escondida por el p99; relación entre niveles ponderada con el ruido; mes a
+medio cargar) y los BAJOS: corregidos, con 4 pruebas que fallan con el código anterior. Simulación con sus datos: San Andrés T2 80,0 % → 81,9 % CRG 4 firme (tramo abr–oct); El Brillante 25,4 → 20,7 % CRG 1
+firme; Ánimas Bajas 69,7 % CRG 3 firme; Nueva Cospique T3 55,5 % CRG 1 firme. En vivo tras los 3 de datos: firmes 184, provisionales 15,
+CRG 4–5 firmes 94.
+
+**192.5 Anti-patterns evitados.** Una regla de reserva automática para todo el parque (tocaría equipos que nadie revisó: es opcional por
+equipo); «sin carga» por fecha para la reserva (no aplica a meses posteriores y dejaba el periodo provisional); estimar la carga de
+Ánimas Bajas con P y Q (vienen con signo y escala errados).
+
+**192.6 Archivos.** NUEVOS: `assets/js/domain/scada_carga_reserva.js`, `tests/scada_carga_reserva.test.js`. Modificados:
+`scada_carga_vista.js`, `scada_carga_firmeza_periodo.js`, `scada_carga_firmeza_rango.js`, `ui/cargabilidad-scada/detalle.js`,
+`ui/scada-datos/homologacion.js` y pruebas. Datos: homologación (San Andrés T2, El Brillante, Ánimas Bajas; Nueva Cospique tras el
+despliegue). INTACTOS: limpieza, importación, sumas, cifra del periodo.
+
+**192.7 Doctrina.** Propuestas con su recomendada, aprobadas por él · simulación con sus datos antes de escribir · marca opcional por
+equipo (blast radius mínimo) · L-102. NO revisado externamente.
+
+**192.8 Verificado sano / no re-auditar.** La cifra del periodo de Nueva Cospique (55,5 %) incluye las horas de ~1 A de los meses de
+reserva (no la cambian de banda; sacarlas daría 55,8 %). San Andrés T2: el 81,9 % firme cuelga de que el 13,8 kV midió justo 3 de 6
+meses del tramo vigente: un mes perdido más lo vuelve provisional. Pendientes de campo/SCADA: relé de Ánimas Bajas, 34,5 kV de San
+Andrés T2 («Not Renewed» desde el 20-ago-2026), pinza en El Brillante (confirmación, no bloquea). ACEPTADO: un diálogo «Revisar»
+abierto con código viejo borra la marca de reserva al guardar (vuelve a provisional; por eso se escribe con el despliegue en vivo);
+en el detalle por rango la reserva del agregado y la relación entre niveles se calculan con todo el rango (casos raros, conservadores).

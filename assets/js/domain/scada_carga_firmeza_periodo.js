@@ -18,10 +18,11 @@ export const FRACCION_MESES_MIN = 0.5;
  * todo el mes) no cuenta ni como medido ni como no medido: no había nada que medir (revisión adversarial 2026-10-27). Un
  * mes sin horas (`horas` = 0: el punto no vino en el exporte) SÍ es un mes en que no midió.
  * @param {Array<{n:number, cob:number|null, servicio?:number|null, horas?:number|null, fuera?:number}|null>} porMes  un registro por mes
- * @returns {{coberturaFirmeza: number|null, mesesMedidos: number, mesesSinServicio: number}}
+ * @returns {{coberturaFirmeza: number|null, mesesMedidos: number, mesesSinServicio: number, nMedido: number, unaFaltaMedida: number}}
+ *   `nMedido` / `unaFaltaMedida`: horas válidas y de dos fases de los meses que cuentan (para la unidad de reserva).
  */
 export function firmezaDeMeses(porMes) {
-  let n = 0; let serv = 0; let medidos = 0; let sinServicio = 0;
+  let n = 0; let serv = 0; let medidos = 0; let sinServicio = 0; let unaFalta = 0;
   for (const x of porMes || []) {
     if (!x) continue;
     const nx = x.n > 0 ? x.n : 0;
@@ -30,9 +31,9 @@ export function firmezaDeMeses(porMes) {
     const s = Math.max(nx, base - (x.fuera > 0 ? x.fuera : 0));
     if (!(s > 0)) { if (x.horas > 0) sinServicio++; continue; }
     if (!nx) continue;
-    n += nx; serv += s; medidos++;
+    n += nx; serv += s; medidos++; unaFalta += x.unaFalta > 0 ? x.unaFalta : 0;
   }
-  return { coberturaFirmeza: serv > 0 ? n / serv : null, mesesMedidos: medidos, mesesSinServicio: sinServicio };
+  return { coberturaFirmeza: serv > 0 ? n / serv : null, mesesMedidos: medidos, mesesSinServicio: sinServicio, nMedido: n, unaFaltaMedida: unaFalta };
 }
 
 /**
@@ -41,21 +42,25 @@ export function firmezaDeMeses(porMes) {
  * @param {number} mesesTotal  meses del periodo que el parque cargó
  * @param {number[]} [fueraPorMes]  horas que el parque aún no cargó de cada mes (mismo orden que `filasMes`)
  * @returns {Object<string, {coberturaFirmeza:number|null, mesesMedidos:number, mesesTotal:number, faseSinCargaMideMes?:true}>}
- *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo desenergizado todo el mes.
+ *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo desenergizado todo el mes y los meses en reserva.
  */
 export function firmezaPeriodoDeFilas(filasMes, mesesTotal, fueraPorMes = []) {
-  const por = {}; const mide = {};
+  const por = {}; const mide = {}; let reserva = 0;
   (filasMes || []).forEach((x, k) => {
     if (!x || !Array.isArray(x.devanados)) return;
+    // Unidad de reserva (2026-10-28): un mes en reserva no cuenta, ni como medido ni como no medido.
+    if (x.enReserva) { reserva++; return; }
     for (const d of x.devanados) {
-      if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura, servicio: d.servicio, horas: d.horas, fuera: (fueraPorMes && fueraPorMes[k]) || 0 });
+      if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura, servicio: d.servicio, horas: d.horas, unaFalta: d.unaFalta, fuera: (fueraPorMes && fueraPorMes[k]) || 0 });
       // Fase sin carga por diseño (2026-10-28): el resguardo de un mes no se diluye en el año.
       if (d && d.d && d.faseSinCargaMide) mide[d.d] = true;
     }
   });
   return Object.fromEntries(Object.entries(por).map(([d, l]) => {
     const f = firmezaDeMeses(l);
-    return [d, { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesTotal - f.mesesSinServicio),
-      ...(mide[d] ? { faseSinCargaMideMes: true } : {}) }];
+    return [d, { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesTotal - f.mesesSinServicio - reserva),
+      ...(mide[d] ? { faseSinCargaMideMes: true } : {}),
+      // Con meses en reserva, las 72 h y «falta una fase» se miran SOLO en los meses que cuentan (no con el ruido de la reserva).
+      ...(reserva ? { mesesReserva: reserva, nFirmeza: f.nMedido, unaFaltaFirmeza: f.unaFaltaMedida } : {}) }];
   }));
 }

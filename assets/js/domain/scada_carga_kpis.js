@@ -273,7 +273,8 @@ function midePoco(x) {
   const m = [];
   const cob = x.coberturaFirmeza != null ? x.coberturaFirmeza : x.cobertura;
   if (cob != null && cob < CALCULO.coberturaMinFirme) m.push('cobertura menor al 50 %');
-  if (x.n < CALCULO.horasMinFirme) m.push('menos de 72 horas válidas');
+  // Unidad de reserva: las horas de los meses que cuentan (`nFirmeza`), no las del ruido de los meses en reserva.
+  if ((x.nFirmeza != null ? x.nFirmeza : x.n) < CALCULO.horasMinFirme) m.push('menos de 72 horas válidas');
   if (x.mesesTotal > 0 && (x.mesesMedidos || 0) / x.mesesTotal < FRACCION_MESES_MIN) m.push('midió menos de la mitad de los meses');
   return m;
 }
@@ -311,7 +312,9 @@ export function firmeza(ctx) {
     if (!mc.length && senal(usados.filter((x) => midePoco(x).length)) > senal(bien)) motivos.push('sobrecarga que solo muestra un devanado que mide poco');
   }
   // Con solo 2 de 3 fases la fase más cargada puede ser la que falta: la cifra es un mínimo, no firme.
-  if (usados.some((x) => x.n > 0 && (x.unaFalta || 0) / x.n > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');
+  const nF = (x) => (x.nFirmeza != null ? x.nFirmeza : x.n);
+  const ufF = (x) => (x.unaFaltaFirmeza != null ? x.unaFaltaFirmeza : x.unaFalta) || 0;
+  if (usados.some((x) => nF(x) > 0 && ufF(x) / nF(x) > CALCULO.maxFraccionDosFases)) motivos.push('falta una fase en la mayoría de las horas');
   // Banco de dos monofásicas (2026-10-28): si la fase marcada sin carga por diseño empieza a medir, la marca ya no se cree.
   if (usados.some((x) => x.faseSinCargaMide)) motivos.push('la fase marcada sin carga está midiendo');
   if ((ctx.devanados || []).some((x) => x.escala === 'ESCALA_I' || x.escala === 'ESCALA_INDETERMINADA')) motivos.push('escala de la corriente sospechosa');

@@ -85,7 +85,7 @@ export function resumenPeriodo(porMes) {
     let n = 0; let horas = 0; let serv = 0; let des = 0; let unaFalta = 0; let fi = 0; let sP = 0;
     let max = null; let sost = null; let sMax = null; let sP99 = null;
     const p50 = []; const prom = []; const rUI = []; const uProm = []; const partes = []; const sinTop = [];
-    for (const { mes, r, noCargadas } of porMes) {
+    for (const { mes, r, noCargadas, reserva } of porMes) {
       const x = r && r[nv];
       // Los días que el parque no cargó no cuentan, como un mes no cargado (el resumen los trae como horas del mes).
       const fuera = noCargadas > 0 ? noCargadas : 0;
@@ -96,7 +96,9 @@ export function resumenPeriodo(porMes) {
       n += nm; unaFalta += i.unaFalta || 0; fi += x.flujoInverso || 0; sP += (x.sP || 1) * Math.max(1, nm);
       horas += Math.max(0, (x.horas || 0) - fuera); serv += Math.max(0, (x.servicio != null ? x.servicio : (x.horas || 0)) - fuera); des += x.des || 0;
       max = mayor(max, i.max); sost = mayor(sost, x.sost && x.sost.v); sMax = mayor(sMax, x.sMax); sP99 = mayor(sP99, x.sP99);
-      p50.push([i.p50, nm]); prom.push([i.prom, nm]); rUI.push([x.rUI, nm]); uProm.push([x.uProm, nm]);
+      // Un mes en reserva (unidad de reserva, 2026-10-28) no pondera los valores típicos: su ruido de ~1 A falsearía la
+      // relación entre niveles. La cifra (p99) y las horas no cambian.
+      if (!reserva) { p50.push([i.p50, nm]); prom.push([i.prom, nm]); rUI.push([x.rUI, nm]); uProm.push([x.uProm, nm]); }
       const top = topsDe(x.top);
       if (nm && !top) sinTop.push(mes);
       partes.push({ n: nm, top });
@@ -237,7 +239,8 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     // Con suma de circuitos, cada mes trae su nivel sumado DERIVADO (o un registro sin cifra); sin suma, el mismo objeto.
     const rMes = Object.fromEntries((mesesP || []).map((mes) => [mes, cid && resumenes && resumenes[mes] && resumenes[mes].claves ? componerResumen(resumenes[mes].claves, cid, fila, puntos) || null : null]));
     const rDe = (mes) => rMes[mes] || null;
-    const sint = conDerivado(resumenPeriodo(mesesP.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes] }))), fila, cid, mesesP, rDe);
+    const sint = conDerivado(resumenPeriodo(mesesP.map((mes) => ({ mes, r: rDe(mes), noCargadas: noCargadas[mes],
+      ...(filaMes(mes) && filaMes(mes).enReserva ? { reserva: true } : {}) }))), fila, cid, mesesP, rDe);
     // `mes` = el último del periodo: si TODO el periodo es anterior al primer mes del punto, el motivo lo dice como en la lista.
     // Firmeza por el devanado que da la cifra, contado en los meses en que midió (decisión del Ingeniero, 2026-10-27).
     // Los días que el parque aún no cargó no son hueco (`99 §159`): se descuentan como en `resumenPeriodo`.

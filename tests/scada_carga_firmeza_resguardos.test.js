@@ -53,7 +53,7 @@ describe('cobertura en los meses en que midió: horas en servicio, días sin car
   });
   test('un mes desenergizado todo el mes no cuenta (no había nada que medir); uno que no vino en el exporte sí', () => {
     const r = firmezaDeMeses([{ n: 700, cob: 1, servicio: 700, horas: 720 }, { n: 0, cob: null, servicio: 0, horas: 720 }, { n: 0, cob: null, servicio: 0, horas: 744 }, null]);
-    assert.deepEqual({ ...r, coberturaFirmeza: Math.round(r.coberturaFirmeza * 1e6) / 1e6 }, { coberturaFirmeza: 1, mesesMedidos: 1, mesesSinServicio: 2 });
+    assert.deepEqual({ ...r, coberturaFirmeza: Math.round(r.coberturaFirmeza * 1e6) / 1e6 }, { coberturaFirmeza: 1, mesesMedidos: 1, mesesSinServicio: 2, nMedido: 700, unaFaltaMedida: 0 });
     // Sin horas (el punto no vino en el exporte) o sin saber cuántas: es un mes en que no midió.
     assert.equal(firmezaDeMeses([{ n: 0, cob: null, servicio: 0, horas: 0 }, { n: 0, cob: null, servicio: 0 }]).mesesSinServicio, 0);
   });
@@ -194,7 +194,7 @@ describe('detalle: firmeza de un rango de meses completos', () => {
   test('el detalle la aplica solo en meses completos, descuenta los días sin cargar y avisa si falla', () => {
     const d = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
     assert.match(d, /if \(esDeMesesCompletos\(desde, hasta, mesesRango\)\)/);
-    assert.match(d, /firmezaDelRango\(recs, previo\.niveles, mesesCargados, desde, horasNoCargadas\(ctx\.catalogo, mesesCargados\)\)/);
+    assert.match(d, /firmezaDelRango\(recs, previo\.niveles, mesesCargados, desde, horasNoCargadas\(ctx\.catalogo, mesesCargados\), /);
     assert.match(d, /console\.warn\('\[cargabilidad-scada\] firmeza del rango', e\)/);
   });
 });
