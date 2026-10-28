@@ -480,10 +480,10 @@ describe('SIN suma, todo da exactamente lo mismo que antes (no-regresión)', () 
     const w = readFileSync(new URL('../assets/js/workers/scada_carga_importar.worker.js', import.meta.url), 'utf8');
     assert.match(w, /const objetivo = objetivoConSumas\(filasAnalisis\);/);
     assert.match(w, /if \(specs\.length\) \{/);
-    assert.match(w, /derivados, versionSuma: SUMA\.version \}\);/);
+    assert.match(w, /derivados, versionSuma: SUMA\.version, versionInvalid: VERSION_INVALID \}\);/);
     assert.doesNotMatch(w, /resumen\[mes\]\[cid\] = .*derivad/, 'el resumen del transformador queda como vino');
     const im = readFileSync(new URL('../assets/js/ui/scada-datos/importar-mes.js', import.meta.url), 'utf8');
-    assert.match(im, /scada_carga_importar\.worker\.js\?v=suma1/);
+    assert.match(im, /scada_carga_importar\.worker\.js\?v=invalid1/);
     assert.match(im, /if \(filasConSuma\(\)\.length && procesado\.versionSuma == null\)/);
     assert.match(im, /if \(Array\.isArray\(manifiesto\.alias\) && manifiesto\.alias\.length\) validarAlias\(manifiesto\.alias, filasHomologacion\(\)\)/);
     assert.match(im, /aliasTocaSuma\(manifiesto\.alias, filasHomologacion\(\)\)/);

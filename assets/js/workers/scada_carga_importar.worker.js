@@ -19,6 +19,8 @@ import {
 import { empaquetar } from '../domain/scada_carga_series.js';
 import { seLee } from '../domain/scada_carga_paquete.js';
 import { objetivoConSumas, especSuma, derivadosDelMes, SUMA } from '../domain/scada_carga_suma.js';
+// Bandera «Invalid» no confiable de un punto (2026-10-28): archivo NUEVO; sin marcas, se limpia como siempre.
+import { puntosInvalidNoConfiable, conMarcaInvalid, VERSION_INVALID } from '../domain/scada_carga_invalid.js';
 
 let acc = null;
 let cancelado = false;
@@ -71,12 +73,13 @@ function procesar({ meses, guardados, modo }) {
   const specs = Object.values(filasAnalisis || {}).map(especSuma).filter(Boolean);
   const involucrados = new Set(specs.flatMap((s) => [s.cid, ...Object.values(s.porNivel).flatMap((x) => x.cids)]));
   const derivados = [];
+  const conInvalid = puntosInvalidNoConfiable(filasAnalisis);
   for (const [mes, porPunto] of armados) {
     resumen[mes] = {};
     const porCid = {};
     for (const [cid, nuevo] of porPunto) {
       const g = guardados ? guardados[cid + '|' + mes] || null : null;
-      const p = procesarPuntoMes(nuevo, g, modo);
+      const p = conInvalid.has(cid) ? conMarcaInvalid(procesarPuntoMes(nuevo, g, modo, { aceptarInvalid: true })) : procesarPuntoMes(nuevo, g, modo);
       conflictos += p.conflictos;
       resumen[mes][cid] = p.resumen;
       if (involucrados.has(cid)) porCid[cid] = { niveles: p.niveles };
@@ -99,7 +102,7 @@ function procesar({ meses, guardados, modo }) {
   }
   const catalogoMeses = {};
   for (const mes of meses) { const d = diasDelMes(acc, mes); catalogoMeses[mes] = { dias: d.mascara, nDias: d.dias, completo: d.completo }; }
-  postMessage({ tipo: 'procesado', docs, resumen, catalogo: { meses: catalogoMeses, puntos }, conteos, conflictos, sinCambios, derivados, versionSuma: SUMA.version });
+  postMessage({ tipo: 'procesado', docs, resumen, catalogo: { meses: catalogoMeses, puntos }, conteos, conflictos, sinCambios, derivados, versionSuma: SUMA.version, versionInvalid: VERSION_INVALID });
 }
 
 self.onmessage = async (ev) => {

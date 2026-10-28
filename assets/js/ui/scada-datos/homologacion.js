@@ -159,6 +159,8 @@ export function montarHomologacion(cont, { alCambiar }) {
     const fscGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.fases_sin_carga && typeof f.decision.fases_sin_carga === 'object') ? f.decision.fases_sin_carga : null;
     // Unidad de reserva (2026-10-28, `99 §192`): igual que la fase sin carga, se muestra y se conserva con el mismo punto.
     const reservaGuardada = !!(f.decision && f.decision.tipo === 'usar' && f.decision.unidad_reserva === true);
+    // Bandera «Invalid» no confiable del punto (2026-10-28, `99 §193`): igual, se muestra y se conserva con el mismo punto.
+    const invalidGuardada = !!(f.decision && f.decision.tipo === 'usar' && f.decision.invalid_no_confiable === true);
     const rPropio = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[ev0.cid] || null : null;
     const derUltimo = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[claveSuma(ev0.cid)] || null : null;
     const sugeridos = [...new Set(Object.values(ctx.puntos).filter((p) => estN && normalizarTexto(p.est) === estN && !esElementoTransformador(p.elem)).map((p) => p.elem))]
@@ -258,6 +260,7 @@ export function montarHomologacion(cont, { alCambiar }) {
         if (Object.keys(fsc).length) decision.fases_sin_carga = fsc;
       }
       if (reservaGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) decision.unidad_reserva = true;
+      if (invalidGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) decision.invalid_no_confiable = true;
       // Suma de circuitos: solo con «Confirmar: usar esta medida» y solo los niveles marcados (sin suma, la decisión de siempre).
       const suma = {};
       if (tipo.value === 'usar') {
@@ -323,6 +326,7 @@ export function montarHomologacion(cont, { alCambiar }) {
       el('p', { class: 'cs-dato' }, el('b', {}, 'En el Excel: '), f.texto_excel || '(sin punto)'),
       el('ul', { class: 'cs-avisos' }, ev0.avisos.length ? ev0.avisos.map((a) => el('li', {}, (AVISOS[a] ? AVISOS[a].texto : a) + (AVISOS[a] && AVISOS[a].bloquea ? '' : ' (informativo)'))) : el('li', {}, 'Sin avisos.')),
       rel ? el('p', { class: 'cs-ayuda' }, 'Relación de corrientes entre los dos lados: medida ' + num(rel.medido, 2) + ' frente a ' + num(rel.esperado, 2) + ' esperada por las tensiones de placa.') : null,
+      invalidGuardada ? el('p', { class: 'cs-ayuda' }, 'Bandera «Invalid» no confiable: en este punto las horas marcadas «Invalid» se toman como buenas (el resto de la limpieza sigue igual). Se conserva al guardar con el mismo punto; «Excluir» o «Reabrir» la quitan. Al quitarla, sus meses se vuelven a limpiar desde lo guardado (no hace falta releer las carpetas).') : null,
       reservaGuardada ? el('p', { class: 'cs-ayuda' }, 'Unidad de reserva: un mes sin carga apreciable queda «en reserva» y no cuenta para la firmeza. Se conserva al guardar con el mismo punto; «Excluir» o «Reabrir» la quitan.') : null,
       fscGuardada ? el('p', { class: 'cs-ayuda' }, 'Fase sin carga (p. ej., banco de dos monofásicas o red de dos fases): '
         + Object.entries(fscGuardada).map(([nv, ph]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', fase ' + String(ph).slice(1)).join(' · ')
