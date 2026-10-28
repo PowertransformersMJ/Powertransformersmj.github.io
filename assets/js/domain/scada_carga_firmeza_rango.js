@@ -10,10 +10,11 @@
 
 import { msInicio, horasMes, ventanaDeMes } from './scada_carga_series.js';
 import { NIVELES } from './scada_carga_config.js';
-import { resumenFisico } from './scada_carga_kpis.js';
+import { resumenFisico, cargabilidad } from './scada_carga_kpis.js';
 import { resumirParaGuardar } from './scada_carga_importacion.js';
 import { firmezaDeMeses } from './scada_carga_firmeza_periodo.js';
 import { faseSinCargaMide } from './scada_carga_fase_sin_carga.js';
+import { mesEnReserva } from './scada_carga_reserva.js';
 
 const H_MS = 3600e3;
 
@@ -47,29 +48,44 @@ export function recortarMes(rec, mes, desdeMs) {
 /**
  * Por devanado, su cobertura en los meses en que midió y cuántos midió (lo que `firmeza` lee). Menos de 2 meses → null.
  * @param {Object<string, {t, fam}>} recs  por nivel, las curvas recortadas al rango
- * @param {Array<{nivel, devanado}>} niveles  los de `calcularEquipo` (nivel → devanado)
+ * @param {Array<{nivel, devanado, A?}>} niveles  los de `calcularEquipo` (nivel → devanado y su ampacidad)
  * @param {string[]} mesesCargados  los meses del rango que el parque cargó
  * @param {number} desdeMs
  * @param {Object<string, number>} [noCargadas]  horas que el parque aún no cargó de cada mes (`horasNoCargadas`)
+ * @param {{reserva?: boolean}} [opciones]  `reserva`: unidad de reserva marcada (un mes en reserva no cuenta, `scada_carga_reserva.js`)
  * @returns {null | Object<string, {coberturaFirmeza:number|null, mesesMedidos:number, mesesTotal:number}>}
  */
-export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargadas = {}) {
+export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargadas = {}, { reserva = false } = {}) {
   if (!mesesCargados || mesesCargados.length < 2) return null;
-  const out = {};
+  // Primero el resumen de cada nivel en cada mes (como lo guarda el importador); luego se cuenta.
+  const porNivel = [];
   for (const [nv, rec] of Object.entries(recs || {})) {
     const i = (niveles || []).find((x) => x.nivel === nv);
     if (!i || !i.devanado || !rec) continue;
-    let mide = false;
-    const lista = mesesCargados.map((mes) => {
+    const meses = mesesCargados.map((mes) => {
       const fam = recortarMes(rec, mes, desdeMs);
-      if (!fam) return null;
-      const r = resumirParaGuardar(resumenFisico(fam, NIVELES[nv].kv), fam);
+      return fam ? resumirParaGuardar(resumenFisico(fam, NIVELES[nv].kv), fam) : null;
+    });
+    porNivel.push({ nv, d: i.devanado, A: i.A, meses });
+  }
+  // Unidad de reserva: los meses sin carga apreciable no cuentan (los mismos criterios que el mes de la lista).
+  const enReserva = mesesCargados.map((mes, k) => reserva && mesEnReserva(porNivel.map((x) => {
+    const r = x.meses[k];
+    const n = r && r.i ? r.i.n : 0;
+    return { devanado: x.d, n, pct: n > 0 && x.A > 0 ? cargabilidad(r, x.A) : null, horas: r ? r.horas : null, servicio: r ? r.servicio : null };
+  })));
+  const nReserva = enReserva.filter(Boolean).length;
+  const out = {};
+  for (const x of porNivel) {
+    let mide = false;
+    const lista = x.meses.map((r, k) => {
+      if (!r || enReserva[k]) return null;
       // Fase sin carga por diseño: el resguardo, mes a mes (solo lo usa `calcularEquipo` si el nivel lleva la marca).
-      if (r && r.i && faseSinCargaMide(r.i.n, r.i.unaFalta)) mide = true;
-      return r ? { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, fuera: (noCargadas && noCargadas[mes]) || 0 } : null;
+      if (r.i && faseSinCargaMide(r.i.n, r.i.unaFalta)) mide = true;
+      return { n: r.i ? r.i.n : 0, cob: r.cob, servicio: r.servicio, horas: r.horas, fuera: (noCargadas && noCargadas[mesesCargados[k]]) || 0 };
     });
     const f = firmezaDeMeses(lista);
-    out[i.devanado] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio),
+    out[x.d] = { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesCargados.length - f.mesesSinServicio - nReserva),
       ...(mide ? { faseSinCargaMideMes: true } : {}) };
   }
   return out;

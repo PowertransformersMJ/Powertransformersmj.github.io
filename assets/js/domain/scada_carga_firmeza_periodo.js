@@ -41,12 +41,14 @@ export function firmezaDeMeses(porMes) {
  * @param {number} mesesTotal  meses del periodo que el parque cargó
  * @param {number[]} [fueraPorMes]  horas que el parque aún no cargó de cada mes (mismo orden que `filasMes`)
  * @returns {Object<string, {coberturaFirmeza:number|null, mesesMedidos:number, mesesTotal:number, faseSinCargaMideMes?:true}>}
- *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo desenergizado todo el mes.
+ *   `mesesTotal` de cada devanado = los del periodo menos los que estuvo desenergizado todo el mes y los meses en reserva.
  */
 export function firmezaPeriodoDeFilas(filasMes, mesesTotal, fueraPorMes = []) {
-  const por = {}; const mide = {};
+  const por = {}; const mide = {}; let reserva = 0;
   (filasMes || []).forEach((x, k) => {
     if (!x || !Array.isArray(x.devanados)) return;
+    // Unidad de reserva (2026-10-28): un mes en reserva no cuenta, ni como medido ni como no medido.
+    if (x.enReserva) { reserva++; return; }
     for (const d of x.devanados) {
       if (d && d.d) (por[d.d] = por[d.d] || []).push({ n: d.n, cob: d.cobertura, servicio: d.servicio, horas: d.horas, fuera: (fueraPorMes && fueraPorMes[k]) || 0 });
       // Fase sin carga por diseño (2026-10-28): el resguardo de un mes no se diluye en el año.
@@ -55,7 +57,7 @@ export function firmezaPeriodoDeFilas(filasMes, mesesTotal, fueraPorMes = []) {
   });
   return Object.fromEntries(Object.entries(por).map(([d, l]) => {
     const f = firmezaDeMeses(l);
-    return [d, { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesTotal - f.mesesSinServicio),
+    return [d, { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesTotal - f.mesesSinServicio - reserva),
       ...(mide[d] ? { faseSinCargaMideMes: true } : {}) }];
   }));
 }

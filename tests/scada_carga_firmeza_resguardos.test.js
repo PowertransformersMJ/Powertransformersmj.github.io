@@ -194,7 +194,7 @@ describe('detalle: firmeza de un rango de meses completos', () => {
   test('el detalle la aplica solo en meses completos, descuenta los días sin cargar y avisa si falla', () => {
     const d = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
     assert.match(d, /if \(esDeMesesCompletos\(desde, hasta, mesesRango\)\)/);
-    assert.match(d, /firmezaDelRango\(recs, previo\.niveles, mesesCargados, desde, horasNoCargadas\(ctx\.catalogo, mesesCargados\)\)/);
+    assert.match(d, /firmezaDelRango\(recs, previo\.niveles, mesesCargados, desde, horasNoCargadas\(ctx\.catalogo, mesesCargados\), /);
     assert.match(d, /console\.warn\('\[cargabilidad-scada\] firmeza del rango', e\)/);
   });
 });

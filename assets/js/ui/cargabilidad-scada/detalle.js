@@ -40,6 +40,8 @@ import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 // Firmeza de varios meses por el devanado que da la cifra (2026-10-27): archivo NUEVO; sin él la firmeza es la del rango.
 import { firmezaDelRango, esDeMesesCompletos } from '../../domain/scada_carga_firmeza_rango.js';
 import { horasNoCargadas } from '../../domain/scada_carga_periodo.js';
+// Unidad de reserva (2026-10-28): archivo NUEVO; sin la marca, el rango cuenta como siempre.
+import { esUnidadReserva } from '../../domain/scada_carga_reserva.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
 import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga, filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
@@ -452,7 +454,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         fila('Flujo de potencia inverso', f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
         fila('Escala de la medida', escala),
         fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')
-          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga por diseño: banco de dos monofásicas)' : '')),
+          + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')),
         info.suma ? fila('Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
   }
   /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */
@@ -660,7 +662,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       const mesesCargados = mesesRango.filter((m) => !!(ctx.catalogo && ctx.catalogo.meses && ctx.catalogo.meses[m]));
       let firmezaPeriodo = null;
       if (esDeMesesCompletos(desde, hasta, mesesRango)) {
-        try { firmezaPeriodo = firmezaDelRango(recs, previo.niveles, mesesCargados, desde, horasNoCargadas(ctx.catalogo, mesesCargados)); }
+        try { firmezaPeriodo = firmezaDelRango(recs, previo.niveles, mesesCargados, desde, horasNoCargadas(ctx.catalogo, mesesCargados), { reserva: esUnidadReserva(a.fila) }); }
         catch (e) { console.warn('[cargabilidad-scada] firmeza del rango', e); firmezaPeriodo = null; }
       }
       a.calc = calcularEquipo({ tx: a.tx, fila: a.fila, punto: a.punto, resumenPorNivel, conteos: conteosDe(a), umbrales: ctx.umbrales, mesesFallidos: [...fallidos], firmezaPeriodo });
