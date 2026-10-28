@@ -35,15 +35,20 @@ describe('la regla', () => {
     assert.equal(r.mesesMedidos, 2);
     assert.equal(r.coberturaFirmeza, 630 / 770);
   });
-  test('el motivo: solo si la cifra del equipo BAJA sin los meses casi sin medida', () => {
-    const d = (pct, pctSinMesesCasi, A = 800) => ({ pct, A, ...(pctSinMesesCasi !== undefined ? { pctSinMesesCasi } : {}) });
+  test('el motivo: solo si la regla nueva la vuelve firme Y la cifra BAJA sin los meses casi sin medida', () => {
+    const d = (pct, pctSinMesesCasi, coberturaConCasi = 0.3, A = 800) => ({ pct, A, ...(pctSinMesesCasi !== undefined ? { pctSinMesesCasi, coberturaConCasi } : {}) });
     assert.equal(motivoMesCasiSinMedida([d(60, 55)], 60), MOTIVO_MES_CASI_SIN_MEDIDA);
     assert.equal(motivoMesCasiSinMedida([d(60, 60)], 60), null, 'sin ellos la cifra es la misma');
     assert.equal(motivoMesCasiSinMedida([d(60, 60.00005)], 60), null, 'dentro del medio paso de redondeo');
     assert.equal(motivoMesCasiSinMedida([d(60, null)], 60), MOTIVO_MES_CASI_SIN_MEDIDA, 'sin ellos no queda cifra');
-    assert.equal(motivoMesCasiSinMedida([d(70), d(60, 50)], 70), null, 'el devanado que no da la cifra no cambia nada');
+    assert.equal(motivoMesCasiSinMedida([d(70, undefined), d(60, 50)], 70), null, 'el devanado que no da la cifra no cambia nada');
     assert.equal(motivoMesCasiSinMedida([d(70, 50), d(65)], 70), MOTIVO_MES_CASI_SIN_MEDIDA, 'sin ellos la cifra pasa al otro devanado y baja');
     assert.equal(motivoMesCasiSinMedida([d(60)], 60), null, 'sin meses casi sin medida, nada');
+    assert.equal(motivoMesCasiSinMedida([d(84.09, 83.97, 0.8)], 84.09), null, 'con la regla de antes ya era firme (Puerto Escondido): nada cambia');
+  });
+  test('firmezaDeMeses deja la cobertura de la regla de antes solo si hubo meses casi sin medida', () => {
+    assert.equal(firmezaDeMeses([{ n: 600, servicio: 720 }, { n: 30, servicio: 744 }]).coberturaConCasi, 630 / 1464);
+    assert.equal('coberturaConCasi' in firmezaDeMeses([{ n: 600, servicio: 720 }]), false);
   });
 });
 

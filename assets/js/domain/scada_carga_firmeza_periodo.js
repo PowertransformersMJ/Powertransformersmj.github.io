@@ -24,9 +24,10 @@ export const FRACCION_MESES_MIN = 0.5;
  * @param {Array<{n:number, cob:number|null, servicio?:number|null, horas?:number|null, fuera?:number}|null>} porMes  un registro por mes
  * @returns {{coberturaFirmeza: number|null, mesesMedidos: number, mesesSinServicio: number, nMedido: number, unaFaltaMedida: number}}
  *   `nMedido` / `unaFaltaMedida`: horas válidas y de dos fases de los meses que cuentan (para la unidad de reserva).
+ *   Con algún mes casi sin medida, además `coberturaConCasi`: la cobertura contándolos como medidos (la regla de antes).
  */
 export function firmezaDeMeses(porMes) {
-  let n = 0; let serv = 0; let medidos = 0; let sinServicio = 0; let unaFalta = 0;
+  let n = 0; let serv = 0; let medidos = 0; let sinServicio = 0; let unaFalta = 0; let nCasi = 0; let servCasi = 0;
   for (const x of porMes || []) {
     if (!x) continue;
     const nx = x.n > 0 ? x.n : 0;
@@ -35,10 +36,11 @@ export function firmezaDeMeses(porMes) {
     const s = Math.max(nx, base - (x.fuera > 0 ? x.fuera : 0));
     if (!(s > 0)) { if (x.horas > 0) sinServicio++; continue; }
     if (!nx) continue;
-    if (mesCasiSinMedida(nx, s)) continue;
+    if (mesCasiSinMedida(nx, s)) { nCasi += nx; servCasi += s; continue; }
     n += nx; serv += s; medidos++; unaFalta += x.unaFalta > 0 ? x.unaFalta : 0;
   }
-  return { coberturaFirmeza: serv > 0 ? n / serv : null, mesesMedidos: medidos, mesesSinServicio: sinServicio, nMedido: n, unaFaltaMedida: unaFalta };
+  return { coberturaFirmeza: serv > 0 ? n / serv : null, mesesMedidos: medidos, mesesSinServicio: sinServicio, nMedido: n, unaFaltaMedida: unaFalta,
+    ...(servCasi > 0 ? { coberturaConCasi: (n + nCasi) / (serv + servCasi) } : {}) };
 }
 
 /**
@@ -65,6 +67,7 @@ export function firmezaPeriodoDeFilas(filasMes, mesesTotal, fueraPorMes = []) {
     const f = firmezaDeMeses(l);
     return [d, { coberturaFirmeza: f.coberturaFirmeza, mesesMedidos: f.mesesMedidos, mesesTotal: Math.max(0, mesesTotal - f.mesesSinServicio - reserva),
       ...(mide[d] ? { faseSinCargaMideMes: true } : {}),
+      ...(f.coberturaConCasi != null ? { coberturaConCasi: f.coberturaConCasi } : {}),
       // Con meses en reserva, las 72 h y «falta una fase» se miran SOLO en los meses que cuentan (no con el ruido de la reserva).
       ...(reserva ? { mesesReserva: reserva, nFirmeza: f.nMedido, unaFaltaFirmeza: f.unaFaltaMedida } : {}) }];
   }));

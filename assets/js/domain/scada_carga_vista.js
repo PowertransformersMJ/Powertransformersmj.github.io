@@ -165,6 +165,7 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
       ...(bm != null ? { bandaMuertaPct: bmPct } : {}),
       // Mes casi sin medida: la cifra del devanado SIN esos meses (del detalle o del resumen del periodo), para el resguardo.
       ...pctSinMesesCasi(fp, r, A, pct, estadistico),
+      ...(fp && fp.coberturaConCasi != null ? { coberturaConCasi: fp.coberturaConCasi } : {}),
       servicio: r && r.servicio != null ? r.servicio : null, horas: r && r.horas != null ? r.horas : null,
       ...(fp ? { coberturaFirmeza: fp.coberturaFirmeza, mesesMedidos: fp.mesesMedidos, mesesTotal: fp.mesesTotal } : {}) });
   }

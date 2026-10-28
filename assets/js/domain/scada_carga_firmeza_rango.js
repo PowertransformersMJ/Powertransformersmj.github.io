@@ -101,6 +101,7 @@ export function firmezaDelRango(recs, niveles, mesesCargados, desdeMs, noCargada
       ...(mide ? { faseSinCargaMideMes: true } : {}),
       // Mes casi sin medida (2026-10-28): el p99 sin esos meses, para el resguardo de `calcularEquipo`.
       ...(hayCasi ? { p99SinMesesCasi: p99DePeriodo(partesSin).p99 } : {}),
+      ...(f.coberturaConCasi != null ? { coberturaConCasi: f.coberturaConCasi } : {}),
       ...(nReserva ? { mesesReserva: nReserva, nFirmeza: f.nMedido, unaFaltaFirmeza: f.unaFaltaMedida } : {}) };
   }
   return out;
