@@ -69,6 +69,7 @@
 | §191 | ADR-191 — **Los 26 provisionales**: «No usar» en Puerto Escondido, Gambote, Las Delicias y Loma del Bálsamo; marca **fase sin carga por diseño** (bancos de dos monofásicas: Mata de Caña, El Paraíso) · TODO-69 | 9492 |
 | §192 | ADR-192 — **Las 4 propuestas**: San Andrés T2 (medida anterior), El Brillante y Ánimas Bajas (fase S sin carga), Nueva Cospique T3 con la marca **unidad de reserva** · TODO-69 | 9551 |
 | §193 | ADR-193 — **San Luis T1** (unidad cambiada en mayo: medida anterior excluida) y la marca **bandera «Invalid» no confiable** (La Europa T1, Ovejas T2; reproceso desde lo guardado) · TODO-69 | 9610 |
+| §194 | ADR-194 — **Maracayo T1** (bandera «Invalid» no confiable; sigue provisional por medida muerta desde jun), Ferrocarril aplazado y **pedido consolidado** al área SCADA y la brigada · TODO-69 | 9665 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
