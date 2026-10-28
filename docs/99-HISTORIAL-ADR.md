@@ -9601,3 +9601,8 @@ meses del tramo vigente: un mes perdido más lo vuelve provisional. Pendientes d
 Andrés T2 («Not Renewed» desde el 20-ago-2026), pinza en El Brillante (confirmación, no bloquea). ACEPTADO: un diálogo «Revisar»
 abierto con código viejo borra la marca de reserva al guardar (vuelve a provisional; por eso se escribe con el despliegue en vivo);
 en el detalle por rango la reserva del agregado y la relación entre niveles se calculan con todo el rango (casos raros, conservadores).
+
+**192.9 Verificado en vivo** (2026-10-28, código `4b3db97` descargado): marca de Nueva Cospique T3 escrita con el despliegue en vivo
+(rev 55 → 56, releída IDÉNTICA). Ene–oct firmes 185, provisionales 14, CRG 4–5 firmes 94, sobrecarga 46 (44 · 1 · 1). Detalle de
+Nueva Cospique T3: 55,5 % CRG 1 firme, «Cobertura 67 % del primario · en los meses en que midió (1 de 1; 8 meses en reserva no
+cuentan)», sus meses «en reserva (sin carga apreciable)».
