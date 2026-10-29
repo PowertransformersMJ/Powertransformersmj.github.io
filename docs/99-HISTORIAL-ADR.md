@@ -9829,3 +9829,53 @@ lo opera ENERGUA (Energía Atenea)»; octubre: El Desastre «Sin cifra · desde 
 de Santa Teresa con un rango hasta octubre salía «provisional» (el recorte solo actuaba si el punto traía datos de septiembre, y el suyo
 no trae) → `cargar` corta cualquier rango (enlace, selector, «Ver ese día») al final de agosto (`f6d5d9e`); verificado: rango 01-ene a
 31-ago, aviso «Las curvas llegan hasta agosto 2026…», sin «provisional», «A la fecha» ago-2026 72,3 % CRG 3. Sin escrituras a la base.
+
+## 197. ADR-197 — Cargabilidad SCADA: las 8 decisiones del panel de gases y Duval («procede con las recomendadas»), el aviso de ENERGUA y el punto 10 (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «continuemos con los demás pendientes» → sus respuestas: puntos 1–8 «Procede con las recomendadas» · Oriente en el panel de gases
+> «Mostrar con aviso de ENERGUA» · punto 10 «B: aviso en los 27» (página `Decisiones_Cargabilidad_SCADA_2026-10-27.html`).
+
+**197.1 Causa raíz.** Las 8 decisiones de la página del 27-oct estaban pendientes (los paneles de gases y de Duval, en «Borrador»). Con
+el traspaso de Oriente (`§196`) la página quedó con ejemplos de equipos que AFINIA ya no opera: recalculado con la curva limpia (la del
+panel del detalle), la fila más grave (2 h > 130 %) la ocupan SOLO La Paz T1 (149,1 %, ago) y Barranco de Loba T1 (135,5 %, jun), los dos
+de Oriente; de AFINIA ninguno (el más cercano, Pradera T2 127,1 %). San Carlos y San Bernardo del Viento no estaban: eran horas de escala
+imposible en el resumen (con la curva, 54,5 % y 118,5 %). Nivel 5: 33 equipos (32 firmes) = 19 AFINIA + 14 Oriente.
+
+**197.2 Solución (esta tanda).**
+- Punto 5: el nivel 5 se llama **«Urgente»** (`NIVELES_ATENCION`; antes «Inmediato»).
+- Punto 2: archivo nuevo `domain/dga_pd_por_confirmar.js`: zona PD concluyente con H₂ ≥ 2.000 ppm → rótulo **«PD por confirmar (hidrógeno
+  muy alto)»**; el texto que chocaba («la carga no mueve este defecto» frente a «el gas del aceite crece con la temperatura») se reemplaza
+  por las dos posibilidades; en la tabla de ritmos, «× 1 o más»; la etiqueta del triángulo proyectado, «por confirmar».
+- Oriente: el panel de gases muestra arriba «Periodo hasta ago-2026: desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea). Lo de este
+  panel es información para ENERGUA, no una orden a AFINIA».
+- Puntos 1-bis (130 %), 3 (15 % / 1 ppm) y 4 (supuestos de temperatura): SIN cambio, ya estaban así y rotulados.
+- Entregables (flujo `wf_fea4d1b2-517`, redactor + verificador): textos del panel para su revisión (punto 1; el panel sigue en «Borrador»
+  hasta su visto bueno de los textos), pedidos al laboratorio separados AFINIA / ENERGUA (puntos 2 y 7) y nota para ENERGUA (La Paz T1 y
+  Barranco de Loba T1; él decide si la comparte).
+- PENDIENTES de esta decisión: punto 8 (tensión mínima < 0,5 pu con otro color: vista previa con un caso real antes) y punto 10 B (traer
+  las columnas de refrigeración de su Excel de Salud a cada equipo + aviso en los 27; CF-27 de Fichas a la misma fuente; diseño aparte,
+  W-11: toca la importación del Excel).
+
+**197.3 No-regresión.** Vista previa fiel en su Chrome (módulos del commit sobre el detalle real, L-157): La Paz T1 «Urgente · nivel 5»
+con el aviso de ENERGUA; Llerasca T1 «PD · PD por confirmar (hidrógeno muy alto)» con el texto nuevo. Fuera de la zona PD con H₂ alto y
+de Oriente, los paneles quedan iguales (salvo la palabra del nivel 5). Sin escrituras a la base.
+
+**197.4 Tests.** `tests/dga_pd_por_confirmar.test.js` (3) y `scada_carga_dga.test.js` («Urgente»); suite 3.236 / 2 omitidas; lint OK.
+
+**197.5 Anti-patterns evitados.** Contar la fila más grave con el resumen crudo (San Carlos 3.334 %: horas imposibles); dar por cierta una
+descarga parcial que un solo triángulo no separa del gas del aceite; dirigir órdenes de AFINIA a equipos que opera otra empresa.
+
+**197.6 Archivos.** Nuevo: `domain/dga_pd_por_confirmar.js` y su test. Modificados: `domain/scada_carga_dga.js`, `ui/cargabilidad-scada/
+panel-dga.js`, `panel-duval.js`, `tests/scada_carga_dga.test.js`. Entregables en Descargas (privados).
+
+**197.7 Doctrina.** Decisiones de criterio suyas (W-11, con la recomendada) · los paneles siguen en «Borrador» hasta su visto bueno de los
+textos · vista previa fiel antes de publicar. NO revisado externamente.
+
+**197.8 Verificado sano / no re-auditar.** Los 13 de la zona PD son 8 de Oriente (Ferrocarril, La Europa, Llerasca, Mata de Caña ×2, El
+Paraíso ×2, Santa Teresa) y 5 de AFINIA (Puerto Badel, Pozo Azul, Tres Palmas ×3); 12 con cifra firme hoy. Los datos del cálculo
+(privados) en la bóveda `2026-10-28-provisionales-26/crudo/decisiones/`.
+
+**197.9 Sharding del índice (§G.5).** La madre `00-INDICE.md` pasó su tope (17.693/16.000 caracteres): nace la hija por rango
+`00c-INDICE-ADR-141-197.md` con las filas §141–§197 sin tocar una letra (descubierta por el patrón `00[a-z]-INDICE*.md` del kernel,
+sin cambiarlo); tope 120 líneas / 12.000 caracteres en el manifiesto; la madre apunta a ella y recibe las filas nuevas desde §198;
+fila en `CLAUDE.md §0`.
