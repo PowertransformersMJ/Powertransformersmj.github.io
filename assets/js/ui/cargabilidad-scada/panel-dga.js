@@ -24,6 +24,8 @@ import { leerUltimaDGA } from '../../domain/dga_duval.js';
 import { textoItem, noPuedeSaber } from '../../domain/scada_carga_dga_textos_ppm.js';
 // Equipos que pasaron a otro operador (decisión del Ingeniero 2026-10-28): archivo NUEVO; fuera de la zona, nada cambia.
 import { traspasoDe, textoTraspaso } from '../../domain/scada_carga_traspaso.js';
+// Sin textos de ventilación: cargabilidad y ventilación son frentes distintos (orden del Ingeniero, 2026-10-28). Archivo NUEVO.
+import { sinVentilacion, noPuedeSaberSinVentilacion } from '../../domain/scada_carga_dga_sin_ventilacion.js';
 
 const VISIBLES = { adversidades: 3, acciones: 4 };
 const NOMBRE_CORTO = { tdgc: 'combustibles', co: 'CO', co2: 'CO₂', c2h2: 'acetileno' };
@@ -170,11 +172,11 @@ export function pintarPanelDga(nodo, { tx, estado, calc, porNivel, umbrales, ran
     avisoTraspaso(tx),
     cabecera(estado, r || { franja: { fila: null, motivo: '' } }, entrada, filas, umbrales),
     el('div', { class: 'cs-dga-medido' }, tarjetaCarga(estado, entrada), tarjetaGases(g, cg)),
-    r && r.nivel ? lista('Posibles adversidades', r.adversidades, VISIBLES.adversidades, false, 'csDgaAdv', conPpm) : null,
-    r && r.nivel ? lista('Acciones preventivas', r.acciones, VISIBLES.acciones, true, 'csDgaAcc', conPpm) : null,
+    r && r.nivel ? lista('Posibles adversidades', sinVentilacion(r.adversidades), VISIBLES.adversidades, false, 'csDgaAdv', conPpm) : null,
+    r && r.nivel ? lista('Acciones preventivas', sinVentilacion(r.acciones), VISIBLES.acciones, true, 'csDgaAcc', conPpm) : null,
     tablaDecision(r, filas),
     el('details', { class: 'cs-dga-mas', 'data-k': 'limites' }, el('summary', { id: 'csDgaSum-limites' }, 'Lo que este panel no puede saber'),
-      el('ul', { class: 'cs-dga-lista' }, noPuedeSaber(NO_PUEDE_SABER, conPpm).map((t) => el('li', {}, t)))),
+      el('ul', { class: 'cs-dga-lista' }, noPuedeSaber(noPuedeSaberSinVentilacion(NO_PUEDE_SABER), conPpm).map((t) => el('li', {}, t)))),
     el('p', { class: 'cs-ayuda' }, NOTA_PIE));
   for (const d of nodo.querySelectorAll('details[data-k]')) {
     const k = d.dataset.k;

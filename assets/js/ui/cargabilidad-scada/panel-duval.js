@@ -259,8 +259,8 @@ function conMasCarga(nodo, args, d) {
     libreTxt !== '' && !libreOk ? p('Escriba un número entero de 1 a ' + ESCENARIO_LIBRE_MAX + '.', 'cs-dga-sub cs-dga-aviso') : null,
     gasesConCarga(d, columnas, calc, porNivel, prov),
     p('Pérdidas por corriente: las del devanado y las conexiones crecen con el cuadrado de la corriente; las del núcleo no cambian. No es una temperatura.'),
-    d.estado === 'ok' ? el('p', { class: 'cs-dga-sub' }, el('b', {}, '¿Le afecta la carga? '), d.info.carga) : null,
-    p('Capacidad con ventiladores (ONAF): si una etapa no arranca, el margen real es menor.', 'cs-dga-sub cs-dga-aviso'));
+    // Sin el renglón de los ventiladores: cargabilidad y ventilación son frentes distintos (orden del Ingeniero, 2026-10-28).
+    d.estado === 'ok' ? el('p', { class: 'cs-dga-sub' }, el('b', {}, '¿Le afecta la carga? '), d.info.carga) : null);
 }
 
 /**
@@ -289,8 +289,7 @@ export function pintarPanelDuval(nodo, args) {
         el('li', {}, 'A dónde se movería el punto si sube la carga: ninguna norma ni estudio da esa trayectoria; en el papel, el punto se queda en T1 o T2 aunque suba la temperatura (Duval 2002).'),
         el('li', {}, 'Dónde está el defecto ni si está activo o creciendo: hay una sola muestra, sin fecha de toma.'),
         el('li', {}, 'La temperatura del defecto, del aceite o del devanado: el SCADA no trae temperaturas.'),
-        el('li', {}, 'Qué carga tenía el equipo cuando se tomó la muestra: el archivo no trae la fecha de toma.'),
-        el('li', {}, 'Si los ventiladores estaban en marcha.'))),
+        el('li', {}, 'Qué carga tenía el equipo cuando se tomó la muestra: el archivo no trae la fecha de toma.'))),
     el('details', { class: 'cs-dga-mas', 'data-k': 'saber' }, el('summary', { id: 'csDuvalSum-saber' }, 'Cómo saberlo de verdad'),
       el('ul', { class: 'cs-dga-lista' },
         el('li', {}, 'Tomar una muestra de seguimiento después de un periodo de carga alta, con fecha y ppm de cada gas, y compararla con la anterior: la velocidad de aumento es la única «proyección» medida.'),

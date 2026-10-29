@@ -9904,3 +9904,13 @@ la pregunta de «EJECUTADA», y pidió corregir lo que quedara pendiente por mez
   del modelo térmico (cómo se estimó la temperatura). Pedidos al laboratorio v2: la misma definición. Las v1 quedan obsoletas.
 - Abierto, decisión suya: los textos de los paneles de Cargabilidad que hablan de ventiladores (en su listado de textos: ítems 2, 23 y 42,
   más una línea del recuadro «Con más carga» del panel de Duval). Se le pregunta; no se quitan sin su palabra (retirar lo mínimo).
+
+**197.12 «Quitarlos de Cargabilidad» (2026-10-28).** Los textos de ventiladores salen de los paneles de Cargabilidad (archivo nuevo
+`domain/scada_carga_dga_sin_ventilacion.js`: filtro sobre lo que el panel muestra, el catálogo no se edita, como las variantes de ppm):
+ítems enteros ADV-R1-02 («si fallan los ventiladores…») y ACC-R1-02 («verificar el sistema de enfriamiento», que traía además el
+contraste de los indicadores de temperatura: se le ofrece conservarlo si lo quiere), las frases de ventilación de ADV-R1-03 y ACC-R2-01, el
+renglón «si los ventiladores estaban en marcha» de «no puede saber»; en el panel de Duval, «Capacidad con ventiladores (ONAF)…» y «Si los
+ventiladores estaban en marcha». Quedan, sin tocar (no estaban en lo aprobado): la cita de la norma de un texto (constantes de tiempo «con
+ventiladores» y «con enfriamiento natural») y la termografía (cubre «radiadores y ventiladores»); las etapas ONAN/ONAF de la placa
+(«Cada devanado frente a su placa») son placa. Vista previa fiel (Pradera T2): menciones 9 → 2 en gases, 2 → 0 en Duval; adversidades
+9 → 8, acciones 12 → 11; nivel igual. `tests/scada_carga_dga_sin_ventilacion.test.js` (4); suite 3.240.
