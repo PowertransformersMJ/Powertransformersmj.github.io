@@ -22,6 +22,8 @@ import {
 } from '../../domain/scada_carga_dga_textos.js';
 import { leerUltimaDGA } from '../../domain/dga_duval.js';
 import { textoItem, noPuedeSaber } from '../../domain/scada_carga_dga_textos_ppm.js';
+// Equipos que pasaron a otro operador (decisión del Ingeniero 2026-10-28): archivo NUEVO; fuera de la zona, nada cambia.
+import { traspasoDe, textoTraspaso } from '../../domain/scada_carga_traspaso.js';
 
 const VISIBLES = { adversidades: 3, acciones: 4 };
 const NOMBRE_CORTO = { tdgc: 'combustibles', co: 'CO', co2: 'CO₂', c2h2: 'acetileno' };
@@ -131,6 +133,13 @@ function tablaDecision(r, filas) {
           })))))));
 }
 
+/** Equipo que ya opera otra empresa: lo del panel es información para ella, no una orden a AFINIA (null fuera de la zona). */
+function avisoTraspaso(tx) {
+  const t = traspasoDe(tx);
+  return t ? el('p', { class: 'cs-dga-sub cs-dga-aviso' }, textoTraspaso(t) + '. Lo de este panel es información para '
+    + t.operador.split(' (')[0] + ', no una orden a AFINIA.') : null;
+}
+
 /**
  * Pinta el panel en `nodo` (siempre el mismo nodo del equipo).
  * @param {HTMLElement} nodo
@@ -158,6 +167,7 @@ export function pintarPanelDga(nodo, { tx, estado, calc, porNivel, umbrales, ran
     el('div', { class: 'cs-dga-titulo' }, el('h2', { id: 'csDgaTitulo' }, 'Gases disueltos (DGA) y carga'),
       APROBADO ? null : el('span', { class: 'cs-dga-borrador' }, 'Borrador · pendiente del Ingeniero')),
     rango ? el('p', { class: 'cs-ayuda', style: 'margin:0 0 6px' }, 'Nivel para el rango ' + rango + '.') : null,
+    avisoTraspaso(tx),
     cabecera(estado, r || { franja: { fila: null, motivo: '' } }, entrada, filas, umbrales),
     el('div', { class: 'cs-dga-medido' }, tarjetaCarga(estado, entrada), tarjetaGases(g, cg)),
     r && r.nivel ? lista('Posibles adversidades', r.adversidades, VISIBLES.adversidades, false, 'csDgaAdv', conPpm) : null,

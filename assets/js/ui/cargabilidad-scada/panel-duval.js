@@ -15,6 +15,8 @@ import { POLIGONOS_DUVAL1, ZONAS_DUVAL1, REFERENCIA_SIGNIFICANCIA, GASES_DGA, du
 import { margenesCarga, escenarioCarga, corrienteReferencia, ESCENARIOS_FIJOS, ESCENARIO_LIBRE_MAX } from '../../domain/scada_carga_proyeccion.js';
 import { margenPpm, CAMBIO_PEQUENO } from '../../domain/dga_duval_margen.js';
 import { simularTermico, ritmoGases, tendenciaDuval, AMBIENTE_SUPUESTO, LIMITES_PUNTO_CALIENTE, CORRIENTE_MAX_PU, EA_CO_CO2_KJ, HUECO_MAX_H } from '../../domain/scada_carga_termico.js';
+// «PD por confirmar (hidrógeno muy alto)» (decisión del Ingeniero 2026-10-28, punto 2): archivo NUEVO; fuera de ese caso, igual.
+import { pdPorConfirmar, ROTULO_PD_POR_CONFIRMAR, TEXTO_TENDENCIA_PD_POR_CONFIRMAR, ORIGEN_PD_POR_CONFIRMAR } from '../../domain/dga_pd_por_confirmar.js';
 
 const NS = 'http://www.w3.org/2000/svg';
 const W = 280; const H = (W * Math.sqrt(3)) / 2; const X0 = 34; const Y0 = 24;
@@ -83,7 +85,7 @@ function triangulo(d, modo = 'hoy') {
     svg('text', { x: 24, y: 17, class: 'cs-duval-etq-hoy' }, 'hoy'),
     flecha ? [svg('line', { x1: 7, y1: 33, x2: 19, y2: 33, class: 'cs-duval-flecha2' }), svg('polygon', { points: '19,28 27,33 19,38', class: 'cs-duval-flecha2-punta' }),
       svg('text', { x: 32, y: 37, class: 'cs-duval-etq' }, 'con más carga')] : null,
-    tend && tend.tipo === 'quieto' ? svg('text', { x: 7, y: 37, class: 'cs-duval-etq' }, 'la carga no lo mueve') : null] : null;
+    tend && tend.tipo === 'quieto' ? svg('text', { x: 7, y: 37, class: 'cs-duval-etq' }, pdPorConfirmar(d) ? 'por confirmar' : 'la carga no lo mueve') : null] : null;
   const desc = proy
     ? (tend ? 'Con más carga: ' + tend.texto + (flecha ? ' La flecha da solo la dirección, no una posición.' : '') : 'Sin gas suficiente: no hay tendencia que mostrar.')
     : (d.zona ? 'Punto en la zona ' + d.zona + (color ? '' : d.estado === 'incoherente' ? ' (no confiable)' : ' (no concluyente)') : 'Sin punto');
@@ -98,7 +100,7 @@ function triangulo(d, modo = 'hoy') {
 /** Bloque «hacia dónde tendería» del recuadro «Con más carga»: el triángulo proyectado y su explicación. */
 function proyectado(d) {
   const tend = tendenciaDuval(d.zona, d.estado === 'ok');
-  const texto = tend ? tend.texto + (tend.tipo === 'flecha' ? ' La flecha da solo la dirección, no una posición calculada (ninguna norma da la trayectoria): en laboratorio, el aceite solo pasa de T2 a 300 °C a T3 a 500 y 800 °C, corriéndose hacia el etileno (Duval 2002, Tabla II).' : '')
+  const texto = pdPorConfirmar(d) ? TEXTO_TENDENCIA_PD_POR_CONFIRMAR : tend ? tend.texto + (tend.tipo === 'flecha' ? ' La flecha da solo la dirección, no una posición calculada (ninguna norma da la trayectoria): en laboratorio, el aceite solo pasa de T2 a 300 °C a T3 a 500 y 800 °C, corriéndose hacia el etileno (Duval 2002, Tabla II).' : '')
     : d.estado === 'no_concluyente' ? 'Sin gas suficiente para leer el triángulo: no hay tendencia que mostrar.'
       : d.estado === 'incoherente' ? 'Punto no confiable: no se muestra tendencia.' : 'Sin partes por millón (ppm) de los gases del triángulo: no hay punto ni tendencia.';
   return el('div', { class: 'cs-duval-proy' }, el('p', { class: 'cs-duval-sub-t' }, '¿Hacia dónde tendería el punto?'), triangulo(d, 'proyectado'),
@@ -115,7 +117,8 @@ function hoy(d) {
   if (d.zona) {
     const info = d.info;
     if (d.estado === 'ok') {
-      partes.push(el('p', { class: 'cs-duval-zona' }, el('b', {}, d.zona + ' · ' + info.nombre)));
+      partes.push(el('p', { class: 'cs-duval-zona' }, el('b', {}, d.zona + ' · ' + (pdPorConfirmar(d) ? ROTULO_PD_POR_CONFIRMAR : info.nombre))));
+      if (pdPorConfirmar(d)) partes.push(p(TEXTO_TENDENCIA_PD_POR_CONFIRMAR, 'cs-dga-sub cs-dga-aviso'));
       if (info.banda) partes.push(p('Zona de ' + info.banda + ' si la falla está en el aceite; si está en el papel, la zona no indica la temperatura (Duval 2002). No es una temperatura medida.'));
       partes.push(p('Gas suficiente: ' + d.significancia.sobreL1.map((k) => CORTO[k] || k).join(', ') + ' en su límite L1 o más (' + REFERENCIA_SIGNIFICANCIA.fuente + ').'));
       if (!d.significancia.sobreL1.some((k) => k in NOMBRE_TRI)) partes.push(p('Ninguno de los tres gases del triángulo llega a su L1: la zona sale de gases bajos y es orientativa.', 'cs-dga-sub cs-dga-aviso'));
@@ -183,8 +186,8 @@ function gasesConCarga(d, columnas, calc, porNivel, prov) {
     const rs = columnas.map((c, i) => ({ ...ritmoGases({ zona: d.zona, concluyente: concl, f: c.f, rangoPapel: rango(term[i]) })[k], fuera: fueraDe(term[i]) }));
     return el('tr', {}, el('th', { scope: 'row' }, GAS_CORTO[k]),
       el('td', { class: 'cs-num' }, gases[k] == null ? '—' : num(gases[k], gases[k] < 10 ? 1 : 0)),
-      el('td', {}, rs[0].origen === 'sin_falla' ? sinFalla(d) : ORIGEN[rs[0].origen]),
-      rs.slice(1).map((r) => el('td', { class: 'cs-num' }, celdaRitmo(r))));
+      el('td', {}, rs[0].origen === 'sin_falla' ? sinFalla(d) : (rs[0].origen === 'descarga' && pdPorConfirmar(d) ? ORIGEN_PD_POR_CONFIRMAR : ORIGEN[rs[0].origen])),
+      rs.slice(1).map((r) => el('td', { class: 'cs-num' }, r.origen === 'descarga' && pdPorConfirmar(d) ? '× 1 o más' : celdaRitmo(r))));
   });
   const tablaG = el('div', { class: 'cs-tabla-caja', style: 'margin-top:6px' },
     el('table', { class: 'cs-tabla cs-duval-tabla' },
@@ -234,7 +237,7 @@ function conMasCarga(nodo, args, d) {
   const input = el('input', { type: 'number', id: 'csDuvalLibre', min: 1, max: ESCENARIO_LIBRE_MAX, step: 1, value: nodo._duvalLibre, 'aria-label': 'Aumento de carga a elegir, en %', class: 'cs-duval-libre' });
   input.addEventListener('change', () => { nodo._duvalLibre = input.value; pintarPanelDuval(nodo, nodo._duvalArgs); });
   const tendZ = d.estado === 'ok' ? tendenciaDuval(d.zona, true) : null;
-  const zonaTxt = d.estado === 'ok' ? d.zona + ' hoy; la zona con más carga no se calcula: ' + (tendZ && tendZ.tipo === 'flecha' ? 'el triángulo de arriba da solo la dirección' : 'la carga no mueve este tipo de defecto') + ', y solo una muestra nueva lo confirma'
+  const zonaTxt = d.estado === 'ok' ? d.zona + ' hoy; la zona con más carga no se calcula: ' + (tendZ && tendZ.tipo === 'flecha' ? 'el triángulo de arriba da solo la dirección' : (pdPorConfirmar(d) ? 'si es descarga la carga no la mueve; si es gas del aceite, crece con la temperatura' : 'la carga no mueve este tipo de defecto')) + ', y solo una muestra nueva lo confirma'
     : d.estado === 'no_concluyente' ? 'no concluyente en todas (' + (d.significancia.sobreL1.length ? 'muy pocos ppm para el triángulo' : 'gases de fondo') + '): solo una muestra nueva lo dice'
       : d.estado === 'incoherente' ? 'punto no confiable (los ppm no dan la calificación vigente)' : 'sin punto';
   return caja(
