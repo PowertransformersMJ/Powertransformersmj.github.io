@@ -162,7 +162,7 @@ describe('tabla de niveles (ratificada 2026-10-01; R2×B = 4 por MO.00418 §4.1.
     for (const f of filas) { const m = MATRIZ_ATENCION[f]; assert.ok(m.B <= m.C && m.C <= m.D && m.D <= m.E); }
   });
   test('número y palabra; provisional si la cifra no es firme', () => {
-    assert.deepEqual(nivelAtencion('R3', 'C', 'firme'), { n: 5, palabra: 'Inmediato', provisional: false });
+    assert.deepEqual(nivelAtencion('R3', 'C', 'firme'), { n: 5, palabra: 'Urgente', provisional: false }, '«Urgente», decisión del Ingeniero 2026-10-28 (antes «Inmediato»)');
     assert.equal(nivelAtencion('R1', 'B', 'provisional').provisional, true);
     assert.equal(nivelAtencion('R0', 'B', 'firme'), null);
     assert.equal(NIVELES_ATENCION.length, 5);

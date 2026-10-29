@@ -34,7 +34,9 @@ export const NIVELES_ATENCION = Object.freeze([
   Object.freeze({ n: 2, palabra: 'Seguimiento' }),
   Object.freeze({ n: 3, palabra: 'Atención' }),
   Object.freeze({ n: 4, palabra: 'Prioritario' }),
-  Object.freeze({ n: 5, palabra: 'Inmediato' }),
+  // «Urgente», no «Inmediato» (decisión del Ingeniero 2026-10-28, punto 5): el nivel sale de la carga de meses pasados y de
+  // gases de 2025, no de una medición en tiempo real; «Inmediato» podía leerse como orden de descargar en el acto.
+  Object.freeze({ n: 5, palabra: 'Urgente' }),
 ]);
 
 /** Rótulos de las filas armados con las bandas CRG VIGENTES (si un admin las cambia, el rótulo no miente). */
