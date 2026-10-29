@@ -607,6 +607,19 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   async function cargar(desde, hasta, { enfocar = false, aviso = null } = {}) {
     const mio = ++token;
     const a = actual;
+    // Traspaso a otro operador (2026-10-28): el rango no pasa del último mes que operó AFINIA, venga del enlace, del selector o
+    // de «Ver ese día» (si no, sep–oct contaban como horas sin medir y el detalle contradecía a la lista; vista en vivo).
+    if (a.tras) {
+      const corte = ventanaDeMes(ultimoMesDeAfinia(a.tras)).hasta;
+      if (desde >= corte) {
+        const lim = limites(a); const ultimo = lim.meses[lim.meses.length - 1]; const w = ventanaDeMes(ultimo);
+        desde = w.desde; hasta = w.hasta;
+        aviso = 'No se muestra ese rango: ' + motivoTraspaso(a.tras) + '. Se muestra ' + nombreMes(ultimo) + '.';
+      } else if (hasta > corte) {
+        hasta = corte;
+        aviso = aviso || ('Las curvas llegan hasta ' + nombreMes(ultimoMesDeAfinia(a.tras)) + ': ' + motivoTraspaso(a.tras) + '.');
+      }
+    }
     a.desde = desde; a.hasta = hasta;
     // El encabezado no muestra cifras de otro rango mientras se lee este (ni si falla).
     a.calc = null; a.porNivel = null; a.leyendo = true; a.sumaRango = null;
@@ -753,6 +766,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const limitesPlaca = !cambio && actual.limitesPlaca ? actual.limitesPlaca : null;
     const placaLeida = !cambio && !!actual.placaLeida;
     actual = { mat: matricula, tx, fila, punto, cid, placa: placaDe(tx), porNivel: null, calc: null, nivel: cambio ? null : actual.nivel, dgaNodo, duvalNodo, dga: null, historiaNodo, historiaLista, mensualNodo, mensualLista, placaNodo, placaLista, limitesPlaca, placaLeida,
+      // Campo NUEVO (traspaso a otro operador): solo en los equipos de la zona que pasó; `cargar` corta el rango con él.
+      ...(tras ? { tras } : {}),
       // Campos NUEVOS (cambio de medida): solo con más de una configuración.
       ...(segs.length > 1 ? { segmentos: segs, segmento: seg, segmentoBase: segs.find((s) => s.desde === seg.desde && s.hasta === seg.hasta) || null, llaveSeg } : {}) };
     if (!punto || !(punto.meses || []).length) {
@@ -785,7 +800,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       const cand = { desde: dl == null ? null : dl - H_MS, hasta: hl };
       // Traspaso: un rango que pasa del último mes que lo operó AFINIA se corta al final de ese mes, y se dice por qué; uno
       // que empieza después se reemplaza por el mes inicial, con el mismo motivo (no «rango no válido»).
-      const corte = porTraspaso ? ventanaDeMes(ultimoMesDeAfinia(tras)).hasta : null;
+      const corte = tras ? ventanaDeMes(ultimoMesDeAfinia(tras)).hasta : null;
       let avisoTras = null;
       if (corte != null && cand.desde != null && cand.desde >= corte) {
         aviso = 'No se muestra ese rango: ' + motivoTraspaso(tras) + '. Se muestra ' + nombreMes(mesInicial) + '.';

@@ -118,7 +118,10 @@ test('pantallas: la lista y el detalle lo dicen (lo que no corre en Node queda e
   assert.match(l, /mes >= x\.traspaso\.desde\) return el\('i', \{ class: 'cs-tira-mes cs-tira--vacio', title: nombreMes\(mes\) \+ ': ' \+ motivoTraspaso\(x\.traspaso\) \}\);/);
   const d = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
   assert.match(d, /const punto = puntoAntesDelTraspaso\(/);
-  assert.match(d, /const corte = porTraspaso \? ventanaDeMes\(ultimoMesDeAfinia\(tras\)\)\.hasta : null;/);
+  assert.match(d, /const corte = tras \? ventanaDeMes\(ultimoMesDeAfinia\(tras\)\)\.hasta : null;/);
+  // `cargar` corta cualquier rango (enlace, selector, «Ver ese día») al último mes de AFINIA, aunque el punto no traiga sep.
+  assert.match(d, /if \(a\.tras\) \{\n\s+const corte = ventanaDeMes\(ultimoMesDeAfinia\(a\.tras\)\)\.hasta;/);
+  assert.match(d, /\.\.\.\(tras \? \{ tras \} : \{\}\),/);
   assert.match(d, /cand\.hasta = corte;/);
   assert.match(d, /const mesCfg = tras && \(!mesPedido \|\| mesPedido >= tras\.desde\) \? ultimoMesDeAfinia\(tras\) : mesPedido;/);
   assert.match(l, /'Cambio_de_medida', 'Otro_operador'\],/);
