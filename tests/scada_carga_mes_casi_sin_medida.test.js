@@ -66,7 +66,8 @@ describe('la regla', () => {
 });
 
 // ── Periodo de la lista con UN nivel (13,8 kV → secundario, ampacidad 800 A) ─────────────────────────────────────────
-const tx = { id: 'a', identificacion: { matricula: 'T1-X/X-DM1' }, ubicacion: { subestacion_nombre: 'DEMO UNO', zona: 'ORIENTE' },
+// Zona OCCIDENTE: la zona Oriente pasó a otro operador en sep-2026 (`scada_carga_traspaso.js`) y su periodo se corta en agosto.
+const tx = { id: 'a', identificacion: { matricula: 'T1-X/X-DM1' }, ubicacion: { subestacion_nombre: 'DEMO UNO', zona: 'OCCIDENTE' },
   electrico: { tension_primaria_kv: 34.5, tension_secundaria_kv: 13.8, corriente_nominal_primaria_a: 300, corriente_nominal_secundaria_a: 800 } };
 const { filas } = fusionarHomologacion(leerFilasHomologacion([['SUBESTACION', 'MATRICULA', 'swTrafo'], ['DEMO UNO', 'T1-X/X-DM1', '/EstDemo1/swTrafo1']]).filas, null);
 const cid = claveId('EstDemo1', 'swTrafo1');

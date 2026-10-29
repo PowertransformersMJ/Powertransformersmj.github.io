@@ -19,6 +19,8 @@ import { TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto, CSV_DEV_CA
 import { conteoSobrecarga, rotuloSobrecarga, csvSobrecarga, CSV_SOBRECARGA_CAB as CSV_SOB_CAB, tieneSobrecarga, textoDevanados } from '../../domain/scada_carga_sobrecarga.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; las filas lo traen en `cambioMedida` (con guarda).
 import { textoMes } from '../../domain/scada_carga_cambio_medida.js';
+// Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; las filas lo traen en `traspaso` (con guarda).
+import { textoTraspaso, motivoTraspaso } from '../../domain/scada_carga_traspaso.js';
 // Filtro «Devanado sobrecargado» (2026-10-27): archivo NUEVO.
 import { DEVANADOS_FILTRO, conteoPorDevanado, pasaFiltroDevanado } from '../../domain/scada_carga_filtro_devanado.js';
 
@@ -446,6 +448,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
 
   /** Cambio de medida (campos con guarda): qué configuración se ve y, en un periodo, la sobrecarga de antes del cambio. */
   function notaCambio(td, x) {
+    // Periodo recortado por el traspaso a otro operador (la fila de un mes ya lo dice en su motivo).
+    if (x.traspaso && Array.isArray(x.traspaso.meses) && x.pct != null) td.append(el('span', { class: 'cs-sub' }, textoTraspaso(x.traspaso)));
     const cm = x.cambioMedida;
     if (!cm) return;
     if (cm.tipo === 'medida') td.append(el('span', { class: 'cs-sub' }, 'Medida anterior al cambio de ' + textoMes(cm.vigenteDesde) + (cm.nota ? ': ' + cm.nota : '')));
@@ -555,6 +559,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const cajas = mesesEntre(st.periodo.desde, st.periodo.hasta).map((mes) => {
       const m = porMes.get(mes);
       if (!todos.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': no cargado' });
+      if (x && x.traspaso && x.traspaso.desde && mes >= x.traspaso.desde) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + motivoTraspaso(x.traspaso) });
       if (otraMedida.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + textoAntes(x.cambioMedida) + ' (antes del cambio de medida)' });
       if (!m || m.pct == null) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + ((m && m.motivoNulo) || 'sin cifra') });
       const cls = m.clase === 'firme' ? (m.sost ? 'cs-tira--sost' : 'cs-tira--crg' + (m.crg || 0)) : (m.sost ? 'cs-tira--prov cs-tira--sostp' : 'cs-tira--prov');
