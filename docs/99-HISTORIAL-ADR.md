@@ -9914,3 +9914,5 @@ ventiladores estaban en marcha». Quedan, sin tocar (no estaban en lo aprobado):
 ventiladores» y «con enfriamiento natural») y la termografía (cubre «radiadores y ventiladores»); las etapas ONAN/ONAF de la placa
 («Cada devanado frente a su placa») son placa. Vista previa fiel (Pradera T2): menciones 9 → 2 en gases, 2 → 0 en Duval; adversidades
 9 → 8, acciones 12 → 11; nivel igual. `tests/scada_carga_dga_sin_ventilacion.test.js` (4); suite 3.240.
+Verificado en vivo (merge `a3c44fe`, caché vencida, página recargada): Pradera T2 con todo desplegado: 2 menciones en gases (la cita de
+la norma y la termografía), 0 en Duval, adversidades 8, acciones 11, «Urgente, nivel 5 de 5».
