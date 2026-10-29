@@ -85,7 +85,7 @@ function triangulo(d, modo = 'hoy') {
     svg('text', { x: 24, y: 17, class: 'cs-duval-etq-hoy' }, 'hoy'),
     flecha ? [svg('line', { x1: 7, y1: 33, x2: 19, y2: 33, class: 'cs-duval-flecha2' }), svg('polygon', { points: '19,28 27,33 19,38', class: 'cs-duval-flecha2-punta' }),
       svg('text', { x: 32, y: 37, class: 'cs-duval-etq' }, 'con más carga')] : null,
-    tend && tend.tipo === 'quieto' ? svg('text', { x: 7, y: 37, class: 'cs-duval-etq' }, 'la carga no lo mueve') : null] : null;
+    tend && tend.tipo === 'quieto' ? svg('text', { x: 7, y: 37, class: 'cs-duval-etq' }, pdPorConfirmar(d) ? 'por confirmar' : 'la carga no lo mueve') : null] : null;
   const desc = proy
     ? (tend ? 'Con más carga: ' + tend.texto + (flecha ? ' La flecha da solo la dirección, no una posición.' : '') : 'Sin gas suficiente: no hay tendencia que mostrar.')
     : (d.zona ? 'Punto en la zona ' + d.zona + (color ? '' : d.estado === 'incoherente' ? ' (no confiable)' : ' (no concluyente)') : 'Sin punto');

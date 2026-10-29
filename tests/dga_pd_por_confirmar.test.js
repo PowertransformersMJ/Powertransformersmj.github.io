@@ -31,6 +31,7 @@ test('pantallas: el panel de Duval usa el rótulo y el texto; el de gases, el av
   assert.match(du, /\(pdPorConfirmar\(d\) \? ROTULO_PD_POR_CONFIRMAR : info\.nombre\)/);
   assert.match(du, /const texto = pdPorConfirmar\(d\) \? TEXTO_TENDENCIA_PD_POR_CONFIRMAR : tend \? tend\.texto/);
   assert.match(du, /rs\[0\]\.origen === 'descarga' && pdPorConfirmar\(d\) \? ORIGEN_PD_POR_CONFIRMAR/);
+  assert.match(du, /pdPorConfirmar\(d\) \? 'por confirmar' : 'la carga no lo mueve'/, 'la etiqueta del triángulo proyectado tampoco afirma lo que no se sabe');
   const dg = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/panel-dga.js', import.meta.url), 'utf8');
   assert.match(dg, /textoTraspaso\(t\) \+ '\. Lo de este panel es información para '/);
   assert.match(dg, /    avisoTraspaso\(tx\),\n/);
