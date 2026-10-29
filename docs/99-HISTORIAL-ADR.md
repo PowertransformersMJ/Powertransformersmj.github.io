@@ -9770,3 +9770,54 @@ ene–oct: **191 firmes · 9 provisionales · 8 sin cifra**, CRG 4–5 firmes 95
 retenidos sin la marca en su homologación vieja → el resguardo «sin marca»): correcto; recargada, 191/9 (L-161). Quedan 9 provisionales,
 todos del área SCADA o la brigada: El Desastre, San Andrés T1, San Felipe, Casa de Zinc, Santa Elena, Santa Teresa, San Luis, Tres
 Esquinas y Ferrocarril (pedido de `§194`).
+
+## 196. ADR-196 — Cargabilidad SCADA: la zona Oriente pasó a ENERGUA (Energía Atenea) el 1-sep-2026; su periodo llega hasta agosto (TODO-69) ⟦OPUS-5.5⟧ (2026-10-28)
+
+> «procede con los provisionales, los equipos de zona oriente hasta el 1 de septiembre se tuvo medida, ya esos equipos son
+> gerenciados por otra empresa llamada ENERGUA, ENERGIA ATENEA» (2026-10-28).
+
+**196.1 Causa raíz.** El «hueco» de sep–oct que el pedido de `§194` atribuía al SCADA (fila A1: «~167 estaciones dejaron de venir») NO
+era una falla: es el traspaso de la operación. Verificado con los resúmenes guardados: de los 62 equipos de la zona Oriente
+(`ubicacion.zona`), 61 midieron en agosto, 8 traen solo 24–48 h del 1–2 de septiembre y ninguno octubre; Occidente (89) y Bolívar (57)
+vinieron normal en sep y oct; ningún equipo de otra zona dejó de venir. La firmeza contaba sep–oct como meses «sin medir» y dejaba
+provisionales a Santa Teresa T1 y Santa Elena T1 («midió menos de la mitad de los meses»: 4 de 9).
+
+**196.2 Solución.** Archivo nuevo `domain/scada_carga_traspaso.js` (`TRASPASOS = [{zona: 'ORIENTE', desde: '2026-09', operador:
+'ENERGUA (Energía Atenea)'}]`): para esos equipos, un mes desde el traspaso queda sin cifra con el motivo «desde el 1-sep-2026 lo opera
+ENERGUA (Energía Atenea)» (`calcularEquipo` · `fueraDeOperacion`); el periodo (lista y acumulado) se corta en los meses que los operó
+AFINIA (`filasPeriodo`, campo `traspaso {…, meses}`; sin ningún mes, sin cifra con ese motivo); la lista lleva la nota «Medido hasta
+ago-2026: …» y la tira de meses lo dice; el detalle recorta el punto a esos meses, corta el rango del enlace y avisa. Las 24–48 h del
+1–2 de septiembre quedan fuera (corte mensual): Hatillo de Loba cambia en milésimas (56,503 → 56,504 %).
+
+**196.3 No-regresión.** Vista previa en su Chrome con los módulos de `5862b56` (L-157), 2.080 filas: 0 cambios fuera de Oriente; periodo
+ene–oct 191 → **193 firmes**, 9 → **7 provisionales**, 8 sin cifra; CRG 4–5 firmes 95 y sobrecarga sostenida 44 sin cambio; septiembre: los 8
+con horas del 1–2 pasan de provisional a «lo opera ENERGUA»; octubre: mismos conteos, cambia el motivo de los 62.
+
+**196.4 Tests.** `tests/scada_carga_traspaso.test.js` (13: regla, mes, periodo recortado tipo Santa Teresa, periodo entero después,
+mes a mes, sobrecarga de un circuito sin confirmar, cambio de medida vigente desde el traspaso, pantallas y CSV); los fixtures de
+`scada_carga_mes_casi_sin_medida.test.js` pasan de zona ORIENTE a OCCIDENTE (su periodo llega a octubre a propósito). Suite 3.233 / 2
+omitidas; lint OK. Revisión adversarial `wf_af8acd4b-615` (3 frentes + verificadores): 4 confirmados (3 son el mismo: el panel «mes a
+mes y acumulada» repetía la cifra de agosto «a oct-2026») + 8 menores, todos corregidos en `82bd3a7`: acumulado sin cifra desde el
+traspaso; sin sobrecarga en un mes del otro operador (también la «posible» de un circuito sin confirmar); configuración del último mes de
+AFINIA (periodo y detalle); el detalle culpa al traspaso solo si el recorte es por él, corta al final de agosto y avisa sin «rango no
+válido»; CSV con la columna nueva «Otro_operador» al final; la nota dice «Periodo hasta ago-2026» (la medida pudo caerse antes). Vista previa
+repetida con `82bd3a7`: igual (193 · 7 · 8; 0 fuera de Oriente); Santa Teresa mes a mes «A la fecha» = ago-2026, 72,3 % firme, 7 meses.
+
+**196.5 Anti-patterns evitados.** Pedirle al área SCADA restituir estaciones que ya no son de AFINIA; tratar sep–oct de Oriente como
+«no midió»; borrar del parque los equipos de Oriente (no se pidió: siguen en el parque, solo cambia su periodo de carga); exportación
+nueva en un archivo viejo (L-102).
+
+**196.6 Archivos.** Nuevo: `domain/scada_carga_traspaso.js` y su test. Modificados: `scada_carga_vista.js` (`fueraDeOperacion`, sin
+sobrecarga), `scada_carga_periodo.js`, `scada_carga_mensual.js`, `ui/cargabilidad-scada/lista.js` (nota, tira, CSV), `detalle.js`.
+INTACTOS: limpieza, importador, Firestore (sin escrituras: es solo cálculo), `functions/`. Entregable: el pedido v2
+(`~/Downloads/Pedido_SCADA_y_Brigada_Cargabilidad_2026-10-28_v2.html`, flujo `wf_f3ef856b-1ac` redactor + verificador; v1 intacta):
+37 filas activas (7 + 20 + 10); a «Ya no aplica» van A1, 4 de prioridad alta, 8 del resto, 4 de brigada y el re-exporte sep–oct.
+
+**196.7 Doctrina.** Dato del dueño verificado con los datos antes de usarlo (§3.3) · su «procede» explícito · vista previa con datos
+reales (L-157) · revisión adversarial antes de publicar · no cruzar a otros módulos (Salud, Mapa) sin pedido. NO revisado externamente.
+
+**196.8 Verificado sano / no re-auditar.** Ninguna otra zona perdió sep–oct (Occidente 85/85/84, Bolívar 53/54/53 en ago/sep/oct). Los 7
+provisionales que quedan: 5 de Oriente (El Desastre, Casa de Zinc, Ferrocarril, San Felipe, Tres Esquinas: su medida de ene–ago queda como
+está; ya no hay arreglo posible por AFINIA) + San Andrés de Sotavento T1 (Occidente) y San Luis T1 (Bolívar), que siguen en el pedido.
+Barranco de Loba T1 deja de marcar en la vista de septiembre su «posible sobrecarga» de 115,4 % (48 h del 1–2-sep); su periodo ene–ago
+conserva sus sobrecargas.
