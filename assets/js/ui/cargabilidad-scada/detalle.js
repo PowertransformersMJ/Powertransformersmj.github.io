@@ -42,7 +42,7 @@ import { firmezaDelRango, esDeMesesCompletos } from '../../domain/scada_carga_fi
 // Corriente con banda muerta (2026-10-28): archivo NUEVO; las horas «retenidas» del rango, para saber si la marca sigue.
 import { horasRetenidasI } from '../../domain/scada_carga_banda_muerta.js';
 // Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; las curvas llegan hasta el último mes que lo operó AFINIA.
-import { traspasoDe, puntoAntesDelTraspaso, motivoTraspaso } from '../../domain/scada_carga_traspaso.js';
+import { traspasoDe, puntoAntesDelTraspaso, motivoTraspaso, ultimoMesDeAfinia } from '../../domain/scada_carga_traspaso.js';
 import { horasNoCargadas } from '../../domain/scada_carga_periodo.js';
 // Unidad de reserva (2026-10-28): archivo NUEVO; sin la marca, el rango cuenta como siempre.
 import { esUnidadReserva } from '../../domain/scada_carga_reserva.js';
@@ -711,14 +711,21 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     // sin mes pedido, la de hoy. Sin cambios de medida: la misma fila de siempre y el mismo punto.
     const mesDe = (t) => (typeof t === 'string' && /^\d{4}-\d{2}/.test(t) ? t.slice(0, 7) : null);
     const segs = filaBase ? segmentosDeFila(filaBase) : [];
-    const seg = filaBase ? segmentoDelMes(filaBase, mes || mesDe(desde) || mesDe(hasta)) : null;
+    // Traspaso a otro operador (2026-10-28): sin mes pedido, o con uno ya del otro operador, la configuración es la del último
+    // mes que operó AFINIA (si no, un cambio de medida vigente desde el traspaso dejaba el detalle sin curvas).
+    const tras = traspasoDe(tx);
+    const mesPedido = mes || mesDe(desde) || mesDe(hasta);
+    const mesCfg = tras && (!mesPedido || mesPedido >= tras.desde) ? ultimoMesDeAfinia(tras) : mesPedido;
+    const seg = filaBase ? segmentoDelMes(filaBase, mesCfg) : null;
     const fila = seg ? seg.fila : filaBase;
     const k = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
     const cid = k ? claveId(k.est, k.elem) : null;
     const puntoTodo = cid && ctx.catalogo && ctx.catalogo.puntos ? ctx.catalogo.puntos[cid] || null : null;
-    // Traspaso a otro operador (2026-10-28): el punto llega hasta el último mes que lo operó AFINIA (como la lista).
-    const tras = traspasoDe(tx);
-    const punto = puntoAntesDelTraspaso(seg && segs.length > 1 ? puntoDelSegmento(puntoTodo, seg) : puntoTodo, tras);
+    // Traspaso: el punto llega hasta el último mes que lo operó AFINIA (como la lista). `porTraspaso`: el recorte es por el
+    // traspaso (la configuración tenía meses de después), no por un cambio de medida.
+    const puntoSeg = seg && segs.length > 1 ? puntoDelSegmento(puntoTodo, seg) : puntoTodo;
+    const porTraspaso = !!tras && !!puntoSeg && (puntoSeg.meses || []).some((m) => m >= tras.desde);
+    const punto = puntoAntesDelTraspaso(puntoSeg, tras);
     const matricula = leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || mat;
     const cambio = !actual || actual.tx !== tx;
     // Cambio de medida: OTRA configuración del mismo equipo rehace la historia y el mes a mes (no la placa ni DGA, que son del
@@ -752,7 +759,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       actual.calc = calcularEquipo({ tx, fila, punto: null, resumenPorNivel: null, conteos: conteosDe(actual), umbrales: ctx.umbrales });
       const motivoSin = !ctx.catalogo ? 'Todavía no hay mediciones SCADA cargadas.'
         : (seg && seg.tipo === 'sin_carga' ? 'Sin cifra: ' + motivoSinCarga(seg.fila.cambioMedida) + '.'
-        : (tras && puntoTodo && (puntoTodo.meses || []).length ? 'Sin cifra: ' + motivoTraspaso(tras) + '.'
+        : (porTraspaso ? 'Sin cifra: ' + motivoTraspaso(tras) + '.'
         : (!fila ? 'Este transformador no está en la homologación con el SCADA.'
           : (!cid ? 'No hay curvas que mostrar: falta su punto SCADA en la homologación.' : 'Su punto SCADA todavía no tiene datos cargados.'))));
       poner(cont, encabezado(actual), actual.placaNodo, el('div', { class: 'cs-panel cs-estado' }, motivoSin), actual.dgaNodo, actual.duvalNodo);
@@ -771,16 +778,23 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     let rango = ventanaDeMes(mesInicial);
     // Si el enlace pide un mes que este punto no tiene, se dice (antes saltaba a otro mes en silencio).
     let aviso = mes && !punto.meses.includes(mes) && !(desde || hasta)
-      ? (tras && mes >= tras.desde ? 'Sin datos de ' + nombreMes(mes) + ': ' + motivoTraspaso(tras) + '. Se muestra ' + nombreMes(mesInicial) + '.'
+      ? (tras && mes >= tras.desde ? 'No se muestra ' + nombreMes(mes) + ': ' + motivoTraspaso(tras) + '. Se muestra ' + nombreMes(mesInicial) + '.'
         : 'Este punto no tiene datos de ' + nombreMes(mes) + ': se muestra ' + nombreMes(mesInicial) + '.') : null;
     if (desde || hasta) {
       const dl = parseFechaHoraCO(desde); const hl = parseFechaHoraCO(hasta);
       const cand = { desde: dl == null ? null : dl - H_MS, hasta: hl };
-      // Traspaso: un rango que pasa del último mes que lo operó AFINIA se corta ahí, y se dice por qué.
+      // Traspaso: un rango que pasa del último mes que lo operó AFINIA se corta al final de ese mes, y se dice por qué; uno
+      // que empieza después se reemplaza por el mes inicial, con el mismo motivo (no «rango no válido»).
+      const corte = porTraspaso ? ventanaDeMes(ultimoMesDeAfinia(tras)).hasta : null;
       let avisoTras = null;
-      if (tras && cand.hasta != null && cand.hasta > lim.max && (cand.desde == null || cand.desde < lim.max)) {
-        cand.hasta = lim.max;
-        avisoTras = 'Las curvas llegan hasta ' + nombreMes(lim.meses[lim.meses.length - 1]) + ': ' + motivoTraspaso(tras) + '.';
+      if (corte != null && cand.desde != null && cand.desde >= corte) {
+        aviso = 'No se muestra ese rango: ' + motivoTraspaso(tras) + '. Se muestra ' + nombreMes(mesInicial) + '.';
+        cargar(rango.desde, rango.hasta, { enfocar: true, aviso });
+        return;
+      }
+      if (corte != null && cand.hasta != null && cand.hasta > corte) {
+        cand.hasta = corte;
+        avisoTras = 'Las curvas llegan hasta ' + nombreMes(ultimoMesDeAfinia(tras)) + ': ' + motivoTraspaso(tras) + '.';
       }
       const v = validar(cand.desde, cand.hasta, lim);
       if (v.ok) { rango = cand; aviso = avisoTras; }

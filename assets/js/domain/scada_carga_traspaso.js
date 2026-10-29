@@ -51,7 +51,15 @@ export function motivoTraspaso(t) {
   return t ? 'desde el 1-' + textoMes(t.desde) + ' lo opera ' + t.operador : '';
 }
 
-/** «Medido hasta ago-2026: desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea)» — la nota de un periodo recortado. */
+/** El último mes que operó AFINIA ('2026-08' para un traspaso desde '2026-09'). */
+export function ultimoMesDeAfinia(t) {
+  return t ? mesAnterior(t.desde) : null;
+}
+
+/**
+ * «Periodo hasta ago-2026: desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea)» — la nota de un periodo recortado. Dice
+ * hasta dónde llega el PERIODO, no hasta dónde midió el equipo (su medida pudo caerse antes; revisión adversarial 2026-10-28).
+ */
 export function textoTraspaso(t) {
-  return t ? 'Medido hasta ' + textoMes(mesAnterior(t.desde)) + ': ' + motivoTraspaso(t) : '';
+  return t ? 'Periodo hasta ' + textoMes(mesAnterior(t.desde)) + ': ' + motivoTraspaso(t) : '';
 }

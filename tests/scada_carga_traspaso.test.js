@@ -6,7 +6,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  TRASPASOS, traspasoDe, mesDeOtroOperador, mesesAntesDelTraspaso, puntoAntesDelTraspaso, motivoTraspaso, textoTraspaso
+  TRASPASOS, traspasoDe, mesDeOtroOperador, mesesAntesDelTraspaso, puntoAntesDelTraspaso, motivoTraspaso, textoTraspaso, ultimoMesDeAfinia
 } from '../assets/js/domain/scada_carga_traspaso.js';
 import { estadisticas } from '../assets/js/domain/scada_carga_kpis.js';
 import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
@@ -14,6 +14,8 @@ import { filasLista } from '../assets/js/domain/scada_carga_vista.js';
 import { filasPeriodo } from '../assets/js/domain/scada_carga_periodo.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
 import { TOP_HORAS } from '../assets/js/domain/scada_carga_importacion.js';
+import { serieMensualEquipo } from '../assets/js/domain/scada_carga_mensual.js';
+import { decisionConCambio } from '../assets/js/domain/scada_carga_cambio_medida.js';
 
 const T = TRASPASOS[0];
 const txZona = (zona) => ({ id: 'a', identificacion: { matricula: 'T1-X/X-DM1' }, ubicacion: { subestacion_nombre: 'DEMO UNO', zona },
@@ -44,7 +46,8 @@ describe('la regla', () => {
     const p = { meses: ['2026-09'] };
     assert.equal(puntoAntesDelTraspaso(p, null), p);
     assert.equal(motivoTraspaso(T), 'desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea)');
-    assert.equal(textoTraspaso(T), 'Medido hasta ago-2026: desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea)');
+    assert.equal(textoTraspaso(T), 'Periodo hasta ago-2026: desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea)');
+    assert.equal(ultimoMesDeAfinia(T), '2026-08');
   });
 });
 
@@ -115,5 +118,61 @@ test('pantallas: la lista y el detalle lo dicen (lo que no corre en Node queda e
   assert.match(l, /mes >= x\.traspaso\.desde\) return el\('i', \{ class: 'cs-tira-mes cs-tira--vacio', title: nombreMes\(mes\) \+ ': ' \+ motivoTraspaso\(x\.traspaso\) \}\);/);
   const d = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
   assert.match(d, /const punto = puntoAntesDelTraspaso\(/);
-  assert.match(d, /cand\.hasta = lim\.max;/);
+  assert.match(d, /const corte = porTraspaso \? ventanaDeMes\(ultimoMesDeAfinia\(tras\)\)\.hasta : null;/);
+  assert.match(d, /cand\.hasta = corte;/);
+  assert.match(d, /const mesCfg = tras && \(!mesPedido \|\| mesPedido >= tras\.desde\) \? ultimoMesDeAfinia\(tras\) : mesPedido;/);
+  assert.match(l, /'Cambio_de_medida', 'Otro_operador'\],/);
+  assert.equal((l.match(/csvCambio\(x\), csvOperador\(x\)\]/g) || []).length, 2, 'los dos CSV llevan la columna nueva al final');
+});
+
+describe('revisión adversarial 2026-10-28', () => {
+  test('mes a mes y acumulado: desde el traspaso, sin acumulado ni promedio y con su motivo; agosto queda igual', () => {
+    const tx = txZona('ORIENTE');
+    const porMes = { ...santaTeresa, '2026-09': nivelR(48) };
+    const catalogo = { meses: Object.fromEntries(MESES.map((m) => [m, { completo: true }])), puntos: { [cid]: { niveles: { N13_8: {} }, meses: MESES.filter((m) => porMes[m]) } } };
+    const resumenes = Object.fromEntries(MESES.map((m) => [m, { mes: m, claves: porMes[m] ? { [cid]: { N13_8: porMes[m] } } : {} }]));
+    const serie = serieMensualEquipo({ tx, homologacion: { filas }, catalogo, punto: catalogo.puntos[cid], resumenes });
+    const de = (m) => serie.find((x) => x.mes === m);
+    for (const m of ['2026-09', '2026-10']) {
+      assert.equal(de(m).acumulado.pct, null, m);
+      assert.equal(de(m).acumulado.motivoNulo, 'desde el 1-sep-2026 lo opera ENERGUA (Energía Atenea)');
+      assert.equal(de(m).acumulado.nMeses, 0);
+      assert.equal(de(m).promedio.pct, null);
+      assert.equal(de(m).mensual.pct, null);
+    }
+    assert.equal(de('2026-08').acumulado.firme, true);
+    assert.equal(de('2026-08').acumulado.nMeses, 7);
+    // «A la fecha» = la última con acumulado: agosto, no octubre.
+    assert.equal([...serie].reverse().find((x) => x.acumulado.pct != null).mes, '2026-08');
+  });
+  test('un mes del otro operador no cuenta sobrecarga, tampoco la «posible» de un circuito sin confirmar', () => {
+    const { filas: fc } = fusionarHomologacion(leerFilasHomologacion([['SUBESTACION', 'MATRICULA', 'swTrafo'], ['DEMO UNO', 'T1-X/X-DM1', '/EstDemo1/CIR301']]).filas, null);
+    const cidC = claveId('EstDemo1', 'CIR301');
+    const sost = { ...nivelR(48), sost: { v: 1100, idx: 0 } };
+    const catalogo = { meses: { '2026-09': { completo: true } }, puntos: { [cidC]: { niveles: { N13_8: {} }, meses: ['2026-09'] } } };
+    const fila = (zona) => filasLista({ parque: [txZona(zona)], homologacion: { filas: fc }, catalogo, resumenMes: { mes: '2026-09', claves: { [cidC]: { N13_8: sost } } } })[0];
+    assert.equal(fila('ORIENTE').sobrecarga, null);
+    assert.ok(fila('OCCIDENTE').sobrecarga, 'en otra zona, la de siempre');
+  });
+  test('cambio de medida vigente desde el traspaso: el periodo usa la configuración del último mes de AFINIA', () => {
+    const { filas: f0 } = fusionarHomologacion(leerFilasHomologacion([['SUBESTACION', 'MATRICULA', 'swTrafo'], ['DEMO UNO', 'T1-X/X-DM1', '/EstDemo1/swTrafo1']]).filas, null);
+    const id = Object.keys(f0)[0];
+    const base = { ...f0[id], decision: { tipo: 'usar', clave: '/EstDemo1/swTrafo1', mapa: { N13_8: 'S' }, niveles_vistos: ['N13_8'], nota: 'demo', avisos_vistos: [] } };
+    const fc = { [id]: { ...base, decision: decisionConCambio(base, { hasta: '2026-08', antes: 'actual', nota: 'antes por el interruptor',
+      nueva: { tipo: 'usar', clave: '/EstDemo1/DEM302', mapa: { N13_8: 'S' }, niveles_vistos: ['N13_8'], nota: 'desde sep por el circuito', avisos_vistos: [] } }) } };
+    const cidC = claveId('EstDemo1', 'DEM302');
+    const porMes = Object.fromEntries(MESES.map((m, k) => [m, k < 7 ? { [cid]: { N13_8: nivelR(600) } } : { [cidC]: { N13_8: nivelR(600) } }]));
+    const catalogo = { meses: Object.fromEntries(MESES.map((m) => [m, { completo: true }])),
+      puntos: { [cid]: { niveles: { N13_8: {} }, meses: MESES.slice(0, 7) }, [cidC]: { niveles: { N13_8: {} }, meses: MESES.slice(7) } } };
+    const resumenes = Object.fromEntries(MESES.map((m) => [m, { mes: m, claves: porMes[m] }]));
+    const per = (zona) => {
+      const tx = txZona(zona);
+      const fpm = Object.fromEntries(MESES.map((m) => [m, filasLista({ parque: [tx], homologacion: { filas: fc }, catalogo, resumenMes: resumenes[m] })]));
+      return filasPeriodo({ parque: [tx], homologacion: { filas: fc }, catalogo, meses: MESES, resumenes, filasPorMes: fpm })[0];
+    };
+    const p = per('ORIENTE');
+    assert.ok(p.pct != null, 'tiene cifra: ' + p.motivoNulo);
+    assert.deepEqual(p.periodo.meses, MESES.slice(0, 7));
+    assert.equal(p.claveId, cid, 'la medida de antes del cambio, la que operó AFINIA');
+  });
 });

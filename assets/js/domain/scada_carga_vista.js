@@ -314,7 +314,8 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
       ...(otro ? { motivoNulo: motivoTraspaso(otro), traspaso: otro } : {})
     };
     // Qué devanado se sobrecarga y de qué tipo (firme · posible · circuito sin confirmar). Campo NUEVO: se lee con guarda.
-    return { ...x, sobrecarga: sobrecargaDeMes(x) };
+    // Un mes del otro operador no cuenta sobrecarga (tampoco la «posible» de un circuito sin confirmar: revisión 2026-10-28).
+    return { ...x, sobrecarga: otro ? null : sobrecargaDeMes(x) };
   });
 }
 

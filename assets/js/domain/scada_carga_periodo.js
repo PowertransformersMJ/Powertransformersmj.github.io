@@ -240,10 +240,14 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
   const noCargadasTodo = horasNoCargadas(catalogo, meses);
   return (parque || []).map((tx) => {
     const filaBase = filaDeTransformador(tx, porMat);
-    const seg = filaBase ? segmentoDelMes(filaBase, mesFin) : null;
+    // Traspaso (2026-10-28): la configuración es la del último mes del periodo que operó AFINIA (si no, un cambio de medida
+    // vigente desde el traspaso dejaba el periodo entero sin cifra; revisión adversarial).
+    const tras = traspasoDe(tx);
+    const mesesAfinia = mesesAntesDelTraspaso(tras, meses);
+    const mesRef = tras && mesesAfinia.length ? mesesAfinia[mesesAfinia.length - 1] : mesFin;
+    const seg = filaBase ? segmentoDelMes(filaBase, mesRef) : null;
     const fila = seg ? seg.fila : filaBase;
     // Traspaso (2026-10-28): para un equipo que pasó a otro operador, el periodo llega hasta el último mes que lo operó AFINIA.
-    const tras = traspasoDe(tx);
     const mesesSeg = seg ? mesesDelSegmento(seg, meses) : meses;
     const mesesP = mesesAntesDelTraspaso(tras, mesesSeg);
     const recortado = !!tras && mesesP.length < mesesSeg.length;
@@ -277,7 +281,7 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     const sost = ag.mesesSostenida > 0;
     // Cambio de medida: qué configuración se muestra y la sobrecarga de los meses de ANTES del cambio (campos NUEVOS, con guarda).
     const cm = fila && fila.cambioMedida ? fila.cambioMedida : null;
-    const mesesAntes = cm && seg.desde ? (meses || []).filter((m) => m < seg.desde) : [];
+    const mesesAntes = cm && seg.desde ? mesesAfinia.filter((m) => m < seg.desde) : [];
     const antes = mesesAntes.length ? sobrecargaAntesDelCambio(mesesAntes.map(filaMes)) : null;
     const x = {
       id: tx.id, matricula: base.matricula || '', subestacion: base.subestacion || '', zona: base.zona || '', departamento: base.departamento || '',
