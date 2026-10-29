@@ -9879,3 +9879,15 @@ Paraíso ×2, Santa Teresa) y 5 de AFINIA (Puerto Badel, Pozo Azul, Tres Palmas 
 `00c-INDICE-ADR-141-197.md` con las filas §141–§197 sin tocar una letra (descubierta por el patrón `00[a-z]-INDICE*.md` del kernel,
 sin cambiarlo); tope 120 líneas / 12.000 caracteres en el manifiesto; la madre apunta a ella y recibe las filas nuevas desde §198;
 fila en `CLAUDE.md §0`.
+
+**197.10 Verificado en vivo y entregado (2026-10-28).** Merge `2bdf7de`, caché vencida, página recargada: Pradera T2 «Urgente · nivel 5 de
+5» sin aviso; Llerasca T1 «PD · PD por confirmar (hidrógeno muy alto)», «× 1 o más» y el aviso de ENERGUA. Entregables (Descargas;
+copias en la bóveda `…/2026-10-28-provisionales-26/crudo/decisiones/`): `Textos_Panel_Gases_para_revision_2026-10-28.html` (62 ítems
+numerados, literales, con qué equipos los muestran, AFINIA/Oriente), `Pedidos_Laboratorio_Gases_2026-10-28.html` (AFINIA 10 pedidos;
+parte aparte para ENERGUA, 8) y `Nota_para_ENERGUA_La_Paz_y_Barranco_de_Loba_2026-10-28.html` (borrador: él decide si la comparte).
+Los verificadores corrigieron, entre otras cosas, la ventilación de Barranco de Loba T1: en el Excel de Salud figura OPERATIVA.
+Punto 10 B: diseño hecho (`wf_7a2bf653-d8d`, solo lectura) — campo `ventilacion_excel` (todo el Excel, con su fecha) y
+`ventilacion_confirmacion` aparte (no la borra una recarga), cargador aparte con el molde de «Cargar solo los gases» (`§131`), columna
+detectada por valores (la cabecera «REFRIGERACION» está repetida: tipo y estado), aviso en lista/detalle/CSV de SCADA y en la ficha; sin
+cambios de reglas; CF-27 (papel) en tanda aparte con su vista previa. De los 27 OBSOLETA, 8 son de Oriente. Espera sus respuestas
+(EJECUTADA, quién confirma, Oriente, fecha del Excel).
