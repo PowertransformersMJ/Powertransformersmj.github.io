@@ -9821,3 +9821,11 @@ provisionales que quedan: 5 de Oriente (El Desastre, Casa de Zinc, Ferrocarril, 
 está; ya no hay arreglo posible por AFINIA) + San Andrés de Sotavento T1 (Occidente) y San Luis T1 (Bolívar), que siguen en el pedido.
 Barranco de Loba T1 deja de marcar en la vista de septiembre su «posible sobrecarga» de 115,4 % (48 h del 1–2-sep); su periodo ene–ago
 conserva sus sobrecargas.
+
+**196.9 Verificado en vivo (2026-10-28).** Merge `0b0b634`, caché vencida, página recargada, módulos nuevos en uso (`toString`): periodo
+ene–oct **193 firmes · 7 provisionales**, CRG 4–5 firmes 95, sobrecarga sostenida 46 (44 firmes · 1 provisional · 1 antes de un cambio) —
+sin cambio. Santa Teresa T1 72,3 % CRG 3 y Santa Elena T1 28,7 % CRG 1 firmes con la nota «Periodo hasta ago-2026: desde el 1-sep-2026
+lo opera ENERGUA (Energía Atenea)»; octubre: El Desastre «Sin cifra · desde el 1-sep-2026 lo opera ENERGUA». Hallazgo en vivo: el detalle
+de Santa Teresa con un rango hasta octubre salía «provisional» (el recorte solo actuaba si el punto traía datos de septiembre, y el suyo
+no trae) → `cargar` corta cualquier rango (enlace, selector, «Ver ese día») al final de agosto (`f6d5d9e`); verificado: rango 01-ene a
+31-ago, aviso «Las curvas llegan hasta agosto 2026…», sin «provisional», «A la fecha» ago-2026 72,3 % CRG 3. Sin escrituras a la base.
