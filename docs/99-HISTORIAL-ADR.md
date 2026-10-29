@@ -9891,3 +9891,16 @@ Punto 10 B: diseño hecho (`wf_7a2bf653-d8d`, solo lectura) — campo `ventilaci
 detectada por valores (la cabecera «REFRIGERACION» está repetida: tipo y estado), aviso en lista/detalle/CSV de SCADA y en la ficha; sin
 cambios de reglas; CF-27 (papel) en tanda aparte con su vista previa. De los 27 OBSOLETA, 8 son de Oriente. Espera sus respuestas
 (EJECUTADA, quién confirma, Oriente, fecha del Excel).
+
+**197.11 Orden del Ingeniero: «no mezcles cargabilidad con ventilación, son dos cosas diferentes» (2026-10-28).** Respondió así a
+la pregunta de «EJECUTADA», y pidió corregir lo que quedara pendiente por mezclarlas. Corregido:
+- El punto 10 SALE de Cargabilidad SCADA: no habrá aviso de ventilación en la lista, el detalle ni el CSV de SCADA, ni «la cifra puede
+  quedarse corta». La ventilación del Excel de Salud pasa al frente de REFRIGERACIÓN (TODO-80), con sus respuestas: confirma él, con
+  fecha y nota; los 8 de Oriente llevan el aviso como información; fecha del Excel 18-oct-2026; «EJECUTADA» se muestra como dato y no
+  confirma (su respuesta no la definió). Se ve en la ficha del equipo / módulo de refrigeración; el diseño de `§197.10` vale sin la parte
+  de SCADA. CF-27 (papel), tanda aparte con vista previa.
+- Nota para ENERGUA v2 (`…_2026-10-28_v2.html`): sin la sección de ventilación de La Paz T1, sin su fila en la tabla, sin la recomendación
+  de ventiladores ni las menciones en limitaciones y fuentes; la «cifra de carga» se define contra la corriente de placa. Queda el supuesto
+  del modelo térmico (cómo se estimó la temperatura). Pedidos al laboratorio v2: la misma definición. Las v1 quedan obsoletas.
+- Abierto, decisión suya: los textos de los paneles de Cargabilidad que hablan de ventiladores (en su listado de textos: ítems 2, 23 y 42,
+  más una línea del recuadro «Con más carga» del panel de Duval). Se le pregunta; no se quitan sin su palabra (retirar lo mínimo).
