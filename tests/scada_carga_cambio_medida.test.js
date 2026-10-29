@@ -196,8 +196,9 @@ describe('pantallas (lo que no corre en Node queda en el código)', () => {
   });
   test('el detalle abre UNA configuración (la del mes pedido) y ofrece las otras', () => {
     const d = src('ui/cargabilidad-scada/detalle.js');
-    assert.match(d, /const seg = filaBase \? segmentoDelMes\(filaBase, mes \|\| mesDe\(desde\) \|\| mesDe\(hasta\)\) : null;/);
-    assert.match(d, /const punto = seg && segs\.length > 1 \? puntoDelSegmento\(puntoTodo, seg\) : puntoTodo;/);
+    assert.match(d, /const mesPedido = mes \|\| mesDe\(desde\) \|\| mesDe\(hasta\);/);
+    assert.match(d, /const seg = filaBase \? segmentoDelMes\(filaBase, mesCfg\) : null;/);
+    assert.match(d, /const puntoSeg = seg && segs\.length > 1 \? puntoDelSegmento\(puntoTodo, seg\) : puntoTodo;/);
     assert.match(d, /avisoCambioMedida\(a\)\);/);
     // Revisión adversarial: OTRA configuración del mismo equipo rehace la historia y el mes a mes; los botones no ensucian
     // el historial («Volver a la lista» vuelve a la lista).

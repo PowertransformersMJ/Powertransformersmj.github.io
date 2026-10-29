@@ -31,6 +31,8 @@ import { segmentoDelMes, mesesDelSegmento, filasDelMes, sobrecargaAntesDelCambio
 import { firmezaPeriodoDeFilas } from './scada_carga_firmeza_periodo.js';
 // Mes casi sin medida (2026-10-28): archivo NUEVO.
 import { mesCasiSinMedida } from './scada_carga_mes_casi_sin_medida.js';
+// Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; fuera de la zona, nada cambia.
+import { traspasoDe, mesesAntesDelTraspaso, motivoTraspaso } from './scada_carga_traspaso.js';
 
 /** Meses por periodo (el mismo tope del detalle): con 90 horas por mes el p99 sale exacto hasta 8.928 h. */
 export const MAX_MESES_PERIODO = 12;
@@ -238,9 +240,17 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
   const noCargadasTodo = horasNoCargadas(catalogo, meses);
   return (parque || []).map((tx) => {
     const filaBase = filaDeTransformador(tx, porMat);
-    const seg = filaBase ? segmentoDelMes(filaBase, mesFin) : null;
+    // Traspaso (2026-10-28): la configuración es la del último mes del periodo que operó AFINIA (si no, un cambio de medida
+    // vigente desde el traspaso dejaba el periodo entero sin cifra; revisión adversarial).
+    const tras = traspasoDe(tx);
+    const mesesAfinia = mesesAntesDelTraspaso(tras, meses);
+    const mesRef = tras && mesesAfinia.length ? mesesAfinia[mesesAfinia.length - 1] : mesFin;
+    const seg = filaBase ? segmentoDelMes(filaBase, mesRef) : null;
     const fila = seg ? seg.fila : filaBase;
-    const mesesP = seg ? mesesDelSegmento(seg, meses) : meses;
+    // Traspaso (2026-10-28): para un equipo que pasó a otro operador, el periodo llega hasta el último mes que lo operó AFINIA.
+    const mesesSeg = seg ? mesesDelSegmento(seg, meses) : meses;
+    const mesesP = mesesAntesDelTraspaso(tras, mesesSeg);
+    const recortado = !!tras && mesesP.length < mesesSeg.length;
     // Los días no cargados se corrigen solo en periodos de VARIOS meses: con los meses de la configuración que se muestra.
     const noCargadas = mesesP && meses && mesesP.length !== meses.length ? horasNoCargadas(catalogo, mesesP) : noCargadasTodo;
     const filaMes = (mes) => (idx.get(mes) && idx.get(mes).get(tx.id)) || null;
@@ -256,7 +266,10 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     // Firmeza por el devanado que da la cifra, contado en los meses en que midió (decisión del Ingeniero, 2026-10-27).
     // Los días que el parque aún no cargó no son hueco (`99 §159`): se descuentan como en `resumenPeriodo`.
     const firmezaPeriodo = firmezaPeriodoDeFilas(mesesP.map(filaMes), mesesP.length, mesesP.map((m) => noCargadas[m] || 0));
-    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico, mes: mesFin, firmezaPeriodo });
+    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: cid ? sint.porNivel : null, conteos, umbrales, estadistico,
+      mes: recortado && mesesP.length ? mesesP[mesesP.length - 1] : mesFin, firmezaPeriodo,
+      // Todo el periodo es de después del traspaso: sin cifra, con ese motivo.
+      fueraDeOperacion: recortado && !mesesP.length ? motivoTraspaso(tras) : null });
     const hayAntes = !!punto && (punto.meses || []).some((m) => m < mesesP[0]);
     const ag = agregadosDeMeses(mesesP.map((mes) => ({ mes, fila: filaMes(mes), r: rDe(mes) })), { hayAntes });
     const base = (meses || []).map(filaMes).find(Boolean) || {};
@@ -268,7 +281,7 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
     const sost = ag.mesesSostenida > 0;
     // Cambio de medida: qué configuración se muestra y la sobrecarga de los meses de ANTES del cambio (campos NUEVOS, con guarda).
     const cm = fila && fila.cambioMedida ? fila.cambioMedida : null;
-    const mesesAntes = cm && seg.desde ? (meses || []).filter((m) => m < seg.desde) : [];
+    const mesesAntes = cm && seg.desde ? mesesAfinia.filter((m) => m < seg.desde) : [];
     const antes = mesesAntes.length ? sobrecargaAntesDelCambio(mesesAntes.map(filaMes)) : null;
     const x = {
       id: tx.id, matricula: base.matricula || '', subestacion: base.subestacion || '', zona: base.zona || '', departamento: base.departamento || '',
@@ -283,7 +296,10 @@ export function filasPeriodo({ parque, homologacion, catalogo, meses, resumenes,
       periodo: { meses: mesesP, faltanPreparar: faltan, ...ag },
       ...(cm ? { cambioMedida: { ...cm, mesesAntes } } : {}),
       ...(antes ? { sobrecargaAnterior: { ...antes, hasta: mesesAntes[mesesAntes.length - 1] } } : {}),
-      ...(cm && cm.tipo === 'sin_carga' && c.pct == null ? { motivoNulo: motivoSinCarga(cm), sinCarga: true } : {})
+      ...(cm && cm.tipo === 'sin_carga' && c.pct == null ? { motivoNulo: motivoSinCarga(cm), sinCarga: true } : {}),
+      // Traspaso (campo NUEVO, con guarda): el periodo de este equipo llega hasta `meses`; sin ningún mes, su motivo manda.
+      ...(recortado ? { traspaso: { ...tras, meses: mesesP } } : {}),
+      ...(recortado && !mesesP.length ? { motivoNulo: motivoTraspaso(tras) } : {})
     };
     // Qué devanado se sobrecargó y en cuántos meses, con las filas de cada mes (2026-10-26). Campo NUEVO: se lee con guarda.
     return { ...x, sobrecarga: sobrecargaDelPeriodo(x, mesesP.map(filaMes)) };

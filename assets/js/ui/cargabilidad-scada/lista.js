@@ -19,6 +19,10 @@ import { TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto, CSV_DEV_CA
 import { conteoSobrecarga, rotuloSobrecarga, csvSobrecarga, CSV_SOBRECARGA_CAB as CSV_SOB_CAB, tieneSobrecarga, textoDevanados } from '../../domain/scada_carga_sobrecarga.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; las filas lo traen en `cambioMedida` (con guarda).
 import { textoMes } from '../../domain/scada_carga_cambio_medida.js';
+// Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; las filas lo traen en `traspaso` (con guarda).
+import { textoTraspaso, motivoTraspaso } from '../../domain/scada_carga_traspaso.js';
+// Columna NUEVA al final de los CSV (las demás no se mueven): el periodo recortado o el mes del otro operador.
+const csvOperador = (x) => (!x || !x.traspaso ? '' : (Array.isArray(x.traspaso.meses) && x.traspaso.meses.length ? textoTraspaso(x.traspaso) : motivoTraspaso(x.traspaso)));
 // Filtro «Devanado sobrecargado» (2026-10-27): archivo NUEVO.
 import { DEVANADOS_FILTRO, conteoPorDevanado, pasaFiltroDevanado } from '../../domain/scada_carga_filtro_devanado.js';
 
@@ -446,6 +450,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
 
   /** Cambio de medida (campos con guarda): qué configuración se ve y, en un periodo, la sobrecarga de antes del cambio. */
   function notaCambio(td, x) {
+    // Periodo recortado por el traspaso a otro operador (la fila de un mes ya lo dice en su motivo).
+    if (x.traspaso && Array.isArray(x.traspaso.meses) && x.pct != null) td.append(el('span', { class: 'cs-sub' }, textoTraspaso(x.traspaso)));
     const cm = x.cambioMedida;
     if (!cm) return;
     if (cm.tipo === 'medida') td.append(el('span', { class: 'cs-sub' }, 'Medida anterior al cambio de ' + textoMes(cm.vigenteDesde) + (cm.nota ? ': ' + cm.nota : '')));
@@ -555,6 +561,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const cajas = mesesEntre(st.periodo.desde, st.periodo.hasta).map((mes) => {
       const m = porMes.get(mes);
       if (!todos.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': no cargado' });
+      if (x && x.traspaso && x.traspaso.desde && mes >= x.traspaso.desde) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + motivoTraspaso(x.traspaso) });
       if (otraMedida.has(mes)) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + textoAntes(x.cambioMedida) + ' (antes del cambio de medida)' });
       if (!m || m.pct == null) return el('i', { class: 'cs-tira-mes cs-tira--vacio', title: nombreMes(mes) + ': ' + ((m && m.motivoNulo) || 'sin cifra') });
       const cls = m.clase === 'firme' ? (m.sost ? 'cs-tira--sost' : 'cs-tira--crg' + (m.crg || 0)) : (m.sost ? 'cs-tira--prov cs-tira--sostp' : 'cs-tira--prov');
@@ -636,11 +643,11 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const dev = { P: 'Primario', S: 'Secundario', T: 'Terciario' };
     descargarCSV('cargabilidad_scada_' + st.mes + '.csv',
       // 'Suma_de_circuitos': columna NUEVA al final (las de antes no se mueven); vacía si la fila no mide con suma.
-      ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida', ...CSV_DEV_CAB, 'Suma_de_circuitos', ...CSV_SOB_CAB, 'Cambio_de_medida'],
+      ['Matricula', 'Subestacion', 'Zona', 'Mes', 'Cargabilidad_SCADA_pct', 'Clase', 'CRG', 'Devanado', 'Oficial_Excel_equipo_pct', 'Oficial_Excel_mismo_devanado_pct', 'Diferencia_mismo_devanado_pts', 'Medida', 'Motivos', 'Sobrecarga_sostenida', ...CSV_DEV_CAB, 'Suma_de_circuitos', ...CSV_SOB_CAB, 'Cambio_de_medida', 'Otro_operador'],
       filas.map((x) => [x.matricula, x.subestacion, x.zona, st.mes, x.pct, x.clase, x.crg, x.pct != null && x.devMax ? dev[x.devMax] : '', x.oficial ? x.oficial.pct : null,
         x.delta != null && x.oficial && x.oficial.porDevanado ? x.oficial.porDevanado[x.devMax] : null,
         x.delta, ESTADOS[x.estado] || x.estado, x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '),
-        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no'), ...csvDevanados(x.devanadosPlaca), textoSumaCSV(x), ...csvSobrecarga(x), csvCambio(x)]));
+        x.sobrecargaSostenida ? 'si' : (x.clase === 'firme' && ((x.sobrecargaPorVerificar && x.sobrecargaPorVerificar.length) || x.verificacion === 'fallo') ? 'por confirmar' : 'no'), ...csvDevanados(x.devanadosPlaca), textoSumaCSV(x), ...csvSobrecarga(x), csvCambio(x), csvOperador(x)]));
   }
 
   function exportarPeriodo() {
@@ -648,12 +655,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     descargarCSV('cargabilidad_scada_' + desde + '_a_' + hasta + '.csv',
       ['Matricula', 'Subestacion', 'Zona', 'Periodo_desde', 'Periodo_hasta', 'Meses_con_cifra', 'Carga_periodo_pct', 'Clase', 'CRG', 'Peor_mes', 'Peor_mes_pct', 'Peor_mes_clase',
         'Meses_CRG4_5', 'Mayor_corriente_devanado', 'Mayor_corriente_A', 'Mayor_corriente_pct', 'Mayor_corriente_hora_CO', 'Mayor_corriente_por_confirmar',
-        'Primer_mes_sobrecarga_sostenida', 'Desde_inicio_de_los_datos', 'Primer_mes_hora_sobre_100', 'Meses_con_sobrecarga_sostenida', 'Medida', 'Motivos', ...CSV_DEV_CAB, 'Suma_de_circuitos', ...CSV_SOB_CAB, 'Cambio_de_medida'],
+        'Primer_mes_sobrecarga_sostenida', 'Desde_inicio_de_los_datos', 'Primer_mes_hora_sobre_100', 'Meses_con_sobrecarga_sostenida', 'Medida', 'Motivos', ...CSV_DEV_CAB, 'Suma_de_circuitos', ...CSV_SOB_CAB, 'Cambio_de_medida', 'Otro_operador'],
       filas.map((x) => { const p = x.periodo; const pm = p.peorMes; const mc = p.mayorCorriente; const ps = p.primeraSostenida; return [
         x.matricula, x.subestacion, x.zona, desde, hasta, p.mesesConCifra, x.pct, x.clase, x.crg, pm ? pm.mes : '', pm ? pm.pct : null, pm ? pm.clase : '',
         p.mesesCRG45, mc ? DEV[mc.devanado] : '', mc ? mc.max : null, mc ? mc.pct : null, mc && mc.ms != null ? formatoCO(mc.ms) : '', mc && mc.porConfirmar ? 'si' : 'no',
         ps ? ps.mes : '', ps ? (ps.inicioDatos ? 'si' : (ps.inicioPeriodo ? 'inicio del periodo' : 'no')) : '', p.primeraHora ? p.primeraHora.mes : '', p.mesesSostenida, ESTADOS[x.estado] || x.estado,
-        x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '), ...csvDevanados(x.devanadosPlaca), textoSumaCSV(x), ...csvSobrecarga(x), csvCambio(x)]; }));
+        x.pct == null ? (x.motivoNulo || '') : x.motivos.join(' | '), ...csvDevanados(x.devanadosPlaca), textoSumaCSV(x), ...csvSobrecarga(x), csvCambio(x), csvOperador(x)]; }));
   }
 
   function dibujar() { conservarFoco(dibujarSinFoco); }

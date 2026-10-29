@@ -19,6 +19,8 @@
 import { filasLista } from './scada_carga_vista.js';
 import { filasPeriodo, MAX_MESES_PERIODO } from './scada_carga_periodo.js';
 import { devanadosDe } from './scada_carga_devanados.js';
+// Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; fuera de la zona, nada cambia.
+import { mesDeOtroOperador, motivoTraspaso } from './scada_carga_traspaso.js';
 
 // `devanados` (2026-10-23, «la cargabilidad de cada devanado con sus límites de potencia y ampacidad»): los de
 // `devanadosDe` (ADR-165) sobre la MISMA fila: tensión, ampacidad y potencia del devanado (sus límites), corriente p99 y
@@ -82,6 +84,13 @@ export function serieMensualEquipo({ tx, homologacion, catalogo, punto, resumene
       return { mes, leido: false, cargado: false, mensual: hueco, acumulado: { ...hueco, desde: mes, nMeses: 0 }, promedio: { pct: null, nMeses: 0 } };
     }
     const leido = !!(resumenes && resumenes[mes]);
+    // Un mes del otro operador (traspaso, 2026-10-28): sin acumulado ni promedio, con su motivo; la línea se corta en el
+    // último mes de AFINIA y «A la fecha» queda en ese mes (revisión adversarial: repetía la cifra de agosto «a oct»).
+    const otro = mesDeOtroOperador(tx, mes);
+    if (otro) {
+      const sin = { ...resumida(null, tx), motivoNulo: motivoTraspaso(otro) };
+      return { mes, leido, cargado: true, mensual: leido ? mensual[mes] : sin, acumulado: { ...sin, desde: mes, nMeses: 0 }, promedio: { pct: null, nMeses: 0 } };
+    }
     // Tramo acumulado: los meses LEÍDOS dentro de los 12 meses de calendario que terminan en este (como elegir ese rango
     // en «Varios meses»; un mes sin cargar dentro del rango no alarga el tramo).
     const [y, m] = mes.split('-').map(Number); const k0 = y * 12 + (m - 1) - (MAX_MESES_PERIODO - 1);

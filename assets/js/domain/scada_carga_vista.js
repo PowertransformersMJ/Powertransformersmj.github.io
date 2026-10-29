@@ -35,6 +35,8 @@ import { esUnidadReserva, mesEnReserva, MOTIVO_RESERVA, horasNoCargadasDelMes } 
 // Corriente con banda muerta (marca del Ingeniero) y mes casi sin medida (2026-10-28): archivos NUEVOS.
 import { bandaMuerta, motivoBandaMuerta, motivoBandaMuertaSinMarca } from './scada_carga_banda_muerta.js';
 import { motivoMesCasiSinMedida, reglaDeAntes } from './scada_carga_mes_casi_sin_medida.js';
+// Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; fuera de la zona, nada cambia.
+import { mesDeOtroOperador, motivoTraspaso } from './scada_carga_traspaso.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -109,7 +111,7 @@ function senalSobrecarga(n) {
  * Cálculo de UN transformador para un periodo con resúmenes por nivel (físicos, en A).
  * Lo usa la lista (resumen del mes guardado) y el detalle (resumen del rango calculado).
  */
-export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null, firmezaPeriodo = null, fueraMes = 0 }) {
+export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbrales, estadistico = CALCULO.estadistico, mesesFallidos = [], mes = null, firmezaPeriodo = null, fueraMes = 0, fueraDeOperacion = null }) {
   const placa = placaDe(tx);
   const clave = fila ? analizarClaveHomologada(claveEfectiva(fila)) : null;
   const esCircuito = !!clave && !esElementoTransformador(clave.elem);
@@ -205,6 +207,8 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   const enReserva = esUnidadReserva(fila) && !!clave && !!punto && estado !== 'excluida' && estado !== 'sin_homologacion'
     && !(esCircuito && estado !== 'confirmada') && mesEnReserva(nivelesReserva, fueraMes);
   if (enReserva) { pctEq = null; motivoNulo = MOTIVO_RESERVA; }
+  // Equipo que ya opera otra empresa ese mes (traspaso, `scada_carga_traspaso.js`): sin cifra y con ese motivo.
+  if (fueraDeOperacion) { pctEq = null; motivoNulo = fueraDeOperacion; }
   // Sobrecarga sostenida y pico (`99 §129`). Cuentan SOLO los devanados con cifra válida (no los de escala sospechosa ni
   // sin ampacidad) y nada si el equipo no tiene cifra. El resumen guardado es de la corriente EN BRUTO: es exacto si el mes
   // no trae horas imposibles (> 3 × ampacidad) en ese nivel —se sabe por su máximo— y así se usa (probado con los 8 meses
@@ -288,7 +292,10 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
     // Con suma de circuitos, el nivel sumado es su resumen DERIVADO (o un registro sin cifra); sin suma, el mismo objeto.
     // Con el catálogo: si otro transformador de la estación mide esa barra (D5), el nivel queda sin cifra.
     const r = cid ? componerResumen(claves, cid, fila, puntos) || null : null;
-    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes, fueraMes });
+    // Un mes en que el equipo ya lo opera otra empresa (traspaso, 2026-10-28): sin cifra, con su motivo.
+    const otro = mesDeOtroOperador(tx, mesLista);
+    const c = calcularEquipo({ tx, fila, punto, resumenPorNivel: r, conteos, umbrales, estadistico, mes: resumenMes && resumenMes.mes, fueraMes,
+      fueraDeOperacion: otro ? motivoTraspaso(otro) : null });
     const x = {
       id: tx.id,
       matricula: leer(tx, 'identificacion.matricula') || leer(tx, 'identificacion.codigo') || tx.codigo || '',
@@ -302,10 +309,13 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
       // Cambio de medida (campo NUEVO, solo en equipos con medidas anteriores; se lee con guarda). «Sin carga»: sin cifra
       // con su motivo propio, nunca 0 % ni «excluida por el Ingeniero».
       ...(fila && fila.cambioMedida ? { cambioMedida: fila.cambioMedida } : {}),
-      ...(fila && fila.cambioMedida && fila.cambioMedida.tipo === 'sin_carga' ? { motivoNulo: motivoSinCarga(fila.cambioMedida), sinCarga: true } : {})
+      ...(fila && fila.cambioMedida && fila.cambioMedida.tipo === 'sin_carga' ? { motivoNulo: motivoSinCarga(fila.cambioMedida), sinCarga: true } : {}),
+      // Traspaso (campo NUEVO, con guarda): el motivo del otro operador manda en ese mes.
+      ...(otro ? { motivoNulo: motivoTraspaso(otro), traspaso: otro } : {})
     };
     // Qué devanado se sobrecarga y de qué tipo (firme · posible · circuito sin confirmar). Campo NUEVO: se lee con guarda.
-    return { ...x, sobrecarga: sobrecargaDeMes(x) };
+    // Un mes del otro operador no cuenta sobrecarga (tampoco la «posible» de un circuito sin confirmar: revisión 2026-10-28).
+    return { ...x, sobrecarga: otro ? null : sobrecargaDeMes(x) };
   });
 }
 
