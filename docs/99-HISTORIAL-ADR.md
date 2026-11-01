@@ -10055,3 +10055,9 @@ o consulte por fuera de la página no deja rastro (dicho en el panel). (c) Las r
 visitante hostil puede inundar su rastro o inventar «inicios» desde la consola (costo de centavos; remedio: «Desactivar», que
 corta en la siguiente petición). (d) Un evento del mapa en el primer segundo, antes de que cargue el módulo, puede perderse.
 Refutados: «el rastro por sí mismo es ilegal» (lo legal es decisión del dueño, documentada aquí) y uno de duplicados.
+
+**199.9 Verificado tras publicar (2026-11-01).** Reglas desplegadas ANTES que la página (`firebase deploy --only firestore:rules`:
+«released rules»); merges `2c4c4b5` y `08023e2` (recuadros del panel a 94 % de opacidad: sobre la foto no se leían), Deploy y CI ✅;
+los 6 archivos nuevos → 200. En SU Chrome como admin: pestaña y entrada de menú «Actividad del visitante», el panel lista las 3
+cuentas en «Otras cuentas» y avisa que no hay visitantes; KPIs en cero, sin errores. Pendiente (TODO-83): los primeros datos
+reales cuando exista la cuenta del visitante.
