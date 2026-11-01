@@ -1727,6 +1727,38 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // ── Rastro de actividad del visitante (`99 §199`, pedido del Ingeniero 2026-11-01: «cuántas veces inicia
+    // sesión, qué consulta, todo»; control interno). El navegador del visitante AGREGA sus propios eventos
+    // (forma acotada: domain/rastro_visitante.js) con la hora del servidor; nadie los edita; solo el
+    // administrador los lee y los borra (se conservan mientras la cuenta exista).
+    function rastroTexto(m, k, tope) {
+      return !(k in m) || (m[k] is string && m[k].size() <= tope);
+    }
+    function rastroDetalle(d) {
+      return d is map && d.keys().hasOnly(['mat', 'mes', 'desde', 'hasta', 'periodo', 'control', 'valor', 'texto', 'tipo', 'nombre'])
+        && rastroTexto(d, 'mat', 160) && rastroTexto(d, 'mes', 160) && rastroTexto(d, 'desde', 160) && rastroTexto(d, 'hasta', 160)
+        && rastroTexto(d, 'periodo', 160) && rastroTexto(d, 'control', 160) && rastroTexto(d, 'valor', 160)
+        && rastroTexto(d, 'texto', 160) && rastroTexto(d, 'tipo', 160) && rastroTexto(d, 'nombre', 160);
+    }
+    function rastroDisp(d) {
+      return d is map && d.keys().hasOnly(['nav', 'so', 'tipo', 'pantalla'])
+        && rastroTexto(d, 'nav', 40) && rastroTexto(d, 'so', 40) && rastroTexto(d, 'tipo', 40) && rastroTexto(d, 'pantalla', 40);
+    }
+    match /actividad_visitante/{uid}/eventos/{id} {
+      allow create: if esVisitanteActivo() && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['tipo', 'pagina', 'detalle', 'disp', 'ingreso', 'sesion', 'en'])
+        && request.resource.data.keys().hasAll(['tipo', 'pagina', 'ingreso', 'sesion', 'en'])
+        && request.resource.data.tipo in ['pagina', 'equipo', 'ruta', 'control', 'clic', 'seleccion', 'intento']
+        && rastroTexto(request.resource.data, 'pagina', 40) && rastroTexto(request.resource.data, 'ingreso', 40)
+        && rastroTexto(request.resource.data, 'sesion', 40)
+        && (!('detalle' in request.resource.data) || rastroDetalle(request.resource.data.detalle))
+        && (!('disp' in request.resource.data) || rastroDisp(request.resource.data.disp))
+        && request.resource.data.en == request.time;
+      allow get, list: if isAdmin();
+      allow update: if false;
+      allow delete: if isAdmin();
+    }
+
     // ══════════════════════════════════════════════════════════════
     // Informe de Mantenimiento Brigada · formato F60-ADM (TODO-81)
     // Lo LEE el equipo activo; lo ARMAN solo los editores de

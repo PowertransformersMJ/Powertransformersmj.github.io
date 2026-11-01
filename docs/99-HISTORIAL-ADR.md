@@ -9994,3 +9994,64 @@ nuevo: `sess.acceso = {restringido:false}`): menú completo (7 grupos), chip ADM
 CSV del nivel y «Descargar como PNG» — sin cambios. Vista previa SIMULADA del visitante (franja roja, sus datos de admin): menú
 «Consulta» con las 2 entradas, chip VISITANTE, sin buscador, sin gases/Duval ni descargas; Mapa sin el rótulo Borrador (152
 puntos). Pendiente (TODO-83): la validación con la cuenta real del visitante, que crea el Ingeniero.
+
+## 199. ADR-199 — Rastro de actividad del visitante: inicios de sesión, visitas, páginas, equipos, filtros, selecciones del mapa e intentos; panel «Actividad del visitante» (TODO-83) ⟦OPUS-5.5⟧ (2026-11-01)
+
+> «este perfil de visitante necesito rastrearlo, cuantas veces inicia sesion en que se ubica, que consulta, todo» (2026-11-01).
+> Sus decisiones (preguntas cerradas): «Solo módulo y equipo» (sin ubicación física) · aviso: «es un control interno, no es
+> necesario que la persona sepa, ya que la pagina es de mi propiedad y es visitante»; ante la verificación legal: «esta pagina no
+> es de afinia, es mia de uso personal» · «Panel en Administración» · conservar «Mientras la cuenta exista».
+
+**199.1 Causa raíz.** No había registro de uso por cuenta: la bitácora `/auditoria` solo guarda mutaciones y el visitante no
+escribe en ella (ADR-198). Firestore no deja rastro de las lecturas del cliente.
+
+**199.2 Solución.** El navegador del visitante AGREGA sus eventos en `actividad_visitante/{uid}/eventos` (sin poder leerlos):
+`pagina` (con navegador, sistema, tipo de equipo y pantalla), `equipo` y `ruta` (de `#mat/#mes/#periodo`, por hashchange y
+por `history.replaceState`, que la lista y el detalle usan), `control` (filtro y valor, con el nombre del rótulo SIN las opciones),
+`clic` (botones; no repite lo que ya anota equipo/selección; botones marcables con su estado), `seleccion` (evento `sgm:consulta`
+que emite `mapa-colombia.js#seleccionar`, con el nombre del departamento y la matrícula) e `intento` (página no permitida: el
+guardián la deja en `sessionStorage` antes de redirigir). `domain/rastro_visitante.js` (forma acotada = la de las reglas;
+resumen: INICIO DE SESIÓN = marca `user.metadata.lastSignInTime`; VISITA = tramo continuo que se corta a los 30 min sin
+actividad, al cambiar de día en Colombia o de inicio de sesión). `ui/rastro-visitante.js` lo carga el guardián SOLO para el
+visitante, sin esperar. Reglas: create solo del visitante activo en su uid, claves y tamaños cerrados, `en == request.time`;
+get/list y delete solo admin; nadie edita. Panel `admin/actividad-visitante.html` (pestaña y menú de Administración): KPIs
+(inicios, visitas, última actividad, equipos, intentos, acciones), visitas, equipos más consultados, uso por día, línea de
+tiempo, CSV y borrado (anotado en Auditoría); lee SOLO el periodo elegido (filtro en el servidor) y lista a los visitantes
+primero y a las demás cuentas después. Al eliminar una cuenta se borra antes su rastro (`data/usuarios.js#eliminar` →
+`data/actividad_visitante.js`). Mapa con `?v=199`.
+
+**199.3 No-regresión.** Para admin y técnicos nada cambia: el rastro solo se importa con `acceso.restringido`; el evento del
+mapa no tiene oyentes para ellos; la eliminación de una cuenta sin rastro hace una lectura vacía más.
+
+**199.4 Verificación.** `test:unit` 3277 ✅ · lint ✅ · `test:rules` 337 ✅ (el visitante agrega su evento —con y sin detalle,
+con dispositivo, intento—; no en otro uid, ni tipo raro, ni clave de más, ni texto largo, ni hora del cliente; ni técnico, ni
+inactivo, ni admin escriben; solo el admin lee y borra; nadie edita). `tests/rastro_visitante.test.js` (forma, visitas, día
+de Colombia, tableta/iPad, amarres con las reglas, rastro antes que el perfil, panel sin HTML ajeno). Revisión adversarial con
+verificación (`wf_2b109a52-3cf`): 28 hallazgos, 26 reales (2 medios de diseño aceptados, ver .8), corregidos los de código.
+Verificación legal en fuentes oficiales (`wf_32a77f0b-5ff`).
+
+**199.5 Anti-patterns evitados.** Contar «inicios» por recarga; leer 5000 documentos para mostrar una semana; dejar el rastro
+huérfano al eliminar la cuenta o cambiarle el rol; pintar como HTML lo que escribió el visitante; una exportación nueva en un
+módulo publicado (L-102); un separador de línea literal en un regex (el editor convirtió ` ` en el carácter: se reescribió
+con escapes).
+
+**199.6 Archivos.** NUEVOS: `assets/js/domain/rastro_visitante.js`, `assets/js/ui/rastro-visitante.js`,
+`assets/js/data/actividad_visitante.js`, `admin/actividad-visitante.html`, `assets/js/admin/admin-actividad-visitante.js`,
+`assets/css/actividad-visitante.css`, `tests/rastro_visitante.test.js`. Modificados: `firestore.rules` (bloque del rastro antes del
+del Informe de Brigada), `assets/js/auth/session-guard.js`, `assets/js/ui/mapa/mapa-colombia.js` (+ `?v=199` en `pages/mapa-v2.html`),
+`assets/js/data/usuarios.js` (eliminar), `admin/administracion.html`, `assets/js/aqua-shell.js`, `tests-rules/visitante.rules.test.js`.
+
+**199.7 Doctrina.** Decisiones de criterio suyas con la recomendada; skill `legal-colombia` (marco colombiano, fuentes .gov.co);
+revisión adversarial; L-78, L-102. Crudo y síntesis: bóveda `2026-11-01-rastro-visitante/`. NO revisado externamente.
+
+**199.8 Verificado sano / riesgos ACEPTADOS (decisión del Ingeniero).** (a) LEGAL: la verificación (Ley 1581/2012 arts. 3, 4, 9,
+10, 12; C-748/2011; Decreto 1074/2015 arts. 2.2.2.25.2.1, .2.2 y .2.4) halló que un rastro ligado a una cuenta con nombre es dato
+personal, que la autorización debe ser previa, expresa e informada (sin consentimiento tácito; las excepciones del art. 10 no
+incluyen control interno) y que se prohíbe recolectar por medios engañosos. Se le ofreció «Aviso y Acepto una vez»; decidió no
+avisar porque la plataforma es suya y de uso personal. La exclusión del art. 2 lit. a) es la del ámbito personal o doméstico
+(vida privada o familiar, Decreto 1074 art. 2.2.2.25.1.2): si la plataforma se usa formalmente para AFINIA, revisarlo con su
+oficial de datos. Orientación, no asesoría legal. (b) El registro lo anota el navegador del visitante: quien bloquee la escritura
+o consulte por fuera de la página no deja rastro (dicho en el panel). (c) Las reglas no limitan cuántos eventos escribe: un
+visitante hostil puede inundar su rastro o inventar «inicios» desde la consola (costo de centavos; remedio: «Desactivar», que
+corta en la siguiente petición). (d) Un evento del mapa en el primer segundo, antes de que cargue el módulo, puede perderse.
+Refutados: «el rastro por sí mismo es ilegal» (lo legal es decisión del dueño, documentada aquí) y uno de duplicados.

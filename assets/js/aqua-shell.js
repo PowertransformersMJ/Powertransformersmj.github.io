@@ -353,6 +353,7 @@
         <a href="${u('admin/administracion.html')}#tab=catalogos" class="sb-item sb-admin" data-key="catalogos"><span class="i"><i data-lucide="list"></i></span>Catálogos</a>
         <a href="${u('admin/administracion.html')}#tab=importar" class="sb-item sb-admin" data-key="importar"><span class="i"><i data-lucide="upload"></i></span>Importar</a>
         <a href="${u('admin/administracion.html')}#tab=auditoria" class="sb-item sb-admin" data-key="auditoria"><span class="i"><i data-lucide="scroll-text"></i></span>Auditoría</a>
+        <a href="${u('admin/administracion.html')}#tab=actividad-visitante" class="sb-item sb-admin" data-key="actividad-visitante"><span class="i"><i data-lucide="eye"></i></span>Actividad del visitante</a>
         <a href="${u('admin/umbrales-salud.html')}" class="sb-item sb-admin" data-key="umbrales-salud"><span class="i"><i data-lucide="sliders-horizontal"></i></span>Umbrales de Salud</a>
         <a href="${u('admin/scada-datos.html')}" class="sb-item sb-admin" data-key="scada-datos"><span class="i"><i data-lucide="folder-up"></i></span>Datos SCADA</a>
         <a href="${u('admin/migrate-contrato-id.html')}" class="sb-item sb-admin" data-key="migrate-contrato-id" title="Acceso temporal · retirar después de ejecutar la migración"><span class="i"><i data-lucide="database-zap"></i></span>Migrar contrato_id</a>
