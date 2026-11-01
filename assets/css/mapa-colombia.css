@@ -8,6 +8,8 @@
   font: 600 .68rem/1 var(--font-body, Inter), sans-serif; letter-spacing: .04em;
   color: #9a3412; background: #ffedd5; border: 1px solid #fdba74; border-radius: 999px; padding: .3rem .6rem;
 }
+/* El visitante no ve lo que está en Borrador (`99 §198`); el guardián marca <html data-rol>. */
+html[data-rol="visitante"] .mc-borrador { display: none; }
 
 .mc-barra { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: .2rem 0 .9rem; }
 .mc-barra .form-select { width: auto; flex: 0 1 11.5rem; min-width: 9.5rem; }

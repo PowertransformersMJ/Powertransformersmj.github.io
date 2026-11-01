@@ -48,11 +48,37 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Rol «visitante» (`99 §198`, pedido del Ingeniero 2026-10-30: «solo podrá apreciar el módulo de
+    // cargabilidad SCADA y mapa… no puede crear ni gestionar nada»). NO es miembro del equipo: solo lee
+    // lo que esos dos módulos usan (`puedeVerCargaMapa`). Ante la duda, CERRADO: cuenta como visitante
+    // todo texto que contenga «visitante» (mayúsculas, espacios raros o saltos de línea escritos por
+    // consola) y todo rol que no sea texto (lista, número…); sin rol (o null) sigue siendo del equipo.
+    // Espejo EXACTO: storage.rules, functions/acceso_ia.mjs y assets/js/domain/acceso_por_rol.js.
+    function esRolVisitante(r) {
+      return r is string ? r.lower().matches('(?s).*visitante.*') : r != null;
+    }
+
     function isTeamMember() {
       return isSignedIn() && (
-        (hasProfile() && profile().activo == true) ||
+        (hasProfile() && profile().activo == true && !esRolVisitante(profile().get('rol', ''))) ||
         adminsBootstrapValido()
       );
+    }
+
+    function esVisitanteActivo() {
+      return isSignedIn() && hasProfile() && profile().activo == true
+        && esRolVisitante(profile().get('rol', ''));
+    }
+
+    // Lectura de Cargabilidad SCADA y del Mapa: el equipo, o el visitante activo. Va SOLO en las
+    // lecturas que esas dos páginas hacen (lista cerrada en `99 §198`); todo lo demás sigue en isTeamMember.
+    function puedeVerCargaMapa() {
+      return isTeamMember() || esVisitanteActivo();
+    }
+
+    // Un perfil visitante no lleva permisos puntuales (`99 §118`): el panel los vacía al asignarle el rol.
+    function visitanteSinPermisos(d) {
+      return !esRolVisitante(d.get('rol', '')) || d.get('permisos_extra', []).size() == 0;
     }
 
     function isAdmin() {
@@ -138,16 +164,20 @@ service cloud.firestore {
                     && request.resource.data.rol in [
                         'admin','tecnico',
                         'director_proyectos','analista_tx',
-                        'gestor_contractual','brigadista','auditor_campo'
+                        'gestor_contractual','brigadista','auditor_campo',
+                        'visitante'
                        ]
+                    && visitanteSinPermisos(request.resource.data)
                     && request.resource.data.activo is bool;
       allow update: if isAdmin()
                     && (!('rol' in request.resource.data)
                         || request.resource.data.rol in [
                             'admin','tecnico',
                             'director_proyectos','analista_tx',
-                            'gestor_contractual','brigadista','auditor_campo'
+                            'gestor_contractual','brigadista','auditor_campo',
+                            'visitante'
                            ])
+                    && visitanteSinPermisos(request.resource.data)
                     && (!('activo' in request.resource.data)
                         || request.resource.data.activo is bool);
       allow delete: if isAdmin() && request.auth.uid != uid;
@@ -157,7 +187,9 @@ service cloud.firestore {
     // La UI dedicada entra en F20. F16 sólo expone CRUD admin
     // para que el importador F17 pueda poblar la colección.
     match /subestaciones/{id} {
-      allow read:   if isTeamMember();
+      // El visitante (`99 §198`) la lee para el Mapa, con el mismo tope de 500 que usa la página.
+      allow get:    if puedeVerCargaMapa();
+      allow list:   if isTeamMember() || (esVisitanteActivo() && request.query.limit <= 500);
       allow create: if isAdmin()
                     && request.resource.data.keys().hasAll([
                         'codigo','nombre','departamento'
@@ -195,7 +227,10 @@ service cloud.firestore {
     // trae los dos.
     match /transformadores/{id} {
 
-      allow read: if isTeamMember();
+      // El visitante (`99 §198`) lo lee para Cargabilidad SCADA y el Mapa (tope de 500, el de las páginas);
+      // sus subcolecciones (placas_historicas, historial_hi, historial) siguen solo para el equipo.
+      allow get:  if puedeVerCargaMapa();
+      allow list: if isTeamMember() || (esVisitanteActivo() && request.query.limit <= 500);
 
       allow create: if isAdmin()
         && request.resource.data.schema_version == 2
@@ -378,7 +413,9 @@ service cloud.firestore {
     // Documento `global` con los umbrales activos del motor de
     // salud. Historial append-only en /historial/{id}.
     match /umbrales_salud/{id} {
-      allow read:   if isTeamMember();
+      // El visitante (`99 §198`) lee SOLO el vigente: sin él vería otras bandas CRG que el equipo, sin aviso.
+      allow get:    if isTeamMember() || (esVisitanteActivo() && id == 'global');
+      allow list:   if isTeamMember();
       allow write:  if isAdmin();
       match /historial/{evt} {
         allow read:   if isTeamMember();
@@ -949,6 +986,7 @@ service cloud.firestore {
     // La delegación `d` de quien pide, vigente para el directorio del custodio `c`.
     function delegacionVigente(d, c) {
       return request.auth.uid != c && hasProfile() && profile().get('activo', false) == true
+        && !esRolVisitante(profile().get('rol', ''))   // el visitante no firma (`99 §198`)
         && d.custodio == c && d.alcance == 'ordenes' && custodioVigente(c);
     }
     function delegadoLee(c, persona) {
@@ -973,6 +1011,7 @@ service cloud.firestore {
     }
     function delegacionFichasVigente(d, c) {
       return request.auth.uid != c && hasProfile() && profile().get('activo', false) == true
+        && !esRolVisitante(profile().get('rol', ''))   // el visitante no firma (`99 §198`)
         && d.custodio == c && d.alcance == 'fichas' && custodioVigente(c);
     }
     function delegadoFichasLee(c, persona) {
@@ -1043,6 +1082,7 @@ service cloud.firestore {
                               'autorizaciones', 'alcance', 'lote', 'en'])
           && d.custodio == request.auth.uid && d.custodioNombre == profile().get('nombre', '')
           && delegado != request.auth.uid && u.get('activo', false) == true && d.delegadoNombre == u.get('nombre', '')
+          && !esRolVisitante(u.get('rol', ''))   // no se delega en un visitante (`99 §198`)
           && d.personaPropia in ['CARLOS_MARTELO', 'JORGE_RHENALS']
           && d.personas is list && d.personas.size() >= 1 && d.personas.size() <= 3
           && d.personas.hasOnly(delegables()) && d.personas.toSet().size() == d.personas.size()
@@ -1053,7 +1093,8 @@ service cloud.firestore {
           && d.alcance == 'ordenes' && d.lote is string && d.lote.matches('^[A-Za-z0-9]{20}$') && d.en == request.time
           && !exists(reg) && existsAfter(reg) && getAfter(reg).data.tipo == (resource == null ? 'alta' : 'cambio');
       }
-      allow get:    if hasProfile() && ((request.auth.uid == delegado && profile().get('activo', false) == true)
+      allow get:    if hasProfile() && ((request.auth.uid == delegado && profile().get('activo', false) == true
+                                         && !esRolVisitante(profile().get('rol', '')))   // `99 §198`
                                         || (isAdmin() && resource.data.custodio == request.auth.uid));
       allow list:   if hasProfile() && isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
       allow create: if hasProfile() && isAdmin() && delegacionValida();
@@ -1099,6 +1140,7 @@ service cloud.firestore {
                               'autorizaciones', 'alcance', 'lote', 'en'])
           && d.custodio == request.auth.uid && d.custodioNombre == profile().get('nombre', '')
           && delegado != request.auth.uid && u.get('activo', false) == true && d.delegadoNombre == u.get('nombre', '')
+          && !esRolVisitante(u.get('rol', ''))   // no se delega en un visitante (`99 §198`)
           && d.personaPropia in ['CARLOS_MARTELO', 'JORGE_RHENALS']
           && d.personas is list && d.personas.size() >= 1 && d.personas.size() <= 5
           && d.personas.hasOnly(delegablesFichas()) && d.personas.toSet().size() == d.personas.size()
@@ -1111,7 +1153,8 @@ service cloud.firestore {
           && d.alcance == 'fichas' && d.lote is string && d.lote.matches('^[A-Za-z0-9]{20}$') && d.en == request.time
           && !exists(reg) && existsAfter(reg) && getAfter(reg).data.tipo == (resource == null ? 'alta' : 'cambio');
       }
-      allow get:    if hasProfile() && ((request.auth.uid == delegado && profile().get('activo', false) == true)
+      allow get:    if hasProfile() && ((request.auth.uid == delegado && profile().get('activo', false) == true
+                                         && !esRolVisitante(profile().get('rol', '')))   // `99 §198`
                                         || (isAdmin() && resource.data.custodio == request.auth.uid));
       allow list:   if hasProfile() && isAdmin() && request.query.limit <= 50 && resource.data.custodio == request.auth.uid;
       allow create: if hasProfile() && isAdmin() && delegacionFichasValida();
@@ -1352,6 +1395,7 @@ service cloud.firestore {
     function puedeAdjuntarOperativo() {
       return hasProfile() && (isAdmin()
         || (profile().get('activo', false) == true
+            && !esRolVisitante(profile().get('rol', ''))   // `99 §198`
             && profile().get('permisos_extra', []) is list
             && profile().get('permisos_extra', []).hasAny(['fichas.adjuntar_operativo'])));
     }
@@ -1461,7 +1505,7 @@ service cloud.firestore {
            && (k != 0 || f.partes != 1 || hashing.sha256(getAfter(rutaPartePlaca(id, k)).data.bytes).toHexString().lower() == f.huella));
     }
     match /placas_caracteristicas/{id} {
-      allow get:  if isTeamMember();
+      allow get:  if puedeVerCargaMapa();   // el visitante: la placa del detalle de Cargabilidad (`99 §198`)
       allow list: if isAdmin() && request.query.limit <= 50;
       allow create, update: if isAdmin() && hasProfile()
                     && id.matches('^[A-Za-z0-9]{6,64}$')
@@ -1488,7 +1532,7 @@ service cloud.firestore {
                     && existsAfter(rutaRegPlaca(id + '_' + resource.data.carga.paquete + '_retiro'))
                     && !existsAfter(rutaPartePlaca(id, 0)) && !existsAfter(rutaPartePlaca(id, 1)) && !existsAfter(rutaPartePlaca(id, 2));
       match /partes/{n} {
-        allow get: if isTeamMember();
+        allow get: if puedeVerCargaMapa();   // la foto de la placa (`99 §198`)
         allow create, update: if isAdmin() && hasProfile() && n in ['0', '1', '2']
                       && request.resource.data.keys().hasOnly(['bytes', 'lote'])
                       && request.resource.data.bytes is bytes
@@ -1575,7 +1619,7 @@ service cloud.firestore {
     }
     function scadaSello(d) { return d.actualizadoEn == request.time && scadaQuien(d.actualizadoPor); }
     match /scada_series/{id} {
-      allow get: if isTeamMember();
+      allow get: if puedeVerCargaMapa();   // también el visitante (`99 §198`)
       allow list: if false;
       allow create, update: if scadaAdmin()
         && id.matches('[a-z0-9_-]{1,40}__[a-z0-9_-]{1,40}__20[0-9]{2}-(0[1-9]|1[0-2])')
@@ -1590,7 +1634,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /scada_resumen/{mes} {
-      allow get: if isTeamMember();
+      allow get: if puedeVerCargaMapa();   // también el visitante (`99 §198`)
       allow list: if false;
       allow create, update: if scadaAdmin()
         && mes.matches('20[0-9]{2}-(0[1-9]|1[0-2])') && request.resource.data.mes == mes
@@ -1601,7 +1645,7 @@ service cloud.firestore {
       allow delete: if false;
     }
     match /scada_catalogo/{id} {
-      allow get: if isTeamMember();
+      allow get: if puedeVerCargaMapa();   // también el visitante (`99 §198`)
       allow list: if false;
       allow create, update: if scadaAdmin() && id == 'estado'
         && request.resource.data.keys().hasOnly(['schema', 'meses', 'puntos', 'cargaId', 'actualizadoPor', 'actualizadoEn'])
@@ -1640,7 +1684,7 @@ service cloud.firestore {
               && d.filas.diff(resource.data.filas).affectedKeys().hasOnly([reg.filaId])));
     }
     match /scada_homologacion/{id} {
-      allow get: if isTeamMember();
+      allow get: if puedeVerCargaMapa();   // también el visitante (`99 §198`)
       allow list: if false;
       allow create, update: if scadaAdmin() && id == 'vigente'
         && request.resource.data.keys().hasOnly(['schema', 'rev', 'fuente', 'filas', 'ultimoRegistro', 'actualizadoPor', 'actualizadoEn'])
@@ -1698,6 +1742,7 @@ service cloud.firestore {
     function ibrRutaParteFicha(f) { return /databases/$(database)/documents/informes_brigada_fichas/$(f)/partes/0; }
     function ibrEditor() {
       return hasProfile() && profile().activo == true
+        && !esRolVisitante(profile().get('rol', ''))   // aunque siga en la lista de editores (`99 §198`)
         && exists(ibrRutaConfig())
         && request.auth.uid in get(ibrRutaConfig()).data.editores;
     }

@@ -539,15 +539,56 @@
     const initials = (name || '').split(/\s+/).map(s => s[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() || '··';
     const av = document.getElementById('tbAvatar');
     if (av) { av.textContent = initials; av.title = name; }
+    const restringido = !!(sess.acceso && sess.acceso.restringido);
     const rch = document.getElementById('tbRole');
     if (rch) {
       rch.hidden = false;
-      rch.textContent = role === 'admin' ? 'ADMIN' : role.toUpperCase().slice(0, 8);
+      rch.textContent = role === 'admin' ? 'ADMIN' : restringido ? 'VISITANTE' : role.toUpperCase().slice(0, 8);
     }
     if (role === 'admin') {
       document.querySelectorAll('.sb-admin-group').forEach((el) => el.hidden = false);
     } else {
       document.querySelectorAll('.sb-admin').forEach((el) => el.style.display = 'none');
+    }
+    if (restringido) aplicarAccesoRestringido(sess.acceso);
+  }
+
+  /* Rol «visitante» (`99 §198`): el menú queda en las páginas que le permite el guardián (la lista
+     vive en assets/js/domain/acceso_por_rol.js y llega en sess.acceso). Esconder no protege: las
+     reglas son la barrera. Idempotente: applySession puede correr dos veces (init y evento). */
+  function aplicarAccesoRestringido(acceso) {
+    const sb = document.getElementById('aquaSidebar');
+    if (!sb || document.getElementById('sbConsulta')) return;
+    sb.querySelectorAll('.sb-group').forEach((g) => { g.hidden = true; });
+    sb.querySelectorAll('.sb-item.is-active').forEach((a) => a.classList.remove('is-active'));
+    const grupo = document.createElement('div');
+    grupo.className = 'sb-group';
+    grupo.id = 'sbConsulta';
+    const titulo = document.createElement('div');
+    titulo.className = 'sb-group-title';
+    titulo.textContent = 'Consulta';
+    grupo.appendChild(titulo);
+    const aqui = location.pathname.replace(/\.html$/, '').replace(/\/+$/, '');
+    (acceso.paginas || []).forEach((p) => {
+      const a = document.createElement('a');
+      a.href = u(p.ruta);
+      a.className = 'sb-item';
+      const i = document.createElement('span');
+      i.className = 'i';
+      const ic = document.createElement('i');
+      ic.setAttribute('data-lucide', p.icono);
+      i.appendChild(ic);
+      a.append(i, document.createTextNode(p.titulo));
+      if (aqui.endsWith('/' + p.ruta.replace(/\.html$/, ''))) a.classList.add('is-active');
+      grupo.appendChild(a);
+    });
+    const cabeza = sb.querySelector('.sb-brand-head');
+    sb.insertBefore(grupo, cabeza ? cabeza.nextSibling : sb.firstChild);
+    if (acceso.inicio) document.querySelectorAll('.tb-brand, .sb-brand-head').forEach((a) => a.setAttribute('href', u(acceso.inicio)));
+    const buscar = document.querySelector('.tb-search');
+    if (buscar) buscar.style.display = 'none';
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      try { window.lucide.createIcons(); } catch (_) {}
     }
   }
 

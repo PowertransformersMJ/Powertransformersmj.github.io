@@ -253,13 +253,32 @@ export function ensureSession({ requireAdmin = false } = {}) {
           return;
         }
 
+        // Rol «visitante» (`99 §198`): solo Cargabilidad SCADA y el Mapa. El módulo de acceso se carga
+        // SOLO para él (el equipo no gana ninguna dependencia nueva; si fallara, el visitante queda oculto
+        // con el error). Va antes del chequeo de admin: en admin/* también va a su inicio, no al home.
+        let acceso = { restringido: false, permitido: true };
+        const r = profile.rol;   // mismo criterio que acceso_por_rol.js (ante la duda, cerrado)
+        if (r != null && (typeof r !== 'string' || r.toLowerCase().includes('visitante'))) {
+          const { decidirAcceso } = await import('../domain/acceso_por_rol.js');
+          acceso = decidirAcceso(profile.rol, location.pathname);
+          if (!acceso.permitido) {
+            // Dentro de un iframe decide la página de arriba: este marco queda oculto, sin redirigir.
+            if (window.self !== window.top) { console.warn('[SGM] visitante: página embebida no permitida.'); return; }
+            console.warn('[SGM] el visitante no tiene esta página — a su inicio.');
+            redirect(BASE_URL + acceso.destino);
+            return;
+          }
+          // Marca para las páginas: ocultan lo que está en Borrador y las descargas (CSS y solo-ver.js).
+          document.documentElement.dataset.rol = 'visitante';
+        }
+
         if (requireAdmin && profile.rol !== 'admin') {
           console.warn('[SGM] rol insuficiente para admin: %s — al home.', profile.rol);
           redirect(HOME_URL + '?denied=admin');
           return;
         }
 
-        const sess = { user, profile, role: profile.rol };
+        const sess = { user, profile, role: profile.rol, acceso };
         window.__sgmSession = sess;
         window.__sgmAdmin = { uid: user.uid, email: user.email };
         try {

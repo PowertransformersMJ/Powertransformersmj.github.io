@@ -21,7 +21,8 @@ import { sanitizarPerfilRBAC } from '../domain/rbac.js';
 export const ROLES = [
   'admin', 'director_proyectos', 'analista_tx',
   'gestor_contractual', 'brigadista', 'auditor_campo',
-  'tecnico'  // legacy F14
+  'tecnico',  // legacy F14
+  'visitante' // 99 §198: solo ve Cargabilidad SCADA y el Mapa
 ];
 
 export const ROLE_LABELS = {
@@ -31,7 +32,8 @@ export const ROLE_LABELS = {
   gestor_contractual:  'Gestión Contractual',
   brigadista:          'Brigadista',
   auditor_campo:       'Auditor de Campo',
-  tecnico:             'Técnico (legacy)'
+  tecnico:             'Técnico (legacy)',
+  visitante:           'Visitante (solo ve Cargabilidad SCADA y Mapa)'
 };
 
 export function labelRol(r) {
@@ -81,6 +83,8 @@ export async function crear({
   if (!uid) throw new Error('UID requerido.');
   if (!email) throw new Error('Email requerido.');
   if (!ROLES.includes(rol)) throw new Error('Rol inválido.');
+  // 99 §198: el visitante no lleva permisos puntuales (las reglas lo exigen).
+  if (rol === 'visitante') permisos_extra = [];
   const rbac = sanitizarPerfilRBAC({ zonas, contratos, permisos_extra });
   const payload = {
     email: String(email).trim().toLowerCase(),
@@ -107,6 +111,9 @@ export async function crear({
 
 export async function actualizar(uid, patch, { actorUid } = {}) {
   if (!uid) throw new Error('UID requerido.');
+  // 99 §198: al pasar a visitante se le vacían los permisos puntuales en la MISMA escritura (las
+  // reglas rechazan un visitante con permisos; la casilla deshabilitada no los manda).
+  if (patch.rol === 'visitante') patch = { ...patch, permisos_extra: [] };
   const prev = await obtener(uid);
   const clean = {};
   if ('nombre'   in patch) clean.nombre   = String(patch.nombre || '').trim();

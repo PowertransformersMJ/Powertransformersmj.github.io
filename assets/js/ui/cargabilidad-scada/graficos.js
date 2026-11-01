@@ -9,6 +9,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { loadPlotly } from '../../plotly-loader.js';
+import { sinBotones } from './solo-ver.js';
 import { FASES, FASE_DE, CALCULO } from '../../domain/scada_carga_config.js';
 import { NOMBRE_EXTRA } from '../../domain/scada_carga_extras.js';
 import { xPlotly, intervaloCO } from '../../domain/scada_carga_fecha.js';
@@ -129,7 +130,7 @@ export async function dibujarFigura(div, d, vigente = () => true) {
       yaxis: { title: { text: p.unidad, font: { size: 12 } }, gridcolor: '#eef1f6', ...p.eje, ...(escala ? { range: escala.rango, autorange: false } : {}) },
       shapes: shapes[clave], annotations: annotations[clave]
     };
-    const config = { responsive: true, displaylogo: false, locale: 'es', scrollZoom: false, modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+    const config = { responsive: true, displaylogo: false, locale: 'es', scrollZoom: false, modeBarButtonsToRemove: sinBotones(['lasso2d', 'select2d']),
       toImageButtonOptions: { filename: 'cargabilidad_scada_' + d.etiqueta.replace(/[^a-z0-9]+/gi, '_') + '_' + clave } };
     await Plotly.react(lienzo, datos, layout, config);
     if (!vigente()) { liberarFigura(div); return; }

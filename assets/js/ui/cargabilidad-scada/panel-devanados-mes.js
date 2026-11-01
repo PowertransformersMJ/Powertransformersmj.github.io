@@ -28,6 +28,7 @@ import { lecturaUmbral, columnasEtapas, escalaRotulos, partirRenglon } from '../
 import { nivelesExcluidos, notaCorta } from '../../domain/scada_niveles_excluidos.js';
 import { NIVELES } from '../../domain/scada_carga_config.js';
 import { loadPlotly } from '../../plotly-loader.js';
+import { sinBotones } from './solo-ver.js';
 
 const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const corto = (mes) => CORTOS[Number(String(mes).slice(5, 7)) - 1] + ' ' + String(mes).slice(2, 4);
@@ -413,7 +414,7 @@ export async function pintarDevanadosMes(nodo, opts) {
         yaxis: { title: { text: 'A' }, range: [0, maxY], gridcolor: '#eef1f6', zeroline: false, fixedrange: true },
         ...(f ? { yaxis2: { title: { text: MVA_EQ }, overlaying: 'y', side: 'right', range: [0, maxY * f], showgrid: false, zeroline: false, fixedrange: true } } : {}),
         shapes, annotations
-      }, { displaylogo: false, responsive: true, locale: 'es', modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'toggleSpikelines', 'zoom2d', 'pan2d'] });
+      }, { displaylogo: false, responsive: true, locale: 'es', modeBarButtonsToRemove: sinBotones(['select2d', 'lasso2d', 'autoScale2d', 'toggleSpikelines', 'zoom2d', 'pan2d']) });
     }
   } catch (e) {
     console.warn('[cargabilidad-scada] devanados mes a mes', e);

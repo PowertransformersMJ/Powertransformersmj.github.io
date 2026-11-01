@@ -290,6 +290,13 @@
     btnReset.disabled = true;
   }
 
+  // 99 §198: el visitante entra directo a Cargabilidad SCADA (sin pasar por el inicio, que leería datos que
+  // no le sirven). Mismo criterio que assets/js/domain/acceso_por_rol.js; la barrera es el guardián de cada página.
+  const inicioDe = (p) => {
+    const r = p && p.rol;
+    return r != null && (typeof r !== 'string' || r.toLowerCase().includes('visitante')) ? 'pages/cargabilidad-scada.html' : 'home.html';
+  };
+
   (function bootstrap() {
     const auth = getAuthSafe();
     const db   = getDbSafe();
@@ -306,7 +313,7 @@
       try {
         const snap = await getDoc(doc(db, 'usuarios', user.uid));
         if (snap.exists() && snap.data().activo !== false) {
-          location.replace('home.html');
+          location.replace(inicioDe(snap.data()));
           return;
         }
         const adminSnap = await getDoc(doc(db, 'admins', user.uid));
@@ -346,10 +353,11 @@
 
       let ok = false;
       let falla = false;
+      let destino = 'home.html';
       const esFalla = (e) => !(e && (e.code === 'permission-denied' || e.code === 'unauthenticated'));
       try {
         const snap = await getDoc(doc(db, 'usuarios', cred.user.uid));
-        if (snap.exists() && snap.data().activo !== false) ok = true;
+        if (snap.exists() && snap.data().activo !== false) { ok = true; destino = inicioDe(snap.data()); }
       } catch (e) { falla = falla || esFalla(e); }
       if (!ok) {
         try {
@@ -374,7 +382,7 @@
       }
 
       setMsg('✓ Acceso concedido. Redirigiendo…', 'ok');
-      setTimeout(() => location.replace('home.html'), 400);
+      setTimeout(() => location.replace(destino), 400);
     } catch (err) {
       setMsg(humanize(err), 'err');
       btn.disabled = false;

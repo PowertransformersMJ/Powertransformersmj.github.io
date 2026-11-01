@@ -10,6 +10,7 @@ import {
 } from '../data/usuarios.js';
 import { logout, getSession } from '../auth/session-guard.js';
 import { PERMISO_ADJUNTAR_OPERATIVO, conPermisoOperativo } from '../domain/permiso_operativo.js';
+import { esRolVisitante } from '../domain/acceso_por_rol.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -67,7 +68,9 @@ function render() {
       : '<span class="cod-pill activo">ACTIVO</span>';
     const rolPill = (u.rol === 'admin'
       ? '<span class="rol-pill admin">ADMINISTRADOR</span>'
-      : '<span class="rol-pill tecnico">TÉCNICO</span>')
+      : esRolVisitante(u.rol)
+        ? '<span class="rol-pill visitante" title="Solo ve Cargabilidad SCADA y el Mapa">VISITANTE</span>'
+        : '<span class="rol-pill tecnico">TÉCNICO</span>')
       + (u.rol !== 'admin' && Array.isArray(u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO)
         ? ' <span class="rol-pill tecnico" title="Puede adjuntar el Diagrama Operativo en Fichas">+ DIAGRAMA OPERATIVO</span>' : '');
     const isMe = u.uid === meUid;
@@ -183,9 +186,11 @@ function sincronizarPermiso(u) {
   if (!perm) return;
   const tenia = Array.isArray(u && u.permisos_extra) && u.permisos_extra.includes(PERMISO_ADJUNTAR_OPERATIVO);
   const esAdmin = $('eRol').value === 'admin';
-  perm.disabled = esAdmin;
-  perm.checked = esAdmin ? true : tenia;
-  perm.title = esAdmin ? 'El administrador ya puede por su rol.' : '';
+  // 99 §198: el visitante no lleva permisos puntuales (al guardar se le vacían).
+  const esVisitante = $('eRol').value === 'visitante';
+  perm.disabled = esAdmin || esVisitante;
+  perm.checked = esAdmin ? true : esVisitante ? false : tenia;
+  perm.title = esAdmin ? 'El administrador ya puede por su rol.' : esVisitante ? 'El visitante solo ve; no adjunta.' : '';
 }
 $('eRol').addEventListener('change', () => sincronizarPermiso(cache.find((x) => x.uid === $('eUid').value) || {}));
 

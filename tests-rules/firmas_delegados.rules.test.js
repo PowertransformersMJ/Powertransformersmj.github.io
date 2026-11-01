@@ -38,6 +38,8 @@ before(async () => {
     await u('fd_baja', 'tecnico', true, 'Se Da De Baja');
     await u('fd_degradado', 'admin', true, 'Custodio Que Baja');
     await u('fd_sin_nombre', 'tecnico', true, 'Queda Sin Nombre');
+    await u('fd_visitante', 'visitante', true, 'Visitante FD');   // 99 §198
+    await u('fd_pasa', 'tecnico', true, 'Pasa A Visitante');
     await setDoc(doc(d, 'admins/fd_arranque'), { email: 'x@x.co' });
     const firma = { imagen: Bytes.fromUint8Array(new Uint8Array([137, 80, 78, 71])), huella: 'e'.repeat(64), autorizacion: HOY, registro: 'r', en: new Date() };
     for (const p of ['MIGUEL_JIMENEZ', 'CARLOS_MARTELO', 'JORGE_RHENALS', 'JORGE_MIRANDA']) {
@@ -297,5 +299,22 @@ describe('vigencia: retirar, dar de baja o degradar corta en la siguiente petici
     await assertFails(getDoc(doc(db('fd_baja'), 'firmas_equipo/fd_degradado/personas/MIGUEL_JIMENEZ')));
     // Ya no es admin: puede retirar su delegación aunque no escriba registro.
     await assertSucceeds(deleteDoc(doc(db('fd_degradado'), 'firmas_delegados/fd_baja')));
+  });
+});
+
+describe('rol visitante (`99 §198`): no se le delega; un delegado que pasa a visitante deja de leer y de emitir', () => {
+  test('el custodio no le otorga a un visitante', async () => {
+    await assertFails(otorgar('fd_admin', 'fd_visitante', deleg({ delegadoNombre: 'Visitante FD', personaPropia: 'JORGE_RHENALS', lote: lote(95) })));
+  });
+  test('con delegación vigente lee y emite; al pasar a visitante, ni su delegación, ni las firmas, ni emite', async () => {
+    await assertSucceeds(otorgar('fd_admin', 'fd_pasa', deleg({ delegadoNombre: 'Pasa A Visitante', personaPropia: 'JORGE_RHENALS', lote: lote(96) })));
+    const em = (t) => setDoc(doc(db('fd_pasa'), 'ordenes_emisiones/' + fol(t)), emision({ emisor: 'fd_pasa', emisorNombre: 'Pasa A Visitante', delegacion: lote(96) }));
+    await assertSucceeds(getDoc(doc(db('fd_pasa'), 'firmas_delegados/fd_pasa')));
+    await assertSucceeds(getDoc(doc(db('fd_pasa'), 'firmas_equipo/fd_admin/personas/MIGUEL_JIMENEZ')));
+    await assertSucceeds(em('vis0'));
+    await testEnv.withSecurityRulesDisabled((ctx) => updateDoc(doc(ctx.firestore(), 'usuarios/fd_pasa'), { rol: 'visitante' }));
+    await assertFails(getDoc(doc(db('fd_pasa'), 'firmas_delegados/fd_pasa')));
+    await assertFails(getDoc(doc(db('fd_pasa'), 'firmas_equipo/fd_admin/personas/MIGUEL_JIMENEZ')));
+    await assertFails(em('vis1'));
   });
 });

@@ -40,11 +40,19 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
     }
 
-    // Miembro ACTIVO del equipo: perfil en /usuarios con activo == true, o
-    // bootstrap válido. Es el criterio de lectura de todo el bucket.
+    // Rol «visitante» (`99 §198`): solo ve Cargabilidad SCADA y el Mapa, que no
+    // usan Storage → aquí no lee NADA. Espejo EXACTO de firestore.rules (ante la
+    // duda, cerrado: texto que contenga «visitante» o rol que no sea texto).
+    // Función pura: no lee documentos (no cuenta para el tope de dos).
+    function esRolVisitante(r) {
+      return r is string ? r.lower().matches('(?s).*visitante.*') : r != null;
+    }
+
+    // Miembro ACTIVO del equipo: perfil en /usuarios con activo == true y que no
+    // sea visitante, o bootstrap válido. Es el criterio de lectura de todo el bucket.
     function isTeamMember() {
       return isSignedIn() && (
-        (hasProfile() && profile().activo == true) ||
+        (hasProfile() && profile().activo == true && !esRolVisitante(profile().get('rol', ''))) ||
         adminsBootstrapValido()
       );
     }
@@ -170,6 +178,7 @@ service firebase.storage {
     // navegador; lo emitido queda congelado en Firestore (versiones/{n}).
     function ibrEditor() {
       return hasProfile() && profile().activo == true
+        && !esRolVisitante(profile().get('rol', ''))   // aunque siga en la lista (`99 §198`); mismo usuarios/{uid}: no suma documentos
         && request.auth.uid in firestore.get(/databases/(default)/documents/informes_brigada_config/general).data.editores;
     }
     function ibrHuella(h) { return h is string && h.matches('^[0-9a-f]{64}$'); }
