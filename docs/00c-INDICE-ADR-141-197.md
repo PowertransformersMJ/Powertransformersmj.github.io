@@ -70,3 +70,4 @@
 | §197 | ADR-197 — panel de gases: «Urgente» · «PD por confirmar» · aviso ENERGUA · TODO-69 | 9833 |
 | §198 | ADR-198 — **rol visitante**: solo Cargabilidad SCADA y Mapa, sin escribir, sin Borrador ni descargas; cerrado en páginas, base, Storage e IA · TODO-83 | 9920 |
 | §199 | ADR-199 — **rastro del visitante**: inicios, visitas, páginas, equipos, filtros, mapa e intentos; panel en Administración; sin aviso (decisión suya, verificación legal en .8) · TODO-83 | 9998 |
+| §200 | ADR-200 — **octubre 27–29** cargado; **Colomboy T1** por 13,8 kV; **Nueva Cospique T3** reconfirmada · TODO-69 | 10065 |

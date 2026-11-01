@@ -10061,3 +10061,28 @@ Refutados: «el rastro por sí mismo es ilegal» (lo legal es decisión del due�
 los 6 archivos nuevos → 200. En SU Chrome como admin: pestaña y entrada de menú «Actividad del visitante», el panel lista las 3
 cuentas en «Otras cuentas» y avisa que no hay visitantes; KPIs en cero, sin errores. Pendiente (TODO-83): los primeros datos
 reales cuando exista la cuenta del visitante.
+
+## 200. ADR-200 — Cargabilidad SCADA: octubre 27–29 cargado; Colomboy T1 por 13,8 kV (su 34,5 kV revivió con 74 h); Nueva Cospique T3 reconfirmada (TODO-69) ⟦OPUS-5.5⟧ (2026-11-01)
+
+> «he cargado mas dias en el mes de octubre para que por favor los proceses» · Colomboy «Usar el lado de 13,8 kV (Recomendado)» ·
+> Nueva Cospique T3 «Sí, confirmar igual (Recomendado)» (2026-11-01).
+
+**200.1 Causa raíz.** Él agregó las carpetas 27–29 de octubre. Al cargarlas, Colomboy T1 (2,5 MVA) pasó de firme a provisional en
+ene–oct: su 34,5 kV, sin horas válidas todo el año (3 en abril), midió 74 h el 27–29 oct (≥ 72 h: mes medido); dio 63,5 % (CRG 2,
+los días de más carga) frente a 57,4 % del 13,8 kV, y la cifra pasó al lado medido un solo mes de nueve. Nueva Cospique T3 (unidad
+de reserva) quedó «Pendiente»: con 1–2 A de ruido en los dos lados apareció el aviso de relación de corrientes (2,30 frente a 7,97).
+
+**200.2 Solución (datos, sin código).** Paquete `octubre-2026-11-01` (1306 archivos, 147 estaciones, alias 870 y relevo 10585 filas,
+6 partes) → simulación en «Completar» (168 series, 0 iguales, suma de Berrugas «cuadra», 144 cifras cambian: días nuevos) → guardado
+(168 series + 1 resumen). Colomboy: «Revisar» → 34,5 kV «No usar», 13,8 kV → Secundario, nota con la causa (rev 63 → 64).
+Nueva Cospique T3: misma decisión (reserva, ambos lados) con el aviso visto y la nota ampliada (rev 64 → 65): 0 pendientes de 217.
+
+**200.4 Verificación (en vivo, su Chrome).** Antes (oct 1–26 / ene–oct): 126/9 · 193/7 firmes/provisionales; CRG 4–5 55 · 95.
+Tras la carga: 128/8 · 192/8 (Colomboy). Tras las dos decisiones: **octubre 129 firmes · 7 provisionales · 56 CRG 4–5 · 16
+sobrecarga; ene–oct 193 · 7 · 96 · 46**. Octubre: 29 de 31 días (≥ 90 %: «completo»); 172 puntos con `top`; sin «falta preparar».
+
+**200.5 Anti-patterns evitados.** Armar la decisión a mano (se usó «Revisar», que calcula sus avisos); reconfirmar la unidad de
+reserva sin su visto bueno (el control de permisos lo frenó y se le preguntó).
+
+**200.8 Verificado sano.** El 34,5 kV de Colomboy parece real (los dos lados ven ~1,55 MVA esos días): revisar con noviembre si se
+sostiene y volver a usar los dos lados. Las 57 claves que no vienen son, en su mayoría, de Oriente (ENERGUA desde sep).
