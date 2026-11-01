@@ -553,6 +553,14 @@ function fichaMunicipio(m) {
  *  sin él, su departamento registrado. El resaltado anterior vuelve SIEMPRE a su estilo base. */
 function seleccionar(sel, { desdePanel = false } = {}) {
   estado.seleccion = sel;
+  // Aviso de lo seleccionado (`99 §199`): lo escucha el rastro del visitante; a nadie más le cambia nada.
+  if (sel) {
+    try {
+      const nombre = sel.tipo === 'departamento' ? (NOMBRE_DEPTO[sel.dep] || sel.dep) : sel.tipo === 'municipio' ? sel.mun && sel.mun.nom : sel.sub && sel.sub.nombre;
+      const t = sel.tx && sel.sub && Array.isArray(sel.sub.tx) ? sel.sub.tx.find((x) => x.id === sel.tx) : null;   // sel.tx es el id
+      document.dispatchEvent(new CustomEvent('sgm:consulta', { detail: { tipo: sel.tipo, nombre: nombre || '', tx: t ? (t.matricula || t.codigo || '') : '' } }));
+    } catch (_) { /* nunca rompe la selección */ }
+  }
   const m = estado.mapa;
   if (estado.resaltado) { estado.resaltado.setStyle(estado.resaltado._mcBase || {}); estado.resaltado = null; }
   let capa = sel && sel.capa;

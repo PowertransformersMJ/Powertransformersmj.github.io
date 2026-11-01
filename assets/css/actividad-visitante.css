@@ -1,0 +1,27 @@
+/* ═══════════════════════════════════════════════════════════════
+   SGM · TRANSPOWER — Panel «Actividad del visitante» (familia .av-, `99 §199`)
+   Sistema AQUA LIGHT. Archivo NUEVO.
+═══════════════════════════════════════════════════════════════ */
+
+.av .av-campo { display: inline-flex; flex-direction: column; gap: 2px; font-size: .72rem; color: var(--text-soft, #5b6b82); }
+.av .av-campo .form-select { min-width: 13rem; }
+.av .av-peligro { color: #b42318; border-color: rgba(180, 35, 24, .35); }
+.av .av-peligro:disabled { opacity: .45; }
+
+.av-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: .75rem; margin: 1rem 0; }
+.av-kpi { background: rgba(255, 255, 255, .72); border: 1px solid rgba(15, 40, 80, .08); border-radius: 14px; padding: .8rem 1rem; }
+.av-kpi strong { display: block; font: 600 1.35rem/1.2 var(--font-display, 'Space Grotesk'), sans-serif; color: var(--ink-primary, #0f2a4a); }
+.av-kpi span { font-size: .78rem; color: var(--text-soft, #5b6b82); }
+
+.av-panel { background: rgba(255, 255, 255, .72); border: 1px solid rgba(15, 40, 80, .08); border-radius: 16px; padding: 1rem 1.1rem; margin-bottom: 1rem; }
+.av-panel h2 { font: 600 1rem/1.3 var(--font-display, 'Space Grotesk'), sans-serif; margin: 0 0 .6rem; color: var(--ink-primary, #0f2a4a); }
+.av-dos { display: grid; grid-template-columns: 2fr 1fr; gap: 1rem; }
+.av-tabla { overflow-x: auto; }
+.av .av-mono { font-family: var(--font-mono, 'JetBrains Mono'), monospace; font-size: .78rem; }
+.av .av-n { text-align: right; font-variant-numeric: tabular-nums; }
+.av .av-equipos { max-width: 22rem; }
+.av .av-vacio { color: var(--text-soft, #5b6b82); font-style: italic; }
+.av-nota { font-size: .78rem; color: var(--text-soft, #5b6b82); margin: 0 0 .4rem; }
+
+@media (max-width: 860px) { .av-dos { grid-template-columns: 1fr; } }
+.av .info-msg[hidden] { display: none; }

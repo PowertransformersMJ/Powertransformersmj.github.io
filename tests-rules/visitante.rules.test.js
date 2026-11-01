@@ -2,7 +2,8 @@
 // Rol «visitante» (`99 §198`, pedido del Ingeniero 2026-10-30): solo ve Cargabilidad SCADA y el
 // Mapa. En la base LEE solo lo que esas dos páginas usan (transformadores y subestaciones con el
 // tope de 500, umbrales_salud/global, scada_series/resumen/catálogo/homologación por id, placas y
-// sus partes por id, y su propio perfil); no escribe NADA; en Storage no lee nada.
+// sus partes por id, y su propio perfil); no escribe nada SALVO su propio rastro de actividad
+// (`actividad_visitante/{suUid}/eventos`, forma acotada, sin poder leerlo: `99 §199`); en Storage no lee nada.
 // Cada caso en las DOS direcciones (L-78): lo que se le niega al visitante, un técnico lo hace
 // (control: la regla de hoy sigue igual para el equipo). Las ramas por permiso puntual, editores de
 // brigada y delegaciones se prueban en sus archivos (fichas_adjuntos_permiso, informes_brigada,
@@ -193,5 +194,46 @@ describe('Storage: el visitante no lee ni lista nada (el técnico sí, como hoy)
       await assertSucceeds(getBytes(ref(st(TEC), r)));
     }
     await assertFails(getBytes(ref(st('vis_variante'), 'documentos/vis_doc/a.pdf')));
+  });
+});
+
+describe('rastro de actividad del visitante (`99 §199`): él agrega lo suyo; solo el admin lo lee y lo borra', () => {
+  const ev = (extra = {}) => ({ tipo: 'equipo', pagina: 'cargabilidad-scada', ingreso: 'Sun, 01 Nov 2026 17:00:00 GMT', sesion: 'abc123',
+    detalle: { mat: 'VIS-TX-1', mes: '2026-09' }, en: serverTimestamp(), ...extra });
+  const col = (quien, uid) => collection(db(quien), 'actividad_visitante', uid, 'eventos');
+  test('el visitante agrega su evento (con y sin detalle, con dispositivo)', async () => {
+    await assertSucceeds(addDoc(col(VIS, VIS), ev()));
+    const { detalle, ...sinDetalle } = ev({ tipo: 'pagina', disp: { nav: 'Chrome', so: 'Windows', tipo: 'Computador', pantalla: '1920×1080' } });
+    await assertSucceeds(addDoc(col(VIS, VIS), sinDetalle));
+    await assertSucceeds(addDoc(col(VIS, VIS), ev({ tipo: 'intento', detalle: { texto: 'admin/usuarios' } })));
+  });
+  test('lo que no cuadra, no: otro uid, tipo raro, clave de más, texto largo, hora del cliente, detalle con clave rara', async () => {
+    await assertFails(addDoc(col(VIS, TEC), ev()));
+    await assertFails(addDoc(col(VIS, VIS), ev({ tipo: 'borrar' })));
+    await assertFails(addDoc(col(VIS, VIS), ev({ extra: 1 })));
+    await assertFails(addDoc(col(VIS, VIS), ev({ detalle: { mat: 'x'.repeat(161) } })));
+    await assertFails(addDoc(col(VIS, VIS), ev({ detalle: { raro: 'x' } })));
+    await assertFails(addDoc(col(VIS, VIS), ev({ en: new Date() })));
+    await assertFails(addDoc(col(VIS, VIS), ev({ pagina: 'p'.repeat(41) })));
+    await assertFails(addDoc(col(VIS, VIS), ev({ disp: { nav: 'Chrome', huella: 'x' } })));
+  });
+  test('ni el técnico, ni el visitante desactivado, ni el admin escriben aquí', async () => {
+    await assertFails(addDoc(col(TEC, TEC), ev()));
+    await assertFails(addDoc(col('vis_inactivo', 'vis_inactivo'), ev()));
+    await assertFails(addDoc(col('vis_admin', 'vis_admin'), ev()));
+  });
+  test('leer: solo el admin; el visitante no lee ni lo suyo; nadie edita; solo el admin borra', async () => {
+    let ref;
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      ref = await addDoc(collection(ctx.firestore(), 'actividad_visitante', VIS, 'eventos'), { tipo: 'pagina', pagina: 'mapa-v2', ingreso: 'x', sesion: 's', en: new Date() });
+    });
+    await assertSucceeds(getDocs(query(col('vis_admin', VIS), orderBy('en', 'desc'), limit(50))));
+    await assertFails(getDocs(query(col(VIS, VIS), limit(5))));
+    await assertFails(getDoc(doc(db(VIS), ref.path)));
+    await assertFails(getDocs(query(col(TEC, VIS), limit(5))));
+    await assertFails(updateDoc(doc(db(VIS), ref.path), { tipo: 'clic' }));
+    await assertFails(updateDoc(doc(db('vis_admin'), ref.path), { tipo: 'clic' }));
+    await assertFails(deleteDoc(doc(db(VIS), ref.path)));
+    await assertSucceeds(deleteDoc(doc(db('vis_admin'), ref.path)));
   });
 });

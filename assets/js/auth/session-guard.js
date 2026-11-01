@@ -265,6 +265,8 @@ export function ensureSession({ requireAdmin = false } = {}) {
             // Dentro de un iframe decide la página de arriba: este marco queda oculto, sin redirigir.
             if (window.self !== window.top) { console.warn('[SGM] visitante: página embebida no permitida.'); return; }
             console.warn('[SGM] el visitante no tiene esta página — a su inicio.');
+            // Para su rastro (`99 §199`): la página que intentó abrir; la anota al llegar a su inicio.
+            try { sessionStorage.setItem('sgm.rastro.intento', location.pathname.split('/').filter(Boolean).slice(-2).join('/')); } catch (_) {}
             redirect(BASE_URL + acceso.destino);
             return;
           }
@@ -290,6 +292,10 @@ export function ensureSession({ requireAdmin = false } = {}) {
         } catch (_) {}
         clearTimeout(FAILSAFE_TIMER);
         revealBody();
+        // Rastro de actividad del visitante (`99 §199`): solo para él, sin esperar; si falla, la página sigue igual.
+        if (acceso.restringido) {
+          import('../ui/rastro-visitante.js').then((m) => m.iniciar(sess)).catch((e) => console.warn('[SGM] rastro', e));
+        }
         console.info('[SGM] sesión OK · rol:', profile.rol);
         resolve(sess);
       } catch (innerErr) {

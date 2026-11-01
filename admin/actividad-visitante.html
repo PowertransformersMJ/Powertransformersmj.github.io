@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es" data-aqua>
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta name="robots" content="noindex, nofollow"/>
+  <title>SGM · TRANSPOWER — Actividad del visitante</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/img/aqua/logo-aqua.svg"/>
+  <script type="module" src="../assets/js/auth/admin-guard.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="../assets/css/aqua-components.css"/>
+  <link rel="stylesheet" href="../assets/css/inventario.css"/>
+  <link rel="stylesheet" href="../assets/css/actividad-visitante.css"/>
+</head>
+<body class="aqua">
+<main class="app-main page-container av" id="contenido">
+
+  <div class="page-header">
+    <div class="breadcrumb">Admin / Actividad del visitante</div>
+    <h1 class="page-title">Actividad del <em>visitante</em></h1>
+    <p class="page-subtitle">
+      Cada inicio de sesión de una cuenta con rol Visitante y lo que consulta: las páginas que abre, los equipos y
+      meses que mira, los filtros y botones que usa y lo que selecciona en el mapa, con su navegador y tipo de equipo.
+      Solo el administrador lo ve; se conserva mientras la cuenta exista (al eliminar la cuenta se borra con ella).
+    </p>
+    <p class="av-nota">Lo anota el navegador del visitante: muestra lo que hizo en la pantalla. Si alguien bloquea el
+      registro o consulta por fuera de la página, eso no queda aquí.</p>
+  </div>
+
+  <div class="inv-toolbar">
+    <div class="inv-filters">
+      <label class="av-campo"><span>Visitante</span>
+        <select class="form-select" id="fVisitante"><option value="">Cargando…</option></select>
+      </label>
+      <label class="av-campo"><span>Periodo</span>
+        <select class="form-select" id="fRango">
+          <option value="7">Últimos 7 días</option>
+          <option value="30" selected>Últimos 30 días</option>
+          <option value="90">Últimos 90 días</option>
+          <option value="0">Todo</option>
+        </select>
+      </label>
+      <button class="btn-secondary" type="button" id="btnRecargar">↻ Recargar</button>
+      <button class="btn-secondary" type="button" id="btnCsv" disabled>Descargar (CSV)</button>
+    </div>
+    <button class="btn-secondary av-peligro" type="button" id="btnBorrar" disabled>Borrar el rastro de este visitante</button>
+  </div>
+
+  <div id="avMsg" class="info-msg" role="status" hidden></div>
+
+  <section class="av-kpis" aria-label="Resumen">
+    <div class="av-kpi"><strong id="kIngresos">—</strong><span>inicios de sesión</span></div>
+    <div class="av-kpi"><strong id="kVisitas">—</strong><span>visitas</span></div>
+    <div class="av-kpi"><strong id="kUltimo">—</strong><span>última actividad</span></div>
+    <div class="av-kpi"><strong id="kEquipos">—</strong><span>equipos consultados</span></div>
+    <div class="av-kpi"><strong id="kIntentos">—</strong><span>intentos de abrir otras páginas</span></div>
+    <div class="av-kpi"><strong id="kEventos">—</strong><span>acciones registradas</span></div>
+  </section>
+
+  <section class="av-panel" aria-labelledby="tIngresos">
+    <h2 id="tIngresos">Visitas</h2>
+    <p class="av-nota">Una visita es un tramo de uso continuo: se corta tras 30 minutos sin actividad o al cambiar de día.</p>
+    <div class="av-tabla"><table class="data-table" id="tablaIngresos">
+      <thead><tr><th scope="col">Fecha</th><th scope="col">Desde</th><th scope="col">Hasta</th><th scope="col">Duración</th><th scope="col">Páginas</th><th scope="col">Equipos consultados</th><th scope="col">Navegador</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <div class="av-dos">
+    <section class="av-panel" aria-labelledby="tEquipos">
+      <h2 id="tEquipos">Equipos más consultados</h2>
+      <div class="av-tabla"><table class="data-table" id="tablaEquipos">
+        <thead><tr><th scope="col">Equipo</th><th scope="col">Veces</th><th scope="col">Última vez</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </section>
+    <section class="av-panel" aria-labelledby="tDias">
+      <h2 id="tDias">Uso por día</h2>
+      <div class="av-tabla"><table class="data-table" id="tablaDias">
+        <thead><tr><th scope="col">Día</th><th scope="col">Visitas</th><th scope="col">Minutos</th></tr></thead>
+        <tbody></tbody>
+      </table></div>
+    </section>
+  </div>
+
+  <section class="av-panel" aria-labelledby="tLinea">
+    <h2 id="tLinea">Línea de tiempo</h2>
+    <p class="av-nota" id="notaLinea"></p>
+    <div class="av-tabla"><table class="data-table" id="tablaLinea">
+      <thead><tr><th scope="col">Fecha y hora</th><th scope="col">Página</th><th scope="col">Qué hizo</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+</main>
+
+<script type="module" src="../assets/js/admin/admin-actividad-visitante.js"></script>
+<script src="../assets/vendor/lucide/lucide.min.js" defer></script>
+<script src="../assets/js/aqua.js" defer></script>
+<script src="../assets/js/aqua-shell.js" defer></script>
+</body>
+</html>

@@ -145,6 +145,10 @@ export async function actualizar(uid, patch, { actorUid } = {}) {
 
 export async function eliminar(uid, { actorUid } = {}) {
   if (!uid) throw new Error('UID requerido.');
+  // 99 §199: el rastro de actividad del visitante se conserva mientras la cuenta exista → se borra ANTES que
+  // el perfil (si fallara, el perfil queda y se puede reintentar; nunca queda un rastro huérfano sin dueño).
+  const { borrarRastro } = await import('./actividad_visitante.js');
+  await borrarRastro(uid, { actorUid });
   await deleteDoc(ref(uid));
   try {
     const { addDoc } = await import('https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js');
