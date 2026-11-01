@@ -141,3 +141,12 @@ pruebas. · **Regla**: toda regla de Storage que mire Firestore lleva una prueba
 (≤ 2) y que se verificó con una mutación; las pruebas del emulador no bastan. Y lo que el navegador debe LEER va a Firestore
 (L-29). **Gate**: `tests/informe_brigada_datos_estatico.test.js` (patrón reutilizable).
 
+
+### L-162 · Un rol que cierra se compara IGUAL en todas las capas, y ante la duda, cerrado
+**Disparador**: un rol o bandera que restringe (p. ej. «visitante») y se evalúa en reglas, Storage, funciones y navegador. ·
+**Cicatriz** (`99 §198`): la revisión adversarial halló que `trim()` de las reglas solo quita espacios ASCII y el de JS también
+quita el de no separación y la marca BOM; y que `String(['visitante'])` da 'visitante' en JS mientras `r is string` da falso en las
+reglas. Un rol escrito a mano por consola dejaba la PANTALLA restringida y la BASE abierta (lo peor: parece cerrado). · **Regla**:
+una sola definición, copiada idéntica en cada capa, que falle CERRADA (texto que contenga la palabra, o rol que no sea texto) y
+una prueba de texto que amarre las copias; casos con NBSP, BOM, salto de línea, lista y número en el emulador. **Gate**:
+`tests/acceso_por_rol.test.js` (amarres) + `tests-rules/visitante.rules.test.js`.

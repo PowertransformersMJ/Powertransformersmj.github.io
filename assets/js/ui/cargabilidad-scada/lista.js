@@ -8,6 +8,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
+import { soloVer } from './solo-ver.js';
 import { filasLista, filtrarFilas, ordenarFilas, mesPorDefecto } from '../../domain/scada_carga_vista.js';
 import { CRG_CHIP, CALCULO } from '../../domain/scada_carga_config.js';
 import { nombreMes, aInputCO, formatoCO } from '../../domain/scada_carga_fecha.js';
@@ -420,7 +421,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
         el('label', { class: 'cs-check', for: 'csSost' }, chk('csSost', f.soloSostenida, (v) => { f.soloSostenida = v; }), ' Solo con sobrecarga sostenida')),
       el('div', { class: 'cs-acciones' },
         contador = el('p', { class: 'cs-contador', role: 'status', 'aria-live': 'polite', style: 'margin:0' }),
-        el('button', { type: 'button', class: 'btn btn--glass btn--sm', onclick: exportar }, 'Descargar lista (CSV)')));
+        soloVer() ? null : el('button', { type: 'button', class: 'btn btn--glass btn--sm cs-solo-equipo', onclick: exportar }, 'Descargar lista (CSV)')));
   }
 
   /** ¿Algún nivel del devanado se mide por suma de circuitos? (rótulo de `calcularEquipo`; con guarda, campo opcional). */

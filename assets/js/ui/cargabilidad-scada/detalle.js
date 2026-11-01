@@ -11,6 +11,7 @@
 // ══════════════════════════════════════════════════════════════
 
 import { el, poner, num, descargarCSV, conservarFoco } from './dom.js';
+import { soloVer } from './solo-ver.js';
 import { chipCifra, textoBandas } from './lista.js';
 import { devanadosDe, TEXTO_AVISO_DEVANADO, kvTexto, ampTexto, mvaTexto, pctTexto } from '../../domain/scada_carga_devanados.js';
 import { limitesDePlaca } from '../../domain/placa_etapas.js';
@@ -123,12 +124,15 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   // Panel «Gases disueltos (DGA) y carga» (`99 §127`): se carga APARTE con import(); si falla, la ranura sigue
   // oculta y el detalle queda igual que antes. Si llega tarde, pinta el último estado del equipo abierto.
   let panelDga = null;
-  import('./panel-dga.js').then((m) => { panelDga = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
-    .catch((e) => console.warn('[cargabilidad-scada] panel DGA', e));
   // «Triángulo de Duval: hoy y con más carga» (`99 §131`): otra ranura y otro import() aislado, con el MISMO estado.
   let panelDuval = null;
-  import('./panel-duval.js').then((m) => { panelDuval = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
-    .catch((e) => console.warn('[cargabilidad-scada] triángulo de Duval', e));
+  // Al visitante no se le cargan (están en Borrador, `99 §198`): sus ranuras quedan ocultas, como si el import fallara.
+  if (!soloVer()) {
+    import('./panel-dga.js').then((m) => { panelDga = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
+      .catch((e) => console.warn('[cargabilidad-scada] panel DGA', e));
+    import('./panel-duval.js').then((m) => { panelDuval = m; if (actual && actual.dga) pintarDga(actual, actual.dga); })
+      .catch((e) => console.warn('[cargabilidad-scada] triángulo de Duval', e));
+  }
   // «Placa característica» (TODO-69): otra ranura con su import() aislado; si falla, queda oculta y el detalle sigue igual.
   let panelPlaca = null;
   import('./panel-placa.js').then((m) => { panelPlaca = m; if (actual) pintarPlacaDe(actual); })
@@ -157,6 +161,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
   /** Estado EXPLÍCITO del panel: 'leyendo' | 'ok' (con el cálculo recién hecho) | 'error' | 'sin_scada'. */
   function pintarDga(a, estado) {
     if (!a || !a.dgaNodo) return;
+    // Se vuelve a preguntar al pintar: si la sesión llegó DESPUÉS de montar (conexión lenta), igual se oculta.
+    if (soloVer()) { a.dgaNodo.hidden = true; if (a.duvalNodo) a.duvalNodo.hidden = true; return; }
     a.dga = estado;
     const rango = a.desde != null && a.hasta != null ? formatoCO(a.desde + H_MS) + ' a ' + formatoCO(a.hasta) : null;
     if (panelDga) {
@@ -584,7 +590,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         el('figure', { style: 'margin:0' }, fig,
           el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.'
             + (info.suma ? ' En este nivel las corrientes son la suma hora por hora de los circuitos ' + info.suma.de.join(' + ') + ' (una hora vale solo si valen todos); la tensión, P y Q son las del transformador; el máximo, el mínimo y el instantáneo no se calculan para una suma.' : ''))),
-        el('div', { class: 'cs-acciones' }, el('button', { type: 'button', id: 'csCsvNivel', class: 'btn btn--glass btn--sm', onclick: () => exportarCSV(a, nv) }, 'Descargar CSV del nivel'))),
+        soloVer() ? null : el('div', { class: 'cs-acciones cs-solo-equipo' }, el('button', { type: 'button', id: 'csCsvNivel', class: 'btn btn--glass btn--sm', onclick: () => exportarCSV(a, nv) }, 'Descargar CSV del nivel'))),
       el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d, !!info.suma)))));
     const mio = token;
     const vigente = () => mio === token && figura === fig;

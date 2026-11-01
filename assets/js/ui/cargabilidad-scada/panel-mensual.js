@@ -16,6 +16,7 @@ import { CRG_CHIP, DEVANADO, CALCULO } from '../../domain/scada_carga_config.js'
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
 import { loadPlotly } from '../../plotly-loader.js';
+import { sinBotones } from './solo-ver.js';
 
 const CORTOS = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
 const corto = (mes) => CORTOS[Number(String(mes).slice(5, 7)) - 1] + ' ' + String(mes).slice(2, 4);
@@ -137,7 +138,7 @@ export async function pintarMensual(nodo, { a, ctx, vigente = () => true, conPro
       yaxis: { title: { text: '%' }, range: [0, maxY], gridcolor: '#eef1f6', zeroline: false },
       xaxis: { type: 'category', gridcolor: '#eef1f6' },
       shapes: [...bandas.map((v) => lineaH(v, '#8a97ab', 'dot')), lineaH(CALCULO.sobrecargaPct, '#c91a14', 'dash')]
-    }, { displaylogo: false, responsive: true, locale: 'es', modeBarButtonsToRemove: ['select2d', 'lasso2d', 'autoScale2d', 'toggleSpikelines'] });
+    }, { displaylogo: false, responsive: true, locale: 'es', modeBarButtonsToRemove: sinBotones(['select2d', 'lasso2d', 'autoScale2d', 'toggleSpikelines']) });
   } catch (e) {
     console.warn('[cargabilidad-scada] mensual', e);
     grafica.removeAttribute('role'); grafica.removeAttribute('aria-label'); grafica.style.minHeight = '0';

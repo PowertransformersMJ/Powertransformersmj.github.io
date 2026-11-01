@@ -75,6 +75,8 @@ before(async () => {
     await setDoc(doc(d, 'usuarios/fp_otro'),     { email: 'o@x.co', rol: 'tecnico', activo: true,  nombre: 'Otro Permiso FP', permisos_extra: ['inventario.editar'] });
     await setDoc(doc(d, 'usuarios/fp_inactivo'), { email: 'i@x.co', rol: 'tecnico', activo: false, nombre: 'Inactivo FP', permisos_extra: [PERM] });
     await setDoc(doc(d, 'usuarios/fp_raro'),     { email: 'r@x.co', rol: 'tecnico', activo: true,  nombre: 'Raro FP', permisos_extra: PERM });
+    // 99 §198: un visitante con el permiso escrito A MANO (la regla de /usuarios no lo deja poner).
+    await setDoc(doc(d, 'usuarios/fp_visitante'), { email: 'v@x.co', rol: 'visitante', activo: true, nombre: 'Visitante FP', permisos_extra: [PERM] });
   });
 });
 after(async () => { if (testEnv) await testEnv.cleanup(); });
@@ -143,5 +145,23 @@ describe('sin el permiso, no', () => {
     await assertSucceeds(updateDoc(doc(db('fp_admin'), 'usuarios/fp_sin'), { permisos_extra: [] }));
     const L5 = 'SSSSSSSSSSuuuuuuuuuu';
     await assertFails(lote(db('fp_sin'), { id: ID2, lt: L5, m: meta({ clave: CLAVE2, matricula: '', serie: 'SERIE-FP-2', lote: L5, ...S }), reg: registro({ idAdjunto: ID2, accion: 'reemplazo', lote: L5, ...S }) }));
+  });
+});
+
+describe('rol visitante (`99 §198`): ni con el permiso puesto a mano', () => {
+  const CLAVE3 = 'S:SERIE-FP-3';
+  const ID3 = 'salud_' + createHash('sha256').update(CLAVE3).digest('hex');
+  const intento = (uid, nombre) => lote(db(uid), { id: ID3, m: meta({ clave: CLAVE3, matricula: '', serie: 'SERIE-FP-3', ...de(uid, nombre) }),
+    reg: registro({ idAdjunto: ID3, ...de(uid, nombre) }) });
+  test('el visitante no adjunta ni lee; el mismo lote a nombre de un técnico con permiso sí pasa (control)', async () => {
+    await assertFails(intento('fp_visitante', 'Visitante FP'));
+    await assertFails(getDoc(doc(db('fp_visitante'), 'fichas_adjuntos', ID)));
+    await assertSucceeds(intento('fp_carlos', 'Carlos FP'));
+  });
+  test('el admin no le pone el permiso a un visitante; al pasarlo a visitante se le vacía en la misma escritura', async () => {
+    await assertFails(updateDoc(doc(db('fp_admin'), 'usuarios/fp_otro'), { rol: 'visitante' }));   // conserva un permiso
+    await assertSucceeds(updateDoc(doc(db('fp_admin'), 'usuarios/fp_otro'), { rol: 'visitante', permisos_extra: [] }));
+    await assertFails(updateDoc(doc(db('fp_admin'), 'usuarios/fp_otro'), { permisos_extra: [PERM] }));
+    await assertSucceeds(updateDoc(doc(db('fp_admin'), 'usuarios/fp_otro'), { rol: 'tecnico', permisos_extra: [PERM] }));
   });
 });

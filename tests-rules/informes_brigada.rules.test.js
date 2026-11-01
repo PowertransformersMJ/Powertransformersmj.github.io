@@ -33,9 +33,9 @@ const H = 'ab'.repeat(32);
 const H2 = 'cd'.repeat(32);
 const NOMBRES = {
   ib_admin: 'Admin Prueba', ib_editor: 'Editor Prueba', ib_tecnico: 'Tecnico Prueba',
-  ib_inactivo: 'Inactivo Prueba', ib_admin_fuera: 'Admin Fuera Prueba'
+  ib_inactivo: 'Inactivo Prueba', ib_admin_fuera: 'Admin Fuera Prueba', ib_visitante: 'Visitante Prueba'
 };
-const ROLES = { ib_admin: 'admin', ib_editor: 'tecnico', ib_tecnico: 'tecnico', ib_inactivo: 'tecnico', ib_admin_fuera: 'admin' };
+const ROLES = { ib_admin: 'admin', ib_editor: 'tecnico', ib_tecnico: 'tecnico', ib_inactivo: 'tecnico', ib_admin_fuera: 'admin', ib_visitante: 'visitante' };
 const autor = (uid) => ({ uid, nombre: NOMBRES[uid] });
 const EQUIPO = { transformador_id: 'tx-prueba-1', matricula: 'T9-Z/Z-PRU', subestacion: 'Prueba Norte', serie: 'SERIE-PRUEBA-001' };
 const CONTENIDO = { esquema: 'ibr@1', equipo: { matricula: 'T9-Z/Z-PRU' }, odt: ['ODT-PRUEBA-1'], tablas: { material: [{ descripcion: 'X', cantidad: 1 }] } };
@@ -565,6 +565,31 @@ describe('13 · Storage · fichas de fabricante', () => {
     await assertSucceeds(getBytes(ref(st('ib_tecnico'), 'informes_brigada_marca/fichas/ficha_st_1')));
     await assertFails(sub('ib_editor', 'ficha_st_1'));   // inmutable
     await assertFails(deleteObject(ref(st('ib_admin'), 'informes_brigada_marca/fichas/ficha_st_1')));   // lo usan versiones emitidas
+  });
+});
+
+describe('13b · rol visitante en la lista de editores (`99 §198`): no edita, no sube, no lee firmas', () => {
+  // Un técnico editor al que el admin pasa a visitante sigue en la lista hasta que alguien la limpie.
+  const CON_VISITANTE = { editores: ['ib_editor', 'ib_admin', 'ib_inactivo', 'ib_visitante'] };
+  test('Firestore: ni la configuración ni un informe; el mismo informe a nombre del editor sí (control)', async () => {
+    await sembrarConfig(CON_VISITANTE);
+    await assertFails(getDoc(doc(db('ib_visitante'), 'informes_brigada_config/general')));
+    await assertFails(crear('ib_visitante', 'c_visitante'));
+    await assertSucceeds(crear('ib_editor', 'c_visitante_control'));
+  });
+  test('Storage: no sube fotos ni fichas ni lee firmas de terceros; el editor sí (control)', async () => {
+    const META = { contentType: 'image/jpeg', customMetadata: { huella: H } };
+    const foto = (uid) => uploadBytes(ref(st(uid), `informes_brigada/s_vis/archivos/${nuevoIdArchivo()}`), JPEG, META);
+    const ficha = (uid, id) => uploadBytes(ref(st(uid), `informes_brigada_marca/fichas/${id}`), PNG, { contentType: 'image/png', customMetadata: { huella: H } });
+    const firma = (uid) => getBytes(ref(st(uid), `informes_brigada_marca/firmas/f-ana-prueba/${H}`));
+    await assertFails(foto('ib_visitante'));
+    await assertSucceeds(foto('ib_editor'));
+    await assertFails(ficha('ib_visitante', 'ficha_vis_1'));
+    await assertSucceeds(ficha('ib_editor', 'ficha_vis_2'));
+    await assertFails(firma('ib_visitante'));
+    await assertSucceeds(firma('ib_editor'));
+    await assertFails(getBytes(ref(st('ib_visitante'), 'informes_brigada_marca/fichas/ficha_vis_2')));
+    await sembrarConfig();   // la configuración de siempre para lo que sigue
   });
 });
 

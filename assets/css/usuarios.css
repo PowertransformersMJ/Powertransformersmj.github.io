@@ -22,6 +22,12 @@
   background: rgba(0,200,255,.06);
   border-color: rgba(0,200,255,.22);
 }
+/* 99 §198: solo ve Cargabilidad SCADA y el Mapa. */
+.rol-pill.visitante {
+  color: var(--text-muted, #5b6b73);
+  background: rgba(120,130,150,.08);
+  border-color: rgba(120,130,150,.3);
+}
 
 /* Estado reusa cod-pill (activo/inactivo). Si el CSS de codigos
    ya no se carga, definimos lo esencial aquí. */

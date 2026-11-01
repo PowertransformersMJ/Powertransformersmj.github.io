@@ -33,6 +33,7 @@ import { defineSecret }       from 'firebase-functions/params';
 import Anthropic from '@anthropic-ai/sdk';
 import { Agent } from 'undici';
 import { conReintentosIA, conTimeoutAbortable } from './reintentos.mjs';
+import { decidirAccesoIA } from './acceso_ia.mjs';
 
 // Dispatcher HTTP para la IA con el bodyTimeout/headersTimeout DESACTIVADOS
 // (ADR-018). Causa raíz del fallo "Claude API: terminated": el bodyTimeout por
@@ -569,9 +570,14 @@ async function exigirMiembroActivo(request) {
     db.doc(`usuarios/${uid}`).get(),
     db.doc(`admins/${uid}`).get(),
   ]);
-  const perfilActivo = perfilSnap.exists && perfilSnap.data() && perfilSnap.data().activo === true;
-  const bootstrap = adminSnap.exists && (!perfilSnap.exists || (perfilSnap.data() && perfilSnap.data().activo === true));
-  if (!perfilActivo && !bootstrap) {
+  // Decisión pura en acceso_ia.mjs (`99 §198`): el visitante se niega antes que nada.
+  const decision = decidirAccesoIA(
+    { existe: perfilSnap.exists, datos: perfilSnap.exists ? perfilSnap.data() : null },
+    { existe: adminSnap.exists });
+  if (decision === 'visitante') {
+    throw new HttpsError('permission-denied', 'El perfil de visitante no usa la IA.');
+  }
+  if (decision !== 'ok') {
     throw new HttpsError('permission-denied', 'Requiere un perfil de equipo activo.');
   }
 }

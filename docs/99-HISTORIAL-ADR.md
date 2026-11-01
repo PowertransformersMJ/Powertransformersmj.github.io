@@ -9916,3 +9916,73 @@ ventiladores» y «con enfriamiento natural») y la termografía (cubre «radiad
 9 → 8, acciones 12 → 11; nivel igual. `tests/scada_carga_dga_sin_ventilacion.test.js` (4); suite 3.240.
 Verificado en vivo (merge `a3c44fe`, caché vencida, página recargada): Pradera T2 con todo desplegado: 2 menciones en gases (la cita de
 la norma y la termografía), 0 en Duval, adversidades 8, acciones 11, «Urgente, nivel 5 de 5».
+
+## 198. ADR-198 — Rol «visitante»: solo ve Cargabilidad SCADA y el Mapa, no escribe nada, sin Borrador ni descargas; cerrado en las páginas, la base, Storage y la IA (TODO-83) ⟦OPUS-5.5⟧ (2026-11-01)
+
+> «necesito crear un nuevo usuario, este solo podrá apreciar el módulo de cargabilidad SCADA y mapa, solo es visitante, no puede
+> crear ni gestionar nada, solo apreciar los parámetros» (2026-10-30). Sus decisiones (preguntas cerradas): solo esos dos módulos y
+> «los equipos deben mostrar su estado de salud» (lee los datos que esos módulos usan); «Ocultarle lo que está en Borrador» (panel
+> de gases, triángulo de Duval y el rótulo del Mapa); descargas: «No, solo ver en pantalla»; gases: «Basta con ocultarlo».
+
+**198.1 Causa raíz.** La plataforma solo distinguía admin / «cualquier perfil activo»: `isTeamMember()` (73 usos en
+`firestore.rules`, copia en `storage.rules`) no miraba el rol; `page-guard` dejaba entrar a todo pages/* y home; 12 escrituras
+(auditoría, movimientos, contador, órdenes de materiales y lápida, firma propia) y las 2 funciones de IA (`exigirMiembroActivo`)
+se abrían a cualquier perfil activo; además leían `activo` por su cuenta `puedeAdjuntarOperativo`, `ibrEditor` (Firestore y
+Storage), las delegaciones de firmas y su lectura propia. Esconder páginas no habría cerrado nada.
+
+**198.2 Solución.** Negar por defecto + lista blanca, el MISMO criterio en las cuatro capas: `esRolVisitante(r)` = texto que
+contenga «visitante» (minúsculas, `(?s)`) o rol que no sea texto; sin rol / null sigue del equipo («ante la duda, cerrado»).
+- Reglas: `isTeamMember` excluye al visitante; `puedeVerCargaMapa` (= equipo o visitante activo) SOLO en las 9 lecturas de las
+  dos páginas: transformadores y subestaciones (get; list con `limit<=500` para el visitante), `umbrales_salud/global`,
+  `placas_caracteristicas` y `partes`, `scada_series/resumen/catalogo/homologacion` (get). Fuera: `scada_cargas`, su registro,
+  subcolecciones e historial. `/usuarios`: 'visitante' en el enum de alta y edición + `visitanteSinPermisos`. Defensa: el
+  visitante fuera de `puedeAdjuntarOperativo`, `ibrEditor` (ambos archivos), `delegacionVigente`/`FichasVigente`, la validación
+  del delegado (`u`) y el get propio de su delegación.
+- Funciones: `functions/acceso_ia.mjs` (puro) niega al visitante ANTES del arranque por /admins; resto idéntico (prueba de equivalencia).
+- Cliente: `domain/acceso_por_rol.js` (NUEVO) decide páginas; `session-guard` lo importa SOLO para el visitante, antes del chequeo
+  de admin (en admin/* también va a su inicio), lo manda a Cargabilidad si la página no es suya (en un iframe no redirige) y marca
+  `<html data-rol="visitante">`. `aqua-shell`: menú «Consulta» (dos entradas, Mapa directo a `mapa-v2.html`), chip VISITANTE, sin
+  buscador. `index.html`: el visitante entra directo a Cargabilidad (no carga el inicio). Cargabilidad: `solo-ver.js` (NUEVO) — sin
+  paneles de gases/Duval (no se importan y se vuelve a preguntar al pintar), sin CSV ni «descargar imagen» de las gráficas; segunda
+  capa en CSS. Mapa: `.mc-borrador` oculto (CSS `?v=198`). Panel de usuarios: opción Visitante en alta/edición/filtro, píldora,
+  casilla del permiso desactivada; `data/usuarios.js` le vacía `permisos_extra` en la MISMA escritura.
+
+**198.3 No-regresión.** Para todo rol ≠ visitante las reglas nuevas equivalen a las de antes (la cláusula agregada da verdadero);
+el guardián no carga nada nuevo para el equipo; `decidirAccesoIA` = la lógica anterior caso por caso. Producción antes de desplegar:
+3 perfiles (1 admin, 2 técnicos), roles de texto sin «visitante» → despliegue inerte.
+
+**198.4 Verificación.** `test:unit` 3264 ✅ (2 omitidas) · lint ✅ · `test:rules` 333/333 ✅: `tests-rules/visitante.rules.test.js`
+(lee lo suyo, nada más, no escribe, Storage cerrado, variantes NBSP/BOM/salto/lista/número cerradas, null y sin rol = equipo, alta
+solo sin permisos) + casos en `fichas_adjuntos_permiso`, `informes_brigada` (13b), `firmas_delegados(_fichas)` (incluida la emisión
+delegada, que mide el tope de 1000 expresiones), cada uno con su control positivo de técnico. `tests/acceso_por_rol.test.js` (rutas,
+sin bucle, amarres de texto entre capas) y `tests/acceso_ia.test.js`. Comité ×3 antes de codear (`wf_4a610b5c-4d3`, aprobar con
+cambios: ibrEditor en Storage, delegado `u`, get propio de la delegación, import solo para el visitante, chip, excepciones) y
+revisión adversarial con verificación (`wf_c7267758-040`): 10 hallazgos, 7 reales (bajos), 3 refutados; corregidos los de código.
+
+**198.5 Anti-patterns evitados.** Esconder menús creyendo que protege; abrir `isTeamMember` al visitante y tapar escrituras una
+por una (dejaba cédulas, contratos y PDF); normalizar distinto en reglas (trim ASCII) y JS (trim Unicode); una dependencia nueva
+para el equipo en el guardián; exportaciones nuevas en módulos publicados (L-102); `--only firestore` (arrastra índices).
+
+**198.6 Archivos.** NUEVOS: `assets/js/domain/acceso_por_rol.js`, `assets/js/ui/cargabilidad-scada/solo-ver.js`,
+`functions/acceso_ia.mjs`, `tests/acceso_por_rol.test.js`, `tests/acceso_ia.test.js`, `tests-rules/visitante.rules.test.js`.
+Modificados: `firestore.rules`, `storage.rules`, `functions/index.js`, `assets/js/auth/session-guard.js`, `assets/js/aqua-shell.js`,
+`index.html`, `admin/usuarios.html`, `assets/js/admin/admin-usuarios.js`, `assets/js/data/usuarios.js`, `assets/css/usuarios.css`,
+`assets/css/mapa-colombia.css`, `pages/mapa-v2.html`, `assets/css/cargabilidad-scada.css`, y en `ui/cargabilidad-scada/`: `detalle.js`,
+`lista.js`, `graficos.js`, `panel-mensual.js`, `panel-devanados-mes.js`; 4 archivos de `tests-rules/`. INTACTOS: `isAdmin`,
+`scadaAdmin`, home.html, `domain/schema.js`/`rbac.js`, los demás módulos.
+
+**198.7 Doctrina.** W-11 completo: evidencia (6 lectores + crítico, `wf_cd868a63-752`), decisiones de criterio suyas con la
+recomendada, comité, revisión adversarial verificada, L-78 (dos direcciones), L-144 (Storage: el rol se lee del mismo
+`usuarios/{uid}`, no suma documentos), L-102, L-162 (nueva). Crudo y síntesis: bóveda `2026-10-30-rol-visitante/`. NO revisado
+externamente.
+
+**198.8 Verificado sano / riesgos ACEPTADOS.** (a) Ocultar ≠ negar: el visitante descarga el documento ENTERO de cada
+transformador (salud, `ultima_dga` con las ppm, placa) y de cada subestación (posición); lo que se ocultó (gases, Duval, CSV) es
+de pantalla — decisión suya informada («Basta con ocultarlo»); cerrarlo de verdad = proyección o colección aparte (frente
+nuevo). (b) Excepciones: borrar SU firma (y su copia vieja en Storage) y leer su /admins propio siguen abiertas (inocuas, solo lo
+suyo). (c) Las reglas no limitan frecuencia: un visitante puede gastar lecturas repitiendo consultas (igual que hoy un técnico);
+remedio: alerta de presupuesto y «Desactivar» (corta en la siguiente petición). (d) Para quitarle el acceso: «Desactivar», no
+«Eliminar» (un uid en /admins sin perfil vuelve a ser admin de arranque, ADR-079 — hoy ningún visitante está en /admins).
+(e) Ventana de caché de ~10 min tras publicar (módulos viejos: menú completo) — no abre datos; la validación se hace con lo
+servido comprobado. Refutados: «solo-ver.js podría no viajar y la CI no lo vería» (la prueba de importaciones de
+`scada_carga_mensual.test.js` lo atrapa); «despliegue parcial de funciones» (se ve en el CLI); el bootstrap por /admins es diseño.

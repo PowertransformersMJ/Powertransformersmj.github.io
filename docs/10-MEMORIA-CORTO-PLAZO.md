@@ -24,14 +24,12 @@
 > **(J)** Copia mensual de la bóveda (su decisión, `§162.10`): conectar un disco externo y correr `brain-private/respaldo-boveda.sh /Volumes/<disco>`.
 
 ### 🚫 Callejones probados (NO reintentar)
-> **Los de la Fase 9 viven en `99 §52.8-52.9`** (+ `--branch` de filter-repo → **L-25**). Los de dominio (Reprocesar `§20`,
-> DGA/aceite o fabricar el dato `§27`, **L-50/L-69**) → `CLAUDE.md §3.2`. **Vivos aquí**: anteponer una redacción nueva al
-> arreglo de opciones —el borrador guarda la versión por su ÍNDICE y correrían las fichas guardadas (`99 §85.3`)— ·
-> `codigo` como respaldo de la matrícula: es el CODIGO SUBESTACION y nombra al equipo equivocado (`§85.3`, `§82`) · panel
-> "parecido a X" en vez de reusar X (**L-57**) · estado consolidado para todos los chips (**L-58**) · `args` de Workflow
-> como string JSON (**L-71**) · dar por basura un contador de "omitidos" sin abrir el archivo (**L-72**) · apóstrofo «contra fórmulas» en un `.xlsx` (se imprime, **L-100**) · redondear centavos del
-> PE.02081 (`§87`) · reintentar abrir Microsoft Excel desde aquí (-1743, **L-103**) · probar «Exportar Excel» del custodio en
-> producción (registra un folio, **L-94**).
+> **Fase 9** → `99 §52.8-52.9` (+ `--branch` de filter-repo, **L-25**). Dominio (Reprocesar `§20`, fabricar DGA/aceite `§27`,
+> **L-50/L-69**) → `CLAUDE.md §3.2`. **Vivos**: anteponer una redacción nueva al arreglo de opciones (el borrador guarda por
+> ÍNDICE, `§85.3`) · `codigo` como respaldo de la matrícula (es la S/E: otro equipo, `§85.3`, `§82`) · panel «parecido a X» en
+> vez de reusar X (**L-57**) · estado consolidado para todos los chips (**L-58**) · `args` de Workflow como string (**L-71**) ·
+> descartar «omitidos» sin abrir el archivo (**L-72**) · apóstrofo contra fórmulas en `.xlsx` (**L-100**) · redondear centavos
+> del PE.02081 (`§87`) · abrir Microsoft Excel desde aquí (**L-103**) · «Exportar Excel» del custodio en producción (folio, **L-94**).
 > **Ya verificado SANO — no re-auditar sin motivo** → `00` Capa 2 (casillas `NN.8` + crudo de la bóveda).
 
 ---
@@ -40,6 +38,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
+| **TODO-83** | 🟡 **Rol visitante** (`§198`). **Suyo**: crear la cuenta (Firebase → UID → Usuarios, rol Visitante; quitar = «Desactivar»). Luego, validación en vivo. | 🟡 |
 | **TODO-81** | 🟡 **Informe de Mantenimiento Brigada** PUBLICADO (`99 §163`): F60 Applus, PDF y Word; 3 firmas centradas (§163.15). ⏸ Firmas en borrador: rama `informe-brigada-firmas-borrador`, espera su 1/2/3. Falta de él: Applus, Word en Word. | 🟡 |
 | **TODO-80** | 🔄 **Refrigeración ONAN/ONAF** (W-11 paso 2) · ventilación del Excel (`§197.11`) · **nexo con SCADA** al cerrar sus provisionales (10-24, `§181.8`) · guía v3, placas v2 y R3 (116 ONAF) en Descargas; sin Pk de placa: 414 FN063 vs 866; P0 sin placa: excitación calibrada (L-151). D2 suyo: reserva opcional. Suyo: D1, D3 (factor 1,13), D4–D11 (L-148–L-151). | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`–`§197`; DGA, Duval: BORRADOR). 8 sin cifra (campo → `§188.8`, `§189.8`). **Suyo**: textos del panel (`§197`) · punto 8 · re-exportar mayo (`§125`) · circuitos y arreglos de campo (pasos 3–5, `§158.8`) · corregir lo que la placa señala, uno a uno (`§166.7`) · corregir Casacará (2 MVA) en su Excel de Salud (`§158.11`). Para el área SCADA/Operación: 4 señales no válidas y 4 con P/Q ×1000 (`§158.12`), límite de 20 A de Casacará (`§158.11`). Ofrecido → `§160.7`–`.8`. Cargar un mes → `60 §W-13` (8). | 🟡 |
