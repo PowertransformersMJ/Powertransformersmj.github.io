@@ -9986,3 +9986,11 @@ remedio: alerta de presupuesto y «Desactivar» (corta en la siguiente petición
 (e) Ventana de caché de ~10 min tras publicar (módulos viejos: menú completo) — no abre datos; la validación se hace con lo
 servido comprobado. Refutados: «solo-ver.js podría no viajar y la CI no lo vería» (la prueba de importaciones de
 `scada_carga_mensual.test.js` lo atrapa); «despliegue parcial de funciones» (se ve en el CLI); el bootstrap por /admins es diseño.
+
+**198.9 Verificado tras publicar (2026-11-01).** Reglas de Firestore y Storage desplegadas (`firebase deploy --only
+firestore:rules,storage`: «released rules»); las 2 funciones de IA «Successful update»; merge `7997742`, Deploy y CI ✅; lo servido
+trae el código nuevo (los 2 módulos nuevos → 200). En SU Chrome, como admin, con la caché renovada y la página recargada (guardián
+nuevo: `sess.acceso = {restringido:false}`): menú completo (7 grupos), chip ADMIN, «Descargar lista», detalle con gases, Duval,
+CSV del nivel y «Descargar como PNG» — sin cambios. Vista previa SIMULADA del visitante (franja roja, sus datos de admin): menú
+«Consulta» con las 2 entradas, chip VISITANTE, sin buscador, sin gases/Duval ni descargas; Mapa sin el rótulo Borrador (152
+puntos). Pendiente (TODO-83): la validación con la cuenta real del visitante, que crea el Ingeniero.
