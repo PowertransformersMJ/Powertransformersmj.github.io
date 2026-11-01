@@ -38,7 +38,7 @@
 
 | ID | Item PENDIENTE | Estado |
 |---|---|---|
-| **TODO-83** | 🟡 **Rol visitante** (`§198`). **Suyo**: crear la cuenta (Firebase → UID → Usuarios, rol Visitante; quitar = «Desactivar»). Luego, validación en vivo. | 🟡 |
+| **TODO-83** | 🟡 **Rol visitante** (`§198`) + su rastro (`§199`). **Suyo**: crear la cuenta (Firebase → UID → Usuarios, rol Visitante; quitar = «Desactivar»). Luego, validación en vivo. | 🟡 |
 | **TODO-81** | 🟡 **Informe de Mantenimiento Brigada** PUBLICADO (`99 §163`): F60 Applus, PDF y Word; 3 firmas centradas (§163.15). ⏸ Firmas en borrador: rama `informe-brigada-firmas-borrador`, espera su 1/2/3. Falta de él: Applus, Word en Word. | 🟡 |
 | **TODO-80** | 🔄 **Refrigeración ONAN/ONAF** (W-11 paso 2) · ventilación del Excel (`§197.11`) · **nexo con SCADA** al cerrar sus provisionales (10-24, `§181.8`) · guía v3, placas v2 y R3 (116 ONAF) en Descargas; sin Pk de placa: 414 FN063 vs 866; P0 sin placa: excitación calibrada (L-151). D2 suyo: reserva opcional. Suyo: D1, D3 (factor 1,13), D4–D11 (L-148–L-151). | 🟡 |
 | **TODO-69** | 🟡 **Cargabilidad SCADA** (`99 §125`–`§197`; DGA, Duval: BORRADOR). 8 sin cifra (campo → `§188.8`, `§189.8`). **Suyo**: textos del panel (`§197`) · punto 8 · re-exportar mayo (`§125`) · circuitos y arreglos de campo (pasos 3–5, `§158.8`) · corregir lo que la placa señala, uno a uno (`§166.7`) · corregir Casacará (2 MVA) en su Excel de Salud (`§158.11`). Para el área SCADA/Operación: 4 señales no válidas y 4 con P/Q ×1000 (`§158.12`), límite de 20 A de Casacará (`§158.11`). Ofrecido → `§160.7`–`.8`. Cargar un mes → `60 §W-13` (8). | 🟡 |
