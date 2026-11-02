@@ -10086,3 +10086,15 @@ reserva sin su visto bueno (el control de permisos lo frenó y se le preguntó).
 
 **200.8 Verificado sano.** El 34,5 kV de Colomboy parece real (los dos lados ven ~1,55 MVA esos días): revisar con noviembre si se
 sostiene y volver a usar los dos lados. Las 57 claves que no vienen son, en su mayoría, de Oriente (ENERGUA desde sep).
+
+## 201. ADR-201 — Cargabilidad SCADA: los rótulos de las barras «frente a sus límites de placa» se salían sobre la leyenda al cambiar el tamaño de la ventana (TODO-69) ⟦OPUS-5.5⟧ (2026-11-02)
+
+> «por favor corrige este error, se estan trocando las cosas» (captura de Pradera T2, 2026-11-02).
+
+**201.1 Causa raíz** (reproducida en su Chrome). Las dos barras de resumen (`dibujarResumen`, `panel-devanados-mes.js`) piden
+250 + 15 px por renglón de abajo (295 con devanado, carga y % de ONAF), pero su recuadro solo tenía `min-height: 270px`. Con
+`responsive: true`, un cambio de tamaño de la ventana hace que Plotly tome la altura del recuadro: el recuadro quedaba en 270 y los
+renglones 2 y 3 (hasta 296 px) salían por debajo, sobre la leyenda HTML. Las otras 8 gráficas del detalle no cambian al redimensionar.
+**201.2 Solución.** El recuadro lleva la altura de su gráfica (`box-sizing: content-box` + `height`); en el camino de error se limpia.
+**201.4 Verificación.** Antes/después en su Chrome con un cambio de tamaño forzado (contenedor a 760 px y de vuelta): sin la corrección
+270 px de recuadro y rótulos a 296; con ella 295 y 286. `test:unit` 3277 ✅ · lint ✅. Lección → `30` L-163.
