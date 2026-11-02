@@ -124,6 +124,11 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
       xanchor: 'center', yanchor: 'bottom', yshift: 4, showarrow: false, align: 'left',
       text: r.map((x) => '<span style="color:' + x.c + '">' + x.t + '</span>').join('<br>'), font: { size: letra },
       bgcolor: 'rgba(255,255,255,0.92)', bordercolor: '#c3cede', borderwidth: 1, borderpad: 3 })).filter(Boolean);
+    // El recuadro lleva la altura de la gráfica: con `responsive`, al cambiar el tamaño de la ventana Plotly toma la del
+    // recuadro, que sin esto era su mínimo (270 px) y los renglones de abajo se salían sobre la leyenda (2026-11-02).
+    const altura = 250 + 15 * renglonesAbajo;
+    div.style.boxSizing = 'content-box';
+    div.style.height = altura + 'px';
     await Plotly.newPlot(div, [
       { type: 'bar', name: 'Límite mayor', x: xs, y: lim, width: 0.62,
         marker: { color: registrados.map((b) => tinte(color(b), 0.14)), line: { color: registrados.map(color), width: 1.8 } },
@@ -141,7 +146,7 @@ async function dibujarResumen(Plotly, { resA, resM, registrados, U, conCifraEq, 
         customdata: bajas.map((x) => x.e.nombre + ' ' + fmt(x.v) + origen(x.e)),
         hovertemplate: '%{customdata}<extra>Etapa de placa</extra>' }
     ], {
-      title: { text: titulo, font: { size: 13 }, x: 0, xanchor: 'left' }, barmode: 'overlay', height: 250 + 15 * renglonesAbajo, dragmode: false,
+      title: { text: titulo, font: { size: 13 }, x: 0, xanchor: 'left' }, barmode: 'overlay', height: altura, dragmode: false,
       margin: { l: 52, r: 10, t: 34, b: 16 + 15 * renglonesAbajo }, font: { family: fuente, size: 12, color: '#1f3656' }, paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: '#fff',
       showlegend: false, xaxis: { type: 'category', fixedrange: true, tickangle: 0, tickfont: { size: letra + 1 } },
       yaxis: { title: { text: unidad }, range: [0, maxY], gridcolor: '#eef1f6', fixedrange: true }, annotations
@@ -420,7 +425,7 @@ export async function pintarDevanadosMes(nodo, opts) {
     console.warn('[cargabilidad-scada] devanados mes a mes', e);
     for (const { graf } of [...graficas, { graf: resA }, { graf: resM }]) {
       if (window.Plotly && graf.classList.contains('js-plotly-plot')) { try { window.Plotly.purge(graf); } catch (_) { /* nada */ } }
-      graf.removeAttribute('role'); graf.removeAttribute('aria-label'); graf.style.minHeight = '0';
+      graf.removeAttribute('role'); graf.removeAttribute('aria-label'); graf.style.minHeight = '0'; graf.style.height = '';
       poner(graf, el('p', { class: 'cs-ayuda' }, 'No se pudo dibujar la gráfica; la tabla trae las mismas cifras.'));
     }
   }
