@@ -232,3 +232,9 @@ los DOS slugs, y corregir cada puntero que nombra el archivo viejo; la cabecera 
 > de aquí): lo que la regla EJECUTA es lo que manda, desplegar solo compila, se prueba a carga máxima y
 > contra la CLASE, y sanear por la forma deja el texto libre. Léela ANTES de tocar `firestore.rules`,
 > `storage.rules`, datos personales o firmas de otros.
+
+### L-163 · Plotly `responsive`: una gráfica más alta que su recuadro se encoge al primer cambio de tamaño de la ventana
+**Cicatriz** (`99 §201`): las barras de Cargabilidad pedían 295 px y su recuadro solo tenía un mínimo de 270; al redimensionar,
+Plotly tomó 270 y los rótulos de abajo se montaron sobre la leyenda. En la carga inicial se veía bien (por eso no salió en la
+vista previa). · **Regla**: si `layout.height` es mayor que la altura CSS del recuadro, darle al recuadro esa altura; y verificar
+con un cambio de tamaño forzado (`window.dispatchEvent(new Event('resize'))`), no solo con la carga inicial. **Gate** [HONOR].
