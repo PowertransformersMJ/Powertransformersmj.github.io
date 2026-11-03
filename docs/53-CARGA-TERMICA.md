@@ -36,6 +36,8 @@
   sigue con la ampacidad de la plataforma; si no es la de placa, se avisa y se corrige en la revisión uno a uno (TODO-54).
   La corriente límite es la IMPRESA en la placa cuando la trae (se rotula «impresa» o «calculada», `99 §170`); un
   terciario de COMPENSACIÓN no tiene límite de carga; una lectura de plano o de equipo «futuro» se advierte.
+  «Compensación» = lo que dice la placa (estabilización); un terciario con reactores, zigzag cargable o SSAA sí lleva
+  corriente y necesita límite (`56 §5`). Topología que explica entrada común, barra partida y escalas de TC → `56 §3–§4`.
   Con la ventilación OBSOLETA el límite usable es la ONAN, no la ONAF (Corozal y Chiriguaná: ~120–135 % de su ONAN, `§169.9`).
 - **Periodo de varios meses** (`99 §159`): su cifra es el p99 de TODAS sus horas (exacto con las 90 más altas de cada mes),
   NUNCA el promedio ni la mediana de los p99 mensuales (subestiman ~10–14 pts, hasta 37) ni el peor mes (sobrestima ~8).
@@ -82,6 +84,9 @@
   supera 1,5 × la placa, con su causa probable: ≈ ×10 → errata (corregir ampacidad y carga juntas, TODO-54); ≈ √3 o 3 → parece
   monofásico (confirmar fases); otra → la ampacidad parece de otra potencia (placa cambiada, p. ej. Casacará). `scada_carga_devanados.js`.
 - Al corregir la POTENCIA de placa, corregir también la ampacidad y la carga medida que se derivó de ella: Casacará T1 quedó con la ampacidad de 5 MVA tras pasar a 2 MVA (`99 §158.11`). Su Excel de Salud de Activos aún trae la vieja: no reimportarlo sin corregirlo.
+
+- La bahía puede limitar antes que la placa (TC sin corriente térmica extendida, bajantes y conectores, cable) y un TC de
+  medida pierde exactitud sobre el 120 % de su nominal → `56 §4` (inferencias del libro, sin verificar en el parque).
 
 ## 4. Sobrecarga sostenida
 - **≥ 2 h seguidas > 100 %** (criterio del Ingeniero, `§122.2`) · fila severa **≥ 2 h > 130 % (1,3 p.u.)**: el MENOR

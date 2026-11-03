@@ -17,7 +17,7 @@
 
 ## 🗂️ Categorías esperadas
 
-> Numeración: **41–48** dominios genéricos de software · **49–5x** dominio del transformador y su operación (49 pruebas eléctricas, 50 equipo, 51 salud y riesgo, 52 DGA/aceite/papel, 53 carga y térmica, 54 suministros y órdenes E/S). **No reutilizar** estos números para otras neuronas. Del 50 en adelante el linter exige el nombre literal en `CLAUDE.md §0` (registrarlos aquí no basta).
+> Numeración: **41–48** dominios genéricos de software · **49–5x** dominio del transformador y su operación (49 pruebas eléctricas, 50 equipo, 51 salud y riesgo, 52 DGA/aceite/papel, 53 carga y térmica, 54 suministros y órdenes E/S, 56 subestación que lo rodea; el 55 queda reservado a territorio). **No reutilizar** estos números para otras neuronas. Del 50 en adelante el linter exige el nombre literal en `CLAUDE.md §0` (registrarlos aquí no basta).
 
 | ID | Lóbulo | Disparador (cliente dice…) | Estado | Cubre |
 |---|---|---|---|---|
@@ -35,6 +35,7 @@
 | **52** | Gases disueltos, aceite y papel | "DGA", "gases", "ppm", "Duval", "gas suficiente", "acetileno", "ADFQ", "rigidez", "furanos", "2FAL", "DP", "vida del papel" | 🟠 **activo** → `docs/52-DGA-ACEITE-PAPEL.md` | Criterio de la DGA (bandas, Duval, significancia, interpretaciones que conviven), del aceite y del papel. |
 | **53** | Carga y térmica | "cargabilidad", "CRG", "ampacidad", "ONAF", "sobrecarga", "sostenida", "punto caliente", "IEC 60076-7", "C57.91", "regla de los 6 °C", "con más carga", "DGA × carga" | 🟠 **activo** → `docs/53-CARGA-TERMICA.md` | Esfuerzo de la operación sobre el equipo: cifra SCADA, ampacidad, sobrecarga, modelo térmico, proyección y puente DGA × carga. |
 | **54** | Suministros, contrato y órdenes E/S | "contrato", "4125000143", "órdenes de entrada/salida", "OE/OS", "Libro4", "nexo", "movimientos", "no cuadra con las órdenes" | 🟠 **activo** → `docs/54-SUMINISTROS-ORDENES.md` | Suministro de accesorios del parque: órdenes de Materiales E/S, contrato 4125000143 y su nexo con ellas («la orden manda»), qué descuenta, valor y cantidades, movimientos enlazados e indicadores. |
+| **56** | Subestaciones AT/EAT (el entorno del transformador) | "configuración", "barra partida", "entrada común", "acople", "TC/TT", "87T/86/50BF", "disparo", "servicios auxiliares", "malla", "distancias", "BIL/Um", "contaminación", "foso/muro", "puesta en servicio", "FAT/SAT" | 🟠 **activo** → `docs/56-SUBESTACIONES-AT-EAT.md` | Lo que rodea al equipo: configuración y su efecto en la medida y los disparos, cadena TC→SCADA, protección de la bahía, SSAA, malla, distancias, aislamiento, obra civil y contraincendio, puesta en servicio. Fuente: libro HMV (3.ª ed.), ingerido 2026-11-02 (`99 §202`). |
 
 **Categorías futuras**: un dominio nuevo de software ocupa un número libre de 41–48; uno del transformador, el
 siguiente 5x (candidatos SIN contenido real todavía, NO crear: OLTC propio cuando exista un módulo que lo use;
@@ -63,6 +64,9 @@ mientras, la ruta vive en `00` Capa 2 (`99 §152`–`§157`).
 | Accesorio (radiador, buje, Buchholz, motoventilador…) | **50** como subsistema del equipo · **54** su suministro, entrega y descuento del contrato | un hecho, un dueño |
 | Cédulas, firmas y permisos de quien firma una orden E/S | `35` (reglas) · `22` (archivos) · **54** solo apunta | datos personales fuera del repo |
 | Lecciones de dominio (pruebas, DGA, carga, salud) | `34` | hija de `30` con alcance ampliado |
+| Buchholz, alivio, nivel, imagen térmica (el accesorio) · su función en el esquema (63B/63P/71/49), 87T, 51, 86, 50BF | **50** el accesorio · **56** el esquema de protección de la bahía | el equipo frente a la subestación |
+| Entrada común, barra partida, acople, escala de TC | **56** la topología y la cadena de medida · **53** la cifra y su firmeza | un hecho, un dueño |
+| Pruebas de puesta en servicio (FAT/SAT) frente a umbrales del tablero | **49** el criterio · **56** qué es y qué no es una prueba de puesta en servicio | las tablas del libro no son umbrales |
 
 ---
 

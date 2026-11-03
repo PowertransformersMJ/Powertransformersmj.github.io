@@ -58,6 +58,7 @@
   iguales entre 1 y el máximo (baseline 48.312 ⇒ pasos de 9.662).
 - **Problema abierto**: la banda «mínima» se traga la gran mayoría del parque y hay equipos grandes que declaran
   pocos usuarios → la criticidad casi no distingue. Opciones y decisión suya → TODO-55 (`99 §81.1`, `§107.4`, `§74.24`).
+  Insumo posible: la consecuencia según la configuración de la S/E y el catálogo de causas de falla → `56 §3` y `§5`.
 - Matriz 5×5 oficial (fila = HI, columna = criticidad, MO.00418 Tabla 11) → `colorCelda`. En la hoja «Salud y
   riesgo» de Fichas: sin dato de usuarios no hay casilla (`99 §107`, `§111`).
 

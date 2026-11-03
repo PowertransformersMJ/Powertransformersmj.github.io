@@ -201,7 +201,7 @@ Skill consultada: `factor-potencia-aislamiento` (02-calculos, 03-criterios, 04-d
 Datos REALES verificados (fixtures 450108): cada punto trae `Tan δ @10 kV` **y** `@2 kV` por
 sección + `Cap (pF)` en `punto.extra`; **NO** hay temperatura registrada en el informe.
 
-Lo que el panel YA cubre: veredicto multi-norma (NETA 0.5% / IEEE 1%), peor medición, tendencia
+Lo que el panel YA cubre: veredicto multi-norma (NETA 1,0 % / IEEE 0,5 %, atribución corregida en `§53`), peor medición, tendencia
 del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no implementados)**:
 1. **Tip-up `ΔFP = FP@10kV − FP@2kV` por sección** (skill §D + 02§3): detecta ionización en voids/PD (ΔFP↑) o humedad superficial / tierra de núcleo faltante (ΔFP↓) — mecanismo INVISIBLE al FP absoluto. **Computable YA con dato real, sin corrección de T** (es diferencia a igual T). MÁXIMO valor/factibilidad.
 2. **Localización del defecto por modo** (04-diagnostico): CH alto=AT↔tierra/bujes · CL=MT↔tierra · CHL=entre AT-MT · CHT=AT-BT… → traduce "qué sección alta" en "dónde está el defecto". Decisión accionable.
@@ -209,6 +209,8 @@ del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no
 4. **Corrección a 20 °C — caveat + captura de T** (02§2, 03): hoy se compara FP CRUDO vs 0.5/1% SIN corregir a 20 °C (la skill exige corregir SIEMPRE). No hay T → NO fabricar; mostrar caveat "valores como medidos" + capturar T+factor del fabricante en extracción futura. Correctitud normativa.
 5. **Pendiente/tasa de cambio con bandera predictiva** (03§E): la pendiente condena aunque FP≤0.5%; hoy solo hay tendencia del peor caso.
 6. **Baseline de fábrica/commissioning** (03 precedencia 1): no existe en data → usar el informe más antiguo como proxy + marcar "sin baseline de fábrica".
+   El libro HMV (cap. 19) respalda FAT/SAT como punto de partida del mantenimiento; sus Tablas 19.1–19.3 NO son umbrales
+   (deciden si se energiza) y divergen del tablero en PI/DAR, FP de bujes y R de devanados → `56 §10` y `§12` (no cambiar).
 
 Estado: **AUDITORÍA CERRADA** (ADR-038→040). #1 tip-up + #4 caveat 20 °C (ADR-038); #2 localización por modo (ADR-039); #5 pendiente predictiva por sección + #6 baseline-proxy (ADR-040). **#3 capacitancia DESCARTADA con causa**: comparar pF entre informes da artefactos (CHL −91%) porque los esquemas/modos de medida difieren (combos 2 vs 3 devanados, GST/UST) → la misma etiqueta de sección no mide lo mismo; el tan δ (ratio) sí es comparable, la capacitancia (absoluta) no. Para habilitar #3 haría falta **extracción POR MODO** (capturar GST/UST/GSTg por sección). Validado todo con workflow + datos REALES 450108.
 

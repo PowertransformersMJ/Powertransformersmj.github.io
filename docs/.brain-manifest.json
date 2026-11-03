@@ -136,6 +136,10 @@
     "docs/40-LOBULOS-DOMINIO.md": {
       "lines": 280,
       "chars": 16000
+    },
+    "docs/56-SUBESTACIONES-AT-EAT.md": {
+      "lines": 260,
+      "chars": 24000
     }
   },
   "archiveDir": "../brain-private/sgm-transpower/research-archive",
@@ -197,5 +201,6 @@
       "adr": "99 §150",
       "razon": "Decisión del Ingeniero 2026-10-07 («Frenar al publicar»): el gate #14 avisa y NUNCA bloquea un commit del cerebro; boot-gate y los demás avisos de brain-check sí lo bloquean (corregido 2026-10-11, §162). El freno de publicar es githooks/pre-push → scripts/freno-publicar.mjs (M-10)."
     }
-  ]
+  ],
+  "_capsNuevos202": "Nace el lobulo 56 (subestaciones AT/EAT) con la ingesta del libro HMV, 99 §202. Tope de 24.000 (no 16.000): un libro de 823 paginas destilado a la topologia, la medida, la proteccion de la bahia y la puesta en servicio; el detalle por capitulo vive en la boveda."
 }

@@ -7,7 +7,7 @@
 
 ## 🎯 Foco (al 2026-10-28) — SCADA conformes: provisionales 44 → 7 (`§190`–`§196`); el resto, área SCADA/brigada (pedido) (TODO-69) · luego REFRIGERACIÓN (TODO-80) · firmas (TODO-81) · CONTRATO (TODO-76)
 
-> Qué pasó → `05` y `00` (**no se repite aquí**, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
+> Qué pasó → `05` y `00` (no se repite, §G.3). ⚠️ **Abiertos** = la tabla de abajo (🔴 primero) + los fríos de `11`.
 > **Al retomar**: suyo → TODO-69 · TODO-76 · TODO-78; técnico en vivo → TODO-62; Fichas CF-43/44/36/35 → `99 §140`; mantenimiento del cerebro → `§162`.
 
 ### 🔴 Solo puede hacerlo el Ingeniero (nadie más tiene la llave)
