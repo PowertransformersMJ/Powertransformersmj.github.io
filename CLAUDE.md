@@ -36,7 +36,7 @@ El cerebro se divide en **nodos**. Auto-cargas SOLO `CLAUDE.md` + `05` + `10` (�
 | 📚 **Largo Plazo** | `docs/99-HISTORIAL-ADR.md` | ❌ on-demand | Trigger de Error / detalle histórico de un §. NUNCA completo — usa offset/limit. |
 | 🔁 **Workflows** | `docs/60-WORKFLOWS.md` | ❌ on-demand | Trigger 🧪/🔵: catálogo W-01..W-14 de procesos de detección. **W-11 = SSoT del flujo fuerte** (leerlo ANTES de una Decisión Fuerte o de UI sensible). |
 | 🛰️ **Consejo Externo** | `docs/15-CONSEJO-EXTERNO.md` | ❌ on-demand | Trigger de Decisión Fuerte: crítica adversarial de un provider de OTRA familia (config + tiers ahí). |
-| 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` (registro + fronteras) | ❌ on-demand | Trigger 🔵. Transformador: `49-PRUEBAS-ELECTRICAS.md` · `50-TRANSFORMADORES-POTENCIA.md` (equipo, OLTC) · `51-SALUD-RIESGO-ACTIVOS.md` · `52-DGA-ACEITE-PAPEL.md` · `53-CARGA-TERMICA.md`. Suministros: `54-SUMINISTROS-ORDENES.md` (contrato y órdenes E/S). |
+| 🎯 **Lóbulos de Dominio** | `docs/40-LOBULOS-DOMINIO.md` (registro + fronteras) | ❌ on-demand | Trigger 🔵. Transformador: `49-PRUEBAS-ELECTRICAS.md` · `50-TRANSFORMADORES-POTENCIA.md` (equipo, OLTC) · `51-SALUD-RIESGO-ACTIVOS.md` · `52-DGA-ACEITE-PAPEL.md` · `53-CARGA-TERMICA.md`. Suministros: `54-SUMINISTROS-ORDENES.md` (contrato y órdenes E/S). S/E: `56-SUBESTACIONES-AT-EAT.md`. |
 | 🛠️ **Skills externas** | `~/.claude/skills/` + `skills/` + tool Skill | ❌ on-demand | Expertise portable de método. NO es neurona — recurso paralelo. **Catálogo → `docs/skills-inventory.md`**. |
 
 **Hojas de detalle**: convención `docs/<tema>.md`; SIEMPRE referenciadas desde su neurona madre — nada huérfano (§G.5). Las hojas del dueño (ARQUITECTURA, MODELO-DATOS-v2, PLAN-*, SESION-*, etc.) están catalogadas en `21`.

@@ -10098,3 +10098,63 @@ renglones 2 y 3 (hasta 296 px) salían por debajo, sobre la leyenda HTML. Las ot
 **201.2 Solución.** El recuadro lleva la altura de su gráfica (`box-sizing: content-box` + `height`); en el camino de error se limpia.
 **201.4 Verificación.** Antes/después en su Chrome con un cambio de tamaño forzado (contenedor a 760 px y de vuelta): sin la corrección
 270 px de recuadro y rótulos a 296; con ella 295 y 286. `test:unit` 3277 ✅ · lint ✅. Lección → `30` L-163.
+
+## 202. ADR-202 — Lóbulo 56 · Subestaciones AT/EAT: ingesta del libro «Subestaciones de Alta y Extra Alta Tensión» (HMV, 3.ª ed.) ⟦OPUS-5.5⟧ (2026-11-02)
+
+> «he cargado un libro de subestaciones de alta y extralta tension para que por favor lo proceses y ayude a fortalecer al cerebro» (2026-11-02).
+
+**202.1 Causa raíz.** El cerebro sabía del transformador (49–54) pero no de la subestación que lo rodea: no tenía la tabla de Um
+ni de niveles IEC 60071, ni las configuraciones que explican la entrada común y la barra partida que tanto costaron en SCADA
+(`§176`–`§189`), ni el esquema de protección de la bahía (87T, 86, 50BF) que necesita la respuesta a disparos. El libro (823
+págs., escaneo con OCR) estaba en `~/Desktop/GitHub-MJ/` y en Descargas.
+
+**202.2 Solución.** Workflow de 31 agentes: 15 lectores, uno por bloque de capítulos, con texto propio y página; 15
+verificadores que re-leyeron cada página; y un contraste con los lóbulos 49–53. Nace **`docs/56-SUBESTACIONES-AT-EAT.md`**: §0
+fuente · §1 mapa de capítulos · §2 Um y BIL · §3 configuraciones y casos SGM · §4 cadena TC→SCADA · §5 protección de la bahía ·
+§6 energización · §7 SSAA · §8 malla, distancias, pararrayos y costa · §9 contraincendio · §10 puesta en servicio · §11
+insumos para la Guía de disparos (propuesta) · §12 divergencias. El 55 sigue reservado a territorio (`§162`). Registro: fila en
+`40` + 3 fronteras, nombre literal en `CLAUDE.md §0` (para entrar en el presupuesto de arranque se recortó una frase de `10`),
+ruta en `00` Capa 2, tope de 24.000 en el manifest y punteros de una línea en 49, 50, 51 y 53. Notas completas por capítulo →
+bóveda `2026-11-02-libro-subestaciones/`.
+
+**202.3 No-regresión.** Solo cerebro, sin código. Ningún criterio vigente cambia: las Tablas 19.1–19.3 del libro (FP, IR,
+PI/DAR) no entran como umbral. **El libro no entra al repo** (público; derechos de autor): solo síntesis propia con página. De
+paso se corrigió en `49` la atribución invertida «NETA 0,5 % / IEEE 1 %», que su propia tabla ya había corregido en `§53`.
+
+**202.4 Verificación.** Revisé yo mismo en el texto, página por página, las cifras que pasaron al lóbulo:
+- Um 14,52 / 36,5 (p. 4);
+- espiras < 10 % de In (p. 535);
+- 51 entre 130 y 150 % (p. 540);
+- 50BF a 150 / 240 / 340 ms (p. 591);
+- clase 0,2 al 5 % (p. 297);
+- distancias por litros de aceite (p. 117);
+- fuga específica 27,8 / 43,3 / 53,7 mm/kV (p. 418);
+- baterías al 80 % (p. 713);
+- foso del 120 % (p. 744).
+
+Los rótulos G1/G2 de la Tabla 4.7 se perdieron en el OCR y se escribieron según la IEC 61936-1. `brain:check` y `boot-gate` en verde.
+
+**202.5 Anti-patterns evitados.**
+- Fiarse de una sola lectura: los verificadores corrigieron o retiraron de 18 a 44 ítems por bloque (páginas, cifras, vínculos forzados).
+- Copiar el libro al repo.
+- Duplicar en 49, 50 y 53 lo que es de la subestación: allá solo van punteros.
+- Cambiar un umbral del tablero por un promedio empírico del libro.
+
+**202.6 Archivos.** Nuevo: `docs/56-SUBESTACIONES-AT-EAT.md`. Tocados: `CLAUDE.md` §0, `00`, `10` (una frase), `40`, `49`,
+`50`, `51`, `53`, manifest. Sin tocar: código, reglas, kernel.
+
+**202.7 Doctrina.**
+- Neurogénesis con contenido real (§G.4).
+- Un hecho, un dueño: el valor de norma vive en `56`.
+- Verifica, no asumas (§3.3).
+- Lo que es inferencia nuestra va rotulado como tal.
+
+**202.8 Verificado sano / no re-auditar.**
+- El contraste confirmó que los ADR citados (§170, §176–§189) dicen lo que se les atribuye.
+- Las divergencias del libro con el cerebro (temperatura de corrección de la R de devanados, bandas de PI/DAR, FP de bujes,
+  K0 del aluminio) se revisaron una a una: el cerebro se queda con su criterio (`56 §12`).
+- El «terciario de compensación» de `53` es correcto para lo que la placa llama así. Solo se precisó el término.
+- **Abierto:**
+  - Um 36 frente a 36,5 kV.
+  - Las configuraciones reales del parque, sin unifilares.
+  - La Guía de disparos del Ingeniero (`Guia_Respuesta_Disparo_Transformadores_AFINIA`, en su escritorio): no está ingerida.
