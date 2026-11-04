@@ -109,7 +109,7 @@ export function armarContenedor(meta, archivos) {
   // Solo si hubo relevos (§158): así un paquete sin relevos queda byte a byte como antes.
   if (meta.relevos && meta.relevos.length) manifiesto.relevos = meta.relevos.map((r) => ({ est: r.est, nueva: r.nueva, desde: r.desde }));
   // Igual con los alias de elemento: solo si los hubo.
-  if (meta.alias && meta.alias.length) manifiesto.alias = meta.alias.map((x) => ({ est: x.est, de: x.de, a: x.a }));
+  if (meta.alias && meta.alias.length) manifiesto.alias = meta.alias.map((x) => (x.desde ? { est: x.est, de: x.de, a: x.a, desde: x.desde } : { est: x.est, de: x.de, a: x.a }));
   const cab = enc.encode(PAQUETE.firma + ' ' + PAQUETE.version + '\n' + JSON.stringify(manifiesto) + '\n');
   const total = cab.length + lista.reduce((s, a) => s + a.bytes, 0);
   const out = new Uint8Array(total);
