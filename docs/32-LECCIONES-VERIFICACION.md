@@ -45,6 +45,12 @@ al backend: **el repo describe una intención; producción es un hecho aparte**.
 **Corolario.** Un `where` + `orderBy` nuevo lleva su índice en el MISMO turno: declarado y desplegado.
 **Gate.** [HONOR]. Ver `99 §63`.
 **Y `§117`**: `firestore.indexes.json` se edita como TEXTO, insertando solo el índice nuevo: reescribirlo con un serializador (`json.dumps`) reformateó el archivo entero y el cambio dejó de poderse revisar (se restauró con `git checkout` y se insertó a mano).
+**Y al desplegar** (`§163`, revisor del 10-14): `firestore:indexes` con `--force` borra sin preguntar todo índice o exención de
+producción que no esté en el archivo: se despliega con `--non-interactive` y sin `--force`, tras comparar `firebase
+firestore:indexes` con el archivo; después se vuelve a listar (conteo esperado) y se espera a que la exención quede aplicada antes
+de la primera escritura grande: si no, se indexan todos los subcampos del mapa. `deploy --only storage` reemplaza el juego COMPLETO de
+reglas de Storage y el CLI no deja leer las vivas: `main` debe ser lo desplegado antes de desplegar (ante la duda, el historial de
+reglas de la consola).
 
 ### L-67 · Una hoja de estilos sin marcado detrás es un port a medias
 **Síntoma.** El dueño dice que un módulo portado «no está como lo diseñó». Difícil de confirmar
@@ -222,6 +228,9 @@ cierra LEYÉNDOLO en la sesión real (`window.__sgmSession.profile`), no se deja
 comprobar la versión con `import()` del módulo cambiado; si es vieja, `fetch(u, {cache: 'reload'})` de cada módulo
 cambiado y recargar; (3) una exportación NUEVA se pone en un archivo NUEVO (no en uno que el navegador ya tenía): la mezcla de un módulo nuevo con su vecino viejo tumbó la página de Fichas (`99 §102.4`); (4) un productor nuevo no le entrega a un consumidor ya publicado un TIPO que no sabe escribir: `top` como `Uint8Array` hacía fallar el `escribirResumen` viejo de una pestaña abierta antes de publicar; va como lista de números (`99 §159`). **Gate** [HONOR] (TODO-57 es el arreglo de fondo).
 (5) un módulo publicado que necesita una exportación NUEVA de un vecino que puede seguir viejo en caché lo importa por espacio de nombres (`import * as KPIS`) y pregunta si existe: un `import { x }` que falta tumba el módulo entero (`99 §158.10`, `ui/cargabilidad-scada/detalle.js`).
+(6) al revés que (4): un consumidor NUEVO que lee una opción con `!!` recibe de un productor VIEJO en caché, con el mismo nombre, un
+dato de otra forma: la lista de niveles (`['N13_8']`) del importador viejo encendía la banda muerta en TODOS los niveles; se exige
+`=== true` (`99 §195.4`, `domain/scada_carga_limpieza.js`).
 
 ### L-104 · Vacío no es cero: `Number(null)` y `Number('')` dan 0
 **Disparador**: un número de la base decide una clasificación, un color o un veredicto. · **Cicatriz**
@@ -264,6 +273,9 @@ se arma con las llaves ORDENADAS y los Timestamp como número; (2) un «cambiaro
 sospecha del comparador antes que del dato: se re-verifica con la comparación ordenada ANTES de decir nada; (3) la
 fidelidad de una carga se prueba con una lectura independiente de la fuente (aquí, openpyxl sobre el Excel) y una huella
 común (SHA-1 de líneas canónicas), no con el mismo código que escribió. **Gate**: [HONOR].
+**Y dónde vive la foto** (`§189.4`): en una recarga de varios meses que él puede pausar, la foto «antes» se guarda FUERA de la
+pestaña (`localStorage` o un archivo) antes de escribir: la de `window.__antes2` se perdió al recargarse la pestaña tras la pausa;
+el plan, guardado en `localStorage`, sí sobrevivió.
 
 ### L-121 · Un mensaje de commit no prueba una función: el camino vivo se recorre en el tamaño en que se usa
 **Cicatriz** (`99 §135`): `dd9b5f6` (16-ago) decía «botón de menú con panel deslizante, cierre con Escape y al pulsar
@@ -307,7 +319,7 @@ se cruza con su texto impreso (potencia, tensión, frecuencia), no solo con la c
 
 ### L-147 · Lo que se le promete al dueño sobre cómo queda un PDF se MIDE en el PDF, no se deduce del CSS
 **Disparador**: antes de describirle al Ingeniero qué protege, tapa o marca algo en un PDF (marca de agua, firma, sello),
-sobre todo si va dentro de una pregunta para que DECIDA. · **Cicatriz** (`99 §163.16`, en pausa):
+sobre todo si va dentro de una pregunta para que DECIDA. · **Cicatriz** (`99 §203.6`, en pausa):
 - le ofrecí «firmas en el PDF del borrador, con la marca BORRADOR impresa encima, que no se puede borrar» porque en el CSS la
   marca está en la capa de arriba (`z-index` 20 contra 2);
 - en el PDF real la marca es una diagonal que no pasa por las firmas (0 píxeles encima), cada firma es una imagen aparte
@@ -351,4 +363,45 @@ candidatos. **Gate**: [HONOR].
 orden de las claves entre lecturas (comparación profunda: 0 diferencias). Y la lista de una pestaña abierta ANTES de escribir las marcas
 mostró 188/12 en vez de 191/9: la página guarda la homologación con que abrió. · **Regla**: comparar con una función profunda que no
 dependa del orden (y Timestamps por `toMillis`); verificar la lista con la página RECARGADA después de la última escritura.
+**Gate**: [HONOR]. · **Del lado de él** (11-02, tras `§200`): «está solo hasta el 26 de octubre» con los datos completos. (a) En
+la vista del mes el eje rotula por semanas (último rótulo «oct 25», la curva sigue); (b) «oct 26» en «Mes a mes» es octubre de
+2026; (c) la página lee una vez al abrir (caché en `data/scada_carga.js`): una pestaña abierta antes de la carga muestra lo viejo;
+(d) un devanado sin datos (el 13,8 kV de Pradera T2) sale vacío. Antes de responder, leer en producción la última hora con dato
+del devanado que da la cifra; tras cargar un mes, pedirle que recargue.
+
+### L-169 · Una exportación se comprueba en producción sin descargarla: se intercepta el `Blob`
+**Disparador**: probar una descarga (CSV, lista, Excel) antes de darla por publicada sin dejarle un archivo en su equipo. ·
+**Cicatriz** (`99 §185.4`): un `fetch` de la URL `blob:` después del clic dio «Failed to fetch»: la página ya la había revocado.
+· **Receta**: antes del clic, envolver `URL.createObjectURL` para guardar el `Blob` y anular `HTMLAnchorElement.prototype.click`
+solo para enlaces `blob:`; pulsar el botón; restaurar las dos en un `finally`; contar filas y columnas con `await blob.text()`.
+Si el botón ESCRIBE (folio, emisión), no se pulsa en vivo: banco o `?nocustodio=1` (L-94). **Gate**: [HONOR].
+
+### L-170 · Antes de entregar un informe, cada palabra del pedido tiene su sección, y lo que pidió va primero
+**Cicatriz** (2026-10-13, refrigeración, TODO-80): pidió «la escogencia, selección e implementación» del régimen a partir de
+ONAF/ONAN; la v1 (13 decisiones y catálogo mundial) decía CUÁNTOS ventiladores, no CUÁNDO conviene ONAN, ONAF, ONAF2 u OFAF.
+Reclamó dos veces ese día («no logro apreciar los criterios para la escogencia…»; «no veo aún el cálculo, hasta ahora solo temas
+técnicos conceptuales») y hubo que rehacerlo. · **Regla**: si el pedido dice «escogencia», «selección» o «cálculo», el informe
+ABRE con eso (criterios de decisión o el número); antes de entregar, cada término del pedido se coteja contra una sección del
+índice. Ir más allá se suma después, no en su lugar. Bóveda `2026-10-12-refrigeracion-onaf-onan`. **Gate**: [HONOR].
+
+### L-171 · Una calculadora de dimensionamiento falla CERRADA: ante una entrada dudosa avisa o no calcula, nunca pide menos en silencio
+**Cicatriz** (2026-10-13, calculadora de ventiladores ONAF, HTML sueltos; los revisores hallaron 9 defectos en la v1 y 17 en la
+v2, todos corregidos): «1.000 m» se leía como 1 m (`num()` sin punto de miles: 16 ventiladores en vez de 18) y «10.000 kVA»
+como 10; al cargar un ejemplo la unidad anterior quedaba vieja; la segunda etapa marcada y vacía calculaba una sola; la
+potencia de referencia de las pérdidas no tenía rango; se aceptaba un caudal medido mayor que el de la ficha. · **Regla**: un
+solo lector de números (miles y coma), rango por campo, estado que se limpia al cambiar el contexto, casilla condicional vacía =
+error; cada campo se prueba con su valor absurdo. Vale al llevar el Método SGM v2 a la plataforma (TODO-80). **Gate**: [HONOR].
+
+### L-172 · El nombre de una subestación se LEE; nunca se deduce de la sigla de la matrícula
+**Cicatriz** (10-23 y 10-27): una síntesis de la bóveda puso nombres supuestos (TVJ «Tierra Vieja» es Tolú Viejo; CMB es
+Chambacú; SIM, Simití), el borrador de ADR-173 traía otro, y la página de decisiones escribió «La Loma de Caña» por LLC
+(Llerasca) y «Talaigua» por Talaigua Nuevo. · **Regla**: en un entregable, el nombre sale de `ubicacion.subestacion_nombre` del
+parque o del Excel; si no está, se escribe la matrícula. **Gate**: [HONOR].
+
+### L-173 · Un hueco de datos que empieza un día 1 y cae en UNA zona: contar por zona y preguntar por un cambio de operador antes de culpar a la medida
+**Cicatriz** (`99 §196`): desde el 1-sep el exporte SCADA dejó de traer casi toda la zona Oriente, y el cerebro lo trató unas
+cuatro semanas como falla (`§125.8`, bóveda `2026-10-08-scada-sin-medicion`, fila A1 de `§194`: «~167 estaciones» pedidas al
+área SCADA). Era el traspaso a ENERGUA (Energía Atenea): Oriente, 61 equipos con agosto, 8 con solo el 1–2-sep y 0 en octubre;
+las otras zonas, normales. · **Regla**: ante un hueco agrupado, contar por zona u operador y por fecha de corte; si cae en un
+grupo desde un día 1, preguntarle al Ingeniero por un cambio de organización ANTES de pedir arreglos o llamarlo falla.
 **Gate**: [HONOR].

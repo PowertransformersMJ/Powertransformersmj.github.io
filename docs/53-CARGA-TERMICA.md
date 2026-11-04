@@ -28,12 +28,20 @@
   (`electrico.corriente_nominal_*_a`). Horas > 3 × ampacidad = escala imposible, fuera. Equipo = máximo de sus
   devanados: **NUNCA se suman niveles**. Calibrada contra la carga oficial 2025: mediana del cociente 0,993.
 - **Firme / provisional**: firme solo si se cumple TODO: homologación automática (sin avisos que la frenen) o confirmada por el Ingeniero —y confirmada si lo que se mide es un circuito—, ampacidad en cada devanado, se mide el devanado que lleva la carga, cobertura ≥ 50 %, ≥ 72 h válidas, las 3 fases en la mayoría de las horas (con solo 2 en más del 50 % es provisional, `§125.2`), sin escala sospechosa y sin mes del rango sin leer (`firmeza` en `scada_carga_kpis.js`); la provisional va en gris con su motivo.
+  Cobertura, horas y meses: los del devanado que DA la cifra, en los meses en que midió (`§190`). Marcas por punto (suyas):
+  **fase sin carga por diseño** (dos monofásicas: no es «falta una fase», `§191`) · **unidad de reserva** (su mes sin carga no
+  cuenta, `§192`) · **«Invalid» no confiable** (se aceptan esas horas, `§193`) · **banda muerta** (`§195`). **Mes casi sin
+  medida** (< 72 h y < ½ de lo que estuvo en servicio) = no medido (`§195`).
 - Ventana del mes = las horas que el SCADA ROTULA en él (`ventanaDeMes`). Gotchas → L-113 (`37`), L-117 (`36`).
+- **Cambio de MEDIDA desde un mes** (`99 §186`): con `decision.previas` cada mes de la lista va con la medida que regía; periodo,
+  detalle, historia y mes a mes usan la vigente y lo anterior va aparte («vigente + lo anterior», suya). «Sin carga» = sin cifra
+  con su motivo, nunca 0 %.
 - **Mes a mes y acumulada** (`99 §168`, detalle de cada equipo): mes = «Un mes»; acumulada = «Varios meses» desde el primer mes con
   datos (12 meses de calendario). **«A la fecha» = la cargabilidad oficial** al revisar cada equipo (decisión suya 2026-10-23).
 - **Cada devanado frente a su PLACA** (`99 §169`): límite = la mayor etapa de la placa (ONAF; ONAN si la placa solo trae una;
   ONAF II si tres) a la tensión de placa de la CONEXIÓN del equipo; también el % de ONAN (sin ventiladores). La cifra oficial
-  sigue con la ampacidad de la plataforma; si no es la de placa, se avisa y se corrige en la revisión uno a uno (TODO-54).
+  usa la corriente de PLACA desde `§172` (435 devanados; antes, la ampacidad de la plataforma); excepciones por decidir:
+  Momil, Ferrocarril, Monterrey (TODO-54).
   La corriente límite es la IMPRESA en la placa cuando la trae (se rotula «impresa» o «calculada», `99 §170`); un
   terciario de COMPENSACIÓN no tiene límite de carga; una lectura de plano o de equipo «futuro» se advierte.
   «Compensación» = lo que dice la placa (estabilización); un terciario con reactores, zigzag cargable o SSAA sí lleva
@@ -70,16 +78,17 @@
   contrasta con las fases sanas del transformador (±10 %; si no cuadra → provisional). Sin suma válida, el nivel no da cifra.
 
 ## 3. Ampacidad
-- Es la de **ventiladores en servicio (ONAF)**, confirmado por el Ingeniero (`99 §127.1`). Si la refrigeración falla,
-  la ampacidad real es menor y la cifra subestima: hoy nada lo cruza («refrigeración deficiente» sin señal → CF-27).
-  Hoy son **27 equipos ONAF con ventilación obsoleta** (dato del diseño de `§122`, bóveda `2026-09-30-cargabilidad-scada/diseno-v2.md`; riesgo anotado en `99 §127.8`): en ellos la cifra medida y el nivel del panel DGA pueden quedarse cortos.
+- Es la de **ventiladores en servicio (ONAF)**, confirmado por el Ingeniero (`99 §127.1`). **Cargabilidad NO cruza la
+  ventilación** (orden suya, `§197.11`–`.12`): sin avisos, sin «la cifra puede quedarse corta» y sin textos de ventiladores en
+  SCADA. Los 27 ONAF con ventilación OBSOLETA (antes riesgo aquí, `§127.8`) y CF-27 → REFRIGERACIÓN (TODO-80, `50`).
 - Erratas ×10 conocidas en la ampacidad: hay que dividir el PAR (ampacidad y carga), no la ampacidad sola (TODO-54).
 - Vistas desde el SCADA, solo informativas y sin tocar: posibles erratas en la cifra OFICIAL de Salud de Activos
   (Ariguaní; El Carmen y Sampués, corrientes copiadas entre T1 y T2 —Sampués NO: iban en paralelo y Salud da a cada uno la mitad, `99 §188.8`—; Membrillal T1) y un circuito cuya limpieza descartó casi todo agosto → síntesis
   de la bóveda `2026-10-08-scada-sin-medicion` y TODO-54.
-- **Devanados de placa por transformador** (pedido del Ingeniero 2026-10-22; BORRADOR hasta su «procede»): la lista y el detalle muestran
-  cada devanado con tensión, ampacidad y **potencia CALCULADA** = √3 × kV × A (no hay campo de potencia por devanado; monofásico:
-  kV × A, o kV × A ÷ √3 si cuadra mejor con la placa: devanado entre fase y neutro). La carga de un devanado se publica SOLO si el
+- **Devanados de placa por transformador** (`§165`; `§172`, «todo con base a la placa»): el DETALLE da tensión, potencia y
+  corriente de PLACA (corriente CALCULADA solo si la placa no la imprime; la de las notas que cuadra con OTRO devanado no es
+  «impresa», `§173`) y anota si la plataforma difiere (`scada_devanados_placa.js`). La LISTA y el CSV siguen con la plataforma
+  y la **potencia CALCULADA** = √3 × kV × A (monofásico: kV × A, o ÷ √3 si cuadra mejor con la placa). La carga de un devanado se publica SOLO si el
   equipo tiene cifra (circuito sin confirmar, excluida o sin homologación no dan número, tampoco sus devanados). Aviso si un devanado
   supera 1,5 × la placa, con su causa probable: ≈ ×10 → errata (corregir ampacidad y carga juntas, TODO-54); ≈ √3 o 3 → parece
   monofásico (confirmar fases); otra → la ampacidad parece de otra potencia (placa cambiada, p. ej. Casacará). `scada_carga_devanados.js`.
@@ -92,6 +101,8 @@
 - **≥ 2 h seguidas > 100 %** (criterio del Ingeniero, `§122.2`) · fila severa **≥ 2 h > 130 % (1,3 p.u.)**: el MENOR
   tope de corriente de IEC 60076-7:2005 Tabla 4, criterio conservador del área, solo con cifra FIRME (`§127.2`).
   La edición 2018 (§7.2, Tabla 3, leída en `§132`) mantiene 1,3 p.u. para unidades GRANDES y da 1,5 p.u. a las medianas en carga cíclica normal y en emergencia larga: el 130 % sigue siendo el tope más conservador de la norma vigente (bóveda `2026-10-02-duval-proyeccion`, crudo del paso 5).
+- **Por devanado y catalogada entera** (`99 §185`): la etiqueta nombra el devanado y cuenta 4 tipos: firme · posible (cifra
+  provisional) · periodo sin cifra · circuito sin confirmar; solo la firme lleva color. Filtro por devanado → `§187`.
 - La marca de la LISTA (resumen en bruto) decide solo donde se probó exacta; si no, lee la curva del mes con la serie
   limpia (`§129`, L-119). El «Máximo sostenido 2 h» del detalle sale de la serie limpia (`§130`).
 
@@ -103,8 +114,9 @@
   (1,8 p.u.); riesgo de burbujas sobre 140 °C (§5.3).
 - **Es ESTIMADO, no medido**: el SCADA trae I, U, P, Q y ninguna temperatura.
 - Fuente: leída en una copia de tercero cotejada con la muestra oficial de iTeh (`§132.4`).
-- **Supuestos pendientes del Ingeniero** (TODO-69, `§132.8`): ambiente 30 °C, papel no mejorado, constantes típicas
-  en vez de las de los protocolos de calentamiento, y huecos del SCADA ≤ 2 h rellenados (los más largos quedan fuera).
+- **Supuestos APROBADOS** (punto 4, «procede con las recomendadas», `§197.2`; antes pendientes, `§132.8`): ambiente 30 °C,
+  papel no mejorado, constantes típicas (las del protocolo de calentamiento de cada equipo cuando él las tenga) y huecos del
+  SCADA ≤ 2 h rellenados (los más largos quedan fuera); van rotulados en pantalla.
 
 ## 6. Regla de los 6 °C (dueña única)
 - Papel NO mejorado: referencia **98 °C**; cada **6 K** de más duplica la velocidad de envejecimiento (IEC 60076-7,
@@ -136,7 +148,7 @@
 - ⚠️ **Dos rótulos «Borrador»**: el del panel DGA lo apaga `APROBADO` (`domain/scada_carga_dga_textos.js:13`); el del triángulo de Duval está escrito fijo en `ui/cargabilidad-scada/panel-duval.js:274` y no lo mira. Cuando él apruebe los textos, se quitan los dos o se decide panel por panel.
 
 ## 10. Pendientes (solo punteros)
-- TODO-69 (supuestos del §5, textos DGA, 0,5 pu) · TODO-54 (erratas de ampacidad) · TODO-71 (detalle de la tabla vieja)
-  · TODO-73 (`sobrecarga_admisible.js`) · CF-27 (refrigeración deficiente).
+- TODO-69 (textos DGA, 0,5 pu) · TODO-54 (erratas de ampacidad) · TODO-71 (detalle de la tabla vieja) · TODO-73
+  (`sobrecarga_admisible.js`). CF-27 salió de este lóbulo → TODO-80 (`§197.11`).
 - Skill por actualizar con fuente web verificada en la misma sesión: `gestion-vida-activo` (método IEC 60076-7:2018 y la
   conciliación de los 6 °C; cotejar C57.91). No crear una skill nueva de térmica: duplicaría este §5.

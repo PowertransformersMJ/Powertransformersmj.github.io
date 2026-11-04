@@ -16,7 +16,7 @@
 - `MODELO-DATOS-v2.md` — documento maestro del schema Firestore v2 (Fase 16): Health Index ponderado por secciones, referencia MO.00418.DE-GAC-AX.01 Ed. 02.
 - `DEPLOY-FUNCTIONS.md` — guía de activación por etapas de `onMuestraCreate` y `cronAlertasDiarias` (F32); email opcional vía Firebase Extension "Trigger Email" + Gmail SMTP (estado vivo de las CF → `05`).
 - `OPERACIONES.md` — runbook operativo v2.0.8: bootstrap, uso diario y emergencia (audiencia: Ingeniero Director). **Aquí viven los comandos `firebase deploy --only …`** (su regla de quién despliega está superada; manda `CLAUDE.md §2`); para COMPARAR declarado vs desplegado se pregunta al servidor: `firebase firestore:indexes` / `firebase functions:list` (L-66).
-- `MANTENIMIENTO-BRIGADA.md` — módulo Selección ONAF: calculadora de refrigeración ONAN→ONAF conforme IEEE C57.12.00 / C57.91-2011 / ANSI C57.12.91 + Westinghouse.
+- `MANTENIMIENTO-BRIGADA.md` — módulo Selección ONAF: calculadora de refrigeración ONAN→ONAF (dice «conforme IEEE C57.12.00 / C57.91-2011 / ANSI C57.12.91 + Westinghouse»). ⚠️ Corregido por el estudio del 2026-10-12/13: la C57.12.91 es de transformadores SECOS y las pendientes coinciden con el folleto Krenz-Vent solo en 115/125 % (origen Westinghouse sin verificar) → `50 §Refrigeración`, TODO-80.
 - `MANTENIMIENTO-PREDICTIVO.md` — refactor del tablero estático de Pruebas Eléctricas (TransformerOps) a módulo modular sobre Firestore realtime + sistema Aqua.
 - `PLAN-SERVICIOS-EXTERNOS.md` — guía paso a paso (legacy, para no-programadores) de conexión con Firebase, Node.js, GitHub Pages y Vercel.
 - `PLAN-SUMINISTROS.md` — plan v2.2 de integración Suministros + Repuestos (F38–F50) a partir de los fuentes `.jsx`/`.xlsm`, con decisiones bloqueantes aprobadas. Es un plan: lo construido difiere (no existen `suministros-stock` ni `suministros-correcciones`; la decisión 6, «solo admin», la supera `99 §148`). Criterio vigente → `54`.
@@ -27,6 +27,7 @@
 - `UI-V3-DARKMODE.md` — refactor visual UI v3 dark mode (histórico; el sistema activo es AQUA LIGHT).
 - `INSTALACION-CEREBRO.md` — manual del cerebro anterior; hoy en `_legacy/cerebro-anterior/docs/`.
 - `workflow-auditoria-secciones-pruebas.md` — hoja enlazada desde `20` (§Pruebas Eléctricas): proceso repetible de auditoría/completitud por sección del tablero de pruebas (columnas que la IA pierde).
+- `workflow-datos-reales.md` — hoja de `60` (W-13 paso 9, W-15 paso 7; nació 2026-11-03): corregir un equipo contra su placa «uno a uno», escribir en producción con `firebase-admin` y extraer valores de informes del cliente para un cálculo.
 - `docs/pruebas/` — 10 fichas JSON de criterios normativos, una por prueba (01 FP aislamiento … 10 DFR): mapa código↔norma con `_fuente` apuntando a dominio/skill; las consume `assets/js/pruebas-electricas-shell.js` vía `fetch('../docs/pruebas/…')`.
 
 ---

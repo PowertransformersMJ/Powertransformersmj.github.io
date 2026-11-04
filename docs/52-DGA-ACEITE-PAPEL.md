@@ -44,12 +44,18 @@
 
 ## 5. Qué tan firme es la zona (margen en ppm)
 - `domain/dga_duval_margen.js` `margenPpm`: cuántas ppm de UN gas mueven el punto a la zona vecina. «No firme» si el
-  cambio necesario es ≤ máx(15 % del gas, 1 ppm) (`CAMBIO_PEQUENO`) — **criterio pendiente del Ingeniero** (TODO-69, `§131.10`).
+  cambio necesario es ≤ máx(15 % del gas, 1 ppm) (`CAMBIO_PEQUENO`) — **criterio del área, APROBADO sin cambio** (punto 3,
+  «procede con las recomendadas», `§197.2`; antes pendiente, `§131.10`). Recomendado para después: la incertidumbre que declare
+  el laboratorio, cuando la declare.
 
 ## 6. Zona PD con H₂ muy alto
 - En el parque, los equipos que salen PD lo hacen por H₂ ≥ 2.000 ppm; en el Triángulo 1 el gaseo del aceite se parece
   a PD → la pantalla recomienda confirmar con los **Triángulos 4 y 5 (Duval 2008)**, que NO están implementados ni
-  verificados. Decisión pendiente (TODO-69, `§131.8`). Candidatos naturales a una medición de descargas parciales.
+  verificados. **Decidido** (punto 2, `§197.2`; antes pendiente, `§131.8`): zona PD con H₂ ≥ 2.000 ppm → rótulo **«PD por
+  confirmar (hidrógeno muy alto)»** con las dos posibilidades (descarga parcial o gas del propio aceite a temperatura de
+  servicio), `domain/dga_pd_por_confirmar.js`; ninguna se da por cierta hasta la lectura del laboratorio (informes originales,
+  muestra nueva, triángulos 4 y 5). Son 13 en zona PD: 8 de Oriente (ENERGUA) y 5 de AFINIA (`§197.8`). Candidatos naturales
+  a una medición de descargas parciales.
 
 ## 7. Registro de las interpretaciones de la DGA que conviven en el código
 | Interpretación | Dónde | Estado |

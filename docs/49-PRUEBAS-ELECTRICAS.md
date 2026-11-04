@@ -215,6 +215,7 @@ del peor caso, por-devanado con líneas límite/guía. **Gaps de mayor valor (no
 Estado: **AUDITORÍA CERRADA** (ADR-038→040). #1 tip-up + #4 caveat 20 °C (ADR-038); #2 localización por modo (ADR-039); #5 pendiente predictiva por sección + #6 baseline-proxy (ADR-040). **#3 capacitancia DESCARTADA con causa**: comparar pF entre informes da artefactos (CHL −91%) porque los esquemas/modos de medida difieren (combos 2 vs 3 devanados, GST/UST) → la misma etiqueta de sección no mide lo mismo; el tan δ (ratio) sí es comparable, la capacitancia (absoluta) no. Para habilitar #3 haría falta **extracción POR MODO** (capturar GST/UST/GSTg por sección). Validado todo con workflow + datos REALES 450108.
 
 ## 🔌 Panel de corriente de excitación (2026-06-10, ADR-041) — criterio + hallazgo de patrón
+> «P@10kV» de los informes = potencia referida a 10 kV, no medida a 10 kV → `34` L-151.
 
 Skill consultada: `corriente-excitacion` (`01-teoria`, `03-criterios-evaluacion`, `04-diagnostico`).
 Módulo: `assets/js/ui/pruebas/excitacion-panel.js` (espejo del panel tan δ; helpers puros testeados).

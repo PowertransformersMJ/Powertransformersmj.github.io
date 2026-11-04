@@ -113,3 +113,13 @@ después él trajo el pedido: Σ cantidad × precio de su Excel daba $2.269.222.
 era lo pactado. Hubo que corregir datos de producción y el tablero. · **Regla**: cuando una hoja trae cantidades y precios
 de un contrato, ANTES de preguntar o recomendar, multiplicar y comparar contra el valor del contrato (pedido, aceptación,
 adiciones), y pedir ese documento si no está. Una recomendación sin ese cuadre es una suposición; dila como tal. [HONOR]
+
+### L-174 · El Python de esta Mac: openpyxl vive en el site-packages del usuario, `-I` lo esconde y un `.py` con nombre de módulo estándar lo rompe
+**Disparador**: leer un .xlsx (Excel de Salud, SCADA, algo de Descargas) o correr un generador largo de PDF con `python3`.
+· **Cicatriz** (10-19, 10-23, 10-27): (1) `python3 -I` (el modo aislado que se usa con insumos descargados) da
+`ModuleNotFoundError: openpyxl`: está en `~/Library/Python/3.9/lib/python/site-packages` del `/usr/bin/python3` 3.9.6; (2) un
+`inspect.py` de trabajo en la carpeta del script tapó el módulo estándar y openpyxl falló con un `UnicodeDecodeError` engañoso
+(4 intentos perdidos); (3) un generador con líneas de más de 1.000 caracteres y tildes dio «Non-UTF-8 code… no encoding
+declared» aunque el archivo era UTF-8 válido. · **Receta**: (1) leer con SheetJS del repo (`require('<repo>/node_modules/xlsx')`
+en un `.cjs`) o, sin soltar `-I`, añadir esa ruta a `sys.path` a mano; (2) el script en una carpeta limpia, sin archivos con
+nombre de módulo estándar; (3) `# -*- coding: utf-8 -*-` en la primera línea. Complementa L-103. **Gate**: [HONOR].
