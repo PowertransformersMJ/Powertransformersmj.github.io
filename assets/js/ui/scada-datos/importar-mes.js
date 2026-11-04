@@ -25,6 +25,8 @@ import { leerSeriesPunto, leerCatalogo, olvidarCache, leerResumenMes } from '../
 import { abrirCarga, cerrarCarga, escribirSeries, escribirResumen, escribirCatalogo, cargaIdDelCatalogo } from '../../data/scada_carga_admin.js';
 // Suma de circuitos (2026-10-24): archivo NUEVO. Sin sumas en la homologación, la carga es la de siempre.
 import { especSuma, aliasTocaSuma, componerResumen, textoSuma, textoCuadre, claveSuma } from '../../domain/scada_carga_suma.js';
+// Diferencia de barra (2026-11-04, `99 §208`): archivo NUEVO (L-102).
+import { DIF, textoParte } from '../../domain/scada_carga_diferencia.js';
 import { calcularEquipo } from '../../domain/scada_carga_vista.js';
 // Bandera «Invalid» no confiable de un punto (2026-10-28): archivo NUEVO; sin marcas, nada cambia.
 import { puntosInvalidNoConfiable } from '../../domain/scada_carga_invalid.js';
@@ -336,7 +338,7 @@ export function montarCargaMes(cont, { alTerminar }) {
         } catch (e) { console.warn('[scada-datos] suma de circuitos', e); }
         for (const nv of Object.keys(spec.porNivel)) {
           const d = (procesado.derivados || []).find((x) => x.mes === mes && x.base === spec.cid && x.nivel === nv);
-          lineas.push({ matricula: f.matricula, mes, nivel: nv, texto: textoSuma(spec, nv), resumen: d ? d.resumen : null, cifra });
+          lineas.push({ matricula: f.matricula, mes, nivel: nv, texto: textoSuma(spec, nv), resumen: d ? d.resumen : null, cifra, dif: spec.porNivel[nv].modo === 'diferencia' });
         }
       }
     }
@@ -526,6 +528,23 @@ export function montarCargaMes(cont, { alTerminar }) {
         el('button', { type: 'button', class: 'btn btn--ghost', onclick: () => { fase = 'analizado'; plan = null; dibujar(); } }, 'Volver')));
   }
 
+  const VEREDICTO_DIF = { ok: 'cuadra con la medida propia', no_cuadra: 'NO cuadra con la medida propia: la cifra saldrá provisional', sin_contraste: 'sin contraste con la medida propia: la cifra saldrá provisional' };
+  /** Una línea del plan para un nivel por diferencia de barra: horas por regla, lo que se le atribuye y el veredicto. */
+  function lineaDiferencia(x, cab, d, VEREDICTO) {
+    if (d.tipo !== DIF.tipo) return el('li', { class: 'cs-error' }, cab + ': el lector de esta pestaña es de una versión anterior y no calcula la diferencia de barra: recargue la página (Cmd+Shift+R) y vuelva a leer la carpeta.');
+    if (d.estado === 'sin_nivel') return el('li', { class: 'cs-error' }, cab + ': ' + (d.sinNivel || []).join(' y ') + ' llegó en esta carpeta pero no mide ' + NIVELES[x.nivel].etiqueta + '; revise el nivel o el nombre en la homologación. Ese mes quedará sin cifra en ese nivel.');
+    if (d.estado === 'sentidos') return el('li', { class: 'cs-error' }, cab + ': el sentido de la potencia de ' + ((d.sentidos && d.sentidos.fallan) || []).join(', ') + ' cambió frente al verificado. Ese mes quedará sin cifra en ese nivel hasta revisar la convención del SCADA.');
+    if (d.estado === 'escala_pq') return el('li', { class: 'cs-error' }, cab + ': la potencia de una bahía viene fuera de escala en más de la mitad de las horas. Ese mes quedará sin cifra en ese nivel.');
+    if (d.estado !== 'ok') return el('li', { class: 'cs-error' }, cab + ': falta ' + (d.faltan || []).join(' y ') + ' en esta carpeta; ese mes quedará sin cifra en ese nivel.');
+    const h = d.horas || {};
+    const cifra = x.cifra && x.cifra.pct != null ? 'cifra del mes ' + num(x.cifra.pct, 1) + ' %' + (x.cifra.crg ? ' (CRG ' + x.cifra.crg + ')' : '') + (x.cifra.clase === 'firme' ? ', firme' : ', provisional') : 'sin cifra del mes' + (x.cifra && x.cifra.motivoNulo ? ' (' + x.cifra.motivoNulo + ')' : '');
+    return el('li', {}, el('b', {}, cab), el('br'),
+      (h.completas || 0) + ' h válidas' + [h.abiertas ? h.abiertas + ' con una salida abierta' : null, h.restadoPuenteado ? h.restadoPuenteado + ' sin dato por la bahía del transformador restado puenteada' : null,
+        h.escala ? h.escala + ' fuera por escala' : null, h.fueraServicio ? h.fueraServicio + ' con todo fuera de servicio' : null].filter(Boolean).map((t) => ' · ' + t).join('')
+        + (textoParte(d) ? ' · ' + textoParte(d) : '') + ' · medida propia ÷ diferencia: ' + (textoCuadre(d) || '—') + ' → ' + (VEREDICTO[d.veredicto] || d.veredicto) + ' · ' + cifra + '.', el('br'),
+      el('span', { class: 'cs-sub' }, 'Se guarda aparte como resumen derivado; las medidas de las bahías y de los transformadores no cambian.'));
+  }
+
   /** Bloque «Suma de circuitos» del plan: lo que se va a guardar APARTE, con su cuadre. */
   function bloquePlanSumas(sumas) {
     const VEREDICTO = { ok: 'cuadra con el transformador', no_cuadra: 'NO cuadra con el transformador: la cifra saldrá provisional', sin_contraste: 'no se pudo contrastar con el transformador: la cifra saldrá provisional' };
@@ -533,6 +552,7 @@ export function montarCargaMes(cont, { alTerminar }) {
       const r = x.resumen; const d = r && r.derivado;
       const cab = x.matricula + ' · ' + nombreMes(x.mes) + ' · ' + (x.texto || 'suma de circuitos');
       if (!d) return el('li', { class: 'cs-error' }, cab + ': no se calculó la suma (el lector no la devolvió): no se puede guardar así. Recargue la página (Cmd+Shift+R) y vuelva a leer la carpeta.');
+      if (x.dif) return lineaDiferencia(x, cab, d, VEREDICTO_DIF);
       if (d.estado === 'sin_nivel') return el('li', { class: 'cs-error' }, cab + ': ' + (d.sinNivel || []).join(' y ') + ' llegó en esta carpeta pero no mide ' + NIVELES[x.nivel].etiqueta + '; revise el nivel o el nombre en la homologación. Ese mes quedará sin cifra en ese nivel.');
       if (d.estado !== 'ok') return el('li', { class: 'cs-error' }, cab + ': falta ' + (d.faltan || []).join(' y ') + ' en esta carpeta; ese mes quedará sin cifra en ese nivel.');
       const h = d.horas || {};
@@ -543,7 +563,7 @@ export function montarCargaMes(cont, { alTerminar }) {
         el('span', { class: 'cs-sub' }, 'Se guarda aparte como resumen derivado; la medida del transformador no cambia.'));
     });
     return el('div', { class: 'cs-panel', style: 'margin-top:10px' },
-      el('h3', {}, 'Suma de circuitos'),
+      el('h3', {}, sumas.lineas.some((x) => x.dif) ? 'Datos derivados: suma de circuitos y diferencia de barra' : 'Suma de circuitos'),
       el('ul', { class: 'cs-avisos' }, items.length ? items : el('li', {}, 'El transformador de la suma no viene en esta carpeta: no se calcula ninguna suma.'),
         el('li', {}, sumas.ajenos == null ? 'No se pudo comparar con lo guardado cuántos puntos ajenos a las sumas cambian de cifra (revise la conexión).'
           : 'Puntos medidos que cambian de cifra frente a lo guardado (la suma va aparte): ' + sumas.ajenos + '. Al volver a cargar un mes ya completo debe ser 0; con días u horas nuevas es normal que cambien.')));

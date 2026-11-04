@@ -424,8 +424,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
         soloVer() ? null : el('button', { type: 'button', class: 'btn btn--glass btn--sm cs-solo-equipo', onclick: exportar }, 'Descargar lista (CSV)')));
   }
 
-  /** ¿Algún nivel del devanado se mide por suma de circuitos? (rótulo de `calcularEquipo`; con guarda, campo opcional). */
-  const porSuma = (d) => Array.isArray(d.niveles) && d.niveles.some((t) => /suma de circuitos/.test(String(t)));
+  /**
+   * ¿Algún nivel del devanado es un dato derivado (suma de circuitos o diferencia de barra)? Su texto, o null. Sale del
+   * rótulo de `calcularEquipo`; con guarda (campo opcional).
+   */
+  const porSuma = (d) => (!Array.isArray(d.niveles) ? null : d.niveles.some((t) => /diferencia de barra/.test(String(t))) ? 'por diferencia de barra'
+    : (d.niveles.some((t) => /suma de circuitos/.test(String(t))) ? 'por suma de circuitos' : null));
   /** Todos los devanados de placa del equipo, uno por línea; en negrilla el que da la cifra. */
   function celdaDevanados(x) {
     // Campo propio: una fila de un módulo de dominio viejo en caché (max-age 600, L-102) no lo trae y se ve lo de antes.
@@ -434,8 +438,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
     return el('td', { class: 'cs-devs' }, ds.map((d) => el('span', { class: 'cs-dev' + (d.manda ? ' cs-dev--manda' : '') },
       d.nombre + ' ' + [d.kv ? kvTexto(d.kv) + ' kV' : 'sin tensión', d.A ? ampTexto(d.A) + ' A' : 'sin ampacidad', d.mva != null ? mvaTexto(d.mva) + ' MVA' : null,
         d.pct != null ? pctTexto(d.pct) + ' %' : null].filter(Boolean).join(' · ') + (d.manda ? ' — da la cifra' : ''),
-      // Un devanado medido por suma de circuitos lo dice (su cifra es un dato derivado, no la medida propia).
-      porSuma(d) ? el('span', { class: 'cs-sub' }, 'por suma de circuitos') : null,
+      // Un devanado medido por suma de circuitos o por diferencia de barra lo dice (su cifra es un dato derivado, no la medida propia).
+      porSuma(d) ? el('span', { class: 'cs-sub' }, porSuma(d)) : null,
       d.aviso && d.aviso !== 'sin_tension' && d.aviso !== 'sin_ampacidad' ? el('span', { class: 'cs-sub cs-dev-aviso' }, TEXTO_AVISO_DEVANADO[d.aviso]) : null)));
   }
 

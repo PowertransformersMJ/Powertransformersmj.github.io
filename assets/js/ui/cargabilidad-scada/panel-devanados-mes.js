@@ -55,8 +55,9 @@ function chip(pct, firme, umbrales, aviso, difA = false) {
 const de = (lista, d) => (lista || []).find((x) => x.d === d) || null;
 // Un devanado medido por SUMA DE CIRCUITOS (2026-10-24) lo dice: su cifra es un dato derivado, no la medida propia. Sale del
 // rótulo del nivel que pone `calcularEquipo`; con guarda (un dominio viejo en caché no lo trae y se ve lo de antes).
-const porSuma = (niveles) => Array.isArray(niveles) && niveles.some((t) => /suma de circuitos/.test(String(t)));
-const SUB_SUMA = 'por suma de circuitos (dato derivado)';
+// La DIFERENCIA DE BARRA (2026-11-04, `99 §208`) también es un dato derivado y lo dice con su nombre.
+const porSuma = (niveles) => Array.isArray(niveles) && niveles.some((t) => /suma de circuitos|diferencia de barra/.test(String(t)));
+const subSuma = (niveles) => (niveles.some((t) => /diferencia de barra/.test(String(t))) ? 'por diferencia de barra (dato derivado)' : 'por suma de circuitos (dato derivado)');
 
 // % frente al límite mayor, con su nombre; un terciario de compensación no tiene límite de carga.
 const pctTexto = (i, u) => (u.sinLimite ? 'sin límite de carga (compensación)' : num(pctDe(i, u.onaf), 1) + ' % de ' + u.tope);
@@ -228,7 +229,7 @@ function detalleUmbrales(registrados, U, ed, conCifraEq, mat, umbrales, estado =
     const clase = l && l.clase === 'holgado' && (califCRG(l.pctTope, umbrales) || 0) >= 4 ? 'neutro' : l && l.clase;
     const lect = l ? el('td', { class: 'cs-lect cs-lect--' + clase }, LECTURA[l.clase](l, u)) : el('td', { class: 'cs-mensual-nulo' }, '—');
     return el('tr', {}, el('th', { scope: 'row', style: 'border-left: 4px solid ' + (COLOR_DEV[b.d] || SIN) },
-      b.nombre + (b.kv ? ' ' + kvTexto(b.kv) + ' kV' : ''), porSuma(ed.porDevanado[b.d].niveles) ? el('span', { class: 'cs-sub' }, SUB_SUMA) : null), ...celdas, carga, lect);
+      b.nombre + (b.kv ? ' ' + kvTexto(b.kv) + ' kV' : ''), porSuma(ed.porDevanado[b.d].niveles) ? el('span', { class: 'cs-sub' }, subSuma(ed.porDevanado[b.d].niveles)) : null), ...celdas, carga, lect);
   });
   return el('div', { class: 'cs-devmes-det' },
     el('p', { class: 'cs-dato' }, el('b', {}, 'Detalle de los umbrales' + deQue),
@@ -303,7 +304,7 @@ export async function pintarDevanadosMes(nodo, opts) {
         el('span', { class: 'cs-sub' }, ' ' + tramo + (hoy.manda ? ' · da la cifra del equipo' : '')))
       : null;
     const cab = el('div', { class: 'cs-devmes-cab' }, el('h5', { id: idTit }, base.nombre + (base.kv ? ' · ' + kvTexto(base.kv) + ' kV' : '')),
-      porSuma(niveles) ? el('p', { class: 'cs-sub' }, SUB_SUMA) : null,
+      porSuma(niveles) ? el('p', { class: 'cs-sub' }, subSuma(niveles)) : null,
       limites, ...avisos.map((t) => el('p', { class: 'cs-devmes-aviso' }, t)), linHoy);
     const sec = (...hijos) => el('section', { class: 'cs-devmes', style: 'border-left: 5px solid ' + (COLOR_DEV[d] || SIN), 'aria-labelledby': idTit }, ...hijos);
     if (!algunoLeido) { bloques.push(sec(cab, el('p', { class: 'cs-ayuda' }, 'No se pudo leer ningún mes: sin cifras por ahora (Reintentar, arriba); se muestran solo sus límites.'))); continue; }

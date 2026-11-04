@@ -98,7 +98,7 @@ si se escriben datos, simulación + foto antes/después (W-13).
 2. **Detección de fila-cabecera** antes de importar hojas con títulos encima (columnas `__EMPTY`).
 3. **Simulación primero (dry-run)**: reportar creados/actualizados EXACTOS contra el total esperado, antes de escribir nada.
 4. **Guard de omitidos**: toda fila que no entra se REPORTA. Una importación que omite en silencio es peor que una que falla.
-5. **Subir el archivo**: por defecto lo arrastra el Ingeniero en su Chrome (L-62). **Excepción a pedido suyo** (`99 §125`, 10-01: *«prefiero que los proceses tú, quedan limpios y menos probabilidad de error»*): si el insumo ya está en su disco, Claude lo prepara (meses SCADA: «paquete preparado», `scripts/scada-empaquetar.mjs`) y lo sube por la extensión desde Descargas, una parte por llamada (`file_upload` ≤ 10 MB → L-117), como en `§125` y `§131`. **Escribir** en producción solo con la simulación del paso 3 a la vista y su «procede» para esa tanda (`§131.4` → `§131.9`). ⚠️ Choca con el paso 8.
+5. **Subir el archivo**: por defecto lo arrastra el Ingeniero en su Chrome (L-62). **Excepción a pedido suyo** (`99 §125`, 10-01): si el insumo ya está en su disco, Claude lo prepara (meses SCADA: «paquete preparado», `scripts/scada-empaquetar.mjs`) y lo sube por la extensión desde Descargas, una parte por llamada (`file_upload` ≤ 10 MB → L-117), como en `§125` y `§131`. **Escribir** en producción solo con la simulación del paso 3 a la vista y su «procede» para esa tanda (`§131.4` → `§131.9`). ⚠️ Choca con el paso 8.
 6. **Verificar el tablero vivo** tras la carga (W-10 + validación live), no solo el log del importador.
 7. **Comprobar la carga**: foto antes/después que compara VALORES con las llaves ordenadas (L-120) y fidelidad con una lectura independiente de la fuente; una matrícula repetida en el Excel puede ser dos equipos distintos: no se escoge «la primera», se reporta y no se escribe (`§131`).
 8. **Mes SCADA** (`§158`–`§159`; rutas de disco y paquetes vigentes → memoria del proyecto y bóveda `2026-10-08-scada-sin-medicion`):
@@ -109,6 +109,7 @@ si se escriben datos, simulación + foto antes/después (W-13).
    «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después
    (paso 7). Un periodo que dice «falta preparar <mes>» se arregla recargando ese mes en «Completar» (0 curvas, solo el resumen).
    Con una **suma de circuitos** decidida (`§182`), el plan muestra su bloque (cuadre R/S/T «ok») y cada recarga rehace la suma.
+   Con una **diferencia de barra** (`§208`): chequeo de bahías antes de empaquetar → [hoja](workflow-datos-reales.md) §4.
    ✅ **Decidido (`§207`, 2026-11-04)**: para cargar meses o días nuevos con los mismos criterios dijo «no necesito autorizarte nada»: se carga sin pedir «procede». Lo que cambie criterios (alias, relevo, decisión) se le pregunta.
 9. **Escritura puntual** (un equipo contra su placa, guiones `firebase-admin`) → hoja [`workflow-datos-reales.md`](workflow-datos-reales.md) §1–§2.
 

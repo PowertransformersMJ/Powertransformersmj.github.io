@@ -543,6 +543,8 @@ describe('L-102 y compilación', () => {
     assert.deepEqual(imp.sort(), [
       './scada_carga_config.js:CODIGO,CODIGOS_VALIDOS,DEVANADO,FAMILIAS_I,FAMILIAS_U,NIVELES',
       './scada_carga_csv.js:claveId,esElementoTransformador,normalizarTexto',
+      // Archivo NUEVO en 2026-11-04 (§208): no hay copia vieja en caché a la que le falte una exportación.
+      './scada_carga_diferencia.js:CRITERIO_DIF,DIF,componerDiferencia,dentroDelPiso,erroresDiferencia,escalaFueraDeBanda,especDiferenciaNivel,sobrePiso,textoDiferencia,textoParte',
       './scada_carga_fecha.js:nombreMes',
       './scada_carga_homologacion.js:analizarClaveHomologada,claveEfectiva,mapaDeDecision,objetivoImportacion',
       './scada_carga_importacion.js:resumirParaGuardar',
@@ -749,7 +751,7 @@ describe('revisión adversarial 2026-10-24: candado del detalle, D5 después de 
     assert.match(im, /if \(d\.estado === 'sin_nivel'\)/);
     const h = src('ui/scada-datos/homologacion.js');
     assert.match(h, /if \(mes !== mesResumen \|\| carga !== cargaResumen\) \{/, 'tras cargar el MISMO mes se vuelve a leer su resumen');
-    assert.match(h, /if \(tipo\.value === 'usar' && !niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| fscGuardada \|\| bmGuardada \|\| mapaGuardado\)\) \{/, 'sin niveles a la vista no se borra la suma');
+    assert.match(h, /if \(tipo\.value === 'usar' && !niveles\.length && \(Object\.keys\(sumaGuardada\)\.length \|\| Object\.keys\(difGuardada\)\.length \|\| fscGuardada \|\| bmGuardada \|\| mapaGuardado\)\) \{/, 'sin niveles a la vista no se borra la suma');
     assert.match(h, /ponga primero «Medir con la medida del transformador» en el nivel sumado, guarde, y vuelva a abrir «Revisar»/);
     assert.match(h, /medir\.disabled = !s\.value;/); assert.match(h, /de la medida propia del transformador: no se usa/);
     assert.match(h, /if \(!medirSel\[nv\] \|\| medirSel\[nv\]\.disabled \|\| medirSel\[nv\]\.value !== 'suma'\) continue;/);
@@ -759,9 +761,12 @@ describe('revisión adversarial 2026-10-24: candado del detalle, D5 después de 
     // …y desde el mismo día la columna del cambio de medida (también al final).
     assert.equal((l.match(/\.\.\.CSV_DEV_CAB, 'Suma_de_circuitos', \.\.\.CSV_SOB_CAB, 'Cambio_de_medida', 'Otro_operador'\]/g) || []).length, 2, 'columnas NUEVAS al final de los dos CSV (la del traspaso, 2026-10-28, después)');
     assert.equal((l.match(/\.\.\.csvDevanados\(x\.devanadosPlaca\), textoSumaCSV\(x\), \.\.\.csvSobrecarga\(x\), csvCambio\(x\), csvOperador\(x\)\]/g) || []).length, 2);
-    assert.match(l, /porSuma\(d\) \? el\('span', \{ class: 'cs-sub' \}, 'por suma de circuitos'\) : null/);
+    // Desde 2026-11-04 (§208) el subrótulo dice de qué dato derivado sale: la suma de circuitos o la diferencia de barra.
+    assert.match(l, /porSuma\(d\) \? el\('span', \{ class: 'cs-sub' \}, porSuma\(d\)\) : null/);
+    assert.match(l, /'por diferencia de barra'[\s\S]{0,120}'por suma de circuitos'/);
     const pd = src('ui/cargabilidad-scada/panel-devanados-mes.js');
-    assert.match(pd, /porSuma\(niveles\) \? el\('p', \{ class: 'cs-sub' \}, SUB_SUMA\) : null/);
+    assert.match(pd, /porSuma\(niveles\) \? el\('p', \{ class: 'cs-sub' \}, subSuma\(niveles\)\) : null/);
+    assert.match(pd, /'por diferencia de barra \(dato derivado\)' : 'por suma de circuitos \(dato derivado\)'/);
     assert.match(pd, /porSuma\(ed\.porDevanado\[b\.d\]\.niveles\)/);
     // El rótulo del que cuelgan esas líneas lo pone calcularEquipo en el nivel (y devanadosDe lo pasa a cada devanado).
     const x = lista(resMar);

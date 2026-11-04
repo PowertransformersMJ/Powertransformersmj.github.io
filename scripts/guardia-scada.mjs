@@ -42,8 +42,9 @@ const FILA = new RegExp('Mv' + 'Moment');
 // sin barras costaba tiempo cuadrático: revisión adversarial 2026-10-24).
 const CLAVE = /\/?\s*((?=[A-Za-zÀ-ÿñÑ0-9]{0,9}[a-zà-ÿñ])[A-Za-zÀ-ÿñÑ][A-Za-zÀ-ÿñÑ0-9]{1,9})\s*\/(?:\s*[0-9.,]+\s*[kK]\s*[vV]\s*\/)?\s*(sw[A-Z][A-Za-z]*\d+[A-Za-z]{0,2}|swAuto\d+|[A-Z]{3}3\d{2}|LN\d{3})\b/;
 // Un circuito o una línea SUELTOS (sin '/estación/'), desde la suma de circuitos (2026-10-24): «EDM3xx» es el de prueba;
-// un color «#RRGGBB» (p. ej. el ámbar de la paleta) no es un circuito.
-const SUELTO = /(?<!#)\b(?!EDM3\d{2}\b)[A-Z]{3}3\d{2}\b|\bLN\d{3}\b/;
+// un color «#RRGGBB» (p. ej. el ámbar de la paleta) no es un circuito. Desde la diferencia de barra (2026-11-04, §208)
+// también las bahías de 66 kV de la serie 6xx («EDM6xx» es la de prueba) y los bancos de condensadores «BCOMPn».
+const SUELTO = /(?<!#)\b(?!EDM[36]\d{2}\b)[A-Z]{3}[36]\d{2}\b|\bLN\d{3}\b|\bBCOMP\d+\b/;
 const ARCHIVO = new RegExp('(variables[ _-]?el[eé]ctricas|homologaci[oó]n|swtrafo|' + 'mv' + 'moment|_average[-_]|_quality[-_]|ir_current|p_average|urs_average)', 'i');
 const TABLA = /\.(csv|xls|xlsx)$/i;
 // Una foto JPEG en base64 (empieza por «/9j/») de cientos de caracteres; y los archivos del paquete de placas.

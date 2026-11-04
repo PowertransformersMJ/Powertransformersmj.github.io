@@ -20,6 +20,10 @@
 // Tensión, P y Q del nivel = las del transformador (rotuladas): así el chequeo potencia/corriente hace de testigo.
 // Los nombres de los circuitos salen SIEMPRE de la decisión guardada en la base: aquí no hay ningún nombre real.
 // Funciones PURAS: ninguna modifica lo que recibe. Archivo NUEVO (L-102): solo importa exportaciones ya publicadas.
+// 2026-11-04 (`99 §208`): segundo MODO, la DIFERENCIA DE BARRA (`decision.diferencia`, `scada_carga_diferencia.js`): el
+// nivel de un transformador que comparte la barra con otro = salidas de la barra menos el otro, con P y Q. Usa la misma
+// clave '<cid>--suma', el mismo candado y el mismo derivado; cada nivel de `especSuma` dice su `modo`. Sin
+// `decision.diferencia`, todo devuelve EXACTAMENTE lo mismo que antes.
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { CODIGO, CODIGOS_VALIDOS, FAMILIAS_I, FAMILIAS_U, NIVELES, DEVANADO } from './scada_carga_config.js';
@@ -30,6 +34,8 @@ import { resumirParaGuardar } from './scada_carga_importacion.js';
 import { validos } from './scada_carga_limpieza.js';
 import { horasMes } from './scada_carga_series.js';
 import { nombreMes } from './scada_carga_fecha.js';
+import { DIF, CRITERIO_DIF, especDiferenciaNivel, componerDiferencia, sobrePiso, escalaFueraDeBanda, dentroDelPiso, erroresDiferencia,
+  textoDiferencia, textoParte } from './scada_carga_diferencia.js';
 
 /** Parámetros de la suma. Cambiar uno exige subir `version` (los derivados viejos dejan de leerse y se recargan). */
 export const SUMA = Object.freeze({
@@ -64,11 +70,14 @@ const huellaDe = (r) => (r && r.i ? { n: r.i.n == null ? null : r.i.n, p99: r.i.
 const huellaBarra = (barra, nv) => (barra ? huellaDe(resumirParaGuardar(resumenFisico(barra, NIVELES[nv].kv), barra)) : null);
 const mismaHuella = (a, b) => (a == null && b == null) || (!!a && !!b && a.n === b.n && a.p99 === b.p99);
 
-/** D5: otros transformadores (sw*) de la estación que miden ese nivel en el catálogo (sus elementos, en orden). */
-function otrosTransformadores(puntos, cidTrafo, est, nv) {
+/**
+ * D5: otros transformadores (sw*) de la estación que miden ese nivel en el catálogo (sus elementos, en orden). `excluir`
+ * = los transformadores que la diferencia de barra ya resta (no son «otro» que mide la barra: ya están en la cuenta).
+ */
+function otrosTransformadores(puntos, cidTrafo, est, nv, excluir = []) {
   const e = normalizarTexto(est); const out = [];
   for (const [cid, p] of Object.entries(puntos || {})) {
-    if (cid === cidTrafo || !p || normalizarTexto(p.est) !== e || !esElementoTransformador(p.elem)) continue;
+    if (cid === cidTrafo || excluir.includes(cid) || !p || normalizarTexto(p.est) !== e || !esElementoTransformador(p.elem)) continue;
     if (p.niveles && p.niveles[nv]) out.push(p.elem);
   }
   return out.sort((a, b) => normalizarTexto(a).localeCompare(normalizarTexto(b)));
@@ -109,18 +118,22 @@ const fasesDe = (x) => {
 
 /**
  * La suma que decidió el Ingeniero para una fila, normalizada; null si no hay. Solo con decisión «usar», fila no
- * retirada y en niveles ASIGNADOS a un devanado en su mapa.
+ * retirada y en niveles ASIGNADOS a un devanado en su mapa. Un nivel por diferencia de barra (`decision.diferencia`)
+ * entra con `modo: 'diferencia'` y lo suyo (`especDiferenciaNivel`); si un nivel está en las dos, manda la suma (y
+ * `erroresSuma` no deja guardarlo así).
  * @returns {null|{cid, est, elem, porNivel: Object<string, {nivel, devanado, elems: string[], cids: string[],
  *   fases: string[], firma: string, barraPropia: boolean}>}}
  */
 export function especSuma(fila) {
   const d = fila && fila.decision;
-  if (!fila || fila.retirada || !d || d.tipo !== 'usar' || !d.suma || typeof d.suma !== 'object') return null;
+  const conSuma = !!(d && d.suma && typeof d.suma === 'object');
+  const conDif = !!(d && d.diferencia && typeof d.diferencia === 'object');
+  if (!fila || fila.retirada || !d || d.tipo !== 'usar' || (!conSuma && !conDif)) return null;
   const k = analizarClaveHomologada(claveEfectiva(fila));
   if (!k) return null;
   const mapa = mapaDeDecision(fila) || {};
   const porNivel = {};
-  for (const nv of Object.keys(d.suma).sort()) {
+  for (const nv of conSuma ? Object.keys(d.suma).sort() : []) {
     const s = d.suma[nv];
     if (!NIVELES[nv] || !mapa[nv] || !s || typeof s !== 'object') continue;
     const elems = elementosDe(s.de, k.est);
@@ -128,6 +141,11 @@ export function especSuma(fila) {
     const cids = elems.map((e) => claveId(k.est, e));
     const fases = fasesDe(s.fases);
     porNivel[nv] = { nivel: nv, devanado: mapa[nv], elems, cids, fases, firma: firmaSuma(nv, cids, fases), barraPropia: s.barra_propia === true };
+  }
+  for (const nv of conDif ? Object.keys(d.diferencia).sort() : []) {
+    if (porNivel[nv] || !NIVELES[nv] || !mapa[nv]) continue;
+    const x = especDiferenciaNivel(d.diferencia[nv], k.est, nv, mapa[nv]);
+    if (x) porNivel[nv] = x;
   }
   return Object.keys(porNivel).length ? { cid: claveId(k.est, k.elem), est: k.est, elem: k.elem, porNivel } : null;
 }
@@ -337,7 +355,10 @@ export function componerNivel({ fuentes, barra, n = null, fases = SUMA.fases }) 
   return { fam, horas: final.horas, cuadre, referencias: cuadre.referencias, veredicto: cuadre.veredicto, signosP: signosP(fuentes) };
 }
 
-const sello = (sp, base) => ({ tipo: SUMA.tipo, v: SUMA.version, firma: sp.firma, de: [...sp.elems], fases: [...sp.fases], base });
+const esDif = (sp) => !!sp && sp.modo === 'diferencia';
+const sello = (sp, base) => (esDif(sp)
+  ? { tipo: DIF.tipo, v: DIF.version, firma: sp.firma, de: [...sp.elems], restar: [...sp.restar], fases: [...sp.fases], base }
+  : { tipo: SUMA.tipo, v: SUMA.version, firma: sp.firma, de: [...sp.elems], fases: [...sp.fases], base });
 /** Lo que se guarda del cuadre (mapas y números: nada de listas dentro de listas, L-30). */
 const cuadreGuardado = (c) => ({ porFase: c.porFase, comparadas: c.comparadas, cuadran: c.cuadran, veredicto: c.veredicto });
 /**
@@ -361,10 +382,36 @@ function fuentesDe(sp, nv, serieDe) {
   return { fuentes, faltan: sp.elems.filter((e, i) => !series[i]), sinNivel: sp.elems.filter((e, i) => series[i] && !fuentes[i]) };
 }
 
+/**
+ * Un nivel compuesto según su modo: la suma de siempre (`componerNivel`) o la diferencia de barra, cuyo cuadre con la
+ * medida propia del transformador mira solo las horas sobre el piso de exactitud. `serieDe(cid)` = la serie de un punto
+ * (de la diferencia se usan los OTROS niveles del restado: saber si estaba fuera del todo).
+ */
+function componerModo(sp, fuentes, barra, n, serieDe) {
+  if (!esDif(sp)) return componerNivel({ fuentes, barra, n, fases: sp.fases });
+  const ns = sp.salidas.length;
+  const otrosRestar = sp.cidsRestar.map((c) => {
+    const s = serieDe(c);
+    return Object.entries((s && s.niveles) || {}).filter(([k, x]) => k !== sp.nivel && x && x.fam).map(([, x]) => x.fam);
+  });
+  const c = componerDiferencia({ salidas: fuentes.slice(0, ns), restar: fuentes.slice(ns), otrosRestar, sp, n });
+  const cuadre = cuadreSuma(sobrePiso(c.fam, c.piso.A), barra);
+  return { ...c, cuadre, referencias: cuadre.referencias, veredicto: cuadre.veredicto };
+}
+
+/** Estado de un derivado por diferencia compuesto: los sentidos que cambiaron y la escala fuera bloquean. */
+const estadoDif = (c) => (!c.sentidos.ok ? 'sentidos' : (c.bloqueaEscala ? 'escala_pq' : 'ok'));
+
 /** El nivel sumado ya compuesto, en su derivado: estado 'ok' o el registro sin cifra (falta / sin_nivel). */
-function derivadoCompuesto(se, c, faltan, sinNivel, barra, nv) {
+function derivadoCompuesto(se, c, faltan, sinNivel, barra, nv, sp = null, fuentes = null) {
   if (faltan.length) return registroSinSuma(se, 'falta', { faltan }).derivado;
   if (sinNivel.length) return registroSinSuma(se, 'sin_nivel', { sinNivel }).derivado;
+  if (esDif(sp)) {
+    // Huella de la medida de cada restado con que se compuso (si se recarga distinta, el derivado ya no vale).
+    const baseR = Object.fromEntries(sp.cidsRestar.map((cid, i) => [cid, huellaBarra(fuentes[sp.salidas.length + i], nv)]));
+    return { ...se, estado: estadoDif(c), base_i: huellaBarra(barra, nv), base_r: baseR, horas: c.horas, parte: c.parte, piso: c.piso,
+      sentidos: c.sentidos, escalaMes: c.escalaMes, cuadre: cuadreGuardado(c.cuadre), referencias: c.referencias, veredicto: c.veredicto, criterio: CRITERIO_DIF };
+  }
   return { ...se, estado: 'ok', base_i: huellaBarra(barra, nv), horas: c.horas, cuadre: cuadreGuardado(c.cuadre), referencias: c.referencias, veredicto: c.veredicto, signosP: c.signosP, criterio: CRITERIO };
 }
 
@@ -398,11 +445,11 @@ export function derivadosDelMes({ mes, porCid, filas }) {
       const { fuentes, faltan, sinNivel } = fuentesDe(sp, nv, (c) => porCid[c]);
       if (faltan.length || sinNivel.length) { reg[nv] = { i: { n: 0 }, derivado: derivadoCompuesto(se, null, faltan, sinNivel) }; continue; }
       const barra = trafo.niveles && trafo.niveles[nv] ? trafo.niveles[nv].fam : null;
-      const c = componerNivel({ fuentes, barra, n, fases: sp.fases });
-      reg[nv] = {
-        ...resumirParaGuardar(resumenFisico(c.fam, NIVELES[nv].kv), c.fam),
-        derivado: derivadoCompuesto(se, c, faltan, sinNivel, barra, nv)
-      };
+      const c = componerModo(sp, fuentes, barra, n, (x) => porCid[x]);
+      const derivado = derivadoCompuesto(se, c, faltan, sinNivel, barra, nv, sp, fuentes);
+      // Diferencia bloqueada (sentido cambiado, escala fuera): sin resumen de cifra, solo el derivado que dice por qué.
+      reg[nv] = esDif(sp) && derivado.estado !== 'ok' ? { i: { n: 0 }, derivado }
+        : { ...resumirParaGuardar(resumenFisico(c.fam, NIVELES[nv].kv), c.fam), derivado };
     }
     if (Object.keys(reg).length) out[claveSuma(s.cid)] = reg;
   }
@@ -428,10 +475,10 @@ export function componerSerieMes({ mes, trafo, circuitos, spec, guardadas = null
     const se = sello(sp, spec.cid);
     const { fuentes, faltan, sinNivel } = fuentesDe(sp, nv, (c) => (circuitos ? circuitos[c] : null));
     const barra = niveles[nv] && niveles[nv].fam ? niveles[nv].fam : null;
-    const c = componerNivel({ fuentes, barra, n, fases: sp.fases });
+    const c = componerModo(sp, fuentes, barra, n, (x) => (circuitos ? circuitos[x] : null));
     niveles[nv] = { kv: NIVELES[nv].kv, fam: c.fam };
-    derivado[nv] = derivadoCompuesto(se, c, faltan, sinNivel, barra, nv);
-    const otros = otrosTransformadores(puntos, spec.cid, spec.est, nv);
+    derivado[nv] = derivadoCompuesto(se, c, faltan, sinNivel, barra, nv, sp, fuentes);
+    const otros = otrosTransformadores(puntos, spec.cid, spec.est, nv, sp.cidsRestar || []);
     if (otros.length) derivado[nv] = registroSinSuma(se, 'barra_compartida', { otros }).derivado;
     else if (guardadas) {
       const g = nivelGuardado(guardadas, spec.cid, sp);
@@ -451,30 +498,54 @@ export function componerSerieMes({ mes, trafo, circuitos, spec, guardadas = null
  */
 export function estadoSumaNivel(r, sp) {
   const et = sp && NIVELES[sp.nivel] ? NIVELES[sp.nivel].etiqueta : 'este nivel';
+  const dif = esDif(sp);
+  const que = dif ? 'la diferencia de barra' : 'la suma de circuitos';
   const no = (estado, motivo) => ({ estado, veredicto: null, motivo, aviso: null });
-  if (sp && !sp.barraPropia) return no('sin_barra', 'falta confirmar que la barra de ' + et + ' la alimenta solo este transformador');
+  if (sp && !sp.barraPropia) {
+    return no('sin_barra', dif ? 'falta confirmar que la barra de ' + et + ' no tiene más bahías que las de la diferencia'
+      : 'falta confirmar que la barra de ' + et + ' la alimenta solo este transformador');
+  }
   const d = r && r.derivado;
   const falta = (meses, faltan) => {
-    if (meses && meses.length) return 'falta calcular la suma de circuitos de ' + meses.map(nombreMes).join(', ') + ': vuelva a ' + (meses.length === 1 ? 'cargarlo' : 'cargarlos');
-    if (faltan && faltan.length) return 'falta calcular la suma de circuitos de este mes (no llegó ' + faltan.join(' ni ') + '): vuelva a cargarlo con ' + (faltan.length === 1 ? 'esa medida' : 'esas medidas');
-    return 'falta calcular la suma de circuitos de este mes: vuelva a cargarlo';
+    if (meses && meses.length) return 'falta calcular ' + que + ' de ' + meses.map(nombreMes).join(', ') + ': vuelva a ' + (meses.length === 1 ? 'cargarlo' : 'cargarlos');
+    if (faltan && faltan.length) return 'falta calcular ' + que + ' de este mes (no llegó ' + faltan.join(' ni ') + '): vuelva a cargarlo con ' + (faltan.length === 1 ? 'esa medida' : 'esas medidas');
+    return 'falta calcular ' + que + ' de este mes: vuelva a cargarlo';
   };
   if (!d) return no('falta', falta());
-  if (d.v !== SUMA.version) return no('otra_version', falta(d.meses));
+  if (d.v !== (dif ? DIF.version : SUMA.version)) return no('otra_version', falta(d.meses));
   if (sp && d.firma !== sp.firma) return no('otra_firma', falta(d.meses));
   // D5 después de guardar: apareció otro transformador de la estación que mide la barra.
   if (d.estado === 'barra_compartida') {
     const o = Array.isArray(d.otros) && d.otros.length ? ' (' + d.otros.join(', ') + ')' : '';
-    return no('barra_compartida', 'otro transformador de la estación' + o + ' también mide ' + et + ': la barra puede ser compartida y la suma de circuitos no se puede usar');
+    return no('barra_compartida', 'otro transformador de la estación' + o + ' también mide ' + et + (dif
+      ? ': la barra puede tener otra entrada y la diferencia de barra no se puede usar'
+      : ': la barra puede ser compartida y la suma de circuitos no se puede usar'));
   }
   // Un circuito que SÍ llegó pero no mide el nivel: volver a cargar no lo arregla (es la decisión la que está mal).
   if (d.estado === 'sin_nivel') {
     const s = Array.isArray(d.sinNivel) ? d.sinNivel : [];
-    return no('sin_nivel', (s.length ? s.join(' y ') + (s.length === 1 ? ' llegó pero no mide ' : ' llegaron pero no miden ') : 'un circuito de la suma no mide ')
-      + et + ': revise el nivel o el nombre del circuito en la homologación');
+    return no('sin_nivel', (s.length ? s.join(' y ') + (s.length === 1 ? ' llegó pero no mide ' : ' llegaron pero no miden ') : (dif ? 'una bahía de la diferencia no mide ' : 'un circuito de la suma no mide '))
+      + et + (dif ? ': revise el nivel o el nombre de la bahía en la homologación' : ': revise el nivel o el nombre del circuito en la homologación'));
   }
+  // Diferencia de barra: un signo que cambió inventaría carga; la potencia fuera de escala no da una cifra confiable.
+  if (dif && d.estado === 'sentidos') {
+    const f = d.sentidos && Array.isArray(d.sentidos.fallan) ? d.sentidos.fallan : [];
+    return no('sentidos', 'el sentido de la potencia de ' + (f.length ? f.join(', ') : 'una bahía') + ' cambió frente al verificado: '
+      + 'hay que revisar la convención del SCADA antes de usar la diferencia de barra');
+  }
+  if (dif && d.estado === 'escala_pq') return no('escala_pq', 'la potencia de una bahía de la barra viene fuera de escala en más de la mitad de las horas: la diferencia de barra no se puede usar');
   if (d.estado !== 'ok') return no(d.estado === 'falta' ? 'falta' : String(d.estado || 'falta'), falta(d.meses, d.faltan));
   const veredicto = d.veredicto || null;
+  if (dif) {
+    // «≈ 0»: la cifra queda dentro del error de la diferencia. Solo rotula (la clase no cambia).
+    const casiCero = dentroDelPiso(r && r.i ? r.i.p99 : null, d.piso);
+    const pisoTxt = casiCero ? ' · ≈ 0 (dentro del error de la diferencia, piso ' + String(d.piso.A).replace('.', ',') + ' A)' : '';
+    const fuera = escalaFueraDeBanda(d.escalaMes);
+    const avisos = [veredicto === 'no_cuadra' ? 'la diferencia de barra no cuadra con la medida propia del transformador'
+      : (veredicto === 'sin_contraste' ? 'la diferencia de barra no se pudo contrastar con la medida propia del transformador' : null),
+    fuera.length ? 'la potencia y la corriente de ' + fuera.join(', ') + ' no cuadran entre sí' : null].filter(Boolean);
+    return { estado: 'ok', veredicto, motivo: null, aviso: avisos.length ? avisos.join(' · ') + pisoTxt : null, casiCero };
+  }
   const aviso = veredicto === 'no_cuadra' ? 'la suma de circuitos no cuadra con el transformador'
     : (veredicto === 'sin_contraste' ? 'la suma de circuitos no se pudo contrastar con el transformador' : null);
   return { estado: 'ok', veredicto, motivo: null, aviso };
@@ -488,14 +559,24 @@ function nivelGuardado(claves, cid, sp, puntos = null, est = null) {
   const der = (claves && claves[claveSuma(cid)]) || {};
   const r = der[sp.nivel] || null;
   const se = sello(sp, cid);
-  const otros = puntos ? otrosTransformadores(puntos, cid, est, sp.nivel) : [];
+  const otros = puntos ? otrosTransformadores(puntos, cid, est, sp.nivel, sp.cidsRestar || []) : [];
   if (otros.length) return registroSinSuma(se, 'barra_compartida', { otros });
   const e = estadoSumaNivel(r, { ...sp, barraPropia: true });
   const d0 = r && r.derivado;
-  if (e.estado !== 'ok') return registroSinSuma(se, e.estado, d0 && d0.estado === e.estado ? { faltan: d0.faltan, sinNivel: d0.sinNivel, otros: d0.otros } : {});
+  if (e.estado !== 'ok') {
+    const reg = registroSinSuma(se, e.estado, d0 && d0.estado === e.estado ? { faltan: d0.faltan, sinNivel: d0.sinNivel, otros: d0.otros } : {});
+    // El bloqueo de la diferencia lleva su detalle (qué sentido cambió) para el periodo.
+    if (esDif(sp) && d0 && d0.estado === e.estado && d0.sentidos) reg.derivado.sentidos = d0.sentidos;
+    return reg;
+  }
   // La medida del transformador cambió después de calcular la suma (se recargó el mes sin ella): ya no vale.
   const base = claves && claves[cid] ? claves[cid][sp.nivel] || null : null;
   if (!mismaHuella(d0.base_i == null ? null : d0.base_i, huellaDe(base))) return registroSinSuma(se, 'desfasado');
+  // Diferencia: lo mismo con la medida de cada transformador restado.
+  for (const c of esDif(sp) ? sp.cidsRestar : []) {
+    const br = d0.base_r && d0.base_r[c] !== undefined ? d0.base_r[c] : null;
+    if (!mismaHuella(br, huellaDe(claves && claves[c] ? claves[c][sp.nivel] || null : null))) return registroSinSuma(se, 'desfasado');
+  }
   return r;
 }
 
@@ -516,7 +597,7 @@ export function componerResumen(claves, cid, fila, puntos = null) {
 
 const PESO_VEREDICTO = { ok: 0, sin_contraste: 1, no_cuadra: 2 };
 // Estados que volver a cargar NO arregla: pasan al periodo con su propio motivo (no «falta calcular…»).
-const BLOQUEOS = ['barra_compartida', 'sin_nivel'];
+const BLOQUEOS = ['barra_compartida', 'sin_nivel', 'sentidos', 'escala_pq'];
 
 /**
  * Derivado de VARIOS meses (periodo de la lista o rango del detalle): válido solo si cada mes con datos del transformador
@@ -526,18 +607,29 @@ const BLOQUEOS = ['barra_compartida', 'sin_nivel'];
  * @param {object} sp  `especSuma(fila).porNivel[nivel]`
  */
 export function derivadoDeMeses(meses, sp) {
+  const dif = esDif(sp);
+  const ver = dif ? DIF.version : SUMA.version;
   const faltan = []; let peor = null; const noCuadran = [];
   const razones = {}; const horas = { completas: 0, bandaMuerta: 0, rechazadas: 0, abiertas: 0, fueraServicio: 0, hueco: 0 };
+  if (dif) { horas.restadoPuenteado = 0; horas.escala = 0; }
   let bloqueo = null; const otros = new Set(); const sinNivel = new Set();
+  // Diferencia: lo peor de los meses (piso y parte más altos, la escala más lejos de 1, los sentidos que cambiaron).
+  const fallan = new Set(); let piso = null; let parte = null; const escalaMes = {};
   for (const { mes, derivado: d } of meses || []) {
-    if (!d || d.estado !== 'ok' || d.v !== SUMA.version || d.firma !== sp.firma) {
+    if (!d || d.estado !== 'ok' || d.v !== ver || d.firma !== sp.firma) {
       faltan.push(mes);
-      if (d && d.v === SUMA.version && d.firma === sp.firma && BLOQUEOS.includes(d.estado)) {
+      if (d && d.v === ver && d.firma === sp.firma && BLOQUEOS.includes(d.estado)) {
         if (bloqueo == null || BLOQUEOS.indexOf(d.estado) < BLOQUEOS.indexOf(bloqueo)) bloqueo = d.estado;
         for (const x of d.otros || []) otros.add(x);
         for (const x of d.sinNivel || []) sinNivel.add(x);
+        for (const x of (d.sentidos && d.sentidos.fallan) || []) fallan.add(x);
       }
       continue;
+    }
+    if (dif) {
+      if (d.piso && d.piso.A != null && (piso == null || d.piso.A > piso.A)) piso = { ...d.piso };
+      if (d.parte) parte = { p: Math.max(parte ? parte.p ?? -Infinity : -Infinity, d.parte.p ?? -Infinity), q: Math.max(parte ? parte.q ?? -Infinity : -Infinity, d.parte.q ?? -Infinity) };
+      for (const [e, r] of Object.entries(d.escalaMes || {})) if (Number.isFinite(r) && (escalaMes[e] == null || Math.abs(r - 1) > Math.abs(escalaMes[e] - 1))) escalaMes[e] = r;
     }
     const v = d.veredicto || 'sin_contraste';
     if (peor == null || PESO_VEREDICTO[v] > PESO_VEREDICTO[peor]) peor = v;
@@ -551,12 +643,15 @@ export function derivadoDeMeses(meses, sp) {
       g.min = Math.min(g.min, x); g.max = Math.max(g.max, x);
     }
   }
+  const fin = (x) => (x == null || !Number.isFinite(x) ? null : x);
   return {
-    tipo: SUMA.tipo, v: SUMA.version, firma: sp.firma, de: [...sp.elems], fases: [...sp.fases],
+    tipo: dif ? DIF.tipo : SUMA.tipo, v: ver, firma: sp.firma, de: [...sp.elems], ...(dif ? { restar: [...sp.restar] } : {}), fases: [...sp.fases],
     estado: faltan.length ? (bloqueo || 'falta') : 'ok', ...(faltan.length ? { meses: faltan.sort() } : {}),
     ...(bloqueo === 'barra_compartida' && otros.size ? { otros: [...otros].sort() } : {}),
     ...(bloqueo === 'sin_nivel' && sinNivel.size ? { sinNivel: [...sinNivel].sort() } : {}),
-    veredicto: peor, mesesNoCuadran: noCuadran.sort(), razones, horas
+    ...(bloqueo === 'sentidos' ? { sentidos: { ok: false, fallan: [...fallan].sort() } } : {}),
+    veredicto: peor, mesesNoCuadran: noCuadran.sort(), razones, horas,
+    ...(dif ? { piso, parte: parte ? { p: fin(parte.p), q: fin(parte.q) } : null, escalaMes } : {})
   };
 }
 
@@ -569,7 +664,9 @@ export function derivadoDeMeses(meses, sp) {
  */
 export function erroresSuma(fila, decision, { filas = {}, puntos = {}, filaId = null } = {}) {
   const err = [];
-  if (!decision || decision.tipo !== 'usar' || !decision.suma || typeof decision.suma !== 'object') return err;
+  if (!decision || decision.tipo !== 'usar') return err;
+  const conDif = !!(decision.diferencia && typeof decision.diferencia === 'object');
+  if (!decision.suma || typeof decision.suma !== 'object') return conDif ? erroresDif(fila, decision, { filas, puntos, filaId }) : err;
   const k = analizarClaveHomologada(claveEfectiva({ ...fila, decision }));
   if (!k) { err.push('La fila no tiene un punto SCADA: no se puede medir con la suma de circuitos.'); return err; }
   const est = normalizarTexto(k.est);
@@ -630,6 +727,35 @@ export function erroresSuma(fila, decision, { filas = {}, puntos = {}, filaId = 
     }
     if (s.barra_propia !== true) err.push('Confirme que la barra de ' + et + ' la alimenta solo este transformador (casilla obligatoria).');
   }
+  return conDif ? [...err, ...erroresDif(fila, decision, { filas, puntos, filaId })] : err;
+}
+
+/**
+ * Errores de las diferencias de barra de una decisión (`erroresDiferencia` con lo que usan las otras filas vigentes),
+ * más D5 sin contar la propia medida ni los transformadores restados.
+ */
+function erroresDif(fila, decision, { filas = {}, puntos = {}, filaId = null } = {}) {
+  const k = analizarClaveHomologada(claveEfectiva({ ...fila, decision }));
+  if (!k) return ['La fila no tiene un punto SCADA: no se puede medir por diferencia de barra.'];
+  const id = filaId || (fila && fila.id) || null;
+  const claveDe = new Map(); const usadoEn = new Map();
+  for (const [fid, g] of Object.entries(filas || {})) {
+    if (fid === id || g.retirada || (g.decision && g.decision.tipo === 'no_usar')) continue;
+    const kg = analizarClaveHomologada(claveEfectiva(g));
+    if (kg) claveDe.set(claveId(kg.est, kg.elem), g.matricula || fid);
+    const sg = especSuma(g);
+    if (sg) for (const x of Object.values(sg.porNivel)) for (const c of x.cidsSalidas || x.cids) usadoEn.set(c, g.matricula || fid);
+  }
+  const err = erroresDiferencia(k, decision, { claveDe, usadoEn, puntos, analizar: analizarClaveHomologada });
+  const cidTrafo = claveId(k.est, k.elem);
+  for (const nv of Object.keys(decision.diferencia).sort()) {
+    const cfg = decision.diferencia[nv];
+    if (!NIVELES[nv] || !cfg || typeof cfg !== 'object') continue;
+    const restar = (Array.isArray(cfg.restar) ? cfg.restar : []).map((x) => claveId(k.est, String(x == null ? '' : x).trim()));
+    for (const otro of otrosTransformadores(puntos, cidTrafo, k.est, nv, restar)) {
+      err.push('Otro transformador de la estación (' + otro + ') también mide ' + NIVELES[nv].etiqueta + ' y no está en la diferencia: la barra puede tener otra entrada.');
+    }
+  }
   return err;
 }
 
@@ -648,7 +774,8 @@ export function claveEnSumaAjena(clave, filas, filaId = null) {
   for (const [fid, g] of Object.entries(filas || {})) {
     if (fid === filaId) continue;
     const s = especSuma(g);
-    if (s && Object.values(s.porNivel).some((x) => x.cids.includes(cid))) return g.matricula || fid;
+    // De una diferencia de barra solo cuentan las salidas: el transformador restado es la medida de SU propia fila.
+    if (s && Object.values(s.porNivel).some((x) => (x.cidsSalidas || x.cids).includes(cid))) return g.matricula || fid;
   }
   return null;
 }
@@ -702,14 +829,17 @@ export function textoSuma(spec, nv = null, { derivado = null } = {}) {
   const niveles = (nv ? [nv] : Object.keys(spec.porNivel)).filter((x) => spec.porNivel[x]);
   const partes = niveles.map((x) => {
     const sp = spec.porNivel[x];
-    return (sp.devanado && DEVANADO[sp.devanado] ? DEVANADO[sp.devanado] : NIVELES[x].etiqueta) + ' por suma de circuitos ' + sp.elems.join(' + ');
+    const nombre = sp.devanado && DEVANADO[sp.devanado] ? DEVANADO[sp.devanado] : NIVELES[x].etiqueta;
+    return esDif(sp) ? textoDiferencia(sp, nombre) : nombre + ' por suma de circuitos ' + sp.elems.join(' + ');
   });
   if (!partes.length) return null;
   let t = partes.join('; ');
   const c = textoCuadre(derivado);
+  const dif = niveles.length === 1 && esDif(spec.porNivel[niveles[0]]);
+  if (dif && derivado) { const pt = textoParte(derivado); if (pt) t += ' · ' + pt; }
   if (c) {
     const v = { ok: 'cuadra', no_cuadra: 'no cuadra', sin_contraste: 'sin contraste' }[derivado.veredicto] || null;
-    t += ' · transformador ÷ suma: ' + c + (v ? ' (' + v + ')' : '');
+    t += (dif ? ' · medida propia ÷ diferencia: ' : ' · transformador ÷ suma: ') + c + (v ? ' (' + v + ')' : '');
   }
   return t;
 }
