@@ -25,6 +25,7 @@
 | §204 | ADR-204 — **octubre completo** (30–31); **Nueva Cospique T3 en servicio** desde el 30-oct · TODO-69 | 10363 |
 | §205 | ADR-205 — alias con **«desde»** (Pradera renombrado en 13,8 kV); **pedido v3** (Las Palomas, MovilCor, San Luis) · TODO-69 | 10395 |
 | §206 | ADR-206 — **noviembre 1–2** cargado; **relevo de La Unión** (desde 19-sep) y sep–oct recargados · TODO-69 | 10461 |
+| §207 | ADR-207 — **mayo 2026 cargado**; cargar con los mismos criterios ya no pide «procede» · TODO-69 | 10496 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 

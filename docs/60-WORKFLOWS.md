@@ -109,8 +109,7 @@ si se escriben datos, simulación + foto antes/después (W-13).
    «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después
    (paso 7). Un periodo que dice «falta preparar <mes>» se arregla recargando ese mes en «Completar» (0 curvas, solo el resumen).
    Con una **suma de circuitos** decidida (`§182`), el plan muestra su bloque (cuadre R/S/T «ok») y cada recarga rehace la suma.
-   ⚠️ **Sin decidir (TODO-69)**: cuando él pide «lo proceses», el día o mes nuevo se cargó en «Completar» con simulación limpia SIN
-   otro «procede» (`§158.12`, `§158.14`, `§200`), contra el paso 5. Cuál vale lo decide él; hasta entonces, preguntarle.
+   ✅ **Decidido (`§207`, 2026-11-04)**: para cargar meses o días nuevos con los mismos criterios dijo «no necesito autorizarte nada»: se carga sin pedir «procede». Lo que cambie criterios (alias, relevo, decisión) se le pregunta.
 9. **Escritura puntual** (un equipo contra su placa, guiones `firebase-admin`) → hoja [`workflow-datos-reales.md`](workflow-datos-reales.md) §1–§2.
 
 ---
