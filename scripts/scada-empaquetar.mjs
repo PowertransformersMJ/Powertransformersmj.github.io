@@ -128,9 +128,9 @@ export function juntarRelevos(...listas) {
  */
 export function leerAlias(texto) {
   return String(texto || '').split(',').map((x) => x.trim()).filter(Boolean).map((x) => {
-    const m = x.match(/^([^/=]+)\/([^/=]+)=([^/=]+)$/);
-    if (!m) throw new Error('--alias «' + x + '»: se escribe ESTACION/ELEMENTO=HOMOLOGADO.');
-    return { est: m[1].trim(), de: m[2].trim(), a: m[3].trim() };
+    const m = x.match(/^([^/=@]+)\/([^/=@]+)=([^/=@]+)(?:@(\d{4}-\d{2}-\d{2}))?$/);
+    if (!m) throw new Error('--alias «' + x + '»: se escribe ESTACION/ELEMENTO=HOMOLOGADO (y, si el nuevo reemplaza al viejo desde un día, @AAAA-MM-DD).');
+    return m[4] ? { est: m[1].trim(), de: m[2].trim(), a: m[3].trim(), desde: m[4] } : { est: m[1].trim(), de: m[2].trim(), a: m[3].trim() };
   });
 }
 
@@ -144,9 +144,13 @@ export function aliasDelExcel(rutaExcel) {
   const aoa = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: false, defval: '' });
   const cab = (aoa[0] || []).map((c) => normalizarTexto(c).normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
   const col = (re) => cab.findIndex((c) => re.test(c));
-  const [ce, cd, ca] = [col(/^estacion/), col(/^elemento/), col(/^homologado/)];
-  if (ce < 0 || cd < 0 || ca < 0) throw new Error('La hoja «' + hoja + '» debe traer las columnas ESTACION, ELEMENTO y HOMOLOGADO.');
-  return aoa.slice(1).filter((f) => f.some((c) => String(c).trim())).map((f) => ({ est: String(f[ce]).trim(), de: String(f[cd]).trim(), a: String(f[ca]).trim() }));
+  const [ce, cd, ca, cf] = [col(/^estacion/), col(/^elemento/), col(/^homologado/), col(/^desde/)];
+  if (ce < 0 || cd < 0 || ca < 0) throw new Error('La hoja «' + hoja + '» debe traer las columnas ESTACION, ELEMENTO y HOMOLOGADO (DESDE es opcional).');
+  return aoa.slice(1).filter((f) => f.some((c) => String(c).trim())).map((f) => {
+    const x = { est: String(f[ce]).trim(), de: String(f[cd]).trim(), a: String(f[ca]).trim() };
+    const desde = cf >= 0 ? String(f[cf]).trim() : '';
+    return desde ? { ...x, desde } : x;
+  });
 }
 
 /** Filas de la homologación del Excel (para validar los alias), con las MISMAS opciones que la página. */
@@ -177,7 +181,7 @@ export function empaquetar({ carpeta, estaciones, relevos = [], alias = [], crea
   const enc = new TextEncoder();
   const archivos = [];
   let bytesOrigen = 0; let leidos = 0; let renombradas = 0; let descartadas = 0;
-  const al = { renombradas: 0, descartadas: 0, horasRellenadas: 0 };
+  const al = { renombradas: 0, descartadas: 0, horasRellenadas: 0, reemplazadas: 0 };
   for (const f of recorrer(raiz)) {
     bytesOrigen += f.tamano;
     let contenido = null;
@@ -185,7 +189,7 @@ export function empaquetar({ carpeta, estaciones, relevos = [], alias = [], crea
       let texto = readFileSync(f.abs, 'utf8');
       if (relevos.length) { const r = aplicarRelevos(texto, relevos); texto = r.texto; renombradas += r.renombradas; descartadas += r.descartadas; }
       // Alias de elemento DESPUÉS de los relevos: la estación ya tiene su nombre homologado.
-      if (alias.length) { const r = aplicarAliasElemento(texto, alias); texto = r.texto; al.renombradas += r.renombradas; al.descartadas += r.descartadas; al.horasRellenadas += r.horasRellenadas; }
+      if (alias.length) { const r = aplicarAliasElemento(texto, alias); texto = r.texto; al.renombradas += r.renombradas; al.descartadas += r.descartadas; al.horasRellenadas += r.horasRellenadas; al.reemplazadas += r.reemplazadas; }
       contenido = enc.encode(filtrarTexto(texto, set));
       leidos++;
     }
@@ -230,6 +234,6 @@ if (esPrincipal) {
   const mb = (b) => (b / 1048576).toFixed(1) + ' MB';
   console.log(`${r.carpeta}: ${r.archivos} archivos (${mb(r.bytesOrigen)}), ${r.leidos} leídos; paquete ${mb(r.bytesContenedor)} → ${mb(r.bytesComprimido)} comprimido en ${r.partes.length} parte(s) de ≤ ${mb(PAQUETE.parteMaxBytes)}; ${est.length} estaciones; sha ${r.sha.slice(0, 12)}…`);
   for (const p of r.partes) console.log('  ' + p.nombre + '  ' + mb(p.bytes.length));
-  if (alias.length) console.log(`  alias: ${alias.map((x) => x.est + '/' + x.de + '→' + x.a).join(' · ')} · filas renombradas ${r.alias.renombradas} · fundidas en la fila real ${r.alias.descartadas} (horas rellenadas ${r.alias.horasRellenadas})`);
+  if (alias.length) console.log(`  alias: ${alias.map((x) => x.est + '/' + x.de + '→' + x.a + (x.desde ? ' desde ' + x.desde : '')).join(' · ')} · filas renombradas ${r.alias.renombradas} · fundidas en la fila real ${r.alias.descartadas} (horas rellenadas ${r.alias.horasRellenadas}) · viejas reemplazadas ${r.alias.reemplazadas}`);
   if (relevos.length) console.log(`  relevos: ${relevos.map((x) => x.est + '←' + x.nueva + ' desde ' + x.desde).join(' · ')} · filas renombradas ${r.relevos.renombradas} · descartadas ${r.relevos.descartadas}`);
 }

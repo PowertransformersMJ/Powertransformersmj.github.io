@@ -123,7 +123,7 @@ describe('alias de elemento', () => {
       const raiz = join(dir, 'Septiembre');
       for (const d of [1, 2]) { mkdirSync(join(raiz, '0' + d + 'Septiembre'), { recursive: true }); writeFileSync(join(raiz, '0' + d + 'Septiembre', `ir_average-2026090${d}.csv`), archivo(d)); }
       const r = empaquetar({ carpeta: raiz, estaciones: OBJ.estaciones, alias: ALIAS, creado: '2026-10-24T00:00:00Z' });
-      assert.deepEqual(r.alias, { renombradas: 2, descartadas: 0, horasRellenadas: 0 });
+      assert.deepEqual(r.alias, { renombradas: 2, descartadas: 0, horasRellenadas: 0, reemplazadas: 0 });
       const { manifiesto, archivos } = leerContenedor(new Uint8Array(gunzipSync(Buffer.concat(r.partes.map((p) => Buffer.from(p.bytes))))));
       assert.deepEqual(manifiesto.alias, ALIAS);
       assert.doesNotMatch(new TextDecoder().decode(archivos[0].contenido), /EstDemo1 *\/13\.8kV *\/swTafoX1/);
@@ -134,8 +134,67 @@ describe('alias de elemento', () => {
   });
   test('L-102: archivo nuevo que solo importa exportaciones ya publicadas', () => {
     const src = readFileSync(new URL('../assets/js/domain/scada_carga_alias.js', import.meta.url), 'utf8');
-    assert.match(src, /import \{ normalizarTexto, nivelDe \} from '\.\/scada_carga_csv\.js'/);
+    assert.match(src, /import \{ normalizarTexto, nivelDe, fechaDeEncabezado \} from '\.\/scada_carga_csv\.js'/);
     assert.match(src, /import \{ analizarClaveHomologada, claveEfectiva \} from '\.\/scada_carga_homologacion\.js'/);
     assert.equal((src.match(/^import /gm) || []).length, 2);
+  });
+});
+
+describe('alias con fecha «desde»: el elemento nuevo reemplaza al viejo (`99 §205`, Pradera)', () => {
+  // El SCADA renombró el 13,8 kV y sigue exportando el nombre viejo congelado e «Invalid»: el viejo trae VALOR.
+  const DESDE = [{ est: 'EstDemo1', de: 'swTafoX1', a: 'swTrafo1', desde: '2026-09-20' }];
+  const conViejo = (d) => [cab(d),
+    fila('EstDemo1', '34.5kV', 'swTrafo1', 'I R', 400),
+    fila('EstDemo1', '13.8kV', 'swTrafo1', 'I R', 18.048),
+    fila('EstDemo1', '13.8kV', 'swTafoX1', 'I R', 700)].join('\n');
+  const l138 = (t) => t.split('\n').filter((x) => /^\/EstDemo1 *\/13\.8kV/.test(x));
+  test('antes de la fecha sigue la regla de fundir: gana la fila vieja', () => {
+    const r = aplicarAliasElemento(conViejo(19), DESDE);
+    assert.equal(r.reemplazadas, 0);
+    assert.equal(r.descartadas, 1);
+    assert.deepEqual(l138(r.texto).map((x) => x.split(',')[1]), ['18.048']);
+  });
+  test('desde la fecha el nuevo toma su lugar en ESE nivel; los otros niveles no se tocan', () => {
+    for (const d of [20, 21]) {
+      const r = aplicarAliasElemento(conViejo(d), DESDE);
+      assert.equal(r.reemplazadas, 1);
+      assert.equal(r.renombradas, 1);
+      const l = l138(r.texto);
+      assert.equal(l.length, 1);
+      assert.match(l[0], /^\/EstDemo1 *\/13\.8kV *\/swTrafo1 *\//);
+      assert.equal(l[0].split(',')[1], '700');
+      assert.ok(r.texto.split('\n').some((x) => /^\/EstDemo1 *\/34\.5kV *\/swTrafo1 *\//.test(x) && x.includes(',400')), 'el 34,5 kV sigue');
+    }
+  });
+  test('si el archivo no trae el elemento nuevo, la fila vieja se queda aunque la fecha ya rija', () => {
+    const t = [cab(25), fila('EstDemo1', '13.8kV', 'swTrafo1', 'I R', 18.048)].join('\n');
+    const r = aplicarAliasElemento(t, DESDE);
+    assert.equal(r.reemplazadas, 0);
+    assert.equal(l138(r.texto).length, 1);
+  });
+  test('archivo de calidad: la bandera vieja sale y queda la del nuevo', () => {
+    const t = [cab(22), fila('EstDemo1', '13.8kV', 'swTrafo1', 'I R', 'Invalid'), fila('EstDemo1', '13.8kV', 'swTafoX1', 'I R', 'Actual')].join('\n');
+    const l = l138(aplicarAliasElemento(t, DESDE).texto);
+    assert.equal(l.length, 1);
+    assert.ok(l[0].includes(',Actual') && !l[0].includes('Invalid'));
+  });
+  test('validar y leer la fecha: se conserva si viene y se frena si está mal escrita', () => {
+    assert.deepEqual(validarAlias(DESDE, FILAS), DESDE);
+    assert.deepEqual(validarAlias(ALIAS, FILAS), ALIAS, 'sin fecha, igual que antes');
+    assert.throws(() => validarAlias([{ ...DESDE[0], desde: '20/09/2026' }], FILAS), /AAAA-MM-DD/);
+    assert.throws(() => validarAlias([{ ...DESDE[0], desde: '2026-02-30' }], FILAS), /AAAA-MM-DD/);
+    assert.deepEqual(leerAlias('EstDemo1/swTafoX1=swTrafo1@2026-09-20'), DESDE);
+    assert.throws(() => leerAlias('EstDemo1/swTafoX1=swTrafo1@20-09-2026'), /ESTACION\/ELEMENTO=HOMOLOGADO/);
+  });
+  test('el empaquetador la aplica, cuenta lo reemplazado y la anota en el manifiesto', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'scada-alias-desde-'));
+    try {
+      const raiz = join(dir, 'Septiembre');
+      for (const d of [19, 20]) { mkdirSync(join(raiz, d + 'Septiembre'), { recursive: true }); writeFileSync(join(raiz, d + 'Septiembre', `ir_average-202609${d}.csv`), conViejo(d)); }
+      const r = empaquetar({ carpeta: raiz, estaciones: OBJ.estaciones, alias: DESDE, creado: '2026-11-03T00:00:00Z' });
+      assert.deepEqual(r.alias, { renombradas: 1, descartadas: 1, horasRellenadas: 0, reemplazadas: 1 });
+      const { manifiesto } = leerContenedor(new Uint8Array(gunzipSync(Buffer.concat(r.partes.map((p) => Buffer.from(p.bytes))))));
+      assert.deepEqual(manifiesto.alias, DESDE);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });

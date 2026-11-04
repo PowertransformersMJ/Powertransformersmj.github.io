@@ -11,13 +11,17 @@
 //     vacías; en las horas con valor gana la real;
 //   · el alias solo apunta a un elemento homologado de su estación, y el elemento con errata no puede ser
 //     el de ninguna fila de la homologación (lo escondería);
+//   · con fecha «desde» (opcional, AAAA-MM-DD): desde ese día el elemento NUEVO reemplaza al homologado en el MISMO
+//     nivel y variable (la fila vieja se quita aunque traiga valores, p. ej. congelada o «Invalid»), para cuando el SCADA
+//     renombra un punto y sigue exportando el nombre viejo sin datos válidos (Pradera, `99 §205`). Antes de esa fecha, y
+//     en los niveles donde el archivo no trae el elemento nuevo, sigue la regla de fundir;
 //   · solo el paquete preparado lo aplica, después de los relevos de estación (`99 §158`). El empaquetador
 //     valida contra el Excel (no ve las decisiones de la página); la página vuelve a validar el manifiesto
 //     contra la homologación vigente, con sus decisiones, antes de leer el paquete (`99 §181`).
 // Funciones PURAS. Archivo NUEVO (L-102): solo importa exportaciones ya publicadas. Sin nombres reales.
 // ══════════════════════════════════════════════════════════════════════════════
 
-import { normalizarTexto, nivelDe } from './scada_carga_csv.js';
+import { normalizarTexto, nivelDe, fechaDeEncabezado } from './scada_carga_csv.js';
 import { analizarClaveHomologada, claveEfectiva } from './scada_carga_homologacion.js';
 
 const tok = (s) => String(s || '').replace(/\s+/g, ' ').trim().toLowerCase();
@@ -25,9 +29,9 @@ const niv = (s) => nivelDe(s) || normalizarTexto(s);
 
 /**
  * Valida una lista de alias contra la homologación. Lanza un Error con texto llano.
- * @param {Array<{est: string, de: string, a: string}>} alias
+ * @param {Array<{est: string, de: string, a: string, desde?: string}>} alias
  * @param {Object<string, object>} filas  filas de la homologación (fusionarHomologacion(...).filas)
- * @returns {Array<{est, de, a}>} los alias limpios (sin espacios a los lados)
+ * @returns {Array<{est, de, a, desde?}>} los alias limpios (sin espacios a los lados); `desde` solo si viene
  */
 export function validarAlias(alias, filas) {
   const homologados = new Map();   // est → Set(elem) de las filas vigentes
@@ -54,9 +58,19 @@ export function validarAlias(alias, filas) {
     if (out.some((y) => normalizarTexto(y.est) === normalizarTexto(est) && normalizarTexto(y.de) === normalizarTexto(de))) {
       throw new Error(donde + ': hay dos alias para el mismo elemento.');
     }
-    out.push({ est, de, a });
+    const desde = String(x.desde || '').trim();
+    if (desde && !fechaValida(desde)) throw new Error(donde + ': la fecha «desde» se escribe AAAA-MM-DD y debe existir (llegó «' + desde + '»).');
+    out.push(desde ? { est, de, a, desde } : { est, de, a });
   }
   return out;
+}
+
+/** «AAAA-MM-DD» que existe en el calendario. */
+function fechaValida(f) {
+  const m = String(f).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return false;
+  const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
 }
 
 /**
@@ -65,16 +79,23 @@ export function validarAlias(alias, filas) {
  * otra fila de alias ya renombrada—, la del alias se funde en ella y solo LLENA sus horas vacías («null» o en blanco);
  * en las horas con valor gana la que ya estaba (la real siempre, aunque venga después en el archivo). Así el día en que
  * el SCADA corrija el nombre a mitad de jornada no se pierden horas (revisión adversarial 2026-10-24).
+ * Un alias con `desde` cuya fecha ya llegó (la del encabezado del archivo) invierte la regla para las medidas que el
+ * archivo trae con el elemento nuevo: la fila del homologado se QUITA y la del alias toma su lugar (`99 §205`).
  * @param {string} texto  un archivo del exporte (encabezado + filas)
- * @param {Array<{est: string, de: string, a: string}>} alias  ya validados
- * @returns {{texto: string, renombradas: number, descartadas: number, horasRellenadas: number}}
- *          descartadas = filas del alias fundidas en otra fila de la misma medida
+ * @param {Array<{est: string, de: string, a: string, desde?: string}>} alias  ya validados
+ * @returns {{texto: string, renombradas: number, descartadas: number, horasRellenadas: number, reemplazadas: number}}
+ *          descartadas = filas del alias fundidas en otra fila de la misma medida;
+ *          reemplazadas = filas del homologado quitadas porque un alias con `desde` ya rige
  */
 export function aplicarAliasElemento(texto, alias) {
   const t = String(texto || '');
-  if (!alias || !alias.length) return { texto: t, renombradas: 0, descartadas: 0, horasRellenadas: 0 };
-  const A = alias.map((x) => ({ est: normalizarTexto(x.est), de: normalizarTexto(x.de), a: normalizarTexto(x.a), aTxt: String(x.a).trim() }));
+  if (!alias || !alias.length) return { texto: t, renombradas: 0, descartadas: 0, horasRellenadas: 0, reemplazadas: 0 };
   const lineas = t.split('\n');
+  const cab = fechaDeEncabezado(String(lineas[0] || '').replace(/^\uFEFF/, ''));
+  const A = alias.map((x) => ({
+    est: normalizarTexto(x.est), de: normalizarTexto(x.de), a: normalizarTexto(x.a), aTxt: String(x.a).trim(),
+    rige: !!(x.desde && cab.ok && cab.fecha >= String(x.desde).trim())
+  }));
   const partes = lineas.map((l, i) => {
     if (i === 0) return null;
     const coma = l.indexOf(',');
@@ -82,17 +103,25 @@ export function aplicarAliasElemento(texto, alias) {
     return segs && segs.length >= 6 ? { coma, segs, est: normalizarTexto(segs[1]), elem: normalizarTexto(segs[3]) } : null;
   });
   const medida = (est, nivel, elem, variable) => est + '|' + niv(nivel) + '|' + elem + '|' + tok(variable);
+  // 0.ª pasada: medidas que el archivo trae con el elemento NUEVO de un alias que ya rige (su fila vieja sobra).
+  const rigen = new Set();
+  for (let i = 1; i < lineas.length; i++) {
+    const p = partes[i];
+    const x = p ? A.find((y) => y.est === p.est && y.de === p.elem) : null;
+    if (x && x.rige) rigen.add(medida(x.est, p.segs[2], x.a, p.segs[4]));
+  }
   // 1.ª pasada: la fila REAL de cada medida del elemento homologado (la primera, si el archivo trae dos).
+  const out = lineas.slice();   // null = línea quitada
+  let renombradas = 0; let descartadas = 0; let horasRellenadas = 0; let reemplazadas = 0;
   const duena = new Map();   // medida → índice de la línea que la lleva
   for (let i = 1; i < lineas.length; i++) {
     const p = partes[i];
     if (!p || !A.some((x) => x.est === p.est && x.a === p.elem)) continue;
     const k = medida(p.est, p.segs[2], p.elem, p.segs[4]);
+    if (rigen.has(k)) { out[i] = null; reemplazadas++; continue; }
     if (!duena.has(k)) duena.set(k, i);
   }
   // 2.ª pasada: renombrar, o fundir en la fila que ya lleva esa medida.
-  const out = lineas.slice();   // null = línea quitada
-  let renombradas = 0; let descartadas = 0; let horasRellenadas = 0;
   for (let i = 1; i < lineas.length; i++) {
     const p = partes[i];
     const x = p ? A.find((y) => y.est === p.est && y.de === p.elem) : null;
@@ -111,7 +140,7 @@ export function aplicarAliasElemento(texto, alias) {
     descartadas++;
     horasRellenadas += llenarHorasVacias(out, j, lineas[i].slice(p.coma + 1));
   }
-  return { texto: out.filter((l) => l !== null).join('\n'), renombradas, descartadas, horasRellenadas };
+  return { texto: out.filter((l) => l !== null).join('\n'), renombradas, descartadas, horasRellenadas, reemplazadas };
 }
 
 const vacia = (c) => { const s = String(c == null ? '' : c).trim(); return s === '' || /^null$/i.test(s); };

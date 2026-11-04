@@ -10391,3 +10391,69 @@ sostuvo no se escribió) · repo público: sin nombres de personas externas, cor
 - La nota se volvió a leer tras recargar. En medio hubo un corte de red: «No se pudo leer su perfil», resuelto con «Reintentar».
 
 **204.8 Verificado sano.** Octubre trae 31 de 31 días.
+
+## 205. ADR-205 — Cargabilidad SCADA: alias de elemento con fecha «desde» (Pradera T1/T2 renombrados en 13,8 kV); pedido v3 al área SCADA (TODO-69) ⟦OPUS-5.5⟧ (2026-11-03)
+
+> «Pedido v3 al área SCADA (Recomendado)» · Pradera «Alias + ajuste pequeño (Recomendado)» · MovilCor «Preguntarlo en el
+> pedido (Recomendado)» · Brigada «Sí, partirla (Recomendado)» · septiembre/octubre «Sí, guarda (Recomendado)» (2026-11-03/04).
+
+**205.1 Causa raíz.**
+- **Pradera.** A mediados de sept-2026 el SCADA renombró el 13,8 kV de sus dos transformadores: «swTrafo2» → «swTraf2»
+  (desde el 14-sep) y «swTrafo1» → «swTraf1F» (desde el 17-sep).
+  - Los nombres viejos siguen llegando, congelados e «Invalid»: 0 de 744 h válidas en octubre. Los nuevos traen 740.
+  - En los días en que ambos midieron dan lo mismo: diferencia mediana de 0,4 % en T2 y 0,07 % en T1. Los viejos murieron el
+    20-sep hacia las 11 h.
+  - El alias de `§181` funde y deja ganar a la fila real, que aquí trae valor aunque no sirva: no alcanzaba.
+- **Al preparar el pedido**, cifras verificadas en los crudos:
+  - **Las Palomas T1:** 13,8 kV congelado en 18,048 A con «Invalid» desde el 4-ago.
+  - **Corozal:** su 34,5 kV llega desde el 20-oct como estación «MovilCor», con valores reales desde el 23-oct. Antes estaba
+    fijo en 52,0 A desde el 12-oct. Su cifra sale del 13,8 kV y no se afecta.
+
+**205.2 Solución.**
+- **Código** (`9381153`): un alias puede traer **DESDE** (AAAA-MM-DD).
+  - Desde ese día, en las medidas que el archivo trae con el elemento nuevo, la fila del homologado se quita y la nueva toma su
+    lugar. Los demás niveles no se tocan; antes de la fecha sigue la regla de fundir.
+  - Dónde se escribe: columna DESDE de la hoja «Alias de elemento», `--alias …@AAAA-MM-DD` y el manifiesto (solo si viene).
+  - Archivos: `scada_carga_alias.js`, `scada_carga_paquete.js` y `scada-empaquetar.mjs`. La página solo vuelve a validar.
+- **Homologación nueva**: «… (v3 corregida 2026-10-08 + alias 2026-11-03).xlsx», que agrega los dos alias de Pradera (13,8 kV
+  de T2 y de T1), ambos desde 2026-09-20; los nombres exactos viven solo en la hoja «Alias de elemento» del Excel. La de octubre se conserva.
+- **Datos**: paquetes `pradera-alias-2026-11-03`.
+  - Septiembre: 598 filas viejas reemplazadas y 310 fundidas antes del 20.
+  - Octubre: 1705 reemplazadas.
+  - En «Completar» no entraba nada: las 2784 horas ya guardadas eran las viejas. En **«Reemplazar»** cambian solo 2 series por
+    mes, las de Pradera (174 y 164 iguales); se guardaron con su «procede».
+- **Pedido v3** (`~/Downloads/Pedido_SCADA_y_Brigada_Cargabilidad_2026-11-03_v3.html`, copia en la bóveda
+  `2026-10-28-provisionales-26/`; workflow `wf_e13c432f-928`, redactor + verificador):
+  - 40 filas, con octubre completo.
+  - Filas nuevas: R29 Las Palomas, R30 Corozal/MovilCor (solo preguntas) y B15 San Luis (pinza en R y T de 18 a 21 h).
+  - «Brigada» se parte en «Visita a la subestación» (7) y «Consulta a Operación» (4).
+  - Pradera y Nueva Cospique T3 van como información.
+
+**205.3 No-regresión.**
+- Sin DESDE, el alias se comporta igual que antes; las pruebas del alias de Boston siguen intactas.
+- El manifiesto sin DESDE no cambia ni un byte.
+- Las demás series de septiembre y octubre se compararon contra lo guardado: idénticas.
+
+**205.4 Verificación.**
+- Pruebas: `test:unit` 3283 ✅ y lint ✅, con 6 casos nuevos:
+  - antes y después de la fecha;
+  - otro nivel intacto;
+  - archivo de calidad;
+  - validación;
+  - `--alias`;
+  - manifiesto.
+- En vivo, Cargabilidad tras guardar:
+  - **Periodo ene–oct sin cambios**: 192 firmes · 8 provisionales · 96 CRG 4–5 · 46 con sobrecarga. Pradera T2 sigue en 119,5 % y
+    T1 en 102,9 %, porque las marca el 34,5 kV de agosto.
+  - **Octubre**: Pradera T2 queda en 105,7 % (CRG 5) con sobrecarga sostenida también en 13,8 kV (hasta 105,8 %); T1 en 91,1 %.
+- En medio hubo dos cortes de la extensión. Se volvió a subir solo lo que no había llegado, comprobado con el contador de la página.
+
+**205.5 Anti-patterns evitados.**
+- Repartir la carga de la entrada.
+- «Completar» cuando lo guardado es lo malo: se usó «Reemplazar», con la simulación a la vista.
+- Homologar MovilCor con un relevo de estación entera, que habría borrado el 13,8 kV de Corozal.
+
+**205.8 Verificado sano / pendiente.**
+- MovilCor queda como pregunta (R30). Para homologarlo haría falta un relevo por nivel, que hoy no existe.
+- **La Unión** muestra el mismo patrón que Pradera desde el 29-oct: puntos nuevos «swTraf1», UNN302F–304F. Hay que revisarlo al
+  cargar noviembre.
