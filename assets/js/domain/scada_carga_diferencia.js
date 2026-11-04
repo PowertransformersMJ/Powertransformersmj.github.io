@@ -53,20 +53,23 @@ const coma = (x, d = 1) => (x == null || !Number.isFinite(x) ? '—' : x.toFixed
 /** Un código de hueco nunca es «fuera de servicio» (9): eso diría que el transformador estaba apagado. */
 const hueco = (c) => (c === CODIGO.DESENERGIZADO ? CODIGO.CERO : c);
 
-/** Lista de nombres sin repetidos (por texto comparable), sin vacíos, en orden alfabético comparable. */
-function lista(x) {
+/**
+ * Lista de nombres sin repetidos (por texto comparable), sin vacíos, en orden alfabético comparable. `leer` = cómo se lee
+ * cada nombre (un '/estación/elemento' de la misma estación, por su elemento: ver `especDiferenciaNivel`).
+ */
+function lista(x, leer = (t) => t) {
   const vistos = new Set(); const out = [];
   for (const y of Array.isArray(x) ? x : []) {
-    const t = String(y == null ? '' : y).trim();
+    const t = leer(String(y == null ? '' : y).trim());
     if (!t || vistos.has(norm(t))) continue;
     vistos.add(norm(t)); out.push(t);
   }
   return out.sort((a, b) => norm(a).localeCompare(norm(b)));
 }
 /** Sentidos guardados: {elemento comparable: ±1}; cualquier otro valor se ignora (lo señala `erroresDiferencia`). */
-function sentidos(x) {
+function sentidos(x, leer = (t) => t) {
   const out = {};
-  for (const [k, v] of Object.entries(x && typeof x === 'object' ? x : {})) if (v === 1 || v === -1) out[norm(k)] = v;
+  for (const [k, v] of Object.entries(x && typeof x === 'object' ? x : {})) if (v === 1 || v === -1) out[norm(leer(String(k).trim()))] = v;
   return out;
 }
 
@@ -83,13 +86,17 @@ export function firmaDiferencia(nv, { salidas = [], restar = [], invP = [], invQ
  * @param {object} cfg  `decision.diferencia[nivel]` = {salidas, restar, invertir_p, invertir_q, sentido_p, sentido_q,
  *   barra_solo_estos, verificado}
  * @param {string} est  la estación del transformador; @param {string} nv  el nivel; @param {string} devanado  P, S o T
+ * @param {function} [analizar]  el analizador de claves '/estación/elemento' de la homologación (lo pasa quien llama: este
+ *   archivo no la importa). Con él, un '/estación/elemento' de la MISMA estación vale por su elemento, como en la suma
+ *   (`erroresDiferencia` lo acepta así); cualquier otra cosa se conserva tal cual y nunca llega.
  */
-export function especDiferenciaNivel(cfg, est, nv, devanado) {
+export function especDiferenciaNivel(cfg, est, nv, devanado, analizar = null) {
   if (!cfg || typeof cfg !== 'object' || !NIVELES[nv] || !devanado) return null;
-  const salidas = lista(cfg.salidas); const restar = lista(cfg.restar);
+  const leer = (t) => { const k = typeof analizar === 'function' ? analizar(t) : null; return k && norm(k.est) === norm(est) ? k.elem : t; };
+  const salidas = lista(cfg.salidas, leer); const restar = lista(cfg.restar, leer);
   if (!salidas.length || !restar.length) return null;
-  const invP = lista(cfg.invertir_p).map(norm); const invQ = lista(cfg.invertir_q).map(norm);
-  const sentidoP = sentidos(cfg.sentido_p); const sentidoQ = sentidos(cfg.sentido_q);
+  const invP = lista(cfg.invertir_p, leer).map(norm); const invQ = lista(cfg.invertir_q, leer).map(norm);
+  const sentidoP = sentidos(cfg.sentido_p, leer); const sentidoQ = sentidos(cfg.sentido_q, leer);
   const cidsSalidas = salidas.map((e) => claveId(est, e)); const cidsRestar = restar.map((e) => claveId(est, e));
   return {
     modo: 'diferencia', nivel: nv, devanado, elems: [...salidas, ...restar], cids: [...cidsSalidas, ...cidsRestar],
@@ -181,7 +188,8 @@ export function componerDiferencia({ salidas = [], restar = [], otrosRestar = []
       if (!f) { if (codigo == null) codigo = CODIGO.SIN_ARCHIVO; continue; }
       if (!x.restado && sinCorriente(f, h) && (todas9(f, h) || U != null)) { abiertas++; continue; }   // salida abierta: 0
       if (x.restado && sinCorriente(f, h)) {
-        if (x.otros.every((o) => sinCorriente(o, h))) continue;   // restado fuera en todos sus devanados: aporta 0
+        // Restado fuera en todos sus devanados: aporta 0. Sin sus otros devanados no se sabe: hueco (falla cerrado).
+        if (x.otros.length && x.otros.every((o) => sinCorriente(o, h))) continue;
         puenteado = true; if (codigo == null) codigo = hueco(f.IR.m[h]); continue;
       }
       const p = f.P; const q = f.Q;
