@@ -10457,3 +10457,38 @@ sostuvo no se escribió) · repo público: sin nombres de personas externas, cor
 - MovilCor queda como pregunta (R30). Para homologarlo haría falta un relevo por nivel, que hoy no existe.
 - **La Unión** muestra el mismo patrón que Pradera desde el 29-oct: puntos nuevos «swTraf1», UNN302F–304F. Hay que revisarlo al
   cargar noviembre.
+
+## 206. ADR-206 — Cargabilidad SCADA: noviembre 1–2 cargado; relevo de estación de La Unión registrado (desde el 19-sep) y septiembre–octubre recargados (TODO-69) ⟦OPUS-5.5⟧ (2026-11-04)
+
+> «he cargado el mes de noviembre para que por favor lo proceses» · relevo «Sí, registrarlo y recargar (Recomendado)» · guardado
+> «Sí, y sigue con oct y nov (Recomendado)» (2026-11-04).
+
+**206.1 Causa raíz.** El 18-sep el SCADA pasó La Unión a una estación nueva: ese día midieron las dos, 9 h la vieja y 11 h la nueva.
+Desde el 19-sep solo trae la nueva, y la vieja quedó sin horas válidas. El diagnóstico del 23-oct lo había visto («relevo no
+registrado», bóveda `2026-10-23-provisionales-septiembre`), pero nunca se registró. Así, La Unión T1 se quedó sin medida en
+septiembre (desde el 19), en octubre y al comienzo de noviembre. Es el mismo caso de Sampués (`§158`).
+
+**206.2 Solución (datos, sin código).**
+- **Homologación nueva** «… + relevo 2026-11-04»: el relevo de La Unión, desde 2026-09-19, va en la hoja «Relevos de estación»;
+  el de Sampués sigue.
+- **Paquetes** `launion-relevo-2026-11-04` (septiembre, octubre y noviembre), simulados y guardados con su «procede»:
+  - **Septiembre**, en «Reemplazar»: 1 serie, la de La Unión T1, con 3312 horas.
+  - **Octubre**, en «Reemplazar»: 2 series. Una es La Unión T1; la otra es un punto nuevo de transformador que la estación nueva
+    trae desde el 29-oct, todo «Invalid», y que entra al catálogo sin dar cifra. Cambia la cifra de 1 solo equipo.
+  - **Noviembre**, en «Completar» (mes nuevo, 2 de 30 días): 167 series. Faltan las mismas 57 claves de siempre.
+
+**206.4 Verificación (en vivo).**
+- **Periodo ene–nov**: 191 firmes · 9 provisionales · 96 CRG 4–5 · 46 con sobrecarga. Ene–oct estaba en 192 · 8 · 96 · 46.
+- El provisional nuevo es **Berrugas T1**: su suma de circuitos de noviembre (12 h) no alcanza a contrastarse. Se resuelve solo
+  con más días.
+- **La Unión T1**:
+  - ene–nov: firme, 94,0 % (CRG 5), con cifra en 10 meses;
+  - sep–oct: 88,3 % (CRG 4), con su peor mes en septiembre, 89,4 %, igual que lo simulado el 23-oct.
+- Pradera T2 y T1 sin cambios (119,5 % y 102,9 %).
+- La extensión se cortó una vez a mitad de octubre: se volvieron a subir solo las partes que faltaban, comprobado con el contador.
+
+**206.8 Pendiente / no re-auditar.**
+- El 13,8 kV de La Unión en la estación nueva está «Invalid» desde el 14-oct; el de 34,5 kV mide completo. Va al área SCADA en la
+  próxima versión del pedido.
+- El punto nuevo de transformador de la estación nueva no tiene datos válidos. Si llega a medir, decidir si es el 13,8 kV de T1,
+  con un alias como el de Pradera (`§205`).
