@@ -10492,3 +10492,30 @@ septiembre (desde el 19), en octubre y al comienzo de noviembre. Es el mismo cas
   próxima versión del pedido.
 - El punto nuevo de transformador de la estación nueva no tiene datos válidos. Si llega a medir, decidir si es el 13,8 kV de T1,
   con un alias como el de Pradera (`§205`).
+
+## 207. ADR-207 — Cargabilidad SCADA: mayo 2026 cargado (por fin); su «no necesito autorizarte nada» resuelve la autorización de las cargas (TODO-69) ⟦OPUS-5.5⟧ (2026-11-04)
+
+> «he cargado el mes de mayo para que lo proceses y sea apreciable en cargabilidad SCADA, manten los mismos criterios, no necesito
+> autorizarte nada» (2026-11-04).
+
+**207.1 Causa raíz.** Mayo de 2026 nunca había venido en el exporte (`§125`). Desde octubre seguía abierta la pregunta de si su
+pedido de procesar valía como autorización (`§203.9`, W-13 paso 8).
+
+**207.2 Solución (datos, sin código).**
+- **Paquete** `mayo-2026-11-04`: 1360 archivos, 8 partes, 147 estaciones, con la homologación vigente «… + relevo 2026-11-04».
+  En mayo no aplican los relevos; los alias de Boston dieron 909 filas.
+- **Simulación en «Completar»**: 31 de 31 días, 202 de 203 claves (en mayo todavía viene Oriente), 227 series, 0 iguales.
+  Berrugas «cuadra»: 27,6 %, CRG 1, firme.
+- **Guardado** sin pedir «procede», por su instrucción. La regla queda en W-13 paso 8: cargar con los mismos criterios no lo
+  necesita; lo que cambie criterios se le pregunta.
+
+**207.4 Verificación (en vivo).**
+- **Mayo**: 179 firmes · 17 provisionales · 85 CRG 4–5 · 35 con sobrecarga.
+- **Periodo ene–nov**: «11 meses con datos» y ya sin el aviso «mayo no está cargado». Queda 191 · 9 · 96 · **49** (antes, 46).
+- Los 3 nuevos con sobrecarga sostenida solo la tienen en mayo: T1-M/M-SML, T2-M/M-BEC y T2-M/M-SGE.
+- La cifra del periodo de algunos equipos cambia un poco porque entran las horas de mayo. Ejemplo: Pradera T2 pasa de 119,5 % a
+  118,7 %.
+
+**207.8 En curso.** El Carmen: el Ingeniero informó que T1A y T2A comparten la barra de 66 kV y escogió «T2A por diferencia de
+barra». Hoy T1A lleva el 100 % de esa barra (balance de P) y T2A no tiene medida válida en 2026. La resta se hace con P y Q,
+porque los bancos de compensación invalidan restar corrientes. Diseño y revisión adversarial en curso → ADR propio.
