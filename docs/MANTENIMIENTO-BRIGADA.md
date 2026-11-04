@@ -9,6 +9,13 @@
 > **Branch entregable:** `claude/add-calculation-tool-LSoff`
 > **Commits:** `4323ac4` → `2ee9a9c` (10 commits)
 > **Estado:** Producción · 497/497 tests verdes · html-validate limpio
+>
+> ⚠️ **Nota de corrección (2026-11-03; estudio del 2026-10-12/13, TODO-80).** Esta hoja se conserva como se escribió, pero dos
+> afirmaciones no se sostienen: (1) la **ANSI C57.12.91** es el código de pruebas de transformadores **SECOS**: no aplica a los de
+> aceite (decisión 11, suya: quitarla del informe firmado y citar IEEE C57.12.90); (2) las 4 pendientes «Westinghouse»
+> (1,20 / 2,00 / 2,65 / 4,25 CFM/kVA) coinciden con el folleto **Krenz-Vent** solo en 115 y 125 %; su origen Westinghouse está
+> sin verificar. Además, la calculadora toma el kVA del inventario (con ventiladores) como ONAN. Donde abajo dice «oficiales»
+> o «Westinghouse», leer con esta nota. Detalle → `50` §Refrigeración y bóveda `2026-10-12-refrigeracion-onaf-onan`.
 
 ---
 

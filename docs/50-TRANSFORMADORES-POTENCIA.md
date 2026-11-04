@@ -165,9 +165,12 @@ Patrón: `SKILL.md` (frontmatter + workflow 6 pasos + árbol de decisión + fich
 
 ## ❄️ Refrigeración y 🛡️ protecciones (punteros)
 - Tipos ONAN/ONAF/OFAF/ODAF y «etapa ≠ MVA gratis» → skill `sistema-refrigeracion` + `_conocimiento/00-fundamentos-transformador.md §E`.
-  Calibración Westinghouse de CFM → `domain/refrigeracion.js` + hoja `MANTENIMIENTO-BRIGADA.md`.
+  Calibración de CFM rotulada «Westinghouse» (origen sin verificar; ver el estudio ↓) → `domain/refrigeracion.js` + hoja `MANTENIMIENTO-BRIGADA.md`.
   ⚠️ **Estudio 2026-10-12/13 (TODO-80, Borrador hasta sus decisiones; bóveda `2026-10-12-refrigeracion-onaf-onan`)**:
-  - las 4 pendientes «Westinghouse» salen del folleto **Krenz-Vent** (TRACOL 2019) y solo coinciden en 115/125 %;
+  - las 4 pendientes «Westinghouse» salen del folleto **Krenz-Vent** (TRACOL 2019) y solo coinciden en 115/125 % (se rotulan
+    «origen Westinghouse, coincide con Krenz en 115/125 %», no «Krenz» a secas);
+  - cita «ANSI C57.12.91», que es el código de pruebas de transformadores **SECOS** (no aplica a los de aceite); decisión 11,
+    suya (TODO-80): quitarla del informe firmado y citar IEEE C57.12.90 con ediciones vigentes;
   - la calculadora toma el kVA del inventario (CON ventiladores) como ONAN y sobrestima el aire en r − 1;
   - **vara objetiva = lo que instaló el fabricante** (9 WEG de AFINIA con dossier): el aire sigue a 780·Pk·(r−1) con las
     pérdidas MEDIDAS (0,29–0,64 %); suponer el 1 % de Krenz pide ≈ 2,5 veces. Método SGM v2 y calculadora v2 → bóveda;

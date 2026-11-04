@@ -16,6 +16,12 @@
 
 | § | Qué resuelve (hook para decidir si leerlo) | Línea |
 |---|---|---|
+| §198 | ADR-198 — **rol visitante**: solo Cargabilidad SCADA y Mapa, sin escribir, sin Borrador ni descargas; cerrado en páginas, base, Storage e IA · TODO-83 | 9920 |
+| §199 | ADR-199 — **rastro del visitante**: inicios, visitas, páginas, equipos, filtros, mapa e intentos; panel en Administración; sin aviso (decisión suya, verificación legal en .8) · TODO-83 | 9998 |
+| §200 | ADR-200 — **octubre 27–29** cargado; **Colomboy T1** por 13,8 kV; **Nueva Cospique T3** reconfirmada · TODO-69 | 10065 |
+| §201 | ADR-201 — barras «frente a sus límites de placa»: rótulos sobre la leyenda al redimensionar (altura del recuadro) · TODO-69 | 10090 |
+| §202 | ADR-202 — **lóbulo 56 · Subestaciones AT/EAT**: ingesta del libro HMV (31 agentes, verificado por página); el libro no entra al repo | 10102 |
+| §203 | ADR-203 — **pendientes recuperados** 11-oct → 2-nov: TODO-69, 54, 80, 81, 83 y Fichas | 10162 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
@@ -34,6 +40,7 @@
 | Dos caminos escriben o leen lo mismo (trigger + importador, lectura de una vez + escucha en vivo, módulo viejo en caché, iframe) · lo derivado no cuadra con su fuente | 🧵 `37-LECCIONES-COSTURAS-DATOS` (hija de `30`) |
 | Voy a tocar un exportador (PDF/XLSX), un texto que se firma o un Excel del cliente | 🖨️ `38-LECCIONES-PAPEL-EXCEL` (hija de `30`) + cola de Fichas |
 | Voy a GUARDAR desde un formulario que no muestra todo el documento (editar un equipo, una S/E…) | `30` **L-134** + `99 §154` (`actualizarCampos`) |
+| Corregir un equipo contra su placa, escribir con `firebase-admin` o extraer valores de informes del cliente para un cálculo | hoja `workflow-datos-reales.md` (de `60`: W-13 paso 9, W-15 paso 7) |
 | Validar si algo es código muerto antes de borrar | 🧪 `30-LECCIONES` + `_legacy/README.md` |
 | Bug recurrente / 2 fallos en el mismo síntoma | Capa 1 → tramo de `99-HISTORIAL-ADR` |
 | ¿Qué hay pendiente? estado del sprint | ⚡ `10-CORTO-PLAZO` (TODO-NN) |
@@ -50,7 +57,7 @@
 | 🛠️ ¿Qué skill tengo para X? | `docs/skills-inventory.md` + `40-LOBULOS §Recursos` |
 | ¿Podemos seguir en GitHub Pages? ¿migramos el hosting? ¿los ToS nos prohíben algo? | `99 §60` (veredicto + runbook Cloudflare + disparadores) — **no re-analizar por calendario** |
 | 🛰️ Decisión fuerte / cara de revertir → ¿2ª opinión externa? | `60-WORKFLOWS §W-11` (checklist cerrado) → `15-CONSEJO-EXTERNO` + skills `proceso-decision-fuerte`/`comite-expertos` |
-| 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real, cargar un mes SCADA, cerrar el turno) | 🔁 `60-WORKFLOWS` (W-01..W-14) |
+| 🔁 ¿Cómo se corre un proceso repetible? (red-team de reglas, verificar un subagente, criterio multi-norma, importar Excel real, cargar un mes SCADA, cerrar el turno, ingerir un libro) | 🔁 `60-WORKFLOWS` (W-01..W-15) |
 | 🔑 Tocar `scripts/*.mjs` del cerebro / actualizar el kernel | `../brain-private/kernel/README.md` → editar allí + `npm run brain:pull` (NUNCA en el repo: gate #0) |
 | 🤖 Extracción de PDFs con IA / Claude API / costos LLM | 🤖 `31` (L-20/L-21) + `99 §3` + Skill `claude-api` |
 | 📄 Fichas · Excel PE.02081 · firmas · «Salud y riesgo» · «Diagrama Operativo» | `cola-fichas-tecnicas.md` (cerrados → `cola-fichas-tecnicas-cerrados.md`) + archivos → `22-ESPACIAL-MODULOS` + `99 §82 en adelante` + **L-103** (`38`) |

@@ -77,6 +77,12 @@
   magnitudes y la de barra fasorial: con factores de potencia parecidos la diferencia es pequeña (cubierta por el ±10 % de `§182`).
 - **Un punto que no representa la carga**: el TC del acople, un solo interruptor de una salida con dos, o un circuito
   tomado como «toda la carga» (`§189`). **Antes de confirmar un punto, mirar el unifilar.**
+- **Cómo saber qué mide un punto** (método numérico, nuestro; practicado en Becerril, `§186`, bóveda
+  `2026-10-26-scada-sobrecarga-por-devanado`): ajustar el punto contra cada candidato (un circuito, la suma, el otro nivel × su
+  relación) **mes a mes**, hora a hora y por fase. Decide el **coeficiente ≈ 1 con la mediana del cociente, NO el R²**: dos
+  circuitos con la misma curva del día dan R² 0,97–0,99 con coeficiente 1,7. Fases rotuladas corridas bajan el R²: promediar las 3
+  o re-emparejarlas. Horas con la medida de un circuito en 0 A y el interruptor del transformador marcando lo de siempre prueban
+  una sola barra (con barras separadas habría caído a ~0). Por mes se ve el cambio de configuración. La tensión entre barras no prueba nada si un medidor cambió de calibración (`§186.5`).
 - **Ceros sin salida de servicio**: con transferencia, un punto junto al interruptor marca cero con el transformador cargado.
 - **Consecuencia de una falla o de un mantenimiento** según la configuración (Tabla 2.1, p. 47–53: nada, un circuito, la
   mitad o todo) → insumo para la criticidad de TODO-55 (`51`). ⚠️ El OCR perdió encabezados de esa tabla: ver la imagen.

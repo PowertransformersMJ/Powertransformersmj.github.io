@@ -2,12 +2,12 @@
 
 > Nodo de signos vitales. Se **AUTO-CARGA** (con `CLAUDE.md` + `10`). "¿En qué estado está el sistema AHORA?". Tope ~25 líneas / 4k chars (§G.5) — tablero, no bitácora. Detalle histórico → `99` vía `00`.
 
-| Señal | Valor (al **2026-10-26**) |
+| Señal | Valor (al **2026-11-03**) |
 |---|---|
-| **Misión ahora** | **Último frente**: CARGABILIDAD SCADA — cada devanado frente a su PLACA, corriente impresa en 102 placas (`§169`–`§170`, 10-23); sigue la revisión 1 a 1 (TODO-54). Siguen **CONTRATO = ÓRDENES** (TODO-76) y REFRIGERACIÓN (TODO-80). **Esperan su respuesta**: MAPA (TODO-78) · FICHAS (CF-43/44). Cadena → `00` Capa 1. |
-| **Build** | 🟢 **3130 pass / 0 fail / 2 skip** + `lint:html` limpio · verificado-vivo: 2026-10-26 (local; CI de main en verde, `gh run list`; prueba de velocidad inestable → relanzar, **L-122**). Reglas (242), `test:trigger` y `guardia:cedulas`: último 2026-10-11 (Storage con el de Firestore al lado, L-78). Lo servido → handoff o `git fetch` + curl (L-65), nunca de memoria. |
+| **Misión ahora** | **Últimos**: VISITANTE y su rastro (`§198`–`§199`; validarlo en vivo, TODO-83) · SCADA oct 27–29 (`§200`) · lóbulo `56` (`§202`). Siguen SCADA (TODO-69/54), REFRIGERACIÓN (TODO-80), CONTRATO (TODO-76). **Esperan su respuesta**: MAPA (TODO-78) · FICHAS (CF-43/44). Cadena → `00` Capa 1. |
+| **Build** | 🟢 **3277 pass / 0 fail / 2 skip** + `lint:html` limpio · verificado-vivo: 2026-11-03 (local; CI de main 🟢 (`gh run list`); prueba de velocidad inestable → relanzar, L-122). Reglas 337 (11-01, `§199.4`; con Storage, L-78); `test:trigger` y `guardia:cedulas`: 10-11. Lo servido → handoff o `git fetch` + curl (L-65), nunca de memoria. |
 | **Branch / Deploy** | `DESARROLLO-/-PROYECTO-MJ` y `main` con el MISMO contenido (`main` avanza por merge; SHA vivo → handoff hook o `git fetch`, nunca de memoria; se commitea+pushea+mergea en el mismo turno). |
-| **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices + 13 exenciones `scada_*`: archivo = servidor** (2026-10-01, L-66). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
+| **Backend** | Firebase `lordpowertransformersmj` (Auth + Firestore + Storage). **Billing REACTIVADO (2026-07-23)**. **4 CF desplegadas con `maxInstances`**: `extraerPruebasElectricasIA` · `narrativaTendenciaIA` · `onMuestraCreate` · `cronAlertasDiarias`. **55 índices + 18 exenciones (13 `scada_*` + 5 de Brigada, `§163`): archivo = servidor** (2026-11-03, L-66). Rol **visitante** (`§198`). **Firmas**, **Diagrama Operativo** y registro de órdenes con folio: en Firestore (`§100`/`§112`/`§114`). |
 | **Parque real** | **208 TX** · 3.838,5 MVA · **salud 85/83/16/15/9** (la del Excel, decisión del Ingeniero `99 §74.15`) · 0 discrepancias UUCC · 4 fuera del catálogo CREG · verificado-vivo: 2026-10-09 |
 | **Deuda crítica** | 🔴 Lo que **solo el Ingeniero** puede hacer → `10 §Solo puede hacerlo el Ingeniero` (B–J). |
 

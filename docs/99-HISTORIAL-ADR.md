@@ -10158,3 +10158,204 @@ Los rótulos G1/G2 de la Tabla 4.7 se perdieron en el OCR y se escribieron segú
   - Um 36 frente a 36,5 kV.
   - Las configuraciones reales del parque, sin unifilares.
   - La Guía de disparos del Ingeniero (`Guia_Respuesta_Disparo_Transformadores_AFINIA`, en su escritorio): no está ingerida.
+
+## 203. ADR-203 — Auditoría de documentación de la sesión 11-oct → 2-nov: pendientes y notas recuperados ⟦OPUS-5.5⟧ (2026-11-03)
+
+> «sincroniza el cerebro, luego documenta absolutaente todo» (2026-11-03).
+
+**203.1 Causa raíz.** Ofertas, preguntas y decisiones sin respuesta del Ingeniero quedaron solo en el chat, en un crudo de la
+bóveda o dentro de una casilla «Verificado sano / no re-auditar» (que le dice al siguiente agente que NO lo mire), y no en la tabla
+de pendientes de `10`. Además, dos notas de `10` se recortaron sin pasar a otro nodo: el puntero de TODO-80 a las 25 decisiones
+(18-oct, `320c55e`) y, por el boot-gate, quién hizo qué al crear la cuenta del visitante en TODO-83 (1-nov, `e37cb68`).
+
+**203.2 Solución.** Auditoría de la transcripción del 11-oct al 2-nov con verificación adversarial; cada punto se volvió a comprobar
+el 3-nov contra el repo, la bóveda, Descargas o el chat, y solo queda lo que sigue vigente. Este ADR es el nodo dueño de esos
+pendientes recuperados; `10` lleva un solo puntero (`§G.3`, sin espacio en el arranque). Fechas locales. Al cerrar uno, se anota
+aquí con su §. Formato: qué · fuente · (ID de la auditoría).
+
+**203.3 TODO-69 · Cargabilidad SCADA.**
+- *Suyo — decisiones sin respuesta:*
+  - **a `§196.8`** — Conformidad: el 29-oct se le propuso sacar de la meta de AFINIA los 5 provisionales de Oriente (El Desastre,
+    Casa de Zinc, Ferrocarril, San Felipe, Tres Esquinas): siguen visibles como provisionales, con «periodo de AFINIA cerrado: lo
+    opera ENERGUA», y lo que falta queda en los 10 de AFINIA. Orden de impacto que se le dio: 1) enviar el pedido v2; 2) «procede»
+    o correcciones de los textos del panel (`§197`); 3) esta decisión; 4) re-exportar mayo. Sin respuesta (V111).
+  - **a `§165.7`** — Umbral del aviso de devanado (1,5 × la placa, `FACTOR_NO_CUADRA`) y sus textos de causa (errata ×10, parece
+    monofásico, no cuadra con la placa): propuesta del equipo; se le preguntó el 22-oct y no respondió. Los devanados de placa
+    se publicaron a su pedido ese día, sin rótulo Borrador (`§165`; `53` §3 decía «BORRADOR», corregido el 3-nov) (V048).
+  - **a `§158.13`** — «MovilCor» (desde el 19-oct, 34,5 kV, casi todo en 0, mismos elementos que Corozal 34,5 kV, cuyo lado de
+    34,5 kV de T1-M/M-COR está congelado desde el 13-oct): ¿subestación móvil en Corozal? ¿homologarla? Preguntado el 23-oct, sin
+    respuesta; no está en el pedido v2 ni en las cargas de `§158.14` y `§200` (V070).
+  - **a `§196.6`** — Antes de enviar el pedido v2: cómo se llama en AFINIA el personal que va a la subestación (pinza, relé, foto
+    de placa, termografía; el área SCADA corrige desde el sistema) y si la sección «Brigada» se parte en «Visita a la subestación»
+    (6 filas) y «Consulta a Operación» (4: El Carmen T2A, Membrillal T1, Maracayo T1, Montelíbano T2, que preguntan si el equipo
+    está en servicio o en reserva). Preguntado el 28-oct, sin respuesta (V118).
+- *Suyo — envíos y datos (ninguno consta como hecho):*
+  - **a `§196.6` y `§197.10`–`.11`** — Enviar: (a) el pedido v2 al área SCADA y la brigada
+    (`Pedido_SCADA_y_Brigada_Cargabilidad_2026-10-28_v2.html`, 37 filas; de él dependen San Andrés T1 y San Luis T1); (b) los
+    pedidos al laboratorio v2 (`Pedidos_Laboratorio_Gases_2026-10-28_v2.html`: 10 de AFINIA; la parte de ENERGUA, 8, va aparte);
+    (c) revisar la nota para ENERGUA v2 sobre La Paz T1 y Barranco de Loba T1 (`Nota_para_ENERGUA_…_2026-10-28_v2.html`), que pide
+    cuatro cosas antes de enviarla (entre ellas, si necesita el visto bueno de su jefatura), y decidir si la envía. Las v1 están
+    obsoletas. Todo en Descargas, con copia en la bóveda `2026-10-28-provisionales-26/` (archivos del 28-oct; el 29-oct se le
+    repitió que enviar el pedido va primero) (V100, V112).
+  - **a `§125`** — Re-exportar del histórico del SCADA: mayo de 2026 entero; en febrero, los archivos de promedio de los días 1, 2,
+    3, 5, 13 y 20 (faltan para todo el parque, `wf_5ad4d24f-b17`); en septiembre, la fase R de los días 6 y 11 y la fase S de los
+    días 6, 8, 11 y 23. Lista: «Pendiente del Ingeniero» del pedido v2 (V100, V111).
+- *Ofrecido, sin respuesta:*
+  - **a `§168.8`** — Rótulos «Cifra oficial (Excel)» del indicador del detalle y «Oficial (Excel)» de la columna de la lista →
+    «Cifra oficial» con su fuente debajo (p. ej. «SCADA ene–oct 2026»), con vista previa (23-oct). El código sigue igual
+    (`detalle.js` y `lista.js`; el texto del panel en `scada_carga_dga_textos.js` también lo cita) (V065).
+  - **a `§195.9`** — San Andrés de Sotavento T1: su decisión «Nota de corroboración, sigue provisional» quedó SIN escribir (la fila
+    no tiene decisión y escribir la nota obligaba a confirmar la homologación). Ofrecido dos veces el 28-oct y otra el 29-oct:
+    confirmarla para dejarle la nota (~83 %, CRG 4) (V108).
+  - **a `§193`** — San Luis T1 (86,0 %, CRG 4 provisional): mide en pasos de 2 A (unos 10 puntos en este equipo) y la CRG 5 empieza
+    en 90 %: podría estar ya en CRG 5. El reconectador de aguas abajo no sirve de medida (lleva solo parte de la carga y también
+    estuvo congelado). Ofrecido el 28-oct: (a) marcar su fase S «sin carga por diseño», como Mata de Caña y El Paraíso
+    (`§191`); (b) agregar al pedido una medición con pinza a la hora pico, que diría si está en CRG 4 o 5. El 29-oct se le repitió
+    la (b) como opcional (V113).
+  - **a `§201`** — Una línea visible «Datos hasta el 29-oct-2026 23:00» en la lista y el detalle, con vista previa (2-nov) (V130).
+- *Para el área SCADA / Operación (no están en el pedido v2):*
+  - **a `§158.14`** — Las Palomas T1: su 13,8 kV no trajo ninguna hora en octubre (1–26) y cubre ~50 % del periodo. La cifra sale
+    del 34,5 kV (firme, `§190`), así que el defecto de medida quedó sin dueño. No consta si el 27–29 (`§200`) lo trajo
+    (27-oct) (V091).
+  - **a `§200`** — Pradera T2: su 13,8 kV tuvo 0 horas válidas de 744 en octubre (septiembre: 417 de 720, 58 %), y el detalle dice
+    «Homologación sin observaciones». La cifra sale del 34,5 kV (692 h, 93 %). Pista sin verificar: el exporte de septiembre trae dos
+    elementos nuevos de esa estación (≈ 20 y ≈ 14 días con datos): podría ser un cambio de nombre, como el de Boston (`§181`,
+    alias). Al cargar noviembre: revisar si pide alias; si no, sumarlo al pedido. Crudo: bóveda
+    `2026-10-08-scada-sin-medicion/crudos/agentes/f1-variables-Agosto-Septiembre.json` (2-nov) (V128).
+  - **a `§158.11` y `§196`** — RETIRADO de `10`: el «límite de 20 A de Casacará» para el área SCADA/Operación. Casacará T1 es de
+    Oriente (lista de 62, bóveda `2026-10-28-provisionales-26/crudo/zona-oriente-62-equipos.txt`) y el pedido v2 pasó su fila R28 a
+    «Ya no aplica»; se le dijo el 29-oct. Se queda en `10` la otra tarea, corregir Casacará (2 MVA) en su Excel de Salud: es de otro
+    módulo y no se retira sin preguntarle (V117).
+- *Defecto menor sin dueño:*
+  - **a `§174.8`** — En la gráfica mes a mes de un devanado SIN placa, la «Ampacidad» de la plataforma se rotula con el color de la
+    ONAF (rojo) y escribe «— MVA» si falta la tensión (`panel-devanados-mes.js`, rótulos de las etapas). Quedó solo en la casilla
+    «no re-auditar»; `§198` y `§201` tocaron después el archivo y no lo corrigieron. Es de pantalla: con vista previa y su
+    «procede» (V075).
+
+**203.4 TODO-54 · Ampacidades = corriente de placa.**
+- **a `§169.11`** — Simití T1: la baja tensión está fija en la toma 1 (14,49 kV; lo dice la placa con un aviso). Suyo: (a) calcular
+  el límite del secundario a 14,49 kV (≈ 199,2 / 259,0 A ONAN/ONAF), o (b) dejarlo a 13,8 kV (≈ 209 / 272 A) con el rótulo «a la
+  tensión nominal; equipo fijo en 14,49 kV». No se le dio recomendada. Importa: la auditoría por devanado del 26-oct pone ese
+  secundario en 100,5 %; con (a) quedaría en ~105 %. Simití es de Bolívar: la decisión toca todo su periodo (ver .11) (23-oct)
+  (V066).
+- **a `§172`** — Candelaria T5 (T-KDR05): su terciario de compensación tiene 2.091,8 A de ampacidad en la plataforma aunque la placa
+  dice que no lleva carga. `§172` lo dejó «por decidir» junto con Bosque T4, que `§189` resolvió («terciario de compensación sin
+  ampacidad»); Candelaria quedó fuera de la lista. Tratarlo igual, con su visto bueno. No cambia cifras: el SCADA solo trae sus
+  lados de 220 y 110 kV (23-oct; crudo `2026-10-23-umbrales-graficas/`) (V073).
+- **Nuevo** — Santa Rosa del Sur TR-2: placa «en sitio» sin equipo en el parque. Reparación de TRADELCA (2019), 5/6,5 MVA
+  ONAN/ONAF, 30 kV (la serie, en el crudo); el parque solo tiene T1-M/M-SAR (el Suntec del TR-1). El índice de pruebas lo enlaza,
+  por la serie, con un informe de la brigada del 21-jun-2024 en esa subestación: probablemente está instalado. El diagnóstico de
+  Santa Rosa T1 (`§179`, 23-oct) lo dejó «fuera de este caso». Suyo: ¿alta en el parque, la misma unidad con otra matrícula o fuera
+  de servicio? Crudos: bóveda `2026-10-12-refrigeracion-onaf-onan/crudos/placas-2026-10-18/consolidado.json` y
+  `pruebas-2026-10-19/args_relectura.json` (V076).
+- **a `§185.8`(b)** — San Luis T1: la placa característica guardada es la de la unidad anterior (Magnetron 300 kVA); la que sirve
+  desde mayo es la Siemens de 500 kVA reparada en mar-2026 (`§185`, `§193.1`). Ofrecido el 26-oct reemplazarla desde
+  `admin/placas-caracteristicas.html` con la foto que él envió: sin respuesta. Esa foto solo está en
+  `~/Downloads/PHOTO-2026-03-25-08-57-09.jpg` (y un duplicado « 2»); «Placas Trafos/San Luis/TR-1» solo tiene la de 2021 (unidad
+  vieja). Guardar una copia ahí, nunca en el repo (V086).
+
+**203.5 TODO-80 · Refrigeración ONAN/ONAF.**
+- **Decisiones abiertas fuera de D1–D11** (las D son del Método SGM v2: dimensionado D1–D8, carga con ventiladores caídos D9 y
+  prueba térmica D10–D11; de las 4 de la calculadora v1 —A o B, φ 0,90 u 0,80, Tipo 3 a 40 °C, Krenz F20 fuera de la mezcla—,
+  el Método v2 fija φ 0,90 y deja fuera el Tipo 3; A o B y el F20 no constan como resueltas): las 25 del informe v2
+  (E1–E12 de escogencia del régimen y 1–13 de selección) y sus 8 preguntas de dato (13-oct; SINTESIS de la bóveda
+  `2026-10-12-refrigeracion-onaf-onan`, «Pendiente: sus 25 decisiones»). Entre ellas: la 11, corregir las normas que cita el informe
+  firmado (quitar «ANSI C57.12.91», que es de secos, y actualizar ediciones), y la 12, qué norma se compra: recomendada solo la
+  IEC 60076-7:2018 (CHF 380, también en español), que además respaldaría las cifras del modelo térmico de Cargabilidad SCADA, hoy
+  leídas de una copia de tercero (`53` §5). La fila de `10` perdió el puntero el 18-oct (`320c55e`) (V004, V009).
+- **Calculadora VIVA de Mantenimiento Brigada** (`pages/calculo-refrigeracion.html`): sin cambios desde el estudio (su último
+  commit es del 28-sep; la tolerancia sigue en 5 %). Sus defectos están en la SINTESIS §Comparación y en L-142 (`37`); la medida
+  inmediata sin código (ONAN de placa a mano y tolerancia 0), en la SINTESIS. Faltaba: deja registrar una acción con la mezcla
+  «NO APROBADA»; decisión 11 de la comparación (bloquear, exigir justificación —recomendada— o solo avisar), hoy solo en
+  `crudos/comparacion-brigada/editor/informe-final.md`. Las 11 decisiones de la comparación siguen abiertas (13-oct) (V008, V009).
+- **Entregable que ningún nodo del repo nombra**: `~/Downloads/Calculadora_Capacidad_Radiadores.html` (Borrador, 19-oct; a su
+  pedido, el dibujo señala L, b, N y p). Fuente, rejilla y pruebas: bóveda `crudos/radiadores-2026-10-19/calculadora/` (la bóveda
+  lo nombra desde el 3-nov: README, fila 2026-10-12, y SINTESIS «Entregable (19-oct…)»); enlace con el Método SGM v2: índice I_R
+  (borrador, SINTESIS §Capacidad de un radiador) (V052).
+
+**203.6 TODO-81 · Informe de Mantenimiento Brigada.**
+- **a `§163.7`** — El W-11 de la publicación (14-oct) NO fue completo: faltaron el paso 4 de la secuencia practicada (vista previa
+  con SUS datos reales; se le ofreció como decisión 3, «¿La hacemos?») y el reporte de validación live en su Chrome (artefacto (c),
+  `60` §W-11). Su «procede» se tomó como «publicar con las recomendadas», y la prueba con datos reales pasó a ser «su primer informe
+  real». No vale como precedente de un W-11 completo (V019).
+- **a `§163.8`** — Suyo, abierto: emitir el PRIMER informe real (sería la primera vez que se estampan las 3 firmas en producción;
+  puede ser uno de los 2 borradores); luego Claude revisa el PDF y el Word. Se le dijo el 14 y el 16-oct. Claude no crea informes
+  reales (uno emitido no se borra); `§183` (26-oct) también se verificó sin crear informes (V023).
+- **a `§163.14`** — Emitir congela el CONTENIDO y los datos de las firmas, no el papel: el PDF y el Word se vuelven a dibujar con el
+  código vigente cada vez que se abren o se descargan (`construirDocumento` calcula el tamaño y la posición de cada firma en cada
+  dibujo y no los guarda; la huella cubre solo el contenido). Un cambio futuro del papel cambia el aspecto de versiones ya
+  entregadas: «nada emitido cambia de aspecto» valió porque no había emitidos. Antes de tocar el papel con informes emitidos,
+  decidirlo con él (nota del revisor «código» de `wf_37cf88e2-d50`, 16-oct) (V020).
+- **a `§163.16`** (L-147 lo cita; ese § no existe) — Pausa del 16-oct, firmas vistas en el BORRADOR: él escogió «Pantalla y PDF del
+  borrador» (nunca en el Word); la revisión de seguridad (`wf_c338eaae-937`) no lo dio por listo y se le corrigió la información
+  (L-147). Esperan su respuesta: 1) copia marcada (recomendada); 2) firma limpia; 3) solo en pantalla. Opción (b) del revisor, solo
+  en el crudo: mostrar la firma del borrador solo cuando no queden faltantes que bloqueen (un borrador recién creado tiene 73 y ya
+  mostraría las 3, porque se crea con los firmantes por defecto). La rama `informe-brigada-firmas-borrador` (`2719eda`) vive SOLO
+  en este Mac, sin copia en origin. Si se aprueba, cambia «En borrador, nunca» de `163.11`. Detalle: SINTESIS de la bóveda, «⏸ EN
+  PAUSA» (V021).
+- **a `§183.8`** — Actividad escrita a mano: el campo usa `<input list>` + `<datalist>`, que choca con L-05 (`30`: en Safari la lista
+  puede no mostrarse); no se registró como decisión consciente. Si falla, se escribe igual, sin las 8 sugerencias. Sin verificar: qué
+  hace Esc con la lista desplegada (con la lista cerrada, Esc cierra «Nuevo informe» y se pierde lo escrito, como antes); el arreglo
+  del teclado en teléfono (no hay simulador iOS en la Mac); el aviso `aria-live` con un lector de pantalla real. Pendiente: probarlo
+  en un iPhone con Safari (crudo `wf_4694b289-772`, 26-oct) (V083).
+
+**203.7 TODO-83 · Rol visitante.**
+- **a `§198` y `§199`** — Cuenta del visitante creada el 1-nov. A su pedido («creemos el usuario, usa la extensión de chrome») él
+  creó la cuenta en Firebase Auth (Claude no crea cuentas ni escribe contraseñas); Claude tomó el UID, registró el perfil en
+  Administración → Usuarios (rol Visitante, activo, sin permisos extra ni zonas) y lo verificó leyendo su documento en `usuarios`. El
+  nombre salió del correo, sin tilde; se le ofreció corregirlo. La nota de quién hizo qué se recortó de `10` por el boot-gate
+  (`e37cb68`). Sigue: la validación en vivo (V122).
+- **a `§199.8`(a)** — El primer visitante tiene una cuenta del dominio corporativo de AFINIA. Pesa en la salvedad: la exclusión del
+  ámbito personal es solo la de la vida privada o familiar, y si la plataforma se usa formalmente para AFINIA hay que revisarlo con su
+  oficial de datos. Orientación, no asesoría legal (V123).
+- **a `§198.8`(c)** — Solo él tiene la llave: crear una alerta de presupuesto en Google Cloud Billing (el proyecto factura y las
+  reglas no limitan cuántas lecturas o escrituras hace un visitante). Se la recomendó el 1-nov, también la revisión del rastro; se le
+  ofreció explicarle cómo y no respondió (V121).
+- **a `§198.8`** — Dos puntos de seguridad que existían ANTES del cambio quedaron solo como tareas aparte del 1-nov, sin arreglo:
+  (1) las funciones de IA dejan elegir el modelo más caro y no tienen tope por persona; (2) la regla de `/auditoria` deja leer la
+  bitácora al rol `auditor_campo` sin exigir cuenta activa (hoy no hay auditores). Se le anunciaron «para cuando usted quiera».
+  Pendiente frío → `11` TODO-84 (V120).
+
+**203.8 Otros · Fichas Técnicas.** Hallados el 22-oct al explorar la placa; se le ofreció corregirlos aparte y no respondió.
+(a) La ficha muestra «Serie: —» aunque 207 de 208 equipos tienen serie (banco del 8-oct): `ui/fichas/panel.js` y
+`ui/fichas/ficha-tecnica.js` la buscan en `serie` / `identificacion.numero_serie`, y el dato vive en `placa.serial` o `serial`
+(`MODELO-DATOS-v2`); `parque_salud.js` lee igual. `informe_brigada_modelo.js` y `cargabilidad_parque.js` ya leen `placa.serial`.
+(b) En `home.html`, el enlace del ranking de salud va a `pages/inventario.html?codigo=…`; `aqua-shell.js` lo redirige y el código se
+pierde. Crudo: bóveda `2026-10-22-devanados-scada/placa/frente1-plataforma.json` (V046).
+
+**203.9 Notas a ADRs anteriores y cabos sueltos** (lo que ningún otro nodo podía recibir sin pasar su tope).
+- **a `§125.5`** — «Escribir con credenciales de admin» sigue siendo anti-patrón para lo que tiene pantalla (meses SCADA,
+  importaciones). Para lo que no la tiene (un equipo contra su placa), el guion `firebase-admin` es válido con la receta de
+  `docs/workflow-datos-reales.md` (V017).
+- **a `§172`** — El Excel de Salud conserva las ampacidades viejas: una reimportación desharía la tanda de `§171`/`§172` (bóveda
+  `PENDIENTES-SALUD-ACTIVOS.md`, fila 25) (V071).
+- **a `§194`** — La fila A1 («~167 estaciones») quedó superada por `§196` (Oriente pasa a ENERGUA); ver L-173 (V105).
+- **TODO-69, preguntas suyas:**
+  - ¿Su pedido «procésalo», más «Completar» y una simulación limpia, valen como autorización? ¿O se mantiene un «procede» aparte
+    por tanda? (W-13, pasos 5 y 8: mientras no responda, se le pregunta) (V090).
+  - ¿Se agrega al menú el enlace a `admin/placas-caracteristicas.html`, junto a «Datos SCADA»? Hoy solo se llega por URL (V062).
+- **Lóbulo `42-LEGAL`** — No existe; `00` lo enruta como «on-demand». Su contenido candidato es `§199.8`(a), la Ley 1581
+  (arts. 3, 4, 9, 10 y 12) y la jurisprudencia citada en el crudo de `§199`. Nace solo con su decisión o con una auditoría legal (V124).
+- **Estructura del cerebro (→ TODO-66):**
+  - L-164 a L-168 viven en `30` con la nota «Desborde», porque `33` y `36` están llenos. Crear la hija `39` exige registrarla en
+    `CLAUDE.md §0`, que está a pocos caracteres de su tope de arranque: queda para la auditoría Nivel 2.
+  - `60` (16.8k/17k) lleva un solo puntero a las lecciones que afinan W-06, W-11, W-13 y W-14.
+- L-147 citaba `99 §163.16`, que no existe; ahora cita `§203.6`.
+
+**203.10 No-regresión / archivos.** Solo cerebro: este ADR, su fila de índice y `10` (un puntero; sale el límite de 20 A de
+Casacará). Con la misma auditoría se escribieron L-164–L-174 y ampliaciones, notas en 05/11/20–23/50/52/53/56/60, la hoja
+`workflow-datos-reales.md`, memorias y la bóveda (crudos de TODO-81, carpetas de §198/§199 a su sitio). Este ADR no toca código, reglas ni datos.
+
+**203.11 Doctrina.** `§G.3` (un pendiente = un nodo dueño; `10` apunta) · `§3.3` (cada punto re-verificado el 3-nov; lo que no se
+sostuvo no se escribió) · repo público: sin nombres de personas externas, correos ni claves de puntos del SCADA · retirar lo mínimo
+(solo lo que el pedido v2 ya dio por «Ya no aplica»). NO revisado externamente.
+
+**203.12 Verificado sano / no re-auditar.**
+- Simití NO es de Oriente: no está entre los 62 con zona Oriente de `§196` (lista cruda de la bóveda), y la tabla corregida de la
+  auditoría por devanado del 26-oct lo da en Bolívar (su primera tabla lo rotuló «Oriente»). Su periodo no se corta en agosto.
+- Febrero: los 6 días que faltan son archivos de PROMEDIO de todo el parque (`wf_5ad4d24f-b17`); «febrero 27/28» de `§125.8` es otro
+  conteo, no una contradicción.
+- Re-exportar septiembre y octubre COMPLETOS ya no aplica (`§196`): quedó superado lo que se le dijo el 28-oct.
+- Ya estaban documentados y no se repiten: «[object Object]» de la refrigeración en Fichas (`10` lista (I), `§103.8`, `§185.8`(d));
+  «ningún informe de prueba en producción» (`§163.2`, `§183`); la placa de San Luis como «ofrecido» (`§185.8`(b)), aquí solo se
+  sube a pendiente con la ruta de la foto.

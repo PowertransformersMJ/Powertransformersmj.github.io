@@ -20,7 +20,7 @@
 
 | ID | Workflow | Cuándo usarlo | Qué detecta | Cómo se corre |
 |---|---|---|---|---|
-| **W-01** | **Red-team de reglas Firestore/Storage** | Antes de desplegar `firestore.rules` / `storage.rules` | Fuga de datos entre roles, escritura no autorizada, escalada `tecnico`→`admin` | Lentes que intentan ROMPER las reglas (escalada · lectura indebida · integridad) + `npm run test:rules` (emulador) |
+| **W-01** | **Red-team de reglas Firestore/Storage** | Antes de desplegar `firestore.rules` / `storage.rules` | Fuga de datos entre roles, escritura no autorizada, escalada `tecnico`→`admin` | Lentes que intentan ROMPER las reglas (escalada · lectura indebida · integridad) + `npm run test:rules` (emulador). Al cerrar: matar el emulador que quede en el 8080 (`lsof -nP -iTCP:8080`) y borrar los `tests-rules/zz-redteam*` antes de la batería (`§166`) |
 | **W-02** | **Auditoría de panel/feature por dimensiones** | Antes de moldear o construir una fase del tablero | Huecos de UX, navegación, dominio, costo/escala en free-tier | Una lente por dimensión → síntesis contra el norte. Acotado. |
 | **W-03** | **Red-team de diseño** | Antes de congelar un diseño caro de revertir (schema, RBAC, flujo de datos) | Supuestos frágiles, modos de fallo, sobre-ingeniería | Lentes (seguridad · costo · escala · datos · mantenibilidad) atacan el diseño → síntesis |
 | **W-04** | **Verificación post-subagente** | SIEMPRE tras delegar a un subagente o workflow | Que el subagente **alucinó**: reporta algo que no quedó en el repo | Releer los archivos/estado REALES y comparar contra lo reportado. Nunca dar por bueno el informe. |
@@ -34,6 +34,9 @@
 | **W-12** | **⚡ Verificación de criterio multi-norma** *(propio)* | Al añadir/cambiar/citar un criterio de prueba eléctrica | Veredicto sacado del TEXTO de la IA en vez del VALOR contra la NORMA; criterio sin clase de tensión; norma mal atribuida; fusión indebida de calificaciones | Ver detalle ↓ |
 | **W-13** | **📥 Importación de datos reales del Ingeniero** *(propio)* | Antes de cargar un Excel/entregable real a producción | Cabeceras que cambian, filas-título, silencios (filas omitidas sin reportar), sobre-escritura de datos buenos | Ver detalle ↓ |
 | **W-14** | **🤝 Cierre de turno con el Ingeniero** *(propio)* | Al cerrar cada turno de trabajo con él | Que se le diga «listo» sin que esté en producción, que se le mezclen frentes o se le pierda el idioma | Ver la sección W-14 abajo |
+| **W-15** | **📚 Ingesta de un libro o documento extenso** *(propio)* | Cuando él entrega un libro, manual o norma para «fortalecer el cerebro» | Cifras y páginas inventadas o corridas, vínculos forzados con la plataforma, texto copiado (derechos), choques con criterios vigentes | Ver la sección W-15 abajo |
+
+> Afinan W-06/11/13/14 (`99 §203.9`): L-164 cupo de búsquedas · L-166 HTML suelto · L-168 vista de un rol · L-170 pedido literal · L-161, L-167 cargas SCADA.
 
 ---
 
@@ -95,7 +98,7 @@ si se escriben datos, simulación + foto antes/después (W-13).
 2. **Detección de fila-cabecera** antes de importar hojas con títulos encima (columnas `__EMPTY`).
 3. **Simulación primero (dry-run)**: reportar creados/actualizados EXACTOS contra el total esperado, antes de escribir nada.
 4. **Guard de omitidos**: toda fila que no entra se REPORTA. Una importación que omite en silencio es peor que una que falla.
-5. **Subir el archivo**: por defecto lo arrastra el Ingeniero en su Chrome (L-62). **Excepción a pedido suyo** (`99 §125`, 10-01: *«prefiero que los proceses tú, quedan limpios y menos probabilidad de error»*): si el insumo ya está en su disco, Claude lo prepara (meses SCADA: «paquete preparado», `scripts/scada-empaquetar.mjs`) y lo sube por la extensión desde Descargas, una parte por llamada (`file_upload` ≤ 10 MB → L-117), como en `§125` y `§131`. **Escribir** en producción solo con la simulación del paso 3 a la vista y su «procede» para esa tanda (`§131.4` → `§131.9`).
+5. **Subir el archivo**: por defecto lo arrastra el Ingeniero en su Chrome (L-62). **Excepción a pedido suyo** (`99 §125`, 10-01: *«prefiero que los proceses tú, quedan limpios y menos probabilidad de error»*): si el insumo ya está en su disco, Claude lo prepara (meses SCADA: «paquete preparado», `scripts/scada-empaquetar.mjs`) y lo sube por la extensión desde Descargas, una parte por llamada (`file_upload` ≤ 10 MB → L-117), como en `§125` y `§131`. **Escribir** en producción solo con la simulación del paso 3 a la vista y su «procede» para esa tanda (`§131.4` → `§131.9`). ⚠️ Choca con el paso 8.
 6. **Verificar el tablero vivo** tras la carga (W-10 + validación live), no solo el log del importador.
 7. **Comprobar la carga**: foto antes/después que compara VALORES con las llaves ordenadas (L-120) y fidelidad con una lectura independiente de la fuente; una matrícula repetida en el Excel puede ser dos equipos distintos: no se escoge «la primera», se reporta y no se escribe (`§131`).
 8. **Mes SCADA** (`§158`–`§159`; rutas de disco y paquetes vigentes → memoria del proyecto y bóveda `2026-10-08-scada-sin-medicion`):
@@ -106,6 +109,9 @@ si se escriben datos, simulación + foto antes/después (W-13).
    «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después
    (paso 7). Un periodo que dice «falta preparar <mes>» se arregla recargando ese mes en «Completar» (0 curvas, solo el resumen).
    Con una **suma de circuitos** decidida (`§182`), el plan muestra su bloque (cuadre R/S/T «ok») y cada recarga rehace la suma.
+   ⚠️ **Sin decidir (TODO-69)**: cuando él pide «lo proceses», el día o mes nuevo se cargó en «Completar» con simulación limpia SIN
+   otro «procede» (`§158.12`, `§158.14`, `§200`), contra el paso 5. Cuál vale lo decide él; hasta entonces, preguntarle.
+9. **Escritura puntual** (un equipo contra su placa, guiones `firebase-admin`) → hoja [`workflow-datos-reales.md`](workflow-datos-reales.md) §1–§2.
 
 ---
 
@@ -117,9 +123,29 @@ si se escriben datos, simulación + foto antes/después (W-13).
    datos y cerebro por separado. Nada se le da por publicado sin esa evidencia.
 2. **Solo los pendientes del frente en curso** (→ `10`); los de otros frentes, solo si los pide.
 3. **Un HTML SUELTO** (tablero, banco, ejemplos) se entrega en Descargas + archivo enviado + abierto en Chrome; las páginas del
-   SITIO se entregan con el deploy, el enlace en vivo y capturas.
+   SITIO se entregan con el deploy, el enlace en vivo, capturas y «recargue con Cmd + Shift + R» (la caché dura ~10 min, `max-age=600`).
 4. **Los pasos de pantalla** se le ofrecen hechos con la extensión de su Chrome; se ejecutan solo si los pide en ese turno.
 5. **Tras una compactación del contexto**, revisar idioma (español) y trato (tuteo, «Ingeniero») antes de escribirle.
+
+---
+## 📚 W-15 — Ingesta de un libro o documento extenso *(propio de SGM, `§202`)*
+
+**Disparador:** él entrega un libro, manual o norma para que el cerebro aprenda de él (primer caso: el de subestaciones, 823 págs.).
+
+1. **Texto por página**: `pdftotext -layout` del PDF entero y partirlo por `\f` en un archivo por página (scratchpad). Anotar el
+   desfase entre página del PDF y página IMPRESA (el lóbulo cita la impresa).
+2. **Lectores por bloque de capítulos** (~30–90 págs. cada uno), con esquema fijo: conceptos · criterios y valores con norma ·
+   lo que toca al transformador · vínculo con SGM (vacío si no hay) · mantenimiento · glosario · dudas de OCR; máx. 12 por lista.
+3. **Un verificador por lector** que re-lee las mismas páginas, corrige cifras y páginas y retira lo forzado (en `§202` corrigió
+   o retiró 18–44 ítems por bloque: **una sola lectura NO basta**). Cada verificador escribe su JSON a disco.
+4. **Un contraste** contra los lóbulos vigentes: aportes por lóbulo, choques con lo que el cerebro afirma, casos reales que explica,
+   frontera del lóbulo nuevo. **Un choque no cambia un criterio vigente**: se anota como divergencia y se decide aparte.
+5. **Síntesis propia**: lóbulo nuevo o sección (neurogénesis con nombre en `CLAUDE.md §0`, fila en `40`, ruta en `00`, tope en el
+   manifest) y punteros de una línea en los lóbulos hermanos; las cifras clave se re-comprueban en la página antes de publicar.
+6. **Derechos de autor**: el libro NO entra al repo (público) ni a la bóveda (se espeja); citas ≤ 12 palabras; tablas resumidas
+   con su página. Las notas completas por capítulo → bóveda (con fila en su README) + ADR.
+7. **Variante: VALORES de informes del cliente para un cálculo** (placas, resistencias, P0) → hoja `workflow-datos-reales.md` §3:
+   suma árbitros, cada valor en su línea y revisión del CÓDIGO del cálculo (la doble lectura no atrapó sus 6 errores).
 
 ---
 
