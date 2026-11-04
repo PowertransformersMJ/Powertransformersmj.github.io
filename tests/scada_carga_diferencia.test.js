@@ -17,7 +17,7 @@ import {
   erroresSuma, aliasTocaSuma, textoSuma, claveEnSumaAjena, cuadreSuma
 } from '../assets/js/domain/scada_carga_suma.js';
 import { crearAcumulador, acumularArchivo, armarMeses, procesarPuntoMes } from '../assets/js/domain/scada_carga_importacion.js';
-import { fusionarHomologacion, leerFilasHomologacion } from '../assets/js/domain/scada_carga_homologacion.js';
+import { fusionarHomologacion, leerFilasHomologacion, analizarClaveHomologada } from '../assets/js/domain/scada_carga_homologacion.js';
 import { claveId } from '../assets/js/domain/scada_carga_csv.js';
 import { CODIGO } from '../assets/js/domain/scada_carga_config.js';
 import { filasLista } from '../assets/js/domain/scada_carga_vista.js';
@@ -97,6 +97,23 @@ describe('la decisión: especDiferenciaNivel y la firma', () => {
     assert.equal(especDiferenciaNivel(CFG, 'EstDemo1', 'N66', null), null);
     assert.equal(firmaDiferencia('N66', {}), 'dif1|N66|S:|R:|iP:|iQ:|sP:|sQ:');
   });
+  test('un «/estación/elemento» de la MISMA estación vale por su elemento (como en la suma): mismos cids, misma firma, signos aplicados', () => {
+    const conClave = (e) => '/EstDemo1/' + e;
+    const cfg = { ...CFG, salidas: SAL.map(conClave), restar: [conClave('swTrafo1')], invertir_q: [conClave('EDMBC1'), 'EDMBC2'],
+      sentido_p: Object.fromEntries(Object.entries(CFG.sentido_p).map(([k, v]) => [conClave(k), v])),
+      sentido_q: Object.fromEntries(Object.entries(CFG.sentido_q).map(([k, v]) => [conClave(k), v])) };
+    const x = especDiferenciaNivel(cfg, 'EstDemo1', 'N66', 'S', analizarClaveHomologada);
+    assert.deepEqual(x.salidas, SAL); assert.deepEqual(x.restar, ['swTrafo1']);
+    assert.deepEqual(x.cids, SP.cids); assert.deepEqual(x.cidsSalidas, SP.cidsSalidas); assert.deepEqual(x.cidsRestar, SP.cidsRestar);
+    assert.equal(x.firma, SP.firma, 'la firma es la de los nombres simples');
+    assert.deepEqual(x.invQ, ['edmbc1', 'edmbc2'], 'la Q invertida de «/EstDemo1/EDMBC1» se aplica');
+    assert.deepEqual(x.sentidoP, SP.sentidoP); assert.deepEqual(x.sentidoQ, SP.sentidoQ);
+    assert.deepEqual([...componerDiferencia({ ...escenario(0.3), sp: x }).fam.IR.v], [...componerDiferencia(escenario(0.3)).fam.IR.v], 'la misma diferencia hora por hora');
+    // De OTRA estación se conserva tal cual: nunca llega (y `erroresDiferencia` lo señala al guardar).
+    assert.ok(especDiferenciaNivel({ ...CFG, salidas: [...SAL, '/EstDemo2/EDM601'] }, 'EstDemo1', 'N66', 'S', analizarClaveHomologada).salidas.includes('/EstDemo2/EDM601'));
+    // Sin el analizador, los nombres se toman tal cual (como antes).
+    assert.deepEqual(especDiferenciaNivel(cfg, 'EstDemo1', 'N66', 'S').salidas, SAL.map(conClave));
+  });
 });
 
 describe('componerDiferencia: la resta fasorial y las reglas de cada hora', () => {
@@ -162,6 +179,18 @@ describe('componerDiferencia: la resta fasorial y las reglas de cada hora', () =
     assert.notEqual(c.fam.URS.v, esc.restar[0].URS.v, 'una copia, no la misma serie');
     // P y Q del nivel = la diferencia.
     cerca(-c.fam.P.v[20], 0.3 * necesita(20).P, 1e-3, 'P = ΔP');
+  });
+  test('(c) falla cerrado: el restado en 9 SIN sus otros devanados (otrosRestar vacío) → hueco, nunca «aporta 0»', () => {
+    const esc = escenario(0.3, { swTrafo1: { abierta: (h) => h === 9 } });
+    for (const otrosRestar of [[[]], []]) {
+      const c = componerDiferencia({ ...esc, otrosRestar });
+      assert.equal(c.fam.IR.m[9], CODIGO.CERO, 'hueco con código 6 (el 9 se anota 6)');
+      assert.ok(Number.isNaN(c.fam.IR.v[9]));
+      assert.equal(c.horas.restadoPuenteado, 1); assert.equal(c.horas.hueco, 1); assert.equal(c.horas.completas, N - 1);
+    }
+    // Con su otro devanado también fuera esa hora, sí aporta 0 (la regla (d) no cambia).
+    const fuera = componerDiferencia(escenario(0.3, { swTrafo1: { abierta: (h) => h === 9 }, alta: { abierta: (h) => h === 9 } }));
+    assert.equal(fuera.fam.IR.m[9], 0); assert.equal(fuera.horas.restadoPuenteado, 0);
   });
   test('escala por hora: P y Q ×1000 en 10 h → hueco con código 7; en más de la mitad → bloquea; una fase ×2 en el TC solo avisa', () => {
     const sano = componerDiferencia(escenario(0.3));
@@ -391,6 +420,15 @@ describe('al guardar: erroresSuma con diferencia, claveEnSumaAjena, alias y text
     const con3 = { ...puntos, [claveId('EstDemo1', 'swTrafo3')]: { est: 'EstDemo1', elem: 'swTrafo3', niveles: { N66: true } } };
     assert.ok(erroresSuma(FILAS[F2], FILAS[F2].decision, { filas: FILAS, puntos: con3, filaId: F2 }).some((x) => /swTrafo3.*no está en la diferencia/.test(x)));
   });
+  test('bahías y restado escritos «/EstDemo1/…»: misma firma por especSuma, el derivado guardado vale y no hay falso D5', () => {
+    const cfg = { ...CFG, salidas: SAL.map((e) => '/EstDemo1/' + e), restar: ['/EstDemo1/swTrafo1'] };
+    assert.deepEqual(errDe(cfg), [], 'el restado escrito así no es «otro transformador que mide la barra»');
+    const fila = { ...FILAS[F2], decision: dec('/EstDemo1/swTrafo2', { N66: 'S' }, { diferencia: { N66: cfg } }) };
+    const sp = especSuma(fila).porNivel.N66;
+    assert.equal(sp.firma, SP.firma); assert.deepEqual(sp.cids, SP.cids);
+    assert.equal(componerResumen(claves, CID2, fila, puntos).N66, claves[claveSuma(CID2)].N66, 'el derivado de los nombres simples');
+    assert.equal(claveEnSumaAjena('/EstDemo1/EDM601', { ...FILAS, [F2]: fila }, 'otra'), 'T2-X/X-DM1');
+  });
   test('claveEnSumaAjena: el restado sigue siendo la medida de SU fila; una salida no puede ser la medida de otra', () => {
     assert.equal(claveEnSumaAjena('/EstDemo1/swTrafo1', FILAS, F1), null);
     assert.equal(claveEnSumaAjena('/EstDemo1/EDM601', FILAS, 'otra'), 'T2-X/X-DM1');
@@ -415,6 +453,32 @@ describe('L-102 y no regresión', () => {
       './scada_carga_csv.js:claveId,esElementoTransformador,normalizarTexto',
       './scada_carga_kpis.js:percentilOrdenado'
     ]);
+  });
+  test('cada bloqueo del rango da SU motivo (no «falta calcular»), el que el detalle pone primero en la línea del nivel', () => {
+    const sp = especSuma(FILAS[F2]).porNivel.N66;
+    const d = DER[claveSuma(CID2)].N66.derivado;
+    const sello = { tipo: DIF.tipo, v: DIF.version, firma: sp.firma, de: [...sp.elems], restar: [...sp.restar], fases: [...sp.fases], base: CID2 };
+    const bloqueos = [
+      ['sentidos', { sentidos: { ok: false, fallan: ['swTrafo1 (P)'] } }, /el sentido de la potencia de swTrafo1 \(P\) cambió/],
+      ['escala_pq', {}, /fuera de escala en más de la mitad de las horas/],
+      ['barra_compartida', { otros: ['swTrafo3'] }, /\(swTrafo3\) también mide 66 kV/],
+      ['sin_nivel', { sinNivel: ['EDM602'] }, /EDM602 llegó pero no mide 66 kV/]];
+    for (const [estado, extra, re] of bloqueos) {
+      const per = derivadoDeMeses([{ mes: '2026-02', derivado: { ...sello, estado, ...extra } }, { mes: MES, derivado: d }], sp);
+      assert.equal(per.estado, estado);
+      const m = estadoSumaNivel({ derivado: per }, sp).motivo;
+      assert.match(m, re); assert.doesNotMatch(m, /^falta calcular/);
+    }
+  });
+  test('la UI: el último mes solo con la firma vigente; el motivo del propio nivel primero; el CSV de la diferencia con su nombre', () => {
+    const h = readFileSync(new URL('../assets/js/ui/scada-datos/homologacion.js', import.meta.url), 'utf8');
+    assert.match(h, /const firma = \(\(especSuma\(f\) \|\| \{ porNivel: \{\} \}\)\.porNivel\[nv\] \|\| \{\}\)\.firma;/);
+    assert.match(h, /if \(d && d\.tipo === DIF\.tipo && d\.v === DIF\.version && firma != null && d\.firma === firma\) \{/);
+    assert.match(h, /\} else t \+= ' Lo que da la diferencia se calculará al volver a cargar los meses\.';/);
+    const det = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
+    assert.match(det, /const propio = sp \? estadoSumaNivel\(\{ derivado: der \}, sp\)\.motivo : null;/);
+    assert.match(det, /\(propio \|\| \(a\.calc && a\.calc\.motivoNulo\) \|\| 'falta calcular la diferencia de este rango'\)/);
+    assert.match(det, /info\.suma\.modo === 'diferencia' \? '_diferencia-barra' : '_suma-circuitos'/);
   });
   test('sin decision.diferencia, especSuma no cambia (sin «modo») y una suma de circuitos sigue igual', () => {
     const suma = { ...FILAS[F1], decision: dec('/EstDemo1/swTrafo1', { N66: 'S' }, { suma: { N66: { de: ['EDM601', 'EDM602'], fases: ['IR', 'IS', 'IT'], barra_propia: true } } }) };

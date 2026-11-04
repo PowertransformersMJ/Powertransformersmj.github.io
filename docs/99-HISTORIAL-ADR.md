@@ -10587,3 +10587,22 @@ vive en el guion de la bóveda.
   de octubre de 33 a 9 A, pero podría esconder carga real (no entra).
 - Una salida PUENTEADA en una línea no se puede distinguir desde la estación: la cubre W-13, que revisa cualquier mes con T2A > 5 %.
 - Otras S/E candidatas (sin confirmar que compartan barra): Cereté, Membrillal y Cotorra. Se le preguntan antes de aplicarla.
+
+**208.9 Verificado tras publicar (2026-11-04).**
+- **Publicación**: merge `266ca8c`. El despliegue quedó 14 min en cola de GitHub. Producción sirve el archivo nuevo, y la página
+  de datos, recargada, usaba el código nuevo.
+- **Decisión de T2A**: guardada con `decidirFila` (homologación rev 66 → 67, con registro). `erroresSuma` dio [] en seco antes de
+  escribir, y la firma guardada es la de la vista previa.
+- **Recarga ene–nov en «Completar»**: con los paquetes VIGENTES COMPLETOS (147 estaciones). Cada mes guardó 4 series (las bahías
+  nuevas) y su resumen, con «puntos medidos que cambian de cifra: 0» y Berrugas «cuadra»; en noviembre sale «sin contraste» porque
+  ese mes tiene solo 2 días. T2A por mes: ene 2,4 · feb 1,8 · mar 1,7 · abr 1,8 · may 2,0 · jun 1,9 · jul 1,6 · ago 2,6 · sep 1,7 ·
+  oct 2,0 · nov 1,6 %. Todos los meses quedaron provisionales, en CRG 1. Las horas de bahía puenteada son feb 2 y oct 7.
+- **En vivo**: T2A en 1,9 % ene–nov, provisional, con el rótulo «≈ 0» y 0 textos «null». En la vista previa daba 1,8 %; la diferencia
+  es que el paquete de enero trae más archivos que la carpeta local (660 h frente a 405). T1A sigue en 102,6 %. La ficha de octubre
+  quedó igual a la vista previa (7,9 A, 2,0 %).
+- **Callejón**: un paquete «solo El Carmen» lo RECHAZA la página (`estacionesFaltantes`: le faltan 146 estaciones). Para recargar una
+  sola S/E se usan los paquetes completos vigentes; no conviene relajar esa guarda.
+- **Revisión adversarial independiente del código publicado** (`wf_e8d47b72-f7a`: 3 revisores + 3 escépticos; el primer intento cayó
+  por red). Encontró 5 defectos REALES y latentes, ninguno con la decisión real: el restado sin sus otros devanados «aportaba 0», un
+  nombre escrito «/estación/elemento», la firma en «Revisar», el motivo del nivel en el detalle y el nombre del CSV. Corregidos en
+  `858fd88`, y con el código corregido los 11 meses dan lo mismo. Crudo en la bóveda (misma carpeta de `§208.7`).

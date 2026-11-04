@@ -20,7 +20,7 @@ import { guardarHomologacion, decidirFila } from '../../data/scada_carga_admin.j
 import { leerResumenMes } from '../../data/scada_carga.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
 // Suma de circuitos (2026-10-24): archivo NUEVO. Sin suma en la decisión, el diálogo evalúa y guarda lo de siempre.
-import { SUMA, erroresSuma, componerResumen, claveSuma, firmaSuma, textoCuadre, claveEnSumaAjena } from '../../domain/scada_carga_suma.js';
+import { SUMA, erroresSuma, componerResumen, claveSuma, firmaSuma, textoCuadre, claveEnSumaAjena, especSuma } from '../../domain/scada_carga_suma.js';
 // Diferencia de barra (2026-11-04, `99 §208`): archivo NUEVO (L-102).
 import { DIF, textoParte } from '../../domain/scada_carga_diferencia.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO. «Revisar» CONSERVA las medidas anteriores (el diálogo rehace la
@@ -176,7 +176,8 @@ export function montarHomologacion(cont, { alCambiar }) {
     const listaDe = (t) => String(t || '').split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
     const medirSel = {}; const sumaUI = {};
     const VEREDICTO = { ok: 'cuadra', no_cuadra: 'no cuadra: la cifra saldrá provisional', sin_contraste: 'sin contraste: la cifra saldrá provisional' };
-    // Párrafo de una diferencia guardada, con lo que dio el último mes cargado (si ya se calculó con esta versión).
+    // Párrafo de una diferencia guardada, con lo que dio el último mes cargado (si ya se calculó con esta versión y la firma
+    // vigente: un derivado de otras bahías, signos o sentidos no dice nada de la diferencia guardada).
     const textoDiferenciaGuardada = (nv, x) => {
       const et = NIVELES[nv] ? NIVELES[nv].etiqueta : nv;
       const lst = (a) => (Array.isArray(a) ? a.join(' + ') : '');
@@ -184,11 +185,12 @@ export function montarHomologacion(cont, { alCambiar }) {
       let t = et + ' medido por diferencia de barra: salidas ' + lst(x.salidas) + ' menos el transformador ' + lst(x.restar) + ', con P y Q' + inv
         + (x.verificado ? '; sentidos verificados en ' + nombreMes(String(x.verificado)) : '') + '. Corriente = √(P² + Q²) ÷ (√3·U), con la tensión de la barra.';
       const r = derUltimo && derUltimo[nv]; const d = r && r.derivado;
-      if (d && d.tipo === DIF.tipo && d.v === DIF.version) {
+      const firma = ((especSuma(f) || { porNivel: {} }).porNivel[nv] || {}).firma;
+      if (d && d.tipo === DIF.tipo && d.v === DIF.version && firma != null && d.firma === firma) {
         t += ' Último mes cargado (' + nombreMes(mesResumen) + '): ' + (d.estado === 'ok'
           ? (r.i && r.i.p99 != null ? num(r.i.p99, 0) + ' A (p99)' : 'sin horas válidas') + (textoParte(d) ? ' · ' + textoParte(d) : '') + ' · ' + (VEREDICTO[d.veredicto] || d.veredicto || '')
           : 'sin cifra (' + d.estado + ')') + '.';
-      }
+      } else t += ' Lo que da la diferencia se calculará al volver a cargar los meses.';
       return t + ' Se conserva al guardar con el mismo punto, ese nivel asignado y «Medir con» en la diferencia; «Excluir» o «Reabrir» la quitan.';
     };
     const textoCuadreUltimo = (nv, lista) => {

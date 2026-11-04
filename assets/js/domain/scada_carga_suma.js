@@ -144,7 +144,7 @@ export function especSuma(fila) {
   }
   for (const nv of conDif ? Object.keys(d.diferencia).sort() : []) {
     if (porNivel[nv] || !NIVELES[nv] || !mapa[nv]) continue;
-    const x = especDiferenciaNivel(d.diferencia[nv], k.est, nv, mapa[nv]);
+    const x = especDiferenciaNivel(d.diferencia[nv], k.est, nv, mapa[nv], analizarClaveHomologada);
     if (x) porNivel[nv] = x;
   }
   return Object.keys(porNivel).length ? { cid: claveId(k.est, k.elem), est: k.est, elem: k.elem, porNivel } : null;
@@ -751,7 +751,8 @@ function erroresDif(fila, decision, { filas = {}, puntos = {}, filaId = null } =
   for (const nv of Object.keys(decision.diferencia).sort()) {
     const cfg = decision.diferencia[nv];
     if (!NIVELES[nv] || !cfg || typeof cfg !== 'object') continue;
-    const restar = (Array.isArray(cfg.restar) ? cfg.restar : []).map((x) => claveId(k.est, String(x == null ? '' : x).trim()));
+    // Los restados leídos como en `especSuma`: un '/estación/elemento' de la misma estación vale por su elemento.
+    const restar = elementosDe(cfg.restar, k.est).map((e) => claveId(k.est, e));
     for (const otro of otrosTransformadores(puntos, cidTrafo, k.est, nv, restar)) {
       err.push('Otro transformador de la estación (' + otro + ') también mide ' + NIVELES[nv].etiqueta + ' y no está en la diferencia: la barra puede tener otra entrada.');
     }

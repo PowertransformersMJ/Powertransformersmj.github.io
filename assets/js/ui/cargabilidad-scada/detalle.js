@@ -49,7 +49,7 @@ import { horasNoCargadas } from '../../domain/scada_carga_periodo.js';
 import { esUnidadReserva } from '../../domain/scada_carga_reserva.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
 import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga, filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
-import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
+import { SUMA, especSuma, derivadoDeMeses, textoCuadre, estadoSumaNivel } from '../../domain/scada_carga_suma.js';
 // Diferencia de barra (2026-11-04, `99 §208`): archivo NUEVO (L-102).
 import { textoParte } from '../../domain/scada_carga_diferencia.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
@@ -485,7 +485,12 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     if (info.suma.modo === 'diferencia') {
       const base = 'salidas ' + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ')
         + ' (P y Q hora por hora; corriente equivalente con la tensión de la barra; solo el devanado de ' + NIVELES[nv].etiqueta + ')';
-      if (!der || der.estado !== 'ok') return base + ' · ' + (a.calc && a.calc.motivoNulo ? a.calc.motivoNulo : 'falta calcular la diferencia de este rango');
+      if (!der || der.estado !== 'ok') {
+        // Primero el motivo de ESTE nivel (sentidos, escala, barra compartida…): el del equipo es null si otro nivel da cifra.
+        const sp = (especSuma(a.fila) || { porNivel: {} }).porNivel[nv];
+        const propio = sp ? estadoSumaNivel({ derivado: der }, sp).motivo : null;
+        return base + ' · ' + (propio || (a.calc && a.calc.motivoNulo) || 'falta calcular la diferencia de este rango');
+      }
       const h = der.horas || {};
       const v = { ok: 'cuadra', no_cuadra: 'no cuadra: cifra provisional', sin_contraste: 'sin contraste: cifra provisional' }[der.veredicto] || '';
       const pt = textoParte(der);
@@ -525,7 +530,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
 
   function exportarCSV(a, nv) {
     const d = a.porNivel[nv];
-    // Nivel sumado: columna NUEVA al FINAL ('Origen') y el nombre del archivo lo dice; los demás niveles salen como siempre.
+    // Nivel sumado o por diferencia: columna NUEVA al FINAL ('Origen') y el nombre del archivo lo dice (cada modo con el
+    // suyo); los demás niveles salen como siempre.
     const info = (a.calc && a.calc.niveles.find((x) => x.nivel === nv)) || {};
     const origen = !info.suma ? null : info.suma.modo === 'diferencia'
       ? 'IR, IS, IT = corriente equivalente de la diferencia de barra (salidas ' + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ') + ', con P y Q); P, Q = diferencia; U = medida del transformador restado'
@@ -539,7 +545,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
       filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | '), ...extras, ...(origen ? [origen] : [])]);
     }
     const nombreExtra = { max: 'max', min: 'min', ins: 'inst' };
-    descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + (origen ? '_suma-circuitos' : '') + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
+    descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + (origen ? (info.suma.modo === 'diferencia' ? '_diferencia-barra' : '_suma-circuitos') : '') + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
       ['Inicio_hora_CO', 'Fin_hora_CO', 'IR_A', 'IS_A', 'IT_A', 'URS_kV', 'UST_kV', 'UTR_kV', 'P_MW', 'Q_Mvar', 'S_MVA_calculada', 'FP_calculado', 'I_fase_max_A', 'Cargabilidad_pct', 'Horas_descartadas_por',
         ...FAMILIAS.flatMap((f) => EXTRAS.map((e) => f + '_' + nombreExtra[e] + '_' + UNIDAD[f])), ...(origen ? ['Origen'] : [])],
       filas);

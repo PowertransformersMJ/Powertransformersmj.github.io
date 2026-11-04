@@ -471,7 +471,7 @@ describe('SIN suma, todo da exactamente lo mismo que antes (no-regresión)', () 
     const det = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/detalle.js', import.meta.url), 'utf8');
     assert.match(det, /leerSeriesEquipo\(a\.cid, existentes, a\.fila, \{ puntos: \(ctx\.catalogo && ctx\.catalogo\.puntos\) \|\| null \}\)/);
     assert.match(det, /\.\.\.\(origen \? \['Origen'\] : \[\]\)/, 'la columna Origen solo en un nivel sumado (al final)');
-    assert.match(det, /\(origen \? '_suma-circuitos' : ''\)/);
+    assert.match(det, /\(origen \? \(info\.suma\.modo === 'diferencia' \? '_diferencia-barra' : '_suma-circuitos'\) : ''\)/, 'la suma conserva su nombre');
     const his = readFileSync(new URL('../assets/js/ui/cargabilidad-scada/historia.js', import.meta.url), 'utf8');
     assert.match(his, /componerResumen\(leidas\[k\]\.datos\.claves, a\.cid, a\.fila, \(ctx\.catalogo && ctx\.catalogo\.puntos\) \|\| null\)/);
     assert.match(his, /leerSeriesEquipo\(a\.cid, \[mes\], a\.fila, \{ puntos: \(ctx\.catalogo && ctx\.catalogo\.puntos\) \|\| null \}\)/);
