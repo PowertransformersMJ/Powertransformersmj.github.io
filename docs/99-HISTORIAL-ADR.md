@@ -10519,3 +10519,71 @@ pedido de procesar valía como autorización (`§203.9`, W-13 paso 8).
 **207.8 En curso.** El Carmen: el Ingeniero informó que T1A y T2A comparten la barra de 66 kV y escogió «T2A por diferencia de
 barra». Hoy T1A lleva el 100 % de esa barra (balance de P) y T2A no tiene medida válida en 2026. La resta se hace con P y Q,
 porque los bancos de compensación invalidan restar corrientes. Diseño y revisión adversarial en curso → ADR propio.
+
+## 208. ADR-208 — Cargabilidad SCADA: El Carmen T2A medido por DIFERENCIA DE BARRA en 66 kV (dos transformadores en la misma barra) (TODO-69) ⟦OPUS-5.5⟧ (2026-11-04)
+
+> «para que tengas en cuenta que los transformadores 1 y 2 de la subestacion el carmen comparten barras a nivel de 66 kV para que
+> por favor lo implementes» → «T2A por diferencia de barra (Recomendado)» → tras la vista previa: «Procede, publícalo (Recomendado)».
+
+**208.1 Causa raíz.** T2A no tiene medida propia que sirva: su punto de 110/66 kV (renombrado en 2026; el «alias pendiente» de
+`§189.8`) llega todo «no válido» en los dos niveles, y su punto de siempre solo trae 13,8 kV. Su barra de 66 kV la comparte con T1A,
+así que la suma de circuitos (`§182`) no sirve: D5 la prohíbe y, además, suma MAGNITUDES de corriente. Con los dos bancos de
+condensadores de la barra, restar magnitudes da 183 A falsos de mediana. Lo correcto es la resta FASORIAL con P y Q.
+
+**208.2 Solución.** Segundo MODO de la suma de circuitos, en la clave aparte `decision.diferencia[nivel]` = {salidas, restar,
+invertir_p/q, sentido_p/q, barra_solo_estos, verificado}. Archivo NUEVO `domain/scada_carga_diferencia.js`; la suma lo orquesta
+(misma clave `<cid>--suma`, mismo candado de lectura, mismo derivado aparte). Fórmula: ΔP = −Σ s·P, ΔQ = −Σ s·Q, I = 1000·√(ΔP²+ΔQ²)
+÷ (√3·U), con U = la tensión de la barra.
+- **Signos**: P con +1 en todo; Q con −1 en los bancos, que llegan con el signo del generador. Cierre: 0,13–0,21 % en P y 1,3–1,6 % en Q.
+- **Reglas por hora**: la hora vale solo si cada elemento en servicio trae P y Q válidas. Una salida abierta aporta 0. El restado aporta
+  0 solo con TODOS sus devanados fuera: su bahía en 0 mientras su 110 kV lleva carga es un hueco (bahía puenteada del 18-oct, 7 h).
+  Si el restado no trae tensión, se usa la de otra bahía. Escala por hora √3·U·I ÷ S fuera de [0,5; 2] → hueco.
+- **Guardas**: el sentido de cada bahía material, guardado y BLOQUEANTE (0 falsas alarmas con T2A llevando de 0 a 100 % de la carga).
+  Escala del mes fuera de [0,85; 1,15] → aviso; más de la mitad de las horas fuera de escala → sin cifra. Piso de exactitud = 3 % del
+  p99 del flujo de la barra; por debajo, rótulo «≈ 0». El cuadre con la medida propia mira solo las horas sobre el piso.
+- **Rótulos**: «diferencia de barra (dato derivado)» en la lista, el panel del mes, el detalle (escala, desbalance y flujo inverso:
+  «no aplica»), el CSV, el diálogo «Revisar» (la muestra y la conserva; no la arma) y el plan de la simulación.
+- **guardia-scada**: también bloquea las bahías 6xx y los bancos «BCOMPn» sueltos.
+
+**208.3 No-regresión.** Sin `decision.diferencia`, todo devuelve EXACTAMENTE lo mismo: las 47 pruebas de la suma (Berrugas) pasan sin
+cambio. Sí se actualizaron 4 pruebas que fijan el texto exacto del código: el import nuevo, el freno «sin niveles» y los
+subrótulos. No hay exportaciones nuevas en archivos publicados; solo el archivo nuevo (L-102). T1A no cambia (102,6 %).
+
+**208.4 Verificación.**
+- Pruebas: 23 nuevas, incluido el camino REAL del importador hasta la cifra de la lista; la suite completa da 3307 bien y 0 mal.
+- Con los crudos reales y el código nuevo (fuera del repo): 11 meses con estado «ok», sentidos estables y 0 h fuera de escala; p99
+  de 6,3–10,3 A, siempre «≈ 0». Coincide al decimal con la revisión independiente (ago 10,27 A · oct 7,86 A · may 7,98 A).
+- Tres medidas independientes dicen T2A ≈ 0 hoy: la barra de 66 kV, la de 13,8 kV (cierra con T1A solo: 0,998) y la línea de 110 kV
+  menos T1A y sus pérdidas.
+- Vista previa FIEL en su Chrome (L-157): módulos del commit `dae847e`, datos de producción y el derivado en memoria. T2A sale con
+  1,8 % ene–nov y 2,0 % en octubre, CRG 1, provisional («sin contraste» y «≈ 0»), con 0 textos «null».
+- La huella de T1A coincide con la guardada en 10 de 11 meses. En enero, la base tiene más horas que la carpeta local (cargado en
+  «Completar» sobre otra carga); al recargar en «Completar» la huella sale igual.
+
+**208.5 Anti-patterns evitados.** Restar magnitudes de corriente (183 A falsos). Una guarda de signos que se dispara cuando T2A toma
+carga real: la del primer diseño avisaba desde el 70 %. Tomar como «aporta 0» al restado con la bahía puenteada: octubre pasaría de
+1,5 % a 4,0 %. Inventar filas del detalle. Comparar ruido con ruido en el cuadre. La búsqueda exhaustiva de signos NO entra al repo:
+vive en el guion de la bóveda.
+
+**208.6 Archivos.**
+- NUEVOS: `domain/scada_carga_diferencia.js` y `tests/scada_carga_diferencia.test.js`.
+- MODIFICADOS: `domain/scada_carga_{suma,vista}.js`; `ui/cargabilidad-scada/{lista,panel-devanados-mes,detalle}.js`;
+  `ui/scada-datos/{homologacion,importar-mes}.js`; `scripts/guardia-scada.mjs`; y 4 pruebas.
+- INTACTOS: el worker, `data/scada_carga_suma.js`, periodo, reserva, limpieza, kpis, `firestore.rules` y el empaquetador.
+
+**208.7 Doctrina.**
+- Excepción DECLARADA y acotada a «la cifra usa SOLO la corriente» (`53 §2`, `§158.12`) y al antipatrón «calcular corriente desde la
+  potencia» (`§189.5`). Solo vale en la diferencia de barra, con su guarda de escala; no reabre Cereté, que tiene una sola bahía.
+- Cierra el «alias pendiente» de `§189.8`: lo reemplaza la decisión con el punto de 110/66 kV.
+- Decisión de criterio SUYA (W-11 con la recomendada), vista previa fiel antes de publicar (L-56, L-157) y diseño con revisión
+  adversarial independiente (workflow con Opus).
+- NO revisado por un proveedor externo (`docs/15`). Crudo y síntesis en la bóveda: `sgm-transpower/research-archive/2026-11-04-elcarmen-diferencia-barra/`.
+
+**208.8 Verificado sano / no re-auditar.**
+- Ampacidad: 394 A, la corriente impresa en la placa del secundario de 66 kV (45 MVA ONAF). Los 525 A del pedido eran un error (60 MVA
+  es el primario).
+- El elemento «Barra» de 66 kV es solo un punto de tensión (sin P ni Q): no es una bahía.
+- Los máximos de 5–10 % (18-oct, 14-may) son artefactos de maniobra, no carga: una regla «hora de apertura → hueco» bajaría el máximo
+  de octubre de 33 a 9 A, pero podría esconder carga real (no entra).
+- Una salida PUENTEADA en una línea no se puede distinguir desde la estación: la cubre W-13, que revisa cualquier mes con T2A > 5 %.
+- Otras S/E candidatas (sin confirmar que compartan barra): Cereté, Membrillal y Cotorra. Se le preguntan antes de aplicarla.

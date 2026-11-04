@@ -61,3 +61,16 @@ devanado y pérdidas en vacío 10-19; TODO-80, bóveda `2026-10-12-refrigeracion
    de cálculo de la rama R3 (dos etapas, grupos con dígitos, «R corr.» sin temperatura, equipo duplicado, toma no nominal,
    errata de un equipo): solo los halló esta revisión.
 7. Resultado y Excel → Descargas + bóveda; nada al repo.
+
+## 4. Diferencia de barra: chequeo de bahías antes de cada mes (`99 §208`)
+
+Un nivel medido por diferencia de barra (El Carmen T2A, 66 kV) atribuye al transformador TODO lo que la barra no explica. Por eso,
+antes de empaquetar cada mes, Claude lista los elementos de esa barra en los crudos. Deben ser las 2 líneas, los 2 bancos de
+condensadores, los 2 transformadores y el punto de tensión «Barra» (solo tensión: no es una bahía). Los nombres reales están en la
+decisión guardada y en la bóveda (`2026-11-04-elcarmen-diferencia-barra`), nunca aquí.
+- Si aparece un elemento nuevo, o una salida renombrada, se PARA y se le pregunta antes de guardar. Una bahía no listada pasaría su
+  carga a T2A y parecería carga real. Esta barra ya cambió de nombres: una línea en 2025→2026 y el punto de 110/66 kV de T2A.
+- Un mes en que T2A pase del 5 % se revisa con los crudos antes de darlo por bueno: una salida puenteada no se distingue desde la
+  estación.
+- Después de cada carga, en el plan de la simulación, los sentidos deben dar «ok» y las horas fuera de escala deben ser pocas.
+
