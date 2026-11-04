@@ -22,6 +22,7 @@
 | §201 | ADR-201 — barras «frente a sus límites de placa»: rótulos sobre la leyenda al redimensionar (altura del recuadro) · TODO-69 | 10090 |
 | §202 | ADR-202 — **lóbulo 56 · Subestaciones AT/EAT**: ingesta del libro HMV (31 agentes, verificado por página); el libro no entra al repo | 10102 |
 | §203 | ADR-203 — **pendientes recuperados** 11-oct → 2-nov: TODO-69, 54, 80, 81, 83 y Fichas | 10162 |
+| §204 | ADR-204 — **octubre completo** (30–31); **Nueva Cospique T3 en servicio** desde el 30-oct · TODO-69 | 10363 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
