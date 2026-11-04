@@ -144,12 +144,14 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     // Horas limpiadas con banda muerta sin la marca en la decisión de hoy (se quitó y no se volvió a limpiar): sin tope.
     const bmSinMarca = !!(d && !sp && bm == null && r && r.bandaMuertaAceptadas > 0);
     const fila1 = {
-      nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + ' · suma de circuitos' : NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
+      nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + (sp.modo === 'diferencia' ? ' · diferencia de barra' : ' · suma de circuitos') : NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
       pct, escala, cobertura: r ? r.cob : null, n: r && r.i ? r.i.n : 0, sostenidaPct: sostPct, picoPct,
       sinDatos: !r || !r.i || r.i.n === 0,
       ...(fsc ? { faseSinCarga: fsc } : {}),
       ...(bm != null ? { bandaMuerta: bm, bandaMuertaPct: bmPct } : {}),
-      ...(sp ? { suma: { de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null } } : {})
+      ...(sp ? { suma: { de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null,
+        // Diferencia de barra (`99 §208`): de qué salidas y qué transformador restado sale el nivel.
+        ...(sp.modo === 'diferencia' ? { modo: 'diferencia', salidas: sp.salidas, restar: sp.restar } : {}) } } : {})
     };
     if (sp) {
       sumaNiveles.push({ nivel: nv, etiqueta: NIVELES[nv].etiqueta, devanado: d, de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null, derivado: (r && r.derivado) || null });

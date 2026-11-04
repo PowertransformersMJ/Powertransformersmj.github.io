@@ -33,6 +33,15 @@ describe('bloquea por forma', () => {
     assert.equal(motivoEnLinea('Secundario por suma de circuitos ' + c1), 'nombre de un circuito o línea del SCADA');
     assert.equal(motivoEnLinea('la línea ' + 'LN' + '570'), 'nombre de un circuito o línea del SCADA');
   });
+  test('una bahía de 66 kV (serie 6xx) o un banco de condensadores sueltos (diferencia de barra, 2026-11-04)', () => {
+    const b1 = 'XYZ' + '613'; const b2 = 'QRS' + '614'; const bc = 'BCO' + 'MP1';
+    assert.equal(motivoEnLinea('66 kV por diferencia de barra: ' + b1 + ' + ' + bc), 'nombre de un circuito o línea del SCADA');
+    assert.equal(motivoEnLinea('la línea era ' + b2 + ' en 2025'), 'nombre de un circuito o línea del SCADA');
+    assert.equal(motivoEnLinea('los bancos ' + bc + ' y ' + 'BCO' + 'MP2'), 'nombre de un circuito o línea del SCADA');
+    // La bahía de prueba «EDM6xx» y un número de más cifras no son bahías.
+    assert.equal(motivoEnLinea('diferencia de barra ' + 'EDM' + '601 + ' + 'EDM' + '602'), '');
+    assert.equal(motivoEnLinea('ABC' + '6012'), '');
+  });
   test('una línea larga sin barras no la cuelga (búsqueda con tope)', () => {
     const t0 = Date.now();
     assert.equal(motivoEnLinea('A'.repeat(200000)), '');

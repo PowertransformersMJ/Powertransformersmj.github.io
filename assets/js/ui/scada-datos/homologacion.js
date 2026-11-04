@@ -21,6 +21,8 @@ import { leerResumenMes } from '../../data/scada_carga.js';
 import { nombreMes } from '../../domain/scada_carga_fecha.js';
 // Suma de circuitos (2026-10-24): archivo NUEVO. Sin suma en la decisión, el diálogo evalúa y guarda lo de siempre.
 import { SUMA, erroresSuma, componerResumen, claveSuma, firmaSuma, textoCuadre, claveEnSumaAjena } from '../../domain/scada_carga_suma.js';
+// Diferencia de barra (2026-11-04, `99 §208`): archivo NUEVO (L-102).
+import { DIF, textoParte } from '../../domain/scada_carga_diferencia.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO. «Revisar» CONSERVA las medidas anteriores (el diálogo rehace la
 // decisión desde cero: sin esto las borraría) y «Reabrir» avisa antes de borrarlas. Sin medidas anteriores, todo igual.
 import { tieneCambiosDeMedida, tienePreviasGuardadas, llavesPrevias, erroresCambioMedida, textoMes, segmentos as segmentosDeFila, textoVentana } from '../../domain/scada_carga_cambio_medida.js';
@@ -164,6 +166,9 @@ export function montarHomologacion(cont, { alCambiar }) {
     // Corriente con banda muerta (2026-10-28, `99 §195`): igual que la fase sin carga, se muestra y se conserva con el mismo
     // punto y el nivel asignado.
     const bmGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.banda_muerta && typeof f.decision.banda_muerta === 'object') ? f.decision.banda_muerta : null;
+    // Diferencia de barra (2026-11-04, `99 §208`): el diálogo no la arma (sus bahías, signos y sentidos los escribe Claude con
+    // los datos); la muestra y la conserva al guardar con el mismo punto, el nivel asignado y «Medir con» en la diferencia.
+    const difGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.diferencia && typeof f.decision.diferencia === 'object') ? f.decision.diferencia : {};
     const rPropio = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[ev0.cid] || null : null;
     const derUltimo = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[claveSuma(ev0.cid)] || null : null;
     const sugeridos = [...new Set(Object.values(ctx.puntos).filter((p) => estN && normalizarTexto(p.est) === estN && !esElementoTransformador(p.elem)).map((p) => p.elem))]
@@ -171,6 +176,21 @@ export function montarHomologacion(cont, { alCambiar }) {
     const listaDe = (t) => String(t || '').split(/[,;]+/).map((x) => x.trim()).filter(Boolean);
     const medirSel = {}; const sumaUI = {};
     const VEREDICTO = { ok: 'cuadra', no_cuadra: 'no cuadra: la cifra saldrá provisional', sin_contraste: 'sin contraste: la cifra saldrá provisional' };
+    // Párrafo de una diferencia guardada, con lo que dio el último mes cargado (si ya se calculó con esta versión).
+    const textoDiferenciaGuardada = (nv, x) => {
+      const et = NIVELES[nv] ? NIVELES[nv].etiqueta : nv;
+      const lst = (a) => (Array.isArray(a) ? a.join(' + ') : '');
+      const inv = Array.isArray(x.invertir_q) && x.invertir_q.length ? ' (la Q de ' + x.invertir_q.join(' y ') + ' llega con el signo invertido)' : '';
+      let t = et + ' medido por diferencia de barra: salidas ' + lst(x.salidas) + ' menos el transformador ' + lst(x.restar) + ', con P y Q' + inv
+        + (x.verificado ? '; sentidos verificados en ' + nombreMes(String(x.verificado)) : '') + '. Corriente = √(P² + Q²) ÷ (√3·U), con la tensión de la barra.';
+      const r = derUltimo && derUltimo[nv]; const d = r && r.derivado;
+      if (d && d.tipo === DIF.tipo && d.v === DIF.version) {
+        t += ' Último mes cargado (' + nombreMes(mesResumen) + '): ' + (d.estado === 'ok'
+          ? (r.i && r.i.p99 != null ? num(r.i.p99, 0) + ' A (p99)' : 'sin horas válidas') + (textoParte(d) ? ' · ' + textoParte(d) : '') + ' · ' + (VEREDICTO[d.veredicto] || d.veredicto || '')
+          : 'sin cifra (' + d.estado + ')') + '.';
+      }
+      return t + ' Se conserva al guardar con el mismo punto, ese nivel asignado y «Medir con» en la diferencia; «Excluir» o «Reabrir» la quitan.';
+    };
     const textoCuadreUltimo = (nv, lista) => {
       const r = derUltimo && derUltimo[nv]; const d = r && r.derivado;
       const cids = k ? lista.map((e) => claveId(k.est, e)) : [];
@@ -216,7 +236,8 @@ export function montarHomologacion(cont, { alCambiar }) {
       const r = rPropio ? rPropio[nv] : null;
       const medir = el('select', { id: 'dlgMedir-' + nv, 'aria-label': 'Con qué se mide el nivel ' + NIVELES[nv].etiqueta },
         el('option', { value: 'medida' }, 'Medir con la medida del transformador'),
-        el('option', { value: 'suma', selected: !!sumaGuardada[nv] }, 'Medir con la suma de circuitos'));
+        el('option', { value: 'suma', selected: !!sumaGuardada[nv] }, 'Medir con la suma de circuitos'),
+        difGuardada[nv] ? el('option', { value: 'diferencia', selected: !sumaGuardada[nv] }, 'Por diferencia de barra (guardada)') : null);
       medirSel[nv] = medir;
       const bloque = bloqueSuma(nv);
       const celdaP99 = el('td', {});
@@ -226,7 +247,7 @@ export function montarHomologacion(cont, { alCambiar }) {
         medir.disabled = !s.value;
         bloque.hidden = medir.disabled || medir.value !== 'suma';
         celdaP99.textContent = r && r.i && r.i.p99 != null
-          ? num(r.i.p99, 0) + ' A (p99 del último mes' + (!medir.disabled && medir.value === 'suma' ? ', de la medida propia del transformador: no se usa' : '') + ')'
+          ? num(r.i.p99, 0) + ' A (p99 del último mes' + (!medir.disabled && medir.value !== 'medida' ? ', de la medida propia del transformador: no se usa' : '') + ')'
           : 'sin datos del último mes';
       };
       medir.addEventListener('change', sincronizar);
@@ -276,12 +297,19 @@ export function montarHomologacion(cont, { alCambiar }) {
           suma[nv] = { de: listaDe(sumaUI[nv].de.value), fases: [...SUMA.fases], barra_propia: !!sumaUI[nv].barra.checked };
         }
       }
+      // Diferencia de barra guardada: se copia tal cual en los niveles que siguen asignados y en «Medir con» la diferencia.
+      const diferencia = {};
+      if (tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) {
+        for (const [nv, x] of Object.entries(difGuardada)) {
+          if (decision.mapa && decision.mapa[nv] && medirSel[nv] && !medirSel[nv].disabled && medirSel[nv].value === 'diferencia') diferencia[nv] = x;
+        }
+      }
       // Sin los niveles a la vista (no se leyeron los datos cargados), guardar borraría la suma de circuitos que ya tiene.
       // Tampoco con un mapa decidido (un nivel en «No usar»): guardar sin niveles lo cambiaría por el automático.
       const mapaGuardado = !!(f.decision && f.decision.tipo === 'usar' && f.decision.mapa && Object.keys(f.decision.mapa).length);
-      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || fscGuardada || bmGuardada || mapaGuardado)) {
+      if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || Object.keys(difGuardada).length || fscGuardada || bmGuardada || mapaGuardado)) {
         msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su '
-          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (fscGuardada ? 'fase sin carga' : (bmGuardada ? 'banda muerta' : 'asignación de niveles'))) + '.';
+          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (Object.keys(difGuardada).length ? 'diferencia de barra' : (fscGuardada ? 'fase sin carga' : (bmGuardada ? 'banda muerta' : 'asignación de niveles')))) + '.';
         return;
       }
       // La medida elegida no puede ser un circuito que otra fila ya suma: la misma corriente contaría en dos equipos.
@@ -301,6 +329,9 @@ export function montarHomologacion(cont, { alCambiar }) {
           return;
         }
         decision.suma = suma;
+      }
+      if (Object.keys(diferencia).length) decision.diferencia = diferencia;
+      if (decision.suma || decision.diferencia) {
         const errores = erroresSuma(f, decision, { filas: ctx.filas, puntos: ctx.puntos, filaId: f.id });
         if (errores.length) { msg.textContent = errores.join(' '); return; }
       }
@@ -337,6 +368,7 @@ export function montarHomologacion(cont, { alCambiar }) {
       bmGuardada ? el('p', { class: 'cs-ayuda' }, 'Corriente con banda muerta: '
         + Object.entries(bmGuardada).map(([nv, a]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', escalón de ' + String(a).replace('.', ',') + ' A').join(' · ')
         + '. El valor que se repite se toma como bueno solo con bandera buena y si la tensión del punto se movió en ese tramo; la cifra es firme solo si el escalón no pasa de 5 puntos. Se conserva al guardar con el mismo punto y ese nivel asignado; «Excluir» o «Reabrir» la quitan.') : null,
+      ...Object.entries(difGuardada).map(([nv, x]) => el('p', { class: 'cs-ayuda' }, textoDiferenciaGuardada(nv, x))),
       reservaGuardada ? el('p', { class: 'cs-ayuda' }, 'Unidad de reserva: un mes sin carga apreciable queda «en reserva» y no cuenta para la firmeza. Se conserva al guardar con el mismo punto; «Excluir» o «Reabrir» la quitan.') : null,
       fscGuardada ? el('p', { class: 'cs-ayuda' }, 'Fase sin carga (p. ej., banco de dos monofásicas o red de dos fases): '
         + Object.entries(fscGuardada).map(([nv, ph]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', fase ' + String(ph).slice(1)).join(' · ')

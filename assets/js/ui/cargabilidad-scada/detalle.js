@@ -50,6 +50,8 @@ import { esUnidadReserva } from '../../domain/scada_carga_reserva.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO; el detalle muestra UNA configuración (la del mes pedido).
 import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVentana, motivoSinCarga, filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre } from '../../domain/scada_carga_suma.js';
+// Diferencia de barra (2026-11-04, `99 §208`): archivo NUEVO (L-102).
+import { textoParte } from '../../domain/scada_carga_diferencia.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 
 const H_MS = 3600e3;
@@ -67,6 +69,10 @@ function textoSumaDetalle(a) {
   const spec = especSuma(a.fila);
   if (!spec || spec.cid !== a.cid) return null;
   return Object.entries(spec.porNivel).map(([nv, sp]) => {
+    if (sp.modo === 'diferencia') {
+      return NIVELES[nv].etiqueta + ' = diferencia de barra ' + sp.salidas.join(' + ') + ' − ' + sp.restar.join(' − ')
+        + ' (dato derivado con P y Q, solo el devanado de ' + NIVELES[nv].etiqueta + '; la medida propia del transformador se conserva y no se usa)';
+    }
     const der = a.sumaRango && a.sumaRango[nv];
     const rz = (der && der.razones) || {};
     const distintas = ['IR', 'IS', 'IT'].filter((F) => rz[F] && (Math.abs(rz[F].min - 1) > SUMA.tolCuadre || Math.abs(rz[F].max - 1) > SUMA.tolCuadre))
@@ -448,7 +454,10 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     // sostenido» y del panel DGA (`99 §130`); antes salía del resumen en bruto y una hora imposible daba miles de amperios.
     // Sin ampacidad no hay con qué descartar: queda el del resumen.
     const sost = d.carga ? maxSostenido(d.iF.map((v, h) => (Number.isFinite(d.carga.serie[h]) ? v : NaN)), CALCULO.sobrecargaMinH) : f.sostenida;
-    const escala = { ok: 'sin observaciones', ESCALA_PQ: 'P y Q no cuadran con √3·U·I: revise la escala de las potencias', ESCALA_I: 'la corriente parece estar en otra escala', ESCALA_INDETERMINADA: 'corriente y potencias en escalas dudosas', sin_dato: 'sin datos para comparar', sin_devanado: 'nivel sin devanado asignado' }[info.escala] || info.escala;
+    // Diferencia de barra: la corriente sale de P, Q y U, así que la escala, el desbalance y el flujo inverso no dicen nada.
+    const dif = !!(info.suma && info.suma.modo === 'diferencia');
+    const NO_APLICA = 'no aplica (dato derivado)';
+    const escala = dif ? NO_APLICA : { ok: 'sin observaciones', ESCALA_PQ: 'P y Q no cuadran con √3·U·I: revise la escala de las potencias', ESCALA_I: 'la corriente parece estar en otra escala', ESCALA_INDETERMINADA: 'corriente y potencias en escalas dudosas', sin_dato: 'sin datos para comparar', sin_devanado: 'nivel sin devanado asignado' }[info.escala] || info.escala;
     return el('table', { class: 'cs-sec' },
       el('caption', { class: 'cs-ayuda', style: 'text-align:left' }, 'Nivel ' + NIVELES[nv].etiqueta + (info.devanado ? ' → ' + DEVANADO[info.devanado]
         : nivelesExcluidos({ tx: a.tx, fila: a.fila, punto: a.punto }).porNivel[nv] ? ' (medida excluida en la homologación: no entra en ninguna cifra)' : ' (sin devanado asignado)')),
@@ -459,20 +468,32 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           + (d.carga && d.carga.excluidas ? ' · sin ' + d.carga.excluidas + ' h de escala imposible' : '') : '—'),
         fila('Tensión de línea promedio', f.u.prom != null ? num(f.u.prom, 2) + ' kV (' + num(100 * f.u.prom / kv, 1) + ' % de ' + num(kv, 1) + ' kV)' : '—'),
         fila('Desequilibrio de tensión', d.deseq.n ? 'p95 ' + num(d.deseq.p95, 2) + ' % · máx ' + num(d.deseq.max, 2) + ' %' : '—'),
-        fila('Desbalance de corriente', d.desb.n ? 'p95 ' + num(d.desb.p95, 1) + ' % · máx ' + num(d.desb.max, 1) + ' % (con carga ≥ 5 % de la ampacidad)' : '—'),
+        fila('Desbalance de corriente', dif ? NO_APLICA : d.desb.n ? 'p95 ' + num(d.desb.p95, 1) + ' % · máx ' + num(d.desb.max, 1) + ' % (con carga ≥ 5 % de la ampacidad)' : '—'),
         fila('Potencia aparente S', f.s.n ? 'p99 ' + num(f.s.p99, 2) + ' MVA · máx ' + num(f.s.max, 2) + ' MVA' : '—'),
         fila('Factor de potencia', d.fp.prom != null ? 'promedio ' + num(d.fp.prom, 3) + (d.fp.min != null ? ' · mínimo ' + num(d.fp.min, 3) + ' (' + intervaloCO(d.t[d.fp.iMin]) + ')' : '') : '—'),
-        fila('Flujo de potencia inverso', f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
+        fila('Flujo de potencia inverso', dif ? NO_APLICA : f.flujoInverso ? f.flujoInverso + ' h con P de signo contrario al habitual' : 'no'),
         fila('Escala de la medida', escala),
         fila('Horas', f.horas + ' en el rango · ' + f.i.n + ' válidas · ' + f.desenergizadas + ' fuera de servicio' + (f.i.unaFalta ? ' · ' + f.i.unaFalta + ' con solo 2 fases' : '')
           + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')
           + (info.bandaMuerta != null ? ' · corriente con banda muerta: el valor repetido cuenta como válido si la tensión se movió (escalón de ' + num(info.bandaMuerta, 3) + ' A'
             + (info.bandaMuertaPct != null ? ' = ' + num(info.bandaMuertaPct, 1) + ' puntos' : '') + ', según la decisión de la homologación)' : '')),
-        info.suma ? fila('Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
+        info.suma ? fila(dif ? 'Diferencia de barra' : 'Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
   }
   /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */
   function textoSumaNivel(a, nv, info) {
     const der = a.sumaRango && a.sumaRango[nv];
+    if (info.suma.modo === 'diferencia') {
+      const base = 'salidas ' + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ')
+        + ' (P y Q hora por hora; corriente equivalente con la tensión de la barra; solo el devanado de ' + NIVELES[nv].etiqueta + ')';
+      if (!der || der.estado !== 'ok') return base + ' · ' + (a.calc && a.calc.motivoNulo ? a.calc.motivoNulo : 'falta calcular la diferencia de este rango');
+      const h = der.horas || {};
+      const v = { ok: 'cuadra', no_cuadra: 'no cuadra: cifra provisional', sin_contraste: 'sin contraste: cifra provisional' }[der.veredicto] || '';
+      const pt = textoParte(der);
+      return base + (pt ? ' · ' + pt : '') + ' · medida propia ÷ diferencia: ' + (textoCuadre(der) || '—') + (v ? ' (' + v + ')' : '')
+        + (h.abiertas || h.restadoPuenteado || h.escala ? ' · en los meses del rango: ' + [h.abiertas ? h.abiertas + ' h con una salida abierta (aporta 0)' : null,
+          h.restadoPuenteado ? h.restadoPuenteado + ' h sin dato porque la bahía del transformador restado marcó 0 mientras otro devanado llevaba carga' : null,
+          h.escala ? h.escala + ' h fuera por escala de la potencia' : null].filter(Boolean).join(' · ') : '');
+    }
     const base = info.suma.de.join(' + ') + ' (corrientes sumadas hora por hora; tensión, P y Q del transformador)';
     if (!der || der.estado !== 'ok') return base + ' · ' + (a.calc && a.calc.motivoNulo ? a.calc.motivoNulo : 'falta calcular la suma de este rango');
     const h = der.horas || {};
@@ -506,7 +527,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const d = a.porNivel[nv];
     // Nivel sumado: columna NUEVA al FINAL ('Origen') y el nombre del archivo lo dice; los demás niveles salen como siempre.
     const info = (a.calc && a.calc.niveles.find((x) => x.nivel === nv)) || {};
-    const origen = info.suma ? 'IR, IS, IT = suma de circuitos ' + info.suma.de.join(' + ') + ' (derivada); U, P y Q = del transformador' : null;
+    const origen = !info.suma ? null : info.suma.modo === 'diferencia'
+      ? 'IR, IS, IT = corriente equivalente de la diferencia de barra (salidas ' + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ') + ', con P y Q); P, Q = diferencia; U = medida del transformador restado'
+      : 'IR, IS, IT = suma de circuitos ' + info.suma.de.join(' + ') + ' (derivada); U, P y Q = del transformador';
     const motivo = (k) => MOTIVO[k] || MOTIVO_LECTURA[k] || ('código ' + k);
     const filas = [];
     for (let k = 0; k < d.t.length; k++) {
@@ -571,7 +594,7 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         const fuera = !i.devanado && excl.porNivel[k];
         return el('button', { type: 'button', id: 'csNivelBtn-' + k, 'aria-pressed': String(k === nv), title: fuera && excl.nota ? excl.nota : null,
           onclick: () => { if (k !== nv) pintarNivel(a, k); } },
-          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] + (i.suma ? ' · suma de circuitos' : '') : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
+          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] + (i.suma ? (i.suma.modo === 'diferencia' ? ' · diferencia de barra' : ' · suma de circuitos') : '') : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
       }));
     liberarFigura(figura);
     // Contenedor de las gráficas (una por magnitud, cada una con su título y su descripción accesible).
@@ -589,9 +612,11 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         panelFiltro,
         el('figure', { style: 'margin:0' }, fig,
           el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.'
-            + (info.suma ? ' En este nivel las corrientes son la suma hora por hora de los circuitos ' + info.suma.de.join(' + ') + ' (una hora vale solo si valen todos); la tensión, P y Q son las del transformador; el máximo, el mínimo y el instantáneo no se calculan para una suma.' : ''))),
+            + (info.suma && info.suma.modo === 'diferencia' ? ' En este nivel las tres fases muestran la misma corriente equivalente (no se mide por fase): sale de la diferencia de P y Q de la barra (salidas '
+              + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ') + '); P y Q son esa diferencia y la tensión es la medida del transformador restado.' : '')
+            + (info.suma && info.suma.modo !== 'diferencia' ? ' En este nivel las corrientes son la suma hora por hora de los circuitos ' + info.suma.de.join(' + ') + ' (una hora vale solo si valen todos); la tensión, P y Q son las del transformador; el máximo, el mínimo y el instantáneo no se calculan para una suma.' : ''))),
         soloVer() ? null : el('div', { class: 'cs-acciones cs-solo-equipo' }, el('button', { type: 'button', id: 'csCsvNivel', class: 'btn btn--glass btn--sm', onclick: () => exportarCSV(a, nv) }, 'Descargar CSV del nivel'))),
-      el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d, !!info.suma)))));
+      el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d, !!info.suma && info.suma.modo !== 'diferencia')))));
     const mio = token;
     const vigente = () => mio === token && figura === fig;
     const dibujar = () => dibujarFigura(fig, {
