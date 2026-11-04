@@ -10359,3 +10359,35 @@ sostuvo no se escribió) · repo público: sin nombres de personas externas, cor
 - Ya estaban documentados y no se repiten: «[object Object]» de la refrigeración en Fichas (`10` lista (I), `§103.8`, `§185.8`(d));
   «ningún informe de prueba en producción» (`§163.2`, `§183`); la placa de San Luis como «ofrecido» (`§185.8`(b)), aquí solo se
   sube a pendiente con la ruta de la foto.
+
+## 204. ADR-204 — Cargabilidad SCADA: octubre completo (30–31 cargados); Nueva Cospique T3 entra en servicio el 30-oct (TODO-69) ⟦OPUS-5.5⟧ (2026-11-03)
+
+> «sigamos en SCADA» · «Sí, cárgalos primero (Recomendado)» · «Sí, guarda (Recomendado)» · nota de T3 «Actualizar la nota
+> (Recomendado)» (2026-11-03).
+
+**204.1 Causa raíz.** Él agregó los días 30 y 31 de octubre a «Variables Electricas/Octubre» (21:58). Octubre quedaba en 29/31.
+
+**204.2 Solución (datos, sin código).**
+- **Paquete** `octubre-2026-11-03`: 1396 archivos, 147 estaciones, 7 partes, sha 370003b6…. Alias de Boston: 930 filas. Relevo de
+  Sampués: 11 315 filas.
+- **Simulación en «Completar»**: 168 series en 32 lotes, 0 iguales. Berrugas por suma de circuitos «cuadra»: R 1,00 · S 2,03 ·
+  T 0,99; 29,2 %, CRG 1. Cambian de cifra 145 puntos, por los días nuevos. De las claves de la homologación vinieron 146 de 203;
+  las 57 que faltan son las de siempre, sobre todo de Oriente.
+- **Guardado** con su «procede»: 168 series + 1 resumen.
+- **Nueva Cospique T3** (unidad de reserva desde `§191`/`§200`): entró en servicio el **30-oct a la 1:00** y comparte la carga con
+  T4. En 13,8 kV pasó de 0 A a 116–373 A el 30 y a 350–447 A el 31; T4 bajó de ~830 A a 430–685 A. Su nota en la homologación
+  se amplió con eso (decisión, punto y niveles sin cambio, rev +1). La marca de reserva va mes a mes: un mes con carga cuenta normal.
+
+**204.4 Verificación (en vivo, su Chrome; foto «antes» fuera de la pestaña, L-120).**
+
+| | Firmes | Provisionales | CRG 4–5 | Sobrecarga |
+|---|---|---|---|---|
+| **Octubre**, antes → después | 129 → 129 | 7 → 8 | 56 → 55 | 16 → 16 |
+| **Ene–oct**, antes → después | 193 → **192** | 7 → **8** | 96 → 96 | 46 → 46 |
+
+- El único cambio del periodo es Nueva Cospique T3: 56,1 %, CRG 1, provisional porque «la cifra depende de meses que casi no
+  midieron». Es lo correcto hasta que mida un mes completo.
+- En octubre, Maracayo T1 pasó de sin cifra a provisional, con menos de 72 h.
+- La nota se volvió a leer tras recargar. En medio hubo un corte de red: «No se pudo leer su perfil», resuelto con «Reintentar».
+
+**204.8 Verificado sano.** Octubre trae 31 de 31 días.
