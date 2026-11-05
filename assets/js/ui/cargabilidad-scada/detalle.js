@@ -79,7 +79,9 @@ function textoSumaDetalle(a) {
       // Se comparan los textos ya redondeados: dos razones que se leen iguales van una sola vez (nunca «2,02–2,02»).
       .map((F) => 'fase ' + FASE_CORTA[F] + ' lee ' + (num(rz[F].min, 2) === num(rz[F].max, 2) ? num(rz[F].min, 2) : num(rz[F].min, 2) + '–' + num(rz[F].max, 2)) + ' ×');
     return NIVELES[nv].etiqueta + ' = suma de circuitos ' + sp.elems.join(' + ') + ' (dato derivado; la medida propia del transformador se conserva y no se usa'
-      + (distintas.length ? ': su ' + distintas.join(', su ') : '') + ')';
+      + (distintas.length ? ': su ' + distintas.join(', su ') : '')
+      // Barra partida con guarda de potencia (2026-11-04): solo con la marca en la decisión.
+      + (sp.guardaPotencia === true ? '; ' + (sp.barraPartida === true ? 'barra partida' : 'guarda de potencia') + ': sin las horas en que el transformador no lleva solo esos circuitos' : '') + ')';
   }).join(' · ');
 }
 
@@ -499,13 +501,20 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           h.restadoPuenteado ? h.restadoPuenteado + ' h sin dato porque la bahía del transformador restado marcó 0 mientras otro devanado llevaba carga' : null,
           h.escala ? h.escala + ' h fuera por escala de la potencia' : null].filter(Boolean).join(' · ') : '');
     }
-    const base = info.suma.de.join(' + ') + ' (corrientes sumadas hora por hora; tensión, P y Q del transformador)';
+    // Barra partida con guarda de potencia (2026-11-04): las marcas salen de la decisión (sin ellas, el texto de siempre).
+    const spm = (especSuma(a.fila) || { porNivel: {} }).porNivel[nv] || {};
+    const base = info.suma.de.join(' + ') + ' (corrientes sumadas hora por hora; tensión, P y Q del transformador)'
+      + (spm.guardaPotencia === true ? ' · ' + (spm.barraPartida === true ? 'barra partida' : 'guarda de potencia')
+        + ': solo cuentan las horas en que la potencia del transformador cuadra a ±5 % con la de estos circuitos'
+        + (spm.sentidoP === -1 ? ' (la del transformador llega con el signo contrario y se compara cambiada de signo)' : '') : '');
     if (!der || der.estado !== 'ok') return base + ' · ' + (a.calc && a.calc.motivoNulo ? a.calc.motivoNulo : 'falta calcular la suma de este rango');
     const h = der.horas || {};
     const v = { ok: 'cuadra', no_cuadra: 'no cuadra: cifra provisional', sin_contraste: 'sin contraste: cifra provisional' }[der.veredicto] || '';
     return base + ' · transformador ÷ suma: ' + (textoCuadre(der) || '—') + (v ? ' (' + v + ')' : '')
-      + (h.bandaMuerta || h.abiertas ? ' · en los meses del rango: ' + [h.bandaMuerta ? h.bandaMuerta + ' h por banda muerta validada con el transformador' : null,
-        h.abiertas ? h.abiertas + ' h con un circuito abierto (aporta 0)' : null].filter(Boolean).join(' y ') : '');
+      + (h.bandaMuerta || h.abiertas || h.guarda || h.guardaSinP ? ' · en los meses del rango: ' + [h.bandaMuerta ? h.bandaMuerta + ' h por banda muerta validada con el transformador' : null,
+        h.abiertas ? h.abiertas + ' h con un circuito abierto (aporta 0)' : null,
+        h.guarda ? h.guarda + ' h fuera porque el transformador no llevaba solo esos circuitos (paralelo u otra fuente)' : null,
+        h.guardaSinP ? h.guardaSinP + ' h fuera porque faltó la potencia del transformador o de un circuito para comprobarlo' : null].filter(Boolean).join(' y ') : '');
   }
 
   function tablaCalidad(d, esSuma = false) {
@@ -711,6 +720,14 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           if (!resumenPorNivel[nv]) continue;
           const conDatos = existentes.filter((m) => porMes[m] && porMes[m].estado === 'ok').map((m) => ({ mes: m, derivado: (porMes[m].derivado && porMes[m].derivado[nv]) || null }));
           a.sumaRango[nv] = derivadoDeMeses(conDatos, sp);
+          // Barra partida con guarda (2026-11-04): las horas que la guarda quitó DENTRO del rango (código 8 en las corrientes
+          // sumadas), para que el motivo «sin horas» hable del rango y no de los meses enteros. Solo con la guarda.
+          if (sp.guardaPotencia === true && a.sumaRango[nv] && a.sumaRango[nv].horas && porNivel[nv].fam && porNivel[nv].fam.IR) {
+            const cod8 = Number.isInteger(CODIGO.PARALELO) ? CODIGO.PARALELO : 8;
+            let enRango = 0;
+            for (const c of porNivel[nv].fam.IR.m) if (c === cod8) enRango++;
+            a.sumaRango[nv] = { ...a.sumaRango[nv], horas: { ...a.sumaRango[nv].horas, guardaRango: enRango } };
+          }
           resumenPorNivel[nv] = { ...resumenPorNivel[nv], derivado: a.sumaRango[nv] };
         }
       }

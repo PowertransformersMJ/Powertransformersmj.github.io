@@ -193,12 +193,52 @@ export function montarHomologacion(cont, { alCambiar }) {
       } else t += ' Lo que da la diferencia se calculará al volver a cargar los meses.';
       return t + ' Se conserva al guardar con el mismo punto, ese nivel asignado y «Medir con» en la diferencia; «Excluir» o «Reabrir» la quitan.';
     };
+    // Barra partida y guarda de potencia (2026-11-04): el diálogo no las fija (las escribe Claude con los datos); las
+    // muestra y las CONSERVA al guardar si la lista de circuitos del nivel no cambió (sin esto, «Guardar» las borraba).
+    const marcasQueSiguen = (nv, lista) => {
+      const g = sumaGuardada[nv] || {};
+      if (g.barra_partida !== true && g.guarda_potencia !== true) return {};
+      const comparable = (a) => [...new Set(a.map((x) => normalizarTexto(String(x == null ? '' : x).trim())).filter(Boolean))].sort().join('|');
+      if (comparable(Array.isArray(g.de) ? g.de : []) !== comparable(lista)) return {};
+      return { ...(g.barra_partida === true ? { barra_partida: true } : {}), ...(g.guarda_potencia === true ? { guarda_potencia: true } : {}),
+        // El sentido de la potencia del transformador va con la guarda (sin ella no se usa).
+        ...(g.guarda_potencia === true && g.sentido_p !== undefined ? { sentido_p: g.sentido_p } : {}) };
+    };
+    // ¿El dominio cargado conoce la barra partida, la guarda y el sentido de la potencia? Uno viejo (en caché) ignora las marcas
+    // en la firma: con ellas, la firma debe terminar en '|gp-'.
+    const dominioConoceMarcas = () => {
+      try { return firmaSuma('N13_8', ['x'], ['IR'], { guardaPotencia: true, sentidoP: -1 }).endsWith('|gp-'); } catch (e) { return false; }
+    };
+    // Otros transformadores de la estación que miden ese nivel en los datos cargados (la regla D5 de `erroresSuma`).
+    const otrosQueMiden = (nv) => [...new Set(Object.entries(ctx.puntos).filter(([cid, p]) => cid !== ev0.cid && p && estN && normalizarTexto(p.est) === estN
+      && esElementoTransformador(p.elem) && p.niveles && p.niveles[nv]).map(([, p]) => p.elem))].sort();
+    const textoMarcasGuardadas = (nv, lista) => {
+      const g = sumaGuardada[nv] || {};
+      if (g.barra_partida !== true && g.guarda_potencia !== true) return '';
+      const que = [g.barra_partida === true ? 'Barra partida: este transformador alimenta solo estos circuitos en su sección de la barra; por eso la suma se usa aunque otro transformador de la estación mida este nivel.' : null,
+        g.guarda_potencia === true ? 'Guarda de potencia: cada hora se compara la potencia del transformador con la de estos circuitos; si no cuadra a ±5 % (paralelo con el otro transformador u otra fuente) o falta una de esas potencias, esa hora no se usa.'
+          + (g.sentido_p === -1 ? ' La potencia del transformador llega con el signo contrario al de sus circuitos: se compara cambiada de signo.' : '') : null].filter(Boolean).join(' ');
+      if (Object.keys(marcasQueSiguen(nv, lista)).length) {
+        return que + ' Se conserva al guardar con «Confirmar», esta misma lista de circuitos y «Medir con» la suma; «Excluir», «Reabrir» o medir con '
+          + 'la medida del transformador la quitan, y para volver a usarla hay que revisarla de nuevo con los datos.';
+      }
+      // Con otra lista la barra partida se quita, y sin ella rige D5: si otro transformador mide el nivel, no se puede guardar.
+      const otros = g.barra_partida === true ? otrosQueMiden(nv) : [];
+      if (otros.length) {
+        return que + ' La lista de circuitos cambió: así no se puede guardar, porque otro transformador de la estación (' + otros.join(', ')
+          + ') mide este nivel y la barra partida solo vale con la lista revisada. Vuelva a la lista guardada: ' + (Array.isArray(g.de) ? g.de.join(', ') : '') + '.';
+      }
+      return que + ' La lista de circuitos cambió: al guardar se quita (hay que volver a revisarla con los datos).';
+    };
     const textoCuadreUltimo = (nv, lista) => {
       const r = derUltimo && derUltimo[nv]; const d = r && r.derivado;
       const cids = k ? lista.map((e) => claveId(k.est, e)) : [];
-      if (d && d.estado === 'ok' && cids.length && d.firma === firmaSuma(nv, cids, SUMA.fases)) {
+      const m = marcasQueSiguen(nv, lista);
+      if (d && d.estado === 'ok' && cids.length && d.firma === firmaSuma(nv, cids, SUMA.fases, { barraPartida: m.barra_partida === true, guardaPotencia: m.guarda_potencia === true, sentidoP: m.sentido_p })) {
         return 'Último mes cargado (' + nombreMes(mesResumen) + '): suma ' + (r.i && r.i.p99 != null ? num(r.i.p99, 0) + ' A (p99)' : 'sin horas válidas')
-          + ' · transformador ÷ suma: ' + (textoCuadre(d) || '—') + ' (' + (VEREDICTO[d.veredicto] || d.veredicto) + ').';
+          + ' · transformador ÷ suma: ' + (textoCuadre(d) || '—') + ' (' + (VEREDICTO[d.veredicto] || d.veredicto) + ')'
+          + (d.horas && d.horas.guarda ? ' · ' + d.horas.guarda + ' h fuera porque el transformador no llevaba solo esos circuitos (paralelo u otra fuente)' : '')
+          + (d.horas && d.horas.guardaSinP ? ' · ' + d.horas.guardaSinP + ' h fuera porque faltó la potencia del transformador o de un circuito para comprobarlo' : '') + '.';
       }
       return 'El cuadre con el transformador se calculará al volver a cargar los meses.';
     };
@@ -209,7 +249,12 @@ export function montarHomologacion(cont, { alCambiar }) {
       de.value = (Array.isArray(g.de) ? g.de : []).join(', ');
       const barra = el('input', { type: 'checkbox', id: idBarra, checked: g.barra_propia === true });
       const cuadre = el('p', { class: 'cs-ayuda', role: 'status', 'aria-live': 'polite' });
-      const pintarCuadre = () => { cuadre.textContent = textoCuadreUltimo(nv, listaDe(de.value)); };
+      const marcas = el('p', { class: 'cs-ayuda' });
+      const pintarCuadre = () => {
+        cuadre.textContent = textoCuadreUltimo(nv, listaDe(de.value));
+        marcas.textContent = textoMarcasGuardadas(nv, listaDe(de.value));
+        marcas.hidden = !marcas.textContent;
+      };
       de.addEventListener('input', pintarCuadre);
       pintarCuadre();
       const agregar = (e) => {
@@ -225,7 +270,7 @@ export function montarHomologacion(cont, { alCambiar }) {
           ? el('p', { class: 'cs-ayuda' }, 'Circuitos de esta estación en los datos cargados: ', ...sugeridos.map((e) => el('button', { type: 'button', class: 'btn btn--ghost btn--sm', onclick: () => agregar(e) }, '+ ' + e)))
           : el('p', { class: 'cs-ayuda' }, 'Los circuitos de esta estación todavía no están en los datos cargados: escriba sus nombres; entran al volver a cargar los meses.'),
         el('label', { class: 'cs-check', for: idBarra }, barra, ' La barra de este nivel la alimenta solo este transformador (obligatorio para usar la suma)'),
-        cuadre));
+        marcas, cuadre));
     }
     const bloquesSuma = [];
     const filasMapa = niveles.map((nv) => {
@@ -297,6 +342,8 @@ export function montarHomologacion(cont, { alCambiar }) {
         for (const nv of niveles) {
           if (!medirSel[nv] || medirSel[nv].disabled || medirSel[nv].value !== 'suma') continue;
           suma[nv] = { de: listaDe(sumaUI[nv].de.value), fases: [...SUMA.fases], barra_propia: !!sumaUI[nv].barra.checked };
+          // Barra partida y guarda de potencia guardadas: se copian si la lista de circuitos del nivel no cambió.
+          Object.assign(suma[nv], marcasQueSiguen(nv, suma[nv].de));
         }
       }
       // Diferencia de barra guardada: se copia tal cual en los niveles que siguen asignados y en «Medir con» la diferencia.
@@ -333,6 +380,10 @@ export function montarHomologacion(cont, { alCambiar }) {
         decision.suma = suma;
       }
       if (Object.keys(diferencia).length) decision.diferencia = diferencia;
+      // Caché del navegador (L-102): con la barra partida o la guarda guardadas, el dominio cargado debe conocerlas; uno viejo
+      // aplicaría D5 y diría que la suma no se puede usar. Se pide recargar en vez de mostrar ese error.
+      const conMarcas = Object.values(sumaGuardada).some((x) => x && (x.barra_partida === true || x.guarda_potencia === true));
+      if (conMarcas && !dominioConoceMarcas()) { msg.textContent = 'Esta pestaña tiene una versión anterior: recargue la página (Cmd+Shift+R) antes de guardar.'; return; }
       if (decision.suma || decision.diferencia) {
         const errores = erroresSuma(f, decision, { filas: ctx.filas, puntos: ctx.puntos, filaId: f.id });
         if (errores.length) { msg.textContent = errores.join(' '); return; }
