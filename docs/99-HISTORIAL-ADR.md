@@ -10606,3 +10606,54 @@ vive en el guion de la bóveda.
   por red). Encontró 5 defectos REALES y latentes, ninguno con la decisión real: el restado sin sus otros devanados «aportaba 0», un
   nombre escrito «/estación/elemento», la firma en «Revisar», el motivo del nivel en el detalle y el nombre del CSV. Corregidos en
   `858fd88`, y con el código corregido los 11 meses dan lo mismo. Crudo en la bóveda (misma carpeta de `§208.7`).
+
+## 209. ADR-209 — Cargabilidad SCADA: Cereté T1 por suma de circuitos con BARRA PARTIDA y guarda de potencia; Membrillal T1 con nota; Cotorra sin cambio (TODO-69) ⟦OPUS-5.5⟧ (2026-11-06)
+
+> «revisa Cereté, Membrillal y Cotorra» → «Suma de sus 3 circuitos (Recomendado)» · «Nota y consultar Operación (Recomendado)» ·
+> pedido al área SCADA + aviso a Operación + pendiente de Salud → tras la vista previa: «Procede, publícalo (Recomendado)».
+
+**209.1 Causa raíz.** Los tres candidatos del barrido de `§208.8`, estudiados con los crudos de 2026 (3 analistas + 3 escépticos con
+lector propio):
+- **Cereté T1** (20 MVA, 34,5/13,8): su corriente NUNCA llega (0 «Existent», 19 meses); P, Q y U sí. Su barra de 13,8 kV está PARTIDA:
+  el T1 alimenta solo 3 circuitos (P del T1 ÷ ΣP = 1,0014–1,0033) y el T2 otro en la otra sección. La suma de circuitos la bloqueaba D5
+  (el T2 mide 13,8 kV). Excepciones medidas: paralelo T1–T2 del 1-mar al 10-abr-2026 (k ≈ 0,69) y el 24-ago-2025 con el T2 fuera
+  (k = 1,12–1,21). La diferencia de barra en 34,5 kV NO sirve: la barra no cierra por 3,4–4,0 MW (daría 110–145 % falsos).
+- **Membrillal T1** (35 MVA): NO lleva carga en 19 meses (el T2 iguala la suma de todos sus circuitos, 0,996–1,002). En su barra de
+  66 kV salen 9–13 MVA sin medir que no son del T1 (restárselos fabricaría un 35–44 % falso).
+- **Cotorra T2**: su 84,2 % por el 34,5 kV es correcto (T1 y T2 en paralelo, barra común); solo se cayó la medida de su 13,8 kV.
+
+**209.2 Solución.**
+- Suma de circuitos con dos marcas nuevas en `decision.suma[nivel]`: `barra_partida` (excepción a D5, solo con la guarda) y
+  `guarda_potencia` + `sentido_p` (±1): hora a hora k = sentido·P del transformador ÷ Σ P de los circuitos que suman; fuera de
+  [0,95; 1,05] → hueco código 8 (`horas.guarda`); sin potencia para comprobar → hueco (`horas.guardaSinP`). En Cereté la P del T1 en
+  13,8 kV llega NEGATIVA y la de sus circuitos positiva: `sentido_p: −1`. La firma lleva las marcas (`|bp|gp-`); el candado de lectura
+  suma la huella de la P del transformador; motivo propio si la guarda deja 0 horas (también por rango en el detalle); textos en lista,
+  detalle, plan y «Revisar» (conserva las marcas; avisa si la pestaña es vieja). Código 8 nuevo en `config.js` (con respaldo).
+- Membrillal T1: decisión «usar» con su mapa automático explícito y nota con la prueba (rev 68); sigue sin cifra, «sin carga».
+- Pedido v4 al área SCADA (41 filas) y aviso informativo a Operación (Cereté al 95–100 % en jul–sep; Cotorra sin N-1; El Carmen;
+  Membrillal), redactor + verificador; pendiente de Salud fila 30 (Membrillal T1: oficial 96 % sin respaldo SCADA).
+
+**209.3 No-regresión.** Sin las marcas todo es idéntico: Berrugas byte a byte en los 11 meses y El Carmen (diferencia de barra) igual;
+las mismas 18 exportaciones en `scada_carga_suma.js` (L-102). Suite 3353/0 (41 pruebas nuevas, camino real del importador).
+
+**209.4 Verificación.** Con los paquetes vigentes completos y el código del commit `d4d1bc2`: ene 79,3 · feb 79,6 · mar 75,8 (7 h) ·
+abr 86,3 · may 91,9 · jun 93,6 · jul 99,5 · ago 100,4 · sep 95,4 · oct 89,3 · nov 83,5 %; periodo **94,8 % CRG 5 provisional**
+(p99 793,6 A de 836,74 A), posible sobrecarga sostenida jul–ago (hasta 100,9 %). Igual al estudio independiente. Vista previa fiel en su
+Chrome (L-157): T2, T3 y T4 de Cereté sin cambio; 0 textos «null»; ningún mes «desfasado».
+
+**209.5 Anti-patterns evitados.** Restar en una barra que no cierra; atribuir al T1 de Membrillal una carga ajena; comparar la P con
+su signo crudo (la 1.ª revisión lo atrapó: 0 horas válidas); llamar «paralelo» a horas sin dato de potencia; relajar la guarda de
+estaciones del paquete (un paquete de una sola S/E lo rechaza la página: se recarga con los completos).
+
+**209.6 Archivos.** `domain/scada_carga_{config,suma}.js`, `ui/cargabilidad-scada/detalle.js`, `ui/scada-datos/{importar-mes,homologacion}.js`,
+`tests/scada_carga_suma_barra_partida.test.js` (nuevo). INTACTOS: worker, diferencia de barra, periodo, firestore.rules.
+
+**209.7 Doctrina.** Decisiones de criterio SUYAS (W-11 con la recomendada) · dos revisiones adversariales del código antes de la vista
+previa · vista previa fiel (L-56, L-157) · escritura con su «procede». NO revisado por proveedor externo. Bóveda:
+`2026-11-04-cerete-membrillal-cotorra/` (estudio, revisiones, pedido v4 y aviso).
+
+**209.8 Verificado sano / no re-auditar.**
+- Membrillal T1 sin carga es real (4 pruebas independientes); el 96 % de Salud no lo sostiene el SCADA (pendiente de Salud, no se toca).
+- Cotorra: nada que cambiar; diferencia de barra imposible (P y Q congeladas) y la suma daría T1+T2 (~155 %).
+- Cereté: la cifra es la de la fase más cargada (suma), no la de la potencia propia (que daría 2–3 puntos menos, promedio de fases).
+- Marzo de Cereté con 7 h es real (paralelo): la plataforma lo muestra «mes provisional», no lo inventa.

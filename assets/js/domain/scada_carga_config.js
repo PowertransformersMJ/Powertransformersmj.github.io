@@ -46,6 +46,9 @@ export const CODIGO = Object.freeze({
   CONGELADO: 5,          // el mismo valor varias horas seguidas: el dato no se renovó
   CERO: 6,               // cero sin explicación (sin tensión que diga que está energizado)
   FUERA_ESCALA: 7,       // tensión imposible para su nivel (voltios, ×10, 1000)
+  // Solo en un nivel por SUMA DE CIRCUITOS con la guarda de potencia (barra partida, 2026-11-04): esa hora la potencia del
+  // transformador no cuadra con la de sus circuitos (paralelo con el otro transformador u otra fuente), o falta una de ellas.
+  PARALELO: 8,
   DESENERGIZADO: 9,      // corriente en cero con tensión presente: fuera de servicio, no es hueco
   RETENIDO: 10           // tensión que no cambió por banda muerta mientras la corriente sí: válida
 });
@@ -53,6 +56,7 @@ export const CODIGOS_VALIDOS = Object.freeze([0, 10]);
 export const MOTIVO = Object.freeze({
   0: 'válido', 1: 'sin archivo', 2: 'vacío o no numérico', 3: 'marcado no válido por el SCADA',
   4: 'valor tope del sistema', 5: 'valor congelado', 6: 'cero sin explicación', 7: 'fuera de escala',
+  8: 'la potencia del transformador no cuadra con sus circuitos (paralelo, otra fuente o potencia sin dato)',
   9: 'fuera de servicio', 10: 'retenido (válido)'
 });
 

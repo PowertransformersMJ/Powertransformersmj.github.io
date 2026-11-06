@@ -559,6 +559,9 @@ export function montarCargaMes(cont, { alTerminar }) {
       const cifra = x.cifra && x.cifra.pct != null ? 'cifra del mes ' + num(x.cifra.pct, 1) + ' %' + (x.cifra.crg ? ' (CRG ' + x.cifra.crg + ')' : '') + (x.cifra.clase === 'firme' ? ', firme' : ', provisional') : 'sin cifra del mes' + (x.cifra && x.cifra.motivoNulo ? ' (' + x.cifra.motivoNulo + ')' : '');
       return el('li', {}, el('b', {}, cab), el('br'),
         (h.completas || 0) + ' h con las tres fases' + (h.bandaMuerta ? ' (' + h.bandaMuerta + ' por banda muerta validada con el transformador)' : '') + (h.fueraServicio ? ' · ' + h.fueraServicio + ' h con todos los circuitos abiertos' : '')
+          // Barra partida con guarda de potencia (2026-11-04): las horas que la guarda dejó fuera (solo si la decisión la trae).
+          + (h.guarda ? ' · ' + h.guarda + ' h fuera porque el transformador no llevaba solo esos circuitos (paralelo u otra fuente)' : '')
+          + (h.guardaSinP ? ' · ' + h.guardaSinP + ' h fuera porque faltó la potencia del transformador o de un circuito para comprobarlo' : '')
           + ' · transformador ÷ suma: ' + (textoCuadre(d) || '—') + ' → ' + (VEREDICTO[d.veredicto] || d.veredicto) + ' · ' + cifra + '.', el('br'),
         el('span', { class: 'cs-sub' }, 'Se guarda aparte como resumen derivado; la medida del transformador no cambia.'));
     });
