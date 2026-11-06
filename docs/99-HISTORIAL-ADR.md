@@ -10657,3 +10657,14 @@ previa · vista previa fiel (L-56, L-157) · escritura con su «procede». NO re
 - Cotorra: nada que cambiar; diferencia de barra imposible (P y Q congeladas) y la suma daría T1+T2 (~155 %).
 - Cereté: la cifra es la de la fase más cargada (suma), no la de la potencia propia (que daría 2–3 puntos menos, promedio de fases).
 - Marzo de Cereté con 7 h es real (paralelo): la plataforma lo muestra «mes provisional», no lo inventa.
+
+**209.9 Verificado tras publicar (2026-11-06).**
+- **Publicación** `f0ef754` (despliegue OK). La página de datos recargada traía el código nuevo (firma con `|gp-`, código 8).
+- **Decisión de Cereté T1** guardada con `decidirFila` (homologación rev 68 → 69), con la misma firma de la vista previa.
+- **Recarga ene–nov en «Completar»** con los paquetes vigentes completos. Cada mes guardó 3 series (sus circuitos) y su resumen, con
+  «puntos medidos que cambian de cifra: 0»; El Carmen T2A y Berrugas sin cambio (Berrugas «sin contraste» en noviembre, como antes).
+  Cereté T1 por mes: ene 79,3 · feb 79,6 (49 h sin potencia) · mar 75,8 (7 h; 724 h de paralelo) · abr 86,3 (229 h de paralelo) ·
+  may 91,9 · jun 93,6 · jul 99,5 · ago 100,4 · sep 95,3 · oct 89,2 · nov 83,4 %.
+- **En vivo**: periodo ene–nov 94,8 % CRG 5 provisional, posible sobrecarga sostenida jul–ago; T2/T3/T4 de Cereté, El Carmen y
+  Membrillal T1 sin cambio; 0 textos «null».
+- **Callejón**: el freno de arranque del cerebro pidió refrescar su marca (sesión abierta más de 48 h): `session-handoff --boot-echo`.
