@@ -62,15 +62,14 @@ devanado y pérdidas en vacío 10-19; TODO-80, bóveda `2026-10-12-refrigeracion
    errata de un equipo): solo los halló esta revisión.
 7. Resultado y Excel → Descargas + bóveda; nada al repo.
 
-## 4. Diferencia de barra: chequeo de bahías antes de cada mes (`99 §208`)
+## 4. Diferencia de barra y medida común: chequeo antes de cada mes (`99 §208`, `§210`)
 
-Un nivel medido por diferencia de barra (El Carmen T2A, 66 kV) atribuye al transformador TODO lo que la barra no explica. Por eso,
-antes de empaquetar cada mes, Claude lista los elementos de esa barra en los crudos. Deben ser las 2 líneas, los 2 bancos de
-condensadores, los 2 transformadores y el punto de tensión «Barra» (solo tensión: no es una bahía). Los nombres reales están en la
-decisión guardada y en la bóveda (`2026-11-04-elcarmen-diferencia-barra`), nunca aquí.
-- Si aparece un elemento nuevo, o una salida renombrada, se PARA y se le pregunta antes de guardar. Una bahía no listada pasaría su
-  carga a T2A y parecería carga real. Esta barra ya cambió de nombres: una línea en 2025→2026 y el punto de 110/66 kV de T2A.
-- Un mes en que T2A pase del 5 % se revisa con los crudos antes de darlo por bueno: una salida puenteada no se distingue desde la
-  estación.
-- Después de cada carga, en el plan de la simulación, los sentidos deben dar «ok» y las horas fuera de escala deben ser pocas.
+**Medida común (El Carmen T1A + T2A, `§210`)**: los dos en paralelo detrás de la MISMA medida de 110/66 kV; cada uno ve su parte
+(66 kV mitades; 110 kV T1A 58 % / T2A 42 %, criterio del Ingeniero). Antes de empaquetar un mes: (1) el punto común sigue trayendo
+110, 66 y 13,8 kV; (2) la bahía nueva del T2A sigue en «Invalid» — si empieza a medir, el T2A tendría medida propia: se PARA y se le
+pregunta; (3) si llega la lectura de los relés diferenciales, la `parte` se ajusta con esa medida (con su «procede»).
 
+**Diferencia de barra** (sirve solo si lo que se resta mide UN equipo; en El Carmen era común y se retiró): antes de empaquetar,
+Claude lista los elementos de la barra en los crudos y PARA ante un elemento nuevo o renombrado (una bahía no listada pasaría su
+carga al transformador y parecería real); un mes con el restado > 5 % se revisa con los crudos; en el plan, sentidos «ok» y pocas
+horas fuera de escala. Los nombres reales viven en la decisión guardada y en la bóveda, nunca aquí.

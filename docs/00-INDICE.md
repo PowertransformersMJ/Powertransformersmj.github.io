@@ -26,8 +26,9 @@
 | §205 | ADR-205 — alias con **«desde»** (Pradera renombrado en 13,8 kV); **pedido v3** (Las Palomas, MovilCor, San Luis) · TODO-69 | 10395 |
 | §206 | ADR-206 — **noviembre 1–2** cargado; **relevo de La Unión** (desde 19-sep) y sep–oct recargados · TODO-69 | 10461 |
 | §207 | ADR-207 — **mayo 2026 cargado**; cargar con los mismos criterios ya no pide «procede» · TODO-69 | 10496 |
-| §208 | ADR-208 — **El Carmen T2A por DIFERENCIA DE BARRA** en 66 kV (dos transformadores en la misma barra; P y Q) · TODO-69 | 10523 |
+| §208 | ADR-208 — **El Carmen T2A por DIFERENCIA DE BARRA** en 66 kV (conclusión corregida en §210: era medida común) · TODO-69 | 10523 |
 | §209 | ADR-209 — **Cereté T1 por suma con BARRA PARTIDA** y guarda de potencia; Membrillal T1 nota; Cotorra sin cambio · TODO-69 | 10610 |
+| §210 | ADR-210 — **El Carmen T1A+T2A en PARALELO con MEDIDA COMÚN** (parte de cada uno, criterio del Ingeniero; corrige §208) · TODO-69 | 10672 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
