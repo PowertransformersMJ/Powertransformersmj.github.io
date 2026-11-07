@@ -37,6 +37,8 @@ import { bandaMuerta, motivoBandaMuerta, motivoBandaMuertaSinMarca } from './sca
 import { motivoMesCasiSinMedida, reglaDeAntes } from './scada_carga_mes_casi_sin_medida.js';
 // Equipos que pasaron a otro operador (2026-10-28): archivo NUEVO; fuera de la zona, nada cambia.
 import { mesDeOtroOperador, motivoTraspaso } from './scada_carga_traspaso.js';
+// Medida común de transformadores en paralelo (2026-11-06): archivo NUEVO; sin la marca en la decisión, nada cambia.
+import { especMedidaComun, etiquetaMedidaComun, motivoMedidaComun } from './scada_carga_medida_comun.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -121,6 +123,11 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   // periodo o el del rango del detalle); si no, queda sin cifra con su motivo. NUNCA la medida propia del transformador.
   const spec = especSuma(fila);
   const sumaNiveles = []; const motivosSuma = []; const avisosSuma = [];
+  // Medida común (2026-11-06): el resumen ya llega con la parte de este transformador (÷ n o × parte: `componerResumen` o
+  // las curvas de `leerSeriesEquipo`); aquí solo se ROTULA el nivel y la cifra queda provisional con su motivo. Sin la
+  // marca, `mc` es null y nada cambia.
+  const mc = especMedidaComun(fila);
+  const comunNiveles = []; const comunConDatos = [];
   const niveles = [];
   const devanados = [];
   const nivelesReserva = [];
@@ -143,16 +150,25 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     const bmPct = bm != null ? (A > 0 ? 100 * bm / A : null) : undefined;
     // Horas limpiadas con banda muerta sin la marca en la decisión de hoy (se quitó y no se volvió a limpiar): sin tope.
     const bmSinMarca = !!(d && !sp && bm == null && r && r.bandaMuertaAceptadas > 0);
+    // El reparto del nivel: `{n}` (partes iguales: ÷ n) o `{n, parte}` (la parte de este transformador).
+    const xComun = d && !sp && mc && mc.porNivel[nv] && mc.porNivel[nv].devanado === d ? mc.porNivel[nv] : null;
+    const repComun = xComun ? { n: xComun.n, ...(xComun.parte != null ? { parte: xComun.parte } : {}) } : null;
     const fila1 = {
-      nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + (sp.modo === 'diferencia' ? ' · diferencia de barra' : ' · suma de circuitos') : NIVELES[nv].etiqueta, devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
+      nivel: nv, etiqueta: sp ? NIVELES[nv].etiqueta + (sp.modo === 'diferencia' ? ' · diferencia de barra' : ' · suma de circuitos') : (repComun ? etiquetaMedidaComun(nv, repComun) : NIVELES[nv].etiqueta), devanado: d, nombreDevanado: d ? DEVANADO[d] : null, A,
       pct, escala, cobertura: r ? r.cob : null, n: r && r.i ? r.i.n : 0, sostenidaPct: sostPct, picoPct,
       sinDatos: !r || !r.i || r.i.n === 0,
       ...(fsc ? { faseSinCarga: fsc } : {}),
       ...(bm != null ? { bandaMuerta: bm, bandaMuertaPct: bmPct } : {}),
       ...(sp ? { suma: { de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null,
         // Diferencia de barra (`99 §208`): de qué salidas y qué transformador restado sale el nivel.
-        ...(sp.modo === 'diferencia' ? { modo: 'diferencia', salidas: sp.salidas, restar: sp.restar } : {}) } } : {})
+        ...(sp.modo === 'diferencia' ? { modo: 'diferencia', salidas: sp.salidas, restar: sp.restar } : {}) } } : {}),
+      // Medida común (campo NUEVO, solo con la marca: cada consumidor lo lee con guarda).
+      ...(repComun ? { medidaComun: repComun } : {})
     };
+    if (repComun) {
+      comunNiveles.push({ nivel: nv, etiqueta: NIVELES[nv].etiqueta, devanado: d, ...repComun });
+      if (r) comunConDatos.push({ nivel: nv, ...repComun });
+    }
     if (sp) {
       sumaNiveles.push({ nivel: nv, etiqueta: NIVELES[nv].etiqueta, devanado: d, de: sp.elems, estado: es ? es.estado : null, veredicto: es ? es.veredicto : null, derivado: (r && r.derivado) || null });
       if (es && es.motivo) motivosSuma.push(es.motivo);
@@ -188,7 +204,9 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
   // son ellos los que vuelven firme al equipo y la cifra o la sobrecarga dependen de esos meses (2026-10-28).
   const firmeAntes = !devanados.some((x) => x.coberturaConCasi != null)
     || firmeza({ estadoHomologacion: estado, esCircuito, devanados: devanados.map(reglaDeAntes), placa, mesesFallidos }).firme;
-  const extraSuma = [...new Set([...motivosSuma, ...avisosSuma, motivoBandaMuerta(devanados), motivoBandaMuertaSinMarca(devanados),
+  // Medida común: UNA frase con los niveles que trajeron datos (cada uno con su parte), aunque sean dos y en formas distintas.
+  const avisosComun = comunConDatos.length ? [motivoMedidaComun(comunConDatos)] : [];
+  const extraSuma = [...new Set([...motivosSuma, ...avisosSuma, ...avisosComun, motivoBandaMuerta(devanados), motivoBandaMuertaSinMarca(devanados),
     motivoMesCasiSinMedida(devanados, pctEq, firmeAntes)].filter(Boolean))];
   const f = extraSuma.length ? { firme: false, motivos: [...f0.motivos, ...extraSuma] } : f0;
   // Un circuito sin confirmar o una homologación excluida NO dan número (decisión del Ingeniero).
@@ -247,7 +265,9 @@ export function calcularEquipo({ tx, fila, punto, resumenPorNivel, conteos, umbr
     delta: pctEq != null && oficialDev != null ? pctEq - oficialDev : null,
     ...(enReserva ? { enReserva: true } : {}),
     // Campo NUEVO, solo con suma (cada consumidor lo lee con guarda: un módulo viejo en caché no lo trae).
-    ...(spec ? { suma: { niveles: sumaNiveles, texto: textoSuma(spec), veredicto: peorVeredicto(sumaNiveles) } } : {})
+    ...(spec ? { suma: { niveles: sumaNiveles, texto: textoSuma(spec), veredicto: peorVeredicto(sumaNiveles) } } : {}),
+    // Medida común (campo NUEVO, solo con la marca y algún nivel asignado): la lista lo usa para leer la curva dividida.
+    ...(comunNiveles.length ? { medidaComun: { niveles: comunNiveles } } : {})
   };
 }
 

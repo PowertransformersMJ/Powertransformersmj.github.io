@@ -12,6 +12,10 @@
 
 import { normalizarTexto, claveId, esElementoTransformador } from './scada_carga_csv.js';
 import { CALCULO, NIVELES } from './scada_carga_config.js';
+// Medida común de transformadores en paralelo (2026-11-06): archivo NUEVO (L-102) que no importa este (sin ciclo). El
+// conteo de los grupos vive allá; aquí solo se consulta. Sin la marca en ninguna fila, los dos conjuntos salen vacíos y
+// CLAVE_COMPARTIDA se avisa como siempre.
+import { gruposMedidaComun } from './scada_carga_medida_comun.js';
 
 /** FNV-1a de 32 bits → hex (ids estables y cortos). */
 export function fnv1a(s) {
@@ -156,6 +160,9 @@ export const AVISOS = Object.freeze({
   NO_ENCONTRADO: { bloquea: true, texto: 'La homologación no trae un punto SCADA para este transformador.' },
   CLAVE_CIRCUITO: { bloquea: true, texto: 'Se mide un circuito, no el transformador: es solo una parte de su carga.' },
   CLAVE_COMPARTIDA: { bloquea: true, texto: 'La misma medida está asignada a más de un transformador.' },
+  // Medida común (2026-11-06): `seConfirma: false` = no se puede «ver» (avisos_vistos no lo apaga): se resuelve arreglando
+  // el grupo. Campo NUEVO: quien no lo conoce lo trata como cualquier aviso que bloquea.
+  MEDIDA_COMUN_INCOMPLETA: { bloquea: true, seConfirma: false, texto: 'Esta medida es común a varios transformadores en paralelo, pero el grupo ya no cuadra (falta uno, otro no tiene la marca o la tiene distinta, o las partes no suman 100 %): la parte de cada uno puede estar mal.' },
   MATRICULA_REPETIDA: { bloquea: true, texto: 'La matrícula aparece en más de una fila de la homologación.' },
   MATRICULA_SIN_EQUIPO: { bloquea: true, texto: 'La matrícula no existe en el parque.' },
   NIVEL_SIN_DEVANADO: { bloquea: true, texto: 'Un nivel medido no coincide con ninguna tensión de placa.' },
@@ -203,7 +210,9 @@ export function mapaDeDecision(fila) {
  * Avisos de una fila con su contexto.
  * @param {object} fila  fila de la homologación vigente
  * @param {{filasPorClave: Map<string, number>, filasPorMatricula: Map<string, number>, tx: object|null,
- *          punto: {niveles: Object<string, object>}|null, resumenPorNivel?: object}} ctx
+ *          punto: {niveles: Object<string, object>}|null, resumenPorNivel?: object,
+ *          clavesMedidaComun?: Set<string>, clavesMedidaComunIncompleta?: Set<string>}} ctx  (los dos últimos, de
+ *          `conteosHomologacion`; sin ellos, ni CLAVE_COMPARTIDA se apaga ni sale MEDIDA_COMUN_INCOMPLETA)
  * @returns {{avisos: string[], mapa, relacion}}
  */
 export function avisosFila(fila, ctx) {
@@ -213,7 +222,12 @@ export function avisosFila(fila, ctx) {
   if (fila.retirada) avisos.push('RETIRADA');
   if (!k) avisos.push('NO_ENCONTRADO');
   else if (!esElementoTransformador(k.elem)) avisos.push('CLAVE_CIRCUITO');
-  if (k && (ctx.filasPorClave.get(claveId(k.est, k.elem)) || 0) > 1) avisos.push('CLAVE_COMPARTIDA');
+  // Varias filas con la misma medida y la medida común declarada igual en todas (transformadores en paralelo): no es una
+  // medida asignada por error a más de un transformador, es la parte de cada uno. Sin la marca, el aviso de siempre.
+  if (k && (ctx.filasPorClave.get(claveId(k.est, k.elem)) || 0) > 1 && !(ctx.clavesMedidaComun && ctx.clavesMedidaComun.has(claveId(k.est, k.elem)))) avisos.push('CLAVE_COMPARTIDA');
+  // Una fila del punto declara la medida común y el grupo ya no cuadra: en TODAS las filas vigentes de ese punto.
+  if (k && !fila.retirada && !(fila.decision && fila.decision.tipo === 'no_usar')
+    && ctx.clavesMedidaComunIncompleta && ctx.clavesMedidaComunIncompleta.has(claveId(k.est, k.elem))) avisos.push('MEDIDA_COMUN_INCOMPLETA');
   if ((ctx.filasPorMatricula.get(normalizarMatricula(fila.matricula)) || 0) > 1) avisos.push('MATRICULA_REPETIDA');
   if (!ctx.tx) avisos.push('MATRICULA_SIN_EQUIPO');
   if (fila.decision && fila.decision.clave_excel_vista != null && fila.decision.clave_excel_vista !== fila.clave_excel) avisos.push('CLAVE_CAMBIO');
@@ -253,22 +267,33 @@ export function estadoEfectivo(fila, avisos) {
   const bloqueantes = (avisos || []).filter((a) => AVISOS[a] && AVISOS[a].bloquea);
   if (fila.decision) {
     const vistos = new Set(fila.decision.avisos_vistos || []);
-    return bloqueantes.every((a) => vistos.has(a)) ? 'confirmada' : 'pendiente';
+    // Un aviso con `seConfirma: false` (MEDIDA_COMUN_INCOMPLETA) no lo apaga avisos_vistos, aunque lo traiga.
+    return bloqueantes.every((a) => vistos.has(a) && AVISOS[a].seConfirma !== false) ? 'confirmada' : 'pendiente';
   }
   return bloqueantes.length ? 'pendiente' : 'automatica';
 }
 
-/** Conteos por clave y por matrícula (para CLAVE_COMPARTIDA y MATRICULA_REPETIDA), sin las retiradas ni excluidas. */
+/**
+ * Conteos por clave y por matrícula (para CLAVE_COMPARTIDA y MATRICULA_REPETIDA), sin las retiradas ni excluidas. Con la
+ * medida común (2026-11-06), `clavesMedidaComun` = las claves compartidas cuya medida común cuadra en todas sus filas, y
+ * `clavesMedidaComunIncompleta` = las claves donde alguna fila vigente declara la marca y el grupo NO cuadra (aviso
+ * MEDIDA_COMUN_INCOMPLETA). Campos NUEVOS: se leen con guarda; sin ninguna marca, vacíos.
+ */
 export function conteosHomologacion(filas) {
-  const filasPorClave = new Map(); const filasPorMatricula = new Map();
-  for (const f of Object.values(filas || {})) {
+  const filasPorClave = new Map(); const filasPorMatricula = new Map(); const grupos = new Map();
+  for (const [fid, f] of Object.entries(filas || {})) {
     if (f.retirada || (f.decision && f.decision.tipo === 'no_usar')) continue;
     const k = analizarClaveHomologada(claveEfectiva(f));
-    if (k) { const id = claveId(k.est, k.elem); filasPorClave.set(id, (filasPorClave.get(id) || 0) + 1); }
+    if (k) {
+      const id = claveId(k.est, k.elem); filasPorClave.set(id, (filasPorClave.get(id) || 0) + 1);
+      if (!grupos.has(id)) grupos.set(id, []);
+      grupos.get(id).push({ ...f, id: f.id || fid });
+    }
     const m = normalizarMatricula(f.matricula);
     filasPorMatricula.set(m, (filasPorMatricula.get(m) || 0) + 1);
   }
-  return { filasPorClave, filasPorMatricula };
+  const gm = gruposMedidaComun(grupos);
+  return { filasPorClave, filasPorMatricula, clavesMedidaComun: gm.coherentes, clavesMedidaComunIncompleta: gm.incompletas };
 }
 
 /** Objetivo de la importación: estaciones de las claves homologadas; sus elementos homologados y TODO swTrafo de esas estaciones. */
