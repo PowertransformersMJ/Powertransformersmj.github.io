@@ -109,7 +109,7 @@ si se escriben datos, simulación + foto antes/después (W-13).
    «Completar» quedan los ceros viejos, `§158.2`) · ante la duda, preguntarle con la simulación a la vista → foto antes/después
    (paso 7). Un periodo que dice «falta preparar <mes>» se arregla recargando ese mes en «Completar» (0 curvas, solo el resumen).
    Con una **suma de circuitos** decidida (`§182`), el plan muestra su bloque (cuadre R/S/T «ok») y cada recarga rehace la suma.
-   Con **diferencia de barra** o **medida común** (`§208`/`§210`): chequeo antes de empaquetar → [hoja](workflow-datos-reales.md) §4.
+   Diferencia de barra o medida común (`§208`/`§210`): chequeo previo → [hoja](workflow-datos-reales.md) §4.
    ✅ **Decidido (`§207`, 2026-11-04)**: para cargar meses o días nuevos con los mismos criterios dijo «no necesito autorizarte nada»: se carga sin pedir «procede». Lo que cambie criterios (alias, relevo, decisión) se le pregunta.
 9. **Escritura puntual** (un equipo contra su placa, guiones `firebase-admin`) → hoja [`workflow-datos-reales.md`](workflow-datos-reales.md) §1–§2.
 
