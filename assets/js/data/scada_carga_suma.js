@@ -12,10 +12,25 @@
 //     registro sin cifra aunque las curvas se puedan sumar; si esa lectura falla, el mes queda «no se pudo leer».
 // Lo compuesto es una copia: nunca se modifica lo que guarda la caché. Solo getDoc por id (como siempre).
 // Archivo NUEVO (L-102): importa solo `leerSeriesPunto` y `leerResumenMes` (ya publicadas) y el dominio nuevo.
+// 2026-11-06: MEDIDA COMÚN de transformadores en paralelo (`decision.medida_comun`): cada mes leído sale con esos niveles
+// en la parte de este transformador (÷ n o × su parte: corrientes con sus extras, P y Q; las tensiones no), sobre una COPIA (la caché de la
+// sesión no se toca). Es el punto común de las curvas del detalle, la historia y la verificación de sobrecarga de la lista.
+// Sin la marca, lo de siempre (sin suma: EXACTAMENTE lo de `leerSeriesPunto`).
 // ══════════════════════════════════════════════════════════════
 
 import { leerSeriesPunto, leerResumenMes } from './scada_carga.js';
 import { especSuma, componerSerieMes } from '../domain/scada_carga_suma.js';
+import { analizarClaveHomologada, claveEfectiva } from '../domain/scada_carga_homologacion.js';
+import { claveId } from '../domain/scada_carga_csv.js';
+import { especMedidaComun, dividirSerie, dividirLectura } from '../domain/scada_carga_medida_comun.js';
+
+/** La medida común de la fila SOLO si su clave es la del punto que se lee (si no, null: nada se divide). */
+function medidaComunDe(fila, cid) {
+  const mc = especMedidaComun(fila);
+  if (!mc) return null;
+  const k = analizarClaveHomologada(claveEfectiva(fila));
+  return k && claveId(k.est, k.elem) === cid ? mc : null;
+}
 
 /**
  * Series de un equipo en varios meses, con sus niveles sumados si la homologación lo pide.
@@ -27,6 +42,9 @@ import { especSuma, componerSerieMes } from '../domain/scada_carga_suma.js';
  */
 export async function leerSeriesEquipo(cid, meses, fila, { puntos = null } = {}) {
   const spec = especSuma(fila);
+  const mc = medidaComunDe(fila, cid);
+  // Medida común sin suma: lo de `leerSeriesPunto` con sus niveles divididos (copia; la caché no se toca).
+  if (mc && (!spec || spec.cid !== cid)) return dividirLectura(await leerSeriesPunto(cid, meses), mc);
   if (!spec || spec.cid !== cid) return leerSeriesPunto(cid, meses);
   const circuitos = [...new Set(Object.values(spec.porNivel).flatMap((x) => x.cids))];
   const [base, resumenes, ...otros] = await Promise.all([leerSeriesPunto(cid, meses), Promise.all(meses.map((m) => leerResumenMes(m))),
@@ -41,7 +59,7 @@ export async function leerSeriesEquipo(cid, meses, fila, { puntos = null } = {})
     const series = Object.fromEntries(circuitos.map((c, k) => [c, deMes[k] && deMes[k].estado === 'ok' ? deMes[k].serie : null]));
     const guardadas = rg.estado === 'ok' && rg.datos && rg.datos.claves ? rg.datos.claves : {};
     const r = componerSerieMes({ mes, trafo: t.serie, circuitos: series, spec, guardadas, puntos });
-    porMes[mes] = { estado: 'ok', serie: r.serie, derivado: r.derivado };
+    porMes[mes] = { estado: 'ok', serie: mc ? dividirSerie(r.serie, mc) : r.serie, derivado: r.derivado };
   });
   return { porMes };
 }

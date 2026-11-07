@@ -116,16 +116,23 @@ export function montarLista(cont, ctx, { alAbrir }) {
   const curvasEnCurso = new Map();
   // Con suma de circuitos (2026-10-24), la curva del mes se compone con la de sus circuitos: el lector va en un archivo
   // aparte, cargado con import() solo si hace falta (si falla, la marca queda «por confirmar», como cualquier fallo).
-  function leerCurvaUnaVez(cid, mes, fila = null) {
-    const k = cid + '|' + mes + (fila ? '|suma' : '');
+  // Con medida común (2026-11-06) el mismo lector la divide entre los transformadores en paralelo: como dos filas leen el
+  // MISMO punto, la lectura compuesta se recuerda por fila (`filaId`), nunca se comparte con otra decisión.
+  function leerCurvaUnaVez(cid, mes, fila = null, filaId = null) {
+    const k = cid + '|' + mes + (fila ? '|suma' + (filaId ? '|' + filaId : '') : '');
     if (!curvasEnCurso.has(k)) {
       const lectura = fila ? import('../../data/scada_carga_suma.js').then((m) => m.leerSeriesEquipo(cid, [mes], fila)) : leerSeriesPunto(cid, [mes]);
       curvasEnCurso.set(k, lectura.finally(() => curvasEnCurso.delete(k)));
     }
     return curvasEnCurso.get(k);
   }
-  /** La fila de la homologación de una fila de la lista, SOLO si mide con suma de circuitos (si no, null: lo de siempre). */
+  /**
+   * La fila de la homologación de una fila de la lista, SOLO si mide con suma de circuitos o con medida común (si no, null:
+   * lo de siempre). Sin esto, la sobrecarga de un equipo con medida común se verificaba con la medida de TODOS los
+   * transformadores en paralelo contra la ampacidad de uno.
+   */
   function filaConSuma(x) {
+    if (x && x.medidaComun && !x.suma && x.filaId && ctx.homologacion && ctx.homologacion.filas) return ctx.homologacion.filas[x.filaId] || null;
     return x && x.suma && x.filaId && ctx.homologacion && ctx.homologacion.filas ? ctx.homologacion.filas[x.filaId] || null : null;
   }
 
@@ -170,7 +177,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const nuevas = await Promise.all(pend.map(async (x, k) => {
       if (!mod || k >= tope) return porConfirmar(x);
       try {
-        const doc = (await leerCurvaUnaVez(x.claveId, mes, filaConSuma(x))).porMes[mes];
+        const doc = (await leerCurvaUnaVez(x.claveId, mes, filaConSuma(x), x.filaId)).porMes[mes];
         return mod.aplicarVerificacion(x, x.sobrecargaPorVerificar.map((n) => mod.sobrecargaDeCurva(doc, mes, n.nivel, n.A)));
       } catch (e) { console.warn('[cargabilidad-scada] verificar sobrecarga', e); return porConfirmar(x); }
     }));
@@ -196,7 +203,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const nuevas = await Promise.all(pend.map(async (x, k) => {
       if (!mod || k >= tope) return porConfirmar(x);
       try {
-        const doc = (await leerCurvaUnaVez(x.claveId, mes, filaConSuma(x))).porMes[mes];
+        const doc = (await leerCurvaUnaVez(x.claveId, mes, filaConSuma(x), x.filaId)).porMes[mes];
         return mod.aplicarVerificacion(x, x.sobrecargaPorVerificar.map((n) => mod.sobrecargaDeCurva(doc, mes, n.nivel, n.A)));
       } catch (e) { console.warn('[cargabilidad-scada] verificar sobrecarga', e); return porConfirmar(x); }
     }));

@@ -550,12 +550,18 @@ describe('L-102 y compilación', () => {
       './scada_carga_importacion.js:resumirParaGuardar',
       './scada_carga_kpis.js:percentilOrdenado,resumenFisico',
       './scada_carga_limpieza.js:validos',
+      // Archivo NUEVO en 2026-11-06 (medida común de transformadores en paralelo): sin copia vieja en caché.
+      './scada_carga_medida_comun.js:dividirResumen,especMedidaComun',
       './scada_carga_series.js:horasMes'
     ].sort());
     const data = src('data/scada_carga_suma.js');
     assert.deepEqual([...data.matchAll(/^import .*$/gm)].map((m) => m[0]), [
       "import { leerSeriesPunto, leerResumenMes } from './scada_carga.js';",
-      "import { especSuma, componerSerieMes } from '../domain/scada_carga_suma.js';"
+      "import { especSuma, componerSerieMes } from '../domain/scada_carga_suma.js';",
+      // Medida común (2026-11-06): exportaciones ya publicadas de la homologación y del CSV, y el archivo NUEVO.
+      "import { analizarClaveHomologada, claveEfectiva } from '../domain/scada_carga_homologacion.js';",
+      "import { claveId } from '../domain/scada_carga_csv.js';",
+      "import { especMedidaComun, dividirSerie, dividirLectura } from '../domain/scada_carga_medida_comun.js';"
     ]);
   });
   test('los módulos de pantalla, el worker y el lector nuevo compilan', () => {

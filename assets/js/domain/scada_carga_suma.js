@@ -45,6 +45,8 @@ import { horasMes } from './scada_carga_series.js';
 import { nombreMes } from './scada_carga_fecha.js';
 import { DIF, CRITERIO_DIF, especDiferenciaNivel, componerDiferencia, sobrePiso, escalaFueraDeBanda, dentroDelPiso, erroresDiferencia,
   textoDiferencia, textoParte } from './scada_carga_diferencia.js';
+// Medida común de transformadores en paralelo (2026-11-06): archivo NUEVO (L-102). Sin la marca, nada de esto se usa.
+import { especMedidaComun, dividirResumen } from './scada_carga_medida_comun.js';
 
 /** Parámetros de la suma. Cambiar uno exige subir `version` (los derivados viejos dejan de leerse y se recargan). */
 export const SUMA = Object.freeze({
@@ -733,18 +735,34 @@ function nivelGuardado(claves, cid, sp, puntos = null, est = null) {
 }
 
 /**
+ * La medida común de la fila (`scada_carga_medida_comun.js`) SOLO si su clave es la del punto `cid`; si no, null.
+ * Interna a propósito (L-102): una exportación nueva aquí rompería una pantalla con este archivo viejo en caché.
+ */
+function medidaComunDelPunto(fila, cid) {
+  const mc = especMedidaComun(fila);
+  if (!mc || !cid) return null;
+  const k = analizarClaveHomologada(claveEfectiva(fila));
+  return k && claveId(k.est, k.elem) === cid ? mc : null;
+}
+
+/**
  * Resumen guardado de un punto con sus niveles sumados: el del transformador con cada nivel de la suma reemplazado por
  * su derivado VÁLIDO (misma firma, versión y medida del transformador) o, si no lo hay, por un registro sin cifra que
  * dice por qué. Con `puntos` (el catálogo) aplica D5 también después de guardar la decisión. Sin suma devuelve
  * EXACTAMENTE lo mismo que recibe (el mismo objeto). Nunca modifica `claves`.
+ * Medida común (2026-11-06): con `decision.medida_comun`, una COPIA con esos niveles en la parte de este transformador
+ * (÷ n o × su parte: todas las corrientes y potencias, también las horas más altas del periodo). Es el
+ * punto común de la lista, el periodo, la historia, la homologación y la simulación de la carga. Sin la marca, lo de
+ * siempre (sin suma: el mismo objeto).
  */
 export function componerResumen(claves, cid, fila, puntos = null) {
   const base = claves && cid ? claves[cid] || null : null;
   const s = especSuma(fila);
-  if (!s || !base || s.cid !== cid) return base;
+  const mc = base ? medidaComunDelPunto(fila, cid) : null;
+  if (!s || !base || s.cid !== cid) return mc ? dividirResumen(base, mc) : base;
   const out = { ...base };
   for (const sp of Object.values(s.porNivel)) out[sp.nivel] = nivelGuardado(claves, cid, sp, puntos, s.est);
-  return out;
+  return mc ? dividirResumen(out, mc) : out;
 }
 
 const PESO_VEREDICTO = { ok: 0, sin_contraste: 1, no_cuadra: 2 };

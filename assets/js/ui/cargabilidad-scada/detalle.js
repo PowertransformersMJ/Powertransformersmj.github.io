@@ -52,6 +52,9 @@ import { segmentoDelMes, segmentos as segmentosDeFila, puntoDelSegmento, textoVe
 import { SUMA, especSuma, derivadoDeMeses, textoCuadre, estadoSumaNivel } from '../../domain/scada_carga_suma.js';
 // Diferencia de barra (2026-11-04, `99 §208`): archivo NUEVO (L-102).
 import { textoParte } from '../../domain/scada_carga_diferencia.js';
+// Medida común de transformadores en paralelo (2026-11-06): archivo NUEVO (L-102). Las curvas ya llegan divididas de
+// `leerSeriesEquipo`; aquí solo el rótulo del nivel, la nota bajo las curvas, una fila de la tabla y la columna del CSV.
+import { notaCurvasMedidaComun, alcanceCurvasMedidaComun, origenCsvMedidaComun, textoDetalleMedidaComun, rotuloMedidaComun } from '../../domain/scada_carga_medida_comun.js';
 import { BASELINE_UMBRALES_SALUD } from '../../domain/umbrales_salud_baseline.js';
 
 const H_MS = 3600e3;
@@ -479,7 +482,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           + (info.faseSinCarga ? ' (fase ' + info.faseSinCarga.slice(1) + ' sin carga, según la decisión de la homologación)' : '')
           + (info.bandaMuerta != null ? ' · corriente con banda muerta: el valor repetido cuenta como válido si la tensión se movió (escalón de ' + num(info.bandaMuerta, 3) + ' A'
             + (info.bandaMuertaPct != null ? ' = ' + num(info.bandaMuertaPct, 1) + ' puntos' : '') + ', según la decisión de la homologación)' : '')),
-        info.suma ? fila(dif ? 'Diferencia de barra' : 'Suma de circuitos', textoSumaNivel(a, nv, info)) : null));
+        info.suma ? fila(dif ? 'Diferencia de barra' : 'Suma de circuitos', textoSumaNivel(a, nv, info)) : null,
+        // Medida común (2026-11-06): solo con la marca en la decisión.
+        info.medidaComun ? fila('Medida común', textoDetalleMedidaComun(info.medidaComun)) : null));
   }
   /** Una línea del nivel sumado: de qué circuitos sale, cómo cuadra con el transformador y cuántas horas aportó cada regla. */
   function textoSumaNivel(a, nv, info) {
@@ -545,18 +550,20 @@ export function montarDetalle(cont, ctx, { alVolver }) {
     const origen = !info.suma ? null : info.suma.modo === 'diferencia'
       ? 'IR, IS, IT = corriente equivalente de la diferencia de barra (salidas ' + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ') + ', con P y Q); P, Q = diferencia; U = medida del transformador restado'
       : 'IR, IS, IT = suma de circuitos ' + info.suma.de.join(' + ') + ' (derivada); U, P y Q = del transformador';
+    // Medida común (2026-11-06): la misma columna 'Origen' al final y el nombre del archivo lo dice (solo con la marca).
+    const origenComun = !info.suma && info.medidaComun ? origenCsvMedidaComun(info.medidaComun) : null;
     const motivo = (k) => MOTIVO[k] || MOTIVO_LECTURA[k] || ('código ' + k);
     const filas = [];
     for (let k = 0; k < d.t.length; k++) {
       const obs = FAMILIAS.filter((f) => !(d.fam[f].m[k] === CODIGO.VALIDO || d.fam[f].m[k] === CODIGO.RETENIDO)).map((f) => f + ': ' + motivo(d.fam[f].m[k]));
       // Columnas nuevas AL FINAL (§126): máx, mín e instantáneo que se muestran (las de antes no se mueven).
       const extras = FAMILIAS.flatMap((f) => EXTRAS.map((e) => { const x = d.ext.series[f] && d.ext.series[f][e]; return x && Number.isFinite(x[k]) ? x[k] : null; }));
-      filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | '), ...extras, ...(origen ? [origen] : [])]);
+      filas.push([xPlotly(d.t[k]), xPlotly(d.t[k] + H_MS), ...FAMILIAS.map((f) => d.val[f][k]), d.S[k], d.fp.serie[k], d.iF[k], d.carga ? d.carga.serie[k] : null, obs.join(' | '), ...extras, ...(origen ? [origen] : []), ...(origenComun ? [origenComun] : [])]);
     }
     const nombreExtra = { max: 'max', min: 'min', ins: 'inst' };
-    descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + (origen ? (info.suma.modo === 'diferencia' ? '_diferencia-barra' : '_suma-circuitos') : '') + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
+    descargarCSV('cargabilidad_scada_' + a.mat.replace(/[^a-z0-9]+/gi, '_') + '_' + nv + (origen ? (info.suma.modo === 'diferencia' ? '_diferencia-barra' : '_suma-circuitos') : '') + (origenComun ? '_medida-comun' : '') + '_' + aInputCO(a.desde + H_MS).slice(0, 10) + '_' + aInputCO(a.hasta).slice(0, 10) + '.csv',
       ['Inicio_hora_CO', 'Fin_hora_CO', 'IR_A', 'IS_A', 'IT_A', 'URS_kV', 'UST_kV', 'UTR_kV', 'P_MW', 'Q_Mvar', 'S_MVA_calculada', 'FP_calculado', 'I_fase_max_A', 'Cargabilidad_pct', 'Horas_descartadas_por',
-        ...FAMILIAS.flatMap((f) => EXTRAS.map((e) => f + '_' + nombreExtra[e] + '_' + UNIDAD[f])), ...(origen ? ['Origen'] : [])],
+        ...FAMILIAS.flatMap((f) => EXTRAS.map((e) => f + '_' + nombreExtra[e] + '_' + UNIDAD[f])), ...(origen ? ['Origen'] : []), ...(origenComun ? ['Origen'] : [])],
       filas);
   }
 
@@ -609,7 +616,8 @@ export function montarDetalle(cont, ctx, { alVolver }) {
         const fuera = !i.devanado && excl.porNivel[k];
         return el('button', { type: 'button', id: 'csNivelBtn-' + k, 'aria-pressed': String(k === nv), title: fuera && excl.nota ? excl.nota : null,
           onclick: () => { if (k !== nv) pintarNivel(a, k); } },
-          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] + (i.suma ? (i.suma.modo === 'diferencia' ? ' · diferencia de barra' : ' · suma de circuitos') : '') : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
+          NIVELES[k].etiqueta + (i.devanado ? ' · ' + DEVANADO[i.devanado] + (i.suma ? (i.suma.modo === 'diferencia' ? ' · diferencia de barra' : ' · suma de circuitos') : '')
+            + (i.medidaComun ? ' · ' + rotuloMedidaComun(i.medidaComun) : '') : fuera ? ' · excluida (homologación)' : ' · sin devanado'));
       }));
     liberarFigura(figura);
     // Contenedor de las gráficas (una por magnitud, cada una con su título y su descripción accesible).
@@ -629,7 +637,9 @@ export function montarDetalle(cont, ctx, { alVolver }) {
           el('figcaption', {}, 'Cada punto va en la hora en que lo rotula el SCADA (hora de Colombia): el de las 14:00 es el promedio de 13:00 a 14:00. P y Q son totales trifásicos del SCADA; S y el factor de potencia se calculan de ellas. Línea roja: ampacidad del devanado y 100 %; líneas grises: bandas CRG ' + textoBandas(ctx.umbrales) + '. Los huecos son horas sin dato válido.'
             + (info.suma && info.suma.modo === 'diferencia' ? ' En este nivel las tres fases muestran la misma corriente equivalente (no se mide por fase): sale de la diferencia de P y Q de la barra (salidas '
               + info.suma.salidas.join(' + ') + ' − transformador ' + info.suma.restar.join(' − ') + '); P y Q son esa diferencia y la tensión es la medida del transformador restado.' : '')
-            + (info.suma && info.suma.modo !== 'diferencia' ? ' En este nivel las corrientes son la suma hora por hora de los circuitos ' + info.suma.de.join(' + ') + ' (una hora vale solo si valen todos); la tensión, P y Q son las del transformador; el máximo, el mínimo y el instantáneo no se calculan para una suma.' : ''))),
+            + (info.suma && info.suma.modo !== 'diferencia' ? ' En este nivel las corrientes son la suma hora por hora de los circuitos ' + info.suma.de.join(' + ') + ' (una hora vale solo si valen todos); la tensión, P y Q son las del transformador; el máximo, el mínimo y el instantáneo no se calculan para una suma.' : '')
+            // Medida común (2026-11-06): solo con la marca en la decisión.
+            + (info.medidaComun ? ' En este nivel, ' + notaCurvasMedidaComun(info.medidaComun) + '. ' + alcanceCurvasMedidaComun(info.medidaComun) : ''))),
         soloVer() ? null : el('div', { class: 'cs-acciones cs-solo-equipo' }, el('button', { type: 'button', id: 'csCsvNivel', class: 'btn btn--glass btn--sm', onclick: () => exportarCSV(a, nv) }, 'Descargar CSV del nivel'))),
       el('div', { class: 'cs-dos' }, el('div', { class: 'cs-panel' }, tablaNivel(a, nv)), el('div', { class: 'cs-panel' }, tablaCalidad(d, !!info.suma && info.suma.modo !== 'diferencia')))));
     const mio = token;

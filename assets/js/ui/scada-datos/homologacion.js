@@ -26,6 +26,9 @@ import { DIF, textoParte } from '../../domain/scada_carga_diferencia.js';
 // Cambio de medida desde un mes (2026-10-26): archivo NUEVO. «Revisar» CONSERVA las medidas anteriores (el diálogo rehace la
 // decisión desde cero: sin esto las borraría) y «Reabrir» avisa antes de borrarlas. Sin medidas anteriores, todo igual.
 import { tieneCambiosDeMedida, tienePreviasGuardadas, llavesPrevias, erroresCambioMedida, textoMes, segmentos as segmentosDeFila, textoVentana } from '../../domain/scada_carga_cambio_medida.js';
+// Medida común de transformadores en paralelo (2026-11-06): archivo NUEVO (L-102). El diálogo no la arma (la escribe Claude
+// con los datos): la muestra, la CONSERVA al guardar con el mismo punto y sus niveles asignados, y revisa que siga coherente.
+import { erroresMedidaComun, textoMedidaComunGuardada, avisosQueSePuedenVer, repartoMedidaComun, copiaMedidaComun, porcentajeParte, fraccionMedidaComun } from '../../domain/scada_carga_medida_comun.js';
 
 const SHEETJS = 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
 const SHEETJS_SRI = 'sha384-vtjasyidUo0kW94K5MXDXntzOJpQgBKXmE7e2Ga4LG0skTTLeBi97eFAXsqewJjw';
@@ -169,6 +172,10 @@ export function montarHomologacion(cont, { alCambiar }) {
     // Diferencia de barra (2026-11-04, `99 §208`): el diálogo no la arma (sus bahías, signos y sentidos los escribe Claude con
     // los datos); la muestra y la conserva al guardar con el mismo punto, el nivel asignado y «Medir con» en la diferencia.
     const difGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.diferencia && typeof f.decision.diferencia === 'object') ? f.decision.diferencia : {};
+    // Medida común (2026-11-06): igual que la diferencia, el diálogo no la arma; la muestra y la conserva al guardar con el
+    // mismo punto, el nivel asignado y «Medir con la medida del transformador» en ese nivel.
+    const mcGuardada = (f.decision && f.decision.tipo === 'usar' && f.decision.medida_comun && typeof f.decision.medida_comun === 'object'
+      && !Array.isArray(f.decision.medida_comun) && Object.keys(f.decision.medida_comun).length) ? f.decision.medida_comun : null;
     const rPropio = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[ev0.cid] || null : null;
     const derUltimo = ev0.cid && resumenUltimo && resumenUltimo.claves ? resumenUltimo.claves[claveSuma(ev0.cid)] || null : null;
     const sugeridos = [...new Set(Object.values(ctx.puntos).filter((p) => estN && normalizarTexto(p.est) === estN && !esElementoTransformador(p.elem)).map((p) => p.elem))]
@@ -293,8 +300,13 @@ export function montarHomologacion(cont, { alCambiar }) {
       const sincronizar = () => {
         medir.disabled = !s.value;
         bloque.hidden = medir.disabled || medir.value !== 'suma';
+        // Con medida común, el p99 es el de la medida COMÚN (la de todos en paralelo); cada uno lleva su parte, en las palabras
+        // del motivo: «la mitad = 617 A» (partes iguales) o «el 58 % = 716 A» (por partes).
+        const repComun = mcGuardada && !medir.disabled && medir.value === 'medida' ? repartoMedidaComun(mcGuardada[nv]) : null;
         celdaP99.textContent = r && r.i && r.i.p99 != null
-          ? num(r.i.p99, 0) + ' A (p99 del último mes' + (!medir.disabled && medir.value !== 'medida' ? ', de la medida propia del transformador: no se usa' : '') + ')'
+          ? num(r.i.p99, 0) + ' A (p99 del último mes' + (!medir.disabled && medir.value !== 'medida' ? ', de la medida propia del transformador: no se usa' : '')
+            + (repComun ? ', de la medida común: a este transformador le corresponde '
+              + (repComun.parte != null ? 'el ' + porcentajeParte(repComun.parte) + ' = ' + num(r.i.p99 * repComun.parte, 0) : fraccionMedidaComun(repComun.n) + ' = ' + num(r.i.p99 / repComun.n, 0)) + ' A' : '') + ')'
           : 'sin datos del último mes';
       };
       medir.addEventListener('change', sincronizar);
@@ -358,7 +370,7 @@ export function montarHomologacion(cont, { alCambiar }) {
       const mapaGuardado = !!(f.decision && f.decision.tipo === 'usar' && f.decision.mapa && Object.keys(f.decision.mapa).length);
       if (tipo.value === 'usar' && !niveles.length && (Object.keys(sumaGuardada).length || Object.keys(difGuardada).length || fscGuardada || bmGuardada || mapaGuardado)) {
         msg.textContent = 'No se pudieron ver los niveles de este punto (no se leyeron los datos cargados): recargue la página antes de guardar, para no perder su '
-          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (Object.keys(difGuardada).length ? 'diferencia de barra' : (fscGuardada ? 'fase sin carga' : (bmGuardada ? 'banda muerta' : 'asignación de niveles')))) + '.';
+          + (Object.keys(sumaGuardada).length ? 'suma de circuitos' : (Object.keys(difGuardada).length ? 'diferencia de barra' : (fscGuardada ? 'fase sin carga' : (bmGuardada ? 'banda muerta' : (mcGuardada ? 'medida común' : 'asignación de niveles'))))) + '.';
         return;
       }
       // La medida elegida no puede ser un circuito que otra fila ya suma: la misma corriente contaría en dos equipos.
@@ -380,6 +392,13 @@ export function montarHomologacion(cont, { alCambiar }) {
         decision.suma = suma;
       }
       if (Object.keys(diferencia).length) decision.diferencia = diferencia;
+      // Medida común guardada: se copia tal cual en los niveles que siguen asignados y en «Medir con la medida del
+      // transformador» (con la suma o la diferencia en ese nivel, se quita: no se combinan). La parte `{parte, de}` va como
+      // objeto NUEVO con solo esos dos números (`copiaMedidaComun`), nunca la referencia a lo leído.
+      if (mcGuardada && tipo.value === 'usar' && (selClave.value || null) === (claveEfectiva(f) || null)) {
+        const mc = copiaMedidaComun(Object.fromEntries(Object.entries(mcGuardada).filter(([nv]) => decision.mapa && decision.mapa[nv] && medirSel[nv] && !medirSel[nv].disabled && medirSel[nv].value === 'medida')));
+        if (Object.keys(mc).length) decision.medida_comun = mc;
+      }
       // Caché del navegador (L-102): con la barra partida o la guarda guardadas, el dominio cargado debe conocerlas; uno viejo
       // aplicaría D5 y diría que la suma no se puede usar. Se pide recargar en vez de mostrar ese error.
       const conMarcas = Object.values(sumaGuardada).some((x) => x && (x.barra_partida === true || x.guarda_potencia === true));
@@ -388,10 +407,20 @@ export function montarHomologacion(cont, { alCambiar }) {
         const errores = erroresSuma(f, decision, { filas: ctx.filas, puntos: ctx.puntos, filaId: f.id });
         if (errores.length) { msg.textContent = errores.join(' '); return; }
       }
+      // Medida común: la de esta decisión y su coherencia con las otras filas de la misma medida (sin ninguna marca, nada).
+      const cidDe = (g) => { const kk = analizarClaveHomologada(claveEfectiva(g)); return kk ? claveId(kk.est, kk.elem) : null; };
+      const erroresComun = erroresMedidaComun(f, decision, { filas: ctx.filas, filaId: f.id, cidDe });
+      // El diálogo no arma ni ajusta la marca: el mensaje dice la salida.
+      if (erroresComun.length) { msg.textContent = erroresComun.join(' ') + ' La marca de medida común la ajusta Claude; para quitarla use «Reabrir».'; return; }
+      // Los avisos de la decisión de prueba con los conteos de ANTES de guardar, como siempre: con los de después, una fila SIN
+      // la marca que pasa a un punto ya usado (o vuelve a «usar») dejaría «visto» un CLAVE_COMPARTIDA o MATRICULA_REPETIDA que
+      // nunca salió en pantalla. Con la marca da lo mismo: el filtro de abajo quita CLAVE_COMPARTIDA y MEDIDA_COMUN_INCOMPLETA,
+      // y la marca solo se conserva en una fila que ya era «usar» con este punto (sus conteos no cambian).
       const evD = evaluar(f, ctx, decision);
       const bloq = new Set([...ev0.avisos, ...evD.avisos].filter((a) => AVISOS[a] && AVISOS[a].bloquea));
-      // NIVEL_NO_REVISADO lo resuelve esta misma decisión (niveles_vistos): no se marca como visto para siempre.
-      decision.avisos_vistos = [...bloq].filter((x) => x !== 'NIVEL_NO_REVISADO');
+      // NIVEL_NO_REVISADO lo resuelve esta misma decisión (niveles_vistos): no se marca como visto para siempre. Tampoco
+      // MEDIDA_COMUN_INCOMPLETA (se resuelve arreglando el grupo) ni, con la medida común, CLAVE_COMPARTIDA.
+      decision.avisos_vistos = avisosQueSePuedenVer([...bloq].filter((x) => x !== 'NIVEL_NO_REVISADO'), decision);
       msg.textContent = 'Guardando…';
       const r = await decidirFila(f.id, decision);
       if (!r.ok) { msg.textContent = r.motivo; return; }
@@ -422,6 +451,7 @@ export function montarHomologacion(cont, { alCambiar }) {
         + Object.entries(bmGuardada).map(([nv, a]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', escalón de ' + String(a).replace('.', ',') + ' A').join(' · ')
         + '. El valor que se repite se toma como bueno solo con bandera buena y si la tensión del punto se movió en ese tramo; la cifra es firme solo si el escalón no pasa de 5 puntos. Se conserva al guardar con el mismo punto y ese nivel asignado; «Excluir» o «Reabrir» la quitan.') : null,
       ...Object.entries(difGuardada).map(([nv, x]) => el('p', { class: 'cs-ayuda' }, textoDiferenciaGuardada(nv, x))),
+      mcGuardada ? el('p', { class: 'cs-ayuda' }, textoMedidaComunGuardada(mcGuardada)) : null,
       reservaGuardada ? el('p', { class: 'cs-ayuda' }, 'Unidad de reserva: un mes sin carga apreciable queda «en reserva» y no cuenta para la firmeza. Se conserva al guardar con el mismo punto; «Excluir» o «Reabrir» la quitan.') : null,
       fscGuardada ? el('p', { class: 'cs-ayuda' }, 'Fase sin carga (p. ej., banco de dos monofásicas o red de dos fases): '
         + Object.entries(fscGuardada).map(([nv, ph]) => (NIVELES[nv] ? NIVELES[nv].etiqueta : nv) + ', fase ' + String(ph).slice(1)).join(' · ')

@@ -10668,3 +10668,58 @@ previa · vista previa fiel (L-56, L-157) · escritura con su «procede». NO re
 - **En vivo**: periodo ene–nov 94,8 % CRG 5 provisional, posible sobrecarga sostenida jul–ago; T2/T3/T4 de Cereté, El Carmen y
   Membrillal T1 sin cambio; 0 textos «null».
 - **Callejón**: el freno de arranque del cerebro pidió refrescar su marca (sesión abierta más de 48 h): `session-handoff --boot-echo`.
+
+## 210. ADR-210 — Cargabilidad SCADA: El Carmen T1A y T2A EN PARALELO con MEDIDA COMÚN; parte de cada uno por criterio del Ingeniero (corrige `§208`) (TODO-69) ⟦OPUS-5.5⟧ (2026-11-06)
+
+> «recuerda que te dije que por 66 kv comparten carga actualiza» → «Mitad de la medida común (Recomendado)» · «Sí, como prioridad
+> (Recomendado)» (cambiadores en el aviso) → ante el reparto por placa: «…el que deberia tener mayor cargabilidad es el trafo 1 y no
+> el trafo 2» y «…no estoy de acuerdo que el trafo 2 tenga mayor cargabilidad que el trafo 1, por favor corrige» → tras la vista
+> previa: «Procede, publícalo (Recomendado)».
+
+**210.1 Causa raíz.** `§208` supuso que el punto de 110/66 kV que se restaba medía SOLO al T1A. No: es la medida COMÚN de T1A + T2A
+en paralelo (110 y 66 kV). Prueba (analista con el lector real + escéptico con lector propio): la reactiva que consume el grupo,
+Qc = −Q110 + Q66 − Q13,8, ajustada a q0 + x·s² (base 60 MVA) da x = 7,89 % en ene–jun 2025 = la pareja (8,1 %), no uno (16,1 %).
+Por eso el T1A salía con 102,6 % (toda la estación contra la placa de uno) y el 1,9 % del T2A era un artefacto. El 13,8 kV es solo del
+T1A. Desde el 12-jul-2025 los cambiadores van DESACOPLADOS (x ≈ 13 % = pareja + corriente circulante 14–17 MVA; escalón de MEDIO paso
+en U66/U110; vértice en la posición ≈ 11): uno fijo, el otro regula y llega a su tope en la punta (U66 −0,6 kV).
+
+**210.2 Solución.**
+- Marca nueva `decision.medida_comun = { <nivel>: n | {parte, de} }` (archivo nuevo `domain/scada_carga_medida_comun.js`): cada fila
+  ve su PARTE de la medida común (corrientes con extras, P, Q, sostenida, `top`; no tensiones, conteos, rUI ni topes del sistema).
+  Ganchos únicos: `componerResumen` (lista, periodo, historia, homologación) y `leerSeriesEquipo` (curvas, DGA/térmico, CSV) + la
+  verificación de sobrecarga de la lista por fila. Cifra PROVISIONAL con motivo; rótulos «58 % de la medida común» / «÷ 2».
+- Grupo coherente (misma forma, mismo `de`/n, filas = n, partes suman 100 % ±1) → sin CLAVE_COMPARTIDA; si no →
+  MEDIDA_COMUN_INCOMPLETA, bloqueante y que NO se puede «ver» (`estadoEfectivo` lo ignora en `avisos_vistos`). «Revisar» conserva la
+  marca y no la arma (la escribe Claude); banda muerta o fases sin carga junto con medida común en un nivel → error.
+- **Reparto (criterio del Ingeniero, manda)**: 66 kV por mitades; el 13,8 kV solo del T1A → en el 110 kV común el T1A lleva su
+  mitad del 66 + todo el 13,8. Hora a hora con P/Q su parte es 57,5–57,9 % todos los meses → T1A {N110: {parte 0,58, de 2}, N66: 2},
+  T2A {N110: {parte 0,42, de 2}, N66: 2}; la «diferencia» del T2A se retira.
+- Aviso a Operación v2 y pedido al área SCADA v5 (Descargas): El Carmen como PRIORIDAD (A13): leer en hora pico los relés
+  diferenciales de cada uno y la posición de los dos cambiadores; revisar el mando maestro-seguidor; Cereté ya publicado.
+
+**210.3 No-regresión.** Sin la marca `componerResumen` devuelve el MISMO objeto y la lista es idéntica byte a byte a HEAD (datos
+reales, 11 meses + periodo). L-102: lo nuevo solo se importa del archivo nuevo. Suite 3432 (3430 bien, 0 fallos, 2 omitidas).
+
+**210.4 Verificación.** Datos reales (camino de la plataforma): T1A ene–nov **59,5 %** (110 kV, CRG 1; ago 61,3 % mes CRG 2),
+T2A **50,9 %** (66 kV, CRG 1), los dos provisionales; frente al cálculo hora a hora (c1.py) +0,1 / 0,0 puntos. Vista previa fiel
+(L-157) en su Chrome: solo cambian las 2 filas de El Carmen (CSV completo, 208 filas, contra producción), 0 «null».
+
+**210.5 Anti-patterns evitados.** Atribuir a UN equipo una medida sin probar con la física si es común (el error de `§208`);
+recomendar la «mitad» sin calcular el reparto; dividir topes del sistema; un aviso de grupo que se apaga con «visto»; insistir sobre
+la decisión del dueño sin la medida de campo.
+
+**210.6 Archivos.** Nuevo `domain/scada_carga_medida_comun.js` y `tests/scada_carga_medida_comun.test.js`; tocados
+`domain/scada_carga_{homologacion,suma,vista}.js`, `data/scada_carga_suma.js`, `ui/cargabilidad-scada/{lista,detalle}.js`,
+`ui/scada-datos/homologacion.js`, `tests/scada_carga_suma.test.js` (lista de imports L-102). INTACTOS: diferencia de barra (sigue
+válida para un restado que mida UN equipo), importador, worker, firestore.rules.
+
+**210.7 Doctrina.** W-11: decisión de criterio SUYA; tres revisiones adversariales del código (4 lentes + refutadores; arreglos con
+2 verificadores; la «parte» con 2 revisores); vista previa fiel; escritura con su «procede». NO revisado por proveedor externo.
+Bóveda: `2026-11-06-elcarmen-paralelo/` (estudio, reparto, criterio) y aviso en `2026-11-04-elcarmen-diferencia-barra/SINTESIS.md`.
+
+**210.8 Verificado sano / no re-auditar.**
+- El paralelo es real (dos lectores, 2025 y 2026); q0 y las pérdidas NO sirven para contar equipos (bajo la resolución).
+- **Desacuerdo registrado**: el modelo de dos tridevanados con la placa (xM del T1A −0,98 %; los datos de 2025 dan −0,90 %) reparte
+  ~54 % del 13,8 kV del T1A por el T2A y, con la circulante, da T2A 85,5 % / T1A 53,0 % («regula el T2A», por la tensión de 13,8 kV;
+  dos lectores, ±1 punto). El Ingeniero lo rechazó dos veces; manda su criterio. ÁRBITRO: la lectura de los relés diferenciales en
+  hora pico (pedida). Si da otro reparto, se cambia la `parte` con esa medida; no reabrir la discusión sin ella.
