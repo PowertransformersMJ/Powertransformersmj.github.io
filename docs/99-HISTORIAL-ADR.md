@@ -10723,3 +10723,14 @@ Bóveda: `2026-11-06-elcarmen-paralelo/` (estudio, reparto, criterio) y aviso en
   ~54 % del 13,8 kV del T1A por el T2A y, con la circulante, da T2A 85,5 % / T1A 53,0 % («regula el T2A», por la tensión de 13,8 kV;
   dos lectores, ±1 punto). El Ingeniero lo rechazó dos veces; manda su criterio. ÁRBITRO: la lectura de los relés diferenciales en
   hora pico (pedida). Si da otro reparto, se cambia la `parte` con esa medida; no reabrir la discusión sin ella.
+
+**210.9 Verificado tras publicar (2026-11-06).**
+- **Publicación** `7f0f424` (servida 21:56). Las decisiones se escribieron a las 22:07 (≥ 10 min, caché `max-age=600`), con la página
+  RECARGADA de verdad: navegar a la misma URL con otro `#` NO recarga y dejó módulos viejos (aviso nuevo ausente) — se usó `reload()`.
+- **Decisiones** con `decidirFila`: T1A (antes automática, sin decisión) y T2A (sin la diferencia) → homologación rev 69 → 71;
+  validaciones de grupo y de suma vacías; el punto común queda «coherente», 0 grupos incompletos.
+- **En vivo** (lista recargada, CSV completo 208 filas): T1A **59,506 %** (110 kV, ago 61,3 %), T2A **50,94 %** (66 kV, ago 52,0 %),
+  provisionales, «Confirmada», igual a la vista previa; indicadores 190 firmes · 12 provisionales · 95 CRG 4–5 · 49 sobrecarga, iguales
+  a la vista previa (que ya había mostrado 206 filas idénticas a producción). Ficha del T2A ene–nov: 110 kV 43,1 %, 66 kV 50,9 %,
+  curvas dibujadas, 0 «null».
+- Aviso v2 y pedido v5 al día con lo publicado (59,5 % / 61,3 %; «ya se muestra»); los envía él.
