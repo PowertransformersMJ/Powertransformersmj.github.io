@@ -1,16 +1,16 @@
 # CLAUDE.md — SGM · TRANSPOWER · 🌉 PUENTE (este repo es el SITIO; el cerebro vive en la bóveda)
 
-Tu cerebro NO está en este repo: está en `../brain-private/sgm-transpower/`, la bóveda privada hermana. Las tres
+Tu cerebro NO está en este repo: está en `~/Proyectos/brain-private/sgm-transpower/`, la bóveda privada. Las tres
 importaciones de abajo lo cargan al arrancar: el router, el estado (`05`) y la memoria corta (`10`). Si NO los ves en
 tu contexto (por ejemplo, porque se rechazó la aprobación de importaciones externas), **léelos por ruta antes de tocar
 nada**. Todas las rutas `docs/…`, `skills/…` y `_legacy/…` que cite el router son de esa carpeta, no de aquí.
 
-@../brain-private/sgm-transpower/CLAUDE.md
-@../brain-private/sgm-transpower/docs/05-ESTADO-GLOBAL.md
-@../brain-private/sgm-transpower/docs/10-MEMORIA-CORTO-PLAZO.md
+@~/Proyectos/brain-private/sgm-transpower/CLAUDE.md
+@~/Proyectos/brain-private/sgm-transpower/docs/05-ESTADO-GLOBAL.md
+@~/Proyectos/brain-private/sgm-transpower/docs/10-MEMORIA-CORTO-PLAZO.md
 
 ## Dónde se commitea cada cosa
-- El cerebro (router, `docs/`, ADR, lecciones) se commitea **en la bóveda** (`cd ../brain-private`). Su pre-commit corre
+- El cerebro (router, `docs/`, ADR, lecciones) se commitea **en la bóveda** (`cd ~/Proyectos/brain-private`). Su pre-commit corre
   el linter sobre lo preparado.
 - El sitio (HTML, CSS, JS, workflows e imágenes) se commitea **aquí**. Nunca los dos en el mismo commit.
 

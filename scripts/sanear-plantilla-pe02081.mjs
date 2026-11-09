@@ -35,6 +35,7 @@ import zlib from 'node:zlib';
 import readline from 'node:readline';
 import { fileURLToPath } from 'node:url';
 import JSZip from 'jszip';
+import { rutaBoveda } from './boveda.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RAIZ = path.resolve(__dirname, '..');
@@ -105,24 +106,21 @@ const CELDAS_HOJA6 = 'BCDEFGHIJKLMNO'.split('').map(
  *    subestación y usuarios de dominio. Este repositorio es PÚBLICO, así que
  *    escribirlos en el código sería filtrar exactamente lo que este script borra.
  *    Viven en la bóveda privada, fuera del repo:
- *      ../brain-private/sgm-transpower/saneamiento-pe02081.json
+ *      brain-private/sgm-transpower/saneamiento-pe02081.json (hermana del repo PRINCIPAL; scripts/boveda.mjs)
  *    Si el archivo no está, el saneamiento se detiene: es preferible fallar a
  *    publicar una plantilla a medio sanear.
  *
  * ⚠️ El JSON NO debe tocar «21/04/2026» ni «2027»: el exportador los usa como
  *    anclas literales para escribir la fecha de entrega y el año de entrada.
  */
-const CONFIG_SENSIBLE = new URL(
-  '../../brain-private/sgm-transpower/saneamiento-pe02081.json',
-  import.meta.url
-);
+const CONFIG_SENSIBLE = path.join(rutaBoveda(), 'sgm-transpower', 'saneamiento-pe02081.json');
 
 function cargarConfigSensible() {
   if (!fs.existsSync(CONFIG_SENSIBLE)) {
     console.error([
       '',
       '✖ Falta la configuración sensible del saneamiento.',
-      '  Se esperaba en: ../brain-private/sgm-transpower/saneamiento-pe02081.json',
+      '  Se esperaba en: ' + CONFIG_SENSIBLE,
       '  Esa lista contiene nombres de personas y de subestaciones reales, y por eso',
       '  vive en la bóveda privada y no en este repositorio público.',
       ''

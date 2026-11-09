@@ -4,7 +4,9 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { motivoEnLinea, revisarTexto, archivoSospechoso } from '../scripts/guardia-scada.mjs';
 
 const S = '/';
@@ -62,7 +64,28 @@ describe('bloquea por forma', () => {
     assert.ok(archivoSospechoso('placas-parte-7.json'));
     assert.ok(!archivoSospechoso('admin/placas-caracteristicas.html'));
   });
+  test('el nombre en Unicode descompuesto (NFD, como llega desde un Mac) también casa', () => {
+    // «o» y «e» + tilde combinante (U+0301): antes no casaba con «homologaci[oó]n» ni con «el[eé]ctricas».
+    assert.ok(archivoSospechoso('datos/Homologación subestaciones.xlsx'));
+    assert.ok(archivoSospechoso('Variables Eléctricas.csv'));
+    assert.ok(archivoSospechoso('Variables Eléctricas.csv'.normalize('NFC')));
+    assert.ok(!archivoSospechoso('docs/homologación.md'));
+  });
 });
+
+/** Archivos versionados (git ls-files -z en `cwd`) cuyo texto trae algo con forma de dato SCADA. */
+function archivosConDatos(cwd) {
+  // Con -z: sin él git escapa las tildes («Medici\303\263n …»), readFileSync falla y el archivo se saltaba en
+  // silencio (revisión adversarial 2026-11-09).
+  const archivos = execFileSync('git', ['ls-files', '-z'], { cwd, encoding: 'utf8' }).split('\0')
+    .filter((f) => f && !/\.(png|jpe?g|gif|webp|pdf|xlsx?|emf|woff2?|ico|zip|docx|pptx|mp4)$/i.test(f));
+  const con = [];
+  for (const f of archivos) {
+    let t; try { t = readFileSync(join(cwd, f), 'utf8'); } catch (_) { continue; }
+    if (revisarTexto(t).length) con.push(f);
+  }
+  return con;
+}
 
 describe('deja pasar', () => {
   test('las estaciones de prueba «EstDemo», los modelos de equipos y los ids internos', () => {
@@ -77,14 +100,22 @@ describe('deja pasar', () => {
     assert.equal(motivoEnLinea('ABC' + '3012'), '');
   });
   test('el repositorio actual no tiene ningún falso positivo', () => {
-    const archivos = execFileSync('git', ['ls-files'], { encoding: 'utf8' }).split('\n')
-      .filter((f) => f && !/\.(png|jpe?g|gif|webp|pdf|xlsx?|emf|woff2?|ico|zip|docx|pptx|mp4)$/i.test(f));
-    const con = [];
-    for (const f of archivos) {
-      let t; try { t = readFileSync(f, 'utf8'); } catch (_) { continue; }
-      if (revisarTexto(t).length) con.push(f);
-    }
-    assert.deepEqual(con, []);
+    assert.deepEqual(archivosConDatos(process.cwd()), []);
+  });
+});
+
+describe('la revisión del árbol no se salta archivos', () => {
+  test('una ruta con tilde se lee (git ls-files -z), y su dato se ve', () => {
+    const base = mkdtempSync(join(tmpdir(), 'guardia-scada-arbol-'));
+    try {
+      const g = (...a) => execFileSync('git', a, { cwd: base, encoding: 'utf8' });
+      g('init', '-q');
+      mkdirSync(join(base, 'datos'));
+      writeFileSync(join(base, 'datos', 'Medición enero.txt'), 'hola\n' + fila('Ficticia') + '\n');
+      writeFileSync(join(base, 'limpio.txt'), 'nada\n');
+      g('add', '--', '.');
+      assert.deepEqual(archivosConDatos(base), ['datos/Medición enero.txt']);
+    } finally { rmSync(base, { recursive: true, force: true }); }
   });
 });
 

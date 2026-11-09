@@ -34,7 +34,9 @@ import { fileURLToPath } from 'node:url';
 import { paresDeArchivo, problemaCedula } from '../assets/js/domain/responsables_ordenes.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const git = (args, opts = {}) => execFileSync('git', args, { cwd: ROOT, maxBuffer: 1024 * 1024 * 1024, ...opts }).toString();
+// core.quotePath=false: sin él, git escapa las rutas con tilde («"\303\223rden de trabajo.pdf"») y la comilla final tapa la
+// extensión: un PDF con tilde en el nombre pasaba la guardia de binarios en silencio (K-7, 2026-11-09).
+const git = (args, opts = {}) => execFileSync('git', ['-c', 'core.quotePath=false', ...args], { cwd: ROOT, maxBuffer: 1024 * 1024 * 1024, ...opts }).toString();
 
 /** La bóveda se busca desde el repositorio PRINCIPAL: un worktree vive en otra carpeta. */
 function rutaHuellas() {
@@ -103,7 +105,26 @@ function agregadasPorArchivo(diff) {
   return archivos;
 }
 
-/** Revisa un diff → {bloqueos:[], avisos:[]} (mensajes SIN dígitos). */
+/**
+ * Lee la salida de `--numstat -z` → [{ binario, mas, menos, ruta }]. Sin -z, git entrecomilla las rutas con comillas
+ * dobles o barra invertida («"Acta \"final\".pdf"») y escribe un renombre en la misma carpeta como «actas/{a.pdf => b.pdf}»:
+ * en los dos casos EXT_BLOQUEO no casaba y el PDF pasaba (K-7, revisión adversarial 2026-11-09). Con -z la ruta llega tal
+ * cual y un renombre llega como «a\tb\t\0viejo\0nuevo\0»: se revisa la ruta NUEVA, que es la que entra.
+ */
+function filasNumstat(salida) {
+  const partes = String(salida || '').split('\0');
+  const filas = [];
+  for (let i = 0; i < partes.length; i++) {
+    const m = partes[i].match(/^\n*(-|\d+)\t(-|\d+)\t([\s\S]*)$/);
+    if (!m) continue;
+    let ruta = m[3];
+    if (ruta === '') { ruta = partes[i + 2] || ''; i += 2; }   // renombre o copia: «viejo\0nuevo»
+    filas.push({ binario: m[1] === '-' && m[2] === '-', mas: m[1], menos: m[2], ruta });
+  }
+  return filas;
+}
+
+/** Revisa un diff → {bloqueos:[], avisos:[]} (mensajes SIN dígitos). `numstat` es la salida de `--numstat -z`. */
 function revisarDiff(diff, numstat) {
   const bloqueos = [], avisos = [];
   for (const [archivo, lineas] of agregadasPorArchivo(diff)) {
@@ -124,10 +145,10 @@ function revisarDiff(diff, numstat) {
       }
     }
   }
-  String(numstat || '').split('\n').filter(Boolean).forEach((fila) => {
-    const [a, b, ...resto] = fila.split('\t');
-    const ruta = resto.join('\t');
-    if (a !== '-' || b !== '-') return;
+  filasNumstat(numstat).forEach(({ binario, mas, menos, ruta }) => {
+    // Un .gitattributes con «*.pdf diff» hace que git muestre el PDF como texto (numstat con números y no «-»): por eso
+    // un documento con contenido se frena por su extensión aunque git no lo llame binario. «0\t0» = vacío o solo renombrado.
+    if (!binario && (!EXT_BLOQUEO.test(ruta) || (mas === '0' && menos === '0'))) return;
     if (EXT_BLOQUEO.test(ruta) || IMG_SOSPECHOSA.test(ruta)) {
       if (process.env.GUARDIA_BINARIOS_OK === '1') avisos.push(`${ocultar(ruta)}: binario aceptado por GUARDIA_BINARIOS_OK=1`);
       else bloqueos.push(`${ocultar(ruta)}: documento binario (puede llevar cédulas que no se pueden leer); si lo revisó, GUARDIA_BINARIOS_OK=1`);
@@ -148,7 +169,11 @@ function informar({ bloqueos, avisos }, que) {
   process.exit(0);
 }
 
-const DIFF_OPC = ['--no-color', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', '-U0'];
+// --text: un .gitattributes con «*.csv -diff» (o «binary») hace que git diga «Binary files differ» y la FORMA no
+// vería ninguna línea; con --text toda línea agregada se lee (K-7, revisión adversarial 2026-11-09). El numstat va SIN
+// --text a propósito: es el que dice qué es binario para frenar PDF/Excel/Word.
+const DIFF_OPC = ['--no-color', '--text', '--no-ext-diff', '--no-textconv', '--src-prefix=a/', '--dst-prefix=b/', '-U0'];
+const NUMSTAT_OPC = ['--numstat', '-z', '--no-ext-diff', '--no-textconv'];
 const modo = process.argv[2] || '';
 
 if (modo === '--registrar') {
@@ -207,10 +232,10 @@ if (modo === '--push' || modo === '--historia') {
       if (traeRegistrada(msg)) bloqueos.push(`commit ${sha.slice(0, 8)}: el mensaje trae una cédula registrada`);
       else if (RE_FORMA.test(msg)) bloqueos.push(`commit ${sha.slice(0, 8)}: el mensaje trae «cédula/C.C.» seguida de un número`);
       const diff = git(['show', '-m', '--first-parent', '--format=', ...DIFF_OPC, sha]);
-      const numstat = git(['show', '-m', '--first-parent', '--format=', '--numstat', '--no-ext-diff', sha]);
+      const numstat = git(['show', '-m', '--first-parent', '--format=', ...NUMSTAT_OPC, sha]);
       const res = revisarDiff(diff, modo === '--historia' ? '' : numstat);
       res.bloqueos.forEach((b) => bloqueos.push(`commit ${sha.slice(0, 8)} · ${b}`));
-      if (modo === '--historia') binariosSinRevisar += numstat.split('\n').filter((f) => f.startsWith('-\t-\t')).length;
+      if (modo === '--historia') binariosSinRevisar += filasNumstat(numstat).filter((f) => f.binario).length;
       else res.avisos.forEach((a) => avisos.push(a));
     });
   });
@@ -226,5 +251,5 @@ if (modo === '--push' || modo === '--historia') {
 
 // Por defecto: lo preparado para commit.
 const diff = git(['diff', '--cached', ...DIFF_OPC]);
-const numstat = git(['diff', '--cached', '--numstat', '--no-ext-diff', '--diff-filter=AMR']);
+const numstat = git(['diff', '--cached', ...NUMSTAT_OPC, '--diff-filter=AMR']);
 informar(revisarDiff(diff, numstat), 'commit');

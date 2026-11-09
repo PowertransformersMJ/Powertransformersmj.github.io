@@ -23,8 +23,13 @@ concurrency:
   # El nombre del flujo que INVOCA entra en el grupo: cuando el despliegue llama
   # a esta verificación, no debe cancelar (ni ser cancelada por) la corrida
   # propia de CI sobre la misma rama.
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # En las ramas que PUBLICAN (main y master, las de pages.yml) ninguna corrida se cancela: la guardia SCADA revisa
+  # solo el rango de SU push, y una corrida cancelada dejaba ese rango sin revisar (revisión de K-7, 2026-11-09).
+  # Por eso ahí el grupo lleva el número de la corrida (uno por push): con un grupo compartido, GitHub cancela la
+  # corrida que espera turno cuando llega otra, aunque cancel-in-progress sea false. En las demás ramas y en los PR
+  # se cancela lo viejo, como siempre.
+  group: ci-${{ github.workflow }}-${{ github.ref }}${{ (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') && format('-{0}', github.run_id) || '' }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/master' }}
 
 jobs:
   verificar:
@@ -41,6 +46,14 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+
+      # 🔒 Cero cerebro en el sitio (99 §212; K-7/S7-10): el repo es PÚBLICO. Falla si lo versionado trae
+      # `docs/` (salvo las fichas `docs/pruebas/*.json`), `skills/`, `_legacy/`, `.claude/**` (salvo
+      # settings.json), un SKILL.md, un nombre propio del cerebro (05-ESTADO-GLOBAL, 10-MEMORIA-CORTO-PLAZO,
+      # 99-HISTORIAL-ADR) en cualquier carpeta, o un CLAUDE.md / AGENTS.md / GEMINI.md de más de 2 kB. En CI
+      # dice la categoría y cuántos, sin rutas (el log es público). Solo usa node y git: va antes de `npm ci`.
+      - name: Cero cerebro en el sitio (rutas y tamaño del puente)
+        run: node scripts/guardia-cero-cerebro.mjs --arbol
 
       - name: Instalar dependencias
         run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund
@@ -77,3 +90,29 @@ jobs:
       # sin el segundo emulador `isTeamMember()` no se puede evaluar.
       - name: Tests de reglas Firestore + Storage (emuladores)
         run: npm run test:rules
+
+  # Guardia de datos SCADA del lado del servidor (S7-07@10-11; K-7 de la auditoría del 2026-11-08).
+  # Las de la máquina (pre-commit, commit-msg, pre-push) no ven lo que entra por la web de GitHub
+  # («Add files via upload», merges de PR), desde otra máquina sin `core.hooksPath` ni con --no-verify.
+  # Revisa el RANGO del push o del PR: mensajes, líneas agregadas y nombres de archivo. Solo usa
+  # patrones (no necesita la bóveda ni dependencias). Además mira los NOMBRES de todo el árbol de la punta
+  # (el rojo dura mientras el archivo siga ahí, aunque el push siguiente venga limpio), y el contenido del
+  # árbol lo revisa tests/scada_carga_guardia.test.js. El freno de publicar NO corre aquí: lee el 99 de la bóveda,
+  # que en CI no existe (99 §212). Como `pages.yml` reutiliza este flujo, un rojo aquí frena el deploy.
+  guardia-scada:
+    name: Guardia de datos SCADA (rango del push o del PR)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout con historia (el rango necesita el commit anterior y origin/main)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Guardia SCADA sobre los commits nuevos
+        run: node scripts/guardia-scada.mjs --ci

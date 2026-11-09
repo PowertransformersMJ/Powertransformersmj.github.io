@@ -8,8 +8,12 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 REFS=$(cat)
+# 🔒 Cero cerebro en el sitio (99 §212; K-7/S7-10): ni un commit del rango ni la punta que se sube traen docs/ (salvo docs/pruebas/*.json), skills/, _legacy/ o un CLAUDE.md de más de 2 kB.
+printf '%s\n' "$REFS" | node scripts/guardia-cero-cerebro.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube devuelve cerebro al sitio público (99 §212)."; exit 1; }
 printf '%s\n' "$REFS" | node scripts/guardia-cedulas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube puede llevar una cédula."; exit 1; }
 printf '%s\n' "$REFS" | node scripts/guardia-scada.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube trae datos de red del SCADA (99 §122)."; exit 1; }
+# 🔒 Guardia de FIRMAS (99 §99) sobre cada commit del rango: lo que no pasó por el pre-commit (S7-09@10-11).
+printf '%s\n' "$REFS" | node scripts/guardia-firmas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube trae una imagen de firma (99 §99; ver arriba)."; exit 1; }
 # 🛑 Freno al PUBLICAR (99 §150, M-10): a main no sube código que cite un ADR que no esté guardado en su docs/99.
 printf '%s\n' "$REFS" | node scripts/freno-publicar.mjs --push || { echo "❌ PUSH BLOQUEADO: freno al publicar (99 §150)."; exit 1; }
 exit 0
