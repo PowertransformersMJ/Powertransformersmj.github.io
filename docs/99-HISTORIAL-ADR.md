@@ -10770,3 +10770,10 @@ un gate imprime su cobertura.
 
 **211.8 Verificado sano / no re-auditar.** `docs/pruebas/` solo tiene las 10 fichas JSON; `api/` es de Vercel y la web de Pages no lo
 carga; `assets/plantillas/PE-02081-planificacion.xlsx` es la plantilla SANEADA que la web ofrece (`sanear-plantilla-pe02081.mjs`).
+
+**211.9 Verificado tras publicar (2026-11-08).** Merge `f3c2c3d`. Run «Deploy · GitHub Pages» `42539395786`: verificación previa
+✅ y `build-deploy` ✅. `curl` anónimo con anti-caché: las **71** páginas (`index`, `home`, `pages/*`, `admin/*`) dan 200, igual que
+`assets/css/aqua-tokens.css`, `manifest.json`, `sw.js`, `docs/pruebas/01-…json` y `scripts/migrate/tipificar-suministros-fan-db.js`;
+dan **404** `/CLAUDE.md`, `/.claude/settings.json`, `/docs/05-ESTADO-GLOBAL.md`, `/docs/CONTRATO_4125000143_ANALISIS.md`,
+`/docs/99-HISTORIAL-ADR.md`, `/skills/`, `/githooks/pre-commit`, `/package.json` y `/README.md`. **Sigue abierto** (211.5): raw de
+GitHub, la historia y las `refs/pull`, mientras el repo sea público.
