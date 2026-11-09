@@ -29,6 +29,7 @@
 | §208 | ADR-208 — **El Carmen T2A por DIFERENCIA DE BARRA** en 66 kV (conclusión corregida en §210: era medida común) · TODO-69 | 10523 |
 | §209 | ADR-209 — **Cereté T1 por suma con BARRA PARTIDA** y guarda de potencia; Membrillal T1 nota; Cotorra sin cambio · TODO-69 | 10610 |
 | §210 | ADR-210 — **El Carmen T1A+T2A en PARALELO con MEDIDA COMÚN** (parte de cada uno, criterio del Ingeniero; corrige §208) · TODO-69 | 10672 |
+| §211 | ADR-211 — **La web publica SOLO lo que carga**: `pages.yml` con LISTA DE PERMITIDOS (cerebro fuera de la web) | 10738 |
 
 ## Capa 2 — Ruteo semántico (síntoma → neurona) — CONSULTA ESTO PRIMERO
 
