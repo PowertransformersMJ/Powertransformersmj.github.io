@@ -10734,3 +10734,39 @@ Bóveda: `2026-11-06-elcarmen-paralelo/` (estudio, reparto, criterio) y aviso en
   a la vista previa (que ya había mostrado 206 filas idénticas a producción). Ficha del T2A ene–nov: 110 kV 43,1 %, 66 kV 50,9 %,
   curvas dibujadas, 0 «null».
 - Aviso v2 y pedido v5 al día con lo publicado (59,5 % / 61,3 %; «ya se muestra»); los envía él.
+
+## 211. ADR-211 — La web publica SOLO lo que carga: `pages.yml` pasa de lista de borrado a LISTA DE PERMITIDOS (contención del cerebro público) ⟦OPUS-5.5⟧ (2026-11-08)
+
+> Origen: inventario del 2026-11-08 de la bóveda (`brain-private/programa/INVENTARIO.md`, anexo 03) y entrega `01` del buzón
+> de `cerebro-mj` (propuesta de Daniel, evaluada). El Ingeniero delegó las decisiones de esa tanda el 2026-11-08.
+
+**211.1 Causa raíz.** `pages.yml` subía `path: .` tras borrar una lista fija (`_dev _legacy tests functions .github`, `scripts/*.mjs`
+y config). Esa lista no cubría el cerebro, así que `curl` anónimo daba 200 en `/CLAUDE.md`, `/.claude/settings.json`,
+`/docs/05-ESTADO-GLOBAL.md` y `/docs/CONTRATO_4125000143_ANALISIS.md` (medido el 2026-11-08 con anti-caché). Una lista de borrado
+envejece sola: todo archivo nuevo se publica por defecto.
+
+**211.2 Solución.** El artefacto se arma en `_site/` SOLO con lo que la web carga en ejecución: `index.html home.html pages admin
+assets sw.js manifest.json robots.txt sitemap.xml transformador_2048px-2.png .nojekyll`, más `docs/pruebas/*.json` (lo pide con
+`fetch` `pruebas-electricas-shell.js`) y `scripts/migrate/tipificar-suministros-fan-db.js` (lo importa en caliente
+`calculo-refrigeracion.js`). Lo nuevo queda FUERA por defecto. Un paso nuevo, `scripts/verificar-artefacto-pages.mjs`, frena la
+publicación si una página cita un archivo que el repo tiene y la lista dejó fuera.
+
+**211.3 No-regresión.** No cambia ninguna página, módulo ni ruta servida que la web use; `ci.yml` y el `needs: verificar` siguen igual.
+
+**211.4 Verificación.** En local, con `git archive HEAD`: el artefacto tiene 522 archivos y el verificador revisa 1.766 referencias
+relativas; 0 faltan (29 rotas que ya lo estaban en el repo no las causa la lista). **Mutantes** (cada uno da rojo, exit 1): sin
+`assets/css` faltan 28; sin `scripts/` falta `tipificar-suministros-fan-db.js`; sin `docs/` falta `docs/pruebas` (ruta armada con
+`fetch('../docs/pruebas/' + id)`, que se resuelve contra cada carpeta con `.html`). Tras publicar: ver 211.9.
+
+**211.5 Anti-patterns evitados.** Ocultar con una lista de borrado (envejece); cerrar la lista sin medir qué carga la web; dar por
+cerrada la fuga sin `curl` contra la URL. **Lo que esto NO arregla**: el repo sigue PÚBLICO, así que `raw.githubusercontent.com`
+sigue sirviendo el cerebro, su historia y las 187 `refs/pull`. Eso lo cierran la mudanza del cerebro a la bóveda (F8) y la decisión
+ya tomada por el Ingeniero (GitHub Pro + repo privado), que espera su pago.
+
+**211.6 Archivos.** `.github/workflows/pages.yml` y `scripts/verificar-artefacto-pages.mjs` (nuevo). INTACTOS: `ci.yml`, todo el sitio.
+
+**211.7 Doctrina.** Lista de permitidos sobre lista de borrado; todo gate se prueba en las dos direcciones (base verde y mutantes rojos);
+un gate imprime su cobertura.
+
+**211.8 Verificado sano / no re-auditar.** `docs/pruebas/` solo tiene las 10 fichas JSON; `api/` es de Vercel y la web de Pages no lo
+carga; `assets/plantillas/PE-02081-planificacion.xlsx` es la plantilla SANEADA que la web ofrece (`sanear-plantilla-pe02081.mjs`).
