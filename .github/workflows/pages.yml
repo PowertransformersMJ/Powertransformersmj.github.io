@@ -44,30 +44,33 @@ jobs:
       - name: Configurar Pages
         uses: actions/configure-pages@v5
 
-      # El sitio publicaba el repositorio ENTERO (`path: .`), así que carpetas de
-      # trabajo quedaban servidas en internet sin sesión. Entre ellas `_dev/`, con
-      # nueve informes de ensayos REALES del transformador serie 450108.
-      # Aquí se retiran del artefacto ANTES de publicar. No se borran del repo:
-      # solo dejan de servirse. Ninguna de estas rutas la necesita el sitio en
-      # ejecución — verificado: ninguna página ni módulo de `assets/js/` las carga.
-      - name: Retirar del artefacto lo que NO debe publicarse
+      # LISTA DE PERMITIDOS (99 §211). Antes se publicaba el repo entero menos una
+      # lista de borrado, y esa lista no cubría el cerebro: `CLAUDE.md`, `.claude/`,
+      # `docs/` (análisis de contrato incluido) y `skills/` se servían sin sesión.
+      # Ahora el artefacto se arma SOLO con lo que la web carga en ejecución; todo
+      # lo nuevo queda fuera por defecto. Para publicar algo más, se añade aquí.
+      #   · `docs/pruebas/*.json`: las fichas que `pruebas-electricas-shell.js` pide con fetch.
+      #   · `scripts/migrate/tipificar-suministros-fan-db.js`: lo importa en caliente
+      #     `assets/js/calculo-refrigeracion.js`.
+      - name: Armar el artefacto SOLO con lo que la web necesita
         run: |
           set -eux
-          # `scripts/` NO se retira entero: `assets/js/calculo-refrigeracion.js`
-          # importa en caliente `scripts/migrate/tipificar-suministros-fan-db.js`
-          # (líneas 244 y 313). Se retira solo lo que nadie carga en ejecución.
-          rm -rf _dev _legacy tests functions .github
-          find scripts -maxdepth 1 -type f -name '*.mjs' -delete
-          rm -f  package.json package-lock.json firebase.json .firebaserc \
-                 firestore.rules firestore.indexes.json storage.rules \
-                 vercel.json eslint.config.js .html-validate.json
+          mkdir -p _site/docs _site/scripts/migrate
+          cp -R index.html home.html pages admin assets sw.js manifest.json \
+                robots.txt sitemap.xml transformador_2048px-2.png .nojekyll _site/
+          cp -R docs/pruebas _site/docs/pruebas
+          cp scripts/migrate/tipificar-suministros-fan-db.js _site/scripts/migrate/
           echo "--- lo que queda publicado ---"
-          ls -a
+          find _site -maxdepth 2 | sort
+
+      # Si una página cita un archivo que el repo tiene y la lista dejó fuera, NO se publica.
+      - name: Comprobar que al artefacto no le falta nada
+        run: node scripts/verificar-artefacto-pages.mjs _site .
 
       - name: Subir artefacto
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Desplegar
         id: deploy
