@@ -71,10 +71,20 @@ function git(args) {
 }
 
 /** Un archivo leído de git, o null si no está (sin repo, sin commit o sin la ruta). No ensucia la consola. */
-function mostrar(args) {
-  try { return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); }
+function mostrar(args, env = process.env) {
+  try { return execFileSync('git', args, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'], env }); }
   catch { return null; }
 }
+
+/**
+ * El entorno para leer OTRO repo (la bóveda). Dentro de un gancho, git fija GIT_DIR, GIT_INDEX_FILE… del SITIO, y
+ * `git -C <bóveda>` los obedece: leía el repo del sitio y frenaba todo push a main que citara un ADR, aunque el ADR
+ * estuviera commiteado en la bóveda (K-7, 2026-11-09; roto desde la mudanza de `99 §212`). Se quitan las variables
+ * que atan git a un repo concreto.
+ */
+const SIN_REPO_DEL_GANCHO = Object.fromEntries(Object.entries(process.env).filter(([k]) =>
+  !['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_OBJECT_DIRECTORY', 'GIT_ALTERNATE_OBJECT_DIRECTORIES',
+    'GIT_COMMON_DIR', 'GIT_PREFIX', 'GIT_NAMESPACE', 'GIT_QUARANTINE_PATH'].includes(k)));
 
 /**
  * Lo que el freno LEE, con git. Es el lector por defecto de `revisarCommit`; las pruebas le pasan uno falso con la misma
@@ -85,7 +95,7 @@ function mostrar(args) {
 const LECTOR_GIT = Object.freeze({
   citado: (sha) => git(['grep', '-I', '-o', '-E', '99 §[0-9]+', sha, '--', ...RUTAS_CODIGO]),
   el99DelCommit: (sha) => mostrar(['show', `${sha}:docs/99-HISTORIAL-ADR.md`]),
-  el99DeLaBoveda: () => mostrar(['-C', BOVEDA, 'show', `HEAD:${RUTA_99_BOVEDA}`])
+  el99DeLaBoveda: () => mostrar(['-C', BOVEDA, 'show', `HEAD:${RUTA_99_BOVEDA}`], SIN_REPO_DEL_GANCHO)
 });
 
 /** Revisa un commit: [] si todo lo citado tiene su ADR; ['SIN-99'] si no hay 99 ni en el commit ni en la bóveda. */

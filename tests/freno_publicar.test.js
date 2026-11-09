@@ -184,6 +184,17 @@ test('bóveda (git real): el ADR commiteado en la bóveda → exit 0 y en silenc
   assert.deepEqual(frenar(sitio), { codigo: 0, salida: '' });
 });
 
+test('bóveda (git real, DENTRO del gancho): con GIT_DIR/GIT_INDEX_FILE del sitio sigue leyendo la bóveda → exit 0', (t) => {
+  // Así lo llama git en el pre-push: con las variables del repo del SITIO puestas. Antes de K-7 (2026-11-09) el freno
+  // las heredaba al leer la bóveda y frenaba en falso todo push a main que citara un ADR (roto desde 99 §212).
+  const { sitio } = montaje(t, adr(N1));
+  const r = spawnSync(process.execPath, [join(sitio, 'scripts', 'freno-publicar.mjs'), '--rev', 'HEAD'], {
+    cwd: sitio, encoding: 'utf8',
+    env: { ...ENV, GIT_DIR: join(sitio, '.git'), GIT_INDEX_FILE: join(sitio, '.git', 'index'), GIT_WORK_TREE: sitio }
+  });
+  assert.deepEqual({ codigo: r.status, salida: r.stdout }, { codigo: 0, salida: '' });
+});
+
 /** El freno como lo llama el pre-push: `--push` con «<ref> <sha> <ref remoto> <sha remoto>» por stdin. */
 function frenarPush(sitio, refRemoto) {
   const sha = git(sitio, 'rev-parse', 'HEAD').trim();
