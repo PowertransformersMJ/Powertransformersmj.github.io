@@ -2,7 +2,7 @@
 # ===========================================================
 # 🧠 pre-commit — guardias del SITIO y escáner de secretos
 # ===========================================================
-# Desde 2026-11-08 (99 §212) el cerebro vive en la bóveda (../brain-private/sgm-transpower):
+# Desde 2026-11-08 (99 §212) el cerebro vive en la bóveda (brain-private/sgm-transpower, hermana del repo PRINCIPAL):
 # su linter corre en el pre-commit de la bóveda, no aquí. Aquí quedan las guardias del
 # sitio (cédulas, firmas, SCADA) y el escáner de secretos del kernel. Falla CERRADO.
 #
@@ -48,10 +48,26 @@ else
   echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisaron datos SCADA (99 §122)."
 fi
 
+# 🔒 Cero cerebro en el sitio (99 §212; K-7/S7-10): el repo es PÚBLICO y el cerebro vive en la bóveda.
+# Bloquea si lo preparado trae docs/ (salvo las fichas docs/pruebas/*.json), skills/, _legacy/ o un
+# CLAUDE.md de más de 2 kB (el puente mide ~1,6 kB). Solo mira rutas y tamaños.
+if command -v node >/dev/null 2>&1; then
+  if ! node scripts/guardia-cero-cerebro.mjs; then
+    echo ""
+    echo "❌ COMMIT BLOQUEADO: lo preparado devuelve cerebro al sitio público (ver arriba)."
+    exit 1
+  fi
+else
+  echo "⚠️  pre-commit: 'node' no está en PATH → NO se revisó «cero cerebro» (99 §212)."
+fi
+
 # 🔒 Escáner de secretos del kernel (bóveda hermana) sobre LO PREPARADO, y también sobre el
-# disco de esas rutas (99 §212). Sin node o sin bóveda NO se commitea (fallo cerrado).
+# disco de esas rutas (99 §212). La bóveda se busca junto al repo PRINCIPAL (scripts/boveda.mjs): sirve
+# igual desde un worktree (.claude/worktrees/<n>/). Sin node o sin bóveda NO se commitea (fallo cerrado).
 command -v node >/dev/null 2>&1 || { echo "❌ COMMIT BLOQUEADO: 'node' no está en PATH (fallo cerrado)."; exit 1; }
-K="$(git rev-parse --show-toplevel)/../brain-private/kernel/verify-secretos.mjs"
+B="$(node scripts/boveda.mjs)" || { echo "❌ COMMIT BLOQUEADO: no encuentro la bóveda privada (el porqué y cómo seguir, arriba)."; exit 1; }
+K="$B/kernel/verify-secretos.mjs"
 [ -f "$K" ] || { echo "❌ COMMIT BLOQUEADO: no encuentro el escáner del kernel ($K)."; exit 1; }
-node "$K" --staged || { echo ""; echo "❌ COMMIT BLOQUEADO: el cambio trae una credencial (ver arriba)."; exit 1; }
+# --coordenadas (L-140, kernel ≥ 1.16.0): también la posición de una S/E (par lat/long del área de AFINIA).
+node "$K" --staged --coordenadas || { echo ""; echo "❌ COMMIT BLOQUEADO: el cambio trae una credencial o la posición de una S/E (L-140; ver arriba)."; exit 1; }
 exit 0

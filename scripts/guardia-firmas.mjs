@@ -16,6 +16,14 @@
 //   · un Excel emitido con firmas del equipo (folio `_F-XXXXXXXX` en el nombre)
 //     o cualquier documento zip que traiga dentro `xl/media/firma-*`.
 // No imprime el contenido de nada.
+//
+//   (sin argumentos) → lo preparado (pre-commit; y pre-merge-commit, donde el
+//                      índice ya es el resultado del merge)
+//   --push           → lo que se va a subir (pre-push): lee las referencias por
+//                      stdin, como guardia-cedulas, y revisa los archivos que
+//                      agrega o cambia CADA commit del rango, leídos de su blob.
+//                      Cubre lo que no pasa por el pre-commit: cherry-pick,
+//                      rebase, merge en avance rápido y `commit --no-verify`.
 // ══════════════════════════════════════════════════════════════
 
 import { execFileSync } from 'node:child_process';
@@ -67,31 +75,69 @@ function huellasPrivadas() {
   catch (_) { return null; }
 }
 
-// TODO lo preparado (agregado, copiado, modificado, renombrado o cambiado de
-// tipo): no solo lo que tiene extensión de imagen (revisión de ADR-099).
-const preparados = git(['diff', '--cached', '--name-only', '--diff-filter=ACMRT', '-z']).split('\0').filter(Boolean);
+/** Por qué un archivo es una FIRMA ('' si no lo es). `leer(f)` da sus bytes; si no se pueden leer, no se revisa. */
+function motivoFirma(f, leer, huellas, cuenta) {
+  if (EXCEL_EMITIDO.test(f)) return 'Excel emitido con firmas del equipo';
+  let b = null;
+  try { b = leer(f); } catch (_) { return ''; }
+  if (zipConFirma(b)) return 'documento con una firma estampada dentro';
+  if (!(IMAGEN.test(f) || esImagenPorBytes(b))) return '';
+  cuenta.imagenes++;
+  if (SOSPECHOSO.test(f)) return 'imagen con nombre o ruta de firma';
+  if (huellas && huellas.has(createHash('sha256').update(b).digest('hex'))) return 'es una firma registrada';
+  return '';
+}
+
+/** --push: los rangos de commits a revisar, desde las referencias que git le pasa al pre-push por stdin. */
+function rangosDePush(entrada) {
+  const rangos = [];
+  for (const fila of String(entrada || '').split('\n').filter(Boolean)) {
+    const [, local, , remoto] = fila.trim().split(/\s+/);
+    if (!local || /^0+$/.test(local)) continue;                  // se borra una rama: nada que revisar
+    // Rama nueva, o un remoto que este clon no tiene (push forzado tras un push ajeno): todo lo que no está en un remoto.
+    let conocido = !!remoto && !/^0+$/.test(remoto);
+    if (conocido) { try { execFileSync('git', ['cat-file', '-e', remoto + '^{commit}'], { stdio: 'ignore' }); } catch (_) { conocido = false; } }
+    rangos.push(conocido ? [remoto + '..' + local] : [local, '--not', '--remotes']);
+  }
+  return rangos;
+}
+
+const PUSH = process.argv.includes('--push');
 const huellas = huellasPrivadas();
 const bloqueos = [];
-let revisadas = 0;
-for (const f of preparados) {
-  if (EXCEL_EMITIDO.test(f)) { bloqueos.push(f + ' (Excel emitido con firmas del equipo)'); continue; }
-  let b = null;
-  try { b = bytesPreparados(f); } catch (_) { continue; }
-  if (zipConFirma(b)) { bloqueos.push(f + ' (documento con una firma estampada dentro)'); continue; }
-  const imagen = IMAGEN.test(f) || esImagenPorBytes(b);
-  if (!imagen) continue;
-  revisadas++;
-  if (SOSPECHOSO.test(f)) { bloqueos.push(f + ' (imagen con nombre o ruta de firma)'); continue; }
-  if (huellas && huellas.has(createHash('sha256').update(b).digest('hex'))) bloqueos.push(f + ' (es una firma registrada)');
+const cuenta = { imagenes: 0 };
+if (PUSH) {
+  let entrada = '';
+  try { entrada = readFileSync(0, 'utf8'); } catch (_) { entrada = ''; }
+  for (const rango of rangosDePush(entrada)) {
+    for (const sha of git(['rev-list', ...rango]).split('\n').filter(Boolean)) {
+      // Lo que ESE commit agrega o cambia (un merge, contra su primer padre), leído de su blob y no del disco.
+      const rutas = git(['show', '-m', '--first-parent', '--format=', '--name-only', '--diff-filter=ACMRT', '-z', sha]).split('\0').filter(Boolean);
+      const blob = (f) => execFileSync('git', ['cat-file', 'blob', sha + ':' + f], { maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] });
+      for (const f of rutas) {
+        const m = motivoFirma(f, blob, huellas, cuenta);
+        if (m) bloqueos.push('commit ' + sha.slice(0, 8) + ' · ' + f + ' (' + m + ')');
+      }
+    }
+  }
+} else {
+  // TODO lo preparado (agregado, copiado, modificado, renombrado o cambiado de
+  // tipo): no solo lo que tiene extensión de imagen (revisión de ADR-099).
+  const preparados = git(['diff', '--cached', '--name-only', '--diff-filter=ACMRT', '-z']).split('\0').filter(Boolean);
+  for (const f of preparados) {
+    const m = motivoFirma(f, bytesPreparados, huellas, cuenta);
+    if (m) bloqueos.push(f + ' (' + m + ')');
+  }
 }
-if (revisadas && !(huellas && huellas.size)) {
+if (cuenta.imagenes && !(huellas && huellas.size)) {
   console.log('⚠️  guardia-firmas: no se encontró la lista privada de huellas; solo se revisaron nombres y contenido.');
 }
 
 if (bloqueos.length) {
-  console.log('🔒 guardia-firmas: el commit trae FIRMAS o documentos con firmas (el repo es público):');
-  for (const x of bloqueos) console.log('   · ' + x);
+  console.log('🔒 guardia-firmas: ' + (PUSH ? 'lo que se va a subir' : 'el commit') + ' trae FIRMAS o documentos con firmas (el repo es público):');
+  for (const x of [...new Set(bloqueos)]) console.log('   · ' + x);
   console.log('   Las firmas se suben en «Mi firma» o en «Firmas del equipo»; nunca al repositorio.');
+  if (PUSH) console.log('   Un commit nuevo que la borre no basta (la historia es pública): rehaga el cambio sin la firma en una rama nueva desde lo ya publicado y suba esa.');
   process.exit(1);
 }
 process.exit(0);

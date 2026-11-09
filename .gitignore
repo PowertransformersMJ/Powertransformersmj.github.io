@@ -69,6 +69,13 @@ docs/.handoff-auto.md
 docs/.estado-auto.md
 docs/.boot-marker
 .claude/settings.local.json.BAK-*
+# 🧠 Cero cerebro en el sitio (99 §212; K-7/S7-10): el cerebro vive en la bóveda. Del docs/ del sitio solo se
+# versionan las fichas que la web carga (docs/pruebas/*.json). Es la primera red (git add -f la salta); la que
+# frena es scripts/guardia-cero-cerebro.mjs (pre-commit, pre-push y CI).
+/docs/*
+!/docs/pruebas/
+/skills/
+/_legacy/
 # ⚠️ scripts/.kernel-version.json SÍ se commitea: es el sello de integridad del kernel (gate #0).
 
 # ⚠️ CONFIDENCIAL / COPYRIGHT — NUNCA al repo público (ADR-052 Ola 0)

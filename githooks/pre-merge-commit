@@ -3,8 +3,9 @@
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 for d in "$HOME"/.nvm/versions/node/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 if ! command -v node >/dev/null 2>&1; then
-  echo "⚠️  pre-merge-commit: 'node' no está en PATH → NO se revisaron cédulas (99 §78)."
+  echo "⚠️  pre-merge-commit: 'node' no está en PATH → NO se revisaron cédulas ni firmas (99 §78, §99)."
   exit 0
 fi
 node scripts/guardia-cedulas.mjs || { echo "❌ MERGE BLOQUEADO: el resultado puede llevar una cédula."; exit 1; }
+node scripts/guardia-firmas.mjs || { echo "❌ MERGE BLOQUEADO: el resultado trae una imagen de firma (99 §99; ver arriba)."; exit 1; }
 exit 0
