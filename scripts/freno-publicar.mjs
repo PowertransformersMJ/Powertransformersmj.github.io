@@ -11,11 +11,19 @@
 //   printf '<ref> <sha> <ref remoto> <sha remoto>\n' | node scripts/freno-publicar.mjs --push
 //   node scripts/freno-publicar.mjs --rev <commit>        → revisa un commit a mano
 //
+// 2026-11-08 (99 §212, F8): el cerebro vive en la bóveda hermana (../brain-private/sgm-transpower/). El 99 que manda
+// es el del commit que se publica si aún lo trae (commits viejos) y si no, el COMMITEADO en la bóveda (su HEAD, no el
+// disco): «el ADR se guarda antes de publicar» sigue siendo verificable. Sin bóveda NO se publica (fallo cerrado).
+//
 // Las funciones puras se prueban en tests/freno_publicar.test.js (sin git).
 // ===========================================================
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const BOVEDA = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'brain-private');
+const RUTA_99_BOVEDA = 'sgm-transpower/docs/99-HISTORIAL-ADR.md';
 
 /** Rutas de CÓDIGO que se publican (los docs del cerebro no cuentan: citan lo que quieran). */
 export const RUTAS_CODIGO = Object.freeze([
@@ -60,9 +68,14 @@ function git(args) {
 /** Revisa un commit: [] si todo lo citado tiene su ADR. */
 export function revisarCommit(sha) {
   const citado = git(['grep', '-I', '-o', '-E', '99 §[0-9]+', sha, '--', ...RUTAS_CODIGO]);
-  let h99 = '';
-  try { h99 = execFileSync('git', ['show', `${sha}:docs/99-HISTORIAL-ADR.md`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }); }
-  catch { h99 = ''; }
+  let h99 = null;
+  try { h99 = execFileSync('git', ['show', `${sha}:docs/99-HISTORIAL-ADR.md`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); }
+  catch { h99 = null; }
+  if (h99 === null) {
+    try { h99 = execFileSync('git', ['-C', BOVEDA, 'show', `HEAD:${RUTA_99_BOVEDA}`], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }); }
+    catch { h99 = null; }
+  }
+  if (h99 === null) return ['SIN-99'];
   return faltantes(citasDeAdr(citado), encabezadosAdr(h99));
 }
 
@@ -75,11 +88,14 @@ function main() {
   let malo = false;
   for (const sha of shas) {
     const f = revisarCommit(sha);
-    if (f.length) {
+    if (f[0] === 'SIN-99') {
+      malo = true;
+      console.log(`⛔ FRENO AL PUBLICAR (99 §150): no encuentro el 99 ni en ${sha.slice(0, 7)} ni commiteado en la bóveda (${BOVEDA}/${RUTA_99_BOVEDA}). Sin el 99 no se puede comprobar: NO se publica.`);
+    } else if (f.length) {
       malo = true;
       console.log(`⛔ FRENO AL PUBLICAR (99 §150): ${sha.slice(0, 7)} lleva código que cita ${f.map((n) => '99 §' + n).join(', ')}, ` +
-        'pero esos ADR no están en docs/99-HISTORIAL-ADR.md de lo que se publica.\n' +
-        '   Guarde primero el ADR (commit del cerebro en la rama) y vuelva a publicar. Documentar nunca está bloqueado.');
+        'pero esos ADR no están en el 99 (del commit o, desde la mudanza, commiteado en la bóveda).\n' +
+        '   Guarde primero el ADR (commit del cerebro en la BÓVEDA) y vuelva a publicar. Documentar nunca está bloqueado.');
     }
   }
   process.exit(malo ? 1 : 0);

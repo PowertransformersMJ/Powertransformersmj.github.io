@@ -1,19 +1,85 @@
 {
+  "permissions": {
+    "deny": [
+      "Bash(rm -rf *)",
+      "Bash(rm -fr *)",
+      "Bash(rm -Rf *)",
+      "Bash(rm -rF *)",
+      "Bash(rm -r *)",
+      "Bash(rm -R *)",
+      "Bash(rm -f -r *)",
+      "Bash(rm -r -f *)",
+      "Bash(rm --recursive *)",
+      "Bash(sudo *)",
+      "Bash(git reset --hard*)",
+      "Bash(git reset * --hard*)",
+      "Bash(git clean*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f*)",
+      "Bash(git push * --force*)",
+      "Bash(git push * -f*)",
+      "Bash(git push * +*)",
+      "Bash(git commit --amend*)",
+      "Bash(git commit * --amend*)",
+      "Bash(git * --no-verify*)",
+      "Bash(git * --no-gpg-sign*)",
+      "Bash(git config core.hooksPath *)",
+      "Bash(git config * core.hooksPath *)",
+      "Bash(git -c core.hooksPath*)",
+      "Bash(git filter-branch*)",
+      "Bash(git filter-repo*)",
+      "Bash(git reflog expire*)",
+      "Bash(git stash clear*)",
+      "Bash(gh repo delete*)",
+      "Bash(gh repo edit * --visibility*)",
+      "Bash(gh auth token*)",
+      "Bash(git -C * config core.hooksPath *)",
+      "Bash(git -C * config * core.hooksPath *)",
+      "Bash(git -C * push --force*)",
+      "Bash(git -C * push -f*)",
+      "Bash(git -C * reset --hard*)",
+      "Bash(git -C * clean*)"
+    ]
+  },
   "hooks": {
     "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/brain-check.mjs\" --boot --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 30,
+            "statusMessage": "Auto-auditoría del cerebro (en la bóveda)…"
+          },
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/session-handoff.mjs\" --boot-echo --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 15,
+            "statusMessage": "Cerebro en la bóveda + handoff…"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/brain-check.mjs\" --boot",
-            "timeout": 30,
-            "statusMessage": "Auto-auditoría del cerebro (brain:check --boot)…"
-          },
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/session-handoff.mjs\" --tick --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/session-handoff.mjs\" --boot-echo",
-            "timeout": 15,
-            "statusMessage": "Handoff automático de la sesión anterior…"
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/session-handoff.mjs\" --tick --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -23,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/session-handoff.mjs\" --precompact",
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/session-handoff.mjs\" --precompact --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 15,
             "statusMessage": "Caja negra: volcando foto de sesión…"
           }
@@ -35,7 +101,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/session-handoff.mjs\" --end",
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/session-handoff.mjs\" --end --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 15
           }
         ]
@@ -46,7 +112,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/session-handoff.mjs\" --end",
+            "command": "node \"$CLAUDE_PROJECT_DIR/../brain-private/kernel/session-handoff.mjs\" --end --root \"$CLAUDE_PROJECT_DIR/../brain-private/sgm-transpower\" --sitio \"$CLAUDE_PROJECT_DIR\"",
             "timeout": 15,
             "async": true
           }
