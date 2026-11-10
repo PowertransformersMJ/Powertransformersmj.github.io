@@ -20,7 +20,9 @@
 // Revisa SOLO lo que se agrega (líneas nuevas del diff y archivos nuevos), y el
 // mensaje del commit (también es público). Nunca imprime lo que encontró.
 // Las líneas se leen con --text, --no-textconv y --no-ext-diff: un «.gitattributes» («*.csv -diff», «binary»), un
-// filtro textconv o un diff externo no la dejan ciega; lo binario se decide por el CONTENIDO, como git sin atributos.
+// filtro textconv o un diff externo no la dejan ciega; lo binario se decide por el CONTENIDO, como git sin atributos,
+// salvo un texto en UTF-16 (se lee decodificado) y un .csv/.tsv/.txt/.dat/.log/.prn/.asc con un NUL suelto (valen sus
+// líneas). K-16.
 // En --ci revisa además los NOMBRES de todo el árbol de la punta: el rojo dura mientras el archivo siga en él.
 //
 // Uso:  node scripts/guardia-scada.mjs              (lo preparado: pre-commit)
@@ -124,10 +126,11 @@ function bloquesDeDiff(diff) {
  * De estos blobs, ¿cuáles son binarios por CONTENIDO? Un NUL en los primeros 8000 bytes: la misma regla de git, pero
  * sin mirar los atributos. Con --text, una foto real (un PNG de la historia) daba un «circuito» por azar: medido el
  * 2026-11-09 sobre los 1849 commits del repo, ese era el único cambio de veredicto, y esta regla lo quita.
+ * Devuelve un Map blob → contenido (K-16): con el contenido se lee un CSV guardado en UTF-16 (ver textoUtf16).
  */
 function blobsBinarios(blobs) {
   const pedir = [...new Set(blobs)].filter((s) => s && !/^0+$/.test(s));
-  const binarios = new Set();
+  const binarios = new Map();
   if (!pedir.length) return binarios;
   const out = execFileSync('git', ['cat-file', '--batch'], { input: pedir.join('\n') + '\n', maxBuffer: 256 * 1024 * 1024 });
   let i = 0;
@@ -138,24 +141,79 @@ function blobsBinarios(blobs) {
     i = fin + 1;
     if (cab.length < 3) continue;
     const n = Number(cab[2]);
-    if (out.subarray(i, i + Math.min(n, 8000)).includes(0)) binarios.add(cab[0]);
+    if (out.subarray(i, i + Math.min(n, 8000)).includes(0)) binarios.set(cab[0], out.subarray(i, i + n));
     i += n + 1;
   }
   return binarios;
 }
 
-/** Hallazgos en las líneas agregadas de un diff (hecho con DIFF_CRUDO): [{ ruta, motivo }], sin los binarios. */
+// Un .csv/.tsv/.txt es TEXTO por su nombre: un NUL suelto (p. ej. al inicio de un exporte) no lo vuelve una foto (K-16).
+// También .dat, .log, .prn y .asc: con esos nombres se guardan exportes y registros de texto, y con un NUL al inicio
+// pasaban en todos los modos (revisión de K-16, 2026-11-09; no era regresión).
+// La comilla final opcional: sin core.quotePath=false, git entrecomilla en el «+++» una ruta con tilde.
+const TEXTO_PLANO = /\.(csv|tsv|txt|dat|log|prn|asc)"?$/i;
+// Lo legible de un texto latino, por código: tabulador y saltos, ASCII imprimible, Latin-1 y Latin extendido (0xA0 a
+// 0x24F), y la tipografía de uso común (rayas, comillas, viñeta, puntos suspensivos y el euro).
+const TIPOGRAFIA = new Set([0x2013, 0x2014, 0x2018, 0x2019, 0x201a, 0x201b, 0x201c, 0x201d, 0x201e, 0x2022, 0x2026, 0x20ac]);
+const legible = (c) => c === 9 || c === 10 || c === 13 || (c >= 0x20 && c <= 0x7e) || (c >= 0xa0 && c <= 0x24f) || TIPOGRAFIA.has(c);
+
+/**
+ * El texto de un blob en UTF-16 (el «Unicode» con que guardan Excel y el Bloc de notas), o '' si no lo es. Con BOM
+ * (FF FE o FE FF) o sin él (el orden lo dice el lado, par o impar, con más NUL). Sin BOM se acepta solo si lo
+ * decodificado es casi todo texto latino legible: una foto o un PDF leídos así dan signos al azar y no pasan. Con BOM se
+ * acepta siempre: el BOM ya dice que es texto, y la prueba de legibilidad dejaba pasar un exporte corto con las unidades
+ * en griego (Ω, φ, Δ) en la cabecera (revisión de K-16, 2026-11-09). Con --text, git parte el UTF-16 en bytes con un NUL
+ * entre letra y letra: ninguna forma casaba, y el NUL además lo marcaba binario (K-16).
+ */
+export function textoUtf16(buf) {
+  const b = Buffer.from(buf || []);
+  if (b.length < 4) return '';
+  let be = b[0] === 0xfe && b[1] === 0xff;
+  const conBom = be || (b[0] === 0xff && b[1] === 0xfe);
+  if (!conBom) {
+    let par = 0, impar = 0;
+    for (let i = 0; i < Math.min(b.length, 8000); i++) if (b[i] === 0) { if (i % 2) impar++; else par++; }
+    be = par > impar;
+  }
+  const cuerpo = b.subarray(conBom ? 2 : 0);
+  const pares = Buffer.from(cuerpo.subarray(0, cuerpo.length - (cuerpo.length % 2)));
+  if (be) pares.swap16();
+  const texto = pares.toString('utf16le');
+  if (conBom) return texto;
+  const muestra = texto.slice(0, 4000);
+  if (!muestra) return '';
+  let raros = 0;
+  for (let i = 0; i < muestra.length; i++) if (!legible(muestra.charCodeAt(i))) raros++;
+  return raros <= muestra.length * 0.05 ? texto : '';
+}
+
+/**
+ * Hallazgos en las líneas agregadas de un diff (hecho con DIFF_CRUDO): [{ ruta, motivo }]. Lo binario por contenido
+ * (un NUL en los primeros 8000 bytes) se descartaba siempre, y así pasaban un CSV en UTF-16 o uno con un NUL al inicio
+ * (K-16; ya pasaba antes de K-7). Ahora, de un blob binario: si es texto UTF-16, se revisa decodificado (entero: sus
+ * líneas del diff no se pueden separar); si su nombre es de texto (TEXTO_PLANO), valen sus líneas agregadas; si no, se
+ * descarta.
+ */
 function hallazgosDeDiff(diff) {
   const conHallazgo = [];
   for (const b of bloquesDeDiff(diff)) {
     const motivos = [];
     for (const l of b.lineas) { const m = motivoEnLinea(l); if (m) motivos.push(m); }
-    if (motivos.length) conHallazgo.push({ ...b, motivos });
+    // Un bloque con NUL en lo agregado puede ser UTF-16, donde ninguna forma casa: su blob se lee abajo.
+    if (motivos.length || b.lineas.some((l) => l.includes('\0'))) conHallazgo.push({ ...b, motivos });
   }
-  // Solo se lee el contenido de los archivos con algún hallazgo: lo normal (sin hallazgos) no cuesta nada más.
+  // Solo se lee el contenido de los archivos con algún hallazgo o con NUL: lo normal (texto limpio) no cuesta nada más.
   const binarios = blobsBinarios(conHallazgo.map((b) => b.blob));
   const out = [];
-  for (const b of conHallazgo) if (!binarios.has(b.blob)) for (const motivo of b.motivos) out.push({ ruta: b.ruta, motivo });
+  for (const b of conHallazgo) {
+    let motivos = b.motivos;
+    if (binarios.has(b.blob)) {
+      const t16 = textoUtf16(binarios.get(b.blob));
+      if (t16) motivos = revisarTexto(t16).map((h) => h.motivo);
+      else if (!TEXTO_PLANO.test(b.ruta)) motivos = [];
+    }
+    for (const motivo of motivos) out.push({ ruta: b.ruta, motivo });
+  }
   return out;
 }
 
@@ -164,9 +222,13 @@ function hallazgosPreparados() {
   return hallazgosDeDiff(git(['diff', '--cached', '-U0', ...DIFF_CRUDO, '--diff-filter=ACMRT']));
 }
 
-/** Hallazgos en las líneas agregadas por un commit ya hecho (--push, --rango y --ci). */
+/**
+ * Hallazgos en las líneas agregadas por un commit ya hecho (--push, --rango y --ci). Con -m --first-parent, como
+ * cédulas: sin ellos git muestra un merge como diff COMBINADO, que en un merge limpio sale vacío, y lo que traía la
+ * rama no se veía si sus commits quedaban fuera del rango (K-16; revisión de K-7, 2026-11-09).
+ */
 function hallazgosDeCommit(sha) {
-  return hallazgosDeDiff(git(['show', ...DIFF_CRUDO, '-U0', '--format=', sha]));
+  return hallazgosDeDiff(git(['show', '-m', '--first-parent', ...DIFF_CRUDO, '-U0', '--format=', sha]));
 }
 
 /**
@@ -190,7 +252,8 @@ function revisarShas(shas, conRutas = true) {
     const msg = git(['log', '-1', '--format=%B', sha]);
     if (revisarTexto(msg).length) bloqueos.push('commit ' + sha.slice(0, 8) + ' (el mensaje trae un dato SCADA)');
     if (hallazgosDeCommit(sha).length) bloqueos.push('commit ' + sha.slice(0, 8) + ' (agrega un dato SCADA)');
-    const nuevos = git(['show', '--no-color', '--name-only', '--diff-filter=ACR', '--format=', '-z', sha]).split('\0').filter(Boolean);
+    // -m --first-parent: los nombres que trae un merge limpio (el combinado no lista ninguno; K-16).
+    const nuevos = git(['show', '-m', '--first-parent', '--no-color', '--name-only', '--diff-filter=ACR', '--format=', '-z', sha]).split('\0').filter(Boolean);
     for (const f of nuevos) {
       if (archivoSospechoso(f)) bloqueos.push('commit ' + sha.slice(0, 8) + ' (' + (conRutas ? f : 'un archivo con nombre de exporte SCADA, de homologación o del paquete de placas') + ')');
     }

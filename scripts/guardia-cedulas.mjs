@@ -232,7 +232,10 @@ if (modo === '--push' || modo === '--historia') {
       if (traeRegistrada(msg)) bloqueos.push(`commit ${sha.slice(0, 8)}: el mensaje trae una cédula registrada`);
       else if (RE_FORMA.test(msg)) bloqueos.push(`commit ${sha.slice(0, 8)}: el mensaje trae «cédula/C.C.» seguida de un número`);
       const diff = git(['show', '-m', '--first-parent', '--format=', ...DIFF_OPC, sha]);
-      const numstat = git(['show', '-m', '--first-parent', '--format=', ...NUMSTAT_OPC, sha]);
+      // --diff-filter=d: un BORRADO no sube nada (el commit que agregó el archivo ya se revisa por su cuenta). Sin él,
+      // borrar un PDF/Word daba un falso rojo en --push y contaba como «binario sin revisar» en --historia
+      // (129b0fc2 y ad5bc682 borran un .docx; K-16, 2026-11-09).
+      const numstat = git(['show', '-m', '--first-parent', '--format=', ...NUMSTAT_OPC, '--diff-filter=d', sha]);
       const res = revisarDiff(diff, modo === '--historia' ? '' : numstat);
       res.bloqueos.forEach((b) => bloqueos.push(`commit ${sha.slice(0, 8)} · ${b}`));
       if (modo === '--historia') binariosSinRevisar += filasNumstat(numstat).filter((f) => f.binario).length;

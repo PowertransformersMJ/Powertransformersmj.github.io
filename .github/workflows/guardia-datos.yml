@@ -1,0 +1,81 @@
+name: Guardia de datos · ramas fuera de CI
+
+# K-16 (resto de K-7; revisión adversarial del 2026-11-09). La guardia SCADA y la de cero cerebro corrían solo en las
+# ramas de ci.yml (main, master, claude/**, DESARROLLO-/-PROYECTO-MJ): un push o una subida web a ordenes/*, mapa/*,
+# fichas/*, informe-brigada… no se revisaba hasta un PR o main. Este flujo LIGERO corre esas dos guardias (solo node y
+# git: sin npm ci, sin la suite y sin la bóveda) en TODAS las demás ramas, en las etiquetas y en los PR a otras bases.
+# Sus listas son el COMPLEMENTO EXACTO de las de ci.yml, para no correr dos veces lo mismo:
+# tests/guardia_datos_ramas.test.js falla si una cambia y la otra no.
+# GitHub lee el flujo del COMMIT SUBIDO: una rama vieja que no trae este archivo no dispara nada hasta que traiga main
+# (merge o rebase). Mientras tanto la revisa el PR a main: ci.yml corre sobre el merge con main.
+on:
+  push:
+    branches-ignore:
+      - main
+      - master
+      - 'claude/**'
+      - 'DESARROLLO-/-PROYECTO-MJ'
+    # Con solo branches-ignore GitHub no correría en las etiquetas: se piden aparte (ci.yml no las mira).
+    tags:
+      - '**'
+  pull_request:
+    branches-ignore:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+concurrency:
+  # Ninguna corrida se cancela ni se descarta: cada push tiene su propio veredicto, y un rojo no lo tapa el push
+  # siguiente. Con un grupo compartido GitHub cancela la corrida que espera turno aunque cancel-in-progress sea
+  # false (ver ci.yml), así que el grupo es uno por corrida.
+  group: guardia-datos-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  guardias:
+    name: Guardias de datos (SCADA y cero cerebro), sin la bóveda
+    # Borrar una rama no trae commits que revisar.
+    if: github.event.deleted != true
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout con historia (la rama se compara con la principal)
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      # Las guardias se toman de la rama PRINCIPAL, no de la rama subida: una rama de antes de K-7 trae una guardia
+      # SCADA sin «--ci» (sale 0 sin revisar nada) y no trae la de cero cerebro (rojo por «Cannot find module»).
+      # Así toda rama se mide con la regla vigente. Se copian bajo su ruta REAL: guardia-scada solo corre si argv[1]
+      # es su ruta real; por un enlace sale 0 sin revisar (medido en macOS, /var → /private/var).
+      - name: Tomar las guardias de la rama principal
+        id: guardias
+        env:
+          PRINCIPAL: ${{ github.event.repository.default_branch }}
+        run: |
+          D="$(realpath "$RUNNER_TEMP")/guardias-de-main"
+          mkdir -p "$D"
+          for g in guardia-scada guardia-cero-cerebro; do
+            git show "origin/${PRINCIPAL:-main}:scripts/$g.mjs" > "$D/$g.mjs" \
+              || { echo "❌ no encuentro scripts/$g.mjs en origin/${PRINCIPAL:-main}: sin guardia no hay revisión"; exit 1; }
+          done
+          echo "GUARDIAS=$D" >> "$GITHUB_ENV"
+
+      # Los commits que la rama trae y la principal no (o los del PR), sus mensajes y los NOMBRES del árbol de la punta.
+      # En CI no imprime rutas ni datos: solo el SHA y un motivo genérico (el registro es público).
+      - name: Guardia SCADA (lo que la rama trae y la principal no)
+        run: node "$GUARDIAS/guardia-scada.mjs" --ci
+
+      # Corre aunque la SCADA salga en rojo: así un solo push muestra los dos veredictos. En CI dice la categoría
+      # y cuántos, sin rutas.
+      - name: Cero cerebro en el sitio (rutas y tamaño del puente)
+        if: ${{ !cancelled() && steps.guardias.outcome == 'success' }}
+        run: node "$GUARDIAS/guardia-cero-cerebro.mjs" --arbol

@@ -1,6 +1,9 @@
 name: CI · Lint + Tests
 
 on:
+  # Las ramas y las bases de PR que NO están en estas listas (y las etiquetas) las revisa guardia-datos.yml: las
+  # guardias SCADA y de cero cerebro, sin la suite (K-16). Sus listas son el complemento EXACTO de estas:
+  # tests/guardia_datos_ramas.test.js falla si se desalinean. Si agregas o quitas una rama aquí, hazlo allá también.
   push:
     branches:
       - main
