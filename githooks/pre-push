@@ -4,7 +4,7 @@
 PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 for d in "$HOME"/.nvm/versions/node/*/bin; do [ -d "$d" ] && PATH="$d:$PATH"; done
 if ! command -v node >/dev/null 2>&1; then
-  echo "❌ PUSH BLOQUEADO: 'node' no está en PATH y no se pueden revisar cédulas (99 §78). Use --no-verify solo si lo revisó a mano."
+  echo "❌ PUSH BLOQUEADO: 'node' no está en PATH y no se pueden revisar cédulas, credenciales ni coordenadas (99 §78, L-140). Abra una terminal con node (nvm o Homebrew) y vuelva a subir."
   exit 1
 fi
 REFS=$(cat)
@@ -14,6 +14,84 @@ printf '%s\n' "$REFS" | node scripts/guardia-cedulas.mjs --push || { echo "❌ P
 printf '%s\n' "$REFS" | node scripts/guardia-scada.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube trae datos de red del SCADA (99 §122)."; exit 1; }
 # 🔒 Guardia de FIRMAS (99 §99) sobre cada commit del rango: lo que no pasó por el pre-commit (S7-09@10-11).
 printf '%s\n' "$REFS" | node scripts/guardia-firmas.mjs --push || { echo "❌ PUSH BLOQUEADO: lo que se sube trae una imagen de firma (99 §99; ver arriba)."; exit 1; }
+# 🔒 Credenciales y posición de una S/E (L-140; K-16): el escáner del kernel COMMIT POR COMMIT, «--rango <padre> <commit>
+# --coordenadas» por cada commit nuevo del push, del más viejo al más nuevo (el padre de un commit raíz es el árbol vacío),
+# para lo que no pasó por el pre-commit. Commit por commit y no las dos puntas: un dato que un commit agrega y otro del mismo
+# push quita no sale en el diff entre las puntas, pero queda en la historia pública. Nuevos = los que no están en ninguna
+# rama de ESTE remoto ($1; si es una URL, el remoto que la tiene) ni en lo que el remoto ya tiene en esa referencia
+# («rev-list <local> --not --remotes=<remoto>
+# <lo de allá>»): lo ya publicado (o que ya pasó por aquí) no se vuelve a revisar, y actualizar una rama vieja con main no
+# vuelve a revisar lo que main ya publicó. Lo de OTRO remoto (uno privado) sí se revisa: que esté allá no lo hace público.
+# Un MERGE se revisa contra la mezcla AUTOMÁTICA de sus dos padres («git merge-tree --write-tree»), sin los archivos que el
+# merge cambia respecto a LOS DOS padres («diff-tree -c»), que así se leen ENTEROS. Lo metido a mano al resolver un
+# conflicto, lo que el merge agrega de suyo y lo que la mezcla ARMA con una mitad de cada lado (la latitud de una rama y la
+# longitud de la otra en un archivo que tocaron las dos) sí sale; un merge que junta archivos distintos no da nada (contra el
+# primer padre mostraría todo lo que trae main). Ojo: un archivo que tocaron los dos lados se lee entero, y si trae un dato
+# que main ya publicó (hoy la llave web de Firebase y los 2 del DANE, sin permitir) frena, igual que cualquier commit que lo
+# toque. Un merge de más de dos padres, o uno que merge-tree no puede mezclar: contra su primer padre (más estricto). Rama
+# borrada: nada que revisar. Una referencia que no lleva a un commit (una etiqueta a un árbol): entera, contra el árbol vacío
+# («rev-list» no lista nada y pasaría sin revisar). La bóveda, con scripts/boveda.mjs (sirve desde un worktree); sin ella NO
+# se sube (fallo cerrado), y tampoco si no se pueden listar los commits nuevos.
+B="$(node scripts/boveda.mjs)" || { echo "❌ PUSH BLOQUEADO: no encuentro la bóveda privada (el porqué y cómo seguir, arriba)."; exit 1; }
+K="$B/kernel/verify-secretos.mjs"
+[ -f "$K" ] || { echo "❌ PUSH BLOQUEADO: no encuentro el escáner del kernel ($K)."; exit 1; }
+# El escáner debe ser 1.17.0 o más: lee cada archivo por el id de su blob (un nombre en NFD o que no es UTF-8 no queda sin
+# leer), empareja el par partido en líneas y toma los permitidos de lo que se sube. Con uno anterior, esta guardia valdría
+# menos de lo que dicen sus pruebas: no se sube.
+KV="$(tr -d '\r' < "$B/kernel/VERSION" 2>/dev/null)"
+node -e 'const [a, b] = String(process.argv[1] || "").trim().split(".").map(Number); process.exit(a > 1 || (a === 1 && b >= 17) ? 0 : 1)' -- "$KV" ||
+  { echo "❌ PUSH BLOQUEADO: el kernel de la bóveda es «${KV:-sin VERSION}» y este gancho necesita 1.17.0 o más (K-16). Hay que poner al día el kernel de la bóveda."; exit 1; }
+VACIO="$(git hash-object -t tree /dev/null)"
+# El remoto POR NOMBRE: git pasa en $1 el nombre, o la URL si se sube a una URL. Con una URL se busca el remoto que la
+# tiene; si ninguno, se queda la URL y no casa con ninguna rama remota (se revisa más, nunca menos).
+NOMBRE="${1:-sin-remoto}"
+if ! git remote | grep -qxF -- "$NOMBRE"; then
+  for RM in $(git remote); do [ "$(git remote get-url "$RM" 2>/dev/null)" = "$NOMBRE" ] && { NOMBRE="$RM"; break; }; done
+fi
+# La base de un merge de dos padres: la mezcla automática SIN los archivos que difieren de los dos padres. Falla (y el
+# merge va contra su primer padre) si merge-tree no puede mezclar o si falla cualquier paso: sh no tiene pipefail, así que
+# la lista va a un archivo con && y no por una tubería.
+base_de_merge() {
+  M="$(git merge-tree --write-tree --allow-unrelated-histories "$1^1" "$1^2" 2>/dev/null | head -n 1)"
+  git cat-file -e "$M^{tree}" 2>/dev/null || return 1
+  [ -n "$(git diff-tree -r -c --name-only --no-commit-id "$1")" ] || { printf '%s\n' "$M"; return 0; }
+  D="$(mktemp -d)" || return 1
+  git diff-tree -r -c -z --name-only --no-commit-id "$1" > "$D/lista" &&
+    GIT_INDEX_FILE="$D/indice" git read-tree "$M" &&
+    GIT_INDEX_FILE="$D/indice" git update-index -z --force-remove --stdin < "$D/lista" &&
+    GIT_INDEX_FILE="$D/indice" git write-tree
+  R=$?
+  rm -f "$D/indice" "$D/lista"; rmdir "$D" 2>/dev/null
+  return $R
+}
+printf '%s\n' "$REFS" | while read -r _ LOCAL _ REMOTO; do
+  case "$LOCAL" in *[!0]*) ;; *) continue ;; esac
+  if ! git cat-file -e "$LOCAL^{commit}" 2>/dev/null; then node "$K" --rango "$VACIO" "$LOCAL" --coordenadas </dev/null || exit 1; continue; fi
+  YA=""
+  git cat-file -e "$REMOTO^{commit}" 2>/dev/null && YA="$REMOTO"
+  NUEVOS="$(git rev-list --reverse "$LOCAL" --not --remotes="$NOMBRE" $YA)" || { echo "❌ No pude listar los commits nuevos de $LOCAL."; exit 1; }
+  for C in $NUEVOS; do
+    if ! git rev-parse -q --verify "$C^2" >/dev/null; then
+      QUE="contra su padre"
+      P="$(git rev-parse -q --verify "$C^1")" || P="$VACIO"
+    elif ! git rev-parse -q --verify "$C^3" >/dev/null && P="$(base_de_merge "$C")"; then
+      QUE="contra la mezcla automática de sus padres"
+    else
+      QUE="contra su primer padre"
+      P="$(git rev-parse "$C^1")"
+    fi
+    node "$K" --rango "$P" "$C" --coordenadas </dev/null || { echo "   ↑ en el commit $(printf '%.8s' "$C") ($QUE)."; exit 1; }
+  done
+done || {
+  echo ""; echo "❌ PUSH BLOQUEADO: lo que se sube trae una credencial o la posición de una S/E (L-140; ver arriba)."
+  echo "   Se revisa commit por commit: sacarlo en un commit NUEVO no basta (el que lo trae también se sube). Hay que rehacer,"
+  echo "   sin el dato, lo que aún no se subió, encima de lo ya publicado: «git reset --soft \"\$(git merge-base HEAD origin/main)\"»"
+  echo "   y commitear de nuevo sin el dato (con origin/main a secas se desharía lo que main publicó después). Si la rama ya"
+  echo "   está arriba con otra historia, se sube con otro nombre: el push forzado lo niegan el guard y los deny. Si es un dato"
+  echo "   PÚBLICO (DANE, la llave web de Firebase), aceptarlo en .secretos-permitidos.txt (commiteado en ese commit o antes) lo"
+  echo "   decide el Ingeniero."
+  exit 1
+}
 # 🛑 Freno al PUBLICAR (99 §150, M-10): a main no sube código que cite un ADR que no esté guardado en su docs/99.
 printf '%s\n' "$REFS" | node scripts/freno-publicar.mjs --push || { echo "❌ PUSH BLOQUEADO: freno al publicar (99 §150)."; exit 1; }
 exit 0

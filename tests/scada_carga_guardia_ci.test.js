@@ -300,3 +300,139 @@ describe('ci.yml', () => {
     assert.match(job, /run: node scripts\/guardia-scada\.mjs --ci/);
   });
 });
+
+// K-16 (lo vio la revisión de K-7; ya pasaba antes): un CSV guardado en UTF-16, o con un NUL suelto al inicio, se tomaba
+// por binario y sus líneas no se leían; y en un merge limpio git muestra el diff COMBINADO, vacío, así que lo que traía
+// la rama no se veía si su commit quedaba fuera del rango. Repo temporal aparte; datos inventados y armados por partes.
+describe('UTF-16, un NUL suelto y los merges limpios (K-16)', () => {
+  let d;
+  const gd = (...a) => execFileSync('git', a, { cwd: d, encoding: 'utf8' }).trim();
+  const FILA = S + ESTACION + S + 'swTr' + 'afo1' + S + 'I R' + S + 'Mv' + 'Moment,1,2,3';   // fila de exporte inventada
+  const DEMO = S + 'EstDemo1' + S + 'swTr' + 'afo1' + ';1,2,3';                              // la forma de prueba: pasa
+  const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13]), Buffer.from('\n ' + CIRCUITO + ' \n')]);
+  const utf16 = (t) => Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(t, 'utf16le')]);   // con BOM, como Excel
+  const conNul = (t) => Buffer.concat([Buffer.from([0]), Buffer.from(t)]);
+  function commitEn(mensaje, archivos) {
+    for (const [r, t] of Object.entries(archivos)) writeFileSync(join(d, r), t);
+    gd('add', '--', ...Object.keys(archivos));
+    gd('commit', '-q', '-m', mensaje);
+    return gd('rev-parse', 'HEAD');
+  }
+  const losTres = (antes, sha) => ({
+    rango: correr(['--rango', antes + '..' + sha], { cwd: d }).code,
+    push: correr(['--push'], { entrada: 'refs/heads/main ' + sha + ' refs/heads/main ' + antes + '\n', cwd: d }).code,
+    ci: push(antes, sha, 'refs/heads/main', d).code,
+  });
+  /** El pre-commit con estos archivos preparados; después el índice y el disco vuelven a HEAD. */
+  function preparado(archivos) {
+    for (const [r, t] of Object.entries(archivos)) writeFileSync(join(d, r), t);
+    gd('add', '--', ...Object.keys(archivos));
+    try { return correr([], { cwd: d }).code; } finally { gd('reset', '-q', '--hard', 'HEAD'); }
+  }
+  /** Una rama con `archivos`, main que avanza y un merge --no-ff limpio: { lado (el commit de la rama), merge }. */
+  function mergeLimpio(rama, archivos) {
+    gd('checkout', '-q', '-b', rama);
+    const lado = commitEn('en la rama ' + rama, archivos);
+    gd('checkout', '-q', 'main');
+    commitEn('main avanza (' + rama + ')', { ['main-' + rama + '.txt']: 'm\n' });
+    gd('merge', '-q', '--no-ff', '-m', 'merge limpio de ' + rama, rama);
+    return { lado, merge: gd('rev-parse', 'HEAD') };
+  }
+  before(() => {
+    d = join(base, 'k16');
+    mkdirSync(d);
+    gd('init', '-q', '-b', 'main');
+    gd('config', 'user.name', 'Prueba');
+    gd('config', 'user.email', 'prueba@example.invalid');
+    gd('config', 'commit.gpgsign', 'false');
+    commitEn('base', { 'leeme.txt': 'hola\n' });
+  });
+
+  test('textoUtf16 (pura): lee UTF-16 con y sin BOM, en los dos órdenes; una foto, un UTF-8 con NUL o puro NUL dan vacío', async () => {
+    const { textoUtf16 } = await import('../scripts/guardia-scada.mjs');
+    assert.equal(typeof textoUtf16, 'function', 'guardia-scada.mjs no exporta textoUtf16');
+    const t = 'equipo;medida\n' + FILA + '\nÑandú «sí» – 13,8 kV\n';
+    const be = Buffer.from(t, 'utf16le').swap16();
+    assert.equal(textoUtf16(utf16(t)), t);
+    assert.equal(textoUtf16(Buffer.concat([Buffer.from([0xfe, 0xff]), be])), t);
+    assert.equal(textoUtf16(Buffer.from(t, 'utf16le')), t, 'sin BOM');
+    assert.equal(textoUtf16(be), t, 'sin BOM, big endian');
+    assert.equal(textoUtf16(PNG), '');
+    assert.equal(textoUtf16(conNul(t)), '', 'un NUL suelto no vuelve UTF-16 a un texto UTF-8');
+    assert.equal(textoUtf16(Buffer.alloc(64)), '');
+  });
+  test('un CSV en UTF-16 (el «Unicode» de Excel) se frena en --rango, --push, --ci y el pre-commit', () => {
+    const antes = gd('rev-parse', 'HEAD');
+    const csv = commitEn('agrega un exporte en UTF-16', { 'medidas.csv': utf16('equipo;medida\r\n' + FILA + '\r\n') });
+    assert.deepEqual(losTres(antes, csv), { rango: 1, push: 1, ci: 1 });
+    assert.equal(preparado({ 'otra.csv': utf16(FILA + '\r\n') }), 1);
+  });
+  test('un CSV con un NUL suelto al inicio se frena en los cuatro modos (por su nombre es texto, no una foto)', () => {
+    const antes = gd('rev-parse', 'HEAD');
+    const csv = commitEn('agrega un exporte con NUL', { 'exporte.csv': conNul('equipo;medida\n' + FILA + '\n') });
+    assert.deepEqual(losTres(antes, csv), { rango: 1, push: 1, ci: 1 });
+    assert.equal(preparado({ 'otra.txt': conNul(FILA + '\n') }), 1);
+  });
+  // Revisión de K-16: con BOM la prueba de legibilidad sobraba y estorbaba. Un exporte corto con las unidades en griego
+  // (Ω, φ, Δ) pasa del 5 % de signos no latinos, se tomaba por binario y sus líneas no se leían.
+  const UNIDADES = 'Punto;R (Ω);X (Ω);Z (Ω);φ (°);Δφ (°)';
+  test('textoUtf16 (pura): con BOM se acepta lo decodificado aunque no sea latino; sin BOM sigue la prueba', async () => {
+    const { textoUtf16 } = await import('../scripts/guardia-scada.mjs');
+    const t = UNIDADES + '\r\n' + FILA + '\r\n';
+    assert.equal(textoUtf16(utf16(t)), t, 'con BOM FF FE');
+    assert.equal(textoUtf16(Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(t, 'utf16le').swap16()])), t, 'con BOM FE FF');
+    assert.equal(textoUtf16(Buffer.from(t, 'utf16le')), '', 'sin BOM, tanto griego no pasa la prueba de legibilidad');
+    assert.equal(textoUtf16(PNG), '');
+    assert.equal(textoUtf16(Buffer.alloc(64)), '');
+  });
+  test('un CSV en UTF-16 con BOM, unidades en griego y UNA fila se frena en los cuatro modos', () => {
+    const antes = gd('rev-parse', 'HEAD');
+    const csv = commitEn('agrega un exporte corto con unidades', { 'medidas-unidades.csv': utf16(UNIDADES + '\r\n' + FILA + '\r\n') });
+    assert.deepEqual(losTres(antes, csv), { rango: 1, push: 1, ci: 1 });
+    assert.equal(preparado({ 'otra-unidades.csv': utf16(UNIDADES + '\r\n' + FILA + '\r\n') }), 1);
+  });
+  // Revisión de K-16: el NUL suelto solo valía en .csv/.tsv/.txt; un exporte de texto guardado como .dat, .log, .prn o
+  // .asc con un NUL al inicio pasaba en todos los modos.
+  for (const ext of ['dat', 'log', 'prn', 'asc']) {
+    test(`un .${ext} con un NUL suelto al inicio se frena en los cuatro modos`, () => {
+      const antes = gd('rev-parse', 'HEAD');
+      const sha = commitEn('agrega un exporte .' + ext + ' con NUL', { ['exporte-k16.' + ext]: conNul('equipo;medida\n' + FILA + '\n') });
+      assert.deepEqual(losTres(antes, sha), { rango: 1, push: 1, ci: 1 });
+      assert.equal(preparado({ ['otro-k16.' + ext]: conNul(FILA + '\n') }), 1);
+    });
+  }
+  test('sin falso rojo: un .log con un NUL suelto y líneas limpias pasa', () => {
+    const antes = gd('rev-parse', 'HEAD');
+    const log = commitEn('un registro limpio con NUL', { 'registro-k16.log': conNul('arranque\nTR-01 operativo\n' + DEMO + '\n') });
+    assert.deepEqual(losTres(antes, log), { rango: 0, push: 0, ci: 0 });
+  });
+  test('sin falso rojo: un UTF-16 limpio o de prueba (EstDemo) y una foto con una forma por azar pasan', () => {
+    const antes = gd('rev-parse', 'HEAD');
+    const limpio = commitEn('UTF-16 limpio', { 'lista.csv': utf16('equipo;estado\r\nTR-01;operativo\r\n' + DEMO + '\r\n') });
+    assert.deepEqual(losTres(antes, limpio), { rango: 0, push: 0, ci: 0 });
+    const foto = commitEn('una foto', { 'foto-k16.png': PNG });
+    assert.deepEqual(losTres(limpio, foto), { rango: 0, push: 0, ci: 0 });
+    assert.equal(preparado({ 'lista2.csv': utf16('TR-02;mantenimiento\r\n') }), 0);
+  });
+  test('merge limpio: la línea que trae la rama se ve aunque el commit de la rama quede fuera del rango', () => {
+    const { lado, merge } = mergeLimpio('rama-linea', { 'nota-rama.txt': 'punto ' + CLAVE + '\n' });
+    // lado..merge = el merge y el commit de main: el de la rama ya se subió antes (p. ej. a su propia rama)
+    assert.deepEqual(losTres(lado, merge), { rango: 1, push: 1, ci: 1 });
+  });
+  test('merge limpio: el NOMBRE de una tabla de exporte que trae la rama también se ve (--rango y --push)', () => {
+    const { lado, merge } = mergeLimpio('rama-nombre', { [TABLA]: 'a,b\n' });
+    try {
+      const r = correr(['--rango', lado + '..' + merge], { cwd: d });
+      assert.equal(r.code, 1, r.out);
+      assert.match(r.out, /Variables/);
+      assert.equal(correr(['--push'], { entrada: 'refs/heads/main ' + merge + ' refs/heads/main ' + lado + '\n', cwd: d }).code, 1);
+    } finally {
+      gd('rm', '-q', '--', TABLA);                           // fuera del árbol: si no, --ci frena todo lo que sigue
+      gd('commit', '-q', '-m', 'saca la tabla');
+    }
+  });
+  test('sin falso rojo: un merge limpio de una rama limpia pasa', () => {
+    const { lado, merge } = mergeLimpio('rama-limpia', { 'limpia.txt': 'sin datos\n' });
+    assert.deepEqual(losTres(lado, merge), { rango: 0, push: 0, ci: 0 });
+  });
+});

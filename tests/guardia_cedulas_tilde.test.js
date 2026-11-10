@@ -188,3 +188,61 @@ test('cédulas (control, sin falso rojo): un PDF que se BORRA no se frena en el 
   const r = guardia(repo);
   assert.equal(r.status, 0, r.stdout + r.stderr);
 });
+
+// K-16: en --push y --historia el numstat no llevaba --diff-filter, así que BORRAR un documento binario daba un falso
+// rojo (en la historia real, 129b0fc2 y ad5bc682 borran un .docx). Un borrado no sube nada; agregarlo sigue frenando.
+/** Un repo con un commit que AGREGA un .docx de mentira y otro que solo lo BORRA. */
+function agregarYBorrar(t) {
+  const repo = repoTemporal(t);
+  const base = cabeza(repo);
+  escribir(join(repo, 'formatos', 'Formato de prueba.docx'), binarioDeMentira(512, 3));
+  git(repo, 'add', 'formatos');
+  git(repo, 'commit', '-q', '-m', 'formato');
+  const conFormato = cabeza(repo);
+  git(repo, 'rm', '-q', 'formatos/Formato de prueba.docx');
+  git(repo, 'commit', '-q', '-m', 'limpieza');
+  return { repo, base, conFormato };
+}
+
+test('cédulas --push (sin falso rojo): un commit que solo BORRA un documento binario pasa', (t) => {
+  const { repo, conFormato } = agregarYBorrar(t);
+  const r = empujar(repo, conFormato);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+});
+
+test('cédulas --push (control): el commit que AGREGA ese documento se sigue frenando', (t) => {
+  const { repo, base, conFormato } = agregarYBorrar(t);
+  const r = empujar(repo, base);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.ok((r.stdout + r.stderr).includes(`commit ${conFormato.slice(0, 8)} · formatos/Formato de prueba.docx: documento binario`), r.stdout + r.stderr);
+});
+
+test('cédulas --push: en un rango con el alta y la baja del documento, frena SOLO el alta', (t) => {
+  const { repo, base } = agregarYBorrar(t);
+  const r = empujar(repo, base);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.equal((r.stdout + r.stderr).match(/documento binario/g).length, 1, 'el commit que solo borra no debe frenar: ' + r.stdout + r.stderr);
+});
+
+test('cédulas --push: un commit que borra un documento y AGREGA otro se frena solo por el nuevo', (t) => {
+  const repo = repoTemporal(t);
+  escribir(join(repo, 'actas', 'vieja.pdf'), binarioDeMentira(256, 5));
+  git(repo, 'add', 'actas');
+  git(repo, 'commit', '-q', '-m', 'acta vieja');
+  const antes = cabeza(repo);
+  git(repo, 'rm', '-q', 'actas/vieja.pdf');
+  escribir(join(repo, 'actas', 'nueva.xlsx'), binarioDeMentira(256, 9));
+  git(repo, 'add', 'actas');
+  git(repo, 'commit', '-q', '-m', 'cambia el acta');
+  const r = empujar(repo, antes);
+  assert.equal(r.status, 1, r.stdout + r.stderr);
+  assert.match(r.stdout + r.stderr, /actas\/nueva\.xlsx: documento binario/);
+  assert.doesNotMatch(r.stdout + r.stderr, /vieja\.pdf/);
+});
+
+test('cédulas --historia: un documento BORRADO no cuenta como «binario sin revisar»', (t) => {
+  const { repo } = agregarYBorrar(t);
+  const r = guardia(repo, ['--historia']);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /· 1 binario\(s\) SIN revisar por texto/);
+});
