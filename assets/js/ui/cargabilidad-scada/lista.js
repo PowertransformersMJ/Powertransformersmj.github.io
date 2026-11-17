@@ -26,6 +26,9 @@ import { textoTraspaso, motivoTraspaso } from '../../domain/scada_carga_traspaso
 const csvOperador = (x) => (!x || !x.traspaso ? '' : (Array.isArray(x.traspaso.meses) && x.traspaso.meses.length ? textoTraspaso(x.traspaso) : motivoTraspaso(x.traspaso)));
 // Filtro «Devanado sobrecargado» (2026-10-27): archivo NUEVO.
 import { DEVANADOS_FILTRO, conteoPorDevanado, pasaFiltroDevanado } from '../../domain/scada_carga_filtro_devanado.js';
+// Con «Solo con sobrecarga sostenida» (2026-11-17, «Sí, ajústalo»): orden por la fuerza de la sobrecarga y la nota de por qué
+// la cifra puede quedar bajo el 100 %. Archivo NUEVO (L-102 (3)): no hay copia vieja en caché a la que le falte algo.
+import { ordenarPorFuerza, ordenConSostenida, notaSostenida, TEXTO_ORDEN_FUERZA } from '../../domain/scada_carga_horas_sobre.js';
 
 const PASO = 100;
 const ESTADOS = { automatica: 'Automática', confirmada: 'Confirmada', pendiente: 'Por confirmar', excluida: 'Excluida', sin_homologacion: 'Sin homologación' };
@@ -110,7 +113,7 @@ export function montarLista(cont, ctx, { alAbrir }) {
     filtro: { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false, devSobre: [] },
     orden: { campo: 'pct', dir: 'desc' }
   };
-  let tablaCaja = null; let contador = null; let kpiCaja = null;
+  let tablaCaja = null; let contador = null; let kpiCaja = null; let notaSost = null;
   let turno = 0;   // descarta la respuesta de un mes que ya no es el elegido
   // Una misma curva pedida dos veces a la vez (la lista verificando y el detalle abriéndose) se lee UNA vez.
   const curvasEnCurso = new Map();
@@ -136,9 +139,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     return x && x.suma && x.filaId && ctx.homologacion && ctx.homologacion.filas ? ctx.homologacion.filas[x.filaId] || null : null;
   }
 
-  // El orden elegido en un modo no pasa al otro si esa columna no existe allí (vuelve a la cifra, de mayor a menor).
+  // El orden elegido en un modo no pasa al otro si esa columna no existe allí (vuelve al de siempre: la cifra, de mayor a
+  // menor; con «Solo con sobrecarga sostenida» marcado, la fuerza de la sobrecarga, que es su orden de siempre). El orden
+  // por fuerza no es una columna: vale en los dos modos mientras el filtro siga marcado.
   function ordenDelModo(cols) {
-    if (!cols.some((c) => c.campo && c.campo === st.orden.campo)) st.orden = { campo: 'pct', dir: 'desc' };
+    if (st.orden.campo === 'fuerza' && st.filtro.soloSostenida) return;
+    if (!cols.some((c) => c.campo && c.campo === st.orden.campo)) st.orden = ordenConSostenida({ campo: 'pct', dir: 'desc' }, st.filtro.soloSostenida);
   }
 
   async function cargarMes(mes) {
@@ -408,8 +414,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
       d.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && d.open) { d.open = false; sum.focus(); } });
       return d;
     };
-    const chk = (id, valor, alCambiar) => {
-      const c = el('input', { type: 'checkbox', id, checked: valor });
+    const chk = (id, valor, alCambiar, extra = {}) => {
+      const c = el('input', { type: 'checkbox', id, checked: valor, ...extra });
       c.addEventListener('change', () => { alCambiar(c.checked); st.visibles = PASO; pintarTabla(); });
       return c;
     };
@@ -425,10 +431,24 @@ export function montarLista(cont, ctx, { alAbrir }) {
           DEVANADOS_FILTRO.map(([d, n]) => [d, n + ' (' + conteoDev[d] + ')']), (v) => { f.devSobre = v; }, 'Todos',
           { corto: Object.fromEntries(DEVANADOS_FILTRO), todasMarcadas: 'Los tres', elegidas: ' elegidos', rotuloId: 'csDevSobre-rotulo' })),
         el('label', { class: 'cs-check', for: 'csFirmes' }, chk('csFirmes', f.soloFirmes, (v) => { f.soloFirmes = v; }), ' Solo cifras firmes'),
-        el('label', { class: 'cs-check', for: 'csSost' }, chk('csSost', f.soloSostenida, (v) => { f.soloSostenida = v; }), ' Solo con sobrecarga sostenida')),
+        // Al marcarlo con el orden de siempre, la lista pasa a la fuerza de la sobrecarga; al desmarcarlo, vuelve a la cifra.
+        // La nota que aparece al marcarlo es su descripción (un lector de pantalla la lee con la casilla; oculta, no lee nada).
+        el('label', { class: 'cs-check', for: 'csSost' }, chk('csSost', f.soloSostenida, (v) => { f.soloSostenida = v; st.orden = ordenConSostenida(st.orden, v); },
+          { 'aria-describedby': 'csNotaSost' }), ' Solo con sobrecarga sostenida')),
       el('div', { class: 'cs-acciones' },
         contador = el('p', { class: 'cs-contador', role: 'status', 'aria-live': 'polite', style: 'margin:0' }),
-        soloVer() ? null : el('button', { type: 'button', class: 'btn btn--glass btn--sm cs-solo-equipo', onclick: exportar }, 'Descargar lista (CSV)')));
+        soloVer() ? null : el('button', { type: 'button', class: 'btn btn--glass btn--sm cs-solo-equipo', onclick: exportar }, 'Descargar lista (CSV)')),
+      // Por qué un equipo con sobrecarga sostenida puede tener cifra bajo el 100 %: visible solo con el filtro marcado
+      // (la pinta `pintarTabla`, que es lo único que corre al marcar o desmarcar).
+      notaSost = el('p', { class: 'cs-ayuda', id: 'csNotaSost', role: 'note', hidden: true }));
+  }
+  /** La nota del filtro «Solo con sobrecarga sostenida»: visible y con su texto (mes o periodo) solo si está marcado. */
+  function pintarNotaSostenida() {
+    if (!notaSost) return;
+    if (!st.filtro.soloSostenida) { notaSost.hidden = true; notaSost.textContent = ''; return; }
+    const n = notaSostenida(st.modo === 'periodo' && !!st.periodo);
+    poner(notaSost, el('b', {}, n.titulo), n.texto);
+    notaSost.hidden = false;
   }
 
   /**
@@ -599,6 +619,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
   function filasVisibles() {
     // El devanado se filtra también aquí, con el archivo NUEVO (nunca viejo en caché): un vista.js viejo no lo conoce (L-102).
     const xs = filtrarFilas(st.filas || [], st.filtro).filter((x) => pasaFiltroDevanado(x, st.filtro.devSobre));
+    // Por fuerza de la sobrecarga (solo con el filtro marcado; el archivo nuevo, nunca un vista.js viejo que no lo conoce).
+    if (st.orden.campo === 'fuerza') return ordenarPorFuerza(xs);
     return ordenarFilas(xs, st.orden.campo, st.orden.dir);
   }
 
@@ -608,9 +630,12 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const todas = filasVisibles();
     const vis = todas.slice(0, st.visibles);
     contador.textContent = todas.length + ' de ' + st.filas.length + ' transformadores';
+    pintarNotaSostenida();
     if (!todas.length) {
+      // «Quitar filtros» desmarca también «Solo con sobrecarga sostenida»: si lo estaba, el orden vuelve a la cifra como al
+      // desmarcarlo a mano; si no lo estaba, el orden elegido no se toca.
       poner(tablaCaja, el('div', { class: 'cs-estado' }, 'Ningún transformador cumple los filtros.', el('br'),
-        el('button', { type: 'button', id: 'csQuitar', class: 'btn btn--glass btn--sm', onclick: () => { st.filtro = { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false, devSobre: [] }; dibujar(); const q = document.getElementById('csTexto'); if (q) q.focus(); } }, 'Quitar filtros')));
+        el('button', { type: 'button', id: 'csQuitar', class: 'btn btn--glass btn--sm', onclick: () => { const sost = st.filtro.soloSostenida; st.filtro = { texto: '', zona: [], estado: '', crg: [], soloFirmes: false, soloSostenida: false, devSobre: [] }; if (sost) st.orden = ordenConSostenida(st.orden, false); dibujar(); const q = document.getElementById('csTexto'); if (q) q.focus(); } }, 'Quitar filtros')));
       return;
     }
     const th = (c) => {
@@ -627,7 +652,8 @@ export function montarLista(cont, ctx, { alAbrir }) {
     const cols = per ? COLUMNAS_PERIODO : COLUMNAS;
     const tabla = el('table', { class: 'cs-tabla' + (per ? ' cs-tabla--periodo' : '') },
       el('caption', {}, 'Cargabilidad SCADA ' + (per ? 'de ' + nombreMes(st.periodo.desde) + ' a ' + nombreMes(st.periodo.hasta) + ': carga del periodo y peor mes de cada transformador' : 'de ' + nombreMes(st.mes))
-        + '. Ordenado por ' + ((cols.find((c) => c.campo === st.orden.campo) || COLUMNAS.find((c) => c.campo === st.orden.campo) || {}).texto || '') + '.'),
+        + '. Ordenado por ' + (st.orden.campo === 'fuerza' ? TEXTO_ORDEN_FUERZA
+          : ((cols.find((c) => c.campo === st.orden.campo) || COLUMNAS.find((c) => c.campo === st.orden.campo) || {}).texto || '')) + '.'),
       el('thead', {}, el('tr', {}, cols.map(th))),
       el('tbody', {}, vis.map(per ? filaPeriodo : filaTabla)));
     poner(tablaCaja, tabla,

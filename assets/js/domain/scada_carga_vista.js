@@ -39,6 +39,8 @@ import { motivoMesCasiSinMedida, reglaDeAntes } from './scada_carga_mes_casi_sin
 import { mesDeOtroOperador, motivoTraspaso } from './scada_carga_traspaso.js';
 // Medida común de transformadores en paralelo (2026-11-06): archivo NUEVO; sin la marca en la decisión, nada cambia.
 import { especMedidaComun, etiquetaMedidaComun, motivoMedidaComun } from './scada_carga_medida_comun.js';
+// Horas sobre el 100 % de cada nivel, contadas en las horas más altas del resumen del mes (2026-11-17): archivo NUEVO.
+import { nivelesConHoras } from './scada_carga_horas_sobre.js';
 
 const sinTildes = (s) => normalizarTexto(s).normalize('NFD').replace(/[̀-ͯ]/g, '');
 const leer = (o, ruta) => ruta.split('.').reduce((x, k) => (x == null ? x : x[k]), o);
@@ -326,6 +328,9 @@ export function filasLista({ parque, homologacion, catalogo, resumenMes, umbrale
       potenciaKva: Number(leer(tx, 'placa.potencia_kva')) || null,
       filaId: fila ? fila.id : null, claveId: cid, tienePunto: !!punto,
       ...c,
+      // Cuántas horas del mes pasó cada nivel del 100 % (campo NUEVO `horasSobre`, solo si su resumen guarda las horas más
+      // altas; sin ellas, el nivel queda igual). Lo usa la sobrecarga para decirlo; ninguna cifra ni marca cambia.
+      niveles: nivelesConHoras(c.niveles, r),
       // Todos los devanados de placa con su potencia, su ampacidad y su carga (pedido del Ingeniero, 2026-10-22).
       devanadosPlaca: devanadosDe(tx, c),
       // Cambio de medida (campo NUEVO, solo en equipos con medidas anteriores; se lee con guarda). «Sin carga»: sin cifra

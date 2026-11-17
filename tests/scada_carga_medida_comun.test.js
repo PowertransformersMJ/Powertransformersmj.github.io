@@ -35,6 +35,7 @@ import { claveId } from '../assets/js/domain/scada_carga_csv.js';
 import { componerResumen, erroresSuma, claveEnSumaAjena } from '../assets/js/domain/scada_carga_suma.js';
 import { filasLista, calcularEquipo } from '../assets/js/domain/scada_carga_vista.js';
 import { filasPeriodo, topsDe } from '../assets/js/domain/scada_carga_periodo.js';
+import { horasSobreDeNivel } from '../assets/js/domain/scada_carga_horas_sobre.js';
 
 // ── Datos sintéticos (EstDemo1) ────────────────────────────────────────────────
 const MV = 'Mv' + 'Moment';
@@ -230,10 +231,15 @@ describe('la lista del mes: cada transformador con su parte, provisional y con s
       assert.equal(y.motivos.some((m) => /medida común/.test(m)), false);
       assert.equal(nivel(y, 'N110').medidaComun, undefined);
     }
-    // calcularEquipo con el resumen de siempre da lo mismo que la lista (nada nuevo sin la marca).
+    // calcularEquipo con el resumen de siempre da lo mismo que la lista (nada nuevo sin la marca). Lo único que la lista le
+    // agrega a un nivel (2026-11-17) son sus horas sobre el 100 %, contadas en el `top` del MISMO resumen: aquí la medida
+    // de los dos contra la placa de uno pasa del 100 %, así que las trae, y son exactamente las de ese resumen.
     const fila = { ...SIN[F1], id: F1 };
     const c = calcularEquipo({ tx: TX1, fila, punto: catalogo.puntos[CID], resumenPorNivel: MAR.resumen[CID], conteos: conteosHomologacion(SIN), umbrales: undefined, mes: '2026-03' });
-    assert.equal(c.pct, y1.pct); assert.deepEqual(c.motivos, y1.motivos); assert.deepEqual(c.niveles, y1.niveles);
+    const sinHoras = (n) => { const { horasSobre, ...resto } = n; return resto; };   // eslint-disable-line no-unused-vars
+    assert.equal(c.pct, y1.pct); assert.deepEqual(c.motivos, y1.motivos); assert.deepEqual(c.niveles, y1.niveles.map(sinHoras));
+    assert.ok(y1.niveles.some((n) => 'horasSobre' in n), 'sin la marca, la medida común entera pasa del 100 % de la placa de uno');
+    for (const n of y1.niveles) if ('horasSobre' in n) assert.deepEqual(n.horasSobre, horasSobreDeNivel(MAR.resumen[CID][n.nivel], n.A), n.nivel);
   });
 });
 
