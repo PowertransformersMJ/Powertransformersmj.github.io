@@ -145,7 +145,7 @@ describe('revisión adversarial', () => {
     const rt = rotuloSobrecarga(per);
     assert.equal(rt.severo, false);
     assert.doesNotMatch(rt.texto, /provisional/);
-    assert.equal(rt.texto, 'Sobrecarga sostenida (≥ 2 h sobre el 100 %) en 2 meses (2 con cifra firme): secundario 13,8 kV en 2 meses (hasta 103,8 %)');
+    assert.equal(rt.texto, 'Sobrecarga sostenida (≥ 2 h seguidas sobre el 100 %) en 2 meses (2 con cifra firme): secundario 13,8 kV en 2 meses (hasta 103,8 %)');
     assert.match(rt.nota, /El periodo no tiene cifra/);
     assert.deepEqual(conteoSobrecarga([per]), { firme: 0, posible: 0, sin_cifra: 1, circuito: 0, total: 1 });
     assert.deepEqual(csvSobrecarga(per), ['periodo sin cifra (meses con sobrecarga)', 'secundario 13,8 kV en 2 meses (hasta 103,8 %)']);
@@ -180,7 +180,7 @@ describe('revisión adversarial', () => {
     const x = fila({ N34_5: r(1.02 * A_P, 1.2 * A_P, 1.10 * A_P), N13_8: r(1.0 * A_S, 1.15 * A_S, 1.05 * A_S) });
     const rf = rotuloSobrecarga(x);
     assert.equal(rf.severo, true);
-    assert.equal(rf.texto, 'Sobrecarga sostenida (≥ 2 h sobre el 100 %) en el primario 34,5 kV (hasta 110,0 %) y el secundario 13,8 kV (hasta 105,0 %)');
+    assert.equal(rf.texto, 'Sobrecarga sostenida (≥ 2 h seguidas sobre el 100 %) en el primario 34,5 kV (hasta 110,0 %) y el secundario 13,8 kV (hasta 105,0 %)');
     assert.deepEqual(csvSobrecarga(x), ['firme', 'primario 34,5 kV (hasta 110,0 %); secundario 13,8 kV (hasta 105,0 %)']);
     const rp = rotuloSobrecarga(fila({ N13_8: r(1.0 * A_S, 1.2 * A_S, 1.1 * A_S, 0.3) }));
     assert.equal(rp.severo, false); assert.match(rp.texto, /^Posible sobrecarga sostenida \(cifra provisional\) en el secundario/);

@@ -24,6 +24,9 @@ import { leerSeriesEquipo } from '../../data/scada_carga_suma.js';
 import { sobrecargaDelPeriodo, esCircuitoSinConfirmar } from '../../domain/scada_carga_sobrecarga.js';
 // Cambio de medida (2026-10-26): archivo NUEVO; los conteos de la configuración que se ve (sin cambios: los de siempre).
 import { filasDelMes } from '../../domain/scada_carga_cambio_medida.js';
+// Máximo sostenido sin redondeo engañoso (2026-11-17, «Sí, ajústalo»): «hasta 100,04 %», no «100,0 %», como en la lista.
+// Archivo NUEVO (L-102 (3)): no hay copia vieja en caché a la que le falte; con una historia vieja, el 1 decimal de siempre.
+import { pctSostenidaTxt } from '../../domain/scada_carga_horas_sobre.js';
 
 const MAX_CURVAS = 6;   // curvas de mes que la historia puede leer por equipo (cada una de 70 a 260 KB)
 const SOBRE = CALCULO.sobrecargaPct;
@@ -195,7 +198,7 @@ export async function pintarHistoria(nodo, { a, ctx, alVerDia, vigente, alReinte
     const kv = num(placa[d].kv, 1) + ' kV';
     const dc = sobCircuito && sobCircuito.tipo === 'circuito' ? sobCircuito.devanados.find((z) => z.devanado === d) : null;
     if (!g) return el('div', { class: 'cs-hist-dev' }, el('b', {}, DEVANADO[d] + ' ' + kv), ' · ', el('span', { class: 'cs-sub', style: 'display:inline' }, motivoDev(d)),
-      dc ? el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida en ' + dc.meses + (dc.meses === 1 ? ' mes' : ' meses') + (dc.pct != null ? ' (hasta ' + num(dc.pct, 1) + ' %)' : '')
+      dc ? el('span', { class: 'cs-sub' }, 'Posible sobrecarga sostenida en ' + dc.meses + (dc.meses === 1 ? ' mes' : ' meses') + (dc.pct != null ? ' (hasta ' + pctSostenidaTxt(dc.pct) + ')' : '')
         + ': se mide un circuito; vale si es la única salida del transformador.') : null);
     const pend = g.pendientes.length ? g.pendientes.map(nombreMes).join(', ') : null;
     const cabeza = g.pct != null

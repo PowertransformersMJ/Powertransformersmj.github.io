@@ -13,10 +13,17 @@
 // horas imposibles (> 3 × ampacidad) y el medio paso de redondeo del resumen. Los niveles que la curva del mes decidió
 // (`aplicarVerificacion`) llegan en `sobrecargaCurva`. No cambia ninguna cifra ni ninguna marca de antes: solo las nombra.
 // Revisión adversarial (2026-10-26): periodo sin cifra ≠ provisional, un devanado una vez por mes, la curva se dice.
-// Funciones PURAS. Archivo NUEVO a propósito (L-102): solo importa exportaciones ya publicadas.
+// Desde 2026-11-17 («Sí, ajústalo», `scada_carga_horas_sobre.js`): cada devanado dice también cuántas horas pasó del 100 %
+// (si el resumen trae sus horas más altas; si no, nada) y su máximo con los decimales que hagan falta para que «100,04 %» no
+// se lea «100,0 %»; y la regla del rótulo dice «2 h seguidas», como la tarjeta. Ninguna marca, tipo ni conteo cambia: solo
+// el texto de los devanados y esa palabra.
+// Funciones PURAS. Archivo NUEVO a propósito (L-102): solo importa exportaciones ya publicadas (y, desde 2026-11-17, las del
+// archivo NUEVO de las horas, que no puede estar viejo en caché).
 // ══════════════════════════════════════════════════════════════════════════════
 
 import { CALCULO, NIVELES, DEVANADO } from './scada_carga_config.js';
+// Horas sobre el 100 % y máximo sin redondeo engañoso (2026-11-17): archivo NUEVO, sin copia vieja en caché (L-102).
+import { horasValidas, sumarHorasSobre, textoHorasSobre, pctSostenidaTxt } from './scada_carga_horas_sobre.js';
 
 const ORDEN = { P: 0, S: 1, T: 2 };
 const SOBRE = () => CALCULO.sobrecargaPct;
@@ -33,9 +40,11 @@ export function esCircuitoSinConfirmar(x) {
 
 /**
  * La sobrecarga sostenida de UNA fila de un mes (de `filasLista`, ya verificada si hizo falta).
- * @returns {null | {tipo: 'firme'|'posible'|'circuito', devanados: Array<{devanado, nombre, nivel, etiqueta, pct: number|null, curva?: boolean}>}}
+ * @returns {null | {tipo: 'firme'|'posible'|'circuito', devanados: Array<{devanado, nombre, nivel, etiqueta, pct: number|null, curva?: boolean,
+ *   horasSobre?: {horas: number, cota: null|'tope'|'borde'}}>}}
  *   pct = máximo sostenido 2 h en % de la ampacidad (null si lo decidió la curva del mes). Un devanado aparece UNA vez
- *   (si dos niveles van al mismo devanado, manda el de mayor máximo sostenido).
+ *   (si dos niveles van al mismo devanado, manda el de mayor máximo sostenido). horasSobre = las horas del mes sobre el
+ *   100 % de ESE nivel (campo NUEVO, solo si su resumen las trae: `nivelesConHoras`; la curva del mes no las da).
  */
 export function sobrecargaDeMes(x) {
   if (!x) return null;
@@ -44,7 +53,9 @@ export function sobrecargaDeMes(x) {
   for (const n of (x.niveles || []).filter((y) => nivelValido(y) && pasa(y))) {
     const g = por[n.devanado];
     if (g && g.pct >= n.sostenidaPct) continue;
-    por[n.devanado] = { devanado: n.devanado, nombre: DEVANADO[n.devanado], nivel: n.nivel, etiqueta: etiquetaNivel(n.nivel), pct: n.sostenidaPct };
+    const h = horasValidas(n.horasSobre);   // con guarda: un nivel de un dominio viejo no las trae (L-102 (6))
+    por[n.devanado] = { devanado: n.devanado, nombre: DEVANADO[n.devanado], nivel: n.nivel, etiqueta: etiquetaNivel(n.nivel), pct: n.sostenidaPct,
+      ...(h ? { horasSobre: h } : {}) };
   }
   for (const c of x.sobrecargaCurva || []) {
     if (!c || !c.devanado || por[c.devanado]) continue;
@@ -67,10 +78,13 @@ export function sobrecargaDeMes(x) {
  * @param {object} filaPeriodo  sobrecargaSostenida / sobrecargaProvisional / pct / esCircuito / estado
  * @param {Array<object|null>} filasMes
  * @returns {null | {tipo, meses: number, porClase: {firme, posible, circuito}, devanados: Array<{devanado, nombre, nivel,
- *   etiqueta, meses: number, pct: number|null, mesesCurva: number}>}}
+ *   etiqueta, meses: number, pct: number|null, mesesCurva: number, horasSobre?: {horas: number, cota: null|'tope'|'falta'}}>}}
+ *   horasSobre = la suma de las horas sobre el 100 % de sus meses con sostenida (campo NUEVO, solo si algún mes las trae;
+ *   «al menos» si a algún mes le faltan, `sumarHorasSobre`).
  */
 export function sobrecargaDelPeriodo(filaPeriodo, filasMes) {
   const por = {}; let meses = 0; const porClase = { firme: 0, posible: 0, circuito: 0 };
+  const horasPorDev = {};   // devanado → las horas de cada mes con sostenida en él (null si ese mes no las tiene)
   for (const x of filasMes || []) {
     const s = sobrecargaDeMes(x);
     if (!s) continue;
@@ -80,7 +94,12 @@ export function sobrecargaDelPeriodo(filaPeriodo, filasMes) {
       g.meses++;
       if (d.curva) g.mesesCurva++;
       if (d.pct != null && (g.pct == null || d.pct > g.pct)) Object.assign(g, { pct: d.pct, nivel: d.nivel, etiqueta: d.etiqueta });
+      (horasPorDev[d.devanado] || (horasPorDev[d.devanado] = [])).push(d.horasSobre || null);
     }
+  }
+  for (const [dev, lista] of Object.entries(horasPorDev)) {
+    const h = sumarHorasSobre(lista);
+    if (h) por[dev].horasSobre = h;
   }
   const f = filaPeriodo || {};
   let tipo = null;
@@ -118,13 +137,14 @@ export function conteoSobrecarga(filas) {
   return c;
 }
 
-const pctTxt = (v) => (v == null ? null : v.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' %');
 const listaY = (xs) => (xs.length <= 1 ? xs.join('') : xs.slice(0, -1).join(', ') + ' y ' + xs[xs.length - 1]);
 const nMeses = (n) => n + (n === 1 ? ' mes' : ' meses');
 
 /**
  * Dónde está la sobrecarga, en palabras: «en el secundario 13,8 kV (hasta 121,8 %)» · en un periodo, con sus meses:
  * «secundario 13,8 kV en 9 meses (hasta 106,2 %) y primario 34,5 kV en 2 meses (hasta 109,8 %)». Vacío si no hay devanados.
+ * Con las horas sobre el 100 % (2026-11-17, solo si el devanado las trae): «en el secundario 13,8 kV (14 h en total sobre
+ * el 100 %, hasta 119,4 %)» · «secundario 13,8 kV en 8 meses (120 h en total sobre el 100 %; hasta 106,2 %)».
  * Con `{ csv: true }`: sin artículos, separados por «; » (una celda de hoja de cálculo).
  */
 export function textoDevanados(s, { csv = false } = {}) {
@@ -133,7 +153,10 @@ export function textoDevanados(s, { csv = false } = {}) {
   const partes = s.devanados.map((d) => {
     const base = d.nombre.toLowerCase() + ' ' + d.etiqueta;
     const det = [];
-    if (d.pct != null) det.push('hasta ' + pctTxt(d.pct));
+    // En un mes, las horas y el máximo van juntos («14 h …, hasta 119,4 %»); en un periodo, separados por «; » como sus meses.
+    const horas = textoHorasSobre(d.horasSobre);
+    if (d.pct != null) det.push((horas ? horas + (periodo ? '; ' : ', ') : '') + 'hasta ' + pctSostenidaTxt(d.pct));
+    else if (horas) det.push(horas);
     if (periodo && d.mesesCurva) det.push(d.pct == null ? 'confirmada con la curva' : d.mesesCurva + (d.mesesCurva === 1 ? ' mes confirmado' : ' meses confirmados') + ' con la curva');
     else if (!periodo && d.curva) det.push('confirmada con la curva del mes');
     return base + (periodo ? ' en ' + nMeses(d.meses) : '') + (det.length ? ' (' + det.join('; ') + ')' : '');
@@ -160,7 +183,9 @@ export function rotuloSobrecarga(x) {
   const tipo = tipoDe(x);
   if (!tipo) return null;
   const s = x.sobrecarga || null;
-  const regla = '(≥ ' + CALCULO.sobrecargaMinH + ' h sobre el ' + CALCULO.sobrecargaPct + ' %)';
+  // «seguidas» (2026-11-17, como la tarjeta): junto a las horas «en total sobre el 100 %» de cada devanado, la regla sin esa
+  // palabra se leía como la misma cuenta (revisión adversarial). Solo el texto: el criterio es el de siempre.
+  const regla = '(≥ ' + CALCULO.sobrecargaMinH + ' h seguidas sobre el ' + CALCULO.sobrecargaPct + ' %)';
   const t = textoDevanados(s);
   const donde = t ? (s.meses != null ? ': ' + t : ' ' + t) : '';
   const n = x.periodo ? (s && s.meses != null && tipo !== 'firme' && tipo !== 'posible' ? s.meses : x.periodo.mesesSostenida) : null;
