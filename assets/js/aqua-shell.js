@@ -222,6 +222,7 @@
       <div class="sb-group">
         <div class="sb-group-title">Ejecución</div>
         <a href="${u('pages/ordenes.html')}" class="sb-item" data-key="ordenes"><span class="i"><i data-lucide="clipboard-list"></i></span>Órdenes</a>
+        <a href="${u('pages/firma-odt-afinia.html')}" class="sb-item" data-key="firma-odt-afinia"><span class="i"><i data-lucide="signature"></i></span>Firma de ODT Afinia</a>
         <a href="${u('pages/ordenes-materiales.html')}" class="sb-item" data-key="ordenes-materiales"><span class="i"><i data-lucide="package"></i></span>Órdenes de Materiales</a>
         <a href="${u('pages/mantenimiento-brigada.html')}" class="sb-item" data-key="mantenimiento-brigada"><span class="i"><i data-lucide="hard-hat"></i></span>Mantenimiento Brigada</a>
         <a href="${u('pages/informe-brigada.html')}" class="sb-item" data-key="informe-brigada"><span class="i"><i data-lucide="file-text"></i></span>Informe de Mantenimiento Brigada</a>

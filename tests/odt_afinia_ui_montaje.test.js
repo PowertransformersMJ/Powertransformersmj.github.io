@@ -218,9 +218,9 @@ describe('Arranque (app.js)', () => {
       for (const [k, v] of [['window', g.window], ['location', g.location], ['__sgmSession', g.sesion]]) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; }
     }
   }
-  test('técnico: franja de vista previa y dos vistas (sin «Publicar»)', async () => {
+  test('técnico: sin franja de vista previa (publicada, 99 §231.15) y dos vistas (sin «Publicar»)', async () => {
     const { raiz, franja, escuchas } = await arrancar(AZT);
-    assert.ok(franja.textContent.includes('VISTA PREVIA'));
+    assert.equal(franja.textContent, '', 'publicada: la franja queda vacía (ningún aviso de vista previa, con cualquier redacción)');
     const nav = raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent);
     assert.deepEqual(nav, ['Bandeja', 'Habilitarme y Mi firma']);
     assert.ok(escuchas.includes('hashchange'));
