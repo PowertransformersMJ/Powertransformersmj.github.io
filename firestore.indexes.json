@@ -460,6 +460,14 @@
         { "fieldPath": "lectores",    "arrayConfig": "CONTAINS" },
         { "fieldPath": "publicadoEn", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "odt_afinia_obs",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lectores",  "arrayConfig": "CONTAINS" },
+        { "fieldPath": "creadoEn",  "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
@@ -481,6 +489,7 @@
     { "collectionGroup": "partes", "fieldPath": "bytes", "indexes": [] },
     { "collectionGroup": "partes", "fieldPath": "datos", "indexes": [] },
     { "collectionGroup": "actos", "fieldPath": "imagen", "indexes": [] },
+    { "collectionGroup": "puntos", "fieldPath": "rastro", "indexes": [] },
     { "collectionGroup": "informes_brigada", "fieldPath": "contenido", "indexes": [] },
     { "collectionGroup": "versiones", "fieldPath": "contenido", "indexes": [] }
   ]

@@ -6,6 +6,7 @@
 // Decisión del Ingeniero del 2026-11-21 («la contraseña solo al iniciar sesión»): Firmar se monta sin campo de
 // contraseña ni casilla: «Preparar mi firma» → «Firmar» → «Confirmar firma», con el token de la sesión (sin
 // reautenticar), un solo envío y sin restos «null». La habilitación conserva su casilla y su contraseña.
+// La pestaña «Por subsanar» (2026-11-21) se monta con sus datos en tests/odt_afinia_obs_ui.test.js; aquí solo su lugar en el menú.
 // Lo que NO cubre (necesita navegador): pdf.js (pintar, texto, tinta), pdf-lib cargado por
 // fetch + import(), Firebase Auth real (reautenticación al habilitarse) y el panel «Mi firma».
 import { test, describe, before, after } from 'node:test';
@@ -227,16 +228,17 @@ describe('Arranque (app.js)', () => {
       for (const [k, v] of [['window', g.window], ['location', g.location], ['__sgmSession', g.sesion]]) { if (v === undefined) delete globalThis[k]; else globalThis[k] = v; }
     }
   }
-  test('técnico: sin franja de vista previa (publicada, 99 §231.15) y dos vistas (sin «Publicar»)', async () => {
+  test('técnico: sin franja de vista previa (publicada, 99 §231.15) y dos vistas (sin «Publicar» ni, sin ODT asignadas, «Por subsanar»)', async () => {
     const { raiz, franja, escuchas } = await arrancar(AZT);
     assert.equal(franja.textContent, '', 'publicada: la franja queda vacía (ningún aviso de vista previa, con cualquier redacción)');
     const nav = raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent);
     assert.deepEqual(nav, ['Bandeja', 'Habilitarme y Mi firma']);
     assert.ok(escuchas.includes('hashchange'));
   });
-  test('administrador: tres vistas (con «Publicar ODT»)', async () => {
+  test('administrador: cuatro vistas (con «Publicar ODT» y, desde el 2026-11-21, «Por subsanar»)', async () => {
     const { raiz } = await arrancar(ADMIN);
-    assert.deepEqual(raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT']);
+    // Sin Firestore (Node) el contador no llega: la pestaña sale sin número. Con datos: tests/odt_afinia_obs_ui.test.js.
+    assert.deepEqual(raiz.querySelectorAll('.odt-nav-btn').map((b) => b.textContent), ['Bandeja', 'Habilitarme y Mi firma', 'Publicar ODT', 'Por subsanar']);
   });
 });
 

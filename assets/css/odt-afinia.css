@@ -2,7 +2,7 @@
    SGM · TRANSPOWER — FIRMA DE ODT AFINIA · pantalla (prefijo .odt-)
    ---------------------------------------------------------------------------
    Piel de `pages/firma-odt-afinia.html`: bandeja, habilitación, publicar,
-   firmar, constancia y descarga.
+   firmar, constancia, descarga y la pestaña «Por subsanar» (2026-11-21).
 
    CONVENCIÓN — toda regla vive bajo el prefijo `.odt-`. No hay reglas sobre
    body, *, h1 ni sobre las clases de AQUA (.btn, .input, .chip…): este archivo
@@ -201,6 +201,29 @@ textarea.odt-campo { resize: vertical; }
 .odt-pagina { margin: 0; display: grid; gap: 4px; justify-items: center; }
 .odt-pagina figcaption { font-size: 12px; color: var(--odt-tenue, #4d6485); }
 .odt-lienzo { display: block; max-width: 100%; height: auto; background: #fff; box-shadow: 0 2px 10px rgba(0, 40, 90, .18); border-radius: 2px; }
+
+/* ── Por subsanar (2026-11-21): lista, puntos, rastro y registro ───────────── */
+.odt-chip--abierta { background: var(--odt-aviso-fondo, #fff4e0); color: var(--odt-aviso, #7a4200); }
+.odt-chip--resuelta { background: var(--odt-sup-suave, #f6f8fc); color: var(--odt-tenue, #4d6485); border-style: dashed; }
+.odt-chip--publicar { background: var(--odt-ok-fondo, #e6f7ee); color: var(--odt-ok, #00733b); border-color: #a6dcbf; }
+.odt-chip--pendiente { background: var(--odt-aviso-fondo, #fff4e0); color: var(--odt-aviso, #7a4200); }
+.odt-chip--subsanado { background: var(--odt-info-fondo, #eaf2ff); color: var(--odt-info, #0b3d91); }
+.odt-chip--verificado { background: var(--odt-ok-fondo, #e6f7ee); color: var(--odt-ok, #00733b); }
+.odt-chip--quien { font-size: 11.5px; }
+.odt-obs-conteo { font-weight: 600; }
+.odt-obs-puntos { margin: 8px 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.odt-obs-punto { padding: 12px 14px; border-radius: var(--odt-r, 10px); background: #fff; border: 1px solid var(--odt-linea, rgba(0, 40, 90, .12)); }
+.odt-obs-texto { margin: 0 0 6px; color: var(--odt-tinta, #0d1f38); overflow-wrap: anywhere; }
+.odt-obs-linea { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; margin: 0 0 6px; }
+.odt-obs-rastro { margin: 4px 0; font-size: 13px; }
+.odt-obs-rastro-lista { margin: 6px 0 0; padding-left: 20px; display: grid; gap: 4px; color: var(--odt-tinta-2, #1f3656); overflow-wrap: anywhere; }
+.odt-obs-accion { margin: 6px 0 0; }
+.odt-obs-previa { margin: 8px 0; }
+.odt-campo-fila--ancha { max-width: 860px; }
+/* El contador de la pestaña «Por subsanar»: separado del texto y legible también en la pestaña activa
+   (allí la pestaña pone el texto en blanco: la píldora pasa a fondo blanco y número azul). */
+.odt-nav-btn .odt-cuenta { margin-left: 6px; color: var(--odt-tinta-2, #1f3656); }
+.odt-nav-btn[aria-current="page"] .odt-cuenta { background: #fff; color: var(--odt-marca, #007aff); }
 
 /* ── Celular ──────────────────────────────────────────────────────────────── */
 @media (max-width: 720px) {
