@@ -55,6 +55,15 @@ const caja = () => document.createElement('div');
 const espera = () => new Promise((r) => setTimeout(r, 5));
 const botones = (el) => el.todos().filter((x) => x.tagName === 'BUTTON');
 const boton = (el, texto) => botones(el).find((b) => b.textContent.includes(texto));
+/** Ningún resto de «null»/«undefined» pintado como texto (el navegador real los escribe; 99 §231.12). */
+function sinRestos(el) {
+  const restos = [];
+  (function recorrer(n) {
+    if (n.childNodes && n.childNodes.length) { n.childNodes.forEach(recorrer); return; }
+    if (['null', 'undefined', 'false'].includes(String(n.textContent).trim())) restos.push(n.textContent);
+  })(el);
+  assert.deepEqual(restos, [], 'quedó un resto pintado como texto: ' + restos.join(', '));
+}
 
 describe('Bandeja', () => {
   test('el AZT ve la ODT en «Mi turno»; «Firmadas por mí» trae el aviso de suplantación', async () => {
@@ -99,6 +108,7 @@ describe('Detalle de una ODT: acciones según quién y en qué paso', () => {
     assert.ok(!t.includes('Descargar la ODT firmada'));
     assert.ok(!t.includes('Anular (administrador)'));
     assert.ok(!c.todos().some((x) => x.tagName === 'INPUT' && x.type === 'checkbox'), 'la declaración aparece solo después de Preparar');
+    sinRestos(c);
   });
   test('Responsable antes del AZT: no puede firmar; ve la ODT en pantalla', async () => {
     const { repo, id } = await base();
@@ -188,6 +198,7 @@ describe('Habilitarme y Publicar', () => {
     await montarPublicar(c, { repo: {}, sesion: ADMIN, alPublicar: () => {} });
     assert.ok(c.textContent.includes('Elegir el PDF de la ODT'));
     assert.ok(!c.todos().some((x) => x.tagName === 'INPUT' && x.type === 'password'));
+    sinRestos(c);
   });
 });
 

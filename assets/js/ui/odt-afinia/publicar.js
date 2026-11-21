@@ -100,11 +100,12 @@ export async function montarPublicar(contenedor, { repo, cuenta, sesion, alPubli
   const zonaArchivo = h('div', { class: 'odt-bloque' });
   const zonaDatos = h('div', { class: 'odt-bloque' });
   const zonaVista = h('div', { class: 'odt-vista' });
-  contenedor.append(
+  // Sin nulos en append(): el navegador los pintaría como el texto «null» (99 §231.12).
+  contenedor.append(...[
     h('p', { class: 'odt-parrafo', text: 'Publique la ODT tal como la va a entregar: el PDF original de 2 páginas, sin firmas. Después la firman el AZT y el Responsable, cada uno desde su cuenta.' }),
     ANCLAS_CALIBRADAS ? null : aviso('Las posiciones de las casillas todavía no se han calibrado con ODT reales: si una ODT verdadera se rechaza por «etiquetas», avise para calibrarlas.', 'aviso'),
     h('div', { class: 'odt-acciones' }, h('label', { class: 'odt-btn odt-btn--primario', htmlFor: 'odtArchivo', text: 'Elegir el PDF de la ODT' }), entrada),
-    zonaArchivo, zonaDatos, zonaVista);
+    zonaArchivo, zonaDatos, zonaVista].filter(Boolean));
 
   entrada.addEventListener('change', async () => {
     const archivo = entrada.files && entrada.files[0];

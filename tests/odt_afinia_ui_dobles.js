@@ -130,7 +130,9 @@ class Elemento {
   set textContent(v) { for (const c of this.childNodes) c.parentNode = null; this.childNodes = [new NodoTexto(v)]; }
   set innerHTML(_v) { throw new Error('innerHTML no se usa en el módulo'); }
   appendChild(c) { if (c.parentNode) c.parentNode.removeChild(c); c.parentNode = this; this.childNodes.push(c); return c; }
-  append(...cs) { for (const c of cs) if (c != null) this.appendChild(typeof c === 'string' ? new NodoTexto(c) : c); }
+  // Como el navegador (DOM, ParentNode.append): lo que no es un nodo se convierte en TEXTO, también
+  // null, undefined y false («null» en pantalla). Antes se saltaban y escondían ese error (99 §231.12).
+  append(...cs) { for (const c of cs) this.appendChild(c instanceof Elemento || c instanceof NodoTexto ? c : new NodoTexto(String(c))); }
   removeChild(c) { this.childNodes = this.childNodes.filter((x) => x !== c); c.parentNode = null; return c; }
   remove() { if (this.parentNode) this.parentNode.removeChild(this); }
   setAttribute(k, v) { this.atributos[k] = String(v); }

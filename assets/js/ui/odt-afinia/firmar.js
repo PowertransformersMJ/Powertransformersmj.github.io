@@ -40,12 +40,13 @@ export function montarFirmar(contenedor, { repo, cuenta, sesion, odt, bytesV0, a
   const zonaVista = h('div', { class: 'odt-vista' });
   const zonaDecl = h('div', { class: 'odt-bloque' });
 
-  contenedor.append(
+  // Sin nulos en append(): el navegador los pintaría como el texto «null» (99 §231.12).
+  contenedor.append(...[
     h('p', { class: 'odt-parrafo', text: 'Primero se prepara la ODT con su firma, sin guardar nada. Revise las dos páginas; si está de acuerdo, acepte la declaración y escriba su contraseña.' }),
     fecha ? h('div', { class: 'odt-campo-fila' },
       h('label', { htmlFor: 'odtFechaCierre', text: 'FECHA CIERRE (dd/mm/aaaa; no posterior a hoy ni anterior a la fecha del trabajo, ' + odt.fechaTrabajo + ')' }), fecha) : null,
     h('div', { class: 'odt-acciones' }, btnPreparar),
-    estado, zonaVista, zonaDecl);
+    estado, zonaVista, zonaDecl].filter(Boolean));
 
   let congelado = null;
   const reiniciar = () => {
