@@ -5,8 +5,9 @@
 // del guard y monta: Bandeja · Habilitarme y Mi firma · Publicar (solo admin).
 // La vista se elige con el ancla de la dirección (#bandeja, #habilitarme,
 // #publicar, #odt=<id>) para que una recarga vuelva al mismo sitio.
-// La página está AISLADA: no tiene entrada en el menú hasta el «procede» del
-// Ingeniero (P6); mientras tanto la franja roja lo dice.
+// Estuvo AISLADA (sin menú, con la franja roja de vista previa) hasta el
+// «procede» del Ingeniero (2026-11-21, 99 §231.15): ahora está en el menú,
+// sección Ejecución, y la franja queda vacía (ESTADO_PAGINA = 'publicado').
 // Un mensaje («firma registrada», «anulada», «publicada») es de UNA ODT: se muestra en
 // su vista si la persona sigue en ella; si ya se fue a otra, va al aviso general de
 // arriba, nunca a la vista de otra ODT ni se pierde en la bandeja.
@@ -26,8 +27,9 @@ import { montarHabilitarme } from './habilitarme.js';
 import { montarPublicar } from './publicar.js';
 import { montarDetalle } from './detalle.js';
 
-/** 'vista_previa' mientras la página no esté en el menú; 'publicado' después del «procede». */
-export const ESTADO_PAGINA = 'vista_previa';
+/** 'vista_previa' mientras la página no esté en el menú; 'publicado' después del «procede».
+ *  «Procede» del Ingeniero el 2026-11-21 («Sí, agrégalo», 99 §231.15): en el menú, sección Ejecución. */
+export const ESTADO_PAGINA = 'publicado';
 
 function esperarSesion(ms = 30000) {
   if (window.__sgmSession) return Promise.resolve(window.__sgmSession);

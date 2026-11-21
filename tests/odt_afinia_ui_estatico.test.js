@@ -1,6 +1,6 @@
 // Firma de ODT Afinia · revisión ESTÁTICA de la página, la pantalla y la capa de datos:
 //   · la página copia la estructura de informe-brigada (page-guard, AQUA, import() con try/catch,
-//     lucide/aqua/aqua-shell con defer) y está AISLADA: el menú no la nombra (P6, hasta el «procede»);
+//     lucide/aqua/aqua-shell con defer) y, con el «procede» (99 §231.15), está en el menú UNA vez, en Ejecución;
 //   · CSS con prefijo .odt-, sin transition: all ni backdrop-filter, y el módulo NO se imprime (L-107);
 //   · ninguna salida del documento fuera de «Descargar» (sin window.print, window.open ni URLs públicas);
 //     la descarga registra ANTES de entregar; pdf.js recibe siempre una COPIA;
@@ -26,7 +26,7 @@ const UI = Object.fromEntries(readdirSync(UI_DIR).filter((n) => n.endsWith('.js'
 const DATOS = Object.fromEntries(['odt_afinia.js', 'odt_afinia_lotes.js', 'odt_afinia_mi_firma.js', 'odt_afinia_cuenta.js']
   .map((n) => [n, leer('assets/js/data/' + n)]));
 
-describe('página aislada con la estructura de informe-brigada', () => {
+describe('página con la estructura de informe-brigada, en el menú tras el «procede»', () => {
   test('guard, estilos AQUA y del módulo', () => {
     assert.match(PAGINA, /<script type="module" src="\.\.\/assets\/js\/auth\/page-guard\.js"><\/script>/);
     for (const css of ['aqua-tokens.css', 'aqua-components.css', 'odt-afinia.css']) assert.ok(PAGINA.includes('../assets/css/' + css), css);
@@ -42,11 +42,17 @@ describe('página aislada con la estructura de informe-brigada', () => {
       assert.ok(PAGINA.includes('<script src="' + s + '" defer></script>'), s);
     }
   });
-  test('el menú NO la nombra (queda aislada hasta el «procede» del Ingeniero)', () => {
+  test('con su «procede» (99 §231.15): el menú la nombra UNA vez, en Ejecución, debajo de Órdenes, y la página está publicada', () => {
     const shell = leer('assets/js/aqua-shell.js');
-    assert.ok(!/firma-odt-afinia|odt-afinia/.test(shell));
-    const app = UI['app.js'];
-    assert.match(app, /export const ESTADO_PAGINA = 'vista_previa';/);
+    const lineas = shell.split('\n').filter((l) => l.includes('firma-odt-afinia'));
+    assert.equal(lineas.length, 1, 'una sola línea del menú');
+    assert.match(lineas[0], /href="\$\{u\('pages\/firma-odt-afinia\.html'\)\}" class="sb-item" data-key="firma-odt-afinia"/);
+    assert.match(lineas[0], /data-lucide="signature"/);
+    assert.ok(!/sb-admin/.test(lineas[0]), 'no es solo de admin: la ven los técnicos que firman');
+    const ejecucion = shell.slice(shell.indexOf('<div class="sb-group-title">Ejecución</div>'));
+    const bloque = ejecucion.slice(0, ejecucion.indexOf('</div>', ejecucion.indexOf('</div>') + 1));
+    assert.ok(bloque.indexOf("pages/ordenes.html')") < bloque.indexOf('firma-odt-afinia') && bloque.indexOf('firma-odt-afinia') < bloque.indexOf("pages/ordenes-materiales.html')"), 'entre Órdenes y Órdenes de Materiales');
+    assert.match(UI['app.js'], /export const ESTADO_PAGINA = 'publicado';/);
   });
   test('la página no pasa a «publicado» con los textos sin el «procede» del Ingeniero', async () => {
     const { TEXTOS_APROBADOS } = await import('../assets/js/domain/odt_afinia_textos.js');
