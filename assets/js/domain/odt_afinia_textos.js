@@ -16,12 +16,14 @@ import { VERSIONES, esNro, tieneFormaFechaDMA } from './odt_afinia_rutas.js';
 
 /**
  * ¿El Ingeniero ya aprobó («procede») el acuerdo y las dos declaraciones v1?
- * Mientras sea false (W-11, modo paso a paso), la pantalla los muestra con el rótulo
- * ROTULO_BORRADOR, y una prueba estática impide poner la página en 'publicado'
- * (tests/odt_afinia_ui_estatico.test.js). Al aprobarlos: si el texto cambia, se sube la
- * versión (odt-*-v2) A LA VEZ en las reglas, aquí y en las dos pruebas de amarre.
+ * SÍ: el 2026-11-20 los aprobó TAL CUAL («Sí, los apruebo», 99 §231.10). Con false la
+ * pantalla los mostraba con el rótulo ROTULO_BORRADOR, y una prueba estática impide poner
+ * la página en 'publicado' sin esta marca (tests/odt_afinia_ui_estatico.test.js).
+ * Lo aprobado es el texto v1 EXACTO (prueba que lo fija en tests/odt_afinia_ui_pantalla.test.js):
+ * si el texto cambia, se sube la versión (odt-*-v2) A LA VEZ en las reglas, aquí y en las
+ * pruebas de amarre, y vuelve a necesitar su aprobación.
  */
-export const TEXTOS_APROBADOS = false;
+export const TEXTOS_APROBADOS = true;
 export const ROTULO_BORRADOR = 'Borrador · pendiente del Ingeniero';
 
 /** Marcadores de los huecos dentro de PLANTILLAS (no son texto: se reemplazan). */
